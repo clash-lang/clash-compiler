@@ -5,7 +5,7 @@ Copyright  :  (C) 2016,      University of Twente,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
-'X': An exception for uninitialized values
+'XException': An exception for uninitialized values
 
 >>> show (errorX "undefined" :: Integer, 4 :: Int)
 "(*** Exception: X: undefined
@@ -30,15 +30,19 @@ CallStack (from HasCallStack):
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Clash.XException
-  ( -- * 'X': An exception for uninitialized values
+  ( -- * 'XException': An exception for uninitialized values
     XException(..), errorX, isX, hasX, maybeIsX, maybeHasX, fromJustX, undefined,
     xToErrorCtx, xToError
-    -- * Printing 'X' exceptions as \"X\"
+    -- * Printing 'XException's as \"X\"
   , ShowX (..), showsX, printX, showsPrecXWith
     -- * Strict evaluation
   , seqX, forceX, deepseqX, rwhnfX, defaultSeqX, hwSeqX
     -- * Structured undefined / deep evaluation with undefined values
   , NFDataX (rnfX, deepErrorX, hasUndefined, ensureSpine)
+
+    -- * Internals
+  , GShowX(..), GDeepErrorX(..), GHasUndefined(..), GEnsureSpine(..)
+  , GNFDataX(..), Zero, One, ShowType(..), RnfArgs(..), NFDataX1(..)
   )
 where
 
@@ -86,7 +90,7 @@ instance Show XException where
 
 instance Exception XException
 
--- | Either 'seqX' or 'deepSeqX' depending on the value of the cabal flag
+-- | Either 'seqX' or 'deepseqX' depending on the value of the cabal flag
 -- '-fsuper-strict'. If enabled, 'defaultSeqX' will be 'deepseqX', otherwise
 -- 'seqX'. Flag defaults to /false/ and thus 'seqX'.
 defaultSeqX :: NFDataX a => a -> b -> b
@@ -171,7 +175,7 @@ xToErrorCtx ctx a = unsafeDupablePerformIO
 -- > f (xToError -> a) (xToError -> b) = ...
 --
 -- Unlike 'xToErrorCtx', where we have an extra String argument to distinguish
--- one call to 'xoToError' to the other, 'xToError' will use the 'GHC.CallStack'
+-- one call to 'xToError' to the other, 'xToError' will use the 'GHC.CallStack'
 -- mechanism to aid the user in distinguishing different call to 'xToError'.
 -- We can also use BangPatterns to report the potential 'XException' being
 -- thrown by /a/ or /b/ even earlier, i.e. when /f/ is applied:
@@ -340,17 +344,17 @@ showXWith f x =
 showsPrecXWith :: (Int -> a -> ShowS) -> Int -> a -> ShowS
 showsPrecXWith f n = showXWith (f n)
 
--- | Like 'shows', but values that normally throw an 'X' exception are
+-- | Like 'shows', but values that normally throw an 'XException' are
 -- converted to \"X\", instead of error'ing out with an exception.
 showsX :: ShowX a => a -> ShowS
 showsX = showsPrecX 0
 
--- | Like 'print', but values that normally throw an 'X' exception are
+-- | Like 'print', but values that normally throw an 'XException' are
 -- converted to \"X\", instead of error'ing out with an exception
 printX :: ShowX a => a -> IO ()
 printX x = putStrLn $ showX x
 
--- | Like the 'Show' class, but values that normally throw an 'X' exception are
+-- | Like the 'Show' class, but values that normally throw an 'XException' are
 -- converted to \"X\", instead of error'ing out with an exception.
 --
 -- >>> show (errorX "undefined" :: Integer, 4 :: Int)
@@ -370,16 +374,16 @@ printX x = putStrLn $ showX x
 -- > data T = MkTA Int | MkTB Bool
 -- >   deriving (Show,Generic,ShowX)
 class ShowX a where
-  -- | Like 'showsPrec', but values that normally throw an 'X' exception are
+  -- | Like 'showsPrec', but values that normally throw an 'XException' are
   -- converted to \"X\", instead of error'ing out with an exception.
   showsPrecX :: Int -> a -> ShowS
 
-  -- | Like 'show', but values that normally throw an 'X' exception are
+  -- | Like 'show', but values that normally throw an 'XException' are
   -- converted to \"X\", instead of error'ing out with an exception.
   showX :: a -> String
   showX x = showsX x ""
 
-  -- | Like 'showList', but values that normally throw an 'X' exception are
+  -- | Like 'showList', but values that normally throw an 'XException' are
   -- converted to \"X\", instead of error'ing out with an exception.
   showListX :: [a] -> ShowS
   showListX ls s = showListX__ showsX ls s
@@ -668,7 +672,7 @@ instance GEnsureSpine V1 where
 class NFDataX1 f where
   -- | 'liftRnfX' should reduce its argument to normal form (that is, fully
   -- evaluate all sub-components), given an argument to reduce @a@ arguments,
-  -- and then return '()'.
+  -- and then return @()@.
   --
   -- See 'rnfX' for the generic deriving.
   liftRnfX :: (a -> ()) -> f a -> ()
@@ -958,6 +962,7 @@ instance GDeepErrorX (f :+: g) where
 mkShowXTupleInstances [2..maxTupleSize]
 mkNFDataXTupleInstances [2..maxTupleSize]
 
+-- | Call to 'errorX' with default string
 undefined :: HasCallStack => a
 undefined = errorX "undefined"
 

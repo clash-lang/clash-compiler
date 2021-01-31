@@ -48,7 +48,7 @@ import Clash.Signal.Delayed.Internal
   (DSignal(..), dfromList, dfromList_lazy, fromSignal, toSignal,
    unsafeFromSignal, antiDelay, feedback)
 import qualified Clash.Explicit.Signal.Delayed as E
-import           Clash.Sized.Vector            (Vec)
+import           Clash.Sized.Vector
 import           Clash.Signal
   (HiddenClock, HiddenClockResetEnable, HiddenEnable, hideClock,
    hideClockResetEnable, hideEnable)

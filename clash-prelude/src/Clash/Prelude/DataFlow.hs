@@ -18,7 +18,7 @@ Self-synchronizing circuits based on data-flow principles.
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
-module Clash.Prelude.DataFlow {-# DEPRECATED "Module will be removed in future versions of clash-prelude." #-}
+module Clash.Prelude.DataFlow {-# DEPRECATED "Module will be removed in future versions of clash-prelude in favor of clash-protocols. See: https://github.com/clash-lang/clash-protocols/." #-}
   ( -- * Data types
     DataFlow (..)
     -- * Creating DataFlow circuits
@@ -112,7 +112,7 @@ newtype DataFlow dom iEn oEn i o
           )
   }
 
--- | Dataflow circuit synchronized to the 'systemClockGen'.
+-- | Dataflow circuit synchronized to the 'Clash.Signal.systemClockGen'.
 -- type DataFlow iEn oEn i o = DataFlow' systemClockGen iEn oEn i o
 
 -- | Create a 'DataFlow' circuit from a circuit description with the appropriate

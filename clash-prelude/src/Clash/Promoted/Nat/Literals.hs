@@ -3,7 +3,7 @@ Copyright  :  (C) 2013-2016, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
-Predefined 'SNat' singleton literals in the range [0 .. 1024]
+Predefined 'Clash.Promoted.Nat.SNat' singleton literals in the range [0 .. 1024]
 
 Defines:
 
@@ -15,7 +15,8 @@ d2 = SNat :: SNat 2
 d1024 = SNat :: SNat 1024
 @
 
-You can generate more 'SNat' literals using 'decLiteralsD' from "Clash.Promoted.Nat.TH"
+You can generate more 'Clash.Promoted.Nat.SNat' literals using 'decLiteralsD'
+from "Clash.Promoted.Nat.TH"
 -}
 
 {-# LANGUAGE CPP #-}

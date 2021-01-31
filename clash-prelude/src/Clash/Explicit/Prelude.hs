@@ -138,7 +138,7 @@ import Clash.HaskellPrelude
 
 import Clash.Annotations.TopEntity
 import Clash.Class.AutoReg
-import Clash.Class.BitPack
+import Clash.Class.BitPack hiding (GBitPack(..))
 import Clash.Class.Exp
 import Clash.Class.Num
 import Clash.Class.Resize
@@ -171,7 +171,9 @@ import Clash.Sized.RTree
 import Clash.Sized.Signed
 import Clash.Sized.Unsigned
 import Clash.Sized.Vector hiding (fromList, unsafeFromList)
-import Clash.XException
+import Clash.XException hiding
+  ( GShowX(..), GDeepErrorX(..), GHasUndefined(..), GEnsureSpine(..)
+  , GNFDataX(..), Zero, One, ShowType(..), RnfArgs(..), NFDataX1(..) )
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications

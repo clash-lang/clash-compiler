@@ -9,6 +9,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -43,15 +44,15 @@ module Clash.Explicit.Signal.Delayed
   )
 where
 
+import Prelude                    ((.), (<$>), (<*>), id, Num(..))
+
 import Data.Coerce                (coerce)
 import Data.Kind                  (Type)
 import Data.Proxy                 (Proxy (..))
 import Data.Singletons.Prelude    (Apply, TyFun, type (@@))
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (^), type (*))
-import Prelude                    hiding (head, length, repeat)
 
 import Clash.Sized.Vector
-  (Vec, dtfold, head, length, repeat, shiftInAt0, singleton)
 import Clash.Signal.Delayed.Internal
   (DSignal(..), dfromList, dfromList_lazy, fromSignal, toSignal,
    unsafeFromSignal, antiDelay, feedback)

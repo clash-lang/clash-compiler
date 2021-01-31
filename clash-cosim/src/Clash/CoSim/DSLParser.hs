@@ -28,7 +28,7 @@ import Text.Parsec ( (<|>)
 
 
 data CoSimDSLToken = HDL String
-                   -- ^ String representing 'dumb' HDL code
+                   -- ^ String representing /dumb/ HDL code
                    | VarName String
                    -- ^ Named argument
                    | VarNum Int

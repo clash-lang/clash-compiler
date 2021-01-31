@@ -406,10 +406,10 @@ biTbClockGen done = (testClk, circuitClk)
 -- import "Clash.Explicit.Testbench"
 --
 -- -- Fast domain: twice as fast as \"Slow\"
--- 'createDomain' 'vSystem'{vName=\"Fast\", vPeriod=10}
+-- 'Clash.Explicit.Prelude.createDomain' 'Clash.Explicit.Prelude.vSystem'{vName=\"Fast\", vPeriod=10}
 --
 -- -- Slow domain: twice as slow as "Fast"
--- 'createDomain' 'vSystem'{vName=\"Slow\", vPeriod=20}
+-- 'Clash.Explicit.Prelude.createDomain' 'Clash.Explicit.Prelude.vSystem'{vName=\"Slow\", vPeriod=20}
 --
 -- topEntity
 --   :: 'Clock' \"Fast\"
@@ -427,14 +427,14 @@ biTbClockGen done = (testClk, circuitClk)
 --   :: 'Signal' \"Slow\" Bool
 -- testBench = done
 --   where
---     testInput      = 'Clash.Explicit.Testbench.stimuliGenerator' clkA1 rstA1 $('listToVecTH' [1::Unsigned 8,2,3,4,5,6,7,8])
---     expectedOutput = 'Clash.Explicit.Testbench.outputVerifier'   clkB2 rstB2 $('listToVecTH' [(0,0) :: (Unsigned 8, Unsigned 8),(1,2),(3,4),(5,6),(7,8)])
+--     testInput      = 'Clash.Explicit.Testbench.stimuliGenerator' clkA1 rstA1 $('Clash.Sized.Vector.listToVecTH' [1::Unsigned 8,2,3,4,5,6,7,8])
+--     expectedOutput = 'Clash.Explicit.Testbench.outputVerifier'   clkB2 rstB2 $('Clash.Sized.Vector.listToVecTH' [(0,0) :: (Unsigned 8, Unsigned 8),(1,2),(3,4),(5,6),(7,8)])
 --     done           = expectedOutput (topEntity clkA1 rstA1 enableGen clkB2 testInput)
 --     done'          = not \<$\> done
 --     clkA1          = 'tbClockGen' \@\"Fast\" (unsafeSynchronizer clkB2 clkA1 done')
 --     clkB2          = 'tbClockGen' \@\"Slow\" done'
---     rstA1          = 'resetGen' \@\"Fast\"
---     rstB2          = 'resetGen' \@\"Slow\"
+--     rstA1          = 'Clash.Signal.resetGen' \@\"Fast\"
+--     rstB2          = 'Clash.Signal.resetGen' \@\"Slow\"
 -- @
 tbClockGen
   :: KnownDomain testDom

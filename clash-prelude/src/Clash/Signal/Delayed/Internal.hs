@@ -123,7 +123,7 @@ dfromList_lazy = coerce . fromList_lazy
 --     mac' :: 'DSignal' dom 0 Int -> 'DSignal' dom 0 Int -> 'DSignal' dom 0 Int
 --          -> ('DSignal' dom 0 Int, 'DSignal' dom 1 Int)
 --     mac' a b acc = let acc' = a * b + acc
---                    in  (acc, 'delay' clk rst en ('singleton' 0) acc')
+--                    in  (acc, 'Clash.Explicit.Signal.Delayed.delayedI' clk rst en 0 acc')
 -- @
 --
 -- >>> sampleN 7 (mac systemClockGen systemResetGen enableGen (dfromList [0..]) (dfromList [0..]))
@@ -158,7 +158,7 @@ unsafeFromSignal = DSignal
 -- mac clk rst en x y = acc'
 --   where
 --     acc' = (x * y) + 'antiDelay' d1 acc
---     acc  = 'delay' clk rst en ('singleton' 0) acc'
+--     acc  = 'Clash.Explicit.Signal.Delayed.delayedI' clk rst en 0 acc'
 -- @
 antiDelay :: SNat d -> DSignal dom (n + d) a -> DSignal dom n a
 antiDelay _ = coerce

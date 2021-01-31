@@ -246,9 +246,9 @@ instance (KnownNat d, NFDataX a) => NFDataX (RTree d a) where
 
 As an example of when you might want to use 'dtfold' we will build a
 population counter: a circuit that counts the number of bits set to '1' in
-a 'BitVector'. Given a vector of /n/ bits, we only need we need a data type
-that can represent the number /n/: 'Index' @(n+1)@. 'Index' @k@ has a range
-of @[0 .. k-1]@ (using @ceil(log2(k))@ bits), hence we need 'Index' @n+1@.
+a 'Clash.Sized.BitVector.BitVector'. Given a vector of /n/ bits, we only need we
+need a data type that can represent the number /n/: 'Index' @(n+1)@. 'Index' @k@
+has a range of @[0 .. k-1]@ (using @ceil(log2(k))@ bits), hence we need 'Index' @n+1@.
 As an initial attempt we will use 'tfold', because it gives a nice (@log2(n)@)
 tree-structure of adders:
 
@@ -276,7 +276,7 @@ type:
 
 We have such an adder in the form of the 'Clash.Class.Num.add' function, as
 defined in the instance 'Clash.Class.Num.ExtendingNum' instance of 'Index'.
-However, we cannot simply use 'fold' to create a tree-structure of
+However, we cannot simply use 'Clash.Sized.Vector.fold' to create a tree-structure of
 'Clash.Class.Num.add'es:
 #if __GLASGOW_HASKELL__ >= 900
 >>> :{
@@ -523,7 +523,7 @@ tunzip = tdfold (Proxy @(UnzipTree a b)) lr br
 
     br _ (l1,r1) (l2,r2) = (BR l1 l2, BR r1 r2)
 
--- | Given a function 'f' that is strict in its /n/th 'RTree' argument, make it
+-- | Given a function @f@ that is strict in its /n/th 'RTree' argument, make it
 -- lazy by applying 'lazyT' to this argument:
 --
 -- > f x0 x1 .. (lazyT xn) .. xn_plus_k

@@ -9,7 +9,7 @@ this aspect by explicitly marking the endpoint, or port, of such a wire as
 /inout/, thereby making this port function as both a source and a drain for the
 signals flowing over the wire.
 
-Clash has support for 'inout' ports through the implementation of /BiSignal/s.
+Clash has support for @inout@ ports through the implementation of /BiSignal/s.
 To cleanly map to functions (and thus support software simulation using Haskell),
 a /BiSignal/ comes in two parts; the __in__ part:
 
@@ -32,7 +32,7 @@ Where:
   * Lastly, /ds/ indicates the default behavior for the BiSignal if nothing is
     being written (pull-down, pull-up, or undefined).
 
-'BiSignalIn' is used by Clash to generate the 'inout' ports on a HDL level,
+'BiSignalIn' is used by Clash to generate the @inout@ ports on a HDL level,
 while 'BiSignalOut' is only used for simulation purposes and generally discarded
 by the compiler.
 
@@ -135,7 +135,7 @@ import           GHC.TypeLits               (KnownNat, Nat)
 import           GHC.Stack                  (HasCallStack)
 import           Data.Reflection            (Given (..))
 
--- | Used to specify the /default/ behavior of a 'BiSignal', i.e. what value is
+-- | Used to specify the /default/ behavior of a \"BiSignal\", i.e. what value is
 -- read when no value is being written to it.
 data BiSignalDefault
   = PullUp
@@ -144,7 +144,7 @@ data BiSignalDefault
   -- ^ __inout__ port behaves as if connected to a pull-down resistor
   | Floating
   -- ^ __inout__ port behaves as if is /floating/. Reading a /floating/
-  -- 'BiSignal' value in simulation will yield an errorX (undefined value).
+  -- \"BiSignal\" value in simulation will yield an errorX (undefined value).
   deriving (Show)
 
 -- | Singleton versions of 'BiSignalDefault'
@@ -296,7 +296,7 @@ writeToBiSignal input writes =
     (pack . fromJustX <$> writes)
 {-# INLINE writeToBiSignal #-}
 
--- | Converts the 'out' part of a BiSignal to an 'in' part. In simulation it
+-- | Converts the @out@ part of a BiSignal to an @in@ part. In simulation it
 -- checks whether multiple components are writing and will error accordingly.
 -- Make sure this is only called ONCE for every BiSignal.
 veryUnsafeToBiSignalIn

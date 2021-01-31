@@ -166,7 +166,7 @@ import           Clash.HaskellPrelude
 
 import           Clash.Annotations.TopEntity
 import           Clash.Class.AutoReg         (AutoReg, deriveAutoReg)
-import           Clash.Class.BitPack
+import           Clash.Class.BitPack hiding  (GBitPack(..))
 import           Clash.Class.Exp
 import           Clash.Class.Num
 import           Clash.Class.Parity
@@ -195,10 +195,13 @@ import           Clash.Sized.RTree
 import           Clash.Sized.Signed
 import           Clash.Sized.Unsigned
 import           Clash.Sized.Vector hiding (fromList, unsafeFromList)
-import           Clash.Signal
+import           Clash.Signal hiding
+  (HiddenClockName, HiddenResetName, HiddenEnableName)
 import           Clash.Signal.Delayed
 import           Clash.Signal.Trace
-import           Clash.XException
+import           Clash.XException hiding
+  ( GShowX(..), GDeepErrorX(..), GHasUndefined(..), GEnsureSpine(..)
+  , GNFDataX(..), Zero, One, ShowType(..), RnfArgs(..), NFDataX1(..) )
 
 {- $setup
 >>> :set -XDataKinds -XFlexibleContexts -XTypeApplications

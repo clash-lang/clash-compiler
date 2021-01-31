@@ -89,7 +89,7 @@ import Clash.XException   (ShowX (..), showsPrecXWith)
 >>> import Clash.Promoted.Nat.Literals (d789)
 -}
 
--- | Singleton value for a type-level natural number 'n'
+-- | Singleton value for a type-level natural number @n@
 --
 -- * "Clash.Promoted.Nat.Literals" contains a list of predefined 'SNat' literals
 -- * "Clash.Promoted.Nat.TH" has functions to easily create large ranges of new
@@ -119,7 +119,7 @@ instance ShowX (SNat n) where
   showsPrecX = showsPrecXWith showsPrec
 
 {-# INLINE withSNat #-}
--- | Supply a function with a singleton natural 'n' according to the context
+-- | Supply a function with a singleton natural @n@ according to the context
 withSNat :: KnownNat n => (SNat n -> a) -> a
 withSNat f = f SNat
 
@@ -347,13 +347,13 @@ compareSNat a b =
 -- * Append a zero (/0/):
 --
 --      @
---      __B0__ :: 'BNat' n -> 'BNat' (2 '*' n)
+--      __B0__ :: 'BNat' n -> 'BNat' (2 'GHC.TypeNats.*' n)
 --      @
 --
 -- * Append a one (/1/):
 --
 --      @
---      __B1__ :: 'BNat' n -> 'BNat' ((2 '*' n) '+' 1)
+--      __B1__ :: 'BNat' n -> 'BNat' ((2 'GHC.TypeNats.*' n) 'GHC.TypeNats.+' 1)
 --      @
 data BNat :: Nat -> Type where
   BT :: BNat 0
@@ -509,7 +509,7 @@ stripZeros (B0 x)  = case stripZeros x of
 -- @
 -- f :: Index (n+1) -> Index (n + 1) -> Bool
 --
--- g :: forall n. (1 '<=' n) => Index n -> Index n -> Bool
+-- g :: forall n. (1 'GHC.TypeNats.<=' n) => Index n -> Index n -> Bool
 -- g a b = 'leToPlus' \@1 \@n (f a b)
 -- @
 --
@@ -518,7 +518,7 @@ stripZeros (B0 x)  = case stripZeros x of
 -- @
 -- head :: Vec (n + 1) a -> a
 --
--- head' :: forall n a. (1 '<=' n) => Vec n a -> a
+-- head' :: forall n a. (1 'GHC.TypeNats.<=' n) => Vec n a -> a
 -- head' = 'leToPlus' @1 @n head
 -- @
 leToPlus

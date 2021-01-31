@@ -60,6 +60,12 @@ module Clash.Signal.Internal
   , DomainResetKind
   , DomainInitBehavior
   , DomainResetPolarity
+
+  , DomainConfigurationPeriod
+  , DomainConfigurationActiveEdge
+  , DomainConfigurationResetKind
+  , DomainConfigurationInitBehavior
+  , DomainConfigurationResetPolarity
     -- ** Default domains
   , System
   , XilinxSystem
@@ -254,7 +260,8 @@ data InitBehavior
   -- ^ Power up value of memory elements is /unknown/.
   | Defined
   -- ^ If applicable, power up value of a memory element is defined. Applies to
-  -- 'register's for example, but not to 'blockRam'.
+  -- 'Clash.Signal.register's for example, but not to
+  -- 'Clash.Prelude.BlockRam.blockRam'.
   deriving (Show, Read, Eq, Ord, Generic, NFData, Data, Hashable)
 
 data SInitBehavior (init :: InitBehavior) where
@@ -488,13 +495,13 @@ data VDomainConfiguration
   , vPeriod :: Natural
   -- ^ Corresponds to '_period' on 'DomainConfiguration'
   , vActiveEdge :: ActiveEdge
-  -- ^ Corresponds to '_edge' on 'DomainConfiguration'
+  -- ^ Corresponds to '_activeEdge' on 'DomainConfiguration'
   , vResetKind :: ResetKind
-  -- ^ Corresponds to '_reset' on 'DomainConfiguration'
+  -- ^ Corresponds to '_resetKind' on 'DomainConfiguration'
   , vInitBehavior :: InitBehavior
-  -- ^ Corresponds to '_init' on 'DomainConfiguration'
+  -- ^ Corresponds to '_initBehavior' on 'DomainConfiguration'
   , vResetPolarity :: ResetPolarity
-  -- ^ Corresponds to '_polarity' on 'DomainConfiguration'
+  -- ^ Corresponds to '_resetPolarity' on 'DomainConfiguration'
   }
 
 -- | Convert 'SDomainConfiguration' to 'VDomainConfiguration'. Should be used in combination with
@@ -740,7 +747,7 @@ of the second argument is evaluated as soon as the tail of the result is evaluat
 -- | __WARNING: EXTREMELY EXPERIMENTAL__
 --
 -- The circuit semantics of this operation are unclear and/or non-existent.
--- There is a good reason there is no 'Monad' instance for 'Signal''.
+-- There is a good reason there is no 'Monad' instance for 'Signal'.
 --
 -- Is currently treated as 'id' by the Clash compiler.
 joinSignal# :: Signal dom (Signal dom a) -> Signal dom a
@@ -820,7 +827,7 @@ clockTag
 clockTag (Clock dom) = dom
 
 -- | Clock generator for simulations. Do __not__ use this clock generator for
--- for the /testBench/ function, use 'tbClockGen' instead.
+-- for the /testBench/ function, use 'Clash.Explicit.Testbench.tbClockGen' instead.
 --
 -- To be used like:
 --
@@ -846,7 +853,7 @@ clockGen = Clock SSymbol
 -- rstSystem = resetGen @System
 -- @
 --
--- See 'tbClockGen' for example usage.
+-- See 'Clash.Explicit.Testbench.tbClockGen' for example usage.
 --
 resetGen
   :: forall dom
@@ -1237,7 +1244,7 @@ infix 4 .<=.
 -- __(.<=.)__ :: 'Ord' a => 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' 'Bool'
 -- @
 --
--- It is a version of ('<=') that returns a 'Clash.Signal.Signal' of 'Bool'
+-- It is a version of ('GHC.TypeNats.<=') that returns a 'Clash.Signal.Signal' of 'Bool'
 (.<=.) :: (Ord a, Applicative f) => f a -> f a -> f Bool
 (.<=.) = liftA2 (<=)
 

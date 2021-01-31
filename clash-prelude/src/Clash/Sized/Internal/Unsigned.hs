@@ -190,7 +190,7 @@ data Unsigned (n :: Nat) =
     U { unsafeToNatural :: !Natural }
 #else
 newtype Unsigned (n :: Nat) =
-    -- | The constructor, 'U', and the field, 'unsafeToInteger', are not
+    -- | The constructor, 'U', and the field, 'unsafeToNatural', are not
     -- synthesizable.
     U { unsafeToNatural :: Natural }
 #endif

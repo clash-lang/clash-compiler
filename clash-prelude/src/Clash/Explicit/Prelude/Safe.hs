@@ -133,7 +133,9 @@ import Clash.Sized.RTree
 import Clash.Sized.Signed
 import Clash.Sized.Unsigned
 import Clash.Sized.Vector hiding (fromList, unsafeFromList)
-import Clash.XException
+import Clash.XException hiding
+  ( GShowX(..), GDeepErrorX(..), GHasUndefined(..), GEnsureSpine(..)
+  , GNFDataX(..), Zero, One, ShowType(..), RnfArgs(..), NFDataX1(..) )
 
 {- $setup
 >>> :set -XDataKinds
