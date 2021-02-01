@@ -7,6 +7,7 @@
 -}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -71,6 +72,7 @@ let mac :: Clock System
 
 -- | A synchronized signal with samples of type @a@, synchronized to clock
 -- @clk@, that has accumulated @delay@ amount of samples delay along its path.
+type role DSignal nominal nominal representational
 newtype DSignal (dom :: Domain) (delay :: Nat) a =
     DSignal { toSignal :: Signal dom a
               -- ^ Strip a 'DSignal' from its delay information.

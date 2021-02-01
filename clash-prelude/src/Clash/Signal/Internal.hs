@@ -12,6 +12,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -643,6 +644,7 @@ Check out 'IntelSystem' and 'XilinxSystem' too!
 See the module documentation of "Clash.Signal" for more information about
 domains.
 -}
+type role Signal nominal representational
 data Signal (dom :: Domain) a
   -- | The constructor, @(':-')@, is __not__ synthesizable.
   = a :- Signal dom a
