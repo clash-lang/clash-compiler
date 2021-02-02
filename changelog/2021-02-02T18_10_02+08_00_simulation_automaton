@@ -1,0 +1,1 @@
+FEATURE: new Automaton-based interface to simulation, to allow interleaving of cyle-by-cycle simulation and external effects
