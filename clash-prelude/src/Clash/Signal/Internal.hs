@@ -1141,7 +1141,7 @@ asyncRegister# clk (unsafeToHighPolarity -> rst) (fromEnable -> ena) initVal res
     let oR = if r then resetVal else o
         oE = if r then resetVal else (if e then x else o)
         -- [Note: register strictness annotations]
-    in  oR `defaultSeqX` oR :- (as `seq` enas `seq` go oE rs es xs)
+    in  o `defaultSeqX` oR :- (as `seq` enas `seq` go oE rs es xs)
 {-# NOINLINE asyncRegister# #-}
 {-# ANN asyncRegister# hasBlackBox #-}
 
