@@ -95,6 +95,7 @@ topEntity clk rst en = readFromBiSignal bus'
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -175,9 +176,13 @@ instance HasBiSignalDefault 'PullDown where
 instance HasBiSignalDefault 'Floating where
   pullUpMode _ = SFloating
 
+type role BiSignalIn nominal nominal nominal
+
 -- | The /in/ part of an __inout__ port
 data BiSignalIn (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
   = BiSignalIn (SBiSignalDefault ds) (Signal dom (Maybe (BitVector n)))
+
+type role BiSignalOut nominal nominal nominal
 
 -- | The /out/ part of an __inout__ port
 --

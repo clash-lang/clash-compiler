@@ -69,6 +69,7 @@ operator that uses truncation introduces an additional error of /0.109375/:
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -155,6 +156,8 @@ import Clash.XException
 >>> import Clash.Prelude
 >>> let n = $$(fLit pi) :: SFixed 4 4
 -}
+
+type role Fixed representational nominal nominal
 
 -- | 'Fixed'-point number
 --

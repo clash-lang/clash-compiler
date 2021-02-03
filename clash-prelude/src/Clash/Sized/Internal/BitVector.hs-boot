@@ -13,7 +13,7 @@ import GHC.TypeLits (KnownNat,Nat)
 import GHC.Stack    (HasCallStack)
 import Data.Kind    (Type)
 
-type role BitVector phantom
+type role BitVector nominal
 data BitVector :: Nat -> Type
 data Bit
 

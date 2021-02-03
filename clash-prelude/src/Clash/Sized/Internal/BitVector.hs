@@ -10,6 +10,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -197,6 +198,8 @@ import                qualified Data.Map.Strict            as M
 >>> :set -XBinaryLiterals
 >>> import Clash.Sized.Internal.BitVector
 -}
+
+type role BitVector nominal
 
 -- * Type definitions
 

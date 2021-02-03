@@ -8,6 +8,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -125,6 +126,8 @@ import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, (++#), high, low, un
 import qualified Clash.Sized.Internal.BitVector as BV
 import Clash.XException
   (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX)
+
+type role Signed nominal
 
 -- | Arbitrary-width signed integer represented by @n@ bits, including the sign
 -- bit.
