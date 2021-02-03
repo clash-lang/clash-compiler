@@ -14,7 +14,7 @@ packages:
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2021-02-02T18:59:30Z
+index-state: 2021-02-05T07:51:25Z
 
 -- For some reason the `clash-testsuite` executable fails to run without
 -- this, as it cannot find the related library...
