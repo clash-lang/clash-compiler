@@ -165,6 +165,15 @@ type role Signed nominal
 -- 3
 -- >>> satAdd SatSymmetric (-2) (-3) :: Signed 3
 -- -3
+--
+-- Signed has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+--
+-- >>> :i Signed
+-- type role Signed nominal
+-- ...
+--
+-- as it is not safe to coerce between different width Signed. To change the
+-- width, use the functions in the 'Clash.Class.Resize.Resize' class.
 #if MIN_VERSION_base(4,15,0)
 data Signed (n :: Nat) =
     -- | The constructor, 'S', and the field, 'unsafeToInteger', are not

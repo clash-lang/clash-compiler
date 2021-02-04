@@ -207,6 +207,15 @@ type role BitVector nominal
 --
 -- * Bit indices are descending
 -- * 'Num' instance performs /unsigned/ arithmetic.
+--
+-- BitVector has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+--
+-- >>> :i BitVector
+-- type role BitVector nominal
+-- ...
+--
+-- as it is not safe to coerce between different size BitVector. To change the
+-- size, use the functions in the 'Clash.Class.Resize.Resize' class.
 data BitVector (n :: Nat) =
     -- | The constructor, 'BV', and  the field, 'unsafeToInteger', are not
     -- synthesizable.

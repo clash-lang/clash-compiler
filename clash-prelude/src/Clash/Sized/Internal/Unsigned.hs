@@ -174,6 +174,15 @@ type role Unsigned nominal
 -- 7
 -- >>> satSub SatSymmetric 2 3 :: Unsigned 3
 -- 0
+--
+-- Unsigned has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+--
+-- >>> :i Unsigned
+-- type role Unsigned nominal
+-- ...
+--
+-- as it is not safe to coerce between different width Unsigned. To change the
+-- width, use the functions in the 'Clash.Class.Resize.Resize' class.
 #if MIN_VERSION_base(4,15,0)
 data Unsigned (n :: Nat) =
     -- | The constructor, 'U', and the field, 'unsafeToInteger', are not

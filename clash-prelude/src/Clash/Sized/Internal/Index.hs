@@ -141,6 +141,15 @@ type role Index nominal
 -- >>> 2 * 4 :: Index 8
 -- *** Exception: X: Clash.Sized.Index: result 8 is out of bounds: [0..7]
 -- ...
+--
+-- Index has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+--
+-- >>> :i Index
+-- type role Index nominal
+-- ...
+--
+-- as it is not safe to coerce between different range Index. To change the
+-- size, use the functions in the 'Clash.Class.Resize.Resize' class.
 #if MIN_VERSION_base(4,15,0)
 data Index (n :: Nat) =
     -- | The constructor, 'I', and the field, 'unsafeToInteger', are not

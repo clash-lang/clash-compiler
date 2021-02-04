@@ -72,6 +72,15 @@ let mac :: Clock System
 
 -- | A synchronized signal with samples of type @a@, synchronized to clock
 -- @clk@, that has accumulated @delay@ amount of samples delay along its path.
+--
+-- DSignal has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+--
+-- >>> :i DSignal
+-- type role DSignal nominal nominal representational
+-- ...
+--
+-- as it is safe to coerce the values in the signal, but not safe to coerce the
+-- synthesis domain or delay in the signal.
 type role DSignal nominal nominal representational
 newtype DSignal (dom :: Domain) (delay :: Nat) a =
     DSignal { toSignal :: Signal dom a
