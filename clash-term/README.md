@@ -16,12 +16,12 @@ package clash-lib
 
 1. Run `clash`, which will write the rewrite history in `history.dat`:
 ```bash
-> cabal new-run -- clash --vhdl examples/ALU.hs
+> cabal v2-run -- clash --vhdl examples/ALU.hs
 ```
 
 2. The rewrite history has now been dumped to the file system, in `history.dat`.
 
 3. Run the terminal UI with the `clash-term` executable, giving the history file as input:
 ```bash
-> cabal new-run -- clash-term history.dat
+> cabal v2-run -- clash-term history.dat
 ```

@@ -13,7 +13,7 @@ main = defaultMainWithDoctests "doctests"
 -- If the macro is defined, we have new cabal-install,
 -- but for some reason we don't have cabal-doctest in package-db
 --
--- Probably we are running cabal sdist, when otherwise using new-build
+-- Probably we are running cabal sdist, when otherwise using v2-build
 -- workflow
 #warning You are configuring this package without cabal-doctest installed. \
          The doctests test-suite will not work as a result. \

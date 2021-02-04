@@ -10,7 +10,7 @@ sed -i 's/documentation: False/documentation: True/g' cabal.project.local
 cabal sdist $1 |& tee sdist.log
 
 # Build documentation
-cabal new-haddock $1 \
+cabal v2-haddock $1 \
     --haddock-for-hackage \
     --haddock-hyperlinked-source \
     --enable-documentation |& tee haddock.log

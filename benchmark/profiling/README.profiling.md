@@ -10,6 +10,6 @@ package clash-profiling
 
 And run using:
 ```
-$ cabal new-run clash-profile-normalization-prepare -- [INPUT_FILES]
-$ cabal new-run clash-profile-normalization-run -- [INPUT_FILES] +RTS -p
+$ cabal v2-run clash-profile-normalization-prepare -- [INPUT_FILES]
+$ cabal v2-run clash-profile-normalization-run -- [INPUT_FILES] +RTS -p
 ```

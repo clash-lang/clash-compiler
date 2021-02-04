@@ -36,25 +36,25 @@ inotifywait --help | grep -e "^inotifywait"
 ghcid --version
 
 if [[ $1 == "p" || $1 == "prelude" || $1 == "clash-prelude" ]]; then
-  target="cabal new-repl clash-prelude --repl-options=-fobject-code --repl-options=-fforce-recomp"
+  target="cabal v2-repl clash-prelude --repl-options=-fobject-code --repl-options=-fforce-recomp"
   watch="clash-prelude/clash-prelude.cabal"
 elif [[ $1 == "p:tests" || $1 == "prelude:tests" || $1 == "clash-prelude:tests" ]]; then
-  target="cabal new-repl clash-prelude:unittests"
+  target="cabal v2-repl clash-prelude:unittests"
   watch="clash-prelude/src clash-prelude/clash-prelude.cabal"
 elif [[ $1 == "l" || $1 == "lib" || $1 == "clash-lib" ]]; then
-  target="cabal new-repl clash-lib"
+  target="cabal v2-repl clash-lib"
   watch="clash-prelude clash-lib/clash-lib.cabal"
 elif [[ $1 == "l:tests" || $1 == "lib:tests" || $1 == "clash-lib:tests" ]]; then
-  target="cabal new-repl clash-lib:unittests"
+  target="cabal v2-repl clash-lib:unittests"
   watch="clash-prelude clash-lib/src clash-lib/clash-lib.cabal"
 elif [[ $1 == "c" || $1 == "cores" || $1 == "clash-cores" ]]; then
-  target="cabal new-repl clash-cores"
+  target="cabal v2-repl clash-cores"
   watch="clash-prelude clash-lib clash-cores/clash-cores.cabal"
 elif [[ $1 == "c:tests" || $1 == "cores:tests" || $1 == "clash-cores:tests" ]]; then
-  target="cabal new-repl clash-cores:unittests"
+  target="cabal v2-repl clash-cores:unittests"
   watch="clash-prelude clash-lib clash-cores/src clash-cores/clash-cores.cabal"
 elif [[ $1 == "g" || $1 == "ghc" || $1 == "clash-ghc" ]]; then
-  target="cabal new-repl clash-ghc --repl-options=-fobject-code --repl-options=-fforce-recomp"
+  target="cabal v2-repl clash-ghc --repl-options=-fobject-code --repl-options=-fforce-recomp"
   watch="clash-prelude clash-lib clash-ghc/clash-ghc.cabal"
 elif [[ $1 == "dev" || $1 == "clash-dev" ]]; then
   target="./clash-dev"
@@ -84,7 +84,7 @@ set +e
 
 while true; do
   if [[ ${target} == "./clash-dev" ]]; then
-    cabal new-build clash-prelude --write-ghc-environment-files=always
+    cabal v2-build clash-prelude --write-ghc-environment-files=always
     sed -i '/clash-lib/d' .ghc.environment.x86_64-linux-*
     sed -i '/clash-ghc/d' .ghc.environment.x86_64-linux-*
   fi

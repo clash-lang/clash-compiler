@@ -85,9 +85,9 @@ cat ${HOME}/.cabal/config
 
 set +u
 
-# run new-update first to generate the cabal config file that we can then modify
+# run v2-update first to generate the cabal config file that we can then modify
 # retry 5 times, as hackage servers are not perfectly reliable
 NEXT_WAIT_TIME=0
-until cabal new-update || [ $NEXT_WAIT_TIME -eq 5 ]; do
+until cabal v2-update || [ $NEXT_WAIT_TIME -eq 5 ]; do
   sleep $(( NEXT_WAIT_TIME++ ))
 done
