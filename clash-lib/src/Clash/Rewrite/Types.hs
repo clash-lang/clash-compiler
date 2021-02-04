@@ -32,7 +32,8 @@ import Control.Monad.Writer                  (MonadWriter (..))
 import Data.Binary                           (Binary)
 import Data.Hashable                         (Hashable)
 import Data.IntMap.Strict                    (IntMap)
-import Data.Monoid                           (Any)
+import Data.Map.Strict                       (Map)
+import Data.Monoid                           (Any,Sum)
 import qualified Data.Set                    as Set
 import GHC.Generics
 
@@ -74,7 +75,9 @@ data RewriteStep
 data RewriteState extra
   = RewriteState
   { _transformCounter :: {-# UNPACK #-} !Int
-  -- ^ Number of applied transformations
+  -- ^ Total number of applied transformations
+  , _transformCounters :: Map String (Sum Word)
+  -- ^ Map that tracks how many times each transformation is applied
   , _bindings         :: !BindingMap
   -- ^ Global binders
   , _uniqSupply       :: !Supply
