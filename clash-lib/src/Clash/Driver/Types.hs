@@ -86,6 +86,8 @@ data DebugLevel
   -- ^ Run invariant checks and err if violated (enabled by any debug flag)
   | DebugFinal
   -- ^ Show completely normalized expressions
+  | DebugCount
+  -- ^ Count transformations
   | DebugName
   -- ^ Show names of applied transformations
   | DebugTry

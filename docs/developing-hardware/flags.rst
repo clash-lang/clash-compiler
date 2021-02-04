@@ -25,7 +25,7 @@ Clash Compiler Flags
 
   - ``DebugFinal`` to show expressions after they have been completely
     normalized
-
+  - ``DebugCount`` to count how often each transformation is applied
   - ``DebugName`` to show the names of transformations as they are applied
   - ``DebugTry`` to show names of tried and applied transformations
   - ``DebugApplied`` to show sub-expressions after they are rewritten
