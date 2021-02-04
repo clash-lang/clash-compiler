@@ -13,7 +13,7 @@ module Clash.Sized.Internal.Index where
 import Data.Kind (Type)
 import GHC.TypeLits (KnownNat, Nat)
 
-type role Index phantom
+type role Index nominal
 data Index :: Nat -> Type
 
 instance KnownNat n => Num (Index n)

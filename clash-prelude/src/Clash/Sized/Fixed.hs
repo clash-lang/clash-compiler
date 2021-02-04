@@ -168,6 +168,16 @@ import Clash.XException
 --
 -- The 'Num' operators for this type saturate to 'maxBound' on overflow and
 -- 'minBound' on underflow, and use truncation as the rounding method.
+--
+-- Fixed has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+--
+-- >>> :i Fixed
+-- type role Fixed representational nominal nominal
+-- ...
+--
+-- as it is safe to coerce between different compatible underlying types, but
+-- not necessasrily safe to coerce between different widths of this type.  To
+-- change the width, use the functions in the 'Clash.Class.Resize.Resize' class.
 newtype Fixed (rep :: Nat -> Type) (int :: Nat) (frac :: Nat) =
   Fixed { unFixed :: rep (int + frac) }
 

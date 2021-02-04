@@ -95,6 +95,7 @@ topEntity clk rst en = readFromBiSignal bus'
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -175,14 +176,35 @@ instance HasBiSignalDefault 'PullDown where
 instance HasBiSignalDefault 'Floating where
   pullUpMode _ = SFloating
 
--- | The /in/ part of an __inout__ port
+type role BiSignalIn nominal nominal nominal
+
+-- | The /in/ part of an __inout__ port.
+-- BiSignalIn has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+--
+-- >>> :i BiSignalIn
+-- type role BiSignalIn nominal nominal nominal
+-- ...
+--
+-- as it is not safe to coerce the default behaviour, synthesis domain or width
+-- of the data in the signal.
 data BiSignalIn (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
   = BiSignalIn (SBiSignalDefault ds) (Signal dom (Maybe (BitVector n)))
+
+type role BiSignalOut nominal nominal nominal
 
 -- | The /out/ part of an __inout__ port
 --
 -- Wraps (multiple) writing signals. The semantics are such that only one of
 -- the signals may write at a single time step.
+--
+-- BiSignalOut has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+--
+-- >>> :i BiSignalOut
+-- type role BiSignalOut nominal nominal nominal
+-- ...
+--
+-- as it is not safe to coerce the default behaviour, synthesis domain or width
+-- of the data in the signal.
 #if MIN_VERSION_base(4,15,0)
 data BiSignalOut (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
   = BiSignalOut ![Signal dom (Maybe (BitVector n))]

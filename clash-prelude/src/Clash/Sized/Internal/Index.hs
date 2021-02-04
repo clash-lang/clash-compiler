@@ -9,6 +9,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -115,6 +116,8 @@ import Clash.XException
 >>> import Clash.Sized.Internal.Index
 -}
 
+type role Index nominal
+
 -- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
 --
 -- Given an upper bound @n@, an 'Index' @n@ number has a range of: [0 .. @n@-1]
@@ -138,6 +141,15 @@ import Clash.XException
 -- >>> 2 * 4 :: Index 8
 -- *** Exception: X: Clash.Sized.Index: result 8 is out of bounds: [0..7]
 -- ...
+--
+-- Index has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+--
+-- >>> :i Index
+-- type role Index nominal
+-- ...
+--
+-- as it is not safe to coerce between different range Index. To change the
+-- size, use the functions in the 'Clash.Class.Resize.Resize' class.
 #if MIN_VERSION_base(4,15,0)
 data Index (n :: Nat) =
     -- | The constructor, 'I', and the field, 'unsafeToInteger', are not

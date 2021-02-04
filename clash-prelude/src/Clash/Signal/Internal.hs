@@ -12,6 +12,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -645,9 +646,19 @@ because some VHDL simulators don't support fractions of picoseconds.
 * __NB__: Whether 'System' has good defaults depends on your target platform.
 Check out 'IntelSystem' and 'XilinxSystem' too!
 
+Signals have the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+
+>>> :i Signal
+type role Signal nominal representational
+...
+
+as it is safe to coerce the underlying value of a signal, but not safe to coerce
+a signal between different synthesis domains.
+
 See the module documentation of "Clash.Signal" for more information about
 domains.
 -}
+type role Signal nominal representational
 data Signal (dom :: Domain) a
   -- | The constructor, @(':-')@, is __not__ synthesizable.
   = a :- Signal dom a
