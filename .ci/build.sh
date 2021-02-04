@@ -1,8 +1,9 @@
 #!/bin/bash
 set -xueo pipefail
 
-# TODO: make sdist work on all, it currently fails for clash-cosim
-cabal v2-sdist clash-prelude clash-lib clash-ghc
+# Generate source distributions for all our packages
+# TODO: `sdist clash-cosim` only works _after_ building it
+cabal v2-sdist clash-prelude clash-lib clash-ghc clash-cores
 
 # test that we can create a build plan with the index-state in cabal.project
 set +u
