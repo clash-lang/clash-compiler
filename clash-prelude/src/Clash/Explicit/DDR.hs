@@ -180,7 +180,7 @@ ddrOut# clk rst en i0 xs ys =
     -- That is why we drop the first value of the stream.
     let (_ :- out) = zipSig xs' ys' in out
   where
-    xs' = register# clk rst en (error "ddrOut: unreachable error") i0 xs
+    xs' = register# clk rst en (errorX "ddrOut: unreachable error") i0 xs
     ys' = register# clk rst en (deepErrorX "ddrOut: initial value undefined") i0 ys
     zipSig (a :- as) (b :- bs) = a :- b :- zipSig as bs
 {-# NOINLINE ddrOut# #-}
