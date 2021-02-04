@@ -4,16 +4,19 @@ include:
 #   - '/.ci/gitlab/benchmark.yml'
 
 stages:
+  - pre
   - test
   - pack
   - pack-test
   - publish
+  - post
 
 # Triggers child pipelines that runs tests for various GHC and Cabal versions.
 # Should be replaced by matrix builds in the future, but currently blocking on:
 # https://gitlab.com/gitlab-org/gitlab/-/issues/270957
 .common-trigger:
   stage: test
+  needs: []
   trigger:
     include: .ci/gitlab/test.yml
     strategy: depend
@@ -53,6 +56,7 @@ tests-9.0:
 # Tests run on shared runners:
 haddock:
   extends: .common
+  needs: []
   stage: test
   variables:
     GHC_VERSION: 8.10.3
@@ -107,3 +111,29 @@ snap-stable:
     RELEASE_CHANNEL: stable
   rules:
     - if: '$CI_COMMIT_TAG != null' # tags
+
+# Work around https://gitlab.com/gitlab-org/gitlab/-/issues/216629
+.github_status:
+  image: curlimages/curl
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+
+set_pending:
+  extends: .github_status
+  stage: pre
+  script:
+    - .ci/set_github_status.sh pending
+
+set_success:
+  extends: .github_status
+  stage: post
+  when: on_success
+  script:
+    - .ci/set_github_status.sh success
+
+set_failure:
+  extends: .github_status
+  stage: post
+  when: on_failure
+  script:
+    - .ci/set_github_status.sh failure
