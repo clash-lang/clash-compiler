@@ -784,21 +784,28 @@ imap f = go 0
     go n (x `Cons` xs) = f n x `Cons` go (n+1) xs
 {-# NOINLINE imap #-}
 
--- | Zip two vectors with a functions that also takes the elements' indices.
---
--- >>> izipWith (\i a b -> i + a + b) (2 :> 2 :> Nil)  (3 :> 3:> Nil)
--- <*** Exception: X: Clash.Sized.Index: result 3 is out of bounds: [0..1]
--- ...
--- >>> izipWith (\i a b -> fromIntegral i + a + b) (2 :> 2 :> Nil) (3 :> 3 :> Nil) :: Vec 2 (Unsigned 8)
--- <5,6>
---
--- \"'imap' @f xs@\" corresponds to the following circuit layout:
---
--- <<doc/izipWith.svg>>
---
--- __NB:__ 'izipWith' is /strict/ in its second argument, and /lazy/ in its
--- third. This matters when 'izipWith' is used in a recursive setting. See
--- 'lazyV' for more information.
+{- | Zip two vectors with a functions that also takes the elements' indices.
+
+#if __GLASGOW_HASKELL__ >= 900
+>>> izipWith (\i a b -> i + a + b) (2 :> 2 :> Nil)  (3 :> 3:> Nil)
+<*** Exception: X: Clash.Sized.Index: result 2 is out of bounds: [0..1]
+...
+#else
+>>> izipWith (\i a b -> i + a + b) (2 :> 2 :> Nil)  (3 :> 3:> Nil)
+<*** Exception: X: Clash.Sized.Index: result 3 is out of bounds: [0..1]
+...
+#endif
+>>> izipWith (\i a b -> fromIntegral i + a + b) (2 :> 2 :> Nil) (3 :> 3 :> Nil) :: Vec 2 (Unsigned 8)
+<5,6>
+
+\"'imap' @f xs@\" corresponds to the following circuit layout:
+
+<<doc/izipWith.svg>>
+
+__NB:__ 'izipWith' is /strict/ in its second argument, and /lazy/ in its
+third. This matters when 'izipWith' is used in a recursive setting. See
+'lazyV' for more information.
+-}
 izipWith :: KnownNat n => (Index n -> a -> b -> c) -> Vec n a -> Vec n b
          -> Vec n c
 izipWith f xs ys = imap (\i -> uncurry (f i)) (zip xs ys)
