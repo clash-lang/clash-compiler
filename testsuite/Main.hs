@@ -325,7 +325,7 @@ runClashTest = defaultMain $ clashTestRoot
         }
       , runTest "RecursiveBoxed" def{
           hdlTargets=[VHDL]
-        , expectClashFail=Just (def, " already inlined 20 times in:RecursiveBoxed.topEntity")
+        , expectClashFail=Just (def, " already inlined 20 times in: RecursiveBoxed.topEntity")
         }
       , runTest "RecursiveDatatype" def{
           hdlTargets=[VHDL]

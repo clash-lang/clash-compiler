@@ -74,6 +74,7 @@ import           Control.Monad.State.Strict  (evalState)
 import           Control.Monad.Writer        (lift, listen)
 import           Control.Monad.Trans.Except  (runExcept)
 import           Data.Coerce                 (coerce)
+import           Data.Default
 import qualified Data.Either                 as Either
 import qualified Data.HashMap.Lazy           as HashMap
 import qualified Data.HashMap.Strict         as HashMapS
@@ -107,7 +108,7 @@ import           Clash.Core.FreeVars
    typeFreeVars, localVarsDoNotOccurIn, localIdDoesNotOccurIn,
    countFreeOccurances)
 import           Clash.Core.Literal          (Literal (..))
-import           Clash.Core.Pretty           (showPpr)
+import           Clash.Core.Pretty           (PrettyOptions(..), showPpr, showPpr')
 import           Clash.Core.Subst
 import           Clash.Core.Term
 import           Clash.Core.TermInfo
@@ -477,36 +478,39 @@ inlineNonRepWorker e@(Case scrut altsTy alts)
       -- Constraint dictionary inlining always terminates, so we ignore the
       -- usual inline safeguards.
       notClassTy = not (isClassTy tcm scrutTy)
-    if notClassTy && (Maybe.fromMaybe 0 isInlined) > limit
-      then
-        trace (concat [ $(curLoc) ++ "InlineNonRep: " ++ showPpr (varName f)
-                      ," already inlined " ++ show limit ++ " times in:"
-                      , showPpr (varName cf)
-                      , "\nType of the subject is: " ++ showPpr scrutTy
-                      , "\nFunction " ++ showPpr (varName cf)
-                      , " will not reach a normal form, and compilation"
-                      , " might fail."
-                      , "\nRun with '-fclash-inline-limit=N' to increase"
-                      , " the inlining limit to N."
-                      ])
-              (pure e)
-      else do
-        bodyMaybe   <- lookupVarEnv f <$> Lens.use bindings
-        nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator
-                                                  <*> Lens.view customReprs
-                                                  <*> pure False
-                                                  <*> Lens.view tcCache
-                                                  <*> pure scrutTy)
-        case (nonRepScrut, bodyMaybe) of
-          (True,Just b) -> do
-            Monad.when notClassTy (zoomExtra (addNewInline f cf))
+      overLimit = notClassTy && (Maybe.fromMaybe 0 isInlined) > limit
 
-            let scrutBody0 = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
-            let scrutBody1 = mkApps scrutBody0 args
 
-            changed (Case scrutBody1 altsTy alts)
+    bodyMaybe   <- lookupVarEnv f <$> Lens.use bindings
+    nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator
+                                              <*> Lens.view customReprs
+                                              <*> pure False
+                                              <*> Lens.view tcCache
+                                              <*> pure scrutTy)
+    case (nonRepScrut, bodyMaybe) of
+      (True, Just b) -> do
+        if overLimit then
+          trace ($(curLoc) ++ [I.i|
+            InlineNonRep: #{showPpr (varName f)} already inlined
+            #{limit} times in: #{showPpr (varName cf)}. The type of the subject
+            is:
 
-          _ -> pure e
+              #{showPpr' def{displayTypes=True\} scrutTy}
+
+            Function #{showPpr (varName cf)} will not reach a normal form and
+            compilation might fail.
+
+            Run with '-fclash-inline-limit=N' to increase the inline limit to N.
+          |]) (return e)
+        else do
+          Monad.when notClassTy (zoomExtra (addNewInline f cf))
+
+          let scrutBody0 = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
+          let scrutBody1 = mkApps scrutBody0 args
+
+          changed $ Case scrutBody1 altsTy alts
+      _ ->
+        return e
 
 inlineNonRepWorker e = pure e
 {-# SCC inlineNonRepWorker #-}
