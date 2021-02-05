@@ -25,4 +25,82 @@
     , "template"  : "~ARG[0] % ~ARG[1]"
     }
   }
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Natural.naturalLogBase#"
+  , "kind"      : "Expression"
+  , "type"      : "naturalLogBase# :: Natural -> Natural -> Word#"
+  , "imports"   : ["~INCLUDENAME[0].inc"]
+  , "includes" :
+    [ { "name" : "naturalLogBase"
+      , "extension" : "inc"
+      , "template" :
+"// natural logBase
+function integer ~INCLUDENAME[0];
+input [~SIZE[~TYP[0]]-1:0] base, value;
+begin
+  for (~INCLUDENAME[0] = 0; value >= base; ~INCLUDENAME[0]=~INCLUDENAME[0]+1)
+    value = value / base;
+end
+endfunction"
+      }
+    ]
+  , "template"  : "~INCLUDENAME[0](~ARG[0],~ARG[1])"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Natural.naturalEq#"
+  , "kind"      : "Expression"
+  , "type"      : "naturalEq :: Natural -> Natural -> Int#"
+  , "template"  : "(~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]'d1 : ~SIZE[~TYPO]'d0"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Natural.naturalNe#"
+  , "kind"      : "Expression"
+  , "type"      : "naturalNe# :: Natural -> Natural -> Int#"
+  , "template"  : "(~ARG[0] != ~ARG[1]) ? ~SIZE[~TYPO]'d1 : ~SIZE[~TYPO]'d0"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Natural.naturalLe#"
+  , "kind"      : "Expression"
+  , "type"      : "naturalLe :: Natural -> Natural -> Int#"
+  , "template"  : "(~ARG[0] <= ~ARG[1]) ? ~SIZE[~TYPO]'d1 : ~SIZE[~TYPO]'d0"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Natural.naturalGt#"
+  , "kind"      : "Expression"
+  , "type"      : "naturalGt# :: Natural -> Natural -> Int#"
+  , "template"  : "(~ARG[0] > ~ARG[1] ? ~SIZE[~TYPO]'d1 : ~SIZE[~TYPO]'d0"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Natural.naturalLt#"
+  , "kind"      : "Expression"
+  , "type"      : "naturalLt# :: Natural -> Natural -> Int#"
+  , "template"  : "(~ARG[0] < ~ARG[1]) ? ~SIZE[~TYPO]'d1 : ~SIZE[~TYPO]'d0"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Natural.naturalGe#"
+  , "kind"      : "Expression"
+  , "type"      : "naturalGe# :: Natural -> Natural -> Int#"
+  , "template"  : "(~ARG[0] >= ~ARG[1]) ? ~SIZE[~TYPO]'d1 : ~SIZE[~TYPO]'d0"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Natural.naturalShiftL#"
+  , "kind"      : "Expression"
+  , "type"      : "naturalShiftL :: Natural -> Word# -> Natural"
+  , "template"  : "~ARG[0] <<< ~ARG[1]"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Natural.NaturalCompare"
+  , "kind"      : "Expression"
+  , "type"      : "naturalCompare :: Natural -> Natural -> Ordering"
+  , "template"  : "(~ARG[0] < ~ARG[1]) ? -~SIZE[~TYPO]'d0 : ((~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]'d1 : ~SIZE[~TYPO]'d2)"
+  }
+}
 ]
