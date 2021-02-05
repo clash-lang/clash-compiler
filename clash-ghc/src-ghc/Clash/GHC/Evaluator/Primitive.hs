@@ -918,9 +918,23 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                    }
        in (\e -> setTerm (Data e) mach) <$> dc
 
+  "GHC.Classes.eqInt" | Just (i,j) <- intCLiterals args
+    -> reduce (boolToBoolLiteral tcm ty (i == j))
+
+  "GHC.Classes.neInt" | Just (i,j) <- intCLiterals args
+    -> reduce (boolToBoolLiteral tcm ty (i /= j))
+
+  "GHC.Classes.leInt" | Just (i,j) <- intCLiterals args
+    -> reduce (boolToBoolLiteral tcm ty (i <= j))
+
+  "GHC.Classes.ltInt" | Just (i,j) <- intCLiterals args
+    -> reduce (boolToBoolLiteral tcm ty (i < j))
 
   "GHC.Classes.geInt" | Just (i,j) <- intCLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i >= j))
+
+  "GHC.Classes.gtInt" | Just (i,j) <- intCLiterals args
+    -> reduce (boolToBoolLiteral tcm ty (i > j))
 
   "GHC.Classes.&&"
     | [ lArg , rArg ] <- args
