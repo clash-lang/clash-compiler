@@ -132,7 +132,6 @@ ghcPrimUnwind tcm p tys vs v [] m
                        , "Clash.Transformations.removedArg"
                        , "GHC.Prim.MutableByteArray#"
                        , "Clash.Transformations.undefined"
-                       , "Control.Exception.Base.absentError"
                        ]
               -- The above primitives are actually values, and not operations.
   = ghcUnwind (PrimVal p tys (vs ++ [v])) m tcm
