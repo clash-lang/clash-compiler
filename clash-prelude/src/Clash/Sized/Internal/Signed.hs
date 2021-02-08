@@ -288,7 +288,7 @@ instance KnownNat n => Enum (Signed n) where
 enumFrom# :: forall n. KnownNat n => Signed n -> [Signed n]
 enumFrom# x = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x .. unsafeToInteger (maxBound :: Signed n)]
   where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL0` sz
+        mB   = 1 `shiftL` sz
         mask = mB - 1
 {-# NOINLINE enumFrom# #-}
 
@@ -299,21 +299,21 @@ enumFromThen# x y =
   bound = if x <= y then maxBound else minBound :: Signed n
   toSigneds = map (fromInteger_INLINE sz mB mask)
   sz = fromInteger (natVal (Proxy @n)) - 1
-  mB = 1 `shiftL0` sz
+  mB = 1 `shiftL` sz
   mask = mB - 1
 {-# NOINLINE enumFromThen# #-}
 
 enumFromTo# :: forall n. KnownNat n => Signed n -> Signed n -> [Signed n]
 enumFromTo# x y = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x .. unsafeToInteger y]
   where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL0` sz
+        mB   = 1 `shiftL` sz
         mask = mB - 1
 {-# NOINLINE enumFromTo# #-}
 
 enumFromThenTo# :: forall n. KnownNat n => Signed n -> Signed n -> Signed n -> [Signed n]
 enumFromThenTo# x1 x2 y = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
   where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL0` sz
+        mB   = 1 `shiftL` sz
         mask = mB - 1
 {-# NOINLINE enumFromThenTo# #-}
 
@@ -377,7 +377,7 @@ instance KnownNat n => Num (Signed n) where
 {-# NOINLINE (*#) #-}
 (*#) = \(S a) (S b) -> fromInteger_INLINE sz mB mask (a * b)
   where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL0` sz
+        mB   = 1 `shiftL` sz
         mask = mB - 1
 
 negate#,abs# :: forall n . KnownNat n => Signed n -> Signed n
@@ -401,7 +401,7 @@ abs# =
 fromInteger# :: forall n . KnownNat n => Integer -> Signed (n :: Nat)
 fromInteger# = fromInteger_INLINE sz mB mask
   where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL0` sz
+        mB   = 1 `shiftL` sz
         mask = mB - 1
 
 {-# INLINE fromInteger_INLINE #-}
@@ -411,7 +411,7 @@ fromInteger_INLINE sz mb mask =
             i2 = case i `shiftR` sz of
                    q | q .&. 1 == 0 -> i1
                      | otherwise    -> i1 - mb
-        in  if mb == 0 then S 0 else S i2
+        in  if sz < 0 then S 0 else S i2
 
 instance ExtendingNum (Signed m) (Signed n) where
   type AResult (Signed m) (Signed n) = Signed (Max m n + 1)
