@@ -149,9 +149,7 @@ import           Clash.Sized.Unsigned
 import           Clash.Sized.Vector hiding (fromList, unsafeFromList)
 import           Clash.Signal
 import           Clash.Signal.Delayed
-import           Clash.XException hiding
-  ( GShowX(..), GDeepErrorX(..), GHasUndefined(..), GEnsureSpine(..)
-  , GNFDataX(..), Zero, One, ShowType(..), RnfArgs(..), NFDataX1(..) )
+import           Clash.XException
 
 {- $setup
 >>> :set -XFlexibleContexts -XTypeApplications

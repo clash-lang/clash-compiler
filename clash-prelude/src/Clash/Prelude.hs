@@ -199,9 +199,7 @@ import           Clash.Signal hiding
   (HiddenClockName, HiddenResetName, HiddenEnableName)
 import           Clash.Signal.Delayed
 import           Clash.Signal.Trace
-import           Clash.XException hiding
-  ( GShowX(..), GDeepErrorX(..), GHasUndefined(..), GEnsureSpine(..)
-  , GNFDataX(..), Zero, One, ShowType(..), RnfArgs(..), NFDataX1(..) )
+import           Clash.XException
 
 {- $setup
 >>> :set -XDataKinds -XFlexibleContexts -XTypeApplications
