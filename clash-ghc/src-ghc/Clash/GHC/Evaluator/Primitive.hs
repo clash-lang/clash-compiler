@@ -1006,6 +1006,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | Just (a,b) <- integerLiterals args
     , Just c <- flogBase a b
     -> (reduce . Literal . WordLiteral . toInteger) c
+
+  "GHC.Num.Natural.naturalLogBase#"
+    | Just (a,b) <- naturalLiterals args
+    , Just c <- flogBase a b
+    -> (reduce . Literal . WordLiteral . toInteger) c
 #else
   "GHC.Integer.Logarithms.integerLogBase#"
     | Just (a,b) <- integerLiterals args
@@ -1274,7 +1279,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
             LT -> Data ltDc
             EQ -> Data eqDc
             GT -> Data gtDc
-    | otherwise -> error "QQ"
 
 #if MIN_VERSION_base(4,15,0)
   "GHC.Num.Integer.integerShiftR#"
@@ -1369,6 +1373,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
          reduce (naturalToNaturalLiteral 0)
        else
          reduce (naturalToNaturalLiteral (fromInteger i))
+
+  "GHC.Num.Integer.integerToNaturalThrow"
+    | [i] <- integerLiterals' args
+    -> let nTy = snd (splitFunForallTy ty) in
+       reduce (checkNaturalRange1 nTy i id)
 #endif
 
 #if !MIN_VERSION_base(4,15,0)
@@ -1486,6 +1495,66 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     ->
      let nTy = snd (splitFunForallTy ty) in
      reduce (checkNaturalRange2 nTy i j lcm)
+#endif
+
+#if MIN_VERSION_base(4,15,0)
+  "GHC.Num.Natural.naturalGt#"
+    | Just (i,j) <- naturalLiterals args
+    -> reduce (boolToIntLiteral (i > j))
+
+  "GHC.Num.Natural.naturalGe#"
+    | Just (i,j) <- naturalLiterals args
+    -> reduce (boolToIntLiteral (i >= j))
+
+  "GHC.Num.Natural.naturalEq#"
+    | Just (i,j) <- naturalLiterals args
+    -> reduce (boolToIntLiteral (i == j))
+
+  "GHC.Num.Natural.naturalNe#"
+    | Just (i,j) <- naturalLiterals args
+    -> reduce (boolToIntLiteral (i /= j))
+
+  "GHC.Num.Natural.naturalLt#"
+    | Just (i,j) <- naturalLiterals args
+    -> reduce (boolToIntLiteral (i < j))
+
+  "GHC.Num.Natural.naturalLe#"
+    | Just (i,j) <- naturalLiterals args
+    -> reduce (boolToIntLiteral (i <= j))
+
+  "GHC.Num.Natural.naturalShiftL#"
+    | [iV, Lit (WordLiteral j)] <- args
+    , [i] <- naturalLiterals' [iV]
+    -> reduce (naturalToNaturalLiteral (fromInteger (i `shiftL` fromInteger j)))
+
+  "GHC.Num.Natural.naturalShiftR#"
+    | [iV, Lit (WordLiteral j)] <- args
+    , [i] <- naturalLiterals' [iV]
+    -> reduce (naturalToNaturalLiteral (fromInteger (i `shiftR` fromInteger j)))
+
+  "GHC.Num.Natural.naturalCompare"
+    | [i, j] <- naturalLiterals' args
+    -> let -- Get the required result type (viewed as an applied type constructor name)
+           (_,tyView -> TyConApp tupTcNm []) = splitFunForallTy ty
+           -- Find the type constructor from the name
+           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           -- Get the data constructors of that type
+           -- The type is 'Ordering', so they are: 'LT', 'EQ', 'GT'
+           [ltDc, eqDc, gtDc] = tyConDataCons tupTc
+           -- Do the actual compile-time evaluation
+           ordVal = compareInteger i j
+        in reduce $ case ordVal of
+            LT -> Data ltDc
+            EQ -> Data eqDc
+            GT -> Data gtDc
+
+  "GHC.Num.Natural.naturalSignum"
+    | [i] <- naturalLiterals' args
+    -> reduce (Literal (NaturalLiteral (signum i)))
+
+  "GHC.Num.Natural.$wnaturalSignum"
+    | [i] <- naturalLiterals' args
+    -> reduce (Literal (WordLiteral (signum i)))
 #endif
 
   -- GHC.Real.^  -- XXX: Very fragile

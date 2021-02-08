@@ -8,12 +8,21 @@
     }
   }
 , { "BlackBox":
+  { "name": "GHC.Num.Integer.integerToNaturalThrow"
+  , "workInfo" : "Never"
+  , "kind": "Expression"
+  , "type": "integerToNaturalThrow :: Integer -> Natural"
+  , "template": "(~ARG[0] < ~SIZE[~TYP[0]]'d0 ? ~ERRORO: $unsigned(~VAR[n][0][(~SIZE[~TYPO]-1):0]))"
+  , "warning": "GHC.Num.Integer.integerToNaturalThrow: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
+  }
+}
+, { "BlackBox":
   { "name": "GHC.Num.Integer.integerToNaturalClamp"
   , "workInfo" : "Never"
   , "kind": "Expression"
   , "type": "integerToNatural :: Integer -> Natural"
   , "template": "(~ARG[0] < ~SIZE[~TYP[0]]'d0 ? ~SIZE[~TYPO]'d0 : $unsigned(~VAR[n][0][(~SIZE[~TYPO]-1):0]))"
-  , "warning": "GHC.Num.Integer.integerToNatural: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
+  , "warning": "GHC.Num.Integer.integerToNaturalClamp: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
   }
 }
 , { "BlackBox" :
@@ -74,14 +83,14 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "GHC.Integer.Type.integerNe#"
+    { "name"      : "GHC.Num.Integer.integerNe#"
     , "kind"      : "Expression"
     , "type"      : "integerNe# :: Integer -> Integer -> Int#"
     , "template"  : "(~ARG[0] != ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
     }
   }
 , { "BlackBox" :
-    { "name"      : "GHC.Integer.Type.integerLe#"
+    { "name"      : "GHC.Num.Integer.integerLe#"
     , "kind"      : "Expression"
     , "type"      : "integerLe :: Integer -> Integer -> Int#"
     , "template"  : "(~ARG[0] <= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"

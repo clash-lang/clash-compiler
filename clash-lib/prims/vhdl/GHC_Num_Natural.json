@@ -26,4 +26,72 @@
     , "warning": "GHC.Num.Natural.naturalRem: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
+  , { "BlackBox" :
+    { "name"      : "GHC.Num.Natural.naturalLogBase#"
+    , "kind"      : "Expression"
+    , "type"      : "naturalLogBase# :: Natural -> Natural -> Word#"
+    , "template"  : "to_unsigned(integer(floor(log(real(to_integer(~ARG[1])),real(to_integer(~ARG[0]))))),~SIZE[~TYPO])"
+    }
+  }
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Natural.naturalEq#"
+  , "kind"      : "Declaration"
+  , "type"      : "naturalEq# :: Natural -> Natural -> Int#"
+  , "template"  : "~RESULT <= to_unsigned(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_unsigned(0,~SIZE[~TYPO]);"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Natural.naturalNe#"
+  , "kind"      : "Declaration"
+  , "type"      : "naturalNe# :: Natural -> Natural -> Int#"
+  , "template"  : "~RESULT <= to_unsigned(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_unsigned(0,~SIZE[~TYPO]);"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Natural.naturalLe#"
+  , "kind"      : "Declaration"
+  , "type"      : "naturalLe# :: Natural -> Natural -> Int#"
+  , "template"  : "~RESULT <= to_unsigned(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_unsigned(0,~SIZE[~TYPO]);"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Natural.naturalGt#"
+  , "kind"      : "Declaration"
+  , "type"      : "naturalGt# :: Natural -> Natural -> Int#"
+  , "template"  : "~RESULT <= to_unsigned(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_unsigned(0,~SIZE[~TYPO]);"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Natural.naturalLt#"
+  , "kind"      : "Declaration"
+  , "type"      : "naturalLt# :: Natural -> Natural -> Int#"
+  , "template"  : "~RESULT <= to_unsigned(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_unsigned(0,~SIZE[~TYPO]);"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Natural.naturalGe#"
+  , "kind"      : "Declaration"
+  , "type"      : "naturalGe# :: Natural -> Natural -> Int#"
+  , "template"  : "~RESULT <= to_unsigned(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_unsigned(0,~SIZE[~TYPO]);"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Natural.naturalShiftL#"
+  , "kind"      : "Expression"
+  , "type"      : "naturalShiftL :: Natural -> Word# -> Natural"
+  , "template"  : "shift_left(~ARG[0],to_integer(~ARG[1]))"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Natural.naturalCompare"
+  , "kind"      : "Declaration"
+  , "type"      : "naturalCompare :: Natural -> Natural -> Ordering"
+  , "template"  :
+"-- begin naturalCompare
+~RESULT <= \"00\" when ~ARG[0] < ~ARG[1] else
+         \"01\" when ~ARG[0] = ~ARG[1] else
+         \"10\";
+-- end naturalCompare"
+  }
+}
 ]

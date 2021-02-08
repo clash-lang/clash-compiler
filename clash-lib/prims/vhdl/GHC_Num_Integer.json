@@ -7,6 +7,19 @@
     , "warning": "GHC.Num.Integer.integerToNatural: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
+  , { "BlackBox":
+    { "name": "GHC.Num.Integer.integerToNaturalThrow"
+    , "workInfo" : "Never"
+    , "kind": "Declaration"
+    , "type": "integerToNaturalThrow :: Integer -> Natural"
+    , "template":
+"-- integerToNaturalThrow begin
+~RESULT <= ~ERRORO when ~ARG[0] < ~SIZE[~TYP[0]]'d0 else
+           resize(unsigned(std_logic_vector(~ARG[0])),~SIZE[~TYPO]);
+-- integerToNaturalThrow end"
+    , "warning": "GHC.Num.Integer.integerToNaturalThrow: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
+    }
+  }
 , { "BlackBox":
     { "name": "GHC.Num.Integer.integerToNaturalClamp"
     , "workInfo" : "Never"
@@ -17,7 +30,7 @@
 ~RESULT <= to_unsigned(0,~SIZE[~TYPO]]) when ~ARG[0] < ~SIZE[~TYP[0]]'d0 else
            resize(unsigned(std_logic_vector(~ARG[0])),~SIZE[~TYPO]);
 -- integerToNaturalClamp end"
-    , "warning": "GHC.Num.Integer.integerToNatural: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
+    , "warning": "GHC.Num.Integer.integerToNaturalClamp: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
