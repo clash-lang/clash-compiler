@@ -8,7 +8,6 @@ evaluation to check whether it is possible to perform changes without
 duplicating work in the result, e.g. inlining.
 -}
 
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -60,38 +59,59 @@ isWorkFreeBinder cache bndrs bndr =
 -- result for querying work info of global binders.
 --
 isWorkFree
-  :: (MonadState s m)
+  :: forall s m
+   . (MonadState s m)
   => Lens' s (VarEnv Bool)
   -> BindingMap
   -> Term
   -> m Bool
-isWorkFree cache bndrs (collectArgs -> (fun,args)) = case fun of
-  Var i ->
-    if | isPolyFunTy (varType i) -> pure False
-       | isLocalId i -> pure True
-       | otherwise -> andM [isWorkFreeBinder cache bndrs i, allM isWorkFreeArg args]
-  Data {} -> allM isWorkFreeArg args
-  Literal {} -> pure True
-  Prim pInfo -> case primWorkInfo pInfo of
-    -- We can ignore the arguments, because this primitive outputs a constant
-    -- regardless of its arguments
-    WorkConstant -> pure True
-    WorkNever -> allM isWorkFreeArg args
-    WorkVariable -> pure (all isConstantArg args)
-    -- Things like clock or reset generator always perform work
-    WorkAlways -> pure False
-  Lam _ e -> andM [isWorkFree cache bndrs e, allM isWorkFreeArg args]
-  TyLam _ e -> andM [isWorkFree cache bndrs e, allM isWorkFreeArg args]
-  Letrec bs e ->
-    andM [isWorkFree cache bndrs e, allM (isWorkFree cache bndrs . snd) bs, allM isWorkFreeArg args]
-  Case s _ [(_,a)] ->
-    andM [isWorkFree cache bndrs s, isWorkFree cache bndrs a, allM isWorkFreeArg args]
-  Cast e _ _ ->
-    andM [isWorkFree cache bndrs e, allM isWorkFreeArg args]
-  _ ->
-    pure False
+isWorkFree cache bndrs = go True
  where
-  isWorkFreeArg e = eitherM (isWorkFree cache bndrs) (pure . const True) (pure e)
+  -- If we are in the outermost level of a term (i.e. not checking a subterm)
+  -- then a term is work free if it simply refers to a local variable. This
+  -- does not apply to subterms, as we do not want to count expressions like
+  --
+  --   f[LocalId] x[LocalId]
+  --
+  -- as being work free, as the term bound to f may introduce work.
+  --
+  go :: Bool -> Term -> m Bool
+  go isOutermost (collectArgs -> (fun, args)) =
+    case fun of
+      Var i
+        -- We only allow polymorphic / function typed variables to be inlined
+        -- if they are locally scoped, and the term is only a variable.
+        --
+        -- TODO This could be improved later by passing an InScopeSet to
+        -- isWorkFree with all the local FVs of the term being checked. PE
+        -- would need to be changed to know the FVs of global binders first.
+        --
+        | isPolyFunTy (varType i) ->
+            pure (isLocalId i && isOutermost && null args)
+        | isLocalId i ->
+            pure True
+        | otherwise ->
+            andM [isWorkFreeBinder cache bndrs i, allM goArg args]
+
+      Data _ -> allM goArg args
+      Literal _ -> pure True
+      Prim pr ->
+        case primWorkInfo pr of
+          -- We can ignore arguments because the primitive outputs a constant
+          -- regardless of their values.
+          WorkConstant -> pure True
+          WorkNever -> allM goArg args
+          WorkVariable -> pure (all isConstantArg args)
+          WorkAlways -> pure False
+
+      Lam _ e -> andM [go False e, allM goArg args]
+      TyLam _ e -> andM [go False e, allM goArg args]
+      Letrec bs e -> andM [go False e, allM (go False . snd) bs, allM goArg args]
+      Case s _ [(_, a)] -> andM [go False s, go False a, allM goArg args]
+      Case e _ _ -> andM [go False e, allM goArg args]
+      _ -> pure False
+
+  goArg e = eitherM (go False) (pure . const True) (pure e)
   isConstantArg = either isConstant (const True)
 
 -- | Determine if a term represents a constant
