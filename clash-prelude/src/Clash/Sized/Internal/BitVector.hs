@@ -894,7 +894,7 @@ slice# (BV msk i) m n = BV (shiftR (msk .&. mask) n')
 replaceBit# :: KnownNat n => BitVector n -> Int -> Bit -> BitVector n
 replaceBit# bv@(BV m v) i (Bit mb b)
 #if MIN_VERSION_base(4,15,0)
-    | i >= 0 && i < sz = BV (clearBit m i .|. normalizeNat (naturalFromWord mb `shiftL` i))
+    | i >= 0 && i < sz = BV (clearBit m i .|. (naturalFromWord mb `shiftL` i))
 #else
     | i >= 0 && i < sz = BV (clearBit m i .|. (wordToNatural mb `shiftL` i))
 #endif

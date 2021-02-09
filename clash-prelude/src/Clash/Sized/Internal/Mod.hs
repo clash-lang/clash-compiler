@@ -371,13 +371,3 @@ naturalToInteger (NatJ# bn) = Jp# bn
 
 brokenInvariant :: a
 brokenInvariant = error "argument is larger than modulo"
-
-#if MIN_VERSION_base(4,15,0)
--- Work-around for issue https://gitlab.haskell.org/ghc/ghc/-/issues/19170
--- TODO: remove once https://gitlab.haskell.org/ghc/ghc/-/merge_requests/4736
--- is merged
-normalizeNat :: Natural -> Natural
-normalizeNat (NB r) = bigNatToNat r
-normalizeNat n = n
-{-# INLINE normalizeNat #-}
-#endif
