@@ -185,7 +185,7 @@ data EmptyTuple = EmptyTuple
 -- the argument type of 'bundle' should uniquely identify the result type, and
 -- vice versa for 'unbundle'. The type signatures in the snippet above don't
 -- though, as @()@ doesn't uniquely map to a specific domain. In other words,
--- 'domain' should occur in both the argument and result of both functions.
+-- @domain@ should occur in both the argument and result of both functions.
 --
 -- "TaggedEmptyTuple" tackles this by carrying the domain in its type. The
 -- 'bundle' and 'unbundle' instance now looks like:

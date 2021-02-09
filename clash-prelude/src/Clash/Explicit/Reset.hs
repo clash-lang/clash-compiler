@@ -98,7 +98,7 @@ import           GHC.TypeLits (type (+), KnownNat)
 -- topEntity clk asyncRst ena key1 =
 --   withClockResetEnable clk rst ena leds
 --  where
---   rst   = 'resetSynchronizer' clk asyncRst
+--   rst   = 'resetSynchronizer' clk asyncRst ena
 --   key1R = isRising 1 key1
 --   leds  = mealy blinkerT (1, False, 0) key1R
 -- @
@@ -117,7 +117,7 @@ import           GHC.TypeLits (type (+), KnownNat)
 --   -> Signal System (BitVector 8)
 -- topEntity clk rst ena key1 =
 --     let  (pllOut,pllStable) = altpll (SSymbol @"altpll50") clk rst
---          rstSync            = 'resetSynchronizer' pllOut (unsafeToHighPolarity pllStable)
+--          rstSync            = 'resetSynchronizer' pllOut (unsafeToHighPolarity pllStable) ena
 --     in   exposeClockResetEnable leds pllOut rstSync enableGen
 --   where
 --     key1R  = isRising 1 key1

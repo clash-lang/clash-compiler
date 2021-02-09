@@ -132,7 +132,7 @@ type family ResolveOrErr (dom :: Domain) (t :: Type) :: Domain where
 -- | Type class that specifies that a certain domain, /dom/, needs to be present
 -- in some other type, /r/. This is used to disambiguate what hidden clock,
 -- reset, and enable lines should be exposed in functions such as
--- 'withSpecificReset'.
+-- 'Clash.Signal.withSpecificReset'.
 --
 -- Functions in need of this class should use 'WithSpecificDomain' though, to
 -- force Clash to display an error instead of letting it silently pass.

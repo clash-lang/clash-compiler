@@ -5,6 +5,10 @@ Copyright : © 2015-2016, Christiaan Baaij,
 Licence   : Creative Commons 4.0 (CC BY 4.0) (https://creativecommons.org/licenses/by/4.0/)
 -}
 
+{-# LANGUAGE NoImplicitPrelude #-}
+
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+
 module Clash.Examples (
   -- * Decoders and Encoders
   -- $decoders_and_encoders
@@ -20,12 +24,17 @@ module Clash.Examples (
   )
 where
 
+import Clash.Prelude
+import Control.Lens
+import Control.Monad
+import Control.Monad.Trans.State
+
 {- $setup
 >>> :set -XDataKinds
 >>> :m -Clash.Explicit.Prelude
 >>> :m -Clash.Signal.Internal
 >>> import Clash.Prelude
->>> import Test.QuickCheck
+>>> import Test.QuickCheck ((===))
 >>> import Clash.Examples.Internal
 -}
 

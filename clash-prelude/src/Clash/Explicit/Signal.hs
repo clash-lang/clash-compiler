@@ -331,7 +331,7 @@ countSometimes clk rst en = s where
 -- | Clock generator for the 'System' clock domain.
 --
 -- __NB__: should only be used for simulation, and __not__ for the /testBench/
--- function. For the /testBench/ function, used 'tbSystemClockGen'
+-- function. For the /testBench/ function, used 'Clash.Explicit.Testbench.tbSystemClockGen'
 systemClockGen
   :: Clock System
 systemClockGen = clockGen
@@ -481,13 +481,13 @@ unsafeSynchronizer _clk1 _clk2 =
 -- with values appearing from the "future".
 veryUnsafeSynchronizer
   :: Int
-  -- ^ Period of clock belonging to 'dom1'
+  -- ^ Period of clock belonging to @dom1@
   -> Int
-  -- ^ Period of clock belonging to 'dom2'
+  -- ^ Period of clock belonging to @dom2@
   -> Signal dom1 a
   -> Signal dom2 a
 veryUnsafeSynchronizer t1 t2
-  -- this case is just an optimisation for when the periods are the same
+  -- this case is just an optimization for when the periods are the same
   | t1 == t2 = same
 
   | otherwise = go 0

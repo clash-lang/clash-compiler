@@ -65,7 +65,7 @@ topEntity clk20 rstBtn modeBtn =
 
   -- Signal coming from the reset button is low when pressed, and high when
   -- not pressed. We convert this signal to the polarity of our domain with
-  -- 'unsafeFromActiveLow'.
+  -- 'unsafeFromLowPolarity'.
   rst = unsafeFromLowPolarity rstBtn
 
   -- Instantiate a PLL: this stabilizes the incoming clock signal and indicates
@@ -80,7 +80,7 @@ topEntity clk20 rstBtn modeBtn =
 
   -- Synchronize reset to clock signal coming from PLL. We want the reset to
   -- remain active while the PLL is NOT stable, hence the conversion with
-  -- 'unsafeFromActiveLow'
+  -- 'unsafeFromLowPolarity'
   rstSync =
     resetSynchronizer
       clk50

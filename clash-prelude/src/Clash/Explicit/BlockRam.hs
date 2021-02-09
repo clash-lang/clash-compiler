@@ -82,7 +82,7 @@ cpu
 cpu regbank (memOut,instr) = (regbank',(rdAddr,(,aluOut) '<$>' wrAddrM,fromIntegral ipntr))
   where
     -- Current instruction pointer
-    ipntr = regbank '!!' PC
+    ipntr = regbank 'Clash.Sized.Vector.!!' PC
 
     -- Decoder
     (MachCode {..}) = case instr of
@@ -94,8 +94,8 @@ cpu regbank (memOut,instr) = (regbank',(rdAddr,(,aluOut) '<$>' wrAddrM,fromInteg
       Nop                  -> nullCode
 
     -- ALU
-    regX   = regbank '!!' inputX
-    regY   = regbank '!!' inputY
+    regX   = regbank 'Clash.Sized.Vector.!!' inputX
+    regY   = regbank 'Clash.Sized.Vector.!!' inputY
     aluOut = alu aluCode regX regY
 
     -- next instruction
@@ -104,10 +104,10 @@ cpu regbank (memOut,instr) = (regbank',(rdAddr,(,aluOut) '<$>' wrAddrM,fromInteg
                _                    -> ipntr + 1
 
     -- update registers
-    regbank' = 'replace' Zero   0
-             $ 'replace' PC     nextPC
-             $ 'replace' result aluOut
-             $ 'replace' ldReg  memOut
+    regbank' = 'Clash.Sized.Vector.replace' Zero   0
+             $ 'Clash.Sized.Vector.replace' PC     nextPC
+             $ 'Clash.Sized.Vector.replace' result aluOut
+             $ 'Clash.Sized.Vector.replace' ldReg  memOut
              $ regbank
 
 alu Add   x y = x + y
@@ -135,9 +135,9 @@ dataMem clk rst en rd wrM = 'Clash.Explicit.Mealy.mealy' clk rst en dataMemT ('C
   where
     dataMemT mem (rd,wrM) = (mem',dout)
       where
-        dout = mem '!!' rd
+        dout = mem 'Clash.Sized.Vector.!!' rd
         mem' = case wrM of
-                 Just (wr,din) -> 'replace' wr din mem
+                 Just (wr,din) -> 'Clash.Sized.Vector.replace' wr din mem
                  _ -> mem
 @
 
@@ -206,8 +206,9 @@ to see that our system indeed calculates that the GCD of 6 and 4 is 2.
 === Improvement 1: using @asyncRam@
 
 As you can see, it's fairly straightforward to build a memory using registers
-and read ('!!') and write ('replace') logic. This might however not result in
-the most efficient hardware structure, especially when building an ASIC.
+and read ('Clash.Sized.Vector.!!') and write ('Clash.Sized.Vector.replace')
+logic. This might however not result in the most efficient hardware structure,
+especially when building an ASIC.
 
 Instead it is preferable to use the 'Clash.Prelude.RAM.asyncRam' function which
 has the potential to be translated to a more efficient structure:
@@ -224,15 +225,16 @@ system2
 system2 instrs clk rst en = memOut
   where
     memOut = 'Clash.Explicit.RAM.asyncRam' clk clk en d32 rdAddr dout
-    (rdAddr,dout,ipntr) = 'mealyB' clk rst en cpu ('Clash.Sized.Vector.replicate' d7 0) (memOut,instr)
+    (rdAddr,dout,ipntr) = 'Clash.Explicit.Prelude.mealyB' clk rst en cpu ('Clash.Sized.Vector.replicate' d7 0) (memOut,instr)
     instr  = 'Clash.Prelude.ROM.asyncRom' instrs '<$>' ipntr
 @
 
 Again, we can simulate our system and see that it works. This time however,
 we need to disregard the first few output samples, because the initial content of an
-'Clash.Prelude.RAM.asyncRam' is 'undefined', and consequently, the first few
-output samples are also 'undefined'. We use the utility function 'printX' to conveniently
-filter out the undefinedness and replace it with the string "X" in the few leading outputs.
+'Clash.Prelude.RAM.asyncRam' is /undefined/, and consequently, the first few
+output samples are also /undefined/. We use the utility function
+'Clash.XException.printX' to conveniently filter out the undefinedness and
+replace it with the string "X" in the few leading outputs.
 
 @
 >>> printX $ sampleN 32 $ system2 prog systemClockGen resetGen enableGen
@@ -272,7 +274,7 @@ cpu2
 cpu2 (regbank,ldRegD) (memOut,instr) = ((regbank',ldRegD'),(rdAddr,(,aluOut) '<$>' wrAddrM,fromIntegral ipntr))
   where
     -- Current instruction pointer
-    ipntr = regbank '!!' PC
+    ipntr = regbank 'Clash.Sized.Vector.!!' PC
 
     -- Decoder
     (MachCode {..}) = case instr of
@@ -284,8 +286,8 @@ cpu2 (regbank,ldRegD) (memOut,instr) = ((regbank',ldRegD'),(rdAddr,(,aluOut) '<$
       Nop                  -> nullCode
 
     -- ALU
-    regX   = regbank '!!' inputX
-    regY   = regbank '!!' inputY
+    regX   = regbank 'Clash.Sized.Vector.!!' inputX
+    regY   = regbank 'Clash.Sized.Vector.!!' inputY
     aluOut = alu aluCode regX regY
 
     -- next instruction
@@ -295,10 +297,10 @@ cpu2 (regbank,ldRegD) (memOut,instr) = ((regbank',ldRegD'),(rdAddr,(,aluOut) '<$
 
     -- update registers
     ldRegD'  = ldReg -- Delay the ldReg by 1 cycle
-    regbank' = 'replace' Zero   0
-             $ 'replace' PC     nextPC
-             $ 'replace' result aluOut
-             $ 'replace' ldRegD memOut
+    regbank' = 'Clash.Sized.Vector.replace' Zero   0
+             $ 'Clash.Sized.Vector.replace' PC     nextPC
+             $ 'Clash.Sized.Vector.replace' result aluOut
+             $ 'Clash.Sized.Vector.replace' ldRegD memOut
              $ regbank
 @
 
@@ -316,7 +318,7 @@ system3
 system3 instrs clk rst en = memOut
   where
     memOut = 'blockRam' clk en (replicate d32 0) rdAddr dout
-    (rdAddr,dout,ipntr) = 'mealyB' clk rst en cpu2 (('Clash.Sized.Vector.replicate' d7 0),Zero) (memOut,instr)
+    (rdAddr,dout,ipntr) = 'Clash.Explicit.Prelude.mealyB' clk rst en cpu2 (('Clash.Sized.Vector.replicate' d7 0),Zero) (memOut,instr)
     instr  = 'Clash.Explicit.Prelude.asyncRom' instrs '<$>' ipntr
 @
 
@@ -361,8 +363,8 @@ prog2 = -- 0 := 4
 
 When we simulate our system we see that it works. This time again,
 we need to disregard the first sample, because the initial output of a
-'blockRam' is 'undefined'. We use the utility function 'printX' to conveniently
-filter out the undefinedness and replace it with the string "X".
+'blockRam' is /undefined/. We use the utility function 'Clash.XException.printX'
+to conveniently filter out the undefinedness and replace it with the string "X".
 
 @
 >>> printX $ sampleN 34 $ system3 prog2 systemClockGen resetGen enableGen
@@ -375,6 +377,7 @@ This concludes the short introduction to using 'blockRam'.
 -}
 
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE NoImplicitPrelude#-}
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -399,11 +402,12 @@ module Clash.Explicit.BlockRam
   )
 where
 
+import           Clash.HaskellPrelude
+
 import           Data.Maybe             (isJust)
 import qualified Data.Sequence          as Seq
 import           GHC.Stack              (HasCallStack, withFrozenCallStack)
 import           GHC.TypeLits           (KnownNat, type (^), type (<=))
-import           Prelude                hiding (length, replicate)
 
 import           Clash.Annotations.Primitive
   (hasBlackBox)
@@ -418,7 +422,7 @@ import           Clash.Sized.Index      (Index)
 import           Clash.Sized.Vector     (Vec, replicate, toList, iterateI)
 import qualified Clash.Sized.Vector     as CV
 import           Clash.XException
-  (maybeIsX, seqX, NFDataX, deepErrorX, defaultSeqX, fromJustX)
+  (maybeIsX, seqX, NFDataX, deepErrorX, defaultSeqX, fromJustX, undefined)
 
 {- $setup
 >>> :m -Clash.Prelude
@@ -691,7 +695,7 @@ prog2 = -- 0 := 4
 -- | Create a blockRAM with space for @n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is 'undefined'
+-- * __NB__: Initial output value is /undefined/
 --
 -- @
 -- bram40
@@ -737,7 +741,7 @@ blockRam = \clk gen content rd wrM ->
 -- | Create a blockRAM with space for 2^@n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is 'undefined'
+-- * __NB__: Initial output value is /undefined/
 --
 -- @
 -- bram32
@@ -870,7 +874,7 @@ blockRamU# clk en SNat =
     clk
     en
     (CV.map
-      (\i -> deepErrorX $ "Initial value at index " ++ show i ++ " undefined.")
+      (\i -> deepErrorX $ "Initial value at index " <> show i <> " undefined.")
       (iterateI @n succ (0 :: Int)))
 {-# NOINLINE blockRamU# #-}
 {-# ANN blockRamU# hasBlackBox #-}

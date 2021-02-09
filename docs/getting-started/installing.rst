@@ -57,7 +57,7 @@ available versions of the compiler. To run clashi, execute:
 .. code:: bash
 
    stack run clashi
-   
+
 To compile a file (to VHDL) with Clash, run:
 
 
@@ -97,7 +97,7 @@ Finally, run Clash using ``cabal``:
 
 .. code:: bash
 
-   cabal new-run --write-ghc-environment-files=always -- clash
+   cabal v2-run --write-ghc-environment-files=always -- clash
 
 Stack
 ~~~~~
@@ -119,4 +119,3 @@ the ``clash`` and ``clashi`` binaries on your PATH:
 .. code:: bash
 
    nix-shell
-

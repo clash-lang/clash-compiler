@@ -85,6 +85,7 @@ import Data.Int
 import GHC.Prim
 import GHC.TypeLits
 import GHC.Word
+import GHC.Stack
 import Data.Default.Class
 
 {- $setup
@@ -226,7 +227,7 @@ at the same time. If you followed the installation instructions, you already
 know how to start the Clash compiler in interpretive mode:
 
 @
-clash.clashi  # When installed from source, use 'clashi'
+clash.clashi  # When installed from source, use @clashi@
 @
 
 For those familiar with Haskell/GHC, this is indeed just @GHCi@, with three
@@ -415,12 +416,12 @@ macT acc inp = (ma acc inp, acc)
 
 Going back to the original specification we note the following:
 
-  * 'acc' is the current /state/ of the circuit.
-  * '(x, y)' is its input.
-  * 'acc'' is the updated, or next, /state/.
-  * 'o' is the output.
+  * @acc@ is the current /state/ of the circuit.
+  * @(x, y)@ is its input.
+  * @acc'@ is the updated, or next, /state/.
+  * @o@ is the output.
 
-When we examine the type of 'macT' we see that is still completely combinational:
+When we examine the type of @macT@ we see that is still completely combinational:
 
 >>> :t macT
 macT :: Num a => a -> (a, a) -> (a, a)
@@ -461,7 +462,7 @@ and have made an initial confirmation that it is working as expected.
 We are now almost at the point that we can create actual hardware, in the form
 of a <http://en.wikipedia.org/wiki/VHDL VHDL> netlist, from our sequential
 circuit specification. The first thing we have to do is create a function
-called 'topEntity' and ensure that it has a __monomorphic__ type. In our case
+called @topEntity@ and ensure that it has a __monomorphic__ type. In our case
 that means that we have to give it an explicit type annotation. It might not
 always be needed, you can always check the type with the @:t@ command and see
 if the function is monomorphic:
@@ -502,7 +503,7 @@ topEntity
 topEntity = 'exposeClockResetEnable' mac
 @
 
-The 'topEntity' function is the starting point for the Clash compiler to
+The @topEntity@ function is the starting point for the Clash compiler to
 transform your circuit description into a VHDL netlist. It must meet the
 following restrictions in order for the Clash compiler to work:
 
@@ -513,9 +514,9 @@ following restrictions in order for the Clash compiler to work:
     <Clash-Tutorial.html#annotations name assignment> in the generated HDL
     easier to do.
 
-Our 'topEntity' meets those restrictions, and so we can convert it successfully
+Our @topEntity@ meets those restrictions, and so we can convert it successfully
 to VHDL by executing the @:vhdl@ command in the interpreter. This will create
-a directory called 'vhdl', which contains a directory called @MAC@, which
+a directory called @vhdl@, which contains a directory called @MAC@, which
 ultimately contains all the generated VHDL files. You can now load these files
 into your favourite VHDL synthesis tool, marking @topentity.vhdl@ as the file
 containing the top level entity.
@@ -550,7 +551,7 @@ topEntity
   -> 'Enable' System
   -> 'Signal' System ('Signed' 9, 'Signed' 9)
   -> 'Signal' System ('Signed' 9)
-topEntity = 'exposeClockReset' mac
+topEntity = 'exposeClockResetEnable' mac
 
 testBench :: 'Signal' System Bool
 testBench = done
@@ -613,7 +614,7 @@ Verilog files end in the file extension @v@, while SystemVerilog files end in
 the file extension @sv@.
 
 This concludes the main part of this section on \"Your first circuit\", read on
-for alternative specifications for the same 'mac' circuit, or just skip to the
+for alternative specifications for the same @mac@ circuit, or just skip to the
 next section where we will describe another DSP classic: an FIR filter
 structure.
 -}
@@ -623,8 +624,8 @@ structure.
 
     @'Signal' a@ is also also considered a 'Num'eric type as long as the value
     type /a/ is also 'Num'eric.  This means that we can also use the standard
-    numeric operators, such as ('*') and ('+'), directly on signals. An
-    alternative specification of the 'mac' circuit will also use the 'register'
+    numeric operators, such as ('GHC.Num.*') and ('GHC.Num.+'), directly on signals. An
+    alternative specification of the @mac@ circuit will also use the 'register'
     function directly:
 
     @
@@ -635,8 +636,8 @@ structure.
 
 * __'Applicative' instance for 'Signal'__:
 
-    We can also mix the combinational 'ma' function, with the sequential
-    'register' function, by lifting the 'ma' function to the sequential 'Signal'
+    We can also mix the combinational @ma@ function, with the sequential
+    'register' function, by lifting the @ma@ function to the sequential 'Signal'
     domain using the operators ('<$>' and '<*>') of the 'Applicative' type
     class:
 
@@ -683,7 +684,7 @@ structure.
                 in  (s',o)
     @
 
-    We can then create the complete 'mac' circuit as:
+    We can then create the complete @mac@ circuit as:
 
     @
     macS = asStateM macTS 0
@@ -1025,7 +1026,7 @@ primitive definitions must have a @.json@ file-extension.
 Clash differentiates between two types of primitives, /expression/ primitives
 and /declaration/ primitives, corresponding to whether the primitive is a VHDL
 /expression/ or a VHDL /declaration/. We will first explore /expression/
-primitives, using 'Signed' multiplication ('*') as an example. The
+primitives, using 'Signed' multiplication (@*@) as an example. The
 "Clash.Sized.Internal.Signed" module specifies multiplication as follows:
 
 @
@@ -1053,9 +1054,9 @@ primitive the kind must be set to @Expression@. As the name suggest, it is a VHD
 tilde (~). Here:
 
   * @~ARG[1]@ denotes the second argument given to the @(*#)@ function, which
-    corresponds to the LHS of the ('*') operator.
+    corresponds to the LHS of the (@*@) operator.
   * @~ARG[2]@ denotes the third argument given to the @(*#)@ function, which
-    corresponds to the RHS of the ('*') operator.
+    corresponds to the RHS of the (@*@) operator.
   * @~LIT[0]@ denotes the first argument given to the @(*#)@ function, with
     the extra condition that it must be a @LIT@eral. If for some reason this
     first argument does not turn out to be a literal then the compiler will
@@ -1070,7 +1071,7 @@ corresponding to the methods of the type class. In the above case, 'KnownNat'
 is actually just like a @newtype@ wrapper for 'Integer'.
 
 The second kind of primitive that we will explore is the /declaration/ primitive.
-We will use 'blockRam#' as an example, for which the Haskell/Clash code is:
+We will use @blockRam#@ as an example, for which the Haskell/Clash code is:
 
 @
 {\-\# LANGUAGE BangPatterns \#\-\}
@@ -2103,7 +2104,7 @@ Here is a list of Haskell features for which the Clash compiler has only
            sorted = 'zipWith' compareSwapL ('lazyV' lefts) rights
         @
 
-        Where we can clearly see that 'lefts' and 'sorted' are defined in terms
+        Where we can clearly see that @lefts@ and @sorted@ are defined in terms
         of each other. Also the above @sortV@ function /is/ synthesizable.
 
     * __Static/Structure-dependent recursion__
@@ -2162,8 +2163,8 @@ Here is a list of Haskell features for which the Clash compiler has only
     @
     x =
       case 'resetKind' @@'System' of
-        SAsynchronous -> 'a'
-        SSynchronous -> 'b'
+        SAsynchronous -> \'a\'
+        SSynchronous -> \'b\'
     @
 
 * __Floating point types__
@@ -2522,7 +2523,7 @@ topEntity clk20 rstBtn modeBtn =
 
   -- Signal coming from the reset button is low when pressed, and high when
   -- not pressed. We convert this signal to the polarity of our domain with
-  -- 'unsafeFromActiveLow'.
+  -- 'unsafeFromLowPolarity'.
   rst = 'Clash.Signal.unsafeFromLowPolarity' rstBtn
 
   -- Instantiate a PLL: this stabilizes the incoming clock signal and indicates
@@ -2537,7 +2538,7 @@ topEntity clk20 rstBtn modeBtn =
 
   -- Synchronize reset to clock signal coming from PLL. We want the reset to
   -- remain active while the PLL is NOT stable, hence the conversion with
-  -- 'unsafeFromActiveLow'
+  -- 'unsafeFromLowPolarity'
   rstSync =
     'Clash.Signal.resetSynchronizer'
       clk50

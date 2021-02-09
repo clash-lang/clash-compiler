@@ -1,58 +1,78 @@
 include:
+  - '/.ci/gitlab/common.yml'
   - '/.ci/gitlab/publish.yml'
-  - '/.ci/gitlab/benchmark.yml'
-  - '/.ci/gitlab/tests.yml'
+#   - '/.ci/gitlab/benchmark.yml'
 
 stages:
-  # TODO: separate 'test' into 'build' and 'test'.
-  # - build
+  - pre
   - test
   - pack
   - pack-test
   - publish
+  - post
 
-# Haddock, doctests, unittests, clash-dev testing. These are single threaded
-# tests and therefore suitable for public runners.
-tests-8.4.4:
-  extends: .tests-interruptible
-tests-8.8.4:
-  extends: .tests-interruptible
-tests-8.10.2:
-  extends: .tests-interruptible
-tests-8.6.5-singular-hidden:
-  extends: .tests-interruptible
+# Triggers child pipelines that runs tests for various GHC and Cabal versions.
+# Should be replaced by matrix builds in the future, but currently blocking on:
+# https://gitlab.com/gitlab-org/gitlab/-/issues/270957
+.common-trigger:
+  stage: test
+  needs: []
+  trigger:
+    include: .ci/gitlab/test.yml
+    strategy: depend
+
+tests-8.4:
+  extends: .common-trigger
   variables:
+    GHC_VERSION: 8.4.4
+    CABAL_VERSION: 2.4.1.0
+
+tests-8.6:
+  extends: .common-trigger
+  variables:
+    GHC_VERSION: 8.6.5
+    CABAL_VERSION: 3.0.0.0
     MULTIPLE_HIDDEN: "no"
 
-# Testsuite (HDL generation and simulation). Highly parallel and memory
-# intensive, should only picked up by beefy (local) runners.
-testsuite-8.4.4:
-  extends: .testsuite-interruptible
-testsuite-8.8.4:
-  extends: .testsuite-interruptible
-testsuite-8.10.2:
-  extends: .testsuite-interruptible
-testsuite-8.6.5-singular-hidden:
-  extends: .testsuite-interruptible
+tests-8.8:
+  extends: .common-trigger
   variables:
-    MULTIPLE_HIDDEN: "no"
+    GHC_VERSION: 8.8.4
+    CABAL_VERSION: 3.2.0.0
 
-# Tests on master. These are marked non-interruptible so we can receive e-mails
-# on failed jobs, without receiving false negatives.
-ghc-8.4.4-master:
-  extends: .tests-non-interruptible
-ghc-8.8.4-master:
-  extends: .tests-non-interruptible
-ghc-8.10.2-master:
-  extends: .tests-non-interruptible
-ghc-8.6.5-singular-hidden-master:
-  extends: .tests-non-interruptible
+tests-8.10:
+  extends: .common-trigger
   variables:
-    MULTIPLE_HIDDEN: "no"
+    GHC_VERSION: 8.10.3
+    CABAL_VERSION: 3.2.0.0
 
-# Run benchmarks for isclashfastyet.com
-benchmark-8.10.2:
-  extends: .benchmark
+tests-9.0:
+  extends: .common-trigger
+  variables:
+    GHC_HEAD: "yes" # We need the HEAD overlay for now
+    GHC_VERSION: 9.0.1
+    CABAL_VERSION: 3.4.0.0-rc4
+
+# Tests run on shared runners:
+haddock:
+  extends: .common
+  needs: []
+  stage: test
+  variables:
+    GHC_VERSION: 8.10.3
+    CABAL_VERSION: 3.2.0.0
+  artifacts:
+    paths:
+      - hadocs/*/*
+    expire_in: 1 month
+  script:
+    - .ci/build_docs.sh
+  # Run on shared runners
+  tags:
+
+# # Run benchmarks for isclashfastyet.com
+# benchmark-8.10.2:
+#   extends: .benchmark
 
 # "Publish" a release candidate
 hackage-release-candidate:
@@ -91,3 +111,29 @@ snap-stable:
     RELEASE_CHANNEL: stable
   rules:
     - if: '$CI_COMMIT_TAG != null' # tags
+
+# Work around https://gitlab.com/gitlab-org/gitlab/-/issues/216629
+.github_status:
+  image: curlimages/curl
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+
+set_pending:
+  extends: .github_status
+  stage: pre
+  script:
+    - .ci/set_github_status.sh pending
+
+set_success:
+  extends: .github_status
+  stage: post
+  when: on_success
+  script:
+    - .ci/set_github_status.sh success
+
+set_failure:
+  extends: .github_status
+  stage: post
+  when: on_failure
+  script:
+    - .ci/set_github_status.sh failure

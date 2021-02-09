@@ -76,6 +76,7 @@ module Clash.Signal.Trace
   , Value
   , Width
   , TraceMap
+  , TypeRepBS
   -- ** Functions
   , traceSignal#
   , traceVecSignal#

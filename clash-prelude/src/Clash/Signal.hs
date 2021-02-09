@@ -24,16 +24,16 @@ domain looks like:
 'DomainConfiguration'
   { _name :: 'Domain'
   -- ^ Domain name
-  , _period :: 'Nat'
+  , _period :: 'Clash.Promoted.Nat.Nat'
   -- ^ Clock period in /ps/
-  , _edge :: 'ActiveEdge'
+  , _activeEdge :: 'ActiveEdge'
   -- ^ Active edge of the clock
-  , _reset :: 'ResetKind'
+  , _resetKind :: 'ResetKind'
   -- ^ Whether resets are synchronous (edge-sensitive) or asynchronous (level-sensitive)
-  , _init :: 'InitBehavior'
+  , _initBehavior :: 'InitBehavior'
   -- ^ Whether the initial (or "power up") value of memory elements is
   -- unknown/undefined, or configurable to a specific value
-  , _polarity :: ResetPolarity
+  , _resetPolarity :: ResetPolarity
   -- ^ Whether resets are active high or active low
   }
 @
@@ -49,7 +49,7 @@ instance KnownDomain "System" where
   knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
 @
 
-In words, "System" is a synthesis domain with a clock running with a period
+In words, \"System\" is a synthesis domain with a clock running with a period
 of 10000 /ps/. Memory elements respond to the rising edge of the clock,
 asynchronously to changes in their resets, and have defined power up values
 if applicable.
@@ -251,6 +251,11 @@ module Clash.Signal
   , readFromBiSignal
   , writeToBiSignal
   , mergeBiSignalOuts
+
+    -- * Internals
+  , HiddenClockName
+  , HiddenResetName
+  , HiddenEnableName
   )
 where
 
@@ -309,7 +314,7 @@ let countSometimes = s where
 
 -}
 
--- * Hidden clock and reset arguments
+-- * Hidden clock, reset, and enable arguments
 
 {- $hiddenclockandreset #hiddenclockandreset#
 Clocks and resets are by default implicitly routed to their components. You can
@@ -327,7 +332,7 @@ Constraint.
 Or it has a hidden reset when it has a:
 
 @
-g :: 'HiddenReset' dom polarity => ...
+g :: 'HiddenReset' dom => ...
 @
 
 Constraint.
@@ -336,30 +341,30 @@ Or it has both a hidden clock argument and a hidden reset argument when it
 has a:
 
 @
-h :: 'HiddenClockReset' dom  => ..
+h :: 'HiddenClockResetEnable' dom  => ..
 @
 
 Constraint.
 
 Given a component with an explicit clock and reset arguments, you can turn them
-into hidden arguments using 'hideClock' and 'hideReset'. So given a:
+into hidden arguments using 'hideClock', 'hideReset', and 'hideEnable'. So given a:
 
 @
-f :: Clock dom -> Reset dom -> Signal dom a -> ...
+f :: Clock dom -> Reset dom -> Enable dom -> Signal dom a -> ...
 @
 
 You hide the clock and reset arguments by:
 
 @
--- g :: 'HiddenClockReset' dom  => Signal dom a -> ...
-g = 'hideClockReset' f
+-- g :: 'HiddenClockResetEnable' dom  => Signal dom a -> ...
+g = 'hideClockResetEnable' f
 @
 
 Or, alternatively, by:
 
 @
--- h :: HiddenClockResetEnable dom  => Signal dom a -> ...
-h = f 'hasClock' 'hasReset'
+-- h :: 'HiddenClockResetEnable' dom  => Signal dom a -> ...
+h = f 'hasClock' 'hasReset' 'hasEnable'
 @
 
 === Assigning explicit clock and reset arguments to hidden clocks and resets
@@ -367,7 +372,7 @@ h = f 'hasClock' 'hasReset'
 Given a component:
 
 @
-f :: HiddenClockResetEnable dom
+f :: 'HiddenClockResetEnable' dom
   => Signal dom Int
   -> Signal dom Int
 @
@@ -395,29 +400,34 @@ components such as PPLs and 'resetSynchronizer':
 
 @
 topEntity
-  :: Clock System
-  -> Reset System
-  -> Enable System
-  -> Signal System Int
-  -> Signal System Int
-topEntity clk rst =
-  let (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' (SSymbol \@\"altpll50\") clk rst
-      rstSync            = 'resetSynchronizer' pllOut ('unsafeToAsyncReset' pllStable)
-  in  'exposeClockResetEnable' f pllOut rstSync
+  :: Clock  System
+  -> Reset  System
+  -> Signal System Bit
+  -> Signal System (BitVector 8)
+topEntity clk rst ena key1 =
+    let  (pllOut,pllStable) = altpll (SSymbol \@\"altpll50\") clk rst
+         rstSync            = 'resetSynchronizer' pllOut (unsafeToHighPolarity pllStable) ena
+    in   exposeClockResetEnable leds pllOut rstSync enableGen
+  where
+    key1R  = isRising 1 key1
+    leds   = mealy blinkerT (1, False, 0) key1R
 @
 
 or, using the alternative method:
 
 @
-topEntity2
-  :: Clock System
-  -> Reset System
-  -> Signal System Int
-  -> Signal System Int
-topEntity2 clk rst =
-  let (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' (SSymbol \@\"altpll50\") clk rst
-      rstSync            = 'resetSynchronizer' pllOut ('unsafeToAsyncReset' pllStable)
-  in  'withClockReset' pllOut rstSync f
+topEntity
+  :: Clock  System
+  -> Reset  System
+  -> Signal System Bit
+  -> Signal System (BitVector 8)
+topEntity clk rst ena key1 =
+    let  (pllOut,pllStable) = altpll (SSymbol \@\"altpll50\") clk rst
+         rstSync            = 'resetSynchronizer' pllOut (unsafeToHighPolarity pllStable) ena
+    in   'withClockResetEnable' pllOut rstSync enableGen leds
+  where
+    key1R  = isRising 1 key1
+    leds   = mealy blinkerT (1, False, 0) key1R
 @
 
 -}
@@ -1410,7 +1420,7 @@ infixr 3 `register`
 --
 -- countSometimes = s where
 --   s     = 'regMaybe' 0 (plusM ('pure' '<$>' s) sometimes1)
---   plusM = 'liftA2' (liftA2 (+))
+--   plusM = 'Control.Applicative.liftA2' (liftA2 (+))
 -- @
 --
 -- We get:

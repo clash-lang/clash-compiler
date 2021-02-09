@@ -350,7 +350,7 @@ flush (File fp) = SimIO (IO.hFlush fp)
 --     rst = resetGen
 --     ena = enableGen
 --
---     regOut = register clk rst ena (fromEnum 'a') regIn
+--     regOut = register clk rst ena (fromEnum \'a\') regIn
 --     regIn  = 'mealyIO' clk tbMachine tbInit regOut
 -- @
 mealyIO

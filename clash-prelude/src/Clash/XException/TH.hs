@@ -9,6 +9,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 module Clash.XException.TH
   ( mkShowXTupleInstances
   , mkNFDataXTupleInstances
+  , mkShowXTupleInstance
   ) where
 
 import Data.Either (isLeft)

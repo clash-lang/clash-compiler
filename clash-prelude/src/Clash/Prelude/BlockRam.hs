@@ -84,10 +84,10 @@ cpu :: Vec 7 Value          -- ^ Register bank
        , (MemAddr, Maybe (MemAddr,Value), InstrAddr)
        )
 cpu regbank (memOut, instr) =
-  (regbank', (rdAddr, (,aluOut) '<$>' wrAddrM, fromIntegral ipntr))
+  (regbank', (rdAddr, (,aluOut) 'Prelude.<$>' wrAddrM, fromIntegral ipntr))
  where
   -- Current instruction pointer
-  ipntr = regbank '!!' PC
+  ipntr = regbank 'Clash.Sized.Vector.!!' PC
 
   -- Decoder
   (MachCode {..}) = case instr of
@@ -99,8 +99,8 @@ cpu regbank (memOut, instr) =
     Nop                  -> nullCode
 
   -- ALU
-  regX   = regbank '!!' inputX
-  regY   = regbank '!!' inputY
+  regX   = regbank 'Clash.Sized.Vector.!!' inputX
+  regY   = regbank 'Clash.Sized.Vector.!!' inputY
   aluOut = alu aluCode regX regY
 
   -- next instruction
@@ -110,10 +110,10 @@ cpu regbank (memOut, instr) =
       _                    -> ipntr + 1
 
   -- update registers
-  regbank' = 'replace' Zero   0
-           $ 'replace' PC     nextPC
-           $ 'replace' result aluOut
-           $ 'replace' ldReg  memOut
+  regbank' = 'Clash.Sized.Vector.replace' Zero   0
+           $ 'Clash.Sized.Vector.replace' PC     nextPC
+           $ 'Clash.Sized.Vector.replace' result aluOut
+           $ 'Clash.Sized.Vector.replace' ldReg  memOut
            $ regbank
 
 alu Add   x y = x + y
@@ -135,14 +135,14 @@ dataMem
   -> Signal dom Value
   -- ^ data out
 dataMem rd wrM =
-  'Clash.Prelude.Mealy.mealy' dataMemT ('replicate' d32 0) (bundle (rd,wrM))
+  'Clash.Prelude.Mealy.mealy' dataMemT ('Clash.Sized.Vector.replicate' d32 0) (bundle (rd,wrM))
  where
   dataMemT mem (rd,wrM) = (mem',dout)
     where
-      dout = mem '!!' rd
+      dout = mem 'Clash.Sized.Vector.!!' rd
       mem' =
         case wrM of
-          Just (wr,din) -> 'replace' wr din mem
+          Just (wr,din) -> 'Clash.Sized.Vector.replace' wr din mem
           _             -> mem
 @
 
@@ -158,8 +158,8 @@ system
 system instrs = memOut
   where
     memOut = dataMem rdAddr dout
-    (rdAddr, dout, ipntr) = 'Clash.Prelude.Mealy.mealyB' cpu ('replicate' d7 0) (memOut,instr)
-    instr  = 'Clash.Prelude.ROM.asyncRom' instrs '<$>' ipntr
+    (rdAddr, dout, ipntr) = 'Clash.Prelude.Mealy.mealyB' cpu ('Clash.Sized.Vector.replicate' d7 0) (memOut,instr)
+    instr  = 'Clash.Prelude.ROM.asyncRom' instrs 'Prelude.<$>' ipntr
 @
 
 Create a simple program that calculates the GCD of 4 and 6:
@@ -209,8 +209,9 @@ to see that our system indeed calculates that the GCD of 6 and 4 is 2.
 === Improvement 1: using @asyncRam@
 
 As you can see, it's fairly straightforward to build a memory using registers
-and read ('!!') and write ('replace') logic. This might however not result in
-the most efficient hardware structure, especially when building an ASIC.
+and read ('Clash.Sized.Vector.!!') and write ('Clash.Sized.Vector.replace')
+logic. This might however not result in the most efficient hardware structure,
+especially when building an ASIC.
 
 Instead it is preferable to use the 'Clash.Prelude.RAM.asyncRam' function which
 has the potential to be translated to a more efficient structure:
@@ -224,15 +225,16 @@ system2
 system2 instrs = memOut
   where
     memOut = 'Clash.Prelude.RAM.asyncRam' d32 rdAddr dout
-    (rdAddr,dout,ipntr) = 'mealyB' cpu ('replicate' d7 0) (memOut,instr)
-    instr  = 'Clash.Prelude.ROM.asyncRom' instrs '<$>' ipntr
+    (rdAddr,dout,ipntr) = 'Clash.Prelude.mealyB' cpu ('Clash.Sized.Vector.replicate' d7 0) (memOut,instr)
+    instr  = 'Clash.Prelude.ROM.asyncRom' instrs 'Prelude.<$>' ipntr
 @
 
 Again, we can simulate our system and see that it works. This time however,
 we need to disregard the first few output samples, because the initial content of an
-'Clash.Prelude.RAM.asyncRam' is 'undefined', and consequently, the first few
-output samples are also 'undefined'. We use the utility function 'printX' to conveniently
-filter out the undefinedness and replace it with the string "X" in the few leading outputs.
+'Clash.Prelude.RAM.asyncRam' is 'Clash.XException.undefined', and consequently, the first few
+output samples are also 'Clash.XException.undefined'. We use the utility function
+'Clash.XException.printX' to conveniently filter out the undefinedness and
+replace it with the string "X" in the few leading outputs.
 
 @
 >>> printX $ sampleN @System 32 (system2 prog)
@@ -270,10 +272,10 @@ cpu2
      , (MemAddr, Maybe (MemAddr, Value), InstrAddr)
      )
 cpu2 (regbank,ldRegD) (memOut,instr) =
-  ((regbank', ldRegD'), (rdAddr, (,aluOut) '<$>' wrAddrM, fromIntegral ipntr))
+  ((regbank', ldRegD'), (rdAddr, (,aluOut) 'Prelude.<$>' wrAddrM, fromIntegral ipntr))
  where
   -- Current instruction pointer
-  ipntr = regbank '!!' PC
+  ipntr = regbank 'Clash.Sized.Vector.!!' PC
 
   -- Decoder
   (MachCode {..}) = case instr of
@@ -285,8 +287,8 @@ cpu2 (regbank,ldRegD) (memOut,instr) =
     Nop                  -> nullCode
 
   -- ALU
-  regX   = regbank '!!' inputX
-  regY   = regbank '!!' inputY
+  regX   = regbank 'Clash.Sized.Vector.!!' inputX
+  regY   = regbank 'Clash.Sized.Vector.!!' inputY
   aluOut = alu aluCode regX regY
 
   -- next instruction
@@ -297,10 +299,10 @@ cpu2 (regbank,ldRegD) (memOut,instr) =
 
   -- update registers
   ldRegD'  = ldReg  -- Delay the ldReg by 1 cycle
-  regbank' = 'replace' Zero   0
-           $ 'replace' PC     nextPC
-           $ 'replace' result aluOut
-           $ 'replace' ldRegD memOut
+  regbank' = 'Clash.Sized.Vector.replace' Zero   0
+           $ 'Clash.Sized.Vector.replace' PC     nextPC
+           $ 'Clash.Sized.Vector.replace' result aluOut
+           $ 'Clash.Sized.Vector.replace' ldRegD memOut
            $ regbank
 @
 
@@ -315,8 +317,8 @@ system3
 system3 instrs = memOut
   where
     memOut = 'blockRam' (replicate d32 0) rdAddr dout
-    (rdAddr,dout,ipntr) = 'mealyB' cpu2 (('replicate' d7 0),Zero) (memOut,instr)
-    instr  = 'Clash.Prelude.ROM.asyncRom' instrs '<$>' ipntr
+    (rdAddr,dout,ipntr) = 'Clash.Prelude.mealyB' cpu2 (('Clash.Sized.Vector.replicate' d7 0),Zero) (memOut,instr)
+    instr  = 'Clash.Prelude.ROM.asyncRom' instrs 'Prelude.<$>' ipntr
 @
 
 We are, however, not done. We will also need to update our program. The reason
@@ -360,8 +362,8 @@ prog2 = -- 0 := 4
 
 When we simulate our system we see that it works. This time again,
 we need to disregard the first sample, because the initial output of a
-'blockRam' is 'undefined'. We use the utility function 'printX' to conveniently
-filter out the undefinedness and replace it with the string "X".
+'blockRam' is 'Clash.XException.undefined'. We use the utility function 'Clash.XException.printX'
+to conveniently filter out the undefinedness and replace it with the string "X".
 
 @
 >>> printX $ sampleN @System 34 (system3 prog2)
@@ -374,6 +376,7 @@ This concludes the short introduction to using 'blockRam'.
 -}
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE GADTs #-}
 
 {-# LANGUAGE Safe #-}
@@ -391,6 +394,8 @@ module Clash.Prelude.BlockRam
   , readNew
   )
 where
+
+import           Prelude                 (Enum, Maybe, Eq)
 
 import           GHC.TypeLits            (KnownNat, type (^), type (<=))
 import           GHC.Stack               (HasCallStack, withFrozenCallStack)
@@ -668,7 +673,7 @@ prog2 = -- 0 := 4
 -- | Create a blockRAM with space for @n@ elements.
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is 'undefined'
+-- * __NB__: Initial output value is 'Clash.XException.undefined'
 --
 -- @
 -- bram40
@@ -716,9 +721,9 @@ blockRamU
      , Enum addr
      , 1 <= n )
   => E.ResetStrategy r
-  -- ^ Whether to clear BRAM on asserted reset ('ClearOnReset') or
-  -- not ('NoClearOnReset'). Reset needs to be asserted at least /n/ cycles to
-  -- clear the BRAM.
+  -- ^ Whether to clear BRAM on asserted reset ('Clash.Explicit.BlockRam.ClearOnReset')
+  -- or not ('Clash.Explicit.BlockRam.NoClearOnReset'). Reset needs to be
+  -- asserted at least /n/ cycles to clear the BRAM.
   -> SNat n
   -- ^ Number of elements in BRAM
   -> (Index n -> a)
@@ -744,9 +749,9 @@ blockRam1
      , Enum addr
      , 1 <= n )
   => E.ResetStrategy r
-  -- ^ Whether to clear BRAM on asserted reset ('ClearOnReset') or
-  -- not ('NoClearOnReset'). Reset needs to be asserted at least /n/ cycles to
-  -- clear the BRAM.
+  -- ^ Whether to clear BRAM on asserted reset ('Clash.Explicit.BlockRam.ClearOnReset')
+  -- or not ('Clash.Explicit.BlockRam.NoClearOnReset'). Reset needs to be
+  -- asserted at least /n/ cycles to clear the BRAM.
   -> SNat n
   -- ^ Number of elements in BRAM
   -> a
@@ -765,7 +770,7 @@ blockRam1 =
 -- | Create a blockRAM with space for 2^@n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is 'undefined'
+-- * __NB__: Initial output value is 'Clash.XException.undefined'
 --
 -- @
 -- bram32

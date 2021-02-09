@@ -138,7 +138,7 @@ import Clash.HaskellPrelude
 
 import Clash.Annotations.TopEntity
 import Clash.Class.AutoReg
-import Clash.Class.BitPack
+import Clash.Class.BitPack hiding (GBitPack(..))
 import Clash.Class.Exp
 import Clash.Class.Num
 import Clash.Class.Resize

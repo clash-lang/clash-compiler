@@ -12,6 +12,9 @@ module Clash.Class.HasDomain.Common
   , (:<<>>:)
   , (:$$$:)
   , (:++:)
+
+  -- * Internal
+  , ToEM
   ) where
 
 import           GHC.TypeLits               (Symbol)

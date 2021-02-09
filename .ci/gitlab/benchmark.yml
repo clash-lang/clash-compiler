@@ -34,7 +34,7 @@
     - export CABAL_JOBS=1
     - export
     - .ci/setup.sh
-    - cabal new-run --write-ghc-environment-files=always benchmark -- --csv benchmark.csv
+    - cabal v2-run --write-ghc-environment-files=always benchmark -- --csv benchmark.csv
   # Benchmarks should be stuck to one (or multiple identical) machine(s). We
   # currently have just a single one, which goes down due to power outages :-(.
   # As long as we haven't setup isclashfastyet.com it might as well can run on

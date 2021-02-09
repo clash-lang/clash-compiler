@@ -78,22 +78,26 @@ lit = Assertion IsNotTemporal . CvLit
 
 -- | Truth table for 'not':
 --
+-- @
 -- a     | not a
 -- ------------
 -- True  | False
 -- False | True
+-- @
 not :: AssertionValue dom a => a -> Assertion dom
 not (toAssertionValue -> a) = Assertion (isTemporal a) (CvNot (assertion a))
 {-# INLINE not #-}
 
 -- | Truth table for 'and':
 --
+-- @
 -- a     | b     | a `and` b
 -- --------------|----------
 -- False | False | False
 -- False | True  | False
 -- True  | False | False
 -- True  | True  | True
+-- @
 and :: (AssertionValue dom a, AssertionValue dom b) => a -> b -> Assertion dom
 and (toAssertionValue -> a) (toAssertionValue -> b) =
   Assertion
@@ -103,12 +107,14 @@ and (toAssertionValue -> a) (toAssertionValue -> b) =
 
 -- | Truth table for 'or':
 --
+-- @
 -- a     | b     | a `or` b
 -- --------------|---------
 -- False | False | False
 -- False | True  | True
 -- True  | False | True
 -- True  | True  | True
+-- @
 or :: (AssertionValue dom a, AssertionValue dom b) => a -> b -> Assertion dom
 or (toAssertionValue -> a) (toAssertionValue -> b) =
   Assertion
@@ -119,12 +125,14 @@ or (toAssertionValue -> a) (toAssertionValue -> b) =
 -- |
 -- Truth table for 'implies':
 --
+-- @
 -- a     | b     | a `implies` b
 -- --------------|--------------
 -- False | False | True
 -- False | True  | True
 -- True  | False | False
 -- True  | True  | True
+-- @
 implies :: (AssertionValue dom a, AssertionValue dom b) => a -> b -> Assertion dom
 implies (toAssertionValue -> Assertion aTmp a) (toAssertionValue -> Assertion bTmp b) =
   Assertion (max aTmp bTmp) (CvImplies a b)
@@ -132,30 +140,34 @@ implies (toAssertionValue -> Assertion aTmp a) (toAssertionValue -> Assertion bT
 
 -- | Truth table for 'next':
 --
+-- @
 -- a[n]  | a[n+1] | a `implies` next a
 -- ---------------|-------------------
 -- False | False  | True
 -- False | True   | True
 -- True  | False  | False
 -- True  | True   | True
+-- @
 --
--- where a[n] represents the value of 'a' at cycle 'n' and a[n+1] represents
--- the value of 'a' at cycle 'n+1'. Cycle n is an arbitrary cycle.
+-- where a[n] represents the value of @a@ at cycle @n@ and @a[n+1]@ represents
+-- the value of @a@ at cycle @n+1@. Cycle n is an arbitrary cycle.
 next :: AssertionValue dom a => a -> Assertion dom
 next = nextN 1
 {-# INLINE next #-}
 
 -- | Truth table for 'nextN':
 --
+-- @
 -- a[n]  | a[n+m] | a `implies` next m a
 -- ---------------|---------------------
 -- False | False  | True
 -- False | True   | True
 -- True  | False  | False
 -- True  | True   | True
+-- @
 --
--- where a[n] represents the value of 'a' at cycle 'n' and a[n+m] represents
--- the value of 'a' at cycle 'n+m'. Cycle n is an arbitrary cycle.
+-- where a[n] represents the value of @a@ at cycle @n@ and a[n+m] represents
+-- the value of @a@ at cycle @n+m@. Cycle n is an arbitrary cycle.
 nextN :: AssertionValue dom a => Word -> a -> Assertion dom
 nextN n = Assertion IsTemporal . CvNext n . assertion . toAssertionValue
 {-# INLINE nextN #-}

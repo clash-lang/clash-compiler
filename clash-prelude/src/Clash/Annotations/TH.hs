@@ -142,7 +142,7 @@ unarrow :: Type -> [Type]
 unarrow (ArrowTy x y) = x : unarrow y
 unarrow _ = []
 
--- | Collapse a list of 'PortNames' into a single 'PortName'
+-- | Collapse a list of 'PortName's into a single 'PortName'
 collapseNames :: [PortName] -> [PortName]
 collapseNames [] = []
 collapseNames [x] = [x]
@@ -179,7 +179,7 @@ datatypeVars' d = name <$> datatypeVars d
 
 -- | Run a 'Name' through the template haskell machinery, getting a
 -- 'DatatypeInfo' if the 'Name' specified a datatype. The result is processed by
--- a given function or a default 'a' is returned in the style of 'maybe'.
+-- a given function or a default @a@ is returned in the style of 'maybe'.
 tryReifyDatatype :: a -> (DatatypeInfo -> a) -> Name -> Tracked Q a
 tryReifyDatatype a f name = lift (recover (pure a) $ f <$> reifyDatatype name)
 

@@ -28,6 +28,9 @@ module Clash.Class.BitPack
   , boolToBit
   , bitToBool
   , packXWith
+
+  -- * Internals
+  , GBitPack(..)
   )
 where
 

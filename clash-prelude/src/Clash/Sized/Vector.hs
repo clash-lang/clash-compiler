@@ -129,7 +129,8 @@ import Prelude                    hiding ((++), (!!), concat, concatMap, drop,
                                           unzip3, zip, zip3, zipWith, zipWith3)
 import qualified Data.String.Interpolate as I
 import qualified Prelude          as P
-import Test.QuickCheck            (Arbitrary (..), CoArbitrary (..))
+import Test.QuickCheck
+  (Arbitrary(arbitrary, shrink), CoArbitrary(coarbitrary))
 import Unsafe.Coerce              (unsafeCoerce)
 
 import Clash.Annotations.Primitive
@@ -2444,7 +2445,7 @@ forceV v =
 {-# INLINE forceV #-}
 
 -- | Evaluate all elements of a vector to WHNF, returning the second argument.
--- Does not propagate 'XException's.
+-- Does not propagate 'Clash.XException.XException's.
 seqVX
   :: KnownNat n
   => Vec n a
@@ -2456,7 +2457,8 @@ seqVX v b =
 {-# NOINLINE seqVX #-}
 infixr 0 `seqVX`
 
--- | Evaluate all elements of a vector to WHNF. Does not propagate 'XException's.
+-- | Evaluate all elements of a vector to WHNF. Does not propagate
+-- 'Clash.XException.XException's.
 forceVX
   :: KnownNat n
   => Vec n a
