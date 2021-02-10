@@ -156,6 +156,7 @@ import Data.Data                  (Data)
 import Data.Default.Class         (Default (..))
 import Data.Hashable              (Hashable)
 import Data.Proxy                 (Proxy(..))
+import Data.Ratio                 (Ratio)
 import Data.Type.Equality         ((:~:))
 import GHC.Generics               (Generic)
 import GHC.Stack                  (HasCallStack)
@@ -1420,24 +1421,23 @@ simulate_lazy f = sample_lazy . f . fromList_lazy
 -- i.e. to calculate the clock period for a circuit to run at 240 MHz we get
 --
 -- >>> hzToPeriod 240e6
--- 4167
+-- 4166
 --
 -- __NB__: This function is /not/ synthesizable
--- __NB__: This function is lossy. I.e., hzToPeriod . periodToHz /= id.
-hzToPeriod :: HasCallStack => Double -> Natural
-hzToPeriod freq | freq <= 0.0 = error "Frequency must be strictly positive"
-                | otherwise   = ceiling ((1.0 / freq) / 1.0e-12)
+--
+-- __NB__: This function is lossy. I.e.,  periodToHz . hzToPeriod /= id.
+hzToPeriod :: HasCallStack => Ratio Natural -> Natural
+hzToPeriod freq = floor ((1.0 / freq) / 1.0e-12)
 
 -- | Calculate the frequence in __Hz__, given the period in __ps__
 --
 -- i.e. to calculate the clock frequency of a clock with a period of 5000 ps:
 --
 -- >>> periodToHz 5000
--- 2.0e8
+-- 200000000 % 1
 --
 -- __NB__: This function is /not/ synthesizable
--- __NB__: This function is lossy. I.e., hzToPeriod . periodToHz /= id.
-periodToHz :: Natural -> Double
+periodToHz :: Natural -> Ratio Natural
 periodToHz period = 1.0 / (1.0e-12 * fromIntegral period)
 
 -- | Build an 'Automaton' from a function over 'Signal's.

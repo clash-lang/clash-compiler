@@ -1839,7 +1839,7 @@ We can calculate the clock periods using 'hzToPeriod':
 >>> hzToPeriod 20e6
 50000
 >>> hzToPeriod 9e6
-111112
+111111
 
 We can then create the clock and reset domains:
 
