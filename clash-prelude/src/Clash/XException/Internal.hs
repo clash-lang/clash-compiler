@@ -27,20 +27,18 @@ CallStack (from HasCallStack):
 
 {-# LANGUAGE Trustworthy #-}
 
-{-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 module Clash.XException.Internal
   ( XException(..)
     -- * Printing 'XException's as \"X\"
-  , ShowX (..), showsX, showsPrecXWith
+  , showsX, showsPrecXWith
   , showXWith
-    -- * Structured undefined / deep evaluation with undefined values
-  , NFDataX (rnfX, deepErrorX, hasUndefined, ensureSpine)
 
     -- * Internals
   , GShowX(..), GDeepErrorX(..), GHasUndefined(..), GEnsureSpine(..)
   , GNFDataX(..), Zero, One, ShowType(..), RnfArgs(..), NFDataX1(..)
+  , showListX__, genericShowsPrecX
   )
 where
 
@@ -54,8 +52,7 @@ import           GHC.Exts
   (Char (C#), Double (D#), Float (F#), Int (I#), Word (W#))
 import           GHC.Generics
 import           GHC.Show            (appPrec)
-import           GHC.Stack
-  (HasCallStack, withFrozenCallStack)
+import           GHC.Stack           (HasCallStack)
 import           System.IO.Unsafe    (unsafeDupablePerformIO)
 
 -- | An exception representing an \"uninitialized\" value.
@@ -65,43 +62,6 @@ instance Show XException where
   show (XException s) = s
 
 instance Exception XException
-
--- | Like the 'Show' class, but values that normally throw an 'XException' are
--- converted to \"X\", instead of error'ing out with an exception.
---
--- >>> show (errorX "undefined" :: Integer, 4 :: Int)
--- "(*** Exception: X: undefined
--- CallStack (from HasCallStack):
--- ...
--- >>> showX (errorX "undefined" :: Integer, 4 :: Int)
--- "(X,4)"
---
--- Can be derived using 'GHC.Generics':
---
--- > {-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
--- >
--- > import Clash.Prelude
--- > import GHC.Generics
--- >
--- > data T = MkTA Int | MkTB Bool
--- >   deriving (Show,Generic,ShowX)
-class ShowX a where
-  -- | Like 'showsPrec', but values that normally throw an 'XException' are
-  -- converted to \"X\", instead of error'ing out with an exception.
-  showsPrecX :: Int -> a -> ShowS
-
-  -- | Like 'show', but values that normally throw an 'XException' are
-  -- converted to \"X\", instead of error'ing out with an exception.
-  showX :: a -> String
-  showX x = showsX x ""
-
-  -- | Like 'showList', but values that normally throw an 'XException' are
-  -- converted to \"X\", instead of error'ing out with an exception.
-  showListX :: [a] -> ShowS
-  showListX ls s = showListX__ showsX ls s
-
-  default showsPrecX :: (Generic a, GShowX (Rep a)) => Int -> a -> ShowS
-  showsPrecX = genericShowsPrecX
 
 -- | Like 'shows', but values that normally throw an 'XException' are
 -- converted to \"X\", instead of error'ing out with an exception.
@@ -142,60 +102,6 @@ showXWith f x =
 -- >   showsPrecX = showsPrecXWith showsPrec
 showsPrecXWith :: (Int -> a -> ShowS) -> Int -> a -> ShowS
 showsPrecXWith f n = showXWith (f n)
-
-
--- | Class that houses functions dealing with /undefined/ values in Clash. See
--- 'deepErrorX' and 'rnfX'.
-class NFDataX a where
-  -- | Create a value where all the elements have an 'Clash.XException.errorX',
-  -- but the spine is defined.
-  deepErrorX :: HasCallStack => String -> a
-
-  default deepErrorX :: (HasCallStack, Generic a, GDeepErrorX (Rep a)) => String -> a
-  deepErrorX = withFrozenCallStack $ to . gDeepErrorX
-
-  -- | Determines whether any of parts of a given construct contain undefined
-  -- parts. Note that a negative answer does not mean its bit representation
-  -- is fully defined. For example:
-  --
-  -- >>> m = Nothing :: Maybe Bool
-  -- >>> hasUndefined m
-  -- False
-  -- >>> pack m
-  -- 0.
-  -- >>> hasUndefined (pack m)
-  -- True
-  --
-  hasUndefined :: a -> Bool
-
-  default hasUndefined :: (Generic a, GHasUndefined (Rep a)) => a -> Bool
-  hasUndefined = gHasUndefined . from
-
-  -- | Create a value where at the very least the spine is defined. For example:
-  --
-  -- >>> spined = ensureSpine (errorX "?" :: (Int, Int))
-  -- >>> case spined of (_, _) -> 'a'
-  -- 'a'
-  -- >>> fmap (const 'b') (ensureSpine undefined :: Vec 3 Int)
-  -- <'b','b','b'>
-  -- >>> fmap (const 'c') (ensureSpine undefined :: RTree 2 Int)
-  -- <<'c','c'>,<'c','c'>>
-  --
-  -- For users familiar with 'Clash.Sized.Vector.lazyV': this is the generalized
-  -- version of it.
-  ensureSpine :: a -> a
-
-  default ensureSpine :: (Generic a, GEnsureSpine (Rep a)) => a -> a
-  ensureSpine = to . gEnsureSpine . from
-
-  -- | Evaluate a value to NF. As opposed to 'Control.DeepSeq.NFData's
-  -- 'Control.DeepSeq.rnf', it does not bubble up 'XException's.
-  rnfX :: a -> ()
-
-  default rnfX :: (Generic a, GNFDataX Zero (Rep a)) => a -> ()
-  rnfX = grnfX RnfArgs0 . from
-
-
 
 class GShowX f where
   gshowsPrecX :: ShowType -> Int -> f a -> ShowS
@@ -424,3 +330,21 @@ instance GHasUndefined V1 where
 
 class GDeepErrorX f where
   gDeepErrorX :: HasCallStack => String -> f a
+
+instance GDeepErrorX V1 where
+  gDeepErrorX = errorX
+
+instance GDeepErrorX U1 where
+  gDeepErrorX = const U1
+
+instance (GDeepErrorX a) => GDeepErrorX (M1 m d a) where
+  gDeepErrorX e = M1 (gDeepErrorX e)
+
+instance (GDeepErrorX f, GDeepErrorX g) => GDeepErrorX (f :*: g) where
+  gDeepErrorX e = gDeepErrorX e :*: gDeepErrorX e
+
+instance NFDataX c => GDeepErrorX (K1 i c) where
+  gDeepErrorX e = K1 (deepErrorX e)
+
+instance GDeepErrorX (f :+: g) where
+  gDeepErrorX = errorX
