@@ -27,8 +27,6 @@ CallStack (from HasCallStack):
 
 {-# LANGUAGE Trustworthy #-}
 
-{-# OPTIONS_GHC -Wno-orphans #-}
-
 module Clash.XException
   ( -- * 'XException': An exception for uninitialized values
     XException(..), errorX, isX, hasX, maybeIsX, maybeHasX, fromJustX, undefined,
@@ -65,7 +63,7 @@ import           Foreign.C.Types     (CUShort)
 import           GHC.Generics
 import           GHC.Natural         (Natural)
 import           GHC.Stack
-  (HasCallStack, callStack, prettyCallStack)
+  (HasCallStack, callStack, prettyCallStack, withFrozenCallStack)
 import           Numeric.Half        (Half)
 import           System.IO.Unsafe    (unsafeDupablePerformIO)
 
@@ -308,7 +306,42 @@ isX a =
       (\(XException msg) -> return (Left msg)))
 {-# NOINLINE isX #-}
 
+-- | Like the 'Show' class, but values that normally throw an 'XException' are
+-- converted to \"X\", instead of error'ing out with an exception.
+--
+-- >>> show (errorX "undefined" :: Integer, 4 :: Int)
+-- "(*** Exception: X: undefined
+-- CallStack (from HasCallStack):
+-- ...
+-- >>> showX (errorX "undefined" :: Integer, 4 :: Int)
+-- "(X,4)"
+--
+-- Can be derived using 'GHC.Generics':
+--
+-- > {-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
+-- >
+-- > import Clash.Prelude
+-- > import GHC.Generics
+-- >
+-- > data T = MkTA Int | MkTB Bool
+-- >   deriving (Show,Generic,ShowX)
+class ShowX a where
+  -- | Like 'showsPrec', but values that normally throw an 'XException' are
+  -- converted to \"X\", instead of error'ing out with an exception.
+  showsPrecX :: Int -> a -> ShowS
 
+  -- | Like 'show', but values that normally throw an 'XException' are
+  -- converted to \"X\", instead of error'ing out with an exception.
+  showX :: a -> String
+  showX x = showsX x ""
+
+  -- | Like 'showList', but values that normally throw an 'XException' are
+  -- converted to \"X\", instead of error'ing out with an exception.
+  showListX :: [a] -> ShowS
+  showListX ls s = showListX__ showsX ls s
+
+  default showsPrecX :: (Generic a, GShowX (Rep a)) => Int -> a -> ShowS
+  showsPrecX = genericShowsPrecX
 
 -- | Like 'print', but values that normally throw an 'XException' are
 -- converted to \"X\", instead of error'ing out with an exception
@@ -409,6 +442,56 @@ rwhnfX :: a -> ()
 rwhnfX = (`seqX` ())
 {-# INLINE rwhnfX #-}
 
+-- | Class that houses functions dealing with /undefined/ values in Clash. See
+-- 'deepErrorX' and 'rnfX'.
+class NFDataX a where
+  -- | Create a value where all the elements have an 'errorX',
+  -- but the spine is defined.
+  deepErrorX :: HasCallStack => String -> a
+
+  default deepErrorX :: (HasCallStack, Generic a, GDeepErrorX (Rep a)) => String -> a
+  deepErrorX = withFrozenCallStack $ to . gDeepErrorX
+
+  -- | Determines whether any of parts of a given construct contain undefined
+  -- parts. Note that a negative answer does not mean its bit representation
+  -- is fully defined. For example:
+  --
+  -- >>> m = Nothing :: Maybe Bool
+  -- >>> hasUndefined m
+  -- False
+  -- >>> pack m
+  -- 0.
+  -- >>> hasUndefined (pack m)
+  -- True
+  --
+  hasUndefined :: a -> Bool
+
+  default hasUndefined :: (Generic a, GHasUndefined (Rep a)) => a -> Bool
+  hasUndefined = gHasUndefined . from
+
+  -- | Create a value where at the very least the spine is defined. For example:
+  --
+  -- >>> spined = ensureSpine (errorX "?" :: (Int, Int))
+  -- >>> case spined of (_, _) -> 'a'
+  -- 'a'
+  -- >>> fmap (const 'b') (ensureSpine undefined :: Vec 3 Int)
+  -- <'b','b','b'>
+  -- >>> fmap (const 'c') (ensureSpine undefined :: RTree 2 Int)
+  -- <<'c','c'>,<'c','c'>>
+  --
+  -- For users familiar with 'Clash.Sized.Vector.lazyV': this is the generalized
+  -- version of it.
+  ensureSpine :: a -> a
+
+  default ensureSpine :: (Generic a, GEnsureSpine (Rep a)) => a -> a
+  ensureSpine = to . gEnsureSpine . from
+
+  -- | Evaluate a value to NF. As opposed to 'NFData's
+  -- 'rnf', it does not bubble up 'XException's.
+  rnfX :: a -> ()
+
+  default rnfX :: (Generic a, GNFDataX Zero (Rep a)) => a -> ()
+  rnfX = grnfX RnfArgs0 . from
 
 instance NFDataX ()
 
@@ -575,24 +658,6 @@ instance NFDataX a => NFDataX (M.Last a)
 #if __GLASGOW_HASKELL__ < 900
 instance NFDataX a => NFDataX (SG.Option a)
 #endif
-
-instance GDeepErrorX V1 where
-  gDeepErrorX = errorX
-
-instance GDeepErrorX U1 where
-  gDeepErrorX = const U1
-
-instance (GDeepErrorX a) => GDeepErrorX (M1 m d a) where
-  gDeepErrorX e = M1 (gDeepErrorX e)
-
-instance (GDeepErrorX f, GDeepErrorX g) => GDeepErrorX (f :*: g) where
-  gDeepErrorX e = gDeepErrorX e :*: gDeepErrorX e
-
-instance NFDataX c => GDeepErrorX (K1 i c) where
-  gDeepErrorX e = K1 (deepErrorX e)
-
-instance GDeepErrorX (f :+: g) where
-  gDeepErrorX = errorX
 
 mkShowXTupleInstances [2..maxTupleSize]
 mkNFDataXTupleInstances [2..maxTupleSize]
