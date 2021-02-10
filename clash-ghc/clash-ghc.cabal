@@ -151,7 +151,7 @@ library
                       containers                >= 0.5.4.0  && < 0.7,
                       directory                 >= 1.2      && < 1.4,
                       filepath                  >= 1.3      && < 1.5,
-                      ghc                       >= 8.4.0    && < 8.11,
+                      ghc                       >= 8.4.0    && < 9.1,
                       process                   >= 1.2      && < 1.7,
                       hashable                  >= 1.1.2.3  && < 1.4,
                       haskeline                 >= 0.7.0.3  && < 0.9,
@@ -170,13 +170,13 @@ library
                       ghc-typelits-natnormalise >= 0.6      && < 0.8,
                       deepseq                   >= 1.3.0.2  && < 1.5,
                       time                      >= 1.4.0.1  && < 1.12,
-                      ghc-boot                  >= 8.4.0    && < 8.11,
-                      ghc-prim                  >= 0.3.1.0  && < 0.7,
-                      ghci                      >= 8.4.0    && < 8.11,
+                      ghc-boot                  >= 8.4.0    && < 9.1,
+                      ghc-prim                  >= 0.3.1.0  && < 0.8,
+                      ghci                      >= 8.4.0    && < 9.1,
                       uniplate                  >= 1.6.12   && < 1.8,
                       reflection                >= 2.1.2    && < 3.0,
                       primitive                 >= 0.5.0.1  && < 1.0,
-                      template-haskell          >= 2.8.0.0  && < 2.17,
+                      template-haskell          >= 2.8.0.0  && < 2.18,
                       utf8-string               >= 1.0.0.0  && < 1.1.0.0,
                       vector                    >= 0.11     && < 1.0
   if impl(ghc >= 8.10.0)
@@ -192,7 +192,7 @@ library
     CPP-Options:      -DUSE_GHC_PATHS=1
 
   if os(windows)
-    Build-Depends:    Win32                     >= 2.3.1    && < 2.10
+    Build-Depends:    Win32                     >= 2.3.1    && < 2.11
   else
     Build-Depends:    unix                      >= 2.7.1    && < 2.9
 
