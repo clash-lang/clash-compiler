@@ -3,6 +3,12 @@ include:
   - '/.ci/gitlab/publish.yml'
 #   - '/.ci/gitlab/benchmark.yml'
 
+# Default GHC / Cabal version. Used for generating Haddock and releasing to
+# Hackage.
+variables:
+  GHC_VERSION: 8.10.3
+  CABAL_VERSION: 3.2.0.0
+
 stages:
   - pre
   - test
@@ -58,9 +64,6 @@ haddock:
   extends: .common
   needs: []
   stage: test
-  variables:
-    GHC_VERSION: 8.10.3
-    CABAL_VERSION: 3.2.0.0
   artifacts:
     paths:
       - hadocs/*/*

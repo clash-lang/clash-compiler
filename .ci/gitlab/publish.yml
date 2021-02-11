@@ -2,8 +2,6 @@ hackage-sdist:
   extends: .common
   stage: pack
   interruptible: false
-  variables:
-    GHC_VERSION: 8.10.3
   script:
     - .ci/build_sdist.sh clash-prelude
     - .ci/build_sdist.sh clash-lib
@@ -12,10 +10,6 @@ hackage-sdist:
     paths:
       - clash-*.tar.gz  # clash-{prelude,lib,ghc}-$version{-docs,}.tar.gz
     expire_in: 1 week
-  rules:
-    - if: '$CI_COMMIT_TAG != null' # tags
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-    - if: $CI_PIPELINE_SOURCE == "trigger"
 
 .hackage:
   extends: .common
@@ -23,8 +17,6 @@ hackage-sdist:
   stage: publish
   cache:
     key: hackage
-  variables:
-    GHC_VERSION: 8.10.3
   script:
     - .ci/publish_sdist.sh clash-prelude
     - .ci/publish_sdist.sh clash-lib
