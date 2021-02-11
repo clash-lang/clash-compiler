@@ -194,7 +194,6 @@ module Clash.Explicit.Signal
   , enableGen
     -- * Clock
   , Clock
-  , freqCalc  -- DEPRECATED
   , periodToHz
   , hzToPeriod
     -- ** Synchronization primitive
@@ -357,18 +356,6 @@ systemClockGen = clockGen
 -- @
 systemResetGen ::Reset System
 systemResetGen = resetGen
-
--- | Calculate the period, in __ps__, given a frequency in __Hz__
---
--- i.e. to calculate the clock period for a circuit to run at 240 MHz we get
---
--- >>> freqCalc 240e6
--- 4167
---
--- __NB__: This function is /not/ synthesizable
-freqCalc :: Double -> Integer
-freqCalc = toInteger . hzToPeriod
-{-# DEPRECATED freqCalc "Use 'hzToPeriod' instead." #-}
 
 -- ** Synchronization primitive
 -- | The 'unsafeSynchronizer' function is a primitive that must be used to
