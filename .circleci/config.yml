@@ -80,6 +80,7 @@ aliases:
     run:
       name: Build dependencies and Clash itself with Nix
       command: .ci/nix_build.sh
+      no_output_timeout: 1h
 
   - &stack_build
     run:
@@ -99,6 +100,7 @@ aliases:
           cabal v2-run testsuite -- --hide-successes -p .VHDL
           cabal v2-run testsuite -- --hide-successes -p .Verilog
         fi
+      no_output_timeout: 1h
 
   # When testing a pull request on CircleCI,
   # fetch the result of merging it in.
