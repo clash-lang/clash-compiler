@@ -116,8 +116,22 @@ constantPropagation =
     -- binder might be recursive. The idea is, is that if the recursive
     -- non-representable binder is inlined once, we can get rid of the recursive
     -- aspect using the case-of-known-constructor
+    --
+    -- Note that we first do a dead code removal pass, which makes sure that
+    -- unused let-bindings get cleaned up. Only if no dead code is removed
+    -- 'inlineNonRep' is executed. We do this for two reasons:
+    --
+    --   1. 'deadCode' is an expensive operation and is therefore left out of
+    --      the hot loop 'transPropagateAndInline'.
+    --
+    --   2. In various situations 'transPropagateAndInline' can do more work
+    --      after 'deadCode' was successful. This work in turn might remove a
+    --      a construct 'inlineNonRep' would fire on - saving the compiler work.
+    --
     inlineNR :: NormRewrite
-    inlineNR = bottomupR (apply "inlineNonRep" inlineNonRep)
+    inlineNR =
+          bottomupR (apply "deadCode" deadCode)
+      >-! bottomupR (apply "inlineNonRep" inlineNonRep)
 
     specTransformations :: [(String,NormRewrite)]
     specTransformations =
