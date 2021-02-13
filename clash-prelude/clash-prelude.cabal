@@ -409,6 +409,7 @@ test-suite unittests
                  Clash.Tests.DerivingDataRepr
                  Clash.Tests.DerivingDataReprTypes
                  Clash.Tests.Fixed
+                 Clash.Tests.FixedExhaustive
                  Clash.Tests.NFDataX
                  Clash.Tests.Reset
                  Clash.Tests.Resize
@@ -420,6 +421,8 @@ test-suite unittests
 
                  Clash.Tests.Laws.Enum
                  Clash.Tests.Laws.SaturatingNum
+
+                 Hedgehog.Extra
 
                  Test.Tasty.HUnit.Extra
                  Test.QuickCheck.Extra

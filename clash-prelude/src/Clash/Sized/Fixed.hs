@@ -69,6 +69,7 @@ operator that uses truncation introduces an additional error of /0.109375/:
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NegativeLiterals #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -118,7 +119,7 @@ import Text.Read                  (Read(..))
 import Data.List                  (find)
 import Data.Proxy                 (Proxy (..))
 import Data.Ratio                 ((%), denominator, numerator)
-import Data.Typeable              (Typeable, TypeRep, typeRep)
+import Data.Typeable              (Typeable, TypeRep, typeRep, typeOf)
 import GHC.TypeLits               (KnownNat, Nat, type (+), natVal)
 import GHC.TypeLits.Extra         (Max)
 import Language.Haskell.TH        (Q, appT, conT, litT, mkName,
@@ -141,7 +142,7 @@ import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    boundedMul)
 import Clash.Class.Resize         (Resize (..))
 import Clash.Promoted.Nat         (SNat, natToNum, natToInteger)
-import Clash.Prelude.BitIndex     (msb, split)
+import Clash.Prelude.BitIndex     (lsb, msb, split)
 import Clash.Prelude.BitReduction (reduceAnd, reduceOr)
 import Clash.Sized.BitVector      (BitVector, (++#))
 import Clash.Sized.Signed         (Signed)
@@ -186,7 +187,6 @@ deriving instance (Typeable rep, Typeable int, Typeable frac
                   , Data (rep (int + frac))) => Data (Fixed rep int frac)
 deriving instance Eq (rep (int + frac))      => Eq (Fixed rep int frac)
 deriving instance Ord (rep (int + frac))     => Ord (Fixed rep int frac)
-deriving instance Enum (rep (int + frac))    => Enum (Fixed rep int frac)
 deriving instance Bounded (rep (int + frac)) => Bounded (Fixed rep int frac)
 deriving instance Default (rep (int + frac)) => Default (Fixed rep int frac)
 deriving instance Arbitrary (rep (int + frac)) => Arbitrary (Fixed rep int frac)
@@ -382,7 +382,7 @@ Where 'NumSFixedC' refers to the @Constraints@ needed by the operators of
 the 'Num' class for the 'SFixed' datatype.
 
 Although the number of constraints for the @mac@ function defined earlier might
-be considered small, here is an \"this way lies madness\" example where you
+be considered small, here is a \"this way lies madness\" example where you
 really want to use constraint kinds:
 
 @
@@ -495,11 +495,10 @@ type NumFixedC rep int frac
     , BitPack (rep ((int + int) + (frac + frac)))
     , Bits    (rep ((int + int) + (frac + frac)))
     , BitPack (rep (int + frac))
-    , Enum    (rep (int + frac))
     , Bits    (rep (int + frac))
-    , Ord     (rep (int + frac))
     , Integral (rep (int + frac))
     , Resize  rep
+    , Typeable rep
     , KnownNat int
     , KnownNat frac
     )
@@ -904,6 +903,184 @@ fLitR a = Fixed (fromInteger sat)
     truncated = truncate shifted :: Integer
     shifted   = a * (2 ^ (natToInteger @frac))
 
+-- | These behave similar to 'Prelude.Float', 'Prelude.Double' and
+-- 'Prelude.Rational'. 'succ'\/'pred' add\/subtract 1. See the
+-- <https://www.haskell.org/onlinereport/haskell2010/haskellch6.html#dx13-131001 Haskell Report>
+-- for full details.
+--
+-- The rules set out there for instances of both 'Enum' and
+-- 'Bounded' are also observed. In particular, 'succ' and 'pred' result in a
+-- runtime error if the result cannot be represented. See 'satSucc' and
+-- 'satPred' for other options.
+instance NumFixedC rep int frac => Enum (Fixed rep int frac) where
+  succ f =
+    let err = error $
+             "Enum.succ{" ++ show (typeOf f) ++ "}: tried to take 'succ' of "
+          ++ show f ++ ", causing overflow. Use 'satSucc' and specify a "
+          ++ "SaturationMode if you need other behavior."
+    in case natToInteger @int of
+         0 -> err
+         _ -> if f > satPred SatBound maxBound then
+                err
+              else
+                satSucc SatWrap f
+
+
+  pred f =
+    let err = error $
+             "Enum.pred{" ++ show (typeOf f) ++ "}: tried to take 'pred' of "
+          ++ show f ++ ", causing negative overflow. Use 'satPred' and "
+          ++ "specify a SaturationMode if you need other behavior."
+    in case natToInteger @int of
+         0 -> err
+         _ -> if f < satSucc SatBound minBound then
+                err
+              else
+                satPred SatWrap f
+
+  toEnum i =
+    if res > rMax || res < rMin then
+      error $  "Enum.toEnum{"
+            ++ show (typeRep $ Proxy @(Fixed rep int frac)) ++ "}: tag ("
+            ++ show i ++ ") is outside of bounds "
+            ++ show ( minBound :: Fixed rep int frac
+                    , maxBound :: Fixed rep int frac)
+    else
+      Fixed (fromInteger res)
+     where
+      sh   = natToNum @frac
+      res  = toInteger i `shiftL` sh
+      rMax = toInteger (maxBound :: rep (int + frac))
+      rMin = toInteger (minBound :: rep (int + frac))
+
+  fromEnum f@(Fixed fRep) =
+    if res > rMax || res < rMin then
+      error $  "Enum.fromEnum{" ++ show (typeOf f) ++ "}: value ("
+            ++ show f ++ ") is outside of Int's bounds "
+            ++ show (rMin, rMax)
+    else
+      fromInteger res
+     where
+      nF     = natToNum @frac
+      frMask = fromInteger $ (1 `shiftL` nF) - 1
+      offset = if f < 0 && fRep .&. frMask /= 0 then 1 else 0
+      -- res amounts to "truncate f", but without needing all the constraints
+      -- for RealFrac.
+      res    = toInteger $ (fRep `shiftR` nF) + offset
+      rMax   = toInteger (maxBound :: Int)
+      rMin   = toInteger (minBound :: Int)
+
+  enumFrom x1 = enumFromTo x1 maxBound
+  enumFromThen (Fixed x1Rep) (Fixed x2Rep) =
+    map Fixed $ enumFromThen x1Rep x2Rep
+
+  enumFromTo x1@(Fixed x1Rep) y@(Fixed yRep)
+    | yPlusHalf < x1 = []
+    | closeToMax     = [x1]
+    | otherwise      =  map Fixed $ enumFromThenTo
+                                      x1Rep
+                                      (unFixed $ satSucc SatWrap x1)
+                                      (unFixed $ yPlusHalf)
+   where
+    closeToMax = natToInteger @int == 0 || x1 > satPred SatBound maxBound
+    nF = natToNum @frac
+    yPlusHalf | nF == 0       = y
+              | isSigned yRep = y - (Fixed $ -1 `shiftL` (nF - 1))
+              | otherwise     = y + (Fixed $ 1 `shiftL` (nF - 1))
+
+  enumFromThenTo = enumFromThenTo#
+
+-- Inspired by Enum Int from GHC.Enum in base-4.14.1.0
+--
+-- Note that if x2 /= x1, it is guaranteed that (int + frac) >= 1, because if it
+-- were zero there would only be one concrete value. This fact is relied upon in
+-- enumFromThenToUp and enumFromThenToDown, which would have undefined behavior
+-- for (int + frac) == 0.
+enumFromThenTo#
+  :: forall f rep int frac
+   . ( NumFixedC rep int frac
+     , f ~ Fixed rep int frac)
+  => f
+  -> f
+  -> f
+  -> [f]
+enumFromThenTo# x1 x2 y
+  | x2 == x1  = if y < x1 then
+                  []
+                else
+                  repeat x1
+  | x2 > x1   = enumFromThenToUp x1 x2 y
+  | otherwise = enumFromThenToDown x1 x2 y
+
+enumFromThenToUp
+  :: forall f rep int frac
+   . ( NumFixedC rep int frac
+     , f ~ Fixed rep int frac)
+  => f
+  -> f
+  -> f
+  -> [f]
+enumFromThenToUp x1 x2 y
+  | y < x1 = let y' = satAdd SatWrap y halfDelta  -- Never wraps
+             in if y' < x1 || (isMinusHalf && y' <= x1) then
+                  []
+                else
+                  [x1]
+  | y < x2 = let x2' = satSub SatWrap x2 halfDelta  -- Never wraps `
+             in if y > x2' || (not isMinusHalf && y >= x2') then
+                  [x1, x2]
+                else
+                  [x1]
+  | otherwise = let y' = satSub SatWrap y (delta `shiftR` 1) -- Does wrap
+                    go_up x
+                      | x' < x            = [x]
+                      | isHalf && x >= y' = [x]
+                      | x > y'            = [x]
+                      | otherwise          = x : go_up x'
+                     where
+                      x' = satAdd SatWrap x delta  -- Does wrap
+                in x1 : go_up x2
+ where
+   delta = satSub SatWrap x2 x1  -- Does wrap!
+   halfDelta = satSub SatWrap (x2 `shiftR` 1) (x1 `shiftR` 1)  -- Never wraps
+   isHalf = lsb delta == 1
+   isMinusHalf = lsb x2 == 0 && lsb x1 == 1
+
+enumFromThenToDown
+  :: forall f rep int frac
+   . ( NumFixedC rep int frac
+     , f ~ Fixed rep int frac)
+  => f
+  -> f
+  -> f
+  -> [f]
+enumFromThenToDown x1 x2 y
+  | y > x1 = let y' = satSub SatWrap y halfDelta  -- Never wraps
+             in if y' > x1 || (isMinusHalf && y' >= x1) then
+                  []
+                else
+                  [x1]
+  | y > x2 = let x2' = satAdd SatWrap x2 halfDelta  -- Never wraps `
+             in if y < x2' || (not isMinusHalf && y <= x2') then
+                  [x1, x2]
+                else
+                  [x1]
+  | otherwise = let y' = satAdd SatWrap y (delta `shiftR` 1)  -- Does wrap
+                    go_dn x
+                      | x' > x            = [x]
+                      | isHalf && x <= y' = [x]
+                      | x < y'            = [x]
+                      | otherwise         = x : go_dn x'
+                     where
+                      x' = satSub SatWrap x delta  -- Does wrap
+                in x1 : go_dn x2
+ where
+  delta = satSub SatWrap x1 x2  -- Does wrap!
+  halfDelta = satSub SatWrap (x1 `shiftR` 1) (x2 `shiftR` 1)  -- Never wraps
+  isHalf = lsb delta == 1
+  isMinusHalf = lsb x1 == 0 && lsb x2 == 1
+
+
 instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
   satAdd w (Fixed a) (Fixed b) = Fixed (satAdd w a b)
   satSub  w (Fixed a) (Fixed b) = Fixed (satSub w a b)
@@ -920,7 +1097,7 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
         (rL,rR) = split res :: (BitVector int, BitVector (int + frac + frac))
     in  case isSigned a of
           True  -> let overflow = complement (reduceOr (pack (msb rR) ++# pack rL)) .|.
-                                             reduceAnd (pack (msb rR) ++# pack rL)
+                                  reduceAnd (pack (msb rR) ++# pack rL)
                    in  case overflow of
                          1 -> unpack (resize (shiftR rR sh))
                          _ -> case msb rL of
@@ -936,7 +1113,7 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
         (rL,rR) = split res :: (BitVector int, BitVector (int + frac + frac))
     in  case isSigned a of
           True  -> let overflow = complement (reduceOr (pack (msb rR) ++# pack rL)) .|.
-                                             reduceAnd (pack (msb rR) ++# pack rL)
+                                  reduceAnd (pack (msb rR) ++# pack rL)
                    in  case overflow of
                          1 -> unpack (resize (shiftR rR sh))
                          _ -> 0
@@ -950,12 +1127,12 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
         (rL,rR) = split res :: (BitVector int, BitVector (int + frac + frac))
     in  case isSigned a of
           True  -> let overflow = complement (reduceOr (pack (msb rR) ++# pack rL)) .|.
-                                             reduceAnd (pack (msb rR) ++# pack rL)
+                                  reduceAnd (pack (msb rR) ++# pack rL)
                    in  case overflow of
                          1 -> unpack (resize (shiftR rR sh))
                          _ -> case msb rL of
                                 0 -> maxBound
-                                _ -> succ minBound
+                                _ -> Fixed $ succ minBound
           False -> case rL of
                      0 -> unpack (resize (shiftR rR sh))
                      _ -> maxBound
@@ -977,7 +1154,7 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
         symBound = if isSigned fRep
                    then Fixed $ minBound + 1
                    else minBound
-    in case natVal (Proxy @int) of
+    in case natToInteger @int of
          0 -> case satMode of
                 SatWrap      -> f
                 SatBound     -> minBound
@@ -1043,9 +1220,6 @@ divide (Fixed fr1) fx2@(Fixed fr2) =
 type FracFixedC rep int frac
   = ( NumFixedC rep int frac
     , DivideC   rep int frac int frac
-    , Integral  (rep (int + frac))
-    , KnownNat  int
-    , KnownNat  frac
     )
 
 -- | Constraint for the 'Fractional' instance of 'SFixed'
@@ -1086,18 +1260,17 @@ instance FracFixedC rep int frac => Fractional (Fixed rep int frac) where
       n    = numerator   r `shiftL` (2 * frac)
       d    = denominator r `shiftL` frac
 
-instance (NumFixedC rep int frac, Integral (rep (int + frac))) =>
-         Real (Fixed rep int frac) where
+instance NumFixedC rep int frac => Real (Fixed rep int frac) where
   toRational f@(Fixed fRep) = nom % denom
    where
      nF        = fracShift f
      denom     = 1 `shiftL` nF
      nom       = toInteger fRep
 
-instance (FracFixedC rep int frac, NumFixedC rep int frac, Integral (rep (int + frac))) =>
-         RealFrac (Fixed rep int frac) where
+instance FracFixedC rep int frac => RealFrac (Fixed rep int frac) where
   properFraction f@(Fixed fRep) = (fromIntegral whole, fract)
     where
       whole = (fRep `shiftR` fracShift f) + offset
       fract = Fixed $ fRep - (whole `shiftL` fracShift f)
-      offset = if f < 0 then 1 else 0
+      frMask = fromInteger $ (1 `shiftL` fracShift f) - 1
+      offset = if f < 0 && fRep .&. frMask /= 0 then 1 else 0
