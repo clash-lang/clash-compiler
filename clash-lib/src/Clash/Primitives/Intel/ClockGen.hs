@@ -159,6 +159,8 @@ altpllQsysTemplate bbCtx = pure bbText
   ((_,stripVoid -> kdIn,_):(_,stripVoid -> kdOut,_):_) = bbInputs bbCtx
   KnownDomain _ clkInPeriod _ _ _ _ = kdIn
   KnownDomain _ clkOutPeriod _ _ _ _ = kdOut
+  clkInFreq :: Integer
+  clkInFreq = round (1.0 / (fromInteger @Double clkInPeriod * 1.0e-12))
   clkOutFreq :: Double
   clkOutFreq = (1.0 / (fromInteger clkOutPeriod * 1.0e-12)) / 1e6
   clklcm = lcm clkInPeriod clkOutPeriod
@@ -184,7 +186,7 @@ altpllQsysTemplate bbCtx = pure bbText
   <parameter name="CLK0_MULTIPLY_BY" value="#{clkmult}" />
   <parameter name="CLK0_PHASE_SHIFT" value="0" />
   <parameter name="COMPENSATE_CLOCK" value="CLK0" />
-  <parameter name="INCLK0_INPUT_FREQUENCY" value="#{clkInPeriod}" />
+  <parameter name="INCLK0_INPUT_FREQUENCY" value="#{clkInFreq}" />
   <parameter name="OPERATION_MODE" value="NORMAL" />
   <parameter name="PLL_TYPE" value="AUTO" />
   <parameter name="PORT_ARESET" value="PORT_USED" />
@@ -201,7 +203,7 @@ altpllQsysTemplate bbCtx = pure bbText
     CT#CLK0_PHASE_SHIFT 0
     CT#OPERATION_MODE NORMAL
     CT#COMPENSATE_CLOCK CLK0
-    CT#INCLK0_INPUT_FREQUENCY #{clkInPeriod}
+    CT#INCLK0_INPUT_FREQUENCY #{clkInFreq}
     CT#PORT_INCLK0 PORT_USED
     CT#PORT_ARESET PORT_USED
     CT#BANDWIDTH_TYPE AUTO
