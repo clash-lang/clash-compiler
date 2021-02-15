@@ -131,7 +131,7 @@ constantPropagation =
     inlineNR :: NormRewrite
     inlineNR =
           bottomupR (apply "deadCode" deadCode)
-      >-! bottomupR (apply "inlineNonRep" inlineNonRep)
+      >-! apply "inlineNonRep" inlineNonRep
 
     specTransformations :: [(String,NormRewrite)]
     specTransformations =
