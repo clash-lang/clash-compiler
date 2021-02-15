@@ -979,15 +979,11 @@ expr_ _ (DataCon ty@(Vector 0 _) _ _) = verilogTypeErrValue ty
 
 expr_ _ (DataCon (Vector 1 _) _ [e]) = expr_ False e
 expr_ _ e@(DataCon (Vector _ _) _ es@[_,_]) =
-  case vectorChain e of
-    Just es' -> listBraces (mapM (expr_ False) es')
-    Nothing  -> listBraces (mapM (expr_ False) es)
+    listBraces $ mapM (expr_ False) $ fromMaybe es $ vectorChain e
 
 expr_ _ (DataCon (RTree 0 _) _ [e]) = expr_ False e
 expr_ _ e@(DataCon (RTree _ _) _ es@[_,_]) =
-  case rtreeChain e of
-    Just es' -> listBraces (mapM (expr_ False) es')
-    Nothing  -> listBraces (mapM (expr_ False) es)
+    listBraces $ mapM (expr_ False) $ fromMaybe es $ rtreeChain e
 
 expr_ _ (DataCon (SP {}) (DC (BitVector _,_)) es) = assignExpr
   where
@@ -1174,7 +1170,7 @@ dcToExpr :: HWType -> Int -> Expr
 dcToExpr ty i = Literal (Just (ty,conSize ty)) (NumLit (toInteger i))
 
 listBraces :: Monad m => m [Doc] -> m Doc
-listBraces = align . encloseSep lbrace rbrace comma
+listBraces = align . enclose lbrace rbrace . hsep . punctuate (comma <+> softline)
 
 parenIf :: Monad m => Bool -> m Doc -> m Doc
 parenIf True  = parens

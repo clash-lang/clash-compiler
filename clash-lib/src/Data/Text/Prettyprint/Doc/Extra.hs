@@ -46,7 +46,7 @@ layoutOneLine doc = scan 0 [doc]
 renderOneLine
   :: PP.Doc ann
   -> LT.Text
-renderOneLine = renderLazy . layoutOneLine
+renderOneLine = renderLazy . layoutPretty defaultLayoutOptions
 
 int :: Applicative f => Int -> f Doc
 int = pure . PP.pretty
@@ -123,6 +123,9 @@ punctuate = liftA2 PP.punctuate
 
 encloseSep :: Applicative f => f Doc -> f Doc -> f Doc -> f [Doc] -> f Doc
 encloseSep l r s is = PP.encloseSep <$> l <*> r <*> s <*> is
+
+enclose :: Applicative f => f Doc -> f Doc -> f Doc -> f Doc
+enclose = liftA3 PP.enclose
 
 line :: Applicative f => f Doc
 line = pure PP.line
