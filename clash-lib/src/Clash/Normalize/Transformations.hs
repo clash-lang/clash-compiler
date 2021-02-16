@@ -424,9 +424,46 @@ caseCase _ e = return e
 {-# SCC caseCase #-}
 
 -- | Inline function with a non-representable result if it's the subject
--- of a Case-decomposition
+-- of a Case-decomposition. It's a custom topdown traversal that -for efficiency
+-- reasons- does not explore alternative of cases whose subject triggered an
+-- 'inlineNonRepWorker'.
 inlineNonRep :: HasCallStack => NormRewrite
-inlineNonRep _ e@(Case scrut altsTy alts)
+inlineNonRep ctx0 e0@(Case {}) = do
+  r <- listen (inlineNonRepWorker e0)
+  case r of
+    (e1, Monoid.getAny -> True) ->
+      return e1
+    (~(Case subj0 typ alts), _) -> do
+      -- If a term _in_ the subject triggers 'inlineNonRepWorker', inline and
+      -- propagate might eliminate this case. We therefore don't explore the
+      -- alternatives. Note that this makes it substantially different from a
+      -- 'topdownSucR' transformation.
+      let
+        TransformContext inScope ctx1 = ctx0
+        ctx2 = TransformContext inScope (CaseScrut:ctx1)
+
+      listen (inlineNonRep ctx2 subj0) >>= \case
+        (subj1, Monoid.getAny -> True) ->
+          return (Case subj1 typ alts)
+        (subj1, _) -> do
+          let (pats, rhss0) = unzip alts
+          rhss1 <- mapM (inlineNonRep ctx2) rhss0
+          pure (Case subj1 typ (zip pats rhss1))
+
+inlineNonRep ctx e =
+  -- All non-case statements are simply traversed. TODO: are there other special
+  -- cases like 'Case' that would warrant an optimization like ^ ?
+  allR inlineNonRep ctx e
+{-# SCC inlineNonRep #-}
+
+-- | Inline function with a non-representable result if it's the subject
+-- of a Case-decomposition. This worker function only tries the given term
+-- (i.e., it does not traverse it).
+--
+-- It sets the changed flag in the NormalizeSession if it successfully inlines
+-- a binder.
+inlineNonRepWorker :: HasCallStack => Term -> NormalizeSession Term
+inlineNonRepWorker e@(Case scrut altsTy alts)
   | (Var f, args,ticks) <- collectArgsTicks scrut
   , isGlobalId f
   = do
@@ -448,7 +485,7 @@ inlineNonRep _ e@(Case scrut altsTy alts)
                       , "\nRun with '-fclash-inline-limit=N' to increase"
                       , " the inlining limit to N."
                       ])
-              (return e)
+              (pure e)
       else do
         bodyMaybe   <- lookupVarEnv f <$> Lens.use bindings
         nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator
@@ -463,14 +500,14 @@ inlineNonRep _ e@(Case scrut altsTy alts)
             let scrutBody0 = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
             let scrutBody1 = mkApps scrutBody0 args
 
-            changed $ Case scrutBody1 altsTy alts
+            changed (Case scrutBody1 altsTy alts)
 
-          _ -> return e
+          _ -> pure e
   where
     exception = isClassTy
 
-inlineNonRep _ e = return e
-{-# SCC inlineNonRep #-}
+inlineNonRepWorker e = pure e
+{-# SCC inlineNonRepWorker #-}
 
 
 caseCon :: HasCallStack => NormRewrite
