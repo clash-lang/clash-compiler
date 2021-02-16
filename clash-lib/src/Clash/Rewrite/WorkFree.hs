@@ -60,7 +60,7 @@ isWorkFreeBinder cache bndrs bndr =
 --
 isWorkFree
   :: forall s m
-   . (MonadState s m)
+   . (HasCallStack, MonadState s m)
   => Lens' s (VarEnv Bool)
   -> BindingMap
   -> Term
@@ -75,7 +75,7 @@ isWorkFree cache bndrs = go True
   --
   -- as being work free, as the term bound to f may introduce work.
   --
-  go :: Bool -> Term -> m Bool
+  go :: HasCallStack => Bool -> Term -> m Bool
   go isOutermost (collectArgs -> (fun, args)) =
     case fun of
       Var i
@@ -109,7 +109,12 @@ isWorkFree cache bndrs = go True
       Letrec bs e -> andM [go False e, allM (go False . snd) bs, allM goArg args]
       Case s _ [(_, a)] -> andM [go False s, go False a, allM goArg args]
       Case e _ _ -> andM [go False e, allM goArg args]
-      _ -> pure False
+      Cast e _ _ -> andM [go False e, allM goArg args]
+
+      -- (Ty)App's and  Ticks are removed by collectArgs
+      Tick _ _ -> error "isWorkFree: unexpected Tick"
+      App {}   -> error "isWorkFree: unexpected App"
+      TyApp {} -> error "isWorkFree: unexpected TyApp"
 
   goArg e = eitherM (go False) (pure . const True) (pure e)
   isConstantArg = either isConstant (const True)
