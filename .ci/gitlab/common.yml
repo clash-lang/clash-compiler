@@ -16,8 +16,6 @@
     paths:
       - cache.tar.zst
   before_script:
-    - unset SNAPCRAFT_LOGIN_FILE
-    - unset HACKAGE_PASSWORD
     - export THREADS=$(nproc)
     - export CABAL_JOBS=$(nproc)
     - export
