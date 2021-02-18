@@ -1045,7 +1045,9 @@ letCast _ e = return e
 -- and expression where two casts are "back-to-back" after which we can
 -- eliminate them in 'eliminateCastCast'.
 argCastSpec :: HasCallStack => NormRewrite
-argCastSpec ctx e@(App _ (stripTicks -> Cast e' _ _)) = do
+argCastSpec ctx e@(App f (stripTicks -> Cast e' _ _))
+ -- Don't specialise prims, because we can't push casts into them
+ | not . isPrim . fst . collectArgs $ f = do
   bndrs <- Lens.use bindings
   isWorkFree workFreeBinders bndrs e' >>= \case
     True -> go
