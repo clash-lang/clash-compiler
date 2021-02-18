@@ -84,12 +84,16 @@ data PrettyOptions = PrettyOptions
   -- ^ whether to display type information
   , displayQualifiers :: Bool
   -- ^ whether to display module qualifiers
+  , displayTicks      :: Bool
+  -- ^ whether to display ticks
   }
+
 instance Default PrettyOptions where
   def = PrettyOptions
     { displayUniques    = unsafeLookupEnvBool "CLASH_PPR_UNIQUES" True
     , displayTypes      = unsafeLookupEnvBool "CLASH_PPR_TYPES" True
     , displayQualifiers = unsafeLookupEnvBool "CLASH_PPR_QUALIFIERS" True
+    , displayTicks      = unsafeLookupEnvBool "CLASH_PPR_TICKS" True
     }
 
 -- | Annotations carried on pretty-printed code.
@@ -101,7 +105,7 @@ data ClashAnnotation
   deriving Eq
 
 -- | Specific places in the program syntax.
-data SyntaxElement = Keyword | LitS | Type | Unique | Qualifier
+data SyntaxElement = Keyword | LitS | Type | Unique | Qualifier | Ticky
   deriving (Eq, Show)
 
 -- | Clash's specialized @Doc@ type holds metadata of type @ClashAnnotation@.
@@ -130,6 +134,7 @@ class PrettyPrec p where
           if not (displayTypes opts)      && ann == AnnSyntax Type
           || not (displayUniques opts)    && ann == AnnSyntax Unique
           || not (displayQualifiers opts) && ann == AnnSyntax Qualifier
+          || not (displayTicks opts)      && ann == AnnSyntax Ticky
             then Empty
             else Annotated ann (hide d')
         d -> d
@@ -256,7 +261,7 @@ instance PrettyPrec Term where
     Tick t e'       -> do
       tDoc <- pprPrec prec t
       eDoc <- pprPrec prec e'
-      return (tDoc <> line' <> eDoc)
+      return (annotate (AnnSyntax Ticky) (tDoc <> line') <> eDoc)
 
 instance PrettyPrec TickInfo where
   pprPrec prec (SrcSpan sp)   = pprPrec prec sp
