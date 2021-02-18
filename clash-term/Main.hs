@@ -76,18 +76,20 @@ instance Diff Term where
     Type      -> RW.Type
     Unique    -> RW.Unique
     Qualifier -> RW.Qualifier
+    Ticky     -> RW.Custom "Tick"
 
   ppr' :: PrettyOptions -> Term -> ClashDoc
   ppr' = Pr.ppr'
 
   initOptions :: PrettyOptions
-  initOptions = PrettyOptions True True True
+  initOptions = PrettyOptions True True True True
 
   flagFields :: [(PrettyOptions -> Bool, PrettyOptions -> Bool -> PrettyOptions, String)]
   flagFields =
     [ (displayUniques, \opt b -> opt {displayUniques = b}, "display uniques")
     , (displayTypes, \opt b -> opt {displayTypes = b}, "display types")
     , (displayQualifiers, \opt b -> opt {displayQualifiers = b}, "display qualifiers")
+    , (displayTicks, \opt b -> opt {displayTicks = b}, "display ticks")
     ]
 
   patch :: Term -> Context -> Term -> Term

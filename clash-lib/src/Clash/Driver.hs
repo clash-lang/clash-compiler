@@ -180,7 +180,7 @@ splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
               to a malformed Synthesize annotation. All clocks, resets, and
               enables should be given a unique port name. Type to be split:
 
-                #{showPpr' (PrettyOptions False True False) a}
+                #{showPpr' (PrettyOptions False True False False) a}
 
               Given port annotation: #{p}. You might want to use the
               following instead: PortProduct #{show nm} []. This allows Clash to
