@@ -1045,7 +1045,14 @@ letCast _ e = return e
 -- and expression where two casts are "back-to-back" after which we can
 -- eliminate them in 'eliminateCastCast'.
 argCastSpec :: HasCallStack => NormRewrite
-argCastSpec ctx e@(App _ (stripTicks -> Cast e' _ _)) = do
+argCastSpec ctx e@(App f (stripTicks -> Cast e' _ _))
+ -- Don't specialise when the arguments are casts-of-casts, these casts-of-casts
+ -- will be eliminated by 'eliminateCastCast' during the normalization of the
+ -- "current" function. We thus prevent the unnecessary introduction of a
+ -- specialized version of 'f'.
+ | not (isCast e)
+ -- Don't specialise prims, because we can't push casts into them
+ , not . isPrim . fst . collectArgs $ f = do
   bndrs <- Lens.use bindings
   isWorkFree workFreeBinders bndrs e' >>= \case
     True -> go

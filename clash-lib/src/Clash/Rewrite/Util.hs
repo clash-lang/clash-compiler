@@ -920,6 +920,7 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
           bs' -> init bs' ++ bs
         go bs _ = bs
 
+-- Specialising non Var's is used by nonRepANF
 specialise' _ _ _ _ctx _ (appE,args,ticks) (Left specArg) = do
   -- Create binders and variable references for free variables in 'specArg'
   let (specBndrs,specVars) = specArgBndrsAndVars (Left specArg)
