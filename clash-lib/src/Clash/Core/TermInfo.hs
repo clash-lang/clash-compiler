@@ -302,3 +302,8 @@ isCon _         = False
 isPrim :: Term -> Bool
 isPrim (Prim {}) = True
 isPrim _         = False
+
+-- | Is a term a cast?
+isCast :: Term -> Bool
+isCast (Cast {}) = True
+isCast _         = False
