@@ -99,6 +99,7 @@ flagsClash r = [
   , defFlag "fclash-aggressive-x-optimization-blackboxes" $ NoArg (liftEwM (setAggressiveXOptBB r))
   , defFlag "fclash-inline-workfree-limit"       $ IntSuffix (liftEwM . setInlineWFLimit r)
   , defFlag "fclash-edalize"                     $ NoArg (liftEwM (setEdalize r))
+  , defFlag "fclash-no-ternary-operator"         $ NoArg (liftEwM (setNoTernaryOperator r))
   ]
 
 -- | Print deprecated flag warning
@@ -257,3 +258,6 @@ setAggressiveXOptBB r = modifyIORef r (\c -> c { opt_aggressiveXOptBB = True })
 
 setEdalize :: IORef ClashOpts -> IO ()
 setEdalize r = modifyIORef r (\c -> c { opt_edalize = True })
+
+setNoTernaryOperator :: IORef ClashOpts -> IO ()
+setNoTernaryOperator r = modifyIORef r (\c -> c {opt_ternaryOperator = False})

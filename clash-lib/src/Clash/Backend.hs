@@ -61,6 +61,8 @@ data Usage
 -- | Is '-fclash-aggresive-x-optimization-blackbox' set?
 newtype AggressiveXOptBB = AggressiveXOptBB Bool
 
+-- | Is '-fclash-ternary-operator' set?
+newtype TernaryOpt = TernaryOpt { getTernaryOpt :: Bool }
 
 -- | Kind of a HDL type. Used to determine whether types need conversions in
 -- order to cross top entity boundaries.
@@ -84,6 +86,7 @@ class HasIdentifierSet state => Backend state where
     -> PreserveCase
     -> Maybe (Maybe Int)
     -> AggressiveXOptBB
+    -> TernaryOpt
     -> state
 
   -- | What HDL is the backend generating

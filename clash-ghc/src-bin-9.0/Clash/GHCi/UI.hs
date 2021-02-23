@@ -148,7 +148,7 @@ import Clash.GHCi.Leak
 
 -- clash additions
 import qualified Clash.Backend
-import           Clash.Backend (AggressiveXOptBB)
+import           Clash.Backend (AggressiveXOptBB, TernaryOpt)
 import           Clash.Backend.SystemVerilog (SystemVerilogState)
 import           Clash.Backend.VHDL (VHDLState)
 import           Clash.Backend.Verilog (VerilogState)
@@ -2186,7 +2186,7 @@ exceptT :: Applicative m => Either e a -> ExceptT e m a
 exceptT = ExceptT . pure
 
 makeHDL' :: Clash.Backend.Backend backend
-         => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> backend)
+         => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> TernaryOpt -> backend)
          -> IORef ClashOpts
          -> [FilePath]
          -> InputT GHCi ()
@@ -2227,7 +2227,7 @@ makeHDL' backend opts lst = go =<< case lst of
 
 makeHDL :: GHC.GhcMonad m
         => Clash.Backend.Backend backend
-        => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> backend)
+        => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> TernaryOpt -> backend)
         -> IORef ClashOpts
         -> [FilePath]
         -> m ()
@@ -2244,6 +2244,7 @@ makeHDL backend optsRef srcs = do
                   lw     = opt_lowerCaseBasicIds opts1
                   frcUdf = opt_forceUndefined opts1
                   xOptBB = opt_aggressiveXOptBB opts1
+                  tern   = opt_ternaryOperator opts1
                   hdl    = Clash.Backend.hdlKind backend'
                   -- determine whether `-outputdir` was used
                   outputDir = do odir <- objectDir dflags
@@ -2257,6 +2258,7 @@ makeHDL backend optsRef srcs = do
                   opts2 = opts1 { opt_hdlDir = maybe outputDir Just (opt_hdlDir opts1)
                                 , opt_importPaths = idirs}
                   backend' = backend iw syn esc lw frcUdf (Clash.Backend.AggressiveXOptBB xOptBB)
+                               (Clash.Backend.TernaryOpt tern)
 
               checkMonoLocalBinds dflags
               checkImportDirs opts0 idirs

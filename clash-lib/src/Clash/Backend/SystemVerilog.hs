@@ -85,6 +85,7 @@ data SystemVerilogState =
     , _hdlsyn    :: HdlSyn
     , _undefValue :: Maybe (Maybe Int)
     , _aggressiveXOptBB_ :: AggressiveXOptBB
+    , _useTernaryOperator :: TernaryOpt
     }
 
 makeLenses ''SystemVerilogState
@@ -93,7 +94,7 @@ instance HasIdentifierSet SystemVerilogState where
   identifierSet = idSeen
 
 instance Backend SystemVerilogState where
-  initBackend w hdlsyn_ esc lw undefVal xOpt = SystemVerilogState {
+  initBackend w hdlsyn_ esc lw undefVal xOpt optTernary = SystemVerilogState {
       _tyCache=HashSet.empty
     , _nameCache=HashMap.empty
     , _genDepth=0
@@ -111,6 +112,7 @@ instance Backend SystemVerilogState where
     , _hdlsyn=hdlsyn_
     , _undefValue=undefVal
     , _aggressiveXOptBB_=xOpt
+    , _useTernaryOperator=optTernary
     }
   hdlKind         = const SystemVerilog
   primDirs        = const $ do root <- primsRoot
@@ -173,7 +175,7 @@ instance Backend SystemVerilogState where
   getDataFiles = use dataFiles
   addMemoryDataFile f = memoryDataFiles %= (f:)
   getMemoryDataFiles = use memoryDataFiles
-  ifThenElseExpr _ = True
+  ifThenElseExpr = getTernaryOpt . view useTernaryOperator
   aggressiveXOptBB = use aggressiveXOptBB_
 
 type SystemVerilogM a = Mon (State SystemVerilogState) a

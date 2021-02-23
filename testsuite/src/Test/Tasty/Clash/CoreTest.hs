@@ -57,6 +57,7 @@ mkBackend
   => SBuildTarget target
   -> TargetToState target
 mkBackend _ = initBackend WORD_SIZE_IN_BITS Other True PreserveCase Nothing (AggressiveXOptBB False)
+                          (TernaryOpt True)
 
 -- Run clash as far as having access to core for all bindings. This is used
 -- to test operations on core, such as transformations and evaluation.

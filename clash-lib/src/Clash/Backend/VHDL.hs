@@ -97,6 +97,7 @@ data VHDLState =
   , _productFieldNameCache :: HashMap (Maybe [TextS.Text], [HWType]) [TextS.Text]
   -- ^ Caches output of 'productFieldNames'.
   , _aggressiveXOptBB_ :: AggressiveXOptBB
+  , _useTernaryOperator :: TernaryOpt
   }
 
 makeLenses ''VHDLState
@@ -105,7 +106,7 @@ instance HasIdentifierSet VHDLState where
   identifierSet = idSeen
 
 instance Backend VHDLState where
-  initBackend w hdlsyn_ esc lw undefVal xOpt = VHDLState
+  initBackend w hdlsyn_ esc lw undefVal xOpt optTernary = VHDLState
     { _tyCache=mempty
     , _nameCache=mempty
     , _modNm=""
@@ -121,6 +122,7 @@ instance Backend VHDLState where
     , _undefValue=undefVal
     , _productFieldNameCache=mempty
     , _aggressiveXOptBB_=xOpt
+    , _useTernaryOperator=optTernary
     }
   hdlKind         = const VHDL
   primDirs        = const $ do root <- primsRoot
@@ -1368,12 +1370,25 @@ inst_ :: Declaration -> VHDLM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
   pretty id_ <+> larrow <+> align (expr_ False e) <> semi
 
-inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
-  pretty id_ <+> larrow
-           <+> align (vsep (sequence [expr_ False t <+> "when" <+>
-                                      expr_ False scrut <+> "else"
-                                     ,expr_ False f <> semi
-                                     ]))
+inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = do
+  conditionalAssignent <- getTernaryOpt <$> use useTernaryOperator
+  if conditionalAssignent then
+    fmap Just $
+      pretty id_ <+> larrow
+              <+> align (vsep (sequence [expr_ False t <+> "when" <+>
+                                          expr_ False scrut <+> "else"
+                                        ,expr_ False f <> semi
+                                        ]))
+  else
+    fmap Just $
+      "process" <+> parens "all" <> line <>
+      "begin" <> line <>
+        indent 2 ("if" <+> expr_ False scrut <+> "then" <> line <>
+          indent 2 (pretty id_ <+> larrow <+> expr_ False t <> semi) <> line <>
+        "else" <> line <>
+          indent 2 (pretty id_ <+> larrow <+> expr_ False f <> semi) <> line <>
+        "end if" <> semi) <> line <>
+      "end process" <> semi
   where
     (t,f) = if b then (l,r) else (r,l)
 
