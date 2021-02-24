@@ -70,7 +70,7 @@ import           Control.Lens.Internal.TH     (bndrName, conAppsT)
 --   "potentially uninteresting" part will only be enabled if the constructor
 --   bits indicate they're interesting.
 --
---   The most important example of this is "Maybe". Consider "Maybe Byte)";
+--   The most important example of this is 'Maybe'. Consider @Maybe (Signed 16)@;
 --   when viewed as bits, a 'Nothing' would look like:
 --
 --     >>> pack @(Maybe (Signed 16)) Nothing
@@ -82,14 +82,14 @@ import           Control.Lens.Internal.TH     (bndrName, conAppsT)
 --     1_0000_0000_0000_0011
 --
 --   In the first case, Nothing, we don't particularly care about updating the
---   register holding the "Signed 16" field, as they'll be unknown anyway. We
+--   register holding the @Signed 16@ field, as they'll be unknown anyway. We
 --   can therefore deassert its enable line.
 --
 -- Making Clash lay it out like this increases the chances of synthesis tools
 -- clock gating the registers, saving energy.
 --
 -- This version of 'autoReg' will split the given data type up recursively. For
--- example, given "a :: Maybe (Maybe Int, Maybe Int)", a total of five registers
+-- example, given @a :: Maybe (Maybe Int, Maybe Int)@, a total of five registers
 -- will be rendered. Both the "interesting" and "uninteresting" enable lines of
 -- the inner Maybe types will be controlled by the outer one, in addition to
 -- the inner parts controlling their "uninteresting" parts as described in (2).
@@ -102,8 +102,11 @@ import           Control.Lens.Internal.TH     (bndrName, conAppsT)
 --
 -- If you have a product type you can use 'deriveAutoReg' to derive an instance.
 --
--- "Clash.Prelude" exports an implicit version of this: 'Clash.Prelude.autoReg'
 class NFDataX a => AutoReg a where
+  -- | For documentation see class 'AutoReg'.
+  --
+  -- This is version with explicit clock/reset/enable,
+  -- "Clash.Prelude" exports an implicit version of this: 'Clash.Prelude.autoReg'
   autoReg
     :: (HasCallStack, KnownDomain dom)
     => Clock dom -> Reset dom -> Enable dom

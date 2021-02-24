@@ -420,7 +420,7 @@ substInExistentials is exts subst@(typeVar, _type) =
       -- it is as we would replace global variables in them.
       take (i+1) exts ++ substGlobalsInExistentials is (drop (i+1) exts) [subst]
 
--- | This checks if the substitution satisfies the invariant from 'TvSbust's
+-- | This checks if the substitution satisfies the invariant from 'TvSubst's
 -- Note [The substitution invariant].
 checkValidSubst
   :: HasCallStack

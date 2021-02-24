@@ -666,7 +666,7 @@ mkNFDataXTupleInstances [2..maxTupleSize]
 undefined :: HasCallStack => a
 undefined = errorX "undefined"
 
--- | Same as "Data.Maybe.fromJust", but returns a bottom/undefined value that
+-- | Same as 'Data.Maybe.fromJust', but returns a bottom/undefined value that
 -- other Clash constructs are aware of.
 fromJustX :: HasCallStack => Maybe a -> a
 fromJustX Nothing = errorX "isJustX: Nothing"

@@ -6,7 +6,7 @@
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 
--- | Test constant folding of most primitives on "Num" types
+-- | Test constant folding of most primitives on 'Num' types
 --
 -- Any number found in the HDL between [22000,22999] is considered unfolded
 -- and is reported as an error.

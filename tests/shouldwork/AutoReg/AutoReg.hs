@@ -13,7 +13,6 @@
 module AutoReg where
 import Data.Int
 import Clash.Prelude
-import Clash.Class.AutoReg (AutoReg)
 import Clash.Sized.Internal.BitVector
 import Control.Monad (when)
 import qualified Data.List as L

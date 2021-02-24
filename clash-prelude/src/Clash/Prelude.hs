@@ -130,8 +130,7 @@ module Clash.Prelude
   , Lift (..)
     -- ** Type classes
     -- *** Clash
-  -- , module Clash.Class.AutoReg
-  , autoReg, deriveAutoReg
+  , AutoReg, autoReg, deriveAutoReg
   , module Clash.Class.BitPack
   , module Clash.Class.Exp
   , module Clash.Class.Num

@@ -6,7 +6,6 @@ import Test.Tasty
 import Test.Tasty.QuickCheck
 import qualified Data.List as L
 import Clash.Prelude
-import Clash.Class.AutoReg (AutoReg)
 
 test :: (Eq a, Show a, AutoReg a, Arbitrary a) => a -> [a] -> Property
 test initVal xs = testFor (L.length xs) $ register initVal input .==. autoReg initVal input

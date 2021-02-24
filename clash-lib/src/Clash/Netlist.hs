@@ -677,8 +677,7 @@ mkFunApp dstId fun args tickDecls = do
 
         -- Filter void arguments, but make sure to render their declarations:
         let
-          filteredTypeExprs = filter (not . isVoid . fst) (zip argHWTys argExprs)
-          (hWTysFiltered, argExprsFiltered) = unzip filteredTypeExprs
+          filteredTypeExprs = filter (not . isVoid . snd) (zip argExprs argHWTys)
 
         dstHWty  <- unsafeCoreTypeToHWTypeM' $(curLoc) fResTy
 
@@ -727,7 +726,7 @@ mkFunApp dstId fun args tickDecls = do
         instDecls <-
           mkTopUnWrapper
             fun expandedTopEntity (dstId, dstHWty)
-            (zip argExprsFiltered hWTysFiltered) tickDecls
+            filteredTypeExprs tickDecls
 
         return (argDecls ++ instDecls)
 
@@ -751,14 +750,13 @@ mkFunApp dstId fun args tickDecls = do
 
           -- Filter void arguments, but make sure to render their declarations:
           let
-            argTypeExprs = zip argHWTys (zip argTys argExprs)
+            argTypeExprs = zip argHWTys (zip argExprs argTys)
             filteredTypeExprs = fmap snd $ filter (not . isVoidMaybe True . fst) argTypeExprs
-            (argTysFiltered, argsFiltered) = unzip filteredTypeExprs
 
           let compOutp = (\(_,x,_) -> x) <$> listToMaybe co
-          if length argTysFiltered == length compInps
+          if length filteredTypeExprs == length compInps
             then do
-              (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dstId) (zip argsFiltered argTysFiltered)
+              (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dstId) filteredTypeExprs
               let inpAssigns    = zipWith (\(i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
                   outpAssign    = case compOutp of
                     Nothing -> []
@@ -770,7 +768,11 @@ mkFunApp dstId fun args tickDecls = do
               let portMap = NamedPortMap (outpAssign ++ inpAssigns)
                   instDecl = InstDecl Entity Nothing [] compName instLabel3 [] portMap
               return (argDecls ++ argDecls' ++ tickDecls ++ [instDecl])
-            else error [I.i|
+            else
+              let
+                argsFiltered :: [Expr]
+                argsFiltered = map fst filteredTypeExprs
+              in error [I.i|
               Under-applied normalized function at component #{compName}:
 
               #{showPpr fun}

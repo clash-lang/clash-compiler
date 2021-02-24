@@ -237,7 +237,7 @@ clashCmd target sourceDir extraArgs modName oDir =
 
 clashHDL
   :: Maybe (TestExitCode, T.Text)
-  -- ^ Expect failure / test exit code. See "TestOptions".
+  -- ^ Expect failure / test exit code. See 'TestOptions'.
   -> HDL
   -- ^ Build target
   -> FilePath
@@ -375,7 +375,7 @@ ghdlMake path modName subdirs libs entName =
 
 ghdlSim
   :: Maybe (TestExitCode, T.Text)
-  -- ^ Expect failure / test exit code. See "TestOptions".
+  -- ^ Expect failure / test exit code. See 'TestOptions'.
   -> [TestName]
   -- ^ Path to test
   -> String
@@ -427,7 +427,7 @@ noConflict nm seen
 
 vvp
   :: Maybe (TestExitCode, T.Text)
-  -- ^ Expect failure / test exit code. See "TestOptions".
+  -- ^ Expect failure / test exit code. See 'TestOptions'.
   -> Bool
   -- ^ Whether an empty stderr means test failure
   -> [TestName]
@@ -480,7 +480,7 @@ vlog entName path modName subdirs =
 
 vsim
   :: Maybe (TestExitCode, T.Text)
-  -- ^ Expect failure / test exit code. See "TestOptions".
+  -- ^ Expect failure / test exit code. See 'TestOptions'.
   -> [TestName]
   -- ^ Path to test
   -> String
@@ -626,7 +626,6 @@ runTest
   :: String
   -- ^ Name of test
   -> TestOptions
-  -- ^ See "TestOptions"
   -> [TestName]
   -- ^ Parent test names in order of distance to the test. That is, the last
   -- item in the list will be the root node, while the first one will be the

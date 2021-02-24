@@ -170,7 +170,7 @@ data BlockState backend = BlockState
     -- ^ Declarations store
   , _bsHigherOrderCalls :: IntMap Int
     -- ^ Tracks how many times a higher order function has been instantiated.
-    -- Needed to fill in the second field of "Clash.Netlist.BlackBox.Types.Decl"
+    -- Needed to fill in the second field of 'Clash.Netlist.BlackBox.Types.Decl'
   , _bsBackend :: backend
     -- ^ Backend state
   }

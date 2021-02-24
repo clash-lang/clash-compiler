@@ -572,7 +572,7 @@ loadImportAndInterpret
   -> String
   -- ^ Function name
   -> String
-  -- ^ Type name ("BlackBoxFunction" or "TemplateFunction")
+  -- ^ Type name ('BlackBoxFunction' or 'TemplateFunction')
   -> m (Either Hint.InterpreterError a)
 loadImportAndInterpret iPaths0 interpreterArgs topDir qualMod funcName typ = do
   Hint.liftIO $ Monad.when debugIsOn $

@@ -194,10 +194,10 @@ constantArgs nm BlackBox {template = templ@(BBTemplate _), resultInits = tRIM} =
   getConstant (Const i)    = Just i
   getConstant _            = Nothing
 
-  -- Ensure that if the "Integer" arguments are constants, that they are reduced
+  -- Ensure that if the 'Integer' arguments are constants, that they are reduced
   -- to literals, so that the buildin rules can properly fire.
   --
-  -- Only in the the case that "Integer" arguments are truly variables should
+  -- Only in the the case that 'Integer' arguments are truly variables should
   -- the blackbox rules fire.
   fromIntForce
     | nm == "Clash.Sized.Internal.BitVector.fromInteger#"  = [2]
