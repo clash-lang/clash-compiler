@@ -173,11 +173,11 @@ apply = \s rewrite ctx expr0 -> do
   Monad.when hasChanged (transformCounter += 1)
 
   -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
-  rewriteHist <- Lens.view dbgRewriteHistory
-  Monad.when (rewriteHist && hasChanged) $ do
+  rewriteHistFile <- Lens.view dbgRewriteHistoryFile
+  Monad.when (isJust rewriteHistFile && hasChanged) $ do
     (curBndr, _) <- Lens.use curFun
     let !_ = unsafePerformIO
-             $ BS.appendFile "history.dat"
+             $ BS.appendFile (fromJust rewriteHistFile)
              $ BL.toStrict
              $ encode RewriteStep
                  { t_ctx    = tfContext ctx

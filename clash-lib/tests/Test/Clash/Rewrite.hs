@@ -65,7 +65,7 @@ instance Default RewriteEnv where
     , _dbgTransformations=Set.empty
     , _dbgTransformationsFrom=0
     , _dbgTransformationsLimit=maxBound
-    , _dbgRewriteHistory=False
+    , _dbgRewriteHistoryFile=Nothing
     , _aggressiveXOpt=False
     , _typeTranslator=error "_typeTranslator: NYI"
     , _tcCache=emptyUniqMap

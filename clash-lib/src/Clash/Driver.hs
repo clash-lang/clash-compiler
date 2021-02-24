@@ -279,8 +279,9 @@ generateHDL
   -> IO ()
 generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
   topEntities0 mainTopEntity opts (startTime,prepTime) = do
-    when (opt_dbgRewriteHistory opts) $
-      whenM (Directory.doesFileExist "history.dat") (Directory.removeFile "history.dat")
+    case opt_dbgRewriteHistoryFile opts of
+      Nothing -> pure ()
+      Just histFile -> whenM (Directory.doesFileExist histFile) (Directory.removeFile histFile)
     let (tes, deps) = sortTop bindingsMap topEntities1
      in go prepTime initIs HashMap.empty deps tes
  where
@@ -359,6 +360,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
                                -- 1. Debug
                                opt_dbgLevel           = DebugNone
                              , opt_dbgTransformations = Set.empty
+                             , opt_dbgRewriteHistoryFile = Nothing
                                -- 2. Caching
                              , opt_cachehdl           = True
                                -- 3. Warnings

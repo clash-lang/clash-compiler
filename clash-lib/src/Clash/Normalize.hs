@@ -19,7 +19,6 @@ import           Control.Concurrent.Supply        (Supply)
 import           Control.Exception                (throw)
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    (when)
-import           Control.Monad.Extra              (whenM)
 import           Control.Monad.State.Strict       (State)
 import           Data.Default                     (def)
 import           Data.Either                      (lefts,partitionEithers)
@@ -78,7 +77,7 @@ import           Clash.Normalize.Util
 import           Clash.Primitives.Types           (CompiledPrimMap)
 import           Clash.Rewrite.Combinators        ((>->),(!->),repeatR,topdownR)
 import           Clash.Rewrite.Types
-  (RewriteEnv (..), RewriteState (..), bindings, dbgLevel, dbgRewriteHistory, extra,
+  (RewriteEnv (..), RewriteState (..), bindings, dbgLevel, dbgRewriteHistoryFile, extra,
    tcCache, topEntities)
 import           Clash.Rewrite.Util
   (apply, isUntranslatableType, runRewriteSession)
@@ -128,7 +127,7 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
                   (opt_dbgTransformations opts)
                   (opt_dbgTransformationsFrom opts)
                   (opt_dbgTransformationsLimit opts)
-                  (opt_dbgRewriteHistory opts)
+                  (opt_dbgRewriteHistoryFile opts)
                   (opt_aggressiveXOpt opts)
                   typeTrans
                   tcm
@@ -377,9 +376,10 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm)) used) = do
       let tm1 = substTm "flattenCallTree.flattenExpr" subst tm
 
       -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
-      whenM (Lens.view dbgRewriteHistory) $
+      rewriteHistFile <- Lens.view dbgRewriteHistoryFile
+      when (Maybe.isJust rewriteHistFile) $
         let !_ = unsafePerformIO
-             $ BS.appendFile "history.dat"
+             $ BS.appendFile (Maybe.fromJust rewriteHistFile)
              $ BL.toStrict
              $ encode RewriteStep
                  { t_ctx    = []
