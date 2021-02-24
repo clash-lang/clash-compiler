@@ -282,7 +282,7 @@ generateHDL
 generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
   topEntities0 mainTopEntity opts (startTime,prepTime) = do
 #ifdef HISTORY
-    whenM (Directory.doesFileExist "history.dat") (Directory.deleteFile "history.dat")
+    whenM (Directory.doesFileExist "history.dat") (Directory.removeFile "history.dat")
 #endif
     let (tes, deps) = sortTop bindingsMap topEntities1
      in go prepTime initIs HashMap.empty deps tes
