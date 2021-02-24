@@ -26,9 +26,7 @@ import           Control.Lens                     (view, _4)
 import qualified Control.Monad                    as Monad
 import           Control.Monad                    (guard, when, unless, foldM)
 import           Control.Monad.Catch              (MonadMask)
-#ifdef HISTORY
 import           Control.Monad.Extra              (whenM)
-#endif
 import           Control.Monad.IO.Class           (MonadIO)
 import           Control.Monad.State              (evalState, get)
 import           Control.Monad.State.Strict       (State)
@@ -281,9 +279,8 @@ generateHDL
   -> IO ()
 generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
   topEntities0 mainTopEntity opts (startTime,prepTime) = do
-#ifdef HISTORY
-    whenM (Directory.doesFileExist "history.dat") (Directory.removeFile "history.dat")
-#endif
+    when (opt_dbgRewriteHistory opts) $
+      whenM (Directory.doesFileExist "history.dat") (Directory.removeFile "history.dat")
     let (tes, deps) = sortTop bindingsMap topEntities1
      in go prepTime initIs HashMap.empty deps tes
  where

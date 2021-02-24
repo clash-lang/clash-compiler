@@ -140,6 +140,12 @@ data ClashOpts = ClashOpts
   -- limit is exceeded, Clash will stop normalizing.
   --
   -- Command line flag: -fclash-debug-transformations-limit
+
+  , opt_dbgRewriteHistory :: Bool
+  -- ^ Save all applied rewrites to @history.dat@
+  --
+  -- Command line flag: -fclash-debug-history
+
   , opt_cachehdl :: Bool
   -- ^ Reuse previously generated output from Clash. Only caches topentities.
   --
@@ -260,6 +266,7 @@ defClashOpts :: ClashOpts
 defClashOpts
   = ClashOpts
   { opt_dbgLevel            = DebugNone
+  , opt_dbgRewriteHistory = False
   , opt_dbgTransformations  = Set.empty
   , opt_dbgTransformationsFrom = 0
   , opt_dbgTransformationsLimit = maxBound

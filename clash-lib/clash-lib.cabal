@@ -78,12 +78,6 @@ flag debug
    default: False
    manual: True
 
-flag history
-   description:
-     Emit rewrite history to disk
-   default: False
-   manual: True
-
 flag unittests
   description:
     You can disable testing with unittests using `-f-unittests`.
@@ -293,9 +287,6 @@ Library
 
   if flag(debug)
     cpp-options:      -DDEBUG
-
-  if flag(history)
-    cpp-options:      -DHISTORY
 
   if flag(experimental-evaluator)
     cpp-options:      -DEXPERIMENTAL_EVALUATOR
