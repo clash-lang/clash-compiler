@@ -1,6 +1,6 @@
 Cabal-version:        2.2
 Name:                 clash-prelude
-Version:              1.3.0
+Version:              1.4.0
 Synopsis:             CAES Language for Synchronous Hardware - Prelude library
 Description:
   Clash is a functional hardware description language that borrows both its
@@ -69,9 +69,7 @@ flag large-tuples
   description:
     Generate instances for classes such as `NFDataX` and `BitPack` for tuples
     up to and including 62 elements - the GHC imposed maximum. This greatly
-    increases compile times for `clash-prelude` and therefore mostly impacts the
-    Clash developers themselves. Hence its default is set to disabled on
-    development versions and enabled on releases.
+    increases compile times for `clash-prelude`.
   -- I have no idea to pass cabal flags to nix, so the comment below,
   -- "-- large-tuples", is there to enable a call to 'sed' that replaces
   -- True with False. This is done to prevent OOM on CircleCI.
@@ -101,7 +99,7 @@ flag multiple-hidden
     experimental feature, possibly triggering confusing error messages. By
     default, it is enabled on development versions of Clash and disabled on
     releases.
-  default: True
+  default: False
   manual: True
 
 flag doctests
