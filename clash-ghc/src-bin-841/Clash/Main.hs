@@ -87,7 +87,7 @@ import           Data.IORef (IORef, newIORef, readIORef)
 import qualified Data.Version (showVersion)
 
 import qualified Clash.Backend
-import           Clash.Backend (AggressiveXOptBB)
+import           Clash.Backend (AggressiveXOptBB, TernaryOpt)
 import           Clash.Backend.SystemVerilog (SystemVerilogState)
 import           Clash.Backend.VHDL    (VHDLState)
 import           Clash.Backend.Verilog (VerilogState)
@@ -978,7 +978,7 @@ abiHash strs = do
 
 makeHDL'
   :: Clash.Backend.Backend backend
-  => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> backend)
+  => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> TernaryOpt -> backend)
   -> IORef ClashOpts
   -> [(String,Maybe Phase)]
   -> Ghc ()
@@ -986,13 +986,13 @@ makeHDL' _       _ []   = throwGhcException (CmdLineError "No input files")
 makeHDL' backend r srcs = makeHDL backend r $ fmap fst srcs
 
 makeVHDL :: IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
-makeVHDL = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> VHDLState)
+makeVHDL = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> TernaryOpt -> VHDLState)
 
 makeVerilog ::  IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
-makeVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> VerilogState)
+makeVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> TernaryOpt ->VerilogState)
 
 makeSystemVerilog ::  IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
-makeSystemVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> SystemVerilogState)
+makeSystemVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> TernaryOpt -> SystemVerilogState)
 
 -- -----------------------------------------------------------------------------
 -- Util

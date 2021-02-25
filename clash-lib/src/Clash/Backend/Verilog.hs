@@ -31,7 +31,7 @@ module Clash.Backend.Verilog
 where
 
 import qualified Control.Applicative                  as A
-import           Control.Lens                         (Lens',(+=),(-=),(.=),(%=), makeLenses, use)
+import           Control.Lens                         (Lens',(+=),(-=),(.=),(%=), makeLenses, use, view)
 import           Control.Monad                        (forM)
 import           Control.Monad.State                  (State)
 import           Data.Bits                            (Bits, testBit)
@@ -94,6 +94,7 @@ data VerilogState =
     , _hdlsyn    :: HdlSyn
     , _undefValue :: Maybe (Maybe Int)
     , _aggressiveXOptBB_ :: AggressiveXOptBB
+    , _useTernaryOperator :: TernaryOpt
     }
 
 makeLenses ''VerilogState
@@ -102,7 +103,7 @@ instance HasIdentifierSet VerilogState where
   identifierSet = idSeen
 
 instance Backend VerilogState where
-  initBackend iw hdlsyn_ esc lw undefVal xOpt = VerilogState
+  initBackend iw hdlsyn_ esc lw undefVal xOpt optTernary = VerilogState
     { _genDepth=0
     , _idSeen=Id.emptyIdentifierSet esc lw Verilog
     , _srcSpan=noSrcSpan
@@ -116,6 +117,7 @@ instance Backend VerilogState where
     , _hdlsyn=hdlsyn_
     , _undefValue=undefVal
     , _aggressiveXOptBB_=xOpt
+    , _useTernaryOperator=optTernary
     }
   hdlKind         = const Verilog
   primDirs        = const $ do root <- primsRoot
@@ -176,7 +178,7 @@ instance Backend VerilogState where
   getDataFiles = use dataFiles
   addMemoryDataFile f = memoryDataFiles %= (f:)
   getMemoryDataFiles = use memoryDataFiles
-  ifThenElseExpr _ = True
+  ifThenElseExpr = getTernaryOpt . view useTernaryOperator
   aggressiveXOptBB = use aggressiveXOptBB_
 
 type VerilogM a = Mon (State VerilogState) a

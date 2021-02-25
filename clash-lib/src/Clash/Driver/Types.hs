@@ -209,6 +209,8 @@ data ClashOpts = ClashOpts
   -- ^ At what size do we cache normalized work-free top-level binders.
   , opt_edalize :: Bool
   -- ^ Generate an EDAM file for use with Edalize.
+  , opt_ternaryOperator :: Bool
+  -- ^ Generate HDL with ternary operators when the backend supports it.
   }
 
 instance Hashable ClashOpts where
@@ -244,7 +246,8 @@ instance Hashable ClashOpts where
     opt_aggressiveXOpt `hashWithSalt`
     opt_aggressiveXOptBB `hashWithSalt`
     opt_inlineWFCacheLimit `hashWithSalt`
-    opt_edalize
+    opt_edalize `hashWithSalt`
+    opt_ternaryOperator
    where
     hashOverridingBool :: Int -> OverridingBool -> Int
     hashOverridingBool s1 Auto = hashWithSalt s1 (0 :: Int)
@@ -289,6 +292,7 @@ defClashOpts
   , opt_aggressiveXOptBB    = False
   , opt_inlineWFCacheLimit  = 10 -- TODO: find "optimal" value
   , opt_edalize             = False
+  , opt_ternaryOperator     = True
   }
 
 -- | Information about the generated HDL between (sub)runs of the compiler

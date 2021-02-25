@@ -241,6 +241,13 @@ Clash Compiler Flags
 
 .. _`Edalize`: https://github.com/olofk/edalize
 
+-fclash-no-ternary-operator
+  Do not use conditional assignment, nor the ternary operator, when translating
+  expressions isomorphic to ``if b then t else f``, but use a sequential process
+  or always block instead.
+
+  **Default:** Use conditional assignment and ternary operators
+
 -main-is
   When using one of ``--vhdl``, ``--verilog``, or ``--systemverilog``, this
   flag refers to synthesis target. For example, running Clash with
