@@ -1,3 +1,0 @@
-FIXED: `signum` and `RealFrac` for `Fixed` now give the correct results.
-
-CHANGED/FIXED: `Fixed` now obeys the laws for `Enum` as set out in the Haskell Report, and it is now consistent with the documentation for the `Enum` class on Hackage. As `Fixed` is also `Bounded`, the rule in the Report that `succ maxBound` and `pred minBound` should result in a runtime error is interpreted as meaning that `succ` and `pred` result in a runtime error whenever the result cannot be represented, not merely for `minBound` and `maxBound` alone.

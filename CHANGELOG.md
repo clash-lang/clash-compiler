@@ -1,4 +1,79 @@
 # Changelog for the Clash project
+## 1.4.0 *February 25th 2020*
+Highlighted changes (repeated in other categories):
+
+  * Clash no longer disables the monomorphism restriction. See [#1270](https://github.com/clash-lang/clash-compiler/issues/1270), and mentioned issues, as to why. This can cause, among other things, certain eta-reduced descriptions of sequential circuits to no longer type-check. See [#1349](https://github.com/clash-lang/clash-compiler/pull/1349) for code hints on what kind of changes to make to your own code in case it no longer type-checks due to this change.
+  * Type arguments of `Clash.Sized.Vector.fold` swapped: before `forall a n . (a -> a -> a) -> Vec (n+1) a -> a`, after `forall n a . (a -> a -> a) -> Vec (n+1) a`. This makes it easier to use `fold` in a `1 <= n` context so you can "simply" do `fold @(n-1)`
+  * `Fixed` now obeys the laws for `Enum` as set out in the Haskell Report, and it is now consistent with the documentation for the `Enum` class on Hackage. As `Fixed` is also `Bounded`, the rule in the Report that `succ maxBound` and `pred minBound` should result in a runtime error is interpreted as meaning that `succ` and `pred` result in a runtime error whenever the result cannot be represented, not merely for `minBound` and `maxBound` alone.
+
+Fixed:
+  * Result of `Clash.Class.Exp.(^)` has enough bits in order to deal with `x^0`.
+  * Resizes to `Signed 0` (e.g., `resize @(Signed n) @(Signed 0)`) don't throw an error anymore
+  * `satMul` now correctly handles arguments of type `Index 2`
+  * `Clash.Explicit.Reset.resetSynchronizer` now synchronizes on synchronous domains too [#1567](https://github.com/clash-lang/clash-compiler/pull/1567).
+  * `Clash.Explicit.Reset.convertReset`: now converts synchronous domains too, if necessary [#1567](https://github.com/clash-lang/clash-compiler/pull/1567).
+  * `inlineWorkFree` now never inlines a topentity. It previously only respected this invariant in one of the two cases [#1587](https://github.com/clash-lang/clash-compiler/pull/1587).
+  * Clash now reduces recursive type families [#1591](https://github.com/clash-lang/clash-compiler/issues/1591)
+  * Primitive template warning is now retained when a `PrimitiveGuard` annotation is present [#1625](https://github.com/clash-lang/clash-compiler/issues/1625)
+  * `signum` and `RealFrac` for `Fixed` now give the correct results.
+  * Fixed a memory leak in register when used on asynchronous domains. Although the memory leak has always been there, it was only triggered on asserted resets. These periods are typically short, hence typically unnoticable.
+  * `createDomain` will not override user definitions of types, helping users who strive for complete documentation coverage [#1674] https://github.com/clash-lang/clash-compiler/issues/1674
+  * As part of an internal overhaul on netlist identifier generation [#1265](https://github.com/clash-lang/clash-compiler/pull/1265):
+    * Clash no longer produces "name conflicts" between basic and extended identifiers. I.e., `\x\` and `x` are now considered the same variable in VHDL (likewise for other HDLs). Although the VHDL spec considers them distinct variables, some HDL tools - like Quartus - don't.
+    * Capitalization of Haskell names are now preserved in VHDL. Note that VHDL is a case insensitive languages, so there are measures in place to prevent Clash from generating both `Foo` and `fOO`. This used to be handled by promoting every capitalized identifier to an extended one and wasn't handled for basic ones.
+    * Names generated for testbenches can no longer cause collisions with previously generated entities.
+    * Names generated for components can no longer cause collisions with user specified top entity names.
+    * For (System)Verilog, variables can no longer cause collisions with (to be) generated entity names.
+    * HO blackboxes can no longer cause collisions with identifiers declared in their surrounding architecture block.
+
+
+Changed:
+  * Treat enable lines specially in generated HDL [#1171](https://github.com/clash-lang/clash-compiler/issues/1171)
+  * `Signed`, `Unsigned`, `SFixed`, and `UFixed` now correctly implement the `Enum` law specifying that the predecessor of `minBound` and the successor of `maxBound` should result in an error [#1495](https://github.com/clash-lang/clash-compiler/pull/1495).
+  * `Fixed` now obeys the laws for `Enum` as set out in the Haskell Report, and it is now consistent with the documentation for the `Enum` class on Hackage. As `Fixed` is also `Bounded`, the rule in the Report that `succ maxBound` and `pred minBound` should result in a runtime error is interpreted as meaning that `succ` and `pred` result in a runtime error whenever the result cannot be represented, not merely for `minBound` and `maxBound` alone.
+  * Type arguments of `Clash.Sized.Vector.fold` swapped: before `forall a n . (a -> a -> a) -> Vec (n+1) a -> a`, after `forall n a . (a -> a -> a) -> Vec (n+1) a`. This makes it easier to use `fold` in a `1 <= n` context so you can "simply" do `fold @(n-1)`
+  * Moved `Clash.Core.Evaluator` into `Clash.GHC` and provided generic interface in `Clash.Core.Evalautor.Types`. This removes all GHC specific code from the evaluator in clash-lib.
+  * Clash no longer disables the monomorphism restriction. See [#1270](https://github.com/clash-lang/clash-compiler/issues/1270), and mentioned issues, as to why. This can cause, among other things, certain eta-reduced descriptions of sequential circuits to no longer type-check. See [#1349](https://github.com/clash-lang/clash-compiler/pull/1349) for code hints on what kind of changes to make to your own code in case it no longer type-checks due to this change.
+  * Clash now generates SDC files for each topentity with clock inputs
+  * `deepErrorX` is now equal to `undefined#`, which means that instead of the whole BitVector being undefined, its individual bits are. This makes sure bit operations are possible on it. [#1532](https://github.com/clash-lang/clash-compiler/pull/1532)
+  * From GHC 9.0.1 onwards the following types: `BiSignalOut`, `Index`, `Signed`, `Unsigned`, `File`, `Ref`, and `SimIO` are all encoded as `data` instead of `newtype` to work around an [issue](https://github.com/clash-lang/clash-compiler/pull/1624#discussion_r558333461) where the Clash compiler can no longer recognize primitives over these types. This means you can no longer use `Data.Coerce.coerce` to coerce between these types and their underlying representation.
+  * Signals on different domains used to be coercable because the domain had a type role "phantom". This has been changed to "nominal" to prevent accidental, unsafe coercions. [#1640](https://github.com/clash-lang/clash-compiler/pull/1640)
+  * Size parameters on types in Clash.Sized.Internal.* are now nominal to prevent unsafe coercions. [#1640](https://github.com/clash-lang/clash-compiler/pull/1640)
+  * `hzToPeriod` now takes a `Ratio Natural` rather than a `Double`. It rounds slightly differently, leading to more intuitive results and satisfying the requested change in [#1253](https://github.com/clash-lang/clash-compiler/issues/1253). Clash expresses clock rate as the clock period in picoseconds. If picosecond precision is required for your design, please use the exact method of specifying a clock period rather than a clock frequency.
+  * `periodToHz` now results in a `Ratio Natural`
+
+
+Added:
+  * Support for GHC 9.0.1
+  * `Clash.Signal.sameDomain`: Allows user obtain evidence whether two domains are equal.
+  * `xToErrorCtx`: makes it easier to track the origin of `XException` where `pack` would hide them [#1461](https://github.com/clash-lang/clash-compiler/pull/1461)
+  * Additional field with synthesis attributes added to `InstDecl` in `Clash.Netlist.Types` [#1482](https://github.com/clash-lang/clash-compiler/pull/1482)
+  * `Data.Ix.Ix` instances for `Signed` and `Unsigned` [#1481](https://github.com/clash-lang/clash-compiler/pull/1481)
+  * Added `Data.Ix.Ix` instances for `Index` [#1631](https://github.com/clash-lang/clash-compiler/pull/1631)
+  * Added `nameHint` to allow explicitly naming terms, e.g. `Signal`s.
+  * Checked versions of `resize`, `truncateB`, and `fromIntegral`. Depending on the type `resize`, `truncateB`, and `fromIntegral` either yield an `XException` or silently perform wrap-around if its argument does not fit in the resulting type's bounds. The added functions check the bound condition and fail with an error call if the condition is violated. They do not affect HDL generation. [#1491](https://github.com/clash-lang/clash-compiler/pull/1491)
+  * `HasBiSignalDefault`: constraint to Clash.Signal.BiSignal, `pullUpMode` gives access to the pull-up mode. [#1498](https://github.com/clash-lang/clash-compiler/pull/1498)
+  * Match patterns to bitPattern [#1545](https://github.com/clash-lang/clash-compiler/pull/1545)
+  * Non TH `fromList` and `unsafeFromList` for Vec. These functions allow Vectors to be created from a list without needing to use template haskell, which is not always desirable. The unsafe version of the function does not compare the length of the list to the desired length of the vector, either truncating or padding with undefined if the lengths differ.
+  * `Clash.Explicit.Reset.resetGlitchFilter`: filters glitchy reset signals. Useful when your reset signal is connected to sensitive actuators.
+  * Clash can now generate EDAM for using Edalize. This generates edam.py files in all top entities with the configuration for building that entity. Users still need to edit this file to specify the EDA tool to use, and if necessary the device to target (for Quartus, Vivado etc.). [#1386](https://github.com/clash-lang/clash-compiler/issues/1386)
+  * `-fclash-aggressive-x-optimization-blackboxes`: when enabled primitives can detect undefined values and change their behavior accordingly. For example, if `register` is used in combination with an undefined reset value, it will leave out the reset logic entirely. Related issue: [#1506](https://github.com/clash-lang/clash-compiler/issues/1506).
+  * Automaton-based interface to simulation, to allow interleaving of cyle-by-cycle simulation and external effects [#1261](https://github.com/clash-lang/clash-compiler/pull/1261)
+
+
+New internal features:
+  * `constructProduct` and `deconstructProduct` in `Clash.Primitives.DSL`. Like `tuple` and `untuple`, but on arbitrary product types.
+  * Support for multi result primitives. Primitives can now assign their results to multiple variables. This can help to work around synthesis tools limits in some cases. See [#1560](https://github.com/clash-lang/clash-compiler/pull/1560).
+  * Added a rule for missing `Int` comparisons in `GHC.Classes` in the compile time evaluator. [#1648](https://github.com/clash-lang/clash-compiler/issues/1648)
+  * Clash now creates a mapping from domain names to configurations in `LoadModules`. [#1405](https://github.com/clash-lang/clash-compiler/pull/1405)
+  * The convenience functions in `Clash.Primitives.DSL` now take a list of HDLs, instead of just one.
+  * `Clash.Netlist.Id` overhauls the way identifiers are generated in the Netlist part of Clash.
+
+Deprecated:
+  * `Clash.Prelude.DataFlow`: see [#1490](https://github.com/clash-lang/clash-compiler/pull/1490). In time, its functionality will be replaced by [clash-protocols](https://gitlab.com/clash-lang/clash-protocols).
+
+Removed:
+  * The deprecated function `freqCalc` has been removed.
 
 ## 1.2.5 *November 9th 2020*
 Fixed:

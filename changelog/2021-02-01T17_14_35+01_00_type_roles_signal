@@ -1,2 +1,0 @@
-CHANGED: Signals on different domains used to be coercable because the domain had a type role "phantom". This has been changed to "nominal" to prevent accidental, unsafe coercions.
-CHANGED: Size parameters on types in Clash.Sized.Internal.* are now nominal to prevent unsafe coercions.
