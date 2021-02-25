@@ -1,7 +1,7 @@
 Cabal-version:        2.2
 Name:                 clash-ghc
 Version:              1.4.0
-Synopsis:             CAES Language for Synchronous Hardware
+Synopsis:             Clash: a functional hardware description language - GHC frontend
 Description:
   Clash is a functional hardware description language that borrows both its
   syntax and semantics from the functional programming language Haskell. The
