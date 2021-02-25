@@ -1,3 +1,0 @@
-ADDED: Added 'Clash.Signal.sameDomain': Allows user obtain evidence whether two domains are equal.
-FIXED: Fixed 'Clash.Explicit.Reset.resetSynchronizer': The synchronizer was not synchronizing reset for synchronous domains correctly.
-FIXED: Fixed 'Clash.Explicit.Reset.convertReset': Reset conversion was never performed when converting between synchronous resets.

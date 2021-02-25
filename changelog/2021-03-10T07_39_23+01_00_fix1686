@@ -1,2 +1,0 @@
-CHANGED: Clash internal API functions `generateBindings` and `loadModules` take an additional startup action
-ADDED: `defaultWithAction` added to Clash-as-a-library API to work around/fix issues such as [#1686](https://github.com/clash-lang/clash-compiler/issues/1686)

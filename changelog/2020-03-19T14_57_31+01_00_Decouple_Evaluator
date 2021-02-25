@@ -1,1 +1,0 @@
-CHANGED: Moved Clash.Core.Evalautor into Clash.GHC and provided generic interface in Clash.Core.Evalautor.Types. This removes all GHC specific code from the evaluator in clash-lib.

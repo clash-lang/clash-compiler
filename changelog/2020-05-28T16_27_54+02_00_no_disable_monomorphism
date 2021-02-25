@@ -1,4 +1,0 @@
-CHANGED: Clash no longer disables the monomorphism restriction.
-See https://github.com/clash-lang/clash-compiler/issues/1270, and mentioned issues, as to why.
-This can cause, among other things, certain eta-reduced descriptions of sequential circuits to no longer type-check.
-See https://github.com/clash-lang/clash-compiler/pull/1349 for code hints on what kind of changes to make to your own code in case it no longer type-checks due to this change.
