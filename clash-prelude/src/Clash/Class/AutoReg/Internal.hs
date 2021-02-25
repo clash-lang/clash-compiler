@@ -48,7 +48,19 @@ import           Language.Haskell.TH.Syntax
 import           Language.Haskell.TH.Lib
 import           Language.Haskell.TH.Ppr
 
-import           Control.Lens.Internal.TH     (bndrName, conAppsT)
+import           Control.Lens.Internal.TH     (conAppsT)
+
+#if MIN_VERSION_base(4,15,0)
+-- | Return 'Name' contained in a 'TyVarBndr'.
+bndrName :: TyVarBndr a -> Name
+bndrName (PlainTV  n _) = n
+bndrName (KindedTV n _ _) = n
+#else
+-- | Return 'Name' contained in a 'TyVarBndr'.
+bndrName :: TyVarBndr -> Name
+bndrName (PlainTV  n) = n
+bndrName (KindedTV n _) = n
+#endif
 
 -- $setup
 -- >>> import Data.Maybe

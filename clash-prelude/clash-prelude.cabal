@@ -331,7 +331,7 @@ Library
                       hashable                  >= 1.2.1.0  && < 1.4,
                       half                      >= 0.2.2.3 && < 1.0,
                       interpolate               >= 0.2     && < 0.3,
-                      lens                      >= 4.10    && < 4.20,
+                      lens                      >= 4.10    && < 5.1.0,
                       recursion-schemes         >= 5.1     && < 5.3,
                       QuickCheck                >= 2.7     && < 2.15,
                       reflection                >= 2       && < 2.2,
