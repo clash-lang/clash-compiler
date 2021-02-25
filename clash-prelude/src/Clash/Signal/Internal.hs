@@ -155,6 +155,7 @@ import Data.Char                  (isAsciiUpper, isAlphaNum, isAscii)
 import Data.Data                  (Data)
 import Data.Default.Class         (Default (..))
 import Data.Hashable              (Hashable)
+import Data.Maybe                 (isJust)
 import Data.Proxy                 (Proxy(..))
 import Data.Ratio                 (Ratio)
 import Data.Type.Equality         ((:~:))
@@ -554,16 +555,28 @@ createDomain (VDomainConfiguration name period edge reset init_ polarity) =
         kcImpl = mkTySynInstD ''KnownConf [LitT (StrTyLit name)] kcType
         vName' = mkName ('v':name)
 
-    pure  [ -- KnownDomain instance (ex: instance KnownDomain "System" where ...)
-            InstanceD Nothing [] kdType [kcImpl, kdImpl]
+    tySynExists <- isJust <$> lookupTypeName name
+    vHelperExists <- isJust <$> lookupValueName ('v':name)
 
-            -- Type synonym (ex: type System = "System")
-          , TySynD (mkName name) [] (LitT (StrTyLit name)  `SigT`  ConT ''Domain)
+    pure $ concat
+      [
+        [ -- Type synonym (ex: type System = "System")
+          TySynD (mkName name) [] (LitT (StrTyLit name)  `SigT`  ConT ''Domain)
+        | not tySynExists
+        ]
 
-            -- vDomain helper (ex: vSystem = vDomain (knownDomain @System))
-          , SigD vName' (ConT ''VDomainConfiguration)
+      , concat
+        [ -- vDomain helper (ex: vSystem = vDomain (knownDomain @System))
+          [ SigD vName' (ConT ''VDomainConfiguration)
           , FunD vName' [Clause [] (NormalB vNameImpl) []]
           ]
+        | not vHelperExists
+        ]
+      , [ -- KnownDomain instance (ex: instance KnownDomain "System" where ...)
+          InstanceD Nothing [] kdType [kcImpl, kdImpl]
+        ]
+      ]
+
   else
     error ("Domain names should be a valid Haskell type name, not: " ++ name)
  where

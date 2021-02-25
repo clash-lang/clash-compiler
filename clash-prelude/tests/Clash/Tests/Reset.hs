@@ -14,7 +14,10 @@ import Test.Tasty.HUnit
 import Test.Tasty.TH
 import Clash.Explicit.Prelude
 
+-- Testing with explicit declaration of the Low type alias
+type Low = ("Low" :: Domain)
 createDomain vSystem{vName="Low", vResetPolarity=ActiveLow}
+
 createDomain vSystem{vName="NoInit", vInitBehavior=Unknown}
 
 sampleResetN :: KnownDomain dom => Int -> Reset dom -> [Bool]
