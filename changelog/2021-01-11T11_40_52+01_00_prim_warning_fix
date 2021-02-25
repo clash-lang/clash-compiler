@@ -1,2 +1,0 @@
-CHANGED: Split warnings of `PrimitiveGuard` into separate data type.
-FIXED: Primitive template warning is now retained when a `PrimitiveGuard` annotation is present (fixes #1625).

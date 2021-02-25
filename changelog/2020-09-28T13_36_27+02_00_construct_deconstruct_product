@@ -1,1 +1,0 @@
-ADDED: Added 'constructProduct' and 'deconstructProduct' in "Clash.Primitives.DSL". Like 'tuple' and 'untuple', but on arbitrary product types.

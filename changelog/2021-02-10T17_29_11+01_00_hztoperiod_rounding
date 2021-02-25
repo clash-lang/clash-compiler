@@ -1,2 +1,0 @@
-CHANGED: hzToPeriod now takes a `Ratio Natural` rather than a `Double`. It rounds slightly differently, leading to more intuitive results and satisfying the requested change in issue #1253. While the difference is observable in simulation, it does not affect generated circuits in a significant way.
-CHANGED: For symmetry, `periodToHz` now results in a `Ratio Natural`.
