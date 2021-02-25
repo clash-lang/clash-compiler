@@ -1,1 +1,0 @@
-FIXED: Fixed a memory leak in register when used on asynchronous domains. Although the memory leak has always been there, it was only triggered on asserted resets. These periods are typically short, hence unnoticable.

@@ -1,1 +1,0 @@
-ADDED: Added 'Clash.Explicit.Reset.resetGlitchFilter': filters glitchy reset signals. Useful when your reset signal is connected to sensitive actuators.
