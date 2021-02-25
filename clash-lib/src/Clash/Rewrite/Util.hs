@@ -53,15 +53,11 @@ import qualified Data.Set.Ordered.Extra      as OSet
 import           Data.Text                   (Text)
 import qualified Data.Text                   as Text
 
-#if defined(EXPERIMENTAL_EVALUATOR) || defined(HISTORY)
 import           System.IO.Unsafe            (unsafePerformIO)
-#endif
 
-#ifdef HISTORY
 import           Data.Binary                 (encode)
 import qualified Data.ByteString             as BS
 import qualified Data.ByteString.Lazy        as BL
-#endif
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Types.Basic             (InlineSpec (..))
@@ -175,12 +171,13 @@ apply = \s rewrite ctx expr0 -> do
   let hasChanged = Monoid.getAny anyChanged
       !expr2     = if hasChanged then expr1 else expr0
   Monad.when hasChanged (transformCounter += 1)
-#ifdef HISTORY
-  -- NB: When HISTORY is on, emit binary data holding the recorded rewrite steps
-  Monad.when hasChanged $ do
+
+  -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
+  rewriteHistFile <- Lens.view dbgRewriteHistoryFile
+  Monad.when (isJust rewriteHistFile && hasChanged) $ do
     (curBndr, _) <- Lens.use curFun
     let !_ = unsafePerformIO
-             $ BS.appendFile "history.dat"
+             $ BS.appendFile (fromJust rewriteHistFile)
              $ BL.toStrict
              $ encode RewriteStep
                  { t_ctx    = tfContext ctx
@@ -190,7 +187,6 @@ apply = \s rewrite ctx expr0 -> do
                  , t_after  = expr1
                  }
     return ()
-#endif
 
   dbgFrom <- Lens.view dbgTransformationsFrom
   dbgLimit <- Lens.view dbgTransformationsLimit

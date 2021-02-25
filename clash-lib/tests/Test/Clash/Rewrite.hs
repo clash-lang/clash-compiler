@@ -65,6 +65,7 @@ instance Default RewriteEnv where
     , _dbgTransformations=Set.empty
     , _dbgTransformationsFrom=0
     , _dbgTransformationsLimit=maxBound
+    , _dbgRewriteHistoryFile=Nothing
     , _aggressiveXOpt=False
     , _typeTranslator=error "_typeTranslator: NYI"
     , _tcCache=emptyUniqMap
@@ -311,4 +312,3 @@ parseToTermQQ = TH.QuasiQuoter{
   , TH.quoteType = error "parseToTerm.quoteType: NYI"
   , TH.quoteDec = error "parseToTerm.quoteDec: NYI"
   }
-

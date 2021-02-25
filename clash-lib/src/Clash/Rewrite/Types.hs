@@ -111,6 +111,8 @@ data RewriteEnv
   -- ^ See ClashOpts.opt_dbgTransformationsFrom
   , _dbgTransformationsLimit :: Int
   -- ^ See ClashOpts.opt_dbgTransformationsLimit
+  , _dbgRewriteHistoryFile :: Maybe FilePath
+  -- ^ See ClashOpts.opt_dbgRewriteHistory
   , _aggressiveXOpt :: Bool
   -- ^ Transformations to print debugging info for
   , _typeTranslator :: CustomReprs

@@ -33,6 +33,11 @@ Clash Compiler Flags
 
   **Default:** ``DebugNone``
 
+-fclash-debug-history[=FILENAME]
+  Saves all applied rewrites into ``FILENAME``,
+  for later analysis with the clash-term tool.
+  When no filename is given it defaults to ``history.dat``.
+
 -fclash-debug-transformations
   List the transformations that are to be debugged. This is given as a
   comma-separated list of transformations, e.g.

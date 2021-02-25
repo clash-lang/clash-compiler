@@ -73,6 +73,7 @@ flagsClash r = [
   , defFlag "fclash-debug-transformations"       $ SepArg (setDebugTransformations r)
   , defFlag "fclash-debug-transformations-from"  $ OptIntSuffix (setDebugTransformationsFrom r)
   , defFlag "fclash-debug-transformations-limit" $ OptIntSuffix (setDebugTransformationsLimit r)
+  , defFlag "fclash-debug-history"               $ AnySuffix (liftEwM . (setRewriteHistoryFile r))
   , defFlag "fclash-hdldir"                      $ SepArg (setHdlDir r)
   , defFlag "fclash-hdlsyn"                      $ SepArg (setHdlSyn r)
   , defFlag "fclash-nocache"                     $ NoArg (deprecated "nocache" "no-cache" setNoCache r)
@@ -257,3 +258,10 @@ setAggressiveXOptBB r = modifyIORef r (\c -> c { opt_aggressiveXOptBB = True })
 
 setEdalize :: IORef ClashOpts -> IO ()
 setEdalize r = modifyIORef r (\c -> c { opt_edalize = True })
+
+setRewriteHistoryFile :: IORef ClashOpts -> String -> IO ()
+setRewriteHistoryFile r arg = do
+  let fileNm = case drop (length "-fclash-debug-history=") arg of
+                [] -> "history.dat"
+                str -> str
+  modifyIORef r (\c -> c {opt_dbgRewriteHistoryFile = Just fileNm})

@@ -77,21 +77,19 @@ import           Clash.Normalize.Util
 import           Clash.Primitives.Types           (CompiledPrimMap)
 import           Clash.Rewrite.Combinators        ((>->),(!->),repeatR,topdownR)
 import           Clash.Rewrite.Types
-  (RewriteEnv (..), RewriteState (..), bindings, dbgLevel, extra,
+  (RewriteEnv (..), RewriteState (..), bindings, dbgLevel, dbgRewriteHistoryFile, extra,
    tcCache, topEntities)
 import           Clash.Rewrite.Util
   (apply, isUntranslatableType, runRewriteSession)
 import           Clash.Util
 import           Clash.Util.Interpolate           (i)
 
-#ifdef HISTORY
 import           Data.Binary                      (encode)
 import qualified Data.ByteString                  as BS
 import qualified Data.ByteString.Lazy             as BL
 
 import           System.IO.Unsafe                 (unsafePerformIO)
 import           Clash.Rewrite.Types (RewriteStep(..))
-#endif
 
 
 -- | Run a NormalizeSession in a given environment
@@ -129,6 +127,7 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
                   (opt_dbgTransformations opts)
                   (opt_dbgTransformationsFrom opts)
                   (opt_dbgTransformationsLimit opts)
+                  (opt_dbgRewriteHistoryFile opts)
                   (opt_aggressiveXOpt opts)
                   typeTrans
                   tcm
@@ -375,10 +374,12 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm)) used) = do
     [] -> return tm
     _  -> do
       let tm1 = substTm "flattenCallTree.flattenExpr" subst tm
-#ifdef HISTORY
-      -- NB: When HISTORY is on, emit binary data holding the recorded rewrite steps
-      let !_ = unsafePerformIO
-             $ BS.appendFile "history.dat"
+
+      -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
+      rewriteHistFile <- Lens.view dbgRewriteHistoryFile
+      when (Maybe.isJust rewriteHistFile) $
+        let !_ = unsafePerformIO
+             $ BS.appendFile (Maybe.fromJust rewriteHistFile)
              $ BL.toStrict
              $ encode RewriteStep
                  { t_ctx    = []
@@ -387,7 +388,7 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm)) used) = do
                  , t_before = tm
                  , t_after  = tm1
                  }
-#endif
+        in pure ()
       rewriteExpr ("flattenExpr",flatten) (showPpr nm, tm1) (nm', sp)
   let allUsed = newUsed ++ concat il_used
   -- inline all components when the resulting expression after flattening

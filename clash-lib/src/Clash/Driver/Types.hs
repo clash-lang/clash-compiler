@@ -140,6 +140,12 @@ data ClashOpts = ClashOpts
   -- limit is exceeded, Clash will stop normalizing.
   --
   -- Command line flag: -fclash-debug-transformations-limit
+
+  , opt_dbgRewriteHistoryFile :: Maybe FilePath
+  -- ^ Save all applied rewrites to a file
+  --
+  -- Command line flag: -fclash-debug-history
+
   , opt_cachehdl :: Bool
   -- ^ Reuse previously generated output from Clash. Only caches topentities.
   --
@@ -223,6 +229,7 @@ instance Hashable ClashOpts where
     opt_dbgTransformations `hashWithSalt`
     opt_dbgTransformationsFrom `hashWithSalt`
     opt_dbgTransformationsLimit `hashWithSalt`
+    opt_dbgRewriteHistoryFile `hashWithSalt`
     opt_cachehdl `hashWithSalt`
     opt_cleanhdl `hashWithSalt`
     opt_primWarn `hashWithSalt`
@@ -260,6 +267,7 @@ defClashOpts :: ClashOpts
 defClashOpts
   = ClashOpts
   { opt_dbgLevel            = DebugNone
+  , opt_dbgRewriteHistoryFile = Nothing
   , opt_dbgTransformations  = Set.empty
   , opt_dbgTransformationsFrom = 0
   , opt_dbgTransformationsLimit = maxBound
