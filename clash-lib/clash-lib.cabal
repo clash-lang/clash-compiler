@@ -1,7 +1,7 @@
 Cabal-version:        2.2
 Name:                 clash-lib
 Version:              1.3.0
-Synopsis:             CAES Language for Synchronous Hardware - As a Library
+Synopsis:             Clash: a functional hardware description language - As a library
 Description:
   Clash is a functional hardware description language that borrows both its
   syntax and semantics from the functional programming language Haskell. The
