@@ -543,6 +543,16 @@ isValidDomainName _ = False
 --
 -- > vSystem10 = knownVDomain @System10
 --
+-- It will also make @System10@ an instance of 'KnownDomain'.
+--
+-- If either identifier is already in scope it will not be generated a second time.
+-- Note: This can be useful for example when documenting a new domain:
+--
+-- > -- | Here is some documentation for CustomDomain
+-- > type CustomDomain = ("CustomDomain" :: Domain)
+-- >
+-- > -- | Here is some documentation for vCustomDomain
+-- > createDomain vSystem{vName="CustomDomain"}
 createDomain :: VDomainConfiguration -> Q [Dec]
 createDomain (VDomainConfiguration name period edge reset init_ polarity) =
   if isValidDomainName name then do
