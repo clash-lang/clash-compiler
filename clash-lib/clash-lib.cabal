@@ -160,7 +160,7 @@ Library
                       haskell-src-meta        >= 0.8      && < 0.9,
                       hint                    >= 0.7      && < 0.10,
                       interpolate             >= 0.2.0    && < 1.0,
-                      lens                    >= 4.10     && < 4.20,
+                      lens                    >= 4.10     && < 5.1.0,
                       mtl                     >= 2.1.2    && < 2.3,
                       ordered-containers      >= 0.2      && < 0.3,
                       parsers                 >= 0.12.8   && < 1.0,
