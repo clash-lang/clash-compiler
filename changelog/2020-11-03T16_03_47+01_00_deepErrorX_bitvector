@@ -1,7 +1,0 @@
-CHANGED: 'deepErrorX' is now equal to 'undefined#', which means that instead of
-the whole BitVector being undefined, its individual bits are. This makes
-sure bit operations are possible on it.
-
-Motivation: allows a shift register to be gradually filled with bits
-until there are no undefined bits, whereas previously this would
-terminate the simulation.

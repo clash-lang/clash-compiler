@@ -1,1 +1,0 @@
-CHANGED: When `-fclash-aggressive-x-optimization-blackboxes` is enabled primitives can detect undefined values and change their behavior accordingly. For example, if `register` is used in combination with an undefined reset value, it will leave out the reset logic entirely. Related issue: [#1506](https://github.com/clash-lang/clash-compiler/issues/1506).

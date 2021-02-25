@@ -1,1 +1,0 @@
-Fixed: Resizes to `Signed 0` (e.g., `resize @(Signed n) @(Signed 0)`) don't throw an error anymore
