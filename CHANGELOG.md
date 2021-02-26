@@ -48,8 +48,7 @@ Added:
   * `Clash.Signal.sameDomain`: Allows user obtain evidence whether two domains are equal.
   * `xToErrorCtx`: makes it easier to track the origin of `XException` where `pack` would hide them [#1461](https://github.com/clash-lang/clash-compiler/pull/1461)
   * Additional field with synthesis attributes added to `InstDecl` in `Clash.Netlist.Types` [#1482](https://github.com/clash-lang/clash-compiler/pull/1482)
-  * `Data.Ix.Ix` instances for `Signed` and `Unsigned` [#1481](https://github.com/clash-lang/clash-compiler/pull/1481)
-  * Added `Data.Ix.Ix` instances for `Index` [#1631](https://github.com/clash-lang/clash-compiler/pull/1631)
+  * `Data.Ix.Ix` instances for `Signed`, `Unsigned`, and `Index` [#1481](https://github.com/clash-lang/clash-compiler/pull/1481) [#1631](https://github.com/clash-lang/clash-compiler/pull/1631)
   * Added `nameHint` to allow explicitly naming terms, e.g. `Signal`s.
   * Checked versions of `resize`, `truncateB`, and `fromIntegral`. Depending on the type `resize`, `truncateB`, and `fromIntegral` either yield an `XException` or silently perform wrap-around if its argument does not fit in the resulting type's bounds. The added functions check the bound condition and fail with an error call if the condition is violated. They do not affect HDL generation. [#1491](https://github.com/clash-lang/clash-compiler/pull/1491)
   * `HasBiSignalDefault`: constraint to Clash.Signal.BiSignal, `pullUpMode` gives access to the pull-up mode. [#1498](https://github.com/clash-lang/clash-compiler/pull/1498)
