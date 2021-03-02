@@ -78,7 +78,7 @@ import Clash.Core.TermInfo   (termType)
 import Clash.Core.TyCon      (tyConDataCons)
 import Clash.Core.Type       (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
 import Clash.Core.Util       (sccLetBindings)
-import Clash.Core.Var        (isGlobalId)
+import Clash.Core.Var        (isGlobalId, isLocalId)
 import Clash.Core.VarEnv
   (InScopeSet, elemInScopeSet, extendInScopeSetList, notElemInScopeSet, unionInScope)
 import Clash.Normalize.Types (NormalizeState)
@@ -437,7 +437,7 @@ areShared inScope xs@(x:_) = noFV1 && allEqual xs
     Left tm  -> getAll (Lens.foldMapOf (termFreeVars' isLocallyBound)
                                        (const (All False)) tm)
 
-  isLocallyBound v = v `notElemInScopeSet` inScope
+  isLocallyBound v = isLocalId v && v `notElemInScopeSet` inScope
 
 -- | Create a list of arguments given a map of positions to common arguments,
 -- and a list of arguments
