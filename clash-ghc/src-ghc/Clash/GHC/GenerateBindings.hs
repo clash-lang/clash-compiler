@@ -42,10 +42,12 @@ import qualified GHC.Core.TyCon          as GHC
 import qualified GHC.Core.Type           as GHC
 import qualified GHC.Builtin.Types       as GHC
 import qualified GHC.Utils.Misc          as GHC
+import qualified GHC.Settings.Constants  as GHC
 import qualified GHC.Types.Var           as GHC
 import qualified GHC.Types.SrcLoc        as GHC
 #else
 import qualified BasicTypes              as GHC
+import qualified Constants               as GHC
 import qualified CoreSyn                 as GHC
 import qualified Demand                  as GHC
 import qualified DynFlags                as GHC
@@ -339,12 +341,12 @@ mkTupTyCons :: GHC2CoreState -> (GHC2CoreState,IntMap TyConName)
 mkTupTyCons tcMap = (tcMap'',tupTcCache)
   where
     tupTyCons        = GHC.boolTyCon : GHC.promotedTrueDataCon : GHC.promotedFalseDataCon
-                     : map (GHC.tupleTyCon GHC.Boxed) [2..62]
+                     : map (GHC.tupleTyCon GHC.Boxed) [2..GHC.mAX_TUPLE_SIZE]
     (tcNames,tcMap',_) =
       RWS.runRWS (mapM (\tc -> coreToName GHC.tyConName GHC.tyConUnique
                                           qualifiedNameString tc) tupTyCons)
                  GHC.noSrcSpan
                  tcMap
-    tupTcCache       = IMS.fromList (zip [2..62] (drop 3 tcNames))
+    tupTcCache       = IMS.fromList (zip [2..GHC.mAX_TUPLE_SIZE] (drop 3 tcNames))
     tupHM            = listToUniqMap (zip tcNames tupTyCons)
     tcMap''          = tcMap' & tyConMap %~ (`unionUniqMap` tupHM)
