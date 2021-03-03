@@ -60,7 +60,7 @@ import           System.IO.Unsafe
 #endif
 
 -- internal
-import Clash.Core.DataCon    (DataCon, dcTag)
+import Clash.Core.DataCon    (DataCon)
 
 #if EXPERIMENTAL_EVALUATOR
 import Clash.Core.PartialEval
@@ -75,7 +75,7 @@ import Clash.Core.Term
   (LetBinding, Pat (..), PrimInfo (..), Term (..), TickInfo (..), collectArgs,
    collectArgsTicks, mkApps, mkTicks, patIds)
 import Clash.Core.TermInfo   (termType)
-import Clash.Core.TyCon      (tyConDataCons)
+import Clash.Core.TyCon      (TyConMap, TyConName, tyConDataCons)
 import Clash.Core.Type       (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
 import Clash.Core.Util       (sccLetBindings)
 import Clash.Core.Var        (isGlobalId, isLocalId)
@@ -389,29 +389,25 @@ disJointSelProj
   -> RewriteMonad NormalizeState (Maybe LetBinding,[Term])
 disJointSelProj _ _ (Leaf []) = return (Nothing,[])
 disJointSelProj inScope argTys cs = do
+    tcm    <- Lens.view tcCache
+    tupTcm <- Lens.view tupleTcCache
     let maxIndex = length argTys - 1
         css = map (\i -> fmap ((:[]) . (!!i)) cs) [0..maxIndex]
     (untran,tran) <- List.partitionM (isUntranslatableType False . snd) (zip [0..] argTys)
     let untranCs   = map (css!!) (map fst untran)
-        untranSels = zipWith (\(_,ty) cs' -> genCase ty Nothing []  cs')
+        untranSels = zipWith (\(_,ty) cs' -> genCase tcm tupTcm ty [ty]  cs')
                              untran untranCs
     (lbM,projs) <- case tran of
       []       -> return (Nothing,[])
-      [(i,ty)] -> return (Nothing,[genCase ty Nothing [] (css!!i)])
+      [(i,ty)] -> return (Nothing,[genCase tcm tupTcm ty [ty] (css!!i)])
       tys      -> do
-        tcm    <- Lens.view tcCache
-        tupTcm <- Lens.view tupleTcCache
         let m            = length tys
-            Just tupTcNm = IM.lookup m tupTcm
-            Just tupTc   = lookupUniqMap tupTcNm tcm
-            [tupDc]      = tyConDataCons tupTc
             (tyIxs,tys') = unzip tys
-            tupTy        = mkTyConApp tupTcNm tys'
+            tupTy        = mkTupTy tcm tupTcm tys'
             cs'          = fmap (\es -> map (es !!) tyIxs) cs
-            djCase       = genCase tupTy (Just tupDc) tys' cs'
+            djCase       = genCase tcm tupTcm tupTy tys' cs'
         scrutId <- mkInternalVar inScope "tupIn" tupTy
-        projections <- mapM (mkSelectorCase ($(curLoc) ++ "disJointSelProj")
-                                            inScope tcm (Var scrutId) (dcTag tupDc)) [0..m-1]
+        projections <- mapM (mkTupSelector inScope tcm tupTcm (Var scrutId) tys') [0..m-1]
         return (Just (scrutId,djCase),projections)
     let selProjs = tranOrUnTran 0 (zip (map fst untran) untranSels) projs
 
@@ -453,17 +449,16 @@ mkDJArgs n ((m,x):cms) (y:uncms)
 
 -- | Create a case-expression that selects between the distinct arguments given
 -- a case-tree
-genCase :: Type -- ^ Type of the alternatives
-        -> Maybe DataCon -- ^ DataCon to pack multiple arguments
+genCase :: TyConMap
+        -> IM.IntMap TyConName
+        -> Type -- ^ Type of the alternatives
         -> [Type] -- ^ Types of the arguments
         -> CaseTree [Term] -- ^ CaseTree of arguments
         -> Term
-genCase ty dcM argTys = go
+genCase tcm tupTcm ty argTys = go
   where
     go (Leaf tms) =
-      case dcM of
-        Just dc -> mkApps (Data dc) (map Right argTys ++ map Left tms)
-        _ -> head tms
+      mkTupTm tcm tupTcm (List.zipEqual argTys tms)
 
     go (LB lb ct) =
       Letrec lb (go ct)
@@ -477,6 +472,53 @@ genCase ty dcM argTys = go
 
     go (Branch scrut pats) =
       Case scrut ty (map (second go) pats)
+
+-- | Lookup the TyConName and DataCon for a tuple of size n
+findTup :: TyConMap -> IM.IntMap TyConName -> Int -> (TyConName,DataCon)
+findTup tcm tupTcm n = (tupTcNm,tupDc)
+  where
+    tupTcNm      = Maybe.fromMaybe (error $ $curLoc ++ "Can't find " ++ show n ++ "-tuple") $ IM.lookup n tupTcm
+    Just tupTc   = lookupUniqMap tupTcNm tcm
+    [tupDc]      = tyConDataCons tupTc
+
+mkTupTm :: TyConMap -> IM.IntMap TyConName -> [(Type,Term)] -> Term
+mkTupTm tcm tupTcm args = snd $ mkTup tcm tupTcm args
+
+mkTup :: TyConMap -> IM.IntMap TyConName -> [(Type,Term)] -> (Type,Term)
+mkTup _ _ [] = error $ $curLoc ++ "mkTup: Can't create 0-tuple"
+mkTup _ _ [(ty,tm)] = (ty,tm)
+mkTup tcm tupTcm args = (ty,tm)
+  where
+    (argTys,tms) = unzip args
+    (tupTcNm,tupDc) = findTup tcm tupTcm (length args)
+    tm = mkApps (Data tupDc) (map Right argTys ++ map Left tms)
+    ty = mkTyConApp tupTcNm argTys
+
+mkTupTy
+  :: TyConMap
+  -> IM.IntMap TyConName
+  -> [Type]
+  -> Type
+mkTupTy _ _ [] = error $ $curLoc ++ "mkTupTy: Can't create 0-tuple"
+mkTupTy _ _ [ty] = ty
+mkTupTy tcm tupTcm tys = mkTyConApp tupTcNm tys
+  where
+    m = length tys
+    (tupTcNm,_) = findTup tcm tupTcm m
+
+mkTupSelector
+  :: MonadUnique m
+  => InScopeSet
+  -> TyConMap
+  -> IM.IntMap TyConName
+  -> Term
+  -> [Type]
+  -> Int
+  -> m Term
+mkTupSelector _ _ _ scrut [_] 0 = return scrut
+mkTupSelector _ _ _ _     [_] n = error $ $curLoc ++ "mkTupSelector called with one type, but to select " ++ show n
+mkTupSelector inScope tcm _ scrut _ n = mkSelectorCase ($curLoc ++ "mkTupSelector") inScope tcm scrut 1 n
+
 
 -- | Determine if a term in a function position is interesting to lift out of
 -- of a case-expression.
