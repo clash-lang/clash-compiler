@@ -450,14 +450,14 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       let seen1 = State.execState (mapM_ Id.addRaw (componentNames manifest)) seen0
       return (topTime, manifest, seen1, edamFiles')
     else do
-      -- 1. Normalise topEntity
+      -- 1. Normalize topEntity
       let transformedBindings = normalizeEntity reprs bindingsMap primMap tcm tupTcm
                                   typeTrans eval topEntityNames opts supplyN
                                   topEntity
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = reportTimeDiff normTime prevTime
-      putStrLn $ "Clash: Normalisation took " ++ prepNormDiff
+      putStrLn $ "Clash: Normalization took " ++ prepNormDiff
 
       -- 2. Generate netlist for topEntity
 
