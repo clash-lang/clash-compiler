@@ -8,14 +8,6 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# OPTIONS_HADDOCK hide #-}
 
-#ifndef MAX_TUPLE_SIZE
-#ifdef LARGE_TUPLES
-#define MAX_TUPLE_SIZE 62
-#else
-#define MAX_TUPLE_SIZE 12
-#endif
-#endif
-
 module Clash.CPP
  ( maxTupleSize
 
@@ -23,6 +15,21 @@ module Clash.CPP
  , fSuperStrict
  , fStrictMapSignal
  ) where
+
+#ifndef MAX_TUPLE_SIZE
+#ifdef LARGE_TUPLES
+
+#if MIN_VERSION_ghc(9,0,0)
+import GHC.Settings.Constants (mAX_TUPLE_SIZE)
+#else
+import Constants (mAX_TUPLE_SIZE)
+#endif
+#define MAX_TUPLE_SIZE (fromIntegral mAX_TUPLE_SIZE)
+
+#else
+#define MAX_TUPLE_SIZE 12
+#endif
+#endif
 
 maxTupleSize :: Num a => a
 maxTupleSize = MAX_TUPLE_SIZE
