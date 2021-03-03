@@ -87,6 +87,7 @@ import qualified Data.Text    as T
 data ExpectOutput a
   = ExpectStdOut a
   | ExpectStdErr a
+  | ExpectEither a
   | ExpectNothing
   deriving Functor
 
@@ -339,9 +340,14 @@ runFailingProgram testExitCode program args stdO errOnEmptyStderr expectedCode e
           else
             case expectedStderr of
               ExpectStdErr r | not (cleanNewlines r `T.isInfixOf` cleanNewlines stderrT) ->
-                unexpectedStd "stderr" program code stderrT stdoutT r
+                unexpectedStd "stderr" program args code stderrT stdoutT r
               ExpectStdOut r | not (cleanNewlines r `T.isInfixOf` cleanNewlines stdoutT) ->
-                unexpectedStd "stdout" program code stderrT stdoutT r
+                unexpectedStd "stdout" program args code stderrT stdoutT r
+              ExpectEither r
+                |  not (cleanNewlines r `T.isInfixOf` cleanNewlines stdoutT)
+                && not (cleanNewlines r `T.isInfixOf` cleanNewlines stderrT)
+                ->
+                unexpectedStd "stdout or stderr" program args code stderrT stdoutT r
               _ ->
                 if testExitCode then
                   passed
