@@ -352,6 +352,8 @@ Library
     Build-Depends:    ghc-bignum                >= 1.0      && < 1.1
   else
     Build-Depends:    integer-gmp               >= 1.0.1.0  && < 2.0
+  if flag(large-tuples)
+    Build-Depends:    ghc
 
 test-suite doctests
   type:             exitcode-stdio-1.0
