@@ -753,7 +753,7 @@ mkWildValBinder is = mkInternalVar is "wild"
 -- | Make a case-decomposition that extracts a field out of a (Sum-of-)Product type
 mkSelectorCase
   :: HasCallStack
-  => (Functor m, MonadUnique m)
+  => MonadUnique m
   => String -- ^ Name of the caller of this function
   -> InScopeSet
   -> TyConMap -- ^ TyCon cache
