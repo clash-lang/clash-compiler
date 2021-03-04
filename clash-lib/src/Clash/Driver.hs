@@ -352,7 +352,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       topNmT    = Id.toText topNm
       topNmU    = Data.Text.unpack topNmT
 
-  unless (opt_cachehdl opts) $ putStrLn "Clash: Ignoring .manifest files"
+  unless (opt_cachehdl opts) $ putStrLn "Clash: Ignoring previously made caches"
 
   -- Calculate the hash over the callgraph and the topEntity annotation
   (useCacheTop,manifest) <- do
