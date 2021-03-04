@@ -71,6 +71,9 @@ module Test.Tasty.Program (
  , ExpectOutput(..)
  ) where
 
+import qualified Clash.Util.Interpolate  as I
+import qualified Data.List as List
+
 import Data.Typeable           ( Typeable                                 )
 import Data.Maybe              ( fromMaybe                                )
 import System.FilePath.Glob    ( globDir1, compile                        )
@@ -282,10 +285,10 @@ runProgram program args stdO stdF workDir = do
   case exitCode of
     ExitSuccess ->
       if stdF && not (null stdout)
-        then return (exitFailure program 1 stderrT stdoutT)
+        then return (exitFailure program args 1 stderrT stdoutT)
         else return (testPassed $ T.unpack $ testOutput stdO stderrT stdoutT)
     ExitFailure code ->
-      return $ exitFailure program code stderrT stdoutT
+      return $ exitFailure program args code stderrT stdoutT
 
 -- | Run a program with given options and optional working directory.
 -- Return success if program exists with error code. Fails if program does
@@ -364,16 +367,22 @@ execNotFoundFailure file =
   testFailed $ "Cannot locate program " ++ file ++ " in the PATH"
 
 -- | Indicates that program failed with an error code
-exitFailure :: String -> Int -> T.Text -> T.Text -> Result
-exitFailure (T.pack -> file) (showT -> code) stderr stdout =
-  testFailed $ T.unpack $ [text|
-    Program $file failed with error-code $code.
+exitFailure :: String -> [String] -> Int -> T.Text -> T.Text -> Result
+exitFailure cmd args code stderr stdout =
+  testFailed [I.i|
+    Program #{cmd} failed with error-code #{code}.
+
+    Full invocation:
+
+      #{cmd} #{List.intercalate " " args}
 
     Stderr was:
-    $stderr
+
+      #{stderr}
 
     Stdout was:
-    $stdout
+
+      #{stdout}
   |]
 
 unexpectedStd
@@ -381,6 +390,8 @@ unexpectedStd
   -- ^ Expected output name
   -> String
   -- ^ Program name
+  -> [String]
+  -- ^ Program arguments
   -> Int
   -- ^ Code returned by program
   -> T.Text
@@ -390,17 +401,23 @@ unexpectedStd
   -> T.Text
   -- ^ Expected stderr
   -> Result
-unexpectedStd expectedOut (T.pack -> file) (showT -> code) stderr stdout expected =
-  testFailed $ T.unpack $ [text|
-    Program $file did not print expected output to $expectedOut. We expected:
+unexpectedStd expectedOut cmd args code stderr stdout expected =
+  testFailed [I.i|
+    Program #{cmd} did not print expected output to #{expectedOut}. We expected:
 
-       $expected
+       #{expected}
+
+    Full invocation:
+
+      #{cmd} #{List.intercalate " " args}
 
     Stderr was:
-    $stderr
+
+      #{stderr}
 
     Stdout was:
-    $stdout
+
+      #{stdout}
   |]
 
 unexpectedEmptyStderr
