@@ -21,13 +21,19 @@ module Clash.Driver.Types where
 #include "MachDeps.h"
 
 import           Control.DeepSeq                (NFData)
+import           Control.Exception              (tryJust)
+import           Control.Monad                  (guard)
 import           Data.Binary                    (Binary)
 import           Data.Fixed
 import           Data.Hashable
 import qualified Data.Set                       as Set
 import           Data.Text                      (Text)
+import qualified Data.Text                      as Text
+import qualified Data.Text.IO                   as Text
 import           Data.Text.Prettyprint.Doc
 import           GHC.Generics                   (Generic)
+import           System.IO.Error                (isDoesNotExistError)
+import           Text.Read                      (readMaybe)
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Types.Basic                (InlineSpec)
@@ -302,9 +308,8 @@ defClashOpts
 -- | Information about the generated HDL between (sub)runs of the compiler
 data Manifest
   = Manifest
-  { manifestHash :: (Int,Maybe Int)
+  { manifestHash :: Int
     -- ^ Hash of the TopEntity and all its dependencies
-    --   + (maybe) Hash of the TestBench and all its dependencies
   , successFlags  :: (Int,Int,Bool)
     -- ^ Compiler flags used to achieve successful compilation:
     --
@@ -327,9 +332,29 @@ data Manifest
     -- ^ Names of all the generated components for the @TopEntity@ (does not
     -- include the names of the components of the @TestBench@ accompanying
     -- the @TopEntity@).
+  , topComponent :: Text
+    -- ^ Design entry point. This is usually the component annotated with a
+    -- @TopEntity@ annotation.
   , fileNames :: [FilePath]
     -- ^ Names of all the generated files for the @TopEntity@
   } deriving (Show,Read)
+
+-- | Read a manifest file from disk. Returns 'Nothing' if file does not exist.
+-- Any other IO exception is re-raised.
+readManifest :: FilePath -> IO (Maybe Manifest)
+readManifest path = do
+  contentsE <- tryJust (guard . isDoesNotExistError) (readFile path)
+  pure (either (const Nothing) readMaybe contentsE)
+
+-- | Write manifest file to disk
+writeManifest :: Manifest -> FilePath -> IO ()
+writeManifest man path = Text.writeFile path (serializeManifest man)
+
+-- | Serialize a manifest.
+--
+-- TODO: This should really yield a 'ByteString'.
+serializeManifest :: Manifest -> Text
+serializeManifest = Text.pack . show
 
 -- | Synopsys Design Constraint (SDC) information for a component.
 -- Currently this limited to the names and periods of clocks for create_clock.

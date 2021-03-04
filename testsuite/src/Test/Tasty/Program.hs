@@ -69,6 +69,8 @@ module Test.Tasty.Program (
  , PrintOutput(..)
  , GlobArgs(..)
  , ExpectOutput(..)
+ , TestProgram(..)
+ , TestFailingProgram(..)
  ) where
 
 import qualified Clash.Util.Interpolate  as I

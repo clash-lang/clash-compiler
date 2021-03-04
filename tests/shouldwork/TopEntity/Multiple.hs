@@ -28,36 +28,19 @@ main1SystemVerilog :: IO ()
 main1SystemVerilog = do
   [(dir, _fname)] <- map splitFileName <$> getArgs
   files <- listDirectory dir
-  if files == ["topentity1"] then
-    pure ()
-  else
+  if any (`elem` files) [show 'topEntity2, show 'topEntity3] then
     error ("Unexpected files / directories: " ++ show files)
-
--- | Make sure topEntity1 is not compiled when -main-is topEntity2 and
--- -fclash-single-main is enabled. TODO: Implement this feature.
-main2Verilog :: IO ()
-main2Verilog = do
-  args <- getArgs
-  putStrLn (show args)
-  [(dir, _fname)] <- map splitFileName <$> getArgs
-  files <- listDirectory dir
-  if files == ["topentity2"] then
-    pure ()
   else
-    error ("Unexpected files / directories: " ++ show files)
+    pure ()
 
 -- | Check whether we can compile a binder that doesn't have a synthesize
 -- annotation _and_ isn't called 'topEntity' using -main-is.
 main3VHDL :: IO ()
 main3VHDL = do
-  [(dir, _fname)] <- map splitFileName <$> getArgs
+  [dir] <- getArgs
   files <- listDirectory dir
-  if sort files == sort [ "Multiple_types.vhdl"
-                        , "topentity1"
-                        , "topentity2"
-                        , "topEntity3.manifest"
-                        , "topEntity3.vhdl"
-                        ] then
+  let expected = [show 'topEntity1, show 'topEntity2, show 'topEntity3]
+  if all (`elem` files) expected then
     pure ()
   else
     error ("Unexpected files / directories: " ++ show (sort files))

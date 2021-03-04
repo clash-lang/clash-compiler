@@ -107,7 +107,7 @@ countLinesContaining needle haystack = L.length $ L.filter (needle `L.isInfixOf`
 mainHDL :: String -> IO ()
 mainHDL topFile = do
   [topDir] <- getArgs
-  content <- readFile (takeDirectory topDir </> topFile)
+  content <- readFile (topDir </> show 'topEntity </> topFile)
   let regCount = countLinesContaining "register begin" content
   when (expectedRegCount /= regCount)
     (error $ unlines

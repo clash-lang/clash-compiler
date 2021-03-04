@@ -39,20 +39,20 @@ assertIn needle haystack
 mainVHDL :: IO ()
 mainVHDL = do
   [topDir] <- getArgs
-  content  <- readFile (takeDirectory topDir </> "f" </> "f.vhdl")
+  content  <- readFile (topDir </> show 'f </> "f.vhdl")
 
   assertIn "en  : in f_types.en_System;" content
 
 mainVerilog :: IO ()
 mainVerilog = do
   [topDir] <- getArgs
-  content  <- readFile (takeDirectory topDir </> "f" </> "f.v")
+  content  <- readFile (topDir </> show 'f </> "f.v")
 
   assertIn "input  en // enable" content
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
   [topDir] <- getArgs
-  content  <- readFile (takeDirectory topDir </> "f" </> "f.sv")
+  content  <- readFile (topDir </> show 'f </> "f.sv")
 
   assertIn "input logic en  // enable" content

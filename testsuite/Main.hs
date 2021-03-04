@@ -157,8 +157,7 @@ runClashTest = defaultMain $ clashTestRoot
     [ runTest "ALU" def{hdlSim=False}
     , let _opts = def { hdlSim=False
                       , hdlTargets=[VHDL]
-                      , entities=Entities [["blinker"]]
-                      , topEntities=TopEntities ["blinker"]
+                      , buildTargets=BuildSpecific ["blinker"]
                       }
        in NEEDS_PRIMS_GHC(runTest "Blinker" _opts)
     , NEEDS_PRIMS_GHC (runTest "BlockRamTest" def{hdlSim=False})
@@ -166,8 +165,7 @@ runClashTest = defaultMain $ clashTestRoot
     , NEEDS_PRIMS_GHC(runTest "CHIP8" def{hdlSim=False})
     , NEEDS_PRIMS_GHC(runTest "CochleaPlus" def{hdlSim=False})
     , let _opts = def { clashFlags=["-fclash-component-prefix", "test"]
-                      , entities=Entities [["","test_testBench"]]
-                      , topEntities=TopEntities ["test_testBench"]
+                      , buildTargets=BuildSpecific ["test_testBench"]
                       }
        in NEEDS_PRIMS(runTest "FIR" _opts)
     , NEEDS_PRIMS_GHC(runTest "Fifo" def{hdlSim=False})
@@ -182,19 +180,11 @@ runClashTest = defaultMain $ clashTestRoot
         ]
     , clashTestGroup "i2c"
         [ let _opts = def { clashFlags=["-O2","-fclash-component-prefix","test"]
-                        , entities=Entities [["test_i2c","test_bitmaster","test_bytemaster"]]
-                        , topEntities=TopEntities ["test_i2c"]
+                        , buildTargets=BuildSpecific ["test_i2c"]
                         , hdlSim=False
                         }
            in NEEDS_PRIMS_GHC(runTest "I2C" _opts)
-        , let _opts = def { entities = Entities [[ ".." </> "I2C" </> "i2c"
-                                                 , ".." </> "I2C" </> "bitmaster"
-                                                 , ".." </> "I2C" </> "bytemaster"
-                                                 , "configi2c"
-                                                 , "slave"
-                                                 , "system"
-                                                 ]]
-                          , topEntities = TopEntities ["system"]
+        , let _opts = def { buildTargets = BuildSpecific ["system"]
                           , hdlTargets = [Verilog]
                           , hdlSim = True
                           , vvpStderrEmptyFail = False
@@ -272,15 +262,13 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "Verification"
         [ let n = 9 -- GHDL only has VERY basic PSL support
               _opts = def { hdlTargets=[VHDL]
-                          , entities=Entities [["fails" ++ show i] | i <- [(1::Int)..n]]
-                          , topEntities=TopEntities ["fails" ++ show i | i <- [(1::Int)..n]]
+                          , buildTargets=BuildSpecific ["fails" <> show i | i <- [(1::Int)..n]]
                           , expectSimFail=Just (def, "psl assertion failed")
                           }
            in NEEDS_PRIMS_GHC(runTest "NonTemporalPSL" _opts)
         , let n = 13
               _opts = def { hdlTargets=[SystemVerilog]
-                          , entities=Entities [["fails" ++ show i] | i <- [(1::Int)..n]]
-                          , topEntities=TopEntities ["fails" ++ show i | i <- [(1::Int)..n]]
+                          , buildTargets=BuildSpecific ["fails" <> show i | i <- [(1::Int)..n]]
                           -- Only QuestaSim supports simulating SVA/PSL, but ModelSim does check
                           -- for syntax errors.
                           , hdlSim=False
@@ -289,8 +277,7 @@ runClashTest = defaultMain $ clashTestRoot
         , let is = [(1::Int)..13] \\ [4, 6, 7, 8, 10, 11, 12] in
           runTest "NonTemporalSVA" def{
             hdlTargets=[SystemVerilog]
-          , entities=Entities [["fails" ++ show i] | i <- is]
-          , topEntities=TopEntities ["fails" ++ show i | i <- is]
+          , buildTargets=BuildSpecific ["fails" <> show i | i <- is]
           -- Only QuestaSim supports simulating SVA/PSL, but ModelSim does check
           -- for syntax errors.
           , hdlSim=False
@@ -365,8 +352,7 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS_GHC(runTest "CountTrailingZeros" def)
         , NEEDS_PRIMS_GHC(runTest "DeepseqX" def)
         , NEEDS_PRIMS_GHC(runTest "LotOfStates" def)
-        , let _opts = def { entities = Entities [["nameoverlap"]]
-                          , topEntities = TopEntities ["nameoverlap"]
+        , let _opts = def { buildTargets = BuildSpecific ["nameoverlap"]
                           , hdlSim = False
                           }
            in NEEDS_PRIMS_GHC(runTest "NameOverlap" _opts)
@@ -383,8 +369,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "SimpleConstructor" def{hdlSim=False}
         , runTest "TyEqConstraints" def{
             hdlSim=False
-          , entities=Entities [["top1"]]
-          , topEntities=TopEntities ["top1"]
+          , buildTargets=BuildSpecific ["top1"]
           }
         , NEEDS_PRIMS(runTest "T1012" def{hdlSim=False})
         , NEEDS_PRIMS(runTest "T1240" def{hdlSim=False})
@@ -398,7 +383,7 @@ runClashTest = defaultMain $ clashTestRoot
         , let _opts = def { hdlTargets=[VHDL]
                           , hdlSim=False
                           , clashFlags=["-main-is", "plus"]
-                          , topEntities=TopEntities ["plus"]
+                          , buildTargets=BuildSpecific ["plus"]
                           }
            in NEEDS_PRIMS_GHC(runTest "T1305" _opts)
         , let _opts = def {hdlTargets = [VHDL], hdlSim = False}
@@ -652,8 +637,7 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS_GHC(runTest "BlockRamTest" def{hdlSim=False})
         , NEEDS_PRIMS_GHC(runTest "Compression" def)
         , NEEDS_PRIMS_GHC(runTest "DelayedReset" def)
-        , let _opts = def { entities=Entities [["example"]]
-                          , topEntities=TopEntities ["example"]
+        , let _opts = def { buildTargets=BuildSpecific ["example"]
                           , hdlSim=False
                           }
            in NEEDS_PRIMS_GHC(runTest "NoCPR" _opts)
@@ -680,7 +664,7 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "SimIO"
         [ let _opts = def { hdlTargets=[Verilog]
                           , vvpStderrEmptyFail=False
-                          , topEntities=TopEntities ["topEntity"]
+                          , buildTargets=BuildSpecific ["topEntity"]
                           }
            in NEEDS_PRIMS_GHC(runTest "Test00" _opts)
         ]
@@ -702,9 +686,9 @@ runClashTest = defaultMain $ clashTestRoot
         -- VHDL tests disabled for now: I can't figure out how to generate a static name whilst retaining the ability to actually test..
         [ outputTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] [] "PortGeneration" "main"
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithSingletonVector" "main"
-        , runTest "TopEntHOArg" def{entities=Entities [["f", "g"]], topEntities=TopEntities ["f"], hdlSim=False}
-        , runTest "T701" def {hdlSim=False,entities=Entities [["mynot", ""]]}
-        , runTest "T1033" def {hdlSim=False,entities=Entities [["top", ""]], topEntities=TopEntities ["top"]}
+        , runTest "TopEntHOArg" def{buildTargets=BuildSpecific ["f"], hdlSim=False}
+        , runTest "T701" def {hdlSim=False}
+        , runTest "T1033" def {hdlSim=False,buildTargets=BuildSpecific ["top"]}
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] [] "T1033" "main"
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] [] "T1072" "main"
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] [] "T1074" "main"
@@ -712,38 +696,32 @@ runClashTest = defaultMain $ clashTestRoot
         , outputTest ("tests" </> "shouldwork" </> "TopEntity") [VHDL] ["-main-is", "topEntity3"] [] "Multiple" "main3"
         , runTest "T1139" def{hdlSim=False}
         , let _opts = def { hdlTargets=[Verilog]
-                          , entities=Entities [["", "PortNames_topEntity", "PortNames_testBench"]]
-                          , topEntities=TopEntities ["PortNames_testBench"]
+                          , buildTargets=BuildSpecific ["PortNames_testBench"]
                           }
            in NEEDS_PRIMS_GHC(runTest "PortNames" _opts)
         , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNames" "main")
         , let _opts = def { hdlTargets=[Verilog]
-                          , entities=Entities [["", "PortProducts_topEntity", "PortProducts_testBench"]]
-                          , topEntities=TopEntities ["PortProducts_testBench"]
+                          , buildTargets=BuildSpecific ["PortProducts_testBench"]
                           }
            in NEEDS_PRIMS_GHC(runTest "PortProducts" _opts)
         , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortProducts" "main")
         , let _opts = def { hdlTargets=[Verilog]
-                          , entities=Entities [["", "PortProductsSum_topEntity", "PortProductsSum_testBench"]]
-                          , topEntities=TopEntities ["PortProductsSum_testBench"]
+                          , buildTargets=BuildSpecific ["PortProductsSum_testBench"]
                           }
            in NEEDS_PRIMS_GHC(runTest "PortProductsSum" _opts)
         , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortProductsSum" "main")
         , let _opts = def { hdlTargets=[Verilog]
-                          , entities=Entities [["", "PortNamesWithUnit_topEntity", "PortNamesWithUnit_testBench"]]
-                          , topEntities=TopEntities ["PortNamesWithUnit_testBench"]
+                          , buildTargets=BuildSpecific ["PortNamesWithUnit_testBench"]
                           }
            in NEEDS_PRIMS_GHC(runTest "PortNamesWithUnit" _opts)
         , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithUnit" "main")
         , let _opts = def { hdlTargets=[Verilog]
-                          , entities=Entities [["", "PortNamesWithVector_topEntity", "PortNamesWithVector_testBench"]]
-                          , topEntities=TopEntities ["PortNamesWithVector_testBench"]
+                          , buildTargets=BuildSpecific ["PortNamesWithVector_testBench"]
                           }
            in NEEDS_PRIMS_GHC(runTest "PortNamesWithVector" _opts)
         , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithVector" "main")
         , let _opts = def { hdlTargets=[Verilog]
-                          , entities=Entities [["", "PortNamesWithRTree_topEntity", "PortNamesWithRTree_testBench"]]
-                          , topEntities=TopEntities ["PortNamesWithRTree_testBench"]
+                          , buildTargets=BuildSpecific ["PortNamesWithRTree_testBench"]
                           }
            in NEEDS_PRIMS_GHC(runTest "PortNamesWithRTree" _opts)
         , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithRTree" "main")

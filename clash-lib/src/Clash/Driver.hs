@@ -21,16 +21,17 @@ module Clash.Driver where
 
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
-import           Control.Exception                (tryJust, bracket, throw)
+import           Control.Exception                (bracket, throw)
 import           Control.Lens                     (view, _4)
 import qualified Control.Monad                    as Monad
-import           Control.Monad                    (guard, when, unless, foldM)
+import           Control.Monad                    (when, unless, foldM)
 import           Control.Monad.Catch              (MonadMask)
 import           Control.Monad.Extra              (whenM)
 import           Control.Monad.IO.Class           (MonadIO)
 import           Control.Monad.State              (evalState, get)
 import           Control.Monad.State.Strict       (State)
 import qualified Control.Monad.State.Strict       as State
+import           Data.Char                        (isAscii, isAlphaNum)
 import           Data.Coerce                      (coerce)
 import           Data.Default
 import           Data.Hashable                    (hash)
@@ -60,12 +61,10 @@ import           System.Environment               (getExecutablePath)
 import           System.FilePath                  ((</>), (<.>))
 import qualified System.FilePath                  as FilePath
 import qualified System.IO                        as IO
-import           System.IO.Error                  (isDoesNotExistError)
 import           System.IO.Temp
   (getCanonicalTemporaryDirectory, withTempDirectory)
 import           Text.Trifecta.Result
   (Result(Success, Failure), _errDoc)
-import           Text.Read                        (readMaybe)
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Builtin.Names                 (eqTyConKey, ipClassKey)
@@ -231,8 +230,8 @@ splitTopEntityT _ _ t = t
 
 -- | Remove constraints such as 'a ~ 3'.
 removeForAll :: TopEntityT -> TopEntityT
-removeForAll (TopEntityT var annM tbM) =
-  TopEntityT var{varType=tvSubstWithTyEq (varType var)} annM tbM
+removeForAll (TopEntityT var annM isTb) =
+  TopEntityT var{varType=tvSubstWithTyEq (varType var)} annM isTb
 
 -- | Given a list of all found top entities and _maybe_ a top entity (+dependencies)
 -- passed in by '-main-is', return the list of top entities Clash needs to
@@ -247,6 +246,13 @@ getClashModificationDate = Directory.getModificationTime =<< getExecutablePath
 
 hdlFromBackend :: forall backend. Backend backend => Proxy backend -> HDL
 hdlFromBackend _ = hdlKind (undefined :: backend)
+
+replaceChar :: Char -> Char -> String -> String
+replaceChar a b = map go
+ where
+  go c
+    | c == a = b
+    | otherwise = c
 
 -- | Create a set of target HDL files for a set of functions
 generateHDL
@@ -269,7 +275,7 @@ generateHDL
   -> Evaluator
   -- ^ Hardcoded evaluator for partial evaluation
   -> [TopEntityT]
-  -- ^ All topentities and associated testbench
+  -- ^ All topentities
   -> Maybe (TopEntityT, [TopEntityT])
   -- ^ Main top entity to compile. If Nothing, all top entities in previous
   -- argument will be compiled.
@@ -303,16 +309,17 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
     -> HashMap Unique [Unique]
     -> [TopEntityT]
     -> IO ()
-  go prevTime _ _ _ [] = putStrLn $ "Clash: Total compilation took " ++
-                                reportTimeDiff prevTime startTime
+  go prevTime _ _ _ [] =
+    putStrLn $ "Clash: Total compilation took " ++ reportTimeDiff prevTime startTime
 
   -- Process the next TopEntity
-  go prevTime seen0 edamFiles deps (TopEntityT topEntity annM benchM:topEntities') = do
+  go prevTime seen0 edamFiles deps (TopEntityT topEntity annM isTb:topEntities') = do
   let topEntityS = Data.Text.unpack (nameOcc (varName topEntity))
   putStrLn $ "Clash: Compiling " ++ topEntityS
 
   -- Some initial setup
-  let modName1 = takeWhile (/= '.') topEntityS
+  let -- TODO: 'modName1' should be run through 'seen0'
+      modName1 = filter (\c -> isAscii c && (isAlphaNum c || c == '_')) (replaceChar '.' '_' topEntityS)
       topNm = lookupVarEnv' compNames topEntity
       (modNameS, fmap Data.Text.pack -> prefixM) = case topPrefixM of
         Just (Data.Text.unpack -> p)
@@ -340,9 +347,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       xOpt      = coerce (opt_aggressiveXOptBB opts)
       hdlState' = setModName modNameT
                 $ fromMaybe (initBackend iw hdlsyn escpIds lwIds forceUnd xOpt :: backend) hdlState
-      hdlDir    = fromMaybe "." (opt_hdlDir opts) </>
-                        Clash.Backend.name hdlState' </>
-                        takeWhile (/= '.') topEntityS
+      hdlDir    = fromMaybe (Clash.Backend.name hdlState') (opt_hdlDir opts) </> topEntityS
       ite       = ifThenElseExpr hdlState'
       topNmT    = Id.toText topNm
       topNmU    = Data.Text.unpack topNmT
@@ -350,7 +355,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
   unless (opt_cachehdl opts) $ putStrLn "Clash: Ignoring .manifest files"
 
   -- Calculate the hash over the callgraph and the topEntity annotation
-  (useCacheTop,useCacheBench,manifest) <- do
+  (useCacheTop,manifest) <- do
     clashModDate <- getClashModificationDate
 
     let primMapHash = hashCompiledPrimMap primMap
@@ -401,34 +406,20 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
              )
 
     let
-      benchHashM =
-        case benchM of
-          Nothing -> Nothing
-          Just bench ->
-            let terms = callGraphBindings bindingsMap bench in
-            Just (hash (annM, primMapHash, show clashModDate, terms, optsHash))
-
-    let successFlagsI = (opt_inlineLimit opts,opt_specLimit opts,opt_floatSupport opts)
-        manifestI    = Manifest (topHash,benchHashM) successFlagsI [] [] [] [] [] []
-
-    let
-      manFile =
-        case annM of
-          Nothing -> hdlDir </> topNmU <.> "manifest"
-          _       -> hdlDir </> topNmU </> topNmU <.> "manifest"
+      successFlagsI = (opt_inlineLimit opts,opt_specLimit opts,opt_floatSupport opts)
+      manifestI = Manifest topHash successFlagsI [] [] [] [] [] "" []
+      manFile = hdlDir </> topNmU <.> "manifest"
 
     manM <- if not (opt_cachehdl opts)
             then return Nothing -- ignore manifest file because -fclash-nocache
-            else (>>= readMaybe) . either (const Nothing) Just <$>
-              tryJust (guard . isDoesNotExistError) (readFile manFile)
-    return (maybe (False,False,manifestI)
+            else readManifest manFile
+    return (maybe (False,manifestI)
                   (\man ->
                     let allowCache (inl0,spec0,fl0) (inl1,spec1,fl1) =
                           inl0 <= inl1 && spec0 <= spec1 && (not (fl0 && not fl1))
                         flagsAllowCache = allowCache (successFlags man) successFlagsI
-                    in  (flagsAllowCache && fst (manifestHash man) == topHash
-                        ,flagsAllowCache && snd (manifestHash man) == benchHashM
-                        ,man { manifestHash = (topHash,benchHashM)
+                    in  (flagsAllowCache && manifestHash man == topHash
+                        ,man { manifestHash = topHash
                              , successFlags  = if flagsAllowCache
                                                  then successFlags man
                                                  else successFlagsI
@@ -436,10 +427,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
                         ))
                   manM)
 
-  (supplyN,supplyTB) <- Supply.splitSupply
-                    . snd
-                    . Supply.freshId
-                   <$> Supply.newSupply
+  supplyN <- Supply.newSupply
   let topEntityNames = map topId topEntities1
 
   (topTime,manifest',seen2,edamFiles') <- if useCacheTop
@@ -466,11 +454,10 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       -- Already create the directory where the HDL ends up being generated, as
       -- we use directories relative to this final directory to find manifest
       -- files belonging to other top entities. Failing to do so leads to #463
-      let dir = hdlDir </> maybe "" (const modNameS) annM
-      prepareDir (opt_cleanhdl opts) (extension hdlState') dir
+      prepareDir (opt_cleanhdl opts) (extension hdlState') hdlDir
       -- Now start the netlist generation
       (topComponent, netlist, seen2) <-
-        genNetlist False opts reprs transformedBindings topEntityMap compNames primMap
+        genNetlist isTb opts reprs transformedBindings topEntityMap compNames primMap
                    tcm typeTrans iw ite (SomeBackend hdlState') seen0 hdlDir prefixM topEntity
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
@@ -478,74 +465,30 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       putStrLn $ "Clash: Netlist generation took " ++ normNetDiff
 
       -- 3. Generate topEntity wrapper
-      let (hdlDocs, manifest', dfiles, mfiles) =
-             createHDL hdlState' modNameT seen2 netlist domainConfs (Just topComponent) (topNmT, Right manifest)
-      mapM_ (writeHDL dir) hdlDocs
-      copyDataFiles (opt_importPaths opts) dir dfiles
-      writeMemoryDataFiles dir mfiles
+      let
+        (hdlDocs, manifest', dfiles, mfiles) =
+          createHDL
+            hdlState' modNameT seen2 netlist domainConfs topComponent
+            (topNmT, manifest{topComponent=Id.toText (componentName topComponent)})
+      mapM_ (writeHDL hdlDir) hdlDocs
+      copyDataFiles (opt_importPaths opts) hdlDir dfiles
+      writeMemoryDataFiles hdlDir mfiles
 
       topTime <- hdlDocs `seq` Clock.getCurrentTime
       let edamFiles' = HashMap.insert (varUniq topEntity) (asEdamFile topNm <$> fileNames manifest') edamFiles
       return (topTime,manifest',seen2, edamFiles')
 
   -- Generate EDAM if needed
-  if opt_edalize opts
-    then let dir      = hdlDir </> maybe "" (const modNameS) annM
-             topFiles = fileNames manifest'
-             incFiles = concatMap (\u -> HashMap.lookupDefault [] u edamFiles') $ HashMap.lookupDefault [] (varUniq topEntity) deps
-             edamInfo = createEDAM topNm incFiles topFiles
-          in writeHDL dir ("edam.py", pprEdam edamInfo)
+  Monad.when (opt_edalize opts) $ do
+    let
+      topFiles = fileNames manifest'
+      incFiles = concatMap (\u -> HashMap.lookupDefault [] u edamFiles')
+               $ HashMap.lookupDefault [] (varUniq topEntity) deps
+      edamInfo = createEDAM topNm incFiles topFiles
 
-    else pure ()
+    writeHDL hdlDir ("edam.py", pprEdam edamInfo)
 
-  benchTime <- case benchM of
-    Just tb | not useCacheBench -> do
-      putStrLn $ "Clash: Compiling " ++ Data.Text.unpack (nameOcc (varName tb))
-
-      let modName' = Id.toText (lookupVarEnv' compNames tb)
-          hdlState2 = setModName modName' hdlState'
-
-      -- 1. Normalise testBench
-      let transformedBindings = normalizeEntity reprs bindingsMap primMap tcm tupTcm
-                                  typeTrans eval topEntityNames opts supplyTB tb
-      normTime <- transformedBindings `deepseq` Clock.getCurrentTime
-      let prepNormDiff = reportTimeDiff normTime topTime
-      putStrLn $ "Clash: Testbench normalization took " ++ prepNormDiff
-
-      -- 2. Generate netlist for topEntity
-
-      -- See [Note] Create HDL dir before netlist generation
-      let dir = hdlDir </> maybe "" t_name annM </> Data.Text.unpack modName'
-      prepareDir (opt_cleanhdl opts) (extension hdlState2) dir
-      -- Now start the netlist generation
-      (_topName, netlist, seen3) <-
-        genNetlist True opts reprs transformedBindings topEntityMap compNames primMap
-                   tcm typeTrans iw ite (SomeBackend hdlState') seen2 hdlDir prefixM tb
-
-      netlistTime <- netlist `deepseq` Clock.getCurrentTime
-      let normNetDiff = reportTimeDiff netlistTime normTime
-      putStrLn $ "Clash: Testbench netlist generation took " ++ normNetDiff
-
-      -- 3. Write HDL
-      let (hdlDocs,_,dfiles,mfiles) =
-            createHDL hdlState2 modName' seen3 netlist domainConfs Nothing
-                           (topNmT, Left manifest')
-      writeHDL (hdlDir </> maybe "" t_name annM) (head hdlDocs)
-      mapM_ (writeHDL dir) (tail hdlDocs)
-      copyDataFiles (opt_importPaths opts) dir dfiles
-      writeMemoryDataFiles dir mfiles
-
-      hdlDocs `seq` Clock.getCurrentTime
-
-    Just tb -> do
-      let tb' = Data.Text.unpack (nameOcc (varName tb))
-      putStrLn ("Clash: Compiling: " ++ tb')
-      putStrLn ("Clash: Using cached result for: " ++ tb')
-      return topTime
-
-    Nothing -> return topTime
-
-  go benchTime seen2 edamFiles' deps topEntities'
+  go topTime seen2 edamFiles' deps topEntities'
 
 -- | Interpret a specific function from a specific module. This action tries
 -- two things:
@@ -791,18 +734,15 @@ createHDL
   -- ^ List of components
   -> HashMap Data.Text.Text VDomainConfiguration
   -- ^ Known domains to configurations
-  -> Maybe Component
+  -> Component
   -- ^ Top component
-  -> (IdentifierText, Either Manifest Manifest)
+  -> (IdentifierText, Manifest)
   -- ^ Name of the manifest file
-  -- + Either:
-  --   * Left manifest:  Only write/update the hashes of the @manifest@
-  --   * Right manifest: Update all fields of the @manifest@
   -> ([(String,Doc)],Manifest,[(String,FilePath)],[(String,String)])
   -- ^ The pretty-printed HDL documents
   -- + The update manifest file
   -- + The data files that need to be copied
-createHDL backend modName seen components domainConfs mtop (topName,manifestE) = flip evalState backend $ getMon $ do
+createHDL backend modName seen components domainConfs top (topName, manifest0) = flip evalState backend $ getMon $ do
   let componentsL = eltsVarEnv components
   (hdlNmDocs,incs) <-
     unzip <$> mapM (\(_wereVoids,sp,ids,comp) ->
@@ -816,38 +756,37 @@ createHDL backend modName seen components domainConfs mtop (topName,manifestE) =
       qincs = concat incs
       topFiles = hdl ++ qincs
 
-  let sdc = case mtop of
-              Just top ->
-                let topClks = findClocks top
-                    sdcInfo = fmap findDomainConfig <$> topClks
-                    sdcFile = Data.Text.unpack topName <.> "sdc"
-                    sdcDoc  = (sdcFile, pprSDC (SdcInfo sdcInfo))
-                 in if null sdcInfo then Nothing else Just sdcDoc
+  let
+    topClks = findClocks top
+    sdcInfo = fmap findDomainConfig <$> topClks
+    sdcFile = Data.Text.unpack topName <.> "sdc"
+    sdcDoc  = (sdcFile, pprSDC (SdcInfo sdcInfo))
+    sdc = if null sdcInfo then Nothing else Just sdcDoc
 
-              Nothing -> Nothing
+  manifest1 <- do
+    let
+      topInNames = map fst (inputs top)
+      topOutNames = map (fst . (\(_,x,_) -> x)) (outputs top)
+      compNames = map (componentName . view _4) componentsL
 
-  manifest <- either return (\m -> do
-      let top = fromMaybe (error "Top entity needed to update manifest") mtop
-      let topInNames = map fst (inputs top)
-      topInTypes  <- mapM (fmap (Text.toStrict . renderOneLine) .
-                           hdlType (External topName) . snd) (inputs top)
-      let topOutNames = map (fst . (\(_,x,_) -> x)) (outputs top)
-      topOutTypes <- mapM (fmap (Text.toStrict . renderOneLine) .
-                           hdlType (External topName) . snd . (\(_,x,_) -> x)) (outputs top)
-      let compNames = map (componentName . view _4) componentsL
-      return (m { portInNames    = map Id.toText topInNames
-                , portInTypes    = topInTypes
-                , portOutNames   = map Id.toText topOutNames
-                , portOutTypes   = topOutTypes
-                , componentNames = map Id.toText compNames
-                , fileNames      = maybe (fmap fst topFiles) (\x -> fst x : fmap fst topFiles) sdc
-                })
-    ) manifestE
+    topInTypes  <- mapM (fmap (Text.toStrict . renderOneLine) .
+                          hdlType (External topName) . snd) (inputs top)
+    topOutTypes <- mapM (fmap (Text.toStrict . renderOneLine) .
+                          hdlType (External topName) . snd . (\(_,x,_) -> x)) (outputs top)
+    return manifest0{
+        portInNames = map Id.toText topInNames
+      , portInTypes = topInTypes
+      , portOutNames = map Id.toText topOutNames
+      , portOutTypes = topOutTypes
+      , componentNames = map Id.toText compNames
+      , fileNames = maybe (fmap fst topFiles) (\x -> fst x : fmap fst topFiles) sdc
+      }
+
   let manDoc = ( Data.Text.unpack topName <.> "manifest"
-               , pretty (Text.pack (show manifest)))
+               , pretty (serializeManifest manifest1) )
 
   let topDocs = maybe (manDoc:topFiles) (:manDoc:topFiles) sdc
-  return (topDocs, manifest, dataFiles, memFiles)
+  return (topDocs, manifest1, dataFiles, memFiles)
  where
   findDomainConfig dom =
     HashMap.lookupDefault
@@ -1012,11 +951,10 @@ sortTop bindingsMap topEntities =
         Left msg   -> error msg
         Right tops -> (tops, mapFrom edges')
  where
-  go t@(TopEntityT topE _ tbM) =
+  go t@(TopEntityT topE _ _) =
     let topRefs = goRefs topE topE
-        tbRefs  = maybe [] (goRefs topE) tbM
     in  ((varUniq topE,t)
-         ,map ((\top -> (varUniq topE, varUniq (topId top)))) (tbRefs ++ topRefs))
+         ,map ((\top -> (varUniq topE, varUniq (topId top)))) topRefs)
 
   goRefs top i_ =
     let cg = callGraph bindingsMap i_

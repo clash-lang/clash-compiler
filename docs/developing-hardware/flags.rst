@@ -67,17 +67,15 @@ Clash Compiler Flags
   **Default:** MAX_INT
 
 -fclash-hdldir
-  Specify the directory that generated HDL is written into. Generated code
-  is still put into a directory named according to the output language within
-  this directory. For example
+  Specify the directory that generated HDL is written into. For example
 
   .. code-block:: bash
 
     clash -fclash-hdldir build/hdl
 
-  will create a directory ``build/hdl/verilog`` if verilog is generated.
+  will create a directory ``build/hdl``
 
-  **Default:** "."
+  **Default:** Either ``vhdl``, ``verilog``, or ``systemverilog`` depending on the synthesis target.
 
 -fclash-hdlsyn
   Specify the HDL synthesis tool which will be used. Available options are

@@ -24,17 +24,17 @@ assertIn needle haystack
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
   [topDir] <- getArgs
-  content <- readFile (takeDirectory topDir </> "topEntity.sv")
+  content <- readFile (topDir </> show 'topEntity </> "topEntity.sv")
   assertIn "before_foo_after" content
 
 mainVerilog :: IO ()
 mainVerilog = do
   [topDir] <- getArgs
-  content <- readFile (takeDirectory topDir </> "topEntity.v")
+  content <- readFile (topDir </> show 'topEntity </> "topEntity.v")
   assertIn "before_foo_after" content
 
 mainVHDL :: IO ()
 mainVHDL = do
   [topDir] <- getArgs
-  content <- readFile (takeDirectory topDir </> "topEntity.vhdl")
+  content <- readFile (topDir </> show 'topEntity </> "topEntity.vhdl")
   assertIn "before_foo_after" content

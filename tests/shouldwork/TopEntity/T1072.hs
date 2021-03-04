@@ -41,15 +41,15 @@ main topFile = do
 
 mainVHDL :: IO ()
 mainVHDL = do
-  [topFile] <- getArgs
-  main (replaceFileName topFile "top/top.vhdl")
+  [topDir] <- getArgs
+  main (topDir </> show 'topEntity </> "top.vhdl")
 
 mainVerilog :: IO ()
 mainVerilog = do
-  [topFile] <- getArgs
-  main (replaceFileName topFile "top/top.v")
+  [topDir] <- getArgs
+  main (topDir </> show 'topEntity </> "top.v")
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
-  [topFile] <- getArgs
-  main (replaceFileName topFile "top/top.sv")
+  [topDir] <- getArgs
+  main (topDir </> show 'topEntity </> "top.sv")

@@ -49,7 +49,7 @@ assertIn needle haystack
 mainVerilog :: IO ()
 mainVerilog = do
   [topDir] <- getArgs
-  content <- readFile (takeDirectory topDir </> "PortProducts_topEntity" </> "PortProducts_topEntity.v")
+  content <- readFile (topDir </> show 'topEntity </> "PortProducts_topEntity.v")
 
   assertIn "top_zero" content
   assertIn "top_sub_one" content

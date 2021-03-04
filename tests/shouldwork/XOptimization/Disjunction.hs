@@ -32,19 +32,23 @@ assertNotIn needle haystack
 -- VHDL test
 mainVHDL :: IO ()
 mainVHDL = do
-  [topFile] <- getArgs
-  content <- readFile topFile
+  [topDir] <- getArgs
+  content <- readFile (topDir </> show 'topEntity </> "topEntity.vhdl")
 
   assertNotIn "false" content
 
 -- Verilog test
 mainVerilog :: IO ()
 mainVerilog = do
-  [topFile] <- getArgs
-  content <- readFile topFile
+  [topDir] <- getArgs
+  content <- readFile (topDir </> show 'topEntity </> "topEntity.v")
 
   assertNotIn "1'b0" content
 
 -- SystemVerilog test
 mainSystemVerilog :: IO ()
-mainSystemVerilog = mainVerilog
+mainSystemVerilog = do
+  [topDir] <- getArgs
+  content <- readFile (topDir </> show 'topEntity </> "topEntity.sv")
+
+  assertNotIn "1'b0" content

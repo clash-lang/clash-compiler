@@ -1,0 +1,2 @@
+CHANGED: Each binder marked with a `Synthesize` or `TestBench` pragma will be put in its own directory under their fully qualified Haskell name. For example, two binders `foo` and `bar` in module `A` will be synthesized in `A.foo` and `A.bar`.
+CHANGED: Clash will no longer generate vhdl, verilog, or systemverilog subdirectories when using `-fclash-hdldir`.
