@@ -6,12 +6,22 @@
   Collection of utilities
 -}
 
-module Clash.Util.Graph (topSort, reverseTopSort) where
+module Clash.Util.Graph
+  ( topSort
+  , reverseTopSort
+  , callGraphBindings
+  ) where
 
 import           Data.Tuple            (swap)
 import           Data.Foldable         (foldlM)
 import qualified Data.IntMap.Strict    as IntMap
 import qualified Data.IntSet           as IntSet
+
+import           Clash.Core.Var (Id)
+import           Clash.Core.Term (Term)
+import           Clash.Driver.Types (BindingMap, Binding (bindingTerm))
+import           Clash.Unique (lookupUniqMap', keysUniqMap)
+import           Clash.Normalize.Util (callGraph)
 
 data Marker
   = Temporary
@@ -126,3 +136,15 @@ reverseTopSort
   -- ^ Reversely, topologically sorted nodes
 reverseTopSort nodes edges =
   topSort nodes (map swap edges)
+
+-- | Get all the terms corresponding to a call graph
+callGraphBindings
+  :: BindingMap
+  -- ^ All bindings
+  -> Id
+  -- ^ Root of the call graph
+  -> [Term]
+callGraphBindings bindingsMap tm =
+  map (bindingTerm . (bindingsMap `lookupUniqMap'`)) (keysUniqMap cg)
+  where
+    cg = callGraph bindingsMap tm

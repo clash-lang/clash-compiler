@@ -16,21 +16,27 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Clash.Driver where
 
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
-import           Control.Exception                (bracket, throw)
+import           Control.Exception                (throw)
 import           Control.Lens                     (view, _4)
 import qualified Control.Monad                    as Monad
-import           Control.Monad                    (when, unless, foldM)
+import           Control.Monad                    (unless, foldM, forM, filterM)
 import           Control.Monad.Catch              (MonadMask)
-import           Control.Monad.Extra              (whenM)
+import           Control.Monad.Extra              (whenM, ifM, unlessM)
 import           Control.Monad.IO.Class           (MonadIO)
 import           Control.Monad.State              (evalState, get)
 import           Control.Monad.State.Strict       (State)
 import qualified Control.Monad.State.Strict       as State
+import qualified Crypto.Hash.SHA256               as Sha256
+import           Data.ByteString                  (ByteString)
+import qualified Data.ByteString                  as ByteString
+import qualified Data.ByteString.Lazy             as ByteStringLazy
+import qualified Data.ByteString.Lazy.Char8       as ByteStringLazyChar8
 import           Data.Char                        (isAscii, isAlphaNum)
 import           Data.Coerce                      (coerce)
 import           Data.Default
@@ -41,24 +47,25 @@ import qualified Data.HashSet                     as HashSet
 import           Data.Proxy                       (Proxy(..))
 import           Data.IntMap                      (IntMap)
 import           Data.List                        (intercalate)
-import           Data.Maybe                       (fromMaybe)
+import           Data.Maybe                       (fromMaybe, maybeToList)
 import           Data.Semigroup.Monad
-import qualified Data.Set                         as Set
 import qualified Data.Text
 import           Data.Text.Lazy                   (Text)
 import qualified Data.Text.Lazy                   as Text
+import           Data.Text.Lazy.Encoding          as Text
 import qualified Data.Text.Lazy.IO                as Text
-import           Data.Text.Prettyprint.Doc        (pretty)
 import           Data.Text.Prettyprint.Doc.Extra
-  (Doc, LayoutOptions (..), PageWidth (..) , layoutPretty, renderLazy,
-   renderOneLine)
+  (Doc, LayoutOptions (..), PageWidth (..) , layoutPretty, renderLazy)
 import qualified Data.Time.Clock                  as Clock
 import qualified Language.Haskell.Interpreter     as Hint
 import qualified Language.Haskell.Interpreter.Extension as Hint
 import qualified Language.Haskell.Interpreter.Unsafe as Hint
 import qualified System.Directory                 as Directory
+import           System.Directory
+  (doesPathExist, listDirectory, doesDirectoryExist, createDirectoryIfMissing,
+   removeDirectoryRecursive, doesFileExist)
 import           System.Environment               (getExecutablePath)
-import           System.FilePath                  ((</>), (<.>))
+import           System.FilePath                  ((</>), (<.>), takeDirectory, takeFileName, isAbsolute)
 import qualified System.FilePath                  as FilePath
 import qualified System.IO                        as IO
 import           System.IO.Temp
@@ -71,13 +78,11 @@ import           GHC.Builtin.Names                 (eqTyConKey, ipClassKey)
 import           GHC.Types.Unique                  (getKey)
 
 import           GHC.Types.SrcLoc                  (SrcSpan)
-import           GHC.Utils.Misc                    (OverridingBool(Auto))
 #else
 import           PrelNames               (eqTyConKey, ipClassKey)
 import           Unique                  (getKey)
 
 import           SrcLoc                           (SrcSpan)
-import           Util                             (OverridingBool(Auto))
 #endif
 import           GHC.BasicTypes.Extra             ()
 
@@ -98,7 +103,6 @@ import           Clash.Core.Evaluator.Types       (Evaluator)
 
 import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr')
-import           Clash.Core.Term                  (Term)
 import           Clash.Core.Type
   (Type(ForAllTy, LitTy, AnnType), TypeView(..), tyView, mkFunTy, LitTy(SymTy))
 import           Clash.Core.TyCon                 (TyConMap, TyConName)
@@ -109,6 +113,7 @@ import           Clash.Core.VarEnv
   (VarEnv, elemVarEnv, eltsVarEnv, emptyVarEnv, lookupVarEnv, lookupVarEnv', mkVarEnv)
 import           Clash.Debug                      (debugIsOn)
 import           Clash.Driver.Types
+import           Clash.Driver.Manifest            (Manifest(..), readFreshManifest, UnexpectedModification, pprintUnexpectedModifications, mkManifest, writeManifest)
 import           Clash.Edalize.Edam
 import           Clash.Netlist                    (genNetlist, genTopNames)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
@@ -127,15 +132,14 @@ import qualified Clash.Primitives.GHC.Word        as P
 import qualified Clash.Primitives.Intel.ClockGen  as P
 import qualified Clash.Primitives.Verification    as P
 import           Clash.Primitives.Types
-import           Clash.Primitives.Util            (hashCompiledPrimMap)
 import           Clash.Signal.Internal
-import           Clash.Unique
-  (Unique, keysUniqMap, lookupUniqMap')
+import           Clash.Unique                     (Unique)
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util
   (ClashException(..), HasCallStack, first, reportTimeDiff,
    wantedLanguageExtensions, unwantedLanguageExtensions, curLoc)
 import           Clash.Util.Graph                 (reverseTopSort)
+import qualified Clash.Util.Interpolate           as I
 
 -- | Worker function of 'splitTopEntityT'
 splitTopAnn
@@ -313,7 +317,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
     putStrLn $ "Clash: Total compilation took " ++ reportTimeDiff prevTime startTime
 
   -- Process the next TopEntity
-  go prevTime seen0 edamFiles deps (TopEntityT topEntity annM isTb:topEntities') = do
+  go prevTime seen0 edamFiles0 deps (TopEntityT topEntity annM isTb:topEntities') = do
   let topEntityS = Data.Text.unpack (nameOcc (varName topEntity))
   putStrLn $ "Clash: Compiling " ++ topEntityS
 
@@ -348,97 +352,53 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       hdlState' = setModName modNameT
                 $ fromMaybe (initBackend iw hdlsyn escpIds lwIds forceUnd xOpt :: backend) hdlState
       hdlDir    = fromMaybe (Clash.Backend.name hdlState') (opt_hdlDir opts) </> topEntityS
+      manPath   = hdlDir </> Data.Text.unpack topNmT <.> "manifest"
       ite       = ifThenElseExpr hdlState'
       topNmT    = Id.toText topNm
-      topNmU    = Data.Text.unpack topNmT
 
   unless (opt_cachehdl opts) $ putStrLn "Clash: Ignoring previously made caches"
 
-  -- Calculate the hash over the callgraph and the topEntity annotation
-  (useCacheTop,manifest) <- do
-    clashModDate <- getClashModificationDate
-
-    let primMapHash = hashCompiledPrimMap primMap
-
-    let optsHash = hash opts { -- Ignore the following settings, they don't
-                               -- affect the generated HDL:
-                               -- 1. Debug
-                               opt_dbgLevel           = DebugNone
-                             , opt_dbgTransformations = Set.empty
-                             , opt_dbgRewriteHistoryFile = Nothing
-                               -- 2. Caching
-                             , opt_cachehdl           = True
-                               -- 3. Warnings
-                             , opt_primWarn           = True
-                             , opt_color              = Auto
-                             , opt_errorExtra         = False
-                             , opt_checkIDir          = True
-                               -- 4. Optional output
-                             , opt_edalize            = False
-                               -- Ignore the following settings, they don't
-                               -- affect the generated HDL. However, they do
-                               -- influence whether HDL can be generated at all.
-                               --
-                               -- So later on we check whether the new flags
-                               -- changed in such a way that they could affect
-                               -- successful compilation, and use that information
-                               -- to decide whether to use caching or not.
-                               --
-                               -- 1. termination measures
-                             , opt_inlineLimit       = 20
-                             , opt_specLimit         = 20
-                               -- 2. Float support
-                             , opt_floatSupport      = False
-                               -- Finally, also ignore the HDL dir setting,
-                               -- because when a user moves the entire dir
-                               -- with generated HDL, they probably still want
-                               -- to use that as a cache
-                             , opt_hdlDir            = Nothing
-                             }
-
-    let
-      topHash =
-        hash ( annM
-             , primMapHash
-             , show clashModDate
-             , callGraphBindings bindingsMap topEntity
-             , optsHash
-             )
-
-    let
-      successFlagsI = (opt_inlineLimit opts,opt_specLimit opts,opt_floatSupport opts)
-      manifestI = Manifest topHash successFlagsI [] [] [] [] [] "" []
-      manFile = hdlDir </> topNmU <.> "manifest"
-
-    manM <- if not (opt_cachehdl opts)
-            then return Nothing -- ignore manifest file because -fclash-nocache
-            else readManifest manFile
-    return (maybe (False,manifestI)
-                  (\man ->
-                    let allowCache (inl0,spec0,fl0) (inl1,spec1,fl1) =
-                          inl0 <= inl1 && spec0 <= spec1 && (not (fl0 && not fl1))
-                        flagsAllowCache = allowCache (successFlags man) successFlagsI
-                    in  (flagsAllowCache && manifestHash man == topHash
-                        ,man { manifestHash = topHash
-                             , successFlags  = if flagsAllowCache
-                                                 then successFlags man
-                                                 else successFlagsI
-                             }
-                        ))
-                  manM)
+  -- Get manifest file if cache is not stale and caching is enabled. This is used
+  -- to prevent unnecessary recompilation.
+  clashModDate <- getClashModificationDate
+  (userModifications, maybeManifest, topHash) <-
+    readFreshManifest topEntities0 (bindingsMap, topEntity) primMap opts clashModDate manPath
 
   supplyN <- Supply.newSupply
   let topEntityNames = map topId topEntities1
 
-  (topTime,manifest',seen2,edamFiles') <- if useCacheTop
-    then do
-      putStrLn ("Clash: Using cached result for: " ++ Data.Text.unpack (nameOcc (varName topEntity)))
+  (topTime, seen2, edamFiles2) <- case maybeManifest of
+    Just manifest0@Manifest{fileNames} | Just [] <- userModifications -> do
+      -- Found a 'manifest' files. Use it to extend "seen" set. Generate EDAM
+      -- files if necessary.
+      putStrLn ("Clash: Using cached result for: " ++ topEntityS)
       topTime <- Clock.getCurrentTime
-      let edamFiles' = HashMap.insert (varUniq topEntity) (asEdamFile topNm <$> fileNames manifest) edamFiles
-      let seen1 = State.execState (mapM_ Id.addRaw (componentNames manifest)) seen0
-      return (topTime, manifest, seen1, edamFiles')
-    else do
-      -- 1. Normalize topEntity
+      let seen1 = State.execState (mapM_ Id.addRaw (componentNames manifest0)) seen0
+
+      (edamFiles1, fileNames1) <-
+        if opt_edalize opts
+        then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles0 fileNames
+        else pure (edamFiles0, fileNames)
+
+      writeManifest manifest0{fileNames=fileNames1} manPath
+
+      return
+        ( topTime
+        , seen1
+        , edamFiles1
+        )
+
+    _ -> do
+      -- 1. Prepare HDL directory
+      --
+      -- [Note] Create HDL dir before netlist generation
+      --
+      -- Already create the directory where the HDL ends up being generated, as
+      -- we use directories relative to this final directory to find manifest
+      -- files belonging to other top entities. Failing to do so leads to #463
+      () <- prepareDir hdlDir opts userModifications
+
+      -- 2. Normalize topEntity
       let transformedBindings = normalizeEntity reprs bindingsMap primMap tcm tupTcm
                                   typeTrans eval topEntityNames opts supplyN
                                   topEntity
@@ -447,15 +407,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       let prepNormDiff = reportTimeDiff normTime prevTime
       putStrLn $ "Clash: Normalization took " ++ prepNormDiff
 
-      -- 2. Generate netlist for topEntity
-
-      -- [Note] Create HDL dir before netlist generation
-      --
-      -- Already create the directory where the HDL ends up being generated, as
-      -- we use directories relative to this final directory to find manifest
-      -- files belonging to other top entities. Failing to do so leads to #463
-      prepareDir (opt_cleanhdl opts) (extension hdlState') hdlDir
-      -- Now start the netlist generation
+      -- 3. Generate netlist for topEntity
       (topComponent, netlist, seen2) <-
         genNetlist isTb opts reprs transformedBindings topEntityMap compNames primMap
                    tcm typeTrans iw ite (SomeBackend hdlState') seen0 hdlDir prefixM topEntity
@@ -464,31 +416,36 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       let normNetDiff = reportTimeDiff netlistTime normTime
       putStrLn $ "Clash: Netlist generation took " ++ normNetDiff
 
-      -- 3. Generate topEntity wrapper
+      -- 4. Generate topEntity wrapper
       let
-        (hdlDocs, manifest', dfiles, mfiles) =
-          createHDL
-            hdlState' modNameT seen2 netlist domainConfs topComponent
-            (topNmT, manifest{topComponent=Id.toText (componentName topComponent)})
-      mapM_ (writeHDL hdlDir) hdlDocs
-      copyDataFiles (opt_importPaths opts) hdlDir dfiles
-      writeMemoryDataFiles hdlDir mfiles
+        (hdlDocs, dfiles, mfiles) =
+          createHDL hdlState' modNameT seen2 netlist domainConfs topComponent topNmT
+
+      -- TODO: Data files should go into their own directory
+      -- FIXME: Files can silently overwrite each other
+      hdlDocDigests <- mapM (writeHDL hdlDir) hdlDocs
+      dataFilesDigests <- copyDataFiles (opt_importPaths opts) hdlDir dfiles
+      memoryFilesDigests <- writeMemoryDataFiles hdlDir mfiles
+
+      let
+        components = map (view _4) (eltsVarEnv netlist)
+        filesAndDigests0 =
+             zip (map fst hdlDocs) hdlDocDigests
+          <> zip (map snd dfiles) dataFilesDigests
+          <> zip (map fst mfiles) memoryFilesDigests
+
+      (edamFiles1, filesAndDigests1) <-
+        if opt_edalize opts
+        then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles0 filesAndDigests0
+        else pure (edamFiles0, filesAndDigests0)
+
+      let manifest = mkManifest opts topComponent components filesAndDigests1 topHash
+      writeManifest manifest manPath
 
       topTime <- hdlDocs `seq` Clock.getCurrentTime
-      let edamFiles' = HashMap.insert (varUniq topEntity) (asEdamFile topNm <$> fileNames manifest') edamFiles
-      return (topTime,manifest',seen2, edamFiles')
+      return (topTime, seen2, edamFiles1)
 
-  -- Generate EDAM if needed
-  Monad.when (opt_edalize opts) $ do
-    let
-      topFiles = fileNames manifest'
-      incFiles = concatMap (\u -> HashMap.lookupDefault [] u edamFiles')
-               $ HashMap.lookupDefault [] (varUniq topEntity) deps
-      edamInfo = createEDAM topNm incFiles topFiles
-
-    writeHDL hdlDir ("edam.py", pprEdam edamInfo)
-
-  go topTime seen2 edamFiles' deps topEntities'
+  go topTime seen2 edamFiles2 deps topEntities'
 
 -- | Interpret a specific function from a specific module. This action tries
 -- two things:
@@ -736,13 +693,12 @@ createHDL
   -- ^ Known domains to configurations
   -> Component
   -- ^ Top component
-  -> (IdentifierText, Manifest)
+  -> IdentifierText
   -- ^ Name of the manifest file
-  -> ([(String,Doc)],Manifest,[(String,FilePath)],[(String,String)])
+  -> ([(String,Doc)],[(String,FilePath)],[(String,String)])
   -- ^ The pretty-printed HDL documents
-  -- + The update manifest file
   -- + The data files that need to be copied
-createHDL backend modName seen components domainConfs top (topName, manifest0) = flip evalState backend $ getMon $ do
+createHDL backend modName seen components domainConfs top topName = flip evalState backend $ getMon $ do
   let componentsL = eltsVarEnv components
   (hdlNmDocs,incs) <-
     unzip <$> mapM (\(_wereVoids,sp,ids,comp) ->
@@ -752,41 +708,18 @@ createHDL backend modName seen components domainConfs top (topName, manifest0) =
   typesPkg <- mkTyPackage modName hwtys
   dataFiles <- Mon getDataFiles
   memFiles  <- Mon getMemoryDataFiles
-  let hdl   = map (first (<.> Clash.Backend.extension backend)) (typesPkg ++ hdlNmDocs)
-      qincs = concat incs
-      topFiles = hdl ++ qincs
-
   let
+    hdl = map (first (<.> Clash.Backend.extension backend)) (typesPkg ++ hdlNmDocs)
+    qincs = concat incs
+    topFiles = hdl ++ qincs
+
     topClks = findClocks top
     sdcInfo = fmap findDomainConfig <$> topClks
     sdcFile = Data.Text.unpack topName <.> "sdc"
     sdcDoc  = (sdcFile, pprSDC (SdcInfo sdcInfo))
     sdc = if null sdcInfo then Nothing else Just sdcDoc
 
-  manifest1 <- do
-    let
-      topInNames = map fst (inputs top)
-      topOutNames = map (fst . (\(_,x,_) -> x)) (outputs top)
-      compNames = map (componentName . view _4) componentsL
-
-    topInTypes  <- mapM (fmap (Text.toStrict . renderOneLine) .
-                          hdlType (External topName) . snd) (inputs top)
-    topOutTypes <- mapM (fmap (Text.toStrict . renderOneLine) .
-                          hdlType (External topName) . snd . (\(_,x,_) -> x)) (outputs top)
-    return manifest0{
-        portInNames = map Id.toText topInNames
-      , portInTypes = topInTypes
-      , portOutNames = map Id.toText topOutNames
-      , portOutTypes = topOutTypes
-      , componentNames = map Id.toText compNames
-      , fileNames = maybe (fmap fst topFiles) (\x -> fst x : fmap fst topFiles) sdc
-      }
-
-  let manDoc = ( Data.Text.unpack topName <.> "manifest"
-               , pretty (serializeManifest manifest1) )
-
-  let topDocs = maybe (manDoc:topFiles) (:manDoc:topFiles) sdc
-  return (topDocs, manifest1, dataFiles, memFiles)
+  return (maybeToList sdc <> topFiles, dataFiles, memFiles)
  where
   findDomainConfig dom =
     HashMap.lookupDefault
@@ -794,16 +727,49 @@ createHDL backend modName seen components domainConfs top (topName, manifest0) =
       dom
       domainConfs
 
+writeEdam ::
+  FilePath ->
+  (Id.Identifier, Unique) ->
+  HashMap Unique [Unique] ->
+  HashMap Unique [EdamFile] ->
+  [(FilePath, ByteString)] ->
+  IO (HashMap Unique [EdamFile], [(FilePath, ByteString)])
+writeEdam hdlDir (topNm, topEntity) deps edamFiles0 filesAndDigests = do
+  let
+    (edamFiles1, edamInfo) =
+      createEDAM (topNm, topEntity) deps edamFiles0 (map fst filesAndDigests)
+  edamDigest <- writeHDL hdlDir ("edam.py", pprEdam edamInfo)
+  pure (edamFiles1, ("edam.py", edamDigest) : filesAndDigests)
+
 -- | Create an Edalize metadata file for using Edalize to build the project.
 --
-createEDAM :: Id.Identifier -> [EdamFile] -> [FilePath] -> Edam
-createEDAM topName incFiles files = Edam
-  { edamProjectName = Id.toText topName
-  , edamTopEntity   = Id.toText topName
-  , edamFiles       = fmap (asEdamFile topName) files <> fmap asIncFile incFiles
-  , edamToolOptions = def
-  }
+-- TODO: Handle libraries. Also see: https://github.com/olofk/edalize/issues/220
+createEDAM ::
+  -- Top entity name and unique
+  (Id.Identifier, Unique) ->
+  -- | Top entity dependency map
+  HashMap Unique [Unique] ->
+  -- | Edam files of each top entity
+  HashMap Unique [EdamFile] ->
+  -- | Files to include in Edam file
+  [FilePath] ->
+  -- | (updated map, edam)
+  (HashMap Unique [EdamFile], Edam)
+createEDAM (topName, topUnique) deps edamFileMap files =
+  (HashMap.insert topUnique (edamFiles edam) edamFileMap, edam)
  where
+  edam = Edam
+    { edamProjectName = Id.toText topName
+    , edamTopEntity   = Id.toText topName
+    , edamFiles       = fmap (asEdamFile topName) files <> fmap asIncFile incFiles
+    , edamToolOptions = def
+    }
+
+  incFiles =
+    concatMap
+      (\u -> HashMap.lookupDefault [] u edamFileMap)
+      (HashMap.lookupDefault [] topUnique deps)
+
   asIncFile f =
     f { efName = ".." </> Data.Text.unpack (efLogicalName f) </> efName f }
 
@@ -821,87 +787,157 @@ asEdamFile topName path =
       ".sdc" -> SDC
       _ -> Clash.Edalize.Edam.Unknown
 
--- | Prepares the directory for writing HDL files. This means creating the
---   dir if it does not exist and removing all existing .hdl files from it.
-prepareDir :: Bool -- ^ Remove existing HDL files
-           -> String -- ^ File extension of the HDL files.
-           -> String
-           -> IO ()
-prepareDir cleanhdl ext dir = do
-  -- Create the dir if needed
-  Directory.createDirectoryIfMissing True dir
-  -- Clean the directory when needed
-  when cleanhdl $ do
-    -- Find all HDL files in the directory
-    files <- Directory.getDirectoryContents dir
-    let to_remove = filter ((==ext) . FilePath.takeExtension) files
-    -- Prepend the dirname to the filenames
-    let abs_to_remove = map (FilePath.combine dir) to_remove
-    -- Remove the files
-    mapM_ Directory.removeFile abs_to_remove
+-- | Prepares directory for writing HDL files.
+prepareDir ::
+  -- | HDL directory to prepare
+  FilePath ->
+  -- | Relevant options: @-fclash-no-clean@
+  ClashOpts ->
+  -- | Did directory contain unexpected modifications? See 'readFreshManifest'
+  Maybe [UnexpectedModification] ->
+  IO ()
+prepareDir hdlDir ClashOpts{opt_clear} mods = do
+  ifM
+    (doesPathExist hdlDir)
+    (ifM
+      (doesDirectoryExist hdlDir)
+      (detectCaseIssues >> clearOrError >> createDir)
+      (error [I.i|Tried to write HDL files to #{hdlDir}, but it wasn't a directory.|]))
+    createDir
 
--- | Writes a HDL file to the given directory
-writeHDL :: FilePath -> (String, Doc) -> IO ()
+ where
+  createDir = createDirectoryIfMissing True hdlDir
+
+  -- Windows considers 'foo' and 'FOO' the same directory. Error if users tries
+  -- to synthesize two top entities with conflicting (in this sense) names.
+  detectCaseIssues = do
+    allPaths <- listDirectory (takeDirectory hdlDir)
+    unless (takeFileName hdlDir `elem` allPaths) (error [I.i|
+      OS indicated #{hdlDir} existed, but Clash could not find it among the
+      list of existing directories in #{takeDirectory hdlDir}:
+
+        #{allPaths}
+
+      This probably means your OS or filesystem is case-insensitive. Rename your
+      top level binders in order to prevent this error message.
+    |])
+
+  clearOrError =
+    case mods of
+      Just [] ->
+        -- No unexpected changes, so no user work will get lost
+        removeDirectoryRecursive hdlDir
+      _ | opt_clear ->
+        -- Unexpected changes / non-empty directory, but @-fclash-clear@ was
+        -- set, so remove directory anyway.
+        removeDirectoryRecursive hdlDir
+      Just unexpected ->
+        -- Unexpected changes; i.e. modifications were made after last Clash run
+        error [I.i|
+          Changes were made to #{hdlDir} after last Clash run:
+
+            #{pprintUnexpectedModifications 5 unexpected}
+
+          Use '-fclash-clear' if you want Clash to clear out the directory.
+          Warning: this will remove the complete directory, be cautious of data
+          loss.
+        |]
+      Nothing ->
+        -- No manifest file was found. Refuse to write if directory isn't empty.
+        unlessM
+          (null <$> listDirectory hdlDir)
+          (error [I.i|
+            Tried to write HDL files to #{hdlDir}, but directory wasn't empty.
+
+            Use '-fclash-clear' if you want Clash to clear out the directory.
+            Warning: this will remove the complete directory, be cautious of data
+            loss.
+          |])
+
+-- | Write a file to disk in chunks. Returns SHA256 sum of file contents.
+writeAndHash :: FilePath -> ByteStringLazy.ByteString -> IO ByteString
+writeAndHash path bs =
+  IO.withFile path IO.WriteMode $ \handle ->
+      fmap Sha256.finalize
+    $ foldM (writeChunk handle) Sha256.init
+    $ ByteStringLazy.toChunks bs
+ where
+  writeChunk :: IO.Handle -> Sha256.Ctx -> ByteString -> IO Sha256.Ctx
+  writeChunk h !ctx chunk = do
+    ByteString.hPut h chunk
+    pure (Sha256.update ctx chunk)
+
+-- | Writes a HDL file to the given directory. Returns SHA256 hash of written
+-- file.
+writeHDL :: FilePath -> (FilePath, Doc) -> IO ByteString
 writeHDL dir (cname, hdl) = do
-  let rendered = renderLazy (layoutPretty (LayoutOptions (AvailablePerLine 120 0.4)) hdl)
-      -- remove blank lines to keep things clean
-      clean = Text.unlines
-            . map (\t -> if Text.all (==' ') t then Text.empty else t)
-            . Text.lines
-  bracket (IO.openFile (dir </> cname) IO.WriteMode) IO.hClose $ \h -> do
-    Text.hPutStr h (clean rendered)
-    Text.hPutStr h (Text.pack "\n")
+  let
+    layout = LayoutOptions (AvailablePerLine 120 0.4)
+    rendered0 = renderLazy (layoutPretty layout hdl)
+    rendered1 = Text.unlines (map Text.stripEnd (Text.lines rendered0))
+  writeAndHash (dir </> cname) (Text.encodeUtf8 (rendered1 <> "\n"))
 
 -- | Copy given files
 writeMemoryDataFiles
     :: FilePath
     -- ^ Directory to copy  files to
-    -> [(String, String)]
+    -> [(FilePath, String)]
     -- ^ (filename, content)
-    -> IO ()
+    -> IO [ByteString]
 writeMemoryDataFiles dir files =
-    mapM_
-      (uncurry writeFile)
-      [(dir </> fname, content) | (fname, content) <- files]
+  forM files $ \(fname, content) ->
+    writeAndHash (dir </> fname) (ByteStringLazyChar8.pack content)
 
+-- | Copy data files added with ~FILEPATH
 copyDataFiles
-    :: [FilePath]
-    -> FilePath
-    -> [(String,FilePath)]
-    -> IO ()
-copyDataFiles idirs dir = mapM_ (copyFile' idirs)
-  where
-    copyFile' dirs (nm,old) = do
-      oldExists <- Directory.doesFileExist old
-      if oldExists
-        then Directory.copyFile old new
-        else goImports dirs
-      where
-        new = dir FilePath.</> nm
+  :: [FilePath]
+  -- ^ Import directories passed in with @-i@
+  -> FilePath
+  -- ^ Directory to copy to
+  -> [(FilePath,FilePath)]
+  -- ^ [(name of newly made file in HDL output dir, file to copy)]
+  -> IO [ByteString]
+  -- ^ SHA256 hashes of written files
+copyDataFiles idirs targetDir = mapM copyDataFile
+ where
+  copyDataFile :: (FilePath, FilePath) -> IO ByteString
+  copyDataFile (newName, toCopy)
+    | isAbsolute toCopy = do
+      ifM
+        (doesFileExist toCopy)
+        (copyAndHash toCopy (targetDir </> newName))
+        (error [I.i|Could not find data file #{show toCopy}. Does it exist?|])
+    | otherwise = do
+      let candidates = map (</> toCopy) idirs
+      found <- filterM doesFileExist candidates
+      case found of
+        [] -> error [I.i|
+          Could not find data file #{show toCopy}. The following directories were
+          searched:
 
-        goImports [] = do
-          oldExists <- Directory.doesFileExist old
-          if oldExists
-            then Directory.copyFile old new
-            else unless (null old) (putStrLn ("WARNING: file " ++ show old ++ " does not exist"))
-        goImports (d:ds) = do
-          let old2 = d FilePath.</> old
-          old2Exists <- Directory.doesFileExist old2
-          if old2Exists
-            then Directory.copyFile old2 new
-            else goImports ds
+            #{idirs}
 
--- | Get all the terms corresponding to a call graph
-callGraphBindings
-  :: BindingMap
-  -- ^ All bindings
-  -> Id
-  -- ^ Root of the call graph
-  -> [Term]
-callGraphBindings bindingsMap tm =
-  map (bindingTerm . (bindingsMap `lookupUniqMap'`)) (keysUniqMap cg)
-  where
-    cg = callGraph bindingsMap tm
+          You can add directories Clash will look in using `-i`.
+        |]
+        (_:_:_) -> error [I.i|
+          Multiple data files for #{show toCopy} found. The following candidates
+          were found:
+
+            #{found}
+
+          Please disambiguate data files.
+        |]
+        [c] ->
+          copyAndHash c (targetDir </> newName)
+
+  copyAndHash src dst = do
+    ifM
+      (doesPathExist dst)
+      (error [I.i|
+        Tried to copy data file #{src} to #{dst} but a file or directory with
+        that name already existed. This is a bug in Clash, please report it.
+      |])
+      (ByteStringLazy.readFile src >>= writeAndHash dst)
 
 -- | Normalize a complete hierarchy
 normalizeEntity
