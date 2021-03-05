@@ -908,15 +908,15 @@ collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
           let binders1 = tail binders ++ [(fst b, C.Var result)]
           ds1 <- concatMapM (uncurry (mkDeclarations' Sequential)) binders1
           netDecls <- concatMapM mkNetDecl binders
-          return (netDecls ++ ds1,extendIdSubst (mkSubst qInScopeSet) x (Var (fst b)))
+          return (netDecls ++ ds1,extendIdSubst (mkSubst eInScopeSet) x (Var (fst b)))
         _ -> error "internal error"
     _ -> do
-      ([x'],s) <- mkUnique (mkSubst qInScopeSet) [x]
+      ([x'],s) <- mkUnique (mkSubst eInScopeSet) [x]
       netDecls <- concatMapM mkNetDecl [(x',m)]
       ds1 <- mkDeclarations' Sequential x' m
       return (netDecls ++ ds1,s)
 
-  qInScopeSet = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet q)
+  eInScopeSet = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet e)
 
 collectBindIO _ es = error ("internal error:\n" ++ showPpr es)
 
