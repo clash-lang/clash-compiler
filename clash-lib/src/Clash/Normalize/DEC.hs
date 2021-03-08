@@ -55,6 +55,18 @@ import qualified Data.Map.Strict                  as Map
 import qualified Data.Maybe                       as Maybe
 import           Data.Monoid                      (All (..))
 
+#if MIN_VERSION_ghc(8,10,0)
+import           GHC.Hs.Utils                     (chunkify,mkChunkified)
+#else
+import           HsUtils                          (chunkify,mkChunkified)
+#endif
+
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Settings.Constants           (mAX_TUPLE_SIZE)
+#else
+import           Constants                        (mAX_TUPLE_SIZE)
+#endif
+
 #if EXPERIMENTAL_EVALUATOR
 import           System.IO.Unsafe
 #endif
@@ -403,11 +415,11 @@ disJointSelProj inScope argTys cs = do
       tys      -> do
         let m            = length tys
             (tyIxs,tys') = unzip tys
-            tupTy        = mkTupTy tcm tupTcm tys'
+            tupTy        = mkBigTupTy tcm tupTcm tys'
             cs'          = fmap (\es -> map (es !!) tyIxs) cs
             djCase       = genCase tcm tupTcm tupTy tys' cs'
         scrutId <- mkInternalVar inScope "tupIn" tupTy
-        projections <- mapM (mkTupSelector inScope tcm tupTcm (Var scrutId) tys') [0..m-1]
+        projections <- mapM (mkBigTupSelector inScope tcm tupTcm (Var scrutId) tys') [0..m-1]
         return (Just (scrutId,djCase),projections)
     let selProjs = tranOrUnTran 0 (zip (map fst untran) untranSels) projs
 
@@ -458,7 +470,7 @@ genCase :: TyConMap
 genCase tcm tupTcm ty argTys = go
   where
     go (Leaf tms) =
-      mkTupTm tcm tupTcm (List.zipEqual argTys tms)
+      mkBigTupTm tcm tupTcm (List.zipEqual argTys tms)
 
     go (LB lb ct) =
       Letrec lb (go ct)
@@ -481,32 +493,36 @@ findTup tcm tupTcm n = (tupTcNm,tupDc)
     Just tupTc   = lookupUniqMap tupTcNm tcm
     [tupDc]      = tyConDataCons tupTc
 
-mkTupTm :: TyConMap -> IM.IntMap TyConName -> [(Type,Term)] -> Term
-mkTupTm tcm tupTcm args = snd $ mkTup tcm tupTcm args
+mkBigTupTm :: TyConMap -> IM.IntMap TyConName -> [(Type,Term)] -> Term
+mkBigTupTm tcm tupTcm args = snd $ mkBigTup tcm tupTcm args
 
-mkTup :: TyConMap -> IM.IntMap TyConName -> [(Type,Term)] -> (Type,Term)
-mkTup _ _ [] = error $ $curLoc ++ "mkTup: Can't create 0-tuple"
-mkTup _ _ [(ty,tm)] = (ty,tm)
-mkTup tcm tupTcm args = (ty,tm)
+mkSmallTup,mkBigTup :: TyConMap -> IM.IntMap TyConName -> [(Type,Term)] -> (Type,Term)
+mkSmallTup _ _ [] = error $ $curLoc ++ "mkSmallTup: Can't create 0-tuple"
+mkSmallTup _ _ [(ty,tm)] = (ty,tm)
+mkSmallTup tcm tupTcm args = (ty,tm)
   where
     (argTys,tms) = unzip args
     (tupTcNm,tupDc) = findTup tcm tupTcm (length args)
     tm = mkApps (Data tupDc) (map Right argTys ++ map Left tms)
     ty = mkTyConApp tupTcNm argTys
 
-mkTupTy
+mkBigTup tcm tupTcm = mkChunkified (mkSmallTup tcm tupTcm)
+
+mkSmallTupTy,mkBigTupTy
   :: TyConMap
   -> IM.IntMap TyConName
   -> [Type]
   -> Type
-mkTupTy _ _ [] = error $ $curLoc ++ "mkTupTy: Can't create 0-tuple"
-mkTupTy _ _ [ty] = ty
-mkTupTy tcm tupTcm tys = mkTyConApp tupTcNm tys
+mkSmallTupTy _ _ [] = error $ $curLoc ++ "mkSmallTupTy: Can't create 0-tuple"
+mkSmallTupTy _ _ [ty] = ty
+mkSmallTupTy tcm tupTcm tys = mkTyConApp tupTcNm tys
   where
     m = length tys
     (tupTcNm,_) = findTup tcm tupTcm m
 
-mkTupSelector
+mkBigTupTy tcm tupTcm = mkChunkified (mkSmallTupTy tcm tupTcm)
+
+mkSmallTupSelector,mkBigTupSelector
   :: MonadUnique m
   => InScopeSet
   -> TyConMap
@@ -515,9 +531,19 @@ mkTupSelector
   -> [Type]
   -> Int
   -> m Term
-mkTupSelector _ _ _ scrut [_] 0 = return scrut
-mkTupSelector _ _ _ _     [_] n = error $ $curLoc ++ "mkTupSelector called with one type, but to select " ++ show n
-mkTupSelector inScope tcm _ scrut _ n = mkSelectorCase ($curLoc ++ "mkTupSelector") inScope tcm scrut 1 n
+mkSmallTupSelector _ _ _ scrut [_] 0 = return scrut
+mkSmallTupSelector _ _ _ _     [_] n = error $ $curLoc ++ "mkSmallTupSelector called with one type, but to select " ++ show n
+mkSmallTupSelector inScope tcm _ scrut _ n = mkSelectorCase ($curLoc ++ "mkSmallTupSelector") inScope tcm scrut 1 n
+
+mkBigTupSelector inScope tcm tupTcm scrut tys n = go (chunkify tys)
+  where
+    go [_] = mkSmallTupSelector inScope tcm tupTcm scrut tys n
+    go tyss = do
+      let (nOuter,nInner) = divMod n mAX_TUPLE_SIZE
+          tyss' = map (mkSmallTupTy tcm tupTcm) tyss
+      outer <- mkSmallTupSelector inScope tcm tupTcm scrut tyss' nOuter
+      inner <- mkSmallTupSelector inScope tcm tupTcm outer (tyss List.!! nOuter) nInner
+      return inner
 
 
 -- | Determine if a term in a function position is interesting to lift out of
