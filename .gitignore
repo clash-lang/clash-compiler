@@ -56,3 +56,6 @@ _build/
 
 # Python env
 docs/env
+
+# rewrite histories
+*.dat
