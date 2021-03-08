@@ -529,6 +529,7 @@ runClashTest = defaultMain $ clashTestRoot
         , outputTest ("tests" </> "shouldwork" </> "Issues") allTargets ["-fclash-aggressive-x-optimization-blackboxes"] ["-itests/shouldwork/Issues"] "T1506B" "main"
         , runTest "T1615" def{hdlSim=False, hdlTargets=[Verilog]}
         , runTest "T1663" def{hdlTargets=[VHDL], hdlSim=False}
+        , runTest "T1669_DEC" def{hdlTargets=[VHDL]}
         , runTest "T1715" def
         , runTest "T1721" def{hdlSim=False}
         ] <>
