@@ -1,0 +1,38 @@
+CHANGED: the type classes `Clash.Signal.Bundle.Bundle` and `Clash.Signal.Delay.Bundle.Bundle`
+are now merged into a single type class `Clash.Prelude.Bundle.Bundle`. The type
+class has a new signature:
+
+```
+class Bundle f a res | f a -> res, f res -> a, a res -> f  where
+  type Unbundled f a
+  type Unbundled f a = f a
+  bundle :: res -> f a
+  unbundle :: f a -> res
+```
+
+Migration guide:
+
+When you have a polymorphic type signature involving the `Unbundle` type family:
+
+```
+f :: Unbundled dom i -> ...
+```
+
+you will have to change your code to:
+
+```
+f :: Bundle (Signal dom) i fi => fi -> ...
+```
+
+When you have a monomorphic type signatures involving the `Unbundled` type
+family:
+
+```
+f :: Unbundled dom (a,b) -> ...
+```
+
+you will have to change your code to:
+
+```
+f :: Unbundled (Signal dom) (a,b) -> ...
+```

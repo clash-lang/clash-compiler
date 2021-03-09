@@ -1,7 +1,6 @@
 module DelayN where
 
 import Clash.Prelude
-import qualified Clash.Signal.Delayed.Bundle as D
 import Clash.Explicit.Testbench
 
 zeroAt0

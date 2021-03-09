@@ -419,7 +419,7 @@ import           Clash.Explicit.Signal  (KnownDomain, Enable, register, fromEnab
 import           Clash.Signal.Internal
   (Clock(..), Reset, Signal (..), invertReset, (.&&.), mux)
 import           Clash.Promoted.Nat     (SNat(..))
-import           Clash.Signal.Bundle    (unbundle)
+import           Clash.Prelude.Bundle   (unbundle)
 import           Clash.Sized.Unsigned   (Unsigned)
 import           Clash.Sized.Index      (Index)
 import           Clash.Sized.Vector     (Vec, replicate, iterateI)

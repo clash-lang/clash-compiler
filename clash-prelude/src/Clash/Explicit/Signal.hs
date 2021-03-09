@@ -3,8 +3,9 @@ Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software,
                   2017     , Google Inc.
                   2020     , Ben Gamari
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Clash has synchronous 'Signal's in the form of:
 
@@ -131,7 +132,7 @@ can potentially introduce situations prone to meta-stability:
 -}
 
 {-# LANGUAGE ExplicitNamespaces #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
@@ -270,8 +271,8 @@ import           GHC.TypeLits                   (type (<=))
 
 import           Clash.Annotations.Primitive    (hasBlackBox)
 import           Clash.Promoted.Nat             (SNat(..), snatToNum)
-import           Clash.Signal.Bundle
-  (Bundle (..), EmptyTuple(..), TaggedEmptyTuple(..), vecBundle#)
+import           Clash.Prelude.Bundle
+  (Bundle (..), EmptyTuple(..), TaggedEmptyTuple(..), vecBundle#, vecBundleD#)
 import           Clash.Signal.BiSignal
 import           Clash.Signal.Internal
 import           Clash.Signal.Internal.Ambiguous
@@ -747,8 +748,8 @@ simulateWithResetN nReset resetVal nSamples f as =
 --
 -- __NB__: This function is not synthesizable
 simulateB
-  :: (Bundle a, Bundle b, NFDataX a, NFDataX b)
-  => (Unbundled dom1 a -> Unbundled dom2 b)
+  :: (Bundle (Signal dom1) a fa, Bundle (Signal dom2) b fb, NFDataX a, NFDataX b)
+  => (fa -> fb)
   -- ^ The function we want to simulate
   -> [a]
   -- ^ Input samples
@@ -764,8 +765,8 @@ simulateB f = simulate (bundle . f . unbundle)
 --
 -- __NB__: This function is not synthesizable
 simulateB_lazy
-  :: (Bundle a, Bundle b)
-  => (Unbundled dom1 a -> Unbundled dom2 b)
+  :: (Bundle (Signal dom1) a fa, Bundle (Signal dom1) b fb)
+  => (fa -> fb)
   -- ^ The function we want to simulate
   -> [a]
   -- ^ Input samples
@@ -844,3 +845,4 @@ sampleWithResetN nReset nSamples f =
   take nSamples (sampleWithReset nReset f)
 
 {-# RULES "sequenceAVecSignal" Clash.Sized.Vector.traverse# (\x -> x) = vecBundle# #-}
+{-# RULES "sequenceAVecSignal" Clash.Sized.Vector.traverse# (\x -> x) = vecBundleD# #-}

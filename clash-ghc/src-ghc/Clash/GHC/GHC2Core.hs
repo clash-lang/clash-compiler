@@ -9,6 +9,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -149,6 +150,9 @@ import Var        (TyVarBndr (..))
 #endif
 import VarSet     (isEmptyVarSet)
 #endif
+
+-- Clash prelude
+import           Clash.Prelude.Bundle (vecBundle#, vecBundleD#)
 
 -- Local imports
 import           Clash.Annotations.Primitive (extractPrim)
@@ -356,9 +360,12 @@ coreToTerm primMap unlocs = term
         go "Clash.Signal.Internal.joinSignal#" args
           | length args == 3
           = term (args!!2)
-        go "Clash.Signal.Bundle.vecBundle#"    args
+        go "Clash.Prelude.Bundle.vecBundle#"    args
           | length args == 4
           = term (args!!3)
+        go "Clash.Prelude.Bundle.vecBundleD#"   args
+          | length args == 5
+          = term (args!!4)
         --- Remove `$`
         go "GHC.Base.$"                        args
           | length args == 5
@@ -411,16 +418,24 @@ coreToTerm primMap unlocs = term
             -- length args = domain tyvar + signal arg + number of type vars
           , length args == 2 + n
           = term (last args)
+          | Just n <- parseBundle "bundleD" nm
+            -- length args = domain tyvar + + delay tyvar + signal arg + number of type vars
+          , length args == 3 + n
+          = term (last args)
         go nm args
           | Just n <- parseBundle "unbundle" nm
             -- length args = domain tyvar + signal arg + number of type vars
           , length args == 2 + n
           = term (last args)
+          | Just n <- parseBundle "unbundleD" nm
+            -- length args = domain tyvar + delay tyvar + signal arg + number of type vars
+          , length args == 3 + n
+          = term (last args)
         go _ _ = term' e
 
     parseBundle :: Text -> Text -> Maybe Int
     parseBundle fNm nm0 = do
-      nm1 <- Text.stripPrefix ("Clash.Signal.Bundle." <> fNm) nm0
+      nm1 <- Text.stripPrefix ("Clash.Prelude.Bundle." <> fNm) nm0
       nm2 <- Text.stripSuffix "#" nm1
       Text.readMaybe (Text.unpack nm2)
 
@@ -535,7 +550,8 @@ coreToTerm primMap unlocs = term
               | f == "Clash.Signal.Internal.appSignal#" -> return (appSignalTerm xType)
               | f == "Clash.Signal.Internal.traverse#"  -> return (traverseTerm xType)
               | f == "Clash.Signal.Internal.joinSignal#" -> return (joinTerm xType)
-              | f == "Clash.Signal.Bundle.vecBundle#"   -> return (vecUnwrapTerm xType)
+              | f == pack (show 'vecBundle#)            -> return (vecUnwrapTerm xType)
+              | f == pack (show 'vecBundleD#)           -> return (vecUnwrapDTerm xType)
               | f == "GHC.Base.$"                       -> return (dollarTerm xType)
               | f == "GHC.Stack.withFrozenCallStack"    -> return (withFrozenCallStackTerm xType)
               | f == "GHC.Magic.noinline"               -> return (idTerm xType)
@@ -1164,6 +1180,34 @@ vecUnwrapTerm (C.ForAllTy tTV (C.ForAllTy nTV (C.ForAllTy aTV funTy))) =
     vsId             = C.mkLocalId vsTy vsName
 
 vecUnwrapTerm ty = error $ $(curLoc) ++ show ty
+
+-- | Given the type:
+--
+-- @
+-- forall dom.forall t.forall n.forall a.Vec n (DSignal dom t a) ->
+-- DSignal dom t (Vec n a)
+-- @
+--
+-- Generate the term:
+--
+-- @
+-- /\(dom:Domain)/\(t:Nat)./\(n:Nat)./\(a:*).\(vs:DSignal t (Vec n a)).vs
+-- @
+vecUnwrapDTerm :: C.Type
+              -> C.Term
+vecUnwrapDTerm (C.ForAllTy dTV (C.ForAllTy tTV (C.ForAllTy nTV (C.ForAllTy aTV funTy)))) =
+    C.TyLam dTV (
+    C.TyLam tTV (
+    C.TyLam nTV (
+    C.TyLam aTV (
+    C.Lam   vsId (
+    C.Var vsId)))))
+  where
+    (C.FunTy _ vsTy) = C.tyView funTy
+    vsName           = C.mkUnsafeSystemName "vs" 0
+    vsId             = C.mkLocalId vsTy vsName
+
+vecUnwrapDTerm ty = error $ $(curLoc) ++ show ty
 
 -- | Given the type:
 --

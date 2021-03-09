@@ -236,6 +236,7 @@ Library
                       Clash.Prelude.BitReduction
                       Clash.Prelude.BlockRam
                       Clash.Prelude.BlockRam.File
+                      Clash.Prelude.Bundle
                       Clash.Prelude.DataFlow
                       Clash.Prelude.Mealy
                       Clash.Prelude.Moore
@@ -252,11 +253,9 @@ Library
                       Clash.Promoted.Symbol
 
                       Clash.Signal
-                      Clash.Signal.Bundle
                       Clash.Signal.BiSignal
                       Clash.Signal.Delayed
                       Clash.Signal.Delayed.Internal
-                      Clash.Signal.Delayed.Bundle
                       Clash.Signal.Internal
                       Clash.Signal.Internal.Ambiguous
                       Clash.Signal.Trace
@@ -294,7 +293,7 @@ Library
                       Clash.Class.AutoReg.Internal
                       Clash.CPP
                       Clash.Examples.Internal
-                      Clash.Signal.Bundle.Internal
+                      Clash.Prelude.Bundle.Internal
                       Language.Haskell.TH.Compat
                       Paths_clash_prelude
 

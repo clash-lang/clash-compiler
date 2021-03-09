@@ -116,7 +116,7 @@ import Clash.Promoted.Nat    (SNat (..), pow2SNat, natToNum, snatToNum)
 import Clash.Sized.Internal.BitVector (Bit(..), BitVector(..))
 import Clash.Signal.Internal
   (Clock(..), Signal (..), Enable, KnownDomain, fromEnable, (.&&.))
-import Clash.Signal.Bundle   (unbundle)
+import Clash.Prelude.Bundle   (unbundle)
 import Clash.Sized.Unsigned  (Unsigned)
 import Clash.XException      (errorX, maybeIsX, seqX, fromJustX)
 

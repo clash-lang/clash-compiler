@@ -2,8 +2,9 @@
   Copyright  :  (C) 2013-2016, University of Twente,
                     2017     , Google Inc.
                     2019     , Myrtle Software Ltd
+                    2021     , QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Whereas the output of a Moore machine depends on the /previous state/, the
   output of a Mealy machine depends on /current transition/.
@@ -119,13 +120,13 @@ mealy = hideClockResetEnable E.mealy
 mealyB
   :: ( HiddenClockResetEnable dom
      , NFDataX s
-     , Bundle i
-     , Bundle o )
+     , Bundle (Signal dom) i fi
+     , Bundle (Signal dom) o fo)
   => (s -> i -> (s,o))
   -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
   -> s
   -- ^ Initial state
-  -> (Unbundled dom i -> Unbundled dom o)
+  -> (fi -> fo)
   -- ^ Synchronous sequential function with input and output matching that
   -- of the mealy machine
 mealyB = hideClockResetEnable E.mealyB
@@ -135,13 +136,13 @@ mealyB = hideClockResetEnable E.mealyB
 (<^>)
   :: ( HiddenClockResetEnable dom
      , NFDataX s
-     , Bundle i
-     , Bundle o )
+     , Bundle (Signal dom) i fi
+     , Bundle (Signal dom) o fo)
   => (s -> i -> (s,o))
   -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
   -> s
   -- ^ Initial state
- -> (Unbundled dom i -> Unbundled dom o)
+ -> (fi -> fo)
  -- ^ Synchronous sequential function with input and output matching that
  -- of the mealy machine
 (<^>) = mealyB

@@ -2,8 +2,9 @@
   Copyright  :  (C) 2013-2016, University of Twente,
                     2017     , Google Inc.
                     2019     , Myrtle Software Ltd
+                    2021     , QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Whereas the output of a Mealy machine depends on /current transition/, the
   output of a Moore machine depends on the /previous state/.
@@ -11,6 +12,8 @@
   Moore machines are strictly less expressive, but may impose laxer timing
   requirements.
 -}
+
+{-# LANGUAGE FlexibleContexts #-}
 
 {-# LANGUAGE Safe #-}
 
@@ -143,8 +146,8 @@ medvedev clk rst en tr st = moore clk rst en tr id st
 mooreB
   :: ( KnownDomain dom
      , NFDataX s
-     , Bundle i
-     , Bundle o )
+     , Bundle (Signal dom) i fi
+     , Bundle (Signal dom) o fo)
   => Clock dom
   -> Reset dom
   -> Enable dom
@@ -156,7 +159,7 @@ mooreB
   -- @state -> output@
   -> s
   -- ^ Initial state
-  -> (Unbundled dom i -> Unbundled dom o)
+  -> (fi -> fo)
   -- ^ Synchronous sequential function with input and output matching that
   -- of the moore machine
 mooreB clk rst en ft fo iS i = unbundle (moore clk rst en ft fo iS (bundle i))
@@ -166,13 +169,13 @@ mooreB clk rst en ft fo iS i = unbundle (moore clk rst en ft fo iS (bundle i))
 medvedevB
   :: ( KnownDomain dom
      , NFDataX s
-     , Bundle i
-     , Bundle s )
+     , Bundle (Signal dom) i fi
+     , Bundle (Signal dom) s fs)
   => Clock dom
   -> Reset dom
   -> Enable dom
   -> (s -> i -> s)
   -> s
-  -> (Unbundled dom i -> Unbundled dom s)
+  -> (fi -> fs)
 medvedevB clk rst en tr st = mooreB clk rst en tr id st
 {-# INLINE medvedevB #-}

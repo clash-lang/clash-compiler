@@ -53,7 +53,7 @@ import Clash.Class.BitPack.BitIndex (msb)
 import Clash.Explicit.Mealy   (mealyB)
 import Clash.Promoted.Nat     (SNat)
 import Clash.Signal           (KnownDomain, (.&&.))
-import Clash.Signal.Bundle    (Bundle (..))
+import Clash.Prelude.Bundle   (Bundle (..))
 import Clash.Explicit.Signal  (Clock, Reset, Signal, Enable, enable, register)
 import Clash.Sized.BitVector  (BitVector)
 import Clash.Sized.Vector

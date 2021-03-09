@@ -2,8 +2,9 @@
   Copyright  :  (C) 2013-2016, University of Twente
                     2017     , Google Inc.
                     2019     , Myrtle Software Ltd
+                    2021     , QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Whereas the output of a Mealy machine depends on /current transition/, the
   output of a Moore machine depends on the /previous state/.
@@ -134,15 +135,15 @@ medvedev tr st = moore tr id st
 mooreB
   :: ( HiddenClockResetEnable dom
      , NFDataX s
-     , Bundle i
-     , Bundle o )
+     , Bundle (Signal dom) i fi
+     , Bundle (Signal dom) o fo)
   => (s -> i -> s)
   -- ^ Transfer function in moore machine form: @state -> input -> newstate@
   -> (s -> o)
   -- ^ Output function in moore machine form: @state -> output@
   -> s
   -- ^ Initial state
-  -> (Unbundled dom i -> Unbundled dom o)
+  -> (fi -> fo)
    -- ^ Synchronous sequential function with input and output matching that
    -- of the moore machine
 mooreB = hideClockResetEnable E.mooreB
@@ -152,10 +153,10 @@ mooreB = hideClockResetEnable E.mooreB
 medvedevB
   :: ( HiddenClockResetEnable dom
      , NFDataX s
-     , Bundle i
-     , Bundle s )
+     , Bundle (Signal dom) i fi
+     , Bundle (Signal dom) s fs)
   => (s -> i -> s)
   -> s
-  -> (Unbundled dom i -> Unbundled dom s)
+  -> (fi -> fs)
 medvedevB tr st = mooreB tr id st
 {-# INLINE medvedevB #-}

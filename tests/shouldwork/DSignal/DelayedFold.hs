@@ -1,7 +1,6 @@
 module DelayedFold where
 
 import Clash.Prelude
-import qualified Clash.Signal.Delayed.Bundle as D
 import Clash.Explicit.Testbench
 
 zeroAt0
@@ -16,7 +15,7 @@ folder
   :: HiddenClockResetEnable dom
   => DSignal dom 0 (Vec 4 Int)
   -> DSignal dom 2 Int
-folder = zeroAt0 . delayedFold d1 0 (+) . D.unbundle
+folder = zeroAt0 . delayedFold d1 0 (+) . unbundle
 --{-# NOINLINE folder #-}
 
 topEntity
