@@ -2102,7 +2102,7 @@ makeHDL' backend opts lst = go =<< case lst of
     env <- GHC.getSession
     liftIO (unload env [])
     -- Finally generate the HDL
-    makeHDL backend opts srcs
+    makeHDL backend (return ()) opts srcs
 
   recover dflags = do
     _ <- GHC.setSessionDynFlags dflags
@@ -2111,10 +2111,11 @@ makeHDL' backend opts lst = go =<< case lst of
 makeHDL :: GHC.GhcMonad m
         => Clash.Backend.Backend backend
         => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> backend)
+        -> Ghc ()
         -> IORef ClashOpts
         -> [FilePath]
         -> m ()
-makeHDL backend optsRef srcs = do
+makeHDL backend startAction optsRef srcs = do
   dflags <- GHC.getSessionDynFlags
   liftIO $ do startTime <- Clock.getCurrentTime
               opts0  <- readIORef optsRef
@@ -2150,7 +2151,7 @@ makeHDL backend optsRef srcs = do
                 -- Generate bindings:
                 let dbs = reverse [p | PackageDB (PkgConfFile p) <- packageDBFlags dflags]
                 (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs,domainConfs) <-
-                  generateBindings color primDirs idirs dbs hdl src (Just dflags)
+                  generateBindings startAction color primDirs idirs dbs hdl src (Just dflags)
 
                 let getMain = getMainTopEntity src bindingsMap topEntities
                 mainTopEntity <- traverse getMain (GHC.mainFunIs dflags)

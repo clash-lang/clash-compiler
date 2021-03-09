@@ -11,7 +11,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Clash.Main (defaultMain) where
+module Clash.Main (defaultMain, defaultMainWithAction) where
 
 -- The official GHC API
 import qualified GHC
@@ -112,7 +112,10 @@ import           Clash.GHC.Util (handleClashException)
 -- GHC's command-line interface
 
 defaultMain :: [String] -> IO ()
-defaultMain = flip withArgs $ do
+defaultMain = defaultMainWithAction (return ())
+
+defaultMainWithAction :: Ghc () -> [String] -> IO ()
+defaultMainWithAction startAction = flip withArgs $ do
    initGCStatistics -- See Note [-Bsymbolic and hooks]
    hSetBuffering stdout LineBuffering
    hSetBuffering stderr LineBuffering
@@ -177,12 +180,12 @@ defaultMain = flip withArgs $ do
                           ShowGhciUsage          -> showGhciUsage dflagsExtra1
                           PrintWithDynFlags f    -> putStrLn (f dflagsExtra1)
               Right postLoadMode ->
-                  main' postLoadMode dflagsExtra1 argv3 flagWarnings r
+                  main' postLoadMode dflagsExtra1 argv3 flagWarnings startAction r
 
 main' :: PostLoadMode -> DynFlags -> [Located String] -> [Warn]
-      -> IORef ClashOpts
+      -> Ghc () -> IORef ClashOpts
       -> Ghc ()
-main' postLoadMode dflags0 args flagWarnings clashOpts = do
+main' postLoadMode dflags0 args flagWarnings startAction clashOpts = do
   -- set the default GhcMode, HscTarget and GhcLink.  The HscTarget
   -- can be further adjusted on a module by module basis, using only
   -- the -fvia-C and -fasm flags.  If the default HscTarget is not
@@ -298,7 +301,7 @@ main' postLoadMode dflags0 args flagWarnings clashOpts = do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
     clashOpts' <- liftIO (readIORef clashOpts)
-    let clash fun = gcatch (fun clashOpts srcs) (handleClashException dflags6 clashOpts')
+    let clash fun = gcatch (fun startAction clashOpts srcs) (handleClashException dflags6 clashOpts')
     case postLoadMode of
        ShowInterface f        -> liftIO $ doShowIface dflags6 f
        DoMake                 -> doMake srcs
@@ -980,17 +983,17 @@ abiHash strs = do
 makeHDL'
   :: Clash.Backend.Backend backend
   => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> backend)
-  -> IORef ClashOpts -> [(String,Maybe Phase)] -> Ghc ()
-makeHDL' _       _ []   = throwGhcException (CmdLineError "No input files")
-makeHDL' backend r srcs = makeHDL backend r $ fmap fst srcs
+  -> Ghc () -> IORef ClashOpts -> [(String,Maybe Phase)] -> Ghc ()
+makeHDL' _       _           _ []   = throwGhcException (CmdLineError "No input files")
+makeHDL' backend startAction r srcs = makeHDL backend startAction r $ fmap fst srcs
 
-makeVHDL :: IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
+makeVHDL :: Ghc () -> IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
 makeVHDL = makeHDL' (Clash.Backend.initBackend @VHDLState)
 
-makeVerilog ::  IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
+makeVerilog :: Ghc () -> IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
 makeVerilog = makeHDL' (Clash.Backend.initBackend @VerilogState)
 
-makeSystemVerilog ::  IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
+makeSystemVerilog :: Ghc () -> IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
 makeSystemVerilog = makeHDL' (Clash.Backend.initBackend @SystemVerilogState)
 
 -- -----------------------------------------------------------------------------

@@ -29,6 +29,7 @@ import           Data.List               (isPrefixOf)
 import qualified Data.Text               as Text
 import qualified Data.Time.Clock         as Clock
 
+import qualified GHC                     as GHC (Ghc)
 #if MIN_VERSION_ghc(9,0,0)
 import qualified GHC.Types.Basic         as GHC
 import qualified GHC.Core                as GHC
@@ -96,7 +97,11 @@ indexMaybe (x:_)  0 = Just x
 indexMaybe (_:xs) n = indexMaybe xs (n-1)
 
 generateBindings
-  :: GHC.OverridingBool
+  :: GHC.Ghc ()
+  -- ^ Allows us to have some initial action, such as sharing a linker state
+  -- See https://github.com/clash-lang/clash-compiler/issues/1686 and
+  -- https://mail.haskell.org/pipermail/ghc-devs/2021-March/019605.html
+  -> GHC.OverridingBool
   -- ^ Use color
   -> [FilePath]
   -- ^ primitives (blackbox) directories
@@ -116,7 +121,7 @@ generateBindings
         , [DataRepr']
         , HashMap.HashMap Text.Text VDomainConfiguration
         )
-generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
+generateBindings startAction useColor primDirs importDirs dbs hdl modName dflagsM = do
   (  bindings
    , clsOps
    , unlocatable
@@ -125,7 +130,7 @@ generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
    , partitionEithers -> (unresolvedPrims, pFP)
    , customBitRepresentations
    , primGuards
-   , domainConfs ) <- loadModules useColor hdl modName dflagsM importDirs
+   , domainConfs ) <- loadModules startAction useColor hdl modName dflagsM importDirs
   primMapR <- generatePrimMap unresolvedPrims primGuards (concat [pFP, primDirs, importDirs])
   tdir <- maybe ghcLibDir (pure . GHC.topDir) dflagsM
   startTime <- Clock.getCurrentTime

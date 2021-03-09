@@ -401,7 +401,11 @@ varNameString :: Var.Var -> String
 varNameString = nameString . Var.varName
 
 loadModules
-  :: OverridingBool
+  :: GHC.Ghc ()
+  -- ^ Allows us to have some initial action, such as sharing a linker state
+  -- See https://github.com/clash-lang/clash-compiler/issues/1686 and
+  -- https://mail.haskell.org/pipermail/ghc-devs/2021-March/019605.html
+  -> OverridingBool
   -- ^ Use color
   -> HDL
   -- ^ HDL target
@@ -421,10 +425,11 @@ loadModules
         , [(Text.Text, PrimitiveGuard ())]
         , HashMap Text.Text VDomainConfiguration -- domain names to configuration
         )
-loadModules useColor hdl modName dflagsM idirs = do
+loadModules startAction useColor hdl modName dflagsM idirs = do
   libDir <- MonadUtils.liftIO ghcLibDir
   startTime <- Clock.getCurrentTime
   GHC.runGhc (Just libDir) $ do
+    startAction
     -- 'mainFunIs' is set to Nothing due to issue #1304:
     -- https://github.com/clash-lang/clash-compiler/issues/1304
     setupGhc useColor ((\d -> d{GHC.mainFunIs=Nothing}) <$> dflagsM) idirs
