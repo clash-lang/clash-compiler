@@ -136,10 +136,12 @@ Library
                       TemplateHaskell
 
   Build-depends:      aeson                   >= 0.6.2.0  && < 1.6,
+                      aeson-pretty            >= 0.8      && < 0.9,
                       ansi-terminal           >= 0.8.0.0  && < 0.12,
                       array,
                       attoparsec              >= 0.10.4.0 && < 0.14,
                       base                    >= 4.11     && < 5,
+                      base16-bytestring       >= 0.1.1    && < 1.1,
                       binary                  >= 0.8.5    && < 0.11,
                       bytestring              >= 0.10.0.2 && < 0.12,
                       clash-prelude           == 1.3.0,
@@ -310,7 +312,10 @@ test-suite unittests
 
       ghc-typelits-knownnat,
 
+      aeson,
+      aeson-pretty,
       base,
+      base16-bytestring,
       bytestring,
       containers,
       concurrent-supply,
@@ -331,6 +336,7 @@ test-suite unittests
 
   Other-Modules: Clash.Tests.Core.FreeVars
                  Clash.Tests.Core.Subst
+                 Clash.Tests.Driver.Manifest
                  Clash.Tests.Netlist.Id
                  Clash.Tests.Util.Interpolate
                  Clash.Tests.Normalize.Transformations

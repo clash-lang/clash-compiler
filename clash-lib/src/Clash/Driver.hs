@@ -113,7 +113,7 @@ import           Clash.Core.VarEnv
   (VarEnv, elemVarEnv, eltsVarEnv, emptyVarEnv, lookupVarEnv, lookupVarEnv', mkVarEnv)
 import           Clash.Debug                      (debugIsOn)
 import           Clash.Driver.Types
-import           Clash.Driver.Manifest            (Manifest(..), readFreshManifest, UnexpectedModification, pprintUnexpectedModifications, mkManifest, writeManifest)
+import           Clash.Driver.Manifest            (Manifest(..), readFreshManifest, UnexpectedModification, pprintUnexpectedModifications, mkManifest, writeManifest, manifestFilename)
 import           Clash.Edalize.Edam
 import           Clash.Netlist                    (genNetlist, genTopNames)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
@@ -352,7 +352,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       hdlState' = setModName modNameT
                 $ fromMaybe (initBackend iw hdlsyn escpIds lwIds forceUnd xOpt :: backend) hdlState
       hdlDir    = fromMaybe (Clash.Backend.name hdlState') (opt_hdlDir opts) </> topEntityS
-      manPath   = hdlDir </> Data.Text.unpack topNmT <.> "manifest"
+      manPath   = hdlDir </> manifestFilename
       ite       = ifThenElseExpr hdlState'
       topNmT    = Id.toText topNm
 
@@ -380,7 +380,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
         then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles0 fileNames
         else pure (edamFiles0, fileNames)
 
-      writeManifest manifest0{fileNames=fileNames1} manPath
+      writeManifest manPath manifest0{fileNames=fileNames1}
 
       return
         ( topTime
@@ -442,7 +442,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       let manifest = mkManifest
                        hdlState' domainConfs opts topComponent components
                        filesAndDigests1 topHash
-      writeManifest manifest manPath
+      writeManifest manPath manifest
 
       topTime <- hdlDocs `seq` Clock.getCurrentTime
       return (topTime, seen2, edamFiles1)

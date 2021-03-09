@@ -9,7 +9,7 @@
 module Test.Tasty.Clash where
 
 import           Clash.Annotations.Primitive (HDL(..))
-import           Clash.Driver.Manifest     (readManifest, Manifest(..))
+import           Clash.Driver.Manifest     (readManifest, Manifest(..), manifestFilename)
 import           Control.Monad             (foldM, forM_)
 import           Data.Char                 (toLower)
 import           Data.Coerce               (coerce)
@@ -279,7 +279,7 @@ instance IsTest GhdlImportTest where
     src <- gitSourceDirectory
     let workDir = src </> "work"
     createDirectory workDir
-    manifests <- getManifests (src </> "*/*.manifest")
+    manifests <- getManifests (src </> "*" </> manifestFilename)
     foldM (goManifest workDir) (testPassed "") manifests
    where
     stdArgs  = ["-i", "--std=93"]
