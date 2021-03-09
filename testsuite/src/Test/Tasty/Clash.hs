@@ -9,7 +9,7 @@
 module Test.Tasty.Clash where
 
 import           Clash.Annotations.Primitive (HDL(..))
-import           Clash.Driver.Types        (readManifest, Manifest(..))
+import           Clash.Driver.Manifest     (readManifest, Manifest(..))
 import           Control.Monad             (foldM, forM_)
 import           Data.Char                 (toLower)
 import           Data.Coerce               (coerce)
@@ -295,7 +295,7 @@ instance IsTest GhdlImportTest where
       | resultSuccessful result = do
         let
           top = T.unpack topComponent
-          relVhdlFiles = filter (".vhdl" `List.isSuffixOf`) fileNames
+          relVhdlFiles = filter (".vhdl" `List.isSuffixOf`) (map fst fileNames)
           absVhdlFiles = map (replaceFileName manifestPath) relVhdlFiles
         createDirectory (workDir </> top)
         runGhdlI workDir (["--work=" <> top, "--workdir=" <> top] <> absVhdlFiles)

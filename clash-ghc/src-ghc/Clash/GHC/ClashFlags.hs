@@ -79,8 +79,8 @@ flagsClash r = [
   , defFlag "fclash-nocache"                     $ NoArg (deprecated "nocache" "no-cache" setNoCache r)
   , defFlag "fclash-no-cache"                    $ NoArg (liftEwM (setNoCache r))
   , defFlag "fclash-no-check-inaccessible-idirs" $ NoArg (liftEwM (setNoIDirCheck r))
-  , defFlag "fclash-noclean"                     $ NoArg (deprecated "noclean" "no-clean" setNoClean r)
-  , defFlag "fclash-no-clean"                    $ NoArg (liftEwM (setNoClean r))
+  , defFlag "fclash-no-clean"                    $ NoArg (setNoClean r)
+  , defFlag "fclash-clear"                       $ NoArg (liftEwM (setClear r))
   , defFlag "fclash-no-prim-warn"                $ NoArg (liftEwM (setNoPrimWarn r))
   , defFlag "fclash-spec-limit"                  $ IntSuffix (liftEwM . setSpecLimit r)
   , defFlag "fclash-inline-limit"                $ IntSuffix (liftEwM . setInlineLimit r)
@@ -184,8 +184,11 @@ setNoCache r = modifyIORef r (\c -> c {opt_cachehdl = False})
 setNoIDirCheck :: IORef ClashOpts -> IO ()
 setNoIDirCheck r = modifyIORef r (\c -> c {opt_checkIDir = False})
 
-setNoClean :: IORef ClashOpts -> IO ()
-setNoClean r = modifyIORef r (\c -> c {opt_cleanhdl = False})
+setNoClean :: a -> EwM IO ()
+setNoClean _ = addWarn "-fclash-no-clean has been removed"
+
+setClear :: IORef ClashOpts -> IO ()
+setClear r = modifyIORef r (\c -> c {opt_clear = True})
 
 setNoPrimWarn :: IORef ClashOpts -> IO ()
 setNoPrimWarn r = modifyIORef r (\c -> c {opt_primWarn = False})
