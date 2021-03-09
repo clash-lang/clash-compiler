@@ -1,5 +1,11 @@
 [ { "Primitive" :
-    { "name"      : "Clash.Signal.Bundle.vecBundle#"
+    { "name"      : "Clash.Prelude.Bundle.vecBundle#"
+    , "workInfo"  : "Never"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "Clash.Prelude.Bundle.vecBundleD#"
     , "workInfo"  : "Never"
     , "primType"  : "Function"
     }
