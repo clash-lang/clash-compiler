@@ -43,7 +43,7 @@ assertIn needle haystack
 mainVerilog :: IO ()
 mainVerilog = do
   [topDir] <- getArgs
-  content  <- readFile (takeDirectory topDir </> "PortNamesWithSingletonVector_topEntity" </> "PortNamesWithSingletonVector_topEntity.v")
+  content  <- readFile (topDir </> show 'topEntity </> "PortNamesWithSingletonVector_topEntity.v")
 
   mapM_ (`assertIn` content)
     [ "input  inp0"

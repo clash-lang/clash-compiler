@@ -19,6 +19,7 @@ import qualified Data.Text.IO as T
 import           Data.Text.Prettyprint.Doc.Extra (Doc (..))
 import qualified Prelude as P
 import           System.Environment              (getArgs)
+import           System.FilePath                 ((</>))
 
 
 myTF :: TemplateFunction
@@ -78,8 +79,8 @@ assertIn needle haystack
 -- VHDL test
 mainVHDL :: IO ()
 mainVHDL = do
-  [topFile] <- getArgs
-  content <- P.readFile topFile
+  [topDir] <- getArgs
+  content <- P.readFile (topDir </> show 'topEntity </> "topEntity.vhdl")
 
   assertIn "attribute my_int_attr : integer;" content
   assertIn "attribute my_int_attr of TEST : component is 7;" content
@@ -90,10 +91,14 @@ mainVHDL = do
 -- Verilog test
 mainVerilog :: IO ()
 mainVerilog = do
-  [topFile] <- getArgs
-  content <- P.readFile topFile
+  [topDir] <- getArgs
+  content <- P.readFile (topDir </> show 'topEntity </> "topEntity.v")
 
   assertIn "(* my_int_attr = 7, my_string_attr = \"Hello World!\" *)" content
 
 -- Verilog and SystemVerilog should share annotation syntax
-mainSystemVerilog = mainVerilog
+mainSystemVerilog = do
+  [topDir] <- getArgs
+  content <- P.readFile (topDir </> show 'topEntity </> "topEntity.sv")
+
+  assertIn "(* my_int_attr = 7, my_string_attr = \"Hello World!\" *)" content

@@ -32,7 +32,7 @@ assertNotIn needle haystack
 mainVHDL :: IO ()
 mainVHDL = do
   [topDir] <- getArgs
-  content  <- readFile (takeDirectory topDir </> "topEntity.vhdl")
+  content  <- readFile (topDir </> show 'topEntity </> "topEntity.vhdl")
 
   assertNotIn "255" content
   assertNotIn "256" content

@@ -49,8 +49,8 @@ topEntity a = (succ a, comment luckyNumber, implicitComment a)
 mainHDL :: String -> String -> IO ()
 mainHDL topFile implFile = do
   [topDir] <- getArgs
-  contentTopEntity <- readFile (takeDirectory topDir </> topFile)
-  contentImplicitComment <- readFile (takeDirectory topDir </> implFile)
+  contentTopEntity <- readFile (topDir </> show 'topEntity </> topFile)
+  contentImplicitComment <- readFile (topDir </> show 'topEntity </> implFile)
 
   if luckyNumber `isInfixOf` contentTopEntity then
     pure ()

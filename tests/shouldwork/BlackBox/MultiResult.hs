@@ -66,7 +66,7 @@ assertIn needle haystack
 
 mainVHDL :: IO ()
 mainVHDL = do
-  [topFile] <- getArgs
-  content <- readFile topFile
+  [topDir] <- getArgs
+  content <- readFile (topDir </> show 'topEntity </> "topEntity.vhdl")
   assertIn "foo" content
   assertIn "foo_0" content

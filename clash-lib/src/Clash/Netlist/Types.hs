@@ -89,15 +89,14 @@ import Clash.Annotations.BitRepresentation.Internal
 
 import {-# SOURCE #-} qualified Clash.Netlist.Id as Id
 
--- | Structure describing a top entity: it's id, its port annotations, and
--- associated testbench.
+-- | Structure describing a top entity: it's id and its port annotations.
 data TopEntityT = TopEntityT
   { topId :: Id
   -- ^ Id of top entity
   , topAnnotation :: Maybe TopEntity
   -- ^ (Maybe) a topentity annotation
-  , associatedTestbench :: Maybe Id
-  -- ^ (Maybe) a test bench associated with the topentity
+  , topIsTestBench :: Bool
+  -- ^ Whether this entity is a test bench
   } deriving (Generic, Show)
 
 -- | Same as "TopEntity", but with all port names that end up in HDL specified

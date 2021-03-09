@@ -70,7 +70,7 @@ assertNotIn needle haystack
 mainVerilog :: IO ()
 mainVerilog = do
   [topDir] <- getArgs
-  content <- readFile (takeDirectory topDir </> "PortNamesWithVector_topEntity" </> "PortNamesWithVector_topEntity.v")
+  content <- readFile (topDir </> show 'topEntity </> "PortNamesWithVector_topEntity.v")
 
   assertIn    "tupje_zero" content
   assertIn    "tupje_vecje_elmje1_one" content

@@ -7,6 +7,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -24,10 +25,10 @@ where
 import           Control.Monad.IO.Class      (MonadIO (..))
 import qualified Data.ByteString.Lazy.UTF8   as BLU
 import qualified Data.ByteString.Lazy        as BL
-import           Data.List                   (elemIndex, foldl', partition)
+import           Data.Either                 (partitionEithers)
+import           Data.List                   (elemIndex, foldl')
 import qualified Data.Text                   as Text
-import           Data.Maybe                  (isJust, isNothing,
-                                              mapMaybe, catMaybes)
+import           Data.Maybe                  (isNothing, mapMaybe, catMaybes)
 import           Data.Word                   (Word8)
 
 -- GHC API
@@ -98,6 +99,7 @@ import           Clash.Primitives.Types              (UnresolvedPrimitive, name)
 import           Clash.Primitives.Util               (decodeOrErr)
 import           Clash.GHC.GHC2Core                  (qualifiedNameString')
 import           Clash.Util                          (curLoc)
+import qualified Clash.Util.Interpolate              as I
 
 -- | Data structure tracking loaded binders (and their related data)
 data LoadedBinders = LoadedBinders
@@ -208,29 +210,38 @@ loadExternalExprs'
 loadExternalExprs' _hdl loaded visited [] =
   return (loaded, visited)
 loadExternalExprs' hdl loaded0 visited0 (e:es) = do
-  let fvs = CoreFVs.exprSomeFreeVarsList
-              (\v -> Var.isId v &&
-                     isNothing (Id.isDataConId_maybe v) &&
-                     not (v `UniqSet.elementOfUniqSet` visited0)
-              ) e
+  let
+    isInteresting v =
+         Var.isId v
+      && not (v `UniqSet.elementOfUniqSet` visited0)
+      && isNothing (Id.isDataConId_maybe v)
 
-      (clsOps',fvs') = partition (isJust . Id.isClassOpId_maybe) fvs
+    fvs0 = CoreFVs.exprSomeFreeVarsList isInteresting e
+    fvs1 = map (\v -> maybe (Left v) (Right . (v,)) (Id.isClassOpId_maybe v)) fvs0
+    (fvs2, clsOps0) = partitionEithers fvs1
+    clsOps1 = map goClsOp clsOps0
 
-      clsOps'' = map
-        ( \v -> flip (maybe (error $ $(curLoc) ++ "Not a class op")) (Id.isClassOpId_maybe v) $ \c ->
-            let clsIds = Class.classAllSelIds c
-            in  maybe (error $ $(curLoc) ++ "Index not found")
-                      (v,)
-                      (elemIndex v clsIds)
-        ) clsOps'
-
-  loaded1 <- mergeLoadedBinders <$> mapM (loadExprFromIface hdl) fvs'
+  loaded1 <- mergeLoadedBinders <$> mapM (loadExprFromIface hdl) fvs2
 
   loadExternalExprs'
     hdl
-    (mergeLoadedBinders [loaded0, loaded1, emptyLb{lbClassOps=clsOps''}])
-    (foldl' UniqSet.addListToUniqSet visited0 [collectLbBinders loaded1, clsOps'])
+    (mergeLoadedBinders [loaded0, loaded1, emptyLb{lbClassOps=clsOps1}])
+    (foldl' UniqSet.addListToUniqSet visited0 [collectLbBinders loaded1, map fst clsOps0])
     (es ++ map snd (lbBinders loaded1))
+ where
+  goClsOp :: (Var.Var, GHC.Class) -> (CoreSyn.CoreBndr, Int)
+  goClsOp (v, c) =
+    case elemIndex v (Class.classAllSelIds c) of
+      Nothing -> error [I.i|
+        Internal error: couldn't find class-method
+
+          #{showPpr DynFlags.unsafeGlobalDynFlags v}
+
+        in class
+
+          #{showPpr DynFlags.unsafeGlobalDynFlags c}
+      |]
+      Just n -> (v, n)
 
 loadExprFromIface
   :: GHC.GhcMonad m

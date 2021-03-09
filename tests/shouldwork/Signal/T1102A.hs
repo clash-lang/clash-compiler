@@ -22,7 +22,7 @@ assertIn needle haystack
 mainVHDL :: IO ()
 mainVHDL = do
   [topDir] <- getArgs
-  content <- readFile (takeDirectory topDir </> "top/top.vhdl")
+  content <- readFile (topDir </> show 'topEntity </> "top.vhdl")
 
   -- TODO: Could we remove bitvector noise?
   assertIn "x_0 <= top_types.fromSLV(x);" content

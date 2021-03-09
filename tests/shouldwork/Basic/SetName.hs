@@ -35,8 +35,7 @@ assertIn needle haystack
 mainVHDL :: IO ()
 mainVHDL = do
   [topDir] <- getArgs
-  content  <- readFile (takeDirectory topDir </> "f" </> "f.vhdl")
+  content  <- readFile (topDir </> show 'f </> "f.vhdl")
 
   assertIn "foo" content
   assertIn "foo_0" content
-

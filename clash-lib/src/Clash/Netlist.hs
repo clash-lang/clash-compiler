@@ -235,12 +235,11 @@ genTopNames prefixM esc lw hdl tops =
   -- TODO: Report error if fixed top entities have conflicting names
   flip runState (Id.emptyIdentifierSet esc lw hdl) $ do
     env0 <- foldlM goFixed emptyVarEnv fixedTops
-    env1 <- foldlM goNonFixed env0 (nonFixedTops ++ tests)
+    env1 <- foldlM goNonFixed env0 nonFixedTops
     pure env1
  where
   fixedTops = [(topId, ann) | TopEntityT{topId, topAnnotation=Just ann} <- tops]
   nonFixedTops = [topId | TopEntityT{topId, topAnnotation=Nothing} <- tops]
-  tests = [testId | TopEntityT{associatedTestbench=Just testId} <- tops]
 
   goFixed env (topId, ann) = do
     topNm <- genTopName prefixM ann

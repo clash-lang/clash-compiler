@@ -7,13 +7,18 @@ import Data.Char (toLower,toUpper)
 import qualified Data.List as L
 import Data.Maybe
 import Data.Semigroup ((<>))
+import System.Directory
 import System.Environment (getArgs)
+import System.FilePath ((</>))
+import System.FilePath.Glob (glob)
 import System.Exit
 import System.IO
 
 import Text.Parser.Combinators
 import Text.Trifecta
 import Text.Trifecta.Delta
+
+import Debug.Trace
 
 -- | Prevent GHC from constant folding operations. Clash should be able to
 -- do it though.
@@ -32,9 +37,21 @@ mainVHDL = checkForUnfolded vhdlNr
 mainVerilog = checkForUnfolded verilogNr
 mainSystemVerilog = checkForUnfolded verilogNr
 
+-- | Implements @glob (topDir </> "*.topEntity" </> "topEntity.{vhdl,sv,v}")@.
+-- We can't use glob because 'topDir' contains spaces.
+findTopEntity :: FilePath -> IO FilePath
+findTopEntity topDir = do
+  [topLib] <- filter (".topEntity" `L.isSuffixOf`) <$> listDirectory topDir
+  topFiles <- listDirectory (topDir </> topLib)
+  let
+    exts = [".vhdl", ".sv", ".v"]
+    isTopEnt f = "topEntity" `L.isPrefixOf` f && any (`L.isSuffixOf` f) exts
+    [topFile] = filter isTopEnt topFiles
+  pure (topDir </> topLib </> topFile)
+
 checkForUnfolded nrParser = do
-  [topFile] <- getArgs
-  content <- readFile topFile
+  [topDir] <- getArgs
+  content <- readFile =<< findTopEntity topDir
   case parseString (allNrs nrParser) mempty content of
     Failure err -> die ("Parsing failed with: " <> show err)
     Success nrs -> case filter isUnfolded nrs of

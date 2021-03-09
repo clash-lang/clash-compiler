@@ -9,6 +9,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -32,10 +33,11 @@ import           Clash.Annotations.TopEntity     (TopEntity (..))
 import           Clash.Primitives.Types          (UnresolvedPrimitive)
 import           Clash.Util                      (ClashException(..), pkgIdFromTypeable)
 import qualified Clash.Util.Interpolate          as I
-import           Control.Arrow                   (first, second)
+import           Control.Arrow                   (first)
 import           Control.DeepSeq                 (deepseq)
 import           Control.Exception               (SomeException, throw)
 import           Control.Monad                   (forM, when)
+import           Data.List.Extra                 (nubSort)
 #if MIN_VERSION_ghc(8,6,0)
 import           Control.Exception               (throwIO)
 #endif
@@ -46,14 +48,17 @@ import           Control.Monad.IO.Class          (liftIO)
 import           Data.Char                       (isDigit)
 import           Data.Generics.Uniplate.DataOnly (transform)
 import           Data.Data                       (Data)
+import           Data.Functor                    ((<&>))
 import           Data.HashMap.Strict             (HashMap)
 import qualified Data.HashMap.Strict             as HashMap
 import           Data.Typeable                   (Typeable)
-import           Data.List                       (foldl', nub)
-import           Data.Maybe                      (catMaybes, listToMaybe, fromMaybe)
+import           Data.List                       (foldl', nub, find)
+import qualified Data.Map                        as Map
+import           Data.Maybe                      (catMaybes, fromMaybe, mapMaybe)
 import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
 import qualified Data.Time.Clock                 as Clock
+import qualified Data.Set                        as Set
 import           Debug.Trace
 import           Language.Haskell.TH.Syntax      (lift)
 import           GHC.Natural                     (naturalFromInteger)
@@ -389,6 +394,12 @@ loadLocalModule hdl modName = do
   let allBinders = concat binders ++ makeRecursiveGroups (lbBinders loaded0)
   pure (rootIds, modFamInstEnvs', rootModule, loaded1, allBinders)
 
+nameString :: Name.Name -> String
+nameString = OccName.occNameString . Name.nameOccName
+
+varNameString :: Var.Var -> String
+varNameString = nameString . Var.varName
+
 loadModules
   :: OverridingBool
   -- ^ Use color
@@ -404,9 +415,7 @@ loadModules
         , [(CoreSyn.CoreBndr,Int)]               -- Class operations
         , [CoreSyn.CoreBndr]                     -- Unlocatable Expressions
         , FamInstEnv.FamInstEnvs
-        , [( CoreSyn.CoreBndr                    -- topEntity bndr
-           , Maybe TopEntity                     -- (maybe) TopEntity annotation
-           , Maybe CoreSyn.CoreBndr)]            -- (maybe) testBench bndr
+        , [(CoreSyn.CoreBndr, Maybe TopEntity, Bool)]  -- binder + synthesize annotation + is testbench?
         , [Either UnresolvedPrimitive FilePath]
         , [DataRepr']
         , [(Text.Text, PrimitiveGuard ())]
@@ -424,7 +433,7 @@ loadModules useColor hdl modName dflagsM idirs = do
     -- TODO: contribute to any top entities. This effect is worsened when using
     -- TODO: -main-is, which only synthesizes a single top entity (and all its
     -- TODO: dependencies).
-    (rootIds, modFamInstEnvs, rootModule, LoadedBinders{..}, allBinders) <-
+    (rootIds, modFamInstEnvs, _rootModule, LoadedBinders{..}, allBinders) <-
       -- We need to try and load external modules first, because we can't
       -- recover from errors in 'loadLocalModule'.
       loadExternalModule hdl modName >>= \case
@@ -454,58 +463,77 @@ loadModules useColor hdl modName dflagsM idirs = do
     famInstEnvs <- TcRnMonad.liftIO $ TcRnMonad.initTcForLookup hscEnv FamInst.tcGetFamInstEnvs
 #endif
 
-    -- Because tidiedMods is in topological order, binders is also, and hence
-    -- allSyn is in topological order. This means that the "root" 'topEntity'
-    -- will be compiled last.
-    allSyn     <- map (second Just) <$> findSynthesizeAnnotations allBinderIds
-    topSyn     <- map (second Just) <$> findSynthesizeAnnotations rootIds
-    benchAnn   <- findTestBenchAnnotations rootIds
+    allSyn     <- Map.fromList <$> findSynthesizeAnnotations allBinderIds
+    topSyn     <- map fst <$> findSynthesizeAnnotations rootIds
+    benchAnn   <- findTestBenches rootIds
     reprs'     <- findCustomReprAnnotations
     primGuards <- findPrimitiveGuardAnnotations allBinderIds
-    let topEntityName = fromMaybe "topEntity" (GHC.mainFunIs =<< dflagsM)
-        nameString    = OccName.occNameString . Name.nameOccName
-        varNameString = nameString . Var.varName
-        topEntities = filter ((==topEntityName) . varNameString) rootIds
-        benches     = filter ((== "testBench") . varNameString) rootIds
-        mergeBench (x,y) = (x,y,lookup x benchAnn)
-        allSyn'     = map mergeBench allSyn
+    let
+      -- All binders synthesized with Synthesize, all binders annotated with
+      -- TestBench and the binders they're pointing to, plus magically named
+      -- functions called "topEntity" or "testBench". Synthesized in case user
+      -- didn't specify a particular target.
+      isMagicName = (`elem` ["topEntity", "testBench"])
+      allImplicit = nubSort $
+           Map.keys benchAnn
+        <> Map.keys allSyn
+        <> concat (Map.elems benchAnn)
+        <> filter (isMagicName . varNameString) rootIds
+        <> topSyn
 
-    topEntities' <-
-      case (topEntities, topSyn) of
-        ([], []) ->
-          let modName1 = Outputable.showSDocUnsafe (ppr rootModule) in
-          if topEntityName /= "topEntity" then
-            Panic.pgmError [I.i|
-              No top-level function called '#{topEntityName}' found. Did you
-              forget to export it?
-            |]
-          else
-            Panic.pgmError [I.i|
-              No top-level function called 'topEntity' found, nor a function with
-              a 'Synthesize' annotation in module #{modName1}. Did you forget to
-              export them?
+      -- Top entities we wish to synthesize. Users can filter these with -main-is.
+      topEntities1 =
+        case GHC.mainFunIs =<< dflagsM of
+          Just mainIsNm ->
+            -- Use requested top entity.
+            --
+            -- TODO: Look up associated test benches in 'benchAnn'. This would
+            --       be wasted effort if implemented right now, as 'getMainTopEntity'
+            --       would later remove them again. Functionality of that function
+            --       should be moved here.
+            --
+            -- TODO: Handle fully qualified names to -main-is
+            case find ((==mainIsNm) . varNameString) rootIds of
+              Nothing ->
+                Panic.pgmError [I.i|
+                  No top-level function called '#{mainIsNm}' found. Did you
+                  forget to export it?
+                |]
+              Just top ->
+                -- Note that we return /all/ top entities here, even the ones
+                -- we don't which to synthesize. 'getMainTopEntity' will later
+                -- restrict this to just this top entity (and its dependencies,
+                -- which is why we return everything in the first place).
+                --
+                -- This is quite wasteful though; als Clash will load all
+                -- definitions even though it will end up using just a few. TODO
+                nubSort (top:allImplicit)
+          Nothing ->
+            -- User didn't specify anything.
+            case allImplicit of
+              [] ->
+                Panic.pgmError [I.i|
+                  No top-level function called 'topEntity' or 'testBench' found,
+                  nor any function annotated with a 'Synthesize' or 'TestBench'
+                  annotation. If you want to synthesize a specific binder in
+                  #{show modName}, use '-main-is=myTopEntity'.
+                |]
+              _ ->
+                allImplicit
 
-              For more information on 'Synthesize' annotations, check out the
-              documentation of "Clash.Annotations.TopEntity".
-            |]
-        ([], _) ->
-          return allSyn'
-        ([x], _) ->
-          case lookup x topSyn of
-            Nothing ->
-              case lookup x benchAnn of
-                Nothing -> return ((x,Nothing,listToMaybe benches):allSyn')
-                Just y  -> return ((x,Nothing,Just y):allSyn')
-            Just _ ->
-              return allSyn'
-        (_, _) ->
-          Panic.pgmError $ $(curLoc) ++ "Multiple 'topEntities' found."
+      -- Include whether found top entity is a test bench
+      allBenchIds = Set.fromList (concat (Map.elems benchAnn))
+      topEntities2 = topEntities1 <&> \tid ->
+        ( tid
+        , tid `Map.lookup` allSyn       -- include top entity annotation (if any)
+        , tid `Set.member` allBenchIds  -- indicate whether top entity is test bench
+        )
 
     let reprs1 = lbReprs ++ reprs'
 
     annTime <-
       extTime
-        `deepseq` length topEntities'
+        `deepseq` length topEntities2
         `deepseq` lbPrims
         `deepseq` reprs1
         `deepseq` primGuards
@@ -539,7 +567,7 @@ loadModules useColor hdl modName dflagsM idirs = do
            , lbClassOps
            , lbUnlocatable
            , famInstEnvs'
-           , topEntities'
+           , topEntities2
            , lbPrims
            , reprs1
            , primGuards
@@ -547,7 +575,7 @@ loadModules useColor hdl modName dflagsM idirs = do
            )
 
 -- | Given a type that represents the RHS of a KnownConf type family instance,
--- unpack the fields of the DomainConfguration and make a VDomainConfiguration.
+-- unpack the fields of the DomainConfiguration and make a VDomainConfiguration.
 --
 unpackKnownConf :: Type.Type -> VDomainConfiguration
 unpackKnownConf ty
@@ -729,33 +757,63 @@ findSynthesizeAnnotations bndrs = do
   isSyn (Synthesize {}) = True
   isSyn _               = False
 
--- | Find testbench annotations and make sure that each binder has no more than
--- a single annotation.
-findTestBenchAnnotations
-  :: GHC.GhcMonad m
-  => [CoreSyn.CoreBndr]
-  -> m [(CoreSyn.CoreBndr,CoreSyn.CoreBndr)]
-findTestBenchAnnotations bndrs = do
-  anns0 <- findNamedAnnotations bndrs
-  let anns1 = map (filter isTB) anns0
-      anns2 = errOnDuplicateAnnotations "TestBench" bndrs anns1
-  return (map (second findTB) anns2)
-  where
-    isTB (TestBench {}) = True
-    isTB _              = False
+-- | Find test bench annotations and return a map tying top entities to their
+-- test benches. If there is a binder called @testBench@ _without_ an annotation
+-- it assumed to belong to a binder called @topEntity@. If the latter does not
+-- exist, the function @testBench@ is left alone.
+findTestBenches ::
+  GHC.GhcMonad m =>
+  -- | Root binders
+  [CoreSyn.CoreBndr] ->
+  -- | (design under test, associated test benches)
+  m (Map.Map CoreSyn.CoreBndr [CoreSyn.CoreBndr])
+findTestBenches bndrs0 = do
+  anns <- findNamedAnnotations bndrs0
+  let
+    duts0 = foldl' insertTb Map.empty (concat (zipWith go0 bndrs0 anns))
+    duts1 = specialCaseMagicName duts0
+  pure duts1
+ where
+  insertTb m (dut, tb) = Map.insertWith (<>) dut [tb] m
+  bndrsMap = HashMap.fromList (map (\x -> (toQualNm x, x)) bndrs0)
 
-    findTB :: TopEntity -> CoreSyn.CoreBndr
-    findTB (TestBench tb) = case listToMaybe (filter (eqNm tb) bndrs) of
-      Just tb' -> tb'
-      Nothing  -> Panic.pgmError $
-        "TestBench named: " ++ show tb ++ " not found"
-    findTB _ = Panic.pgmError "Unexpected Synthesize"
+  -- Special case magic name 'testBench'. See function documentation.
+  specialCaseMagicName m =
+    let
+      topEntM = find ((=="topEntity") . varNameString) bndrs0
+      tbM = find ((=="testBench") . varNameString) bndrs0
+    in
+      case (topEntM, tbM) of
+        (Just dut, Just tb) -> insertTb m (dut, tb)
+        _ -> m
 
-    eqNm thNm bndr = Text.pack (show thNm) == qualNm
-      where
-        bndrNm  = Var.varName bndr
-        qualNm  = maybe occName (\modName -> modName `Text.append` ('.' `Text.cons` occName)) (modNameM bndrNm)
-        occName = Text.pack (OccName.occNameString (Name.nameOccName bndrNm))
+  -- go0 + go1: map over all annotations; look for test bench annotations and
+  -- tie them to top entities indicated in the annotation.
+  go0 bndr anns = mapMaybe (go1 bndr) anns
+  go1 tbBndr (TestBench dutNm) =
+    case HashMap.lookup (Text.pack (show dutNm)) bndrsMap of
+      Nothing ->
+        Panic.pgmError [I.i|
+          Could not find design under test #{show (show dutNm)}, associated with
+          test bench #{show (toQualNm tbBndr)}. Note that testbenches should be
+          exported from the same module as the design under test.
+        |]
+      Just dutBndr ->
+        Just (dutBndr, tbBndr)
+  go1 _ _ = Nothing
+
+-- | Create a fully qualified name from a var, excluding package. Example
+-- output: @Clash.Sized.Internal.BitVector.low@.
+toQualNm :: Var.Var -> Text.Text
+toQualNm bndr =
+  let
+    bndrNm  = Var.varName bndr
+    occName = Text.pack (OccName.occNameString (Name.nameOccName bndrNm))
+  in
+    maybe
+      occName
+      (\modName -> modName `Text.append` ('.' `Text.cons` occName))
+      (modNameM bndrNm)
 
 -- | Find primitive annotations bound to given binders, or annotations made
 -- in modules of those binders.

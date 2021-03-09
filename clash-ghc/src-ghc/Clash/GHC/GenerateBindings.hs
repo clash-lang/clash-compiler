@@ -146,14 +146,13 @@ generateBindings useColor primDirs importDirs dbs hdl modName dflagsM = do
       clsMap                        = mapUniqMap (\(v,i) -> (Binding v GHC.noSrcSpan GHC.Inline IsFun (mkClassSelector inScope0 allTcCache (varType v) i))) clsVMap
       allBindings                   = bindingsMap `unionVarEnv` clsMap
       topEntities'                  =
-        (\m -> fst (RWS.evalRWS m GHC.noSrcSpan tcMap')) $ mapM (\(topEnt,annM,benchM) -> do
+        (\m -> fst (RWS.evalRWS m GHC.noSrcSpan tcMap')) $ mapM (\(topEnt,annM,isTb) -> do
           topEnt' <- coreToName GHC.varName GHC.varUnique qualifiedNameString topEnt
-          benchM' <- traverse coreToId benchM
-          return (topEnt', annM, benchM')) topEntities
+          return (topEnt', annM, isTb)) topEntities
       topEntities'' =
-        map (\(topEnt, annM, benchM) ->
+        map (\(topEnt, annM, isTb) ->
                 case lookupUniqMap topEnt allBindings of
-                  Just b -> TopEntityT (bindingId b) annM benchM
+                  Just b -> TopEntityT (bindingId b) annM isTb
                   Nothing -> error "This shouldn't happen"
             ) topEntities'
   -- Parsing / compiling primitives:
