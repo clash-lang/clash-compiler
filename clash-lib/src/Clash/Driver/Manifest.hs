@@ -38,6 +38,7 @@ import           Clash.Core.Var (Id)
 import           Clash.Netlist.Types (TopEntityT, Component(..), HWType)
 import qualified Clash.Netlist.Types as Netlist
 import qualified Clash.Netlist.Id as Id
+import           Clash.Netlist.Util (typeSize)
 import           Clash.Primitives.Util (hashCompiledPrimMap)
 import           Clash.Util.Graph (callGraphBindings)
 
@@ -52,6 +53,8 @@ data ManifestPort = ManifestPort
   -- ^ Port name (as rendered in HDL)
   , mpTypeName :: Text
   -- ^ Type name (as rendered in HDL)
+  , mpWidth :: Int
+  -- ^ Port width in bits
   } deriving (Show,Read)
 
 -- | Information about the generated HDL between (sub)runs of the compiler
@@ -100,6 +103,7 @@ mkManifestPort ::
 mkManifestPort backend portId portType = ManifestPort{..}
  where
   mpName = Id.toText portId
+  mpWidth = typeSize portType
   mpTypeName = flip evalState backend $ getMon $ do
      LText.toStrict . renderOneLine <$> hdlType (External mpName) portType
 
