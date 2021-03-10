@@ -1,0 +1,1 @@
+CHANGED: Primitives should now be stored in `*.primitives` files. While primitive files very much look like JSON files, they're not actually spec complaint as they use newlines in strings. This has recently been brought to our attention by Aeson fixing an oversight in their parser implementation. We've therefore decided to rename the extension to prevent confusion.

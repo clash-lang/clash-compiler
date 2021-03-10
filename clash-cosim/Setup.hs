@@ -48,7 +48,7 @@ import qualified Data.Text.Lazy.Encoding as TL
 
 __COSIM_MAX_NUMBER_OF_ARGUMENTS__ = 16
 __COSIM_MAX_NUMBER_OF_CLOCKS__ = 1
-__COSIM_PRIMITIVE_PATH__ = "src/prims/verilog/Clash_CoSim_CoSimInstances.json"
+__COSIM_PRIMITIVE_PATH__ = "src/prims/verilog/Clash_CoSim_CoSimInstances.primitives"
 
 main = do
     setEnv "COSIM_MAX_NUMBER_OF_ARGUMENTS" $ show __COSIM_MAX_NUMBER_OF_ARGUMENTS__

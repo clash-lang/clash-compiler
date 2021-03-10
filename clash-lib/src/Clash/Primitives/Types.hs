@@ -161,7 +161,7 @@ data Primitive a b c d
     -- synthesizable, but may also be used for other purposes.
   , outputReg :: Bool
     -- ^ Verilog only: whether the result should be a /reg/(@True@) or /wire/
-    -- (@False@); when not specified in the /.json/ file, the value will default
+    -- (@False@); when not specified in the /.primitives/ file, the value will default
     -- to @False@ (i.e. /wire/).
   , libraries :: [a]
     -- ^ VHDL only: add /library/ declarations for the given names
@@ -187,7 +187,7 @@ data Primitive a b c d
   , includes  :: [((S.Text,S.Text),b)]
     -- ^ Create files to be included with the generated primitive. The fields
     -- are ((name, extension), content), where content is a template of the file
-    -- Defaults to @[]@ when not specified in the /.json/ file
+    -- Defaults to @[]@ when not specified in the /.primitives/ file
   , resultNames :: [b]
     -- ^ (Maybe) Control the generated name of the result
   , resultInits :: [b]

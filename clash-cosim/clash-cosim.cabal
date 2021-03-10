@@ -17,9 +17,9 @@ Build-Type:     Custom
 --
 Data-Files:     src/cbits/cosim_vpi.vpi
                 src/cbits/cosim_vpi.sl
-                src/prims/verilog/Clash_CoSim_CoSimInstances.json
+                src/prims/verilog/Clash_CoSim_CoSimInstances.primitives
 
-extra-tmp-files: src/prims/verilog/Clash_CoSim_CoSimInstances.json
+extra-tmp-files: src/prims/verilog/Clash_CoSim_CoSimInstances.primitives
 
 Extra-Source-Files: src/cbits/comm/*.c
                     src/cbits/comm/*.h

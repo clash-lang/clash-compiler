@@ -200,7 +200,7 @@ data HDL
 -- You create a package which has a @myfancyip.cabal@ file with the following stanza:
 --
 -- @
--- data-files: path\/to\/MyFancyIP.json
+-- data-files: path\/to\/MyFancyIP.primitives
 -- cpp-options: -DCABAL
 -- @
 --

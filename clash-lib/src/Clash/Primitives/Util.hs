@@ -166,7 +166,7 @@ generatePrimMap unresolvedPrims primGuards filePaths = do
          if fpExists
            then
              fmap ( map (FilePath.combine filePath)
-                  . filter (isSuffixOf ".json")
+                  . filter (isSuffixOf ".primitives")
                   ) (Directory.getDirectoryContents filePath)
            else
              return []

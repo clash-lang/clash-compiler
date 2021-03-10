@@ -206,7 +206,7 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "InvalidPrimitive"
         [ runTest "InvalidPrimitive" def{
             hdlTargets=[VHDL]
-          , expectClashFail=Just (def, "InvalidPrimitive.json")
+          , expectClashFail=Just (def, "InvalidPrimitive.primitives")
           }
         ]
       , clashTestGroup "GADTs"
