@@ -75,7 +75,7 @@ runToCoreStage target f src = do
   ids <- newSupply
   pds <- primDirs backend
   (bm, tcm, _, _, _, _, _) <- generateBindings
-    Auto pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
+    (return ()) Auto pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
 
   return (bm, tcm, ids)
  where

@@ -54,7 +54,8 @@ doHDL
 doHDL b src = do
   startTime <- Clock.getCurrentTime
   pd      <- primDirs b
-  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs,domainConfs) <- generateBindings Auto pd ["."] [] (hdlKind b) src Nothing
+  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs,domainConfs) <-
+    generateBindings (return ()) Auto pd ["."] [] (hdlKind b) src Nothing
   prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` reprs `deepseq` Clock.getCurrentTime
   let prepStartDiff = reportTimeDiff prepTime startTime
   putStrLn $ "Loading dependencies took " ++ prepStartDiff

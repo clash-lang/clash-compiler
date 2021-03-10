@@ -100,7 +100,7 @@ runToNetlistStage
 runToNetlistStage target f src = do
   pds <- primDirs backend
   (bm, tcm, tupTcm, tes, pm, rs, _)
-    <- generateBindings Auto pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
+    <- generateBindings (return ()) Auto pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
 
   let (compNames, initIs) = genTopNames Nothing True PreserveCase hdl tes
       teNames = fmap topId tes
