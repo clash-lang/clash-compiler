@@ -1693,7 +1693,7 @@ asyncFIFOSynchronizer addrSize\@SNat wclk rclk wrst rrst wen ren rinc wdataM =
   (rempty, raddr, rptr) =
     'mealyB'
       rclk rrst ren
-      (ptrCompareT addrSize (==))
+      (ptrCompareT addrSize isEmpty)
       (0, 0, True)
       (s_wptr, rinc)
 
@@ -1814,7 +1814,7 @@ asyncFIFOSynchronizer addrSize\@SNat wclk rclk wrst rrst wen ren rinc wdataM =
   (rempty, raddr, rptr) =
     'mealyB'
       rclk rrst ren
-      (ptrCompareT addrSize (==))
+      (ptrCompareT addrSize isEmpty)
       (0, 0, True)
       (s_wptr, rinc)
 

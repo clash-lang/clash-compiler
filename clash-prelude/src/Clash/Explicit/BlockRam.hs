@@ -846,7 +846,7 @@ blockRamU clk rst0 en rstStrategy n@SNat initF rd0 mw0 =
   wa1 = mux rstBool (fromInteger . toInteger <$> waCounter) (fromEnum <$> wa0)
   w1  = mux rstBool (initF <$> waCounter) w0
 
--- | blockRAM1 primitive
+-- | blockRAMU primitive
 blockRamU#
   :: forall n dom a
    . ( KnownDomain dom

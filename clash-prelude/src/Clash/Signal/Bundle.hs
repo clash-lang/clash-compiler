@@ -78,6 +78,7 @@ import Clash.Sized.RTree            (RTree, lazyT)
 -- @
 --
 -- For custom product types you'll have to write the instance manually:
+--
 -- @
 -- data Pair a b = MkPair { getA :: a, getB :: b }
 --
@@ -177,9 +178,11 @@ data EmptyTuple = EmptyTuple
 -- | Helper type to emulate the "old" behavior of Bundle's unit instance. I.e.,
 -- the instance for @Bundle ()@ used to be defined as:
 --
---     class Bundle () where
---       bundle   :: () -> Signal domain ()
---       unbundle :: Signal domain () -> ()
+-- @
+-- class Bundle () where
+--   bundle   :: () -> Signal dom ()
+--   unbundle :: Signal dom () -> ()
+-- @
 --
 -- In order to have sensible type inference, the 'Bundle' class specifies that
 -- the argument type of 'bundle' should uniquely identify the result type, and
@@ -190,11 +193,13 @@ data EmptyTuple = EmptyTuple
 -- 'TaggedEmptyTuple' tackles this by carrying the domain in its type. The
 -- 'bundle' and 'unbundle' instance now looks like:
 --
---     class Bundle EmptyTuple where
---       bundle   :: TaggedEmptyTuple domain -> Signal domain EmptyTuple
---       unbundle :: Signal domain EmptyTuple -> TaggedEmptyTuple domain
+-- @
+-- class Bundle EmptyTuple where
+--   bundle   :: TaggedEmptyTuple dom -> Signal dom EmptyTuple
+--   unbundle :: Signal dom EmptyTuple -> TaggedEmptyTuple dom
+-- @
 --
--- @domain@ is now mentioned both the argument and result for both 'bundle' and
+-- @dom@ is now mentioned both the argument and result for both 'bundle' and
 -- 'unbundle'.
 data TaggedEmptyTuple (dom :: Domain) = TaggedEmptyTuple
 

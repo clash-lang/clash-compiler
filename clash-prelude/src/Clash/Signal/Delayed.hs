@@ -164,6 +164,7 @@ delayN d dflt = hideClock (hideEnable (E.delayN d dflt))
 -- [-1,-1,1,2,3,4]
 --
 -- You can also use type application to do the same:
+--
 -- >>> sampleN @System 6 (toSignal (delayI @2 (-1) (dfromList [1..])))
 -- [-1,-1,1,2,3,4]
 delayI

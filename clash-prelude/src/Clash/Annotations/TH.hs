@@ -1,16 +1,17 @@
 {-|
 
 This module can automatically generate TopEntity definitions from 'Clash.NamedTypes'
-annotations. Annotations involving data/type families must be inspected for correctness.
+annotations. Annotations involving data\/type families must be inspected for correctness.
 Not all cases can be handled with automatic generation due to the difficulty of type manipulation
-in template Haskell. In particular annotations _inside_ the following is unlikely to work:
+in template Haskell. In particular annotations __inside__ the following is unlikely to work:
 
-- Data/type family referencing other data/type families.
+- Data\/type family referencing other data\/type families.
 - Annotations inside recursive data types
 - Clock constraints other than a single HiddenClockResetEnable. (You can still
-  use arbitrary explicit clock/reset/enables!)
+  use arbitrary explicit clock\/reset\/enables!)
 
-See "Clash.Tests.TopEntityGeneration" for more examples.
+See <https://github.com/clash-lang/clash-compiler/blob/master/clash-prelude/tests/Clash/Tests/TopEntityGeneration.hs Clash.Tests.TopEntityGeneration>
+for more examples.
 
 @
 import Clash.Annotations.TH
@@ -183,7 +184,7 @@ datatypeVars' d = name <$> datatypeVars d
 tryReifyDatatype :: a -> (DatatypeInfo -> a) -> Name -> Tracked Q a
 tryReifyDatatype a f name = lift (recover (pure a) $ f <$> reifyDatatype name)
 
--- * Type tree folding / unfolding
+-- * Type tree folding \/ unfolding
 
 -- | Flag constructors with partially named fields as failing.
 portsFromTypes
