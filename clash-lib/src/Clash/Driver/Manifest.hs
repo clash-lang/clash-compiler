@@ -35,7 +35,7 @@ import           Clash.Backend (Backend (hdlType), Usage (External))
 import           Clash.Driver.Types
 import           Clash.Primitives.Types
 import           Clash.Core.Var (Id)
-import           Clash.Netlist.Types (TopEntityT, Component(..), HWType)
+import           Clash.Netlist.Types (TopEntityT, Component(..), HWType (Clock))
 import qualified Clash.Netlist.Types as Netlist
 import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.Util (typeSize)
@@ -55,6 +55,8 @@ data ManifestPort = ManifestPort
   -- ^ Type name (as rendered in HDL)
   , mpWidth :: Int
   -- ^ Port width in bits
+  , mpIsClock :: Bool
+  -- ^ Is this port a clock?
   } deriving (Show,Read)
 
 -- | Information about the generated HDL between (sub)runs of the compiler
@@ -104,6 +106,7 @@ mkManifestPort backend portId portType = ManifestPort{..}
  where
   mpName = Id.toText portId
   mpWidth = typeSize portType
+  mpIsClock = case portType of {Clock _ -> True; _ -> False}
   mpTypeName = flip evalState backend $ getMon $ do
      LText.toStrict . renderOneLine <$> hdlType (External mpName) portType
 
