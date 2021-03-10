@@ -61,11 +61,11 @@ Extra-source-files:
   src/ClashDebug.h
 
 Data-files:
-  prims/common/*.json,
-  prims/commonverilog/*.json,
-  prims/verilog/*.json,
-  prims/systemverilog/*.json,
-  prims/vhdl/*.json
+  prims/common/*.primitives,
+  prims/commonverilog/*.primitives,
+  prims/verilog/*.primitives,
+  prims/systemverilog/*.primitives,
+  prims/vhdl/*.primitives
 
 source-repository head
   type: git

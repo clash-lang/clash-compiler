@@ -1021,7 +1021,7 @@ as \"regular\" primitives. The compiler looks for primitives in four locations:
 
 Where redefined primitives in the current directory or include directories will
 overwrite those in the official install location. For now, files containing
-primitive definitions must have a @.json@ file-extension.
+primitive definitions must have a @.primitives@ file-extension.
 
 Clash differentiates between two types of primitives, /expression/ primitives
 and /declaration/ primitives, corresponding to whether the primitive is a VHDL
