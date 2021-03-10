@@ -11,6 +11,7 @@ module Clash.Driver.Manifest where
 
 import           Control.Exception (tryJust)
 import           Control.Monad (guard)
+import           Control.Monad.State (evalState)
 import qualified Crypto.Hash.SHA256 as Sha256
 import qualified Data.ByteString.Lazy as ByteStringLazy
 import           Data.ByteString (ByteString)
@@ -19,18 +20,22 @@ import           Data.Maybe (catMaybes)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import           Data.Text (Text)
+import qualified Data.Text.Lazy as LText
+import           Data.Text.Prettyprint.Doc.Extra (renderOneLine)
 import           Data.Time (UTCTime)
 import qualified Data.Set as Set
+import           Data.Semigroup.Monad (getMon)
 import           Text.Read (readMaybe)
 import           System.IO.Error (isDoesNotExistError)
 import           System.FilePath (takeDirectory, (</>))
 import           System.Directory (listDirectory, doesFileExist)
 
 import           Clash.Annotations.TopEntity.Extra ()
+import           Clash.Backend (Backend (hdlType), Usage (External))
 import           Clash.Driver.Types
 import           Clash.Primitives.Types
 import           Clash.Core.Var (Id)
-import           Clash.Netlist.Types (TopEntityT, Component(..))
+import           Clash.Netlist.Types (TopEntityT, Component(..), HWType)
 import qualified Clash.Netlist.Types as Netlist
 import qualified Clash.Netlist.Id as Id
 import           Clash.Primitives.Util (hashCompiledPrimMap)
@@ -41,6 +46,13 @@ import GHC.Utils.Misc (OverridingBool(..))
 #else
 import Util (OverridingBool(..))
 #endif
+
+data ManifestPort = ManifestPort
+  { mpName :: Text
+  -- ^ Port name (as rendered in HDL)
+  , mpTypeName :: Text
+  -- ^ Type name (as rendered in HDL)
+  } deriving (Show,Read)
 
 -- | Information about the generated HDL between (sub)runs of the compiler
 data Manifest
@@ -53,8 +65,8 @@ data Manifest
     --   * opt_inlineLimit
     --   * opt_specLimit
     --   * opt_floatSupport
-  , portInNames  :: [Text]
-  , portOutNames :: [Text]
+  , inPorts :: [ManifestPort]
+  , outPorts :: [ManifestPort]
   , componentNames :: [Text]
     -- ^ Names of all the generated components for the @TopEntity@ (does not
     -- include the names of the components of the @TestBench@ accompanying
@@ -76,7 +88,25 @@ data UnexpectedModification
   | Removed FilePath
   deriving (Show)
 
+mkManifestPort ::
+  Backend backend =>
+  -- | Backend used to lookup port type names
+  backend ->
+  -- | Port name
+  Id.Identifier ->
+  -- | Port type
+  HWType ->
+  ManifestPort
+mkManifestPort backend portId portType = ManifestPort{..}
+ where
+  mpName = Id.toText portId
+  mpTypeName = flip evalState backend $ getMon $ do
+     LText.toStrict . renderOneLine <$> hdlType (External mpName) portType
+
 mkManifest ::
+  Backend backend =>
+  -- | Backend used to lookup port type names
+  backend ->
   -- | Options Clash was run with
   ClashOpts ->
   -- | Component of top entity
@@ -89,18 +119,16 @@ mkManifest ::
   Int ->
   -- | New manifest
   Manifest
-mkManifest ClashOpts{..} Component{..} components files topHash = Manifest
+mkManifest backend ClashOpts{..} Component{..} components files topHash = Manifest
   { manifestHash = topHash
-  , portInNames = map Id.toText topInNames
-  , portOutNames = map Id.toText topOutNames
+  , inPorts = [mkManifestPort backend pName pType | (pName, pType) <- inputs]
+  , outPorts = [mkManifestPort backend pName pType | (_, (pName, pType), _) <- outputs]
   , componentNames = map Id.toText compNames
   , topComponent = Id.toText componentName
   , fileNames = files
   , successFlags = (opt_inlineLimit, opt_specLimit, opt_floatSupport)
   }
  where
-  topInNames = map fst inputs
-  topOutNames = map (\(_, (x, _), _) -> x) outputs
   compNames = map Netlist.componentName components
 
 -- | Pretty print an unexpected modification as a list item.

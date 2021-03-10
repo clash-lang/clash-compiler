@@ -439,7 +439,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
         then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles0 filesAndDigests0
         else pure (edamFiles0, filesAndDigests0)
 
-      let manifest = mkManifest opts topComponent components filesAndDigests1 topHash
+      let manifest = mkManifest hdlState' opts topComponent components filesAndDigests1 topHash
       writeManifest manifest manPath
 
       topTime <- hdlDocs `seq` Clock.getCurrentTime
