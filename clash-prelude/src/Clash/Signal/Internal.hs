@@ -505,6 +505,7 @@ data VDomainConfiguration
   , vResetPolarity :: ResetPolarity
   -- ^ Corresponds to '_resetPolarity' on 'DomainConfiguration'
   }
+  deriving (Eq, Show, Read)
 
 -- | Convert 'SDomainConfiguration' to 'VDomainConfiguration'. Should be used in combination with
 -- 'createDomain' only.

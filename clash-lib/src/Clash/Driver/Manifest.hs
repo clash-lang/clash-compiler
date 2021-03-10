@@ -11,29 +11,38 @@ module Clash.Driver.Manifest where
 
 import           Control.Exception (tryJust)
 import           Control.Monad (guard)
+import           Control.Monad.State (evalState)
 import qualified Crypto.Hash.SHA256 as Sha256
 import qualified Data.ByteString.Lazy as ByteStringLazy
 import           Data.ByteString (ByteString)
 import           Data.Hashable (hash)
+import           Data.HashMap.Strict (HashMap)
 import           Data.Maybe (catMaybes)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import           Data.Text (Text)
+import qualified Data.Text.Lazy as LText
+import           Data.Text.Prettyprint.Doc.Extra (renderOneLine)
 import           Data.Time (UTCTime)
 import qualified Data.Set as Set
+import           Data.Semigroup.Monad (getMon)
 import           Text.Read (readMaybe)
 import           System.IO.Error (isDoesNotExistError)
 import           System.FilePath (takeDirectory, (</>))
 import           System.Directory (listDirectory, doesFileExist)
 
 import           Clash.Annotations.TopEntity.Extra ()
+import           Clash.Backend (Backend (hdlType), Usage (External))
 import           Clash.Driver.Types
 import           Clash.Primitives.Types
 import           Clash.Core.Var (Id)
-import           Clash.Netlist.Types (TopEntityT, Component(..))
+import           Clash.Netlist.Types
+  (TopEntityT, Component(..), HWType (Clock), hwTypeDomain)
 import qualified Clash.Netlist.Types as Netlist
 import qualified Clash.Netlist.Id as Id
+import           Clash.Netlist.Util (typeSize)
 import           Clash.Primitives.Util (hashCompiledPrimMap)
+import           Clash.Signal (VDomainConfiguration)
 import           Clash.Util.Graph (callGraphBindings)
 
 #if MIN_VERSION_ghc(9,0,0)
@@ -41,6 +50,21 @@ import GHC.Utils.Misc (OverridingBool(..))
 #else
 import Util (OverridingBool(..))
 #endif
+
+data ManifestPort = ManifestPort
+  { mpName :: Text
+  -- ^ Port name (as rendered in HDL)
+  , mpTypeName :: Text
+  -- ^ Type name (as rendered in HDL)
+  , mpWidth :: Int
+  -- ^ Port width in bits
+  , mpIsClock :: Bool
+  -- ^ Is this port a clock?
+  , mpDomain :: Maybe Text
+  -- ^ Domain this port belongs to. This is currently only included for clock,
+  -- reset, and enable ports. TODO: add to all ports originally defined as a
+  -- @Signal@ too.
+  } deriving (Show,Read)
 
 -- | Information about the generated HDL between (sub)runs of the compiler
 data Manifest
@@ -53,8 +77,8 @@ data Manifest
     --   * opt_inlineLimit
     --   * opt_specLimit
     --   * opt_floatSupport
-  , portInNames  :: [Text]
-  , portOutNames :: [Text]
+  , inPorts :: [ManifestPort]
+  , outPorts :: [ManifestPort]
   , componentNames :: [Text]
     -- ^ Names of all the generated components for the @TopEntity@ (does not
     -- include the names of the components of the @TestBench@ accompanying
@@ -65,7 +89,9 @@ data Manifest
   , fileNames :: [(FilePath, ByteString)]
     -- ^ Names and hashes of all the generated files for the @TopEntity@. Hashes
     -- are SHA256.
-  } deriving (Show,Read)
+  , domains :: HashMap Text VDomainConfiguration
+    -- ^ Domains encountered in design
+  } deriving (Show, Read)
 
 data UnexpectedModification
   -- | Clash generated file was modified
@@ -76,7 +102,30 @@ data UnexpectedModification
   | Removed FilePath
   deriving (Show)
 
+mkManifestPort ::
+  Backend backend =>
+  -- | Backend used to lookup port type names
+  backend ->
+  -- | Port name
+  Id.Identifier ->
+  -- | Port type
+  HWType ->
+  ManifestPort
+mkManifestPort backend portId portType = ManifestPort{..}
+ where
+  mpName = Id.toText portId
+  mpWidth = typeSize portType
+  mpIsClock = case portType of {Clock _ -> True; _ -> False}
+  mpDomain = hwTypeDomain portType
+  mpTypeName = flip evalState backend $ getMon $ do
+     LText.toStrict . renderOneLine <$> hdlType (External mpName) portType
+
 mkManifest ::
+  Backend backend =>
+  -- | Backend used to lookup port type names
+  backend ->
+  -- | Domains encountered in design
+  HashMap Text VDomainConfiguration ->
   -- | Options Clash was run with
   ClashOpts ->
   -- | Component of top entity
@@ -89,18 +138,17 @@ mkManifest ::
   Int ->
   -- | New manifest
   Manifest
-mkManifest ClashOpts{..} Component{..} components files topHash = Manifest
+mkManifest backend domains ClashOpts{..} Component{..} components files topHash = Manifest
   { manifestHash = topHash
-  , portInNames = map Id.toText topInNames
-  , portOutNames = map Id.toText topOutNames
+  , inPorts = [mkManifestPort backend pName pType | (pName, pType) <- inputs]
+  , outPorts = [mkManifestPort backend pName pType | (_, (pName, pType), _) <- outputs]
   , componentNames = map Id.toText compNames
   , topComponent = Id.toText componentName
   , fileNames = files
   , successFlags = (opt_inlineLimit, opt_specLimit, opt_floatSupport)
+  , domains = domains
   }
  where
-  topInNames = map fst inputs
-  topOutNames = map (\(_, (x, _), _) -> x) outputs
   compNames = map Netlist.componentName components
 
 -- | Pretty print an unexpected modification as a list item.
