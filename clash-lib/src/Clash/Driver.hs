@@ -431,7 +431,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
         components = map (view _4) (eltsVarEnv netlist)
         filesAndDigests0 =
              zip (map fst hdlDocs) hdlDocDigests
-          <> zip (map snd dfiles) dataFilesDigests
+          <> zip (map fst dfiles) dataFilesDigests
           <> zip (map fst mfiles) memoryFilesDigests
 
       (edamFiles1, filesAndDigests1) <-
