@@ -452,6 +452,14 @@ data HWType
   -- ^ File type for simulation-level I/O
   deriving (Eq, Ord, Show, Generic, NFData, Hashable)
 
+hwTypeDomain :: HWType -> Maybe DomainName
+hwTypeDomain = \case
+  Clock dom -> Just dom
+  Reset dom -> Just dom
+  Enable dom -> Just dom
+  KnownDomain dom _ _ _ _ _ -> Just dom
+  _ -> Nothing
+
 -- | Extract hardware attributes from Annotated. Returns an empty list if
 -- non-Annotated given or if Annotated has an empty list of attributes.
 hwTypeAttrs :: HWType -> [Attr']

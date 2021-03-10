@@ -16,6 +16,7 @@ import qualified Crypto.Hash.SHA256 as Sha256
 import qualified Data.ByteString.Lazy as ByteStringLazy
 import           Data.ByteString (ByteString)
 import           Data.Hashable (hash)
+import           Data.HashMap.Strict (HashMap)
 import           Data.Maybe (catMaybes)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
@@ -35,11 +36,13 @@ import           Clash.Backend (Backend (hdlType), Usage (External))
 import           Clash.Driver.Types
 import           Clash.Primitives.Types
 import           Clash.Core.Var (Id)
-import           Clash.Netlist.Types (TopEntityT, Component(..), HWType (Clock))
+import           Clash.Netlist.Types
+  (TopEntityT, Component(..), HWType (Clock), hwTypeDomain)
 import qualified Clash.Netlist.Types as Netlist
 import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.Util (typeSize)
 import           Clash.Primitives.Util (hashCompiledPrimMap)
+import           Clash.Signal (VDomainConfiguration)
 import           Clash.Util.Graph (callGraphBindings)
 
 #if MIN_VERSION_ghc(9,0,0)
@@ -57,6 +60,10 @@ data ManifestPort = ManifestPort
   -- ^ Port width in bits
   , mpIsClock :: Bool
   -- ^ Is this port a clock?
+  , mpDomain :: Maybe Text
+  -- ^ Domain this port belongs to. This is currently only included for clock,
+  -- reset, and enable ports. TODO: add to all ports originally defined as a
+  -- @Signal@ too.
   } deriving (Show,Read)
 
 -- | Information about the generated HDL between (sub)runs of the compiler
@@ -82,7 +89,9 @@ data Manifest
   , fileNames :: [(FilePath, ByteString)]
     -- ^ Names and hashes of all the generated files for the @TopEntity@. Hashes
     -- are SHA256.
-  } deriving (Show,Read)
+  , domains :: HashMap Text VDomainConfiguration
+    -- ^ Domains encountered in design
+  } deriving (Show, Read)
 
 data UnexpectedModification
   -- | Clash generated file was modified
@@ -107,6 +116,7 @@ mkManifestPort backend portId portType = ManifestPort{..}
   mpName = Id.toText portId
   mpWidth = typeSize portType
   mpIsClock = case portType of {Clock _ -> True; _ -> False}
+  mpDomain = hwTypeDomain portType
   mpTypeName = flip evalState backend $ getMon $ do
      LText.toStrict . renderOneLine <$> hdlType (External mpName) portType
 
@@ -114,6 +124,8 @@ mkManifest ::
   Backend backend =>
   -- | Backend used to lookup port type names
   backend ->
+  -- | Domains encountered in design
+  HashMap Text VDomainConfiguration ->
   -- | Options Clash was run with
   ClashOpts ->
   -- | Component of top entity
@@ -126,7 +138,7 @@ mkManifest ::
   Int ->
   -- | New manifest
   Manifest
-mkManifest backend ClashOpts{..} Component{..} components files topHash = Manifest
+mkManifest backend domains ClashOpts{..} Component{..} components files topHash = Manifest
   { manifestHash = topHash
   , inPorts = [mkManifestPort backend pName pType | (pName, pType) <- inputs]
   , outPorts = [mkManifestPort backend pName pType | (_, (pName, pType), _) <- outputs]
@@ -134,6 +146,7 @@ mkManifest backend ClashOpts{..} Component{..} components files topHash = Manife
   , topComponent = Id.toText componentName
   , fileNames = files
   , successFlags = (opt_inlineLimit, opt_specLimit, opt_floatSupport)
+  , domains = domains
   }
  where
   compNames = map Netlist.componentName components
