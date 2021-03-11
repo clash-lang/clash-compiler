@@ -140,6 +140,7 @@ module Clash.Prelude
   , module Control.Applicative
   , module Data.Bits
   , module Data.Default.Class
+  , module Data.Kind
     -- ** Exceptions
   , module Clash.XException
     -- ** Named types
@@ -157,6 +158,7 @@ where
 import           Control.Applicative
 import           Data.Bits
 import           Data.Default.Class
+import           Data.Kind (Type, Constraint)
 import           GHC.Stack                   (HasCallStack)
 import           GHC.TypeLits
 import           GHC.TypeLits.Extra
