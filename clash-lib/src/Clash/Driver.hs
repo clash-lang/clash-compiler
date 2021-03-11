@@ -849,7 +849,12 @@ prepareDir hdlDir ClashOpts{opt_clear} mods = do
         unlessM
           (null <$> listDirectory hdlDir)
           (error [I.i|
-            Tried to write HDL files to #{hdlDir}, but directory wasn't empty.
+            Tried to write HDL files to #{hdlDir}, but directory wasn't empty. This
+            message will be supressed if Clash can detect that no files have
+            changed since it was last run. If you're seeing this message even
+            though you haven't modified any files, Clash encountered a problem
+            reading "#{manifestFilename :: String}". This can happen when upgrading
+            Clash.
 
             Use '-fclash-clear' if you want Clash to clear out the directory.
             Warning: this will remove the complete directory, be cautious of data
