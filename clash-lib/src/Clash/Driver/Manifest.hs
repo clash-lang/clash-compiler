@@ -43,9 +43,10 @@ import           Text.Read (readMaybe)
 
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend (Backend (hdlType), Usage (External))
+import           Clash.Core.Name (nameOcc)
 import           Clash.Driver.Types
 import           Clash.Primitives.Types
-import           Clash.Core.Var (Id)
+import           Clash.Core.Var (Id, varName)
 import           Clash.Netlist.Types
   (TopEntityT, Component(..), HWType (Clock), hwTypeDomain)
 import qualified Clash.Netlist.Types as Netlist
@@ -130,6 +131,9 @@ data Manifest
     -- are SHA256.
   , domains :: HashMap Text VDomainConfiguration
     -- ^ Domains encountered in design
+  , transitiveDependencies :: [Text]
+    -- ^ Dependencies of this design (fully qualified binder names). Is a
+    -- transitive closure of all dependencies.
   } deriving (Show,Read,Eq)
 
 instance ToJSON Manifest where
@@ -164,6 +168,8 @@ instance ToJSON Manifest where
             ]
           )
         | (domNm, VDomainConfiguration{..}) <- HashMap.toList domains ]
+      , "dependencies" .= Aeson.object
+        [ "transitive" .= transitiveDependencies ]
       ]
 
 instance FromJSON Manifest where
@@ -193,6 +199,7 @@ instance FromJSON Manifest where
                 pure (fName, fst (Base16.decode (Text.encodeUtf8 sha256)))
 #endif
         <*> (v .: "domains" >>= HashMap.traverseWithKey parseDomain)
+        <*> (v .: "dependencies" >>= (.: "transitive"))
    where
     parseDomain :: Text -> Aeson.Object -> Parser VDomainConfiguration
     parseDomain nm v =
@@ -254,13 +261,15 @@ mkManifest ::
   Component ->
   -- | All other entities
   [Component] ->
+  -- | Names of dependencies (transitive closure)
+  [Id] ->
   -- | Files and  their hashes
   [(FilePath, ByteString)] ->
   -- | Hash returned by 'readFreshManifest'
   Int ->
   -- | New manifest
   Manifest
-mkManifest backend domains ClashOpts{..} Component{..} components files topHash = Manifest
+mkManifest backend domains ClashOpts{..} Component{..} components deps files topHash = Manifest
   { manifestHash = topHash
   , inPorts = [mkManifestPort backend pName pType | (pName, pType) <- inputs]
   , outPorts = [mkManifestPort backend pName pType | (_, (pName, pType), _) <- outputs]
@@ -269,6 +278,7 @@ mkManifest backend domains ClashOpts{..} Component{..} components files topHash 
   , fileNames = files
   , successFlags = (opt_inlineLimit, opt_specLimit, opt_floatSupport)
   , domains = domains
+  , transitiveDependencies = map (nameOcc . varName) deps
   }
  where
   compNames = map Netlist.componentName components

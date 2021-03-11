@@ -47,7 +47,7 @@ import qualified Data.HashSet                     as HashSet
 import           Data.Proxy                       (Proxy(..))
 import           Data.IntMap                      (IntMap)
 import           Data.List                        (intercalate)
-import           Data.Maybe                       (fromMaybe, maybeToList)
+import           Data.Maybe                       (fromMaybe, maybeToList, mapMaybe)
 import qualified Data.Map.Ordered                 as OMap
 import           Data.Map.Ordered.Extra           ()
 import           Data.Semigroup.Monad
@@ -112,7 +112,7 @@ import           Clash.Core.Util                  (shouldSplit)
 import           Clash.Core.Var
   (Id, varName, varUniq, varType)
 import           Clash.Core.VarEnv
-  (elemVarEnv, emptyVarEnv, lookupVarEnv, lookupVarEnv', mkVarEnv)
+  (elemVarEnv, emptyVarEnv, lookupVarEnv, lookupVarEnv', mkVarEnv, lookupVarEnvDirectly)
 import           Clash.Debug                      (debugIsOn)
 import           Clash.Driver.Types
 import           Clash.Driver.Manifest            (Manifest(..), readFreshManifest, UnexpectedModification, pprintUnexpectedModifications, mkManifest, writeManifest, manifestFilename)
@@ -135,7 +135,7 @@ import qualified Clash.Primitives.Intel.ClockGen  as P
 import qualified Clash.Primitives.Verification    as P
 import           Clash.Primitives.Types
 import           Clash.Signal.Internal
-import           Clash.Unique                     (Unique)
+import           Clash.Unique                     (Unique, getUnique)
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util
   (ClashException(..), HasCallStack, first, reportTimeDiff,
@@ -441,9 +441,15 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
         then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles0 filesAndDigests0
         else pure (edamFiles0, filesAndDigests0)
 
-      let manifest = mkManifest
-                       hdlState' domainConfs opts topComponent components
-                       filesAndDigests1 topHash
+      let
+        depUniques = fromMaybe [] (HashMap.lookup (getUnique topEntity) deps)
+        depBindings = mapMaybe (flip lookupVarEnvDirectly bindingsMap) depUniques
+        depIds = map bindingId depBindings
+
+        manifest =
+          mkManifest
+            hdlState' domainConfs opts topComponent components depIds
+            filesAndDigests1 topHash
       writeManifest manPath manifest
 
       topTime <- hdlDocs `seq` Clock.getCurrentTime
