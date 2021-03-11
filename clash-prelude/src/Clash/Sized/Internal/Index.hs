@@ -179,7 +179,7 @@ instance (KnownNat n, 1 <= n) => BitPack (Index n) where
   unpack = unpack#
 
 -- | Safely convert an `SNat` value to an `Index`
-fromSNat :: (KnownNat m, n <= m + 1) => SNat n -> Index m
+fromSNat :: (KnownNat m, n + 1 <= m) => SNat n -> Index m
 fromSNat = snatToNum
 
 {-# NOINLINE pack# #-}

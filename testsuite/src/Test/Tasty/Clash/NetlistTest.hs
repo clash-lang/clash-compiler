@@ -19,7 +19,7 @@ module Test.Tasty.Clash.NetlistTest
   ) where
 
 import qualified Prelude as P
-import           Clash.Prelude
+import           Clash.Prelude hiding (Type)
 
 import           Clash.Annotations.Primitive (HDL(..))
 import           Clash.Annotations.BitRepresentation.Internal
