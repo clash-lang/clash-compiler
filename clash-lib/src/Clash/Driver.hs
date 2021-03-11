@@ -48,6 +48,8 @@ import           Data.Proxy                       (Proxy(..))
 import           Data.IntMap                      (IntMap)
 import           Data.List                        (intercalate)
 import           Data.Maybe                       (fromMaybe, maybeToList)
+import qualified Data.Map.Ordered                 as OMap
+import           Data.Map.Ordered.Extra           ()
 import           Data.Semigroup.Monad
 import qualified Data.Text
 import           Data.Text.Lazy                   (Text)
@@ -110,7 +112,7 @@ import           Clash.Core.Util                  (shouldSplit)
 import           Clash.Core.Var
   (Id, varName, varUniq, varType)
 import           Clash.Core.VarEnv
-  (VarEnv, elemVarEnv, eltsVarEnv, emptyVarEnv, lookupVarEnv, lookupVarEnv', mkVarEnv)
+  (elemVarEnv, emptyVarEnv, lookupVarEnv, lookupVarEnv', mkVarEnv)
 import           Clash.Debug                      (debugIsOn)
 import           Clash.Driver.Types
 import           Clash.Driver.Manifest            (Manifest(..), readFreshManifest, UnexpectedModification, pprintUnexpectedModifications, mkManifest, writeManifest, manifestFilename)
@@ -121,7 +123,7 @@ import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFun
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types
   (IdentifierText, BlackBox (..), Component (..), FilteredHWType, HWMap, SomeBackend (..),
-   TopEntityT(..), TemplateFunction, findClocks)
+   TopEntityT(..), TemplateFunction, ComponentMap, findClocks)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
@@ -428,7 +430,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       memoryFilesDigests <- writeMemoryDataFiles hdlDir mfiles
 
       let
-        components = map (view _4) (eltsVarEnv netlist)
+        components = map (view _4 . snd) (OMap.assocs netlist)
         filesAndDigests0 =
              zip (map fst hdlDocs) hdlDocDigests
           <> zip (map fst dfiles) dataFilesDigests
@@ -689,7 +691,7 @@ createHDL
   -- ^ Module hierarchy root
   -> Id.IdentifierSet
   -- ^ Component names
-  -> VarEnv ([Bool],SrcSpan,Id.IdentifierSet,Component)
+  -> ComponentMap
   -- ^ List of components
   -> HashMap Data.Text.Text VDomainConfiguration
   -- ^ Known domains to configurations
@@ -701,7 +703,7 @@ createHDL
   -- ^ The pretty-printed HDL documents
   -- + The data files that need to be copied
 createHDL backend modName seen components domainConfs top topName = flip evalState backend $ getMon $ do
-  let componentsL = eltsVarEnv components
+  let componentsL = map snd (OMap.assocs components)
   (hdlNmDocs,incs) <-
     unzip <$> mapM (\(_wereVoids,sp,ids,comp) ->
                       genHDL modName sp (Id.union seen ids) comp)

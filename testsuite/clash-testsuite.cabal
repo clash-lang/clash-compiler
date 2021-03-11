@@ -85,6 +85,7 @@ library
     mtl,
     concurrent-supply,
     unordered-containers,
+    ordered-containers,
     containers,
 
 

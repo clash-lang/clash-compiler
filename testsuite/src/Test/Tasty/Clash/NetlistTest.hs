@@ -59,6 +59,7 @@ import qualified Control.Concurrent.Supply as Supply
 import           Control.DeepSeq (force)
 import           Control.Monad.State.Strict (State)
 import           Data.Maybe
+import qualified Data.Map.Ordered as OMap
 import qualified Data.Text as Text
 import           System.FilePath ((</>))
 
@@ -118,7 +119,8 @@ runToNetlistStage target f src = do
 #endif
           teNames opts supplyN te
 
-  fmap (\(_,x,_) -> force (eltsVarEnv x)) $ netlistFrom (transformedBindings, tcm, tes2, compNames, pm, reprs, te, initIs)
+  fmap (\(_,x,_) -> force (P.map snd (OMap.assocs x))) $
+    netlistFrom (transformedBindings, tcm, tes2, compNames, pm, reprs, te, initIs)
  where
   backend = mkBackend target
   opts = f mkClashOpts

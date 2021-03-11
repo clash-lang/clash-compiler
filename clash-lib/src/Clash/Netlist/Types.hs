@@ -52,6 +52,7 @@ import Data.HashMap.Strict                  (HashMap)
 import Data.HashSet                         (HashSet)
 import qualified Data.List                  as List
 import Data.IntMap                          (IntMap, empty)
+import Data.Map.Ordered                     (OMap)
 import Data.Maybe                           (mapMaybe)
 import qualified Data.Set                   as Set
 import Data.Text                            (Text)
@@ -82,6 +83,7 @@ import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Primitives.Types               (CompiledPrimMap)
 import Clash.Signal.Internal
   (ResetPolarity, ActiveEdge, ResetKind, InitBehavior)
+import Clash.Unique                         (Unique)
 import Clash.Util                           (makeLenses)
 
 import Clash.Annotations.BitRepresentation.Internal
@@ -281,13 +283,16 @@ data NetlistEnv
   -- ^ (Maybe) user given instance/register name
   }
 
+type ComponentMap = OMap Unique ([Bool], SrcSpan, IdentifierSet, Component)
+
 -- | State of the NetlistMonad
 data NetlistState
   = NetlistState
   { _bindings       :: BindingMap
   -- ^ Global binders
-  , _components     :: VarEnv ([Bool],SrcSpan,IdentifierSet,Component)
-  -- ^ Cached components
+  , _components     :: ComponentMap
+  -- ^ Cached components. Is an insertion ordered map to preserve a topologically
+  -- sorted component list for the manifest file.
   , _primitives     :: CompiledPrimMap
   -- ^ Primitive Definitions
   , _typeTranslator :: CustomReprs -> TyConMap -> Type

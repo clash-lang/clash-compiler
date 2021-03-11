@@ -119,6 +119,9 @@ data Manifest
     -- ^ Names of all the generated components for the @TopEntity@ (does not
     -- include the names of the components of the @TestBench@ accompanying
     -- the @TopEntity@).
+    --
+    -- This list is reverse topologically sorted. I.e., a component might depend
+    -- on any component listed before it, but not after it.
   , topComponent :: Text
     -- ^ Design entry point. This is usually the component annotated with a
     -- @TopEntity@ annotation.

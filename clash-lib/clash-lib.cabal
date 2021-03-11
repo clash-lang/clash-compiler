@@ -282,6 +282,7 @@ Library
                       Control.Applicative.Extra
                       Data.Aeson.Extra
                       Data.List.Extra
+                      Data.Map.Ordered.Extra
                       Data.Primitive.ByteArray.Extra
                       Data.Semigroup.Monad.Extra
                       Data.Set.Ordered.Extra

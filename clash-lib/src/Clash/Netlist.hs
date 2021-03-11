@@ -36,6 +36,7 @@ import           Data.List                        (elemIndex, partition, sortOn)
 import           Data.List.Extra                  (zipEqual)
 import           Data.Maybe
   (listToMaybe, mapMaybe, fromMaybe)
+import qualified Data.Map.Ordered                 as OMap
 import qualified Data.Set                         as Set
 import           Data.Primitive.ByteArray         (ByteArray (..))
 import qualified Data.Text                        as StrictText
@@ -121,7 +122,7 @@ genNetlist
   -- ^ Component name prefix
   -> Id
   -- ^ Name of the @topEntity@
-  -> IO (Component, VarEnv ([Bool],SrcSpan,IdentifierSet,Component), IdentifierSet)
+  -> IO (Component, ComponentMap, IdentifierSet)
 genNetlist isTb opts reprs globals tops topNames primMap tcm typeTrans iw ite be seen0 env prefixM topEntity = do
   ((_wereVoids, _sp, _is, topComponent), s) <-
     runNetlistMonad isTb opts reprs globals tops primMap tcm typeTrans
@@ -174,7 +175,7 @@ runNetlistMonad isTb opts reprs s tops p tcm typeTrans iw
     s' =
       NetlistState
         { _bindings=s
-        , _components=emptyVarEnv
+        , _components=OMap.empty
         , _primitives=p
         , _typeTranslator=typeTrans
         , _tcCache=tcm
@@ -262,7 +263,7 @@ genComponent compName = do
       (_,sp) <- Lens.use curCompNm
       throw (ClashException sp ($(curLoc) ++ "No normalized expression found for: " ++ show compName) Nothing)
     Just b -> do
-      makeCachedU compName components $ genComponentT compName (bindingTerm b)
+      makeCachedO compName components $ genComponentT compName (bindingTerm b)
 
 -- | Generate a component for a given function
 genComponentT
