@@ -11,10 +11,12 @@ packages:
   ./benchmark/profiling/run
   ./clash-term
 
+write-ghc-environment-files: always
+
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2021-02-25T05:27:39Z
+index-state: 2021-03-18T06:58:19Z
 
 -- For some reason the `clash-testsuite` executable fails to run without
 -- this, as it cannot find the related library...
@@ -43,4 +45,23 @@ optional-packages:
   ./clash-cores
 
 allow-newer:
-  brick:base
+  brick:base,
+  vector-binary-instances:base,
+  cryptohash-sha256:base
+
+source-repository-package
+  type: git
+  location: https://github.com/kcsongor/generic-lens.git
+  tag: 8e1fc7dcf444332c474fca17110d4bc554db08c8
+  subdir: generic-lens-core
+
+source-repository-package
+  type: git
+  location: https://github.com/kcsongor/generic-lens.git
+  tag: 8e1fc7dcf444332c474fca17110d4bc554db08c8
+  subdir: generic-lens
+
+source-repository-package
+  type: git
+  location: https://github.com/haskell-hint/hint.git
+  tag: abdb192eace46ef71b7b4a2d4a67654248f8dbdb

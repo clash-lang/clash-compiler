@@ -49,7 +49,7 @@ import Prelude                    ((.), (<$>), (<*>), id, Num(..))
 import Data.Coerce                (coerce)
 import Data.Kind                  (Type)
 import Data.Proxy                 (Proxy (..))
-import Data.Singletons.Prelude    (Apply, TyFun, type (@@))
+import Data.Singletons            (Apply, TyFun, type (@@))
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (^), type (*))
 
 import Clash.Sized.Vector

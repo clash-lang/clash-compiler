@@ -55,7 +55,7 @@ import Data.Default.Class          (Default (..))
 import Data.Either                 (isLeft)
 import Data.Foldable               (toList)
 import Data.Kind                   (Type)
-import Data.Singletons.Prelude     (Apply, TyFun, type (@@))
+import Data.Singletons             (Apply, TyFun, type (@@))
 import Data.Proxy                  (Proxy (..))
 import GHC.TypeLits                (KnownNat, Nat, type (+), type (^), type (*))
 import Language.Haskell.TH.Syntax  (Lift(..))
@@ -85,7 +85,7 @@ import Clash.XException
 >>> :set -XUndecidableInstances
 >>> import Clash.Prelude
 >>> import Data.Kind
->>> import Data.Singletons.Prelude (Apply, TyFun)
+>>> import Data.Singletons (Apply, TyFun)
 >>> import Data.Proxy
 >>> data IIndex (f :: TyFun Nat Type) :: Type
 >>> type instance Apply IIndex l = Index ((2^l)+1)
@@ -333,7 +333,7 @@ the form of 'dtfold':
 
 @
 {\-\# LANGUAGE UndecidableInstances \#-\}
-import Data.Singletons.Prelude
+import Data.Singletons
 import Data.Proxy
 
 data IIndex (f :: 'TyFun' Nat *) :: *
