@@ -1,0 +1,21 @@
+name: CI
+
+on: issue_comment
+
+jobs:
+  kloonbot:
+    name: Clone branch to local branch
+    runs-on: ubuntu-latest
+    if: ${{ github.event.issue.pull_request }}
+
+    env:
+      KBOT_AUTHOR_ASSOC: ${{ github.event.comment.author_association }}
+      KBOT_COMMENT: ${{ github.event.comment.body }}
+      KBOT_PULL_REQUEST_URL: ${{ github.event.issue.pull_request.url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - run: |
+          ./.ci/kloonbot.sh
