@@ -13,6 +13,17 @@ pull_request_rules:
         branches:
           - "1.2"
 
+  - name: backport patches to 1.4
+    conditions:
+      - base=master
+      - label=backport 1.4
+      - merged
+    actions:
+      copy:
+        ignore_conflicts: True
+        branches:
+          - "1.4"
+
   # For more information https://doc.mergify.io/actions.html#merge
   - name: auto merge on green CI and auto-merge label
     conditions:
@@ -41,4 +52,3 @@ pull_request_rules:
     actions:
       merge:
         method: rebase
-

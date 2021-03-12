@@ -1,1 +1,0 @@
-CHANGED: '$topEntity.manifest' has been renamed to 'manifest' in order to make it easier for external tools to find it.
