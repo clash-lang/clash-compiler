@@ -32,7 +32,6 @@ if [ "$(cat ${hash_file})" == "${revision}" ]; then
   echo "Already built and published ${revision} on ${RELEASE_CHANNEL}. Nothing to do!";
   exit 0;
 fi
-echo "${revision}" > ${hash_file}
 
 cd .ci/bindist/linux/snap || exit
 
@@ -54,4 +53,5 @@ if [[ $1 == "publish" ]]; then
   echo "$SNAPCRAFT_LOGIN_FILE" | base64 --decode --ignore-garbage > snapcraft.login
   snapcraft login --with snapcraft.login
   snapcraft push ./*.snap --release ${RELEASE_CHANNEL}
+  echo "${revision}" > ${hash_file}
 fi
