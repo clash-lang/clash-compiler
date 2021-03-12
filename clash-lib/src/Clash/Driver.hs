@@ -23,7 +23,6 @@ module Clash.Driver where
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
 import           Control.Exception                (throw)
-import           Control.Lens                     (view, _4)
 import qualified Control.Monad                    as Monad
 import           Control.Monad                    (unless, foldM, forM, filterM)
 import           Control.Monad.Catch              (MonadMask)
@@ -123,7 +122,7 @@ import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFun
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types
   (IdentifierText, BlackBox (..), Component (..), FilteredHWType, HWMap, SomeBackend (..),
-   TopEntityT(..), TemplateFunction, ComponentMap, findClocks)
+   TopEntityT(..), TemplateFunction, ComponentMap, findClocks, ComponentMeta(..))
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
@@ -430,7 +429,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       memoryFilesDigests <- writeMemoryDataFiles hdlDir mfiles
 
       let
-        components = map (view _4 . snd) (OMap.assocs netlist)
+        components = map (snd . snd) (OMap.assocs netlist)
         filesAndDigests0 =
              zip (map fst hdlDocs) hdlDocDigests
           <> zip (map fst dfiles) dataFilesDigests
@@ -711,9 +710,10 @@ createHDL
 createHDL backend modName seen components domainConfs top topName = flip evalState backend $ getMon $ do
   let componentsL = map snd (OMap.assocs components)
   (hdlNmDocs,incs) <-
-    unzip <$> mapM (\(_wereVoids,sp,ids,comp) ->
-                      genHDL modName sp (Id.union seen ids) comp)
-              componentsL
+    fmap unzip $
+      forM componentsL $ \(ComponentMeta{cmLoc, cmScope}, comp) ->
+         genHDL modName cmLoc (Id.union seen cmScope) comp
+
   hwtys <- HashSet.toList <$> extractTypes <$> Mon get
   typesPkg <- mkTyPackage modName hwtys
   dataFiles <- Mon getDataFiles

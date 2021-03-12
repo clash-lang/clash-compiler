@@ -44,10 +44,8 @@ import           Clash.GHC.Evaluator
 import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
 import           Clash.Netlist
-import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.BlackBox.Types (HdlSyn(Other))
 import           Clash.Netlist.Types hiding (backend, hdlDir)
-import           Clash.Util
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Utils.Misc
@@ -97,7 +95,7 @@ runToNetlistStage
   -- ^ Function to modify the default clash options
   -> FilePath
   -- ^ Module to load
-  -> IO [([Bool], SrcSpan, Id.IdentifierSet, Component)]
+  -> IO [(ComponentMeta, Component)]
 runToNetlistStage target f src = do
   pds <- primDirs backend
   (bm, tcm, tupTcm, tes, pm, rs, _)

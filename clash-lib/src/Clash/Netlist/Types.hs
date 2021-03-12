@@ -283,7 +283,13 @@ data NetlistEnv
   -- ^ (Maybe) user given instance/register name
   }
 
-type ComponentMap = OMap Unique ([Bool], SrcSpan, IdentifierSet, Component)
+data ComponentMeta = ComponentMeta
+  { cmWereVoids :: [Bool]
+  , cmLoc :: SrcSpan
+  , cmScope :: IdentifierSet
+  } deriving (Generic, Show, NFData)
+
+type ComponentMap = OMap Unique (ComponentMeta, Component)
 
 -- | State of the NetlistMonad
 data NetlistState

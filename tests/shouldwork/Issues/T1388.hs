@@ -63,10 +63,7 @@ assertNoSLVInPortMap =
   goPort p = False
 
 
-getComponent :: (a, b, c, d) -> d
-getComponent (_, _, _, x) = x
-
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
-  mapM_ (assertNoSLVInPortMap . getComponent) netlist
+  mapM_ (assertNoSLVInPortMap . snd) netlist

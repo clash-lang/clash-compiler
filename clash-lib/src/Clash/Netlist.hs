@@ -124,7 +124,7 @@ genNetlist
   -- ^ Name of the @topEntity@
   -> IO (Component, ComponentMap, IdentifierSet)
 genNetlist isTb opts reprs globals tops topNames primMap tcm typeTrans iw ite be seen0 env prefixM topEntity = do
-  ((_wereVoids, _sp, _is, topComponent), s) <-
+  ((_meta, topComponent), s) <-
     runNetlistMonad isTb opts reprs globals tops primMap tcm typeTrans
                     iw ite be seen1 env componentNames_ $ genComponent topEntity
   return (topComponent, _components s, seen1)
@@ -255,7 +255,7 @@ genComponent
   :: HasCallStack
   => Id
   -- ^ Name of the function
-  -> NetlistMonad ([Bool],SrcSpan,IdentifierSet,Component)
+  -> NetlistMonad (ComponentMeta, Component)
 genComponent compName = do
   compExprM <- lookupVarEnv compName <$> Lens.use bindings
   case compExprM of
@@ -272,7 +272,7 @@ genComponentT
   -- ^ Name of the function
   -> Term
   -- ^ Corresponding term
-  -> NetlistMonad ([Bool],SrcSpan,IdentifierSet,Component)
+  -> NetlistMonad (ComponentMeta, Component)
 genComponentT compName0 componentExpr = do
   tcm <- Lens.use tcCache
   compName1 <- (`lookupVarEnv'` compName0) <$> Lens.use componentNames
@@ -318,14 +318,14 @@ genComponentT compName0 componentExpr = do
           component      = Component compName1 compInps compOutps'
                              (netDecls ++ argWrappers ++ decls ++ resUnwrappers')
       ids <- Lens.use seenIds
-      return (wereVoids, sp, ids, component)
+      return (ComponentMeta wereVoids sp ids, component)
     -- No result declaration means that the result is empty, this only happens
     -- when the TopEntity has an empty result. We just create an empty component
     -- in this case.
     Nothing -> do
       let component = Component compName1 compInps [] (netDecls ++ argWrappers ++ decls)
       ids <- Lens.use seenIds
-      return (wereVoids, sp, ids, component)
+      return (ComponentMeta wereVoids sp ids, component)
 
 mkNetDecl :: (Id, Term) -> NetlistMonad [Declaration]
 mkNetDecl (id_,tm) = preserveVarEnv $ do
@@ -740,7 +740,7 @@ mkFunApp dstId fun args tickDecls = do
             #{showPpr fun}
         |]
         Just (Binding{bindingTerm}) -> do
-          (_,_,_,Component compName compInps co _) <- preserveVarEnv $ genComponent fun
+          (_, Component compName compInps co _) <- preserveVarEnv $ genComponent fun
           let argTys = map (termType tcm) args
           argHWTys <- mapM coreTypeToHWTypeM' argTys
 

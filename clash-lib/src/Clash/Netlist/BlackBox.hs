@@ -1101,17 +1101,20 @@ mkFunInput resId e =
                   normalized <- Lens.use bindings
                   case lookupVarEnv fun normalized of
                     Just _ -> do
-                      (wereVoids,_,_,N.Component compName compInps [(_,compOutp,_)] _) <-
+                      (meta,N.Component compName compInps [(_,compOutp,_)] _) <-
                         preserveVarEnv $ genComponent fun
 
-                      let inpAssign (i, t) e' = (Identifier i Nothing, In, t, e')
-                          inpVar i            = Id.unsafeMake ("~VAR[arg" <> showt i <> "][" <> showt i <> "]")
-                          inpVars             = [Identifier (inpVar i)  Nothing | i <- originalIndices wereVoids]
-                          inpAssigns          = zipWith inpAssign compInps inpVars
-                          outpAssign          = ( Identifier (fst compOutp) Nothing
-                                                , Out
-                                                , snd compOutp
-                                                , Identifier (Id.unsafeMake "~RESULT") Nothing )
+                      let
+                        ComponentMeta{cmWereVoids} = meta
+                        inpAssign (i, t) e' = (Identifier i Nothing, In, t, e')
+                        inpVar i = Id.unsafeMake ("~VAR[arg" <> showt i <> "][" <> showt i <> "]")
+                        inpVars = [Identifier (inpVar i)  Nothing | i <- originalIndices cmWereVoids]
+                        inpAssigns = zipWith inpAssign compInps inpVars
+                        outpAssign =
+                          ( Identifier (fst compOutp) Nothing
+                          , Out
+                          , snd compOutp
+                          , Identifier (Id.unsafeMake "~RESULT") Nothing )
                       instLabel <- Id.next compName
                       let
                         portMap = NamedPortMap (outpAssign:inpAssigns)

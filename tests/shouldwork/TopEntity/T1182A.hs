@@ -41,20 +41,17 @@ assertInputs expType (N.Component _ [(clk,N.Clock _)] [(N.Wire,(ssan,actType),No
   = pure ()
 assertInputs _ c = error $ "Component mismatch: " P.++ show c
 
-getComponent :: (a, b, c, d) -> d
-getComponent (_, _, _, x) = x
-
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
-  mapM_ (assertInputs (N.BitVector 8) . getComponent) netlist
+  mapM_ (assertInputs (N.BitVector 8) . snd) netlist
 
 mainVerilog :: IO ()
 mainVerilog = do
   netlist <- runToNetlistStage SVerilog id testPath
-  mapM_ (assertInputs (N.Vector 8 N.Bool) . getComponent) netlist
+  mapM_ (assertInputs (N.Vector 8 N.Bool) . snd) netlist
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
   netlist <- runToNetlistStage SSystemVerilog id testPath
-  mapM_ (assertInputs (N.BitVector 8) . getComponent) netlist
+  mapM_ (assertInputs (N.BitVector 8) . snd) netlist
