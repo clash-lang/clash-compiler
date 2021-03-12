@@ -7,9 +7,9 @@ import Data.Kind (Type)
 
 import Data.Proxy
 #if MIN_VERSION_singletons(2,4,0)
-import Data.Singletons.Prelude hiding (type (+))
+import Data.Singletons hiding (type (+))
 #else
-import Data.Singletons.Prelude
+import Data.Singletons
 #endif
 
 data IIndex (f :: TyFun Nat Type) :: Type
