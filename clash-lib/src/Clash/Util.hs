@@ -36,6 +36,8 @@ import Data.HashMap.Lazy              (HashMap)
 import qualified Data.HashMap.Lazy    as HashMapL
 import qualified Data.List.Extra      as List
 import Data.Maybe                     (fromMaybe, listToMaybe, catMaybes)
+import Data.Map.Ordered               (OMap)
+import qualified Data.Map.Ordered     as OMap
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Render.String
 import Data.Time.Clock                (UTCTime)
@@ -182,6 +184,25 @@ makeCachedU key l create = do
     Nothing -> do
       value <- create
       l %= extendUniqMap key value
+      return value
+
+-- | Cache the result of a monadic action using a 'OMap'
+makeCachedO
+  :: (MonadState s m, Uniquable k)
+  => k
+  -- ^ Key the action is associated with
+  -> Lens' s (OMap Unique v)
+  -- ^ Lens to the cache
+  -> m v
+  -- ^ Action to cache
+  -> m v
+makeCachedO key l create = do
+  cache <- use l
+  case OMap.lookup (getUnique key) cache of
+    Just value -> return value
+    Nothing -> do
+      value <- create
+      l %= (flip (OMap.|>)) (getUnique key, value)
       return value
 
 combineM :: (Applicative f)

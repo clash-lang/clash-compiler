@@ -25,24 +25,20 @@ assertNoMux c =
 testPath :: FilePath
 testPath = "tests/shouldwork/XOptimization/OneDefinedDataPat.hs"
 
-getComponent :: (a, b, c, d) -> d
-getComponent (_, _, _, x) = x
-
 enableXOpt :: ClashOpts -> ClashOpts
 enableXOpt c = c { opt_aggressiveXOpt = True }
 
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL enableXOpt testPath
-  mapM_ (assertNoMux . getComponent) netlist
+  mapM_ (assertNoMux . snd) netlist
 
 mainVerilog :: IO ()
 mainVerilog = do
   netlist <- runToNetlistStage SVerilog enableXOpt testPath
-  mapM_ (assertNoMux . getComponent) netlist
+  mapM_ (assertNoMux . snd) netlist
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
   netlist <- runToNetlistStage SSystemVerilog enableXOpt testPath
-  mapM_ (assertNoMux . getComponent) netlist
-
+  mapM_ (assertNoMux . snd) netlist

@@ -75,21 +75,17 @@ assertOneVGA (Component _ _ _ ds)
   isVGADecl (NetDecl' _ Wire (Id.toText -> "VGA") _ _) = True
   isVGADecl _ = False
 
-getComponent :: (a, b, c, d) -> d
-getComponent (_, _, _, x) = x
-
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
-  mapM_ (assertOneVGA . getComponent) netlist
+  mapM_ (assertOneVGA . snd) netlist
 
 mainVerilog :: IO ()
 mainVerilog = do
   netlist <- runToNetlistStage SVerilog id testPath
-  mapM_ (assertOneVGA . getComponent) netlist
+  mapM_ (assertOneVGA . snd) netlist
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
   netlist <- runToNetlistStage SSystemVerilog id testPath
-  mapM_ (assertOneVGA . getComponent) netlist
-
+  mapM_ (assertOneVGA . snd) netlist

@@ -51,10 +51,7 @@ noRotateRight (Component nm _ _ _)
   | Id.toText nm == "rotate_right" = error ("No component should be called rotate_right")
   | otherwise = pure ()
 
-getComponent :: (a, b, c, d) -> d
-getComponent (_, _, _, x) = x
-
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
-  mapM_ (noRotateRight . getComponent) netlist
+  mapM_ (noRotateRight . snd) netlist

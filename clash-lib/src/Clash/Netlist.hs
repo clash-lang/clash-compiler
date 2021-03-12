@@ -36,6 +36,7 @@ import           Data.List                        (elemIndex, partition, sortOn)
 import           Data.List.Extra                  (zipEqual)
 import           Data.Maybe
   (listToMaybe, mapMaybe, fromMaybe)
+import qualified Data.Map.Ordered                 as OMap
 import qualified Data.Set                         as Set
 import           Data.Primitive.ByteArray         (ByteArray (..))
 import qualified Data.Text                        as StrictText
@@ -121,9 +122,9 @@ genNetlist
   -- ^ Component name prefix
   -> Id
   -- ^ Name of the @topEntity@
-  -> IO (Component, VarEnv ([Bool],SrcSpan,IdentifierSet,Component), IdentifierSet)
+  -> IO (Component, ComponentMap, IdentifierSet)
 genNetlist isTb opts reprs globals tops topNames primMap tcm typeTrans iw ite be seen0 env prefixM topEntity = do
-  ((_wereVoids, _sp, _is, topComponent), s) <-
+  ((_meta, topComponent), s) <-
     runNetlistMonad isTb opts reprs globals tops primMap tcm typeTrans
                     iw ite be seen1 env componentNames_ $ genComponent topEntity
   return (topComponent, _components s, seen1)
@@ -174,7 +175,7 @@ runNetlistMonad isTb opts reprs s tops p tcm typeTrans iw
     s' =
       NetlistState
         { _bindings=s
-        , _components=emptyVarEnv
+        , _components=OMap.empty
         , _primitives=p
         , _typeTranslator=typeTrans
         , _tcCache=tcm
@@ -254,7 +255,7 @@ genComponent
   :: HasCallStack
   => Id
   -- ^ Name of the function
-  -> NetlistMonad ([Bool],SrcSpan,IdentifierSet,Component)
+  -> NetlistMonad (ComponentMeta, Component)
 genComponent compName = do
   compExprM <- lookupVarEnv compName <$> Lens.use bindings
   case compExprM of
@@ -262,7 +263,7 @@ genComponent compName = do
       (_,sp) <- Lens.use curCompNm
       throw (ClashException sp ($(curLoc) ++ "No normalized expression found for: " ++ show compName) Nothing)
     Just b -> do
-      makeCachedU compName components $ genComponentT compName (bindingTerm b)
+      makeCachedO compName components $ genComponentT compName (bindingTerm b)
 
 -- | Generate a component for a given function
 genComponentT
@@ -271,7 +272,7 @@ genComponentT
   -- ^ Name of the function
   -> Term
   -- ^ Corresponding term
-  -> NetlistMonad ([Bool],SrcSpan,IdentifierSet,Component)
+  -> NetlistMonad (ComponentMeta, Component)
 genComponentT compName0 componentExpr = do
   tcm <- Lens.use tcCache
   compName1 <- (`lookupVarEnv'` compName0) <$> Lens.use componentNames
@@ -317,14 +318,14 @@ genComponentT compName0 componentExpr = do
           component      = Component compName1 compInps compOutps'
                              (netDecls ++ argWrappers ++ decls ++ resUnwrappers')
       ids <- Lens.use seenIds
-      return (wereVoids, sp, ids, component)
+      return (ComponentMeta wereVoids sp ids, component)
     -- No result declaration means that the result is empty, this only happens
     -- when the TopEntity has an empty result. We just create an empty component
     -- in this case.
     Nothing -> do
       let component = Component compName1 compInps [] (netDecls ++ argWrappers ++ decls)
       ids <- Lens.use seenIds
-      return (wereVoids, sp, ids, component)
+      return (ComponentMeta wereVoids sp ids, component)
 
 mkNetDecl :: (Id, Term) -> NetlistMonad [Declaration]
 mkNetDecl (id_,tm) = preserveVarEnv $ do
@@ -739,7 +740,7 @@ mkFunApp dstId fun args tickDecls = do
             #{showPpr fun}
         |]
         Just (Binding{bindingTerm}) -> do
-          (_,_,_,Component compName compInps co _) <- preserveVarEnv $ genComponent fun
+          (_, Component compName compInps co _) <- preserveVarEnv $ genComponent fun
           let argTys = map (termType tcm) args
           argHWTys <- mapM coreTypeToHWTypeM' argTys
 

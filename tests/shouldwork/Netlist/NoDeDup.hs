@@ -66,10 +66,7 @@ assertNumTwiceInsts (Component nm inps outs ds) =
   twiceInsts = filter isTwiceInst ds
   nTwiceInsts = P.length twiceInsts
 
-getComponent :: (a, b, c, d) -> d
-getComponent (_, _, _, x) = x
-
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
-  mapM_ (assertNumTwiceInsts . getComponent) netlist
+  mapM_ (assertNumTwiceInsts . snd) netlist

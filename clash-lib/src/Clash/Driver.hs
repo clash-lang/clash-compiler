@@ -23,7 +23,6 @@ module Clash.Driver where
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
 import           Control.Exception                (throw)
-import           Control.Lens                     (view, _4)
 import qualified Control.Monad                    as Monad
 import           Control.Monad                    (unless, foldM, forM, filterM)
 import           Control.Monad.Catch              (MonadMask)
@@ -47,7 +46,9 @@ import qualified Data.HashSet                     as HashSet
 import           Data.Proxy                       (Proxy(..))
 import           Data.IntMap                      (IntMap)
 import           Data.List                        (intercalate)
-import           Data.Maybe                       (fromMaybe, maybeToList)
+import           Data.Maybe                       (fromMaybe, maybeToList, mapMaybe)
+import qualified Data.Map.Ordered                 as OMap
+import           Data.Map.Ordered.Extra           ()
 import           Data.Semigroup.Monad
 import qualified Data.Text
 import           Data.Text.Lazy                   (Text)
@@ -110,7 +111,7 @@ import           Clash.Core.Util                  (shouldSplit)
 import           Clash.Core.Var
   (Id, varName, varUniq, varType)
 import           Clash.Core.VarEnv
-  (VarEnv, elemVarEnv, eltsVarEnv, emptyVarEnv, lookupVarEnv, lookupVarEnv', mkVarEnv)
+  (elemVarEnv, emptyVarEnv, lookupVarEnv, lookupVarEnv', mkVarEnv, lookupVarEnvDirectly)
 import           Clash.Debug                      (debugIsOn)
 import           Clash.Driver.Types
 import           Clash.Driver.Manifest            (Manifest(..), readFreshManifest, UnexpectedModification, pprintUnexpectedModifications, mkManifest, writeManifest, manifestFilename)
@@ -121,7 +122,7 @@ import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFun
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types
   (IdentifierText, BlackBox (..), Component (..), FilteredHWType, HWMap, SomeBackend (..),
-   TopEntityT(..), TemplateFunction, findClocks)
+   TopEntityT(..), TemplateFunction, ComponentMap, findClocks, ComponentMeta(..))
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
@@ -133,7 +134,7 @@ import qualified Clash.Primitives.Intel.ClockGen  as P
 import qualified Clash.Primitives.Verification    as P
 import           Clash.Primitives.Types
 import           Clash.Signal.Internal
-import           Clash.Unique                     (Unique)
+import           Clash.Unique                     (Unique, getUnique)
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util
   (ClashException(..), HasCallStack, first, reportTimeDiff,
@@ -428,7 +429,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       memoryFilesDigests <- writeMemoryDataFiles hdlDir mfiles
 
       let
-        components = map (view _4) (eltsVarEnv netlist)
+        components = map (snd . snd) (OMap.assocs netlist)
         filesAndDigests0 =
              zip (map fst hdlDocs) hdlDocDigests
           <> zip (map fst dfiles) dataFilesDigests
@@ -439,9 +440,15 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
         then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles0 filesAndDigests0
         else pure (edamFiles0, filesAndDigests0)
 
-      let manifest = mkManifest
-                       hdlState' domainConfs opts topComponent components
-                       filesAndDigests1 topHash
+      let
+        depUniques = fromMaybe [] (HashMap.lookup (getUnique topEntity) deps)
+        depBindings = mapMaybe (flip lookupVarEnvDirectly bindingsMap) depUniques
+        depIds = map bindingId depBindings
+
+        manifest =
+          mkManifest
+            hdlState' domainConfs opts topComponent components depIds
+            filesAndDigests1 topHash
       writeManifest manPath manifest
 
       topTime <- hdlDocs `seq` Clock.getCurrentTime
@@ -689,7 +696,7 @@ createHDL
   -- ^ Module hierarchy root
   -> Id.IdentifierSet
   -- ^ Component names
-  -> VarEnv ([Bool],SrcSpan,Id.IdentifierSet,Component)
+  -> ComponentMap
   -- ^ List of components
   -> HashMap Data.Text.Text VDomainConfiguration
   -- ^ Known domains to configurations
@@ -701,11 +708,12 @@ createHDL
   -- ^ The pretty-printed HDL documents
   -- + The data files that need to be copied
 createHDL backend modName seen components domainConfs top topName = flip evalState backend $ getMon $ do
-  let componentsL = eltsVarEnv components
+  let componentsL = map snd (OMap.assocs components)
   (hdlNmDocs,incs) <-
-    unzip <$> mapM (\(_wereVoids,sp,ids,comp) ->
-                      genHDL modName sp (Id.union seen ids) comp)
-              componentsL
+    fmap unzip $
+      forM componentsL $ \(ComponentMeta{cmLoc, cmScope}, comp) ->
+         genHDL modName cmLoc (Id.union seen cmScope) comp
+
   hwtys <- HashSet.toList <$> extractTypes <$> Mon get
   typesPkg <- mkTyPackage modName hwtys
   dataFiles <- Mon getDataFiles

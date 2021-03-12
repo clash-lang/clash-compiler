@@ -45,15 +45,12 @@ assertOneDecl (Component _ _ _ ds) =
   isSigAssignment i (Assignment _ (Identifier i' _)) = i == i'
   isSigAssignment _ _ = False
 
-getComponent :: (a, b, c, d) -> d
-getComponent (_, _, _, x) = x
-
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
-  mapM_ (assertOneDecl . getComponent) netlist
+  mapM_ (assertOneDecl . snd) netlist
 
 mainVerilog :: IO ()
 mainVerilog = do
   netlist <- runToNetlistStage SVerilog id testPath
-  mapM_ (assertOneDecl . getComponent) netlist
+  mapM_ (assertOneDecl . snd) netlist

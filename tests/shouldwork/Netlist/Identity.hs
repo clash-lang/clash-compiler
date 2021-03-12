@@ -46,15 +46,14 @@ getComponent (_, _, _, x) = x
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
-  mapM_ (assertAssignsInOut . getComponent) netlist
+  mapM_ (assertAssignsInOut . snd) netlist
 
 mainVerilog :: IO ()
 mainVerilog = do
   netlist <- runToNetlistStage SVerilog id testPath
-  mapM_ (assertAssignsInOut . getComponent) netlist
+  mapM_ (assertAssignsInOut . snd) netlist
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
   netlist <- runToNetlistStage SSystemVerilog id testPath
-  mapM_ (assertAssignsInOut . getComponent) netlist
-
+  mapM_ (assertAssignsInOut . snd) netlist

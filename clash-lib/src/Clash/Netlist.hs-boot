@@ -21,20 +21,15 @@ import Clash.Core.DataCon   (DataCon)
 import Clash.Core.Term      (Alt,LetBinding,Term)
 import Clash.Core.Type      (Type)
 import Clash.Core.Var       (Id)
-import Clash.Netlist.Types  (Expr, HWType, Identifier, NetlistMonad, Component,
-                             Declaration, NetlistId, DeclarationType, IdentifierSet)
-
-#if MIN_VERSION_ghc(9,0,0)
-import GHC.Types.SrcLoc     (SrcSpan)
-#else
-import SrcLoc               (SrcSpan)
-#endif
+import Clash.Netlist.Types
+  (Expr, HWType, Identifier, NetlistMonad, Declaration, NetlistId,
+   DeclarationType, ComponentMeta, Component)
 
 import GHC.Stack (HasCallStack)
 
 genComponent :: HasCallStack
              => Id
-             -> NetlistMonad ([Bool],SrcSpan,IdentifierSet,Component)
+             -> NetlistMonad (ComponentMeta, Component)
 
 mkExpr :: HasCallStack
        => Bool

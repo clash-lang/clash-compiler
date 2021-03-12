@@ -36,24 +36,20 @@ assertOneAltPerDefined c =
 testPath :: FilePath
 testPath = "tests/shouldwork/XOptimization/ManyDefined.hs"
 
-getComponent :: (a, b, c, d) -> d
-getComponent (_, _, _, x) = x
-
 enableXOpt :: ClashOpts -> ClashOpts
 enableXOpt c = c { opt_aggressiveXOpt = True }
 
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL enableXOpt testPath
-  mapM_ (assertOneAltPerDefined . getComponent) netlist
+  mapM_ (assertOneAltPerDefined . snd) netlist
 
 mainVerilog :: IO ()
 mainVerilog = do
   netlist <- runToNetlistStage SVerilog enableXOpt testPath
-  mapM_ (assertOneAltPerDefined . getComponent) netlist
+  mapM_ (assertOneAltPerDefined . snd) netlist
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
   netlist <- runToNetlistStage SSystemVerilog enableXOpt testPath
-  mapM_ (assertOneAltPerDefined . getComponent) netlist
-
+  mapM_ (assertOneAltPerDefined . snd) netlist

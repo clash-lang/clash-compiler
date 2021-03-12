@@ -68,6 +68,7 @@ genManifest =
     <*> coerce @(Q.Gen ArbitraryText)   @(Q.Gen Text)   Q.arbitrary -- top name
     <*> Q.listOf ((,) <$> genString <*> genDigest) -- files
     <*> (HashMap.fromList <$> Q.listOf genDomain) -- domains
+    <*> coerce @(Q.Gen [ArbitraryText]) @(Q.Gen [Text]) Q.arbitrary -- dependencies
 
 tests :: TestTree
 tests =

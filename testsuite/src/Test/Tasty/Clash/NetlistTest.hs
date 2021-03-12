@@ -44,10 +44,8 @@ import           Clash.GHC.Evaluator
 import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
 import           Clash.Netlist
-import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.BlackBox.Types (HdlSyn(Other))
 import           Clash.Netlist.Types hiding (backend, hdlDir)
-import           Clash.Util
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Utils.Misc
@@ -59,6 +57,7 @@ import qualified Control.Concurrent.Supply as Supply
 import           Control.DeepSeq (force)
 import           Control.Monad.State.Strict (State)
 import           Data.Maybe
+import qualified Data.Map.Ordered as OMap
 import qualified Data.Text as Text
 import           System.FilePath ((</>))
 
@@ -96,7 +95,7 @@ runToNetlistStage
   -- ^ Function to modify the default clash options
   -> FilePath
   -- ^ Module to load
-  -> IO [([Bool], SrcSpan, Id.IdentifierSet, Component)]
+  -> IO [(ComponentMeta, Component)]
 runToNetlistStage target f src = do
   pds <- primDirs backend
   (bm, tcm, tupTcm, tes, pm, rs, _)
@@ -118,7 +117,8 @@ runToNetlistStage target f src = do
 #endif
           teNames opts supplyN te
 
-  fmap (\(_,x,_) -> force (eltsVarEnv x)) $ netlistFrom (transformedBindings, tcm, tes2, compNames, pm, reprs, te, initIs)
+  fmap (\(_,x,_) -> force (P.map snd (OMap.assocs x))) $
+    netlistFrom (transformedBindings, tcm, tes2, compNames, pm, reprs, te, initIs)
  where
   backend = mkBackend target
   opts = f mkClashOpts
