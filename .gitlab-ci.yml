@@ -55,9 +55,8 @@ tests-8.10:
 tests-9.0:
   extends: .common-trigger
   variables:
-    GHC_HEAD: "yes" # We need the HEAD overlay for now
     GHC_VERSION: 9.0.1
-    CABAL_VERSION: 3.4.0.0-rc4
+    CABAL_VERSION: 3.4.0.0
 
 stack-build:
   extends: .common

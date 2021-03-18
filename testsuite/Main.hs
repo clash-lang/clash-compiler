@@ -15,11 +15,8 @@ import           System.Directory
   (createDirectoryIfMissing, removeDirectoryRecursive, getCurrentDirectory,
    doesDirectoryExist, makeAbsolute)
 import           System.Environment
-import           System.Exit
-  (exitWith, ExitCode(ExitSuccess, ExitFailure))
 import           System.FilePath           ((</>))
 import           System.Info
-import           System.Process            (readCreateProcessWithExitCode, proc)
 import           GHC.Conc                  (numCapabilities)
 import           GHC.Stack
 import           GHC.IO.Unsafe             (unsafePerformIO)
@@ -112,22 +109,10 @@ setClashEnvs :: HasCallStack => RunWith -> IO ()
 setClashEnvs Global = setEnv "GHC_ENVIRONMENT" "-"
 setClashEnvs Stack = pure ()
 setClashEnvs Cabal = do
-  -- Make sure environment variable exists
-  let cp = proc "cabal" ["--write-ghc-environment-files=always", "v2-run", "--", "clash", "--help"]
-  (exitCode, stdout, stderr) <- readCreateProcessWithExitCode cp ""
-  case exitCode of
-    ExitSuccess -> do
-      binDir <- cabalClashBinDir
-      path <- getEnv "PATH"
-      setEnv "PATH" (binDir <> ":" <> path)
-      setCabalPackagePaths
-    ExitFailure _ -> do
-      putStrLn "'cabal run clash' failed"
-      putStrLn ">>> stdout:"
-      putStrLn stdout
-      putStrLn ">>> stderr:"
-      putStrLn stderr
-      exitWith exitCode
+  binDir <- cabalClashBinDir
+  path <- getEnv "PATH"
+  setEnv "PATH" (binDir <> ":" <> path)
+  setCabalPackagePaths
 
 clashTestRoot
   :: [[TestName] -> TestTree]

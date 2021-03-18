@@ -49,17 +49,8 @@ import           Language.Haskell.TH.Lib
 import           Language.Haskell.TH.Ppr
 
 import           Control.Lens.Internal.TH     (conAppsT)
-
-#if MIN_VERSION_base(4,15,0)
--- | Return 'Name' contained in a 'TyVarBndr'.
-bndrName :: TyVarBndr a -> Name
-bndrName (PlainTV  n _) = n
-bndrName (KindedTV n _ _) = n
-#else
--- | Return 'Name' contained in a 'TyVarBndr'.
-bndrName :: TyVarBndr -> Name
-bndrName (PlainTV  n) = n
-bndrName (KindedTV n _) = n
+#if !(MIN_VERSION_th_abstraction(0,4,0))
+import           Control.Lens.Internal.TH     (bndrName)
 #endif
 
 -- $setup
@@ -272,7 +263,9 @@ deriveAutoRegProduct tyInfo conInfo = go (constructorName conInfo) fieldInfos
   tyNm = datatypeName tyInfo
   tyVarBndrs = datatypeVars tyInfo
 
-#if MIN_VERSION_th_abstraction(0,3,0)
+#if MIN_VERSION_th_abstraction(0,4,0)
+  toTyVar = VarT . tvName
+#elif MIN_VERSION_th_abstraction(0,3,0)
   toTyVar = VarT . bndrName
 #else
   toTyVar t = case t of

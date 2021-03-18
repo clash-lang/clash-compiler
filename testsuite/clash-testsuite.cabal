@@ -80,6 +80,7 @@ library
   build-depends:
     deepseq            >=1.4      && <1.5,
     concurrent-extra   >=0.7      && <0.8,
+    singletons,
     generic-lens,
     interpolate,
     mtl,
@@ -94,6 +95,18 @@ executable clash-testsuite
   main-is:             Main.hs
   ghc-options:         -threaded -with-rtsopts=-N
 
+  build-tool-depends:
+    clash-ghc:clash
+
   build-depends:
     containers,
     clash-testsuite
+
+  if impl(ghc >= 9.0.0)
+    build-depends:
+      singletons,
+      singletons-base,
+      singletons-th
+  else
+    build-depends:
+      singletons < 3.0

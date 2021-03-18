@@ -7,9 +7,15 @@
 module T1591 where
 
 import Clash.Prelude
-import Data.Singletons.Prelude
+
+import Data.Singletons
 import Data.Singletons.TH
 
+#if MIN_VERSION_singletons(3,0,0)
+import Prelude.Singletons
+#else
+import Data.Singletons.Prelude
+#endif
 
 $(singletons [d|
     countStates :: Nat -> Nat -> Nat

@@ -335,7 +335,7 @@ Library
                       recursion-schemes         >= 5.1     && < 5.3,
                       QuickCheck                >= 2.7     && < 2.15,
                       reflection                >= 2       && < 2.2,
-                      singletons                >= 1.0     && < 3.0,
+                      singletons                >= 2.0     && < 3.1,
                       template-haskell          >= 2.12.0.0 && < 2.18,
                       th-abstraction            >= 0.2.10 && < 0.5.0,
                       th-lift                   >= 0.7.0    && < 0.9,

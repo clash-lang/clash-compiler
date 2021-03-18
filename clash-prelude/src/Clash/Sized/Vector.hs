@@ -109,7 +109,7 @@ import Data.Default.Class         (Default (..))
 import qualified Data.Foldable    as F
 import Data.Kind                  (Type)
 import Data.Proxy                 (Proxy (..))
-import Data.Singletons.Prelude    (TyFun,Apply,type (@@))
+import Data.Singletons            (TyFun,Apply,type (@@))
 import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (-), type (*),
                                    type (^), type (<=), natVal)
 import GHC.Base                   (Int(I#),Int#,isTrue#)
@@ -2128,7 +2128,7 @@ lazyV = lazyV' (repeat ())
 -- now correctly define /append'/:
 --
 -- @
--- import Data.Singletons.Prelude
+-- import Data.Singletons
 -- import Data.Proxy
 --
 -- data Append (m :: Nat) (a :: *) (f :: 'TyFun' Nat *) :: *
@@ -2258,7 +2258,7 @@ the form of 'dtfold':
 
 @
 {\-\# LANGUAGE UndecidableInstances \#-\}
-import Data.Singletons.Prelude
+import Data.Singletons
 import Data.Proxy
 
 data IIndex (f :: 'TyFun' Nat *) :: *
