@@ -29,7 +29,7 @@ RUN apt-get update \
  && cd .. \
  && rm -rf ghdl-0.37
 
-ARG GHCUP_VERSION="0.1.12"
+ARG GHCUP_VERSION="0.1.14"
 ARG GHCUP_URL="https://downloads.haskell.org/~ghcup/${GHCUP_VERSION}/x86_64-linux-ghcup-${GHCUP_VERSION}"
 ARG GHCUP_BIN=/usr/bin/ghcup
 
@@ -38,7 +38,7 @@ RUN curl $GHCUP_URL --output $GHCUP_BIN \
  && ghcup install cabal 2.4.1.0 \
  && ghcup install cabal 3.0.0.0 \
  && ghcup install cabal 3.2.0.0 \
- && ghcup install cabal 3.4.0.0-rc4
+ && ghcup install cabal 3.4.0.0
 
 ARG ghc_version
 ENV GHC_VERSION=$ghc_version

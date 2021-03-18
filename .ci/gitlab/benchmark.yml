@@ -1,5 +1,5 @@
 .benchmark:
-  image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-$GHC_VERSION:2021-02-08
+  image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-$GHC_VERSION:2021-03-18
   stage: test
   timeout: 2 hours
   variables:
