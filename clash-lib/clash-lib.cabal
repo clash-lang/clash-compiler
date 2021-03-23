@@ -139,7 +139,7 @@ Library
                       aeson-pretty            >= 0.8      && < 0.9,
                       ansi-terminal           >= 0.8.0.0  && < 0.12,
                       array,
-                      attoparsec              >= 0.10.4.0 && < 0.14,
+                      attoparsec              >= 0.10.4.0 && < 0.15,
                       base                    >= 4.11     && < 5,
                       base16-bytestring       >= 0.1.1    && < 1.1,
                       binary                  >= 0.8.5    && < 0.11,
