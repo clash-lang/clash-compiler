@@ -695,5 +695,5 @@ undefined = errorX "undefined"
 -- | Same as 'Data.Maybe.fromJust', but returns a bottom/undefined value that
 -- other Clash constructs are aware of.
 fromJustX :: HasCallStack => Maybe a -> a
-fromJustX Nothing = errorX "isJustX: Nothing"
+fromJustX Nothing = errorX "fromJustX: Nothing"
 fromJustX (Just a) = a

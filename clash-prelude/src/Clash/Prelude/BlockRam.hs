@@ -375,9 +375,11 @@ This concludes the short introduction to using 'blockRam'.
 
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-# LANGUAGE Safe #-}
 
@@ -392,6 +394,8 @@ module Clash.Prelude.BlockRam
   , E.ResetStrategy(..)
     -- * Read/Write conflict resolution
   , readNew
+  , trueDualPortBlockRam
+  ,E.RamOp (..)
   )
 where
 
@@ -833,3 +837,46 @@ readNew
   -- ^ Value of the @ram@ at address @r@ from the previous clock cycle
 readNew = hideClockResetEnable E.readNew
 {-# INLINE readNew #-}
+
+-- | Produces vendor-agnostic HDL that will be inferred as a true, dual port
+-- block ram. Any values that's being written on a particular port is also the
+-- value that will be read on that port, i.e. the same-port read/write behavior
+-- is: WriteFirst. For mixed port read/write, when both ports have the same
+-- address, when there is a write on the port A, the output of port B is
+-- undefined, and visa versa. Explicitly clocked version is
+-- `Clash.Explicit.BlockRam.trueDualPortBlockRam`
+trueDualPortBlockRam ::
+#ifdef CLASH_MULTIPLE_HIDDEN
+  forall nAddrs dom1 dom2 a .
+  ( HasCallStack
+  , KnownNat nAddrs
+  , HiddenClock dom1
+  , HiddenClock dom2
+  , NFDataX a
+  )
+  => Signal dom1 (E.RamOp nAddrs a)
+  -- ^ ram operation for port A
+  -> Signal dom2 (E.RamOp nAddrs a)
+  -- ^ ram operation for port B
+  -> (Signal dom1 a, Signal dom2 a)
+  -- ^ Outputs data on /next/ cycle. When writing, the data written
+  -- will be echoed. When reading, the read data is returned.
+trueDualPortBlockRam inA inB = E.trueDualPortBlockRam (hasClock @dom1) (hasClock @dom2)
+ inA inB
+#else
+  forall nAddrs dom a .
+  ( HasCallStack
+  , KnownNat nAddrs
+  , HiddenClock dom
+  , NFDataX a
+  )
+  => Signal dom (E.RamOp nAddrs a)
+  -- ^ ram operation for port A
+  -> Signal dom (E.RamOp nAddrs a)
+  -- ^ ram operation for port B
+  -> (Signal dom a, Signal dom a)
+  -- ^ Outputs data on /next/ cycle. When writing, the data written
+  -- will be echoed. When reading, the read data is returned.
+trueDualPortBlockRam inA inB = E.trueDualPortBlockRam hasClock hasClock
+ inA inB
+#endif
