@@ -1,0 +1,1 @@
+FIXED: Broken VHDL primitive template for setSlice# [#1715](https://github.com/clash-lang/clash-compiler/issues/1715)
