@@ -65,6 +65,7 @@ instance Default RewriteEnv where
     , _typeTranslator=error "_typeTranslator: NYI"
     , _tcCache=emptyUniqMap
     , _tupleTcCache=IntMap.empty
+    , _peEvaluator=error "_peEvaluator: NYI"
     , _evaluator=error "_evaluator: NYI"
     , _topEntities=emptyVarSet
     , _customReprs=buildCustomReprs []
@@ -80,12 +81,7 @@ instance Default extra => Default (RewriteState extra) where
     , _curFun=error "_curFun: NYI"
     , _nameCounter=2
     , _workFreeBinders=emptyVarEnv
-#if EXPERIMENTAL_EVALUATOR
-    , _ioHeap=error "_ioHeap: NYI"
-    , _ioAddr=0
-#else
     , _globalHeap=error "_globalHeap: NYI"
-#endif
     , _extra=def
     }
 

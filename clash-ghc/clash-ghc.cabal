@@ -65,12 +65,6 @@ flag use-ghc-paths
   default: False
   manual: True
 
-flag experimental-evaluator
-  description:
-    Use the new partial evaluator (experimental; may break)
-  default: False
-  manual: True
-
 executable clash
   Main-Is:            src-ghc/Batch.hs
   Build-Depends:      base, clash-ghc
@@ -112,8 +106,8 @@ common common-options
                       TypeOperators
                       ViewPatterns
 
-  if flag(experimental-evaluator)
-      cpp-options: -DEXPERIMENTAL_EVALUATOR
+  if impl(ghc >= 8.6)
+      default-extensions: NoStarIsType
 
 library
   import:             common-options
