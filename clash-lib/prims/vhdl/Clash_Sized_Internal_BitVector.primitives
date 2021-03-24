@@ -309,11 +309,11 @@ end block; ~ELSE
            -> BitVector (m + 1 + i)"
     , "template" :
 "-- setSlice begin
-~GENSYM[setSlice][0] : process(~VAR[bv][0]~VARS[4])
-  variable ~GENSYM[ivec][1] : ~TYP[0];
+~GENSYM[setSlice][0] : process(~VAR[bv][1]~VARS[4])
+  variable ~GENSYM[ivec][1] : ~TYP[1];
 begin
-  ~SYM[1] := ~ARG[1];
-  ~SYM[1](~LIT[2] downto ~LIT[3]) := ~VAR[bv][4];
+  ~SYM[1] := ~VAR[bv][1];
+  ~SYM[1](~LIT[2] downto ~LIT[3]) := ~ARG[4];
   ~RESULT <= ~SYM[1];
 end process;
 -- setSlice end"
