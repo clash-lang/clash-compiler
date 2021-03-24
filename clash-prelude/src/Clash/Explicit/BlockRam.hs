@@ -394,17 +394,21 @@ module Clash.Explicit.BlockRam
   , blockRamPow2
   , blockRamU
   , blockRam1
+  , trueDualPortBlockRam
   , ResetStrategy(..)
     -- * Read/Write conflict resolution
   , readNew
     -- * Internal
   , blockRam#
+  , trueDualPortBlockRam#
   )
 where
 
 import           Clash.HaskellPrelude
 
-import           Data.Maybe             (isJust)
+import           Data.Either            (isLeft)
+import           Data.Maybe             (isJust, fromMaybe)
+import           Data.Bifunctor         (first, second, bimap)
 import qualified Data.Sequence          as Seq
 import           GHC.Stack              (HasCallStack, withFrozenCallStack)
 import           GHC.TypeLits           (KnownNat, type (^), type (<=))
@@ -412,17 +416,19 @@ import           GHC.TypeLits           (KnownNat, type (^), type (<=))
 import           Clash.Annotations.Primitive
   (hasBlackBox)
 import           Clash.Class.Num        (SaturationMode(SatBound), satSucc)
+import           Clash.Class.BitPack    (BitPack)
 import           Clash.Explicit.Signal  (KnownDomain, Enable, register, fromEnable)
 import           Clash.Signal.Internal
   (Clock(..), Reset, Signal (..), invertReset, (.&&.), mux)
-import           Clash.Promoted.Nat     (SNat(..))
-import           Clash.Signal.Bundle    (unbundle)
+import           Clash.Promoted.Nat     (SNat(..), snatToNum, natToNum)
+import           Clash.Signal.Bundle    (unbundle, bundle)
+import           Clash.Signal.Internal.Ambiguous (clockPeriod)
 import           Clash.Sized.Unsigned   (Unsigned)
 import           Clash.Sized.Index      (Index)
 import           Clash.Sized.Vector     (Vec, replicate, toList, iterateI)
 import qualified Clash.Sized.Vector     as CV
 import           Clash.XException
-  (maybeIsX, seqX, NFDataX, deepErrorX, defaultSeqX, fromJustX, undefined)
+  (maybeIsX, seqX, NFDataX, deepErrorX, defaultSeqX, fromJustX, undefined, isX)
 
 {- $setup
 >>> :m -Clash.Prelude
@@ -1038,3 +1044,133 @@ readNew clk rst en ram rdAddr wrM = mux wasSame wasWritten $ ram rdAddr wrM
         (wasSame,wasWritten) =
           unbundle (register clk rst en (False, undefined)
                              (readNewT <$> rdAddr <*> wrM))
+
+trueDualPortBlockRam ::
+  forall nAddrs domA domB a .
+  ( HasCallStack
+  , KnownNat nAddrs
+  , KnownDomain domA
+  , KnownDomain domB
+  , NFDataX a
+  , BitPack a
+  ) =>
+
+  -- | Clock for port A
+  Clock domA ->
+  -- | Write data port A
+  Signal domA (Maybe a) ->
+  -- | Address to read from or write to on port A
+  Signal domA (Index nAddrs) ->
+
+  -- | Clock for port B
+  Clock domB ->
+  -- | Write data B
+  Signal domB (Maybe a) ->
+  -- | Address to read from or write to on port B
+  Signal domB (Index nAddrs) ->
+
+  -- | Outputs data on /next/ cycle. If write enable is @True@, the data written
+  -- will be echoed. If write enable is @False@, the read data is returned.
+  (Signal domA a, Signal domB a)
+trueDualPortBlockRam clkA writeA addrA clkB writeB addrB =
+  trueDualPortBlockRam#
+    clkA (isJust <$> writeA) addrA (fromJustX <$> writeA)
+    clkB (isJust <$> writeB) addrB (fromJustX <$> writeB)
+
+trueDualPortBlockRam# ::
+  forall nAddrs domA domB a .
+  ( HasCallStack
+  , KnownNat nAddrs
+  , KnownDomain domA
+  , KnownDomain domB
+  , NFDataX a
+  , BitPack a
+  ) =>
+
+  -- | Clock for port A
+  Clock domA ->
+  -- | Write enable for port A
+  Signal domA Bool ->
+  -- | Address to read from or write to on port A
+  Signal domA (Index nAddrs) ->
+  -- | Data in for port A; ignored when /write enable/ is @False@
+  Signal domA a ->
+
+  -- | Clock for port B
+  Clock domB ->
+  -- | Write enable for port B
+  Signal domB Bool ->
+  -- | Address to read from or write to on port B
+  Signal domB (Index nAddrs) ->
+  -- | Data in for port B; ignored when /write enable/ is @False@
+  Signal domB a ->
+
+  -- | Outputs data on /next/ cycle. If write enable is @True@, the data written
+  -- will be echoed. If write enable is @False@, the read data is returned.
+  (Signal domA a, Signal domB a)
+trueDualPortBlockRam# !_clkA weA addrA datA !_clkB weB addrB datB =
+  bimap
+    (deepErrorX "trueDualPortBlockRam: Port A: First value undefined" :-)
+    (deepErrorX "trueDualPortBlockRam: Port B: First value undefined" :-)
+    ( go
+        (Seq.fromFunction (natToNum @nAddrs) initElement)
+        0
+        (bundle (weA, fromIntegral <$> addrA, datA))
+        (bundle (weB, fromIntegral <$> addrB, datB)) )
+ where
+  tA = snatToNum @Int (clockPeriod @domA)
+  tB = snatToNum @Int (clockPeriod @domB)
+
+  initElement :: Int -> a
+  initElement n =
+    deepErrorX ("Unknown initial element; position " <> show n)
+
+  unknownEnableAndAddr :: Int -> a
+  unknownEnableAndAddr n =
+    deepErrorX ("Write enable and data unknown; position " <> show n)
+
+  unknownAddr :: Int -> a
+  unknownAddr n =
+    deepErrorX ("Write enabled, but address unknown; position " <> show n)
+
+  writeRam :: Bool -> Int -> a -> Seq.Seq a -> (Maybe a, Seq.Seq a)
+  writeRam enable addr dat mem
+    | enableUndefined && addrUndefined
+    = ( Just (deepErrorX "Unknown enable and address")
+      , Seq.fromFunction (natToNum @nAddrs) unknownEnableAndAddr )
+    | addrUndefined
+    = ( Just (deepErrorX "Unknown address")
+      , Seq.fromFunction (natToNum @nAddrs) unknownAddr )
+    | enableUndefined
+    = writeRam True addr (deepErrorX ("Write unknown; position" <> show addr)) mem
+    | enable
+    = (Just dat, Seq.insertAt addr dat mem)
+    | otherwise
+    = (Nothing, mem)
+   where
+    enableUndefined = isLeft (isX enable)
+    addrUndefined = isLeft (isX addr)
+
+  go ::
+    Seq.Seq a ->
+    Int ->
+    Signal domA (Bool, Int, a) ->
+    Signal domB (Bool, Int, a) ->
+    (Signal domA a, Signal domB a)
+  go ram0 relativeTime as0@((weA_, addrA_, datA_) :- as1) bs0@((weB_, addrB_, datB_) :- bs1)
+    -- TODO: Add conflict resolution
+    | relativeTime <= 0 =
+      let
+        (wrote, !ram1) = writeRam weA_ addrA_ datA_ ram0
+        out = fromMaybe (ram1 `Seq.index` addrA_) wrote
+      in
+        first (out :-) (go ram1 (relativeTime + tA) as1 bs0)
+    | otherwise =
+      let
+        (wrote, !ram1) = writeRam weB_ addrB_ datB_ ram0
+        out = fromMaybe (ram1 `Seq.index` addrB_) wrote
+      in
+        second (out :-) (go ram1 (relativeTime - tB) as0 bs1)
+
+{-# NOINLINE trueDualPortBlockRam# #-}
+{-# ANN trueDualPortBlockRam# hasBlackBox #-}
