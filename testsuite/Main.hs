@@ -529,6 +529,7 @@ runClashTest = defaultMain $ clashTestRoot
         , outputTest ("tests" </> "shouldwork" </> "Issues") allTargets ["-fclash-aggressive-x-optimization-blackboxes"] ["-itests/shouldwork/Issues"] "T1506B" "main"
         , runTest "T1615" def{hdlSim=False, hdlTargets=[Verilog]}
         , runTest "T1663" def{hdlTargets=[VHDL], hdlSim=False}
+        , runTest "T1715" def
         ] <>
         if compiledWith == Cabal then
           -- This tests fails without environment files present, which are only
