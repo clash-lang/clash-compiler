@@ -19,12 +19,6 @@ flag cosim
    default: False
    manual: True
 
-flag experimental-evaluator
-  description:
-    Use the new partial evaluator (experimental; may break)
-  default: False
-  manual: True
-
 flag multiple-hidden
   description:
     Allow multiple hidden clocks, resets, and enables to be used. This is an
@@ -76,9 +70,6 @@ common basic-config
 
   if flag(cosim)
     cpp-options:       -DCOSIM
-
-  if flag(experimental-evaluator)
-    cpp-options:       -DEXPERIMENTAL_EVALUATOR
 
   if flag(multiple-hidden)
     cpp-options:       -DCLASH_MULTIPLE_HIDDEN

@@ -34,9 +34,7 @@ normalization :: NormRewrite
 normalization =
   rmDeadcode >-> multPrim >-> constantPropagation >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
   bindConst >-> letTL
-#if !EXPERIMENTAL_EVALUATOR
   >-> evalConst
-#endif
   >-!-> cse >-!-> cleanup >->
   xOptim >-> rmDeadcode >->
   cleanup >-> bindSimIO >-> recLetRec >-> splitArgs
@@ -49,9 +47,7 @@ normalization =
     rmDeadcode = bottomupR (apply "deadcode" deadCode)
     bindConst  = topdownR (apply "bindConstantVar" bindConstantVar)
     -- See [Note] bottomup traversal evalConst:
-#if !EXPERIMENTAL_EVALUATOR
     evalConst  = bottomupR (apply "evalConst" reduceConst)
-#endif
     cse        = topdownR (apply "CSE" simpleCSE)
     xOptim     = bottomupR (apply "xOptimize" xOptimize)
     cleanup    = topdownR (apply "etaExpandSyn" etaExpandSyn) >->
@@ -91,9 +87,7 @@ constantPropagation =
       [ ("applicationPropagation", appProp              )
       , ("bindConstantVar"       , bindConstantVar      )
       , ("caseLet"               , caseLet              )
-#if !EXPERIMENTAL_EVALUATOR
       , ("caseCase"              , caseCase             )
-#endif
       , ("caseCon"               , caseCon              )
       , ("elimExistentials"      , elimExistentials     )
       , ("caseElemNonReachable"  , caseElemNonReachable )

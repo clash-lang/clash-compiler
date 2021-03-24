@@ -49,9 +49,7 @@ import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
 import           Data.Text                   (Text)
 import qualified Data.Text                   as Text
-
 import           System.IO.Unsafe            (unsafePerformIO)
-
 import           Data.Binary                 (encode)
 import qualified Data.ByteString             as BS
 import qualified Data.ByteString.Lazy        as BL
@@ -62,13 +60,7 @@ import           GHC.Types.Basic             (InlineSpec (..))
 import           BasicTypes                  (InlineSpec (..))
 #endif
 
-#if EXPERIMENTAL_EVALUATOR
-import           Clash.Core.PartialEval
-import           Clash.Core.PartialEval.NormalForm
-#else
 import           Clash.Core.Evaluator.Types  (PureHeap, whnf')
-#endif
-
 import           Clash.Core.FreeVars
   (freeLocalVars, localIdDoesNotOccurIn, localIdOccursIn,
    termFreeVars', freeLocalIds)
@@ -731,32 +723,14 @@ whnfRW isSubj ctx@(TransformContext is0 _) e rw = do
   ids <- Lens.use uniqSupply
   let (ids1,ids2) = splitSupply ids
   uniqSupply Lens..= ids2
-
-#if EXPERIMENTAL_EVALUATOR
-  (i, _) <- Lens.use curFun
-  heap <- Lens.use ioHeap
-  addr <- Lens.use ioAddr
-  fuel <- Lens.view fuelLimit
-  let genv = mkGlobalEnv bndrs tcm is0 ids1 fuel heap addr
-
-  case unsafePerformIO (nf eval genv isSubj i e) of
-    (!e', !genv') -> do
-      ioHeap Lens..= genvHeap genv'
-      ioAddr Lens..= genvAddr genv'
-
-      -- TODO I remain unsure about this. Do I want to use bindPureHeap?
-      rw (ctx { tfInScope = genvInScope genv' }) e'
-#else
   gh <- Lens.use globalHeap
 
   case whnf' eval bndrs tcm gh ids1 is0 isSubj e of
     (!gh1,ph,v) -> do
       globalHeap Lens..= gh1
       bindPureHeap tcm ph rw ctx v
-#endif
 {-# SCC whnfRW #-}
 
-#if !EXPERIMENTAL_EVALUATOR
 -- | Binds variables on the PureHeap over the result of the rewrite
 --
 -- To prevent unnecessary rewrites only do this when rewrite changed something.
@@ -814,7 +788,6 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
         nm = mkLocalId ty (mkUnsafeSystemName "x" uniq) -- See [Note: Name re-creation]
 
     inlineTest bs _ (_, stripTicks -> e_) = isWorkFree workFreeBinders bs e_
-#endif
 
 -- | Remove unused binders in given let-binding. Returns /Nothing/ if no unused
 -- binders were found.
