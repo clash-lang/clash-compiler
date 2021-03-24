@@ -35,9 +35,6 @@ fi
 
 cd .ci/bindist/linux/snap || exit
 
-# Make sure devel is in snap/snapcraft.yaml before replacing it with 'stable'
-# (if applicable). sed doesn't fail if it doesn't replace anything.
-grep devel snap/snapcraft.yaml
 if [[ ${RELEASE_CHANNEL} == "stable" || ${RELEASE_CHANNEL} == "beta" ]]; then
   # The Snap Store only allows grade=stable for stable snaps
   sed -i s/devel/stable/ snap/snapcraft.yaml
