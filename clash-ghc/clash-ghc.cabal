@@ -234,6 +234,7 @@ library
                       Clash.GHC.PartialEval.Primitive.Unboxed
                       Clash.GHC.PartialEval.Primitive.Signed
                       Clash.GHC.PartialEval.Primitive.Unsigned
+                      Clash.GHC.PartialEval.Primitive.Vector
                       Clash.GHC.PartialEval.Primitive.Word
                       Clash.GHC.PartialEval.Quote
                       Clash.GHC.Util

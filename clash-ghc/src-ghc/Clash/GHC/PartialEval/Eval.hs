@@ -85,6 +85,7 @@ import           Clash.GHC.PartialEval.Primitive.Narrowing
 import           Clash.GHC.PartialEval.Primitive.Natural
 import           Clash.GHC.PartialEval.Primitive.Signed
 import           Clash.GHC.PartialEval.Primitive.Unsigned
+import           Clash.GHC.PartialEval.Primitive.Vector
 import           Clash.GHC.PartialEval.Primitive.Word
 
 -- | Evaluate a term to WHNF.
@@ -372,6 +373,7 @@ evalPrimitive pr args = do
     , naturalPrims
     , signedPrims
     , unsignedPrims
+    , vectorPrims
     , wordPrims
     ]
 
