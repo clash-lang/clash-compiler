@@ -17,6 +17,8 @@ module Clash.Core.PartialEval.Monad
   ( -- * Partial Evaluation Monad
     Eval
   , runEval
+    -- * Partial Evaluation Exception
+  , EvalException(..)
     -- * Local and Global Environments
   , getLocalEnv
   , setLocalEnv
@@ -64,7 +66,7 @@ module Clash.Core.PartialEval.Monad
 
 import           Control.Applicative (Alternative)
 import           Control.Concurrent.Supply (Supply)
-import           Control.Monad.Catch (MonadThrow, MonadCatch, MonadMask)
+import           Control.Monad.Catch
 import           Control.Monad.IO.Class (MonadIO)
 
 #if !MIN_VERSION_base(4,13,0)
@@ -82,6 +84,7 @@ import           Clash.Core.Name (OccName)
 import           Clash.Core.PartialEval.AsTerm
 import           Clash.Core.PartialEval.NormalForm
 import           Clash.Core.Subst
+import           Clash.Core.Term (Pat, PrimInfo)
 import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type (Kind, KindOrType, Type, normalizeType)
 import           Clash.Core.Util (mkUniqSystemId, mkUniqSystemTyVar)
@@ -140,6 +143,33 @@ runEval g l x =
   let extract (a, g', _) = (a, g')
    in extract <$> RWS.runRWST (unEval x) l g
 {-# INLINE runEval #-}
+
+-- | Exceptions specific to partial evaluation. Note that other exceptions
+-- may still be thrown, such as ArithException or IOException.
+--
+data EvalException
+  = ResultUndefined
+    -- ^ The result of an evaluation is undefined. This can be used as an early
+    -- exit for some primitive definitions.
+  | CannotApply Value (Arg Value)
+    -- ^ An attempt to apply an argument to an incompatible value was made,
+    -- for instance applying to a non-function value.
+  | CannotMatch Value [Pat]
+    -- ^ An attempt to match the given value on the following patterns did
+    -- not succeed. This likely means the supplied patterns were non-exhaustive.
+  | CannotConvert (Maybe Value)
+    -- ^ An attempt to convert a value between a Haskell value and an AST did
+    -- not succeed. This likely means a primitive failed to evaluate from not
+    -- all relevant arguments being statically known.
+  | UnexpectedArgs PrimInfo (Args Value)
+    -- ^ Arguments which are being examined are not in an expected form. This
+    -- is used in primitive rules to debug bad primitive definitions.
+  | NoHeapBinding Int
+    -- ^ An attempt to read from the IO heap failed as there was no binding.
+    -- This is indicative of an internal error in the evaluator.
+  deriving (Show)
+
+instance Exception EvalException
 
 getLocalEnv :: Eval LocalEnv
 getLocalEnv = RWS.ask
@@ -267,7 +297,7 @@ getRef addr = do
 
   case IntMap.lookup addr heap of
     Just val -> pure val
-    Nothing  -> error ("getHeap: Address " <> show addr <> " out of bounds")
+    Nothing  -> throwM (NoHeapBinding addr)
 
 setRef :: Int -> Value -> Eval ()
 setRef addr val = modifyGlobalEnv go
