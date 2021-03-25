@@ -27,10 +27,11 @@ module Clash.Core.PartialEval.Monad
   , getContext
   , withContext
     -- * Local Type Bindings
-  , getTvSubst
   , findTyVar
   , withTyVar
   , withTyVars
+  , normTy
+  , normVarTy
     -- * Local Term Bindings
   , findId
   , withId
@@ -70,6 +71,7 @@ import           Control.Monad.Fail (MonadFail)
 
 import           Control.Monad.RWS.Strict (RWST, MonadReader, MonadState)
 import qualified Control.Monad.RWS.Strict as RWS
+import           Data.Bitraversable (bitraverse)
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Map.Strict as Map
 
@@ -77,11 +79,11 @@ import           Clash.Core.HasFreeVars
 import           Clash.Core.Name (OccName)
 import           Clash.Core.PartialEval.AsTerm
 import           Clash.Core.PartialEval.NormalForm
-import           Clash.Core.Subst (Subst, mkTvSubst)
+import           Clash.Core.Subst
 import           Clash.Core.TyCon (TyConMap)
-import           Clash.Core.Type (Kind, KindOrType, Type)
+import           Clash.Core.Type (Kind, KindOrType, Type, normalizeType)
 import           Clash.Core.Util (mkUniqSystemId, mkUniqSystemTyVar)
-import           Clash.Core.Var (Id, TyVar, Var)
+import           Clash.Core.Var (Id, TyVar, Var(varType))
 import           Clash.Core.VarEnv
 import           Clash.Driver.Types (Binding(..))
 import           Clash.Rewrite.WorkFree (isWorkFree)
@@ -169,48 +171,85 @@ findTyVar :: TyVar -> Eval (Maybe Type)
 findTyVar i = Map.lookup i . lenvTypes <$> getLocalEnv
 
 withTyVar :: TyVar -> Type -> Eval a -> Eval a
-withTyVar i a x = do
-  modifyGlobalEnv goGlobal
-  modifyLocalEnv goLocal x
+withTyVar i ty = withTyVars [(i, ty)]
+
+withTyVars :: [(TyVar, Type)] -> Eval a -> Eval a
+withTyVars tys action = do
+  normTys <- traverse (bitraverse pure normTy) tys
+
+  modifyGlobalEnv (goGlobal normTys)
+  modifyLocalEnv (goLocal normTys) action
  where
-  goGlobal env@GlobalEnv{genvInScope=inScope} =
-    let fvs = unitVarSet i `unionVarSet` freeVarsOf a
+  goGlobal xs env@GlobalEnv{genvInScope=inScope} =
+    let fvs = mkVarSet (fst <$> xs) `unionVarSet` freeVarsOf (snd <$> xs)
         iss = mkInScopeSet fvs `unionInScope` inScope
      in env { genvInScope = iss }
 
-  goLocal env@LocalEnv{lenvTypes=types} =
-    env { lenvTypes = Map.insert i a types }
+  goLocal xs env@LocalEnv{lenvTypes=types} =
+    (substEnvTys xs env) { lenvTypes = Map.fromList xs <> types }
 
-withTyVars :: [(TyVar, Type)] -> Eval a -> Eval a
-withTyVars = flip $ foldr (uncurry withTyVar)
+-- | Substitute all bound types in the environment with the list of bindings.
+-- This must be used after normTy to ensure that the substitution does not
+-- introduce new free variables into a type.
+--
+substEnvTys :: [(TyVar, Type)] -> LocalEnv -> LocalEnv
+substEnvTys tys env =
+  env { lenvTypes = fmap go (lenvTypes env) }
+ where
+  substFvs = freeVarsOf (snd <$> tys)
+  substVars = mkVarSet (fst <$> tys)
 
-getTvSubst :: Eval Subst
-getTvSubst = do
-  inScope <- getInScope
-  tys <- lenvTypes <$> getLocalEnv
-  let vars = mkVarEnv (Map.toList tys)
+  go ty =
+    let domFvs = freeVarsOf ty
+        inScope = unionVarSet (differenceVarSet domFvs substVars) substFvs
+        subst = mkTvSubst (mkInScopeSet inScope) (mkVarEnv tys)
+     in substTy subst ty
 
-  pure (mkTvSubst inScope vars)
+-- | Normalize a binding of type to tyvar using the existing environment. This
+-- is needed to ensure that new bindings in the environment do not contain
+-- variable references to bindings already in the environment, as these tyvars
+-- may become free when substituted into the result.
+--
+-- TODO Only do if type contains tyvars, otherwise it's a waste of time making
+-- the substitution from the environment.
+--
+normTy :: Type -> Eval Type
+normTy ty = do
+  tcm <- getTyConMap
+  tys <- Map.toList . lenvTypes <$> getLocalEnv
+
+  let substFvs = freeVarsOf (snd <$> tys)
+      substVars = mkVarSet (fst <$> tys)
+      domFvs = freeVarsOf ty
+      inScope = unionVarSet (differenceVarSet domFvs substVars) substFvs
+      subst = mkTvSubst (mkInScopeSet inScope) (mkVarEnv tys)
+
+  pure (normalizeType tcm (substTy subst ty))
+
+normVarTy :: Var a -> Eval (Var a)
+normVarTy var = do
+  ty <- normTy (varType var)
+  pure (var { varType = ty })
 
 findId :: Id -> Eval (Maybe Value)
 findId i = Map.lookup i . lenvValues <$> getLocalEnv
 
 withId :: Id -> Value -> Eval a -> Eval a
-withId i v x = do
+withId i v = withIds [(i, v)]
+
+withIds :: [(Id, Value)] -> Eval a -> Eval a
+withIds ids action = do
   modifyGlobalEnv goGlobal
-  modifyLocalEnv goLocal x
+  modifyLocalEnv goLocal action
  where
   goGlobal env@GlobalEnv{genvInScope=inScope} =
     -- TODO Change this to use an instance HasFreeVars Value
-    let fvs = unitVarSet i `unionVarSet` freeVarsOf (asTerm v)
-        iss = mkInScopeSet fvs `unionInScope` inScope
+    let fvs = mkVarSet (fst <$> ids) `unionVarSet` freeVarsOf (asTerm . snd <$> ids)
+        iss = inScope `unionInScope` mkInScopeSet fvs
      in env { genvInScope = iss }
 
   goLocal env@LocalEnv{lenvValues=values} =
-    env { lenvValues = Map.insert i v values }
-
-withIds :: [(Id, Value)] -> Eval a -> Eval a
-withIds = flip $ foldr (uncurry withId)
+    env { lenvValues = Map.fromList ids <> values }
 
 withoutId :: Id -> Eval a -> Eval a
 withoutId i = modifyLocalEnv go

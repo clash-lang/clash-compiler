@@ -45,7 +45,7 @@ quoteNeutral = \case
   NeCase x ty alts -> quoteNeCase x ty alts
 
 quoteArgs :: Args Value -> Eval (Args Normal)
-quoteArgs = traverse (bitraverse quote pure)
+quoteArgs = traverse (bitraverse quote normTy)
 
 quoteAlts :: [(Pat, Value)] -> Eval [(Pat, Normal)]
 quoteAlts = traverse (bitraverse pure quote)
