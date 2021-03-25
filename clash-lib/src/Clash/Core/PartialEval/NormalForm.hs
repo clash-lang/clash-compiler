@@ -123,6 +123,15 @@ isUndefined = \case
   VNeutral (NePrim pr _) ->
     primName pr `elem` undefinedPrims
 
+  VNeutral (NeApp n _) ->
+    isUndefined (VNeutral n)
+
+  VNeutral (NeTyApp n _) ->
+    isUndefined (VNeutral n)
+
+  VTick value _ -> isUndefined value
+  VCast value _ _ -> isUndefined value
+
   _ -> False
 
 -- | A term which is in beta-normal eta-long form (NF). This has no redexes,

@@ -20,12 +20,13 @@ module Clash.GHC.PartialEval.Eval
   , applyTy
   ) where
 
-import           Control.Monad (foldM)
+import           Control.Monad (filterM, foldM, zipWithM)
 import           Control.Monad.Catch hiding (mask)
 import           Data.Bifunctor
 import           Data.Bitraversable
 import           Data.Either
 import           Data.Graph (SCC(..))
+import           Data.Maybe (catMaybes)
 import           Data.Primitive.ByteArray (ByteArray(..))
 import qualified Data.Text as Text
 
@@ -33,6 +34,8 @@ import qualified Data.Text as Text
 import           GHC.Num.Integer (Integer (..))
 #else
 import           GHC.Integer.GMP.Internals (BigNat(..), Integer(..))
+import           Clash.Core.TyCon (tyConDataCons)
+import           Clash.Unique (lookupUniqMap)
 #endif
 
 import           GHC.Stack (HasCallStack)
@@ -44,23 +47,23 @@ import           BasicTypes (InlineSpec(..))
 #endif
 
 import           Clash.Core.DataCon (DataCon(..))
+import           Clash.Core.EqSolver (isAbsurdPat, patEqs, solveNonAbsurds)
+import           Clash.Core.HasFreeVars
 import           Clash.Core.HasType
 import           Clash.Core.Literal (Literal(..))
 import           Clash.Core.Name (nameOcc)
 import           Clash.Core.PartialEval.AsTerm
 import           Clash.Core.PartialEval.Monad
 import           Clash.Core.PartialEval.NormalForm
-import           Clash.Core.Subst (deShadowTerm)
+import           Clash.Core.Subst (deShadowAlt, deShadowTerm)
 import           Clash.Core.Term
 import           Clash.Core.TermInfo hiding (isFun)
-import           Clash.Core.TyCon (tyConDataCons)
 import           Clash.Core.Type
-import           Clash.Core.TysPrim (integerPrimTy)
 import qualified Clash.Core.Util as Util
 import           Clash.Core.Var
+import           Clash.Core.VarEnv
 import           Clash.Driver.Types (Binding(..), IsPrim(..))
 import qualified Clash.Normalize.Primitives as NP (undefined)
-import           Clash.Unique (lookupUniqMap')
 
 -- | Evaluate a term to WHNF.
 --
@@ -360,7 +363,7 @@ evalApp x y
          then do
            tcm <- getTyConMap
            let resultTy = termType tcm term
-           eval (Util.undefinedTm resultTy)
+           eval (TyApp (Prim NP.undefined) resultTy)
          else do
            argThunks <- delayArgs args
            foldM applyArg evalF argThunks
@@ -410,82 +413,108 @@ evalLetrec bs x = evalSccs x (Util.sccLetBindings bs)
           pure (VNeutral (NeLetrec binds rest))
 
 evalCase :: (HasCallStack) => Term -> Type -> [Alt] -> Eval Value
-evalCase term ty as = do
+evalCase term ty alts = do
+  let altFvs = freeVarsOf (Case term ty alts)
   subject <- withContext CaseSubject (delayEval term)
-  resTy <- normTy ty
-  alts <- delayAlts as
+  altTy <- normTy ty
 
-  caseCon subject resTy alts
+  withInScopeList (eltsVarSet altFvs) $ do
+    inScope <- getInScope
+
+    -- Deshadow alts to prevent universal / existential collisions
+    -- in recursive types (e.g. n and n1 for Vec)
+    delayedAlts <- delayAlts (deShadowAlt inScope <$> alts)
+
+    case delayedAlts of
+      -- Case expressions of the form "case i[LocalId] of { _ -> e }" should
+      -- force their argument to WHNF and update the local environment.
+      [(DefaultPat, v)]
+        |  Var i <- term
+        -> do forced <- eval term
+              withId i forced (forceEval v)
+
+      -- Case expressions with one non-absurd alternative which binds no
+      -- pattern variables can be replaced with just the alternative RHS.
+      [(p, v)]
+        | localVarsDoNotOccurIn (patVars p) (unsafeAsTerm v) -> forceEval v
+
+      -- Other case expressions have to go through caseCon + tryTransformCase,
+      -- no shortcuts can be taken in advance.
+      _ ->
+        -- Set the pattern vars as being in scope before evaluating the case.
+        let bound = concatMap (patVars . fst) delayedAlts
+         in withInScopeList bound (caseCon subject altTy delayedAlts)
 
 -- | Attempt to apply the case-of-known-constructor transformation on a case
 -- expression. If no suitable alternative can be chosen, attempt to transform
 -- the case expression to try and expose more opportunities.
 --
 caseCon :: Value -> Type -> [(Pat, Value)] -> Eval Value
-caseCon subject ty alts = do
+caseCon subject altTy alts = do
   forcedSubject <- withContext CaseSubject (forceEval subject)
 
   -- If the subject is undefined, the whole expression is undefined.
-  case isUndefined forcedSubject of
-    True -> eval (TyApp (Prim NP.undefined) ty)
-    False ->
-      case stripValue forcedSubject of
-        -- Known literal: attempt to match or throw an error.
-        VLiteral lit -> do
-          let def = error ("caseCon: No pattern matched " <> show lit <> " in " <> show alts)
-          match <- findBestAlt (matchLiteral lit) alts
-          evalAlt def match
+  if isUndefined forcedSubject then eval (TyApp (Prim NP.undefined) altTy) else
+    case stripValue forcedSubject of
+      -- Known literal: attempt to match or throw an error.
+      VLiteral lit -> do
+        let def = throwM (CannotMatch forcedSubject (fmap fst alts))
+        match <- findBestAlt (matchLiteral lit) alts
+        evalAlt def match
 
-        -- Known data constructor: attempt to match or throw an error.
-        -- The environment here is the same as the current environment.
-        VData dc args _env -> do
-          let def = error ("caseCon: No pattern matched " <> show dc <> " in " <> show alts)
-          match <- findBestAlt (matchData dc args) alts
-          evalAlt def match
+      -- Known data constructor: attempt to match or throw an error.
+      -- The environment is not used matching does not need evaluation.
+      VData dc args _ -> do
+        let def = throwM (CannotMatch forcedSubject (fmap fst alts))
+        match <- findBestAlt (matchData dc args) alts
+        evalAlt def match
 
-        -- Neutral primitives may be clash primitives which are treated as
-        -- values, like fromInteger# for various types in clash-prelude.
-        VNeutral (NePrim pr args) -> do
-          let def = VNeutral (NeCase forcedSubject ty alts)
-          match <- findBestAlt (matchClashPrim pr args) alts
-          evalAlt def match
+      -- Neutral primitives may be clash primitives which are treated as
+      -- values, like fromInteger# for various types in clash-prelude.
+      VNeutral (NePrim pr args) -> do
+        let def = tryTransformCase forcedSubject altTy alts
+        match <- findBestAlt (matchPrimLiteral pr args) alts
+        evalAlt def match
 
-        -- We know nothing: attempt case-of-case / case-of-let.
-        _ -> tryTransformCase forcedSubject ty alts
+      -- We know nothing: attempt case-of-case / case-of-let.
+      _ -> tryTransformCase forcedSubject altTy alts
 
 -- | Attempt to apply a transformation to a case expression to expose more
 -- opportunities for caseCon. If no transformations can be applied the
 -- case expression can only be neutral.
 --
 tryTransformCase :: Value -> Type -> [(Pat, Value)] -> Eval Value
-tryTransformCase subject ty alts =
+tryTransformCase subject altTy alts =
   case stripValue subject of
     -- A case of case: pull out the inner case expression if possible and
     -- attempt caseCon on the new case expression.
     VNeutral (NeCase innerSubject _ innerAlts) -> do
-      forcedAlts <- forceAlts innerAlts
+      forcedInnerAlts <- forceAlts innerAlts
 
-      if all (isKnown . snd) forcedAlts
-       then let asCase v = VNeutral (NeCase v ty alts)
-                newAlts  = second asCase <$> innerAlts
-             in caseCon innerSubject ty newAlts
+      if any (isKnown . snd) forcedInnerAlts then
+        -- We can do case of case, attempt caseCon on the result
+        let asCase v = VNeutral (NeCase v altTy alts)
+            newAlts  = second asCase <$> forcedInnerAlts
+         in caseCon innerSubject altTy newAlts
 
-        else pure (VNeutral (NeCase subject ty alts))
+        -- We cannot do case of case, force alternatives.
+      else do
+        forcedAlts <- forceAlts alts
+        pure (VNeutral (NeCase subject altTy forcedAlts))
 
     -- A case of let: Pull out the let expression if possible and attempt
     -- caseCon on the new case expression.
     VNeutral (NeLetrec bindings innerSubject) -> do
-      newCase <- caseCon innerSubject ty alts
+      newCase <- caseCon innerSubject altTy alts
       pure (VNeutral (NeLetrec bindings newCase))
 
-    -- There is no way to continue evaluating the case, do nothing.
-    -- TODO elimExistentials here.
-    _ -> pure (VNeutral (NeCase subject ty alts))
+    -- There is no way to continue evaluating the case, force all alternatives.
+    _ -> do
+      forcedAlts <- forceAlts alts
+      pure (VNeutral (NeCase subject altTy forcedAlts))
  where
   -- We only care about case of case if alternatives of the inner case
   -- expression correspond to something we can do caseCon on.
-  --
-  -- TODO We may also care if it is another case of case?
   --
   isKnown = \case
     VNeutral (NePrim pr _) ->
@@ -501,35 +530,108 @@ tryTransformCase subject ty alts =
     VData{} -> True
     _ -> False
 
-delayAlts :: [Alt] -> Eval [(Pat, Value)]
-delayAlts = traverse (bitraverse delayPat delayEval)
+-- | For each pattern, solve existential variables and refine until either no
+-- more existentials can be solved, or the pattern can be identified as absurd.
+--
+-- This corresponds to elimExistentials and caseElemNonReachable in the old
+-- transformation pipeline.
+--
+solveAndElim :: [Pat] -> Eval [Maybe (Pat, [(TyVar, Type)])]
+solveAndElim pats = do
+  tcm <- getTyConMap
+  traverse (go tcm []) pats
  where
-  delayPat = \case
-    DataPat dc tvs ids -> do
-      tvs' <- traverse normVarTy tvs
-      let tys  = fmap (\tv -> (tv, VarTy tv)) tvs'
+  go tcm sols pat
+    -- We obviously don't want to keep absurd patterns.
+    | isAbsurdPat tcm pat =
+        pure Nothing
 
+    | otherwise =
+        case pat of
+          DataPat dc tvs ids ->
+            case solveNonAbsurds tcm (mkVarSet tvs) (patEqs tcm pat) of
+              -- No new solutions, the pattern cannot be refined further.
+              [] -> pure (Just (pat, sols))
+
+              -- New solutions are available, using these solutions may mean
+              -- checking again yields more solutions.
+              ss -> withTyVars ss $ do
+                      ids' <- traverse normVarTy ids
+                      go tcm (sols <> ss) (DataPat dc tvs ids')
+
+          _ -> pure (Just (pat, sols))
+
+-- Delay the evaluation of alternatives, eliminating any alternatives
+-- immediately if they can be shown to be absurd by 'solveAndElim'.
+--
+delayAlts :: [Alt] -> Eval [(Pat, Value)]
+delayAlts (unzip -> (pats, terms)) = do
+  normPats <- traverse normPat pats
+  solvedPats <- solveAndElim normPats
+  newAlts <- zipWithM goAlts solvedPats terms
+
+  pure (catMaybes newAlts)
+ where
+  normPat = \case
+    DataPat dc tvs ids -> do
+      -- We still need to normalize the tyvars and ids with the types in scope
+      -- before we try to use solveAndElim. If we skip this, solveAndElim may
+      -- not be able to solve anything at all, and absurd alts won't be removed.
+      tvs' <- traverse normVarTy tvs
+      let tys = fmap (\tv -> (tv, VarTy tv)) tvs'
       ids' <- withTyVars tys (traverse normVarTy ids)
 
       pure (DataPat dc tvs' ids')
 
     pat -> pure pat
 
+  goAlts patSols term =
+    case patSols of
+      Nothing -> pure Nothing
+      Just (pat, tys) ->
+        withTyVars tys $ do
+          -- We always need to delay primitives in case alternatives, as they
+          -- may require variables bound in patterns to evaluate correctly.
+          value <- VThunk term <$> getLocalEnv
+          pure (Just (pat, value))
+
 forceAlts :: [(Pat, Value)] -> Eval [(Pat, Value)]
-forceAlts = traverse (traverse forceEval)
+forceAlts = traverse (bitraverse pure forceEval)
 
 data PatResult
   = Match   (Pat, Value) [(TyVar, Type)] [(Id, Value)]
   | NoMatch
+  deriving (Show)
 
-evalAlt :: Value -> PatResult -> Eval Value
+evalAlt :: Eval Value -> PatResult -> Eval Value
 evalAlt def = \case
   Match (_, val) tvs ids -> do
     tvs' <- traverse (bitraverse normVarTy pure) tvs
     ids' <- withTyVars tvs' (traverse (bitraverse normVarTy pure) ids)
-    forceEvalWith tvs' ids' val
+    body <- forceEvalWith tvs' ids' val
 
-  NoMatch -> pure def
+    -- Let bind any ids bound by the pattern which perform work. If these
+    -- are used in the body, then they will not be inlined during evaluation so
+    -- if not let bound they would appear as free variables in the result.
+
+    workIds <- filterM (fmap not . mustInline) ids'
+
+    case workIds of
+      [] -> pure body
+      _  -> pure (VNeutral (NeLetrec workIds body))
+
+  NoMatch -> def
+ where
+  mustInline (_, value) = do
+    workFree <- workFreeValue value
+    expandable <- expandableValue value
+    tcm <- getTyConMap
+
+    let valTy = termType tcm (unsafeAsTerm value)
+        isClass = isClassTy tcm valTy
+        isFun   = isPolyFunTy valTy
+
+    pure (isClass || isFun || (workFree && expandable))
 
 matchLiteral :: Literal -> (Pat, Value) -> Eval PatResult
 matchLiteral lit alt@(pat, _) =
@@ -585,42 +687,118 @@ matchLiteral lit alt@(pat, _) =
 
     _ -> pure NoMatch
  where
-  -- Somewhat of a hack: We find the constructor for BigNat and apply a
-  -- ByteArray literal made from the given ByteArray to it.
 #if MIN_VERSION_base(4,15,0)
   matchBigNat i ba = do
+    pure (Match alt [] [(i, VLiteral $ ByteArrayLiteral (ByteArray ba))])
 #else
+  -- This function is a nasty hack. We want the data constructor BN# from
+  -- BigNat, but according to the TyConMap there are no constructors for
+  -- Integer or Natural, which is where we would find BigNat. However, if you
+  -- use integer-gmp, BigNat is in the TyConMap...
   matchBigNat i (BN# ba) = do
-#endif
     tcm <- getTyConMap
-    let Just integerTcName = fmap fst (splitTyConAppM integerPrimTy)
-        [_, jpDc, _] = tyConDataCons (lookupUniqMap' tcm integerTcName)
-        ([bnTy], _) = splitFunTys tcm (dcType jpDc)
-        Just bnTcName = fmap fst (splitTyConAppM bnTy)
-        [bnDc] = tyConDataCons (lookupUniqMap' tcm bnTcName)
+    let Just bigNatTc = lookupUniqMap @Int 8214565720323826339 tcm
+        [bnDc] = tyConDataCons bigNatTc
+        arr = ByteArrayLiteral (ByteArray ba)
 
-    let arr = ByteArrayLiteral (ByteArray ba)
     val <- VData bnDc [Left (VLiteral arr)] <$> getLocalEnv
-
     pure (Match alt [] [(i, val)])
+#endif
 
 matchData :: DataCon -> Args Value -> (Pat, Value) -> Eval PatResult
 matchData dc args alt@(pat, _) =
   case pat of
     DataPat c tvs ids
       |  dc == c
-      -> do let (tms, tys) = bimap (zip ids) (zip tvs) (partitionEithers args)
-            pure (Match alt tys tms)
+      -> let (tmArgs, tyArgs) = partitionEithers args
+             tms = zip ids tmArgs
+             tys = zip tvs (drop (length tyArgs - length tvs) tyArgs)
+          in pure (Match alt tys tms)
 
     DefaultPat -> pure (Match alt [] [])
     _ -> pure NoMatch
 
+{-
+NOTE [matching primtives]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+In both GHC and Clash, there exist primitives which can refer to either a data
+constructor or a literal. For instance
+
+  * W32# is a primitive, but also corresponds to a data constructor
+  * Signed.fromInteger# is a primitive, but also corresponds to a literal
+
+We keep these as primitives in the partial evalautor, as turning W32# into a
+data constructor means it will not be turned into a primitive without another
+pass over the AST. For both examples above, not leaving the value as as
+primitive in the normalized AST result in failures later in compilation.
+-}
+
 -- TODO Should this also consider DataPat and data constructors?
 -- The old evaluator did not, but matchData wouldn't cover it.
 --
-matchClashPrim :: PrimInfo -> Args Value -> (Pat, Value) -> Eval PatResult
-matchClashPrim pr args alt@(pat, _) =
+matchPrimLiteral :: PrimInfo -> Args Value -> (Pat, Value) -> Eval PatResult
+matchPrimLiteral pr args alt@(pat, _) =
   case pat of
+    DataPat dc [] [x]
+      -- Char data constructor
+      |  nameOcc (dcName dc) == "GHC.Types.C#"
+      ,  [Left val] <- args
+      -> do lit <- forceEval val
+
+            case lit of
+              VLiteral (CharLiteral _) -> pure (Match alt [] [(x, lit)])
+              _ -> pure NoMatch
+
+      -- Int data constructors
+      |  name <- nameOcc (dcName dc)
+      ,  [Left val] <- args
+      ,  name `elem` ghcIntPrims
+      -> do lit <- forceEval val
+
+            case lit of
+              VLiteral (IntLiteral _) -> pure (Match alt [] [(x, lit)])
+
+              -- GHC.Int.Int64 is a special case
+              VLiteral (Int64Literal _)
+                |  name == "GHC.Int.I64#"
+                -> pure (Match alt [] [(x, lit)])
+
+              _ -> pure NoMatch
+
+      -- Word data constructors
+      |  name <- nameOcc (dcName dc)
+      ,  [Left val] <- args
+      , name `elem` ghcWordPrims
+      -> do lit <- forceEval val
+
+            case lit of
+              VLiteral (WordLiteral _) -> pure (Match alt [] [(x, lit)])
+
+              -- GHC.Word.Word64 is a special case
+              VLiteral (Word64Literal _)
+                |  name == "GHC.Word.W64#"
+                -> pure (Match alt [] [(x, lit)])
+
+              _ -> pure NoMatch
+
+      -- Float data constructor
+      |  nameOcc (dcName dc) == "GHC.Types.F#"
+      ,  [Left val] <- args
+      -> do lit <- forceEval val
+
+            case lit of
+              VLiteral (FloatLiteral _) -> pure (Match alt [] [(x, lit)])
+              _ -> pure NoMatch
+
+      -- Double data constructor
+      |  nameOcc (dcName dc) == "GHC.Types.D#"
+      ,  [Left val] <- args
+      -> do lit <- forceEval val
+
+            case lit of
+              VLiteral (DoubleLiteral _) -> pure (Match alt [] [(x, lit)])
+              _ -> pure NoMatch
+
     LitPat lit
       -- Bit literals
       |  primName pr == "Clash.Sized.BitVector.fromInteger##"
@@ -634,7 +812,7 @@ matchClashPrim pr args alt@(pat, _) =
 
       -- BitVector literals
       |  primName pr == "Clash.Sized.BitVector.fromInteger#"
-      ,  [Right _n, Left _knN, Left mask, Left val] <- args
+      ,  [Right _, Left _, Left mask, Left val] <- args
       -> do VLiteral (NaturalLiteral m) <- forceEval mask
             VLiteral l <- forceEval val
 
@@ -642,18 +820,34 @@ matchClashPrim pr args alt@(pat, _) =
               then pure (Match alt [] [])
               else pure NoMatch
 
-      -- Sized integer / natural literals
+      -- Index / Sized / Unsigned literals
       |  primName pr `elem` clashSizedNumbers
-      ,  [Right _n, Left _knN, Left val] <- args
+      ,  [Right _, Left _, Left val] <- args
       -> do VLiteral l <- forceEval val
 
             if l == lit
               then pure (Match alt [] [])
               else pure NoMatch
 
-    -- The primitive is not a literal from clash-prelude
+    -- The primitive is not a special data constructor / literal
     _ -> pure NoMatch
  where
+  ghcIntPrims =
+    [ "GHC.Int.I8#"
+    , "GHC.Int.I16#"
+    , "GHC.Int.I32#"
+    , "GHC.Int.I64"
+    , "GHC.Types.I#"
+    ]
+
+  ghcWordPrims =
+    [ "GHC.Word.W8#"
+    , "GHC.Word.W16#"
+    , "GHC.Word.W32#"
+    , "GHC.Word.W64#"
+    , "GHC.Types.W#"
+    ]
+
   clashSizedNumbers =
     [ "Clash.Sized.Internal.Index.fromInteger#"
     , "Clash.Sized.Internal.Signed.fromInteger#"
@@ -672,11 +866,11 @@ findBestAlt
 findBestAlt checkAlt =
   go NoMatch
  where
-  go !acc [] = pure acc
-  go !acc (a:as) = do
+  go acc [] = pure acc
+  go acc (a:as) = do
     match <- checkAlt a
     case match of
-      Match (pat, _term) _tvs _ids
+      Match (pat, _) _ _
         | pat == DefaultPat -> go match as
         | otherwise -> pure match
 
