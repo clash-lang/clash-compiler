@@ -70,6 +70,7 @@ import           Clash.Driver.Types (Binding(..), IsPrim(..))
 import qualified Clash.Normalize.Primitives as NP (undefined)
 
 import           Clash.GHC.PartialEval.Primitive.Bit
+import           Clash.GHC.PartialEval.Primitive.BitPack
 import           Clash.GHC.PartialEval.Primitive.BitVector
 import           Clash.GHC.PartialEval.Primitive.ByteArray
 import           Clash.GHC.PartialEval.Primitive.Char
@@ -83,7 +84,10 @@ import           Clash.GHC.PartialEval.Primitive.Int
 import           Clash.GHC.PartialEval.Primitive.Integer
 import           Clash.GHC.PartialEval.Primitive.Narrowing
 import           Clash.GHC.PartialEval.Primitive.Natural
+import           Clash.GHC.PartialEval.Primitive.Promoted
 import           Clash.GHC.PartialEval.Primitive.Signed
+import           Clash.GHC.PartialEval.Primitive.Singletons
+import           Clash.GHC.PartialEval.Primitive.Transformations
 import           Clash.GHC.PartialEval.Primitive.Unsigned
 import           Clash.GHC.PartialEval.Primitive.Vector
 import           Clash.GHC.PartialEval.Primitive.Word
@@ -359,6 +363,7 @@ evalPrimitive pr args = do
  where
   primitives = HashMap.unions
     [ bitPrims
+    , bitPackPrims
     , bitVectorPrims
     , byteArrayPrims
     , charPrims
@@ -371,7 +376,10 @@ evalPrimitive pr args = do
     , integerPrims
     , narrowingPrims
     , naturalPrims
+    , promotedPrims
     , signedPrims
+    , singletonsPrims
+    , transformationsPrims
     , unsignedPrims
     , vectorPrims
     , wordPrims

@@ -214,6 +214,7 @@ library
 
                       Clash.GHC.PartialEval.Eval
                       Clash.GHC.PartialEval.Primitive.Bit
+                      Clash.GHC.PartialEval.Primitive.BitPack
                       Clash.GHC.PartialEval.Primitive.BitVector
                       Clash.GHC.PartialEval.Primitive.ByteArray
                       Clash.GHC.PartialEval.Primitive.Char
@@ -229,8 +230,11 @@ library
                       Clash.GHC.PartialEval.Primitive.Internal.Sized
                       Clash.GHC.PartialEval.Primitive.Narrowing
                       Clash.GHC.PartialEval.Primitive.Natural
+                      Clash.GHC.PartialEval.Primitive.Promoted
+                      Clash.GHC.PartialEval.Primitive.Singletons
                       Clash.GHC.PartialEval.Primitive.Strategy
                       Clash.GHC.PartialEval.Primitive.ToAst
+                      Clash.GHC.PartialEval.Primitive.Transformations
                       Clash.GHC.PartialEval.Primitive.Unboxed
                       Clash.GHC.PartialEval.Primitive.Signed
                       Clash.GHC.PartialEval.Primitive.Unsigned
