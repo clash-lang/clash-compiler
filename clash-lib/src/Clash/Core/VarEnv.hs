@@ -45,7 +45,9 @@ module Clash.Core.VarEnv
     -- ** Modification
   , delVarSetByKey
   , unionVarSet
+  , differenceVarSet
     -- ** Working with predicates
+  , nullVarSet
     -- *** Searching
   , elemVarSet
   , notElemVarSet
@@ -293,6 +295,13 @@ unionVarSet
   -> VarSet
 unionVarSet = unionUniqSet
 
+-- | Take the difference of two sets
+differenceVarSet
+  :: VarSet
+  -> VarSet
+  -> VarSet
+differenceVarSet = differenceUniqSet
+
 -- | Is the variable an element in the set
 elemVarSet
   :: Var a
@@ -315,6 +324,12 @@ subsetVarSet
   -- ^ Set of variables B
   -> Bool
 subsetVarSet = subsetUniqSet
+
+-- | Check whether a varset is empty
+nullVarSet
+  :: VarSet
+  -> Bool
+nullVarSet = nullUniqSet
 
 -- | Look up a variable in the set, returns it if it exists
 lookupVarSet

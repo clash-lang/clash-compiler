@@ -51,6 +51,8 @@ module Clash.Unique
     -- * UniqSet
   , UniqSet
     -- ** Accessors
+    -- *** Size information
+  , nullUniqSet
     -- *** Indexing
   , lookupUniqSet
     -- ** Construction
@@ -67,6 +69,7 @@ module Clash.Unique
   , elemUniqSetDirectly
     -- *** Misc
   , subsetUniqSet
+  , differenceUniqSet
     -- ** Conversions
     -- *** Lists
   , mkUniqSet
@@ -369,6 +372,12 @@ elemUniqSetDirectly
   -> Bool
 elemUniqSetDirectly k (UniqSet m) = k `IntMap.member` m
 
+-- | Check whether a set is empty
+nullUniqSet
+  :: UniqSet a
+  -> Bool
+nullUniqSet (UniqSet env) = IntMap.null env
+
 -- | Look up an element in the set, returns it if it exists
 lookupUniqSet
   :: Uniquable a
@@ -411,3 +420,10 @@ subsetUniqSet
   -- ^ Set B
   -> Bool
 subsetUniqSet (UniqSet e1) (UniqSet e2) = IntMap.null (IntMap.difference e1 e2)
+
+-- | Take the difference of two sets
+differenceUniqSet
+  :: UniqSet a
+  -> UniqSet a
+  -> UniqSet a
+differenceUniqSet (UniqSet e1) (UniqSet e2) = UniqSet (IntMap.difference e1 e2)
