@@ -136,10 +136,15 @@ retickResult value ticks =
 forceEval :: (HasCallStack) => Value -> Eval Value
 forceEval = forceEvalWith [] []
 
+normTyBinders :: [(TyVar, Type)] -> Eval [(TyVar, Type)]
+normTyBinders =
+  let normTyBinder = bitraverse normVarTy normTy
+   in traverse normTyBinder
+
 forceEvalWith :: [(TyVar, Type)] -> [(Id, Value)] -> Value -> Eval Value
 forceEvalWith tvs ids = \case
   VThunk term env -> do
-    tvs' <- traverse (bitraverse pure normTy) tvs
+    tvs' <- normTyBinders tvs
     setLocalEnv env (withTyVars tvs' . withIds ids $ eval term)
 
   -- A ticked thunk is still a thunk.
@@ -237,7 +242,6 @@ lookupLocal i = do
 
 lookupGlobal :: Id -> Eval Value
 lookupGlobal i = do
-  -- inScope <- getInScope
   fuel <- getFuel
   var <- findBinding i
   target <- getTarget

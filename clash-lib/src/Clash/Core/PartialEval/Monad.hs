@@ -40,7 +40,6 @@ module Clash.Core.PartialEval.Monad
   , findId
   , withId
   , withIds
-  , withoutId
     -- * Global Term Bindings
   , findBinding
   , replaceBinding
@@ -50,7 +49,6 @@ module Clash.Core.PartialEval.Monad
     -- * Fuel
   , getFuel
   , withFuel
-  , preserveFuel
     -- * Accessing Global State
   , getTyConMap
   , getInScope
@@ -277,12 +275,6 @@ withIds ids = modifyLocalEnv goLocal
         iss = inScope `unionInScope` mkInScopeSet fvs
      in env { lenvValues = Map.fromList ids <> values, lenvInScope = iss }
 
-withoutId :: Id -> Eval a -> Eval a
-withoutId i = modifyLocalEnv go
- where
-  go env@LocalEnv{lenvValues=values} =
-    env { lenvValues = Map.delete i values }
-
 findBinding :: Id -> Eval (Maybe (Binding Value))
 findBinding i = lookupVarEnv i . genvBindings <$> getGlobalEnv
 
@@ -335,16 +327,6 @@ withFuel x = modifyGlobalEnv go >> x
  where
   go env@GlobalEnv{genvFuel=fuel} =
     env { genvFuel = fuel - 1 }
-
-preserveFuel :: Eval a -> Eval a
-preserveFuel x = do
-  fuel <- getFuel
-  res  <- x
-
-  modifyGlobalEnv (go fuel)
-  pure res
- where
-  go fuel env = env { genvFuel = fuel }
 
 getTyConMap :: Eval TyConMap
 getTyConMap = genvTyConMap <$> getGlobalEnv
