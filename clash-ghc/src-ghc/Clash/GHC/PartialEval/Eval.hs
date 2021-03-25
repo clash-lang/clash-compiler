@@ -341,32 +341,45 @@ evalApp x y
   (f, args, _ticks) = collectArgsTicks term
 
 evalLetrec :: (HasCallStack) => [LetBinding] -> Term -> Eval Value
-evalLetrec bs x = do
-  -- Determine if a binding should be kept in a letrec or inlined. We keep
-  -- bindings which perform work to prevent duplication of registers etc.
-  (keep, inline) <- foldM evalScc ([], []) (Util.sccLetBindings bs)
-  eX <- withIds (keep <> inline) (eval x)
-
-  case keep of
-    [] -> pure eX
-    _  -> pure (VNeutral (NeLetrec keep eX))
+evalLetrec bs x = evalSccs x (Util.sccLetBindings bs)
  where
-  evalBind (i, y) = do
-    var <- normVarTy i
-    eY <- delayEval y
+  -- Evaluate let bindings one by one according to their ordered SCCs. This is
+  -- necessary to ensure that each let binding is delayed with an environment
+  -- containing all previous bindings needed for evaluation.
+  evalSccs body = \case
+    [] -> eval body
+    (scc:sccs) ->
+      case scc of
+        AcyclicSCC (i, b) -> do
+          var <- normVarTy i
+          val <- delayEval b
+          rest <- withId var val (evalSccs body sccs)
+          workFree <- workFreeValue val
+          let nonSharable = isPolyFunTy (varType var)
 
-    pure (var, eY)
+          -- We keep let bindings which perform work, as it may not be possible
+          -- to inline them during evaluation. Sometimes this is redundant, as
+          -- the binding is only used once (and could be inlined) or is used
+          -- as a case subject and would be removed from the final circuit.
+          if nonSharable || workFree
+            then pure rest
+            else pure (VNeutral (NeLetrec [(var, val)] rest))
 
-  evalScc (k, i) = \case
-    AcyclicSCC y -> do
-      eY <- evalBind y
-      workFree <- workFreeValue (snd eY)
+        CyclicSCC ibs -> do
+          -- Each let binding in a recursive group must be delayed as a let
+          -- expression with the other bindings in the group. This is because
+          -- the evaluator is too strict to delay each binding with an
+          -- environment containing each other binding (i.e. using mfix).
+          let go (i, b) = do var <- normVarTy i
+                             let ibs' = filter (\(j,_) -> var /= j) ibs
+                             val <- if null ibs' then delayEval b else delayEval (Letrec ibs' b)
 
-      if workFree then pure (k, eY:i) else pure (eY:k, i)
+                             pure (var, val)
 
-    CyclicSCC ys -> do
-      eYs <- traverse evalBind ys
-      pure (eYs <> k, i)
+          binds <- traverse go ibs
+          rest <- withIds binds (evalSccs body sccs)
+
+          pure (VNeutral (NeLetrec binds rest))
 
 evalCase :: (HasCallStack) => Term -> Type -> [Alt] -> Eval Value
 evalCase term ty as = do
