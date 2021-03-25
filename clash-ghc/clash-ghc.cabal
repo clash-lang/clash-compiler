@@ -211,11 +211,24 @@ library
                       Clash.GHC.ClashFlags
                       Clash.GHC.GHC2Core
                       Clash.GHC.LoadInterfaceFiles
+
                       Clash.GHC.PartialEval.Eval
+                      Clash.GHC.PartialEval.Primitive.ByteArray
+                      Clash.GHC.PartialEval.Primitive.Char
+                      Clash.GHC.PartialEval.Primitive.Double
+                      Clash.GHC.PartialEval.Primitive.Enum
+                      Clash.GHC.PartialEval.Primitive.Float
                       Clash.GHC.PartialEval.Primitive.FromAst
+                      Clash.GHC.PartialEval.Primitive.GhcMisc
                       Clash.GHC.PartialEval.Primitive.Info
+                      Clash.GHC.PartialEval.Primitive.Int
+                      Clash.GHC.PartialEval.Primitive.Integer
+                      Clash.GHC.PartialEval.Primitive.Narrowing
+                      Clash.GHC.PartialEval.Primitive.Natural
+                      Clash.GHC.PartialEval.Primitive.Strategy
                       Clash.GHC.PartialEval.Primitive.ToAst
                       Clash.GHC.PartialEval.Primitive.Unboxed
+                      Clash.GHC.PartialEval.Primitive.Word
                       Clash.GHC.PartialEval.Quote
                       Clash.GHC.Util
                       Paths_clash_ghc

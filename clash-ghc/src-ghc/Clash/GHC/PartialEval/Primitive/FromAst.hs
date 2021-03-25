@@ -55,7 +55,7 @@ import Clash.Core.PartialEval.Monad
 import Clash.Core.PartialEval.NormalForm
 import Clash.Core.Term (PrimInfo(..))
 
-import Clash.GHC.PartialEval.Eval
+import {-# SOURCE #-} Clash.GHC.PartialEval.Eval
 import Clash.GHC.PartialEval.Primitive.Info
 import Clash.GHC.PartialEval.Primitive.Unboxed
 
