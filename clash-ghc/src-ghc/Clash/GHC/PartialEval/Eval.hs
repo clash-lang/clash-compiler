@@ -303,20 +303,34 @@ evalTyLam i x = do
 evalApp :: (HasCallStack) => Term -> Arg Term -> Eval Value
 evalApp x y
   | Data dc <- f
-  = if fullyApplied (dcType dc) args
-      then do
-        argThunks <- delayArgs args
-        VData dc argThunks <$> getLocalEnv
+  , dcArgs  <- fst $ splitFunForallTy (dcType dc)
+  , numArgs <- length dcArgs
+  = case compare (length args) numArgs of
+      -- The data constructor is under-applied, eta expand and evaluate the
+      -- result.
+      LT -> etaExpand term >>= eval
 
-      else etaExpand term >>= eval
+      -- The data constructor has all arguments given, and is a value.
+      EQ -> do
+        argThunks <- delayArgs args
+        env <- getLocalEnv
+
+        pure (VData dc argThunks env)
+
+      -- The data constructor is over-applied. This can only be an error in
+      -- the partial evaluator.
+      GT -> error "evalApp: Overapplied data constructor"
 
   | Prim pr <- f
   , prArgs  <- fst $ splitFunForallTy (primType pr)
   , numArgs <- length prArgs
   = case compare (length args) numArgs of
-      LT ->
-        etaExpand term >>= eval
+      -- The primitive is under-applied, eta expand and evaluate the result.
+      -- This will attempt primitive reducition with the eta-expanded version
+      -- which may still reduce depending on the primitive.
+      LT -> etaExpand term >>= eval
 
+      -- The primitive has all arguments given, attempt primitive reduction.
       EQ -> do
         argThunks <- delayArgs args
         let tyVars = lefts prArgs
@@ -324,22 +338,35 @@ evalApp x y
 
         withTyVars (zip tyVars tyArgs) (evalPrimOp pr argThunks)
 
+      -- The primitive is over-applied, i.e. it returns a function type after
+      -- primitive reduction. Primitive reduction is performed, and the
+      -- remaining arguments applied to the result.
       GT -> do
         let (pArgs, rArgs) = splitAt numArgs args
         pArgThunks <- delayArgs pArgs
-        primRes <- evalPrimOp pr pArgThunks
-        rArgThunks <- delayArgs rArgs
+        let tyVars = lefts prArgs
+            tyArgs = rights args
 
+        primRes <- withTyVars (zip tyVars tyArgs) (evalPrimOp pr pArgThunks)
+        rArgThunks <- delayArgs rArgs
         foldM applyArg primRes rArgThunks
 
   | otherwise
-  = preserveFuel $ do
-      evalF <- eval f
-      argThunks <- delayArgs args
-      foldM applyArg evalF argThunks
+  = do evalF <- eval f
+
+       -- If the LHS of an application is undefined, the result can only be
+       -- undefined, so there is no point evaluating the arguments.
+       if isUndefined evalF
+         then do
+           tcm <- getTyConMap
+           let resultTy = termType tcm term
+           eval (Util.undefinedTm resultTy)
+         else do
+           argThunks <- delayArgs args
+           foldM applyArg evalF argThunks
  where
   term = either (App x) (TyApp x) y
-  (f, args, _ticks) = collectArgsTicks term
+  (f, args) = collectArgs term
 
 evalLetrec :: (HasCallStack) => [LetBinding] -> Term -> Eval Value
 evalLetrec bs x = evalSccs x (Util.sccLetBindings bs)
