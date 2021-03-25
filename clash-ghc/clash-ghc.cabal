@@ -223,6 +223,7 @@ library
                       Clash.GHC.PartialEval.Primitive.FromAst
                       Clash.GHC.PartialEval.Primitive.GhcMisc
                       Clash.GHC.PartialEval.Primitive.Info
+                      Clash.GHC.PartialEval.Primitive.Index
                       Clash.GHC.PartialEval.Primitive.Int
                       Clash.GHC.PartialEval.Primitive.Integer
                       Clash.GHC.PartialEval.Primitive.Internal.Sized
@@ -231,6 +232,8 @@ library
                       Clash.GHC.PartialEval.Primitive.Strategy
                       Clash.GHC.PartialEval.Primitive.ToAst
                       Clash.GHC.PartialEval.Primitive.Unboxed
+                      Clash.GHC.PartialEval.Primitive.Signed
+                      Clash.GHC.PartialEval.Primitive.Unsigned
                       Clash.GHC.PartialEval.Primitive.Word
                       Clash.GHC.PartialEval.Quote
                       Clash.GHC.Util

@@ -77,11 +77,14 @@ import           Clash.GHC.PartialEval.Primitive.Double
 import           Clash.GHC.PartialEval.Primitive.Enum
 import           Clash.GHC.PartialEval.Primitive.Float
 import           Clash.GHC.PartialEval.Primitive.GhcMisc
+import           Clash.GHC.PartialEval.Primitive.Index
 import           Clash.GHC.PartialEval.Primitive.Info
 import           Clash.GHC.PartialEval.Primitive.Int
 import           Clash.GHC.PartialEval.Primitive.Integer
 import           Clash.GHC.PartialEval.Primitive.Narrowing
 import           Clash.GHC.PartialEval.Primitive.Natural
+import           Clash.GHC.PartialEval.Primitive.Signed
+import           Clash.GHC.PartialEval.Primitive.Unsigned
 import           Clash.GHC.PartialEval.Primitive.Word
 
 -- | Evaluate a term to WHNF.
@@ -362,10 +365,13 @@ evalPrimitive pr args = do
     , enumPrims
     , floatPrims
     , ghcPrims
+    , indexPrims
     , intPrims
     , integerPrims
     , narrowingPrims
     , naturalPrims
+    , signedPrims
+    , unsignedPrims
     , wordPrims
     ]
 
