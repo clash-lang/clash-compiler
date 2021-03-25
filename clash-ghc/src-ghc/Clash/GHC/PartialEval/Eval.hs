@@ -49,6 +49,7 @@ import           Clash.Core.Name (nameOcc)
 import           Clash.Core.PartialEval.AsTerm
 import           Clash.Core.PartialEval.Monad
 import           Clash.Core.PartialEval.NormalForm
+import           Clash.Core.Subst (deShadowTerm)
 import           Clash.Core.Term
 import           Clash.Core.TermInfo hiding (isFun)
 import           Clash.Core.TyCon (tyConDataCons)
@@ -647,11 +648,26 @@ applyArg :: Value -> Arg Value -> Eval Value
 applyArg val =
   either (apply val) (applyTy val)
 
+canApply :: Value -> Eval Bool
+canApply value = do
+  tcm <- getTyConMap
+
+  let ty = valueType tcm value
+      isClass = isClassTy tcm ty
+      isFun = isPolyFunTy ty
+
+  workFree <- workFreeValue value
+  expandable <- expandableValue value
+
+  pure (isClass || isFun || (workFree && expandable))
+ where
+  valueType tcm = termType tcm . unsafeAsTerm
+
 apply :: (HasCallStack) => Value -> Value -> Eval Value
 apply val arg = do
   tcm <- getTyConMap
   forced <- forceEval val
-  canApply <- workFreeValue arg
+  applicable <- canApply arg
 
   let argTy = termType tcm (unsafeAsTerm arg)
   let (lhs, ticks) = collectValueTicks forced
@@ -660,7 +676,7 @@ apply val arg = do
     -- If the LHS of application evaluates to a letrec, then add any bindings
     -- that do work to this letrec instead of creating a new one.
     VNeutral (NeLetrec bs x)
-      | canApply  -> do
+      | applicable -> do
           inner <- apply x arg
           pure (mkValueTicks (VNeutral (NeLetrec bs inner)) ticks)
 
@@ -678,7 +694,7 @@ apply val arg = do
     -- If the LHS of application is neutral, make a letrec around the neutral
     -- application if the argument performs work.
     VNeutral neu
-      | canApply  ->
+      | applicable  ->
           pure (mkValueTicks (VNeutral (NeApp neu arg)) ticks)
 
       | otherwise -> do
@@ -692,7 +708,7 @@ apply val arg = do
     -- If the LHS of application is a lambda, make a letrec with the name of
     -- the argument around the result of evaluation if it performs work.
     VLam i x env
-      | canApply -> do
+      | applicable -> do
           var <- normVarTy i
 
           setLocalEnv env $ do
@@ -701,8 +717,22 @@ apply val arg = do
 
       | otherwise ->
           setLocalEnv env $ do
-            inner <- withId i arg (eval x)
-            pure (mkValueTicks (VNeutral (NeLetrec [(i, arg)] inner)) ticks)
+            -- We rename i to j and bind the argument to j. This is somewhat of
+            -- a hack to stop recursive functions with work performing arguments
+            -- from binding let x = x in ... for arguments in recursive calls.
+            j <- getUniqueId (nameOcc (varName i)) (varType i)
+            let jVal = VNeutral (NeVar j)
+
+            inScope <- getInScope
+            let x' = deShadowTerm inScope x
+
+            -- (j, arg) is not bound in the environment, as this leads to extra
+            -- inlining with case subjects which currently leads to free FVs.
+            inner <- withId i jVal (eval x')
+
+            -- TODO Make this more efficient: only generate a single let for a
+            -- work free argument that doesn't change between calls.
+            pure (mkValueTicks (VNeutral (NeLetrec [(j, arg)] inner)) ticks)
 
     f ->
       error ("apply: Cannot apply " <> show arg <> " to " <> show f)
@@ -718,9 +748,11 @@ applyTy val ty = do
     VNeutral neu ->
       pure (mkValueTicks (VNeutral (NeTyApp neu argTy)) ticks)
 
-    VTyLam i x env ->
+    VTyLam i x env -> do
+      var <- normVarTy i
+
       setLocalEnv env $ do
-        inner <- withTyVar i argTy (eval x)
+        inner <- withTyVar var argTy (eval x)
         pure (mkValueTicks inner ticks)
 
     f ->
