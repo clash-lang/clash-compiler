@@ -25,6 +25,8 @@ import           Data.Bitraversable
 import           Data.Either
 import           Data.Graph (SCC(..))
 import           Data.Primitive.ByteArray (ByteArray(..))
+import qualified Data.Text as Text
+
 #if MIN_VERSION_base(4,15,0)
 import           GHC.Num.Integer (Integer (..))
 #else
@@ -40,6 +42,7 @@ import           BasicTypes (InlineSpec(..))
 import           Clash.Core.DataCon (DataCon(..))
 import           Clash.Core.HasType
 import           Clash.Core.Literal (Literal(..))
+import           Clash.Core.Name (nameOcc)
 import           Clash.Core.PartialEval.AsTerm
 import           Clash.Core.PartialEval.Monad
 import           Clash.Core.PartialEval.NormalForm
@@ -56,27 +59,64 @@ import           Clash.Unique (lookupUniqMap')
 -- | Evaluate a term to WHNF.
 --
 eval :: Term -> Eval Value
-eval = \case
-  Var i           -> evalVar i
-  Literal lit     -> pure (VLiteral lit)
-  Data dc         -> evalData dc
-  Prim pr         -> evalPrim pr
-  Lam i x         -> evalLam i x
-  TyLam i x       -> evalTyLam i x
-  App x y         -> evalApp x (Left y)
-  TyApp x ty      -> evalApp x (Right ty)
-  Letrec bs x     -> evalLetrec bs x
-  Case x ty alts  -> evalCase x ty alts
-  Cast x a b      -> evalCast x a b
-  Tick tick x     -> evalTick tick x
+eval ticked = do
+  let (term, ticks) = collectTicks ticked
 
-delayEval :: Term -> Eval Value
-delayEval = \case
-  Literal lit -> pure (VLiteral lit)
-  Lam i x -> evalLam i x
-  TyLam i x -> evalTyLam i x
-  Tick t x -> flip VTick t <$> delayEval x
-  term -> VThunk term <$> getLocalEnv
+  case term of
+    Var i -> do
+      result <- evalVar i
+      pure (mkValueTicks result ticks)
+
+    Literal lit -> do
+      pure (mkValueTicks (VLiteral lit) ticks)
+
+    Data dc -> do
+      result <- evalData dc
+      pure (mkValueTicks result ticks)
+
+    Prim pr -> do
+      result <- evalPrim pr
+      pure (mkValueTicks result ticks)
+
+    Lam i x -> do
+      result <- evalLam i x
+      pure (mkValueTicks result ticks)
+
+    TyLam i x -> do
+      result <- evalTyLam i x
+      pure (mkValueTicks result ticks)
+
+    App x y -> do
+      result <- evalApp x (Left y)
+      pure (retickResult result ticks)
+
+    TyApp x ty -> do
+      result <- evalApp x (Right ty)
+      pure (retickResult result ticks)
+
+    Letrec bs x -> do
+      result <- evalLetrec bs x
+      pure (mkValueTicks result ticks)
+
+    Case x ty alts -> do
+      result <- evalCase x ty alts
+      pure (mkValueTicks result ticks)
+
+    Cast x a b -> do
+      result <- evalCast x a b
+      pure (mkValueTicks result ticks)
+
+    Tick _ _ -> error "eval: impossible case"
+
+retickResult :: Value -> [TickInfo] -> Value
+retickResult value ticks =
+  case value of
+    VNeutral (NeLetrec bs x) ->
+      let bs' = fmap (\b -> mkValueTicks b ticks) <$> bs
+          x'  = mkValueTicks x ticks
+       in VNeutral (NeLetrec bs' x')
+
+    _ -> mkValueTicks value ticks
 
 forceEval :: Value -> Eval Value
 forceEval = forceEvalWith [] []
@@ -87,7 +127,17 @@ forceEvalWith tvs ids = \case
     tvs' <- traverse (bitraverse pure normTy) tvs
     setLocalEnv env (withTyVars tvs' . withIds ids $ eval term)
 
+  -- A ticked thunk is still a thunk.
+  VTick value tick ->
+    flip VTick tick <$> forceEvalWith tvs ids value
+
   value -> pure value
+
+delayEval :: Term -> Eval Value
+delayEval term =
+  case fst (collectArgs term) of
+    Prim{} -> eval term
+    _ -> VThunk term <$> getLocalEnv
 
 delayArg :: Arg Term -> Eval (Arg Value)
 delayArg = bitraverse delayEval normTy
@@ -100,6 +150,16 @@ evalVar i
   | isLocalId i = lookupLocal i
   | otherwise   = lookupGlobal i
 
+-- An inlined term must be wrapped in a tick which prefixes names with the
+-- name of the identifier which was inlined.
+--
+tickInlined :: Id -> Value -> Value
+tickInlined i value =
+  VTick value (NameMod PrefixName (LitTy $ SymTy (nameOf i)))
+ where
+  unQual = snd . Text.breakOnEnd "."
+  nameOf = Text.unpack . unQual . nameOcc . varName
+
 lookupLocal :: Id -> Eval Value
 lookupLocal i = do
   var <- normVarTy i
@@ -108,7 +168,9 @@ lookupLocal i = do
   case val of
     Just x -> do
       workFree <- workFreeValue x
-      if workFree then forceEval x else pure (VNeutral (NeVar var))
+      if workFree
+        then tickInlined var <$> forceEval x
+        else pure (VNeutral (NeVar var))
 
     Nothing -> pure (VNeutral (NeVar var))
 
@@ -135,7 +197,7 @@ lookupGlobal i = do
       -> withContext i . withFuel $ do
            val <- forceEval (bindingTerm x)
            replaceBinding (x { bindingTerm = val })
-           pure val
+           pure (tickInlined i val)
 
     Nothing
       -> pure (VNeutral (NeVar i))
@@ -543,9 +605,6 @@ findBestAlt checkAlt =
 evalCast :: Term -> Type -> Type -> Eval Value
 evalCast x a b = VCast <$> eval x <*> normTy a <*> normTy b
 
-evalTick :: TickInfo -> Term -> Eval Value
-evalTick tick x = VTick <$> eval x <*> pure tick
-
 applyArg :: Value -> Arg Value -> Eval Value
 applyArg val =
   either (apply val) (applyTy val)
@@ -557,37 +616,46 @@ apply val arg = do
   canApply <- workFreeValue arg
   let argTy = valueType tcm arg
 
-  case stripValue forced of
+  let (lhs, ticks) = collectValueTicks forced
+
+  case lhs of
     -- If the LHS of application evaluates to a letrec, then add any bindings
     -- that do work to this letrec instead of creating a new one.
     VNeutral (NeLetrec bs x)
       | canApply  -> do
           inner <- apply x arg
-          pure (VNeutral (NeLetrec bs inner))
+          pure (mkValueTicks (VNeutral (NeLetrec bs inner)) ticks)
 
       | otherwise -> do
           varTy <- normTy argTy
           var <- getUniqueId "workArg" varTy
           inner <- apply x (VNeutral (NeVar var))
-          pure (VNeutral (NeLetrec ((var, arg) : bs) inner))
+          pure (mkValueTicks (VNeutral (NeLetrec (bs <> [(var, arg)]) inner)) ticks)
 
     -- If the LHS of application is neutral, make a letrec around the neutral
     -- application if the argument performs work.
     VNeutral neu
-      | canApply  -> pure (VNeutral (NeApp neu arg))
+      | canApply  ->
+          pure (mkValueTicks (VNeutral (NeApp neu arg)) ticks)
+
       | otherwise -> do
           varTy <- normTy argTy
           var <- getUniqueId "workArg" varTy
           let inner = VNeutral (NeApp neu (VNeutral (NeVar var)))
-          pure (VNeutral (NeLetrec [(var, arg)] inner))
+          pure (mkValueTicks (VNeutral (NeLetrec [(var, arg)] inner)) ticks)
 
     -- If the LHS of application is a lambda, make a letrec with the name of
     -- the argument around the result of evaluation if it performs work.
     VLam i x env
-      | canApply  -> setLocalEnv env $ withId i arg (eval x)
-      | otherwise -> setLocalEnv env $ do
-          inner <- withId i arg (eval x)
-          pure (VNeutral (NeLetrec [(i, arg)] inner))
+      | canApply ->
+          setLocalEnv env $ do
+            inner <- withId i arg (eval x)
+            pure (mkValueTicks inner ticks)
+
+      | otherwise ->
+          setLocalEnv env $ do
+            inner <- withId i arg (eval x)
+            pure (mkValueTicks (VNeutral (NeLetrec [(i, arg)] inner)) ticks)
 
     f ->
       error ("apply: Cannot apply " <> show arg <> " to " <> show f)
@@ -600,12 +668,16 @@ applyTy val ty = do
   forced <- forceEval val
   argTy <- normTy ty
 
-  case stripValue forced of
-    VNeutral n ->
-      pure (VNeutral (NeTyApp n argTy))
+  let (lhs, ticks) = collectValueTicks forced
+
+  case lhs of
+    VNeutral neu ->
+      pure (mkValueTicks (VNeutral (NeTyApp neu argTy)) ticks)
 
     VTyLam i x env ->
-      setLocalEnv env $ withTyVar i argTy (eval x)
+      setLocalEnv env $ do
+        inner <- withTyVar i argTy (eval x)
+        pure (mkValueTicks inner ticks)
 
     f ->
       error ("applyTy: Cannot apply " <> show argTy <> " to " <> show f)
