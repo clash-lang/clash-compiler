@@ -19,7 +19,7 @@ import Clash.Core.DataCon (DataCon)
 import Clash.Core.PartialEval.Monad
 import Clash.Core.PartialEval.NormalForm
 import Clash.Core.Term (Term, PrimInfo, TickInfo, Pat)
-import Clash.Core.Type (Type(VarTy))
+import Clash.Core.Type (Type)
 import Clash.Core.Var (Id, TyVar)
 
 import Clash.GHC.PartialEval.Eval
@@ -58,19 +58,13 @@ quoteData dc args env = setLocalEnv env (NData dc <$> quoteArgs args)
 
 quoteLam :: Id -> Term -> LocalEnv -> Eval Normal
 quoteLam i x env =
-  setLocalEnv env $ do
-    eX <- apply (VLam i x env) (VNeutral (NeVar i))
-    qX <- quote eX
-
-    pure (NLam i qX env)
+  setLocalEnv env $
+    fmap (NLam i) (eval x >>= quote)
 
 quoteTyLam :: TyVar -> Term -> LocalEnv -> Eval Normal
 quoteTyLam i x env =
-  setLocalEnv env $ do
-    eX <- applyTy (VTyLam i x env) (VarTy i)
-    qX <- quote eX
-
-    pure (NTyLam i qX env)
+  setLocalEnv env $
+    fmap (NTyLam i) (eval x >>= quote)
 
 quoteCast :: Value -> Type -> Type -> Eval Normal
 quoteCast x a b = NCast <$> quote x <*> pure a <*> pure b

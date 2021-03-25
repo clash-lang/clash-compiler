@@ -72,8 +72,8 @@ instance AsTerm Normal where
     NNeutral neu -> asTerm neu
     NLiteral lit -> Literal lit
     NData dc args -> mkApps (Data dc) (argsToTerms args)
-    NLam i x _env -> Lam i (asTerm x)
-    NTyLam i x _env -> TyLam i (asTerm x)
+    NLam i x -> Lam i (asTerm x)
+    NTyLam i x -> TyLam i (asTerm x)
     NCast x a b -> Cast (asTerm x) a b
     NTick x tick -> Tick tick (asTerm x)
 

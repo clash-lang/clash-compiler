@@ -37,7 +37,7 @@ import Data.Map.Strict (Map)
 
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal
-import Clash.Core.Term (Term(..), PrimInfo(primName), TickInfo, Pat)
+import Clash.Core.Term (Term(..), PrimInfo(..), TickInfo, Pat)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type, TyVar)
 import Clash.Core.Util (undefinedPrims)
@@ -45,13 +45,10 @@ import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (VarEnv, InScopeSet)
 import Clash.Driver.Types (Binding(..))
 
-type Args a
-  = [Arg a]
-
 -- | An argument applied to a function / data constructor / primitive.
 --
-type Arg a
-  = Either a Type
+type Arg a = Either a Type
+type Args a = [Arg a]
 
 -- | Neutral terms cannot be reduced, as they represent things like variables
 -- which are unknown, partially applied functions, or case expressions where
@@ -130,17 +127,12 @@ isUndefined = \case
 -- | A term which is in beta-normal eta-long form (NF). This has no redexes,
 -- and all partially applied functions in sub-terms are eta-expanded.
 --
--- While not strictly necessary, NLam includes the environment at the point the
--- original term was evaluated. This makes it easier for the AsTerm instance
--- for Normal to reintroduce let expressions before lambdas without
--- accidentally floating a let using a lambda bound variable outwards.
---
 data Normal
   = NNeutral  !(Neutral Normal)
   | NLiteral  !Literal
   | NData     !DataCon !(Args Normal)
-  | NLam      !Id !Normal !LocalEnv
-  | NTyLam    !TyVar !Normal !LocalEnv
+  | NLam      !Id !Normal
+  | NTyLam    !TyVar !Normal
   | NCast     !Normal !Type !Type
   | NTick     !Normal !TickInfo
   deriving (Show)
