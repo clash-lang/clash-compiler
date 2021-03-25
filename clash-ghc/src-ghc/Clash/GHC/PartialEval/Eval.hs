@@ -33,6 +33,8 @@ import           GHC.Num.Integer (Integer (..))
 import           GHC.Integer.GMP.Internals (BigNat(..), Integer(..))
 #endif
 
+import           GHC.Stack (HasCallStack)
+
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Types.Basic (InlineSpec(..))
 #else
@@ -58,7 +60,7 @@ import           Clash.Unique (lookupUniqMap')
 
 -- | Evaluate a term to WHNF.
 --
-eval :: Term -> Eval Value
+eval :: (HasCallStack) => Term -> Eval Value
 eval ticked = do
   let (term, ticks) = collectTicks ticked
 
@@ -118,7 +120,7 @@ retickResult value ticks =
 
     _ -> mkValueTicks value ticks
 
-forceEval :: Value -> Eval Value
+forceEval :: (HasCallStack) => Value -> Eval Value
 forceEval = forceEvalWith [] []
 
 forceEvalWith :: [(TyVar, Type)] -> [(Id, Value)] -> Value -> Eval Value
@@ -145,7 +147,7 @@ delayArg = bitraverse delayEval normTy
 delayArgs :: Args Term -> Eval (Args Value)
 delayArgs = traverse delayArg
 
-evalVar :: Id -> Eval Value
+evalVar :: (HasCallStack) => Id -> Eval Value
 evalVar i
   | isLocalId i = lookupLocal i
   | otherwise   = lookupGlobal i
@@ -202,7 +204,7 @@ lookupGlobal i = do
     Nothing
       -> pure (VNeutral (NeVar i))
 
-evalData :: DataCon -> Eval Value
+evalData :: (HasCallStack) => DataCon -> Eval Value
 evalData dc
   | fullyApplied (dcType dc) [] =
       VData dc [] <$> getLocalEnv
@@ -210,7 +212,7 @@ evalData dc
   | otherwise =
       etaExpand (Data dc) >>= eval
 
-evalPrim :: PrimInfo -> Eval Value
+evalPrim :: (HasCallStack) => PrimInfo -> Eval Value
 evalPrim pr
   | fullyApplied (primType pr) [] =
       evalPrimOp pr []
@@ -252,17 +254,17 @@ etaExpand term = do
       (mkApps term (fmap (bimap Var VarTy) missingArgs))
       missingArgs
 
-evalLam :: Id -> Term -> Eval Value
+evalLam :: (HasCallStack) => Id -> Term -> Eval Value
 evalLam i x = do
   var <- normVarTy i
   withInScope var (VLam var x <$> getLocalEnv)
 
-evalTyLam :: TyVar -> Term -> Eval Value
+evalTyLam :: (HasCallStack) => TyVar -> Term -> Eval Value
 evalTyLam i x = do
   var <- normVarTy i
   withInScope var (VTyLam var x <$> getLocalEnv)
 
-evalApp :: Term -> Arg Term -> Eval Value
+evalApp :: (HasCallStack) => Term -> Arg Term -> Eval Value
 evalApp x y
   | Data dc <- f
   = if fullyApplied (dcType dc) args
@@ -303,7 +305,7 @@ evalApp x y
   term = either (App x) (TyApp x) y
   (f, args, _ticks) = collectArgsTicks term
 
-evalLetrec :: [LetBinding] -> Term -> Eval Value
+evalLetrec :: (HasCallStack) => [LetBinding] -> Term -> Eval Value
 evalLetrec bs x = do
   -- Determine if a binding should be kept in a letrec or inlined. We keep
   -- bindings which perform work to prevent duplication of registers etc.
@@ -331,7 +333,7 @@ evalLetrec bs x = do
       eYs <- traverse evalBind ys
       pure (eYs <> k, i)
 
-evalCase :: Term -> Type -> [Alt] -> Eval Value
+evalCase :: (HasCallStack) => Term -> Type -> [Alt] -> Eval Value
 evalCase term ty as = do
   subject <- delayEval term
   resTy <- normTy ty
@@ -604,14 +606,14 @@ findBestAlt checkAlt =
 
       NoMatch -> go acc as
 
-evalCast :: Term -> Type -> Type -> Eval Value
+evalCast :: (HasCallStack) => Term -> Type -> Type -> Eval Value
 evalCast x a b = VCast <$> eval x <*> normTy a <*> normTy b
 
 applyArg :: Value -> Arg Value -> Eval Value
 applyArg val =
   either (apply val) (applyTy val)
 
-apply :: Value -> Value -> Eval Value
+apply :: (HasCallStack) => Value -> Value -> Eval Value
 apply val arg = do
   tcm <- getTyConMap
   forced <- forceEval val
@@ -671,7 +673,7 @@ apply val arg = do
     f ->
       error ("apply: Cannot apply " <> show arg <> " to " <> show f)
 
-applyTy :: Value -> Type -> Eval Value
+applyTy :: (HasCallStack) => Value -> Type -> Eval Value
 applyTy val ty = do
   forced <- forceEval val
   argTy <- normTy ty
