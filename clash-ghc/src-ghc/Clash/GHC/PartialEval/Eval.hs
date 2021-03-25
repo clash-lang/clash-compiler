@@ -16,16 +16,19 @@ performing type applications.
 
 module Clash.GHC.PartialEval.Eval
   ( eval
+  , forceEval
   , apply
   , applyTy
   ) where
 
-import           Control.Monad (filterM, foldM, zipWithM)
+import           Control.Exception (IOException)
+import           Control.Monad (filterM, foldM, when, zipWithM)
 import           Control.Monad.Catch hiding (mask)
 import           Data.Bifunctor
 import           Data.Bitraversable
 import           Data.Either
 import           Data.Graph (SCC(..))
+import qualified Data.HashMap.Strict as HashMap
 import           Data.Maybe (catMaybes)
 import           Data.Primitive.ByteArray (ByteArray(..))
 import qualified Data.Text as Text
@@ -62,6 +65,7 @@ import           Clash.Core.Type
 import qualified Clash.Core.Util as Util
 import           Clash.Core.Var
 import           Clash.Core.VarEnv
+import           Clash.Debug (debugIsOn, traceM)
 import           Clash.Driver.Types (Binding(..), IsPrim(..))
 import qualified Clash.Normalize.Primitives as NP (undefined)
 
@@ -142,17 +146,40 @@ forceEvalWith tvs ids = \case
 
   value -> pure value
 
+forceArgs :: Args Value -> Eval (Args Value)
+forceArgs =
+  let forceArg = bitraverse forceEval normTy
+   in traverse forceArg
+
+{-
+NOTE [strict primitives]
+~~~~~~~~~~~~~~~~~~~~~~~~
+When evaluating, we want to avoid duplication of work where it can be avoided.
+However, sometimes avoiding inlining because a term performs work can lead to
+suboptimal results from partial evaluation, like a term which can be constant
+folded not being constant folded. One way we do this is by forcing inlining
+of local variables when evaluating the subject of a case expression, but this
+alone is still not sufficient.
+
+As the environment delays substitutions, it can also appear that a primitive
+which would reduce to a constant performs work, preventing it being inlined.
+To prevent this, the evaluator always evaluates primitives strictly, meaning
+that if they appear in a let binding or as an argument in application they are
+reduced immediately instead of creating a thunk. This leads to more places
+where let expressions can be removed entirely, and more places where
+applications can be performed without needing to create a workArg binding.
+-}
+
 delayEval :: Term -> Eval Value
 delayEval term =
   case fst (collectArgs term) of
     Prim{} -> eval term
     _ -> VThunk term <$> getLocalEnv
 
-delayArg :: Arg Term -> Eval (Arg Value)
-delayArg = bitraverse delayEval normTy
-
 delayArgs :: Args Term -> Eval (Args Value)
-delayArgs = traverse delayArg
+delayArgs =
+  let delayArg = bitraverse delayEval normTy
+   in traverse delayArg
 
 evalVar :: (HasCallStack) => Id -> Eval Value
 evalVar i
@@ -254,14 +281,95 @@ evalData dc
 evalPrim :: (HasCallStack) => PrimInfo -> Eval Value
 evalPrim pr
   | fullyApplied (primType pr) [] =
-      evalPrimOp pr []
+      evalPrimitive pr []
 
   | otherwise =
       etaExpand (Prim pr) >>= eval
 
--- TODO Hook up to primitive evaluation skeleton
-evalPrimOp :: PrimInfo -> Args Value -> Eval Value
-evalPrimOp pr args = pure (VNeutral (NePrim pr args))
+-- | Given a primitive and its arguments, determine the exact result type of
+-- the result of the primitive.
+--
+resultType :: PrimInfo -> Args Value -> Eval Type
+resultType pr args = do
+  tcm <- getTyConMap
+  let tmArgs = first asTerm <$> args
+
+  pure (applyTypeToArgs (Prim pr) tcm (primType pr) tmArgs)
+
+-- | Evaluate a primitive with the given arguments.
+-- See NOTE [Evaluating primitives] for more information.
+--
+evalPrimitive :: PrimInfo -> Args Value -> Eval Value
+evalPrimitive pr args = do
+  ty <- resultType pr args
+
+  case HashMap.lookup (primName pr) primitives of
+    Just f ->
+      f pr args `catches`
+        [ -- Catch an Eval specific error and attempt to correct it.
+          -- TODO This should print warnings if Clash is built with +debug
+          Handler $ \(e :: EvalException) ->
+            case e of
+              ResultUndefined ->
+                eval (TyApp (Prim NP.undefined) ty)
+
+              UnexpectedArgs pr' args' -> do
+                when debugIsOn $
+                  let failed  = show (primName pr') <> " with args:\n" <> show args'
+                      context = show (primName pr) <> " with args:\n" <> show args
+                   in traceM ("evalPrimitive: Unexpected arguments while evaluating " <> failed <> " from " <> context)
+
+                forcedArgs <- forceArgs args
+                pure (VNeutral (NePrim pr forcedArgs))
+
+              _ -> do
+                forcedArgs <- forceArgs args
+                pure (VNeutral (NePrim pr forcedArgs))
+
+          -- The Alternative / MonadPlus instance for IO throws an IOException
+          -- on empty / mzero. Catch this and return a neutral primitive.
+        , Handler $ \(_ :: IOException) -> do
+            forcedArgs <- forceArgs args
+            pure (VNeutral (NePrim pr forcedArgs))
+        ]
+
+    Nothing -> do
+      when debugIsOn $ do
+        let hasUnfolding = case primUnfolding pr of
+                             Unfolding _ -> "has unfolding"
+                             NoUnfolding -> "no unfolding"
+
+        traceM ("evalPrimitive: " <> show (primName pr) <> ": no implementation, " <> hasUnfolding)
+
+      forcedArgs <- forceArgs args
+      pure (VNeutral (NePrim pr forcedArgs))
+ where
+  primitives = HashMap.empty
+
+{-
+NOTE [Evaluating primitives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When the evaluator encounters a primitive operation with all arguments applied,
+it will attempt to evaluate it. If this is possible, the call to the primitive
+will be replaced with the result. However, it may not be possible to evaluate
+a primitive if not all arguments are statically known (i.e. if an argument is
+a variable with an unknown value). In this case, a neutral primitive is
+returned instead.
+
+Some primitives do not evaluate, and are deliberately preserved in the result
+of the evaluator as neutral primitives. Notable examples of this are
+
+  * GHC.CString.unpackCString#
+  * Clash.Sized.Internal.BitVector.fromInteger##
+  * Clash.Sized.Internal.BitVector.fromInteger#
+  * Clash.Sized.Internal.Index.fromInteger#
+  * Clash.Sized.Internal.Signed.fromInteger#
+  * Clash.Sized.Internal.Unsigned.fromInteger#
+
+Some primitives may throw exceptions (such as division by zero) or need to
+perform IO (e.g. primitives on ByteArray#). These effects are supported by the
+Eval monad, see Clash.Core.PartialEval.Monad.
+-}
 
 fullyApplied :: Type -> Args a -> Bool
 fullyApplied ty args =
@@ -339,7 +447,7 @@ evalApp x y
         let tyVars = lefts prArgs
             tyArgs = rights args
 
-        withTyVars (zip tyVars tyArgs) (evalPrimOp pr argThunks)
+        withTyVars (zip tyVars tyArgs) (evalPrimitive pr argThunks)
 
       -- The primitive is over-applied, i.e. it returns a function type after
       -- primitive reduction. Primitive reduction is performed, and the
@@ -350,7 +458,7 @@ evalApp x y
         let tyVars = lefts prArgs
             tyArgs = rights args
 
-        primRes <- withTyVars (zip tyVars tyArgs) (evalPrimOp pr pArgThunks)
+        primRes <- withTyVars (zip tyVars tyArgs) (evalPrimitive pr pArgThunks)
         rArgThunks <- delayArgs rArgs
         foldM applyArg primRes rArgThunks
 

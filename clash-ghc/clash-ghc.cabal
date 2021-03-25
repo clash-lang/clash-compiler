@@ -200,10 +200,6 @@ library
                       Clash.GHC.NetlistTypes
 
                       Clash.GHC.PartialEval
-                      Clash.GHC.PartialEval.Eval
-                      Clash.GHC.PartialEval.Quote
-                      Clash.GHC.PartialEval.Primitive
-
                       Clash.GHCi.Common
 
   Other-Modules:      Clash.GHCi.Leak
@@ -215,6 +211,8 @@ library
                       Clash.GHC.ClashFlags
                       Clash.GHC.GHC2Core
                       Clash.GHC.LoadInterfaceFiles
+                      Clash.GHC.PartialEval.Eval
+                      Clash.GHC.PartialEval.Quote
                       Clash.GHC.Util
                       Paths_clash_ghc
   if impl(ghc >= 8.8.0)
