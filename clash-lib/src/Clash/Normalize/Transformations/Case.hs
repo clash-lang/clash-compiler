@@ -451,7 +451,7 @@ caseElemNonReachable :: HasCallStack => NormRewrite
 caseElemNonReachable _ case0@(Case scrut altsTy alts0) = do
   tcm <- Lens.view tcCache
 
-  let (altsAbsurd, altsOther) = List.partition (isAbsurdAlt tcm) alts0
+  let (altsAbsurd, altsOther) = List.partition (isAbsurdPat tcm . fst) alts0
   case altsAbsurd of
     [] -> return case0
     _  -> changed =<< caseOneAlt (Case scrut altsTy altsOther)
@@ -654,8 +654,8 @@ elimExistentials (TransformContext is0 _) (Case scrut altsTy alts0) = do
  where
     -- Eliminate free type variables if possible
     go :: InScopeSet -> TyConMap -> Alt -> NormalizeSession Alt
-    go is2 tcm alt@(DataPat dc exts0 xs0, term0) =
-      case solveNonAbsurds tcm (mkVarSet exts0) (altEqs tcm alt) of
+    go is2 tcm alt@(pat@(DataPat dc exts0 xs0), term0) =
+      case solveNonAbsurds tcm (mkVarSet exts0) (patEqs tcm pat) of
         -- No equations solved:
         [] -> return alt
         -- One or more equations solved:
