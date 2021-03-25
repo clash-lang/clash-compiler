@@ -212,6 +212,10 @@ library
                       Clash.GHC.GHC2Core
                       Clash.GHC.LoadInterfaceFiles
                       Clash.GHC.PartialEval.Eval
+                      Clash.GHC.PartialEval.Primitive.FromAst
+                      Clash.GHC.PartialEval.Primitive.Info
+                      Clash.GHC.PartialEval.Primitive.ToAst
+                      Clash.GHC.PartialEval.Primitive.Unboxed
                       Clash.GHC.PartialEval.Quote
                       Clash.GHC.Util
                       Paths_clash_ghc

@@ -69,6 +69,8 @@ import           Clash.Debug (debugIsOn, traceM)
 import           Clash.Driver.Types (Binding(..), IsPrim(..))
 import qualified Clash.Normalize.Primitives as NP (undefined)
 
+import           Clash.GHC.PartialEval.Primitive.Info (resultType)
+
 -- | Evaluate a term to WHNF.
 --
 eval :: (HasCallStack) => Term -> Eval Value
@@ -285,16 +287,6 @@ evalPrim pr
 
   | otherwise =
       etaExpand (Prim pr) >>= eval
-
--- | Given a primitive and its arguments, determine the exact result type of
--- the result of the primitive.
---
-resultType :: PrimInfo -> Args Value -> Eval Type
-resultType pr args = do
-  tcm <- getTyConMap
-  let tmArgs = first asTerm <$> args
-
-  pure (applyTypeToArgs (Prim pr) tcm (primType pr) tmArgs)
 
 -- | Evaluate a primitive with the given arguments.
 -- See NOTE [Evaluating primitives] for more information.
