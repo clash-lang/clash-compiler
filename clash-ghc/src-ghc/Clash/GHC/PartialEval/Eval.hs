@@ -618,8 +618,8 @@ apply val arg = do
   tcm <- getTyConMap
   forced <- forceEval val
   canApply <- workFreeValue arg
-  let argTy = termType tcm (asTerm arg)
 
+  let argTy = termType tcm (unsafeAsTerm arg)
   let (lhs, ticks) = collectValueTicks forced
 
   case lhs of
