@@ -41,9 +41,6 @@ whnf
   -- ^ The evaluator implementation to use.
   -> GlobalEnv
   -- ^ The initial global environment.
-  -> Bool
-  -- ^ Whether evaluation should keep lifted data constructors.
-  -- See NOTE [Lifted Constructors] in Clash.Core.PartialEval.NormalForm.
   -> InScopeSet
   -- ^ The set of initially in scope variables.
   -> Id
@@ -52,8 +49,8 @@ whnf
   -- ^ The term under evaluation.
   -> IO (Term, GlobalEnv)
   -- ^ The term evalated to WHNF, and the final global environment.
-whnf eval gEnv isSubj inScope i x =
-  let lEnv = LocalEnv i mempty mempty inScope (genvFuel gEnv) isSubj
+whnf eval gEnv inScope i x =
+  let lEnv = LocalEnv i mempty mempty inScope (genvFuel gEnv)
    in runEval gEnv lEnv (asTerm <$> evalWhnf eval x)
 
 -- | Evaluate a term to NF, converting the result back to a Term.
@@ -64,9 +61,6 @@ nf
   -- ^ The evaluator implementation to use.
   -> GlobalEnv
   -- ^ The initial global environment.
-  -> Bool
-  -- ^ Whether evaluation should keep lifted data constructors.
-  -- See NOTE [Lifted Constructors] in Clash.Core.PartialEval.NormalForm.
   -> InScopeSet
   -- ^ The set of initially in scope variables.
   -> Id
@@ -75,8 +69,8 @@ nf
   -- ^ The term under evaluation.
   -> IO (Term, GlobalEnv)
   -- ^ The term evalated to NF, and the final global environment.
-nf eval gEnv isSubj inScope i x =
-  let lEnv = LocalEnv i mempty mempty inScope (genvFuel gEnv) isSubj
+nf eval gEnv inScope i x =
+  let lEnv = LocalEnv i mempty mempty inScope (genvFuel gEnv)
    in runEval gEnv lEnv (asTerm <$> (evalWhnf eval x >>= quoteNf eval))
 
 mkGlobalEnv
@@ -94,7 +88,7 @@ mkGlobalEnv
   -- ^ The address of the next heap element.
   -> GlobalEnv
 mkGlobalEnv bm tcm ids fuel heap addr =
-  GlobalEnv (fmap asThunk bm) tcm ids fuel heap addr mempty
+  GlobalEnv (fmap asThunk bm) tcm ids fuel heap addr Normal mempty
  where
   asThunk b@Binding{bindingId=i,bindingTerm=t} =
-    b { bindingTerm = VThunk t (LocalEnv i mempty mempty emptyInScopeSet fuel False) }
+    b { bindingTerm = VThunk t (LocalEnv i mempty mempty emptyInScopeSet fuel) }

@@ -26,6 +26,7 @@ module Clash.Core.PartialEval.NormalForm
   , isUndefined
   , Normal(..)
   , LocalEnv(..)
+  , EvalContext(..)
   , GlobalEnv(..)
   , workFreeCache
   ) where
@@ -138,7 +139,7 @@ data Normal
   deriving (Show)
 
 data LocalEnv = LocalEnv
-  { lenvContext :: Id
+  { lenvTarget :: Id
     -- ^ The id of the term currently under evaluation.
   , lenvTypes :: Map TyVar Type
     -- ^ Local type environment. These are types that are introduced while
@@ -154,15 +155,22 @@ data LocalEnv = LocalEnv
     -- ^ The amount of fuel left in the local environment when the previous
     -- head was reached. This is needed so resuming evaluation does not lead
     -- to additional fuel being available.
-  , lenvKeepLifted :: Bool
-    -- ^ When evaluating, keep data constructors for boxed data types (e.g. I#)
-    -- instead of converting these back to their corresponding primitive. This
-    -- is used when evaluating terms where the result is subject of a case
-    -- expression (see note: lifted data types).
   }
 
 instance Show LocalEnv where
   show = const "<env>"
+
+data EvalContext
+  = Normal
+  -- ^ The normal evalaution context, with no special rules.
+  | CaseSubject
+  -- ^ Evaluation is in a case subject. This makes inlining more eager to fire,
+  -- but only in cases where it could lead to a case alternative being chosen.
+  | Primitive
+  -- ^ Evaluation is in a primitive. This makes inlining and application more
+  -- eager to fire, as preventing either could prevent the primitive reducing.
+  --
+  -- TODO This is not used currently, perhaps it is not needed?
 
 -- TODO Add recursion info to the binding map. Until then we are forced to
 -- spend fuel on non-recursive (terminating) terms. Later it would save us from
@@ -184,6 +192,10 @@ data GlobalEnv = GlobalEnv
     -- ^ The heap containing the results of any evaluated IO primitives.
   , genvAddr :: Int
     -- ^ The address of the next element to be inserted into the heap.
+  , genvContext :: EvalContext
+    -- ^ Whether the evaluator is in a special context, which changes the rules
+    -- for inlining / application. This can lead to better results as it allows
+    -- evaluation to carefully relax rules.
   , genvWorkCache :: VarEnv Bool
     -- ^ Cache for the results of isWorkFree. This is required to use
     -- Clash.Rewrite.WorkFree.isWorkFree.

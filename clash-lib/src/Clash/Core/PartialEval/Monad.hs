@@ -26,6 +26,8 @@ module Clash.Core.PartialEval.Monad
     -- * Evaluation Context
   , getContext
   , withContext
+  , getTarget
+  , withTarget
     -- * Local Type Bindings
   , findTyVar
   , withTyVar
@@ -43,9 +45,6 @@ module Clash.Core.PartialEval.Monad
     -- * IO Heap Bindings
   , getRef
   , setRef
-    -- * Lifted Data Constructors
-  , isKeepingLifted
-  , keepLifted
     -- * Fuel
   , getFuel
   , withFuel
@@ -164,13 +163,13 @@ modifyGlobalEnv :: (GlobalEnv -> GlobalEnv) -> Eval ()
 modifyGlobalEnv = RWS.modify'
 {-# INLINE modifyGlobalEnv #-}
 
-getContext :: Eval Id
-getContext = lenvContext <$> getLocalEnv
+getTarget :: Eval Id
+getTarget = lenvTarget <$> getLocalEnv
 
-withContext :: Id -> Eval a -> Eval a
-withContext i = modifyLocalEnv go
+withTarget :: Id -> Eval a -> Eval a
+withTarget i = modifyLocalEnv go
  where
-  go env = env { lenvContext = i }
+  go env = env { lenvTarget = i }
 
 findTyVar :: TyVar -> Eval (Maybe Type)
 findTyVar i = Map.lookup i . lenvTypes <$> getLocalEnv
@@ -280,13 +279,18 @@ setRef addr val = modifyGlobalEnv go
     | otherwise =
         env { genvHeap = IntMap.insert addr val heap }
 
-isKeepingLifted :: Eval Bool
-isKeepingLifted = lenvKeepLifted <$> getLocalEnv
+getContext :: Eval EvalContext
+getContext = genvContext <$> getGlobalEnv
 
-keepLifted :: Eval a -> Eval a
-keepLifted = modifyLocalEnv forceLifted
+withContext :: EvalContext -> Eval a -> Eval a
+withContext context action = do
+  old <- getContext
+  modifyGlobalEnv (setContext context)
+  result <- action
+  modifyGlobalEnv (setContext old)
+  pure result
  where
-  forceLifted env = env { lenvKeepLifted = True }
+  setContext x env = env { genvContext = x }
 
 getFuel :: Eval Word
 getFuel = do

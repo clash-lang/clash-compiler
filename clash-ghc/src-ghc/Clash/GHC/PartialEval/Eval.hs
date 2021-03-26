@@ -170,9 +170,12 @@ lookupLocal i = do
   case val of
     Just x -> do
       workFree <- workFreeValue x
-      if workFree
-        then tickInlined var <$> forceEval x
-        else pure (VNeutral (NeVar var))
+      context <- getContext
+
+      case context of
+        CaseSubject   -> tickInlined var <$> forceEval x
+        _ | workFree  -> tickInlined var <$> forceEval x
+          | otherwise -> pure (VNeutral (NeVar var))
 
     Nothing -> pure (VNeutral (NeVar var))
 
@@ -196,7 +199,7 @@ lookupGlobal i = do
 
       -- Inlining can occur, using one unit of fuel in the process.
       |  otherwise
-      -> withContext i . withFuel $ do
+      -> withTarget i . withFuel $ do
            val <- forceEval (bindingTerm x)
            replaceBinding (x { bindingTerm = val })
            pure (tickInlined i val)
@@ -335,7 +338,7 @@ evalLetrec bs x = do
 
 evalCase :: (HasCallStack) => Term -> Type -> [Alt] -> Eval Value
 evalCase term ty as = do
-  subject <- delayEval term
+  subject <- withContext CaseSubject (delayEval term)
   resTy <- normTy ty
   alts <- delayAlts as
 
@@ -347,7 +350,7 @@ evalCase term ty as = do
 --
 caseCon :: Value -> Type -> [(Pat, Value)] -> Eval Value
 caseCon subject ty alts = do
-  forcedSubject <- keepLifted (forceEval subject)
+  forcedSubject <- withContext CaseSubject (forceEval subject)
 
   -- If the subject is undefined, the whole expression is undefined.
   case isUndefined forcedSubject of
