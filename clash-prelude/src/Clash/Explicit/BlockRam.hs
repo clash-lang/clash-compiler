@@ -1139,8 +1139,8 @@ trueDualPortBlockRam# ::
   forall nAddrs domFast domSlow a .
   ( HasCallStack
   , KnownNat nAddrs
-  , KnownDomain domFast
   , KnownDomain domSlow
+  , KnownDomain domFast
   , NFDataX a
   , BitPack a
   ) =>

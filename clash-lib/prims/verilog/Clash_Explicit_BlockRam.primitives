@@ -148,4 +148,58 @@ end~FI
 // blockRam1 end"
     }
   }
+, { "BlackBox" :
+    { "name" : "Clash.Explicit.BlockRam.trueDualPortBlockRam#"
+    , "kind" : "Declaration"
+    , "type" :
+"trueDualPortBlockRam# ::
+  forall nAddrs domFast domSlow a .
+  ( HasCallStack           ~ARG[0]
+  , KnownNat nAddrs        ~ARG[1]
+  , KnownDomain domSlow    ~ARG[2]
+  , KnownDomain domFast    ~ARG[3]
+  , NFDataX a              ~ARG[4]
+  , BitPack a              ~ARG[5]
+  ) =>
+
+  Clock domSlow ->                   ~ARG[6]
+  Signal domSlow Bool ->             ~ARG[7]
+  Signal domSlow (Index nAddrs) ->   ~ARG[8]
+  Signal domSlow a ->                ~ARG[9]
+
+  Clock domFast ->                   ~ARG[10]
+  Signal domFast Bool ->             ~ARG[11]
+  Signal domFast (Index nAddrs) ->   ~ARG[12]
+  Signal domFast a ->                ~ARG[13]
+  (Signal domSlow a, Signal domFast a)"
+    , "template" :
+"// trueDualPortBlockRam begin
+// Shared memory
+reg [~SIZE[~TYP[9]]-1:0] ~GENSYM[mem][0] [(2**~SIZE[~TYP[8]])-1:0];
+
+reg ~SIGD[~GENSYM[data_slow][1]][9];
+reg ~SIGD[~GENSYM[data_fast][2]][13];
+
+// First port (slow clock)
+always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[6]) begin
+    ~SYM[1] <= ~SYM[0][~ARG[8]];
+    if(~ARG[7]) begin
+        ~SYM[1] <= ~ARG[9];
+        ~SYM[0][~ARG[8]] <= ~ARG[9];
+    end
+end
+
+// Second port (fast clock)
+always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[10]) begin
+    ~SYM[2] <= ~SYM[0][~ARG[12]];
+    if(~ARG[11]) begin
+        ~SYM[2] <= ~ARG[13];
+        ~SYM[0][~ARG[12]] <= ~ARG[13];
+    end
+end
+
+assign ~RESULT = {~SYM[1], ~SYM[2]};
+// end trueDualPortBlockRam"
+    }
+  }
 ]
