@@ -287,7 +287,7 @@ isSignalType tcm ty = go HashSet.empty ty
     go tcSeen (tyView -> TyConApp tcNm args) = case nameOcc tcNm of
       "Clash.Signal.Internal.Signal"      -> True
       "Clash.Signal.BiSignal.BiSignalIn"  -> True
-      "Clash.Signal.Internal.BiSignalOut" -> True
+      "Clash.Signal.BiSignal.BiSignalOut" -> True
       _ | tcNm `HashSet.member` tcSeen    -> False -- Do not follow rec types
         | otherwise -> case lookupUniqMap tcNm tcm of
             Just tc -> let dcs         = tyConDataCons tc
