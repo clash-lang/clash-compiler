@@ -11,6 +11,7 @@ performing type applications.
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.GHC.PartialEval.Eval
@@ -49,6 +50,7 @@ import           Clash.Core.PartialEval.AsTerm
 import           Clash.Core.PartialEval.Monad
 import           Clash.Core.PartialEval.NormalForm
 import           Clash.Core.Term
+import           Clash.Core.TermInfo hiding (isFun)
 import           Clash.Core.TyCon (tyConDataCons)
 import           Clash.Core.Type
 import           Clash.Core.TysPrim (integerPrimTy)
@@ -162,6 +164,27 @@ tickInlined i value =
   unQual = snd . Text.breakOnEnd "."
   nameOf = Text.unpack . unQual . nameOcc . varName
 
+-- Test whether a value is eligable for inlining.
+canInline :: Value -> Eval Bool
+canInline value = do
+  context <- getContext
+  tcm <- getTyConMap
+
+  let vTy = valueType tcm value
+  let isClass = isClassTy tcm vTy
+
+  -- TODO Does Primitive need a different rule
+  case context of
+    CaseSubject -> do
+      expandable <- expandableValue value
+      pure (isClass || expandable)
+
+    _ -> do
+      workFree <- workFreeValue value
+      pure (isClass || workFree)
+ where
+  valueType tcm = termType tcm . unsafeAsTerm
+
 lookupLocal :: Id -> Eval Value
 lookupLocal i = do
   var <- normVarTy i
@@ -169,13 +192,12 @@ lookupLocal i = do
 
   case val of
     Just x -> do
-      workFree <- workFreeValue x
-      context <- getContext
+      inlinable <- canInline x
+      let isFun = isPolyFunTy (varType var)
 
-      case context of
-        CaseSubject   -> tickInlined var <$> forceEval x
-        _ | workFree  -> tickInlined var <$> forceEval x
-          | otherwise -> pure (VNeutral (NeVar var))
+      if isFun || inlinable
+        then tickInlined var <$> forceEval x
+        else pure (VNeutral (NeVar var))
 
     Nothing -> pure (VNeutral (NeVar var))
 
@@ -184,28 +206,37 @@ lookupGlobal i = do
   -- inScope <- getInScope
   fuel <- getFuel
   var <- findBinding i
+  target <- getTarget
 
-  case var of
-    Just x
-      -- The binding cannot be inlined. Note that this is limited to bindings
-      -- which are not primitives in Clash, as these must be marked NOINLINE.
-      |  bindingSpec x == NoInline
-      ,  bindingIsPrim x == IsFun
-      -> pure (VNeutral (NeVar i))
+  if i == target then pure (VNeutral (NeVar i)) else
+    case var of
+      Just x
+        -- The binding cannot be inlined. Note that this is limited to bindings
+        -- which are not primitives in Clash, as these must be marked NOINLINE.
+        |  bindingSpec x == NoInline
+        ,  bindingIsPrim x == IsFun
+        -> do -- traceM ("lookupGlobal(" <> showPpr i <> "): NOINLINE\n")
+              pure (VNeutral (NeVar i))
 
-      -- There is no fuel, meaning no more inlining can occur.
-      |  fuel == 0
-      -> pure (VNeutral (NeVar i))
+        |  otherwise
+        -> withTarget i $ do
+              -- We check if the identifier is work free, otherwise isWorkFreeBinder
+              -- is not used and we may decide a self-recursive binding is work free.
+              inlinable <- canInline (VNeutral (NeVar i))
+              fuel <- getFuel
 
-      -- Inlining can occur, using one unit of fuel in the process.
-      |  otherwise
-      -> withTarget i . withFuel $ do
-           val <- forceEval (bindingTerm x)
-           replaceBinding (x { bindingTerm = val })
-           pure (tickInlined i val)
+              if | inlinable -> updateGlobal i x
+                 | fuel > 0  -> withFuel (updateGlobal i x)
+                 | otherwise -> pure (VNeutral (NeVar i))
 
-    Nothing
-      -> pure (VNeutral (NeVar i))
+      Nothing ->
+        pure (VNeutral (NeVar i))
+ where
+  updateGlobal j x =
+    withTarget j $ do
+      value <- forceEval (bindingTerm x)
+      replaceBinding (x { bindingTerm = value })
+      pure (tickInlined j value)
 
 evalData :: (HasCallStack) => DataCon -> Eval Value
 evalData dc
