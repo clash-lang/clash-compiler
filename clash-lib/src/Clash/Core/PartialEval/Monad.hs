@@ -60,6 +60,7 @@ module Clash.Core.PartialEval.Monad
   , getUniqueTyVar
     -- * Work free check
   , workFreeValue
+  , expandableValue
   ) where
 
 import           Control.Applicative (Alternative)
@@ -88,7 +89,7 @@ import           Clash.Core.Util (mkUniqSystemId, mkUniqSystemTyVar)
 import           Clash.Core.Var (Id, TyVar, Var(varType))
 import           Clash.Core.VarEnv
 import           Clash.Driver.Types (Binding(..))
-import           Clash.Rewrite.WorkFree (isWorkFree)
+import           Clash.Rewrite.WorkFree
 
 {-
 NOTE [RWS monad]
@@ -349,11 +350,16 @@ getUniqueVar f name ty = do
   go ids env =
     env { genvSupply = ids }
 
-workFreeValue :: Value -> Eval Bool
-workFreeValue = \case
-  VNeutral _ -> pure False
-  VThunk x _ -> do
-    bindings <- fmap (fmap asTerm) . genvBindings <$> getGlobalEnv
-    isWorkFree workFreeCache bindings x
+expandableValue :: Value -> Eval Bool
+expandableValue value = do
+  bindingValues <- fmap genvBindings getGlobalEnv
+  let bindingTerms = fmap (fmap asTerm) bindingValues
 
-  _ -> pure True
+  isExpandable workFreeCache bindingTerms (asTerm value)
+
+workFreeValue :: Value -> Eval Bool
+workFreeValue value = do
+  bindingValues <- fmap genvBindings getGlobalEnv
+  let bindingTerms = fmap (fmap asTerm) bindingValues
+
+  isWorkFree workFreeCache bindingTerms (asTerm value)
