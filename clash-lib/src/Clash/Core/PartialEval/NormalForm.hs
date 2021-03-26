@@ -34,17 +34,16 @@ import Control.Concurrent.Supply (Supply)
 import Control.Lens (Lens', lens)
 import Data.IntMap.Strict (IntMap)
 import Data.Map.Strict (Map)
-import qualified Data.Text.Extra as Text
 
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal
 import Clash.Core.Term (Term(..), PrimInfo(primName), TickInfo, Pat)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type, TyVar)
+import Clash.Core.Util (undefinedPrims)
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (VarEnv, InScopeSet)
 import Clash.Driver.Types (Binding(..))
-import qualified Clash.Normalize.Primitives as NP (undefined)
 
 type Args a
   = [Arg a]
@@ -118,14 +117,7 @@ collectValueTicks = go []
 isUndefined :: Value -> Bool
 isUndefined = \case
   VNeutral (NePrim pr _) ->
-    primName pr `elem`
-      [ "Control.Exception.Base.absentError"
-      , "Control.Exception.Base.patError"
-      , "EmptyCase"
-      , "GHC.Err.undefined"
-      , Text.showt 'NP.undefined
-      , "Clash.XException.errorX"
-      ]
+    primName pr `elem` undefinedPrims
 
   _ -> False
 
