@@ -40,13 +40,14 @@ partialEvaluatorBefore =
 -- | Normalisation transformation
 normalization :: NormRewrite
 normalization =
-  rmDeadcode >-> multPrim >-> constantPropagation >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
+  pe >-!-> rmDeadcode >-> multPrim >-> constantPropagation >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
   bindConst >-> letTL
   >-> evalConst
   >-!-> cse >-!-> cleanup >->
   xOptim >-> rmDeadcode >->
   cleanup >-> bindSimIO >-> recLetRec >-> splitArgs
   where
+    pe = apply "partialEval" partialEval
     multPrim   = topdownR (apply "setupMultiResultPrim" setupMultiResultPrim)
     anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF >-> topdownR (apply "caseCon" caseCon)
     letTL      = topdownSucR (apply "topLet" topLet)

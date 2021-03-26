@@ -12,11 +12,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Normalize.Transformations.Reduce
-  ( reduceBinders
+  ( partialEval
+  , reduceBinders
   , reduceConst
   , reduceNonRepPrim
   ) where
 
+import Control.Concurrent.Supply (splitSupply)
 import qualified Control.Lens as Lens
 import Control.Monad.Trans.Except (runExcept)
 import qualified Data.Either as Either
@@ -24,10 +26,14 @@ import qualified Data.List as List
 import qualified Data.List.Extra as List
 import qualified Data.Maybe as Maybe
 import GHC.Stack (HasCallStack)
+import System.IO.Unsafe (unsafePerformIO)
 
 import Clash.Core.FreeVars (typeFreeVars)
 import Clash.Core.HasType
 import Clash.Core.Name (nameOcc)
+import Clash.Core.PartialEval
+import Clash.Core.PartialEval.AsTerm
+import Clash.Core.PartialEval.NormalForm
 import Clash.Core.Subst (Subst, extendIdSubst, substTm)
 import Clash.Core.Term
   ( LetBinding, PrimInfo(..), Term(..), TickInfo(..), collectArgs
@@ -39,9 +45,32 @@ import Clash.Normalize.PrimitiveReductions
 import Clash.Normalize.Primitives (removedArg)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession, normalizeUltra)
 import Clash.Normalize.Util (shouldReduce)
-import Clash.Rewrite.Types (TransformContext(..), extra, tcCache)
+import Clash.Rewrite.Types
 import Clash.Rewrite.Util (changed, isUntranslatableType, setChanged, whnfRW)
 import Clash.Unique (lookupUniqMap)
+
+partialEval :: NormRewrite
+partialEval (TransformContext is0 _) e = do
+  (heap,addr) <- Lens.use globalHeap
+  fun <- Lens.use curFun
+  ids <- Lens.use uniqSupply
+  bndrs <- Lens.use bindings
+  tcm <- Lens.view tcCache
+  fuel <- Lens.view fuelLimit
+  eval <- Lens.view peEvaluator
+
+  let (ids1, ids2) = splitSupply ids
+  let genv = mkGlobalEnv bndrs tcm ids1 fuel mempty addr
+
+  uniqSupply Lens..= ids2
+
+  case unsafePerformIO (nf eval genv is0 (fst fun) e) of
+    (!e', !genv') -> do
+      let tmHeap = fmap asTerm (genvHeap genv')
+
+      -- If partial eval changes a heap value, prefer the new value
+      globalHeap Lens..= (tmHeap <> heap, genvAddr genv')
+      changed e'
 
 -- | XXX: is given inverse topologically sorted binders, but returns
 -- topologically sorted binders
