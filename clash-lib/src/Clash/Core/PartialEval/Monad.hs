@@ -53,6 +53,8 @@ module Clash.Core.PartialEval.Monad
     -- * Accessing Global State
   , getTyConMap
   , getInScope
+  , withInScope
+  , withInScopeList
     -- * Fresh Variable Generation
   , getUniqueId
   , getUniqueTyVar
@@ -144,7 +146,9 @@ getLocalEnv = RWS.ask
 {-# INLINE getLocalEnv #-}
 
 setLocalEnv :: LocalEnv -> Eval a -> Eval a
-setLocalEnv = RWS.local . const
+setLocalEnv new =
+  let mergeInScope = unionInScope (lenvInScope new) . lenvInScope
+   in RWS.local (\env -> new { lenvInScope = mergeInScope env })
 {-# INLINE setLocalEnv #-}
 
 modifyLocalEnv :: (LocalEnv -> LocalEnv) -> Eval a -> Eval a
@@ -176,17 +180,13 @@ withTyVar i ty = withTyVars [(i, ty)]
 withTyVars :: [(TyVar, Type)] -> Eval a -> Eval a
 withTyVars tys action = do
   normTys <- traverse (bitraverse pure normTy) tys
-
-  modifyGlobalEnv (goGlobal normTys)
   modifyLocalEnv (goLocal normTys) action
  where
-  goGlobal xs env@GlobalEnv{genvInScope=inScope} =
+  goLocal xs env@LocalEnv{lenvTypes=types,lenvInScope=inScope} =
     let fvs = mkVarSet (fst <$> xs) `unionVarSet` freeVarsOf (snd <$> xs)
         iss = mkInScopeSet fvs `unionInScope` inScope
-     in env { genvInScope = iss }
-
-  goLocal xs env@LocalEnv{lenvTypes=types} =
-    (substEnvTys xs env) { lenvTypes = Map.fromList xs <> types }
+        env' = substEnvTys xs env
+     in env' { lenvTypes = Map.fromList xs <> types , lenvInScope = iss }
 
 -- | Substitute all bound types in the environment with the list of bindings.
 -- This must be used after normTy to ensure that the substitution does not
@@ -238,18 +238,13 @@ withId :: Id -> Value -> Eval a -> Eval a
 withId i v = withIds [(i, v)]
 
 withIds :: [(Id, Value)] -> Eval a -> Eval a
-withIds ids action = do
-  modifyGlobalEnv goGlobal
-  modifyLocalEnv goLocal action
+withIds ids = modifyLocalEnv goLocal
  where
-  goGlobal env@GlobalEnv{genvInScope=inScope} =
+  goLocal env@LocalEnv{lenvValues=values,lenvInScope=inScope} =
     -- TODO Change this to use an instance HasFreeVars Value
     let fvs = mkVarSet (fst <$> ids) `unionVarSet` freeVarsOf (asTerm . snd <$> ids)
         iss = inScope `unionInScope` mkInScopeSet fvs
-     in env { genvInScope = iss }
-
-  goLocal env@LocalEnv{lenvValues=values} =
-    env { lenvValues = Map.fromList ids <> values }
+     in env { lenvValues = Map.fromList ids <> values, lenvInScope = iss }
 
 withoutId :: Id -> Eval a -> Eval a
 withoutId i = modifyLocalEnv go
@@ -319,7 +314,16 @@ getTyConMap :: Eval TyConMap
 getTyConMap = genvTyConMap <$> getGlobalEnv
 
 getInScope :: Eval InScopeSet
-getInScope = genvInScope <$> getGlobalEnv
+getInScope = lenvInScope <$> getLocalEnv
+
+withInScope :: Var a -> Eval b -> Eval b
+withInScope var = withInScopeList [var]
+
+withInScopeList :: [Var a] -> Eval b -> Eval b
+withInScopeList vars = modifyLocalEnv go
+ where
+  go env@LocalEnv{lenvInScope=inScope} =
+    env { lenvInScope = extendInScopeSetList inScope vars }
 
 getUniqueId :: OccName -> Type -> Eval Id
 getUniqueId = getUniqueVar mkUniqSystemId
@@ -335,16 +339,15 @@ getUniqueVar
   -> KindOrType
   -> Eval (Var a)
 getUniqueVar f name ty = do
-  env <- getGlobalEnv
-  let iss = genvInScope env
-      ids = genvSupply env
-      ((ids', iss'), i) = f (ids, iss) (name, ty)
+  iss <- getInScope
+  ids <- genvSupply <$> getGlobalEnv
+  let ((ids', _), i) = f (ids, iss) (name, ty)
 
-  modifyGlobalEnv (go ids' iss')
+  modifyGlobalEnv (go ids')
   pure i
  where
-  go ids iss env =
-    env { genvInScope = iss, genvSupply = ids }
+  go ids env =
+    env { genvSupply = ids }
 
 workFreeValue :: Value -> Eval Bool
 workFreeValue = \case

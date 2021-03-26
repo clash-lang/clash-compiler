@@ -235,12 +235,18 @@ etaExpand term = do
     x@(Prim pr, _) -> expand tcm (primType pr) x
     _ -> pure term
  where
-  etaNameOf =
-    either (pure . Right) (fmap Left . getUniqueId "eta")
+  etaNamesOf acc = \case
+    []        -> pure acc
+    (x:xs)  ->
+      case x of
+        Left tv  -> etaNamesOf (Right tv : acc) xs
+        Right ty -> do
+          i <- getUniqueId "eta" ty
+          withInScope i (etaNamesOf (Left i : acc) xs)
 
   expand tcm ty (tm, args) = do
     let (missingTys, _) = splitFunForallTy (applyTypeToArgs tm tcm ty args)
-    missingArgs <- traverse etaNameOf missingTys
+    missingArgs <- reverse <$> etaNamesOf [] missingTys
 
     pure $ mkAbstraction
       (mkApps term (fmap (bimap Var VarTy) missingArgs))
@@ -248,17 +254,13 @@ etaExpand term = do
 
 evalLam :: Id -> Term -> Eval Value
 evalLam i x = do
-  env <- getLocalEnv
   var <- normVarTy i
-
-  pure (VLam var x env)
+  withInScope var (VLam var x <$> getLocalEnv)
 
 evalTyLam :: TyVar -> Term -> Eval Value
 evalTyLam i x = do
-  env <- getLocalEnv
   var <- normVarTy i
-
-  pure (VTyLam var x env)
+  withInScope var (VTyLam var x <$> getLocalEnv)
 
 evalApp :: Term -> Arg Term -> Eval Value
 evalApp x y
@@ -614,7 +616,7 @@ apply val arg = do
   tcm <- getTyConMap
   forced <- forceEval val
   canApply <- workFreeValue arg
-  let argTy = valueType tcm arg
+  let argTy = termType tcm (asTerm arg)
 
   let (lhs, ticks) = collectValueTicks forced
 
@@ -627,10 +629,15 @@ apply val arg = do
           pure (mkValueTicks (VNeutral (NeLetrec bs inner)) ticks)
 
       | otherwise -> do
-          varTy <- normTy argTy
-          var <- getUniqueId "workArg" varTy
-          inner <- apply x (VNeutral (NeVar var))
-          pure (mkValueTicks (VNeutral (NeLetrec (bs <> [(var, arg)]) inner)) ticks)
+          let bound = fmap fst bs
+
+          withInScopeList bound $ do
+            varTy <- normTy argTy
+            var <- getUniqueId "workArg" varTy
+
+            withInScope var $ do
+              inner <- apply x (VNeutral (NeVar var))
+              pure (mkValueTicks (VNeutral (NeLetrec (bs <> [(var, arg)]) inner)) ticks)
 
     -- If the LHS of application is neutral, make a letrec around the neutral
     -- application if the argument performs work.
@@ -641,15 +648,19 @@ apply val arg = do
       | otherwise -> do
           varTy <- normTy argTy
           var <- getUniqueId "workArg" varTy
-          let inner = VNeutral (NeApp neu (VNeutral (NeVar var)))
-          pure (mkValueTicks (VNeutral (NeLetrec [(var, arg)] inner)) ticks)
+
+          withInScope var $ do
+            let inner = VNeutral (NeApp neu (VNeutral (NeVar var)))
+            pure (mkValueTicks (VNeutral (NeLetrec [(var, arg)] inner)) ticks)
 
     -- If the LHS of application is a lambda, make a letrec with the name of
     -- the argument around the result of evaluation if it performs work.
     VLam i x env
-      | canApply ->
+      | canApply -> do
+          var <- normVarTy i
+
           setLocalEnv env $ do
-            inner <- withId i arg (eval x)
+            inner <- withId var arg (eval x)
             pure (mkValueTicks inner ticks)
 
       | otherwise ->
@@ -659,9 +670,6 @@ apply val arg = do
 
     f ->
       error ("apply: Cannot apply " <> show arg <> " to " <> show f)
- where
-  -- TODO Write an instance for InferType Value and use that instead
-  valueType tcm = inferCoreTypeOf tcm . asTerm
 
 applyTy :: Value -> Type -> Eval Value
 applyTy val ty = do

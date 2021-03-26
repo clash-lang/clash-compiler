@@ -146,6 +146,10 @@ data LocalEnv = LocalEnv
   , lenvValues :: Map Id Value
     -- ^ Local term environment. These are WHNF terms or unevaluated thunks
     -- introduced while evaluating the current term (i.e. by applications)
+  , lenvInScope :: InScopeSet
+    -- ^ The set of in scope variables during partial evaluation. This includes
+    -- new variables introduced by the evaluator (such as the ids of binders
+    -- introduced during eta expansion.)
   , lenvFuel :: Word
     -- ^ The amount of fuel left in the local environment when the previous
     -- head was reached. This is needed so resuming evaluation does not lead
@@ -155,10 +159,14 @@ data LocalEnv = LocalEnv
     -- instead of converting these back to their corresponding primitive. This
     -- is used when evaluating terms where the result is subject of a case
     -- expression (see note: lifted data types).
-  } deriving (Show)
+  }
 
--- TODO Add recursion info to the global environment. Until then we are forced
--- to spend fuel on non-recursive (terminating) terms.
+instance Show LocalEnv where
+  show = const "<env>"
+
+-- TODO Add recursion info to the binding map. Until then we are forced to
+-- spend fuel on non-recursive (terminating) terms. Later it would save us from
+-- calling termination analysis on non-recursive terms.
 
 data GlobalEnv = GlobalEnv
   { genvBindings :: VarEnv (Binding Value)
@@ -166,10 +174,6 @@ data GlobalEnv = GlobalEnv
     -- of the top level definitions which are forced on lookup.
   , genvTyConMap :: TyConMap
     -- ^ The type constructors known about by Clash.
-  , genvInScope :: InScopeSet
-    -- ^ The set of in scope variables during partial evaluation. This includes
-    -- new variables introduced by the evaluator (such as the ids of binders
-    -- introduced during eta expansion.)
   , genvSupply :: Supply
     -- ^ The supply of fresh names for generating identifiers.
   , genvFuel :: Word
