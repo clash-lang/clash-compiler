@@ -177,7 +177,8 @@ getLocalEnv = RWS.ask
 setLocalEnv :: LocalEnv -> Eval a -> Eval a
 setLocalEnv new =
   let mergeInScope = unionInScope (lenvInScope new) . lenvInScope
-   in RWS.local (\env -> new { lenvInScope = mergeInScope env })
+      minFuel      = min (lenvFuel new) . lenvFuel
+   in RWS.local (\env -> new { lenvInScope = mergeInScope env, lenvFuel = minFuel env })
 {-# INLINE setLocalEnv #-}
 
 modifyLocalEnv :: (LocalEnv -> LocalEnv) -> Eval a -> Eval a

@@ -263,7 +263,6 @@ lookupLocal i = do
 
 lookupGlobal :: Id -> Eval Value
 lookupGlobal i = do
-  fuel <- getFuel
   var <- findBinding i
   target <- getTarget
 
