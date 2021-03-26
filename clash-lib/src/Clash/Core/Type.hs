@@ -490,7 +490,10 @@ funSubst tcm (Just s) = uncurry go
     -- to different types, so this is OK for our purposes.
     go (AppTy a1 r1) (AppTy a2 r2) = do
       s1 <- funSubst tcm (Just s) (a1, a2)
-      funSubst tcm (Just s1) (r1, r2)
+      funSubst tcm (Just s1)
+                   ( r1
+                   , argView tcm r2 -- See [Note: Eager type families]
+                   )
 
     go ty1@(ConstTy _) ty2 =
       -- Looks through AnnType
