@@ -449,6 +449,29 @@ evalTyLam i x = do
   var <- normVarTy i
   withInScope var (VTyLam var x <$> getLocalEnv)
 
+-- The thunks for each term-level argument to a data constructor should
+-- contain any existential type arguments that preceed them in the list of
+-- arguments. This is not a problem for primitives in practice as there are
+-- no primitives which are both impredicative and don't evaluate to undefined.
+--
+delayDataArgs :: DataCon -> Args Term -> Eval (Args Value)
+delayDataArgs dc = go (dcUnivTyVars dc <> dcExtTyVars dc)
+ where
+  go tvs = \case
+    [] ->
+      pure []
+
+    (Left tm : args) -> do
+      tm' <- delayEval tm
+      fmap (Left tm' :) (go tvs args)
+
+    (Right ty : args) -> do
+      i'  <- normVarTy (head tvs)
+      ty' <- normTy ty
+
+      withTyVar i' ty' $
+        fmap (Right ty' :) (go (tail tvs) args)
+
 evalApp :: (HasCallStack) => Term -> Arg Term -> Eval Value
 evalApp x y
   | Data dc <- f
@@ -461,7 +484,7 @@ evalApp x y
 
       -- The data constructor has all arguments given, and is a value.
       EQ -> do
-        argThunks <- delayArgs args
+        argThunks <- delayDataArgs dc args
         env <- getLocalEnv
 
         pure (VData dc argThunks env)
