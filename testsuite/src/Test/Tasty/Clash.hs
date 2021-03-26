@@ -435,6 +435,8 @@ instance IsTest IVerilogMakeTest where
 data IVerilogSimTest = IVerilogSimTest
   { ivsExpectFailure :: Maybe (TestExitCode, T.Text)
     -- ^ Expected failure code and output (if any)
+  , ivsStderrEmptyFail :: Bool
+    -- ^ Whether empty stderr means failure
   , ivsSourceDirectory :: IO FilePath
     -- ^ Directory containing executables produced by 'IVerilogMakeTest'
   , ivsTop :: String
@@ -444,13 +446,22 @@ data IVerilogSimTest = IVerilogSimTest
 instance IsTest IVerilogSimTest where
   run optionSet IVerilogSimTest{..} progressCallback = do
     src <- ivsSourceDirectory
+
+    -- HACK: Copy "memory.list" such that tests can find it. This is hardcoded
+    -- for "BlockRamFile" and "RomFile". Ideally designs would never generate
+    -- relative paths, but use Cabal infrastructure to insert absolute paths
+    -- instead.
+    lists <- glob (src </> "*/memory.list")
+    forM_ lists $ \memFile ->
+      copyFile memFile (src </> "memory.list")
+
     let topExe = ivsTop <> ".exe"
     case ivsExpectFailure of
       Nothing -> run optionSet (vvp src [topExe]) progressCallback
       Just exit -> run optionSet (failingVvp src [topExe] exit) progressCallback
    where
     vvp workDir args =
-      TestProgram "vvp" args NoGlob PrintNeither False (Just workDir)
+      TestProgram "vvp" args NoGlob PrintNeither ivsStderrEmptyFail (Just workDir)
 
     failingVvp workDir args (testExit, expectedErr) =
       TestFailingProgram
@@ -578,7 +589,7 @@ verilogTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
 
   simName t = "iverilog (sim " <> t <> ")"
   simTests =
-    [ (simName t, singleTest (simName t) (IVerilogSimTest expectSimFail tmpDir t))
+    [ (simName t, singleTest (simName t) (IVerilogSimTest expectSimFail vvpStderrEmptyFail tmpDir t))
     | t <- getBuildTargets opts ]
 
 -- | Generate two test trees for testing SystemVerilog: one for building designs and
