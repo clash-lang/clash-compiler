@@ -1,0 +1,1 @@
+FIXED: Erroneous examples in BlockRam.File and ROM.File documentation [#1608](https://github.com/clash-lang/clash-compiler/issues/1608)

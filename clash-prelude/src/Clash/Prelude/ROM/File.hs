@@ -34,7 +34,9 @@ We can instantiate a synchronous ROM using the content of the above file like
 so:
 
 @
-f :: HiddenClock dom  => Signal dom (Unsigned 3) -> Signal dom (Unsigned 9)
+f :: (HiddenClock dom, HiddenEnable dom)
+   => Signal dom (Unsigned 3)
+   -> Signal dom (Unsigned 9)
 f rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' d7 \"memory.bin\" rd
 @
 
@@ -50,7 +52,9 @@ However, we can also interpret the same data as a tuple of a 6-bit unsigned
 number, and a 3-bit signed number:
 
 @
-g :: HiddenClock dom  => Signal dom (Unsigned 3) -> Signal dom (Unsigned 6,Signed 3)
+g :: (HiddenClock dom, HiddenEnable dom)
+  => Signal dom (Unsigned 3)
+  -> Signal dom (Unsigned 6,Signed 3)
 g rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' d7 \"memory.bin\" rd
 @
 

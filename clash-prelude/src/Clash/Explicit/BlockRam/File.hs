@@ -34,11 +34,11 @@ For example, a data file @memory.bin@ containing the 9-bit unsigned number
 We can instantiate a BlockRAM using the content of the above file like so:
 
 @
-f
-  :: Clock  dom
+f :: Clock  dom
+  -> Enable dom
   -> Signal dom (Unsigned 3)
   -> Signal dom (Unsigned 9)
-f clk rd = 'Clash.Class.BitPack.unpack' '<$>' 'blockRamFile' clk d7 \"memory.bin\" rd (signal Nothing)
+f clk ena rd = 'Clash.Class.BitPack.unpack' '<$>' 'blockRamFile' clk ena d7 \"memory.bin\" rd (signal Nothing)
 @
 
 In the example above, we basically treat the BlockRAM as an synchronous ROM.
@@ -46,7 +46,7 @@ We can see that it works as expected:
 
 @
 __>>> import qualified Data.List as L__
-__>>> L.tail $ sampleN 4 $ f systemClockGen (fromList [3..5])__
+__>>> L.tail $ sampleN 4 $ f systemClockGen enableGen (fromList [3..5])__
 [10,11,12]
 @
 
@@ -54,18 +54,18 @@ However, we can also interpret the same data as a tuple of a 6-bit unsigned
 number, and a 3-bit signed number:
 
 @
-g
-  :: Clock  dom
+g :: Clock  dom
+  -> Enable dom
   -> Signal dom (Unsigned 3)
   -> Signal dom (Unsigned 6,Signed 3)
-g clk rd = 'Clash.Class.BitPack.unpack' '<$>' 'blockRamFile' clk d7 \"memory.bin\" rd (signal Nothing)
+g clk ena rd = 'Clash.Class.BitPack.unpack' '<$>' 'blockRamFile' clk ena d7 \"memory.bin\" rd (signal Nothing)
 @
 
 And then we would see:
 
 @
 __>>> import qualified Data.List as L__
-__>>> L.tail $ sampleN 4 $ g systemClockGen (fromList [3..5])__
+__>>> L.tail $ sampleN 4 $ g systemClockGen enableGen (fromList [3..5])__
 [(1,2),(1,3)(1,-4)]
 @
 
