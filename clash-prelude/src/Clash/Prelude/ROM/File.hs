@@ -269,12 +269,13 @@ romFile
      , KnownNat n
      , HiddenClock dom
      , HiddenEnable dom
+     , Enum addr
      )
   => SNat n
   -- ^ Size of the ROM
   -> FilePath
   -- ^ File describing the content of the ROM
-  -> Signal dom (Unsigned n)
+  -> Signal dom addr
   -- ^ Read address @rd@
   -> Signal dom (BitVector m)
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
