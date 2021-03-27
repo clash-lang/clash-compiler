@@ -34,11 +34,11 @@ We can instantiate a synchronous ROM using the content of the above file like
 so:
 
 @
-f
-  :: Clock  dom
+f :: Clock  dom
+  -> Enable dom
   -> Signal dom (Unsigned 3)
   -> Signal dom (Unsigned 9)
-f clk rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' clk d7 \"memory.bin\" rd
+f clk ena rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' clk ena d7 \"memory.bin\" rd
 @
 
 And see that it works as expected:
@@ -53,11 +53,11 @@ However, we can also interpret the same data as a tuple of a 6-bit unsigned
 number, and a 3-bit signed number:
 
 @
-g
-  :: Clock  dom Regular
+g :: Clock  dom
+  -> Enable dom
   -> Signal dom (Unsigned 3)
   -> Signal dom (Unsigned 6,Signed 3)
-g clk rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' clk d7 \"memory.bin\" rd
+g clk ena rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' clk ena d7 \"memory.bin\" rd
 @
 
 And then we would see:
