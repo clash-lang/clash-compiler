@@ -532,6 +532,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1669_DEC" def{hdlTargets=[VHDL]}
         , runTest "T1715" def
         , runTest "T1721" def{hdlSim=False}
+        , runTest "T1606A" def{hdlSim=False}
         , runTest "T1606B" def{hdlSim=False}
         ] <>
         if compiledWith == Cabal then
