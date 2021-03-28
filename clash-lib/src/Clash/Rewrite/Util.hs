@@ -65,8 +65,6 @@ import           GHC.Types.Basic             (InlineSpec (..))
 import           BasicTypes                  (InlineSpec (..))
 #endif
 
-import           Clash.Core.DataCon          (dcExtTyVars)
-
 #if EXPERIMENTAL_EVALUATOR
 import           Clash.Core.PartialEval
 import           Clash.Core.PartialEval.NormalForm
@@ -83,14 +81,8 @@ import           Clash.Core.Subst
   (substTmEnv, aeqTerm, aeqType, extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term
 import           Clash.Core.TermInfo
-import           Clash.Core.TyCon
-  (TyConMap, tyConDataCons)
-import           Clash.Core.Type             (KindOrType, Type (..),
-                                              TypeView (..), coreView1,
-                                              normalizeType,
-                                              typeKind, tyView)
-import           Clash.Core.Util
-  (dataConInstArgTysE)
+import           Clash.Core.TyCon            (TyConMap)
+import           Clash.Core.Type             (Type (..), normalizeType, typeKind)
 import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
@@ -365,19 +357,6 @@ mkBinderFor is tcm name (Right ty) = do
   name' <- cloneNameWithInScopeSet is name
   let ki = typeKind tcm ty
   return (Right (mkTyVar ki (coerce name')))
-
--- | Make a new, unique, identifier
-mkInternalVar
-  :: (MonadUnique m)
-  => InScopeSet
-  -> OccName
-  -- ^ Name of the identifier
-  -> KindOrType
-  -> m Id
-mkInternalVar inScope name ty = do
-  i <- getUniqueM
-  let nm = mkUnsafeInternalName name i
-  return (uniqAway inScope (mkLocalId ty nm))
 
 -- | Inline the binders in a let-binding that have a certain property
 inlineBinders
@@ -741,49 +720,6 @@ isUntranslatableType stringRepresentable ty =
                              <*> pure stringRepresentable
                              <*> Lens.view tcCache
                              <*> pure ty)
-
--- | Make a binder that should not be referenced
-mkWildValBinder
-  :: (MonadUnique m)
-  => InScopeSet
-  -> Type
-  -> m Id
-mkWildValBinder is = mkInternalVar is "wild"
-
--- | Make a case-decomposition that extracts a field out of a (Sum-of-)Product type
-mkSelectorCase
-  :: HasCallStack
-  => MonadUnique m
-  => String -- ^ Name of the caller of this function
-  -> InScopeSet
-  -> TyConMap -- ^ TyCon cache
-  -> Term -- ^ Subject of the case-composition
-  -> Int -- n'th DataCon
-  -> Int -- n'th field
-  -> m Term
-mkSelectorCase caller inScope tcm scrut dcI fieldI = go (termType tcm scrut)
-  where
-    go (coreView1 tcm -> Just ty') = go ty'
-    go scrutTy@(tyView -> TyConApp tc args) =
-      case tyConDataCons (lookupUniqMap' tcm tc) of
-        [] -> cantCreate $(curLoc) ("TyCon has no DataCons: " ++ show tc ++ " " ++ showPpr tc) scrutTy
-        dcs | dcI > length dcs -> cantCreate $(curLoc) "DC index exceeds max" scrutTy
-            | otherwise -> do
-          let dc = indexNote ($(curLoc) ++ "No DC with tag: " ++ show (dcI-1)) dcs (dcI-1)
-          let (Just fieldTys) = dataConInstArgTysE inScope tcm dc args
-          if fieldI >= length fieldTys
-            then cantCreate $(curLoc) "Field index exceed max" scrutTy
-            else do
-              wildBndrs <- mapM (mkWildValBinder inScope) fieldTys
-              let ty = indexNote ($(curLoc) ++ "No DC field#: " ++ show fieldI) fieldTys fieldI
-              selBndr <- mkInternalVar inScope "sel" ty
-              let bndrs  = take fieldI wildBndrs ++ [selBndr] ++ drop (fieldI+1) wildBndrs
-                  pat    = DataPat dc (dcExtTyVars dc) bndrs
-                  retVal = Case scrut ty [ (pat, Var selBndr) ]
-              return retVal
-    go scrutTy = cantCreate $(curLoc) ("Type of subject is not a datatype: " ++ showPpr scrutTy) scrutTy
-
-    cantCreate loc info scrutTy = error $ loc ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: (" ++ showPpr scrut ++ " :: " ++ showPpr scrutTy ++ ")\nAdditional info: " ++ info
 
 -- | Specialise an application on its argument
 specialise :: Lens' extra (Map.Map (Id, Int, Either Term Type) Id) -- ^ Lens into previous specialisations

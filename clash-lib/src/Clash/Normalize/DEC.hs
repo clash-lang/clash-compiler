@@ -89,14 +89,13 @@ import Clash.Core.Term
 import Clash.Core.TermInfo   (termType)
 import Clash.Core.TyCon      (TyConMap, TyConName, tyConDataCons)
 import Clash.Core.Type       (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
-import Clash.Core.Util       (sccLetBindings)
+import Clash.Core.Util       (mkInternalVar, mkSelectorCase, sccLetBindings)
 import Clash.Core.Var        (isGlobalId, isLocalId)
 import Clash.Core.VarEnv
   (InScopeSet, elemInScopeSet, extendInScopeSetList, notElemInScopeSet, unionInScope)
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Types
-import Clash.Rewrite.Util    (mkInternalVar, mkSelectorCase,
-                              isUntranslatableType)
+import Clash.Rewrite.Util    (isUntranslatableType)
 import Clash.Rewrite.WorkFree (isConstant)
 import Clash.Unique          (lookupUniqMap)
 import Clash.Util
