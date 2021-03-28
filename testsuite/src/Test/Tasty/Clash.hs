@@ -31,6 +31,39 @@ import           Test.Tasty.Program
 import           Test.Tasty.Providers
 import           Test.Tasty.Runners
 
+{- Note [copy data files hack]
+
+Clash currently creates a directory for every top entity it synthesizes. For
+example, two top entities 'foo' and 'bar' in module FooBar would be synthesized
+in the folders:
+
+  $hdldir/FooBar.foo
+  $hdldir/FooBar.bar
+
+Any data files used in 'foo' would be copied to its directory, while any data
+files used by 'bar' would be copied to  _its_ directory. For example, if 'foo'
+and 'bar' would both instantiate a 'blockRamFile' with 'memory_foo.list' and
+'memory_bar.list' respectively, the following files would exist after synthesizing:
+
+  $hdldir/FooBar.foo/foo.vhdl
+  $hdldir/FooBar.foo/memory_foo.list
+  $hdldir/FooBar.bar/bar.vhdl
+  $hdldir/FooBar.bar/memory_bar.list
+
+The HDL files (`foo.vhdl` and `bar.vhdl`) would refer to those files relative
+to it, for example just "memory_foo.list". Some tools look for these
+files relative to the HDL files (most synthesis tools), while others will try to
+find them in whatever directory they're executed in (most simulators).
+
+The "hack" in this case refers to copying the files from the HDL directory to
+the directory the simulator is run from.
+
+Note: the sensible thing for Clash would be to use relative paths in the HDL
+      files as such: `../FooBar.foo/memory_foo.list`. This would satisfy both
+      tooling looking relative to HDL files, and tooling run from a sibling
+      directory.
+-}
+
 data SBuildTarget (target :: HDL) where
   SVHDL          :: SBuildTarget 'VHDL
   SVerilog       :: SBuildTarget 'Verilog
@@ -359,10 +392,7 @@ instance IsTest GhdlSimTest where
     src <- gstSourceDirectory
     let workDir = src </> "work"
 
-    -- HACK: Copy "memory.list" such that tests can find it. This is hardcoded
-    -- for "BlockRamFile" and "RomFile". Ideally designs would never generate
-    -- relative paths, but use Cabal infrastructure to insert absolute paths
-    -- instead.
+    -- See Note [copy data files hack]
     lists <- glob (src </> "*/memory.list")
     forM_ lists $ \memFile ->
       copyFile memFile (workDir </> "memory.list")
@@ -435,6 +465,8 @@ instance IsTest IVerilogMakeTest where
 data IVerilogSimTest = IVerilogSimTest
   { ivsExpectFailure :: Maybe (TestExitCode, T.Text)
     -- ^ Expected failure code and output (if any)
+  , ivsStderrEmptyFail :: Bool
+    -- ^ Whether empty stderr means failure
   , ivsSourceDirectory :: IO FilePath
     -- ^ Directory containing executables produced by 'IVerilogMakeTest'
   , ivsTop :: String
@@ -444,13 +476,19 @@ data IVerilogSimTest = IVerilogSimTest
 instance IsTest IVerilogSimTest where
   run optionSet IVerilogSimTest{..} progressCallback = do
     src <- ivsSourceDirectory
+
+    -- See Note [copy data files hack]
+    lists <- glob (src </> "*/memory.list")
+    forM_ lists $ \memFile ->
+      copyFile memFile (src </> "memory.list")
+
     let topExe = ivsTop <> ".exe"
     case ivsExpectFailure of
       Nothing -> run optionSet (vvp src [topExe]) progressCallback
       Just exit -> run optionSet (failingVvp src [topExe] exit) progressCallback
    where
     vvp workDir args =
-      TestProgram "vvp" args NoGlob PrintNeither False (Just workDir)
+      TestProgram "vvp" args NoGlob PrintNeither ivsStderrEmptyFail (Just workDir)
 
     failingVvp workDir args (testExit, expectedErr) =
       TestFailingProgram
@@ -504,10 +542,7 @@ instance IsTest ModelsimSimTest where
   run optionSet ModelsimSimTest{..} progressCallback = do
     src <- msimSourceDirectory
 
-    -- HACK: Copy "memory.list" such that tests can find it. This is hardcoded
-    -- for "BlockRamFile" and "RomFile". Ideally designs would never generate
-    -- relative paths, but use Cabal infrastructure to insert absolute paths
-    -- instead.
+    -- See Note [copy data files hack]
     lists <- glob (src </> "*/memory.list")
     forM_ lists $ \memFile ->
       copyFile memFile (src </> "memory.list")
@@ -578,7 +613,7 @@ verilogTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
 
   simName t = "iverilog (sim " <> t <> ")"
   simTests =
-    [ (simName t, singleTest (simName t) (IVerilogSimTest expectSimFail tmpDir t))
+    [ (simName t, singleTest (simName t) (IVerilogSimTest expectSimFail vvpStderrEmptyFail tmpDir t))
     | t <- getBuildTargets opts ]
 
 -- | Generate two test trees for testing SystemVerilog: one for building designs and
