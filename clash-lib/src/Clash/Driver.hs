@@ -168,7 +168,7 @@ splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
      = PortName "" : go res (p:ps)
    | otherwise =
     case shouldSplit tcm a of
-      Just (_,argTys@(_:_:_)) ->
+      Just (_,_,argTys@(_:_:_)) ->
         -- Port must be split up into 'n' pieces.. can it?
         case p of
           PortProduct nm portNames0 ->

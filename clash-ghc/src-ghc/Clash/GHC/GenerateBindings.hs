@@ -71,6 +71,7 @@ import           Clash.Core.Term         (Term (..), mkLams, mkTyLams)
 import           Clash.Core.Type         (Type (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
 import           Clash.Core.TyCon        (TyConMap, TyConName, isNewTypeTc)
 import           Clash.Core.TysPrim      (tysPrimMap)
+import           Clash.Core.Util         (mkInternalVar, mkSelectorCase)
 import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet
@@ -87,7 +88,6 @@ import           Clash.Netlist.Types     (TopEntityT(..))
 import           Clash.Primitives.Types
   (Primitive (..), CompiledPrimMap)
 import           Clash.Primitives.Util   (generatePrimMap)
-import           Clash.Rewrite.Util      (mkInternalVar, mkSelectorCase)
 import           Clash.Unique
   (listToUniqMap, lookupUniqMap, mapUniqMap, unionUniqMap, uniqMapToUniqSet)
 import           Clash.Util              (reportTimeDiff)

@@ -120,8 +120,8 @@ import           Clash.Core.Type             (Type (..), TypeView (..), applyFun
                                               LitTy (..), coreView1)
 import           Clash.Core.TyCon            (TyConMap, tyConDataCons)
 import           Clash.Core.Util
-  ( isSignalType, mkVec, tyNatSize, undefinedTm,
-   shouldSplit, inverseTopSortLetBindings)
+  (Projections (..), isSignalType, mkVec, tyNatSize, undefinedTm,
+   shouldSplit, inverseTopSortLetBindings, mkInternalVar, mkSelectorCase)
 import           Clash.Core.Var
   (Id, TyVar, Var (..), isGlobalId, isLocalId, mkLocalId)
 import           Clash.Core.VarEnv
@@ -2888,12 +2888,12 @@ separateLambda
   -- ^ If lambda is split up, this function returns a Just containing the new term
 separateLambda tcm ctx@(TransformContext is0 _) b eb0 =
   case shouldSplit tcm (varType b) of
-    Just (dc,argTys@(_:_:_)) ->
+    Just (dc, _, argTys) ->
       let
         nm = mkDerivedName ctx (nameOcc (varName b))
         bs0 = map (`mkLocalId` nm) argTys
         (is1, bs1) = List.mapAccumL newBinder is0 bs0
-        subst = extendIdSubst (mkSubst is1) b (mkApps dc (map (Left . Var) bs1))
+        subst = extendIdSubst (mkSubst is1) b (dc (map Var bs1))
         eb1 = substTm "separateArguments" subst eb0
       in
         Just (mkLams eb1 bs1)
@@ -2953,9 +2953,8 @@ separateArguments (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, 
     tcm <- Lens.view tcCache
     let argTy = termType tcm tmArg
     case shouldSplit tcm argTy of
-      Just (_,argTys@(_:_:_)) -> do
-        tmArgs <- mapM (mkSelectorCase ($(curLoc) ++ "splitArg") is0 tcm tmArg 1)
-                       [0..length argTys - 1]
+      Just (_,Projections projections,_) -> do
+        tmArgs <- projections is0 tmArg
         changed (map ((ty,) . Left) tmArgs)
       _ ->
         return [(ty,arg)]
