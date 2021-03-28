@@ -7,16 +7,18 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Core.Util where
 
 import           Control.Concurrent.Supply     (Supply, freshId)
 import qualified Control.Lens                  as Lens
-import Control.Monad.Trans.Except              (Except, throwE)
+import Control.Monad.Trans.Except              (Except, throwE, runExcept)
 import qualified Data.HashSet                  as HashSet
 import qualified Data.Graph                    as Graph
 import Data.List                               (foldl', mapAccumR)
@@ -46,6 +48,7 @@ import Clash.Core.Name
 import Clash.Core.Pretty                 (showPpr)
 import Clash.Core.Subst
 import Clash.Core.Term
+import Clash.Core.TermInfo               (termType)
 import Clash.Core.TyCon                  (TyConMap, tyConDataCons)
 import Clash.Core.Type
 import Clash.Core.TysPrim                (typeNatKind)
@@ -458,24 +461,37 @@ tyLitShow _ (LitTy (SymTy s))        = return s
 tyLitShow _ (LitTy (NumTy s))        = return (show s)
 tyLitShow _ ty = throwE $ $(curLoc) ++ "Cannot reduce to a string:\n" ++ showPpr ty
 
+-- | Helper existential for 'shouldSplit', contains a function that:
+--
+-- 1. given a term of a type that should be split,
+-- 2. creates projections of that term for all the constructor arguments
+data Projections where
+  Projections :: (forall m . MonadUnique m => InScopeSet -> Term -> m [Term])
+              -> Projections
+
 -- | Determine whether we should split away types from a product type, i.e.
 -- clocks should always be separate arguments, and not part of a product.
 shouldSplit
   :: TyConMap
   -> Type
   -- ^ Type to examine
-  -> Maybe (Term,[Type])
+  -> Maybe ([Term] -> Term, Projections, [Type])
   -- ^ If we want to split values of the given type then we have /Just/:
   --
   -- 1. The (type-applied) data-constructor which, when applied to values of
-  --    the types in 2., creates a value of the examined type
+  --    the types in 3., creates a value of the examined type
   --
-  -- 2. The arguments types of the product we are trying to split.
+  -- 2. Function that give a term of the type we need to split, creates projections
+  --    of that term for all the types in 3.
+  --
+  -- 3. The arguments types of the product we are trying to split.
   --
   -- Note that we only split one level at a time (although we check all the way
   -- down), e.g. given /(Int, (Clock, Bool))/ we return:
   --
-  -- > Just ((,) @Int @(Clock, Bool), [Int, (Clock, Bool)])
+  -- > Just ( (,) @Int @(Clock, Bool)
+  -- >      , \s -> [case s of (a,b) -> a, case s of (a,b) -> b]
+  -- >      , [Int, (Clock, Bool)])
   --
   -- An outer loop is required to subsequently split the /(Clock, Bool)/ tuple.
 shouldSplit tcm (tyView ->  TyConApp (nameOcc -> "Clash.Explicit.SimIO.SimIO") [tyArg]) =
@@ -487,17 +503,51 @@ shouldSplit tcm ty = shouldSplit0 tcm (tyView (coreView tcm ty))
 shouldSplit0
   :: TyConMap
   -> TypeView
-  -> Maybe (Term,[Type])
+  -> Maybe ([Term] -> Term, Projections, [Type])
 shouldSplit0 tcm (TyConApp tcNm tyArgs)
   | Just tc <- lookupUniqMap tcNm tcm
   , [dc] <- tyConDataCons tc
-  , let dcArgs  = substArgTys dc tyArgs
+  , let dcArgs = substArgTys dc tyArgs
+  , let dcArgsLen = length dcArgs
+  , dcArgsLen > 1
   , let dcArgVs = map (tyView . coreView tcm) dcArgs
   = if any shouldSplitTy dcArgVs && not (isHidden tcNm tyArgs) then
-      Just (mkApps (Data dc) (map Right tyArgs), dcArgs)
+      Just ( mkApps (Data dc) . (map Right tyArgs ++) . map Left
+           , Projections
+             (\is0 subj -> mapM (mkSelectorCase ($(curLoc) ++ "splitArg") is0 tcm subj 1)
+                                [0..dcArgsLen - 1])
+           , dcArgs
+           )
+    else
+      Nothing
+  | "Clash.Sized.Vector.Vec" <- nameOcc tcNm
+  , [nTy,argTy] <- tyArgs
+  , Right n <- runExcept (tyNatSize tcm nTy)
+  , n > 1
+  , Just tc <- lookupUniqMap tcNm tcm
+  , [nil,cons] <- tyConDataCons tc
+  = if shouldSplitTy (tyView (coreView tcm argTy)) then
+      Just ( mkVec nil cons argTy n
+           , Projections (\is0 subj -> mapM (mkVecSelector is0 subj) [0..n-1])
+           , replicate (fromInteger n) argTy)
     else
       Nothing
  where
+  -- Project the n'th value out of a vector
+  --
+  -- >>> mkVecSelector subj 0
+  -- case subj of Cons x xs -> x
+  --
+  -- >>> mkVecSelector subj 2
+  -- case (case (case subj of Cons x xs -> xs) of Cons x xs -> xs) of Cons x xs -> x
+  mkVecSelector :: forall m . MonadUnique m => InScopeSet -> Term -> Integer -> m Term
+  mkVecSelector is0 subj 0 =
+    mkSelectorCase ($(curLoc) ++ "mkVecSelector") is0 tcm subj 2 1
+
+  mkVecSelector is0 subj !n = do
+    subj1 <- mkSelectorCase ($(curLoc) ++ "mkVecSelector") is0 tcm subj 2 2
+    mkVecSelector is0 subj1 (n-1)
+
   shouldSplitTy :: TypeView -> Bool
   shouldSplitTy ty = isJust (shouldSplit0 tcm ty) || splitTy ty
 
@@ -554,8 +604,8 @@ splitShouldSplit
 splitShouldSplit tcm = foldr go []
  where
   go ty rest = case shouldSplit tcm ty of
-    Just (_,tys) -> splitShouldSplit tcm tys ++ rest
-    Nothing      -> ty : rest
+    Just (_,_,tys) -> splitShouldSplit tcm tys ++ rest
+    Nothing        -> ty : rest
 
 -- | Strip implicit parameter wrappers (IP)
 stripIP :: Type -> Type
@@ -601,3 +651,59 @@ sccLetBindings =
                             (Set.elems (Lens.setOf freeLocalIds e) )
                   in  ((i,e),varUniq i,fvs)))
 {-# SCC sccLetBindings #-}
+
+-- | Make a case-decomposition that extracts a field out of a (Sum-of-)Product type
+mkSelectorCase
+  :: HasCallStack
+  => MonadUnique m
+  => String -- ^ Name of the caller of this function
+  -> InScopeSet
+  -> TyConMap -- ^ TyCon cache
+  -> Term -- ^ Subject of the case-composition
+  -> Int -- ^ n'th DataCon
+  -> Int -- ^ n'th field
+  -> m Term
+mkSelectorCase caller inScope tcm scrut dcI fieldI = go (termType tcm scrut)
+  where
+    go (coreView1 tcm -> Just ty') = go ty'
+    go scrutTy@(tyView -> TyConApp tc args) =
+      case tyConDataCons (lookupUniqMap' tcm tc) of
+        [] -> cantCreate $(curLoc) ("TyCon has no DataCons: " ++ show tc ++ " " ++ showPpr tc) scrutTy
+        dcs | dcI > length dcs -> cantCreate $(curLoc) "DC index exceeds max" scrutTy
+            | otherwise -> do
+          let dc = indexNote ($(curLoc) ++ "No DC with tag: " ++ show (dcI-1)) dcs (dcI-1)
+          let (Just fieldTys) = dataConInstArgTysE inScope tcm dc args
+          if fieldI >= length fieldTys
+            then cantCreate $(curLoc) "Field index exceed max" scrutTy
+            else do
+              wildBndrs <- mapM (mkWildValBinder inScope) fieldTys
+              let ty = indexNote ($(curLoc) ++ "No DC field#: " ++ show fieldI) fieldTys fieldI
+              selBndr <- mkInternalVar inScope "sel" ty
+              let bndrs  = take fieldI wildBndrs ++ [selBndr] ++ drop (fieldI+1) wildBndrs
+                  pat    = DataPat dc (dcExtTyVars dc) bndrs
+                  retVal = Case scrut ty [ (pat, Var selBndr) ]
+              return retVal
+    go scrutTy = cantCreate $(curLoc) ("Type of subject is not a datatype: " ++ showPpr scrutTy) scrutTy
+
+    cantCreate loc info scrutTy = error $ loc ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: (" ++ showPpr scrut ++ " :: " ++ showPpr scrutTy ++ ")\nAdditional info: " ++ info
+
+-- | Make a binder that should not be referenced
+mkWildValBinder
+  :: (MonadUnique m)
+  => InScopeSet
+  -> Type
+  -> m Id
+mkWildValBinder is = mkInternalVar is "wild"
+
+-- | Make a new, unique, identifier
+mkInternalVar
+  :: (MonadUnique m)
+  => InScopeSet
+  -> OccName
+  -- ^ Name of the identifier
+  -> KindOrType
+  -> m Id
+mkInternalVar inScope name ty = do
+  i <- getUniqueM
+  let nm = mkUnsafeInternalName name i
+  return (uniqAway inScope (mkLocalId ty nm))

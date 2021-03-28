@@ -94,11 +94,10 @@ import           Clash.Core.TyCon
 import           Clash.Core.TysPrim
 import           Clash.Core.Util
   (mkRTree,mkVec,tyNatSize,dataConInstArgTys,primCo,
-   undefinedTm)
+   undefinedTm, mkSelectorCase)
 import           Clash.Core.Var      (mkLocalId, mkTyVar)
 import           Clash.Debug
 import           Clash.GHC.GHC2Core  (modNameM)
-import           Clash.Rewrite.Util  (mkSelectorCase)
 import           Clash.Unique        (lookupUniqMap)
 import           Clash.Util
   (MonadUnique (..), clogBase, flogBase, curLoc)

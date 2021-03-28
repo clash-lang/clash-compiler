@@ -60,7 +60,7 @@ normalization =
                                       ,("letFlat"        , flattenLet)])
                  >-> rmDeadcode >-> letTL
     splitArgs  = topdownR (apply "separateArguments" separateArguments) !->
-                 topdownR (apply "caseCon" caseCon)
+                 bottomupR (apply "caseCon" caseCon)
     bindSimIO  = topdownR (apply "bindSimIO" inlineSimIO)
 
 
