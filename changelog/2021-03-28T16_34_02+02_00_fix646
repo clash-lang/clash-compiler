@@ -1,0 +1,1 @@
+FIXED: Erroneous examples in `Clash.Annotation.TopEntity` documentation [#646](https://github.com/clash-lang/clash-compiler/issues/646) and [#654](https://github.com/clash-lang/clash-compiler/issues/654)
