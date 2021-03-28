@@ -61,21 +61,54 @@ module Blinker where
 import Clash.Prelude
 import Clash.Intel.ClockGen
 
-type Dom50 = Dom \"System\" 20000
+'Clash.Explicit.Signal.createDomain' vSystem{vName=\"DomInput\", vPeriod=20000}
+'Clash.Explicit.Signal.createDomain' vSystem{vName=\"Dom50\", vPeriod=50000}
 
 topEntity
-  :: Clock Dom50
-  -> Reset Dom50
+  :: Clock DomInput
+  -> Reset DomInput
+  -> Enable Dom50
   -> Signal Dom50 Bit
   -> Signal Dom50 (BitVector 8)
-topEntity clk rst key1 =
-    let  (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' (SSymbol @ "altpll50") clk rst
-         rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeToAsyncReset' pllStable)
-    in   'Clash.Signal.exposeClockResetEnable' leds pllOut rstSync
-  where
-    key1R  = 'Clash.Prelude.isRising' 1 key1
-    leds   = 'Clash.Prelude.mealy' blinkerT (1,False,0) key1R
+topEntity clk20 rstBtn enaBtn modeBtn =
+  'Clash.Signal.exposeClockResetEnable'
+    ('Clash.Prelude.mealy' blinkerT initialStateBlinkerT . 'Clash.Prelude.isRising' 1)
+    clk50
+    rstSync
+    enaBtn
+    modeBtn
+ where
+  -- Start with the first LED turned on, in rotate mode, with the counter on zero
+  initialStateBlinkerT = (1, False, 0)
 
+  -- Signal coming from the reset button is low when pressed, and high when
+  -- not pressed. We convert this signal to the polarity of our domain with
+  -- /unsafeFromLowPolarity/.
+  rst = 'Clash.Signal.unsafeFromLowPolarity' ('Clash.Signal.unsafeFromReset' rstBtn)
+
+  -- Instantiate a PLL: this stabilizes the incoming clock signal and indicates
+  -- when the signal is stable. We're also using it to transform an incoming
+  -- clock signal running at 20 MHz to a clock signal running at 50 MHz.
+  (clk50, pllStable) =
+    'Clash.Intel.ClockGen.altpll'
+      \@Dom50
+      (SSymbol @"altpll50")
+      clk20
+      rst
+
+  -- Synchronize reset to clock signal coming from PLL. We want the reset to
+  -- remain active while the PLL is NOT stable, hence the conversion with
+  -- /unsafeFromLowPolarity/
+  rstSync =
+    'Clash.Prelude.resetSynchronizer'
+      clk50
+      ('Clash.Signal.unsafeFromLowPolarity' pllStable)
+      enableGen
+
+blinkerT
+  :: (BitVector 8, Bool, Index 16650001)
+  -> Bool
+  -> ((BitVector 8, Bool, Index 16650001), BitVector 8)
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where
     -- clock frequency = 50e6  (50 MHz)
@@ -94,7 +127,7 @@ blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
 @
 
 The Clash compiler would normally generate the following
-@blinker_topentity.vhdl@ file:
+@topEntity.vhdl@ file:
 
 @
 -- Automatically generated VHDL-93
@@ -104,25 +137,21 @@ use IEEE.NUMERIC_STD.ALL;
 use IEEE.MATH_REAL.ALL;
 use std.textio.all;
 use work.all;
-use work.blinker_types.all;
+use work.Blinker_topEntity_types.all;
 
-entity blinker_topentity is
+entity topEntity is
   port(-- clock
-       input_0  : in std_logic;
-       -- asynchronous reset: active high
-       input_1  : in std_logic;
-       input_2  : in std_logic_vector(0 downto 0);
-       output_0 : out std_logic_vector(7 downto 0));
+       clk20   : in Blinker_topEntity_types.clk_DomInput;
+       -- reset
+       rstBtn  : in Blinker_topEntity_types.rst_DomInput;
+       -- enable
+       enaBtn  : in Blinker_topEntity_types.en_Dom50;
+       modeBtn : in std_logic;
+       result  : out std_logic_vector(7 downto 0));
 end;
 
-architecture structural of blinker_topentity is
-begin
-  blinker_topentity_0_inst : entity blinker_topentity_0
-    port map
-      (clk    => input_0
-      ,rst    => input_1
-      ,key1   => input_2
-      ,result => output_0);
+architecture structural of topEntity is
+  ...
 end;
 @
 
@@ -134,7 +163,8 @@ However, if we add the following 'Synthesize' annotation in the file:
     { t_name   = "blinker"
     , t_inputs = [ PortName \"CLOCK_50\"
                  , PortName \"KEY0\"
-                 , PortName \"KEY1\" ]
+                 , PortName \"KEY1\"
+                 , PortName \"KEY2\" ]
     , t_output = PortName \"LED\"
     }) \#-\}
 @
@@ -153,28 +183,24 @@ use work.blinker_types.all;
 
 entity blinker is
   port(-- clock
-       CLOCK_50 : in std_logic;
-       -- asynchronous reset: active high
-       KEY0     : in std_logic;
-       KEY1     : in std_logic_vector(0 downto 0);
+       CLOCK_50 : in blinker_types.clk_DomInput;
+       -- reset
+       KEY0     : in blinker_types.rst_DomInput;
+       -- enable
+       KEY1     : in blinker_types.en_Dom50;
+       KEY2     : in std_logic;
        LED      : out std_logic_vector(7 downto 0));
 end;
 
 architecture structural of blinker is
-begin
-  blinker_topentity_inst : entity blinker_topentity
-    port map
-      (clk    => CLOCK_50
-      ,rst    => KEY0
-      ,key1   => KEY1
-      ,result => LED);
+  ...
 end;
 @
 
 Where we now have:
 
 * A top-level component that is called @blinker@.
-* Inputs and outputs that have a /user/-chosen name: @CLOCK_50@, @KEY0@, @KEY1@, @LED@, etc.
+* Inputs and outputs that have a /user/-chosen name: @CLOCK_50@, @KEY0@, @KEY1@, @KEY2@, @LED@, etc.
 
 See the documentation of 'Synthesize' for the meaning of all its fields.
 
@@ -275,7 +301,7 @@ instance Lift TopEntity where
 -- @
 -- data T = MkT Int Bool
 --
--- {\-\# ANN topEntity (defSyn "f") \#-\}
+-- {\-\# ANN f (defSyn "f") \#-\}
 -- f :: Int -> T -> (T,Bool)
 -- f a b = ...
 -- @
@@ -284,19 +310,17 @@ instance Lift TopEntity where
 --
 -- @
 -- entity f is
---   port(input_0      : in signed(63 downto 0);
---        input_1_0    : in signed(63 downto 0);
---        input_1_1    : in boolean;
---        output_0_0_0 : out signed(63 downto 0);
---        output_0_0_1 : out boolean;
---        output_0_1   : out boolean);
+--   port(a      : in signed(63 downto 0);
+--        b_0    : in signed(63 downto 0);
+--        b_1    : in boolean;
+--        result : out std_logic_vector(65 downto 0));
 -- end;
 -- @
 --
 -- However, we can change this by using 'PortName's. So by:
 --
 -- @
--- {\-\# ANN topEntity
+-- {\-\# ANN f
 --    (Synthesize
 --       { t_name   = "f"
 --       , t_inputs = [ PortName \"a\"
@@ -311,15 +335,15 @@ instance Lift TopEntity where
 -- @
 -- entity f is
 --   port(a   : in signed(63 downto 0);
---        b   : in f_types.t;
---        res : out f_types.tup2);
+--        b   : in std_logic_vector(64 downto 0);
+--        res : out std_logic_vector(65 downto 0));
 -- end;
 -- @
 --
 -- If we want to name fields for tuples/records we have to use 'PortProduct'
 --
 -- @
--- {\-\# ANN topEntity
+-- {\-\# ANN f
 --    (Synthesize
 --       { t_name   = "f"
 --       , t_inputs = [ PortName \"a\"
@@ -336,7 +360,7 @@ instance Lift TopEntity where
 --   port(a     : in signed(63 downto 0);
 --        b     : in signed(63 downto 0);
 --        c     : in boolean;
---        q     : out f_types.t;
+--        res_q : out std_logic_vector(64 downto 0);
 --        res_1 : out boolean);
 -- end;
 -- @
@@ -347,7 +371,7 @@ data PortName
   = PortName String
   -- ^ You want a port, with the given name, for the entire argument\/type
   --
-  -- You can use an empty String ,\"\" , in case you want an auto-generated name.
+  -- You can use an empty String ,@""@ , in case you want an auto-generated name.
   | PortProduct String [PortName]
   -- ^ You want to assign ports to fields of a product argument\/type
   --
@@ -357,7 +381,7 @@ data PortName
   --
   -- 2. The prefix for any unnamed ports below the 'PortProduct'
   --
-  -- You can use an empty String ,\"\" , in case you want an auto-generated name.
+  -- You can use an empty String ,@""@ , in case you want an auto-generated name.
   deriving (Eq,Data,Show,Generic,Lift)
 
 -- | Default 'Synthesize' annotation which has no specified names for the input
