@@ -241,6 +241,7 @@ data HDL
 -- nicer multiline strings.
 --
 -- @
+-- {\-\# LANGUAGE QuasiQuotes \#-\}
 -- module InlinePrimitive where
 --
 -- import           Clash.Annotations.Primitive
