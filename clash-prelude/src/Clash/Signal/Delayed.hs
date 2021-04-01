@@ -127,7 +127,8 @@ delayedI = hideClockResetEnable E.delayedI
 --
 -- @
 -- delayN2
---   :: HiddenClockResetEnable dom
+--   :: ( HiddenClock dom
+--      , HiddenEnable dom )
 --   => Int
 --   -> 'DSignal' dom n Int
 --   -> 'DSignal' dom (n + 2) Int
@@ -153,7 +154,8 @@ delayN d dflt = hideClock (hideEnable (E.delayN d dflt))
 --
 -- @
 -- delayI2
---   :: HiddenClockResetEnable dom
+--   :: ( HiddenClock dom
+--      , HiddenEnable dom )
 --   => Int
 --   -> 'DSignal' dom n Int
 --   -> 'DSignal' dom (n + 2) Int
@@ -169,14 +171,15 @@ delayN d dflt = hideClock (hideEnable (E.delayN d dflt))
 -- [-1,-1,1,2,3,4]
 delayI
   :: forall d n a dom
-   . ( HiddenClockResetEnable dom
+   . ( HiddenClock dom
+     , HiddenEnable dom
      , NFDataX a
      , KnownNat d )
   => a
   -- ^ Initial value
   -> DSignal dom n a
   -> DSignal dom (n+d) a
-delayI dflt = delayN (SNat :: SNat d) dflt
+delayI dflt = hideClock (hideEnable (E.delayI dflt))
 
 -- | Tree fold over a 'Vec' of 'DSignal's with a combinatorial function,
 -- and delaying @delay@ cycles after each application.
