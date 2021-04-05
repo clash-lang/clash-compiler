@@ -16,6 +16,8 @@
 module Clash.GHC.GHC2Core
   ( C2C
   , GHC2CoreState
+  , GHC2CoreEnv (..)
+  , srcSpan
   , tyConMap
   , coreToTerm
   , coreToId
@@ -29,7 +31,7 @@ module Clash.GHC.GHC2Core
 where
 
 -- External Modules
-import           Control.Lens                ((^.), (%~), (&), (%=))
+import           Control.Lens                ((^.), (%~), (&), (%=), (.~), view)
 import           Control.Monad.RWS.Strict    (RWS)
 import qualified Control.Monad.RWS.Strict    as RWS
 import qualified Data.ByteString.Char8       as Char8
@@ -51,7 +53,7 @@ import qualified Text.Read                   as Text
 #if MIN_VERSION_ghc(9,0,0)
 import GHC.Core.Coercion.Axiom
   (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs), fromBranches)
-import GHC.Core.Coercion (coercionType,coercionKind)
+import GHC.Core.Coercion (Role (Nominal), coercionType, coercionKind)
 import GHC.Core.FVs  (exprSomeFreeVars)
 import GHC.Core
   (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..), Tickish (..),
@@ -60,7 +62,8 @@ import GHC.Core.DataCon
   (DataCon, dataConExTyCoVars, dataConName, dataConRepArgTys, dataConTag,
    dataConTyCon, dataConUnivTyVars, dataConWorkId, dataConFieldLabels, flLabel)
 import GHC.Driver.Session (unsafeGlobalDynFlags)
-import GHC.Core.FamInstEnv (FamInst (..), FamInstEnvs, familyInstances)
+import GHC.Core.FamInstEnv
+  (FamInst (..), FamInstEnvs, familyInstances, normaliseType, emptyFamInstEnvs)
 import GHC.Data.FastString (unpackFS, bytesFS)
 import GHC.Types.Id (isDataConId_maybe)
 import GHC.Types.Id.Info (IdDetails (..), unfoldingInfo)
@@ -87,7 +90,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Set (isEmptyVarSet)
 #else
 import CoAxiom    (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs),
-                   fromBranches)
+                   fromBranches, Role (Nominal))
 import Coercion   (coercionType,coercionKind)
 import CoreFVs    (exprSomeFreeVars)
 import CoreSyn
@@ -105,7 +108,7 @@ import DataCon    (DataCon,
                    dataConFieldLabels, flLabel)
 import DynFlags   (unsafeGlobalDynFlags)
 import FamInstEnv (FamInst (..), FamInstEnvs,
-                   familyInstances)
+                   familyInstances, normaliseType, emptyFamInstEnvs)
 
 #if MIN_VERSION_ghc(8,10,0)
 import FastString (unpackFS, bytesFS)
@@ -174,6 +177,14 @@ data GHC2CoreState
 
 makeLenses ''GHC2CoreState
 
+data GHC2CoreEnv
+  = GHC2CoreEnv
+  { _srcSpan :: SrcSpan
+  , _famInstEnvs :: FamInstEnvs
+  }
+
+makeLenses ''GHC2CoreEnv
+
 emptyGHC2CoreState :: GHC2CoreState
 emptyGHC2CoreState = GHC2CoreState C.emptyUniqMap HashMap.empty
 
@@ -191,7 +202,7 @@ instance Monoid SrcSpanRB where
   mappend = (<>)
 #endif
 
-type C2C = RWS SrcSpan SrcSpanRB GHC2CoreState
+type C2C = RWS GHC2CoreEnv SrcSpanRB GHC2CoreState
 
 makeAllTyCons
   :: GHC2CoreState
@@ -203,13 +214,14 @@ makeAllTyCons hm fiEnvs = go hm hm
         | C.nullUniqMap (new ^. tyConMap) = C.emptyUniqMap
         | otherwise                       = tcm `C.unionUniqMap` tcm'
       where
-        (tcm,old', _) = RWS.runRWS (T.mapM (makeTyCon fiEnvs) (new ^. tyConMap)) noSrcSpan old
+        (tcm,old', _) = RWS.runRWS (T.mapM makeTyCon (new ^. tyConMap))
+                                   (GHC2CoreEnv noSrcSpan fiEnvs)
+                                   old
         tcm'          = go old' (old' & tyConMap %~ (`C.differenceUniqMap` (old ^. tyConMap)))
 
-makeTyCon :: FamInstEnvs
-          -> TyCon
+makeTyCon :: TyCon
           -> C2C C.TyCon
-makeTyCon fiEnvs tc = tycon
+makeTyCon tc = tycon
   where
     tycon
       | isFamilyTyCon tc    = mkFunTyCon
@@ -242,8 +254,9 @@ makeTyCon fiEnvs tc = tycon
           tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
           tcKind <- coreToType (tyConKind tc)
           substs <- case isClosedSynFamilyTyConWithAxiom_maybe tc of
-            Nothing -> let instances = familyInstances fiEnvs tc
-                       in  mapM famInstToSubst instances
+            Nothing -> do
+                       instances <- familyInstances <$> view famInstEnvs <*> pure tc
+                       mapM famInstToSubst instances
             Just cx -> let bx = fromBranches (co_ax_branches cx)
                        in  mapM (\b -> (,) <$> mapM coreToType (cab_lhs b)
                                            <*> coreToType (cab_rhs b))
@@ -338,7 +351,7 @@ coreToTerm primMap unlocs = term
     term e
       | (Var x,args) <- collectArgs e
       , let (nm, _) = RWS.evalRWS (qualifiedNameString (varName x))
-                                  noSrcSpan
+                                  (GHC2CoreEnv noSrcSpan emptyFamInstEnvs)
                                   emptyGHC2CoreState
       = go nm args
       | otherwise
@@ -495,7 +508,12 @@ coreToTerm primMap unlocs = term
 
 
     termSP sp = fmap (second unSrcSpanRB) . RWS.listen . addUsefullR sp . term
-    coreToIdSP sp = RWS.local (\r -> if isGoodSrcSpan sp then sp else r) . coreToId
+    coreToIdSP sp = RWS.local (\r@(GHC2CoreEnv _ e) ->
+                                  if isGoodSrcSpan sp then
+                                    GHC2CoreEnv sp e
+                                  else
+                                    r)
+                  . coreToId
 
 
     lookupPrim :: Text -> Maybe (Maybe CompiledPrimitive)
@@ -516,7 +534,7 @@ coreToTerm primMap unlocs = term
                        unfolding = unfoldingInfo xInfo
                    in  case unfolding of
                           CoreUnfolding {} -> do
-                            sp <- RWS.ask
+                            sp <- view srcSpan
                             RWS.censor (const (SrcSpanRB sp)) (term (unfoldingTemplate unfolding))
                           NoUnfolding -> error ("No unfolding for DC wrapper: " ++ showPpr unsafeGlobalDynFlags x)
                           _ -> error ("Unexpected unfolding for DC wrapper: " ++ showPpr unsafeGlobalDynFlags x)
@@ -621,7 +639,7 @@ addUsefull :: SrcSpan
            -> C2C a
 addUsefull x m =
   if isGoodSrcSpan x
-  then do a <- RWS.local (const x) m
+  then do a <- RWS.local (srcSpan .~ x) m
           RWS.tell (SrcSpanRB x)
           return a
   else m
@@ -631,7 +649,7 @@ addUsefullR :: SrcSpan
             -> C2C a
 addUsefullR x m =
   if isGoodSrcSpan x
-  then RWS.local (const x) m
+  then RWS.local (srcSpan .~ x) m
   else m
 
 isSizedCast :: Type -> Type -> C2C Bool
@@ -789,16 +807,19 @@ coreToAttr (TyConApp ty args) = do
   let key   = args !! 0
   let value = args !! 1
   name' <- typeConstructorToString ty
+  envs <- view famInstEnvs
+  let (_,key1) = normaliseType envs Nominal key
+      (_,value1) = normaliseType envs Nominal value
   case name' of
     "Clash.Annotations.SynthesisAttributes.StringAttr" ->
-        return $ C.StringAttr' (tyLitToString key) (tyLitToString value)
+        return $ C.StringAttr' (tyLitToString key1) (tyLitToString value1)
     "Clash.Annotations.SynthesisAttributes.IntegerAttr" ->
-        return $ C.IntegerAttr' (tyLitToString key) (tyLitToInteger value)
+        return $ C.IntegerAttr' (tyLitToString key1) (tyLitToInteger value1)
     "Clash.Annotations.SynthesisAttributes.BoolAttr" -> do
-        bool <- boolTypeToBool value
-        return $ C.BoolAttr' (tyLitToString key) bool
+        bool <- boolTypeToBool value1
+        return $ C.BoolAttr' (tyLitToString key1) bool
     "Clash.Annotations.SynthesisAttributes.Attr" ->
-        return $ C.Attr' (tyLitToString key)
+        return $ C.Attr' (tyLitToString key1)
     _ ->
         error $ unwords [ "Expected StringAttr, IntegerAttr, BoolAttr or Attr"
                         , "constructor, got:" ++ name' ]
@@ -977,7 +998,7 @@ coreToName toName toUnique toString v = do
            = C.System
            | otherwise
            = C.User
-  locR <- RWS.ask
+  locR <- view srcSpan
   let loc = if isGoodSrcSpan locI then locI else locR
   return (C.Name sort ns key loc)
 
