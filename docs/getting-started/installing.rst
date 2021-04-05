@@ -37,7 +37,7 @@ To checkout a release *branch* use:
 Note that release branches might contain non-released patches.
 
 Cabal
------
+^^^^^
 To use Cabal you need both Cabal and GHC installed on your system. For Linux and
 MacOS users we recommend using `ghcup <https://www.haskell.org/ghcup/>`__.
 Windows users are recommended to use the
@@ -57,8 +57,8 @@ If this fails, make sure you've got an up-to-date package index:
    cabal update
 
 Stack
------
-`Install Stack <https://docs.haskellstack.org/en/stable/install_and_upgrade/`__
+^^^^^
+`Install Stack <https://docs.haskellstack.org/en/stable/install_and_upgrade/>`__
 and run:
 
 .. code:: bash
@@ -66,7 +66,7 @@ and run:
    stack run -- clash
 
 Nix
----
+^^^
 Or `use Nix <https://nixos.org/nix/download.html>`__ to get a shell with the
 ``clash`` and ``clashi`` binaries on your PATH:
 
