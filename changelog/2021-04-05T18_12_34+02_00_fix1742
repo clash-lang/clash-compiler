@@ -1,0 +1,1 @@
+FIXED: Annotate attributes cannot use type families [#1742](https://github.com/clash-lang/clash-compiler/issues/1742)
