@@ -16,7 +16,7 @@ where
 
 import           Control.Arrow           ((***), first)
 import           Control.DeepSeq         (deepseq)
-import           Control.Lens            ((%~),(&))
+import           Control.Lens            ((%~),(&),(.~))
 import           Control.Monad           (unless)
 import qualified Control.Monad.State     as State
 import qualified Control.Monad.RWS.Strict as RWS
@@ -38,6 +38,7 @@ import qualified GHC.Driver.Session      as GHC
 import qualified GHC.Types.Id.Info       as GHC
 import qualified GHC.Utils.Outputable    as GHC
 import qualified GHC.Types.Name          as GHC hiding (varName)
+import qualified GHC.Core.FamInstEnv     as GHC
 import qualified GHC.Core.TyCon          as GHC
 import qualified GHC.Core.Type           as GHC
 import qualified GHC.Builtin.Types       as GHC
@@ -51,6 +52,7 @@ import qualified Constants               as GHC
 import qualified CoreSyn                 as GHC
 import qualified Demand                  as GHC
 import qualified DynFlags                as GHC
+import qualified FamInstEnv              as GHC
 import qualified IdInfo                  as GHC
 import qualified Outputable              as GHC
 import qualified Name                    as GHC hiding (varName)
@@ -80,8 +82,8 @@ import           Clash.Debug             (traceIf)
 import           Clash.Driver            (compilePrimitive)
 import           Clash.Driver.Types      (BindingMap, Binding(..), IsPrim(..))
 import           Clash.GHC.GHC2Core
-  (C2C, GHC2CoreState, tyConMap, coreToId, coreToName, coreToTerm,
-   makeAllTyCons, qualifiedNameString, emptyGHC2CoreState)
+  (C2C, GHC2CoreState, GHC2CoreEnv (..), tyConMap, coreToId, coreToName, coreToTerm,
+   makeAllTyCons, qualifiedNameString, emptyGHC2CoreState, srcSpan)
 import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
 import           Clash.Netlist.BlackBox.Util (getUsedArguments)
 import           Clash.Netlist.Types     (TopEntityT(..))
@@ -142,7 +144,7 @@ generateBindings startAction useColor primDirs importDirs dbs hdl modName dflags
                  primMapR
   let ((bindingsMap,clsVMap),tcMap,_) =
         RWS.runRWS (mkBindings primMapC bindings clsOps unlocatable)
-                   GHC.noSrcSpan
+                   (GHC2CoreEnv GHC.noSrcSpan fiEnvs)
                    emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
       tcCache                       = makeAllTyCons tcMap' fiEnvs
@@ -153,9 +155,10 @@ generateBindings startAction useColor primDirs importDirs dbs hdl modName dflags
       clsMap                        = mapUniqMap (\(v,i) -> (Binding v GHC.noSrcSpan GHC.Inline IsFun (mkClassSelector inScope0 allTcCache (varType v) i))) clsVMap
       allBindings                   = bindingsMap `unionVarEnv` clsMap
       topEntities'                  =
-        (\m -> fst (RWS.evalRWS m GHC.noSrcSpan tcMap')) $ mapM (\(topEnt,annM,isTb) -> do
-          topEnt' <- coreToName GHC.varName GHC.varUnique qualifiedNameString topEnt
-          return (topEnt', annM, isTb)) topEntities
+        (\m -> fst (RWS.evalRWS m (GHC2CoreEnv GHC.noSrcSpan fiEnvs) tcMap')) $
+          mapM (\(topEnt,annM,isTb) -> do
+            topEnt' <- coreToName GHC.varName GHC.varUnique qualifiedNameString topEnt
+            return (topEnt', annM, isTb)) topEntities
       topEntities'' =
         map (\(topEnt, annM, isTb) ->
                 case lookupUniqMap topEnt allBindings of
@@ -212,7 +215,7 @@ mkBindings primMap bindings clsOps unlocatable = do
     GHC.NonRec v e -> do
       let sp = GHC.getSrcSpan v
           inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
-      tm <- RWS.local (const sp) (coreToTerm primMap unlocatable e)
+      tm <- RWS.local (srcSpan .~ sp) (coreToTerm primMap unlocatable e)
       v' <- coreToId v
       nm <- qualifiedNameString (GHC.varName v)
       let pr = if HashMap.member nm primMap then IsPrim else IsFun
@@ -222,7 +225,7 @@ mkBindings primMap bindings clsOps unlocatable = do
       tms <- mapM (\(v,e) -> do
                     let sp  = GHC.getSrcSpan v
                         inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
-                    tm <- RWS.local (const sp) (coreToTerm primMap unlocatable e)
+                    tm <- RWS.local (srcSpan .~ sp) (coreToTerm primMap unlocatable e)
                     v' <- coreToId v
                     nm <- qualifiedNameString (GHC.varName v)
                     let pr = if HashMap.member nm primMap then IsPrim else IsFun
@@ -345,7 +348,7 @@ mkTupTyCons tcMap = (tcMap'',tupTcCache)
     (tcNames,tcMap',_) =
       RWS.runRWS (mapM (\tc -> coreToName GHC.tyConName GHC.tyConUnique
                                           qualifiedNameString tc) tupTyCons)
-                 GHC.noSrcSpan
+                 (GHC2CoreEnv GHC.noSrcSpan GHC.emptyFamInstEnvs)
                  tcMap
     tupTcCache       = IMS.fromList (zip [2..GHC.mAX_TUPLE_SIZE] (drop 3 tcNames))
     tupHM            = listToUniqMap (zip tcNames tupTyCons)
