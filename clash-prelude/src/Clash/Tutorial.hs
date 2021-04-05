@@ -223,11 +223,20 @@ For installation instructions, see <https://clash-lang.org/install/ clash-lang.o
 
 {- $working
 This tutorial can be followed best whilst having the Clash interpreter running
-at the same time. If you followed the installation instructions, you already
-know how to start the Clash compiler in interpretive mode:
+at the same time. If you followed the installation instructions based on
+<https://docs.haskellstack.org/en/stable/README/#how-to-install Stack>, you can
+start the Clash compiler in interpretive mode by:
 
 @
-clash.clashi  # When installed from source, use @clashi@
+stack exec --package clash-ghc -- clashi
+@
+
+If you followed the installation instruction based on
+<https://snapcraft.io/clash snap> (Linux only), you can start the Clash compiler
+in interpretive mode by:
+
+@
+clash.clashi
 @
 
 For those familiar with Haskell/GHC, this is indeed just @GHCi@, with three
@@ -442,7 +451,7 @@ mealy f initS = ...
 The complete sequential MAC circuit can now be specified as:
 
 @
-mac = 'mealy' macT 0
+mac inp = 'mealy' macT 0 inp
 @
 
 Where the first argument of @'mealy'@ is our @macT@ function, and the second
@@ -492,7 +501,7 @@ macT acc (x,y) = (acc',o)
     acc' = ma acc (x,y)
     o    = acc
 
-mac = 'mealy' macT 0
+mac inp = 'mealy' macT 0 inp
 
 topEntity
   :: 'Clock' 'System'
