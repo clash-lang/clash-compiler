@@ -1,1 +1,0 @@
-FIXED: Blackboxes of `Clash.Sized.Vector` functions error on vectors containing `Clocks`, `Reset`, or `Enable` [#1606](https://github.com/clash-lang/clash-compiler/issues/1606)
