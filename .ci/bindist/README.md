@@ -33,8 +33,6 @@ triggered on any other branch a _beta_ release gets made.
   * `clash-ghc/clash-cores.cabal`
   * `.ci/bindist/linux/snap/snap/snapcraft.yaml`
   * `docs/conf.py`
-  * `README.md`
-  * `content/install/index.md` @ `clash-lang/clash-lang.org`
 2. Change the defaults of cabal flags in `clash-prelude/clash-prelude.cabal`
    where necessary. At the time of writing this applies only to
    `-fmultiple-hidden`.
@@ -61,8 +59,6 @@ triggered on any other branch a _beta_ release gets made.
   * `clash-ghc/clash-cores.cabal`
   * `.ci/bindist/linux/snap/snap/snapcraft.yaml`
   * `docs/conf.py`
-  * `README.md`
-  * `content/install/index.md` @ `clash-lang/clash-lang.org`
 2. Update the CHANGELOG (see changelog/README.md).
 3. Ask someone with admin permissions on GitLab to trigger a nightly scheduele,
    or simply wait a day. Verify that both Snap and Hackage release fine, and
