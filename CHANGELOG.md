@@ -1,5 +1,21 @@
 # Changelog for the Clash project
-## 1.4.0 *March 12th 2020*
+
+## 1.4.1 *April 6th 2021*
+Fixed:
+
+ * Broken VHDL primitive template for setSlice# [#1715](https://github.com/clash-lang/clash-compiler/issues/1715)
+ * Unable to reduce nested type families [#1721](https://github.com/clash-lang/clash-compiler/issues/1721)
+ * DEC transformation fails for functions applied to more than 62 arguments [#1669](https://github.com/clash-lang/clash-compiler/issues/1669)
+ * Erroneous examples in BlockRam.File and ROM.File documentation [#1608](https://github.com/clash-lang/clash-compiler/issues/1608)
+ * Blackboxes of `Clash.Sized.Vector` functions error on vectors containing `Clocks`, `Reset`, or `Enable` [#1606](https://github.com/clash-lang/clash-compiler/issues/1606)
+ * `Clash.Signal.Delayed.delayI` cannot be reset, the `HiddenReset` constraint was unintentional. Asserting its reset has never worked. Removed the constraint [#1739](https://github.com/clash-lang/clash-compiler/pull/1739).
+ * Annotate attributes cannot use type families [#1742](https://github.com/clash-lang/clash-compiler/issues/1742)
+
+Changed:
+
+ * `Clash.Prelude.ROM.File.romFile` now takes an `Enum addr => addr` as address argument, making it actually useful. [#407](https://github.com/clash-lang/clash-compiler/issues/407)
+
+## 1.4.0 *March 12th 2021*
 Highlighted changes (repeated in other categories):
 
   * Clash no longer disables the monomorphism restriction. See [#1270](https://github.com/clash-lang/clash-compiler/issues/1270), and mentioned issues, as to why. This can cause, among other things, certain eta-reduced descriptions of sequential circuits to no longer type-check. See [#1349](https://github.com/clash-lang/clash-compiler/pull/1349) for code hints on what kind of changes to make to your own code in case it no longer type-checks due to this change.
