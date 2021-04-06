@@ -57,4 +57,35 @@ assign ~RESULT = ~ARG[7];
 // assertBitVector end"
     }
   }
+, { "BlackBox" :
+    { "name" : "Clash.Explicit.Testbench.tbClockGen"
+    , "workInfo" : "Always"
+    , "kind" : "Declaration"
+    , "warning" : "Clash.Signal.Internal.tbClockGen is not synthesizable!"
+    , "type" :
+"tbClockGen
+  :: KnownDomain dom     -- ARG[0]
+  => Signal dom Bool      -- ARG[1]
+  -> Clock dom"
+    , "template" :
+"// tbClockGen begin
+// pragma translate_off
+// 1 = 0.1ps
+localparam ~GENSYM[half_period][0] = (~PERIOD[0]0 / 2);
+always begin
+  ~RESULT = ~IF~ACTIVEEDGE[Rising][0]~THEN 0 ~ELSE 1 ~FI;
+  #30000 forever begin
+    if (~ ~ARG[1]) begin
+      $finish;
+    end
+    ~RESULT = ~ ~RESULT;
+    #~SYM[0];
+    ~RESULT = ~ ~RESULT;
+    #~SYM[0];
+  end
+end
+// pragma translate_on
+// tbClockGen end"
+    }
+  }
 ]

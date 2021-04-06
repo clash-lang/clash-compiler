@@ -16,12 +16,4 @@
     , "template" : "~ARG[0]"
     }
   }
-, { "BlackBox" :
-    { "name" : "Clash.Explicit.Testbench.tbEnableGen"
-    , "workInfo" : "Always"
-    , "kind" : "Declaration"
-    , "type" : "tbEnableGen :: Enable dom"
-    , "template" : "assign ~RESULT = 1'b1;"
-    }
-  }
 ]
