@@ -154,4 +154,43 @@ end block;
 -- assertBitVector end"
     }
   }
+, { "BlackBox" :
+    { "name" : "Clash.Explicit.Testbench.tbClockGen"
+    , "workInfo"  : "Always"
+    , "kind" : "Declaration"
+    , "warning" : "Clash.Signal.Internal.tbClockGen is not synthesizable!"
+    , "type" :
+"tbClockGen
+  :: KnownDomain dom     -- ARG[0]
+  => Signal dom Bool     -- ARG[1]
+  -> Clock dom"
+    , "template" :
+"-- tbClockGen begin
+-- pragma translate_off
+~GENSYM[clkGen][0] : process is
+  constant ~GENSYM[half_periodH][1] : time := ~PERIOD[0]000 fs / 2;
+  constant ~GENSYM[half_periodL][2] : time := ~PERIOD[0]000 fs - ~SYM[1];
+begin
+  ~RESULT <= ~IF~ACTIVEEDGE[Rising][0]~THEN'0'~ELSE'1'~FI;
+  wait for 3000 ps;
+  while ~ARG[1] loop
+    ~RESULT <= not ~RESULT;
+    wait for ~SYM[1];
+    ~RESULT <= not ~RESULT;
+    wait for ~SYM[2];
+  end loop;
+  wait;
+end process;
+-- pragma translate_on
+-- tbClockGen end"
+    }
+  }
+, { "BlackBox" :
+    { "name" : "Clash.Explicit.Testbench.tbEnableGen"
+    , "workInfo" : "Always"
+    , "kind" : "Declaration"
+    , "type" : "tbEnableGen :: Enable dom"
+    , "template" : "~RESULT <= true;"
+    }
+  }
 ]
