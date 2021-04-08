@@ -23,10 +23,10 @@
     * Clash.Sized.Vector.dtfold
     * Clash.Sized.RTree.tfold
     * Clash.Sized.Vector.reverse
+    * Clash.Sized.Vector.unconcat
 
   Partially handles:
 
-    * Clash.Sized.Vector.unconcat
     * Clash.Sized.Vector.transpose
 -}
 
@@ -914,12 +914,15 @@ reduceAppend inScope n m aTy lArg rArg = do
 -- | Replace an application of the @Clash.Sized.Vector.unconcat@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.unconcat@
-reduceUnconcat :: Integer  -- ^ Length of the result vector
+reduceUnconcat :: InScopeSet
+               -> PrimInfo -- ^ Unconcat primitive info
+               -> Integer  -- ^ Length of the result vector
                -> Integer  -- ^ Length of the elements of the result vector
                -> Type -- ^ Element type
+               -> Term -- ^ SNat "Length of the elements of the result vector"
                -> Term -- ^ Argument vector
                -> NormalizeSession Term
-reduceUnconcat n 0 aTy arg = do
+reduceUnconcat inScope unconcatPrimInfo n m aTy sm arg = do
     tcm <- Lens.view tcCache
     let ty = termType tcm arg
     go tcm ty
@@ -929,13 +932,46 @@ reduceUnconcat n 0 aTy arg = do
       | (Just vecTc)     <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [nilCon,consCon] <- tyConDataCons vecTc
-      = let nilVec           = mkVec nilCon consCon aTy 0 []
-            innerVecTy       = mkTyConApp vecTcNm [LitTy (NumTy 0), aTy]
-            retVec           = mkVec nilCon consCon innerVecTy n (replicate (fromInteger n) nilVec)
-        in  changed retVec
-    go _ ty = error $ $(curLoc) ++ "reduceUnconcat: argument does not have a vector type: " ++ showPpr ty
+      , let innerVecTy = mkTyConApp vecTcNm [LitTy (NumTy m), aTy]
+      = if n == 0 then
+          changed (mkVecNil nilCon innerVecTy)
+        else if m == 0 then do
+          let
+            nilVec = mkVecNil nilCon aTy
+            retVec = mkVec nilCon consCon innerVecTy n (replicate (fromInteger n) nilVec)
+          changed retVec
+        else do
+          uniqs0 <- Lens.use uniqSupply
+          let
+            (uniqs1,(vars,headsAndTails)) =
+              second (second concat . unzip)
+                     (extractElems uniqs0 inScope consCon aTy 'U' (n*m) arg)
+            -- Build a vector out of the first m elements
+            mvec = mkVec nilCon consCon aTy m (take (fromInteger m) vars)
+            -- Get the vector representing the next ((n-1)*m) elements
+            -- N.B. `extractElems (xs :: Vec 2 a)` creates:
+            -- x0  = head xs
+            -- xs0 = tail xs
+            -- x1  = head xs0
+            -- xs1 = tail xs0
+            (lbs,head -> nextVec) = splitAt ((2*fromInteger m)-1) headsAndTails
+            -- recursively call unconcat
+            nextUnconcat = mkApps (Prim unconcatPrimInfo)
+                                  [ Right (LitTy (NumTy (n-1)))
+                                  , Right (LitTy (NumTy m))
+                                  , Right aTy
+                                  , Left (Literal (NaturalLiteral (n-1)))
+                                  , Left sm
+                                  , Left (snd nextVec)
+                                  ]
+            -- let (mvec,nextVec) = splitAt sm arg
+            -- in Cons mvec (unconcat sm nextVec)
+            lBody = mkVecCons consCon innerVecTy n mvec nextUnconcat
+            lb = Letrec lbs lBody
 
-reduceUnconcat _ _ _ _ = error $ $(curLoc) ++ "reduceUnconcat: unimplemented"
+          uniqSupply Lens..= uniqs1
+          changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceUnconcat: argument does not have a vector type: " ++ showPpr ty
 
 -- | Replace an application of the @Clash.Sized.Vector.transpose@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
