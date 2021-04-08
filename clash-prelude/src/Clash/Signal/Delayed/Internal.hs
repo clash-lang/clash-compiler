@@ -54,18 +54,24 @@ import Clash.XException           (NFDataX)
 >>> :m -Clash.Signal
 >>> import Clash.Explicit.Prelude
 >>> :{
-let mac :: Clock System
-        -> Reset System
-        -> Enable System
-        -> DSignal System 0 Int -> DSignal System 0 Int
-        -> DSignal System 0 Int
+let mac
+      :: forall dom
+       . KnownDomain dom
+      => Clock dom
+      -> Reset dom
+      -> Enable dom
+      -> DSignal dom 0 Int
+      -> DSignal dom 0 Int
+      -> DSignal dom 0 Int
     mac clk rst en x y = feedback (mac' x y)
       where
-        mac' :: DSignal System 0 Int -> DSignal System 0 Int
-             -> DSignal System 0 Int
-             -> (DSignal System 0 Int, DSignal System 1 Int)
+        mac'
+          :: DSignal dom 0 Int
+          -> DSignal dom 0 Int
+          -> DSignal dom 0 Int
+          -> (DSignal dom 0 Int, DSignal dom 1 Int)
         mac' a b acc = let acc' = a * b + acc
-                       in  (acc, delayed clk rst en (singleton 0) acc')
+                       in  (acc, delayedI clk rst en 0 acc')
 :}
 
 -}
@@ -94,7 +100,7 @@ newtype DSignal (dom :: Domain) (delay :: Nat) a =
 -- Every element in the list will correspond to a value of the signal for one
 -- clock cycle.
 --
--- >>> sampleN 2 (dfromList [1,2,3,4,5])
+-- >>> sampleN 2 (toSignal (dfromList [1,2,3,4,5]))
 -- [1,2]
 --
 -- __NB__: This function is not synthesizable
@@ -106,7 +112,7 @@ dfromList = coerce . fromList
 -- Every element in the list will correspond to a value of the signal for one
 -- clock cycle.
 --
--- >>> sampleN 2 (dfromList [1,2,3,4,5])
+-- >>> sampleN 2 (toSignal (dfromList [1,2,3,4,5]))
 -- [1,2]
 --
 -- __NB__: This function is not synthesizable
@@ -116,17 +122,27 @@ dfromList_lazy = coerce . fromList_lazy
 -- | Feed the delayed result of a function back to its input:
 --
 -- @
--- mac :: Clock dom -> Reset dom -> Enable dom
---     -> 'DSignal' dom 0 Int -> 'DSignal' dom 0 Int -> 'DSignal' dom 0 Int
+-- mac
+--   :: forall dom
+--    . KnownDomain dom
+--   => Clock dom
+--   -> Reset dom
+--   -> Enable dom
+--   -> 'DSignal' dom 0 Int
+--   -> 'DSignal' dom 0 Int
+--   -> 'DSignal' dom 0 Int
 -- mac clk rst en x y = 'feedback' (mac' x y)
 --   where
---     mac' :: 'DSignal' dom 0 Int -> 'DSignal' dom 0 Int -> 'DSignal' dom 0 Int
---          -> ('DSignal' dom 0 Int, 'DSignal' dom 1 Int)
+--     mac'
+--       :: 'DSignal' dom 0 Int
+--       -> 'DSignal' dom 0 Int
+--       -> 'DSignal' dom 0 Int
+--       -> ('DSignal' dom 0 Int, 'DSignal' dom 1 Int)
 --     mac' a b acc = let acc' = a * b + acc
 --                    in  (acc, 'Clash.Explicit.Signal.Delayed.delayedI' clk rst en 0 acc')
 -- @
 --
--- >>> sampleN 7 (mac systemClockGen systemResetGen enableGen (dfromList [0..]) (dfromList [0..]))
+-- >>> sampleN 7 (toSignal (mac systemClockGen systemResetGen enableGen (dfromList [0..]) (dfromList [0..])))
 -- [0,0,1,5,14,30,55]
 feedback
   :: (DSignal dom n a -> (DSignal dom n a,DSignal dom (n + m + 1) a))
@@ -134,8 +150,6 @@ feedback
 feedback f = let (o,r) = f (coerce r) in o
 
 -- | 'Signal's are not delayed
---
--- > sample s == dsample (fromSignal s)
 fromSignal :: Signal dom a -> DSignal dom 0 a
 fromSignal = coerce
 
@@ -153,8 +167,14 @@ unsafeFromSignal = DSignal
 -- Access a /delayed/ signal in the present.
 --
 -- @
--- mac :: Clock dom -> Reset dom -> Enable dom
---     -> 'DSignal' dom 0 Int -> 'DSignal' dom 0 Int -> 'DSignal' dom 0 Int
+-- mac
+--   :: KnownDomain dom
+--   => Clock dom
+--   -> Reset dom
+--   -> Enable dom
+--   -> 'DSignal' dom 0 Int
+--   -> 'DSignal' dom 0 Int
+--   -> 'DSignal' dom 0 Int
 -- mac clk rst en x y = acc'
 --   where
 --     acc' = (x * y) + 'antiDelay' d1 acc
