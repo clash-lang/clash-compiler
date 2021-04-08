@@ -1,0 +1,1 @@
+FIXED: `unconcat` cannot be used as initial/reset value for a `register` [#1756](https://github.com/clash-lang/clash-compiler/issues/1756)

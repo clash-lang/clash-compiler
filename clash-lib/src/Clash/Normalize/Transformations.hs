@@ -2327,9 +2327,20 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                else return e
           _ -> return e
       "Clash.Sized.Vector.unconcat" | argLen == 6 -> do
-        let ([_knN,_sm,arg],[mTy,nTy,aTy]) = Either.partitionEithers args
+        let ([_knN,sm,arg],[nTy,mTy,aTy]) = Either.partitionEithers args
+            argTy = termType tcm arg
         case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy)) of
-          (Right n, Right 0) -> (`mkTicks` ticks) <$> reduceUnconcat n 0 aTy arg
+          (Right n, Right m) -> do
+            shouldReduce1 <- List.orM [ pure (m==0)
+                                      , shouldReduce ctx
+                                      , isUntranslatableType_not_poly aTy
+                                      --  Note [Unroll shouldSplit types]
+                                      , pure (Maybe.isJust (shouldSplit tcm argTy))
+                                      ]
+            if shouldReduce1 then
+              (`mkTicks` ticks) <$> reduceUnconcat is0 p n m aTy sm arg
+            else
+              return e
           _ -> return e
       "Clash.Sized.Vector.transpose" | argLen == 5 -> do
         let ([_knN,arg],[mTy,nTy,aTy]) = Either.partitionEithers args
