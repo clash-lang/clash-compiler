@@ -1082,9 +1082,6 @@ trueDualPortBlockRam ::
   -- ^ Outputs data on /next/ cycle. If write enable is @True@, the data written
   -- will be echoed. If write enable is @False@, the read data is returned.
 
-trueDualPortBlockRam clkA writeA addrA clkB writeB addrB
-  | snatToNum @Int (clockPeriod @domA) < snatToNum @Int (clockPeriod @domB)
-  = swap (trueDualPortBlockRam clkB writeB addrB clkA writeA addrA)
 trueDualPortBlockRam clkA writeA addrA clkB writeB addrB =
   trueDualPortBlockRam#
     clkA (isJust <$> writeA) addrA (fromJustX <$> writeA)
@@ -1132,10 +1129,50 @@ mergeMaybeConflicts Nothing (Just c) = Just c
 mergeMaybeConflicts (Just c1) (Just c2) = Just (mergeConflicts c1 c2)
 
 -- | Primitive of 'trueDualPortBlockRam'.
---
--- Warning: this primitive only works if @domFast@'s clock is faster (or equal to)
--- @domSlow@'s clock.
 trueDualPortBlockRam# ::
+  forall nAddrs domA domB a .
+  ( HasCallStack
+  , KnownNat nAddrs
+  , KnownDomain domA
+  , KnownDomain domB
+  , NFDataX a
+  , BitPack a
+  )
+  => Clock domA
+  -- ^ Clock for port A
+  -> Signal domA Bool
+  -- ^ Write enable for port A
+  -> Signal domA (Index nAddrs)
+  -- ^ Address to read from or write to on port A
+  -> Signal domA a
+  -- ^ Data in for port A; ignored when /write enable/ is @False@
+
+  -> Clock domB
+  -- ^ Clock for port B
+  -> Signal domB Bool
+  -- ^ Write enable for port B
+  -> Signal domB (Index nAddrs)
+  -- ^ Address to read from or write to on port B
+  -> Signal domB a
+  -- ^ Data in for port B; ignored when /write enable/ is @False@
+
+  -> (Signal domA a, Signal domB a)
+  -- ^ Outputs data on /next/ cycle. If write enable is @True@, the data written
+  -- will be echoed. If write enable is @False@, the read data is returned.
+trueDualPortBlockRam# clkA weA addrA datA clkB weB addrB datB
+  | snatToNum @Int (clockPeriod @domA) < snatToNum @Int (clockPeriod @domB)
+  = swap (trueDualPortBlockRamModel clkB weB addrB datB clkA weA addrA datA)
+  | otherwise
+  =       trueDualPortBlockRamModel clkA weA addrA datA clkB weB addrB datB
+{-# NOINLINE trueDualPortBlockRam# #-}
+{-# ANN trueDualPortBlockRam# hasBlackBox #-}
+
+
+-- | Haskell model for the primitive 'trueDualPortBlockRam#'.
+--
+-- Warning: this model only works if @domFast@'s clock is faster (or equal to)
+-- @domSlow@'s clock.
+trueDualPortBlockRamModel ::
   forall nAddrs domFast domSlow a .
   ( HasCallStack
   , KnownNat nAddrs
@@ -1146,27 +1183,17 @@ trueDualPortBlockRam# ::
   ) =>
 
   Clock domSlow ->
-  -- ^ Clock for port A
   Signal domSlow Bool ->
-  -- ^ Write enable for port A
   Signal domSlow (Index nAddrs) ->
-  -- ^ Address to read from or write to on port A
   Signal domSlow a ->
-  -- ^ Data in for port A; ignored when /write enable/ is @False@
 
   Clock domFast ->
-  -- ^ Clock for port B
   Signal domFast Bool ->
-  -- ^ Write enable for port B
   Signal domFast (Index nAddrs) ->
-  -- ^ Address to read from or write to on port B
   Signal domFast a ->
-  -- ^ Data in for port B; ignored when /write enable/ is @False@
 
   (Signal domSlow a, Signal domFast a)
-  -- ^ Outputs data on /next/ cycle. If write enable is @True@, the data written
-  -- will be echoed. If write enable is @False@, the read data is returned.
-trueDualPortBlockRam# !_clkA weA addrA datA !_clkB weB addrB datB =
+trueDualPortBlockRamModel !_clkA weA addrA datA !_clkB weB addrB datB =
   ( deepErrorX "trueDualPortBlockRam: Port A: First value undefined" :- outA
   , deepErrorX "trueDualPortBlockRam: Port B: First value undefined" :- outB )
  where
@@ -1279,6 +1306,3 @@ trueDualPortBlockRam# !_clkA weA addrA datA !_clkB weB addrB datB =
             deepErrorX "trueDualPortBlockRam: conflicting read/write queries"
           _ ->
             out0
-
-{-# NOINLINE trueDualPortBlockRam# #-}
-{-# ANN trueDualPortBlockRam# hasBlackBox #-}
