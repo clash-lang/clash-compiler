@@ -182,7 +182,7 @@ delayedI clk rst en dflt = delayed clk rst en (repeat dflt)
 -- delayN2 = 'delayN' d2
 -- @
 --
--- >>> printX $ sampleN 6 (toSignal (delayN2 (-1) enableGen systemClockGen (dfromList [1..])))
+-- >>> printX $ sampleN 6 (delayN2 (-1) enableGen systemClockGen (dfromList [1..]))
 -- [-1,-1,1,2,3,4]
 delayN
   :: forall dom a d n
@@ -214,12 +214,12 @@ delayN d dflt ena clk = coerce . go (snatToInteger d) . coerce @_ @(Signal dom a
 -- delayI2 = 'delayI'
 -- @
 --
--- >>> sampleN 6 (toSignal (delayI2 (-1) enableGen systemClockGen (dfromList [1..])))
+-- >>> sampleN 6 (delayI2 (-1) enableGen systemClockGen (dfromList [1..]))
 -- [-1,-1,1,2,3,4]
 --
 -- You can also use type application to do the same:
 --
--- >>> sampleN 6 (toSignal (delayI @2 (-1) enableGen systemClockGen (dfromList [1..])))
+-- >>> sampleN 6 (delayI @2 (-1) enableGen systemClockGen (dfromList [1..]))
 -- [-1,-1,1,2,3,4]
 delayI
   :: forall d n a dom
@@ -246,10 +246,10 @@ type instance Apply (DelayedFold dom n delay a) k = DSignal dom (n + (delay*k)) 
 -- countingSignals = repeat (dfromList [0..])
 -- @
 --
--- >>> printX $ sampleN 6 (toSignal (delayedFold  d1 (-1) (+) enableGen systemClockGen countingSignals))
+-- >>> printX $ sampleN 6 (delayedFold  d1 (-1) (+) enableGen systemClockGen countingSignals)
 -- [-1,-2,0,4,8,12]
 --
--- >>> printX $ sampleN 8 (toSignal (delayedFold d2 (-1) (*) enableGen systemClockGen countingSignals))
+-- >>> printX $ sampleN 8 (delayedFold d2 (-1) (*) enableGen systemClockGen countingSignals)
 -- [-1,-1,1,1,0,1,16,81]
 delayedFold
   :: forall dom  n delay k a

@@ -64,7 +64,7 @@ import           Clash.XException              (NFDataX)
 >>> let delay3 = delayed (-1 :> -1 :> -1 :> Nil)
 >>> let delay2 = delayedI :: HiddenClockResetEnable dom  => Int -> DSignal dom n Int -> DSignal dom (n + 2) Int
 >>> let delayN2 = delayN d2
->>> let delayI2 = delayI :: HiddenClockResetEnable dom  => Int -> DSignal dom n Int -> DSignal dom (n + 2) Int
+>>> let delayI2 = delayI :: (HiddenClock dom, HiddenEnable dom) => Int -> DSignal dom n Int -> DSignal dom (n + 2) Int
 >>> let countingSignals = Clash.Prelude.repeat (dfromList [0..]) :: Vec 4 (DSignal dom 0 Int)
 -}
 
