@@ -63,10 +63,6 @@ if [ ! -f cabal.project.local ]; then
     sed -i 's/flags: +doctests/flags: +doctests -multiple-hidden/g' cabal.project.local
   fi
 
-  if [[ "$CI_COMMIT_BRANCH" =~ "^partial-evaluator-" ]]; then
-    sed -i 's/-experimental-evaluator/+experimental-evaluator/g' cabal.project.local
-  fi
-
   set +u
   if [[ "$GHC_HEAD" == "yes" ]]; then
     cat .ci/cabal.project.local.append-HEAD >> cabal.project.local

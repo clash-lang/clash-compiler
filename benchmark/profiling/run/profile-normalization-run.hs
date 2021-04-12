@@ -7,11 +7,8 @@ import           Clash.Core.Var
 import           Clash.Driver
 import           Clash.Driver.Types
 
-#if EXPERIMENTAL_EVALUATOR
 import           Clash.GHC.PartialEval
-#else
 import           Clash.GHC.Evaluator
-#endif
 
 import qualified Control.Concurrent.Supply    as Supply
 import           Control.DeepSeq              (deepseq)
@@ -45,11 +42,8 @@ benchFile idirs src = do
       primMap' = fmap (fmap unremoveBBfunc) primMap
       res :: BindingMap
       res = normalizeEntity reprs bindingsMap primMap' tcm tupTcm typeTrans
-#if EXPERIMENTAL_EVALUATOR
                    ghcEvaluator
-#else
                    evaluator
-#endif
                    topEntityNames (opts idirs) supplyN topEntity
   res `deepseq` putStrLn ".. done\n"
 

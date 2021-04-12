@@ -25,6 +25,7 @@ import qualified Control.Lens                  as Lens
 import           Control.Monad                 (when, replicateM, zipWithM)
 import           Control.Monad.Extra           (concatMapM)
 import           Control.Monad.IO.Class        (liftIO)
+import           Data.Binary.IEEE754           (floatToWord, doubleToWord)
 import           Data.Char                     (ord)
 import           Data.Either                   (lefts, partitionEithers)
 import qualified Data.HashMap.Lazy             as HashMap
@@ -252,6 +253,14 @@ mkArgument bbName bndr nArg e = do
           return ((N.Literal (Just (Unsigned 64,64)) (N.NumLit i),hwTy,True),[])
         (C.Literal (NaturalLiteral n), [],_) ->
           return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit n),hwTy,True),[])
+        (C.Literal (FloatLiteral n), [], _) ->
+          let f = fromRational n
+              i = toInteger (floatToWord f)
+           in return ((N.Literal (Just (BitVector 32, 32)) (N.NumLit i), hwTy, True), [])
+        (C.Literal (DoubleLiteral n), [], _) ->
+          let d = fromRational n
+              i = toInteger (doubleToWord d)
+           in return ((N.Literal (Just (BitVector 64, 64)) (N.NumLit i), hwTy, True), [])
         (Prim pinfo,args,ticks) -> withTicks ticks $ \tickDecls -> do
           (e',d) <- mkPrimitive True False (NetlistId bndr ty) pinfo args tickDecls
           case e' of
@@ -923,11 +932,11 @@ collectBindIO _ es = error ("internal error:\n" ++ showPpr es)
 -- | Collect the sequential declarations for 'appIO'
 collectAppIO :: NetlistId -> [Term] -> [Term] -> NetlistMonad (Expr,[Declaration])
 collectAppIO dst (fun1:arg1:_) rest = case collectArgs fun1 of
-  (Prim (PrimInfo "Clash.Explicit.SimIO.fmapSimIO#" _ _ _),(lefts -> (fun0:arg0:_))) -> do
+  (Prim (PrimInfo "Clash.Explicit.SimIO.fmapSimIO#" _ _ _ _),(lefts -> (fun0:arg0:_))) -> do
     tcm <- Lens.use tcCache
     let argN = map (Left . unSimIO tcm) (arg0:arg1:rest)
     mkExpr False Sequential dst (mkApps fun0 argN)
-  (Prim (PrimInfo "Clash.Explicit.SimIO.apSimIO#" _ _ _),(lefts -> args)) -> do
+  (Prim (PrimInfo "Clash.Explicit.SimIO.apSimIO#" _ _ _ _),(lefts -> args)) -> do
     collectAppIO dst args (arg1:rest)
   _ -> error ("internal error:\n" ++ showPpr (fun1:arg1:rest))
 
@@ -947,11 +956,12 @@ unSimIO tcm arg =
   let argTy = termType tcm arg
   in  case tyView argTy of
         TyConApp _ [tcArg] ->
-          mkApps (Prim ( PrimInfo
-                           "Clash.Explicit.SimIO.unSimIO#"
-                           (mkFunTy argTy tcArg)
-                           WorkNever
-                           SingleResult ))
+          mkApps (Prim (PrimInfo
+                          "Clash.Explicit.SimIO.unSimIO#"
+                          (mkFunTy argTy tcArg)
+                          WorkNever
+                          SingleResult
+                          Nothing))
                  [Left arg]
         _ -> error ("internal error:\n" ++ showPpr arg)
 

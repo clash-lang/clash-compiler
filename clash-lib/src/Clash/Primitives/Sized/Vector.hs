@@ -40,10 +40,10 @@ import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TExpr, TDecl),
    Element(Component, Typ, TypElem, Text), Decl(Decl), emptyBlackBoxMeta)
 import           Clash.Netlist.Types
-  (Identifier, TemplateFunction, BlackBoxContext, HWType(Vector),
-   Declaration(..), Expr(BlackBoxE, Literal, Identifier), Literal(NumLit),
+  (Identifier, TemplateFunction, BlackBoxContext, HWType(Vector,Signed,Void),
+   Declaration(..), Expr(BlackBoxE, Literal, Identifier, DataCon), Literal(NumLit),
    BlackBox(BBTemplate, BBFunction), TemplateFunction(..), WireOrReg(Wire),
-   Modifier(Indexed, Nested), bbInputs, bbResults, emptyBBContext, tcCache,
+   Modifier(Indexed, Nested, DC), bbInputs, bbResults, emptyBBContext, tcCache,
    bbFunctions)
 import qualified Clash.Netlist.Id                   as Id
 import           Clash.Netlist.Util                 (typeSize)
@@ -298,6 +298,8 @@ indexIntVerilogTemplate bbCtx = getMon $ case typeSize vTy of
   ixI :: Expr ->  Int
   ixI ix0 = case ix0 of
     Literal _ (NumLit i) ->
+      fromInteger i
+    DataCon (Signed 64) (DC (Void Nothing, -1)) [Literal (Just (Signed 64, 64)) (NumLit i)] ->
       fromInteger i
     BlackBoxE "GHC.Types.I#" _ _ _ _ ixCtx _ ->
       let (ix1,_,_) = head (bbInputs ixCtx)

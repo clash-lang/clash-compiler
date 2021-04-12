@@ -61,9 +61,13 @@ module Clash.Normalize.Transformations
   , xOptimize
   , setupMultiResultPrim
   , inlineSimIO
+
+  -- experimental
+  , partialEval
   )
 where
 
+import           Control.Concurrent.Supply   (splitSupply)
 import           Control.Exception           (throw)
 import           Control.Lens                ((^.),_1,_2)
 import qualified Control.Lens                as Lens
@@ -90,6 +94,7 @@ import           GHC.Num.Integer             (Integer (..))
 #else
 import           GHC.Integer.GMP.Internals   (Integer (..), BigNat (..))
 #endif
+import           System.IO.Unsafe            (unsafePerformIO)
 import           TextShow                    (TextShow(showt))
 
 #if MIN_VERSION_ghc(9,0,0)
@@ -108,6 +113,9 @@ import           Clash.Core.FreeVars
    typeFreeVars, localVarsDoNotOccurIn, localIdDoesNotOccurIn,
    countFreeOccurances)
 import           Clash.Core.Literal          (Literal (..))
+import           Clash.Core.PartialEval
+import           Clash.Core.PartialEval.AsTerm
+import           Clash.Core.PartialEval.NormalForm
 import           Clash.Core.Pretty           (PrettyOptions(..), showPpr, showPpr')
 import           Clash.Core.Subst
 import           Clash.Core.Term
@@ -150,6 +158,29 @@ import           Clash.Rewrite.Util
 import           Clash.Unique
 import           Clash.Util
 import qualified Clash.Util.Interpolate as I
+
+partialEval :: NormRewrite
+partialEval (TransformContext is0 _) e = do
+  (heap,addr) <- Lens.use globalHeap
+  fun <- Lens.use curFun
+  ids <- Lens.use uniqSupply
+  bndrs <- Lens.use bindings
+  tcm <- Lens.view tcCache
+  fuel <- Lens.view fuelLimit
+  eval <- Lens.view peEvaluator
+
+  let (ids1, ids2) = splitSupply ids
+  let genv = mkGlobalEnv bndrs tcm ids1 fuel mempty addr
+
+  uniqSupply Lens..= ids2
+
+  case unsafePerformIO (nf eval genv is0 (fst fun) e) of
+    (!e', !genv') -> do
+      let tmHeap = fmap asTerm (genvHeap genv')
+
+      -- If partial eval changes a heap value, prefer the new value
+      globalHeap Lens..= (tmHeap <> heap, genvAddr genv')
+      changed e'
 
 inlineOrLiftNonRep :: HasCallStack => NormRewrite
 inlineOrLiftNonRep ctx eLet@(Letrec _ body) =
@@ -318,7 +349,7 @@ caseElemNonReachable :: HasCallStack => NormRewrite
 caseElemNonReachable _ case0@(Case scrut altsTy alts0) = do
   tcm <- Lens.view tcCache
 
-  let (altsAbsurd, altsOther) = List.partition (isAbsurdAlt tcm) alts0
+  let (altsAbsurd, altsOther) = List.partition (isAbsurdPat tcm . fst) alts0
   case altsAbsurd of
     [] -> return case0
     _  -> changed =<< caseOneAlt (Case scrut altsTy altsOther)
@@ -363,7 +394,7 @@ elemExistentials (TransformContext is0 _) (Case scrut altsTy alts0) = do
     -- Eliminate free type variables if possible
     go :: InScopeSet -> TyConMap -> (Pat, Term) -> NormalizeSession (Pat, Term)
     go is2 tcm alt@(DataPat dc exts0 xs0, term0) =
-      case solveNonAbsurds tcm (mkVarSet exts0) (altEqs tcm alt) of
+      case solveNonAbsurds tcm (mkVarSet exts0) (patEqs tcm $ fst alt) of
         -- No equations solved:
         [] -> return alt
         -- One or more equations solved:
@@ -2092,8 +2123,11 @@ reduceBinders !subst processed ((i,substTm "reduceBinders" subst -> e):rest)
 reduceConst :: HasCallStack => NormRewrite
 reduceConst ctx e@(App _ _)
   | (Prim p0, _) <- collectArgs e
+--, isConstant e
   = whnfRW False ctx e $ \_ctx1 e1 -> case e1 of
       (collectArgs -> (Prim p1, _)) | primName p0 == primName p1 -> return e
+      (collectArgs -> (Lam{}, _)) -> return e
+      (collectArgs -> (TyLam{}, _)) -> return e
       _ -> changed e1
 
 reduceConst _ e = return e
@@ -3068,7 +3102,7 @@ xOptimize (TransformContext is0 _) e@(Case subj ty alts) = do
 
     case defPart of
       ([], _)    -> return e
-      (_, [])    -> changed (Prim (PrimInfo "Clash.XException.errorX" ty WorkConstant SingleResult))
+      (_, [])    -> changed (Prim (PrimInfo "Clash.XException.errorX" ty WorkConstant SingleResult Nothing))
       (_, [alt]) -> xOptimizeSingle is0 subj alt
       (_, defs)  -> xOptimizeMany is0 subj ty defs
   else
@@ -3227,7 +3261,9 @@ setupMultiResultPrim' tcm primInfo@PrimInfo{primType} =
     { primName = "c$multiPrimSelect"
     , primType = mkPolyFunTy pResTy [Right pResTy, Right t]
     , primWorkInfo = WorkAlways
-    , primMultiResult = SingleResult }
+    , primMultiResult = SingleResult
+    , primCoreId = Nothing
+    }
 
   letTerm =
     Letrec

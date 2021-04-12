@@ -28,4 +28,20 @@
     , "template"  : "~ARG[0]"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Types.F#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      : "F# :: Float# -> Float"
+    , "template"  : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Types.D#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      : "D# :: Double# -> Double"
+    , "template"  : "~ARG[0]"
+    }
+  }
 ]

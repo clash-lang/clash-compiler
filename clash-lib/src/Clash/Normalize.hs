@@ -40,15 +40,10 @@ import           BasicTypes                       (InlineSpec (..))
 
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
-
-#if EXPERIMENTAL_EVALUATOR
-import           Clash.Core.PartialEval           (Evaluator)
-#else
-import           Clash.Core.Evaluator.Types       (Evaluator)
-#endif
-
+import           Clash.Core.Evaluator.Types as WHNF (Evaluator)
 import           Clash.Core.FreeVars
   (freeLocalIds, globalIds, globalIdOccursIn, localIdDoesNotOccurIn)
+import           Clash.Core.PartialEval as PE     (Evaluator)
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)
 import           Clash.Core.Subst
   (extendGblSubstList, mkSubst, substTm)
@@ -108,8 +103,10 @@ runNormalization
   -- ^ TyCon cache
   -> IntMap TyConName
   -- ^ Tuple TyCon cache
-  -> Evaluator
+  -> PE.Evaluator
   -- ^ Hardcoded evaluator for partial evaluation
+  -> WHNF.Evaluator
+  -- ^ Hardcoded evaluator for WHNF (old evaluator)
   -> CompiledPrimMap
   -- ^ Primitive Definitions
   -> VarEnv Bool
@@ -119,7 +116,7 @@ runNormalization
   -> NormalizeSession a
   -- ^ NormalizeSession to run
   -> a
-runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcsMap topEnts
+runNormalization opts supply globals typeTrans reprs tcm tupTcm peEval eval primMap rcsMap topEnts
   = runRewriteSession rwEnv rwState
   where
     rwEnv     = RewriteEnv
@@ -132,6 +129,7 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
                   typeTrans
                   tcm
                   tupTcm
+                  peEval
                   eval
                   (mkVarSet topEnts)
                   reprs
@@ -143,12 +141,7 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
                   supply
                   (error $ $(curLoc) ++ "Report as bug: no curFun",noSrcSpan)
                   0
-#if EXPERIMENTAL_EVALUATOR
-                  IntMap.empty
-                  0
-#else
                   (IntMap.empty, 0)
-#endif
                   emptyVarEnv
                   normState
 
@@ -408,11 +401,7 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm)) used) = do
       repeatR (topdownR (apply "appPropFast" appPropFast >->
                  apply "bindConstantVar" bindConstantVar >->
                  apply "caseCon" caseCon >->
-#if EXPERIMENTAL_EVALUATOR
-                 apply "deadcode" deadCode >->
-#else
                  (apply "reduceConst" reduceConst !-> apply "deadcode" deadCode) >->
-#endif
                  apply "reduceNonRepPrim" reduceNonRepPrim >->
                  apply "removeUnusedExpr" removeUnusedExpr >->
                  apply "flattenLet" flattenLet)) !->

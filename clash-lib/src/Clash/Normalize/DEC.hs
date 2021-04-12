@@ -67,19 +67,9 @@ import           GHC.Settings.Constants           (mAX_TUPLE_SIZE)
 import           Constants                        (mAX_TUPLE_SIZE)
 #endif
 
-#if EXPERIMENTAL_EVALUATOR
-import           System.IO.Unsafe
-#endif
-
 -- internal
 import Clash.Core.DataCon    (DataCon)
-
-#if EXPERIMENTAL_EVALUATOR
-import Clash.Core.PartialEval
-#else
 import Clash.Core.Evaluator.Types  (whnf')
-#endif
-
 import Clash.Core.FreeVars
   (termFreeVars', typeFreeVars', localVarsDoNotOccurIn)
 import Clash.Core.Literal    (Literal (..))
@@ -171,17 +161,8 @@ collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), t
     ids <- Lens.use uniqSupply
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
-#if EXPERIMENTAL_EVALUATOR
-    (i,_) <- Lens.use curFun
-    heap <- Lens.use ioHeap
-    addr <- Lens.use ioAddr
-    fuel <- Lens.view fuelLimit
-    let genv = mkGlobalEnv bndrs tcm is0 ids1 fuel heap addr
-    let eval = fst . unsafePerformIO . nf evaluate genv False i
-#else
     gh <- Lens.use globalHeap
     let eval = (Lens.view Lens._3) . whnf' evaluate bndrs tcm gh ids1 is0 False
-#endif
     let eTy  = termType tcm e
     untran <- isUntranslatableType False eTy
     case untran of

@@ -250,6 +250,7 @@ coreView1 tcMap ty = case tyView ty of
          AlgTyCon {algTcRhs = (NewTyCon _ nt)}
            -> newTyConInstRhs nt args
          _ -> reduceTypeFamily tcMap ty
+  OtherType (AnnType _ ty') -> coreView1 tcMap ty'
   _ -> Nothing
 
 -- | Instantiate and Apply the RHS/Original of a NewType with the given

@@ -182,7 +182,8 @@ piResultTyMaybe m ty arg
   | Just ty' <- coreView1 m ty
   = piResultTyMaybe m ty' arg
   | FunTy a res <- tyView ty
-  = if debugIsOn && not (aeqType a arg) then error [I.i|
+  -- TODO Remove when coreview is not here: types should be aeq anyway
+  = if debugIsOn && not (aeqType (coreView m a) (coreView m arg)) then error [I.i|
       Unexpected application. A function with type:
 
         #{showPpr ty}
@@ -233,7 +234,8 @@ piResultTys m ty origArgs@(arg:args)
   | Just ty' <- coreView1 m ty
   = piResultTys m ty' origArgs
   | FunTy a res <- tyView ty
-  = if debugIsOn && not (aeqType a arg) then error [I.i|
+  -- TODO Remove when coreview is not here: types should be aeq anyway
+  = if debugIsOn && not (aeqType (coreView m a) (coreView m arg)) then error [I.i|
       Unexpected application. A function with type:
 
         #{showPpr ty}

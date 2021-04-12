@@ -467,7 +467,7 @@ coreToTerm primMap unlocs = term
         return (x',b')
 
     term' (Case _ _ ty [])  =
-      C.TyApp (C.Prim (C.PrimInfo (pack "EmptyCase") C.undefinedTy C.WorkNever C.SingleResult))
+      C.TyApp (C.Prim (C.PrimInfo (pack "EmptyCase") C.undefinedTy C.WorkNever C.SingleResult Nothing))
         <$> coreToType ty
     term' (Case e b ty alts) = do
      let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (== b))
@@ -500,10 +500,10 @@ coreToTerm primMap unlocs = term
 #endif
     term' (Tick _ e) = term e
     term' (Type t) =
-      C.TyApp (C.Prim (C.PrimInfo (pack "_TY_") C.undefinedTy C.WorkNever C.SingleResult))
+      C.TyApp (C.Prim (C.PrimInfo (pack "_TY_") C.undefinedTy C.WorkNever C.SingleResult Nothing))
         <$> coreToType t
     term' (Coercion co) =
-      C.TyApp (C.Prim (C.PrimInfo (pack "_CO_") C.undefinedTy C.WorkNever C.SingleResult))
+      C.TyApp (C.Prim (C.PrimInfo (pack "_CO_") C.undefinedTy C.WorkNever C.SingleResult Nothing))
         <$> coreToType (coercionType co)
 
 
@@ -528,7 +528,7 @@ coreToTerm primMap unlocs = term
             Just p  ->
               -- Primitive will be marked MultiResult in Transformations if it
               -- is a multi result primitive.
-              return $ C.Prim (C.PrimInfo xNameS xType (maybe C.WorkVariable workInfo p) C.SingleResult)
+              return $ C.Prim (C.PrimInfo xNameS xType (maybe C.WorkVariable workInfo p) C.SingleResult Nothing)
             Nothing -> if isDataConWrapId x && not (isNewTyCon (dataConTyCon dc))
               then let xInfo = idInfo x
                        unfolding = unfoldingInfo xInfo
@@ -565,18 +565,30 @@ coreToTerm primMap unlocs = term
               -> return (nameModTerm C.SetName xType)
               | f == "Clash.XException.xToErrorCtx"
               -> return (xToErrorCtxTerm xType)
-              | otherwise -> return (C.Prim (C.PrimInfo xNameS xType wi C.SingleResult))
-            Just (Just (BlackBox {workInfo = wi})) ->
-              return $ C.Prim (C.PrimInfo xNameS xType wi C.SingleResult)
-            Just (Just (BlackBoxHaskell {workInfo = wi})) ->
-              return $ C.Prim (C.PrimInfo xNameS xType wi C.SingleResult)
+              | x `elem` unlocs
+              -> return (C.Prim (C.PrimInfo xNameS xType wi C.SingleResult Nothing))
+              | otherwise
+              -> do bndr <- coreToId x
+                    return (C.Prim (C.PrimInfo xNameS xType wi C.SingleResult (Just bndr)))
+            Just (Just (BlackBox {workInfo = wi}))
+              | x `elem` unlocs
+              -> return $ C.Prim (C.PrimInfo xNameS xType wi C.SingleResult Nothing)
+              | otherwise
+              -> do bndr <- coreToId x
+                    return (C.Prim (C.PrimInfo xNameS xType wi C.SingleResult (Just bndr)))
+            Just (Just (BlackBoxHaskell {workInfo = wi}))
+              | x `elem` unlocs
+              -> return $ C.Prim (C.PrimInfo xNameS xType wi C.SingleResult Nothing)
+              | otherwise
+              -> do bndr <- coreToId x
+                    return $ C.Prim (C.PrimInfo xNameS xType wi C.SingleResult (Just bndr))
             Just Nothing ->
               -- Was guarded by "DontTranslate". We don't know yet if Clash will
               -- actually use it later on, so we don't err here.
-              return $ C.Prim (C.PrimInfo xNameS xType C.WorkVariable C.SingleResult)
+              return $ C.Prim (C.PrimInfo xNameS xType C.WorkVariable C.SingleResult Nothing)
             Nothing
               | x `elem` unlocs
-              -> return (C.Prim (C.PrimInfo xNameS xType C.WorkVariable C.SingleResult))
+              -> return (C.Prim (C.PrimInfo xNameS xType C.WorkVariable C.SingleResult Nothing))
               | otherwise
               -> C.Var <$> coreToId x
 
@@ -1324,8 +1336,8 @@ runRWTerm (C.ForAllTy rTV (C.ForAllTy oTV funTy)) =
   C.TyLam rTV (
   C.TyLam oTV (
   C.Lam   fId (
-  (C.App (C.Var fId) (C.Prim (C.PrimInfo rwNm rwTy C.WorkNever C.SingleResult))))))
-  where
+  (C.App (C.Var fId) (C.Prim (C.PrimInfo rwNm rwTy C.WorkNever C.SingleResult Nothing))))))
+ where
     (C.FunTy fTy _)  = C.tyView funTy
     (C.FunTy rwTy _) = C.tyView fTy
     fName            = C.mkUnsafeSystemName "f" 0

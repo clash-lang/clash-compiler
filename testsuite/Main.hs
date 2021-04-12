@@ -24,21 +24,14 @@ import           Text.Printf               (printf)
 
 import           Test.Tasty
 import           Test.Tasty.Clash
-
-#if EXPERIMENTAL_EVALUATOR
 import           Test.Tasty.HUnit
-#endif
 
 -- We want to selectively disable these tests while certain primitives are not
 -- implemented in the new evaluator. These macros are used to prevent the
 -- testsuite becoming a mess of CPP blocks.
-#if EXPERIMENTAL_EVALUATOR
 #define NEEDS_PRIMS(x) (const $ testCase "DISABLED" (True @?= True))
-#else
-#define NEEDS_PRIMS(x) (x)
-#endif
 
-#if EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
+#if __GLASGOW_HASKELL__ >= 865
 #define NEEDS_PRIMS_GHC(x) (NEEDS_PRIMS(x))
 #else
 #define NEEDS_PRIMS_GHC(x) (x)

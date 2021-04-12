@@ -95,13 +95,8 @@ import           Clash.Annotations.TopEntity
   (TopEntity (..), PortName(PortName, PortProduct))
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
-
-#if EXPERIMENTAL_EVALUATOR
-import           Clash.Core.PartialEval           (Evaluator)
-#else
-import           Clash.Core.Evaluator.Types       (Evaluator)
-#endif
-
+import           Clash.Core.PartialEval as PE     (Evaluator)
+import           Clash.Core.Evaluator.Types as WHNF (Evaluator)
 import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr')
 import           Clash.Core.Type
@@ -277,8 +272,10 @@ generateHDL
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
-  -> Evaluator
+  -> PE.Evaluator
   -- ^ Hardcoded evaluator for partial evaluation
+  -> WHNF.Evaluator
+  -- ^ Hardcoded evaluator for WHNF (old evaluator)
   -> [TopEntityT]
   -- ^ All topentities
   -> Maybe (TopEntityT, [TopEntityT])
@@ -288,7 +285,7 @@ generateHDL
   -- ^ Debug information level for the normalization process
   -> (Clock.UTCTime,Clock.UTCTime)
   -> IO ()
-generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
+generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans peEval eval
   topEntities0 mainTopEntity opts (startTime,prepTime) = do
     case opt_dbgRewriteHistoryFile opts of
       Nothing -> pure ()
@@ -401,7 +398,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
 
       -- 2. Normalize topEntity
       let transformedBindings = normalizeEntity reprs bindingsMap primMap tcm tupTcm
-                                  typeTrans eval topEntityNames opts supplyN
+                                  typeTrans peEval eval topEntityNames opts supplyN
                                   topEntity
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
@@ -968,8 +965,10 @@ normalizeEntity
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
-  -> Evaluator
+  -> PE.Evaluator
   -- ^ Hardcoded evaluator for partial evaluation
+  -> WHNF.Evaluator
+  -- ^ Hardcoded evaluator for WHNF (old evaluator)
   -> [Id]
   -- ^ TopEntities
   -> ClashOpts
@@ -979,7 +978,7 @@ normalizeEntity
   -> Id
   -- ^ root of the hierarchy
   -> BindingMap
-normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans eval topEntities
+normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans peEval eval topEntities
   opts supply tm = transformedBindings
   where
     doNorm = do norm <- normalize [tm]
@@ -987,7 +986,7 @@ normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans eval topEntities
                 cleaned <- cleanupGraph tm normChecked
                 return cleaned
     transformedBindings = runNormalization opts supply bindingsMap
-                            typeTrans reprs tcm tupTcm eval primMap emptyVarEnv
+                            typeTrans reprs tcm tupTcm peEval eval primMap emptyVarEnv
                             topEntities doNorm
 
 -- | topologically sort the top entities

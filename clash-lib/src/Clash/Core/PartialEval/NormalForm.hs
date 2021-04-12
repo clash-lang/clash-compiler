@@ -19,12 +19,14 @@ module Clash.Core.PartialEval.NormalForm
   , Args
   , Neutral(..)
   , Value(..)
+  , collectValueApps
   , mkValueTicks
   , stripValue
   , collectValueTicks
   , isUndefined
   , Normal(..)
   , LocalEnv(..)
+  , EvalContext(..)
   , GlobalEnv(..)
   , workFreeCache
   ) where
@@ -36,20 +38,18 @@ import Data.Map.Strict (Map)
 
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal
-import Clash.Core.Term (Term(..), PrimInfo(primName), TickInfo, Pat)
+import Clash.Core.Term (Term(..), PrimInfo(..), TickInfo, Pat)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type, TyVar)
+import Clash.Core.Util (undefinedPrims)
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (VarEnv, InScopeSet)
 import Clash.Driver.Types (Binding(..))
 
-type Args a
-  = [Arg a]
-
 -- | An argument applied to a function / data constructor / primitive.
 --
-type Arg a
-  = Either a Type
+type Arg a = Either a Type
+type Args a = [Arg a]
 
 -- | Neutral terms cannot be reduced, as they represent things like variables
 -- which are unknown, partially applied functions, or case expressions where
@@ -99,6 +99,17 @@ data Value
   | VThunk    !Term !LocalEnv
   deriving (Show)
 
+collectValueApps :: Value -> Maybe (Neutral Value, Args Value)
+collectValueApps (VNeutral n) = Just (go [] n)
+ where
+  go !args = \case
+    NeApp x y -> go (Left y : args) x
+    NeTyApp x ty -> go (Right ty : args) x
+    neu -> (neu, args)
+
+collectValueApps (VTick x _) = collectValueApps x
+collectValueApps _ = Nothing
+
 mkValueTicks :: Value -> [TickInfo] -> Value
 mkValueTicks = foldl VTick
 
@@ -115,37 +126,34 @@ collectValueTicks = go []
 isUndefined :: Value -> Bool
 isUndefined = \case
   VNeutral (NePrim pr _) ->
-    primName pr `elem`
-      [ "Control.Exception.Base.absentError"
-      , "Control.Exception.Base.patError"
-      , "EmptyCase"
-      , "GHC.Err.undefined"
-      , "Clash.Transformations.undefined"
-      , "Clash.XException.errorX"
-      ]
+    primName pr `elem` undefinedPrims
+
+  VNeutral (NeApp n _) ->
+    isUndefined (VNeutral n)
+
+  VNeutral (NeTyApp n _) ->
+    isUndefined (VNeutral n)
+
+  VTick value _ -> isUndefined value
+  VCast value _ _ -> isUndefined value
 
   _ -> False
 
 -- | A term which is in beta-normal eta-long form (NF). This has no redexes,
 -- and all partially applied functions in sub-terms are eta-expanded.
 --
--- While not strictly necessary, NLam includes the environment at the point the
--- original term was evaluated. This makes it easier for the AsTerm instance
--- for Normal to reintroduce let expressions before lambdas without
--- accidentally floating a let using a lambda bound variable outwards.
---
 data Normal
   = NNeutral  !(Neutral Normal)
   | NLiteral  !Literal
   | NData     !DataCon !(Args Normal)
-  | NLam      !Id !Normal !LocalEnv
-  | NTyLam    !TyVar !Normal !LocalEnv
+  | NLam      !Id !Normal
+  | NTyLam    !TyVar !Normal
   | NCast     !Normal !Type !Type
   | NTick     !Normal !TickInfo
   deriving (Show)
 
 data LocalEnv = LocalEnv
-  { lenvContext :: Id
+  { lenvTarget :: Id
     -- ^ The id of the term currently under evaluation.
   , lenvTypes :: Map TyVar Type
     -- ^ Local type environment. These are types that are introduced while
@@ -153,19 +161,34 @@ data LocalEnv = LocalEnv
   , lenvValues :: Map Id Value
     -- ^ Local term environment. These are WHNF terms or unevaluated thunks
     -- introduced while evaluating the current term (i.e. by applications)
+  , lenvInScope :: InScopeSet
+    -- ^ The set of in scope variables during partial evaluation. This includes
+    -- new variables introduced by the evaluator (such as the ids of binders
+    -- introduced during eta expansion.)
   , lenvFuel :: Word
     -- ^ The amount of fuel left in the local environment when the previous
     -- head was reached. This is needed so resuming evaluation does not lead
     -- to additional fuel being available.
-  , lenvKeepLifted :: Bool
-    -- ^ When evaluating, keep data constructors for boxed data types (e.g. I#)
-    -- instead of converting these back to their corresponding primitive. This
-    -- is used when evaluating terms where the result is subject of a case
-    -- expression (see note: lifted data types).
-  } deriving (Show)
+  }
 
--- TODO Add recursion info to the global environment. Until then we are forced
--- to spend fuel on non-recursive (terminating) terms.
+instance Show LocalEnv where
+  show = const "<env>"
+
+data EvalContext
+  = Normal
+  -- ^ The normal evalaution context, with no special rules.
+  | CaseSubject
+  -- ^ Evaluation is in a case subject. This makes inlining more eager to fire,
+  -- but only in cases where it could lead to a case alternative being chosen.
+  | Primitive
+  -- ^ Evaluation is in a primitive. This makes inlining and application more
+  -- eager to fire, as preventing either could prevent the primitive reducing.
+  --
+  -- TODO This is not used currently, perhaps it is not needed?
+
+-- TODO Add recursion info to the binding map. Until then we are forced to
+-- spend fuel on non-recursive (terminating) terms. Later it would save us from
+-- calling termination analysis on non-recursive terms.
 
 data GlobalEnv = GlobalEnv
   { genvBindings :: VarEnv (Binding Value)
@@ -173,10 +196,6 @@ data GlobalEnv = GlobalEnv
     -- of the top level definitions which are forced on lookup.
   , genvTyConMap :: TyConMap
     -- ^ The type constructors known about by Clash.
-  , genvInScope :: InScopeSet
-    -- ^ The set of in scope variables during partial evaluation. This includes
-    -- new variables introduced by the evaluator (such as the ids of binders
-    -- introduced during eta expansion.)
   , genvSupply :: Supply
     -- ^ The supply of fresh names for generating identifiers.
   , genvFuel :: Word
@@ -187,6 +206,10 @@ data GlobalEnv = GlobalEnv
     -- ^ The heap containing the results of any evaluated IO primitives.
   , genvAddr :: Int
     -- ^ The address of the next element to be inserted into the heap.
+  , genvContext :: EvalContext
+    -- ^ Whether the evaluator is in a special context, which changes the rules
+    -- for inlining / application. This can lead to better results as it allows
+    -- evaluation to carefully relax rules.
   , genvWorkCache :: VarEnv Bool
     -- ^ Cache for the results of isWorkFree. This is required to use
     -- Clash.Rewrite.WorkFree.isWorkFree.

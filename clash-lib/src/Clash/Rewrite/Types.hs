@@ -36,12 +36,8 @@ import Data.Monoid                           (Any)
 import qualified Data.Set                    as Set
 import GHC.Generics
 
-#if EXPERIMENTAL_EVALUATOR
-import Clash.Core.PartialEval                (Evaluator)
-import Clash.Core.PartialEval.NormalForm     (Value)
-#else
-import Clash.Core.Evaluator.Types            (Evaluator, PrimHeap)
-#endif
+import Clash.Core.PartialEval as PE          (Evaluator)
+import Clash.Core.Evaluator.Types as WHNF    (Evaluator, PrimHeap)
 
 import Clash.Core.Term           (Term, Context)
 import Clash.Core.Type           (Type)
@@ -83,15 +79,8 @@ data RewriteState extra
   -- ^ Function which is currently normalized
   , _nameCounter      :: {-# UNPACK #-} !Int
   -- ^ Used for 'Fresh'
-#if EXPERIMENTAL_EVALUATOR
-  , _ioHeap           :: IntMap Value
-  -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
-  , _ioAddr           :: Int
-  -- ^ Next address to use for heap insertion.
-#else
   , _globalHeap       :: PrimHeap
   -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
-#endif
   , _workFreeBinders  :: VarEnv Bool
   -- ^ Map telling whether a binder's definition is work-free
   , _extra            :: !extra
@@ -124,8 +113,10 @@ data RewriteEnv
   -- ^ TyCon cache
   , _tupleTcCache   :: IntMap TyConName
   -- ^ Tuple TyCon cache
-  , _evaluator      :: Evaluator
+  , _peEvaluator    :: PE.Evaluator
   -- ^ Hardcoded evaluator for partial evaluation
+  , _evaluator      :: WHNF.Evaluator
+  -- ^ Hardcoded evaluator for WHNF (old evaluator)
   , _topEntities    :: VarSet
   -- ^ Functions that are considered TopEntities
   , _customReprs    :: CustomReprs

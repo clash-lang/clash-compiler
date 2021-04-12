@@ -287,7 +287,7 @@ isSignalType tcm ty = go HashSet.empty ty
     go tcSeen (tyView -> TyConApp tcNm args) = case nameOcc tcNm of
       "Clash.Signal.Internal.Signal"      -> True
       "Clash.Signal.BiSignal.BiSignalIn"  -> True
-      "Clash.Signal.Internal.BiSignalOut" -> True
+      "Clash.Signal.BiSignal.BiSignalOut" -> True
       _ | tcNm `HashSet.member` tcSeen    -> False -- Do not follow rec types
         | otherwise -> case lookupUniqMap tcNm tcm of
             Just tc -> let dcs         = tyConDataCons tc
@@ -426,7 +426,7 @@ dataConInstArgTys (MkData { dcArgTys, dcUnivTyVars, dcExtTyVars }) inst_tys =
 primCo
   :: Type
   -> Term
-primCo ty = Prim (PrimInfo "_CO_" ty WorkNever SingleResult)
+primCo ty = Prim (PrimInfo "_CO_" ty WorkNever SingleResult Nothing)
 
 -- | Make an undefined term
 undefinedTm
@@ -434,7 +434,23 @@ undefinedTm
   -> Term
 undefinedTm =
   let undefinedNm = "Clash.Transformations.undefined" in
-  TyApp (Prim (PrimInfo undefinedNm  undefinedTy WorkNever SingleResult))
+  TyApp (Prim (PrimInfo undefinedNm undefinedTy WorkNever SingleResult Nothing))
+
+undefinedPrims :: [T.Text]
+undefinedPrims =
+  [ "Clash.Transformations.undefined"
+  , "Clash.XException.errorX"
+  , "Control.Exception.Base.absentError"
+  , "Control.Exception.Base.patError"
+  , "EmptyCase"
+  , "GHC.Err.error"
+  , "GHC.Err.errorWithoutStackTrace"
+  , "GHC.Err.undefined"
+  , "GHC.Real.divZeroError"
+  , "GHC.Real.overflowError"
+  , "GHC.Real.ratioZeroDenominatorError"
+  , "GHC.Real.underflowError"
+  ]
 
 substArgTys
   :: DataCon
