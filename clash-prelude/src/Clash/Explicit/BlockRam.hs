@@ -1083,7 +1083,7 @@ trueDualPortBlockRam ::
   -- will be echoed. If write enable is @False@, the read data is returned.
 
 trueDualPortBlockRam clkA writeA addrA clkB writeB addrB =
-  trueDualPortBlockRam#
+  trueDualPortBlockRamWrapper
     clkA (isJust <$> writeA) addrA (fromJustX <$> writeA)
     clkB (isJust <$> writeB) addrB (fromJustX <$> writeB)
 
@@ -1128,8 +1128,12 @@ mergeMaybeConflicts (Just c) Nothing = Just c
 mergeMaybeConflicts Nothing (Just c) = Just c
 mergeMaybeConflicts (Just c1) (Just c2) = Just (mergeConflicts c1 c2)
 
+
+trueDualPortBlockRamWrapper = trueDualPortBlockRam#
+{-# NOINLINE trueDualPortBlockRamWrapper #-}
+
 -- | Primitive of 'trueDualPortBlockRam'.
-trueDualPortBlockRam# ::
+trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
   forall nAddrs domA domB a .
   ( HasCallStack
   , KnownNat nAddrs
