@@ -522,7 +522,7 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
                   No top-level function called 'topEntity' or 'testBench' found,
                   nor any function annotated with a 'Synthesize' or 'TestBench'
                   annotation. If you want to synthesize a specific binder in
-                  #{show modName}, use '-main-is=myTopEntity'.
+                  #{show modName}, use '-main-is myTopEntity'.
                 |]
               _ ->
                 allImplicit
