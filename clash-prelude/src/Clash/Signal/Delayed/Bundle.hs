@@ -12,10 +12,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 
-#if __GLASGOW_HASKELL__ < 806
-{-# LANGUAGE TypeInType #-}
-#endif
-
 module Clash.Signal.Delayed.Bundle (
     Bundle(..)
   -- ** Tools to emulate pre Clash 1.0 @Bundle ()@ instance

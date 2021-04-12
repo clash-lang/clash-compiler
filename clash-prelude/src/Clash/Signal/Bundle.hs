@@ -13,10 +13,6 @@ The Product/Signal isomorphism
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 
-#if __GLASGOW_HASKELL__ < 806
-{-# LANGUAGE TypeInType #-}
-#endif
-
 {-# LANGUAGE Trustworthy #-}
 
 --{-# OPTIONS_GHC -ddump-splices #-}

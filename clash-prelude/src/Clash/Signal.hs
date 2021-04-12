@@ -76,10 +76,6 @@ Check out 'IntelSystem' and 'XilinxSystem' too!
 
 {-# LANGUAGE Trustworthy #-}
 
-#if __GLASGOW_HASKELL__ < 806
-{-# LANGUAGE TypeInType #-}
-#endif
-
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module Clash.Signal

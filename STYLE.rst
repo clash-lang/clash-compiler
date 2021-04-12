@@ -235,10 +235,6 @@ blank line. Pragmas should be ordered alphabetically. Example:
     {-# LANGUAGE FlexibleInstances #-}
     {-# LANGUAGE QuasiQuotes #-}
 
-    #if __GLASGOW_HASKELL__ < 806
-    {-# LANGUAGE TypeInType #-}
-    #endif
-
     {-# LANGUAGE Safe #-}
 
 Pragmas
