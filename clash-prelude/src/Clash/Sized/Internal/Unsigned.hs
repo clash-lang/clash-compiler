@@ -99,9 +99,7 @@ import GHC.Num.Natural
 import GHC.Integer.GMP.Internals      (bigNatToWord)
 import GHC.Natural                    (Natural (..), naturalFromInteger)
 #endif
-#if MIN_VERSION_base(4,12,0)
 import GHC.Natural                    (naturalToInteger)
-#endif
 import GHC.TypeLits                   (KnownNat, Nat, type (+))
 #if MIN_VERSION_base(4,15,0)
 import GHC.TypeNats                   (natVal)
@@ -498,8 +496,9 @@ shiftL#, shiftR#, rotateL#, rotateR# :: forall n .KnownNat n => Unsigned n -> In
 shiftL# =
   \(U v) i ->
     if i >= 0 then
-#if MIN_VERSION_base
-      U ((naturalShiftL v i) `mod` m)
+#if MIN_VERSION_base(4,15,0)
+      let i' = fromIntegral i
+       in U ((naturalShiftL v i') `mod` m)
 #else
       U ((shiftL v i) `mod` m)
 #endif
@@ -507,9 +506,11 @@ shiftL# =
       error ("'shiftL undefined for negative number: " ++ show i)
  where
 #if MIN_VERSION_base(4,15,0)
-  m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
+  sz = naturalToWord (natVal (Proxy @n))
+  m = 1 `naturalShiftL` sz
 #else
-  m = 1 `shiftL` fromInteger (natVal (Proxy @n))
+  sz = fromInteger (natVal (Proxy @n))
+  m = 1 `shiftL` sz
 #endif
 
 {-# NOINLINE shiftR# #-}

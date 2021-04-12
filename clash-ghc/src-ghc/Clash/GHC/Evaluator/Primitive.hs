@@ -692,7 +692,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "GHC.Prim.powerFloat#"  | Just r <- liftFFF powerFloat# args
     -> reduce r
 
-#if MIN_VERSION_base(4,12,0)
   -- GHC.Float.asinh  -- XXX: Very fragile
   --  $w$casinh is the Double specialisation of asinh
   --  $w$casinh1 is the Float specialisation of asinh
@@ -704,7 +703,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce r
     where go f = case asinh (F# f) of
                    F# f' -> f'
-#endif
 
 #if MIN_VERSION_ghc(8,7,0)
   "GHC.Prim.asinhFloat#"  | Just r <- liftFF asinhFloat# args
@@ -1570,9 +1568,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   -- Type level ^    -- XXX: Very fragile
   -- These is are specialized versions of ^_f, named by some combination of ghc and singletons.
-  "Data.Singletons.TypeLits.Internal.$s^_f"            -- ghc-8.4.4, singletons-2.4.1
-    | [i,j] <- naturalLiterals' args
-    -> reduce (Literal (NaturalLiteral (i ^ j)))
   "Data.Singletons.TypeLits.Internal.$fSingI->^@#@$_f" -- ghc-8.6.5, singletons-2.5.1
     | [i,j] <- naturalLiterals' args
     -> reduce (Literal (NaturalLiteral (i ^ j)))

@@ -71,9 +71,6 @@ where
 import           Data.Foldable                  ( fold)
 import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
-#if !(MIN_VERSION_base(4,11,0))
-import           Data.Semigroup                as Semigroup
-#endif
 import           Data.Maybe                     ( catMaybes )
 import           Language.Haskell.TH
 
@@ -114,11 +111,8 @@ instance Semigroup a => Semigroup (Naming a) where
   _ <> HasFail e               = HasFail e
   HasFail e <> _               = HasFail e
 
-instance (Semigroup a, Monoid a) => Monoid (Naming a) where
+instance Monoid a => Monoid (Naming a) where
   mempty = Complete mempty
-#if !(MIN_VERSION_base(4,11,0))
-  mappend = (Semigroup.<>)
-#endif
 
 -- | Track seen 'Name's, and track current 'Info' for error reporting.
 type ErrorContext = String

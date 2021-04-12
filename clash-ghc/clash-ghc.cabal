@@ -46,8 +46,7 @@ Build-type:           Simple
 Extra-source-files:   README.md,
                       CHANGELOG.md,
                       LICENSE_GHC,
-                      cbits/PosixSource.h,
-                      src-bin-841/Clash/GHCi/HsVersions.h
+                      cbits/PosixSource.h
 
 source-repository head
   type: git
@@ -105,15 +104,13 @@ common common-options
                       DerivingStrategies
                       InstanceSigs
                       KindSignatures
+                      NoStarIsType
                       ScopedTypeVariables
                       StandaloneDeriving
                       TupleSections
                       TypeApplications
                       TypeOperators
                       ViewPatterns
-
-  if impl(ghc >= 8.6)
-      default-extensions: NoStarIsType
 
   if flag(experimental-evaluator)
       cpp-options: -DEXPERIMENTAL_EVALUATOR
@@ -129,8 +126,6 @@ library
     HS-Source-Dirs: src-bin-881
   elif impl(ghc >= 8.6.0)
     HS-Source-Dirs: src-bin-861
-  elif impl(ghc >= 8.4.1)
-    HS-Source-Dirs: src-bin-841
 
   GHC-Options:        -Wall -Wcompat
   if impl(ghc >= 8.10.0)
@@ -152,7 +147,7 @@ library
                       directory                 >= 1.2      && < 1.4,
                       extra                     >= 1.6      && < 1.8,
                       filepath                  >= 1.3      && < 1.5,
-                      ghc                       >= 8.4.0    && < 9.1,
+                      ghc                       >= 8.6.0    && < 9.1,
                       process                   >= 1.2      && < 1.7,
                       hashable                  >= 1.1.2.3  && < 1.4,
                       haskeline                 >= 0.7.0.3  && < 0.9,
@@ -171,9 +166,9 @@ library
                       ghc-typelits-natnormalise >= 0.6      && < 0.8,
                       deepseq                   >= 1.3.0.2  && < 1.5,
                       time                      >= 1.4.0.1  && < 1.12,
-                      ghc-boot                  >= 8.4.0    && < 9.1,
+                      ghc-boot                  >= 8.6.0    && < 9.1,
                       ghc-prim                  >= 0.3.1.0  && < 0.8,
-                      ghci                      >= 8.4.0    && < 9.1,
+                      ghci                      >= 8.6.0    && < 9.1,
                       uniplate                  >= 1.6.12   && < 1.8,
                       reflection                >= 2.1.2    && < 3.0,
                       primitive                 >= 0.5.0.1  && < 1.0,
@@ -218,7 +213,8 @@ library
 
                       Clash.GHCi.Common
 
-  Other-Modules:      Clash.GHCi.UI
+  Other-Modules:      Clash.GHCi.Leak
+                      Clash.GHCi.UI
                       Clash.GHCi.UI.Info
                       Clash.GHCi.UI.Monad
                       Clash.GHCi.UI.Tags
@@ -228,7 +224,5 @@ library
                       Clash.GHC.LoadInterfaceFiles
                       Clash.GHC.Util
                       Paths_clash_ghc
-  if impl(ghc >= 8.6.0)
-    Other-Modules:    Clash.GHCi.Leak
   if impl(ghc >= 8.8.0)
     Other-Modules:    Clash.GHCi.Util

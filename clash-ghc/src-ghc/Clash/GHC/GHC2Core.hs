@@ -40,9 +40,6 @@ import           Data.Hashable               (Hashable (..))
 import           Data.HashMap.Strict         (HashMap)
 import qualified Data.HashMap.Strict         as HashMap
 import           Data.Maybe                  (catMaybes,fromMaybe,listToMaybe)
-#if !MIN_VERSION_base(4,11,0)
-import           Data.Semigroup
-#endif
 import           Data.Text                   (Text, pack)
 import qualified Data.Text                   as Text
 import           Data.Text.Encoding          (decodeUtf8)
@@ -118,10 +115,7 @@ import FastString (unpackFS, fastStringToByteString)
 
 import Id         (isDataConId_maybe)
 import IdInfo     (IdDetails (..), unfoldingInfo)
-import Literal    (Literal (..))
-#if MIN_VERSION_ghc(8,6,0)
-import Literal    (LitNumType (..))
-#endif
+import Literal    (Literal (..), LitNumType (..))
 import Module     (moduleName, moduleNameString)
 import Name       (Name, nameModule_maybe,
                    nameOccName, nameUnique, getSrcSpan)
@@ -198,9 +192,6 @@ instance Semigroup SrcSpanRB where
 
 instance Monoid SrcSpanRB where
   mempty = SrcSpanRB noSrcSpan
-#if !MIN_VERSION_base(4,11,0)
-  mappend = (<>)
-#endif
 
 type C2C = RWS GHC2CoreEnv SrcSpanRB GHC2CoreState
 
@@ -316,16 +307,8 @@ makeTyCon tc = tycon
 makeAlgTyConRhs :: AlgTyConRhs
                 -> C2C (Maybe C.AlgTyConRhs)
 makeAlgTyConRhs algTcRhs = case algTcRhs of
-#if MIN_VERSION_ghc(8,6,0)
   DataTyCon dcs _ _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
-#else
-  DataTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
-#endif
-#if MIN_VERSION_ghc(8,6,0)
   SumTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
-#else
-  SumTyCon dcs -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
-#endif
 
 #if MIN_VERSION_ghc(8,10,0)
   NewTyCon dc _ (rhsTvs,rhsEtad) _ _ ->
@@ -603,7 +586,6 @@ coreToTerm primMap unlocs = term
       MachStr    fs  -> C.StringLiteral (Char8.unpack fs)
       MachChar   c   -> C.CharLiteral c
 #endif
-#if MIN_VERSION_ghc(8,6,0)
 #if MIN_VERSION_ghc(9,0,0)
       LitNumber lt i -> case lt of
 #else
@@ -615,13 +597,6 @@ coreToTerm primMap unlocs = term
         LitNumInt64   -> C.IntLiteral i
         LitNumWord    -> C.WordLiteral i
         LitNumWord64  -> C.WordLiteral i
-#else
-      MachInt    i   -> C.IntLiteral i
-      MachInt64  i   -> C.IntLiteral i
-      MachWord   i   -> C.WordLiteral i
-      MachWord64 i   -> C.WordLiteral i
-      LitInteger i _ -> C.IntegerLiteral i
-#endif
 #if MIN_VERSION_ghc(8,8,0)
       LitFloat r    -> C.FloatLiteral r
       LitDouble r   -> C.DoubleLiteral r
@@ -713,11 +688,7 @@ hasPrimCo (AxiomRuleCo _ coers) = do
   tcs <- catMaybes <$> mapM hasPrimCo coers
   return (listToMaybe tcs)
 
-#if MIN_VERSION_ghc(8,6,0)
 hasPrimCo (NthCo _ _ co)  = hasPrimCo co
-#else
-hasPrimCo (NthCo _ co)  = hasPrimCo co
-#endif
 hasPrimCo (LRCo _ co)   = hasPrimCo co
 hasPrimCo (InstCo co _) = hasPrimCo co
 hasPrimCo (SubCo co)    = hasPrimCo co

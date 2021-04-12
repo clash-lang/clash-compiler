@@ -38,12 +38,9 @@ import Control.Exception              (catch, evaluate)
 import Data.Binary.IEEE754            (doubleToWord, floatToWord, wordToDouble,
                                        wordToFloat)
 
-#if MIN_VERSION_base(4,12,0)
 import Data.Complex                   (Complex)
-import Data.Ord                       (Down)
-#endif
-
 import Data.Int
+import Data.Ord                       (Down)
 import Data.Word
 import Foreign.C.Types                (CUShort)
 import GHC.TypeLits                   (KnownNat, Nat, type (+), type (-))
@@ -385,10 +382,8 @@ instance ( BitPack a
 
 instance BitPack a => BitPack (Maybe a)
 
-#if MIN_VERSION_base(4,12,0)
 instance BitPack a => BitPack (Complex a)
 instance BitPack a => BitPack (Down a)
-#endif
 
 -- | Zero-extend a 'Bool'ean value to a 'BitVector' of the appropriate size.
 --

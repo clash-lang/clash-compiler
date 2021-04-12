@@ -149,9 +149,7 @@ import GHC.Integer.GMP.Internals  (Integer (..), bigNatToWord, shiftRBigNat)
 import GHC.Natural
   (Natural (..), naturalFromInteger, wordToNatural)
 #endif
-#if MIN_VERSION_base(4,12,0)
 import GHC.Natural                (naturalToInteger)
-#endif
 import GHC.Prim                   (dataToTag#)
 import GHC.Stack                  (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-))

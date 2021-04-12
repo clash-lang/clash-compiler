@@ -112,19 +112,12 @@ workflows:
   version: 2
   build_and_test_clash:
     jobs:
-      - ghc-8.4
       - ghc-8.6-singular-hidden
       # - ghc-8.6
       - ghc-8.8
       - ghc-8.10
 
 jobs:
-  ghc-8.4:
-    environment:
-      <<: *env
-      GHC_VERSION: 8.4.4
-      CABAL_VERSION: 2.4.1.0
-    <<: *build_default
   ghc-8.6:
     environment:
       <<: *env
