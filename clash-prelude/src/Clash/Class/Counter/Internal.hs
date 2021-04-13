@@ -1,0 +1,223 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
+
+module Clash.Class.Counter.Internal where
+
+import Clash.Sized.BitVector (BitVector)
+import Clash.Sized.Index (Index)
+import Clash.Sized.Signed (Signed)
+import Clash.Sized.Unsigned (Unsigned)
+
+import Data.Bifunctor (bimap)
+import GHC.TypeLits (KnownNat, type (<=))
+
+-- $setup
+-- >>> import Clash.Class.Counter
+-- >>> import Clash.Sized.BitVector (BitVector)
+-- >>> import Clash.Sized.Index (Index)
+-- >>> import Clash.Sized.Signed (Signed)
+-- >>> import Clash.Sized.Unsigned (Unsigned)
+
+-- | 'Clash.Class.Counter.Counter' is a class that composes multiple counters
+-- into a single one. It is similar to odometers found in olds cars,
+-- once all counters reach their maximum they reset to zero - i.e. odometer
+-- rollover. See 'Clash.Class.Counter.countSucc' and 'Clash.Class.Counter.countPred'
+-- for API usage examples.
+--
+-- Example use case: when driving a monitor through VGA you would like to keep
+-- track at least two counters: one counting a horizontal position, and one
+-- vertical. Perhaps a fancy VGA driver would also like to keep track of the
+-- number of drawn frames. To do so, the three counters are setup with different
+-- types. On each /round/ of the horizontal counter the vertical counter should
+-- be increased. On each /round/ of the vertical counter the frame counter should
+-- be increased. With this class you could simply use the type:
+--
+-- @
+-- (FrameCount, VerticalCount, HorizontalCount)
+-- @
+--
+-- and have 'Clash.Class.Counter.countSucc' work as described.
+--
+-- __N.B.__: This class exposes four functions 'countMin', 'countMax',
+-- 'countSuccOverflow', and 'countPredOverflow'. These functions are considered
+-- an internal API. Users are encouraged to use 'Clash.Class.Counter.countSucc'
+-- and 'Clash.Class.Counter.countPred'.
+--
+class Counter a where
+  -- | Value counter wraps around to on a 'countSuccOverflow' overflow
+  countMin :: a
+  default countMin :: Bounded a => a
+  countMin = minBound
+
+  -- | Value counter wraps around to on a 'countPredOverflow' overflow
+  countMax :: a
+  default countMax :: Bounded a => a
+  countMax = maxBound
+
+  -- | Gets the successor of @a@. If it overflows, the left part of the tuple
+  -- will be set to True.
+  countSuccOverflow :: a -> (Bool, a)
+  default countSuccOverflow :: (Eq a, Enum a, Bounded a) => a -> (Bool, a)
+  countSuccOverflow a
+    | a == maxBound = (True, countMin)
+    | otherwise = (False, succ a)
+
+  -- | Gets the predecessor of @a@. If it overflows, the left part of the tuple
+  -- will be set to True.
+  countPredOverflow :: a -> (Bool, a)
+  default countPredOverflow :: (Eq a, Enum a, Bounded a) => a -> (Bool, a)
+  countPredOverflow a
+    | a == minBound = (True, countMax)
+    | otherwise = (False, pred a)
+
+instance (1 <= n, KnownNat n) => Counter (Index n)
+instance KnownNat n => Counter (Unsigned n)
+instance KnownNat n => Counter (Signed n)
+instance KnownNat n => Counter (BitVector n)
+
+-- | Counter instance that flip-flops between 'Left' and 'Right'. Examples:
+--
+-- >>> type T = Either (Index 2) (Unsigned 2)
+-- >>> countSucc @T (Left 0)
+-- Left 1
+-- >>> countSucc @T (Left 1)
+-- Right 0
+-- >>> countSucc @T (Right 0)
+-- Right 1
+instance (Counter a, Counter b) => Counter (Either a b) where
+  countMin = Left countMin
+  countMax = Right countMax
+
+  countSuccOverflow e =
+    case bimap countSuccOverflow countSuccOverflow e of
+      Left (overflow, a)  -> (False, if overflow then Right countMin else Left a)
+      Right (overflow, b) -> (overflow, if overflow then Left countMin else Right b)
+
+  countPredOverflow e =
+    case bimap countPredOverflow countPredOverflow e of
+      Left (overflow, a)  -> (overflow, if overflow then Right countMax else Left a)
+      Right (overflow, b) -> (False, if overflow then Left countMax else Right b)
+
+-- | Counters on tuples increment from right-to-left. This makes sense from the
+-- perspective of LSB/MSB; MSB is on the left-hand-side and LSB is on the
+-- right-hand-side in other Clash types.
+--
+-- >>> type T = (Unsigned 2, Index 2, Index 2)
+-- >>> countSucc @T (0, 0, 0)
+-- (0,0,1)
+-- >>> countSucc @T (0, 0, 1)
+-- (0,1,0)
+-- >>> countSucc @T (0, 1, 0)
+-- (0,1,1)
+-- >>> countSucc @T (0, 1, 1)
+-- (1,0,0)
+instance (Counter a, Counter b) => Counter (a, b) where
+  countMin = (countMin, countMin)
+  countMax = (countMax, countMax)
+
+  countSuccOverflow (a0, b0) =
+    if overflowB
+    then (overflowA, (a1, b1))
+    else (overflowB, (a0, b1))
+   where
+    (overflowB, b1) = countSuccOverflow b0
+    (overflowA, a1) = countSuccOverflow a0
+
+  countPredOverflow (a0, b0) =
+    if overflowB
+    then (overflowA, (a1, b1))
+    else (overflowB, (a0, b1))
+   where
+    (overflowB, b1) = countPredOverflow b0
+    (overflowA, a1) = countPredOverflow a0
+
+instance (Counter a, Counter b, Counter c) => Counter (a, b, c) where
+  countMin = (countMin, countMin, countMin)
+  countMax = (countMax, countMax, countMax)
+
+  countSuccOverflow (a0, b0, c0) =
+    if overflowC
+    then (overflowAB, (a1, b1, c1))
+    else (overflowC, (a0, b0, c1))
+   where
+    (overflowC, c1) = countSuccOverflow c0
+    (overflowAB, (a1, b1)) = countSuccOverflow (a0, b0)
+
+  countPredOverflow (a0, b0, c0) =
+    if overflowC
+    then (overflowAB, (a1, b1, c1))
+    else (overflowC, (a0, b0, c1))
+   where
+    (overflowC, c1) = countPredOverflow c0
+    (overflowAB, (a1, b1)) = countPredOverflow (a0, b0)
+
+instance (Counter a, Counter b, Counter c, Counter d) => Counter (a, b, c, d) where
+  countMin = (countMin, countMin, countMin, countMin)
+  countMax = (countMax, countMax, countMax, countMax)
+
+  countSuccOverflow (a0, b0, c0, d0) =
+    if overflowD
+    then (overflowABC, (a1, b1, c1, d1))
+    else (overflowD, (a0, b0, c0, d1))
+   where
+    (overflowD, d1) = countSuccOverflow d0
+    (overflowABC, (a1, b1, c1)) = countSuccOverflow (a0, b0, c0)
+
+  countPredOverflow (a0, b0, c0, d0) =
+    if overflowD
+    then (overflowABC, (a1, b1, c1, d1))
+    else (overflowD, (a0, b0, c0, d1))
+   where
+    (overflowD, d1) = countPredOverflow d0
+    (overflowABC, (a1, b1, c1)) = countPredOverflow (a0, b0, c0)
+
+instance ( Counter a
+         , Counter b
+         , Counter c
+         , Counter d
+         , Counter e ) => Counter (a, b, c, d, e) where
+  countMin = (countMin, countMin, countMin, countMin, countMin)
+  countMax = (countMax, countMax, countMax, countMax, countMax)
+
+  countSuccOverflow (a0, b0, c0, d0, e0) =
+    if overflowE
+    then (overflowABCD, (a1, b1, c1, d1, e1))
+    else (overflowE, (a0, b0, c0, d0, e1))
+   where
+    (overflowE, e1) = countSuccOverflow e0
+    (overflowABCD, (a1, b1, c1, d1)) = countSuccOverflow (a0, b0, c0, d0)
+
+  countPredOverflow (a0, b0, c0, d0, e0) =
+    if overflowE
+    then (overflowABCD, (a1, b1, c1, d1, e1))
+    else (overflowE, (a0, b0, c0, d0, e1))
+   where
+    (overflowE, e1) = countPredOverflow e0
+    (overflowABCD, (a1, b1, c1, d1)) = countPredOverflow (a0, b0, c0, d0)
+
+instance ( Counter a
+         , Counter b
+         , Counter c
+         , Counter d
+         , Counter e
+         , Counter f ) => Counter (a, b, c, d, e, f) where
+  countMin = (countMin, countMin, countMin, countMin, countMin, countMin)
+  countMax = (countMax, countMax, countMax, countMax, countMax, countMax)
+
+  countSuccOverflow (a0, b0, c0, d0, e0, f0) =
+    if overflowF
+    then (overflowABCDE, (a1, b1, c1, d1, e1, f1))
+    else (overflowF, (a0, b0, c0, d0, e0, f1))
+   where
+    (overflowF, f1) = countSuccOverflow f0
+    (overflowABCDE, (a1, b1, c1, d1, e1)) = countSuccOverflow (a0, b0, c0, d0, e0)
+
+  countPredOverflow (a0, b0, c0, d0, e0, f0) =
+    if overflowF
+    then (overflowABCDE, (a1, b1, c1, d1, e1, f1))
+    else (overflowF, (a0, b0, c0, d0, e0, f1))
+   where
+    (overflowF, f1) = countPredOverflow f0
+    (overflowABCDE, (a1, b1, c1, d1, e1)) = countPredOverflow (a0, b0, c0, d0, e0)
+
+-- TODO: TemplateHaskell for instance generation

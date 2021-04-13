@@ -187,6 +187,8 @@ Library
 
                       Clash.Class.AutoReg
                       Clash.Class.BitPack
+                      Clash.Class.Counter
+                      Clash.Class.Counter.Internal
                       Clash.Class.Exp
                       Clash.Class.HasDomain
                       Clash.Class.HasDomain.HasSingleDomain
@@ -403,6 +405,7 @@ test-suite unittests
                  Clash.Tests.AutoReg
                  Clash.Tests.BitPack
                  Clash.Tests.BitVector
+                 Clash.Tests.Counter
                  Clash.Tests.DerivingDataRepr
                  Clash.Tests.DerivingDataReprTypes
                  Clash.Tests.Fixed
