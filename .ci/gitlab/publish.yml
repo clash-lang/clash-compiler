@@ -80,6 +80,7 @@ debian-bindist-test:
       - .ci/bindist/linux/snap/*.snap
     expire_in: 1 week
   script:
+    - export THREADS=$(./.ci/effective_cpus.sh)
     - .ci/snap.sh build
     # TODO: Smoke test for snaps. Not sure how to do this on CI, as we need
     #       snapd to be running (?).

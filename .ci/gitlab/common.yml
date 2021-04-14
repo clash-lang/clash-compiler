@@ -1,5 +1,5 @@
 .common:
-  image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-$GHC_VERSION:2021-03-18
+  image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-$GHC_VERSION:2021-04-14
   timeout: 2 hours
   stage: build
   variables:
@@ -16,8 +16,8 @@
     paths:
       - cache.tar.zst
   before_script:
-    - export THREADS=$(nproc)
-    - export CABAL_JOBS=$(nproc)
+    - export THREADS=$(./.ci/effective_cpus.sh)
+    - export CABAL_JOBS=$(./.ci/effective_cpus.sh)
     - export
     - tar -xf cache.tar.zst -C / || true
     - .ci/setup.sh
