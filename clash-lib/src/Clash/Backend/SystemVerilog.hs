@@ -28,9 +28,6 @@ import qualified Data.HashSet                         as HashSet
 import           Data.List                            (nub, nubBy)
 import           Data.List.Extra                      ((<:>), zipEqual)
 import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
-#if !MIN_VERSION_base(4,11,0)
-import           Data.Monoid                          hiding (Sum, Product)
-#endif
 import           Data.Semigroup.Monad
 import qualified Data.Text.Lazy                       as Text
 import qualified Data.Text                            as TextS

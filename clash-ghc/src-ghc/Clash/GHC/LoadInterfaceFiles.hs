@@ -387,12 +387,7 @@ loadExprFromTyThing bndr tyThing = case tyThing of
 #endif
         -> Left
             ( bndr
-#if MIN_VERSION_ghc(8,2,2)
             , MkCore.mkAbsentErrorApp
-#else
-            , MkCore.mkRuntimeErrorApp
-                MkCore.aBSENT_ERROR_ID
-#endif
                 (Var.varType _id)
                 ("no_unfolding " ++ showPpr unsafeGlobalDynFlags bndr)
             )

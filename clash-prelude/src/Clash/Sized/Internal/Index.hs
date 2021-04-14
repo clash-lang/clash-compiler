@@ -87,11 +87,7 @@ import Language.Haskell.TH        (TypeQ)
 #endif
 import GHC.Generics               (Generic)
 import GHC.Natural                (Natural, naturalFromInteger)
-#if MIN_VERSION_base(4,12,0)
 import GHC.Natural                (naturalToInteger)
-#else
-import Clash.Sized.Internal.Mod   (naturalToInteger)
-#endif
 import GHC.Stack                  (HasCallStack)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-),
                                    type (*), type (<=), natVal)

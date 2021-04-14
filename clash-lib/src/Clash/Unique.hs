@@ -80,9 +80,6 @@ import           Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.List   as List
 import           Data.Text.Prettyprint.Doc
-#if !MIN_VERSION_base(4,11,0)
-import           Data.Semigroup
-#endif
 import           GHC.Stack
 
 import           Clash.Pretty

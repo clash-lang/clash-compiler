@@ -90,12 +90,7 @@ import Data.Proxy                     (Proxy (..))
 import Text.Read                      (Read (..), ReadPrec)
 import Text.Printf                    (PrintfArg (..), printf)
 import GHC.Generics                   (Generic)
-import GHC.Natural                    (naturalFromInteger)
-#if MIN_VERSION_base(4,12,0)
-import GHC.Natural                    (naturalToInteger)
-#else
-import Clash.Sized.Internal.Mod       (naturalToInteger)
-#endif
+import GHC.Natural                    (naturalFromInteger, naturalToInteger)
 
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import GHC.TypeLits.Extra             (Max)

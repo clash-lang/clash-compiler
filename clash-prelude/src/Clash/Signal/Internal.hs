@@ -17,10 +17,6 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 
-#if __GLASGOW_HASKELL__ < 806
-{-# LANGUAGE TypeInType #-}
-#endif
-
 {-# LANGUAGE Unsafe #-}
 
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Extra.Solver #-}

@@ -318,17 +318,12 @@ wantedLanguageExtensions =
   , LangExt.TypeApplications
   , LangExt.TypeFamilies
   , LangExt.TypeOperators
-#if !MIN_VERSION_ghc(8,6,0)
-  , LangExt.TypeInType
-#endif
   ]
 
 unwantedLanguageExtensions :: [LangExt.Extension]
 unwantedLanguageExtensions =
   [ LangExt.ImplicitPrelude
-#if MIN_VERSION_ghc(8,6,0)
   , LangExt.StarIsType
-#endif
   , LangExt.Strict
   , LangExt.StrictData
   ]

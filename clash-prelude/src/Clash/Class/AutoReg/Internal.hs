@@ -9,9 +9,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- needed for constraint on the Fixed instance
-#if __GLASGOW_HASKELL__ < 806
-{-# OPTIONS_GHC -Wwarn=unused-pattern-binds #-}
-#endif
 
 module Clash.Class.AutoReg.Internal
   ( AutoReg (..)
@@ -210,9 +207,7 @@ unfoldType = go []
     go acc (ForallT _ _ ty) = go acc ty
     go acc (AppT ty1 ty2)   = go (ty2:acc) ty1
     go acc (SigT ty _)      = go acc ty
-#if MIN_VERSION_template_haskell(2,11,0)
     go acc (ParensT ty)     = go acc ty
-#endif
 #if MIN_VERSION_template_haskell(2,15,0)
     go acc (AppKindT ty _)  = go acc ty
 #endif

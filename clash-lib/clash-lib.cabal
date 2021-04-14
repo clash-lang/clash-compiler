@@ -105,16 +105,13 @@ common common-options
                       DerivingStrategies
                       InstanceSigs
                       KindSignatures
+                      NoStarIsType
                       ScopedTypeVariables
                       StandaloneDeriving
                       TupleSections
                       TypeApplications
                       TypeOperators
                       ViewPatterns
-
-  if impl(ghc >= 8.6)
-      default-extensions: NoStarIsType
-
 
 Library
   import:             common-options
@@ -157,7 +154,7 @@ Library
                       exceptions              >= 0.8.3    && < 0.11.0,
                       extra                   >= 1.6.17   && < 1.8,
                       filepath                >= 1.3.0.1  && < 1.5,
-                      ghc                     >= 8.4.0    && < 9.1,
+                      ghc                     >= 8.6.0    && < 9.1,
                       ghc-boot-th,
                       hashable                >= 1.2.1.0  && < 1.4,
                       haskell-src-meta        >= 0.8      && < 0.9,

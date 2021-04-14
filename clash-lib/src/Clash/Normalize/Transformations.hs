@@ -637,7 +637,6 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       (Literal l,_,_) -> caseCon ctx1 (Case (Literal l) ty alts)
       -- WHNF of subject is a data-constructor, try `caseCon` with that
       (Data _,_,_) -> caseCon ctx1 (Case subj1 ty alts)
-#if MIN_VERSION_ghc(8,2,2)
       -- WHNF of subject is _|_, in the form of `absentError`: that means that
       -- the entire case-expression is evaluates to _|_
       (Prim pInfo,_:msgOrCallStack:_,ticks)
@@ -645,14 +644,10 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
         let e1 = mkApps (mkTicks (Prim pInfo) ticks)
                         [Right ty,msgOrCallStack]
         in  changed e1
-#endif
       -- WHNF of subject is _|_, in the form of `absentError`, `patError`,
       -- or `undefined`: that means the entire case-expression is _|_
       (Prim pInfo,repTy:_:msgOrCallStack:_,ticks)
         | primName pInfo `elem` ["Control.Exception.Base.patError"
-#if !MIN_VERSION_ghc(8,2,2)
-                                ,"Control.Exception.Base.absentError"
-#endif
                                 ,"GHC.Err.undefined"] ->
         let e1 = mkApps (mkTicks (Prim pInfo) ticks)
                         [repTy,Right ty,msgOrCallStack]

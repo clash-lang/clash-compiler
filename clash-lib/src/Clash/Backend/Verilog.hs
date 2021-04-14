@@ -43,9 +43,6 @@ import           Data.Maybe                           (catMaybes, fromMaybe)
 import           Data.List
   (mapAccumL, mapAccumR, nubBy, foldl')
 import           Data.List.Extra                      ((<:>))
-#if !MIN_VERSION_base(4,11,0)
-import           Data.Monoid                          hiding (Product, Sum)
-#endif
 import           Data.Semigroup.Monad.Extra
 import           Data.Text.Lazy                       (pack)
 import qualified Data.Text.Lazy                       as Text

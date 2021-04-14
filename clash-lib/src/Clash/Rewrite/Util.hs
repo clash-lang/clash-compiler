@@ -610,16 +610,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
                                     -- function at this moment for a reason!
                                     -- (termination, CSE and DEC oppertunities,
                                     -- ,etc.)
-                                    (Binding
-                                      newBodyId
-                                      sp
-#if MIN_VERSION_ghc(8,4,1)
-                                      NoUserInline
-#else
-                                      EmptyInlineSpec
-#endif
-                                      IsFun
-                                      newBody)
+                                    (Binding newBodyId sp NoUserInline IsFun newBody)
              -- Return the new binder
              return (var, newExpr)
     -- If it does, use the existing binder
@@ -864,14 +855,7 @@ specialise' _ _ _ _ctx _ (appE,args,ticks) (Left specArg) = do
   -- Create a new function if an alpha-equivalent binder doesn't exist
   newf <- case eltsUniqMap existing of
     [] -> do (cf,sp) <- Lens.use curFun
-             mkFunction (appendToName (varName cf) "_specF")
-                        sp
-#if MIN_VERSION_ghc(8,4,1)
-                        NoUserInline
-#else
-                        EmptyInlineSpec
-#endif
-                        newBody
+             mkFunction (appendToName (varName cf) "_specF") sp NoUserInline newBody
     (b:_) -> return (bindingId b)
   -- Create specialized argument
   let newArg  = Left $ mkApps (Var newf) specVars

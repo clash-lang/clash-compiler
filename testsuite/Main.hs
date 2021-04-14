@@ -376,20 +376,8 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS_GHC(runTest "T1322" def{hdlTargets=[VHDL]})
         , let _opts = def {hdlTargets = [VHDL], hdlSim = False}
            in NEEDS_PRIMS_GHC(runTest "T1340" _opts)
-#if MIN_VERSION_ghc(8,6,1)
-          -- GHC 8.4 doesn't constant fold constructs on naturals. This tricks
-          -- Clash into thinking binders variables aren't constant, while in
-          -- reality the are. A proper solution would be to:
-          --
-          --   1. Normalize any global binders applied to constant-only arguments
-          --      before finishing normalizing binders they're used in.
-          --   2. Implement a proper partial evaluator.
-          --
-          -- As (2) is in the works, we've decided to not persue (1) for now and
-          -- simply advice users encountering this bug to use >8.4.
         , let _opts = def { hdlTargets = [VHDL], hdlSim = False}
            in NEEDS_PRIMS_GHC(runTest "T1354A" _opts)
-#endif
         , let _opts = def { hdlTargets = [VHDL], hdlSim = False}
            in NEEDS_PRIMS_GHC(runTest "T1354B" _opts)
         , runTest "T1402" def{clashFlags=["-O"]}
@@ -571,11 +559,8 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS(outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding_1" "main")
         , NEEDS_PRIMS(runTest "NumConstantFoldingTB_2" def{clashFlags=["-itests/shouldwork/Numbers"]})
         , NEEDS_PRIMS(outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding_2" "main")
-#if MIN_VERSION_base(4,12,0)
-        -- Naturals are broken on GHC <= 8.4. See https://github.com/clash-lang/clash-compiler/pull/473
         , NEEDS_PRIMS_GHC(runTest "Naturals" def)
         , NEEDS_PRIMS_GHC(runTest "NaturalToInteger" def{hdlSim=False})
-#endif
         , NEEDS_PRIMS_GHC(runTest "NegativeLits" def)
         , NEEDS_PRIMS_GHC(runTest "Resize" def)
         , NEEDS_PRIMS_GHC(runTest "Resize2" def)

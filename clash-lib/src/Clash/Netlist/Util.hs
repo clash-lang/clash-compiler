@@ -48,9 +48,6 @@ import qualified Data.List               as List
 import           Data.Maybe
   (catMaybes, fromMaybe, isNothing, mapMaybe, isJust, listToMaybe, maybeToList)
 import           Text.Printf             (printf)
-#if !(MIN_VERSION_base(4,11,0))
-import           Data.Semigroup          ((<>))
-#endif
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import           Data.Text.Lazy          (toStrict)

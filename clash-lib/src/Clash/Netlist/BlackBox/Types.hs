@@ -7,12 +7,7 @@
   Types used in BlackBox modules
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
--- since GHC 8.6 we can haddock individual contructor fields \o/
-#if __GLASGOW_HASKELL__ >= 806
-#define FIELD ^
-#endif
 
 module Clash.Netlist.BlackBox.Types
  ( BlackBoxMeta(..)
@@ -213,9 +208,9 @@ data Element
 data Decl
   = Decl
       !Int
-      -- FIELD Argument position of the function to instantiate
+      -- ^ Argument position of the function to instantiate
       !Int
-      -- FIELD Subposition of function: blackboxes can request multiple instances
+      -- ^ Subposition of function: blackboxes can request multiple instances
       -- to be rendered of their given functions. This subposition indicates the
       -- nth function instance to be rendered (zero-indexed).
       --
@@ -224,7 +219,7 @@ data Decl
       -- to indicate the subposition, and every ~INST will default its subposition
       -- to zero. Haskell blackboxes can use this data type.
       [(BlackBoxTemplate,BlackBoxTemplate)]
-      -- FIELD (name of signal, type of signal)
+      -- ^ (name of signal, type of signal)
   deriving (Show, Generic, NFData, Binary, Hashable)
 
 data HdlSyn = Vivado | Quartus | Other

@@ -7,7 +7,7 @@ NAME="clash-ci-"
 DIR=$(dirname "$0")
 now=$(date +%F)
 
-GHC_VERSIONS="9.0.1 8.10.3 8.8.4 8.6.5 8.4.4"
+GHC_VERSIONS="9.0.1 8.10.3 8.8.4 8.6.5"
 for GHC_VERSION in $GHC_VERSIONS
 do
   docker build --build-arg ghc_version=${GHC_VERSION} -t "${REPO}/${NAME}${GHC_VERSION}:$now" "$DIR"

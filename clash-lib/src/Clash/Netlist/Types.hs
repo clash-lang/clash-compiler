@@ -23,11 +23,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
--- since GHC 8.6 we can haddock individual constructor fields \o/
-#if __GLASGOW_HASKELL__ >= 806
-#define FIELD ^
-#endif
-
 module Clash.Netlist.Types
   ( Declaration (..,NetDecl)
   , module Clash.Netlist.Types
@@ -118,11 +113,11 @@ data ExpandedPortName a
   -- | Same as "PortProduct", but fully expanded
   | ExpandedPortProduct
       Text
-      -- FIELD Name hint. Can be used to create intermediate signal names.
+      -- ^ Name hint. Can be used to create intermediate signal names.
       HWType
-      -- FIELD Type of product
+      -- ^ Type of product
       [ExpandedPortName a]
-      -- FIELD Product fields
+      -- ^ Product fields
   deriving (Show, Functor, Foldable, Traversable)
 
 -- | Monad that caches generated components (StateT) and remembers hidden inputs
@@ -214,9 +209,9 @@ data Identifier
   -- appear in the HDL exactly as the user specified.
   = RawIdentifier
       !Text
-      -- FIELD An identifier exactly as given by the user
+      -- ^ An identifier exactly as given by the user
       (Maybe Identifier)
-      -- FIELD Parsed version of raw identifier. Will not be populated if this
+      -- ^ Parsed version of raw identifier. Will not be populated if this
       -- identifier was created with an unsafe function.
       !CallStack
       -- ^ Stores where this identifier was generated. Tracking is only enabled
@@ -505,43 +500,43 @@ data PortMap
 data Declaration
   -- | Signal assignment
   = Assignment
-      !Identifier -- FIELD Signal to assign
-      !Expr       -- FIELD Assigned expression
+      !Identifier -- ^ Signal to assign
+      !Expr       -- ^ Assigned expression
 
   -- | Conditional signal assignment:
   | CondAssignment
-      !Identifier            -- FIELD Signal to assign
-      !HWType                -- FIELD Type of the result/alternatives
-      !Expr                  -- FIELD Scrutinized expression
-      !HWType                -- FIELD Type of the scrutinee
-      [(Maybe Literal,Expr)] -- FIELD List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
+      !Identifier            -- ^ Signal to assign
+      !HWType                -- ^ Type of the result/alternatives
+      !Expr                  -- ^ Scrutinized expression
+      !HWType                -- ^ Type of the scrutinee
+      [(Maybe Literal,Expr)] -- ^ List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
 
   -- | Instantiation of another component:
   | InstDecl
-      EntityOrComponent                  -- FIELD Whether it's an entity or a component
-      (Maybe Text)                       -- FIELD Library instance is defined in
-      [Attr']                            -- FIELD Attributes to add to the generated code
-      !Identifier                        -- FIELD The component's (or entity's) name
-      !Identifier                        -- FIELD Instance label
-      [(Expr,HWType,Expr)]               -- FIELD List of parameters for this component (param name, param type, param value)
+      EntityOrComponent                  -- ^ Whether it's an entity or a component
+      (Maybe Text)                       -- ^ Library instance is defined in
+      [Attr']                            -- ^ Attributes to add to the generated code
+      !Identifier                        -- ^ The component's (or entity's) name
+      !Identifier                        -- ^ Instance label
+      [(Expr,HWType,Expr)]               -- ^ List of parameters for this component (param name, param type, param value)
       PortMap
 
   -- | Instantiation of blackbox declaration
   | BlackBoxD
-      !Text                    -- FIELD Primitive name
-      [BlackBoxTemplate]       -- FIELD VHDL only: add @library@ declarations
-      [BlackBoxTemplate]       -- FIELD VHDL only: add @use@ declarations
-      [((Text,Text),BlackBox)] -- FIELD Intel Quartus only: create a @.qsys@ file from given template
-      !BlackBox                -- FIELD Template tokens
-      BlackBoxContext          -- FIELD Context in which tokens should be rendered
+      !Text                    -- ^ Primitive name
+      [BlackBoxTemplate]       -- ^ VHDL only: add @library@ declarations
+      [BlackBoxTemplate]       -- ^ VHDL only: add @use@ declarations
+      [((Text,Text),BlackBox)] -- ^ Intel Quartus only: create a @.qsys@ file from given template
+      !BlackBox                -- ^ Template tokens
+      BlackBoxContext          -- ^ Context in which tokens should be rendered
 
   -- | Signal declaration
   | NetDecl'
-      (Maybe Comment)                -- FIELD Note; will be inserted as a comment in target hdl
-      WireOrReg                      -- FIELD Wire or register
-      !Identifier                    -- FIELD Name of signal
-      (Either IdentifierText HWType) -- FIELD Pointer to type of signal or type of signal
-      (Maybe Expr)                   -- FIELD Initial value
+      (Maybe Comment)                -- ^ Note; will be inserted as a comment in target hdl
+      WireOrReg                      -- ^ Wire or register
+      !Identifier                    -- ^ Name of signal
+      (Either IdentifierText HWType) -- ^ Pointer to type of signal or type of signal
+      (Maybe Expr)                   -- ^ Initial value
       -- ^ Signal declaration
   | TickDecl Comment
   -- ^ HDL tick corresponding to a Core tick
@@ -553,23 +548,23 @@ data Declaration
 data Seq
   -- | Clocked sequential statements
   = AlwaysClocked
-      ActiveEdge -- FIELD Edge of the clock the statement should be executed
-      Expr       -- FIELD Clock expression
-      [Seq]      -- FIELD Statements to be executed on the active clock edge
+      ActiveEdge -- ^ Edge of the clock the statement should be executed
+      Expr       -- ^ Clock expression
+      [Seq]      -- ^ Statements to be executed on the active clock edge
   -- | Statements running at simulator start
   | Initial
-      [Seq] -- FIELD Statements to run at simulator start
+      [Seq] -- ^ Statements to run at simulator start
   -- | Statements to run always
   | AlwaysComb
-      [Seq] -- FIELD Statements to run always
+      [Seq] -- ^ Statements to run always
   -- | Declaration in sequential form
   | SeqDecl
-      Declaration -- FIELD The declaration
+      Declaration -- ^ The declaration
   -- | Branching statement
   | Branch
-      !Expr                    -- FIELD Scrutinized expresson
-      !HWType                  -- FIELD Type of the scrutinized expression
-      [(Maybe Literal,[Seq])]  -- FIELD List of: (Maybe match, RHS of Alternative)
+      !Expr                    -- ^ Scrutinized expresson
+      !HWType                  -- ^ Type of the scrutinized expression
+      [(Maybe Literal,[Seq])]  -- ^ List of: (Maybe match, RHS of Alternative)
   deriving Show
 
 data EntityOrComponent = Entity | Comp | Empty
@@ -617,25 +612,25 @@ data Expr
 
   -- | Instantiation of a BlackBox expression
   | BlackBoxE
-      !Text                    -- FIELD Primitive name
-      [BlackBoxTemplate]       -- FIELD VHDL only: add @library@ declarations
-      [BlackBoxTemplate]       -- FIELD VHDL only: add @use@ declarations:
-      [((Text,Text),BlackBox)] -- FIELD Intel/Quartus only: create a @.qsys@ file from given template.
-      !BlackBox                -- FIELD Template tokens
-      !BlackBoxContext         -- FIELD Context in which tokens should be rendered
-      !Bool                    -- FIELD Wrap in parentheses?
+      !Text                    -- ^ Primitive name
+      [BlackBoxTemplate]       -- ^ VHDL only: add @library@ declarations
+      [BlackBoxTemplate]       -- ^ VHDL only: add @use@ declarations:
+      [((Text,Text),BlackBox)] -- ^ Intel/Quartus only: create a @.qsys@ file from given template.
+      !BlackBox                -- ^ Template tokens
+      !BlackBoxContext         -- ^ Context in which tokens should be rendered
+      !Bool                    -- ^ Wrap in parentheses?
 
   -- | Convert some type to a BitVector.
   | ToBv
-      (Maybe Identifier) -- FIELD Type prefix
-      HWType             -- FIELD Type to convert _from_
-      Expr               -- FIELD Expression to convert to BitVector
+      (Maybe Identifier) -- ^ Type prefix
+      HWType             -- ^ Type to convert _from_
+      Expr               -- ^ Expression to convert to BitVector
 
   -- | Convert BitVector to some type.
   | FromBv
-      (Maybe Identifier) -- FIELD Type prefix
-      HWType             -- FIELD Type to convert _to_
-      Expr               -- FIELD BitVector to convert
+      (Maybe Identifier) -- ^ Type prefix
+      HWType             -- ^ Type to convert _to_
+      Expr               -- ^ BitVector to convert
 
   | IfThenElse Expr Expr Expr
   -- | Do nothing
@@ -718,12 +713,12 @@ data BlackBox
 data TemplateFunction where
   TemplateFunction
     :: [Int]
-    -- FIELD Used arguments
+    -- ^ Used arguments
     -> (BlackBoxContext -> Bool)
-    -- FIELD Validation function. Should return 'False' if function can't render
+    -- ^ Validation function. Should return 'False' if function can't render
     -- given a certain context.
     -> (forall s . Backend s => BlackBoxContext -> Lazy.State s Doc)
-    -- FIELD Render function
+    -- ^ Render function
     -> TemplateFunction
 
 instance Show BlackBox where

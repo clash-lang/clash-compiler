@@ -27,12 +27,6 @@ stages:
     include: .ci/gitlab/test.yml
     strategy: depend
 
-tests-8.4:
-  extends: .common-trigger
-  variables:
-    GHC_VERSION: 8.4.4
-    CABAL_VERSION: 2.4.1.0
-
 tests-8.6:
   extends: .common-trigger
   variables:

@@ -12,10 +12,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 
-#if __GLASGOW_HASKELL__ < 806
-{-# LANGUAGE TypeInType #-}
-#endif
-
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}

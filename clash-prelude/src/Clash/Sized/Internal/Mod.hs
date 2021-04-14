@@ -36,13 +36,7 @@ import GHC.Exts ((==#))
 #endif
 import GHC.Exts
   ((<=#), geWord#, isTrue#, minusWord#, plusWord#, uncheckedShiftL#, xor#,
-   timesWord2#, quotRemWord2#, and#)
-#if MIN_VERSION_base(4,12,0)
-import GHC.Exts (addWordC#)
-#endif
-#if !MIN_VERSION_base(4,12,0)
-import GHC.Exts (Int#, Word#, plusWord2#, word2Int#)
-#endif
+   timesWord2#, quotRemWord2#, and#, addWordC#)
 #if MIN_VERSION_base(4,15,0)
 import GHC.Num.BigNat
   (BigNat#, bigNatAdd, bigNatAddWord#, bigNatAnd, bigNatBit#, bigNatCompare,
@@ -55,9 +49,6 @@ import GHC.Integer.GMP.Internals
   (BigNat, Integer (..), bigNatToWord, compareBigNat, minusBigNat, minusBigNatWord,
    plusBigNat, plusBigNatWord, sizeofBigNat#, bitBigNat, wordToBigNat2,
    remBigNat, timesBigNat, timesBigNatWord, xorBigNat, wordToBigNat, andBigNat)
-#endif
-#if !MIN_VERSION_base(4,12,0)
-import GHC.Integer.GMP.Internals (wordToInteger)
 #endif
 
 #include "MachDeps.h"
@@ -357,16 +348,6 @@ subIfGe z# m# = case z# `compareBigNat` m# of
   EQ -> NatS# 0##
   GT -> bigNatToNat $ z# `minusBigNat` m#
 
-#if !MIN_VERSION_base(4,12,0)
-addWordC# :: Word# -> Word# -> (# Word#, Int# #)
-addWordC# x# y# = (# z#, word2Int# c# #)
-  where
-    !(# c#, z# #) = x# `plusWord2#` y#
-
-naturalToInteger :: Natural -> Integer
-naturalToInteger (NatS# w)  = wordToInteger w
-naturalToInteger (NatJ# bn) = Jp# bn
-#endif
 #endif
 
 brokenInvariant :: a

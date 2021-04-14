@@ -1,13 +1,9 @@
-{-# LANGUAGE CPP, UndecidableInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 module DTFold where
 
 import Clash.Prelude
 import Clash.Explicit.Testbench
-#if MIN_VERSION_singletons(2,4,0)
 import Data.Singletons hiding (type (+))
-#else
-import Data.Singletons
-#endif
 import Data.Proxy
 import Data.Kind (Type)
 

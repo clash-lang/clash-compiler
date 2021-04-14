@@ -138,15 +138,13 @@ common common-options
                       InstanceSigs
                       KindSignatures
                       MagicHash
+                      NoStarIsType
                       ScopedTypeVariables
                       StandaloneDeriving
                       TupleSections
                       TypeApplications
                       TypeOperators
                       ViewPatterns
-
-  if impl(ghc >= 8.6)
-      default-extensions: NoStarIsType
 
 custom-setup
   setup-depends:
@@ -369,11 +367,8 @@ test-suite doctests
   else
     build-depends:
       base,
-      doctest >= 0.9.1 && < 0.19,
+      doctest >= 0.16.1 && < 0.19,
       clash-prelude
-  if impl(ghc >= 8.6)
-    build-depends:
-      doctest >= 0.16.1
 
 test-suite unittests
   import:           common-options
