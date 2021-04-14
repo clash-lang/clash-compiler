@@ -189,6 +189,7 @@ Library
                       Clash.Class.BitPack
                       Clash.Class.Counter
                       Clash.Class.Counter.Internal
+                      Clash.Class.Counter.TH
                       Clash.Class.Exp
                       Clash.Class.HasDomain
                       Clash.Class.HasDomain.HasSingleDomain

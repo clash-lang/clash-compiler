@@ -1,8 +1,12 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Clash.Class.Counter.Internal where
 
+import Clash.CPP (maxTupleSize)
+
+import Clash.Class.Counter.TH (genTupleInstances)
 import Clash.Sized.BitVector (BitVector)
 import Clash.Sized.Index (Index)
 import Clash.Sized.Signed (Signed)
@@ -131,93 +135,4 @@ instance (Counter a, Counter b) => Counter (a, b) where
     (overflowB, b1) = countPredOverflow b0
     (overflowA, a1) = countPredOverflow a0
 
-instance (Counter a, Counter b, Counter c) => Counter (a, b, c) where
-  countMin = (countMin, countMin, countMin)
-  countMax = (countMax, countMax, countMax)
-
-  countSuccOverflow (a0, b0, c0) =
-    if overflowC
-    then (overflowAB, (a1, b1, c1))
-    else (overflowC, (a0, b0, c1))
-   where
-    (overflowC, c1) = countSuccOverflow c0
-    (overflowAB, (a1, b1)) = countSuccOverflow (a0, b0)
-
-  countPredOverflow (a0, b0, c0) =
-    if overflowC
-    then (overflowAB, (a1, b1, c1))
-    else (overflowC, (a0, b0, c1))
-   where
-    (overflowC, c1) = countPredOverflow c0
-    (overflowAB, (a1, b1)) = countPredOverflow (a0, b0)
-
-instance (Counter a, Counter b, Counter c, Counter d) => Counter (a, b, c, d) where
-  countMin = (countMin, countMin, countMin, countMin)
-  countMax = (countMax, countMax, countMax, countMax)
-
-  countSuccOverflow (a0, b0, c0, d0) =
-    if overflowD
-    then (overflowABC, (a1, b1, c1, d1))
-    else (overflowD, (a0, b0, c0, d1))
-   where
-    (overflowD, d1) = countSuccOverflow d0
-    (overflowABC, (a1, b1, c1)) = countSuccOverflow (a0, b0, c0)
-
-  countPredOverflow (a0, b0, c0, d0) =
-    if overflowD
-    then (overflowABC, (a1, b1, c1, d1))
-    else (overflowD, (a0, b0, c0, d1))
-   where
-    (overflowD, d1) = countPredOverflow d0
-    (overflowABC, (a1, b1, c1)) = countPredOverflow (a0, b0, c0)
-
-instance ( Counter a
-         , Counter b
-         , Counter c
-         , Counter d
-         , Counter e ) => Counter (a, b, c, d, e) where
-  countMin = (countMin, countMin, countMin, countMin, countMin)
-  countMax = (countMax, countMax, countMax, countMax, countMax)
-
-  countSuccOverflow (a0, b0, c0, d0, e0) =
-    if overflowE
-    then (overflowABCD, (a1, b1, c1, d1, e1))
-    else (overflowE, (a0, b0, c0, d0, e1))
-   where
-    (overflowE, e1) = countSuccOverflow e0
-    (overflowABCD, (a1, b1, c1, d1)) = countSuccOverflow (a0, b0, c0, d0)
-
-  countPredOverflow (a0, b0, c0, d0, e0) =
-    if overflowE
-    then (overflowABCD, (a1, b1, c1, d1, e1))
-    else (overflowE, (a0, b0, c0, d0, e1))
-   where
-    (overflowE, e1) = countPredOverflow e0
-    (overflowABCD, (a1, b1, c1, d1)) = countPredOverflow (a0, b0, c0, d0)
-
-instance ( Counter a
-         , Counter b
-         , Counter c
-         , Counter d
-         , Counter e
-         , Counter f ) => Counter (a, b, c, d, e, f) where
-  countMin = (countMin, countMin, countMin, countMin, countMin, countMin)
-  countMax = (countMax, countMax, countMax, countMax, countMax, countMax)
-
-  countSuccOverflow (a0, b0, c0, d0, e0, f0) =
-    if overflowF
-    then (overflowABCDE, (a1, b1, c1, d1, e1, f1))
-    else (overflowF, (a0, b0, c0, d0, e0, f1))
-   where
-    (overflowF, f1) = countSuccOverflow f0
-    (overflowABCDE, (a1, b1, c1, d1, e1)) = countSuccOverflow (a0, b0, c0, d0, e0)
-
-  countPredOverflow (a0, b0, c0, d0, e0, f0) =
-    if overflowF
-    then (overflowABCDE, (a1, b1, c1, d1, e1, f1))
-    else (overflowF, (a0, b0, c0, d0, e0, f1))
-   where
-    (overflowF, f1) = countPredOverflow f0
-    (overflowABCDE, (a1, b1, c1, d1, e1)) = countPredOverflow (a0, b0, c0, d0, e0)
-
--- TODO: TemplateHaskell for instance generation
+genTupleInstances maxTupleSize
