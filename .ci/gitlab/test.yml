@@ -12,8 +12,8 @@ stages:
   before_script:
     - unset SNAPCRAFT_LOGIN_FILE
     - unset HACKAGE_PASSWORD
-    - export THREADS=$(nproc)
-    - export CABAL_JOBS=$(nproc)
+    - export THREADS=$(./.ci/effective_cpus.sh)
+    - export CABAL_JOBS=$(./.ci/effective_cpus.sh)
     - export
     - tar -xf cache.tar.zst -C / || true
     - tar -xf dist.tar.zst -C /

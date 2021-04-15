@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd $(dirname $0)
 
-export SNAPCRAFT_BUILD_ENVIRONMENT_CPU=$(nproc)
+export SNAPCRAFT_BUILD_ENVIRONMENT_CPU=${THREADS:-$(nproc)}
 export SNAPCRAFT_BUILD_ENVIRONMENT_MEMORY=8G
 
 DEBIAN_DIR=../debian

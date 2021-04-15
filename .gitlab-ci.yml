@@ -6,7 +6,7 @@ include:
 # Default GHC / Cabal version. Used for generating Haddock and releasing to
 # Hackage.
 variables:
-  GHC_VERSION: 8.10.3
+  GHC_VERSION: 8.10.4
   CABAL_VERSION: 3.2.0.0
 
 stages:
@@ -43,7 +43,7 @@ tests-8.8:
 tests-8.10:
   extends: .common-trigger
   variables:
-    GHC_VERSION: 8.10.3
+    GHC_VERSION: 8.10.4
     CABAL_VERSION: 3.2.0.0
 
 tests-9.0:
@@ -57,7 +57,7 @@ stack-build:
   needs: []
   stage: test
   variables:
-    GHC_VERSION: 8.10.3
+    GHC_VERSION: 8.10.4
     CABAL_VERSION: 3.2.0.0
   script:
     - .ci/stack_build.sh
@@ -80,7 +80,7 @@ nix-build:
     - ln -s $(find /nix -type f -name bash | grep bash-4.4-p23 | head -n1) /bin
 
   script:
-    - nix-build -j$(nproc)
+    - nix-build -j$(./.ci/effective_cpus.sh)
 
 # Tests run on shared runners:
 haddock:

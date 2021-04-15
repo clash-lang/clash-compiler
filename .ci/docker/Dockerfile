@@ -42,4 +42,5 @@ RUN curl $GHCUP_URL --output $GHCUP_BIN \
 
 ARG ghc_version
 ENV GHC_VERSION=$ghc_version
-RUN ghcup install ghc ${GHC_VERSION}
+RUN ghcup install ghc ${GHC_VERSION} \
+ && ghcup set ghc ${GHC_VERSION}
