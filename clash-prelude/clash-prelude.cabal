@@ -327,6 +327,7 @@ Library
                       data-binary-ieee754       >= 0.4.4   && < 0.6,
                       data-default-class        >= 0.1.2   && < 0.2,
                       deepseq                   >= 1.4.1.0 && < 1.5,
+                      extra                     >= 1.6.17  && < 1.8,
                       ghc-prim                  >= 0.5.1.0 && < 0.8,
                       ghc-typelits-extra        >= 0.4     && < 0.5,
                       ghc-typelits-knownnat     >= 0.7.2   && < 0.8,
