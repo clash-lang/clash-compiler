@@ -202,7 +202,7 @@ end block;
 "-- trueDualPortBlockRam begin
 ~GENSYM[~RESULT_trueDualPortBlockRam][1] : block
   -- Shared memory
-  type mem_type is array ( (2**~SIZE[~TYP[8]])-1 downto 0 ) of ~TYP[9];
+  type mem_type is array ( ~LIT[1]-1 downto 0 ) of ~TYP[9];
   shared variable mem : mem_type;
   signal ~GENSYM[a_dout][2] : ~TYP[9];
   signal ~GENSYM[b_dout][3] : ~TYP[13];

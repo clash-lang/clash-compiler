@@ -175,7 +175,7 @@ end~FI
     , "template" :
 "// trueDualPortBlockRam begin
 // Shared memory
-reg [~SIZE[~TYP[9]]-1:0] ~GENSYM[mem][0] [(2**~SIZE[~TYP[8]])-1:0];
+reg [~SIZE[~TYP[9]]-1:0] ~GENSYM[mem][0] [~LIT[1]-1:0];
 
 reg ~SIGD[~GENSYM[data_slow][1]][9];
 reg ~SIGD[~GENSYM[data_fast][2]][13];
