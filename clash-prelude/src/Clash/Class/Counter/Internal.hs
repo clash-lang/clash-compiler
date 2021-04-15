@@ -115,7 +115,13 @@ instance (Counter a, Counter b) => Counter (Either a b) where
 -- (0,1,1)
 -- >>> countSucc @T (0, 1, 1)
 -- (1,0,0)
-instance (Counter a, Counter b) => Counter (a, b) where
+--
+-- __N.B.__: The documentation only shows the instances up to /3/-tuples. By
+-- default, instances up to and including /12/-tuples will exist. If the flag
+-- @large-tuples@ is set instances up to the GHC imposed limit will exist. The
+-- GHC imposed limit is either 62 or 64 depending on the GHC version.
+instance (Counter a0, Counter a1) => Counter (a0, a1) where
+  -- a0/a1 instead of a/b to be consistent with TH generated instances
   countMin = (countMin, countMin)
   countMax = (countMax, countMax)
 
