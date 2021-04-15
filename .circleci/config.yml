@@ -63,30 +63,6 @@ aliases:
           .ci/build.sh
         fi
 
-  - &nix_setup
-    run:
-      name: Setup binaries (such as git)
-      command: |
-        # Circle CI needs git/ssh in /usr/bin
-        nix-env -i git findutils gnugrep gnused coreutils openssh bash-4.4-p23
-
-        #                               bin         nix pkg        multiple may exist
-        ln -s $(find /nix -type f -name git  | grep libexec      | head -n1) /usr/bin
-        ln -s $(find /nix -type f -name ssh  | grep openssh      | head -n1) /usr/bin
-        ln -s $(find /nix -type f -name sed  | grep gnused       | head -n1) /usr/bin
-        ln -s $(find /nix -type f -name bash | grep bash-4.4-p23 | head -n1) /bin
-
-  - &nix_build
-    run:
-      name: Build dependencies and Clash itself with Nix
-      command: .ci/nix_build.sh
-      no_output_timeout: 1h
-
-  - &stack_build
-    run:
-      name: Build dependencies and Clash itself with Stack
-      command: .ci/stack_build.sh
-
   - &run_tests
     run:
       name: Run tests
@@ -131,33 +107,6 @@ aliases:
       - *build
       - *cache_save
       - *run_tests
-  - &build_with_stack
-    docker:
-      - image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-$GHC_VERSION:2021-02-08
-        # Read-only permissions
-        auth:
-          username: clash-lang-builder
-          password: $DOCKER_PASS
-    steps:
-      - checkout
-      - *merge_pullrequest
-      - *submodules
-      - *cache_calc_key
-      - *cache_restore
-      - *stack_build
-      - *cache_save
-  - &build_with_nix
-    docker:
-      - image: nixos/nix
-    steps:
-      - *cache_calc_key
-      - *cache_restore
-      - *nix_setup
-      - checkout
-      - *merge_pullrequest
-      - *submodules
-      - *nix_build
-      - *cache_save
 
 workflows:
   version: 2
@@ -168,8 +117,6 @@ workflows:
       # - ghc-8.6
       - ghc-8.8
       - ghc-8.10
-      - stack-build
-      - nix-build
 
 jobs:
   ghc-8.4:
@@ -203,13 +150,3 @@ jobs:
       CABAL_VERSION: 3.0.0.0
       MULTIPLE_HIDDEN: no
     <<: *build_default
-  stack-build:
-    environment:
-      GHC_VERSION: 8.10.3
-      CABAL_VERSION: 3.2.0.0
-      <<: *env
-    <<: *build_with_stack
-  nix-build:
-    environment:
-      <<: *env
-    <<: *build_with_nix

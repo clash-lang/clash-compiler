@@ -58,6 +58,36 @@ tests-9.0:
     GHC_VERSION: 9.0.1
     CABAL_VERSION: 3.4.0.0
 
+stack-build:
+  extends: .common
+  needs: []
+  stage: test
+  variables:
+    GHC_VERSION: 8.10.3
+    CABAL_VERSION: 3.2.0.0
+  script:
+    - .ci/stack_build.sh
+  # Run on shared runners
+  tags:
+
+nix-build:
+  image: nixos/nix
+  needs: []
+  stage: test
+  before_script:
+    # Circle CI needs git/ssh in /usr/bin
+    - nix-env -i git findutils gnugrep gnused coreutils openssh bash-4.4-p23 zstd
+
+    #                                 bin         nix pkg        multiple may exist
+    - ln -s $(find /nix -type f -name git  | grep libexec      | head -n1) /usr/bin
+    - ln -s $(find /nix -type f -name ssh  | grep openssh      | head -n1) /usr/bin
+    - ln -s $(find /nix -type f -name sed  | grep gnused       | head -n1) /usr/bin
+    - ln -s $(find /nix -type f -name zstd | grep zstd         | head -n1) /usr/bin
+    - ln -s $(find /nix -type f -name bash | grep bash-4.4-p23 | head -n1) /bin
+
+  script:
+    - .ci/nix_build.sh
+
 # Tests run on shared runners:
 haddock:
   extends: .common
