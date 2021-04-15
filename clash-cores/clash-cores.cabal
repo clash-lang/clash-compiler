@@ -102,6 +102,7 @@ test-suite unittests
   other-Modules:
     Test.Cores.Internal.SampleSPI
     Test.Cores.Internal.Signals
+    Test.Cores.LatticeSemi.ICE40.IO
     Test.Cores.SPI
     Test.Cores.SPI.MultiSlave
 

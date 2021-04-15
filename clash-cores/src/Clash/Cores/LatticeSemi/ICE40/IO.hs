@@ -150,7 +150,8 @@ ddrIn
      , KnownConfiguration fast ('DomainConfiguration fast period edge reset init polarity)
      , HiddenClock slow
      , HiddenEnable slow
-     , NFDataX a)
+     , NFDataX a
+     )
   => Signal fast a
   -> Signal slow (a, a)
 ddrIn =
