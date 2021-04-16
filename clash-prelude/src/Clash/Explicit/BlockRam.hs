@@ -1099,6 +1099,9 @@ data Conflict = Conflict
   { cfWrite :: !(MaybeX Bool)
   , cfAddress :: !(MaybeX Int) }
 
+instance Semigroup Conflict where
+  (<>) = mergeConflicts
+
 -- | "Stronger" conflict wins:
 --
 --   * Writes over read
@@ -1115,19 +1118,6 @@ mergeConflicts conflict1 conflict2 = Conflict
 
   mergeWrite a b = mergeX (||) a b
   mergeAddress a b = mergeX const a b
-
--- | "Stronger" conflict wins:
---
---   * Writes over reads
---   * Undefineds over reads/writes
---   * @Just@s over @Nothing@s
---
-mergeMaybeConflicts :: Maybe Conflict -> Maybe Conflict -> Maybe Conflict
-mergeMaybeConflicts Nothing Nothing = Nothing
-mergeMaybeConflicts (Just c) Nothing = Just c
-mergeMaybeConflicts Nothing (Just c) = Just c
-mergeMaybeConflicts (Just c1) (Just c2) = Just (mergeConflicts c1 c2)
-
 
 trueDualPortBlockRamWrapper = trueDualPortBlockRam#
 {-# NOINLINE trueDualPortBlockRamWrapper #-}
@@ -1300,7 +1290,7 @@ trueDualPortBlockRamModel !_clkA weA addrA datA !_clkB weB addrB datB =
       conflict1 = getConflict weB_ addrB_ weA_ addrA_
       (wrote, !ram1) = writeRam weB_ addrB_ datB_ ram0
       out0 = fromMaybe (ram1 `Seq.index` addrB_) wrote
-      conflict2 = mergeMaybeConflicts conflict0 conflict1
+      conflict2 = conflict0 <> conflict1
       (as2, bs2) = go conflict2 ram1 (relativeTime - tB) as0 bs1
       out1 =
         case conflict1 of
