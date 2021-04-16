@@ -10,11 +10,12 @@ module Main where
 import Prelude
 import Test.Tasty
 
+import qualified Test.Cores.LatticeSemi.ICE40.IO as IO
 import qualified Test.Cores.SPI as SPI
 import qualified Test.Cores.SPI.MultiSlave as Mul
 
 tests :: TestTree
-tests = testGroup "Unittests" [SPI.tests, Mul.tests]
+tests = testGroup "Unittests" [IO.tests, SPI.tests, Mul.tests]
 
 main :: IO ()
 main = defaultMain tests

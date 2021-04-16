@@ -27,6 +27,8 @@ import           Clash.Signal.Internal        (Signal(..))
 import           Data.String.Interpolate      (i)
 import           Data.String.Interpolate.Util (unindent)
 import           GHC.Stack                    (HasCallStack)
+import           Test.QuickCheck              (Arbitrary(..))
+import qualified Test.QuickCheck as QC
 
 -- | Input pinType  mnemonics as documented in the first table of LITL p88. Note
 -- that @PIN_INPUT_DDR@ is missing. Use 'PIN_INPUTRegistered' instead.
@@ -42,6 +44,14 @@ data PinInputConfig
   -- ^ (Not supported by Clash simulation.) Disables internal data changes on
   -- the physical input pin by latching the value.
   deriving (Eq, Show, Generic, BitPack)
+
+instance Arbitrary PinInputConfig where
+  arbitrary = QC.elements
+    [ InputRegistered
+    , Input
+    , InputRegisteredLatch
+    , InputLatch
+    ]
 
 -- | Output pinType  mnemonics as documented in the second table of LITL p88.
 data PinOutputConfig
@@ -79,6 +89,24 @@ data PinOutputConfig
   -- ^ (Not supported by Clash simulation.) Output signal is registered and
   -- inverted, the enable/tristate control is registered.
   deriving (Eq, Show)
+
+instance Arbitrary PinOutputConfig where
+  arbitrary = QC.elements
+    -- Never pick NoOutout, this means that the actual value will always be
+    -- all undefined bits which is pointless to test for.
+    [ Output
+    , OutputTristate
+    , OutputEnableRegistered
+    , OutputRegistered
+    , OutputRegisteredEnable
+    , OutputRegisteredEnableRegistered
+    , OutputDDR
+    , OutputDDREnable
+    , OutputDDREnableRegistered
+    , OutputRegisteredInverted
+    , OutputRegisteredEnableInverted
+    , OutputRegisteredEnableRegisteredInverted
+    ]
 
 instance BitPack PinOutputConfig where
   type BitSize PinOutputConfig = 4
@@ -186,6 +214,15 @@ ddrOut ddr0 ddr1 =
   zipSignals (x :- xs) (y :- ys) =
     x :- y :- zipSignals xs ys
 
+-- TODO
+--
+-- The current implementations of the primitives here support only pin
+-- configurations with no DDR (sbio) or DDR input and output (sbioDDR). The
+-- real primitive supports a greater range of configurations (input only,
+-- output only, DDR input / SDR output, SDR input / DDR output). This can be
+-- implemented, but would probably require that the pin configuration types
+-- are GADTs, and special types are made for D_OUT and D_IN.
+
 -- | SB_IO primitive as described in LITL p87.
 -- This does not support DDR configurations, see 'sbioDDR'.
 sbio
@@ -238,15 +275,7 @@ sbioPrim pinConf pkgPinIn latchInput dOut0 outputEnable =
  where
   pinIn = unpack (slice d1 d0 pinConf)
   pinOut = unpack (slice d5 d2 pinConf)
-
-  pkgPinInRead
-      -- TODO When there is no output, we can't just echo back the value on
-      -- the BiSignal because we get an X excpetion when readFromBiSignal reads
-      -- an undefined value. However, making it always low means our assertion
-      -- is wrong. Perhaps this should be all "don't care" and the assertion
-      -- should be using Clash.Sized.Internal.BitVector.isLike?
-    | pinOut == PIN_NO_OUTPUT = pure low
-    | otherwise = readFromBiSignal @Bit pkgPinIn
+  pkgPinInRead = readFromBiSignal @Bit pkgPinIn
 
   dIn0 =
     case pinIn of
@@ -265,7 +294,7 @@ sbioPrim pinConf pkgPinIn latchInput dOut0 outputEnable =
   pkgPinInWrite =
     case pinOut of
       NoOutput ->
-        pure (Just (unpack undefined#))
+        pure Nothing
 
       Output ->
         fmap Just dOut0
@@ -274,7 +303,7 @@ sbioPrim pinConf pkgPinIn latchInput dOut0 outputEnable =
         tristate outputEnable dOut0
 
       OutputEnableRegistered ->
-        tristate (delay True outputEnable) dOut0
+        tristate (delay False outputEnable) dOut0
 
       OutputRegistered ->
         fmap Just (delay (deepErrorX "pkgPinInWrite: undefined") dOut0)
@@ -284,7 +313,7 @@ sbioPrim pinConf pkgPinIn latchInput dOut0 outputEnable =
 
       OutputRegisteredEnableRegistered ->
         tristate
-          (delay True outputEnable)
+          (delay False outputEnable)
           (delay (deepErrorX "pkgPinInWrite: undefined") dOut0)
 
       OutputRegisteredInverted ->
@@ -295,7 +324,7 @@ sbioPrim pinConf pkgPinIn latchInput dOut0 outputEnable =
 
       OutputRegisteredEnableRegisteredInverted ->
         tristate
-          (delay True outputEnable)
+          (delay False outputEnable)
           (delay (deepErrorX "pkgPinInWrite: undefined") (fmap complement dOut0))
 
       _ -> error "sbio: DDR is not supported, see sbioDDR"
@@ -370,15 +399,7 @@ sbioDDRPrim pinConf pkgPinIn dOut0 dOut1 outputEnable =
  where
   pinIn = unpack (slice d1 d0 pinConf)
   pinOut = unpack (slice d5 d2 pinConf)
-
-  pkgPinInRead
-      -- TODO When there is no output, we can't just echo back the value on
-      -- the BiSignal because we get an X excpetion when readFromBiSignal reads
-      -- an undefined value. However, making it always low means our assertion
-      -- is wrong. Perhaps this should be all "don't care" and the assertion
-      -- should be using Clash.Sized.Internal.BitVector.isLike?
-    | pinOut == PIN_NO_OUTPUT = pure low
-    | otherwise = readFromBiSignal @Bit pkgPinIn
+  pkgPinInRead = readFromBiSignal @Bit pkgPinIn
 
   (dIn0, dIn1) =
     case pinIn of
@@ -389,7 +410,7 @@ sbioDDRPrim pinConf pkgPinIn dOut0 dOut1 outputEnable =
   pkgPinInWrite =
     case pinOut of
       NoOutput ->
-        pure (Just (unpack undefined#))
+        pure Nothing
 
       OutputDDR ->
         fmap Just (ddrOut dOut0 dOut1)
@@ -399,10 +420,20 @@ sbioDDRPrim pinConf pkgPinIn dOut0 dOut1 outputEnable =
          in tristate en (ddrOut dOut0 dOut1)
 
       OutputDDREnableRegistered ->
-        let en = E.veryUnsafeSynchronizer 2 1 (delay True outputEnable)
+        let en = E.veryUnsafeSynchronizer 2 1 (delay False outputEnable)
          in tristate en (ddrOut dOut0 dOut1)
 
       _ -> error "sbioDDR: Non-DDR output is not support, see sbio"
 {-# NOINLINE sbioDDRPrim #-}
--- TODO hasBlackBox and InlinePrimitive
+{-# ANN sbioDDRPrim hasBlackBox #-}
+{-# ANN sbioDDRPrim (InlinePrimitive [VHDL,Verilog,SystemVerilog] $ unindent [i|
+   [ { "BlackBox" :
+        { "name" : "Clash.Cores.LatticeSemi.ICE40.IO.sbio",
+          "kind" : "Declaration",
+          "format": "Haskell",
+          "templateFunction": "Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO.sbioTF"
+        }
+     }
+   ]
+   |]) #-}
 
