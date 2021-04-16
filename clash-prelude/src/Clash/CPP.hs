@@ -27,7 +27,11 @@ import Constants (mAX_TUPLE_SIZE)
 #define MAX_TUPLE_SIZE (fromIntegral mAX_TUPLE_SIZE)
 
 #else
+#ifdef HADDOCK_ONLY
+#define MAX_TUPLE_SIZE 3
+#else
 #define MAX_TUPLE_SIZE 12
+#endif
 #endif
 #endif
 

@@ -659,7 +659,16 @@ instance NFDataX a => NFDataX (M.Last a)
 instance NFDataX a => NFDataX (SG.Option a)
 #endif
 
+-- | __N.B.__: The documentation only shows instances up to /3/-tuples. By
+-- default, instances up to and including /12/-tuples will exist. If the flag
+-- @large-tuples@ is set instances up to the GHC imposed limit will exist. The
+-- GHC imposed limit is either 62 or 64 depending on the GHC version.
 mkShowXTupleInstances [2..maxTupleSize]
+
+-- | __N.B.__: The documentation only shows instances up to /3/-tuples. By
+-- default, instances up to and including /12/-tuples will exist. If the flag
+-- @large-tuples@ is set instances up to the GHC imposed limit will exist. The
+-- GHC imposed limit is either 62 or 64 depending on the GHC version.
 mkNFDataXTupleInstances [2..maxTupleSize]
 
 -- | Call to 'errorX' with default string
