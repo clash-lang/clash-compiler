@@ -51,7 +51,7 @@ import Clash.Signal.Internal (Clock (..), Reset (..))
 import Clash.Signal          (mux, KnownDomain, Enable)
 import Clash.Sized.Index     (Index)
 import Clash.Sized.Internal.BitVector
-  (BitVector, isLike)
+  (BitVector, isLike#)
 import Clash.Sized.Vector    (Vec, (!!), length)
 import Clash.XException      (ShowX (..), XException)
 
@@ -138,7 +138,7 @@ assertBitVector clk (Reset _) msg checked expected returned =
                             ]) r)
   <$> checked <*> expected <*> fromList [(0::Integer)..] <*> returned
   where
-    eqX a b = unsafeDupablePerformIO (catch (evaluate (a `isLike` b))
+    eqX a b = unsafeDupablePerformIO (catch (evaluate (a `isLike#` b))
                                             (\(_ :: XException) -> return False))
 {-# NOINLINE assertBitVector #-}
 {-# ANN assertBitVector hasBlackBox #-}

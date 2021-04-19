@@ -72,7 +72,7 @@ module Clash.Sized.Internal.BitVector
     -- **** Eq
   , eq#
   , neq#
-  , isLike
+  , isLike#
     -- *** Ord
   , lt#
   , ge#
@@ -1232,19 +1232,22 @@ undefined# =
   in  BV (m-1) 0
 {-# NOINLINE undefined# #-}
 
--- | Check if one BitVector is like another.
--- NFDataX bits in the second argument are interpreted as don't care bits.
+-- | Check if one BitVector is similar to another, interpreting undefined bits
+-- in the second argument as being "don't care" bits. This is a more lenient
+-- version of '(==)', similar to @std_match@ in VHDL or @casez@ in Verilog.
 --
 -- >>> let expected = $$(bLit "1.") :: BitVector 2
 -- >>> let checked  = $$(bLit "11") :: BitVector 2
--- >>> checked  `isLike` expected
+--
+-- >>> checked  `isLike#` expected
 -- True
--- >>> expected `isLike` checked
+-- >>> expected `isLike#` checked
 -- False
 --
 -- __NB__: Not synthesizable
-isLike :: forall n . KnownNat n => BitVector n -> BitVector n -> Bool
-isLike =
+--
+isLike# :: forall n . KnownNat n => BitVector n -> BitVector n -> Bool
+isLike# =
   \(BV cMask c) (BV eMask e) ->
         -- set don't care bits to 0
     let e' = e .&. complementN eMask
@@ -1255,7 +1258,7 @@ isLike =
     in  e' == c' && e' == c''
  where
   complementN = complementMod (natVal (Proxy @n))
-{-# NOINLINE isLike #-}
+{-# NOINLINE isLike# #-}
 
 fromBits :: [Bit] -> Integer
 fromBits = L.foldl (\v b -> v `shiftL` 1 .|. fromIntegral b) 0

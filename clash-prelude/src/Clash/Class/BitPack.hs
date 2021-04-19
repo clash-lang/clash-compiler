@@ -22,6 +22,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 module Clash.Class.BitPack
   ( BitPack (..)
+  , isLike
   , bitCoerce
   , bitCoerceMap
   , boolToBV
@@ -55,7 +56,7 @@ import Clash.Class.BitPack.Internal   (deriveBitPackTuples)
 import Clash.Class.Resize             (zeroExtend, resize)
 import Clash.Sized.BitVector          (Bit, BitVector, (++#))
 import Clash.Sized.Internal.BitVector
-  (pack#, split#, checkUnpackUndef, undefined#, unpack#, unsafeToNatural)
+  (pack#, split#, checkUnpackUndef, undefined#, unpack#, unsafeToNatural, isLike#)
 import Clash.XException
 
 {- $setup
@@ -133,6 +134,44 @@ packXWith f x =
   unsafeDupablePerformIO (catch (f <$> evaluate x)
                                 (\(XException _) -> return undefined#))
 {-# NOINLINE packXWith #-}
+
+-- | Pack both arguments to a 'BitVector' and use
+-- 'Clash.Sized.Internal.BitVector.isLike#' to compare them. This is a more
+-- lentiant comparison than '(==)', behaving more like (but not necessarily
+-- exactly the same as) @std_match@ in VHDL or @casez@ in Verilog.
+--
+-- Unlike '(==)', isLike is not symmetric. The reason for this is that a
+-- defined bit is said to be like an undefined bit, but not vice-versa:
+--
+-- >>> isLike (12 :: Signed 8) undefined
+-- True
+-- >>> isLike undefined (12 :: Signed 8)
+-- False
+--
+-- However, it is still trivially reflexive and transitive:
+--
+-- >>> :set -XTemplateHaskell
+-- >>> let x1 = $$(bLit "0010") :: BitVector 4
+-- >>> let x2 = $$(bLit "0.10") :: BitVector 4
+-- >>> let x3 = $$(bLit "0.1.") :: BitVector 4
+-- >>> isLike x1 x1
+-- True
+-- >>> isLike x1 x2
+-- True
+-- >>> isLike x2 x3
+-- True
+-- >>> isLike x1 x3
+-- True
+--
+-- __N.B.__: Not synthesizable
+--
+isLike
+  :: (BitPack a)
+  => a
+  -> a
+  -> Bool
+isLike x y =
+  isLike# (pack x) (pack y)
 
 {-# INLINE[1] bitCoerce #-}
 -- | Coerce a value from one type to another through its bit representation.
