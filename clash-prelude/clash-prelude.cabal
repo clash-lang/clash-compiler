@@ -413,6 +413,7 @@ test-suite unittests
                  Clash.Tests.SizedNum
                  Clash.Tests.TopEntityGeneration
                  Clash.Tests.Unsigned
+                 Clash.Tests.Vector
 
                  Clash.Tests.Laws.Enum
                  Clash.Tests.Laws.SaturatingNum
