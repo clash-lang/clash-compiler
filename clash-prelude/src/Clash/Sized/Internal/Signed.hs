@@ -114,8 +114,8 @@ import Clash.Class.Num                (ExtendingNum (..), SaturatingNum (..),
                                        SaturationMode (..))
 import Clash.Class.Parity             (Parity (..))
 import Clash.Class.Resize             (Resize (..))
-import Clash.Prelude.BitIndex         ((!), msb, replaceBit, split)
-import Clash.Prelude.BitReduction     (reduceAnd, reduceOr)
+import Clash.Class.BitPack.BitIndex   ((!), msb, replaceBit, split)
+import Clash.Class.BitPack.BitReduction (reduceAnd, reduceOr)
 import Clash.Promoted.Nat             (natToNatural)
 import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, (++#), high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV

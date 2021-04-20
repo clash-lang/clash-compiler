@@ -48,7 +48,7 @@ import Prelude
 
 import Clash.Class.BitPack    (boolToBV)
 import Clash.Class.Resize     (truncateB)
-import Clash.Prelude.BitIndex (msb)
+import Clash.Class.BitPack.BitIndex (msb)
 import Clash.Explicit.Mealy   (mealyB)
 import Clash.Promoted.Nat     (SNat)
 import Clash.Signal           (KnownDomain, (.&&.))

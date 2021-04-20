@@ -35,7 +35,7 @@ import GHC.TypeLits                (type (+), type (-), type (<=))
 
 import Clash.Class.BitPack         (boolToBV)
 import Clash.Class.Resize          (truncateB)
-import Clash.Prelude.BitIndex      (slice)
+import Clash.Class.BitPack.BitIndex (slice)
 import Clash.Explicit.Mealy        (mealyB)
 import Clash.Explicit.RAM          (asyncRam)
 import Clash.Explicit.Signal

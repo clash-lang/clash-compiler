@@ -53,8 +53,6 @@ module Clash.Explicit.Prelude.Safe
     -- ** Datatypes
     -- *** Bit vectors
   , module Clash.Sized.BitVector
-  , module Clash.Prelude.BitIndex
-  , module Clash.Prelude.BitReduction
     -- *** Arbitrary-width numbers
   , module Clash.Sized.Signed
   , module Clash.Sized.Unsigned
@@ -119,8 +117,6 @@ import Clash.Explicit.Signal
 import Clash.Explicit.Signal.Delayed
 import Clash.Explicit.Synchronizer
   (dualFlipFlopSynchronizer, asyncFIFOSynchronizer)
-import Clash.Prelude.BitIndex
-import Clash.Prelude.BitReduction
 import Clash.Prelude.ROM             (asyncRom, asyncRomPow2)
 import Clash.Promoted.Nat
 import Clash.Promoted.Nat.TH

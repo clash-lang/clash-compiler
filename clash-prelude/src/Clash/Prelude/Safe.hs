@@ -69,8 +69,6 @@ module Clash.Prelude.Safe
     -- ** Datatypes
     -- *** Bit vectors
   , module Clash.Sized.BitVector
-  , module Clash.Prelude.BitIndex
-  , module Clash.Prelude.BitReduction
     -- *** Arbitrary-width numbers
   , module Clash.Sized.Signed
   , module Clash.Sized.Unsigned
@@ -128,8 +126,6 @@ import           Clash.Class.Num
 import           Clash.Class.Resize
 import           Clash.Hidden
 import           Clash.NamedTypes
-import           Clash.Prelude.BitIndex
-import           Clash.Prelude.BitReduction
 import           Clash.Prelude.BlockRam
 import qualified Clash.Explicit.Prelude.Safe as E
 import           Clash.Prelude.Mealy         (mealy, mealyB, (<^>))

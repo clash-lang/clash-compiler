@@ -181,6 +181,10 @@ Library
 
                       Clash.Class.AutoReg
                       Clash.Class.BitPack
+                      Clash.Class.BitPack.BitReduction
+                      Clash.Class.BitPack.BitIndex
+                      Clash.Class.BitPack.Internal
+                      Clash.Class.BitPack.Internal.TH
                       Clash.Class.Counter
                       Clash.Class.Counter.Internal
                       Clash.Class.Counter.TH
@@ -288,7 +292,6 @@ Library
   other-modules:
                       Clash.Class.AutoReg.Instances
                       Clash.Class.AutoReg.Internal
-                      Clash.Class.BitPack.Internal
                       Clash.CPP
                       Clash.Examples.Internal
                       Clash.Signal.Bundle.Internal

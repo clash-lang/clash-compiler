@@ -96,12 +96,12 @@ import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
                                    coarbitraryIntegral, shrinkIntegral)
 
-import Clash.Class.BitPack        (BitPack (..), packXWith)
+import Clash.Class.BitPack.Internal (BitPack (..), packXWith)
 import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import Clash.Class.Parity         (Parity (..))
 import Clash.Class.Resize         (Resize (..))
-import Clash.Prelude.BitIndex     (replaceBit)
+import Clash.Class.BitPack.BitIndex (replaceBit)
 import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV), high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV
 import Clash.Promoted.Nat         (SNat(..), snatToNum, natToInteger, leToPlusKN)

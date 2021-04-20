@@ -101,8 +101,6 @@ module Clash.Prelude
     -- ** Datatypes
     -- *** Bit vectors
   , module Clash.Sized.BitVector
-  , module Clash.Prelude.BitIndex
-  , module Clash.Prelude.BitReduction
     -- *** Arbitrary-width numbers
   , module Clash.Sized.Signed
   , module Clash.Sized.Unsigned
@@ -167,7 +165,7 @@ import           Clash.HaskellPrelude
 
 import           Clash.Annotations.TopEntity
 import           Clash.Class.AutoReg         (AutoReg, deriveAutoReg)
-import           Clash.Class.BitPack hiding  (GBitPack(..))
+import           Clash.Class.BitPack
 import           Clash.Class.Exp
 import           Clash.Class.Num
 import           Clash.Class.Parity
@@ -176,8 +174,6 @@ import qualified Clash.Explicit.Prelude      as E
 import           Clash.Hidden
 import           Clash.Magic
 import           Clash.NamedTypes
-import           Clash.Prelude.BitIndex
-import           Clash.Prelude.BitReduction
 import           Clash.Prelude.BlockRam
 import           Clash.Prelude.BlockRam.File
 import           Clash.Prelude.ROM.File
