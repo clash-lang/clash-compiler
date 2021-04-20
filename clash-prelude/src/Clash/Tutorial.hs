@@ -2027,7 +2027,7 @@ A list of often encountered errors and their solutions:
     Results in a successful computation:
 
     >>> sortVL (4 :> 1 :> 2 :> 3 :> Nil)
-    <1,2,3,4>
+    1 :> 2 :> 3 :> 4 :> Nil
 -}
 
 {- $limitations #limitations#

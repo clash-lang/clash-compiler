@@ -8,12 +8,13 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE QuasiQuotes #-}
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -202,7 +203,9 @@ let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index
 
 -}
 
-infixr 5 `Cons`
+#define CONS_PREC 5
+
+infixr CONS_PREC `Cons`
 -- | Fixed size vectors.
 --
 -- * Lists with their length encoded in their type
@@ -277,7 +280,7 @@ instance NFData a => NFData (Vec n a) where
 -- | Add an element to the head of a vector.
 --
 -- >>> 3:>4:>5:>Nil
--- <3,4,5>
+-- 3 :> 4 :> 5 :> Nil
 -- >>> let x = 3:>4:>5:>Nil
 -- >>> :t x
 -- x :: Num a => Vec 3 a
@@ -302,15 +305,20 @@ pattern (:>) x xs <- ((\ys -> (head ys,tail ys)) -> (x,xs))
   where
     (:>) x xs = Cons x xs
 
-infixr 5 :>
+infixr CONS_PREC :>
 
 instance Show a => Show (Vec n a) where
-  showsPrec _ vs = \s -> '<':punc vs ('>':s)
-    where
-      punc :: Vec m a -> ShowS
-      punc Nil            = id
-      punc (x `Cons` Nil) = shows x
-      punc (x `Cons` xs)  = \s -> shows x (',':punc xs s)
+  showsPrec n = \case
+    Nil -> showString "Nil"
+    vs -> showParen (n > CONS_PREC) (go vs)
+
+   where
+    go :: Vec m a -> ShowS
+    go Nil = showString "Nil"
+    go (x `Cons` xs) =
+        showsPrec (CONS_PREC + 1) x
+      . showString " :> "
+      . go xs
 
 instance ShowX a => ShowX (Vec n a) where
   showsPrecX _n vs = showString "<" . punc vs
@@ -396,7 +404,7 @@ instance (NFDataX a, KnownNat n) => NFDataX (Vec n a) where
 -- | Create a vector of one element
 --
 -- >>> singleton 5
--- <5>
+-- 5 :> Nil
 singleton :: a -> Vec 1 a
 singleton = (`Cons` Nil)
 
@@ -437,7 +445,7 @@ head (x `Cons` _) = x
 {- | Extract the elements after the head of a vector
 
 >>> tail (1:>2:>3:>Nil)
-<2,3>
+2 :> 3 :> Nil
 
 #if __GLASGOW_HASKELL__ >= 900
 >>> tail Nil
@@ -504,7 +512,7 @@ last (_ `Cons` y `Cons` ys) = last (y `Cons` ys)
 {- | Extract all the elements of a vector except the last element
 
 >>> init (1:>2:>3:>Nil)
-<1,2>
+1 :> 2 :> Nil
 
 #if __GLASGOW_HASKELL__ >= 900
 >>> init Nil
@@ -542,9 +550,9 @@ init (x `Cons` y `Cons` ys) = x `Cons` init (y `Cons` ys)
 -- * The shifted out elements
 --
 -- >>> shiftInAt0 (1 :> 2 :> 3 :> 4 :> Nil) ((-1) :> 0 :> Nil)
--- (<-1,0,1,2>,<3,4>)
+-- (-1 :> 0 :> 1 :> 2 :> Nil,3 :> 4 :> Nil)
 -- >>> shiftInAt0 (1 :> Nil) ((-1) :> 0 :> Nil)
--- (<-1>,<0,1>)
+-- (-1 :> Nil,0 :> 1 :> Nil)
 shiftInAt0 :: KnownNat n
            => Vec n a -- ^ The old vector
            -> Vec m a -- ^ The elements to shift in at the head
@@ -561,9 +569,9 @@ shiftInAt0 xs ys = splitAtI zs
 -- * The shifted out elements
 --
 -- >>> shiftInAtN (1 :> 2 :> 3 :> 4 :> Nil) (5 :> 6 :> Nil)
--- (<3,4,5,6>,<1,2>)
+-- (3 :> 4 :> 5 :> 6 :> Nil,1 :> 2 :> Nil)
 -- >>> shiftInAtN (1 :> Nil) (2 :> 3 :> Nil)
--- (<3>,<1,2>)
+-- (3 :> Nil,1 :> 2 :> Nil)
 shiftInAtN :: KnownNat m
            => Vec n a -- ^ The old vector
            -> Vec m a -- ^ The elements to shift in at the tail
@@ -577,7 +585,7 @@ infixl 5 :<
 -- | Add an element to the tail of a vector.
 --
 -- >>> (3:>4:>5:>Nil) :< 1
--- <3,4,5,1>
+-- 3 :> 4 :> 5 :> 1 :> Nil
 -- >>> let x = (3:>4:>5:>Nil) :< 1
 -- >>> :t x
 -- x :: Num a => Vec 4 a
@@ -607,9 +615,9 @@ infixr 4 +>>
 -- element.
 --
 -- >>> 1 +>> (3:>4:>5:>Nil)
--- <1,3,4>
+-- 1 :> 3 :> 4 :> Nil
 -- >>> 1 +>> Nil
--- <>
+-- Nil
 (+>>) :: KnownNat n => a -> Vec n a -> Vec n a
 s +>> xs = fst (shiftInAt0 xs (singleton s))
 {-# INLINE (+>>) #-}
@@ -620,9 +628,9 @@ infixl 4 <<+
 -- element.
 --
 -- >>> (3:>4:>5:>Nil) <<+ 1
--- <4,5,1>
+-- 4 :> 5 :> 1 :> Nil
 -- >>> Nil <<+ 1
--- <>
+-- Nil
 (<<+) :: Vec n a -> a -> Vec n a
 xs <<+ s = fst (shiftInAtN xs (singleton s))
 {-# INLINE (<<+) #-}
@@ -634,7 +642,7 @@ xs <<+ s = fst (shiftInAtN xs (singleton s))
 -- * The shifted out values
 --
 -- >>> shiftOutFrom0 d2 ((1 :> 2 :> 3 :> 4 :> 5 :> Nil) :: Vec 5 Integer)
--- (<3,4,5,0,0>,<1,2>)
+-- (3 :> 4 :> 5 :> 0 :> 0 :> Nil,1 :> 2 :> Nil)
 shiftOutFrom0 :: (Default a, KnownNat m)
               => SNat m        -- ^ @m@, the number of elements to shift out
               -> Vec (m + n) a -- ^ The old vector
@@ -650,7 +658,7 @@ shiftOutFrom0 m xs = shiftInAtN xs (replicate m def)
 -- * The shifted out values
 --
 -- >>> shiftOutFromN d2 ((1 :> 2 :> 3 :> 4 :> 5 :> Nil) :: Vec 5 Integer)
--- (<0,0,1,2,3>,<4,5>)
+-- (0 :> 0 :> 1 :> 2 :> 3 :> Nil,4 :> 5 :> Nil)
 shiftOutFromN :: (Default a, KnownNat n)
               => SNat m        -- ^ @m@, the number of elements to shift out
               -> Vec (m + n) a -- ^ The old vector
@@ -663,7 +671,7 @@ infixr 5 ++
 -- | Append two vectors.
 --
 -- >>> (1:>2:>3:>Nil) ++ (7:>8:>Nil)
--- <1,2,3,7,8>
+-- 1 :> 2 :> 3 :> 7 :> 8 :> Nil
 (++) :: Vec n a -> Vec m a -> Vec (n + m) a
 Nil           ++ ys = ys
 (x `Cons` xs) ++ ys = x `Cons` xs ++ ys
@@ -672,9 +680,9 @@ Nil           ++ ys = ys
 -- | Split a vector into two vectors at the given point.
 --
 -- >>> splitAt (SNat :: SNat 3) (1:>2:>3:>7:>8:>Nil)
--- (<1,2,3>,<7,8>)
+-- (1 :> 2 :> 3 :> Nil,7 :> 8 :> Nil)
 -- >>> splitAt d3 (1:>2:>3:>7:>8:>Nil)
--- (<1,2,3>,<7,8>)
+-- (1 :> 2 :> 3 :> Nil,7 :> 8 :> Nil)
 splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
 splitAt n xs = splitAtU (toUNat n) xs
 {-# NOINLINE splitAt #-}
@@ -688,7 +696,7 @@ splitAtU (USucc s) (y `Cons` ys) = let (as,bs) = splitAtU s ys
 -- by the context.
 --
 -- >>> splitAtI (1:>2:>3:>7:>8:>Nil) :: (Vec 2 Int, Vec 3 Int)
--- (<1,2>,<3,7,8>)
+-- (1 :> 2 :> Nil,3 :> 7 :> 8 :> Nil)
 splitAtI :: KnownNat m => Vec (m + n) a -> (Vec m a, Vec n a)
 splitAtI = withSNat splitAt
 {-# INLINE splitAtI #-}
@@ -696,7 +704,7 @@ splitAtI = withSNat splitAt
 -- | Concatenate a vector of vectors.
 --
 -- >>> concat ((1:>2:>3:>Nil) :> (4:>5:>6:>Nil) :> (7:>8:>9:>Nil) :> (10:>11:>12:>Nil) :> Nil)
--- <1,2,3,4,5,6,7,8,9,10,11,12>
+-- 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> 8 :> 9 :> 10 :> 11 :> 12 :> Nil
 concat :: Vec n (Vec m a) -> Vec (n * m) a
 concat Nil           = Nil
 concat (x `Cons` xs) = x ++ concat xs
@@ -705,7 +713,7 @@ concat (x `Cons` xs) = x ++ concat xs
 -- | Map a function over all the elements of a vector and concatentate the resulting vectors.
 --
 -- >>> concatMap (replicate d3) (1:>2:>3:>Nil)
--- <1,1,1,2,2,2,3,3,3>
+-- 1 :> 1 :> 1 :> 2 :> 2 :> 2 :> 3 :> 3 :> 3 :> Nil
 concatMap :: (a -> Vec m b) -> Vec n a -> Vec (n * m) b
 concatMap f xs = concat (map f xs)
 {-# INLINE concatMap #-}
@@ -714,7 +722,7 @@ concatMap f xs = concat (map f xs)
 -- /m/\", where the length /m/ is given.
 --
 -- >>> unconcat d4 (1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>Nil)
--- <<1,2,3,4>,<5,6,7,8>,<9,10,11,12>>
+-- (1 :> 2 :> 3 :> 4 :> Nil) :> (5 :> 6 :> 7 :> 8 :> Nil) :> (9 :> 10 :> 11 :> 12 :> Nil) :> Nil
 unconcat :: KnownNat n => SNat m -> Vec (n * m) a -> Vec n (Vec m a)
 unconcat n xs = unconcatU (withSNat toUNat) (toUNat n) xs
 {-# NOINLINE unconcat #-}
@@ -728,7 +736,7 @@ unconcatU (USucc n') m ys = let (as,bs) = splitAtU m ys
 -- /m/\", where the length /m/ is determined by the context.
 --
 -- >>> unconcatI (1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>Nil) :: Vec 2 (Vec 6 Int)
--- <<1,2,3,4,5,6>,<7,8,9,10,11,12>>
+-- (1 :> 2 :> 3 :> 4 :> 5 :> 6 :> Nil) :> (7 :> 8 :> 9 :> 10 :> 11 :> 12 :> Nil) :> Nil
 unconcatI :: (KnownNat n, KnownNat m) => Vec (n * m) a -> Vec n (Vec m a)
 unconcatI = withSNat unconcat
 {-# INLINE unconcatI #-}
@@ -736,7 +744,7 @@ unconcatI = withSNat unconcat
 -- | Merge two vectors, alternating their elements, i.e.,
 --
 -- >>> merge (1 :> 2 :> 3 :> 4 :> Nil) (5 :> 6 :> 7 :> 8 :> Nil)
--- <1,5,2,6,3,7,4,8>
+-- 1 :> 5 :> 2 :> 6 :> 3 :> 7 :> 4 :> 8 :> Nil
 merge :: KnownNat n => Vec n a -> Vec n a -> Vec (2 * n) a
 merge x y = concat (transpose (x :> singleton y))
 {-# INLINE merge #-}
@@ -744,7 +752,7 @@ merge x y = concat (transpose (x :> singleton y))
 -- | The elements in a vector in reverse order.
 --
 -- >>> reverse (1:>2:>3:>4:>Nil)
--- <4,3,2,1>
+-- 4 :> 3 :> 2 :> 1 :> Nil
 reverse :: Vec n a -> Vec n a
 reverse Nil           = Nil
 reverse (x `Cons` xs) = reverse xs :< x
@@ -768,10 +776,10 @@ map f (x `Cons` xs) = f x `Cons` map f xs
 -- >>> :t imap (+) (2 :> 2 :> 2 :> 2 :> Nil)
 -- imap (+) (2 :> 2 :> 2 :> 2 :> Nil) :: Vec 4 (Index 4)
 -- >>> imap (+) (2 :> 2 :> 2 :> 2 :> Nil)
--- <2,3,*** Exception: X: Clash.Sized.Index: result 4 is out of bounds: [0..3]
+-- 2 :> 3 :> *** Exception: X: Clash.Sized.Index: result 4 is out of bounds: [0..3]
 -- ...
 -- >>> imap (\i a -> fromIntegral i + a) (2 :> 2 :> 2 :> 2 :> Nil) :: Vec 4 (Unsigned 8)
--- <2,3,4,5>
+-- 2 :> 3 :> 4 :> 5 :> Nil
 --
 -- \"'imap' @f xs@\" corresponds to the following circuit layout:
 --
@@ -788,15 +796,15 @@ imap f = go 0
 
 #if __GLASGOW_HASKELL__ >= 900
 >>> izipWith (\i a b -> i + a + b) (2 :> 2 :> Nil)  (3 :> 3:> Nil)
-<*** Exception: X: Clash.Sized.Index: result 2 is out of bounds: [0..1]
+*** Exception: X: Clash.Sized.Index: result 2 is out of bounds: [0..1]
 ...
 #else
 >>> izipWith (\i a b -> i + a + b) (2 :> 2 :> Nil)  (3 :> 3:> Nil)
-<*** Exception: X: Clash.Sized.Index: result 3 is out of bounds: [0..1]
+*** Exception: X: Clash.Sized.Index: result 3 is out of bounds: [0..1]
 ...
 #endif
 >>> izipWith (\i a b -> fromIntegral i + a + b) (2 :> 2 :> Nil) (3 :> 3 :> Nil) :: Vec 2 (Unsigned 8)
-<5,6>
+5 :> 6 :> Nil
 
 \"'imap' @f xs@\" corresponds to the following circuit layout:
 
@@ -848,7 +856,7 @@ ifoldl f z xs = last ws
 -- | Generate a vector of indices.
 --
 -- >>> indices d4
--- <0,1,2,3>
+-- 0 :> 1 :> 2 :> 3 :> Nil
 indices :: KnownNat n => SNat n -> Vec n (Index n)
 indices _ = indicesI
 {-# INLINE indices #-}
@@ -857,7 +865,7 @@ indices _ = indicesI
 -- by the context.
 --
 -- >>> indicesI :: Vec 4 (Index 4)
--- <0,1,2,3>
+-- 0 :> 1 :> 2 :> 3 :> Nil
 indicesI :: KnownNat n => Vec n (Index n)
 indicesI = imap const (repeat ())
 {-# INLINE indicesI #-}
@@ -1113,7 +1121,7 @@ fold f vs = fold' (toList vs)
 -- > scanl f z (x1 :> x2 :> ... :> Nil) == z :> (z `f` x1) :> ((z `f` x1) `f` x2) :> ... :> Nil
 --
 -- >>> scanl (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
--- <0,5,9,12,14>
+-- 0 :> 5 :> 9 :> 12 :> 14 :> Nil
 --
 -- \"'scanl' @f z xs@\" corresponds to the following circuit layout:
 --
@@ -1133,7 +1141,7 @@ scanl f z xs = ws
 -- > postscanl f z (x1 :> x2 :> ... :> Nil) == (z `f` x1) :> ((z `f` x1) `f` x2) :> ... :> Nil
 --
 -- >>> postscanl (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
--- <5,9,12,14>
+-- 5 :> 9 :> 12 :> 14 :> Nil
 --
 -- \"'postscanl' @f z xs@\" corresponds to the following circuit layout:
 --
@@ -1148,7 +1156,7 @@ postscanl f z xs = tail (scanl f z xs)
 -- > scanr f z (... :> xn1 :> xn :> Nil) == ... :> (xn1 `f` (xn `f` z)) :> (xn `f` z) :> z :> Nil
 --
 -- >>> scanr (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
--- <14,9,5,2,0>
+-- 14 :> 9 :> 5 :> 2 :> 0 :> Nil
 --
 -- \"'scanr' @f z xs@\" corresponds to the following circuit layout:
 --
@@ -1168,7 +1176,7 @@ scanr f z xs = ws
 -- > postscanr f z (... :> xn1 :> xn :> Nil) == ... :> (xn1 `f` (xn `f` z)) :> (xn `f` z) :> Nil
 --
 -- >>> postscanr (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
--- <14,9,5,2>
+-- 14 :> 9 :> 5 :> 2 :> Nil
 --
 -- \"'postscanr' @f z xs@\" corresponds to the following circuit layout:
 --
@@ -1183,7 +1191,7 @@ postscanr f z xs = init (scanr f z xs)
 -- together with the new vector.
 --
 -- >>> mapAccumL (\acc x -> (acc + x,acc + 1)) 0 (1 :> 2 :> 3 :> 4 :> Nil)
--- (10,<1,2,4,7>)
+-- (10,1 :> 2 :> 4 :> 7 :> Nil)
 --
 -- \"'mapAccumL' @f acc xs@\" corresponds to the following circuit layout:
 --
@@ -1204,7 +1212,7 @@ mapAccumL f acc xs = (acc',ys)
 -- together with the new vector.
 --
 -- >>> mapAccumR (\acc x -> (acc + x,acc + 1)) 0 (1 :> 2 :> 3 :> 4 :> Nil)
--- (10,<10,8,5,1>)
+-- (10,10 :> 8 :> 5 :> 1 :> Nil)
 --
 -- \"'mapAccumR' @f acc xs@\" corresponds to the following circuit layout:
 --
@@ -1222,7 +1230,7 @@ mapAccumR f acc xs = (acc',ys)
 -- | 'zip' takes two vectors and returns a vector of corresponding pairs.
 --
 -- >>> zip (1:>2:>3:>4:>Nil) (4:>3:>2:>1:>Nil)
--- <(1,4),(2,3),(3,2),(4,1)>
+-- (1,4) :> (2,3) :> (3,2) :> (4,1) :> Nil
 zip :: Vec n a -> Vec n b -> Vec n (a,b)
 zip = zipWith (,)
 {-# INLINE zip #-}
@@ -1230,7 +1238,7 @@ zip = zipWith (,)
 -- | 'zip3' takes three vectors and returns a vector of corresponding triplets.
 --
 -- >>> zip3 (1:>2:>3:>4:>Nil) (4:>3:>2:>1:>Nil) (5:>6:>7:>8:>Nil)
--- <(1,4,5),(2,3,6),(3,2,7),(4,1,8)>
+-- (1,4,5) :> (2,3,6) :> (3,2,7) :> (4,1,8) :> Nil
 zip3 :: Vec n a -> Vec n b -> Vec n c -> Vec n (a,b,c)
 zip3 = zipWith3 (,,)
 {-# INLINE zip3 #-}
@@ -1278,7 +1286,7 @@ zip7 = zipWith7 (,,,,,,)
 -- and a vector of second components.
 --
 -- >>> unzip ((1,4):>(2,3):>(3,2):>(4,1):>Nil)
--- (<1,2,3,4>,<4,3,2,1>)
+-- (1 :> 2 :> 3 :> 4 :> Nil,4 :> 3 :> 2 :> 1 :> Nil)
 unzip :: Vec n (a,b) -> (Vec n a, Vec n b)
 unzip xs = (map fst xs, map snd xs)
 {-# INLINE unzip #-}
@@ -1287,7 +1295,7 @@ unzip xs = (map fst xs, map snd xs)
 -- a vector of second components, and a vector of third components.
 --
 -- >>> unzip3 ((1,4,5):>(2,3,6):>(3,2,7):>(4,1,8):>Nil)
--- (<1,2,3,4>,<4,3,2,1>,<5,6,7,8>)
+-- (1 :> 2 :> 3 :> 4 :> Nil,4 :> 3 :> 2 :> 1 :> Nil,5 :> 6 :> 7 :> 8 :> Nil)
 unzip3 :: Vec n (a,b,c) -> (Vec n a, Vec n b, Vec n c)
 unzip3 xs = ( map (\(x,_,_) -> x) xs
             , map (\(_,y,_) -> y) xs
@@ -1411,11 +1419,11 @@ replace_int xs i@(I# n0) a
 -- ending at @'length' - 1@.
 --
 -- >>> replace 3 7 (1:>2:>3:>4:>5:>Nil)
--- <1,2,3,7,5>
+-- 1 :> 2 :> 3 :> 7 :> 5 :> Nil
 -- >>> replace 0 7 (1:>2:>3:>4:>5:>Nil)
--- <7,2,3,4,5>
+-- 7 :> 2 :> 3 :> 4 :> 5 :> Nil
 -- >>> replace 9 7 (1:>2:>3:>4:>5:>Nil)
--- <1,2,3,4,*** Exception: Clash.Sized.Vector.replace: index 9 is larger than maximum index 4
+-- 1 :> 2 :> 3 :> 4 :> 5 :> *** Exception: Clash.Sized.Vector.replace: index 9 is larger than maximum index 4
 -- ...
 replace :: (KnownNat n, Enum i) => i -> a -> Vec n a -> Vec n a
 replace i y xs = replace_int xs (fromEnum i) y
@@ -1424,11 +1432,11 @@ replace i y xs = replace_int xs (fromEnum i) y
 {- | \"'take' @n xs@\" returns the /n/-length prefix of /xs/.
 
 >>> take (SNat :: SNat 3) (1:>2:>3:>4:>5:>Nil)
-<1,2,3>
+1 :> 2 :> 3 :> Nil
 >>> take d3               (1:>2:>3:>4:>5:>Nil)
-<1,2,3>
+1 :> 2 :> 3 :> Nil
 >>> take d0               (1:>2:>Nil)
-<>
+Nil
 
 #if __GLASGOW_HASKELL__ >= 900
 >>> take d4               (1:>2:>Nil)
@@ -1463,7 +1471,7 @@ take n = fst . splitAt n
 -- | \"'takeI' @xs@\" returns the prefix of /xs/ as demanded by the context.
 --
 -- >>> takeI (1:>2:>3:>4:>5:>Nil) :: Vec 2 Int
--- <1,2>
+-- 1 :> 2 :> Nil
 takeI :: KnownNat m => Vec (m + n) a -> Vec m a
 takeI = withSNat take
 {-# INLINE takeI #-}
@@ -1471,11 +1479,11 @@ takeI = withSNat take
 -- | \"'drop' @n xs@\" returns the suffix of /xs/ after the first /n/ elements.
 --
 -- >>> drop (SNat :: SNat 3) (1:>2:>3:>4:>5:>Nil)
--- <4,5>
+-- 4 :> 5 :> Nil
 -- >>> drop d3               (1:>2:>3:>4:>5:>Nil)
--- <4,5>
+-- 4 :> 5 :> Nil
 -- >>> drop d0               (1:>2:>Nil)
--- <1,2>
+-- 1 :> 2 :> Nil
 -- >>> drop d4               (1:>2:>Nil)
 -- <BLANKLINE>
 -- <interactive>:...: error:
@@ -1490,7 +1498,7 @@ drop n = snd . splitAt n
 -- | \"'dropI' @xs@\" returns the suffix of /xs/ as demanded by the context.
 --
 -- >>> dropI (1:>2:>3:>4:>5:>Nil) :: Vec 2 Int
--- <4,5>
+-- 4 :> 5 :> Nil
 dropI :: KnownNat m => Vec (m + n) a -> Vec n a
 dropI = withSNat drop
 {-# INLINE dropI #-}
@@ -1512,9 +1520,9 @@ at n xs = head $ snd $ splitAt n xs
 -- offset @f@ from /xs/.
 --
 -- >>> select (SNat :: SNat 1) (SNat :: SNat 2) (SNat :: SNat 3) (1:>2:>3:>4:>5:>6:>7:>8:>Nil)
--- <2,4,6>
+-- 2 :> 4 :> 6 :> Nil
 -- >>> select d1 d2 d3 (1:>2:>3:>4:>5:>6:>7:>8:>Nil)
--- <2,4,6>
+-- 2 :> 4 :> 6 :> Nil
 select :: (CmpNat (i + s) (s * n) ~ 'GT)
        => SNat f
        -> SNat s
@@ -1533,7 +1541,7 @@ select f s n xs = select' (toUNat n) $ drop f xs
 -- with step-size /s/ and offset /f/ from /xs/.
 --
 -- >>> selectI d1 d2 (1:>2:>3:>4:>5:>6:>7:>8:>Nil) :: Vec 2 Int
--- <2,4>
+-- 2 :> 4 :> Nil
 selectI :: (CmpNat (i + s) (s * n) ~ 'GT, KnownNat n)
         => SNat f
         -> SNat s
@@ -1545,9 +1553,9 @@ selectI f s xs = withSNat (\n -> select f s n xs)
 -- | \"'replicate' @n a@\" returns a vector that has /n/ copies of /a/.
 --
 -- >>> replicate (SNat :: SNat 3) 6
--- <6,6,6>
+-- 6 :> 6 :> 6 :> Nil
 -- >>> replicate d3 6
--- <6,6,6>
+-- 6 :> 6 :> 6 :> Nil
 replicate :: SNat n -> a -> Vec n a
 replicate n a = replicateU (toUNat n) a
 {-# NOINLINE replicate #-}
@@ -1560,7 +1568,7 @@ replicateU (USucc s) x = x `Cons` replicateU s x
 -- by the context.
 --
 -- >>> repeat 6 :: Vec 5 Int
--- <6,6,6,6,6>
+-- 6 :> 6 :> 6 :> 6 :> 6 :> Nil
 repeat :: KnownNat n => a -> Vec n a
 repeat = withSNat replicate
 {-# INLINE repeat #-}
@@ -1572,7 +1580,7 @@ repeat = withSNat replicate
 -- > iterate d4 f x               == (x :> f x :> f (f x) :> f (f (f x)) :> Nil)
 --
 -- >>> iterate d4 (+1) 1
--- <1,2,3,4>
+-- 1 :> 2 :> 3 :> 4 :> Nil
 --
 -- \"'iterate' @n f z@\" corresponds to the following circuit layout:
 --
@@ -1587,7 +1595,7 @@ iterate SNat = iterateI
 -- > iterateI f x :: Vec 3 a == (x :> f x :> f (f x) :> Nil)
 --
 -- >>> iterateI (+1) 1 :: Vec 3 Int
--- <1,2,3>
+-- 1 :> 2 :> 3 :> Nil
 --
 -- \"'iterateI' @f z@\" corresponds to the following circuit layout:
 --
@@ -1612,7 +1620,7 @@ iterateI f a = xs
 -- a simple use of 'unfoldr':
 --
 -- >>> unfoldr d10 (\s -> (s,s-1)) 10
--- <10,9,8,7,6,5,4,3,2,1>
+-- 10 :> 9 :> 8 :> 7 :> 6 :> 5 :> 4 :> 3 :> 2 :> 1 :> Nil
 unfoldr :: SNat n -> (s -> (a,s)) -> s -> Vec n a
 unfoldr SNat = unfoldrI
 {-# INLINE unfoldr #-}
@@ -1626,7 +1634,7 @@ unfoldr SNat = unfoldrI
 -- a simple use of 'unfoldrI':
 --
 -- >>> unfoldrI (\s -> (s,s-1)) 10 :: Vec 10 Int
--- <10,9,8,7,6,5,4,3,2,1>
+-- 10 :> 9 :> 8 :> 7 :> 6 :> 5 :> 4 :> 3 :> 2 :> 1 :> Nil
 unfoldrI :: KnownNat n => (s -> (a,s)) -> s -> Vec n a
 unfoldrI f s0 = map fst xs
  where
@@ -1641,7 +1649,7 @@ unfoldrI f s0 = map fst xs
 -- > generate d4 f x               == (f x :> f (f x) :> f (f (f x)) :> f (f (f (f x))) :> Nil)
 --
 -- >>> generate d4 (+1) 1
--- <2,3,4,5>
+-- 2 :> 3 :> 4 :> 5 :> Nil
 --
 -- \"'generate' @n f z@\" corresponds to the following circuit layout:
 --
@@ -1656,7 +1664,7 @@ generate SNat f a = iterateI f (f a)
 -- > generateI f x :: Vec 3 a == (f x :> f (f x) :> f (f (f x)) :> Nil)
 --
 -- >>> generateI (+1) 1 :: Vec 3 Int
--- <2,3,4>
+-- 2 :> 3 :> 4 :> Nil
 --
 -- \"'generateI' @f z@\" corresponds to the following circuit layout:
 --
@@ -1669,9 +1677,9 @@ generateI f a = iterateI f (f a)
 --
 -- >>> let xss = (1:>2:>Nil):>(3:>4:>Nil):>(5:>6:>Nil):>Nil
 -- >>> xss
--- <<1,2>,<3,4>,<5,6>>
+-- (1 :> 2 :> Nil) :> (3 :> 4 :> Nil) :> (5 :> 6 :> Nil) :> Nil
 -- >>> transpose xss
--- <<1,3,5>,<2,4,6>>
+-- (1 :> 3 :> 5 :> Nil) :> (2 :> 4 :> 6 :> Nil) :> Nil
 transpose :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)
 transpose = traverse# id
 {-# NOINLINE transpose #-}
@@ -1688,7 +1696,7 @@ transpose = traverse# id
 -- >>> :t stencil1d d2 sum xs
 -- stencil1d d2 sum xs :: Num b => Vec 5 b
 -- >>> stencil1d d2 sum xs
--- <3,5,7,9,11>
+-- 3 :> 5 :> 7 :> 9 :> 11 :> Nil
 stencil1d :: KnownNat n
           => SNat (stX + 1) -- ^ Windows length /stX/, at least size 1
           -> (Vec (stX + 1) a -> b) -- ^ The stencil (function)
@@ -1710,7 +1718,7 @@ stencil1d stX f xs = map f (windows1d stX xs)
 -- >>> :t stencil2d d2 d2 (sum . map sum) xss
 -- stencil2d d2 d2 (sum . map sum) xss :: Num b => Vec 3 (Vec 3 b)
 -- >>> stencil2d d2 d2 (sum . map sum) xss
--- <<14,18,22>,<30,34,38>,<46,50,54>>
+-- (14 :> 18 :> 22 :> Nil) :> (30 :> 34 :> 38 :> Nil) :> (46 :> 50 :> 54 :> Nil) :> Nil
 stencil2d :: (KnownNat n, KnownNat m)
           => SNat (stY + 1) -- ^ Window hight /stY/, at least size 1
           -> SNat (stX + 1) -- ^ Window width /stX/, at least size 1
@@ -1729,7 +1737,7 @@ stencil2d stY stX f xss = (map.map) f (windows2d stY stX xss)
 -- >>> :t windows1d d2 xs
 -- windows1d d2 xs :: Num a => Vec 5 (Vec 2 a)
 -- >>> windows1d d2 xs
--- <<1,2>,<2,3>,<3,4>,<4,5>,<5,6>>
+-- (1 :> 2 :> Nil) :> (2 :> 3 :> Nil) :> (3 :> 4 :> Nil) :> (4 :> 5 :> Nil) :> (5 :> 6 :> Nil) :> Nil
 windows1d :: KnownNat n
           => SNat (stX + 1) -- ^ Length of the window, at least size 1
           -> Vec ((stX + n) + 1) a
@@ -1751,7 +1759,7 @@ windows1d stX xs = map (take stX) (rotations xs)
 -- >>> :t windows2d d2 d2 xss
 -- windows2d d2 d2 xss :: Num a => Vec 3 (Vec 3 (Vec 2 (Vec 2 a)))
 -- >>> windows2d d2 d2 xss
--- <<<<1,2>,<5,6>>,<<2,3>,<6,7>>,<<3,4>,<7,8>>>,<<<5,6>,<9,10>>,<<6,7>,<10,11>>,<<7,8>,<11,12>>>,<<<9,10>,<13,14>>,<<10,11>,<14,15>>,<<11,12>,<15,16>>>>
+-- (((1 :> 2 :> Nil) :> (5 :> 6 :> Nil) :> Nil) :> ((2 :> 3 :> Nil) :> (6 :> 7 :> Nil) :> Nil) :> ((3 :> 4 :> Nil) :> (7 :> 8 :> Nil) :> Nil) :> Nil) :> (((5 :> 6 :> Nil) :> (9 :> 10 :> Nil) :> Nil) :> ((6 :> 7 :> Nil) :> (10 :> 11 :> Nil) :> Nil) :> ((7 :> 8 :> Nil) :> (11 :> 12 :> Nil) :> Nil) :> Nil) :> (((9 :> 10 :> Nil) :> (13 :> 14 :> Nil) :> Nil) :> ((10 :> 11 :> Nil) :> (14 :> 15 :> Nil) :> Nil) :> ((11 :> 12 :> Nil) :> (15 :> 16 :> Nil) :> Nil) :> Nil) :> Nil
 windows2d :: (KnownNat n,KnownNat m)
           => SNat (stY + 1) -- ^ Window hight /stY/, at least size 1
           -> SNat (stX + 1) -- ^ Window width /stX/, at least size 1
@@ -1789,7 +1797,7 @@ permute f defs is xs = ys
 -- >>> let input = 1:>9:>6:>4:>4:>2:>0:>1:>2:>Nil
 -- >>> let from  = 1:>3:>7:>2:>5:>3:>Nil
 -- >>> backpermute input from
--- <9,4,1,6,2,4>
+-- 9 :> 4 :> 1 :> 6 :> 2 :> 4 :> Nil
 backpermute :: (Enum i, KnownNat n)
             => Vec n a  -- ^ Source vector, /xs/
             -> Vec m i  -- ^ Index mapping, /is/
@@ -1808,7 +1816,7 @@ backpermute xs = map (xs!!)
 -- >>> let to = 1:>3:>7:>2:>5:>8:>Nil
 -- >>> let input = 1:>9:>6:>4:>4:>2:>5:>Nil
 -- >>> scatter defVec to input
--- <0,1,4,9,0,4,0,6,2>
+-- 0 :> 1 :> 4 :> 9 :> 0 :> 4 :> 0 :> 6 :> 2 :> Nil
 --
 -- __NB__: If the same index appears in the index mapping more than once, the
 -- latest mapping is chosen.
@@ -1831,7 +1839,7 @@ scatter = permute const
 -- >>> let input = 1:>9:>6:>4:>4:>2:>0:>1:>2:>Nil
 -- >>> let from  = 1:>3:>7:>2:>5:>3:>Nil
 -- >>> gather input from
--- <9,4,1,6,2,4>
+-- 9 :> 4 :> 1 :> 6 :> 2 :> 4 :> Nil
 gather :: (Enum i, KnownNat n)
        => Vec n a  -- ^ Source vector, /xs/
        -> Vec m i  -- ^ Index mapping, /is/
@@ -1847,7 +1855,7 @@ gather xs = map (xs!!)
 --
 -- >>> let xs = 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> 8 :> 9 :> Nil
 -- >>> interleave d3 xs
--- <1,4,7,2,5,8,3,6,9>
+-- 1 :> 4 :> 7 :> 2 :> 5 :> 8 :> 3 :> 6 :> 9 :> Nil
 interleave :: (KnownNat n, KnownNat d)
            => SNat d -- ^ Interleave step, /d/
            -> Vec (n * d) a
@@ -1859,11 +1867,11 @@ interleave d = concat . transpose . unconcat d
 --
 -- >>> let xs = 1 :> 2 :> 3 :> 4 :> Nil
 -- >>> rotateLeft xs 1
--- <2,3,4,1>
+-- 2 :> 3 :> 4 :> 1 :> Nil
 -- >>> rotateLeft xs 2
--- <3,4,1,2>
+-- 3 :> 4 :> 1 :> 2 :> Nil
 -- >>> rotateLeft xs (-1)
--- <4,1,2,3>
+-- 4 :> 1 :> 2 :> 3 :> Nil
 --
 -- __NB:__ use `rotateLeftS` if you want to rotate left by a /static/ amount.
 rotateLeft :: (Enum i, KnownNat n)
@@ -1880,11 +1888,11 @@ rotateLeft xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
 --
 -- >>> let xs = 1 :> 2 :> 3 :> 4 :> Nil
 -- >>> rotateRight xs 1
--- <4,1,2,3>
+-- 4 :> 1 :> 2 :> 3 :> Nil
 -- >>> rotateRight xs 2
--- <3,4,1,2>
+-- 3 :> 4 :> 1 :> 2 :> Nil
 -- >>> rotateRight xs (-1)
--- <2,3,4,1>
+-- 2 :> 3 :> 4 :> 1 :> Nil
 --
 -- __NB:__ use `rotateRightS` if you want to rotate right by a /static/ amount.
 rotateRight :: (Enum i, KnownNat n)
@@ -1901,7 +1909,7 @@ rotateRight xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
 --
 -- >>> let xs = 1 :> 2 :> 3 :> 4 :> Nil
 -- >>> rotateLeftS xs d1
--- <2,3,4,1>
+-- 2 :> 3 :> 4 :> 1 :> Nil
 --
 -- __NB:__ use `rotateLeft` if you want to rotate left by a /dynamic/ amount.
 rotateLeftS :: KnownNat n
@@ -1920,7 +1928,7 @@ rotateLeftS xs d = go (snatToInteger d `mod` natVal (asNatProxy xs)) xs
 --
 -- >>> let xs = 1 :> 2 :> 3 :> 4 :> Nil
 -- >>> rotateRightS xs d1
--- <4,1,2,3>
+-- 4 :> 1 :> 2 :> 3 :> Nil
 --
 -- __NB:__ use `rotateRight` if you want to rotate right by a /dynamic/ amount.
 rotateRightS :: KnownNat n
@@ -1946,7 +1954,7 @@ toList = foldr (:) []
 -- the list is not equal to the size of the resulting vector.
 --
 -- >>> Vec.fromList [1,2,3,4,5] :: Maybe (Vec 5 Int)
--- Just <1,2,3,4,5>
+-- Just (1 :> 2 :> 3 :> 4 :> 5 :> Nil)
 --
 -- >>> Vec.fromList [1,2,3,4,5] :: Maybe (Vec 3 Int)
 -- Nothing
@@ -1973,13 +1981,13 @@ fromList xs
 -- undefined elements.
 --
 -- >>> Vec.unsafeFromList [1,2,3,4,5] :: Vec 5 Int
--- <1,2,3,4,5>
+-- 1 :> 2 :> 3 :> 4 :> 5 :> Nil
 --
 -- >>> Vec.unsafeFromList [1,2,3,4,5] :: Vec 3 Int
--- <1,2,3>
+-- 1 :> 2 :> 3 :> Nil
 --
 -- >>> Vec.unsafeFromList [1,2,3,4,5] :: Vec 10 Int
--- <1,2,3,4,5,*** Exception: Clash.Sized.Vector.unsafeFromList: vector larger than list
+-- 1 :> 2 :> 3 :> 4 :> 5 :> *** Exception: Clash.Sized.Vector.unsafeFromList: vector larger than list
 -- ...
 --
 -- __NB:__ use `listToVecTH` if you want to make a /statically known/ vector
@@ -2003,7 +2011,7 @@ unsafeFromList = unfoldr SNat go
 -- >>> [1 :: Signed 8,2,3,4,5]
 -- [1,2,3,4,5]
 -- >>> $(listToVecTH [1::Signed 8,2,3,4,5])
--- <1,2,3,4,5>
+-- 1 :> 2 :> 3 :> 4 :> 5 :> Nil
 listToVecTH :: Lift a => [a] -> ExpQ
 listToVecTH []     = [| Nil |]
 listToVecTH (x:xs) = [| x :> $(listToVecTH xs) |]
@@ -2050,7 +2058,7 @@ lengthS _ = SNat
 -- Results in a successful computation:
 --
 -- >>> sortVL (4 :> 1 :> 2 :> 3 :> Nil)
--- <1,2,3,4>
+-- 1 :> 2 :> 3 :> 4 :> Nil
 --
 -- __NB__: There is also a solution using 'flip', but it slightly obfuscates the
 -- meaning of the code:
@@ -2064,7 +2072,7 @@ lengthS _ = SNat
 -- @
 --
 -- >>> sortV_flip (4 :> 1 :> 2 :> 3 :> Nil)
--- <1,2,3,4>
+-- 1 :> 2 :> 3 :> 4 :> Nil
 lazyV :: KnownNat n
       => Vec n a
       -> Vec n a
@@ -2144,7 +2152,7 @@ lazyV = lazyV' (repeat ())
 -- And that it works:
 --
 -- >>> append' (1 :> 2 :> Nil) (3 :> 4 :> Nil)
--- <1,2,3,4>
+-- 1 :> 2 :> 3 :> 4 :> Nil
 --
 -- __NB__: \"@'dfold' m f z xs@\" creates a linear structure, which has a depth,
 -- or delay, of O(@'length' xs@). Look at 'dtfold' for a /dependently/ typed
@@ -2340,7 +2348,7 @@ type instance Apply (VCons a) l = Vec l a
 -- Builds a triangular structure of compare and swaps to sort a row.
 --
 -- >>> insertionSort (7 :> 3 :> 9 :> 1 :> Nil)
--- <1,3,7,9>
+-- 1 :> 3 :> 7 :> 9 :> Nil
 --
 -- The circuit layout of @insertionSort@, build using 'vfold', is:
 --
@@ -2358,9 +2366,9 @@ vfold f xs = dfold (Proxy @(VCons b)) f Nil xs
 -- >>> let rotateMatrix = smap (flip rotateRightS)
 -- >>> let xss = (1:>2:>3:>Nil):>(1:>2:>3:>Nil):>(1:>2:>3:>Nil):>Nil
 -- >>> xss
--- <<1,2,3>,<1,2,3>,<1,2,3>>
+-- (1 :> 2 :> 3 :> Nil) :> (1 :> 2 :> 3 :> Nil) :> (1 :> 2 :> 3 :> Nil) :> Nil
 -- >>> rotateMatrix xss
--- <<1,2,3>,<3,1,2>,<2,3,1>>
+-- (1 :> 2 :> 3 :> Nil) :> (3 :> 1 :> 2 :> Nil) :> (2 :> 3 :> 1 :> Nil) :> Nil
 smap :: forall k a b . KnownNat k => (forall l . SNat l -> a -> b) -> Vec k a -> Vec k b
 smap f xs = reverse
           $ dfold (Proxy @(VCons b))
@@ -2408,7 +2416,7 @@ unconcatBitVector# orig = snd (go (toUNat (SNat @n)))
 -- >>> x
 -- 0000_0110
 -- >>> bv2v x
--- <0,0,0,0,0,1,1,0>
+-- 0 :> 0 :> 0 :> 0 :> 0 :> 1 :> 1 :> 0 :> Nil
 bv2v :: KnownNat n => BitVector n -> Vec n Bit
 bv2v = unpack
 
@@ -2416,7 +2424,7 @@ bv2v = unpack
 --
 -- >>> let x = (0:>0:>0:>1:>0:>0:>1:>0:>Nil) :: Vec 8 Bit
 -- >>> x
--- <0,0,0,1,0,0,1,0>
+-- 0 :> 0 :> 0 :> 1 :> 0 :> 0 :> 1 :> 0 :> Nil
 -- >>> v2bv x
 -- 0001_0010
 v2bv :: KnownNat n => Vec n Bit -> BitVector n
