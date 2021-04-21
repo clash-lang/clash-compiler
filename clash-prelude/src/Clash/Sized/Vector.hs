@@ -144,7 +144,7 @@ import Clash.Sized.Index          (Index)
 
 import Clash.Class.BitPack        (packXWith, BitPack (..))
 import Clash.XException
-  (ShowX (..), NFDataX (..), showsX, showsPrecXWith, seqX, isX)
+  (ShowX (..), NFDataX (..), showsX, seqX, isX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -313,14 +313,13 @@ instance Show a => Show (Vec n a) where
       punc (x `Cons` xs)  = \s -> shows x (',':punc xs s)
 
 instance ShowX a => ShowX (Vec n a) where
-  showsPrecX = showsPrecXWith go
-    where
-      go _ vs = \s -> '<': punc vs ('>':s)
-        where
-          punc :: Vec m a -> ShowS
-          punc Nil            = id
-          punc (x `Cons` Nil) = showsX x
-          punc (x `Cons` xs)  = \s -> showsX x (',':punc xs s)
+  showsPrecX _n vs = showString "<" . punc vs
+   where
+    punc :: Vec m a -> ShowS
+    punc (isX -> Left _) = showString "X"
+    punc Nil = showString ">"
+    punc (Cons x (isX -> Right Nil)) = showsX x . ('>':)
+    punc (Cons x xs) = showsX x . showString "," . punc xs
 
 instance (KnownNat n, Eq a) => Eq (Vec n a) where
   (==) Nil _            = True
