@@ -318,7 +318,7 @@ instance ShowX a => ShowX (Vec n a) where
     punc :: Vec m a -> ShowS
     punc (isX -> Left _) = showString "X"
     punc Nil = showString ">"
-    punc (Cons x (isX -> Right Nil)) = showsX x
+    punc (Cons x (isX -> Right Nil)) = showsX x . ('>':)
     punc (Cons x xs) = showsX x . showString "," . punc xs
 
 instance (KnownNat n, Eq a) => Eq (Vec n a) where
