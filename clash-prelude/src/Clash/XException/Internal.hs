@@ -12,7 +12,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 CallStack (from HasCallStack):
 ...
 >>> showX (errorX "undefined" :: Integer, 4 :: Int)
-"(X,4)"
+"(undefined,4)"
 -}
 
 {-# LANGUAGE CPP #-}
@@ -31,7 +31,7 @@ CallStack (from HasCallStack):
 
 module Clash.XException.Internal
   ( XException(..)
-    -- * Printing 'XException's as \"X\"
+    -- * Printing 'XException's as @undefined@
   , showsX, showsPrecXWith
   , showXWith
 
@@ -64,7 +64,7 @@ instance Show XException where
 instance Exception XException
 
 -- | Like 'shows', but values that normally throw an 'XException' are
--- converted to \"X\", instead of error'ing out with an exception.
+-- converted to @undefined@, instead of error'ing out with an exception.
 showsX :: ShowX a => a -> ShowS
 showsX = showsPrecX 0
 
@@ -82,15 +82,17 @@ genericShowsPrecX n = gshowsPrecX Pref n . from
 
 showXWith :: (a -> ShowS) -> a -> ShowS
 showXWith f x =
-  \s -> unsafeDupablePerformIO (catch (f <$> evaluate x <*> pure s)
-                                      (\(XException _) -> return ('X': s)))
+  unsafeDupablePerformIO $
+    catch
+      (f <$> evaluate x)
+      (\(XException _) -> return (showString "undefined"))
 
 -- | Use when you want to create a 'ShowX' instance where:
 --
 -- - There is no 'Generic' instance for your data type
 -- - The 'Generic' derived ShowX method would traverse into the (hidden)
 --   implementation details of your data type, and you just want to show the
---   entire value as \"X\".
+--   entire value as @undefined@.
 --
 -- Can be used like:
 --
