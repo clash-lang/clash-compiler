@@ -12,7 +12,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 CallStack (from HasCallStack):
 ...
 >>> showX (errorX "undefined" :: Integer, 4 :: Int)
-"(X,4)"
+"(undefined,4)"
 -}
 
 {-# LANGUAGE CPP #-}
@@ -31,7 +31,7 @@ module Clash.XException
   ( -- * 'XException': An exception for uninitialized values
     XException(..), errorX, isX, hasX, maybeIsX, maybeHasX, fromJustX, undefined,
     xToErrorCtx, xToError
-    -- * Printing 'XException's as \"X\"
+    -- * Printing 'XException's as @undefined@
   , ShowX (..), showsX, printX, showsPrecXWith
     -- * Strict evaluation
   , seqX, forceX, deepseqX, rwhnfX, defaultSeqX, hwSeqX
@@ -85,7 +85,7 @@ infixr 0 `defaultSeqX`
 
 -- | Like 'error', but throwing an 'XException' instead of an 'ErrorCall'
 --
--- The 'ShowX' methods print these error-values as \"X\"; instead of error'ing
+-- The 'ShowX' methods print these error-values as @undefined@; instead of error'ing
 -- out with an exception.
 errorX :: HasCallStack => String -> a
 errorX msg = throw (XException ("X: " ++ msg ++ "\n" ++ prettyCallStack callStack))
@@ -307,14 +307,14 @@ isX a =
 {-# NOINLINE isX #-}
 
 -- | Like the 'Show' class, but values that normally throw an 'XException' are
--- converted to \"X\", instead of error'ing out with an exception.
+-- converted to @undefined@, instead of error'ing out with an exception.
 --
 -- >>> show (errorX "undefined" :: Integer, 4 :: Int)
 -- "(*** Exception: X: undefined
 -- CallStack (from HasCallStack):
 -- ...
 -- >>> showX (errorX "undefined" :: Integer, 4 :: Int)
--- "(X,4)"
+-- "(undefined,4)"
 --
 -- Can be derived using 'GHC.Generics':
 --
@@ -327,16 +327,16 @@ isX a =
 -- >   deriving (Show,Generic,ShowX)
 class ShowX a where
   -- | Like 'showsPrec', but values that normally throw an 'XException' are
-  -- converted to \"X\", instead of error'ing out with an exception.
+  -- converted to @undefined@, instead of error'ing out with an exception.
   showsPrecX :: Int -> a -> ShowS
 
   -- | Like 'show', but values that normally throw an 'XException' are
-  -- converted to \"X\", instead of error'ing out with an exception.
+  -- converted to @undefined@, instead of error'ing out with an exception.
   showX :: a -> String
   showX x = showsX x ""
 
   -- | Like 'showList', but values that normally throw an 'XException' are
-  -- converted to \"X\", instead of error'ing out with an exception.
+  -- converted to @undefined@, instead of error'ing out with an exception.
   showListX :: [a] -> ShowS
   showListX ls s = showListX__ showsX ls s
 
@@ -344,7 +344,7 @@ class ShowX a where
   showsPrecX = genericShowsPrecX
 
 -- | Like 'print', but values that normally throw an 'XException' are
--- converted to \"X\", instead of error'ing out with an exception
+-- converted to @undefined@, instead of error'ing out with an exception
 printX :: ShowX a => a -> IO ()
 printX x = putStrLn $ showX x
 

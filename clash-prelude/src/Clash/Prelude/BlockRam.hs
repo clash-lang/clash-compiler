@@ -238,7 +238,7 @@ replace it with the string "X" in the few leading outputs.
 
 @
 >>> printX $ sampleN @System 32 (system2 prog)
-[X,X,X,X,X,X,4,4,4,4,4,4,4,4,6,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,2]
+[undefined,undefined,undefined,undefined,undefined,undefined,4,4,4,4,4,4,4,4,6,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,2]
 
 @
 
@@ -367,7 +367,7 @@ to conveniently filter out the undefinedness and replace it with the string "X".
 
 @
 >>> printX $ sampleN @System 34 (system3 prog2)
-[X,0,0,0,0,0,0,4,4,4,4,4,4,4,4,6,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,2]
+[undefined,0,0,0,0,0,0,4,4,4,4,4,4,4,4,6,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,2]
 
 @
 

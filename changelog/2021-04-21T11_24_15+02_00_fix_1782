@@ -1,0 +1,1 @@
+CHANGED: `ShowX` and its functions now produce valid Haskell [#1782](https://github.com/clash-lang/clash-compiler/issues/1782)
