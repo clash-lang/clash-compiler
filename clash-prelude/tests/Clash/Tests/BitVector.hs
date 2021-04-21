@@ -114,12 +114,12 @@ tests = localOption (Q.QuickCheckMaxRatio 2) $ testGroup "All"
     , testCase "show5"  $ show @(BitVector 2) 0b10 @?= "0b10"
     , testCase "show6"  $ show @(BitVector 2) 0b11 @?= "0b11"
     , testCase "show7"  $ show @(BitVector 3) 0b111 @?= "0b111"
-    , testCase "show8"  $ show @(BitVector 4) $$(bLit "0000") @?= "0b0000"
-    , testCase "show9"  $ show @(BitVector 4) $$(bLit "000.") @?= "0b000."
-    , testCase "show10" $ show @(BitVector 4) $$(bLit "010.") @?= "0b010."
-    , testCase "show11" $ show @(BitVector 5) $$(bLit "1010.") @?= "0b1_010."
-    , testCase "show12" $ show @(BitVector 8) $$(bLit "0001010.") @?= "0b0001_010."
-    , testCase "show13" $ show @(BitVector 9) $$(bLit "10001010.") @?= "0b1_0001_010."
+    , testCase "show8"  $ show @(BitVector 4) $(bLit "0000") @?= "0b0000"
+    , testCase "show9"  $ show @(BitVector 4) $(bLit "000.") @?= "0b000."
+    , testCase "show10" $ show @(BitVector 4) $(bLit "010.") @?= "0b010."
+    , testCase "show11" $ show @(BitVector 5) $(bLit "1010.") @?= "0b1_010."
+    , testCase "show12" $ show @(BitVector 8) $(bLit "0001010.") @?= "0b0001_010."
+    , testCase "show13" $ show @(BitVector 9) $(bLit "10001010.") @?= "0b1_0001_010."
     ]
   ]
 

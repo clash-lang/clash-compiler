@@ -151,9 +151,9 @@ packXWith f x =
 -- However, it is still trivially reflexive and transitive:
 --
 -- >>> :set -XTemplateHaskell
--- >>> let x1 = $$(bLit "0010") :: BitVector 4
--- >>> let x2 = $$(bLit "0.10") :: BitVector 4
--- >>> let x3 = $$(bLit "0.1.") :: BitVector 4
+-- >>> let x1 = $(bLit "0010")
+-- >>> let x2 = $(bLit "0.10")
+-- >>> let x3 = $(bLit "0.1.")
 -- >>> isLike x1 x1
 -- True
 -- >>> isLike x1 x2

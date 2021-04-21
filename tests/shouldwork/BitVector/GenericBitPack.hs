@@ -80,17 +80,17 @@ testBench = done
                 , $(lift (pack jT))
                 , $(lift (pack kT))
                 )
-              , ( $$(bLit "00100010")  :: BitVector 8
-                , $$(bLit "000")       :: BitVector 3
-                , $$(bLit "001")       :: BitVector 3
-                , $$(bLit "010")       :: BitVector 3
-                , $$(bLit "110")       :: BitVector 3
-                , $$(bLit "000100010") :: BitVector 9
-                , $$(bLit "100001010") :: BitVector 9
-                , $$(bLit "0001000001") :: BitVector 10
-                , $$(bLit "01010.....") :: BitVector 10
-                , $$(bLit "1000001...") :: BitVector 10
-                , $$(bLit "00100010")  :: BitVector 8
+              , ( $(bLit "00100010")
+                , $(bLit "000")
+                , $(bLit "001")
+                , $(bLit "010")
+                , $(bLit "110")
+                , $(bLit "000100010")
+                , $(bLit "100001010")
+                , $(bLit "0001000001")
+                , $(bLit "01010.....")
+                , $(bLit "1000001...")
+                , $(bLit "00100010")
                 )
               ) :> Nil)
 
