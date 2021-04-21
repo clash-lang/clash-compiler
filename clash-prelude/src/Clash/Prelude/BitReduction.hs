@@ -24,11 +24,11 @@ import Clash.Sized.Internal.BitVector (Bit, reduceAnd#, reduceOr#, reduceXor#)
 -- | Are all bits set to '1'?
 --
 -- >>> pack (-2 :: Signed 6)
--- 11_1110
+-- 0b11_1110
 -- >>> reduceAnd (-2 :: Signed 6)
 -- 0
 -- >>> pack (-1 :: Signed 6)
--- 11_1111
+-- 0b11_1111
 -- >>> reduceAnd (-1 :: Signed 6)
 -- 1
 --
@@ -43,11 +43,11 @@ reduceAnd v = reduceAnd# (pack v)
 -- | Is there at least one bit set to '1'?
 --
 -- >>> pack (5 :: Signed 6)
--- 00_0101
+-- 0b00_0101
 -- >>> reduceOr (5 :: Signed 6)
 -- 1
 -- >>> pack (0 :: Signed 6)
--- 00_0000
+-- 0b00_0000
 -- >>> reduceOr (0 :: Signed 6)
 -- 0
 --
@@ -62,15 +62,15 @@ reduceOr v = reduceOr# (pack v)
 -- | Is the number of bits set to '1' uneven?
 --
 -- >>> pack (5 :: Signed 6)
--- 00_0101
+-- 0b00_0101
 -- >>> reduceXor (5 :: Signed 6)
 -- 0
 -- >>> pack (28 :: Signed 6)
--- 01_1100
+-- 0b01_1100
 -- >>> reduceXor (28 :: Signed 6)
 -- 1
 -- >>> pack (-5 :: Signed 6)
--- 11_1011
+-- 0b11_1011
 -- >>> reduceXor (-5 :: Signed 6)
 -- 1
 --

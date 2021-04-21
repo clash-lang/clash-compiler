@@ -408,8 +408,9 @@ instance NFData (BitVector n) where
   -- coercion
 
 instance KnownNat n => Show (BitVector n) where
-  show bv@(BV msk i) = reverse . underScore . reverse $ showBV (natVal bv) msk i []
-    where
+  show bv@(BV msk i) =
+    ("0b" <>) . reverse . underScore . reverse $ showBV (natVal bv) msk i []
+   where
       showBV 0 _ _ s = s
       showBV n m v s = let (v',vBit) = divMod v 2
                            (m',mBit) = divMod m 2
@@ -434,26 +435,26 @@ instance KnownNat n => NFDataX (BitVector n) where
 -- | Create a binary literal
 --
 -- >>> $$(bLit "1001") :: BitVector 4
--- 1001
+-- 0b1001
 -- >>> $$(bLit "1001") :: BitVector 3
--- 001
+-- 0b001
 --
 -- __NB__: You can also just write:
 --
 -- >>> 0b1001 :: BitVector 4
--- 1001
+-- 0b1001
 --
 -- The advantage of 'bLit' is that you can use computations to create the
 -- string literal:
 --
 -- >>> import qualified Data.List as List
 -- >>> $$(bLit (List.replicate 4 '1')) :: BitVector 4
--- 1111
+-- 0b1111
 --
 -- Also 'bLit' can handle don't care bits:
 --
 -- >>> $$(bLit "1.0.") :: BitVector 4
--- 1.0.
+-- 0b1.0.
 #if MIN_VERSION_template_haskell(2,17,0)
 bLit :: forall n. KnownNat n => String -> Code Q (BitVector n)
 #else

@@ -128,7 +128,7 @@ errorX msg = throw (XException ("X: " ++ msg ++ "\n" ++ prettyCallStack callStac
 -- :}
 --
 -- >>> h' (errorX "QQ") 3
--- 0000_0011
+-- 0b0000_0011
 -- >>> h (errorX "QQ") 3
 -- *** Exception: a is X
 -- X: QQ
@@ -184,7 +184,7 @@ xToErrorCtx ctx a = unsafeDupablePerformIO
 -- :}
 --
 -- >>> h' (errorX "QQ") 3
--- 0000_0011
+-- 0b0000_0011
 -- >>> f (errorX "QQ") 3
 -- *** Exception: CallStack (from HasCallStack):
 --   xToError, called at ...
@@ -460,7 +460,7 @@ class NFDataX a where
   -- >>> hasUndefined m
   -- False
   -- >>> pack m
-  -- 0.
+  -- 0b0.
   -- >>> hasUndefined (pack m)
   -- True
   --

@@ -79,9 +79,9 @@ decoderShift enable binaryIn =
 Examples:
 
 >>> decoderCase True 3
-0000_0000_0000_1000
+0b0000_0000_0000_1000
 >>> decoderShift True 7
-0000_0000_1000_0000
+0b0000_0000_1000_0000
 
 The following property holds:
 
