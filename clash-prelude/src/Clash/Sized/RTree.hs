@@ -434,7 +434,7 @@ type instance Apply (V2TTree a) d = RTree d a
 -- | Convert a vector with /2^d/ elements to a tree of depth /d/.
 --
 -- >>> (1:>2:>3:>4:>Nil)
--- <1,2,3,4>
+-- 1 :> 2 :> 3 :> 4 :> Nil
 -- >>> v2t (1:>2:>3:>4:>Nil)
 -- <<1,2>,<3,4>>
 v2t :: forall d a . KnownNat d => Vec (2^d) a -> RTree d a
@@ -448,7 +448,7 @@ type instance Apply (T2VTree a) d = Vec (2^d) a
 -- >>> (BR (BR (LR 1) (LR 2)) (BR (LR 3) (LR 4)))
 -- <<1,2>,<3,4>>
 -- >>> t2v (BR (BR (LR 1) (LR 2)) (BR (LR 3) (LR 4)))
--- <1,2,3,4>
+-- 1 :> 2 :> 3 :> 4 :> Nil
 t2v :: forall d a . KnownNat d => RTree d a -> Vec (2^d) a
 t2v = tdfold (Proxy @(T2VTree a)) (:> Nil) (\_ l r -> l ++ r)
 

@@ -475,7 +475,7 @@ class NFDataX a where
   -- >>> case spined of (_, _) -> 'a'
   -- 'a'
   -- >>> fmap (const 'b') (ensureSpine undefined :: Vec 3 Int)
-  -- <'b','b','b'>
+  -- 'b' :> 'b' :> 'b' :> Nil
   -- >>> fmap (const 'c') (ensureSpine undefined :: RTree 2 Int)
   -- <<'c','c'>,<'c','c'>>
   --
