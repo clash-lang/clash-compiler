@@ -1,0 +1,1 @@
+FIXED: `showX` now doesn't crash if a spine of a `Vec` is undefined

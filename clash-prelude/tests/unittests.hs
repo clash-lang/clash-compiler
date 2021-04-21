@@ -15,6 +15,7 @@ import qualified Clash.Tests.Signal
 import qualified Clash.Tests.Signed
 import qualified Clash.Tests.TopEntityGeneration
 import qualified Clash.Tests.Unsigned
+import qualified Clash.Tests.Vector
 
 import qualified Clash.Tests.Laws.Enum
 import qualified Clash.Tests.Laws.SaturatingNum
@@ -34,6 +35,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Signed.tests
   , Clash.Tests.TopEntityGeneration.tests
   , Clash.Tests.Unsigned.tests
+  , Clash.Tests.Vector.tests
   , testGroup "Laws"
     [ Clash.Tests.Laws.Enum.tests
     , Clash.Tests.Laws.SaturatingNum.tests
