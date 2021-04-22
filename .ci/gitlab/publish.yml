@@ -1,5 +1,6 @@
 hackage-sdist:
   extends: .common
+  needs: []
   stage: pack
   interruptible: false
   script:
