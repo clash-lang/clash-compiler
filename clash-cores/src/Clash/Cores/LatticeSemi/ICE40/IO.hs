@@ -333,7 +333,7 @@ sbioPrim pinConf pkgPinIn latchInput dOut0 outputEnable =
 {-# ANN sbioPrim hasBlackBox #-}
 {-# ANN sbioPrim (InlinePrimitive [VHDL,Verilog,SystemVerilog] $ unindent [i|
    [ { "BlackBox" :
-        { "name" : "Clash.Cores.LatticeSemi.ICE40.IO.sbio",
+        { "name" : "Clash.Cores.LatticeSemi.ICE40.IO.sbioPrim",
           "kind" : "Declaration",
           "format": "Haskell",
           "templateFunction": "Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO.sbioTF"
@@ -428,10 +428,10 @@ sbioDDRPrim pinConf pkgPinIn dOut0 dOut1 outputEnable =
 {-# ANN sbioDDRPrim hasBlackBox #-}
 {-# ANN sbioDDRPrim (InlinePrimitive [VHDL,Verilog,SystemVerilog] $ unindent [i|
    [ { "BlackBox" :
-        { "name" : "Clash.Cores.LatticeSemi.ICE40.IO.sbio",
+        { "name" : "Clash.Cores.LatticeSemi.ICE40.IO.sbioDDRPrim",
           "kind" : "Declaration",
           "format": "Haskell",
-          "templateFunction": "Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO.sbioTF"
+          "templateFunction": "Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO.sbioDDRTF"
         }
      }
    ]
