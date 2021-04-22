@@ -2419,7 +2419,7 @@ unconcatBitVector# orig = snd (go (toUNat (SNat @n)))
 --
 -- >>> let x = 6 :: BitVector 8
 -- >>> x
--- 0000_0110
+-- 0b0000_0110
 -- >>> bv2v x
 -- 0 :> 0 :> 0 :> 0 :> 0 :> 1 :> 1 :> 0 :> Nil
 bv2v :: KnownNat n => BitVector n -> Vec n Bit
@@ -2431,7 +2431,7 @@ bv2v = unpack
 -- >>> x
 -- 0 :> 0 :> 0 :> 1 :> 0 :> 0 :> 1 :> 0 :> Nil
 -- >>> v2bv x
--- 0001_0010
+-- 0b0001_0010
 v2bv :: KnownNat n => Vec n Bit -> BitVector n
 v2bv = pack
 

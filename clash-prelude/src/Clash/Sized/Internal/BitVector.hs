@@ -408,19 +408,28 @@ instance NFData (BitVector n) where
   -- coercion
 
 instance KnownNat n => Show (BitVector n) where
-  show bv@(BV msk i) = reverse . underScore . reverse $ showBV (natVal bv) msk i []
-    where
-      showBV 0 _ _ s = s
-      showBV n m v s = let (v',vBit) = divMod v 2
-                           (m',mBit) = divMod m 2
-                       in  case (mBit,vBit) of
-                           (0,0) -> showBV (n - 1) m' v' ('0':s)
-                           (0,_) -> showBV (n - 1) m' v' ('1':s)
-                           _     -> showBV (n - 1) m' v' ('.':s)
+  show (BV m i) =
+    case natToNum @n @Int of
+      0 -> "0"
+      _ -> '0' : 'b' : go groupSize (natToNum @n @Int) m i []
+   where
+    go _ 0 _ _ s = s
+    go c n m0 v0 s =
+      let
+        (!v1, !vBit) = quotRem v0 2
+        (!m1, !mBit) = quotRem m0 2
+        !renderedBit = showBit mBit vBit
+      in
+        case c of
+          0 -> go (groupSize - 1) (n - 1) m1 v1 (renderedBit : '_' : s)
+          _ -> go (c - 1)         (n - 1) m1 v1 (renderedBit :       s)
 
-      underScore xs = case splitAt 5 xs of
-                        ([a,b,c,d,e],rest) -> [a,b,c,d,'_'] ++ underScore (e:rest)
-                        (rest,_)               -> rest
+    showBit 0 0 = '0'
+    showBit 0 1 = '1'
+    showBit _ _ = '.'
+
+    groupSize :: Int
+    groupSize = 4
   {-# NOINLINE show #-}
 
 instance KnownNat n => ShowX (BitVector n) where
@@ -434,26 +443,26 @@ instance KnownNat n => NFDataX (BitVector n) where
 -- | Create a binary literal
 --
 -- >>> $$(bLit "1001") :: BitVector 4
--- 1001
+-- 0b1001
 -- >>> $$(bLit "1001") :: BitVector 3
--- 001
+-- 0b001
 --
 -- __NB__: You can also just write:
 --
 -- >>> 0b1001 :: BitVector 4
--- 1001
+-- 0b1001
 --
 -- The advantage of 'bLit' is that you can use computations to create the
 -- string literal:
 --
 -- >>> import qualified Data.List as List
 -- >>> $$(bLit (List.replicate 4 '1')) :: BitVector 4
--- 1111
+-- 0b1111
 --
 -- Also 'bLit' can handle don't care bits:
 --
 -- >>> $$(bLit "1.0.") :: BitVector 4
--- 1.0.
+-- 0b1.0.
 #if MIN_VERSION_template_haskell(2,17,0)
 bLit :: forall n. KnownNat n => String -> Code Q (BitVector n)
 #else

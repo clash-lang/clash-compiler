@@ -23,7 +23,7 @@ import qualified Test.Tasty.Hedgehog as H
 import qualified Test.Tasty.QuickCheck as Q
 
 import Clash.Prelude
-  (Bit, high, low, bitPattern, type (<=), type (-), natToInteger, liftA2, msb)
+  (Bit, high, low, bitPattern, type (<=), type (-), natToInteger, liftA2, msb, bLit)
 import Clash.Sized.Internal.BitVector (BitVector (..))
 
 import Clash.Tests.SizedNum
@@ -104,6 +104,22 @@ tests = localOption (Q.QuickCheckMaxRatio 2) $ testGroup "All"
     , H.testProperty "msb @(BitVector 64)" (msbTest @64)
     , H.testProperty "msb @(BitVector 128)" (msbTest @128)
     , H.testProperty "msb @(BitVector 129)" (msbTest @129)
+    ]
+  , testGroup "show"
+    [ testCase "show0"  $ show @(BitVector 0) 0b0 @?= "0"
+    , testCase "show1"  $ show @(BitVector 1) 0b1 @?= "0b1"
+    , testCase "show2"  $ show @(BitVector 1) 0b0 @?= "0b0"
+    , testCase "show3"  $ show @(BitVector 2) 0b00 @?= "0b00"
+    , testCase "show4"  $ show @(BitVector 2) 0b01 @?= "0b01"
+    , testCase "show5"  $ show @(BitVector 2) 0b10 @?= "0b10"
+    , testCase "show6"  $ show @(BitVector 2) 0b11 @?= "0b11"
+    , testCase "show7"  $ show @(BitVector 3) 0b111 @?= "0b111"
+    , testCase "show8"  $ show @(BitVector 4) $$(bLit "0000") @?= "0b0000"
+    , testCase "show9"  $ show @(BitVector 4) $$(bLit "000.") @?= "0b000."
+    , testCase "show10" $ show @(BitVector 4) $$(bLit "010.") @?= "0b010."
+    , testCase "show11" $ show @(BitVector 5) $$(bLit "1010.") @?= "0b1_010."
+    , testCase "show12" $ show @(BitVector 8) $$(bLit "0001010.") @?= "0b0001_010."
+    , testCase "show13" $ show @(BitVector 9) $$(bLit "10001010.") @?= "0b1_0001_010."
     ]
   ]
 

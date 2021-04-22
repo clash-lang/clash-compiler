@@ -81,7 +81,7 @@ class KnownNat (BitSize a) => BitPack a where
   -- | Convert element of type @a@ to a 'BitVector'
   --
   -- >>> pack (-5 :: Signed 6)
-  -- 11_1011
+  -- 0b11_1011
   pack   :: a -> BitVector (BitSize a)
   default pack
     :: ( Generic a
@@ -103,12 +103,12 @@ class KnownNat (BitSize a) => BitPack a where
   -- | Convert a 'BitVector' to an element of type @a@
   --
   -- >>> pack (-5 :: Signed 6)
-  -- 11_1011
+  -- 0b11_1011
   -- >>> let x = pack (-5 :: Signed 6)
   -- >>> unpack x :: Unsigned 6
   -- 59
   -- >>> pack (59 :: Unsigned 6)
-  -- 11_1011
+  -- 0b11_1011
   unpack :: BitVector (BitSize a) -> a
   default unpack
     :: ( Generic a
@@ -177,11 +177,11 @@ isLike x y =
 -- | Coerce a value from one type to another through its bit representation.
 --
 -- >>> pack (-5 :: Signed 6)
--- 11_1011
+-- 0b11_1011
 -- >>> bitCoerce (-5 :: Signed 6) :: Unsigned 6
 -- 59
 -- >>> pack (59 :: Unsigned 6)
--- 11_1011
+-- 0b11_1011
 bitCoerce
   :: (BitPack a, BitPack b, BitSize a ~ BitSize b)
   => a
@@ -191,11 +191,11 @@ bitCoerce = unpack . pack
 -- | Map a value by first coercing to another type through its bit representation.
 --
 -- >>> pack (-5 :: Signed 32)
--- 1111_1111_1111_1111_1111_1111_1111_1011
+-- 0b1111_1111_1111_1111_1111_1111_1111_1011
 -- >>> bitCoerceMap @(Vec 4 (BitVector 8)) (replace 1 0) (-5 :: Signed 32)
 -- -16711685
 -- >>> pack (-16711685 :: Signed 32)
--- 1111_1111_0000_0000_1111_1111_1111_1011
+-- 0b1111_1111_0000_0000_1111_1111_1111_1011
 bitCoerceMap
   :: forall a b . (BitPack a, BitPack b, BitSize a ~ BitSize b)
   => (a -> a)
@@ -431,9 +431,9 @@ instance BitPack a => BitPack (Down a)
 -- | Zero-extend a 'Bool'ean value to a 'BitVector' of the appropriate size.
 --
 -- >>> boolToBV True :: BitVector 6
--- 00_0001
+-- 0b00_0001
 -- >>> boolToBV False :: BitVector 6
--- 00_0000
+-- 0b00_0000
 boolToBV :: KnownNat n => Bool -> BitVector (n + 1)
 boolToBV = zeroExtend . pack
 

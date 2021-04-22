@@ -311,6 +311,7 @@ wantedLanguageExtensions =
   , LangExt.KindSignatures
   , LangExt.MagicHash
   , LangExt.MonoLocalBinds
+  , LangExt.NumericUnderscores
   , LangExt.QuasiQuotes
   , LangExt.ScopedTypeVariables
   , LangExt.TemplateHaskell

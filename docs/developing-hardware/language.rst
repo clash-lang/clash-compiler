@@ -28,6 +28,7 @@ exposed by GHC as language extensions. The extensions used by Clash are
 - ``KindSignatures``
 - ``MagicHash``
 - ``MonoLocalBinds``
+- ``NumericUnderscores``
 - ``NoImplicitPrelude``
 - ``NoMonomorphismRestriction``
 - ``NoStarIsType`` (since GHC 8.6)

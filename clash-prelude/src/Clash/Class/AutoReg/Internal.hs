@@ -74,12 +74,12 @@ import           Control.Lens.Internal.TH     (bndrName)
 --   when viewed as bits, a 'Nothing' would look like:
 --
 --     >>> pack @(Maybe (Signed 16)) Nothing
---     0_...._...._...._....
+--     0b0_...._...._...._....
 --
 --   and 'Just'
 --
 --     >>> pack @(Maybe (Signed 16)) (Just 3)
---     1_0000_0000_0000_0011
+--     0b1_0000_0000_0000_0011
 --
 --   In the first case, Nothing, we don't particularly care about updating the
 --   register holding the @Signed 16@ field, as they'll be unknown anyway. We
