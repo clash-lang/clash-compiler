@@ -79,11 +79,11 @@ testBenchUS = done
     expectedOutput = outputVerifier clkTest rstTest testoutputSync
     actualOutput   = ignoreFor clkReal rstReal enableGen d1 (dummy, dummy) (topEntityUS clkReal rstReal testInput)
     done           = expectedOutput actualOutput
-    done'          = not <$> done
+    notDone        = not <$> done
 
-    clkTest        = tbClockGen @TB done'
-    clkDDR         = tbClockGen @SyncDDR (unsafeSynchronizer clkTest clkDDR done')
-    clkReal        = tbClockGen @SyncReal (unsafeSynchronizer clkTest clkReal done')
+    clkTest        = tbClockGen @TB notDone
+    clkDDR         = tbClockGen @SyncDDR (unsafeSynchronizer clkTest clkDDR notDone)
+    clkReal        = tbClockGen @SyncReal (unsafeSynchronizer clkTest clkReal notDone)
 
     rstTest        = resetGen @TB
     rstDDR         = resetGen @SyncDDR
@@ -96,10 +96,10 @@ testBenchUA = done
     expectedOutput = outputVerifier'   clkReal rstReal testoutputAsync
     actualOutput   = ignoreFor clkReal rstReal enableGen d1 (dummy, dummy) (topEntityUA clkReal rstReal testInput)
     done           = expectedOutput actualOutput
-    done'          = not <$> done
+    notDone        = not <$> done
 
-    clkDDR         = tbClockGen @AsyncDDR (unsafeSynchronizer clkReal clkDDR done')
-    clkReal        = tbClockGen @AsyncReal done'
+    clkDDR         = tbClockGen @AsyncDDR (unsafeSynchronizer clkReal clkDDR notDone)
+    clkReal        = tbClockGen @AsyncReal notDone
     rstDDR         = resetGen @AsyncDDR
     rstReal        = resetGen @AsyncReal
 
@@ -110,11 +110,11 @@ testBenchGS = done
     expectedOutput = outputVerifier clkTest rstTest testoutputSync
     actualOutput   = ignoreFor clkReal rstReal enableGen d1 (dummy, dummy) (topEntityGS clkReal rstReal testInput)
     done           = expectedOutput actualOutput
-    done'          = not <$> done
+    notDone        = not <$> done
 
-    clkTest        = tbClockGen @TB done'
-    clkDDR         = tbClockGen @SyncDDR (unsafeSynchronizer clkTest clkDDR done')
-    clkReal        = tbClockGen @SyncReal (unsafeSynchronizer clkTest clkReal done')
+    clkTest        = tbClockGen @TB notDone
+    clkDDR         = tbClockGen @SyncDDR (unsafeSynchronizer clkTest clkDDR notDone)
+    clkReal        = tbClockGen @SyncReal (unsafeSynchronizer clkTest clkReal notDone)
 
     rstTest        = resetGen @TB
     rstDDR         = resetGen @SyncDDR
@@ -127,9 +127,9 @@ testBenchGA = done
     expectedOutput = outputVerifier'   clkReal rstReal testoutputAsync
     actualOutput   = ignoreFor clkReal rstReal enableGen d1 (dummy, dummy) (topEntityGA clkReal rstReal testInput)
     done           = expectedOutput actualOutput
-    done'          = not <$> done
+    notDone        = not <$> done
 
-    clkDDR         = tbClockGen @AsyncDDR (unsafeSynchronizer clkReal clkDDR done')
-    clkReal        = tbClockGen @AsyncReal done'
+    clkDDR         = tbClockGen @AsyncDDR (unsafeSynchronizer clkReal clkDDR notDone)
+    clkReal        = tbClockGen @AsyncReal notDone
     rstDDR         = resetGen @AsyncDDR
     rstReal        = resetGen @AsyncReal
