@@ -422,6 +422,10 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS(runTest "MultiResult" def)
         , NEEDS_PRIMS(runTest "T919" def{hdlSim=False})
         , NEEDS_PRIMS(runTest "T1524" def)
+        , runTest "T1786" def{
+            hdlTargets=[VHDL]
+          , buildTargets=BuildSpecific ["testEnableTB", "testBoolTB"]
+          }
         ]
       , clashTestGroup "BoxedFunctions"
         [ runTest "DeadRecursiveBoxed" def{hdlSim=False}
