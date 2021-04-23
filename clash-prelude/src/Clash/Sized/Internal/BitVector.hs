@@ -159,15 +159,18 @@ import GHC.TypeNats               (natVal)
 import GHC.TypeLits               (natVal)
 #endif
 import GHC.TypeLits.Extra         (Max)
-import Language.Haskell.TH        (Lit (..), Pat, Q, appT, conT, litE, litP, litT, mkName, numTyLit, sigE, tupE, tupP, varP)
+import Language.Haskell.TH
+  (Lit (..), ExpQ, Type(ConT, AppT, LitT), Exp(VarE, AppE, SigE, LitE),
+   TyLit(NumTyLit), Pat, Q, appT, conT, litE, litP, litT, mkName, numTyLit,
+   sigE, tupE, tupP, varP)
 import Language.Haskell.TH.Syntax (Lift(..))
 #if MIN_VERSION_template_haskell(2,16,0)
 import Language.Haskell.TH.Compat
 #endif
 #if MIN_VERSION_template_haskell(2,17,0)
-import Language.Haskell.TH        (Code, Quote, Type)
+import Language.Haskell.TH        (Quote)
 #else
-import Language.Haskell.TH        (TExp, TypeQ)
+import Language.Haskell.TH        (TypeQ)
 #endif
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
@@ -442,10 +445,8 @@ instance KnownNat n => NFDataX (BitVector n) where
 
 -- | Create a binary literal
 --
--- >>> $$(bLit "1001") :: BitVector 4
+-- >>> $(bLit "1001")
 -- 0b1001
--- >>> $$(bLit "1001") :: BitVector 3
--- 0b001
 --
 -- __NB__: You can also just write:
 --
@@ -456,33 +457,31 @@ instance KnownNat n => NFDataX (BitVector n) where
 -- string literal:
 --
 -- >>> import qualified Data.List as List
--- >>> $$(bLit (List.replicate 4 '1')) :: BitVector 4
+-- >>> $(bLit (List.replicate 4 '1'))
 -- 0b1111
 --
 -- Also 'bLit' can handle don't care bits:
 --
--- >>> $$(bLit "1.0.") :: BitVector 4
+-- >>> $(bLit "1.0.")
 -- 0b1.0.
-#if MIN_VERSION_template_haskell(2,17,0)
-bLit :: forall n. KnownNat n => String -> Code Q (BitVector n)
-#else
-bLit :: forall n. KnownNat n => String -> Q (TExp (BitVector n))
-#endif
-bLit s = [|| fromInteger# m i1 ||]
+--
+-- __N.B.__: From Clash 1.6 an onwards 'bLit' will deduce the size of the
+--           BitVector from the given string and annotate the splice it
+--           produces accordingly.
+bLit :: String -> ExpQ
+bLit s = pure (SigE body typ)
+ where
+  typ = ConT ''BitVector `AppT` LitT (NumTyLit (toInteger n))
+  body = VarE 'fromInteger# `AppE` iLit mask `AppE` iLit value
+
+  iLit = LitE . IntegerL . toInteger
+  (n, BV mask value) = read# s :: (Natural, BitVector n)
+
+read# :: String -> (Natural, BitVector n)
+read# cs0 = (fromIntegral (length cs1), BV m v)
   where
-    bv :: BitVector n
-    bv = read# s
-
-    m,i :: Natural
-    BV m i = bv
-
-    i1 :: Integer
-    i1 = toInteger i
-
-read# :: KnownNat n => String -> BitVector n
-read# cs = BV m v
-  where
-    (vs,ms) = unzip . map readBit . filter (/= '_') $ cs
+    cs1 = filter (/= '_') cs0
+    (vs, ms) = unzip (map readBit cs1)
     combineBits = foldl (\b a -> b*2+a) 0
     v = combineBits vs
     m = combineBits ms
@@ -490,7 +489,9 @@ read# cs = BV m v
       '0' -> (0,0)
       '1' -> (1,0)
       '.' -> (0,1)
-      _   -> error $ "Clash.Sized.Internal.bLit: unknown character: " ++ show c ++ " in input: " ++ cs
+      _   -> error $
+           "Clash.Sized.Internal.bLit: unknown character: "
+        ++ show c ++ " in input: " ++ cs0
 
 
 instance KnownNat n => Eq (BitVector n) where
@@ -1219,7 +1220,7 @@ undefError op bvs = withFrozenCallStack $
   ++ unwords (L.map show bvs)
 
 
--- | Implement BitVector undefinedness checking for unpack funtions
+-- | Implement BitVector undefinedness checking for unpack functions
 checkUnpackUndef :: (KnownNat n, Typeable a)
                  => (BitVector n -> a) -- ^ unpack function
                  -> BitVector n -> a
@@ -1245,8 +1246,8 @@ undefined# =
 -- in the second argument as being "don't care" bits. This is a more lenient
 -- version of '(==)', similar to @std_match@ in VHDL or @casez@ in Verilog.
 --
--- >>> let expected = $$(bLit "1.") :: BitVector 2
--- >>> let checked  = $$(bLit "11") :: BitVector 2
+-- >>> let expected = $(bLit "1.")
+-- >>> let checked  = $(bLit "11")
 --
 -- >>> checked  `isLike#` expected
 -- True
