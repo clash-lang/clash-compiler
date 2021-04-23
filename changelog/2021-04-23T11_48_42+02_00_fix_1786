@@ -1,0 +1,1 @@
+FIXED: ~ISACTIVEENABLE in blackboxes works again, and now acts on `Signal dom Bool` in addition to `Enable dom`. Since [#1368](https://github.com/clash-lang/clash-compiler/pull/1368), enable lines were always generated even if they were known to be always enabled. Fixes [#1786](https://github.com/clash-lang/clash-compiler/issues/1786).
