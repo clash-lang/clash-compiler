@@ -23,6 +23,8 @@ import Clash.XException (errorX, showX)
 
 import Clash.Cores.LatticeSemi.ICE40.IO
 
+import Debug.Trace -- TODO
+
 -- | A variant of System which runs at double speed. Used when testing DDR.
 createDomain vSystem{vName="SystemFast", vPeriod=(vPeriod vSystem `div` 2)}
 
@@ -63,8 +65,10 @@ simpleEcho =
 
     let samples = sampleSbio pinIn pinOut dOut0 dOut1 latch outEn numCycles
 
-    pure . QC.collect (pinIn, pinOut) $
-      checkDIn0 pinOut samples dIn0 .&&. checkDIn1 isDDR samples dIn1
+    pure
+      . QC.collect (pinIn, pinOut)
+      . trace (showX (show pinIn, show pinOut, dOut0, dOut1, latch, outEn, dIn0, dIn1))
+      $ checkDIn0 pinOut samples dIn0 .&&. checkDIn1 isDDR samples dIn1
 
 -- | Test that configurations which use iCEgate low power latch correctly hold
 -- the previous value when the latch is asserted.
@@ -144,8 +148,10 @@ enabledEcho =
 
     let samples = sampleSbio pinIn pinOut dOut0 dOut1 latch outEn numCycles
 
-    pure . QC.collect (pinIn, pinOut) $
-      checkDIn0 pinOut samples dIn0' .&&. checkDIn1 isDDR samples dIn1'
+    pure
+      . QC.collect (pinIn, pinOut)
+      . trace (showX (show pinIn, show pinOut, dOut0, dOut1, latch, outEn, dIn0, dIn1))
+      $ checkDIn0 pinOut samples dIn0' .&&. checkDIn1 isDDR samples dIn1'
 
 isEnableRegistered :: PinOutputConfig -> Bool
 isEnableRegistered = \case
