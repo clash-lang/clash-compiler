@@ -9,9 +9,10 @@ Verification
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Clash.Verification.PrettyPrinters
+module Clash.Verification.Pretty
   ( pprPslProperty
   , pprSvaProperty
+  , pprYosysSvaProperty
 
   -- * Debugging functions
   , pprProperty
@@ -20,6 +21,7 @@ module Clash.Verification.PrettyPrinters
 import           Clash.Annotations.Primitive      (HDL(..))
 import           Clash.Signal.Internal            (ActiveEdge, ActiveEdge(..))
 import           Clash.Verification.Internal      hiding (assertion)
+import           Clash.Netlist.Types              (Declaration(..), Seq(..), Expr, CommentOrDirective(..))
 import           Data.Maybe                       (fromMaybe)
 import           Data.Text                        (Text)
 import qualified Data.Text as Text                (pack)
@@ -107,7 +109,7 @@ symbol VHDL = \case
 
 -- | Pretty print Property. Doesn't print valid HDL, but can be used for
 -- debugging purposes.
-pprProperty :: Property dom -> Text
+pprProperty :: Property dom -> Declaration
 pprProperty (Property prop0) =
   let prop1 = fromMaybe "__autogen__" . fst <$> prop0 in
   pprPslProperty VHDL "prop" "clk" Rising prop1
@@ -123,8 +125,8 @@ pprPslProperty
   -- ^ Edge property should be sensitive to
   -> Property' Text
   -- ^ Assertion / Cover statement
-  -> Text
-pprPslProperty hdl propName clkId edge assertion =
+  -> Declaration
+pprPslProperty hdl propName clkId edge assertion = TickDecl . Comment $
   "psl property " <> propName <> " " <> symbol hdl Is <> "\n" <>
   "(" <> prop <> ") @(" <> pslEdge hdl edge clkId <> ")" <>
   ";\n" <> "psl " <> coverOrAssert <> " " <>
@@ -134,6 +136,7 @@ pprPslProperty hdl propName clkId edge assertion =
     case assertion of
       CvCover e -> ("cover", pprPslAssertion hdl False e)
       CvAssert e -> ("assert", pprPslAssertion hdl False e)
+      CvAssume e -> ("assume", pprPslAssertion hdl False e)
 
 pprPslAssertion :: HDL -> Bool -> Assertion' Text -> Text
 pprPslAssertion hdl parens e =
@@ -168,6 +171,7 @@ pprPslAssertion hdl parens e =
 
     (CvAlways e1) -> "always " <> pprPslAssertion hdl True e1
     (CvNever e1) -> "never " <> pprPslAssertion hdl True e1
+    (CvEventually e1) -> "eventually! " <> pprPslAssertion hdl True e1
  where
   pslBinOp1 = pslBinOp hdl True
 
@@ -220,6 +224,7 @@ pprSvaAssertion parens e =
 
     (CvAlways e1) -> "always (" <> pprSvaAssertion False e1 <> ")"
     (CvNever _e) -> error "'never' not supported in SVA"
+    (CvEventually e1) -> "s_eventually (" <> pprSvaAssertion False e1 <> ")"
  where
   svaBinOp1 = svaBinOp parens
   symbol' = symbol SystemVerilog
@@ -233,8 +238,8 @@ pprSvaProperty
   -- ^ Edge property should be sensitive to
   -> Property' Text
   -- ^ Assertion / Cover statement
-  -> Text
-pprSvaProperty propName clkId edge assertion =
+  -> Declaration
+pprSvaProperty propName clkId edge assertion = TickDecl . Comment $
   propName <> ": " <> coverOrAssert <> " property (@(" <>
   svaEdge edge clkId <> ") " <> prop <> ");"
  where
@@ -242,3 +247,32 @@ pprSvaProperty propName clkId edge assertion =
     case assertion of
       CvCover e -> ("cover", pprSvaAssertion False e)
       CvAssert e -> ("assert", pprSvaAssertion False e)
+      CvAssume e -> ("assume", pprSvaAssertion False e)
+
+---------------------------------------
+--     Yosys Formal Extensions       --
+---------------------------------------
+
+-- | Generate something like:
+-- @always @(posedge clk_i) isOn: cover (result);@
+pprYosysSvaProperty
+  :: Text
+  -- ^ Property name
+  -> Expr
+  -- ^ Clock expression
+  -> ActiveEdge
+  -- ^ Edge property should be sensitive to
+  -> Property' Text
+  -- ^ Assertion / Cover statement
+  -> Declaration
+pprYosysSvaProperty propName clk edge assertion = ConditionalDecl
+  "FORMAL"
+  [Seq [AlwaysClocked edge clk [SeqDecl (TickDecl directive)]]]
+ where
+  directive = Directive
+    (propName <> ": " <> coverOrAssert <> " property (" <> prop <> ")")
+
+  (coverOrAssert, prop) = case assertion of
+    CvCover  e -> ("cover", pprSvaAssertion False e)
+    CvAssert e -> ("assert", pprSvaAssertion False e)
+    CvAssume e -> ("assume", pprSvaAssertion False e)

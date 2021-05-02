@@ -36,10 +36,12 @@ module Clash.Explicit.Verification
   , timpliesOverlapping
   , always
   , never
+  , eventually
 
   -- * Asserts
   , assert
   , cover
+  , assume
 
   -- * Assertion checking
   , check
@@ -209,10 +211,15 @@ always :: AssertionValue dom a => a -> Assertion dom
 always = Assertion IsTemporal . CvAlways . assertion . toAssertionValue
 {-# INLINE always #-}
 
--- | Specify assertion should _never_ hold
+-- | Specify assertion should _never_ hold (not supported by SVA)
 never :: AssertionValue dom a => a -> Assertion dom
 never = Assertion IsTemporal . CvNever . assertion . toAssertionValue
 {-# INLINE never #-}
+
+-- | Specify assertion should _eventually_ hold
+eventually :: AssertionValue dom a => a -> Assertion dom
+eventually = Assertion IsTemporal . CvEventually . assertion . toAssertionValue
+{-# INLINE eventually #-}
 
 -- | Check whether given assertion always holds. Results can be collected with
 -- 'check'.
@@ -225,6 +232,13 @@ assert = Property . CvAssert . assertion . toAssertionValue
 cover :: AssertionValue dom a => a -> Property dom
 cover = Property . CvCover . assertion . toAssertionValue
 {-# INLINE cover #-}
+
+-- | Inform the prover that this property is true. This is the same as 'assert'
+-- for simulations.
+assume :: AssertionValue dom a => a -> Property dom
+assume = Property . CvAssume . assertion . toAssertionValue
+{-# INLINE assume #-}
+
 
 -- | Print property as PSL/SVA in HDL. Clash simulation support not yet
 -- implemented.

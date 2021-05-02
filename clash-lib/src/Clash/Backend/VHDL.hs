@@ -69,6 +69,7 @@ import qualified Clash.Util.Interpolate               as I
 import           Clash.Util.Graph                     (reverseTopSort)
 
 import           Clash.Backend.Verilog (Range (..), continueWithRange)
+import           Debug.Trace (traceM)
 
 -- | State for the 'Clash.Netlist.VHDL.VHDLM' monad:
 data VHDLState =
@@ -1327,7 +1328,8 @@ patLitCustom _ x y = error $ $(curLoc) ++ unwords
 
 insts :: [Declaration] -> VHDLM Doc
 insts [] = emptyDoc
-insts (TickDecl id_:ds) = comment "--" id_ <> line <> insts ds
+insts (TickDecl (Comment c):ds) = comment "--" c <> line <> insts ds
+insts (TickDecl (Directive d):ds) = pretty d <> ";" <> line <> insts ds
 insts (d:ds) = do
   d' <- inst_ d
   case d' of
@@ -1418,6 +1420,12 @@ inst_ (InstDecl entOrComp libM _ nm lbl gens pms0) = do
 
 inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
   fmap Just (Ap (column (renderBlackBox libs imps inc bs bbCtx)))
+
+inst_ (ConditionalDecl cond _) = do
+  traceM
+    $ "WARNING: Conditional compilation is not supported in VHDL. Discarding code conditional on "
+    <> TextS.unpack cond
+  return Nothing
 
 inst_ _ = return Nothing
 

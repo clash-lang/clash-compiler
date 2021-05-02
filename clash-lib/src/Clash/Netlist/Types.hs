@@ -358,6 +358,12 @@ data SomeBackend where
   SomeBackend :: Backend backend => backend -> SomeBackend
 
 type Comment = Text
+type Directive = Text
+
+data CommentOrDirective
+  = Comment Comment
+  | Directive Directive
+  deriving Show
 
 -- | Component: base unit of a Netlist
 data Component
@@ -537,10 +543,19 @@ data Declaration
       (Either IdentifierText HWType) -- ^ Pointer to type of signal or type of signal
       (Maybe Expr)                   -- ^ Initial value
       -- ^ Signal declaration
-  | TickDecl Comment
-  -- ^ HDL tick corresponding to a Core tick
+
+  -- | HDL tick corresponding to a Core tick
+  | TickDecl CommentOrDirective
+
   -- | Sequential statement
   | Seq [Seq]
+
+  -- | Compilation conditional on some preprocessor symbol, note that
+  -- declarations here are ignored for VHDL. See here for a discussion
+  -- https://github.com/clash-lang/clash-compiler/pull/1798#discussion_r648571862
+  | ConditionalDecl
+      !Text -- ^ condition text, for example @FORMAL@
+      [Declaration]
   deriving Show
 
 -- | Sequential statements

@@ -1646,7 +1646,7 @@ withTicks ticks0 k = do
   go decls (NoDeDup:ticks) = go decls ticks
 
   go decls (SrcSpan sp:ticks) =
-    go (TickDecl (Text.pack (showSDocUnsafe (ppr sp))):decls) ticks
+    go (TickDecl (Comment (Text.pack (showSDocUnsafe (ppr sp)))):decls) ticks
 
   go decls (NameMod m nm0:ticks) = do
     tcm <- Lens.use tcCache

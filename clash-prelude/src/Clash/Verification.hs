@@ -31,6 +31,7 @@ module Clash.Verification
   , EV.timpliesOverlapping
   , EV.always
   , EV.never
+  , EV.eventually
 
   -- * Asserts
   , EV.assert
