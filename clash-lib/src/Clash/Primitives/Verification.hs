@@ -16,7 +16,7 @@ import           GHC.Stack                       (HasCallStack)
 import           Clash.Annotations.Primitive     (HDL(..))
 import           Clash.Backend
   (Backend, blockDecl, hdlKind)
-import           Clash.Core.Term                 (Term(Var))
+import           Clash.Core.Term                 (Term(Var), termToId)
 import           Clash.Core.TermInfo             (termType)
 import           Clash.Core.TermLiteral          (termToDataError)
 import           Clash.Util                      (indexNote)
@@ -48,8 +48,8 @@ checkBBF _isD _primName args _ty =
  where
   -- TODO: Improve error handling; currently errors don't indicate what
   -- TODO: blackbox generated them.
-  (Var (id2identifier -> clkId)) = indexNote "clk" (lefts args) 1
-  (Var (id2identifier -> _clkId)) = indexNote "rst" (lefts args) 2
+  (id2identifier -> clkId) = termToId (indexNote "clk" (lefts args) 1)
+  (id2identifier -> _clkId) = termToId (indexNote "rst" (lefts args) 2)
 
   litArgs = do
     propName <- termToDataError (indexNote "propName" (lefts args) 3)

@@ -26,6 +26,7 @@ module Clash.Core.Term
   , TmName
   , idToVar
   , varToId
+  , termToId
   , LetBinding
   , Pat (..)
   , patIds
@@ -387,3 +388,11 @@ idToVar tv        = error $ $(curLoc) ++ "idToVar: tyVar: " ++ show tv
 varToId :: Term -> Id
 varToId (Var i) = i
 varToId e       = error $ $(curLoc) ++ "varToId: not a var: " ++ show e
+
+-- | Make an 'Id' out of the single 'Id' mentioned in a 'Term', if there isn't
+-- exactly one 'Id' then error
+termToId :: Term -> Id
+termToId t = case collectTermIds t of
+  [] -> error $ $(curLoc) ++ "termToId: no Ids: " ++ show t
+  [i] -> i
+  _ -> error $ $(curLoc) ++ "termToId: more than one Id in term: " ++ show t
