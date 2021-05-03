@@ -28,6 +28,7 @@ import Data.Maybe
 import qualified Data.Set                      as Set
 import qualified Data.Set.Lens                 as Lens
 import qualified Data.Text                     as T
+import           GHC.Stack                     (HasCallStack)
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Builtin.Names       (ipClassKey)

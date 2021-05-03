@@ -101,7 +101,8 @@ import qualified Data.List.Extra           as List
 import           Data.Maybe                (fromMaybe)
 import           Data.Text.Prettyprint.Doc
 import           GHC.Exts                  (Any)
-import           GHC.Generics
+import           GHC.Generics              (Generic)
+import           GHC.Stack                 (HasCallStack)
 
 import           Clash.Core.Pretty         ()
 import           Clash.Core.Var

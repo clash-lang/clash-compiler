@@ -61,6 +61,7 @@ import           Data.Text.Prettyprint.Doc
 import qualified Data.List                 as List
 import qualified Data.List.Extra           as List
 import           Data.Ord                  (comparing)
+import           GHC.Stack                 (HasCallStack)
 
 import           Clash.Core.FreeVars
   (noFreeVarsOfType, localFVsOfTerms, tyFVsOfTypes)
