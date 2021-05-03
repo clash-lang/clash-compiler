@@ -1,9 +1,10 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016     , Myrtle Software Ltd,
-                    2017     , Google Inc.
+                    2017     , Google Inc.,
+                    2021     , QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Type and instance definitions for Rewrite modules
 -}
@@ -32,10 +33,11 @@ import Control.Monad.State.Strict            (State)
 import Control.Monad.Writer                  (MonadWriter (..))
 import Data.Binary                           (Binary)
 import Data.Hashable                         (Hashable)
+import Data.HashMap.Strict                   (HashMap)
 import Data.IntMap.Strict                    (IntMap)
-import Data.Map.Strict                       (Map)
-import Data.Monoid                           (Any,Sum)
+import Data.Monoid                           (Any)
 import qualified Data.Set                    as Set
+import Data.Text                             (Text)
 import GHC.Generics
 
 #if EXPERIMENTAL_EVALUATOR
@@ -75,9 +77,11 @@ data RewriteStep
 -- | State of a rewriting session
 data RewriteState extra
   = RewriteState
+    -- TODO Given we now keep transformCounters, this should just be 'fold'
+    -- over that map, otherwise the two counts could fall out of sync.
   { _transformCounter :: {-# UNPACK #-} !Int
   -- ^ Total number of applied transformations
-  , _transformCounters :: Map String (Sum Word)
+  , _transformCounters :: HashMap Text Word
   -- ^ Map that tracks how many times each transformation is applied
   , _bindings         :: !BindingMap
   -- ^ Global binders
