@@ -22,7 +22,7 @@ import           Clash.Signal.Internal            (ActiveEdge, ActiveEdge(..))
 import           Clash.Verification.Internal      hiding (assertion)
 import           Data.Maybe                       (fromMaybe)
 import           Data.Text                        (Text)
-import           TextShow                         (showt)
+import qualified Data.Text as Text                (pack)
 
 data Symbol
   = TImpliesOverlapping
@@ -155,7 +155,7 @@ pprPslAssertion hdl parens e =
 
     (CvNext 0 e1) -> pprPslAssertion hdl parens e1
     (CvNext 1 e1) -> " ## " <> pprPslAssertion hdl True e1
-    (CvNext n e1) -> " ##" <> showt n <> " " <> pprPslAssertion hdl False e1
+    (CvNext n e1) -> " ##" <> Text.pack (show n) <> " " <> pprPslAssertion hdl False e1
 
     (CvBefore _ _) -> "{" <> afters1 <> "}"
      where
@@ -207,7 +207,7 @@ pprSvaAssertion parens e =
     (CvToTemporal e1) -> "{" <> pprSvaAssertion False e1 <> "}"
 
     (CvNext 0 e1) -> pprSvaAssertion parens e1
-    (CvNext n e1) -> "nexttime[" <> showt n <> "] " <> pprSvaAssertion False e1
+    (CvNext n e1) -> "nexttime[" <> Text.pack (show n) <> "] " <> pprSvaAssertion False e1
 
     (CvBefore _ _) -> "{" <> afters1 <> "}"
      where

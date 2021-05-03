@@ -35,8 +35,6 @@ import           Data.Typeable                            (Typeable)
 import qualified Language.Haskell.TH.Syntax               as TH
 import           GHC.Generics                             (Generic)
 import           GHC.Stack                                (HasCallStack)
-import qualified TextShow                                 as TS
-import qualified TextShow.Generic                         as TS
 
 
 -- | Simple version of template haskell type. Used internally to match on.
@@ -47,6 +45,7 @@ data Type'
   -- ^ Qualified name of type
   | LitTy' Integer
   -- ^ Numeral literal (used in BitVector 10, for example)
+<<<<<<< HEAD
     deriving (Generic, NFData, Eq, Typeable, Hashable, Ord, Show)
 
 -- Replace with
@@ -57,6 +56,9 @@ data Type'
 instance TS.TextShow Type' where
   showt = TS.showt . coerce @_ @(TS.FromGeneric (Type'))
   showb = TS.showb . coerce @_ @(TS.FromGeneric (Type'))
+=======
+  deriving (Generic, NFData, Eq, Typeable, Hashable, Ord, Show)
+>>>>>>> 4fbd94762... Remove unnecessary dependencies from clash-prelude
 
 -- | Internal version of DataRepr
 data DataRepr' = DataRepr'
