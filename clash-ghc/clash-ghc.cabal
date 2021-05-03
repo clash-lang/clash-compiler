@@ -145,7 +145,6 @@ library
 
   Build-Depends:      array                     >= 0.4      && < 0.6,
                       base                      >= 4.11     && < 5,
-                      bifunctors                >= 4.1.1    && < 6.0,
                       bytestring                >= 0.9      && < 0.12,
                       Cabal,
                       containers                >= 0.5.4.0  && < 0.7,
