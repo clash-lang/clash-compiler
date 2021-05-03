@@ -21,7 +21,6 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 
 -- since GHC 8.6 we can haddock individual constructor fields \o/
 #if __GLASGOW_HASKELL__ >= 806

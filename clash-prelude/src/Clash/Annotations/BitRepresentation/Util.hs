@@ -4,8 +4,6 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE TemplateHaskell #-}
-
 module Clash.Annotations.BitRepresentation.Util
   ( bitOrigins
   , bitOrigins'

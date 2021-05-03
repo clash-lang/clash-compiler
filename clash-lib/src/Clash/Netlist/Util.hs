@@ -993,9 +993,6 @@ idToPort var = do
     then return Nothing
     else return (Just (id2identifier var, hwTy))
 
-id2type :: Id -> Type
-id2type = varType
-
 id2identifier :: Id -> Identifier
 id2identifier = Id.unsafeMake . nameOcc . varName
 

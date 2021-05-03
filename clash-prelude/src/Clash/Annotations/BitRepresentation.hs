@@ -9,8 +9,6 @@ bit representation for a data type. See @DataReprAnn@ for documentation.
 -}
 
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-}
 

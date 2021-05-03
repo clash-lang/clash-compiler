@@ -22,8 +22,6 @@ CallStack (from HasCallStack):
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 {-# LANGUAGE Trustworthy #-}
 
