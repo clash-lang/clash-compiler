@@ -79,7 +79,6 @@ import Clash.Primitives.Types               (CompiledPrimMap)
 import Clash.Signal.Internal
   (ResetPolarity, ActiveEdge, ResetKind, InitBehavior)
 import Clash.Unique                         (Unique)
-import Clash.Util                           (makeLenses)
 
 import Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, DataRepr', ConstrRepr')
@@ -814,8 +813,8 @@ emptyBBContext name
   , bbCtxName     = Nothing
   }
 
-makeLenses ''NetlistEnv
-makeLenses ''NetlistState
+Lens.makeLenses ''NetlistEnv
+Lens.makeLenses ''NetlistState
 
 -- | Structures that hold an 'IdentifierSet'
 class HasIdentifierSet s where

@@ -39,6 +39,7 @@ module Clash.Normalize.PrimitiveReductions where
 
 import qualified Control.Lens                     as Lens
 import           Control.Lens                     ((.=))
+import           Data.Bifunctor                   (second)
 import           Data.List                        (mapAccumR)
 import           Data.List.Extra                  (zipEqual)
 import qualified Data.Maybe                       as Maybe

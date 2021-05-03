@@ -19,6 +19,7 @@ module Clash.Core.Util where
 import           Control.Concurrent.Supply     (Supply, freshId)
 import qualified Control.Lens                  as Lens
 import Control.Monad.Trans.Except              (Except, throwE, runExcept)
+import Data.Bifunctor                          (first)
 import qualified Data.HashSet                  as HashSet
 import qualified Data.Graph                    as Graph
 import Data.List                               (foldl', mapAccumR)

@@ -31,9 +31,10 @@ module Clash.GHC.GHC2Core
 where
 
 -- External Modules
-import           Control.Lens                ((^.), (%~), (&), (%=), (.~), view)
+import           Control.Lens                ((^.), (%~), (&), (%=), (.~), view, makeLenses)
 import           Control.Monad.RWS.Strict    (RWS)
 import qualified Control.Monad.RWS.Strict    as RWS
+import           Data.Bifunctor              (second)
 import qualified Data.ByteString.Char8       as Char8
 import           Data.Char                   (isDigit)
 import           Data.Hashable               (Hashable (..))

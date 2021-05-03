@@ -26,6 +26,7 @@ where
 -- External Import
 import Control.DeepSeq
 import Data.Binary                            (Binary)
+import Data.Function                          (on)
 import qualified Data.Text as T
 import GHC.Generics
 
@@ -35,7 +36,6 @@ import Clash.Core.Name
 import {-# SOURCE #-} Clash.Core.Type         (Kind, Type)
 import Clash.Core.Var                         (TyVar)
 import Clash.Unique
-import Clash.Util
 
 -- | Type Constructor
 data TyCon
