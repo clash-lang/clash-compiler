@@ -12,9 +12,9 @@ import           Control.Applicative ((<|>))
 import           Control.Applicative.Extra (orEmpty)
 import           Data.Maybe (fromMaybe)
 import           Data.Text (Text)
+import           Data.Text.Extra (showt)
 import qualified Data.Text as Text
 import qualified Data.Char as Char
-import           TextShow (showt)
 
 parseWhiteSpace :: Text -> Maybe Text
 parseWhiteSpace = parseSingle isWhiteSpace

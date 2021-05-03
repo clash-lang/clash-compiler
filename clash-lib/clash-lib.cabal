@@ -150,7 +150,6 @@ Library
                       deepseq                 >= 1.3.0.2  && < 1.5,
                       dlist                   >= 0.8      && < 1.1,
                       directory               >= 1.2.0.1  && < 1.4,
-                      errors                  >= 1.4.2    && < 2.4,
                       exceptions              >= 0.8.3    && < 0.11.0,
                       extra                   >= 1.6.17   && < 1.8,
                       filepath                >= 1.3.0.1  && < 1.5,
@@ -163,21 +162,17 @@ Library
                       lens                    >= 4.10     && < 5.1.0,
                       mtl                     >= 2.1.2    && < 2.3,
                       ordered-containers      >= 0.2      && < 0.3,
-                      parsers                 >= 0.12.8   && < 1.0,
                       prettyprinter           >= 1.2.0.1  && < 2.0,
                       pretty-show             >= 1.9      && < 2.0,
                       primitive               >= 0.5.0.1  && < 1.0,
-                      process                 >= 1.1.0.2  && < 1.7,
                       reducers                >= 3.12.2   && < 4.0,
                       template-haskell        >= 2.8.0.0  && < 2.18,
                       temporary               >= 1.2.1    && < 1.4,
                       terminal-size           >= 0.3      && < 0.4,
                       text                    >= 1.2.2    && < 1.3,
-                      text-show               >= 3.7      && < 3.10,
                       time                    >= 1.4.0.1  && < 1.12,
                       transformers            >= 0.5.2.0  && < 0.6,
                       trifecta                >= 1.7.1.1  && < 2.2,
-                      utf8-string             >= 1.0.1    && < 1.1,
                       vector                  >= 0.11     && < 1.0,
                       vector-binary-instances >= 0.2.3.5  && < 0.3,
                       unordered-containers    >= 0.2.3.3  && < 0.3
@@ -283,6 +278,7 @@ Library
                       Data.Primitive.ByteArray.Extra
                       Data.Semigroup.Monad.Extra
                       Data.Set.Ordered.Extra
+                      Data.Text.Extra
                       GHC.BasicTypes.Extra
                       GHC.SrcLoc.Extra
                       Paths_clash_lib

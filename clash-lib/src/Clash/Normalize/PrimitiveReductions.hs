@@ -43,8 +43,8 @@ import           Data.Bifunctor                   (second)
 import           Data.List                        (mapAccumR)
 import           Data.List.Extra                  (zipEqual)
 import qualified Data.Maybe                       as Maybe
+import           Data.Text.Extra                  (showt)
 import           GHC.Stack                        (HasCallStack)
-import           TextShow                         (showt)
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Builtin.Names
