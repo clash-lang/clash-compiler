@@ -40,6 +40,7 @@ import Data.Maybe                       (fromMaybe)
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Internal
 import GHC.Show                         (showMultiLineString)
+import GHC.Stack                        (HasCallStack)
 import Numeric                          (fromRat)
 #if MIN_VERSION_ghc(9,0,0)
 import qualified GHC.Utils.Outputable   as GHC

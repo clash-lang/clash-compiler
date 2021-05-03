@@ -36,13 +36,14 @@ import           Clash.Core.Name        (nameOcc)
 import           Clash.Core.Var         (varName)
 import           Clash.Normalize.Util   (collectCallGraphUniques, callGraph)
 import qualified Clash.Util.Interpolate as I
-import           Clash.Util             (ClashException(..), HasCallStack, noSrcSpan)
+import           Clash.Util             (ClashException(..), noSrcSpan)
 import           Clash.Unique           (getUnique)
 import           Control.Exception      (throw)
 import           Data.List              (isSuffixOf)
 import qualified Data.Text              as Text
 import qualified Data.HashSet           as HashSet
 import qualified GHC.LanguageExtensions as LangExt (Extension (..))
+import           GHC.Stack              (HasCallStack)
 
 import           Control.Monad          (forM_, unless, when)
 import           System.Directory       (doesDirectoryExist)

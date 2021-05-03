@@ -40,6 +40,7 @@ import qualified Data.Map.Ordered                 as OMap
 import qualified Data.Set                         as Set
 import           Data.Primitive.ByteArray         (ByteArray (..))
 import qualified Data.Text                        as StrictText
+import           GHC.Stack                        (HasCallStack)
 #if MIN_VERSION_base(4,15,0)
 import           GHC.Num.Integer                  (Integer (..))
 #else

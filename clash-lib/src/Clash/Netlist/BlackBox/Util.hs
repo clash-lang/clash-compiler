@@ -23,6 +23,7 @@ import           Control.Lens
   (use, (%=), _1, _2, element, (^?))
 import           Control.Monad                   (forM)
 import           Control.Monad.State             (State, StateT (..), lift)
+import           Data.Bitraversable              (bitraverse)
 import           Data.Bool                       (bool)
 import           Data.Coerce                     (coerce)
 import           Data.Foldable                   (foldrM)
@@ -37,6 +38,7 @@ import           Data.Text.Lazy                  (Text)
 import qualified Data.Text.Lazy                  as Text
 import qualified Data.Text.Prettyprint.Doc       as PP
 import           Data.Text.Prettyprint.Doc.Extra
+import           GHC.Stack                       (HasCallStack)
 import           System.FilePath                 (replaceBaseName, takeBaseName,
                                                   takeFileName, (<.>))
 import           Text.Printf
@@ -197,7 +199,7 @@ setSym bbCtx l = do
                 ++ " is already defined in BlackBox for: "
                 ++ bbnm)
       Component (Decl n subN l') ->
-        Component <$> (Decl n subN <$> mapM (combineM (mapM setSym') (mapM setSym')) l')
+        Component <$> (Decl n subN <$> mapM (bitraverse (mapM setSym') (mapM setSym')) l')
       IF c t f      -> IF <$> pure c <*> mapM setSym' t <*> mapM setSym' f
       SigD e' m     -> SigD <$> (mapM setSym' e') <*> pure m
       BV t e' m     -> BV <$> pure t <*> mapM setSym' e' <*> pure m
@@ -322,8 +324,8 @@ renderElem
   -> Element
   -> State backend (Int -> Text)
 renderElem b (Component (Decl n subN (l:ls))) = do
-  (o,oTy,_) <- idToExpr <$> combineM (lineToIdentifier b) (return . lineToType b) l
-  is <- mapM (fmap idToExpr . combineM (lineToIdentifier b) (return . lineToType b)) ls
+  (o,oTy,_) <- idToExpr <$> bitraverse (lineToIdentifier b) (return . lineToType b) l
+  is <- mapM (fmap idToExpr . bitraverse (lineToIdentifier b) (return . lineToType b)) ls
   let func0 = IntMap.lookup n (bbFunctions b)
       errr = concat [ "renderElem: not enough functions rendered? Needed "
                     , show (subN +1 ), " got only ", show (length (fromJust func0)) ]

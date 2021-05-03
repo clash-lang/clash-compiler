@@ -23,6 +23,7 @@ import Clash.Util
 
 import Control.DeepSeq
 import qualified Data.Time.Clock as Clock
+import GHC.Stack (HasCallStack)
 
 #if MIN_VERSION_ghc(9,0,0)
 import GHC.Utils.Misc (OverridingBool(..))
