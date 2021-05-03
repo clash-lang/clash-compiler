@@ -20,6 +20,7 @@ import qualified Data.IntMap                        as IntMap
 import           Data.List.Extra                    (iterateNM)
 import           Data.Maybe                         (fromMaybe)
 import           Data.Semigroup.Monad               (getMon)
+import           Data.Text.Extra                    (showt)
 import           Data.Text.Lazy                     (pack)
 import           Data.Text.Prettyprint.Doc.Extra
   (Doc, string, renderLazy, layoutPretty, LayoutOptions(..),
@@ -28,7 +29,6 @@ import           Text.Trifecta.Result               (Result(Success))
 import qualified Data.String.Interpolate            as I
 import qualified Data.String.Interpolate.Util       as I
 import           GHC.Stack                          (HasCallStack)
-import           TextShow                           (showt)
 
 import           Clash.Backend
   (Backend, hdlTypeErrValue, expr, blockDecl)

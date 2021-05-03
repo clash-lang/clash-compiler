@@ -16,7 +16,6 @@ where
 import           Control.Applicative          ((<|>))
 import           Data.Text.Lazy               (Text, pack, unpack)
 import qualified Data.Text.Lazy               as Text
-import           Text.Parser.Combinators
 import           Text.Trifecta                hiding (Err)
 import           Text.Trifecta.Delta
 

@@ -19,9 +19,9 @@ import qualified Data.List as List
 import qualified Data.Text.Prettyprint.Doc as PP
 import qualified Data.Text as Text
 import           Data.Text (Text)
+import           Data.Text.Extra (showt)
 import qualified Data.Maybe as Maybe
 import           Text.Read (readMaybe)
-import           TextShow (showt)
 import           GHC.Stack
 
 import qualified Data.IntMap as IntMap

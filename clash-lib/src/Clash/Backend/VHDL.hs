@@ -41,12 +41,12 @@ import           Data.Monoid                          hiding (Sum, Product)
 import           Data.Semigroup.Monad.Extra
 import qualified Data.Text.Lazy                       as T
 import qualified Data.Text                            as TextS
+import           Data.Text.Extra
 import qualified Data.Text.Prettyprint.Doc            as PP
 import           Data.Text.Prettyprint.Doc.Extra
 import           GHC.Stack                            (HasCallStack)
 import qualified System.FilePath
 import           Text.Printf
-import           TextShow                             (showt)
 
 import           Clash.Annotations.Primitive          (HDL (..))
 import           Clash.Annotations.BitRepresentation.Internal
