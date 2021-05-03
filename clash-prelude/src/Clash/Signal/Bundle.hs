@@ -10,7 +10,6 @@ The Product/Signal isomorphism
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 
 {-# LANGUAGE Trustworthy #-}

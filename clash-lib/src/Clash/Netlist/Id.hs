@@ -7,13 +7,9 @@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
 
 module Clash.Netlist.Id
   ( -- * Utilities to use IdentifierSet

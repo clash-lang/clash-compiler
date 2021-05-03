@@ -6,7 +6,6 @@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
 
 module Clash.GHC.ClashFlags
   ( parseClashFlags
