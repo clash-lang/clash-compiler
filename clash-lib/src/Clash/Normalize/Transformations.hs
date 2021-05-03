@@ -64,6 +64,7 @@ module Clash.Normalize.Transformations
   )
 where
 
+import           Control.Arrow               ((***))
 import           Control.Exception           (throw)
 import           Control.Lens                ((^.),_1,_2)
 import qualified Control.Lens                as Lens
@@ -73,6 +74,7 @@ import           Control.Monad.State         (StateT (..), modify)
 import           Control.Monad.State.Strict  (evalState)
 import           Control.Monad.Writer        (lift, listen)
 import           Control.Monad.Trans.Except  (runExcept)
+import           Data.Bifunctor              (second)
 import           Data.Coerce                 (coerce)
 import           Data.Default
 import qualified Data.Either                 as Either

@@ -42,6 +42,7 @@ where
 -- external
 import           Control.Concurrent.Supply        (splitSupply)
 import qualified Control.Lens                     as Lens
+import           Data.Bifunctor                   (second)
 import           Data.Bits                        ((.&.),complement)
 import           Data.Coerce                      (coerce)
 import qualified Data.Either                      as Either

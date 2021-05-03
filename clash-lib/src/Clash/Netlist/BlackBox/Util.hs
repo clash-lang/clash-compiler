@@ -21,7 +21,7 @@ module Clash.Netlist.BlackBox.Util where
 import           Control.Exception               (throw)
 import           Control.Lens
   (use, (%=), _1, _2, element, (^?))
-import           Control.Monad                   (forM)
+import           Control.Monad                   (forM, (<=<))
 import           Control.Monad.State             (State, StateT (..), lift)
 import           Data.Bitraversable              (bitraverse)
 import           Data.Bool                       (bool)

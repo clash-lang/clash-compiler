@@ -26,6 +26,7 @@ import qualified Control.Lens                     as Lens
 import           Control.Monad.Extra              (concatMapM)
 import           Control.Monad.Reader             (runReaderT)
 import           Control.Monad.State.Strict       (State, runStateT, runState)
+import           Data.Bifunctor                   (first, second)
 import           Data.Binary.IEEE754              (floatToWord, doubleToWord)
 import           Data.Char                        (ord)
 import           Data.Either                      (partitionEithers, rights)

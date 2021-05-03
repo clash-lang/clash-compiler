@@ -21,6 +21,7 @@ module Clash.Rewrite.Types where
 import Control.Concurrent.Supply             (Supply, freshId)
 import Control.DeepSeq                       (NFData)
 import Control.Lens                          (Lens', use, (.=))
+import qualified Control.Lens as Lens
 #if !MIN_VERSION_base(4,13,0)
 import Control.Monad.Fail                    (MonadFail(fail))
 #endif
@@ -98,7 +99,7 @@ data RewriteState extra
   -- ^ Additional state
   }
 
-makeLenses ''RewriteState
+Lens.makeLenses ''RewriteState
 
 -- | Read-only environment of a rewriting session
 data RewriteEnv
@@ -134,7 +135,7 @@ data RewriteEnv
   -- ^ Maximum amount of fuel for the evaluator
   }
 
-makeLenses ''RewriteEnv
+Lens.makeLenses ''RewriteEnv
 
 -- | Monad that keeps track how many transformations have been applied and can
 -- generate fresh variables and unique identifiers. In addition, it keeps track

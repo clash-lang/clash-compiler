@@ -20,7 +20,9 @@ import qualified Control.Applicative                  as A
 import           Control.Lens                         hiding (Indexed)
 import           Control.Monad                        (forM,liftM,zipWithM)
 import           Control.Monad.State                  (State)
+import           Data.Bifunctor                       (first)
 import           Data.Bits                            (Bits, testBit)
+import           Data.Function                        (on)
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
 import           Data.HashSet                         (HashSet)
@@ -58,7 +60,7 @@ import           Clash.Netlist.Types                  hiding (_intWidth, intWidt
 import           Clash.Netlist.Util
 import           Clash.Signal.Internal                (ActiveEdge (..))
 import           Clash.Util
-  (SrcSpan, noSrcSpan, curLoc, makeCached, first, on, indexNote)
+  (SrcSpan, noSrcSpan, curLoc, makeCached, indexNote)
 import           Clash.Util.Graph                     (reverseTopSort)
 
 -- | State for the 'Clash.Backend.SystemVerilog.SystemVerilogM' monad:

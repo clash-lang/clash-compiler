@@ -23,6 +23,7 @@ module Clash.Rewrite.Util
   , module Clash.Rewrite.WorkFree
   ) where
 
+import           Control.Arrow               ((&&&), (***))
 import           Control.Concurrent.Supply   (splitSupply)
 import           Control.DeepSeq
 import           Control.Exception           (throw)
@@ -36,7 +37,7 @@ import           Control.Monad.Fail          (MonadFail)
 import qualified Control.Monad.State.Strict  as State
 import qualified Control.Monad.Writer        as Writer
 import           Data.Bool                   (bool)
-import           Data.Bifunctor              (bimap)
+import           Data.Bifunctor              (bimap, second)
 import           Data.Coerce                 (coerce)
 import           Data.Functor.Const          (Const (..))
 import           Data.List                   (group, partition, sort)

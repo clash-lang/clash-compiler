@@ -11,6 +11,7 @@
 
 module Clash.Normalize.Types where
 
+import Control.Lens               (makeLenses)
 import Control.Monad.State.Strict (State)
 import Data.Map                   (Map)
 import Data.Set                   (Set)
@@ -23,7 +24,6 @@ import Clash.Core.VarEnv      (VarEnv)
 import Clash.Driver.Types     (BindingMap)
 import Clash.Primitives.Types (CompiledPrimMap)
 import Clash.Rewrite.Types    (Rewrite, RewriteMonad)
-import Clash.Util
 
 -- | State of the 'NormalizeMonad'
 data NormalizeState

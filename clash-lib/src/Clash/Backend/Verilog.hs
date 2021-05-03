@@ -34,7 +34,9 @@ import qualified Control.Applicative                  as A
 import           Control.Lens                         (Lens',(+=),(-=),(.=),(%=), makeLenses, use)
 import           Control.Monad                        (forM)
 import           Control.Monad.State                  (State)
+import           Data.Bifunctor                       (first, second)
 import           Data.Bits                            (Bits, testBit)
+import           Data.Function                        (on)
 import           Data.HashMap.Strict                  (HashMap)
 import qualified Data.HashMap.Strict                  as HashMap
 import           Data.HashSet                         (HashSet)
@@ -72,7 +74,7 @@ import           Clash.Netlist.Types                  hiding (_intWidth, intWidt
 import           Clash.Netlist.Util
 import           Clash.Signal.Internal                (ActiveEdge (..))
 import           Clash.Util
-  (SrcSpan, noSrcSpan, curLoc, on, first, indexNote, makeCached, second)
+  (SrcSpan, noSrcSpan, curLoc, indexNote, makeCached)
 
 -- | State for the 'Clash.Backend.Verilog.VerilogM' monad:
 data VerilogState =
