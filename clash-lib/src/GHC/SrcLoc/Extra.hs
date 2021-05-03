@@ -5,8 +5,6 @@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 

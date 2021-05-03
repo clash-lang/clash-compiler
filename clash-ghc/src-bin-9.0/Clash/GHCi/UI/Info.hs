@@ -2,7 +2,6 @@
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns        #-}
 {-# OPTIONS_GHC -Wno-name-shadowing -Wno-compat-unqualified-imports #-}
 
 -- | Get information on modules, expressions, and identifiers

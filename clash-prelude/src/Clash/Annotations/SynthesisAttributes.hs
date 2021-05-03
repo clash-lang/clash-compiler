@@ -8,7 +8,6 @@
   please report any unexpected or broken behavior to Clash's GitHub page
   (<https://github.com/clash-lang/clash-compiler/issues>).
 -}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE PolyKinds #-}
 
 {-# LANGUAGE Safe #-}
