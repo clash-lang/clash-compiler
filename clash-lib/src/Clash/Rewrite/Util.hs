@@ -1,9 +1,10 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016     , Myrtle Software Ltd,
-                    2017     , Google Inc.
+                    2017     , Google Inc.,
+                    2021     , QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Utilities for rewriting: e.g. inlining, specialisation, etc.
 -}
@@ -39,12 +40,12 @@ import           Data.Bool                   (bool)
 import           Data.Bifunctor              (bimap)
 import           Data.Coerce                 (coerce)
 import           Data.Functor.Const          (Const (..))
+import qualified Data.HashMap.Strict         as HashMap
 import           Data.List                   (group, partition, sort, sortOn)
 import qualified Data.List                   as List
 import qualified Data.List.Extra             as List
 import           Data.List.Extra             (partitionM)
 import qualified Data.Map                    as Map
-import qualified Data.Map.Strict             as MapStrict
 import           Data.Maybe
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
@@ -190,16 +191,8 @@ apply = \s rewrite ctx expr0 -> do
 
   if lvl == DebugNone
     then return expr2
-    else do
-      Monad.when (lvl >= DebugCount && hasChanged) $ updateTransformCounters s
-      applyDebug lvl dbgTranss fromLimit s expr0 hasChanged expr2
+    else applyDebug lvl dbgTranss fromLimit s expr0 hasChanged expr2
 {-# INLINE apply #-}
-
-updateTransformCounters
-  :: String -- ^ Name of the transformation
-  -> RewriteMonad extra ()
-updateTransformCounters name =
-  transformCounters  %= (MapStrict.insertWith mappend name (Monoid.Sum 1))
 
 applyDebug
   :: DebugLevel
@@ -237,6 +230,10 @@ applyDebug lvl transformations fromLimit name exprOld hasChanged exprNew
 applyDebug lvl _transformations _fromLimit name exprOld hasChanged exprNew =
  traceIf (lvl >= DebugAll) ("Tried: " ++ name ++ " on:\n" ++ before) $ do
   nTrans <- pred <$> Lens.use transformCounter
+
+  Monad.when (lvl >= DebugCount && hasChanged) $
+    transformCounters %= HashMap.insertWith (const succ) (Text.pack name) 1
+
   Monad.when (lvl > DebugNone && hasChanged) $ do
     tcm                  <- Lens.view tcCache
     let beforeTy          = termType tcm exprOld
@@ -311,13 +308,17 @@ runRewriteSession :: RewriteEnv
                   -> a
 runRewriteSession r s m =
   traceIf (_dbgLevel r >= DebugCount)
-    ("Clash: Transform counters:\n" ++ showCounters (s' ^. transformCounters)) $
+    ("Clash: Transformations:\n" ++ Text.unpack (showCounters (s' ^. transformCounters))) $
     traceIf (_dbgLevel r > DebugSilent)
       ("Clash: Applied " ++ show (s' ^. transformCounter) ++ " transformations")
       a
   where
     (a,s',_) = runR m r s
-    showCounters = unlines . map (\(nm,cnt) -> nm ++ ": " ++ show (Monoid.getSum cnt)) . sortOn snd . Map.toList
+    showCounters =
+      Text.unlines
+        . map (\(nm,cnt) -> nm <> ": " <> Text.pack (show cnt))
+        . sortOn snd
+        . HashMap.toList
 
 -- | Notify that a transformation has changed the expression
 setChanged :: RewriteMonad extra ()
