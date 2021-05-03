@@ -1,9 +1,10 @@
 {-|
 Copyright   :  (C) 2015-2016, University of Twente,
                    2016-2019, Myrtle Software Ltd,
-                   2017     , Google Inc.
+                   2017     , Google Inc.,
+                   2021     , QBayLogic B.V.,
 License     :  BSD2 (see the file LICENSE)
-Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Synchronizer circuits for safe clock domain crossings
 -}

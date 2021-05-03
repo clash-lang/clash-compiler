@@ -1,8 +1,9 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
-                  2016-2017, Myrtle Software Ltd
+                  2016-2017, Myrtle Software Ltd,
+                  2021,      QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
@@ -22,6 +23,8 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 module Clash.Class.BitPack.Internal where
 
+import Prelude                        hiding (map)
+
 import Control.Exception              (catch, evaluate)
 import Data.Binary.IEEE754            (doubleToWord, floatToWord, wordToDouble,
                                        wordToFloat)
@@ -31,17 +34,16 @@ import Data.Int
 import Data.Ord                       (Down)
 import Data.Word
 import Foreign.C.Types                (CUShort)
-import GHC.TypeLits                   (KnownNat, Nat, type (+), type (-))
-import Numeric.Half                   (Half (..))
 import GHC.Generics
+import GHC.TypeLits                   (KnownNat, Nat, type (+), type (-))
 import GHC.TypeLits.Extra             (CLog, Max)
-import Prelude                        hiding (map)
+import Numeric.Half                   (Half (..))
 import System.IO.Unsafe               (unsafeDupablePerformIO)
 
 import Clash.Annotations.Primitive    (hasBlackBox)
-import Clash.Promoted.Nat             (SNat(..), snatToNum)
 import Clash.Class.BitPack.Internal.TH (deriveBitPackTuples)
 import Clash.Class.Resize             (zeroExtend, resize)
+import Clash.Promoted.Nat             (SNat(..), snatToNum)
 import Clash.Sized.BitVector          (Bit, BitVector, (++#))
 import Clash.Sized.Internal.BitVector
   (pack#, split#, checkUnpackUndef, undefined#, unpack#, unsafeToNatural, isLike#)
@@ -52,7 +54,28 @@ import Clash.XException
 >>> import Clash.Prelude
 -}
 
--- | Convert to and from a 'BitVector'
+-- | Convert data to/from a 'BitVector'. This allows functions to be defined
+-- on the underlying representation of data, while exposing a nicer API using
+-- pack / unpack at the boundaries. For example:
+--
+-- @
+--     f :: forall a b. (BitPack a, BitPack b) => a -> b
+--     f = unpack . go . pack
+--      where
+--       go :: BitVector (BitSize a) -> BitVector (BitSize b)
+--       go = _ -- A function on the underlying bit vector
+-- @
+--
+-- A type should only implement this class if it has a statically known size,
+-- as otherwise it is not possible to determine how many bits are needed to
+-- represent values. This means that types such as @[a]@ cannot have @BitPack@
+-- instances, as even if @a@ has a statically known size, the length of the
+-- list cannot be known in advance.
+--
+-- Clash provides some generic functions on packable types in the prelude, such
+-- as indexing into packable stuctures (see "Clash.Class.BitPack.BitIndex") and
+-- bitwise reduction of packable data (see "Clash.Class.BitPack.BitReduction").
+--
 class KnownNat (BitSize a) => BitPack a where
   -- | Number of 'Clash.Sized.BitVector.Bit's needed to represents elements
   -- of type @a@

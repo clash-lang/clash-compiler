@@ -1,7 +1,8 @@
 {-|
-Copyright  :  (C) 2013-2016, University of Twente
+Copyright  :  (C) 2013-2016, University of Twente,
+                  2021,      QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE FlexibleContexts #-}
