@@ -6,7 +6,6 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -35,8 +34,6 @@ import           Data.Typeable                            (Typeable)
 import qualified Language.Haskell.TH.Syntax               as TH
 import           GHC.Generics                             (Generic)
 import           GHC.Stack                                (HasCallStack)
-import qualified TextShow                                 as TS
-import qualified TextShow.Generic                         as TS
 
 
 -- | Simple version of template haskell type. Used internally to match on.
@@ -48,7 +45,6 @@ data Type'
   | LitTy' Integer
   -- ^ Numeral literal (used in BitVector 10, for example)
   deriving (Generic, NFData, Eq, Typeable, Hashable, Ord, Show)
-  deriving TS.TextShow via TS.FromGeneric (Type')
 
 -- | Internal version of DataRepr
 data DataRepr' = DataRepr'
