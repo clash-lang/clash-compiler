@@ -20,8 +20,8 @@ module Clash.Primitives.GHC.Literal
 import qualified Data.Text.Lazy               as LT
 import           Data.Text
   (Text, stripPrefix, stripSuffix, unpack)
+import           Data.Text.Extra              (showtl)
 import           Text.Read                    (readMaybe)
-import           TextShow                     (showtl)
 
 import           Clash.Core.Term              (Term)
 import           Clash.Core.Type              (Type)

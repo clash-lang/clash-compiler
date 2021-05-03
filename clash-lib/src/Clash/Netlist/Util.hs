@@ -24,7 +24,6 @@
 module Clash.Netlist.Util where
 
 import           Data.Coerce             (coerce)
-import           Control.Error           (hush)
 import           Control.Exception       (throw)
 import           Control.Lens            ((.=))
 import qualified Control.Lens            as Lens
@@ -51,10 +50,10 @@ import           Data.Maybe
 import           Text.Printf             (printf)
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
+import           Data.Text.Extra         (showt)
 import           Data.Text.Lazy          (toStrict)
 import           Data.Text.Prettyprint.Doc.Extra
 import           GHC.Stack               (HasCallStack)
-import           TextShow                (showt)
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Utils.Monad         (zipWith3M)
@@ -251,7 +250,7 @@ coreTypeToHWTypeM ty = do
   htm0  <- Lens.use htyCache
   let (hty,htm1) = runState (coreTypeToHWType tt reprs tcm ty) htm0
   htyCache Lens..= htm1
-  return (hush hty)
+  return (either (const Nothing) Just hty)
 
 -- | Constructs error message for unexpected projections out of a type annotated
 -- with a custom bit representation.

@@ -87,13 +87,13 @@ import qualified Data.Maybe                  as Maybe
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Primitive.ByteArray    as BA
 import qualified Data.Text                   as Text
+import           Data.Text.Extra             (showt)
 import           GHC.Stack                   (HasCallStack)
 #if MIN_VERSION_base(4,15,0)
 import           GHC.Num.Integer             (Integer (..))
 #else
 import           GHC.Integer.GMP.Internals   (Integer (..), BigNat (..))
 #endif
-import           TextShow                    (TextShow(showt))
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Types.Basic             (InlineSpec (..))

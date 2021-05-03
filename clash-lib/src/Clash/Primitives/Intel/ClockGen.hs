@@ -23,9 +23,9 @@ import Control.Monad.State
 import Data.Semigroup.Monad
 import qualified Data.String.Interpolate.IsString as I
 import Data.Text.Prettyprint.Doc.Extra
-import TextShow (showt)
 
 import qualified Data.Text as TextS
+import Data.Text.Extra (showt)
 
 altpllTF :: TemplateFunction
 altpllTF = TemplateFunction used valid altpllTemplate

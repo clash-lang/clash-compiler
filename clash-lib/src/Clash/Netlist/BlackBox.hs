@@ -39,6 +39,7 @@ import           Data.Text.Lazy                (fromStrict)
 import qualified Data.Text.Lazy                as Text
 import           Data.Text                     (unpack)
 import qualified Data.Text                     as TextS
+import           Data.Text.Extra
 import           GHC.Stack
   (HasCallStack, callStack, prettyCallStack)
 import qualified System.Console.ANSI           as ANSI
@@ -47,7 +48,6 @@ import           System.Console.ANSI
   , ConsoleIntensity(BoldIntensity), ConsoleLayer(Foreground), ColorIntensity(Vivid))
 import           System.IO
   (hPutStrLn, stderr, hFlush, hIsTerminalDevice)
-import           TextShow                      (showt)
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Utils.Misc                (OverridingBool(..))
 #else
