@@ -32,6 +32,7 @@ import           Control.Monad.State              (evalState, get)
 import           Control.Monad.State.Strict       (State)
 import qualified Control.Monad.State.Strict       as State
 import qualified Crypto.Hash.SHA256               as Sha256
+import           Data.Bifunctor                   (first)
 import           Data.ByteString                  (ByteString)
 import qualified Data.ByteString                  as ByteString
 import qualified Data.ByteString.Lazy             as ByteStringLazy
@@ -138,7 +139,7 @@ import           Clash.Signal.Internal
 import           Clash.Unique                     (Unique, getUnique)
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util
-  (ClashException(..), first, reportTimeDiff,
+  (ClashException(..), reportTimeDiff,
    wantedLanguageExtensions, unwantedLanguageExtensions, curLoc)
 import           Clash.Util.Graph                 (reverseTopSort)
 import qualified Clash.Util.Interpolate           as I

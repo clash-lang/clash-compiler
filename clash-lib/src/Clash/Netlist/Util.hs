@@ -36,6 +36,7 @@ import           Control.Monad.State.Strict
   (State, evalState, get, modify, runState)
 import           Control.Monad.Trans.Except
   (ExceptT (..), runExcept, runExceptT, throwE)
+import           Data.Bifunctor          (second)
 import           Data.Either             (partitionEithers)
 import           Data.Foldable           (Foldable(toList))
 import           Data.Hashable           (Hashable)

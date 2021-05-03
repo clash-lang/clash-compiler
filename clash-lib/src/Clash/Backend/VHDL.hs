@@ -23,7 +23,9 @@ import           Control.Applicative                  (liftA2)
 import           Control.Lens                         hiding (Indexed, Empty)
 import           Control.Monad                        (forM,join,zipWithM)
 import           Control.Monad.State                  (State, StateT)
+import           Data.Bifunctor                       (first)
 import           Data.Bits                            (testBit, Bits)
+import           Data.Function                        (on)
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
 import qualified Data.HashMap.Strict                  as HashMapS
@@ -60,7 +62,7 @@ import qualified Clash.Netlist.Id                     as Id
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util
 import           Clash.Util
-  (SrcSpan, noSrcSpan, clogBase, curLoc, first, makeCached, on, indexNote)
+  (SrcSpan, noSrcSpan, clogBase, curLoc, makeCached, indexNote)
 import qualified Clash.Util.Interpolate               as I
 import           Clash.Util.Graph                     (reverseTopSort)
 

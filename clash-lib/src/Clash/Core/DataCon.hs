@@ -22,6 +22,7 @@ where
 
 import Control.DeepSeq                        (NFData(..))
 import Data.Binary                            (Binary)
+import Data.Function                          (on)
 import Data.Hashable                          (Hashable)
 import qualified Data.Text                    as Text
 import GHC.Generics                           (Generic)
@@ -30,7 +31,6 @@ import Clash.Core.Name                        (Name (..))
 import {-# SOURCE #-} Clash.Core.Type         (Type)
 import Clash.Core.Var                         (TyVar)
 import Clash.Unique
-import Clash.Util
 
 -- | Data Constructor
 data DataCon

@@ -16,20 +16,15 @@
 
 module Clash.Util
   ( module Clash.Util
-  , module X
-  , makeLenses
   , SrcSpan
   , noSrcSpan
   )
 where
 
-import Control.Arrow                  as X ((***),(&&&),first,second)
 import qualified Control.Exception    as Exception
 import Control.Lens
-import Control.Monad                  as X ((<=<),(>=>))
 import Control.Monad.State            (MonadState,StateT)
 import qualified Control.Monad.State  as State
-import Data.Function                  as X (on)
 import Data.Hashable                  (Hashable)
 import Data.HashMap.Lazy              (HashMap)
 import qualified Data.HashMap.Lazy    as HashMapL

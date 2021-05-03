@@ -25,6 +25,7 @@ import qualified Control.Lens                  as Lens
 import           Control.Monad                 (when, replicateM, zipWithM)
 import           Control.Monad.Extra           (concatMapM)
 import           Control.Monad.IO.Class        (liftIO)
+import           Data.Bifunctor                (first, second)
 import           Data.Char                     (ord)
 import           Data.Either                   (lefts, partitionEithers)
 import qualified Data.HashMap.Lazy             as HashMap
