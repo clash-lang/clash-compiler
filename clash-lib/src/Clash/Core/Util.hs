@@ -28,9 +28,13 @@ import Data.Maybe
 import qualified Data.Set                      as Set
 import qualified Data.Set.Lens                 as Lens
 import qualified Data.Text                     as T
+<<<<<<< HEAD
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Semigroup
 #endif
+=======
+import           GHC.Stack                     (HasCallStack)
+>>>>>>> 06634ed98... Remove HasCallStack, combineM from Clash.Util
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Builtin.Names       (ipClassKey)

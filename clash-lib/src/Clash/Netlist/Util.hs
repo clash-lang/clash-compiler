@@ -55,6 +55,7 @@ import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import           Data.Text.Lazy          (toStrict)
 import           Data.Text.Prettyprint.Doc.Extra
+import           GHC.Stack               (HasCallStack)
 import           TextShow                (showt)
 
 #if MIN_VERSION_ghc(9,0,0)

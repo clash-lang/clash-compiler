@@ -58,6 +58,7 @@ import qualified Data.Text.Lazy.IO                as Text
 import           Data.Text.Prettyprint.Doc.Extra
   (Doc, LayoutOptions (..), PageWidth (..) , layoutPretty, renderLazy)
 import qualified Data.Time.Clock                  as Clock
+import           GHC.Stack                        (HasCallStack)
 import qualified Language.Haskell.Interpreter     as Hint
 import qualified Language.Haskell.Interpreter.Extension as Hint
 import qualified Language.Haskell.Interpreter.Unsafe as Hint
@@ -137,7 +138,7 @@ import           Clash.Signal.Internal
 import           Clash.Unique                     (Unique, getUnique)
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util
-  (ClashException(..), HasCallStack, first, reportTimeDiff,
+  (ClashException(..), first, reportTimeDiff,
    wantedLanguageExtensions, unwantedLanguageExtensions, curLoc)
 import           Clash.Util.Graph                 (reverseTopSort)
 import qualified Clash.Util.Interpolate           as I

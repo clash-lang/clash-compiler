@@ -75,7 +75,6 @@ module Clash.Primitives.DSL
   , clog2
   ) where
 
-import           Clash.Util                      (HasCallStack, clogBase)
 import           Control.Lens                    hiding (Indexed, assign)
 import           Control.Monad.State
 import           Data.Default                    (Default(def))
@@ -90,6 +89,7 @@ import           Data.String
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
 import           Data.Text.Prettyprint.Doc.Extra
+import           GHC.Stack                       (HasCallStack)
 import           TextShow                        (showt)
 
 import           Clash.Annotations.Primitive     (HDL (..), Primitive (..))
@@ -102,6 +102,7 @@ import           Clash.Netlist.BlackBox.Types
 import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types             hiding (Component, toBit)
 import           Clash.Netlist.Util
+import           Clash.Util                      (clogBase)
 import qualified Data.String.Interpolate         as I
 import           Data.String.Interpolate.Util    (unindent)
 import           Language.Haskell.TH             (Name)

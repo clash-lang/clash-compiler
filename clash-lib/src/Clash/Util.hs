@@ -20,7 +20,6 @@ module Clash.Util
   , makeLenses
   , SrcSpan
   , noSrcSpan
-  , HasCallStack
   )
 where
 
@@ -205,13 +204,6 @@ makeCachedO key l create = do
       l %= (flip (OMap.|>)) (getUnique key, value)
       return value
 
-combineM :: (Applicative f)
-         => (a -> f b)
-         -> (c -> f d)
-         -> (a,c)
-         -> f (b,d)
-combineM f g (x,y) = (,) <$> f x <*> g y
-
 -- | Same as 'indexNote' with last two arguments swapped
 indexNote'
   :: HasCallStack
@@ -280,11 +272,6 @@ reportTimeDiff start end =
        = "%-Mm%-S%03Qs"
        | otherwise
        = "%-S%03Qs"
-
--- | Left-biased choice on maybes
-orElse :: Maybe a -> Maybe a -> Maybe a
-orElse x@(Just _) _y = x
-orElse _x y = y
 
 -- | Left-biased choice on maybes
 orElses :: [Maybe a] -> Maybe a

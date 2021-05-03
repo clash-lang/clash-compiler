@@ -27,6 +27,7 @@ import           Data.Text.Prettyprint.Doc.Extra
 import           Text.Trifecta.Result               (Result(Success))
 import qualified Data.String.Interpolate            as I
 import qualified Data.String.Interpolate.Util       as I
+import           GHC.Stack                          (HasCallStack)
 import           TextShow                           (showt)
 
 import           Clash.Backend
@@ -51,7 +52,7 @@ import qualified Clash.Primitives.DSL               as Prim
 import           Clash.Primitives.DSL
   (declarationReturn, instHO, tInputs, tExprToInteger)
 
-import           Clash.Util                         (HasCallStack, curLoc)
+import           Clash.Util                         (curLoc)
 
 -- | Blackbox function for 'Clash.Sized.Vector.iterateI'
 iterateBBF :: HasCallStack => BlackBoxFunction

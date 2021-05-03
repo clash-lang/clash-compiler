@@ -8,6 +8,7 @@ module Clash.Core.TermInfo where
 import Data.Maybe (fromMaybe)
 import Data.Text.Prettyprint.Doc (line)
 import Data.Text (isInfixOf)
+import GHC.Stack (HasCallStack)
 
 import Clash.Core.DataCon
 import Clash.Core.FreeVars
