@@ -488,6 +488,7 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "Floating"
         [ runTest "FloatPack" def{hdlSim=False, clashFlags=["-fclash-float-support"]}
         , NEEDS_PRIMS(runTest "FloatConstFolding" def{clashFlags=["-fclash-float-support"]})
+        , runTest "T1803" def{clashFlags=["-fclash-float-support"]}
         ]
       , clashTestGroup "GADTs"
         [ NEEDS_PRIMS_GHC(runTest "Constrained" def)
