@@ -1,9 +1,10 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                      2017-2019, Myrtle Software Ltd
-                     2017     , Google Inc.
+                     2017     , Google Inc.,
+                     2021     , QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Clash is a functional hardware description language that borrows both its
   syntax and semantics from the functional programming language Haskell. The
@@ -101,8 +102,6 @@ module Clash.Prelude
     -- ** Datatypes
     -- *** Bit vectors
   , module Clash.Sized.BitVector
-  , module Clash.Prelude.BitIndex
-  , module Clash.Prelude.BitReduction
     -- *** Arbitrary-width numbers
   , module Clash.Sized.Signed
   , module Clash.Sized.Unsigned
@@ -167,7 +166,7 @@ import           Clash.HaskellPrelude
 
 import           Clash.Annotations.TopEntity
 import           Clash.Class.AutoReg         (AutoReg, deriveAutoReg)
-import           Clash.Class.BitPack hiding  (GBitPack(..))
+import           Clash.Class.BitPack
 import           Clash.Class.Exp
 import           Clash.Class.Num
 import           Clash.Class.Parity
@@ -176,8 +175,6 @@ import qualified Clash.Explicit.Prelude      as E
 import           Clash.Hidden
 import           Clash.Magic
 import           Clash.NamedTypes
-import           Clash.Prelude.BitIndex
-import           Clash.Prelude.BitReduction
 import           Clash.Prelude.BlockRam
 import           Clash.Prelude.BlockRam.File
 import           Clash.Prelude.ROM.File

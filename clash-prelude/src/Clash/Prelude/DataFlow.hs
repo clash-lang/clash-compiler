@@ -1,9 +1,10 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.
-                  2019     , Myrtle Software Ltd
+                  2019     , Myrtle Software Ltd,
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Self-synchronizing circuits based on data-flow principles.
 -}
@@ -48,7 +49,7 @@ import Prelude
 
 import Clash.Class.BitPack    (boolToBV)
 import Clash.Class.Resize     (truncateB)
-import Clash.Prelude.BitIndex (msb)
+import Clash.Class.BitPack.BitIndex (msb)
 import Clash.Explicit.Mealy   (mealyB)
 import Clash.Promoted.Nat     (SNat)
 import Clash.Signal           (KnownDomain, (.&&.))

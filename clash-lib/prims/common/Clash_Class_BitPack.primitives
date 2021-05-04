@@ -1,5 +1,5 @@
 [ { "BlackBox" :
-    { "name"      : "Clash.Class.BitPack.packFloat#"
+    { "name"      : "Clash.Class.BitPack.Internal.packFloat#"
     , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type" :
@@ -8,7 +8,7 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Class.BitPack.unpackFloat#"
+    { "name"      : "Clash.Class.BitPack.Internal.unpackFloat#"
     , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type" :
@@ -17,7 +17,7 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Class.BitPack.packDouble#"
+    { "name"      : "Clash.Class.BitPack.Internal.packDouble#"
     , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type" :
@@ -26,7 +26,7 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Class.BitPack.unpackDouble#"
+    { "name"      : "Clash.Class.BitPack.Internal.unpackDouble#"
     , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type" :

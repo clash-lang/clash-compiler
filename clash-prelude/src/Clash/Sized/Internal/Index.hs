@@ -1,8 +1,9 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
-                  2016-2019, Myrtle Software Ltd
+                  2016-2019, Myrtle Software Ltd,
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
@@ -96,12 +97,12 @@ import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
                                    coarbitraryIntegral, shrinkIntegral)
 
-import Clash.Class.BitPack        (BitPack (..), packXWith)
+import Clash.Class.BitPack.Internal (BitPack (..), packXWith)
 import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import Clash.Class.Parity         (Parity (..))
 import Clash.Class.Resize         (Resize (..))
-import Clash.Prelude.BitIndex     (replaceBit)
+import Clash.Class.BitPack.BitIndex (replaceBit)
 import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV), high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV
 import Clash.Promoted.Nat         (SNat(..), snatToNum, natToInteger, leToPlusKN)

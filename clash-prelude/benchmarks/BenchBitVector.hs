@@ -10,7 +10,7 @@ module BenchBitVector where
 import Data.Bits
 import Clash.Sized.BitVector
 import Clash.Class.Num
-import Clash.Prelude.BitIndex
+import Clash.Class.BitPack.BitIndex
 import GHC.TypeLits                   (type (*))
 import Criterion                      (Benchmark, env, bench, nf, bgroup)
 import Language.Haskell.TH.Syntax     (lift)

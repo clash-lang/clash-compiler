@@ -1,8 +1,9 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
-                  2016     , Myrtle Software Ltd
+                  2016     , Myrtle Software Ltd,
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
@@ -128,8 +129,8 @@ import Clash.Class.Num                (ExtendingNum (..), SaturatingNum (..),
                                        SaturationMode (..))
 import Clash.Class.Parity             (Parity (..))
 import Clash.Class.Resize             (Resize (..))
-import Clash.Prelude.BitIndex         ((!), msb, replaceBit, split)
-import Clash.Prelude.BitReduction     (reduceOr)
+import Clash.Class.BitPack.BitIndex   ((!), msb, replaceBit, split)
+import Clash.Class.BitPack.BitReduction (reduceOr)
 import Clash.Promoted.Nat             (natToNum, natToNatural)
 import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV

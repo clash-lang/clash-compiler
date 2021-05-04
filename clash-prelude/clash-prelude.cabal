@@ -50,7 +50,8 @@ Author:               The Clash Authors
 Maintainer:           QBayLogic B.V. <devops@qbaylogic.com>
 Copyright:            Copyright © 2013-2016, University of Twente,
                                   2016-2017, Myrtle Software Ltd,
-                                  2017-2019, QBayLogic B.V., Google Inc.
+                                  2017-2019, QBayLogic B.V., Google Inc.,
+                                  2021,      QBayLogic B.V.
 Category:             Hardware
 Build-type:           Custom
 
@@ -181,6 +182,10 @@ Library
 
                       Clash.Class.AutoReg
                       Clash.Class.BitPack
+                      Clash.Class.BitPack.BitIndex
+                      Clash.Class.BitPack.BitReduction
+                      Clash.Class.BitPack.Internal
+                      Clash.Class.BitPack.Internal.TH
                       Clash.Class.Counter
                       Clash.Class.Counter.Internal
                       Clash.Class.Counter.TH
@@ -288,7 +293,6 @@ Library
   other-modules:
                       Clash.Class.AutoReg.Instances
                       Clash.Class.AutoReg.Internal
-                      Clash.Class.BitPack.Internal
                       Clash.CPP
                       Clash.Examples.Internal
                       Clash.Signal.Bundle.Internal

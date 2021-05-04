@@ -1,9 +1,10 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.
-                  2019     , Myrtle Software Ltd
+                  2019     , Myrtle Software Ltd,
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 __This is the <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/safe_haskell.html Safe> API only of "Clash.Explicit.Prelude"__
 
@@ -53,8 +54,6 @@ module Clash.Explicit.Prelude.Safe
     -- ** Datatypes
     -- *** Bit vectors
   , module Clash.Sized.BitVector
-  , module Clash.Prelude.BitIndex
-  , module Clash.Prelude.BitReduction
     -- *** Arbitrary-width numbers
   , module Clash.Sized.Signed
   , module Clash.Sized.Unsigned
@@ -119,8 +118,6 @@ import Clash.Explicit.Signal
 import Clash.Explicit.Signal.Delayed
 import Clash.Explicit.Synchronizer
   (dualFlipFlopSynchronizer, asyncFIFOSynchronizer)
-import Clash.Prelude.BitIndex
-import Clash.Prelude.BitReduction
 import Clash.Prelude.ROM             (asyncRom, asyncRomPow2)
 import Clash.Promoted.Nat
 import Clash.Promoted.Nat.TH

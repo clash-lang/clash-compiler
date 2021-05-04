@@ -1,9 +1,10 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                      2017-2019, Myrtle Software Ltd
-                     2017     , Google Inc.
+                     2017     , Google Inc.,
+                     2021     , QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   __This is the <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/safe_haskell.html Safe> API only of "Clash.Prelude"__
 
@@ -69,8 +70,6 @@ module Clash.Prelude.Safe
     -- ** Datatypes
     -- *** Bit vectors
   , module Clash.Sized.BitVector
-  , module Clash.Prelude.BitIndex
-  , module Clash.Prelude.BitReduction
     -- *** Arbitrary-width numbers
   , module Clash.Sized.Signed
   , module Clash.Sized.Unsigned
@@ -128,8 +127,6 @@ import           Clash.Class.Num
 import           Clash.Class.Resize
 import           Clash.Hidden
 import           Clash.NamedTypes
-import           Clash.Prelude.BitIndex
-import           Clash.Prelude.BitReduction
 import           Clash.Prelude.BlockRam
 import qualified Clash.Explicit.Prelude.Safe as E
 import           Clash.Prelude.Mealy         (mealy, mealyB, (<^>))

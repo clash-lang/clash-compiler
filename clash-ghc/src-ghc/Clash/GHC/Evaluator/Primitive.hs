@@ -1,9 +1,10 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
-                     2017     , QBayLogic, Google Inc.
+                     2017     , QBayLogic, Google Inc.,
+                     2021     , QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
@@ -1777,7 +1778,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | otherwise -> error (show args)
 
 
-  "Clash.Class.BitPack.packDouble#" -- :: Double -> BitVector 64
+  "Clash.Class.BitPack.Internal.packDouble#" -- :: Double -> BitVector 64
     | [DC _ [Left arg]] <- args
     , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
     , mach2@Machine{mStack=[],mTerm=Literal (DoubleLiteral i)} <- whnf eval tcm True (setTerm arg $ stackClear mach)
@@ -1787,7 +1788,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
              , mTerm = mkBitVectorLit' resTyInfo 0 (toInteger $ (pack :: Double -> BitVector 64) $ fromRational i)
              }
 
-  "Clash.Class.BitPack.packFloat#" -- :: Float -> BitVector 32
+  "Clash.Class.BitPack.Internal.packFloat#" -- :: Float -> BitVector 32
     | [DC _ [Left arg]] <- args
     , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
     , mach2@Machine{mStack=[],mTerm=Literal (FloatLiteral i)} <- whnf eval tcm True (setTerm arg $ stackClear mach)
@@ -1797,11 +1798,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
              , mTerm = mkBitVectorLit' resTyInfo 0 (toInteger $ (pack :: Float -> BitVector 32) $ fromRational i)
              }
 
-  "Clash.Class.BitPack.unpackFloat#"
+  "Clash.Class.BitPack.Internal.unpackFloat#"
     | [i] <- bitVectorLiterals' args
     -> reduce (Literal (FloatLiteral (toRational $ (unpack :: BitVector 32 -> Float) (toBV i))))
 
-  "Clash.Class.BitPack.unpackDouble#"
+  "Clash.Class.BitPack.Internal.unpackDouble#"
     | [i] <- bitVectorLiterals' args
     -> reduce (Literal (DoubleLiteral (toRational $ (unpack :: BitVector 64 -> Double) (toBV i))))
 

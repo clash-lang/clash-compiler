@@ -1,9 +1,10 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.
-                  2019     , Myrtle Software Ltd
+                  2019     , Myrtle Software Ltd,
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 This module defines the explicitly clocked counterparts of the functions
 defined in "Clash.Prelude".
@@ -78,8 +79,6 @@ module Clash.Explicit.Prelude
     -- ** Datatypes
     -- *** Bit vectors
   , module Clash.Sized.BitVector
-  , module Clash.Prelude.BitIndex
-  , module Clash.Prelude.BitReduction
     -- *** Arbitrary-width numbers
   , module Clash.Sized.Signed
   , module Clash.Sized.Unsigned
@@ -138,7 +137,7 @@ import Clash.HaskellPrelude
 
 import Clash.Annotations.TopEntity
 import Clash.Class.AutoReg
-import Clash.Class.BitPack hiding (GBitPack(..))
+import Clash.Class.BitPack
 import Clash.Class.Exp
 import Clash.Class.Num
 import Clash.Class.Resize
@@ -156,8 +155,6 @@ import Clash.Explicit.Reset
 import Clash.Explicit.Signal
 import Clash.Explicit.Signal.Delayed
 import Clash.Explicit.Testbench
-import Clash.Prelude.BitIndex
-import Clash.Prelude.BitReduction
 import Clash.Prelude.ROM.File       (asyncRomFile, asyncRomFilePow2)
 import Clash.Promoted.Nat
 import Clash.Promoted.Nat.TH

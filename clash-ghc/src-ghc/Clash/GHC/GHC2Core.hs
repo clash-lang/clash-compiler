@@ -2,8 +2,9 @@
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017-2818, Google Inc.
+                     2021,      QBayLogic B.V.,
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
@@ -370,7 +371,7 @@ coreToTerm primMap unlocs = term
         go "GHC.Stack.withFrozenCallStack"     args
           | length args == 3
           = term (App (args!!2) (args!!1))
-        go "Clash.Class.BitPack.packXWith" args
+        go "Clash.Class.BitPack.Internal.packXWith" args
           | [_nTy,_aTy,_kn,f] <- args
           = term f
         go "Clash.Sized.BitVector.Internal.checkUnpackUndef" args
@@ -539,7 +540,7 @@ coreToTerm primMap unlocs = term
               | f == "GHC.Magic.noinline"               -> return (idTerm xType)
               | f == "GHC.Magic.lazy"                   -> return (idTerm xType)
               | f == "GHC.Magic.runRW#"                 -> return (runRWTerm xType)
-              | f == "Clash.Class.BitPack.packXWith"    -> return (packXWithTerm xType)
+              | f == "Clash.Class.BitPack.Internal.packXWith"    -> return (packXWithTerm xType)
               | f == "Clash.Sized.Internal.BitVector.checkUnpackUndef" -> return (checkUnpackUndefTerm xType)
               | f == "Clash.Magic.prefixName"
               -> return (nameModTerm C.PrefixName xType)
