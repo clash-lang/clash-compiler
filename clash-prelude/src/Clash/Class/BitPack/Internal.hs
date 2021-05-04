@@ -56,7 +56,7 @@ import Clash.XException
 
 -- | Convert data to/from a 'BitVector'. This allows functions to be defined
 -- on the underlying representation of data, while exposing a nicer API using
--- pack / unpack at the boundaries. For example:
+-- 'pack' / 'unpack' at the boundaries. For example:
 --
 -- @
 --     f :: forall a b. (BitPack a, BitPack b) => a -> b
