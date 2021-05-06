@@ -2,8 +2,9 @@
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017     , Google Inc.
+                     2021     , QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
@@ -629,7 +630,7 @@ makeRecursiveGroups
       Digraph.DigraphNode
         (b,e)
         (Var.varUnique b)
-        (UniqSet.nonDetKeysUniqSet (CoreFVs.exprFreeIds e))
+        (UniqSet.nonDetKeysUniqSet (CoreFVs.exprSomeFreeVars Var.isId e))
 
     makeBind
       :: Digraph.SCC (CoreSyn.CoreBndr,CoreSyn.CoreExpr)
