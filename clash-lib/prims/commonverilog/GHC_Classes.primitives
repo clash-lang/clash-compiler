@@ -22,7 +22,7 @@
 , { "BlackBox" :
     { "name"      : "GHC.Classes.||"
     , "kind"      : "Expression"
-    , "type"      : "(::) :: Bool -> Bool -> Bool"
+    , "type"      : "(||) :: Bool -> Bool -> Bool"
     , "template"  : "~ARG[0] | ~ARG[1]"
     }
   }
