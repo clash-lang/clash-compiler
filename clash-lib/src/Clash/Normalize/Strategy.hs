@@ -92,7 +92,7 @@ constantPropagation =
       , ("caseCase"              , caseCase             )
 #endif
       , ("caseCon"               , caseCon              )
-      , ("elemExistentials"      , elemExistentials     )
+      , ("elimExistentials"      , elimExistentials     )
       , ("caseElemNonReachable"  , caseElemNonReachable )
       , ("removeUnusedExpr"      , removeUnusedExpr     )
       -- These transformations can safely be applied in a top-down traversal as
