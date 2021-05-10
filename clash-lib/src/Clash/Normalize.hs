@@ -406,7 +406,7 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm)) used) = do
      else return (CBranch (nm,(Binding nm' sp inl pr newExpr)) allUsed)
   where
     flatten =
-      repeatR (topdownR (apply "appPropFast" appPropFast >->
+      repeatR (topdownR (apply "appProp" appProp >->
                  apply "bindConstantVar" bindConstantVar >->
                  apply "caseCon" caseCon >->
 #if EXPERIMENTAL_EVALUATOR

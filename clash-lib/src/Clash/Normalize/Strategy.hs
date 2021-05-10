@@ -74,18 +74,18 @@ constantPropagation =
   dec >->
   conSpec
   where
-    etaTL              = apply "etaTL" etaExpansionTL !-> topdownR (apply "applicationPropagation" appPropFast)
+    etaTL              = apply "etaTL" etaExpansionTL !-> topdownR (apply "applicationPropagation" appProp)
     inlineAndPropagate = repeatR (topdownR (applyMany transPropagateAndInline) >-> inlineNR)
     spec               = bottomupR (applyMany specTransformations)
     caseFlattening     = repeatR (topdownR (apply "caseFlat" caseFlat))
     dec                = repeatR (topdownR (apply "DEC" disjointExpressionConsolidation))
-    conSpec            = bottomupR  ((apply "appPropCS" appPropFast !->
+    conSpec            = bottomupR  ((apply "appPropCS" appProp !->
                                      bottomupR (apply "constantSpec" constantSpec)) >-!
                                      apply "constantSpec" constantSpec)
 
     transPropagateAndInline :: [(String,NormRewrite)]
     transPropagateAndInline =
-      [ ("applicationPropagation", appPropFast          )
+      [ ("applicationPropagation", appProp              )
       , ("bindConstantVar"       , bindConstantVar      )
       , ("caseLet"               , caseLet              )
 #if !EXPERIMENTAL_EVALUATOR
