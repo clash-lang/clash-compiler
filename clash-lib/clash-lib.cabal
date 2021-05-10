@@ -245,6 +245,7 @@ Library
                       Clash.Normalize.Transformations.Case
                       Clash.Normalize.Transformations.Cast
                       Clash.Normalize.Transformations.DEC
+                      Clash.Normalize.Transformations.Inline
                       Clash.Normalize.Transformations.Letrec
                       Clash.Normalize.Transformations.Reduce
                       Clash.Normalize.Types
