@@ -74,25 +74,25 @@ constantPropagation =
   dec >->
   conSpec
   where
-    etaTL              = apply "etaTL" etaExpansionTL !-> topdownR (apply "applicationPropagation" appPropFast)
+    etaTL              = apply "etaTL" etaExpansionTL !-> topdownR (apply "applicationPropagation" appProp)
     inlineAndPropagate = repeatR (topdownR (applyMany transPropagateAndInline) >-> inlineNR)
     spec               = bottomupR (applyMany specTransformations)
     caseFlattening     = repeatR (topdownR (apply "caseFlat" caseFlat))
     dec                = repeatR (topdownR (apply "DEC" disjointExpressionConsolidation))
-    conSpec            = bottomupR  ((apply "appPropCS" appPropFast !->
+    conSpec            = bottomupR  ((apply "appPropCS" appProp !->
                                      bottomupR (apply "constantSpec" constantSpec)) >-!
                                      apply "constantSpec" constantSpec)
 
     transPropagateAndInline :: [(String,NormRewrite)]
     transPropagateAndInline =
-      [ ("applicationPropagation", appPropFast          )
+      [ ("applicationPropagation", appProp              )
       , ("bindConstantVar"       , bindConstantVar      )
       , ("caseLet"               , caseLet              )
 #if !EXPERIMENTAL_EVALUATOR
       , ("caseCase"              , caseCase             )
 #endif
       , ("caseCon"               , caseCon              )
-      , ("elemExistentials"      , elemExistentials     )
+      , ("elimExistentials"      , elimExistentials     )
       , ("caseElemNonReachable"  , caseElemNonReachable )
       , ("removeUnusedExpr"      , removeUnusedExpr     )
       -- These transformations can safely be applied in a top-down traversal as
@@ -109,7 +109,7 @@ constantPropagation =
       , ("splitCastWork"   , splitCastWork)
       , ("argCastSpec"     , argCastSpec)
       , ("inlineCast"      , inlineCast)
-      , ("eliminateCastCast",eliminateCastCast)
+      , ("elimCastCast"    , elimCastCast)
       ]
 
     -- InlineNonRep cannot be applied in a top-down traversal, as the non-representable

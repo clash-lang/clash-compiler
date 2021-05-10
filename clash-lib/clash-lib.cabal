@@ -238,10 +238,21 @@ Library
                       Clash.Netlist.Util
 
                       Clash.Normalize
-                      Clash.Normalize.DEC
                       Clash.Normalize.PrimitiveReductions
                       Clash.Normalize.Strategy
                       Clash.Normalize.Transformations
+                      Clash.Normalize.Transformations.ANF
+                      Clash.Normalize.Transformations.Case
+                      Clash.Normalize.Transformations.Cast
+                      Clash.Normalize.Transformations.DEC
+                      Clash.Normalize.Transformations.EtaExpand
+                      Clash.Normalize.Transformations.Inline
+                      Clash.Normalize.Transformations.Letrec
+                      Clash.Normalize.Transformations.MultiPrim
+                      Clash.Normalize.Transformations.Reduce
+                      Clash.Normalize.Transformations.SeparateArgs
+                      Clash.Normalize.Transformations.Specialize
+                      Clash.Normalize.Transformations.XOptimize
                       Clash.Normalize.Types
                       Clash.Normalize.Util
 
