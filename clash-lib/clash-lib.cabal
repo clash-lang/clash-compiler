@@ -249,6 +249,7 @@ Library
                       Clash.Normalize.Transformations.Letrec
                       Clash.Normalize.Transformations.Reduce
                       Clash.Normalize.Transformations.Specialize
+                      Clash.Normalize.Transformations.XOptimize
                       Clash.Normalize.Types
                       Clash.Normalize.Util
 
