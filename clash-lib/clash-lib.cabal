@@ -248,6 +248,7 @@ Library
                       Clash.Normalize.Transformations.EtaExpand
                       Clash.Normalize.Transformations.Inline
                       Clash.Normalize.Transformations.Letrec
+                      Clash.Normalize.Transformations.MultiPrim
                       Clash.Normalize.Transformations.Reduce
                       Clash.Normalize.Transformations.Specialize
                       Clash.Normalize.Transformations.XOptimize

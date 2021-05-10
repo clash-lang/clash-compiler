@@ -22,20 +22,16 @@ module Clash.Normalize.Transformations
   ( module X
   , separateArguments
   , separateLambda
-  , setupMultiResultPrim
   )
 where
 
 import qualified Control.Lens                as Lens
 import           Control.Monad.Writer        (listen)
-import qualified Data.Either                 as Either
 import qualified Data.List                   as List
 import qualified Data.Monoid                 as Monoid
-import           Data.Text.Extra             (showt)
 import           GHC.Stack                   (HasCallStack)
 
-import           Clash.Annotations.Primitive (extractPrim)
-import           Clash.Core.Name (mkUnsafeInternalName, Name (..))
+import           Clash.Core.Name (Name(..))
 import           Clash.Core.Subst
 import           Clash.Core.Term
 import           Clash.Core.TermInfo
@@ -52,11 +48,11 @@ import Clash.Normalize.Transformations.DEC as X
 import Clash.Normalize.Transformations.EtaExpand as X
 import Clash.Normalize.Transformations.Inline as X
 import Clash.Normalize.Transformations.Letrec as X
+import Clash.Normalize.Transformations.MultiPrim as X
 import Clash.Normalize.Transformations.Reduce as X
 import Clash.Normalize.Transformations.Specialize as X
 import Clash.Normalize.Transformations.XOptimize as X
 import           Clash.Normalize.Types
-import           Clash.Primitives.Types (Primitive(..))
 import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
 
@@ -145,91 +141,3 @@ separateArguments (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, 
 
 separateArguments _ e = return e
 {-# SCC separateArguments #-}
-
--- A multi result primitive assigns its results to multiple result variables
--- instead of one. Besides producing nicer HDL it works around issues with
--- synthesis tooling described in:
---
---   https://github.com/clash-lang/clash-compiler/issues/1555
---
--- This transformation rewrites primitives indicating they can assign their
--- results to multiple signals, such that netlist can easily render it.
---
--- Example:
---
--- @
--- prim :: forall a. a -> (a, a)
--- @
---
--- will be rewritten to:
---
--- @
---   \a0 -> let
---            r  = prim @t0 a0 r0 r1     -- With 'Clash.Core.Term.MultiPrim'
---            r0 = multiPrimSelect r0 r
---            r1 = multiPrimSelect r1 r
---          in
---            (x, y)
--- @
---
--- Netlist will not render any @multiPrimSelect@ primitives. Similar to
--- primitives having a /void/ return type, /r/ is not rendered either.
---
--- This transformation is currently hardcoded to recognize tuples as return
--- types, not any product type. It will error if it sees a multi result primitive
--- with a non-tuple return type.
---
-setupMultiResultPrim :: HasCallStack => NormRewrite
-setupMultiResultPrim _ctx e@(Prim pInfo@PrimInfo{primMultiResult=SingleResult}) = do
-  tcm <- Lens.view tcCache
-  prim <- Lens.use (extra . primitives . Lens.at (primName pInfo))
-
-  case prim >>= extractPrim of
-    Just (BlackBoxHaskell{multiResult=True}) ->
-      changed (setupMultiResultPrim' tcm pInfo)
-    Just (BlackBox{multiResult=True}) ->
-      changed (setupMultiResultPrim' tcm pInfo)
-    _ ->
-      return e
-
-setupMultiResultPrim _ e = return e
-
-setupMultiResultPrim' :: HasCallStack => TyConMap -> PrimInfo -> Term
-setupMultiResultPrim' tcm primInfo@PrimInfo{primType} =
-  mkAbstraction letTerm (map Right typeVars <> map Left argIds)
- where
-  typeVars = Either.lefts pArgs
-
-  internalNm prefix n = mkUnsafeInternalName (prefix <> showt n) n
-  internalId prefix typ n = mkLocalId typ (internalNm prefix n)
-
-  nTermArgs = length (Either.rights pArgs)
-  argIds = zipWith (internalId "a") (Either.rights pArgs) [1..nTermArgs]
-  resIds = zipWith (internalId "r") resTypes [nTermArgs+1..nTermArgs+length resTypes]
-  resId = mkLocalId pResTy (mkUnsafeInternalName "r" (nTermArgs+length resTypes+1))
-
-  (pArgs, pResTy) = splitFunForallTy primType
-  MultiPrimInfo{mpi_resultDc=tupTc, mpi_resultTypes=resTypes} =
-    multiPrimInfo' tcm primInfo
-
-  multiPrimSelect r t = (r, mkTmApps (Prim (multiPrimSelectInfo t)) [Var r, Var resId])
-  multiPrimSelectBinds = zipWith multiPrimSelect  resIds resTypes
-  multiPrimTermArgs = map (Left . Var) (argIds <> resIds)
-  multiPrimTypeArgs = map (Right . VarTy) typeVars
-  multiPrimBind =
-    mkApps
-      (Prim primInfo{primMultiResult=MultiResult})
-      (multiPrimTypeArgs <> multiPrimTermArgs)
-
-  multiPrimSelectInfo t = PrimInfo
-    { primName = "c$multiPrimSelect"
-    , primType = mkPolyFunTy pResTy [Right pResTy, Right t]
-    , primWorkInfo = WorkAlways
-    , primMultiResult = SingleResult }
-
-  letTerm =
-    Letrec
-      ((resId,multiPrimBind):multiPrimSelectBinds)
-      (mkTmApps (mkTyApps (Data tupTc) resTypes) (map Var resIds))
-
-
