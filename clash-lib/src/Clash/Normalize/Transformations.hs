@@ -32,7 +32,6 @@ module Clash.Normalize.Transformations
   , inlineWorkFree
   , inlineHO
   , inlineSmall
-  , disjointExpressionConsolidation
   , inlineCleanup
   , inlineBndrsCleanup
   , splitCastWork
@@ -53,7 +52,7 @@ where
 
 import           Control.Arrow               ((***))
 import           Control.Exception           (throw)
-import           Control.Lens                ((^.),_1,_2)
+import           Control.Lens                (_2)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import           Control.Monad.Extra         (orM)
@@ -110,8 +109,8 @@ import           Clash.Driver.Types          (Binding(..), DebugLevel (..))
 import           Clash.Netlist.BlackBox.Types (Element(Err))
 import           Clash.Netlist.Types         (BlackBox(..))
 import           Clash.Netlist.Util (representableType, bindsExistentials)
-import           Clash.Normalize.DEC
 import Clash.Normalize.Transformations.Case as X
+import Clash.Normalize.Transformations.DEC as X
 import Clash.Normalize.Transformations.Letrec as X
 import Clash.Normalize.Transformations.Reduce as X
 import           Clash.Normalize.Types
@@ -1149,140 +1148,6 @@ inlineHO _ e@(App _ _)
 
 inlineHO _ e = return e
 {-# SCC inlineHO #-}
-
--- | This transformation lifts applications of global binders out of
--- alternatives of case-statements.
---
--- e.g. It converts:
---
--- @
--- case x of
---   A -> f 3 y
---   B -> f x x
---   C -> h x
--- @
---
--- into:
---
--- @
--- let f_arg0 = case x of {A -> 3; B -> x}
---     f_arg1 = case x of {A -> y; B -> x}
---     f_out  = f f_arg0 f_arg1
--- in  case x of
---       A -> f_out
---       B -> f_out
---       C -> h x
--- @
-disjointExpressionConsolidation :: HasCallStack => NormRewrite
-disjointExpressionConsolidation ctx@(TransformContext isCtx _) e@(Case _scrut _ty _alts@(_:_:_)) = do
-    -- Collect all (the applications of) global binders (and certain primitives)
-    -- that would be interesting to share out of the case-alternatives.
-    (_,isCollected,collected) <- collectGlobals isCtx [] [] e
-    -- Filter those that are used at most once in every (nested) branch.
-    let disJoint = filter (isDisjoint . snd . snd) collected
-    if null disJoint
-       then return e
-       else do
-         -- For every to-lift expression create (the generalization of):
-         --
-         -- let fargs = case x of {A -> (3,y); B -> (x,x)}
-         -- in  f (fst fargs) (snd fargs)
-         --
-         -- the let-expression is not created when `f` has only one (selectable)
-         -- argument
-         --
-         -- NB: mkDisJointGroup needs the context InScopeSet, isCtx, to determine
-         -- whether expressions reference variables from the context, or
-         -- variables inside a let-expression inside one of the alternatives.
-         lifted <- mapM (mkDisjointGroup isCtx) disJoint
-         tcm    <- Lens.view tcCache
-         -- Create let-binders for all of the lifted expressions
-         --
-         -- NB: Because we will be substituting under binders we use the collected
-         -- inScopeSet, isCollected, which also contains all the binders
-         -- created inside all of the alternatives. With this inScopeSet, we
-         -- ensure that the let-bindings we create here won't be accidentally
-         -- captured by binders inside the case-alternatives.
-         (_,funOutIds) <- List.mapAccumLM (mkFunOut tcm)
-                                          isCollected
-                                          (zip disJoint lifted)
-         -- Create "substitutions" of the form [f X Y := f_out]
-         let substitution = zip (map fst disJoint) (map Var funOutIds)
-         -- For all of the lifted expression: substitute occurrences of the
-         -- disjoint expressions (f X Y) by a variable reference to the lifted
-         -- expression (f_out)
-         let isCtx1 = extendInScopeSetList isCtx funOutIds
-         lifted1 <- substLifted isCtx1 substitution lifted
-         -- Do the same for the actual case expression
-         (e1,_,_) <- collectGlobals isCtx1 substitution [] e
-         -- Let-bind all the lifted function
-         let lb = Letrec (zip funOutIds lifted1) e1
-         -- Do an initial dead-code elimination pass, as `mkDisJoint` doesn't
-         -- clean-up unused let-binders.
-         lb1 <- bottomupR deadCode ctx lb
-         changed lb1
-  where
-    -- Make the let-binder for the lifted expressions
-    mkFunOut tcm isN ((fun,_),(eLifted,_)) = do
-      let ty  = termType tcm eLifted
-          nm  = case collectArgs fun of
-                   (Var v,_)  -> nameOcc (varName v)
-                   (Prim p,_) -> primName p
-                   _          -> "complex_expression_"
-          nm1 = last (Text.splitOn "." nm) `Text.append` "Out"
-      nm2 <- mkInternalVar isN nm1 ty
-      return (extendInScopeSet isN nm2,nm2)
-
-    -- Substitute inside the lifted expressions
-    --
-    -- In case you are wondering why this function isn't simply
-    --
-    -- > mapM (\s (eL,seen) -> collectGlobal isN s seen eL) substitution lifted
-    --
-    -- then that's because we have e.g. the list of "substitutions":
-    --
-    -- [foo _ _ := foo_out; bar _ _ := bar_out]
-    --
-    -- and if we were to apply that to a lifted expression, which is going
-    -- to be of the form `foo (case ...) (case ...)` then we would end up
-    -- with let-bindings that are simply:
-    --
-    -- > let foo_out = foo_out ; bar_out = bar_out
-    --
-    -- instead of the desired
-    --
-    -- > let foo_out = foo ((case ...)[foo _ _ := foo_out; bar _ _ := bar_out])
-    -- >                   ((case ...)[foo _ _ := foo_out; bar _ _ := bar_out])
-    -- >     bar_out = bar ((case ...)[foo _ _ := foo_out; bar _ _ := bar_out])
-    -- >                   ((case ...)[foo _ _ := foo_out; bar _ _ := bar_out])
-    --
-    -- So what we do is that for every lifted-expression we make sure that the
-    -- 'substitution' never contains the self-substitution, so we end up with:
-    --
-    -- > let foo_out = (foo (case ...) (case ...))[bar _ _ := bar_out]
-    --       bar_out = (bar (case ...) (case ...))[foo _ _ := foo_out]
-    --
-    -- We used to have a different approach, see commit
-    -- 73d237017c4a5fff0c49bb72c9c4d5f6c68faf69
-    --
-    -- But that lead to the generation of combinational loops. Now that we no
-    -- longer traverse into recursive groups of let-bindings, the issue #1316
-    -- that the above commit tried to solve, no longer shows up.
-    substLifted isN substitution lifted = do
-      -- remove the self-substitutions for the respective lifted expressions
-      let subsMatrix = l2m substitution
-      lifted1 <- Monad.zipWithM (\s (eL,seen) -> collectGlobals isN s seen eL)
-                                 subsMatrix
-                                 lifted
-      return (map (^. _1) lifted1)
-
-    l2m = go []
-     where
-      go _  []     = []
-      go xs (y:ys) = (xs ++ ys) : go (xs ++ [y]) ys
-
-disjointExpressionConsolidation _ e = return e
-{-# SCC disjointExpressionConsolidation #-}
 
 -- | Given a function in the desired normal form, inline all the following
 -- let-bindings:

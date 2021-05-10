@@ -1,9 +1,8 @@
 {-|
-  Copyright  :  (C) 2015-2016, University of Twente
+  Copyright  :  (C) 2015-2016, University of Twente,
+                    2021,      QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
-
-  Helper functions for the 'disjointExpressionConsolidation' transformation
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   The 'disjointExpressionConsolidation' transformation lifts applications of
   global binders out of alternatives of case-statements.
@@ -31,75 +30,212 @@
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Normalize.DEC
-  (collectGlobals
-  ,collectGlobalsArgs
-  ,isDisjoint
-  ,mkDisjointGroup
-  )
-where
+module Clash.Normalize.Transformations.DEC
+  ( disjointExpressionConsolidation
+  ) where
 
--- external
-import           Control.Concurrent.Supply        (splitSupply)
-import qualified Control.Lens                     as Lens
-import           Data.Bifunctor                   (second)
-import           Data.Bits                        ((.&.),complement)
-import           Data.Coerce                      (coerce)
-import qualified Data.Either                      as Either
-import qualified Data.Foldable                    as Foldable
-import qualified Data.Graph                       as Graph
-import qualified Data.IntMap.Strict               as IM
-import qualified Data.IntSet                      as IntSet
-import qualified Data.List                        as List
-import qualified Data.List.Extra                  as List
-import qualified Data.Map.Strict                  as Map
-import qualified Data.Maybe                       as Maybe
-import           Data.Monoid                      (All (..))
+import Control.Concurrent.Supply (splitSupply)
+import Control.Lens ((^.), _1)
+import qualified Control.Lens as Lens
+import qualified Control.Monad as Monad
+import Data.Bifunctor (second)
+import Data.Bits ((.&.), complement)
+import Data.Coerce (coerce)
+import qualified Data.Either as Either
+import qualified Data.Foldable as Foldable
+import qualified Data.Graph as Graph
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
+import qualified Data.IntSet as IntSet
+import qualified Data.List as List
+import qualified Data.List.Extra as List
+import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
+import Data.Monoid (All(..))
+import qualified Data.Text as Text
+import GHC.Stack (HasCallStack)
 
 #if MIN_VERSION_ghc(8,10,0)
-import           GHC.Hs.Utils                     (chunkify,mkChunkified)
+import GHC.Hs.Utils (chunkify, mkChunkified)
 #else
-import           HsUtils                          (chunkify,mkChunkified)
+import HsUtils (chunkify, mkChunkified)
 #endif
 
 #if MIN_VERSION_ghc(9,0,0)
-import           GHC.Settings.Constants           (mAX_TUPLE_SIZE)
+import GHC.Settings.Constants (mAX_TUPLE_SIZE)
 #else
-import           Constants                        (mAX_TUPLE_SIZE)
+import Constants (mAX_TUPLE_SIZE)
 #endif
 
 #if EXPERIMENTAL_EVALUATOR
-import           System.IO.Unsafe
+import System.IO.Unsafe
 #endif
 
--- internal
-import Clash.Core.DataCon    (DataCon)
+import Clash.Core.DataCon (DataCon)
 
 #if EXPERIMENTAL_EVALUATOR
 import Clash.Core.PartialEval
 #else
-import Clash.Core.Evaluator.Types  (whnf')
+import Clash.Core.Evaluator.Types (whnf')
 #endif
 
 import Clash.Core.FreeVars
   (termFreeVars', typeFreeVars', localVarsDoNotOccurIn)
-import Clash.Core.Literal    (Literal (..))
+import Clash.Core.Literal (Literal(..))
+import Clash.Core.Name (nameOcc)
 import Clash.Core.Term
-  (LetBinding, Pat (..), PrimInfo (..), Term (..), TickInfo (..), collectArgs,
-   collectArgsTicks, mkApps, mkTicks, patIds)
-import Clash.Core.TermInfo   (termType)
-import Clash.Core.TyCon      (TyConMap, TyConName, tyConDataCons)
-import Clash.Core.Type       (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
-import Clash.Core.Util       (mkInternalVar, mkSelectorCase, sccLetBindings)
-import Clash.Core.Var        (isGlobalId, isLocalId)
+  ( Alt, LetBinding, Pat(..), PrimInfo(..), Term(..), TickInfo(..)
+  , collectArgs, collectArgsTicks, mkApps, mkTicks, patIds)
+import Clash.Core.TermInfo (termType)
+import Clash.Core.TyCon (TyConMap, TyConName, tyConDataCons)
+import Clash.Core.Type (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
+import Clash.Core.Util (mkInternalVar, mkSelectorCase, sccLetBindings)
+import Clash.Core.Var (isGlobalId, isLocalId, varName)
 import Clash.Core.VarEnv
-  (InScopeSet, elemInScopeSet, extendInScopeSetList, notElemInScopeSet, unionInScope)
-import Clash.Normalize.Types (NormalizeState)
+  ( InScopeSet, elemInScopeSet, extendInScopeSet, extendInScopeSetList
+  , notElemInScopeSet, unionInScope)
+import Clash.Normalize.Transformations.Letrec (deadCode)
+import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Rewrite.Combinators (bottomupR)
 import Clash.Rewrite.Types
-import Clash.Rewrite.Util    (isUntranslatableType)
+import Clash.Rewrite.Util (changed, isUntranslatableType)
 import Clash.Rewrite.WorkFree (isConstant)
-import Clash.Unique          (lookupUniqMap)
-import Clash.Util
+import Clash.Unique (lookupUniqMap)
+import Clash.Util (MonadUnique, curLoc)
+
+-- | This transformation lifts applications of global binders out of
+-- alternatives of case-statements.
+--
+-- e.g. It converts:
+--
+-- @
+-- case x of
+--   A -> f 3 y
+--   B -> f x x
+--   C -> h x
+-- @
+--
+-- into:
+--
+-- @
+-- let f_arg0 = case x of {A -> 3; B -> x}
+--     f_arg1 = case x of {A -> y; B -> x}
+--     f_out  = f f_arg0 f_arg1
+-- in  case x of
+--       A -> f_out
+--       B -> f_out
+--       C -> h x
+-- @
+disjointExpressionConsolidation :: HasCallStack => NormRewrite
+disjointExpressionConsolidation ctx@(TransformContext isCtx _) e@(Case _scrut _ty _alts@(_:_:_)) = do
+    -- Collect all (the applications of) global binders (and certain primitives)
+    -- that would be interesting to share out of the case-alternatives.
+    (_,isCollected,collected) <- collectGlobals isCtx [] [] e
+    -- Filter those that are used at most once in every (nested) branch.
+    let disJoint = filter (isDisjoint . snd . snd) collected
+    if null disJoint
+       then return e
+       else do
+         -- For every to-lift expression create (the generalization of):
+         --
+         -- let fargs = case x of {A -> (3,y); B -> (x,x)}
+         -- in  f (fst fargs) (snd fargs)
+         --
+         -- the let-expression is not created when `f` has only one (selectable)
+         -- argument
+         --
+         -- NB: mkDisJointGroup needs the context InScopeSet, isCtx, to determine
+         -- whether expressions reference variables from the context, or
+         -- variables inside a let-expression inside one of the alternatives.
+         lifted <- mapM (mkDisjointGroup isCtx) disJoint
+         tcm    <- Lens.view tcCache
+         -- Create let-binders for all of the lifted expressions
+         --
+         -- NB: Because we will be substituting under binders we use the collected
+         -- inScopeSet, isCollected, which also contains all the binders
+         -- created inside all of the alternatives. With this inScopeSet, we
+         -- ensure that the let-bindings we create here won't be accidentally
+         -- captured by binders inside the case-alternatives.
+         (_,funOutIds) <- List.mapAccumLM (mkFunOut tcm)
+                                          isCollected
+                                          (zip disJoint lifted)
+         -- Create "substitutions" of the form [f X Y := f_out]
+         let substitution = zip (map fst disJoint) (map Var funOutIds)
+         -- For all of the lifted expression: substitute occurrences of the
+         -- disjoint expressions (f X Y) by a variable reference to the lifted
+         -- expression (f_out)
+         let isCtx1 = extendInScopeSetList isCtx funOutIds
+         lifted1 <- substLifted isCtx1 substitution lifted
+         -- Do the same for the actual case expression
+         (e1,_,_) <- collectGlobals isCtx1 substitution [] e
+         -- Let-bind all the lifted function
+         let lb = Letrec (zip funOutIds lifted1) e1
+         -- Do an initial dead-code elimination pass, as `mkDisJoint` doesn't
+         -- clean-up unused let-binders.
+         lb1 <- bottomupR deadCode ctx lb
+         changed lb1
+  where
+    -- Make the let-binder for the lifted expressions
+    mkFunOut tcm isN ((fun,_),(eLifted,_)) = do
+      let ty  = termType tcm eLifted
+          nm  = case collectArgs fun of
+                   (Var v,_)  -> nameOcc (varName v)
+                   (Prim p,_) -> primName p
+                   _          -> "complex_expression_"
+          nm1 = last (Text.splitOn "." nm) `Text.append` "Out"
+      nm2 <- mkInternalVar isN nm1 ty
+      return (extendInScopeSet isN nm2,nm2)
+
+    -- Substitute inside the lifted expressions
+    --
+    -- In case you are wondering why this function isn't simply
+    --
+    -- > mapM (\s (eL,seen) -> collectGlobal isN s seen eL) substitution lifted
+    --
+    -- then that's because we have e.g. the list of "substitutions":
+    --
+    -- [foo _ _ := foo_out; bar _ _ := bar_out]
+    --
+    -- and if we were to apply that to a lifted expression, which is going
+    -- to be of the form `foo (case ...) (case ...)` then we would end up
+    -- with let-bindings that are simply:
+    --
+    -- > let foo_out = foo_out ; bar_out = bar_out
+    --
+    -- instead of the desired
+    --
+    -- > let foo_out = foo ((case ...)[foo _ _ := foo_out; bar _ _ := bar_out])
+    -- >                   ((case ...)[foo _ _ := foo_out; bar _ _ := bar_out])
+    -- >     bar_out = bar ((case ...)[foo _ _ := foo_out; bar _ _ := bar_out])
+    -- >                   ((case ...)[foo _ _ := foo_out; bar _ _ := bar_out])
+    --
+    -- So what we do is that for every lifted-expression we make sure that the
+    -- 'substitution' never contains the self-substitution, so we end up with:
+    --
+    -- > let foo_out = (foo (case ...) (case ...))[bar _ _ := bar_out]
+    --       bar_out = (bar (case ...) (case ...))[foo _ _ := foo_out]
+    --
+    -- We used to have a different approach, see commit
+    -- 73d237017c4a5fff0c49bb72c9c4d5f6c68faf69
+    --
+    -- But that lead to the generation of combinational loops. Now that we no
+    -- longer traverse into recursive groups of let-bindings, the issue #1316
+    -- that the above commit tried to solve, no longer shows up.
+    substLifted isN substitution lifted = do
+      -- remove the self-substitutions for the respective lifted expressions
+      let subsMatrix = l2m substitution
+      lifted1 <- Monad.zipWithM (\s (eL,seen) -> collectGlobals isN s seen eL)
+                                 subsMatrix
+                                 lifted
+      return (map (^. _1) lifted1)
+
+    l2m = go []
+     where
+      go _  []     = []
+      go xs (y:ys) = (xs ++ ys) : go (xs ++ [y]) ys
+
+disjointExpressionConsolidation _ e = return e
+{-# SCC disjointExpressionConsolidation #-}
 
 data CaseTree a
   = Leaf a
@@ -152,9 +288,7 @@ collectGlobals'
   -- ^ The expression
   -> Bool
   -- ^ Whether expression is constant
-  -> RewriteMonad
-      NormalizeState
-      (Term, InScopeSet, [(Term, ([Term], CaseTree [Either Term Type]))])
+  -> NormalizeSession (Term, InScopeSet, [(Term, ([Term], CaseTree [Either Term Type]))])
 collectGlobals' is0 substitution seen (Case scrut ty alts) _eIsConstant = do
   rec (alts1, isAlts, collectedAlts) <-
         collectGlobalsAlts is0 substitution seen scrut1 alts
@@ -241,26 +375,24 @@ collectGlobals
   -- ^ List of already seen global binders
   -> Term
   -- ^ The expression
-  -> RewriteMonad
-      NormalizeState
-      (Term, InScopeSet, [(Term, ([Term], CaseTree [Either Term Type]))])
+  -> NormalizeSession (Term, InScopeSet, [(Term, ([Term], CaseTree [Either Term Type]))])
 collectGlobals inScope substitution seen e =
   collectGlobals' inScope substitution seen e (isConstant e)
 
 -- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
 -- of a list of application arguments. Also substitute truly disjoint
 -- applications of globals by a reference to a lifted out application.
-collectGlobalsArgs ::
-     InScopeSet
+collectGlobalsArgs
+  :: InScopeSet
   -> [(Term,Term)] -- ^ Substitution of (applications of) a global
                    -- binder by a reference to a lifted term.
   -> [Term] -- ^ List of already seen global binders
   -> [Either Term Type] -- ^ The list of arguments
-  -> RewriteMonad NormalizeState
-                  ([Either Term Type]
-                  ,InScopeSet
-                  ,[(Term,([Term],CaseTree [(Either Term Type)]))]
-                  )
+  -> NormalizeSession
+       ( [Either Term Type]
+       , InScopeSet
+       , [(Term, ([Term], CaseTree [(Either Term Type)]))]
+       )
 collectGlobalsArgs is0 substitution seen args = do
     ((is1,_),(args',collected)) <- second unzip <$> List.mapAccumLM go (is0,seen) args
     return (args',is1,concat collected)
@@ -279,12 +411,12 @@ collectGlobalsAlts ::
                    -- binder by a reference to a lifted term.
   -> [Term] -- ^ List of already seen global binders
   -> Term -- ^ The subject term
-  -> [(Pat,Term)] -- ^ The list of alternatives
-  -> RewriteMonad NormalizeState
-                  ([(Pat,Term)]
-                  ,InScopeSet
-                  ,[(Term,([Term],CaseTree [(Either Term Type)]))]
-                  )
+  -> [Alt] -- ^ The list of alternatives
+  -> NormalizeSession
+       ( [Alt]
+       , InScopeSet
+       , [(Term, ([Term], CaseTree [(Either Term Type)]))]
+       )
 collectGlobalsAlts is0 substitution seen scrut alts = do
     (is1,(alts',collected)) <- second unzip <$> List.mapAccumLM go is0 alts
     let collectedM  = map (Map.fromList . map (second (second (:[])))) collected
@@ -306,11 +438,11 @@ collectGlobalsLbs ::
                    -- binder by a reference to a lifted term.
   -> [Term] -- ^ List of already seen global binders
   -> [LetBinding] -- ^ The list let-bindings
-  -> RewriteMonad NormalizeState
-                  ([LetBinding]
-                  ,InScopeSet
-                  ,[(Term,([Term],CaseTree [(Either Term Type)]))]
-                  )
+  -> NormalizeSession
+       ( [LetBinding]
+       , InScopeSet
+       , [(Term, ([Term], CaseTree [(Either Term Type)]))]
+       )
 collectGlobalsLbs is0 substitution seen lbs = do
     let lbsSCCs = sccLetBindings lbs
     ((is1,_),(lbsSCCs1,collected)) <-
@@ -318,12 +450,12 @@ collectGlobalsLbs is0 substitution seen lbs = do
     return (Graph.flattenSCCs lbsSCCs1,is1,concat collected)
   where
     go :: (InScopeSet,[Term]) -> Graph.SCC LetBinding
-       -> RewriteMonad NormalizeState
-                  ((InScopeSet, [Term])
-                  ,(Graph.SCC LetBinding
-                   ,[(Term,([Term],CaseTree [(Either Term Type)]))]
-                   )
-                  )
+       -> NormalizeSession
+            ( (InScopeSet, [Term])
+            , ( Graph.SCC LetBinding
+              , [(Term, ([Term], CaseTree [(Either Term Type)]))]
+              )
+            )
     go (isN0,s) (Graph.AcyclicSCC (id_, e)) = do
       (e',isN1,collected) <- collectGlobals isN0 substitution s e
       return ((isN1,map fst collected ++ s),(Graph.AcyclicSCC (id_,e'),collected))
@@ -355,7 +487,7 @@ mkDisjointGroup
   -- expression
   -> (Term,([Term],CaseTree [(Either Term Type)]))
   -- ^ Case-tree of arguments belonging to the applied term.
-  -> RewriteMonad NormalizeState (Term,[Term])
+  -> NormalizeSession (Term,[Term])
 mkDisjointGroup inScope (fun,(seen,cs)) = do
     let argss    = Foldable.toList cs
         argssT   = zip [0..] (List.transpose argss)
@@ -398,7 +530,7 @@ disJointSelProj
   -- ^ Types of the arguments
   -> CaseTree [Term]
   -- The case-tree of arguments
-  -> RewriteMonad NormalizeState (Maybe LetBinding,[Term])
+  -> NormalizeSession (Maybe LetBinding,[Term])
 disJointSelProj _ _ (Leaf []) = return (Nothing,[])
 disJointSelProj inScope argTys cs = do
     tcm    <- Lens.view tcCache
@@ -462,7 +594,7 @@ mkDJArgs n ((m,x):cms) (y:uncms)
 -- | Create a case-expression that selects between the distinct arguments given
 -- a case-tree
 genCase :: TyConMap
-        -> IM.IntMap TyConName
+        -> IntMap TyConName
         -> Type -- ^ Type of the alternatives
         -> [Type] -- ^ Types of the arguments
         -> CaseTree [Term] -- ^ CaseTree of arguments
@@ -486,17 +618,17 @@ genCase tcm tupTcm ty argTys = go
       Case scrut ty (map (second go) pats)
 
 -- | Lookup the TyConName and DataCon for a tuple of size n
-findTup :: TyConMap -> IM.IntMap TyConName -> Int -> (TyConName,DataCon)
+findTup :: TyConMap -> IntMap TyConName -> Int -> (TyConName,DataCon)
 findTup tcm tupTcm n = (tupTcNm,tupDc)
   where
-    tupTcNm      = Maybe.fromMaybe (error $ $curLoc ++ "Can't find " ++ show n ++ "-tuple") $ IM.lookup n tupTcm
+    tupTcNm      = Maybe.fromMaybe (error $ $curLoc ++ "Can't find " ++ show n ++ "-tuple") $ IntMap.lookup n tupTcm
     Just tupTc   = lookupUniqMap tupTcNm tcm
     [tupDc]      = tyConDataCons tupTc
 
-mkBigTupTm :: TyConMap -> IM.IntMap TyConName -> [(Type,Term)] -> Term
+mkBigTupTm :: TyConMap -> IntMap TyConName -> [(Type,Term)] -> Term
 mkBigTupTm tcm tupTcm args = snd $ mkBigTup tcm tupTcm args
 
-mkSmallTup,mkBigTup :: TyConMap -> IM.IntMap TyConName -> [(Type,Term)] -> (Type,Term)
+mkSmallTup,mkBigTup :: TyConMap -> IntMap TyConName -> [(Type,Term)] -> (Type,Term)
 mkSmallTup _ _ [] = error $ $curLoc ++ "mkSmallTup: Can't create 0-tuple"
 mkSmallTup _ _ [(ty,tm)] = (ty,tm)
 mkSmallTup tcm tupTcm args = (ty,tm)
@@ -510,7 +642,7 @@ mkBigTup tcm tupTcm = mkChunkified (mkSmallTup tcm tupTcm)
 
 mkSmallTupTy,mkBigTupTy
   :: TyConMap
-  -> IM.IntMap TyConName
+  -> IntMap TyConName
   -> [Type]
   -> Type
 mkSmallTupTy _ _ [] = error $ $curLoc ++ "mkSmallTupTy: Can't create 0-tuple"
@@ -526,7 +658,7 @@ mkSmallTupSelector,mkBigTupSelector
   :: MonadUnique m
   => InScopeSet
   -> TyConMap
-  -> IM.IntMap TyConName
+  -> IntMap TyConName
   -> Term
   -> [Type]
   -> Int

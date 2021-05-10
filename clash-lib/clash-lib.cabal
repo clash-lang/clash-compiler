@@ -238,11 +238,11 @@ Library
                       Clash.Netlist.Util
 
                       Clash.Normalize
-                      Clash.Normalize.DEC
                       Clash.Normalize.PrimitiveReductions
                       Clash.Normalize.Strategy
                       Clash.Normalize.Transformations
                       Clash.Normalize.Transformations.Case
+                      Clash.Normalize.Transformations.DEC
                       Clash.Normalize.Transformations.Letrec
                       Clash.Normalize.Transformations.Reduce
                       Clash.Normalize.Types
