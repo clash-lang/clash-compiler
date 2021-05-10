@@ -34,12 +34,7 @@ module Clash.Normalize.Transformations
   , inlineSmall
   , inlineCleanup
   , inlineBndrsCleanup
-  , splitCastWork
   , inlineCast
-  , caseCast
-  , letCast
-  , eliminateCastCast
-  , argCastSpec
   , etaExpandSyn
   , appPropFast
   , separateArguments
@@ -51,7 +46,6 @@ module Clash.Normalize.Transformations
 where
 
 import           Control.Arrow               ((***))
-import           Control.Exception           (throw)
 import           Control.Lens                (_2)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
@@ -89,8 +83,7 @@ import           Clash.Core.Term
 import           Clash.Core.TermInfo
 import           Clash.Core.Type             (Type (..), TypeView (..), applyFunTy,
                                               isPolyFunCoreTy, isClassTy,
-                                              normalizeType, splitFunForallTy,
-                                              splitFunTy,
+                                              splitFunForallTy, splitFunTy,
                                               tyView, mkPolyFunTy, coreView)
 import           Clash.Core.TyCon            (TyConMap)
 import           Clash.Core.Util
@@ -110,6 +103,7 @@ import           Clash.Netlist.BlackBox.Types (Element(Err))
 import           Clash.Netlist.Types         (BlackBox(..))
 import           Clash.Netlist.Util (representableType, bindsExistentials)
 import Clash.Normalize.Transformations.Case as X
+import Clash.Normalize.Transformations.Cast as X
 import Clash.Normalize.Transformations.DEC as X
 import Clash.Normalize.Transformations.Letrec as X
 import Clash.Normalize.Transformations.Reduce as X
@@ -364,64 +358,6 @@ bindConstantVar = inlineBinders test
           _ -> return False
 {-# SCC bindConstantVar #-}
 
--- | Push a cast over a case into it's alternatives.
-caseCast :: HasCallStack => NormRewrite
-caseCast _ (Cast (stripTicks -> Case subj ty alts) ty1 ty2) = do
-  let alts' = map (\(p,e) -> (p, Cast e ty1 ty2)) alts
-  changed (Case subj ty alts')
-caseCast _ e = return e
-{-# SCC caseCast #-}
-
-
--- | Push a cast over a Letrec into it's body
-letCast :: HasCallStack => NormRewrite
-letCast _ (Cast (stripTicks -> Letrec binds body) ty1 ty2) =
-  changed $ Letrec binds (Cast body ty1 ty2)
-letCast _ e = return e
-{-# SCC letCast #-}
-
-
--- | Push cast over an argument to a function into that function
---
--- This is done by specializing on the casted argument.
--- Example:
--- @
---   y = f (cast a)
---     where f x = g x
--- @
--- transforms to:
--- @
---   y = f' a
---     where f' x' = (\x -> g x) (cast x')
--- @
---
--- The reason d'etre for this transformation is that we hope to end up with
--- and expression where two casts are "back-to-back" after which we can
--- eliminate them in 'eliminateCastCast'.
-argCastSpec :: HasCallStack => NormRewrite
-argCastSpec ctx e@(App f (stripTicks -> Cast e' _ _))
- -- Don't specialise when the arguments are casts-of-casts, these casts-of-casts
- -- will be eliminated by 'eliminateCastCast' during the normalization of the
- -- "current" function. We thus prevent the unnecessary introduction of a
- -- specialized version of 'f'.
- | not (isCast e)
- -- Don't specialise prims, because we can't push casts into them
- , not . isPrim . fst . collectArgs $ f = do
-  bndrs <- Lens.use bindings
-  isWorkFree workFreeBinders bndrs e' >>= \case
-    True -> go
-    False -> warn go
- where
-  go = specializeNorm ctx e
-  warn = trace (unwords
-    [ "WARNING:", $(curLoc), "specializing a function on a non work-free"
-    , "cast. Generated HDL implementation might contain duplicate work."
-    , "Please report this as a bug.", "\n\nExpression where this occured:"
-    , "\n\n" ++ showPpr e
-    ])
-argCastSpec _ e = return e
-{-# SCC argCastSpec #-}
-
 -- | Only inline casts that just contain a 'Var', because these are guaranteed work-free.
 -- These are the result of the 'splitCastWork' transformation.
 inlineCast :: HasCallStack => NormRewrite
@@ -430,63 +366,6 @@ inlineCast = inlineBinders test
     test _ (_, (Cast (stripTicks -> Var {}) _ _)) = return True
     test _ _ = return False
 {-# SCC inlineCast #-}
-
--- | Eliminate two back to back casts where the type going in and coming out are the same
---
--- @
---   (cast :: b -> a) $ (cast :: a -> b) x   ==> x
--- @
-eliminateCastCast :: HasCallStack => NormRewrite
-eliminateCastCast _ c@(Cast (stripTicks -> Cast e tyA tyB) tyB' tyC) = do
-  tcm <- Lens.view tcCache
-  let ntyA  = normalizeType tcm tyA
-      ntyB  = normalizeType tcm tyB
-      ntyB' = normalizeType tcm tyB'
-      ntyC  = normalizeType tcm tyC
-  if ntyB == ntyB' && ntyA == ntyC then changed e
-                                   else throwError
-  where throwError = do
-          (nm,sp) <- Lens.use curFun
-          throw (ClashException sp ($(curLoc) ++ showPpr nm
-                  ++ ": Found 2 nested casts whose types don't line up:\n"
-                  ++ showPpr c)
-                Nothing)
-
-eliminateCastCast _ e = return e
-{-# SCC eliminateCastCast #-}
-
--- | Make a cast work-free by splitting the work of to a separate binding
---
--- @
--- let x = cast (f a b)
--- ==>
--- let x  = cast x'
---     x' = f a b
--- @
-splitCastWork :: HasCallStack => NormRewrite
-splitCastWork ctx@(TransformContext is0 _) unchanged@(Letrec vs e') = do
-  (vss', Monoid.getAny -> hasChanged) <- listen (mapM (splitCastLetBinding is0) vs)
-  let vs' = concat vss'
-  if hasChanged then changed (Letrec vs' e')
-                else return unchanged
-  where
-    splitCastLetBinding
-      :: InScopeSet
-      -> LetBinding
-      -> RewriteMonad extra [LetBinding]
-    splitCastLetBinding isN x@(nm, e) = case stripTicks e of
-      Cast (Var {}) _ _  -> return [x]  -- already work-free
-      Cast (Cast {}) _ _ -> return [x]  -- casts will be eliminated
-      Cast e0 ty1 ty2 -> do
-        tcm <- Lens.view tcCache
-        nm' <- mkTmBinderFor isN tcm (mkDerivedName ctx (nameOcc $ varName nm)) e0
-        changed [(nm',e0)
-                ,(nm, Cast (Var nm') ty1 ty2)
-                ]
-      _ -> return [x]
-
-splitCastWork _ e = return e
-{-# SCC splitCastWork #-}
 
 
 -- | Inline work-free functions, i.e. fully applied functions that evaluate to

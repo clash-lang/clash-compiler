@@ -109,7 +109,7 @@ constantPropagation =
       , ("splitCastWork"   , splitCastWork)
       , ("argCastSpec"     , argCastSpec)
       , ("inlineCast"      , inlineCast)
-      , ("eliminateCastCast",eliminateCastCast)
+      , ("elimCastCast"    , elimCastCast)
       ]
 
     -- InlineNonRep cannot be applied in a top-down traversal, as the non-representable

@@ -242,6 +242,7 @@ Library
                       Clash.Normalize.Strategy
                       Clash.Normalize.Transformations
                       Clash.Normalize.Transformations.Case
+                      Clash.Normalize.Transformations.Cast
                       Clash.Normalize.Transformations.DEC
                       Clash.Normalize.Transformations.Letrec
                       Clash.Normalize.Transformations.Reduce
