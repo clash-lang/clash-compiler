@@ -243,6 +243,7 @@ Library
                       Clash.Normalize.Strategy
                       Clash.Normalize.Transformations
                       Clash.Normalize.Transformations.Case
+                      Clash.Normalize.Transformations.Reduce
                       Clash.Normalize.Types
                       Clash.Normalize.Util
 
