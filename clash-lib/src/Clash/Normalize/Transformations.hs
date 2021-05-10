@@ -20,8 +20,6 @@
 
 module Clash.Normalize.Transformations
   ( module X
-  , etaExpansionTL
-  , etaExpandSyn
   , separateArguments
   , separateLambda
   , setupMultiResultPrim
@@ -32,7 +30,6 @@ import qualified Control.Lens                as Lens
 import           Control.Monad.Writer        (listen)
 import qualified Data.Either                 as Either
 import qualified Data.List                   as List
-import qualified Data.Maybe                  as Maybe
 import qualified Data.Monoid                 as Monoid
 import           Data.Text.Extra             (showt)
 import           GHC.Stack                   (HasCallStack)
@@ -42,19 +39,17 @@ import           Clash.Core.Name (mkUnsafeInternalName, Name (..))
 import           Clash.Core.Subst
 import           Clash.Core.Term
 import           Clash.Core.TermInfo
-import           Clash.Core.Type             (Type (..),
-                                              splitFunForallTy, splitFunTy,
-                                              mkPolyFunTy)
+import           Clash.Core.Type             (Type (..), splitFunForallTy, mkPolyFunTy)
 import           Clash.Core.TyCon            (TyConMap)
-import           Clash.Core.Util (Projections (..), shouldSplit, mkInternalVar)
+import           Clash.Core.Util (Projections (..), shouldSplit)
 import           Clash.Core.Var
   (Id, TyVar, Var (..), isGlobalId, mkLocalId)
-import           Clash.Core.VarEnv
-  (elemVarSet, extendInScopeSet, extendInScopeSetList, uniqAway)
+import           Clash.Core.VarEnv (extendInScopeSet, uniqAway)
 import Clash.Normalize.Transformations.ANF as X
 import Clash.Normalize.Transformations.Case as X
 import Clash.Normalize.Transformations.Cast as X
 import Clash.Normalize.Transformations.DEC as X
+import Clash.Normalize.Transformations.EtaExpand as X
 import Clash.Normalize.Transformations.Inline as X
 import Clash.Normalize.Transformations.Letrec as X
 import Clash.Normalize.Transformations.Reduce as X
@@ -64,74 +59,6 @@ import           Clash.Normalize.Types
 import           Clash.Primitives.Types (Primitive(..))
 import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
-import           Clash.Util
-
--- | Eta-expand top-level lambda's (DON'T use in a traversal!)
-etaExpansionTL :: HasCallStack => NormRewrite
-etaExpansionTL (TransformContext is0 ctx) (Lam bndr e) = do
-  e' <- etaExpansionTL
-          (TransformContext (extendInScopeSet is0 bndr) (LamBody bndr:ctx))
-          e
-  return $ Lam bndr e'
-
-etaExpansionTL (TransformContext is0 ctx) (Letrec xes e) = do
-  let bndrs = map fst xes
-  e' <- etaExpansionTL
-          (TransformContext (extendInScopeSetList is0 bndrs)
-                            (LetBody bndrs:ctx))
-          e
-  case stripLambda e' of
-    (bs@(_:_),e2) -> do
-      let e3 = Letrec xes e2
-      changed (mkLams e3 bs)
-    _ -> return (Letrec xes e')
-  where
-    stripLambda :: Term -> ([Id],Term)
-    stripLambda (Lam bndr e0) =
-      let (bndrs,e1) = stripLambda e0
-      in  (bndr:bndrs,e1)
-    stripLambda e' = ([],e')
-
-etaExpansionTL (TransformContext is0 ctx) e
-  = do
-    tcm <- Lens.view tcCache
-    if isFun tcm e
-      then do
-        let argTy = ( fst
-                    . Maybe.fromMaybe (error $ $(curLoc) ++ "etaExpansion splitFunTy")
-                    . splitFunTy tcm
-                    . termType tcm
-                    ) e
-        newId <- mkInternalVar is0 "arg" argTy
-        e' <- etaExpansionTL (TransformContext (extendInScopeSet is0 newId)
-                                               (LamBody newId:ctx))
-                             (App e (Var newId))
-        changed (Lam newId e')
-      else return e
-{-# SCC etaExpansionTL #-}
-
--- | Eta-expand functions with a Synthesize annotation, needed to allow such
--- functions to appear as arguments to higher-order primitives.
-etaExpandSyn :: HasCallStack => NormRewrite
-etaExpandSyn (TransformContext is0 ctx) e@(collectArgs -> (Var f, _)) = do
-  topEnts <- Lens.view topEntities
-  tcm <- Lens.view tcCache
-  let isTopEnt = f `elemVarSet` topEnts
-      isAppFunCtx =
-        \case
-          AppFun:_ -> True
-          TickC _:c -> isAppFunCtx c
-          _ -> False
-      argTyM = fmap fst (splitFunTy tcm (termType tcm e))
-  case argTyM of
-    Just argTy | isTopEnt && not (isAppFunCtx ctx) -> do
-      newId <- mkInternalVar is0 "arg" argTy
-      changed (Lam newId (App e (Var newId)))
-    _ -> return e
-
-etaExpandSyn _ e = return e
-{-# SCC etaExpandSyn #-}
-
 
 -- | Worker function of 'separateArguments'.
 separateLambda
