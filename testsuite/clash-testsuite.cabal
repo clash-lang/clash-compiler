@@ -35,6 +35,10 @@ common basic-config
     OverloadedStrings
     ViewPatterns
 
+  ghc-options:
+    -fexpose-all-unfoldings
+    -fno-worker-wrapper
+
   build-depends:
     base                >=4.10 && <5,
     aeson,
@@ -69,13 +73,24 @@ common basic-config
 
 library
   import: basic-config
-  hs-source-dirs: src
+  hs-source-dirs:
+    src,
+    -- Behaviour when loading modules can differ if the module is loaded from
+    -- an external interface file. See
+    -- https://github.com/clash-lang/clash-compiler/issues/1796 for an example.
+    --
+    -- TODO: Cabal complains when source dirs are relative and outside the
+    -- project dir. Should 'tests/' be moved inside 'testsuite/'?
+    ../tests/shouldwork/LoadModules
 
   exposed-modules:
     Test.Tasty.Clash
     Test.Tasty.Clash.CoreTest
     Test.Tasty.Clash.NetlistTest
     Test.Tasty.Program
+
+    -- From tests/shouldwork/LoadModules
+    T1796
 
   build-depends:
     deepseq            >=1.4      && <1.5,
