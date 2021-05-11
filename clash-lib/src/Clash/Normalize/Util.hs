@@ -1,7 +1,8 @@
 {-|
-  Copyright  :  (C) 2012-2016, University of Twente
+  Copyright  :  (C) 2012-2016, University of Twente,
+                    2021     , QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Utility functions used by the normalisation transformations
 -}
@@ -10,6 +11,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Normalize.Util
  ( ConstantSpecInfo(..)
@@ -28,7 +30,6 @@ module Clash.Normalize.Util
  , constantSpecInfo
  , normalizeTopLvlBndr
  , rewriteExpr
- , removedTm
  , mkInlineTick
  , substWithTyEq
  , tvSubstWithTyEq
@@ -46,6 +47,7 @@ import qualified Data.HashMap.Strict     as HashMapS
 import qualified Data.HashSet            as HashSet
 import           Data.Text               (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.Extra as Text
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Builtin.Names       (eqTyConKey)
@@ -67,7 +69,7 @@ import           Clash.Core.Term
 import           Clash.Core.TermInfo     (isPolyFun, termType)
 import           Clash.Core.TyCon        (TyConMap)
 import           Clash.Core.Type
-  (Type(LitTy, VarTy), LitTy(SymTy), TypeView (..), tyView, undefinedTy,
+  (Type(LitTy, VarTy), LitTy(SymTy), TypeView (..), tyView,
    splitFunForallTy, splitTyConAppM, mkPolyFunTy)
 import           Clash.Core.Util
   (isClockOrReset)
@@ -77,6 +79,7 @@ import           Clash.Core.VarEnv
    lookupVarEnv, unionVarEnvWith, unitVarEnv, extendInScopeSetList)
 import           Clash.Debug             (traceIf)
 import           Clash.Driver.Types      (BindingMap, Binding(..), DebugLevel (..))
+import           Clash.Normalize.Primitives (removedArg)
 import {-# SOURCE #-} Clash.Normalize.Strategy (normalization)
 import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
@@ -309,7 +312,7 @@ constantSpecInfo ctx e = do
   if isClockOrReset tcm (termType tcm e) then
     case collectArgs e of
       (Prim p, _)
-        | primName p == "Clash.Transformations.removedArg" ->
+        | primName p == Text.showt 'removedArg ->
           pure (constantCsr e)
       _ -> bindCsr ctx e
   else
@@ -462,7 +465,7 @@ substWithTyEq e0 = go [] False [] e0
     , tv `elem` tvs
     = let
         subst0 = extendTvSubst (mkSubst emptyInScopeSet) tv ty
-        subst1 = extendIdSubst subst0 v (removedTm (varType v))
+        subst1 = extendIdSubst subst0 v (TyApp (Prim removedArg) (varType v))
       in go (tvs List.\\ [tv]) True (substId subst0 v : ids_) (substTm "substWithTyEq e" subst1 e)
     | otherwise = go tvs changed (v:ids_) e
   go tvs True ids_ e =
@@ -519,13 +522,6 @@ rewriteExpr (nrwS,nrw) (bndrS,expr) (nm, sp) = do
   traceIf (lvl >= DebugFinal)
     (bndrS ++ " after " ++ nrwS ++ ":\n\n" ++ after ++ "\n") $
     return rewritten
-
-removedTm
-  :: Type
-  -> Term
-removedTm =
-  let removedNm = "Clash.Transformations.removedArg" in
-  TyApp (Prim (PrimInfo removedNm undefinedTy WorkNever SingleResult))
 
 -- | A tick to prefix an inlined expression with it's original name.
 -- For example, given

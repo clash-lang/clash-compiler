@@ -1,7 +1,8 @@
 {-|
-  Copyright   :  (C) 2017, Google Inc.
+  Copyright   :  (C) 2017, Google Inc.,
+                     2021, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Call-by-need evaluator based on the evaluator described in:
 
@@ -48,6 +49,7 @@ import           Clash.Core.Util
 import           Clash.Core.Var
 import           Clash.Core.VarEnv
 import           Clash.Debug
+import qualified Clash.Normalize.Primitives as NP (undefined)
 import           Clash.Unique
 import           Clash.Util                              (curLoc)
 
@@ -193,8 +195,8 @@ stepTyApp x ty m tcm =
       let tys = fst $ splitFunForallTy (primType p)
        in case compare (length args) (length tys) of
             EQ -> case lefts args of
-                    [] | primName p `elem` [ "Clash.Transformations.removedArg"
-                                           , "Clash.Transformations.undefined" ] ->
+                    [] | primName p `elem` [ "Clash.Normalize.Primitives.removedArg"
+                                           , "Clash.Normalize.Primitives.undefined" ] ->
                             ghcUnwind (PrimVal p (rights args) []) m tcm
 
                        | otherwise ->
@@ -310,7 +312,7 @@ apply _tcm (Lambda x' e) x m =
   subst0 = mkSubst $ extendInScopeSet (mScopeNames m) x
 apply tcm pVal@(PrimVal (PrimInfo{primType}) tys vs) x m
   | isUndefinedPrimVal pVal
-  = setTerm (undefinedTm ty) m
+  = setTerm (TyApp (Prim NP.undefined) ty) m
  where
   ty = piResultTys tcm primType (tys ++ map (termType tcm . valToTerm) vs ++ [varType x])
 
@@ -326,7 +328,7 @@ instantiate _tcm (TyLambda x e) ty m =
   iss0   = mkInScopeSet (localFVsOfTerms [e] `unionUniqSet` tyFVsOfTypes [ty])
 instantiate tcm pVal@(PrimVal (PrimInfo{primType}) tys []) ty m
   | isUndefinedPrimVal pVal
-  = setTerm (undefinedTm (piResultTys tcm primType (tys ++ [ty]))) m
+  = setTerm (TyApp (Prim NP.undefined) (piResultTys tcm primType (tys ++ [ty]))) m
 
 instantiate _ p _ _ = error $ "Evaluator.instantiate: Not a tylambda: " ++ show p
 
@@ -400,7 +402,7 @@ scrutinise (DC dc xs) _altTy alts m
 
 scrutinise v@(PrimVal p _ vs) altTy alts m
   | isUndefinedPrimVal v
-  = setTerm (undefinedTm altTy) m
+  = setTerm (TyApp (Prim NP.undefined) altTy) m
 
   | any (\case {(LitPat {},_) -> True; _ -> False}) alts
   = case alts of

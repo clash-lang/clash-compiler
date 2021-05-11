@@ -2,9 +2,10 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
-                    2017     , Google Inc.
+                    2017     , Google Inc.,
+                    2021     , QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Functions to create BlackBox Contexts and fill in BlackBox templates
 -}
@@ -89,6 +90,7 @@ import           Clash.Netlist.BlackBox.Types  as B
 import           Clash.Netlist.BlackBox.Util   as B
 import           Clash.Netlist.Types           as N
 import           Clash.Netlist.Util            as N
+import           Clash.Normalize.Primitives    (removedArg)
 import           Clash.Primitives.Types        as P
 import qualified Clash.Primitives.Util         as P
 import           Clash.Signal.Internal         (ActiveEdge (..))
@@ -229,8 +231,8 @@ mkArgument bbName bndr nArg e = do
     ((e',t,l),d) <- case hwTyM of
       Nothing
         | (Prim p,_) <- collectArgs e
-        , primName p == "Clash.Transformations.removedArg"
-        -> return ((Identifier (Id.unsafeMake "Clash.Transformations.removedArg") Nothing, Void Nothing, False), [])
+        , primName p == showt 'removedArg
+        -> return ((Identifier (Id.unsafeMake (showt 'removedArg)) Nothing, Void Nothing, False), [])
         | otherwise
         -> return ((error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg), Void Nothing, False), [])
       Just hwTy -> case collectArgsTicks e of
