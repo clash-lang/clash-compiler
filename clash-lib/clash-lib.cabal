@@ -239,6 +239,7 @@ Library
 
                       Clash.Normalize
                       Clash.Normalize.PrimitiveReductions
+                      Clash.Normalize.Primitives
                       Clash.Normalize.Strategy
                       Clash.Normalize.Transformations
                       Clash.Normalize.Transformations.ANF
