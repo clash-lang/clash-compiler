@@ -79,7 +79,7 @@
     },
     {
       "name": "clash-testsuite",
-      "src": {"type": "local", "dir": "../../../../../testsuite"},
+      "src": {"type": "local", "dir": "../../../../../tests"},
       "cabal_debian_options": [
         "--disable-haddock",
         "--depends", "haskell-clash-testsuite-utils:iverilog",

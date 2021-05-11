@@ -83,9 +83,9 @@ prelude:doctests:
 suite:vhdl:
   extends: .test-common-local
   script:
-    - cabal v2-run -- testsuite -j$THREADS -p .VHDL --hide-successes
+    - cabal v2-run -- clash-testsuite -j$THREADS -p .VHDL --hide-successes
 
 suite:verilog:
   extends: .test-common-local
   script:
-    - cabal v2-run -- testsuite -j$THREADS -p .Verilog --hide-successes
+    - cabal v2-run -- clash-testsuite -j$THREADS -p .Verilog --hide-successes

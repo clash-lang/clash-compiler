@@ -5,7 +5,7 @@ packages:
 - clash-lib
 - clash-ghc
 - clash-cores
-- testsuite
+- tests
 
 extra-deps:
 - ./clash-cosim
