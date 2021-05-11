@@ -5,7 +5,7 @@ packages:
   ./clash-ghc
   ./clash-lib
   ./clash-prelude
-  ./testsuite
+  ./tests
   ./benchmark
   ./benchmark/profiling/prepare
   ./benchmark/profiling/run
