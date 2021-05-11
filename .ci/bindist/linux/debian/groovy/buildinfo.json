@@ -69,7 +69,7 @@
     },
     {
       "name": "clash-testsuite",
-      "src": {"type": "local", "dir": "../../../../../testsuite"},
+      "src": {"type": "local", "dir": "../../../../../tests"},
       "cabal_debian_options": [
         "--depends", "haskell-clash-testsuite-utils:iverilog",
         "--depends", "haskell-clash-testsuite-utils:ghdl-llvm"

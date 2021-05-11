@@ -1,4 +1,4 @@
-cabal-version:       2.2
+cabal-version:       2.4
 
 name:                clash-testsuite
 version:             0.0.0
@@ -12,7 +12,6 @@ maintainer:          Christiaan Baaij <christiaan.baaij@gmail.com>
 copyright:           Copyright © 2015 University of Twente
 category:            Testing
 build-type:          Simple
--- extra-source-files:
 
 flag cosim
    description:
@@ -34,6 +33,10 @@ common basic-config
     DeriveDataTypeable
     OverloadedStrings
     ViewPatterns
+
+  ghc-options:
+    -fexpose-all-unfoldings
+    -fno-worker-wrapper
 
   build-depends:
     base                >=4.10 && <5,
@@ -69,13 +72,21 @@ common basic-config
 
 library
   import: basic-config
-  hs-source-dirs: src
+  hs-source-dirs:
+    src,
+    -- Behaviour when loading modules can differ if the module is loaded from
+    -- an external interface file. See
+    -- https://github.com/clash-lang/clash-compiler/issues/1796 for an example.
+    shouldwork/LoadModules
 
   exposed-modules:
     Test.Tasty.Clash
     Test.Tasty.Clash.CoreTest
     Test.Tasty.Clash.NetlistTest
     Test.Tasty.Program
+
+    -- From tests/shouldwork/LoadModules
+    T1796
 
   build-depends:
     deepseq            >=1.4      && <1.5,
