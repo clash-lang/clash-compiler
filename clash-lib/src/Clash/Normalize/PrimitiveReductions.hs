@@ -1,8 +1,9 @@
 {-|
   Copyright  :  (C) 2015-2016, University of Twente,
-                    2016     , Myrtle Software Ltd
+                    2016     , Myrtle Software Ltd,
+                    2021     , QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Reductions of primitives
 
@@ -79,11 +80,11 @@ import           Clash.Core.TysPrim
   (integerPrimTy, typeNatKind, liftedTypeKind)
 import           Clash.Core.Util
   (appendToVec, extractElems, extractTElems, mkRTree,
-   mkUniqInternalId, mkUniqSystemTyVar, mkVec, dataConInstArgTys,
-   primCo, undefinedTm)
+   mkUniqInternalId, mkUniqSystemTyVar, mkVec, dataConInstArgTys, primCo)
 import           Clash.Core.Var                   (Var (..), mkTyVar, mkLocalId)
 import           Clash.Core.VarEnv
   (InScopeSet, extendInScopeSetList)
+import qualified Clash.Normalize.Primitives as NP (undefined)
 import {-# SOURCE #-} Clash.Normalize.Strategy
 import           Clash.Normalize.Types
 import           Clash.Rewrite.Types
@@ -841,7 +842,7 @@ reduceLast inScope n aTy vArg = do
             (tB,_)       = head (last elems)
         uniqSupply Lens..= uniqs1
         case n of
-         0 -> changed (undefinedTm aTy)
+         0 -> changed (TyApp (Prim NP.undefined) aTy)
          _ -> changed (Letrec (init (concat elems)) (Var tB))
     go _ ty = error $ $(curLoc) ++ "reduceLast: argument does not have a vector type: " ++ showPpr ty
 
@@ -1223,7 +1224,7 @@ reduceIndex_int is0 n aTy v i = do
 
       -- Build a right-biased tree of case-expressions
       let indexed = foldr (index_intElement tcm iDc iTy)
-                              (undefinedTm aTy)
+                              (TyApp (Prim NP.undefined) aTy)
                               (zip vars [0..])
           lb      = Letrec (init elems) indexed
       uniqSupply Lens..= uniqs1

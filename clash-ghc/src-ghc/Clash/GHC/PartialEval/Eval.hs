@@ -1,5 +1,5 @@
 {-|
-Copyright   : (C) 2020, QBayLogic B.V.
+Copyright   : (C) 2020-2021, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -51,6 +51,7 @@ import           Clash.Core.TysPrim (integerPrimTy)
 import qualified Clash.Core.Util as Util
 import           Clash.Core.Var
 import           Clash.Driver.Types (Binding(..), IsPrim(..))
+import qualified Clash.Normalize.Primitives as NP (undefined)
 import           Clash.Unique (lookupUniqMap')
 
 -- | Evaluate a term to WHNF.
@@ -295,7 +296,7 @@ caseCon subject ty alts = do
 
   -- If the subject is undefined, the whole expression is undefined.
   case isUndefined forcedSubject of
-    True -> eval (Util.undefinedTm ty)
+    True -> eval (TyApp (Prim NP.undefined) ty)
     False ->
       case stripValue forcedSubject of
         -- Known literal: attempt to match or throw an error.

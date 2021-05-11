@@ -63,9 +63,9 @@ import Clash.Core.VarEnv
 import Clash.Netlist.BlackBox.Types ()
 import Clash.Netlist.BlackBox.Util (getUsedArguments)
 import Clash.Netlist.Util (splitNormalized)
+import Clash.Normalize.Primitives (removedArg)
 import Clash.Normalize.Transformations.Reduce (reduceBinders)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession, primitives)
-import Clash.Normalize.Util (removedTm)
 import Clash.Primitives.Types (Primitive(..), UsedArguments(..))
 import Clash.Rewrite.Types
   (TransformContext(..), bindings, curFun, extra, tcCache, workFreeBinders)
@@ -133,11 +133,11 @@ removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
       args'' <- go tcm (n+1) used args'
       case tm of
         TyApp (Prim p0) _
-          | primName p0 == "Clash.Transformations.removedArg"
+          | primName p0 == Text.showt 'removedArg
           -> return (Left tm : args'')
         _ -> do
           let ty = termType tcm tm
-              p' = removedTm ty
+              p' = TyApp (Prim removedArg) ty
           if n < arity && n `notElem` used
              then changed (Left p' : args'')
              else return  (Left tm : args'')

@@ -1,5 +1,5 @@
 [ { "BlackBox" :
-    { "name"      : "Clash.Transformations.removedArg"
+    { "name"      : "Clash.Normalize.Primitives.removedArg"
     , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "removedArg :: a"
@@ -7,7 +7,7 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Transformations.undefined"
+    { "name"      : "Clash.Normalize.Primitives.undefined"
     , "workInfo"  : "Constant"
     , "kind"      : "Expression"
     , "type"      : "undefined :: forall a . a"

@@ -1,5 +1,5 @@
 {-|
-Copyright   : (C) 2020, QBayLogic B.V.
+Copyright   : (C) 2020-2021, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -13,6 +13,7 @@ evaluator see Clash.Core.PartialEval.
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Core.PartialEval.NormalForm
   ( Arg
@@ -33,6 +34,7 @@ import Control.Concurrent.Supply (Supply)
 import Control.Lens (Lens', lens)
 import Data.IntMap.Strict (IntMap)
 import Data.Map.Strict (Map)
+import qualified Data.Text.Extra as Text
 
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal
@@ -42,6 +44,7 @@ import Clash.Core.Type (Type, TyVar)
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (VarEnv, InScopeSet)
 import Clash.Driver.Types (Binding(..))
+import qualified Clash.Normalize.Primitives as NP (undefined)
 
 type Args a
   = [Arg a]
@@ -120,7 +123,7 @@ isUndefined = \case
       , "Control.Exception.Base.patError"
       , "EmptyCase"
       , "GHC.Err.undefined"
-      , "Clash.Transformations.undefined"
+      , Text.showt 'NP.undefined
       , "Clash.XException.errorX"
       ]
 
