@@ -248,6 +248,7 @@ Library
                       Clash.Normalize
                       Clash.Normalize.DEC
                       Clash.Normalize.PrimitiveReductions
+                      Clash.Normalize.Primitives
                       Clash.Normalize.Strategy
                       Clash.Normalize.Transformations
                       Clash.Normalize.Types
