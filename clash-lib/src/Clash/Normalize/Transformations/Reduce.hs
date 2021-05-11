@@ -36,8 +36,9 @@ import Clash.Core.TyCon (tyConDataCons)
 import Clash.Core.Type (TypeView(..), mkTyConApp, tyView)
 import Clash.Core.Util (mkVec, shouldSplit, tyNatSize)
 import Clash.Normalize.PrimitiveReductions
+import Clash.Normalize.Primitives (removedArg)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession, normalizeUltra)
-import Clash.Normalize.Util (removedTm, shouldReduce)
+import Clash.Normalize.Util (shouldReduce)
 import Clash.Rewrite.Types (TransformContext(..), extra, tcCache)
 import Clash.Rewrite.Util (changed, isUntranslatableType, setChanged, whnfRW)
 import Clash.Unique (lookupUniqMap)
@@ -444,7 +445,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                     [Right lTy
                                     ,Right rTy
                                     ,Left  bvArg
-                                    ,Left  (removedTm rTy)
+                                    ,Left  (TyApp (Prim removedArg) rTy)
                                     ]
 
               changed (mkTicks tup ticks)
@@ -454,7 +455,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                   tup          = mkApps (Data tupDc)
                                     [Right lTy
                                     ,Right rTy
-                                    ,Left  (removedTm lTy)
+                                    ,Left  (TyApp (Prim removedArg) lTy)
                                     ,Left  bvArg
                                     ]
 

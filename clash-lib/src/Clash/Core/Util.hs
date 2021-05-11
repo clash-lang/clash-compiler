@@ -1,7 +1,8 @@
 {-|
-  Copyright   :  (C) 2012-2016, University of Twente
+  Copyright   :  (C) 2012-2016, University of Twente,
+                     2021     , QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Smart constructor and destructor functions for CoreHW
 -}
@@ -426,14 +427,6 @@ primCo
   :: Type
   -> Term
 primCo ty = Prim (PrimInfo "_CO_" ty WorkNever SingleResult)
-
--- | Make an undefined term
-undefinedTm
-  :: Type
-  -> Term
-undefinedTm =
-  let undefinedNm = "Clash.Transformations.undefined" in
-  TyApp (Prim (PrimInfo undefinedNm  undefinedTy WorkNever SingleResult))
 
 substArgTys
   :: DataCon

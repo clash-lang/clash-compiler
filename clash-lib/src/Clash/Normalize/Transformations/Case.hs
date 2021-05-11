@@ -62,7 +62,6 @@ import Clash.Core.Term
 import Clash.Core.TermInfo (termType)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (LitTy(..), Type(..), TypeView(..), coreView1, tyView)
-import Clash.Core.Util (undefinedTm)
 import Clash.Core.Var (Var(..))
 import Clash.Core.VarEnv
   ( InScopeSet, elemVarSet, extendInScopeSet, extendInScopeSetList, mkVarSet
@@ -71,6 +70,7 @@ import Clash.Debug (traceIf)
 import Clash.Driver.Types (DebugLevel(..))
 import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
 import Clash.Netlist.Util (coreTypeToHWType, representableType)
+import qualified Clash.Normalize.Primitives as NP (undefined)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Combinators ((>-!))
 import Clash.Rewrite.Types
@@ -203,7 +203,7 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
            -- that if there is one, and we couldn't match with any of the data
            -- patterns.
            ((DefaultPat,altE):_) -> changed altE
-           _ -> changed (undefinedTm ty)
+           _ -> changed (TyApp (Prim NP.undefined) ty)
     where
       -- Check whether the pattern matches the data constructor
       equalCon (DataPat dcPat _ _) = dcTag dc == dcTag dcPat
@@ -258,7 +258,7 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- WHNF of subject is _|_, in the form of our internal _|_-values: that
       -- means the entire case-expression is _|_
       (Prim pInfo,[_],ticks)
-        | primName pInfo `elem` [ "Clash.Transformations.undefined"
+        | primName pInfo `elem` [ Text.showt 'NP.undefined
                                 , "Clash.GHC.Evaluator.undefined"
                                 , "EmptyCase"] ->
         let e1 = mkApps (mkTicks (Prim pInfo) ticks) [Right ty]

@@ -94,8 +94,7 @@ import           Clash.Core.TyCon
   (TyConMap, TyConName, tyConDataCons)
 import           Clash.Core.TysPrim
 import           Clash.Core.Util
-  (mkRTree,mkVec,tyNatSize,dataConInstArgTys,primCo,
-   undefinedTm, mkSelectorCase)
+  (mkRTree,mkVec,tyNatSize,dataConInstArgTys,primCo, mkSelectorCase)
 import           Clash.Core.Var      (mkLocalId, mkTyVar)
 import           Clash.Debug
 import           Clash.GHC.GHC2Core  (modNameM)
@@ -106,6 +105,7 @@ import           Clash.Normalize.PrimitiveReductions
   (typeNatMul, typeNatSub, typeNatAdd, vecLastPrim, vecInitPrim, vecHeadPrim,
    vecTailPrim, mkVecCons, mkVecNil)
 
+import qualified Clash.Normalize.Primitives as NP
 import Clash.Promoted.Nat.Unsafe (unsafeSNat)
 import qualified Clash.Sized.Internal.BitVector as BitVector
 import qualified Clash.Sized.Internal.Signed    as Signed
@@ -119,7 +119,7 @@ import {-# SOURCE #-} Clash.GHC.Evaluator
 
 isUndefinedPrimVal :: Value -> Bool
 isUndefinedPrimVal (PrimVal (PrimInfo{primName}) _ _) =
-  primName `elem` ["Clash.Transformations.undefined"
+  primName `elem` [ Text.pack (show 'NP.undefined)
                   ,"Clash.XException.errorX"
                   ,"Control.Exception.Base.absentError"]
 isUndefinedPrimVal _ = False
@@ -129,9 +129,9 @@ ghcPrimUnwind :: PrimUnwind
 ghcPrimUnwind tcm p tys vs v [] m
   | primName p `elem` [ "Clash.Sized.Internal.Index.fromInteger#"
                        , "GHC.CString.unpackCString#"
-                       , "Clash.Transformations.removedArg"
+                       , Text.pack (show 'NP.removedArg)
                        , "GHC.Prim.MutableByteArray#"
-                       , "Clash.Transformations.undefined"
+                       , Text.pack (show 'NP.undefined)
                        ]
               -- The above primitives are actually values, and not operations.
   = ghcUnwind (PrimVal p tys (vs ++ [v])) m tcm
@@ -158,7 +158,7 @@ ghcPrimUnwind tcm p tys vs v [] m
   | isUndefinedPrimVal v
   = let tyArgs = map Right tys
         tmArgs = map (Left . valToTerm) (vs ++ [v])
-    in  Just $ flip setTerm m $ undefinedTm $
+    in  Just $ flip setTerm m $ TyApp (Prim NP.undefined) $
           applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
   | otherwise
   = ghcPrimStep tcm (forcePrims m) p tys (vs ++ [v]) m
@@ -178,7 +178,7 @@ ghcPrimUnwind tcm p tys vs v [e] m0
   = if isUndefinedPrimVal v then
       let tyArgs = map Right tys
           tmArgs = map (Left . valToTerm) (vs ++ [v]) ++ [Left e]
-      in  Just $ flip setTerm m0 $ undefinedTm $
+      in  Just $ flip setTerm m0 $ TyApp (Prim NP.undefined) $
             applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
     else
       let (m1,i) = newLetBinding tcm m0 e
@@ -188,7 +188,7 @@ ghcPrimUnwind tcm p tys vs (collectValueTicks -> (v, ts)) (e:es) m
   | isUndefinedPrimVal v
   = let tyArgs = map Right tys
         tmArgs = map (Left . valToTerm) (vs ++ [v]) ++ map Left (e:es)
-    in  Just $ flip setTerm m $ undefinedTm $
+    in  Just $ flip setTerm m $ TyApp (Prim NP.undefined) $
           applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
   | otherwise
   = Just . setTerm e $ stackPush (PrimApply p tys (vs ++ [foldr TickValue v ts]) es) m
@@ -990,7 +990,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     ->
       if divisor == 0 then
         let iTy = snd (splitFunForallTy ty) in
-        reduce (undefinedTm iTy)
+        reduce (TyApp (Prim NP.undefined) iTy)
       else
         reduce (Literal (IntLiteral (dividend `mod` divisor)))
 
@@ -3893,7 +3893,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       -> Term
     checkNaturalRange nTy natsAsInts f =
       if any (<0) natsAsInts then
-        undefinedTm nTy
+        TyApp (Prim NP.undefined) nTy
       else
         f (map fromInteger natsAsInts)
 
@@ -3916,7 +3916,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     makeUndefinedIf wantToHandle tm =
       case unsafeDupablePerformIO $ tryJust selectException (evaluate $ force tm) of
         Right b -> b
-        Left e -> trace (msg e) (undefinedTm resTy)
+        Left e -> trace (msg e) (TyApp (Prim NP.undefined) resTy)
       where
         resTy = getResultTy tcm ty tys
         selectException e | wantToHandle e = Just e
@@ -4263,7 +4263,7 @@ mkIndexLitE rTy nTy kn val
   , val < kn
   = Right (mkSizedLit indexConPrim rTy nTy kn val)
   | otherwise
-  = Left (undefinedTm (mkTyConApp indexTcNm [nTy]))
+  = Left (TyApp (Prim NP.undefined) (mkTyConApp indexTcNm [nTy]))
   where
     TyConApp indexTcNm _ = tyView (snd (splitFunForallTy rTy))
 

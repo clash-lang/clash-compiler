@@ -1,5 +1,5 @@
 {-|
-Copyright   : (C) 2020, QBayLogic B.V.
+Copyright   : (C) 2020-2021, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qaylogic.com>
 
@@ -10,6 +10,7 @@ duplicating work in the result, e.g. inlining.
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Rewrite.WorkFree
   ( isWorkFree
@@ -22,6 +23,7 @@ module Clash.Rewrite.WorkFree
 import Control.Lens (Lens')
 import Control.Monad.Extra (allM, andM, eitherM)
 import Control.Monad.State.Class (MonadState)
+import qualified Data.Text.Extra as Text
 import GHC.Stack (HasCallStack)
 
 import Clash.Core.FreeVars
@@ -34,6 +36,7 @@ import Clash.Core.Util
 import Clash.Core.Var (Id, Var(..), isLocalId)
 import Clash.Core.VarEnv (VarEnv, lookupVarEnv)
 import Clash.Driver.Types (BindingMap, Binding(..))
+import Clash.Normalize.Primitives (removedArg)
 import Clash.Util (makeCachedU)
 
 -- | Determines whether a global binder is work free. Errors if binder does
@@ -132,7 +135,7 @@ isConstantNotClockReset :: TyConMap -> Term -> Bool
 isConstantNotClockReset tcm e
   | isClockOrReset tcm eTy =
       case fst (collectArgs e) of
-        Prim pr -> primName pr == "Clash.Transformations.removedArg"
+        Prim pr -> primName pr == Text.showt 'removedArg
         _ -> False
 
   | otherwise = isConstant e
@@ -148,7 +151,7 @@ isWorkFreeClockOrResetOrEnable tcm e =
   let eTy = termType tcm e in
   if isClockOrReset tcm eTy || isEnable tcm eTy then
     case collectArgs e of
-      (Prim p,_) -> Just (primName p == "Clash.Transformations.removedArg")
+      (Prim p,_) -> Just (primName p == Text.showt 'removedArg)
       (Var _, []) -> Just True
       (Data _, []) -> Just True -- For Enable True/False
       (Literal _,_) -> Just True
