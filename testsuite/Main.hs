@@ -537,6 +537,9 @@ runClashTest = defaultMain $ clashTestRoot
           [clashLibTest ("tests" </> "shouldwork" </> "Issues") allTargets [] "T1568" "main"]
         else
           []
+      , clashTestGroup "LoadModules"
+        [ runTest "T1796" def{hdlSim=False}
+        ]
       , clashTestGroup "Naming"
         [ runTest "T967a" def{hdlSim=False}
         , runTest "T967b" def{hdlSim=False}

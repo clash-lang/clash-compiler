@@ -271,13 +271,12 @@ instance IsTest ClashTest where
 
     args oDir =
       [ target
-      , ctSourceDirectory </> ctModName <.> "hs"
-      , "-i" ++ ctSourceDirectory
+      , "-i" <> ctSourceDirectory
+      , ctModName
       , "-fclash-hdldir", oDir
       , "-odir", oDir
       , "-hidir", oDir
       , "-fclash-debug", "DebugSilent"
-      , "-package", "clash-testsuite"
       ] <> ctExtraArgs
 
     target =
@@ -654,7 +653,6 @@ runTest1 modName opts@TestOptions{..} path target =
 
  where
   mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
-
   sourceDir = foldl (</>) sourceDirectory (reverse (tail path))
 
   clashTest tmpDir =
