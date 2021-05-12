@@ -3234,12 +3234,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                     _ -> Nothing
                  _ -> Nothing
 
-  "Clash.Transformations.eqInt"
-    | [ DC _ [Left (Literal (IntLiteral i))]
-      , DC _ [Left (Literal (IntLiteral j))]
-      ] <- args
-    -> reduce (boolToBoolLiteral tcm ty (i == j))
-
 -- - specialized permutations
   "Clash.Sized.Vector.reverse" -- :: Vec n a -> Vec n a
     | isSubj
