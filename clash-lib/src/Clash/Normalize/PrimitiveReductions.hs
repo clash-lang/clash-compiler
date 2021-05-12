@@ -1089,7 +1089,7 @@ reduceReplace_int is0 n aTy vTy v i newA = do
     -> Term
   eqIntPrim intTy boolTy =
     Prim (PrimInfo
-           "Clash.Transformations.eqInt"
+           "GHC.Classes.eqInt"
            (mkFunTy intTy (mkFunTy intTy boolTy))
            WorkVariable
            SingleResult )
@@ -1193,7 +1193,7 @@ reduceIndex_int is0 n aTy v i = do
     -> Term
   eqIntPrim intTy boolTy =
     Prim ( PrimInfo
-            "Clash.Transformations.eqInt"
+            "GHC.Classes.eqInt"
             (mkFunTy intTy (mkFunTy intTy boolTy))
             WorkVariable
             SingleResult )
