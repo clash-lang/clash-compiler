@@ -559,7 +559,7 @@ collectEqArgs (collectArgsTicks -> (Prim p, args, ticks))
     nm == Text.showt 'U.eq#
     = let [_,Left scrut,Left val] = args
       in Just (mkTicks scrut ticks,val)
-  | nm == "Clash.Transformations.eqInt"
+  | nm == "GHC.Classes.eqInt"
     = let [Left scrut,Left val] = args
       in  Just (mkTicks scrut ticks,val)
  where
