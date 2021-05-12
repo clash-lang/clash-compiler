@@ -229,6 +229,8 @@ Library
 
                       Clash.Magic
 
+                      Clash.Num.Saturating
+
                       Clash.NamedTypes
 
                       Clash.Prelude
