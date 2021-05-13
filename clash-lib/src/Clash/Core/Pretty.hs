@@ -1,8 +1,9 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
-                     2016     , Myrtle Software Ltd
+                     2016     , Myrtle Software Ltd,
+                     2021     , QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   PrettyPrec printing class and instances for CoreHW
 -}
@@ -41,7 +42,6 @@ import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Internal
 import GHC.Show                         (showMultiLineString)
 import GHC.Stack                        (HasCallStack)
-import Numeric                          (fromRat)
 #if MIN_VERSION_ghc(9,0,0)
 import qualified GHC.Utils.Outputable   as GHC
 #else
@@ -307,8 +307,8 @@ instance PrettyPrec Literal where
       | otherwise      -> pretty i
     WordLiteral w      -> pretty w
     Word64Literal w    -> pretty w
-    FloatLiteral r     -> pretty (fromRat r :: Float)
-    DoubleLiteral r    -> pretty (fromRat r :: Double)
+    FloatLiteral f     -> pretty f
+    DoubleLiteral d    -> pretty d
     CharLiteral c      -> pretty c
     StringLiteral s    -> vcat $ map pretty $ showMultiLineString s
     NaturalLiteral n   -> pretty n

@@ -59,6 +59,7 @@ import           GHC.Real            (Ratio (..))
 import           GHC.TypeLits        (KnownNat)
 import           GHC.Types           (IO (..))
 import           GHC.Word
+import           Numeric.Extra       (doubleToFloat)
 import           System.IO.Unsafe    (unsafeDupablePerformIO)
 
 #if MIN_VERSION_ghc(9,0,0)
@@ -311,17 +312,17 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   "GHC.Prim.int2Float#"
     | [Lit (IntLiteral i)] <- args
-    -> reduce . Literal . FloatLiteral  . toRational $ (fromInteger i :: Float)
+    -> reduce . Literal . FloatLiteral  $ fromInteger i
   "GHC.Prim.int2Double#"
     | [Lit (IntLiteral i)] <- args
-    -> reduce . Literal . DoubleLiteral . toRational $ (fromInteger i :: Double)
+    -> reduce . Literal . DoubleLiteral $ fromInteger i
 
   "GHC.Prim.word2Float#"
     | [Lit (WordLiteral i)] <- args
-    -> reduce . Literal . FloatLiteral  . toRational $ (fromInteger i :: Float)
+    -> reduce . Literal . FloatLiteral $ fromInteger i
   "GHC.Prim.word2Double#"
     | [Lit (WordLiteral i)] <- args
-    -> reduce . Literal . DoubleLiteral . toRational $ (fromInteger i :: Double)
+    -> reduce . Literal . DoubleLiteral $ fromInteger i
 
   "GHC.Prim.uncheckedIShiftL#"
     | [ Lit (IntLiteral i)
@@ -561,14 +562,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "GHC.Prim.fabsDouble#" | Just r <- liftDD fabsDouble# args
     -> reduce r
 
-  "GHC.Prim.double2Int#" | [i] <- doubleLiterals' args
-    -> let !(D# a) = fromRational i
-           r = double2Int# a
+  "GHC.Prim.double2Int#" | [!(D# a)] <- doubleLiterals' args
+    -> let r = double2Int# a
        in  reduce . Literal . IntLiteral . toInteger $ I# r
-  "GHC.Prim.double2Float#"
-    | [Lit (DoubleLiteral d)] <- args
-    -> reduce (Literal (FloatLiteral (toRational (fromRational d :: Float))))
-
+  "GHC.Prim.double2Float#" | [Lit (DoubleLiteral d)] <- args
+    -> reduce (Literal (FloatLiteral (doubleToFloat d)))
 
   "GHC.Prim.expDouble#" | Just r <- liftDD expDouble# args
     -> reduce r
@@ -607,11 +605,10 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "GHC.Prim.**##" | Just r <- liftDDD (**##) args
     -> reduce r
 -- decodeDouble_2Int# :: Double# -> (#Int#, Word#, Word#, Int##)
-  "GHC.Prim.decodeDouble_2Int#" | [i] <- doubleLiterals' args
+  "GHC.Prim.decodeDouble_2Int#" | [!(D# a)] <- doubleLiterals' args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
            (Just tupTc) = lookupUniqMap tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
-           !(D# a) = fromRational i
            !(# p, q, r, s #) = decodeDouble_2Int# a
        in reduce $
           mkApps (Data tupDc) (map Right tyArgs ++
@@ -620,11 +617,10 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                    , Left (Literal . WordLiteral . toInteger $ W# r)
                    , Left (Literal . IntLiteral  . toInteger $ I# s)])
 -- decodeDouble_Int64# :: Double# -> (# Int64#, Int# #)
-  "GHC.Prim.decodeDouble_Int64#" | [i] <- doubleLiterals' args
+  "GHC.Prim.decodeDouble_Int64#" | [!(D# a)] <- doubleLiterals' args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
            (Just tupTc) = lookupUniqMap tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
-           !(D# a) = fromRational i
            !(# p, q #) = decodeDouble_Int64# a
        in reduce $
           mkApps (Data tupDc) (map Right tyArgs ++
@@ -661,9 +657,8 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "GHC.Prim.fabsFloat#"  | Just r <- liftFF fabsFloat# args
     -> reduce r
 
-  "GHC.Prim.float2Int#" | [i] <- floatLiterals' args
-    -> let !(F# a) = fromRational i
-           r = float2Int# a
+  "GHC.Prim.float2Int#" | [!(F# a)] <- floatLiterals' args
+    -> let r = float2Int# a
        in  reduce . Literal . IntLiteral . toInteger $ I# r
 
   "GHC.Prim.expFloat#"  | Just r <- liftFF expFloat# args
@@ -714,11 +709,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce r
 #endif
 
-  "GHC.Prim.float2Double#" | [i] <- floatLiterals' args
-    -> let !(F# a) = fromRational i
-           r = float2Double# a
-       in  reduce . Literal . DoubleLiteral . toRational $ D# r
-
+  "GHC.Prim.float2Double#" | [!(F# a)] <- floatLiterals' args
+    -> let r = float2Double# a
+       in  reduce . Literal . DoubleLiteral $ D# r
 
   "GHC.Prim.newByteArray#"
     | [iV,PrimVal rwTy _ _] <- args
@@ -895,11 +888,10 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in reduce newE
 
 -- decodeFloat_Int# :: Float# -> (#Int#, Int##)
-  "GHC.Prim.decodeFloat_Int#" | [i] <- floatLiterals' args
+  "GHC.Prim.decodeFloat_Int#" | [!(F# a)] <- floatLiterals' args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
            (Just tupTc) = lookupUniqMap tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
-           !(F# a) = fromRational i
            !(# p, q #) = decodeFloat_Int# a
        in reduce $
           mkApps (Data tupDc) (map Right tyArgs ++
@@ -1034,11 +1026,10 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 #else
   "GHC.Integer.Type.decodeDoubleInteger" -- :: Double# -> (#Integer, Int##)
 #endif
-    | [Lit (DoubleLiteral i)] <- args
+    | [Lit (DoubleLiteral !(D# a))] <- args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
            (Just tupTc) = lookupUniqMap tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
-           !(D# a)  = fromRational i
            !(# b, c #) = decodeDoubleInteger a
     in reduce $
        mkApps (Data tupDc) (map Right tyArgs ++
@@ -1054,7 +1045,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , [i] <- integerLiterals' [iV]
     -> let !(I# k') = fromInteger j
            r = encodeDoubleInteger i k'
-    in  reduce . Literal . DoubleLiteral . toRational $ D# r
+    in  reduce . Literal . DoubleLiteral $ D# r
 
 #if MIN_VERSION_base(4,15,0)
   "GHC.Num.Integer.integerEncodeFloat#"
@@ -1062,7 +1053,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , [i] <- integerLiterals' [iV]
     -> let !(I# k') = fromInteger j
            r = integerEncodeFloat# i k'
-        in reduce . Literal . FloatLiteral . toRational $ F# r
+        in reduce . Literal . FloatLiteral $ F# r
 #endif
 
 #if MIN_VERSION_base(4,15,0)
@@ -1672,9 +1663,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> case fromInteger matDigs of
           matDigs'
             | matDigs' == floatDigits (undefined :: Float)
-            -> reduce (Literal (FloatLiteral (toRational (fromRational (n :% d) :: Float))))
+            -> reduce (Literal (FloatLiteral (fromRational (n :% d) :: Float)))
             | matDigs' == floatDigits (undefined :: Double)
-            -> reduce (Literal (DoubleLiteral (toRational (fromRational (n :% d) :: Double))))
+            -> reduce (Literal (DoubleLiteral (fromRational (n :% d) :: Double)))
           _ -> error $ $(curLoc) ++ "GHC.Float.$w$sfromRat'': Not a Float or Double"
 
   "GHC.Float.$w$sfromRat''1" -- XXX: Very fragile
@@ -1686,9 +1677,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> case fromInteger matDigs of
           matDigs'
             | matDigs' == floatDigits (undefined :: Float)
-            -> reduce (Literal (FloatLiteral (toRational (fromRational (n :% d) :: Float))))
+            -> reduce (Literal (FloatLiteral (fromRational (n :% d) :: Float)))
             | matDigs' == floatDigits (undefined :: Double)
-            -> reduce (Literal (DoubleLiteral (toRational (fromRational (n :% d) :: Double))))
+            -> reduce (Literal (DoubleLiteral (fromRational (n :% d) :: Double)))
           _ -> error $ $(curLoc) ++ "GHC.Float.$w$sfromRat'': Not a Float or Double"
 
 #if MIN_VERSION_base(4,15,0)
@@ -1768,7 +1759,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "GHC.Integer.Type.doubleFromInteger"
 #endif
     | [i] <- integerLiterals' args
-    -> reduce (Literal (DoubleLiteral (toRational (fromInteger i :: Double))))
+    -> reduce (Literal (DoubleLiteral (fromInteger i :: Double)))
 
   "GHC.Base.eqString"
     | [PrimVal _ _ [Lit (StringLiteral s1)]
@@ -1785,7 +1776,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let resTyInfo = extractTySizeInfo tcm ty tys
         in Just $ mach2
              { mStack = mStack mach
-             , mTerm = mkBitVectorLit' resTyInfo 0 (toInteger $ (pack :: Double -> BitVector 64) $ fromRational i)
+             , mTerm = mkBitVectorLit' resTyInfo 0 (toInteger $ (pack :: Double -> BitVector 64) i)
              }
 
   "Clash.Class.BitPack.Internal.packFloat#" -- :: Float -> BitVector 32
@@ -1795,16 +1786,16 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let resTyInfo = extractTySizeInfo tcm ty tys
         in Just $ mach2
              { mStack = mStack mach
-             , mTerm = mkBitVectorLit' resTyInfo 0 (toInteger $ (pack :: Float -> BitVector 32) $ fromRational i)
+             , mTerm = mkBitVectorLit' resTyInfo 0 (toInteger $ (pack :: Float -> BitVector 32) i)
              }
 
   "Clash.Class.BitPack.Internal.unpackFloat#"
     | [i] <- bitVectorLiterals' args
-    -> reduce (Literal (FloatLiteral (toRational $ (unpack :: BitVector 32 -> Float) (toBV i))))
+    -> reduce (Literal (FloatLiteral ((unpack :: BitVector 32 -> Float) (toBV i))))
 
   "Clash.Class.BitPack.Internal.unpackDouble#"
     | [i] <- bitVectorLiterals' args
-    -> reduce (Literal (DoubleLiteral (toRational $ (unpack :: BitVector 64 -> Double) (toBV i))))
+    -> reduce (Literal (DoubleLiteral ((unpack :: BitVector 64 -> Double) (toBV i))))
 
   -- expIndex#
   --   :: KnownNat m
@@ -3943,18 +3934,18 @@ wrapSigned n i = if n == 0 then 0 else res
            (s,i1) | even s    -> i1
                   | otherwise -> i1 - mask
 
-doubleLiterals' :: [Value] -> [Rational]
+doubleLiterals' :: [Value] -> [Double]
 doubleLiterals' = listOf doubleLiteral
 
-doubleLiteral :: Value -> Maybe Rational
+doubleLiteral :: Value -> Maybe Double
 doubleLiteral v = case v of
   Lit (DoubleLiteral i) -> Just i
   _ -> Nothing
 
-floatLiterals' :: [Value] -> [Rational]
+floatLiterals' :: [Value] -> [Float]
 floatLiterals' = listOf floatLiteral
 
-floatLiteral :: Value -> Maybe Rational
+floatLiteral :: Value -> Maybe Float
 floatLiteral v = case v of
   Lit (FloatLiteral i) -> Just i
   _ -> Nothing
@@ -4476,23 +4467,23 @@ liftDD  :: (Double# -> Double#) -> [Value] -> Maybe Term
 liftDD  f args = case doubleLiterals' args of
   [i]   -> Just $ runDD f i
   _     -> Nothing
-runDDI :: (Double# -> Double# -> Int#) -> Rational -> Rational -> Term
+runDDI :: (Double# -> Double# -> Int#) -> Double -> Double -> Term
 runDDI f i j
-  = let !(D# a) = fromRational i
-        !(D# b) = fromRational j
+  = let !(D# a) = i
+        !(D# b) = j
         r = f a b
     in  Literal . IntLiteral . toInteger $ I# r
-runDDD :: (Double# -> Double# -> Double#) -> Rational -> Rational -> Term
+runDDD :: (Double# -> Double# -> Double#) -> Double -> Double -> Term
 runDDD f i j
-  = let !(D# a) = fromRational i
-        !(D# b) = fromRational j
+  = let !(D# a) = i
+        !(D# b) = j
         r = f a b
-    in  Literal . DoubleLiteral . toRational $ D# r
-runDD :: (Double# -> Double#) -> Rational -> Term
+    in  Literal . DoubleLiteral $ D# r
+runDD :: (Double# -> Double#) -> Double -> Term
 runDD f i
-  = let !(D# a) = fromRational i
+  = let !(D# a) = i
         r = f a
-    in  Literal . DoubleLiteral . toRational $ D# r
+    in  Literal . DoubleLiteral $ D# r
 
 liftFFI :: (Float# -> Float# -> Int#) -> [Value] -> Maybe Term
 liftFFI f args = case floatLiterals' args of
@@ -4506,23 +4497,23 @@ liftFF  :: (Float# -> Float#) -> [Value] -> Maybe Term
 liftFF  f args = case floatLiterals' args of
   [i]   -> Just $ runFF f i
   _     -> Nothing
-runFFI :: (Float# -> Float# -> Int#) -> Rational -> Rational -> Term
+runFFI :: (Float# -> Float# -> Int#) -> Float -> Float -> Term
 runFFI f i j
-  = let !(F# a) = fromRational i
-        !(F# b) = fromRational j
+  = let !(F# a) = i
+        !(F# b) = j
         r = f a b
     in  Literal . IntLiteral . toInteger $ I# r
-runFFF :: (Float# -> Float# -> Float#) -> Rational -> Rational -> Term
+runFFF :: (Float# -> Float# -> Float#) -> Float -> Float -> Term
 runFFF f i j
-  = let !(F# a) = fromRational i
-        !(F# b) = fromRational j
+  = let !(F# a) = i
+        !(F# b) = j
         r = f a b
-    in  Literal . FloatLiteral . toRational $ F# r
-runFF :: (Float# -> Float#) -> Rational -> Term
+    in  Literal . FloatLiteral $ F# r
+runFF :: (Float# -> Float#) -> Float -> Term
 runFF f i
-  = let !(F# a) = fromRational i
+  = let !(F# a) = i
         r = f a
-    in  Literal . FloatLiteral . toRational $ F# r
+    in  Literal . FloatLiteral $ F# r
 
 splitAtPrim
   :: TyConName

@@ -1,9 +1,10 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016     , Myrtle Software Ltd,
-                     2017     , Google Inc.
+                     2017     , Google Inc.,
+                     2021     , QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Term Literal
 -}
@@ -41,8 +42,8 @@ data Literal
   | Int64Literal    !Integer
   | Word64Literal   !Integer
   | StringLiteral   !String
-  | FloatLiteral    !Rational
-  | DoubleLiteral   !Rational
+  | FloatLiteral    !Float
+  | DoubleLiteral   !Double
   | CharLiteral     !Char
   | NaturalLiteral  !Integer
   | ByteArrayLiteral !ByteArray
