@@ -1,9 +1,10 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
-                     2017-2018, Google Inc.
+                     2017-2018, Google Inc.,
+                     2021     , QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Create Netlists out of normalized CoreHW Terms
 -}
@@ -848,11 +849,9 @@ mkExpr _ _ _ (stripTicks -> Core.Literal l) = do
     Int64Literal i   -> return (HW.Literal (Just (Signed 64,64)) $ NumLit i, [])
     Word64Literal w  -> return (HW.Literal (Just (Unsigned 64,64)) $ NumLit w, [])
     CharLiteral c    -> return (HW.Literal (Just (Unsigned 21,21)) . NumLit . toInteger $ ord c, [])
-    FloatLiteral r   -> let f = fromRational r :: Float
-                            i = toInteger (floatToWord f)
+    FloatLiteral f   -> let i = toInteger (floatToWord f)
                         in  return (HW.Literal (Just (BitVector 32,32)) (NumLit i), [])
-    DoubleLiteral r  -> let d = fromRational r :: Double
-                            i = toInteger (doubleToWord d)
+    DoubleLiteral d  -> let i = toInteger (doubleToWord d)
                         in  return (HW.Literal (Just (BitVector 64,64)) (NumLit i), [])
     NaturalLiteral n -> return (HW.Literal (Just (Unsigned iw,iw)) $ NumLit n, [])
 #if MIN_VERSION_base(4,15,0)

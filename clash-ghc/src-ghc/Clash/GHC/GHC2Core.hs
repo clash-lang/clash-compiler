@@ -600,13 +600,13 @@ coreToTerm primMap unlocs = term
         LitNumWord    -> C.WordLiteral i
         LitNumWord64  -> C.WordLiteral i
 #if MIN_VERSION_ghc(8,8,0)
-      LitFloat r    -> C.FloatLiteral r
-      LitDouble r   -> C.DoubleLiteral r
+      LitFloat r    -> C.FloatLiteral (fromRational r)
+      LitDouble r   -> C.DoubleLiteral (fromRational r)
       LitNullAddr   -> C.StringLiteral []
       LitLabel fs _ _ -> C.StringLiteral (unpackFS fs)
 #else
-      MachFloat r    -> C.FloatLiteral r
-      MachDouble r   -> C.DoubleLiteral r
+      MachFloat r    -> C.FloatLiteral (fromRational r)
+      MachDouble r   -> C.DoubleLiteral (fromRational r)
       MachNullAddr   -> C.StringLiteral []
       MachLabel fs _ _ -> C.StringLiteral (unpackFS fs)
 #endif
