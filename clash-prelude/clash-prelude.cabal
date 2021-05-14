@@ -230,6 +230,7 @@ Library
                       Clash.Magic
 
                       Clash.Num.Saturating
+                      Clash.Num.Wrapping
 
                       Clash.NamedTypes
 
