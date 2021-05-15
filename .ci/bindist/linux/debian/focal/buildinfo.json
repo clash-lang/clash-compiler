@@ -1,5 +1,5 @@
 {
-  "docker": "docker.pkg.github.com/clash-lang/clash-compiler/bindist-debian-focal:2020-11-20",
+  "docker": "docker.pkg.github.com/clash-lang/clash-compiler/bindist-debian-focal:2021-05-14",
   "build-dependencies": [
     "devscripts",
     "cabal-install",

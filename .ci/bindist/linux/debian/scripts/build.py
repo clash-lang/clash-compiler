@@ -97,8 +97,7 @@ def main():
   for pkg in buildinfo.get("packages", []):
     unpack_dir = os.path.join(BUILD_DIR, pkg["name"])
 
-    # Don't do work if Debian packages are already built. See comment in
-    # if __name__ ==... section at the bottom of this file.
+    # Don't do work if Debian packages are already built.
     if os.path.exists(unpack_dir):
       debs = [p for p in os.listdir(unpack_dir) if p.endswith(".deb")]
     else:
@@ -148,7 +147,5 @@ def main():
     run(["bash", "-c", "dpkg-scanpackages . > Packages"])
 
 if __name__ == '__main__':
-  # Commnet next line to enable caching (probably brittle)
-  shutil.rmtree(BUILD_DIR, ignore_errors=True)
   os.makedirs(BUILD_DIR, exist_ok=True)
   main()
