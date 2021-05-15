@@ -73,8 +73,8 @@ aliases:
           cabal v2-test clash-lib
           cabal v2-test clash-cores
           cabal v2-test clash-cosim
-          cabal v2-run testsuite -- -j$THREADS --hide-successes -p .VHDL
-          cabal v2-run testsuite -- -j$THREADS --hide-successes -p .Verilog
+          cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .VHDL
+          cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .Verilog
         fi
       no_output_timeout: 1h
 
