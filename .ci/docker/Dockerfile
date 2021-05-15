@@ -33,12 +33,12 @@ ARG GHCUP_VERSION="0.1.14"
 ARG GHCUP_URL="https://downloads.haskell.org/~ghcup/${GHCUP_VERSION}/x86_64-linux-ghcup-${GHCUP_VERSION}"
 ARG GHCUP_BIN=/usr/bin/ghcup
 
+ARG cabal_version
+ENV CABAL_VERSION=$cabal_version
 RUN curl $GHCUP_URL --output $GHCUP_BIN \
  && chmod +x $GHCUP_BIN \
- && ghcup install cabal 2.4.1.0 \
- && ghcup install cabal 3.0.0.0 \
- && ghcup install cabal 3.2.0.0 \
- && ghcup install cabal 3.4.0.0
+ && ghcup install cabal ${CABAL_VERSION} \
+ && ghcup set cabal ${CABAL_VERSION}
 
 ARG ghc_version
 ENV GHC_VERSION=$ghc_version

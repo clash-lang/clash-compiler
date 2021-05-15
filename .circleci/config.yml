@@ -92,7 +92,11 @@ aliases:
 
   - &build_default
     docker:
+<<<<<<< HEAD
       - image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-$GHC_VERSION:2021-03-18
+=======
+      - image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-$GHC_VERSION:2021-05-14
+>>>>>>> 87f0d1589... Always run Debian bindist, add caching (#1808)
         # Read-only permissions
         auth:
           username: clash-lang-builder
@@ -129,24 +133,25 @@ jobs:
     environment:
       <<: *env
       GHC_VERSION: 8.6.5
-      CABAL_VERSION: 3.0.0.0
     <<: *build_default
   ghc-8.8:
     environment:
       <<: *env
       GHC_VERSION: 8.8.4
-      CABAL_VERSION: 3.2.0.0
     <<: *build_default
   ghc-8.10:
     environment:
       <<: *env
+<<<<<<< HEAD
       GHC_VERSION: 8.10.3
       CABAL_VERSION: 3.2.0.0
+=======
+      GHC_VERSION: 8.10.4
+>>>>>>> 87f0d1589... Always run Debian bindist, add caching (#1808)
     <<: *build_default
   ghc-8.6-singular-hidden:
     environment:
       <<: *env
       GHC_VERSION: 8.6.5
-      CABAL_VERSION: 3.0.0.0
       MULTIPLE_HIDDEN: no
     <<: *build_default

@@ -6,8 +6,12 @@ include:
 # Default GHC / Cabal version. Used for generating Haddock and releasing to
 # Hackage.
 variables:
+<<<<<<< HEAD
   GHC_VERSION: 8.10.3
   CABAL_VERSION: 3.2.0.0
+=======
+  GHC_VERSION: 8.10.4
+>>>>>>> 87f0d1589... Always run Debian bindist, add caching (#1808)
 
 stages:
   - pre
@@ -37,34 +41,39 @@ tests-8.6:
   extends: .common-trigger
   variables:
     GHC_VERSION: 8.6.5
-    CABAL_VERSION: 3.0.0.0
     MULTIPLE_HIDDEN: "no"
 
 tests-8.8:
   extends: .common-trigger
   variables:
     GHC_VERSION: 8.8.4
-    CABAL_VERSION: 3.2.0.0
 
 tests-8.10:
   extends: .common-trigger
   variables:
+<<<<<<< HEAD
     GHC_VERSION: 8.10.3
     CABAL_VERSION: 3.2.0.0
+=======
+    GHC_VERSION: 8.10.4
+>>>>>>> 87f0d1589... Always run Debian bindist, add caching (#1808)
 
 tests-9.0:
   extends: .common-trigger
   variables:
     GHC_VERSION: 9.0.1
-    CABAL_VERSION: 3.4.0.0
 
 stack-build:
   extends: .common
   needs: []
   stage: test
   variables:
+<<<<<<< HEAD
     GHC_VERSION: 8.10.3
     CABAL_VERSION: 3.2.0.0
+=======
+    GHC_VERSION: 8.10.4
+>>>>>>> 87f0d1589... Always run Debian bindist, add caching (#1808)
   script:
     - .ci/stack_build.sh
   # Run on shared runners

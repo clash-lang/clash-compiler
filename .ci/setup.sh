@@ -42,10 +42,7 @@ if [[ ${tag_version} != "" && ${version} != ${tag_version} ]]; then
     fi
 fi
 
-# GHC files are compressed when building docker image to save space
-ghcup set ghc ${GHC_VERSION}
-ghcup set cabal ${CABAL_VERSION}
-
+# Print out versions for debugging purposes
 cabal --version
 ghc --version
 
