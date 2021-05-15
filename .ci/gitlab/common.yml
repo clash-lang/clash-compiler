@@ -1,5 +1,5 @@
 .common:
-  image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-$GHC_VERSION:2021-04-14
+  image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-$GHC_VERSION:2021-05-14
   timeout: 2 hours
   stage: build
   variables:
@@ -22,6 +22,6 @@
     - tar -xf cache.tar.zst -C / || true
     - .ci/setup.sh
   after_script:
-    - tar -cf - $(ls -d /root/.cabal /root/.stack || true) | zstd -T${THREADS} -3 > cache.tar.zst
+    - tar -cf - $(ls -d /root/.cabal /root/.stack $(pwd)/.ci/bindist/linux/debian/*/build || true) | zstd -T${THREADS} -3 > cache.tar.zst
   tags:
     - local
