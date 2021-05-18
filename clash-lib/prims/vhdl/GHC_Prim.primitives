@@ -163,16 +163,26 @@
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.uncheckedIShiftL#"
-    , "kind"      : "Expression"
+    , "kind"      : "Declaration"
     , "type"      : "uncheckedIShiftL# :: Int# -> Int# -> Int#"
-    , "template"  : "shift_left(~ARG[0],to_integer(~ARG[1]))"
+    , "template"  :
+"~RESULT <= shift_left(~ARG[0],to_integer(~ARG[1]))
+    -- pragma translate_off
+    when (~ARG[1] >= 0) else (others => 'X')
+    -- pragma translate_on
+    ;"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.uncheckedIShiftRA#"
-    , "kind"      : "Expression"
+    , "kind"      : "Declaration"
     , "type"      : "uncheckedIShiftRA# :: Int# -> Int# -> Int#"
-    , "template"  : "shift_right(~ARG[0],to_integer(~ARG[1]))"
+    , "template"  :
+"~RESULT <= shift_right(~ARG[0],to_integer(~ARG[1]))
+    -- pragma translate_off
+    when (~ARG[1] >= 0) else (others => 'X')
+    -- pragma translate_on
+    ;"
     }
   }
 , { "BlackBox" :
@@ -233,16 +243,26 @@
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.uncheckedShiftL#"
-    , "kind"      : "Expression"
+    , "kind"      : "Declaration"
     , "type"      : "uncheckedShiftL# :: Word# -> Int# -> Word#"
-    , "template"  : "shift_left(~ARG[0],to_integer(~ARG[1]))"
+    , "template"  :
+"~RESULT <= shift_left(~ARG[0],to_integer(~ARG[1]))
+    -- pragma translate_off
+    when (~ARG[1] >= 0) else (others => 'X')
+    -- pragma translate_on
+    ;"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.uncheckedShiftRL#"
-    , "kind"      : "Expression"
+    , "kind"      : "Declaration"
     , "type"      : "uncheckedShiftR# :: Word# -> Int# -> Word#"
-    , "template"  : "shift_right(~ARG[0],to_integer(~ARG[1]))"
+    , "template"  :
+"~RESULT <= shift_right(~ARG[0],to_integer(~ARG[1]))
+    -- pragma translate_off
+    when (~ARG[1] >= 0) else (others => 'X')
+    -- pragma translate_on
+    ;"
     }
   }
 , { "BlackBox" :

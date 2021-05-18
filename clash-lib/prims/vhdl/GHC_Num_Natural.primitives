@@ -77,16 +77,26 @@
 }
 , { "BlackBox" :
   { "name"      : "GHC.Num.Natural.naturalShiftL#"
-  , "kind"      : "Expression"
+  , "kind"      : "Declaration"
   , "type"      : "naturalShiftL# :: Natural -> Word# -> Natural"
-  , "template"  : "shift_left(~ARG[0],to_integer(~ARG[1]))"
+  , "template"  :
+"~RESULT <= shift_left(~ARG[0],to_integer(~VAR[count][1](30 downto 0)))
+    -- pragma translate_off
+    when (~ARG[1] >= to_unsigned(0, ~SIZE[~TYP[1]]-1)) else (others => 'X')
+    -- pragma translate_on
+    ;"
   }
 }
 , { "BlackBox" :
   { "name"      : "GHC.Num.Natural.naturalShiftR#"
-  , "kind"      : "Expression"
+  , "kind"      : "Declaration"
   , "type"      : "naturalShiftR# :: Natural -> Word# -> Natural"
-  , "template"  : "shift_right(~ARG[0], to_integer(~ARG[1]))"
+  , "template"  :
+"~RESULT <= shift_right(~ARG[0], to_integer(~VAR[count][1](30 downto 0)))
+    -- pragma translate_off
+    when (~ARG[1] >= to_unsigned(0, ~SIZE[~TYP[1]]-1)) else (others => 'X')
+    -- pragma translate_on
+    ;"
   }
 }
 , { "BlackBox" :

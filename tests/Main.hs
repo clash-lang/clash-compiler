@@ -589,6 +589,7 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS_GHC(runTest "Resize3" def)
         , NEEDS_PRIMS_GHC(runTest "SatMult" def{hdlSim=False})
         , NEEDS_PRIMS_GHC(runTest "ShiftRotate" def)
+        , runTest "ShiftRotateNegative" def{hdlTargets=[VHDL]}
         , NEEDS_PRIMS_GHC(runTest "SignedProjectionTB" def)
         , NEEDS_PRIMS_GHC(runTest "SignedZero" def)
         , NEEDS_PRIMS_GHC(runTest "Signum" def)
