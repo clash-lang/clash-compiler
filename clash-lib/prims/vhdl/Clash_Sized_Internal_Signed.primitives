@@ -205,30 +205,50 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.shiftL#"
-    , "kind"      : "Expression"
+    , "kind"      : "Declaration"
     , "type"      : "shiftL# :: KnownNat n => Signed n -> Int -> Signed n"
-    , "template"  : "shift_left(~ARG[1],to_integer(~ARG[2]))"
+    , "template"  :
+"~RESULT <= shift_left(~ARG[1],to_integer(~ARG[2]))
+    -- pragma translate_off
+    when (~ARG[2] >= 0) else (others => 'X')
+    -- pragma translate_on
+    ;"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.shiftR#"
-    , "kind"      : "Expression"
+    , "kind"      : "Declaration"
     , "type"      : "shiftR# :: KnownNat n => Signed n -> Int -> Signed n"
-    , "template"  : "shift_right(~ARG[1],to_integer(~ARG[2]))"
+    , "template"  :
+"~RESULT <= shift_right(~ARG[1],to_integer(~ARG[2]))
+    -- pragma translate_off
+    when (~ARG[2] >= 0) else (others => 'X')
+    -- pragma translate_on
+    ;"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.rotateL#"
-    , "kind"      : "Expression"
+    , "kind"      : "Declaration"
     , "type"      : "rotateL# :: KnownNat n => Signed n -> Int -> Signed n"
-    , "template"  : "rotate_left(~ARG[1],to_integer(~ARG[2]))"
+    , "template"  :
+"~RESULT <= rotate_left(~ARG[1],to_integer(~ARG[2]))
+    -- pragma translate_off
+    when (~ARG[2] >= 0) else (others => 'X')
+    -- pragma translate_on
+    ;"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.rotateR#"
-    , "kind"      : "Expression"
+    , "kind"      : "Declaration"
     , "type"      : "rotateR# :: KnownNat n => Signed n -> Int -> Signed n"
-    , "template"  : "rotate_right(~ARG[1],to_integer(~ARG[2]))"
+    , "template"  :
+"~RESULT <= rotate_right(~ARG[1],to_integer(~ARG[2]))
+    -- pragma translate_off
+    when (~ARG[2] >= 0) else (others => 'X')
+    -- pragma translate_on
+    ;"
     }
   }
 , { "BlackBox" :
