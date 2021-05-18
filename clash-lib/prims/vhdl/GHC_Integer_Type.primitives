@@ -162,16 +162,26 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.shiftRInteger"
-    , "kind"      : "Expression"
+    , "kind"      : "Declaration"
     , "type"      : "shiftRInteger :: Integer -> Int# -> Integer"
-    , "template"  : "shift_right(~ARG[0],to_integer(~ARG[1]))"
+    , "template"  :
+"~RESULT <= shift_right(~ARG[0], to_integer(~ARG[1]))
+    -- pragma translate_off
+    when (~ARG[1] >= 0) else (others => 'X')
+    -- pragma translate_on
+    ;"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.shiftLInteger"
-    , "kind"      : "Expression"
+    , "kind"      : "Declaration"
     , "type"      : "shiftLInteger :: Integer -> Int# -> Integer"
-    , "template"  : "shift_left(~ARG[0],to_integer(~ARG[1]))"
+    , "template"  :
+"~RESULT <= shift_left(~ARG[0], to_integer(~ARG[1]))
+    -- pragma translate_off
+    when (~ARG[1] >= 0) else (others => 'X')
+    -- pragma translate_on
+    ;"
     }
   }
 , { "BlackBox" :

@@ -352,8 +352,10 @@ instance Bits Bit where
   bitSizeMaybe _    = Just 1
   bitSize _         = 1
   isSigned _        = False
+  shift b i         = if i == 0 then b else low
   shiftL b i        = if i == 0 then b else low
   shiftR b i        = if i == 0 then b else low
+  rotate b _        = b
   rotateL b _       = b
   rotateR b _       = b
   popCount b        = if eq## b low then 0 else 1
