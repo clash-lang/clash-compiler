@@ -1,5 +1,15 @@
 # Changelog for the Clash project
 
+## 1.4.2 *May 18th 2021*
+Fixed:
+
+ * Erroneous examples in `Clash.Annotation.TopEntity` documentation [#646](https://github.com/clash-lang/clash-compiler/issues/646) and [#654](https://github.com/clash-lang/clash-compiler/issues/654)
+ * `unconcat` cannot be used as initial/reset value for a `register` [#1756](https://github.com/clash-lang/clash-compiler/issues/1756)
+ * `showX` now doesn't crash if a spine of a `Vec` is undefined
+ * `~ISACTIVEENABLE` in blackboxes works again, and now acts on `Signal dom Bool` in addition to `Enable dom`. Since [#1368](https://github.com/clash-lang/clash-compiler/pull/1368), enable lines were always generated even if they were known to be always enabled. Fixes [#1786](https://github.com/clash-lang/clash-compiler/issues/1786).
+ * clash --show-options now shows -fclash-* options in GHC 9.0 [#1787](https://github.com/clash-lang/clash-compiler/issues/1787)
+ * `makeRecursiveGroups` now correctly identifies mutual recursion between global binders ([#1796](https://github.com/clash-lang/clash-compiler/issues/1796)).
+
 ## 1.4.1 *April 6th 2021*
 Fixed:
 
