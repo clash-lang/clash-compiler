@@ -23,6 +23,7 @@ import           GHC.IO.Unsafe             (unsafePerformIO)
 import           Text.Printf               (printf)
 
 import           Test.Tasty
+import           Test.Tasty.Common
 import           Test.Tasty.Clash
 
 #if EXPERIMENTAL_EVALUATOR

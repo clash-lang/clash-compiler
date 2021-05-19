@@ -1,35 +1,32 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Test.Tasty.Clash where
 
 import           Clash.Annotations.Primitive (HDL(..))
-import           Clash.Driver.Manifest     (readManifest, Manifest(..), manifestFilename)
-import           Control.Monad             (foldM, forM_)
-import           Data.Char                 (toLower)
 import           Data.Coerce               (coerce)
 import           Data.Default              (Default, def)
 import qualified Data.List                 as List
 import           Data.List                 (intercalate)
-import           Data.Maybe                (isJust, fromMaybe)
+import           Data.Maybe                (isJust)
 import qualified Data.Text                 as T
 import qualified System.Directory          as Directory
-import           System.Directory          (createDirectory, listDirectory, copyFile)
-import           System.FilePath           ((</>),(<.>), replaceFileName)
-import           System.FilePath.Glob      (glob)
+import           System.FilePath           ((</>),(<.>))
 import           System.IO.Unsafe          (unsafePerformIO)
 import           System.IO.Temp            (createTempDirectory, getCanonicalTemporaryDirectory)
 
 import           Test.Tasty
 import           Test.Tasty.Program
 import           Test.Tasty.Providers
-import           Test.Tasty.Runners
+
+import           Test.Tasty.Common
+import           Test.Tasty.Ghdl
+import           Test.Tasty.Iverilog
+import           Test.Tasty.Modelsim
 
 {- Note [copy data files hack]
 
@@ -86,23 +83,6 @@ getBuildTargets TestOptions{hdlSim, buildTargets=BuildAuto}
   -- using that in this testsuite
   | hdlSim = ["testBench"]
   | otherwise = ["topEntity"]
-
-data TestExitCode
-  = TestExitCode
-  | TestSpecificExitCode Int
-  | NoTestExitCode
-
-instance Default TestExitCode where
-  def = TestExitCode
-
-testExitCode :: TestExitCode -> Bool
-testExitCode TestExitCode = True
-testExitCode (TestSpecificExitCode _) = True
-testExitCode NoTestExitCode = False
-
-specificExitCode :: TestExitCode -> Maybe Int
-specificExitCode (TestSpecificExitCode n) = Just n
-specificExitCode _ = Nothing
 
 data TestOptions =
   TestOptions
@@ -235,15 +215,6 @@ sequenceTests path (unzip -> (testNames, testTrees)) =
       applyAfter Nothing  tt = tt
       applyAfter (Just p) tt = after AllSucceed p tt
 
-getManifests :: String -> IO [(FilePath, Manifest)]
-getManifests pattern = mapM go =<< glob pattern
- where
-  go :: FilePath -> IO (FilePath, Manifest)
-  go path = do
-    let err = error ("Failed to read/decode: " <> show path)
-    manifest <- fromMaybe err <$> readManifest path
-    pure (path, manifest)
-
 data ClashTest = ClashTest
   { ctExpectFailure :: Maybe (TestExitCode, T.Text)
     -- ^ Expected failure code and output (if any)
@@ -284,290 +255,6 @@ instance IsTest ClashTest where
         VHDL          -> "--vhdl"
         Verilog       -> "--verilog"
         SystemVerilog -> "--systemverilog"
-
-  testOptions = coerce (testOptions @TestProgram)
-
--- | Search through a directory with VHDL files produced by Clash
--- and produces /work/ files using @ghdl -i@ for each library.
---
--- For example, for I2C it would execute:
---
--- @
--- ghdl -i --work=bitMaster --workdir=bitMaster --std=93 <files>
--- ghdl -i --work=byteMaster --workdir=byteMaster --std=93 <files>
--- ghdl -i --work=i2c --workdir=i2c --std=93 <files>
--- @
---
--- After executing this test, $tmpDir/work contains a directory for each
--- top entity: @bitMaster@, @byteMaster@, @i2c@. A more typical test case might
--- produce @topEntity@ and @testBench@ instead.
---
-data GhdlImportTest = GhdlImportTest
-  { gitSourceDirectory :: IO FilePath
-    -- ^ Directory containing VHDL files produced by Clash
-  }
-
-instance IsTest GhdlImportTest where
-  run optionSet GhdlImportTest{gitSourceDirectory} progressCallback = do
-    src <- gitSourceDirectory
-    let workDir = src </> "work"
-    createDirectory workDir
-    manifests <- getManifests (src </> "*" </> manifestFilename)
-    foldM (goManifest workDir) (testPassed "") manifests
-   where
-    stdArgs  = ["-i", "--std=93"]
-    runGhdlI workDir args =
-      run optionSet (ghdlI workDir args) progressCallback
-    ghdlI workDir args =
-      TestProgram "ghdl" (stdArgs <> args) NoGlob PrintNeither False (Just workDir)
-
-    -- Read a manifest file, error if its malformed / inaccessible. Run @ghdl -i@
-    -- on files associated with the component.
-    goManifest :: FilePath -> Result -> (FilePath, Manifest) -> IO Result
-    goManifest workDir result (manifestPath, Manifest{topComponent,fileNames})
-      | resultSuccessful result = do
-        let
-          top = T.unpack topComponent
-          relVhdlFiles = filter (".vhdl" `List.isSuffixOf`) (map fst fileNames)
-          absVhdlFiles = map (replaceFileName manifestPath) relVhdlFiles
-        createDirectory (workDir </> top)
-        runGhdlI workDir (["--work=" <> top, "--workdir=" <> top] <> absVhdlFiles)
-
-      | otherwise = pure result
-
-  testOptions = coerce (testOptions @TestProgram)
-
--- | Create an executable given directory 'GhdlImportTest' produced work files
--- in.
---
--- For example, for I2C it would execute:
---
--- @
--- ghdl -m -fpsl --work=i2c --workdir=i2c -PbitMaster -PbyteMaster -Pi2c -o i2c_exe i2c
--- @
---
-data GhdlMakeTest = GhdlMakeTest
-  { gmtSourceDirectory :: IO FilePath
-    -- ^ Directory containing VHDL files produced by Clash
-  , gmtTop :: String
-    -- ^ Entry point to be converted to executables
-  }
-
-instance IsTest GhdlMakeTest where
-  run optionSet GhdlMakeTest{gmtSourceDirectory,gmtTop} progressCallback = do
-    src <- gmtSourceDirectory
-    let
-      workDir = src </> "work"
-    libs <- listDirectory workDir
-    runGhdl workDir $
-        ["-m", "-fpsl", "--work=" <> gmtTop, "--workdir=" <> gmtTop]
-      <> ["-P" <> lib | lib <- libs]
-      <> ["-o", map toLower (gmtTop <> "_exe"), gmtTop]
-   where
-    ghdl workDir args = TestProgram "ghdl" args NoGlob PrintNeither False (Just workDir)
-    runGhdl workDir args = run optionSet (ghdl workDir args) progressCallback
-
-  testOptions = coerce (testOptions @TestProgram)
-
--- | Run executable generated by 'GhdlMakeTest'.
---
--- For examples, for I2C it would execute:
---
--- @
--- ghdl -r --workdir=i2c --work=i2c i2c_exe --assert-level=error
--- @
---
-data GhdlSimTest = GhdlSimTest
-  { gstExpectFailure :: Maybe (TestExitCode, T.Text)
-    -- ^ Expected failure code and output (if any)
-  , gstSourceDirectory :: IO FilePath
-    -- ^ Directory containing executables produced by 'GhdlMakeTest'
-  , gstTop :: String
-    -- ^ Entry point to be executed
-  }
-
-instance IsTest GhdlSimTest where
-  run optionSet GhdlSimTest{..} progressCallback = do
-    src <- gstSourceDirectory
-    let workDir = src </> "work"
-
-    -- See Note [copy data files hack]
-    lists <- glob (src </> "*/memory.list")
-    forM_ lists $ \memFile ->
-      copyFile memFile (workDir </> "memory.list")
-
-    case gstExpectFailure of
-      Nothing -> run optionSet (program workDir gstTop) progressCallback
-      Just exit -> run optionSet (failingProgram workDir gstTop exit) progressCallback
-   where
-    program workDir top =
-      TestProgram "ghdl" (args top) NoGlob PrintNeither False (Just workDir)
-
-    failingProgram workDir top (testExit, expectedErr) =
-      TestFailingProgram
-        (testExitCode testExit) "ghdl" (args top) NoGlob PrintNeither False
-        (specificExitCode testExit) (ExpectEither expectedErr) (Just workDir)
-
-    args work =
-      [ "-r"
-      , "--workdir=" <> work
-      , "--work=" <> work
-      , map toLower (work <> "_exe")
-      , "--assert-level=error"
-      ]
-
-  testOptions = coerce (testOptions @TestProgram)
-
--- | Make executable from Verilog produced by Clash using Icarus Verilog.
---
--- For example, for I2C it would execute:
---
--- @
--- iverilog \
---   -I test_i2c -I test_bitmaster -I test_bytemaster \
---   -g2 -s test_i2c -o test_i2c.exe \
---   <verilog_files>
--- @
---
-data IVerilogMakeTest = IVerilogMakeTest
-  { ivmSourceDirectory :: IO FilePath
-    -- ^ Directory containing VHDL files produced by Clash
-  , ivmTop :: String
-    -- ^ Entry point to be compiled
-  }
-
-instance IsTest IVerilogMakeTest where
-  run optionSet IVerilogMakeTest{ivmSourceDirectory,ivmTop} progressCallback = do
-    src <- ivmSourceDirectory
-    libs <- listDirectory src
-    verilogFiles <- glob (src </> "*" </> "*.v")
-    runIcarus src (mkArgs libs verilogFiles ivmTop)
-   where
-    mkArgs libs files top =
-         concat [["-I", l] | l <- libs]
-      <> ["-g2", "-s", top, "-o", top <> ".exe"]
-      <> files
-
-    icarus workDir args = TestProgram "iverilog" args NoGlob PrintNeither False (Just workDir)
-    runIcarus workDir args = run optionSet (icarus workDir args) progressCallback
-
-  testOptions = coerce (testOptions @TestProgram)
-
--- | Run executable produced by 'IverilogMakeTest'.
---
--- For example, for I2C it would execute:
---
--- @
--- vvp test_i2c.exe
--- @
---
-data IVerilogSimTest = IVerilogSimTest
-  { ivsExpectFailure :: Maybe (TestExitCode, T.Text)
-    -- ^ Expected failure code and output (if any)
-  , ivsStderrEmptyFail :: Bool
-    -- ^ Whether empty stderr means failure
-  , ivsSourceDirectory :: IO FilePath
-    -- ^ Directory containing executables produced by 'IVerilogMakeTest'
-  , ivsTop :: String
-    -- ^ Entry point to simulate
-  }
-
-instance IsTest IVerilogSimTest where
-  run optionSet IVerilogSimTest{..} progressCallback = do
-    src <- ivsSourceDirectory
-
-    -- See Note [copy data files hack]
-    lists <- glob (src </> "*/memory.list")
-    forM_ lists $ \memFile ->
-      copyFile memFile (src </> "memory.list")
-
-    let topExe = ivsTop <> ".exe"
-    case ivsExpectFailure of
-      Nothing -> run optionSet (vvp src [topExe]) progressCallback
-      Just exit -> run optionSet (failingVvp src [topExe] exit) progressCallback
-   where
-    vvp workDir args =
-      TestProgram "vvp" args NoGlob PrintNeither ivsStderrEmptyFail (Just workDir)
-
-    failingVvp workDir args (testExit, expectedErr) =
-      TestFailingProgram
-        (testExitCode testExit) "vvp" args NoGlob PrintNeither False
-        (specificExitCode testExit) (ExpectEither expectedErr) (Just workDir)
-
-  testOptions = coerce (testOptions @TestProgram)
-
-data ModelsimVlibTest = ModelsimVlibTest
-  { mvtSourceDirectory :: IO FilePath
-    -- ^ Directory containing VHDL files produced by Clash
-  }
-
-instance IsTest ModelsimVlibTest where
-  run optionSet ModelsimVlibTest{mvtSourceDirectory} progressCallback = do
-    src <- mvtSourceDirectory
-    runVlib src ["work"]
-   where
-    vlib workDir args = TestProgram "vlib" args NoGlob PrintNeither False (Just workDir)
-    runVlib workDir args = run optionSet (vlib workDir args) progressCallback
-
-  testOptions = coerce (testOptions @TestProgram)
-
-data ModelsimVlogTest = ModelsimVlogTest
-  { vlogSourceDirectory :: IO FilePath
-    -- ^ Directory containing VHDL files produced by Clash
-  }
-
-instance IsTest ModelsimVlogTest where
-  run optionSet ModelsimVlogTest{vlogSourceDirectory} progressCallback = do
-    src <- vlogSourceDirectory
-    typeFiles <- glob (src </> "*" </> "*_types.sv")
-    allFiles <- glob (src </> "*" </> "*.sv")
-    runVlog src (["-sv", "-work", "work"] <> typeFiles <> allFiles)
-   where
-    vlog workDir args = TestProgram "vlog" args NoGlob PrintNeither False (Just workDir)
-    runVlog workDir args = run optionSet (vlog workDir args) progressCallback
-
-  testOptions = coerce (testOptions @TestProgram)
-
-data ModelsimSimTest = ModelsimSimTest
-  { msimExpectFailure :: Maybe (TestExitCode, T.Text)
-    -- ^ Expected failure code and output (if any)
-  , msimSourceDirectory :: IO FilePath
-    -- ^ Directory containing VHDL files produced by Clash
-  , msimTop :: String
-    -- ^ Entry point to simulate
-  }
-
-instance IsTest ModelsimSimTest where
-  run optionSet ModelsimSimTest{..} progressCallback = do
-    src <- msimSourceDirectory
-
-    -- See Note [copy data files hack]
-    lists <- glob (src </> "*/memory.list")
-    forM_ lists $ \memFile ->
-      copyFile memFile (src </> "memory.list")
-
-    let args = ["-batch", "-do", doScript, msimTop]
-    case msimExpectFailure of
-      Nothing -> run optionSet (vsim src args) progressCallback
-      Just exit -> run optionSet (failingVsim src args exit) progressCallback
-   where
-    vsim workDir args =
-      TestProgram "vsim" args NoGlob PrintNeither False (Just workDir)
-
-    failingVsim workDir args (testExit, expectedErr) =
-      TestFailingProgram
-        (testExitCode testExit) "vsim" args NoGlob PrintNeither False
-        (specificExitCode testExit) (ExpectEither expectedErr) (Just workDir)
-
-    doScript = List.intercalate ";"
-      [ "run -all"
-      , unwords
-         ["if {[string equal ready [runStatus]]}"
-         ,"then {quit -f}"
-         ,"else {quit -code 1 -f}"
-         ]
-      , "quit -code 2 -f"
-      ]
 
   testOptions = coerce (testOptions @TestProgram)
 
