@@ -24,6 +24,7 @@ import Data.Binary                            (Binary)
 import Data.Hashable                          (Hashable)
 import Data.Primitive.ByteArray               (ByteArray)
 import Data.Primitive.ByteArray.Extra         ()
+import Data.Word                              (Word32, Word64)
 import GHC.Generics                           (Generic)
 
 import {-# SOURCE #-} Clash.Core.Type         (Type)
@@ -34,6 +35,24 @@ import Clash.Core.TysPrim                     (intPrimTy, integerPrimTy,
                                                floatPrimTy, doublePrimTy,
                                                naturalPrimTy, byteArrayPrimTy)
 
+{-
+Note [Storage of floating point in Literal]
+-------------------------------------------
+
+GHC stores literals of 'Float' and 'Double' as 'Rational'. However, unlike
+GHC, we also need to store transfinite "literals". We need to preserve all
+information there is in a specific code word representing a floating point
+value.
+
+Storing them as 'Float' and 'Double' here introduces issues with 'Eq' and
+'Hashable'. 0.0 == -0.0, and NaN compares unequal to everything including
+itself.
+
+Also unlike GHC, we already assume that 'Float' is single-precision IEEE-754,
+and 'Double' is double-precision IEEE-754. So we can store them as 'Word32'
+and 'Word64' and get the 'Eq' and hashing properties we require.
+-}
+
 -- | Term Literal
 data Literal
   = IntegerLiteral  !Integer
@@ -42,8 +61,8 @@ data Literal
   | Int64Literal    !Integer
   | Word64Literal   !Integer
   | StringLiteral   !String
-  | FloatLiteral    !Float
-  | DoubleLiteral   !Double
+  | FloatLiteral    !Word32
+  | DoubleLiteral   !Word64
   | CharLiteral     !Char
   | NaturalLiteral  !Integer
   | ByteArrayLiteral !ByteArray
