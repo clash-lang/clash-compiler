@@ -35,6 +35,7 @@ import Data.Char                        (isSymbol, isUpper, ord)
 import Data.Default                     (Default(..))
 import Data.Text                        (Text)
 import Control.Monad.Identity
+import Data.Binary.IEEE754              (wordToDouble, wordToFloat)
 import Data.List.Extra                  ((<:>))
 import qualified Data.Text              as T
 import Data.Maybe                       (fromMaybe)
@@ -307,8 +308,8 @@ instance PrettyPrec Literal where
       | otherwise      -> pretty i
     WordLiteral w      -> pretty w
     Word64Literal w    -> pretty w
-    FloatLiteral f     -> pretty f
-    DoubleLiteral d    -> pretty d
+    FloatLiteral w     -> pretty $ wordToFloat w
+    DoubleLiteral w    -> pretty $ wordToDouble w
     CharLiteral c      -> pretty c
     StringLiteral s    -> vcat $ map pretty $ showMultiLineString s
     NaturalLiteral n   -> pretty n
