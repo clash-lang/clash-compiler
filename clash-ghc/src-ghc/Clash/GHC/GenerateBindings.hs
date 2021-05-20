@@ -1,14 +1,16 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
-                          2017, QBayLogic, Google Inc.
+                          2017, QBayLogic, Google Inc.,
+                          2021, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Clash.GHC.GenerateBindings
   (generateBindings)
@@ -93,6 +95,7 @@ import           Clash.Primitives.Util   (generatePrimMap)
 import           Clash.Unique
   (listToUniqMap, lookupUniqMap, mapUniqMap, unionUniqMap, uniqMapToUniqSet)
 import           Clash.Util              (reportTimeDiff)
+import qualified Clash.Util.Interpolate as I
 
 -- | Safe indexing, returns a 'Nothing' if the index does not exist
 indexMaybe :: [a] -> Int -> Maybe a
@@ -163,7 +166,10 @@ generateBindings startAction useColor primDirs importDirs dbs hdl modName dflags
         map (\(topEnt, annM, isTb) ->
                 case lookupUniqMap topEnt allBindings of
                   Just b -> TopEntityT (bindingId b) annM isTb
-                  Nothing -> error "This shouldn't happen"
+                  Nothing -> GHC.pgmError [I.i|
+                    No top entity called '#{topEnt}' found. Make sure you are
+                    compiling with the '-fexpose-all-unfoldings' flag.
+                  |]
             ) topEntities'
   -- Parsing / compiling primitives:
   prepTime  <- startTime `deepseq` primMapC `seq` Clock.getCurrentTime
