@@ -92,8 +92,15 @@ endfunction"
 , { "BlackBox" :
   { "name"      : "GHC.Num.Natural.naturalShiftL#"
   , "kind"      : "Expression"
-  , "type"      : "naturalShiftL :: Natural -> Word# -> Natural"
+  , "type"      : "naturalShiftL# :: Natural -> Word# -> Natural"
   , "template"  : "~ARG[0] <<< ~ARG[1]"
+  }
+}
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Natural.naturalShiftR#"
+  , "kind"      : "Expression"
+  , "type"      : "naturalShiftR# :: Natuarl -> Word# -> Natural"
+  , "template"  : "~ARG[0] >>> ~ARG[1]"
   }
 }
 , { "BlackBox" :
