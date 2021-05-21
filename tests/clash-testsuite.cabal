@@ -87,6 +87,7 @@ library
     Test.Tasty.Ghdl
     Test.Tasty.Iverilog
     Test.Tasty.Modelsim
+    Test.Tasty.SymbiYosys
     Test.Tasty.Program
 
     -- From tests/shouldwork/LoadModules

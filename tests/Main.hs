@@ -269,6 +269,13 @@ runClashTest = defaultMain $ clashTestRoot
           -- for syntax errors.
           , hdlSim=False
           }
+        , runTest "SymbiYosys" def{
+            hdlTargets=[Verilog, SystemVerilog]
+          , buildTargets=BuildSpecific ["topEntity"]
+          , hdlLoad=False
+          , verificationTool=Just SymbiYosys
+          , expectVerificationFail=Just (def, "Unreached cover statement at B")
+          }
         ]
       , clashTestGroup "ZeroWidth"
         [ runTest "FailGracefully1" def{
@@ -775,6 +782,14 @@ runClashTest = defaultMain $ clashTestRoot
         , let _opts = def { hdlSim = False, hdlTargets = [VHDL], clashFlags = ["-fclash-hdlsyn", "Vivado"]}
            in NEEDS_PRIMS_GHC(runTest "T1360" _opts)
         ] -- end vector
+      , clashTestGroup "Verification" [
+          runTest "SymbiYosys" def{
+            hdlTargets=[Verilog, SystemVerilog]
+          , buildTargets=BuildSpecific ["topEntity"]
+          , hdlLoad=False
+          , verificationTool=Just SymbiYosys
+          }
+        ]
       , clashTestGroup "XOptimization"
         [ NEEDS_PRIMS(outputTest  ("tests" </> "shouldwork" </> "XOptimization") allTargets [] [] "Conjunction" "main")
         , NEEDS_PRIMS(outputTest  ("tests" </> "shouldwork" </> "XOptimization") allTargets [] [] "Disjunction" "main")

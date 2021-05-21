@@ -27,6 +27,7 @@ import           Test.Tasty.Common
 import           Test.Tasty.Ghdl
 import           Test.Tasty.Iverilog
 import           Test.Tasty.Modelsim
+import           Test.Tasty.SymbiYosys
 
 {- Note [copy data files hack]
 
@@ -84,6 +85,9 @@ getBuildTargets TestOptions{hdlSim, buildTargets=BuildAuto}
   | hdlSim = ["testBench"]
   | otherwise = ["topEntity"]
 
+-- | Possible verification tools
+data VerificationTool = SymbiYosys
+
 data TestOptions =
   TestOptions
     { hdlSim :: Bool
@@ -95,6 +99,12 @@ data TestOptions =
     -- ^ Expect simulation to fail: Nothing if simulation is expected to run
     -- without errors, or Just (part of) the error message the simulation is
     -- expected to throw.
+    , verificationTool :: Maybe VerificationTool
+    -- ^ A formal verification tool with which to attempt to verify
+    -- the generated hdl
+    , expectVerificationFail :: Maybe (TestExitCode, T.Text)
+    -- ^ Expect the verifier to fail: Nothing if verification should succeed,
+    -- or Just (part of) the error message Clash is expected to throw.
     , expectClashFail :: Maybe (TestExitCode, T.Text)
     -- ^ Expect Clash to fail: Nothing if Clash is expected to compile without
     -- errors, or Just (part of) the error message Clash is expected to throw.
@@ -119,6 +129,8 @@ instance Default TestOptions where
       , hdlLoad=True
       , expectClashFail=Nothing
       , expectSimFail=Nothing
+      , expectVerificationFail=Nothing
+      , verificationTool=Nothing
       , hdlTargets=allTargets
       , clashFlags=[]
       , buildTargets=BuildAuto
@@ -324,6 +336,16 @@ systemVerilogTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
     [ (simName t, singleTest (simName t) (ModelsimSimTest expectSimFail tmpDir t))
     | t <- getBuildTargets opts ]
 
+-- | Generate a test tree for running SymbiYosys
+sbyTests :: TestOptions -> IO FilePath -> ([(TestName, TestTree)])
+sbyTests opts@TestOptions {..} tmpDir =
+  [ ( "SymbiYosys"
+    , singleTest "SymbiYosys"
+                 (SbyVerificationTest expectVerificationFail tmpDir t)
+    )
+  | t <- getBuildTargets opts
+  ]
+
 runTest1
   :: String
   -> TestOptions
@@ -333,10 +355,15 @@ runTest1
 runTest1 modName opts@TestOptions{..} path target =
   withResource mkTmpDir Directory.removeDirectoryRecursive $ \tmpDir -> do
     testGroup (show target) $ sequenceTests (show target:path) $ clashTest tmpDir :
-      case target of
+      (case target of
         VHDL -> buildAndSimTests (vhdlTests opts tmpDir)
         Verilog -> buildAndSimTests (verilogTests opts tmpDir)
         SystemVerilog-> buildAndSimTests (systemVerilogTests opts tmpDir)
+      ) <>
+      (case verificationTool of
+         Nothing -> []
+         Just SymbiYosys -> sbyTests opts tmpDir
+      )
 
  where
   mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
