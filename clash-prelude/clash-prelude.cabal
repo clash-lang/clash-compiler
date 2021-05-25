@@ -231,6 +231,7 @@ Library
 
                       Clash.Num.Saturating
                       Clash.Num.Wrapping
+                      Clash.Num.Zeroing
 
                       Clash.NamedTypes
 
