@@ -619,6 +619,11 @@ instance KnownNat n => SaturatingNum (Unsigned n) where
     in  case msb r of
           0 -> resize# r
           _ -> minBound#
+  satAdd SatError a b =
+    let r = plus# a b
+    in  case msb r of
+          0 -> resize# r
+          _ -> errorX "Unsigned.satAdd: overflow"
   satAdd _ a b =
     let r  = plus# a b
     in  case msb r of
@@ -626,6 +631,11 @@ instance KnownNat n => SaturatingNum (Unsigned n) where
           _ -> maxBound#
 
   satSub SatWrap a b = a -# b
+  satSub SatError a b =
+    let r = minus# a b
+    in  case msb r of
+          0 -> resize# r
+          _ -> errorX "Unsigned.satSub: underflow"
   satSub _ a b =
     let r = minus# a b
     in  case msb r of
@@ -639,12 +649,31 @@ instance KnownNat n => SaturatingNum (Unsigned n) where
     in  case rL of
           0 -> unpack# rR
           _ -> minBound#
+  satMul SatError a b =
+    let r       = times# a b
+        (rL,rR) = split r
+    in  case rL of
+          0 -> unpack# rR
+          _ -> errorX "Unsigned.satMul: overflow"
   satMul _ a b =
     let r       = times# a b
         (rL,rR) = split r
     in  case rL of
           0 -> unpack# rR
           _ -> maxBound#
+
+  -- Implementations for satSucc and satPred are needed because 1 :: Unsigned 0
+  -- overflows to 0, meaning without the first check SatError would return 0.
+
+  satSucc SatError a
+    | a == maxBound = errorX "Unsigned.satSucc: overflow"
+  satSucc satMode a = satAdd satMode a 1
+  {-# INLINE satSucc #-}
+
+  satPred SatError a
+    | a == minBound = errorX "Unsigned.satPred: underflow"
+  satPred satMode a = satSub satMode a 1
+  {-# INLINE satPred #-}
 
 instance KnownNat n => Arbitrary (Unsigned n) where
   arbitrary = arbitraryBoundedIntegral

@@ -52,6 +52,7 @@ data SaturationMode
   | SatSymmetric -- ^ Become 'maxBound' on overflow, and (@'minBound' + 1@) on
                  -- underflow for signed numbers, and 'minBound' for unsigned
                  -- numbers.
+  | SatError -- ^ Become an XException on overflow and underflow
   deriving (Show, Eq, Enum, Bounded)
 
 -- | 'Num' operators in which overflow and underflow behavior can be specified
