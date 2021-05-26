@@ -1121,6 +1121,21 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
                      0 -> unpack (resize (shiftR rR sh))
                      _ -> 0
 
+  satMul SatError (Fixed a) (Fixed b) =
+    let res     = a `mul` b
+        sh      = natToNum @frac
+        (rL,rR) = split res :: (BitVector int, BitVector (int + frac + frac))
+    in  case isSigned a of
+          True  -> let overflow = complement (reduceOr (pack (msb rR) ++# pack rL)) .|.
+                                  reduceAnd (pack (msb rR) ++# pack rL)
+                   in  case overflow of
+                         1 -> unpack (resize (shiftR rR sh))
+                         _ -> errorX "Fixed.satMul: result exceeds bounds"
+
+          False -> case rL of
+                     0 -> unpack (resize (shiftR rR sh))
+                     _ -> errorX "Fixed.satMul: result exceeds maxBound"
+
   satMul SatSymmetric (Fixed a) (Fixed b) =
     let res     = a `mul` b
         sh      = natToNum @frac
@@ -1143,6 +1158,7 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
          0 -> case satMode of
                 SatWrap -> f
                 SatZero -> 0
+                SatError -> errorX "Fixed.satSucc: result exceeds maxBound"
                 _       -> maxBound
          _ -> if isSigned fRep
               then satSub satMode f $ Fixed $ fromInteger $ (-1) `shiftL` sh
@@ -1159,6 +1175,7 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
                 SatWrap      -> f
                 SatBound     -> minBound
                 SatZero      -> 0
+                SatError     -> errorX "Fixed.satPred: result exceeds minBound"
                 SatSymmetric -> symBound
          _ -> if isSigned fRep
               then satAdd satMode f $ Fixed $ fromInteger $ (-1) `shiftL` sh

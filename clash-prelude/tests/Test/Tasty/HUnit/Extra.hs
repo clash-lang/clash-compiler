@@ -13,7 +13,7 @@ import Test.Tasty.HUnit
 import Clash.XException (XException)
 
 -- | Succeed if evaluating leads to an XException
-expectXException :: (Show a, NFData a) => a -> Assertion
+expectXException :: (Show a) => a -> Assertion
 expectXException a0 =
   try @XException (evaluate a0) >>= \case
     Left _ -> pure ()

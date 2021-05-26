@@ -14,6 +14,7 @@ import Test.Tasty.Hedgehog
 
 import Clash.Class.Num
 import Clash.Sized.Fixed (Fixed(..), FracFixedC, NumFixedC, SFixed, UFixed)
+import Clash.XException (errorX)
 
 import GHC.TypeLits (KnownNat)
 
@@ -47,6 +48,10 @@ saturate minB maxB _ SatZero x
 saturate minB maxB _ SatSymmetric x
   | x < minB  = if minB < 0 then (-maxB) else minB
   | x > maxB  = maxB
+  | otherwise = x
+saturate minB maxB _ SatError x
+  | x < minB  = errorX "saturate: underflow"
+  | x > maxB  = errorX "saturate: overflow"
   | otherwise = x
 
 -- Saturate to bounds of type b.
@@ -83,8 +88,16 @@ satSuccProperty
 satSuccProperty genA = property $ do
   satMode <- forAll Gen.enumBounded
   a <- forAll genA
-  toRational (satSucc satMode a) === (saturateToBounded (Proxy @a) satMode)
-                                        (toRational a + 1)
+
+  case satMode of
+    SatError
+      | toRational (maxBound @a) - 1 < toRational a
+      , toRational a <= toRational (maxBound @a)
+      -> throwsException (satSucc satMode a)
+
+    _ ->
+      toRational (satSucc satMode a) ===
+        saturateToBounded (Proxy @a) satMode (toRational a + 1)
 
 satPredProperty
   :: forall a
@@ -94,8 +107,16 @@ satPredProperty
 satPredProperty genA = property $ do
   satMode <- forAll Gen.enumBounded
   a <- forAll genA
-  toRational (satPred satMode a) === (saturateToBounded (Proxy @a) satMode)
-                                        (toRational a - 1)
+
+  case satMode of
+    SatError
+      | toRational (minBound @a) <= toRational a
+      , toRational a < toRational (minBound @a) + 1
+      -> throwsException (satPred satMode a)
+
+    _ ->
+      toRational (satPred satMode a) ===
+        saturateToBounded (Proxy @a) satMode (toRational a - 1)
 
 saturatingNumLaws
   :: (SaturatingNum a, Real a, Show a)

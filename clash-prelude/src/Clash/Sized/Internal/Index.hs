@@ -324,6 +324,12 @@ instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
         z | let m = fromInteger# (natToInteger @(n - 1))
           , z > m -> fromInteger# 0
         z -> resize# z
+  satAdd SatError a b =
+    leToPlusKN @1 @n $
+      case plus# a b of
+        z | let m = fromInteger# (natToInteger @(n - 1))
+          , z > m -> errorX "Index.satAdd: overflow"
+        z -> resize# z
   satAdd _ a b =
     leToPlusKN @1 @n $
       case plus# a b of
@@ -335,7 +341,10 @@ instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
     if lt# a b
        then maxBound -# (b -# a) +# 1
        else a -# b
-
+  satSub SatError a b =
+    if lt# a b
+       then errorX "Index.satSub: underflow"
+       else a -# b
   satSub _ a b =
     if lt# a b
        then fromInteger# 0
@@ -355,6 +364,12 @@ instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
         z | let m = fromInteger# (natToInteger @(n - 1))
           , z > m -> fromInteger# 0
         z -> resize# z
+  satMul SatError a b =
+    leToPlusKN @1 @n $
+      case times# a b of
+        z | let m = fromInteger# (natToInteger @(n - 1))
+          , z > m -> errorX "Index.satMul: overflow"
+        z -> resize# z
   satMul _ a b =
     leToPlusKN @1 @n $
       case times# a b of
@@ -362,12 +377,20 @@ instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
           , z > m -> maxBound#
         z -> resize# z
 
+  satSucc SatError !a =
+    case natToInteger @n of
+      1 -> errorX "Index.satSucc: overflow"
+      _ -> satAdd SatError a $ fromInteger# 1
   satSucc satMode !a =
     case natToInteger @n of
       1 -> fromInteger# 0
       _ -> satAdd satMode a $ fromInteger# 1
   {-# INLINE satSucc #-}
 
+  satPred SatError !a =
+    case natToInteger @n of
+      1 -> errorX "Index.satPred: underflow"
+      _ -> satSub SatError a $ fromInteger# 1
   satPred satMode !a =
     case natToInteger @n of
       1 -> fromInteger# 0

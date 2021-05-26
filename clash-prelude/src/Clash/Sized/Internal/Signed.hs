@@ -638,6 +638,12 @@ instance KnownNat n => SaturatingNum (Signed n) where
     in  case msb r `xor` msb r' of
           0 -> unpack# r'
           _ -> fromInteger# 0
+  satAdd SatError a b =
+    let r      = plus# a b
+        (_,r') = split r
+    in  case msb r `xor` msb r' of
+          0 -> unpack# r'
+          _ -> errorX "Signed.satAdd: overflow/underflow"
   satAdd SatSymmetric a b =
     let r      = plus# a b
         (_,r') = split r
@@ -662,6 +668,12 @@ instance KnownNat n => SaturatingNum (Signed n) where
     in  case msb r `xor` msb r' of
           0 -> unpack# r'
           _ -> fromInteger# 0
+  satSub SatError a b =
+    let r      = minus# a b
+        (_,r') = split r
+    in  case msb r `xor` msb r' of
+          0 -> unpack# r'
+          _ -> errorX "Signed.satSub: overflow/underflow"
   satSub SatSymmetric a b =
     let r      = minus# a b
         (_,r') = split r
@@ -690,6 +702,14 @@ instance KnownNat n => SaturatingNum (Signed n) where
     in  case overflow of
           1 -> unpack# rR
           _ -> fromInteger# 0
+  satMul SatError a b =
+    let r        = times# a b
+        (rL,rR)  = split r
+        overflow = complement (reduceOr (BV.pack# (msb rR) ++# pack rL)) .|.
+                   reduceAnd (BV.pack# (msb rR) ++# pack rL)
+    in  case overflow of
+          1 -> unpack# rR
+          _ -> errorX "Signed.satMul: overflow/underflow"
   satMul SatSymmetric a b =
     let r        = times# a b
         (rL,rR)  = split r
@@ -701,8 +721,13 @@ instance KnownNat n => SaturatingNum (Signed n) where
             0 -> maxBound#
             _ -> minBoundSym#
 
+  satSucc SatError a
+    | a == maxBound = errorX "Signed.satSucc: overflow"
   satSucc satMode a = satSub satMode a $ fromInteger# (-1)
   {-# INLINE satSucc #-}
+
+  satPred SatError a
+    | a == minBound = errorX "Signed.satPred: underflow"
   satPred satMode a = satAdd satMode a $ fromInteger# (-1)
   {-# INLINE satPred #-}
 

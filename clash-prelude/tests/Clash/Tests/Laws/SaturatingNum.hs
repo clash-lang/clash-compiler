@@ -9,6 +9,7 @@ module Clash.Tests.Laws.SaturatingNum (tests) where
 import Test.Tasty
 import Test.Tasty.Hedgehog
 import Test.Tasty.HUnit
+import Test.Tasty.HUnit.Extra
 
 import Clash.Class.Num
 import Clash.Sized.Index (Index)
@@ -30,6 +31,8 @@ type SaturationLaw a =
   Gen a ->
   Assertion
 
+-- Check that all modes apart from SatError are total. SatError cannot be total
+-- as it throws an XException on overflow/underflow.
 isTotal ::
   forall a.
   (NFData a, Show a, Eq a) =>
@@ -40,8 +43,13 @@ isTotal f genA = property $ do
   satMode <- forAll Gen.enumBounded
   a <- forAll genA
   b <- forAll genA
-  _ <- evalNF (f satMode a b)
-  pure ()
+
+  if isTotalMode satMode
+     then evalNF (f satMode a b) *> success
+     else success
+ where
+  isTotalMode SatError = False
+  isTotalMode _ = True
 
 satWrapOverflowLaw :: forall a. SaturationLaw a
 satWrapOverflowLaw _ = satSucc @a SatWrap maxBound @?= minBound
@@ -60,6 +68,12 @@ satZeroOverflowLaw _ = satSucc @a SatZero maxBound @?= 0
 
 satZeroUnderflowLaw :: forall a. SaturationLaw a
 satZeroUnderflowLaw _ = satPred @a SatZero minBound @?= 0
+
+satErrorOverflowLaw :: forall a. SaturationLaw a
+satErrorOverflowLaw _ = expectXException (satSucc @a SatError maxBound)
+
+satErrorUnderflowLaw :: forall a. SaturationLaw a
+satErrorUnderflowLaw _ = expectXException (satPred @a SatError minBound)
 
 satSymmetricOverflow :: forall a. SaturationLaw a
 satSymmetricOverflow _ = satSucc @a SatSymmetric maxBound @?= maxBound
@@ -91,7 +105,10 @@ saturatingNumLaws testEnum genA =
     , testCase "SatBound: Become minBound on underflow"
                (satBoundUnderflowLaw genA)
     , testCase "SatZero: Become 0 on overflow" (satZeroOverflowLaw genA)
-    , testCase "SatZero: Become 0 on underflow" (satZeroUnderflowLaw genA) ]
+    , testCase "SatZero: Become 0 on underflow" (satZeroUnderflowLaw genA)
+    , testCase "SatError: Error on overflow" (satErrorOverflowLaw genA)
+    , testCase "SatError: Error on underflow" (satErrorUnderflowLaw genA)
+    ]
   else
     []) <>
   [ testProperty "satAddTotal" (isTotal satAdd genA)
