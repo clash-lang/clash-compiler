@@ -229,6 +229,7 @@ Library
 
                       Clash.Magic
 
+                      Clash.Num.Erroring
                       Clash.Num.Overflowing
                       Clash.Num.Saturating
                       Clash.Num.Wrapping
