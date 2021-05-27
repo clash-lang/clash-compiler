@@ -31,7 +31,7 @@ Features of Clash:
 
 **Slack**: [functionalprogramming.slack.com#clash](https://functionalprogramming.slack.com/archives/CPGMJFF50) (Invite yourself at [fpchat-invite.herokuapp.com](http://fpchat-invite.herokuapp.com)).
 
-**IRC**: [libera.chat#clash (webchat acces)](https://web.libera.chat/#clash) (or ircs://irc.libera.chat:6697/clash if you want to use a regural IRC client)
+**IRC**: [libera.chat#clash (webchat access)](https://web.libera.chat/#clash) (or ircs://irc.libera.chat:6697/clash if you want to use a regular IRC client)
 
 # Get Clash
 Check out [clash-lang.org/install](https://clash-lang.org/install/) to install the latest stable release of Clash, or to setup a Clash project.
