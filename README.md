@@ -29,9 +29,9 @@ Features of Clash:
 # Community
 **Mailing list**: for updates and questions join the mailing list clash-language+subscribe@googlegroups.com or read the [forum](https://groups.google.com/d/forum/clash-language)
 
-**Slack**: Invite yourself at [fpchat-invite.herokuapp.com](https://fpchat-invite.herokuapp.com/). To join #clash, click on "Channels" and search for "clash".
+**Slack**: [functionalprogramming.slack.com#clash](https://functionalprogramming.slack.com/archives/CPGMJFF50) (Invite yourself at [fpchat-invite.herokuapp.com](http://fpchat-invite.herokuapp.com)).
 
-**IRC**: [freenode#clash-lang](https://webchat.freenode.net/#clash-lang)
+**IRC**: [libera.chat#clash (webchat access)](https://web.libera.chat/#clash) (or ircs://irc.libera.chat:6697/clash if you want to use a regular IRC client)
 
 # Get Clash
 Check out [clash-lang.org/install](https://clash-lang.org/install/) to install the latest stable release of Clash, or to setup a Clash project.
