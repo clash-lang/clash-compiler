@@ -414,6 +414,7 @@ test-suite unittests
                  Clash.Tests.Fixed
                  Clash.Tests.FixedExhaustive
                  Clash.Tests.NFDataX
+                 Clash.Tests.NumNewtypes
                  Clash.Tests.Reset
                  Clash.Tests.Resize
                  Clash.Tests.Signal
