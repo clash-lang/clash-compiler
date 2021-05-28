@@ -53,6 +53,7 @@ module Clash.Sized.Internal.Index
   , (+#)
   , (-#)
   , (*#)
+  , negate#
   , fromInteger#
     -- ** ExtendingNum
   , plus#
@@ -260,7 +261,7 @@ instance KnownNat n => Num (Index n) where
   (+)         = (+#)
   (-)         = (-#)
   (*)         = (*#)
-  negate      = (maxBound# -#)
+  negate      = negate#
   abs         = id
   signum i    = if i == 0 then 0 else 1
   fromInteger = fromInteger#
@@ -274,6 +275,10 @@ instance KnownNat n => Num (Index n) where
 
 {-# NOINLINE (*#) #-}
 (*#) (I a) (I b) = fromInteger_INLINE $ a * b
+
+negate# :: KnownNat n => Index n -> Index n
+negate# 0 = 0
+negate# i = maxBound -# i +# 1
 
 fromInteger# :: KnownNat n => Integer -> Index n
 {-# NOINLINE fromInteger# #-}
