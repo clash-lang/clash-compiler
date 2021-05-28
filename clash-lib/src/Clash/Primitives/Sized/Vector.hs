@@ -1,5 +1,5 @@
 {-|
-  Copyright   :  (C) 2020 QBayLogic
+  Copyright   :  (C) 2020-2021 QBayLogic
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -19,7 +19,7 @@ import           Data.Either                        (rights)
 import qualified Data.IntMap                        as IntMap
 import           Data.List.Extra                    (iterateNM)
 import           Data.Maybe                         (fromMaybe)
-import           Data.Semigroup.Monad               (getMon)
+import           Data.Monoid                        (Ap(getAp))
 import           Data.Text.Extra                    (showt)
 import           Data.Text.Lazy                     (pack)
 import           Data.Text.Prettyprint.Doc.Extra
@@ -164,7 +164,7 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
   callDecls <- zipWithM callDecl [0..] fCalls
   foldNm <- Id.make "fold"
 
-  getMon $ blockDecl foldNm $
+  getAp $ blockDecl foldNm $
     resultAssign :
     vecAssign :
     vecDecl :
@@ -280,7 +280,7 @@ indexIntVerilogTemplate
   :: Backend s
   => BlackBoxContext
   -> State s Doc
-indexIntVerilogTemplate bbCtx = getMon $ case typeSize vTy of
+indexIntVerilogTemplate bbCtx = getAp $ case typeSize vTy of
   0 -> hdlTypeErrValue rTy
   _ -> case vec of
     Identifier i mM -> case mM of

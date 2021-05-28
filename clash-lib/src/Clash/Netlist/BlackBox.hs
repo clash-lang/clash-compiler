@@ -34,7 +34,7 @@ import qualified Data.IntMap                   as IntMap
 import           Data.List                     (elemIndex, partition)
 import           Data.List.Extra               (countEq, mapAccumLM)
 import           Data.Maybe                    (listToMaybe, fromJust, fromMaybe)
-import           Data.Semigroup.Monad
+import           Data.Monoid                   (Ap(getAp))
 import qualified Data.Set                      as Set
 import           Data.Text.Lazy                (fromStrict)
 import qualified Data.Text.Lazy                as Text
@@ -1142,7 +1142,7 @@ mkFunInput resId e =
       return ((Left l',if oreg then Reg else Wire,libs,imps,inc,bbCtx),dcls ++ templDecl)
     Left (TExpr,_,libs,imps,inc,nm,templ') -> do
       onBlackBox
-        (\t -> do t' <- getMon (prettyBlackBox t)
+        (\t -> do t' <- getAp (prettyBlackBox t)
                   let t'' = Id.unsafeMake (Text.toStrict t')
                       assn = Assignment (Id.unsafeMake "~RESULT") (Identifier t'' Nothing)
                   return ((Right (Id.unsafeMake "",[assn]),Wire,libs,imps,inc,bbCtx),dcls))
@@ -1150,7 +1150,7 @@ mkFunInput resId e =
           let f' bbCtx' = do
                 let assn = Assignment (Id.unsafeMake "~RESULT")
                             (BlackBoxE nm libs imps inc templ' bbCtx' False)
-                p <- getMon (Backend.blockDecl (Id.unsafeMake "") [assn])
+                p <- getAp (Backend.blockDecl (Id.unsafeMake "") [assn])
                 return p
           return ((Left (BBFunction bbName bbHash (TemplateFunction k g f'))
                   ,Wire

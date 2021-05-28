@@ -7,7 +7,7 @@ import qualified Prelude as P
 
 import Control.Monad.State (State)
 import Data.List (isInfixOf)
-import Data.Semigroup.Monad (getMon)
+import Data.Monoid (Ap(getAp))
 import Data.Text.Prettyprint.Doc.Extra (Doc)
 import System.Environment (getArgs)
 import System.FilePath ((</>))
@@ -33,7 +33,7 @@ myMultiplyTemplate
 myMultiplyTemplate bbCtx = do
   x <- Id.make "x123456"
   y <- Id.make "y123456"
-  getMon $ blockDecl x [NetDecl Nothing y Bool]
+  getAp $ blockDecl x [NetDecl Nothing y Bool]
 
 
 {-# ANN myMultiply (InlinePrimitive [VHDL] "[ { \"BlackBox\" : { \"name\" : \"TemplateFunction.myMultiply\", \"kind\": \"Declaration\", \"format\": \"Haskell\", \"templateFunction\": \"TemplateFunction.myMultiplyTF\"}} ]") #-}

@@ -9,7 +9,7 @@ import qualified Prelude as P
 
 import Control.Monad.State (State)
 import Data.List (isInfixOf)
-import Data.Semigroup.Monad (getMon)
+import Data.Monoid (Ap(getAp))
 import Data.Text.Prettyprint.Doc.Extra (Doc)
 import System.Environment (getArgs)
 import System.FilePath ((</>))
@@ -42,7 +42,7 @@ myAddTemplate bbCtx = do
   blockId <- Id.make "my_add_block"
   myAddInstId <- Id.make "my_add_inst"
   let myAddId = Id.unsafeMake "my_add"
-  getMon $ blockDecl blockId
+  getAp $ blockDecl blockId
     [ InstDecl Comp Nothing [] myAddId myAddInstId
         [ (instPort "size", Integer, Literal Nothing (NumLit . fromIntegral $ typeSize xTy))
         ]

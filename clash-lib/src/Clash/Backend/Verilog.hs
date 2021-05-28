@@ -1,8 +1,9 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
-                     2017-2018, Google Inc.
+                     2017-2018, Google Inc.,
+                     2021     , QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Generate Verilog for assorted Netlist datatypes
 -}
@@ -42,10 +43,11 @@ import qualified Data.HashMap.Strict                  as HashMap
 import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
 import           Data.Maybe                           (catMaybes, fromMaybe)
+import           Data.Monoid                          (Ap(Ap))
+import           Data.Monoid.Extra                    ()
 import           Data.List
   (mapAccumL, mapAccumR, nubBy, foldl')
 import           Data.List.Extra                      ((<:>))
-import           Data.Semigroup.Monad.Extra
 import           Data.Text.Lazy                       (pack)
 import qualified Data.Text.Lazy                       as Text
 import qualified Data.Text                            as TextS
@@ -178,7 +180,7 @@ instance Backend VerilogState where
   ifThenElseExpr _ = True
   aggressiveXOptBB = use aggressiveXOptBB_
 
-type VerilogM a = Mon (State VerilogState) a
+type VerilogM a = Ap (State VerilogState) a
 
 -- | Generate Verilog for a Netlist component
 genVerilog
@@ -192,11 +194,11 @@ genVerilog sp seen c = do
     --
     -- TODO: Collect all type names up front, to prevent relatively costly union.
     -- TODO: Investigate whether type names / signal names collide in the first place
-    Mon $ idSeen %= Id.union seen
+    Ap $ idSeen %= Id.union seen
 
-    Mon (setSrcSpan sp)
+    Ap (setSrcSpan sp)
     v    <- commentHeader <> line <> timescale <> line <> module_ c
-    incs <- Mon $ use includes
+    incs <- Ap $ use includes
     return ((TextS.unpack (Id.toText cName), v), incs)
   where
     cName    = componentName c
@@ -225,12 +227,12 @@ sigPort wor (Id.toText -> pName) hwType iEM =
 
 module_ :: Component -> VerilogM Doc
 module_ c =
-  modVerilog <* Mon (imports .= HashSet.empty >> libraries .= HashSet.empty)
+  modVerilog <* Ap (imports .= HashSet.empty >> libraries .= HashSet.empty)
   where
     modVerilog = do
       body <- modBody
-      imps <- Mon $ use imports
-      libs <- Mon $ use libraries
+      imps <- Ap $ use imports
+      libs <- Ap $ use libraries
       modHeader <> line <> modPorts <> line <>
         include (HashSet.toList imps) <>
         uselibs (HashSet.toList libs) <>
@@ -263,13 +265,13 @@ module_ c =
                   <> (if null xs then emptyDoc else line <> vcat (forM xs commafy))
                   <> line <> rparen
 
-include :: Monad m => [Text.Text] -> Mon m Doc
+include :: Monad m => [Text.Text] -> Ap m Doc
 include [] = emptyDoc
 include xs = line <>
   indent 2 (vcat (mapM (\i -> string "`include" <+> dquotes (string i)) xs))
   <> line <> line
 
-uselibs :: Monad m => [Text.Text] -> Mon m Doc
+uselibs :: Monad m => [Text.Text] -> Ap m Doc
 uselibs [] = emptyDoc
 uselibs xs = line <>
   -- NOTE: We must produce a single uselib directive as later ones overwrite earlier ones.
@@ -303,7 +305,7 @@ verilogTypeMark = const emptyDoc
 -- | Convert a Netlist HWType to an error Verilog value for that type
 verilogTypeErrValue :: HWType -> VerilogM Doc
 verilogTypeErrValue ty = do
-  udf <- Mon (use undefValue)
+  udf <- Ap (use undefValue)
   case udf of
     Nothing       -> braces (int (typeSize ty) <+> braces "1'bx")
     Just Nothing  -> int (typeSize ty) <> "'d0 /* undefined */"
@@ -510,7 +512,7 @@ inst_ (InstDecl _ _ attrs nm lbl ps pms0) = fmap Just $
       | otherwise  = addAttrs attrs line
 
 inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
-  fmap Just (Mon (column (renderBlackBox libs imps inc bs bbCtx)))
+  fmap Just (Ap (column (renderBlackBox libs imps inc bs bbCtx)))
 
 inst_ (Seq ds) = Just <$> seqs ds
 
@@ -850,12 +852,12 @@ customReprDataCon dataRepr constrRepr [] =
     _ -> error "internal error"
 customReprDataCon dataRepr constrRepr args = do
   funId <- mkConstrFunction
-  Mon (imports %= HashSet.insert (Text.pack (TextS.unpack (Id.toText funId) ++ ".inc")))
+  Ap (imports %= HashSet.insert (Text.pack (TextS.unpack (Id.toText funId) ++ ".inc")))
   pretty funId <> tupled (mapM (expr_ False . snd) nzArgs)
  where
   nzArgs = filter ((/=0) . typeSize . fst) args
 
-  mkConstrFunction :: Mon (State VerilogState) Identifier
+  mkConstrFunction :: Ap (State VerilogState) Identifier
   mkConstrFunction = makeCached (crName constrRepr) customConstrs $ do
     let size    = drSize dataRepr
         aTys    = map fst args
@@ -902,7 +904,7 @@ customReprDataCon dataRepr constrRepr args = do
       indent 2 (pretty fId <+> "=" <+> val <> semi) <> line <>
       "end" <> line <>
       "endfunction"
-    Mon (includes %= ((TextS.unpack (Id.toText fId) ++ ".inc",funDoc):))
+    Ap (includes %= ((TextS.unpack (Id.toText fId) ++ ".inc",funDoc):))
     return fId
 
 -- | Turn a Netlist expression into a Verilog expression
@@ -936,25 +938,25 @@ expr_ _ (Identifier d_ (Just (Indexed (CustomProduct _id dataRepr _size _maybeFi
 
 -- See [Note] integer projection
 expr_ _ (Identifier id_ (Just (Indexed ((Signed w),_,_))))  = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
     pretty id_
 
 -- See [Note] integer projection
 expr_ _ (Identifier id_ (Just (Indexed ((Unsigned w),_,_))))  = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
     pretty id_
 
 -- See [Note] mask projection
 expr_ _ (Identifier _ (Just (Indexed ((BitVector _),_,0)))) = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   traceIf True ($(curLoc) ++ "WARNING: synthesizing bitvector mask to dontcare") $
     verilogTypeErrValue (Signed iw)
 
 -- See [Note] bitvector projection
 expr_ _ (Identifier id_ (Just (Indexed ((BitVector w),_,1)))) = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
     pretty id_
 
@@ -1046,18 +1048,18 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   = exprLit undefValue (Just (Index (fromInteger n),fromInteger n)) i
 
 expr_ b (BlackBoxE _ libs imps inc bs bbCtx b') = do
-  parenIf (b || b') (Mon (renderBlackBox libs imps inc bs bbCtx <*> pure 0))
+  parenIf (b || b') (Ap (renderBlackBox libs imps inc bs bbCtx <*> pure 0))
 
 expr_ _ (DataTag Bool (Left id_)) = pretty id_ <> brackets (int 0)
 expr_ _ (DataTag Bool (Right id_)) = do
-  iw <- Mon (use intWidth)
+  iw <- Ap (use intWidth)
   "$unsigned" <> parens (listBraces (sequence [braces (int (iw-1) <+> braces "1'b0"),pretty id_]))
 
 expr_ _ (DataTag (Sum _ _) (Left id_))     = "$unsigned" <> parens (pretty id_)
 expr_ _ (DataTag (Sum _ _) (Right id_))    = "$unsigned" <> parens (pretty id_)
 
 expr_ _ (DataTag (Product {}) (Right _))  = do
-  iw <- Mon (use intWidth)
+  iw <- Ap (use intWidth)
   int iw <> "'sd0"
 
 expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "$unsigned" <> parens
@@ -1068,17 +1070,17 @@ expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "$unsigned" <> parens
     end   = typeSize hty - conSize hty
 
 expr_ _ (DataTag (Vector 0 _) (Right _)) = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   int iw <> "'sd0"
 expr_ _ (DataTag (Vector _ _) (Right _)) = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   int iw <> "'sd1"
 
 expr_ _ (DataTag (RTree 0 _) (Right _)) = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   int iw <> "'sd0"
 expr_ _ (DataTag (RTree _ _) (Right _)) = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   int iw <> "'sd1"
 
 expr_ b (ToBv _ _ e) = expr_ b e
@@ -1108,7 +1110,7 @@ rtreeChain _                               = Nothing
 exprLitV :: Maybe (HWType,Size) -> Literal -> VerilogM Doc
 exprLitV = exprLit undefValue
 
-exprLit :: Lens' s (Maybe (Maybe Int)) -> Maybe (HWType,Size) -> Literal -> Mon (State s) Doc
+exprLit :: Lens' s (Maybe (Maybe Int)) -> Maybe (HWType,Size) -> Literal -> Ap (State s) Doc
 exprLit _ Nothing (NumLit i) = integer i
 
 exprLit k (Just (hty,sz)) (NumLit i) = case hty of
@@ -1147,7 +1149,7 @@ toBits' size msk val = map (\(m,i) -> if odd m then U else (if odd i then H else
                   ( map (`mod` 2) $ iterate (`div` 2) val)
 
 
-bits :: Lens' s (Maybe (Maybe Int)) -> [Bit] -> Mon (State s) Doc
+bits :: Lens' s (Maybe (Maybe Int)) -> [Bit] -> Ap (State s) Doc
 bits k = hcat . traverse (bit_char k)
 
 bit_char' :: Bit -> Char
@@ -1156,9 +1158,9 @@ bit_char' L = '0'
 bit_char' U = 'x'
 bit_char' Z = 'z'
 
-bit_char :: Lens' s (Maybe (Maybe Int)) -> Bit -> Mon (State s) Doc
+bit_char :: Lens' s (Maybe (Maybe Int)) -> Bit -> Ap (State s) Doc
 bit_char k b = do
-  udf <- Mon (use k)
+  udf <- Ap (use k)
   case (udf,b) of
     (Just Nothing,U)  -> char '0'
     (Just (Just i),U) -> "'" <> int i <> "'"
@@ -1175,7 +1177,7 @@ parenIf :: Monad m => Bool -> m Doc -> m Doc
 parenIf True  = parens
 parenIf False = id
 
-punctuate' :: Monad m => Mon m Doc -> Mon m [Doc] -> Mon m Doc
+punctuate' :: Monad m => Ap m Doc -> Ap m [Doc] -> Ap m Doc
 punctuate' s d = vcat (punctuate s d) <> s
 
 encodingNote :: Applicative m => HWType -> m Doc
