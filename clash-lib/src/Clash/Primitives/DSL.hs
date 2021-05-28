@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2019, Myrtle Software Ltd.
-                     2020, QBayLogic B.V.
+                     2020-2021, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -83,8 +83,8 @@ import qualified Data.IntMap                     as IntMap
 import           Data.List                       (intersperse)
 import           Data.List.Extra                 (zipEqual)
 import           Data.Maybe                      (fromMaybe)
+import           Data.Monoid                     (Ap(getAp))
 import           Data.Semigroup                  hiding (Product)
-import           Data.Semigroup.Monad
 import           Data.String
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
@@ -222,7 +222,7 @@ declaration blockName s = do
       BlockState decs _hoCalls backend1 = execState s initState
   put backend1
   blockNameUnique <- Id.makeBasic blockName
-  getMon $ blockDecl blockNameUnique (reverse decs)
+  getAp $ blockDecl blockNameUnique (reverse decs)
 
 -- | Add a declaration to the state.
 addDeclaration :: Declaration -> State (BlockState backend) ()

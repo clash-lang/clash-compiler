@@ -11,9 +11,9 @@ import           Clash.Prelude
 import           Control.Monad.State
 import           GHC.Stack
 import           Data.List                       (isInfixOf)
+import           Data.Monoid                     (Ap(getAp))
 import           Data.String.Interpolate         (i)
 import           Data.String.Interpolate.Util    (unindent)
-import           Data.Semigroup.Monad            (getMon)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Data.Text.Prettyprint.Doc.Extra (Doc (..))
@@ -41,7 +41,7 @@ myTemplate bbCtx = do
       [ IntegerAttr' "my_int_attr"    7
       , StringAttr'  "my_string_attr" "Hello World!"
       ]
-  getMon
+  getAp
     $ blockDecl blkName [InstDecl Comp Nothing attrs compName compInst [] (NamedPortMap []) ]
 
 

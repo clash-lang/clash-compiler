@@ -1,8 +1,9 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
-                     2017-2018, Google Inc.
+                     2017-2018, Google Inc.,
+                     2021     , QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Generate SystemVerilog for assorted Netlist datatypes
 -}
@@ -30,7 +31,8 @@ import qualified Data.HashSet                         as HashSet
 import           Data.List                            (nub, nubBy)
 import           Data.List.Extra                      ((<:>), zipEqual)
 import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
-import           Data.Semigroup.Monad
+import           Data.Monoid                          (Ap(Ap))
+import           Data.Monoid.Extra                    ()
 import qualified Data.Text.Lazy                       as Text
 import qualified Data.Text                            as TextS
 import           Data.Text.Prettyprint.Doc.Extra
@@ -175,7 +177,7 @@ instance Backend SystemVerilogState where
   ifThenElseExpr _ = True
   aggressiveXOptBB = use aggressiveXOptBB_
 
-type SystemVerilogM a = Mon (State SystemVerilogState) a
+type SystemVerilogM a = Ap (State SystemVerilogState) a
 
 -- | Generate SystemVerilog for a Netlist component
 genSystemVerilog
@@ -190,11 +192,11 @@ genSystemVerilog _ sp seen c = do
     --
     -- TODO: Collect all type names up front, to prevent relatively costly union.
     -- TODO: Investigate whether type names / signal names collide in the first place
-    Mon $ idSeen %= Id.union seen
+    Ap $ idSeen %= Id.union seen
 
-    Mon $ setSrcSpan sp
+    Ap $ setSrcSpan sp
     v    <- verilog
-    incs <- Mon $ use includes
+    incs <- Ap $ use includes
     return ((TextS.unpack (Id.toText cName), v), incs)
   where
     cName   = componentName c
@@ -210,7 +212,7 @@ genSystemVerilog _ sp seen c = do
 -- | Generate a SystemVerilog package containing type definitions for the given HWTypes
 mkTyPackage_ :: TextS.Text -> [HWType] -> SystemVerilogM [(String,Doc)]
 mkTyPackage_ modName hwtys = do
-    Mon (tyPkgCtx .= True)
+    Ap (tyPkgCtx .= True)
     normTys <- nub <$> mapM (normaliseType) (hwtys ++ usedTys)
     let
       needsDec    = nubBy eqReprTy $ normTys
@@ -223,7 +225,7 @@ mkTyPackage_ modName hwtys = do
          indent 2 packageDec <> line <>
          indent 2 funDecs <> line <>
        "endpackage" <+> colon <+> modNameD <> "_types"
-    Mon (tyPkgCtx .= False)
+    Ap (tyPkgCtx .= False)
     return pkg
   where
     modNameD    = stringS modName
@@ -288,10 +290,10 @@ normaliseType (Vector n ty)    = Vector n <$> (normaliseType ty)
 normaliseType (RTree d ty)     = RTree d <$> (normaliseType ty)
 normaliseType (Product nm lbls tys) = Product nm lbls <$> (mapM normaliseType tys)
 normaliseType ty@(SP _ elTys)      = do
-  Mon $ mapM_ ((tyCache %=) . HashSet.insert) (concatMap snd elTys)
+  Ap $ mapM_ ((tyCache %=) . HashSet.insert) (concatMap snd elTys)
   return (BitVector (typeSize ty))
 normaliseType (CustomSP _ _dataRepr size elTys) = do
-  Mon $ mapM_ ((tyCache %=) . HashSet.insert) [ty | (_, _, subTys) <- elTys, ty <- subTys]
+  Ap $ mapM_ ((tyCache %=) . HashSet.insert) [ty | (_, _, subTys) <- elTys, ty <- subTys]
   return (BitVector size)
 normaliseType ty@(Index _) = return (Unsigned (typeSize ty))
 normaliseType ty@(Sum _ _) = return (BitVector (typeSize ty))
@@ -309,7 +311,7 @@ range (Right n) = brackets (int 0 <> colon <> int (n-1))
 
 tyDec :: HWType -> SystemVerilogM (Maybe Doc)
 tyDec ty@(Vector n elTy) | typeSize ty > 0 = Just A.<$> do
-  syn <- Mon hdlSyn
+  syn <- Ap hdlSyn
   case syn of
     Vivado -> case splitVecTy ty of
       Just ([Right n',Left n''],elTy') ->
@@ -324,7 +326,7 @@ tyDec ty@(Vector n elTy) | typeSize ty > 0 = Just A.<$> do
         brackets (int 0 <> colon <> int (n' - 1)) <> semi
       _ -> error $ $(curLoc) ++ "impossible"
 tyDec ty@(RTree n elTy) | typeSize elTy > 0 = Just A.<$> do
-  syn <- Mon hdlSyn
+  syn <- Ap hdlSyn
   case syn of
     Vivado -> case splitVecTy ty of
       Just ([Right n',Left n''],elTy') -> -- n' == 2^n
@@ -381,14 +383,14 @@ splitVecTy = fmap splitElemTy . go
 
 lvType :: HWType -> SystemVerilogM (Maybe Doc)
 lvType ty@(Vector n elTy) | typeSize ty > 0 = Just A.<$> do
-  syn <- Mon hdlSyn
+  syn <- Ap hdlSyn
   case syn of
     Vivado -> "logic" <+> brackets (int 0 <> colon <> int (n-1)) <> brackets (int (typeSize elTy - 1) <> colon <> int 0)
     _ -> case splitVecTy ty of
       Just (ns,elTy') -> elTy' <> hcat (mapM range ns)
       _ -> error $ $(curLoc) ++ "impossible"
 lvType ty@(RTree n elTy) | typeSize elTy > 0 = Just A.<$> do
-  syn <- Mon hdlSyn
+  syn <- Ap hdlSyn
   case syn of
     Vivado -> "logic" <+> brackets (int 0 <> colon <> int (2^n-1)) <> brackets (int (typeSize elTy - 1) <> colon <> int 0)
     _ -> case splitVecTy ty of
@@ -427,7 +429,7 @@ funDec ty@(Vector n elTy) | typeSize ty > 0 = Just A.<$>
 
     vecSigDecl :: SystemVerilogM Doc -> SystemVerilogM Doc
     vecSigDecl d = do
-      syn <- Mon hdlSyn
+      syn <- Ap hdlSyn
       case syn of
         Vivado -> case splitVecTy ty of
           Just ([Right n',Left n''],elTy') ->
@@ -466,7 +468,7 @@ funDec ty@(RTree n elTy) | typeSize elTy > 0 = Just A.<$>
   where
     treeSigDecl :: SystemVerilogM Doc -> SystemVerilogM Doc
     treeSigDecl d = do
-      syn <- Mon hdlSyn
+      syn <- Ap hdlSyn
       case syn of
         Vivado -> case splitVecTy (RTree (n-1) elTy) of
           Just ([Right n',Left n''],elTy') -> -- n' == 2 ^ (n-1)
@@ -489,12 +491,12 @@ funDec _ = pure Nothing
 
 module_ :: Component -> SystemVerilogM Doc
 module_ c =
-  modVerilog <* Mon (imports .= [] >> oports .= [])
+  modVerilog <* Ap (imports .= [] >> oports .= [])
  where
   modVerilog = do
     body <- modBody
-    imps <- Mon $ use imports
-    libs <- Mon $ use libraries
+    imps <- Ap $ use imports
+    libs <- Ap $ use libraries
     modHeader <> line <> modPorts <> line <> include (nub imps) <> uselibs (nub libs) <> pure body <> line <> modEnding
 
   modHeader  = "module" <+> pretty (componentName c)
@@ -541,11 +543,11 @@ module_ c =
 verilogType :: HWType -> SystemVerilogM Doc
 verilogType t_ = do
   t <- normaliseType t_
-  Mon (tyCache %= HashSet.insert t)
+  Ap (tyCache %= HashSet.insert t)
   let logicOrWire | isBiSignalIn t = "wire"
                   | otherwise      = "logic"
-  pkgCtx <- Mon $ use tyPkgCtx
-  nm <- Mon $ use modNm
+  pkgCtx <- Ap $ use tyPkgCtx
+  nm <- Ap $ use modNm
   let pvrType = if pkgCtx
                 then tyName t
                 else stringS nm <> "_types::" <> tyName t
@@ -570,9 +572,9 @@ sigDecl d t = verilogType t <+> d
 verilogTypeMark :: HWType -> SystemVerilogM Doc
 verilogTypeMark t_ = do
   t <- normaliseType t_
-  Mon (tyCache %= HashSet.insert t)
-  pkgCtx <- Mon $ use tyPkgCtx
-  nm <- Mon $ use modNm
+  Ap (tyCache %= HashSet.insert t)
+  pkgCtx <- Ap $ use tyPkgCtx
+  nm <- Ap $ use modNm
   let pvrType = if pkgCtx
                 then tyName t
                 else stringS nm <> "_types::" <> tyName t
@@ -596,7 +598,7 @@ tyName t@(CustomSum _ _ _ _) = "logic_vector_" <> int (typeSize t)
 tyName t@(CustomSP _ _ _ _)  = "logic_vector_" <> int (typeSize t)
 tyName t@(Product nm _ _)      = do
   tN <- normaliseType t
-  PP.pretty =<< Mon (makeCached tN nameCache prodName)
+  PP.pretty =<< Ap (makeCached tN nameCache prodName)
  where
   prodName :: State SystemVerilogState Identifier
   prodName = Id.makeBasicOr (last (TextS.splitOn "." nm)) "product"
@@ -610,12 +612,12 @@ tyName t =  error $ $(curLoc) ++ "tyName: " ++ show t
 -- | Convert a Netlist HWType to an error SystemVerilog value for that type
 verilogTypeErrValue :: HWType -> SystemVerilogM Doc
 verilogTypeErrValue (Vector n elTy) = do
-  syn <- Mon hdlSyn
+  syn <- Ap hdlSyn
   case syn of
     Vivado -> char '\'' <> braces (int n <+> braces (singularErrValue elTy))
     _ -> char '\'' <> braces (int n <+> braces (verilogTypeErrValue elTy))
 verilogTypeErrValue (RTree n elTy) = do
-  syn <- Mon hdlSyn
+  syn <- Ap hdlSyn
   case syn of
     Vivado -> char '\'' <> braces (int (2^n) <+> braces (singularErrValue elTy))
     _ -> char '\'' <> braces (int (2^n) <+> braces (verilogTypeErrValue elTy))
@@ -624,7 +626,7 @@ verilogTypeErrValue ty = singularErrValue ty
 
 singularErrValue :: HWType -> SystemVerilogM Doc
 singularErrValue ty = do
-  udf <- Mon (use undefValue)
+  udf <- Ap (use undefValue)
   case udf of
     Nothing       -> braces (int (typeSize ty) <+> braces "1'bx")
     Just Nothing  -> int (typeSize ty) <> "'d0 /* undefined */"
@@ -760,8 +762,8 @@ inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> pretty id_ <+> equals <+> align (expr_ False e <> semi)
 
 inst_ (CondAssignment id_ ty scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $ do
-    { syn <- Mon hdlSyn
-    ; p   <- Mon $ use oports
+    { syn <- Ap hdlSyn
+    ; p   <- Ap $ use oports
     ; if syn == Vivado && id_ `elem` p
          then do
               { regId <- Id.suffix id_ "reg"
@@ -794,8 +796,8 @@ inst_ (CondAssignment id_ _ scrut scrutTy@(CustomProduct {}) es) =
   inst_' id_ scrut scrutTy es
 
 inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
-    { syn <- Mon hdlSyn
-    ; p <- Mon $ use oports
+    { syn <- Ap hdlSyn
+    ; p <- Ap $ use oports
     ; if syn == Vivado && id_ `elem` p
          then do
            { regId <- Id.suffix id_ "reg"
@@ -838,7 +840,7 @@ inst_ (InstDecl _ _ attrs nm lbl ps pms0) = fmap Just $
       | otherwise  = addAttrs attrs line
 
 inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
-  fmap Just (Mon (column (renderBlackBox libs imps inc bs bbCtx)))
+  fmap Just (Ap (column (renderBlackBox libs imps inc bs bbCtx)))
 
 inst_ (Seq ds) = Just <$> seqs ds
 
@@ -1035,8 +1037,8 @@ expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = pretty id_ <> brackets (i
 expr_ _ (Identifier id_ (Just m@Nested {})) = case modifier 0 [] m of
   Nothing -> pretty id_
   Just (mods,resTy) -> do
-    nm <- Mon $ use modNm
-    pkgCtx <- Mon $ use tyPkgCtx
+    nm <- Ap $ use modNm
+    pkgCtx <- Ap $ use tyPkgCtx
     let prefix = if pkgCtx then emptyDoc else stringS nm <> "_types::"
     let e = pretty id_ <> hcat (mapM (either bracketNMod bracketNMod) (reverse mods))
     case resTy of
@@ -1045,13 +1047,13 @@ expr_ _ (Identifier id_ (Just m@Nested {})) = case modifier 0 [] m of
         | Left (NRange {}):_ <- mods
         -> e
         | otherwise  -> do
-        Mon (tyCache %= HashSet.insert resTy)
+        Ap (tyCache %= HashSet.insert resTy)
         prefix <> tyName resTy <> "_from_lv" <> parens e
       RTree {}
         | Left (NRange {}):_ <- mods
         -> e
         | otherwise -> do
-        Mon (tyCache %= HashSet.insert resTy)
+        Ap (tyCache %= HashSet.insert resTy)
         prefix <> tyName resTy <> "_from_lv" <> parens e
       _ -> e
  where
@@ -1060,25 +1062,25 @@ expr_ _ (Identifier id_ (Just m@Nested {})) = case modifier 0 [] m of
 
 -- See [Note] integer projection
 expr_ _ (Identifier id_ (Just (Indexed ((Signed w),_,_))))  = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
     pretty id_
 
 -- See [Note] integer projection
 expr_ _ (Identifier id_ (Just (Indexed ((Unsigned w),_,_))))  = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
     pretty id_
 
 -- See [Note] mask projection
 expr_ _ (Identifier _ (Just (Indexed ((BitVector _),_,0)))) = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   traceIf True ($(curLoc) ++ "WARNING: synthesizing bitvector mask to dontcare") $
     verilogTypeErrValue (Signed iw)
 
 -- See [Note] bitvector projection
 expr_ _ (Identifier id_ (Just (Indexed ((BitVector w),_,1)))) = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   traceIf (iw < w) ($(curLoc) ++ "WARNING: result smaller than argument") $
     pretty id_
 
@@ -1163,18 +1165,18 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   = exprLitSV (Just (Index (fromInteger n),fromInteger n)) i
 
 expr_ b (BlackBoxE _ libs imps inc bs bbCtx b') =
-  parenIf (b || b') (Mon (renderBlackBox libs imps inc bs bbCtx <*> pure 0))
+  parenIf (b || b') (Ap (renderBlackBox libs imps inc bs bbCtx <*> pure 0))
 
 expr_ _ (DataTag Bool (Left id_))          = pretty id_ <> brackets (int 0)
 expr_ _ (DataTag Bool (Right id_))         = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   "$unsigned" <> parens (listBraces (sequence [braces (int (iw-1) <+> braces "1'b0"),pretty id_]))
 
 expr_ _ (DataTag (Sum _ _) (Left id_))     = "$unsigned" <> parens (pretty id_)
 expr_ _ (DataTag (Sum _ _) (Right id_))    = "$unsigned" <> parens (pretty id_)
 
 expr_ _ (DataTag (Product {}) (Right _))  = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   int iw <> "'sd0"
 
 expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "$unsigned" <> parens
@@ -1185,45 +1187,45 @@ expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "$unsigned" <> parens
     end   = typeSize hty - conSize hty
 
 expr_ _ (DataTag (Vector 0 _) (Right _)) = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   int iw <> "'sd0"
 expr_ _ (DataTag (Vector _ _) (Right _)) = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   int iw <> "'sd1"
 
 expr_ _ (DataTag (RTree 0 _) (Right _)) = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   int iw <> "'sd0"
 expr_ _ (DataTag (RTree _ _) (Right _)) = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   int iw <> "'sd1"
 
 expr_ b (ToBv topM t e) = do
-  nm <- Mon $ use modNm
-  pkgCtx <- Mon $ use tyPkgCtx
+  nm <- Ap $ use modNm
+  pkgCtx <- Ap $ use tyPkgCtx
   let prefix = if pkgCtx then emptyDoc else stringS nm <> "_types::"
   case t of
     Vector {} -> do
-      Mon (tyCache %= HashSet.insert t)
+      Ap (tyCache %= HashSet.insert t)
       maybe prefix ((<> "_types::") . pretty) topM <>
         tyName t <> "_to_lv" <> parens (expr_ False e)
     RTree {} -> do
-      Mon (tyCache %= HashSet.insert t)
+      Ap (tyCache %= HashSet.insert t)
       maybe prefix ((<> "_types::") . pretty) topM <>
         tyName t <> "_to_lv" <> parens (expr_ False e)
     _ -> expr b e
 
 expr_ b (FromBv topM t e) = do
-  nm <- Mon $ use modNm
-  pkgCtx <- Mon $ use tyPkgCtx
+  nm <- Ap $ use modNm
+  pkgCtx <- Ap $ use tyPkgCtx
   let prefix = if pkgCtx then emptyDoc else stringS nm <> "_types::"
   case t of
     Vector {} -> do
-      Mon (tyCache %= HashSet.insert t)
+      Ap (tyCache %= HashSet.insert t)
       maybe prefix ((<> "_types::") . pretty) topM <>
         tyName t <> "_from_lv" <> parens (expr_ False e)
     RTree {} -> do
-      Mon (tyCache %= HashSet.insert t)
+      Ap (tyCache %= HashSet.insert t)
       maybe prefix ((<> "_types::") . pretty) topM <>
         tyName t <> "_from_lv" <> parens (expr_ False e)
     _ -> expr b e
@@ -1287,7 +1289,7 @@ parenIf :: Monad m => Bool -> m Doc -> m Doc
 parenIf True  = parens
 parenIf False = id
 
-punctuate' :: Monad m => Mon m Doc -> Mon m [Doc] -> Mon m Doc
+punctuate' :: Monad m => Ap m Doc -> Ap m [Doc] -> Ap m Doc
 punctuate' s d = vcat (punctuate s d) <> s
 
 

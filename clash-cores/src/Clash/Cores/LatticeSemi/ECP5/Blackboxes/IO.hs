@@ -16,7 +16,7 @@ import           Clash.Netlist.BlackBox.Util
 import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types
 import           Control.Monad.State             (State())
-import           Data.Semigroup.Monad            (getMon)
+import           Data.Monoid                     (Ap(getAp))
 import           Data.Text as TextS
 import           Data.Text.Prettyprint.Doc.Extra
 import           Prelude
@@ -41,7 +41,7 @@ bbTemplate bbCtx = do
 
   compName <- Id.addRaw (TextS.pack compName')
 
-  getMon $ blockDecl bb $
+  getAp $ blockDecl bb $
     [ NetDecl Nothing dIn Bit
     , InstDecl Comp Nothing [] compName bb_inst
       [

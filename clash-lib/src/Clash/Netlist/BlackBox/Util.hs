@@ -1,8 +1,9 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
+                    2021     , QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Utilties to verify blackbox contexts against templates and rendering filled
   in templates
@@ -32,7 +33,7 @@ import qualified Data.IntMap                     as IntMap
 import           Data.List                       (nub)
 import           Data.List.Extra                 (indexMaybe)
 import           Data.Maybe                      (mapMaybe, maybeToList, fromJust)
-import           Data.Semigroup.Monad
+import           Data.Monoid                     (Ap(getAp))
 import qualified Data.Text
 import           Data.Text.Lazy                  (Text)
 import qualified Data.Text.Lazy                  as Text
@@ -341,7 +342,7 @@ renderElem b (Component (Decl n subN (l:ls))) = do
         return t
       Right (nm0,ds) -> do
         nm1 <- Id.next nm0
-        block <- getMon (blockDecl nm1 ds)
+        block <- getAp (blockDecl nm1 ds)
         return (render block)
 
   templ4 <-
@@ -357,7 +358,7 @@ renderElem b (Component (Decl n subN (l:ls))) = do
             nm1 <- Id.toText <$> Id.makeBasic "bb"
             nm2 <- Id.makeBasic "bb"
             let bbD = BlackBoxD nm1 libs imps inc (N.BBTemplate templ3) b'
-            block <- getMon (blockDecl nm2 (templDecls ++ [bbD]))
+            block <- getAp (blockDecl nm2 (templDecls ++ [bbD]))
             return (render block)
 
   case verifyBlackBoxContext b' templ4 of
@@ -377,7 +378,7 @@ renderElem b (SigD e m) = do
              Nothing -> snd $ bbResult "~SIGD" b
              Just n  -> let (_,ty',_) = bbInputs b !! n
                         in  ty'
-  t  <- getMon (hdlSig e' ty)
+  t  <- getAp (hdlSig e' ty)
   return (const (renderOneLine t))
 
 renderElem b (Period n) = do
@@ -578,24 +579,24 @@ renderTag :: Backend backend
           -> State backend Text
 renderTag _ (Text t)        = return t
 renderTag b (Result)    = do
-  fmap renderOneLine . getMon . expr False . fst $ bbResult "~RESULT" b
+  fmap renderOneLine . getAp . expr False . fst $ bbResult "~RESULT" b
 renderTag b (Arg n)  = do
   let (e,_,_) = bbInputs b !! n
-  renderOneLine <$> getMon (expr False e)
+  renderOneLine <$> getAp (expr False e)
 
 renderTag b (Const n)  = do
   let (e,_,_) = bbInputs b !! n
-  renderOneLine <$> getMon (expr False e)
+  renderOneLine <$> getAp (expr False e)
 
 renderTag b t@(ArgGen k n)
   | k == bbLevel b
   , let (e,_,_) = bbInputs b !! n
-  = renderOneLine <$> getMon (expr False e)
+  = renderOneLine <$> getAp (expr False e)
   | otherwise
-  = getMon (prettyElem t)
+  = getAp (prettyElem t)
 
 renderTag b (Lit n) =
-  renderOneLine <$> getMon (expr False (mkLit e))
+  renderOneLine <$> getAp (expr False (mkLit e))
  where
   (e,_,_) = bbInputs b !! n
 
@@ -617,25 +618,25 @@ renderTag _ (Sym t _) = return t
 renderTag b (BV True es e) = do
   e' <- Text.concat <$> mapM (fmap ($ 0) . renderElem b) es
   let ty = lineToType b [e]
-  renderOneLine <$> getMon (toBV ty e')
+  renderOneLine <$> getAp (toBV ty e')
 renderTag b (BV False es e) = do
   e' <- Text.concat <$> (mapM (fmap ($ 0) . renderElem b) es)
   let ty = lineToType b [e]
-  renderOneLine <$> getMon (fromBV ty e')
+  renderOneLine <$> getAp (fromBV ty e')
 
 renderTag b (Sel e n) =
   let ty = lineToType b [e]
-  in  renderOneLine <$> getMon (hdlRecSel ty n)
+  in  renderOneLine <$> getAp (hdlRecSel ty n)
 
-renderTag b (Typ Nothing)   = fmap renderOneLine . getMon . hdlType Internal . snd $ bbResult "~TYPO" b
+renderTag b (Typ Nothing)   = fmap renderOneLine . getAp . hdlType Internal . snd $ bbResult "~TYPO" b
 renderTag b (Typ (Just n))  = let (_,ty,_) = bbInputs b !! n
-                              in  renderOneLine <$> getMon (hdlType Internal ty)
-renderTag b (TypM Nothing)  = fmap renderOneLine . getMon . hdlTypeMark . snd $ bbResult "~TYPMO" b
+                              in  renderOneLine <$> getAp (hdlType Internal ty)
+renderTag b (TypM Nothing)  = fmap renderOneLine . getAp . hdlTypeMark . snd $ bbResult "~TYPMO" b
 renderTag b (TypM (Just n)) = let (_,ty,_) = bbInputs b !! n
-                              in  renderOneLine <$> getMon (hdlTypeMark ty)
-renderTag b (Err Nothing)   = fmap renderOneLine . getMon . hdlTypeErrValue . snd $ bbResult "~ERRORO" b
+                              in  renderOneLine <$> getAp (hdlTypeMark ty)
+renderTag b (Err Nothing)   = fmap renderOneLine . getAp . hdlTypeErrValue . snd $ bbResult "~ERRORO" b
 renderTag b (Err (Just n))  = let (_,ty,_) = bbInputs b !! n
-                              in  renderOneLine <$> getMon (hdlTypeErrValue ty)
+                              in  renderOneLine <$> getAp (hdlTypeErrValue ty)
 renderTag b (Size e)        = return . Text.pack . show . typeSize $ lineToType b [e]
 
 renderTag b (Length e) = return . Text.pack . show . vecLen $ lineToType b [e]
@@ -659,7 +660,7 @@ renderTag b (MaxIndex e) = return . Text.pack . show . vecLen $ lineToType b [e]
       error $ $(curLoc) ++ "vecLen of a non-vector type: " ++ show thing
 
 renderTag b e@(TypElem _)   = let ty = lineToType b [e]
-                              in  renderOneLine <$> getMon (hdlType Internal ty)
+                              in  renderOneLine <$> getAp (hdlType Internal ty)
 renderTag _ (Gen b)         = renderOneLine <$> genStmt b
 renderTag _ (GenSym [Text t] _) = return t
 
@@ -674,7 +675,7 @@ renderTag b (IndexType (Lit n)) =
   case bbInputs b !! n of
     (Literal _ (NumLit n'),_,_) ->
       let hty = Index (fromInteger n')
-      in  fmap renderOneLine (getMon (hdlType Internal hty))
+      in  fmap renderOneLine (getAp (hdlType Internal hty))
     x -> error $ $(curLoc) ++ "Index type not given a literal: " ++ show x
 renderTag b (FilePath e)    = case e of
   Lit n -> do
@@ -684,9 +685,9 @@ renderTag b (FilePath e)    = case e of
         s' <- addAndSetData s
         return (Text.pack (show s'))
       _ -> do
-        e2  <- getMon (prettyElem e)
+        e2  <- getAp (prettyElem e)
         error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
-  _ -> do e' <- getMon (prettyElem e)
+  _ -> do e' <- getAp (prettyElem e)
           error $ $(curLoc) ++ "~FILEPATH expects a ~LIT[N] argument, but got: " ++ show e'
 renderTag b (IncludeName n) = case indexMaybe (bbQsysIncName b) n of
   Just nm -> return (Text.fromStrict nm)
@@ -742,7 +743,7 @@ renderTag b CtxName = case bbCtxName b of
   _ -> error "internal error"
 
 
-renderTag _ e = do e' <- getMon (prettyElem e)
+renderTag _ e = do e' <- getAp (prettyElem e)
                    error $ $(curLoc) ++ "Unable to evaluate: " ++ show e'
 
 -- | Compute string from a list of elements. Can interpret ~NAME string literals
@@ -799,13 +800,13 @@ exprToString _ = Nothing
 
 prettyBlackBox :: Monad m
                => BlackBoxTemplate
-               -> Mon m Text
+               -> Ap m Text
 prettyBlackBox bbT = Text.concat <$> mapM prettyElem bbT
 
 prettyElem
   :: (HasCallStack, Monad m)
   => Element
-  -> Mon m Text
+  -> Ap m Text
 prettyElem (Text t) = return t
 prettyElem (Component (Decl i 0 args)) = do
   args' <- mapM (\(a,b) -> (,) <$> prettyBlackBox a <*> prettyBlackBox b) args

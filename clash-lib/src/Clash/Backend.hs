@@ -1,8 +1,9 @@
 {-|
   Copyright  :  (C) 2015-2016, University of Twente,
-                    2017     , Myrtle Software Ltd, Google Inc.
+                    2017     , Myrtle Software Ltd, Google Inc.,
+                    2021     , QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP               #-}
@@ -11,7 +12,7 @@
 module Clash.Backend where
 
 import Data.HashSet                         (HashSet)
-import Data.Semigroup.Monad                 (Mon (..))
+import Data.Monoid                          (Ap)
 import Data.Text                            (Text)
 import qualified Data.Text.Lazy             as LT
 import Control.Monad.State                  (State)
@@ -103,35 +104,35 @@ class HasIdentifierSet state => Backend state where
   extractTypes     :: state -> HashSet HWType
 
   -- | Generate HDL for a Netlist component
-  genHDL           :: ModName -> SrcSpan -> IdentifierSet -> Component -> Mon (State state) ((String, Doc),[(String,Doc)])
+  genHDL           :: ModName -> SrcSpan -> IdentifierSet -> Component -> Ap (State state) ((String, Doc),[(String,Doc)])
   -- | Generate a HDL package containing type definitions for the given HWTypes
-  mkTyPackage      :: ModName -> [HWType] -> Mon (State state) [(String, Doc)]
+  mkTyPackage      :: ModName -> [HWType] -> Ap (State state) [(String, Doc)]
   -- | Convert a Netlist HWType to a target HDL type
-  hdlType          :: Usage -> HWType -> Mon (State state) Doc
+  hdlType          :: Usage -> HWType -> Ap (State state) Doc
   -- | Query what kind of type a given HDL type is
   hdlHWTypeKind :: HWType -> State state HWKind
   -- | Convert a Netlist HWType to an HDL error value for that type
-  hdlTypeErrValue  :: HWType       -> Mon (State state) Doc
+  hdlTypeErrValue  :: HWType       -> Ap (State state) Doc
   -- | Convert a Netlist HWType to the root of a target HDL type
-  hdlTypeMark      :: HWType       -> Mon (State state) Doc
+  hdlTypeMark      :: HWType       -> Ap (State state) Doc
   -- | Create a record selector
-  hdlRecSel        :: HWType -> Int -> Mon (State state) Doc
+  hdlRecSel        :: HWType -> Int -> Ap (State state) Doc
   -- | Create a signal declaration from an identifier (Text) and Netlist HWType
-  hdlSig           :: LT.Text -> HWType -> Mon (State state) Doc
+  hdlSig           :: LT.Text -> HWType -> Ap (State state) Doc
   -- | Create a generative block statement marker
   genStmt          :: Bool -> State state Doc
   -- | Turn a Netlist Declaration to a HDL concurrent block
-  inst             :: Declaration  -> Mon (State state) (Maybe Doc)
+  inst             :: Declaration  -> Ap (State state) (Maybe Doc)
   -- | Turn a Netlist expression into a HDL expression
   expr             :: Bool -- ^ Enclose in parentheses?
                    -> Expr -- ^ Expr to convert
-                   -> Mon (State state) Doc
+                   -> Ap (State state) Doc
   -- | Bit-width of Int,Word,Integer
   iwWidth          :: State state Int
   -- | Convert to a bit-vector
-  toBV             :: HWType -> LT.Text -> Mon (State state) Doc
+  toBV             :: HWType -> LT.Text -> Ap (State state) Doc
   -- | Convert from a bit-vector
-  fromBV           :: HWType -> LT.Text -> Mon (State state) Doc
+  fromBV           :: HWType -> LT.Text -> Ap (State state) Doc
   -- | Synthesis tool we're generating HDL for
   hdlSyn           :: State state HdlSyn
   -- | setModName
@@ -141,7 +142,7 @@ class HasIdentifierSet state => Backend state where
   -- | getSrcSpan
   getSrcSpan       :: State state SrcSpan
   -- | Block of declarations
-  blockDecl        :: Identifier -> [Declaration] -> Mon (State state) Doc
+  blockDecl        :: Identifier -> [Declaration] -> Ap (State state) Doc
   addIncludes      :: [(String, Doc)] -> State state ()
   addLibraries     :: [LT.Text] -> State state ()
   addImports       :: [LT.Text] -> State state ()
