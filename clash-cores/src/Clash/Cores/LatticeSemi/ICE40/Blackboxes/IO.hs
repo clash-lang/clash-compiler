@@ -13,7 +13,7 @@ module Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO (sbioTF) where
 import           Prelude
 
 import           Control.Monad.State
-import           Data.Semigroup.Monad               (getMon)
+import           Data.Monoid (Ap(getAp))
 import           Data.Text.Prettyprint.Doc.Extra
 import           GHC.Stack
   (HasCallStack, prettyCallStack, callStack)
@@ -69,7 +69,7 @@ sbioTemplate bbCtx = do
         , Identifier dIn1 Nothing
         ]
 
-  getMon $ blockDecl sbio $
+  getAp $ blockDecl sbio $
     [ NetDecl Nothing dIn0 Bit
     , NetDecl Nothing dIn1 Bit
     , InstDecl Comp Nothing [] compName sbio_inst

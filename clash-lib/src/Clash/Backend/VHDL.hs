@@ -1,8 +1,9 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
-                     2017-2018, Google Inc.
+                     2017-2018, Google Inc.,
+                     2021     , QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Generate VHDL for assorted Netlist datatypes
 -}
@@ -33,10 +34,15 @@ import           Data.List
   (mapAccumL, nub, nubBy, intersperse, group, sort)
 import           Data.List.Extra                      ((<:>), equalLength, zipEqual)
 import           Data.Maybe                           (catMaybes,mapMaybe)
+<<<<<<< HEAD
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid                          hiding (Sum, Product)
 #endif
 import           Data.Semigroup.Monad.Extra
+=======
+import           Data.Monoid                          (Ap(Ap))
+import           Data.Monoid.Extra                    ()
+>>>>>>> b8586de7 (Remove reducers from clash-lib)
 import qualified Data.Text.Lazy                       as T
 import qualified Data.Text                            as TextS
 import qualified Data.Text.Prettyprint.Doc            as PP
@@ -185,7 +191,7 @@ instance Backend VHDLState where
   toBV t id_
     | isBV t = pretty id_
     | otherwise = do
-      nm <- Mon $ use modNm
+      nm <- Ap $ use modNm
       -- TODO: restore hack
 --      seen <- use seenIdentifiers
       -- This is a bit hacky, as id_ is just a rendered expression.
@@ -198,7 +204,7 @@ instance Backend VHDLState where
   fromBV t id_
     | isBV t = pretty id_
     | otherwise = do
-      nm <- Mon $ use modNm
+      nm <- Ap $ use modNm
       qualTyName t <> "'" <> parens (pretty nm <> "_types.fromSLV" <> parens (pretty id_))
   hdlSyn          = use hdlsyn
   setModName nm s = s {_modNm = nm}
@@ -235,7 +241,7 @@ instance Backend VHDLState where
   ifThenElseExpr _ = False
   aggressiveXOptBB = use aggressiveXOptBB_
 
-type VHDLM a = Mon (State VHDLState) a
+type VHDLM a = Ap (State VHDLState) a
 
 -- Check if the underlying type is a BitVector
 isBV :: HWType -> Bool
@@ -331,13 +337,13 @@ genVHDL nm sp seen c = do
     --
     -- TODO: Collect all type names up front, to prevent relatively costly union.
     -- TODO: Investigate whether type names / signal names collide in the first place
-    Mon $ idSeen %= Id.union seen
+    Ap $ idSeen %= Id.union seen
 
-    Mon $ setSrcSpan sp
+    Ap $ setSrcSpan sp
     v <- vhdl
-    i <- Mon $ use includes
-    Mon $ libraries .= []
-    Mon $ packages  .= []
+    i <- Ap $ use includes
+    Ap $ libraries .= []
+    Ap $ packages  .= []
     return ((TextS.unpack (Id.toText cName), v), i)
   where
     cName   = componentName c
@@ -353,7 +359,7 @@ genVHDL nm sp seen c = do
 -- | Generate a VHDL package containing type definitions for the given HWTypes
 mkTyPackage_ :: ModName -> [HWType] -> VHDLM [(String,Doc)]
 mkTyPackage_ modName (map filterTransparent -> hwtys) = do
-    { syn <- Mon hdlSyn
+    { syn <- Ap hdlSyn
     ; let usedTys     = concatMap mkUsedTys hwtys
     ; let normTys0    = nub (map mkVecZ (hwtys ++ usedTys))
     ; let sortedTys0  = topSortHWTys normTys0
@@ -469,7 +475,7 @@ typAliasDec hwty =
 
 tyDec :: HasCallStack => HWType -> VHDLM Doc
 tyDec hwty = do
-  syn <- Mon hdlSyn
+  syn <- Ap hdlSyn
   case hwty of
     -- "Proper" custom types:
     Vector _ elTy ->
@@ -570,7 +576,7 @@ funDec _ Bool = Just
     "end" <> semi <> line <>
     "function" <+> "tagToEnum" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "boolean" <+> "is" <> line <>
     "begin" <> line <>
-      indent 2 (vcat $ sequence ["if" <+> "s" <+> "=" <+> "to_signed" <> parens (int 0 <> comma <> (Mon (use intWidth) >>= int)) <+> "then"
+      indent 2 (vcat $ sequence ["if" <+> "s" <+> "=" <+> "to_signed" <> parens (int 0 <> comma <> (Ap (use intWidth) >>= int)) <+> "then"
                                 ,   indent 2 ("return" <+> "false" <> semi)
                                 ,"else"
                                 ,   indent 2 ("return" <+> "true" <> semi)
@@ -580,9 +586,9 @@ funDec _ Bool = Just
     "function" <+> "dataToTag" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "signed" <+> "is" <> line <>
     "begin" <> line <>
       indent 2 (vcat $ sequence ["if" <+> "b" <+> "then"
-                                ,  indent 2 ("return" <+> "to_signed" <> parens (int 1 <> comma <> (Mon (use intWidth) >>= int)) <> semi)
+                                ,  indent 2 ("return" <+> "to_signed" <> parens (int 1 <> comma <> (Ap (use intWidth) >>= int)) <> semi)
                                 ,"else"
-                                ,  indent 2 ("return" <+> "to_signed" <> parens (int 0 <> comma <> (Mon (use intWidth) >>= int)) <> semi)
+                                ,  indent 2 ("return" <+> "to_signed" <> parens (int 0 <> comma <> (Ap (use intWidth) >>= int)) <> semi)
                                 ,"end" <+> "if" <> semi
                                 ]) <> line <>
     "end" <> semi
@@ -768,8 +774,8 @@ funDec _ _ = Nothing
 
 tyImports :: ModName -> VHDLM Doc
 tyImports nm = do
-  libs <- Mon $ use libraries
-  packs <- Mon $ use packages
+  libs <- Ap $ use libraries
+  packs <- Ap $ use packages
   punctuate' semi $ sequence
     ([ "library IEEE"
      , "use IEEE.STD_LOGIC_1164.ALL"
@@ -817,7 +823,7 @@ port (Id.toText -> elName) hwType portDirection fillToN iEM =
 
 entity :: Component -> VHDLM Doc
 entity c = do
-    syn <- Mon hdlSyn
+    syn <- Ap hdlSyn
     rec (p,ls) <- fmap unzip (ports (maximum ls))
     "entity" <+> pretty (componentName c) <+> "is" <> line <>
       (case p of
@@ -842,7 +848,7 @@ entity c = do
 
 architecture :: Component -> VHDLM Doc
 architecture c = do {
-  ; syn <- Mon hdlSyn
+  ; syn <- Ap hdlSyn
   ; let attrs = case syn of
                   -- See: [Note] Hack entity attributes in architecture
                   Other -> declAttrs
@@ -995,7 +1001,7 @@ qualTyName (filterTransparent -> hwty) = case hwty of
 
   -- Custom types:
   _ -> do
-    modName <- Mon (use modNm)
+    modName <- Ap (use modNm)
     pretty modName <> "_types." <> tyName hwty
 
 -- | Generates a unique name for a given type. This action will cache its
@@ -1028,7 +1034,7 @@ tyName'
   -- ^ Type to name
   -> VHDLM TextS.Text
 tyName' rec0 (filterTransparent -> t) = do
-  Mon (tyCache %= HashSet.insert t)
+  Ap (tyCache %= HashSet.insert t)
   case t of
     KnownDomain {} ->
       return (error ($(curLoc) ++ "Forced to print KnownDomain tyName"))
@@ -1052,37 +1058,37 @@ tyName' rec0 (filterTransparent -> t) = do
       let nm = TextS.concat [ "array_of_"
                             , if rec0 then showt n `TextS.append` "_" else ""
                             , elTy']
-      Mon $ makeCached (t, rec0) nameCache (return nm)
+      Ap $ makeCached (t, rec0) nameCache (return nm)
     RTree n elTy  -> do
       elTy' <- tyName' True elTy
       let nm = TextS.concat [ "tree_of_"
                             , if rec0 then showt n `TextS.append` "_" else ""
                             , elTy']
-      Mon $ makeCached (t, rec0) nameCache (return nm)
+      Ap $ makeCached (t, rec0) nameCache (return nm)
     -- TODO: nice formatting for Index. I.e., 2000 = 2e3, 1024 = 2pow10
     Index n ->
       return ("index_" `TextS.append` showt n)
     Clock nm0 ->
       let nm1 = "clk_" `TextS.append` nm0 in
-      Mon $ makeCached (t, False) nameCache (userTyName "clk" nm1 t)
+      Ap $ makeCached (t, False) nameCache (userTyName "clk" nm1 t)
     Reset nm0 ->
       let nm1 = "rst_" `TextS.append` nm0 in
-      Mon $ makeCached (t, False) nameCache (userTyName "rst" nm1 t)
+      Ap $ makeCached (t, False) nameCache (userTyName "rst" nm1 t)
     Enable nm0 ->
       let nm1 = "en_" `TextS.append` nm0 in
-      Mon $ makeCached (t, False) nameCache (userTyName "en" nm1 t)
+      Ap $ makeCached (t, False) nameCache (userTyName "en" nm1 t)
     Sum nm _  ->
-      Mon $ makeCached (t, False) nameCache (userTyName "sum" nm t)
+      Ap $ makeCached (t, False) nameCache (userTyName "sum" nm t)
     CustomSum nm _ _ _ ->
-      Mon $ makeCached (t, False) nameCache (userTyName "sum" nm t)
+      Ap $ makeCached (t, False) nameCache (userTyName "sum" nm t)
     SP nm _ ->
-      Mon $ makeCached (t, False) nameCache (userTyName "sp" nm t)
+      Ap $ makeCached (t, False) nameCache (userTyName "sp" nm t)
     CustomSP nm _ _ _ ->
-      Mon $ makeCached (t, False) nameCache (userTyName "sp" nm t)
+      Ap $ makeCached (t, False) nameCache (userTyName "sp" nm t)
     Product nm _ _ ->
-      Mon $ makeCached (t, False) nameCache (userTyName "product" nm t)
+      Ap $ makeCached (t, False) nameCache (userTyName "product" nm t)
     CustomProduct nm _ _ _ _ ->
-      Mon $ makeCached (t, False) nameCache (userTyName "product" nm t)
+      Ap $ makeCached (t, False) nameCache (userTyName "product" nm t)
     Annotated _ hwTy ->
       tyName' rec0 hwTy
     BiDirectional _ hwTy ->
@@ -1184,20 +1190,20 @@ userTyName dflt nm0 hwTy = do
 -- | Convert a Netlist HWType to an error VHDL value for that type
 sizedQualTyNameErrValue :: HWType -> VHDLM Doc
 sizedQualTyNameErrValue Bool                = do
-  udf <- Mon (use undefValue)
+  udf <- Ap (use undefValue)
   case udf of
     Just (Just 0) -> "false"
     _             -> "true"
 sizedQualTyNameErrValue Bit                 = singularErrValue
 sizedQualTyNameErrValue t@(Vector n elTy)   = do
-  syn <-Mon hdlSyn
+  syn <-Ap hdlSyn
   case syn of
     Vivado -> qualTyName t <> "'" <> parens (int 0 <+> "to" <+> int (n-1) <+> rarrow <+>
                 "std_logic_vector'" <> parens (int 0 <+> "to" <+> int (typeSize elTy - 1) <+>
                  rarrow <+> singularErrValue))
     _ -> qualTyName t <> "'" <> parens (int 0 <+> "to" <+> int (n-1) <+> rarrow <+> sizedQualTyNameErrValue elTy)
 sizedQualTyNameErrValue t@(RTree n elTy)    = do
-  syn <-Mon hdlSyn
+  syn <-Ap hdlSyn
   case syn of
     Vivado -> qualTyName t <> "'" <>  parens (int 0 <+> "to" <+> int (2^n - 1) <+> rarrow <+>
                 "std_logic_vector'" <> parens (int 0 <+> "to" <+> int (typeSize elTy - 1) <+>
@@ -1216,7 +1222,7 @@ sizedQualTyNameErrValue t =
 
 singularErrValue :: VHDLM Doc
 singularErrValue = do
-  udf <- Mon (use undefValue)
+  udf <- Ap (use undefValue)
   case udf of
     Nothing       -> "'-'"
     Just Nothing  -> "'0'"
@@ -1393,7 +1399,7 @@ inst_ (CondAssignment id_ _sig scrut scrutTy es) = fmap Just $
     conds ((Just c ,e):es') = expr_ False e <+> "when" <+> patLit scrutTy c <:> conds es'
 
 inst_ (InstDecl entOrComp libM _ nm lbl gens pms0) = do
-    maybe (return ()) (\lib -> Mon (libraries %= (T.fromStrict lib:))) libM
+    maybe (return ()) (\lib -> Ap (libraries %= (T.fromStrict lib:))) libM
     fmap Just $
       nest 2 $ pretty lbl <+> colon <> entOrComp'
                 <+> maybe emptyDoc ((<> ".") . pretty) libM <> pretty nm <> line <> gms <> pms2 <> semi
@@ -1416,7 +1422,7 @@ inst_ (InstDecl entOrComp libM _ nm lbl gens pms0) = do
     entOrComp' = case entOrComp of { Entity -> " entity"; Comp -> " component"; Empty -> ""}
 
 inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
-  fmap Just (Mon (column (renderBlackBox libs imps inc bs bbCtx)))
+  fmap Just (Ap (column (renderBlackBox libs imps inc bs bbCtx)))
 
 inst_ _ = return Nothing
 
@@ -1484,7 +1490,7 @@ expr_ _ (Literal sizeM lit) = exprLit sizeM lit
 expr_ _ (Identifier id_ Nothing) = pretty id_
 
 expr_ _ (Identifier id_ (Just m)) = do
-  syn <- Mon hdlSyn
+  syn <- Ap hdlSyn
   maybe (pretty id_) (foldr renderModifier (pretty id_)) (buildModifier syn [] m)
 
 expr_ b (DataCon _ (DC (Void {}, -1)) [e]) =  expr_ b e
@@ -1492,12 +1498,12 @@ expr_ b (DataCon _ (DC (Void {}, -1)) [e]) =  expr_ b e
 expr_ _ (DataCon ty@(Vector 0 _) _ _) = sizedQualTyNameErrValue ty
 
 expr_ _ (DataCon ty@(Vector 1 elTy) _ [e])       = do
-  syn <- Mon hdlSyn
+  syn <- Ap hdlSyn
   case syn of
     Vivado -> qualTyName ty <> "'" <> parens (int 0 <+> rarrow <+> toSLV elTy e)
     _ -> qualTyName ty <> "'" <> parens (int 0 <+> rarrow <+> expr_ False e)
 expr_ _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2]) = do
-  syn <- Mon hdlSyn
+  syn <- Ap hdlSyn
   case syn of
     Vivado -> qualTyName ty <> "'" <> case vectorChain e of
       Just es -> align (tupled (mapM (toSLV elTy) es))
@@ -1507,7 +1513,7 @@ expr_ _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2]) = do
             Nothing -> parens (qualTyName elTy <> "'" <> parens (expr_ False e1) <+> "&" <+> expr_ False e2)
 
 expr_ _ (DataCon ty@(RTree 0 elTy) _ [e]) = do
-  syn <- Mon hdlSyn
+  syn <- Ap hdlSyn
   case syn of
     Vivado -> qualTyName ty <> "'" <> parens (int 0 <+> rarrow <+> toSLV elTy e)
     _ -> qualTyName ty <> "'" <> parens (int 0 <+> rarrow <+> expr_ False e)
@@ -1592,17 +1598,17 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "GHC.Types.I#"
   , [Literal _ (NumLit n)] <- extractLiterals bbCtx
-  = do iw <- Mon $ use intWidth
+  = do iw <- Ap $ use intWidth
        exprLit (Just (Signed iw,iw)) (NumLit n)
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "GHC.Types.W#"
   , [Literal _ (NumLit n)] <- extractLiterals bbCtx
-  = do iw <- Mon $ use intWidth
+  = do iw <- Ap $ use intWidth
        exprLit (Just (Unsigned iw,iw)) (NumLit n)
 
 expr_ b (BlackBoxE _ libs imps inc bs bbCtx b') = do
-  parenIf (b || b') (Mon (renderBlackBox libs imps inc bs bbCtx <*> pure 0))
+  parenIf (b || b') (Ap (renderBlackBox libs imps inc bs bbCtx <*> pure 0))
 
 expr_ _ (DataTag Bool (Left id_)) = "tagToEnum" <> parens (pretty id_)
 expr_ _ (DataTag Bool (Right id_)) = "dataToTag" <> parens (pretty id_)
@@ -1610,14 +1616,14 @@ expr_ _ (DataTag Bool (Right id_)) = "dataToTag" <> parens (pretty id_)
 expr_ _ (DataTag hty@(Sum _ _) (Left id_)) =
   "std_logic_vector" <> parens ("resize" <> parens ("unsigned" <> parens ("std_logic_vector" <> parens (pretty id_)) <> "," <> int (typeSize hty)))
 expr_ _ (DataTag (Sum _ _) (Right id_)) = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   "signed" <> parens ("std_logic_vector" <> parens ("resize" <> parens ("unsigned" <> parens (pretty id_) <> "," <> int iw)))
 
 expr_ _ (DataTag (Product {}) (Right _))  = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   "to_signed" <> parens (int 0 <> "," <> int iw)
 expr_ _ (DataTag hty@(SP _ _) (Right id_)) = do {
-    ; iw <- Mon $ use intWidth
+    ; iw <- Ap $ use intWidth
     ; "signed" <> parens ("std_logic_vector" <> parens (
       "resize" <> parens ("unsigned" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int end))
                           <> "," <> int iw)))
@@ -1627,28 +1633,28 @@ expr_ _ (DataTag hty@(SP _ _) (Right id_)) = do {
     end   = typeSize hty - conSize hty
 
 expr_ _ (DataTag (Vector 0 _) (Right _)) = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   "to_signed" <> parens (int 0 <> "," <> int iw)
 expr_ _ (DataTag (Vector _ _) (Right _)) = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   "to_signed" <> parens (int 1 <> "," <> int iw)
 
 expr_ _ (DataTag (RTree 0 _) (Right _)) = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   "to_signed" <> parens (int 0 <> "," <> int iw)
 expr_ _ (DataTag (RTree _ _) (Right _)) = do
-  iw <- Mon $ use intWidth
+  iw <- Ap $ use intWidth
   "to_signed" <> parens (int 1 <> "," <> int iw)
 
 expr_ _ (ToBv topM hwty e) = do
-  nm <- Mon $ use modNm
+  nm <- Ap $ use modNm
   case topM of
     Nothing -> pretty nm <> "_types" <> dot <> "toSLV" <>
                parens (qualTyName hwty <> "'" <> parens (expr_ False e))
     Just t  -> pretty t <> dot <> pretty t <> "_types" <> dot <> "toSLV" <> parens (expr_ False e)
 
 expr_ _ (FromBv topM _ e) = do
-  nm <- Mon $ use modNm
+  nm <- Ap $ use modNm
   maybe (pretty nm <> "_types" ) (\t -> pretty t <> dot <> pretty t <> "_types") topM <> dot <>
     "fromSLV" <> parens (expr_ False e)
 
@@ -1752,7 +1758,7 @@ bit_char :: Bit -> VHDLM Doc
 bit_char H = char '1'
 bit_char L = char '0'
 bit_char U = do
-  udf <- Mon (use undefValue)
+  udf <- Ap (use undefValue)
   case udf of
     Nothing -> char '-'
     Just Nothing -> char '0'
@@ -1761,19 +1767,19 @@ bit_char Z = char 'Z'
 
 toSLV :: HasCallStack => HWType -> Expr -> VHDLM Doc
 toSLV Bool         e = do
-  nm <- Mon $ use modNm
+  nm <- Ap $ use modNm
   pretty nm <> "_types.toSLV" <> parens (expr_ False e)
 toSLV Bit          e = do
-  nm <- Mon $ use modNm
+  nm <- Ap $ use modNm
   pretty nm <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (Clock {})    e = do
-  nm <- Mon $ use modNm
+  nm <- Ap $ use modNm
   pretty nm <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (Reset {})    e = do
-  nm <- Mon $ use modNm
+  nm <- Ap $ use modNm
   pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (Enable _)    e = do
-  nm <- Mon $ use modNm
+  nm <- Ap $ use modNm
   pretty nm <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (BitVector _) e = expr_ True e
 toSLV (Signed _)   e = "std_logic_vector" <> parens (expr_ False e)
@@ -1800,7 +1806,7 @@ toSLV (CustomProduct _ _ _ _ _) e = do
   -- need to do anything.
   expr_ False e
 toSLV t@(Product _ _ _) e = do
-  nm <- Mon $ use modNm
+  nm <- Ap $ use modNm
   pretty nm <> "_types.toSLV" <> parens (qualTyName t <> "'" <> parens (expr_ False e))
 toSLV (SP _ _) e       = expr_ False e
 toSLV (CustomSP _ _ _ _) e =
@@ -1809,7 +1815,7 @@ toSLV (CustomSP _ _ _ _) e =
   expr_ False e
 toSLV (Vector n elTy) (Identifier id_ Nothing) = do
     selIds' <- sequence selIds
-    syn <- Mon hdlSyn
+    syn <- Ap hdlSyn
     parens (vcat $ punctuate " & "
       (case syn of
         Vivado -> mapM (expr_ False) selIds'
@@ -1819,15 +1825,15 @@ toSLV (Vector n elTy) (Identifier id_ Nothing) = do
     selIds   = map (fmap (`Identifier` Nothing)) selNames
 -- Don't split up newtype wrappers, or void-filtered types
 toSLV (Vector _ _) e@(DataCon _ (DC (Void Nothing, -1)) _) = do
-  nm <- Mon $ use modNm
+  nm <- Ap $ use modNm
   pretty nm <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (Vector n elTy) (DataCon _ _ es) =
   "std_logic_vector'" <> (parens $ vcat $ punctuate " & " (zipWithM toSLV [elTy,Vector (n-1) elTy] es))
 toSLV (Vector _ _) e = do
-  nm <- Mon $ use modNm
+  nm <- Ap $ use modNm
   pretty nm <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (RTree _ _) e = do
-  nm <- Mon (use modNm)
+  nm <- Ap (use modNm)
   pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV hty e = error $ $(curLoc) ++  "toSLV:\n\nType: " ++ show hty ++ "\n\nExpression: " ++ show e
 
@@ -1840,11 +1846,11 @@ larrow = "<="
 rarrow :: VHDLM Doc
 rarrow = "=>"
 
-parenIf :: Monad m => Bool -> Mon m Doc -> Mon m Doc
+parenIf :: Monad m => Bool -> Ap m Doc -> Ap m Doc
 parenIf True  = parens
 parenIf False = id
 
-punctuate' :: Monad m => Mon m Doc -> Mon m [Doc] -> Mon m Doc
+punctuate' :: Monad m => Ap m Doc -> Ap m [Doc] -> Ap m Doc
 punctuate' s d = vcat (punctuate s d) <> s
 
 encodingNote :: HWType -> VHDLM Doc
@@ -2182,26 +2188,26 @@ renderModifier (Slice start end,_) doc = doc <> parens (int start <+> "to" <+> i
 renderModifier (Select sel,_) doc = doc <> sel
 -- See [Note] integer projection
 renderModifier (Resize,ty) doc = do
-  iw <- Mon (use intWidth)
+  iw <- Ap (use intWidth)
   -- These integer projections always come last, so it's safe not to return a
   -- modified name, but an expression instead.
   traceIf (iw < typeSize ty) ($(curLoc) ++ "WARNING: result smaller than argument") $
     "resize" <> parens (doc <> "," <> int iw)
 renderModifier (ResizeAndConvert,ty) doc = do
-  iw <- Mon (use intWidth)
+  iw <- Ap (use intWidth)
   -- These natural projections always come last, so it's safe not to return a
   -- modified name, but an expression instead.
   traceIf (iw < typeSize ty) ($(curLoc) ++ "WARNING: result smaller than argument") $
     "resize" <> parens ("unsigned" <> parens doc <> "," <> int iw)
 -- See [Note] mask projection
 renderModifier (DontCare,_) _ = do
-  iw <- Mon (use intWidth)
+  iw <- Ap (use intWidth)
   -- These mask projections always come last, so it's safe not to return a
   -- modified name, but an expression instead.
   traceIf True ($(curLoc) ++ "WARNING: rendering bitvector mask as dontcare") $
     sizedQualTyNameErrValue (Unsigned iw)
 renderModifier (Range r,t) doc = do
-  nm <- Mon (use modNm)
+  nm <- Ap (use modNm)
   let doc1 = case r of
         Contiguous start end -> slice start end
         Split rs -> parens (hcat (punctuate " & " (mapM (\(s,e,_) -> slice s e) rs)))

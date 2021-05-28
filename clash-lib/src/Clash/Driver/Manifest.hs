@@ -26,6 +26,7 @@ import           Data.Hashable (hash)
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import           Data.Maybe (catMaybes)
+import           Data.Monoid (Ap(getAp))
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import qualified Data.Text.Lazy as LText
@@ -34,7 +35,6 @@ import           Data.Text (Text)
 import           Data.Text.Prettyprint.Doc.Extra (renderOneLine)
 import           Data.Time (UTCTime)
 import qualified Data.Set as Set
-import           Data.Semigroup.Monad (getMon)
 import           Data.String (IsString)
 import           System.IO.Error (isDoesNotExistError)
 import           System.FilePath (takeDirectory, (</>))
@@ -242,7 +242,7 @@ mkManifestPort backend portId portType = ManifestPort{..}
   mpWidth = typeSize portType
   mpIsClock = case portType of {Clock _ -> True; _ -> False}
   mpDomain = hwTypeDomain portType
-  mpTypeName = flip evalState backend $ getMon $ do
+  mpTypeName = flip evalState backend $ getAp $ do
      LText.toStrict . renderOneLine <$> hdlType (External mpName) portType
 
 -- | Filename manifest file should be written to and read from

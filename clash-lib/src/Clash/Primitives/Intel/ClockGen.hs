@@ -1,7 +1,8 @@
 {-|
-  Copyright   :  (C) 2018, Google Inc.
+  Copyright   :  (C) 2018, Google Inc.,
+                     2021, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Blackbox template functions for Clash.Intel.ClockGen.{alteraPll,altpll}
 -}
@@ -19,8 +20,7 @@ import Clash.Netlist.Types
 import Clash.Netlist.Util
 
 import Control.Monad.State
-
-import Data.Semigroup.Monad
+import Data.Monoid (Ap(getAp))
 import qualified Data.String.Interpolate.IsString as I
 import Data.Text.Prettyprint.Doc.Extra
 import TextShow (showt)
@@ -88,7 +88,7 @@ alteraPllTemplate bbCtx = do
 
  let outclkPorts = map (\n -> instPort ("outclk_" <> showt n)) [(0 :: Int)..length clocks-1]
 
- getMon $ blockDecl alteraPll $ concat
+ getAp $ blockDecl alteraPll $ concat
   [[ NetDecl Nothing locked  rstTy
    , NetDecl' Nothing Reg pllLock (Right Bool) Nothing]
   ,[ NetDecl Nothing clkNm ty | (clkNm,ty) <- zip clocks tys]
@@ -127,7 +127,7 @@ altpllTemplate bbCtx = do
  -- TODO: bbQsysIncName into account when generating fresh ids
  let compName = Id.unsafeMake (head (bbQsysIncName bbCtx))
 
- getMon $ blockDecl alteraPll
+ getAp $ blockDecl alteraPll
   [ NetDecl Nothing locked  Bit
   , NetDecl' Nothing Reg pllLock (Right Bool) Nothing
   , NetDecl Nothing pllOut clkOutTy

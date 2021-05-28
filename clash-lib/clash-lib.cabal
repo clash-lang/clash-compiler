@@ -170,8 +170,11 @@ Library
                       prettyprinter           >= 1.2.0.1  && < 2.0,
                       pretty-show             >= 1.9      && < 2.0,
                       primitive               >= 0.5.0.1  && < 1.0,
+<<<<<<< HEAD
                       process                 >= 1.1.0.2  && < 1.7,
                       reducers                >= 3.12.2   && < 4.0,
+=======
+>>>>>>> b8586de7 (Remove reducers from clash-lib)
                       template-haskell        >= 2.8.0.0  && < 2.18,
                       temporary               >= 1.2.1    && < 1.4,
                       terminal-size           >= 0.3      && < 0.4,
@@ -283,8 +286,8 @@ Library
                       Data.Aeson.Extra
                       Data.List.Extra
                       Data.Map.Ordered.Extra
+                      Data.Monoid.Extra
                       Data.Primitive.ByteArray.Extra
-                      Data.Semigroup.Monad.Extra
                       Data.Set.Ordered.Extra
                       GHC.BasicTypes.Extra
                       GHC.SrcLoc.Extra

@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd,
                     2017-2018, Google Inc.
-                    2020     , QBayLogic
+                    2020-2021, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -54,12 +54,12 @@ import qualified Data.List                  as List
 import Data.IntMap                          (IntMap, empty)
 import Data.Map.Ordered                     (OMap)
 import Data.Maybe                           (mapMaybe)
+import Data.Monoid                          (Ap(..))
 import qualified Data.Set                   as Set
 import Data.Text                            (Text)
 
 import Data.Typeable                        (Typeable)
 import Data.Text.Prettyprint.Doc.Extra      (Doc)
-import Data.Semigroup.Monad                 (Mon(..))
 import GHC.Generics                         (Generic)
 import GHC.Stack
 import Language.Haskell.TH.Syntax           (Lift)
@@ -855,5 +855,5 @@ instance HasIdentifierSet s => IdentifierSetMonad (Lazy.State s) where
     Lens.use identifierSet
   {-# INLINE identifierSetM #-}
 
-instance IdentifierSetMonad m => IdentifierSetMonad (Mon m) where
-  identifierSetM = Mon . identifierSetM
+instance IdentifierSetMonad m => IdentifierSetMonad (Ap m) where
+  identifierSetM = Ap . identifierSetM

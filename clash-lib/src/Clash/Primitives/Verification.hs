@@ -8,9 +8,9 @@ import Data.Either
 
 import qualified Control.Lens                    as Lens
 import           Control.Monad.State             (State)
+import           Data.Monoid                     (Ap(getAp))
 import           Data.Text.Prettyprint.Doc.Extra (Doc)
 import qualified Data.Text                       as Text
-import           Data.Semigroup.Monad            (getMon)
 import           GHC.Stack                       (HasCallStack)
 
 import           Clash.Annotations.Primitive     (HDL(..))
@@ -106,7 +106,7 @@ checkTF'
   -> State s Doc
 checkTF' decls clkId propName renderAs prop bbCtx = do
   blockName <- Id.makeBasic (propName <> "_block")
-  getMon (blockDecl blockName (TickDecl renderedPslProperty : decls))
+  getAp (blockDecl blockName (TickDecl renderedPslProperty : decls))
 
  where
   hdl = hdlKind (undefined :: s)

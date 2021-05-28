@@ -2,7 +2,7 @@
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017     , QBayLogic, Google Inc.
-                     2020       QBayLogic
+                     2020-2021, QBayLogic
 
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -49,7 +49,7 @@ import           Data.List                        (intercalate)
 import           Data.Maybe                       (fromMaybe, maybeToList, mapMaybe)
 import qualified Data.Map.Ordered                 as OMap
 import           Data.Map.Ordered.Extra           ()
-import           Data.Semigroup.Monad
+import           Data.Monoid                      (Ap(..))
 import qualified Data.Text
 import           Data.Text.Lazy                   (Text)
 import qualified Data.Text.Lazy                   as Text
@@ -707,17 +707,17 @@ createHDL
   -> ([(String,Doc)],[(String,FilePath)],[(String,String)])
   -- ^ The pretty-printed HDL documents
   -- + The data files that need to be copied
-createHDL backend modName seen components domainConfs top topName = flip evalState backend $ getMon $ do
+createHDL backend modName seen components domainConfs top topName = flip evalState backend $ getAp $ do
   let componentsL = map snd (OMap.assocs components)
   (hdlNmDocs,incs) <-
     fmap unzip $
       forM componentsL $ \(ComponentMeta{cmLoc, cmScope}, comp) ->
          genHDL modName cmLoc (Id.union seen cmScope) comp
 
-  hwtys <- HashSet.toList <$> extractTypes <$> Mon get
+  hwtys <- HashSet.toList <$> extractTypes <$> Ap get
   typesPkg <- mkTyPackage modName hwtys
-  dataFiles <- Mon getDataFiles
-  memFiles  <- Mon getMemoryDataFiles
+  dataFiles <- Ap getDataFiles
+  memFiles  <- Ap getMemoryDataFiles
   let
     hdl = map (first (<.> Clash.Backend.extension backend)) (typesPkg ++ hdlNmDocs)
     qincs = concat incs
