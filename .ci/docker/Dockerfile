@@ -5,6 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH=/opt/bin:/ro
 ARG DEPS_GHC="curl libc6-dev libgmp-dev pkg-config libnuma-dev"
 ARG DEPS_CABAL="zlib1g-dev"
 ARG DEPS_GHDL="clang gcc gnat llvm-9-dev"
+ARG DEPS_SYMBIYOSYS="tclsh git python python3 build-essential bison flex libreadline-dev gawk tcl-dev libffi-dev autoconf cmake"
 ARG DEPS_CLASH="libtinfo-dev libtinfo5"
 ARG DEPS_CLASH_COSIM="make"
 
@@ -14,6 +15,7 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends --no-install-suggests \
       $DEPS_GHC $DEPS_CABAL \
       $DEPS_GHDL $DEPS_IVERILOG \
+      $DEPS_SYMBIYOSYS \
       $DEPS_CLASH $DEPS_CLASH_COSIM \
       ca-certificates iverilog pixz jq zstd \
       git ssh \
@@ -28,6 +30,34 @@ RUN apt-get update \
  && make install \
  && cd .. \
  && rm -rf ghdl-0.37
+
+ARG YOSYS_VERSION="yosys-0.9"
+RUN curl -L "https://github.com/YosysHQ/yosys/archive/refs/tags/$YOSYS_VERSION.tar.gz" \
+      | tar -xz \
+ && cd yosys-$YOSYS_VERSION \
+ && make -j$(nproc) \
+ && make install \
+ && cd .. \
+ && rm -Rf yosys-$YOSYS_VERSION
+
+ARG Z3_VERSION="z3-4.8.10"
+RUN curl -L "https://github.com/Z3Prover/z3/archive/refs/tags/$Z3_VERSION.tar.gz" \
+      | tar -xz \
+ && cd z3-$Z3_VERSION \
+ && python scripts/mk_make.py \
+ && cd build \
+ && make -j$(nproc) \
+ && make install \
+ && cd ../.. \
+ && rm -Rf z3-$Z3_VERSION
+
+ARG SYMBIYOSYS_VERSION="66a458958dc93f8e12418d425e4c31848889937b"
+RUN git clone https://github.com/cliffordwolf/SymbiYosys.git SymbiYosys \
+ && cd SymbiYosys \
+ && git checkout $SYMBIYOSYS_VERSION \
+ && make install \
+ && cd .. \
+ && rm -Rf SymbiYosys
 
 ARG GHCUP_VERSION="0.1.14"
 ARG GHCUP_URL="https://downloads.haskell.org/~ghcup/${GHCUP_VERSION}/x86_64-linux-ghcup-${GHCUP_VERSION}"
