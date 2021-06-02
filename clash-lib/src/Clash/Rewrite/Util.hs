@@ -162,9 +162,8 @@ apply = \s rewrite ctx expr0 -> do
       isRelevantTrans = s `Set.member` dbgTranss || Set.null dbgTranss
   traceIf (isTryLvl && isRelevantTrans) ("Trying: " ++ s) (pure ())
 
-  (expr1,anyChanged) <- Writer.listen (rewrite ctx expr0)
+  (!expr1,anyChanged) <- Writer.listen (rewrite ctx expr0)
   let hasChanged = Monoid.getAny anyChanged
-      !expr2     = if hasChanged then expr1 else expr0
   Monad.when hasChanged (transformCounter += 1)
 
   -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
@@ -191,8 +190,8 @@ apply = \s rewrite ctx expr0 -> do
         else Just (dbgFrom, dbgLimit)
 
   if lvl == DebugNone
-    then return expr2
-    else applyDebug lvl dbgTranss fromLimit s expr0 hasChanged expr2
+    then return expr1
+    else applyDebug lvl dbgTranss fromLimit s expr0 hasChanged expr1
 {-# INLINE apply #-}
 
 applyDebug
