@@ -31,14 +31,13 @@ RUN apt-get update \
  && cd .. \
  && rm -rf ghdl-0.37
 
-ARG YOSYS_VERSION="yosys-0.9"
-RUN curl -L "https://github.com/YosysHQ/yosys/archive/refs/tags/$YOSYS_VERSION.tar.gz" \
-      | tar -xz \
- && cd yosys-$YOSYS_VERSION \
+ARG YOSYS_VERSION="8cfed1a97957e4c096d1e0a0304d978bcb27e116"
+RUN git clone https://github.com/YosysHQ/yosys.git yosys \
+ && cd yosys \
  && make -j$(nproc) \
  && make install \
  && cd .. \
- && rm -Rf yosys-$YOSYS_VERSION
+ && rm -Rf yosys
 
 ARG Z3_VERSION="z3-4.8.10"
 RUN curl -L "https://github.com/Z3Prover/z3/archive/refs/tags/$Z3_VERSION.tar.gz" \
