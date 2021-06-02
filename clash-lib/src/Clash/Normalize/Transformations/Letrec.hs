@@ -70,7 +70,7 @@ import Clash.Primitives.Types (Primitive(..), UsedArguments(..))
 import Clash.Rewrite.Types
   (TransformContext(..), bindings, curFun, extra, tcCache, workFreeBinders)
 import Clash.Rewrite.Util
-  (changed, isFromInt, isUntranslatable, mkTmBinderFor, removeUnusedBinders)
+  (changed, isFromInt, isUntranslatable, mkTmBinderFor, removeUnusedBinders, setChanged)
 import Clash.Rewrite.WorkFree
 import Clash.Unique (lookupUniqMap)
 
@@ -176,6 +176,14 @@ removeUnusedExpr _ e = return e
 --
 -- NB: must only be called in the cleaning up phase.
 flattenLet :: HasCallStack => NormRewrite
+flattenLet ctx@(TransformContext is0 _) (Letrec binds0 body0@Letrec{}) = do
+  -- deshadow binds1, so binds0 and binds1 don't conflict when merged
+  let is1 = extendInScopeSetList is0 (fmap fst binds0)
+      Letrec binds1 body1 = deShadowTerm is1 body0
+
+  setChanged
+  flattenLet ctx{tfInScope=is1} (Letrec (binds0 <> binds1) body1)
+
 flattenLet (TransformContext is0 _) (Letrec binds body) = do
   let is1 = extendInScopeSetList is0 (map fst binds)
       bodyOccs = Lens.foldMapByOf
