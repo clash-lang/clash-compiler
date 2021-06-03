@@ -1,7 +1,8 @@
 {-|
-  Copyright   :  (C) 2018, Google Inc.
+  Copyright   :  (C) 2018, Google Inc.,
+                     2021, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   API for synthesis attributes (sometimes refered to as "synthesis directives",
   "pragmas", or "logic synthesis directives"). This is an experimental feature,
@@ -67,7 +68,29 @@ type Annotate (a :: Type) (attrs :: k) = a
 -- For VHDL, see:
 --     <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vhdl/vhdl_file_dir.htm>
 --
--- Warning: This is an experimental feature, please report any unexpected or broken
+-- = Warnings
+--
+-- When using annotations, it is important that annotated arguments are not
+-- eta-reduced, as this may result in the annotation being stripped by GHC. For
+-- example
+--
+-- @
+-- f :: Signal System Bool \`Annotate\` 'StringAttr \"chip_pin\" \"C4\"
+--   -> Signal System Bool
+-- f x = id x -- Using a lambda, i.e. f = \x -> id x also works
+-- @
+--
+-- will reliably show the annotation in the generated HDL, but
+--
+-- @
+-- g :: Signal System Bool \`Annotate\` 'StringAttr \"chip_pin\" \"C4\"
+--   -> Signal System Bool
+-- g = id
+-- @
+--
+-- will not work.
+--
+-- This is an experimental feature, please report any unexpected or broken
 -- behavior to Clash's GitHub page (<https://github.com/clash-lang/clash-compiler/issues>).
 data Attr
   = BoolAttr Symbol Bool
