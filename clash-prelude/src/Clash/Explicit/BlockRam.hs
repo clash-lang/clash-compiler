@@ -1,9 +1,10 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2017, Myrtle Software Ltd,
-                  2017     , Google Inc.
+                  2017     , Google Inc.,
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 BlockRAM primitives
 
@@ -422,7 +423,7 @@ import           Clash.Sized.Index      (Index)
 import           Clash.Sized.Vector     (Vec, replicate, toList, iterateI)
 import qualified Clash.Sized.Vector     as CV
 import           Clash.XException
-  (maybeIsX, seqX, NFDataX, deepErrorX, defaultSeqX, fromJustX, undefined)
+  (maybeIsX, seqErrorX, NFDataX, deepErrorX, defaultSeqX, fromJustX, undefined)
 
 {- $setup
 >>> :m -Clash.Prelude
@@ -1002,7 +1003,7 @@ blockRam# (Clock _) gen content rd wen =
   go !ram o ret@(~(re :- res)) rt@(~(r :- rs)) et@(~(e :- en)) wt@(~(w :- wr)) dt@(~(d :- din)) =
     let ram' = d `defaultSeqX` upd ram e (fromEnum w) d
         o'   = if re then ram `Seq.index` r else o
-    in  o `seqX` o :- (ret `seq` rt `seq` et `seq` wt `seq` dt `seq` go ram' o' res rs en wr din)
+    in  o `seqErrorX` o :- (ret `seq` rt `seq` et `seq` wt `seq` dt `seq` go ram' o' res rs en wr din)
 
   upd ram we waddr d = case maybeIsX we of
     Nothing -> case maybeIsX waddr of

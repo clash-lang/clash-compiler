@@ -1,9 +1,10 @@
 {-|
 Copyright  :  (C) 2016,      University of Twente,
                   2017,      QBayLogic, Google Inc.
-                  2017-2019, Myrtle Software Ltd
+                  2017-2019, Myrtle Software Ltd,
+                  2021,      QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 'XException': An exception for uninitialized values
 
@@ -34,7 +35,7 @@ module Clash.XException
     -- * Printing 'XException's as @undefined@
   , ShowX (..), showsX, printX, showsPrecXWith
     -- * Strict evaluation
-  , seqX, forceX, deepseqX, rwhnfX, defaultSeqX, hwSeqX
+  , seqX, seqErrorX, forceX, deepseqX, rwhnfX, defaultSeqX, hwSeqX
     -- * Structured undefined / deep evaluation with undefined values
   , NFDataX (rnfX, deepErrorX, hasUndefined, ensureSpine)
   )
@@ -47,7 +48,7 @@ import           Clash.CPP           (maxTupleSize, fSuperStrict)
 import           Clash.XException.Internal
 import           Clash.XException.TH
 import           Control.Exception
-  (ErrorCall (..), catch, evaluate, throw)
+  (ErrorCall (..), Handler(..), catch, catches, evaluate, throw)
 import           Control.DeepSeq     (NFData, rnf)
 import           Data.Complex        (Complex)
 import           Data.Either         (isLeft)
@@ -212,6 +213,22 @@ seqX a b = unsafeDupablePerformIO
   (catch (evaluate a >> return b) (\(XException _) -> return b))
 {-# NOINLINE seqX #-}
 infixr 0 `seqX`
+
+-- | Like 'seqX', but will also catch ErrorCall exceptions which are thrown.
+-- This should be used with care.
+--
+-- > seqErrorX (ErrorCall msg)  b = b
+-- > seqErrorX (XException msg) b = b
+-- > seqErrorX _|_              b = _|_
+seqErrorX :: a -> b -> b
+seqErrorX a b = unsafeDupablePerformIO
+  ((evaluate a >> return b) `catches`
+     [ Handler (\(XException _) -> return b)
+     , Handler (\(ErrorCall _) -> return b)
+     ])
+{-# NOINLINE seqErrorX #-}
+{-# ANN seqErrorX hasBlackBox #-}
+infixr 0 `seqErrorX`
 
 -- | Like 'seqX' in simulation, but will force its first argument to be rendered
 -- in HDL. This is useful for components that need to be rendered in hardware,

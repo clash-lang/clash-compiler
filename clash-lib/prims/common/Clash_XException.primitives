@@ -7,6 +7,14 @@
     }
   }
 , { "BlackBox" :
+    { "name"      : "Clash.XException.seqErrorX"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      : "seqErrorX :: a -> b -> b"
+    , "template"  : "~ARG[1]"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "Clash.XException.errorX"
     , "workInfo"  : "Constant"
     , "kind"      : "Expression"
