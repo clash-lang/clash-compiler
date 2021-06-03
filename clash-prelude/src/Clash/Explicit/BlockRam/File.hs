@@ -1,9 +1,10 @@
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
-                  2017     , Google Inc.
-                  2019     , Myrtle Software Ltd
+                  2017     , Google Inc.,
+                  2019     , Myrtle Software Ltd,
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 = Initializing a BlockRAM with a data file #usingramfiles#
 
@@ -29,6 +30,12 @@ For example, a data file @memory.bin@ containing the 9-bit unsigned number
 000001011
 000001100
 000001101
+@
+
+Such a file can be produced with 'memFile':
+
+@
+writeFile "memory.bin" (memFile Nothing [7 :: Unsigned 9 .. 13])
 @
 
 We can instantiate a BlockRAM using the content of the above file like so:
@@ -87,12 +94,15 @@ module Clash.Explicit.BlockRam.File
   ( -- * BlockRAM synchronized to an arbitrary clock
     blockRamFile
   , blockRamFilePow2
+    -- * Producing files
+  , memFile
     -- * Internal
   , blockRamFile#
   , initMem
   )
 where
 
+import Data.Bits             ((.&.), (.|.), shiftL, xor)
 import Data.Char             (digitToInt)
 import Data.Maybe            (isJust, listToMaybe)
 import qualified Data.Sequence as Seq
@@ -101,13 +111,17 @@ import GHC.TypeLits          (KnownNat)
 import Numeric               (readInt)
 import System.IO.Unsafe      (unsafePerformIO)
 
-import Clash.Promoted.Nat    (SNat (..), pow2SNat)
-import Clash.Sized.BitVector (BitVector)
+import Clash.Class.BitPack   (BitPack, BitSize, pack)
+import Clash.Promoted.Nat    (SNat (..), pow2SNat, natToNum)
+import Clash.Sized.Internal.BitVector (Bit(..), BitVector(..))
 import Clash.Signal.Internal
   (Clock(..), Signal (..), Enable, KnownDomain, fromEnable, (.&&.))
 import Clash.Signal.Bundle   (unbundle)
 import Clash.Sized.Unsigned  (Unsigned)
 import Clash.XException      (errorX, maybeIsX, seqX, fromJustX)
+
+-- $setup
+-- >>> import Clash.Prelude.BlockRam.File
 
 
 -- | Create a blockRAM with space for 2^@n@ elements
@@ -134,8 +148,9 @@ import Clash.XException      (errorX, maybeIsX, seqX, fromJustX)
 -- * Use the adapter 'Clash.Explicit.BlockRam.readNew' for obtaining write-before-read semantics like this: @'Clash.Explicit.BlockRam.readNew' clk rst en (blockRamFilePow2' clk en file) rd wrM@.
 -- * See "Clash.Explicit.BlockRam.File#usingramfiles" for more information on how
 -- to instantiate a Block RAM with the contents of a data file.
--- * See "Clash.Explicit.Fixed#creatingdatafiles" for ideas on how to create your
--- own data files.
+-- * See 'memFile' for creating a data file with Clash.
+-- * See "Clash.Explicit.Fixed#creatingdatafiles" for more ideas on how to
+-- create your own data files.
 blockRamFilePow2
   :: forall dom n m
    . (KnownDomain dom, KnownNat m, KnownNat n, HasCallStack)
@@ -179,8 +194,9 @@ blockRamFilePow2 = \clk en file rd wrM -> withFrozenCallStack
 -- * Use the adapter 'Clash.Explicit.BlockRam.readNew' for obtaining write-before-read semantics like this: @'Clash.Explicit.BlockRam.readNew' clk rst en ('blockRamFile' clk en size file) rd wrM@.
 -- * See "Clash.Explicit.BlockRam.File#usingramfiles" for more information on how
 -- to instantiate a Block RAM with the contents of a data file.
--- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
--- own data files.
+-- * See 'memFile' for creating a data file with Clash.
+-- * See "Clash.Sized.Fixed#creatingdatafiles" for more ideas on how to create
+-- your own data files.
 blockRamFile
   :: (KnownDomain dom, KnownNat m, Enum addr, HasCallStack)
   => Clock dom
@@ -204,6 +220,80 @@ blockRamFile = \clk gen sz file rd wrM ->
   in  withFrozenCallStack
       (blockRamFile# clk gen sz file (fromEnum <$> rd) en (fromEnum <$> wr) din)
 {-# INLINE blockRamFile #-}
+
+-- | Convert data to the String contents of a memory file.
+--
+-- * __NB:__ Not synthesizable
+-- * The following document the several ways to instantiate components with
+-- files:
+--
+--     * "Clash.Prelude.BlockRam.File#usingramfiles"
+--     * "Clash.Prelude.ROM.File#usingromfiles"
+--     * "Clash.Explicit.BlockRam.File#usingramfiles"
+--     * "Clash.Explicit.ROM.File#usingromfiles"
+--
+-- * See "Clash.Sized.Fixed#creatingdatafiles" for more ideas on how to create
+-- your own data files.
+--
+-- = Example
+--
+-- The @Maybe@ datatype has don't care bits, where the actual value does not
+-- matter. But the bits need a defined value in the memory. Either 0 or 1 can be
+-- used, and both are valid representations of the data.
+--
+-- >>> let es = [ Nothing, Just (7 :: Unsigned 8), Just 8]
+-- >>> mapM_ (putStrLn . show . pack) es
+-- 0b0_...._....
+-- 0b1_0000_0111
+-- 0b1_0000_1000
+-- >>> putStr (memFile (Just 0) es)
+-- 000000000
+-- 100000111
+-- 100001000
+-- >>> putStr (memFile (Just 1) es)
+-- 011111111
+-- 100000111
+-- 100001000
+--
+memFile
+  :: forall a f
+   . ( BitPack a
+     , Foldable f
+     , HasCallStack)
+  => Maybe Bit
+  -- ^ Value to map don't care bits to. Nothing means throwing an error on
+  -- don't care bits.
+  -> f a
+  -- ^ Values to convert.
+  -> String
+  -- ^ Contents of the memory file.
+memFile care = foldr (\e -> showsBV $ pack e) ""
+ where
+  showsBV :: BitVector (BitSize a) -> String -> String
+  showsBV (BV mask val) s =
+    if n == 0 then
+      '0' : '\n' : s
+    else
+      case care of
+        Just (Bit 0 0) -> go n (val .&. (mask `xor` fullMask)) ('\n' : s)
+        Just (Bit 0 1)  -> go n (val .|. mask) ('\n' : s)
+        _ -> if mask /= 0 then
+               err
+             else
+               go n val ('\n' : s)
+   where
+    n = natToNum @(BitSize a) @Int
+    fullMask = (1 `shiftL` n) - 1
+    err = withFrozenCallStack $ error $
+            "memFile: cannot convert don't-care values. "
+            ++ "Please specify mapping to definite value."
+    go 0  _ s0 = s0
+    go n0 v s0 =
+      let (!v0, !vBit) = quotRem v 2
+      in if vBit == 0 then
+           go (n0 - 1) v0 $ '0' : s0
+         else
+           go (n0 - 1) v0 $ '1' : s0
 
 -- | blockRamFile primitive
 blockRamFile#

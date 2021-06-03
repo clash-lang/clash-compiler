@@ -1,9 +1,10 @@
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
-                  2019     , Myrtle Software Ltd
-                  2017     , Google Inc.
+                  2019     , Myrtle Software Ltd,
+                  2017     , Google Inc.,
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 = Initializing a BlockRAM with a data file #usingramfiles#
 
@@ -29,6 +30,12 @@ For example, a data file @memory.bin@ containing the 9-bit unsigned number
 000001011
 000001100
 000001101
+@
+
+Such a file can be produced with 'E.memFile':
+
+@
+writeFile "memory.bin" (memFile Nothing [7 :: Unsigned 9 .. 13])
 @
 
 We can instantiate a BlockRAM using the content of the above file like so:
@@ -80,6 +87,8 @@ module Clash.Prelude.BlockRam.File
   ( -- * BlockRAM synchronized to an arbitrary clock
     blockRamFile
   , blockRamFilePow2
+    -- * Producing files
+  , E.memFile
   )
 where
 
