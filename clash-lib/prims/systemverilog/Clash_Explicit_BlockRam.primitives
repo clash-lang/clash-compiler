@@ -137,4 +137,58 @@ assign ~RESULT = ~FROMBV[~SYM[2]][~TYP[10]];
 // blockRam1 end"
     }
   }
+, { "BlackBox" :
+    { "name" : "Clash.Explicit.BlockRam.trueDualPortBlockRam#"
+    , "kind" : "Declaration"
+    , "type" :
+"trueDualPortBlockRam# ::
+  forall nAddrs domA domB a .
+  ( HasCallStack           ~ARG[0]
+  , KnownNat nAddrs        ~ARG[1]
+  , KnownDomain domA       ~ARG[2]
+  , KnownDomain domB       ~ARG[3]
+  , NFDataX a              ~ARG[4]
+  , BitPack a              ~ARG[5]
+  ) =>
+
+  Clock domA ->                   ~ARG[6]
+  Signal domA Bool ->             ~ARG[7]
+  Signal domA (Index nAddrs) ->   ~ARG[8]
+  Signal domA a ->                ~ARG[9]
+
+  Clock domB ->                   ~ARG[10]
+  Signal domB Bool ->             ~ARG[11]
+  Signal domB (Index nAddrs) ->   ~ARG[12]
+  Signal domB a ->                ~ARG[13]
+  (Signal domA a, Signal domB a)"
+    , "template" :
+"// trueDualPortBlockRam begin
+// Shared memory
+logic [~SIZE[~TYP[9]]-1:0] ~GENSYM[mem][0] [~LIT[1]-1:0];
+
+~SIGD[~GENSYM[data_slow][1]][9];
+~SIGD[~GENSYM[data_fast][2]][13];
+
+// Port A
+always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[6]) begin
+    ~SYM[1] <= ~SYM[0][~ARG[8]];
+    if(~ARG[7]) begin
+        ~SYM[1] <= ~ARG[9];
+        ~SYM[0][~ARG[8]] <= ~ARG[9];
+    end
+end
+
+// Port B
+always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[10]) begin
+    ~SYM[2] <= ~SYM[0][~ARG[12]];
+    if(~ARG[11]) begin
+        ~SYM[2] <= ~ARG[13];
+        ~SYM[0][~ARG[12]] <= ~ARG[13];
+    end
+end
+
+assign ~RESULT = {~SYM[1], ~SYM[2]};
+// end trueDualPortBlockRam"
+    }
+  }
 ]

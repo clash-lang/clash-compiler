@@ -624,6 +624,10 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS_GHC(runTest "BlockRamTest" def{hdlSim=False})
         , NEEDS_PRIMS_GHC(runTest "Compression" def)
         , NEEDS_PRIMS_GHC(runTest "DelayedReset" def)
+        , runTest "DualBlockRam" def{
+              clashFlags=["-main-is", "test1a"]
+            , buildTargets=BuildSpecific ["test1a"]
+            }
         , let _opts = def { buildTargets=BuildSpecific ["example"]
                           , hdlSim=False
                           }
