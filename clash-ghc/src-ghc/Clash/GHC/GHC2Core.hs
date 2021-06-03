@@ -746,8 +746,12 @@ _ATTR_NAME = "Clash.Annotations.SynthesisAttributes.Attr"
 
 -- | Flatten a list type structure to a list of types.
 listTypeToListOfTypes :: Type -> [Type]
+-- TyConApp ': [kind, head, tail]
 listTypeToListOfTypes (TyConApp _ [_, a, as]) = a : listTypeToListOfTypes as
-listTypeToListOfTypes _                       = []
+listTypeToListOfTypes ty                      =
+  case coreView ty of
+    Nothing -> []
+    Just ty' -> listTypeToListOfTypes ty'
 
 -- | Try to determine boolean value by looking at constructor name of type.
 boolTypeToBool :: Type -> C2C Bool
@@ -777,7 +781,7 @@ tyLitToInteger s = error $ unwords [ "Could not unpack given type to integer:"
 coreToAttr
   :: Type
   -> C2C C.Attr'
-coreToAttr (TyConApp ty args) = do
+coreToAttr t@(TyConApp ty args) = do
   let key   = args !! 0
   let value = args !! 1
   name' <- typeConstructorToString ty
@@ -795,8 +799,10 @@ coreToAttr (TyConApp ty args) = do
     "Clash.Annotations.SynthesisAttributes.Attr" ->
         return $ C.Attr' (tyLitToString key1)
     _ ->
-        error $ unwords [ "Expected StringAttr, IntegerAttr, BoolAttr or Attr"
-                        , "constructor, got:" ++ name' ]
+        case coreView t of
+          Just t' -> coreToAttr t'
+          Nothing -> error $ unwords [ "Expected StringAttr, IntegerAttr, BoolAttr or Attr"
+                       , "constructor, got:" ++ name' ]
 
 coreToAttr t =
   error $ unwords [ "Expected type constructor (TyConApp), but got:"
@@ -820,7 +826,8 @@ coreToAttrs' [annotationType, realType, attributes] = allAttrs
 
         let result | name' == "GHC.Types.[]" && name'' == _ATTR_NAME =
                       -- List of attributes
-                      sequence $ map coreToAttr (listTypeToListOfTypes attributes)
+                      traverse coreToAttr (listTypeToListOfTypes attributes)
+
                    | name' == "GHC.Types.[]" =
                       -- List, but unknown types
                       error $ $(curLoc) ++ unwords [ "Annotate expects an"

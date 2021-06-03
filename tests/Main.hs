@@ -660,6 +660,7 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") allTargets [] [] "Product" "main")
         ,                 outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") allTargets [] [] "InstDeclAnnotations" "main"
         , NEEDS_PRIMS_GHC(runTest "Product" def)
+        , outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") allTargets [] [] "T1771" "main"
         ]
       , clashTestGroup "Testbench"
         [ NEEDS_PRIMS_GHC(runTest "TB" def{clashFlags=["-fclash-inline-limit=0"]})
