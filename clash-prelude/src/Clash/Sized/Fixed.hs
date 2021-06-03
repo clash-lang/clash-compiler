@@ -734,14 +734,14 @@ fLit a = [|| Fixed (fromInteger sat) ||]
 
 -- | Convert, at run-time, a 'Double' to a 'Fixed'-point.
 --
--- __NB__: this functions is /not/ synthesizable
+-- __NB__: this function is /not/ synthesizable
 --
 -- = Creating data-files #creatingdatafiles#
 --
--- An example usage of this function is for example to convert a data file
--- containing 'Double's to a data file with ASCI-encoded binary numbers to be
--- used by a synthesizable function like 'Clash.Prelude.ROM.File.asyncRomFile'.
--- For example, given a file @Data.txt@ containing:
+-- An example usage of this function is to convert a data file containing
+-- 'Double's to a data file with ASCII-encoded binary numbers to be used by a
+-- synthesizable function like 'Clash.Prelude.ROM.File.asyncRomFile'. For
+-- example, consider a file @Data.txt@ containing:
 --
 -- @
 -- 1.2 2.0 3.0 4.0
@@ -758,12 +758,13 @@ fLit a = [|| Fixed (fromInteger sat) ||]
 -- module Main where
 --
 -- import Clash.Prelude
+-- import Clash.Prelude.ROM.File
 -- import System.Environment
 -- import qualified Data.List as L
 --
 -- createRomFile
---   :: KnownNat n
---   => (Double -> BitVector n)
+--   :: BitPack a
+--   => (Double -> a)
 --   -> FilePath
 --   -> FilePath
 --   -> IO ()
@@ -771,8 +772,8 @@ fLit a = [|| Fixed (fromInteger sat) ||]
 --   f <- readFile fileR
 --   let ds :: [Double]
 --       ds = L.concat . (L.map . L.map) read . L.map words $ lines f
---       bvs = L.map (filter (/= '_') . show . convert) ds
---   writeFile fileW (unlines bvs)
+--       fes = L.map convert ds
+--   writeFile fileW ('Clash.Prelude.ROM.File.memFile' Nothing fes)
 --
 -- toSFixed8_8 :: Double -> SFixed 8 8
 -- toSFixed8_8 = 'fLitR'
@@ -780,7 +781,7 @@ fLit a = [|| Fixed (fromInteger sat) ||]
 -- main :: IO ()
 -- main = do
 --   [fileR,fileW] <- getArgs
---   createRomFile ('pack' . toSFixed8_8) fileR fileW
+--   createRomFile toSFixed8_8 fileR fileW
 -- @
 --
 -- We then compile this to an executable:
@@ -790,7 +791,7 @@ fLit a = [|| Fixed (fromInteger sat) ||]
 -- @
 --
 -- We can then use this utility to convert our @Data.txt@ file which contains
--- 'Double's to a @Data.bin@ file which will containing the desired ASCI-encoded
+-- 'Double's to a @Data.bin@ file which will containing the desired ASCII-encoded
 -- binary data:
 --
 -- @
@@ -831,30 +832,31 @@ fLit a = [|| Fixed (fromInteger sat) ||]
 --
 -- For those of us who like to live on the edge, another option is to convert
 -- our @Data.txt@ at compile-time using
--- <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#template-haskell Template Haskell>.
+-- <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/template_haskell.html Template Haskell>.
 -- For this we first create a module @CreateRomFileTH.hs@:
 --
 -- @
 -- module CreateRomFileTH (romDataFromFile) where
 --
 -- import Clash.Prelude
--- import qualified Data.List        as L
--- import Language.Haskell.TH        (ExpQ, litE, stringL)
+-- import Clash.Prelude.ROM.File
+-- import qualified Data.List as L
+-- import Language.Haskell.TH (ExpQ, litE, stringL)
 -- import Language.Haskell.TH.Syntax (qRunIO)
 --
--- createRomFile :: KnownNat n => (Double -> BitVector n)
+-- createRomFile :: BitPack a => (Double -> a)
 --               -> FilePath -> FilePath -> IO ()
 -- createRomFile convert fileR fileW = do
 --   f <- readFile fileR
 --   let ds :: [Double]
 --       ds = L.concat . (L.map . L.map) read . L.map words $ lines f
---       bvs = L.map (filter (/= '_') . show . convert) ds
---   writeFile fileW (unlines bvs)
+--       fes = L.map convert ds
+--   writeFile fileW ('Clash.Prelude.ROM.File.memFile' Nothing fes)
 --
--- romDataFromFile :: KnownNat n => (Double -> BitVector n) -> String -> ExpQ
+-- romDataFromFile :: BitPack a => (Double -> a) -> String -> ExpQ
 -- romDataFromFile convert fileR = do
 --   let fileW = fileR L.++ ".bin"
---   bvF <- qRunIO (createRomFile convert fileR fileW)
+--   qRunIO (createRomFile convert fileR fileW)
 --   litE (stringL fileW)
 -- @
 --
@@ -866,13 +868,10 @@ fLit a = [|| Fixed (fromInteger sat) ||]
 -- import Clash.Prelude
 -- import CreateRomFileTH
 --
--- toSFixed8_8 :: Double -> SFixed 8 8
--- toSFixed8_8 = 'fLitR'
---
 -- romF' :: Unsigned 3 -> Unsigned 3 -> SFixed 8 8
 -- romF' rowAddr colAddr = unpack $
 --   asyncRomFile d8
---                $(romDataFromFile (pack . toSFixed8_8) "Data.txt") -- Template Haskell splice
+--                $(romDataFromFile (fLitR :: Double -> SFixed 8 8) "Data.txt") -- Template Haskell splice
 --                ((rowAddr * 4) + colAddr)
 -- @
 --

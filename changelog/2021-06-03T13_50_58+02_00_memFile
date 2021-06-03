@@ -1,0 +1,1 @@
+ADDED: Added `Clash.Explicit.BlockRam.File.memFile`, a function for creating the contents of the data files this blockRAM uses. Can also be imported from `Clash.Prelude.BlockRam.File`, `Clash.Prelude.ROM.File` and `Clash.Explicit.ROM.File`.

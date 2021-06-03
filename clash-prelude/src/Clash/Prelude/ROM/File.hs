@@ -1,9 +1,10 @@
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
-                  2017     , Google Inc.
-                  2019     , Myrtle Software Ltd
+                  2017     , Google Inc.,
+                  2019     , Myrtle Software Ltd,
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 = Initializing a ROM with a data file #usingromfiles#
 
@@ -28,6 +29,12 @@ For example, a data file @memory.bin@ containing the 9-bit unsigned number
 000001011
 000001100
 000001101
+@
+
+Such a file can be produced with 'memFile':
+
+@
+writeFile "memory.bin" (memFile Nothing [7 :: Unsigned 9 .. 13])
 @
 
 We can instantiate a synchronous ROM using the content of the above file like
@@ -80,6 +87,8 @@ module Clash.Prelude.ROM.File
     -- * Synchronous ROM synchronized to an arbitrary clock
   , romFile
   , romFilePow2
+    -- * Producing files
+  , memFile
     -- * Internal
   , asyncRomFile#
   )
@@ -89,7 +98,7 @@ import           Data.Array                   (listArray,(!))
 import           GHC.TypeLits                 (KnownNat)
 import           System.IO.Unsafe             (unsafePerformIO)
 
-import           Clash.Explicit.BlockRam.File (initMem)
+import           Clash.Explicit.BlockRam.File (initMem, memFile)
 import qualified Clash.Explicit.ROM.File      as E
 import           Clash.Promoted.Nat           (SNat (..), pow2SNat, snatToNum)
 import           Clash.Signal
