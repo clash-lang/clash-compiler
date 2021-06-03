@@ -23,9 +23,10 @@ main = do
 prepareFile :: [FilePath] -> FilePath -> IO ()
 prepareFile idirs fIn = do
   putStrLn $ "Preparing: " ++ fIn
-  let fOut = fIn ++ ".bin"
+  let fOut = fIn ++ ".net.bin"
   inp <- runNormalisationStage idirs fIn
   let (transformedBindings,topEntities,primMap,tcm,reprs,topEntity) = inp
+      inp' :: NetlistInputs
       inp' = (transformedBindings,topEntities,fmap (fmap removeBBfunc) primMap,tcm,reprs,topEntity)
   putStrLn $ "Serialising to : " ++ fOut
   B.writeFile fOut $ encode inp'

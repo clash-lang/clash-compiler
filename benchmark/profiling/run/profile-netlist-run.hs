@@ -1,7 +1,5 @@
-import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import           Clash.Backend
 import           Clash.Core.Name
-import           Clash.Core.TyCon
 import           Clash.Core.Var
 import           Clash.Core.VarEnv (mkVarEnv)
 import           Clash.Driver.Types
@@ -57,14 +55,8 @@ benchFile idirs src = do
 
 setupEnv
   :: FilePath
-  -> IO (BindingMap
-        ,[TopEntityT]
-        ,CompiledPrimMap'
-        ,TyConMap
-        ,CustomReprs
-        ,Id
-        )
+  -> IO NetlistInputs
 setupEnv src = do
-  let bin = src ++ ".bin"
+  let bin = src ++ ".net.bin"
   putStrLn $ "Reading from: " ++ bin
   decode <$> B.readFile bin
