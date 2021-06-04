@@ -1,4 +1,8 @@
 {-|
+Copyright  : (C) 2021, QBayLogic B.V.
+License    : BSD2 (see the file LICENSE)
+Maintainer : QBayLogic B.V. <devops@qbaylogic.com>
+
 Functions to read, write, and handle manifest files.
 -}
 
@@ -22,6 +26,7 @@ import           Data.Aeson.Types (Parser)
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Lazy as ByteStringLazy
 import           Data.ByteString (ByteString)
+import           Data.Char (toLower)
 import           Data.Hashable (hash)
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
@@ -36,6 +41,7 @@ import           Data.Text.Prettyprint.Doc.Extra (renderOneLine)
 import           Data.Time (UTCTime)
 import qualified Data.Set as Set
 import           Data.String (IsString)
+import           GHC.Generics (Generic)
 import           System.IO.Error (isDoesNotExistError)
 import           System.FilePath (takeDirectory, (</>))
 import           System.Directory (listDirectory, doesFileExist)
@@ -62,11 +68,25 @@ import GHC.Utils.Misc (OverridingBool(..))
 import Util (OverridingBool(..))
 #endif
 
+data PortDirection
+  = In | Out | InOut
+  deriving (Generic, Eq, Read, Show)
+
+instance ToJSON PortDirection where
+  toJSON = Aeson.genericToJSON Aeson.defaultOptions
+    { Aeson.constructorTagModifier = fmap toLower }
+
+instance FromJSON PortDirection where
+  parseJSON = Aeson.genericParseJSON Aeson.defaultOptions
+    { Aeson.constructorTagModifier = fmap toLower }
+
 data ManifestPort = ManifestPort
   { mpName :: Text
   -- ^ Port name (as rendered in HDL)
   , mpTypeName :: Text
   -- ^ Type name (as rendered in HDL)
+  , mpDirection :: PortDirection
+  -- ^ Port direction (in / out / inout)
   , mpWidth :: Int
   -- ^ Port width in bits
   , mpIsClock :: Bool
@@ -82,6 +102,7 @@ instance ToJSON ManifestPort where
     Aeson.object $
       [ "name" .= mpName
       , "type_name" .= mpTypeName
+      , "direction" .= mpDirection
       , "width" .= mpWidth
       , "is_clock" .= mpIsClock
       ] <>
@@ -94,6 +115,7 @@ instance FromJSON ManifestPort where
     ManifestPort
       <$> v .: "name"
       <*> v .: "type_name"
+      <*> v .: "direction"
       <*> v .: "width"
       <*> v .: "is_clock"
       <*> v .:? "domain"
@@ -114,8 +136,8 @@ data Manifest
     --   * opt_inlineLimit
     --   * opt_specLimit
     --   * opt_floatSupport
-  , inPorts :: [ManifestPort]
-  , outPorts :: [ManifestPort]
+  , ports :: [ManifestPort]
+    -- ^ Ports in the generated @TopEntity@.
   , componentNames :: [Text]
     -- ^ Names of all the generated components for the @TopEntity@ (does not
     -- include the names of the components of the @TestBench@ accompanying
@@ -146,9 +168,7 @@ instance ToJSON Manifest where
       , "components" .= componentNames
       , "top_component" .= Aeson.object
         [ "name" .= topComponent
-        , "ports_flat" .= Aeson.object
-          [ "in" .= inPorts
-          , "out" .= outPorts ]
+        , "ports_flat" .= ports
         ]
       , "files" .=
         [ Aeson.object
@@ -176,13 +196,11 @@ instance FromJSON Manifest where
   parseJSON = Aeson.withObject "Manifest" $ \v ->
     let
       topComponent = v .: "top_component"
-      portsFlat = topComponent >>= (.: "ports_flat")
     in
       Manifest
         <$> v .: "hash"
         <*> v .: "flags"
-        <*> (portsFlat >>= (.: "in"))
-        <*> (portsFlat >>= (.: "out"))
+        <*> (topComponent >>= (.: "ports_flat"))
         <*> v .: "components"
         <*> (topComponent >>= (.: "name"))
         <*> do
@@ -235,11 +253,13 @@ mkManifestPort ::
   Id.Identifier ->
   -- | Port type
   HWType ->
+  PortDirection ->
   ManifestPort
-mkManifestPort backend portId portType = ManifestPort{..}
+mkManifestPort backend portId portType portDir = ManifestPort{..}
  where
   mpName = Id.toText portId
   mpWidth = typeSize portType
+  mpDirection = portDir
   mpIsClock = case portType of {Clock _ -> True; _ -> False}
   mpDomain = hwTypeDomain portType
   mpTypeName = flip evalState backend $ getAp $ do
@@ -271,8 +291,7 @@ mkManifest ::
   Manifest
 mkManifest backend domains ClashOpts{..} Component{..} components deps files topHash = Manifest
   { manifestHash = topHash
-  , inPorts = [mkManifestPort backend pName pType | (pName, pType) <- inputs]
-  , outPorts = [mkManifestPort backend pName pType | (_, (pName, pType), _) <- outputs]
+  , ports = inPorts <> inOutPorts <> outPorts
   , componentNames = map Id.toText compNames
   , topComponent = Id.toText componentName
   , fileNames = files
@@ -282,6 +301,15 @@ mkManifest backend domains ClashOpts{..} Component{..} components deps files top
   }
  where
   compNames = map Netlist.componentName components
+
+  inPorts =
+    [mkManifestPort backend pName pType In | p@(pName, pType) <- inputs, not (Netlist.isBiDirectional p)]
+
+  inOutPorts =
+    [mkManifestPort backend pName pType InOut | p@(pName, pType) <- inputs, Netlist.isBiDirectional p]
+
+  outPorts =
+    [mkManifestPort backend pName pType Out | (_, (pName, pType), _) <- outputs]
 
 -- | Pretty print an unexpected modification as a list item.
 pprintUnexpectedModification :: UnexpectedModification -> String

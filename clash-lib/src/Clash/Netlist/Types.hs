@@ -367,12 +367,13 @@ data Component
   , outputs       :: [(WireOrReg,(Identifier,HWType),Maybe Expr)] -- ^ Output ports
   , declarations  :: [Declaration] -- ^ Internal declarations
   }
-  deriving Show
+  deriving (Show, Generic, NFData)
 
-instance NFData Component where
-  rnf c = case c of
-    Component nm inps outps decls -> rnf nm    `seq` rnf inps `seq`
-                                     rnf outps `seq` rnf decls
+-- | Check if an input port is really an inout port.
+--
+isBiDirectional :: (Identifier, HWType) -> Bool
+isBiDirectional (_, BiDirectional _ _) = True
+isBiDirectional _ = False
 
 -- | Find the name and domain name of each clock argument of a component.
 --
