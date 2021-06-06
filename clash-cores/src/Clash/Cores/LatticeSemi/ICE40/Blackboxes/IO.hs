@@ -11,6 +11,7 @@
 module Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO
   ( sbioTF
   , sbioDDRTF
+  , sb_io_tf
   ) where
 
 import           Prelude
@@ -157,3 +158,76 @@ sbioDDRTemplate bbCtx = do
    ] = bbInputs bbCtx
 
   [(Identifier result Nothing,resTy)] = bbResults bbCtx
+
+-- | Generates HDL for SB_IO for the LATTICE ICE
+sb_io_tf :: TemplateFunction
+sb_io_tf = TemplateFunction used valid sb_io_template
+ where
+  used = [4..11]
+  valid = const True
+
+sb_io_template
+  :: Backend s
+  => BlackBoxContext
+  -> State s Doc
+sb_io_template bbCtx = do
+  let compName = Id.unsafeMake "SB_IO"  -- Hardcoded for now
+
+  sbio <- Id.makeBasic "sbio"
+  sbio_inst <- Id.makeBasic "sbio_inst"
+
+  dIn0 <- Id.makeBasic "dIn0"
+  dIn1 <- Id.makeBasic "dIn1"
+
+  let
+    resultTuple =
+      DataCon
+        resTy
+        (DC (resTy,0))
+        [ Identifier dIn0 Nothing
+        , Identifier dIn1 Nothing
+        ]
+
+  getMon $ blockDecl sbio $
+    [ NetDecl Nothing dIn0 Bit
+    , NetDecl Nothing dIn1 Bit
+    , InstDecl Comp Nothing [] compName sbio_inst
+      [ (instPort "NEG_TRIGGER", Bool, nEG_TRIGGER)
+      , (instPort "PIN_TYPE", BitVector 6, pIN_TYPE)
+      , (instPort "PULLUP", Bool, pULLUP)
+      , (instPort "IO_STANDARD", String, iO_STANDARD)
+      ]
+      (NamedPortMap [
+        (instPort "D_OUT_1", In, Bit, dOut1)
+      , (instPort "D_OUT_0", In, Bit, dOut0)
+      , (instPort "CLOCK_ENABLE", In, Bool, clockEnable)
+      , (instPort "LATCH_INPUT_VALUE", In, Bool, latchInputValue)
+      , (instPort "INPUT_CLK", In, clkTyIn, clkIn)
+      , (instPort "D_IN_1", Out, Bit, Identifier dIn1 Nothing)
+      , (instPort "D_IN_0", Out, Bit, Identifier dIn0 Nothing)
+      , (instPort "OUTPUT_ENABLE", In, Bool, outputEnable)
+      , (instPort "OUTPUT_CLK", In, clkTyOut, clkOut)
+        -- NOTE: Direction is set to 'In', but will be rendered as inout due to
+        -- its the type packackagePinTy
+      , (instPort "PACKAGE_PIN", In, packagePinTy, packagePin)
+      ])
+    , Assignment result resultTuple
+    ]
+ where
+ [ _KnownDomainSlow
+  , _KnownDomainFast
+  , (nEG_TRIGGER, _, True)
+  , (pIN_TYPE, _pinTy, pinConfigLiteral -> ())
+  , (pULLUP, _, True)
+  , (iO_STANDARD, _, True)
+  , (dOut1, Bit, _)
+  , (dOut0, Bit, _)
+  , (clockEnable, Bool, _)
+  , (latchInputValue, Bool, _)
+  , (clkIn, clkTyIn, _)
+  , (outputEnable, Bool, _)
+  , (clkOut, clkTyOut, _)
+  , (packagePin, packagePinTy, _)
+  ] = bbInputs bbCtx
+
+ [(Identifier result Nothing,resTy)] = bbResults bbCtx

@@ -9,6 +9,7 @@
   referred to as LITL.
 -}
 
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuasiQuotes #-}
 
@@ -17,6 +18,7 @@ module Clash.Cores.LatticeSemi.ICE40.IO
   , sbioDDR
   , PinOutputConfig(..)
   , PinInputConfig(..)
+  , sb_io
   ) where
 
 import           Clash.Annotations.Primitive  (Primitive(..), HDL(..), hasBlackBox)
@@ -27,6 +29,7 @@ import           Clash.Signal.Internal        (Signal(..))
 import           Data.String.Interpolate      (i)
 import           Data.String.Interpolate.Util (unindent)
 import           GHC.Stack                    (HasCallStack)
+import           GHC.Natural                  (Natural)
 import           Test.QuickCheck              (Arbitrary(..))
 import qualified Test.QuickCheck as QC
 
@@ -437,3 +440,258 @@ sbioDDRPrim pinConf pkgPinIn dOut0 dOut1 outputEnable =
    ]
    |]) #-}
 
+sb_io ::
+  forall slow fast iO_STANDARD .
+  (KnownDomain slow, KnownDomain fast) =>
+  -- | NEG_TRIGGER
+  Bool ->
+  -- | PIN_TYPE
+  BitVector 6 ->
+  -- | PULLUP
+  Bool ->
+  -- | IO_STANDARD
+  SSymbol iO_STANDARD ->
+  -- | D_OUT_1
+  Signal slow Bit ->
+  -- | D_OUT_0
+  Signal slow Bit ->
+  -- | CLOCK_ENABLE
+  Signal slow Bool ->
+  -- | LATCH_INPUT_VALUE
+  Signal slow Bool ->
+  -- | INPUT_CLK
+  Clock slow ->
+  -- | OUTPUT_ENABLE
+  Signal slow Bool ->
+  -- | OUTPUT_CLK
+  Clock slow ->
+  -- | PACKAGE_PIN
+  BiSignalIn 'Floating fast 1 ->
+  -- | (D_IN_1, D_IN_0, PACKAGE_PIN)
+  ( Signal slow Bit
+  , Signal slow Bit
+  , BiSignalOut 'Floating fast 1
+  )
+sb_io nEG_TRIGGER pIN_TYPE !_pULLUP !_iO_STANDARD d_out_1 d_out_0 clock_enable
+  latch_input_value !_input_clk output_enable !_output_clk package_pin_in
+    = (d_in_1, d_in_0, package_pin_out)
+  where
+    package_pin_out = writeToBiSignal package_pin_in
+                        (mux padoen (pure Nothing) (Just <$> padout))
+
+    clockRatio = getClockRatio (snatToNatural (clockPeriod @slow))
+                               (snatToNatural (clockPeriod @fast))
+
+    inclk_n, outclk_n :: Signal fast Bool
+    inclk_n  = case clockRatio of
+                 SDR -> pure True
+                 DDR -> not nEG_TRIGGER :- nEG_TRIGGER :- inclk_n
+    outclk_n = case clockRatio of
+                 SDR -> pure True
+                 DDR -> not nEG_TRIGGER :- nEG_TRIGGER :- inclk_n
+
+    inclke_sync = E.veryUnsafeSynchronizer
+                    (snatToNum (clockPeriod @fast))
+                    (snatToNum (clockPeriod @slow))
+                    clock_enable
+
+    outclke_sync = E.veryUnsafeSynchronizer
+                    (snatToNum (clockPeriod @fast))
+                    (snatToNum (clockPeriod @slow))
+                    clock_enable
+
+    inclk  = liftA2 (&&) inclk_n inclke_sync
+    outclk = liftA2 (&&) outclk_n outclke_sync
+
+    (d_in_1, d_in_0, padout, padoen) =
+      prio_physical clockRatio d_out_1 d_out_0 output_enable latch_input_value
+        inclk outclk pIN_TYPE (readFromBiSignal @Bit package_pin_in)
+{-# NOINLINE sb_io #-}
+{-# ANN sb_io hasBlackBox #-}
+{-# ANN sb_io (InlinePrimitive [VHDL,Verilog,SystemVerilog] $ unindent [i|
+   [ { "BlackBox" :
+        { "name" : "Clash.Cores.LatticeSemi.ICE40.IO.sb_io",
+          "kind" : "Declaration",
+          "format": "Haskell",
+          "templateFunction": "Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO.sb_io_tf"
+        }
+     }
+   ]
+   |]) #-}
+
+prio_physical ::
+  forall slow fast .
+  (KnownDomain slow, KnownDomain fast) =>
+  ClockRatio ->
+  -- | ddr1
+  Signal slow Bit ->
+  -- | ddr0
+  Signal slow Bit ->
+  -- | oepin
+  Signal slow Bool ->
+  -- | hold
+  Signal slow Bool ->
+  -- | inclk
+  Signal fast Bool ->
+  -- | outclk
+  Signal fast Bool ->
+  -- | cbit
+  BitVector 6 ->
+  -- | padin
+  Signal fast Bit ->
+  -- | (dout1, dout0, padout, padoen)
+  ( Signal slow Bit
+  , Signal slow Bit
+  , Signal fast Bit
+  , Signal fast Bool
+  )
+prio_physical clockRatio ddr1 ddr0 oepin hold inclk outclk cbit padin = (dout1, dout0, padout, padoen)
+  where
+    {- bs_en = '0'
+       shift = '0'
+       tclk  = '0'
+       update = '0'
+       sdi = '0'
+       mode = '0'
+       hiz_b = '1'
+       rstio = '0'
+       jtag_update_n30 = '1'
+    -}
+    dout1 = din_reg_1
+    padin_n1 = padin
+    inclk_n2 = inclk
+
+    din_reg_0 = case clockRatio of
+       SDR -> goSDR undefined inclk_n2 padin_n1
+       DDR -> goDDR undefined inclk_n2 padin_n1
+     where
+       goSDR o ~(c0 :- cs) ~(p :- ps) =
+         let oN | c0 = p
+                | otherwise = o
+          in o :- goSDR oN cs ps
+
+       goDDR o ~(c0 :- c1 :- cs) ~(p1 :- p2 :- ps) =
+         let oN | c0 && not c1 = p1
+                | not c0 && c1 = p2
+                | otherwise    = o
+          in o :- goDDR oN cs ps
+
+    pad_n3 = padin
+
+    din_reg_1 = case clockRatio of
+        SDR -> goSDR undefined inclk pad_n3
+        DDR -> goDDR undefined inclk pad_n3
+      where
+        goSDR o ~(c0 :- cs) ~(p :- ps) =
+         let oN | c0 = p
+                | otherwise = o
+          in o :- goSDR oN cs ps
+
+        goDDR o ~(c0 :- c1 :- cs) ~(p1 :- p2 :- ps) =
+         let oN | c0 && not c1 = p2
+                | not c0 && c1 = p1
+                | otherwise    = o
+          in o :- goDDR oN cs ps
+
+    hold_AND2 = (pack (cbit ! (1 :: Word)) .&.) <$> (bitCoerce <$> hold)
+    -- Input mux
+    temp1 :: Signal slow (BitVector 2)
+    temp1 = liftA2 (++#) (pack <$> hold_AND2) (pure (pack (cbit ! (0 :: Word))))
+
+    dout0 = case clockRatio of
+        SDR -> goSDR undefined temp1 din_reg_0 padin
+        DDR -> goDDR undefined temp1 din_reg_0 padin
+      where
+        goSDR :: Bit -> Signal slow (BitVector 2) -> Signal slow Bit -> Signal fast Bit -> Signal slow Bit
+        goSDR o ~(t1 :- ts) ~(d :- ds) ~(p :- ps) = case t1 of
+          0b00 -> d :- goSDR d ts ds ps
+          0b01 -> p :- goSDR p ts ds ps
+          0b10 -> o :- goSDR o ts ds ps
+          0b11 -> o :- goSDR o ts ds ps
+          _    -> low :- goSDR low ts ds ps
+
+        goDDR :: Bit -> Signal slow (BitVector 2) -> Signal slow Bit -> Signal fast Bit -> Signal slow Bit
+        goDDR o ~(t1 :- ts) ~(d :- ds) ~(p :- _ :- ps) = case t1 of
+          0b00 -> d :- goDDR d ts ds ps
+          0b01 -> p :- goDDR p ts ds ps
+          0b10 -> o :- goDDR o ts ds ps
+          0b11 -> o :- goDDR o ts ds ps
+          _    -> low :- goDDR low ts ds ps
+
+    dout_reg_0 :: Signal fast Bit
+    dout_reg_0 = case clockRatio of
+        SDR -> goSDR undefined outclk_n12 ddr0_n11
+        DDR -> goDDR undefined outclk_n12 ddr0_n11
+      where
+        goSDR o ~(c0 :- cs) ~(d :- ds) =
+          let oN | c0 = d
+                 | otherwise = o
+           in o :- goSDR oN cs ds
+
+        goDDR o ~(c0 :- c1 :- cs) ~(p1 :- p2 :- ps) =
+          let oN | c0 && not c1 = p1
+                | not c0 && c1 = p2
+                | otherwise    = o
+          in o :- goDDR oN cs ps
+
+    dout_reg_0_n = complement <$> dout_reg_0
+    n19 = not <$> ((|| bitCoerce (cbit ! (2 :: Word))) <$> outclk_n12)
+
+    reg_or_wire_n17 | cbit ! (2 :: Word) == high = dout_reg_0_n
+                    | otherwise        = E.veryUnsafeSynchronizer
+                                           (snatToNum (clockPeriod @slow))
+                                           (snatToNum (clockPeriod @fast))
+                                           ddr0
+
+    n18 = mux n19 dout_reg_1 dout_reg_0
+    n14 | cbit ! (3 :: Word) == high = reg_or_wire_n17
+        | otherwise        = n18
+
+    padout = n14
+
+    ddr0_n11 = ddr0
+    outclk_n12 = outclk
+    ddr1_n13 = ddr1
+
+    dout_reg_1 :: Signal fast Bit
+    dout_reg_1 = case clockRatio of
+        SDR -> goSDR undefined outclk_n12 ddr1_n13
+        DDR -> goDDR undefined outclk_n12 ddr1_n13
+      where
+        goSDR o ~(c0 :- cs) ~(d :- ds) =
+          let oN | c0 = d
+                 | otherwise = o
+           in o :- goSDR oN cs ds
+
+        goDDR o ~(c0 :- c1 :- cs) ~(p1 :- p2 :- ps) =
+          let oN | c0 && not c1 = p2
+                | not c0 && c1 = p1
+                | otherwise    = o
+          in o :- goDDR oN cs ps
+
+    outclk_n22 = outclk
+
+    tristate   = E.veryUnsafeSynchronizer (snatToNum (clockPeriod @slow))
+                                          (snatToNum (clockPeriod @fast))
+                                          oepin
+    tristate_q = E.delay clockGen (toEnable outclk_n22) undefined tristate
+
+    oen_n_n24 = go (slice d5 d4 cbit) <$> tristate <*> tristate_q
+      where
+        go 0b00 _ _  = False
+        go 0b01 _ _  = True
+        go 0b10 op _ = op
+        go 0b11 _ tq = tq
+        go _ _ _     = False
+
+    n26 = oen_n_n24
+    padoen = not <$> n26
+
+
+data ClockRatio = SDR | DDR
+
+getClockRatio :: Natural -> Natural -> ClockRatio
+getClockRatio slow fast
+  | slow == fast     = SDR
+  | 2 * slow == fast = DDR
+  | otherwise        = error "Not SDR nor DDR"

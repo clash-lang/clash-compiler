@@ -353,6 +353,5 @@ goDDR pinIn pinOut dOut0Vals dOut1Vals outputEnableVals samples =
   outputEnable = fromList outputEnableVals
 
   (pkgPin, dIn0, dIn1) =
-    withSpecificClock @System clk $ withSpecificEnable @System en
+    withClock @System clk $ withEnable @System en
       (sbioDDR @System @SystemFast pinIn pinOut (veryUnsafeToBiSignalIn pkgPin) dOut0 dOut1 outputEnable)
-
