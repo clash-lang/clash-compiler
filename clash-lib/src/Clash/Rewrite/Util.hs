@@ -199,7 +199,7 @@ applyDebug
   -- ^ The current debugging level
   -> Set.Set String
   -- ^ Transformations to debug
-  -> Maybe (Int, Int)
+  -> Maybe (Word, Word)
   -- ^ Only print debug information for transformations [n, n+limit]. See flag
   -- documentation of "-fclash-debug-transformations-from" and
   -- "-fclash-debug-transformations-limit"
