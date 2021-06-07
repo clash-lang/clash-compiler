@@ -79,7 +79,7 @@ data RewriteState extra
   = RewriteState
     -- TODO Given we now keep transformCounters, this should just be 'fold'
     -- over that map, otherwise the two counts could fall out of sync.
-  { _transformCounter :: {-# UNPACK #-} !Int
+  { _transformCounter :: {-# UNPACK #-} !Word
   -- ^ Total number of applied transformations
   , _transformCounters :: HashMap Text Word
   -- ^ Map that tracks how many times each transformation is applied
@@ -115,9 +115,9 @@ data RewriteEnv
   -- ^ Level at which we print debugging messages
   , _dbgTransformations :: Set.Set String
   -- ^ See ClashOpts.dbgTransformations
-  , _dbgTransformationsFrom :: Int
+  , _dbgTransformationsFrom :: Word
   -- ^ See ClashOpts.opt_dbgTransformationsFrom
-  , _dbgTransformationsLimit :: Int
+  , _dbgTransformationsLimit :: Word
   -- ^ See ClashOpts.opt_dbgTransformationsLimit
   , _dbgRewriteHistoryFile :: Maybe FilePath
   -- ^ See ClashOpts.opt_dbgRewriteHistory

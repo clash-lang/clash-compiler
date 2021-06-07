@@ -133,11 +133,11 @@ data ClashOpts = ClashOpts
   -- ^ List the transformations that are to be debugged.
   --
   -- Command line flag: -fclash-debug-transformations
-  , opt_dbgTransformationsFrom :: Int
+  , opt_dbgTransformationsFrom :: Word
   -- ^ Only output debug information from (applied) transformation n
   --
   -- Command line flag: -fclash-debug-transformations-from
-  , opt_dbgTransformationsLimit :: Int
+  , opt_dbgTransformationsLimit :: Word
   -- ^ Only output debug information for n (applied) transformations. If this
   -- limit is exceeded, Clash will stop normalizing.
   --
