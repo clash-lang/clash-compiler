@@ -63,7 +63,7 @@ doHDL b src = do
 
   generateHDL (buildCustomReprs reprs) domainConfs bindingsMap (Just b) primMap tcm tupTcm
     (ghcTypeToHWType WORD_SIZE_IN_BITS True) evaluator topEntities Nothing
-    defClashOpts{opt_cachehdl = False, opt_dbgLevel = DebugSilent, opt_clear = True}
+    defClashOpts{opt_cachehdl = False, opt_debug = debugSilent, opt_clear = True}
     (startTime,prepTime)
 
 main :: IO ()

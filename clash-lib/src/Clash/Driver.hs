@@ -292,7 +292,7 @@ generateHDL
   -> IO ()
 generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
   topEntities0 mainTopEntity opts (startTime,prepTime) = do
-    case opt_dbgRewriteHistoryFile opts of
+    case dbg_historyFile (opt_debug opts) of
       Nothing -> pure ()
       Just histFile -> whenM (Directory.doesFileExist histFile) (Directory.removeFile histFile)
     let (tes, deps) = sortTop bindingsMap topEntities1

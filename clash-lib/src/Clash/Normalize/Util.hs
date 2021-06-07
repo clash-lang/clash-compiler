@@ -77,13 +77,14 @@ import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
    lookupVarEnv, unionVarEnvWith, unitVarEnv, extendInScopeSetList)
 import           Clash.Debug             (traceIf)
-import           Clash.Driver.Types      (BindingMap, Binding(..), DebugLevel (..))
+import           Clash.Driver.Types
+  (BindingMap, Binding(..), TransformationInfo(FinalTerm), hasTransformationInfo)
 import           Clash.Normalize.Primitives (removedArg)
 import {-# SOURCE #-} Clash.Normalize.Strategy (normalization)
 import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
 import           Clash.Rewrite.Types
-  (RewriteMonad, TransformContext(..), bindings, curFun, dbgLevel, extra,
+  (RewriteMonad, TransformContext(..), bindings, curFun, debugOpts, extra,
    tcCache)
 import           Clash.Rewrite.Util
   (runRewrite, specialise, mkTmBinderFor, mkDerivedName)
@@ -511,14 +512,14 @@ rewriteExpr :: (String,NormRewrite) -- ^ Transformation to apply
             -> NormalizeSession Term
 rewriteExpr (nrwS,nrw) (bndrS,expr) (nm, sp) = do
   curFun .= (nm, sp)
-  lvl <- Lens.view dbgLevel
+  opts <- Lens.view debugOpts
   let before = showPpr expr
-  let expr' = traceIf (lvl >= DebugFinal)
+  let expr' = traceIf (hasTransformationInfo FinalTerm opts)
                 (bndrS ++ " before " ++ nrwS ++ ":\n\n" ++ before ++ "\n")
                 expr
   rewritten <- runRewrite nrwS emptyInScopeSet nrw expr'
   let after = showPpr rewritten
-  traceIf (lvl >= DebugFinal)
+  traceIf (hasTransformationInfo FinalTerm opts)
     (bndrS ++ " after " ++ nrwS ++ ":\n\n" ++ after ++ "\n") $
     return rewritten
 

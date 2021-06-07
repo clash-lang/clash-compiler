@@ -371,9 +371,11 @@ readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashMo
       -- Ignore the following settings, they don't affect the generated HDL:
 
       -- 1. Debug
-      opt_dbgLevel = DebugNone
-    , opt_dbgTransformations = Set.empty
-    , opt_dbgRewriteHistoryFile = Nothing
+      opt_debug = opt_debug
+        { dbg_invariants = False
+        , dbg_transformations = Set.empty
+        , dbg_historyFile = Nothing
+        }
 
       -- 2. Caching
     , opt_cachehdl = True
