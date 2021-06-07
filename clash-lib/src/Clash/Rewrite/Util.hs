@@ -37,7 +37,6 @@ import           Control.Monad.Fail          (MonadFail)
 #endif
 import qualified Control.Monad.State.Strict  as State
 import qualified Control.Monad.Writer        as Writer
-import           Data.Bool                   (bool)
 import           Data.Bifunctor              (bimap, second)
 import           Data.Coerce                 (coerce)
 import           Data.Functor.Const          (Const (..))
@@ -94,7 +93,8 @@ import           Clash.Core.VarEnv
    mkVarEnv, eltsVarSet, elemVarEnv, lookupVarEnv, extendVarEnv)
 import           Clash.Debug
 import           Clash.Driver.Types
-  (DebugLevel (..), BindingMap, Binding(..), IsPrim(..))
+  (TransformationInfo(..), DebugOpts(..), BindingMap, Binding(..), IsPrim(..),
+  hasDebugInfo, hasTransformationInfo, isDebugging)
 import           Clash.Netlist.Util          (representableType)
 import           Clash.Pretty                (clashPretty, showDoc)
 import           Clash.Rewrite.Types
@@ -156,18 +156,15 @@ apply
   -- ^ Transformation to be applied
   -> Rewrite extra
 apply = \s rewrite ctx expr0 -> do
-  lvl <- Lens.view dbgLevel
-  dbgTranss <- Lens.view dbgTransformations
-  let isTryLvl = lvl == DebugTry || lvl >= DebugAll
-      isRelevantTrans = s `Set.member` dbgTranss || Set.null dbgTranss
-  traceIf (isTryLvl && isRelevantTrans) ("Trying: " ++ s) (pure ())
+  opts <- Lens.view debugOpts
+  traceIf (hasDebugInfo TryName s opts) ("Trying: " <> s) (pure ())
 
   (!expr1,anyChanged) <- Writer.listen (rewrite ctx expr0)
   let hasChanged = Monoid.getAny anyChanged
   Monad.when hasChanged (transformCounter += 1)
 
   -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
-  rewriteHistFile <- Lens.view dbgRewriteHistoryFile
+  let rewriteHistFile = dbg_historyFile opts
   Monad.when (isJust rewriteHistFile && hasChanged) $ do
     (curBndr, _) <- Lens.use curFun
     let !_ = unsafePerformIO
@@ -182,28 +179,13 @@ apply = \s rewrite ctx expr0 -> do
                  }
     return ()
 
-  dbgFrom <- Lens.view dbgTransformationsFrom
-  dbgLimit <- Lens.view dbgTransformationsLimit
-  let fromLimit =
-        if (dbgFrom, dbgLimit) == (0, maxBound)
-        then Nothing
-        else Just (dbgFrom, dbgLimit)
-
-  if lvl == DebugNone
-    then return expr1
-    else applyDebug lvl dbgTranss fromLimit s expr0 hasChanged expr1
+  if isDebugging opts
+    then applyDebug s expr0 hasChanged expr1
+    else return expr1
 {-# INLINE apply #-}
 
 applyDebug
-  :: DebugLevel
-  -- ^ The current debugging level
-  -> Set.Set String
-  -- ^ Transformations to debug
-  -> Maybe (Word, Word)
-  -- ^ Only print debug information for transformations [n, n+limit]. See flag
-  -- documentation of "-fclash-debug-transformations-from" and
-  -- "-fclash-debug-transformations-limit"
-  -> String
+  :: String
   -- ^ Name of the transformation
   -> Term
   -- ^ Original expression
@@ -212,82 +194,87 @@ applyDebug
   -> Term
   -- ^ New expression
   -> RewriteMonad extra Term
-applyDebug lvl transformations fromLimit name exprOld hasChanged exprNew
-  | Just (from, limit) <- fromLimit = do
-    nTrans <- Lens.use transformCounter
-    if | nTrans - from > limit ->
-          error "-fclash-debug-transformations-limit exceeded"
-       | nTrans > from ->
-          applyDebug lvl transformations Nothing name exprOld hasChanged exprNew
-       | otherwise ->
-          pure exprNew
+applyDebug name exprOld hasChanged exprNew = do
+  nTrans <- Lens.use transformCounter
+  opts <- Lens.view debugOpts
 
-applyDebug lvl transformations fromLimit name exprOld hasChanged exprNew
-  | not (Set.null transformations) =
-    let newLvl = bool DebugNone lvl (name `Set.member` transformations) in
-    applyDebug newLvl Set.empty fromLimit name exprOld hasChanged exprNew
+  let from = fromMaybe 0 (dbg_transformationsFrom opts)
+  let limit = fromMaybe maxBound (dbg_transformationsLimit opts)
 
-applyDebug lvl _transformations _fromLimit name exprOld hasChanged exprNew =
- traceIf (lvl >= DebugAll) ("Tried: " ++ name ++ " on:\n" ++ before) $ do
-  nTrans <- pred <$> Lens.use transformCounter
-
-  Monad.when (lvl >= DebugCount && hasChanged) $
-    transformCounters %= HashMap.insertWith (const succ) (Text.pack name) 1
-
-  Monad.when (lvl > DebugNone && hasChanged) $ do
-    tcm                  <- Lens.view tcCache
-    let beforeTy          = termType tcm exprOld
-        beforeFV          = Lens.setOf freeLocalVars exprOld
-        afterTy           = termType tcm exprNew
-        afterFV           = Lens.setOf freeLocalVars exprNew
-        newFV             = not (afterFV `Set.isSubsetOf` beforeFV)
-        accidentalShadows = findAccidentialShadows exprNew
-
-    Monad.when newFV $
-            error ( concat [ $(curLoc)
-                           , "Error when applying rewrite ", name
-                           , " to:\n" , before
-                           , "\nResult:\n" ++ after ++ "\n"
-                           , "It introduces free variables."
-                           , "\nBefore: " ++ showPpr (Set.toList beforeFV)
-                           , "\nAfter: " ++ showPpr (Set.toList afterFV)
-                           ]
-                  )
-    Monad.when (not (null accidentalShadows)) $
-      error ( concat [ $(curLoc)
-                     , "Error when applying rewrite ", name
-                     , " to:\n" , before
-                     , "\nResult:\n" ++ after ++ "\n"
-                     , "It accidentally creates shadowing let/case-bindings:\n"
-                     , " ", showPpr accidentalShadows, "\n"
-                     , "This usually means that a transformation did not extend "
-                     , "or incorrectly extended its InScopeSet before applying a "
-                     , "substitution."
-                     ])
-
-    traceIf (lvl >= DebugApplied && (not (normalizeType tcm beforeTy `aeqType` normalizeType tcm afterTy)))
-            ( concat [ $(curLoc)
-                     , "Error when applying rewrite ", name
-                     , " to:\n" , before
-                     , "\nResult:\n" ++ after ++ "\n"
-                     , "Changes type from:\n", showPpr beforeTy
-                     , "\nto:\n", showPpr afterTy
-                     ]
-            ) (return ())
-
-  Monad.when (lvl >= DebugSilent && not hasChanged && not (exprOld `aeqTerm` exprNew)) $
-    error $ $(curLoc) ++ "Expression changed without notice(" ++ name ++  "): before"
-                      ++ before ++ "\nafter:\n" ++ after
-
-  traceIf (lvl >= DebugName && hasChanged) (name <> " {" <> show nTrans <> "}") $
-    traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite to:\n"
-                      ++ before ++ "\nResult:\n" ++ after ++ "\n") $
-      traceIf (lvl >= DebugAll && not hasChanged) ("No changes when applying rewrite "
-                        ++ name ++ " to:\n" ++ after ++ "\n") $
-        return exprNew
+  if | nTrans - from > limit ->
+         error "-fclash-debug-transformations-limit exceeded"
+     | nTrans <= from ->
+         pure exprNew
+     | otherwise ->
+         go opts
  where
-  before = showPpr exprOld
-  after  = showPpr exprNew
+  go opts = traceIf (hasDebugInfo TryTerm name opts) ("Tried: " ++ name ++ " on:\n" ++ before) $ do
+    nTrans <- pred <$> Lens.use transformCounter
+
+    Monad.when (dbg_countTransformations opts && hasChanged) $ do
+      transformCounters %= HashMap.insertWith (const succ) (Text.pack name) 1
+
+    Monad.when (dbg_invariants opts && hasChanged) $ do
+      tcm                  <- Lens.view tcCache
+      let beforeTy          = termType tcm exprOld
+          beforeFV          = Lens.setOf freeLocalVars exprOld
+          afterTy           = termType tcm exprNew
+          afterFV           = Lens.setOf freeLocalVars exprNew
+          newFV             = not (afterFV `Set.isSubsetOf` beforeFV)
+          accidentalShadows = findAccidentialShadows exprNew
+
+      Monad.when newFV $
+              error ( concat [ $(curLoc)
+                             , "Error when applying rewrite ", name
+                             , " to:\n" , before
+                             , "\nResult:\n" ++ after ++ "\n"
+                             , "It introduces free variables."
+                             , "\nBefore: " ++ showPpr (Set.toList beforeFV)
+                             , "\nAfter: " ++ showPpr (Set.toList afterFV)
+                             ]
+                    )
+      Monad.when (not (null accidentalShadows)) $
+        error ( concat [ $(curLoc)
+                       , "Error when applying rewrite ", name
+                       , " to:\n" , before
+                       , "\nResult:\n" ++ after ++ "\n"
+                       , "It accidentally creates shadowing let/case-bindings:\n"
+                       , " ", showPpr accidentalShadows, "\n"
+                       , "This usually means that a transformation did not extend "
+                       , "or incorrectly extended its InScopeSet before applying a "
+                       , "substitution."
+                       ])
+
+      -- TODO This check should not have the `hasDebugInfo` call in it, as
+      -- setting dbg_invariants should be all that is necessary to check this.
+      -- However, currently this error is very fragile, as Clash currently does
+      -- not keep casts, so "illegally" changing between `Signal dom a` and `a`
+      -- will trigger this error for many designs.
+      --
+      -- This should be changed when #1064 (PR to keep casts in core) is merged.
+      Monad.when (hasDebugInfo AppliedTerm name opts && not (normalizeType tcm beforeTy `aeqType` normalizeType tcm afterTy)) $
+        error ( concat [ $(curLoc)
+                       , "Error when applying rewrite ", name
+                       , " to:\n" , before
+                       , "\nResult:\n" ++ after ++ "\n"
+                       , "Changes type from:\n", showPpr beforeTy
+                       , "\nto:\n", showPpr afterTy
+                       ]
+              )
+
+    Monad.when (dbg_invariants opts && not hasChanged && not (exprOld `aeqTerm` exprNew)) $
+      error $ $(curLoc) ++ "Expression changed without notice(" ++ name ++  "): before"
+                        ++ before ++ "\nafter:\n" ++ after
+
+    traceIf (hasDebugInfo AppliedName name opts && hasChanged) (name <> " {" <> show nTrans <> "}") $
+      traceIf (hasDebugInfo AppliedTerm name opts && hasChanged) ("Changes when applying rewrite to:\n"
+                        ++ before ++ "\nResult:\n" ++ after ++ "\n") $
+        traceIf (hasDebugInfo TryTerm name opts && not hasChanged) ("No changes when applying rewrite "
+                          ++ name ++ " to:\n" ++ after ++ "\n") $
+          return exprNew
+   where
+    before = showPpr exprOld
+    after  = showPpr exprNew
 
 -- | Perform a transformation on a Term
 runRewrite
@@ -307,9 +294,9 @@ runRewriteSession :: RewriteEnv
                   -> RewriteMonad extra a
                   -> a
 runRewriteSession r s m =
-  traceIf (_dbgLevel r >= DebugCount)
+  traceIf (dbg_countTransformations (_debugOpts r))
     ("Clash: Transformations:\n" ++ Text.unpack (showCounters (s' ^. transformCounters))) $
-    traceIf (_dbgLevel r > DebugSilent)
+    traceIf (None < dbg_transformationInfo (_debugOpts r))
       ("Clash: Applied " ++ show (s' ^. transformCounter) ++ " transformations")
       a
   where
@@ -745,7 +732,7 @@ specialise' :: Lens' extra (Map.Map (Id, Int, Either Term Type) Id) -- ^ Lens in
             -> Either Term Type -- ^ Argument to specialize on
             -> RewriteMonad extra Term
 specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
-  lvl <- Lens.view dbgLevel
+  opts <- Lens.view debugOpts
   tcm <- Lens.view tcCache
 
   -- Don't specialise TopEntities
@@ -753,8 +740,11 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
   if f `elemVarSet` topEnts
   then do
     case specArgIn of
-      Left _ -> traceIf (lvl >= DebugNone) ("Not specializing TopEntity: " ++ showPpr (varName f)) (return e)
-      Right tyArg -> traceIf (lvl >= DebugApplied) ("Dropping type application on TopEntity: " ++ showPpr (varName f) ++ "\ntype:\n" ++ showPpr tyArg) $
+      Left _ -> do
+        traceM ("Not specializing TopEntity: " ++ showPpr (varName f))
+        return e
+      Right tyArg ->
+        traceIf (hasTransformationInfo AppliedTerm opts) ("Dropping type application on TopEntity: " ++ showPpr (varName f) ++ "\ntype:\n" ++ showPpr tyArg) $
         -- TopEntities aren't allowed to be semantically polymorphic.
         -- But using type equality constraints they may be syntactically polymorphic.
         -- > topEntity :: forall dom . (dom ~ "System") => Signal dom Bool -> Signal dom Bool
@@ -778,7 +768,7 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
   case specM of
     -- Use previously specialized function
     Just f' ->
-      traceIf (lvl >= DebugApplied)
+      traceIf (hasTransformationInfo AppliedTerm opts)
         ("Using previous specialization of " ++ showPpr (varName f) ++ " on " ++
           (either showPpr showPpr) specAbs ++ ": " ++ showPpr (varName f')) $
         changed $ mkApps (mkTicks (Var f') ticks) (args ++ specVars)

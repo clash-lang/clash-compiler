@@ -1,8 +1,9 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
-                     2016-2017, Myrtle Software Ltd
+                     2016-2017, Myrtle Software Ltd,
+                     2021,      QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
@@ -54,9 +55,12 @@ parseClashFlagsFull flagsAvialable args = do
 flagsClash :: IORef ClashOpts -> [Flag IO]
 flagsClash r = [
     defFlag "fclash-debug"                       $ SepArg (setDebugLevel r)
+  , defFlag "fclash-debug-info"                  $ SepArg (setDebugInfo r)
+  , defFlag "fclash-debug-invariants"            $ NoArg (liftEwM (setDebugInvariants r))
+  , defFlag "fclash-debug-count-transformations" $ NoArg (liftEwM (setDebugCountTransformations r))
   , defFlag "fclash-debug-transformations"       $ SepArg (setDebugTransformations r)
-  , defFlag "fclash-debug-transformations-from"  $ OptIntSuffix (setDebugTransformationsFrom r)
-  , defFlag "fclash-debug-transformations-limit" $ OptIntSuffix (setDebugTransformationsLimit r)
+  , defFlag "fclash-debug-transformations-from"  $ IntSuffix (setDebugTransformationsFrom r)
+  , defFlag "fclash-debug-transformations-limit" $ IntSuffix (setDebugTransformationsLimit r)
   , defFlag "fclash-debug-history"               $ AnySuffix (liftEwM . (setRewriteHistoryFile r))
   , defFlag "fclash-hdldir"                      $ SepArg (setHdlDir r)
   , defFlag "fclash-hdlsyn"                      $ SepArg (setHdlSyn r)
@@ -136,31 +140,92 @@ setSpecLimit :: IORef ClashOpts
              -> IO ()
 setSpecLimit r n = modifyIORef r (\c -> c {opt_specLimit = n})
 
+setDebugInvariants :: IORef ClashOpts -> IO ()
+setDebugInvariants r =
+  modifyIORef r $ \c ->
+    c { opt_debug = (opt_debug c) { dbg_invariants = True } }
+
+setDebugCountTransformations :: IORef ClashOpts -> IO ()
+setDebugCountTransformations r =
+  modifyIORef r $ \c ->
+    c { opt_debug = (opt_debug c) { dbg_countTransformations = True } }
+
 setDebugTransformations :: IORef ClashOpts -> String -> EwM IO ()
 setDebugTransformations r s =
-  liftEwM (modifyIORef r (\c -> c {opt_dbgTransformations = transformations}))
+  liftEwM (modifyIORef r (setTransformations transformations))
  where
   transformations = Set.fromList (filter (not . null) (map trim (splitOn "," s)))
   trim = dropWhileEnd isSpace . dropWhile isSpace
 
-setDebugTransformationsFrom :: IORef ClashOpts -> Maybe Int -> EwM IO ()
-setDebugTransformationsFrom r (Just n) =
-  liftEwM (modifyIORef r (\c -> c {opt_dbgTransformationsFrom = n}))
-setDebugTransformationsFrom _r Nothing = pure ()
+  setTransformations xs opts =
+    opts { opt_debug = (opt_debug opts) { dbg_transformations = xs } }
 
-setDebugTransformationsLimit :: IORef ClashOpts -> Maybe Int -> EwM IO ()
-setDebugTransformationsLimit r (Just n) =
-  liftEwM (modifyIORef r (\c -> c {opt_dbgTransformationsLimit = n}))
-setDebugTransformationsLimit _r Nothing = pure ()
+setDebugTransformationsFrom :: IORef ClashOpts -> Int -> EwM IO ()
+setDebugTransformationsFrom r n =
+  liftEwM (modifyIORef r (setFrom (fromIntegral n)))
+ where
+  setFrom from opts =
+    opts { opt_debug = (opt_debug opts) { dbg_transformationsFrom = Just from } }
 
-setDebugLevel :: IORef ClashOpts
-              -> String
-              -> EwM IO ()
-setDebugLevel r s = case readMaybe s of
-  Just dbgLvl -> liftEwM $ do
-                   modifyIORef r (\c -> c {opt_dbgLevel = dbgLvl})
-                   when (dbgLvl > DebugNone) $ setNoCache r -- when debugging disable cache
-  Nothing     -> addWarn (s ++ " is an invalid debug level")
+setDebugTransformationsLimit :: IORef ClashOpts -> Int -> EwM IO ()
+setDebugTransformationsLimit r n =
+  liftEwM (modifyIORef r (setLimit (fromIntegral n)))
+ where
+  setLimit limit opts =
+    opts { opt_debug = (opt_debug opts) { dbg_transformationsLimit = Just limit } }
+
+setDebugLevel :: IORef ClashOpts -> String -> EwM IO ()
+setDebugLevel r s =
+  case s of
+    "DebugNone" ->
+      liftEwM $ modifyIORef r (setLevel debugNone)
+    "DebugSilent" ->
+      liftEwM $ do
+        modifyIORef r (setLevel debugSilent)
+        setNoCache r
+    "DebugFinal" ->
+      liftEwM $ do
+        modifyIORef r (setLevel debugFinal)
+        setNoCache r
+    "DebugCount" ->
+      liftEwM $ do
+        modifyIORef r (setLevel debugCount)
+        setNoCache r
+    "DebugName" ->
+      liftEwM $ do
+        modifyIORef r (setLevel debugName)
+        setNoCache r
+    "DebugTry" ->
+      liftEwM $ do
+        modifyIORef r (setLevel debugTry)
+        setNoCache r
+    "DebugApplied" ->
+      liftEwM $ do
+        modifyIORef r (setLevel debugApplied)
+        setNoCache r
+    "DebugAll" ->
+      liftEwM $ do
+        modifyIORef r (setLevel debugAll)
+        setNoCache r
+    _ ->
+      addWarn (s ++ " is an invalid debug level")
+ where
+  setLevel lvl opts =
+    opts { opt_debug = lvl }
+
+setDebugInfo :: IORef ClashOpts -> String -> EwM IO ()
+setDebugInfo r s =
+  case readMaybe s of
+    Just info ->
+      liftEwM $ do
+        modifyIORef r (setInfo info)
+        when (info /= None) (setNoCache r)
+
+    Nothing ->
+      addWarn (s ++ " is an invalid debug info")
+ where
+  setInfo info opts =
+    opts { opt_debug = (opt_debug opts) { dbg_transformationInfo = info } }
 
 setNoCache :: IORef ClashOpts -> IO ()
 setNoCache r = modifyIORef r (\c -> c {opt_cachehdl = False})
@@ -251,4 +316,7 @@ setRewriteHistoryFile r arg = do
   let fileNm = case drop (length "-fclash-debug-history=") arg of
                 [] -> "history.dat"
                 str -> str
-  modifyIORef r (\c -> c {opt_dbgRewriteHistoryFile = Just fileNm})
+  modifyIORef r (setFile fileNm)
+ where
+  setFile file opts =
+    opts { opt_debug = (opt_debug opts) { dbg_historyFile = Just file } }

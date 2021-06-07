@@ -33,6 +33,34 @@ Clash Compiler Flags
 
   **Default:** ``DebugNone``
 
+  .. info:: This flag exists for backwards compatibility. It is now possible to
+  set debugging flags individually with `-fclash-debug-invariants`,
+  `-fclash-debug-info` and `-fclash-debug-count-transformations`.
+
+-fclash-debug-invariants
+  Check invariants while debugging and print warnings / errors which may be
+  useful, such as alterting when unexpected changes occur or when a
+  transformation introduces free variables / shadowing.
+
+-fclash-debug-info
+  Specify the information to show about individual transformations while
+  debugging. From least to most information, these are
+
+  - ``None`` to show no information
+  - ``FinalTerm`` to show the final result of normalization
+  - ``AppliedName`` to show the names of applied transformations
+  - ``AppliedTerm`` to show the result of applied transformations
+  - ``TryName`` to show the names of attempted transforamtions, as well as the
+    result of any transformations which are applied
+  - ``TryTerm`` to show the names and results of all transformations attempted
+    whether they were applied or not
+
+    **Default:** ``None``
+
+-fclash-debug-count-transformations
+  Count the transformations that are applied and print a summary at the end
+  of the normalization phase.
+
 -fclash-debug-history[=FILENAME]
   Saves all applied rewrites into ``FILENAME``,
   for later analysis with the clash-term tool.
@@ -48,8 +76,8 @@ Clash Compiler Flags
 
   **Default:** []
 
--fclash-debug-transformations-from
-  Only print debug output from applied transformation ``n`` and onwards.
+-fclash-debug-transformations-from=N
+  Only print debug output from applied transformation ``N`` and onwards.
 
   .. code-block:: bash
 
@@ -57,8 +85,8 @@ Clash Compiler Flags
 
   **Default:** 0
 
--fclash-debug-transformations-limit
-  Only print debug output for ``n`` applied transformations.
+-fclash-debug-transformations-limit=N
+  Only print debug output for ``N`` applied transformations.
 
   .. code-block:: bash
 

@@ -1,9 +1,10 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016     , Myrtle Software Ltd,
-                     2017     , Google Inc.
+                     2017     , Google Inc.,
+                     2021     , QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Turn CoreHW terms into normalized CoreHW Terms
 -}
@@ -65,7 +66,7 @@ import           Clash.Core.VarEnv
    mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
 import           Clash.Debug                      (traceIf)
 import           Clash.Driver.Types
-  (BindingMap, Binding(..), ClashOpts (..), DebugLevel (..))
+  (BindingMap, Binding(..), ClashOpts (..), DebugOpts(..))
 import           Clash.Netlist.Types
   (HWMap, FilteredHWType(..))
 import           Clash.Netlist.Util
@@ -77,7 +78,7 @@ import           Clash.Normalize.Util
 import           Clash.Primitives.Types           (CompiledPrimMap)
 import           Clash.Rewrite.Combinators        ((>->),(!->),repeatR,topdownR)
 import           Clash.Rewrite.Types
-  (RewriteEnv (..), RewriteState (..), bindings, dbgLevel, dbgRewriteHistoryFile, extra,
+  (RewriteEnv (..), RewriteState (..), bindings, debugOpts, extra,
    tcCache, topEntities)
 import           Clash.Rewrite.Util
   (apply, isUntranslatableType, runRewriteSession)
@@ -123,11 +124,7 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm eval primMap rcs
   = runRewriteSession rwEnv rwState
   where
     rwEnv     = RewriteEnv
-                  (opt_dbgLevel opts)
-                  (opt_dbgTransformations opts)
-                  (opt_dbgTransformationsFrom opts)
-                  (opt_dbgTransformationsLimit opts)
-                  (opt_dbgRewriteHistoryFile opts)
+                  (opt_debug opts)
                   (opt_aggressiveXOpt opts)
                   typeTrans
                   tcm
@@ -238,8 +235,8 @@ normalize' nm = do
             -- for the ByteArray# inside of a Natural constant.
             -- (GHC-8.4 does this with tests/shouldwork/Numbers/Exp.hs)
             -- It will later be inlined by flattenCallTree.
-            lvl <- Lens.view dbgLevel
-            traceIf (lvl > DebugNone)
+            opts <- Lens.view debugOpts
+            traceIf (dbg_invariants opts)
                     (concat [$(curLoc), "Expr belonging to bndr: ", nmS, " (:: "
                             , showPpr (varType nm')
                             , ") has a non-representable return type."
@@ -377,7 +374,8 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm)) used) = do
       let tm1 = substTm "flattenCallTree.flattenExpr" subst tm
 
       -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
-      rewriteHistFile <- Lens.view dbgRewriteHistoryFile
+      opts <- Lens.view debugOpts
+      let rewriteHistFile = dbg_historyFile opts
       when (Maybe.isJust rewriteHistFile) $
         let !_ = unsafePerformIO
              $ BS.appendFile (Maybe.fromJust rewriteHistFile)

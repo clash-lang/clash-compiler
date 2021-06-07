@@ -22,7 +22,7 @@ import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
 import Clash.Core.VarEnv (InScopeSet, emptyVarSet, emptyVarEnv, emptyInScopeSet)
-import Clash.Driver.Types (DebugLevel(DebugSilent))
+import Clash.Driver.Types (debugSilent)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (runRewrite)
 import Clash.Normalize.Types
@@ -44,7 +44,6 @@ import qualified Language.Haskell.TH.Quote as TH
 import qualified Data.List as List
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import qualified Data.IntMap as IntMap
 import qualified Data.Text as Text
 
@@ -61,11 +60,7 @@ lookupTM u tm = case HashMap.lookup u tm of
 
 instance Default RewriteEnv where
   def = RewriteEnv
-    { _dbgLevel=DebugSilent
-    , _dbgTransformations=Set.empty
-    , _dbgTransformationsFrom=0
-    , _dbgTransformationsLimit=maxBound
-    , _dbgRewriteHistoryFile=Nothing
+    { _debugOpts=debugSilent
     , _aggressiveXOpt=False
     , _typeTranslator=error "_typeTranslator: NYI"
     , _tcCache=emptyUniqMap

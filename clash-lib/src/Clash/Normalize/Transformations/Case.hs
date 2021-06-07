@@ -67,14 +67,14 @@ import Clash.Core.VarEnv
   ( InScopeSet, elemVarSet, extendInScopeSet, extendInScopeSetList, mkVarSet
   , unitVarSet, uniqAway)
 import Clash.Debug (traceIf)
-import Clash.Driver.Types (DebugLevel(..))
+import Clash.Driver.Types (DebugOpts(dbg_invariants))
 import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
 import Clash.Netlist.Util (coreTypeToHWType, representableType)
 import qualified Clash.Normalize.Primitives as NP (undefined)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Combinators ((>-!))
 import Clash.Rewrite.Types
-  ( TransformContext(..), bindings, customReprs, dbgLevel, tcCache
+  ( TransformContext(..), bindings, customReprs, debugOpts, tcCache
   , typeTranslator, workFreeBinders)
 import Clash.Rewrite.Util (apply, changed, isFromInt, whnfRW)
 import Clash.Rewrite.WorkFree
@@ -283,19 +283,15 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
             -- that.
             -> caseCon ctx1 (Case (Literal (IntegerLiteral 0)) ty alts)
           _ -> do
-            let ret = caseOneAlt e
-            -- Otherwise check whether the entire case-expression has a single
-            -- alternative, and pick that one.
-            lvl <- Lens.view dbgLevel
-            if lvl > DebugNone then do
-              let subjIsConst = isConstant subj
-              -- In debug mode we always report missing evaluation rules for the
-              -- primitive evaluator
-              traceIf (lvl > DebugNone && subjIsConst)
-                      ("Unmatchable constant as case subject: " ++ showPpr subj ++
-                       "\nWHNF is: " ++ showPpr subj1) ret
-            else
-              ret
+            opts <- Lens.view debugOpts
+            -- When invariants are being checked, report missing evaluation
+            -- rules for the primitive evaluator.
+            traceIf (dbg_invariants opts && isConstant subj)
+              ("Unmatchable constant as case subject: " ++ showPpr subj ++
+                 "\nWHNF is: " ++ showPpr subj1)
+              -- Otherwise check whether the entire case-expression has a
+              -- single alternative, and pick that one.
+              (caseOneAlt e)
 
   -- The subject is a variable
   (Var v, [], _) | isNum0 (varType v) ->

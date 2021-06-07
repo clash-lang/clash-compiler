@@ -36,7 +36,6 @@ import Data.Hashable                         (Hashable)
 import Data.HashMap.Strict                   (HashMap)
 import Data.IntMap.Strict                    (IntMap)
 import Data.Monoid                           (Any)
-import qualified Data.Set                    as Set
 import Data.Text                             (Text)
 import GHC.Generics
 
@@ -52,7 +51,7 @@ import Clash.Core.Type           (Type)
 import Clash.Core.TyCon          (TyConName, TyConMap)
 import Clash.Core.Var            (Id)
 import Clash.Core.VarEnv         (InScopeSet, VarSet, VarEnv)
-import Clash.Driver.Types        (BindingMap, DebugLevel)
+import Clash.Driver.Types        (BindingMap, DebugOpts)
 import Clash.Netlist.Types       (FilteredHWType, HWMap)
 import Clash.Rewrite.WorkFree    (isWorkFree)
 import Clash.Util
@@ -111,16 +110,8 @@ Lens.makeLenses ''RewriteState
 -- | Read-only environment of a rewriting session
 data RewriteEnv
   = RewriteEnv
-  { _dbgLevel       :: DebugLevel
-  -- ^ Level at which we print debugging messages
-  , _dbgTransformations :: Set.Set String
-  -- ^ See ClashOpts.dbgTransformations
-  , _dbgTransformationsFrom :: Word
-  -- ^ See ClashOpts.opt_dbgTransformationsFrom
-  , _dbgTransformationsLimit :: Word
-  -- ^ See ClashOpts.opt_dbgTransformationsLimit
-  , _dbgRewriteHistoryFile :: Maybe FilePath
-  -- ^ See ClashOpts.opt_dbgRewriteHistory
+  { _debugOpts      :: DebugOpts
+  -- ^ Options for debugging during rewriting
   , _aggressiveXOpt :: Bool
   -- ^ Transformations to print debugging info for
   , _typeTranslator :: CustomReprs

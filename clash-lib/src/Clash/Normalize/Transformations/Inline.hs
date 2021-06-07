@@ -73,13 +73,13 @@ import Clash.Core.VarEnv
   , foldlWithUniqueVarEnv', lookupVarEnv, lookupVarEnvDirectly, mkVarEnv
   , notElemVarSet, unionVarEnv, unionVarEnvWith, unitVarSet)
 import Clash.Debug (trace, traceIf)
-import Clash.Driver.Types (Binding(..), DebugLevel(..))
+import Clash.Driver.Types (Binding(..), DebugOpts(dbg_invariants))
 import Clash.Netlist.Util (representableType)
 import Clash.Primitives.Types
   (CompiledPrimMap, Primitive(..), TemplateKind(..))
 import Clash.Rewrite.Combinators (allR)
 import Clash.Rewrite.Types
-  ( TransformContext(..), bindings, curFun, customReprs, dbgLevel, extra
+  ( TransformContext(..), bindings, curFun, customReprs, debugOpts, extra
   , tcCache, topEntities, typeTranslator)
 import Clash.Rewrite.Util
   ( changed, inlineBinders, inlineOrLiftBinders, isJoinPointIn
@@ -392,8 +392,8 @@ inlineHO _ e@(App _ _)
               limit     <- Lens.use (extra.inlineLimit)
               if (Maybe.fromMaybe 0 isInlined) > limit
                 then do
-                  lvl <- Lens.view dbgLevel
-                  traceIf (lvl > DebugNone) ($(curLoc) ++ "InlineHO: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf) (return e)
+                  opts <- Lens.view debugOpts
+                  traceIf (dbg_invariants opts) ($(curLoc) ++ "InlineHO: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf) (return e)
                 else do
                   bodyMaybe <- lookupVarEnv f <$> Lens.use bindings
                   case bodyMaybe of

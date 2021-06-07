@@ -2,7 +2,7 @@
   Copyright  :  (C) 2013-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017     , QBayLogic, Google Inc.
-                    2020     , QBayLogic
+                    2020-2021, QBayLogic
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -24,6 +24,8 @@ import           Control.DeepSeq                (NFData)
 import           Data.Binary                    (Binary)
 import           Data.Fixed
 import           Data.Hashable
+import           Data.Maybe                     (isJust)
+import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
 import           Data.Text                      (Text)
 import           Data.Text.Prettyprint.Doc
@@ -78,25 +80,172 @@ data Binding a = Binding
 -- Global functions cannot be mutually recursive, only self-recursive.
 type BindingMap = VarEnv (Binding Term)
 
--- | Debug Message Verbosity
-data DebugLevel
-  = DebugNone
-  -- ^ Don't show debug messages
-  | DebugSilent
-  -- ^ Run invariant checks and err if violated (enabled by any debug flag)
-  | DebugFinal
-  -- ^ Show completely normalized expressions
-  | DebugCount
-  -- ^ Count transformations
-  | DebugName
-  -- ^ Show names of applied transformations
-  | DebugTry
-  -- ^ Show names of tried AND applied transformations
-  | DebugApplied
-  -- ^ Show sub-expressions after a successful rewrite
-  | DebugAll
-  -- ^ Show all sub-expressions on which a rewrite is attempted
-  deriving (Eq,Ord,Read,Enum,Generic,Hashable)
+-- | Information to show about transformations during compilation.
+--
+-- __NB__: The @Ord@ instance compares by amount of information.
+data TransformationInfo
+  = None
+  -- ^ Show no information about transformations.
+  | FinalTerm
+  -- ^ Show the final term after all applied transformations.
+  | AppliedName
+  -- ^ Show the name of every transformation that is applied.
+  | AppliedTerm
+  -- ^ Show the name and result of every transformation that is applied.
+  | TryName
+  -- ^ Show the name of every transformation that is attempted, and the result
+  -- of every transformation that is applied.
+  | TryTerm
+  -- ^ Show the name and input to every transformation that is applied, and
+  -- the result of every transformation that is applied.
+  deriving (Eq, Generic, Hashable, Ord, Read, Show)
+
+-- | Options related to debugging. See 'ClashOpts'
+data DebugOpts = DebugOpts
+  { dbg_invariants :: Bool
+  -- ^ Check that the results of applied transformations do not violate the
+  -- invariants for rewriting (e.g. no accidental shadowing, or type changes).
+  --
+  -- Command line flag: -fclash-debug-invariants
+  , dbg_transformationInfo :: TransformationInfo
+  -- ^ The information to show when debugging a transformation. See the
+  -- 'TransformationInfo' type for different configurations.
+  --
+  -- Command line flag: -fclash-debug-info (None|FinalTerm|AppliedName|AppliedTerm|TryName|TryTerm)
+  , dbg_transformations :: Set String
+  -- ^ List the transformations that are being debugged. When the set is empty,
+  -- all transformations are debugged.
+  --
+  -- Command line flag: -fclash-debug-transformations t1[,t2...]
+  , dbg_countTransformations :: Bool
+  -- ^ Count how many times transformations are applied and provide a summary
+  -- at the end of normalization. This includes all transformations, not just
+  -- those in 'dbg_transformations'.
+  --
+  -- Command line flag: -fclash-debug-count-transformations
+  , dbg_transformationsFrom :: Maybe Word
+  -- ^ Debug transformations applied after the nth transformation applied. This
+  -- includes all transformations, not just those in 'dbg_transformations'.
+  --
+  -- Command line flag: -fclash-debug-transformations-from=N
+  , dbg_transformationsLimit :: Maybe Word
+  -- ^ Debug up to the nth applied transformation. If this limit is exceeded
+  -- then Clash will error. This includes all transformations, not just those
+  -- in 'dbg_transformations'.
+  --
+  -- Command line flag: -fclash-debug-transformations-limit=N
+  , dbg_historyFile :: Maybe FilePath
+  -- ^ Save information about all applied transformations to a history file
+  -- for use with @clash-term@.
+  --
+  -- Command line flag: -fclash-debug-history[=FILE]
+  } deriving (Show)
+
+instance Hashable DebugOpts where
+  hashWithSalt s DebugOpts{..} =
+    s `hashWithSalt`
+    dbg_invariants `hashWithSalt`
+    dbg_transformationInfo `hashSet`
+    dbg_transformations `hashWithSalt`
+    dbg_countTransformations `hashWithSalt`
+    dbg_transformationsFrom `hashWithSalt`
+    dbg_transformationsLimit `hashWithSalt`
+    dbg_historyFile
+   where
+    hashSet = Set.foldl' hashWithSalt
+    infixl 0 `hashSet`
+
+-- | Check whether the debugging options mean the compiler is debugging. This
+-- is true only if at least one debugging feature is enabled, namely one of
+--
+--   * checking for invariants
+--   * showing info for transformations
+--   * counting applied transformations
+--   * limiting the number of transformations
+--
+-- Other flags, such as writing to a history file or offsetting which applied
+-- transformation to show information from do not affect the result, as it is
+-- possible to enable these but still not perform any debugging checks in
+-- functions like 'applyDebug'. If this is no longer the case, this function
+-- will need to be changed.
+isDebugging :: DebugOpts -> Bool
+isDebugging opts = or
+  [ dbg_invariants opts
+  , dbg_transformationInfo opts > None
+  , dbg_countTransformations opts
+  , isJust (dbg_transformationsLimit opts)
+  ]
+
+-- | Check whether the requested information is available to the specified
+-- transformation according to the options. e.g.
+--
+-- @
+-- traceIf (hasDebugInfo AppliedName name opts) ("Trace something using: " <> show name)
+-- @
+--
+-- This accounts for the set of transformations which are being debugged. For a
+-- check which is agnostic to the a transformation, see 'hasTransformationInfo'.
+hasDebugInfo :: TransformationInfo -> String -> DebugOpts -> Bool
+hasDebugInfo info name opts =
+  isDebugged name && hasTransformationInfo info opts
+ where
+  isDebugged n =
+    let set = dbg_transformations opts
+     in Set.null set || Set.member n set
+
+-- | Check that the transformation info shown supports the requested info.
+-- If the call-site is in the context of a particular transformation,
+-- 'hasDebugInfo' should be used instead.
+hasTransformationInfo :: TransformationInfo -> DebugOpts -> Bool
+hasTransformationInfo info opts =
+  info <= dbg_transformationInfo opts
+
+-- NOTE [debugging options]
+--
+-- The preset debugging options here provide backwards compatibility with the
+-- old style DebugLevel enum. However it is also possible to have finer-grained
+-- control over debugging by using individual flags which did not previously
+-- exist, e.g. -fclash-debug-invariants.
+
+-- | -fclash-debug DebugNone
+debugNone :: DebugOpts
+debugNone = DebugOpts
+  { dbg_invariants = False
+  , dbg_transformationInfo = None
+  , dbg_transformations = Set.empty
+  , dbg_countTransformations = False
+  , dbg_transformationsFrom = Nothing
+  , dbg_transformationsLimit = Nothing
+  , dbg_historyFile = Nothing
+  }
+
+-- | -fclash-debug DebugSilent
+debugSilent :: DebugOpts
+debugSilent = debugNone { dbg_invariants = True }
+
+-- | -fclash-debug DebugFinal
+debugFinal :: DebugOpts
+debugFinal = debugSilent { dbg_transformationInfo = FinalTerm }
+
+-- | -fclash-debug DebugCount
+debugCount :: DebugOpts
+debugCount = debugFinal { dbg_countTransformations = True }
+
+-- | -fclash-debug DebugName
+debugName :: DebugOpts
+debugName = debugCount { dbg_transformationInfo = AppliedName }
+
+-- | -fclash-debug DebugTry
+debugTry :: DebugOpts
+debugTry = debugName { dbg_transformationInfo = TryName }
+
+-- | -fclash-debug DebugApplied
+debugApplied :: DebugOpts
+debugApplied = debugTry { dbg_transformationInfo = AppliedTerm }
+
+-- | -fclash-debug DebugAll
+debugAll :: DebugOpts
+debugAll = debugApplied { dbg_transformationInfo = TryTerm }
 
 -- | Options passed to Clash compiler
 data ClashOpts = ClashOpts
@@ -124,30 +273,8 @@ data ClashOpts = ClashOpts
   -- of zero means no potentially non-terminating binding is unfolded.
   --
   -- Command line flag: -fclash-evaluator-fuel-limit
-  , opt_dbgLevel :: DebugLevel
-  -- ^ Set the debugging mode for the compiler, exposing additional output. See
-  -- "DebugLevel" for the available options.
-  --
-  -- Command line flag: -fclash-debug
-  , opt_dbgTransformations :: Set.Set String
-  -- ^ List the transformations that are to be debugged.
-  --
-  -- Command line flag: -fclash-debug-transformations
-  , opt_dbgTransformationsFrom :: Word
-  -- ^ Only output debug information from (applied) transformation n
-  --
-  -- Command line flag: -fclash-debug-transformations-from
-  , opt_dbgTransformationsLimit :: Word
-  -- ^ Only output debug information for n (applied) transformations. If this
-  -- limit is exceeded, Clash will stop normalizing.
-  --
-  -- Command line flag: -fclash-debug-transformations-limit
-
-  , opt_dbgRewriteHistoryFile :: Maybe FilePath
-  -- ^ Save all applied rewrites to a file
-  --
-  -- Command line flag: -fclash-debug-history
-
+  , opt_debug :: DebugOpts
+  -- ^ Options which control debugging. See 'DebugOpts'.
   , opt_cachehdl :: Bool
   -- ^ Reuse previously generated output from Clash. Only caches topentities.
   --
@@ -231,11 +358,6 @@ instance Hashable ClashOpts where
     opt_inlineFunctionLimit `hashWithSalt`
     opt_inlineConstantLimit `hashWithSalt`
     opt_evaluatorFuelLimit `hashWithSalt`
-    opt_dbgLevel `hashSet`
-    opt_dbgTransformations `hashWithSalt`
-    opt_dbgTransformationsFrom `hashWithSalt`
-    opt_dbgTransformationsLimit `hashWithSalt`
-    opt_dbgRewriteHistoryFile `hashWithSalt`
     opt_cachehdl `hashWithSalt`
     opt_clear `hashWithSalt`
     opt_primWarn `hashOverridingBool`
@@ -264,23 +386,15 @@ instance Hashable ClashOpts where
     hashOverridingBool s1 Never = hashWithSalt s1 (2 :: Int)
     infixl 0 `hashOverridingBool`
 
-    hashSet :: Hashable a => Int -> Set.Set a -> Int
-    hashSet = Set.foldl' hashWithSalt
-    infixl 0 `hashSet`
-
 defClashOpts :: ClashOpts
 defClashOpts
   = ClashOpts
-  { opt_dbgLevel            = DebugNone
-  , opt_dbgRewriteHistoryFile = Nothing
-  , opt_dbgTransformations  = Set.empty
-  , opt_dbgTransformationsFrom = 0
-  , opt_dbgTransformationsLimit = maxBound
-  , opt_inlineLimit         = 20
+  { opt_inlineLimit         = 20
   , opt_specLimit           = 20
   , opt_inlineFunctionLimit = 15
   , opt_inlineConstantLimit = 0
   , opt_evaluatorFuelLimit  = 20
+  , opt_debug               = debugNone
   , opt_cachehdl            = True
   , opt_clear               = False
   , opt_primWarn            = True
