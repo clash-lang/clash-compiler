@@ -13,7 +13,7 @@ topEntity clk rst en = o2
     where
         o1 = withClockResetEnable clk rst enMerged $ register 1 $ succ <$> o1
         o2 = CEP.register clk rst enMerged 0 o1
-        enMerged = CEP.enable en (pure True)
+        enMerged = CEP.andEnable en (pure True)
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool

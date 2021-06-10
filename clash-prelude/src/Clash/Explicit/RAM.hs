@@ -36,7 +36,7 @@ import GHC.TypeLits          (KnownNat)
 import qualified Data.Sequence as Seq
 
 import Clash.Explicit.Signal
-  (unbundle, unsafeSynchronizer, KnownDomain, enable)
+  (unbundle, unsafeSynchronizer, KnownDomain, andEnable)
 import Clash.Promoted.Nat    (SNat (..), snatToNum, pow2SNat)
 import Clash.Signal.Internal (Clock (..), Signal (..), Enable, fromEnable)
 import Clash.Sized.Unsigned  (Unsigned)
@@ -139,7 +139,7 @@ asyncRam# wclk rclk en sz rd we wr din =
     ramI = Seq.replicate
               (snatToNum sz)
               (withFrozenCallStack (errorX "asyncRam#: initial value undefined"))
-    en' = fromEnable (enable en we)
+    en' = fromEnable (andEnable en we)
     dout = go ramI rd' en' wr din
     szI = snatToNum sz :: Int
 
