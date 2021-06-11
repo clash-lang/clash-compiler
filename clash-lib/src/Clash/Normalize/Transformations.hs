@@ -2041,9 +2041,10 @@ inlineHO _ e = return e
 -- On the two examples that were tested, Reducer and PipelinesViaFolds, this new
 -- version of CSE removed the same amount of let-binders.
 simpleCSE :: HasCallStack => NormRewrite
-simpleCSE (TransformContext is0 _) (inverseTopSortLetBindings -> Letrec bndrs body) = do
+simpleCSE (TransformContext is0 _) term@Letrec{} = do
+  let Letrec bndrs body = inverseTopSortLetBindings term
   let is1 = extendInScopeSetList is0 (map fst bndrs)
-  (subst,bndrs1) <- reduceBinders (mkSubst is1) [] bndrs
+  ((subst,bndrs1), change) <- listen $ reduceBinders (mkSubst is1) [] bndrs
   -- TODO: check whether a substitution over the body is enough, the reason I'm
   -- doing a substitution over the the binders as well is that I don't know in
   -- what order a recursive group shows up in a inverse topological sort.
@@ -2053,9 +2054,13 @@ simpleCSE (TransformContext is0 _) (inverseTopSortLetBindings -> Letrec bndrs bo
   -- NB: don't apply the substitution to the entire let-expression, and that
   -- would rename the let-bindings because they've been added to the InScopeSet
   -- of the substitution.
-  let bndrs2 = map (second (substTm "simpleCSE.bndrs" subst)) bndrs1
-      body1  = substTm "simpleCSE.body" subst body
-  return (Letrec bndrs2 body1)
+  if Monoid.getAny change
+    then
+      let bndrs2 = map (second (substTm "simpleCSE.bndrs" subst)) bndrs1
+          body1  = substTm "simpleCSE.body" subst body
+       in changed (Letrec bndrs2 body1)
+    else
+      return term
 
 simpleCSE _ e = return e
 {-# SCC simpleCSE #-}
