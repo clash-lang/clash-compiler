@@ -76,7 +76,6 @@ nix-build:
   script:
     - nix-build -j$(./.ci/effective_cpus.sh)
 
-# Tests run on shared runners:
 haddock:
   extends: .common
   needs: []
@@ -87,8 +86,8 @@ haddock:
     expire_in: 1 month
   script:
     - .ci/build_docs.sh
-  # Run on shared runners
   tags:
+    - local
 
 # # Run benchmarks for isclashfastyet.com
 # benchmark-8.10.2:

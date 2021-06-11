@@ -11,6 +11,8 @@ hackage-sdist:
     paths:
       - clash-*.tar.gz  # clash-{prelude,lib,ghc}-$version{-docs,}.tar.gz
     expire_in: 1 week
+  tags:
+    - local
 
 .hackage:
   extends: .common
