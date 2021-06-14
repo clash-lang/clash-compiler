@@ -1257,11 +1257,13 @@ constantSpec ctx@(TransformContext is0 tfCtx) e@(App e1 e2)
          else do
            -- Parts of e2 are constant
            let is1 = extendInScopeSetList is0 (fst <$> csrNewBindings specInfo)
-           Letrec newBindings
-            <$> specializeNorm
-                  (TransformContext is1 tfCtx)
-                  (App e1 (csrNewTerm specInfo))
+           (body, isSpec) <- listen $ specializeNorm
+             (TransformContext is1 tfCtx)
+             (App e1 (csrNewTerm specInfo))
 
+           if Monoid.getAny isSpec
+             then changed (Letrec newBindings body)
+             else return e
        else
         -- e2 has no constant parts
         return e
