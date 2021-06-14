@@ -22,7 +22,9 @@ module Clash.Normalize.Transformations.Specialize
 
 import qualified Control.Lens as Lens
 import Control.Monad.Extra (orM)
+import qualified Control.Monad.Writer as Writer (listen)
 import qualified Data.Either as Either
+import qualified Data.Monoid as Monoid (getAny)
 import GHC.Stack (HasCallStack)
 
 import Clash.Core.FreeVars (termFreeTyVars, typeFreeVars)
@@ -44,7 +46,7 @@ import Clash.Rewrite.Combinators (topdownR)
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, censor, customReprs, tcCache
   , typeTranslator, workFreeBinders)
-import Clash.Rewrite.Util (mkDerivedName, mkTmBinderFor, setChanged)
+import Clash.Rewrite.Util (mkDerivedName, mkTmBinderFor, setChanged, changed)
 import Clash.Rewrite.WorkFree (isWorkFree)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Normalize.Util
@@ -234,11 +236,13 @@ constantSpec ctx@(TransformContext is0 tfCtx) e@(App e1 e2)
          else do
            -- Parts of e2 are constant
            let is1 = extendInScopeSetList is0 (fst <$> csrNewBindings specInfo)
-           Letrec newBindings
-            <$> specializeNorm
-                  (TransformContext is1 tfCtx)
-                  (App e1 (csrNewTerm specInfo))
+           (body, isSpec) <- Writer.listen $ specializeNorm
+             (TransformContext is1 tfCtx)
+             (App e1 (csrNewTerm specInfo))
 
+           if Monoid.getAny isSpec
+             then changed (Letrec newBindings body)
+             else return e
        else
         -- e2 has no constant parts
         return e

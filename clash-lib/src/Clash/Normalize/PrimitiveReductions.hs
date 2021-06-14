@@ -485,7 +485,7 @@ reduceIterateI (TransformContext is0 ctx) n aTy vTy f0 a = do
   --   in
   --     (a :> el1 :> el2 :> el3 :> ..)
   --
-  pure (Letrec (zip elementIds elems) vec)
+  changed (Letrec (zip elementIds elems) vec)
 
 -- | Replace an application of the @Clash.Sized.Vector.traverse#@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
