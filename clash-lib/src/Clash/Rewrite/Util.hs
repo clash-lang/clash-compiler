@@ -275,7 +275,7 @@ applyDebug lvl _transformations _fromLimit name exprOld hasChanged exprNew =
                      ]
             ) (return ())
 
-  Monad.when (lvl >= DebugApplied && not hasChanged && not (exprOld `aeqTerm` exprNew)) $
+  Monad.when (lvl >= DebugSilent && not hasChanged && not (exprOld `aeqTerm` exprNew)) $
     error $ $(curLoc) ++ "Expression changed without notice(" ++ name ++  "): before"
                       ++ before ++ "\nafter:\n" ++ after
 
