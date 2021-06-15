@@ -1,7 +1,8 @@
 # Guidelines for Respectful Communication
 
 As members of a Haskell Foundation affiliated project, we commit ourselves to
-a high standard of public behaviour. We have one over-arching rule:
+a high standard of public behaviour and we expect the same of participants on
+the project-related public forums. We have one over-arching rule:
 
     We strive to treat every person with respect.
 
