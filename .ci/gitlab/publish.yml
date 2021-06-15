@@ -42,7 +42,7 @@ hackage-sdist:
 debian-bindist:
   extends: .common
   needs: []
-  image: docker.pkg.github.com/clash-lang/clash-compiler/bindist-debian-focal:2021-05-14
+  image: docker.pkg.github.com/clash-lang/clash-compiler/bindist-debian-focal:2021-06-16
   stage: pack
   cache:
     when: on_success
