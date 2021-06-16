@@ -24,12 +24,10 @@ module Clash.Rewrite.Util
   , module Clash.Rewrite.WorkFree
   ) where
 
-import           Control.Arrow               ((&&&), (***))
 import           Control.Concurrent.Supply   (splitSupply)
 import           Control.DeepSeq
 import           Control.Exception           (throw)
-import           Control.Lens
-  (Lens', (%=), (+=), (^.), _Left)
+import           Control.Lens ((%=), (+=), (^.))
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 #if !MIN_VERSION_base(4,13,0)
@@ -37,7 +35,7 @@ import           Control.Monad.Fail          (MonadFail)
 #endif
 import qualified Control.Monad.State.Strict  as State
 import qualified Control.Monad.Writer        as Writer
-import           Data.Bifunctor              (bimap, second)
+import           Data.Bifunctor              (second)
 import           Data.Coerce                 (coerce)
 import           Data.Functor.Const          (Const (..))
 import qualified Data.HashMap.Strict         as HashMap
@@ -45,13 +43,10 @@ import           Data.List                   (group, partition, sort, sortOn)
 import qualified Data.List                   as List
 import qualified Data.List.Extra             as List
 import           Data.List.Extra             (partitionM)
-import qualified Data.Map                    as Map
 import           Data.Maybe
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
-import qualified Data.Set.Ordered            as OSet
-import qualified Data.Set.Ordered.Extra      as OSet
 import           Data.Text                   (Text)
 import qualified Data.Text                   as Text
 
@@ -76,7 +71,7 @@ import           Clash.Core.Evaluator.Types  (PureHeap, whnf')
 
 import           Clash.Core.FreeVars
   (freeLocalVars, localIdDoesNotOccurIn, localIdOccursIn,
-   typeFreeVars, termFreeVars', freeLocalIds)
+   termFreeVars', freeLocalIds)
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
@@ -88,13 +83,13 @@ import           Clash.Core.Type             (Type (..), normalizeType, typeKind
 import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
-  (InScopeSet, VarEnv, elemVarSet, extendInScopeSetList, mkInScopeSet,
+  (InScopeSet, extendInScopeSetList, mkInScopeSet,
    uniqAway, uniqAway', mapVarEnv, eltsVarEnv, unitVarSet, emptyVarEnv,
    mkVarEnv, eltsVarSet, elemVarEnv, lookupVarEnv, extendVarEnv)
 import           Clash.Debug
 import           Clash.Driver.Types
   (TransformationInfo(..), DebugOpts(..), BindingMap, Binding(..), IsPrim(..),
-  hasDebugInfo, hasTransformationInfo, isDebugging)
+  hasDebugInfo, isDebugging)
 import           Clash.Netlist.Util          (representableType)
 import           Clash.Pretty                (clashPretty, showDoc)
 import           Clash.Rewrite.Types
@@ -712,162 +707,6 @@ isUntranslatableType stringRepresentable ty =
                              <*> Lens.view tcCache
                              <*> pure ty)
 
--- | Specialise an application on its argument
-specialise :: Lens' extra (Map.Map (Id, Int, Either Term Type) Id) -- ^ Lens into previous specialisations
-           -> Lens' extra (VarEnv Int) -- ^ Lens into the specialisation history
-           -> Lens' extra Int -- ^ Lens into the specialisation limit
-           -> Rewrite extra
-specialise specMapLbl specHistLbl specLimitLbl ctx e = case e of
-  (TyApp e1 ty) -> specialise' specMapLbl specHistLbl specLimitLbl ctx e (collectArgsTicks e1) (Right ty)
-  (App e1 e2)   -> specialise' specMapLbl specHistLbl specLimitLbl ctx e (collectArgsTicks e1) (Left  e2)
-  _             -> return e
-
--- | Specialise an application on its argument
-specialise' :: Lens' extra (Map.Map (Id, Int, Either Term Type) Id) -- ^ Lens into previous specialisations
-            -> Lens' extra (VarEnv Int) -- ^ Lens into specialisation history
-            -> Lens' extra Int -- ^ Lens into the specialisation limit
-            -> TransformContext -- Transformation context
-            -> Term -- ^ Original term
-            -> (Term, [Either Term Type], [TickInfo]) -- ^ Function part of the term, split into root and applied arguments
-            -> Either Term Type -- ^ Argument to specialize on
-            -> RewriteMonad extra Term
-specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
-  opts <- Lens.view debugOpts
-  tcm <- Lens.view tcCache
-
-  -- Don't specialise TopEntities
-  topEnts <- Lens.view topEntities
-  if f `elemVarSet` topEnts
-  then do
-    case specArgIn of
-      Left _ -> do
-        traceM ("Not specializing TopEntity: " ++ showPpr (varName f))
-        return e
-      Right tyArg ->
-        traceIf (hasTransformationInfo AppliedTerm opts) ("Dropping type application on TopEntity: " ++ showPpr (varName f) ++ "\ntype:\n" ++ showPpr tyArg) $
-        -- TopEntities aren't allowed to be semantically polymorphic.
-        -- But using type equality constraints they may be syntactically polymorphic.
-        -- > topEntity :: forall dom . (dom ~ "System") => Signal dom Bool -> Signal dom Bool
-        -- The TyLam's in the body will have been removed by 'Clash.Normalize.Util.substWithTyEq'.
-        -- So we drop the TyApp ("specialising" on it) and change the varType to match.
-        let newVarTy = piResultTy tcm (varType f) tyArg
-        in  changed (mkApps (mkTicks (Var f{varType = newVarTy}) ticks) args)
-  else do -- NondecreasingIndentation
-
-  let specArg = bimap (normalizeTermTypes tcm) (normalizeType tcm) specArgIn
-      -- Create binders and variable references for free variables in 'specArg'
-      -- (specBndrsIn,specVars) :: ([Either Id TyVar], [Either Term Type])
-      (specBndrsIn,specVars) = specArgBndrsAndVars specArg
-      argLen  = length args
-      specBndrs :: [Either Id TyVar]
-      specBndrs = map (Lens.over _Left (normalizeId tcm)) specBndrsIn
-      specAbs :: Either Term Type
-      specAbs = either (Left . (`mkAbstraction` specBndrs)) (Right . id) specArg
-  -- Determine if 'f' has already been specialized on (a type-normalized) 'specArg'
-  specM <- Map.lookup (f,argLen,specAbs) <$> Lens.use (extra.specMapLbl)
-  case specM of
-    -- Use previously specialized function
-    Just f' ->
-      traceIf (hasTransformationInfo AppliedTerm opts)
-        ("Using previous specialization of " ++ showPpr (varName f) ++ " on " ++
-          (either showPpr showPpr) specAbs ++ ": " ++ showPpr (varName f')) $
-        changed $ mkApps (mkTicks (Var f') ticks) (args ++ specVars)
-    -- Create new specialized function
-    Nothing -> do
-      -- Determine if we can specialize f
-      bodyMaybe <- fmap (lookupUniqMap (varName f)) $ Lens.use bindings
-      case bodyMaybe of
-        Just (Binding _ sp inl _ bodyTm) -> do
-          -- Determine if we see a sequence of specialisations on a growing argument
-          specHistM <- lookupUniqMap f <$> Lens.use (extra.specHistLbl)
-          specLim   <- Lens.use (extra . specLimitLbl)
-          if maybe False (> specLim) specHistM
-            then throw (ClashException
-                        sp
-                        (unlines [ "Hit specialisation limit " ++ show specLim ++ " on function `" ++ showPpr (varName f) ++ "'.\n"
-                                 , "The function `" ++ showPpr f ++ "' is most likely recursive, and looks like it is being indefinitely specialized on a growing argument.\n"
-                                 , "Body of `" ++ showPpr f ++ "':\n" ++ showPpr bodyTm ++ "\n"
-                                 , "Argument (in position: " ++ show argLen ++ ") that triggered termination:\n" ++ (either showPpr showPpr) specArg
-                                 , "Run with '-fclash-spec-limit=N' to increase the specialisation limit to N."
-                                 ])
-                        Nothing)
-            else do
-              let existingNames = collectBndrsMinusApps bodyTm
-                  newNames      = [ mkUnsafeInternalName ("pTS" `Text.append` Text.pack (show n)) n
-                                  | n <- [(0::Int)..]
-                                  ]
-              -- Make new binders for existing arguments
-              (boundArgs,argVars) <- fmap (unzip . map (either (Left &&& Left . Var) (Right &&& Right . VarTy))) $
-                                     Monad.zipWithM
-                                       (mkBinderFor is0 tcm)
-                                       (existingNames ++ newNames)
-                                       args
-              -- Determine name the resulting specialized function, and the
-              -- form of the specialized-on argument
-              (fId,inl',specArg') <- case specArg of
-                Left a@(collectArgsTicks -> (Var g,gArgs,_gTicks)) -> if isPolyFun tcm a
-                    then do
-                      -- In case we are specialising on an argument that is a
-                      -- global function then we use that function's name as the
-                      -- name of the specialized higher-order function.
-                      -- Additionally, we will return the body of the global
-                      -- function, instead of a variable reference to the
-                      -- global function.
-                      --
-                      -- This will turn things like @mealy g k@ into a new
-                      -- binding @g'@ where both the body of @mealy@ and @g@
-                      -- are inlined, meaning the state-transition-function
-                      -- and the memory element will be in a single function.
-                      gTmM <- fmap (lookupUniqMap (varName g)) $ Lens.use bindings
-                      return (g,maybe inl bindingSpec gTmM, maybe specArg (Left . (`mkApps` gArgs) . bindingTerm) gTmM)
-                    else return (f,inl,specArg)
-                _ -> return (f,inl,specArg)
-              -- Create specialized functions
-              let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg'])) (boundArgs ++ specBndrs)
-              newf <- mkFunction (varName fId) sp inl' newBody
-              -- Remember specialization
-              (extra.specHistLbl) %= extendUniqMapWith f 1 (+)
-              (extra.specMapLbl)  %= Map.insert (f,argLen,specAbs) newf
-              -- use specialized function
-              let newExpr = mkApps (mkTicks (Var newf) ticks) (args ++ specVars)
-              newf `deepseq` changed newExpr
-        Nothing -> return e
-  where
-    collectBndrsMinusApps :: Term -> [Name a]
-    collectBndrsMinusApps = reverse . go []
-      where
-        go bs (Lam v e')    = go (coerce (varName v):bs)  e'
-        go bs (TyLam tv e') = go (coerce (varName tv):bs) e'
-        go bs (App e' _) = case go [] e' of
-          []  -> bs
-          bs' -> init bs' ++ bs
-        go bs (TyApp e' _) = case go [] e' of
-          []  -> bs
-          bs' -> init bs' ++ bs
-        go bs _ = bs
-
--- Specialising non Var's is used by nonRepANF
-specialise' _ _ _ _ctx _ (appE,args,ticks) (Left specArg) = do
-  -- Create binders and variable references for free variables in 'specArg'
-  let (specBndrs,specVars) = specArgBndrsAndVars (Left specArg)
-  -- Create specialized function
-      newBody = mkAbstraction specArg specBndrs
-  -- See if there's an existing binder that's alpha-equivalent to the
-  -- specialized function
-  existing <- filterUniqMap ((`aeqTerm` newBody) . bindingTerm) <$> Lens.use bindings
-  -- Create a new function if an alpha-equivalent binder doesn't exist
-  newf <- case eltsUniqMap existing of
-    [] -> do (cf,sp) <- Lens.use curFun
-             mkFunction (appendToName (varName cf) "_specF") sp NoUserInline newBody
-    (b:_) -> return (bindingId b)
-  -- Create specialized argument
-  let newArg  = Left $ mkApps (Var newf) specVars
-  -- Use specialized argument
-  let newExpr = mkApps (mkTicks appE ticks) (args ++ [newArg])
-  changed newExpr
-
-specialise' _ _ _ _ e _ _ = return e
-
 normalizeTermTypes :: TyConMap -> Term -> Term
 normalizeTermTypes tcm e = case e of
   Cast e' ty1 ty2 -> Cast (normalizeTermTypes tcm e') (normalizeType tcm ty1) (normalizeType tcm ty2)
@@ -878,53 +717,6 @@ normalizeTermTypes tcm e = case e of
 normalizeId :: TyConMap -> Id -> Id
 normalizeId tcm v@(Id {}) = v {varType = normalizeType tcm (varType v)}
 normalizeId _   tyvar     = tyvar
-
--- Note [Collect free-variables in an insertion-ordered set]
---
--- In order for the specialization cache to work, 'specArgBndrsAndVars' should
--- yield (alpha equivalent) results for the same specialization. While collecting
--- free variables in a given term or type it should therefore keep a stable
--- ordering based on the order in which it finds free vars. To see why,
--- consider the following two pseudo-code calls to 'specialise':
---
---     specialise {f ('a', x[123], y[456])}
---     specialise {f ('b', x[456], y[123])}
---
--- Collecting the binders in a VarSet would yield the following (unique ordered)
--- sets:
---
---     {x[123], y[456]}
---     {y[123], x[456]}
---
--- ..and therefore breaking specializing caching. We now track them in insert-
--- ordered sets, yielding:
---
---     {x[123], y[456]}
---     {x[456], y[123]}
---
-
--- | Create binders and variable references for free variables in 'specArg'
-specArgBndrsAndVars
-  :: Either Term Type
-  -> ([Either Id TyVar], [Either Term Type])
-specArgBndrsAndVars specArg =
-  -- See Note [Collect free-variables in an insertion-ordered set]
-  let unitFV :: Var a -> Const (OSet.OLSet TyVar, OSet.OLSet Id) (Var a)
-      unitFV v@(Id {}) = Const (mempty, coerce (OSet.singleton (coerce v)))
-      unitFV v@(TyVar {}) = Const (coerce (OSet.singleton (coerce v)), mempty)
-
-      (specFTVs,specFVs) = case specArg of
-        Left tm  -> (OSet.toListL *** OSet.toListL) . getConst $
-                    Lens.foldMapOf freeLocalVars unitFV tm
-        Right ty -> (eltsUniqSet (Lens.foldMapOf typeFreeVars unitUniqSet ty),[] :: [Id])
-
-      specTyBndrs = map Right specFTVs
-      specTmBndrs = map Left  specFVs
-
-      specTyVars  = map (Right . VarTy) specFTVs
-      specTmVars  = map (Left . Var) specFVs
-
-  in  (specTyBndrs ++ specTmBndrs,specTyVars ++ specTmVars)
 
 -- | Evaluate an expression to weak-head normal form (WHNF), and apply a
 -- transformation on the expression in WHNF.
