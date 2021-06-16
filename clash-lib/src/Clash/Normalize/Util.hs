@@ -18,7 +18,6 @@ module Clash.Normalize.Util
  , shouldReduce
  , alreadyInlined
  , addNewInline
- , specializeNorm
  , isRecursiveBndr
  , isClosed
  , callGraph
@@ -87,7 +86,7 @@ import           Clash.Rewrite.Types
   (RewriteMonad, TransformContext(..), bindings, curFun, debugOpts, extra,
    tcCache)
 import           Clash.Rewrite.Util
-  (runRewrite, specialise, mkTmBinderFor, mkDerivedName)
+  (runRewrite, mkTmBinderFor, mkDerivedName)
 import           Clash.Unique
 import           Clash.Util              (SrcSpan, makeCachedU)
 
@@ -158,10 +157,6 @@ addNewInline f cf =
                      cf
                      (unitVarEnv f 1)
                      (\_ hm -> extendVarEnvWith f 1 (+) hm)
-
--- | Specialize under the Normalization Monad
-specializeNorm :: NormRewrite
-specializeNorm = specialise specialisationCache specialisationHistory specialisationLimit
 
 -- | Determine if a term is closed
 isClosed :: TyConMap

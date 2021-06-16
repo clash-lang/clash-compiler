@@ -44,8 +44,8 @@ import Clash.Core.Util (mkSelectorCase)
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (InScopeSet, extendInScopeSet, extendInScopeSetList)
 import Clash.Netlist.Util (bindsExistentials)
+import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
-import Clash.Normalize.Util (specializeNorm)
 import Clash.Rewrite.Combinators (bottomupR)
 import Clash.Rewrite.Types
   (Transform, TransformContext(..), tcCache)
@@ -332,9 +332,9 @@ nonRepANF ctx@(TransformContext is0 _) e@(App appConPrim arg)
         -- This is a situation similar to Note [CaseLet deshadow]
         let (binds1,body1) = deshadowLetExpr is0 binds body
         in  changed (Letrec binds1 (App appConPrim body1))
-      (True,Case {})  -> specializeNorm ctx e
-      (True,Lam {})   -> specializeNorm ctx e
-      (True,TyLam {}) -> specializeNorm ctx e
+      (True,Case {})  -> specialize ctx e
+      (True,Lam {})   -> specialize ctx e
+      (True,TyLam {}) -> specialize ctx e
       _               -> return e
 
 nonRepANF _ e = return e

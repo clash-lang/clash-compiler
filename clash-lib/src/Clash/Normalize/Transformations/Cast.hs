@@ -23,8 +23,8 @@ import Clash.Core.Type (normalizeType)
 import Clash.Core.Var (varName)
 import Clash.Core.VarEnv (InScopeSet)
 import Clash.Debug (trace)
+import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
-import Clash.Normalize.Util (specializeNorm)
 import Clash.Rewrite.Types
   (TransformContext(..), bindings, curFun, tcCache, workFreeBinders)
 import Clash.Rewrite.Util (changed, mkDerivedName, mkTmBinderFor)
@@ -62,7 +62,7 @@ argCastSpec ctx e@(App f (stripTicks -> Cast e' _ _))
     True -> go
     False -> warn go
  where
-  go = specializeNorm ctx e
+  go = specialize ctx e
   warn = trace (unwords
     [ "WARNING:", $(curLoc), "specializing a function on a non work-free"
     , "cast. Generated HDL implementation might contain duplicate work."
