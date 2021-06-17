@@ -6,7 +6,7 @@ include:
 # Default GHC / Cabal version. Used for generating Haddock and releasing to
 # Hackage.
 variables:
-  GHC_VERSION: 8.10.4
+  GHC_VERSION: 8.10.2
 
 stages:
   - pre
@@ -40,7 +40,7 @@ tests-8.8:
 tests-8.10:
   extends: .common-trigger
   variables:
-    GHC_VERSION: 8.10.4
+    GHC_VERSION: 8.10.2
 
 tests-9.0:
   extends: .common-trigger
@@ -52,7 +52,7 @@ stack-build:
   needs: []
   stage: test
   variables:
-    GHC_VERSION: 8.10.4
+    GHC_VERSION: 8.10.2
   script:
     - .ci/stack_build.sh
   # Run on shared runners

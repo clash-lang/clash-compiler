@@ -49,11 +49,17 @@ ghc --version
 # This might happen during tags on GitLab CI
 CI_COMMIT_BRANCH=${CI_COMMIT_BRANCH:-no_branch_set_by_ci}
 
+# Set MULTIPLE_HIDDEN on when not building a tag, unless it is already set.
+if [[ $CI_COMMIT_TAG != "" ]]; then
+  MULTIPLE_HIDDEN=${MULTIPLE_HIDDEN:-no}
+else
+  MULTIPLE_HIDDEN=${MULTIPLE_HIDDEN:-yes}
+fi
+
 # File may exist as part of a dist.tar.zst
 if [ ! -f cabal.project.local ]; then
   cp .ci/cabal.project.local .
 
-  MULTIPLE_HIDDEN=${MULTIPLE_HIDDEN:-yes}
   if [[ "$MULTIPLE_HIDDEN" == "yes" ]]; then
     sed -i 's/flags: +doctests/flags: +doctests +multiple-hidden/g' cabal.project.local
   elif [[ "$MULTIPLE_HIDDEN" == "no" ]]; then
