@@ -24,8 +24,8 @@ jobs:
             ghc: 8.8.4
             multiple_hidden: yes
 
-          - name: GHC 8.10.4, Multiple Hidden
-            ghc: 8.10.4
+          - name: GHC 8.10.2, Multiple Hidden
+            ghc: 8.10.2
             multiple_hidden: yes
 
           - name: GHC 9.0.1, Multiple Hidden
@@ -34,7 +34,7 @@ jobs:
 
     # Run steps inside the clash CI docker image
     container:
-      image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-${{ matrix.ghc }}:2021-06-02
+      image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-${{ matrix.ghc }}:2021-06-23
 
       credentials:
         username: clash-lang-builder

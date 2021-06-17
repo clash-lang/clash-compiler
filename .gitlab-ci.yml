@@ -6,8 +6,7 @@ include:
 # Default GHC / Cabal version. Used for generating Haddock and releasing to
 # Hackage.
 variables:
-  GHC_VERSION: 8.10.3
-  CABAL_VERSION: 3.2.0.0
+  GHC_VERSION: 8.10.2
 
 stages:
   - pre
@@ -27,12 +26,6 @@ stages:
     include: .ci/gitlab/test.yml
     strategy: depend
 
-tests-8.4:
-  extends: .common-trigger
-  variables:
-    GHC_VERSION: 8.4.4
-    CABAL_VERSION: 2.4.1.0
-
 tests-8.6:
   extends: .common-trigger
   variables:
@@ -49,8 +42,7 @@ tests-8.8:
 tests-8.10:
   extends: .common-trigger
   variables:
-    GHC_VERSION: 8.10.3
-    CABAL_VERSION: 3.2.0.0
+    GHC_VERSION: 8.10.2
 
 tests-9.0:
   extends: .common-trigger
@@ -63,8 +55,7 @@ stack-build:
   needs: []
   stage: test
   variables:
-    GHC_VERSION: 8.10.3
-    CABAL_VERSION: 3.2.0.0
+    GHC_VERSION: 8.10.2
   script:
     - .ci/stack_build.sh
   # Run on shared runners
