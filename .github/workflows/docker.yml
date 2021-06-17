@@ -1,0 +1,69 @@
+name: Build and Publish Docker Images
+
+on:
+  pull_request:
+    types:
+      - open
+      - synchronize
+
+    paths:
+      - .ci/docker/Dockerfile
+
+jobs:
+  # Build the CI image dockerfile given this is a PR that has changed the
+  # Dockerfile for CI. This replaces the old build-and-publish.sh script.
+  build-ci-images:
+    runs-on: ubuntu-latest
+
+    # The docker environment is special, and needs someone privileged to review
+    # the deployment. See 'Environments' in the repository settings.
+    environment: Docker
+
+    strategy:
+      matrix:
+        include:
+          - ghc: 9.0.1
+            cabal: 3.4.0.0
+
+          - ghc: 8.10.4
+            cabal: 3.2.0.0
+
+          - ghc: 8.8.4
+            cabal: 3.2.0.0
+
+          - ghc: 8.6.5
+            cabal: 3.0.0.0
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Registry Login
+        uses: docker/login-action@v1
+        with:
+          registry: docker.pkg.github.com
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check Current Date
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+
+      - name: Setup BuildKit
+        uses: docker/setup-buildx-action@v1
+        id: builder
+
+      - name: Build and Push
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          context: .ci/docker
+          builder: ${{ steps.builder.outputs.name }}
+
+          build-args:
+            ghc_version: ${{ matrix.ghc }}
+            cabal_version: ${{ matrix.cabal }}
+
+          tags:
+            - docker.pkg.github.com/${{ github.repository }}/clash-ci-${{ matrix.ghc }}:latest
+            - docker.pkg.github.com/${{ github.repository }}/clash-ci-${{ matrix.ghc }}:${{ steps.date.outputs.date }}
