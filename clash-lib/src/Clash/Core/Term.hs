@@ -383,7 +383,10 @@ idToVar :: Id -> Term
 idToVar i@(Id {}) = Var i
 idToVar tv        = error $ $(curLoc) ++ "idToVar: tyVar: " ++ show tv
 
--- | Make a term variable out of a variable reference
+-- | Make a term variable out of a variable reference or ticked variable
+-- reference
 varToId :: Term -> Id
-varToId (Var i) = i
-varToId e       = error $ $(curLoc) ++ "varToId: not a var: " ++ show e
+varToId = \case
+  Var i    -> i
+  Tick _ e -> varToId e
+  e        -> error $ $(curLoc) ++ "varToId: not a var: " ++ show e

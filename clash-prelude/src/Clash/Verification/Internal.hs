@@ -40,6 +40,13 @@ data RenderAs
   -- ^ SystemVerilog Assertions
   | AutoRenderAs
   -- ^ Use SVA for SystemVerilog, PSL for others
+  | YosysFormal
+  -- ^ Yosys Formal Extensions for Verilog and SystemVerilog. See:
+  -- https://symbiyosys.readthedocs.io/en/latest/verilog.html and
+  -- https://symbiyosys.readthedocs.io/en/latest/verific.html
+  --
+  -- Falls back to PSL for VHDL, however currently Clash's PSL syntax isn't
+  -- suported by GHDL+SymbiYosys;
   deriving (Show, Eq)
 
 data IsTemporal
@@ -79,6 +86,8 @@ data Assertion' a
   -- ^ Assertion should _always_ hold
   | CvNever (Assertion' a)
   -- ^ Assertion should _never_ hold (not supported by SVA)
+  | CvEventually (Assertion' a)
+  -- ^ Assertion should _eventually_ hold
   deriving (Show, Functor, Foldable, Traversable)
 
 -- | Internal version of 'Property'. All user facing will instantiate @a@
@@ -87,6 +96,7 @@ data Assertion' a
 data Property' a
   = CvAssert (Assertion' a)
   | CvCover (Assertion' a)
+  | CvAssume (Assertion' a)
   deriving (Show, Functor, Foldable, Traversable)
 
 data Assertion (dom :: Domain) =

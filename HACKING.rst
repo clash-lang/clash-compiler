@@ -11,10 +11,13 @@ tested. This means you need
 - ghdl_ installed to test *VHDL*
 - iverilog_ installed to test *Verilog*
 - ModelSim_ installed to test *System Verilog*
+- SymbiYosys_ and Z3_ installed to test *Verilog* and *System Verilog*
 
 .. _ghdl: https://github.com/ghdl/ghdl
 .. _iverilog: https://github.com/steveicarus/iverilog
 .. _ModelSim: https://fpgasoftware.intel.com/?product=modelsim_ae#tabs-2
+.. _SymbiYosys: https://github.com/YosysHQ/SymbiYosys
+.. _Z3: https://github.com/Z3Prover/z3
 
 Subprojects
 -----------

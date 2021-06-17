@@ -134,7 +134,7 @@ cosimBuild args flags pkgDescription localBuildInfo = do
 
 
     makeResult <- trySome $ callProcess
-                                "/usr/bin/make"
+                                "make"
                                 [ "-C"
                                 , "src/cbits"
                                 , "-s"

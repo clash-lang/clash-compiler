@@ -277,7 +277,6 @@ Library
 
                       Clash.Verification
                       Clash.Verification.DSL
-                      Clash.Verification.PrettyPrinters
                       Clash.Verification.Internal
 
                       Clash.XException

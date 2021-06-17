@@ -80,9 +80,14 @@ library
     shouldwork/LoadModules
 
   exposed-modules:
+    Test.Tasty.Common
     Test.Tasty.Clash
     Test.Tasty.Clash.CoreTest
     Test.Tasty.Clash.NetlistTest
+    Test.Tasty.Ghdl
+    Test.Tasty.Iverilog
+    Test.Tasty.Modelsim
+    Test.Tasty.SymbiYosys
     Test.Tasty.Program
 
     -- From tests/shouldwork/LoadModules

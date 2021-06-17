@@ -679,7 +679,8 @@ addAttrs attrs' t =
 
 insts :: [Declaration] -> SystemVerilogM Doc
 insts [] = emptyDoc
-insts (TickDecl id_:ds) = comment "//" id_ <> line <> insts ds
+insts (TickDecl (Comment c):ds) = comment "//" c <> line <> insts ds
+insts (TickDecl (Directive d):ds) = pretty d <> ";" <> line <> insts ds
 insts (d:ds) = do
   docM <- inst_ d
   case docM of
@@ -846,6 +847,9 @@ inst_ (Seq ds) = Just <$> seqs ds
 
 inst_ (NetDecl' {}) = return Nothing
 
+inst_ (ConditionalDecl cond ds) = Just <$>
+  "`ifdef" <+> pretty cond <> line <> indent 2 (insts ds) <> line <> "`endif"
+
 -- | Render a data constructor application for data constructors having a
 -- custom bit representation.
 customReprDataCon
@@ -943,7 +947,8 @@ seq_ (SeqDecl sd) = case sd of
 
 seqs :: [Seq] -> SystemVerilogM Doc
 seqs [] = emptyDoc
-seqs (SeqDecl (TickDecl id_):ds) = "//" <+> pretty id_ <> line <> seqs ds
+seqs (SeqDecl (TickDecl (Comment c)):ds) = comment "//" c <> line <> seqs ds
+seqs (SeqDecl (TickDecl (Directive d)):ds) = pretty d <> ";" <> line <> seqs ds
 seqs (d:ds) = seq_ d <> line <> line <> seqs ds
 
 -- | Turn a Netlist expression into a SystemVerilog expression

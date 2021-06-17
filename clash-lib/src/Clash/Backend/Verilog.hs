@@ -367,7 +367,8 @@ noEmptyInit d = do
 
 insts :: [Declaration] -> VerilogM Doc
 insts [] = emptyDoc
-insts (TickDecl id_:ds) = comment "//" id_ <> line <> insts ds
+insts (TickDecl (Comment c):ds) = comment "//" c <> line <> insts ds
+insts (TickDecl (Directive d):ds) = pretty d <> ";" <> line <> insts ds
 insts (d:ds) = do
   docM <- inst_ d
   case docM of
@@ -518,6 +519,9 @@ inst_ (Seq ds) = Just <$> seqs ds
 
 inst_ (NetDecl' {}) = return Nothing
 
+inst_ (ConditionalDecl cond ds) = Just <$>
+  "`ifdef" <+> pretty cond <> line <> indent 2 (insts ds) <> line <> "`endif"
+
 seq_ :: Seq -> VerilogM Doc
 seq_ (AlwaysClocked edge clk ds) =
   "always @" <>
@@ -571,7 +575,8 @@ seq_ (SeqDecl sd) = case sd of
 
 seqs :: [Seq] -> VerilogM Doc
 seqs [] = emptyDoc
-seqs (SeqDecl (TickDecl id_):ds) = "//" <+> stringS id_ <> line <> seqs ds
+seqs (SeqDecl (TickDecl (Comment c)):ds) = comment "//" c <> line <> seqs ds
+seqs (SeqDecl (TickDecl (Directive d)):ds) = pretty d <> ";" <> line <> seqs ds
 seqs (d:ds) = seq_ d <> line <> line <> seqs ds
 
 -- | Range slice, can be contiguous, or split into multiple sub-ranges

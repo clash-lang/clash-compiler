@@ -15,25 +15,24 @@ import           GHC.Stack                       (HasCallStack)
 import           Clash.Annotations.Primitive     (HDL(..))
 import           Clash.Backend
   (Backend, blockDecl, hdlKind)
-import           Clash.Core.Term                 (Term(Var))
+import           Clash.Core.Term                 (Term(Var), varToId)
 import           Clash.Core.TermInfo             (termType)
 import           Clash.Core.TermLiteral          (termToDataError)
 import           Clash.Util                      (indexNote)
 import           Clash.Netlist                   (mkExpr)
-import           Clash.Netlist.Util              (stripVoid)
-import           Clash.Netlist.Util              (id2identifier)
+import           Clash.Netlist.Util              (stripVoid, id2identifier)
 import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types
   (BlackBox(BBFunction), TemplateFunction(..), BlackBoxContext, Identifier,
-   NetlistMonad, Declaration(Assignment, NetDecl', TickDecl),
+   NetlistMonad, Declaration(Assignment, NetDecl'),
    HWType(Bool, KnownDomain), WireOrReg(Wire), NetlistId(..),
-   DeclarationType(Concurrent), tcCache, bbInputs)
+   DeclarationType(Concurrent), tcCache, bbInputs, Expr(Identifier))
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TDecl), RenderVoid(..),
    emptyBlackBoxMeta)
 
 import           Clash.Verification.Internal
-import           Clash.Verification.PrettyPrinters
+import           Clash.Verification.Pretty
 
 checkBBF :: BlackBoxFunction
 checkBBF _isD _primName args _ty =
@@ -43,12 +42,14 @@ checkBBF _isD _primName args _ty =
       cvProperty1 <- mapM (uncurry bindMaybe) cvProperty0
       let decls = concatMap snd cvProperty1
           cvProperty2 = fmap fst cvProperty1
-      pure (Right (meta, bb (checkTF decls clkId propName renderAs cvProperty2)))
+      pure (Right (meta, bb (checkTF decls (clkExpr, clkId) propName renderAs cvProperty2)))
  where
   -- TODO: Improve error handling; currently errors don't indicate what
   -- TODO: blackbox generated them.
-  (Var (id2identifier -> clkId)) = indexNote "clk" (lefts args) 1
-  (Var (id2identifier -> _clkId)) = indexNote "rst" (lefts args) 2
+  clk = indexNote "clk" (lefts args) 1
+  clkExpr = Identifier clkId Nothing
+  (id2identifier -> clkId) = varToId clk
+  (id2identifier -> _clkId) = varToId (indexNote "rst" (lefts args) 2)
 
   litArgs = do
     propName <- termToDataError (indexNote "propName" (lefts args) 3)
@@ -82,20 +83,20 @@ checkBBF _isD _primName args _ty =
 
 checkTF
   :: [Declaration]
-  -> Identifier
+  -> (Expr, Identifier)
   -> Text.Text
   -> RenderAs
   -> Property' Identifier
   -> TemplateFunction
-checkTF decls clkId propName renderAs prop =
-  TemplateFunction [] (const True) (checkTF' decls clkId propName renderAs prop)
+checkTF decls clk propName renderAs prop =
+  TemplateFunction [] (const True) (checkTF' decls clk propName renderAs prop)
 
 checkTF'
   :: forall s
    . (HasCallStack, Backend s)
   => [Declaration]
   -- ^ Extra decls needed
-  -> Identifier
+  -> (Expr, Identifier)
   -- ^ Clock
   -> Text.Text
   -- ^ Prop name
@@ -103,9 +104,9 @@ checkTF'
   -> Property' Identifier
   -> BlackBoxContext
   -> State s Doc
-checkTF' decls clkId propName renderAs prop bbCtx = do
+checkTF' decls (clk, clkId) propName renderAs prop bbCtx = do
   blockName <- Id.makeBasic (propName <> "_block")
-  getAp (blockDecl blockName (TickDecl renderedPslProperty : decls))
+  getAp (blockDecl blockName (renderedPslProperty : decls))
 
  where
   hdl = hdlKind (undefined :: s)
@@ -115,9 +116,17 @@ checkTF' decls clkId propName renderAs prop bbCtx = do
       (_, stripVoid -> KnownDomain _nm _period e _rst _init _polarity, _) -> e
       _ -> error $ "Unexpected first argument: " ++ show (head (bbInputs bbCtx))
 
-  renderedPslProperty
-    | renderAs == SVA || hdl == SystemVerilog = sva
-    | otherwise = psl
+  renderedPslProperty = case renderAs of
+    PSL          -> psl
+    SVA          -> sva
+    AutoRenderAs -> case hdl of
+      SystemVerilog -> sva
+      _             -> psl
+    YosysFormal -> case hdl of
+      VHDL -> psl
+      _    -> ysva
+
    where
     sva = pprSvaProperty propName (Id.toText clkId) edge (fmap Id.toText prop)
+    ysva = pprYosysSvaProperty propName clk edge (fmap Id.toText prop)
     psl = pprPslProperty hdl propName (Id.toText clkId) edge (fmap Id.toText prop)
