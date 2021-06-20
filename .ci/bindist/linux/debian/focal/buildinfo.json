@@ -32,7 +32,7 @@
     },
     {
       "name": "ghc-typelits-natnormalise",
-      "src": {"type": "hackage"}
+      "src": {"type": "hackage", "version": "0.7.6" }
     },
     {
       "name": "ghc-typelits-knownnat",

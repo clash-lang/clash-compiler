@@ -324,7 +324,7 @@ Library
                       ghc-prim                  >= 0.5.1.0 && < 0.8,
                       ghc-typelits-extra        >= 0.4     && < 0.5,
                       ghc-typelits-knownnat     >= 0.7.2   && < 0.8,
-                      ghc-typelits-natnormalise >= 0.7.2   && < 0.8,
+                      ghc-typelits-natnormalise >= 0.7.6   && < 0.8,
                       hashable                  >= 1.2.1.0  && < 1.4,
                       half                      >= 0.2.2.3 && < 1.0,
                       interpolate               >= 0.2     && < 0.3,

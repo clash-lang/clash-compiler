@@ -87,8 +87,8 @@ haddock:
     expire_in: 1 month
   script:
     - .ci/build_docs.sh
-  # Run on shared runners
-  tags:
+  # Do not run on shared runners
+  tags: [ local ]
 
 # # Run benchmarks for isclashfastyet.com
 # benchmark-8.10.2:
