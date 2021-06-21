@@ -1,4 +1,4 @@
-name: CI
+name: Kloonbot
 
 on: issue_comment
 
