@@ -49,7 +49,7 @@ ghcup set cabal ${CABAL_VERSION}
 cabal --version
 ghc --version
 
-# This might happen when running on Circle CI or during tags
+# This might happen during tags on GitLab CI
 CI_COMMIT_BRANCH=${CI_COMMIT_BRANCH:-no_branch_set_by_ci}
 
 # File may exist as part of a dist.tar.zst

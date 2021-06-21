@@ -1,0 +1,83 @@
+name: CI
+on: pull_request_target
+
+concurrency:
+  group: ${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_and_test:
+    # Only run for external PRs
+    if: github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+
+    name: Build and Test
+
+    strategy:
+      matrix:
+        include:
+          - name: GHC 8.6.5, Single Hidden
+            ghc: 8.6.5
+            multiple_hidden: no
+
+          - name: GHC 8.8.4, Multiple Hidden
+            ghc: 8.8.4
+            multiple_hidden: yes
+
+          - name: GHC 8.10.4, Multiple Hidden
+            ghc: 8.10.4
+            multiple_hidden: yes
+
+          - name: GHC 9.0.1, Multiple Hidden
+            ghc: 9.0.1
+            multiple_hidden: yes
+
+    # Run steps inside the clash CI docker image
+    container:
+      image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-${{ matrix.ghc }}:2021-06-02
+
+      credentials:
+        username: clash-lang-builder
+        password: ${{ secrets.GHA_TOKEN }}
+
+      env:
+        THREADS: 2
+        CABAL_JOBS: 2
+        MULTIPLE_HIDDEN: ${{ matrix.multiple_hidden }}
+        CI_COMMIT_BRANCH: ${{ github.base_ref }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+
+      - name: Setup CI
+        run: |
+          ./.ci/setup.sh
+          cabal v2-freeze
+
+      - name: Restore Cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            dist-newstyle
+            ~/.cabal/packages
+            ~/.cabal/store
+
+          key: ${{ matrix.ghc }}-${{ hashFiles('cabal.project.freeze') }}
+          restore-keys: ${{ matrix.ghc }}-
+
+      - name: Build Clash
+        run: ./.ci/build.sh
+
+      - name: Test Clash
+        run: |
+          cabal v2-test clash-prelude
+          cabal v2-test clash-lib
+          cabal v2-test clash-cores
+          cabal v2-test clash-cosim
+          cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .VHDL
+          cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .Verilog
