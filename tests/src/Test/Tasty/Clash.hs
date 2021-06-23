@@ -469,24 +469,23 @@ outputTest modName targets extraClashArgs extraGhcArgs path =
         ]
 
 clashLibTest'
-  :: FilePath
-  -- ^ Work directory
+  :: String
+  -- ^ Module name
   -> HDL
   -- ^ Build target
   -> [String]
   -- ^ Extra GHC arguments
-  -> String
-  -- ^ Module name
   -> [TestName]
   -- ^ Parent test names in order of distance to the test. That is, the last
   -- item in the list will be the root node, while the first one will be the
   -- one closest to the test.
   -> TestTree
-clashLibTest' env target extraGhcArgs modName path =
+clashLibTest' modName target extraGhcArgs path =
   withResource acquire tastyRelease (const seqTests)
     where
       -- TODO: Run these tests in their own temporary directory
       path' = show target:path
+      sourceDir = foldl (</>) sourceDirectory (reverse (tail path))
       acquire = tastyAcquire path' [modName]
       out = testDirectory path' </> modName </> "out"
 
@@ -496,7 +495,7 @@ clashLibTest' env target extraGhcArgs modName path =
         , "-main-is", modName ++ ".main" ++ show target
         , "-o", out
         , "-outputdir", testDirectory path' </> modName
-        ] ++ extraGhcArgs ++ [env </> modName <.> "hs"]
+        ] ++ extraGhcArgs ++ [sourceDir </> modName <.> "hs"]
 
       seqTests = testGroup (show target) $ sequenceTests path' $
         [ ( "[lib] clash"
@@ -504,25 +503,22 @@ clashLibTest' env target extraGhcArgs modName path =
         , ("exec", testProgram "exec" out [] NoGlob PrintStdErr False Nothing) ]
 
 clashLibTest
-  :: FilePath
-  -- ^ Work directory
+  :: String
+  -- ^ Module name
   -> [HDL]
   -- ^ Build targets
   -> [String]
   -- ^ Extra GHC arguments
-  -> String
-  -- ^ Module name
   -> [TestName]
   -- ^ Parent test names in order of distance to the test. That is, the last
   -- item in the list will be the root node, while the first one will be the
   -- one closest to the test.
   -> TestTree
-clashLibTest env targets extraGhcArgs modName path =
+clashLibTest modName targets extraGhcArgs path =
   -- HACK: clashLibTests are run sequentially to prevent race issues. See:
   -- HACK: https://github.com/clash-lang/clash-compiler/pull/1416
-  testGroup testName $ sequenceTests path'
-    [(show target, runLibTest target) | target <- targets]
- where
-  runLibTest target = clashLibTest' env target extraGhcArgs modName path'
-  testName = modName ++ " [clash-lib test]"
-  path' = testName : path
+  let testName = modName ++ " [clash-lib test]"
+   in testGroup testName $ sequenceTests (testName:path)
+        [ (show target, clashLibTest' modName target extraGhcArgs (testName:path))
+        | target <- targets
+        ]
