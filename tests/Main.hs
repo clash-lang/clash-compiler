@@ -26,25 +26,6 @@ import           Test.Tasty
 import           Test.Tasty.Common
 import           Test.Tasty.Clash
 
-#if EXPERIMENTAL_EVALUATOR
-import           Test.Tasty.HUnit
-#endif
-
--- We want to selectively disable these tests while certain primitives are not
--- implemented in the new evaluator. These macros are used to prevent the
--- testsuite becoming a mess of CPP blocks.
-#if EXPERIMENTAL_EVALUATOR
-#define NEEDS_PRIMS(x) (const $ testCase "DISABLED" (True @?= True))
-#else
-#define NEEDS_PRIMS(x) (x)
-#endif
-
-#if EXPERIMENTAL_EVALUATOR || __GLASGOW_HASKELL__ >= 865
-#define NEEDS_PRIMS_GHC(x) (NEEDS_PRIMS(x))
-#else
-#define NEEDS_PRIMS_GHC(x) (x)
-#endif
-
 -- | GHC version as major.minor.patch1. For example: 8.10.2.
 ghcVersion3 :: String
 ghcVersion3 =
@@ -137,7 +118,7 @@ runClashTest :: IO ()
 runClashTest = defaultMain $ clashTestRoot
   [ clashTestGroup "netlist"
     [ clashLibTest ("tests" </> "shouldwork" </> "Netlist") allTargets [] "Identity" "main"
-    , NEEDS_PRIMS(clashLibTest ("tests" </> "shouldwork" </> "Netlist") [VHDL] [] "NoDeDup" "main")
+    , clashLibTest ("tests" </> "shouldwork" </> "Netlist") [VHDL] [] "NoDeDup" "main"
     , clashLibTest ("tests" </> "shouldwork" </> "Netlist") allTargets [] "T1766" "main"
     ]
   , clashTestGroup "examples"
@@ -146,37 +127,37 @@ runClashTest = defaultMain $ clashTestRoot
                       , hdlTargets=[VHDL]
                       , buildTargets=BuildSpecific ["blinker"]
                       }
-       in NEEDS_PRIMS_GHC(runTest "Blinker" _opts)
-    , NEEDS_PRIMS_GHC (runTest "BlockRamTest" def{hdlSim=False})
-    , NEEDS_PRIMS_GHC(runTest "Calculator" def)
-    , NEEDS_PRIMS_GHC(runTest "CHIP8" def{hdlSim=False})
-    , NEEDS_PRIMS_GHC(runTest "CochleaPlus" def{hdlSim=False})
+       in runTest "Blinker" _opts
+    , runTest "BlockRamTest" def{hdlSim=False}
+    , runTest "Calculator" def
+    , runTest "CHIP8" def{hdlSim=False}
+    , runTest "CochleaPlus" def{hdlSim=False}
     , let _opts = def { clashFlags=["-fclash-component-prefix", "test"]
                       , buildTargets=BuildSpecific ["test_testBench"]
                       }
-       in NEEDS_PRIMS(runTest "FIR" _opts)
-    , NEEDS_PRIMS_GHC(runTest "Fifo" def{hdlSim=False})
-    , NEEDS_PRIMS_GHC(runTest "MAC" def)
-    , NEEDS_PRIMS_GHC(runTest "MatrixVect" def)
-    , NEEDS_PRIMS_GHC(runTest "Queens" def{hdlSim=False})
-    , NEEDS_PRIMS_GHC(runTest "Reducer" def{hdlSim=False})
-    , NEEDS_PRIMS_GHC(runTest "Sprockell" def{hdlSim=False})
-    , NEEDS_PRIMS_GHC(runTest "Windows" def{hdlSim=False})
+       in runTest "FIR" _opts
+    , runTest "Fifo" def{hdlSim=False}
+    , runTest "MAC" def
+    , runTest "MatrixVect" def
+    , runTest "Queens" def{hdlSim=False}
+    , runTest "Reducer" def{hdlSim=False}
+    , runTest "Sprockell" def{hdlSim=False}
+    , runTest "Windows" def{hdlSim=False}
     , clashTestGroup "crc32"
-        [ NEEDS_PRIMS_GHC(runTest "CRC32" def)
+        [ runTest "CRC32" def
         ]
     , clashTestGroup "i2c"
         [ let _opts = def { clashFlags=["-O2","-fclash-component-prefix","test"]
                         , buildTargets=BuildSpecific ["test_i2c"]
                         , hdlSim=False
                         }
-           in NEEDS_PRIMS_GHC(runTest "I2C" _opts)
+           in runTest "I2C" _opts
         , let _opts = def { buildTargets = BuildSpecific ["system"]
                           , hdlTargets = [Verilog]
                           , hdlSim = True
                           , vvpStderrEmptyFail = False
                           }
-           in NEEDS_PRIMS(runTest "I2Ctest" _opts)
+           in runTest "I2Ctest" _opts
         ]
     ]
   , clashTestGroup "tests"
@@ -252,7 +233,7 @@ runClashTest = defaultMain $ clashTestRoot
                           , buildTargets=BuildSpecific ["fails" <> show i | i <- [(1::Int)..n]]
                           , expectSimFail=Just (def, "psl assertion failed")
                           }
-           in NEEDS_PRIMS_GHC(runTest "NonTemporalPSL" _opts)
+           in runTest "NonTemporalPSL" _opts
         , let n = 13
               _opts = def { hdlTargets=[SystemVerilog]
                           , buildTargets=BuildSpecific ["fails" <> show i | i <- [(1::Int)..n]]
@@ -260,7 +241,7 @@ runClashTest = defaultMain $ clashTestRoot
                           -- for syntax errors.
                           , hdlSim=False
                           }
-           in NEEDS_PRIMS_GHC(runTest "NonTemporalPSL" _opts)
+           in runTest "NonTemporalPSL" _opts
         , let is = [(1::Int)..13] \\ [4, 6, 7, 8, 10, 11, 12] in
           runTest "NonTemporalSVA" def{
             hdlTargets=[SystemVerilog]
@@ -320,18 +301,18 @@ runClashTest = defaultMain $ clashTestRoot
       ]
     , clashTestGroup "shouldwork"
       [ clashTestGroup "AutoReg"
-        [ NEEDS_PRIMS(outputTest ("tests" </> "shouldwork" </> "AutoReg") allTargets [] [] "AutoReg" "main")
-        , NEEDS_PRIMS(runTest "T1507" def{hdlSim=False})
+        [ outputTest ("tests" </> "shouldwork" </> "AutoReg") allTargets [] [] "AutoReg" "main"
+        , runTest "T1507" def{hdlSim=False}
         , let _opts = def{hdlSim=False, hdlTargets=[VHDL]}
-           in NEEDS_PRIMS(runTest "T1632" _opts)
+           in runTest "T1632" _opts
         ]
       , clashTestGroup "Basic"
-        [ NEEDS_PRIMS(runTest "AES" def{hdlSim=False})
-        , NEEDS_PRIMS(runTest "BangData" def{hdlSim=False})
+        [ runTest "AES" def{hdlSim=False}
+        , runTest "BangData" def{hdlSim=False}
         , runTest "Trace" def{hdlSim=False}
-        , NEEDS_PRIMS(runTest "DivMod" def{hdlSim=False})
-        , NEEDS_PRIMS(runTest "DivZero" def)
-        , NEEDS_PRIMS(runTest "LambdaDrop" def{hdlSim=False})
+        , runTest "DivMod" def{hdlSim=False}
+        , runTest "DivZero" def
+        , runTest "LambdaDrop" def{hdlSim=False}
         , runTest "IrrefError" def{hdlSim=False}
 #ifdef CLASH_MULTIPLE_HIDDEN
         , runTest "MultipleHidden" def
@@ -341,55 +322,55 @@ runClashTest = defaultMain $ clashTestRoot
         , outputTest ("tests" </> "shouldwork" </> "Basic") allTargets [] [] "NameInstance" "main"
         , outputTest ("tests" </> "shouldwork" </> "Basic") [VHDL] [] [] "SetName" "main"
         , runTest "PatError" def{hdlSim=False}
-        , NEEDS_PRIMS_GHC(runTest "ByteSwap32" def)
-        , NEEDS_PRIMS_GHC(runTest "CharTest" def)
-        , NEEDS_PRIMS_GHC(runTest "ClassOps" def)
-        , NEEDS_PRIMS_GHC(runTest "CountTrailingZeros" def)
-        , NEEDS_PRIMS_GHC(runTest "DeepseqX" def)
-        , NEEDS_PRIMS_GHC(runTest "LotOfStates" def)
+        , runTest "ByteSwap32" def
+        , runTest "CharTest" def
+        , runTest "ClassOps" def
+        , runTest "CountTrailingZeros" def
+        , runTest "DeepseqX" def
+        , runTest "LotOfStates" def
         , let _opts = def { buildTargets = BuildSpecific ["nameoverlap"]
                           , hdlSim = False
                           }
-           in NEEDS_PRIMS_GHC(runTest "NameOverlap" _opts)
-        , NEEDS_PRIMS_GHC(runTest "NestedPrimitives" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "NestedPrimitives2" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "NORX" def)
-        , NEEDS_PRIMS_GHC(runTest "Parameters" def{hdlTargets=[VHDL]})
-        , NEEDS_PRIMS_GHC(runTest "PopCount" def)
-        , NEEDS_PRIMS_GHC(runTest "RecordSumOfProducts" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "Replace" def)
-        , NEEDS_PRIMS_GHC(runTest "TestIndex" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "Time" def)
+           in runTest "NameOverlap" _opts
+        , runTest "NestedPrimitives" def{hdlSim=False}
+        , runTest "NestedPrimitives2" def{hdlSim=False}
+        , runTest "NORX" def
+        , runTest "Parameters" def{hdlTargets=[VHDL]}
+        , runTest "PopCount" def
+        , runTest "RecordSumOfProducts" def{hdlSim=False}
+        , runTest "Replace" def
+        , runTest "TestIndex" def{hdlSim=False}
+        , runTest "Time" def
         , runTest "Shift" def{hdlSim=False}
         , runTest "SimpleConstructor" def{hdlSim=False}
         , runTest "TyEqConstraints" def{
             hdlSim=False
           , buildTargets=BuildSpecific ["top1"]
           }
-        , NEEDS_PRIMS(runTest "T1012" def{hdlSim=False})
-        , NEEDS_PRIMS(runTest "T1240" def{hdlSim=False})
+        , runTest "T1012" def{hdlSim=False}
+        , runTest "T1240" def{hdlSim=False}
         , let _opts = def {hdlTargets = [VHDL], hdlSim = False}
-           in NEEDS_PRIMS(runTest "T1297" _opts)
+           in runTest "T1297" _opts
         , runTest "T1254" def{hdlTargets=[VHDL,SystemVerilog],hdlSim=False}
-        , NEEDS_PRIMS_GHC(runTest "T1242" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "T1292" def{hdlTargets=[VHDL]})
+        , runTest "T1242" def{hdlSim=False}
+        , runTest "T1292" def{hdlTargets=[VHDL]}
         , let _opts = def { hdlTargets = [VHDL], hdlLoad = False }
-           in NEEDS_PRIMS_GHC(runTest "T1304" _opts)
+           in runTest "T1304" _opts
         , let _opts = def { hdlTargets=[VHDL]
                           , hdlSim=False
                           , clashFlags=["-main-is", "plus"]
                           , buildTargets=BuildSpecific ["plus"]
                           }
-           in NEEDS_PRIMS_GHC(runTest "T1305" _opts)
+           in runTest "T1305" _opts
         , let _opts = def {hdlTargets = [VHDL], hdlSim = False}
-           in NEEDS_PRIMS_GHC(runTest "T1316" _opts)
-        , NEEDS_PRIMS_GHC(runTest "T1322" def{hdlTargets=[VHDL]})
+           in runTest "T1316" _opts
+        , runTest "T1322" def{hdlTargets=[VHDL]}
         , let _opts = def {hdlTargets = [VHDL], hdlSim = False}
-           in NEEDS_PRIMS_GHC(runTest "T1340" _opts)
+           in runTest "T1340" _opts
         , let _opts = def { hdlTargets = [VHDL], hdlSim = False}
-           in NEEDS_PRIMS_GHC(runTest "T1354A" _opts)
+           in runTest "T1354A" _opts
         , let _opts = def { hdlTargets = [VHDL], hdlSim = False}
-           in NEEDS_PRIMS_GHC(runTest "T1354B" _opts)
+           in runTest "T1354B" _opts
         , runTest "T1402" def{clashFlags=["-O"]}
         , runTest "T1402b" def{hdlTargets=[VHDL], hdlSim=False}
         , runTest "T1556" def
@@ -399,27 +380,27 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "XToError" def{hdlSim=False}
         ]
       , clashTestGroup "BitVector"
-        [ NEEDS_PRIMS_GHC(runTest "Box" def)
-        , NEEDS_PRIMS_GHC(runTest "BoxGrow" def)
-        , NEEDS_PRIMS_GHC(runTest "CLZ" def)
-        , NEEDS_PRIMS_GHC(runTest "RePack" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "ReduceZero" def)
-        , NEEDS_PRIMS_GHC(runTest "ReduceOne" def)
-        , NEEDS_PRIMS_GHC(runTest "ExtendingNumZero" def)
-        , NEEDS_PRIMS_GHC(runTest "AppendZero" def)
-        , NEEDS_PRIMS(runTest "GenericBitPack" def{clashFlags=["-fconstraint-solver-iterations=15"]})
-        , NEEDS_PRIMS(runTest "UnpackUndefined" def{hdlSim=False})
+        [ runTest "Box" def
+        , runTest "BoxGrow" def
+        , runTest "CLZ" def
+        , runTest "RePack" def{hdlSim=False}
+        , runTest "ReduceZero" def
+        , runTest "ReduceOne" def
+        , runTest "ExtendingNumZero" def
+        , runTest "AppendZero" def
+        , runTest "GenericBitPack" def{clashFlags=["-fconstraint-solver-iterations=15"]}
+        , runTest "UnpackUndefined" def{hdlSim=False}
         ]
       , clashTestGroup "BlackBox"
         [ outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "TemplateFunction"   "main"
         , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "BlackBoxFunction"   "main"
-        , NEEDS_PRIMS_GHC(runTest "BlackBoxFunctionHO" def{hdlTargets=[VHDL]})
-        , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "Signal") allTargets [] [] "BlockRamLazy" "main")
+        , runTest "BlackBoxFunctionHO" def{hdlTargets=[VHDL]}
+        , outputTest ("tests" </> "shouldwork" </> "Signal") allTargets [] [] "BlockRamLazy" "main"
         , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "ZeroWidth"          "main"
         , outputTest ("tests" </> "shouldwork" </> "BlackBox") [VHDL]   [] [] "MultiResult"        "main"
-        , NEEDS_PRIMS(runTest "MultiResult" def)
-        , NEEDS_PRIMS(runTest "T919" def{hdlSim=False})
-        , NEEDS_PRIMS(runTest "T1524" def)
+        , runTest "MultiResult" def
+        , runTest "T919" def{hdlSim=False}
+        , runTest "T1524" def
         , runTest "T1786" def{
             hdlTargets=[VHDL]
           , buildTargets=BuildSpecific ["testEnableTB", "testBoolTB"]
@@ -443,37 +424,37 @@ runClashTest = defaultMain $ clashTestRoot
       --     ]
       --   ]
       , clashTestGroup "CSignal"
-        [ NEEDS_PRIMS_GHC(runTest "MAC" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "CBlockRamTest" def{hdlSim=False})
+        [ runTest "MAC" def{hdlSim=False}
+        , runTest "CBlockRamTest" def{hdlSim=False}
         ]
 #ifdef COSIM
       , clashTestGroup "CoSim"
-        [ NEEDS_PRIMS_GHC(runTest "Multiply" def{hdlTargets=[Verilog]})
-        , NEEDS_PRIMS_GHC(runTest "Register" def{hdlTargets=[Verilog]})
+        [ runTest "Multiply" def{hdlTargets=[Verilog]}
+        , runTest "Register" def{hdlTargets=[Verilog]}
         ]
 #endif
       , clashTestGroup "CustomReprs"
         [ clashTestGroup "RotateC"
-          [ NEEDS_PRIMS_GHC(runTest "RotateC" def)
-          , NEEDS_PRIMS_GHC(runTest "ReprCompact" def)
-          , NEEDS_PRIMS_GHC(runTest "ReprCompactScrambled"   def)
-          , NEEDS_PRIMS_GHC(runTest "ReprLastBitConstructor" def)
+          [ runTest "RotateC" def
+          , runTest "ReprCompact" def
+          , runTest "ReprCompactScrambled"   def
+          , runTest "ReprLastBitConstructor" def
           , let _opts = def { hdlTargets = [VHDL, Verilog] }
-             in NEEDS_PRIMS_GHC(runTest "ReprStrangeMasks" _opts)
-          , NEEDS_PRIMS_GHC(runTest "ReprWide" def)
-          , NEEDS_PRIMS_GHC(runTest "RotateCScrambled" def)
+             in runTest "ReprStrangeMasks" _opts
+          , runTest "ReprWide" def
+          , runTest "RotateCScrambled" def
           ]
         , clashTestGroup "RotateCNested"
-          [ NEEDS_PRIMS_GHC(runTest "RotateCNested" def)
+          [ runTest "RotateCNested" def
           ]
         , clashTestGroup "Rotate"
-          [ NEEDS_PRIMS_GHC(runTest "Rotate" def)
+          [ runTest "Rotate" def
           ]
         , clashTestGroup "Deriving"
-          [ NEEDS_PRIMS_GHC(runTest "BitPackDerivation" def)
+          [ runTest "BitPackDerivation" def
           ]
         , clashTestGroup "Indexed"
-          [ NEEDS_PRIMS_GHC(runTest "Indexed" def)
+          [ runTest "Indexed" def
           ]
         ]
       , clashTestGroup "CustomReprs"
@@ -483,61 +464,61 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T694" def{hdlSim=False,hdlTargets=[VHDL]}
         ]
       , clashTestGroup "DDR"
-        [ NEEDS_PRIMS(runTest "DDRinGA" def)
-        , NEEDS_PRIMS(runTest "DDRinGS" def)
-        , NEEDS_PRIMS(runTest "DDRinUA" def)
-        , NEEDS_PRIMS(runTest "DDRinUS" def)
-        , NEEDS_PRIMS(runTest "DDRoutUA" def)
-        , NEEDS_PRIMS(runTest "DDRoutUS" def)
-        , NEEDS_PRIMS(runTest "DDRoutGA" def)
-        , NEEDS_PRIMS(runTest "DDRoutGS" def)
+        [ runTest "DDRinGA" def
+        , runTest "DDRinGS" def
+        , runTest "DDRinUA" def
+        , runTest "DDRinUS" def
+        , runTest "DDRoutUA" def
+        , runTest "DDRoutUS" def
+        , runTest "DDRoutGA" def
+        , runTest "DDRoutGS" def
         ]
       , clashTestGroup "DSignal"
-        [ NEEDS_PRIMS(runTest "DelayedFold" def)
-        , NEEDS_PRIMS(runTest "DelayI" def)
-        , NEEDS_PRIMS(runTest "DelayN" def)
+        [ runTest "DelayedFold" def
+        , runTest "DelayI" def
+        , runTest "DelayN" def
         ]
       , clashTestGroup "Feedback"
-        [ NEEDS_PRIMS_GHC(runTest "Fib" def)
+        [ runTest "Fib" def
 #ifdef CLASH_MULTIPLE_HIDDEN
         , runTest "MutuallyRecursive" def
 #endif
         ]
       , clashTestGroup "Fixed"
-        [ NEEDS_PRIMS(runTest "Mixer" def)
-        , NEEDS_PRIMS(runTest "SFixedTest" def)
-        , NEEDS_PRIMS(runTest "SatWrap" def{hdlSim=False})
-        , NEEDS_PRIMS(runTest "ZeroInt" def)
+        [ runTest "Mixer" def
+        , runTest "SFixedTest" def
+        , runTest "SatWrap" def{hdlSim=False}
+        , runTest "ZeroInt" def
         ]
       , clashTestGroup "Floating"
         [ runTest "FloatPack" def{hdlSim=False, clashFlags=["-fclash-float-support"]}
-        , NEEDS_PRIMS(runTest "FloatConstFolding" def{clashFlags=["-fclash-float-support"]})
+        , runTest "FloatConstFolding" def{clashFlags=["-fclash-float-support"]}
         , runTest "T1803" def{clashFlags=["-fclash-float-support"]}
         ]
       , clashTestGroup "GADTs"
-        [ NEEDS_PRIMS_GHC(runTest "Constrained" def)
-        , NEEDS_PRIMS_GHC(runTest "Head" def)
-        , NEEDS_PRIMS_GHC(runTest "HeadM" def)
-        , NEEDS_PRIMS_GHC(runTest "MonomorphicTopEntity" def)
-        , NEEDS_PRIMS_GHC(runTest "Record" def)
-        , NEEDS_PRIMS_GHC(runTest "Tail" def)
-        , NEEDS_PRIMS_GHC(runTest "TailM" def)
-        , NEEDS_PRIMS_GHC(runTest "TailOfTail" def)
-        , NEEDS_PRIMS_GHC(runTest "T1310" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "T1536" def{hdlSim=False})
+        [ runTest "Constrained" def
+        , runTest "Head" def
+        , runTest "HeadM" def
+        , runTest "MonomorphicTopEntity" def
+        , runTest "Record" def
+        , runTest "Tail" def
+        , runTest "TailM" def
+        , runTest "TailOfTail" def
+        , runTest "T1310" def{hdlSim=False}
+        , runTest "T1536" def{hdlSim=False}
         ]
       , clashTestGroup "HOPrim"
-        [ NEEDS_PRIMS_GHC(runTest "HOIdx" def)
-        , NEEDS_PRIMS_GHC(runTest "HOImap" def)
-        , NEEDS_PRIMS_GHC(runTest "Map" def)
-        , NEEDS_PRIMS_GHC(runTest "Map2" def)
-        , NEEDS_PRIMS_GHC(runTest "TestMap" def)
-        , NEEDS_PRIMS_GHC(runTest "Transpose" def)
-        , NEEDS_PRIMS_GHC(runTest "VecFun" def)
+        [ runTest "HOIdx" def
+        , runTest "HOImap" def
+        , runTest "Map" def
+        , runTest "Map2" def
+        , runTest "TestMap" def
+        , runTest "Transpose" def
+        , runTest "VecFun" def
       ]
       , clashTestGroup "Issues" $
         [ let _opts = def { hdlSim = False, hdlTargets = [Verilog] }
-           in NEEDS_PRIMS(runTest "T1187" _opts)
+           in runTest "T1187" _opts
         , clashLibTest ("tests" </> "shouldwork" </> "Issues") [VHDL] [] "T1388" "main"
         , outputTest ("tests" </> "shouldwork" </> "Issues") allTargets [] [] "T1171" "main"
         , clashLibTest ("tests" </> "shouldwork" </> "Issues") [VHDL] [] "T1439" "main"
@@ -569,49 +550,49 @@ runClashTest = defaultMain $ clashTestRoot
         [ runTest "T967a" def{hdlSim=False}
         , runTest "T967b" def{hdlSim=False}
         , runTest "T967c" def{hdlSim=False}
-        , NEEDS_PRIMS_GHC(clashLibTest ("tests" </> "shouldwork" </> "Naming") allTargets [] "T1041" "main")
+        , clashLibTest ("tests" </> "shouldwork" </> "Naming") allTargets [] "T1041" "main"
         , clashLibTest ("tests" </> "shouldwork" </> "Naming") [VHDL,Verilog] [] "NameHint" "main"
         ]
       , clashTestGroup "Numbers"
-        [ NEEDS_PRIMS_GHC(runTest "BitInteger" def)
+        [ runTest "BitInteger" def
 #if MIN_VERSION_base(4,14,0)
         , runTest "BitReverse" def
 #endif
-        , NEEDS_PRIMS(runTest "Bounds" def)
-        , NEEDS_PRIMS(runTest "DivideByZero" def)
+        , runTest "Bounds" def
+        , runTest "DivideByZero" def
         , let _opts = def { clashFlags=["-fconstraint-solver-iterations=15"] }
-           in NEEDS_PRIMS_GHC(runTest "ExpWithGhcCF" _opts)
+           in runTest "ExpWithGhcCF" _opts
         , let _opts = def { clashFlags=["-fconstraint-solver-iterations=15"] }
-           in NEEDS_PRIMS_GHC(runTest "ExpWithClashCF" _opts)
-        , NEEDS_PRIMS(outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets [] ["-itests/shouldwork/Numbers"] "ExpWithClashCF" "main")
+           in runTest "ExpWithClashCF" _opts
+        , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets [] ["-itests/shouldwork/Numbers"] "ExpWithClashCF" "main"
         , let _opts = def { hdlTargets = [VHDL], hdlSim = False }
-           in NEEDS_PRIMS_GHC(runTest "HalfAsBlackboxArg" _opts)
-        , NEEDS_PRIMS_GHC(runTest "IntegralTB" def)
-        , NEEDS_PRIMS(runTest "NumConstantFoldingTB_1" def{clashFlags=["-itests/shouldwork/Numbers"]})
-        , NEEDS_PRIMS(outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding_1" "main")
-        , NEEDS_PRIMS(runTest "NumConstantFoldingTB_2" def{clashFlags=["-itests/shouldwork/Numbers"]})
-        , NEEDS_PRIMS(outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding_2" "main")
-        , NEEDS_PRIMS_GHC(runTest "Naturals" def)
-        , NEEDS_PRIMS_GHC(runTest "NaturalToInteger" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "NegativeLits" def)
-        , NEEDS_PRIMS_GHC(runTest "Resize" def)
-        , NEEDS_PRIMS_GHC(runTest "Resize2" def)
-        , NEEDS_PRIMS_GHC(runTest "Resize3" def)
-        , NEEDS_PRIMS_GHC(runTest "SatMult" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "ShiftRotate" def)
+           in runTest "HalfAsBlackboxArg" _opts
+        , runTest "IntegralTB" def
+        , runTest "NumConstantFoldingTB_1" def{clashFlags=["-itests/shouldwork/Numbers"]}
+        , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding_1" "main"
+        , runTest "NumConstantFoldingTB_2" def{clashFlags=["-itests/shouldwork/Numbers"]}
+        , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets ["-fconstraint-solver-iterations=15"] ["-itests/shouldwork/Numbers"] "NumConstantFolding_2" "main"
+        , runTest "Naturals" def
+        , runTest "NaturalToInteger" def{hdlSim=False}
+        , runTest "NegativeLits" def
+        , runTest "Resize" def
+        , runTest "Resize2" def
+        , runTest "Resize3" def
+        , runTest "SatMult" def{hdlSim=False}
+        , runTest "ShiftRotate" def
         , runTest "ShiftRotateNegative" def{hdlTargets=[VHDL]}
-        , NEEDS_PRIMS_GHC(runTest "SignedProjectionTB" def)
-        , NEEDS_PRIMS_GHC(runTest "SignedZero" def)
-        , NEEDS_PRIMS_GHC(runTest "Signum" def)
-        , NEEDS_PRIMS_GHC(runTest "Strict" def)
-        , NEEDS_PRIMS(runTest "T1019" def{hdlSim=False})
-        , NEEDS_PRIMS(runTest "T1351" def)
-        , NEEDS_PRIMS(outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets [] ["-itests/shouldwork/Numbers"] "UndefinedConstantFolding" "main")
-        , NEEDS_PRIMS_GHC(runTest "UnsignedZero" def)
+        , runTest "SignedProjectionTB" def
+        , runTest "SignedZero" def
+        , runTest "Signum" def
+        , runTest "Strict" def
+        , runTest "T1019" def{hdlSim=False}
+        , runTest "T1351" def
+        , outputTest ("tests" </> "shouldwork" </> "Numbers") allTargets [] ["-itests/shouldwork/Numbers"] "UndefinedConstantFolding" "main"
+        , runTest "UnsignedZero" def
         ]
       , clashTestGroup "Polymorphism"
         [ runTest "ExistentialBoxed" def{hdlSim=False}
-        , NEEDS_PRIMS_GHC(runTest "FunctionInstances" def)
+        , runTest "FunctionInstances" def
         , runTest "GADTExistential" def{hdlSim=False}
         , runTest "LocalPoly" def{hdlSim=False}
         ]
@@ -622,53 +603,53 @@ runClashTest = defaultMain $ clashTestRoot
           }
         ]
       , clashTestGroup "PrimitiveReductions"
-        [ NEEDS_PRIMS(runTest "Lambda" def)
-        , NEEDS_PRIMS(runTest "ReplaceInt" def)
+        [ runTest "Lambda" def
+        , runTest "ReplaceInt" def
         ]
       , clashTestGroup "RTree"
         [ runTest "TZip" def{hdlSim=False}
-        , NEEDS_PRIMS_GHC(runTest "TFold" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "TRepeat" def)
-        , NEEDS_PRIMS_GHC(runTest "TRepeat2" def)
+        , runTest "TFold" def{hdlSim=False}
+        , runTest "TRepeat" def
+        , runTest "TRepeat2" def
         ]
       , clashTestGroup "Shadowing"
-        [ NEEDS_PRIMS_GHC(runTest "T990" def)
+        [ runTest "T990" def
         ]
       , clashTestGroup "Signal"
         [ runTest "AlwaysHigh" def{hdlSim=False}
         , runTest "BangPatterns" def
-        , NEEDS_PRIMS(runTest "BlockRamFile" def)
-        , NEEDS_PRIMS(runTest "BlockRam0" def)
-        , NEEDS_PRIMS(runTest "BlockRam1" def)
-        , NEEDS_PRIMS(runTest "Ram" def)
-        , NEEDS_PRIMS(runTest "ResetGen" def)
-        , NEEDS_PRIMS(runTest "RomFile" def)
-        , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "Signal") allTargets [] [] "BlockRamLazy" "main")
-        , NEEDS_PRIMS_GHC(runTest "BlockRamTest" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "Compression" def)
-        , NEEDS_PRIMS_GHC(runTest "DelayedReset" def)
+        , runTest "BlockRamFile" def
+        , runTest "BlockRam0" def
+        , runTest "BlockRam1" def
+        , runTest "Ram" def
+        , runTest "ResetGen" def
+        , runTest "RomFile" def
+        , outputTest ("tests" </> "shouldwork" </> "Signal") allTargets [] [] "BlockRamLazy" "main"
+        , runTest "BlockRamTest" def{hdlSim=False}
+        , runTest "Compression" def
+        , runTest "DelayedReset" def
         , let _opts = def { buildTargets=BuildSpecific ["example"]
                           , hdlSim=False
                           }
-           in NEEDS_PRIMS_GHC(runTest "NoCPR" _opts)
-        , NEEDS_PRIMS_GHC(runTest "Oversample" def)
-        , NEEDS_PRIMS_GHC(runTest "RegisterAR" def)
-        , NEEDS_PRIMS_GHC(runTest "RegisterSR" def)
-        , NEEDS_PRIMS_GHC(runTest "RegisterAE" def)
-        , NEEDS_PRIMS_GHC(runTest "RegisterSE" def)
-        , NEEDS_PRIMS_GHC(runTest "ResetSynchronizer" def)
-        , NEEDS_PRIMS_GHC(runTest "ResetSynchronizerSync" def)
-        , NEEDS_PRIMS_GHC(runTest "ResetLow" def)
-        , NEEDS_PRIMS_GHC(runTest "Rom" def)
-        , NEEDS_PRIMS_GHC(runTest "RomNegative" def)
+           in runTest "NoCPR" _opts
+        , runTest "Oversample" def
+        , runTest "RegisterAR" def
+        , runTest "RegisterSR" def
+        , runTest "RegisterAE" def
+        , runTest "RegisterSE" def
+        , runTest "ResetSynchronizer" def
+        , runTest "ResetSynchronizerSync" def
+        , runTest "ResetLow" def
+        , runTest "Rom" def
+        , runTest "RomNegative" def
         , runTest "SigP" def{hdlSim=False}
         , outputTest ("tests" </> "shouldwork" </> "Signal") [VHDL] [] [] "T1102A" "main"
         , outputTest ("tests" </> "shouldwork" </> "Signal") [VHDL] [] [] "T1102B" "main"
 
         , clashTestGroup "BiSignal"
-          [ NEEDS_PRIMS_GHC(runTest "Counter" def)
-          , NEEDS_PRIMS_GHC(runTest "CounterHalfTuple" def)
-          , NEEDS_PRIMS_GHC(runTest "CounterHalfTupleRev" def)
+          [ runTest "Counter" def
+          , runTest "CounterHalfTuple" def
+          , runTest "CounterHalfTupleRev" def
           ]
         , runTest "T1007" def{hdlSim=False}
         ]
@@ -677,22 +658,22 @@ runClashTest = defaultMain $ clashTestRoot
                           , vvpStderrEmptyFail=False
                           , buildTargets=BuildSpecific ["topEntity"]
                           }
-           in NEEDS_PRIMS_GHC(runTest "Test00" _opts)
+           in runTest "Test00" _opts
         ]
       , clashTestGroup "SynthesisAttributes"
-        [ NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") allTargets [] [] "Simple" "main")
-        , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") allTargets [] [] "Product" "main")
-        ,                 outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") allTargets [] [] "InstDeclAnnotations" "main"
-        , NEEDS_PRIMS_GHC(runTest "Product" def)
+        [ outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") allTargets [] [] "Simple" "main"
+        , outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") allTargets [] [] "Product" "main"
+        , outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") allTargets [] [] "InstDeclAnnotations" "main"
+        , runTest "Product" def
         , outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") allTargets [] [] "T1771" "main"
         ]
       , clashTestGroup "Testbench"
-        [ NEEDS_PRIMS_GHC(runTest "TB" def{clashFlags=["-fclash-inline-limit=0"]})
-        , NEEDS_PRIMS_GHC(runTest "SyncTB" def)
+        [ runTest "TB" def{clashFlags=["-fclash-inline-limit=0"]}
+        , runTest "SyncTB" def
         ]
       , clashTestGroup "Types"
         [ runTest "TypeFamilyReduction" def{hdlSim=False}
-        , NEEDS_PRIMS(runTest "NatExp" def{hdlSim=False})
+        , runTest "NatExp" def{hdlSim=False}
         ]
       , clashTestGroup "TopEntity"
         -- VHDL tests disabled for now: I can't figure out how to generate a static name whilst retaining the ability to actually test..
@@ -710,44 +691,44 @@ runClashTest = defaultMain $ clashTestRoot
         , let _opts = def { hdlTargets=[Verilog]
                           , buildTargets=BuildSpecific ["PortNames_testBench"]
                           }
-           in NEEDS_PRIMS_GHC(runTest "PortNames" _opts)
-        , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNames" "main")
+           in runTest "PortNames" _opts
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNames" "main"
         , let _opts = def { hdlTargets=[Verilog]
                           , buildTargets=BuildSpecific ["PortProducts_testBench"]
                           }
-           in NEEDS_PRIMS_GHC(runTest "PortProducts" _opts)
-        , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortProducts" "main")
+           in runTest "PortProducts" _opts
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortProducts" "main"
         , let _opts = def { hdlTargets=[Verilog]
                           , buildTargets=BuildSpecific ["PortProductsSum_testBench"]
                           }
-           in NEEDS_PRIMS_GHC(runTest "PortProductsSum" _opts)
-        , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortProductsSum" "main")
+           in runTest "PortProductsSum" _opts
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortProductsSum" "main"
         , let _opts = def { hdlTargets=[Verilog]
                           , buildTargets=BuildSpecific ["PortNamesWithUnit_testBench"]
                           }
-           in NEEDS_PRIMS_GHC(runTest "PortNamesWithUnit" _opts)
-        , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithUnit" "main")
+           in runTest "PortNamesWithUnit" _opts
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithUnit" "main"
         , let _opts = def { hdlTargets=[Verilog]
                           , buildTargets=BuildSpecific ["PortNamesWithVector_testBench"]
                           }
-           in NEEDS_PRIMS_GHC(runTest "PortNamesWithVector" _opts)
-        , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithVector" "main")
+           in runTest "PortNamesWithVector" _opts
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithVector" "main"
         , let _opts = def { hdlTargets=[Verilog]
                           , buildTargets=BuildSpecific ["PortNamesWithRTree_testBench"]
                           }
-           in NEEDS_PRIMS_GHC(runTest "PortNamesWithRTree" _opts)
-        , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithRTree" "main")
-        , NEEDS_PRIMS_GHC(clashLibTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] "T1182A" "main")
-        , NEEDS_PRIMS_GHC(clashLibTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] "T1182B" "main")
+           in runTest "PortNamesWithRTree" _opts
+        , outputTest ("tests" </> "shouldwork" </> "TopEntity") [Verilog] [] [] "PortNamesWithRTree" "main"
+        , clashLibTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] "T1182A" "main"
+        , clashLibTest ("tests" </> "shouldwork" </> "TopEntity") allTargets [] "T1182B" "main"
         ]
       , clashTestGroup "Unit"
-        [ NEEDS_PRIMS_GHC(runTest "Imap" def)
-        , NEEDS_PRIMS_GHC(runTest "ZipWithUnitVector" def)
-        , NEEDS_PRIMS_GHC(runTest "ZipWithTupleWithUnitLeft" def)
-        , NEEDS_PRIMS_GHC(runTest "ZipWithTupleWithUnitRight" def)
-        , NEEDS_PRIMS_GHC(runTest "ZipWithTripleWithUnitMiddle" def)
-        , NEEDS_PRIMS_GHC(runTest "ZipWithUnitSP" def)
-        , NEEDS_PRIMS_GHC(runTest "ZipWithUnitSP2" def)
+        [ runTest "Imap" def
+        , runTest "ZipWithUnitVector" def
+        , runTest "ZipWithTupleWithUnitLeft" def
+        , runTest "ZipWithTupleWithUnitRight" def
+        , runTest "ZipWithTripleWithUnitMiddle" def
+        , runTest "ZipWithUnitSP" def
+        , runTest "ZipWithUnitSP2" def
         ]
       , clashTestGroup "Vector"
         [ runTest "EnumTypes" def{hdlSim=False}
@@ -756,47 +737,47 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "VScan" def{hdlSim=False}
         , runTest "VZip" def{hdlSim=False}
         , runTest "VecConst" def{hdlSim=False}
-        , NEEDS_PRIMS(runTest "FirOddSize" def)
-        , NEEDS_PRIMS(runTest "IndexInt" def)
-        , NEEDS_PRIMS(runTest "IndexInt2" def)
-        , NEEDS_PRIMS(outputTest ("tests" </> "shouldwork" </> "Vector") [Verilog] [] [] "IndexInt2" "main")
-        , NEEDS_PRIMS_GHC(runTest "Concat" def)
-        , NEEDS_PRIMS_GHC(runTest "DFold" def)
-        , NEEDS_PRIMS_GHC(runTest "DFold2" def)
-        , NEEDS_PRIMS_GHC(runTest "DTFold" def)
-        , NEEDS_PRIMS_GHC(runTest "FindIndex" def)
-        , NEEDS_PRIMS_GHC(runTest "Fold" def)
-        , NEEDS_PRIMS_GHC(runTest "FoldlFuns" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "Foldr" def)
-        , NEEDS_PRIMS_GHC(runTest "FoldrEmpty" def)
-        , NEEDS_PRIMS_GHC(runTest "HOClock" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "HOPrim" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "Indices" def)
-        , NEEDS_PRIMS_GHC(runTest "Iterate" def)
-        , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "Vector") [VHDL] [] [] "IterateCF" "main")
-        , NEEDS_PRIMS_GHC(runTest "Minimum" def)
-        , NEEDS_PRIMS_GHC(runTest "MovingAvg" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "PatHOCon" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "Scatter" def)
-        , NEEDS_PRIMS_GHC(runTest "Split" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "ToList" def)
-        , NEEDS_PRIMS_GHC(runTest "Unconcat" def)
-        , NEEDS_PRIMS_GHC(runTest "VACC" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "VEmpty" def)
-        , NEEDS_PRIMS_GHC(runTest "VIndex" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "VIndicesI" def)
-        , NEEDS_PRIMS_GHC(runTest "VFold" def)
-        , NEEDS_PRIMS_GHC(runTest "VMerge" def)
-        , NEEDS_PRIMS_GHC(runTest "VReplace" def)
-        , NEEDS_PRIMS_GHC(runTest "VReverse" def)
-        , NEEDS_PRIMS_GHC(runTest "VRotate" def)
-        , NEEDS_PRIMS_GHC(runTest "VSelect" def)
-        , NEEDS_PRIMS_GHC(runTest "VecOfSum" def{hdlSim=False})
-        , NEEDS_PRIMS_GHC(runTest "T452" def{hdlSim=False})
+        , runTest "FirOddSize" def
+        , runTest "IndexInt" def
+        , runTest "IndexInt2" def
+        , outputTest ("tests" </> "shouldwork" </> "Vector") [Verilog] [] [] "IndexInt2" "main"
+        , runTest "Concat" def
+        , runTest "DFold" def
+        , runTest "DFold2" def
+        , runTest "DTFold" def
+        , runTest "FindIndex" def
+        , runTest "Fold" def
+        , runTest "FoldlFuns" def{hdlSim=False}
+        , runTest "Foldr" def
+        , runTest "FoldrEmpty" def
+        , runTest "HOClock" def{hdlSim=False}
+        , runTest "HOPrim" def{hdlSim=False}
+        , runTest "Indices" def
+        , runTest "Iterate" def
+        , outputTest ("tests" </> "shouldwork" </> "Vector") [VHDL] [] [] "IterateCF" "main"
+        , runTest "Minimum" def
+        , runTest "MovingAvg" def{hdlSim=False}
+        , runTest "PatHOCon" def{hdlSim=False}
+        , runTest "Scatter" def
+        , runTest "Split" def{hdlSim=False}
+        , runTest "ToList" def
+        , runTest "Unconcat" def
+        , runTest "VACC" def{hdlSim=False}
+        , runTest "VEmpty" def
+        , runTest "VIndex" def{hdlSim=False}
+        , runTest "VIndicesI" def
+        , runTest "VFold" def
+        , runTest "VMerge" def
+        , runTest "VReplace" def
+        , runTest "VReverse" def
+        , runTest "VRotate" def
+        , runTest "VSelect" def
+        , runTest "VecOfSum" def{hdlSim=False}
+        , runTest "T452" def{hdlSim=False}
         , let _opts = def { hdlSim = False, hdlTargets = [VHDL]}
-           in NEEDS_PRIMS_GHC(runTest "T895" _opts)
+           in runTest "T895" _opts
         , let _opts = def { hdlSim = False, hdlTargets = [VHDL], clashFlags = ["-fclash-hdlsyn", "Vivado"]}
-           in NEEDS_PRIMS_GHC(runTest "T1360" _opts)
+           in runTest "T1360" _opts
         ] -- end vector
       , clashTestGroup "Verification" [
           runTest "SymbiYosys" def{
@@ -807,22 +788,20 @@ runClashTest = defaultMain $ clashTestRoot
           }
         ]
       , clashTestGroup "XOptimization"
-        [ NEEDS_PRIMS(outputTest  ("tests" </> "shouldwork" </> "XOptimization") allTargets [] [] "Conjunction" "main")
-        , NEEDS_PRIMS(outputTest  ("tests" </> "shouldwork" </> "XOptimization") allTargets [] [] "Disjunction" "main")
+        [ outputTest  ("tests" </> "shouldwork" </> "XOptimization") allTargets [] [] "Conjunction" "main"
+        , outputTest  ("tests" </> "shouldwork" </> "XOptimization") allTargets [] [] "Disjunction" "main"
         , clashLibTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedDataPat" "main"
         , clashLibTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedLitPat" "main"
         , clashLibTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "OneDefinedDefaultPat" "main"
         , clashLibTest ("tests" </> "shouldwork" </> "XOptimization") allTargets [] "ManyDefined" "main"
         ]
-#if EXPERIMENTAL_EVALUATOR
-      , clashTestGroup "PartialEvaluation"
-        [ clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "EtaExpansion" "main"
-        , clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "KnownCase" "main"
-        , clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "CaseOfCase" "main"
-        , clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "LazyEvaluation" "main"
-        , clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "MutualRecursion" "main"
-        ]
-#endif
+--    , clashTestGroup "PartialEvaluation"
+--      [ clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "EtaExpansion" "main"
+--      , clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "KnownCase" "main"
+--      , clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "CaseOfCase" "main"
+--      , clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "LazyEvaluation" "main"
+--      , clashLibTest ("tests" </> "shouldwork" </> "PartialEvaluation") allTargets [] "MutualRecursion" "main"
+--      ]
       ] -- end shouldwork
     ] -- end tests
   ] -- end .
