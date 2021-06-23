@@ -349,7 +349,7 @@ sbyTests opts@TestOptions {..} tmpDir =
 runTest1
   :: String
   -> TestOptions
-  -> [String]
+  -> [TestName]
   -> HDL
   -> TestTree
 runTest1 modName opts@TestOptions{..} path target =
@@ -399,43 +399,40 @@ runTest modName opts path =
   testGroup modName (map (runTest1 modName opts (modName:path)) (hdlTargets opts))
 
 outputTest'
-  :: FilePath
-  -- ^ Work directory
+  :: String
+  -- ^ Module name
   -> HDL
   -- ^ Build target
   -> [String]
   -- ^ Extra Clash arguments
   -> [String]
   -- ^ Extra GHC arguments
-  -> String
-  -- ^ Module name
-  -> String
-  -- ^ Base function name
   -> [TestName]
   -- ^ Parent test names in order of distance to the test. That is, the last
   -- item in the list will be the root node, while the first one will be the
   -- one closest to the test.
   -> TestTree
-outputTest' env target extraClashArgs extraGhcArgs modName funcName path =
+outputTest' modName target extraClashArgs extraGhcArgs path =
   withResource acquire tastyRelease (const seqTests)
     where
       -- TODO: Run these tests in their own temporary directory
       path' = show target:path
+      sourceDir = foldl (</>) sourceDirectory (reverse (tail path))
       acquire = tastyAcquire path' [modName]
       out = testDirectory path' </> modName </> "out"
 
       args =
         [ "-DCLASHLIBTEST"
         , "-package", "clash-testsuite"
-        , "-main-is", modName ++ "." ++ funcName ++ show target
+        , "-main-is", modName ++ ".main" ++ show target
         , "-o", out
         , "-outputdir", testDirectory path' </> modName
-        ] ++ extraGhcArgs ++ [env </> modName <.> "hs"]
+        ] ++ extraGhcArgs ++ [sourceDir </> modName <.> "hs"]
 
       hdlTest = ("clash", singleTest "clash" (ClashTest {
           ctExpectFailure=Nothing
         , ctBuildTarget=target
-        , ctSourceDirectory=sourceDirectory </> env
+        , ctSourceDirectory=sourceDir
         , ctExtraArgs="-DCLASHLIBTEST" : extraClashArgs
         , ctModName=modName
         , ctOutputDirectory=pure workDir
@@ -451,28 +448,25 @@ outputTest' env target extraClashArgs extraGhcArgs modName funcName path =
           , testProgram "exec" out [workDir] NoGlob PrintStdErr False Nothing ) ]
 
 outputTest
-  :: FilePath
-  -- ^ Work directory
+  :: String
+  -- ^ Module name
   -> [HDL]
   -- ^ Build targets
   -> [String]
   -- ^ Extra clash arguments
   -> [String]
   -- ^ Extra GHC arguments
-  -> String
-  -- ^ Module name
-  -> String
-  -- ^ Base function name
   -> [TestName]
   -- ^ Parent test names in order of distance to the test. That is, the last
   -- item in the list will be the root node, while the first one will be the
   -- one closest to the test.
   -> TestTree
-outputTest env targets extraClashArgs extraGhcArgs modName funcName path =
-  let testName = modName ++ " [output test]" in
-  let path' = testName : path in
-  testGroup testName
-    [outputTest' env target extraClashArgs extraGhcArgs modName funcName path' | target <- targets]
+outputTest modName targets extraClashArgs extraGhcArgs path =
+  let testName = modName ++ " [output test]"
+   in testGroup testName
+        [ outputTest' modName target extraClashArgs extraGhcArgs (testName:path)
+        | target <- targets
+        ]
 
 clashLibTest'
   :: FilePath
@@ -483,14 +477,12 @@ clashLibTest'
   -- ^ Extra GHC arguments
   -> String
   -- ^ Module name
-  -> String
-  -- ^ Base function name
   -> [TestName]
   -- ^ Parent test names in order of distance to the test. That is, the last
   -- item in the list will be the root node, while the first one will be the
   -- one closest to the test.
   -> TestTree
-clashLibTest' env target extraGhcArgs modName funcName path =
+clashLibTest' env target extraGhcArgs modName path =
   withResource acquire tastyRelease (const seqTests)
     where
       -- TODO: Run these tests in their own temporary directory
@@ -501,7 +493,7 @@ clashLibTest' env target extraGhcArgs modName funcName path =
       args =
         [ "-DCLASHLIBTEST"
         , "-package", "clash-testsuite"
-        , "-main-is", modName ++ "." ++ funcName ++ show target
+        , "-main-is", modName ++ ".main" ++ show target
         , "-o", out
         , "-outputdir", testDirectory path' </> modName
         ] ++ extraGhcArgs ++ [env </> modName <.> "hs"]
@@ -520,19 +512,17 @@ clashLibTest
   -- ^ Extra GHC arguments
   -> String
   -- ^ Module name
-  -> String
-  -- ^ Base function name
   -> [TestName]
   -- ^ Parent test names in order of distance to the test. That is, the last
   -- item in the list will be the root node, while the first one will be the
   -- one closest to the test.
   -> TestTree
-clashLibTest env targets extraGhcArgs modName funcName path =
+clashLibTest env targets extraGhcArgs modName path =
   -- HACK: clashLibTests are run sequentially to prevent race issues. See:
   -- HACK: https://github.com/clash-lang/clash-compiler/pull/1416
   testGroup testName $ sequenceTests path'
     [(show target, runLibTest target) | target <- targets]
  where
-  runLibTest target = clashLibTest' env target extraGhcArgs modName funcName path'
+  runLibTest target = clashLibTest' env target extraGhcArgs modName path'
   testName = modName ++ " [clash-lib test]"
   path' = testName : path
