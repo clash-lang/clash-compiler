@@ -110,6 +110,8 @@ data TestOptions =
     -- errors, or Just (part of) the error message Clash is expected to throw.
     , hdlTargets :: [HDL]
     -- ^ Run tests for these targets
+    , ghcFlags :: [String]
+    -- ^ Extra flags to pass to GHC
     , clashFlags :: [String]
     -- ^ Extra flags to pass to Clash
     , buildTargets :: BuildTargets
@@ -132,6 +134,7 @@ instance Default TestOptions where
       , expectVerificationFail=Nothing
       , verificationTool=Nothing
       , hdlTargets=allTargets
+      , ghcFlags=[]
       , clashFlags=[]
       , buildTargets=BuildAuto
       , vvpStderrEmptyFail=True
@@ -156,7 +159,7 @@ testDirectory
   -> FilePath
   -- ^ Test directory
 testDirectory path =
-  foldl (</>) temporaryDirectory (reverse path)
+  List.foldl' (</>) temporaryDirectory (reverse path)
 {-# NOINLINE testDirectory #-}
 
 -- | Directory where testbenches live.
@@ -367,7 +370,7 @@ runTest1 modName opts@TestOptions{..} path target =
 
  where
   mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
-  sourceDir = foldl (</>) sourceDirectory (reverse (tail path))
+  sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))
 
   clashTest tmpDir =
     ("clash", singleTest "clash" (ClashTest {
@@ -417,7 +420,7 @@ outputTest' modName target extraClashArgs extraGhcArgs path =
     where
       -- TODO: Run these tests in their own temporary directory
       path' = show target:path
-      sourceDir = foldl (</>) sourceDirectory (reverse (tail path))
+      sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))
       acquire = tastyAcquire path' [modName]
       out = testDirectory path' </> modName </> "out"
 
@@ -450,22 +453,17 @@ outputTest' modName target extraClashArgs extraGhcArgs path =
 outputTest
   :: String
   -- ^ Module name
-  -> [HDL]
-  -- ^ Build targets
-  -> [String]
-  -- ^ Extra clash arguments
-  -> [String]
-  -- ^ Extra GHC arguments
+  -> TestOptions
   -> [TestName]
   -- ^ Parent test names in order of distance to the test. That is, the last
   -- item in the list will be the root node, while the first one will be the
   -- one closest to the test.
   -> TestTree
-outputTest modName targets extraClashArgs extraGhcArgs path =
+outputTest modName opts path =
   let testName = modName ++ " [output test]"
    in testGroup testName
-        [ outputTest' modName target extraClashArgs extraGhcArgs (testName:path)
-        | target <- targets
+        [ outputTest' modName target (clashFlags opts) (ghcFlags opts) (testName:path)
+        | target <- hdlTargets opts
         ]
 
 clashLibTest'
@@ -485,7 +483,7 @@ clashLibTest' modName target extraGhcArgs path =
     where
       -- TODO: Run these tests in their own temporary directory
       path' = show target:path
-      sourceDir = foldl (</>) sourceDirectory (reverse (tail path))
+      sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))
       acquire = tastyAcquire path' [modName]
       out = testDirectory path' </> modName </> "out"
 
@@ -505,20 +503,17 @@ clashLibTest' modName target extraGhcArgs path =
 clashLibTest
   :: String
   -- ^ Module name
-  -> [HDL]
-  -- ^ Build targets
-  -> [String]
-  -- ^ Extra GHC arguments
+  -> TestOptions
   -> [TestName]
   -- ^ Parent test names in order of distance to the test. That is, the last
   -- item in the list will be the root node, while the first one will be the
   -- one closest to the test.
   -> TestTree
-clashLibTest modName targets extraGhcArgs path =
+clashLibTest modName opts path =
   -- HACK: clashLibTests are run sequentially to prevent race issues. See:
   -- HACK: https://github.com/clash-lang/clash-compiler/pull/1416
   let testName = modName ++ " [clash-lib test]"
    in testGroup testName $ sequenceTests (testName:path)
-        [ (show target, clashLibTest' modName target extraGhcArgs (testName:path))
-        | target <- targets
+        [ (show target, clashLibTest' modName target (ghcFlags opts) (testName:path))
+        | target <- hdlTargets opts
         ]
