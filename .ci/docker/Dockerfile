@@ -96,7 +96,7 @@ FROM ubuntu:$UBUNTU_VERSION AS run
 LABEL vendor="QBayLogic B.V." maintainer="devops@qbaylogic.com"
 ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH="$PATH:/opt/bin:/root/.ghcup/bin"
 
-ARG DEPS_RUNTIME="ca-certificates gcc git jq libc6-dev libgmp10-dev libgnat-9 libllvm11 libreadline8 libtinfo-dev libtcl8.6 make python3 ssh zlib1g-dev zstd"
+ARG DEPS_RUNTIME="ca-certificates curl gcc git jq libc6-dev libgmp10-dev libgnat-9 libllvm11 libreadline8 libtinfo-dev libtcl8.6 make python3 ssh zlib1g-dev zstd"
 RUN apt-get update \
  && apt-get install -y --no-install-recommends $DEPS_RUNTIME \
  && apt-get clean \
