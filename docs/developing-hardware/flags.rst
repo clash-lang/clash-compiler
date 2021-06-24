@@ -33,9 +33,9 @@ Clash Compiler Flags
 
   **Default:** ``DebugNone``
 
-  .. info:: This flag exists for backwards compatibility. It is now possible to
-  set debugging flags individually with `-fclash-debug-invariants`,
-  `-fclash-debug-info` and `-fclash-debug-count-transformations`.
+  .. note:: This flag exists for backwards compatibility. It is now possible to
+    set debugging flags individually with `-fclash-debug-invariants`,
+    `-fclash-debug-info` and `-fclash-debug-count-transformations`.
 
 -fclash-debug-invariants
   Check invariants while debugging and print warnings / errors which may be
