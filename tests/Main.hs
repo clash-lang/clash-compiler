@@ -427,6 +427,17 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "BoxedFunctions"
         [ runTest "DeadRecursiveBoxed" def{hdlSim=False}
         ]
+      -- The Cores.Xilinx.Floating tests require Vivado (and take much time to
+      -- run).
+      --
+      -- , clashTestGroup "Cores"
+      --   [ clashTestGroup "Xilinx"
+      --     [ runTest "Floating" def{ clashFlags=["-fclash-float-support"]
+      --                             , buildTargets=[ "addBasicTB"
+      --                                            , "addEnableTB"
+      --                                            , "addShortPLTB"]}
+      --     ]
+      --   ]
       , clashTestGroup "CSignal"
         [ NEEDS_PRIMS_GHC(runTest "MAC" def{hdlSim=False})
         , NEEDS_PRIMS_GHC(runTest "CBlockRamTest" def{hdlSim=False})

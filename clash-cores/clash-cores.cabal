@@ -67,13 +67,19 @@ common basic-config
     ghc-typelits-extra        >= 0.3.2,
     ghc-typelits-knownnat     >= 0.6,
     interpolate               >= 0.2,
-    QuickCheck
+    QuickCheck,
+    template-haskell
 
 library
   import: basic-config
   hs-source-dirs: src
 
   exposed-modules:
+    Clash.Cores.Xilinx.Floating
+    Clash.Cores.Xilinx.Floating.Annotations
+    Clash.Cores.Xilinx.Floating.BlackBoxes
+    Clash.Cores.Xilinx.Floating.Explicit
+    Clash.Cores.Xilinx.Floating.Internal
     Clash.Cores.SPI
     Clash.Cores.LatticeSemi.ICE40.IO
     Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO
