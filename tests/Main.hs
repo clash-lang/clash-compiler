@@ -6,14 +6,12 @@ module Main (main) where
 import qualified Clash.Util.Interpolate    as I
 
 import           Clash.Annotations.Primitive (HDL(..))
-import           Control.Exception         (finally)
 import qualified Data.Text                 as Text
 import           Data.Default              (def)
 import           Data.List                 ((\\), intercalate)
 import           Data.Version              (versionBranch)
 import           System.Directory
-  (createDirectoryIfMissing, removeDirectoryRecursive, getCurrentDirectory,
-   doesDirectoryExist, makeAbsolute)
+  (getCurrentDirectory, doesDirectoryExist, makeAbsolute)
 import           System.Environment
 import           System.Info
 import           GHC.Conc                  (numCapabilities)
@@ -822,6 +820,5 @@ runClashTest = defaultMain $ clashTestRoot
 main :: IO ()
 main = do
   setEnv "TASTY_NUM_THREADS" (show numCapabilities)
-  createDirectoryIfMissing True temporaryDirectory
   setClashEnvs compiledWith
-  finally runClashTest (removeDirectoryRecursive temporaryDirectory)
+  runClashTest
