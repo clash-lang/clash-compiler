@@ -22,6 +22,7 @@ import           System.IO.Temp            (createTempDirectory, getCanonicalTem
 import           Test.Tasty
 import           Test.Tasty.Program
 import           Test.Tasty.Providers
+import           Test.Tasty.Runners
 
 import           Test.Tasty.Common
 import           Test.Tasty.Ghdl
@@ -140,32 +141,23 @@ instance Default TestOptions where
       , vvpStderrEmptyFail=True
       }
 
--- | Single directory for this test run. All tests are run relative to this
--- directory. This does require all test names to be unique, which is checked
--- in Main.hs.
-temporaryDirectory :: String
-temporaryDirectory = unsafePerformIO $ do
-  cwd     <- Directory.getCurrentDirectory
-  let tmpDir = cwd </> ".clash-test-tmp"
-  Directory.createDirectoryIfMissing True tmpDir
-  tmpDir' <- createTempDirectory tmpDir "clash-test-"
-  return tmpDir'
-{-# NOINLINE temporaryDirectory #-}
-
--- | Given the module name of test, provide the test directory it is running in
-testDirectory
-  :: [TestName]
-  -- ^ Path of test
-  -> FilePath
-  -- ^ Test directory
-testDirectory path =
-  List.foldl' (</>) temporaryDirectory (reverse path)
-{-# NOINLINE testDirectory #-}
-
 -- | Directory where testbenches live.
 sourceDirectory :: String
 sourceDirectory =
-  -- TODO: Allow testsuite to be run from any directory
+  -- TODO: Allow testsuite to be run from any directory. This is easy from the
+  -- clash-testsuite side, as we can add
+  --
+  --     data-files:
+  --       shouldfail/**/*.hs
+  --       shouldwork/**/*.hs
+  --
+  -- to the cabal file, then use Paths_clash_testsuite to get access to the
+  -- data directory / data files. However, invoking clash for building in the
+  -- testsuite requires the location of primitives to be known and accessible
+  -- by clash (clash will automatically search in clash-lib/prims, which is
+  -- why running from the project root works). Getting these would require
+  -- exporting Paths_clash_lib from clash-lib, which might be grimy or not
+  -- possible when using stack instead of cabal. Someone should investigate
   unsafePerformIO Directory.getCurrentDirectory
 {-# NOINLINE sourceDirectory #-}
 
@@ -183,28 +175,6 @@ hdlFiles ext dir subdir = do
   allFiles <- Directory.getDirectoryContents (dir </> subdir)
   return $ map (subdir </>) (filter (List.isSuffixOf ext) allFiles)
 {-# NOINLINE hdlFiles #-}
-
--- | Called before running VHDL/Verilog/SystemVerilog test group. Creates
--- necessary subdirectories to run tests in.
-tastyAcquire
-  :: [TestName]
-  -- ^ Path of test
-  -> [FilePath]
-  -- ^ Subdirectories to create
-  -> IO FilePath
-  -- ^ New test directory
-tastyAcquire path subdirs = do
-  let tdir     = testDirectory path
-  let subdirs' = map (tdir </>) subdirs
-  _ <- mapM (Directory.createDirectoryIfMissing True) (subdirs')
-  return tdir
-
--- | Called after running VHDL/Verilog/System test group. Removes compiled files.
-tastyRelease
-  :: FilePath
-  -> IO ()
-tastyRelease path = do
-  Directory.removeDirectoryRecursive path
 
 -- | Given a number of test trees, make sure each one of them is executed
 -- one after the other. To prevent naming collisions, parent group names can
@@ -230,20 +200,20 @@ sequenceTests path (unzip -> (testNames, testTrees)) =
       applyAfter Nothing  tt = tt
       applyAfter (Just p) tt = after AllSucceed p tt
 
-data ClashTest = ClashTest
-  { ctExpectFailure :: Maybe (TestExitCode, T.Text)
+data ClashGenTest = ClashGenTest
+  { cgExpectFailure :: Maybe (TestExitCode, T.Text)
     -- ^ Expected failure code and output (if any)
-  , ctBuildTarget :: HDL
-  , ctSourceDirectory :: FilePath
-  , ctExtraArgs :: [String]
-  , ctModName :: String
-  , ctOutputDirectory :: IO FilePath
+  , cgBuildTarget :: HDL
+  , cgSourceDirectory :: FilePath
+  , cgExtraArgs :: [String]
+  , cgModName :: String
+  , cgOutputDirectory :: IO FilePath
   }
 
-instance IsTest ClashTest where
-  run optionSet ClashTest{..} progressCallback = do
-    oDir <- ctOutputDirectory
-    case ctExpectFailure of
+instance IsTest ClashGenTest where
+  run optionSet ClashGenTest{..} progressCallback = do
+    oDir <- cgOutputDirectory
+    case cgExpectFailure of
       Nothing -> run optionSet (program oDir) progressCallback
       Just exit -> run optionSet (failingProgram oDir exit) progressCallback
    where
@@ -257,19 +227,54 @@ instance IsTest ClashTest where
 
     args oDir =
       [ target
-      , "-i" <> ctSourceDirectory
-      , ctModName
+      , "-i" <> cgSourceDirectory
+      , cgModName
       , "-fclash-hdldir", oDir
       , "-odir", oDir
       , "-hidir", oDir
       , "-fclash-debug", "DebugSilent"
-      ] <> ctExtraArgs
+      ] <> cgExtraArgs
 
     target =
-      case ctBuildTarget of
+      case cgBuildTarget of
         VHDL          -> "--vhdl"
         Verilog       -> "--verilog"
         SystemVerilog -> "--systemverilog"
+
+  testOptions = coerce (testOptions @TestProgram)
+
+data ClashBinaryTest = ClashBinaryTest
+  { cbBuildTarget :: HDL
+  , cbSourceDirectory :: FilePath
+  , cbExtraBuildArgs :: [String]
+  , cbExtraExecArgs :: [String]
+  , cbModName :: String
+  , cbOutputDirectory :: IO FilePath
+  }
+
+instance IsTest ClashBinaryTest where
+  run optionSet ClashBinaryTest{..} progressCallback = do
+    oDir <- cbOutputDirectory
+    buildRes <- run optionSet (buildProgram oDir) progressCallback
+
+    if resultSuccessful buildRes
+      then run optionSet (execProgram oDir) progressCallback
+      else pure buildRes
+   where
+    buildProgram oDir =
+      TestProgram "clash" (buildArgs oDir) NoGlob PrintStdErr False Nothing
+
+    buildArgs oDir =
+      [ "-package", "clash-testsuite"
+      , "-main-is", cbModName <> ".main" <> show cbBuildTarget
+      , "-o", oDir </> "out"
+      , "-outputdir", oDir
+      ] <> cbExtraBuildArgs <>
+      [ cbSourceDirectory </> cbModName <.> "hs"
+      ]
+
+    execProgram oDir =
+      TestProgram (oDir </> "out") (oDir:cbExtraExecArgs) NoGlob PrintStdErr False Nothing
 
   testOptions = coerce (testOptions @TestProgram)
 
@@ -373,13 +378,13 @@ runTest1 modName opts@TestOptions{..} path target =
   sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))
 
   clashTest tmpDir =
-    ("clash", singleTest "clash" (ClashTest {
-      ctExpectFailure=expectClashFail
-    , ctBuildTarget=target
-    , ctSourceDirectory=sourceDir
-    , ctExtraArgs=clashFlags
-    , ctModName=modName
-    , ctOutputDirectory=tmpDir
+    ("clash (gen)", singleTest "clash (gen)" (ClashGenTest {
+      cgExpectFailure=expectClashFail
+    , cgBuildTarget=target
+    , cgSourceDirectory=sourceDir
+    , cgExtraArgs=clashFlags
+    , cgModName=modName
+    , cgOutputDirectory=tmpDir
     }))
 
   buildAndSimTests (buildTests, simTests) =
@@ -416,39 +421,32 @@ outputTest'
   -- one closest to the test.
   -> TestTree
 outputTest' modName target extraClashArgs extraGhcArgs path =
-  withResource acquire tastyRelease (const seqTests)
-    where
-      -- TODO: Run these tests in their own temporary directory
-      path' = show target:path
-      sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))
-      acquire = tastyAcquire path' [modName]
-      out = testDirectory path' </> modName </> "out"
+  withResource mkTmpDir Directory.removeDirectoryRecursive $ \tmpDir ->
+    testGroup (show target) $ sequenceTests (show target : path) $
+      [ clashGenHdl tmpDir
+      , clashBuild tmpDir
+      ]
+ where
+  mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
+  sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))
 
-      args =
-        [ "-DCLASHLIBTEST"
-        , "-package", "clash-testsuite"
-        , "-main-is", modName ++ ".main" ++ show target
-        , "-o", out
-        , "-outputdir", testDirectory path' </> modName
-        ] ++ extraGhcArgs ++ [sourceDir </> modName <.> "hs"]
+  clashGenHdl workDir = ("clash (gen)", singleTest "clash (gen)" (ClashGenTest {
+      cgExpectFailure=Nothing
+    , cgBuildTarget=target
+    , cgSourceDirectory=sourceDir
+    , cgExtraArgs=extraClashArgs
+    , cgModName=modName
+    , cgOutputDirectory=workDir
+    }))
 
-      hdlTest = ("clash", singleTest "clash" (ClashTest {
-          ctExpectFailure=Nothing
-        , ctBuildTarget=target
-        , ctSourceDirectory=sourceDir
-        , ctExtraArgs="-DCLASHLIBTEST" : extraClashArgs
-        , ctModName=modName
-        , ctOutputDirectory=pure workDir
-        }))
-
-      workDir = testDirectory path'
-
-      seqTests = testGroup (show target) $ sequenceTests path' $
-        [ hdlTest
-        , ( "[out] clash"
-          , testProgram "[out] clash" "clash" args NoGlob PrintStdErr False Nothing )
-        , ( "exec"
-          , testProgram "exec" out [workDir] NoGlob PrintStdErr False Nothing ) ]
+  clashBuild workDir = ("clash (exec)", singleTest "clash (exec)" (ClashBinaryTest {
+      cbBuildTarget=target
+    , cbSourceDirectory=sourceDir
+    , cbExtraBuildArgs="-DOUTPUTTEST" : extraGhcArgs
+    , cbExtraExecArgs=[]
+    , cbModName=modName
+    , cbOutputDirectory=workDir
+    }))
 
 outputTest
   :: String
@@ -479,26 +477,22 @@ clashLibTest'
   -- one closest to the test.
   -> TestTree
 clashLibTest' modName target extraGhcArgs path =
-  withResource acquire tastyRelease (const seqTests)
-    where
-      -- TODO: Run these tests in their own temporary directory
-      path' = show target:path
-      sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))
-      acquire = tastyAcquire path' [modName]
-      out = testDirectory path' </> modName </> "out"
+  withResource mkTmpDir Directory.removeDirectoryRecursive $ \tmpDir ->
+    testGroup (show target) $ sequenceTests (show target : path) $
+      [ clashBuild tmpDir
+      ]
+ where
+  mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
+  sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))
 
-      args =
-        [ "-DCLASHLIBTEST"
-        , "-package", "clash-testsuite"
-        , "-main-is", modName ++ ".main" ++ show target
-        , "-o", out
-        , "-outputdir", testDirectory path' </> modName
-        ] ++ extraGhcArgs ++ [sourceDir </> modName <.> "hs"]
-
-      seqTests = testGroup (show target) $ sequenceTests path' $
-        [ ( "[lib] clash"
-          , testProgram "[lib] clash" "clash" args NoGlob PrintStdErr False Nothing )
-        , ("exec", testProgram "exec" out [] NoGlob PrintStdErr False Nothing) ]
+  clashBuild workDir = ("clash (exec)", singleTest "clash (exec)" (ClashBinaryTest {
+      cbBuildTarget=target
+    , cbSourceDirectory=sourceDir
+    , cbExtraBuildArgs="-DCLASHLIBTEST" : extraGhcArgs
+    , cbExtraExecArgs=[]
+    , cbModName=modName
+    , cbOutputDirectory=workDir
+    }))
 
 clashLibTest
   :: String
