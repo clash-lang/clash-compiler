@@ -54,6 +54,77 @@ import Clash.Rewrite.Util
 import Clash.Rewrite.WorkFree (isConstant, isConstantNotClockReset)
 import Clash.Util (curLoc)
 
+{- [Note: ANF in Clash]
+ANF suitable for use in Clash can be described with the given types:
+
+  data ATerm
+    = ALam !Id ATerm
+    | ATyLam !TyVar ATerm
+    | ALetrec [(Id, CTerm)] !ITerm
+
+  data CTerm
+    = CApp !Id [Either ITerm Type]
+    | CCase !ITerm !Type [(Pat, ITerm)]
+    | CCast !ITerm !Type !Type
+    | CPrim !PrimInfo [Either ITerm Type]
+    | CTick !TickInfo CTerm
+
+  data ITerm
+    = IVar !Id
+    | ILiteral !Literal
+    | IData !DataCon [Either ITerm Type]
+    | IPrim !PrimInfo [Either ITerm Type]
+    | ITick !TickInfo ITerm
+
+where ATerm is a term in A-normal form, CTerm is a compound term (i.e. one
+which can only appear let-bound in ANF) and ITerm is an immediate term (i.e.
+one which represents some simple term).
+
+There are two constructors for primtiives, CPrim and IPrim. The difference
+between these are whether the primitive performs work or not. Primitives which
+perform work should be shared, but work-free primitives can be used directly.
+
+These types help codify some invariants that must hold for the result of ANF:
+
+  * terms start with (ty)lambdas, lambdas do not occur in let bindings or the
+    the body of a letrec expression
+
+  * there are no nested letrec expressions, only a single letrec which may
+    occur after all lambdas
+
+  * an ANF term may not have a letrec expression if the definition is already
+    an immediate term, e.g. where there is no benefit in sharing the result
+
+  * only compound terms are let-bound, as there is no benefit from let binding
+    an immediate term (there is no benefit to sharing immediate terms)
+
+  * arguments to functions / data constructors / primitives are not let bound
+    if they correspond are immediate, but are if they are compound (to produce
+    a variable which is an immediate term)
+
+  * the leftmost innermost term in a function application is always an
+    identifier, lambdas should have been removed by application propagation
+
+  * the right-hand side of a case alternative is an immediate term
+
+  * the body of the letrec expression is an immediate term
+
+Some invariants are not captured by these types:
+
+  * non-representable terms and terms in IO are not let-bound, instead they are
+    pushed down as far as possible
+
+  * if a let binding is created for the result, the name of the Id is "result"
+
+TODO: The best way to enforce that Clash implements ANF compatible with these
+types is to implement ANF using these types. However, as currently implemented
+ANF is mostly defined using the bottom-up transformation 'collectANF'. This
+would be some amount of effort to replace currently, perhaps it would be better
+to convert the result of partial evaluation to these data types when it is
+implemented more, then use these Anf types directly in the conversion to
+netlist, i.e. Term -> Value -> Normal -> Anf -> Netlist.
+-}
+
 {- [Note: Name re-creation]
 The names of heap bound variables are safely generate with mkUniqSystemId in
 Clash.Core.Evaluator.newLetBinding. But only their uniqs end up in the heap,
