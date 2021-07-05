@@ -241,4 +241,11 @@ endfunction"
     , "template"  : "(~ARG[0] < ~ARG[1]) ? -~SIZE[~TYPO]'d0 : ((~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]'d1 : ~SIZE[~TYPO]'d2)"
     }
   }
+, { "BlackBox" :
+  { "name"      : "GHC.Num.Integer.integerQuot"
+  , "kind"      : "Expression"
+  , "type"      : "integerQuot :: Integer -> Integer -> Integer"
+  , "template"  : "~ARG[0] / ~ARG[1]"
+  }
+}
 ]

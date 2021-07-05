@@ -31,13 +31,6 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "GHC.Prim.quotInt#"
-    , "kind"      : "Expression"
-    , "type"      : "quotInt# :: Int# -> Int# -> Int#"
-    , "template"  : "~ARG[0] / ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "GHC.Prim.plusWord#"
     , "kind"      : "Expression"
     , "type"      : "plusWord# :: Word# -> Word# -> Word#"
@@ -49,13 +42,6 @@
     , "kind"      : "Expression"
     , "type"      : "minusWord# :: Word# -> Word# -> Word#"
     , "template"  : "~ARG[0] - ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.quotWord#"
-    , "kind"      : "Expression"
-    , "type"      : "quotWord# :: Word# -> Word# -> Word#"
-    , "template"  : "~ARG[0] / ~ARG[1]"
     }
   }
 ]

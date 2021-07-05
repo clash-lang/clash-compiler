@@ -1,8 +1,0 @@
-[ { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Index.quot#"
-    , "kind"      : "Expression"
-    , "type"      : "quot# :: Index n -> Index n -> Index n"
-    , "template"  : "~ARG[0] / ~ARG[1]"
-    }
-  }
-]

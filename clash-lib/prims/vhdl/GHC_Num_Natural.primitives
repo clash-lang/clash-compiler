@@ -20,9 +20,14 @@
   }
   , { "BlackBox" :
     { "name"      : "GHC.Num.Natural.naturalRem"
-    , "kind"      : "Expression"
+    , "kind"      : "Declaration"
     , "type"      : "naturalRem :: Natural -> Natural -> Natural"
-    , "template"  : "~ARG[0] rem ~ARG[1]"
+    , "template"  :
+"~RESULT <= ~ARG[0] rem ~ARG[1]
+    -- pragma translate_off
+    when (~ARG[1] /= 0) else (others => 'X')
+    -- pragma translate_on
+    ;"
     , "warning": "GHC.Num.Natural.naturalRem: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
@@ -109,6 +114,19 @@
          \"01\" when ~ARG[0] = ~ARG[1] else
          \"10\";
 -- end naturalCompare"
+  }
+}
+, { "BlackBox":
+  { "name": "GHC.Num.Natural.naturalQuot"
+  , "kind": "Declaration"
+  , "type": "naturalQuot :: Natural -> Natural -> Natural"
+  , "template"  :
+"~RESULT <= ~ARG[0] / ~ARG[1]
+    -- pragma translate_off
+    when (~ARG[1] /= 0) else (others => 'X')
+    -- pragma translate_on
+    ;"
+  , "warning": "GHC.Num.Natural.naturalQuot: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
   }
 }
 ]

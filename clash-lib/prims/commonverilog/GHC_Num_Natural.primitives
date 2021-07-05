@@ -110,4 +110,13 @@ endfunction"
   , "template"  : "(~ARG[0] < ~ARG[1]) ? -~SIZE[~TYPO]'d0 : ((~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]'d1 : ~SIZE[~TYPO]'d2)"
   }
 }
+, {
+    "BlackBox": {
+      "name": "GHC.Num.Natural.naturalQuot",
+      "kind": "Expression",
+      "type": "naturalQuot :: Natural -> Natural -> Natural",
+      "template": "~ARG[0] / ~ARG[1]",
+      "warning": "GHC.Num.Natural.naturalQuot: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
+    }
+}
 ]

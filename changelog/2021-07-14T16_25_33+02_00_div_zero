@@ -1,0 +1,1 @@
+FIXED: div/rem/mod now avoid division by zero during VHDL simulation. Due to the use of concurrent statements, even unreachable code would previously result in simulation error.

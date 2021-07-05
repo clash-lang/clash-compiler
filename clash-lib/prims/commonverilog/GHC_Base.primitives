@@ -5,4 +5,11 @@
     , "template"  : "~ARG[0] % ~ARG[1]"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Base.quotInt"
+    , "kind"      : "Expression"
+    , "type"      : "quotInt :: Int -> Int -> Int"
+    , "template"  : "~ARG[0] / ~ARG[1]"
+    }
+  }
 ]

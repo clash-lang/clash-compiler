@@ -13,13 +13,6 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "GHC.Integer.Type.quotInteger"
-    , "kind"      : "Expression"
-    , "type"      : "quotInteger :: Integer -> Integer -> Integer"
-    , "template"  : "~ARG[0] / ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "GHC.Integer.Type.leInteger"
     , "kind"      : "Expression"
     , "type"      : "leInteger :: Integer -> Integer -> Bool"

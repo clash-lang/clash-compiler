@@ -186,4 +186,11 @@
     , "template"  : "(~ARG[0] < ~SIZE[~TYPO]'sd0) ? -~SIZE[~TYPO]'sd1 : ((~ARG[0] == ~SIZE[~TYPO]'sd0) ? ~SIZE[~TYPO]'sd0 : ~SIZE[~TYPO]'sd1)"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.quotInteger"
+    , "kind"      : "Expression"
+    , "type"      : "quotInteger :: Integer -> Integer -> Integer"
+    , "template"  : "~ARG[0] / ~ARG[1]"
+    }
+  }
 ]

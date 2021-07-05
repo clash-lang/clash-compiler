@@ -59,15 +59,6 @@
     }
   },
   {
-    "BlackBox": {
-      "name": "GHC.Num.Natural.naturalQuot",
-      "kind": "Expression",
-      "type": "naturalQuot :: Natural -> Natural -> Natural",
-      "template": "~ARG[0] / ~ARG[1]",
-      "warning": "GHC.Num.Natural.naturalQuot: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
-    }
-  },
-  {
     "Primitive": {
       "name": "GHC.Num.Natural.naturalGcd",
       "workInfo" : "Never",
