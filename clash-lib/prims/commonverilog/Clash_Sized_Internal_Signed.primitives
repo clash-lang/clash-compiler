@@ -203,4 +203,11 @@
     , "template"  : "~IF~SIZE[~TYP[2]]~THEN~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[2]]]~THEN$signed({~VAR[s][2][~LIT[0]-1],~VAR[s][2][0+:(~SIZE[~TYPO]-1)]})~ELSE$signed({{(~SIZE[~TYPO]-~SIZE[~TYP[2]]) {~VAR[s][2][~LIT[0]-1]}},~VAR[s][2]})~FI~ELSE~SIZE[~TYPO]'sd0~FI"
     }
   }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Signed.quot#"
+    , "kind"      : "Expression"
+    , "type"      : "quot# :: Signed n -> Signed n -> Signed n"
+    , "template"  : "~ARG[0] / ~ARG[1]"
+    }
+  }
 ]

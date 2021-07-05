@@ -13,13 +13,6 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.quot#"
-    , "kind"      : "Expression"
-    , "type"      : "quot# :: Unsigned n -> Unsigned n -> Unsigned n"
-    , "template"  : "~ARG[0] / ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.unsignedToWord"
     , "kind"      : "Expression"
     , "template"  : "~ARG[0]"

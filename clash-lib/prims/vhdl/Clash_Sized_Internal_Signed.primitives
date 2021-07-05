@@ -134,9 +134,14 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.rem#"
-    , "kind"      : "Expression"
+    , "kind"      : "Declaration"
     , "type"      : "rem# :: Signed n -> Signed n -> Signed n"
-    , "template"  : "~ARG[0] rem ~ARG[1]"
+    , "template"  :
+"~RESULT <= ~ARG[0] rem ~ARG[1]
+    -- pragma translate_off
+    when (~ARG[1] /= 0) else (others => 'X')
+    -- pragma translate_on
+    ;"
     }
   }
 , { "BlackBox" :
@@ -156,7 +161,11 @@ begin
   ~SYM[3] <= resize(~VAR[dividend][0],~SIZE[~TYPO]+1)   when ~SYM[1] else
              (resize(~VAR[dividend][0],~SIZE[~TYPO]+1) - resize(~VAR[divider][1],~SIZE[~TYPO]+1) - 1)   when ~SYM[2] else
              (resize(~VAR[dividend][0],~SIZE[~TYPO]+1) - resize(~VAR[divider][1],~SIZE[~TYPO]+1) + 1);
-  ~SYM[4] <= ~SYM[3] / ~VAR[divider][1];
+  ~SYM[4] <= ~SYM[3] / ~VAR[divider][1]
+      -- pragma translate_off
+      when (~VAR[divider][1] /= 0) else (others => 'X')
+      -- pragma translate_on
+      ;
   ~RESULT <= signed(~SYM[4](~SIZE[~TYPO]-1 downto 0));
 end block;
 -- divSigned end"
@@ -164,9 +173,14 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.mod#"
-    , "kind"      : "Expression"
+    , "kind"      : "Declaration"
     , "type"      : "mod# :: Signed n -> Signed n -> Signed n"
-    , "template"  : "~ARG[0] mod ~ARG[1]"
+    , "template"  :
+"~RESULT <= ~ARG[0] mod ~ARG[1]
+    -- pragma translate_off
+    when (~ARG[1] /= 0) else (others => 'X')
+    -- pragma translate_on
+    ;"
     }
   }
 , { "BlackBoxHaskell" :
@@ -265,6 +279,18 @@ end block;
     , "kind"      : "Expression"
     , "type"      : "truncateB# :: KnownNat m => Signed (n + m) -> Signed m"
     , "template"  : "~IF~SIZE[~TYPO]~THEN~VAR[s][1](~LIT[0]-1 downto 0)~ELSEsigned'(0 downto 1 => '0')~FI"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Signed.quot#"
+    , "kind"      : "Declaration"
+    , "type"      : "quot# :: Signed n -> Signed n -> Signed n"
+    , "template"  :
+"~RESULT <= ~ARG[0] / ~ARG[1]
+    -- pragma translate_off
+    when (~ARG[1] /= 0) else (others => 'X')
+    -- pragma translate_on
+    ;"
     }
   }
 ]

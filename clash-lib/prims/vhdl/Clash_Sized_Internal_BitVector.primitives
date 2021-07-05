@@ -480,16 +480,26 @@ end process;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.quot#"
-    , "kind"      : "Expression"
+    , "kind"      : "Declaration"
     , "type"      : "quot# :: KnownNat n => BitVector n -> BitVector n -> BitVector n"
-    , "template"  : "std_logic_vector(unsigned(~ARG[1]) / unsigned(~ARG[2]))"
+    , "template"  :
+"~RESULT <= std_logic_vector(unsigned(~ARG[1]) / unsigned(~ARG[2]))
+    -- pragma translate_off
+    when (~ARG[2] /= std_logic_vector(to_unsigned(0,~SIZE[~TYP[2]]))) else (others => 'X')
+    -- pragma translate_on
+    ;"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.rem#"
-    , "kind"      : "Expression"
+    , "kind"      : "Declaration"
     , "type"      : "rem# :: KnownNat n => BitVector n -> BitVector n -> BitVector n"
-    , "template"  : "std_logic_vector(unsigned(~ARG[1]) rem unsigned(~ARG[2]))"
+    , "template"  :
+"~RESULT <= std_logic_vector(unsigned(~ARG[1]) rem unsigned(~ARG[2]))
+    -- pragma translate_off
+    when (~ARG[2] /= std_logic_vector(to_unsigned(0,~SIZE[~TYP[2]]))) else (others => 'X')
+    -- pragma translate_on
+    ;"
     }
   }
 , { "BlackBoxHaskell" :

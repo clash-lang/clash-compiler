@@ -41,13 +41,6 @@
   }
 }
 , { "BlackBox" :
-  { "name"      : "GHC.Num.Integer.integerQuot"
-  , "kind"      : "Expression"
-  , "type"      : "integerQuot :: Integer -> Integer -> Integer"
-  , "template"  : "~ARG[0] / ~ARG[1]"
-  }
-}
-, { "BlackBox" :
   { "name"      : "GHC.Num.Integer.integerLe"
   , "kind"      : "Expression"
   , "type"      : "integerLe :: Integer -> Integer -> Bool"

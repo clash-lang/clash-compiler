@@ -475,4 +475,18 @@ end
 // bitReverse64 end"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.quotInt#"
+    , "kind"      : "Expression"
+    , "type"      : "quotInt# :: Int# -> Int# -> Int#"
+    , "template"  : "~ARG[0] / ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.quotWord#"
+    , "kind"      : "Expression"
+    , "type"      : "quotWord# :: Word# -> Word# -> Word#"
+    , "template"  : "~ARG[0] / ~ARG[1]"
+    }
+  }
 ]

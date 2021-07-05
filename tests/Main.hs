@@ -330,6 +330,7 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS(runTest "BangData" def{hdlSim=False})
         , runTest "Trace" def{hdlSim=False}
         , NEEDS_PRIMS(runTest "DivMod" def{hdlSim=False})
+        , NEEDS_PRIMS(runTest "DivZero" def)
         , NEEDS_PRIMS(runTest "LambdaDrop" def{hdlSim=False})
         , runTest "IrrefError" def{hdlSim=False}
 #ifdef CLASH_MULTIPLE_HIDDEN

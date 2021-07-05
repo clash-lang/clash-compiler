@@ -125,9 +125,14 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.rem#"
-    , "kind"      : "Expression"
+    , "kind"      : "Declaration"
     , "type"      : "rem# :: Unsigned n -> Unsigned n -> Unsigned n"
-    , "template"  : "~ARG[0] rem ~ARG[1]"
+    , "template"  :
+"~RESULT <= ~ARG[0] rem ~ARG[1]
+    -- pragma translate_off
+    when (~ARG[1] /= 0) else (others => 'X')
+    -- pragma translate_on
+    ;"
     }
   }
 , { "BlackBoxHaskell" :
@@ -218,6 +223,18 @@
     , "kind"      : "Expression"
     , "type"      : "resize# :: KnownNat m => Unsigned n -> Unsigned m"
     , "template"  : "~IF~SIZE[~TYP[1]]~THENresize(~ARG[1],~LIT[0])~ELSEunsigned'(~SIZE[~TYPO]-1 downto 0 => '0')~FI"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Unsigned.quot#"
+    , "kind"      : "Declaration"
+    , "type"      : "quot# :: Unsigned n -> Unsigned n -> Unsigned n"
+    , "template"  :
+"~RESULT <= ~ARG[0] / ~ARG[1]
+    -- pragma translate_off
+    when (~ARG[1] /= 0) else (others => 'X')
+    -- pragma translate_on
+    ;"
     }
   }
 ]
