@@ -660,6 +660,7 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS_GHC(runTest "ResetSynchronizerSync" def)
         , NEEDS_PRIMS_GHC(runTest "ResetLow" def)
         , NEEDS_PRIMS_GHC(runTest "Rom" def)
+        , NEEDS_PRIMS_GHC(runTest "RomNegative" def)
         , runTest "SigP" def{hdlSim=False}
         , outputTest ("tests" </> "shouldwork" </> "Signal") [VHDL] [] [] "T1102A" "main"
         , outputTest ("tests" </> "shouldwork" </> "Signal") [VHDL] [] [] "T1102B" "main"

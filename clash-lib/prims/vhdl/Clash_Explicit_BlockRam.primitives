@@ -21,13 +21,13 @@
   signal ~GENSYM[rd][4]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
   signal ~GENSYM[wr][5]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
 begin
-  ~SYM[4] <= to_integer(~ARG[6])
+  ~SYM[4] <= to_integer(~VAR[rdI][6](31 downto 0))
   -- pragma translate_off
                 mod ~LENGTH[~TYP[5]]
   -- pragma translate_on
                 ;
 
-  ~SYM[5] <= to_integer(~ARG[8])
+  ~SYM[5] <= to_integer(~VAR[wrI][8](31 downto 0))
   -- pragma translate_off
                 mod ~LENGTH[~TYP[5]]
   -- pragma translate_on
@@ -80,13 +80,13 @@ end block;
   signal ~GENSYM[rd][4]  : integer range 0 to ~LIT[5] - 1;
   signal ~GENSYM[wr][5]  : integer range 0 to ~LIT[5] - 1;
 begin
-  ~SYM[4] <= to_integer(~ARG[6])
+  ~SYM[4] <= to_integer(~VAR[rdI][6](31 downto 0))
   -- pragma translate_off
                 mod ~LIT[5]
   -- pragma translate_on
                 ;
 
-  ~SYM[5] <= to_integer(~ARG[8])
+  ~SYM[5] <= to_integer(~VAR[wrI][8](31 downto 0))
   -- pragma translate_off
                 mod ~LIT[5]
   -- pragma translate_on
@@ -140,13 +140,13 @@ end block;
   signal ~GENSYM[rd][4]  : integer range 0 to ~LIT[5] - 1;
   signal ~GENSYM[wr][5]  : integer range 0 to ~LIT[5] - 1;
 begin
-  ~SYM[4] <= to_integer(~ARG[7])
+  ~SYM[4] <= to_integer(~VAR[rdI][7](31 downto 0))
   -- pragma translate_off
                 mod ~LIT[5]
   -- pragma translate_on
                 ;
 
-  ~SYM[5] <= to_integer(~ARG[9])
+  ~SYM[5] <= to_integer(~VAR[wrI][9](31 downto 0))
   -- pragma translate_off
                 mod ~LIT[5]
   -- pragma translate_on

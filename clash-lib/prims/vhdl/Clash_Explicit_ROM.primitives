@@ -18,7 +18,7 @@
 begin
   ~SYM[2] <= ~LIT[5];
 
-  ~SYM[3] <= to_integer(~ARG[6])
+  ~SYM[3] <= to_integer(~VAR[rdI][6](31 downto 0))
   -- pragma translate_off
                 mod ~LIT[1]
   -- pragma translate_on
