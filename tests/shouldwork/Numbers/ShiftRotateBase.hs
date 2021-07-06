@@ -8,9 +8,10 @@ import Data.Int
 
 testpattern = 0b1010011000
 
--- test with shift/rotate amounts: 0..16,200
+-- test with shift/rotate amounts: 0..16,200, and a really large
+-- non-power-of-two.
 amounts :: Vec _ Int
-amounts = $(listToVecTH [0::Int ..16]) :< 200
+amounts = $(listToVecTH [0::Int ..16]) :< 200 :< (maxBound - 5)
 
 testall v i
   = ( testAs @(Unsigned 8)  v i
