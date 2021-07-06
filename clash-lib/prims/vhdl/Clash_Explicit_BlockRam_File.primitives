@@ -36,13 +36,13 @@
   signal ~GENSYM[rd][5]  : integer range 0 to ~LIT[5]-1;
   signal ~GENSYM[wr][6]  : integer range 0 to ~LIT[5]-1;
 begin
-  ~SYM[5] <= to_integer(~ARG[7])
+  ~SYM[5] <= to_integer(~VAR[rdI][7](31 downto 0))
   -- pragma translate_off
                 mod ~LIT[5]
   -- pragma translate_on
                 ;
 
-  ~SYM[6] <= to_integer(~ARG[9])
+  ~SYM[6] <= to_integer(~VAR[wrI][9](31 downto 0))
   -- pragma translate_off
                 mod ~LIT[5]
   -- pragma translate_on

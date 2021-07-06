@@ -30,7 +30,7 @@
   signal ~GENSYM[ROM][2] : ~SYM[4](0 to ~LIT[4]-1) := ~SYM[1](~FILE[~LIT[5]]);
   signal ~GENSYM[rd][3] : integer range 0 to ~LIT[4]-1;
 begin
-  ~SYM[3] <= to_integer(~ARG[6])
+  ~SYM[3] <=to_integer(~VAR[rdI][6](31 downto 0))
   -- pragma translate_off
                 mod ~LIT[4]
   -- pragma translate_on

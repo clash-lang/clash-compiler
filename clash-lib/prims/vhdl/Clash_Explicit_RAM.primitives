@@ -24,13 +24,13 @@
   signal ~GENSYM[rd][2] : integer range 0 to ~LIT[6] - 1;
   signal ~GENSYM[wr][3] : integer range 0 to ~LIT[6] - 1;
 begin
-  ~SYM[2] <= to_integer(~ARG[7])
+  ~SYM[2] <= to_integer(~VAR[rdI][7](31 downto 0))
   -- pragma translate_off
                 mod ~LIT[6]
   -- pragma translate_on
                 ;
 
-  ~SYM[3] <= to_integer(~ARG[9])
+  ~SYM[3] <= to_integer(~VAR[wrI][9](31 downto 0))
   -- pragma translate_off
                 mod ~LIT[6]
   -- pragma translate_on
