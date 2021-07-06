@@ -49,10 +49,32 @@ addBasicSamples =
   [ (1, 4, 5)
   , (2, 5, 7)
   , (3, 6, 9)
-    -- Subnormal positive number is conditioned to plus zero
+  ]
+  ++ addSubBasicSamples
+  ++ cartesianProductTest model interesting interesting
+  ++ nanTest
+ where
+  model (conditionFloat -> x) (conditionFloat -> y) = conditionFloat $ x + y
+
+subBasicSamples :: [(Float, Float, Float)]
+subBasicSamples =
+  delayOutput (natToNum @F.SubDefDelay) $
+  [ (1, 6, -5)
+  , (2, 5, -3)
+  , (3, 4, -1)
+  ]
+  ++ map (\(a,b,c) -> (a, negate b, c)) addSubBasicSamples
+  ++ cartesianProductTest model interesting interesting
+  ++ nanTest
+ where
+  model (conditionFloat -> x) (conditionFloat -> y) = conditionFloat $ x - y
+
+addSubBasicSamples :: [(Float, Float, Float)]
+addSubBasicSamples =
+  [ -- Subnormal positive number is conditioned to plus zero
     --
     -- The unconditioned result is the subnormal of largest magnitude
-  , ( -minNormal
+    ( -minNormal
     , minNormal + maxDenormal
     , 0
     )
@@ -93,9 +115,10 @@ addBasicSamples =
     , minDenormal
     , minNormal
     )
-    -- Idem dito.
-  , ( minNormal
-    , maxDenormal
+    -- The result would normally be exact, but the first input is conditioned
+    -- to zero.
+  , ( maxDenormal
+    , minNormal
     , minNormal
     )
     -- Subnormals on input are conditioned to zero, negative version
@@ -119,9 +142,10 @@ addBasicSamples =
     , -minDenormal
     , -minNormal
     )
-    -- Idem dito.
-  , ( -minNormal
-    , -maxDenormal
+    -- The result would normally be exact, but the first input is conditioned
+    -- to zero.
+  , ( -maxDenormal
+    , -minNormal
     , -minNormal
     )
     -- Round to nearest
@@ -190,7 +214,7 @@ addBasicSamples =
     -- infinity
   , ( maxFinite
     , encodeFloat (2 ^ (digits - 1)) (maxExp - 2*digits)
-    , 1/0
+    , infinity
     )
     -- 1111
     --     01111
@@ -201,16 +225,250 @@ addBasicSamples =
     , encodeFloat (2 ^ digits - 1) (maxExp - digits)
     )
     -- Infinities
-  , (infinity, 1, infinity)
-  , (-infinity, 1, -infinity)
+  , (infinity, -maxFinite, infinity)
+  , (-infinity, maxFinite, -infinity)
   , (infinity, -infinity, F.xilinxNaN)
+  ]
+ where
+  digits = floatDigits (undefined :: Float)
+  (_, maxExp) = floatRange (undefined :: Float)
+
+mulBasicSamples :: [(Float, Float, Float)]
+mulBasicSamples =
+  delayOutput (natToNum @F.MulDefDelay) $
+  [ (1, 4, 4)
+  , (2, 5, 10)
+  , (3, 6, 18)
+    -- Subnormal positive number is conditioned to plus zero
+    --
+    -- The unconditioned result is the subnormal of largest magnitude
+  , ( 1/2
+    , encodeFloat (2 ^ digits - 2) (minExp - digits)
+    , 0
+    )
+    -- The unconditioned result is the subnormal of smallest magnitude
+  , ( encodeFloat 1 (1 - digits)
+    , minNormal
+    , 0
+    )
+    -- Subnormal negative number is conditioned to minus zero
+    --
+    -- The unconditioned result is the subnormal of largest magnitude
+  , ( -1/2
+    , encodeFloat (2 ^ digits - 2) (minExp - digits)
+    , -0
+    )
+    -- The unconditioned result is the subnormal of smallest magnitude
+  , ( encodeFloat 1 (1 - digits)
+    , -minNormal
+    , -0
+    )
+    -- Subnormals on input are conditioned to zero
+    --
+    -- The result would normally be about four, but due to conditioning it is
+    -- zero.
+  , ( maxDenormal
+    , maxFinite
+    , 0
+    )
+    -- The result would normally be minNormal, but due to conditioning it is
+    -- zero.
+  , ( encodeFloat 1 (digits - 1)
+    , minDenormal
+    , 0
+    )
+    -- Subnormals on input are conditioned to zero, negative version
+    --
+    --
+    -- The result would normally be about -4, but due to conditioning it is
+    -- zero.
+  , ( -maxDenormal
+    , maxFinite
+    , -0
+    )
+    -- The result would normally be -minNormal, but due to conditioning it is
+    -- zero.
+  , ( encodeFloat 1 (digits - 1)
+    , -minDenormal
+    , -0
+    )
+    -- Round to nearest
+    --
+    -- A small program has been used to determine the two numbers to be
+    -- multiplied such that they lead to the desired product. For ease of
+    -- comprehension, the result is shown in the comments in two formats.
+    --
+    -- First, in an easily read format: as if it were the 8-bit result of a
+    -- product of two 4-bit mantissa's, to show the desired rounding (cf.
+    -- comments in addSubBasicSamples).
+    --
+    -- If the structure of the full result is exactly equal to the ideal 8-bit
+    -- result, that is all. However, if the structure is not ideal, the 8-bit
+    -- result is shown with variable placeholders, and there, let XX = xx + 1.
+    --
+    -- In addition, the precise result is shown for completenes in this case.
+    --
+    -- 1xx0 1001
+    -- -------- round
+    -- 1xx1
+    --
+    -- 0b1000_0000_0000_0000_0000_0110_1000_0000_0000_0000_0000_0001
+    -- ------------------------------------------------------------- round
+    -- 0b1000_0000_0000_0000_0000_0111
+    --
+  , ( 14220287
+    , 9896959
+    , encodeFloat 0b1000_0000_0000_0000_0000_0111 digits
+    )
+    --
+    -- 1000 0111
+    -- --------- round
+    -- 1000
+    --
+  , ( 10066329
+    , 13981015
+    , encodeFloat (2 ^ (digits - 1)) digits
+    )
+    -- Ties to even
+    --
+    -- 1000 1000
+    -- --------- round
+    -- 1000
+  , ( 12713984
+    , 11069504
+    , encodeFloat (2 ^ (digits - 1)) digits
+    )
+    -- Round to nearest
+    --
+    -- 1xx1 1001
+    -- --------- round
+    -- 1XX0
+    --
+    -- 0b1000_0000_0000_0000_0000_1101_1000_0000_0000_0000_0000_0001
+    -- ------------------------------------------------------------- round
+    -- 0b1000_0000_0000_0000_0000_1110
+    --
+  , ( 12427923
+    , 11324315
+    , encodeFloat 0b1000_0000_0000_0000_0000_1110 digits
+    )
+    -- 1xx1 0111
+    -- --------- round
+    -- 1xx1
+    --
+    -- 0b1000_0000_0000_0000_0000_1001_0111_1111_1111_1111_1111_1111
+    -- ------------------------------------------------------------- round
+    -- 0b1000_0000_0000_0000_0000_1001
+    --
+  , ( 10837383
+    , 12986313
+    , encodeFloat 0b1000_0000_0000_0000_0000_1001 digits
+    )
+    -- Ties to even
+    --
+    -- 1001 1000
+    -- --------- round
+    -- 1010
+  , ( 12689408
+    , 11090944
+    , encodeFloat (2 ^ (digits - 1) + 2) digits
+    )
+    -- Infinities
+  , (infinity, minNormal, infinity)
+  , (-infinity, minNormal, -infinity)
+  , (infinity, -minNormal, -infinity)
+  , (-infinity, -minNormal, infinity)
+  , (infinity, 0, F.xilinxNaN)
+  , (-infinity, 0, F.xilinxNaN)
+  , (infinity, -0, F.xilinxNaN)
+  , (-infinity, -0, F.xilinxNaN)
+  ]
+  ++ cartesianProductTest model interesting interesting
+  ++ nanTest
+ where
+  digits = floatDigits (undefined :: Float)
+  (minExp, _) = floatRange (undefined :: Float)
+  model (conditionFloat -> x) (conditionFloat -> y) = conditionFloat $ x * y
+
+divBasicSamples :: [(Float, Float, Float)]
+divBasicSamples =
+  delayOutput (natToNum @F.DivDefDelay) $
+  [ (1, 2, 0.5)
+  , (3, 4, 0.75)
+  , (7, 8, 0.875)
+    -- Subnormal positive number is conditioned to plus zero
+    --
+    -- The unconditioned result is the subnormal of largest magnitude
+  , ( encodeFloat (2 ^ digits - 2) (1 - digits)
+    , encodeFloat 1 (maxExp - 1)
+    , 0
+    )
+    -- The unconditioned result is the subnormal of smallest magnitude
+  , ( encodeFloat 2 (1 - digits)
+    , encodeFloat 1 (maxExp - 1)
+    , 0
+    )
+    -- Subnormal negative number is conditioned to minus zero
+    --
+    -- The unconditioned result is the subnormal of largest magnitude
+  , ( -encodeFloat (2 ^ digits - 2) (1 - digits)
+    , encodeFloat 1 (maxExp - 1)
+    , -0
+    )
+    -- The unconditioned result is the subnormal of smallest magnitude
+  , ( -encodeFloat 2 (1 - digits)
+    , encodeFloat 1 (maxExp - 1)
+    , -0
+    )
+    -- Subnormals on input are conditioned to zero
+    --
+    -- The result would normally be about one, but due to conditioning it is
+    -- zero.
+  , ( maxDenormal
+    , minNormal
+    , 0
+    )
+    -- The result would normally be about maxFinite/2, but due to
+    -- conditioning it is division by zero -> infinity.
+  , ( encodeFloat 2 (1 - digits)
+    , minDenormal
+    , infinity
+    )
+    -- Subnormals on input are conditioned to zero, negative version
+    --
+    --
+    -- The result would normally be about -1, but due to conditioning it is
+    -- zero.
+  , ( -maxDenormal
+    , minNormal
+    , -0
+    )
+    -- The result would normally be about -maxFinite/2, but due to
+    -- conditioning it is division by zero -> negative infinity.
+  , ( encodeFloat 2 (1 - digits)
+    , -minDenormal
+    , -infinity
+    )
+    -- Infinities
+  , (infinity, maxFinite, infinity)
+  , (-infinity, maxFinite, -infinity)
+  , (infinity, -maxFinite, -infinity)
+  , (-infinity, -maxFinite, infinity)
+  , (1, 0, infinity)
+  , (-1, 0, -infinity)
+  , (1, -0, -infinity)
+  , (-1, -0, infinity)
+  , (infinity, infinity, F.xilinxNaN)
+  , (-infinity, infinity, F.xilinxNaN)
+  , (infinity, -infinity, F.xilinxNaN)
+  , (-infinity, -infinity, F.xilinxNaN)
   ]
   ++ cartesianProductTest model interesting interesting
   ++ nanTest
  where
   digits = floatDigits (undefined :: Float)
   (_, maxExp) = floatRange (undefined :: Float)
-  model (conditionFloat -> x) (conditionFloat -> y) = conditionFloat $ x + y
+  model (conditionFloat -> x) (conditionFloat -> y) = conditionFloat $ x / y
 
 cartesianProductTest
   :: (a -> b -> c)
@@ -237,8 +495,10 @@ interesting =
   , epsilon
   , F.xilinxNaN
     -- Some basic numbers
+  , 0
   , 1
   , 2
+  , 4
   , 42
   ]
 

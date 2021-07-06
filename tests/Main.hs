@@ -435,7 +435,10 @@ runClashTest = defaultMain $ clashTestRoot
       --     [ runTest "Floating" def{ clashFlags=["-fclash-float-support"]
       --                             , buildTargets=[ "addBasicTB"
       --                                            , "addEnableTB"
-      --                                            , "addShortPLTB"]}
+      --                                            , "addShortPLTB"
+      --                                            , "subBasicTB"
+      --                                            , "mulBasicTB"
+      --                                            , "divBasicTB"]}
       --     ]
       --   ]
       , clashTestGroup "CSignal"

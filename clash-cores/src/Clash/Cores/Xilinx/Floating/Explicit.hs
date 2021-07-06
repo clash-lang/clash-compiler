@@ -49,6 +49,15 @@ module Clash.Cores.Xilinx.Floating.Explicit
     addWith
   , add
   , AddDefDelay
+  , subWith
+  , sub
+  , SubDefDelay
+  , mulWith
+  , mul
+  , MulDefDelay
+  , divWith
+  , div
+  , DivDefDelay
     -- * Customizing IP
   , Config(..)
   , defConfig
@@ -59,7 +68,7 @@ module Clash.Cores.Xilinx.Floating.Explicit
   , xilinxNaN
   ) where
 
-import Clash.Explicit.Prelude hiding (add)
+import Clash.Explicit.Prelude hiding (add, sub, mul, div)
 
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 
@@ -83,7 +92,7 @@ addWith
 addWith !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
   delayI und en clk . conditionFloatF $ x + y
  where
-  und = withFrozenCallStack $ deepErrorX "Initial values of addFloat undefined"
+  und = withFrozenCallStack $ deepErrorX "Initial values of add undefined"
 {-# NOINLINE addWith #-}
 {-# ANN addWith (vhdlBinaryPrim 'addWith 'addTclTF "add") #-}
 {-# ANN addWith (veriBinaryPrim 'addWith 'addTclTF "add") #-}
@@ -104,6 +113,122 @@ add = withFrozenCallStack $ addWith defConfig
 
 -- | The default delay for floating point addition with default customization.
 type AddDefDelay = 11
+
+-- | Customizable floating point subtraction.
+subWith
+  :: forall d dom n
+   . ( KnownDomain dom
+     , KnownNat d
+     , HasCallStack
+     )
+  => Config
+  -> Clock dom
+  -> Enable dom
+  -> DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + d) Float
+subWith !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
+  delayI und en clk . conditionFloatF $ x - y
+ where
+  und = withFrozenCallStack $ deepErrorX "Initial values of sub undefined"
+{-# NOINLINE subWith #-}
+{-# ANN subWith (vhdlBinaryPrim 'subWith 'subTclTF "sub") #-}
+{-# ANN subWith (veriBinaryPrim 'subWith 'subTclTF "sub") #-}
+
+-- | Floating point subtraction with default settings.
+sub
+  :: forall dom n
+   . ( KnownDomain dom
+     , HasCallStack
+     )
+  => Clock dom
+  -> Enable dom
+  -> DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + SubDefDelay) Float
+sub = withFrozenCallStack $ subWith defConfig
+{-# INLINE sub #-}
+
+-- | The default delay for floating point subtraction with default
+-- customization.
+type SubDefDelay = 11
+
+-- | Customizable floating point multiplication.
+mulWith
+  :: forall d dom n
+   . ( KnownDomain dom
+     , KnownNat d
+     , HasCallStack
+     )
+  => Config
+  -> Clock dom
+  -> Enable dom
+  -> DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + d) Float
+mulWith !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
+  delayI und en clk . conditionFloatF $ x * y
+ where
+  und = withFrozenCallStack $ deepErrorX "Initial values of mul undefined"
+{-# NOINLINE mulWith #-}
+{-# ANN mulWith (vhdlBinaryPrim 'mulWith 'mulTclTF "mul") #-}
+{-# ANN mulWith (veriBinaryPrim 'mulWith 'mulTclTF "mul") #-}
+
+-- | Floating point multiplication with default settings.
+mul
+  :: forall dom n
+   . ( KnownDomain dom
+     , HasCallStack
+     )
+  => Clock dom
+  -> Enable dom
+  -> DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + MulDefDelay) Float
+mul = withFrozenCallStack $ mulWith defConfig
+{-# INLINE mul #-}
+
+-- | The default delay for floating point multiplication with default
+-- customization.
+type MulDefDelay = 8
+
+-- | Customizable floating point division.
+divWith
+  :: forall d dom n
+   . ( KnownDomain dom
+     , KnownNat d
+     , HasCallStack
+     )
+  => Config
+  -> Clock dom
+  -> Enable dom
+  -> DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + d) Float
+divWith !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
+  delayI und en clk . conditionFloatF $ x / y
+ where
+  und = withFrozenCallStack $ deepErrorX "Initial values of div undefined"
+{-# NOINLINE divWith #-}
+{-# ANN divWith (vhdlBinaryPrim 'divWith 'divTclTF "div") #-}
+{-# ANN divWith (veriBinaryPrim 'divWith 'divTclTF "div") #-}
+
+-- | Floating point division with default settings.
+div
+  :: forall dom n
+   . ( KnownDomain dom
+     , HasCallStack
+     )
+  => Clock dom
+  -> Enable dom
+  -> DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + DivDefDelay) Float
+div = withFrozenCallStack $ divWith defConfig
+{-# INLINE div #-}
+
+-- | The default delay for floating point division with default customization.
+type DivDefDelay = 28
 
 -- | Default customization options.
 --

@@ -46,6 +46,15 @@ module Clash.Cores.Xilinx.Floating
     addWith
   , add
   , E.AddDefDelay
+  , subWith
+  , sub
+  , E.SubDefDelay
+  , mulWith
+  , mul
+  , E.MulDefDelay
+  , divWith
+  , div
+  , E.DivDefDelay
     -- * Customizing IP
   , E.Config(..)
   , E.defConfig
@@ -54,7 +63,7 @@ module Clash.Cores.Xilinx.Floating
   , E.BMemUsage(..)
   ) where
 
-import Clash.Prelude hiding (add)
+import Clash.Prelude hiding (add, sub, mul, div)
 
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 
@@ -85,3 +94,81 @@ add
   -> DSignal dom (n + E.AddDefDelay) Float
 add = withFrozenCallStack $ hideEnable $ hideClock E.add
 {-# INLINE add #-}
+
+-- | Customizable floating point subtraction.
+subWith
+  :: ( HiddenClock dom
+     , HiddenEnable dom
+     , KnownNat d
+     , HasCallStack
+     )
+  => E.Config
+  -> DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + d) Float
+subWith cfg = withFrozenCallStack $ hideEnable . hideClock $ E.subWith cfg
+{-# INLINE subWith #-}
+
+-- | Floating point subtraction with default settings.
+sub
+  :: ( HiddenClock dom
+     , HiddenEnable dom
+     , HasCallStack
+     )
+  => DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + E.SubDefDelay) Float
+sub = withFrozenCallStack $ hideEnable $ hideClock E.sub
+{-# INLINE sub #-}
+
+-- | Customizable floating point multiplication.
+mulWith
+  :: ( HiddenClock dom
+     , HiddenEnable dom
+     , KnownNat d
+     , HasCallStack
+     )
+  => E.Config
+  -> DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + d) Float
+mulWith cfg = withFrozenCallStack $ hideEnable . hideClock $ E.mulWith cfg
+{-# INLINE mulWith #-}
+
+-- | Floating point multiplication with default settings.
+mul
+  :: ( HiddenClock dom
+     , HiddenEnable dom
+     , HasCallStack
+     )
+  => DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + E.MulDefDelay) Float
+mul = withFrozenCallStack $ hideEnable $ hideClock E.mul
+{-# INLINE mul #-}
+
+-- | Customizable floating point division.
+divWith
+  :: ( HiddenClock dom
+     , HiddenEnable dom
+     , KnownNat d
+     , HasCallStack
+     )
+  => E.Config
+  -> DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + d) Float
+divWith cfg = withFrozenCallStack $ hideEnable . hideClock $ E.divWith cfg
+{-# INLINE divWith #-}
+
+-- | Floating point division with default settings.
+div
+  :: ( HiddenClock dom
+     , HiddenEnable dom
+     , HasCallStack
+     )
+  => DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + E.DivDefDelay) Float
+div = withFrozenCallStack $ hideEnable $ hideClock E.div
+{-# INLINE div #-}
