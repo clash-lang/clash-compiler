@@ -15,6 +15,7 @@ import Data.Word
 import ShiftRotateBase
 
 topEntity = testall
+{-# NOINLINE topEntity #-}
 
 expected :: Vec _ ( Vec Ops (Unsigned 8)
                   , Vec Ops (Signed 8)

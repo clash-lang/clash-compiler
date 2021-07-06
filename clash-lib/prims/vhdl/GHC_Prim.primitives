@@ -176,11 +176,24 @@
     , "kind"      : "Declaration"
     , "type"      : "uncheckedIShiftL# :: Int# -> Int# -> Int#"
     , "template"  :
-"~RESULT <= shift_left(~ARG[0],to_integer(~ARG[1]))
-    -- pragma translate_off
-    when (~ARG[1] >= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
+"~GENSYM[~RESULT_shiftL][0] : block
+  signal ~GENSYM[sh][1] : natural;
+begin
+  ~SYM[1] <=
+      -- pragma translate_off
+      natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+      -- pragma translate_on
+      to_integer(~VAR[shI][1]
+      -- pragma translate_off
+      (30 downto 0)
+      -- pragma translate_on
+      );
+  ~RESULT <= shift_left(~ARG[0],~SYM[1])
+      -- pragma translate_off
+      when (~ARG[1] >= 0) else (others => 'X')
+      -- pragma translate_on
+      ;
+end block;"
     }
   }
 , { "BlackBox" :
@@ -188,18 +201,49 @@
     , "kind"      : "Declaration"
     , "type"      : "uncheckedIShiftRA# :: Int# -> Int# -> Int#"
     , "template"  :
-"~RESULT <= shift_right(~ARG[0],to_integer(~ARG[1]))
-    -- pragma translate_off
-    when (~ARG[1] >= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
+"~GENSYM[~RESULT_shiftR][0] : block
+  signal ~GENSYM[sh][1] : natural;
+begin
+  ~SYM[1] <=
+      -- pragma translate_off
+      natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+      -- pragma translate_on
+      to_integer(~VAR[shI][1]
+      -- pragma translate_off
+      (30 downto 0)
+      -- pragma translate_on
+      );
+  ~RESULT <= shift_right(~ARG[0],~SYM[1])
+      -- pragma translate_off
+      when (~ARG[1] >= 0) else (others => 'X')
+      -- pragma translate_on
+      ;
+end block;"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.uncheckedIShiftRL#"
-    , "kind"      : "Expression"
+    , "kind"      : "Declaration"
     , "type"      : "uncheckedIShiftRL# :: Int# -> Int# -> Int#"
-    , "template"  : "~ARG[0] srl to_integer(~ARG[1])"
+    , "template"  :
+"~GENSYM[~RESULT_shiftRL][0] : block
+  signal ~GENSYM[sh][1] : natural;
+begin
+  ~SYM[1] <=
+      -- pragma translate_off
+      natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+      -- pragma translate_on
+      to_integer(~VAR[shI][1]
+      -- pragma translate_off
+      (30 downto 0)
+      -- pragma translate_on
+      );
+  ~RESULT <= ~ARG[0] srl ~SYM[1]
+      -- pragma translate_off
+      when (~ARG[1] >= 0) else (others => 'X')
+      -- pragma translate_on
+      ;
+end block;"
     }
   }
 , { "BlackBox" :
@@ -266,11 +310,24 @@
     , "kind"      : "Declaration"
     , "type"      : "uncheckedShiftL# :: Word# -> Int# -> Word#"
     , "template"  :
-"~RESULT <= shift_left(~ARG[0],to_integer(~ARG[1]))
-    -- pragma translate_off
-    when (~ARG[1] >= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
+"~GENSYM[~RESULT_shiftL][0] : block
+  signal ~GENSYM[sh][1] : natural;
+begin
+  ~SYM[1] <=
+      -- pragma translate_off
+      natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+      -- pragma translate_on
+      to_integer(~VAR[shI][1]
+      -- pragma translate_off
+      (30 downto 0)
+      -- pragma translate_on
+      );
+  ~RESULT <= shift_left(~ARG[0],~SYM[1])
+      -- pragma translate_off
+      when (~ARG[1] >= 0) else (others => 'X')
+      -- pragma translate_on
+      ;
+end block;"
     }
   }
 , { "BlackBox" :
@@ -278,11 +335,24 @@
     , "kind"      : "Declaration"
     , "type"      : "uncheckedShiftR# :: Word# -> Int# -> Word#"
     , "template"  :
-"~RESULT <= shift_right(~ARG[0],to_integer(~ARG[1]))
-    -- pragma translate_off
-    when (~ARG[1] >= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
+"~GENSYM[~RESULT_shiftR][0] : block
+  signal ~GENSYM[sh][1] : natural;
+begin
+  ~SYM[1] <=
+      -- pragma translate_off
+      natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+      -- pragma translate_on
+      to_integer(~VAR[shI][1]
+      -- pragma translate_off
+      (30 downto 0)
+      -- pragma translate_on
+      );
+  ~RESULT <= shift_right(~ARG[0],~SYM[1])
+      -- pragma translate_off
+      when (~ARG[1] >= 0) else (others => 'X')
+      -- pragma translate_on
+      ;
+end block;"
     }
   }
 , { "BlackBox" :

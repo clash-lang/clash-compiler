@@ -223,11 +223,24 @@ end block;
     , "kind"      : "Declaration"
     , "type"      : "shiftL# :: KnownNat n => Signed n -> Int -> Signed n"
     , "template"  :
-"~RESULT <= shift_left(~ARG[1],to_integer(~ARG[2]))
-    -- pragma translate_off
-    when (~ARG[2] >= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
+"~GENSYM[~RESULT_shiftL][0] : block
+  signal ~GENSYM[sh][1] : natural;
+begin
+  ~SYM[1] <=
+      -- pragma translate_off
+      natural'high when (~VAR[shI][2](~SIZE[~TYP[2]]-1 downto 31) /= 0) else
+      -- pragma translate_on
+      to_integer(~VAR[shI][2]
+      -- pragma translate_off
+      (30 downto 0)
+      -- pragma translate_on
+      );
+  ~RESULT <= shift_left(~ARG[1],~SYM[1])
+      -- pragma translate_off
+      when (~ARG[2] >= 0) else (others => 'X')
+      -- pragma translate_on
+      ;
+end block;"
     }
   }
 , { "BlackBox" :
@@ -235,11 +248,24 @@ end block;
     , "kind"      : "Declaration"
     , "type"      : "shiftR# :: KnownNat n => Signed n -> Int -> Signed n"
     , "template"  :
-"~RESULT <= shift_right(~ARG[1],to_integer(~ARG[2]))
-    -- pragma translate_off
-    when (~ARG[2] >= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
+"~GENSYM[~RESULT_shiftR][0] : block
+  signal ~GENSYM[sh][1] : natural;
+begin
+  ~SYM[1] <=
+      -- pragma translate_off
+      natural'high when (~VAR[shI][2](~SIZE[~TYP[2]]-1 downto 31) /= 0) else
+      -- pragma translate_on
+      to_integer(~VAR[shI][2]
+      -- pragma translate_off
+      (30 downto 0)
+      -- pragma translate_on
+      );
+  ~RESULT <= shift_right(~ARG[1],~SYM[1])
+      -- pragma translate_off
+      when (~ARG[2] >= 0) else (others => 'X')
+      -- pragma translate_on
+      ;
+end block;"
     }
   }
 , { "BlackBox" :
@@ -247,7 +273,11 @@ end block;
     , "kind"      : "Declaration"
     , "type"      : "rotateL# :: KnownNat n => Signed n -> Int -> Signed n"
     , "template"  :
-"~RESULT <= rotate_left(~ARG[1],to_integer(~ARG[2]))
+"~RESULT <= rotate_left(~ARG[1],to_integer(~ARG[2]
+    -- pragma translate_off
+    mod ~SIZE[~TYP[1]]
+    -- pragma translate_on
+    ))
     -- pragma translate_off
     when (~ARG[2] >= 0) else (others => 'X')
     -- pragma translate_on
@@ -259,7 +289,11 @@ end block;
     , "kind"      : "Declaration"
     , "type"      : "rotateR# :: KnownNat n => Signed n -> Int -> Signed n"
     , "template"  :
-"~RESULT <= rotate_right(~ARG[1],to_integer(~ARG[2]))
+"~RESULT <= rotate_right(~ARG[1],to_integer(~ARG[2]
+    -- pragma translate_off
+    mod ~SIZE[~TYP[1]]
+    -- pragma translate_on
+    ))
     -- pragma translate_off
     when (~ARG[2] >= 0) else (others => 'X')
     -- pragma translate_on

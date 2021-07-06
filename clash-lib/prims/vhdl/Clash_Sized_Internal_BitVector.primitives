@@ -541,11 +541,24 @@ end process;
     , "kind"      : "Declaration"
     , "type"      : "shiftL# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "template"  :
-"~RESULT <= std_logic_vector(shift_left(unsigned(~ARG[1]), to_integer(~ARG[2])))
-    -- pragma translate_off
-    when (~ARG[2] >= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
+"~GENSYM[~RESULT_shiftL][0] : block
+  signal ~GENSYM[sh][1] : natural;
+begin
+  ~SYM[1] <=
+      -- pragma translate_off
+      natural'high when (~VAR[shI][2](~SIZE[~TYP[2]]-1 downto 31) /= 0) else
+      -- pragma translate_on
+      to_integer(~VAR[shI][2]
+      -- pragma translate_off
+      (30 downto 0)
+      -- pragma translate_on
+      );
+  ~RESULT <= std_logic_vector(shift_left(unsigned(~ARG[1]),~SYM[1]))
+      -- pragma translate_off
+      when (~ARG[2] >= 0) else (others => 'X')
+      -- pragma translate_on
+      ;
+end block;"
     }
   }
 , { "BlackBox" :
@@ -553,11 +566,24 @@ end process;
     , "kind"      : "Declaration"
     , "type"      : "shiftR# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "template"  :
-"~RESULT <= std_logic_vector(shift_right(unsigned(~ARG[1]),to_integer(~ARG[2])))
-    -- pragma translate_off
-    when (~ARG[2] >= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
+"~GENSYM[~RESULT_shiftR][0] : block
+  signal ~GENSYM[sh][1] : natural;
+begin
+  ~SYM[1] <=
+      -- pragma translate_off
+      natural'high when (~VAR[shI][2](~SIZE[~TYP[2]]-1 downto 31) /= 0) else
+      -- pragma translate_on
+      to_integer(~VAR[shI][2]
+      -- pragma translate_off
+      (30 downto 0)
+      -- pragma translate_on
+      );
+  ~RESULT <= std_logic_vector(shift_right(unsigned(~ARG[1]),~SYM[1]))
+      -- pragma translate_off
+      when (~ARG[2] >= 0) else (others => 'X')
+      -- pragma translate_on
+      ;
+end block;"
     }
   }
 , { "BlackBox" :
@@ -565,7 +591,11 @@ end process;
     , "kind"      : "Declaration"
     , "type"      : "rotateL# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "template"  :
-"~RESULT <= std_logic_vector(rotate_left(unsigned(~ARG[1]),to_integer(~ARG[2])))
+"~RESULT <= std_logic_vector(rotate_left(unsigned(~ARG[1]),to_integer(~ARG[2]
+    -- pragma translate_off
+    mod ~SIZE[~TYP[1]]
+    -- pragma translate_on
+    )))
     -- pragma translate_off
     when (~ARG[2] >= 0) else (others => 'X')
     -- pragma translate_on
@@ -577,7 +607,11 @@ end process;
     , "kind"      : "Declaration"
     , "type"      : "rotateR# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "template"  :
-"~RESULT <= std_logic_vector(rotate_right(unsigned(~ARG[1]),to_integer(~ARG[2])))
+"~RESULT <= std_logic_vector(rotate_right(unsigned(~ARG[1]),to_integer(~ARG[2]
+    -- pragma translate_off
+    mod ~SIZE[~TYP[1]]
+    -- pragma translate_on
+    )))
     -- pragma translate_off
     when (~ARG[2] >= 0) else (others => 'X')
     -- pragma translate_on
