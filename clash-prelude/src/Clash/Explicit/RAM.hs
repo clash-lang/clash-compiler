@@ -1,9 +1,10 @@
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.
-                  2019     , Myrtle Software Ltd
+                  2019     , Myrtle Software Ltd,
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 RAM primitives with a combinational read port.
 -}
@@ -140,20 +141,41 @@ asyncRam# wclk rclk en sz rd we wr din =
               (withFrozenCallStack (errorX "asyncRam#: initial value undefined"))
     en' = fromEnable (enable en we)
     dout = go ramI rd' en' wr din
+    szI = snatToNum sz :: Int
 
     go :: Seq.Seq a -> Signal wdom Int -> Signal wdom Bool
        -> Signal wdom Int -> Signal wdom a -> Signal wdom a
     go !ram (r :- rs) (e :- es) (w :- ws) (d :- ds) =
       let ram' = upd ram e (fromEnum w) d
-          o    = ram `Seq.index` r
+          o    = ram `safeAt` r
       in  o :- go ram' rs es ws ds
 
     upd ram we' waddr d = case maybeIsX we' of
       Nothing -> case maybeIsX waddr of
         Nothing -> fmap (const (seq waddr d)) ram
-        Just wa -> Seq.update wa d ram
+        Just wa -> safeUpdate wa d ram
       Just True -> case maybeIsX waddr of
         Nothing -> fmap (const (seq waddr d)) ram
-        Just wa -> Seq.update wa d ram
+        Just wa -> safeUpdate wa d ram
       _ -> ram
+
+    safeAt :: HasCallStack => Seq.Seq a -> Int -> a
+    safeAt s i =
+      if (0 <= i) && (i < szI) then
+        Seq.index s i
+      else
+        withFrozenCallStack
+          (errorX ("asyncRam: read address " ++ show i ++
+                   " not in range [0.." ++ show szI ++ ")"))
+    {-# INLINE safeAt #-}
+
+    safeUpdate :: HasCallStack => Int -> a -> Seq.Seq a ->  Seq.Seq a
+    safeUpdate i a s =
+      if (0 <= i) && (i < szI) then
+        Seq.update i a s
+      else
+        withFrozenCallStack
+          (errorX ("asyncRam: write address " ++ show i ++
+                   " not in range [0.." ++ show szI ++ ")"))
+    {-# INLINE safeUpdate #-}
 {-# NOINLINE asyncRam# #-}

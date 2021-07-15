@@ -405,10 +405,12 @@ where
 
 import           Clash.HaskellPrelude
 
+import qualified Data.List              as L
 import           Data.Maybe             (isJust)
 import qualified Data.Sequence          as Seq
 import           GHC.Stack              (HasCallStack, withFrozenCallStack)
 import           GHC.TypeLits           (KnownNat, type (^), type (<=))
+import           Unsafe.Coerce          (unsafeCoerce)
 
 import           Clash.Annotations.Primitive
   (hasBlackBox)
@@ -420,7 +422,7 @@ import           Clash.Promoted.Nat     (SNat(..))
 import           Clash.Signal.Bundle    (unbundle)
 import           Clash.Sized.Unsigned   (Unsigned)
 import           Clash.Sized.Index      (Index)
-import           Clash.Sized.Vector     (Vec, replicate, toList, iterateI)
+import           Clash.Sized.Vector     (Vec, replicate, iterateI)
 import qualified Clash.Sized.Vector     as CV
 import           Clash.XException
   (maybeIsX, seqErrorX, NFDataX, deepErrorX, defaultSeqX, fromJustX, undefined)
@@ -970,7 +972,8 @@ blockRam1# clk en n a =
 
 -- | blockRAM primitive
 blockRam#
-  :: ( KnownDomain dom
+  :: forall dom a n
+   . ( KnownDomain dom
      , HasCallStack
      , NFDataX a )
   => Clock dom
@@ -994,7 +997,7 @@ blockRam#
   -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
 blockRam# (Clock _) gen content rd wen =
   go
-    (Seq.fromList (toList content))
+    (Seq.fromList (unsafeCoerce content))
     (withFrozenCallStack (deepErrorX "blockRam: intial value undefined"))
     (fromEnable gen)
     rd
@@ -1002,17 +1005,39 @@ blockRam# (Clock _) gen content rd wen =
  where
   go !ram o ret@(~(re :- res)) rt@(~(r :- rs)) et@(~(e :- en)) wt@(~(w :- wr)) dt@(~(d :- din)) =
     let ram' = d `defaultSeqX` upd ram e (fromEnum w) d
-        o'   = if re then ram `Seq.index` r else o
+        o'   = if re then ram `safeAt` r else o
     in  o `seqErrorX` o :- (ret `seq` rt `seq` et `seq` wt `seq` dt `seq` go ram' o' res rs en wr din)
 
   upd ram we waddr d = case maybeIsX we of
     Nothing -> case maybeIsX waddr of
       Nothing -> fmap (const (seq waddr d)) ram
-      Just wa -> Seq.update wa d ram
+      Just wa -> safeUpdate wa d ram
     Just True -> case maybeIsX waddr of
       Nothing -> fmap (const (seq waddr d)) ram
-      Just wa -> Seq.update wa d ram
+      Just wa -> safeUpdate wa d ram
     _ -> ram
+
+  szI = L.length (unsafeCoerce content :: [a])
+
+  safeAt :: HasCallStack => Seq.Seq a -> Int -> a
+  safeAt s i = let  in
+    if (0 <= i) && (i < szI) then
+      Seq.index s i
+    else
+      withFrozenCallStack
+        (deepErrorX ("blockRam: read address " <> show i <>
+                     " not in range [0.." <> show szI <> ")"))
+  {-# INLINE safeAt #-}
+
+  safeUpdate :: HasCallStack => Int -> a -> Seq.Seq a ->  Seq.Seq a
+  safeUpdate i a s =
+    if (0 <= i) && (i < szI) then
+      Seq.update i a s
+    else
+      withFrozenCallStack
+        (deepErrorX ("blockRam: write address " <> show i <>
+                     " not in range [0.." <> show szI <> ")"))
+  {-# INLINE safeUpdate #-}
 {-# ANN blockRam# hasBlackBox #-}
 {-# NOINLINE blockRam# #-}
 

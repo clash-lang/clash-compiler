@@ -112,7 +112,7 @@ import Numeric               (readInt)
 import System.IO.Unsafe      (unsafePerformIO)
 
 import Clash.Class.BitPack   (BitPack, BitSize, pack)
-import Clash.Promoted.Nat    (SNat (..), pow2SNat, natToNum)
+import Clash.Promoted.Nat    (SNat (..), pow2SNat, natToNum, snatToNum)
 import Clash.Sized.Internal.BitVector (Bit(..), BitVector(..))
 import Clash.Signal.Internal
   (Clock(..), Signal (..), Enable, KnownDomain, fromEnable, (.&&.))
@@ -317,7 +317,7 @@ blockRamFile#
   -- ^ Value to write (at address @w@)
   -> Signal dom (BitVector m)
   -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
-blockRamFile# (Clock _) ena !_sz file rd wen =
+blockRamFile# (Clock _) ena sz file rd wen =
   go
     ramI
     (withFrozenCallStack (errorX "blockRamFile#: intial value undefined"))
@@ -337,22 +337,42 @@ blockRamFile# (Clock _) ena !_sz file rd wen =
       -> Signal dom (BitVector m)
     go !ram o (re :- res) (r :- rs) (e :- en) (w :- wr) (d :- din) =
       let ram' = upd ram e (fromEnum w) d
-          o'   = if re then ram `Seq.index` r else o
+          o'   = if re then ram `safeAt` r else o
       in  o `seqX` o :- go ram' o' res rs en wr din
 
     upd ram we waddr d = case maybeIsX we of
       Nothing -> case maybeIsX waddr of
         Nothing -> fmap (const (seq waddr d)) ram
-        Just wa -> Seq.update wa d ram
+        Just wa -> safeUpdate wa d ram
       Just True -> case maybeIsX waddr of
         Nothing -> fmap (const (seq waddr d)) ram
-        Just wa -> Seq.update wa d ram
+        Just wa -> safeUpdate wa d ram
       _ -> ram
 
     content = unsafePerformIO (initMem file)
+    szI = snatToNum sz :: Int
 
     ramI :: Seq.Seq (BitVector m)
     ramI = Seq.fromList content
+
+    safeAt :: HasCallStack => Seq.Seq a -> Int -> a
+    safeAt s i = let  in
+      if (0 <= i) && (i < szI) then
+        Seq.index s i
+      else
+        withFrozenCallStack
+          (errorX ("blockRamFile: read address " <> show i <>
+                   " not in range [0.." <> show szI <> ")"))
+    {-# INLINE safeAt #-}
+
+    safeUpdate :: HasCallStack => Int -> a -> Seq.Seq a ->  Seq.Seq a
+    safeUpdate i a s =
+      if (0 <= i) && (i < szI) then
+        Seq.update i a s
+      else
+        withFrozenCallStack
+          (errorX ("blockRamFile: write address " <> show i <>
+                   " not in range [0.." <> show szI <> ")"))
 {-# NOINLINE blockRamFile# #-}
 
 -- | __NB:__ Not synthesizable

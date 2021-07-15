@@ -1,0 +1,1 @@
+CHANGED: RAM/ROM functions: They now throw `XExeception` for out-of-bounds address inputs, so this condition no longer aborts simulation.
