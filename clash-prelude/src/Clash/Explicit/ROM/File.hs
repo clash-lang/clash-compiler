@@ -93,7 +93,8 @@ module Clash.Explicit.ROM.File
   )
 where
 
-import Data.Array                   (listArray,(!))
+import Data.Array                   (listArray)
+import Data.Array.Base              (unsafeAt)
 import GHC.TypeLits                 (KnownNat)
 import System.IO.Unsafe             (unsafePerformIO)
 --
@@ -188,7 +189,8 @@ romFile = \clk en sz file rd -> romFile# clk en sz file (fromEnum <$> rd)
 
 -- | romFile primitive
 romFile#
-  :: (KnownNat m, KnownDomain dom)
+  :: forall m dom n
+   . (KnownNat m, KnownDomain dom)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -202,9 +204,19 @@ romFile#
   -> Signal dom (BitVector m)
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
 romFile# clk en sz file rd =
-  delay clk en (deepErrorX "First value of romFile is undefined") ((content !) <$> rd)
+  delay clk en (deepErrorX "First value of romFile is undefined")
+        (safeAt <$> rd)
  where
   mem     = unsafePerformIO (initMem file)
   content = listArray (0,szI-1) mem
   szI     = snatToNum sz
+
+  safeAt :: Int -> BitVector m
+  safeAt i =
+    if (0 <= i) && (i < szI) then
+      unsafeAt content i
+    else
+      deepErrorX ("romFile: address " ++ show i ++
+                  " not in range [0.." ++ show szI ++ ")")
+  {-# INLINE safeAt #-}
 {-# NOINLINE romFile# #-}

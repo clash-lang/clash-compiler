@@ -1,9 +1,10 @@
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.
-                  2019     , Myrtle Software Ltd
+                  2019     , Myrtle Software Ltd,
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 ROMs
 -}
@@ -26,7 +27,8 @@ module Clash.Explicit.ROM
   )
 where
 
-import Data.Array             ((!),listArray)
+import Data.Array             (listArray)
+import Data.Array.Base        (unsafeAt)
 import GHC.Stack              (withFrozenCallStack)
 import GHC.TypeLits           (KnownNat, type (^))
 import Prelude hiding         (length)
@@ -114,7 +116,17 @@ rom# !_ en content =
   arr = listArray (0,szI-1) (toList content)
 
   go o (e :- es) rd@(~(r :- rs)) =
-    let o1 = if e then arr ! r else o
+    let o1 = if e then safeAt r else o
     -- See [Note: register strictness annotations]
     in  o `seqX` o :- (rd `seq` go o1 es rs)
+
+  safeAt :: Int -> a
+  safeAt i =
+    if (0 <= i) && (i < szI) then
+      unsafeAt arr i
+    else
+      withFrozenCallStack
+        (deepErrorX ("rom: address " ++ show i ++
+                     "not in range [0.." ++ show szI ++ ")"))
+  {-# INLINE safeAt #-}
 {-# NOINLINE rom# #-}
