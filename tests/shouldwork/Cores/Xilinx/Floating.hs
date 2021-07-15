@@ -131,7 +131,7 @@ addBasic clk x y = withClock clk $ withEnable enableGen $ F.add x y
 addBasicTB :: Signal XilinxSystem Bool
 addBasicTB =
   uncurry (basicRomTB addBasic)
-          $(romDataFromFile "samplerom.bin" addBasicSamples)
+          $(romDataFromFile "add-samplerom.bin" addBasicSamples)
 {-# ANN addBasicTB (TestBench 'addBasic) #-}
 
 addEnable
@@ -192,3 +192,48 @@ addShortPLTB =
                   , (3, 6, 9)
                   ])
 {-# ANN addShortPLTB (TestBench 'addShortPL) #-}
+
+subBasic
+  :: Clock XilinxSystem
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem F.SubDefDelay Float
+subBasic clk x y = withClock clk $ withEnable enableGen $ F.sub x y
+{-# NOINLINE subBasic #-}
+{-# ANN subBasic (binTopAnn "subBasic") #-}
+
+subBasicTB :: Signal XilinxSystem Bool
+subBasicTB =
+  uncurry (basicRomTB subBasic)
+          $(romDataFromFile "sub-samplerom.bin" subBasicSamples)
+{-# ANN subBasicTB (TestBench 'subBasic) #-}
+
+mulBasic
+  :: Clock XilinxSystem
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem F.MulDefDelay Float
+mulBasic clk x y = withClock clk $ withEnable enableGen $ F.mul x y
+{-# NOINLINE mulBasic #-}
+{-# ANN mulBasic (binTopAnn "mulBasic") #-}
+
+mulBasicTB :: Signal XilinxSystem Bool
+mulBasicTB =
+  uncurry (basicRomTB mulBasic)
+          $(romDataFromFile "mul-samplerom.bin" mulBasicSamples)
+{-# ANN mulBasicTB (TestBench 'mulBasic) #-}
+
+divBasic
+  :: Clock XilinxSystem
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem F.DivDefDelay Float
+divBasic clk x y = withClock clk $ withEnable enableGen $ F.div x y
+{-# NOINLINE divBasic #-}
+{-# ANN divBasic (binTopAnn "divBasic") #-}
+
+divBasicTB :: Signal XilinxSystem Bool
+divBasicTB =
+  uncurry (basicRomTB divBasic)
+          $(romDataFromFile "div-samplerom.bin" divBasicSamples)
+{-# ANN divBasicTB (TestBench 'divBasic) #-}

@@ -10,6 +10,9 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 module Clash.Cores.Xilinx.Floating.BlackBoxes
   ( addTclTF
+  , subTclTF
+  , mulTclTF
+  , divTclTF
   ) where
 
 import Prelude
@@ -42,9 +45,33 @@ defHasCustom = HasCustom
   , hasBMemUsage = False
   }
 
+hasNoCustom :: HasCustom
+hasNoCustom = HasCustom
+  { addSubVal = Nothing
+  , hasArchOpt = False
+  , hasDspUsage = False
+  , hasBMemUsage = False
+  }
+
 addTclTF :: TemplateFunction
 addTclTF =
   binaryTclTF (defHasCustom { addSubVal = Just "Add" }) "Add_Subtract"
+
+subTclTF :: TemplateFunction
+subTclTF =
+  binaryTclTF (defHasCustom { addSubVal = Just "Subtract" }) "Add_Subtract"
+
+mulTclTF :: TemplateFunction
+mulTclTF = binaryTclTF hasCustom "Multiply"
+ where
+  hasCustom = HasCustom { addSubVal = Nothing
+                        , hasArchOpt = False
+                        , hasDspUsage = True
+                        , hasBMemUsage = False
+                        }
+
+divTclTF :: TemplateFunction
+divTclTF = binaryTclTF hasNoCustom "Divide"
 
 binaryTclTF
   :: HasCustom
