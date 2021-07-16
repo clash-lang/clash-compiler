@@ -108,7 +108,8 @@
     , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Signed (n :: Nat)"
-    , "template"  : "resize(~ARG[1],~LIT[0])"
+    , "format"    : "Haskell"
+    , "templateFunction" : "Clash.Primitives.Sized.Signed.fromIntegerTF"
     }
   }
 , { "BlackBox" :
