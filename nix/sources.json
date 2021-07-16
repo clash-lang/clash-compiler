@@ -5,10 +5,10 @@
         "homepage": null,
         "owner": "clash-lang",
         "repo": "ghc-tcplugins-extra",
-        "rev": "380e4510ae94e6b6cfb1bcacf633437e2c7226a4",
-        "sha256": "0fwfjvqw4k9lk23xrysiw54khfcif2s2cg52zwkgd0wbhjg6rrmd",
+        "rev": "684f3aa53c193220974c542ed337ec94e5265291",
+        "sha256": "19sczl14hcaai20ckrd8gwqbrzyaby9pyv488ljxizq4ynqdx380",
         "type": "tarball",
-        "url": "https://github.com/clash-lang/ghc-tcplugins-extra/archive/380e4510ae94e6b6cfb1bcacf633437e2c7226a4.tar.gz",
+        "url": "https://github.com/clash-lang/ghc-tcplugins-extra/archive/684f3aa53c193220974c542ed337ec94e5265291.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "ghc-typelits-extra": {
@@ -17,10 +17,10 @@
         "homepage": null,
         "owner": "clash-lang",
         "repo": "ghc-typelits-extra",
-        "rev": "2f1ee7c0e5322177b8a20151d51b358dd2691b1f",
-        "sha256": "04akli0l7xd49hl0k23xbwhpijsl33jd59dcpkrnfjljby7nd398",
+        "rev": "055f5c88502d3fa23b4c1ca127d960a0a10f2b0c",
+        "sha256": "0mh8r5vkq8md0y3my4bq3sm17629lx2wfmn665hkwhrfb5bv3s3r",
         "type": "tarball",
-        "url": "https://github.com/clash-lang/ghc-typelits-extra/archive/2f1ee7c0e5322177b8a20151d51b358dd2691b1f.tar.gz",
+        "url": "https://github.com/clash-lang/ghc-typelits-extra/archive/055f5c88502d3fa23b4c1ca127d960a0a10f2b0c.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "ghc-typelits-knownnat": {
@@ -29,10 +29,10 @@
         "homepage": null,
         "owner": "clash-lang",
         "repo": "ghc-typelits-knownnat",
-        "rev": "7801a3485769eb26ee7a00d1e4989a04b19a1850",
-        "sha256": "1m0kmkgcw0kf6w95fg8cf29r50i1br4xp078iwf3hkb1kzs9z9m7",
+        "rev": "fb94131ac8beaf6167fc2cc5f94602cc881950df",
+        "sha256": "1mknsldr99qp4494vxqdjw0v97mzjhsmi3mfcp0h5qbdv11z1qhc",
         "type": "tarball",
-        "url": "https://github.com/clash-lang/ghc-typelits-knownnat/archive/7801a3485769eb26ee7a00d1e4989a04b19a1850.tar.gz",
+        "url": "https://github.com/clash-lang/ghc-typelits-knownnat/archive/fb94131ac8beaf6167fc2cc5f94602cc881950df.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "ghc-typelits-natnormalise": {
@@ -41,10 +41,10 @@
         "homepage": null,
         "owner": "clash-lang",
         "repo": "ghc-typelits-natnormalise",
-        "rev": "91d80e63378ac4009f0475f54c54f81eca4de0ed",
-        "sha256": "1dy9kilvc9nfql64fs79pxaa57dh8dvhkmlx79ghwlgxn6v2ksva",
+        "rev": "3f3ae60a796061b7a496f64ba71f4d57dedd01db",
+        "sha256": "0lvn38sxgxjdfydnhnk466l7m4k1kxxy9782p3xb92mwyi8rgkkh",
         "type": "tarball",
-        "url": "https://github.com/clash-lang/ghc-typelits-natnormalise/archive/91d80e63378ac4009f0475f54c54f81eca4de0ed.tar.gz",
+        "url": "https://github.com/clash-lang/ghc-typelits-natnormalise/archive/3f3ae60a796061b7a496f64ba71f4d57dedd01db.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "gitignore": {
