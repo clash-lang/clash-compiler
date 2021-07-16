@@ -1,15 +1,17 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2019     , Gergő Érdi
-                  2016-2019, Myrtle Software Ltd
+                  2016-2019, Myrtle Software Ltd,
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -1002,23 +1004,26 @@ shiftL#, shiftR#, rotateL#, rotateR#
   :: forall n . KnownNat n => BitVector n -> Int -> BitVector n
 
 {-# NOINLINE shiftL# #-}
-shiftL# =
-  \(BV msk v) i ->
-    if i >= 0 then
-      BV ((shiftL msk i) `mod` m) ((shiftL v i) `mod` m)
-    else
-      error ("'shiftL' undefined for negative number: " ++ show i)
+shiftL# = \(BV msk v) i ->
+  if | i < 0
+     -> error $ "'shiftL' undefined for negative number: " ++ show i
+     | fromIntegral i >= sz
+     -> BV 0 0
+     | otherwise
+     -> BV ((shiftL msk i) `mod` m) ((shiftL v i) `mod` m)
  where
 #if MIN_VERSION_base(4,15,0)
-  m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
+  sz = naturalToWord (natVal (Proxy @n))
+  m = 1 `naturalShiftL` sz
 #else
-  m = 1 `shiftL` fromInteger (natVal (Proxy @n))
+  sz = fromInteger (natVal (Proxy @n))
+  m = 1 `shiftL` sz
 #endif
 
 {-# NOINLINE shiftR# #-}
 shiftR# (BV m v) i
   | i < 0     = error
-              $ "'shiftR undefined for negative number: " ++ show i
+              $ "'shiftR' undefined for negative number: " ++ show i
   | otherwise = BV (shiftR m i) (shiftR v i)
 
 {-# NOINLINE rotateL# #-}
@@ -1045,7 +1050,7 @@ rotateL# =
           b''  = sz - b'
       in  BV ((ml .|. mr) `mod` m) ((vl .|. vr) `mod` m)
     else
-      error "'rotateL' undefined for negative numbers"
+      error $ "'rotateL' undefined for negative number: " ++ show b
  where
 #if MIN_VERSION_base(4,15,0)
   sz = naturalToWord (natVal (Proxy @n))
@@ -1075,7 +1080,7 @@ rotateR# =
           b''  = sz - b'
       in  BV ((ml .|. mr) `mod` m) ((vl .|. vr) `mod` m)
     else
-      error "'rotateR' undefined for negative numbers"
+      error $ "'rotateR' undefined for negative number: " ++ show b
  where
 #if MIN_VERSION_base(4,15,0)
   sz = naturalToWord (natVal (Proxy @n))
