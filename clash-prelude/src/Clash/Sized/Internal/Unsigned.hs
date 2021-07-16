@@ -9,6 +9,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -494,24 +495,22 @@ complement# = \(U i) -> U (complementN i)
 
 shiftL#, shiftR#, rotateL#, rotateR# :: forall n .KnownNat n => Unsigned n -> Int -> Unsigned n
 {-# NOINLINE shiftL# #-}
-shiftL# =
-  \(U v) i ->
-    if i >= 0 then
+shiftL# = \(U v) i ->
 #if MIN_VERSION_base(4,15,0)
-      let i' = fromIntegral i
-       in U ((naturalShiftL v i') `mod` m)
-#else
-      U ((shiftL v i) `mod` m)
-#endif
-    else
-      error ("'shiftL undefined for negative number: " ++ show i)
+  let i' = fromIntegral i in
+  if | i < 0     -> error $ "'shiftL' undefined for negative number: " ++ show i
+     | i' >= sz  -> U 0
+     | otherwise -> U ((naturalShiftL v i') `mod` m)
  where
-#if MIN_VERSION_base(4,15,0)
   sz = naturalToWord (natVal (Proxy @n))
-  m = 1 `naturalShiftL` sz
+  m  = 1 `naturalShiftL` sz
 #else
+  if | i < 0     -> error $ "'shiftL' undefined for negative number: " ++ show i
+     | i >= sz   -> U 0
+     | otherwise -> U ((shiftL v i) `mod` m)
+ where
   sz = fromInteger (natVal (Proxy @n))
-  m = 1 `shiftL` sz
+  m  = 1 `shiftL` sz
 #endif
 
 {-# NOINLINE shiftR# #-}
@@ -520,7 +519,7 @@ shiftL# =
 -- makes implementing the Evaluator easier.
 shiftR# (U v) i
   | i < 0     = error
-              $ "'shiftR undefined for negative number: " ++ show i
+              $ "'shiftR' undefined for negative number: " ++ show i
   | otherwise = U (shiftR v i)
 
 {-# NOINLINE rotateL# #-}
@@ -539,7 +538,7 @@ rotateL# =
           b'' = sz - b'
       in  U ((l .|. r) `mod` m)
     else
-      error "'rotateL undefined for negative numbers"
+      error $ "'rotateL' undefined for negative number: " ++ show b
   where
 #if MIN_VERSION_base(4,15,0)
     sz = naturalToWord (natVal (Proxy @n))
@@ -565,7 +564,7 @@ rotateR# =
           b'' = sz - b'
       in  U ((l .|. r) `mod` m)
     else
-      error "'rotateR undefined for negative numbers"
+      error $ "'rotateR' undefined for negative number: " ++ show b
   where
 #if MIN_VERSION_base(4,15,0)
     sz = naturalToWord (natVal (Proxy @n))

@@ -9,6 +9,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -510,12 +511,10 @@ complement# = \(S a) -> fromInteger_INLINE sz mB mask (complement a)
 
 shiftL#,shiftR#,rotateL#,rotateR# :: forall n . KnownNat n => Signed n -> Int -> Signed n
 {-# NOINLINE shiftL# #-}
-shiftL# =
-  \(S n) b ->
-    if b >= 0 then
-      fromInteger_INLINE sz mB mask (shiftL n b)
-    else
-      error "'shiftL' undefined for negative numbers"
+shiftL# = \(S n) b ->
+  if | b < 0     -> error $ "'shiftL' undefined for negative number: " ++ show b
+     | b > sz    -> S 0
+     | otherwise -> fromInteger_INLINE sz mB mask (shiftL n b)
  where
   sz   = fromInteger (natVal (Proxy @n)) - 1
   mB   = 1 `shiftL` sz
@@ -527,7 +526,7 @@ shiftR# =
     if b >= 0 then
       fromInteger_INLINE sz mB mask (shiftR n b)
     else
-      error "'shiftR' undefined for negative numbers"
+      error $ "'shiftR' undefined for negative number: " ++ show b
  where
   sz   = fromInteger (natVal (Proxy @n)) - 1
   mB   = 1 `shiftL` sz
@@ -545,7 +544,7 @@ rotateL# =
           b''  = sz - b'
       in  fromInteger_INLINE sz1 mB maskM (l .|. r)
     else
-      error "'rotateL undefined for negative numbers"
+      error $ "'rotateL undefined for negative number: " ++ show b
  where
   sz    = fromInteger (natVal (Proxy @n))
   sz1   = sz-1
@@ -564,7 +563,7 @@ rotateR# =
           b'' = sz - b'
       in  fromInteger_INLINE sz1 mB maskM (l .|. r)
     else
-      error "'rotateR' undefined for negative numbers"
+      error $ "'rotateR' undefined for negative number: " ++ show b
  where
   sz    = fromInteger (natVal (Proxy @n))
   sz1   = sz - 1
