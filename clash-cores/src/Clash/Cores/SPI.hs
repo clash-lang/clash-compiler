@@ -368,7 +368,7 @@ spiSlaveLatticeSBIO mode latchSPI =
  where
   sbioX bin en dout = bout
    where
-    (bout,_,_) = sbio 0b101001 bin (pure 0) dout (pure undefined) en
+    (bout,_) = sbio Input OutputTristate bin (pure 0) dout en
 
 
 -- | SPI slave configurable SPI mode, using the BB tri-state buffer

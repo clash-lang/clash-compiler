@@ -8,7 +8,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO (sbioTF) where
+module Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO
+  ( sbioTF
+  , sbioDDRTF
+  ) where
 
 import           Prelude
 
@@ -40,11 +43,10 @@ pinConfigLiteral False =
 
     prettyCallStack callStack
 
--- | Generates HDL for SB_IO for the LATTICE ICE
 sbioTF :: TemplateFunction
 sbioTF = TemplateFunction used valid sbioTemplate
  where
-  used = [1..8]
+  used = [2..8]
   valid = const True
 
 sbioTemplate
@@ -52,6 +54,53 @@ sbioTemplate
   => BlackBoxContext
   -> State s Doc
 sbioTemplate bbCtx = do
+  let compName = Id.unsafeMake "SB_IO"
+
+  sbio <- Id.makeBasic "sbio"
+  sbio_inst <- Id.makeBasic "sbio_inst"
+
+  getMon $ blockDecl sbio $
+    [ InstDecl Comp Nothing [] compName sbio_inst
+      [ (instPort "PIN_TYPE", BitVector 6, pinConfig)
+      ]
+      (NamedPortMap
+        [ (instPort "PACKAGE_PIN", In, packagePinTy, packagePin)
+        , (instPort "LATCH_INPUT_VALUE", In, Bit, latchInput)
+        , (instPort "CLOCK_ENABLE", In, Bool, en)
+        , (instPort "INPUT_CLK", In, clkTy, clk)
+        , (instPort "OUTPUT_CLK", In, clkTy, clk)
+        , (instPort "OUTPUT_ENABLE", In, Bool, outputEnable)
+        , (instPort "D_OUT_0", In, Bit, dOut0)
+        , (instPort "D_OUT_1", In, Bit, Literal (Just (Bit, 1)) (BitLit Z))
+        , (instPort "D_IN_0", Out, Bit, resultId)
+        ])
+    ]
+ where
+  [ _HasCallStack
+   , _KnownDomain
+   , (clk, clkTy, _)
+   , (en, _, _)
+   , (pinConfig, _, pinConfigLiteral -> ())
+   , (packagePin, packagePinTy, _)
+   , (latchInput, Bit, _)
+   , (dOut0, Bit, _)
+   , (outputEnable, Bool, _)
+   ] = bbInputs bbCtx
+
+  [(resultId, _)] = bbResults bbCtx
+
+-- | Generates HDL for SB_IO for the LATTICE ICE
+sbioDDRTF :: TemplateFunction
+sbioDDRTF = TemplateFunction used valid sbioDDRTemplate
+ where
+  used = [4..11]
+  valid = const True
+
+sbioDDRTemplate
+  :: Backend s
+  => BlackBoxContext
+  -> State s Doc
+sbioDDRTemplate bbCtx = do
   let compName = Id.unsafeMake "SB_IO"  -- Hardcoded for now
 
   sbio <- Id.makeBasic "sbio"
@@ -79,7 +128,7 @@ sbioTemplate bbCtx = do
         -- NOTE: Direction is set to 'In', but will be rendered as inout due to
         -- its the type packackagePinTy
         (instPort "PACKAGE_PIN", In, packagePinTy, packagePin)
-      , (instPort "LATCH_INPUT_VALUE", In, Bit, latchInput)
+      , (instPort "LATCH_INPUT_VALUE", In, Bit, Literal (Just (Bit, 1)) (BitLit Z))
       -- TODO: If clock is constantly enabled, docs recommend  not connecting
       -- TODO: CLOCK_ENABLE at all.
       , (instPort "CLOCK_ENABLE", In, Bool, en)
@@ -95,11 +144,13 @@ sbioTemplate bbCtx = do
     ]
  where
   [ _HasCallStack
+   , _KnownDomain
+   , _SlowConfiguration
+   , _FastConfiguration
    , (clk, clkTy, _)
    , (en, _enTy, _)
    , (pinConfig, _pinTy, pinConfigLiteral -> ())
    , (packagePin, packagePinTy, _)
-   , (latchInput, Bit, _)
    , (dOut0, Bit, _)
    , (dOut1, Bit, _)
    , (outputEnable, Bool, _)
