@@ -2,8 +2,9 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software Ltd,
                   2017     , Google Inc.
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Clash has synchronous 'Signal's in the form of:
 
@@ -275,7 +276,7 @@ import           Clash.Explicit.Signal (systemClockGen, systemResetGen)
 import qualified Clash.Explicit.Signal as S
 import           Clash.Hidden
 import           Clash.Promoted.Nat    (SNat (..), snatToNum)
-import           Clash.Signal.Bundle
+import           Clash.Prelude.Bundle
   (Bundle (..), EmptyTuple(..), TaggedEmptyTuple(..))
 import           Clash.Signal.BiSignal --(BisignalIn, BisignalOut, )
 import           Clash.Signal.Internal hiding
@@ -1755,15 +1756,15 @@ simulate_lazy f0 =
 --
 -- __NB__: This function is not synthesizable
 simulateB
-  :: forall dom a b
+  :: forall dom a b fa fb
    . ( KnownDomain dom
-     , Bundle a
-     , Bundle b
+     , Bundle (Signal dom) a fa
+     , Bundle (Signal dom) b fb
      , NFDataX a
      , NFDataX b
      )
-  => (HiddenClockResetEnable dom  =>
-      Unbundled dom a -> Unbundled dom b)
+  => (HiddenClockResetEnable dom =>
+      fa -> fb)
   -- ^ Function we want to simulate, whose components potentially have a hidden
   -- clock (and reset)
   -> [a]
@@ -1790,12 +1791,12 @@ simulateB f0 =
 --
 -- __NB__: This function is not synthesizable
 simulateB_lazy
-  :: forall dom a b
+  :: forall dom a b fa fb
    . ( KnownDomain dom
-     , Bundle a
-     , Bundle b )
-  => (HiddenClockResetEnable dom  =>
-      Unbundled dom a -> Unbundled dom b)
+     , Bundle (Signal dom) a fa
+     , Bundle (Signal dom) b fb)
+  => (HiddenClockResetEnable dom =>
+      fa -> fb)
   -- ^ Function we want to simulate, whose components potentially have a hidden
   -- clock (and reset)
   -> [a]

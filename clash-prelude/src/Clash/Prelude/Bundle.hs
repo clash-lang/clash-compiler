@@ -1,29 +1,33 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017-2019, Myrtle Software Ltd, Google Inc.
-                       2019, QBayLogic B.V.
+                  2019-2021, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 The Product/Signal isomorphism
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilyDependencies #-}
+{-# LANGUAGE TypeFamilies #-}
 
 {-# LANGUAGE Trustworthy #-}
 
 --{-# OPTIONS_GHC -ddump-splices #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
-module Clash.Signal.Bundle
+module Clash.Prelude.Bundle
   ( Bundle (..)
   -- ** Tools to emulate pre Clash 1.0 @Bundle ()@ instance
   , EmptyTuple(..)
   , TaggedEmptyTuple(..)
   -- ** Internal
   , vecBundle#
+  , vecBundleD#
   )
 where
 
@@ -32,8 +36,9 @@ import GHC.Generics
 import GHC.TypeLits                 (KnownNat)
 import Prelude                      hiding (head, map, tail)
 
-import Clash.Signal.Bundle.Internal (deriveBundleTuples)
+import Clash.Prelude.Bundle.Internal (deriveBundleTuples)
 import Clash.Signal.Internal        (Signal (..), Domain)
+import Clash.Signal.Delayed.Internal (DSignal)
 import Clash.Sized.BitVector        (Bit, BitVector)
 import Clash.Sized.Fixed            (Fixed)
 import Clash.Sized.Index            (Index)
@@ -87,9 +92,9 @@ import Clash.Sized.RTree            (RTree, lazyT)
 --   unbundle pairs = MkPair (getA <$> pairs) (getB <$> pairs)
 -- @
 
-class Bundle a where
-  type Unbundled (dom :: Domain) a = res | res -> dom a
-  type Unbundled dom a = Signal dom a
+class Bundle f a res | f a -> res, f res -> a, a res -> f  where
+  type Unbundled f a
+  type Unbundled f a = f a
   -- | Example:
   --
   -- @
@@ -101,12 +106,11 @@ class Bundle a where
   -- @
   -- __bundle__ :: 'Signal' dom 'Clash.Sized.BitVector.Bit' -> 'Signal' dom 'Clash.Sized.BitVector.Bit'
   -- @
-  bundle :: Unbundled dom a -> Signal dom a
+  bundle :: res -> f a
 
   {-# INLINE bundle #-}
-  default bundle :: (Signal dom a ~ Unbundled dom a)
-                 => Unbundled dom a -> Signal dom a
-  bundle s = s
+  default bundle :: (res ~ f a) => res -> f a
+  bundle = id
   -- | Example:
   --
   -- @
@@ -118,28 +122,27 @@ class Bundle a where
   -- @
   -- __unbundle__ :: 'Signal' dom 'Clash.Sized.BitVector.Bit' -> 'Signal' dom 'Clash.Sized.BitVector.Bit'
   -- @
-  unbundle :: Signal dom a -> Unbundled dom a
+  unbundle :: f a -> res
 
   {-# INLINE unbundle #-}
-  default unbundle :: (Unbundled dom a ~ Signal dom a)
-                   => Signal dom a -> Unbundled dom a
-  unbundle s = s
+  default unbundle :: (f a ~ res) => f a -> res
+  unbundle = id
 
-instance Bundle ()
-instance Bundle Bool
-instance Bundle Integer
-instance Bundle Int
-instance Bundle Float
-instance Bundle Double
-instance Bundle (Maybe a)
-instance Bundle (Either a b)
+instance Bundle f () (f ())
+instance Bundle f Bool (f Bool)
+instance Bundle f Integer (f Integer)
+instance Bundle f Int (f Int)
+instance Bundle f Float (f Float)
+instance Bundle f Double (f Double)
+instance Bundle f (Maybe a) (f (Maybe a))
+instance Bundle f (Either a b) (f (Either a b))
 
-instance Bundle Bit
-instance Bundle (BitVector n)
-instance Bundle (Index n)
-instance Bundle (Fixed rep int frac)
-instance Bundle (Signed n)
-instance Bundle (Unsigned n)
+instance Bundle f Bit (f Bit)
+instance Bundle f (BitVector n) (f (BitVector n))
+instance Bundle f (Index n) (f (Index n))
+instance Bundle f (Fixed rep int frac) (f (Fixed rep int frac))
+instance Bundle f (Signed n) (f (Signed n))
+instance Bundle f (Unsigned n) (f (Unsigned n))
 
 -- | __N.B.__: The documentation only shows instances up to /3/-tuples. By
 -- default, instances up to and including /12/-tuples will exist. If the flag
@@ -147,10 +150,13 @@ instance Bundle (Unsigned n)
 -- GHC imposed limit is either 62 or 64 depending on the GHC version.
 deriveBundleTuples ''Bundle ''Unbundled 'bundle 'unbundle
 
-instance KnownNat n => Bundle (Vec n a) where
-  type Unbundled t (Vec n a) = Vec n (Signal t a)
-  -- The 'Traversable' instance of 'Vec' is not synthesizable, so we must
-  -- define 'bundle' as a primitive.
+instance {-# OVERLAPPABLE #-} (KnownNat n, Applicative f, Traversable f) => Bundle f (Vec n a) (Vec n (f a)) where
+  type Unbundled f (Vec n a) = Vec n (f a)
+  bundle   = traverse# id
+  unbundle = sequenceA . fmap lazyV
+
+instance KnownNat n => Bundle (Signal dom) (Vec n a) (Vec n (Signal dom a)) where
+  type Unbundled (Signal dom) (Vec n a) = Vec n (Signal dom a)
   bundle   = vecBundle#
   unbundle = sequenceA . fmap lazyV
 
@@ -158,13 +164,20 @@ instance KnownNat n => Bundle (Vec n a) where
 vecBundle# :: Vec n (Signal t a) -> Signal t (Vec n a)
 vecBundle# = traverse# id
 
-instance KnownNat d => Bundle (RTree d a) where
-  type Unbundled t (RTree d a) = RTree d (Signal t a)
+instance KnownNat n => Bundle (DSignal dom d) (Vec n a) (Vec n (DSignal dom d a)) where
+  type Unbundled (DSignal dom d) (Vec n a) = Vec n (DSignal dom d a)
+  bundle   = vecBundleD#
+  unbundle = sequenceA . fmap lazyV
+
+{-# NOINLINE vecBundleD# #-}
+vecBundleD# :: Vec n (DSignal dom t a) -> DSignal dom t (Vec n a)
+vecBundleD# = traverse# id
+
+instance (KnownNat d, Applicative f, Traversable f) => Bundle f (RTree d a) (RTree d (f a)) where
   bundle   = sequenceA
   unbundle = sequenceA . fmap lazyT
 
-instance Bundle ((f :*: g) a) where
-  type Unbundled t ((f :*: g) a) = (Compose (Signal t) f :*: Compose (Signal t) g) a
+instance Applicative h => Bundle h ((f :*: g) a) ((Compose h f :*: Compose h g) a) where
   bundle (Compose l :*: Compose r) = (:*:) <$> l <*> r
   unbundle s = Compose (getL <$> s) :*: Compose (getR <$> s)
    where
@@ -204,9 +217,7 @@ data TaggedEmptyTuple (dom :: Domain) = TaggedEmptyTuple
 
 -- | See [commit 94b0bff5](https://github.com/clash-lang/clash-compiler/pull/539/commits/94b0bff5770aa4961e04ddce2515130df3fc7863)
 -- and documentation for 'TaggedEmptyTuple'.
-instance Bundle EmptyTuple where
-  type Unbundled dom EmptyTuple = TaggedEmptyTuple dom
-
+instance Bundle (Signal dom) EmptyTuple (TaggedEmptyTuple dom) where
   bundle :: TaggedEmptyTuple dom -> Signal dom EmptyTuple
   bundle TaggedEmptyTuple = pure EmptyTuple
 

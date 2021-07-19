@@ -178,10 +178,10 @@ It instead exports the identically named functions defined in terms of
 registerB
   :: ( HiddenClockResetEnable dom
      , NFDataX a
-     , Bundle a )
+     , Bundle (Signal dom) a fa )
   => a
-  -> Unbundled dom a
-  -> Unbundled dom a
+  -> fa
+  -> fa
 registerB = hideClockResetEnable E.registerB
 infixr 3 `registerB`
 {-# INLINE registerB #-}

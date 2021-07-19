@@ -49,7 +49,7 @@ common basic-config
     ieee754,
     neat-interpolation  >=0.3  && <0.6,
     process             >=1.2  && <1.7,
-    tasty               >=1.2  && <1.4,
+    tasty               >=1.2  && <1.5,
     tasty-hunit,
     temporary,
     text,

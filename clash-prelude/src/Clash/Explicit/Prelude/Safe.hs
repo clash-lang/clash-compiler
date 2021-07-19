@@ -157,13 +157,13 @@ import Clash.XException
 registerB
   :: ( KnownDomain dom
      , NFDataX a
-     , Bundle a )
+     , Bundle (Signal dom) a fa)
   => Clock dom
   -> Reset dom
   -> Enable dom
   -> a
-  -> Unbundled dom a
-  -> Unbundled dom a
+  -> fa
+  -> fa
 registerB clk rst en i =
   unbundle Prelude.. register clk rst en i Prelude.. bundle
 {-# INLINE registerB #-}

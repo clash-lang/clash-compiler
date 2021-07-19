@@ -53,6 +53,6 @@ mealyState f = mealy step
     step s x = let (y, s') = runState (f x) s in (s', y)
 
 mealyStateB
-    :: (HiddenClockResetEnable dom, NFDataX s, Bundle i, Bundle o)
-    => (i -> State s o) -> s -> (Unbundled dom i -> Unbundled dom o)
+    :: (HiddenClockResetEnable dom, NFDataX s, Bundle (Signal dom) i fi, Bundle (Signal dom) o fo)
+    => (i -> State s o) -> s -> (fi -> fo)
 mealyStateB f s0 = unbundle . mealyState f s0 . bundle

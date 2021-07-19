@@ -59,8 +59,8 @@ byteMaster
   :: Clock System
   -> Reset System
   -> Enable System
-  -> Unbundled System ByteMasterI
-  -> Unbundled System ByteMasterO
+  -> Unbundled (Signal System) ByteMasterI
+  -> Unbundled (Signal System) ByteMasterO
 byteMaster = exposeClockResetEnable (mealyB byteMasterT byteMasterInit)
 {-# NOINLINE byteMaster #-}
 
