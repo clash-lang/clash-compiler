@@ -24,8 +24,8 @@ topEntity3 = topEntity2
 {-# NOINLINE topEntity3 #-}
 
 -- | Make sure topEntity2 is not compiled when -main-is topEntity1
-main1SystemVerilog :: IO ()
-main1SystemVerilog = do
+mainSystemVerilog :: IO ()
+mainSystemVerilog = do
   [(dir, _fname)] <- map splitFileName <$> getArgs
   files <- listDirectory dir
   if any (`elem` files) [show 'topEntity2, show 'topEntity3] then
@@ -35,8 +35,8 @@ main1SystemVerilog = do
 
 -- | Check whether we can compile a binder that doesn't have a synthesize
 -- annotation _and_ isn't called 'topEntity' using -main-is.
-main3VHDL :: IO ()
-main3VHDL = do
+mainVHDL :: IO ()
+mainVHDL = do
   [dir] <- getArgs
   files <- listDirectory dir
   let expected = [show 'topEntity1, show 'topEntity2, show 'topEntity3]
