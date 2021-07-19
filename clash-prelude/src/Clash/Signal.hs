@@ -1,9 +1,10 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software Ltd,
-                  2017     , Google Inc.
+                  2017     , Google Inc.,
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Clash has synchronous 'Signal's in the form of:
 
@@ -149,7 +150,7 @@ module Clash.Signal
   , toEnable
   , fromEnable
   , S.enableGen
-    -- * Hidden clocks and resets
+    -- * Hidden clocks, resets and enables
     -- $hiddenclockandreset
 
     -- ** Hidden clock
@@ -193,6 +194,7 @@ module Clash.Signal
 #endif
   , SystemClockResetEnable
     -- * Basic circuit functions
+  , mergeEnable
   , dflipflop
   , delay
   , delayMaybe
@@ -313,9 +315,9 @@ let countSometimes = s where
 -- * Hidden clock, reset, and enable arguments
 
 {- $hiddenclockandreset #hiddenclockandreset#
-Clocks and resets are by default implicitly routed to their components. You can
-see from the type of a component whether it has hidden clock or reset
-arguments:
+Clocks, resets and enables are by default implicitly routed to their components.
+You can see from the type of a component whether it has hidden clock, reset or
+enable arguments:
 
 It has a hidden clock when it has a:
 
@@ -333,8 +335,16 @@ g :: 'HiddenReset' dom => ...
 
 Constraint.
 
-Or it has both a hidden clock argument and a hidden reset argument when it
-has a:
+Or it has a hidden enable when it has a:
+
+@
+g :: 'HiddenEnable' dom => ...
+@
+
+Constraint.
+
+Or it has a hidden clock argument, a hidden reset argument and a hidden enable
+argument when it has a:
 
 @
 h :: 'HiddenClockResetEnable' dom  => ..
@@ -342,8 +352,9 @@ h :: 'HiddenClockResetEnable' dom  => ..
 
 Constraint.
 
-Given a component with an explicit clock and reset arguments, you can turn them
-into hidden arguments using 'hideClock', 'hideReset', and 'hideEnable'. So given a:
+Given a component with explicit clock, reset and enable arguments, you can turn
+them into hidden arguments using 'hideClock', 'hideReset', and 'hideEnable'. So
+given a:
 
 @
 f :: Clock dom -> Reset dom -> Enable dom -> Signal dom a -> ...
@@ -363,7 +374,7 @@ Or, alternatively, by:
 h = f 'hasClock' 'hasReset' 'hasEnable'
 @
 
-=== Assigning explicit clock and reset arguments to hidden clocks and resets
+=== Assigning explicit clock, reset and enable arguments to hidden clocks, resets and enables
 
 Given a component:
 
@@ -373,37 +384,38 @@ f :: 'HiddenClockResetEnable' dom
   -> Signal dom Int
 @
 
-which has hidden clock and routed reset arguments, we expose those hidden
-arguments so that we can explicitly apply them:
+which has hidden clock, routed reset and enable arguments, we expose those
+hidden arguments so that we can explicitly apply them:
 
 @
--- g :: Clock dom -> Reset dom -> Signal dom Int -> Signal dom Int
+-- g :: Clock dom -> Reset dom -> Enable dom -> Signal dom Int -> Signal dom Int
 g = 'exposeClockResetEnable' f
 @
 
 or, alternatively, by:
 
 @
--- h :: Clock dom -> Reset dom -> Signal dom Int -> Signal dom Int
-h clk rst = withClock clk rst f
+-- h :: Clock dom -> Reset dom -> Enable dom -> Signal dom Int -> Signal dom Int
+h clk rst en = 'withClockResetEnable' clk rst en f
 @
 
-Similarly, there are 'exposeClock' and 'exposeReset' to connect just expose
-the hidden clock or the hidden reset argument.
+Similarly, there are 'exposeClock', 'exposeReset' and 'exposeEnable' to just
+expose the hidden clock, the hidden reset or the hidden enable argument.
 
 You will need to explicitly apply clocks and resets when you want to use
-components such as PPLs and 'resetSynchronizer':
+components such as PLLs and 'resetSynchronizer':
 
 @
 topEntity
   :: Clock  System
   -> Reset  System
+  -> Enable System
   -> Signal System Bit
   -> Signal System (BitVector 8)
 topEntity clk rst ena key1 =
     let  (pllOut,pllStable) = altpll (SSymbol \@\"altpll50\") clk rst
          rstSync            = 'resetSynchronizer' pllOut (unsafeToHighPolarity pllStable) ena
-    in   exposeClockResetEnable leds pllOut rstSync enableGen
+    in   exposeClockResetEnable leds pllOut rstSync ena
   where
     key1R  = isRising 1 key1
     leds   = mealy blinkerT (1, False, 0) key1R
@@ -415,12 +427,13 @@ or, using the alternative method:
 topEntity
   :: Clock  System
   -> Reset  System
+  -> Enable System
   -> Signal System Bit
   -> Signal System (BitVector 8)
 topEntity clk rst ena key1 =
     let  (pllOut,pllStable) = altpll (SSymbol \@\"altpll50\") clk rst
          rstSync            = 'resetSynchronizer' pllOut (unsafeToHighPolarity pllStable) ena
-    in   'withClockResetEnable' pllOut rstSync enableGen leds
+    in   'withClockResetEnable' pllOut rstSync ena leds
   where
     key1R  = isRising 1 key1
     leds   = mealy blinkerT (1, False, 0) key1R
@@ -452,7 +465,7 @@ type HiddenReset dom =
   ( Hidden (HiddenResetName dom) (Reset dom)
   , KnownDomain dom )
 
--- | A /constraint/ that indicates the component needs a 'Enable'
+-- | A /constraint/ that indicates the component needs an 'Enable'
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 type HiddenEnable dom =
@@ -460,7 +473,7 @@ type HiddenEnable dom =
   , KnownDomain dom )
 
 -- | A /constraint/ that indicates the component needs a 'Clock', a 'Reset',
--- and an 'Enable' belonging to the same dom.
+-- and an 'Enable' belonging to the same @dom@.
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 type HiddenClockResetEnable dom  =
@@ -470,7 +483,7 @@ type HiddenClockResetEnable dom  =
   )
 
 -- | A /constraint/ that indicates the component needs a 'Clock', a 'Reset',
--- and an 'Enable' belonging to the 'System' dom.
+-- and an 'Enable' belonging to the 'System' domain.
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 type SystemClockResetEnable =
@@ -918,9 +931,9 @@ exposeEnable
      WithSingleDomain dom r =>
 #endif
      (HiddenEnable dom => r)
-  -- ^ The component with a hidden reset
+  -- ^ The component with a hidden enable
   -> (KnownDomain dom => Enable dom -> r)
-  -- ^ The component with its reset argument exposed
+  -- ^ The component with its enable argument exposed
 exposeEnable = \f gen -> exposeSpecificEnable (const f) gen (Proxy @dom)
 {-# INLINE exposeEnable #-}
 
@@ -953,9 +966,9 @@ exposeSpecificEnable
   :: forall dom r
    . WithSpecificDomain dom r
   => (HiddenEnable dom => r)
-  -- ^ The component with a hidden reset
+  -- ^ The component with a hidden enable
   -> (KnownDomain dom => Enable dom -> r)
-  -- ^ The component with its reset argument exposed
+  -- ^ The component with its enable argument exposed
 exposeSpecificEnable = \f gen -> expose @(HiddenEnableName dom) f gen
 {-# INLINE exposeSpecificEnable #-}
 
@@ -966,7 +979,7 @@ hideEnable
   :: forall dom r
    . HiddenEnable dom
   => (Enable dom -> r)
-  -- ^ Component whose reset argument you want to hide
+  -- ^ Component whose enable argument you want to hide
   -> r
 hideEnable = \f -> f (fromLabel @(HiddenEnableName dom))
 {-# INLINE hideEnable #-}
@@ -1023,7 +1036,7 @@ withEnable
 withEnable = \gen f -> expose @(HiddenEnableName dom) f gen
 {-# INLINE withEnable #-}
 
--- | Connect an explicit 'Reset' to a function with a hidden 'Enable'. This
+-- | Connect an explicit 'Enable' to a function with a hidden 'Enable'. This
 -- function can be used on components with multiple domains. As opposed to
 -- 'exposeEnable', callers should explicitly state what the enable domain is. See
 -- the examples for more information.
@@ -1068,6 +1081,28 @@ hasEnable
 hasEnable = fromLabel @(HiddenEnableName dom)
 {-# INLINE hasEnable #-}
 
+-- | Merge enable signal with signal of bools by applying the boolean AND
+-- operation.
+mergeEnable
+  :: forall dom r
+   . KnownDomain dom
+#ifdef CLASH_MULTIPLE_HIDDEN
+  => WithSingleDomain dom r
+#endif
+  => Signal dom Bool
+  -> (HiddenEnable dom => r)
+  -> (HiddenEnable dom => r)
+mergeEnable = \en f -> mergeEnable0 hasEnable en f
+ where
+  mergeEnable0
+    :: KnownDomain dom
+    => Enable dom
+    -> Signal dom Bool
+    -> (HiddenEnable dom => r)
+    -> r
+  mergeEnable0 gen en f =
+    let en0 = E.enable gen en
+    in withEnable en0 f
 
 -- | Expose a hidden 'Clock', 'Reset', and 'Enable' argument of a component, so
 -- it can be applied explicitly.
@@ -1175,8 +1210,8 @@ exposeSpecificClockResetEnable =
 {-# INLINE exposeSpecificClockResetEnable #-}
 #endif
 
--- -- | Hide the 'Clock' and 'Reset' arguments of a component, so they can be
--- -- routed implicitly
+-- -- | Hide the 'Clock', 'Reset' and 'Enable' arguments of a component, so they
+-- can be routed implicitly.
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 hideClockResetEnable
