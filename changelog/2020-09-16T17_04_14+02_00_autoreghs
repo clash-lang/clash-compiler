@@ -1,0 +1,1 @@
+FEATURE: Added `autoRegHS`, a "high-speed" version of `autoReg` that still turns registers of products into products of registers, but no longer uses tag bits to control the enable of the value bits, thus decreasing the logic depth in what might potentially be the critical path.
