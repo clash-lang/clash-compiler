@@ -405,9 +405,15 @@ where
 
 import           Clash.HaskellPrelude
 
+import           Control.Exception      (catch, throw)
+import           Control.Monad          (forM_)
+import           Control.Monad.ST       (ST, runST)
+import           Control.Monad.ST.Unsafe (unsafeInterleaveST, unsafeIOToST, unsafeSTToIO)
+import           Data.Array.MArray      (newListArray)
 import qualified Data.List              as L
 import           Data.Maybe             (isJust)
-import qualified Data.Sequence          as Seq
+import           GHC.Arr
+  (STArray, unsafeReadSTArray, unsafeWriteSTArray)
 import           GHC.Stack              (HasCallStack, withFrozenCallStack)
 import           GHC.TypeLits           (KnownNat, type (^), type (<=))
 import           Unsafe.Coerce          (unsafeCoerce)
@@ -425,7 +431,12 @@ import           Clash.Sized.Index      (Index)
 import           Clash.Sized.Vector     (Vec, replicate, iterateI)
 import qualified Clash.Sized.Vector     as CV
 import           Clash.XException
-  (maybeIsX, seqErrorX, NFDataX, deepErrorX, defaultSeqX, fromJustX, undefined)
+  (maybeIsX, NFDataX, deepErrorX, defaultSeqX, fromJustX, undefined,
+   XException (..), seqX)
+
+-- start benchmark only
+-- import GHC.Arr (listArray, unsafeThawSTArray)
+-- end benchmark only
 
 {- $setup
 >>> :m -Clash.Prelude
@@ -995,48 +1006,67 @@ blockRam#
   -- ^ Value to write (at address @w@)
   -> Signal dom a
   -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
-blockRam# (Clock _) gen content = \rd wen ->
+blockRam# (Clock _) gen content = \rd wen waS wd -> runST $ do
+  ramStart <- newListArray (0,szI-1) contentL
+  -- start benchmark only
+  -- ramStart <- unsafeThawSTArray ramArr
+  -- end benchmark only
   go
-    (Seq.fromList (unsafeCoerce content))
+    ramStart
     (withFrozenCallStack (deepErrorX "blockRam: intial value undefined"))
     (fromEnable gen)
     rd
     (fromEnable gen .&&. wen)
+    waS
+    wd
  where
-  go !ram o ret@(~(re :- res)) rt@(~(r :- rs)) et@(~(e :- en)) wt@(~(w :- wr)) dt@(~(d :- din)) =
-    let ram' = d `defaultSeqX` upd ram e (fromEnum w) d
-        o'   = if re then ram `safeAt` r else o
-    in  o `seqErrorX` o :- (ret `seq` rt `seq` et `seq` wt `seq` dt `seq` go ram' o' res rs en wr din)
+  contentL = unsafeCoerce content :: [a]
+  szI = L.length contentL
+  -- start benchmark only
+  -- ramArr = listArray (0,szI-1) contentL
+  -- end benchmark only
 
+  go :: STArray s Int a -> a -> Signal dom Bool -> Signal dom Int
+     -> Signal dom Bool -> Signal dom Int -> Signal dom a
+     -> ST s (Signal dom a)
+  go !ram o ret@(~(re :- res)) rt@(~(r :- rs)) et@(~(e :- en)) wt@(~(w :- wr)) dt@(~(d :- din)) = do
+    o `seqX` (o :-) <$> (ret `seq` rt `seq` et `seq` wt `seq` dt `seq`
+      unsafeInterleaveST
+        (do o' <- unsafeIOToST
+                    (catch (if re then unsafeSTToIO (ram `safeAt` r) else pure o)
+                    (\err@XException {} -> pure (throw err)))
+            d `defaultSeqX` upd ram e (fromEnum w) d
+            go ram o' res rs en wr din))
+
+  upd :: STArray s Int a -> Bool -> Int -> a -> ST s ()
   upd ram we waddr d = case maybeIsX we of
     Nothing -> case maybeIsX waddr of
-      Nothing -> fmap (const (seq waddr d)) ram
+      Nothing -> forM_ [0..(szI-1)] (\i -> unsafeWriteSTArray ram i (seq waddr d))
       Just wa -> safeUpdate wa d ram
     Just True -> case maybeIsX waddr of
-      Nothing -> fmap (const (seq waddr d)) ram
+      Nothing -> forM_ [0..(szI-1)] (\i -> unsafeWriteSTArray ram i (seq waddr d))
       Just wa -> safeUpdate wa d ram
-    _ -> ram
+    _ -> return ()
 
-  szI = L.length (unsafeCoerce content :: [a])
-
-  safeAt :: HasCallStack => Seq.Seq a -> Int -> a
-  safeAt s i = let  in
+  safeAt :: HasCallStack => STArray s Int a -> Int -> ST s a
+  safeAt s i =
     if (0 <= i) && (i < szI) then
-      Seq.index s i
-    else
+      unsafeReadSTArray s i
+    else pure $
       withFrozenCallStack
         (deepErrorX ("blockRam: read address " <> show i <>
                      " not in range [0.." <> show szI <> ")"))
   {-# INLINE safeAt #-}
 
-  safeUpdate :: HasCallStack => Int -> a -> Seq.Seq a ->  Seq.Seq a
+  safeUpdate :: HasCallStack => Int -> a -> STArray s Int a -> ST s ()
   safeUpdate i a s =
     if (0 <= i) && (i < szI) then
-      Seq.update i a s
+      unsafeWriteSTArray s i a
     else
-      withFrozenCallStack
-        (deepErrorX ("blockRam: write address " <> show i <>
-                     " not in range [0.." <> show szI <> ")"))
+      let d = withFrozenCallStack
+                (deepErrorX ("blockRam: write address " <> show i <>
+                             " not in range [0.." <> show szI <> ")"))
+       in forM_ [0..(szI-1)] (\j -> unsafeWriteSTArray s j d)
   {-# INLINE safeUpdate #-}
 {-# ANN blockRam# hasBlackBox #-}
 {-# NOINLINE blockRam# #-}

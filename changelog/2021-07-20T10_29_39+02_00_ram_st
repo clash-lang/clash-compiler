@@ -1,0 +1,42 @@
+CHANGED: blockRam uses STArray as the underlying representation to improve simulation performance
+
+Before:
+benchmarking RAMs/blockRam# (100% writes)
+time                 3.225 ms   (3.184 ms .. 3.274 ms)
+                     0.999 R²   (0.998 R² .. 0.999 R²)
+mean                 3.239 ms   (3.215 ms .. 3.267 ms)
+std dev              87.20 μs   (73.02 μs .. 106.2 μs)
+allocated:           1.000 R²   (1.000 R² .. 1.000 R²)
+  iters              1.393e7    (1.393e7 .. 1.393e7)
+  y                  3465.257   (2584.017 .. 4323.712)
+variance introduced by outliers: 12% (moderately inflated)
+
+benchmarking RAMs/blockRam# (0% writes)
+time                 1.627 ms   (1.614 ms .. 1.639 ms)
+                     1.000 R²   (0.999 R² .. 1.000 R²)
+mean                 1.627 ms   (1.622 ms .. 1.637 ms)
+std dev              24.32 μs   (18.10 μs .. 35.70 μs)
+allocated:           1.000 R²   (1.000 R² .. 1.000 R²)
+  iters              8033976.000 (8033976.000 .. 8033976.000)
+  y                  2224.000   (2224.000 .. 2224.000)
+
+After:
+benchmarking RAMs/blockRam# (100% writes)
+time                 1.201 ms   (1.185 ms .. 1.218 ms)
+                     0.999 R²   (0.998 R² .. 1.000 R²)
+mean                 1.202 ms   (1.193 ms .. 1.213 ms)
+std dev              34.59 μs   (26.87 μs .. 46.99 μs)
+allocated:           1.000 R²   (1.000 R² .. 1.000 R²)
+  iters              9162800.251 (9162791.332 .. 9162808.822)
+  y                  3490.396   (2822.287 .. 4237.928)
+variance introduced by outliers: 17% (moderately inflated)
+
+benchmarking RAMs/blockRam# (0% writes)
+time                 1.083 ms   (1.069 ms .. 1.098 ms)
+                     0.999 R²   (0.998 R² .. 1.000 R²)
+mean                 1.052 ms   (1.043 ms .. 1.062 ms)
+std dev              30.95 μs   (26.18 μs .. 38.64 μs)
+allocated:           1.000 R²   (1.000 R² .. 1.000 R²)
+  iters              8897232.000 (8897232.000 .. 8897232.000)
+  y                  2224.000   (2224.000 .. 2224.000)
+variance introduced by outliers: 18% (moderately inflated)
