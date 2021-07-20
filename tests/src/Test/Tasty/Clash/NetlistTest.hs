@@ -85,7 +85,7 @@ type family TargetToState (target :: HDL) where
 mkBackend
   :: (Backend (TargetToState target))
   => SBuildTarget target -> TargetToState target
-mkBackend _ = initBackend WORD_SIZE_IN_BITS Other True PreserveCase Nothing (AggressiveXOptBB False)
+mkBackend _ = initBackend WORD_SIZE_IN_BITS Other True PreserveCase Nothing (AggressiveXOptBB False) (RenderEnums True)
 
 runToNetlistStage
   :: (Backend (TargetToState target))

@@ -348,6 +348,9 @@ data ClashOpts = ClashOpts
   -- ^ At what size do we cache normalized work-free top-level binders.
   , opt_edalize :: Bool
   -- ^ Generate an EDAM file for use with Edalize.
+  , opt_renderEnums :: Bool
+  -- ^ Render sum types with all zero-width fields as enums where supported, as
+  -- opposed to rendering them as bitvectors.
   }
 
 instance Hashable ClashOpts where
@@ -378,7 +381,8 @@ instance Hashable ClashOpts where
     opt_aggressiveXOpt `hashWithSalt`
     opt_aggressiveXOptBB `hashWithSalt`
     opt_inlineWFCacheLimit `hashWithSalt`
-    opt_edalize
+    opt_edalize `hashWithSalt`
+    opt_renderEnums
    where
     hashOverridingBool :: Int -> OverridingBool -> Int
     hashOverridingBool s1 Auto = hashWithSalt s1 (0 :: Int)
@@ -416,6 +420,7 @@ defClashOpts
   , opt_aggressiveXOptBB    = False
   , opt_inlineWFCacheLimit  = 10 -- TODO: find "optimal" value
   , opt_edalize             = False
+  , opt_renderEnums         = True
   }
 
 -- | Synopsys Design Constraint (SDC) information for a component.

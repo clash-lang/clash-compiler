@@ -62,6 +62,8 @@ data Usage
 -- | Is '-fclash-aggresive-x-optimization-blackbox' set?
 newtype AggressiveXOptBB = AggressiveXOptBB Bool
 
+-- | Is '-fclash-render-enums' set?
+newtype RenderEnums = RenderEnums Bool
 
 -- | Kind of a HDL type. Used to determine whether types need conversions in
 -- order to cross top entity boundaries.
@@ -85,6 +87,7 @@ class HasIdentifierSet state => Backend state where
     -> PreserveCase
     -> Maybe (Maybe Int)
     -> AggressiveXOptBB
+    -> RenderEnums
     -> state
 
   -- | What HDL is the backend generating
@@ -153,3 +156,5 @@ class HasIdentifierSet state => Backend state where
   ifThenElseExpr :: state -> Bool
   -- | Whether -fclash-aggressive-x-optimization-blackboxes was set
   aggressiveXOptBB :: State state AggressiveXOptBB
+  -- | Whether -fclash-no-render-enums was set
+  renderEnums :: State state RenderEnums

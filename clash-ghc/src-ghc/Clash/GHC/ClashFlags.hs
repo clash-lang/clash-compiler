@@ -88,6 +88,7 @@ flagsClash r = [
   , defFlag "fclash-aggressive-x-optimization-blackboxes" $ NoArg (liftEwM (setAggressiveXOptBB r))
   , defFlag "fclash-inline-workfree-limit"       $ IntSuffix (liftEwM . setInlineWFLimit r)
   , defFlag "fclash-edalize"                     $ NoArg (liftEwM (setEdalize r))
+  , defFlag "fclash-no-render-enums"             $ NoArg (liftEwM (setNoRenderEnums r))
   ]
 
 -- | Print deprecated flag warning
@@ -320,3 +321,6 @@ setRewriteHistoryFile r arg = do
  where
   setFile file opts =
     opts { opt_debug = (opt_debug opts) { dbg_historyFile = Just file } }
+
+setNoRenderEnums :: IORef ClashOpts -> IO ()
+setNoRenderEnums r = modifyIORef r (\c -> c { opt_renderEnums = False })

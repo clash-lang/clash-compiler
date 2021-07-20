@@ -103,7 +103,7 @@ instance HasIdentifierSet VerilogState where
   identifierSet = idSeen
 
 instance Backend VerilogState where
-  initBackend iw hdlsyn_ esc lw undefVal xOpt = VerilogState
+  initBackend iw hdlsyn_ esc lw undefVal xOpt _enums = VerilogState
     { _genDepth=0
     , _idSeen=Id.emptyIdentifierSet esc lw Verilog
     , _srcSpan=noSrcSpan
@@ -179,6 +179,7 @@ instance Backend VerilogState where
   getMemoryDataFiles = use memoryDataFiles
   ifThenElseExpr _ = True
   aggressiveXOptBB = use aggressiveXOptBB_
+  renderEnums = pure (RenderEnums False)
 
 type VerilogM a = Ap (State VerilogState) a
 
