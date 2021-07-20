@@ -91,7 +91,7 @@ import           Data.IORef (IORef, newIORef, readIORef)
 import qualified Data.Version (showVersion)
 
 import qualified Clash.Backend
-import           Clash.Backend (AggressiveXOptBB)
+import           Clash.Backend (AggressiveXOptBB, RenderEnums)
 import           Clash.Backend.SystemVerilog (SystemVerilogState)
 import           Clash.Backend.VHDL    (VHDLState)
 import           Clash.Backend.Verilog (VerilogState)
@@ -1005,7 +1005,7 @@ abiHash strs = do
 
 makeHDL'
   :: Clash.Backend.Backend backend
-  => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> backend)
+  => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> RenderEnums -> backend)
   -> Ghc () -> IORef ClashOpts -> [(String,Maybe Phase)] -> Ghc ()
 makeHDL' _       _           _ []   = throwGhcException (CmdLineError "No input files")
 makeHDL' backend startAction r srcs = makeHDL backend startAction r $ fmap fst srcs

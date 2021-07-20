@@ -353,8 +353,9 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       hdlsyn    = opt_hdlSyn opts
       forceUnd  = opt_forceUndefined opts
       xOpt      = coerce (opt_aggressiveXOptBB opts)
+      enums     = coerce (opt_renderEnums opts)
       hdlState' = setModName modNameT
-                $ fromMaybe (initBackend iw hdlsyn escpIds lwIds forceUnd xOpt :: backend) hdlState
+                $ fromMaybe (initBackend iw hdlsyn escpIds lwIds forceUnd xOpt enums :: backend) hdlState
       hdlDir    = fromMaybe (Clash.Backend.name hdlState') (opt_hdlDir opts) </> topEntityS
       manPath   = hdlDir </> manifestFilename
       ite       = ifThenElseExpr hdlState'

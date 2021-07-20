@@ -140,7 +140,7 @@ import Clash.GHCi.Leak
 
 -- clash additions
 import qualified Clash.Backend
-import           Clash.Backend (AggressiveXOptBB)
+import           Clash.Backend (AggressiveXOptBB, RenderEnums)
 import           Clash.Backend.SystemVerilog (SystemVerilogState)
 import           Clash.Backend.VHDL (VHDLState)
 import           Clash.Backend.Verilog (VerilogState)
@@ -1977,7 +1977,7 @@ exceptT :: Applicative m => Either e a -> ExceptT e m a
 exceptT = ExceptT . pure
 
 makeHDL' :: Clash.Backend.Backend backend
-         => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> backend)
+         => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> RenderEnums -> backend)
          -> IORef ClashOpts
          -> [FilePath]
          -> InputT GHCi ()
@@ -2018,7 +2018,7 @@ makeHDL' backend opts lst = go =<< case lst of
 
 makeHDL :: GHC.GhcMonad m
         => Clash.Backend.Backend backend
-        => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> backend)
+        => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> RenderEnums -> backend)
         -> GHC.Ghc ()
         -> IORef ClashOpts
         -> [FilePath]
@@ -2036,6 +2036,7 @@ makeHDL backend startAction optsRef srcs = do
                   lw     = opt_lowerCaseBasicIds opts1
                   frcUdf = opt_forceUndefined opts1
                   xOptBB = opt_aggressiveXOptBB opts1
+                  enums  = opt_renderEnums opts1
                   hdl    = Clash.Backend.hdlKind backend'
                   -- determine whether `-outputdir` was used
                   outputDir = do odir <- objectDir dflags
@@ -2048,7 +2049,7 @@ makeHDL backend startAction optsRef srcs = do
                   idirs = importPaths dflags
                   opts2 = opts1 { opt_hdlDir = maybe outputDir Just (opt_hdlDir opts1)
                                 , opt_importPaths = idirs}
-                  backend' = backend iw syn esc lw frcUdf (coerce xOptBB)
+                  backend' = backend iw syn esc lw frcUdf (coerce xOptBB) (coerce enums)
 
               checkMonoLocalBinds dflags
               checkImportDirs opts0 idirs
@@ -2087,13 +2088,13 @@ makeHDL backend startAction optsRef srcs = do
                   (startTime,prepTime)
 
 makeVHDL :: IORef ClashOpts -> [FilePath] -> InputT GHCi ()
-makeVHDL = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> VHDLState)
+makeVHDL = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> RenderEnums -> VHDLState)
 
 makeVerilog :: IORef ClashOpts -> [FilePath] -> InputT GHCi ()
-makeVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> VerilogState)
+makeVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> RenderEnums -> VerilogState)
 
 makeSystemVerilog :: IORef ClashOpts -> [FilePath] -> InputT GHCi ()
-makeSystemVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> SystemVerilogState)
+makeSystemVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> RenderEnums -> SystemVerilogState)
 
 -----------------------------------------------------------------------------
 -- | @:type@ command. See also Note [TcRnExprMode] in TcRnDriver.

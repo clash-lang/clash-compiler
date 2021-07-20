@@ -25,5 +25,5 @@ mainVHDL = do
   content <- readFile (topDir </> show 'topEntity </> "top.vhdl")
 
   -- TODO: Could we remove bitvector noise?
-  assertIn "x_0 <= top_types.fromSLV(x);" content
+  assertIn "x_0 <= top_types.Tup5'(top_types.fromSLV(x));" content
   assertIn "y_0 <= x_0;" content

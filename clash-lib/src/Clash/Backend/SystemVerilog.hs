@@ -86,6 +86,7 @@ data SystemVerilogState =
     , _hdlsyn    :: HdlSyn
     , _undefValue :: Maybe (Maybe Int)
     , _aggressiveXOptBB_ :: AggressiveXOptBB
+    , _renderEnums_ :: RenderEnums
     }
 
 makeLenses ''SystemVerilogState
@@ -94,7 +95,7 @@ instance HasIdentifierSet SystemVerilogState where
   identifierSet = idSeen
 
 instance Backend SystemVerilogState where
-  initBackend w hdlsyn_ esc lw undefVal xOpt = SystemVerilogState {
+  initBackend w hdlsyn_ esc lw undefVal xOpt enums = SystemVerilogState {
       _tyCache=HashSet.empty
     , _nameCache=HashMap.empty
     , _genDepth=0
@@ -112,6 +113,7 @@ instance Backend SystemVerilogState where
     , _hdlsyn=hdlsyn_
     , _undefValue=undefVal
     , _aggressiveXOptBB_=xOpt
+    , _renderEnums_=enums
     }
   hdlKind         = const SystemVerilog
   primDirs        = const $ do root <- primsRoot
@@ -176,6 +178,7 @@ instance Backend SystemVerilogState where
   getMemoryDataFiles = use memoryDataFiles
   ifThenElseExpr _ = True
   aggressiveXOptBB = use aggressiveXOptBB_
+  renderEnums = use renderEnums_
 
 type SystemVerilogM a = Ap (State SystemVerilogState) a
 
