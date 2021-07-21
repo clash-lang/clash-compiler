@@ -11,7 +11,7 @@ ROMs
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
@@ -28,7 +28,9 @@ module Clash.Prelude.ROM
   )
 where
 
-import           Data.Array           ((!),listArray)
+import           Data.Array           (listArray)
+import           Data.Array.Base      (unsafeAt)
+import           GHC.Stack            (withFrozenCallStack)
 import           GHC.TypeLits         (KnownNat, type (^))
 import           Prelude              hiding (length)
 
@@ -37,7 +39,7 @@ import           Clash.Signal
 import           Clash.Sized.Unsigned (Unsigned)
 import           Clash.Sized.Vector   (Vec, length, toList)
 
-import           Clash.XException     (NFDataX)
+import           Clash.XException     (NFDataX, errorX)
 
 -- | An asynchronous/combinational ROM with space for @n@ elements
 --
@@ -79,7 +81,7 @@ asyncRomPow2 = asyncRom
 
 -- | asyncROM primitive
 asyncRom#
-  :: KnownNat n
+  :: forall n a . KnownNat n
   => Vec n a
   -- ^ ROM content
   --
@@ -88,10 +90,19 @@ asyncRom#
   -- ^ Read address @rd@
   -> a
   -- ^ The value of the ROM at address @rd@
-asyncRom# content = \rd -> arr ! rd
+asyncRom# content = safeAt
   where
     szI = length content
     arr = listArray (0,szI-1) (toList content)
+
+    safeAt :: Int -> a
+    safeAt i =
+      if (0 <= i) && (i < szI) then
+        unsafeAt arr i
+      else
+        withFrozenCallStack
+          (errorX ("asyncRom: address " ++ show i ++
+                  " not in range [0.." ++ show szI ++ ")"))
 {-# NOINLINE asyncRom# #-}
 
 -- | A ROM with a synchronous read port, with space for @n@ elements
