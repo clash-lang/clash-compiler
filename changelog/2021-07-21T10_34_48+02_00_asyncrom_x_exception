@@ -1,0 +1,1 @@
+CHANGED: `asyncRom` now throws `XException` for out-of-bounds addressing, no longer aborting simulation
