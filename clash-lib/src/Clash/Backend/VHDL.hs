@@ -239,6 +239,15 @@ instance Backend VHDLState where
 
 type VHDLM a = Ap (State VHDLState) a
 
+functionCall :: VHDLM Doc -> [VHDLM Doc] -> VHDLM Doc
+functionCall fun args = fun <> parens (hsep $ punctuate comma $ sequence args)
+
+typeCast :: VHDLM Doc -> VHDLM Doc -> VHDLM Doc
+typeCast ty ex = ty <> parens ex
+
+typeMark :: VHDLM Doc -> VHDLM Doc -> VHDLM Doc
+typeMark ty ex = ty <> squote <> parens ex
+
 -- Check if the underlying type is a BitVector
 isBV :: HWType -> Bool
 isBV (normaliseType -> BitVector _) = True
@@ -572,7 +581,7 @@ funDec _ Bool = Just
     "end" <> semi <> line <>
     "function" <+> "tagToEnum" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "boolean" <+> "is" <> line <>
     "begin" <> line <>
-      indent 2 (vcat $ sequence ["if" <+> "s" <+> "=" <+> "to_signed" <> parens (int 0 <> comma <> (Ap (use intWidth) >>= int)) <+> "then"
+      indent 2 (vcat $ sequence ["if" <+> "s" <+> "=" <+> functionCall "to_signed" [int 0, Ap (use intWidth) >>= int] <+> "then"
                                 ,   indent 2 ("return" <+> "false" <> semi)
                                 ,"else"
                                 ,   indent 2 ("return" <+> "true" <> semi)
@@ -582,9 +591,9 @@ funDec _ Bool = Just
     "function" <+> "dataToTag" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "signed" <+> "is" <> line <>
     "begin" <> line <>
       indent 2 (vcat $ sequence ["if" <+> "b" <+> "then"
-                                ,  indent 2 ("return" <+> "to_signed" <> parens (int 1 <> comma <> (Ap (use intWidth) >>= int)) <> semi)
+                                ,  indent 2 ("return" <+> functionCall "to_signed" [int 1, Ap (use intWidth) >>= int] <> semi)
                                 ,"else"
-                                ,  indent 2 ("return" <+> "to_signed" <> parens (int 0 <> comma <> (Ap (use intWidth) >>= int)) <> semi)
+                                ,  indent 2 ("return" <+> functionCall "to_signed" [int 0, Ap (use intWidth) >>= int] <> semi)
                                 ,"end" <+> "if" <> semi
                                 ]) <> line <>
     "end" <> semi
@@ -595,7 +604,7 @@ funDec _ bit@Bit = Just
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> tyName bit <> semi
   , "function" <+> "toSLV" <+> parens ("sl" <+> colon <+> "in" <+> tyName bit) <+> "return" <+> "std_logic_vector" <+> "is" <> line <>
     "begin" <> line <>
-      indent 2 ("return" <+> "std_logic_vector'" <> parens (int 0 <+> rarrow <+> "sl") <> semi) <> line <>
+      indent 2 ("return" <+> typeMark "std_logic_vector" (int 0 <+> rarrow <+> "sl") <> semi) <> line <>
     "end" <> semi <> line <>
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> tyName bit <+> "is" <> line <>
       indent 2
@@ -611,12 +620,12 @@ funDec _ (Signed _) = Just
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "signed" <> semi
   , "function" <+> "toSLV" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "std_logic_vector" <+> "is" <> line <>
     "begin" <> line <>
-      indent 2 ("return" <+> "std_logic_vector" <> parens ("s") <> semi) <> line <>
+      indent 2 ("return" <+> typeCast "std_logic_vector" "s" <> semi) <> line <>
     "end" <> semi <> line <>
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "signed" <+> "is" <> line <>
       indent 2 ("alias islv : std_logic_vector(0 to slv'length - 1) is slv;") <> line <>
     "begin" <> line <>
-      indent 2 ("return" <+> "signed" <> parens ("islv") <> semi) <> line <>
+      indent 2 ("return" <+> typeCast "signed" "islv" <> semi) <> line <>
     "end" <> semi
   )
 
@@ -625,14 +634,13 @@ funDec _ (Unsigned _) = Just
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "unsigned" <> semi
   , "function" <+> "toSLV" <+> parens ("u" <+> colon <+> "in" <+> "unsigned") <+> "return" <+> "std_logic_vector" <+> "is"  <> line <>
     "begin" <> line <>
-      indent 2 ("return" <+> "std_logic_vector" <> parens ("u") <> semi) <> line <>
+      indent 2 ("return" <+> typeCast "std_logic_vector" "u" <> semi) <> line <>
     "end" <> semi <> line <>
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "unsigned" <+> "is"  <> line <>
       indent 2 "alias islv : std_logic_vector(0 to slv'length - 1) is slv;" <> line <>
     "begin" <> line <>
-      indent 2 ("return" <+> "unsigned" <> parens ("islv") <> semi) <> line <>
+      indent 2 ("return" <+> typeCast "unsigned" "islv" <> semi) <> line <>
     "end" <> semi
-
   )
 
 funDec _ t@(Product _ labels elTys) = Just
@@ -650,16 +658,14 @@ funDec _ t@(Product _ labels elTys) = Just
   )
   where
     elTyToSLV = forM [0..(length elTys - 1)]
-                     (\i -> "toSLV" <>
-                            parens ("p." <> tyName t <> selectProductField labels elTys i))
+                     (\i -> functionCall "toSLV" ["p." <> tyName t <> selectProductField labels elTys i])
 
     argLengths = map typeSize elTys
     starts     = 0 : snd (mapAccumL ((join (,) .) . (+)) 0 argLengths)
     ends       = map (subtract 1) (tail starts)
 
     elTyFromSLV = forM (zip starts ends)
-                       (\(s,e) -> "fromSLV" <>
-                          parens ("islv" <> parens (int s <+> "to" <+> int e)))
+                       (\(s,e) -> functionCall "fromSLV" ["islv" <> parens (int s <+> "to" <+> int e)])
 
 funDec syn t@(Vector _ elTy) = Just
   ( "function" <+> "toSLV" <+> parens ("value : " <+> qualTyName t) <+> "return std_logic_vector" <> semi <> line <>
@@ -677,7 +683,7 @@ funDec syn t@(Vector _ elTy) = Just
                                              "to i*" <> int (typeSize elTy)) <+>
                           ":=" <+> (case syn of
                                       Vivado -> "ivalue" <> parens ("i")
-                                      _  -> "toSLV" <> parens ("ivalue" <> parens ("i"))) <> semi
+                                      _  -> functionCall "toSLV" ["ivalue" <> parens ("i")]) <> semi
               ) <> line <>
          "end" <+> "loop" <> semi <> line <>
          "return" <+> "result" <> semi
@@ -695,7 +701,7 @@ funDec syn t@(Vector _ elTy) = Just
               ( "result" <> parens "i" <+> ":=" <+> case syn of
                     Vivado -> getElem <> semi
                     _ | BitVector _ <- elTy -> getElem <> semi
-                      | otherwise           -> "fromSLV" <> parens getElem <> semi
+                      | otherwise           -> functionCall "fromSLV" [getElem] <> semi
 
               ) <> line <>
          "end" <+> "loop" <> semi <> line <>
@@ -736,7 +742,7 @@ funDec syn t@(RTree _ elTy) = Just
                                              "to i*" <> int (typeSize elTy)) <+>
                           ":=" <+> (case syn of
                                       Vivado -> "ivalue" <> parens ("i")
-                                      _ -> "toSLV" <> parens ("ivalue" <> parens ("i"))) <> semi
+                                      _ -> functionCall "toSLV" ["ivalue" <> parens ("i")]) <> semi
               ) <> line <>
          "end" <+> "loop" <> semi <> line <>
          "return" <+> "result" <> semi
@@ -754,7 +760,7 @@ funDec syn t@(RTree _ elTy) = Just
               ( "result" <> parens "i" <+> ":=" <+> case syn of
                     Vivado -> getElem <> semi
                     _ | BitVector _ <- elTy -> getElem <> semi
-                      | otherwise           -> "fromSLV" <> parens getElem <> semi
+                      | otherwise           -> functionCall "fromSLV" [getElem] <> semi
 
               ) <> line <>
          "end" <+> "loop" <> semi <> line <>
@@ -1305,7 +1311,7 @@ patLitCustom'
   -> VHDLM Doc
 patLitCustom' var size mask value =
   let mask' = string $ T.pack $ stdMatch size mask value in
-  "std_match" <> parens (dquotes mask' <> comma <+> var)
+  functionCall "std_match" [dquotes mask', var]
 
 patLitCustom
   :: VHDLM Doc
@@ -1440,7 +1446,7 @@ customReprDataCon
   -- ^ Arguments applied to constructor
   -> VHDLM Doc
 customReprDataCon dataRepr constrRepr args =
-  "std_logic_vector'" <> parens (hcat $ punctuate " & " $ mapM range origins)
+  typeMark "std_logic_vector" (hcat $ punctuate " & " $ mapM range origins)
     where
       DataRepr' _typ size _constrs = dataRepr
 
@@ -1466,20 +1472,20 @@ customReprDataCon dataRepr constrRepr args =
         -- HACK: While expr' is a std_logic_vector (see call `toSLV`), it cannot
         -- be cast to unsigned in case of literals. This is fixed by explicitly
         -- casting it to std_logic_vector.
-        let unsigned = "unsigned" <> parens ("std_logic_vector'" <> parens expr') in
+        let unsigned = typeCast "unsigned" (typeMark "std_logic_vector" expr') in
 
         if | fsize == size ->
                -- If sizes are equal, rotating / resizing amounts to doing nothing
                expr'
            | end == 0 ->
                -- Rotating is not necessary if relevant bits are already at the end
-               let resized = "resize" <> parens (unsigned <> comma <> int fsize) in
-               "std_logic_vector" <> parens resized
+               let resized = functionCall "resize" [unsigned, int fsize] in
+               typeCast "std_logic_vector" resized
            | otherwise ->
                -- Select bits 'start' downto and including 'end'
                let rotated  = unsigned <+> "srl" <+> int end in
-               let resized = "resize" <> parens (rotated <> comma <> int fsize) in
-               "std_logic_vector" <> parens resized
+               let resized = functionCall "resize" [rotated, int fsize] in
+               typeCast "std_logic_vector" resized
 
 -- | Turn a Netlist expression into a VHDL expression
 expr_
@@ -1510,10 +1516,10 @@ expr_ _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2]) = do
   case syn of
     Vivado -> qualTyName ty <> "'" <> case vectorChain e of
       Just es -> align (tupled (mapM (toSLV elTy) es))
-      Nothing -> parens ("std_logic_vector'" <> parens (toSLV elTy e1) <+> "&" <+> expr_ False e2)
+      Nothing -> parens (typeMark "std_logic_vector" (toSLV elTy e1) <+> "&" <+> expr_ False e2)
     _ -> qualTyName ty <> "'" <> case vectorChain e of
             Just es -> align (tupled (mapM (expr_ False) es))
-            Nothing -> parens (qualTyName elTy <> "'" <> parens (expr_ False e1) <+> "&" <+> expr_ False e2)
+            Nothing -> parens (typeMark (qualTyName elTy) (expr_ False e1) <+> "&" <+> expr_ False e2)
 
 expr_ _ (DataCon ty@(RTree 0 elTy) _ [e]) = do
   syn <- Ap hdlSyn
@@ -1522,13 +1528,13 @@ expr_ _ (DataCon ty@(RTree 0 elTy) _ [e]) = do
     _ -> qualTyName ty <> "'" <> parens (int 0 <+> rarrow <+> expr_ False e)
 expr_ _ e@(DataCon ty@(RTree d elTy) _ [e1,e2]) = qualTyName ty <> "'" <> case rtreeChain e of
   Just es -> tupled (mapM (expr_ False) es)
-  Nothing -> parens (qualTyName (RTree (d-1) elTy) <> "'" <> parens (expr_ False e1) <+>
+  Nothing -> parens (typeMark (qualTyName (RTree (d-1) elTy)) (expr_ False e1) <+>
                      "&" <+> expr_ False e2)
 
 expr_ _ (DataCon (SP {}) (DC (BitVector _,_)) es) = assignExpr
   where
     argExprs   = map (parens . expr_ False) es
-    assignExpr = "std_logic_vector'" <> parens (hcat $ punctuate " & " $ sequence argExprs)
+    assignExpr = typeMark "std_logic_vector" (hcat $ punctuate " & " $ sequence argExprs)
 
 expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
   where
@@ -1539,13 +1545,13 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
     extraArg   = case typeSize ty - dcSize of
                    0 -> []
                    n -> [bits (replicate n U)]
-    assignExpr = "std_logic_vector'" <> parens (hcat $ punctuate " & " $ sequence (dcExpr:argExprs ++ extraArg))
+    assignExpr = typeMark "std_logic_vector" (hcat $ punctuate " & " $ sequence (dcExpr:argExprs ++ extraArg))
 
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) =
   expr_ False (dcToExpr ty i)
 expr_ _ (DataCon ty@(CustomSum _ _ _ tys) (DC (_,i)) []) =
   let (ConstrRepr' _ _ _ value _) = fst $ tys !! i in
-  "std_logic_vector" <> parens ("to_unsigned" <> parens (int (fromIntegral value) <> comma <> int (typeSize ty)))
+  typeCast "std_logic_vector" (functionCall "to_unsigned" [int (fromIntegral value), int (typeSize ty)])
 expr_ _ (DataCon (CustomSP _ dataRepr _size args) (DC (_,i)) es) =
   let (cRepr, _, argTys) = args !! i in
   customReprDataCon dataRepr cRepr (zipEqual argTys es)
@@ -1613,53 +1619,75 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
 expr_ b (BlackBoxE _ libs imps inc bs bbCtx b') = do
   parenIf (b || b') (Ap (renderBlackBox libs imps inc bs bbCtx <*> pure 0))
 
-expr_ _ (DataTag Bool (Left id_)) = "tagToEnum" <> parens (pretty id_)
-expr_ _ (DataTag Bool (Right id_)) = "dataToTag" <> parens (pretty id_)
+expr_ _ (DataTag Bool (Left id_)) = functionCall "tagToEnum" [pretty id_]
+expr_ _ (DataTag Bool (Right id_)) = functionCall "dataToTag" [pretty id_]
 
 expr_ _ (DataTag hty@(Sum _ _) (Left id_)) =
-  "std_logic_vector" <> parens ("resize" <> parens ("unsigned" <> parens ("std_logic_vector" <> parens (pretty id_)) <> "," <> int (typeSize hty)))
+  typeCast "std_logic_vector"
+    (functionCall "resize"
+       [ typeCast "unsigned" (typeCast "std_logic_vector" (pretty id_))
+       , int (typeSize hty)])
+
 expr_ _ (DataTag (Sum _ _) (Right id_)) = do
   iw <- Ap $ use intWidth
-  "signed" <> parens ("std_logic_vector" <> parens ("resize" <> parens ("unsigned" <> parens (pretty id_) <> "," <> int iw)))
+  typeCast "signed"
+    (typeCast "std_logic_vector"
+      (functionCall "resize" [typeCast "unsigned" (pretty id_), int iw]))
 
 expr_ _ (DataTag (Product {}) (Right _))  = do
   iw <- Ap $ use intWidth
-  "to_signed" <> parens (int 0 <> "," <> int iw)
-expr_ _ (DataTag hty@(SP _ _) (Right id_)) = do {
-    ; iw <- Ap $ use intWidth
-    ; "signed" <> parens ("std_logic_vector" <> parens (
-      "resize" <> parens ("unsigned" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int end))
-                          <> "," <> int iw)))
-    }
+  functionCall "to_signed" [int 0, int iw]
+expr_ _ (DataTag hty@(SP _ _) (Right id_)) = do
+  iw <- Ap $ use intWidth
+  typeCast "signed"
+    (typeCast "std_logic_vector"
+      (functionCall "resize"
+         [ typeCast "unsigned"
+             (pretty id_ <> parens (int start <+> "downto" <+> int end))
+         , int iw]))
   where
     start = typeSize hty - 1
     end   = typeSize hty - conSize hty
 
 expr_ _ (DataTag (Vector 0 _) (Right _)) = do
   iw <- Ap $ use intWidth
-  "to_signed" <> parens (int 0 <> "," <> int iw)
+  functionCall "to_signed" [int 0, int iw]
 expr_ _ (DataTag (Vector _ _) (Right _)) = do
   iw <- Ap $ use intWidth
-  "to_signed" <> parens (int 1 <> "," <> int iw)
+  functionCall "to_signed" [int 1, int iw]
 
 expr_ _ (DataTag (RTree 0 _) (Right _)) = do
   iw <- Ap $ use intWidth
-  "to_signed" <> parens (int 0 <> "," <> int iw)
+  functionCall "to_signed" [int 0, int iw]
 expr_ _ (DataTag (RTree _ _) (Right _)) = do
   iw <- Ap $ use intWidth
-  "to_signed" <> parens (int 1 <> "," <> int iw)
+  functionCall "to_signed" [int 1, int iw]
 
 expr_ _ (ToBv topM hwty e) = do
   nm <- Ap $ use modNm
   case topM of
-    Nothing -> pretty nm <> "_types" <> dot <> "toSLV" <>
-               parens (qualTyName hwty <> "'" <> parens (expr_ False e))
-    Just t  -> pretty t <> dot <> pretty t <> "_types" <> dot <> "toSLV" <> parens (expr_ False e)
+    Nothing ->
+      functionCall
+        (pretty nm <> "_types" <> dot <> "toSLV")
+        [qualTyName hwty <> squote <> parens (expr_ False e)]
+
+    Just t ->
+      functionCall
+        (pretty t <> dot <> pretty t <> "_types" <> dot <> "toSLV")
+        [expr_ False e]
 
 expr_ _ (FromBv topM _ e) = do
   nm <- Ap $ use modNm
-  maybe (pretty nm <> "_types" ) (\t -> pretty t <> dot <> pretty t <> "_types") topM <> dot <>
-    "fromSLV" <> parens (expr_ False e)
+  case topM of
+    Nothing ->
+      functionCall
+        (pretty nm <> "_types" <> dot <> "fromSLV")
+        [expr_ False e]
+
+    Just t ->
+      functionCall
+        (pretty t <> dot <> pretty t <> "_types" <> dot <> "fromSLV")
+        [expr_ False e]
 
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
 
@@ -1684,14 +1712,14 @@ exprLit Nothing (NumLit i) = integer i
 
 exprLit (Just (hty,sz)) (NumLit i) = case hty of
   Unsigned n
-    | i < (-2^(31 :: Integer)) -> "unsigned" <> parens ("std_logic_vector" <> parens ("signed'" <> parens lit))
-    | i < 0                    -> "unsigned" <> parens ("std_logic_vector" <> parens ("to_signed" <> parens(integer i <> "," <> int n)))
-    | i < 2^(31 :: Integer) -> "to_unsigned" <> parens (integer i <> "," <> int n)
-    | otherwise -> "unsigned'" <> parens lit
+    | i < (-2^(31 :: Integer)) -> typeCast "unsigned" (typeCast "std_logic_vector" (typeMark "signed" lit))
+    | i < 0                    -> typeCast "unsigned" (typeCast "std_logic_vector" (functionCall "to_signed" [integer i, int n]))
+    | i < 2^(31 :: Integer) -> functionCall "to_unsigned" [integer i, int n]
+    | otherwise -> typeMark "unsigned" lit
   Signed n
-    | i < 2^(31 :: Integer) && i > (-2^(31 :: Integer)) -> "to_signed" <> parens (integer i <> "," <> int n)
-    | otherwise -> "signed'" <> parens lit
-  BitVector _ -> "std_logic_vector'" <> parens lit
+    | i < 2^(31 :: Integer) && i > (-2^(31 :: Integer)) -> functionCall "to_signed" [integer i, int n]
+    | otherwise -> typeMark "signed" lit
+  BitVector _ -> typeMark "std_logic_vector" lit
   Bit         -> squotes (int (fromInteger i `mod` 2))
   _           -> blit
 
@@ -1708,7 +1736,7 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
 
 exprLit (Just (hty,sz)) (BitVecLit m i) = case m of
   0 -> exprLit (Just (hty,sz)) (NumLit i)
-  _ -> "std_logic_vector'" <> parens bvlit
+  _ -> typeMark "std_logic_vector" bvlit
   where
     bvlit = bits (toBits' sz m i)
 
@@ -1771,29 +1799,29 @@ bit_char Z = char 'Z'
 toSLV :: HasCallStack => HWType -> Expr -> VHDLM Doc
 toSLV Bool         e = do
   nm <- Ap $ use modNm
-  pretty nm <> "_types.toSLV" <> parens (expr_ False e)
+  functionCall (pretty nm <> "_types.toSLV") [expr_ False e]
 toSLV Bit          e = do
   nm <- Ap $ use modNm
-  pretty nm <> "_types.toSLV" <> parens (expr_ False e)
+  functionCall (pretty nm <> "_types.toSLV") [expr_ False e]
 toSLV (Clock {})    e = do
   nm <- Ap $ use modNm
-  pretty nm <> "_types.toSLV" <> parens (expr_ False e)
+  functionCall (pretty nm <> "_types.toSLV") [expr_ False e]
 toSLV (Reset {})    e = do
   nm <- Ap $ use modNm
-  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
+  functionCall (pretty nm <> "_types.toSLV") [expr_ False e]
 toSLV (Enable _)    e = do
   nm <- Ap $ use modNm
-  pretty nm <> "_types.toSLV" <> parens (expr_ False e)
+  functionCall (pretty nm <> "_types.toSLV") [expr_ False e]
 toSLV (BitVector _) e = expr_ True e
-toSLV (Signed _)   e = "std_logic_vector" <> parens (expr_ False e)
-toSLV (Unsigned _) e = "std_logic_vector" <> parens (expr_ False e)
-toSLV (Index _)    e = "std_logic_vector" <> parens (expr_ False e)
+toSLV (Signed _)   e = typeCast "std_logic_vector" (expr_ False e)
+toSLV (Unsigned _) e = typeCast "std_logic_vector" (expr_ False e)
+toSLV (Index _)    e = typeCast "std_logic_vector" (expr_ False e)
 toSLV (Sum _ _)    e = expr_ False e
 toSLV (CustomSum _ _dataRepr size reprs) (DataCon _ (DC (_,i)) _) =
   let (ConstrRepr' _ _ _ value _) = fst $ reprs !! i in
-  let unsigned = "to_unsigned" <> parens (int (fromIntegral value) <> comma <> int size) in
-  "std_logic_vector" <> parens unsigned
-toSLV (CustomSum {}) e = "std_logic_vector" <> parens (expr_ False e)
+  let unsigned = functionCall "to_unsigned" [int (fromIntegral value), int size] in
+  typeCast "std_logic_vector" unsigned
+toSLV (CustomSum {}) e = typeCast "std_logic_vector" (expr_ False e)
 toSLV t@(Product _ labels tys) (Identifier id_ Nothing) = do
     selIds' <- sequence selIds
     encloseSep lparen rparen " & " (zipWithM toSLV tys selIds')
@@ -1810,7 +1838,9 @@ toSLV (CustomProduct _ _ _ _ _) e = do
   expr_ False e
 toSLV t@(Product _ _ _) e = do
   nm <- Ap $ use modNm
-  pretty nm <> "_types.toSLV" <> parens (qualTyName t <> "'" <> parens (expr_ False e))
+  functionCall
+    (pretty nm <> "_types.toSLV")
+    [qualTyName t <> "'" <> parens (expr_ False e)]
 toSLV (SP _ _) e       = expr_ False e
 toSLV (CustomSP _ _ _ _) e =
   -- Custom representations are represented as bitvectors in HDL, so we don't
@@ -1829,15 +1859,15 @@ toSLV (Vector n elTy) (Identifier id_ Nothing) = do
 -- Don't split up newtype wrappers, or void-filtered types
 toSLV (Vector _ _) e@(DataCon _ (DC (Void Nothing, -1)) _) = do
   nm <- Ap $ use modNm
-  pretty nm <> "_types.toSLV" <> parens (expr_ False e)
+  functionCall (pretty nm <> "_types.toSLV") [expr_ False e]
 toSLV (Vector n elTy) (DataCon _ _ es) =
-  "std_logic_vector'" <> (parens $ vcat $ punctuate " & " (zipWithM toSLV [elTy,Vector (n-1) elTy] es))
+  typeMark "std_logic_vector" (vcat $ punctuate " & " (zipWithM toSLV [elTy,Vector (n-1) elTy] es))
 toSLV (Vector _ _) e = do
   nm <- Ap $ use modNm
-  pretty nm <> "_types.toSLV" <> parens (expr_ False e)
+  functionCall (pretty nm <> "_types.toSLV") [expr_ False e]
 toSLV (RTree _ _) e = do
   nm <- Ap (use modNm)
-  pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
+  functionCall (pretty nm <> "_types.toSLV") [expr_ False e]
 toSLV hty e = error $ $(curLoc) ++  "toSLV:\n\nType: " ++ show hty ++ "\n\nExpression: " ++ show e
 
 dcToExpr :: HWType -> Int -> Expr
@@ -2195,13 +2225,13 @@ renderModifier (Resize,ty) doc = do
   -- These integer projections always come last, so it's safe not to return a
   -- modified name, but an expression instead.
   traceIf (iw < typeSize ty) ($(curLoc) ++ "WARNING: result smaller than argument") $
-    "resize" <> parens (doc <> "," <> int iw)
+    functionCall "resize" [doc, int iw]
 renderModifier (ResizeAndConvert,ty) doc = do
   iw <- Ap (use intWidth)
   -- These natural projections always come last, so it's safe not to return a
   -- modified name, but an expression instead.
   traceIf (iw < typeSize ty) ($(curLoc) ++ "WARNING: result smaller than argument") $
-    "resize" <> parens ("unsigned" <> parens doc <> "," <> int iw)
+    functionCall "resize" [typeCast "unsigned" doc, int iw]
 -- See [Note] mask projection
 renderModifier (DontCare,_) _ = do
   iw <- Ap (use intWidth)
@@ -2219,6 +2249,6 @@ renderModifier (Range r,t) doc = do
     -- See [Note] Continuing from an SLV slice
     _ ->
       qualTyName t <> "'" <>
-      parens (pretty (TextS.toLower nm) <> "_types.fromSLV" <> parens doc1)
+      parens (functionCall (pretty nm <> "_types.fromSLV") [doc1])
  where
   slice s e = doc <> parens (int s <+> "downto" <+> int e)
