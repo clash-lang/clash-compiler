@@ -128,6 +128,7 @@ import           Clash.Netlist.Types
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
+import qualified Clash.Primitives.Sized.Signed    as P
 import qualified Clash.Primitives.Sized.ToInteger as P
 import qualified Clash.Primitives.Sized.Vector    as P
 import qualified Clash.Primitives.GHC.Int         as P
@@ -544,6 +545,7 @@ knownTemplateFunctions =
     , ('P.alteraPllQsysTF, P.alteraPllQsysTF)
     , ('P.alteraPllTF, P.alteraPllTF)
     , ('P.altpllTF, P.altpllTF)
+    , ('P.fromIntegerTF, P.fromIntegerTF)
     ]
 
 -- | Compiles blackbox functions and parses blackbox templates.
