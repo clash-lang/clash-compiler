@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, TypeApplications #-}
+{-# LANGUAGE MagicHash, TypeApplications, DataKinds #-}
 module BenchRAM (ramBench) where
 
 import Criterion (Benchmark, env, bench, nf, bgroup)
@@ -8,6 +8,7 @@ import Clash.Explicit.RAM
 import Clash.Explicit.ROM
 import Clash.Explicit.Signal
 import Clash.Prelude.ROM
+import Clash.Promoted.Nat
 import Clash.Promoted.Nat.Literals
 import qualified Clash.Sized.Vector as V
 
@@ -23,13 +24,13 @@ ramBench = bgroup "RAMs"
 asyncRamBench :: Benchmark
 asyncRamBench = env setup $ \m ->
   bench "asyncRam#" $
-  nf (take 98 . drop 2 . simulate_lazy
+  nf (take 298 . drop 2 . simulate_lazy
         (\rw -> let (r,w) = unbundle rw
                 in  asyncRam# @System
                       clockGen
                       clockGen
                       enableGen
-                      d1024
+                      (SNat @4096)
                       r
                       (pure True)
                       w
@@ -49,36 +50,36 @@ asyncRomBench = env setup $ \m ->
 blockRamBench :: Benchmark
 blockRamBench = env setup $ \m ->
   bench "blockRam# (100% writes)" $
-  nf (take 98 . drop 2 . simulate_lazy
-        (\w -> blockRam# @System
-                    clockGen
-                    enableGen
-                    ramInit
-                    w
+  nf (take 8298 . drop 2 . simulate_lazy
+        (\w -> ram w
                     (pure True)
                     w
                     w
-                   )) m
+                   )) (cycle m)
   where
-    ramInit = V.replicate d1024 (1 :: Int)
+    ramInit = V.replicate (SNat @4096) (1 :: Int)
     setup   = pure ([557,558..857])
+    ram     = blockRam# @System
+                    clockGen
+                    enableGen
+                    ramInit
 
 blockRamROBench :: Benchmark
 blockRamROBench = env setup $ \m ->
   bench "blockRam# (0% writes)" $
-  nf (take 98 . drop 2 . simulate_lazy
-        (\w -> blockRam# @System
-                    clockGen
-                    enableGen
-                    ramInit
-                    w
+  nf (take 8298 . drop 2 . simulate_lazy
+        (\w -> ram w
                     (pure False)
                     w
                     w
-                   )) m
+                   )) (cycle m)
   where
-    ramInit = V.replicate d1024 (1 :: Int)
+    ramInit = V.replicate (SNat @4096) (1 :: Int)
     setup   = pure ([557,558..857])
+    ram     = blockRam# @System
+                    clockGen
+                    enableGen
+                    ramInit
 
 romBench :: Benchmark
 romBench = env setup $ \m ->
