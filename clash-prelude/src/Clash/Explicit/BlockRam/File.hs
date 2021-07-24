@@ -317,7 +317,7 @@ blockRamFile#
   -- ^ Value to write (at address @w@)
   -> Signal dom (BitVector m)
   -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
-blockRamFile# (Clock _) ena sz file rd wen =
+blockRamFile# (Clock _) ena sz file = \rd wen ->
   go
     ramI
     (withFrozenCallStack (errorX "blockRamFile#: intial value undefined"))

@@ -1,9 +1,12 @@
 {-# LANGUAGE MagicHash, TypeApplications, DataKinds #-}
 module BenchRAM (ramBench) where
 
-import Criterion (Benchmark, env, bench, nf, bgroup)
+import Criterion (Benchmark, env, bench, nf, bgroup, envWithCleanup)
+import System.Directory
+import System.IO
 
 import Clash.Explicit.BlockRam
+import Clash.Explicit.BlockRam.File
 import Clash.Explicit.RAM
 import Clash.Explicit.ROM
 import Clash.Explicit.Signal
@@ -11,6 +14,7 @@ import Clash.Prelude.ROM
 import Clash.Promoted.Nat
 import Clash.Promoted.Nat.Literals
 import qualified Clash.Sized.Vector as V
+import Clash.Sized.Internal.BitVector (undefined#)
 
 ramBench :: Benchmark
 ramBench = bgroup "RAMs"
@@ -18,6 +22,8 @@ ramBench = bgroup "RAMs"
   , asyncRomBench
   , blockRamBench
   , blockRamROBench
+  , blockRamFileBench
+  , blockRamFileROBench
   , romBench
   ]
 
@@ -80,6 +86,52 @@ blockRamROBench = env setup $ \m ->
                     clockGen
                     enableGen
                     ramInit
+
+blockRamFileBench :: Benchmark
+blockRamFileBench = envWithCleanup setup cleanup $ \(~(m,_,ram)) ->
+  bench "blockRamFile# (100% writes)" $
+  nf (take 8298 . drop 2 . simulate_lazy
+        (\w -> ram  w
+                    (pure True)
+                    w
+                    (pure undefined#)
+                   )) (cycle m)
+  where
+    setup = do
+      (fp,h) <- openTempFile "." "mem.bin"
+      hPutStr h (unlines (replicate 4096 (replicate 63 '0' ++ ['1'])))
+      hClose h
+      let ram = blockRamFile# @64 @System
+              clockGen
+              enableGen
+              (SNat @4096)
+              fp
+      fp `seq` ram `seq` return ([557,558..857],fp,ram)
+
+    cleanup (_,f,_) = removeFile f
+
+blockRamFileROBench :: Benchmark
+blockRamFileROBench = envWithCleanup setup cleanup $ \(~(m,_,ram)) ->
+  bench "blockRamFile# (0% writes)" $
+  nf (take 8298 . drop 2 . simulate_lazy
+        (\w -> ram w
+                   (pure False)
+                   w
+                   (pure undefined#)
+                   )) (cycle m)
+  where
+    setup = do
+      (fp,h) <- openTempFile "." "mem.bin"
+      hPutStr h (unlines (replicate 4096 (replicate 63 '0' ++ ['1'])))
+      hClose h
+      let ram = blockRamFile# @64 @System
+                    clockGen
+                    enableGen
+                    (SNat @4096)
+                    fp
+      fp `seq` ram `seq` return ([557,558..857], fp, ram)
+
+    cleanup (_,f,_) = removeFile f
 
 romBench :: Benchmark
 romBench = env setup $ \m ->

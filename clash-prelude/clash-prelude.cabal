@@ -441,6 +441,7 @@ benchmark benchmark-clash-prelude
       base,
       clash-prelude,
       criterion         >= 1.3.0.0 && < 1.6,
+      directory,
       deepseq,
       template-haskell
 
