@@ -995,7 +995,7 @@ blockRam#
   -- ^ Value to write (at address @w@)
   -> Signal dom a
   -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
-blockRam# (Clock _) gen content rd wen =
+blockRam# (Clock _) gen content = \rd wen ->
   go
     (Seq.fromList (unsafeCoerce content))
     (withFrozenCallStack (deepErrorX "blockRam: intial value undefined"))

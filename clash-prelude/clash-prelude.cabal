@@ -432,6 +432,8 @@ benchmark benchmark-clash-prelude
   ghc-options:      -O2 -Wall
   hs-source-dirs:   benchmarks
 
+  ghc-options:      -with-rtsopts=-T
+
   if !flag(benchmarks)
     buildable: False
   else
