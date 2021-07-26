@@ -2,6 +2,7 @@
   Copyright   :  (C) 2019     , Myrtle Software Ltd.
                      2018     , @blaxill
                      2018-2019, QBayLogic B.V.
+                     2021     , LUMI GUIDE FIETSDETECTIE B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -29,6 +30,7 @@ module Clash.Signal.Delayed.Internal
     -- * Experimental
   , unsafeFromSignal
   , antiDelay
+  , forward
   )
 where
 
@@ -49,6 +51,7 @@ import Clash.XException           (NFDataX)
 >>> :m -Clash.Prelude.Safe
 >>> :m -Clash.Signal
 >>> import Clash.Explicit.Prelude
+>>> import qualified Clash.Signal.Delayed.Bundle as DB
 >>> :{
 let mac
       :: forall dom
@@ -68,6 +71,22 @@ let mac
           -> (DSignal dom 0 Int, DSignal dom 1 Int)
         mac' a b acc = let acc' = a * b + acc
                        in  (acc, delayedI clk rst en 0 acc')
+:}
+
+>>> :{
+let numbers
+      :: forall dom
+       . KnownDomain dom
+      => Clock dom
+      -> Reset dom
+      -> Enable dom
+      -> DSignal dom 5 (Int, Int)
+    numbers clk rst en = DB.bundle (forward d1 s1, s2)
+      where
+        s1 :: DSignal dom 4 Int
+        s1 = delayed clk rst en (100 :> 10 :> 5 :> 1 :> Nil) (pure 200)
+        s2 :: DSignal dom 5 Int
+        s2 = fmap (2*) $ delayN d1 0 en clk s1
 :}
 
 -}
@@ -160,7 +179,8 @@ unsafeFromSignal = DSignal
 
 -- | __EXPERIMENTAL__
 --
--- Access a /delayed/ signal in the present.
+-- Access a /delayed/ signal from the future in the present. Often required
+-- When writing a circuit that requires feedback from itself.
 --
 -- @
 -- mac
@@ -178,3 +198,38 @@ unsafeFromSignal = DSignal
 -- @
 antiDelay :: SNat d -> DSignal dom (n + d) a -> DSignal dom n a
 antiDelay _ = coerce
+
+-- | __EXPERIMENTAL__
+--
+-- Access a /delayed/ signal from the past in the present. In contrast with
+-- 'Clash.Explicit.Signal.Delayed.delayed' and friends forward does not insert
+-- any logic. This means using this function violates the delay invariant of
+-- 'DSignal'. This is sometimes useful when combining unrelated delayed signals
+-- where inserting logic is not wanted or when abstracting over internal
+-- delayed signals where the internal delay information should not be leaked.
+--
+-- For example, the circuit below returns a sequence of numbers as a pair
+-- but the internal delay information between the elements of the pair
+-- should not leak into the type.
+--
+-- @
+-- numbers
+--   :: forall dom
+--    . KnownDomain dom
+--   => Clock dom
+--   -> Reset dom
+--   -> Enable dom
+--   -> 'DSignal' dom 5 (Int, Int)
+-- numbers clk rst en = DB.bundle (forward d1 s1, s2)
+--   where
+--     s1 :: 'DSignal' dom 4 Int
+--     s1 = 'Clash.Explicit.Signal.Delayed.delayed' clk rst en (100 :> 10 :> 5 :> 1 :> Nil) (pure 200)
+--     s2 :: 'DSignal' dom 5 Int
+--     s2 = fmap (2*) $ 'Clash.Explicit.Signal.Delayed.delayN' d1 0 en clk s1
+-- @
+--
+-- >>> sampleN 8 (toSignal (numbers systemClockGen systemResetGen enableGen))
+-- [(1,0),(1,2),(5,2),(10,10),(100,20),(200,200),(200,400),(200,400)]
+
+forward :: SNat d -> DSignal dom n a -> DSignal dom (n + d) a
+forward _ = coerce
