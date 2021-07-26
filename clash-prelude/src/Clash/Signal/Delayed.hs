@@ -2,6 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.
                   2019     , Myrtle Software Ltd
+                  2021     , LUMI GUIDE FIETSDETECTIE B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -34,6 +35,7 @@ module Clash.Signal.Delayed
     -- * Experimental
   , unsafeFromSignal
   , antiDelay
+  , forward
   )
 where
 
@@ -42,7 +44,7 @@ import           GHC.TypeLits
 
 import Clash.Signal.Delayed.Internal
   (DSignal(..), dfromList, dfromList_lazy, fromSignal, toSignal,
-   unsafeFromSignal, antiDelay, feedback)
+   unsafeFromSignal, antiDelay, feedback, forward)
 import qualified Clash.Explicit.Signal.Delayed as E
 import           Clash.Sized.Vector
 import           Clash.Signal
