@@ -27,11 +27,16 @@ parse_comment(){
   local cmd=$(echo "${line}" | awk '{print $2}')
   local commit=$(echo "${line}" | awk '{print $3}')
 
-  if [[ ${at} == "@kloonbot" && ${cmd} == "run_ci" ]]; then
-    echo $(echo "$commit" | tr -d '\n\r ')
+  if [[ ${at} == "@kloonbot" ]]; then
+    if [[ ${cmd} == "run_ci" ]]; then
+      echo $(echo "$commit" | tr -d '\n\r ')
+    else
+      echo "parse_comment: Could not parse comment" 1>&2
+      exit 1;
+    fi
   else
-    echo "parse_comment: Could not parse comment" 1>&2
-    exit 1;
+    echo "parse_comment: Comment not directed @kloonbot"
+    exit 0;
   fi
 }
 
