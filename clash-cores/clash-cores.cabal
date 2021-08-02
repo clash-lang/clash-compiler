@@ -81,6 +81,7 @@ library
     Clash.Cores.Xilinx.Floating.Explicit
     Clash.Cores.Xilinx.Floating.Internal
     Clash.Cores.SPI
+    Clash.Cores.UART
     Clash.Cores.LatticeSemi.ICE40.IO
     Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO
     Clash.Cores.LatticeSemi.ECP5.IO
@@ -109,6 +110,7 @@ test-suite unittests
     Test.Cores.Internal.SampleSPI
     Test.Cores.Internal.Signals
     Test.Cores.SPI
+    Test.Cores.UART
     Test.Cores.SPI.MultiSlave
 
   build-depends:

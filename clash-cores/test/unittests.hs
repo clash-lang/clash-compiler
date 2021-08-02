@@ -12,10 +12,10 @@ import Test.Tasty
 
 import qualified Test.Cores.SPI as SPI
 import qualified Test.Cores.SPI.MultiSlave as Mul
+import qualified Test.Cores.UART as UART
 
 tests :: TestTree
-tests = testGroup "Unittests" [SPI.tests, Mul.tests]
+tests = testGroup "Unittests" [SPI.tests, Mul.tests, UART.tests]
 
 main :: IO ()
 main = defaultMain tests
-
