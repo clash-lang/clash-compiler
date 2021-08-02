@@ -49,6 +49,6 @@ fi
 if [[ $1 == "publish" ]]; then
   echo "$SNAPCRAFT_LOGIN_FILE" | base64 --decode --ignore-garbage > snapcraft.login
   snapcraft login --with snapcraft.login
-  snapcraft push ./*.snap --release ${RELEASE_CHANNEL}
+  snapcraft upload ./*.snap --release ${RELEASE_CHANNEL}
   echo "${revision}" > ${hash_file}
 fi
