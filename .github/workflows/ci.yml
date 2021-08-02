@@ -59,6 +59,10 @@ jobs:
           ./.ci/setup.sh
           cabal v2-freeze
 
+          # We only want this for caching, and it makes the CI scripts way
+          # more brittle than is ideal.
+          mv cabal.project.freeze frozen
+
       - name: Restore Cache
         uses: actions/cache@v2
         with:
@@ -67,17 +71,21 @@ jobs:
             ~/.cabal/packages
             ~/.cabal/store
 
-          key: ${{ matrix.ghc }}-${{ hashFiles('cabal.project.freeze') }}
+          key: ${{ matrix.ghc }}-${{ hashFiles('frozen') }}
           restore-keys: ${{ matrix.ghc }}-
 
       - name: Build Clash
         run: ./.ci/build.sh
 
-      - name: Test Clash
+      - name: Unit Tests
         run: |
           cabal v2-test clash-prelude
           cabal v2-test clash-lib
           cabal v2-test clash-cores
           cabal v2-test clash-cosim
-          cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .VHDL
-          cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .Verilog
+
+      - name: Testsuite (VHDL)
+        run: cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .VHDL
+
+      - name: Testsuite (Verilog)
+        run: cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .Verilog
