@@ -35,7 +35,8 @@ parse_comment(){
       exit 1;
     fi
   else
-    echo "parse_comment: Comment not directed @kloonbot"
+    # When the comment is not directed @kloonbot, return an empty string.
+    echo ""
     exit 0;
   fi
 }
@@ -43,15 +44,18 @@ parse_comment(){
 if [[ $KBOT_AUTHOR_ASSOC =~ ^(OWNER|MEMBER|COLLABORATOR)$ ]]; then
   commit=$(parse_comment)
 
-  pull_request_json=$(curl -H "${HEADERS}" "${KBOT_PULL_REQUEST_URL}")
-  is_fork=$(echo "$pull_request_json" | jq -r ".head.repo.fork")
+  # If the comment is empty, do nothing successfully.
+  if [[ ! -z ${commit} ]]; then
+    pull_request_json=$(curl -H "${HEADERS}" "${KBOT_PULL_REQUEST_URL}")
+    is_fork=$(echo "$pull_request_json" | jq -r ".head.repo.fork")
 
-  if [[ ${is_fork} == "true" ]]; then
-    # At this point we've established that:
-    #
-    #  1. This pull request is coming from a forked repo
-    #  2. A comment was made by someone trusted
-    #  3. The comment indicated CI should be run on local runners
-    kloon_fork_branch_to_local_branch "${pull_request_json}" "${commit}"
+    if [[ ${is_fork} == "true" ]]; then
+      # At this point we've established that:
+      #
+      #  1. This pull request is coming from a forked repo
+      #  2. A comment was made by someone trusted
+      #  3. The comment indicated CI should be run on local runners
+      kloon_fork_branch_to_local_branch "${pull_request_json}" "${commit}"
+    fi
   fi
 fi
