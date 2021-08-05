@@ -16,6 +16,7 @@
 --
 module Test.Tasty.Clash.NetlistTest
   ( runToNetlistStage
+  , TargetToState
   ) where
 
 import qualified Prelude as P

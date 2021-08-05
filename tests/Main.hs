@@ -508,7 +508,8 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "VecFun" def
       ]
       , clashTestGroup "Issues" $
-        [ let _opts = def { hdlSim = False, hdlTargets = [Verilog] }
+        [ clashLibTest "T508" def
+        , let _opts = def { hdlSim = False, hdlTargets = [Verilog] }
            in runTest "T1187" _opts
         , clashLibTest "T1388" def{hdlTargets=[VHDL]}
         , outputTest "T1171" def

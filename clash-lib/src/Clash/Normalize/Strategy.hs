@@ -1,7 +1,8 @@
 {-|
-  Copyright  :  (C) 2012-2016, University of Twente
+  Copyright  :  (C) 2012-2016, University of Twente,
+                (C) 2021,      QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Transformation process for normalization
 -}
@@ -137,7 +138,52 @@ constantPropagation =
     specTransformations =
       [ ("typeSpec"    , typeSpec)
       , ("nonRepSpec"  , nonRepSpec)
+      , ("zeroWidthSpec", zeroWidthSpec)
+        -- See Note [zeroWidthSpec enabling transformations]
       ]
+
+{-
+Note [zeroWidthSpec enabling transformations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When zeroWidthSpec fires, it can lead to better results in normalization, but
+this is somewhat incidental. The extra transformations which fire are typically
+from
+
+  * calls to transformations like caseCon which occur after constantPropagation
+    (e.g. caseCon run after ANF conversion).
+
+  * flattening / inlining which happens late in normalization (after regular
+    normalization has occurred)
+
+  * normalizing another function due to being marked NOINLINE
+
+If we consider the following:
+
+    data AB = A | B
+
+    ab :: KnownNat n => Index n -> AB -> AB
+    ab n A = if n >  0 then A else B
+    ab n B = if n == 0 then B else A
+    {-# NOINLINE ab #-}
+
+    topEntity = ab @1
+    {-# NOINLINE topEntity #-}
+
+The zeroWidthSpec transformation fires on the topEntity, giving a
+post-normalization topEntity of
+
+    \(x :: Index 1) ->
+      \(y :: AB) ->
+        letrec result :: AB = ab' y in result
+
+where
+
+    ab' = ab (fromInteger# 0)
+
+The extra transformations which fire happen later when ab' is normalized.
+Removing the NOINLINE from ab gives the same result, but the extra
+transformations fire in flattening instead.
+-}
 
 {- [Note] bottom-up traversal for liftNonRep
 We used to say:
