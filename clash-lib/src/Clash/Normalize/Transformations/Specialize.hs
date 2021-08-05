@@ -12,8 +12,11 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Normalize.Transformations.Specialize
   ( appProp
@@ -21,6 +24,7 @@ module Clash.Normalize.Transformations.Specialize
   , specialize
   , nonRepSpec
   , typeSpec
+  , zeroWidthSpec
   ) where
 
 import Control.Arrow ((***), (&&&))
@@ -40,6 +44,7 @@ import qualified Data.Monoid as Monoid (getAny)
 import qualified Data.Set.Ordered as OSet
 import qualified Data.Set.Ordered.Extra as OSet
 import qualified Data.Text as Text
+import qualified Data.Text.Extra as Text
 import GHC.Stack (HasCallStack)
 
 #if MIN_VERSION_ghc(9,0,0)
@@ -48,17 +53,28 @@ import GHC.Types.Basic (InlineSpec (..))
 import BasicTypes (InlineSpec (..))
 #endif
 
+import qualified Clash.Sized.Internal.BitVector as BV (BitVector, fromInteger#)
+import qualified Clash.Sized.Internal.Index as I (Index, fromInteger#)
+import qualified Clash.Sized.Internal.Signed as S (Signed, fromInteger#)
+import qualified Clash.Sized.Internal.Unsigned as U (Unsigned, fromInteger#)
+
+import Clash.Core.DataCon (DataCon(dcArgTys))
 import Clash.Core.FreeVars (freeLocalVars, termFreeTyVars, typeFreeVars)
+import Clash.Core.Literal (Literal(..))
 import Clash.Core.Name
-  (NameSort(..), Name(nameSort), appendToName, mkUnsafeInternalName)
+  (NameSort(..), Name(..), appendToName, mkUnsafeInternalName, mkUnsafeSystemName)
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Subst
 import Clash.Core.Term
-  ( Term(..), TickInfo, collectArgs, collectArgsTicks, mkApps, mkTicks, patIds
-  , patVars, mkAbstraction)
+  ( Term(..), TickInfo, collectArgs, collectArgsTicks, mkApps, mkTmApps, mkTicks, patIds
+  , patVars, mkAbstraction, PrimInfo(..), WorkInfo(..), IsMultiPrim(..))
 import Clash.Core.TermInfo (isLocalVar, isVar, piResultTy, termType, isPolyFun)
-import Clash.Core.Type (Type(VarTy), applyFunTy, normalizeType)
-import Clash.Core.Var (Var(..), Id, TyVar)
+import Clash.Core.TyCon (TyConMap, tyConDataCons)
+import Clash.Core.Type
+  (LitTy(NumTy), Type(LitTy,VarTy), applyFunTy, splitTyConAppM, normalizeType
+  , mkPolyFunTy, mkTyConApp)
+import Clash.Core.TysPrim
+import Clash.Core.Var (Var(..), Id, TyVar, mkTyVar)
 import Clash.Core.VarEnv
   ( InScopeSet, extendInScopeSet, extendInScopeSetList, lookupVarEnv
   , mkInScopeSet, mkVarSet, unionInScope, elemVarSet)
@@ -537,3 +553,106 @@ typeSpec ctx e@(TyApp e1 ty)
 
 typeSpec _ e = return e
 {-# SCC typeSpec #-}
+
+-- | Specialize functions on arguments which are zero-width. These arguments
+-- can have only one possible value, and specialising on this value may create
+-- additional oppourtunities for transformations to fire.
+--
+-- As we can't remove zero-width arguements (as transformations cannot change
+-- the type of a term), we instead substitute all occurances of a lambda-bound
+-- variable with a zero-width type with the only value of that type.
+--
+zeroWidthSpec :: HasCallStack => NormRewrite
+zeroWidthSpec (TransformContext is _) e@(Lam i x0) = do
+  tcm <- Lens.view tcCache
+  let bndrTy = normalizeType tcm (varType i)
+
+  case zeroWidthTypeElem tcm bndrTy of
+    Just tm ->
+      let subst = extendIdSubst (mkSubst is) i tm
+          x1 = substTm "zeroWidthSpec" subst x0
+       in changed (Lam i x1)
+
+    Nothing ->
+      return e
+
+zeroWidthSpec _ e = return e
+{-# SCC zeroWidthSpec #-}
+
+-- Get the only element of a type, if it is zero-width.
+--
+zeroWidthTypeElem :: TyConMap -> Type -> Maybe Term
+zeroWidthTypeElem tcm ty = do
+  (tcNm, args) <- splitTyConAppM ty
+
+  if | nameOcc tcNm == Text.showt ''BV.BitVector
+     , [LitTy (NumTy 0)] <- args
+     -> return (bitVectorZW tcNm args)
+
+     | nameOcc tcNm == Text.showt ''I.Index
+     , [LitTy (NumTy 1)] <- args
+     -> return (indexZW tcNm args)
+
+     | nameOcc tcNm == Text.showt ''S.Signed
+     , [LitTy (NumTy 0)] <- args
+     -> return (signedZW tcNm args)
+
+     | nameOcc tcNm == Text.showt ''U.Unsigned
+     , [LitTy (NumTy 0)] <- args
+     -> return (unsignedZW tcNm args)
+
+     -- Any other zero-width type should only have a single data constructor
+     -- where all fields are also zero-width.
+     | otherwise
+     -> do
+       tc <- lookupUniqMap tcNm tcm
+
+       case tyConDataCons tc of
+         [dc] -> do
+           zwArgs <- traverse (zeroWidthTypeElem tcm) (dcArgTys dc)
+           return (mkTmApps (Data dc) zwArgs)
+
+         _ ->
+           Nothing
+ where
+  nNm = mkUnsafeSystemName "n" 0
+  nTv = mkTyVar typeNatKind nNm
+
+  mkBitVector tcNm =
+    let prTy = mkPolyFunTy (mkTyConApp tcNm [VarTy nTv])
+                 [Left nTv, Right naturalPrimTy, Right naturalPrimTy, Right integerPrimTy]
+     in PrimInfo (Text.showt 'BV.fromInteger#) prTy WorkNever SingleResult
+
+  bitVectorZW tcNm tyArgs =
+    let pr = mkBitVector tcNm
+     in mkApps (Prim pr) $ fmap Right tyArgs <>
+          [ Left (Literal (NaturalLiteral 0))
+          , Left (Literal (NaturalLiteral 0))
+          , Left (Literal (IntegerLiteral 0))
+          ]
+
+  mkSizedNum tcNm n =
+    let prTy = mkPolyFunTy (mkTyConApp tcNm [VarTy nTv])
+                 [Left nTv, Right naturalPrimTy, Right integerPrimTy]
+     in PrimInfo n prTy WorkNever SingleResult
+
+  indexZW tcNm tyArgs =
+    let pr = mkSizedNum tcNm (Text.showt 'I.fromInteger#)
+     in mkApps (Prim pr) $ fmap Right tyArgs <>
+          [ Left (Literal (NaturalLiteral 1))
+          , Left (Literal (IntegerLiteral 0))
+          ]
+
+  signedZW tcNm tyArgs =
+    let pr = mkSizedNum tcNm (Text.showt 'S.fromInteger#)
+     in mkApps (Prim pr) $ fmap Right tyArgs <>
+          [ Left (Literal (NaturalLiteral 0))
+          , Left (Literal (IntegerLiteral 0))
+          ]
+
+  unsignedZW tcNm tyArgs =
+    let pr = mkSizedNum tcNm (Text.showt 'U.fromInteger#)
+     in mkApps (Prim pr) $ fmap Right tyArgs <>
+          [ Left (Literal (NaturalLiteral 0))
+          , Left (Literal (IntegerLiteral 0))
+          ]
