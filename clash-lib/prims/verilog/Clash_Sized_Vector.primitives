@@ -98,7 +98,7 @@ end
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.map"
-    , "workInfo"  : "Never"
+    , "workInfo"  : "Identity 1 [0]"
     , "kind"      : "Declaration"
     , "type"      : "map :: (a -> b) -> Vec n a -> Vec n b"
     , "template"  :

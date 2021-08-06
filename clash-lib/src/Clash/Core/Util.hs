@@ -428,6 +428,14 @@ primCo
   -> Term
 primCo ty = Prim (PrimInfo "_CO_" ty WorkNever SingleResult)
 
+-- | Make an unsafe coercion
+primUCo :: Term
+primUCo =
+  Prim PrimInfo { primName        = "GHC.Prim.unsafeCoerce#"
+                , primType        = unsafeCoerceTy
+                , primWorkInfo    = WorkNever
+                , primMultiResult = SingleResult }
+
 substArgTys
   :: DataCon
   -> [Type]

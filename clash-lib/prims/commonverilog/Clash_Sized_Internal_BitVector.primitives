@@ -34,7 +34,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.pack#"
-    , "workInfo"  : "Never"
+    , "workInfo"  : "Identity 0 []"
     , "kind"      : "Expression"
     , "type"      : "pack# :: Bit -> BitVector 1"
     , "template"  : "~ARG[0]"
@@ -42,7 +42,7 @@
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.unpack#"
-    , "workInfo"  : "Never"
+    , "workInfo"  : "Identity 0 []"
     , "kind"      : "Expression"
     , "type"      : "unpack# :: BitVector 1 -> Bit"
     , "template"  : "~ARG[0]"

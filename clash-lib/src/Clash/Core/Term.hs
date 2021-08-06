@@ -155,6 +155,10 @@ data WorkInfo
   | WorkAlways
   -- ^ Performs work regardless of whether the variables are constant or
   -- variable; these are things like clock or reset generators
+  | WorkIdentity Int [Int]
+  -- ^ A more restrictive version of 'WorkNever', where the value is the
+  -- argument at the given position if all arguments for the given list of
+  -- positions are also 'WorkIdentity'
   deriving (Eq,Show,Generic,NFData,Hashable,Binary)
 
 -- | Term reference
