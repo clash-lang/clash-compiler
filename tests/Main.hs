@@ -787,6 +787,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "VSelect" def
         , runTest "VecOfSum" def{hdlSim=False}
         , runTest "T452" def{hdlSim=False}
+        , runTest "T478" def{hdlSim=False}
         , let _opts = def { hdlSim = False, hdlTargets = [VHDL]}
            in runTest "T895" _opts
         , let _opts = def { hdlSim = False, hdlTargets = [VHDL], clashFlags = ["-fclash-hdlsyn", "Vivado"]}
