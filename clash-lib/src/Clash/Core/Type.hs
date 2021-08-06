@@ -50,6 +50,7 @@ module Clash.Core.Type
   , findFunSubst
   , reduceTypeFamily
   , undefinedTy
+  , unsafeCoerceTy
   , isIntegerTy
   , normalizeType
   , varAttrs
@@ -662,6 +663,14 @@ undefinedTy =
   let aNm = mkUnsafeSystemName "a" 0
       aTv = (TyVar aNm 0 liftedTypeKind)
   in  ForAllTy aTv (VarTy aTv)
+
+unsafeCoerceTy :: Type
+unsafeCoerceTy =
+  let aNm = mkUnsafeSystemName "a" 0
+      aTv = TyVar aNm 0 liftedTypeKind
+      bNm = mkUnsafeSystemName "b" 1
+      bTv = TyVar bNm 1 liftedTypeKind
+  in ForAllTy aTv (ForAllTy bTv (mkFunTy (VarTy aTv) (VarTy bTv)))
 
 isIntegerTy :: Type -> Bool
 isIntegerTy (ConstTy (TyCon nm)) = nameUniq nm == getKey integerTyConKey

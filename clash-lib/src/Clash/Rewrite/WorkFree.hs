@@ -104,6 +104,7 @@ isWorkFree cache bndrs = go True
           -- regardless of their values.
           WorkConstant -> pure True
           WorkNever -> allM goArg args
+          WorkIdentity _ _ -> allM goArg args
           WorkVariable -> pure (all isConstantArg args)
           WorkAlways -> pure False
 

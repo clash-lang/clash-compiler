@@ -24,6 +24,7 @@ module Clash.Normalize.Transformations.Inline
   , inlineCast
   , inlineCleanup
   , inlineHO
+  , collapseRHSNoops
   , inlineNonRep
   , inlineOrLiftNonRep
   , inlineSimIO
@@ -33,8 +34,10 @@ module Clash.Normalize.Transformations.Inline
 
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
-import Control.Monad.Writer (listen)
+import Control.Monad.Trans.Maybe (MaybeT(..))
+import Control.Monad.Writer ((>=>),lift,listen)
 import Data.Default (Default(..))
+import Data.Either  (lefts)
 import qualified Data.HashMap.Lazy as HashMap
 import qualified Data.List as List
 import qualified Data.Maybe as Maybe
@@ -60,12 +63,12 @@ import Clash.Core.Name (Name(..), NameSort(..))
 import Clash.Core.Pretty (PrettyOptions(..), showPpr, showPpr')
 import Clash.Core.Subst
 import Clash.Core.Term
-  ( CoreContext(..), Pat(..), PrimInfo(..), Term(..), collectArgs
+  ( CoreContext(..), Pat(..), PrimInfo(..), Term(..), WorkInfo(..), collectArgs
   , collectArgsTicks, mkApps , mkTicks, stripTicks)
 import Clash.Core.TermInfo (isLocalVar, isPolyFun, termSize, termType)
 import Clash.Core.Type
   (TypeView(..), isClassTy, isPolyFunCoreTy, tyView)
-import Clash.Core.Util (isSignalType)
+import Clash.Core.Util (isSignalType, primUCo)
 import Clash.Core.Var (Id, Var(..), isGlobalId, isLocalId)
 import Clash.Core.VarEnv
   ( InScopeSet, VarEnv, VarSet, elemUniqInScopeSet, elemVarEnv, elemVarSet
@@ -378,6 +381,54 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
 
 inlineCleanup _ e = return e
 {-# SCC inlineCleanup #-}
+
+{- [Note] relation `collapseRHSNoops` and `inlineCleanup`
+The `collapseRHSNoops` transformation replaces functions/primitives that are the identity
+in HDL, but not in Haskell, by `unsafeCoerce`.
+`inlineCleanup` subsequently inlines these `unsafeCoerce` calls.
+The end result of all of this is that we get no/fewer assignments in HDL where the RHS is
+simply a variable reference. See issue #779 -}
+
+-- | Takes a binding and collapses its term if it is a noop
+collapseRHSNoops :: HasCallStack => NormRewrite
+collapseRHSNoops _ (Letrec binds body) = do
+  binds1 <- mapM runCollapseNoop binds
+  return $ Letrec binds1 body
+  where
+    runCollapseNoop orig =
+      runMaybeT (collapseNoop orig) >>= Maybe.maybe (return orig) changed
+
+    collapseNoop (iD,term) = do
+      (Prim info,args) <- return $ collectArgs term
+      identity         <- getIdentity info $ lefts args
+      collapsed        <- collapseToIdentity iD identity
+      return (iD,collapsed)
+
+    collapseToIdentity iD identity = do
+      tcm <- Lens.view tcCache
+      let aTy = termType tcm identity
+          bTy = varType iD
+      return $ primUCo `TyApp` aTy `TyApp` bTy `App` identity
+
+    getIdentity primInfo termArgs = do
+      WorkIdentity idIdx noopIdxs <- return $ primWorkInfo primInfo
+      mapM_ (getTermArg termArgs >=> isNoop >=> Monad.guard) noopIdxs
+      getTermArg termArgs idIdx
+
+    getTermArg args i = do
+      Monad.guard $ i <= length args - 1
+      return $ args !! i
+
+    isNoop (Var i) = do
+      binding     <- MaybeT $ lookupVarEnv i <$> Lens.use bindings
+      isRecursive <- lift $ isRecursiveBndr $ bindingId binding
+      Monad.guard $ not isRecursive
+      isNoop $ bindingTerm binding
+    isNoop (Prim PrimInfo{primWorkInfo=WorkIdentity _ []}) = return True
+    isNoop _ = return False
+
+collapseRHSNoops _ e = return e
+{-# SCC collapseRHSNoops #-}
 
 -- | Inline a function with functional arguments
 inlineHO :: HasCallStack => NormRewrite

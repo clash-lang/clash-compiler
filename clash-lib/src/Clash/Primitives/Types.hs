@@ -49,6 +49,7 @@ import qualified Data.Text                    as S
 import           Data.Text.Lazy               (Text)
 import           GHC.Generics                 (Generic)
 import           GHC.Stack                    (HasCallStack)
+import           Text.Read                    (readMaybe)
 
 -- | An unresolved primitive still contains pointers to files.
 type UnresolvedPrimitive = Primitive Text ((TemplateFormat,BlackBoxFunctionName),Maybe TemplateSource) (Maybe S.Text) (Maybe TemplateSource)
@@ -295,7 +296,13 @@ instance FromJSON UnresolvedPrimitive where
       parseWorkInfo (String "Never")    = pure (Just WorkNever)
       parseWorkInfo (String "Variable") = pure (Just WorkVariable)
       parseWorkInfo (String "Always")   = pure (Just WorkAlways)
+      parseWorkInfo (parseWorkIdentity -> wi@Just{}) = pure wi
       parseWorkInfo c = fail ("[6] unexpected workInfo: " ++ show c)
+
+      parseWorkIdentity arg = do
+        String str   <- return arg
+        [iStr,xsStr] <- words . S.unpack <$> S.stripPrefix "Identity" str
+        WorkIdentity <$> readMaybe iStr <*> readMaybe xsStr
 
       parseBBFN' = either fail return . parseBBFN
 
