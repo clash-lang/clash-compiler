@@ -1,6 +1,6 @@
 Cabal-version:        2.2
 Name:                 clash-prelude
-Version:              1.4.2
+Version:              1.4.3
 Synopsis:             Clash: a functional hardware description language - Prelude library
 Description:
   Clash is a functional hardware description language that borrows both its
