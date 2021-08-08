@@ -1,5 +1,11 @@
 # Changelog for the Clash project
 
+## 1.4.3 *Aug 8th 2021*
+Fixed:
+
+ * Clash no longer generates calls to `{shift,rotate}_{left,right}` in VHDL where the count is a negative number [#1810](https://github.com/clash-lang/clash-compiler/issues/1810).
+ * Clash no longer incurs unnecessary compile-time complexity while compiling Vector indexing operator [#1557](https://github.com/clash-lang/clash-compiler/issues/1557)
+
 ## 1.4.2 *May 18th 2021*
 Fixed:
 
