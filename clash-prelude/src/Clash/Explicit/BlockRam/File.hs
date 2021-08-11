@@ -102,23 +102,32 @@ module Clash.Explicit.BlockRam.File
   )
 where
 
+import Control.Exception     (catch, throw)
+import Control.Monad         (forM_)
+import Control.Monad.ST      (ST, runST)
+import Control.Monad.ST.Unsafe (unsafeInterleaveST, unsafeIOToST, unsafeSTToIO)
+import Data.Array.MArray     (newArray_)
 import Data.Bits             ((.&.), (.|.), shiftL, xor)
 import Data.Char             (digitToInt)
 import Data.Maybe            (isJust, listToMaybe)
-import qualified Data.Sequence as Seq
+import GHC.Arr               (STArray, unsafeReadSTArray, unsafeWriteSTArray)
 import GHC.Stack             (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits          (KnownNat)
 import Numeric               (readInt)
-import System.IO.Unsafe      (unsafePerformIO)
+import System.IO
 
 import Clash.Class.BitPack   (BitPack, BitSize, pack)
 import Clash.Promoted.Nat    (SNat (..), pow2SNat, natToNum, snatToNum)
-import Clash.Sized.Internal.BitVector (Bit(..), BitVector(..))
+import Clash.Sized.Internal.BitVector (Bit(..), BitVector(..), undefined#)
 import Clash.Signal.Internal
   (Clock(..), Signal (..), Enable, KnownDomain, fromEnable, (.&&.))
 import Clash.Signal.Bundle   (unbundle)
 import Clash.Sized.Unsigned  (Unsigned)
-import Clash.XException      (errorX, maybeIsX, seqX, fromJustX)
+import Clash.XException      (errorX, maybeIsX, seqX, fromJustX, XException (..))
+
+-- start benchmark only
+-- import GHC.Arr (unsafeFreezeSTArray, unsafeThawSTArray)
+-- end benchmark only
 
 -- $setup
 -- >>> import Clash.Prelude.BlockRam.File
@@ -317,62 +326,87 @@ blockRamFile#
   -- ^ Value to write (at address @w@)
   -> Signal dom (BitVector m)
   -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
-blockRamFile# (Clock _) ena sz file = \rd wen ->
+blockRamFile# (Clock _) ena sz file = \rd wen waS wd -> runST $ do
+  ramStart <- newArray_ (0,szI)
+  unsafeIOToST (withFile file ReadMode (\h ->
+    forM_ [0..(szI-1)] (\i -> do
+      l <- hGetLine h
+      let bv = parseBV l
+      bv `seq` unsafeSTToIO (unsafeWriteSTArray ramStart i bv)
+      )))
+  -- start benchmark only
+  -- ramStart <- unsafeThawSTArray ramArr
+  -- end benchmark only
   go
-    ramI
-    (withFrozenCallStack (errorX "blockRamFile#: intial value undefined"))
+    ramStart
+    (withFrozenCallStack (errorX "blockRamFile: intial value undefined"))
     (fromEnable ena)
     rd
     (fromEnable ena .&&. wen)
-  where
-    -- clock enable
-    go
-      :: Seq.Seq (BitVector m)
-      -> BitVector m
-      -> Signal dom Bool
-      -> Signal dom Int
-      -> Signal dom Bool
-      -> Signal dom Int
-      -> Signal dom (BitVector m)
-      -> Signal dom (BitVector m)
-    go !ram o (re :- res) (r :- rs) (e :- en) (w :- wr) (d :- din) =
-      let ram' = upd ram e (fromEnum w) d
-          o'   = if re then ram `safeAt` r else o
-      in  o `seqX` o :- go ram' o' res rs en wr din
+    waS
+    wd
+ where
+  szI = snatToNum sz :: Int
+  -- start benchmark only
+  -- ramArr = runST $ do
+  --             ram <- newArray_ (0,szI-1) -- 0 -- (error "QQ")
+  --             unsafeIOToST (withFile file ReadMode (\h ->
+  --               forM_ [0..(szI-1)] (\i -> do
+  --                 l <- hGetLine h
+  --                 let bv = parseBV l
+  --                 bv `seq` unsafeSTToIO (unsafeWriteSTArray ram i bv))
+  --               ))
+  --             unsafeFreezeSTArray ram
+  -- end benchmark only
 
-    upd ram we waddr d = case maybeIsX we of
-      Nothing -> case maybeIsX waddr of
-        Nothing -> fmap (const (seq waddr d)) ram
-        Just wa -> safeUpdate wa d ram
-      Just True -> case maybeIsX waddr of
-        Nothing -> fmap (const (seq waddr d)) ram
-        Just wa -> safeUpdate wa d ram
-      _ -> ram
+  go :: STArray s Int (BitVector m) -> (BitVector m) -> Signal dom Bool -> Signal dom Int
+    -> Signal dom Bool -> Signal dom Int -> Signal dom (BitVector m)
+    -> ST s (Signal dom (BitVector m))
+  go !ram o ret@(~(re :- res)) rt@(~(r :- rs)) et@(~(e :- en)) wt@(~(w :- wr)) dt@(~(d :- din)) = do
+    o `seqX` (o :-) <$> (ret `seq` rt `seq` et `seq` wt `seq` dt `seq`
+      unsafeInterleaveST
+        (do o' <- unsafeIOToST
+                    (catch (if re then unsafeSTToIO (ram `safeAt` r) else pure o)
+                    (\err@XException {} -> pure (throw err)))
+            d `seqX` upd ram e (fromEnum w) d
+            go ram o' res rs en wr din))
 
-    content = unsafePerformIO (initMem file)
-    szI = snatToNum sz :: Int
+  upd :: STArray s Int (BitVector m) -> Bool -> Int -> (BitVector m) -> ST s ()
+  upd ram we waddr d = case maybeIsX we of
+    Nothing -> case maybeIsX waddr of
+      Nothing -> forM_ [0..(szI-1)] (\i -> unsafeWriteSTArray ram i (seq waddr d))
+      Just wa -> safeUpdate wa d ram
+    Just True -> case maybeIsX waddr of
+      Nothing -> forM_ [0..(szI-1)] (\i -> unsafeWriteSTArray ram i (seq waddr d))
+      Just wa -> safeUpdate wa d ram
+    _ -> return ()
 
-    ramI :: Seq.Seq (BitVector m)
-    ramI = Seq.fromList content
+  safeAt :: HasCallStack => STArray s Int (BitVector m) -> Int -> ST s (BitVector m)
+  safeAt s i =
+    if (0 <= i) && (i < szI) then
+      unsafeReadSTArray s i
+    else pure $
+      withFrozenCallStack
+        (errorX ("blockRamFile: read address " <> show i <>
+                " not in range [0.." <> show szI <> ")"))
+  {-# INLINE safeAt #-}
 
-    safeAt :: HasCallStack => Seq.Seq a -> Int -> a
-    safeAt s i = let  in
-      if (0 <= i) && (i < szI) then
-        Seq.index s i
-      else
-        withFrozenCallStack
-          (errorX ("blockRamFile: read address " <> show i <>
-                   " not in range [0.." <> show szI <> ")"))
-    {-# INLINE safeAt #-}
+  safeUpdate :: HasCallStack => Int -> a -> STArray s Int a -> ST s ()
+  safeUpdate i a s =
+    if (0 <= i) && (i < szI) then
+      unsafeWriteSTArray s i a
+    else
+      let d = withFrozenCallStack
+                (errorX ("blockRamFile: write address " <> show i <>
+                        " not in range [0.." <> show szI <> ")"))
+      in forM_ [0..(szI-1)] (\j -> unsafeWriteSTArray s j d)
+  {-# INLINE safeUpdate #-}
 
-    safeUpdate :: HasCallStack => Int -> a -> Seq.Seq a ->  Seq.Seq a
-    safeUpdate i a s =
-      if (0 <= i) && (i < szI) then
-        Seq.update i a s
-      else
-        withFrozenCallStack
-          (errorX ("blockRamFile: write address " <> show i <>
-                   " not in range [0.." <> show szI <> ")"))
+  parseBV :: String -> BitVector m
+  parseBV s = case parseBV' s of
+                Just i  -> fromInteger i
+                Nothing -> undefined#
+  parseBV' = fmap fst . listToMaybe . readInt 2 (`elem` "01") digitToInt
 {-# NOINLINE blockRamFile# #-}
 
 -- | __NB:__ Not synthesizable
