@@ -8,7 +8,7 @@ module RotateCScrambled
 
 import Clash.Prelude.Testbench
 import Clash.Prelude
-import Prelude
+import Prelude hiding (not)
 import Data.Maybe
 import GHC.Generics
 import Clash.Annotations.BitRepresentation
