@@ -1,5 +1,6 @@
 {-|
   Copyright   :  (C) 2019, QBayLogic B.V.
+                 (C) 2021, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V <devops@qbaylogic.com>
 
@@ -14,11 +15,54 @@ splitAt, tail, take, unzip, unzip3, zip, zip3, zipWith, zipWith3.
 {-# OPTIONS_HADDOCK show-extensions, not-home #-}
 
 module Clash.HaskellPrelude
-  (module Prelude)
+  (module Prelude, (&&), (||), not)
 where
 
 import Prelude hiding
   ((++), (!!), concat, concatMap, drop, even, foldl, foldl1, foldr, foldr1, head, init,
    iterate, last, length, map, odd, repeat, replicate, reverse, scanl, scanr, splitAt,
    tail, take, unzip, unzip3, zip, zip3, zipWith, zipWith3, undefined, (^),
-   getChar, putChar, getLine)
+   getChar, putChar, getLine, (&&), (||), not)
+
+import qualified Prelude
+import GHC.Magic (noinline)
+
+{-
+Note [use of noinline]
+~~~~~~~~~~~~~~~~~~~~~~
+The magic noinline function is used here to prevent GHC inlining these
+functions in the simplifier. They are removed (by GHC) post-simplifier, so
+they have no negative impact on Clash's normalization.
+
+Why prevent this inlining? When GHC sees a function like
+
+    topEntity :: Bool -> Bool -> Bool
+    topEntity a b = a && b
+
+it inlines the definition of && to become
+
+    topEntity a b =
+      case a of
+        True -> case b of
+                  True -> True
+                  False -> False
+        False -> False
+
+which Clash will render as multiplexer(s) instead of using the and operator
+available in the targeted HDL backend. While this has no impact on the quality
+of the final result (EDA tools will optimize this with ease in P&R), it makes
+the generated HDL (and RTL view of circuits) more obfuscated to read.
+-}
+
+infixr 3 &&
+
+(&&) :: Bool -> Bool -> Bool
+(&&) = noinline (Prelude.&&)
+
+infixr 2 ||
+
+(||) :: Bool -> Bool -> Bool
+(||) = noinline (Prelude.||)
+
+not :: Bool -> Bool
+not = noinline Prelude.not
