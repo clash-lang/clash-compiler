@@ -1656,10 +1656,10 @@ ptrSync clk1 clk2 rst2 en2 =
   'Clash.Explicit.Signal.register' clk2 rst2 en2 0 . 'Clash.Explicit.Signal.register' clk2 rst2 en2 0 . 'Clash.Explicit.Signal.unsafeSynchronizer' clk1 clk2
 @
 
-It uses the 'unsafeSynchronizer' primitive, which is needed to go from one clock
+It uses the 'Clash.Explicit.Signal.unsafeSynchronizer' primitive, which is needed to go from one clock
 domain to the other. All synchronizers are specified in terms of
-'unsafeSynchronizer' (see for example the <src/Clash-Prelude-RAM.html#line-103 source of asyncRam>).
-The 'unsafeSynchronizer' primitive is turned into a (bundle of) wire(s) by the
+'Clash.Explicit.Signal.unsafeSynchronizer' (see for example the <src/Clash-Prelude-RAM.html#line-103 source of asyncRam>).
+The 'Clash.Explicit.Signal.unsafeSynchronizer' primitive is turned into a (bundle of) wire(s) by the
 Clash compiler, so developers must ensure that it is only used as part of a
 proper synchronizer.
 
