@@ -23,6 +23,7 @@ assign ~SYM[3] = ~SYM[1] ? ~SYM[4]
 assign ~SYM[6] = ~SYM[3] / ~SYM[5];
 assign ~RESULT = $signed(~SYM[6][~SIZE[~TYPO]-1:0]);
 // integerDiv end"
+    , "warning"   : "GHC.Num.Integer.integerDiv: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -40,6 +41,7 @@ assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~T
                  ~SYM[0] :
                  ((~SYM[0] == ~SIZE[~TYPO]'sd0) ? ~SIZE[~TYPO]'sd0 : ~SYM[0] + ~VAR[divider][1]);
 // integerMod end"
+    , "warning"   : "GHC.Num.Integer.integerMod: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -79,6 +81,7 @@ assign ~SYM[9] = (~VAR[dividend][0][~SIZE[~TYP[0]]-1] == ~VAR[divider][1][~SIZE[
 
 assign ~RESULT = {~SYM[7],~SYM[9]};
 // integerDivMod end"
+    , "warning"   : "GHC.Num.Integer.integerDivMod#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -94,6 +97,7 @@ assign ~SYM[1] = ~ARG[0] % ~ARG[1];
 
 assign ~RESULT = {~SYM[0],~SYM[1]};
 // integerQuotRem end"
+    , "warning"   : "GHC.Num.Integer.integerQuotRem#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 ]

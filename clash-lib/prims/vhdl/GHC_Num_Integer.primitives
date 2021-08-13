@@ -39,6 +39,7 @@
     , "kind"      : "Expression"
     , "type"      : "integerToInt :: Integer -> Int#"
     , "template"  : "~ARG[0]"
+    , "warning"   : "GHC.Num.Integer.integerToInt#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -46,6 +47,7 @@
     , "kind"      : "Expression"
     , "type"      : "integerMul :: Integer -> Integer -> Integer"
     , "template"  : "resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])"
+    , "warning"   : "GHC.Num.Integer.integerMul: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -53,6 +55,7 @@
     , "kind"      : "Expression"
     , "type"      : "integerNegate :: Integer -> Integer"
     , "template"  : "-~ARG[0]"
+    , "warning"   : "GHC.Num.Integer.integerNegate: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -60,6 +63,7 @@
     , "kind"      : "Expression"
     , "type"      : "integerAbs :: Integer -> Integer"
     , "template"  : "abs ~ARG[0]"
+    , "warning"   : "GHC.Num.Integer.integerAbs: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -87,6 +91,7 @@ begin
   ~RESULT <= signed(~SYM[4](~SIZE[~TYPO]-1 downto 0));
 end block;
 -- integerDiv end"
+    , "warning"   : "GHC.Num.Integer.integerDiv: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -94,6 +99,7 @@ end block;
     , "kind"      : "Expression"
     , "type"      : "integerMod :: Integer -> Integer -> Integer"
     , "template"  : "~ARG[0] mod ~ARG[1]"
+    , "warning"   : "GHC.Num.Integer.integerMod: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -129,6 +135,7 @@ begin
   ~RESULT <= (~SYM[5], ~SYM[6]);
 end block;
 -- integerDivMod end"
+    , "warning"   : "GHC.Num.Integer.integerDivMod#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -141,6 +148,7 @@ end block;
     when (~ARG[1] /= 0) else ((others => 'X'), (others => 'X'))
     -- pragma translate_on
     ;"
+    , "warning"   : "GHC.Num.Integer.integerQuotRem#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -153,6 +161,7 @@ end block;
     when (~ARG[1] /= 0) else (others => 'X')
     -- pragma translate_on
     ;"
+    , "warning"   : "GHC.Num.Integer.integerRem: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -160,6 +169,7 @@ end block;
     , "kind"      : "Expression"
     , "type"      : "integerEq :: Integer -> Integer -> Bool"
     , "template"  : "~ARG[0] = ~ARG[1]"
+    , "warning"   : "GHC.Num.Integer.integerEq: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -167,6 +177,7 @@ end block;
     , "kind"      : "Expression"
     , "type"      : "integerNe :: Integer -> Integer -> Bool"
     , "template"  : "~ARG[0] /= ~ARG[1]"
+    , "warning"   : "GHC.Num.Integer.integerNe: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -174,6 +185,7 @@ end block;
     , "kind"      : "Declaration"
     , "type"      : "integerEq# :: Integer -> Integer -> Int#"
     , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
+    , "warning"   : "GHC.Num.Integer.integerEq#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -181,6 +193,7 @@ end block;
     , "kind"      : "Declaration"
     , "type"      : "integerNe# :: Integer -> Integer -> Int#"
     , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
+    , "warning"   : "GHC.Num.Integer.integerNe#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -188,6 +201,7 @@ end block;
     , "kind"      : "Declaration"
     , "type"      : "integerLe# :: Integer -> Integer -> Int#"
     , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
+    , "warning"   : "GHC.Num.Integer.integerLe#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -195,6 +209,7 @@ end block;
     , "kind"      : "Declaration"
     , "type"      : "integerGt# :: Integer -> Integer -> Int#"
     , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
+    , "warning"   : "GHC.Num.Integer.integerGt#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -202,6 +217,7 @@ end block;
     , "kind"      : "Declaration"
     , "type"      : "integerLt# :: Integer -> Integer -> Int#"
     , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
+    , "warning"   : "GHC.Num.Integer.integerLt#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -209,6 +225,7 @@ end block;
     , "kind"      : "Declaration"
     , "type"      : "integerGe# :: Integer -> Integer -> Int#"
     , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
+    , "warning"   : "GHC.Num.Integer.integerGe#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -230,6 +247,7 @@ begin
       );
   ~RESULT <= shift_right(~ARG[0],~SYM[1]);
 end block;"
+    , "warning"   : "GHC.Num.Integer.integerShiftR#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -251,6 +269,7 @@ begin
       );
   ~RESULT <= shift_left(~ARG[0],~SYM[1]);
 end block;"
+    , "warning"   : "GHC.Num.Integer.integerShiftL#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -258,6 +277,7 @@ end block;"
     , "kind"      : "Expression"
     , "type"      : "integerTestBit :: Integer -> Word# -> Bool"
     , "template"  : "~VAR[input][0](to_integer(~ARG[1])) = '1'"
+    , "warning"   : "GHC.Num.Integer.integerTestBit#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -266,6 +286,7 @@ end block;"
     , "kind"      : "Expression"
     , "type"      : "integerFromWord :: Word# -> Integer"
     , "template"  : "signed(std_logic_vector(~ARG[0]))"
+    , "warning"   : "GHC.Num.Integer.integerFromWord#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -274,6 +295,7 @@ end block;"
     , "kind"      : "Expression"
     , "type"      : "integerToWord :: Integer -> Word#"
     , "template"  : "unsigned(std_logic_vector(~ARG[0]))"
+    , "warning"   : "GHC.Num.Integer.integerToWord#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -283,6 +305,7 @@ end block;"
     , "type"      : "integerToWord :: Integer -> Word64#"
     , "comment"   : "only used by 32 bit GHC"
     , "template"  : "unsigned(std_logic_vector(~ARG[0]))"
+    , "warning"   : "GHC.Num.Integer.integerToWord64#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -290,6 +313,7 @@ end block;"
     , "kind"      : "Expression"
     , "type"      : "integerBit :: Word# -> Integer"
     , "template"  : "shift_left(to_signed(1, ~SIZE[~TYPO]),to_integer(~ARG[0]))"
+    , "warning"   : "GHC.Num.Integer.integerBit#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -297,6 +321,7 @@ end block;"
     , "kind"      : "Expression"
     , "type"      : "integerComplement :: Integer -> Integer"
     , "template"  : "not ~ARG[0]"
+    , "warning"   : "GHC.Num.Integer.integerComplement: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -304,6 +329,7 @@ end block;"
     , "kind"      : "Expression"
     , "type"      : "integerXor :: Integer -> Integer -> Integer"
     , "template"  : "~ARG[0] xor ~ARG[1]"
+    , "warning"   : "GHC.Num.Integer.integerXor: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -311,6 +337,7 @@ end block;"
     , "kind"      : "Expression"
     , "type"      : "integerOr :: Integer -> Integer -> Integer"
     , "template"  : "~ARG[0] or ~ARG[1]"
+    , "warning"   : "GHC.Num.Integer.integerOr: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -318,6 +345,7 @@ end block;"
     , "kind"      : "Expression"
     , "type"      : "integerAnd :: Integer -> Integer -> Integer"
     , "template"  : "~ARG[0] and ~ARG[1]"
+    , "warning"   : "GHC.Num.Integer.integerAnd: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -331,6 +359,7 @@ end block;"
   else to_signed(1, ~SIZE[~TYPO]);
 -- end integerSigmum
 "
+    , "warning"   : "GHC.Num.Integer.integerSignum: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -344,6 +373,7 @@ end block;"
   else to_signed(1, ~SIZE[~TYPO]);
 -- end signumInteger
 "
+    , "warning"   : "GHC.Num.Integer.$wintegerSignum: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -351,6 +381,7 @@ end block;"
   , "kind"      : "Expression"
   , "type"      : "integerLogBase# :: Integer -> Integer -> Int#"
   , "template"  : "integer(floor(log(real(~ARG[1]),real(~ARG[0]))))"
+  , "warning"   : "GHC.Num.Integer.integerLogBase#: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
   }
 }
 , { "BlackBox" :
@@ -364,6 +395,7 @@ end block;"
            \"10\";
 -- end integerCompare
 "
+    , "warning"   : "GHC.Num.Integer.integerCompare: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 , { "BlackBox" :
@@ -376,6 +408,7 @@ end block;"
     when (~ARG[1] /= 0) else (others => 'X')
     -- pragma translate_on
     ;"
+  , "warning"   : "GHC.Num.Integer.integerQuot: Integers are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
   }
 }
 ]

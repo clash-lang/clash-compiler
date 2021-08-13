@@ -4,7 +4,8 @@
       "name": "GHC.Num.Natural.NS",
       "workInfo" : "Never",
       "primType": "Constructor",
-      "comment": "Needed to make the evaluator handle this constructor strictly"
+      "comment": "Needed to make the evaluator handle this constructor strictly",
+      "warning": "GHC.Num.Natural.NS: Naturals are dynamically sized in simulation, but fixed-length after synthesization. Use carefully."
     }
   },
   {
@@ -12,7 +13,8 @@
       "name": "GHC.Num.Natural.NB",
       "workInfo" : "Never",
       "primType": "Constructor",
-      "comment": "Needed to make the evaluator handle this constructor strictly"
+      "comment": "Needed to make the evaluator handle this constructor strictly",
+      "warning": "GHC.Num.Natural.NB: Naturals are dynamically sized in simulation, but fixed-length after synthesization. Use carefully."
     }
   },
   {
@@ -28,7 +30,8 @@
     "Primitive": {
       "name": "GHC.Num.Natural.naturalSub",
       "workInfo" : "Never",
-      "primType": "Function"
+      "primType": "Function",
+      "warning": "GHC.Num.Natural.naturalSub: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   },
   {
@@ -62,14 +65,16 @@
     "Primitive": {
       "name": "GHC.Num.Natural.naturalGcd",
       "workInfo" : "Never",
-      "primType": "Function"
+      "primType": "Function",
+      "warning": "GHC.Num.Natural.naturalGcd: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   },
   {
     "Primitive": {
       "name": "GHC.Num.Natural.naturalLcm",
       "workInfo" : "Never",
-      "primType": "Function"
+      "primType": "Function",
+      "warning": "GHC.Num.Natural.naturalLcm: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   }
 ]
