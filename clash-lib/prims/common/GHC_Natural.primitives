@@ -4,7 +4,8 @@
       "name": "GHC.Natural.NatS#",
       "workInfo" : "Never",
       "primType": "Constructor",
-      "comment": "Needed to make the evaluator handle this constructor strictly"
+      "comment": "Needed to make the evaluator handle this constructor strictly",
+      "warning": "GHC.Natural.NatS#: Naturals are dynamically sized in simulation, but fixed-length after synthesization. Use carefully."
     }
   },
   {
@@ -46,7 +47,8 @@
     "Primitive": {
       "name": "GHC.Natural.gcdNatural",
       "workInfo" : "Never",
-      "primType": "Function"
+      "primType": "Function",
+      "warning": "GHC.Natural.gcdNatural: Naturals are dynamically sized in simulation, but fixed-length after synthesization. Use carefully."
     }
   }
 ]
