@@ -148,7 +148,7 @@
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.div#"
     , "kind"      : "Declaration"
-    , "type"      : "div# :: Signed n -> Signed n -> Signed n"
+    , "type"      : "div# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "template"  :
 "-- divSigned begin
 ~GENSYM[divSigned][0] : block
@@ -157,14 +157,14 @@
   signal ~GENSYM[dividend2][3] : signed(~SIZE[~TYPO] downto 0);
   signal ~GENSYM[quot_res][4] : signed(~SIZE[~TYPO] downto 0);
 begin
-  ~SYM[1] <= ~VAR[dividend][0](~VAR[dividend][0]'high) = ~VAR[divider][1](~VAR[divider][1]'high);
-  ~SYM[2] <= ~VAR[divider][1](~VAR[divider][1]'high) = '1';
-  ~SYM[3] <= resize(~VAR[dividend][0],~SIZE[~TYPO]+1)   when ~SYM[1] else
-             (resize(~VAR[dividend][0],~SIZE[~TYPO]+1) - resize(~VAR[divider][1],~SIZE[~TYPO]+1) - 1)   when ~SYM[2] else
-             (resize(~VAR[dividend][0],~SIZE[~TYPO]+1) - resize(~VAR[divider][1],~SIZE[~TYPO]+1) + 1);
-  ~SYM[4] <= ~SYM[3] / ~VAR[divider][1]
+  ~SYM[1] <= ~VAR[dividend][1](~VAR[dividend][1]'high) = ~VAR[divider][2](~VAR[divider][2]'high);
+  ~SYM[2] <= ~VAR[divider][2](~VAR[divider][2]'high) = '1';
+  ~SYM[3] <= resize(~VAR[dividend][1],~SIZE[~TYPO]+1)   when ~SYM[1] else
+             (resize(~VAR[dividend][1],~SIZE[~TYPO]+1) - resize(~VAR[divider][2],~SIZE[~TYPO]+1) - 1)   when ~SYM[2] else
+             (resize(~VAR[dividend][1],~SIZE[~TYPO]+1) - resize(~VAR[divider][2],~SIZE[~TYPO]+1) + 1);
+  ~SYM[4] <= ~SYM[3] / ~VAR[divider][2]
       -- pragma translate_off
-      when (~VAR[divider][1] /= 0) else (others => 'X')
+      when (~VAR[divider][2] /= 0) else (others => 'X')
       -- pragma translate_on
       ;
   ~RESULT <= signed(~SYM[4](~SIZE[~TYPO]-1 downto 0));
@@ -319,11 +319,11 @@ end block;"
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.quot#"
     , "kind"      : "Declaration"
-    , "type"      : "quot# :: Signed n -> Signed n -> Signed n"
+    , "type"      : "quot# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "template"  :
-"~RESULT <= ~ARG[0] / ~ARG[1]
+"~RESULT <= ~ARG[1] / ~ARG[2]
     -- pragma translate_off
-    when (~ARG[1] /= 0) else (others => 'X')
+    when (~ARG[2] /= 0) else (others => 'X')
     -- pragma translate_on
     ;"
     }

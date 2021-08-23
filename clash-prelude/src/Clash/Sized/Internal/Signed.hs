@@ -440,16 +440,28 @@ instance KnownNat n => Integral (Signed n) where
   divMod  n d = (n `div#`  d,n `mod#` d)
   toInteger   = toInteger#
 
-quot#,rem# :: Signed n -> Signed n -> Signed n
 {-# NOINLINE quot# #-}
-quot# (S a) (S b) = S (a `quot` b)
+quot# :: forall n. KnownNat n => Signed n -> Signed n -> Signed n
+quot# (S a) (S b)
+  | a == minB && b == (-1) = S minB
+  | otherwise = S (a `quot` b)
+ where
+  S minB = minBound @(Signed n)
+
 {-# NOINLINE rem# #-}
+rem# :: Signed n -> Signed n -> Signed n
 rem# (S a) (S b) = S (a `rem` b)
 
-div#,mod# :: Signed n -> Signed n -> Signed n
 {-# NOINLINE div# #-}
-div# (S a) (S b) = S (a `div` b)
+div# :: forall n. KnownNat n => Signed n -> Signed n -> Signed n
+div# (S a) (S b)
+  | a == minB && b == (-1) = S minB
+  | otherwise = S (a `div` b)
+ where
+  S minB = minBound @(Signed n)
+
 {-# NOINLINE mod# #-}
+mod# :: Signed n -> Signed n -> Signed n
 mod# (S a) (S b) = S (a `mod` b)
 
 {-# NOINLINE toInteger# #-}
