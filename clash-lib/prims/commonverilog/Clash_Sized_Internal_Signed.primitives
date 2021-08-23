@@ -206,8 +206,8 @@
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.quot#"
     , "kind"      : "Expression"
-    , "type"      : "quot# :: Signed n -> Signed n -> Signed n"
-    , "template"  : "~ARG[0] / ~ARG[1]"
+    , "type"      : "quot# :: KnownNat n => Signed n -> Signed n -> Signed n"
+    , "template"  : "~ARG[1] / ~ARG[2]"
     }
   }
 ]
