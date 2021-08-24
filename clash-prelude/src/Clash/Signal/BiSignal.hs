@@ -110,6 +110,8 @@ module Clash.Signal.BiSignal (
   , SBiSignalDefault(..)
   , HasBiSignalDefault(..)
   , mergeBiSignalOuts
+  , bundle
+  , unbundle
   , readFromBiSignal
   , writeToBiSignal
   , veryUnsafeToBiSignalIn
@@ -120,11 +122,12 @@ import           Data.List                  (intercalate)
 import           Data.Maybe                 (fromMaybe,isJust)
 
 import           Clash.Class.HasDomain
-import           Clash.Class.BitPack        (BitPack (..))
+import           Clash.Class.BitPack        (BitPack (..), lsb)
 import           Clash.Sized.BitVector      (BitVector)
 import qualified Clash.Sized.Vector         as V
 import           Clash.Sized.Vector         (Vec)
 import           Clash.Signal.Internal      (Signal(..), Domain, head#, tail#)
+import qualified Clash.Signal.Bundle        as B
 import           Clash.XException           (errorX, fromJustX)
 
 import           GHC.TypeLits               (KnownNat, Nat)
@@ -263,6 +266,32 @@ mergeBiSignalOuts
   -> BiSignalOut defaultState dom m
 mergeBiSignalOuts = mconcat . V.toList
 {-# NOINLINE mergeBiSignalOuts #-}
+
+-- | Unbundle an `n` bit 'BiSignalIn' into an `n` length vector of 1 bit
+-- 'BiSignalIn'
+--
+-- This is useful if operations need to be applied to a subset of the bits
+-- of a 'BiSignalIn'.
+
+-- Note: It's not allowed to write to an individual 'BiSignalIn' in a
+-- clock cycle while not writing to the others. So either all the bits
+-- need to be written to or none of them.
+unbundle :: KnownNat n => BiSignalIn ds dom n -> Vec n (BiSignalIn ds dom 1)
+unbundle (BiSignalIn ds s) = fmap (BiSignalIn ds) unb
+  where
+    f Nothing = V.repeat Nothing
+    f (Just bv) = fmap (Just . V.v2bv . V.singleton) (V.bv2v bv)
+    unb = B.unbundle $ fmap f s
+
+-- | Bundle an `n` length vector of 1 bit 'BiSignalOut'
+-- into a single `n` bit 'BiSignalOut'
+bundle :: KnownNat n => Vec n (BiSignalOut ds dom 1) -> BiSignalOut ds dom n
+bundle vs = BiSignalOut (fmap bun $ seqA $ fmap getSigs vs)
+  where
+    seqA :: Applicative f => Vec n (f a) -> f (Vec n a)
+    seqA = V.traverse# id
+    bun s = fmap (fmap (V.v2bv . fmap lsb) . seqA) (B.bundle s)
+    getSigs (BiSignalOut xs) = xs
 
 writeToBiSignal#
   :: HasCallStack

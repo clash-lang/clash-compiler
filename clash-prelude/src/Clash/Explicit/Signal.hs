@@ -272,7 +272,7 @@ import           Clash.Annotations.Primitive    (hasBlackBox)
 import           Clash.Promoted.Nat             (SNat(..), snatToNum)
 import           Clash.Signal.Bundle
   (Bundle (..), EmptyTuple(..), TaggedEmptyTuple(..), vecBundle#)
-import           Clash.Signal.BiSignal
+import           Clash.Signal.BiSignal          hiding (bundle, unbundle)
 import           Clash.Signal.Internal
 import           Clash.Signal.Internal.Ambiguous
   (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
