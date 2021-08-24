@@ -28,7 +28,7 @@
     }
   }
 , { "BlackBox" :
-    { "name" : "Clash.Signal.BiSignal.bundle#"
+    { "name" : "Clash.Signal.BiSignal.unbundle#"
     , "workInfo" : "Never"
     , "kind" : "Expression"
     , "type" :
