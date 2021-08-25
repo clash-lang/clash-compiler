@@ -1,7 +1,8 @@
 {-|
-  Copyright   :  (C) 2019, Google Inc.
+  Copyright   :  (C) 2019     , Google Inc.,
+                     2021     , QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -156,7 +157,7 @@ instance AutoReg a => AutoReg (Maybe a) where
      val = fromMaybe (deepErrorX "autoReg'.val") <$> input
      valInit = fromMaybe (deepErrorX "autoReg'.valInit") initVal
 
-     valR = autoReg clk rst (enable en tag) valInit val
+     valR = autoReg clk rst (andEnable en tag) valInit val
 
      createMaybe t v = case t of
        True -> Just v
