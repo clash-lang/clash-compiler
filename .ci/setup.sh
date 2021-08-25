@@ -60,10 +60,8 @@ fi
 if [ ! -f cabal.project.local ]; then
   cp .ci/cabal.project.local .
 
-  if [[ "$MULTIPLE_HIDDEN" == "yes" ]]; then
-    sed -i 's/flags: +doctests/flags: +doctests +multiple-hidden/g' cabal.project.local
-  elif [[ "$MULTIPLE_HIDDEN" == "no" ]]; then
-    sed -i 's/flags: +doctests/flags: +doctests -multiple-hidden/g' cabal.project.local
+  if [[ "$MULTIPLE_HIDDEN" == "no" ]]; then
+    sed -i 's/+multiple-hidden/-multiple-hidden/g' cabal.project.local
   fi
 
   if [[ "$CI_COMMIT_BRANCH" =~ "^partial-evaluator-" ]]; then
