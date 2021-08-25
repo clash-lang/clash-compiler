@@ -28,26 +28,18 @@
     }
   }
 , { "BlackBox" :
-    { "name" : "Clash.Signal.BiSignal.unbundle#"
+    { "name" : "Clash.Signal.BiSignal.unbundle"
     , "workInfo" : "Never"
     , "kind" : "Expression"
-    , "type" :
-"unbundle#
-  :: KnownNat n                  --ARG[0]
-  => BiSignalIn ds dom n         --ARG[1]
-  -> Vec n (BiSignalIn ds dom 1)"
+    , "type" : "unbundle :: KnownNat n => BiSignalIn ds dom n -> Vec n (BiSignalIn ds dom 1)"
     , "template" : "~DEVNULL[~ARG[1]]"
     }
   }
 , { "BlackBox" :
-    { "name" : "Clash.Signal.BiSignal.bundle#"
+    { "name" : "Clash.Signal.BiSignal.bundle"
     , "workInfo" : "Never"
     , "kind" : "Expression"
-    , "type" :
-"bundle#
-  :: KnownNat n                   --ARG[0]
-  => Vec n (BiSignalOut ds dom 1) --ARG[1]
-  -> BiSignalOut ds dom n"
+    , "type" : "bundle :: KnownNat n => Vec n (BiSignalOut ds dom 1) -> BiSignalOut ds dom n"
     , "template" : "~DEVNULL[~ARG[1]]"
     }
   }
