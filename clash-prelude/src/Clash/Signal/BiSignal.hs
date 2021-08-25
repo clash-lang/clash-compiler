@@ -282,6 +282,7 @@ mergeBiSignalOuts = mconcat . V.toList
 unbundle :: KnownNat n => BiSignalIn ds dom n -> Vec n (BiSignalIn ds dom 1)
 unbundle = unbundle#
 {-# NOINLINE unbundle #-}
+{-# ANN unbundle hasBlackBox #-}
 
 unbundle# :: KnownNat n => BiSignalIn ds dom n -> Vec n (BiSignalIn ds dom 1)
 unbundle# (BiSignalIn ds s) = fmap (BiSignalIn ds) unb
@@ -289,13 +290,13 @@ unbundle# (BiSignalIn ds s) = fmap (BiSignalIn ds) unb
     f Nothing = V.repeat Nothing
     f (Just bv) = fmap (Just . V.v2bv . V.singleton) (V.bv2v bv)
     unb = B.unbundle $ fmap f s
-{-# NOINLINE unbundle# #-}
 
 -- | Bundle an `n` length vector of 1 bit 'BiSignalOut'
 -- into a single `n` bit 'BiSignalOut'
 bundle :: KnownNat n => Vec n (BiSignalOut ds dom 1) -> BiSignalOut ds dom n
 bundle = bundle#
 {-# NOINLINE bundle #-}
+{-# ANN bundle hasBlackBox #-}
 
 bundle# :: KnownNat n => Vec n (BiSignalOut ds dom 1) -> BiSignalOut ds dom n
 bundle# vs = BiSignalOut (fmap bun $ seqA $ fmap getSigs vs)
@@ -304,7 +305,6 @@ bundle# vs = BiSignalOut (fmap bun $ seqA $ fmap getSigs vs)
     seqA = V.traverse# id
     bun s = fmap (fmap (V.v2bv . fmap lsb) . seqA) (B.bundle s)
     getSigs (BiSignalOut xs) = xs
-{-# NOINLINE bundle# #-}
 
 writeToBiSignal#
   :: HasCallStack
