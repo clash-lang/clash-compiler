@@ -1,4 +1,4 @@
-# Inspection mechanism for optimizations in the CλaSH compiler
+# Inspection mechanism for optimizations in the Clash compiler
 
 Terminal-based interactive UI, where you replay the optimization performed
 by a previous run of the normalization phase.
@@ -8,15 +8,9 @@ For detailed documentation and example visualizations, see the following [README
 
 ## Usage Instructions
 
-0. Enable the `history` flag on the clash-lib package, by adding to your cabal.project.local:
-```
-package clash-lib
-  flags: history
-```
-
-1. Run `clash`, which will write the rewrite history in `history.dat`:
+1. Run `clash` with the `-fclash-debug-history` flag, which will write the rewrite history in the specified file (default `history.dat`):
 ```bash
-> cabal v2-run -- clash --vhdl examples/ALU.hs
+> cabal v2-run -- clash --vhdl -fclash-debug-history examples/ALU.hs
 ```
 
 2. The rewrite history has now been dumped to the file system, in `history.dat`.
