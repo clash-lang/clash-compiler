@@ -1,8 +1,9 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
-                          2017, Google Inc.
+                          2017, Google Inc.,
+                          2021, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Data Constructors in CoreHW
 -}
@@ -16,6 +17,7 @@ module Clash.Core.DataCon
   ( DataCon (..)
   , DcName
   , ConTag
+  , DcStrictness(..)
   )
 where
 
@@ -50,6 +52,8 @@ data DataCon
   -- part of the result of the DataCon, but only of the arguments.
   , dcArgTys :: [Type]
   -- ^ Argument types
+  , dcArgStrict :: [DcStrictness]
+  -- ^ Argument strictness
   , dcFieldLabels :: [Text.Text]
   -- ^ Names of fields. Used when data constructor is referring to a record type.
   } deriving (Generic,NFData,Hashable,Binary)
@@ -72,3 +76,8 @@ instance Uniquable DataCon where
 type ConTag = Int
 -- | DataCon reference
 type DcName = Name DataCon
+
+data DcStrictness
+  = Strict
+  | Lazy
+  deriving (Generic, NFData, Hashable, Binary)
