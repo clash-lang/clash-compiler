@@ -60,7 +60,8 @@ import GHC.Core
    collectArgs, rhssOfAlts, unfoldingTemplate)
 import GHC.Core.DataCon
   (DataCon, dataConExTyCoVars, dataConName, dataConRepArgTys, dataConTag,
-   dataConTyCon, dataConUnivTyVars, dataConWorkId, dataConFieldLabels, flLabel)
+   dataConTyCon, dataConUnivTyVars, dataConWorkId, dataConFieldLabels, flLabel,
+   HsImplBang(..), dataConImplBangs)
 import GHC.Driver.Session (unsafeGlobalDynFlags)
 import GHC.Core.FamInstEnv
   (FamInst (..), FamInstEnvs, familyInstances, normaliseType, emptyFamInstEnvs)
@@ -96,7 +97,7 @@ import CoreFVs    (exprSomeFreeVars)
 import CoreSyn
   (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..), Tickish (..),
    collectArgs, rhssOfAlts, unfoldingTemplate)
-import DataCon    (DataCon,
+import DataCon    (DataCon, HsImplBang(..),
 #if MIN_VERSION_ghc(8,8,0)
                    dataConExTyCoVars,
 #else
@@ -105,7 +106,7 @@ import DataCon    (DataCon,
                    dataConName, dataConRepArgTys,
                    dataConTag, dataConTyCon,
                    dataConUnivTyVars, dataConWorkId,
-                   dataConFieldLabels, flLabel)
+                   dataConFieldLabels, flLabel, dataConImplBangs)
 import DynFlags   (unsafeGlobalDynFlags)
 import FamInstEnv (FamInst (..), FamInstEnvs,
                    familyInstances, normaliseType, emptyFamInstEnvs)
@@ -715,6 +716,7 @@ coreToDataCon dc = do
 #else
       let decLabel = decodeUtf8 . fastStringToByteString . flLabel
 #endif
+      let repBangs = fmap hsImplBangToBool (dataConImplBangs dc)
       let fLabels  = map decLabel (dataConFieldLabels dc)
 
       nm   <- coreToName dataConName getUnique qualifiedNameString dc
@@ -730,10 +732,16 @@ coreToDataCon dc = do
              , C.dcTag         = dataConTag dc
              , C.dcType        = dcTy
              , C.dcArgTys      = repTys
+             , C.dcArgStrict   = repBangs
              , C.dcUnivTyVars  = uTvs
              , C.dcExtTyVars   = eTvs
              , C.dcFieldLabels = fLabels
              }
+
+hsImplBangToBool :: HsImplBang -> C.DcStrictness
+hsImplBangToBool HsLazy = C.Lazy
+hsImplBangToBool HsStrict = C.Strict
+hsImplBangToBool HsUnpack{} = C.Strict
 
 typeConstructorToString
   :: TyCon
