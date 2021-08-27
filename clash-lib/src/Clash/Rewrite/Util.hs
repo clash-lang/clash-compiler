@@ -240,15 +240,11 @@ applyDebug name exprOld hasChanged exprNew = do
                        , "substitution."
                        ])
 
-      -- TODO This check should not have the `hasDebugInfo` call in it, as
-      -- setting dbg_invariants should be all that is necessary to check this.
-      -- However, currently this error is very fragile, as Clash currently does
-      -- not keep casts, so "illegally" changing between `Signal dom a` and `a`
-      -- will trigger this error for many designs.
-      --
-      -- This should be changed when #1064 (PR to keep casts in core) is merged.
+      -- TODO This check should be an error instead of a trace, however this is
+      -- currently very fragile as Clash doesn't keep casts in core. This should
+      -- be changed when #1064 is merged.
       Monad.when (hasDebugInfo AppliedTerm name opts && not (normalizeType tcm beforeTy `aeqType` normalizeType tcm afterTy)) $
-        error ( concat [ $(curLoc)
+        traceM ( concat [ $(curLoc)
                        , "Error when applying rewrite ", name
                        , " to:\n" , before
                        , "\nResult:\n" ++ after ++ "\n"
