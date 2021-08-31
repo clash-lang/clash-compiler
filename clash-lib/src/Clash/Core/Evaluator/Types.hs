@@ -1,9 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 {-|
-  Copyright     : (C) 2020, QBayLogic B.V.
+  Copyright     : (C) 2020-2021, QBayLogic B.V.
   License       : BSD2 (see the file LICENSE)
-  Maintainer    : Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer    : QBayLogic B.V. <devops@qbaylogic.com>
 
   Types for the Partial Evaluator
 -}
@@ -17,10 +17,10 @@ import Data.Maybe (fromMaybe, isJust)
 import Data.Text.Prettyprint.Doc (hsep)
 
 import Clash.Core.DataCon (DataCon)
+import Clash.Core.HasType
 import Clash.Core.Literal (Literal(CharLiteral))
 import Clash.Core.Pretty (fromPpr, ppr, showPpr)
 import Clash.Core.Term (Term(..), PrimInfo(..), TickInfo, Alt)
-import Clash.Core.TermInfo (termType)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type)
 import Clash.Core.Var (Id, IdScope(..), TyVar)
@@ -56,7 +56,7 @@ whnf
 whnf eval tcm isSubj m
   | isSubj =
       -- See [Note: empty case expressions]
-      let ty = termType tcm (mTerm m)
+      let ty = inferCoreTypeOf tcm (mTerm m)
        in go (stackPush (Scrutinise ty []) m)
   | otherwise = go m
   where
@@ -228,7 +228,7 @@ instance ClashPretty StackFrame where
   clashPretty (Apply i) = hsep ["Apply", fromPpr i]
   clashPretty (Instantiate t) = hsep ["Instantiate", fromPpr t]
   clashPretty (PrimApply p tys vs ts) =
-    hsep ["PrimApply", fromPretty (primName p), "::", fromPpr (primType p),
+    hsep ["PrimApply", fromPretty (primName p), "::", fromPpr (coreTypeOf p),
           "; type args=", fromPpr tys,
           "; val args=", fromPpr (map valToTerm vs),
           "term args=", fromPpr ts]
@@ -349,4 +349,3 @@ getTerm = mTerm
 
 setTerm :: Term -> Machine -> Machine
 setTerm x m = m { mTerm = x }
-

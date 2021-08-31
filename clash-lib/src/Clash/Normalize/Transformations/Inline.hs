@@ -59,13 +59,14 @@ import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.DataCon (DataCon(..))
 import Clash.Core.FreeVars
   (countFreeOccurances, freeLocalIds, localIdDoesNotOccurIn)
+import Clash.Core.HasType
 import Clash.Core.Name (Name(..), NameSort(..))
 import Clash.Core.Pretty (PrettyOptions(..), showPpr, showPpr')
 import Clash.Core.Subst
 import Clash.Core.Term
   ( CoreContext(..), Pat(..), PrimInfo(..), Term(..), WorkInfo(..), collectArgs
   , collectArgsTicks, mkApps , mkTicks, stripTicks)
-import Clash.Core.TermInfo (isLocalVar, isPolyFun, termSize, termType)
+import Clash.Core.TermInfo (isLocalVar, isPolyFun, termSize)
 import Clash.Core.Type
   (TypeView(..), isClassTy, isPolyFunCoreTy, tyView)
 import Clash.Core.Util (isSignalType, primUCo)
@@ -406,8 +407,8 @@ collapseRHSNoops _ (Letrec binds body) = do
 
     collapseToIdentity iD identity = do
       tcm <- Lens.view tcCache
-      let aTy = termType tcm identity
-          bTy = varType iD
+      let aTy = inferCoreTypeOf tcm identity
+          bTy = coreTypeOf iD
       return $ primUCo `TyApp` aTy `TyApp` bTy `App` identity
 
     getIdentity primInfo termArgs = do
@@ -506,7 +507,7 @@ inlineNonRepWorker e@(Case scrut altsTy alts)
     limit     <- Lens.use (extra.inlineLimit)
     tcm       <- Lens.view tcCache
     let
-      scrutTy = termType tcm scrut
+      scrutTy = inferCoreTypeOf tcm scrut
 
       -- Constraint dictionary inlining always terminates, so we ignore the
       -- usual inline safeguards.
@@ -585,7 +586,7 @@ inlineOrLiftNonRep _ e = return e
 inlineSimIO :: HasCallStack => NormRewrite
 inlineSimIO = inlineBinders test
   where
-    test _ (i,_) = case tyView (varType i) of
+    test _ (i,_) = case tyView (coreTypeOf i) of
       TyConApp tc _ -> return $! nameOcc tc == Text.showt ''SimIO.SimIO
       _ -> return False
 {-# SCC inlineSimIO #-}
@@ -622,7 +623,7 @@ inlineWorkFree :: HasCallStack => NormRewrite
 inlineWorkFree _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
   = do
     tcm <- Lens.view tcCache
-    let eTy = termType tcm e
+    let eTy = inferCoreTypeOf tcm e
     argsHaveWork <- or <$> mapM (either expressionHasWork
                                         (const (pure False)))
                                 args
@@ -653,13 +654,13 @@ inlineWorkFree _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
     expressionHasWork e' = do
       let fvIds = Lens.toListOf freeLocalIds e'
       tcm   <- Lens.view tcCache
-      let e'Ty     = termType tcm e'
+      let e'Ty     = inferCoreTypeOf tcm e'
           isSignal = isSignalType tcm e'Ty
       return (not (null fvIds) || isSignal)
 
 inlineWorkFree _ e@(Var f) = do
   tcm <- Lens.view tcCache
-  let fTy      = varType f
+  let fTy      = coreTypeOf f
       closed   = not (isPolyFunCoreTy tcm fTy)
       isSignal = isSignalType tcm fTy
   untranslatable <- isUntranslatableType True fTy

@@ -81,6 +81,7 @@ import           Unique              (getKey)
 import           Clash.Class.BitPack (pack,unpack)
 import           Clash.Core.DataCon  (DataCon (..))
 import           Clash.Core.Evaluator.Types
+import           Clash.Core.HasType  (piResultTys, applyTypeToArgs)
 import           Clash.Core.Literal  (Literal (..))
 import           Clash.Core.Name
   (Name (..), NameSort (..), mkUnsafeSystemName)
@@ -88,7 +89,6 @@ import           Clash.Core.Pretty   (showPpr)
 import           Clash.Core.Term
   (IsMultiPrim (..), Pat (..), PrimInfo (..), Term (..), WorkInfo (..), mkApps,
    PrimUnfolding(..))
-import           Clash.Core.TermInfo (piResultTys, applyTypeToArgs)
 import           Clash.Core.Type
   (Type (..), ConstTy (..), LitTy (..), TypeView (..), mkFunTy, mkTyConApp,
    splitFunForallTy, tyView)

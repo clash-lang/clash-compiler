@@ -20,10 +20,10 @@ import qualified Data.List as List
 import qualified Data.Monoid as Monoid
 import GHC.Stack (HasCallStack)
 
+import Clash.Core.HasType
 import Clash.Core.Name (Name(..))
 import Clash.Core.Subst (extendIdSubst, mkSubst, substTm)
 import Clash.Core.Term (Term(..), collectArgsTicks, mkApps, mkLams, mkTicks)
-import Clash.Core.TermInfo (termType)
 import Clash.Core.Type (Type, mkPolyFunTy, splitFunForallTy)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Util (Projections (..), shouldSplit)
@@ -55,7 +55,7 @@ separateArguments (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, 
   -- We ensure that both the type of the global variable reference is updated
   -- to take into account the changed arguments, and that we apply the global
   -- function with the split apart arguments.
-  let (argTys0,resTy) = splitFunForallTy (varType g)
+  let (argTys0,resTy) = splitFunForallTy (coreTypeOf g)
   (concat -> args1, Monoid.getAny -> hasChanged)
     <- listen (mapM (uncurry splitArg) (zip argTys0 args))
   if hasChanged then
@@ -76,7 +76,7 @@ separateArguments (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, 
   splitArg tv arg@(Right _)    = return [(tv,arg)]
   splitArg ty arg@(Left tmArg) = do
     tcm <- Lens.view tcCache
-    let argTy = termType tcm tmArg
+    let argTy = inferCoreTypeOf tcm tmArg
     case shouldSplit tcm argTy of
       Just (_,Projections projections,_) -> do
         tmArgs <- projections is0 tmArg
@@ -98,7 +98,7 @@ separateLambda
   -> Maybe Term
   -- ^ If lambda is split up, this function returns a Just containing the new term
 separateLambda tcm ctx@(TransformContext is0 _) b eb0 =
-  case shouldSplit tcm (varType b) of
+  case shouldSplit tcm (coreTypeOf b) of
     Just (dc, _, argTys) ->
       let
         nm = mkDerivedName ctx (nameOcc (varName b))

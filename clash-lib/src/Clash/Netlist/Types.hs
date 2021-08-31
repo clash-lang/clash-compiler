@@ -68,8 +68,9 @@ import Clash.Annotations.BitRepresentation  (FieldAnn)
 import Clash.Annotations.Primitive          (HDL(..))
 import Clash.Annotations.TopEntity          (TopEntity)
 import Clash.Backend                        (Backend)
+import Clash.Core.HasType
 import Clash.Core.Type                      (Type)
-import Clash.Core.Var                       (Attr', Id, varType)
+import Clash.Core.Var                       (Attr', Id)
 import Clash.Core.TyCon                     (TyConMap)
 import Clash.Core.VarEnv                    (VarEnv)
 import Clash.Driver.Types                   (BindingMap, ClashOpts)
@@ -795,8 +796,8 @@ netlistTypes
   -> [Type]
 netlistTypes = \case
   NetlistId _ t -> [t]
-  CoreId i -> [varType i]
-  MultiId is -> map varType is
+  CoreId i -> [coreTypeOf i]
+  MultiId is -> map coreTypeOf is
 
 -- | Return the type of a 'NetlistId', fails on 'MultiId'
 netlistTypes1
@@ -805,7 +806,7 @@ netlistTypes1
   -> Type
 netlistTypes1 = \case
   NetlistId _ t -> t
-  CoreId i -> varType i
+  CoreId i -> coreTypeOf i
   m -> error ("netlistTypes1 MultiId: " ++ show m)
 
 -- | Type of declaration, concurrent or sequential

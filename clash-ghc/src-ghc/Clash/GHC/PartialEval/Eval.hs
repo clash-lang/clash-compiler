@@ -38,13 +38,13 @@ import           BasicTypes (InlineSpec(..))
 #endif
 
 import           Clash.Core.DataCon (DataCon(..))
+import           Clash.Core.HasType
 import           Clash.Core.Literal (Literal(..))
 import           Clash.Core.PartialEval.AsTerm
 import           Clash.Core.PartialEval.Monad
 import           Clash.Core.PartialEval.NormalForm
 import           Clash.Core.Subst (substTy)
 import           Clash.Core.Term
-import           Clash.Core.TermInfo
 import           Clash.Core.TyCon (tyConDataCons)
 import           Clash.Core.Type
 import           Clash.Core.TysPrim (integerPrimTy)
@@ -602,8 +602,8 @@ apply val arg = do
     f ->
       error ("apply: Cannot apply " <> show arg <> " to " <> show f)
  where
-  -- Somewhat of a cheat, but very quick to implement.
-  valueType tcm = termType tcm . asTerm
+  -- TODO Write an instance for InferType Value and use that instead
+  valueType tcm = inferCoreTypeOf tcm . asTerm
 
 applyTy :: Value -> Type -> Eval Value
 applyTy val ty = do

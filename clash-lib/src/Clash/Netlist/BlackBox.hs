@@ -61,6 +61,7 @@ import           Clash.Annotations.Primitive
   , extractPrim)
 import           Clash.Core.DataCon            as D (dcTag)
 import           Clash.Core.FreeVars           (freeIds)
+import           Clash.Core.HasType
 import           Clash.Core.Literal            as L (Literal (..))
 import           Clash.Core.Name
   (Name (..), mkUnsafeSystemName)
@@ -133,11 +134,11 @@ mkBlackBoxContext bbName resIds args@(lefts -> termArgs) = do
     let
       resNms = map id2identifier resIds
       resNm = fromMaybe (error "mkBlackBoxContext: head") (listToMaybe resNms)
-    resTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc) . V.varType) resIds
+    resTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc) . coreTypeOf) resIds
     (imps,impDecls) <- unzip <$> zipWithM (mkArgument bbName resNm) [0..] termArgs
     (funs,funDecls) <-
       mapAccumLM
-        (addFunction (map V.varType resIds))
+        (addFunction (map coreTypeOf resIds))
         IntMap.empty
         (zip termArgs [0..])
 
@@ -225,7 +226,7 @@ mkArgument
                   )
 mkArgument bbName bndr nArg e = do
     tcm   <- Lens.use tcCache
-    let ty = termType tcm e
+    let ty = inferCoreTypeOf tcm e
     iw    <- Lens.use intWidth
     hwTyM <- fmap stripFiltered <$> N.termHWTypeM e
     let eTyMsg = "(" ++ showPpr e ++ " :: " ++ showPpr ty ++ ")"
@@ -491,7 +492,7 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                   return (exprN,dcDecls)
                 [Right _, Left scrut] -> do
                   tcm     <- Lens.use tcCache
-                  let scrutTy = termType tcm scrut
+                  let scrutTy = inferCoreTypeOf tcm scrut
                   (scrutExpr,scrutDecls) <-
                     mkExpr False Concurrent (NetlistId (Id.unsafeMake "c$tte_rhs") scrutTy) scrut
                   case scrutExpr of
@@ -509,7 +510,7 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                 return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
               [Right _,Left scrut] -> do
                 tcm      <- Lens.use tcCache
-                let scrutTy = termType tcm scrut
+                let scrutTy = inferCoreTypeOf tcm scrut
                 scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
                 (scrutExpr,scrutDecls) <-
                   mkExpr False Concurrent (NetlistId (Id.unsafeMake "c$dtt_rhs") scrutTy) scrut
@@ -738,14 +739,14 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
           let u = case dst of
                     CoreId u0 -> u0
                     _ -> uniqAway is0
-                           (mkLocalId (termType tcm e)
+                           (mkLocalId (inferCoreTypeOf tcm e)
                                       (mkUnsafeSystemName "mealyres" 0))
           in  (bsN ++ [(u,e)], u)
         e ->
           let u = case dst of
                     CoreId u0 -> u0
                     _ -> uniqAway is0
-                           (mkLocalId (termType tcm e)
+                           (mkLocalId (inferCoreTypeOf tcm e)
                                       (mkUnsafeSystemName "mealyres" 0))
           in  ([(u,e)], u)
 #if __GLASGOW_HASKELL__ >= 900
@@ -757,7 +758,7 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
       -- Take into account that the state argument is split over multiple
       -- binders because it contained types that are not allowed to occur in
       -- a HDL aggregate type
-      mealyInitLength = length (splitShouldSplit tcm [termType tcm mealyInit])
+      mealyInitLength = length (splitShouldSplit tcm [inferCoreTypeOf tcm mealyInit])
       (sArgs,iArgs) = splitAt mealyInitLength args1
   -- Give all binders a unique name
   let sBindings = map (,mealyInit) sArgs ++ map (,mealyIn) iArgs ++ bs
@@ -841,13 +842,13 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
       -- because we're basically clocked logic; so we need to have our outputs
       -- ready before the ambient system starts sampling them. The clockGen code
       -- ensures that the "opposite" edge always comes first.
-      kdTy <- unsafeCoreTypeToHWTypeM $(curLoc) (termType tcm kd)
+      kdTy <- unsafeCoreTypeToHWTypeM $(curLoc) (inferCoreTypeOf tcm kd)
       let edge = case stripVoid (stripFiltered kdTy) of
                    KnownDomain _ _ Rising _ _ _  -> Falling
                    KnownDomain _ _ Falling _ _ _ -> Rising
                    _ -> error "internal error"
       (clkExpr,clkDecls) <-
-        mkExpr False Concurrent (NetlistId (Id.unsafeMake "__MEALY_CLK__") (termType tcm clk)) clk
+        mkExpr False Concurrent (NetlistId (Id.unsafeMake "__MEALY_CLK__") (inferCoreTypeOf tcm clk)) clk
 
       -- collect the declarations related to the input
       let netDeclsInp1 = netDeclsInp ++ inpDeclsMisc
@@ -947,7 +948,7 @@ unSimIO
   -> Term
   -> Term
 unSimIO tcm arg =
-  let argTy = termType tcm arg
+  let argTy = inferCoreTypeOf tcm arg
   in  case tyView argTy of
         TyConApp _ [tcArg] ->
           mkApps (Prim (PrimInfo
@@ -1006,7 +1007,7 @@ mkFunInput resId e =
                 P.BlackBoxHaskell{name=pName, functionName=fName, function=(_, func)} -> do
                   -- Determine result type of this blackbox. If it's not a
                   -- function, simply use its term type.
-                  let (_, resTy) = splitFunTys tcm (termType tcm e)
+                  let (_, resTy) = splitFunTys tcm (inferCoreTypeOf tcm e)
                   bbhRes <- func True pName args [resTy]
                   case bbhRes of
                     Left err ->
@@ -1017,7 +1018,7 @@ mkFunInput resId e =
                         Left ( bbKind, bbOutputReg, bbLibrary, bbImports
                              , bbIncludes, pName, template)
             Data dc -> do
-              let eTy = termType tcm e
+              let eTy = inferCoreTypeOf tcm e
                   (_,resTy) = splitFunTys tcm eTy
 
               resHTyM0 <- coreTypeToHWTypeM resTy
@@ -1169,7 +1170,7 @@ mkFunInput resId e =
   where
     goExpr app@(collectArgsTicks -> (C.Var fun,args@(_:_),ticks)) = do
       tcm <- Lens.use tcCache
-      resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (termType tcm app)
+      resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (inferCoreTypeOf tcm app)
       let (tmArgs,tyArgs) = partitionEithers args
       if null tyArgs
         then
@@ -1185,7 +1186,7 @@ mkFunInput resId e =
           throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
     goExpr e' = do
       tcm <- Lens.use tcCache
-      let eType = termType tcm e'
+      let eType = inferCoreTypeOf tcm e'
       (appExpr,appDecls) <- mkExpr False Concurrent (NetlistId (Id.unsafeMake "c$bb_res") eType) e'
       let assn = Assignment (Id.unsafeMake "~RESULT") appExpr
       nm <- if null appDecls
@@ -1209,7 +1210,7 @@ mkFunInput resId e =
 
     go _ _ (Case scrut ty [alt]) = do
       tcm <- Lens.use tcCache
-      let sTy = termType tcm scrut
+      let sTy = inferCoreTypeOf tcm scrut
       (projection,decls) <- mkProjection False (NetlistId (Id.unsafeMake "c$bb_res") sTy) scrut ty alt
       let assn = Assignment (Id.unsafeMake "~RESULT") projection
       nm <- if null decls
@@ -1219,7 +1220,7 @@ mkFunInput resId e =
 
     go _ _ (Case scrut ty alts@(_:_:_)) = do
       tcm <- Lens.use tcCache
-      let scrutTy = termType tcm scrut
+      let scrutTy = inferCoreTypeOf tcm scrut
       scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
       ite <- Lens.use backEndITE
       let wr = case iteAlts scrutHTy alts of

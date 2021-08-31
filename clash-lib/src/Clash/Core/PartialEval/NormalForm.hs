@@ -79,6 +79,8 @@ data Neutral a
   | NeCase   !a !Type ![(Pat, a)]
   deriving (Show)
 
+-- TODO Write an instance (InferType a) => InferType (Neutral a)
+
 -- | A term which has been potentially evaluated to WHNF. If evaluation has
 -- occurred, then there will be no redexes at the head of the Value, but
 -- sub-terms may still have redexes. Data constructors are only considered to
@@ -100,6 +102,8 @@ data Value
   | VTick     !Value !TickInfo
   | VThunk    !Term !LocalEnv
   deriving (Show)
+
+-- TODO Write an instance InferType Value
 
 mkValueTicks :: Value -> [TickInfo] -> Value
 mkValueTicks = foldl VTick

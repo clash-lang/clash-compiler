@@ -15,8 +15,8 @@ import           GHC.Stack                       (HasCallStack)
 import           Clash.Annotations.Primitive     (HDL(..))
 import           Clash.Backend
   (Backend, blockDecl, hdlKind)
+import           Clash.Core.HasType
 import           Clash.Core.Term                 (Term(Var), varToId)
-import           Clash.Core.TermInfo             (termType)
 import           Clash.Core.TermLiteral          (termToDataError)
 import           Clash.Util                      (indexNote)
 import           Clash.Netlist                   (mkExpr)
@@ -72,7 +72,7 @@ checkBBF _isD _primName args _ty =
   bindMaybe (Just nm) t = do
     tcm <- Lens.use tcCache
     newId <- Id.make (Text.pack nm)
-    (expr0, decls) <- mkExpr False Concurrent (NetlistId newId (termType tcm t)) t
+    (expr0, decls) <- mkExpr False Concurrent (NetlistId newId (inferCoreTypeOf tcm t)) t
     pure
       ( newId
       , decls ++ [sigDecl Bool newId, Assignment newId expr0] )

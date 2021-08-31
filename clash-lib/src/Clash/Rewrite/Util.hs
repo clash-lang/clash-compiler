@@ -64,12 +64,12 @@ import           Clash.Core.Evaluator.Types  (PureHeap, whnf')
 import           Clash.Core.FreeVars
   (freeLocalVars, localIdDoesNotOccurIn, localIdOccursIn,
    termFreeVars', freeLocalIds)
+import           Clash.Core.HasType
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
   (substTmEnv, aeqTerm, aeqType, extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term
-import           Clash.Core.TermInfo
 import           Clash.Core.TyCon            (TyConMap)
 import           Clash.Core.Type             (Type (..), normalizeType, typeKind)
 import           Clash.Core.Var
@@ -203,9 +203,9 @@ applyDebug name exprOld hasChanged exprNew = do
 
     Monad.when (dbg_invariants opts && hasChanged) $ do
       tcm                  <- Lens.view tcCache
-      let beforeTy          = termType tcm exprOld
+      let beforeTy          = inferCoreTypeOf tcm exprOld
           beforeFV          = Lens.setOf freeLocalVars exprOld
-          afterTy           = termType tcm exprNew
+          afterTy           = inferCoreTypeOf tcm exprNew
           afterFV           = Lens.setOf freeLocalVars exprNew
           newFV             = not (afterFV `Set.isSubsetOf` beforeFV)
           accidentalShadows = findAccidentialShadows exprNew
@@ -333,7 +333,7 @@ mkBinderFor
   -> m (Either Id TyVar)
 mkBinderFor is tcm name (Left term) = do
   name' <- cloneNameWithInScopeSet is name
-  let ty = termType tcm term
+  let ty = inferCoreTypeOf tcm term
   return (Left (mkLocalId ty (coerce name')))
 
 mkBinderFor is tcm name (Right ty) = do
@@ -556,7 +556,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
 
   -- Make a new global ID
   tcm       <- Lens.view tcCache
-  let newBodyTy = termType tcm $ mkTyLams (mkLams e boundFVs) boundFTVs
+  let newBodyTy = inferCoreTypeOf tcm $ mkTyLams (mkLams e boundFVs) boundFTVs
   (cf,sp)   <- Lens.use curFun
   binders <- Lens.use bindings
   newBodyNm <-
@@ -626,7 +626,7 @@ mkFunction
   -- ^ Name with a proper unique and the type of the function
 mkFunction bndrNm sp inl body = do
   tcm <- Lens.view tcCache
-  let bodyTy = termType tcm body
+  let bodyTy = inferCoreTypeOf tcm body
   binders <- Lens.use bindings
   bodyNm <- cloneNameWithBindingMap binders bndrNm
   addGlobalBind bodyNm bodyTy sp inl body
@@ -679,7 +679,7 @@ isUntranslatable stringRepresentable tm = do
                              <*> Lens.view customReprs
                              <*> pure stringRepresentable
                              <*> pure tcm
-                             <*> pure (termType tcm tm))
+                             <*> pure (inferCoreTypeOf tcm tm))
 
 {-# INLINE isUntranslatableType #-}
 -- | Determine if a type cannot be represented in hardware
@@ -784,7 +784,7 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
     toLetBinding :: (Unique,Term) -> LetBinding
     toLetBinding (uniq,term) = (nm, term)
       where
-        ty = termType tcm term
+        ty = inferCoreTypeOf tcm term
         nm = mkLocalId ty (mkUnsafeSystemName "x" uniq) -- See [Note: Name re-creation]
 
     inlineTest bs _ (_, stripTicks -> e_) = isWorkFree workFreeBinders bs e_

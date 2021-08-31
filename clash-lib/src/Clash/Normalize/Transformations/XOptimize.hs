@@ -26,13 +26,13 @@ import Clash.XException (errorX)
 
 import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.DataCon (DataCon)
+import Clash.Core.HasType
 import Clash.Core.Term
   ( Alt, IsMultiPrim(..), LetBinding, Pat(..), PrimInfo(..), Term(..)
   , WorkInfo(..), collectArgs, PrimUnfolding(..))
-import Clash.Core.TermInfo (termType)
 import Clash.Core.Type (TyVar, Type)
 import Clash.Core.Util (mkInternalVar)
-import Clash.Core.Var (Id, Var(..))
+import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (InScopeSet)
 import Clash.Netlist.BlackBox.Types (Element(Err))
 import Clash.Netlist.Types (BlackBox(..))
@@ -90,9 +90,9 @@ xOptimize _ e = return e
 xOptimizeSingle :: InScopeSet -> Term -> Alt -> NormalizeSession Term
 xOptimizeSingle is subj (DataPat dc tvs vars, expr) = do
   tcm    <- Lens.view tcCache
-  subjId <- mkInternalVar is "subj" (termType tcm subj)
+  subjId <- mkInternalVar is "subj" (inferCoreTypeOf tcm subj)
 
-  let fieldTys = fmap varType vars
+  let fieldTys = fmap coreTypeOf vars
   lets <- Monad.zipWithM (mkFieldSelector is subjId dc tvs fieldTys) vars [0..]
 
   changed (Letrec ((subjId, subj) : lets) expr)

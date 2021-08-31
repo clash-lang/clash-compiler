@@ -58,13 +58,14 @@ import           Unique                  (getKey)
 import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.FreeVars
   (globalIds, hasLocalFreeVars, globalIdOccursIn)
+import           Clash.Core.HasType
 import           Clash.Core.Name         (Name(nameOcc,nameUniq))
 import           Clash.Core.Pretty       (showPpr)
 import           Clash.Core.Subst
   (deShadowTerm, extendTvSubst, mkSubst, substTm, substTy,
    substId, extendIdSubst)
 import           Clash.Core.Term
-import           Clash.Core.TermInfo     (isPolyFun, termType)
+import           Clash.Core.TermInfo     (isPolyFun)
 import           Clash.Core.TyCon        (TyConMap)
 import           Clash.Core.Type
   (Type(ForAllTy,LitTy, VarTy), LitTy(SymTy), TypeView (..), tyView,
@@ -304,7 +305,7 @@ constantSpecInfo ctx e = do
   --
   -- I believe we can remove this special case in the future by looking at the
   -- primitive's workinfo.
-  if isClockOrReset tcm (termType tcm e) then
+  if isClockOrReset tcm (inferCoreTypeOf tcm e) then
     case collectArgs e of
       (Prim p, _)
         | primName p == Text.showt 'removedArg ->
@@ -428,7 +429,7 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm) = makeCachedU nm (extra.
   old <- Lens.use curFun
   tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
   curFun .= old
-  let ty' = termType tcm tm3
+  let ty' = inferCoreTypeOf tcm tm3
   return (Binding nm'{varType = ty'} sp inl pr tm3)
 
 -- | Turn type equality constraints into substitutions and apply them.
@@ -454,13 +455,13 @@ substWithTyEq e0 = go [] False e0
     -> Term
   go args changed (TyLam tv e) = go (Right tv : args) changed e
   go args changed (Lam v e)
-    | TyConApp (nameUniq -> tcUniq) (tvFirst -> Just (tv, ty)) <- tyView (varType v)
+    | TyConApp (nameUniq -> tcUniq) (tvFirst -> Just (tv, ty)) <- tyView (coreTypeOf v)
     , tcUniq == getKey eqTyConKey
     , Right tv `elem` args
     = let
         tvs = rights args
         subst0 = extendTvSubst (mkSubst $ mkInScopeSet $ mkVarSet tvs) tv ty
-        removedTy = substTy subst0 $ varType v
+        removedTy = substTy subst0 $ coreTypeOf v
         subst1 = extendIdSubst subst0 v (TyApp (Prim removedArg) removedTy)
       in go (Left (substId subst0 v) : (args List.\\ [Right tv])) True (substTm "substWithTyEq e" subst1 e)
     | otherwise = go (Left v : args) changed e

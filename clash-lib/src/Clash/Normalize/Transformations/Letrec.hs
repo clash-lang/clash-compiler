@@ -44,13 +44,14 @@ import Clash.Sized.Vector as Vec (Vec(Cons), splitAt)
 import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.DataCon (DataCon(..))
 import Clash.Core.FreeVars (freeLocalIds, localIdOccursIn, localIdsDoNotOccurIn)
+import Clash.Core.HasType
 import Clash.Core.Name (mkUnsafeSystemName, nameOcc)
 import Clash.Core.Subst
 import Clash.Core.Term
   ( LetBinding, Pat(..), PrimInfo(..), Term(..), collectArgs, collectArgsTicks
   , collectTicks, isLambdaBodyCtx, isTickCtx, mkApps, mkLams, mkTicks
   , partitionTicks, stripTicks)
-import Clash.Core.TermInfo (isCon, isLet, isLocalVar, isTick, termType)
+import Clash.Core.TermInfo (isCon, isLet, isLocalVar, isTick)
 import Clash.Core.TyCon (tyConDataCons)
 import Clash.Core.Type
   (Type(..), TypeView(..), normalizeType
@@ -123,7 +124,7 @@ removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
         return e
 
   where
-    arity = length . Either.rights . fst $ splitFunForallTy (primType pInfo)
+    arity = length . Either.rights . fst $ splitFunForallTy (coreTypeOf pInfo)
 
     go _ _ _ [] = return []
     go tcm !n used (Right ty:args') = do
@@ -136,7 +137,7 @@ removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
           | primName p0 == Text.showt 'removedArg
           -> return (Left tm : args'')
         _ -> do
-          let ty = termType tcm tm
+          let ty = inferCoreTypeOf tcm tm
               p' = TyApp (Prim removedArg) ty
           if n < arity && n `notElem` used
              then changed (Left p' : args'')
@@ -157,7 +158,7 @@ removeUnusedExpr _ e@(collectArgsTicks -> (Data dc, [_,Right aTy,Right nTy,_,Lef
       Right 0
         | (con, _) <- collectArgs nil
         , not (isCon con)
-        -> let eTy = termType tcm e
+        -> let eTy = inferCoreTypeOf tcm e
                (TyConApp vecTcNm _) = tyView eTy
                (Just vecTc) = lookupUniqMap vecTcNm tcm
                [nilCon,consCon] = tyConDataCons vecTc
@@ -307,8 +308,8 @@ recToLetRec (TransformContext is0 []) e = do
     eqArg _ v1 v2@(stripTicks -> Var {})
       = v1 == v2
     eqArg tcm v1 v2@(collectArgs . stripTicks -> (Data _, args'))
-      | let t1 = normalizeType tcm (termType tcm v1)
-      , let t2 = normalizeType tcm (termType tcm v2)
+      | let t1 = normalizeType tcm (inferCoreTypeOf tcm v1)
+      , let t2 = normalizeType tcm (inferCoreTypeOf tcm v2)
       , t1 == t2
       = if isClassConstraint t1 then
           -- Class constraints are equal if their types are equal, so we can

@@ -99,6 +99,7 @@ import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
 import           Clash.Core.PartialEval as PE     (Evaluator)
 import           Clash.Core.Evaluator.Types as WHNF (Evaluator)
+import           Clash.Core.HasType
 import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr')
 import           Clash.Core.Type
@@ -226,7 +227,7 @@ splitTopEntityT
 splitTopEntityT tcm bindingsMap tt@(TopEntityT id_ (Just t@(Synthesize {})) _) =
   case lookupVarEnv id_ bindingsMap of
     Just (Binding _id sp _ _ _) ->
-      tt{topAnnotation=Just (splitTopAnn tcm sp (varType id_) t)}
+      tt{topAnnotation=Just (splitTopAnn tcm sp (coreTypeOf id_) t)}
     Nothing ->
       error "Internal error in 'splitTopEntityT'. Please report as a bug."
 splitTopEntityT _ _ t = t
@@ -234,7 +235,7 @@ splitTopEntityT _ _ t = t
 -- | Remove constraints such as 'a ~ 3'.
 removeForAll :: TopEntityT -> TopEntityT
 removeForAll (TopEntityT var annM isTb) =
-  TopEntityT var{varType=tvSubstWithTyEq (varType var)} annM isTb
+  TopEntityT var{varType=tvSubstWithTyEq (coreTypeOf var)} annM isTb
 
 -- | Given a list of all found top entities and _maybe_ a top entity (+dependencies)
 -- passed in by '-main-is', return the list of top entities Clash needs to
