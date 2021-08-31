@@ -183,7 +183,10 @@ piResultTyMaybe m ty arg
   | Just ty' <- coreView1 m ty
   = piResultTyMaybe m ty' arg
   | FunTy a res <- tyView ty
-  = if debugIsOn && not (aeqType a arg) then error [I.i|
+  -- TODO coreView is used here because the partial evaluator will sometimes
+  -- encounter / not encounter a Signal as an argument unexpectedly. When PR
+  -- #1064 is merged the coreView calls should be removed again.
+  = if debugIsOn && not (aeqType (coreView m a) (coreView m arg)) then error [I.i|
       Unexpected application. A function with type:
 
         #{showPpr ty}
@@ -234,7 +237,10 @@ piResultTys m ty origArgs@(arg:args)
   | Just ty' <- coreView1 m ty
   = piResultTys m ty' origArgs
   | FunTy a res <- tyView ty
-  = if debugIsOn && not (aeqType a arg) then error [I.i|
+  -- TODO coreView is used here because the partial evaluator will sometimes
+  -- encounter / not encounter a Signal as an argument unexpectedly. When PR
+  -- #1064 is merged the coreView calls should be removed again.
+  = if debugIsOn && not (aeqType (coreView m a) (coreView m arg)) then error [I.i|
       Unexpected application. A function with type:
 
         #{showPpr ty}
