@@ -2,8 +2,9 @@
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016     , Myrtle Software Ltd,
                      2017     , Google Inc.
+                     2021     , QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Types in CoreHW
 -}
@@ -251,6 +252,7 @@ coreView1 tcMap ty = case tyView ty of
          AlgTyCon {algTcRhs = (NewTyCon _ nt)}
            -> newTyConInstRhs nt args
          _ -> reduceTypeFamily tcMap ty
+  OtherType (AnnType _ ty') -> coreView1 tcMap ty'
   _ -> Nothing
 
 -- | Instantiate and Apply the RHS/Original of a NewType with the given
