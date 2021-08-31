@@ -52,6 +52,7 @@ import Clash.Sized.Internal.Unsigned as U (Unsigned, eq#)
 import Clash.Core.DataCon (DataCon(..))
 import Clash.Core.EqSolver
 import Clash.Core.FreeVars (freeLocalIds, localVarsDoNotOccurIn)
+import Clash.Core.HasType
 import Clash.Core.Literal (Literal(..))
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty (showPpr)
@@ -59,10 +60,8 @@ import Clash.Core.Subst
 import Clash.Core.Term
   ( Alt, Pat(..), PrimInfo(..), Term(..), collectArgs, collectArgsTicks
   , collectTicks, mkApps, mkTicks, patIds, stripTicks)
-import Clash.Core.TermInfo (termType)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (LitTy(..), Type(..), TypeView(..), coreView1, tyView)
-import Clash.Core.Var (Var(..))
 import Clash.Core.VarEnv
   ( InScopeSet, elemVarSet, extendInScopeSet, extendInScopeSetList, mkVarSet
   , unitVarSet, uniqAway)
@@ -271,7 +270,7 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- or a primitive for which the evaluator doesn't have any evaluation
       -- rules.
       _ -> do
-        let subjTy = termType tcm subj
+        let subjTy = inferCoreTypeOf tcm subj
         tran <- Lens.view typeTranslator
         reprs <- Lens.view customReprs
         case (`evalState` mempty) (coreTypeToHWType tran reprs tcm subjTy) of
@@ -294,7 +293,7 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
               (caseOneAlt e)
 
   -- The subject is a variable
-  (Var v, [], _) | isNum0 (varType v) ->
+  (Var v, [], _) | isNum0 (coreTypeOf v) ->
     -- If we know that the type of the subject is zero-bits wide and
     -- one of the Clash number types. Then the only valid alternative is
     -- the one that can match on the literal "0", so try 'caseCon' with

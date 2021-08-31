@@ -26,12 +26,12 @@ import qualified Data.Maybe as Maybe
 import GHC.Stack (HasCallStack)
 
 import Clash.Core.FreeVars (typeFreeVars)
+import Clash.Core.HasType
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Subst (Subst, extendIdSubst, substTm)
 import Clash.Core.Term
   ( LetBinding, PrimInfo(..), Term(..), TickInfo(..), collectArgs
   , collectArgsTicks, mkApps, mkTicks)
-import Clash.Core.TermInfo
 import Clash.Core.TyCon (tyConDataCons)
 import Clash.Core.Type (TypeView(..), mkTyConApp, tyView)
 import Clash.Core.Util (mkVec, shouldSplit, tyNatSize)
@@ -149,7 +149,7 @@ reduceNonRepPrim :: HasCallStack => NormRewrite
 reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks) <- collectArgsTicks e = do
   tcm <- Lens.view tcCache
   ultra <- Lens.use (extra.normalizeUltra)
-  let eTy = termType tcm e
+  let eTy = inferCoreTypeOf tcm e
   case tyView eTy of
     (TyConApp vecTcNm@(nameOcc -> "Clash.Sized.Vector.Vec")
               [runExcept . tyNatSize tcm -> Right 0, aTy]) -> do
@@ -205,7 +205,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
           _ -> return e
       "Clash.Sized.Vector.fold" | argLen == 4 -> do
         let ([fun,arg],[nTy,aTy]) = Either.partitionEithers args
-            argTy = termType tcm arg
+            argTy = inferCoreTypeOf tcm arg
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ pure (ultra || n == 0)
@@ -219,7 +219,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
           _ -> return e
       "Clash.Sized.Vector.foldr" | argLen == 6 ->
         let ([fun,start,arg],[aTy,bTy,nTy]) = Either.partitionEithers args
-            argTy = termType tcm arg
+            argTy = inferCoreTypeOf tcm arg
         in  case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ pure ultra
@@ -255,7 +255,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
       "Clash.Sized.Vector.head" | argLen == 3 -> do
         let [nTy,aTy] = Either.rights args
             [vArg]    = Either.lefts args
-            argTy     = termType tcm vArg
+            argTy     = inferCoreTypeOf tcm vArg
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ shouldReduce ctx
@@ -269,7 +269,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
       "Clash.Sized.Vector.tail" | argLen == 3 -> do
         let [nTy,aTy] = Either.rights args
             [vArg]    = Either.lefts args
-            argTy     = termType tcm vArg
+            argTy     = inferCoreTypeOf tcm vArg
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ shouldReduce ctx
@@ -283,7 +283,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
       "Clash.Sized.Vector.last" | argLen == 3 -> do
         let [nTy,aTy] = Either.rights args
             [vArg]    = Either.lefts args
-            argTy     = termType tcm vArg
+            argTy     = inferCoreTypeOf tcm vArg
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ shouldReduce ctx
@@ -298,7 +298,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
       "Clash.Sized.Vector.init" | argLen == 3 -> do
         let [nTy,aTy] = Either.rights args
             [vArg]    = Either.lefts args
-            argTy     = termType tcm vArg
+            argTy     = inferCoreTypeOf tcm vArg
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ shouldReduce ctx
@@ -311,7 +311,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
           _ -> return e
       "Clash.Sized.Vector.unconcat" | argLen == 6 -> do
         let ([_knN,sm,arg],[nTy,mTy,aTy]) = Either.partitionEithers args
-            argTy = termType tcm arg
+            argTy = inferCoreTypeOf tcm arg
         case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy)) of
           (Right n, Right m) -> do
             shouldReduce1 <- List.orM [ pure (m==0)
@@ -361,7 +361,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
 
       "Clash.Sized.Vector.index_int" | argLen == 5 -> do
         let ([_knArg,vArg,iArg],[nTy,aTy]) = Either.partitionEithers args
-            argTy = termType tcm vArg
+            argTy = inferCoreTypeOf tcm vArg
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ pure ultra

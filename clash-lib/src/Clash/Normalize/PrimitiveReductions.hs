@@ -62,6 +62,7 @@ import           SrcLoc                           (wiredInSrcSpan)
 #endif
 
 import           Clash.Core.DataCon               (DataCon)
+import           Clash.Core.HasType
 import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Name
   (nameOcc, Name(..), NameSort(User), mkUnsafeSystemName)
@@ -69,7 +70,6 @@ import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term
   (IsMultiPrim (..), CoreContext (..), PrimInfo (..), Term (..), WorkInfo (..), Pat (..),
    collectTermIds, mkApps, PrimUnfolding(..))
-import           Clash.Core.TermInfo
 import           Clash.Core.Type                  (LitTy (..), Type (..),
                                                    TypeView (..), coreView1,
                                                    mkFunTy, mkTyConApp,
@@ -81,7 +81,7 @@ import           Clash.Core.TysPrim
 import           Clash.Core.Util
   (appendToVec, extractElems, extractTElems, mkRTree,
    mkUniqInternalId, mkUniqSystemTyVar, mkVec, dataConInstArgTys, primCo)
-import           Clash.Core.Var                   (Var (..), mkTyVar, mkLocalId)
+import           Clash.Core.Var                   (mkTyVar, mkLocalId)
 import           Clash.Core.VarEnv
   (InScopeSet, extendInScopeSetList)
 import qualified Clash.Normalize.Primitives as NP (undefined)
@@ -283,7 +283,7 @@ reduceReverse
   -> NormalizeSession Term
 reduceReverse inScope0 n elTy vArg = do
   tcm <- Lens.view tcCache
-  let ty = termType tcm vArg
+  let ty = inferCoreTypeOf tcm vArg
   go tcm ty
  where
   go tcm (coreView1 tcm -> Just ty') = go tcm ty'
@@ -317,7 +317,7 @@ reduceZipWith
   -> NormalizeSession Term
 reduceZipWith _ctx zipWithPrimInfo n lhsElTy rhsElTy resElTy fun lhsArg rhsArg = do
   tcm <- Lens.view tcCache
-  changed (go tcm (termType tcm lhsArg))
+  changed (go tcm (inferCoreTypeOf tcm lhsArg))
  where
   go tcm (coreView1 tcm -> Just ty) = go tcm ty
   go tcm (tyView -> TyConApp vecTcNm _)
@@ -361,7 +361,7 @@ reduceMap
   -> NormalizeSession Term
 reduceMap _ctx mapPrimInfo n argElTy resElTy fun arg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm arg
+    let ty = inferCoreTypeOf tcm arg
     changed (go tcm ty)
   where
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
@@ -403,7 +403,7 @@ reduceImap
   -> NormalizeSession Term
 reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm arg
+    let ty = inferCoreTypeOf tcm arg
     go tcm ty
   where
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
@@ -418,7 +418,7 @@ reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
             (uniqs1,nTv) = mkUniqSystemTyVar (uniqs0,is1) ("n",typeNatKind)
             (uniqs2,(vars,elems)) = second (second concat . unzip)
                                   $ uncurry extractElems uniqs1 consCon argElTy 'I' n arg
-            (Right idxTy:_,_) = splitFunForallTy (termType tcm fun)
+            (Right idxTy:_,_) = splitFunForallTy (inferCoreTypeOf tcm fun)
             (TyConApp idxTcNm _) = tyView idxTy
             -- fromInteger# :: KnownNat n => Integer -> Index n
             idxFromIntegerTy = ForAllTy nTv
@@ -502,8 +502,8 @@ reduceTraverse
   -> NormalizeSession Term
 reduceTraverse (TransformContext is0 ctx) n aTy fTy bTy dict fun arg = do
     tcm <- Lens.view tcCache
-    let (TyConApp apDictTcNm _) = tyView (termType tcm dict)
-        ty = termType tcm arg
+    let (TyConApp apDictTcNm _) = tyView (inferCoreTypeOf tcm dict)
+        ty = inferCoreTypeOf tcm arg
     go tcm apDictTcNm ty
   where
     go tcm apDictTcNm (coreView1 tcm -> Just ty') = go tcm apDictTcNm ty'
@@ -535,20 +535,20 @@ reduceTraverse (TransformContext is0 ctx) n aTy fTy bTy dict fun arg = do
             fnPat    = DataPat funcDictCon [] funcDicIds
 
             -- Extract the 'pure' function from the Applicative dictionary
-            pureTy = varType pureId
+            pureTy = coreTypeOf pureId
             pureTm = Case dict pureTy [(apPat,Var pureId)]
 
             -- Extract the '<*>' function from the Applicative dictionary
-            apTy   = varType apId
+            apTy   = coreTypeOf apId
             apTm   = Case dict apTy [(apPat, Var apId)]
 
             -- Extract the Functor dictionary from the Applicative dictionary
-            funcTy = varType functorDictId
+            funcTy = coreTypeOf functorDictId
             funcTm = Case dict funcTy
                                [(apPat,Var functorDictId)]
 
             -- Extract the 'fmap' function from the Functor dictionary
-            fmapTy = varType fmapId
+            fmapTy = coreTypeOf fmapId
             fmapTm = Case (Var functorDictId) fmapTy
                           [(fnPat, Var fmapId)]
 
@@ -639,7 +639,7 @@ reduceFoldr
 reduceFoldr _ _ 0 _ _ start _ = changed start
 reduceFoldr _ctx foldrPrimInfo n aTy fun start arg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm arg
+    let ty = inferCoreTypeOf tcm arg
     changed (go tcm ty)
   where
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
@@ -650,7 +650,7 @@ reduceFoldr _ctx foldrPrimInfo n aTy fun start arg = do
       = let
           (a, as) = extractHeadTail consCon aTy n arg
           b = mkApps (Prim foldrPrimInfo) [ Right aTy
-                                          , Right (termType tcm start)
+                                          , Right (inferCoreTypeOf tcm start)
                                           , Right (LitTy (NumTy (n - 1)))
                                           , Left fun
                                           , Left start
@@ -681,7 +681,7 @@ reduceFold
   -> NormalizeSession Term
 reduceFold (TransformContext is0 ctx) n aTy fun arg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm arg
+    let ty = inferCoreTypeOf tcm arg
     go tcm ty
   where
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
@@ -726,7 +726,7 @@ reduceDFold
 reduceDFold _ 0 _ _ start _ = changed start
 reduceDFold is0 n aTy fun start arg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm arg
+    let ty = inferCoreTypeOf tcm arg
     go tcm ty
   where
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
@@ -741,7 +741,7 @@ reduceDFold is0 n aTy fun start arg = do
             -- TOOD: be used for every other function in this module.
             (uniqs1,(vars,elems)) = second (second concat . unzip)
                                   $ extractElems uniqs0 is1 consCon aTy 'D' n arg
-            (_ltv:Right snTy:_,_) = splitFunForallTy (termType tcm fun)
+            (_ltv:Right snTy:_,_) = splitFunForallTy (inferCoreTypeOf tcm fun)
             (TyConApp snatTcNm _) = tyView snTy
             (Just snatTc)         = lookupUniqMap snatTcNm tcm
             [snatDc]              = tyConDataCons snatTc
@@ -770,7 +770,7 @@ reduceHead
   -> NormalizeSession Term
 reduceHead inScope n aTy vArg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm vArg
+    let ty = inferCoreTypeOf tcm vArg
     go tcm ty
   where
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
@@ -798,7 +798,7 @@ reduceTail
   -> NormalizeSession Term
 reduceTail inScope n aTy vArg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm vArg
+    let ty = inferCoreTypeOf tcm vArg
     go tcm ty
   where
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
@@ -827,7 +827,7 @@ reduceLast
   -> NormalizeSession Term
 reduceLast inScope n aTy vArg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm vArg
+    let ty = inferCoreTypeOf tcm vArg
     go tcm ty
   where
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
@@ -858,7 +858,7 @@ reduceInit
   -> NormalizeSession Term
 reduceInit _inScope initPrimInfo n aTy vArg = do
   tcm <- Lens.view tcCache
-  let ty = termType tcm vArg
+  let ty = inferCoreTypeOf tcm vArg
   changed (go tcm ty)
  where
   go tcm (coreView1 tcm -> Just ty') = go tcm ty'
@@ -896,7 +896,7 @@ reduceAppend
   -> NormalizeSession Term
 reduceAppend inScope n m aTy lArg rArg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm lArg
+    let ty = inferCoreTypeOf tcm lArg
     go tcm ty
   where
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
@@ -927,7 +927,7 @@ reduceUnconcat :: InScopeSet
                -> NormalizeSession Term
 reduceUnconcat inScope unconcatPrimInfo n m aTy sm arg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm arg
+    let ty = inferCoreTypeOf tcm arg
     go tcm ty
   where
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
@@ -986,7 +986,7 @@ reduceTranspose :: Integer  -- ^ Length of the result vector
                 -> NormalizeSession Term
 reduceTranspose n 0 aTy arg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm arg
+    let ty = inferCoreTypeOf tcm arg
     go tcm ty
   where
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
@@ -1103,7 +1103,7 @@ reduceReplace_int is0 n aTy vTy v i newA = do
     = do
       -- Get data constructors of 'Int'
       uniqs0                   <- Lens.use uniqSupply
-      let iTy                   = termType tcm i
+      let iTy                   = inferCoreTypeOf tcm i
           (TyConApp iTcNm _)    = tyView iTy
           (Just iTc)            = lookupUniqMap iTcNm tcm
           [iDc]                 = tyConDataCons iTc
@@ -1145,7 +1145,7 @@ reduceIndex_int
   -> NormalizeSession Term
 reduceIndex_int is0 n aTy v i = do
   tcm <- Lens.view tcCache
-  let vTy = termType tcm v
+  let vTy = inferCoreTypeOf tcm v
   go tcm vTy
  where
   -- Basically creates:
@@ -1208,7 +1208,7 @@ reduceIndex_int is0 n aTy v i = do
     = do
       -- Get data constructors of 'Int'
       uniqs0                   <- Lens.use uniqSupply
-      let iTy                   = termType tcm i
+      let iTy                   = inferCoreTypeOf tcm i
           (TyConApp iTcNm _)    = tyView iTy
           (Just iTc)            = lookupUniqMap iTcNm tcm
           [iDc]                 = tyConDataCons iTc
@@ -1247,7 +1247,7 @@ reduceDTFold
   -> NormalizeSession Term
 reduceDTFold inScope n aTy lrFun brFun arg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm arg
+    let ty = inferCoreTypeOf tcm arg
     go tcm ty
   where
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
@@ -1259,7 +1259,7 @@ reduceDTFold inScope n aTy lrFun brFun arg = do
            let (uniqs1,(vars,elems)) = second (second concat . unzip)
                                      $ extractElems uniqs0 inScope consCon aTy
                                          'T' (2^n) arg
-               (_ltv:Right snTy:_,_) = splitFunForallTy (termType tcm brFun)
+               (_ltv:Right snTy:_,_) = splitFunForallTy (inferCoreTypeOf tcm brFun)
                (TyConApp snatTcNm _) = tyView snTy
                (Just snatTc)         = lookupUniqMap snatTcNm tcm
                [snatDc]              = tyConDataCons snatTc
@@ -1295,7 +1295,7 @@ reduceTFold
   -> NormalizeSession Term
 reduceTFold inScope n aTy lrFun brFun arg = do
     tcm <- Lens.view tcCache
-    let ty = termType tcm arg
+    let ty = inferCoreTypeOf tcm arg
     go tcm ty
   where
     go tcm (coreView1 tcm -> Just ty') = go tcm ty'
@@ -1305,7 +1305,7 @@ reduceTFold inScope n aTy lrFun brFun arg = do
       , [lrCon,brCon] <- tyConDataCons treeTc
       = do uniqs0 <- Lens.use uniqSupply
            let (uniqs1,(vars,elems)) = extractTElems uniqs0 inScope lrCon brCon aTy 'T' n arg
-               (_ltv:Right snTy:_,_) = splitFunForallTy (termType tcm brFun)
+               (_ltv:Right snTy:_,_) = splitFunForallTy (inferCoreTypeOf tcm brFun)
                (TyConApp snatTcNm _) = tyView snTy
                (Just snatTc)         = lookupUniqMap snatTcNm tcm
                [snatDc]              = tyConDataCons snatTc

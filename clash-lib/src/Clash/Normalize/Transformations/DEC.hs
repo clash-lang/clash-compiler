@@ -72,12 +72,12 @@ import Clash.Core.DataCon    (DataCon)
 import Clash.Core.Evaluator.Types  (whnf')
 import Clash.Core.FreeVars
   (termFreeVars', typeFreeVars', localVarsDoNotOccurIn)
+import Clash.Core.HasType
 import Clash.Core.Literal (Literal(..))
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Term
   ( Alt, LetBinding, Pat(..), PrimInfo(..), Term(..), TickInfo(..)
   , collectArgs, collectArgsTicks, mkApps, mkTicks, patIds)
-import Clash.Core.TermInfo (termType)
 import Clash.Core.TyCon (TyConMap, TyConName, tyConDataCons)
 import Clash.Core.Type (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
 import Clash.Core.Util (mkInternalVar, mkSelectorCase, sccLetBindings)
@@ -168,7 +168,7 @@ disjointExpressionConsolidation ctx@(TransformContext isCtx _) e@(Case _scrut _t
   where
     -- Make the let-binder for the lifted expressions
     mkFunOut tcm isN ((fun,_),(eLifted,_)) = do
-      let ty  = termType tcm eLifted
+      let ty  = inferCoreTypeOf tcm eLifted
           nm  = case collectArgs fun of
                    (Var v,_)  -> nameOcc (varName v)
                    (Prim p,_) -> primName p
@@ -299,7 +299,7 @@ collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), t
     uniqSupply Lens..= ids2
     gh <- Lens.use globalHeap
     let eval = (Lens.view Lens._3) . whnf' evaluate bndrs tcm gh ids1 is0 False
-    let eTy  = termType tcm e
+    let eTy  = inferCoreTypeOf tcm e
     untran <- isUntranslatableType False eTy
     case untran of
       -- Don't lift out non-representable values, because they cannot be let-bound
@@ -488,7 +488,7 @@ mkDisjointGroup inScope (fun,(seen,cs)) = do
       [] -> return (Nothing,[])
       -- Create selectors and projections
       (uc:_) -> do
-        let argTys = map (termType tcm) uc
+        let argTys = map (inferCoreTypeOf tcm) uc
         disJointSelProj inScope argTys cs''
     let newArgs = mkDJArgs 0 shared distinctProjections
     case distinctCaseM of
@@ -692,7 +692,7 @@ interestingToLift inScope eval e@(Prim pInfo) args ticks
     _ | DeDup `elem` ticks -> pure (Just e)
     _ -> do
       let isInteresting = (\(x, y, z) -> interestingToLift inScope eval x y z) . collectArgsTicks
-      if isHOTy (primType pInfo) then do
+      if isHOTy (coreTypeOf pInfo) then do
         anyInteresting <- List.anyM (fmap Maybe.isJust . isInteresting) lArgs
         if anyInteresting then pure (Just e) else pure Nothing
       else

@@ -37,12 +37,12 @@ import           GHC.Integer.GMP.Internals
 import           Clash.Core.DataCon
 import           Clash.Core.Evaluator.Types
 import           Clash.Core.FreeVars
+import           Clash.Core.HasType
 import           Clash.Core.Literal
 import           Clash.Core.Name
 import           Clash.Core.Pretty
 import           Clash.Core.Subst
 import           Clash.Core.Term
-import           Clash.Core.TermInfo
 import           Clash.Core.TyCon
 import           Clash.Core.Type
 import           Clash.Core.Util
@@ -179,7 +179,7 @@ stepApp x y m tcm =
           in Just . setTerm x $ stackPush (Apply n) m0
  where
   (term, args, _) = collectArgsTicks (App x y)
-  tys' = fst . splitFunForallTy . termType tcm $ App x y
+  tys' = fst . splitFunForallTy . inferCoreTypeOf tcm $ App x y
 
 stepTyApp :: Term -> Type -> Step
 stepTyApp x ty m tcm =
@@ -211,7 +211,7 @@ stepTyApp x ty m tcm =
     _ -> Just . setTerm x $ stackPush (Instantiate ty) m
  where
   (term, args, _) = collectArgsTicks (TyApp x ty)
-  tys' = fst . splitFunForallTy . termType tcm $ TyApp x ty
+  tys' = fst . splitFunForallTy . inferCoreTypeOf tcm $ TyApp x ty
 
 stepLetRec :: [LetBinding] -> Term -> Step
 stepLetRec bs x m _ = Just (allocate bs x m)
@@ -282,7 +282,7 @@ newLetBinding tcm m e
   = let m' = heapInsert LocalId id_ e m
      in (m' { mSupply = ids', mScopeNames = is1 }, id_)
  where
-  ty = termType tcm e
+  ty = inferCoreTypeOf tcm e
   ((ids', is1), id_) = mkUniqSystemId (mSupply m, mScopeNames m) ("x", ty)
 
 -- | Unwind the stack by 1
@@ -314,7 +314,7 @@ apply tcm pVal@(PrimVal (PrimInfo{primType}) tys vs) x m
   | isUndefinedPrimVal pVal
   = setTerm (TyApp (Prim NP.undefined) ty) m
  where
-  ty = piResultTys tcm primType (tys ++ map (termType tcm . valToTerm) vs ++ [varType x])
+  ty = piResultTys tcm primType (tys ++ map (inferCoreTypeOf tcm . valToTerm) vs ++ [varType x])
 
 apply _ v _ m = error $ "Evaluator.apply: Not a lambda: " ++ show v ++ "\n" ++ show m
 

@@ -2,8 +2,9 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd
                     2017-2018, Google Inc.
+                    2021     , QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Utilities for converting Core Type/Term to Netlist datatypes
 -}
@@ -74,6 +75,7 @@ import           Clash.Backend           (HWKind(..), hdlHWTypeKind)
 import           Clash.Core.DataCon      (DataCon (..))
 import           Clash.Core.EqSolver     (typeEq)
 import           Clash.Core.FreeVars     (localIdOccursIn, typeFreeVars, typeFreeVars')
+import           Clash.Core.HasType
 import qualified Clash.Core.Literal      as C
 import           Clash.Core.Name
   (Name (..), appendToName, nameOcc)
@@ -174,7 +176,7 @@ splitNormalized tcm expr = case collectBndrs expr of
     Left ($(curLoc) ++ "Not in normal form: no Letrec:\n\n" ++ showPpr expr ++
           "\n\nWhich has type:\n\n" ++ showPpr ty)
  where
-  ty = termType tcm expr
+  ty = inferCoreTypeOf tcm expr
 
 -- | Same as @unsafeCoreTypeToHWType@, but discards void filter information
 unsafeCoreTypeToHWType'
@@ -699,7 +701,7 @@ termHWType :: String
            -> NetlistMonad HWType
 termHWType loc e = do
   m <- Lens.use tcCache
-  let ty = termType m e
+  let ty = inferCoreTypeOf m e
   stripFiltered <$> unsafeCoreTypeToHWTypeM loc ty
 
 -- | Gives the HWType corresponding to a term. Returns 'Nothing' if the term has
@@ -710,7 +712,7 @@ termHWTypeM
   -> NetlistMonad (Maybe FilteredHWType)
 termHWTypeM e = do
   m  <- Lens.use tcCache
-  let ty = termType m e
+  let ty = inferCoreTypeOf m e
   coreTypeToHWTypeM ty
 
 isBiSignalIn :: HWType -> Bool
@@ -756,8 +758,8 @@ mkUniqueNormalized
       ,Maybe Id)
 mkUniqueNormalized is0 topMM (args, binds, res) = do
   -- Generate port names and add them to set of seen identifiers
-  argHwtys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc) . varType) args
-  resHwty <- unsafeCoreTypeToHWTypeM $(curLoc) (varType res)
+  argHwtys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc) . coreTypeOf) args
+  resHwty <- unsafeCoreTypeToHWTypeM $(curLoc) (coreTypeOf res)
   etopM <-
     mapM
       (expandTopEntityOrErrM (zip (map Just args) argHwtys) (Just res, resHwty))
@@ -855,7 +857,7 @@ renameBinder (i, collectArgsTicks -> (k, args, ticks)) = withTicks ticks $ \_ ->
   -- Routine for single result primitives (the default kind of primitive)
   goSingle :: PrimInfo -> CompiledPrimitive -> NetlistMonad [(Id, Id)]
   goSingle pInfo (BlackBoxHaskell{function=(_, function)}) = do
-    funRes <- preserveVarEnv (function False (primName pInfo) args [varType i])
+    funRes <- preserveVarEnv (function False (primName pInfo) args [coreTypeOf i])
     case either error fst funRes of
       BlackBoxMeta{bbResultNames=[bbResultName]} ->
         go (primName pInfo) [i] args [bbResultName]
@@ -923,7 +925,7 @@ mkUniqueArguments subst0 (Just (ExpandedTopEntity{..})) args = do
     go (Just port) var = do
       (ports, decls, _, portI) <- mkTopInput port
       let portName = Id.toText portI
-          pId  = mkLocalId (varType var) (setRepName portName (varName var))
+          pId  = mkLocalId (coreTypeOf var) (setRepName portName (varName var))
       return (Just (ports, decls, (pId, (var, Var pId))))
 
 
@@ -947,12 +949,12 @@ mkUniqueResult _subst0 (Just (ExpandedTopEntity{et_output=Nothing})) _res =
   pure Nothing
 mkUniqueResult subst0 (Just (ExpandedTopEntity{et_output=Just iPort})) res = do
   (_, sp) <- Lens.use curCompNm
-  (FilteredHWType hwty _) <- unsafeCoreTypeToHWTypeM $(curLoc) (varType res)
+  (FilteredHWType hwty _) <- unsafeCoreTypeToHWTypeM $(curLoc) (coreTypeOf res)
   when (containsBiSignalIn hwty)
     (throw (ClashException sp ($(curLoc) ++ "BiSignalIn cannot be part of a function's result. Use 'readFromBiSignal'.") Nothing))
   (ports, decls, portI) <- mkTopOutput iPort
   let pO = setRepName (Id.toText portI) (varName res)
-      pOId = mkLocalId (varType res) pO
+      pOId = mkLocalId (coreTypeOf res) pO
       subst1 = extendInScopeId (extendIdSubst subst0 res (Var pOId)) pOId
   return (Just (ports, decls, pOId, subst1))
 
@@ -984,7 +986,7 @@ idToOutPort var = do
 
 idToPort :: Id -> NetlistMonad (Maybe (Identifier, HWType))
 idToPort var = do
-  hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (varType var)
+  hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (coreTypeOf var)
   if isVoid hwTy
     then return Nothing
     else return (Just (id2identifier var, hwTy))
@@ -1596,7 +1598,7 @@ bindsExistentials
   -> Bool
 bindsExistentials exts tms = any (`elem` freeVars) exts
  where
-  freeVars = concatMap (Lens.toListOf typeFreeVars) (map varType tms)
+  freeVars = concatMap (Lens.toListOf typeFreeVars) (map coreTypeOf tms)
 
 iteAlts :: HWType -> [Alt] -> Maybe (Term,Term)
 iteAlts sHTy [(pat0,alt0),(pat1,alt1)] | validIteSTy sHTy = case pat0 of

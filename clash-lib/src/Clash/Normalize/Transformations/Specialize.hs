@@ -60,6 +60,7 @@ import qualified Clash.Sized.Internal.Unsigned as U (Unsigned, fromInteger#)
 
 import Clash.Core.DataCon (DataCon(dcArgTys))
 import Clash.Core.FreeVars (freeLocalVars, termFreeTyVars, typeFreeVars)
+import Clash.Core.HasType
 import Clash.Core.Literal (Literal(..))
 import Clash.Core.Name
   (NameSort(..), Name(..), appendToName, mkUnsafeInternalName, mkUnsafeSystemName)
@@ -68,7 +69,7 @@ import Clash.Core.Subst
 import Clash.Core.Term
   ( Term(..), TickInfo, collectArgs, collectArgsTicks, mkApps, mkTmApps, mkTicks, patIds
   , patVars, mkAbstraction, PrimInfo(..), WorkInfo(..), IsMultiPrim(..), PrimUnfolding(..))
-import Clash.Core.TermInfo (isLocalVar, isVar, piResultTy, termType, isPolyFun)
+import Clash.Core.TermInfo (isLocalVar, isVar, isPolyFun)
 import Clash.Core.TyCon (TyConMap, tyConDataCons)
 import Clash.Core.Type
   (LitTy(NumTy), Type(LitTy,VarTy), applyFunTy, splitTyConAppM, normalizeType
@@ -251,7 +252,7 @@ appProp ctx@(TransformContext is _) = \case
   goCaseArg isA0 ty0 ls0 (Left arg:args0) = do
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
-    let argTy = termType tcm arg
+    let argTy = inferCoreTypeOf tcm arg
         ty1   = applyFunTy tcm ty0 argTy
     orM [pure (isVar arg), isWorkFree workFreeBinders bndrs arg] >>= \case
       True -> do
@@ -332,7 +333,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
         -- > topEntity :: forall dom . (dom ~ "System") => Signal dom Bool -> Signal dom Bool
         -- The TyLam's in the body will have been removed by 'Clash.Normalize.Util.substWithTyEq'.
         -- So we drop the TyApp ("specialising" on it) and change the varType to match.
-        let newVarTy = piResultTy tcm (varType f) tyArg
+        let newVarTy = piResultTy tcm (coreTypeOf f) tyArg
         in  changed (mkApps (mkTicks (Var f{varType = newVarTy}) ticks) args)
   else do -- NondecreasingIndentation
 
@@ -504,7 +505,7 @@ nonRepSpec ctx e@(App e1 e2)
   , (_, [])     <- Either.partitionEithers args
   , null $ Lens.toListOf termFreeTyVars e2
   = do tcm <- Lens.view tcCache
-       let e2Ty = termType tcm e2
+       let e2Ty = inferCoreTypeOf tcm e2
        let localVar = isLocalVar e2
        nonRepE2 <- not <$> (representableType <$> Lens.view typeTranslator
                                               <*> Lens.view customReprs
@@ -565,7 +566,7 @@ typeSpec _ e = return e
 zeroWidthSpec :: HasCallStack => NormRewrite
 zeroWidthSpec (TransformContext is _) e@(Lam i x0) = do
   tcm <- Lens.view tcCache
-  let bndrTy = normalizeType tcm (varType i)
+  let bndrTy = normalizeType tcm (coreTypeOf i)
 
   case zeroWidthTypeElem tcm bndrTy of
     Just tm ->

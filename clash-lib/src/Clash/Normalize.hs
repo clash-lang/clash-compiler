@@ -44,6 +44,7 @@ import           Clash.Annotations.BitRepresentation.Internal
 import           Clash.Core.Evaluator.Types as WHNF (Evaluator)
 import           Clash.Core.FreeVars
   (freeLocalIds, globalIds, globalIdOccursIn, localIdDoesNotOccurIn)
+import           Clash.Core.HasType
 import           Clash.Core.PartialEval as PE     (Evaluator)
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)
 import           Clash.Core.Subst
@@ -178,7 +179,7 @@ normalize' nm = do
       tcm <- Lens.view tcCache
       topEnts <- Lens.view topEntities
       let isTop = nm `elemVarSet` topEnts
-          ty0 = varType nm'
+          ty0 = coreTypeOf nm'
           ty1 = if isTop then tvSubstWithTyEq ty0 else ty0
 
       -- check for polymorphic types
@@ -205,7 +206,7 @@ normalize' nm = do
             let usedBndrs = Lens.toListOf globalIds (bindingTerm tmNorm)
             traceIf (nm `elem` usedBndrs)
                     (concat [ $(curLoc),"Expr belonging to bndr: ",nmS ," (:: "
-                            , showPpr (varType (bindingId tmNorm))
+                            , showPpr (coreTypeOf (bindingId tmNorm))
                             , ") remains recursive after normalization:\n"
                             , showPpr (bindingTerm tmNorm) ])
                     (return ())
@@ -231,7 +232,7 @@ normalize' nm = do
             opts <- Lens.view debugOpts
             traceIf (dbg_invariants opts)
                     (concat [$(curLoc), "Expr belonging to bndr: ", nmS, " (:: "
-                            , showPpr (varType nm')
+                            , showPpr (coreTypeOf nm')
                             , ") has a non-representable return type."
                             , " Not normalising:\n", showPpr tm] )
                     (return ([],(nm,(Binding nm' sp inl pr tm))))

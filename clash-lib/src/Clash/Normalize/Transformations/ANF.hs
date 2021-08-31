@@ -32,12 +32,13 @@ import Clash.Signal.Internal (Signal(..))
 
 import Clash.Core.DataCon (DataCon(..))
 import Clash.Core.FreeVars (localIdsDoNotOccurIn)
+import Clash.Core.HasType
 import Clash.Core.Name (mkUnsafeSystemName, nameOcc)
 import Clash.Core.Subst (deshadowLetExpr, freshenTm)
 import Clash.Core.Term
   ( Alt, CoreContext(..), LetBinding, Pat(..), PrimInfo(..), Term(..)
   , collectArgs, collectTicks, mkTicks, partitionTicks, stripTicks)
-import Clash.Core.TermInfo (isCon, isLocalVar, isPrim, isVar, termType)
+import Clash.Core.TermInfo (isCon, isLocalVar, isPrim, isVar)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type, TypeView(..), coreView, tyView)
 import Clash.Core.Util (mkSelectorCase)
@@ -276,7 +277,7 @@ collectANF ctx e@(App appf arg)
 
 collectANF _ (Letrec binds body) = do
   tcm <- Lens.view tcCache
-  let isSimIO = isSimIOTy tcm (termType tcm body)
+  let isSimIO = isSimIOTy tcm (inferCoreTypeOf tcm body)
   untranslatable <- lift (isUntranslatable False body)
   let localVar = isLocalVar body
   -- See Note [ANF no let-bind]

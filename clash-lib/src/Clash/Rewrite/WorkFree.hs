@@ -27,13 +27,13 @@ import qualified Data.Text.Extra as Text
 import GHC.Stack (HasCallStack)
 
 import Clash.Core.FreeVars
+import Clash.Core.HasType
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Term
-import Clash.Core.TermInfo
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (isPolyFunTy)
 import Clash.Core.Util
-import Clash.Core.Var (Id, Var(..), isLocalId)
+import Clash.Core.Var (Id, isLocalId)
 import Clash.Core.VarEnv (VarEnv, lookupVarEnv)
 import Clash.Driver.Types (BindingMap, Binding(..))
 import Clash.Normalize.Primitives (removedArg)
@@ -89,7 +89,7 @@ isWorkFree cache bndrs = go True
         -- isWorkFree with all the local FVs of the term being checked. PE
         -- would need to be changed to know the FVs of global binders first.
         --
-        | isPolyFunTy (varType i) ->
+        | isPolyFunTy (coreTypeOf i) ->
             pure (isLocalId i && isOutermost && null args)
         | isLocalId i ->
             pure True
@@ -141,7 +141,7 @@ isConstantNotClockReset tcm e
 
   | otherwise = isConstant e
  where
-  eTy = termType tcm e
+  eTy = inferCoreTypeOf tcm e
 
 -- TODO: Remove function after using WorkInfo in 'isWorkFreeIsh'
 isWorkFreeClockOrResetOrEnable
@@ -149,7 +149,7 @@ isWorkFreeClockOrResetOrEnable
   -> Term
   -> Maybe Bool
 isWorkFreeClockOrResetOrEnable tcm e =
-  let eTy = termType tcm e in
+  let eTy = inferCoreTypeOf tcm e in
   if isClockOrReset tcm eTy || isEnable tcm eTy then
     case collectArgs e of
       (Prim p,_) -> Just (primName p == Text.showt 'removedArg)

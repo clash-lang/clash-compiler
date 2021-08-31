@@ -34,6 +34,8 @@ import Clash.Primitives.Types (Primitive(..))
 import Clash.Rewrite.Types (extra, tcCache)
 import Clash.Rewrite.Util (changed)
 
+-- Note [MultiResult type]
+--
 -- A multi result primitive assigns its results to multiple result variables
 -- instead of one. Besides producing nicer HDL it works around issues with
 -- synthesis tooling described in:
@@ -41,23 +43,26 @@ import Clash.Rewrite.Util (changed)
 --   https://github.com/clash-lang/clash-compiler/issues/1555
 --
 -- This transformation rewrites primitives indicating they can assign their
--- results to multiple signals, such that netlist can easily render it.
+-- results to multiple signals, such that netlist can easily render it. This
+-- involves inserting additional arguments for each of the result values, and
+-- then using the c$multiPrimSelect primitive to select individual results.
 --
 -- Example:
 --
 -- @
--- prim :: forall a. a -> (a, a)
+-- prim :: forall a b c. a -> (b, c)
 -- @
 --
 -- will be rewritten to:
 --
 -- @
---   \a0 -> let
---            r  = prim @t0 a0 r0 r1     -- With 'Clash.Core.Term.MultiPrim'
---            r0 = multiPrimSelect r0 r
---            r1 = multiPrimSelect r1 r
+--   \(x :: a) ->
+--         let
+--            r  = prim @a @b @c x r0 r1 -- With 'Clash.Core.Term.MultiPrim'
+--            r0 = c$multiPrimSelect r0 r
+--            r1 = c$multiPrimSelect r1 r
 --          in
---            (x, y)
+--            (r0, r1)
 -- @
 --
 -- Netlist will not render any @multiPrimSelect@ primitives. Similar to

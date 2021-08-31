@@ -22,8 +22,9 @@ import qualified Control.Lens as Lens
 import qualified Data.Maybe as Maybe
 import GHC.Stack (HasCallStack)
 
+import Clash.Core.HasType
 import Clash.Core.Term (CoreContext(..), Term(..), collectArgs, mkLams)
-import Clash.Core.TermInfo (isFun, termType)
+import Clash.Core.TermInfo (isFun)
 import Clash.Core.Type (splitFunTy)
 import Clash.Core.Util (mkInternalVar)
 import Clash.Core.Var (Id)
@@ -45,7 +46,7 @@ etaExpandSyn (TransformContext is0 ctx) e@(collectArgs -> (Var f, _)) = do
           AppFun:_ -> True
           TickC _:c -> isAppFunCtx c
           _ -> False
-      argTyM = fmap fst (splitFunTy tcm (termType tcm e))
+      argTyM = fmap fst (splitFunTy tcm (inferCoreTypeOf tcm e))
   case argTyM of
     Just argTy | isTopEnt && not (isAppFunCtx ctx) -> do
       newId <- mkInternalVar is0 "arg" argTy
@@ -86,7 +87,7 @@ etaExpansionTL (TransformContext is0 ctx) e
         let argTy = ( fst
                     . Maybe.fromMaybe (error $ $(curLoc) ++ "etaExpansion splitFunTy")
                     . splitFunTy tcm
-                    . termType tcm
+                    . inferCoreTypeOf tcm
                     ) e
         newId <- mkInternalVar is0 "arg" argTy
         let ctx' = TransformContext (extendInScopeSet is0 newId) (LamBody newId : ctx)

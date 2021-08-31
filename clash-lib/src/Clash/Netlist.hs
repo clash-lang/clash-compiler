@@ -62,6 +62,7 @@ import           Clash.Annotations.BitRepresentation.ClashLib
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, DataRepr'(..), ConstrRepr'(..), getDataRepr, getConstrRepr)
 import           Clash.Core.DataCon               (DataCon (..))
+import           Clash.Core.HasType
 import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Name                  (Name(..))
 import           Clash.Core.Pretty                (showPpr)
@@ -70,7 +71,7 @@ import           Clash.Core.Term
    TickInfo (..), collectArgs, collectArgsTicks,
    collectTicks, mkApps, mkTicks, stripTicks)
 import qualified Clash.Core.Term                  as Core
-import           Clash.Core.TermInfo              (multiPrimInfo', splitMultiPrimArgs, termType)
+import           Clash.Core.TermInfo              (multiPrimInfo', splitMultiPrimArgs)
 import           Clash.Core.Type
   (Type (..), coreView1, splitFunForallTy, splitCoreFunForallTy)
 import           Clash.Core.TyCon                 (TyConMap)
@@ -283,13 +284,13 @@ genComponentT compName0 componentExpr = do
 
   topEntityTM <- lookupVarEnv compName0 <$> Lens.use topEntityAnns
   let topAnnMM = topAnnotation <$> topEntityTM
-      topVarTypeM = snd . splitCoreFunForallTy tcm . varType . topId <$> topEntityTM
+      topVarTypeM = snd . splitCoreFunForallTy tcm . coreTypeOf . topId <$> topEntityTM
 
   seenIds <~ Lens.use seenComps
   (wereVoids,compInps,argWrappers,compOutps,resUnwrappers,binders,resultM) <-
     case splitNormalized tcm componentExpr of
       Right (args, binds, res) -> do
-        let varType1 = fromMaybe (varType res) topVarTypeM
+        let varType1 = fromMaybe (coreTypeOf res) topVarTypeM
         mkUniqueNormalized
           emptyInScopeSet
           topAnnMM
@@ -331,7 +332,7 @@ genComponentT compName0 componentExpr = do
 
 mkNetDecl :: (Id, Term) -> NetlistMonad [Declaration]
 mkNetDecl (id_,tm) = preserveVarEnv $ do
-  hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (varType id_)
+  hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (coreTypeOf id_)
 
   if | not (shouldRenderDecl hwTy tm) -> return []
      | (Prim pInfo@PrimInfo{primMultiResult=MultiResult}, args) <- collectArgs tm ->
@@ -382,7 +383,7 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
     termToWireOrReg :: Term -> NetlistMonad WireOrReg
     termToWireOrReg (stripTicks -> Case scrut _ alts0@(_:_:_)) = do
       tcm <- Lens.use tcCache
-      let scrutTy = termType tcm scrut
+      let scrutTy = inferCoreTypeOf tcm scrut
       scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
       ite <- Lens.use backEndITE
       case iteAlts scrutHTy alts0 of
@@ -519,7 +520,7 @@ mkSelection
 mkSelection declType bndr scrut altTy alts0 tickDecls = do
   let dstId = netlistId1 id id2identifier bndr
   tcm <- Lens.use tcCache
-  let scrutTy = termType tcm scrut
+  let scrutTy = inferCoreTypeOf tcm scrut
   scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
   scrutId  <- Id.suffix dstId "selection"
   (_,sp) <- Lens.use curCompNm
@@ -665,7 +666,7 @@ mkFunApp dstId fun args tickDecls = do
   tcm     <- Lens.use tcCache
   case (isGlobalId fun, lookupVarEnv fun topAnns) of
     (True, Just topEntity)
-      | let ty = varType (topId topEntity)
+      | let ty = coreTypeOf (topId topEntity)
       , let (fArgTys0,fResTy) = splitFunForallTy ty
       -- Take into account that clocks and stuff are split off from any product
       -- types containing them
@@ -709,15 +710,15 @@ mkFunApp dstId fun args tickDecls = do
         --     Nothing -> error ("Internal error: could not find " <> show fun)
         --     Just (Left err) -> error ("Internal error: " <> show err)
         --     Just (Right (argIds, _binds, resId)) -> do
-        --       argTys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc)) (map varType argIds)
-        --       resTy <- unsafeCoreTypeToHWTypeM $(curLoc) (varType resId)
+        --       argTys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc)) (map coreTypeOf argIds)
+        --       resTy <- unsafeCoreTypeToHWTypeM $(curLoc) (coreTypeOf resId)
         --       is <- Lens.use seenIds
         --       let topAnnM = topAnnotation topEntity
         --       pure (expandTopEntityOrErr is (zip argIds argTys) (resId, resTy) topAnnM)
 
         -- Generate ExpandedTopEntity, see TODO^
         is <- Lens.use seenIds
-        argTys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc) . termType tcm) args
+        argTys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc) . inferCoreTypeOf tcm) args
         resTy <- unsafeCoreTypeToHWTypeM $(curLoc) fResTy
         let
           ettArgs = (Nothing,) <$> argTys
@@ -743,7 +744,7 @@ mkFunApp dstId fun args tickDecls = do
         |]
         Just (Binding{bindingTerm}) -> do
           (_, Component compName compInps co _) <- preserveVarEnv $ genComponent fun
-          let argTys = map (termType tcm) args
+          let argTys = map (inferCoreTypeOf tcm) args
           argHWTys <- mapM coreTypeToHWTypeM' argTys
 
           (argExprs, concat -> argDecls) <- unzip <$>
@@ -890,7 +891,7 @@ mkExpr bbEasD declType bndr app =
     Case scrut ty' [alt] -> mkProjection bbEasD bndr scrut ty' alt
     Case scrut tyA alts -> do
       tcm <- Lens.use tcCache
-      let scrutTy = termType tcm scrut
+      let scrutTy = inferCoreTypeOf tcm scrut
       scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
       ite <- Lens.use backEndITE
       let wr = case iteAlts scrutHTy alts of
@@ -928,7 +929,7 @@ mkProjection
   -> NetlistMonad (Expr, [Declaration])
 mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
   tcm <- Lens.use tcCache
-  let scrutTy = termType tcm scrut
+  let scrutTy = inferCoreTypeOf tcm scrut
       e = Case scrut scrutTy [alt]
   (_,sp) <- Lens.use curCompNm
   varTm <- case v of
@@ -973,7 +974,7 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
                   ++ showPpr e) Nothing)
               else
                 tms
-          argHWTys <- mapM coreTypeToHWTypeM' (map varType tms)
+          argHWTys <- mapM coreTypeToHWTypeM' (map coreTypeOf tms)
           let tmsBundled   = zip argHWTys tms'
               tmsFiltered  = filter (maybe False (not . isVoid) . fst) tmsBundled
               tmsFiltered' = map snd tmsFiltered
@@ -1020,7 +1021,7 @@ mkDcApplication
 mkDcApplication [dstHType] bndr dc args = do
   let dcNm = nameOcc (dcName dc)
   tcm <- Lens.use tcCache
-  let argTys = map (termType tcm) args
+  let argTys = map (inferCoreTypeOf tcm) args
   argNm <- netlistId1 return (\b -> Id.suffix (id2identifier b) "_dc_arg") bndr
   argHWTys <- mapM coreTypeToHWTypeM' argTys
 
@@ -1149,7 +1150,7 @@ mkDcApplication [dstHType] bndr dc args = do
 -- Handle MultiId assignment
 mkDcApplication dstHTypes (MultiId argNms) _ args = do
   tcm                 <- Lens.use tcCache
-  let argTys          = map (termType tcm) args
+  let argTys          = map (inferCoreTypeOf tcm) args
   argHWTys            <- mapM coreTypeToHWTypeM' argTys
   -- Filter out the arguments of hwtype `Void` and only translate
   -- them to the intermediate HDL afterwards

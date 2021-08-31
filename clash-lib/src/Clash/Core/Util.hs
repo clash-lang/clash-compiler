@@ -43,12 +43,12 @@ import           Unique                  (getKey)
 import Clash.Core.DataCon
 import Clash.Core.EqSolver
 import Clash.Core.FreeVars               (tyFVsOfTypes, typeFreeVars, freeLocalIds)
+import Clash.Core.HasType
 import Clash.Core.Name
   (Name (..), OccName, mkUnsafeInternalName, mkUnsafeSystemName)
 import Clash.Core.Pretty                 (showPpr)
 import Clash.Core.Subst
 import Clash.Core.Term
-import Clash.Core.TermInfo               (termType)
 import Clash.Core.TyCon                  (TyConMap, tyConDataCons)
 import Clash.Core.Type
 import Clash.Core.TysPrim                (typeNatKind)
@@ -681,7 +681,7 @@ mkSelectorCase
   -> Int -- ^ n'th DataCon
   -> Int -- ^ n'th field
   -> m Term
-mkSelectorCase caller inScope tcm scrut dcI fieldI = go (termType tcm scrut)
+mkSelectorCase caller inScope tcm scrut dcI fieldI = go (inferCoreTypeOf tcm scrut)
   where
     go (coreView1 tcm -> Just ty') = go ty'
     go scrutTy@(tyView -> TyConApp tc args) =
