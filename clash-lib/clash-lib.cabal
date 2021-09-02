@@ -189,6 +189,7 @@ Library
                       Clash.Core.Evaluator.Types
                       Clash.Core.FreeVars
                       Clash.Core.HasType
+                      Clash.Core.HasFreeVars
                       Clash.Core.Literal
                       Clash.Core.Name
                       Clash.Core.PartialEval
@@ -282,6 +283,7 @@ Library
   Other-Modules:      Clash.Annotations.TopEntity.Extra
                       Control.Applicative.Extra
                       Data.Aeson.Extra
+                      Data.IntMap.Extra
                       Data.List.Extra
                       Data.Map.Ordered.Extra
                       Data.Monoid.Extra

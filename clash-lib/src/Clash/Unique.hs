@@ -69,6 +69,7 @@ module Clash.Unique
   , elemUniqSetDirectly
     -- *** Misc
   , subsetUniqSet
+  , disjointUniqSet
   , differenceUniqSet
     -- ** Conversions
     -- *** Lists
@@ -81,6 +82,11 @@ import           Control.DeepSeq (NFData)
 import           Data.Binary (Binary)
 import           Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+
+#if !MIN_VERSION_containers(0,6,2)
+import qualified Data.IntMap.Extra as IntMap
+#endif
+
 import qualified Data.List   as List
 import           Data.Text.Prettyprint.Doc
 import           GHC.Stack
@@ -420,6 +426,13 @@ subsetUniqSet
   -- ^ Set B
   -> Bool
 subsetUniqSet (UniqSet e1) (UniqSet e2) = IntMap.null (IntMap.difference e1 e2)
+
+-- | Check whether A and B are disjoint
+disjointUniqSet
+  :: UniqSet a
+  -> UniqSet a
+  -> Bool
+disjointUniqSet (UniqSet e1) (UniqSet e2) = IntMap.disjoint e1 e2
 
 -- | Take the difference of two sets
 differenceUniqSet

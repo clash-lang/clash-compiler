@@ -43,7 +43,8 @@ import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
 import           Clash.Core.Evaluator.Types as WHNF (Evaluator)
 import           Clash.Core.FreeVars
-  (freeLocalIds, globalIds, globalIdOccursIn, localIdDoesNotOccurIn)
+  (freeLocalIds, globalIds, globalIdOccursIn)
+import           Clash.Core.HasFreeVars           (notElemFreeVars)
 import           Clash.Core.HasType
 import           Clash.Core.PartialEval as PE     (Evaluator)
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)
@@ -329,7 +330,7 @@ flattenNode c@(CLeaf (nm,(Binding _ _ _ _ e))) = do
       Right (ids,[(bId,bExpr)],_) -> do
         let (fun,args,ticks) = collectArgsTicks bExpr
         case stripArgs ids (reverse ids) (reverse args) of
-          Just remainder | bId `localIdDoesNotOccurIn` bExpr ->
+          Just remainder | bId `notElemFreeVars` bExpr ->
                return (Right ((nm,mkApps (mkTicks fun ticks) (reverse remainder)),[]))
           _ -> return (Right ((nm,e),[]))
       _ -> return (Right ((nm,e),[]))
@@ -344,7 +345,7 @@ flattenNode b@(CBranch (nm,(Binding _ _ _ _ e)) us) = do
       Right (ids,[(bId,bExpr)],_) -> do
         let (fun,args,ticks) = collectArgsTicks bExpr
         case stripArgs ids (reverse ids) (reverse args) of
-          Just remainder | bId `localIdDoesNotOccurIn` bExpr ->
+          Just remainder | bId `notElemFreeVars` bExpr ->
                return (Right ((nm,mkApps (mkTicks fun ticks) (reverse remainder)),us))
           _ -> return (Right ((nm,e),us))
       _ -> do

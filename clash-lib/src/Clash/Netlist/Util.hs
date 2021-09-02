@@ -74,7 +74,8 @@ import           Clash.Annotations.BitRepresentation.Internal
 import           Clash.Backend           (HWKind(..), hdlHWTypeKind)
 import           Clash.Core.DataCon      (DataCon (..))
 import           Clash.Core.EqSolver     (typeEq)
-import           Clash.Core.FreeVars     (localIdOccursIn, typeFreeVars, typeFreeVars')
+import           Clash.Core.FreeVars     (typeFreeVars, typeFreeVars')
+import           Clash.Core.HasFreeVars  (elemFreeVars)
 import           Clash.Core.HasType
 import qualified Clash.Core.Literal      as C
 import           Clash.Core.Name
@@ -787,7 +788,7 @@ mkUniqueNormalized is0 topMM (args, binds, res) = do
         -- we need to add a redirection as most synthesis tools don't allow reads
         -- from output ports. Note that if the result is renamed anyway, we don't
         -- have to do anything here.
-        resultRead = any (localIdOccursIn res) exprs
+        resultRead = any (elemFreeVars res) exprs
         recResult = modifyVarName (`appendToName` "_rec") res
         resRenameM1 = resRenameM0 <|> orNothing resultRead (res, recResult)
 

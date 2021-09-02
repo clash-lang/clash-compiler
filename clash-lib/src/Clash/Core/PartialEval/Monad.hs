@@ -1,5 +1,5 @@
 {-|
-Copyright   : (C) 2020, QBayLogic B.V.
+Copyright   : (C) 2020-2021, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -73,7 +73,7 @@ import qualified Control.Monad.RWS.Strict as RWS
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Map.Strict as Map
 
-import           Clash.Core.FreeVars (localFVsOfTerms, tyFVsOfTypes)
+import           Clash.Core.HasFreeVars
 import           Clash.Core.Name (OccName)
 import           Clash.Core.PartialEval.AsTerm
 import           Clash.Core.PartialEval.NormalForm
@@ -174,7 +174,7 @@ withTyVar i a x = do
   modifyLocalEnv goLocal x
  where
   goGlobal env@GlobalEnv{genvInScope=inScope} =
-    let fvs = unitVarSet i `unionVarSet` tyFVsOfTypes [a]
+    let fvs = unitVarSet i `unionVarSet` freeVarsOf a
         iss = mkInScopeSet fvs `unionInScope` inScope
      in env { genvInScope = iss }
 
@@ -201,8 +201,8 @@ withId i v x = do
   modifyLocalEnv goLocal x
  where
   goGlobal env@GlobalEnv{genvInScope=inScope} =
-    --  TODO Is it a hack to use asTerm here?
-    let fvs = unitVarSet i `unionVarSet` localFVsOfTerms [asTerm v]
+    -- TODO Change this to use an instance HasFreeVars Value
+    let fvs = unitVarSet i `unionVarSet` freeVarsOf (asTerm v)
         iss = mkInScopeSet fvs `unionInScope` inScope
      in env { genvInScope = iss }
 

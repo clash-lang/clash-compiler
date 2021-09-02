@@ -58,7 +58,8 @@ import qualified Clash.Sized.Internal.BitVector as BV (Bit(Bit), BitVector(BV))
 import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.DataCon (DataCon(..))
 import Clash.Core.FreeVars
-  (countFreeOccurances, freeLocalIds, localIdDoesNotOccurIn)
+  (countFreeOccurances, freeLocalIds)
+import Clash.Core.HasFreeVars
 import Clash.Core.HasType
 import Clash.Core.Name (Name(..), NameSort(..))
 import Clash.Core.Pretty (PrettyOptions(..), showPpr, showPpr')
@@ -121,7 +122,7 @@ bindConstantVar = inlineBinders test
   where
     test _ (i,stripTicks -> e) = case isLocalVar e of
       -- Don't inline `let x = x in x`, it throws  us in an infinite loop
-      True -> return (i `localIdDoesNotOccurIn` e)
+      True -> return (i `notElemFreeVars` e)
       _    -> do
         tcm <- Lens.view tcCache
         case isWorkFreeIsh tcm e of
@@ -569,7 +570,7 @@ inlineOrLiftNonRep ctx eLet@(Letrec _ body) =
       -- We do __NOT__ inline:
       not $ or
         [ -- 1. recursive let-binders
-          -- id_ `localIdOccursIn` e' -- <= already checked in inlineOrLiftBinders
+          -- id_ `elemFreeVars` e' -- <= already checked in inlineOrLiftBinders
           -- 2. join points (which are not void-wrappers)
           isJoinPointIn id_ e && not (isVoidWrapper e')
           -- 3. binders that are used more than once in the body, because

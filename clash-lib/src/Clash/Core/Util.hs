@@ -18,12 +18,11 @@
 module Clash.Core.Util where
 
 import           Control.Concurrent.Supply     (Supply, freshId)
-import qualified Control.Lens                  as Lens
 import Control.Monad.Trans.Except              (Except, throwE, runExcept)
 import Data.Bifunctor                          (first)
 import qualified Data.HashSet                  as HashSet
 import qualified Data.Graph                    as Graph
-import Data.List                               (foldl', mapAccumR)
+import Data.List                               (mapAccumR)
 import Data.List.Extra                         (zipEqual)
 import Data.Maybe
   (fromJust, isJust, mapMaybe, catMaybes)
@@ -42,7 +41,8 @@ import           Unique                  (getKey)
 
 import Clash.Core.DataCon
 import Clash.Core.EqSolver
-import Clash.Core.FreeVars               (tyFVsOfTypes, typeFreeVars, freeLocalIds)
+import Clash.Core.FreeVars               (freeLocalIds)
+import Clash.Core.HasFreeVars
 import Clash.Core.HasType
 import Clash.Core.Name
   (Name (..), OccName, mkUnsafeInternalName, mkUnsafeSystemName)
@@ -378,7 +378,7 @@ dataConInstArgTysE is0 tcm (MkData { dcArgTys, dcExtTyVars, dcUnivTyVars }) inst
   -- TODO: Check if all existentials were solved (they should be, or the wouldn't have
   -- TODO: been solved in the caseElemExistentials transformation)
   let is1   = extendInScopeSetList is0 dcExtTyVars
-      is2   = unionInScope is1 (mkInScopeSet (tyFVsOfTypes inst_tys))
+      is2   = unionInScope is1 (mkInScopeSet (freeVarsOf inst_tys))
       subst = extendTvSubstList (mkSubst is2) (zipEqual dcUnivTyVars inst_tys)
   go
     (substGlobalsInExistentials is0 dcExtTyVars (zipEqual dcUnivTyVars inst_tys))
@@ -461,8 +461,7 @@ substArgTys
 substArgTys dc args =
   let univTVs = dcUnivTyVars dc
       extTVs  = dcExtTyVars dc
-      argsFVs = foldl' unionVarSet emptyVarSet
-                  (map (Lens.foldMapOf typeFreeVars unitVarSet) args)
+      argsFVs = freeVarsOf args
       is      = mkInScopeSet (argsFVs `unionVarSet` mkVarSet extTVs)
       -- See Note [The substitution invariant]
       subst   = extendTvSubstList (mkSubst is) (univTVs `zipEqual` args)

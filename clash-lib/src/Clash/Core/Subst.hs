@@ -1,8 +1,9 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
                           2017, Google Inc.
+                          2021, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Capture-free substitution function for CoreHW
 -}
@@ -63,8 +64,7 @@ import qualified Data.List.Extra           as List
 import           Data.Ord                  (comparing)
 import           GHC.Stack                 (HasCallStack)
 
-import           Clash.Core.FreeVars
-  (noFreeVarsOfType, localFVsOfTerms, tyFVsOfTypes)
+import           Clash.Core.HasFreeVars
 import           Clash.Core.Pretty         (ppr, fromPpr)
 import           Clash.Core.Term
   (LetBinding, Pat (..), Term (..), TickInfo (..), PrimInfo(primName))
@@ -249,7 +249,7 @@ zipTvSubst tvs tys
   , not (List.equalLength tvs tys)
   = pprTrace "zipTvSubst" (ppr tvs <> line <> ppr tys) emptySubst
   | otherwise
-  = Subst (mkInScopeSet (tyFVsOfTypes tys)) emptyVarEnv tenv emptyVarEnv
+  = Subst (mkInScopeSet (freeVarsOf tys)) emptyVarEnv tenv emptyVarEnv
  where
   tenv = zipTyEnv tvs tys
 
@@ -433,7 +433,7 @@ checkValidSubst subst@(TvSubst inScope tenv) tys a =
   WARN( not (isValidSubst subst),
         "inScope" <+> clashPretty inScope <> line <>
         "tenv" <+> clashPretty tenv <> line <>
-        "tenvFVs" <+> clashPretty (tyFVsOfTypes tenv) <> line <>
+        "tenvFVs" <+> clashPretty (freeVarsOf tenv) <> line <>
         "tys" <+> fromPpr tys)
   WARN( not tysFVsInSope,
        "inScope" <+> clashPretty inScope <> line <>
@@ -443,7 +443,7 @@ checkValidSubst subst@(TvSubst inScope tenv) tys a =
   a
  where
   needsInScope = foldrWithUnique (\k _ s -> delVarSetByKey k s)
-                   (tyFVsOfTypes tys)
+                   (freeVarsOf tys)
                    tenv
   tysFVsInSope = needsInScope `varSetInScope` inScope
 
@@ -457,7 +457,7 @@ isValidSubst
   -> Bool
 isValidSubst (TvSubst inScope tenv) = tenvFVs `varSetInScope` inScope
  where
-  tenvFVs = tyFVsOfTypes tenv
+  tenvFVs = freeVarsOf tenv
 
 -- | The work-horse of 'substTy'
 substTy'
@@ -502,11 +502,11 @@ substTyVarBndr subst@(TvSubst inScope tenv) oldVar =
          | otherwise = extendVarEnv oldVar (VarTy newVar) tenv
 
   -- Assertion that we're not capturing something in the substitution
-  no_capture = not (newVar `elemVarSet` tyFVsOfTypes tenv)
+  no_capture = not (newVar `elemVarSet` freeVarsOf tenv)
 
   oldKi        = varType oldVar
   -- verify that the kind is closed
-  noKindChange = noFreeVarsOfType oldKi
+  noKindChange = isClosed oldKi
   -- noChange means that the new type variable is identical in all respects to
   -- the old type variable (same unique, same kind)
   -- See 'TvSubstEnv's Note [Extending the TvSubstEnv]
@@ -632,7 +632,7 @@ substIdBndr subst@(Subst inScope env tenv genv) oldId =
         | otherwise    = id1 {varType = substTy subst (varType id1)}
 
   oldTy = varType oldId
-  noTypeChange = nullVarEnv tenv || noFreeVarsOfType oldTy
+  noTypeChange = nullVarEnv tenv || isClosed oldTy
 
   -- Extend the substitution if the unique has changed.
   --
@@ -787,7 +787,7 @@ aeqType
   -> Bool
 aeqType t1 t2 = acmpType' rnEnv t1 t2 == EQ
  where
-  rnEnv = mkRnEnv (mkInScopeSet (tyFVsOfTypes [t1,t2]))
+  rnEnv = mkRnEnv (mkInScopeSet (freeVarsOf [t1,t2]))
 
 -- | Alpha comparison for types
 acmpType
@@ -796,7 +796,7 @@ acmpType
   -> Ordering
 acmpType t1 t2 = acmpType' (mkRnEnv inScope) t1 t2
  where
-  inScope = mkInScopeSet (tyFVsOfTypes [t1,t2])
+  inScope = mkInScopeSet (freeVarsOf [t1,t2])
 
 -- | Alpha comparison for types. Faster than 'acmpType' as it doesn't need to
 -- calculate the free variables to create the 'InScopeSet'
@@ -837,7 +837,7 @@ aeqTerm
   -> Bool
 aeqTerm t1 t2 = aeqTerm' inScope t1 t2
  where
-  inScope = mkInScopeSet (localFVsOfTerms [t1,t2])
+  inScope = mkInScopeSet (freeVarsOf [t1,t2])
 
 -- | Alpha equality for terms. Faster than 'aeqTerm' as it doesn't need to
 -- calculate the free variables to create the 'InScopeSet'
@@ -856,7 +856,7 @@ acmpTerm
   -> Ordering
 acmpTerm t1 t2 = acmpTerm' inScope t1 t2
  where
-  inScope = mkInScopeSet (localFVsOfTerms [t1,t2])
+  inScope = mkInScopeSet (freeVarsOf [t1,t2])
 
 -- | Alpha comparison for types. Faster than 'acmpTerm' as it doesn't need to
 -- calculate the free variables to create the 'InScopeSet'

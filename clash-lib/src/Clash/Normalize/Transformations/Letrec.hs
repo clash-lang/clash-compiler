@@ -43,7 +43,8 @@ import Clash.Sized.Vector as Vec (Vec(Cons), splitAt)
 
 import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.DataCon (DataCon(..))
-import Clash.Core.FreeVars (freeLocalIds, localIdOccursIn, localIdsDoNotOccurIn)
+import Clash.Core.FreeVars (freeLocalIds)
+import Clash.Core.HasFreeVars
 import Clash.Core.HasType
 import Clash.Core.Name (mkUnsafeSystemName, nameOcc)
 import Clash.Core.Subst
@@ -60,7 +61,7 @@ import Clash.Core.Util (inverseTopSortLetBindings, mkVec, tyNatSize)
 import Clash.Core.Var (isGlobalId)
 import Clash.Core.VarEnv
   ( InScopeSet, elemInScopeSet, emptyVarEnv, extendInScopeSetList, lookupVarEnv
-  , unionVarEnvWith, unitVarEnv)
+  , unionVarEnvWith, unitVarEnv, mkVarSet)
 import Clash.Netlist.BlackBox.Types ()
 import Clash.Netlist.BlackBox.Util (getUsedArguments)
 import Clash.Netlist.Util (splitNormalized)
@@ -144,7 +145,7 @@ removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
              else return  (Left tm : args'')
 
 removeUnusedExpr _ e@(Case _ _ [(DataPat _ [] xs,altExpr)]) =
-  if xs `localIdsDoNotOccurIn` altExpr
+  if mkVarSet xs `disjointFreeVars` altExpr
      then changed altExpr
      else return e
 
@@ -201,7 +202,7 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
     -- inline binders into the body when there's only a single binder, and only
     -- if that binder doesn't perform any work or is only used once in the body
     [(id1,e1)] | Just occ <- lookupVarEnv id1 bodyOccs, e1WorkFree || occ < 2 ->
-      if id1 `localIdOccursIn` e1
+      if id1 `elemFreeVars` e1
          -- Except when the binder is recursive!
          then return (Letrec binds1 body)
          else let subst = extendIdSubst (mkSubst is2) id1 e1
@@ -241,7 +242,7 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
         -- only if that binder doesn't perform any work or is only used once in
         -- the body
         [(id2,e2)] | Just occ <- lookupVarEnv id2 bodyOccs, e2WorkFree || occ < 2 ->
-          if id2 `localIdOccursIn` e2
+          if id2 `elemFreeVars` e2
              -- Except when the binder is recursive!
              then changed ([(id2,e2),(id1, body2)])
              else let subst = extendIdSubst (mkSubst isN1) id2 e2

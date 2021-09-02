@@ -19,7 +19,6 @@ module Clash.Normalize.Util
  , alreadyInlined
  , addNewInline
  , isRecursiveBndr
- , isClosed
  , callGraph
  , collectCallGraphUniques
  , classifyFunction
@@ -57,7 +56,8 @@ import           Unique                  (getKey)
 
 import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.FreeVars
-  (globalIds, hasLocalFreeVars, globalIdOccursIn)
+  (globalIds, globalIdOccursIn)
+import           Clash.Core.HasFreeVars  (isClosed)
 import           Clash.Core.HasType
 import           Clash.Core.Name         (Name(nameOcc,nameUniq))
 import           Clash.Core.Pretty       (showPpr)
@@ -65,8 +65,6 @@ import           Clash.Core.Subst
   (deShadowTerm, extendTvSubst, mkSubst, substTm, substTy,
    substId, extendIdSubst)
 import           Clash.Core.Term
-import           Clash.Core.TermInfo     (isPolyFun)
-import           Clash.Core.TyCon        (TyConMap)
 import           Clash.Core.Type
   (Type(ForAllTy,LitTy, VarTy), LitTy(SymTy), TypeView (..), tyView,
    splitTyConAppM, mkPolyFunTy)
@@ -158,12 +156,6 @@ addNewInline f cf =
                      cf
                      (unitVarEnv f 1)
                      (\_ hm -> extendVarEnvWith f 1 (+) hm)
-
--- | Determine if a term is closed
-isClosed :: TyConMap
-         -> Term
-         -> Bool
-isClosed tcm = not . isPolyFun tcm
 
 -- | Test whether a given term represents a non-recursive global variable
 isNonRecursiveGlobalVar
@@ -325,7 +317,7 @@ constantSpecInfo ctx e = do
           bindCsr ctx e
 
       (Lam _ _, _, _ticks) ->
-        if hasLocalFreeVars e then
+        if not (isClosed e) then
           bindCsr ctx e
         else
           pure (constantCsr e)

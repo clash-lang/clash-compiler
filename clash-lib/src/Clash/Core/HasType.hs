@@ -23,7 +23,7 @@ import Data.Text.Prettyprint.Doc (line)
 import GHC.Stack (HasCallStack)
 
 import Clash.Core.DataCon (DataCon(dcType))
-import Clash.Core.FreeVars
+import Clash.Core.HasFreeVars
 import Clash.Core.Literal (Literal(..))
 import Clash.Core.Name (Name(nameOcc))
 import Clash.Core.Pretty
@@ -202,7 +202,7 @@ piResultTys m ty origArgs@(arg:args)
   | otherwise
   = pprPanic "piResultTys1" (ppr ty <> line <> ppr origArgs)
  where
-  inScope = mkInScopeSet (tyFVsOfTypes (ty:origArgs))
+  inScope = mkInScopeSet (freeVarsOf (ty:origArgs))
 
   go env ty' [] = substTy (mkTvSubst inScope env) ty'
   go env ty' allArgs@(arg':args')

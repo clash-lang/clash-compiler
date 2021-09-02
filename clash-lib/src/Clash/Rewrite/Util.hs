@@ -62,8 +62,8 @@ import           BasicTypes                  (InlineSpec (..))
 
 import           Clash.Core.Evaluator.Types  (PureHeap, whnf')
 import           Clash.Core.FreeVars
-  (freeLocalVars, localIdDoesNotOccurIn, localIdOccursIn,
-   termFreeVars', freeLocalIds)
+  (freeLocalVars, termFreeVars', freeLocalIds)
+import           Clash.Core.HasFreeVars      (elemFreeVars, notElemFreeVars)
 import           Clash.Core.HasType
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
@@ -415,7 +415,7 @@ tailCalls id_ = \case
 -- introduced argument 'w' is not used by 'f'
 isVoidWrapper :: Term -> Bool
 isVoidWrapper (Lam bndr e@(collectArgs -> (Var _,_))) =
-  bndr `localIdDoesNotOccurIn` e
+  bndr `notElemFreeVars` e
 isVoidWrapper _ = False
 
 -- | Inline the first set of binder into the second set of binders and into the
@@ -446,7 +446,7 @@ substituteBinders inScope toInline toKeep body =
         subst1  = subst { substTmEnv = mapVarEnv (substTm "substSubst" substE)
                                                  (substTmEnv subst)}
         subst2  = extendIdSubst subst1 x e1
-    in  if x `localIdOccursIn` e1 then
+    in  if x `elemFreeVars` e1 then
           go subst ((x,e1):inlRec) toInl
         else
           go subst2 inlRec toInl
@@ -477,7 +477,7 @@ liftAndSubsituteBinders inScope toLift toKeep body = do
         subst1 = subst { substTmEnv = mapVarEnv (substTm "liftSubst" substE)
                                                 (substTmEnv subst) }
         subst2 = extendIdSubst subst1 x e2
-    if x `localIdOccursIn` e2 then do
+    if x `elemFreeVars` e2 then do
       (_,sp) <- Lens.use curFun
       throw (ClashException sp [I.i|
         Internal error: inlineOrLiftBInders failed on:
