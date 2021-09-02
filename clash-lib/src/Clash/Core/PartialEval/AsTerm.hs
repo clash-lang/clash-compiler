@@ -1,5 +1,5 @@
 {-|
-Copyright   : (C) 2020 QBayLogic B.V.
+Copyright   : (C) 2020-2021, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -18,7 +18,7 @@ module Clash.Core.PartialEval.AsTerm
 import Data.Bifunctor (first, second)
 import Data.Graph (SCC(..), flattenSCCs)
 
-import Clash.Core.FreeVars (localFVsOfTerms)
+import Clash.Core.HasFreeVars
 import Clash.Core.PartialEval.NormalForm
 import Clash.Core.Term (Term(..), LetBinding, Pat, Alt, mkApps)
 import Clash.Core.Util (sccLetBindings)
@@ -49,7 +49,7 @@ removeUnusedBindings bs x
   | null used = x
   | otherwise = Letrec used x
  where
-  free = localFVsOfTerms [x]
+  free = freeVarsOf x
   used = flattenSCCs $ filter isUsed (sccLetBindings bs)
 
   isUsed = \case

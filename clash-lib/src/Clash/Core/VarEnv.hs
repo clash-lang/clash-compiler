@@ -51,6 +51,8 @@ module Clash.Core.VarEnv
     -- *** Searching
   , elemVarSet
   , notElemVarSet
+  , subsetVarSet
+  , disjointVarSet
     -- ** Conversions
     -- *** Lists
   , mkVarSet
@@ -324,6 +326,13 @@ subsetVarSet
   -- ^ Set of variables B
   -> Bool
 subsetVarSet = subsetUniqSet
+
+-- | Are the sets of variables disjoint
+disjointVarSet
+  :: VarSet
+  -> VarSet
+  -> Bool
+disjointVarSet = disjointUniqSet
 
 -- | Check whether a varset is empty
 nullVarSet

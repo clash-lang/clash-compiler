@@ -26,6 +26,7 @@ import Control.Monad.State.Class (MonadState)
 import qualified Data.Text.Extra as Text
 import GHC.Stack (HasCallStack)
 
+import Clash.Core.HasFreeVars
 import Clash.Core.FreeVars
 import Clash.Core.HasType
 import Clash.Core.Pretty (showPpr)
@@ -128,7 +129,7 @@ isConstant :: Term -> Bool
 isConstant e = case collectArgs e of
   (Data _, args)   -> all (either isConstant (const True)) args
   (Prim _, args) -> all (either isConstant (const True)) args
-  (Lam _ _, _)     -> not (hasLocalFreeVars e)
+  (Lam _ _, _)     -> isClosed e
   (Literal _,_)    -> True
   _                -> False
 
@@ -188,7 +189,7 @@ isWorkFreeIsh tcm e =
           WorkVariable -> all isConstantArg args
           _            -> all isWorkFreeIshArg args
 
-        (Lam _ _, _)       -> not (hasLocalFreeVars e)
+        (Lam _ _, _)       -> isClosed e
         (Literal _,_)      -> True
         _                  -> False
  where

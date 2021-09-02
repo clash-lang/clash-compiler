@@ -31,7 +31,7 @@ import GHC.Stack (HasCallStack)
 import Clash.Signal.Internal (Signal(..))
 
 import Clash.Core.DataCon (DataCon(..))
-import Clash.Core.FreeVars (localIdsDoNotOccurIn)
+import Clash.Core.HasFreeVars (disjointFreeVars)
 import Clash.Core.HasType
 import Clash.Core.Name (mkUnsafeSystemName, nameOcc)
 import Clash.Core.Subst (deshadowLetExpr, freshenTm)
@@ -43,7 +43,7 @@ import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type, TypeView(..), coreView, tyView)
 import Clash.Core.Util (mkSelectorCase)
 import Clash.Core.Var (Id)
-import Clash.Core.VarEnv (InScopeSet, extendInScopeSet, extendInScopeSetList)
+import Clash.Core.VarEnv (InScopeSet, extendInScopeSet, extendInScopeSetList, mkVarSet)
 import Clash.Netlist.Util (bindsExistentials)
 import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
@@ -336,7 +336,7 @@ collectANF ctx (Case subj ty alts) = do
 
     case alts' of
       [(DataPat _ [] xs,altExpr)]
-        | xs `localIdsDoNotOccurIn` altExpr || isSimIOAlt
+        | mkVarSet xs `disjointFreeVars` altExpr || isSimIOAlt
         -> return altExpr
       _ -> return (Case subj' ty alts')
   where

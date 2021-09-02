@@ -80,6 +80,7 @@ data Neutral a
   deriving (Show)
 
 -- TODO Write an instance (InferType a) => InferType (Neutral a)
+-- TODO Write an instance (HasFreeVars a) => HasFreeVars (Neutral a)
 
 -- | A term which has been potentially evaluated to WHNF. If evaluation has
 -- occurred, then there will be no redexes at the head of the Value, but
@@ -104,6 +105,7 @@ data Value
   deriving (Show)
 
 -- TODO Write an instance InferType Value
+-- TODO Write an instance HasFreeVars Value
 
 mkValueTicks :: Value -> [TickInfo] -> Value
 mkValueTicks = foldl VTick

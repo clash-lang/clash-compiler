@@ -36,7 +36,7 @@ import           GHC.Integer.GMP.Internals
 
 import           Clash.Core.DataCon
 import           Clash.Core.Evaluator.Types
-import           Clash.Core.FreeVars
+import           Clash.Core.HasFreeVars
 import           Clash.Core.HasType
 import           Clash.Core.Literal
 import           Clash.Core.Name
@@ -325,7 +325,7 @@ instantiate _tcm (TyLambda x e) ty m =
  where
   subst  = extendTvSubst subst0 x ty
   subst0 = mkSubst iss0
-  iss0   = mkInScopeSet (localFVsOfTerms [e] `unionUniqSet` tyFVsOfTypes [ty])
+  iss0   = mkInScopeSet (freeVarsOf e `unionUniqSet` freeVarsOf ty)
 instantiate tcm pVal@(PrimVal (PrimInfo{primType}) tys []) ty m
   | isUndefinedPrimVal pVal
   = setTerm (TyApp (Prim NP.undefined) (piResultTys tcm primType (tys ++ [ty]))) m
@@ -371,7 +371,7 @@ scrutinise (Lit l) _altTy alts m = case alts of
               ba1 = BA.ByteArray ba0
           in  Just (ByteArrayLiteral ba1)
        _ -> Nothing
-    = let inScope = localFVsOfTerms [altE]
+    = let inScope = freeVarsOf altE
           subst0  = mkSubst (mkInScopeSet inScope)
           subst1  = extendIdSubst subst0 x (Literal patE)
       in  substTm "Evaluator.scrutinise" subst1 altE
@@ -388,7 +388,7 @@ scrutinise (Lit l) _altTy alts m = case alts of
               ba1 = BA.ByteArray ba0
           in  Just (ByteArrayLiteral ba1)
        _ -> Nothing
-    = let inScope = localFVsOfTerms [altE]
+    = let inScope = freeVarsOf altE
           subst0  = mkSubst (mkInScopeSet inScope)
           subst1  = extendIdSubst subst0 x (Literal patE)
       in  substTm "Evaluator.scrutinise" subst1 altE
@@ -438,7 +438,7 @@ substInAlt dc tvs xs args e = substTm "Evaluator.substInAlt" subst e
   tms        = lefts args
   substTyMap = zip tvs (drop (length (dcUnivTyVars dc)) tys)
   substTmMap = zip xs tms
-  inScope    = tyFVsOfTypes tys `unionVarSet` localFVsOfTerms (e:tms)
+  inScope    = freeVarsOf tys `unionVarSet` freeVarsOf (e:tms)
   subst      = extendTvSubstList (extendIdSubstList subst0 substTmMap) substTyMap
   subst0     = mkSubst (mkInScopeSet inScope)
 
