@@ -8,7 +8,6 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -159,7 +158,7 @@ import Data.Type.Equality         ((:~:))
 import GHC.Generics               (Generic)
 import GHC.Stack                  (HasCallStack)
 import GHC.TypeLits               (KnownSymbol, Nat, Symbol, type (<=), sameSymbol)
-import Language.Haskell.TH.Syntax -- (Lift (..), Q, Dec)
+import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Compat
 import Numeric.Natural            (Natural)
 import System.IO.Unsafe           (unsafeInterleaveIO, unsafePerformIO)
@@ -701,12 +700,6 @@ tail# (_  :- xs') = xs'
 
 instance Show a => Show (Signal dom a) where
   show (x :- xs) = show x ++ " " ++ show xs
-
-instance Lift a => Lift (Signal dom a) where
-  lift ~(x :- _) = [| signal# x |]
-#if MIN_VERSION_template_haskell(2,16,0)
-  liftTyped = liftTypedFromUntyped
-#endif
 
 instance Default a => Default (Signal dom a) where
   def = signal# def

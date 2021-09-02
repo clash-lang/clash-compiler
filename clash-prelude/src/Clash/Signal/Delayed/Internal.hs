@@ -6,7 +6,6 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -37,7 +36,6 @@ where
 import Data.Coerce                (coerce)
 import Data.Default.Class         (Default(..))
 import GHC.TypeLits               (Nat, type (+))
-import Language.Haskell.TH.Syntax (Lift)
 import Test.QuickCheck            (Arbitrary, CoArbitrary)
 
 import Clash.Promoted.Nat         (SNat)
@@ -108,7 +106,7 @@ newtype DSignal (dom :: Domain) (delay :: Nat) a =
               -- ^ Strip a 'DSignal' of its delay information.
             }
   deriving ( Show, Default, Functor, Applicative, Num, Fractional
-           , Foldable, Traversable, Arbitrary, CoArbitrary, Lift )
+           , Foldable, Traversable, Arbitrary, CoArbitrary )
 
 -- | Create a 'DSignal' from a list
 --
