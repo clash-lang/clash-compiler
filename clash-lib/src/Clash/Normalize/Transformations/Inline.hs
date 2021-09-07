@@ -23,7 +23,6 @@ module Clash.Normalize.Transformations.Inline
   , inlineBndrsCleanup
   , inlineCast
   , inlineCleanup
-  , inlineHO
   , collapseRHSNoops
   , inlineNonRep
   , inlineOrLiftNonRep
@@ -67,7 +66,7 @@ import Clash.Core.Subst
 import Clash.Core.Term
   ( CoreContext(..), Pat(..), PrimInfo(..), Term(..), WorkInfo(..), collectArgs
   , collectArgsTicks, mkApps , mkTicks, stripTicks)
-import Clash.Core.TermInfo (isLocalVar, isPolyFun, termSize)
+import Clash.Core.TermInfo (isLocalVar, termSize)
 import Clash.Core.Type
   (TypeView(..), isClassTy, isPolyFunCoreTy, tyView)
 import Clash.Core.Util (isSignalType, primUCo)
@@ -77,14 +76,14 @@ import Clash.Core.VarEnv
   , eltsVarEnv, emptyVarEnv, extendInScopeSetList, extendVarEnv
   , foldlWithUniqueVarEnv', lookupVarEnv, lookupVarEnvDirectly, mkVarEnv
   , notElemVarSet, unionVarEnv, unionVarEnvWith, unitVarSet)
-import Clash.Debug (trace, traceIf)
-import Clash.Driver.Types (Binding(..), DebugOpts(dbg_invariants))
+import Clash.Debug (trace)
+import Clash.Driver.Types (Binding(..))
 import Clash.Netlist.Util (representableType)
 import Clash.Primitives.Types
   (CompiledPrimMap, Primitive(..), TemplateKind(..))
 import Clash.Rewrite.Combinators (allR)
 import Clash.Rewrite.Types
-  ( TransformContext(..), bindings, curFun, customReprs, debugOpts, extra
+  ( TransformContext(..), bindings, curFun, customReprs, extra
   , tcCache, topEntities, typeTranslator)
 import Clash.Rewrite.Util
   ( changed, inlineBinders, inlineOrLiftBinders, isJoinPointIn
@@ -431,33 +430,6 @@ collapseRHSNoops _ (Letrec binds body) = do
 
 collapseRHSNoops _ e = return e
 {-# SCC collapseRHSNoops #-}
-
--- | Inline a function with functional arguments
-inlineHO :: HasCallStack => NormRewrite
-inlineHO _ e@(App _ _)
-  | (Var f, args, ticks) <- collectArgsTicks e
-  = do
-    tcm <- Lens.view tcCache
-    let hasPolyFunArgs = or (map (either (isPolyFun tcm) (const False)) args)
-    if hasPolyFunArgs
-      then do (cf,_)    <- Lens.use curFun
-              isInlined <- zoomExtra (alreadyInlined f cf)
-              limit     <- Lens.use (extra.inlineLimit)
-              if (Maybe.fromMaybe 0 isInlined) > limit
-                then do
-                  opts <- Lens.view debugOpts
-                  traceIf (dbg_invariants opts) ($(curLoc) ++ "InlineHO: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf) (return e)
-                else do
-                  bodyMaybe <- lookupVarEnv f <$> Lens.use bindings
-                  case bodyMaybe of
-                    Just b -> do
-                      zoomExtra (addNewInline f cf)
-                      changed (mkApps (mkTicks (bindingTerm b) ticks) args)
-                    _ -> return e
-      else return e
-
-inlineHO _ e = return e
-{-# SCC inlineHO #-}
 
 -- | Inline function with a non-representable result if it's the subject
 -- of a Case-decomposition. It's a custom topdown traversal that -for efficiency

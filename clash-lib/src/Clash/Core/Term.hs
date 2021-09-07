@@ -25,7 +25,6 @@ module Clash.Core.Term
   , mkTmApps
   , mkTicks
   , TmName
-  , idToVar
   , varToId
   , LetBinding
   , Pat (..)
@@ -78,7 +77,7 @@ import Clash.Core.Literal                      (Literal)
 import Clash.Core.Name                         (Name (..))
 import {-# SOURCE #-} Clash.Core.Subst         () -- instance Eq Type
 import {-# SOURCE #-} Clash.Core.Type          (Type)
-import Clash.Core.Var                          (Var(Id), Id, TyVar)
+import Clash.Core.Var                          (Var, Id, TyVar)
 import Clash.Util                              (curLoc)
 
 -- | Term representation in the CoreHW language: System F + LetRec + Case
@@ -389,11 +388,6 @@ collectTermIds = concat . walkTerm (Just . go)
   pat (DataPat _ _ ids) = ids
   pat (LitPat _) = []
   pat DefaultPat = []
-
--- | Make variable reference out of term variable
-idToVar :: Id -> Term
-idToVar i@(Id {}) = Var i
-idToVar tv        = error $ $(curLoc) ++ "idToVar: tyVar: " ++ show tv
 
 -- | Make a term variable out of a variable reference or ticked variable
 -- reference

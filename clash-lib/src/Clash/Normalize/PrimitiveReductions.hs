@@ -196,36 +196,6 @@ extractHeadTail consCon elTy n vec =
 
   pat = DataPat consCon [mTV] [co, el, rest]
 
--- Make case statement that projects the _head_ from a given vector
-extractHead
-  :: DataCon
-  -- ^ The Cons (:>) constructor
-  -> Type
-  -- ^ Element type
-  -> Integer
-  -- ^ Length of the vector
-  -> Term
-  -- ^ Vector to extract head from
-  -> Term
-  -- ^ Head of vector
-extractHead consCon elTy vLength vec =
-  fst (extractHeadTail consCon elTy vLength vec)
-
--- Make case statement that projects the _tail_ from a given vector
-extractTail
-  :: DataCon
-  -- ^ The Cons (:>) constructor
-  -> Type
-  -- ^ Element type
-  -> Integer
-  -- ^ Length of the vector
-  -> Term
-  -- ^ Vector to extract head from
-  -> Term
-  -- ^ Tail of vector
-extractTail consCon elTy vLength vec =
-  snd (extractHeadTail consCon elTy vLength vec)
-
 -- | Create a vector of supplied elements
 mkVecCons
   :: HasCallStack

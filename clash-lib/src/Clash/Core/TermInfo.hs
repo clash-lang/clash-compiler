@@ -86,11 +86,6 @@ isFun m t = isFunTy m (inferCoreTypeOf m t)
 isPolyFun :: TyConMap -> Term -> Bool
 isPolyFun m t = isPolyFunCoreTy m (inferCoreTypeOf m t)
 
--- | Is a term a term-abstraction?
-isLam :: Term -> Bool
-isLam (Lam {}) = True
-isLam _        = False
-
 -- | Is a term a recursive let-binding?
 isLet :: Term -> Bool
 isLet (Letrec {}) = True
