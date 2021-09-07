@@ -79,7 +79,7 @@ import           Clash.Core.PartialEval.AsTerm
 import           Clash.Core.PartialEval.NormalForm
 import           Clash.Core.Subst (Subst, mkTvSubst)
 import           Clash.Core.TyCon (TyConMap)
-import           Clash.Core.Type (Kind, KindOrType, Type)
+import           Clash.Core.Type (Type)
 import           Clash.Core.Util (mkUniqSystemId, mkUniqSystemTyVar)
 import           Clash.Core.Var (Id, TyVar, Var)
 import           Clash.Core.VarEnv
@@ -285,15 +285,15 @@ getInScope = genvInScope <$> getGlobalEnv
 getUniqueId :: OccName -> Type -> Eval Id
 getUniqueId = getUniqueVar mkUniqSystemId
 
-getUniqueTyVar :: OccName -> Kind -> Eval TyVar
+getUniqueTyVar :: OccName -> Type -> Eval TyVar
 getUniqueTyVar = getUniqueVar mkUniqSystemTyVar
 
 getUniqueVar
   :: ((Supply, InScopeSet)
-         -> (OccName, KindOrType)
+         -> (OccName, Type)
          -> ((Supply, InScopeSet), Var a))
   -> OccName
-  -> KindOrType
+  -> Type
   -> Eval (Var a)
 getUniqueVar f name ty = do
   env <- getGlobalEnv

@@ -18,6 +18,7 @@ module Clash.Core.HasType
   , piResultTys
   ) where
 
+import Data.Foldable (foldl')
 import qualified Data.Text as Text (isInfixOf)
 import Data.Text.Prettyprint.Doc (line)
 import GHC.Stack (HasCallStack)
@@ -29,12 +30,13 @@ import Clash.Core.Name (Name(nameOcc))
 import Clash.Core.Pretty
 import Clash.Core.Subst
 import Clash.Core.Term (Term(..), IsMultiPrim(..), PrimInfo(..), collectArgs)
-import Clash.Core.TyCon (TyConMap)
+import Clash.Core.TyCon (TyCon(SuperKindTyCon), TyConMap, tyConKind)
 import Clash.Core.Type
 import Clash.Core.TysPrim
 import Clash.Core.Var (Var(varType))
 import Clash.Core.VarEnv
 import Clash.Debug (debugIsOn)
+import Clash.Unique (lookupUniqMap')
 import Clash.Util (pprPanic)
 import qualified Clash.Util.Interpolate as I
 
@@ -105,6 +107,42 @@ instance InferType Term where
       Case _ ty _ -> ty
       Cast _ _ a -> a
       Tick _ x -> go x
+
+instance InferType Type where
+  inferCoreTypeOf tcm = go
+   where
+    go (VarTy k) = coreTypeOf k
+    go (ForAllTy _ ty) = go ty
+    go (LitTy NumTy{}) = typeNatKind
+    go (LitTy SymTy{}) = typeSymbolKind
+    go (AnnType _ ty) = go ty
+    go (tyView -> FunTy _ res)
+      | let resTy = go res
+      , isSuperKind tcm resTy = resTy
+
+      | otherwise = liftedTypeKind
+
+    go (tyView -> TyConApp tc args) =
+      foldl' kindFunResult (tyConKind (lookupUniqMap' tcm tc)) args
+
+    go (AppTy fun arg) =
+      kindFunResult (go fun) arg
+
+    go ConstTy{} =
+      error "inferCoreTypeOf: Naked ConstTy"
+
+kindFunResult :: Type -> Type -> Type
+kindFunResult (tyView -> FunTy _ res) _ = res
+
+kindFunResult (ForAllTy kv ki) arg =
+  substTyWith [kv] [arg] ki
+
+kindFunResult k tys =
+  error ("kindFunResult: " <> show (k,tys))
+
+isSuperKind :: TyConMap -> Type -> Bool
+isSuperKind tcMap (ConstTy (TyCon ((tcMap `lookupUniqMap'`) -> SuperKindTyCon {}))) = True
+isSuperKind _ _ = False
 
 -- | Get the result type of a polymorphic function given a list of arguments
 applyTypeToArgs

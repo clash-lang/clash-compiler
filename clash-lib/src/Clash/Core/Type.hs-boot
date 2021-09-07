@@ -20,10 +20,7 @@ import                Clash.Core.Name
 import {-# SOURCE #-} Clash.Core.TyCon
 
 data Type
-
-type Kind   = Type
 type TyName = Name Type
-type KiName = Name Kind
 
 instance Generic  Type
 instance Show     Type

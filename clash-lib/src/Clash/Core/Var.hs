@@ -40,7 +40,7 @@ import Data.Hashable                    (Hashable(hashWithSalt))
 import GHC.Generics                     (Generic)
 import Clash.Core.Name                  (Name (..))
 import {-# SOURCE #-} Clash.Core.Term   (Term, TmName)
-import {-# SOURCE #-} Clash.Core.Type   (Kind, Type, TyName)
+import {-# SOURCE #-} Clash.Core.Type   (Type, TyName)
 import Clash.Unique
 
 
@@ -68,7 +68,7 @@ data Var a
   { varName :: !(Name a)
   , varUniq :: {-# UNPACK #-} !Unique
   -- ^ Invariant: forall x . varUniq x ~ nameUniq (varName x)
-  , varType :: Kind
+  , varType :: Type
   }
   -- | Constructor for term variables
   | Id
@@ -122,7 +122,7 @@ modifyVarName f (Id n _ t s) =
 
 -- | Make a type variable
 mkTyVar
-  :: Kind
+  :: Type
   -> TyName
   -> TyVar
 mkTyVar tyKind tyName = TyVar tyName (nameUniq tyName) tyKind

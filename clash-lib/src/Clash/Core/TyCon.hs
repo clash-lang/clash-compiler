@@ -33,7 +33,7 @@ import GHC.Generics
 -- Internal Imports
 import Clash.Core.DataCon                     (DataCon)
 import Clash.Core.Name
-import {-# SOURCE #-} Clash.Core.Type         (Kind, Type)
+import {-# SOURCE #-} Clash.Core.Type         (Type)
 import Clash.Core.Var                         (TyVar)
 import Clash.Unique
 
@@ -43,7 +43,7 @@ data TyCon
   = AlgTyCon
   { tyConUniq   :: {-# UNPACK #-} !Unique
   , tyConName   :: !TyConName   -- ^ Name of the TyCon
-  , tyConKind   :: !Kind        -- ^ Kind of the TyCon
+  , tyConKind   :: !Type        -- ^ Type of the TyCon
   , tyConArity  :: !Int         -- ^ Number of type arguments
   , algTcRhs    :: !AlgTyConRhs -- ^ DataCon definitions
   , isClassTc   :: !Bool        -- ^ Is this a class dictionary?
@@ -52,7 +52,7 @@ data TyCon
   | FunTyCon
   { tyConUniq   :: {-# UNPACK #-} !Unique
   , tyConName   :: !TyConName      -- ^ Name of the TyCon
-  , tyConKind   :: !Kind           -- ^ Kind of the TyCon
+  , tyConKind   :: !Type           -- ^ Type of the TyCon
   , tyConArity  :: !Int            -- ^ Number of type arguments
   , tyConSubst  :: [([Type],Type)] -- ^ List of: ([LHS match types], RHS type)
   }
@@ -60,7 +60,7 @@ data TyCon
   | PrimTyCon
   { tyConUniq    :: {-# UNPACK #-} !Unique
   , tyConName    :: !TyConName  -- ^ Name of the TyCon
-  , tyConKind    :: !Kind       -- ^ Kind of the TyCon
+  , tyConKind    :: !Type       -- ^ Type of the TyCon
   , tyConArity   :: !Int        -- ^ Number of type arguments
   }
   -- | To close the loop on the type hierarchy
@@ -105,7 +105,7 @@ data AlgTyConRhs
 
 -- | Create a Kind out of a TyConName
 mkKindTyCon :: TyConName
-            -> Kind
+            -> Type
             -> TyCon
 mkKindTyCon name kind
   = PrimTyCon (nameUniq name) name kind 0

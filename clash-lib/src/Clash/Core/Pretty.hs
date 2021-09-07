@@ -58,7 +58,7 @@ import Clash.Core.Name                  (Name (..))
 import Clash.Core.Term
   (Pat (..), Term (..), TickInfo (..), NameMod (..), CoreContext (..), primArg, PrimInfo(primName))
 import Clash.Core.TyCon                 (TyCon (..), TyConName, isTupleTyConLike)
-import Clash.Core.Type                  (ConstTy (..), Kind, LitTy (..),
+import Clash.Core.Type                  (ConstTy (..), LitTy (..),
                                          Type (..), TypeView (..), tyView)
 import Clash.Core.Var                   (Id, TyVar, Var (..), IdScope(..))
 import Clash.Debug                      (trace)
@@ -465,11 +465,8 @@ pprForAll tvs = do
 pprTvBndr :: Monad m => TyVar -> m ClashDoc
 pprTvBndr tv = do
   tv'   <- pprM tv
-  kind' <- pprKind (varType tv)
+  kind' <- pprType (varType tv)
   return $ tyParens $ tv' <> (annotate (AnnSyntax Type) $ space <> dcolon <+> kind')
-
-pprKind :: Monad m => Kind -> m ClashDoc
-pprKind = pprType
 
 pprTcApp :: Monad m => TypePrec -> (TypePrec -> Type -> m ClashDoc)
   -> TyConName -> [Type] -> m ClashDoc

@@ -332,7 +332,7 @@ tyNatSize _ ty = throwE $ $(curLoc) ++ "Cannot reduce to an integer:\n" ++ showP
 
 mkUniqSystemTyVar
   :: (Supply, InScopeSet)
-  -> (OccName, Kind)
+  -> (OccName, Type)
   -> ((Supply, InScopeSet), TyVar)
 mkUniqSystemTyVar (supply,inScope) (nm, ki) =
   ((supply',extendInScopeSet inScope v'), v')
@@ -718,7 +718,7 @@ mkInternalVar
   => InScopeSet
   -> OccName
   -- ^ Name of the identifier
-  -> KindOrType
+  -> Type
   -> m Id
 mkInternalVar inScope name ty = do
   i <- getUniqueM
