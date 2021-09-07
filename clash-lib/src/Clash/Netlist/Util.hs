@@ -179,20 +179,6 @@ splitNormalized tcm expr = case collectBndrs expr of
  where
   ty = inferCoreTypeOf tcm expr
 
--- | Same as @unsafeCoreTypeToHWType@, but discards void filter information
-unsafeCoreTypeToHWType'
-  :: SrcSpan
-  -- ^ Approximate location in original source file
-  -> String
-  -> (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
-  -> CustomReprs
-  -> TyConMap
-  -> Type
-  -> State HWMap HWType
-unsafeCoreTypeToHWType' sp loc builtInTranslation reprs m ty =
-  stripFiltered <$> (unsafeCoreTypeToHWType sp loc builtInTranslation reprs m ty)
-
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Errors if the Core type is not translatable.
 unsafeCoreTypeToHWType
@@ -688,12 +674,6 @@ conSize :: HWType
         -> Int
 conSize (SP _ cons) = fromMaybe 0 . clogBase 2 . toInteger $ length cons
 conSize t           = typeSize t
-
--- | Gives the length of length-indexed types
-typeLength :: HWType
-           -> Int
-typeLength (Vector n _) = n
-typeLength _            = 0
 
 -- | Gives the HWType corresponding to a term. Returns an error if the term has
 -- a Core type that is not translatable to a HWType.

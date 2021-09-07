@@ -606,14 +606,6 @@ liftBinding (var@Id {varName = idName} ,e) = do
 
 liftBinding _ = error $ $(curLoc) ++ "liftBinding: invalid core, expr bound to tyvar"
 
--- | Ensure that the 'Unique' of a variable does not occur in the 'BindingMap'
-uniqAwayBinder
-  :: BindingMap
-  -> Name a
-  -> Name a
-uniqAwayBinder binders nm =
-  uniqAway' (`elemUniqMapDirectly` binders) (nameUniq nm) nm
-
 -- | Make a global function for a name-term tuple
 mkFunction
   :: TmName

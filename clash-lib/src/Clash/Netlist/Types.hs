@@ -762,19 +762,6 @@ data NetlistId
   -- expressions of types that have to be split apart (e.g. tuples of Files)
   deriving Show
 
--- | Eliminator for 'NetlistId'
-netlistId
-  :: (Identifier -> r)
-  -- ^ Eliminator for Identifiers generated in the NetlistMonad
-  -> (Id -> r)
-  -- ^ Eliminator for original Core Identifiers
-  -> NetlistId
-  -> [r]
-netlistId f g = \case
-  NetlistId i _ -> [f i]
-  CoreId i -> [g i]
-  MultiId is -> map g is
-
 -- | Eliminator for 'NetlistId', fails on 'MultiId'
 netlistId1
   :: HasCallStack

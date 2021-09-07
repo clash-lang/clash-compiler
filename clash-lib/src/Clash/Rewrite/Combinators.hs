@@ -1,7 +1,8 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente
+                         2021, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Rewriting combinators and traversals
 -}
@@ -15,11 +16,7 @@ module Clash.Rewrite.Combinators
   , bottomupR
   , repeatR
   , topdownR
-
-  , whenR
-  , bottomupWhenR
-  )
- where
+  ) where
 
 import           Control.DeepSeq             (deepseq)
 import           Control.Monad               ((>=>))
@@ -149,25 +146,3 @@ infixr 5 >-!
 repeatR :: Rewrite m -> Rewrite m
 repeatR = let go r = r !-> repeatR r in go
 {-# INLINE repeatR #-}
-
-whenR :: Monad m
-      => (TransformContext -> Term -> m Bool)
-      -> Transform m
-      -> Transform m
-whenR f r1 ctx expr = do
-  b <- f ctx expr
-  if b
-    then r1 ctx expr
-    else return expr
-
--- | Only traverse downwards when the assertion evaluates to true
-bottomupWhenR
-  :: Monad m
-  => (TransformContext -> Term -> m Bool)
-  -> Transform m
-  -> Transform m
-bottomupWhenR f r ctx expr = do
-  b <- f ctx expr
-  if b
-    then (allR (bottomupWhenR f r) >-> r) ctx expr
-    else r ctx expr

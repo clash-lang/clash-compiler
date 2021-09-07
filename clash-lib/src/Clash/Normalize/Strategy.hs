@@ -317,10 +317,6 @@ topdownSucR :: Rewrite extra -> Rewrite extra
 topdownSucR r = r >-! (allR (topdownSucR r))
 {-# INLINE topdownSucR #-}
 
-topdownRR :: Rewrite extra -> Rewrite extra
-topdownRR r = repeatR (topdownR r)
-{-# INLINE topdownRR #-}
-
 innerMost :: Rewrite extra -> Rewrite extra
 innerMost = let go r = bottomupR (r !-> innerMost r) in go
 {-# INLINE innerMost #-}

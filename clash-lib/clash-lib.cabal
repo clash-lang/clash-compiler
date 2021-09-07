@@ -202,7 +202,6 @@ Library
                       Clash.Core.TermInfo
                       Clash.Core.TermLiteral
                       Clash.Core.TermLiteral.TH
-                      Clash.Core.Termination
                       Clash.Core.TyCon
                       Clash.Core.Type
                       Clash.Core.TysPrim
@@ -281,7 +280,6 @@ Library
                       Data.Text.Prettyprint.Doc.Extra
 
   Other-Modules:      Clash.Annotations.TopEntity.Extra
-                      Control.Applicative.Extra
                       Data.Aeson.Extra
                       Data.IntMap.Extra
                       Data.List.Extra

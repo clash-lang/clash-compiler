@@ -1,5 +1,5 @@
 {-|
-  Copyright  :  (C) 2020, QBayLogic B.V.
+  Copyright  :  (C) 2020-2021, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com
 -}
@@ -9,7 +9,6 @@ module Clash.Netlist.Id.Common where
 
 import           Control.Arrow (first)
 import           Control.Applicative ((<|>))
-import           Control.Applicative.Extra (orEmpty)
 import           Data.Maybe (fromMaybe)
 import           Data.Text (Text)
 import           Data.Text.Extra (showt)
@@ -28,7 +27,7 @@ parsePrintable = parseSingle (\c -> Char.isPrint c && Char.isAscii c)
 parseSingle :: (Char -> Bool) -> Text -> Maybe Text
 parseSingle predicate s = do
   (l, ls) <- Text.uncons s
-  orEmpty (predicate l) ls
+  if predicate l then Just ls else Nothing
 
 parseMaybeSingle :: (Char -> Bool) -> Text -> Maybe Text
 parseMaybeSingle predicate s = Just (fromMaybe s (parseSingle predicate s))

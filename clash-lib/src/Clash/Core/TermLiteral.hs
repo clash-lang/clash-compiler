@@ -1,7 +1,8 @@
 {-|
-Copyright   :  (C) 2019, Myrtle Software Ltd
+Copyright   :  (C) 2019, Myrtle Software Ltd,
+                   2021, QBayLogic B.V.
 License     :  BSD2 (see the file LICENSE)
-Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Tools to convert a 'Term' into its "real" representation
 -}
@@ -15,7 +16,6 @@ module Clash.Core.TermLiteral
   ( TermLiteral
   , termToData
   , termToDataError
-  , uncheckedTermToData
   ) where
 
 import           Data.Bifunctor                  (bimap)
@@ -122,8 +122,3 @@ termToDataError term = bimap err id (termToData term)
 
       #{typ}
   |]
-
--- | Same as 'termToData', but errors hard if it can't translate a given term
--- to data.
-uncheckedTermToData :: TermLiteral a => Term -> a
-uncheckedTermToData = either error id . termToDataError
