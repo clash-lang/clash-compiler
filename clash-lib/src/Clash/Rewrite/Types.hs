@@ -42,6 +42,7 @@ import GHC.Generics
 import Clash.Core.PartialEval as PE          (Evaluator)
 import Clash.Core.Evaluator.Types as WHNF    (Evaluator, PrimHeap)
 
+import Clash.Core.Subst          () -- Eq instance for Term
 import Clash.Core.Term           (Term, Context)
 import Clash.Core.Type           (Type)
 import Clash.Core.TyCon          (TyConName, TyConMap)
@@ -67,7 +68,7 @@ data RewriteStep
   -- ^ Term before `apply`
   , t_after  :: Term
   -- ^ Term after `apply`
-  } deriving (Show, Generic, NFData, Hashable, Binary)
+  } deriving (Eq, Show, Generic, NFData, Hashable, Binary)
 
 -- | State of a rewriting session
 data RewriteState extra

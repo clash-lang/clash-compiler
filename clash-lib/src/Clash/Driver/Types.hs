@@ -30,6 +30,7 @@ import qualified Data.Set                       as Set
 import           Data.Text                      (Text)
 import           Data.Text.Prettyprint.Doc
 import           GHC.Generics                   (Generic)
+import           GHC.Utils.Misc.Extra           ()
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Types.Basic                (InlineSpec)
@@ -139,7 +140,7 @@ data DebugOpts = DebugOpts
   -- for use with @clash-term@.
   --
   -- Command line flag: -fclash-debug-history[=FILE]
-  } deriving (Show)
+  } deriving (Eq, Show)
 
 instance Hashable DebugOpts where
   hashWithSalt s DebugOpts{..} =
@@ -351,7 +352,7 @@ data ClashOpts = ClashOpts
   , opt_renderEnums :: Bool
   -- ^ Render sum types with all zero-width fields as enums where supported, as
   -- opposed to rendering them as bitvectors.
-  }
+  } deriving (Eq)
 
 instance Hashable ClashOpts where
   hashWithSalt s ClashOpts {..} =
@@ -363,7 +364,7 @@ instance Hashable ClashOpts where
     opt_evaluatorFuelLimit `hashWithSalt`
     opt_cachehdl `hashWithSalt`
     opt_clear `hashWithSalt`
-    opt_primWarn `hashOverridingBool`
+    opt_primWarn `hashWithSalt`
     opt_color `hashWithSalt`
     opt_intWidth `hashWithSalt`
     opt_hdlDir `hashWithSalt`
@@ -383,12 +384,6 @@ instance Hashable ClashOpts where
     opt_inlineWFCacheLimit `hashWithSalt`
     opt_edalize `hashWithSalt`
     opt_renderEnums
-   where
-    hashOverridingBool :: Int -> OverridingBool -> Int
-    hashOverridingBool s1 Auto = hashWithSalt s1 (0 :: Int)
-    hashOverridingBool s1 Always = hashWithSalt s1 (1 :: Int)
-    hashOverridingBool s1 Never = hashWithSalt s1 (2 :: Int)
-    infixl 0 `hashOverridingBool`
 
 defClashOpts :: ClashOpts
 defClashOpts

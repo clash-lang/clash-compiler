@@ -272,7 +272,7 @@ data Primitive
   -- ^ Description of a primitive for a given 'HDL's in a file at 'FilePath'
   | InlinePrimitive [HDL] String
   -- ^ Description of a primitive for a given 'HDL's as an inline 'String'
-  deriving (Show, Read, Data, Generic, NFData, Hashable)
+  deriving (Eq, Show, Read, Data, Generic, NFData, Hashable)
 
 -- | Primitive guard to mark a value as either not translatable or as having a
 -- blackbox with an optional extra warning. Helps Clash generate better error
@@ -287,7 +287,7 @@ data PrimitiveGuard a
   | HasBlackBox [PrimitiveWarning] a
   -- ^ Marks a value as having a blackbox. Clash will error if it hasn't found
   -- a blackbox.
-    deriving (Show, Read, Data, Generic, NFData, Hashable, Functor, Foldable, Traversable, Binary)
+    deriving (Eq, Show, Read, Data, Generic, NFData, Hashable, Functor, Foldable, Traversable, Binary)
 
 -- | Warning that will be emitted on instantiating a guarded value.
 data PrimitiveWarning
@@ -296,7 +296,7 @@ data PrimitiveWarning
   -- instantiated in a non-testbench context.
   | WarnAlways String
   -- ^ Always emit warning upon primitive instantiation.
-    deriving (Show, Read, Data, Generic, NFData, Hashable, Binary)
+    deriving (Eq, Show, Read, Data, Generic, NFData, Hashable, Binary)
 
 -- | Extract primitive definition from a PrimitiveGuard. Will yield Nothing
 -- for guards of value 'DontTranslate'.

@@ -29,4 +29,5 @@ class HasIdentifierSet s where
 type role NetlistMonad nominal
 data NetlistMonad a
 data PreserveCase = PreserveCase | ToLower
+instance Eq PreserveCase
 instance Hashable PreserveCase

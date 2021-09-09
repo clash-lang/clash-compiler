@@ -294,6 +294,7 @@ Library
                       Data.Text.Extra
                       GHC.BasicTypes.Extra
                       GHC.SrcLoc.Extra
+                      GHC.Utils.Misc.Extra
                       Paths_clash_lib
 
   if flag(debug)
