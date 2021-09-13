@@ -12,6 +12,12 @@ let
       overrides = self: super: {
         # External overrides
 
+        # TODO Remove when prettyprinter-1.7.1 is in nixpkgs
+        prettyprinter =
+         self.callCabal2nix "prettyprinter" (builtins.fetchTarball {
+          url = "https://hackage.haskell.org/package/prettyprinter-1.7.1/prettyprinter-1.7.1.tar.gz";
+        }) {};
+
         ghc-typelits-knownnat =
          self.callCabal2nix "ghc-typelits-knownnat" sources.ghc-typelits-knownnat {};
 
