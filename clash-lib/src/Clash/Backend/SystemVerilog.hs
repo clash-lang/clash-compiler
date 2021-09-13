@@ -35,8 +35,7 @@ import           Data.Monoid                          (Ap(Ap))
 import           Data.Monoid.Extra                    ()
 import qualified Data.Text.Lazy                       as Text
 import qualified Data.Text                            as TextS
-import           Data.Text.Prettyprint.Doc.Extra
-import qualified Data.Text.Prettyprint.Doc.Extra      as PP
+import           Prettyprinter.Extra                  as PP
 import qualified System.FilePath
 
 import           Clash.Annotations.Primitive          (HDL (..))

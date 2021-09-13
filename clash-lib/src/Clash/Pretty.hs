@@ -2,8 +2,6 @@
 
 module Clash.Pretty where
 
-import Data.Text.Prettyprint.Doc
-import Data.Text.Prettyprint.Doc.Render.String
 import Data.Maybe (fromMaybe)
 import qualified System.Console.Terminal.Size as Terminal
 import System.Environment (lookupEnv)
@@ -11,6 +9,8 @@ import System.IO.Unsafe (unsafePerformIO)
 import Text.Read (readMaybe)
 import qualified Clash.Util.Interpolate as I
 import GHC.Stack (HasCallStack)
+import Prettyprinter
+import Prettyprinter.Render.String
 
 unsafeLookupEnvWord :: HasCallStack => String -> Word -> Word
 unsafeLookupEnvWord key dflt =

@@ -89,8 +89,8 @@ import           Data.String
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
 import           Data.Text.Extra                 (showt)
-import           Data.Text.Prettyprint.Doc.Extra
 import           GHC.Stack                       (HasCallStack)
+import           Prettyprinter.Extra
 
 import           Clash.Annotations.Primitive     (HDL (..), Primitive (..))
 import           Clash.Backend                   hiding (fromBV, toBV)

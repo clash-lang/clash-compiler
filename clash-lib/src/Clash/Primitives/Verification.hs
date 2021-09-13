@@ -8,9 +8,9 @@ import Data.Either
 import qualified Control.Lens                    as Lens
 import           Control.Monad.State             (State)
 import           Data.Monoid                     (Ap(getAp))
-import           Data.Text.Prettyprint.Doc.Extra (Doc)
 import qualified Data.Text                       as Text
 import           GHC.Stack                       (HasCallStack)
+import           Prettyprinter.Extra             (Doc)
 
 import           Clash.Annotations.Primitive     (HDL(..))
 import           Clash.Backend

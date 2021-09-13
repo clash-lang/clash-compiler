@@ -56,13 +56,13 @@ import           Data.Text.Lazy                   (Text)
 import qualified Data.Text.Lazy                   as Text
 import           Data.Text.Lazy.Encoding          as Text
 import qualified Data.Text.Lazy.IO                as Text
-import           Data.Text.Prettyprint.Doc.Extra
-  (Doc, LayoutOptions (..), PageWidth (..) , layoutPretty, renderLazy)
 import qualified Data.Time.Clock                  as Clock
 import           GHC.Stack                        (HasCallStack)
 import qualified Language.Haskell.Interpreter     as Hint
 import qualified Language.Haskell.Interpreter.Extension as Hint
 import qualified Language.Haskell.Interpreter.Unsafe as Hint
+import           Prettyprinter.Extra
+  (Doc, LayoutOptions (..), PageWidth (..) , layoutPretty, renderLazy)
 import qualified System.Directory                 as Directory
 import           System.Directory
   (doesPathExist, listDirectory, doesDirectoryExist, createDirectoryIfMissing,

@@ -51,7 +51,7 @@ import           Data.List.Extra                      ((<:>))
 import           Data.Text.Lazy                       (pack)
 import qualified Data.Text.Lazy                       as Text
 import qualified Data.Text                            as TextS
-import           Data.Text.Prettyprint.Doc.Extra
+import           Prettyprinter.Extra
 import qualified System.FilePath
 import           GHC.Stack                            (HasCallStack)
 

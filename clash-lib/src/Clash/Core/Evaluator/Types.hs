@@ -14,7 +14,7 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap (insert, lookup)
 import Data.List (foldl')
 import Data.Maybe (fromMaybe, isJust)
-import Data.Text.Prettyprint.Doc (hsep)
+import Prettyprinter (hsep)
 
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.HasType

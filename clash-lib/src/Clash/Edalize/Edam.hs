@@ -1,5 +1,5 @@
 {-|
-Copyright       : (C) 2020, QBayLogic
+Copyright       : (C) 2020-2021, QBayLogic
 License         : BSD2 (see the file LICENSE)
 Maintainer      : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -26,7 +26,7 @@ module Clash.Edalize.Edam
 import Data.Default
 import Data.Maybe
 import Data.Text (Text)
-import Data.Text.Prettyprint.Doc
+import Prettyprinter
 
 -- | EDAM data structure to be given to an Edalize backend. This contains all
 -- information needed to generate a project scaffolding. Note that hooks and
@@ -316,4 +316,3 @@ flagList = squotes . hsep
 
 commaList :: [Doc ann] -> Doc ann
 commaList = vsep . punctuate comma
-

@@ -2,8 +2,8 @@
 
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-module Data.Text.Prettyprint.Doc.Extra
-  ( module Data.Text.Prettyprint.Doc.Extra
+module Prettyprinter.Extra
+  ( module Prettyprinter.Extra
   , LayoutOptions (..)
   , PageWidth (..)
   , layoutCompact
@@ -16,9 +16,9 @@ import           Control.Applicative
 import           Data.String                           (IsString (..))
 import           Data.Text                             as T
 import           Data.Text.Lazy                        as LT
-import qualified Data.Text.Prettyprint.Doc             as PP
-import           Data.Text.Prettyprint.Doc.Internal    hiding (Doc)
-import           Data.Text.Prettyprint.Doc.Render.Text
+import qualified Prettyprinter                         as PP
+import           Prettyprinter.Internal hiding (Doc)
+import           Prettyprinter.Render.Text
 
 type Doc = PP.Doc ()
 

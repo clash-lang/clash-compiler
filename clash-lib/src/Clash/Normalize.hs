@@ -31,7 +31,7 @@ import qualified Data.Map                         as Map
 import qualified Data.Maybe                       as Maybe
 import qualified Data.Set                         as Set
 import qualified Data.Set.Lens                    as Lens
-import           Data.Text.Prettyprint.Doc        (vcat)
+import           Prettyprinter (vcat)
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Types.Basic                  (InlineSpec (..))

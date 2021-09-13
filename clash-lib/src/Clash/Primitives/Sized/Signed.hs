@@ -11,7 +11,7 @@ module Clash.Primitives.Sized.Signed (fromIntegerTF) where
 
 import Control.Monad.State (State)
 import Data.Monoid (Ap(getAp))
-import Data.Text.Prettyprint.Doc.Extra (Doc, tupled)
+import Prettyprinter.Extra (Doc, tupled)
 
 import Clash.Backend (Backend, expr)
 import Clash.Netlist.Types

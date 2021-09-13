@@ -26,7 +26,7 @@ import Clash.Backend (Backend)
 import Clash.Netlist.Types
   (BlackBoxContext(..), Expr(..), HWType(..), Literal(..), Modifier(..),
    TemplateFunction(..))
-import Data.Text.Prettyprint.Doc.Extra (Doc)
+import Prettyprinter.Extra (Doc)
 
 import Clash.Cores.Xilinx.Floating.Internal
 

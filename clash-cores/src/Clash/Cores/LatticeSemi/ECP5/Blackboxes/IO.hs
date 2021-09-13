@@ -18,7 +18,7 @@ import           Clash.Netlist.Types
 import           Control.Monad.State             (State())
 import           Data.Monoid                     (Ap(getAp))
 import           Data.Text as TextS
-import           Data.Text.Prettyprint.Doc.Extra
+import           Prettyprinter.Extra
 import           Prelude
 
 -- | Generates HDL for ECP5 bidirectional buffer BB

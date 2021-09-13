@@ -39,8 +39,6 @@ import Data.Binary.IEEE754              (wordToDouble, wordToFloat)
 import Data.List.Extra                  ((<:>))
 import qualified Data.Text              as T
 import Data.Maybe                       (fromMaybe)
-import Data.Text.Prettyprint.Doc
-import Data.Text.Prettyprint.Doc.Internal
 import GHC.Show                         (showMultiLineString)
 import GHC.Stack                        (HasCallStack)
 #if MIN_VERSION_ghc(9,0,0)
@@ -48,6 +46,8 @@ import qualified GHC.Utils.Outputable   as GHC
 #else
 import qualified Outputable             as GHC
 #endif
+import Prettyprinter
+import Prettyprinter.Internal
 import System.Environment               (lookupEnv)
 import System.IO.Unsafe                 (unsafePerformIO)
 import Text.Read                        (readMaybe)

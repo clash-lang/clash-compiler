@@ -22,7 +22,7 @@ import Clash.Netlist.Util
 import Control.Monad.State
 import Data.Monoid (Ap(getAp))
 import qualified Data.String.Interpolate.IsString as I
-import Data.Text.Prettyprint.Doc.Extra
+import Prettyprinter.Extra
 
 import qualified Data.Text as TextS
 import Data.Text.Extra (showt)

@@ -28,8 +28,8 @@ import           Data.Maybe                     (isJust)
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
 import           Data.Text                      (Text)
-import           Data.Text.Prettyprint.Doc
 import           GHC.Generics                   (Generic)
+import           Prettyprinter
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Types.Basic                (InlineSpec)

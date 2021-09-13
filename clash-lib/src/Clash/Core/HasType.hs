@@ -19,8 +19,8 @@ module Clash.Core.HasType
   ) where
 
 import qualified Data.Text as Text (isInfixOf)
-import Data.Text.Prettyprint.Doc (line)
 import GHC.Stack (HasCallStack)
+import Prettyprinter (line)
 
 import Clash.Core.DataCon (DataCon(dcType))
 import Clash.Core.HasFreeVars

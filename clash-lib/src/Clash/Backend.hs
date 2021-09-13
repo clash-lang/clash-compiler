@@ -16,7 +16,7 @@ import Data.Monoid                          (Ap)
 import Data.Text                            (Text)
 import qualified Data.Text.Lazy             as LT
 import Control.Monad.State                  (State)
-import Data.Text.Prettyprint.Doc.Extra      (Doc)
+import Prettyprinter.Extra                  (Doc)
 
 #if MIN_VERSION_ghc(9,0,0)
 import GHC.Types.SrcLoc (SrcSpan)

@@ -88,8 +88,8 @@ import qualified Data.IntMap.Extra as IntMap
 #endif
 
 import qualified Data.List   as List
-import           Data.Text.Prettyprint.Doc
 import           GHC.Stack
+import           Prettyprinter
 
 import           Clash.Pretty
 

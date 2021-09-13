@@ -53,9 +53,9 @@ import qualified Data.Set                   as Set
 import Data.Text                            (Text)
 
 import Data.Typeable                        (Typeable)
-import Data.Text.Prettyprint.Doc.Extra      (Doc)
 import GHC.Generics                         (Generic)
 import GHC.Stack
+import Prettyprinter.Extra                  (Doc)
 import Language.Haskell.TH.Syntax           (Lift)
 
 #if MIN_VERSION_ghc(9,0,0)

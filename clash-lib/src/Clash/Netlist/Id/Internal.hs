@@ -16,11 +16,11 @@ import {-# SOURCE #-} Clash.Netlist.Types
 import           Control.Arrow (second)
 import qualified Data.Char as Char
 import qualified Data.List as List
-import qualified Data.Text.Prettyprint.Doc as PP
 import qualified Data.Text as Text
 import           Data.Text (Text)
 import           Data.Text.Extra (showt)
 import qualified Data.Maybe as Maybe
+import qualified Prettyprinter as PP
 import           Text.Read (readMaybe)
 import           GHC.Stack
 

@@ -58,11 +58,11 @@ module Clash.Core.Subst
 where
 
 import           Data.Coerce               (coerce)
-import           Data.Text.Prettyprint.Doc
 import qualified Data.List                 as List
 import qualified Data.List.Extra           as List
 import           Data.Ord                  (comparing)
 import           GHC.Stack                 (HasCallStack)
+import           Prettyprinter
 
 import           Clash.Core.HasFreeVars
 import           Clash.Core.Pretty         (ppr, fromPpr)

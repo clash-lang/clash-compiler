@@ -1,7 +1,8 @@
 {-|
-  Copyright   :  (C) 2012-2016, University of Twente
+  Copyright   :  (C) 2012-2016, University of Twente,
+                     2021,      QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Assortment of utility function used in the Clash library
 -}
@@ -32,8 +33,6 @@ import qualified Data.List.Extra      as List
 import Data.Maybe                     (fromMaybe, listToMaybe, catMaybes)
 import Data.Map.Ordered               (OMap)
 import qualified Data.Map.Ordered     as OMap
-import Data.Text.Prettyprint.Doc
-import Data.Text.Prettyprint.Doc.Render.String
 import Data.Time.Clock                (UTCTime)
 import qualified Data.Time.Clock      as Clock
 import qualified Data.Time.Format     as Clock
@@ -43,6 +42,8 @@ import GHC.Base                       (Int(..),isTrue#,(==#),(+#))
 import GHC.Integer.Logarithms         (integerLogBase#)
 import qualified GHC.LanguageExtensions.Type as LangExt
 import GHC.Stack                      (HasCallStack, callStack, prettyCallStack)
+import Prettyprinter
+import Prettyprinter.Render.String
 import Type.Reflection                (tyConPackage, typeRepTyCon, typeOf)
 import qualified Language.Haskell.TH  as TH
 

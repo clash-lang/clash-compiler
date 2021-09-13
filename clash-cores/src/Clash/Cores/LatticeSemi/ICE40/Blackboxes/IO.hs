@@ -14,9 +14,9 @@ import           Prelude
 
 import           Control.Monad.State
 import           Data.Monoid (Ap(getAp))
-import           Data.Text.Prettyprint.Doc.Extra
 import           GHC.Stack
   (HasCallStack, prettyCallStack, callStack)
+import           Prettyprinter.Extra
 
 import           Clash.Backend
 import qualified Clash.Netlist.Id as Id

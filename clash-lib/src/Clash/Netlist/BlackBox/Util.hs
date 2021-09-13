@@ -37,9 +37,9 @@ import           Data.Monoid                     (Ap(getAp))
 import qualified Data.Text
 import           Data.Text.Lazy                  (Text)
 import qualified Data.Text.Lazy                  as Text
-import qualified Data.Text.Prettyprint.Doc       as PP
-import           Data.Text.Prettyprint.Doc.Extra
 import           GHC.Stack                       (HasCallStack)
+import qualified Prettyprinter as PP
+import           Prettyprinter.Extra
 import           System.FilePath                 (replaceBaseName, takeBaseName,
                                                   takeFileName, (<.>))
 import           Text.Printf

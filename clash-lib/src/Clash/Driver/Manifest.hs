@@ -37,11 +37,11 @@ import qualified Data.Text.Encoding as Text
 import qualified Data.Text.Lazy as LText
 import qualified Data.Text.Lazy.Encoding as LText
 import           Data.Text (Text)
-import           Data.Text.Prettyprint.Doc.Extra (renderOneLine)
 import           Data.Time (UTCTime)
 import qualified Data.Set as Set
 import           Data.String (IsString)
 import           GHC.Generics (Generic)
+import           Prettyprinter.Extra (renderOneLine)
 import           System.IO.Error (isDoesNotExistError)
 import           System.FilePath (takeDirectory, (</>))
 import           System.Directory (listDirectory, doesFileExist)

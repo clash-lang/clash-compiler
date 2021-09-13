@@ -22,13 +22,13 @@ import           Data.Maybe                         (fromMaybe)
 import           Data.Monoid                        (Ap(getAp))
 import           Data.Text.Extra                    (showt)
 import           Data.Text.Lazy                     (pack)
-import           Data.Text.Prettyprint.Doc.Extra
-  (Doc, string, renderLazy, layoutPretty, LayoutOptions(..),
-   PageWidth(AvailablePerLine))
 import           Text.Trifecta.Result               (Result(Success))
 import qualified Data.String.Interpolate            as I
 import qualified Data.String.Interpolate.Util       as I
 import           GHC.Stack                          (HasCallStack)
+import           Prettyprinter.Extra
+  (Doc, string, renderLazy, layoutPretty, LayoutOptions(..),
+   PageWidth(AvailablePerLine))
 
 import           Clash.Backend
   (Backend, hdlTypeErrValue, expr, blockDecl)

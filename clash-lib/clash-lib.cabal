@@ -156,7 +156,7 @@ Library
                       lens                    >= 4.10     && < 5.1.0,
                       mtl                     >= 2.1.2    && < 2.3,
                       ordered-containers      >= 0.2      && < 0.3,
-                      prettyprinter           >= 1.2.0.1  && < 2.0,
+                      prettyprinter           >= 1.7      && < 2.0,
                       pretty-show             >= 1.9      && < 2.0,
                       primitive               >= 0.5.0.1  && < 1.0,
                       template-haskell        >= 2.8.0.0  && < 2.18,
@@ -277,7 +277,7 @@ Library
 
                       Clash.Verification.Pretty
 
-                      Data.Text.Prettyprint.Doc.Extra
+                      Prettyprinter.Extra
 
   Other-Modules:      Clash.Annotations.TopEntity.Extra
                       Data.Aeson.Extra
