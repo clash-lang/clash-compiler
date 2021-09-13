@@ -1,0 +1,1 @@
+FIXED: Dont' loop on recursive data types hiding behind type families [#1921](https://github.com/clash-lang/clash-compiler/issues/1921)
