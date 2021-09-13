@@ -156,7 +156,11 @@ Library
                       lens                    >= 4.10     && < 5.1.0,
                       mtl                     >= 2.1.2    && < 2.3,
                       ordered-containers      >= 0.2      && < 0.3,
-                      prettyprinter           >= 1.2.0.1  && < 2.0,
+                      -- TODO upper bound needed on prettyprinter until we can
+                      -- switch to 1.7 on both nix and debian. 1.7.1 has
+                      -- DEPRECATED pragmas on the old module names which
+                      -- break CI
+                      prettyprinter           >= 1.2.0.1  && < 1.7.1,
                       pretty-show             >= 1.9      && < 2.0,
                       primitive               >= 0.5.0.1  && < 1.0,
                       template-haskell        >= 2.8.0.0  && < 2.18,
