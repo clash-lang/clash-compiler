@@ -47,7 +47,7 @@ import           Language.Haskell.TH.Lib
 import           Language.Haskell.TH.Ppr
 
 import           Control.Lens.Internal.TH     (conAppsT)
-#if !(MIN_VERSION_th_abstraction(0,4,0))
+#if MIN_VERSION_th_abstraction(0,3,0) && !(MIN_VERSION_th_abstraction(0,4,0))
 import           Control.Lens.Internal.TH     (bndrName)
 #endif
 
