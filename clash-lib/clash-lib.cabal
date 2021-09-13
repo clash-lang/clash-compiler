@@ -167,7 +167,11 @@ Library
                       mtl                     >= 2.1.2    && < 2.3,
                       ordered-containers      >= 0.2      && < 0.3,
                       parsers                 >= 0.12.8   && < 1.0,
-                      prettyprinter           >= 1.2.0.1  && < 2.0,
+                      -- TODO upper bound needed on prettyprinter until we can
+                      -- switch to 1.7 on both nix and debian. 1.7.1 has
+                      -- DEPRECATED pragmas on the old module names which
+                      -- break CI
+                      prettyprinter           >= 1.2.0.1  && < 1.7.1,
                       pretty-show             >= 1.9      && < 2.0,
                       primitive               >= 0.5.0.1  && < 1.0,
                       process                 >= 1.1.0.2  && < 1.7,
