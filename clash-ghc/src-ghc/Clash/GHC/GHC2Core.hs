@@ -659,6 +659,8 @@ isSizedCast (TyConApp tc1 _) (TyConApp tc2 _) = do
         ,tc2 `hasKey` naturalTyConKey &&
           tc1Nm == "Clash.Sized.Internal.Unsigned.Unsigned"
         ])
+-- XXX: a work-around for issue #1927, the real fix is to handle all casts
+isSizedCast (TyVarTy {}) (TyConApp tc2 _) = return (tc2 `hasKey` integerTyConKey)
 isSizedCast _ _ = return False
 
 hasPrimCo :: Coercion -> C2C (Maybe Type)

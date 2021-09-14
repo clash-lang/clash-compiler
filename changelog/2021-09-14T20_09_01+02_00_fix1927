@@ -1,0 +1,1 @@
+FIXED: Don't error out on `counter ~ (Index numStages)` like equalities [#1927](https://github.com/clash-lang/clash-compiler/issues/1927)
