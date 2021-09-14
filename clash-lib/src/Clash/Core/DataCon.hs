@@ -28,6 +28,7 @@ import Data.Hashable                          (Hashable)
 import qualified Data.Text                    as Text
 import GHC.Generics                           (Generic)
 
+import {-# SOURCE #-} Clash.Core.Hash         ()
 import Clash.Core.Name                        (Name (..))
 import {-# SOURCE #-} Clash.Core.Type         (Type)
 import Clash.Core.Var                         (TyVar)

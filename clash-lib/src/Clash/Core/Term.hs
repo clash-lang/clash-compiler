@@ -76,7 +76,7 @@ import Clash.Core.DataCon                      (DataCon)
 import Clash.Core.Literal                      (Literal)
 import Clash.Core.Name                         (Name (..))
 import {-# SOURCE #-} Clash.Core.Subst         () -- instance Eq Type
-import {-# SOURCE #-} Clash.Core.Type          (Type)
+import Clash.Core.Type                         (Type)
 import Clash.Core.Var                          (Var, Id, TyVar)
 import Clash.Util                              (curLoc)
 
@@ -95,7 +95,7 @@ data Term
                                             -- alternatives, list of alternatives
   | Cast    !Term !Type !Type               -- ^ Cast a term from one type to another
   | Tick    !TickInfo !Term                 -- ^ Annotated term
-  deriving (Show,Generic,NFData,Hashable,Binary)
+  deriving (Show,Generic,NFData,Binary)
 
 data TickInfo
   = SrcSpan !SrcSpan

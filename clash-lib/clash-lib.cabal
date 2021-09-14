@@ -192,6 +192,7 @@ Library
                       Clash.Core.EqSolver
                       Clash.Core.Evaluator.Types
                       Clash.Core.FreeVars
+                      Clash.Core.Hash
                       Clash.Core.HasType
                       Clash.Core.HasFreeVars
                       Clash.Core.Literal
