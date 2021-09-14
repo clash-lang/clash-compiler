@@ -209,6 +209,12 @@ runClashTest = defaultMain $ clashTestRoot
           , expectClashFail=Just (def, "Cannot use attribute annotations on product types of top entities")
           }
         ]
+      , clashTestGroup "Testbench"
+        [ runTest "UnsafeOutputVerifier" def{
+            expectClashFail=Just ( TestSpecificExitCode 0
+                                 , "Clash.Explicit.Testbench.unsafeSimSynchronizer is not safely synthesizable!")
+          }
+        ]
       , clashTestGroup "TopEntity"
         [ runTest "T1033" def{
             hdlTargets=[VHDL]

@@ -1,0 +1,18 @@
+[ { "BlackBox" :
+    { "name"      : "Clash.Explicit.Testbench.unsafeSimSynchronizer"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type" :
+"unsafeSimSynchronizer
+  :: forall dom1 dom2 a
+   . ( KnownDomain dom1         -- ARG[0]
+     , KnownDomain dom2 )       -- ARG[1]
+  => Clock dom1                 -- ARG[2]
+  -> Clock dom2                 -- ARG[3]
+  -> Signal dom1 a              -- ARG[4]
+  -> Signal dom2 a"
+    , "template"  : "~ARG[4]"
+    , "warning"   : "Clash.Explicit.Testbench.unsafeSimSynchronizer is not safely synthesizable!"
+    }
+  }
+]
