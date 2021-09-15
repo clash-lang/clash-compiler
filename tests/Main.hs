@@ -147,7 +147,7 @@ runClashTest = defaultMain $ clashTestRoot
         , let _opts = def { buildTargets = BuildSpecific ["system"]
                           , hdlTargets = [Verilog]
                           , hdlSim = True
-                          , vvpStderrEmptyFail = False
+                          , vvpStdoutNonEmptyFail = False
                           }
            in runTest "I2Ctest" _opts
         ]
@@ -669,7 +669,7 @@ runClashTest = defaultMain $ clashTestRoot
         ]
       , clashTestGroup "SimIO"
         [ let _opts = def { hdlTargets=[Verilog]
-                          , vvpStderrEmptyFail=False
+                          , vvpStdoutNonEmptyFail=False
                           , buildTargets=BuildSpecific ["topEntity"]
                           }
            in runTest "Test00" _opts
