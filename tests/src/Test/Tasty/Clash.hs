@@ -118,8 +118,8 @@ data TestOptions =
     , buildTargets :: BuildTargets
     -- ^ Indicates what should be built to an executable. Defaults to @["testBench"]@
     -- if 'hdlSim' is set, otherwise @["topEntity"]@.
-    , vvpStderrEmptyFail :: Bool
-    -- ^ Whether an empty stderr means test failure when running VVP
+    , vvpStdoutNonEmptyFail :: Bool
+    -- ^ Whether a non-empty stdout means test failure when running VVP
     }
 
 allTargets :: [HDL]
@@ -138,7 +138,7 @@ instance Default TestOptions where
       , ghcFlags=[]
       , clashFlags=[]
       , buildTargets=BuildAuto
-      , vvpStderrEmptyFail=True
+      , vvpStdoutNonEmptyFail=True
       }
 
 -- | Directory where testbenches live.
@@ -319,7 +319,7 @@ verilogTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
 
   simName t = "iverilog (sim " <> t <> ")"
   simTests =
-    [ (simName t, singleTest (simName t) (IVerilogSimTest expectSimFail vvpStderrEmptyFail tmpDir t))
+    [ (simName t, singleTest (simName t) (IVerilogSimTest expectSimFail vvpStdoutNonEmptyFail tmpDir t))
     | t <- getBuildTargets opts ]
 
 -- | Generate two test trees for testing SystemVerilog: one for building designs and

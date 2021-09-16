@@ -61,8 +61,8 @@ instance IsTest IVerilogMakeTest where
 data IVerilogSimTest = IVerilogSimTest
   { ivsExpectFailure :: Maybe (TestExitCode, T.Text)
     -- ^ Expected failure code and output (if any)
-  , ivsStderrEmptyFail :: Bool
-    -- ^ Whether empty stderr means failure
+  , ivsStdoutNonEmptyFail :: Bool
+    -- ^ Whether a non-empty stdout means failure
   , ivsSourceDirectory :: IO FilePath
     -- ^ Directory containing executables produced by 'IVerilogMakeTest'
   , ivsTop :: String
@@ -84,7 +84,7 @@ instance IsTest IVerilogSimTest where
       Just exit -> run optionSet (failingVvp src [topExe] exit) progressCallback
    where
     vvp workDir args =
-      TestProgram "vvp" args NoGlob PrintNeither ivsStderrEmptyFail (Just workDir)
+      TestProgram "vvp" args NoGlob PrintNeither ivsStdoutNonEmptyFail (Just workDir)
 
     failingVvp workDir args (testExit, expectedErr) =
       TestFailingProgram

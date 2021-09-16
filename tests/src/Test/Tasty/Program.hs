@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2014, Jan Stolarek,
                      2015-2016, University of Twente,
-                     2017, QBayLogic
+                     2017-2021, QBayLogic
   License     :
     All rights reserved.
 
@@ -77,7 +77,7 @@ import qualified Clash.Util.Interpolate  as I
 import qualified Data.List as List
 
 import Data.Typeable           ( Typeable                                 )
-import Data.Maybe              ( fromMaybe                                )
+import Data.Maybe              ( fromMaybe, isNothing                     )
 import System.FilePath.Glob    ( globDir1, compile                        )
 import System.Directory        ( findExecutable, getCurrentDirectory      )
 import System.Exit             ( ExitCode(..)                             )
@@ -122,7 +122,7 @@ data TestProgram =
     PrintOutput
     -- ^ What output to print on test success
     Bool
-    -- ^ Whether an empty stderr means test failure
+    -- ^ Whether a non-empty stdout means failure
     (Maybe FilePath)
     -- ^ Work directory
       deriving (Typeable)
@@ -287,7 +287,7 @@ runProgram program args stdO stdF workDir = do
   case exitCode of
     ExitSuccess ->
       if stdF && not (null stdout)
-        then return (exitFailure program args 1 stderrT stdoutT)
+        then return (unexpectedNonEmptyStdout program args 0 stderrT stdoutT)
         else return (testPassed $ T.unpack $ testOutput stdO stderrT stdoutT)
     ExitFailure code ->
       return $ exitFailure program args code stderrT stdoutT
@@ -334,7 +334,7 @@ runFailingProgram testExitCode program args stdO errOnEmptyStderr expectedCode e
   go e@(stdoutT, stderrT, _stdout, stderr, passed) exitCode1 =
     case exitCode1 of
       ExitSuccess ->
-        if testExitCode then
+        if (testExitCode && isNothing expectedCode) then
           unexpectedSuccess program stderrT stdoutT
         else
           go e (ExitFailure 0)
@@ -355,12 +355,12 @@ runFailingProgram testExitCode program args stdO errOnEmptyStderr expectedCode e
                 unexpectedStd "stdout or stderr" program args code stderrT stdoutT r
               _ ->
                 if testExitCode then
-                  passed
-                else
                   case expectedCode of
                     Nothing -> passed
                     Just n | n == code -> passed
                            | otherwise -> unexpectedCode program code n stderrT stdoutT
+                else
+                  passed
 
 
 -- | Indicates that program does not exist in the path
@@ -373,6 +373,35 @@ exitFailure :: String -> [String] -> Int -> T.Text -> T.Text -> Result
 exitFailure cmd args code stderr stdout =
   testFailed [I.i|
     Program #{cmd} failed with error-code #{code}.
+
+    Full invocation:
+
+      #{cmd} #{List.intercalate " " args}
+
+    Stderr was:
+
+      #{stderr}
+
+    Stdout was:
+
+      #{stdout}
+  |]
+
+unexpectedNonEmptyStdout
+  :: String
+  -- ^ Program name
+  -> [String]
+  -- ^ Program arguments
+  -> Int
+  -- ^ Code returned by program
+  -> T.Text
+  -- ^ stderr
+  -> T.Text
+  -- ^ stdout
+  -> Result
+unexpectedNonEmptyStdout cmd args code stderr stdout =
+  testFailed [I.i|
+    Program #{cmd} (return code: #{code}) printed to stdout unexpectedly.
 
     Full invocation:
 
@@ -405,7 +434,7 @@ unexpectedStd
   -> Result
 unexpectedStd expectedOut cmd args code stderr stdout expected =
   testFailed [I.i|
-    Program #{cmd} did not print expected output to #{expectedOut}. We expected:
+    Program #{cmd} (return code #{code}) did not print expected output to #{expectedOut}. We expected:
 
        #{expected}
 
@@ -472,7 +501,7 @@ unexpectedSuccess
   -> Result
 unexpectedSuccess (T.pack -> file) stderr stdout =
   testFailed $ T.unpack $ [text|
-    Program exited $file succesfully, but we expected an error.
+    Program $file exited succesfully, but we expected an error.
 
     Stderr was:
     $stderr
