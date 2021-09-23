@@ -73,12 +73,14 @@ data TyCon
   , tyConKind    :: !Kind       -- ^ Kind of the TyCon
   , tyConArity   :: !Int        -- ^ Number of type arguments
   }
-  deriving (Generic,NFData,Binary)
+  deriving (Show,Generic,NFData,Binary)
 
+{-
 instance Show TyCon where
   show (AlgTyCon       {tyConName = n}) = "AlgTyCon: " ++ show n
   show (FunTyCon       {tyConName = n}) = "FunTyCon: " ++ show n
   show (PrimTyCon      {tyConName = n}) = "PrimTyCon: " ++ show n
+-}
 
 instance Eq TyCon where
   (==) = (==) `on` tyConUniq

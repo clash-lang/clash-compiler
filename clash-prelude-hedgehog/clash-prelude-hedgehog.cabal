@@ -1,0 +1,57 @@
+cabal-version:      2.2
+
+name:               clash-prelude-hedgehog
+version:            1.5.0
+synopsis:           Hedgehog Generators for clash-prelude
+description:        Hedgehog Generators for clash-prelude
+bug-reports:        https://github.com/clash-lang/clash-compiler/issues
+license:            BSD-2-Clause
+license-file:       LICENSE
+author:             QBayLogic B.V.
+maintainer:         devops@qbaylogic.com
+copyright:          Copyright © 2021, QBayLogic B.V.
+category:           Hardware
+build-type:         Simple
+
+common basic-config
+  default-language: Haskell2010
+
+  default-extensions:
+    BinaryLiterals
+    DataKinds
+    ScopedTypeVariables
+    TypeApplications
+    TypeFamilies
+    TypeOperators
+
+  if impl(ghc >= 8.6)
+    default-extensions:
+      NoStarIsType
+
+  ghc-options:
+    -Wall -Wcompat
+
+  build-depends:
+    base,
+    hedgehog,
+
+library
+  import: basic-config
+  hs-source-dirs: src
+
+  exposed-modules:
+    Clash.Hedgehog.Signal
+    Clash.Hedgehog.Sized.BitVector
+    Clash.Hedgehog.Sized.Index
+    Clash.Hedgehog.Sized.Signed
+    Clash.Hedgehog.Sized.Unsigned
+    Clash.Hedgehog.Sized.RTree
+    Clash.Hedgehog.Sized.Vector
+
+  build-depends:
+    ghc-typelits-knownnat,
+    ghc-typelits-natnormalise,
+    text,
+
+    clash-prelude,
+
