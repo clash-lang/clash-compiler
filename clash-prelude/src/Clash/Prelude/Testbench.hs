@@ -1,9 +1,10 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.
-                  2019     , Myrtle Software Ltd
+                  2019     , Myrtle Software Ltd,
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE FlexibleContexts #-}
@@ -28,7 +29,7 @@ module Clash.Prelude.Testbench
   )
 where
 
-import GHC.TypeLits                       (KnownNat)
+import GHC.TypeLits                       (KnownNat, type (<=))
 
 import qualified Clash.Explicit.Testbench as E
 import           Clash.Signal
@@ -72,7 +73,7 @@ assert msg actual expected ret =
   hideReset (hideClock E.assert) msg actual expected ret
 {-# INLINE assert #-}
 
--- | The same as 'assert', but can handle don't care bits in it's expected value.
+-- | The same as 'assert', but can handle don't care bits in its expected value.
 assertBitVector
   :: (KnownNat n, HiddenClock dom , HiddenReset dom )
   => String
@@ -148,13 +149,15 @@ stimuliGenerator = hideReset (hideClock E.stimuliGenerator)
 -- expected value: 10, not equal to actual value: 9
 -- ,False,True]
 --
--- If your working with 'BitVector's containing don't care bits you should use 'outputVerifierBitVector''.
+-- If you're working with 'BitVector's containing don't care bits you should use 'outputVerifierBitVector''.
 outputVerifier'
   :: ( KnownNat l
      , Eq a
      , ShowX a
      , HiddenClock dom
-     , HiddenReset dom  )
+     , HiddenReset dom
+     , 1 <= l
+     )
   => Vec l a
   -- ^ Samples to compare with
   -> Signal dom a
@@ -166,12 +169,14 @@ outputVerifier' = hideReset (hideClock E.outputVerifier')
 
 
 -- | Same as 'outputVerifier'',
--- but can handle don't care bits in it's expected values.
+-- but can handle don't care bits in its expected values.
 outputVerifierBitVector'
   :: ( KnownNat l
      , KnownNat n
      , HiddenClock dom
-     , HiddenReset dom  )
+     , HiddenReset dom
+     , 1 <= l
+     )
   => Vec l (BitVector n)
   -- ^ Samples to compare with
   -> Signal dom (BitVector n)
