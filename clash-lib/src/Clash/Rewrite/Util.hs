@@ -923,7 +923,7 @@ specialise' :: Lens' extra (Map.Map (Id, Int, Either Term Type) Id) -- ^ Lens in
             -> (Term, [AppArg]) -- ^ Function part of the term, split into root and applied arguments
             -> Either Term Type -- ^ Argument to specialize on
             -> RewriteMonad extra Term
-specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var f, args) specArgIn = do
+specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var f, args) specArg = do
   lvl <- Lens.view dbgLevel
   tcm <- Lens.view tcCache
 
@@ -931,7 +931,7 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
   topEnts <- Lens.view topEntities
   if f `elemVarSet` topEnts
   then do
-    case specArgIn of
+    case specArg of
       Left _ -> traceIf (lvl >= DebugNone) ("Not specializing TopEntity: " ++ showPpr (varName f)) (return e)
       Right tyArg -> traceIf (lvl >= DebugApplied) ("Dropping type application on TopEntity: " ++ showPpr (varName f) ++ "\ntype:\n" ++ showPpr tyArg) $
         -- TopEntities aren't allowed to be semantically polymorphic.
@@ -943,13 +943,13 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
         in  changed (mkArgApps (Var f{varType = newVarTy}) args)
   else do -- NondecreasingIndentation
 
-  let specArg = bimap (normalizeTermTypes tcm) (normalizeType tcm) specArgIn
+  let -- specArg = bimap (normalizeTermTypes tcm) (normalizeType tcm) specArgIn
       -- Create binders and variable references for free variables in 'specArg'
       -- (specBndrsIn,specVars) :: ([Either Id TyVar], [Either Term Type])
-      (specBndrsIn,specVars) = specArgBndrsAndVars specArg
+      (specBndrs,specVars) = specArgBndrsAndVars specArg
       argLen  = length args
-      specBndrs :: [Either Id TyVar]
-      specBndrs = map (Lens.over _Left (normalizeId tcm)) specBndrsIn
+      -- specBndrs :: [Either Id TyVar]
+      -- specBndrs = map (Lens.over _Left (normalizeId tcm)) specBndrsIn
       specAbs :: Either Term Type
       specAbs = either (Left . (`mkAbstraction` specBndrs)) (Right . id) specArg
   -- Determine if 'f' has already been specialized on (a type-normalized) 'specArg'
@@ -995,7 +995,7 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
                                        typeAndTermArgs
               -- Determine name the resulting specialized function, and the
               -- form of the specialized-on argument
-              let specArgInArg = either TermArg TypeArg specArgIn
+              let specArgInArg = either TermArg TypeArg specArg
               (fId,inl',specArg') <- case specArg of
                 Left a@(collectAppArgs -> (Var g,gArgs)) -> if isPolyFunX a
                     then do
@@ -1064,16 +1064,16 @@ specialise' _ _ _ _ctx _ (appE,args) (Left specArg) = do
 
 specialise' _ _ _ _ e _ _ = return e
 
-normalizeTermTypes :: TyConMap -> Term -> Term
-normalizeTermTypes tcm e = case e of
-  Cast e' ty1 ty2 -> Cast (normalizeTermTypes tcm e') (normalizeType tcm ty1) (normalizeType tcm ty2)
-  Var v -> Var (normalizeId tcm v)
-  -- TODO other terms?
-  _ -> e
+-- normalizeTermTypes :: TyConMap -> Term -> Term
+-- normalizeTermTypes tcm e = case e of
+--   Cast e' ty1 ty2 -> Cast (normalizeTermTypes tcm e') (normalizeType tcm ty1) (normalizeType tcm ty2)
+--   Var v -> Var (normalizeId tcm v)
+--   -- TODO other terms?
+--   _ -> e
 
-normalizeId :: TyConMap -> Id -> Id
-normalizeId tcm v@(Id {}) = v {varType = normalizeType tcm (varType v)}
-normalizeId _   tyvar     = tyvar
+-- normalizeId :: TyConMap -> Id -> Id
+-- normalizeId tcm v@(Id {}) = v {varType = normalizeType tcm (varType v)}
+-- normalizeId _   tyvar     = tyvar
 
 -- Note [Collect free-variables in an insertion-ordered set]
 --
