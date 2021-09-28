@@ -562,6 +562,7 @@ runClashTest = defaultMain $ clashTestRoot
           [ clashLibTest "Identity" def
           , clashLibTest "NoDeDup" def{hdlTargets=[VHDL]}
           , clashLibTest "T1766" def
+          , clashLibTest "T1935" def
           ]
       , clashTestGroup "Numbers"
         [ runTest "BitInteger" def
