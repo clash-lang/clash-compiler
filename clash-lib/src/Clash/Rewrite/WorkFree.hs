@@ -150,7 +150,7 @@ isWorkFreeClockOrResetOrEnable tcm e =
     case collectArgs e of
       (Prim p,_) -> Just (primName p == "Clash.Transformations.removedArg")
       (Var _, []) -> Just True
-      (Data _, []) -> Just True -- For Enable True/False
+      (Data _, [_dom, Left (stripTicks -> Data _)]) -> Just True -- For Enable True/False
       (Literal _,_) -> Just True
       _ -> Just False
   else
