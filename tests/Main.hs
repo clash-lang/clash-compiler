@@ -137,6 +137,7 @@ runClashTest = defaultMain $ clashTestRoot
   [ clashTestGroup "netlist"
     [ clashLibTest ("tests" </> "shouldwork" </> "Netlist") allTargets [] "Identity" "main"
     , NEEDS_PRIMS(clashLibTest ("tests" </> "shouldwork" </> "Netlist") [VHDL] [] "NoDeDup" "main")
+    , clashLibTest ("tests" </> "shouldwork" </> "Netlist") allTargets [] "T1935" "main"
     ]
   , clashTestGroup "examples"
     [ runTest "ALU" def{hdlSim=False}
