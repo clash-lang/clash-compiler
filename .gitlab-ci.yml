@@ -1,3 +1,7 @@
+# Make all tasks interruptible by default
+default:
+  interruptible: true
+
 include:
   - '/.ci/gitlab/common.yml'
   - '/.ci/gitlab/publish.yml'
@@ -132,7 +136,10 @@ snap-stable:
     - if: '$CI_COMMIT_TAG != null' # tags
 
 # Work around https://gitlab.com/gitlab-org/gitlab/-/issues/216629
+#
+# If we ever remove this, we may have to rethink the use of the interruptible flag
 .github_status:
+  # interruptible: false
   image: curlimages/curl
   variables:
     GIT_SUBMODULE_STRATEGY: recursive

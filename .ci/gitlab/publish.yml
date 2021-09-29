@@ -2,7 +2,6 @@ hackage-sdist:
   extends: .common
   needs: []
   stage: pack
-  interruptible: false
   script:
     - .ci/build_sdist.sh clash-prelude
     - .ci/build_sdist.sh clash-lib
@@ -82,6 +81,7 @@ debian-bindist-test:
 .snap:
   image: docker.pkg.github.com/clash-lang/clash-compiler/snapcraft:2020-11-20
   stage: publish
+  interruptible: false
   cache:
     key: snap-last-run-hash-$CI_COMMIT_REF_SLUG
     paths:
