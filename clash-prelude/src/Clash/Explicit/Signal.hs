@@ -236,6 +236,7 @@ module Clash.Explicit.Signal
   , simulateB
   , simulateWithReset
   , simulateWithResetN
+  , runUntil
     -- ** lazy versions
   , simulate_lazy
   , simulateB_lazy
@@ -279,7 +280,8 @@ import           Clash.Signal.Internal
 import           Clash.Signal.Internal.Ambiguous
   (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
 import qualified Clash.Sized.Vector
-import           Clash.XException               (NFDataX, deepErrorX, fromJustX)
+import           Clash.XException
+  (NFDataX, deepErrorX, fromJustX, seqX, ShowX(..))
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications -XFlexibleInstances -XMultiParamTypeClasses -XTypeFamilies
@@ -858,5 +860,89 @@ sampleWithResetN
   -> [a]
 sampleWithResetN nReset nSamples f =
   take nSamples (sampleWithReset nReset f)
+
+-- | Simulate a component until it matches a condition
+--
+-- It prints a message of the form
+--
+-- @
+-- Signal sampled for N cycles until value X
+-- @
+--
+-- __NB__: This function is not synthesizable
+--
+-- === __Example with test bench__
+--
+-- A common usage is with a test bench using
+-- 'Clash.Explicit.Testbench.outputVerifier'.
+--
+-- __NB__: Since this uses 'Clash.Explicit.Testbench.assert', when using
+-- @clashi@, read the note at "Clash.Explicit.Testbench#assert-clashi".
+--
+-- @
+-- import Clash.Prelude
+-- import Clash.Explicit.Testbench
+--
+-- topEntity
+--   :: 'Signal' 'System' Int
+--   -> 'Signal' 'System' Int
+-- topEntity = id
+--
+-- testBench
+--   :: 'Signal' 'System' Bool
+-- testBench = done
+--  where
+--   testInput = 'Clash.Explicit.Testbench.stimuliGenerator' clk rst $('Clash.Sized.Vector.listToVecTH' [1 :: Int .. 10])
+--   expectedOutput =
+--     'Clash.Explicit.Testbench.outputVerifier'' clk rst $('Clash.Sized.Vector.listToVecTH' $ [1 :: Int .. 9] '<>' [42])
+--   done = expectedOutput $ topEntity testInput
+--   clk = 'Clash.Explicit.Testbench.tbSystemClockGen' (not \<$\> done)
+--   rst = 'systemResetGen'
+-- @
+--
+-- @
+-- > runUntil id testBench
+--
+--
+-- cycle(\<Clock: System\>): 10, outputVerifier
+-- expected value: 42, not equal to actual value: 10
+-- Signal sampled for 11 cycles until value True
+-- @
+--
+-- When you need to verify multiple test benches, the following invocations come
+-- in handy:
+--
+-- @
+-- > 'mapM_' (runUntil id) [ testBenchA, testBenchB ]
+-- @
+--
+-- or when the test benches are in different clock domains:
+--
+-- @
+-- testBenchA :: Signal DomA Bool
+-- testBenchB :: Signal DomB Bool
+-- @
+--
+-- @
+-- > 'sequence_' [ runUntil id testBenchA, runUntil id testBenchB ]
+-- @
+runUntil
+  :: forall dom a
+   . (KnownDomain dom, NFDataX a, ShowX a)
+  => (a -> Bool)
+  -- ^ Condition checking function, should return @True@ to finish run
+  -> Signal dom a
+  -- ^ 'Signal' we want to sample for the condition
+  -> IO ()
+runUntil check s =
+  -- Ensure invocations of 'trace' are printed before the result message
+  value `seqX`
+  putStrLn msg
+ where
+  msg =   ("Signal sampled for " ++) . shows nSamples
+        . (" cycles until value " ++) $ showX value
+  (before, after) = break check $ sample s
+  nSamples = length before
+  value = head after
 
 {-# RULES "sequenceAVecSignal" Clash.Sized.Vector.traverse# (\x -> x) = vecBundle# #-}

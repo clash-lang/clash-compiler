@@ -78,6 +78,12 @@ import Clash.XException      (ShowX (..), XException)
 -- function simply returns the third 'Signal' unaltered as its result. This
 -- function is used by 'outputVerifier'.
 --
+-- === Usage in @clashi@ #assert-clashi#
+--
+-- __NB__: When simulating a component that uses 'assert' in @clashi@, usually,
+-- the warnings are only logged the first time the component is simulated.
+-- Issuing @:reload@ in @clashi@ will discard the cached result of the
+-- computation, and warnings will once again be emitted.
 --
 -- __NB__: This function /can/ be used in synthesizable designs.
 assert
@@ -219,6 +225,9 @@ outputVerifier' =
 -- synthesizable in the sense that HDL simulators will run it. If @testDom@ and
 -- @circuitDom@ refer to the same domain, it can also be synthesized into
 -- hardware.
+--
+-- __NB__: This function uses 'assert'. When simulating this function in
+-- @clashi@, read the [note](#assert-clashi).
 --
 -- Example:
 --

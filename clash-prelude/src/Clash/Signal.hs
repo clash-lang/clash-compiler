@@ -227,6 +227,7 @@ module Clash.Signal
   , simulateN
   , simulateWithReset
   , simulateWithResetN
+  , runUntil
     -- ** lazy versions
   , simulate_lazy
   , simulateB_lazy
@@ -290,7 +291,7 @@ import           Clash.Signal.Internal hiding
    signalAutomaton)
 import           Clash.Signal.Internal.Ambiguous
   (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
-import           Clash.XException      (NFDataX)
+import           Clash.XException      (NFDataX, ShowX)
 
 {- $setup
 >>> :set -XFlexibleContexts -XTypeApplications
@@ -2112,6 +2113,92 @@ simulateB_lazy f0 =
 dup1 :: [a] -> [a]
 dup1 (x:xs) = x:x:xs
 dup1 _      = error "empty list"
+
+
+-- | Simulate a component until it matches a condition
+--
+-- If the given component has not yet been given a clock, reset, or enable
+-- line, 'runUntil' will supply them. The reset will be asserted for a single
+-- cycle.
+--
+-- It prints a message of the form
+--
+-- @
+-- Signal sampled for N cycles until value X
+-- @
+--
+-- __NB__: This function is not synthesizable
+--
+-- === __Example with test bench__
+--
+-- A common usage is with a test bench using
+-- 'Clash.Explicit.Testbench.outputVerifier'.
+--
+-- __NB__: Since this uses 'Clash.Explicit.Testbench.assert', when using
+-- @clashi@, read the note at "Clash.Explicit.Testbench#assert-clashi".
+--
+-- @
+-- import Clash.Prelude
+-- import Clash.Explicit.Testbench
+--
+-- topEntity
+--   :: 'Signal' 'System' Int
+--   -> 'Signal' 'System' Int
+-- topEntity = id
+--
+-- testBench
+--   :: 'Signal' 'System' Bool
+-- testBench = done
+--  where
+--   testInput = 'Clash.Explicit.Testbench.stimuliGenerator' clk rst $('Clash.Sized.Vector.listToVecTH' [1 :: Int .. 10])
+--   expectedOutput =
+--     'Clash.Explicit.Testbench.outputVerifier'' clk rst $('Clash.Sized.Vector.listToVecTH' $ [1 :: Int .. 9] '<>' [42])
+--   done = expectedOutput $ topEntity testInput
+--   clk = 'Clash.Explicit.Testbench.tbSystemClockGen' (not \<$\> done)
+--   rst = 'systemResetGen'
+-- @
+--
+-- @
+-- > runUntil id testBench
+--
+--
+-- cycle(\<Clock: System\>): 10, outputVerifier
+-- expected value: 42, not equal to actual value: 10
+-- Signal sampled for 11 cycles until value True
+-- @
+--
+-- When you need to verify multiple test benches, the following invocations come
+-- in handy:
+--
+-- @
+-- > 'mapM_' (runUntil id) [ testBenchA, testBenchB ]
+-- @
+--
+-- or when the test benches are in different clock domains:
+--
+-- @
+-- testBenchA :: Signal DomA Bool
+-- testBenchB :: Signal DomB Bool
+-- @
+--
+-- @
+-- > 'sequence_' [ runUntil id testBenchA, runUntil id testBenchB ]
+-- @
+
+-- The "value `seqX`" bit is to have any invocations of 'trace', such as in
+-- our 'assert' (, 'outputVerifier', ...) functions, print before printing the
+-- result message.
+runUntil
+  :: forall dom a
+   . (KnownDomain dom, NFDataX a, ShowX a)
+  => (a -> Bool)
+  -- ^ Condition checking function, should return @True@ to finish run
+  -> (HiddenClockResetEnable dom => Signal dom a)
+  -- ^ 'Signal' we want to sample for the condition, potentially having a
+  -- hidden clock, reset and/or enable
+  -> IO ()
+runUntil check s =
+  E.runUntil check $ exposeClockResetEnable @dom s clockGen resetGen enableGen
 
 -- * QuickCheck combinators
 
