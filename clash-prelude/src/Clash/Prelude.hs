@@ -210,15 +210,12 @@ import           Clash.XException
 
 {- $hiding
 "Clash.Prelude" re-exports most of the Haskell "Prelude" with the exception of
-the following: (++), (!!), concat, drop, even, foldl, foldl1, foldr, foldr1, head,
-init, iterate, last, length, map, odd, repeat, replicate, reverse, scanl, scanr,
-splitAt, tail, take, unzip, unzip3, zip, zip3, zipWith, zipWith3.
-
-It instead exports the identically named functions defined in terms of
-'Clash.Sized.Vector.Vec' at "Clash.Sized.Vector". For the 'odd' end 'even'
-function a type class called Parity is available at 'Clash.Class.Parity'.
+those functions that the Clash API defines to work on 'Vec' from
+"Clash.Sized.Vector" instead of on lists as the Haskell Prelude does.
+In addition, for the 'Clash.Class.Parity.odd' and 'Clash.Class.Parity.even'
+functions a type class called 'Clash.Class.Parity.Parity' is available at
+"Clash.Class.Parity".
 -}
-
 
 -- | Give a window over a 'Signal'
 --
