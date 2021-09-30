@@ -56,6 +56,12 @@ import Clash.XException                   (ShowX)
 -- function simply returns the third 'Signal' unaltered as its result. This
 -- function is used by 'outputVerifier''.
 --
+-- === Usage in @clashi@ #assert-clashi#
+--
+-- __NB__: When simulating a component that uses 'assert' in @clashi@, usually,
+-- the warnings are only logged the first time the component is simulated.
+-- Issuing @:reload@ in @clashi@ will discard the cached result of the
+-- computation, and warnings will once again be emitted.
 --
 -- __NB__: This function /can/ be used in synthesizable designs.
 assert
@@ -113,7 +119,13 @@ stimuliGenerator
 stimuliGenerator = hideReset (hideClock E.stimuliGenerator)
 {-# INLINE stimuliGenerator #-}
 
--- |
+-- | Compare a signal (coming from a circuit) to a vector of samples. If a
+-- sample from the signal is not equal to the corresponding sample in the
+-- vector, print to stderr and continue testing. This function is
+-- synthesizable in the sense that HDL simulators will run it.
+--
+-- __NB__: This function uses 'assert'. When simulating this function in
+-- @clashi@, read the [note](#assert-clashi).
 --
 -- Example:
 --
