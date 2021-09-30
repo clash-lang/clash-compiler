@@ -1,8 +1,11 @@
 {-|
 Copyright : © 2014-2016, Christiaan Baaij,
               2017-2019, Myrtle Software Ltd
-              2017     , QBayLogic, Google Inc.
+              2017     , QBayLogic, Google Inc.,
+              2021     , QBayLogic B.V.
+
 Licence   : Creative Commons 4.0 (CC BY 4.0) (https://creativecommons.org/licenses/by/4.0/)
+Maintainer:  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE NoImplicitPrelude #-}
@@ -1088,14 +1091,13 @@ We will use @blockRam#@ as an example, for which the Haskell/Clash code is:
 module BlockRam where
 
 import Clash.Explicit.Prelude
-import qualified Data.Vector           as V
-import           GHC.Stack             (HasCallStack, withFrozenCallStack)
+import Clash.Annotations.Primitive (hasBlackBox)
+import Clash.Signal.Internal (Clock, Signal (..), (.&&.))
+import Clash.Sized.Vector (Vec, toList)
+import Clash.XException (defaultSeqX)
 
-import Clash.Signal.Internal
-  (Clock, Signal (..), (.&&.))
-import Clash.Sized.Vector     (Vec, toList)
-import Clash.XException       (defaultSeqX)
-
+import qualified Data.Vector as V
+import GHC.Stack (HasCallStack, withFrozenCallStack)
 
 blockRam#
   :: ( KnownDomain dom
@@ -1135,6 +1137,7 @@ blockRam# (Clock _) gen content rd wen =
       Just wa -> ram V.// [(wa,d)]
     _ -> ram
 {\-\# NOINLINE blockRam# \#\-\}
+{\-\# ANN blockRam# hasBlackBox \#\-\}
 @
 
 And for which the /declaration/ primitive is:
