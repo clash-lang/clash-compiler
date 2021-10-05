@@ -39,7 +39,7 @@ import Clash.Core.Name (Name(nameOcc))
 import Clash.Core.Pretty
 import Clash.Core.Subst
 import Clash.Core.Term (Term(..), IsMultiPrim(..), PrimInfo(..), collectArgs)
-import Clash.Core.TyCon (TyConMap, tyConKind)
+import Clash.Core.TyCon (TyCon(tyConKind), TyConMap)
 import Clash.Core.Type
 import Clash.Core.TysPrim
 import Clash.Core.Var (Var(varType))
@@ -87,6 +87,9 @@ instance HasType PrimInfo where
 
         | otherwise
         -> error "PrimInfo.coreTypeOf: MultiResult primitive without tuple type"
+
+instance HasType TyCon where
+  coreTypeOf = tyConKind
 
 instance HasType Type where
   coreTypeOf = id
