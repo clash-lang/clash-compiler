@@ -1,8 +1,9 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
-                     2016     , Myrtle Software Ltd
+                     2016     , Myrtle Software Ltd,
+                     2021     , QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Builtin Type and Kind definitions
 -}
@@ -46,21 +47,18 @@ import {-# SOURCE #-} Clash.Core.Type
 import           Clash.Unique
 
 -- | Builtin Name
-tySuperKindTyConName, liftedTypeKindTyConName, typeNatKindTyConName, typeSymbolKindTyConName :: TyConName
-tySuperKindTyConName      = mkUnsafeSystemName "tYPE" (getKey tYPETyConKey)
-liftedTypeKindTyConName   = mkUnsafeSystemName "*" (getKey liftedTypeKindTyConKey)
+liftedTypeKindTyConName, typeNatKindTyConName, typeSymbolKindTyConName :: TyConName
+liftedTypeKindTyConName   = mkUnsafeSystemName "Type" (getKey liftedTypeKindTyConKey)
 typeNatKindTyConName      = mkUnsafeSystemName "Nat" (getKey typeNatKindConNameKey)
 typeSymbolKindTyConName   = mkUnsafeSystemName "Symbol" (getKey typeSymbolKindConNameKey)
 
 -- | Builtin Kind
-liftedTypeKindTc, tySuperKindTc, typeNatKindTc, typeSymbolKindTc :: TyCon
-tySuperKindTc    = SuperKindTyCon (nameUniq tySuperKindTyConName) tySuperKindTyConName
-liftedTypeKindTc = mkKindTyCon liftedTypeKindTyConName tySuperKind
-typeNatKindTc    = mkKindTyCon typeNatKindTyConName tySuperKind
-typeSymbolKindTc = mkKindTyCon typeSymbolKindTyConName tySuperKind
+liftedTypeKindTc, typeNatKindTc, typeSymbolKindTc :: TyCon
+liftedTypeKindTc = mkKindTyCon liftedTypeKindTyConName liftedTypeKind
+typeNatKindTc    = mkKindTyCon typeNatKindTyConName liftedTypeKind
+typeSymbolKindTc = mkKindTyCon typeSymbolKindTyConName liftedTypeKind
 
-liftedTypeKind, tySuperKind, typeNatKind, typeSymbolKind :: Type
-tySuperKind    = mkTyConTy tySuperKindTyConName
+liftedTypeKind, typeNatKind, typeSymbolKind :: Type
 liftedTypeKind = mkTyConTy liftedTypeKindTyConName
 typeNatKind    = mkTyConTy typeNatKindTyConName
 typeSymbolKind = mkTyConTy typeSymbolKindTyConName
@@ -141,8 +139,7 @@ byteArrayPrimTy = mkTyConTy byteArrayPrimTyConName
 
 tysPrimMap :: TyConMap
 tysPrimMap = List.foldl' (\s (k,x) -> extendUniqMap k x s) emptyUniqMap
-  [  (tySuperKindTyConName , tySuperKindTc)
-  ,  (liftedTypeKindTyConName , liftedTypeKindTc)
+  [  (liftedTypeKindTyConName , liftedTypeKindTc)
   ,  (typeNatKindTyConName , typeNatKindTc)
   ,  (typeSymbolKindTyConName , typeSymbolKindTc)
   ,  (intPrimTyConName , intPrimTc)
