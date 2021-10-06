@@ -9,10 +9,13 @@ Utility class to extract type information from data which has a type.
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Core.HasType
   ( HasType(..)
+  , coreKindOf
   , InferType(..)
+  , inferCoreKindOf
   , applyTypeToArgs
   , piResultTy
   , piResultTys
@@ -29,17 +32,22 @@ import Clash.Core.Name (Name(nameOcc))
 import Clash.Core.Pretty
 import Clash.Core.Subst
 import Clash.Core.Term (Term(..), IsMultiPrim(..), PrimInfo(..), collectArgs)
-import Clash.Core.TyCon (TyConMap)
+import Clash.Core.TyCon (TyConMap, tyConKind)
 import Clash.Core.Type
 import Clash.Core.TysPrim
 import Clash.Core.Var (Var(varType))
 import Clash.Core.VarEnv
 import Clash.Debug (debugIsOn)
-import Clash.Util (pprPanic)
+import Clash.Unique (lookupUniqMap')
+import Clash.Util (curLoc, pprPanic)
 import qualified Clash.Util.Interpolate as I
 
 class HasType a where
   coreTypeOf :: a -> Type
+
+coreKindOf :: (HasType a) => a -> Kind
+coreKindOf = coreTypeOf
+{-# INLINE coreKindOf #-}
 
 instance HasType DataCon where
   coreTypeOf = dcType
@@ -81,6 +89,32 @@ instance HasType (Var a) where
 
 class InferType a where
   inferCoreTypeOf :: TyConMap -> a -> Type
+
+inferCoreKindOf :: (InferType a) => TyConMap -> a -> Kind
+inferCoreKindOf = inferCoreTypeOf
+{-# INLINE inferCoreKindOf #-}
+
+instance InferType Type where
+  inferCoreTypeOf tcm ty =
+    case tyView ty of
+      FunTy{} ->
+        liftedTypeKind
+
+      TyConApp tc args ->
+        piResultTys tcm (tyConKind (lookupUniqMap' tcm tc)) args
+
+      OtherType{} ->
+        case ty of
+          ConstTy c -> error $ $(curLoc) ++ "inferCoreTypeOf: naked ConstTy: " ++ show c
+          VarTy k -> varType k
+          ForAllTy _ a -> inferCoreTypeOf tcm a
+          LitTy NumTy{} -> typeNatKind
+          LitTy SymTy{} -> typeSymbolKind
+          AnnType _ a -> inferCoreTypeOf tcm a
+          AppTy a b -> go a [b]
+           where
+            go (AppTy c d) args = go c (d : args)
+            go c args = piResultTys tcm (inferCoreTypeOf tcm c) args
 
 instance InferType Term where
   inferCoreTypeOf tcm = go

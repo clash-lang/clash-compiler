@@ -72,7 +72,7 @@ import GHC.Types.Literal (Literal (..), LitNumType (..))
 import GHC.Unit.Module (moduleName, moduleNameString)
 import GHC.Types.Name
   (Name, nameModule_maybe, nameOccName, nameUnique, getSrcSpan)
-import GHC.Builtin.Names  (tYPETyConKey, integerTyConKey, naturalTyConKey)
+import GHC.Builtin.Names  (integerTyConKey, naturalTyConKey)
 import GHC.Types.Name.Occurrence (occNameString)
 import GHC.Utils.Outputable (showPpr)
 import GHC.Data.Pair (Pair (..))
@@ -123,7 +123,7 @@ import Literal    (Literal (..), LitNumType (..))
 import Module     (moduleName, moduleNameString)
 import Name       (Name, nameModule_maybe,
                    nameOccName, nameUnique, getSrcSpan)
-import PrelNames  (tYPETyConKey, integerTyConKey, naturalTyConKey)
+import PrelNames  (integerTyConKey, naturalTyConKey)
 import OccName    (occNameString)
 import Outputable (showPpr)
 import Pair       (Pair (..))
@@ -223,7 +223,6 @@ makeTyCon tc = tycon
       | isTupleTyCon tc     = mkTupleTyCon
       | isAlgTyCon tc       = mkAlgTyCon
       | isPrimTyCon tc      = mkPrimTyCon
-      | tc `hasKey` tYPETyConKey = mkSuperKindTyCon
       | otherwise           = mkVoidTyCon
       where
         tcArity = tyConArity tc
@@ -289,13 +288,6 @@ makeTyCon tc = tycon
             , C.tyConKind    = tcKind
             , C.tyConArity   = tcArity
             }
-
-        mkSuperKindTyCon = do
-          tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
-          return C.SuperKindTyCon
-                   { C.tyConUniq = C.nameUniq tcName
-                   , C.tyConName = tcName
-                   }
 
         mkVoidTyCon = do
           tcName <- coreToName tyConName tyConUnique qualifiedNameString tc

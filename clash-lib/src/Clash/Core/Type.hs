@@ -31,7 +31,6 @@ module Clash.Core.Type
   , tyView
   , coreView
   , coreView1
-  , typeKind
   , mkTyConTy
   , mkFunTy
   , mkPolyFunTy
@@ -165,6 +164,16 @@ type TyName     = Name Type
 -- | Reference to a Kind
 type KiName     = Name Kind
 
+-- TODO
+--
+-- tyView could be smarter about what it gives back. Since it traverses the
+-- arguments to make a `TyConApp`, if the leftmost innermost type isn't a
+-- TyCon it could still return a list of applied types to save a later call to
+-- something like splitFunForallTy.
+--
+-- It could / should also look through annotations instead of just returning
+-- the original type wrapped in OtherType.
+
 -- | An easier view on types
 --
 -- Note [Arrow arguments]
@@ -285,38 +294,6 @@ splitTyConAppM :: Type
                -> Maybe (TyConName,[Type])
 splitTyConAppM (tyView -> TyConApp tc args) = Just (tc,args)
 splitTyConAppM _                            = Nothing
-
--- | Is a type a Superkind?
-isSuperKind :: TyConMap -> Type -> Bool
-isSuperKind tcMap (ConstTy (TyCon ((tcMap `lookupUniqMap'`) -> SuperKindTyCon {}))) = True
-isSuperKind _ _ = False
-
--- | Determine the kind of a type
-typeKind :: TyConMap -> Type -> Kind
-typeKind _ (VarTy k)            = varType k
-typeKind m (ForAllTy _ ty)      = typeKind m ty
-typeKind _ (LitTy (NumTy _))    = typeNatKind
-typeKind _ (LitTy (SymTy _))    = typeSymbolKind
-typeKind m (AnnType _ann typ)   = typeKind m typ
-typeKind m (tyView -> FunTy _arg res)
-  | isSuperKind m k = k
-  | otherwise       = liftedTypeKind
-  where k = typeKind m res
-
-typeKind m (tyView -> TyConApp tc args) =
-  foldl' kindFunResult (tyConKind (m `lookupUniqMap'` tc)) args
-
-typeKind m (AppTy fun arg)      = kindFunResult (typeKind m fun) arg
-typeKind _ (ConstTy ct)         = error $ $(curLoc) ++ "typeKind: naked ConstTy: " ++ show ct
-
-kindFunResult :: Kind -> KindOrType -> Kind
-kindFunResult (tyView -> FunTy _ res) _ = res
-
-kindFunResult (ForAllTy kv ki) arg =
-  substTyWith [kv] [arg] ki
-
-kindFunResult k tys =
-  error $ $(curLoc) ++ "kindFunResult: " ++ show (k,tys)
 
 -- | Is a type polymorphic?
 isPolyTy :: Type -> Bool

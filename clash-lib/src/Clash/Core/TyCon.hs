@@ -1,7 +1,8 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente
+                     2021,      QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Type Constructors in CoreHW
 -}
@@ -63,18 +64,12 @@ data TyCon
   , tyConKind    :: !Kind       -- ^ Kind of the TyCon
   , tyConArity   :: !Int        -- ^ Number of type arguments
   }
-  -- | To close the loop on the type hierarchy
-  | SuperKindTyCon
-  { tyConUniq    :: {-# UNPACK #-} !Unique
-  , tyConName    :: !TyConName  -- ^ Name of the TyCon
-  }
   deriving (Generic,NFData,Binary)
 
 instance Show TyCon where
   show (AlgTyCon       {tyConName = n}) = "AlgTyCon: " ++ show n
   show (FunTyCon       {tyConName = n}) = "FunTyCon: " ++ show n
   show (PrimTyCon      {tyConName = n}) = "PrimTyCon: " ++ show n
-  show (SuperKindTyCon {tyConName = n}) = "SuperKindTyCon: " ++ show n
 
 instance Eq TyCon where
   (==) = (==) `on` tyConUniq

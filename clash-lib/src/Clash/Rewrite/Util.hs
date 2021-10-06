@@ -71,7 +71,7 @@ import           Clash.Core.Subst
   (substTmEnv, aeqTerm, aeqType, extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term
 import           Clash.Core.TyCon            (TyConMap)
-import           Clash.Core.Type             (Type (..), normalizeType, typeKind)
+import           Clash.Core.Type             (Type (..), normalizeType)
 import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
@@ -338,7 +338,7 @@ mkBinderFor is tcm name (Left term) = do
 
 mkBinderFor is tcm name (Right ty) = do
   name' <- cloneNameWithInScopeSet is name
-  let ki = typeKind tcm ty
+  let ki = inferCoreKindOf tcm ty
   return (Right (mkTyVar ki (coerce name')))
 
 -- | Inline the binders in a let-binding that have a certain property
