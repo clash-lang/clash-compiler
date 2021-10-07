@@ -124,9 +124,12 @@ instance IsTest GhdlSimTest where
     let workDir = src </> "work"
 
     -- See Note [copy data files hack]
-    lists <- glob (src </> "*/memory.list")
-    forM_ lists $ \memFile ->
+    lists1 <- glob (src </> "*/memory.list")
+    forM_ lists1 $ \memFile ->
       copyFile memFile (workDir </> "memory.list")
+    lists2 <- glob (src </> "*/memF0913FE5901895A5.bin")
+    forM_ lists2 $ \memFile ->
+      copyFile memFile (workDir </> "memF0913FE5901895A5.bin")
 
     case gstExpectFailure of
       Nothing -> run optionSet (program workDir gstTop) progressCallback

@@ -80,6 +80,7 @@ __>>> L.tail $ sampleN 4 $ g systemClockGen enableGen (fromList [3..5])__
 
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 {-# LANGUAGE Unsafe #-}
 
@@ -96,6 +97,8 @@ module Clash.Explicit.BlockRam.File
   , blockRamFilePow2
     -- * Producing files
   , memFile
+  , createMemString
+  , MemString(..)
     -- * Internal
   , blockRamFile#
   , initMem
@@ -113,11 +116,14 @@ import Data.Maybe            (isJust, listToMaybe)
 import GHC.Arr               (STArray, unsafeReadSTArray, unsafeWriteSTArray)
 import GHC.Stack             (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits          (KnownNat)
+import Language.Haskell.TH
+  (Dec, litE, litT, mkName, normalB, numTyLit, Q, sigD, stringL, valD, varP)
 import Numeric               (readInt)
 import System.IO
 
 import Clash.Class.BitPack   (BitPack, BitSize, pack)
-import Clash.Promoted.Nat    (SNat (..), pow2SNat, natToNum, snatToNum)
+import Clash.Promoted.Nat
+  (SNat (..), pow2SNat, natToNum, snatToNum, natToInteger)
 import Clash.Sized.Internal.BitVector (Bit(..), BitVector(..), undefined#)
 import Clash.Signal.Internal
   (Clock(..), Signal (..), Enable, KnownDomain, fromEnable, (.&&.))
@@ -303,6 +309,31 @@ memFile care = foldr (\e -> showsBV $ pack e) ""
            go (n0 - 1) v0 $ '0' : s0
          else
            go (n0 - 1) v0 $ '1' : s0
+
+data MemString n m = MemString
+  { memStringLength :: SNat n
+  , memStringWidth :: SNat m
+  , memStringContent :: String
+  }
+
+createMemString
+  :: forall a f
+   . ( BitPack a
+     , Foldable f
+     )
+  => String
+  -> Maybe Bit
+  -> f a
+  -> Q [Dec]
+createMemString name care es = sequence
+  [ sigD name0 [t| MemString $(n) $(m) |]
+  , valD (varP name0) (normalB [| MemString SNat SNat $(s) |]) []
+  ]
+ where
+  name0 = mkName name
+  n = litT . numTyLit . toInteger $ length es
+  m = litT . numTyLit $ natToInteger @(BitSize a)
+  s = litE . stringL $ memFile care es
 
 -- | blockRamFile primitive
 blockRamFile#

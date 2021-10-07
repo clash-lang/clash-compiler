@@ -86,10 +86,14 @@ module Clash.Explicit.ROM.File
   ( -- * Synchronous ROM synchronized to an arbitrary clock
     romFile
   , romFilePow2
+  , romString
     -- * Producing files
   , memFile
+  , createMemString
+  , MemString(..)
     -- * Internal
   , romFile#
+  , romString#
   )
 where
 
@@ -98,13 +102,18 @@ import Data.Array.Base              (unsafeAt)
 import GHC.TypeLits                 (KnownNat)
 import System.IO.Unsafe             (unsafePerformIO)
 --
-import Clash.Explicit.BlockRam.File (initMem, memFile)
+import Clash.Explicit.BlockRam.File
+  (initMem, memFile, createMemString, MemString(..))
 import Clash.Promoted.Nat           (SNat (..), pow2SNat, snatToNum)
 import Clash.Sized.BitVector        (BitVector)
 import Clash.Explicit.Signal        (Clock, Enable, Signal, KnownDomain, delay)
 import Clash.Sized.Unsigned         (Unsigned)
 import Clash.XException             (NFDataX(deepErrorX))
 
+-- XXX: Temporary
+import Data.Maybe (listToMaybe)
+import Data.Char (digitToInt)
+import Numeric (readInt)
 
 -- | A ROM with a synchronous read port, with space for 2^@n@ elements
 --
@@ -187,6 +196,25 @@ romFile
 romFile = \clk en sz file rd -> romFile# clk en sz file (fromEnum <$> rd)
 {-# INLINE romFile #-}
 
+romString
+  :: forall dom addr n m
+   . ( KnownDomain dom
+     , Enum addr
+     )
+  => Clock dom
+  -- ^ 'Clock' to synchronize to
+  -> Enable dom
+  -- ^ Global enable
+  -> MemString n m
+  -- ^ The contents of the ROM
+  -> Signal dom addr
+  -- ^ Read address @rd@
+  -> Signal dom (BitVector m)
+  -- ^ The value of the ROM at address @rd@ from the previous clock cycle
+romString = \clk en (MemString sn SNat contents) rd ->
+  romString# clk en sn contents (fromEnum <$> rd)
+{-# INLINE romString #-}
+
 -- | romFile primitive
 romFile#
   :: forall m dom n
@@ -220,3 +248,47 @@ romFile# clk en sz file rd =
                   " not in range [0.." ++ show szI ++ ")")
   {-# INLINE safeAt #-}
 {-# NOINLINE romFile# #-}
+
+romString#
+  :: forall m dom n
+   . ( KnownNat m
+     , KnownDomain dom
+     )
+  => Clock dom
+  -- ^ 'Clock' to synchronize to
+  -> Enable dom
+  -- ^ Global enable
+  -> SNat n
+  -- ^ Size of the ROM
+  -> String
+  -- ^ The contents of the ROM
+  -> Signal dom Int
+  -- ^ Read address @rd@
+  -> Signal dom (BitVector m)
+  -- ^ The value of the ROM at address @rd@ from the previous clock cycle
+romString# clk en sz contents rd =
+  delay clk en (deepErrorX "First value of romString is undefined")
+        (safeAt <$> rd)
+ where
+  mem  = initMem0 contents
+  arr  = listArray (0,szI-1) mem
+  szI  = snatToNum sz
+
+  safeAt :: Int -> BitVector m
+  safeAt i =
+    if (0 <= i) && (i < szI) then
+      unsafeAt arr i
+    else
+      deepErrorX ("romString: address " ++ show i ++
+                  " not in range [0.." ++ show szI ++ ")")
+  {-# INLINE safeAt #-}
+{-# NOINLINE romString# #-}
+
+initMem0 :: KnownNat n => String -> [BitVector n]
+initMem0 = map parseBV . lines
+  where
+    parseBV s = case parseBV' s of
+                  Just i  -> fromInteger i
+                  Nothing -> error ("Failed to parse: " ++ s)
+    parseBV' = fmap fst . listToMaybe . readInt 2 (`elem` ("01" :: String)) digitToInt
+{-# NOINLINE initMem0 #-}

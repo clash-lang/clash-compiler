@@ -645,6 +645,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Ram" def
         , runTest "ResetGen" def
         , runTest "RomFile" def
+        , runTest "RomString" def{hdlTargets=[VHDL]}
         , outputTest "BlockRamLazy" def
         , runTest "BlockRamTest" def{hdlSim=False}
         , runTest "Compression" def
