@@ -162,6 +162,10 @@ runClashTest = defaultMain $ clashTestRoot
               primitive for WrongReference.myMultiplyX. These names should be
               the same. |])
           }
+        , runTest "T1945" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "Template function for returned False")
+          }
         ]
       , clashTestGroup "InvalidPrimitive"
         [ runTest "InvalidPrimitive" def{
