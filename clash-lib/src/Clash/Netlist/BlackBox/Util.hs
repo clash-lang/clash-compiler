@@ -279,6 +279,14 @@ renderBlackBox libs imps includes bb bbCtx = do
       layout = LayoutOptions (AvailablePerLine 120 0.4)
   nms <-
     forM includes $ \((nm,_),inc) -> do
+      case verifyBlackBoxContext bbCtx inc of
+        Nothing -> return ()
+        Just err0 -> do
+          sp <- getSrcSpan
+          let err1 = concat [ "Couldn't instantiate blackbox for "
+                            , Data.Text.unpack (bbName bbCtx), ". Verification "
+                            , "procedure reported:\n\n" ++ err0 ]
+          throw (ClashException sp ($(curLoc) ++ err1) Nothing)
       let bbCtx' = bbCtx {bbQsysIncName = map Text.toStrict nms'}
       incForHash <- onBlackBox (renderTemplate bbCtx')
                                (\_name _hash (N.TemplateFunction _ _ f) -> do
