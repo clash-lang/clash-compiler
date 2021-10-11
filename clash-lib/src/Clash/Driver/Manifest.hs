@@ -229,12 +229,11 @@ instance FromJSON Manifest where
         <*> parseWithRead "init_behavior" v
         <*> parseWithRead "reset_polarity" v
 
-    parseWithRead :: Read a => Text -> Aeson.Object -> Parser a
     parseWithRead field obj = do
       v <- obj .:? field
       case readMaybe =<< v of
         Just a -> pure a
-        Nothing -> fail $ "Could not read field: " <> Text.unpack field
+        Nothing -> fail $ "Could not read field: " <> show field
 
 data UnexpectedModification
   -- | Clash generated file was modified

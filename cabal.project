@@ -16,7 +16,7 @@ write-ghc-environment-files: always
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2021-08-01T23:17:24Z
+index-state: 2021-10-10T07:42:38Z
 
 -- For some reason the `clash-testsuite` executable fails to run without
 -- this, as it cannot find the related library...
@@ -60,3 +60,8 @@ source-repository-package
   location: https://github.com/kcsongor/generic-lens.git
   tag: 8e1fc7dcf444332c474fca17110d4bc554db08c8
   subdir: generic-lens
+
+source-repository-package
+  type: git
+  location: https://github.com/hasufell/aeson-pretty.git
+  tag: e902ab866bb41d990b66af3644aeb352ff7aaf6f
