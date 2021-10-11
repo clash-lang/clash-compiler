@@ -1,5 +1,12 @@
 # Changelog for the Clash project
 
+## 1.4.4 *Oct 11th 2021*
+Fixed:
+
+ * Dont' loop on recursive data types hiding behind type families [#1921](https://github.com/clash-lang/clash-compiler/issues/1921)
+ * Recognize `enableGen` as workfree and don't duplicate registers [#1935](https://github.com/clash-lang/clash-compiler/issues/1935)
+
+
 ## 1.4.3 *Aug 8th 2021*
 Fixed:
 
