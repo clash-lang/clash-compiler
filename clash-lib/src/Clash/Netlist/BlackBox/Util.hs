@@ -38,7 +38,13 @@ import           Data.Semigroup.Monad
 import qualified Data.Text
 import           Data.Text.Lazy                  (Text)
 import qualified Data.Text.Lazy                  as Text
+
+#if MIN_VERSION_prettyprinter(1,7,0)
+import qualified Prettyprinter                   as PP
+#else
 import qualified Data.Text.Prettyprint.Doc       as PP
+#endif
+
 import           Data.Text.Prettyprint.Doc.Extra
 import           System.FilePath                 (replaceBaseName, takeBaseName,
                                                   takeFileName, (<.>))

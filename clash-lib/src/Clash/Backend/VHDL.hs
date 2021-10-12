@@ -39,7 +39,13 @@ import           Data.Monoid                          hiding (Sum, Product)
 import           Data.Semigroup.Monad.Extra
 import qualified Data.Text.Lazy                       as T
 import qualified Data.Text                            as TextS
+
+#if MIN_VERSION_prettyprinter(1,7,0)
+import qualified Prettyprinter                        as PP
+#else
 import qualified Data.Text.Prettyprint.Doc            as PP
+#endif
+
 import           Data.Text.Prettyprint.Doc.Extra
 import           GHC.Stack                            (HasCallStack)
 import qualified System.FilePath

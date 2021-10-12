@@ -37,8 +37,13 @@ import Control.Monad.Identity
 import Data.List.Extra                  ((<:>))
 import qualified Data.Text              as T
 import Data.Maybe                       (fromMaybe)
+#if MIN_VERSION_prettyprinter(1,7,0)
+import Prettyprinter
+import Prettyprinter.Internal
+#else
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Internal
+#endif
 import GHC.Show                         (showMultiLineString)
 import Numeric                          (fromRat)
 #if MIN_VERSION_ghc(9,0,0)

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -6,7 +7,13 @@
 module Clash.Core.TermInfo where
 
 import Data.Maybe (fromMaybe)
+
+#if MIN_VERSION_prettyprinter(1,7,0)
+import Prettyprinter (line)
+#else
 import Data.Text.Prettyprint.Doc (line)
+#endif
+
 import Data.Text (isInfixOf)
 
 import Clash.Core.DataCon

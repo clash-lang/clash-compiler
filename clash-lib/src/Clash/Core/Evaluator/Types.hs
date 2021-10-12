@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 {-|
@@ -14,7 +15,12 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap (insert, lookup)
 import Data.List (foldl')
 import Data.Maybe (fromMaybe, isJust)
+
+#if MIN_VERSION_prettyprinter(1,7,0)
+import Prettyprinter (hsep)
+#else
 import Data.Text.Prettyprint.Doc (hsep)
+#endif
 
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal (Literal(CharLiteral))

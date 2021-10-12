@@ -26,7 +26,13 @@ import           Data.Fixed
 import           Data.Hashable
 import qualified Data.Set                       as Set
 import           Data.Text                      (Text)
+
+#if MIN_VERSION_prettyprinter(1,7,0)
+import           Prettyprinter
+#else
 import           Data.Text.Prettyprint.Doc
+#endif
+
 import           GHC.Generics                   (Generic)
 
 #if MIN_VERSION_ghc(9,0,0)

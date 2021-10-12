@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-}
@@ -16,9 +17,16 @@ import           Control.Applicative
 import           Data.String                           (IsString (..))
 import           Data.Text                             as T
 import           Data.Text.Lazy                        as LT
+
+#if MIN_VERSION_prettyprinter(1,7,0)
+import qualified Prettyprinter                         as PP
+import           Prettyprinter.Internal                hiding (Doc)
+import           Prettyprinter.Render.Text
+#else
 import qualified Data.Text.Prettyprint.Doc             as PP
 import           Data.Text.Prettyprint.Doc.Internal    hiding (Doc)
 import           Data.Text.Prettyprint.Doc.Render.Text
+#endif
 
 type Doc = PP.Doc ()
 
