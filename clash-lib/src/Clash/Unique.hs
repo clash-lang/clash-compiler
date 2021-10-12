@@ -79,10 +79,17 @@ import           Data.Binary (Binary)
 import           Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.List   as List
+
+#if MIN_VERSION_prettyprinter(1,7,0)
+import           Prettyprinter
+#else
 import           Data.Text.Prettyprint.Doc
+#endif
+
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Semigroup
 #endif
+
 import           GHC.Stack
 
 import           Clash.Pretty

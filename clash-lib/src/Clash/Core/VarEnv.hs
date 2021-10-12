@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -99,7 +100,13 @@ import           Data.Coerce               (coerce)
 import qualified Data.List                 as List
 import qualified Data.List.Extra           as List
 import           Data.Maybe                (fromMaybe)
+
+#if MIN_VERSION_prettyprinter(1,7,0)
+import           Prettyprinter
+#else
 import           Data.Text.Prettyprint.Doc
+#endif
+
 import           GHC.Exts                  (Any)
 import           GHC.Generics
 

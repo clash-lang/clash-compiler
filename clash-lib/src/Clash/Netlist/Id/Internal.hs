@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -16,7 +17,13 @@ import {-# SOURCE #-} Clash.Netlist.Types
 import           Control.Arrow (second)
 import qualified Data.Char as Char
 import qualified Data.List as List
+
+#if MIN_VERSION_prettyprinter(1,7,0)
+import qualified Prettyprinter as PP
+#else
 import qualified Data.Text.Prettyprint.Doc as PP
+#endif
+
 import qualified Data.Text as Text
 import           Data.Text (Text)
 import qualified Data.Maybe as Maybe
