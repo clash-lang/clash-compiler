@@ -49,8 +49,6 @@ module Clash.Core.Type
   , applyFunTy
   , findFunSubst
   , reduceTypeFamily
-  , undefinedTy
-  , unsafeCoerceTy
   , isIntegerTy
   , normalizeType
   , varAttrs
@@ -103,7 +101,6 @@ import           Clash.Core.DataCon
 import           Clash.Core.Name
 import {-# SOURCE #-} Clash.Core.Subst
 import           Clash.Core.TyCon
-import           Clash.Core.TysPrim
 import           Clash.Core.Var
 import           Clash.Unique
 import           Clash.Util
@@ -635,21 +632,6 @@ symLitView :: TyConMap -> Type -> Maybe String
 symLitView _ (LitTy (SymTy s))                = Just s
 symLitView m (reduceTypeFamily m -> Just ty') = symLitView m ty'
 symLitView _ _ = Nothing
-
--- | The type @forall a . a@
-undefinedTy ::Type
-undefinedTy =
-  let aNm = mkUnsafeSystemName "a" 0
-      aTv = (TyVar aNm 0 liftedTypeKind)
-  in  ForAllTy aTv (VarTy aTv)
-
-unsafeCoerceTy :: Type
-unsafeCoerceTy =
-  let aNm = mkUnsafeSystemName "a" 0
-      aTv = TyVar aNm 0 liftedTypeKind
-      bNm = mkUnsafeSystemName "b" 1
-      bTv = TyVar bNm 1 liftedTypeKind
-  in ForAllTy aTv (ForAllTy bTv (mkFunTy (VarTy aTv) (VarTy bTv)))
 
 isIntegerTy :: Type -> Bool
 isIntegerTy (ConstTy (TyCon nm)) = nameUniq nm == getKey integerTyConKey

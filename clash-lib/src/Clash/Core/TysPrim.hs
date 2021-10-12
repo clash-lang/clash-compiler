@@ -43,7 +43,7 @@ import           Unique               (getKey)
 
 import           Clash.Core.Name
 import           Clash.Core.TyCon
-import {-# SOURCE #-} Clash.Core.Type
+import           Clash.Core.Type
 import           Clash.Unique
 
 -- | Builtin Name

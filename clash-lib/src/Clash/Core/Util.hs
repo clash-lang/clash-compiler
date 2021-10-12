@@ -51,12 +51,28 @@ import Clash.Core.Subst
 import Clash.Core.Term
 import Clash.Core.TyCon                  (TyConMap, tyConDataCons)
 import Clash.Core.Type
-import Clash.Core.TysPrim                (typeNatKind)
+import Clash.Core.TysPrim                (liftedTypeKind, typeNatKind)
 import Clash.Core.Var                    (Id, Var(..), mkLocalId, mkTyVar)
 import Clash.Core.VarEnv
 import Clash.Debug                       (traceIf)
 import Clash.Unique
 import Clash.Util
+
+-- | The type @forall a . a@
+undefinedTy ::Type
+undefinedTy =
+  let aNm = mkUnsafeSystemName "a" 0
+      aTv = (TyVar aNm 0 liftedTypeKind)
+  in  ForAllTy aTv (VarTy aTv)
+
+-- | The type @forall a. forall b. a -> b@
+unsafeCoerceTy :: Type
+unsafeCoerceTy =
+  let aNm = mkUnsafeSystemName "a" 0
+      aTv = TyVar aNm 0 liftedTypeKind
+      bNm = mkUnsafeSystemName "b" 1
+      bTv = TyVar bNm 1 liftedTypeKind
+  in ForAllTy aTv (ForAllTy bTv (mkFunTy (VarTy aTv) (VarTy bTv)))
 
 -- | Create a vector of supplied elements
 mkVec :: DataCon -- ^ The Nil constructor
