@@ -27,6 +27,7 @@ module Clash.Core.TysPrim
   , doublePrimTy
   , naturalPrimTy
   , byteArrayPrimTy
+  , eqPrimTy
   , tysPrimMap
   )
 where
@@ -44,6 +45,7 @@ import           Unique               (getKey)
 import           Clash.Core.Name
 import           Clash.Core.TyCon
 import           Clash.Core.Type
+import           Clash.Core.Var (mkTyVar)
 import           Clash.Unique
 
 -- | Builtin Name
@@ -66,7 +68,7 @@ typeSymbolKind = mkTyConTy typeSymbolKindTyConName
 intPrimTyConName, integerPrimTyConName, charPrimTyConName, stringPrimTyConName,
   voidPrimTyConName, wordPrimTyConName, int64PrimTyConName,
   word64PrimTyConName, floatPrimTyConName, doublePrimTyConName,
-  naturalPrimTyConName, byteArrayPrimTyConName :: TyConName
+  naturalPrimTyConName, byteArrayPrimTyConName, eqPrimTyConName :: TyConName
 intPrimTyConName     = mkUnsafeSystemName "GHC.Prim.Int#"
                                 (getKey intPrimTyConKey)
 #if MIN_VERSION_base(4,15,0)
@@ -100,6 +102,8 @@ naturalPrimTyConName = mkUnsafeSystemName "GHC.Natural.Natural"
 byteArrayPrimTyConName = mkUnsafeSystemName "GHC.Prim.ByteArray#"
                           (getKey byteArrayPrimTyConKey)
 
+eqPrimTyConName = mkUnsafeSystemName "GHC.Prim.~#" (getKey eqPrimTyConKey)
+
 liftedPrimTC :: TyConName
              -> TyCon
 liftedPrimTC name = PrimTyCon (nameUniq name) name liftedTypeKind 0
@@ -121,9 +125,22 @@ doublePrimTc  = liftedPrimTC doublePrimTyConName
 naturalPrimTc = liftedPrimTC naturalPrimTyConName
 byteArrayPrimTc = liftedPrimTC  byteArrayPrimTyConName
 
+eqPrimTc :: TyCon
+eqPrimTc = PrimTyCon (nameUniq eqPrimTyConName) eqPrimTyConName ty 4
+ where
+  -- forall (a :: Type). forall (b :: Type). a -> b -> Type
+  --
+  -- The "real" type for this in GHC has a codomain of `TYPE ('TupleRep '[])`
+  -- instead of the `TYPE 'LiftedRep` used here.
+  ty  = mkPolyFunTy liftedTypeKind
+    [Left aTv, Left bTv, Right (VarTy aTv), Right (VarTy bTv)]
+
+  aTv = mkTyVar liftedTypeKind (mkUnsafeSystemName "a" 0)
+  bTv = mkTyVar liftedTypeKind (mkUnsafeSystemName "b" 1)
+
 intPrimTy, integerPrimTy, charPrimTy, stringPrimTy, voidPrimTy, wordPrimTy,
   int64PrimTy, word64PrimTy, floatPrimTy, doublePrimTy, naturalPrimTy,
-  byteArrayPrimTy :: Type
+  byteArrayPrimTy, eqPrimTy :: Type
 intPrimTy     = mkTyConTy intPrimTyConName
 integerPrimTy = mkTyConTy integerPrimTyConName
 charPrimTy    = mkTyConTy charPrimTyConName
@@ -136,6 +153,7 @@ floatPrimTy   = mkTyConTy floatPrimTyConName
 doublePrimTy  = mkTyConTy doublePrimTyConName
 naturalPrimTy = mkTyConTy naturalPrimTyConName
 byteArrayPrimTy = mkTyConTy byteArrayPrimTyConName
+eqPrimTy = mkTyConTy eqPrimTyConName
 
 tysPrimMap :: TyConMap
 tysPrimMap = List.foldl' (\s (k,x) -> extendUniqMap k x s) emptyUniqMap
@@ -154,4 +172,5 @@ tysPrimMap = List.foldl' (\s (k,x) -> extendUniqMap k x s) emptyUniqMap
   ,  (doublePrimTyConName , doublePrimTc)
   ,  (naturalPrimTyConName , naturalPrimTc)
   ,  (byteArrayPrimTyConName , byteArrayPrimTc)
+  ,  (eqPrimTyConName , eqPrimTc)
   ]
