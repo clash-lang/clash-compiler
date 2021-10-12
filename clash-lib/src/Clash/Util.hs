@@ -32,8 +32,15 @@ import qualified Data.List.Extra      as List
 import Data.Maybe                     (fromMaybe, listToMaybe, catMaybes)
 import Data.Map.Ordered               (OMap)
 import qualified Data.Map.Ordered     as OMap
+
+#if MIN_VERSION_prettyprinter(1,7,0)
+import Prettyprinter
+import Prettyprinter.Render.String
+#else
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Render.String
+#endif
+
 import Data.Time.Clock                (UTCTime)
 import qualified Data.Time.Clock      as Clock
 import qualified Data.Time.Format     as Clock

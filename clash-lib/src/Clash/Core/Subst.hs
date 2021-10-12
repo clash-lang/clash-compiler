@@ -58,7 +58,13 @@ module Clash.Core.Subst
 where
 
 import           Data.Coerce               (coerce)
+
+#if MIN_VERSION_prettyprinter(1,7,0)
+import           Prettyprinter
+#else
 import           Data.Text.Prettyprint.Doc
+#endif
+
 import qualified Data.List                 as List
 import qualified Data.List.Extra           as List
 import           Data.Ord                  (comparing)

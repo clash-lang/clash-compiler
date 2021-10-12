@@ -1,9 +1,16 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE QuasiQuotes #-}
 
 module Clash.Pretty where
 
+#if MIN_VERSION_prettyprinter(1,7,0)
+import Prettyprinter
+import Prettyprinter.Render.String
+#else
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Render.String
+#endif
+
 import Data.Maybe (fromMaybe)
 import qualified System.Console.Terminal.Size as Terminal
 import System.Environment (lookupEnv)

@@ -6,6 +6,7 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 Utility class to extract type information from data which has a type.
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -22,7 +23,13 @@ module Clash.Core.HasType
   ) where
 
 import qualified Data.Text as Text (isInfixOf)
+
+#if MIN_VERSION_prettyprinter(1,7,0)
+import Prettyprinter (line)
+#else
 import Data.Text.Prettyprint.Doc (line)
+#endif
+
 import GHC.Stack (HasCallStack)
 
 import Clash.Core.DataCon (DataCon(dcType))

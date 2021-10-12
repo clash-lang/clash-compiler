@@ -88,7 +88,13 @@ import qualified Data.IntMap.Extra as IntMap
 #endif
 
 import qualified Data.List   as List
+
+#if MIN_VERSION_prettyprinter(1,7,0)
+import           Prettyprinter
+#else
 import           Data.Text.Prettyprint.Doc
+#endif
+
 import           GHC.Stack
 
 import           Clash.Pretty
