@@ -159,6 +159,7 @@ import qualified Clash.Core.Name             as C
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.TyCon            as C
 import qualified Clash.Core.Type             as C
+import qualified Clash.Core.Util             as C (undefinedTy)
 import qualified Clash.Core.Var              as C
 import           Clash.Primitives.Types
 import qualified Clash.Unique                as C

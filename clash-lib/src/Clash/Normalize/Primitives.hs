@@ -18,7 +18,7 @@ import Prelude hiding (undefined)
 import qualified Data.Text.Extra as Text
 
 import Clash.Core.Term (IsMultiPrim(..), PrimInfo(..), PrimUnfolding(..), WorkInfo(..))
-import Clash.Core.Type (undefinedTy)
+import Clash.Core.Util (undefinedTy)
 
 -- | The removedArg primitive represents an argument which is computationally
 -- irrelevant, and has been removed from the circuit (as removing it does not
