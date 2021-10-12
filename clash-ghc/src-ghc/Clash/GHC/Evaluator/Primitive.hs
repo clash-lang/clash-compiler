@@ -1661,7 +1661,8 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
             [wordDc] = tyConDataCons wordTc
         in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
   "GHC.Word.W64#"
-    | [Lit (WordLiteral c)] <- args
+    | isSubj
+    , [Lit (WordLiteral c)] <- args
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
             (Just wordTc) = lookupUniqMap wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
