@@ -6,6 +6,7 @@ Maintainer      : QBayLogic B.V. <devops@qbaylogic.com>
 Data types and rendering for Edalize Metadata files (EDAM).
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -26,7 +27,12 @@ module Clash.Edalize.Edam
 import Data.Default
 import Data.Maybe
 import Data.Text (Text)
+
+#if MIN_VERSION_prettyprinter(1,7,0)
+import Prettyprinter
+#else
 import Data.Text.Prettyprint.Doc
+#endif
 
 -- | EDAM data structure to be given to an Edalize backend. This contains all
 -- information needed to generate a project scaffolding. Note that hooks and
