@@ -1,6 +1,20 @@
 # Changelog for the Clash project
 
+## 1.4.5 *Oct 13th 2021*
+
+Changed:
+
+ * `clash-lib` now supports prettyprinter 1.7
+
+Documentation:
+
+ * The documentation on hidden clocks, resets, and enables has been corrected and extended in `Clash.Signal`.
+
 ## 1.4.4 *Oct 11th 2021*
+Changed:
+
+ * `clash-lib` now supports aeson >= 2.0
+
 Fixed:
 
  * Dont' loop on recursive data types hiding behind type families [#1921](https://github.com/clash-lang/clash-compiler/issues/1921)
