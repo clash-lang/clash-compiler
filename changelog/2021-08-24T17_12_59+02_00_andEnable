@@ -1,3 +1,3 @@
 DEPRECATED: The function `Clash.Explicit.Signal.enable` is renamed to `andEnable` and the existing name deprecated.
 ADDED: `Clash.Signal.andEnable` is the `HiddenEnable` version of `Clash.Explicit.Signal.andEnable` (formerly known as `enable`).
-CHANGED: The documentation on hidden clocks, resets, and enables has been corrected and extended in `Clash.Signal`. A warning about possible hard-to-debug issues has been added in the form of the section named "Monomorphism restriction leads to surprising behavior".
+CHANGED: A warning about possible hard-to-debug issues has been added to the `Clash.Signal` documentation on hidden clocks, resets, and enables, in the form of the section named "Monomorphism restriction leads to surprising behavior".
