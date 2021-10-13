@@ -2,9 +2,10 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software,
                   2017     , Google Inc.
-                  2020     , Ben Gamari
+                  2020     , Ben Gamari,
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Clash has synchronous 'Signal's in the form of:
 
@@ -455,16 +456,20 @@ unsafeSynchronizer _clk1 _clk2 =
 --
 -- Note: this unsafeSynchronizer is defined to be consistent with the vhdl and verilog
 -- implementations however as only synchronous signals are represented in Clash this
--- cannot be done precisely and can lead to odd behaviour. For example,
+-- cannot be done precisely and can lead to odd behavior. For example,
+--
 -- @
 -- sample $ unsafeSynchronizer @Dom2 @Dom7 . unsafeSynchronizer @Dom7 @Dom2 $ fromList [0..10]
 -- > [0,4,4,4,7,7,7,7,11,11,11..
 -- @
+--
 -- is quite different from the identity,
+--
 -- @
 -- sample $ fromList [0..10]
 -- > [0,1,2,3,4,5,6,7,8,9,10..
 -- @
+--
 -- with values appearing from the "future".
 veryUnsafeSynchronizer
   :: Int
