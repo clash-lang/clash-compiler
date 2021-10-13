@@ -143,6 +143,14 @@ import Clash.XException
 >>> let rP clk rst en = registerB clk rst en (8::Int,8::Int)
 -}
 
+{- $hiding
+"Clash.Explicit.Prelude.Safe" re-exports most of the Haskell "Prelude" with the
+exception of those functions that the Clash API defines to work on 'Vec' from
+"Clash.Sized.Vector" instead of on lists as the Haskell Prelude does. In
+addition, for the 'Clash.Class.Parity.odd' and 'Clash.Class.Parity.even'
+functions a type class called 'Clash.Class.Parity.Parity' is available at
+"Clash.Class.Parity".
+-}
 
 -- | Create a 'register' function for product-type like signals (e.g.
 -- @('Signal' a, 'Signal' b)@)

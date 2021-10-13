@@ -430,9 +430,9 @@ biTbClockGen done = (testClk, circuitClk)
 --     testInput      = 'Clash.Explicit.Testbench.stimuliGenerator' clkA1 rstA1 $('Clash.Sized.Vector.listToVecTH' [1::Unsigned 8,2,3,4,5,6,7,8])
 --     expectedOutput = 'Clash.Explicit.Testbench.outputVerifier'   clkB2 rstB2 $('Clash.Sized.Vector.listToVecTH' [(0,0) :: (Unsigned 8, Unsigned 8),(1,2),(3,4),(5,6),(7,8)])
 --     done           = expectedOutput (topEntity clkA1 rstA1 enableGen clkB2 testInput)
---     done'          = not \<$\> done
---     clkA1          = 'tbClockGen' \@\"Fast\" (unsafeSynchronizer clkB2 clkA1 done')
---     clkB2          = 'tbClockGen' \@\"Slow\" done'
+--     notDone        = not \<$\> done
+--     clkA1          = 'tbClockGen' \@\"Fast\" (unsafeSynchronizer clkB2 clkA1 notDone)
+--     clkB2          = 'tbClockGen' \@\"Slow\" notDone
 --     rstA1          = 'Clash.Signal.resetGen' \@\"Fast\"
 --     rstB2          = 'Clash.Signal.resetGen' \@\"Slow\"
 -- @
