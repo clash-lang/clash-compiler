@@ -1458,7 +1458,7 @@ assign ~RESULT = ~FROMBV[~SYM[2]][~TYP[9]];
 Clash supports designs multiple /clock/ (and /reset/) domains, though perhaps in
 a slightly limited form. What is possible is:
 
-* Create clock primitives, such as PPLs, which have an accompanying HDL primitive
+* Create clock primitives, such as PLLs, which have an accompanying HDL primitive
   (described <#primitives later on> in this tutorial).
 * Explicitly assign clocks to memory primitives.
 * Synchronize between differently-clocked parts of your design in a type-safe
@@ -1514,7 +1514,7 @@ What is /not/ possible is:
 What this means is that when Clash converts your design to VHDL/(System)Verilog,
 you end up with a top-level module/entity with multiple clock and reset ports
 for the different clock domains. If you're targeting an FPGA, you can use e.g. a
-<https://www.altera.com/literature/ug/ug_altpll.pdf PPL> or
+<https://www.altera.com/literature/ug/ug_altpll.pdf PLL> or
 <http://www.xilinx.com/support/documentation/user_guides/ug472_7Series_Clocking.pdf MMCM>
 to provide the clock signals.
 
@@ -2176,7 +2176,7 @@ Here is a list of Haskell features for which the Clash compiler has only
 
     @
     x =
-      case 'resetKind' @@'System' of
+      case 'resetKind' @'System' of
         SAsynchronous -> \'a\'
         SSynchronous -> \'b\'
     @

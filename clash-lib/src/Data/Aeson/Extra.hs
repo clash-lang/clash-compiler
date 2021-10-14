@@ -49,7 +49,7 @@ type LineMap = IntMap (Int, Int)
 -- | Aeson versions <1.5.0 accept unescaped newlines in JSON strings. This is in
 -- violation of RFC 7159. Aeson 1.5.0 fixes this bug. Unfortunately, "Clash
 -- JSON" files rely on the old behavior. This function replaces newlines (in
--- stings) with their escaped variants.
+-- strings) with their escaped variants.
 toSpecNewlines
   :: ByteString
   -> Either UnicodeException (LineMap, ByteString)
