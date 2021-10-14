@@ -427,6 +427,7 @@ runClashTest = defaultMain $ clashTestRoot
             hdlTargets=[VHDL]
           , buildTargets=BuildSpecific ["testEnableTB", "testBoolTB"]
           }
+        , outputTest ("tests" </> "shouldwork" </> "BlackBox") [Verilog]  [] [] "LITrendering" "main"
         ]
       , clashTestGroup "BoxedFunctions"
         [ runTest "DeadRecursiveBoxed" def{hdlSim=False}
