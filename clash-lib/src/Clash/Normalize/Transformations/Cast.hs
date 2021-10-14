@@ -18,9 +18,9 @@ import GHC.Stack (HasCallStack)
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Term (LetBinding, Term(..), collectArgs, stripTicks)
-import Clash.Core.TermInfo (isCast, isPrim)
+import Clash.Core.TermInfo (isCast)
 import Clash.Core.Type (normalizeType)
-import Clash.Core.Var (varName)
+import Clash.Core.Var (isGlobalId, varName)
 import Clash.Core.VarEnv (InScopeSet)
 import Clash.Debug (trace)
 import Clash.Normalize.Transformations.Specialize (specialize)
@@ -54,9 +54,10 @@ argCastSpec ctx e@(App f (stripTicks -> Cast e' _ _))
  -- will be eliminated by 'eliminateCastCast' during the normalization of the
  -- "current" function. We thus prevent the unnecessary introduction of a
  -- specialized version of 'f'.
- | not (isCast e)
- -- Don't specialise prims, because we can't push casts into them
- , not . isPrim . fst . collectArgs $ f = do
+ | not (isCast e')
+ -- We can only push casts into global binders
+ , (Var g, _) <- collectArgs f
+ , isGlobalId g = do
   bndrs <- Lens.use bindings
   isWorkFree workFreeBinders bndrs e' >>= \case
     True -> go
