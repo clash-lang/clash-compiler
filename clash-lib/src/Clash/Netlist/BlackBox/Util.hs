@@ -606,10 +606,24 @@ renderTag b (Lit n) =
  where
   (e,_,_) = bbInputs b !! n
 
-  mkLit (Literal (Just (Signed _,_)) i)                                 = Literal Nothing i
-  mkLit (Literal (Just (Unsigned _,_)) i)                               = Literal Nothing i
-  mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Signed _,_)) i])   = Literal Nothing i
-  mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Unsigned _,_)) i]) = Literal Nothing i
+  mkLit (Literal (Just (Signed _,_)) i)                                 = Literal Nothing i  -- Integer, Int#
+  mkLit (Literal (Just (Unsigned _,_)) i)                               = Literal Nothing i  -- KnownNat, Natural, Word#
+
+  -- TODO Remove the blackboxes for GHC.Types.I# and GHC.Types.W#.
+  -- Then we can use these two rules for Int and Word
+  -- mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Signed _,_)) i])   = Literal Nothing i
+  mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Unsigned _,_)) i]) = Literal Nothing i  -- SNat
+
+  mkLit (BlackBoxE pNm _ _ _ _ bbCtx _) | pNm `elem` ["GHC.Types.I#","GHC.Int.I8#", "GHC.Int.I16#", "GHC.Int.I32#", "GHC.Int.I64#"
+                                                     ,"GHC.Types.W#","GHC.Word.W8#","GHC.Word.W16#","GHC.Word.W32#","GHC.Word.W64#"
+                                                     ]
+                                        , [Literal _ i] <- extractLiterals bbCtx
+                                        = Literal Nothing i
+  mkLit (BlackBoxE pNm _ _ _ _ bbCtx _) | pNm `elem` ["Clash.Sized.Internal.Signed.fromInteger#"
+                                                     ,"Clash.Sized.Internal.Unsigned.fromInteger#"
+                                                     ,"Clash.Sized.Internal.Index.fromInteger#"]
+                                        , [Literal {}, Literal _ i] <- extractLiterals bbCtx
+                                         = Literal Nothing i
   mkLit i                                                               = i
 
 renderTag b e@(Name _i) =
