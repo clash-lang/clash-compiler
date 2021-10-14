@@ -56,9 +56,8 @@ polyTopEntity
   -> Signal dom ResetCount
 polyTopEntity clk asyncRst = counter
  where
-  ena = enableGen
-  counter = register clk rst ena RRRRRRR (fmap succResetCount counter)
-  rst = resetSynchronizer clk asyncRst ena
+  counter = register clk rst enableGen RRRRRRR (fmap succResetCount counter)
+  rst = resetSynchronizer clk asyncRst
 
 topEntity :: Clock System -> Reset System -> Signal System ResetCount
 topEntity = polyTopEntity @System

@@ -1,0 +1,1 @@
+CHANGED: `resetSynchronizer` now no longer takes an `Enable` argument. The argument was already marked for removal and was ignored.

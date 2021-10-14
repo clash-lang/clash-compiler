@@ -22,6 +22,6 @@ topEntity
 topEntity clk rstnButton = exposeClockResetEnable top clk rst en where
   en = enableGen
   rst = unsafeFromLowPolarity rstnButton
-  rstSync = resetSynchronizer clk rst en
+  rstSync = resetSynchronizer clk rst
 
 makeTopEntityWithName 'topEntity "shell"

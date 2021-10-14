@@ -1,5 +1,5 @@
 {-|
-Copyright  :  (C) 2020, QBayLogic B.V.
+Copyright  :  (C) 2020-2021, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -92,13 +92,12 @@ import           GHC.TypeLits (type (+), KnownNat)
 -- topEntity
 --   :: Clock  System
 --   -> Reset  System
---   -> Enable System
 --   -> Signal System Bit
 --   -> Signal System (BitVector 8)
--- topEntity clk asyncRst ena key1 =
---   withClockResetEnable clk rst ena leds
+-- topEntity clk asyncRst key1 =
+--   withClockResetEnable clk rst enableGen leds
 --  where
---   rst   = 'resetSynchronizer' clk asyncRst ena
+--   rst   = 'resetSynchronizer' clk asyncRst
 --   key1R = isRising 1 key1
 --   leds  = mealy blinkerT (1, False, 0) key1R
 -- @
@@ -115,9 +114,9 @@ import           GHC.TypeLits (type (+), KnownNat)
 --   -> Reset  System
 --   -> Signal System Bit
 --   -> Signal System (BitVector 8)
--- topEntity clk rst ena key1 =
+-- topEntity clk rst key1 =
 --     let  (pllOut,pllStable) = altpll (SSymbol @"altpll50") clk rst
---          rstSync            = 'resetSynchronizer' pllOut (unsafeToHighPolarity pllStable) ena
+--          rstSync            = 'resetSynchronizer' pllOut (unsafeToHighPolarity pllStable)
 --     in   exposeClockResetEnable leds pllOut rstSync enableGen
 --   where
 --     key1R  = isRising 1 key1
@@ -163,10 +162,8 @@ resetSynchronizer
    . KnownDomain dom
   => Clock dom
   -> Reset dom
-  -> Enable dom
-  -- ^ Warning: this argument will be removed in future versions of Clash.
   -> Reset dom
-resetSynchronizer clk rst _ = rstOut
+resetSynchronizer clk rst = rstOut
  where
   isActiveHigh = case resetPolarity @dom of { SActiveHigh -> True; _ -> False }
   rstOut =
@@ -290,4 +287,4 @@ convertReset clkA clkB rstA0 = rstA2
   rstA2 =
     case (sameDomain @domA @domB) of
       Just Refl -> rstA0
-      Nothing   -> resetSynchronizer clkB rstA1 enableGen
+      Nothing   -> resetSynchronizer clkB rstA1
