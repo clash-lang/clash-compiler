@@ -264,10 +264,15 @@ instance IsTest ClashTest where
     program oDir =
       TestProgram "clash" (args oDir) NoGlob PrintNeither False Nothing
 
-    failingProgram oDir (testExit, expectedErr) =
+    failingProgram oDir (testExit, expectedErr) = let
+        -- TODO: there's no easy way to test for the absence of something in stderr
+        expected = case T.splitAt 4 expectedErr of
+                     ("NOT:", rest) -> ExpectNotStdErr rest
+                     _ -> ExpectStdErr expectedErr
+      in
       TestFailingProgram
         (testExitCode testExit) "clash" (args oDir) NoGlob PrintNeither False
-        (specificExitCode testExit) (ExpectStdErr expectedErr) Nothing
+        (specificExitCode testExit) expected Nothing
 
     args oDir =
       [ target
