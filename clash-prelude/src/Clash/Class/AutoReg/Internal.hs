@@ -457,6 +457,7 @@ applyTyVarSubsts substs ty = go ty
                   Just m  -> m
       ConT _ -> ty'
       AppT ty1 ty2 -> AppT (go ty1) (go ty2)
+      LitT _ -> ty'
       _ -> error $ "TODO applyTyVarSubsts: " ++ show ty'
 
 
