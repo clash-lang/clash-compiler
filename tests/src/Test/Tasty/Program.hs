@@ -93,6 +93,7 @@ data ExpectOutput a
   = ExpectStdOut a
   | ExpectStdErr a
   | ExpectEither a
+  | ExpectNotStdErr a
   | ExpectNothing
   deriving Functor
 
@@ -353,6 +354,8 @@ runFailingProgram testExitCode program args stdO errOnEmptyStderr expectedCode e
                 && not (cleanNewlines r `T.isInfixOf` cleanNewlines stderrT)
                 ->
                 unexpectedStd "stdout or stderr" program args code stderrT stdoutT r
+              ExpectNotStdErr r | cleanNewlines r `T.isInfixOf` cleanNewlines stderrT ->
+                unexpectedNonEmptyStderr program args code stderrT stdoutT
               _ ->
                 if testExitCode then
                   passed
@@ -373,6 +376,35 @@ exitFailure :: String -> [String] -> Int -> T.Text -> T.Text -> Result
 exitFailure cmd args code stderr stdout =
   testFailed [I.i|
     Program #{cmd} failed with error-code #{code}.
+
+    Full invocation:
+
+      #{cmd} #{List.intercalate " " args}
+
+    Stderr was:
+
+      #{stderr}
+
+    Stdout was:
+
+      #{stdout}
+  |]
+
+unexpectedNonEmptyStderr
+  :: String
+  -- ^ Program name
+  -> [String]
+  -- ^ Program arguments
+  -> Int
+  -- ^ Code returned by program
+  -> T.Text
+  -- ^ stderr
+  -> T.Text
+  -- ^ stdout
+  -> Result
+unexpectedNonEmptyStderr cmd args code stderr stdout =
+  testFailed [I.i|
+    Program #{cmd} (return code: #{code}) printed to stderr unexpectedly.
 
     Full invocation:
 

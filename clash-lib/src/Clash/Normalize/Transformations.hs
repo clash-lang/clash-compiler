@@ -1056,9 +1056,10 @@ argCastSpec ctx e@(App f (stripTicks -> Cast e' _ _))
  -- will be eliminated by 'eliminateCastCast' during the normalization of the
  -- "current" function. We thus prevent the unnecessary introduction of a
  -- specialized version of 'f'.
- | not (isCast e)
- -- Don't specialise prims, because we can't push casts into them
- , not . isPrim . fst . collectArgs $ f = do
+ | not (isCast e')
+ -- We can only push casts into global binders
+ , (Var g, _) <- collectArgs f
+ , isGlobalId g = do
   bndrs <- Lens.use bindings
   isWorkFree workFreeBinders bndrs e' >>= \case
     True -> go
