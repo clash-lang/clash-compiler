@@ -85,7 +85,6 @@ topEntity clk20 rstBtn modeBtn =
     resetSynchronizer
       clk50
       (unsafeFromLowPolarity pllStable)
-      en
 
 flipMode :: LedMode -> LedMode
 flipMode Rotate = Complement

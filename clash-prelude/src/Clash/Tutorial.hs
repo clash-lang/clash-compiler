@@ -917,7 +917,7 @@ topEntity clk rst =
     'exposeClockResetEnable' ('mealy' blinkerT (1,False,0) . Clash.Prelude.isRising 1) pllOut rstSync 'enableGen'
   where
     (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' \@Dom50 (SSymbol \@\"altpll50\") clk ('Clash.Signal.unsafeFromLowPolarity' rst)
-    rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeFromLowPolarity' pllStable) enableGen
+    rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeFromLowPolarity' pllStable)
 
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where
@@ -2555,7 +2555,6 @@ topEntity clk20 rstBtn modeBtn =
     'Clash.Signal.resetSynchronizer'
       clk50
       (unsafeFromLowPolarity pllStable)
-      en
 
 flipMode :: LedMode -> LedMode
 flipMode Rotate = Complement

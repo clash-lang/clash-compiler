@@ -1,8 +1,9 @@
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
-                  2017     , Google Inc.
+                  2017     , Google Inc.,
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 'TopEntity' annotations allow us to control hierarchy and naming aspects of the
 Clash compiler. We have the 'Synthesize' and 'TestBench' annotation.
@@ -103,7 +104,6 @@ topEntity clk20 rstBtn enaBtn modeBtn =
     'Clash.Prelude.resetSynchronizer'
       clk50
       ('Clash.Signal.unsafeFromLowPolarity' pllStable)
-      enableGen
 
 blinkerT
   :: (BitVector 8, Bool, Index 16650001)

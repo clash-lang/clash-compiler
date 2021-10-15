@@ -413,13 +413,12 @@ components such as PLLs and 'resetSynchronizer':
 topEntity
   :: Clock  System
   -> Reset  System
-  -> Enable System
   -> Signal System Bit
   -> Signal System (BitVector 8)
-topEntity clk rst ena key1 =
+topEntity clk rst key1 =
     let  (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' (SSymbol \@\"altpll50\") clk rst
-         rstSync            = 'resetSynchronizer' pllOut (unsafeToHighPolarity pllStable) ena
-    in   'exposeClockResetEnable' leds pllOut rstSync ena
+         rstSync            = 'resetSynchronizer' pllOut (unsafeToHighPolarity pllStable)
+    in   'exposeClockResetEnable' leds pllOut rstSync enableGen
   where
     key1R  = isRising 1 key1
     leds   = mealy blinkerT (1, False, 0) key1R
@@ -431,13 +430,12 @@ or, using the alternative method:
 topEntity
   :: Clock  System
   -> Reset  System
-  -> Enable System
   -> Signal System Bit
   -> Signal System (BitVector 8)
-topEntity clk rst ena key1 =
+topEntity clk rst key1 =
     let  (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' (SSymbol \@\"altpll50\") clk rst
-         rstSync            = 'resetSynchronizer' pllOut (unsafeToHighPolarity pllStable) ena
-    in   'withClockResetEnable' pllOut rstSync ena leds
+         rstSync            = 'resetSynchronizer' pllOut (unsafeToHighPolarity pllStable)
+    in   'withClockResetEnable' pllOut rstSync enableGen leds
   where
     key1R  = isRising 1 key1
     leds   = mealy blinkerT (1, False, 0) key1R
