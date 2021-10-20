@@ -21,10 +21,8 @@ set -x
 # end of this file).
 
 
-# Locks runner to certain CPU cores. If not used, docker images will think
-# they've got as many cores as the host system (even when setting $NCPUS to
-# a lower number).
-CPUS=0,1,2,3
+# Number of CPUs to limit a docker instance to
+NCPUS=4
 
 # Get this key from https://gitlab.com/clash-lang/clash-compiler/-/settings/ci_cd
 # under "Runners".
@@ -37,13 +35,10 @@ CACHE_IP=localhost
 CACHE_ACCESS_KEY=YYYYYYYYYYYYYY
 CACHE_SECRET_KEY=ZZZZZZZZZZZZZZ
 
-NCPUS=$(echo "$(echo ${CPUS} | grep -o ',' | wc -l) + 1" | bc)
-
 sudo gitlab-runner register \
   -r ${REGISTER_KEY} \
   -u https://gitlab.com/ \
   --docker-cpus ${NCPUS} \
-  --docker-cpuset-cpus ${CPUS} \
   --cache-path cache \
   --cache-type s3 \
   --cache-shared \
