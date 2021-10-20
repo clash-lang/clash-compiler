@@ -66,7 +66,8 @@ instance IsTest ModelsimSimTest where
     forM_ lists $ \memFile ->
       copyFile memFile (src </> "memory.list")
 
-    let args = ["-batch", "-do", doScript, msimTop]
+    -- TODO: remove -voptargs=+acc=p for a next release of questa intel edition
+    let args = ["-voptargs=+acc=p","-batch", "-do", doScript, msimTop]
     case msimExpectFailure of
       Nothing -> run optionSet (vsim src args) progressCallback
       Just exit -> run optionSet (failingVsim src args exit) progressCallback
