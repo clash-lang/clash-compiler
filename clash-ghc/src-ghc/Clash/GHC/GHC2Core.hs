@@ -81,7 +81,7 @@ import GHC.Core.TyCon
   (AlgTyConRhs (..), TyCon, tyConName, algTyConRhs, isAlgTyCon, isFamilyTyCon,
    isFunTyCon, isNewTyCon, isPrimTyCon, isTupleTyCon,
    isClosedSynFamilyTyConWithAxiom_maybe, expandSynTyCon_maybe, tyConArity,
-   tyConDataCons, tyConKind, tyConName, tyConUnique, isClassTyCon)
+   tyConDataCons, tyConKind, tyConName, tyConUnique, isClassTyCon, isPromotedDataCon_maybe)
 import GHC.Core.Type (mkTvSubstPrs, substTy, coreView)
 import GHC.Core.TyCo.Rep (Coercion (..), TyLit (..), Type (..), scaledThing)
 import GHC.Types.Unique (Uniquable (..), Unique, getKey, hasKey)
@@ -130,7 +130,7 @@ import Pair       (Pair (..))
 import SrcLoc     (SrcSpan (..), isGoodSrcSpan)
 import TyCon      (AlgTyConRhs (..), TyCon, tyConName,
                    algTyConRhs, isAlgTyCon, isFamilyTyCon,
-                   isFunTyCon, isNewTyCon,
+                   isFunTyCon, isNewTyCon, isPromotedDataCon_maybe,
                    isPrimTyCon, isTupleTyCon,
                    isClosedSynFamilyTyConWithAxiom_maybe,
                    expandSynTyCon_maybe,
@@ -224,6 +224,7 @@ makeTyCon tc = tycon
       | isTupleTyCon tc     = mkTupleTyCon
       | isAlgTyCon tc       = mkAlgTyCon
       | isPrimTyCon tc      = mkPrimTyCon
+      | Just dc <- isPromotedDataCon_maybe tc = mkPromotedDataCon dc
       | otherwise           = mkVoidTyCon
       where
         tcArity = tyConArity tc
@@ -288,6 +289,20 @@ makeTyCon tc = tycon
             , C.tyConName    = tcName
             , C.tyConKind    = tcKind
             , C.tyConArity   = tcArity
+            }
+
+        mkPromotedDataCon dc = do
+          tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
+          tcKind <- coreToType (tyConKind tc)
+          tcData <- coreToDataCon dc
+
+          return
+            C.PromotedDataCon
+            { C.tyConUniq   = C.nameUniq tcName
+            , C.tyConName   = tcName
+            , C.tyConKind   = tcKind
+            , C.tyConArity  = tcArity
+            , C.tyConData   = tcData
             }
 
         mkVoidTyCon = do
