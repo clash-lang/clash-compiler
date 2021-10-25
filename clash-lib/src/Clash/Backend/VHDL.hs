@@ -1676,18 +1676,6 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   , let k' = max 1 k
   = exprLit (Just (Unsigned k',k')) (NumLit (n-1))
 
-expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
-  | pNm == "GHC.Types.I#"
-  , [Literal _ (NumLit n)] <- extractLiterals bbCtx
-  = do iw <- Ap $ use intWidth
-       exprLit (Just (Signed iw,iw)) (NumLit n)
-
-expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
-  | pNm == "GHC.Types.W#"
-  , [Literal _ (NumLit n)] <- extractLiterals bbCtx
-  = do iw <- Ap $ use intWidth
-       exprLit (Just (Unsigned iw,iw)) (NumLit n)
-
 expr_ b (BlackBoxE _ libs imps inc bs bbCtx b') = do
   parenIf (b || b') (Ap (renderBlackBox libs imps inc bs bbCtx <*> pure 0))
 

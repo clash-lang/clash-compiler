@@ -12,20 +12,4 @@
     , "template"  : "~ARG[0]"
     }
   }
-, { "BlackBox" :
-    { "name"      : "GHC.Types.I#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "I# :: Int# -> Int"
-    , "template"  : "~ARG[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Types.W#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "W# :: Word# -> Word"
-    , "template"  : "~ARG[0]"
-    }
-  }
 ]

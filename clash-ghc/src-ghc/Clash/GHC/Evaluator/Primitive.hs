@@ -1595,13 +1595,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
             [charDc] = tyConDataCons charTc
         in  reduce (mkApps (Data charDc) [Left (Literal (CharLiteral c))])
 
-  "GHC.Types.I#"
-    | isSubj
-    , [Lit (IntLiteral i)] <- args
-    ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
-            (Just intTc) = lookupUniqMap intTcNm tcm
-            [intDc] = tyConDataCons intTc
-        in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
   "GHC.Int.I8#"
     | isSubj
     , [Lit (IntLiteral i)] <- args
@@ -1631,13 +1624,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
             [intDc] = tyConDataCons intTc
         in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
 
-  "GHC.Types.W#"
-    | isSubj
-    , [Lit (WordLiteral c)] <- args
-    ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-            (Just wordTc) = lookupUniqMap wordTcNm tcm
-            [wordDc] = tyConDataCons wordTc
-        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
   "GHC.Word.W8#"
     | isSubj
     , [Lit (WordLiteral c)] <- args

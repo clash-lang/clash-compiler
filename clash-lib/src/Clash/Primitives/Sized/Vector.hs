@@ -43,9 +43,9 @@ import           Clash.Netlist.BlackBox.Types
    Element(Component, Typ, TypElem, Text), Decl(Decl), emptyBlackBoxMeta)
 import           Clash.Netlist.Types
   (Identifier, TemplateFunction, BlackBoxContext, HWType(Vector),
-   Declaration(..), Expr(BlackBoxE, Literal, Identifier), Literal(NumLit),
+   Declaration(..), Expr(Literal, Identifier,DataCon), Literal(NumLit),
    BlackBox(BBTemplate, BBFunction), TemplateFunction(..), WireOrReg(Wire),
-   Modifier(Indexed, Nested), bbInputs, bbResults, emptyBBContext, tcCache,
+   Modifier(Indexed, Nested, DC), HWType(..), bbInputs, bbResults, emptyBBContext, tcCache,
    bbFunctions)
 import qualified Clash.Netlist.Id                   as Id
 import           Clash.Netlist.Util                 (typeSize)
@@ -307,8 +307,8 @@ indexIntVerilogTemplate bbCtx = getAp $ case typeSize vTy of
   ixI ix0 = case ix0 of
     Literal _ (NumLit i) ->
       fromInteger i
-    BlackBoxE "GHC.Types.I#" _ _ _ _ ixCtx _ ->
-      let (ix1,_,_) = head (bbInputs ixCtx)
-      in  ixI ix1
+    DataCon (Signed _) (DC (Void{},_)) [Literal (Just (Signed _,_)) (NumLit i)] ->
+      fromInteger i
     _ ->
       error ($(curLoc) ++ "Unexpected literal: " ++ show ix)
+
