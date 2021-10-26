@@ -1,5 +1,12 @@
 # Changelog for the Clash project
 
+## 1.4.6 *Oct 26th 2021*
+
+Fixed:
+
+  * Clash tries to cast-specialize non-"global binders" resulting in "specialisation of non-work-free cast" warning [#1933](https://github.com/clash-lang/clash-compiler/issues/1945)
+  * More consistently render bare untyped and unsized literals for `~LIT` tags. This fixes [#1934](https://github.com/clash-lang/clash-compiler/issues/1934)
+
 ## 1.4.5 *Oct 13th 2021*
 
 Changed:
