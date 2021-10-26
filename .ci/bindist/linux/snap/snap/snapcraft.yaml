@@ -1,5 +1,5 @@
 name: clash
-version: '1.4.5'
+version: '1.4.6'
 summary: 'Clash: from Haskell to hardware'
 description: |
   Clash is a functional hardware description language that borrows both its

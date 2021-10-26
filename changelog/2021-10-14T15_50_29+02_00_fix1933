@@ -1,1 +1,0 @@
-FIXED: Clash tries to cast-specialize non-"global binders" resulting in "specialisation of non-work-free cast" warning [#1933](https://github.com/clash-lang/clash-compiler/issues/1945)
