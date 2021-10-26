@@ -44,12 +44,17 @@ Test4 43 - 52: Conflict W R - (Value, undefined)
 Test5 53 - 62: Conflict R W - (undefined, value)
 Test6 63 - 72: Conflict W W - (undefined, undefined)
 Test7 73 - 82: Multiple writes to same address with different values
+Test8 : R N
+Test9 : N R
+Test10 : W N
+Test11 : N W
+Test12 : N N
 -}
 
-addrsA = $(listToVecTH $ P.take 40 [0 :: Index 73 ..])
-addrsB = $(listToVecTH $ P.take 20 [40 :: Index 73..])
-valuesA = $(listToVecTH $ P.map This $ P.take 40 [60..])
-valuesB = $(listToVecTH $ P.map That $ P.take 20 [80..])
+addrsA = $(listToVecTH $ P.take 20 [0 :: Index 73 ..])
+addrsB = $(listToVecTH $ P.take 10 [20 :: Index 73..])
+valuesA = $(listToVecTH $ P.map This $ P.take 20 [30..])
+valuesB = $(listToVecTH $ P.map That $ P.take 10 [40..])
 
 --Test 0
 opsA0 = zipWith RamWrite addrsA valuesA
@@ -61,22 +66,22 @@ opsB1 = fmap RamRead addrsB
 
 --Test 2
 opsA2 = twice $ fmap RamRead addrsB
-opsB2 = take d20 $ fmap RamRead addrsA
+opsB2 = take d10 $ fmap RamRead addrsA
 
 -- Test 3
-addrs3 = take d20 addrsA
-values3 = take d20 valuesA
+addrs3 = take d10 addrsA
+values3 = take d10 valuesA
 opsA3 = twice $ fmap RamRead addrs3
 opsB3 = fmap RamRead addrs3
 
 -- Test 4
 addrs4 =  addrsB
-values4 = take d20 valuesA
+values4 = take d10 valuesA
 opsA4 = twice $ zipWith RamWrite addrs4 values4
 opsB4 = fmap RamRead addrs4
 
 -- Test 5
-addrs5 =  take d20 addrsA
+addrs5 =  take d10 addrsA
 values5 = valuesB
 opsA5 = twice $ fmap RamRead addrs5
 opsB5 = zipWith RamWrite addrs5 values5
@@ -88,12 +93,34 @@ opsA6 = twice $ zipWith RamWrite addrs6 values6
 opsB6 = zipWith RamWrite addrs6 values6
 
 -- Test 7
-opsA7 = zipWith RamWrite (replicate d40 $ head addrsA) valuesA
-opsB7 = zipWith RamWrite (replicate d20 $ head addrsB) valuesB
+opsA7 = zipWith RamWrite (replicate d20 $ head addrsA) valuesA
+opsB7 = zipWith RamWrite (replicate d10 $ head addrsB) valuesB
+
+-- Test 8
+opsA8 = fmap RamRead addrsA
+opsB8 = replicate d10 NoOp
+
+-- Test 9
+opsA9 = replicate d20 NoOp
+opsB9 = fmap RamRead addrsB
+
+-- Test 10
+opsA10 = zipWith RamWrite addrsA $ twice valuesB
+opsB10 = replicate d10 NoOp
+
+-- Test 11
+opsA11 = replicate d20 NoOp
+opsB11 = zipWith RamWrite addrsB $ take d10 valuesA
+
+-- Test12
+opsA12 = replicate d20 NoOp
+opsB12 = replicate d10 NoOp
 
 --All operations
-opsA = opsA0 ++ opsA1 ++ opsA2 ++ opsA3 ++ opsA4 ++ opsA5 ++ opsA6 ++ opsA7
-opsB = opsB0 ++ opsB1 ++ opsB2 ++ opsB3 ++ opsB4 ++ opsB5 ++ opsB6 ++ opsB7
+opsA = opsA0 ++ opsA1 ++ opsA2 ++ opsA3 ++ opsA4 ++ opsA5 ++ opsA6
+ ++ opsA7 ++ opsA8 ++ opsA9 ++ opsA10 ++ opsA11 ++ opsA12
+opsB = opsB0 ++ opsB1 ++ opsB2 ++ opsB3 ++ opsB4 ++ opsB5 ++ opsB6
+ ++ opsB7 ++ opsB8 ++ opsB9 ++ opsB10 ++ opsB11 ++ opsB12
 
 topOut clkA rstA clkB rstB = out
   where
