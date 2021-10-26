@@ -224,7 +224,7 @@ end block;"
     , "kind"      : "Declaration"
     , "type"      : "rotateL# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
     , "template"  :
-"~RESULT <= rotate_left(~ARG[1],to_integer(~ARG[2]
+"~RESULT <= rotate_left(~ARG[1],to_integer((~ARG[2])
     -- pragma translate_off
     mod ~SIZE[~TYP[1]]
     -- pragma translate_on
@@ -240,7 +240,7 @@ end block;"
     , "kind"      : "Declaration"
     , "type"      : "rotateR# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
     , "template"  :
-"~RESULT <= rotate_right(~ARG[1],to_integer(~ARG[2]
+"~RESULT <= rotate_right(~ARG[1],to_integer((~ARG[2])
     -- pragma translate_off
     mod ~SIZE[~TYP[1]]
     -- pragma translate_on
