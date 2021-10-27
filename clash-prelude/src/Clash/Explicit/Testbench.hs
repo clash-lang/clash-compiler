@@ -33,6 +33,7 @@ module Clash.Explicit.Testbench
   , outputVerifierBitVector'
   , biTbClockGen
   , unsafeSimSynchronizer
+  , outputVerifierWith
   )
 where
 

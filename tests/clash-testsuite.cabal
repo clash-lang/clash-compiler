@@ -93,6 +93,7 @@ library
     Test.Tasty.Modelsim
     Test.Tasty.SymbiYosys
     Test.Tasty.Program
+    Test.Tasty.Clash.CollectSimResults
 
     -- From tests/shouldwork/LoadModules
     T1796
@@ -108,6 +109,7 @@ library
     unordered-containers,
     ordered-containers,
     containers,
+    template-haskell
 
 
 executable clash-testsuite

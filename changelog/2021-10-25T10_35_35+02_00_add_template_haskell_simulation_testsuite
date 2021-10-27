@@ -1,0 +1,2 @@
+INTERNAL CHANGE: Added 'Test.Tasty.Clash.CollectSimResults' to collect Clash
+simulation results with template haskell for hardware verification.
