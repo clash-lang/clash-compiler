@@ -23,12 +23,12 @@ import Data.Foldable (asum)
 import GHC.Stack (HasCallStack)
 
 import Clash.Core.DataCon
+import Clash.Core.HasType (applyTypeToArgs)
 import Clash.Core.Literal
 import Clash.Core.PartialEval.AsTerm
 import Clash.Core.PartialEval.Monad
 import Clash.Core.PartialEval.NormalForm
 import Clash.Core.Term (Term(..), PrimInfo(..))
-import Clash.Core.TermInfo (applyTypeToArgs)
 import Clash.Core.TyCon
 import Clash.Core.Type
 import Clash.Core.Util (tyNatSize)

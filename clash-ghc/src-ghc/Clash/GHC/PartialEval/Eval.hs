@@ -60,7 +60,6 @@ import           Clash.Core.PartialEval.Monad
 import           Clash.Core.PartialEval.NormalForm
 import           Clash.Core.Subst (deShadowAlt, deShadowTerm)
 import           Clash.Core.Term
-import           Clash.Core.TermInfo hiding (isFun)
 import           Clash.Core.Type
 import qualified Clash.Core.Util as Util
 import           Clash.Core.Var
@@ -243,7 +242,7 @@ canInline value = do
       workFree <- workFreeValue value
       pure (isClass || workFree)
  where
-  valueType tcm = termType tcm . unsafeAsTerm
+  valueType tcm = inferCoreTypeOf tcm . unsafeAsTerm
 
 lookupLocal :: Id -> Eval Value
 lookupLocal i = do
@@ -253,7 +252,7 @@ lookupLocal i = do
   case val of
     Just x -> do
       inlinable <- canInline x
-      let isFun = isPolyFunTy (varType var)
+      let isFun = isPolyFunTy (coreTypeOf var)
 
       if isFun || inlinable
         then tickInlined var <$> forceEval x
@@ -298,7 +297,7 @@ lookupGlobal i = do
 
 evalData :: (HasCallStack) => DataCon -> Eval Value
 evalData dc
-  | fullyApplied (dcType dc) [] =
+  | fullyApplied (coreTypeOf dc) [] =
       VData dc [] <$> getLocalEnv
 
   | otherwise =
@@ -306,7 +305,7 @@ evalData dc
 
 evalPrim :: (HasCallStack) => PrimInfo -> Eval Value
 evalPrim pr
-  | fullyApplied (primType pr) [] =
+  | fullyApplied (coreTypeOf pr) [] =
       evalPrimitive pr []
 
   | otherwise =
@@ -418,8 +417,8 @@ etaExpand term = do
   tcm <- getTyConMap
 
   case collectArgs term of
-    x@(Data dc, _) -> expand tcm (dcType dc) x
-    x@(Prim pr, _) -> expand tcm (primType pr) x
+    x@(Data dc, _) -> expand tcm (coreTypeOf dc) x
+    x@(Prim pr, _) -> expand tcm (coreTypeOf pr) x
     _ -> pure term
  where
   etaNamesOf acc = \case
@@ -475,7 +474,7 @@ delayDataArgs dc = go (dcUnivTyVars dc <> dcExtTyVars dc)
 evalApp :: (HasCallStack) => Term -> Arg Term -> Eval Value
 evalApp x y
   | Data dc <- f
-  , dcArgs  <- fst $ splitFunForallTy (dcType dc)
+  , dcArgs  <- fst $ splitFunForallTy (coreTypeOf dc)
   , numArgs <- length dcArgs
   = case compare (length args) numArgs of
       -- The data constructor is under-applied, eta expand and evaluate the
@@ -494,7 +493,7 @@ evalApp x y
       GT -> error "evalApp: Overapplied data constructor"
 
   | Prim pr <- f
-  , prArgs  <- fst $ splitFunForallTy (primType pr)
+  , prArgs  <- fst $ splitFunForallTy (coreTypeOf pr)
   , numArgs <- length prArgs
   = case compare (length args) numArgs of
       -- The primitive is under-applied, eta expand and evaluate the result.
@@ -531,7 +530,7 @@ evalApp x y
        if isUndefined evalF
          then do
            tcm <- getTyConMap
-           let resultTy = termType tcm term
+           let resultTy = inferCoreTypeOf tcm term
            eval (TyApp (Prim NP.undefined) resultTy)
          else do
            argThunks <- delayArgs args
@@ -555,7 +554,7 @@ evalLetrec bs x = evalSccs x (Util.sccLetBindings bs)
           val <- delayEval b
           rest <- withId var val (evalSccs body sccs)
           workFree <- workFreeValue val
-          let nonSharable = isPolyFunTy (varType var)
+          let nonSharable = isPolyFunTy (coreTypeOf var)
 
           -- We keep let bindings which perform work, as it may not be possible
           -- to inline them during evaluation. Sometimes this is redundant, as
@@ -605,7 +604,7 @@ evalCase term ty alts = do
       -- Case expressions with one non-absurd alternative which binds no
       -- pattern variables can be replaced with just the alternative RHS.
       [(p, v)]
-        | localVarsDoNotOccurIn (patVars p) (unsafeAsTerm v) -> forceEval v
+        | subsetFreeVars (mkVarSet $ patVars p) (unsafeAsTerm v) -> forceEval v
 
       -- Other case expressions have to go through caseCon + tryTransformCase,
       -- no shortcuts can be taken in advance.
@@ -796,7 +795,7 @@ evalAlt def = \case
     expandable <- expandableValue value
     tcm <- getTyConMap
 
-    let valTy = termType tcm (unsafeAsTerm value)
+    let valTy = inferCoreTypeOf tcm (unsafeAsTerm value)
         isClass = isClassTy tcm valTy
         isFun   = isPolyFunTy valTy
 
@@ -1065,7 +1064,7 @@ canApply value = do
 
   pure (isClass || isFun || (workFree && expandable))
  where
-  valueType tcm = termType tcm . unsafeAsTerm
+  valueType tcm = inferCoreTypeOf tcm . unsafeAsTerm
 
 apply :: (HasCallStack) => Value -> Value -> Eval Value
 apply val arg = do
@@ -1073,7 +1072,7 @@ apply val arg = do
   forced <- forceEval val
   applicable <- canApply arg
 
-  let argTy = termType tcm (unsafeAsTerm arg)
+  let argTy = inferCoreTypeOf tcm (unsafeAsTerm arg)
   let (lhs, ticks) = collectValueTicks forced
 
   case lhs of
@@ -1124,7 +1123,7 @@ apply val arg = do
             -- We rename i to j and bind the argument to j. This is somewhat of
             -- a hack to stop recursive functions with work performing arguments
             -- from binding let x = x in ... for arguments in recursive calls.
-            j <- getUniqueId (nameOcc (varName i)) (varType i)
+            j <- getUniqueId (nameOcc (varName i)) (coreTypeOf i)
             let jVal = VNeutral (NeVar j)
 
             inScope <- getInScope
