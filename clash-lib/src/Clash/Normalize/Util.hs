@@ -78,7 +78,7 @@ import           Clash.Debug             (traceIf)
 import           Clash.Driver.Types
   (BindingMap, Binding(..), TransformationInfo(FinalTerm), hasTransformationInfo)
 import           Clash.Normalize.Primitives (removedArg)
-import {-# SOURCE #-} Clash.Normalize.Strategy (normalization)
+import {-# SOURCE #-} Clash.Normalize.Strategy (normalization, partialEvaluatorBefore)
 import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
 import           Clash.Rewrite.Types
@@ -419,7 +419,9 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm) = makeCachedU nm (extra.
   let tm1 = deShadowTerm emptyInScopeSet tm
       tm2 = if isTop then substWithTyEq tm1 else tm1
   old <- Lens.use curFun
-  tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
+  pe <- Lens.use (extra.partialEvaluator)
+  let rewrite = if pe then partialEvaluatorBefore normalization else normalization
+  tm3 <- rewriteExpr ("normalization",rewrite) (nmS,tm2) (nm',sp)
   curFun .= old
   let ty' = inferCoreTypeOf tcm tm3
   return (Binding nm'{varType = ty'} sp inl pr tm3)

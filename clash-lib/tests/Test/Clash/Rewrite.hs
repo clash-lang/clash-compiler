@@ -101,6 +101,7 @@ instance Default NormalizeState where
     , _newInlineStrategy=True
     , _normalizeUltra=False
     , _inlineWFCacheLimit=10
+    , _partialEvaluator=False
     }
 
 instance Default InScopeSet where
