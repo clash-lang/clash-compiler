@@ -58,6 +58,15 @@ import Clash.Debug                       (traceIf)
 import Clash.Unique
 import Clash.Util
 
+-- | Rebuild a let expression / let expressions by taking the SCCs of a list
+-- of bindings and remaking Let (NonRec ...) ... and Let (Rec ...) ...
+--
+listToLets :: [LetBinding] -> Term -> Term
+listToLets xs body = foldr go body (sccLetBindings xs)
+ where
+  go (Graph.AcyclicSCC (i, x)) acc = Let (NonRec i x) acc
+  go (Graph.CyclicSCC binds) acc = Let (Rec binds) acc
+
 -- | The type @forall a . a@
 undefinedTy ::Type
 undefinedTy =
@@ -142,12 +151,12 @@ extractElems
   -- ^ Length of the vector
   -> Term
   -- ^ The vector
-  -> (Supply, [(Term,[LetBinding])])
+  -> (Supply, [(Term,[(Id, Term)])])
 extractElems supply inScope consCon resTy s maxN vec =
   first fst (go maxN (supply,inScope) vec)
  where
   go :: Integer -> (Supply,InScopeSet) -> Term
-     -> ((Supply,InScopeSet),[(Term,[LetBinding])])
+     -> ((Supply,InScopeSet),[(Term,[(Id, Term)])])
   go 0 uniqs _ = (uniqs,[])
   go n uniqs0 e =
     (uniqs3,(elNVar,[(elNId, lhs),(restNId, rhs)]):restVs)
@@ -194,7 +203,7 @@ extractTElems
   -- ^ Depth of the tree
   -> Term
   -- ^ The tree
-  -> (Supply,([Term],[LetBinding]))
+  -> (Supply,([Term],[(Id, Term)]))
 extractTElems supply inScope lrCon brCon resTy s maxN tree =
   first fst (go maxN [0..(2^(maxN+1))-2] [0..(2^maxN - 1)] (supply,inScope) tree)
  where
@@ -203,7 +212,7 @@ extractTElems supply inScope lrCon brCon resTy s maxN tree =
      -> [Int]
      -> (Supply,InScopeSet)
      -> Term
-     -> ((Supply,InScopeSet),([Term],[LetBinding]))
+     -> ((Supply,InScopeSet),([Term],[(Id, Term)]))
   go 0 _ ks uniqs0 e = (uniqs1,([elNVar],[(elNId, rhs)]))
    where
     tys          = [LitTy (NumTy 0),resTy]
@@ -676,8 +685,8 @@ inverseTopSortLetBindings e = e
 -- | Group let-bindings into cyclic groups and acyclic individual bindings
 sccLetBindings
   :: HasCallStack
-  => [LetBinding]
-  -> [Graph.SCC LetBinding]
+  => [(Id, Term)]
+  -> [Graph.SCC (Id, Term)]
 sccLetBindings =
   Graph.stronglyConnComp .
   (map (\(i,e) -> let fvs = fmap varUniq

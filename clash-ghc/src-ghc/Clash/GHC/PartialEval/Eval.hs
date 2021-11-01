@@ -23,7 +23,6 @@ import           Control.Monad (foldM)
 import           Data.Bifunctor
 import           Data.Bitraversable
 import           Data.Either
-import           Data.Graph (SCC(..))
 import           Data.Primitive.ByteArray (ByteArray(..))
 #if MIN_VERSION_base(4,15,0)
 import           GHC.Num.Integer (Integer (..))
@@ -48,7 +47,6 @@ import           Clash.Core.Term
 import           Clash.Core.TyCon (tyConDataCons)
 import           Clash.Core.Type
 import           Clash.Core.TysPrim (integerPrimTy)
-import qualified Clash.Core.Util as Util
 import           Clash.Core.Var
 import           Clash.Driver.Types (Binding(..), IsPrim(..))
 import qualified Clash.Normalize.Primitives as NP (undefined)
@@ -66,7 +64,7 @@ eval = \case
   TyLam i x       -> evalTyLam i x
   App x y         -> evalApp x (Left y)
   TyApp x ty      -> evalApp x (Right ty)
-  Letrec bs x     -> evalLetrec bs x
+  Let bs x        -> evalLet bs x
   Case x ty alts  -> evalCase x ty alts
   Cast x a b      -> evalCast x a b
   Tick tick x     -> evalTick tick x
@@ -250,33 +248,30 @@ evalApp x y
   term = either (App x) (TyApp x) y
   (f, args, _ticks) = collectArgsTicks term
 
-evalLetrec :: [LetBinding] -> Term -> Eval Value
-evalLetrec bs x = do
-  -- Determine if a binding should be kept in a letrec or inlined. We keep
-  -- bindings which perform work to prevent duplication of registers etc.
-  (keep, inline) <- foldM evalScc ([], []) (Util.sccLetBindings bs)
-  eX <- withIds (keep <> inline) (eval x)
+evalLet :: Bind Term -> Term -> Eval Value
+evalLet (NonRec i x) body = do
+  iTy <- evalType (varType i)
+  eX  <- delayEval x
+  wfX <- workFreeValue eX
 
-  case keep of
-    [] -> pure eX
-    _  -> pure (VNeutral (NeLetrec keep eX))
+  eBody <- withId i eX (eval body)
+
+  -- Only keep the let binding if it performs work.
+  if wfX
+    then pure eBody
+    else pure (VNeutral (NeLet (NonRec i{varType=iTy} eX) eBody))
+
+evalLet (Rec xs) body = do
+  binds <- traverse evalBind xs
+  eBody <- withIds binds (eval body)
+
+  pure (VNeutral (NeLet (Rec binds) eBody))
  where
-  evalBind (i, y) = do
+  evalBind (i, x) = do
     iTy <- evalType (varType i)
-    eY <- delayEval y
+    eX <- delayEval x
 
-    pure (i { varType = iTy }, eY)
-
-  evalScc (k, i) = \case
-    AcyclicSCC y -> do
-      eY <- evalBind y
-      workFree <- workFreeValue (snd eY)
-
-      if workFree then pure (k, eY:i) else pure (eY:k, i)
-
-    CyclicSCC ys -> do
-      eYs <- traverse evalBind ys
-      pure (eYs <> k, i)
+    pure (i{varType=iTy}, eX)
 
 evalCase :: Term -> Type -> [Alt] -> Eval Value
 evalCase term ty as = do
@@ -343,9 +338,9 @@ tryTransformCase subject ty alts =
 
     -- A case of let: Pull out the let expression if possible and attempt
     -- caseCon on the new case expression.
-    VNeutral (NeLetrec bindings innerSubject) -> do
+    VNeutral (NeLet bindings innerSubject) -> do
       newCase <- caseCon innerSubject ty alts
-      pure (VNeutral (NeLetrec bindings newCase))
+      pure (VNeutral (NeLet bindings newCase))
 
     -- There is no way to continue evaluating the case, do nothing.
     -- TODO elimExistentials here.
@@ -570,16 +565,16 @@ apply val arg = do
   case stripValue forced of
     -- If the LHS of application evaluates to a letrec, then add any bindings
     -- that do work to this letrec instead of creating a new one.
-    VNeutral (NeLetrec bs x)
+    VNeutral (NeLet bs x)
       | canApply  -> do
           inner <- apply x arg
-          pure (VNeutral (NeLetrec bs inner))
+          pure (VNeutral (NeLet bs inner))
 
       | otherwise -> do
           varTy <- evalType (valueType tcm arg)
           var <- getUniqueId "workArg" varTy
           inner <- apply x (VNeutral (NeVar var))
-          pure (VNeutral (NeLetrec ((var, arg) : bs) inner))
+          pure (VNeutral (NeLet bs (VNeutral (NeLet (NonRec var arg) inner))))
 
     -- If the LHS of application is neutral, make a letrec around the neutral
     -- application if the argument performs work.
@@ -589,7 +584,7 @@ apply val arg = do
           varTy <- evalType (valueType tcm arg)
           var <- getUniqueId "workArg" varTy
           let inner = VNeutral (NeApp neu (VNeutral (NeVar var)))
-          pure (VNeutral (NeLetrec [(var, arg)] inner))
+          pure (VNeutral (NeLet (NonRec var arg) inner))
 
     -- If the LHS of application is a lambda, make a letrec with the name of
     -- the argument around the result of evaluation if it performs work.
@@ -597,7 +592,7 @@ apply val arg = do
       | canApply  -> setLocalEnv env $ withId i arg (eval x)
       | otherwise -> setLocalEnv env $ do
           inner <- withId i arg (eval x)
-          pure (VNeutral (NeLetrec [(i, arg)] inner))
+          pure (VNeutral (NeLet (NonRec i arg) inner))
 
     f ->
       error ("apply: Cannot apply " <> show arg <> " to " <> show f)

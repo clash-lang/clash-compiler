@@ -50,7 +50,7 @@ import Clash.Core.Name (mkUnsafeSystemName, nameOcc)
 import Clash.Core.Subst
 import Clash.Core.Term
   ( LetBinding, Pat(..), PrimInfo(..), Term(..), collectArgs, collectArgsTicks
-  , collectTicks, isLambdaBodyCtx, isTickCtx, mkApps, mkLams, mkTicks
+  , collectTicks, isLambdaBodyCtx, isTickCtx, mkApps, mkLams, mkTicks, Bind(..)
   , partitionTicks, stripTicks)
 import Clash.Core.TermInfo (isCon, isLet, isLocalVar, isTick)
 import Clash.Core.TyCon (tyConDataCons)
@@ -84,7 +84,7 @@ not the complete names. So we use mkUnsafeSystemName to recreate the same Name.
 
 -- | Remove unused let-bindings
 deadCode :: HasCallStack => NormRewrite
-deadCode _ e@(Letrec binds body) =
+deadCode _ e@(Let binds body) =
   case removeUnusedBinders binds body of
     Just t -> changed t
     Nothing -> return e
@@ -428,7 +428,7 @@ topLet (TransformContext is0 ctx) e
     then return e
     else do tcm <- Lens.view tcCache
             argId <- mkTmBinderFor is0 tcm (mkUnsafeSystemName "result" 0) e
-            changed (Letrec [(argId, e)] (Var argId))
+            changed (Let (NonRec argId e) (Var argId))
 
 topLet (TransformContext is0 ctx) e@(Letrec binds body)
   | all (\c -> isLambdaBodyCtx c || isTickCtx c) ctx
@@ -439,9 +439,15 @@ topLet (TransformContext is0 ctx) e@(Letrec binds body)
       then return e
       else do
         tcm <- Lens.view tcCache
-        let is2 = extendInScopeSetList is0 (map fst binds)
+        let is2 = extendInScopeSetList is0 (fmap fst binds)
         argId <- mkTmBinderFor is2 tcm (mkUnsafeSystemName "result" 0) body
-        changed (Letrec (binds ++ [(argId,body)]) (Var argId))
+
+        -- TODO We would like this to be
+        --
+        -- Let binds (Let (NonRec argId body) (Var argId))
+        --
+        -- but this makes tests/shouldwork/SimIO/Test00.hs fail.
+        changed (Letrec (binds ++ [(argId, body)]) (Var argId))
 
 topLet _ e = return e
 {-# SCC topLet #-}

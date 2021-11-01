@@ -16,12 +16,10 @@ module Clash.Core.PartialEval.AsTerm
   ) where
 
 import Data.Bifunctor (first, second)
-import Data.Graph (SCC(..), flattenSCCs)
 
 import Clash.Core.HasFreeVars
 import Clash.Core.PartialEval.NormalForm
-import Clash.Core.Term (Term(..), LetBinding, Pat, Alt, mkApps)
-import Clash.Core.Util (sccLetBindings)
+import Clash.Core.Term (Bind(..), Term(..), Pat, Alt, mkApps)
 import Clash.Core.VarEnv (elemVarSet)
 
 -- | Convert a term in some normal form back into a Term. This is important,
@@ -37,24 +35,19 @@ instance (AsTerm a) => AsTerm (Neutral a) where
     NePrim pr args -> mkApps (Prim pr) (argsToTerms args)
     NeApp x y -> App (asTerm x) (asTerm y)
     NeTyApp x ty -> TyApp (asTerm x) ty
-    NeLetrec bs x ->
-      let bs' = fmap (second asTerm) bs
-          x'  = asTerm x
-       in removeUnusedBindings bs' x'
-
+    NeLet bs x -> removeUnusedBindings (fmap asTerm bs) (asTerm x)
     NeCase x ty alts -> Case (asTerm x) ty (altsToTerms alts)
 
-removeUnusedBindings :: [LetBinding] -> Term -> Term
+removeUnusedBindings :: Bind Term -> Term -> Term
 removeUnusedBindings bs x
-  | null used = x
-  | otherwise = Letrec used x
+  | isUsed bs = Let bs x
+  | otherwise = x
  where
   free = freeVarsOf x
-  used = flattenSCCs $ filter isUsed (sccLetBindings bs)
 
   isUsed = \case
-    AcyclicSCC y -> fst y `elemVarSet` free
-    CyclicSCC ys -> any (flip elemVarSet free . fst) ys
+    NonRec i _ -> elemVarSet i free
+    Rec xs -> any (flip elemVarSet free . fst) xs
 
 instance AsTerm Value where
   asTerm = \case

@@ -400,10 +400,10 @@ nonRepANF ctx@(TransformContext is0 _) e@(App appConPrim arg)
   = do
     untranslatable <- isUntranslatable False arg
     case (untranslatable,stripTicks arg) of
-      (True,Letrec binds body) ->
+      (True,Let binds body) ->
         -- This is a situation similar to Note [CaseLet deshadow]
         let (binds1,body1) = deshadowLetExpr is0 binds body
-        in  changed (Letrec binds1 (App appConPrim body1))
+        in  changed (Let binds1 (App appConPrim body1))
       (True,Case {})  -> specialize ctx e
       (True,Lam {})   -> specialize ctx e
       (True,TyLam {}) -> specialize ctx e

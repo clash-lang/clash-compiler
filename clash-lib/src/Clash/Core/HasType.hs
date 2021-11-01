@@ -142,7 +142,7 @@ instance InferType Term where
         case collectArgs x of
           (fun, args) -> applyTypeToArgs x tcm (go fun) args
 
-      Letrec _ x -> go x
+      Let _ x -> go x
       Case _ ty _ -> ty
       Cast _ _ a -> a
       Tick _ x -> go x

@@ -160,6 +160,11 @@ isVoid _       = False
 isFilteredVoid :: FilteredHWType -> Bool
 isFilteredVoid = isVoid . stripFiltered
 
+squashLets :: Term -> Term
+squashLets (Letrec xs (Letrec ys e)) =
+  squashLets (Letrec (xs <> ys) e)
+squashLets e = e
+
 -- | Split a normalized term into: a list of arguments, a list of let-bindings,
 -- and a variable reference that is the body of the let-binding. Returns a
 -- String containing the error if the term was not in a normalized form.
@@ -168,10 +173,10 @@ splitNormalized
   -> Term
   -> (Either String ([Id],[LetBinding],Id))
 splitNormalized tcm expr = case collectBndrs expr of
-  (args, collectTicks -> (Letrec xes e, ticks))
+  (args, collectTicks -> (squashLets -> Letrec xes e, ticks))
     | (tmArgs,[]) <- partitionEithers args -> case stripTicks e of
         Var v -> Right (tmArgs, fmap (second (`mkTicks` ticks)) xes,v)
-        _     -> Left ($(curLoc) ++ "Not in normal form: res not simple var")
+        t     -> Left ($(curLoc) ++ "Not in normal form: res not simple var: " ++ showPpr t)
     | otherwise -> Left ($(curLoc) ++ "Not in normal form: tyArgs")
   _ ->
     Left ($(curLoc) ++ "Not in normal form: no Letrec:\n\n" ++ showPpr expr ++

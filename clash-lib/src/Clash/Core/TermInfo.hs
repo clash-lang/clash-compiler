@@ -29,9 +29,10 @@ termSize (App e1 e2)  = termSize e1 + termSize e2
 termSize (TyApp e _)  = termSize e
 termSize (Cast e _ _) = termSize e
 termSize (Tick _ e)   = termSize e
-termSize (Letrec bndrs e) = sum (bodySz:bndrSzs)
+termSize (Let (NonRec _ x) e) = termSize x + termSize e
+termSize (Let (Rec xs) e) = sum (bodySz:bndrSzs)
  where
-  bndrSzs = map (termSize . snd) bndrs
+  bndrSzs = map (termSize . snd) xs
   bodySz  = termSize e
 termSize (Case subj _ alts) = sum (subjSz:altSzs)
  where
@@ -88,8 +89,8 @@ isPolyFun m t = isPolyFunCoreTy m (inferCoreTypeOf m t)
 
 -- | Is a term a recursive let-binding?
 isLet :: Term -> Bool
-isLet (Letrec {}) = True
-isLet _           = False
+isLet Let{} = True
+isLet _ = False
 
 -- | Is a term a variable reference?
 isVar :: Term -> Bool

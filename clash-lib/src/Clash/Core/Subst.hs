@@ -73,7 +73,7 @@ import           GHC.Stack                 (HasCallStack)
 import           Clash.Core.HasFreeVars
 import           Clash.Core.Pretty         (ppr, fromPpr)
 import           Clash.Core.Term
-  (LetBinding, Pat (..), Term (..), TickInfo (..), PrimInfo(primName))
+  (Bind(..), Pat (..), Term (..), TickInfo (..), PrimInfo(primName))
 import           Clash.Core.Type           (Type (..))
 import           Clash.Core.VarEnv
 import           Clash.Core.Var            (Id, Var (..), TyVar, isGlobalId)
@@ -558,8 +558,8 @@ substTm doc subst = go where
       (subst',v') -> TyLam v' (substTm doc subst' e)
     App l r -> App (go l) (go r)
     TyApp l r -> TyApp (go l) (substTy subst r)
-    Letrec bs e -> case substBind doc subst bs of
-      (subst',bs') -> Letrec bs' (substTm doc subst' e)
+    Let bs e -> case substBind doc subst bs of
+      (subst',bs') -> Let bs' (substTm doc subst' e)
     Case subj ty alts -> Case (go subj) (substTy subst ty) (map goAlt alts)
     Cast e t1 t2 -> Cast (go e) (substTy subst t1) (substTy subst t2)
     Tick tick e -> Tick (goTick tick) (go e)
@@ -671,10 +671,16 @@ substBind
   :: HasCallStack
   => Doc ()
   -> Subst
-  -> [LetBinding]
-  -> (Subst,[LetBinding])
-substBind doc subst xs =
-  (subst',zip bndrs' rhss')
+  -> Bind Term
+  -> (Subst, Bind Term)
+substBind doc subst (NonRec i x) =
+  (subst', NonRec i' x')
+ where
+  (subst', i') = substIdBndr subst i
+  x' = substTm ("substBind" <+> doc) subst x
+
+substBind doc subst (Rec xs) =
+  (subst', Rec (zip bndrs' rhss'))
  where
   (bndrs,rhss)    = unzip xs
   (subst',bndrs') = List.mapAccumL substIdBndr subst bndrs
@@ -718,11 +724,11 @@ deshadowLetExpr
   :: HasCallStack
   => InScopeSet
   -- ^ Current InScopeSet
-  -> [LetBinding]
+  -> Bind Term
   -- ^ Bindings of the let-expression
   -> Term
   -- ^ The body of the let-expression
-  -> ([LetBinding],Term)
+  -> (Bind Term, Term)
   -- ^ Deshadowed let-bindings, where let-bound expressions and the let-body
   -- properly reference the renamed variables
 deshadowLetExpr is bs e =
@@ -753,9 +759,9 @@ freshenTm is0 = go (mkSubst is0) where
         (is2,r') -> (is2, App l' r')
     TyApp l r -> case go subst0 l of
       (is1,l') -> (is1, TyApp l' (substTy subst0 r))
-    Letrec bs e -> case goBind subst0 bs of
+    Let bs e -> case goBind subst0 bs of
       (subst1,bs') -> case go subst1 e of
-        (is2,e') -> (is2,Letrec bs' e')
+        (is2,e') -> (is2,Let bs' e')
     Case subj ty alts -> case go subst0 subj of
       (is1,subj') -> case List.mapAccumL (\isN -> goAlt subst0 {substInScope = isN}) is1 alts of
         (is2,alts') -> (is2, Case subj' (substTy subst0 ty) alts')
@@ -765,13 +771,18 @@ freshenTm is0 = go (mkSubst is0) where
        (is1, e') -> (is1, Tick (goTick subst0 tick) e')
     tm -> (substInScope subst0, tm)
 
-  goBind subst0 xs =
+  goBind subst0 (NonRec i x) =
+    let (subst1, i') = substIdBndr subst0 i
+        (is2, x') = go subst0 x
+     in (subst1 { substInScope = extendInScopeSet is2 i' }, NonRec i' x')
+
+  goBind subst0 (Rec xs) =
     let (bndrs,rhss)    = unzip xs
         (subst1,bndrs') = List.mapAccumL substIdBndr subst0 bndrs
         (is2,rhss')     = List.mapAccumL (\isN -> go subst1 {substInScope = isN})
                                          (substInScope subst1)
                                          rhss
-    in  (subst1 {substInScope = is2},zip bndrs' rhss')
+    in  (subst1 {substInScope = is2}, Rec $ zip bndrs' rhss')
 
   goAlt subst0 (pat,alt) = case pat of
     DataPat dc tvs ids -> case List.mapAccumL substTyVarBndr' subst0 tvs of
@@ -891,7 +902,9 @@ acmpTerm' inScope = go (mkRnEnv inScope)
     go env l1 l2 `thenCompare` go env r1 r2
   go env (TyApp l1 r1) (TyApp l2 r2) =
     go env l1 l2 `thenCompare` acmpType' env r1 r2
-  go env (Letrec bs1 e1) (Letrec bs2 e2) =
+  go env (Let (NonRec i1 x1) e1) (Let (NonRec i2 x2) e2) =
+    go env x1 x2 `thenCompare` go (rnTmBndr env i1 i2) e1 e2
+  go env (Let (Rec bs1) e1) (Let (Rec bs2) e2) =
     compare (length bs1) (length bs2) `thenCompare`
     foldr thenCmpTm EQ (zipWith (go env') rhs1 rhs2) `thenCompare`
     go env' e1 e2
@@ -931,9 +944,10 @@ acmpTerm' inScope = go (mkRnEnv inScope)
     TyApp {}   -> 6
     Lam {}     -> 7
     TyLam {}   -> 8
-    Letrec {}  -> 9
-    Case {}    -> 10
-    Tick {}    -> 11
+    Let NonRec{} _ -> 9
+    Let Rec{} _ -> 10
+    Case {}    -> 11
+    Tick {}    -> 12
 
 thenCompare :: Ordering -> Ordering -> Ordering
 thenCompare EQ rel = rel

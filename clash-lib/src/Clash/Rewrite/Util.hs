@@ -75,9 +75,9 @@ import           Clash.Core.Type             (Type (..), normalizeType)
 import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
-  (InScopeSet, extendInScopeSetList, mkInScopeSet,
+  (InScopeSet, extendInScopeSet, extendInScopeSetList, mkInScopeSet,
    uniqAway, uniqAway', mapVarEnv, eltsVarEnv, unitVarSet, emptyVarEnv,
-   mkVarEnv, eltsVarSet, elemVarEnv, lookupVarEnv, extendVarEnv)
+   mkVarEnv, eltsVarSet, elemVarEnv, lookupVarEnv, extendVarEnv, elemVarSet)
 import           Clash.Debug
 import           Clash.Driver.Types
   (TransformationInfo(..), DebugOpts(..), BindingMap, Binding(..), IsPrim(..),
@@ -122,8 +122,8 @@ findAccidentialShadows =
     Case t _ as ->
       concatMap (findInPat . fst) as ++
         concatMap findAccidentialShadows (t : map snd as)
-    Letrec bs t ->
-      findDups (map fst bs) ++ findAccidentialShadows t
+    Let NonRec{} t -> findAccidentialShadows t
+    Let (Rec bs) t -> findDups (map fst bs) ++ findAccidentialShadows t
 
  where
   findInPat :: Pat -> [[Id]]
@@ -346,7 +346,17 @@ inlineBinders
   :: (Term -> LetBinding -> RewriteMonad extra Bool)
   -- ^ Property test
   -> Rewrite extra
-inlineBinders condition (TransformContext inScope0 _) expr@(Letrec xes res) = do
+inlineBinders condition (TransformContext inScope0 _) expr@(Let (NonRec i x) res) = do
+  inline <- condition expr (i, x)
+
+  if inline && elemFreeVars i res then
+    let inScope1 = extendInScopeSet inScope0 i
+        subst = extendIdSubst (mkSubst inScope1) i x
+     in changed (substTm "inlineBinders" subst res)
+  else
+    return expr
+
+inlineBinders condition (TransformContext inScope0 _) expr@(Let (Rec xes) res) = do
   (toInline,toKeep) <- partitionM (condition expr) xes
   case toInline of
     [] -> return expr
@@ -760,7 +770,7 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
     -- ‡ https://www.microsoft.com/en-us/research/wp-content/uploads/2016/07/supercomp-by-eval.pdf
     bs <- Lens.use bindings
     inlineBinders (inlineTest bs) ctx0 (Letrec bndrs e1) >>= \case
-      e2@(Letrec bnders1 e3) ->
+      e2@(Let bnders1 e3) ->
         pure (fromMaybe e2 (removeUnusedBinders bnders1 e3))
       e2 ->
         pure e2
@@ -784,10 +794,14 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
 -- | Remove unused binders in given let-binding. Returns /Nothing/ if no unused
 -- binders were found.
 removeUnusedBinders
-  :: [LetBinding]
+  :: Bind Term
   -> Term
   -> Maybe Term
-removeUnusedBinders binds body =
+removeUnusedBinders (NonRec i _) body =
+  let bodyFVs = Lens.foldMapOf freeLocalIds unitVarSet body
+   in if i `elemVarSet` bodyFVs then Nothing else Just body
+
+removeUnusedBinders (Rec binds) body =
   case eltsVarEnv used of
     [] -> Just body
     qqL | not (List.equalLength qqL binds)
