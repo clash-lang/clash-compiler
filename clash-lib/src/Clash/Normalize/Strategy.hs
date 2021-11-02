@@ -16,11 +16,10 @@ import Clash.Normalize.Types
 import Clash.Rewrite.Combinators
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util
-import Clash.Util (pprTraceDebug)
 
 partialEvaluatorBefore :: NormRewrite -> NormRewrite
-partialEvaluatorBefore =
-  pprTraceDebug "Clash: Partial Evaluation is not available in this build of clash" mempty
+partialEvaluatorBefore norm =
+  apply "partialEval" partialEval >-> norm
 
 -- [Note: bottomup traversal evalConst]
 --
@@ -40,14 +39,13 @@ partialEvaluatorBefore =
 -- | Normalisation transformation
 normalization :: NormRewrite
 normalization =
-  pe >-!-> rmDeadcode >-> multPrim >-> constantPropagation >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
+  rmDeadcode >-> multPrim >-> constantPropagation >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
   bindConst >-> letTL
   >-> evalConst
   >-!-> cse >-!-> cleanup >->
   xOptim >-> rmDeadcode >->
   cleanup >-> bindSimIO >-> recLetRec >-> splitArgs
   where
-    pe = apply "partialEval" partialEval
     multPrim   = topdownR (apply "setupMultiResultPrim" setupMultiResultPrim)
     anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF >-> topdownR (apply "caseCon" caseCon)
     letTL      = topdownSucR (apply "topLet" topLet)
