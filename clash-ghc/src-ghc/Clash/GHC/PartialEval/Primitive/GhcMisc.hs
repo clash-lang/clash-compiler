@@ -16,6 +16,11 @@ import GHC.Prim
 import GHC.Types
 
 import Clash.Core.PartialEval.Monad
+import Clash.Core.PartialEval.NormalForm
+import Clash.Core.TyCon (tyConDataCons)
+import Clash.Core.Type
+import Clash.Core.TysPrim
+import Clash.Unique (lookupUniqMap)
 
 import Clash.GHC.PartialEval.Primitive.FromAst
 import Clash.GHC.PartialEval.Primitive.Info
@@ -57,7 +62,7 @@ ghcPrims = HashMap.fromList
   , ("GHC.Show.$witos'", liftId)
   , ("GHC.TypeLits.natVal", primNatValInteger)
   , ("GHC.TypeNats.natVal", primNatValNatural)
-  , ("Unsafe.Coerce.unsafeEqualityProof", liftId)
+  , ("Unsafe.Coerce.unsafeEqualityProof", primUnsafeEqualityProof)
   ]
 
 primF :: PrimImpl
@@ -92,6 +97,22 @@ primNatValNatural pr args
   = do szN <- typeSize n Nothing
        resTy <- resultType pr args
        toValue (naturalFromInteger szN) resTy
+
+  | otherwise
+  = throwM (UnexpectedArgs pr args)
+
+primUnsafeEqualityProof :: PrimImpl
+primUnsafeEqualityProof pr args
+  | [Right kn, Right a, Right b] <- args
+  = do resTy <- resultType pr args
+       let Just tcn = fst <$> splitTyConAppM resTy
+       Just tc <- lookupUniqMap tcn <$> getTyConMap
+       let [dc] = tyConDataCons tc
+
+       -- The types 'a' and 'b' appear flipped in the core output.
+       let Just eqTcn = fst <$> splitTyConAppM eqPrimTy
+       let eq = mkTyConApp eqTcn [kn, kn, b, a]
+       VData dc [Right eq] <$> getLocalEnv
 
   | otherwise
   = throwM (UnexpectedArgs pr args)
