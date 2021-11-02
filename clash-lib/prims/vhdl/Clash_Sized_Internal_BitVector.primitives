@@ -591,7 +591,7 @@ end block;"
     , "kind"      : "Declaration"
     , "type"      : "rotateL# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "template"  :
-"~RESULT <= std_logic_vector(rotate_left(unsigned(~ARG[1]),to_integer(~ARG[2]
+"~RESULT <= std_logic_vector(rotate_left(unsigned(~ARG[1]),to_integer((~ARG[2])
     -- pragma translate_off
     mod ~SIZE[~TYP[1]]
     -- pragma translate_on
@@ -607,7 +607,7 @@ end block;"
     , "kind"      : "Declaration"
     , "type"      : "rotateR# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "template"  :
-"~RESULT <= std_logic_vector(rotate_right(unsigned(~ARG[1]),to_integer(~ARG[2]
+"~RESULT <= std_logic_vector(rotate_right(unsigned(~ARG[1]),to_integer((~ARG[2])
     -- pragma translate_off
     mod ~SIZE[~TYP[1]]
     -- pragma translate_on
