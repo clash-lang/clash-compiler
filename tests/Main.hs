@@ -696,8 +696,78 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "BlockRamTest" def{hdlSim=False}
         , runTest "Compression" def
         , runTest "DelayedReset" def
-        , runTest "DualBlockRam0" def{verilate=SimOnly}
-        , runTest "DualBlockRam1" def{verilate=SimOnly}
+        , runTest "DualBlockRam" def
+          { clashFlags = ["-main-is", "testBench_WF_WF_AB"]
+          , buildTargets = BuildSpecific ["testBench_WF_WF_AB"]
+          , verilate=SimOnly}
+        , runTest "DualBlockRam" def
+          { clashFlags = ["-main-is", "testBench_WF_WF_BC"]
+          , buildTargets = BuildSpecific ["testBench_WF_WF_BC"]
+          , verilate=SimOnly}
+        , runTest "DualBlockRam" def
+          { clashFlags = ["-main-is", "testBench_WF_RF_AB"]
+          , buildTargets = BuildSpecific ["testBench_WF_RF_AB"]
+          , verilate=SimOnly}
+        , runTest "DualBlockRam" def
+          { clashFlags = ["-main-is", "testBench_WF_RF_BC"]
+          , buildTargets = BuildSpecific ["testBench_WF_RF_BC"]
+          , verilate=SimOnly}
+        , runTest "DualBlockRam" def
+          { clashFlags = ["-main-is", "testBench_WF_NC_AB"]
+          , buildTargets = BuildSpecific ["testBench_WF_NC_AB"]
+          , verilate=SimOnly}
+        , runTest "DualBlockRam" def
+          { clashFlags = ["-main-is", "testBench_WF_NC_BC"]
+          , buildTargets = BuildSpecific ["testBench_WF_NC_BC"]
+          , verilate=SimOnly}
+        , runTest "DualBlockRam" def
+          { clashFlags = ["-main-is", "testBench_RF_WF_AB"]
+          , buildTargets = BuildSpecific ["testBench_RF_WF_AB"]
+          , verilate=SimOnly}
+        , runTest "DualBlockRam" def
+          { clashFlags = ["-main-is", "testBench_RF_WF_BC"]
+          , buildTargets = BuildSpecific ["testBench_RF_WF_BC"]
+          , verilate=SimOnly}
+        , runTest "DualBlockRam" def
+          { clashFlags = ["-main-is", "testBench_RF_RF_AB"]
+          , buildTargets = BuildSpecific ["testBench_RF_RF_AB"]
+          , verilate=SimOnly}
+        , runTest "DualBlockRam" def
+          { clashFlags = ["-main-is", "testBench_RF_RF_BC"]
+          , buildTargets = BuildSpecific ["testBench_RF_RF_BC"]
+          , verilate=SimOnly}
+        , runTest "DualBlockRam" def
+          { clashFlags = ["-main-is", "testBench_RF_NC_AB"]
+          , buildTargets = BuildSpecific ["testBench_RF_NC_AB"]
+          , verilate=SimOnly}
+        , runTest "DualBlockRam" def
+          { clashFlags = ["-main-is", "testBench_RF_NC_BC"]
+          , buildTargets = BuildSpecific ["testBench_RF_NC_BC"]
+          , verilate=SimOnly}
+        , runTest "DualBlockRam" def
+          { clashFlags = ["-main-is", "testBench_NC_WF_AB"]
+          , buildTargets = BuildSpecific ["testBench_NC_WF_AB"]
+          , verilate=SimOnly}
+        , runTest "DualBlockRam" def
+          { clashFlags = ["-main-is", "testBench_NC_WF_BC"]
+          , buildTargets = BuildSpecific ["testBench_NC_WF_BC"]
+          , verilate=SimOnly}
+        , runTest "DualBlockRam" def
+          { clashFlags = ["-main-is", "testBench_NC_RF_AB"]
+          , buildTargets = BuildSpecific ["testBench_NC_RF_AB"]
+          , verilate=SimOnly}
+        , runTest "DualBlockRam" def
+          { clashFlags = ["-main-is", "testBench_NC_RF_BC"]
+          , buildTargets = BuildSpecific ["testBench_NC_RF_BC"]
+          , verilate=SimOnly}
+        , runTest "DualBlockRam" def
+          { clashFlags = ["-main-is", "testBench_NC_NC_AB"]
+          , buildTargets = BuildSpecific ["testBench_NC_NC_AB"]
+          , verilate=SimOnly}
+        , runTest "DualBlockRam" def
+          { clashFlags = ["-main-is", "testBench_NC_NC_BC"]
+          , buildTargets = BuildSpecific ["testBench_NC_NC_BC"]
+          , verilate=SimOnly}
         , let _opts = def { buildTargets=BuildSpecific ["example"]
                           , hdlSim=False
                           }

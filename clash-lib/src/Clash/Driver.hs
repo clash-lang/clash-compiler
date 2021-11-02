@@ -135,6 +135,7 @@ import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
 import qualified Clash.Primitives.Sized.Signed    as P
 import qualified Clash.Primitives.Sized.ToInteger as P
 import qualified Clash.Primitives.Sized.Vector    as P
+import qualified Clash.Primitives.TrueDualPortBlockRam as P
 import qualified Clash.Primitives.GHC.Int         as P
 import qualified Clash.Primitives.GHC.Word        as P
 import qualified Clash.Primitives.Intel.ClockGen  as P
@@ -585,6 +586,9 @@ knownBlackBoxFunctions =
     , ('P.unsignedToIntegerVerilog, P.unsignedToIntegerVerilog)
     , ('P.unsignedToIntegerVHDL, P.unsignedToIntegerVHDL)
     , ('P.wordTF, P.wordTF)
+    , ('P.trueDualPortBlockRamVerilog, P.trueDualPortBlockRamVerilog)
+    , ('P.trueDualPortBlockRamSystemVerilog, P.trueDualPortBlockRamSystemVerilog)
+    , ('P.trueDualPortBlockRamVHDL, P.trueDualPortBlockRamVHDL)
     ]
 
 -- | List of known TemplateFunctions used to prevent Hint from firing. This

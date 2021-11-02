@@ -265,6 +265,7 @@ Library
                       Clash.Primitives.Sized.Signed
                       Clash.Primitives.Sized.Vector
                       Clash.Primitives.Verification
+                      Clash.Primitives.TrueDualPortBlockRam
 
                       Clash.Rewrite.Combinators
                       Clash.Rewrite.Types

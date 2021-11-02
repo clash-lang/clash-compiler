@@ -33,8 +33,29 @@ common basic-config
   ghc-options: -Wall -Wcompat
 
   default-extensions:
+    BangPatterns
+    BinaryLiterals
+    DataKinds
+    DefaultSignatures
+    DeriveAnyClass
     DeriveDataTypeable
+    DeriveFoldable
+    DeriveFunctor
+    DeriveGeneric
+    DeriveLift
+    DeriveTraversable
+    DerivingStrategies
+    InstanceSigs
+    KindSignatures
+    MagicHash
+    NoStarIsType
     OverloadedStrings
+    ScopedTypeVariables
+    StandaloneDeriving
+    TupleSections
+    TypeApplications
+    TypeFamilies
+    TypeOperators
     ViewPatterns
 
   ghc-options:
@@ -48,6 +69,9 @@ common basic-config
     directory,
     filepath,
     ghc,
+    ghc-typelits-extra,
+    ghc-typelits-knownnat,
+    ghc-typelits-natnormalise,
     Glob,
     ieee754,
     neat-interpolation,
@@ -83,7 +107,8 @@ library
     -- Behaviour when loading modules can differ if the module is loaded from
     -- an external interface file. See
     -- https://github.com/clash-lang/clash-compiler/issues/1796 for an example.
-    shouldwork/LoadModules
+    shouldwork/LoadModules/Issues
+    shouldwork/LoadModules/BlockRam
 
   exposed-modules:
     Test.Tasty.Common
@@ -100,6 +125,9 @@ library
 
     -- From tests/shouldwork/LoadModules
     T1796
+    DualBlockRamTypes
+    DualBlockRamDefinitions
+    DualBlockRam
 
   build-depends:
     deepseq,

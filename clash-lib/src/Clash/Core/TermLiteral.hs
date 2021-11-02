@@ -9,7 +9,7 @@ Tools to convert a 'Term' into its "real" representation
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
-
+{-# LANGUAGE OverloadedStrings #-}
 --{-# OPTIONS_GHC -ddump-splices #-}
 
 module Clash.Core.TermLiteral
@@ -27,13 +27,16 @@ import           Data.Typeable                   (Typeable, typeRep)
 import           GHC.Natural
 import           GHC.Stack
 
-import           Clash.Core.Term                 (Term(Literal), collectArgs)
+import           Clash.Core.DataCon
+import           Clash.Core.Name
+import           Clash.Core.Term                 (Term(Data,Literal), collectArgs)
 import           Clash.Core.Literal
 import           Clash.Core.Pretty               (showPpr)
 import qualified Clash.Util.Interpolate          as I
 import qualified Clash.Verification.Internal     as Cv
 
 import           Clash.Core.TermLiteral.TH
+import           Clash.Explicit.BlockRam(WriteMode(..))
 
 -- | Tools to deal with literals encoded as a "Term".
 class Typeable a => TermLiteral a where
@@ -101,6 +104,15 @@ instance TermLiteral a => TermLiteral (Cv.Assertion' a) where
 
 instance TermLiteral a => TermLiteral (Cv.Property' a) where
   termToData = $(deriveTermToData ''Cv.Property')
+
+instance TermLiteral WriteMode where
+  termToData (Data dc) = case nameOcc (dcName dc) of
+    "Clash.Explicit.BlockRam.WriteFirst" -> Right WriteFirst
+    "Clash.Explicit.BlockRam.ReadFirst" -> Right ReadFirst
+    "Clash.Explicit.BlockRam.NoChange" -> Right NoChange
+    _         -> Left (Data dc)
+  termToData e = Left e
+  
 
 -- | Same as 'termToData', but returns printable error message if it couldn't
 -- translate a term.
