@@ -91,6 +91,8 @@ import           Clash.GHC.PartialEval.Primitive.Unsigned
 import           Clash.GHC.PartialEval.Primitive.Vector
 import           Clash.GHC.PartialEval.Primitive.Word
 
+import Clash.Core.Pretty -- TODO
+
 -- | Evaluate a term to WHNF.
 --
 eval :: (HasCallStack) => Term -> Eval Value
@@ -173,6 +175,7 @@ forceEvalWith tvs ids = \case
 
   value -> pure value
 
+-- TODO Make impredicative.
 forceArgs :: Args Value -> Eval (Args Value)
 forceArgs =
   let forceArg = bitraverse forceEval normTy
@@ -229,17 +232,23 @@ canInline value = do
   context <- getContext
   tcm <- getTyConMap
 
+  traceM ("canInline:\n" <> showPpr (unsafeAsTerm value))
+
   let vTy = valueType tcm value
   let isClass = isClassTy tcm vTy
+
+  traceM ("canInline.isClass: " <> show isClass)
 
   -- TODO Does Primitive need a different rule
   case context of
     CaseSubject -> do
       expandable <- expandableValue value
+      traceM ("canInline.expandable: " <> show expandable)
       pure (isClass || expandable)
 
     _ -> do
       workFree <- workFreeValue value
+      traceM ("canInline.workFree: " <> show workFree)
       pure (isClass || workFree)
  where
   valueType tcm = inferCoreTypeOf tcm . unsafeAsTerm
@@ -477,19 +486,8 @@ evalApp x y
   , dcArgs  <- fst $ splitFunForallTy (coreTypeOf dc)
   , numArgs <- length dcArgs
   = case compare (length args) numArgs of
-      -- The data constructor is under-applied, eta expand and evaluate the
-      -- result.
       LT -> etaExpand term >>= eval
-
-      -- The data constructor has all arguments given, and is a value.
-      EQ -> do
-        argThunks <- delayDataArgs dc args
-        env <- getLocalEnv
-
-        pure (VData dc argThunks env)
-
-      -- The data constructor is over-applied. This can only be an error in
-      -- the partial evaluator.
+      EQ -> VData dc <$> delayDataArgs dc args <*> getLocalEnv
       GT -> error "evalApp: Overapplied data constructor"
 
   | Prim pr <- f
@@ -604,7 +602,7 @@ evalCase term ty alts = do
       -- Case expressions with one non-absurd alternative which binds no
       -- pattern variables can be replaced with just the alternative RHS.
       [(p, v)]
-        | subsetFreeVars (mkVarSet $ patVars p) (unsafeAsTerm v) -> forceEval v
+        | disjointFreeVars (mkVarSet $ patVars p) (unsafeAsTerm v) -> forceEval v
 
       -- Other case expressions have to go through caseCon + tryTransformCase,
       -- no shortcuts can be taken in advance.
@@ -1055,12 +1053,19 @@ canApply :: Value -> Eval Bool
 canApply value = do
   tcm <- getTyConMap
 
+  traceM ("canApply:\n" <> showPpr (unsafeAsTerm value))
+
   let ty = valueType tcm value
       isClass = isClassTy tcm ty
       isFun = isPolyFunTy ty
 
+  traceM ("canApply.isClass: " <> show isClass)
+  traceM ("canApply.isFun: " <> show isFun)
+
   workFree <- workFreeValue value
+  traceM ("canApply.workFree: " <> show workFree)
   expandable <- expandableValue value
+  traceM ("canApply.expandable: " <> show expandable)
 
   pure (isClass || isFun || (workFree && expandable))
  where
