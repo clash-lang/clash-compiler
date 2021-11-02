@@ -32,9 +32,8 @@ topEntity ::
   ( KnownDomain domA
   , KnownDomain domB
   ) =>
-  -- Write Modes
-  WriteMode ->
-  WriteMode ->
+  -- Configuration
+  TDPConfig ->
 
   -- Clocks
   Clock  domA ->
@@ -155,4 +154,4 @@ inputWritesA clk rst = stimuliGenerator clk rst opsA
 inputWritesB clk rst = stimuliGenerator clk rst opsB
 
 topOut clkA clkB wmA wmB rstA rstB =
-  topEntity wmA wmB clkA clkB (inputWritesA clkA rstA ) (inputWritesB clkB rstB)
+  topEntity (tdpDefault{writeModeA = wmA, writeModeB = wmB}) clkA clkB (inputWritesA clkA rstA ) (inputWritesB clkB rstB)

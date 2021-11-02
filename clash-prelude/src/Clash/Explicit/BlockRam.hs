@@ -414,12 +414,14 @@ module Clash.Explicit.BlockRam
     -- $tdpbram
   , trueDualPortBlockRam
   , RamOp(..)
-  , WriteMode(..)
+  , WriteMode (..)
+  , TDPConfig(..)
     -- * Internal
   , blockRam#
   , blockRamU#
   , blockRam1#
   , trueDualPortBlockRam#
+  , tdpDefault
   )
 where
 
@@ -1148,6 +1150,17 @@ readNew clk rst en ram rdAddr wrM = mux wasSame wasWritten $ ram rdAddr wrM
           unbundle (register clk rst en (False, undefined)
                              (readNewT <$> rdAddr <*> wrM))
 
+data TDPConfig = TDPConfig {
+  writeModeA :: WriteMode,
+  writeModeB :: WriteMode
+  }
+
+tdpDefault :: TDPConfig
+tdpDefault = TDPConfig {
+  writeModeA = WriteFirst,
+  writeModeB = WriteFirst
+  }
+
 -- | Port operation
 data RamOp n a
   = RamRead (Index n)
@@ -1192,10 +1205,8 @@ trueDualPortBlockRam ::
   , KnownDomain domB
   , NFDataX a
   )
-  => WriteMode
-  -- ^ Write mode for port A
-  -> WriteMode
-  -- ^ Write mode for port B
+  => TDPConfig
+  -- ^ Configuration of the TDP Blockram
   -> Clock domA
   -- ^ Clock for port A
   -> Clock domB
@@ -1209,10 +1220,20 @@ trueDualPortBlockRam ::
   -- will be echoed. When reading, the read data is returned.
 
 {-# INLINE trueDualPortBlockRam #-}
-trueDualPortBlockRam = \wmA wmB clkA clkB opA opB ->
-  trueDualPortBlockRamWrapper wmA wmB
-    clkA (isOp <$> opA) (isRamWrite <$> opA) (ramOpAddr <$> opA) (fromJustX . ramOpWriteVal <$> opA)
-    clkB (isOp <$> opB) (isRamWrite <$> opB) (ramOpAddr <$> opB) (fromJustX . ramOpWriteVal <$> opB)
+trueDualPortBlockRam = \config clkA clkB opA opB ->
+  trueDualPortBlockRamWrapper
+    (writeModeA config)
+    (writeModeB config)
+    clkA
+    (isOp <$> opA)
+    (isRamWrite <$> opA)
+    (ramOpAddr <$> opA)
+    (fromJustX . ramOpWriteVal <$> opA)
+    clkB
+    (isOp <$> opB)
+    (isRamWrite <$> opB)
+    (ramOpAddr <$> opB)
+    (fromJustX . ramOpWriteVal <$> opB)
 
 toMaybeX :: a -> MaybeX a
 toMaybeX a =
@@ -1242,7 +1263,7 @@ data Conflict = Conflict
 -- multi-clock true dual-port block RAM. This wrapper pushes the primitive out
 -- into its own module / architecture.
 trueDualPortBlockRamWrapper wmA wmB clkA enA weA addrA datA clkB enB weB addrB datB =
-  trueDualPortBlockRam# wmA wmB clkA enA weA addrA datA clkB enB weB addrB datB
+ trueDualPortBlockRam# wmA wmB clkA enA weA addrA datA clkB enB weB addrB datB
 {-# NOINLINE trueDualPortBlockRamWrapper #-}
 
 -- | Primitive of 'trueDualPortBlockRam'.
@@ -1282,9 +1303,9 @@ trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
 
   -> (Signal domA a, Signal domB a)
   -- ^ Outputs data on /next/ cycle. If write enable is @True@, the data written
-  -- will be echoed. If write enable is @False@, the read data is returned. If
-  -- port enable is @False@, it is /undefined/.
-trueDualPortBlockRam# wmA wmB clkA enA weA addrA datA clkB enB weB addrB datB
+  -- will be echoed. If write enable is @False@, the read data is returned.
+trueDualPortBlockRam# wmA wmB clkA enA weA addrA datA
+ clkB enB weB addrB datB
   | snatToNum @Int (clockPeriod @domA) < snatToNum @Int (clockPeriod @domB)
   = swap (trueDualPortBlockRamModel labelB wmB clkB enB weB addrB datB labelA wmA clkA enA weA addrA datA)
   | otherwise
