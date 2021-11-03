@@ -28,6 +28,7 @@ import Clash.Core.VarEnv
 import Clash.Driver.Types
 import Clash.Netlist.BlackBox.Types (HdlSyn(Other))
 import Clash.Netlist.Types (PreserveCase(..))
+import Clash.Primitives.Types (CompiledPrimMap)
 
 import Clash.GHC.GenerateBindings
 import Clash.GHC.PartialEval
@@ -70,27 +71,27 @@ runToCoreStage
   => SBuildTarget target
   -> (ClashOpts -> ClashOpts)
   -> FilePath
-  -> IO (BindingMap, TyConMap, Supply)
+  -> IO (BindingMap, TyConMap, CompiledPrimMap, Supply)
 runToCoreStage target f src = do
   ids <- newSupply
   pds <- primDirs backend
-  (bm, tcm, _, _, _, _, _) <- generateBindings
+  (bm, tcm, _, _, primMap, _, _) <- generateBindings
     (return ()) Auto pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
 
-  return (bm, tcm, ids)
+  return (bm, tcm, primMap, ids)
  where
   backend = mkBackend target
   opts = f mkClashOpts
 
 findBinding
   :: OccName
-  -> (BindingMap, TyConMap, Supply)
+  -> (BindingMap, TyConMap, CompiledPrimMap, Supply)
   -> IO Term
-findBinding nm (bm, tcm, ids) =
+findBinding nm (bm, tcm, primMap, ids) =
   case List.find byName (eltsVarEnv bm) of
     Just bd ->
-      let env = mkGlobalEnv bm tcm ids 20 mempty 0
-       in fst <$> nf ghcEvaluator env emptyInScopeSet (bindingId bd) (bindingTerm bd)
+      let env = mkGlobalEnv bm primMap tcm ids 20 mempty 0
+       in fst <$> nf ghcEvaluator primMap env emptyInScopeSet (bindingId bd) (bindingTerm bd)
 
     Nothing -> error ("Not in binding map: " <> show nm)
  where

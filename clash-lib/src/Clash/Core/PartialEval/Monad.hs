@@ -12,6 +12,9 @@ evaluator see Clash.Core.PartialEval.
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Core.PartialEval.Monad
   ( -- * Partial Evaluation Monad
@@ -61,6 +64,8 @@ module Clash.Core.PartialEval.Monad
     -- * Work free check
   , workFreeValue
   , expandableValue
+    -- * Primitives info
+  , primUsedArguments
   ) where
 
 import           Control.Applicative (Alternative)
@@ -75,21 +80,32 @@ import           Control.Monad.Fail (MonadFail)
 import           Control.Monad.RWS.Strict (RWST, MonadReader, MonadState)
 import qualified Control.Monad.RWS.Strict as RWS
 import           Data.Bitraversable (bitraverse)
+import           Data.Either (rights)
+import qualified Data.HashMap.Lazy as HashMap (lookup)
 import qualified Data.IntMap.Strict as IntMap
+import           Data.List ((\\))
 import qualified Data.Map.Strict as Map
+import           Data.Text (Text)
+import qualified Data.Text.Extra as Text (showt)
 
+import           Clash.Annotations.BitRepresentation.Deriving (dontApplyInHDL)
+import qualified Clash.Sized.Vector as Vec (splitAt)
+
+import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.HasFreeVars
 import           Clash.Core.Name (OccName)
 import           Clash.Core.PartialEval.AsTerm
 import           Clash.Core.PartialEval.NormalForm
 import           Clash.Core.Subst
-import           Clash.Core.Term (Pat, PrimInfo)
+import           Clash.Core.Term (Pat, PrimInfo(..))
 import           Clash.Core.TyCon (TyConMap)
-import           Clash.Core.Type (Kind, KindOrType, Type, normalizeType)
+import           Clash.Core.Type (Kind, KindOrType, Type, normalizeType, splitFunForallTy)
 import           Clash.Core.Util (mkUniqSystemId, mkUniqSystemTyVar)
 import           Clash.Core.Var (Id, TyVar, Var(varType))
 import           Clash.Core.VarEnv
 import           Clash.Driver.Types (Binding(..))
+import           Clash.Netlist.BlackBox.Util (getUsedArguments)
+import           Clash.Primitives.Types (Primitive(..), UsedArguments(..))
 import           Clash.Rewrite.WorkFree
 
 {-
@@ -384,3 +400,41 @@ workFreeValue value = do
   let bindingTerms = fmap (fmap asTerm) bindingValues
 
   isWorkFree workFreeCache bindingTerms (asTerm value)
+
+-- Stolen from removeUnusedExpr in Clash.Normalize.Transformations.Letrec
+primUsedArguments :: PrimInfo -> Eval [Int]
+primUsedArguments pr = do
+  primMap <- RWS.asks lenvPrimitives
+
+  case HashMap.lookup (primName pr) primMap >>= extractPrim of
+    Just BlackBoxHaskell{usedArguments} ->
+      case usedArguments of
+        UsedArguments used ->
+          pure used
+
+        IgnoredArguments ignored ->
+          pure ([0 .. length args - 1] \\ ignored)
+
+    Just (BlackBox pNm _ _ _ _ _ _ _ _ _ inc r ri templ)
+      | isFromInt pNm -> pure [0..2]
+      | primName pr `elem` [Text.showt 'dontApplyInHDL, Text.showt 'Vec.splitAt] -> pure [0,1]
+      | otherwise -> pure $ concat
+          [ concatMap getUsedArguments r
+          , concatMap getUsedArguments ri
+          , getUsedArguments templ
+          , concatMap (getUsedArguments . snd) inc
+          ]
+
+    _ ->
+      -- Assume all arguments are used if we don't know any better.
+      pure [0..]
+ where
+  args = rights . fst $ splitFunForallTy (primType pr)
+
+-- Stolen from Clash.Rewrite.Util to prevent import loop
+isFromInt :: Text -> Bool
+isFromInt nm = nm == "Clash.Sized.Internal.BitVector.fromInteger##" ||
+               nm == "Clash.Sized.Internal.BitVector.fromInteger#" ||
+               nm == "Clash.Sized.Internal.Index.fromInteger#" ||
+               nm == "Clash.Sized.Internal.Signed.fromInteger#" ||
+               nm == "Clash.Sized.Internal.Unsigned.fromInteger#"

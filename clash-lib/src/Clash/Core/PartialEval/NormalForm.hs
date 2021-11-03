@@ -46,6 +46,7 @@ import Clash.Core.Util (undefinedPrims)
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (VarEnv, InScopeSet)
 import Clash.Driver.Types (Binding(..))
+import Clash.Primitives.Types (CompiledPrimMap)
 
 -- | An argument applied to a function / data constructor / primitive.
 --
@@ -176,6 +177,10 @@ data LocalEnv = LocalEnv
     -- ^ The amount of fuel left in the local environment when the previous
     -- head was reached. This is needed so resuming evaluation does not lead
     -- to additional fuel being available.
+  , lenvPrimitives :: CompiledPrimMap
+    -- ^ The map of primitives which are known by Clash. This is used when
+    -- removing arguments to primitives which are unused to prevent the
+    -- evaluator from being forced to evaluate them to NF.
   }
 
 instance Show LocalEnv where

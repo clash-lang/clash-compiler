@@ -22,6 +22,7 @@ import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv
 import Clash.Driver.Types (Binding(..), BindingMap)
+import Clash.Primitives.Types (CompiledPrimMap)
 
 -- | An evaluator for Clash core. This consists of two functions: one to
 -- evaluate a term to weak-head normal form (WHNF) and another to recursively
@@ -39,6 +40,8 @@ data Evaluator = Evaluator
 whnf
   :: Evaluator
   -- ^ The evaluator implementation to use.
+  -> CompiledPrimMap
+  -- ^ The primitives known by Clash.
   -> GlobalEnv
   -- ^ The initial global environment.
   -> InScopeSet
@@ -49,8 +52,8 @@ whnf
   -- ^ The term under evaluation.
   -> IO (Term, GlobalEnv)
   -- ^ The term evalated to WHNF, and the final global environment.
-whnf eval gEnv inScope i x =
-  let lEnv = LocalEnv i mempty mempty inScope (genvFuel gEnv)
+whnf eval primMap gEnv inScope i x =
+  let lEnv = LocalEnv i mempty mempty inScope (genvFuel gEnv) primMap
    in runEval gEnv lEnv (asTerm <$> evalWhnf eval x)
 
 -- | Evaluate a term to NF, converting the result back to a Term.
@@ -59,6 +62,8 @@ whnf eval gEnv inScope i x =
 nf
   :: Evaluator
   -- ^ The evaluator implementation to use.
+  -> CompiledPrimMap
+  -- ^ The primitives known by Clash.
   -> GlobalEnv
   -- ^ The initial global environment.
   -> InScopeSet
@@ -69,13 +74,15 @@ nf
   -- ^ The term under evaluation.
   -> IO (Term, GlobalEnv)
   -- ^ The term evalated to NF, and the final global environment.
-nf eval gEnv inScope i x =
-  let lEnv = LocalEnv i mempty mempty inScope (genvFuel gEnv)
+nf eval primMap gEnv inScope i x =
+  let lEnv = LocalEnv i mempty mempty inScope (genvFuel gEnv) primMap
    in runEval gEnv lEnv (asTerm <$> (evalWhnf eval x >>= quoteNf eval))
 
 mkGlobalEnv
   :: BindingMap
   -- ^ Global bindings available to the evaluator.
+  -> CompiledPrimMap
+  -- ^ The primitives known by Clash.
   -> TyConMap
   -- ^ The type constructors known by Clash.
   -> Supply
@@ -87,8 +94,8 @@ mkGlobalEnv
   -> Int
   -- ^ The address of the next heap element.
   -> GlobalEnv
-mkGlobalEnv bm tcm ids fuel heap addr =
+mkGlobalEnv bm primMap tcm ids fuel heap addr =
   GlobalEnv (fmap asThunk bm) tcm ids fuel heap addr Normal mempty
  where
   asThunk b@Binding{bindingId=i,bindingTerm=t} =
-    b { bindingTerm = VThunk t (LocalEnv i mempty mempty emptyInScopeSet fuel) }
+    b { bindingTerm = VThunk t (LocalEnv i mempty mempty emptyInScopeSet fuel primMap) }

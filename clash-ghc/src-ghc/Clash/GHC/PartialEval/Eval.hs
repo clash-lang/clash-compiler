@@ -60,13 +60,14 @@ import           Clash.Core.PartialEval.Monad
 import           Clash.Core.PartialEval.NormalForm
 import           Clash.Core.Subst (deShadowAlt, deShadowTerm)
 import           Clash.Core.Term
+import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type
 import qualified Clash.Core.Util as Util
 import           Clash.Core.Var
 import           Clash.Core.VarEnv
 import           Clash.Debug (debugIsOn, traceM)
 import           Clash.Driver.Types (Binding(..), IsPrim(..))
-import qualified Clash.Normalize.Primitives as NP (undefined)
+import qualified Clash.Normalize.Primitives as NP
 
 import           Clash.GHC.PartialEval.Primitive.Bit
 import           Clash.GHC.PartialEval.Primitive.BitPack
@@ -326,6 +327,17 @@ evalPrim pr
   | otherwise =
       etaExpand (Prim pr) >>= eval
 
+removeUnusedArgs :: TyConMap -> [Int] -> Args Value -> Eval (Args Value)
+removeUnusedArgs tcm used = go 0
+ where
+  go _ [] = pure []
+  go i (arg@Right{} : args) = fmap (arg :) (go i args)
+  go i (arg@(Left x) : args)
+    | i `notElem` used = do
+        ty <- normTy $ inferCoreTypeOf tcm (unsafeAsTerm x)
+        fmap (Left (VNeutral (NePrim NP.removedArg [Right ty])) :) (go (i + 1) args)
+    | otherwise = fmap (arg :) (go (i + 1) args)
+
 -- | Evaluate a primitive with the given arguments.
 -- See NOTE [Evaluating primitives] for more information.
 --
@@ -333,9 +345,13 @@ evalPrimitive :: PrimInfo -> Args Value -> Eval Value
 evalPrimitive pr args = do
   ty <- resultType pr args
 
+  tcm <- getTyConMap
+  used <- primUsedArguments pr
+  filteredArgs <- removeUnusedArgs tcm used args
+
   case HashMap.lookup (primName pr) primitives of
     Just f ->
-      f pr args `catches`
+      f pr filteredArgs `catches`
         [ -- Catch an Eval specific error and attempt to correct it.
           -- TODO This should print warnings if Clash is built with +debug
           Handler $ \(e :: EvalException) ->
@@ -346,20 +362,20 @@ evalPrimitive pr args = do
               UnexpectedArgs pr' args' -> do
                 when debugIsOn $
                   let failed  = show (primName pr') <> " with args:\n" <> show args'
-                      context = show (primName pr) <> " with args:\n" <> show args
+                      context = show (primName pr) <> " with args:\n" <> show filteredArgs
                    in traceM ("evalPrimitive: Unexpected arguments while evaluating " <> failed <> " from " <> context)
 
-                forcedArgs <- forceArgs args
+                forcedArgs <- forceArgs filteredArgs
                 pure (VNeutral (NePrim pr forcedArgs))
 
               _ -> do
-                forcedArgs <- forceArgs args
+                forcedArgs <- forceArgs filteredArgs
                 pure (VNeutral (NePrim pr forcedArgs))
 
           -- The Alternative / MonadPlus instance for IO throws an IOException
           -- on empty / mzero. Catch this and return a neutral primitive.
         , Handler $ \(_ :: IOException) -> do
-            forcedArgs <- forceArgs args
+            forcedArgs <- forceArgs filteredArgs
             pure (VNeutral (NePrim pr forcedArgs))
         ]
 
@@ -371,7 +387,7 @@ evalPrimitive pr args = do
 
         traceM ("evalPrimitive: " <> show (primName pr) <> ": no implementation, " <> hasUnfolding)
 
-      forcedArgs <- forceArgs args
+      forcedArgs <- forceArgs filteredArgs
       pure (VNeutral (NePrim pr forcedArgs))
  where
   primitives = HashMap.unions

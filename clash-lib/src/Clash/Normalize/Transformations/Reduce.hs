@@ -43,7 +43,7 @@ import Clash.Core.Type (TypeView(..), mkTyConApp, tyView)
 import Clash.Core.Util (mkVec, shouldSplit, tyNatSize)
 import Clash.Normalize.PrimitiveReductions
 import Clash.Normalize.Primitives (removedArg)
-import Clash.Normalize.Types (NormRewrite, NormalizeSession, normalizeUltra)
+import Clash.Normalize.Types (NormRewrite, NormalizeSession, normalizeUltra, primitives)
 import Clash.Normalize.Util (shouldReduce)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (changed, isUntranslatableType, setChanged, whnfRW)
@@ -55,16 +55,17 @@ partialEval (TransformContext is0 _) e = do
   fun <- Lens.use curFun
   ids <- Lens.use uniqSupply
   bndrs <- Lens.use bindings
+  primMap <- Lens.use (extra.primitives)
   tcm <- Lens.view tcCache
   fuel <- Lens.view fuelLimit
   eval <- Lens.view peEvaluator
 
   let (ids1, ids2) = splitSupply ids
-  let genv = mkGlobalEnv bndrs tcm ids1 fuel mempty addr
+  let genv = mkGlobalEnv bndrs primMap tcm ids1 fuel mempty addr
 
   uniqSupply Lens..= ids2
 
-  case unsafePerformIO (nf eval genv is0 (fst fun) e) of
+  case unsafePerformIO (nf eval primMap genv is0 (fst fun) e) of
     (!e', !genv') -> do
       let tmHeap = fmap asTerm (genvHeap genv')
 
