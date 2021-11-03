@@ -15,13 +15,13 @@ module Clash.Prelude.Synchronizer
   , asyncFIFOSynchronizer
   ) where
 
-import qualified Clash.Explicit.Synchronizer as E
+import           Clash.Class.BitPack         (BitPack)
 import           Clash.Promoted.Nat          (SNat)
 import           Clash.Signal
   (HiddenClockResetEnable, HiddenClock, Signal, hasClock, hasReset, hasEnable)
 import           Clash.XException            (NFDataX)
 import           GHC.TypeLits                (type (<=))
-
+import qualified Clash.Explicit.Synchronizer as E
 -- | Synchronizer based on two sequentially connected flip-flops.
 --
 --  * __NB__: This synchronizer can be used for __bit__-synchronization.
@@ -67,7 +67,8 @@ asyncFIFOSynchronizer
   :: ( HiddenClockResetEnable rdom
      , HiddenClockResetEnable wdom
      , 2 <= addrSize
-     , NFDataX a )
+     , NFDataX a
+     , BitPack a)
   => SNat addrSize
   -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
   -- elements.

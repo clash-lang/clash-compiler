@@ -34,7 +34,7 @@ import Data.Constraint.Nat         (leTrans)
 import Data.Maybe                  (isJust)
 import GHC.TypeLits                (type (+), type (-), type (<=), type (^), KnownNat)
 
-import Clash.Class.BitPack         (boolToBV, unpack)
+import Clash.Class.BitPack         (boolToBV, unpack, BitPack)
 import Clash.Class.Resize          (truncateB)
 import Clash.Class.BitPack.BitIndex (slice)
 import Clash.Explicit.Mealy        (mealyB)
@@ -103,7 +103,8 @@ fifoMem
      , KnownDomain rdom
      , NFDataX a
      , KnownNat addrSize
-     , 1 <= addrSize )
+     , 1 <= addrSize
+     , BitPack a)
   => Clock wdom
   -> Clock rdom
   -> Enable wdom
@@ -115,15 +116,13 @@ fifoMem
   -> Signal rdom a
 fifoMem wclk rclk wen ren full raddr waddr wdataM =
   fst $ trueDualPortBlockRam tdpDefault
-    rclk wclk portA portB
+    rclk wclk ren wen portA portB
  where
 
    portA :: Signal rdom (RamOp (2 ^ addrSize) a)
-   portA = mux (fromEnable ren)
-               (RamRead . unpack <$> raddr)
-               (pure RamNoOp)
+   portA = RamRead . unpack <$> raddr
    portB :: Signal wdom (RamOp (2 ^ addrSize) a)
-   portB = mux (fromEnable wen .&&. fmap not full .&&. fmap isJust wdataM)
+   portB = mux (fmap not full .&&. fmap isJust wdataM)
                (RamWrite <$> fmap unpack waddr <*> fmap fromJustX wdataM)
                (pure RamNoOp)
 
@@ -208,7 +207,8 @@ asyncFIFOSynchronizer
   :: ( KnownDomain wdom
      , KnownDomain rdom
      , 2 <= addrSize
-     , NFDataX a )
+     , NFDataX a
+     , BitPack a)
   => SNat addrSize
   -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
   -- elements.

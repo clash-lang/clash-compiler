@@ -56,15 +56,15 @@ strictAnd !a !b = (&&) a b
 
 
 {- Testvectors
-Setup 0 - 2: Setup cycles
-Test0 3 - 22: Write to different addresses and check if value is present at output.
-Test1 23 -42: Read stored values written by A from A, same for B.
-Test2 43 - 62: Read stored values written by B from A, same for B.
-Test3 63 - 82: Conflict R R - No problem
-Test4 83 - 102: Conflict W R - (Value, undefined)
-Test5 103 - 122: Conflict R W - (undefined, value)
-Test6 123 - 142: Conflict W W - (undefined, undefined)
-Test7 143 - 162: Multiple writes to same address with different values
+Setup : Setup cycles
+Test0 : Write to different addresses and check if value is present at output.
+Test1 : Read stored values written by A from A, same for B.
+Test2 : Read stored values written by B from A, same for B.
+Test3 : Conflict R R - No problem
+Test4 : Conflict W R - (Value, undefined)
+Test5 : Conflict R W - (undefined, value)
+Test6 : Conflict W W - (undefined, undefined)
+Test7 : Multiple writes to same address with different values
 Test8 : W N
 Test9 : N W
 Test10 : R N
@@ -137,8 +137,8 @@ opsA11 = twice (RamRead 11 :> Nil) ++ replicate d20 RamNoOp
 opsB11 = RamRead 11 :> (fmap RamRead addrsB)
 
 -- Test12
-opsA12 = twice (RamRead 12 :> Nil) ++ (replicate d20 RamNoOp)
-opsB12 = RamRead 12 :> (replicate d10 RamNoOp)
+opsA12 = twice (RamRead 1 :> Nil) ++ (fmap RamRead addrsA)
+opsB12 = RamRead 1 :>  (fmap RamRead addrsB)
 
 --All operations
 opsA = (RamNoOp :> opsA0) ++ opsA1 ++ opsA2 ++ opsA3 ++ opsA4 ++ opsA5 ++ opsA6

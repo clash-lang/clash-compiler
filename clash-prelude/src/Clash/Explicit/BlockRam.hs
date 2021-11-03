@@ -446,8 +446,10 @@ import           Unsafe.Coerce          (unsafeCoerce)
 
 import           Clash.Annotations.Primitive
   (hasBlackBox)
+import           Clash.Class.BitPack.Internal (unpack, BitPack)
 import           Clash.Class.Num        (SaturationMode(SatBound), satSucc)
-import           Clash.Explicit.Signal  (KnownDomain, Enable, register, fromEnable)
+import           Clash.Explicit.Signal
+  (KnownDomain, Enable, register, fromEnable, toEnable, unsafeToHighPolarity)
 import           Clash.Signal.Internal
   (Clock(..), Reset, Signal (..), invertReset, (.&&.), mux)
 import           Clash.Promoted.Nat     (SNat(..), snatToNum, natToNum)
@@ -1204,6 +1206,7 @@ trueDualPortBlockRam ::
   , KnownDomain domA
   , KnownDomain domB
   , NFDataX a
+  , BitPack a
   )
   => TDPConfig
   -- ^ Configuration of the TDP Blockram
@@ -1211,6 +1214,10 @@ trueDualPortBlockRam ::
   -- ^ Clock for port A
   -> Clock domB
   -- ^ Clock for port B
+  -> Enable domA
+  -- ^ Enable for port A
+  -> Enable domB
+  -- ^ Enable for port B
   -> Signal domA (RamOp nAddrs a)
   -- ^ RAM operation for port A
   -> Signal domB (RamOp nAddrs a)
@@ -1220,17 +1227,17 @@ trueDualPortBlockRam ::
   -- will be echoed. When reading, the read data is returned.
 
 {-# INLINE trueDualPortBlockRam #-}
-trueDualPortBlockRam = \config clkA clkB opA opB ->
+trueDualPortBlockRam = \config clkA clkB enA enB opA opB ->
   trueDualPortBlockRamWrapper
     (writeModeA config)
     (writeModeB config)
     clkA
-    (isOp <$> opA)
+    (toEnable $ (\en op -> en && (isOp op)) <$> (fromEnable enA) <*> opA)
     (isRamWrite <$> opA)
     (ramOpAddr <$> opA)
     (fromJustX . ramOpWriteVal <$> opA)
     clkB
-    (isOp <$> opB)
+    (toEnable $ (\en op -> en && (isOp op)) <$> (fromEnable enB) <*> opB)
     (isRamWrite <$> opB)
     (ramOpAddr <$> opB)
     (fromJustX . ramOpWriteVal <$> opB)
@@ -1274,6 +1281,7 @@ trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
   , KnownDomain domA
   , KnownDomain domB
   , NFDataX a
+  , BitPack a
   )
   => WriteMode
   -- ^ Write mode for port A
@@ -1281,7 +1289,7 @@ trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
   -- ^ Write mode for port B
   -> Clock domA
   -- ^ Clock for port A
-  -> Signal domA Bool
+  -> Enable domA
   -- ^ Enable for port A
   -> Signal domA Bool
   -- ^ Write enable for port A
@@ -1292,7 +1300,7 @@ trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
 
   -> Clock domB
   -- ^ Clock for port B
-  -> Signal domB Bool
+  -> Enable domB
   -- ^ Enable for port B
   -> Signal domB Bool
   -- ^ Write enable for port B
@@ -1328,12 +1336,13 @@ trueDualPortBlockRamModel ::
   , KnownDomain domSlow
   , KnownDomain domFast
   , NFDataX a
+  , BitPack a
   ) =>
 
   String ->
   WriteMode ->
   Clock domSlow ->
-  Signal domSlow Bool ->
+  Enable domSlow ->
   Signal domSlow Bool ->
   Signal domSlow (Index nAddrs) ->
   Signal domSlow a ->
@@ -1341,7 +1350,7 @@ trueDualPortBlockRamModel ::
   String ->
   WriteMode ->
   Clock domFast ->
-  Signal domFast Bool ->
+  Enable domFast ->
   Signal domFast Bool ->
   Signal domFast (Index nAddrs) ->
   Signal domFast a ->
@@ -1364,8 +1373,8 @@ trueDualPortBlockRamModel labelSlow wmSlow !_clkSlow enSlow weSlow addrSlow datS
       tFast -- ensure 'go' hits fast clock first for 1 cycle, then execute slow
          -- clock for 1 cycle, followed by the regular cadence of 'ceil(tA / tB)'
          -- cycles for the fast clock followed by 1 cycle of the slow clock
-      (bundle (enSlow, weSlow, fromIntegral <$> addrSlow, datSlow))
-      (bundle (enFast, weFast, fromIntegral <$> addrFast, datFast))
+      (bundle (fromEnable enSlow, weSlow, fromIntegral <$> addrSlow, datSlow))
+      (bundle (fromEnable enFast, weFast, fromIntegral <$> addrFast, datFast))
       startSlow startFast
 
   tSlow = snatToNum @Int (clockPeriod @domSlow)
@@ -1437,7 +1446,7 @@ trueDualPortBlockRamModel labelSlow wmSlow !_clkSlow enSlow weSlow addrSlow datS
     enableUndefined = isX enable
     addrUndefined = isX addr
 
-  go ::
+  go :: (BitPack a) =>
     Seq a ->
     Int ->
     Signal domSlow (Bool, Bool, Int, a) ->
