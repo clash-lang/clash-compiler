@@ -98,6 +98,7 @@ import Clash.Core.Pretty -- TODO
 eval :: (HasCallStack) => Term -> Eval Value
 eval ticked = do
   let (term, ticks) = collectTicks ticked
+  -- traceM ("eval.term:\n" <> showPpr term)
 
   case term of
     Var i -> do
@@ -203,7 +204,7 @@ applications can be performed without needing to create a workArg binding.
 delayEval :: Term -> Eval Value
 delayEval term =
   case fst (collectArgs term) of
-    Prim{} -> eval term
+--  Prim{} -> eval term
     _ -> VThunk term <$> getLocalEnv
 
 delayArgs :: Args Term -> Eval (Args Value)
@@ -232,24 +233,29 @@ canInline value = do
   context <- getContext
   tcm <- getTyConMap
 
-  traceM ("canInline:\n" <> showPpr (unsafeAsTerm value))
+  -- traceM ("canInline.value:\n" <> showPpr (unsafeAsTerm value))
 
   let vTy = valueType tcm value
   let isClass = isClassTy tcm vTy
+  let isFun = isPolyFunTy vTy
 
-  traceM ("canInline.isClass: " <> show isClass)
+  -- traceM ("canInline.isClass: " <> show isClass)
 
   -- TODO Does Primitive need a different rule
   case context of
     CaseSubject -> do
       expandable <- expandableValue value
-      traceM ("canInline.expandable: " <> show expandable)
-      pure (isClass || expandable)
+      let result = isClass || isFun || expandable
+
+      -- traceM ("canInline: (isClass: " <> show isClass <> ", isFun: " <> show isFun <> ", expandable: " <> show expandable <> "): " <> show result)
+      pure result
 
     _ -> do
       workFree <- workFreeValue value
-      traceM ("canInline.workFree: " <> show workFree)
-      pure (isClass || workFree)
+      let result = isClass || isFun || workFree
+
+      -- traceM ("canInline: (isClass: " <> show isClass <> ", isFun: " <> show isFun <> ", workFree: " <> show workFree <> "): " <> show result)
+      pure result
  where
   valueType tcm = inferCoreTypeOf tcm . unsafeAsTerm
 
@@ -461,6 +467,10 @@ evalTyLam i x = do
 -- contain any existential type arguments that preceed them in the list of
 -- arguments. This is not a problem for primitives in practice as there are
 -- no primitives which are both impredicative and don't evaluate to undefined.
+--
+-- TODO forceArgs should be impredicative like this, delayDataArgs should be
+-- changed to evalDataArgs which delays lazy arguments and forces strict
+-- arguments.
 --
 delayDataArgs :: DataCon -> Args Term -> Eval (Args Value)
 delayDataArgs dc = go (dcUnivTyVars dc <> dcExtTyVars dc)
@@ -1053,21 +1063,19 @@ canApply :: Value -> Eval Bool
 canApply value = do
   tcm <- getTyConMap
 
-  traceM ("canApply:\n" <> showPpr (unsafeAsTerm value))
+  -- traceM ("canApply.value:\n" <> showPpr (unsafeAsTerm value))
 
   let ty = valueType tcm value
       isClass = isClassTy tcm ty
       isFun = isPolyFunTy ty
 
-  traceM ("canApply.isClass: " <> show isClass)
-  traceM ("canApply.isFun: " <> show isFun)
 
   workFree <- workFreeValue value
-  traceM ("canApply.workFree: " <> show workFree)
   expandable <- expandableValue value
-  traceM ("canApply.expandable: " <> show expandable)
+  let result = isClass || isFun || (workFree && expandable)
 
-  pure (isClass || isFun || (workFree && expandable))
+  -- traceM ("canApply: (isClass: " <> show isClass <> ", isFun: " <> show isFun <> ", workFree: " <> show workFree <> ", expandable: " <> show expandable <> "): " <> show result)
+  pure result
  where
   valueType tcm = inferCoreTypeOf tcm . unsafeAsTerm
 

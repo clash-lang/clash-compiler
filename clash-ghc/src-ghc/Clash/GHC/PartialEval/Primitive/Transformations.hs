@@ -38,6 +38,7 @@ transformationsPrims = HashMap.fromList
   , ("Clash.Explicit.Testbench.assertBitVector", liftId)
   , ("Clash.Explicit.Testbench.tbClockGen", liftId)
   , ("Clash.Explicit.Testbench.tbEnableGen", liftId)
+  , ("Clash.Explicit.Testbench.unsafeSimSynchronizer", liftId)
   , ("Clash.Explicit.Verification.check", liftId)
   , ("Clash.Intel.ClockGen.altpll", liftId)
   , ("Clash.Prelude.ROM.asyncRom#", liftId)
