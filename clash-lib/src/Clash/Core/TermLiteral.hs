@@ -112,7 +112,7 @@ instance TermLiteral WriteMode where
     "Clash.Explicit.BlockRam.NoChange" -> Right NoChange
     _         -> Left (Data dc)
   termToData e = Left e
-  
+
 
 -- | Same as 'termToData', but returns printable error message if it couldn't
 -- translate a term.
