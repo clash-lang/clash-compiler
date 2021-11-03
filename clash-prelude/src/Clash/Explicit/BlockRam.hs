@@ -1281,7 +1281,6 @@ trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
   , KnownDomain domA
   , KnownDomain domB
   , NFDataX a
-  , BitPack a
   )
   => WriteMode
   -- ^ Write mode for port A
@@ -1336,7 +1335,6 @@ trueDualPortBlockRamModel ::
   , KnownDomain domSlow
   , KnownDomain domFast
   , NFDataX a
-  , BitPack a
   ) =>
 
   String ->
@@ -1446,7 +1444,7 @@ trueDualPortBlockRamModel labelSlow wmSlow !_clkSlow enSlow weSlow addrSlow datS
     enableUndefined = isX enable
     addrUndefined = isX addr
 
-  go :: (BitPack a) =>
+  go ::
     Seq a ->
     Int ->
     Signal domSlow (Bool, Bool, Int, a) ->

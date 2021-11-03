@@ -38,7 +38,8 @@ topEntity ::
   -- Clocks
   Clock  domA ->
   Clock  domB ->
-
+  Enable domA ->
+  Enable domB ->
   --Operations
   Signal domA (RamOp 30 ThisOrThat) ->
   Signal domB (RamOp 30 ThisOrThat) ->
@@ -48,7 +49,6 @@ topEntity ::
   , Signal domB ThisOrThat )
 
 topEntity = trueDualPortBlockRam
-
 {-#NOINLINE topEntity #-}
 
 twice = concatMap (replicate d2)
@@ -154,4 +154,4 @@ inputWritesA clk rst = stimuliGenerator clk rst opsA
 inputWritesB clk rst = stimuliGenerator clk rst opsB
 
 topOut clkA clkB wmA wmB rstA rstB =
-  topEntity (tdpDefault{writeModeA = wmA, writeModeB = wmB}) clkA clkB (inputWritesA clkA rstA ) (inputWritesB clkB rstB)
+  topEntity (tdpDefault{writeModeA = wmA, writeModeB = wmB}) clkA clkB enableGen enableGen (inputWritesA clkA rstA ) (inputWritesB clkB rstB)
