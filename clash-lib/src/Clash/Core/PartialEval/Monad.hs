@@ -29,8 +29,6 @@ module Clash.Core.PartialEval.Monad
   , getGlobalEnv
   , modifyGlobalEnv
     -- * Evaluation Context
-  , getContext
-  , withContext
   , getTarget
   , withTarget
     -- * Local Type Bindings
@@ -61,9 +59,6 @@ module Clash.Core.PartialEval.Monad
     -- * Fresh Variable Generation
   , getUniqueId
   , getUniqueTyVar
-    -- * Work free check
-  , workFreeValue
-  , expandableValue
     -- * Primitives info
   , primUsedArguments
   ) where
@@ -106,7 +101,6 @@ import           Clash.Core.VarEnv
 import           Clash.Driver.Types (Binding(..))
 import           Clash.Netlist.BlackBox.Util (getUsedArguments)
 import           Clash.Primitives.Types (Primitive(..), UsedArguments(..))
-import           Clash.Rewrite.WorkFree
 
 {-
 NOTE [RWS monad]
@@ -319,19 +313,6 @@ setRef addr val = modifyGlobalEnv go
     | otherwise =
         env { genvHeap = IntMap.insert addr val heap }
 
-getContext :: Eval EvalContext
-getContext = genvContext <$> getGlobalEnv
-
-withContext :: EvalContext -> Eval a -> Eval a
-withContext context action = do
-  old <- getContext
-  modifyGlobalEnv (setContext context)
-  result <- action
-  modifyGlobalEnv (setContext old)
-  pure result
- where
-  setContext x env = env { genvContext = x }
-
 getFuel :: Eval Word
 getFuel = do
   lenv <- getLocalEnv
@@ -386,20 +367,6 @@ getUniqueVar f name ty = do
  where
   go ids env =
     env { genvSupply = ids }
-
-expandableValue :: Value -> Eval Bool
-expandableValue value = do
-  bindingValues <- fmap genvBindings getGlobalEnv
-  let bindingTerms = fmap (fmap asTerm) bindingValues
-
-  isExpandable workFreeCache bindingTerms (asTerm value)
-
-workFreeValue :: Value -> Eval Bool
-workFreeValue value = do
-  bindingValues <- fmap genvBindings getGlobalEnv
-  let bindingTerms = fmap (fmap asTerm) bindingValues
-
-  isWorkFree workFreeCache bindingTerms (asTerm value)
 
 -- Stolen from removeUnusedExpr in Clash.Normalize.Transformations.Letrec
 primUsedArguments :: PrimInfo -> Eval [Int]

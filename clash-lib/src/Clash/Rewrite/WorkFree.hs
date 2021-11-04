@@ -19,14 +19,12 @@ module Clash.Rewrite.WorkFree
   , isWorkFreeIsh
   , isConstant
   , isConstantNotClockReset
-  , isExpandable
   ) where
 
 import Control.Lens (Lens')
 import Control.Monad.Extra (allM, andM, eitherM)
 import Control.Monad.State.Class (MonadState)
 import qualified Data.Text.Extra as Text
-import Data.Either (lefts)
 import GHC.Stack (HasCallStack)
 
 import Clash.Core.HasFreeVars
@@ -198,49 +196,3 @@ isWorkFreeIsh tcm e =
  where
   isWorkFreeIshArg = either (isWorkFreeIsh tcm) (const True)
   isConstantArg    = either isConstant (const True)
-
--- | An expression is expandable if it can be duplicated when evaluating the
--- subject of a case expression. The only expressions considered to be
--- expandable are those which could lead to case-of-constructor being applied.
---
--- Work free terms are always expandable.
---
-isExpandable
-  :: forall s m
-   . (HasCallStack, MonadState s m)
-  => Lens' s (VarEnv Bool)
-  -> BindingMap
-  -> Term
-  -> m Bool
-isExpandable cache bndrs term = do
-  workFree <- isWorkFree cache bndrs term
-  if workFree then pure True else pure (go emptyVarSet term)
- where
-  goArgs seen = all (go seen) . lefts
-
-  go seen (collectArgs -> (f, args)) =
-    case f of
-      Var i
-        | isLocalId i -> goArgs seen args
-        | i `elemVarSet` seen -> False
-        | otherwise ->
-            let seen' = seen `unionVarSet` unitVarSet i
-                bndr  = lookupVarEnv i bndrs
-             in maybe False (go seen' . bindingTerm) bndr && goArgs seen' args
-
-      Data _ -> goArgs seen args
-      Literal _ -> True
-      Prim pr
-        | primName pr `elem` undefinedPrims -> True
-        | otherwise ->
-            case primWorkInfo pr of
-              WorkNever -> goArgs seen args
-              WorkIdentity _ _ -> goArgs seen args
-              WorkConstant -> goArgs seen args
-              WorkVariable -> goArgs seen args
-              WorkAlways -> False
-
-      Lam _ x -> go seen x && goArgs seen args
-      TyLam _ x -> go seen x && goArgs seen args
-      Tick _ x -> go seen x && goArgs seen args
-      _ -> False

@@ -60,6 +60,7 @@ import           Clash.Core.PartialEval.Monad
 import           Clash.Core.PartialEval.NormalForm
 import           Clash.Core.Subst (deShadowAlt, deShadowTerm)
 import           Clash.Core.Term
+import           Clash.Core.TermInfo (isLocalVar)
 import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type
 import qualified Clash.Core.Util as Util
@@ -203,10 +204,7 @@ applications can be performed without needing to create a workArg binding.
 -}
 
 delayEval :: Term -> Eval Value
-delayEval term =
-  case fst (collectArgs term) of
---  Prim{} -> eval term
-    _ -> VThunk term <$> getLocalEnv
+delayEval term = VThunk term <$> getLocalEnv
 
 delayArgs :: Args Term -> Eval (Args Value)
 delayArgs =
@@ -231,32 +229,17 @@ tickInlined i value =
 -- Test whether a value is eligable for inlining.
 canInline :: Value -> Eval Bool
 canInline value = do
-  context <- getContext
   tcm <- getTyConMap
 
   -- traceM ("canInline.value:\n" <> showPpr (unsafeAsTerm value))
 
   let vTy = valueType tcm value
   let isClass = isClassTy tcm vTy
-  let isFun = isPolyFunTy vTy
+  let isFun = hasFunctions (unsafeAsTerm value) || isPolyFunTy vTy
+  let isVar = isLocalVar (unsafeAsTerm value)
 
-  -- traceM ("canInline.isClass: " <> show isClass)
-
-  -- TODO Does Primitive need a different rule
-  case context of
-    CaseSubject -> do
-      expandable <- expandableValue value
-      let result = isClass || isFun || expandable
-
-      -- traceM ("canInline: (isClass: " <> show isClass <> ", isFun: " <> show isFun <> ", expandable: " <> show expandable <> "): " <> show result)
-      pure result
-
-    _ -> do
-      workFree <- workFreeValue value
-      let result = isClass || isFun || workFree
-
-      -- traceM ("canInline: (isClass: " <> show isClass <> ", isFun: " <> show isFun <> ", workFree: " <> show workFree <> "): " <> show result)
-      pure result
+  let result = isVar || isClass || isFun
+  pure result
  where
   valueType tcm = inferCoreTypeOf tcm . unsafeAsTerm
 
@@ -265,12 +248,13 @@ lookupLocal i = do
   var <- normVarTy i
   val <- findId var
 
+  -- traceM ("lookupLocal: " <> showPpr i)
+
   case val of
     Just x -> do
       inlinable <- canInline x
-      let isFun = isPolyFunTy (coreTypeOf var)
 
-      if isFun || inlinable
+      if inlinable
         then tickInlined var <$> forceEval x
         else pure (VNeutral (NeVar var))
 
@@ -288,7 +272,7 @@ lookupGlobal i = do
         -- which are not primitives in Clash, as these must be marked NOINLINE.
         |  bindingSpec x == NoInline
         ,  bindingIsPrim x == IsFun
-        -> do -- traceM ("lookupGlobal(" <> showPpr i <> "): NOINLINE\n")
+        -> do -- traceM ("lookupGlobal: " <> showPpr i <> " NOINLINE")
               pure (VNeutral (NeVar i))
 
         |  otherwise
@@ -297,6 +281,9 @@ lookupGlobal i = do
               -- is not used and we may decide a self-recursive binding is work free.
               inlinable <- canInline (VNeutral (NeVar i))
               fuel <- getFuel
+
+              -- traceM ("lookupGlobal: " <> showPpr i <> ", inlinable: " <> show inlinable <> ", fuel: " <> show fuel)
+              -- traceM ("lookupGlobal: value:\n" <> showPpr (unsafeAsTerm (bindingTerm x)))
 
               if | inlinable -> updateGlobal i x
                  | fuel > 0  -> withFuel (updateGlobal i x)
@@ -563,6 +550,31 @@ evalApp x y
   term = either (App x) (TyApp x) y
   (f, args) = collectArgs term
 
+-- Does a term contain any lambdas inside it? If so, we don't want to keep it
+-- in a let binding as function values are not sharable.
+hasFunctions :: Term -> Bool
+hasFunctions = go
+ where
+  go e =
+    case collectArgsTicks e of
+      (Var{}, args, _)  -> any go (lefts args)
+      (Data{}, args, _) -> any go (lefts args)
+      (Prim{}, args, _) -> any go (lefts args)
+      (Letrec bs e', args, _) -> any go (e' : fmap snd bs) || any go (lefts args)
+      (Case s _ alts, args, _) -> any go (s : fmap snd alts) || any go (lefts args)
+      (Cast e' _ _, args, _) -> go e' || any go (lefts args)
+      _ -> False
+
+-- Is this something that corresponds to a signal? If so we shouldn't duplicate
+-- as it is a value that changes over time and may duplicate work.
+shouldPreserve :: TyConMap -> Type -> Bool
+shouldPreserve tcm ty =
+  Util.isSignalType tcm ty || Util.isClockOrReset tcm ty || preserveArgs ty
+ where
+  preserveArgs (tyView -> TyConApp _ args) =
+    any (shouldPreserve tcm) args
+  preserveArgs _ = False
+
 evalLetrec :: (HasCallStack) => [LetBinding] -> Term -> Eval Value
 evalLetrec bs x = evalSccs x (Util.sccLetBindings bs)
  where
@@ -577,16 +589,18 @@ evalLetrec bs x = evalSccs x (Util.sccLetBindings bs)
           var <- normVarTy i
           val <- delayEval b
           rest <- withId var val (evalSccs body sccs)
-          workFree <- workFreeValue val
-          let nonSharable = isPolyFunTy (coreTypeOf var)
+          let isFun = hasFunctions x || isPolyFunTy (coreTypeOf var)
 
-          -- We keep let bindings which perform work, as it may not be possible
-          -- to inline them during evaluation. Sometimes this is redundant, as
-          -- the binding is only used once (and could be inlined) or is used
-          -- as a case subject and would be removed from the final circuit.
-          if nonSharable || workFree
+          tcm <- getTyConMap
+          let signalLike = shouldPreserve tcm (coreTypeOf var)
+
+          -- traceM (showPpr i <> ": isFun: " <> show isFun <> ", signalLike: " <> show signalLike)
+
+          if not signalLike && isFun
             then pure rest
-            else pure (VNeutral (NeLetrec [(var, val)] rest))
+            else do
+              traceM ("evalLetrec: keep: " <> showPpr (i, b))
+              pure (VNeutral (NeLetrec [(var, val)] rest))
 
         CyclicSCC ibs -> do
           -- Each let binding in a recursive group must be delayed as a let
@@ -602,12 +616,13 @@ evalLetrec bs x = evalSccs x (Util.sccLetBindings bs)
           binds <- traverse go ibs
           rest <- withIds binds (evalSccs body sccs)
 
+          -- traceM ("evalLetrec: keep: " <> showPpr (fmap fst binds))
           pure (VNeutral (NeLetrec binds rest))
 
 evalCase :: (HasCallStack) => Term -> Type -> [Alt] -> Eval Value
 evalCase term ty alts = do
   let altFvs = freeVarsOf (Case term ty alts)
-  subject <- withContext CaseSubject (delayEval term)
+  subject <- delayEval term
   altTy <- normTy ty
 
   withInScopeList (eltsVarSet altFvs) $ do
@@ -643,7 +658,7 @@ evalCase term ty alts = do
 --
 caseCon :: Value -> Type -> [(Pat, Value)] -> Eval Value
 caseCon subject altTy alts = do
-  forcedSubject <- withContext CaseSubject (forceEval subject)
+  forcedSubject <- forceEval subject
 
   -- If the subject is undefined, the whole expression is undefined.
   if isUndefined forcedSubject then eval (TyApp (Prim NP.undefined) altTy) else
@@ -815,15 +830,14 @@ evalAlt def = \case
   NoMatch -> def
  where
   mustInline (_, value) = do
-    workFree <- workFreeValue value
-    expandable <- expandableValue value
     tcm <- getTyConMap
 
     let valTy = inferCoreTypeOf tcm (unsafeAsTerm value)
         isClass = isClassTy tcm valTy
-        isFun   = isPolyFunTy valTy
+        isFun   = hasFunctions (unsafeAsTerm value)
+                    || isPolyFunTy (inferCoreTypeOf tcm (unsafeAsTerm value))
 
-    pure (isClass || isFun || (workFree && expandable))
+    pure (isClass || isFun)
 
 matchLiteral :: Literal -> (Pat, Value) -> Eval PatResult
 matchLiteral lit alt@(pat, _) =
@@ -1083,14 +1097,11 @@ canApply value = do
 
   let ty = valueType tcm value
       isClass = isClassTy tcm ty
-      isFun = isPolyFunTy ty
+      isFun = hasFunctions (unsafeAsTerm value) || isPolyFunTy ty
 
+  let result = isLocalVar (unsafeAsTerm value) || isClass || isFun
 
-  workFree <- workFreeValue value
-  expandable <- expandableValue value
-  let result = isClass || isFun || (workFree && expandable)
-
-  -- traceM ("canApply: (isClass: " <> show isClass <> ", isFun: " <> show isFun <> ", workFree: " <> show workFree <> ", expandable: " <> show expandable <> "): " <> show result)
+  -- traceM ("canApply: (isClass: " <> show isClass <> ", isFun: " <> show isFun <> "): " <> show result)
   pure result
  where
   valueType tcm = inferCoreTypeOf tcm . unsafeAsTerm
@@ -1118,6 +1129,7 @@ apply val arg = do
           withInScopeList bound $ do
             varTy <- normTy argTy
             var <- getUniqueId "workArg" varTy
+            -- traceM ("apply: keep: " <> showPpr var)
 
             withInScope var $ do
               inner <- apply x (VNeutral (NeVar var))
@@ -1132,6 +1144,8 @@ apply val arg = do
       | otherwise -> do
           varTy <- normTy argTy
           var <- getUniqueId "workArg" varTy
+
+          -- traceM ("apply: keep: " <> showPpr var)
 
           withInScope var $ do
             let inner = VNeutral (NeApp neu (VNeutral (NeVar var)))
@@ -1155,16 +1169,19 @@ apply val arg = do
             j <- getUniqueId (nameOcc (varName i)) (coreTypeOf i)
             let jVal = VNeutral (NeVar j)
 
-            inScope <- getInScope
-            let x' = deShadowTerm inScope x
+            withInScope j $ do
+              inScope <- getInScope
+              let x' = deShadowTerm inScope x
 
-            -- (j, arg) is not bound in the environment, as this leads to extra
-            -- inlining with case subjects which currently leads to free FVs.
-            inner <- withId i jVal (eval x')
+              -- (j, arg) is not bound in the environment, as this leads to extra
+              -- inlining with case subjects which currently leads to free FVs.
+              inner <- withId i jVal (eval x')
 
-            -- TODO Make this more efficient: only generate a single let for a
-            -- work free argument that doesn't change between calls.
-            pure (mkValueTicks (VNeutral (NeLetrec [(j, arg)] inner)) ticks)
+              -- traceM ("apply: keep: " <> showPpr j)
+
+              -- TODO Make this more efficient: only generate a single let for a
+              -- work free argument that doesn't change between calls.
+              pure (mkValueTicks (VNeutral (NeLetrec [(j, arg)] inner)) ticks)
 
     _ ->
       throwM (CannotApply lhs (Left arg))

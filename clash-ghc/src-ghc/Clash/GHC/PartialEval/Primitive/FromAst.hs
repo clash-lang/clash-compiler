@@ -278,6 +278,10 @@ instance FromAst String where
   fromValue (stripValue -> value) =
     case value of
       VLiteral (StringLiteral x) -> pure x
+      VNeutral (NePrim pr [Left s]) -> do
+        guard (primName pr == "GHC.CString.unpackCString#")
+        fromValueForce s
+
       _ -> throwM (CannotConvert (Just value))
 
 instance FromAst (SNat n) where
