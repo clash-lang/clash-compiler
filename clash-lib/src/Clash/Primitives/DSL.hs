@@ -56,6 +56,7 @@ module Clash.Primitives.DSL
   -- ** Conversion
   , toBV
   , fromBV
+  , enableToBit
   , boolToBit
   , boolFromBit
   , boolFromBitVector
@@ -371,6 +372,25 @@ boolToBit bitName = \case
         ]
     pure texp
   tExpr -> error $ "boolToBit: Got \"" <> show tExpr <> "\" expected Bool"
+
+-- | Convert an enable to a bit.
+enableToBit
+  :: (HasCallStack, Backend backend)
+  => Text
+  -- ^ Name hint for intermediate signal
+  -> TExpr
+  -> State (BlockState backend) TExpr
+enableToBit bitName = \case
+  TExpr ena@(Enable _) enableExpr -> do
+    texp@(~(TExpr _ (Identifier uniqueBitName Nothing))) <- declare bitName Wire Bit
+    addDeclaration $
+      CondAssignment uniqueBitName Bit enableExpr ena
+        -- Enable normalizes to Bool for all current backends
+        [ (Just (BoolLit True), Literal Nothing (BitLit H))
+        , (Nothing            , Literal Nothing (BitLit L))
+        ]
+    pure texp
+  tExpr -> error $ "enableToBit: Got \"" <> show tExpr <> "\" expected Enable"
 
 -- | Use to create an output `Bool` from a `Bit`. The expression given
 --   must be the identifier of the bool you wish to get assigned.
