@@ -1,0 +1,1 @@
+CHANGED (internal): Manifest files now use SHA256 for a cache invalidation digest ([#1985](https://github.com/clash-lang/clash-compiler/pull/1985))
