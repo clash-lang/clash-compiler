@@ -1,0 +1,1 @@
+CHANGED (internal): Removed instances of `Hashable Term` and `Hashable Type` ([#XXXX](https://github.com/clash-lang/clash-compiler/pull/XXXX))
