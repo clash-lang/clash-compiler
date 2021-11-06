@@ -45,6 +45,8 @@ import qualified Data.IntSet             as IntSet
 import           Control.Applicative     (Alternative((<|>)))
 import           Data.List               (unzip4, partition)
 import qualified Data.List               as List
+import qualified Data.Map                as Map
+import           Data.Map                (Map)
 import           Data.Maybe
   (catMaybes, fromMaybe, isNothing, mapMaybe, isJust, listToMaybe, maybeToList)
 import           Text.Printf             (printf)
@@ -379,19 +381,19 @@ coreTypeToHWType
   -- ^ Type to convert to HWType
   -> State HWMap (Either String FilteredHWType)
 coreTypeToHWType builtInTranslation reprs m ty = do
-  htyM <- HashMap.lookup ty <$> get
+  htyM <- Map.lookup ty <$> get
   case htyM of
     Just hty -> return hty
     _ -> do
       hty0M <- builtInTranslation reprs m ty
       hty1  <- go hty0M ty
-      modify (HashMap.insert ty hty1)
+      modify (Map.insert ty hty1)
       return hty1
  where
   -- Try builtin translation; for now this is hardcoded to be the one in ghcTypeToHWType
   go :: Maybe (Either String FilteredHWType)
      -> Type
-     -> State (HashMap Type (Either String FilteredHWType))
+     -> State (Map Type (Either String FilteredHWType))
               (Either String FilteredHWType)
   go (Just hwtyE) _ = pure $ maybeConvertToCustomRepr reprs ty <$> hwtyE
   -- Strip transparant types:
@@ -655,7 +657,7 @@ representableType
   -> Bool
 representableType builtInTranslation reprs stringRepresentable m =
     either (const False) isRepresentable .
-    flip evalState HashMap.empty .
+    flip evalState mempty .
     coreTypeToHWType' builtInTranslation reprs m
   where
     isRepresentable hty = case hty of

@@ -77,7 +77,6 @@ import           Data.Coerce                 (coerce)
 import           Data.Default
 import qualified Data.Either                 as Either
 import qualified Data.HashMap.Lazy           as HashMap
-import qualified Data.HashMap.Strict         as HashMapS
 import           Data.List                   ((\\))
 import qualified Data.List                   as List
 import qualified Data.List.Extra             as List
@@ -697,7 +696,7 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
         let subjTy = termType tcm subj
         tran <- Lens.view typeTranslator
         reprs <- Lens.view customReprs
-        case (`evalState` HashMapS.empty) (coreTypeToHWType tran reprs tcm subjTy) of
+        case (`evalState` mempty) (coreTypeToHWType tran reprs tcm subjTy) of
           Right (FilteredHWType (Void (Just hty)) _areVoids)
             | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
             -- If we know that the type of the subject is zero-bits wide and

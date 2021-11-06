@@ -53,6 +53,7 @@ import Data.HashSet                         (HashSet)
 import qualified Data.List                  as List
 import Data.IntMap                          (IntMap, empty)
 import Data.Map.Ordered                     (OMap)
+import Data.Map                             (Map)
 import Data.Maybe                           (mapMaybe)
 import qualified Data.Set                   as Set
 import Data.Text                            (Text)
@@ -132,7 +133,7 @@ newtype NetlistMonad a =
   deriving newtype (Functor, Monad, Applicative, MonadReader NetlistEnv,
                     Strict.MonadState NetlistState, Strict.MonadIO, MonadFail)
 
-type HWMap = HashMap Type (Either String FilteredHWType)
+type HWMap = Map Type (Either String FilteredHWType)
 
 -- | See 'is_freshCache'
 type FreshCache = HashMap Text (IntMap Word)

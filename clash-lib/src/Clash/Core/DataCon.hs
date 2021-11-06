@@ -22,7 +22,6 @@ where
 
 import Control.DeepSeq                        (NFData(..))
 import Data.Binary                            (Binary)
-import Data.Hashable                          (Hashable)
 import qualified Data.Text                    as Text
 import GHC.Generics                           (Generic)
 
@@ -53,7 +52,7 @@ data DataCon
   -- ^ Argument types
   , dcFieldLabels :: [Text.Text]
   -- ^ Names of fields. Used when data constructor is referring to a record type.
-  } deriving (Generic,NFData,Hashable,Binary)
+  } deriving (Generic,NFData,Binary)
 
 instance Show DataCon where
   show = show . dcName

@@ -13,6 +13,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Clash.Core.Term
   ( Term (..)
@@ -60,7 +61,7 @@ import qualified Data.DList                    as DList
 import Data.Either                             (lefts, rights)
 import Data.Foldable                           (foldl')
 import Data.Maybe                              (catMaybes)
-import Data.Hashable                           (Hashable)
+import Data.Hashable                           (Hashable (hashWithSalt))
 import Data.List                               (nub, partition)
 import Data.Text                               (Text)
 import GHC.Generics
@@ -79,6 +80,9 @@ import {-# SOURCE #-} Clash.Core.Type          (Type)
 import Clash.Core.Var                          (Var(Id), Id, TyVar)
 import Clash.Util                              (curLoc)
 
+import GHC.TypeLits
+  (TypeError, ErrorMessage (Text, (:<>:)))
+
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 data Term
   = Var     !Id                             -- ^ Variable reference
@@ -94,7 +98,14 @@ data Term
                                             -- alternatives, list of alternatives
   | Cast    !Term !Type !Type               -- ^ Cast a term from one type to another
   | Tick    !TickInfo !Term                 -- ^ Annotated term
-  deriving (Show,Generic,NFData,Hashable,Binary)
+  deriving (Show, Generic, NFData, Binary)
+
+instance TypeError (
+        'Text "A broken implementation of Hashable Type has been "
+  ':<>: 'Text "removed in Clash 1.4.7. If this is an issue for you, please submit "
+  ':<>: 'Text "an issue report at https://github.com/clash-lang/clash-compiler/issues."
+  ) => Hashable Term where
+    hashWithSalt = error "Term.hashWithSalt: unreachable"
 
 data TickInfo
   = SrcSpan !SrcSpan
@@ -107,7 +118,7 @@ data TickInfo
   | NoDeDup
   -- ^ Do not deduplicate, i.e. /keep/, an expression inside a case-alternative;
   -- do not try to share expressions between multiple branches.
-  deriving (Eq,Show,Generic,NFData,Hashable,Binary)
+  deriving (Eq, Show, Generic, NFData, Binary)
 
 -- | Tag to indicate which instance/register name modifier was used
 data NameMod
@@ -137,7 +148,7 @@ data PrimInfo = PrimInfo
   -- the variables it should assign its results to.
   --
   -- See: 'Clash.Normalize.Transformations.setupMultiResultPrim'
-  } deriving (Show,Generic,NFData,Hashable,Binary)
+  } deriving (Show, Generic, NFData, Binary)
 
 data MultiPrimInfo = MultiPrimInfo
   { mpi_primInfo :: PrimInfo
@@ -171,7 +182,7 @@ data Pat
   -- ^ Literal pattern
   | DefaultPat
   -- ^ Default pattern
-  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
+  deriving (Eq, Ord, Show, Generic, NFData, Binary)
 
 type Alt = (Pat,Term)
 
@@ -237,7 +248,7 @@ data CoreContext
   -- ^ Body of a Cast
   | TickC TickInfo
   -- ^ Body of a Tick
-  deriving (Show, Generic, NFData, Hashable, Binary)
+  deriving (Show, Generic, NFData, Binary)
 
 -- | A list of @CoreContext@ describes the complete navigation path from the
 -- top-level to a specific sub-expression.
