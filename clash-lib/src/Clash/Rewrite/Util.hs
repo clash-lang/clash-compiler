@@ -68,7 +68,7 @@ import           Clash.Core.HasType
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
-  (substTmEnv, aeqTerm, aeqType, extendIdSubst, mkSubst, substTm)
+  (substTmEnv, aeqTerm, aeqType, extendIdSubst, mkSubst, substTm, eqTerm)
 import           Clash.Core.Term
 import           Clash.Core.TyCon            (TyConMap)
 import           Clash.Core.Type             (Type (..), normalizeType)
@@ -245,7 +245,7 @@ applyDebug name exprOld hasChanged exprNew = do
                        ]
               )
 
-    Monad.when (dbg_invariants opts && not hasChanged && not (exprOld `aeqTerm` exprNew)) $
+    Monad.when (dbg_invariants opts && not hasChanged && not (exprOld `eqTerm` exprNew)) $
       error $ $(curLoc) ++ "Expression changed without notice(" ++ name ++  "): before"
                         ++ before ++ "\nafter:\n" ++ after
 

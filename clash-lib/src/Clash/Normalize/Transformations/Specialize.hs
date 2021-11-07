@@ -186,10 +186,16 @@ appProp :: HasCallStack => NormRewrite
 appProp ctx@(TransformContext is _) = \case
   e@App {}
     | let (fun,args,ticks) = collectArgsTicks e
-    -> go is (deShadowTerm is fun) args ticks
+    -> do (eN,hasChanged) <- Writer.listen (go is (deShadowTerm is fun) args ticks)
+          if Monoid.getAny hasChanged
+            then return eN
+            else return e
   e@TyApp {}
     | let (fun,args,ticks) = collectArgsTicks e
-    -> go is (deShadowTerm is fun) args ticks
+    -> do (eN,hasChanged) <- Writer.listen (go is (deShadowTerm is fun) args ticks)
+          if Monoid.getAny hasChanged
+            then return eN
+            else return e
   e          -> return e
  where
   go :: InScopeSet -> Term -> [Either Term Type] -> [TickInfo] -> NormalizeSession Term
