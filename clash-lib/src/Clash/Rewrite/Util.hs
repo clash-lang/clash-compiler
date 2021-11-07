@@ -245,7 +245,9 @@ applyDebug name exprOld hasChanged exprNew = do
                        ]
               )
 
-    Monad.when (dbg_invariants opts && not hasChanged && not (exprOld `aeqTerm` exprNew)) $
+    -- TODO find out a way to enable this again in DebugSilent mode without
+    -- making CI very slow.
+    Monad.when (hasDebugInfo AppliedName name opts && not hasChanged && not (exprOld `aeqTerm` exprNew)) $
       error $ $(curLoc) ++ "Expression changed without notice(" ++ name ++  "): before"
                         ++ before ++ "\nafter:\n" ++ after
 
