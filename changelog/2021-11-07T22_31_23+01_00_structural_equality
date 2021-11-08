@@ -1,0 +1,1 @@
+ADDED: Structural equality on `Term` (`Clash.Core.Subst.eqTerm`) and `Type` (`Clash.Core.Subst.eqType`)

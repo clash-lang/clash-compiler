@@ -11,6 +11,7 @@ module Data.List.Extra
   , equalLength
   , countEq
   , zipEqual
+  , all2
 
   -- * From Control.Monad.Extra
   , anyM
@@ -85,6 +86,13 @@ equalLength :: [a] -> [b] -> Bool
 equalLength [] [] = True
 equalLength (_:as) (_:bs) = equalLength as bs
 equalLength _ _ = False
+
+-- | Like 'all', but the predicate operates over two lists. Asserts to 'False'
+-- when the lists are of unequal length
+all2 :: (a -> b -> Bool) -> [a] -> [b] -> Bool
+all2 _ [] [] = True
+all2 p (a:as) (b:bs) = p a b && all2 p as bs
+all2 _ _ _ = False
 
 -- | Return number of occurrences of an item in a list
 countEq

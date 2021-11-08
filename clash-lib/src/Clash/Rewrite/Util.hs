@@ -78,7 +78,7 @@ import           Clash.Core.FreeVars
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
-  (substTmEnv, aeqTerm, aeqType, extendIdSubst, mkSubst, substTm)
+  (substTmEnv, aeqTerm, aeqType, extendIdSubst, mkSubst, substTm, eqTerm)
 import           Clash.Core.Term
 import           Clash.Core.TermInfo
 import           Clash.Core.TyCon            (TyConMap)
@@ -269,7 +269,7 @@ applyDebug lvl _transformations _fromLimit name exprOld hasChanged exprNew =
                      ]
             ) (return ())
 
-  Monad.when (lvl >= DebugSilent && not hasChanged && not (exprOld `aeqTerm` exprNew)) $
+  Monad.when (lvl >= DebugSilent && not hasChanged && not (exprOld `eqTerm` exprNew)) $
     error $ $(curLoc) ++ "Expression changed without notice(" ++ name ++  "): before"
                       ++ before ++ "\nafter:\n" ++ after
 
