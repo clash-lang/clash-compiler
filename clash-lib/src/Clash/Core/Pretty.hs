@@ -61,7 +61,7 @@ import Clash.Core.DataCon               (DataCon (..))
 import Clash.Core.Literal               (Literal (..))
 import Clash.Core.Name                  (Name (..))
 import Clash.Core.Term
-  (Pat (..), Term (..), TickInfo (..), NameMod (..), CoreContext (..), primArg, PrimInfo(primName))
+  (Pat (..), Term (..), TickInfo (..), NameMod (..), CoreContext (..), primArg, PrimInfo(primName),Bind(..))
 import Clash.Core.TyCon                 (TyCon (..), TyConName, isTupleTyConLike)
 import Clash.Core.Type                  (ConstTy (..), Kind, LitTy (..),
                                          Type (..), TypeView (..), tyView)
@@ -221,11 +221,11 @@ pprTopLevelBndr (bndr,expr) = do
   expr'    <- pprM expr
   return $ bndr' <> line <> hang 2 (sep [(bndrName <+> equals), expr']) <> line
 
-dcolon, rarrow, lam, tylam, at, cast, coerce, letrec, in_, case_, of_, forall_
+dcolon, rarrow, lam, tylam, at, cast, coerce, let_, letrec, in_, case_, of_, forall_
   :: ClashDoc
-[dcolon, rarrow, lam, tylam, at, cast, coerce, letrec, in_, case_, of_, forall_]
+[dcolon, rarrow, lam, tylam, at, cast, coerce, let_, letrec, in_, case_, of_, forall_]
   = annotate (AnnSyntax Keyword) <$>
-    ["::", "->", "λ", "Λ", "@", "▷", "~", "letrec", "in", "case", "of", "forall"]
+    ["::", "->", "λ", "Λ", "@", "▷", "~", "let", "letrec", "in", "case", "of", "forall"]
 
 instance PrettyPrec Text where
   pprPrec _ = pure . pretty
@@ -262,7 +262,8 @@ instance PrettyPrec Term where
     App fun arg     -> pprPrecApp prec fun arg
     TyApp e' ty     -> annotate (AnnContext TyAppC) <$>
                          pprPrecTyApp prec e' ty
-    Letrec xes e1   -> pprPrecLetrec prec xes e1
+    Let (NonRec i x) e1 -> pprPrecLetrec prec False [(i,x)] e1
+    Let (Rec xes) e1   -> pprPrecLetrec prec True xes e1
     Case e' _ alts  -> pprPrecCase prec e' alts
     Cast e' ty1 ty2 -> pprPrecCast prec e' ty1 ty2
     Tick t e'       -> do
@@ -381,8 +382,14 @@ pprPrecCast prec e ty1 ty2 = do
     e' <> annotate (AnnSyntax Type)
                    (softline <> nest 2 (vsep [cast, ty1', coerce, ty2']))
 
-pprPrecLetrec :: Monad m => Rational -> [(Id, Term)] -> Term -> m ClashDoc
-pprPrecLetrec prec xes body = do
+-- TODO Since Clash now keeps non-recursive let expressions separately, the
+-- result of normalization will contain more nested let expressions as the old
+-- Letrec-based definitions are replaced by Let. As this happens, it may be a
+-- good idea to change pprPrecLetrec to encourage more compact forms such as
+-- printing the entire binding on one line if possible.
+
+pprPrecLetrec :: Monad m => Rational -> Bool -> [(Id, Term)] -> Term -> m ClashDoc
+pprPrecLetrec prec isRec xes body = do
   let bndrs = fst <$> xes
   body' <- annotate (AnnContext $ LetBody bndrs) <$> pprPrec noPrec body
   xes'  <- mapM (\(x,e) -> do
@@ -392,8 +399,9 @@ pprPrecLetrec prec xes body = do
                     vsepHard [x', equals <+> e']
                 ) xes
   let xes'' = case xes' of { [] -> ["EmptyLetrec"]; _  -> xes' }
+  let kw = if isRec then letrec else let_
   return $ parensIf (prec > noPrec) $
-    vsepHard [hang 2 (vsepHard $ letrec : xes''), in_ <+> body']
+    vsepHard [hang 2 (vsepHard $ kw : xes''), in_ <+> body']
 
 pprPrecCase :: Monad m => Rational -> Term -> [(Pat,Term)] -> m ClashDoc
 pprPrecCase prec e alts = do

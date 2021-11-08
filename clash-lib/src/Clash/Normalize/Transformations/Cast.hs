@@ -105,10 +105,10 @@ elimCastCast _ c@(Cast (stripTicks -> Cast e tyA tyB) tyB' tyC) = do
 elimCastCast _ e = return e
 {-# SCC elimCastCast #-}
 
--- | Push a cast over a Letrec into it's body
+-- | Push a cast over a Let into it's body
 letCast :: HasCallStack => NormRewrite
-letCast _ (Cast (stripTicks -> Letrec binds body) ty1 ty2) =
-  changed $ Letrec binds (Cast body ty1 ty2)
+letCast _ (Cast (stripTicks -> Let binds body) ty1 ty2) =
+  changed $ Let binds (Cast body ty1 ty2)
 letCast _ e = return e
 {-# SCC letCast #-}
 

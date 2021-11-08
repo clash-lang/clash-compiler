@@ -213,8 +213,9 @@ stepTyApp x ty m tcm =
   (term, args, _) = collectArgsTicks (TyApp x ty)
   tys' = fst . splitFunForallTy . inferCoreTypeOf tcm $ TyApp x ty
 
-stepLetRec :: [LetBinding] -> Term -> Step
-stepLetRec bs x m _ = Just (allocate bs x m)
+stepLet :: Bind Term -> Term -> Step
+stepLet (NonRec i b) x m _ = Just (allocate [(i,b)] x m)
+stepLet (Rec bs) x m _ = Just (allocate bs x m)
 
 stepCase :: Term -> Type -> [Alt] -> Step
 stepCase scrut ty alts m _ =
@@ -245,7 +246,7 @@ ghcStep m = case mTerm m of
   TyLam v x -> stepTyLam v x m
   App x y -> stepApp x y m
   TyApp x ty -> stepTyApp x ty m
-  Letrec bs x -> stepLetRec bs x m
+  Let bs x -> stepLet bs x m
   Case s ty as -> stepCase s ty as m
   Cast x a b -> stepCast x a b m
   Tick t x -> stepTick t x m

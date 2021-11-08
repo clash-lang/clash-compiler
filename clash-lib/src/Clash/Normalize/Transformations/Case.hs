@@ -59,9 +59,10 @@ import Clash.Core.Pretty (showPpr)
 import Clash.Core.Subst
 import Clash.Core.Term
   ( Alt, Pat(..), PrimInfo(..), Term(..), collectArgs, collectArgsTicks
-  , collectTicks, mkApps, mkTicks, patIds, stripTicks)
+  , collectTicks, mkApps, mkTicks, patIds, stripTicks, Bind(..))
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (LitTy(..), Type(..), TypeView(..), coreView1, tyView)
+import Clash.Core.Util (listToLets)
 import Clash.Core.VarEnv
   ( InScopeSet, elemVarSet, extendInScopeSet, extendInScopeSetList, mkVarSet
   , unitVarSet, uniqAway)
@@ -195,7 +196,9 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
             body  = substTm "caseCon'" subst altE
           case Maybe.catMaybes binds2 of
             []     -> pure body
-            binds3 -> pure (Letrec binds3 body)
+            -- Use listToLets to create a series of non-recursive lets instead
+            -- of a recursive group. We know these binders will not form a group.
+            binds3 -> pure (listToLets binds3 body)
      changed altE1
     _ -> case alts of
            -- In Core, default patterns always come first, so we match against
@@ -337,16 +340,14 @@ matchLiteralContructor
 matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
  where
   go [(DefaultPat,e)] = changed e
-  go ((DataPat dc [] xs,e):alts')
+  go ((DataPat dc [] [x],e):alts')
     | dcTag dc == 1
     , l >= ((-2)^(63::Int)) &&  l < 2^(63::Int)
-    = let fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
-          (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                    $ List.zipEqual xs [Literal (IntLiteral l)]
-          e' = case binds of
-                 [] -> e
-                 _  -> Letrec binds e
-      in changed e'
+    = let fvs = Lens.foldMapOf freeLocalIds unitVarSet e
+          bind = NonRec x (Literal (IntLiteral l))
+       in if x `elemVarSet` fvs
+            then changed (Let bind e)
+            else changed e
     | dcTag dc == 2
     , l >= 2^(63::Int)
 #if MIN_VERSION_base(4,15,0)
@@ -356,12 +357,10 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
 #endif
           ba'       = BA.ByteArray ba
           fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
-          (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                    $ List.zipEqual xs [Literal (ByteArrayLiteral ba')]
-          e' = case binds of
-                 [] -> e
-                 _  -> Letrec binds e
-      in changed e'
+          bind      = NonRec x (Literal (ByteArrayLiteral ba'))
+       in if x `elemVarSet` fvs
+            then changed (Let bind e)
+            else changed e
     | dcTag dc == 3
     , l < ((-2)^(63::Int))
 #if MIN_VERSION_base(4,15,0)
@@ -371,12 +370,10 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
 #endif
           ba'       = BA.ByteArray ba
           fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
-          (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                    $ List.zipEqual xs [Literal (ByteArrayLiteral ba')]
-          e' = case binds of
-                 [] -> e
-                 _  -> Letrec binds e
-      in changed e'
+          bind      = NonRec x (Literal (ByteArrayLiteral ba'))
+       in if x `elemVarSet` fvs
+            then changed (Let bind e)
+            else changed e
     | otherwise
     = go alts'
   go ((LitPat l', e):alts')
@@ -389,16 +386,14 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
 matchLiteralContructor c (NaturalLiteral l) alts = go (reverse alts)
  where
   go [(DefaultPat,e)] = changed e
-  go ((DataPat dc [] xs,e):alts')
+  go ((DataPat dc [] [x],e):alts')
     | dcTag dc == 1
     , l >= 0 && l < 2^(64::Int)
     = let fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
-          (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                    $ List.zipEqual xs [Literal (WordLiteral l)]
-          e' = case binds of
-                 [] -> e
-                 _  -> Letrec binds e
-      in changed e'
+          bind      = NonRec x (Literal (WordLiteral l))
+       in if x `elemVarSet` fvs
+            then changed (Let bind e)
+            else changed e
     | dcTag dc == 2
     , l >= 2^(64::Int)
 #if MIN_VERSION_base(4,15,0)
@@ -408,12 +403,10 @@ matchLiteralContructor c (NaturalLiteral l) alts = go (reverse alts)
 #endif
           ba'       = BA.ByteArray ba
           fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
-          (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
-                    $ List.zipEqual xs [Literal (ByteArrayLiteral ba')]
-          e' = case binds of
-                 [] -> e
-                 _  -> Letrec binds e
-      in changed e'
+          bind      = NonRec x (Literal (ByteArrayLiteral ba'))
+       in if x `elemVarSet` fvs
+            then changed (Let bind e)
+            else changed e
     | otherwise
     = go alts'
   go ((LitPat l', e):alts')
@@ -564,7 +557,7 @@ collectEqArgs _ = Nothing
 
 -- | Lift the let-bindings out of the subject of a Case-decomposition
 caseLet :: HasCallStack => NormRewrite
-caseLet (TransformContext is0 _) (Case (collectTicks -> (Letrec xes e,ticks)) ty alts) = do
+caseLet (TransformContext is0 _) (Case (collectTicks -> (Let xes e,ticks)) ty alts) = do
   -- Note [CaseLet deshadow]
   -- Imagine
   --
@@ -593,7 +586,7 @@ caseLet (TransformContext is0 _) (Case (collectTicks -> (Letrec xes e,ticks)) ty
   -- It is safe to over-approximate the free variables in `a` by simply taking
   -- the current InScopeSet.
   let (xes1,e1) = deshadowLetExpr is0 xes e
-  changed (Letrec (fmap (second (`mkTicks` ticks)) xes1)
+  changed (Let (fmap (`mkTicks` ticks) xes1)
                   (Case (mkTicks e1 ticks) ty alts))
 
 caseLet _ e = return e

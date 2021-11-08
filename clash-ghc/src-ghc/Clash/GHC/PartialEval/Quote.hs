@@ -1,5 +1,5 @@
 {-|
-Copyright   : (C) 2020, QBayLogic B.V.
+Copyright   : (C) 2020-2021, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -18,7 +18,7 @@ import Data.Bitraversable
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.PartialEval.Monad
 import Clash.Core.PartialEval.NormalForm
-import Clash.Core.Term (Term, PrimInfo, TickInfo, Pat)
+import Clash.Core.Term (Bind(..), Term, PrimInfo, TickInfo, Pat)
 import Clash.Core.Type (Type(VarTy))
 import Clash.Core.Var (Id, TyVar)
 
@@ -41,7 +41,7 @@ quoteNeutral = \case
   NePrim pr args -> quoteNePrim pr args
   NeApp x y -> quoteNeApp x y
   NeTyApp x ty -> quoteNeTyApp x ty
-  NeLetrec bs x -> quoteNeLetrec bs x
+  NeLet bs x -> quoteNeLet bs x
   NeCase x ty alts -> quoteNeCase x ty alts
 
 quoteArgs :: Args Value -> Eval (Args Normal)
@@ -50,8 +50,9 @@ quoteArgs = traverse (bitraverse quote pure)
 quoteAlts :: [(Pat, Value)] -> Eval [(Pat, Normal)]
 quoteAlts = traverse (bitraverse pure quote)
 
-quoteBinders :: [(Id, Value)] -> Eval [(Id, Normal)]
-quoteBinders = traverse (bitraverse pure quote)
+quoteBind :: Bind Value -> Eval (Bind Normal)
+quoteBind (NonRec i x) = NonRec i <$> quote x
+quoteBind (Rec xs) = Rec <$> traverse (bitraverse pure quote) xs
 
 quoteData :: DataCon -> Args Value -> LocalEnv -> Eval Normal
 quoteData dc args env = setLocalEnv env (NData dc <$> quoteArgs args)
@@ -90,9 +91,12 @@ quoteNeApp x y = NeApp <$> quoteNeutral x <*> quote y
 quoteNeTyApp :: Neutral Value -> Type -> Eval (Neutral Normal)
 quoteNeTyApp x ty = NeTyApp <$> quoteNeutral x <*> pure ty
 
-quoteNeLetrec :: [(Id, Value)] -> Value -> Eval (Neutral Normal)
-quoteNeLetrec bs x =
-  withIds bs (NeLetrec <$> quoteBinders bs <*> quote x)
+quoteNeLet :: Bind Value -> Value -> Eval (Neutral Normal)
+quoteNeLet bs x =
+  withIds (bindToList bs) (NeLet <$> quoteBind bs <*> quote x)
+ where
+  bindToList (NonRec i e) = [(i, e)]
+  bindToList (Rec xs) = xs
 
 quoteNeCase :: Value -> Type -> [(Pat, Value)] -> Eval (Neutral Normal)
 quoteNeCase x ty alts =

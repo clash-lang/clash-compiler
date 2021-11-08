@@ -1,7 +1,8 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente
+                     2021,      QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Free variable calculations
 -}
@@ -34,7 +35,7 @@ import Data.Coerce
 import qualified Data.IntSet            as IntSet
 import Data.Monoid                      (All (..), Any (..))
 
-import Clash.Core.Term                  (Pat (..), Term (..), TickInfo (..))
+import Clash.Core.Term                  (Pat (..), Term (..), TickInfo (..), Bind(..))
 import Clash.Core.Type                  (Type (..))
 import Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), isLocalId)
@@ -223,11 +224,15 @@ termFreeVars' interesting f = go IntSet.empty where
       TyApp <$> go inLocalScope l
             <*> typeFreeVars' interesting inLocalScope f r
 
-    Letrec bs e ->
-      Letrec <$> traverse (goBind inLocalScope') bs
-             <*> go inLocalScope' e
-      where
-        inLocalScope' = foldr IntSet.insert inLocalScope (map (varUniq.fst) bs)
+    Let (NonRec i x) e ->
+      Let <$> (NonRec <$> goBndr inLocalScope i <*> go inLocalScope x)
+          <*> go (IntSet.insert (varUniq i) inLocalScope) e
+
+    Let (Rec bs) e ->
+      Let <$> (Rec <$> traverse (goBind inLocalScope') bs)
+          <*> go inLocalScope' e
+     where
+      inLocalScope' = foldr (IntSet.insert . varUniq . fst) inLocalScope bs
 
     Case subj ty alts ->
       Case <$> go inLocalScope subj

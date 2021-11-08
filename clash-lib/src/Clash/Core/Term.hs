@@ -13,10 +13,11 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Core.Term
-  ( Term (..)
+  ( Term (.., Letrec)
   , mkAbstraction
   , mkTyLams
   , mkLams
@@ -26,6 +27,7 @@ module Clash.Core.Term
   , mkTicks
   , TmName
   , varToId
+  , Bind(..)
   , LetBinding
   , Pat (..)
   , patIds
@@ -90,12 +92,22 @@ data Term
   | TyLam   !TyVar Term                     -- ^ Type-abstraction
   | App     !Term !Term                     -- ^ Application
   | TyApp   !Term !Type                     -- ^ Type-application
-  | Letrec  [LetBinding] Term               -- ^ Recursive let-binding
+  | Let     !(Bind Term) Term               -- ^ Recursive let-binding
   | Case    !Term !Type [Alt]               -- ^ Case-expression: subject, type of
                                             -- alternatives, list of alternatives
   | Cast    !Term !Type !Type               -- ^ Cast a term from one type to another
   | Tick    !TickInfo !Term                 -- ^ Annotated term
   deriving (Show,Generic,NFData,Hashable,Binary)
+
+-- TODO When it is possible, remove this pattern.
+pattern Letrec :: [LetBinding] -> Term -> Term
+pattern Letrec bs x <- Let (bindToList -> bs) x
+ where
+  Letrec bs x = Let (Rec bs) x
+
+bindToList :: Bind a -> [(Id, a)]
+bindToList (NonRec i x) = [(i, x)]
+bindToList (Rec xs) = xs
 
 data TickInfo
   = SrcSpan !SrcSpan
@@ -172,6 +184,12 @@ data WorkInfo
 type TmName     = Name Term
 -- | Binding in a LetRec construct
 type LetBinding = (Id, Term)
+
+data Bind a
+  = NonRec Id a
+  | Rec [(Id, a)]
+  deriving (Eq, Show, Generic, NFData, Hashable, Binary, Functor)
+  -- Structural equivalence instead of alpha equivalance
 
 -- | Patterns in the LHS of a case-decomposition
 data Pat
@@ -361,7 +379,8 @@ walkTerm f = catMaybes . DList.toList . go
     TyLam _ t1 -> go t1
     App t1 t2 -> go t1 <> go t2
     TyApp t1 _ -> go t1
-    Letrec bndrs t1 -> go t1 <> mconcat (map (go . snd) bndrs)
+    Let (NonRec _ x) t1 -> go t1 <> go x
+    Let (Rec bndrs) t1 -> go t1 <> mconcat (map (go . snd) bndrs)
     Case t1 _ alts -> go t1 <> mconcat (map (go . snd) alts)
     Cast t1 _ _ -> go t1
     Tick _ t1 -> go t1
@@ -373,7 +392,8 @@ collectTermIds = concat . walkTerm (Just . go)
   go :: Term -> [Id]
   go (Var i) = [i]
   go (Lam i _) = [i]
-  go (Letrec bndrs _) = map fst bndrs
+  go (Let (NonRec i _) _) = [i]
+  go (Let (Rec bndrs) _) = fmap fst bndrs
   go (Case _ _ alts) = concatMap (pat . fst) alts
   go (Data _) = []
   go (Literal _) = []

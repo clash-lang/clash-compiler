@@ -111,7 +111,8 @@ isWorkFree cache bndrs = go True
 
       Lam _ e -> andM [go False e, allM goArg args]
       TyLam _ e -> andM [go False e, allM goArg args]
-      Letrec bs e -> andM [go False e, allM (go False . snd) bs, allM goArg args]
+      Let (NonRec _ x) e -> andM [go False e, go False x, allM goArg args]
+      Let (Rec bs) e -> andM [go False e, allM (go False . snd) bs, allM goArg args]
       Case s _ [(_, a)] -> andM [go False s, go False a, allM goArg args]
       Case e _ _ -> andM [go False e, allM goArg args]
       Cast e _ _ -> andM [go False e, allM goArg args]

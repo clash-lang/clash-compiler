@@ -67,7 +67,7 @@ import Clash.Core.Name
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Subst
 import Clash.Core.Term
-  ( Term(..), TickInfo, collectArgs, collectArgsTicks, mkApps, mkTmApps, mkTicks, patIds
+  ( Term(..), TickInfo, collectArgs, collectArgsTicks, mkApps, mkTmApps, mkTicks, patIds, Bind(..)
   , patVars, mkAbstraction, PrimInfo(..), WorkInfo(..), IsMultiPrim(..), PrimUnfolding(..))
 import Clash.Core.TermInfo (isLocalVar, isVar, isPolyFun)
 import Clash.Core.TyCon (TyConMap, tyConDataCons)
@@ -75,6 +75,7 @@ import Clash.Core.Type
   (LitTy(NumTy), Type(LitTy,VarTy), applyFunTy, splitTyConAppM, normalizeType
   , mkPolyFunTy, mkTyConApp)
 import Clash.Core.TysPrim
+import Clash.Core.Util (listToLets)
 import Clash.Core.Var (Var(..), Id, TyVar, mkTyVar)
 import Clash.Core.VarEnv
   ( InScopeSet, extendInScopeSet, extendInScopeSetList, lookupVarEnv
@@ -204,14 +205,20 @@ appProp ctx@(TransformContext is _) = \case
         (`mkTicks` ticks) <$> go is0 (substTm "appProp.AppLam" subst e) args []
       False ->
         let is1 = extendInScopeSet is0 v in
-        Letrec [(v, arg)] <$> go is1 (deShadowTerm is1 e) args ticks
+        Let (NonRec v arg) <$> go is1 (deShadowTerm is1 e) args ticks
 
-  go is0 (Letrec vs e) args@(_:_) ticks = do
+  go is0 (Let (NonRec i x) e) args@(_:_) ticks = do
+    setChanged
+    let is1 = extendInScopeSet is0 i
+    -- XXX: binding should already be deshadowed w.r.t. 'is0'
+    Let (NonRec i x) <$> go is1 e args ticks
+
+  go is0 (Let (Rec vs) e) args@(_:_) ticks = do
     setChanged
     let vbs  = map fst vs
         is1  = extendInScopeSetList is0 vbs
     -- XXX: 'vs' should already be deshadowed w.r.t. 'is0'
-    Letrec vs <$> go is1 e args ticks
+    Let (Rec vs) <$> go is1 e args ticks
 
   go is0 (TyLam tv e) (Right t:args) ticks = do
     setChanged
@@ -230,7 +237,10 @@ appProp ctx@(TransformContext is _) = \case
         let vbs   = map fst vs
             is1   = extendInScopeSetList is0 vbs
             alts1 = map (deShadowAlt is1) alts
-        Letrec vs . (`mkTicks` ticks) . Case scrut ty1 <$> mapM (goAlt is1 args1) alts1
+        -- TODO I should have a mkNonRecLets :: [LetBinding] -> Term -> Term
+        -- function which makes a chain of non-recursive let expressions without
+        -- needing to first take the SCCs of all the binders.
+        listToLets vs . (`mkTicks` ticks) . Case scrut ty1 <$> mapM (goAlt is1 args1) alts1
 
   go is0 (Tick sp e) args ticks = do
     setChanged
@@ -288,7 +298,7 @@ constantSpec ctx@(TransformContext is0 tfCtx) e@(App e1 e2)
              (App e1 (csrNewTerm specInfo))
 
            if Monoid.getAny isSpec
-             then changed (Letrec newBindings body)
+             then changed (listToLets newBindings body)
              else return e
        else
         -- e2 has no constant parts

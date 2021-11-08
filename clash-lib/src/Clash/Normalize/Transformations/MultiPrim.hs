@@ -28,6 +28,7 @@ import Clash.Core.Term
 import Clash.Core.TermInfo (multiPrimInfo')
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type(..), mkPolyFunTy, splitFunForallTy)
+import Clash.Core.Util (listToLets)
 import Clash.Core.Var (mkLocalId)
 import Clash.Normalize.Types (NormRewrite, primitives)
 import Clash.Primitives.Types (Primitive(..))
@@ -123,6 +124,6 @@ setupMultiResultPrim' tcm primInfo@PrimInfo{primType} =
     }
 
   letTerm =
-    Letrec
+    listToLets
       ((resId,multiPrimBind):multiPrimSelectBinds)
       (mkTmApps (mkTyApps (Data tupTc) resTypes) (map Var resIds))

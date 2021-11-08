@@ -434,12 +434,12 @@ coreToTerm primMap unlocs = term
       (e1',sp) <- termSP (getSrcSpan x) e1
       x'  <- coreToIdSP sp x
       e2' <- term e2
-      return (C.Letrec [(x', e1')] e2')
+      return (C.Let (C.NonRec x' e1') e2')
 
     term' (Let (Rec xes) e) = do
       xes' <- mapM go xes
       e'   <- term e
-      return (C.Letrec xes' e')
+      return (C.Let (C.Rec xes') e')
      where
       go (x,b) = do
         (b',sp) <- termSP (getSrcSpan x) b
@@ -460,7 +460,7 @@ coreToTerm primMap unlocs = term
      if usesBndr
       then do
         ct <- caseTerm (C.Var b')
-        return (C.Letrec [(b', e')] ct)
+        return (C.Let (C.NonRec b' e') ct)
       else caseTerm e'
 
     term' (Cast e co) = do

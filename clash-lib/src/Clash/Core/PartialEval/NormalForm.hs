@@ -37,7 +37,7 @@ import Data.Map.Strict (Map)
 
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal
-import Clash.Core.Term (Term(..), PrimInfo(primName), TickInfo, Pat)
+import Clash.Core.Term (Bind, Term(..), PrimInfo(primName), TickInfo, Pat)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type, TyVar)
 import Clash.Core.Util (undefinedPrims)
@@ -75,7 +75,7 @@ data Neutral a
   | NePrim   !PrimInfo !(Args a)
   | NeApp    !(Neutral a) !a
   | NeTyApp  !(Neutral a) !Type
-  | NeLetrec ![(Id, a)] !a
+  | NeLet    !(Bind a) !a
   | NeCase   !a !Type ![(Pat, a)]
   deriving (Show)
 

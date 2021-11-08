@@ -14,6 +14,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -267,7 +268,7 @@ mkArgument bbName bndr nArg e = do
         (Case scrut ty' [alt],[],_) -> do
           (projection,decls) <- mkProjection False (NetlistId bndr ty) scrut ty' alt
           return ((projection,hwTy,False),decls)
-        (Letrec _bnds _term, [], _ticks) -> do
+        (Let _bnds _term, [], _ticks) -> do
           (exprN, letDecls) <- mkExpr False Concurrent (NetlistId bndr ty) e
           return ((exprN,hwTy,False),letDecls)
         _ -> do
@@ -543,7 +544,7 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                     [dstNm] ->
                       return ( Identifier dstNm Nothing
                              , dstDecl ++ decls ++ [Assignment dstNm expr])
-                    _ -> error "internal error"
+                    _ -> error $ $(curLoc) ++ "bindSimIO: " ++ show resM
                 _ ->
                   return (Noop,decls)
 
@@ -1238,7 +1239,7 @@ mkFunInput resId e =
       nm <- Id.makeBasic "selection"
       return (Right ((nm,assn++selectionDecls),Wire))
 
-    go is0 _ e'@(Letrec {}) = do
+    go is0 _ e'@(Let{}) = do
       tcm <- Lens.use tcCache
       let normE = splitNormalized tcm e'
       (_,[],[],_,[],binders,resultM) <- case normE of
