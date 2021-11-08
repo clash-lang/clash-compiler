@@ -1,6 +1,7 @@
 {-|
   Copyright   :  (C) 2019, Myrtle Software Ltd.
                      2020-2021, QBayLogic B.V.
+                     2021, Myrtle.ai
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
