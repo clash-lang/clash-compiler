@@ -226,6 +226,14 @@ tickInlined i value =
   unQual = snd . Text.breakOnEnd "."
   nameOf = Text.unpack . unQual . nameOcc . varName
 
+isLiteral :: Term -> Bool
+isLiteral e =
+  case collectArgsTicks e of
+    (Literal _, _, _) -> True
+    (Data _, args, _) -> all (either isLiteral (const True)) args
+    (Prim _, args, _) -> all (either isLiteral (const True)) args
+    _ -> False
+
 -- Test whether a value is eligable for inlining.
 canInline :: Value -> Eval Bool
 canInline value = do
@@ -237,8 +245,9 @@ canInline value = do
   let isClass = isClassTy tcm vTy
   let isFun = hasFunctions (unsafeAsTerm value) || isPolyFunTy vTy
   let isVar = isLocalVar (unsafeAsTerm value)
+  let isLit = isLiteral (unsafeAsTerm value)
 
-  let result = isVar || isClass || isFun
+  let result = isVar || isClass || isFun || isLit
   pure result
  where
   valueType tcm = inferCoreTypeOf tcm . unsafeAsTerm
@@ -277,9 +286,7 @@ lookupGlobal i = do
 
         |  otherwise
         -> withTarget i $ do
-              -- We check if the identifier is work free, otherwise isWorkFreeBinder
-              -- is not used and we may decide a self-recursive binding is work free.
-              inlinable <- canInline (VNeutral (NeVar i))
+              inlinable <- canInline (bindingTerm x)
               fuel <- getFuel
 
               -- traceM ("lookupGlobal: " <> showPpr i <> ", inlinable: " <> show inlinable <> ", fuel: " <> show fuel)
