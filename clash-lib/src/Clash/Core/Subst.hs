@@ -54,6 +54,9 @@ module Clash.Core.Subst
     -- * Alpha equivalence
   , aeqType
   , aeqTerm
+    -- * Structural equivalence
+  , eqTerm
+  , eqType
   )
 where
 
@@ -847,6 +850,22 @@ acmpType' = go
   getRank (AppTy {})    = 4
   getRank (ForAllTy {}) = 5
 
+-- | Structural equality on 'Type'
+eqType
+  :: Type
+  -> Type
+  -> Bool
+eqType = go
+ where
+  go (VarTy tv1) (VarTy tv2) = tv1 == tv2
+  go (ConstTy c1) (ConstTy c2) = c1 == c2
+  go (ForAllTy tv1 t1) (ForAllTy tv2 t2) =
+    tv1 == tv2 && go (varType tv1) (varType tv2) && go t1 t2
+  go (AppTy s1 t1) (AppTy s2 t2) = go s1 s2 && go t1 t2
+  go (LitTy l1) (LitTy l2) = l1 == l2
+  go (AnnType _ t1) (AnnType _ t2) = go t1 t2
+  go _ _ = False
+
 -- | Alpha equality for terms
 aeqTerm
   :: Term
@@ -952,6 +971,55 @@ acmpTerm' inScope = go (mkRnEnv inScope)
 thenCompare :: Ordering -> Ordering -> Ordering
 thenCompare EQ rel = rel
 thenCompare rel _  = rel
+
+-- | Structural equality on 'Term'
+eqTerm :: Term -> Term -> Bool
+eqTerm = go
+ where
+  go (Var id1) (Var id2) = id1 == id2
+  go (Data dc1) (Data dc2) = dc1 == dc2
+  go (Literal l1) (Literal l2) = l1 == l2
+  go (Prim p1) (Prim p2) = primName p1 == primName p2
+  go (Lam b1 e1) (Lam b2 e2) =
+    b1 == b2 && eqType (varType b1) (varType b2) && go e1 e2
+  go (TyLam b1 e1) (TyLam b2 e2) =
+    b1 == b2 && eqType (varType b1) (varType b2) && go e1 e2
+  go (App l1 r1) (App l2 r2) = go l1 l2 && go r1 r2
+  go (TyApp l1 r1) (TyApp l2 r2) = go l1 l2 && eqType r1 r2
+  go (Let bs1 e1) (Let bs2 e2) =
+    go e1 e2 &&
+    goBind bs1 bs2
+   where
+    goBind (NonRec b1 r1) (NonRec b2 r2) =
+      -- No need to check types of NonRec bindings, when the RHSs match the
+      -- types must be the same.
+      b1 == b2 && go r1 r2
+    goBind (Rec brs1) (Rec brs2) =
+      List.all2
+        (\(b1,r1) (b2,r2) ->
+          b1 == b2 &&
+          -- We need to check the types of Rec bindings, because:
+          --
+          -- letrec (x : Bool) = x in X
+          --
+          -- is not structurally equivalent to
+          --
+          -- letrec (x : Int) = x in x
+          eqType (varType b1) (varType b2) &&
+          go r1 r2)
+        brs1 brs2
+    goBind _ _ = False
+  go (Case e1 _ a1) (Case e2 _ a2) =
+    go e1 e2 &&
+    List.all2 goAlt a1 a2
+   where
+    goAlt (p1,r1) (p2,r2) = p1 == p2 && go r1 r2
+  go (Cast e1 l1 r1) (Cast e2 l2 r2) =
+    go e1 e2 &&
+    eqType l1 l2 &&
+    eqType r1 r2
+  go (Tick t1 e1) (Tick t2 e2) = t1 == t2 && go e1 e2
+  go _ _ = False
 
 instance Eq Type where
   (==) = aeqType
