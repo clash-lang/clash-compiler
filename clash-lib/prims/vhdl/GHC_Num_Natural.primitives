@@ -3,9 +3,9 @@
     "BlackBox": {
       "name": "GHC.Num.Natural.naturalMul",
       "kind": "Expression",
-      "type": "timesNatural :: Natural -> Natural -> Natural",
+      "type": "naturalMul :: Natural -> Natural -> Natural",
       "template": "resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])",
-      "warning": "GHC.Num.Natural.timesNatural: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
+      "warning": "GHC.Num.Natural.naturalMul: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
     }
   },
   {
@@ -154,6 +154,14 @@ end block;"
     -- pragma translate_on
     ;"
   , "warning": "GHC.Num.Natural.naturalQuot: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
+  }
+}
+, { "BlackBox" :
+  { "name"     : "GHC.Num.Natural.naturalOr"
+  , "kind"     : "Expression"
+  , "type"     : "naturalOr :: Natural -> Natural -> Natural"
+  , "template" : "~ARG[0] or ~ARG[1]"
+  , "warning": "GHC.Num.Natural.naturalOr: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
   }
 }
 ]

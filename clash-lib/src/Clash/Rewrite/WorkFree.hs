@@ -14,6 +14,7 @@ duplicating work in the result, e.g. inlining.
 
 module Clash.Rewrite.WorkFree
   ( isWorkFree
+  , isWorkFreeBinder
   , isWorkFreeClockOrResetOrEnable
   , isWorkFreeIsh
   , isConstant
@@ -35,7 +36,7 @@ import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (isPolyFunTy)
 import Clash.Core.Util
 import Clash.Core.Var (Id, isLocalId)
-import Clash.Core.VarEnv (VarEnv, lookupVarEnv)
+import Clash.Core.VarEnv
 import Clash.Driver.Types (BindingMap, Binding(..))
 import Clash.Normalize.Primitives (removedArg)
 import Clash.Util (makeCachedU)

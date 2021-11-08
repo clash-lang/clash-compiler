@@ -139,6 +139,7 @@ library
                       containers                >= 0.5.4.0  && < 0.7,
                       data-binary-ieee754       >= 0.4.4    && < 0.6,
                       directory                 >= 1.2      && < 1.4,
+                      exceptions                >= 0.10.4   && < 0.11,
                       extra                     >= 1.6      && < 1.8,
                       filepath                  >= 1.3      && < 1.5,
                       ghc                       >= 8.6.0    && < 9.1,
@@ -169,8 +170,6 @@ library
                       template-haskell          >= 2.8.0.0  && < 2.18,
                       utf8-string               >= 1.0.0.0  && < 1.1.0.0,
                       vector                    >= 0.11     && < 1.0
-  if impl(ghc >= 8.10.0)
-    Build-Depends:    exceptions                >= 0.10.4   && < 0.11,
 
   if impl(ghc >= 9.0.0)
     Build-Depends:    ghc-bignum                >= 1.0      && < 1.1
@@ -201,10 +200,6 @@ library
                       Clash.GHC.NetlistTypes
 
                       Clash.GHC.PartialEval
-                      Clash.GHC.PartialEval.Eval
-                      Clash.GHC.PartialEval.Quote
-                      Clash.GHC.PartialEval.Primitive
-
                       Clash.GHCi.Common
 
   Other-Modules:      Clash.GHCi.Leak
@@ -216,6 +211,36 @@ library
                       Clash.GHC.ClashFlags
                       Clash.GHC.GHC2Core
                       Clash.GHC.LoadInterfaceFiles
+
+                      Clash.GHC.PartialEval.Eval
+                      Clash.GHC.PartialEval.Primitive.Bit
+                      Clash.GHC.PartialEval.Primitive.BitPack
+                      Clash.GHC.PartialEval.Primitive.BitVector
+                      Clash.GHC.PartialEval.Primitive.ByteArray
+                      Clash.GHC.PartialEval.Primitive.Char
+                      Clash.GHC.PartialEval.Primitive.Double
+                      Clash.GHC.PartialEval.Primitive.Enum
+                      Clash.GHC.PartialEval.Primitive.Float
+                      Clash.GHC.PartialEval.Primitive.FromAst
+                      Clash.GHC.PartialEval.Primitive.GhcMisc
+                      Clash.GHC.PartialEval.Primitive.Info
+                      Clash.GHC.PartialEval.Primitive.Index
+                      Clash.GHC.PartialEval.Primitive.Int
+                      Clash.GHC.PartialEval.Primitive.Integer
+                      Clash.GHC.PartialEval.Primitive.Internal.Sized
+                      Clash.GHC.PartialEval.Primitive.Narrowing
+                      Clash.GHC.PartialEval.Primitive.Natural
+                      Clash.GHC.PartialEval.Primitive.Promoted
+                      Clash.GHC.PartialEval.Primitive.Singletons
+                      Clash.GHC.PartialEval.Primitive.Strategy
+                      Clash.GHC.PartialEval.Primitive.ToAst
+                      Clash.GHC.PartialEval.Primitive.Transformations
+                      Clash.GHC.PartialEval.Primitive.Unboxed
+                      Clash.GHC.PartialEval.Primitive.Signed
+                      Clash.GHC.PartialEval.Primitive.Unsigned
+                      Clash.GHC.PartialEval.Primitive.Vector
+                      Clash.GHC.PartialEval.Primitive.Word
+                      Clash.GHC.PartialEval.Quote
                       Clash.GHC.Util
                       Paths_clash_ghc
   if impl(ghc >= 8.8.0)

@@ -17,6 +17,10 @@ import Clash.Rewrite.Combinators
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util
 
+partialEvaluatorBefore :: NormRewrite -> NormRewrite
+partialEvaluatorBefore norm =
+  apply "partialEval" partialEval >-> norm
+
 -- [Note: bottomup traversal evalConst]
 --
 -- 2-May-2019: There is a bug in the evaluator where all data constructors are
@@ -25,6 +29,9 @@ import Clash.Rewrite.Util
 -- not in WHNF, which is what some of the evaluation rules for certain primitive
 -- operations expect. Using a bottom-up traversal works around this bug by
 -- ensuring that the values under the constructor are in WHNF.
+--
+-- TODO We can fix the above now, as we keep track of strictness information
+-- in data constructors (see dcArgStrict constructor).
 --
 -- Using a bottomup traversal ensures that constants are reduced to NF, even if
 -- constructors are lazy, thus ensuring more sensible/smaller generated HDL.

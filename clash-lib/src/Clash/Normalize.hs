@@ -165,6 +165,7 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm peEval eval prim
                   (opt_newInlineStrat opts)
                   (opt_ultra opts)
                   (opt_inlineWFCacheLimit opts)
+                  (opt_partialEvaluator opts)
 
 
 normalize
