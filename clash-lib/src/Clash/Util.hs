@@ -268,7 +268,9 @@ reportTimeDiff start end =
     (Clock.UTCTime (toEnum 0) (fromRational (toRational diff)))
  where
   diff = Clock.diffUTCTime start end
-  fmt  | diff >= 3600
+  fmt  | diff >= 86400
+       = "%-Dd%-Hh%-Mm%-S%03Qs"
+       | diff >= 3600
        = "%-Hh%-Mm%-S%03Qs"
        | diff >= 60
        = "%-Mm%-S%03Qs"
