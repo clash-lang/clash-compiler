@@ -76,7 +76,7 @@ import Clash.Rewrite.Combinators ((>-!))
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, customReprs, debugOpts, tcCache
   , typeTranslator, workFreeBinders)
-import Clash.Rewrite.Util (apply, changed, isFromInt, whnfRW)
+import Clash.Rewrite.Util (changed, isFromInt, whnfRW)
 import Clash.Rewrite.WorkFree
 import Clash.Util (curLoc)
 
@@ -121,8 +121,29 @@ caseCase (TransformContext is0 _) e@(Case (stripTicks -> Case scrut alts1Ty alts
 caseCase _ e = return e
 {-# SCC caseCase #-}
 
+{-
+NOTE: caseOneAlt before caseCon'
+
+When you put a bang on a signal argument:
+    f :: Signal d a -> _
+    f !x = ...
+GHC generates a case like:
+    case x of
+      _ :- _ -> ...
+
+When this f is inlined in an:
+    g = f (pure False)
+And clash does its Signal d a ~ a thing we get:
+    g = case False of
+      _ :- _ -> ...
+Because no pattern matches caseCon transforms this into
+    g = undefined
+
+By trying caseOneAlt first clash can instead drop the case
+and use the body of the single alternative.
+-}
 caseCon :: HasCallStack => NormRewrite
-caseCon = apply "caseOneAlt" (const caseOneAlt) >-! caseCon'
+caseCon = const caseOneAlt >-! caseCon'
 
 -- | Specialize a Case-decomposition (replace by the RHS of an alternative) if
 -- the subject is (an application of) a DataCon; or if there is only a single
