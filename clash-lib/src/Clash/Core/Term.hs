@@ -34,6 +34,7 @@ module Clash.Core.Term
   , Alt
   , TickInfo (..)
   , stripTicks
+  , stripAllTicks
   , partitionTicks
   , NameMod (..)
   , PrimInfo (..)
@@ -78,7 +79,7 @@ import Clash.Core.Name                         (Name (..))
 import {-# SOURCE #-} Clash.Core.Subst         () -- instance Eq Type
 import {-# SOURCE #-} Clash.Core.Type          (Type)
 import Clash.Core.Var                          (Var(Id), Id, TyVar)
-import Clash.Util                              (curLoc)
+import Clash.Util                              (curLoc, second)
 
 import GHC.TypeLits
   (TypeError, ErrorMessage (Text, (:<>:)))
@@ -101,7 +102,7 @@ data Term
   deriving (Show, Generic, NFData, Binary)
 
 instance TypeError (
-        'Text "A broken implementation of Hashable Type has been "
+        'Text "A broken implementation of Hashable Term has been "
   ':<>: 'Text "removed in Clash 1.4.7. If this is an issue for you, please submit "
   ':<>: 'Text "an issue report at https://github.com/clash-lang/clash-compiler/issues."
   ) => Hashable Term where
@@ -130,7 +131,7 @@ data NameMod
   -- ^ @Clash.Magic.suffixNameP@
   | SetName
   -- ^ @Clash.Magic.setName@
-  deriving (Eq,Show,Generic,NFData,Hashable,Binary)
+  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
 
 data IsMultiPrim
   = SingleResult
@@ -293,6 +294,20 @@ isTickCtx _         = False
 stripTicks :: Term -> Term
 stripTicks (Tick _ e) = stripTicks e
 stripTicks e = e
+
+-- | Like 'stripTicks' but removes all ticks from subexpressions.
+stripAllTicks :: Term -> Term
+stripAllTicks = go
+ where
+  go (Lam i x) = Lam i (go x)
+  go (TyLam i x) = TyLam i (go x)
+  go (App f x) = App (go f) (go x)
+  go (TyApp f a) = TyApp (go f) a
+  go (Letrec bs x) = Letrec (map (second go) bs) (go x)
+  go (Case x ty alts) = Case (go x) ty (fmap go <$> alts)
+  go (Cast x a b) = Cast (go x) a b
+  go (Tick _ x) = go x
+  go x = x
 
 -- | Split a (Type)Application in the applied term and it arguments
 collectArgs :: Term -> (Term, [Either Term Type])

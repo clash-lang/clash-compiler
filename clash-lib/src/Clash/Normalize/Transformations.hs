@@ -1955,7 +1955,7 @@ recToLetRec (TransformContext is0 []) e = do
     -- corresponding (sub)field from the target variable.
     --
     -- TODO: See [Note: Breaks on constants and predetermined equality]
-    eqApp tcm v args (collectArgs . stripTicks -> (Var v',args'))
+    eqApp tcm v args (collectArgs . stripAllTicks -> (Var v',args'))
       | isGlobalId v'
       , v == v'
       , let args2 = Either.lefts args'
@@ -1963,9 +1963,9 @@ recToLetRec (TransformContext is0 []) e = do
       = and (zipWith (eqArg tcm) args args2)
     eqApp _ _ _ _ = False
 
-    eqArg _ v1 v2@(stripTicks -> Var {})
+    eqArg _ v1 v2@Var {}
       = v1 == v2
-    eqArg tcm v1 v2@(collectArgs . stripTicks -> (Data _, args'))
+    eqArg tcm v1 v2@(collectArgs -> (Data _, args'))
       | let t1 = normalizeType tcm (termType tcm v1)
       , let t2 = normalizeType tcm (termType tcm v2)
       , t1 == t2

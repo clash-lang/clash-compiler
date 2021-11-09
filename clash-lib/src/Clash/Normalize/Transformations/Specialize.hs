@@ -68,7 +68,7 @@ import Clash.Core.Pretty (showPpr)
 import Clash.Core.Subst
 import Clash.Core.Term
   ( Term(..), TickInfo, collectArgs, collectArgsTicks, mkApps, mkTmApps, mkTicks, patIds, Bind(..)
-  , patVars, mkAbstraction, PrimInfo(..), WorkInfo(..), IsMultiPrim(..), PrimUnfolding(..))
+  , patVars, mkAbstraction, PrimInfo(..), WorkInfo(..), IsMultiPrim(..), PrimUnfolding(..), stripAllTicks)
 import Clash.Core.TermInfo (isLocalVar, isVar, isPolyFun)
 import Clash.Core.TyCon (TyConMap, tyConDataCons)
 import Clash.Core.Type
@@ -319,6 +319,29 @@ specialize ctx e = case e of
   (App e1 e2)   -> specialize' ctx e (collectArgsTicks e1) (Left  e2)
   _             -> return e
 
+{-
+Note [ticks and specialization]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As Clash now distinguishes between ticks in expressions when comparing for
+alpha equality, this has a knock-on effect when accessing the specialization
+cache. Consider these applications which differ only by ticks:
+
+    f[GlobalId] (\x -> ... x[LocalId])
+    f[GlobalId] <tick>(\x -> ... x[LocalId])
+    f[GlobalId] (\x -> ... <tick>x[LocalId])
+
+If one of these had been specialized, the other two would hit that term in the
+specialization cache, saving Clash from having to re-do work which is in effect
+the same. To preserve this behaviour, we use 'stripAllTicks' on the keys for
+the specialization cache.
+
+TODO While this preserves the old behaviour, the old behaviour is likely not
+quite what we want. Using a value from the specialization cache may change the
+ticks present, which can affect naming / debugging information in generated HDL.
+We may also not want to look at ticks, as then the specialization cache will
+miss on virtually every lookup which could add to normalization time.
+-}
+
 -- | Specialise an application on its argument
 specialize'
   :: TransformContext
@@ -360,8 +383,10 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
       argLen  = length args
       specBndrs :: [Either Id TyVar]
       specBndrs = map (Lens.over Lens._Left (normalizeId tcm)) specBndrsIn
+
+      -- See Note [ticks and specialization]
       specAbs :: Either Term Type
-      specAbs = either (Left . (`mkAbstraction` specBndrs)) (Right . id) specArg
+      specAbs = either (Left . stripAllTicks . (`mkAbstraction` specBndrs)) (Right . id) specArg
   -- Determine if 'f' has already been specialized on (a type-normalized) 'specArg'
   specM <- Map.lookup (f,argLen,specAbs) <$> Lens.use (extra.specialisationCache)
   case specM of
