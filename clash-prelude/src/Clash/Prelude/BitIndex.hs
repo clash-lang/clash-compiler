@@ -94,7 +94,7 @@ split v = split# (pack v)
 -- *** Exception: replaceBit: 6 is out of range [5..0]
 -- ...
 replaceBit :: (BitPack a, Enum i) => i -> Bit -> a -> a
-replaceBit i b v = unpack (replaceBit# (pack v) (fromEnum i) b)
+replaceBit i b v = unpack (replaceBit# (pack v) (fromIntegral . fromEnum $ i) b)
 
 {-# INLINE setSlice #-}
 -- | Set the bits between bit index @m@ and bit index @n@.

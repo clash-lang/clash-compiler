@@ -2022,11 +2022,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
         op u i _ = (toInteger m, toInteger v)
           where Bit m v = (BitVector.index# u i)
-  "Clash.Sized.Internal.BitVector.replaceBit#" -- :: :: KnownNat n => BitVector n -> Int -> Bit -> BitVector n
+  "Clash.Sized.Internal.BitVector.replaceBit#" -- :: :: KnownNat n => BitVector n -> Word -> Bit -> BitVector n
     | Just (_, n) <- extractKnownNat tcm tys
     , [ _
       , PrimVal bvP _ [_, Lit (NaturalLiteral mskBv), Lit (IntegerLiteral bv)]
-      , valArgs -> Just [Literal (IntLiteral i)]
+      , valArgs -> Just [Literal (WordLiteral i)]
       , PrimVal bP _ [Lit (WordLiteral mskB), Lit (IntegerLiteral b)]
       ] <- args
     , primName bvP == "Clash.Sized.Internal.BitVector.fromInteger#"
@@ -2039,7 +2039,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       where
         op :: KnownNat n => BitVector n -> Int -> Bit -> Proxy n -> (Integer,Integer)
         -- op bv i b _ = (BitVector.unsafeMask res, BitVector.unsafeToInteger res)
-        op bv i b _ = splitBV (BitVector.replaceBit# bv i b)
+        op bv i b _ = splitBV (BitVector.replaceBit# bv (fromIntegral i) b)
   "Clash.Sized.Internal.BitVector.setSlice#"
   -- :: SNat (m+1+i) -> BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n) -> BitVector (m + 1 + i)
     | mTy : iTy : nTy : _ <- tys

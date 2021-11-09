@@ -742,10 +742,10 @@ instance KnownNat n => Bits (BitVector n) where
   xor               = xor#
   complement        = complement#
   zeroBits          = 0
-  bit i             = replaceBit# 0 i high
-  setBit v i        = replaceBit# v i high
-  clearBit v i      = replaceBit# v i low
-  complementBit v i = replaceBit# v i (complement## (index# v i))
+  bit               = setBit 0
+  setBit v i        = replaceBit# v (fromIntegral i) high
+  clearBit v i      = replaceBit# v (fromIntegral i) low
+  complementBit v i = replaceBit# v (fromIntegral i) (complement## (index# v i))
   testBit v i       = eq## (index# v i) high
   bitSizeMaybe v    = Just (size# v)
   bitSize           = size#
@@ -893,14 +893,14 @@ slice# (BV msk i) m n = BV (shiftR (msk .&. mask) n')
 
 -- * Modifying BitVectors
 {-# NOINLINE replaceBit# #-}
-replaceBit# :: KnownNat n => BitVector n -> Int -> Bit -> BitVector n
+replaceBit# :: KnownNat n => BitVector n -> Word -> Bit -> BitVector n
 replaceBit# bv@(BV m v) i (Bit mb b)
 #if MIN_VERSION_base(4,15,0)
-    | i >= 0 && i < sz = BV (clearBit m i .|. (naturalFromWord mb `shiftL` i))
+    | i < sz = BV (clearBit m (fromIntegral i) .|. (naturalFromWord mb `shiftL` (fromIntegral i)))
 #else
-    | i >= 0 && i < sz = BV (clearBit m i .|. (wordToNatural mb `shiftL` i))
+    | i < sz = BV (clearBit m (fromIntegral i) .|. (wordToNatural mb `shiftL` (fromIntegral i)))
 #endif
-                            (if testBit b 0 && mb == 0 then setBit v i else clearBit v i)
+                            ((if testBit b 0 && mb == 0 then setBit v else clearBit v) (fromIntegral i))
     | otherwise        = err
   where
 #if MIN_VERSION_base(4,15,0)
@@ -1175,7 +1175,7 @@ instance KnownNat n => CoArbitrary (BitVector n) where
 type instance Index   (BitVector n) = Int
 type instance IxValue (BitVector n) = Bit
 instance KnownNat n => Ixed (BitVector n) where
-  ix i f bv = replaceBit# bv i <$> f (index# bv i)
+  ix i f bv = replaceBit# bv (fromIntegral i) <$> f (index# bv i)
 
 
 -- error for infix operator

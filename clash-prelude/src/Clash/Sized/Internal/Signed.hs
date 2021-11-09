@@ -735,7 +735,7 @@ instance KnownNat n => CoArbitrary (Signed n) where
 type instance Index   (Signed n) = Int
 type instance IxValue (Signed n) = Bit
 instance KnownNat n => Ixed (Signed n) where
-  ix i f s = unpack# <$> BV.replaceBit# (pack# s) i
+  ix i f s = unpack# <$> BV.replaceBit# (pack# s) (fromIntegral i)
                      <$> f (BV.index# (pack# s) i)
 
 instance (KnownNat n) => Ix (Signed n) where
