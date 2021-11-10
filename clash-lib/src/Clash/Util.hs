@@ -269,11 +269,11 @@ reportTimeDiff end start =
  where
   diff = Clock.diffUTCTime end start
   fmt  | diff >= 86400
-       = "%-Dd%-Hh%-Mm%-S%03Qs"
+       = "%-Dd%-Hh%-Mm%-Ss"
        | diff >= 3600
-       = "%-Hh%-Mm%-S%03Qs"
+       = "%-Hh%-Mm%-Ss"
        | diff >= 60
-       = "%-Mm%-S%03Qs"
+       = "%-Mm%-Ss"
        | otherwise
        = "%-S%03Qs"
 
