@@ -276,15 +276,18 @@ pkgIdFromTypeable :: Typeable a => a -> String
 pkgIdFromTypeable = tyConPackage . typeRepTyCon . typeOf
 
 reportTimeDiff :: UTCTime -> UTCTime -> String
-reportTimeDiff start end =
-  Clock.formatTime Clock.defaultTimeLocale fmt
+reportTimeDiff end start
+  | diff >= Clock.nominalDay = show days <> "d" <> Clock.formatTime Clock.defaultTimeLocale fmt
+    (Clock.UTCTime (toEnum 0) (fromRational (toRational hms)))
+  | otherwise = Clock.formatTime Clock.defaultTimeLocale fmt
     (Clock.UTCTime (toEnum 0) (fromRational (toRational diff)))
  where
-  diff = Clock.diffUTCTime start end
+  diff = Clock.diffUTCTime end start
+  (days,hms) = divMod @Integer (floor diff) (floor Clock.nominalDay)
   fmt  | diff >= 3600
-       = "%-Hh%-Mm%-S%03Qs"
+       = "%-Hh%-Mm%-Ss"
        | diff >= 60
-       = "%-Mm%-S%03Qs"
+       = "%-Mm%-Ss"
        | otherwise
        = "%-S%03Qs"
 
