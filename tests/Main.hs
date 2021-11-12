@@ -547,6 +547,7 @@ runClashTest = defaultMain $ clashTestRoot
             hdlTargets=[VHDL]
           , expectClashFail=Just (NoTestExitCode, "NOT:WARNING")
           }
+        , outputTest ("tests" </> "shouldwork" </> "Issues") [VHDL] [] [] "T1996" "main"
         ] <>
         if compiledWith == Cabal then
           -- This tests fails without environment files present, which are only

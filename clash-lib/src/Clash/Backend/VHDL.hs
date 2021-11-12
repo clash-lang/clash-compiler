@@ -94,6 +94,8 @@ data VHDLState =
   -- ^ Files to be stored: (filename, contents). These files are generated
   -- during the execution of 'genNetlist'.
   , _idSeen    :: IdentifierSet
+  , _tyPkgCtx :: Bool
+  -- ^ Are we in the context of generating the @_types@ package?
   , _intWidth  :: Int
   -- ^ Int/Word/Integer bit-width
   , _hdlsyn    :: HdlSyn
@@ -121,6 +123,7 @@ instance Backend VHDLState where
     , _dataFiles=[]
     , _memoryDataFiles=[]
     , _idSeen=Id.emptyIdentifierSet esc lw VHDL
+    , _tyPkgCtx=False
     , _intWidth=w
     , _hdlsyn=hdlsyn_
     , _undefValue=undefVal
@@ -359,14 +362,15 @@ genVHDL nm sp seen c = do
 -- | Generate a VHDL package containing type definitions for the given HWTypes
 mkTyPackage_ :: ModName -> [HWType] -> VHDLM [(String,Doc)]
 mkTyPackage_ modName (map filterTransparent -> hwtys) = do
-    { syn <- Mon hdlSyn
+    { Mon (tyPkgCtx .= True)
+    ; syn <- Mon hdlSyn
     ; let usedTys     = concatMap mkUsedTys hwtys
     ; let normTys0    = nub (map mkVecZ (hwtys ++ usedTys))
     ; let sortedTys0  = topSortHWTys normTys0
           packageDec  = vcat $ mapM tyDec (nubBy eqTypM sortedTys0)
           (funDecs,funBodies) = unzip . mapMaybe (funDec syn) $ nubBy eqTypM (map normaliseType sortedTys0)
 
-    ; (:[]) <$> (TextS.unpack (modName `TextS.append` "_types"),) <$>
+    ; pkg <- (:[]) <$> (TextS.unpack (modName `TextS.append` "_types"),) <$>
       "library IEEE;" <> line <>
       "use IEEE.STD_LOGIC_1164.ALL;" <> line <>
       "use IEEE.NUMERIC_STD.ALL;" <> line <> line <>
@@ -375,6 +379,8 @@ mkTyPackage_ modName (map filterTransparent -> hwtys) = do
                     vcat (sequence funDecs)
                   ) <> line <>
       "end" <> semi <> packageBodyDec funBodies
+    ; Mon (tyPkgCtx .= False)
+    ; return pkg
     }
   where
     packageBodyDec :: [VHDLM Doc] -> VHDLM Doc
@@ -640,13 +646,13 @@ funDec _ (Unsigned _) = Just
   )
 
 funDec _ t@(Product _ labels elTys) = Just
-  ( "function" <+> "toSLV" <+> parens ("p :" <+> sizedQualTyName t) <+> "return std_logic_vector" <> semi <> line <>
-    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> sizedQualTyName t <> semi
-  , "function" <+> "toSLV" <+> parens ("p :" <+> sizedQualTyName t) <+> "return std_logic_vector" <+> "is" <> line <>
+  ( "function" <+> "toSLV" <+> parens ("p :" <+> sizedTyName t) <+> "return std_logic_vector" <> semi <> line <>
+    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> sizedTyName t <> semi
+  , "function" <+> "toSLV" <+> parens ("p :" <+> sizedTyName t) <+> "return std_logic_vector" <+> "is" <> line <>
     "begin" <> line <>
     indent 2 ("return" <+> parens (hcat (punctuate " & " elTyToSLV)) <> semi) <> line <>
     "end" <> semi <> line <>
-    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> sizedQualTyName t <+> "is" <> line <>
+    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> sizedTyName t <+> "is" <> line <>
       "alias islv : std_logic_vector(0 to slv'length - 1) is slv;" <> line <>
     "begin" <> line <>
     indent 2 ("return" <+> parens (hcat (punctuate "," elTyFromSLV)) <> semi) <> line <>
@@ -1001,8 +1007,12 @@ qualTyName (filterTransparent -> hwty) = case hwty of
 
   -- Custom types:
   _ -> do
+    pkgCtx <- Mon (use tyPkgCtx)
     modName <- Mon (use modNm)
-    pretty modName <> "_types." <> tyName hwty
+
+    if pkgCtx
+      then tyName hwty
+      else pretty modName <> "_types." <> tyName hwty
 
 -- | Generates a unique name for a given type. This action will cache its
 -- results, thus returning the same answer for the same @HWType@ argument.
