@@ -906,24 +906,24 @@ import "Clash.Prelude"
 import "Clash.Intel.ClockGen"
 
 'createDomain' vSystem{vName=\"DomInput\", vPeriod=20000}
-'createDomain' vSystem{vName=\"Dom50\", vPeriod=50000}
+'createDomain' vSystem{vName=\"Dom100\", vPeriod=10000}
 
 topEntity
   :: Clock DomInput
   -> Signal DomInput Bool
-  -> Signal Dom50 Bit
-  -> Signal Dom50 (BitVector 8)
+  -> Signal Dom100 Bit
+  -> Signal Dom100 (BitVector 8)
 topEntity clk rst =
     'exposeClockResetEnable' ('mealy' blinkerT (1,False,0) . Clash.Prelude.isRising 1) pllOut rstSync 'enableGen'
   where
-    (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' \@Dom50 (SSymbol \@\"altpll50\") clk ('Clash.Signal.unsafeFromLowPolarity' rst)
+    (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' \@Dom100 (SSymbol \@\"altpll100\") clk ('Clash.Signal.unsafeFromLowPolarity' rst)
     rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeFromLowPolarity' pllStable)
 
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where
-    -- clock frequency = 50e6  (50 MHz)
+    -- clock frequency = 100e6  (100 MHz)
     -- led update rate = 333e-3 (every 333ms)
-    cnt_max = 16650000 :: ('Index' 16650001) -- 50e6 * 333e-3
+    cnt_max = 'maxBound' :: ('Index' 33300000) -- 100e6 * 333e-3
 
     cntr' | cntr == cnt_max = 0
           | otherwise       = cntr + 1
@@ -946,17 +946,17 @@ use IEEE.NUMERIC_STD.ALL;
 use IEEE.MATH_REAL.ALL;
 use std.textio.all;
 use work.all;
-use work.blinker_types.all;
+use work.Blinker_topEntity_types.all;
 
-entity topentity is
+entity topEntity is
   port(-- clock
-       clk  : in blinker_types.clk_dominput;
-       rst  : in boolean;
-       x    : in std_logic;
-       leds : out std_logic_vector(7 downto 0));
+       clk    : in Blinker_topEntity_types.clk_DomInput;
+       rst    : in boolean;
+       x      : in std_logic;
+       result : out std_logic_vector(7 downto 0));
 end;
 
-architecture structural of topentity is
+architecture structural of topEntity is
  ...
 end;
 @
@@ -2393,41 +2393,41 @@ module FIR where
 import Clash.Prelude
 import Clash.Explicit.Testbench
 
-dotp :: SaturatingNum a
-     => Vec (n + 1) a
-     -> Vec (n + 1) a
+dotp :: 'SaturatingNum' a
+     => 'Vec' (n + 1) a
+     -> 'Vec' (n + 1) a
      -> a
-dotp as bs = fold boundedAdd (zipWith boundedMul as bs)
+dotp as bs = 'fold' 'boundedAdd' ('zipWith' 'boundedMul' as bs)
 
 fir
-  :: ( HiddenClockResetEnable dom
-     , Default a
-     , KnownNat n
-     , SaturatingNum a
-     , NFDataX a )
-  => Vec (n + 1) a -> Signal dom a -> Signal dom a
+  :: ( 'HiddenClockResetEnable' dom
+     , 'KnownNat' n
+     , 'SaturatingNum' a
+     , 'NFDataX' a
+     , 'Default' a )
+  => 'Vec' (n + 1) a -> 'Signal' dom a -> 'Signal' dom a
 fir coeffs x_t = y_t
   where
-    y_t = dotp coeffs \<$\> bundle xs
-    xs  = window x_t
+    y_t = dotp coeffs \<$\> 'bundle' xs
+    xs  = 'window' x_t
 
 topEntity
-  :: Clock  System
-  -> Reset  System
-  -> Enable System
-  -> Signal System (Signed 16)
-  -> Signal System (Signed 16)
-topEntity = exposeClockResetEnable (fir (2:>3:>(-2):>8:>Nil))
+  :: 'Clock'  'System'
+  -> 'Reset'  'System'
+  -> 'Enable' 'System'
+  -> 'Signal' 'System' ('Signed' 16)
+  -> 'Signal' 'System' ('Signed' 16)
+topEntity = 'exposeClockResetEnable' (fir (2:>3:>(-2):>8:>'Nil'))
 {\-\# NOINLINE topEntity \#-\}
 
-testBench :: Signal System Bool
+testBench :: 'Signal' 'System' 'Bool'
 testBench = done
   where
-    testInput      = stimuliGenerator clk rst (2:>3:>(-2):>8:>Nil)
-    expectedOutput = outputVerifier' clk rst (4:>12:>1:>20:>Nil)
-    done           = expectedOutput (topEntity clk rst enableGen testInput)
-    clk            = tbSystemClockGen (not \<$\> done)
-    rst            = systemResetGen
+    testInput      = 'stimuliGenerator' clk rst (2:>3:>(-2):>8:>'Nil')
+    expectedOutput = 'outputVerifier'' clk rst (4:>12:>1:>20:>'Nil')
+    done           = expectedOutput (topEntity clk rst 'enableGen' testInput)
+    clk            = 'tbSystemClockGen' (not \<$\> done)
+    rst            = 'systemResetGen'
 @
 
 ==== Blinker circuit
@@ -2487,101 +2487,38 @@ Blinker in Clash 1.0:
 @
 module Blinker where
 
-import Clash.Prelude
-import Clash.Intel.ClockGen
+import "Clash.Signal"
+import "Clash.Prelude"
+import "Clash.Intel.ClockGen"
 
-data LedMode
-  = Rotate
-  -- ^ After some period, rotate active led to the left
-  | Complement
-  -- ^ After some period, turn on all disable LEDs, and vice versa
-  deriving (Generic, 'NFDataX')
+'createDomain' vSystem{vName=\"DomInput\", vPeriod=20000}
+'createDomain' vSystem{vName=\"Dom100\", vPeriod=10000}
 
--- Define a synthesis domain with a clock with a period of 20000 /ps/.
-'createDomain' 'vSystem'{vName=\"Input\", vPeriod=20000}
-
--- Define a synthesis domain with a clock with a period of 50000 /ps/.
-'createDomain' 'vSystem'{vName=\"Dom50\", vPeriod=50000}
-
-{\-\# ANN topEntity
-  ('Synthesize'
-    { t_name   = \"blinker\"
-    , t_inputs = [ PortName \"CLOCK_50\"
-                 , PortName \"KEY0\"
-                 , PortName \"KEY1\"
-                 ]
-    , t_output = PortName \"LED\"
-    }) \#-\}
 topEntity
-  :: Clock Input
-  -- ^ Incoming clock
-  -> Signal Input Bool
-  -- ^ Reset signal, straight from KEY0
-  -> Signal Dom50 Bit
-  -- ^ Mode choice, straight from KEY1. See \'LedMode\'.
-  -> Signal Dom50 (BitVector 8)
-  -- ^ Output containing 8 bits, corresponding to 8 LEDs
-topEntity clk20 rstBtn modeBtn =
-  exposeClockResetEnable
-    (mealy blinkerT initialStateBlinkerT . isRising 1)
-    clk50
-    rstSync
-    en
-    modeBtn
- where
-  -- | Enable line for subcomponents: we'll keep it always running
-  en = enableGen
-
-  -- Start with the first LED turned on, in rotate mode, with the counter on zero
-  initialStateBlinkerT = (1, Rotate, 0)
-
-  -- Signal coming from the reset button is low when pressed, and high when
-  -- not pressed. We convert this signal to the polarity of our domain with
-  -- 'unsafeFromLowPolarity'.
-  rst = 'Clash.Signal.unsafeFromLowPolarity' rstBtn
-
-  -- Instantiate a PLL: this stabilizes the incoming clock signal and indicates
-  -- when the signal is stable. We're also using it to transform an incoming
-  -- clock signal running at 20 MHz to a clock signal running at 50 MHz.
-  (clk50, pllStable) =
-    altpll
-      \@Dom50
-      (SSymbol \@\"altpll50\")
-      clk20
-      rst
-
-  -- Synchronize reset to clock signal coming from PLL. We want the reset to
-  -- remain active while the PLL is NOT stable, hence the conversion with
-  -- 'unsafeFromLowPolarity'
-  rstSync =
-    'Clash.Signal.resetSynchronizer'
-      clk50
-      (unsafeFromLowPolarity pllStable)
-
-flipMode :: LedMode -> LedMode
-flipMode Rotate = Complement
-flipMode Complement = Rotate
-
-blinkerT
-  :: (BitVector 8, LedMode, Index 16650001)
-  -> Bool
-  -> ((BitVector 8, LedMode, Index 16650001), BitVector 8)
-blinkerT (leds, mode, cntr) key1R = ((leds', mode', cntr'), leds)
+  :: Clock DomInput
+  -> Signal DomInput Bool
+  -> Signal Dom100 Bit
+  -> Signal Dom100 (BitVector 8)
+topEntity clk rst =
+    'exposeClockResetEnable' ('mealy' blinkerT (1,False,0) . Clash.Prelude.isRising 1) pllOut rstSync 'enableGen'
   where
-    -- clock frequency = 50e6  (50 MHz)
+    (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' \@Dom100 (SSymbol \@\"altpll100\") clk ('Clash.Signal.unsafeFromLowPolarity' rst)
+    rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeFromLowPolarity' pllStable)
+
+blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
+  where
+    -- clock frequency = 100e6  (100 MHz)
     -- led update rate = 333e-3 (every 333ms)
-    cnt_max = 16650000 :: Index 16650001 -- 50e6 * 333e-3
+    cnt_max = 'maxBound' :: ('Index' 33300000) -- 100e6 * 333e-3
 
     cntr' | cntr == cnt_max = 0
           | otherwise       = cntr + 1
 
-    mode' | key1R     = flipMode mode
+    mode' | key1R     = not mode
           | otherwise = mode
 
-    leds' | cntr == 0 =
-              case mode of
-                Rotate -> rotateL leds 1
-                Complement -> complement leds
+    leds' | cntr == 0 = if mode then complement leds
+                                else rotateL leds 1
           | otherwise = leds
 @
 -}
