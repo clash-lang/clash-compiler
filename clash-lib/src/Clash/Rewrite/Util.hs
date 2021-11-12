@@ -62,7 +62,7 @@ import           BasicTypes                  (InlineSpec (..))
 
 import           Clash.Core.Evaluator.Types  (PureHeap, whnf')
 import           Clash.Core.FreeVars
-  (freeLocalVars, termFreeVars', freeLocalIds)
+  (freeLocalVars, termFreeVars', freeLocalIds, globalIdOccursIn)
 import           Clash.Core.HasFreeVars      (elemFreeVars, notElemFreeVars)
 import           Clash.Core.HasType
 import           Clash.Core.Name
@@ -594,6 +594,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
   case aeqExisting of
     -- If it doesn't, create a new binder
     [] -> do -- Add the created function to the list of global bindings
+             let r = newBodyId `globalIdOccursIn` newBody
              bindings %= extendUniqMap newBodyNm
                                     -- We mark this function as internal so that
                                     -- it can be inlined at the very end of
@@ -603,7 +604,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
                                     -- function at this moment for a reason!
                                     -- (termination, CSE and DEC oppertunities,
                                     -- ,etc.)
-                                    (Binding newBodyId sp NoUserInline IsFun newBody)
+                                    (Binding newBodyId sp NoUserInline IsFun newBody r)
              -- Return the new binder
              return (var, newExpr)
     -- If it does, use the existing binder
@@ -644,7 +645,8 @@ addGlobalBind
   -> RewriteMonad extra ()
 addGlobalBind vNm ty sp inl body = do
   let vId = mkGlobalId ty vNm
-  (ty,body) `deepseq` bindings %= extendUniqMap vNm (Binding vId sp inl IsFun body)
+      r = vId `globalIdOccursIn` body
+  (ty,body) `deepseq` bindings %= extendUniqMap vNm (Binding vId sp inl IsFun body r)
 
 -- | Create a new name out of the given name, but with another unique. Resulting
 -- unique is guaranteed to not be in the given InScopeSet.

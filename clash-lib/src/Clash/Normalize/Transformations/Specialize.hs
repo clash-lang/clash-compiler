@@ -376,7 +376,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
       -- Determine if we can specialize f
       bodyMaybe <- fmap (lookupUniqMap (varName f)) $ Lens.use bindings
       case bodyMaybe of
-        Just (Binding _ sp inl _ bodyTm) -> do
+        Just (Binding _ sp inl _ bodyTm _) -> do
           -- Determine if we see a sequence of specialisations on a growing argument
           specHistM <- lookupUniqMap f <$> Lens.use (extra.specialisationHistory)
           specLim   <- Lens.use (extra . specialisationLimit)
