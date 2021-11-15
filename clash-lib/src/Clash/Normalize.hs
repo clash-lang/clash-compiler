@@ -48,7 +48,7 @@ import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
 import           Clash.Core.Evaluator.Types as WHNF (Evaluator)
 import           Clash.Core.FreeVars
-  (freeLocalIds, globalIds, globalIdOccursIn)
+  (freeLocalIds, globalIds)
 import           Clash.Core.HasFreeVars           (notElemFreeVars)
 import           Clash.Core.HasType
 import           Clash.Core.PartialEval as PE     (Evaluator)
@@ -181,7 +181,7 @@ normalize' nm = do
   exprM <- lookupVarEnv nm <$> Lens.use bindings
   let nmS = showPpr (varName nm)
   case exprM of
-    Just (Binding nm' sp inl pr tm) -> do
+    Just (Binding nm' sp inl pr tm r) -> do
       tcm <- Lens.view tcCache
       topEnts <- Lens.view topEntities
       let isTop = nm `elemVarSet` topEnts
@@ -208,9 +208,9 @@ normalize' nm = do
       resTyRep <- not <$> isUntranslatableType False resTy
       if resTyRep
          then do
-            tmNorm <- normalizeTopLvlBndr isTopEnt nm (Binding nm' sp inl pr tm)
+            tmNorm <- normalizeTopLvlBndr isTopEnt nm (Binding nm' sp inl pr tm r)
             let usedBndrs = Lens.toListOf globalIds (bindingTerm tmNorm)
-            traceIf (nm `elem` usedBndrs)
+            traceIf (bindingRecursive tmNorm)
                     (concat [ $(curLoc),"Expr belonging to bndr: ",nmS ," (:: "
                             , showPpr (coreTypeOf (bindingId tmNorm))
                             , ") remains recursive after normalization:\n"
@@ -241,7 +241,7 @@ normalize' nm = do
                             , showPpr (coreTypeOf nm')
                             , ") has a non-representable return type."
                             , " Not normalising:\n", showPpr tm] )
-                    (return ([],(nm,(Binding nm' sp inl pr tm))))
+                    (return ([],(nm,(Binding nm' sp inl pr tm r))))
 
 
     Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " not found"
@@ -259,11 +259,8 @@ checkNonRecursive norm = case mapMaybeVarEnv go norm of
                                  | (a,b) <- eltsVarEnv rcs
                                  ])
  where
-  go (Binding nm _ _ _ tm) =
-    if nm `globalIdOccursIn` tm
-       then Just (nm,tm)
-       else Nothing
-
+  go (Binding nm _ _ _ tm r) =
+    if r then Just (nm,tm) else Nothing
 
 -- | Perform general \"clean up\" of the normalized (non-recursive) function
 -- hierarchy. This includes:
@@ -325,8 +322,8 @@ stripArgs _ _ _ = Nothing
 flattenNode
   :: CallTree
   -> NormalizeSession (Either CallTree ((Id,Term),[CallTree]))
-flattenNode c@(CLeaf (_,(Binding _ _ NoInline _ _))) = return (Left c)
-flattenNode c@(CLeaf (nm,(Binding _ _ _ _ e))) = do
+flattenNode c@(CLeaf (_,(Binding _ _ NoInline _ _ _))) = return (Left c)
+flattenNode c@(CLeaf (nm,(Binding _ _ _ _ e _))) = do
   isTopEntity <- elemVarSet nm <$> Lens.view topEntities
   if isTopEntity then return (Left c) else do
     tcm  <- Lens.view tcCache
@@ -339,9 +336,9 @@ flattenNode c@(CLeaf (nm,(Binding _ _ _ _ e))) = do
                return (Right ((nm,mkApps (mkTicks fun ticks) (reverse remainder)),[]))
           _ -> return (Right ((nm,e),[]))
       _ -> return (Right ((nm,e),[]))
-flattenNode b@(CBranch (_,(Binding _ _ NoInline _ _)) _) =
+flattenNode b@(CBranch (_,(Binding _ _ NoInline _ _ _)) _) =
   return (Left b)
-flattenNode b@(CBranch (nm,(Binding _ _ _ _ e)) us) = do
+flattenNode b@(CBranch (nm,(Binding _ _ _ _ e _)) us) = do
   isTopEntity <- elemVarSet nm <$> Lens.view topEntities
   if isTopEntity then return (Left b) else do
     tcm  <- Lens.view tcCache
@@ -363,7 +360,7 @@ flattenCallTree
   :: CallTree
   -> NormalizeSession CallTree
 flattenCallTree c@(CLeaf _) = return c
-flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm)) used) = do
+flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
   flattenedUsed   <- mapM flattenCallTree used
   (newUsed,il_ct) <- partitionEithers <$> mapM flattenNode flattenedUsed
   let (toInline,il_used) = unzip il_ct
@@ -400,8 +397,8 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm)) used) = do
                                         (Maybe.catMaybes toInline')
         let tm1 = substTm "flattenCallTree.flattenCheap" subst' newExpr
         newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1) (nm', sp)
-        return (CBranch (nm,(Binding nm' sp inl pr newExpr')) (concat allUsed'))
-     else return (CBranch (nm,(Binding nm' sp inl pr newExpr)) allUsed)
+        return (CBranch (nm,(Binding nm' sp inl pr newExpr' r)) (concat allUsed'))
+     else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
   where
     flatten =
       repeatR (topdownR (apply "appProp" appProp >->
@@ -413,10 +410,10 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm)) used) = do
                  apply "flattenLet" flattenLet)) !->
       topdownSucR (apply "topLet" topLet)
 
-    goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e)))
+    goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e _)))
       | inl2 == NoInline = (Nothing     ,[c])
       | otherwise        = (Just (nm2,e),[])
-    goCheap c@(CBranch (nm2,(Binding _ _ inl2 _ e)) us)
+    goCheap c@(CBranch (nm2,(Binding _ _ inl2 _ e _)) us)
       | inl2 == NoInline = (Nothing, [c])
       | otherwise        = (Just (nm2,e),us)
 

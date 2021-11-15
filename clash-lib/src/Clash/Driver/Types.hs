@@ -79,6 +79,11 @@ data Binding a = Binding
     -- ^ The term representation for this binding. This is polymorphic so
     -- alternate representations can be used if more appropriate (i.e. in the
     -- evaluator this can be Value for evaluated bindings).
+  , bindingRecursive :: Bool
+    -- ^ Whether the binding is recursive.
+    --
+    -- TODO Ideally the BindingMap would store recursive and non-recursive
+    -- bindings in a way similar to Let / Letrec. GHC also does this.
   } deriving (Binary, Functor, Generic, NFData, Show)
 
 -- | Global function binders

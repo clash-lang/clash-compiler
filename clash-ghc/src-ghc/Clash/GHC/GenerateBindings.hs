@@ -155,7 +155,9 @@ generateBindings startAction useColor primDirs importDirs dbs hdl modName dflags
       inScope0 = mkInScopeSet (uniqMapToUniqSet
                       ((mapUniqMap (coerce . bindingId) bindingsMap) `unionUniqMap`
                        (mapUniqMap (coerce . bindingId) clsMap)))
-      clsMap                        = mapUniqMap (\(v,i) -> (Binding v GHC.noSrcSpan GHC.Inline IsFun (mkClassSelector inScope0 allTcCache (varType v) i))) clsVMap
+                                    -- Recursion info is always False for class
+                                    -- selectors, no need to check free vars.
+      clsMap                        = mapUniqMap (\(v,i) -> (Binding v GHC.noSrcSpan GHC.Inline IsFun (mkClassSelector inScope0 allTcCache (varType v) i) False)) clsVMap
       allBindings                   = bindingsMap `unionVarEnv` clsMap
       topEntities'                  =
         (\m -> fst (RWS.evalRWS m (GHC2CoreEnv GHC.noSrcSpan fiEnvs) tcMap')) $
@@ -226,7 +228,7 @@ mkBindings primMap bindings clsOps unlocatable = do
       nm <- qualifiedNameString (GHC.varName v)
       let pr = if HashMap.member nm primMap then IsPrim else IsFun
       checkPrimitive primMap v
-      return [(v', (Binding v' sp inl pr tm))]
+      return [(v', (Binding v' sp inl pr tm False))]
     GHC.Rec bs -> do
       tms <- mapM (\(v,e) -> do
                     let sp  = GHC.getSrcSpan v
@@ -236,15 +238,19 @@ mkBindings primMap bindings clsOps unlocatable = do
                     nm <- qualifiedNameString (GHC.varName v)
                     let pr = if HashMap.member nm primMap then IsPrim else IsFun
                     checkPrimitive primMap v
-                    return (Binding v' sp inl pr tm)
+                    return (Binding v' sp inl pr tm True)
                   ) bs
       case tms of
-        [Binding v sp inl pr tm] -> return [(v, Binding v sp inl pr tm)]
+        [Binding v sp inl pr tm r] -> return [(v, Binding v sp inl pr tm r)]
         _ -> let vsL   = map (setIdScope LocalId . bindingId) tms
                  vsV   = map Var vsL
                  subst = extendGblSubstList (mkSubst emptyInScopeSet) (zip vsL vsV)
                  lbs   = zipWith (\b vL -> (vL,substTm "mkBindings" subst (bindingTerm b))) tms vsL
-                 tms1  = zipWith (\b (_, e) -> (bindingId b, b { bindingTerm = Letrec lbs e })) tms lbs
+                 -- All recursive groups with more than one binding are
+                 -- rewritten to have the members of the group bound
+                 -- locally in a letrec. This means that the result is no
+                 -- longer recursive as far as Clash's check is concerned.
+                 tms1  = zipWith (\b (_, e) -> (bindingId b, b { bindingTerm = Letrec lbs e, bindingRecursive = False })) tms lbs
              in  return tms1
     ) bindings
   clsOpList    <- mapM (\(v,i) -> do
