@@ -252,11 +252,11 @@ maybeX f a = either (const Nothing) Just (f a)
 
 -- | Fully evaluate a value, returning 'Nothing' if it throws 'XException'.
 --
--- > maybeX 42                  = Just 42
--- > maybeX (XException msg)    = Nothing
--- > maybeX (3, XException msg) = Nothing
--- > maybeX (3, _|_)            = _|_
--- > maybeX _|_                 = _|_
+-- > maybeHasX 42                  = Just 42
+-- > maybeHasX (XException msg)    = Nothing
+-- > maybeHasX (3, XException msg) = Nothing
+-- > maybeHasX (3, _|_)            = _|_
+-- > maybeHasX _|_                 = _|_
 --
 maybeHasX :: NFData a => a -> Maybe a
 maybeHasX = maybeX hasX
@@ -296,7 +296,7 @@ hasX a =
 -- > isX 42                  = Right 42
 -- > isX (XException msg)    = Left msg
 -- > isX (3, XException msg) = Right (3, XException msg)
--- > isX (3, _|_)            = (3, _|_)
+-- > isX (3, _|_)            = Right (3, _|_)
 -- > isX _|_                 = _|_
 isX :: a -> Either String a
 isX a =

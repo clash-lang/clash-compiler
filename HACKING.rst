@@ -70,5 +70,4 @@ functionality which is not required, or are not yet production-ready. These are
 
   A development tool for analysing how the normalizer in ``clash-lib`` affects
   the core of a particular design. It allows the result of each different
-  optimzer pass to be seen for debugging purposes.
-
+  optimizer pass to be seen for debugging purposes.

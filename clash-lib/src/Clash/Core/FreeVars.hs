@@ -83,7 +83,7 @@ typeFreeVars = typeFreeVars' (const True) IntSet.empty
 -- set, its kind variables also aren´t; so in order to prevent collisions due to
 -- shadowing we close using an empty inScope set.
 --
--- See also: https://git.haskell.org/ghc.git/commitdiff/503514b94f8dc7bd9eab5392206649aee45f140b
+-- See also: https://gitlab.haskell.org/ghc/ghc/-/commit/503514b94f8dc7bd9eab5392206649aee45f140b
 typeFreeVars'
   :: (Contravariant f, Applicative f)
   => (forall b . Var b -> Bool)
@@ -221,7 +221,7 @@ termFreeTyVars = termFreeVars' isTV where
 -- set, its type variables also aren´t; so in order to prevent collisions due to
 -- shadowing we close using an empty inScope set.
 --
--- See also: https://git.haskell.org/ghc.git/commitdiff/503514b94f8dc7bd9eab5392206649aee45f140b
+-- See also: https://gitlab.haskell.org/ghc/ghc/-/commit/503514b94f8dc7bd9eab5392206649aee45f140b
 termFreeVars'
   :: (Contravariant f, Applicative f)
   => (forall b . Var b -> Bool)

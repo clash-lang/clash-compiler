@@ -64,7 +64,7 @@ import           GHC.TypeLits (type (+), KnownNat)
 -- be de-asserted synchronously but it can still be asserted asynchronously.
 -- The reset assert is immediate, but reset de-assertion is delayed by two
 -- cycles.
-
+--
 -- Normally, asynchronous resets can be both asynchronously asserted and
 -- de-asserted. Asynchronous de-assertion can induce meta-stability in the
 -- component which is being reset. To ensure this doesn't happen,

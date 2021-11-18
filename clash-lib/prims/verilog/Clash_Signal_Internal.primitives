@@ -115,40 +115,6 @@ assign ~RESULT = ~SYM[0];
     }
   }
 , { "BlackBox" :
-    { "name" : "Clash.Explicit.Testbench.tbClockGen"
-    , "workInfo"  : "Always"
-    , "kind" : "Declaration"
-    , "warning" : "Clash.Signal.Internal.tbClockGen is not synthesizable!"
-    , "type" :
-"tbClockGen
-  :: KnownDomain dom     -- ARG[0]
-  => Signal dom Bool      -- ARG[1]
-  -> Clock dom"
-    , "template" :
-"// tbClockGen begin
-// pragma translate_off
-reg ~TYPO ~GENSYM[clk][0];
-// 1 = 0.1ps
-localparam ~GENSYM[half_period][1] = (~PERIOD[0]0 / 2);
-always begin
-  // Delay of 1 mitigates race conditions (https://github.com/steveicarus/iverilog/issues/160)
-  #1 ~SYM[0] = ~IF~ACTIVEEDGE[Rising][0]~THEN 0 ~ELSE 1 ~FI;
-  #30000 forever begin
-    if (~ ~ARG[1]) begin
-      $finish;
-    end
-    ~SYM[0] = ~ ~SYM[0];
-    #~SYM[1];
-    ~SYM[0] = ~ ~SYM[0];
-    #~SYM[1];
-  end
-end
-assign ~RESULT = ~SYM[0];
-// pragma translate_on
-// tbClockGen end"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.resetGenN"
     , "workInfo"  : "Always"
     , "kind" : "Declaration"
