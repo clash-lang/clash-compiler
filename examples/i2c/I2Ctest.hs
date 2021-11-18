@@ -3,7 +3,6 @@ module I2Ctest where
 import qualified Data.List as L
 
 import Clash.Explicit.Prelude
-import Clash.Explicit.SimIO
 import I2C
 
 import I2Ctest.I2CSlave
