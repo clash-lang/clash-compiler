@@ -242,15 +242,14 @@ mkBindings primMap bindings clsOps unlocatable = do
                   ) bs
       case tms of
         [Binding v sp inl pr tm r] -> return [(v, Binding v sp inl pr tm r)]
+
+        -- Rewrite the bindings to avoid triggering the recursion check.
+        -- See NOTE [bindings in recursive groups]
         _ -> let vsL   = map (setIdScope LocalId . bindingId) tms
                  vsV   = map Var vsL
                  subst = extendGblSubstList (mkSubst emptyInScopeSet) (zip vsL vsV)
                  lbs   = zipWith (\b vL -> (vL,substTm "mkBindings" subst (bindingTerm b))) tms vsL
-                 -- All recursive groups with more than one binding are
-                 -- rewritten to have the members of the group bound
-                 -- locally in a letrec. This means that the result is no
-                 -- longer recursive as far as Clash's check is concerned.
-                 tms1  = zipWith (\b (_, e) -> (bindingId b, b { bindingTerm = Letrec lbs e, bindingRecursive = False })) tms lbs
+                 tms1  = zipWith (\b (i, _) -> (bindingId b, b { bindingTerm = Letrec lbs (Var i), bindingRecursive = False })) tms lbs
              in  return tms1
     ) bindings
   clsOpList    <- mapM (\(v,i) -> do
@@ -259,6 +258,33 @@ mkBindings primMap bindings clsOps unlocatable = do
                        ) clsOps
 
   return (mkVarEnv (concat bindingsList), mkVarEnv clsOpList)
+
+{-
+NOTE [bindings in recursive groups]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+After normalization, Clash currently checks that all normalized entities are
+not recursive and errors if any are. However, this check only applies to
+recursion on global identifiers. Since GHC may present recursive groups of
+global binders, these are rewritten to only be locally recursive, i.e.
+
+  f[GlobalId] = g[GlobalId] ...
+  g[GlobalId] = f[GlobalId] ...
+
+will be rewritten (and inserted into the map of global bindings) as
+
+  f[GlobalId] = let f[LocalId] = g[LocalId] ...
+                    g[LocalId] = f[LocalId] ...
+                 in f[LocalId]
+
+  g[GlobalId] = let f[LocalId] = g[LocalId] ...
+                    g[LocalId] = f[LocalId] ...
+                 in g[LocalId]
+
+Recursive groups with only a single binding (i.e. global self-recursive
+definitions do not need this rewriting. This is because normalization can
+trivially spot these self-recursive bindings and where necessary lift them to
+global bindings when they appear in a term.
+-}
 
 -- | If this CoreBndr is a primitive, check it's Haskell definition
 --   for potential problems.
