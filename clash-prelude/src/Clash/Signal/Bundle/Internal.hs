@@ -1,9 +1,9 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Signal.Bundle.Internal where
+module Clash.Signal.Bundle.Internal (deriveBundleTuples, idPrimitive) where
 
-import           Control.Monad               (liftM)
+import           Control.Monad.Extra         (concatMapM)
 import           Clash.Annotations.Primitive (Primitive(InlinePrimitive))
 import           Clash.CPP                   (maxTupleSize)
 import           Clash.Signal.Internal       (Signal((:-)))
@@ -19,10 +19,6 @@ idPrimitive nm =
  where
   ipJson = "[{\"Primitive\": {\"name\": \"" ++ show nm ++ "\", \"primType\": \"Function\"}}]"
   ip = InlinePrimitive [minBound..maxBound] ipJson
-
--- | Monadic version of concatMap
-concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
-concatMapM f xs = liftM concat (mapM f xs)
 
 -- | Contruct all the tuple instances for Bundle.
 deriveBundleTuples
@@ -162,7 +158,7 @@ deriveBundleTuples bundleTyName unbundledTyName bundleName unbundleName = do
            , unbundleSig, unbundleF, unbundlePrimAnn, unbundleNoInlineAnn
            ]
 
-mkFunTys :: Foldable t => t Type -> Type -> Type
+mkFunTys :: Foldable t => t TH.Type -> TH.Type -> TH.Type
 mkFunTys args res= foldl' go res args
  where
   go l r = AppT (AppT ArrowT l) r

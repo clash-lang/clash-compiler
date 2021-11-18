@@ -287,6 +287,8 @@ orElses = listToMaybe . catMaybes
 --  * compiling files with clash
 --  * running output tests with runghc
 --  * compiling (local) Template/Blackbox functions with Hint
+--
+-- When changing this list please update docs/developing-hardware/language.rst
 wantedLanguageExtensions :: [LangExt.Extension]
 wantedLanguageExtensions =
   [ LangExt.BinaryLiterals

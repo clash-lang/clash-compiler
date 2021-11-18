@@ -53,9 +53,9 @@ testBench = done
     expectedOutput = outputVerifier'   clk9 rst9
                         (0 :> 1 :>  $(listToVecTH ([2,3,4,6,7,8,9,11,12,13,15,16]::[Integer])))
     done           = expectedOutput (zeroAt0 clk9 rst9 (topEntity clk2 clk7 clk9 testInput))
-    done'          = not <$> done
-    clk2           = tbClockGen @Dom2 (unsafeSynchronizer clk9 clk2 done')
-    clk7           = tbClockGen @Dom7 (unsafeSynchronizer clk9 clk7 done')
-    clk9           = tbClockGen @Dom9 done'
+    notDone        = not <$> done
+    clk2           = tbClockGen @Dom2 (unsafeSynchronizer clk9 clk2 notDone)
+    clk7           = tbClockGen @Dom7 (unsafeSynchronizer clk9 clk7 notDone)
+    clk9           = tbClockGen @Dom9 notDone
     rst7           = resetGen @Dom7
     rst9           = resetGen @Dom9

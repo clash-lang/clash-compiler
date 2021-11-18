@@ -9,12 +9,6 @@ category:            Testing
 build-type:          Simple
 cabal-version:       >=1.10
 
-flag experimental-evaluator
-  description:
-    Use the new partial evaluator (experimental; may break)
-  default: False
-  manual: True
-
 executable clash-profile-normalization-run
   main-is:             profile-normalization-run.hs
   default-language:    Haskell2010
@@ -32,9 +26,6 @@ executable clash-profile-normalization-run
                        clash-profiling-prepare
   -- automatically build ...-prepare tool
   build-tool-depends:  clash-profiling-prepare:clash-profile-normalization-prepare
-
-  if flag(experimental-evaluator)
-    cpp-options: -DEXPERIMENTAL_EVALUATOR
 
 executable clash-profile-netlist-run
   main-is:             profile-netlist-run.hs

@@ -15,6 +15,6 @@ testBench = done
   where
     testInput      = stimuliGenerator clk rst Integral.inputs
     expectedOutput = outputVerifier' clk rst expected
-    done           = expectedOutput (Integral.topEntity <$> testInput)
+    done           = expectedOutput (topEntity <$> testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

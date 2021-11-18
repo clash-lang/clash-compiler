@@ -105,7 +105,7 @@ upDownCounter upDown = s
     s = register 0 (mux upDown (s + 1) (s - 1))
 
 lfsrF' :: BitVector 16 -> BitVector 16
-lfsrF' s = pack feedback ++# slice d15 d1 s
+lfsrF' s = pack feedback ++# slice (SNat @15) d1 s
   where
     feedback = s!5 `xor` s!3 `xor` s!2 `xor` s!0
 
