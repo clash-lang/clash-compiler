@@ -653,6 +653,11 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "AndSpecificEnable" def
 #endif
         , runTest "Ram" def
+        , clashTestGroup "Ram"
+          [ runTest "RMultiTop" def
+          , runTest "RWMulti35" def
+          , runTest "RWMulti53" def
+          ]
         , runTest "ResetGen" def
         , runTest "RomFile" def
         , outputTest "BlockRamLazy" def

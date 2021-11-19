@@ -1,9 +1,10 @@
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.
-                  2019     , Myrtle Software Ltd
+                  2019     , Myrtle Software Ltd,
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 ROMs
 -}
@@ -50,7 +51,7 @@ import           Clash.XException     (NFDataX, errorX)
 asyncRom
   :: (KnownNat n, Enum addr)
   => Vec n a
-  -- ^ ROM content
+  -- ^ ROM content, also determines the size, @n@, of the ROM
   --
   -- __NB:__ must be a constant
   -> addr
@@ -83,7 +84,7 @@ asyncRomPow2 = asyncRom
 asyncRom#
   :: forall n a . KnownNat n
   => Vec n a
-  -- ^ ROM content
+  -- ^ ROM content, also determines the size, @n@, of the ROM
   --
   -- __NB:__ must be a constant
   -> Int
@@ -122,7 +123,7 @@ rom
      , HiddenClock dom
      , HiddenEnable dom  )
   => Vec n a
-  -- ^ ROM content
+  -- ^ ROM content, also determines the size, @n@, of the ROM
   --
   -- __NB:__ must be a constant
   -> Signal dom (Unsigned m)
@@ -135,7 +136,8 @@ rom = hideEnable (hideClock E.rom)
 -- | A ROM with a synchronous read port, with space for 2^@n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is 'undefined'
+-- * __NB__: Initial output value is /undefined/, reading it will throw an
+-- 'Clash.XException.XException'
 --
 -- Additional helpful information:
 --
