@@ -75,7 +75,7 @@ localparam ~GENSYM[half_period][0] = (~PERIOD[0]0 / 2);
 always begin
   ~RESULT = ~IF~ACTIVEEDGE[Rising][0]~THEN 0 ~ELSE 1 ~FI;
   `ifndef VERILATOR
-  #30000 forever begin
+  #~LONGESTPERIOD0 forever begin
     if (~ ~ARG[1]) begin
       $finish;
     end
@@ -92,7 +92,7 @@ end
 `ifdef VERILATOR
   `systemc_interface
   CData ~SYM[1](vluint32_t half_period, bool active_rising, bool result_rec) {
-    static vluint32_t init_wait = 30000;
+    static vluint32_t init_wait = ~LONGESTPERIOD0;
     static vluint32_t to_wait = 0;
     static CData clock = active_rising ? 0 : 1;
 

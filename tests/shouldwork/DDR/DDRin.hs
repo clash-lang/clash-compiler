@@ -67,8 +67,7 @@ testinput = $(listToVecTH [1..17::BitVector 8])
 
 dummy = 0
 
-testoutputAsync = (dummy, dummy):> (1,2) :> (3,4):>(5,6):>(7,8):>(9,10):>(11,12):>(13,14):>((15,16)::(BitVector 8,BitVector 8)) :> Nil
-testoutputSync =  (dummy, dummy):>(dummy,2) :> (3,4):>(5,6):>(7,8):>(9,10):>(11,12):>(13,14):>((15,16)::(BitVector 8,BitVector 8)) :> Nil
+testoutput = (dummy,dummy):>(dummy,2):>(3,4):>(5,6):>(7,8):>(9,10):>(11,12):>(13,14):>((15,16)::(BitVector 8,BitVector 8)) :> Nil
 
 
 
@@ -76,7 +75,7 @@ testBenchUS :: Signal TB Bool
 testBenchUS = done
   where
     testInput      = stimuliGenerator clkDDR rstDDR testinput
-    expectedOutput = outputVerifier clkTest rstTest testoutputSync
+    expectedOutput = outputVerifier clkTest rstTest testoutput
     actualOutput   = ignoreFor clkReal rstReal enableGen d1 (dummy, dummy) (topEntityUS clkReal rstReal testInput)
     done           = expectedOutput actualOutput
     notDone        = not <$> done
@@ -93,7 +92,7 @@ testBenchUA :: Signal TB Bool
 testBenchUA = done
   where
     testInput      = stimuliGenerator clkDDR rstDDR testinput
-    expectedOutput = outputVerifier'   clkReal rstReal testoutputAsync
+    expectedOutput = outputVerifier'   clkReal rstReal testoutput
     actualOutput   = ignoreFor clkReal rstReal enableGen d1 (dummy, dummy) (topEntityUA clkReal rstReal testInput)
     done           = expectedOutput actualOutput
     notDone        = not <$> done
@@ -107,7 +106,7 @@ testBenchGS :: Signal TB Bool
 testBenchGS = done
   where
     testInput      = stimuliGenerator clkDDR rstDDR testinput
-    expectedOutput = outputVerifier clkTest rstTest testoutputSync
+    expectedOutput = outputVerifier clkTest rstTest testoutput
     actualOutput   = ignoreFor clkReal rstReal enableGen d1 (dummy, dummy) (topEntityGS clkReal rstReal testInput)
     done           = expectedOutput actualOutput
     notDone        = not <$> done
@@ -124,7 +123,7 @@ testBenchGA :: Signal TB Bool
 testBenchGA = done
   where
     testInput      = stimuliGenerator clkDDR rstDDR testinput
-    expectedOutput = outputVerifier'   clkReal rstReal testoutputAsync
+    expectedOutput = outputVerifier'   clkReal rstReal testoutput
     actualOutput   = ignoreFor clkReal rstReal enableGen d1 (dummy, dummy) (topEntityGA clkReal rstReal testInput)
     done           = expectedOutput actualOutput
     notDone        = not <$> done
