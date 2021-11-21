@@ -62,7 +62,7 @@ genPort =
 genManifest :: Q.Gen Manifest
 genManifest =
   Manifest
-    <$> Q.arbitrary -- hash
+    <$> genDigest -- hash
     <*> Q.arbitrary -- flags
     <*> Q.listOf genPort -- ports
     <*> coerce @(Q.Gen [ArbitraryText]) @(Q.Gen [Text]) Q.arbitrary -- comp names

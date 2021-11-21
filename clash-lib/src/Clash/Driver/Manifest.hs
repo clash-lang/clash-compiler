@@ -26,7 +26,9 @@ import           Data.Aeson.Types (Parser)
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Lazy as ByteStringLazy
 import           Data.ByteString (ByteString)
+import qualified Data.Binary as Binary
 import           Data.Char (toLower)
+import           Data.Either (fromRight)
 import           Data.Hashable (hash)
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
@@ -123,13 +125,8 @@ instance FromJSON ManifestPort where
 -- | Information about the generated HDL between (sub)runs of the compiler
 data Manifest
   = Manifest
-  { manifestHash :: Int
-    -- ^ Hash of the TopEntity and all its dependencies.
-    --
-    -- TODO: This is currently calculated using 'hash', but this function wasn't
-    --       really designed to give any performance (in the collision / crypto
-    --       sense) guarantees. We should switch to a proper hashing algo like
-    --       SHA256.
+  { manifestHash :: ByteString
+    -- ^ Hash digest of the TopEntity and all its dependencies.
   , successFlags  :: (Int,Int,Bool)
     -- ^ Compiler flags used to achieve successful compilation:
     --
@@ -162,7 +159,7 @@ instance ToJSON Manifest where
   toJSON (Manifest{..}) =
     Aeson.object
       [ "version" .= ("unstable" :: Text)
-      , "hash" .= manifestHash
+      , "hash" .= toHexDigest manifestHash
       , "flags" .= successFlags
         -- TODO: add nested ports (i.e., how Clash split/filtered arguments)
       , "components" .= componentNames
@@ -173,7 +170,7 @@ instance ToJSON Manifest where
       , "files" .=
         [ Aeson.object
           [ "name" .= fName
-          , "sha256" .= Text.decodeUtf8 (Base16.encode fHash)
+          , "sha256" .= toHexDigest fHash
             -- TODO: Add Edam like fields
           ]
         | (fName, fHash) <- fileNames]
@@ -192,13 +189,35 @@ instance ToJSON Manifest where
         [ "transitive" .= transitiveDependencies ]
       ]
 
+-- Note [Failed hex digest decodes]
+--
+-- 'unsafeFromHexDigest' may fail to decode a hex digest if it contains characters
+-- outside of [a-fA-F0-9]. In this case, it will return a broken digest. Because
+-- this module discards any data covered by the broken digest if it does not match
+-- a freshly calculated one, this poses no problem.
+
+-- | Decode a hex digest to a ByteString. Returns a broken digest if the decode
+-- fails - hence it being marked as unsafe.
+unsafeFromHexDigest :: Text -> ByteString
+unsafeFromHexDigest =
+#if MIN_VERSION_base16_bytestring(1,0,0)
+  fromRight "failed decode" . Base16.decode . Text.encodeUtf8
+#else
+  fst . Base16.decode . Text.encodeUtf8
+#endif
+
+-- | Encode a ByteString to a hex digest.
+toHexDigest :: ByteString -> Text
+toHexDigest = Text.decodeUtf8 . Base16.encode
+
 instance FromJSON Manifest where
   parseJSON = Aeson.withObject "Manifest" $ \v ->
     let
       topComponent = v .: "top_component"
     in
       Manifest
-        <$> v .: "hash"
+            -- See Note [Failed hex digest decodes]
+        <$> (unsafeFromHexDigest <$> v .: "hash")
         <*> v .: "flags"
         <*> (topComponent >>= (.: "ports_flat"))
         <*> v .: "components"
@@ -208,14 +227,8 @@ instance FromJSON Manifest where
               forM files $ \obj -> do
                 fName <- obj .: "name"
                 sha256 <- obj .: "sha256"
-                -- Note that we don't particularly care about hash decode
-                -- failures. Realistically it shouldn't happen, and if it does
-                -- there's almost no chance it would result in accidental caching.
-#if MIN_VERSION_base16_bytestring(1,0,0)
-                pure (fName, Base16.decodeLenient (Text.encodeUtf8 sha256))
-#else
-                pure (fName, fst (Base16.decode (Text.encodeUtf8 sha256)))
-#endif
+                -- See Note [Failed hex digest decodes]
+                pure (fName, unsafeFromHexDigest sha256)
         <*> (v .: "domains" >>= HashMap.traverseWithKey parseDomain)
         <*> (v .: "dependencies" >>= (.: "transitive"))
    where
@@ -285,7 +298,7 @@ mkManifest ::
   -- | Files and  their hashes
   [(FilePath, ByteString)] ->
   -- | Hash returned by 'readFreshManifest'
-  Int ->
+  ByteString ->
   -- | New manifest
   Manifest
 mkManifest backend domains ClashOpts{..} Component{..} components deps files topHash = Manifest
@@ -354,7 +367,7 @@ readFreshManifest ::
   FilePath ->
   -- | ( Nothing if no manifest file was found
   --   , Nothing on stale cache, disabled cache, or not manifest file found )
-  IO (Maybe [UnexpectedModification], Maybe Manifest, Int)
+  IO (Maybe [UnexpectedModification], Maybe Manifest, ByteString)
 readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashModDate path = do
   manifestM <- readManifest path
   modificationsM <- traverse (isUserModified path) manifestM
@@ -408,7 +421,7 @@ readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashMo
     , opt_hdlDir = Nothing
     }
 
-  topHash = hash
+  topHash = Sha256.hashlazy $ Binary.encode
     ( tops
     , hashCompiledPrimMap primMap
     , show clashModDate
