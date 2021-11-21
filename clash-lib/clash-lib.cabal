@@ -271,6 +271,7 @@ Library
 
                       Clash.Unique
                       Clash.Util
+                      Clash.Util.Eq
                       Clash.Util.Graph
                       Clash.Util.Interpolate
                       Clash.Pretty

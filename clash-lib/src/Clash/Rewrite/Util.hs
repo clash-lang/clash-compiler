@@ -88,6 +88,7 @@ import           Clash.Rewrite.Types
 import           Clash.Rewrite.WorkFree
 import           Clash.Unique
 import           Clash.Util
+import           Clash.Util.Eq               (fastEqBy)
 import qualified Clash.Util.Interpolate as I
 
 -- | Lift an action working in the '_extra' state to the 'RewriteMonad'
@@ -245,7 +246,8 @@ applyDebug name exprOld hasChanged exprNew = do
                        ]
               )
 
-    Monad.when (dbg_invariants opts && not hasChanged && not (exprOld `eqTerm` exprNew)) $
+    let exprNotEqual = not (fastEqBy eqTerm exprOld exprNew)
+    Monad.when (dbg_invariants opts && not hasChanged && exprNotEqual) $
       error $ $(curLoc) ++ "Expression changed without notice(" ++ name ++  "): before"
                         ++ before ++ "\nafter:\n" ++ after
 
