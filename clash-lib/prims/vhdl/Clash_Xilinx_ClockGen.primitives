@@ -3,32 +3,34 @@
     , "workInfo"  : "Always"
     , "kind"      : "Declaration"
     , "type"      :
-"clockWizard
-  :: ( KnownDomain domIn confIn       -- ARG[0]
-     , KnownDomain domOut confOut )   -- ARG[1]
-  => SSymbol name                    -- ARG[2]
-  -> Clock  pllIn                    -- ARG[3]
-  -> Reset pllIn                     -- ARG[4]
-  -> (Clock pllOut, Enable pllOut)"
+      [ "clockWizard"
+      , "  :: ( KnownDomain domIn confIn       -- ARG[0]"
+      , "     , KnownDomain domOut confOut )   -- ARG[1]"
+      , "  => SSymbol name                    -- ARG[2]"
+      , "  -> Clock  pllIn                    -- ARG[3]"
+      , "  -> Reset pllIn                     -- ARG[4]"
+      , "  -> (Clock pllOut, Enable pllOut)"
+      ]
     , "template" :
-"-- clockWizard begin
-~GENSYM[clockWizard][0] : block
-  signal ~GENSYM[pllOut][1]  : std_logic;
-  signal ~GENSYM[locked][2]  : std_logic;
-  signal ~GENSYM[pllLock][3] : boolean;
-
-  component ~NAME[2]
-    port (CLK_IN1  : in std_logic;
-          RESET    : in std_logic;
-          CLK_OUT1 : out std_logic;
-          LOCKED   : out std_logic);
-  end component;
-begin
-  ~GENSYM[clockWizard_inst][4] : component ~NAME[2] port map (~ARG[3],~IF ~ISACTIVEHIGH[0] ~THEN ~ARG[4] ~ELSE NOT(~ARG[4]) ~FI,~SYM[1],~SYM[2]);
-  ~SYM[3] <= true when ~SYM[2] = '1' else false;
-  ~RESULT <= (~SYM[1],~SYM[3]);
-end block;
--- clockWizard end"
+      [ "-- clockWizard begin"
+      , "~GENSYM[clockWizard][0] : block"
+      , "  signal ~GENSYM[pllOut][1]  : std_logic;"
+      , "  signal ~GENSYM[locked][2]  : std_logic;"
+      , "  signal ~GENSYM[pllLock][3] : boolean;"
+      , ""
+      , "  component ~NAME[2]"
+      , "    port (CLK_IN1  : in std_logic;"
+      , "          RESET    : in std_logic;"
+      , "          CLK_OUT1 : out std_logic;"
+      , "          LOCKED   : out std_logic);"
+      , "  end component;"
+      , "begin"
+      , "  ~GENSYM[clockWizard_inst][4] : component ~NAME[2] port map (~ARG[3],~IF ~ISACTIVEHIGH[0] ~THEN ~ARG[4] ~ELSE NOT(~ARG[4]) ~FI,~SYM[1],~SYM[2]);"
+      , "  ~SYM[3] <= true when ~SYM[2] = '1' else false;"
+      , "  ~RESULT <= (~SYM[1],~SYM[3]);"
+      , "end block;"
+      , "-- clockWizard end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -36,35 +38,37 @@ end block;
     , "workInfo"  : "Always"
     , "kind"      : "Declaration"
     , "type"      :
-"clockWizardDifferential
-  :: ( KnownDomain domIn confIn       -- ARG[0]
-     , KnownDomain domOut confOut )   -- ARG[1]
-  => SSymbol name                    -- ARG[2]
-  -> Clock pllIn                     -- ARG[3]
-  -> Clock pllIn                     -- ARG[4]
-  -> Reset pllIn                     -- ARG[5]
-  -> (Clock pllOut, Enable pllOut)"
+      [ "clockWizardDifferential"
+      , "  :: ( KnownDomain domIn confIn       -- ARG[0]"
+      , "     , KnownDomain domOut confOut )   -- ARG[1]"
+      , "  => SSymbol name                    -- ARG[2]"
+      , "  -> Clock pllIn                     -- ARG[3]"
+      , "  -> Clock pllIn                     -- ARG[4]"
+      , "  -> Reset pllIn                     -- ARG[5]"
+      , "  -> (Clock pllOut, Enable pllOut)"
+      ]
     , "template" :
-"-- clockWizardDifferential begin
-~GENSYM[clockWizardDifferential][0] : block
-  signal ~GENSYM[pllOut][1]  : std_logic;
-  signal ~GENSYM[locked][2]  : std_logic;
-  signal ~GENSYM[pllLock][3] : boolean;
-
-  component ~NAME[2]
-    port (CLK_IN1_D_clk_n : in std_logic;
-          CLK_IN1_D_clk_p : in std_logic;
-          RESET           : in std_logic;
-          CLK_OUT1        : out std_logic;
-          LOCKED          : out std_logic);
-  end component;
-begin
-  ~GENSYM[clockWizardDifferential_inst][4] : component ~NAME[2]
-    port map (~ARG[3],~ARG[4],~IF ~ISACTIVEHIGH[0] ~THEN ~ARG[5] ~ELSE NOT(~ARG[5]) ~FI,~SYM[1],~SYM[2]);
-  ~SYM[3] <= true when ~SYM[2] = '1' else false;
-  ~RESULT <= (~SYM[1],~SYM[3]);
-end block;
--- clockWizardDifferential end"
+      [ "-- clockWizardDifferential begin"
+      , "~GENSYM[clockWizardDifferential][0] : block"
+      , "  signal ~GENSYM[pllOut][1]  : std_logic;"
+      , "  signal ~GENSYM[locked][2]  : std_logic;"
+      , "  signal ~GENSYM[pllLock][3] : boolean;"
+      , ""
+      , "  component ~NAME[2]"
+      , "    port (CLK_IN1_D_clk_n : in std_logic;"
+      , "          CLK_IN1_D_clk_p : in std_logic;"
+      , "          RESET           : in std_logic;"
+      , "          CLK_OUT1        : out std_logic;"
+      , "          LOCKED          : out std_logic);"
+      , "  end component;"
+      , "begin"
+      , "  ~GENSYM[clockWizardDifferential_inst][4] : component ~NAME[2]"
+      , "    port map (~ARG[3],~ARG[4],~IF ~ISACTIVEHIGH[0] ~THEN ~ARG[5] ~ELSE NOT(~ARG[5]) ~FI,~SYM[1],~SYM[2]);"
+      , "  ~SYM[3] <= true when ~SYM[2] = '1' else false;"
+      , "  ~RESULT <= (~SYM[1],~SYM[3]);"
+      , "end block;"
+      , "-- clockWizardDifferential end"
+      ]
     }
   }
 ]

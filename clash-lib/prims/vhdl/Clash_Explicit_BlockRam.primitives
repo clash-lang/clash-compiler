@@ -2,237 +2,245 @@
     { "name" : "Clash.Explicit.BlockRam.blockRam#"
     , "kind" : "Declaration"
     , "type" :
-"blockRam#
-  :: ( KnownDomain dom        ARG[0]
-     , HasCallStack  --       ARG[1]
-     , Undefined a ) --       ARG[2]
-  => Clock dom       -- clk,  ARG[3]
-  -> Enable dom      -- en,   ARG[4]
-  -> Vec n a         -- init, ARG[5]
-  -> Signal dom Int  -- rd,   ARG[6]
-  -> Signal dom Bool -- wren, ARG[7]
-  -> Signal dom Int  -- wr,   ARG[8]
-  -> Signal dom a    -- din,  ARG[9]
-  -> Signal dom a"
+      [ "blockRam#"
+      , "  :: ( KnownDomain dom        ARG[0]"
+      , "     , HasCallStack  --       ARG[1]"
+      , "     , Undefined a ) --       ARG[2]"
+      , "  => Clock dom       -- clk,  ARG[3]"
+      , "  -> Enable dom      -- en,   ARG[4]"
+      , "  -> Vec n a         -- init, ARG[5]"
+      , "  -> Signal dom Int  -- rd,   ARG[6]"
+      , "  -> Signal dom Bool -- wren, ARG[7]"
+      , "  -> Signal dom Int  -- wr,   ARG[8]"
+      , "  -> Signal dom a    -- din,  ARG[9]"
+      , "  -> Signal dom a"
+      ]
     , "template" :
-"-- blockRam begin
-~GENSYM[~RESULT_blockRam][1] : block
-  signal ~GENSYM[~RESULT_RAM][2] : ~TYP[5] := ~CONST[5];
-  signal ~GENSYM[rd][4]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
-  signal ~GENSYM[wr][5]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
-begin
-  ~SYM[4] <= to_integer(~VAR[rdI][6](31 downto 0))
-  -- pragma translate_off
-                mod ~LENGTH[~TYP[5]]
-  -- pragma translate_on
-                ;
-
-  ~SYM[5] <= to_integer(~VAR[wrI][8](31 downto 0))
-  -- pragma translate_off
-                mod ~LENGTH[~TYP[5]]
-  -- pragma translate_on
-                ;
-~IF ~VIVADO ~THEN
-  ~SYM[6] : process(~ARG[3])
-  begin
-    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-      if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
-        ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[9]][~TYP[9]];
-      end if;
-      ~RESULT <= fromSLV(~SYM[2](~SYM[4]));
-    end if;
-  end process; ~ELSE
-  ~SYM[6] : process(~ARG[3])
-  begin
-    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-      if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
-        ~SYM[2](~SYM[5]) <= ~ARG[9];
-      end if;
-      ~RESULT <= ~SYM[2](~SYM[4]);
-    end if;
-  end process; ~FI
-end block;
---end blockRam"
+      [ "-- blockRam begin"
+      , "~GENSYM[~RESULT_blockRam][1] : block"
+      , "  signal ~GENSYM[~RESULT_RAM][2] : ~TYP[5] := ~CONST[5];"
+      , "  signal ~GENSYM[rd][4]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;"
+      , "  signal ~GENSYM[wr][5]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;"
+      , "begin"
+      , "  ~SYM[4] <= to_integer(~VAR[rdI][6](31 downto 0))"
+      , "  -- pragma translate_off"
+      , "                mod ~LENGTH[~TYP[5]]"
+      , "  -- pragma translate_on"
+      , "                ;"
+      , ""
+      , "  ~SYM[5] <= to_integer(~VAR[wrI][8](31 downto 0))"
+      , "  -- pragma translate_off"
+      , "                mod ~LENGTH[~TYP[5]]"
+      , "  -- pragma translate_on"
+      , "                ;"
+      , "~IF ~VIVADO ~THEN"
+      , "  ~SYM[6] : process(~ARG[3])"
+      , "  begin"
+      , "    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then"
+      , "      if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then"
+      , "        ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[9]][~TYP[9]];"
+      , "      end if;"
+      , "      ~RESULT <= fromSLV(~SYM[2](~SYM[4]));"
+      , "    end if;"
+      , "  end process; ~ELSE"
+      , "  ~SYM[6] : process(~ARG[3])"
+      , "  begin"
+      , "    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then"
+      , "      if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then"
+      , "        ~SYM[2](~SYM[5]) <= ~ARG[9];"
+      , "      end if;"
+      , "      ~RESULT <= ~SYM[2](~SYM[4]);"
+      , "    end if;"
+      , "  end process; ~FI"
+      , "end block;"
+      , "--end blockRam"
+      ]
     }
   }
 , { "BlackBox" :
     { "name" : "Clash.Explicit.BlockRam.blockRamU#"
     , "kind" : "Declaration"
     , "type" :
-"blockRamU#
-  :: ( KnownDomain dom        ARG[0]
-     , HasCallStack  --       ARG[1]
-     , Undefined a ) --       ARG[2]
-  => Clock dom       -- clk,  ARG[3]
-  -> Enable dom      -- en,   ARG[4]
-  -> SNat n          -- len,  ARG[5]
-  -> Signal dom Int  -- rd,   ARG[6]
-  -> Signal dom Bool -- wren, ARG[7]
-  -> Signal dom Int  -- wr,   ARG[8]
-  -> Signal dom a    -- din,  ARG[9]
-  -> Signal dom a"
+      [ "blockRamU#"
+      , "  :: ( KnownDomain dom        ARG[0]"
+      , "     , HasCallStack  --       ARG[1]"
+      , "     , Undefined a ) --       ARG[2]"
+      , "  => Clock dom       -- clk,  ARG[3]"
+      , "  -> Enable dom      -- en,   ARG[4]"
+      , "  -> SNat n          -- len,  ARG[5]"
+      , "  -> Signal dom Int  -- rd,   ARG[6]"
+      , "  -> Signal dom Bool -- wren, ARG[7]"
+      , "  -> Signal dom Int  -- wr,   ARG[8]"
+      , "  -> Signal dom a    -- din,  ARG[9]"
+      , "  -> Signal dom a"
+      ]
     , "template" :
-"-- blockRamU begin
-~GENSYM[~RESULT_blockRam][1] : block~IF~VIVADO~THEN
-  type ~GENSYM[ram_t][8] is array (0 to integer'(~LIT[5])-1) of std_logic_vector(~SIZE[~TYP[9]]-1 downto 0);~ELSE
-  type ~SYM[8] is array (0 to integer'(~LIT[5])-1) of ~TYP[9];~FI
-  signal ~GENSYM[~RESULT_RAM][2] : ~SYM[8];
-  signal ~GENSYM[rd][4]  : integer range 0 to ~LIT[5] - 1;
-  signal ~GENSYM[wr][5]  : integer range 0 to ~LIT[5] - 1;
-begin
-  ~SYM[4] <= to_integer(~VAR[rdI][6](31 downto 0))
-  -- pragma translate_off
-                mod ~LIT[5]
-  -- pragma translate_on
-                ;
-
-  ~SYM[5] <= to_integer(~VAR[wrI][8](31 downto 0))
-  -- pragma translate_off
-                mod ~LIT[5]
-  -- pragma translate_on
-                ;
-~IF ~VIVADO ~THEN
-  ~SYM[6] : process(~ARG[3])
-  begin
-    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-      if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
-        ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[9]][~TYP[9]];
-      end if;
-      ~RESULT <= fromSLV(~SYM[2](~SYM[4]));
-    end if;
-  end process; ~ELSE
-  ~SYM[6] : process(~ARG[3])
-  begin
-    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-      if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
-        ~SYM[2](~SYM[5]) <= ~ARG[9];
-      end if;
-      ~RESULT <= ~SYM[2](~SYM[4]);
-    end if;
-  end process; ~FI
-end block;
---end blockRamU"
+      [ "-- blockRamU begin"
+      , "~GENSYM[~RESULT_blockRam][1] : block~IF~VIVADO~THEN"
+      , "  type ~GENSYM[ram_t][8] is array (0 to integer'(~LIT[5])-1) of std_logic_vector(~SIZE[~TYP[9]]-1 downto 0);~ELSE"
+      , "  type ~SYM[8] is array (0 to integer'(~LIT[5])-1) of ~TYP[9];~FI"
+      , "  signal ~GENSYM[~RESULT_RAM][2] : ~SYM[8];"
+      , "  signal ~GENSYM[rd][4]  : integer range 0 to ~LIT[5] - 1;"
+      , "  signal ~GENSYM[wr][5]  : integer range 0 to ~LIT[5] - 1;"
+      , "begin"
+      , "  ~SYM[4] <= to_integer(~VAR[rdI][6](31 downto 0))"
+      , "  -- pragma translate_off"
+      , "                mod ~LIT[5]"
+      , "  -- pragma translate_on"
+      , "                ;"
+      , ""
+      , "  ~SYM[5] <= to_integer(~VAR[wrI][8](31 downto 0))"
+      , "  -- pragma translate_off"
+      , "                mod ~LIT[5]"
+      , "  -- pragma translate_on"
+      , "                ;"
+      , "~IF ~VIVADO ~THEN"
+      , "  ~SYM[6] : process(~ARG[3])"
+      , "  begin"
+      , "    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then"
+      , "      if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then"
+      , "        ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[9]][~TYP[9]];"
+      , "      end if;"
+      , "      ~RESULT <= fromSLV(~SYM[2](~SYM[4]));"
+      , "    end if;"
+      , "  end process; ~ELSE"
+      , "  ~SYM[6] : process(~ARG[3])"
+      , "  begin"
+      , "    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then"
+      , "      if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then"
+      , "        ~SYM[2](~SYM[5]) <= ~ARG[9];"
+      , "      end if;"
+      , "      ~RESULT <= ~SYM[2](~SYM[4]);"
+      , "    end if;"
+      , "  end process; ~FI"
+      , "end block;"
+      , "--end blockRamU"
+      ]
     }
   }
 , { "BlackBox" :
     { "name" : "Clash.Explicit.BlockRam.blockRam1#"
     , "kind" : "Declaration"
     , "type" :
-"blockRam1#
-  :: ( KnownDomain dom        ARG[0]
-     , HasCallStack  --       ARG[1]
-     , Undefined a ) --       ARG[2]
-  => Clock dom       -- clk,  ARG[3]
-  -> Enable dom      -- en,   ARG[4]
-  -> SNat n          -- len,  ARG[5]
-  -> a               -- init, ARG[6]
-  -> Signal dom Int  -- rd,   ARG[7]
-  -> Signal dom Bool -- wren, ARG[8]
-  -> Signal dom Int  -- wr,   ARG[9]
-  -> Signal dom a    -- din,  ARG[10]
-  -> Signal dom a"
+      [ "blockRam1#"
+      , "  :: ( KnownDomain dom        ARG[0]"
+      , "     , HasCallStack  --       ARG[1]"
+      , "     , Undefined a ) --       ARG[2]"
+      , "  => Clock dom       -- clk,  ARG[3]"
+      , "  -> Enable dom      -- en,   ARG[4]"
+      , "  -> SNat n          -- len,  ARG[5]"
+      , "  -> a               -- init, ARG[6]"
+      , "  -> Signal dom Int  -- rd,   ARG[7]"
+      , "  -> Signal dom Bool -- wren, ARG[8]"
+      , "  -> Signal dom Int  -- wr,   ARG[9]"
+      , "  -> Signal dom a    -- din,  ARG[10]"
+      , "  -> Signal dom a"
+      ]
     , "template" :
-"-- blockRam1 begin
-~GENSYM[~RESULT_blockRam][1] : block~IF~VIVADO~THEN
-  type ~GENSYM[ram_t][8] is array (0 to integer'(~LIT[5])-1) of std_logic_vector(~SIZE[~TYP[6]]-1 downto 0);~ELSE
-  type ~SYM[8] is array (0 to integer'(~LIT[5])-1) of ~TYP[6];~FI
-  signal ~GENSYM[~RESULT_RAM][2] : ~SYM[8] := (others => ~IF~VIVADO~THEN~TOBV[~CONST[6]][~TYP[6]]~ELSE~CONST[6]~FI);
-  signal ~GENSYM[rd][4]  : integer range 0 to ~LIT[5] - 1;
-  signal ~GENSYM[wr][5]  : integer range 0 to ~LIT[5] - 1;
-begin
-  ~SYM[4] <= to_integer(~VAR[rdI][7](31 downto 0))
-  -- pragma translate_off
-                mod ~LIT[5]
-  -- pragma translate_on
-                ;
-
-  ~SYM[5] <= to_integer(~VAR[wrI][9](31 downto 0))
-  -- pragma translate_off
-                mod ~LIT[5]
-  -- pragma translate_on
-                ;
-~IF ~VIVADO ~THEN
-  ~SYM[6] : process(~ARG[3])
-  begin
-    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-      if ~ARG[8] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
-        ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[10]][~TYP[10]];
-      end if;
-      ~RESULT <= fromSLV(~SYM[2](~SYM[4]));
-    end if;
-  end process; ~ELSE
-  ~SYM[6] : process(~ARG[3])
-  begin
-    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-      if ~ARG[8] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
-        ~SYM[2](~SYM[5]) <= ~ARG[10];
-      end if;
-      ~RESULT <= ~SYM[2](~SYM[4]);
-    end if;
-  end process; ~FI
-end block;
---end blockRam1"
+      [ "-- blockRam1 begin"
+      , "~GENSYM[~RESULT_blockRam][1] : block~IF~VIVADO~THEN"
+      , "  type ~GENSYM[ram_t][8] is array (0 to integer'(~LIT[5])-1) of std_logic_vector(~SIZE[~TYP[6]]-1 downto 0);~ELSE"
+      , "  type ~SYM[8] is array (0 to integer'(~LIT[5])-1) of ~TYP[6];~FI"
+      , "  signal ~GENSYM[~RESULT_RAM][2] : ~SYM[8] := (others => ~IF~VIVADO~THEN~TOBV[~CONST[6]][~TYP[6]]~ELSE~CONST[6]~FI);"
+      , "  signal ~GENSYM[rd][4]  : integer range 0 to ~LIT[5] - 1;"
+      , "  signal ~GENSYM[wr][5]  : integer range 0 to ~LIT[5] - 1;"
+      , "begin"
+      , "  ~SYM[4] <= to_integer(~VAR[rdI][7](31 downto 0))"
+      , "  -- pragma translate_off"
+      , "                mod ~LIT[5]"
+      , "  -- pragma translate_on"
+      , "                ;"
+      , ""
+      , "  ~SYM[5] <= to_integer(~VAR[wrI][9](31 downto 0))"
+      , "  -- pragma translate_off"
+      , "                mod ~LIT[5]"
+      , "  -- pragma translate_on"
+      , "                ;"
+      , "~IF ~VIVADO ~THEN"
+      , "  ~SYM[6] : process(~ARG[3])"
+      , "  begin"
+      , "    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then"
+      , "      if ~ARG[8] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then"
+      , "        ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[10]][~TYP[10]];"
+      , "      end if;"
+      , "      ~RESULT <= fromSLV(~SYM[2](~SYM[4]));"
+      , "    end if;"
+      , "  end process; ~ELSE"
+      , "  ~SYM[6] : process(~ARG[3])"
+      , "  begin"
+      , "    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then"
+      , "      if ~ARG[8] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then"
+      , "        ~SYM[2](~SYM[5]) <= ~ARG[10];"
+      , "      end if;"
+      , "      ~RESULT <= ~SYM[2](~SYM[4]);"
+      , "    end if;"
+      , "  end process; ~FI"
+      , "end block;"
+      , "--end blockRam1"
+      ]
     }
   }
 , { "BlackBox" :
     { "name" : "Clash.Explicit.BlockRam.trueDualPortBlockRam#"
     , "kind" : "Declaration"
     , "type" :
-"trueDualPortBlockRam# ::
-  forall nAddrs domA domB a .
-  ( HasCallStack           ~ARG[0]
-  , KnownNat nAddrs        ~ARG[1]
-  , KnownDomain domA       ~ARG[2]
-  , KnownDomain domB       ~ARG[3]
-  , NFDataX a              ~ARG[4]
-  , BitPack a              ~ARG[5]
-  ) =>
-
-  Clock domA ->                   ~ARG[6]
-  Signal domA Bool ->             ~ARG[7]
-  Signal domA (Index nAddrs) ->   ~ARG[8]
-  Signal domA a ->                ~ARG[9]
-
-  Clock domB ->                   ~ARG[10]
-  Signal domB Bool ->             ~ARG[11]
-  Signal domB (Index nAddrs) ->   ~ARG[12]
-  Signal domB a ->                ~ARG[13]
-  (Signal domA a, Signal domB a)"
+      [ "trueDualPortBlockRam# ::"
+      , "  forall nAddrs domA domB a ."
+      , "  ( HasCallStack           ~ARG[0]"
+      , "  , KnownNat nAddrs        ~ARG[1]"
+      , "  , KnownDomain domA       ~ARG[2]"
+      , "  , KnownDomain domB       ~ARG[3]"
+      , "  , NFDataX a              ~ARG[4]"
+      , "  , BitPack a              ~ARG[5]"
+      , "  ) =>"
+      , ""
+      , "  Clock domA ->                   ~ARG[6]"
+      , "  Signal domA Bool ->             ~ARG[7]"
+      , "  Signal domA (Index nAddrs) ->   ~ARG[8]"
+      , "  Signal domA a ->                ~ARG[9]"
+      , ""
+      , "  Clock domB ->                   ~ARG[10]"
+      , "  Signal domB Bool ->             ~ARG[11]"
+      , "  Signal domB (Index nAddrs) ->   ~ARG[12]"
+      , "  Signal domB a ->                ~ARG[13]"
+      , "  (Signal domA a, Signal domB a)"
+      ]
     , "template" :
-"-- trueDualPortBlockRam begin
-~GENSYM[~RESULT_trueDualPortBlockRam][1] : block
-  -- Shared memory
-  type mem_type is array ( ~LIT[1]-1 downto 0 ) of ~TYP[9];
-  shared variable mem : mem_type;
-  signal ~GENSYM[a_dout][2] : ~TYP[9];
-  signal ~GENSYM[b_dout][3] : ~TYP[13];
-begin
-
-  -- Port A
-  process(~ARG[6])
-  begin
-      if(rising_edge(~ARG[6])) then
-          if(~ARG[7]) then
-              mem(to_integer(~ARG[8])) := ~ARG[9];
-          end if;
-          ~SYM[2] <= mem(to_integer(~ARG[8]));
-      end if;
-  end process;
-
-  -- Port B
-  process(~ARG[10])
-  begin
-      if(rising_edge(~ARG[10])) then
-          if(~ARG[11]) then
-              mem(to_integer(~ARG[12])) := ~ARG[13];
-          end if;
-          ~SYM[3] <= mem(to_integer(~ARG[12]));
-      end if;
-  end process;
-
-  ~RESULT <= (~SYM[2], ~SYM[3]);
-end block;
--- end trueDualPortBlockRam"
+      [ "-- trueDualPortBlockRam begin"
+      , "~GENSYM[~RESULT_trueDualPortBlockRam][1] : block"
+      , "  -- Shared memory"
+      , "  type mem_type is array ( ~LIT[1]-1 downto 0 ) of ~TYP[9];"
+      , "  shared variable mem : mem_type;"
+      , "  signal ~GENSYM[a_dout][2] : ~TYP[9];"
+      , "  signal ~GENSYM[b_dout][3] : ~TYP[13];"
+      , "begin"
+      , ""
+      , "  -- Port A"
+      , "  process(~ARG[6])"
+      , "  begin"
+      , "      if(rising_edge(~ARG[6])) then"
+      , "          if(~ARG[7]) then"
+      , "              mem(to_integer(~ARG[8])) := ~ARG[9];"
+      , "          end if;"
+      , "          ~SYM[2] <= mem(to_integer(~ARG[8]));"
+      , "      end if;"
+      , "  end process;"
+      , ""
+      , "  -- Port B"
+      , "  process(~ARG[10])"
+      , "  begin"
+      , "      if(rising_edge(~ARG[10])) then"
+      , "          if(~ARG[11]) then"
+      , "              mem(to_integer(~ARG[12])) := ~ARG[13];"
+      , "          end if;"
+      , "          ~SYM[3] <= mem(to_integer(~ARG[12]));"
+      , "      end if;"
+      , "  end process;"
+      , ""
+      , "  ~RESULT <= (~SYM[2], ~SYM[3]);"
+      , "end block;"
+      , "-- end trueDualPortBlockRam"
+      ]
     }
   }
 ]

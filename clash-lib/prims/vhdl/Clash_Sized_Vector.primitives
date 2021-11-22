@@ -35,18 +35,20 @@
     , "workInfo"  : "Never"
     , "kind" : "Declaration"
     , "type" :
-"select :: (CmpNat (i + s) (s * n) ~ GT) -- ARG[0]
-        => SNat f                        -- ARG[1]
-        -> SNat s                        -- ARG[2]
-        -> SNat n                        -- ARG[3]
-        -> Vec i a                       -- ARG[4]
-        -> Vec n a"
+      [ "select :: (CmpNat (i + s) (s * n) ~ GT) -- ARG[0]"
+      , "        => SNat f                        -- ARG[1]"
+      , "        -> SNat s                        -- ARG[2]"
+      , "        -> SNat n                        -- ARG[3]"
+      , "        -> Vec i a                       -- ARG[4]"
+      , "        -> Vec n a"
+      ]
     , "template" :
-"-- select begin
-~GENSYM[select][0] : for ~GENSYM[i][1] in ~RESULT'range generate
-  ~RESULT(~SYM[1]) <= ~VAR[vec][4](~LIT[1]+(~LIT[2]*~SYM[1]));
-end generate;
--- select end"
+      [ "-- select begin"
+      , "~GENSYM[select][0] : for ~GENSYM[i][1] in ~RESULT'range generate"
+      , "  ~RESULT(~SYM[1]) <= ~VAR[vec][4](~LIT[1]+(~LIT[2]*~SYM[1]));"
+      , "end generate;"
+      , "-- select end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -63,13 +65,14 @@ end generate;
     , "kind"      : "Declaration"
     , "type"      : "concat :: Vec n (Vec m a) -> Vec (n * m) a"
     , "template"  :
-"-- concat begin
-~GENSYM[concat][0] : for ~GENSYM[i][1] in 0 to (~LENGTH[~TYP[0]] - 1) generate
-begin~IF ~VIVADO ~THEN
-~RESULT(~SYM[1] * ~LENGTH[~TYPEL[~TYP[0]]] to ((~SYM[1]+1) * ~LENGTH[~TYPEL[~TYP[0]]]) - 1) <= fromSLV(~VAR[vec][0](~SYM[1]));~ELSE
-~RESULT(~SYM[1] * ~LENGTH[~TYPEL[~TYP[0]]] to ((~SYM[1]+1) * ~LENGTH[~TYPEL[~TYP[0]]]) - 1) <= ~VAR[vec][0](~SYM[1]);~FI
-end generate;
--- concat end"
+      [ "-- concat begin"
+      , "~GENSYM[concat][0] : for ~GENSYM[i][1] in 0 to (~LENGTH[~TYP[0]] - 1) generate"
+      , "begin~IF ~VIVADO ~THEN"
+      , "~RESULT(~SYM[1] * ~LENGTH[~TYPEL[~TYP[0]]] to ((~SYM[1]+1) * ~LENGTH[~TYPEL[~TYP[0]]]) - 1) <= fromSLV(~VAR[vec][0](~SYM[1]));~ELSE"
+      , "~RESULT(~SYM[1] * ~LENGTH[~TYPEL[~TYP[0]]] to ((~SYM[1]+1) * ~LENGTH[~TYPEL[~TYP[0]]]) - 1) <= ~VAR[vec][0](~SYM[1]);~FI"
+      , "end generate;"
+      , "-- concat end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -85,18 +88,20 @@ end generate;
     , "workInfo" : "Never"
     , "kind" : "Declaration"
     , "type" :
-"unconcat :: KnownNat n     -- ARG[0]
-          => SNat m         -- ARG[1]
-          -> Vec (n * m) a  -- ARG[2]
-          -> Vec n (Vec m a)"
+      [ "unconcat :: KnownNat n     -- ARG[0]"
+      , "          => SNat m         -- ARG[1]"
+      , "          -> Vec (n * m) a  -- ARG[2]"
+      , "          -> Vec n (Vec m a)"
+      ]
     , "template" :
-"-- unconcat begin~DEVNULL[~ARG[0]]
-~GENSYM[unconcat][0] : for ~GENSYM[i][2] in ~RESULT'range generate
-begin~IF ~VIVADO ~THEN
-  ~RESULT(~SYM[2]) <= ~TOBV[~VAR[vec][2]((~SYM[2] * ~LIT[1]) to ((~SYM[2] * ~LIT[1]) + ~LIT[1] - 1))][~TYPEL[~TYPO]];~ELSE
-  ~RESULT(~SYM[2]) <= ~VAR[vec][2]((~SYM[2] * ~LIT[1]) to ((~SYM[2] * ~LIT[1]) + ~LIT[1] - 1));~FI
-end generate;
--- unconcat end"
+      [ "-- unconcat begin~DEVNULL[~ARG[0]]"
+      , "~GENSYM[unconcat][0] : for ~GENSYM[i][2] in ~RESULT'range generate"
+      , "begin~IF ~VIVADO ~THEN"
+      , "  ~RESULT(~SYM[2]) <= ~TOBV[~VAR[vec][2]((~SYM[2] * ~LIT[1]) to ((~SYM[2] * ~LIT[1]) + ~LIT[1] - 1))][~TYPEL[~TYPO]];~ELSE"
+      , "  ~RESULT(~SYM[2]) <= ~VAR[vec][2]((~SYM[2] * ~LIT[1]) to ((~SYM[2] * ~LIT[1]) + ~LIT[1] - 1));~FI"
+      , "end generate;"
+      , "-- unconcat end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -105,25 +110,26 @@ end generate;
     , "kind"      : "Declaration"
     , "type"      : "map :: (a -> b) -> Vec n a -> Vec n b"
     , "template"  :
-"-- map begin
-~GENSYM[map][0] : for ~GENSYM[i][1] in ~RESULT'range generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[1]]~THEN
-  signal ~GENSYM[map_in][2]  : ~TYPEL[~TYP[1]];~ELSE ~FI
-  signal ~GENSYM[map_out][3] : ~TYPEL[~TYPO];
-begin~IF~SIZE[~TYP[1]]~THEN
-  ~SYM[2] <= fromSLV(~VAR[vec][1](~SYM[1]));~ELSE ~FI
-  ~INST 0
-    ~OUTPUT <= ~SYM[3]~ ~TYPEL[~TYPO]~
-    ~INPUT  <= ~SYM[2]~ ~TYPEL[~TYP[1]]~
-  ~INST
-  ~RESULT(~SYM[1]) <= ~TOBV[~SYM[3]][~TYPEL[~TYPO]];
-end generate;~ELSE
-begin
-  ~INST 0
-    ~OUTPUT <= ~RESULT(~SYM[1])~ ~TYPEL[~TYPO]~
-    ~INPUT  <= ~VAR[vec][1](~SYM[1])~ ~TYPEL[~TYP[1]]~
-  ~INST
-end generate;~FI
--- map end"
+      [ "-- map begin"
+      , "~GENSYM[map][0] : for ~GENSYM[i][1] in ~RESULT'range generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[1]]~THEN"
+      , "  signal ~GENSYM[map_in][2]  : ~TYPEL[~TYP[1]];~ELSE ~FI"
+      , "  signal ~GENSYM[map_out][3] : ~TYPEL[~TYPO];"
+      , "begin~IF~SIZE[~TYP[1]]~THEN"
+      , "  ~SYM[2] <= fromSLV(~VAR[vec][1](~SYM[1]));~ELSE ~FI"
+      , "  ~INST 0"
+      , "    ~OUTPUT <= ~SYM[3]~ ~TYPEL[~TYPO]~"
+      , "    ~INPUT  <= ~SYM[2]~ ~TYPEL[~TYP[1]]~"
+      , "  ~INST"
+      , "  ~RESULT(~SYM[1]) <= ~TOBV[~SYM[3]][~TYPEL[~TYPO]];"
+      , "end generate;~ELSE"
+      , "begin"
+      , "  ~INST 0"
+      , "    ~OUTPUT <= ~RESULT(~SYM[1])~ ~TYPEL[~TYPO]~"
+      , "    ~INPUT  <= ~VAR[vec][1](~SYM[1])~ ~TYPEL[~TYP[1]]~"
+      , "  ~INST"
+      , "end generate;~FI"
+      , "-- map end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -132,36 +138,37 @@ end generate;~FI
     , "kind"      : "Declaration"
     , "type"      : "imap :: KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b"
     , "template"  :
-"-- imap begin
-~GENSYM[imap][0] : block
-  function ~GENSYM[max][6] (l,r : in natural) return natural is
-  begin
-    if l > r then return l;
-    else return r;
-    end if;
-  end function;
-begin
-  ~GENSYM[imap][5] : for ~GENSYM[i][1] in ~RESULT'range generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[2]]~THEN
-    signal ~GENSYM[map_in][2]  : ~TYPEL[~TYP[2]];~ELSE ~FI
-    signal ~GENSYM[map_out][3] : ~TYPEL[~TYPO];
-  begin~IF~SIZE[~TYP[2]]~THEN
-    ~SYM[2] <= fromSLV(~VAR[vec][2](~SYM[1]));~ELSE ~FI
-    ~INST 1
-      ~OUTPUT <= ~SYM[3]~ ~TYPEL[~TYPO]~
-      ~INPUT  <= to_unsigned(~SYM[1],~SYM[6](1,integer(ceil(log2(real(~LIT[0]))))))~ ~INDEXTYPE[~LIT[0]]~
-      ~INPUT  <= ~SYM[2]~ ~TYPEL[~TYP[2]]~
-    ~INST
-    ~RESULT(~SYM[1]) <= ~TOBV[~SYM[3]][~TYPEL[~TYPO]];
-  end generate;~ELSE
-  begin
-    ~INST 1
-      ~OUTPUT <= ~RESULT(~SYM[1])~ ~TYPEL[~TYPO]~
-      ~INPUT  <= to_unsigned(~SYM[1],~SYM[6](1,integer(ceil(log2(real(~LIT[0]))))))~ ~INDEXTYPE[~LIT[0]]~
-      ~INPUT  <= ~VAR[vec][2](~SYM[1])~ ~TYPEL[~TYP[2]]~
-    ~INST
-  end generate;~FI
-end block;
--- imap end"
+      [ "-- imap begin"
+      , "~GENSYM[imap][0] : block"
+      , "  function ~GENSYM[max][6] (l,r : in natural) return natural is"
+      , "  begin"
+      , "    if l > r then return l;"
+      , "    else return r;"
+      , "    end if;"
+      , "  end function;"
+      , "begin"
+      , "  ~GENSYM[imap][5] : for ~GENSYM[i][1] in ~RESULT'range generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[2]]~THEN"
+      , "    signal ~GENSYM[map_in][2]  : ~TYPEL[~TYP[2]];~ELSE ~FI"
+      , "    signal ~GENSYM[map_out][3] : ~TYPEL[~TYPO];"
+      , "  begin~IF~SIZE[~TYP[2]]~THEN"
+      , "    ~SYM[2] <= fromSLV(~VAR[vec][2](~SYM[1]));~ELSE ~FI"
+      , "    ~INST 1"
+      , "      ~OUTPUT <= ~SYM[3]~ ~TYPEL[~TYPO]~"
+      , "      ~INPUT  <= to_unsigned(~SYM[1],~SYM[6](1,integer(ceil(log2(real(~LIT[0]))))))~ ~INDEXTYPE[~LIT[0]]~"
+      , "      ~INPUT  <= ~SYM[2]~ ~TYPEL[~TYP[2]]~"
+      , "    ~INST"
+      , "    ~RESULT(~SYM[1]) <= ~TOBV[~SYM[3]][~TYPEL[~TYPO]];"
+      , "  end generate;~ELSE"
+      , "  begin"
+      , "    ~INST 1"
+      , "      ~OUTPUT <= ~RESULT(~SYM[1])~ ~TYPEL[~TYPO]~"
+      , "      ~INPUT  <= to_unsigned(~SYM[1],~SYM[6](1,integer(ceil(log2(real(~LIT[0]))))))~ ~INDEXTYPE[~LIT[0]]~"
+      , "      ~INPUT  <= ~VAR[vec][2](~SYM[1])~ ~TYPEL[~TYP[2]]~"
+      , "    ~INST"
+      , "  end generate;~FI"
+      , "end block;"
+      , "-- imap end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -170,31 +177,32 @@ end block;
     , "kind"      : "Declaration"
     , "type"      : "imap_go :: Index n -> (Index n -> a -> b) -> Vec m a -> Vec m b"
     , "template"  :
-"-- imap_go begin
-~GENSYM[imap][5] : for ~GENSYM[i][1] in ~RESULT'range generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[2]]~THEN
-  signal ~GENSYM[map_in][2]  : ~TYPEL[~TYP[2]];~ELSE ~FI
-  signal ~GENSYM[map_out][3] : ~TYPEL[~TYPO];
-  signal ~GENSYM[i2][4]      : ~TYP[0];
-begin~IF~SIZE[~TYP[2]]~THEN
-  ~SYM[2] <= fromSLV(~VAR[vec][2](~SYM[1]));~ELSE ~FI
-  ~SYM[4] <= ~ARG[0] + to_unsigned(~SYM[1],~SIZE[~TYP[0]]);
-  ~INST 1
-    ~OUTPUT <= ~SYM[3]~ ~TYPEL[~TYPO]~
-    ~INPUT  <= ~SYM[4]~ ~TYP[0]~
-    ~INPUT  <= ~SYM[2]~ ~TYPEL[~TYP[2]]~
-  ~INST
-  ~RESULT(~SYM[1]) <= ~TOBV[~SYM[3]][~TYPEL[~TYPO]];
-end generate;~ELSE
-  signal ~SYM[4] : ~TYP[0];
-begin
-  ~SYM[4] <= ~ARG[0] + to_unsigned(~SYM[1],~SIZE[~TYP[0]]);
-  ~INST 1
-    ~OUTPUT <= ~RESULT(~SYM[1])~ ~TYPEL[~TYPO]~
-    ~INPUT  <= ~SYM[4]~ ~TYP[0]~
-    ~INPUT  <= ~VAR[vec][2](~SYM[1])~ ~TYPEL[~TYP[2]]~
-  ~INST
-end generate;~FI
--- imap_go end"
+      [ "-- imap_go begin"
+      , "~GENSYM[imap][5] : for ~GENSYM[i][1] in ~RESULT'range generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[2]]~THEN"
+      , "  signal ~GENSYM[map_in][2]  : ~TYPEL[~TYP[2]];~ELSE ~FI"
+      , "  signal ~GENSYM[map_out][3] : ~TYPEL[~TYPO];"
+      , "  signal ~GENSYM[i2][4]      : ~TYP[0];"
+      , "begin~IF~SIZE[~TYP[2]]~THEN"
+      , "  ~SYM[2] <= fromSLV(~VAR[vec][2](~SYM[1]));~ELSE ~FI"
+      , "  ~SYM[4] <= ~ARG[0] + to_unsigned(~SYM[1],~SIZE[~TYP[0]]);"
+      , "  ~INST 1"
+      , "    ~OUTPUT <= ~SYM[3]~ ~TYPEL[~TYPO]~"
+      , "    ~INPUT  <= ~SYM[4]~ ~TYP[0]~"
+      , "    ~INPUT  <= ~SYM[2]~ ~TYPEL[~TYP[2]]~"
+      , "  ~INST"
+      , "  ~RESULT(~SYM[1]) <= ~TOBV[~SYM[3]][~TYPEL[~TYPO]];"
+      , "end generate;~ELSE"
+      , "  signal ~SYM[4] : ~TYP[0];"
+      , "begin"
+      , "  ~SYM[4] <= ~ARG[0] + to_unsigned(~SYM[1],~SIZE[~TYP[0]]);"
+      , "  ~INST 1"
+      , "    ~OUTPUT <= ~RESULT(~SYM[1])~ ~TYPEL[~TYPO]~"
+      , "    ~INPUT  <= ~SYM[4]~ ~TYP[0]~"
+      , "    ~INPUT  <= ~VAR[vec][2](~SYM[1])~ ~TYPEL[~TYP[2]]~"
+      , "  ~INST"
+      , "end generate;~FI"
+      , "-- imap_go end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -203,29 +211,30 @@ end generate;~FI
     , "kind"      : "Declaration"
     , "type"      : "zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c"
     , "template"  :
-"-- zipWith begin
-~GENSYM[zipWith][0] : for ~GENSYM[i][1] in ~RESULT'range generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[1]]~THEN
-  signal ~GENSYM[zipWith_in1][2] : ~TYPEL[~TYP[1]];~ELSE ~FI~IF~SIZE[~TYP[2]]~THEN
-  signal ~GENSYM[zipWith_in2][6] : ~TYPEL[~TYP[2]];~ELSE ~FI
-  signal ~GENSYM[zipWith_out][3] : ~TYPEL[~TYPO];
-begin~IF~SIZE[~TYP[1]]~THEN
-  ~SYM[2] <= fromSLV(~VAR[vec1][1](~SYM[1]));~ELSE ~FI~IF~SIZE[~TYP[2]]~THEN
-  ~SYM[6] <= fromSLV(~VAR[vec2][2](~SYM[1]));~ELSE ~FI
-  ~INST 0
-    ~OUTPUT <= ~SYM[3]~ ~TYPEL[~TYPO]~
-    ~INPUT  <= ~SYM[2]~ ~TYPEL[~TYP[1]]~
-    ~INPUT  <= ~SYM[6]~ ~TYPEL[~TYP[2]]~
-  ~INST
-  ~RESULT(~SYM[1]) <= ~TOBV[~SYM[3]][~TYPEL[~TYPO]];
-end generate;~ELSE
-begin
-  ~INST 0
-    ~OUTPUT <= ~RESULT(~SYM[1])~ ~TYPEL[~TYPO]~
-    ~INPUT  <= ~VAR[vec1][1](~SYM[1])~ ~TYPEL[~TYP[1]]~
-    ~INPUT  <= ~VAR[vec2][2](~SYM[1])~ ~TYPEL[~TYP[2]]~
-  ~INST
-end generate;~FI
--- zipWith end"
+      [ "-- zipWith begin"
+      , "~GENSYM[zipWith][0] : for ~GENSYM[i][1] in ~RESULT'range generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[1]]~THEN"
+      , "  signal ~GENSYM[zipWith_in1][2] : ~TYPEL[~TYP[1]];~ELSE ~FI~IF~SIZE[~TYP[2]]~THEN"
+      , "  signal ~GENSYM[zipWith_in2][6] : ~TYPEL[~TYP[2]];~ELSE ~FI"
+      , "  signal ~GENSYM[zipWith_out][3] : ~TYPEL[~TYPO];"
+      , "begin~IF~SIZE[~TYP[1]]~THEN"
+      , "  ~SYM[2] <= fromSLV(~VAR[vec1][1](~SYM[1]));~ELSE ~FI~IF~SIZE[~TYP[2]]~THEN"
+      , "  ~SYM[6] <= fromSLV(~VAR[vec2][2](~SYM[1]));~ELSE ~FI"
+      , "  ~INST 0"
+      , "    ~OUTPUT <= ~SYM[3]~ ~TYPEL[~TYPO]~"
+      , "    ~INPUT  <= ~SYM[2]~ ~TYPEL[~TYP[1]]~"
+      , "    ~INPUT  <= ~SYM[6]~ ~TYPEL[~TYP[2]]~"
+      , "  ~INST"
+      , "  ~RESULT(~SYM[1]) <= ~TOBV[~SYM[3]][~TYPEL[~TYPO]];"
+      , "end generate;~ELSE"
+      , "begin"
+      , "  ~INST 0"
+      , "    ~OUTPUT <= ~RESULT(~SYM[1])~ ~TYPEL[~TYPO]~"
+      , "    ~INPUT  <= ~VAR[vec1][1](~SYM[1])~ ~TYPEL[~TYP[1]]~"
+      , "    ~INPUT  <= ~VAR[vec2][2](~SYM[1])~ ~TYPEL[~TYP[2]]~"
+      , "  ~INST"
+      , "end generate;~FI"
+      , "-- zipWith end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -234,35 +243,36 @@ end generate;~FI
     , "kind"      : "Declaration"
     , "type"      : "foldr :: (a -> b -> b) -> b -> Vec n a -> b"
     , "template"  :
-"-- foldr begin~IF ~LENGTH[~TYP[2]] ~THEN
-~GENSYM[foldr][0] : block
-  type ~GENSYM[foldr_res_type][1] is array (natural range <>) of ~TYP[1];
-  signal ~GENSYM[intermediate][2] : ~SYM[1] (0 to ~LENGTH[~TYP[2]]);
-begin
-  ~SYM[2](~LENGTH[~TYP[2]]) <= ~ARG[1];
-
-  foldr_loop : for ~GENSYM[i][3] in 0 to (~LENGTH[~TYP[2]] - 1) generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[2]]~THEN
-    signal ~GENSYM[foldr_in][4] : ~TYPEL[~TYP[2]];~ELSE ~FI
-  begin~IF~SIZE[~TYP[2]]~THEN
-    ~SYM[4] <= fromSLV(~VAR[vec][2](~SYM[3]));~ELSE ~FI
-    ~INST 0
-      ~OUTPUT <= ~SYM[2](~SYM[3])~ ~TYP[1]~
-      ~INPUT  <= ~SYM[4]~ ~TYPEL[~TYP[2]]~
-      ~INPUT  <= ~SYM[2](~SYM[3]+1)~ ~TYP[1]~
-    ~INST
-  end generate;~ELSE
-  begin
-    ~INST 0
-      ~OUTPUT <= ~SYM[2](~SYM[3])~ ~TYP[1]~
-      ~INPUT  <= ~VAR[vec][2](~SYM[3])~ ~TYPEL[~TYP[2]]~
-      ~INPUT  <= ~SYM[2](~SYM[3]+1)~ ~TYP[1]~
-    ~INST
-  end generate;~FI
-
-  ~RESULT <= ~SYM[2](0);
-end block;~ELSE
-~RESULT <= ~ARG[1];~FI
--- foldr end"
+      [ "-- foldr begin~IF ~LENGTH[~TYP[2]] ~THEN"
+      , "~GENSYM[foldr][0] : block"
+      , "  type ~GENSYM[foldr_res_type][1] is array (natural range <>) of ~TYP[1];"
+      , "  signal ~GENSYM[intermediate][2] : ~SYM[1] (0 to ~LENGTH[~TYP[2]]);"
+      , "begin"
+      , "  ~SYM[2](~LENGTH[~TYP[2]]) <= ~ARG[1];"
+      , ""
+      , "  foldr_loop : for ~GENSYM[i][3] in 0 to (~LENGTH[~TYP[2]] - 1) generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[2]]~THEN"
+      , "    signal ~GENSYM[foldr_in][4] : ~TYPEL[~TYP[2]];~ELSE ~FI"
+      , "  begin~IF~SIZE[~TYP[2]]~THEN"
+      , "    ~SYM[4] <= fromSLV(~VAR[vec][2](~SYM[3]));~ELSE ~FI"
+      , "    ~INST 0"
+      , "      ~OUTPUT <= ~SYM[2](~SYM[3])~ ~TYP[1]~"
+      , "      ~INPUT  <= ~SYM[4]~ ~TYPEL[~TYP[2]]~"
+      , "      ~INPUT  <= ~SYM[2](~SYM[3]+1)~ ~TYP[1]~"
+      , "    ~INST"
+      , "  end generate;~ELSE"
+      , "  begin"
+      , "    ~INST 0"
+      , "      ~OUTPUT <= ~SYM[2](~SYM[3])~ ~TYP[1]~"
+      , "      ~INPUT  <= ~VAR[vec][2](~SYM[3])~ ~TYPEL[~TYP[2]]~"
+      , "      ~INPUT  <= ~SYM[2](~SYM[3]+1)~ ~TYP[1]~"
+      , "    ~INST"
+      , "  end generate;~FI"
+      , ""
+      , "  ~RESULT <= ~SYM[2](0);"
+      , "end block;~ELSE"
+      , "~RESULT <= ~ARG[1];~FI"
+      , "-- foldr end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -270,19 +280,20 @@ end block;~ELSE
     , "kind"      : "Declaration"
     , "type"      : "index_int :: KnownNat n => Vec n a -> Int -> a"
     , "template"  :
-"-- index begin
-~IF~SIZE[~TYP[1]]~THEN~GENSYM[indexVec][0] : block
-  signal ~GENSYM[vec_index][1] : integer range 0 to ~LIT[0]-1;
-begin
-  ~SYM[1] <= to_integer(~ARG[2])
-  -- pragma translate_off
-               mod ~LIT[0]
-  -- pragma translate_on
-               ;~IF ~VIVADO ~THEN
-  ~RESULT <= fromSLV(~VAR[vec][1](~SYM[1]));~ELSE
-  ~RESULT <= ~VAR[vec][1](~SYM[1]);~FI
-end block;~ELSE~RESULT <= ~ERRORO;~FI
--- index end"
+      [ "-- index begin"
+      , "~IF~SIZE[~TYP[1]]~THEN~GENSYM[indexVec][0] : block"
+      , "  signal ~GENSYM[vec_index][1] : integer range 0 to ~LIT[0]-1;"
+      , "begin"
+      , "  ~SYM[1] <= to_integer(~ARG[2])"
+      , "  -- pragma translate_off"
+      , "               mod ~LIT[0]"
+      , "  -- pragma translate_on"
+      , "               ;~IF ~VIVADO ~THEN"
+      , "  ~RESULT <= fromSLV(~VAR[vec][1](~SYM[1]));~ELSE"
+      , "  ~RESULT <= ~VAR[vec][1](~SYM[1]);~FI"
+      , "end block;~ELSE~RESULT <= ~ERRORO;~FI"
+      , "-- index end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -290,26 +301,27 @@ end block;~ELSE~RESULT <= ~ERRORO;~FI
     , "kind"      : "Declaration"
     , "type"      : "replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a"
     , "template"  :
-"-- replace begin
-~GENSYM[replaceVec][0] : block
-  signal ~GENSYM[vec_index][1] : integer range 0 to ~LIT[0]-1;
-begin
-  ~SYM[1] <= to_integer(~ARG[2])
-  -- pragma translate_off
-               mod ~LIT[0]
-  -- pragma translate_on
-               ;
-
-  process(~SYM[1]~VARS[1]~VARS[3])
-    variable ~GENSYM[ivec][2] : ~TYP[1];
-  begin
-    ~SYM[2] := ~ARG[1];~IF ~VIVADO ~THEN
-    ~SYM[2](~SYM[1]) := ~TOBV[~ARG[3]][~TYP[3]];~ELSE
-    ~SYM[2](~SYM[1]) := ~ARG[3];~FI
-    ~RESULT <= ~SYM[2];
-  end process;
-end block;
--- replace end"
+      [ "-- replace begin"
+      , "~GENSYM[replaceVec][0] : block"
+      , "  signal ~GENSYM[vec_index][1] : integer range 0 to ~LIT[0]-1;"
+      , "begin"
+      , "  ~SYM[1] <= to_integer(~ARG[2])"
+      , "  -- pragma translate_off"
+      , "               mod ~LIT[0]"
+      , "  -- pragma translate_on"
+      , "               ;"
+      , ""
+      , "  process(~SYM[1]~VARS[1]~VARS[3])"
+      , "    variable ~GENSYM[ivec][2] : ~TYP[1];"
+      , "  begin"
+      , "    ~SYM[2] := ~ARG[1];~IF ~VIVADO ~THEN"
+      , "    ~SYM[2](~SYM[1]) := ~TOBV[~ARG[3]][~TYP[3]];~ELSE"
+      , "    ~SYM[2](~SYM[1]) := ~ARG[3];~FI"
+      , "    ~RESULT <= ~SYM[2];"
+      , "  end process;"
+      , "end block;"
+      , "-- replace end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -342,14 +354,15 @@ end block;
     , "kind"      : "Declaration"
     , "type"      : "transpose :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)"
     , "template"  :
-"-- transpose begin
-~GENSYM[transpose_outer][2] : for ~GENSYM[row_index][3] in 0 to (~LENGTH[~TYP[1]] - 1) generate
-  ~GENSYM[transpose_inner][4] : for ~GENSYM[col_index][5] in ~RESULT'range generate~IF ~VIVADO ~THEN
-    ~RESULT(~SYM[5])((~LENGTH[~TYP[1]]-~SYM[3])*~SIZE[~TYPEL[~TYPEL[~TYPO]]]-1 downto (~LENGTH[~TYP[1]]-~SYM[3]-1)*~SIZE[~TYPEL[~TYPEL[~TYPO]]]) <= ~VAR[vec][1](~SYM[3])((~RESULT'length-~SYM[5])*~SIZE[~TYPEL[~TYPEL[~TYPO]]]-1 downto (~RESULT'length-~SYM[5]-1)*~SIZE[~TYPEL[~TYPEL[~TYPO]]]);~ELSE
-    ~RESULT(~SYM[5])(~SYM[3]) <= ~VAR[matrix][1](~SYM[3])(~SYM[5]);~FI
-  end generate;
-end generate;
--- transpose end"
+      [ "-- transpose begin"
+      , "~GENSYM[transpose_outer][2] : for ~GENSYM[row_index][3] in 0 to (~LENGTH[~TYP[1]] - 1) generate"
+      , "  ~GENSYM[transpose_inner][4] : for ~GENSYM[col_index][5] in ~RESULT'range generate~IF ~VIVADO ~THEN"
+      , "    ~RESULT(~SYM[5])((~LENGTH[~TYP[1]]-~SYM[3])*~SIZE[~TYPEL[~TYPEL[~TYPO]]]-1 downto (~LENGTH[~TYP[1]]-~SYM[3]-1)*~SIZE[~TYPEL[~TYPEL[~TYPO]]]) <= ~VAR[vec][1](~SYM[3])((~RESULT'length-~SYM[5])*~SIZE[~TYPEL[~TYPEL[~TYPO]]]-1 downto (~RESULT'length-~SYM[5]-1)*~SIZE[~TYPEL[~TYPEL[~TYPO]]]);~ELSE"
+      , "    ~RESULT(~SYM[5])(~SYM[3]) <= ~VAR[matrix][1](~SYM[3])(~SYM[5]);~FI"
+      , "  end generate;"
+      , "end generate;"
+      , "-- transpose end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -358,11 +371,12 @@ end generate;
     , "kind"      : "Declaration"
     , "type"      : "reverse :: Vec n a -> Vec n a"
     , "template"  :
-"-- reverse begin
-~GENSYM[reverse_loop][2] : for ~GENSYM[i][3] in 0 to (~LENGTH[~TYP[0]] - 1) generate
-  ~RESULT(~VAR[vec][0]'high - ~SYM[3]) <= ~VAR[vec][0](~SYM[3]);
-end generate;
--- reverse end"
+      [ "-- reverse begin"
+      , "~GENSYM[reverse_loop][2] : for ~GENSYM[i][3] in 0 to (~LENGTH[~TYP[0]] - 1) generate"
+      , "  ~RESULT(~VAR[vec][0]'high - ~SYM[3]) <= ~VAR[vec][0](~SYM[3]);"
+      , "end generate;"
+      , "-- reverse end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -370,15 +384,17 @@ end generate;
     , "workInfo" : "Never"
     , "kind" : "Declaration"
     , "type" :
-"concatBitVector# :: (KnownNat n,KnownNat m) -- (ARG[0],ARG[1])
-                  => Vec n (BitVector m)     -- ARG[2]
-                  -> BitVector (n * m)"
+      [ "concatBitVector# :: (KnownNat n,KnownNat m) -- (ARG[0],ARG[1])"
+      , "                  => Vec n (BitVector m)     -- ARG[2]"
+      , "                  -> BitVector (n * m)"
+      ]
     , "template" :
-"-- concatBitVector begin
-~GENSYM[concatBitVectorIter_loop][2] : for ~GENSYM[i][3] in 0 to (~LENGTH[~TYP[2]] - 1) generate
-  ~RESULT(((~SYM[3] * ~LIT[1]) + ~LIT[1] - 1) downto (~SYM[3] * ~LIT[1])) <= ~TYPMO'(~VAR[vec][2](~VAR[vec][2]'high - ~SYM[3]));
-end generate;
--- concatBitVector end"
+      [ "-- concatBitVector begin"
+      , "~GENSYM[concatBitVectorIter_loop][2] : for ~GENSYM[i][3] in 0 to (~LENGTH[~TYP[2]] - 1) generate"
+      , "  ~RESULT(((~SYM[3] * ~LIT[1]) + ~LIT[1] - 1) downto (~SYM[3] * ~LIT[1])) <= ~TYPMO'(~VAR[vec][2](~VAR[vec][2]'high - ~SYM[3]));"
+      , "end generate;"
+      , "-- concatBitVector end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -386,15 +402,17 @@ end generate;
     , "workInfo" : "Never"
     , "kind" : "Declaration"
     , "type" :
-"unconcatBitVector# :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
-                    => BitVector (n * m)        -- ARG[2]
-                    -> Vec n (BitVector m)"
+      [ "unconcatBitVector# :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])"
+      , "                    => BitVector (n * m)        -- ARG[2]"
+      , "                    -> Vec n (BitVector m)"
+      ]
     , "template" :
-"-- unconcatBitVector begin
-~GENSYM[unconcatBitVectorIter_loop][2] : for ~GENSYM[i][3] in ~RESULT'range generate
-  ~RESULT(~RESULT'high - ~SYM[3]) <= ~VAR[vec][2](((~SYM[3] * ~LIT[1]) + ~LIT[1] - 1) downto (~SYM[3] * ~LIT[1]));
-end generate;
--- unconcatBitVector end"
+      [ "-- unconcatBitVector begin"
+      , "~GENSYM[unconcatBitVectorIter_loop][2] : for ~GENSYM[i][3] in ~RESULT'range generate"
+      , "  ~RESULT(~RESULT'high - ~SYM[3]) <= ~VAR[vec][2](((~SYM[3] * ~LIT[1]) + ~LIT[1] - 1) downto (~SYM[3] * ~LIT[1]));"
+      , "end generate;"
+      , "-- unconcatBitVector end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -403,20 +421,21 @@ end generate;
     , "kind"      : "Declaration"
     , "type"      : "rotateLeftS :: KnownNat n => Vec n a -> SNat d -> Vec n a"
     , "template"  :
-"-- rotateLeftS begin
-~GENSYM[rotateLeftS][0] : block
-  constant ~GENSYM[shift_amount][2] : natural := ~LIT[2] mod ~LIT[0];
-begin
-  ~GENSYM[no_shift][3] : if ~SYM[2] = 0 generate
-    ~RESULT <= ~VAR[vec][1];
-  end generate;
-
-  ~GENSYM[do_shift][4] : if ~SYM[2] /= 0 generate
-    ~RESULT <= ~VAR[vec][1](~SYM[2] to ~LIT[0]-1) &
-               ~VAR[vec][1](0 to ~SYM[2]-1);
-  end generate;
-end block;
--- rotateLeftS end"
+      [ "-- rotateLeftS begin"
+      , "~GENSYM[rotateLeftS][0] : block"
+      , "  constant ~GENSYM[shift_amount][2] : natural := ~LIT[2] mod ~LIT[0];"
+      , "begin"
+      , "  ~GENSYM[no_shift][3] : if ~SYM[2] = 0 generate"
+      , "    ~RESULT <= ~VAR[vec][1];"
+      , "  end generate;"
+      , ""
+      , "  ~GENSYM[do_shift][4] : if ~SYM[2] /= 0 generate"
+      , "    ~RESULT <= ~VAR[vec][1](~SYM[2] to ~LIT[0]-1) &"
+      , "               ~VAR[vec][1](0 to ~SYM[2]-1);"
+      , "  end generate;"
+      , "end block;"
+      , "-- rotateLeftS end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -425,20 +444,21 @@ end block;
     , "kind"      : "Declaration"
     , "type"      : "rotateRightS :: KnownNat n => Vec n a -> SNat d -> Vec n a"
     , "template"  :
-"-- rotateRightS begin
-~GENSYM[rotateLeftS][0] : block
-  constant ~GENSYM[shift_amount][2] : natural := ~LIT[2] mod ~LIT[0];
-begin
-  ~GENSYM[no_shift][3] : if ~SYM[2] = 0 generate
-    ~RESULT <= ~VAR[vec][1];
-  end generate;
-
-  ~GENSYM[do_shift][4] : if ~SYM[2] /= 0 generate
-    ~RESULT <= ~VAR[vec][1](~LIT[0]-~SYM[2] to ~LIT[0]-1) &
-               ~VAR[vec][1](0 to ~LIT[0]-~SYM[2]-1);
-  end generate;
-end block;
--- rotateRightS end"
+      [ "-- rotateRightS begin"
+      , "~GENSYM[rotateLeftS][0] : block"
+      , "  constant ~GENSYM[shift_amount][2] : natural := ~LIT[2] mod ~LIT[0];"
+      , "begin"
+      , "  ~GENSYM[no_shift][3] : if ~SYM[2] = 0 generate"
+      , "    ~RESULT <= ~VAR[vec][1];"
+      , "  end generate;"
+      , ""
+      , "  ~GENSYM[do_shift][4] : if ~SYM[2] /= 0 generate"
+      , "    ~RESULT <= ~VAR[vec][1](~LIT[0]-~SYM[2] to ~LIT[0]-1) &"
+      , "               ~VAR[vec][1](0 to ~LIT[0]-~SYM[2]-1);"
+      , "  end generate;"
+      , "end block;"
+      , "-- rotateRightS end"
+      ]
     }
   }
 ]

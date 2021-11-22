@@ -2,53 +2,55 @@
     { "name" : "Clash.Explicit.RAM.asyncRam#"
     , "kind" : "Declaration"
     , "type" :
-"asyncRam#
-  :: ( HasCallStack              -- ARG[0]
-     , KnownDomain wdom wconf    -- ARG[1]
-     , KnownDomain rdom rconf )  -- ARG[2]
-  => Clock wdom                  -- ^ wclk, ARG[3]
-  -> Clock rdom                  -- ^ rclk, ARG[4]
-  -> Enable wdom                 -- ^ wen,  ARG[5]
-  -> SNat n                      -- ^ sz,   ARG[6]
-  -> Signal rdom Int             -- ^ rd,   ARG[7]
-  -> Signal wdom Bool            -- ^ en,   ARG[8]
-  -> Signal wdom Int             -- ^ wr,   ARG[9]
-  -> Signal wdom a               -- ^ din,  ARG[10]
-  -> Signal rdom a"
+      [ "asyncRam#"
+      , "  :: ( HasCallStack              -- ARG[0]"
+      , "     , KnownDomain wdom wconf    -- ARG[1]"
+      , "     , KnownDomain rdom rconf )  -- ARG[2]"
+      , "  => Clock wdom                  -- ^ wclk, ARG[3]"
+      , "  -> Clock rdom                  -- ^ rclk, ARG[4]"
+      , "  -> Enable wdom                 -- ^ wen,  ARG[5]"
+      , "  -> SNat n                      -- ^ sz,   ARG[6]"
+      , "  -> Signal rdom Int             -- ^ rd,   ARG[7]"
+      , "  -> Signal wdom Bool            -- ^ en,   ARG[8]"
+      , "  -> Signal wdom Int             -- ^ wr,   ARG[9]"
+      , "  -> Signal wdom a               -- ^ din,  ARG[10]"
+      , "  -> Signal rdom a"
+      ]
     , "template" :
-"-- asyncRam begin
-~GENSYM[~COMPNAME_asyncRam][0] : block~IF ~VIVADO ~THEN
-  type ~GENSYM[RamType][4] is array(natural range <>) of std_logic_vector(~SIZE[~TYP[10]]-1 downto 0);~ELSE
-  type ~SYM[4] is array(natural range <>) of ~TYP[10];~FI
-  signal ~GENSYM[RAM][1] : ~SYM[4](0 to ~LIT[6]-1);
-  signal ~GENSYM[rd][2] : integer range 0 to ~LIT[6] - 1;
-  signal ~GENSYM[wr][3] : integer range 0 to ~LIT[6] - 1;
-begin
-  ~SYM[2] <= to_integer(~VAR[rdI][7](31 downto 0))
-  -- pragma translate_off
-                mod ~LIT[6]
-  -- pragma translate_on
-                ;
-
-  ~SYM[3] <= to_integer(~VAR[wrI][9](31 downto 0))
-  -- pragma translate_off
-                mod ~LIT[6]
-  -- pragma translate_on
-                ;
-  ~GENSYM[asyncRam_sync][7] : process(~ARG[3])
-  begin
-    if ~IF~ACTIVEEDGE[Rising][1]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-      if (~ARG[8] ~IF ~ISACTIVEENABLE[5] ~THEN and ~ARG[5] ~ELSE ~FI) then~IF ~VIVADO ~THEN
-        ~SYM[1](~SYM[3]) <= ~TOBV[~ARG[10]][~TYP[10]];~ELSE
-        ~SYM[1](~SYM[3]) <= ~ARG[10];~FI
-      end if;
-    end if;
-  end process;
-  ~IF ~VIVADO ~THEN
-  ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYP[10]];~ELSE
-  ~RESULT <= ~SYM[1](~SYM[2]);~FI
-end block;
--- asyncRam end"
+      [ "-- asyncRam begin"
+      , "~GENSYM[~COMPNAME_asyncRam][0] : block~IF ~VIVADO ~THEN"
+      , "  type ~GENSYM[RamType][4] is array(natural range <>) of std_logic_vector(~SIZE[~TYP[10]]-1 downto 0);~ELSE"
+      , "  type ~SYM[4] is array(natural range <>) of ~TYP[10];~FI"
+      , "  signal ~GENSYM[RAM][1] : ~SYM[4](0 to ~LIT[6]-1);"
+      , "  signal ~GENSYM[rd][2] : integer range 0 to ~LIT[6] - 1;"
+      , "  signal ~GENSYM[wr][3] : integer range 0 to ~LIT[6] - 1;"
+      , "begin"
+      , "  ~SYM[2] <= to_integer(~VAR[rdI][7](31 downto 0))"
+      , "  -- pragma translate_off"
+      , "                mod ~LIT[6]"
+      , "  -- pragma translate_on"
+      , "                ;"
+      , ""
+      , "  ~SYM[3] <= to_integer(~VAR[wrI][9](31 downto 0))"
+      , "  -- pragma translate_off"
+      , "                mod ~LIT[6]"
+      , "  -- pragma translate_on"
+      , "                ;"
+      , "  ~GENSYM[asyncRam_sync][7] : process(~ARG[3])"
+      , "  begin"
+      , "    if ~IF~ACTIVEEDGE[Rising][1]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then"
+      , "      if (~ARG[8] ~IF ~ISACTIVEENABLE[5] ~THEN and ~ARG[5] ~ELSE ~FI) then~IF ~VIVADO ~THEN"
+      , "        ~SYM[1](~SYM[3]) <= ~TOBV[~ARG[10]][~TYP[10]];~ELSE"
+      , "        ~SYM[1](~SYM[3]) <= ~ARG[10];~FI"
+      , "      end if;"
+      , "    end if;"
+      , "  end process;"
+      , "  ~IF ~VIVADO ~THEN"
+      , "  ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYP[10]];~ELSE"
+      , "  ~RESULT <= ~SYM[1](~SYM[2]);~FI"
+      , "end block;"
+      , "-- asyncRam end"
+      ]
     }
   }
 ]

@@ -127,35 +127,36 @@
     , "kind"      : "Declaration"
     , "type"      : "reduceAnd# :: KnownNat n => BitVector n -> Bit"
     , "template"  :
-"-- reduceAnd begin,
-~IF~SIZE[~TYP[1]]~THEN
-~GENSYM[reduceAnd][0] : block
-  function and_reduce (arg : std_logic_vector) return std_logic is
-    variable upper, lower : std_logic;
-    variable half         : integer;
-    variable argi         : std_logic_vector (arg'length - 1 downto 0);
-    variable result       : std_logic;
-  begin
-    if (arg'length < 1) then
-      result := '1';
-    else
-      argi := arg;
-      if (argi'length = 1) then
-        result := argi(argi'left);
-      else
-        half   := (argi'length + 1) / 2; -- lsb-biased tree
-        upper  := and_reduce (argi (argi'left downto half));
-        lower  := and_reduce (argi (half - 1 downto argi'right));
-        result := upper and lower;
-      end if;
-    end if;
-    return result;
-  end;
-begin
-  ~RESULT <= and_reduce(~ARG[1]);
-end block;~ELSE
-~RESULT <= '1';~FI
--- reduceAnd end"
+      [ "-- reduceAnd begin,"
+      , "~IF~SIZE[~TYP[1]]~THEN"
+      , "~GENSYM[reduceAnd][0] : block"
+      , "  function and_reduce (arg : std_logic_vector) return std_logic is"
+      , "    variable upper, lower : std_logic;"
+      , "    variable half         : integer;"
+      , "    variable argi         : std_logic_vector (arg'length - 1 downto 0);"
+      , "    variable result       : std_logic;"
+      , "  begin"
+      , "    if (arg'length < 1) then"
+      , "      result := '1';"
+      , "    else"
+      , "      argi := arg;"
+      , "      if (argi'length = 1) then"
+      , "        result := argi(argi'left);"
+      , "      else"
+      , "        half   := (argi'length + 1) / 2; -- lsb-biased tree"
+      , "        upper  := and_reduce (argi (argi'left downto half));"
+      , "        lower  := and_reduce (argi (half - 1 downto argi'right));"
+      , "        result := upper and lower;"
+      , "      end if;"
+      , "    end if;"
+      , "    return result;"
+      , "  end;"
+      , "begin"
+      , "  ~RESULT <= and_reduce(~ARG[1]);"
+      , "end block;~ELSE"
+      , "~RESULT <= '1';~FI"
+      , "-- reduceAnd end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -163,34 +164,35 @@ end block;~ELSE
     , "kind"      : "Declaration"
     , "type"      : "reduceOr# :: KnownNat n => BitVector n -> Bit"
     , "template"  :
-"-- reduceOr begin ~IF~SIZE[~TYP[1]]~THEN
-~GENSYM[reduceOr][0] : block
-  function or_reduce (arg : std_logic_vector) return std_logic is
-    variable upper, lower : std_logic;
-    variable half         : integer;
-    variable argi         : std_logic_vector (arg'length - 1 downto 0);
-    variable result       : std_logic;
-  begin
-    if (arg'length < 1) then
-      result := '0';
-    else
-      argi := arg;
-      if (argi'length = 1) then
-        result := argi(argi'left);
-      else
-        half   := (argi'length + 1) / 2; -- lsb-biased tree
-        upper  := or_reduce (argi (argi'left downto half));
-        lower  := or_reduce (argi (half - 1 downto argi'right));
-        result := upper or lower;
-      end if;
-    end if;
-    return result;
-  end;
-begin
-  ~RESULT <= or_reduce(~ARG[1]);
-end block;~ELSE
-~RESULT <= '0'; ~FI
--- reduceOr end"
+      [ "-- reduceOr begin ~IF~SIZE[~TYP[1]]~THEN"
+      , "~GENSYM[reduceOr][0] : block"
+      , "  function or_reduce (arg : std_logic_vector) return std_logic is"
+      , "    variable upper, lower : std_logic;"
+      , "    variable half         : integer;"
+      , "    variable argi         : std_logic_vector (arg'length - 1 downto 0);"
+      , "    variable result       : std_logic;"
+      , "  begin"
+      , "    if (arg'length < 1) then"
+      , "      result := '0';"
+      , "    else"
+      , "      argi := arg;"
+      , "      if (argi'length = 1) then"
+      , "        result := argi(argi'left);"
+      , "      else"
+      , "        half   := (argi'length + 1) / 2; -- lsb-biased tree"
+      , "        upper  := or_reduce (argi (argi'left downto half));"
+      , "        lower  := or_reduce (argi (half - 1 downto argi'right));"
+      , "        result := upper or lower;"
+      , "      end if;"
+      , "    end if;"
+      , "    return result;"
+      , "  end;"
+      , "begin"
+      , "  ~RESULT <= or_reduce(~ARG[1]);"
+      , "end block;~ELSE"
+      , "~RESULT <= '0'; ~FI"
+      , "-- reduceOr end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -198,102 +200,107 @@ end block;~ELSE
     , "kind"      : "Declaration"
     , "type"      : "reduceXor# :: KnownNat n => BitVector n -> Bit"
     , "template"  :
-"-- reduceXor begin ~IF~SIZE[~TYP[1]]~THEN
-~GENSYM[reduceXor][0] : block
-  function xor_reduce (arg : std_logic_vector) return std_logic is
-    variable upper, lower : std_logic;
-    variable half         : integer;
-    variable argi         : std_logic_vector (arg'length - 1 downto 0);
-    variable result       : std_logic;
-  begin
-    if (arg'length < 1) then
-      result := '0';
-    else
-      argi := arg;
-      if (argi'length = 1) then
-        result := argi(argi'left);
-      else
-        half   := (argi'length + 1) / 2; -- lsb-biased tree
-        upper  := xor_reduce (argi (argi'left downto half));
-        lower  := xor_reduce (argi (half - 1 downto argi'right));
-        result := upper xor lower;
-      end if;
-    end if;
-    return result;
-  end;
-begin
-  ~RESULT <= xor_reduce(~ARG[1]);
-end block;~ELSE
-~RESULT <= '0';~FI
--- reduceXor end"
+      [ "-- reduceXor begin ~IF~SIZE[~TYP[1]]~THEN"
+      , "~GENSYM[reduceXor][0] : block"
+      , "  function xor_reduce (arg : std_logic_vector) return std_logic is"
+      , "    variable upper, lower : std_logic;"
+      , "    variable half         : integer;"
+      , "    variable argi         : std_logic_vector (arg'length - 1 downto 0);"
+      , "    variable result       : std_logic;"
+      , "  begin"
+      , "    if (arg'length < 1) then"
+      , "      result := '0';"
+      , "    else"
+      , "      argi := arg;"
+      , "      if (argi'length = 1) then"
+      , "        result := argi(argi'left);"
+      , "      else"
+      , "        half   := (argi'length + 1) / 2; -- lsb-biased tree"
+      , "        upper  := xor_reduce (argi (argi'left downto half));"
+      , "        lower  := xor_reduce (argi (half - 1 downto argi'right));"
+      , "        result := upper xor lower;"
+      , "      end if;"
+      , "    end if;"
+      , "    return result;"
+      , "  end;"
+      , "begin"
+      , "  ~RESULT <= xor_reduce(~ARG[1]);"
+      , "end block;~ELSE"
+      , "~RESULT <= '0';~FI"
+      , "-- reduceXor end"
+      ]
     }
   }
 , { "BlackBox" :
     { "name" : "Clash.Sized.Internal.BitVector.index#"
     , "kind" : "Declaration"
     , "type" :
-"index# :: KnownNat n  -- ARG[0]
-        => BitVector n -- ARG[1]
-        -> Int         -- ARG[2]
-        -> Bit"
+      [ "index# :: KnownNat n  -- ARG[0]"
+      , "       => BitVector n -- ARG[1]"
+      , "       -> Int         -- ARG[2]"
+      , "       -> Bit"
+      ]
     , "template" :
-"-- indexBitVector begin ~IF~SIZE[~TYP[1]]~THEN~IF ~ISVAR[1] ~THEN
-~GENSYM[indexBitVector][0] : block
-  signal ~GENSYM[vec_index][1] : integer range 0 to ~SIZE[~TYP[1]]-1;
-begin
-  ~SYM[1] <= to_integer(~ARG[2])
-  -- pragma translate_off
-               mod ~SIZE[~TYP[1]]
-  -- pragma translate_on
-               ;
-
-  ~RESULT <= ~ARG[1](~SYM[1]);
-end block;~ELSE
-~SYM[0] : block
-  signal ~SYM[1] : integer range 0 to ~SIZE[~TYP[1]]-1;
-begin
-  ~SYM[1] <= to_integer(~ARG[2])
-  -- pragma translate_off
-               mod ~SIZE[~TYP[1]]
-  -- pragma translate_on
-               ;
-
-  ~RESULT <= ~VAR[bv][1](~SYM[1]);
-end block;~FI~ELSE
-~RESULT <= ~ERRORO;~FI
--- indexBitVector end"
+      [ "-- indexBitVector begin ~IF~SIZE[~TYP[1]]~THEN~IF ~ISVAR[1] ~THEN"
+      , "~GENSYM[indexBitVector][0] : block"
+      , "  signal ~GENSYM[vec_index][1] : integer range 0 to ~SIZE[~TYP[1]]-1;"
+      , "begin"
+      , "  ~SYM[1] <= to_integer(~ARG[2])"
+      , "  -- pragma translate_off"
+      , "               mod ~SIZE[~TYP[1]]"
+      , "  -- pragma translate_on"
+      , "               ;"
+      , ""
+      , "  ~RESULT <= ~ARG[1](~SYM[1]);"
+      , "end block;~ELSE"
+      , "~SYM[0] : block"
+      , "  signal ~SYM[1] : integer range 0 to ~SIZE[~TYP[1]]-1;"
+      , "begin"
+      , "  ~SYM[1] <= to_integer(~ARG[2])"
+      , "  -- pragma translate_off"
+      , "               mod ~SIZE[~TYP[1]]"
+      , "  -- pragma translate_on"
+      , "               ;"
+      , ""
+      , "  ~RESULT <= ~VAR[bv][1](~SYM[1]);"
+      , "end block;~FI~ELSE"
+      , "~RESULT <= ~ERRORO;~FI"
+      , "-- indexBitVector end"
+      ]
     }
   }
 , { "BlackBox" :
     { "name" : "Clash.Sized.Internal.BitVector.replaceBit#"
     , "kind" : "Declaration"
     , "type" :
-"replaceBit# :: KnownNat n  -- ARG[0]
-             => BitVector n -- ARG[1]
-             -> Int         -- ARG[2]
-             -> Bit         -- ARG[3]
-             -> BitVector n"
+      [ "replaceBit# :: KnownNat n  -- ARG[0]"
+      , "             => BitVector n -- ARG[1]"
+      , "             -> Int         -- ARG[2]"
+      , "             -> Bit         -- ARG[3]"
+      , "             -> BitVector n"
+      ]
     , "template" :
-"-- replaceBit begin ~IF~SIZE[~TYP[1]]~THEN
-~GENSYM[replaceBit][0] : block
-  signal ~GENSYM[vec_index][1] : integer range 0 to ~SIZE[~TYP[1]]-1;
-begin
-  ~SYM[1] <= to_integer(~ARG[2])
-  -- pragma translate_off
-               mod ~SIZE[~TYP[1]]
-  -- pragma translate_on
-               ;
-
-  process(~SYM[1],~VAR[b][3]~VARS[1])
-    variable ~GENSYM[ivec][2] : ~TYP[1];
-  begin
-    ~SYM[2] := ~ARG[1];
-    ~SYM[2](~SYM[1]) := ~ARG[3];
-    ~RESULT <= ~SYM[2];
-  end process;
-end block; ~ELSE
-~RESULT <= ~ERRORO;~FI
--- replaceBit end"
+      [ "-- replaceBit begin ~IF~SIZE[~TYP[1]]~THEN"
+      , "~GENSYM[replaceBit][0] : block"
+      , "  signal ~GENSYM[vec_index][1] : integer range 0 to ~SIZE[~TYP[1]]-1;"
+      , "begin"
+      , "  ~SYM[1] <= to_integer(~ARG[2])"
+      , "  -- pragma translate_off"
+      , "               mod ~SIZE[~TYP[1]]"
+      , "  -- pragma translate_on"
+      , "               ;"
+      , ""
+      , "  process(~SYM[1],~VAR[b][3]~VARS[1])"
+      , "    variable ~GENSYM[ivec][2] : ~TYP[1];"
+      , "  begin"
+      , "    ~SYM[2] := ~ARG[1];"
+      , "    ~SYM[2](~SYM[1]) := ~ARG[3];"
+      , "    ~RESULT <= ~SYM[2];"
+      , "  end process;"
+      , "end block; ~ELSE"
+      , "~RESULT <= ~ERRORO;~FI"
+      , "-- replaceBit end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -301,22 +308,24 @@ end block; ~ELSE
     , "workInfo" : "Never"
     , "kind" : "Declaration"
     , "type" :
-"setSlice# :: SNat (m + 1 + i)
-           => BitVector (m + 1 + i) -- ARG[1]
-           -> SNat m                -- ARG[2]
-           -> SNat n                -- ARG[3]
-           -> BitVector (m + 1 - n) -- ARG[4]
-           -> BitVector (m + 1 + i)"
+      [ "setSlice# :: SNat (m + 1 + i)"
+      , "           => BitVector (m + 1 + i) -- ARG[1]"
+      , "           -> SNat m                -- ARG[2]"
+      , "           -> SNat n                -- ARG[3]"
+      , "           -> BitVector (m + 1 - n) -- ARG[4]"
+      , "           -> BitVector (m + 1 + i)"
+      ]
     , "template" :
-"-- setSlice begin
-~GENSYM[setSlice][0] : process(~VAR[bv][1]~VARS[4])
-  variable ~GENSYM[ivec][1] : ~TYP[1];
-begin
-  ~SYM[1] := ~VAR[bv][1];
-  ~SYM[1](~LIT[2] downto ~LIT[3]) := ~ARG[4];
-  ~RESULT <= ~SYM[1];
-end process;
--- setSlice end"
+      [ "-- setSlice begin"
+      , "~GENSYM[setSlice][0] : process(~VAR[bv][1]~VARS[4])"
+      , "  variable ~GENSYM[ivec][1] : ~TYP[1];"
+      , "begin"
+      , "  ~SYM[1] := ~VAR[bv][1];"
+      , "  ~SYM[1](~LIT[2] downto ~LIT[3]) := ~ARG[4];"
+      , "  ~RESULT <= ~SYM[1];"
+      , "end process;"
+      , "-- setSlice end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -324,10 +333,11 @@ end process;
     , "workInfo" : "Never"
     , "kind" : "Expression"
     , "type" :
-"slice# :: BitVector (m + 1 + i) -- ARG[0]
-        -> SNat m                -- ARG[1]
-        -> SNat n                -- ARG[2]
-        -> BitVector (m + 1 - n)"
+      [ "slice# :: BitVector (m + 1 + i) -- ARG[0]"
+      , "       -> SNat m                -- ARG[1]"
+      , "       -> SNat n                -- ARG[2]"
+      , "       -> BitVector (m + 1 - n)"
+      ]
     , "template" : "~VAR[bv][0](~LIT[1] downto ~LIT[2])"
     }
   }
@@ -336,9 +346,10 @@ end process;
     , "workInfo" : "Never"
     , "kind" : "Expression"
     , "type" :
-"split# :: KnownNat n        -- ARG[0]
-        => BitVector (m + n) -- ARG[1]
-        -> (BitVector m, BitVector n)"
+      [ "split# :: KnownNat n        -- ARG[0]"
+      , "       => BitVector (m + n) -- ARG[1]"
+      , "       -> (BitVector m, BitVector n)"
+      ]
     , "template" : "(~VAR[bv][1](~VAR[bv][1]'high downto ~LIT[0]),~VAR[bv][1](~LIT[0]-1 downto 0))"
     }
   }
@@ -347,9 +358,10 @@ end process;
     , "workInfo" : "Never"
     , "kind" : "Expression"
     , "type" :
-"msb# :: KnownNat n  -- ARG[0]
-      => BitVector n -- ARG[1]
-      -> Bit"
+      [ "msb# :: KnownNat n  -- ARG[0]"
+      , "      => BitVector n -- ARG[1]"
+      , "      -> Bit"
+      ]
     , "template" : "~IF ~SIZE[~TYP[1]] ~THEN ~VAR[bv][1](~VAR[bv][1]'high) ~ELSE \"0\" ~FI"
     }
   }
@@ -358,8 +370,9 @@ end process;
     , "workInfo" : "Never"
     , "kind" : "Expression"
     , "type" :
-"lsb# :: BitVector n -- ARG[0]
-      -> Bit"
+      [ "lsb# :: BitVector n -- ARG[0]"
+      , "      -> Bit"
+      ]
     , "template" : "~IF ~SIZE[~TYP[0]] ~THEN ~VAR[bv][0](0) ~ELSE \"0\" ~FI"
     }
   }
@@ -483,11 +496,12 @@ end process;
     , "kind"      : "Declaration"
     , "type"      : "quot# :: KnownNat n => BitVector n -> BitVector n -> BitVector n"
     , "template"  :
-"~RESULT <= std_logic_vector(unsigned(~ARG[1]) / unsigned(~ARG[2]))
-    -- pragma translate_off
-    when (~ARG[2] /= std_logic_vector(to_unsigned(0,~SIZE[~TYP[2]]))) else (others => 'X')
-    -- pragma translate_on
-    ;"
+      [ "~RESULT <= std_logic_vector(unsigned(~ARG[1]) / unsigned(~ARG[2]))"
+      , "    -- pragma translate_off"
+      , "    when (~ARG[2] /= std_logic_vector(to_unsigned(0,~SIZE[~TYP[2]]))) else (others => 'X')"
+      , "    -- pragma translate_on"
+      , "    ;"
+      ]
     }
   }
 , { "BlackBox" :
@@ -495,11 +509,12 @@ end process;
     , "kind"      : "Declaration"
     , "type"      : "rem# :: KnownNat n => BitVector n -> BitVector n -> BitVector n"
     , "template"  :
-"~RESULT <= std_logic_vector(unsigned(~ARG[1]) rem unsigned(~ARG[2]))
-    -- pragma translate_off
-    when (~ARG[2] /= std_logic_vector(to_unsigned(0,~SIZE[~TYP[2]]))) else (others => 'X')
-    -- pragma translate_on
-    ;"
+      [ "~RESULT <= std_logic_vector(unsigned(~ARG[1]) rem unsigned(~ARG[2]))"
+      , "    -- pragma translate_off"
+      , "    when (~ARG[2] /= std_logic_vector(to_unsigned(0,~SIZE[~TYP[2]]))) else (others => 'X')"
+      , "    -- pragma translate_on"
+      , "    ;"
+      ]
     }
   }
 , { "BlackBoxHaskell" :
@@ -541,24 +556,25 @@ end process;
     , "kind"      : "Declaration"
     , "type"      : "shiftL# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "template"  :
-"~GENSYM[~RESULT_shiftL][0] : block
-  signal ~GENSYM[sh][1] : natural;
-begin
-  ~SYM[1] <=
-      -- pragma translate_off
-      natural'high when (~VAR[shI][2](~SIZE[~TYP[2]]-1 downto 31) /= 0) else
-      -- pragma translate_on
-      to_integer(~VAR[shI][2]
-      -- pragma translate_off
-      (30 downto 0)
-      -- pragma translate_on
-      );
-  ~RESULT <= std_logic_vector(shift_left(unsigned(~ARG[1]),~SYM[1]))
-      -- pragma translate_off
-      when (~ARG[2] >= 0) else (others => 'X')
-      -- pragma translate_on
-      ;
-end block;"
+      [ "~GENSYM[~RESULT_shiftL][0] : block"
+      , "  signal ~GENSYM[sh][1] : natural;"
+      , "begin"
+      , "  ~SYM[1] <="
+      , "      -- pragma translate_off"
+      , "      natural'high when (~VAR[shI][2](~SIZE[~TYP[2]]-1 downto 31) /= 0) else"
+      , "      -- pragma translate_on"
+      , "      to_integer(~VAR[shI][2]"
+      , "      -- pragma translate_off"
+      , "      (30 downto 0)"
+      , "      -- pragma translate_on"
+      , "      );"
+      , "  ~RESULT <= std_logic_vector(shift_left(unsigned(~ARG[1]),~SYM[1]))"
+      , "      -- pragma translate_off"
+      , "      when (~ARG[2] >= 0) else (others => 'X')"
+      , "      -- pragma translate_on"
+      , "      ;"
+      , "end block;"
+      ]
     }
   }
 , { "BlackBox" :
@@ -566,24 +582,25 @@ end block;"
     , "kind"      : "Declaration"
     , "type"      : "shiftR# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "template"  :
-"~GENSYM[~RESULT_shiftR][0] : block
-  signal ~GENSYM[sh][1] : natural;
-begin
-  ~SYM[1] <=
-      -- pragma translate_off
-      natural'high when (~VAR[shI][2](~SIZE[~TYP[2]]-1 downto 31) /= 0) else
-      -- pragma translate_on
-      to_integer(~VAR[shI][2]
-      -- pragma translate_off
-      (30 downto 0)
-      -- pragma translate_on
-      );
-  ~RESULT <= std_logic_vector(shift_right(unsigned(~ARG[1]),~SYM[1]))
-      -- pragma translate_off
-      when (~ARG[2] >= 0) else (others => 'X')
-      -- pragma translate_on
-      ;
-end block;"
+      [ "~GENSYM[~RESULT_shiftR][0] : block"
+      , "  signal ~GENSYM[sh][1] : natural;"
+      , "begin"
+      , "  ~SYM[1] <="
+      , "      -- pragma translate_off"
+      , "      natural'high when (~VAR[shI][2](~SIZE[~TYP[2]]-1 downto 31) /= 0) else"
+      , "      -- pragma translate_on"
+      , "      to_integer(~VAR[shI][2]"
+      , "      -- pragma translate_off"
+      , "      (30 downto 0)"
+      , "      -- pragma translate_on"
+      , "      );"
+      , "  ~RESULT <= std_logic_vector(shift_right(unsigned(~ARG[1]),~SYM[1]))"
+      , "      -- pragma translate_off"
+      , "      when (~ARG[2] >= 0) else (others => 'X')"
+      , "      -- pragma translate_on"
+      , "      ;"
+      , "end block;"
+      ]
     }
   }
 , { "BlackBox" :
@@ -591,15 +608,16 @@ end block;"
     , "kind"      : "Declaration"
     , "type"      : "rotateL# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "template"  :
-"~RESULT <= std_logic_vector(rotate_left(unsigned(~ARG[1]),to_integer((~ARG[2])
-    -- pragma translate_off
-    mod ~SIZE[~TYP[1]]
-    -- pragma translate_on
-    )))
-    -- pragma translate_off
-    when (~ARG[2] >= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
+      [ "~RESULT <= std_logic_vector(rotate_left(unsigned(~ARG[1]),to_integer((~ARG[2])"
+      , "    -- pragma translate_off"
+      , "    mod ~SIZE[~TYP[1]]"
+      , "    -- pragma translate_on"
+      , "    )))"
+      , "    -- pragma translate_off"
+      , "    when (~ARG[2] >= 0) else (others => 'X')"
+      , "    -- pragma translate_on"
+      , "    ;"
+      ]
     }
   }
 , { "BlackBox" :
@@ -607,15 +625,16 @@ end block;"
     , "kind"      : "Declaration"
     , "type"      : "rotateR# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "template"  :
-"~RESULT <= std_logic_vector(rotate_right(unsigned(~ARG[1]),to_integer((~ARG[2])
-    -- pragma translate_off
-    mod ~SIZE[~TYP[1]]
-    -- pragma translate_on
-    )))
-    -- pragma translate_off
-    when (~ARG[2] >= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
+      [ "~RESULT <= std_logic_vector(rotate_right(unsigned(~ARG[1]),to_integer((~ARG[2])"
+      , "    -- pragma translate_off"
+      , "    mod ~SIZE[~TYP[1]]"
+      , "    -- pragma translate_on"
+      , "    )))"
+      , "    -- pragma translate_off"
+      , "    when (~ARG[2] >= 0) else (others => 'X')"
+      , "    -- pragma translate_on"
+      , "    ;"
+      ]
     }
   }
 , { "BlackBox" :

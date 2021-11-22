@@ -138,11 +138,12 @@
     , "kind"      : "Declaration"
     , "type"      : "rem# :: Signed n -> Signed n -> Signed n"
     , "template"  :
-"~RESULT <= ~ARG[0] rem ~ARG[1]
-    -- pragma translate_off
-    when (~ARG[1] /= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
+      [ "~RESULT <= ~ARG[0] rem ~ARG[1]"
+      , "    -- pragma translate_off"
+      , "    when (~ARG[1] /= 0) else (others => 'X')"
+      , "    -- pragma translate_on"
+      , "    ;"
+      ]
     }
   }
 , { "BlackBox" :
@@ -150,26 +151,27 @@
     , "kind"      : "Declaration"
     , "type"      : "div# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "template"  :
-"-- divSigned begin
-~GENSYM[divSigned][0] : block
-  signal ~GENSYM[resultPos][1] : boolean;
-  signal ~GENSYM[dividerNeg][2] : boolean;
-  signal ~GENSYM[dividend2][3] : signed(~SIZE[~TYPO] downto 0);
-  signal ~GENSYM[quot_res][4] : signed(~SIZE[~TYPO] downto 0);
-begin
-  ~SYM[1] <= ~VAR[dividend][1](~VAR[dividend][1]'high) = ~VAR[divider][2](~VAR[divider][2]'high);
-  ~SYM[2] <= ~VAR[divider][2](~VAR[divider][2]'high) = '1';
-  ~SYM[3] <= resize(~VAR[dividend][1],~SIZE[~TYPO]+1)   when ~SYM[1] else
-             (resize(~VAR[dividend][1],~SIZE[~TYPO]+1) - resize(~VAR[divider][2],~SIZE[~TYPO]+1) - 1)   when ~SYM[2] else
-             (resize(~VAR[dividend][1],~SIZE[~TYPO]+1) - resize(~VAR[divider][2],~SIZE[~TYPO]+1) + 1);
-  ~SYM[4] <= ~SYM[3] / ~VAR[divider][2]
-      -- pragma translate_off
-      when (~VAR[divider][2] /= 0) else (others => 'X')
-      -- pragma translate_on
-      ;
-  ~RESULT <= signed(~SYM[4](~SIZE[~TYPO]-1 downto 0));
-end block;
--- divSigned end"
+      [ "-- divSigned begin"
+      , "~GENSYM[divSigned][0] : block"
+      , "  signal ~GENSYM[resultPos][1] : boolean;"
+      , "  signal ~GENSYM[dividerNeg][2] : boolean;"
+      , "  signal ~GENSYM[dividend2][3] : signed(~SIZE[~TYPO] downto 0);"
+      , "  signal ~GENSYM[quot_res][4] : signed(~SIZE[~TYPO] downto 0);"
+      , "begin"
+      , "  ~SYM[1] <= ~VAR[dividend][1](~VAR[dividend][1]'high) = ~VAR[divider][2](~VAR[divider][2]'high);"
+      , "  ~SYM[2] <= ~VAR[divider][2](~VAR[divider][2]'high) = '1';"
+      , "  ~SYM[3] <= resize(~VAR[dividend][1],~SIZE[~TYPO]+1)   when ~SYM[1] else"
+      , "             (resize(~VAR[dividend][1],~SIZE[~TYPO]+1) - resize(~VAR[divider][2],~SIZE[~TYPO]+1) - 1)   when ~SYM[2] else"
+      , "             (resize(~VAR[dividend][1],~SIZE[~TYPO]+1) - resize(~VAR[divider][2],~SIZE[~TYPO]+1) + 1);"
+      , "  ~SYM[4] <= ~SYM[3] / ~VAR[divider][2]"
+      , "      -- pragma translate_off"
+      , "      when (~VAR[divider][2] /= 0) else (others => 'X')"
+      , "      -- pragma translate_on"
+      , "      ;"
+      , "  ~RESULT <= signed(~SYM[4](~SIZE[~TYPO]-1 downto 0));"
+      , "end block;"
+      , "-- divSigned end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -177,11 +179,12 @@ end block;
     , "kind"      : "Declaration"
     , "type"      : "mod# :: Signed n -> Signed n -> Signed n"
     , "template"  :
-"~RESULT <= ~ARG[0] mod ~ARG[1]
-    -- pragma translate_off
-    when (~ARG[1] /= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
+      [ "~RESULT <= ~ARG[0] mod ~ARG[1]"
+      , "    -- pragma translate_off"
+      , "    when (~ARG[1] /= 0) else (others => 'X')"
+      , "    -- pragma translate_on"
+      , "    ;"
+      ]
     }
   }
 , { "BlackBoxHaskell" :
@@ -223,24 +226,25 @@ end block;
     , "kind"      : "Declaration"
     , "type"      : "shiftL# :: KnownNat n => Signed n -> Int -> Signed n"
     , "template"  :
-"~GENSYM[~RESULT_shiftL][0] : block
-  signal ~GENSYM[sh][1] : natural;
-begin
-  ~SYM[1] <=
-      -- pragma translate_off
-      natural'high when (~VAR[shI][2](~SIZE[~TYP[2]]-1 downto 31) /= 0) else
-      -- pragma translate_on
-      to_integer(~VAR[shI][2]
-      -- pragma translate_off
-      (30 downto 0)
-      -- pragma translate_on
-      );
-  ~RESULT <= shift_left(~ARG[1],~SYM[1])
-      -- pragma translate_off
-      when (~ARG[2] >= 0) else (others => 'X')
-      -- pragma translate_on
-      ;
-end block;"
+      [ "~GENSYM[~RESULT_shiftL][0] : block"
+      , "  signal ~GENSYM[sh][1] : natural;"
+      , "begin"
+      , "  ~SYM[1] <="
+      , "      -- pragma translate_off"
+      , "      natural'high when (~VAR[shI][2](~SIZE[~TYP[2]]-1 downto 31) /= 0) else"
+      , "      -- pragma translate_on"
+      , "      to_integer(~VAR[shI][2]"
+      , "      -- pragma translate_off"
+      , "      (30 downto 0)"
+      , "      -- pragma translate_on"
+      , "      );"
+      , "  ~RESULT <= shift_left(~ARG[1],~SYM[1])"
+      , "      -- pragma translate_off"
+      , "      when (~ARG[2] >= 0) else (others => 'X')"
+      , "      -- pragma translate_on"
+      , "      ;"
+      , "end block;"
+      ]
     }
   }
 , { "BlackBox" :
@@ -248,24 +252,25 @@ end block;"
     , "kind"      : "Declaration"
     , "type"      : "shiftR# :: KnownNat n => Signed n -> Int -> Signed n"
     , "template"  :
-"~GENSYM[~RESULT_shiftR][0] : block
-  signal ~GENSYM[sh][1] : natural;
-begin
-  ~SYM[1] <=
-      -- pragma translate_off
-      natural'high when (~VAR[shI][2](~SIZE[~TYP[2]]-1 downto 31) /= 0) else
-      -- pragma translate_on
-      to_integer(~VAR[shI][2]
-      -- pragma translate_off
-      (30 downto 0)
-      -- pragma translate_on
-      );
-  ~RESULT <= shift_right(~ARG[1],~SYM[1])
-      -- pragma translate_off
-      when (~ARG[2] >= 0) else (others => 'X')
-      -- pragma translate_on
-      ;
-end block;"
+      [ "~GENSYM[~RESULT_shiftR][0] : block"
+      , "  signal ~GENSYM[sh][1] : natural;"
+      , "begin"
+      , "  ~SYM[1] <="
+      , "      -- pragma translate_off"
+      , "      natural'high when (~VAR[shI][2](~SIZE[~TYP[2]]-1 downto 31) /= 0) else"
+      , "      -- pragma translate_on"
+      , "      to_integer(~VAR[shI][2]"
+      , "      -- pragma translate_off"
+      , "      (30 downto 0)"
+      , "      -- pragma translate_on"
+      , "      );"
+      , "  ~RESULT <= shift_right(~ARG[1],~SYM[1])"
+      , "      -- pragma translate_off"
+      , "      when (~ARG[2] >= 0) else (others => 'X')"
+      , "      -- pragma translate_on"
+      , "      ;"
+      , "end block;"
+      ]
     }
   }
 , { "BlackBox" :
@@ -273,15 +278,16 @@ end block;"
     , "kind"      : "Declaration"
     , "type"      : "rotateL# :: KnownNat n => Signed n -> Int -> Signed n"
     , "template"  :
-"~RESULT <= rotate_left(~ARG[1],to_integer((~ARG[2])
-    -- pragma translate_off
-    mod ~SIZE[~TYP[1]]
-    -- pragma translate_on
-    ))
-    -- pragma translate_off
-    when (~ARG[2] >= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
+      [ "~RESULT <= rotate_left(~ARG[1],to_integer((~ARG[2])"
+      , "    -- pragma translate_off"
+      , "    mod ~SIZE[~TYP[1]]"
+      , "    -- pragma translate_on"
+      , "    ))"
+      , "    -- pragma translate_off"
+      , "    when (~ARG[2] >= 0) else (others => 'X')"
+      , "    -- pragma translate_on"
+      , "    ;"
+      ]
     }
   }
 , { "BlackBox" :
@@ -289,15 +295,16 @@ end block;"
     , "kind"      : "Declaration"
     , "type"      : "rotateR# :: KnownNat n => Signed n -> Int -> Signed n"
     , "template"  :
-"~RESULT <= rotate_right(~ARG[1],to_integer((~ARG[2])
-    -- pragma translate_off
-    mod ~SIZE[~TYP[1]]
-    -- pragma translate_on
-    ))
-    -- pragma translate_off
-    when (~ARG[2] >= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
+      [ "~RESULT <= rotate_right(~ARG[1],to_integer((~ARG[2])"
+      , "    -- pragma translate_off"
+      , "    mod ~SIZE[~TYP[1]]"
+      , "    -- pragma translate_on"
+      , "    ))"
+      , "    -- pragma translate_off"
+      , "    when (~ARG[2] >= 0) else (others => 'X')"
+      , "    -- pragma translate_on"
+      , "    ;"
+      ]
     }
   }
 , { "BlackBox" :
@@ -321,11 +328,12 @@ end block;"
     , "kind"      : "Declaration"
     , "type"      : "quot# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "template"  :
-"~RESULT <= ~ARG[1] / ~ARG[2]
-    -- pragma translate_off
-    when (~ARG[2] /= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
+      [ "~RESULT <= ~ARG[1] / ~ARG[2]"
+      , "    -- pragma translate_off"
+      , "    when (~ARG[2] /= 0) else (others => 'X')"
+      , "    -- pragma translate_on"
+      , "    ;"
+      ]
     }
   }
 ]
