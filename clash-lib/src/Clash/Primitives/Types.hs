@@ -48,7 +48,7 @@ import           Data.Hashable                (Hashable)
 import qualified Data.HashMap.Strict          as H
 import           Data.List                    (intercalate)
 import qualified Data.Text                    as S
-import           Data.Text.Lazy               (Text)
+import           Data.Text.Lazy               as T (Text,unlines)
 import           GHC.Generics                 (Generic)
 import           GHC.Stack                    (HasCallStack)
 import           Text.Read                    (readMaybe)
@@ -286,9 +286,13 @@ instance FromJSON UnresolvedPrimitive where
       parseTemplate c =
         (,) <$> ((,) <$> (c .:? "format" >>= traverse parseTemplateFormat) .!= TTemplate
                      <*> (c .:? "templateFunction" >>= traverse parseBBFN') .!= defTemplateFunction)
-            <*> (Just . TInline <$> c .: "template" <|>
-                 Just . TFile   <$> c .: "file" <|>
-                 pure Nothing)
+            <*> ( Just . TInline <$>
+                    (   c .: "template"
+                    <|> T.unlines <$> c .: "template"
+                    )
+                <|> Just . TFile   <$> c .: "file"
+                <|> pure Nothing
+                )
 
       parseInclude c =
         (,) <$> ((,) <$> c .: "name" <*> c .: "extension")
