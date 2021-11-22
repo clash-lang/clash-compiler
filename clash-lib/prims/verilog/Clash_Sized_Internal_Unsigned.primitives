@@ -3,11 +3,12 @@
     , "kind"      : "Declaration"
     , "type"      : "rotateL# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
     , "template"  :
-"// rotateL begin
-wire [2*~SIZE[~TYPO]-1:0] ~GENSYM[u][0];
-assign ~SYM[0] = {~ARG[1],~ARG[1]} << (~ARG[2] % ~SIZE[~TYPO]);
-assign ~RESULT = ~SYM[0][2*~SIZE[~TYPO]-1 : ~SIZE[~TYPO]];
-// rotateL end"
+      [ "// rotateL begin"
+      , "wire [2*~SIZE[~TYPO]-1:0] ~GENSYM[u][0];"
+      , "assign ~SYM[0] = {~ARG[1],~ARG[1]} << (~ARG[2] % ~SIZE[~TYPO]);"
+      , "assign ~RESULT = ~SYM[0][2*~SIZE[~TYPO]-1 : ~SIZE[~TYPO]];"
+      , "// rotateL end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -15,11 +16,12 @@ assign ~RESULT = ~SYM[0][2*~SIZE[~TYPO]-1 : ~SIZE[~TYPO]];
     , "kind"      : "Declaration"
     , "type"      : "rotateR# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
     , "template"  :
-"// rotateR begin
-wire [2*~SIZE[~TYPO]-1:0] ~GENSYM[u][0];
-assign ~SYM[0] = {~ARG[1],~ARG[1]} >> (~ARG[2] % ~SIZE[~TYPO]);
-assign ~RESULT = ~SYM[0][~SIZE[~TYPO]-1 : 0];
-// rotateR end"
+      [ "// rotateR begin"
+      , "wire [2*~SIZE[~TYPO]-1:0] ~GENSYM[u][0];"
+      , "assign ~SYM[0] = {~ARG[1],~ARG[1]} >> (~ARG[2] % ~SIZE[~TYPO]);"
+      , "assign ~RESULT = ~SYM[0][~SIZE[~TYPO]-1 : 0];"
+      , "// rotateR end"
+      ]
     }
   }
 ]

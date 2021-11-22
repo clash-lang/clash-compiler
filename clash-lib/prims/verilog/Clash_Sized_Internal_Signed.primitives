@@ -3,26 +3,27 @@
     , "kind"      : "Declaration"
     , "type"      : "div# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "template"  :
-"// divSigned begin
-wire ~GENSYM[resultPos][1];
-wire ~GENSYM[dividerNeg][2];
-wire signed [~SIZE[~TYPO]:0] ~GENSYM[dividend2][3];
-wire signed [~SIZE[~TYPO]:0] ~GENSYM[dividendE][4];
-wire signed [~SIZE[~TYPO]:0] ~GENSYM[dividerE][5];
-wire signed [~SIZE[~TYPO]:0] ~GENSYM[quot_res][6];
-
-assign ~SYM[1] = ~VAR[dividend][1][~SIZE[~TYPO]-1] == ~VAR[divider][2][~SIZE[~TYPO]-1];
-assign ~SYM[2] = ~VAR[divider][2][~SIZE[~TYPO]-1] == 1'b1;
-assign ~SYM[4] = $signed({{~VAR[dividend][1][~SIZE[~TYPO]-1]},~VAR[dividend][1]});  // sign extension
-assign ~SYM[5] = $signed({{~VAR[divider][2][~SIZE[~TYPO]-1]} ,~VAR[divider][2]} );  // sign extension
-
-assign ~SYM[3] = ~SYM[1] ? ~SYM[4]
-                         : (~SYM[2] ? (~SYM[4] - ~SYM[5] - ~SIZE[~TYPO]'sd1)
-                                    : (~SYM[4] - ~SYM[5] + ~SIZE[~TYPO]'sd1));
-
-assign ~SYM[6] = ~SYM[3] / ~SYM[5];
-assign ~RESULT = $signed(~SYM[6][~SIZE[~TYPO]-1:0]);
-// divSigned end"
+      [ "// divSigned begin"
+      , "wire ~GENSYM[resultPos][1];"
+      , "wire ~GENSYM[dividerNeg][2];"
+      , "wire signed [~SIZE[~TYPO]:0] ~GENSYM[dividend2][3];"
+      , "wire signed [~SIZE[~TYPO]:0] ~GENSYM[dividendE][4];"
+      , "wire signed [~SIZE[~TYPO]:0] ~GENSYM[dividerE][5];"
+      , "wire signed [~SIZE[~TYPO]:0] ~GENSYM[quot_res][6];"
+      , ""
+      , "assign ~SYM[1] = ~VAR[dividend][1][~SIZE[~TYPO]-1] == ~VAR[divider][2][~SIZE[~TYPO]-1];"
+      , "assign ~SYM[2] = ~VAR[divider][2][~SIZE[~TYPO]-1] == 1'b1;"
+      , "assign ~SYM[4] = $signed({{~VAR[dividend][1][~SIZE[~TYPO]-1]},~VAR[dividend][1]});  // sign extension"
+      , "assign ~SYM[5] = $signed({{~VAR[divider][2][~SIZE[~TYPO]-1]} ,~VAR[divider][2]} );  // sign extension"
+      , ""
+      , "assign ~SYM[3] = ~SYM[1] ? ~SYM[4]"
+      , "                         : (~SYM[2] ? (~SYM[4] - ~SYM[5] - ~SIZE[~TYPO]'sd1)"
+      , "                                    : (~SYM[4] - ~SYM[5] + ~SIZE[~TYPO]'sd1));"
+      , ""
+      , "assign ~SYM[6] = ~SYM[3] / ~SYM[5];"
+      , "assign ~RESULT = $signed(~SYM[6][~SIZE[~TYPO]-1:0]);"
+      , "// divSigned end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -30,16 +31,17 @@ assign ~RESULT = $signed(~SYM[6][~SIZE[~TYPO]-1:0]);
     , "kind"      : "Declaration"
     , "type"      : "mod# :: Signed n -> Signed n -> Signed n"
     , "template"  :
-"// modSigned begin
-// remainder
-wire ~SIGD[~GENSYM[rem_res][0]][0];
-assign ~SYM[0] = ~VAR[dividend][0] % ~VAR[divider][1];
-
-// modulo
-assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~TYPO]-1]) ?
-                 ~SYM[0] :
-                 (~SYM[0] == ~SIZE[~TYPO]'sd0 ? ~SIZE[~TYPO]'sd0 : ~SYM[0] + ~VAR[divider][1]);
-// modSigned end"
+      [ "// modSigned begin"
+      , "// remainder"
+      , "wire ~SIGD[~GENSYM[rem_res][0]][0];"
+      , "assign ~SYM[0] = ~VAR[dividend][0] % ~VAR[divider][1];"
+      , ""
+      , "// modulo"
+      , "assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~TYPO]-1]) ?"
+      , "                 ~SYM[0] :"
+      , "                 (~SYM[0] == ~SIZE[~TYPO]'sd0 ? ~SIZE[~TYPO]'sd0 : ~SYM[0] + ~VAR[divider][1]);"
+      , "// modSigned end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -47,11 +49,12 @@ assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~T
     , "kind"      : "Declaration"
     , "type"      : "rotateL# :: KnownNat n => Signed n -> Int -> Signed n"
     , "template"  :
-"// rotateL begin
-wire [2*~SIZE[~TYPO]-1:0] ~GENSYM[s][0];
-assign ~SYM[0] = {~ARG[1],~ARG[1]} << (~ARG[2] % ~SIZE[~TYPO]);
-assign ~RESULT = $signed(~SYM[0][2*~SIZE[~TYPO]-1 : ~SIZE[~TYPO]]);
-// rotateL end"
+      [ "// rotateL begin"
+      , "wire [2*~SIZE[~TYPO]-1:0] ~GENSYM[s][0];"
+      , "assign ~SYM[0] = {~ARG[1],~ARG[1]} << (~ARG[2] % ~SIZE[~TYPO]);"
+      , "assign ~RESULT = $signed(~SYM[0][2*~SIZE[~TYPO]-1 : ~SIZE[~TYPO]]);"
+      , "// rotateL end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -59,11 +62,12 @@ assign ~RESULT = $signed(~SYM[0][2*~SIZE[~TYPO]-1 : ~SIZE[~TYPO]]);
     , "kind"      : "Declaration"
     , "type"      : "rotateR# :: KnownNat n => Signed n -> Int -> Signed n"
     , "template"  :
-"// rotateR begin
-wire [2*~SIZE[~TYPO]-1:0] ~GENSYM[s][0];
-assign ~SYM[0] = {~ARG[1],~ARG[1]} >> (~ARG[2] % ~SIZE[~TYPO]);
-assign ~RESULT = $signed(~SYM[0][~SIZE[~TYPO]-1 : 0]);
-// rotateR end"
+      [ "// rotateR begin"
+      , "wire [2*~SIZE[~TYPO]-1:0] ~GENSYM[s][0];"
+      , "assign ~SYM[0] = {~ARG[1],~ARG[1]} >> (~ARG[2] % ~SIZE[~TYPO]);"
+      , "assign ~RESULT = $signed(~SYM[0][~SIZE[~TYPO]-1 : 0]);"
+      , "// rotateR end"
+      ]
     }
   }
 ]

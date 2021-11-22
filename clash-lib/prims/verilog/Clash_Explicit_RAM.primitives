@@ -2,30 +2,32 @@
     { "name" : "Clash.Explicit.RAM.asyncRam#"
     , "kind" : "Declaration"
     , "type" :
-"asyncRam#
-  :: ( HasCallStack              -- ARG[0]
-     , KnownDomain wdom wconf    -- ARG[1]
-     , KnownDomain rdom rconf )  -- ARG[2]
-  => Clock wdom                  -- ^ wclk, ARG[3]
-  -> Clock rdom                  -- ^ rclk, ARG[4]
-  -> Enable wdom                 -- ^ wen,  ARG[5]
-  -> SNat n                      -- ^ sz,   ARG[6]
-  -> Signal rdom Int             -- ^ rd,   ARG[7]
-  -> Signal wdom Bool            -- ^ en,   ARG[8]
-  -> Signal wdom Int             -- ^ wr,   ARG[9]
-  -> Signal wdom a               -- ^ din,  ARG[10]
-  -> Signal rdom a"
+      [ "asyncRam#"
+      , "  :: ( HasCallStack              -- ARG[0]"
+      , "     , KnownDomain wdom wconf    -- ARG[1]"
+      , "     , KnownDomain rdom rconf )  -- ARG[2]"
+      , "  => Clock wdom                  -- ^ wclk, ARG[3]"
+      , "  -> Clock rdom                  -- ^ rclk, ARG[4]"
+      , "  -> Enable wdom                 -- ^ wen,  ARG[5]"
+      , "  -> SNat n                      -- ^ sz,   ARG[6]"
+      , "  -> Signal rdom Int             -- ^ rd,   ARG[7]"
+      , "  -> Signal wdom Bool            -- ^ en,   ARG[8]"
+      , "  -> Signal wdom Int             -- ^ wr,   ARG[9]"
+      , "  -> Signal wdom a               -- ^ din,  ARG[10]"
+      , "  -> Signal rdom a"
+      ]
     , "template" :
-"// asyncRam begin
-reg ~TYPO ~GENSYM[RAM][0] [0:~LIT[6]-1];
-always @(~IF~ACTIVEEDGE[Rising][1]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_Ram][1]
-  if (~ARG[8] ~IF ~ISACTIVEENABLE[5] ~THEN & ~ARG[5] ~ELSE ~FI) begin
-    ~SYM[0][~ARG[9]] <= ~ARG[10];
-  end
-end
-
-assign ~RESULT = ~SYM[0][~ARG[7]];
-// asyncRam end"
+      [ "// asyncRam begin"
+      , "reg ~TYPO ~GENSYM[RAM][0] [0:~LIT[6]-1];"
+      , "always @(~IF~ACTIVEEDGE[Rising][1]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_Ram][1]"
+      , "  if (~ARG[8] ~IF ~ISACTIVEENABLE[5] ~THEN & ~ARG[5] ~ELSE ~FI) begin"
+      , "    ~SYM[0][~ARG[9]] <= ~ARG[10];"
+      , "  end"
+      , "end"
+      , ""
+      , "assign ~RESULT = ~SYM[0][~ARG[7]];"
+      , "// asyncRam end"
+      ]
     }
   }
 ]

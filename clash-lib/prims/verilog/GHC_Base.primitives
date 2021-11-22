@@ -3,14 +3,15 @@
     , "kind"      : "Declaration"
     , "type"      : "divInt :: Int -> Int -> Int"
     , "template"  :
-"// divInt begin
-// divide (rounds towards zero)
-wire ~SIGD[~GENSYM[quot_res][0]][0];
-assign ~SYM[0] = ~VAR[dividend][0] / ~VAR[divider][1];
-
-// round toward minus infinity
-assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~TYPO]-1]) ? ~SYM[0] : ~SYM[0] - ~SIZE[~TYPO]'sd1;
-// divInt end"
+      [ "// divInt begin"
+      , "// divide (rounds towards zero)"
+      , "wire ~SIGD[~GENSYM[quot_res][0]][0];"
+      , "assign ~SYM[0] = ~VAR[dividend][0] / ~VAR[divider][1];"
+      , ""
+      , "// round toward minus infinity"
+      , "assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~TYPO]-1]) ? ~SYM[0] : ~SYM[0] - ~SIZE[~TYPO]'sd1;"
+      , "// divInt end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -18,16 +19,17 @@ assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~T
     , "kind"      : "Declaration"
     , "type"      : "modInt :: Int -> Int -> Int"
     , "template" :
-"// modInt begin
-// remainder
-wire ~SIGD[~GENSYM[rem_res][0]][0];
-assign ~SYM[0] = ~VAR[dividend][0] % ~VAR[divider][1];
-
-// modulo
-assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~TYPO]-1]) ?
-                 ~SYM[0] :
-                 ((~VAR[dividend][0] == ~SIZE[~TYPO]'sd0) ? ~SIZE[~TYPO]'sd0 : ~SYM[0] + ~VAR[divider][1]);
-// modInt end"
+      [ "// modInt begin"
+      , "// remainder"
+      , "wire ~SIGD[~GENSYM[rem_res][0]][0];"
+      , "assign ~SYM[0] = ~VAR[dividend][0] % ~VAR[divider][1];"
+      , ""
+      , "// modulo"
+      , "assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~TYPO]-1]) ?"
+      , "                 ~SYM[0] :"
+      , "                 ((~VAR[dividend][0] == ~SIZE[~TYPO]'sd0) ? ~SIZE[~TYPO]'sd0 : ~SYM[0] + ~VAR[divider][1]);"
+      , "// modInt end"
+      ]
     }
   }
 ]
