@@ -286,10 +286,11 @@
     , "kind"      : "Declaration"
     , "type"      : "byteSwap16# :: Word# -> Word#"
     , "template"  :
-"// byteSwap16 begin~IF ~IW64 ~THEN
-assign ~RESULT = {~VAR[w][0][63:16],~VAR[w][0][7:0],~VAR[w][0][15:8]};~ELSE
-assign ~RESULT = {~VAR[w][0][31:16],~VAR[w][0][7:0],~VAR[w][0][15:8]};~FI
-// byteSwap16 end"
+      [ "// byteSwap16 begin~IF ~IW64 ~THEN"
+      , "assign ~RESULT = {~VAR[w][0][63:16],~VAR[w][0][7:0],~VAR[w][0][15:8]};~ELSE"
+      , "assign ~RESULT = {~VAR[w][0][31:16],~VAR[w][0][7:0],~VAR[w][0][15:8]};~FI"
+      , "// byteSwap16 end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -298,10 +299,11 @@ assign ~RESULT = {~VAR[w][0][31:16],~VAR[w][0][7:0],~VAR[w][0][15:8]};~FI
     , "kind"      : "Declaration"
     , "type"      : "byteSwap32# :: Word# -> Word#"
     , "template"  :
-"// byteSwap32 begin~IF ~IW64 ~THEN
-assign ~RESULT = {~VAR[w][0][63:32],~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]};~ELSE
-assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]};~FI
-// byteSwap32 end"
+      [ "// byteSwap32 begin~IF ~IW64 ~THEN"
+      , "assign ~RESULT = {~VAR[w][0][63:32],~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]};~ELSE"
+      , "assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]};~FI"
+      , "// byteSwap32 end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -310,10 +312,11 @@ assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][
     , "kind"      : "Declaration"
     , "type"      : "byteSwap64# :: Word# -> Word#"
     , "template"  :
-"// byteSwap64 begin
-assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]
-                 ,~VAR[w][0][39:32],~VAR[w][0][47:40],~VAR[w][0][55:48],~VAR[w][0][63:56]};
-// byteSwap64 end"
+      [ "// byteSwap64 begin"
+      , "assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]"
+      , "                 ,~VAR[w][0][39:32],~VAR[w][0][47:40],~VAR[w][0][55:48],~VAR[w][0][63:56]};"
+      , "// byteSwap64 end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -322,11 +325,12 @@ assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][
     , "kind"      : "Declaration"
     , "type"      : "byteSwap# :: Word# -> Word#"
     , "template"  :
-"// byteSwap begin~IF ~IW64 ~THEN
-assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]
-                 ,~VAR[w][0][39:32],~VAR[w][0][47:40],~VAR[w][0][55:48],~VAR[w][0][63:56]};~ELSE
-assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]};~FI
-// byteSwap end"
+      [ "// byteSwap begin~IF ~IW64 ~THEN"
+      , "assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]"
+      , "                 ,~VAR[w][0][39:32],~VAR[w][0][47:40],~VAR[w][0][55:48],~VAR[w][0][63:56]};~ELSE"
+      , "assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]};~FI"
+      , "// byteSwap end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -335,9 +339,10 @@ assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][
     , "kind"      : "Declaration"
     , "type"      : "narrow8Int# :: Int# -> Int#"
     , "template"  :
-"// narrow8Int begin
-assign ~RESULT = $signed(~VAR[i][0][7:0]);
-// narrow8Int end"
+      [ "// narrow8Int begin"
+      , "assign ~RESULT = $signed(~VAR[i][0][7:0]);"
+      , "// narrow8Int end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -346,9 +351,10 @@ assign ~RESULT = $signed(~VAR[i][0][7:0]);
     , "kind"      : "Declaration"
     , "type"      : "narrow16Int# :: Int# -> Int#"
     , "template"  :
-"// narrow16Int begin
-assign ~RESULT = $signed(~VAR[i][0][15:0]);
-// narrow16Int end"
+      [ "// narrow16Int begin"
+      , "assign ~RESULT = $signed(~VAR[i][0][15:0]);"
+      , "// narrow16Int end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -357,9 +363,10 @@ assign ~RESULT = $signed(~VAR[i][0][15:0]);
     , "kind"      : "Declaration"
     , "type"      : "narrow32Int# :: Int# -> Int#"
     , "template"  :
-"// narrow32Int begin
-assign ~RESULT = $signed(~VAR[i][0][31:0]);
-// narrow32Int end"
+      [ "// narrow32Int begin"
+      , "assign ~RESULT = $signed(~VAR[i][0][31:0]);"
+      , "// narrow32Int end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -368,9 +375,10 @@ assign ~RESULT = $signed(~VAR[i][0][31:0]);
     , "kind"      : "Declaration"
     , "type"      : "narrow8Int# :: Word# -> Word#"
     , "template"  :
-"// narrow8Word begin
-assign ~RESULT = $unsigned(~VAR[w][0][7:0]);
-// narrow8Word end"
+      [ "// narrow8Word begin"
+      , "assign ~RESULT = $unsigned(~VAR[w][0][7:0]);"
+      , "// narrow8Word end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -379,9 +387,10 @@ assign ~RESULT = $unsigned(~VAR[w][0][7:0]);
     , "kind"      : "Declaration"
     , "type"      : "narrow16Word# :: Word# -> Word#"
     , "template"  :
-"// narrow16Word begin
-assign ~RESULT = $unsigned(~VAR[w][0][15:0]);
-// narrow16Word end"
+      [ "// narrow16Word begin"
+      , "assign ~RESULT = $unsigned(~VAR[w][0][15:0]);"
+      , "// narrow16Word end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -390,9 +399,10 @@ assign ~RESULT = $unsigned(~VAR[w][0][15:0]);
     , "kind"      : "Declaration"
     , "type"      : "narrow32Int# :: Word# -> Word#"
     , "template"  :
-"// narrow32Word begin
-assign ~RESULT = $unsigned(~VAR[w][0][31:0]);
-// narrow32Word end"
+      [ "// narrow32Word begin"
+      , "assign ~RESULT = $unsigned(~VAR[w][0][31:0]);"
+      , "// narrow32Word end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -401,14 +411,15 @@ assign ~RESULT = $unsigned(~VAR[w][0][31:0]);
     , "kind"      : "Declaration"
     , "type"      : "bitReverse# :: Word# -> Word#"
     , "template"  :
-"// bitReverse begin
-genvar ~GENSYM[i][0];
-~GENERATE
-for (~SYM[0] = 0; ~SYM[0] < ~IF ~IW64 ~THEN 64 ~ELSE 32 ~FI; ~SYM[0]=~SYM[0]+1) begin : ~GENSYM[bitReverse][2]
-  assign ~RESULT[~SYM[0]] = ~VAR[x][0][~IF ~IW64 ~THEN 63 ~ELSE 31 ~FI-~SYM[0]];
-end
-~ENDGENERATE
-// bitReverse end"
+      [ "// bitReverse begin"
+      , "genvar ~GENSYM[i][0];"
+      , "~GENERATE"
+      , "for (~SYM[0] = 0; ~SYM[0] < ~IF ~IW64 ~THEN 64 ~ELSE 32 ~FI; ~SYM[0]=~SYM[0]+1) begin : ~GENSYM[bitReverse][2]"
+      , "  assign ~RESULT[~SYM[0]] = ~VAR[x][0][~IF ~IW64 ~THEN 63 ~ELSE 31 ~FI-~SYM[0]];"
+      , "end"
+      , "~ENDGENERATE"
+      , "// bitReverse end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -417,14 +428,15 @@ end
     , "kind"      : "Declaration"
     , "type"      : "bitReverse8# :: Word# -> Word#"
     , "template"  :
-"// bitReverse8 begin
-genvar ~GENSYM[i][0];
-~GENERATE
-for (~SYM[0] = 0; ~SYM[0] < 8; ~SYM[0]=~SYM[0]+1) begin : ~GENSYM[bitReverse8][2]
-  assign ~RESULT[~SYM[0]] = ~VAR[x][0][7-~SYM[0]];
-end
-~ENDGENERATE
-// bitReverse8 end"
+      [ "// bitReverse8 begin"
+      , "genvar ~GENSYM[i][0];"
+      , "~GENERATE"
+      , "for (~SYM[0] = 0; ~SYM[0] < 8; ~SYM[0]=~SYM[0]+1) begin : ~GENSYM[bitReverse8][2]"
+      , "  assign ~RESULT[~SYM[0]] = ~VAR[x][0][7-~SYM[0]];"
+      , "end"
+      , "~ENDGENERATE"
+      , "// bitReverse8 end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -433,14 +445,15 @@ end
     , "kind"      : "Declaration"
     , "type"      : "bitReverse16# :: Word# -> Word#"
     , "template"  :
-"// bitReverse16 begin
-genvar ~GENSYM[i][0];
-~GENERATE
-for (~SYM[0] = 0; ~SYM[0] < 16; ~SYM[0]=~SYM[0]+1) begin : ~GENSYM[bitReverse16][2]
-  assign ~RESULT[~SYM[0]] = ~VAR[x][0][15-~SYM[0]];
-end
-~ENDGENERATE
-// bitReverse16 end"
+      [ "// bitReverse16 begin"
+      , "genvar ~GENSYM[i][0];"
+      , "~GENERATE"
+      , "for (~SYM[0] = 0; ~SYM[0] < 16; ~SYM[0]=~SYM[0]+1) begin : ~GENSYM[bitReverse16][2]"
+      , "  assign ~RESULT[~SYM[0]] = ~VAR[x][0][15-~SYM[0]];"
+      , "end"
+      , "~ENDGENERATE"
+      , "// bitReverse16 end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -449,14 +462,15 @@ end
     , "kind"      : "Declaration"
     , "type"      : "bitReverse32# :: Word# -> Word#"
     , "template"  :
-"// bitReverse32 begin
-genvar ~GENSYM[i][0];
-~GENERATE
-for (~SYM[0] = 0; ~SYM[0] < 32; ~SYM[0]=~SYM[0]+1) begin : ~GENSYM[bitReverse32][2]
-  assign ~RESULT[~SYM[0]] = ~VAR[x][0][31-~SYM[0]];
-end
-~ENDGENERATE
-// bitReverse32 end"
+      [ "// bitReverse32 begin"
+      , "genvar ~GENSYM[i][0];"
+      , "~GENERATE"
+      , "for (~SYM[0] = 0; ~SYM[0] < 32; ~SYM[0]=~SYM[0]+1) begin : ~GENSYM[bitReverse32][2]"
+      , "  assign ~RESULT[~SYM[0]] = ~VAR[x][0][31-~SYM[0]];"
+      , "end"
+      , "~ENDGENERATE"
+      , "// bitReverse32 end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -465,14 +479,15 @@ end
     , "kind"      : "Declaration"
     , "type"      : "bitReverse64# :: Word# -> Word#"
     , "template"  :
-"// bitReverse64 begin
-genvar ~GENSYM[i][0];
-~GENERATE
-for (~SYM[0] = 0; ~SYM[0] < 64; ~SYM[0]=~SYM[0]+1) begin : ~GENSYM[bitReverse64][2]
-  assign ~RESULT[~SYM[0]] = ~VAR[x][0][63-~SYM[0]];
-end
-~ENDGENERATE
-// bitReverse64 end"
+      [ "// bitReverse64 begin"
+      , "genvar ~GENSYM[i][0];"
+      , "~GENERATE"
+      , "for (~SYM[0] = 0; ~SYM[0] < 64; ~SYM[0]=~SYM[0]+1) begin : ~GENSYM[bitReverse64][2]"
+      , "  assign ~RESULT[~SYM[0]] = ~VAR[x][0][63-~SYM[0]];"
+      , "end"
+      , "~ENDGENERATE"
+      , "// bitReverse64 end"
+      ]
     }
   }
 , { "BlackBox" :

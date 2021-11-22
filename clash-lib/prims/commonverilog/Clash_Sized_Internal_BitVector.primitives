@@ -195,10 +195,11 @@
     { "name" : "Clash.Sized.Internal.BitVector.index#"
     , "kind" : "Expression"
     , "type" :
-"index# :: KnownNat n  -- ARG[0]
-        => BitVector n -- ARG[1]
-        -> Int         -- ARG[2]
-        -> Bit"
+      [ "index# :: KnownNat n  -- ARG[0]"
+      , "       => BitVector n -- ARG[1]"
+      , "       -> Int         -- ARG[2]"
+      , "       -> Bit"
+      ]
     , "template" : "~VAR[bv][1][~ARG[2]]"
     }
   }
@@ -207,10 +208,11 @@
     , "workInfo" : "Never"
     , "kind" : "Expression"
     , "type" :
-"slice# :: BitVector (m + 1 + i) -- ARG[0]
-        -> SNat m                -- ARG[1]
-        -> SNat n                -- ARG[2]
-        -> BitVector (m + 1 - n)"
+      [ "slice# :: BitVector (m + 1 + i) -- ARG[0]"
+      , "       -> SNat m                -- ARG[1]"
+      , "       -> SNat n                -- ARG[2]"
+      , "       -> BitVector (m + 1 - n)"
+      ]
     , "template" : "~VAR[bv][0][~LIT[1] : ~LIT[2]]"
     }
   }
@@ -219,9 +221,10 @@
     , "workInfo" : "Never"
     , "kind" : "Expression"
     , "type" :
-"msb# :: KnownNat n  -- ARG[0]
-      => BitVector n -- ARG[1]
-      -> Bit"
+      [ "msb# :: KnownNat n  -- ARG[0]"
+      , "     => BitVector n -- ARG[1]"
+      , "     -> Bit"
+      ]
     , "template" : "~IF ~SIZE[~TYP[1]] ~THEN ~VAR[bv][1][~SIZE[~TYP[1]]-1] ~ELSE 1'b0 ~FI"
     }
   }
@@ -230,8 +233,9 @@
     , "workInfo" : "Never"
     , "kind" : "Expression"
     , "type" :
-"lsb# :: BitVector n -- ARG[0]
-      -> Bit"
+      [ "lsb# :: BitVector n -- ARG[0]"
+      , "      -> Bit"
+      ]
     , "template" : "~IF ~SIZE[~TYP[0]] ~THEN ~VAR[bv][0][0] ~ELSE 1'b0 ~FI"
     }
   }

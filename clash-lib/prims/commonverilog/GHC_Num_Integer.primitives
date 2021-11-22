@@ -247,14 +247,15 @@
       [ { "name" : "integerLogBase"
         , "extension" : "inc"
         , "template" :
-"// integer logBase
-function integer ~INCLUDENAME[0];
-input integer base, value;
-begin
-  for (~INCLUDENAME[0] = 0; value >= base; ~INCLUDENAME[0]=~INCLUDENAME[0]+1)
-    value = value / base;
-end
-endfunction"
+          [ "// integer logBase"
+          , "function integer ~INCLUDENAME[0];"
+          , "input integer base, value;"
+          , "begin"
+          , "  for (~INCLUDENAME[0] = 0; value >= base; ~INCLUDENAME[0]=~INCLUDENAME[0]+1)"
+          , "    value = value / base;"
+          , "end"
+          , "endfunction"
+          ]
         }
       ]
     , "template"  : "~INCLUDENAME[0](~ARG[0],~ARG[1])"

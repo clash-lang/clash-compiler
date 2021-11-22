@@ -35,14 +35,15 @@
     [ { "name" : "naturalLogBase"
       , "extension" : "inc"
       , "template" :
-"// natural logBase
-function integer ~INCLUDENAME[0];
-input [~SIZE[~TYP[0]]-1:0] base, value;
-begin
-  for (~INCLUDENAME[0] = 0; value >= base; ~INCLUDENAME[0]=~INCLUDENAME[0]+1)
-    value = value / base;
-end
-endfunction"
+        [ "// natural logBase"
+        , "function integer ~INCLUDENAME[0];"
+        , "input [~SIZE[~TYP[0]]-1:0] base, value;"
+        , "begin"
+        , "  for (~INCLUDENAME[0] = 0; value >= base; ~INCLUDENAME[0]=~INCLUDENAME[0]+1)"
+        , "    value = value / base;"
+        , "end"
+        , "endfunction"
+        ]
       }
     ]
   , "template"  : "~INCLUDENAME[0](~ARG[0],~ARG[1])"
