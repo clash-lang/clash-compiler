@@ -2,83 +2,89 @@
     { "name" : "Clash.Signal.Internal.delay#"
     , "kind" : "Declaration"
     , "type" :
-"delay#
-  :: ( KnownDomain dom        -- ARG[0]
-     , Undefined a )          -- ARG[1]
-  => Clock dom                -- ARG[2]
-  -> Enable dom               -- ARG[3]
-  -> a                        -- ARG[4]
-  -> Signal clk a             -- ARG[5]
-  -> Signal clk a"
+      [ "delay#"
+      , "  :: ( KnownDomain dom        -- ARG[0]"
+      , "     , Undefined a )          -- ARG[1]"
+      , "  => Clock dom                -- ARG[2]"
+      , "  -> Enable dom               -- ARG[3]"
+      , "  -> a                        -- ARG[4]"
+      , "  -> Signal clk a             -- ARG[5]"
+      , "  -> Signal clk a"
+      ]
     , "resultName" : { "template" : "~CTXNAME" }
     , "resultInit" : { "template" : "~IF~ISINITDEFINED[0]~THEN~CONST[4]~ELSE~FI" }
     , "template" :
-"// delay begin~IF ~ISACTIVEENABLE[3] ~THEN
-always_ff @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~GENSYM[~RESULT_delay][1]
-  if (~ARG[3]) begin
-    ~RESULT <= ~ARG[5];
-  end
-end~ELSE
-always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~SYM[1]
-  ~RESULT <= ~ARG[5];
-end~FI
-// delay end"
+      [ "// delay begin~IF ~ISACTIVEENABLE[3] ~THEN"
+      , "always_ff @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~GENSYM[~RESULT_delay][1]"
+      , "  if (~ARG[3]) begin"
+      , "    ~RESULT <= ~ARG[5];"
+      , "  end"
+      , "end~ELSE"
+      , "always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~SYM[1]"
+      , "  ~RESULT <= ~ARG[5];"
+      , "end~FI"
+      , "// delay end"
+      ]
     }
   }
 , { "BlackBox" :
     { "name" : "Clash.Signal.Internal.asyncRegister#"
     , "kind" : "Declaration"
     , "type" :
-"asyncRegister#
-  :: ( KnownDomain dom        -- ARG[0]
-     , NFDataX a )            -- ARG[1]
-  => Clock dom                -- ARG[2]
-  -> Reset dom                -- ARG[3]
-  -> Enable dom               -- ARG[4]
-  -> a                        -- ARG[5] (powerup value)
-  -> a                        -- ARG[6] (reset value)
-  -> Signal clk a             -- ARG[7]
-  -> Signal clk a"
+      [ "asyncRegister#"
+      , "  :: ( KnownDomain dom        -- ARG[0]"
+      , "     , NFDataX a )            -- ARG[1]"
+      , "  => Clock dom                -- ARG[2]"
+      , "  -> Reset dom                -- ARG[3]"
+      , "  -> Enable dom               -- ARG[4]"
+      , "  -> a                        -- ARG[5] (powerup value)"
+      , "  -> a                        -- ARG[6] (reset value)"
+      , "  -> Signal clk a             -- ARG[7]"
+      , "  -> Signal clk a"
+      ]
     , "resultName" : { "template" : "~CTXNAME" }
     , "resultInit" : { "template" : "~IF~ISINITDEFINED[0]~THEN~CONST[5]~ELSE~FI" }
     , "template" :
-"// async register begin
-always_ff @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]~IF ~ISUNDEFINED[6] ~THEN ~ELSE or ~IF ~ISACTIVEHIGH[0] ~THEN posedge ~ELSE negedge ~FI ~VAR[rst][3]~FI) begin : ~GENSYM[~RESULT_register][1]
-  ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI~VAR[rst][3]) begin
-    ~RESULT <= ~CONST[6];
-  end else ~FI~IF ~ISACTIVEENABLE[4] ~THEN if (~ARG[4]) ~ELSE ~FI begin
-    ~RESULT <= ~ARG[7];
-  end
-end
-// async register end"
+      [ "// async register begin"
+      , "always_ff @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]~IF ~ISUNDEFINED[6] ~THEN ~ELSE or ~IF ~ISACTIVEHIGH[0] ~THEN posedge ~ELSE negedge ~FI ~VAR[rst][3]~FI) begin : ~GENSYM[~RESULT_register][1]"
+      , "  ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI~VAR[rst][3]) begin"
+      , "    ~RESULT <= ~CONST[6];"
+      , "  end else ~FI~IF ~ISACTIVEENABLE[4] ~THEN if (~ARG[4]) ~ELSE ~FI begin"
+      , "    ~RESULT <= ~ARG[7];"
+      , "  end"
+      , "end"
+      , "// async register end"
+      ]
     }
   }
 , { "BlackBox" :
     { "name" : "Clash.Signal.Internal.register#"
     , "kind" : "Declaration"
     , "type" :
-"register#
-  :: ( KnownDomain dom        -- ARG[0]
-     , Undefined a )          -- ARG[1]
-  => Clock dom                -- ARG[2]
-  -> Reset dom                -- ARG[3]
-  -> Enable dom               -- ARG[4]
-  -> a                        -- ARG[5] (powerup value)
-  -> a                        -- ARG[6] (reset value)
-  -> Signal clk a             -- ARG[7]
-  -> Signal clk a"
+      [ "register#"
+      , "  :: ( KnownDomain dom        -- ARG[0]"
+      , "     , Undefined a )          -- ARG[1]"
+      , "  => Clock dom                -- ARG[2]"
+      , "  -> Reset dom                -- ARG[3]"
+      , "  -> Enable dom               -- ARG[4]"
+      , "  -> a                        -- ARG[5] (powerup value)"
+      , "  -> a                        -- ARG[6] (reset value)"
+      , "  -> Signal clk a             -- ARG[7]"
+      , "  -> Signal clk a"
+      ]
     , "resultName" : { "template" : "~CTXNAME" }
     , "resultInit" : { "template" : "~IF~ISINITDEFINED[0]~THEN~CONST[5]~ELSE~FI" }
     , "template" :
-"// register begin
-always_ff @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]~IF ~ISSYNC[0] ~THEN ~ELSE~IF ~ISUNDEFINED[6] ~THEN ~ELSE or ~IF ~ISACTIVEHIGH[0] ~THEN posedge ~ELSE negedge ~FI ~VAR[rst][3]~FI~FI) begin : ~GENSYM[~RESULT_register][1]
-  ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI~VAR[rst][3]) begin
-    ~RESULT <= ~CONST[6];
-  end else ~FI~IF ~ISACTIVEENABLE[4] ~THEN if (~ARG[4]) ~ELSE ~FI begin
-    ~RESULT <= ~ARG[7];
-  end
-end
-// register end"
+      [ "// register begin"
+      , "always_ff @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]~IF ~ISSYNC[0] ~THEN ~ELSE~IF ~ISUNDEFINED[6] ~THEN ~ELSE or ~IF ~ISACTIVEHIGH[0] ~THEN posedge ~ELSE negedge ~FI ~VAR[rst][3]~FI~FI) begin : ~GENSYM[~RESULT_register][1]"
+      , "  ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI~VAR[rst][3]) begin"
+      , "    ~RESULT <= ~CONST[6];"
+      , "  end else ~FI~IF ~ISACTIVEENABLE[4] ~THEN if (~ARG[4]) ~ELSE ~FI begin"
+      , "    ~RESULT <= ~ARG[7];"
+      , "  end"
+      , "end"
+      , "// register end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -87,25 +93,27 @@ end
     , "kind" : "Declaration"
     , "warning" : "Clash.Signal.Internal.clockGen is not synthesizable!"
     , "type" :
-"clockGen
-  :: KnownDomain dom     -- ARG[0]
-  => Clock dom"
+      [ "clockGen"
+      , "  :: KnownDomain dom     -- ARG[0]"
+      , "  => Clock dom"
+      ]
     , "template" :
-"// clockGen begin
-// pragma translate_off
-// 1 = 0.1ps
-localparam ~GENSYM[half_period][0] = (~PERIOD[0]0 / 2);
-always begin
-  ~RESULT = ~IF~ACTIVEEDGE[Rising][0]~THEN 0 ~ELSE 1 ~FI;
-  #30000 forever begin
-    ~RESULT = ~ ~RESULT;
-    #~SYM[0];
-    ~RESULT = ~ ~RESULT;
-    #~SYM[0];
-  end
-end
-// pragma translate_on
-// clockGen end"
+      [ "// clockGen begin"
+      , "// pragma translate_off"
+      , "// 1 = 0.1ps"
+      , "localparam ~GENSYM[half_period][0] = (~PERIOD[0]0 / 2);"
+      , "always begin"
+      , "  ~RESULT = ~IF~ACTIVEEDGE[Rising][0]~THEN 0 ~ELSE 1 ~FI;"
+      , "  #30000 forever begin"
+      , "    ~RESULT = ~ ~RESULT;"
+      , "    #~SYM[0];"
+      , "    ~RESULT = ~ ~RESULT;"
+      , "    #~SYM[0];"
+      , "  end"
+      , "end"
+      , "// pragma translate_on"
+      , "// clockGen end"
+      ]
     }
   }
 , { "BlackBox" :
@@ -114,22 +122,23 @@ end
     , "kind" : "Declaration"
     , "type" : "resetGenN :: (KnownDomain dom, 1 <= n) => SNat n -> Reset dom"
     , "template" :
-"// resetGen begin
-// pragma translate_off
-~IF~ISSYNC[0]~THEN
-localparam ~GENSYM[reset_period][1] = 29998 + (~LIT[2] * ~PERIOD[0]0);
-initial begin
-  #1 ~RESULT = ~IF ~ISACTIVEHIGH[0] ~THEN 1 ~ELSE 0 ~FI;
-  #~SYM[1] ~RESULT = ~IF ~ISACTIVEHIGH[0] ~THEN 0 ~ELSE 1 ~FI;
-end~ELSE
-localparam ~SYM[1] = 30001 + ((~LIT[2] - 1) * ~PERIOD[0]0);
-initial begin
-  #1     ~RESULT = ~IF ~ISACTIVEHIGH[0] ~THEN 1 ~ELSE 0 ~FI;
-  #~SYM[1] ~RESULT = ~IF ~ISACTIVEHIGH[0] ~THEN 0 ~ELSE 1 ~FI;
-end
-~FI
-// pragma translate_on
-// resetGen end"
+      [ "// resetGen begin"
+      , "// pragma translate_off"
+      , "~IF~ISSYNC[0]~THEN"
+      , "localparam ~GENSYM[reset_period][1] = 29998 + (~LIT[2] * ~PERIOD[0]0);"
+      , "initial begin"
+      , "  #1 ~RESULT = ~IF ~ISACTIVEHIGH[0] ~THEN 1 ~ELSE 0 ~FI;"
+      , "  #~SYM[1] ~RESULT = ~IF ~ISACTIVEHIGH[0] ~THEN 0 ~ELSE 1 ~FI;"
+      , "end~ELSE"
+      , "localparam ~SYM[1] = 30001 + ((~LIT[2] - 1) * ~PERIOD[0]0);"
+      , "initial begin"
+      , "  #1     ~RESULT = ~IF ~ISACTIVEHIGH[0] ~THEN 1 ~ELSE 0 ~FI;"
+      , "  #~SYM[1] ~RESULT = ~IF ~ISACTIVEHIGH[0] ~THEN 0 ~ELSE 1 ~FI;"
+      , "end"
+      , "~FI"
+      , "// pragma translate_on"
+      , "// resetGen end"
+      ]
     }
   }
 ]
