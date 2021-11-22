@@ -27,5 +27,8 @@
     80,
     90
   ],
-  "editor.tabSize": 2
+  "editor.tabSize": 2,
+  "files.associations": {
+    "*.primitives": "jsonc"
+  }
 }
