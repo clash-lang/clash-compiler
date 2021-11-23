@@ -14,7 +14,13 @@
     { "name"     : "Clash.Explicit.SimIO.finish"
     , "kind"     : "Declaration"
     , "renderVoid" : "RenderVoid"
-    , "template" : "$finish_and_return(~LIT[0]);"
+    , "template" :
+"`ifdef VERILATOR
+$c(\"std::exit(~LIT[0]);\");
+`else
+// NOTE: $finish_and_return is an iverilog extension!
+$finish_and_return(~LIT[0]);
+`endif"
     }
   }
 , { "BlackBox" :

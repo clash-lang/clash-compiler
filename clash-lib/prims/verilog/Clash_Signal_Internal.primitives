@@ -102,13 +102,43 @@ localparam ~GENSYM[half_period][1] = (~PERIOD[0]0 / 2);
 always begin
   // Delay of 1 mitigates race conditions (https://github.com/steveicarus/iverilog/issues/160)
   #1 ~SYM[0] = ~IF~ACTIVEEDGE[Rising][0]~THEN 0 ~ELSE 1 ~FI;
+  `ifndef VERILATOR
   #30000 forever begin
     ~SYM[0] = ~ ~SYM[0];
     #~SYM[1];
     ~SYM[0] = ~ ~SYM[0];
     #~SYM[1];
   end
+  `else
+  ~SYM[0] = $c(\"this->~GENSYM[tb_clock_gen][2](\",~SYM[1],\",~IF~ACTIVEEDGE[Rising][0]~THENtrue~ELSEfalse~FI)\");
+  `endif
 end
+
+`ifdef VERILATOR
+  `systemc_interface
+  CData ~SYM[2](vluint32_t half_period, bool active_rising) {
+    static vluint32_t init_wait = 30000;
+    static vluint32_t to_wait = 0;
+    static CData clock = active_rising ? 0 : 1;
+
+    if(init_wait == 0) {
+      if(to_wait == 0) {
+        to_wait = half_period - 1;
+        clock = clock == 0 ? 1 : 0;
+      }
+      else {
+        to_wait = to_wait - 1;
+      }
+    }
+    else {
+      init_wait = init_wait - 1;
+    }
+
+    return clock;
+  }
+  `verilog
+`endif
+
 assign ~RESULT = ~SYM[0];
 // pragma translate_on
 // clockGen end"
@@ -120,23 +150,47 @@ assign ~RESULT = ~SYM[0];
     , "kind" : "Declaration"
     , "type" : "resetGenN :: (KnownDomain dom, 1 <= n) => SNat n -> Reset dom"
     , "template" :
-"// resetGen on
+"// resetGen begin
 // pragma translate_off
-~IF~ISSYNC[0]~THEN
 reg ~TYPO ~GENSYM[rst][0];
+~IF~ISSYNC[0]~THEN
 localparam ~GENSYM[reset_period][1] = 29998 + (~LIT[2] * ~PERIOD[0]0);
+~ELSE
+localparam ~SYM[1] = 30001 + ((~LIT[2] - 1) * ~PERIOD[0]0);
+~FI
+`ifndef VERILATOR
 initial begin
   #1 ~SYM[0] = ~IF ~ISACTIVEHIGH[0] ~THEN 1 ~ELSE 0 ~FI;
   #~SYM[1] ~SYM[0] = ~IF ~ISACTIVEHIGH[0] ~THEN 0 ~ELSE 1 ~FI;
 end
-assign ~RESULT = ~SYM[0];~ELSE
-reg ~TYPO ~SYM[0];
-localparam ~SYM[1] = 30001 + ((~LIT[2] - 1) * ~PERIOD[0]0);
-initial begin
-  #1     ~SYM[0] = ~IF ~ISACTIVEHIGH[0] ~THEN 1 ~ELSE 0 ~FI;
-  #~SYM[1] ~SYM[0] = ~IF ~ISACTIVEHIGH[0] ~THEN 0 ~ELSE 1 ~FI;
+`else
+always begin
+  // The redundant (~SYM[0] | ~ ~SYM[0]) is needed to ensure that this is
+  // calculated in every cycle by verilator. Without it, the reset will stop
+  // being updated and will be stuck as asserted forever.
+  ~SYM[0] = $c(\"this->~GENSYM[reset_gen][2](\",~SYM[1],\",~IF~ISACTIVEHIGH[0]~THENtrue~ELSEfalse~FI)\") & (~SYM[0] | ~ ~SYM[0]);
 end
-assign ~RESULT = ~SYM[0]; ~FI
+`systemc_interface
+CData ~SYM[2](vluint32_t reset_period, bool active_high) {
+  static vluint32_t to_wait = reset_period;
+  static CData reset = active_high ? 1 : 0;
+  static bool finished = false;
+
+  if(!finished) {
+    if(to_wait == 0) {
+      reset = reset == 0 ? 1 : 0;
+      finished = true;
+    }
+    else {
+      to_wait = to_wait - 1;
+    }
+  }
+
+  return reset;
+}
+`verilog
+`endif
+assign ~RESULT = ~SYM[0];
 // pragma translate_on
 // resetGen end"
     }

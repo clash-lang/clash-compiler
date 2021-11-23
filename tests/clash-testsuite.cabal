@@ -93,6 +93,7 @@ library
     Test.Tasty.Modelsim
     Test.Tasty.SymbiYosys
     Test.Tasty.Program
+    Test.Tasty.Verilator
     Test.Tasty.Clash.CollectSimResults
 
     -- From tests/shouldwork/LoadModules

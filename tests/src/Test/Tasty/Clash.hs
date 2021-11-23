@@ -29,6 +29,7 @@ import           Test.Tasty.Ghdl
 import           Test.Tasty.Iverilog
 import           Test.Tasty.Modelsim
 import           Test.Tasty.SymbiYosys
+import           Test.Tasty.Verilator
 
 {- Note [copy data files hack]
 
@@ -89,6 +90,11 @@ getBuildTargets TestOptions{hdlSim, buildTargets=BuildAuto}
 -- | Possible verification tools
 data VerificationTool = SymbiYosys
 
+-- | Specify whether a test will use a traditional simulator, verilator, or
+-- both when executing. By default both are used, but this can be changed when
+-- a test is only relevant with one type of tool.
+data Verilate = SimAndVerilate | VerilateOnly | SimOnly
+
 data TestOptions =
   TestOptions
     { hdlSim :: Bool
@@ -120,6 +126,9 @@ data TestOptions =
     -- if 'hdlSim' is set, otherwise @["topEntity"]@.
     , vvpStdoutNonEmptyFail :: Bool
     -- ^ Whether a non-empty stdout means test failure when running VVP
+    , verilate :: Verilate
+    -- ^ Whether to run compatible tests through verilator as well as / in
+    -- place of the simulator that would ordinarily be used.
     }
 
 allTargets :: [HDL]
@@ -139,6 +148,7 @@ instance Default TestOptions where
       , clashFlags=[]
       , buildTargets=BuildAuto
       , vvpStdoutNonEmptyFail=True
+      , verilate=SimAndVerilate
       }
 
 -- | Directory where testbenches live.
@@ -317,15 +327,40 @@ verilogTests
      )
 verilogTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
  where
-  makeName t = "iverilog (make " <> t <> ")"
-  buildTests =
-    [ (makeName t, singleTest (makeName t) (IVerilogMakeTest tmpDir t))
-    | t <- getBuildTargets opts ]
+  makeNameIvl t = "iverilog (make " <> t <> ")"
+  ivlMake =
+    [ (makeNameIvl t, singleTest (makeNameIvl t) (IVerilogMakeTest tmpDir t))
+    | t <- getBuildTargets opts
+    ]
 
-  simName t = "iverilog (sim " <> t <> ")"
+  makeNameVer t = "verilator (make " <> t <> ")"
+  verMake =
+    [ (makeNameVer t, singleTest (makeNameVer t) (VerilatorMakeTest tmpDir t))
+    | t <- getBuildTargets opts
+    ]
+
+  buildTests =
+    case verilate of
+      SimAndVerilate -> ivlMake <> verMake
+      VerilateOnly -> verMake
+      SimOnly -> ivlMake
+
+  simNameIvl t = "iverilog (sim " <> t <> ")"
+  ivlSim =
+    [ (simNameIvl t, singleTest (simNameIvl t) (IVerilogSimTest expectSimFail vvpStdoutNonEmptyFail tmpDir t))
+    | t <- getBuildTargets opts
+    ]
+  simNameVer t = "verilator (sim " <> t <> ")"
+  verSim =
+    [ (simNameVer t, singleTest (simNameVer t) (VerilatorSimTest expectSimFail vvpStdoutNonEmptyFail tmpDir t))
+    | t <- getBuildTargets opts
+    ]
+
   simTests =
-    [ (simName t, singleTest (simName t) (IVerilogSimTest expectSimFail vvpStdoutNonEmptyFail tmpDir t))
-    | t <- getBuildTargets opts ]
+    case verilate of
+      SimAndVerilate -> ivlSim <> verSim
+      VerilateOnly -> verSim
+      SimOnly -> ivlSim
 
 -- | Generate two test trees for testing SystemVerilog: one for building designs and
 -- one for running them. Depending on 'hdlSim' the latter will be executed or not.
@@ -339,15 +374,40 @@ systemVerilogTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
  where
   vlibName = "modelsim (vlib)"
   vlogName = "modelsim (vlog)"
-  buildTests =
+  msimMake =
     [ (vlibName, singleTest vlibName (ModelsimVlibTest tmpDir))
     , (vlogName, singleTest vlogName (ModelsimVlogTest tmpDir))
     ]
 
+  verName t = "verilator (make " <> t <> ")"
+  verMake =
+    [ (verName t, singleTest (verName t) (VerilatorMakeTest tmpDir t))
+    | t <- getBuildTargets opts
+    ]
+
+  buildTests =
+    case verilate of
+      SimAndVerilate -> msimMake <> verMake
+      VerilateOnly -> verMake
+      SimOnly -> msimMake
+
   simName t = "modelsim (sim " <> t <> ")"
-  simTests =
+  msimSim =
     [ (simName t, singleTest (simName t) (ModelsimSimTest expectSimFail tmpDir t))
-    | t <- getBuildTargets opts ]
+    | t <- getBuildTargets opts
+    ]
+
+  simNameVer t = "verilator (sim " <> t <> ")"
+  verSim =
+    [ (simNameVer t, singleTest (simNameVer t) (VerilatorSimTest expectSimFail vvpStdoutNonEmptyFail tmpDir t))
+    | t <- getBuildTargets opts
+    ]
+
+  simTests =
+    case verilate of
+      SimAndVerilate -> msimSim <> verSim
+      VerilateOnly -> verSim
+      SimOnly -> msimSim
 
 -- | Generate a test tree for running SymbiYosys
 sbyTests :: TestOptions -> IO FilePath -> ([(TestName, TestTree)])
