@@ -362,6 +362,8 @@ data ClashOpts = ClashOpts
   , opt_renderEnums :: Bool
   -- ^ Render sum types with all zero-width fields as enums where supported, as
   -- opposed to rendering them as bitvectors.
+  , opt_verilator :: Bool
+  -- ^ Generate shims for top entities for use with Verilator.
   }
 
 instance Hashable ClashOpts where
@@ -393,7 +395,8 @@ instance Hashable ClashOpts where
     opt_aggressiveXOptBB `hashWithSalt`
     opt_inlineWFCacheLimit `hashWithSalt`
     opt_edalize `hashWithSalt`
-    opt_renderEnums
+    opt_renderEnums `hashWithSalt`
+    opt_verilator
    where
     hashOverridingBool :: Int -> OverridingBool -> Int
     hashOverridingBool s1 Auto = hashWithSalt s1 (0 :: Int)
@@ -432,6 +435,7 @@ defClashOpts
   , opt_inlineWFCacheLimit  = 10 -- TODO: find "optimal" value
   , opt_edalize             = False
   , opt_renderEnums         = True
+  , opt_verilator           = False
   }
 
 -- | Synopsys Design Constraint (SDC) information for a component.

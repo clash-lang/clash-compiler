@@ -56,6 +56,11 @@ import           Data.Text.Lazy                   (Text)
 import qualified Data.Text.Lazy                   as Text
 import           Data.Text.Lazy.Encoding          as Text
 import qualified Data.Text.Lazy.IO                as Text
+#if MIN_VERSION_prettyprinter(1,7,0)
+import           Prettyprinter (pretty)
+#else
+import           Data.Text.Prettyprint.Doc (pretty)
+#endif
 import           Data.Text.Prettyprint.Doc.Extra
   (Doc, LayoutOptions (..), PageWidth (..) , layoutPretty, renderLazy)
 import qualified Data.Time.Clock                  as Clock
@@ -383,7 +388,12 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
         then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles0 fileNames
         else pure (edamFiles0, fileNames)
 
-      writeManifest manPath manifest0{fileNames=fileNames1}
+      fileNames2 <-
+        if opt_verilator opts
+        then writeVerilatorShim hdlDir topNm fileNames1
+        else pure fileNames1
+
+      writeManifest manPath manifest0{fileNames=fileNames2}
 
       return
         ( topTime
@@ -442,6 +452,11 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
         then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles0 filesAndDigests0
         else pure (edamFiles0, filesAndDigests0)
 
+      filesAndDigests2 <-
+        if opt_verilator opts
+        then writeVerilatorShim hdlDir topNm filesAndDigests1
+        else pure filesAndDigests1
+
       let
         depUniques = fromMaybe [] (HashMap.lookup (getUnique topEntity) deps)
         depBindings = mapMaybe (flip lookupVarEnvDirectly bindingsMap) depUniques
@@ -450,7 +465,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
         manifest =
           mkManifest
             hdlState' domainConfs opts topComponent components depIds
-            filesAndDigests1 topHash
+            filesAndDigests2 topHash
       writeManifest manPath manifest
 
       topTime <- hdlDocs `seq` Clock.getCurrentTime
@@ -739,6 +754,50 @@ createHDL backend modName seen components domainConfs top topName = flip evalSta
       (error $ $(curLoc) ++ "Unknown synthesis domain: " ++ show dom)
       dom
       domainConfs
+
+writeVerilatorShim
+  :: FilePath
+  -> Id.Identifier
+  -> [(FilePath, ByteString)]
+  -> IO [(FilePath, ByteString)]
+writeVerilatorShim hdlDir topNm filesAndDigests = do
+  let file = Data.Text.unpack (Id.toText topNm) <> "_shim" <.> "cpp"
+  digest <- writeHDL hdlDir (file, pprVerilatorShim topNm)
+  pure ((file, digest) : filesAndDigests)
+
+-- | Create a shim for using verilator, which loads the entity and steps
+-- through simulation until finished.
+--
+pprVerilatorShim :: Id.Identifier -> Doc
+pprVerilatorShim (Id.toText -> topNm) =
+  -- Extra newlines are aggressively inserted so the quasiquoter doesn't wrap
+  -- the outlines lines in the file. It doesn't matter for code inside main,
+  -- but is fatal for the #include directives.
+  pretty $ Data.Text.pack [i|
+    #include <cstdlib>
+
+    #include "V#{topNm}.h"
+
+    #include "verilated.h"
+
+    int main(int argc, char **argv) {
+      VerilatedContext *context = new VerilatedContext;
+
+      context->commandArgs(argc, argv);
+
+      V#{topNm} *top = new V#{topNm}{context};
+
+      while(!context->gotFinish()) {
+        top->eval();
+      }
+
+      delete top;
+
+      delete context;
+
+      return EXIT_SUCCESS;
+    }
+  |]
 
 writeEdam ::
   FilePath ->

@@ -89,6 +89,7 @@ flagsClash r = [
   , defFlag "fclash-inline-workfree-limit"       $ IntSuffix (liftEwM . setInlineWFLimit r)
   , defFlag "fclash-edalize"                     $ NoArg (liftEwM (setEdalize r))
   , defFlag "fclash-no-render-enums"             $ NoArg (liftEwM (setNoRenderEnums r))
+  , defFlag "fclash-verilator"                   $ NoArg (liftEwM (setVerilator r))
   ]
 
 -- | Print deprecated flag warning
@@ -324,3 +325,6 @@ setRewriteHistoryFile r arg = do
 
 setNoRenderEnums :: IORef ClashOpts -> IO ()
 setNoRenderEnums r = modifyIORef r (\c -> c { opt_renderEnums = False })
+
+setVerilator :: IORef ClashOpts -> IO ()
+setVerilator r = modifyIORef r (\c -> c { opt_verilator = True })
