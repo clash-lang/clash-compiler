@@ -312,7 +312,7 @@ constantSpec ctx@(TransformContext is0 tfCtx) e@(App e1 e2)
 constantSpec _ e = return e
 {-# SCC constantSpec #-}
 
--- | Specialise an application on its argument
+-- | Specialize an application on its argument
 specialize :: NormRewrite
 specialize ctx e = case e of
   (TyApp e1 ty) -> specialize' ctx e (collectArgsTicks e1) (Right ty)
@@ -342,7 +342,7 @@ We may also not want to look at ticks, as then the specialization cache will
 miss on virtually every lookup which could add to normalization time.
 -}
 
--- | Specialise an application on its argument
+-- | Specialize an application on its argument
 specialize'
   :: TransformContext
   -- ^ Transformation context
@@ -357,7 +357,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
   opts <- Lens.view debugOpts
   tcm <- Lens.view tcCache
 
-  -- Don't specialise TopEntities
+  -- Don't specialize TopEntities
   topEnts <- Lens.view topEntities
   if f `elemVarSet` topEnts
   then do
@@ -371,7 +371,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
         -- But using type equality constraints they may be syntactically polymorphic.
         -- > topEntity :: forall dom . (dom ~ "System") => Signal dom Bool -> Signal dom Bool
         -- The TyLam's in the body will have been removed by 'Clash.Normalize.Util.substWithTyEq'.
-        -- So we drop the TyApp ("specialising" on it) and change the varType to match.
+        -- So we drop the TyApp ("specializing" on it) and change the varType to match.
         let newVarTy = piResultTy tcm (coreTypeOf f) tyArg
         in  changed (mkApps (mkTicks (Var f{varType = newVarTy}) ticks) args)
   else do -- NondecreasingIndentation
@@ -402,7 +402,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
       bodyMaybe <- fmap (lookupUniqMap (varName f)) $ Lens.use bindings
       case bodyMaybe of
         Just (Binding _ sp inl _ bodyTm _) -> do
-          -- Determine if we see a sequence of specialisations on a growing argument
+          -- Determine if we see a sequence of specializations on a growing argument
           specHistM <- lookupUniqMap f <$> Lens.use (extra.specialisationHistory)
           specLim   <- Lens.use (extra . specialisationLimit)
           if maybe False (> specLim) specHistM
