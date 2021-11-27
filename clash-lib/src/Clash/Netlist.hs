@@ -31,7 +31,6 @@ import           Data.Bifunctor                   (first, second)
 import           Data.Char                        (ord)
 import           Data.Either                      (partitionEithers, rights)
 import           Data.Foldable                    (foldlM)
-import qualified Data.HashMap.Strict              as HashMapS
 import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (elemIndex, partition, sortOn)
 import           Data.List.Extra                  (zipEqual)
@@ -196,7 +195,7 @@ runNetlistMonad isTb opts reprs s tops p tcm typeTrans iw
         , _isTestBench=isTb
         , _backEndITE=ite
         , _backend=be
-        , _htyCache=HashMapS.empty
+        , _htyCache=mempty
         }
 
 -- | Generate names for all binders in "BindingMap", except for the ones already

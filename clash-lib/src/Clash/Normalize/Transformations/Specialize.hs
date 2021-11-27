@@ -68,7 +68,7 @@ import Clash.Core.Pretty (showPpr)
 import Clash.Core.Subst
 import Clash.Core.Term
   ( Term(..), TickInfo, collectArgs, collectArgsTicks, mkApps, mkTmApps, mkTicks, patIds, Bind(..)
-  , patVars, mkAbstraction, PrimInfo(..), WorkInfo(..), IsMultiPrim(..), PrimUnfolding(..))
+  , patVars, mkAbstraction, PrimInfo(..), WorkInfo(..), IsMultiPrim(..), PrimUnfolding(..), stripAllTicks)
 import Clash.Core.TermInfo (isLocalVar, isVar, isPolyFun)
 import Clash.Core.TyCon (TyConMap, tyConDataCons)
 import Clash.Core.Type
@@ -312,14 +312,37 @@ constantSpec ctx@(TransformContext is0 tfCtx) e@(App e1 e2)
 constantSpec _ e = return e
 {-# SCC constantSpec #-}
 
--- | Specialise an application on its argument
+-- | Specialize an application on its argument
 specialize :: NormRewrite
 specialize ctx e = case e of
   (TyApp e1 ty) -> specialize' ctx e (collectArgsTicks e1) (Right ty)
   (App e1 e2)   -> specialize' ctx e (collectArgsTicks e1) (Left  e2)
   _             -> return e
 
--- | Specialise an application on its argument
+{-
+Note [ticks and specialization]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As Clash now distinguishes between ticks in expressions when comparing for
+alpha equality, this has a knock-on effect when accessing the specialization
+cache. Consider these applications which differ only by ticks:
+
+    f[GlobalId] (\x -> ... x[LocalId])
+    f[GlobalId] <tick>(\x -> ... x[LocalId])
+    f[GlobalId] (\x -> ... <tick>x[LocalId])
+
+If one of these had been specialized, the other two would hit that term in the
+specialization cache, saving Clash from having to re-do work which is in effect
+the same. To preserve this behaviour, we use 'stripAllTicks' on the keys for
+the specialization cache.
+
+TODO While this preserves the old behaviour, the old behaviour is likely not
+quite what we want. Using a value from the specialization cache may change the
+ticks present, which can affect naming / debugging information in generated HDL.
+We may also not want to look at ticks, as then the specialization cache will
+miss on virtually every lookup which could add to normalization time.
+-}
+
+-- | Specialize an application on its argument
 specialize'
   :: TransformContext
   -- ^ Transformation context
@@ -334,7 +357,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
   opts <- Lens.view debugOpts
   tcm <- Lens.view tcCache
 
-  -- Don't specialise TopEntities
+  -- Don't specialize TopEntities
   topEnts <- Lens.view topEntities
   if f `elemVarSet` topEnts
   then do
@@ -348,7 +371,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
         -- But using type equality constraints they may be syntactically polymorphic.
         -- > topEntity :: forall dom . (dom ~ "System") => Signal dom Bool -> Signal dom Bool
         -- The TyLam's in the body will have been removed by 'Clash.Normalize.Util.substWithTyEq'.
-        -- So we drop the TyApp ("specialising" on it) and change the varType to match.
+        -- So we drop the TyApp ("specializing" on it) and change the varType to match.
         let newVarTy = piResultTy tcm (coreTypeOf f) tyArg
         in  changed (mkApps (mkTicks (Var f{varType = newVarTy}) ticks) args)
   else do -- NondecreasingIndentation
@@ -360,8 +383,10 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
       argLen  = length args
       specBndrs :: [Either Id TyVar]
       specBndrs = map (Lens.over Lens._Left (normalizeId tcm)) specBndrsIn
+
+      -- See Note [ticks and specialization]
       specAbs :: Either Term Type
-      specAbs = either (Left . (`mkAbstraction` specBndrs)) (Right . id) specArg
+      specAbs = either (Left . stripAllTicks . (`mkAbstraction` specBndrs)) (Right . id) specArg
   -- Determine if 'f' has already been specialized on (a type-normalized) 'specArg'
   specM <- Map.lookup (f,argLen,specAbs) <$> Lens.use (extra.specialisationCache)
   case specM of
@@ -377,7 +402,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
       bodyMaybe <- fmap (lookupUniqMap (varName f)) $ Lens.use bindings
       case bodyMaybe of
         Just (Binding _ sp inl _ bodyTm _) -> do
-          -- Determine if we see a sequence of specialisations on a growing argument
+          -- Determine if we see a sequence of specializations on a growing argument
           specHistM <- lookupUniqMap f <$> Lens.use (extra.specialisationHistory)
           specLim   <- Lens.use (extra . specialisationLimit)
           if maybe False (> specLim) specHistM

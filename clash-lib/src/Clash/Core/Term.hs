@@ -15,6 +15,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Clash.Core.Term
   ( Term (.., Letrec)
@@ -35,6 +36,7 @@ module Clash.Core.Term
   , Alt
   , TickInfo (..)
   , stripTicks
+  , stripAllTicks
   , partitionTicks
   , NameMod (..)
   , PrimInfo (..)
@@ -63,7 +65,7 @@ import qualified Data.DList                    as DList
 import Data.Either                             (lefts, rights)
 import Data.Foldable                           (foldl')
 import Data.Maybe                              (catMaybes)
-import Data.Hashable                           (Hashable)
+import Data.Hashable                           (Hashable (hashWithSalt))
 import Data.List                               (nub, partition)
 import Data.Text                               (Text)
 import GHC.Generics
@@ -82,6 +84,9 @@ import {-# SOURCE #-} Clash.Core.Type          (Type)
 import Clash.Core.Var                          (Var, Id, TyVar)
 import Clash.Util                              (curLoc)
 
+import GHC.TypeLits
+  (TypeError, ErrorMessage (Text, (:<>:)))
+
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 data Term
   = Var     !Id                             -- ^ Variable reference
@@ -97,7 +102,14 @@ data Term
                                             -- alternatives, list of alternatives
   | Cast    !Term !Type !Type               -- ^ Cast a term from one type to another
   | Tick    !TickInfo !Term                 -- ^ Annotated term
-  deriving (Show,Generic,NFData,Hashable,Binary)
+  deriving (Show, Generic, NFData, Binary)
+
+instance TypeError (
+        'Text "A broken implementation of Hashable Term has been "
+  ':<>: 'Text "removed in Clash 1.4.7. If this is an issue for you, please submit "
+  ':<>: 'Text "an issue report at https://github.com/clash-lang/clash-compiler/issues."
+  ) => Hashable Term where
+    hashWithSalt = error "Term.hashWithSalt: unreachable"
 
 -- TODO When it is possible, remove this pattern.
 pattern Letrec :: [LetBinding] -> Term -> Term
@@ -120,7 +132,7 @@ data TickInfo
   | NoDeDup
   -- ^ Do not deduplicate, i.e. /keep/, an expression inside a case-alternative;
   -- do not try to share expressions between multiple branches.
-  deriving (Eq,Show,Generic,NFData,Hashable,Binary)
+  deriving (Eq, Show, Generic, NFData, Binary)
 
 -- | Tag to indicate which instance/register name modifier was used
 data NameMod
@@ -132,7 +144,7 @@ data NameMod
   -- ^ @Clash.Magic.suffixNameP@
   | SetName
   -- ^ @Clash.Magic.setName@
-  deriving (Eq,Show,Generic,NFData,Hashable,Binary)
+  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
 
 data IsMultiPrim
   = SingleResult
@@ -151,7 +163,7 @@ data PrimInfo = PrimInfo
   --
   -- See: 'Clash.Normalize.Transformations.setupMultiResultPrim'
   , primUnfolding :: !PrimUnfolding
-  } deriving (Show,Generic,NFData,Hashable,Binary)
+  } deriving (Show, Generic, NFData, Binary)
 
 data PrimUnfolding
   = NoUnfolding
@@ -200,7 +212,7 @@ data Pat
   -- ^ Literal pattern
   | DefaultPat
   -- ^ Default pattern
-  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
+  deriving (Eq, Ord, Show, Generic, NFData, Binary)
 
 type Alt = (Pat,Term)
 
@@ -266,7 +278,7 @@ data CoreContext
   -- ^ Body of a Cast
   | TickC TickInfo
   -- ^ Body of a Tick
-  deriving (Show, Generic, NFData, Hashable, Binary)
+  deriving (Show, Generic, NFData, Binary)
 
 -- | A list of @CoreContext@ describes the complete navigation path from the
 -- top-level to a specific sub-expression.
@@ -311,6 +323,23 @@ isTickCtx _         = False
 stripTicks :: Term -> Term
 stripTicks (Tick _ e) = stripTicks e
 stripTicks e = e
+
+-- | Like 'stripTicks' but removes all ticks from subexpressions.
+stripAllTicks :: Term -> Term
+stripAllTicks = go
+ where
+  go (Lam i x) = Lam i (go x)
+  go (TyLam i x) = TyLam i (go x)
+  go (App f x) = App (go f) (go x)
+  go (TyApp f a) = TyApp (go f) a
+  go (Let bs x) = Let (goBinds bs) (go x)
+  go (Case x ty alts) = Case (go x) ty (fmap go <$> alts)
+  go (Cast x a b) = Cast (go x) a b
+  go (Tick _ x) = go x
+  go x = x
+
+  goBinds (NonRec i x) = NonRec i (go x)
+  goBinds (Rec ixs) = Rec (fmap go <$> ixs)
 
 -- | Split a (Type)Application in the applied term and it arguments
 collectArgs :: Term -> (Term, [Either Term Type])

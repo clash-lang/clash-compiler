@@ -23,10 +23,10 @@ import qualified Data.Aeson.Encode.Pretty as Aeson
 import           Data.Aeson
   (ToJSON(toJSON), FromJSON(parseJSON), KeyValue ((.=)), (.:), (.:?))
 import           Data.Aeson.Types (Parser)
+import qualified Data.Binary as Binary
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Lazy as ByteStringLazy
 import           Data.ByteString (ByteString)
-import qualified Data.Binary as Binary
 import           Data.Char (toLower)
 import           Data.Either (fromRight)
 import           Data.Hashable (hash)
@@ -421,6 +421,8 @@ readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashMo
     , opt_hdlDir = Nothing
     }
 
+  -- TODO: Binary encoding does not account for alpha equivalence (nor should
+  --       it?), so the cache behaves more pessimisticly than it could.
   topHash = Sha256.hashlazy $ Binary.encode
     ( tops
     , hashCompiledPrimMap primMap

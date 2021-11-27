@@ -51,7 +51,7 @@ import Clash.Core.Subst
 import Clash.Core.Term
   ( LetBinding, Pat(..), PrimInfo(..), Term(..), collectArgs, collectArgsTicks
   , collectTicks, isLambdaBodyCtx, isTickCtx, mkApps, mkLams, mkTicks, Bind(..)
-  , partitionTicks, stripTicks)
+  , partitionTicks, stripAllTicks)
 import Clash.Core.TermInfo (isCon, isLet, isLocalVar, isTick)
 import Clash.Core.TyCon (tyConDataCons)
 import Clash.Core.Type
@@ -298,7 +298,12 @@ recToLetRec (TransformContext is0 []) e = do
     -- corresponding (sub)field from the target variable.
     --
     -- TODO: See [Note: Breaks on constants and predetermined equality]
-    eqApp tcm v args (collectArgs . stripTicks -> (Var v',args'))
+    --
+    -- Since 'aeqTerm' now looks at ticks when determining equality, it is
+    -- required that all ticks are removed with 'stripAllTicks' to keep the
+    -- previous behaviour of this function. If we remove this, most terms will
+    -- not be identified as equal.
+    eqApp tcm v args (collectArgs . stripAllTicks -> (Var v',args'))
       | isGlobalId v'
       , v == v'
       , let args2 = Either.lefts args'
@@ -306,9 +311,9 @@ recToLetRec (TransformContext is0 []) e = do
       = and (zipWith (eqArg tcm) args args2)
     eqApp _ _ _ _ = False
 
-    eqArg _ v1 v2@(stripTicks -> Var {})
+    eqArg _ v1 v2@Var{}
       = v1 == v2
-    eqArg tcm v1 v2@(collectArgs . stripTicks -> (Data _, args'))
+    eqArg tcm v1 v2@(collectArgs -> (Data _, args'))
       | let t1 = normalizeType tcm (inferCoreTypeOf tcm v1)
       , let t2 = normalizeType tcm (inferCoreTypeOf tcm v2)
       , t1 == t2
@@ -341,7 +346,7 @@ recToLetRec (TransformContext is0 []) e = do
     --     construction of `y` with `(fst x, fst x)`.
     --
     eqDat :: Term -> [Int] -> Term -> Bool
-    eqDat v fTrace (collectArgs . stripTicks -> (Data _, args)) =
+    eqDat v fTrace (collectArgs -> (Data _, args)) =
       and (zipWith (eqDat v) (map (:fTrace) [0..]) (Either.lefts args))
     eqDat v1 fTrace v2 =
       case stripProjection (reverse fTrace) v1 v2 of
