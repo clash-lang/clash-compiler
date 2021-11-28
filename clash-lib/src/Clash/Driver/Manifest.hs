@@ -28,7 +28,9 @@ import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Lazy as ByteStringLazy
 import           Data.ByteString (ByteString)
 import           Data.Char (toLower)
+#if MIN_VERSION_base16_bytestring(1,0,0)
 import           Data.Either (fromRight)
+#endif
 import           Data.Hashable (hash)
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
