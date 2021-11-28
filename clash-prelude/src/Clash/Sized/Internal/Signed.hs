@@ -124,6 +124,11 @@ import qualified Clash.Sized.Internal.BitVector as BV
 import Clash.XException
   (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX)
 
+{- $setup
+>>> :m -Prelude
+>>> import Clash.Prelude
+-}
+
 type role Signed nominal
 
 -- | Arbitrary-width signed integer represented by @n@ bits, including the sign

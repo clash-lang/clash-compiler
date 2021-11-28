@@ -69,6 +69,8 @@ import           Numeric.Half        (Half)
 import           System.IO.Unsafe    (unsafeDupablePerformIO)
 
 -- $setup
+-- >>> :m -Prelude
+-- >>> import Clash.Prelude
 -- >>> import Clash.Class.BitPack (pack)
 -- >>> import Clash.Sized.Vector (Vec)
 -- >>> import Clash.Sized.RTree (RTree)

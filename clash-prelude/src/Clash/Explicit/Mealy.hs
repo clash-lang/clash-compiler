@@ -27,8 +27,6 @@ import           Clash.XException      (NFDataX)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
->>> :m -Clash.Prelude
->>> :m -Clash.Prelude.Safe
 >>> import Clash.Explicit.Prelude
 >>> import qualified Data.List as L
 >>> :{

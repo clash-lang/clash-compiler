@@ -47,9 +47,6 @@ import Clash.XException           (NFDataX)
 {- $setup
 >>> :set -XDataKinds
 >>> :set -XTypeOperators
->>> :m -Clash.Prelude
->>> :m -Clash.Prelude.Safe
->>> :m -Clash.Signal
 >>> import Clash.Explicit.Prelude
 >>> import qualified Clash.Signal.Delayed.Bundle as DB
 >>> :{

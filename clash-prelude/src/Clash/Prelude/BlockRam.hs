@@ -413,9 +413,6 @@ import           Clash.Sized.Vector      (Vec)
 import           Clash.XException        (NFDataX)
 
 {- $setup
->>> :m -Clash.Explicit.Prelude
->>> :m -Clash.Explicit.Prelude.Safe
->>> :m -Clash.Prelude.Safe
 >>> import Clash.Prelude as C
 >>> import qualified Data.List as L
 >>> :set -XDataKinds -XRecordWildCards -XTupleSections -XTypeApplications -XFlexibleContexts

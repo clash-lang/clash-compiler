@@ -31,8 +31,6 @@ import Control.Monad.Trans.State
 
 {- $setup
 >>> :set -XDataKinds
->>> :m -Clash.Explicit.Prelude
->>> :m -Clash.Signal.Internal
 >>> import Clash.Prelude
 >>> import Test.QuickCheck ((===))
 >>> import Clash.Examples.Internal

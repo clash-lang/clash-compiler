@@ -63,8 +63,6 @@ import Clash.XException           (NFDataX)
 {- $setup
 >>> :set -XDataKinds
 >>> :set -XTypeOperators
->>> :m -Clash.Prelude
->>> :m -Clash.Prelude.Safe
 >>> import Clash.Explicit.Prelude
 >>> let delay3 clk rst en = delayed clk rst en (-1 :> -1 :> -1 :> Nil)
 >>> let delay2 clk rst en = (delayedI clk rst en :: Int -> DSignal System n Int -> DSignal System (n + 2) Int)

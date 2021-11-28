@@ -172,7 +172,6 @@ import Clash.XException
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
->>> :m -Clash.Prelude
 >>> import Clash.Explicit.Prelude
 >>> let window4 = window @3
 >>> let windowD3 = windowD @2

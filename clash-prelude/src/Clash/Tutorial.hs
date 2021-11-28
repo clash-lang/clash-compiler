@@ -93,7 +93,7 @@ import Data.Default.Class
 
 {- $setup
 >>> :set -XTemplateHaskell -XDataKinds -XConstraintKinds -XTypeApplications
->>> :m -Clash.Explicit.Prelude
+>>> :m -Prelude
 >>> import Clash.Prelude
 >>> import Clash.Explicit.Testbench
 >>> :{

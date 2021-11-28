@@ -43,12 +43,12 @@ module Clash.Sized.Vector
   , splitAt, splitAtI
   , unconcat, unconcatI
     -- * Construction
-    -- ** Initialisation
+    -- ** Initialization
   , singleton
   , replicate, repeat
   , iterate, iterateI, generate, generateI
   , unfoldr, unfoldrI
-    -- *** Initialisation from a list
+    -- *** Initialization from a list
   , listToVecTH
     -- ** Concatenation
   , (++), (+>>), (<<+), concat, concatMap
@@ -58,7 +58,7 @@ module Clash.Sized.Vector
   , replace
     -- ** Permutations
   , permute, backpermute, scatter, gather
-    -- *** Specialised permutations
+    -- *** Specialized permutations
   , reverse, transpose, interleave
   , rotateLeft, rotateRight, rotateLeftS, rotateRightS
     -- * Element-wise operations
@@ -73,7 +73,7 @@ module Clash.Sized.Vector
     -- * Folding
   , foldr, foldl, foldr1, foldl1, fold
   , ifoldr, ifoldl
-    -- ** Specialised folds
+    -- ** Specialized folds
   , dfold, dtfold, vfold
     -- * Prefix sums (scans)
   , scanl, scanr, postscanl, postscanr
@@ -147,59 +147,14 @@ import Clash.Class.BitPack        (packXWith, BitPack (..))
 import Clash.XException           (ShowX (..), NFDataX (..), seqX, isX)
 
 {- $setup
->>> :set -XDataKinds
 >>> :set -XTypeFamilies
 >>> :set -XTypeOperators
 >>> :set -XTemplateHaskell
 >>> :set -XFlexibleContexts
->>> :set -XTypeApplications
->>> :set -fplugin GHC.TypeLits.Normalise
+>>> :m -Prelude
 >>> import Clash.Prelude
->>> import Data.Kind
->>> import Data.Proxy
+>>> import Clash.Sized.Internal.Vector
 >>> import qualified Clash.Sized.Vector as Vec
->>> let compareSwapL a b = if a < b then (a,b) else (b,a)
->>> :{
-let sortV xs = map fst sorted :< (snd (last sorted))
-      where
-        lefts  = head xs :> map snd (init sorted)
-        rights = tail xs
-        sorted = zipWith compareSwapL lefts rights
-:}
-
->>> :{
-let sortVL xs = map fst sorted :< (snd (last sorted))
-      where
-        lefts  = head xs :> map snd (init sorted)
-        rights = tail xs
-        sorted = zipWith compareSwapL (lazyV lefts) rights
-:}
-
->>> :{
-let sortV_flip xs = map fst sorted :< (snd (last sorted))
-      where
-        lefts  = head xs :> map snd (init sorted)
-        rights = tail xs
-        sorted = zipWith (flip compareSwapL) rights lefts
-:}
-
->>> data Append (m :: Nat) (a :: Type) (f :: TyFun Nat Type) :: Type
->>> type instance Apply (Append m a) l = Vec (l + m) a
->>> let append' xs ys = dfold (Proxy :: Proxy (Append m a)) (const (:>)) ys xs
->>> let compareSwap a b = if a > b then (a,b) else (b,a)
->>> let insert y xs     = let (y',xs') = mapAccumL compareSwap y xs in xs' :< y'
->>> let insertionSort   = vfold (const insert)
->>> data IIndex (f :: TyFun Nat Type) :: Type
->>> :set -XUndecidableInstances
->>> type instance Apply IIndex l = Index ((2^l)+1)
->>> :{
-let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index ((2^k)+1)
-    populationCount' bv = dtfold (Proxy @IIndex)
-                                 fromIntegral
-                                 (\_ x y -> add x y)
-                                 (bv2v bv)
-:}
-
 -}
 
 #define CONS_PREC 5

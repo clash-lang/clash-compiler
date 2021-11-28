@@ -450,8 +450,6 @@ import           Clash.XException
 -- end benchmark only
 
 {- $setup
->>> :m -Clash.Prelude
->>> :m -Clash.Prelude.Safe
 >>> import Clash.Explicit.Prelude as C
 >>> import qualified Data.List as L
 >>> :set -XDataKinds -XRecordWildCards -XTupleSections -XDeriveAnyClass -XDeriveGeneric

@@ -130,6 +130,10 @@ import Clash.XException      (errorX, maybeIsX, seqX, fromJustX, XException (..)
 -- end benchmark only
 
 -- $setup
+-- >>> :m -Prelude
+-- >>> :set -fplugin GHC.TypeLits.Normalise
+-- >>> :set -fplugin GHC.TypeLits.KnownNat.Solver
+-- >>> import Clash.Prelude
 -- >>> import Clash.Prelude.BlockRam.File
 
 

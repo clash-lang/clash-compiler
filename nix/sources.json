@@ -1,4 +1,16 @@
 {
+    "doctest-parallel": {
+        "branch": "main",
+        "description": "Test interactive Haskell examples",
+        "homepage": null,
+        "owner": "martijnbastiaan",
+        "repo": "doctest-parallel",
+        "rev": "f75c2973f889ef99f0458317430641148ad8b1ea",
+        "sha256": "0rp0gag4vy4pxx2hlyxp73kdy99ikvpb17zq8nr9b5zc2k50a5sf",
+        "type": "tarball",
+        "url": "https://github.com/martijnbastiaan/doctest-parallel/archive/f75c2973f889ef99f0458317430641148ad8b1ea.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
     "ghc-tcplugins-extra": {
         "branch": "master",
         "description": "",
