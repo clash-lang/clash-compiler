@@ -2127,7 +2127,7 @@ lazyV = lazyV' (repeat ())
 -- import Data.Singletons
 -- import Data.Proxy
 --
--- data Append (m :: Nat) (a :: *) (f :: 'TyFun' Nat *) :: *
+-- data Append (m :: Nat) (a :: Type) (f :: 'TyFun' Nat Type) :: Type
 -- type instance 'Apply' (Append m a) l = 'Vec' (l + m) a
 --
 -- append' xs ys = 'dfold' (Proxy :: Proxy (Append m a)) (const (':>')) ys xs
@@ -2272,7 +2272,7 @@ the form of 'dtfold':
 import Data.Singletons
 import Data.Proxy
 
-data IIndex (f :: 'TyFun' Nat *) :: *
+data IIndex (f :: 'TyFun' Nat Type) :: Type
 type instance 'Apply' IIndex l = 'Index' ((2^l)+1)
 
 populationCount' :: (KnownNat k, KnownNat (2^k))
