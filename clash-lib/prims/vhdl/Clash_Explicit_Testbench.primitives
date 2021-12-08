@@ -164,6 +164,9 @@ end block;
   :: KnownDomain dom     -- ARG[0]
   => Signal dom Bool     -- ARG[1]
   -> Clock dom"
+    , "comment" :
+        "ModelSim and Vivado seem to round time values to an integer number of picoseconds.
+        Use two half periods to prevent rounding errors from affecting the full period."
     , "template" :
 "-- tbClockGen begin
 -- pragma translate_off
