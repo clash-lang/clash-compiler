@@ -47,7 +47,7 @@ hackage-sdist:
 debian-bindist:
   extends: .common
   needs: []
-  image: ghcr.io/clash-lang/bindist-debian-focal:2022-01-20
+  image: ghcr.io/clash-lang/bindist-debian-focal:2022-01-25
   stage: pack
   cache:
     when: on_success
@@ -71,7 +71,7 @@ debian-bindist:
 debian-bindist-test:
   extends: .run-on-nightly-and-changes
   needs: ["debian-bindist"]
-  image: ghcr.io/clash-lang/bindist-debian-focal:2022-01-20
+  image: ghcr.io/clash-lang/bindist-debian-focal:2022-01-25
   stage: pack-test
   script:
     - apt-get update

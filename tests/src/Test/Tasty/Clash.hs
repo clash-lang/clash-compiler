@@ -304,14 +304,14 @@ vhdlTests
 vhdlTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
  where
   importName = "GHDL (import)"
-  makeName t = "GHDL (make " <> t <> ")"
+  makeName t = "ghdl (make " <> t <> ")"
   buildTests = concat
     [ [ (importName, singleTest importName (GhdlImportTest tmpDir)) ]
     , [ (makeName t, singleTest (makeName t) (GhdlMakeTest tmpDir t))
       | t <- getBuildTargets opts ]
     ]
 
-  simName t = "GHDL (sim " <> t <> ")"
+  simName t = "ghdl (sim " <> t <> ")"
   simTests =
     [ (simName t, singleTest (simName t) (GhdlSimTest expectSimFail tmpDir t))
     | t <- getBuildTargets opts
@@ -328,39 +328,16 @@ verilogTests
 verilogTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
  where
   makeNameIvl t = "iverilog (make " <> t <> ")"
-  ivlMake =
+  buildTests =
     [ (makeNameIvl t, singleTest (makeNameIvl t) (IVerilogMakeTest tmpDir t))
     | t <- getBuildTargets opts
     ]
 
-  makeNameVer t = "verilator (make " <> t <> ")"
-  verMake =
-    [ (makeNameVer t, singleTest (makeNameVer t) (VerilatorMakeTest tmpDir t))
-    | t <- getBuildTargets opts
-    ]
-
-  buildTests =
-    case verilate of
-      SimAndVerilate -> ivlMake <> verMake
-      VerilateOnly -> verMake
-      SimOnly -> ivlMake
-
   simNameIvl t = "iverilog (sim " <> t <> ")"
-  ivlSim =
+  simTests =
     [ (simNameIvl t, singleTest (simNameIvl t) (IVerilogSimTest expectSimFail vvpStdoutNonEmptyFail tmpDir t))
     | t <- getBuildTargets opts
     ]
-  simNameVer t = "verilator (sim " <> t <> ")"
-  verSim =
-    [ (simNameVer t, singleTest (simNameVer t) (VerilatorSimTest expectSimFail vvpStdoutNonEmptyFail tmpDir t))
-    | t <- getBuildTargets opts
-    ]
-
-  simTests =
-    case verilate of
-      SimAndVerilate -> ivlSim <> verSim
-      VerilateOnly -> verSim
-      SimOnly -> ivlSim
 
 -- | Generate two test trees for testing SystemVerilog: one for building designs and
 -- one for running them. Depending on 'hdlSim' the latter will be executed or not.
@@ -374,40 +351,37 @@ systemVerilogTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
  where
   vlibName = "modelsim (vlib)"
   vlogName = "modelsim (vlog)"
-  msimMake =
+  buildTests =
     [ (vlibName, singleTest vlibName (ModelsimVlibTest tmpDir))
     , (vlogName, singleTest vlogName (ModelsimVlogTest tmpDir))
     ]
 
-  verName t = "verilator (make " <> t <> ")"
-  verMake =
-    [ (verName t, singleTest (verName t) (VerilatorMakeTest tmpDir t))
-    | t <- getBuildTargets opts
-    ]
-
-  buildTests =
-    case verilate of
-      SimAndVerilate -> msimMake <> verMake
-      VerilateOnly -> verMake
-      SimOnly -> msimMake
-
   simName t = "modelsim (sim " <> t <> ")"
-  msimSim =
+  simTests =
     [ (simName t, singleTest (simName t) (ModelsimSimTest expectSimFail tmpDir t))
     | t <- getBuildTargets opts
     ]
 
-  simNameVer t = "verilator (sim " <> t <> ")"
-  verSim =
-    [ (simNameVer t, singleTest (simNameVer t) (VerilatorSimTest expectSimFail vvpStdoutNonEmptyFail tmpDir t))
+verilatorTests
+  :: TestOptions
+  -> IO FilePath
+  -> ( [(TestName, TestTree)]
+     , [(TestName, TestTree)]
+     )
+verilatorTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
+ where
+  buildName t = "verilator (make " <> t <> ")"
+  simName t = "verilator (sim " <> t <> ")"
+
+  buildTests =
+    [ (buildName t, singleTest (buildName t) (VerilatorMakeTest tmpDir t))
     | t <- getBuildTargets opts
     ]
 
   simTests =
-    case verilate of
-      SimAndVerilate -> msimSim <> verSim
-      VerilateOnly -> verSim
-      SimOnly -> msimSim
+    [ (simName t, singleTest (simName t) (VerilatorSimTest expectSimFail vvpStdoutNonEmptyFail tmpDir t))
+    | t <- getBuildTargets opts
+    ]
 
 -- | Generate a test tree for running SymbiYosys
 sbyTests :: TestOptions -> IO FilePath -> ([(TestName, TestTree)])
@@ -427,17 +401,12 @@ runTest1
   -> TestTree
 runTest1 modName opts@TestOptions{..} path target =
   withResource mkTmpDir Directory.removeDirectoryRecursive $ \tmpDir -> do
-    testGroup (show target) $ sequenceTests (show target:path) $ clashTest tmpDir :
-      (case target of
-        VHDL -> buildAndSimTests (vhdlTests opts tmpDir)
-        Verilog -> buildAndSimTests (verilogTests opts tmpDir)
-        SystemVerilog-> buildAndSimTests (systemVerilogTests opts tmpDir)
-      ) <>
-      (case verificationTool of
-         Nothing -> []
-         Just SymbiYosys -> sbyTests opts tmpDir
-      )
-
+    testGroup (show target) $
+      sequenceTests (show target : path) (clashTest tmpDir : nonVerilator tmpDir)
+        <> tail (sequenceTests (show target : path) (clashTest tmpDir : verilator tmpDir))
+        <> (case verificationTool of
+              Nothing -> []
+              Just SymbiYosys -> tail $ sequenceTests (show target : path) (clashTest tmpDir : sbyTests opts tmpDir))
  where
   mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
   sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))
@@ -458,6 +427,48 @@ runTest1 modName opts@TestOptions{..} path target =
       (_, False, _) -> []
       (_, _, False) -> buildTests
       _ -> buildTests <> simTests
+
+  -- HACK: We want to run verilator and simulator tests independently if they
+  -- are both going to be run, otherwise failures from whichever comes first
+  -- will mean the second is skipped. In lieu of a better way to sequence tests
+  -- we can sequence tests for multiple simulators, then drop the first test
+  -- tree for all but the first simulator (as it will be copies of clash gen).
+  --
+  -- TODO: Since tasty doesn't provide one, we should really provide a better
+  -- set of combinators for describing test dependencies. That way we can have
+  -- some more principled way of having a test structure like
+  --
+  --   Group A
+  --     - Task A1
+  --     - Group B
+  --         - Task B1
+  --         - Task B2
+  --     - Group C
+  --         - Task C1
+  --
+  -- where groups B and C are independent of each other, but both dependent on
+  -- the success of Task A1.
+
+  nonVerilator tmpDir =
+    case target of
+      VHDL -> buildAndSimTests (vhdlTests opts tmpDir)
+      Verilog ->
+        case verilate of
+          VerilateOnly -> []
+          _ -> buildAndSimTests (verilogTests opts tmpDir)
+
+      SystemVerilog ->
+        case verilate of
+          VerilateOnly -> []
+          _ -> buildAndSimTests (systemVerilogTests opts tmpDir)
+
+  verilator tmpDir =
+    case target of
+      VHDL -> []
+      _ ->
+        case verilate of
+          SimOnly -> []
+          _ -> buildAndSimTests (verilatorTests opts tmpDir)
 
 runTest
   :: String

@@ -93,4 +93,4 @@ suite:verilog:
 suite:systemverilog:
   extends: .test-common-local
   script:
-    - cabal v2-run -- clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes
+    - cabal v2-run -- clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim
