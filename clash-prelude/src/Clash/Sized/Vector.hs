@@ -153,7 +153,6 @@ import Clash.XException           (ShowX (..), NFDataX (..), seqX, isX)
 >>> :set -XFlexibleContexts
 >>> :m -Prelude
 >>> import Clash.Prelude
->>> import Clash.Sized.Internal.Vector
 >>> import qualified Clash.Sized.Vector as Vec
 -}
 
@@ -1988,6 +1987,27 @@ lengthS _ = SNat
 -- | What you should use when your vector functions are too strict in their
 -- arguments.
 --
+-- === __doctests setup__
+-- >>> let compareSwapL a b = if a < b then (a,b) else (b,a)
+-- >>> :{
+-- let sortVL :: (Ord a, KnownNat (n + 1)) => Vec ((n + 1) + 1) a -> Vec ((n + 1) + 1) a
+--     sortVL xs = map fst sorted :< (snd (last sorted))
+--       where
+--         lefts  = head xs :> map snd (init sorted)
+--         rights = tail xs
+--         sorted = zipWith compareSwapL (lazyV lefts) rights
+-- :}
+--
+-- >>> :{
+-- let sortV_flip xs = map fst sorted :< (snd (last sorted))
+--       where
+--         lefts  = head xs :> map snd (init sorted)
+--         rights = tail xs
+--         sorted = zipWith (flip compareSwapL) rights lefts
+-- :}
+--
+-- === Example usage
+--
 -- For example:
 --
 -- @
@@ -2044,6 +2064,15 @@ lazyV = lazyV' (repeat ())
 {-# NOINLINE lazyV #-}
 
 -- | A /dependently/ typed fold.
+--
+-- === __doctests setup__
+-- >>> :seti -fplugin GHC.TypeLits.Normalise
+-- >>> import Data.Singletons (Apply, Proxy (..), TyFun)
+-- >>> data Append (m :: Nat) (a :: Type) (f :: TyFun Nat Type) :: Type
+-- >>> type instance Apply (Append m a) l = Vec (l + m) a
+-- >>> let append' xs ys = dfold (Proxy :: Proxy (Append m a)) (const (:>)) ys xs
+--
+-- === Example usage
 --
 -- Using lists, we can define /append/ (a.k.a. @Data.List.@'Data.List.++') in
 -- terms of @Data.List.@'Data.List.foldr':
@@ -2139,6 +2168,21 @@ dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
 
 {- | A combination of 'dfold' and 'fold': a /dependently/ typed fold that
 reduces a vector in a tree-like structure.
+
+=== __doctests setup__
+>>> :seti -XUndecidableInstances
+>>> import Data.Singletons (Apply, Proxy (..), TyFun)
+>>> data IIndex (f :: TyFun Nat Type) :: Type
+>>> type instance Apply IIndex l = Index ((2^l)+1)
+>>> :{
+let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index ((2^k)+1)
+    populationCount' bv = dtfold (Proxy @IIndex)
+                                 fromIntegral
+                                 (\_ x y -> add x y)
+                                 (bv2v bv)
+:}
+
+=== Example usage
 
 As an example of when you might want to use 'dtfold' we will build a
 population counter: a circuit that counts the number of bits set to '1' in
@@ -2297,7 +2341,12 @@ type instance Apply (VCons a) l = Vec l a
 -- | Specialised version of 'dfold' that builds a triangular computational
 -- structure.
 --
--- Example:
+-- === __doctests setup__
+-- >>> let compareSwap a b = if a > b then (a,b) else (b,a)
+-- >>> let insert y xs = let (y',xs') = mapAccumL compareSwap y xs in xs' :< y'
+-- >>> let insertionSort = vfold (const insert)
+--
+-- === Example usage
 --
 -- @
 -- compareSwap a b = if a > b then (a,b) else (b,a)
