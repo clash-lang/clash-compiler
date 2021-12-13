@@ -53,6 +53,9 @@ import           GHC.Show            (appPrec)
 import           GHC.Stack           (HasCallStack)
 import           System.IO.Unsafe    (unsafeDupablePerformIO)
 
+-- $setup
+-- >>> import Clash.Prelude
+
 -- | An exception representing an \"uninitialized\" value.
 newtype XException = XException String
 

@@ -52,8 +52,6 @@ import           Clash.XException (NFDataX, ShowX)
 import           GHC.TypeLits (type (+), KnownNat)
 
 {- $setup
->>> :m -Clash.Prelude
->>> :m -Clash.Prelude.Safe
 >>> import Clash.Explicit.Prelude
 -}
 

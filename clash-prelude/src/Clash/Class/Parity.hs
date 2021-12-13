@@ -30,6 +30,7 @@ import Clash.Sized.Internal.BitVector (BitVector, high, low, lsb#)
 import Clash.Promoted.Nat             (SNat(..), snatToNum)
 
 {- $setup
+>>> :m -Prelude
 >>> import Clash.Prelude
 >>> import Clash.Class.Parity
 -}

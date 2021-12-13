@@ -74,12 +74,12 @@ lib:unittests:
   script:
     - cabal v2-run clash-lib:unittests
 
-# Tests run on local fast machines:
 prelude:doctests:
-  extends: .test-common-local
+  extends: .test-common
   script:
-    - cabal v2-run clash-prelude:doctests
+    - cabal v2-run -- clash-prelude:doctests -j${THREADS}
 
+# Tests run on local fast machines:
 suite:vhdl:
   extends: .test-common-local
   script:

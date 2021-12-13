@@ -23,6 +23,8 @@ import Clash.Promoted.Nat
 
 {- $setup
 >>> :set -XDataKinds
+>>> :m -Prelude
+>>> import Clash.Prelude
 >>> let d1111 = SNat :: SNat 1111
 >>> let d1200 = SNat :: SNat 1200
 >>> let d1201 = SNat :: SNat 1201

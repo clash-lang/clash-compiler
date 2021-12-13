@@ -24,6 +24,9 @@ let
         ghc-tcplugins-extra =
          self.callCabal2nix "ghc-tcplugins-extra" sources.ghc-tcplugins-extra {};
 
+        doctest-parallel =
+         self.callCabal2nix "doctest-parallel" sources.doctest-parallel {};
+
         # Internal overrides
         clash-lib = import ../clash-lib { inherit nixpkgs; };
         clash-ghc = import ../clash-ghc { inherit nixpkgs; };

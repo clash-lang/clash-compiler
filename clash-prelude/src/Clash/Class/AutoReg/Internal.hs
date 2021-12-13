@@ -54,7 +54,7 @@ import           Control.Lens.Internal.TH     (bndrName)
 
 -- $setup
 -- >>> import Data.Maybe
--- >>> import Clash.Class.BitPack (pack)
+-- >>> import Clash.Prelude
 -- >>> :set -fplugin GHC.TypeLits.Normalise
 -- >>> :set -fplugin GHC.TypeLits.KnownNat.Solver
 

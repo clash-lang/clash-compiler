@@ -53,7 +53,7 @@ Copyright:            Copyright © 2013-2016, University of Twente,
                                   2017-2019, QBayLogic B.V., Google Inc.,
                                   2021,      QBayLogic B.V.
 Category:             Hardware
-Build-type:           Custom
+Build-type:           Simple
 
 Extra-source-files:   README.md
                       CHANGELOG.md
@@ -141,12 +141,6 @@ common common-options
                       TypeOperators
                       ViewPatterns
 
-custom-setup
-  setup-depends:
-    base          >= 4.9 && <5,
-    Cabal         >= 1.10,
-    cabal-doctest >= 1.0.1 && <1.1
-
 Library
   import:             common-options
   HS-Source-Dirs:     src
@@ -181,6 +175,7 @@ Library
                       Clash.Annotations.TH
 
                       Clash.Class.AutoReg
+                      Clash.Class.AutoReg.Internal
                       Clash.Class.BitPack
                       Clash.Class.BitPack.BitIndex
                       Clash.Class.BitPack.BitReduction
@@ -294,12 +289,11 @@ Library
 
                       Clash.Tutorial
                       Clash.Examples
+                      Clash.Examples.Internal
 
   other-modules:
                       Clash.Class.AutoReg.Instances
-                      Clash.Class.AutoReg.Internal
                       Clash.CPP
-                      Clash.Examples.Internal
                       Clash.Signal.Bundle.Internal
                       Language.Haskell.TH.Compat
                       Paths_clash_prelude
@@ -365,15 +359,14 @@ test-suite doctests
   ghc-options:      -Wall -Wcompat -threaded
   hs-source-dirs:   tests
 
-  x-doctest-options: -fobject-code
-
   if !flag(doctests)
     buildable: False
   else
     build-depends:
       base,
-      doctest >= 0.16.1 && < 0.19,
-      clash-prelude
+      clash-prelude,
+      doctest-parallel >= 0.2 && < 0.3,
+      filepath
 
 test-suite unittests
   import:           common-options

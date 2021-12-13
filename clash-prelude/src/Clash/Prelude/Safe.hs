@@ -150,6 +150,7 @@ import           Clash.XException
 
 {- $setup
 >>> :set -XFlexibleContexts -XTypeApplications
+>>> :m -Prelude
 >>> :m -Clash.Explicit.Prelude
 >>> import Clash.Prelude.Safe
 >>> let rP = registerB (8,8)

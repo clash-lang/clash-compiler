@@ -295,8 +295,7 @@ import           Clash.XException      (NFDataX, ShowX)
 
 {- $setup
 >>> :set -XFlexibleContexts -XTypeApplications
->>> :m -Clash.Explicit.Prelude
->>> :m -Clash.Explicit.Prelude.Safe
+>>> :m -Prelude
 >>> import Clash.Prelude
 >>> import Clash.Promoted.Nat (SNat(..))
 >>> import Clash.XException (printX)

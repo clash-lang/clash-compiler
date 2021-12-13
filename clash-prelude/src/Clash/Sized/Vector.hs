@@ -43,12 +43,12 @@ module Clash.Sized.Vector
   , splitAt, splitAtI
   , unconcat, unconcatI
     -- * Construction
-    -- ** Initialisation
+    -- ** Initialization
   , singleton
   , replicate, repeat
   , iterate, iterateI, generate, generateI
   , unfoldr, unfoldrI
-    -- *** Initialisation from a list
+    -- *** Initialization from a list
   , listToVecTH
     -- ** Concatenation
   , (++), (+>>), (<<+), concat, concatMap
@@ -58,7 +58,7 @@ module Clash.Sized.Vector
   , replace
     -- ** Permutations
   , permute, backpermute, scatter, gather
-    -- *** Specialised permutations
+    -- *** Specialized permutations
   , reverse, transpose, interleave
   , rotateLeft, rotateRight, rotateLeftS, rotateRightS
     -- * Element-wise operations
@@ -73,7 +73,7 @@ module Clash.Sized.Vector
     -- * Folding
   , foldr, foldl, foldr1, foldl1, fold
   , ifoldr, ifoldl
-    -- ** Specialised folds
+    -- ** Specialized folds
   , dfold, dtfold, vfold
     -- * Prefix sums (scans)
   , scanl, scanr, postscanl, postscanr
@@ -147,59 +147,13 @@ import Clash.Class.BitPack        (packXWith, BitPack (..))
 import Clash.XException           (ShowX (..), NFDataX (..), seqX, isX)
 
 {- $setup
->>> :set -XDataKinds
 >>> :set -XTypeFamilies
 >>> :set -XTypeOperators
 >>> :set -XTemplateHaskell
 >>> :set -XFlexibleContexts
->>> :set -XTypeApplications
->>> :set -fplugin GHC.TypeLits.Normalise
+>>> :m -Prelude
 >>> import Clash.Prelude
->>> import Data.Kind
->>> import Data.Proxy
 >>> import qualified Clash.Sized.Vector as Vec
->>> let compareSwapL a b = if a < b then (a,b) else (b,a)
->>> :{
-let sortV xs = map fst sorted :< (snd (last sorted))
-      where
-        lefts  = head xs :> map snd (init sorted)
-        rights = tail xs
-        sorted = zipWith compareSwapL lefts rights
-:}
-
->>> :{
-let sortVL xs = map fst sorted :< (snd (last sorted))
-      where
-        lefts  = head xs :> map snd (init sorted)
-        rights = tail xs
-        sorted = zipWith compareSwapL (lazyV lefts) rights
-:}
-
->>> :{
-let sortV_flip xs = map fst sorted :< (snd (last sorted))
-      where
-        lefts  = head xs :> map snd (init sorted)
-        rights = tail xs
-        sorted = zipWith (flip compareSwapL) rights lefts
-:}
-
->>> data Append (m :: Nat) (a :: Type) (f :: TyFun Nat Type) :: Type
->>> type instance Apply (Append m a) l = Vec (l + m) a
->>> let append' xs ys = dfold (Proxy :: Proxy (Append m a)) (const (:>)) ys xs
->>> let compareSwap a b = if a > b then (a,b) else (b,a)
->>> let insert y xs     = let (y',xs') = mapAccumL compareSwap y xs in xs' :< y'
->>> let insertionSort   = vfold (const insert)
->>> data IIndex (f :: TyFun Nat Type) :: Type
->>> :set -XUndecidableInstances
->>> type instance Apply IIndex l = Index ((2^l)+1)
->>> :{
-let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index ((2^k)+1)
-    populationCount' bv = dtfold (Proxy @IIndex)
-                                 fromIntegral
-                                 (\_ x y -> add x y)
-                                 (bv2v bv)
-:}
-
 -}
 
 #define CONS_PREC 5
@@ -2033,6 +1987,27 @@ lengthS _ = SNat
 -- | What you should use when your vector functions are too strict in their
 -- arguments.
 --
+-- === __doctests setup__
+-- >>> let compareSwapL a b = if a < b then (a,b) else (b,a)
+-- >>> :{
+-- let sortVL :: (Ord a, KnownNat (n + 1)) => Vec ((n + 1) + 1) a -> Vec ((n + 1) + 1) a
+--     sortVL xs = map fst sorted :< (snd (last sorted))
+--       where
+--         lefts  = head xs :> map snd (init sorted)
+--         rights = tail xs
+--         sorted = zipWith compareSwapL (lazyV lefts) rights
+-- :}
+--
+-- >>> :{
+-- let sortV_flip xs = map fst sorted :< (snd (last sorted))
+--       where
+--         lefts  = head xs :> map snd (init sorted)
+--         rights = tail xs
+--         sorted = zipWith (flip compareSwapL) rights lefts
+-- :}
+--
+-- === Example usage
+--
 -- For example:
 --
 -- @
@@ -2089,6 +2064,15 @@ lazyV = lazyV' (repeat ())
 {-# NOINLINE lazyV #-}
 
 -- | A /dependently/ typed fold.
+--
+-- === __doctests setup__
+-- >>> :seti -fplugin GHC.TypeLits.Normalise
+-- >>> import Data.Singletons (Apply, Proxy (..), TyFun)
+-- >>> data Append (m :: Nat) (a :: Type) (f :: TyFun Nat Type) :: Type
+-- >>> type instance Apply (Append m a) l = Vec (l + m) a
+-- >>> let append' xs ys = dfold (Proxy :: Proxy (Append m a)) (const (:>)) ys xs
+--
+-- === Example usage
 --
 -- Using lists, we can define /append/ (a.k.a. @Data.List.@'Data.List.++') in
 -- terms of @Data.List.@'Data.List.foldr':
@@ -2184,6 +2168,21 @@ dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
 
 {- | A combination of 'dfold' and 'fold': a /dependently/ typed fold that
 reduces a vector in a tree-like structure.
+
+=== __doctests setup__
+>>> :seti -XUndecidableInstances
+>>> import Data.Singletons (Apply, Proxy (..), TyFun)
+>>> data IIndex (f :: TyFun Nat Type) :: Type
+>>> type instance Apply IIndex l = Index ((2^l)+1)
+>>> :{
+let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index ((2^k)+1)
+    populationCount' bv = dtfold (Proxy @IIndex)
+                                 fromIntegral
+                                 (\_ x y -> add x y)
+                                 (bv2v bv)
+:}
+
+=== Example usage
 
 As an example of when you might want to use 'dtfold' we will build a
 population counter: a circuit that counts the number of bits set to '1' in
@@ -2342,7 +2341,12 @@ type instance Apply (VCons a) l = Vec l a
 -- | Specialised version of 'dfold' that builds a triangular computational
 -- structure.
 --
--- Example:
+-- === __doctests setup__
+-- >>> let compareSwap a b = if a > b then (a,b) else (b,a)
+-- >>> let insert y xs = let (y',xs') = mapAccumL compareSwap y xs in xs' :< y'
+-- >>> let insertionSort = vfold (const insert)
+--
+-- === Example usage
 --
 -- @
 -- compareSwap a b = if a > b then (a,b) else (b,a)

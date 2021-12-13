@@ -176,8 +176,7 @@ import Clash.XException
 >>> :set -XDataKinds
 >>> :set -XMagicHash
 >>> :set -XTypeApplications
->>> :m -Clash.Prelude
->>> :m -Clash.Signal
+>>> import Clash.Prelude (SSymbol(..))
 >>> import Clash.Signal.Internal
 >>> import Clash.Promoted.Nat
 >>> import Clash.XException

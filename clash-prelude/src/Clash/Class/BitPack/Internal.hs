@@ -50,6 +50,7 @@ import Clash.Sized.Internal.BitVector
 import Clash.XException
 
 {- $setup
+>>> :m -Prelude
 >>> :set -XDataKinds
 >>> import Clash.Prelude
 -}

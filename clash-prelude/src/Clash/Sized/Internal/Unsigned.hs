@@ -139,6 +139,11 @@ import Clash.Sized.Internal.Mod
 import Clash.XException
   (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX)
 
+{- $setup
+>>> :m -Prelude
+>>> import Clash.Prelude
+-}
+
 #include "MachDeps.h"
 
 type role Unsigned nominal
