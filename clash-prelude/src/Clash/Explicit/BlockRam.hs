@@ -235,7 +235,7 @@ we need to disregard the first few output samples, because the initial content o
 'Clash.Prelude.RAM.asyncRam' is /undefined/, and consequently, the first few
 output samples are also /undefined/. We use the utility function
 'Clash.XException.printX' to conveniently filter out the undefinedness and
-replace it with the string "X" in the few leading outputs.
+replace it with the string @\"undefined\"@ in the first few leading outputs.
 
 @
 >>> printX $ sampleN 32 $ system2 prog systemClockGen resetGen enableGen
@@ -365,7 +365,7 @@ prog2 = -- 0 := 4
 When we simulate our system we see that it works. This time again,
 we need to disregard the first sample, because the initial output of a
 'blockRam' is /undefined/. We use the utility function 'Clash.XException.printX'
-to conveniently filter out the undefinedness and replace it with the string "X".
+to conveniently filter out the undefinedness and replace it with the string @\"undefined\"@.
 
 @
 >>> printX $ sampleN 34 $ system3 prog2 systemClockGen resetGen enableGen
@@ -718,7 +718,8 @@ prog2 = -- 0 := 4
 -- | Create a blockRAM with space for @n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is /undefined/
+-- * __NB__: Initial output value is /undefined/, reading it will throw an
+-- 'XException'
 --
 -- @
 -- bram40
@@ -764,7 +765,8 @@ blockRam = \clk gen content rd wrM ->
 -- | Create a blockRAM with space for 2^@n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is /undefined/
+-- * __NB__: Initial output value is /undefined/, reading it will throw an
+-- 'XException'
 --
 -- @
 -- bram32
@@ -791,9 +793,7 @@ blockRamPow2
   -> Enable dom
   -- ^ Global enable
   -> Vec (2^n) a
-  -- ^ Initial content of the BRAM, also
-  -- determines the size, @2^n@, of
-  -- the BRAM.
+  -- ^ Initial content of the BRAM
   --
   -- __NB__: __MUST__ be a constant.
   -> Signal dom (Unsigned n)
@@ -811,7 +811,7 @@ data ResetStrategy (r :: Bool) where
   ClearOnReset :: ResetStrategy 'True
   NoClearOnReset :: ResetStrategy 'False
 
--- | Version of blockram that has no default values set. May be cleared to a
+-- | Version of blockram that has no default values set. May be cleared to an
 -- arbitrary state using a reset function.
 blockRamU
    :: forall n dom a r addr
@@ -834,7 +834,7 @@ blockRamU
   -> SNat n
   -- ^ Number of elements in BRAM
   -> (Index n -> a)
-  -- ^ If applicable (see first argument), reset BRAM using this function.
+  -- ^ If applicable (see 'ResetStrategy' argument), reset BRAM using this function.
   -> Signal dom addr
   -- ^ Read address @r@
   -> Signal dom (Maybe (addr, a))

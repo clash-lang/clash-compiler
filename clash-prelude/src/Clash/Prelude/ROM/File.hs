@@ -158,7 +158,7 @@ asyncRomFile
   -> BitVector m
   -- ^ The value of the ROM at address @rd@
 asyncRomFile sz file = asyncRomFile# sz file . fromEnum
--- Leave 'asyncRom' eta-reduced, see Note [Eta-reduction and unsafePerformIO initMem]
+-- Leave 'asyncRomFile#' eta-reduced, see Note [Eta-reduction and unsafePerformIO initMem]
 {-# INLINE asyncRomFile #-}
 
 -- Note [Eta-reduction and unsafePerformIO initMem]
@@ -257,7 +257,8 @@ asyncRomFile# sz file = (content !) -- Leave "(content !)" eta-reduced, see
 -- | A ROM with a synchronous read port, with space for @n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is 'undefined'
+-- * __NB__: Initial output value is /undefined/, reading it will throw an
+-- 'Clash.XException.XException'
 -- * __NB__: This function might not work for specific combinations of
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
@@ -298,7 +299,8 @@ romFile = hideEnable (hideClock E.romFile)
 -- | A ROM with a synchronous read port, with space for 2^@n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is 'undefined'
+-- * __NB__: Initial output value is /undefined/, reading it will throw an
+-- 'Clash.XException.XException'
 -- * __NB__: This function might not work for specific combinations of
 -- code-generation backends and hardware targets. Please check the support table
 -- below:

@@ -409,6 +409,7 @@ test-suite unittests
                  Clash.Tests.FixedExhaustive
                  Clash.Tests.NFDataX
                  Clash.Tests.NumNewtypes
+                 Clash.Tests.Ram
                  Clash.Tests.Reset
                  Clash.Tests.Resize
                  Clash.Tests.Signal

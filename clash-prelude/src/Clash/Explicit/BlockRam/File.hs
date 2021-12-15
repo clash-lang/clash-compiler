@@ -140,7 +140,8 @@ import Clash.XException      (errorX, maybeIsX, seqX, fromJustX, XException (..)
 -- | Create a blockRAM with space for 2^@n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is 'undefined'
+-- * __NB__: Initial output value is /undefined/, reading it will throw an
+-- 'XException'
 -- * __NB__: This function might not work for specific combinations of
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
@@ -186,7 +187,8 @@ blockRamFilePow2 = \clk en file rd wrM -> withFrozenCallStack
 -- | Create a blockRAM with space for @n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is 'undefined'
+-- * __NB__: Initial output value is /undefined/, reading it will throw an
+-- 'XException'
 -- * __NB__: This function might not work for specific combinations of
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
