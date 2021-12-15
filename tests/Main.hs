@@ -635,6 +635,7 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "Signal"
         [ runTest "AlwaysHigh" def{hdlSim=False}
         , runTest "BangPatterns" def
+<<<<<<< HEAD
         , NEEDS_PRIMS(runTest "BlockRamFile" def)
         , NEEDS_PRIMS(runTest "BlockRam0" def)
         , NEEDS_PRIMS(runTest "BlockRam1" def)
@@ -645,6 +646,29 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS_GHC(runTest "BlockRamTest" def{hdlSim=False})
         , NEEDS_PRIMS_GHC(runTest "Compression" def)
         , NEEDS_PRIMS_GHC(runTest "DelayedReset" def)
+=======
+        , runTest "BlockRamFile" def
+        , runTest "BlockRam0" def
+        , runTest "BlockRam1" def
+        , runTest "AndEnable" def
+#ifdef CLASH_MULTIPLE_HIDDEN
+        , runTest "AndSpecificEnable" def
+#endif
+        , runTest "Ram" def
+        , clashTestGroup "Ram"
+          [ runTest "RMultiTop" def
+          , runTest "RWMulti35" def
+          , runTest "RWMulti53" def
+          ]
+        , runTest "ResetGen" def
+        , runTest "RomFile" def
+        , outputTest "BlockRamLazy" def
+        , runTest "BlockRamTest" def{hdlSim=False}
+        , runTest "Compression" def
+        , runTest "DelayedReset" def
+        , runTest "DualBlockRam0" def
+        , runTest "DualBlockRam1" def
+>>>>>>> d6df38e43 (Fix asyncRam#: multiple clocks, undefineds, laziness, seqX (#2006))
         , let _opts = def { buildTargets=BuildSpecific ["example"]
                           , hdlSim=False
                           }

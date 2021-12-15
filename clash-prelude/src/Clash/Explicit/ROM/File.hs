@@ -99,7 +99,8 @@ import Clash.XException             (NFDataX(deepErrorX))
 -- | A ROM with a synchronous read port, with space for 2^@n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is 'undefined'
+-- * __NB__: Initial output value is /undefined/, reading it will throw an
+-- 'Clash.XException.XException'
 -- * __NB__: This function might not work for specific combinations of
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
@@ -139,7 +140,8 @@ romFilePow2 = \clk en -> romFile clk en (pow2SNat (SNat @n))
 -- | A ROM with a synchronous read port, with space for @n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is 'undefined'
+-- * __NB__: Initial output value is /undefined/, reading it will throw an
+-- 'Clash.XException.XException'
 -- * __NB__: This function might not work for specific combinations of
 -- code-generation backends and hardware targets. Please check the support table
 -- below:

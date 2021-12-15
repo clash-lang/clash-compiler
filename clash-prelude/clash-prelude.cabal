@@ -408,6 +408,11 @@ test-suite unittests
                  Clash.Tests.Fixed
                  Clash.Tests.FixedExhaustive
                  Clash.Tests.NFDataX
+<<<<<<< HEAD
+=======
+                 Clash.Tests.NumNewtypes
+                 Clash.Tests.Ram
+>>>>>>> d6df38e43 (Fix asyncRam#: multiple clocks, undefineds, laziness, seqX (#2006))
                  Clash.Tests.Reset
                  Clash.Tests.Resize
                  Clash.Tests.Signal

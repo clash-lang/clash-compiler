@@ -34,16 +34,22 @@ import GHC.Stack             (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits          (KnownNat)
 import qualified Data.Sequence as Seq
 
+<<<<<<< HEAD
 import Clash.Explicit.Signal
   (unbundle, unsafeSynchronizer, KnownDomain, enable)
+=======
+import Clash.Explicit.Signal (unbundle, KnownDomain, andEnable)
+>>>>>>> d6df38e43 (Fix asyncRam#: multiple clocks, undefineds, laziness, seqX (#2006))
 import Clash.Promoted.Nat    (SNat (..), snatToNum, pow2SNat)
 import Clash.Signal.Internal (Clock (..), Signal (..), Enable, fromEnable)
+import Clash.Signal.Internal.Ambiguous (clockPeriod)
 import Clash.Sized.Unsigned  (Unsigned)
-import Clash.XException      (errorX, maybeIsX, fromJustX)
+import Clash.XException      (errorX, maybeIsX, fromJustX, seqX)
 
 -- | Create a RAM with space for 2^@n@ elements
 --
--- * __NB__: Initial content of the RAM is 'undefined'
+-- * __NB__: Initial content of the RAM is /undefined/, reading it will throw an
+-- 'Clash.XException.XException'
 --
 -- Additional helpful information:
 --
@@ -75,7 +81,8 @@ asyncRamPow2 = \wclk rclk en rd wrM -> withFrozenCallStack
 
 -- | Create a RAM with space for @n@ elements
 --
--- * __NB__: Initial content of the RAM is 'undefined'
+-- * __NB__: Initial content of the RAM is /undefined/, reading it will throw an
+-- 'Clash.XException.XException'
 --
 -- Additional helpful information:
 --
@@ -110,7 +117,8 @@ asyncRam = \wclk rclk gen sz rd wrM ->
 
 -- | RAM primitive
 asyncRam#
-  :: ( HasCallStack
+  :: forall wdom rdom n a
+   . ( HasCallStack
      , KnownDomain wdom
      , KnownDomain rdom )
   => Clock wdom
@@ -131,13 +139,12 @@ asyncRam#
   -- ^ Value to write (at address @w@)
   -> Signal rdom a
   -- ^ Value of the @RAM@ at address @r@
-asyncRam# wclk rclk en sz rd we wr din =
-    unsafeSynchronizer wclk rclk dout
+asyncRam# !_ !_ en sz rd we wr din = dout
   where
-    rd'  = unsafeSynchronizer rclk wclk rd
     ramI = Seq.replicate
-              (snatToNum sz)
+              szI
               (withFrozenCallStack (errorX "asyncRam#: initial value undefined"))
+<<<<<<< HEAD
     en' = fromEnable (enable en we)
     dout = go ramI rd' en' wr din
 
@@ -147,13 +154,83 @@ asyncRam# wclk rclk en sz rd we wr din =
       let ram' = upd ram e (fromEnum w) d
           o    = ram `Seq.index` r
       in  o :- go ram' rs es ws ds
+=======
+    en0 = fromEnable (andEnable en we)
+    dout = if rPeriod == wPeriod
+           then goSingle ramI rd en0 wr din
+           else go 0 ramI rd en0 wr din
+    rPeriod = snatToNum (clockPeriod @rdom) :: Int
+    wPeriod = snatToNum (clockPeriod @wdom) :: Int
+    szI = snatToNum sz :: Int
 
-    upd ram we' waddr d = case maybeIsX we' of
+    goSingle :: Seq.Seq a -> Signal rdom Int -> Signal wdom Bool
+       -> Signal wdom Int -> Signal wdom a -> Signal rdom a
+    goSingle !ram (r :- rs) ~(e :- es) wt@(~(w :- ws)) dt@(~(d :- ds)) =
+      let ram0 = upd ram e w d
+          o    = ram `safeAt` r
+      in  o :- (o `seqX` wt `seq` dt `seq` goSingle ram0 rs es ws ds)
+>>>>>>> d6df38e43 (Fix asyncRam#: multiple clocks, undefineds, laziness, seqX (#2006))
+
+    -- Given
+    --   tR = absolute time of next active edge of read clock
+    --   tW = absolute time of next active edge of write clock
+    -- relTime is defined as relTime = tW - tR
+    --
+    -- Put differently, relative time 0 points at the next active edge of the
+    -- read clock, and relTime points at the next active edge of the write
+    -- clock.
+    go :: Int -> Seq.Seq a -> Signal rdom Int -> Signal wdom Bool
+       -> Signal wdom Int -> Signal wdom a -> Signal rdom a
+    go   relTime !ram rt@(~(r :- rs)) et@(~(e :- es)) wt@(~(w :- ws))
+         dt@(~(d :- ds))
+      | relTime < 0 = let ram0 = upd ram e w d
+                      in wt `seq` dt `seq`
+                         go (relTime + wPeriod) ram0 rt es ws ds
+      | otherwise   = let o = ram `safeAt` r
+                      in o :- (o `seqX` go (relTime - rPeriod) ram rs et wt dt)
+
+    upd ram we0 waddr d = case maybeIsX we0 of
       Nothing -> case maybeIsX waddr of
+<<<<<<< HEAD
         Nothing -> fmap (const (seq waddr d)) ram
         Just wa -> Seq.update wa d ram
       Just True -> case maybeIsX waddr of
         Nothing -> fmap (const (seq waddr d)) ram
         Just wa -> Seq.update wa d ram
       _ -> ram
+=======
+        Nothing -> -- Put the XException from `waddr` as the value in all
+                   -- locations of `ram`.
+                   seq waddr d <$ ram
+        Just wa -> -- Put the XException from `we` as the value at address
+                   -- `waddr`.
+                   safeUpdate wa (seq we0 d) ram
+      Just True -> case maybeIsX waddr of
+        Nothing -> -- Put the XException from `waddr` as the value in all
+                   -- locations of `ram`.
+                   seq waddr d <$ ram
+        Just wa -> d `seqX` safeUpdate wa d ram
+      _ -> ram
+
+    safeAt :: HasCallStack => Seq.Seq a -> Int -> a
+    safeAt s i =
+      if (0 <= i) && (i < szI) then
+        Seq.index s i
+      else
+        withFrozenCallStack
+          (errorX ("asyncRam: read address " ++ show i ++
+                   " not in range [0.." ++ show szI ++ ")"))
+    {-# INLINE safeAt #-}
+
+    safeUpdate :: HasCallStack => Int -> a -> Seq.Seq a ->  Seq.Seq a
+    safeUpdate i a s =
+      if (0 <= i) && (i < szI) then
+        Seq.update i a s
+      else
+        let d = withFrozenCallStack
+                  (errorX ("asyncRam: write address " ++ show i ++
+                           " not in range [0.." ++ show szI ++ ")"))
+        in d <$ s
+    {-# INLINE safeUpdate #-}
+>>>>>>> d6df38e43 (Fix asyncRam#: multiple clocks, undefineds, laziness, seqX (#2006))
 {-# NOINLINE asyncRam# #-}
