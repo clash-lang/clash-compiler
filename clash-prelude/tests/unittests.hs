@@ -9,6 +9,7 @@ import qualified Clash.Tests.DerivingDataRepr
 import qualified Clash.Tests.Fixed
 import qualified Clash.Tests.FixedExhaustive
 import qualified Clash.Tests.NFDataX
+import qualified Clash.Tests.Ram
 import qualified Clash.Tests.Reset
 import qualified Clash.Tests.Resize
 import qualified Clash.Tests.Signal
@@ -29,6 +30,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Fixed.tests
   , Clash.Tests.FixedExhaustive.tests
   , Clash.Tests.NFDataX.tests
+  , Clash.Tests.Ram.tests
   , Clash.Tests.Reset.tests
   , Clash.Tests.Resize.tests
   , Clash.Tests.Signal.tests

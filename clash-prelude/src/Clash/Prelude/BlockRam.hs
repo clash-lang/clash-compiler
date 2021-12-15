@@ -1,9 +1,10 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software Ltd,
-                  2017     , Google Inc.
+                  2017     , Google Inc.,
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 BlockRAM primitives
 
@@ -231,10 +232,10 @@ system2 instrs = memOut
 
 Again, we can simulate our system and see that it works. This time however,
 we need to disregard the first few output samples, because the initial content of an
-'Clash.Prelude.RAM.asyncRam' is 'Clash.XException.undefined', and consequently, the first few
-output samples are also 'Clash.XException.undefined'. We use the utility function
+'Clash.Prelude.RAM.asyncRam' is /undefined/, and consequently, the first few
+output samples are also /undefined/. We use the utility function
 'Clash.XException.printX' to conveniently filter out the undefinedness and
-replace it with the string "X" in the few leading outputs.
+replace it with the string @\"undefined\"@ in the few leading outputs.
 
 @
 >>> printX $ sampleN @System 32 (system2 prog)
@@ -362,8 +363,8 @@ prog2 = -- 0 := 4
 
 When we simulate our system we see that it works. This time again,
 we need to disregard the first sample, because the initial output of a
-'blockRam' is 'Clash.XException.undefined'. We use the utility function 'Clash.XException.printX'
-to conveniently filter out the undefinedness and replace it with the string "X".
+'blockRam' is /undefined/. We use the utility function 'Clash.XException.printX'
+to conveniently filter out the undefinedness and replace it with the string @\"undefined\"@.
 
 @
 >>> printX $ sampleN @System 34 (system3 prog2)
@@ -673,7 +674,8 @@ prog2 = -- 0 := 4
 -- | Create a blockRAM with space for @n@ elements.
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is 'Clash.XException.undefined'
+-- * __NB__: Initial output value is /undefined/, reading it will throw an
+-- 'Clash.XException.XException'
 --
 -- @
 -- bram40
@@ -770,7 +772,8 @@ blockRam1 =
 -- | Create a blockRAM with space for 2^@n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is 'Clash.XException.undefined'
+-- * __NB__: Initial output value is /undefined/, reading it will throw an
+-- 'Clash.XException.XException'
 --
 -- @
 -- bram32
@@ -794,7 +797,7 @@ blockRamPow2
      , KnownNat n
      )
   => Vec (2^n) a
-  -- ^ Initial content of the BRAM, also determines the size, @2^n@, of the BRAM.
+  -- ^ Initial content of the BRAM
   --
   -- __NB__: __MUST__ be a constant.
   -> Signal dom (Unsigned n)

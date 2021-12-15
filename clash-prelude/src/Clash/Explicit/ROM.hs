@@ -1,9 +1,10 @@
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.
-                  2019     , Myrtle Software Ltd
+                  2019     , Myrtle Software Ltd,
+                  2022     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 ROMs
 -}
@@ -40,7 +41,8 @@ import Clash.XException       (deepErrorX, seqX, NFDataX)
 -- | A ROM with a synchronous read port, with space for 2^@n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is 'undefined'
+-- * __NB__: Initial output value is /undefined/, reading it will throw an
+-- 'Clash.XException.XException'
 --
 -- Additional helpful information:
 --
@@ -66,7 +68,8 @@ romPow2 = rom
 -- | A ROM with a synchronous read port, with space for @n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is 'undefined'
+-- * __NB__: Initial output value is /undefined/, reading it will throw an
+-- 'Clash.XException.XException'
 --
 -- Additional helpful information:
 --
@@ -79,7 +82,7 @@ rom
   -> Enable dom
   -- ^ Global enable
   -> Vec n a
-  -- ^ ROM content
+  -- ^ ROM content, also determines the size, @n@, of the ROM
   --
   -- __NB:__ must be a constant
   -> Signal dom addr
@@ -98,7 +101,7 @@ rom#
   -> Enable dom
   -- ^ Global enable
   -> Vec n a
-  -- ^ ROM content
+  -- ^ ROM content, also determines the size, @n@, of the ROM
   --
   -- __NB:__ must be a constant
   -> Signal dom Int

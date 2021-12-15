@@ -1,9 +1,10 @@
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.
-                  2019     , Myrtle Software Ltd
+                  2019     , Myrtle Software Ltd,
+                  2022     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 = Initializing a BlockRAM with a data file #usingramfiles#
 
@@ -113,7 +114,8 @@ import Clash.XException      (errorX, maybeIsX, seqX, fromJustX)
 -- | Create a blockRAM with space for 2^@n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is 'undefined'
+-- * __NB__: Initial output value is /undefined/, reading it will throw an
+-- 'Clash.XException.XException'
 -- * __NB__: This function might not work for specific combinations of
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
@@ -158,7 +160,8 @@ blockRamFilePow2 = \clk en file rd wrM -> withFrozenCallStack
 -- | Create a blockRAM with space for @n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is 'undefined'
+-- * __NB__: Initial output value is /undefined/, reading it will throw an
+-- 'Clash.XException.XException'
 -- * __NB__: This function might not work for specific combinations of
 -- code-generation backends and hardware targets. Please check the support table
 -- below:

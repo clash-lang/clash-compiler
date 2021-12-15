@@ -1,9 +1,10 @@
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017-2019, Myrtle Software Ltd
-                  2017     , Google Inc.
+                  2017     , Google Inc.,
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 RAM primitives with a combinational read port.
 -}
@@ -34,7 +35,8 @@ import           Clash.Sized.Unsigned (Unsigned)
 
 -- | Create a RAM with space for @n@ elements.
 --
--- * __NB__: Initial content of the RAM is 'undefined'
+-- * __NB__: Initial content of the RAM is /undefined/, reading it will throw an
+-- 'Clash.XException.XException'
 --
 -- Additional helpful information:
 --
@@ -60,7 +62,8 @@ asyncRam = \sz rd wrM -> withFrozenCallStack
 
 -- | Create a RAM with space for 2^@n@ elements
 --
--- * __NB__: Initial content of the RAM is 'undefined'
+-- * __NB__: Initial content of the RAM is /undefined/, reading it will throw an
+-- 'Clash.XException.XException'
 --
 -- Additional helpful information:
 --

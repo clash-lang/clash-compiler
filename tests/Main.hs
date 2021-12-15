@@ -639,6 +639,11 @@ runClashTest = defaultMain $ clashTestRoot
         , NEEDS_PRIMS(runTest "BlockRam0" def)
         , NEEDS_PRIMS(runTest "BlockRam1" def)
         , NEEDS_PRIMS(runTest "Ram" def)
+        , clashTestGroup "Ram"
+          [ NEEDS_PRIMS(runTest "RMultiTop" def)
+          , NEEDS_PRIMS(runTest "RWMulti35" def)
+          , NEEDS_PRIMS(runTest "RWMulti53" def)
+          ]
         , NEEDS_PRIMS(runTest "ResetGen" def)
         , NEEDS_PRIMS(runTest "RomFile" def)
         , NEEDS_PRIMS_GHC(outputTest ("tests" </> "shouldwork" </> "Signal") allTargets [] [] "BlockRamLazy" "main")
