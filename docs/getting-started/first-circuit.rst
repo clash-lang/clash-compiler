@@ -100,8 +100,8 @@ an expected output.
   testBench :: Signal System Bool
   testBench = done
    where
-    testInput    = stimuliGenerator clk rst ((1,1) :> (2,2) :> (3,3) :> (4,4))
-    expectOutput = outputVerifier' clk rst (0 :> 1 :> 5 :> 14 :> 30 :> 46 :> 62)
+    testInput    = stimuliGenerator clk rst ((1,1) :> (2,2) :> (3,3) :> (4,4) :> Nil)
+    expectOutput = outputVerifier' clk rst (0 :> 1 :> 5 :> 14 :> 30 :> 46 :> 62 :> Nil)
     done         = expectOutput (topEntity clk rst en testInput)
     en           = enableGen
     clk          = tbSystemClockGen (fmap not done)
