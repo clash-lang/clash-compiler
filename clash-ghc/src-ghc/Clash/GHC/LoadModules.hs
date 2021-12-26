@@ -48,6 +48,7 @@ import           Data.Char                       (isDigit)
 import           Data.Generics.Uniplate.DataOnly (transform)
 import           Data.Data                       (Data)
 import           Data.Functor                    ((<&>))
+import           Data.Foldable                   (toList)
 import           Data.HashMap.Strict             (HashMap)
 import qualified Data.HashMap.Strict             as HashMap
 import           Data.Typeable                   (Typeable)
@@ -58,6 +59,7 @@ import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
 import qualified Data.Time.Clock                 as Clock
 import qualified Data.Set                        as Set
+import qualified Data.Sequence                   as Seq
 import           Debug.Trace
 import           Language.Haskell.TH.Syntax      (lift)
 import           GHC.Natural                     (naturalFromInteger)
@@ -216,7 +218,7 @@ loadExternalModule hdl modName0 = Exception.gtry $ do
   tyThings <- catMaybes <$> mapM GHC.lookupGlobalName (GHC.modInfoExports modInfo)
   let rootIds = [id_ | GHC.AnId id_ <- tyThings]
   loaded <- loadExternalBinders hdl rootIds
-  let allBinders = makeRecursiveGroups (lbBinders loaded)
+  let allBinders = makeRecursiveGroups (Map.assocs (lbBinders loaded))
   return (rootIds, FamInstEnv.emptyFamInstEnv, modName1, loaded, allBinders)
 
 setupGhc
@@ -369,13 +371,13 @@ loadLocalModule hdl modName = do
   -- Because tidiedMods is in topological order, binders is also, and hence
   -- the binders belonging to the "root" module are the last binders
   let rootIds = map fst . CoreSyn.flattenBinds $ last binders
-  loaded0 <- loadExternalExprs hdl (UniqSet.mkUniqSet binderIds) (concat binders)
+  loaded0 <- loadExternalExprs hdl (concat binders)
 
   -- Find local primitive annotations
   localPrims <- findPrimitiveAnnotations hdl binderIds
-  let loaded1 = loaded0{lbPrims=lbPrims loaded0 ++ localPrims}
+  let loaded1 = loaded0{lbPrims=lbPrims loaded0 <> Seq.fromList localPrims}
 
-  let allBinders = concat binders ++ makeRecursiveGroups (lbBinders loaded0)
+  let allBinders = concat binders ++ makeRecursiveGroups (Map.assocs (lbBinders loaded0))
   pure (rootIds, modFamInstEnvs', rootModule, loaded1, allBinders)
 
 nameString :: Name.Name -> String
@@ -433,7 +435,7 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
 
     modTime <- startTime `deepseq` length allBinderIds `seq` MonadUtils.liftIO Clock.getCurrentTime
     let modStartDiff = reportTimeDiff modTime startTime
-    MonadUtils.liftIO $ putStrLn $ "GHC: Parsing and optimising modules took: " ++ modStartDiff
+    MonadUtils.liftIO $ putStrLn $ "GHC: Parsing and optimizing modules took: " ++ modStartDiff
 
     extTime <- modTime `deepseq` length lbUnlocatable `deepseq` MonadUtils.liftIO Clock.getCurrentTime
     let extModDiff = reportTimeDiff extTime modTime
@@ -514,7 +516,7 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
         , tid `Set.member` allBenchIds  -- indicate whether top entity is test bench
         )
 
-    let reprs1 = lbReprs ++ reprs'
+    let reprs1 = lbReprs <> Seq.fromList reprs'
 
     annTime <-
       extTime
@@ -549,12 +551,12 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
         knownConfMap = HashMap.fromList (zip knownConfNms knownConfDs)
 
     return ( allBinders
-           , lbClassOps
-           , lbUnlocatable
+           , Map.assocs lbClassOps
+           , Set.toList lbUnlocatable
            , famInstEnvs'
            , topEntities2
-           , lbPrims
-           , reprs1
+           , toList lbPrims
+           , toList reprs1
            , primGuards
            , knownConfMap
            )
