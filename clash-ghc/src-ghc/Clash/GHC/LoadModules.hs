@@ -35,7 +35,6 @@ import           Clash.Primitives.Types          (UnresolvedPrimitive)
 import           Clash.Util                      (ClashException(..), pkgIdFromTypeable)
 import qualified Clash.Util.Interpolate          as I
 import           Control.Arrow                   (first)
-import           Control.DeepSeq                 (deepseq)
 import           Control.Exception               (SomeException, throw)
 import           Control.Monad                   (forM, when)
 import           Data.List.Extra                 (nubSort)
@@ -419,6 +418,10 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
     -- 'mainFunIs' is set to Nothing due to issue #1304:
     -- https://github.com/clash-lang/clash-compiler/issues/1304
     setupGhc useColor ((\d -> d{GHC.mainFunIs=Nothing}) <$> dflagsM) idirs
+    setupTime <- MonadUtils.liftIO Clock.getCurrentTime
+    let setupStartDiff = reportTimeDiff setupTime startTime
+    MonadUtils.liftIO $ putStrLn $ "GHC: Setting up GHC took: " ++ setupStartDiff
+
     -- TODO: We currently load the transitive closure of _all_ bindings found
     -- TODO: in the top module. This is wasteful if one or more binders don't
     -- TODO: contribute to any top entities. This effect is worsened when using
@@ -433,13 +436,9 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
 
     let allBinderIds = map fst (CoreSyn.flattenBinds allBinders)
 
-    modTime <- startTime `deepseq` length allBinderIds `seq` MonadUtils.liftIO Clock.getCurrentTime
-    let modStartDiff = reportTimeDiff modTime startTime
-    MonadUtils.liftIO $ putStrLn $ "GHC: Parsing and optimizing modules took: " ++ modStartDiff
-
-    extTime <- modTime `deepseq` length lbUnlocatable `deepseq` MonadUtils.liftIO Clock.getCurrentTime
-    let extModDiff = reportTimeDiff extTime modTime
-    MonadUtils.liftIO $ putStrLn $ "GHC: Loading external modules from interface files took: " ++ extModDiff
+    modTime <- length allBinderIds `seq` MonadUtils.liftIO Clock.getCurrentTime
+    let modStartDiff = reportTimeDiff modTime setupTime
+    MonadUtils.liftIO $ putStrLn $ "GHC: Compiling and loading modules took: " ++ modStartDiff
 
     -- Get type family instances: accumulated by GhcMonad during
     -- 'loadExternalBinders' / 'loadExternalExprs'
@@ -517,17 +516,6 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
         )
 
     let reprs1 = lbReprs <> Seq.fromList reprs'
-
-    annTime <-
-      extTime
-        `deepseq` length topEntities2
-        `deepseq` lbPrims
-        `deepseq` reprs1
-        `deepseq` primGuards
-        `deepseq` MonadUtils.liftIO Clock.getCurrentTime
-
-    let annExtDiff = reportTimeDiff annTime extTime
-    MonadUtils.liftIO $ putStrLn $ "GHC: Parsing annotations took: " ++ annExtDiff
 
     let famInstEnvs' = (fst famInstEnvs, modFamInstEnvs)
         allTCInsts   = FamInstEnv.famInstEnvElts (fst famInstEnvs')
