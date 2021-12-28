@@ -14,12 +14,12 @@ library
   default-language:    Haskell2010
   ghc-options:         -O2 -Wall -Wcompat
   Exposed-Modules:     BenchmarkCommon
-  build-depends:       base                 >= 4.10     && < 5,
-                       concurrent-supply    >= 0.1.7    && < 0.2,
-                       containers           >= 0.5.4.0  && < 0.7,
-                       ghc                  >= 8.6.0    && < 9.1,
-                       mtl                  >= 2.1.2    && < 2.3,
-                       unordered-containers >= 0.2.3.3  && < 0.3,
+  build-depends:       base,
+                       concurrent-supply,
+                       containers,
+                       ghc,
+                       mtl,
+                       unordered-containers,
 
                        clash-ghc,
                        clash-lib,
@@ -32,10 +32,10 @@ executable clash-benchmark-normalization
   build-depends:       base,
                        concurrent-supply,
                        containers,
-                       criterion            >= 1.5.0.0  && < 1.6,
-                       deepseq              >= 1.4      && < 1.5,
-                       directory            >= 1.3.0.0  && < 1.4,
-                       filepath             >= 1.4      && < 1.5,
+                       criterion,
+                       deepseq,
+                       directory,
+                       filepath,
                        unordered-containers,
 
                        clash-benchmark,

@@ -30,3 +30,5 @@ type role NetlistMonad nominal
 data NetlistMonad a
 data PreserveCase = PreserveCase | ToLower
 instance Hashable PreserveCase
+instance Eq PreserveCase
+instance Show PreserveCase
