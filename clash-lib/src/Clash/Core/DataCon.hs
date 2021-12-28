@@ -80,4 +80,4 @@ type DcName = Name DataCon
 data DcStrictness
   = Strict
   | Lazy
-  deriving (Generic, NFData, Hashable, Binary)
+  deriving (Generic, NFData, Eq, Hashable, Binary)

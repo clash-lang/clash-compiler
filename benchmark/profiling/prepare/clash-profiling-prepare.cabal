@@ -14,11 +14,11 @@ library
   default-language:    Haskell2010
   ghc-options:         -Wall -Wcompat
   Exposed-Modules:     SerialiseInstances
-  build-depends:       base                  >= 4.10     && < 5,
-                       binary                >= 0.8.5    && < 0.11,
-                       containers            >= 0.5.4.0  && < 0.7,
-                       hashable              >= 1.1.2.3  && < 1.4,
-                       unordered-containers  >= 0.2.3.3  && < 0.3,
+  build-depends:       base,
+                       binary,
+                       containers,
+                       hashable,
+                       unordered-containers,
 
                        clash-lib,
                        clash-prelude
