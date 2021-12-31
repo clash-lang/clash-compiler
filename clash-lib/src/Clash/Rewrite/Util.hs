@@ -768,7 +768,7 @@ specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var 
       specBndrs :: [Either Id TyVar]
       specBndrs = map (Lens.over _Left (normalizeId tcm)) specBndrsIn
       specAbs :: Either Term Type
-      specAbs = either (Left . (`mkAbstraction` specBndrs)) (Right . id) specArg
+      specAbs = either (Left . stripAllTicks . (`mkAbstraction` specBndrs)) (Right . id) specArg
   -- Determine if 'f' has already been specialized on (a type-normalized) 'specArg'
   specM <- Map.lookup (f,argLen,specAbs) <$> Lens.use (extra.specMapLbl)
   case specM of

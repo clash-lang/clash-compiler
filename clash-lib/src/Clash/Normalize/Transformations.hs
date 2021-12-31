@@ -77,7 +77,6 @@ import           Data.Coerce                 (coerce)
 import           Data.Default
 import qualified Data.Either                 as Either
 import qualified Data.HashMap.Lazy           as HashMap
-import qualified Data.HashMap.Strict         as HashMapS
 import           Data.List                   ((\\))
 import qualified Data.List                   as List
 import qualified Data.List.Extra             as List
@@ -697,7 +696,7 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
         let subjTy = termType tcm subj
         tran <- Lens.view typeTranslator
         reprs <- Lens.view customReprs
-        case (`evalState` HashMapS.empty) (coreTypeToHWType tran reprs tcm subjTy) of
+        case (`evalState` mempty) (coreTypeToHWType tran reprs tcm subjTy) of
           Right (FilteredHWType (Void (Just hty)) _areVoids)
             | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
             -- If we know that the type of the subject is zero-bits wide and
@@ -1380,10 +1379,12 @@ appPropFast :: HasCallStack => NormRewrite
 appPropFast ctx@(TransformContext is _) = \case
   e@App {}
     | let (fun,args,ticks) = collectArgsTicks e
-    -> go is (deShadowTerm is fun) args ticks
+    -> do (eN,hasChanged) <- listen (go is (deShadowTerm is fun) args ticks)
+          if Monoid.getAny hasChanged then return eN else return e
   e@TyApp {}
     | let (fun,args,ticks) = collectArgsTicks e
-    -> go is (deShadowTerm is fun) args ticks
+    -> do (eN,hasChanged) <- listen (go is (deShadowTerm is fun) args ticks)
+          if Monoid.getAny hasChanged then return eN else return e
   e          -> return e
  where
   go :: InScopeSet -> Term -> [Either Term Type] -> [TickInfo]
@@ -1956,7 +1957,7 @@ recToLetRec (TransformContext is0 []) e = do
     -- corresponding (sub)field from the target variable.
     --
     -- TODO: See [Note: Breaks on constants and predetermined equality]
-    eqApp tcm v args (collectArgs . stripTicks -> (Var v',args'))
+    eqApp tcm v args (collectArgs . stripAllTicks -> (Var v',args'))
       | isGlobalId v'
       , v == v'
       , let args2 = Either.lefts args'
@@ -1964,9 +1965,9 @@ recToLetRec (TransformContext is0 []) e = do
       = and (zipWith (eqArg tcm) args args2)
     eqApp _ _ _ _ = False
 
-    eqArg _ v1 v2@(stripTicks -> Var {})
+    eqArg _ v1 v2@Var {}
       = v1 == v2
-    eqArg tcm v1 v2@(collectArgs . stripTicks -> (Data _, args'))
+    eqArg tcm v1 v2@(collectArgs -> (Data _, args'))
       | let t1 = normalizeType tcm (termType tcm v1)
       , let t2 = normalizeType tcm (termType tcm v2)
       , t1 == t2

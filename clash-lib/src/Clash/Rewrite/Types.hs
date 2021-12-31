@@ -30,7 +30,6 @@ import Control.Monad.State                   (MonadState (..))
 import Control.Monad.State.Strict            (State)
 import Control.Monad.Writer                  (MonadWriter (..))
 import Data.Binary                           (Binary)
-import Data.Hashable                         (Hashable)
 import Data.IntMap.Strict                    (IntMap)
 import Data.Monoid                           (Any)
 import qualified Data.Set                    as Set
@@ -68,7 +67,7 @@ data RewriteStep
   -- ^ Term before `apply`
   , t_after  :: Term
   -- ^ Term after `apply`
-  } deriving (Show, Generic, NFData, Hashable, Binary)
+  } deriving (Show, Generic, NFData, Binary)
 
 -- | State of a rewriting session
 data RewriteState extra

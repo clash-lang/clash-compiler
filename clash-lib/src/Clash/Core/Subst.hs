@@ -10,6 +10,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -70,6 +71,7 @@ import           Data.Text.Prettyprint.Doc
 import qualified Data.List                 as List
 import qualified Data.List.Extra           as List
 import           Data.Ord                  (comparing)
+import           GHC.SrcLoc.Extra          ()
 
 import           Clash.Core.FreeVars
   (noFreeVarsOfType, localFVsOfTerms, tyFVsOfTypes)
@@ -822,12 +824,8 @@ acmpType' = go
   go env (AppTy s1 t1) (AppTy s2 t2) =
     go env s1 s2 `thenCompare` go env t1 t2
   go _ (LitTy l1) (LitTy l2) = compare l1 l2
-  go env (AnnType _ t1) (AnnType _ t2) =
-    -- XXX: maybe ignore annotations, like we ignore ticks, i.e.
-    --
-    -- go env (AnnType t1) t2 = go env t1 t2
-    -- go env t1 (AnnType t2) = go env t1 t2
-    go env t1 t2
+  go env (AnnType a1 t1) (AnnType a2 t2) =
+    compare a1 a2 `thenCompare` go env t1 t2
   go _ t1 t2 = compare (getRank t1) (getRank t2)
 
   getRank :: Type -> Word
@@ -851,7 +849,7 @@ eqType = go
     tv1 == tv2 && go (varType tv1) (varType tv2) && go t1 t2
   go (AppTy s1 t1) (AppTy s2 t2) = go s1 s2 && go t1 t2
   go (LitTy l1) (LitTy l2) = l1 == l2
-  go (AnnType _ t1) (AnnType _ t2) = go t1 t2
+  go (AnnType a1 t1) (AnnType a2 t2) = a1 == a2 && go t1 t2
   go _ _ = False
 
 -- | Alpha equality for terms
@@ -925,10 +923,8 @@ acmpTerm' inScope = go (mkRnEnv inScope)
     go env e1 e2 `thenCompare`
     acmpType' env l1 l2 `thenCompare`
     acmpType' env r1 r2
-  -- Look through ticks for aeq
-  go env (Tick _ e1) e2 = go env e1 e2
-  go env e1 (Tick _ e2) = go env e1 e2
-
+  go env (Tick t1 e1) (Tick t2 e2) =
+    compare t1 t2 `thenCompare` go env e1 e2
   go _ e1 e2 = compare (getRank e1) (getRank e2)
 
   goAlt env (DataPat c1 tvs1 ids1,e1) (DataPat c2 tvs2 ids2,e2) =
@@ -1009,3 +1005,5 @@ instance Eq Term where
 
 instance Ord Term where
   compare = acmpTerm
+
+deriving instance Ord TickInfo

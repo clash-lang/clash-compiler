@@ -16,6 +16,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Clash.Core.Type
   ( Type (..)
@@ -61,7 +62,7 @@ where
 import           Control.DeepSeq        as DS
 import           Data.Binary            (Binary)
 import           Data.Coerce            (coerce)
-import           Data.Hashable          (Hashable)
+import           Data.Hashable          (Hashable (hashWithSalt))
 import           Data.List              (foldl')
 import           Data.List.Extra        (splitAtList)
 import           Data.Maybe             (isJust, mapMaybe)
@@ -69,6 +70,7 @@ import           GHC.Base               (isTrue#,(==#))
 import           GHC.Generics           (Generic(..))
 import           GHC.Integer            (smallInteger)
 import           GHC.Integer.Logarithms (integerLogBase#)
+import           GHC.TypeLits           (type TypeError, ErrorMessage(Text, (:<>:)))
 
 -- GHC API
 #if MIN_VERSION_ghc(9,0,0)
@@ -132,7 +134,14 @@ data Type
   | AppTy    !Type !Type        -- ^ Type Application
   | LitTy    !LitTy             -- ^ Type literal
   | AnnType  [Attr'] !Type      -- ^ Annotated type, see Clash.Annotations.SynthesisAttributes
-  deriving (Show,Generic,NFData,Hashable,Binary)
+  deriving (Show, Generic, NFData, Binary)
+
+instance TypeError (
+        'Text "A broken implementation of Hashable Type has been "
+  ':<>: 'Text "removed in Clash 1.4.7. If this is an issue for you, please submit "
+  ':<>: 'Text "an issue report at https://github.com/clash-lang/clash-compiler/issues."
+  ) => Hashable Type where
+    hashWithSalt = error "Type.hashWithSalt: unreachable"
 
 -- | An easier view on types
 data TypeView
