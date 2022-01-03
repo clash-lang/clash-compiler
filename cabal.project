@@ -12,6 +12,27 @@ packages:
   ./benchmark/profiling/prepare
   ./benchmark/profiling/run
   ./clash-term
+  https://github.com/alex-mckenna/fakedata/raw/aeson-2.0/fakedata-1.0.2.tar.gz
+
+-- TODO: The inclusion of a cabal sdist tarball in the packages list is the
+-- unfortunate result of a few things:
+--
+--   1. fakedata does not support aeson-2.0, so we have to use a fork until
+--      support can be upstreamed
+--
+--   2. cabal does not recursively pull submodules by default (although this
+--      was fixed after the 3.6.2.0 release so is not in the wild as of 22-1-3)
+--
+--   3. cabal from 3.4.0.0 handles 'source-repository-package' dependencies
+--      differently, pulling the repo and building the source dist tarball
+--
+--   4. cabal 3.4.0.0 does not support the 'post-checkout-command' key on
+--      'source-repository-package' so we can't pull submodules there
+--
+-- The combination of these things means for the meantime the source dist
+-- tarball is in a fork of the repo and listed in the packages field. This
+-- should work as intended on all the version of cabal we use and doesn't lead
+-- to weird situations where one version of cabal fails to build clash.
 
 write-ghc-environment-files: always
 

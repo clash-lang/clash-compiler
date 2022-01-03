@@ -54,7 +54,7 @@ library
   build-depends:
     containers,
     data-binary-ieee754,
-    fakedata,
+    fakedata >= 1.0.2,
     ghc-typelits-knownnat,
     ghc-typelits-natnormalise,
     hedgehog-fakedata,
