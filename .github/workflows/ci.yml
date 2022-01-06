@@ -34,7 +34,7 @@ jobs:
 
     # Run steps inside the clash CI docker image
     container:
-      image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-${{ matrix.ghc }}:2021-06-24
+      image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-${{ matrix.ghc }}:2022-01-06
 
       credentials:
         username: clash-lang-builder

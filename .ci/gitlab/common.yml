@@ -1,5 +1,5 @@
 .common:
-  image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-$GHC_VERSION:2021-06-24
+  image: docker.pkg.github.com/clash-lang/clash-compiler/clash-ci-$GHC_VERSION:2022-01-06
   timeout: 2 hours
   stage: build
   variables:
