@@ -12,7 +12,7 @@ FROM ubuntu:$UBUNTU_VERSION AS builder
 LABEL vendor="QBayLogic B.V." maintainer="devops@qbaylogic.com"
 ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PREFIX=/opt
 
-ARG DEPS_COMMON="autoconf bison build-essential ca-certificates clang curl flex gcc g++ git make zlib1g-dev"
+ARG DEPS_COMMON="autoconf bison build-essential ca-certificates clang cmake curl flex gcc g++ git make zlib1g-dev"
 RUN apt-get update \
  && apt-get install -y --no-install-recommends $DEPS_COMMON
 
@@ -68,6 +68,18 @@ RUN curl -L "https://github.com/Z3Prover/z3/archive/refs/tags/$z3_version.tar.gz
  && make PREFIX=$PREFIX install \
  && cd ../.. \
  && rm -Rf z3-$z3_version
+
+ARG boolector_version="3.2.0"
+RUN curl -L "https://github.com/Boolector/boolector/archive/refs/tags/$boolector_version.tar.gz" \
+      | tar -xz \
+ && cd boolector-$boolector_version \
+ && ./contrib/setup-lingeling.sh \
+ && ./contrib/setup-btor2tools.sh \
+ && ./configure.sh --prefix $PREFIX \
+ && make PREFIX=$PREFIX -C build -j$(nproc) \
+ && make PREFIX=$PREFIX -C build install \
+ && cd .. \
+ && rm -Rf boolector-$boolector_version
 
 ARG symbiyosys_version="66a458958dc93f8e12418d425e4c31848889937b"
 RUN git clone https://github.com/cliffordwolf/SymbiYosys.git SymbiYosys \
