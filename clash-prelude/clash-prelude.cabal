@@ -50,7 +50,8 @@ Author:               The Clash Authors
 Maintainer:           QBayLogic B.V. <devops@qbaylogic.com>
 Copyright:            Copyright © 2013-2016, University of Twente,
                                   2016-2017, Myrtle Software Ltd,
-                                  2017-2019, QBayLogic B.V., Google Inc.
+                                  2017-2019, QBayLogic B.V., Google Inc.,
+                                  2020-2022, QBayLogic B.V.
 Category:             Hardware
 Build-type:           Custom
 
@@ -408,6 +409,7 @@ test-suite unittests
                  Clash.Tests.Fixed
                  Clash.Tests.FixedExhaustive
                  Clash.Tests.NFDataX
+                 Clash.Tests.Ram
                  Clash.Tests.Reset
                  Clash.Tests.Resize
                  Clash.Tests.Signal
