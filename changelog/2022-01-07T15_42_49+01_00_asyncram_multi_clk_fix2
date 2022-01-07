@@ -1,0 +1,1 @@
+CHANGED: Passing an out-of-bounds write address to `asyncRam` would previously halt the simulation with an exception. It now writes _undefined_ values to all locations in RAM instead, allowing simulation to continue.([#2006](https://github.com/clash-lang/clash-compiler/pull/2006))
