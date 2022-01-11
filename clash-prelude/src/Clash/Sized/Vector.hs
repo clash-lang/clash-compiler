@@ -2161,7 +2161,7 @@ dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
   where
     go :: SNat n -> Vec n a -> (p @@ n)
     go _ Nil                        = z
-    go s (y `Cons` (ys :: Vec z a)) =
+    go s (y `Cons` ys) =
       let s' = s `subSNat` d1
       in  f s' y (go s' ys)
 {-# NOINLINE dfold #-}
