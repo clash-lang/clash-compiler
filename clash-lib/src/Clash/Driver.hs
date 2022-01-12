@@ -2,7 +2,7 @@
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017     , QBayLogic, Google Inc.
-                     2020-2021, QBayLogic
+                     2020-2022, QBayLogic
 
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -109,7 +109,7 @@ import           Clash.Core.Util                  (shouldSplit)
 import           Clash.Core.Var
   (Id, varName, varUniq, varType)
 import           Clash.Core.VarEnv
-  (elemVarEnv, emptyVarEnv, lookupVarEnv, lookupVarEnv', mkVarEnv, lookupVarEnvDirectly)
+  (elemVarEnv, emptyVarEnv, lookupVarEnv, lookupVarEnv', mkVarEnv, lookupVarEnvDirectly, eltsVarEnv, VarEnv)
 import           Clash.Debug                      (debugIsOn)
 import           Clash.Driver.Types
 import           Clash.Driver.Manifest            (Manifest(..), readFreshManifest, UnexpectedModification, pprintUnexpectedModifications, mkManifest, writeManifest, manifestFilename)
@@ -258,6 +258,40 @@ replaceChar a b = map go
     | c == a = b
     | otherwise = c
 
+removeHistoryFile :: Maybe FilePath -> IO ()
+removeHistoryFile =
+  maybe (pure ()) removeHistory
+ where
+  removeHistory path =
+    whenM (Directory.doesFileExist path) (Directory.removeFile path)
+
+prefixModuleName
+  :: HDL
+  -> Maybe Data.Text.Text
+  -> Maybe TopEntity
+  -> String
+  -> (String, Maybe String)
+prefixModuleName hdl compPrefix annM modName =
+  case compPrefix of
+    Just (Data.Text.unpack -> p)
+      | not (null p) -> case annM of
+          Just ann ->
+            let nm = p <> "_" <> t_name ann
+             in (nm, Just nm)
+
+          Nothing ->
+            (p <> "_" <> modName, Just p)
+
+      | Just ann <- annM -> case hdl of
+          VHDL -> (t_name ann, Just modName)
+          _ -> (t_name ann, Nothing)
+
+    _ -> case annM of
+      Just ann -> case hdl of
+        VHDL -> (t_name ann, Just modName)
+        _ -> (t_name ann, Just modName)
+      _ -> (modName, Nothing)
+
 -- | Create a set of target HDL files for a set of functions
 generateHDL
   :: forall backend . Backend backend
@@ -287,73 +321,73 @@ generateHDL
   -- argument will be compiled.
   -> ClashOpts
   -- ^ Debug information level for the normalization process
-  -> (Clock.UTCTime,Clock.UTCTime)
+  -> Clock.UTCTime
   -> IO ()
 generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans peEval eval
-  topEntities0 mainTopEntity opts (startTime,prepTime) = do
-    case dbg_historyFile (opt_debug opts) of
-      Nothing -> pure ()
-      Just histFile -> whenM (Directory.doesFileExist histFile) (Directory.removeFile histFile)
-    let (tes, deps) = sortTop bindingsMap topEntities1
-     in go prepTime initIs HashMap.empty deps tes
- where
-  (compNames, initIs) = genTopNames topPrefixM escpIds lwIds hdl topEntities1
-  topEntityMap = mkVarEnv (fmap (\x -> (topId x, x)) topEntities1)
-  topPrefixM = opt_componentPrefix opts
-  hdl = hdlFromBackend (Proxy @backend)
-  escpIds = opt_escapedIds opts
-  lwIds = opt_lowerCaseBasicIds opts
-  topEntities1 =
-    map
-      (removeForAll . splitTopEntityT tcm bindingsMap)
-      (selectTopEntities topEntities0 mainTopEntity)
+  topEntities0 mainTopEntity opts startTime = do
+    removeHistoryFile (dbg_historyFile (opt_debug opts))
 
-  go
+    let topEntities1 = fmap (removeForAll . splitTopEntityT tcm bindingsMap)
+                         (selectTopEntities topEntities0 mainTopEntity)
+        hdl = hdlFromBackend (Proxy @backend)
+        (compNames, initIs) = genTopNames opts hdl topEntities1
+        (tes, deps) = sortTop bindingsMap topEntities1
+
+    -- TODO This is here because of some minimal effort refactoring. At some
+    -- point generateHDL should be better laid out so this can be closer to
+    -- the few places it is needed.
+    let topEntityMap = mkVarEnv (fmap (\x -> (topId x, x)) topEntities1)
+
+    goAll startTime compNames initIs HashMap.empty deps topEntityMap tes
+ where
+  goAll
     :: Clock.UTCTime
+    -> VarEnv Id.Identifier
     -> Id.IdentifierSet
     -> HashMap Unique [EdamFile]
     -> HashMap Unique [Unique]
+    -> VarEnv TopEntityT
     -> [TopEntityT]
     -> IO ()
-  go prevTime _ _ _ [] =
-    putStrLn $ "Clash: Total compilation took " ++ reportTimeDiff prevTime startTime
+  goAll startTime compNames seen0 edamFiles0 deps topEntityMap tes =
+    case tes of
+      [] -> do
+        time <- Clock.getCurrentTime
+        let diff = reportTimeDiff time startTime
+        putStrLn $ "Clash: Total compilation took " ++ diff
 
-  -- Process the next TopEntity
-  go prevTime seen0 edamFiles0 deps (TopEntityT topEntity annM isTb:topEntities') = do
+      (t:ts) -> do
+        (seen1, edamFiles1) <- go compNames seen0 edamFiles0 deps topEntityMap t
+        goAll startTime compNames seen1 edamFiles1 deps topEntityMap ts
+
+  go
+    :: VarEnv Id.Identifier
+    -> Id.IdentifierSet
+    -> HashMap Unique [EdamFile]
+    -> HashMap Unique [Unique]
+    -> VarEnv TopEntityT
+    -> TopEntityT
+    -> IO (Id.IdentifierSet, HashMap Unique [EdamFile])
+  go compNames seen0 edamFiles0 deps topEntityMap (TopEntityT topEntity annM isTb) = do
+  prevTime <- Clock.getCurrentTime
   let topEntityS = Data.Text.unpack (nameOcc (varName topEntity))
   putStrLn $ "Clash: Compiling " ++ topEntityS
 
   -- Some initial setup
-  let -- TODO: 'modName1' should be run through 'seen0'
-      modName1 = filter (\c -> isAscii c && (isAlphaNum c || c == '_')) (replaceChar '.' '_' topEntityS)
+  let modName1 = filter (\c -> isAscii c && (isAlphaNum c || c == '_')) (replaceChar '.' '_' topEntityS)
+      -- TODO Perhaps it makes more sense to keep modName as an Id.Identifier,
+      -- then if needed convert it back to String/Text.
+      seen1 = State.execState (Id.addRaw (Data.Text.pack modName1)) seen0
       topNm = lookupVarEnv' compNames topEntity
-      (modNameS, fmap Data.Text.pack -> prefixM) = case topPrefixM of
-        Just (Data.Text.unpack -> p)
-          | not (null p) -> case annM of
-            -- Prefix top names with 'p', prefix other with 'p_tname'
-            Just ann ->
-              let nm = p <> "_" <> t_name ann in
-              (nm, Just nm)
-            -- Prefix top names with 'p', prefix other with 'p'
-            _ -> (p <> "_" <> modName1, Just p)
-          | Just ann <- annM -> case hdl of
-              -- Prefix other with 't_name'
-              VHDL -> (t_name ann, Just modNameS)
-              _    -> (t_name ann, Nothing)
-        _ -> case annM of
-          Just ann -> case hdlKind (undefined :: backend) of
-            VHDL -> (t_name ann, Nothing)
-            -- Prefix other with 't_name'
-            _ -> (t_name ann, Just modNameS)
-          _ -> (modName1, Nothing)
+      (modNameS, fmap Data.Text.pack -> prefixM) = prefixModuleName (hdlKind (undefined :: backend)) (opt_componentPrefix opts) annM modName1
       modNameT  = Data.Text.pack modNameS
       iw        = opt_intWidth opts
-      hdlsyn    = opt_hdlSyn opts
       forceUnd  = opt_forceUndefined opts
       xOpt      = coerce (opt_aggressiveXOptBB opts)
       enums     = coerce (opt_renderEnums opts)
       hdlState' = setModName modNameT
-                $ fromMaybe (initBackend iw hdlsyn escpIds lwIds forceUnd xOpt enums :: backend) hdlState
+                  -- TODO initBackend should just take ClashOpts as an argument.
+                $ fromMaybe (initBackend iw (opt_hdlSyn opts) (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) forceUnd xOpt enums :: backend) hdlState
       hdlDir    = fromMaybe (Clash.Backend.name hdlState') (opt_hdlDir opts) </> topEntityS
       manPath   = hdlDir </> manifestFilename
       ite       = ifThenElseExpr hdlState'
@@ -367,16 +401,14 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
   (userModifications, maybeManifest, topHash) <-
     readFreshManifest topEntities0 (bindingsMap, topEntity) primMap opts clashModDate manPath
 
-  supplyN <- Supply.newSupply
-  let topEntityNames = map topId topEntities1
+  let topEntityNames = map topId (eltsVarEnv topEntityMap)
 
-  (topTime, seen2, edamFiles2) <- case maybeManifest of
+  case maybeManifest of
     Just manifest0@Manifest{fileNames} | Just [] <- userModifications -> do
       -- Found a 'manifest' files. Use it to extend "seen" set. Generate EDAM
       -- files if necessary.
       putStrLn ("Clash: Using cached result for: " ++ topEntityS)
-      topTime <- Clock.getCurrentTime
-      let seen1 = State.execState (mapM_ Id.addRaw (componentNames manifest0)) seen0
+      let seen2 = State.execState (mapM_ Id.addRaw (componentNames manifest0)) seen1
 
       (edamFiles1, fileNames1) <-
         if opt_edalize opts
@@ -385,11 +417,11 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
 
       writeManifest manPath manifest0{fileNames=fileNames1}
 
-      return
-        ( topTime
-        , seen1
-        , edamFiles1
-        )
+      topTime <- Clock.getCurrentTime
+      let topDiff = reportTimeDiff topTime prevTime
+      putStrLn $ "Clash: Compiling " ++ topEntityS ++ " took " ++ topDiff
+
+      return (seen2, edamFiles1)
 
     _ -> do
       -- 1. Prepare HDL directory
@@ -399,9 +431,10 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       -- Already create the directory where the HDL ends up being generated, as
       -- we use directories relative to this final directory to find manifest
       -- files belonging to other top entities. Failing to do so leads to #463
-      () <- prepareDir hdlDir opts userModifications
+      prepareDir hdlDir opts userModifications
 
       -- 2. Normalize topEntity
+      supplyN <- Supply.newSupply
       let transformedBindings = normalizeEntity reprs bindingsMap primMap tcm tupTcm
                                   typeTrans peEval eval topEntityNames opts supplyN
                                   topEntity
@@ -413,7 +446,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       -- 3. Generate netlist for topEntity
       (topComponent, netlist, seen2) <-
         genNetlist isTb opts reprs transformedBindings topEntityMap compNames primMap
-                   tcm typeTrans iw ite (SomeBackend hdlState') seen0 hdlDir prefixM topEntity
+                   tcm typeTrans iw ite (SomeBackend hdlState') seen1 hdlDir prefixM topEntity
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = reportTimeDiff netlistTime normTime
@@ -454,9 +487,9 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       writeManifest manPath manifest
 
       topTime <- hdlDocs `seq` Clock.getCurrentTime
-      return (topTime, seen2, edamFiles1)
-
-  go topTime seen2 edamFiles2 deps topEntities'
+      let topDiff = reportTimeDiff topTime prevTime
+      putStrLn $ "Clash: Compiling " ++ topEntityS ++ " took " ++ topDiff
+      return (seen2, edamFiles1)
 
 -- | Interpret a specific function from a specific module. This action tries
 -- two things:

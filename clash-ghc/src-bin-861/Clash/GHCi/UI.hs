@@ -2079,7 +2079,7 @@ makeHDL backend startAction optsRef srcs = do
                   topEntities
                   mainTopEntity
                   opts2
-                  (startTime,prepTime)
+                  startTime
 
 makeVHDL :: IORef ClashOpts -> [FilePath] -> InputT GHCi ()
 makeVHDL = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> RenderEnums -> VHDLState)

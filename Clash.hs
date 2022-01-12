@@ -65,7 +65,7 @@ doHDL b src = do
   generateHDL (buildCustomReprs reprs) domainConfs bindingsMap (Just b) primMap tcm tupTcm
     (ghcTypeToHWType WORD_SIZE_IN_BITS True) ghcEvaluator evaluator topEntities Nothing
     defClashOpts{opt_cachehdl = False, opt_debug = debugSilent, opt_clear = True}
-    (startTime,prepTime)
+    startTime
 
 main :: IO ()
 main = genVHDL "./examples/FIR.hs"
