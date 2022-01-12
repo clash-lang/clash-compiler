@@ -854,7 +854,7 @@ clockTag
 clockTag (Clock dom) = dom
 
 -- | Clock generator for simulations. Do __not__ use this clock generator for
--- for the /testBench/ function, use 'Clash.Explicit.Testbench.tbClockGen' instead.
+-- the /testBench/ function, use 'Clash.Explicit.Testbench.tbClockGen' instead.
 --
 -- To be used like:
 --
