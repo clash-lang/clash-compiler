@@ -24,7 +24,7 @@ prepareFile idirs fIn = do
   putStrLn $ "Preparing: " ++ fIn
   let fOut = fIn ++ ".bin"
   inp <- runInputStage idirs fIn
-  let (bindingsMap,tcm,tupTcm,_topEntities,primMap,reprs,topEntityNames,topEntity) = inp
+  let (bindingsMap,tcm,tupTcm,_topEntities,primMap,reprs,_domainConfs,topEntityNames,topEntity) = inp
       inp' :: NormalizationInputs
       inp' = (bindingsMap,tcm,tupTcm, fmap (fmap removeBBfunc) primMap, reprs,topEntityNames,topEntity)
   putStrLn $ "Serialising to : " ++ fOut

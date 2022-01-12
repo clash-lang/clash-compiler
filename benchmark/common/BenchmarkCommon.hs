@@ -5,6 +5,8 @@
 
 module BenchmarkCommon where
 
+import Clash.Signal (VDomainConfiguration)
+
 import Clash.Annotations.Primitive (HDL(VHDL))
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs, buildCustomReprs)
 import Clash.Backend
@@ -32,7 +34,9 @@ import Util (OverridingBool(..))
 
 import qualified Control.Concurrent.Supply as Supply
 import Control.Monad.State.Strict   (State)
+import Data.HashMap.Strict          (HashMap)
 import Data.IntMap.Strict           (IntMap)
+import Data.Text                    (Text)
 
 defaultTests :: [FilePath]
 defaultTests =
@@ -53,10 +57,11 @@ opts :: [FilePath] -> ClashOpts
 opts idirs =
   defClashOpts{
       opt_cachehdl=False
+    , opt_clear=True
     , opt_errorExtra = True
     , opt_floatSupport = True
     , opt_importPaths=idirs
-    , opt_specLimit=40 -- For "PipelinesViaFolds"
+    , opt_specLimit=100 -- For "ManyEntitiesVaried"
     }
 
 hdl :: HDL
@@ -75,15 +80,16 @@ runInputStage
         ,[TopEntityT]
         ,CompiledPrimMap
         ,CustomReprs
+        ,HashMap Text VDomainConfiguration
         ,[Id]
         ,Id
         )
 runInputStage idirs src = do
   pds <- primDirs backend
-  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs,_domainConfs) <- generateBindings (return ()) Auto pds idirs [] (hdlKind backend) src Nothing
+  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs,domainConfs) <- generateBindings (return ()) Auto pds idirs [] (hdlKind backend) src Nothing
   let topEntityNames = map topId topEntities
       tm = head topEntityNames
-  return (bindingsMap,tcm,tupTcm,topEntities, primMap, buildCustomReprs reprs, topEntityNames,tm)
+  return (bindingsMap,tcm,tupTcm,topEntities, primMap, buildCustomReprs reprs, domainConfs, topEntityNames,tm)
 
 runNormalisationStage
   :: [FilePath]
@@ -97,7 +103,7 @@ runNormalisationStage
         )
 runNormalisationStage idirs src = do
   supplyN <- Supply.newSupply
-  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs,topEntityNames,topEntity) <-
+  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs,_domainConfs,topEntityNames,topEntity) <-
     runInputStage idirs src
   let opts1 = opts idirs
       transformedBindings =
