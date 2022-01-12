@@ -153,7 +153,7 @@ import GHC.Natural
 #endif
 import GHC.Natural                (naturalToInteger)
 import GHC.Prim                   (dataToTag#)
-import GHC.Stack                  (HasCallStack, withFrozenCallStack)
+import GHC.Stack                  (withFrozenCallStack)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-))
 #if MIN_VERSION_base(4,15,0)
 import GHC.TypeNats               (natVal)
@@ -1208,35 +1208,35 @@ instance KnownNat n => Ixed (BitVector n) where
 
 
 -- error for infix operator
-undefErrorI :: (HasCallStack, KnownNat m, KnownNat n) => String -> BitVector m -> BitVector n -> a
+undefErrorI :: (KnownNat m, KnownNat n) => String -> BitVector m -> BitVector n -> a
 undefErrorI op bv1 bv2 = withFrozenCallStack $
   errorX $ "Clash.Sized.BitVector." ++ op
   ++ " called with (partially) undefined arguments: "
   ++ show bv1 ++ " " ++ op ++" " ++ show bv2
 
 -- error for prefix operator/function
-undefErrorP :: (HasCallStack, KnownNat m, KnownNat n) => String -> BitVector m -> BitVector n -> a
+undefErrorP :: (KnownNat m, KnownNat n) => String -> BitVector m -> BitVector n -> a
 undefErrorP op bv1 bv2 = withFrozenCallStack $
   errorX $ "Clash.Sized.BitVector." ++ op
   ++ " called with (partially) undefined arguments: "
   ++ show bv1 ++ " " ++ show bv2
 
 -- error for prefix operator/function
-undefErrorP3 :: (HasCallStack, KnownNat m, KnownNat n, KnownNat o) => String -> BitVector m -> BitVector n -> BitVector o -> a
+undefErrorP3 :: (KnownNat m, KnownNat n, KnownNat o) => String -> BitVector m -> BitVector n -> BitVector o -> a
 undefErrorP3 op bv1 bv2 bv3 = withFrozenCallStack $
   errorX $ "Clash.Sized.BitVector." ++ op
   ++ " called with (partially) undefined arguments: "
   ++ show bv1 ++ " " ++ show bv2 ++ " " ++ show bv3
 
 -- error for unary operator/function
-undefErrorU :: (HasCallStack, KnownNat n) => String -> BitVector n -> a
+undefErrorU :: KnownNat n => String -> BitVector n -> a
 -- undefErrorU op bv1 = undefError ("Clash.Sized.BitVector." ++ op) [bv1]
 undefErrorU op bv1 = withFrozenCallStack $
   errorX $ "Clash.Sized.BitVector." ++ op
   ++ " called with (partially) undefined argument: "
   ++ show bv1
 
-undefError :: (HasCallStack, KnownNat n) => String -> [BitVector n] -> a
+undefError :: KnownNat n => String -> [BitVector n] -> a
 undefError op bvs = withFrozenCallStack $
   errorX $ op
   ++ " called with (partially) undefined arguments: "
