@@ -20,6 +20,8 @@
 
 module Clash.Driver where
 
+import           Control.Concurrent               (MVar, modifyMVar, modifyMVar_, newMVar, withMVar)
+import           Control.Concurrent.Async         (mapConcurrently_)
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
 import           Control.Exception                (throw)
@@ -327,6 +329,9 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
   topEntities0 mainTopEntity opts startTime = do
     removeHistoryFile (dbg_historyFile (opt_debug opts))
 
+    unless (opt_cachehdl opts) $
+      putStrLn "Clash: Ignoring previously made caches"
+
     let topEntities1 = fmap (removeForAll . splitTopEntityT tcm bindingsMap)
                          (selectTopEntities topEntities0 mainTopEntity)
         hdl = hdlFromBackend (Proxy @backend)
@@ -338,47 +343,36 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
     -- the few places it is needed.
     let topEntityMap = mkVarEnv (fmap (\x -> (topId x, x)) topEntities1)
 
-    goAll startTime compNames initIs HashMap.empty deps topEntityMap tes
+    -- Data which is updated and used when updating the different top entities
+    -- is kept in an MVar.
+    idSet <- newMVar initIs
+    edamFiles <- newMVar HashMap.empty
+
+    mapConcurrently_ (go compNames idSet edamFiles deps topEntityMap) tes
+
+    time <- Clock.getCurrentTime
+    let diff = reportTimeDiff time startTime
+    putStrLn $ "Clash: Total compilation took " ++ diff
  where
-  goAll
-    :: Clock.UTCTime
-    -> VarEnv Id.Identifier
-    -> Id.IdentifierSet
-    -> HashMap Unique [EdamFile]
-    -> HashMap Unique [Unique]
-    -> VarEnv TopEntityT
-    -> [TopEntityT]
-    -> IO ()
-  goAll startTime compNames seen0 edamFiles0 deps topEntityMap tes =
-    case tes of
-      [] -> do
-        time <- Clock.getCurrentTime
-        let diff = reportTimeDiff time startTime
-        putStrLn $ "Clash: Total compilation took " ++ diff
-
-      (t:ts) -> do
-        (seen1, edamFiles1) <- go compNames seen0 edamFiles0 deps topEntityMap t
-        goAll startTime compNames seen1 edamFiles1 deps topEntityMap ts
-
   go
     :: VarEnv Id.Identifier
-    -> Id.IdentifierSet
-    -> HashMap Unique [EdamFile]
+    -> MVar Id.IdentifierSet
+    -> MVar (HashMap Unique [EdamFile])
     -> HashMap Unique [Unique]
     -> VarEnv TopEntityT
     -> TopEntityT
-    -> IO (Id.IdentifierSet, HashMap Unique [EdamFile])
-  go compNames seen0 edamFiles0 deps topEntityMap (TopEntityT topEntity annM isTb) = do
+    -> IO ()
+  go compNames seenV edamFilesV deps topEntityMap (TopEntityT topEntity annM isTb) = do
   prevTime <- Clock.getCurrentTime
   let topEntityS = Data.Text.unpack (nameOcc (varName topEntity))
   putStrLn $ "Clash: Compiling " ++ topEntityS
 
-  -- Some initial setup
   let modName1 = filter (\c -> isAscii c && (isAlphaNum c || c == '_')) (replaceChar '.' '_' topEntityS)
-      -- TODO Perhaps it makes more sense to keep modName as an Id.Identifier,
-      -- then if needed convert it back to String/Text.
-      seen1 = State.execState (Id.addRaw (Data.Text.pack modName1)) seen0
-      topNm = lookupVarEnv' compNames topEntity
+
+  modifyMVar_ seenV $ \seen ->
+    pure $! State.execState (Id.addRaw (Data.Text.pack modName1)) seen
+
+  let topNm = lookupVarEnv' compNames topEntity
       (modNameS, fmap Data.Text.pack -> prefixM) = prefixModuleName (hdlKind (undefined :: backend)) (opt_componentPrefix opts) annM modName1
       modNameT  = Data.Text.pack modNameS
       iw        = opt_intWidth opts
@@ -393,8 +387,6 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       ite       = ifThenElseExpr hdlState'
       topNmT    = Id.toText topNm
 
-  unless (opt_cachehdl opts) $ putStrLn "Clash: Ignoring previously made caches"
-
   -- Get manifest file if cache is not stale and caching is enabled. This is used
   -- to prevent unnecessary recompilation.
   clashModDate <- getClashModificationDate
@@ -408,12 +400,14 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       -- Found a 'manifest' files. Use it to extend "seen" set. Generate EDAM
       -- files if necessary.
       putStrLn ("Clash: Using cached result for: " ++ topEntityS)
-      let seen2 = State.execState (mapM_ Id.addRaw (componentNames manifest0)) seen1
 
-      (edamFiles1, fileNames1) <-
+      modifyMVar_ seenV $ \seen ->
+        pure $! State.execState (mapM_ Id.addRaw (componentNames manifest0)) seen
+
+      fileNames1 <- modifyMVar edamFilesV $ \edamFiles ->
         if opt_edalize opts
-        then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles0 fileNames
-        else pure (edamFiles0, fileNames)
+          then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles fileNames
+          else pure (edamFiles, fileNames)
 
       writeManifest manPath manifest0{fileNames=fileNames1}
 
@@ -421,7 +415,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       let topDiff = reportTimeDiff topTime prevTime
       putStrLn $ "Clash: Compiling " ++ topEntityS ++ " took " ++ topDiff
 
-      return (seen2, edamFiles1)
+      return ()
 
     _ -> do
       -- 1. Prepare HDL directory
@@ -444,18 +438,21 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       putStrLn $ "Clash: Normalization took " ++ prepNormDiff
 
       -- 3. Generate netlist for topEntity
-      (topComponent, netlist, seen2) <-
-        genNetlist isTb opts reprs transformedBindings topEntityMap compNames primMap
-                   tcm typeTrans iw ite (SomeBackend hdlState') seen1 hdlDir prefixM topEntity
+      (topComponent, netlist) <- modifyMVar seenV $ \seen -> do
+        (topComponent, netlist, seen') <-
+          -- TODO My word, this has far too many arguments.
+          genNetlist isTb opts reprs transformedBindings topEntityMap compNames
+            primMap tcm typeTrans iw ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
+
+        pure (seen', (topComponent, netlist))
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = reportTimeDiff netlistTime normTime
       putStrLn $ "Clash: Netlist generation took " ++ normNetDiff
 
       -- 4. Generate topEntity wrapper
-      let
-        (hdlDocs, dfiles, mfiles) =
-          createHDL hdlState' modNameT seen2 netlist domainConfs topComponent topNmT
+      (hdlDocs, dfiles, mfiles) <- withMVar seenV $ \seen ->
+        pure $! createHDL hdlState' modNameT seen netlist domainConfs topComponent topNmT
 
       -- TODO: Data files should go into their own directory
       -- FIXME: Files can silently overwrite each other
@@ -470,10 +467,10 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
           <> zip (map fst dfiles) dataFilesDigests
           <> zip (map fst mfiles) memoryFilesDigests
 
-      (edamFiles1, filesAndDigests1) <-
+      filesAndDigests1 <- modifyMVar edamFilesV $ \edamFiles ->
         if opt_edalize opts
-        then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles0 filesAndDigests0
-        else pure (edamFiles0, filesAndDigests0)
+          then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles filesAndDigests0
+          else pure (edamFiles, filesAndDigests0)
 
       let
         depUniques = fromMaybe [] (HashMap.lookup (getUnique topEntity) deps)
@@ -489,7 +486,7 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       topTime <- hdlDocs `seq` Clock.getCurrentTime
       let topDiff = reportTimeDiff topTime prevTime
       putStrLn $ "Clash: Compiling " ++ topEntityS ++ " took " ++ topDiff
-      return (seen2, edamFiles1)
+      return ()
 
 -- | Interpret a specific function from a specific module. This action tries
 -- two things:
