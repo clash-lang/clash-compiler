@@ -68,7 +68,7 @@ flag use-ghc-paths
 executable clash
   Main-Is:            src-ghc/Batch.hs
   Build-Depends:      base, clash-ghc
-  GHC-Options:        -Wall -Wcompat
+  GHC-Options:        -Wall -Wcompat -threaded -rtsopts
   if flag(dynamic)
     GHC-Options: -dynamic
   extra-libraries:    pthread

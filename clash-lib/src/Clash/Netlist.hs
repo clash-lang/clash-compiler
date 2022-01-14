@@ -2,7 +2,7 @@
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017-2018, Google Inc.,
-                     2021     , QBayLogic B.V.
+                     2021-2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -224,23 +224,22 @@ genNames newInlineStrat prefixM is env bndrs =
 -- | Generate names for top entities. Should be executed at the very start of
 -- the synthesis process and shared between all passes.
 genTopNames
-  :: Maybe StrictText.Text
-  -- ^ Prefix
-  -> Bool
-  -- ^ Allow escaped identifiers?
-  -> PreserveCase
-  -- ^ Lower case basic ids?
+  :: ClashOpts
   -> HDL
   -- ^ HDL to generate identifiers for
   -> [TopEntityT]
   -> (VarEnv Identifier, IdentifierSet)
-genTopNames prefixM esc lw hdl tops =
+genTopNames opts hdl tops =
   -- TODO: Report error if fixed top entities have conflicting names
   flip runState (Id.emptyIdentifierSet esc lw hdl) $ do
     env0 <- foldlM goFixed emptyVarEnv fixedTops
     env1 <- foldlM goNonFixed env0 nonFixedTops
     pure env1
  where
+  prefixM = opt_componentPrefix opts
+  esc = opt_escapedIds opts
+  lw = opt_lowerCaseBasicIds opts
+
   fixedTops = [(topId, ann) | TopEntityT{topId, topAnnotation=Just ann} <- tops]
   nonFixedTops = [topId | TopEntityT{topId, topAnnotation=Nothing} <- tops]
 

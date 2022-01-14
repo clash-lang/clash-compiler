@@ -2,7 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017-2019, Myrtle Software Ltd
                   2017     , Google Inc.,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -502,7 +502,7 @@ data VDomainConfiguration
   , vResetPolarity :: ResetPolarity
   -- ^ Corresponds to '_resetPolarity' on 'DomainConfiguration'
   }
-  deriving (Eq, Show, Read)
+  deriving (Eq, Generic, NFData, Show, Read)
 
 -- | Convert 'SDomainConfiguration' to 'VDomainConfiguration'. Should be used in combination with
 -- 'createDomain' only.
