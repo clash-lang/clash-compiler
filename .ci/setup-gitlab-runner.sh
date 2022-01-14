@@ -24,6 +24,9 @@ set -x
 # Number of CPUs to limit a docker instance to
 NCPUS=4
 
+# Number of runners to use. Each runner will get NCPUS
+NRUNNERS=1
+
 # Get this key from https://gitlab.com/clash-lang/clash-compiler/-/settings/ci_cd
 # under "Runners".
 REGISTER_KEY=XXXXXXXXXXXXXXXXX
@@ -48,8 +51,8 @@ sudo gitlab-runner register \
   --cache-s3-bucket-name runner \
   --cache-s3-insecure \
   --docker-image alpine:latest \
-  --limit 1 \
+  --limit ${NRUNNERS} \
   --executor docker \
   -n \
   --tag-list $(hostname),local \
-  --name $(hostname) # <= RUNNER NAME, CHANGE ME IF YOU WANT MORE THAN ONE RUNNER
+  --name $(hostname)
