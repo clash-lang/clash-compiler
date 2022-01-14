@@ -111,9 +111,10 @@ runSingleTransformation
   -- ^ Transformation to perform
   -> C.Term
   -- ^ Term to transform
-  -> C.Term
-runSingleTransformation rwEnv rwState is trans term = t
- where (t, _, _) = runR (runRewrite "" is trans term) rwEnv rwState
+  -> IO C.Term
+runSingleTransformation rwEnv rwState is trans term = do
+  (t, _, _) <- runR (runRewrite "" is trans term) rwEnv rwState
+  pure t
 
 -- | Run a single transformation with an empty environment and empty
 -- InScopeSet. See Default instances ^ to inspect the precise definition of
@@ -123,7 +124,7 @@ runSingleTransformation rwEnv rwState is trans term = t
 -- include a type translator, evaluator, current function, or global heap. Maps,
 -- like the primitive and tycon map, are also empty. If the transformation under
 -- test needs these definitions, you should add them manually.
-runSingleTransformationDef :: Default extra => Rewrite extra -> C.Term -> C.Term
+runSingleTransformationDef :: Default extra => Rewrite extra -> C.Term -> IO C.Term
 runSingleTransformationDef = runSingleTransformation def def def
 
 

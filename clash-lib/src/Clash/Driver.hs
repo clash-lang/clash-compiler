@@ -440,8 +440,8 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
 
       -- 2. Normalize topEntity
       supplyN <- Supply.newSupply
-      let transformedBindings = normalizeEntity env bindingsMap typeTrans peEval
-                                eval topEntityNames supplyN topEntity
+      transformedBindings <- normalizeEntity env bindingsMap typeTrans peEval
+                               eval topEntityNames supplyN topEntity
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = reportTimeDiff normTime prevTime
@@ -1067,7 +1067,7 @@ normalizeEntity
   -- ^ Unique supply
   -> Id
   -- ^ root of the hierarchy
-  -> BindingMap
+  -> IO BindingMap
 normalizeEntity env bindingsMap typeTrans peEval eval topEntities supply tm = transformedBindings
   where
     doNorm = do norm <- normalize [tm]

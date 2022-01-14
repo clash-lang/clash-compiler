@@ -112,7 +112,7 @@ runNormalization
   -- ^ topEntities
   -> NormalizeSession a
   -- ^ NormalizeSession to run
-  -> a
+  -> IO a
 runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
   runRewriteSession rwEnv rwState
   where

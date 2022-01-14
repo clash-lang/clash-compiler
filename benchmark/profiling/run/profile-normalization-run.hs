@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 
 import           Clash.Driver
-import           Clash.Driver.Types
+import           Clash.Driver.Types           (ClashEnv(..), ClashOpts(opt_intWidth))
 
 import           Clash.GHC.PartialEval
 import           Clash.GHC.Evaluator
@@ -43,7 +43,7 @@ benchFile idirs src = do
                    , envCustomReprs = reprs
                    }
 
-      res = normalizeEntity clashEnv bindingsMap
+  res <- normalizeEntity clashEnv bindingsMap
                    (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
                    ghcEvaluator
                    evaluator

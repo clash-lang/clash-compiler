@@ -30,10 +30,12 @@ import           Control.Exception           (throw)
 import           Control.Lens ((%=), (+=), (^.))
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
-#if !MIN_VERSION_base(4,13,0)
-import           Control.Monad.Fail          (MonadFail)
-#endif
 import qualified Control.Monad.State.Strict  as State
+#if MIN_VERSION_transformers(0,5,6)
+import qualified Control.Monad.Trans.RWS.CPS as RWS
+#else
+import qualified Control.Monad.Trans.RWS.Strict as RWS
+#endif
 import qualified Control.Monad.Writer        as Writer
 import           Data.Bifunctor              (second)
 import           Data.Coerce                 (coerce)
@@ -92,10 +94,10 @@ import           Clash.Util.Eq               (fastEqBy)
 import qualified Clash.Util.Interpolate as I
 
 -- | Lift an action working in the '_extra' state to the 'RewriteMonad'
-zoomExtra :: State.State extra a
-          -> RewriteMonad extra a
-zoomExtra m = R (\_ s w -> case State.runState m (s ^. extra) of
-                            (a,s') -> (a,s {_extra = s'},w))
+zoomExtra :: State.State extra a -> RewriteMonad extra a
+zoomExtra m = R . RWS.rwsT $ \_ s ->
+  let (a, st') = State.runState m (_extra s)
+   in pure (a, s { _extra = st' }, mempty)
 
 -- | Some transformations might erroneously introduce shadowing. For example,
 -- a transformation might result in:
@@ -277,15 +279,15 @@ runRewrite name is rewrite expr = apply name rewrite (TransformContext is []) ex
 runRewriteSession :: RewriteEnv
                   -> RewriteState extra
                   -> RewriteMonad extra a
-                  -> a
-runRewriteSession r s m =
+                  -> IO a
+runRewriteSession r s m = do
+  (a, s', _) <- runR m r s
   traceIf (dbg_countTransformations (opt_debug (envOpts (_clashEnv r))))
     ("Clash: Transformations:\n" ++ Text.unpack (showCounters (s' ^. transformCounters))) $
     traceIf (None < dbg_transformationInfo (opt_debug (envOpts (_clashEnv r))))
       ("Clash: Applied " ++ show (s' ^. transformCounter) ++ " transformations")
-      a
+      pure a
   where
-    (a,s',_) = runR m r s
     showCounters =
       Text.unlines
         . map (\(nm,cnt) -> nm <> ": " <> Text.pack (show cnt))
@@ -315,19 +317,19 @@ mkDerivedName (TransformContext _ ctx) sf = case closestLetBinder ctx of
 
 -- | Make a new binder and variable reference for a term
 mkTmBinderFor
-  :: (MonadUnique m, MonadFail m)
+  :: (MonadUnique m)
   => InScopeSet
   -> TyConMap -- ^ TyCon cache
   -> Name a -- ^ Name of the new binder
   -> Term -- ^ Term to bind
   -> m Id
-mkTmBinderFor is tcm name e = do
-  Left r <- mkBinderFor is tcm name (Left e)
-  return r
+mkTmBinderFor is tcm name e =
+  either id (error "mkTmBinderFor: Result is a TyVar")
+    <$> mkBinderFor is tcm name (Left e)
 
 -- | Make a new binder and variable reference for either a term or a type
 mkBinderFor
-  :: (MonadUnique m, MonadFail m)
+  :: (MonadUnique m)
   => InScopeSet
   -> TyConMap -- ^ TyCon cache
   -> Name a -- ^ Name of the new binder

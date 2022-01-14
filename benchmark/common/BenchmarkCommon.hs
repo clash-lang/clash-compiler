@@ -60,7 +60,7 @@ runNormalisationStage idirs src = do
   (env, design) <- runInputStage idirs src
   let topEntityNames = fmap topId (designEntities design)
   let topEntity = head topEntityNames
-  let transformedBindings =
+  transformedBindings <-
         normalizeEntity env (designBindings design)
           (ghcTypeToHWType (opt_intWidth (opts idirs)))
           ghcEvaluator

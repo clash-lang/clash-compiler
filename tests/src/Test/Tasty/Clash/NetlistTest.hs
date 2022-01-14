@@ -79,11 +79,12 @@ runToNetlistStage target f src = do
 
   supplyN <- Supply.newSupply
 
-  let transformedBindings = normalizeEntity env (designBindings design)
-          (ghcTypeToHWType (opt_intWidth opts))
-          ghcEvaluator
-          evaluator
-          teNames supplyN te
+  transformedBindings <-
+    normalizeEntity env (designBindings design)
+      (ghcTypeToHWType (opt_intWidth opts))
+      ghcEvaluator
+      evaluator
+      teNames supplyN te
 
   fmap (\(_,x,_) -> force (P.map snd (OMap.assocs x))) $
     netlistFrom (env, transformedBindings, tes2, compNames, te, initIs)

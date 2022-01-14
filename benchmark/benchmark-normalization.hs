@@ -44,15 +44,16 @@ benchFile idirs src =
   env (setupEnv idirs src) $
     \ ~(clashEnv, clashDesign, supplyN) -> do
       bench ("normalization of " ++ src)
-            (nf (normalizeEntity
-                   clashEnv
-                   (designBindings clashDesign)
-                   (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
-                   ghcEvaluator
-                   evaluator
-                   (fmap topId (designEntities clashDesign))
-                   supplyN)
-                   (topId (head (designEntities clashDesign))))
+            (nfIO
+              (normalizeEntity
+                 clashEnv
+                 (designBindings clashDesign)
+                 (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
+                 ghcEvaluator
+                 evaluator
+                 (fmap topId (designEntities clashDesign))
+                 supplyN
+                 (topId (head (designEntities clashDesign)))))
 
 setupEnv
   :: [FilePath]
