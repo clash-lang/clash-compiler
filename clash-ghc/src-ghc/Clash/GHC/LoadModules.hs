@@ -35,7 +35,6 @@ import           Clash.Primitives.Types          (UnresolvedPrimitive)
 import           Clash.Util                      (ClashException(..), pkgIdFromTypeable)
 import qualified Clash.Util.Interpolate          as I
 import           Control.Arrow                   (first)
-import           Control.DeepSeq                 (deepseq)
 import           Control.Exception               (SomeException, throw)
 import           Control.Monad                   (forM, when)
 import           Data.List.Extra                 (nubSort)
@@ -48,6 +47,7 @@ import           Data.Char                       (isDigit)
 import           Data.Generics.Uniplate.DataOnly (transform)
 import           Data.Data                       (Data)
 import           Data.Functor                    ((<&>))
+import           Data.Foldable                   (toList)
 import           Data.HashMap.Strict             (HashMap)
 import qualified Data.HashMap.Strict             as HashMap
 import           Data.Typeable                   (Typeable)
@@ -58,6 +58,7 @@ import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
 import qualified Data.Time.Clock                 as Clock
 import qualified Data.Set                        as Set
+import qualified Data.Sequence                   as Seq
 import           Debug.Trace
 import           Language.Haskell.TH.Syntax      (lift)
 import           GHC.Natural                     (naturalFromInteger)
@@ -216,7 +217,7 @@ loadExternalModule hdl modName0 = Exception.gtry $ do
   tyThings <- catMaybes <$> mapM GHC.lookupGlobalName (GHC.modInfoExports modInfo)
   let rootIds = [id_ | GHC.AnId id_ <- tyThings]
   loaded <- loadExternalBinders hdl rootIds
-  let allBinders = makeRecursiveGroups (lbBinders loaded)
+  let allBinders = makeRecursiveGroups (Map.assocs (lbBinders loaded))
   return (rootIds, FamInstEnv.emptyFamInstEnv, modName1, loaded, allBinders)
 
 setupGhc
@@ -369,13 +370,13 @@ loadLocalModule hdl modName = do
   -- Because tidiedMods is in topological order, binders is also, and hence
   -- the binders belonging to the "root" module are the last binders
   let rootIds = map fst . CoreSyn.flattenBinds $ last binders
-  loaded0 <- loadExternalExprs hdl (UniqSet.mkUniqSet binderIds) (concat binders)
+  loaded0 <- loadExternalExprs hdl (concat binders)
 
   -- Find local primitive annotations
   localPrims <- findPrimitiveAnnotations hdl binderIds
-  let loaded1 = loaded0{lbPrims=lbPrims loaded0 ++ localPrims}
+  let loaded1 = loaded0{lbPrims=lbPrims loaded0 <> Seq.fromList localPrims}
 
-  let allBinders = concat binders ++ makeRecursiveGroups (lbBinders loaded0)
+  let allBinders = concat binders ++ makeRecursiveGroups (Map.assocs (lbBinders loaded0))
   pure (rootIds, modFamInstEnvs', rootModule, loaded1, allBinders)
 
 nameString :: Name.Name -> String
@@ -417,6 +418,10 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
     -- 'mainFunIs' is set to Nothing due to issue #1304:
     -- https://github.com/clash-lang/clash-compiler/issues/1304
     setupGhc useColor ((\d -> d{GHC.mainFunIs=Nothing}) <$> dflagsM) idirs
+    setupTime <- MonadUtils.liftIO Clock.getCurrentTime
+    let setupStartDiff = reportTimeDiff setupTime startTime
+    MonadUtils.liftIO $ putStrLn $ "GHC: Setting up GHC took: " ++ setupStartDiff
+
     -- TODO: We currently load the transitive closure of _all_ bindings found
     -- TODO: in the top module. This is wasteful if one or more binders don't
     -- TODO: contribute to any top entities. This effect is worsened when using
@@ -431,13 +436,9 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
 
     let allBinderIds = map fst (CoreSyn.flattenBinds allBinders)
 
-    modTime <- startTime `deepseq` length allBinderIds `seq` MonadUtils.liftIO Clock.getCurrentTime
-    let modStartDiff = reportTimeDiff modTime startTime
-    MonadUtils.liftIO $ putStrLn $ "GHC: Parsing and optimising modules took: " ++ modStartDiff
-
-    extTime <- modTime `deepseq` length lbUnlocatable `deepseq` MonadUtils.liftIO Clock.getCurrentTime
-    let extModDiff = reportTimeDiff extTime modTime
-    MonadUtils.liftIO $ putStrLn $ "GHC: Loading external modules from interface files took: " ++ extModDiff
+    modTime <- length allBinderIds `seq` MonadUtils.liftIO Clock.getCurrentTime
+    let modStartDiff = reportTimeDiff modTime setupTime
+    MonadUtils.liftIO $ putStrLn $ "GHC: Compiling and loading modules took: " ++ modStartDiff
 
     -- Get type family instances: accumulated by GhcMonad during
     -- 'loadExternalBinders' / 'loadExternalExprs'
@@ -514,18 +515,7 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
         , tid `Set.member` allBenchIds  -- indicate whether top entity is test bench
         )
 
-    let reprs1 = lbReprs ++ reprs'
-
-    annTime <-
-      extTime
-        `deepseq` length topEntities2
-        `deepseq` lbPrims
-        `deepseq` reprs1
-        `deepseq` primGuards
-        `deepseq` MonadUtils.liftIO Clock.getCurrentTime
-
-    let annExtDiff = reportTimeDiff annTime extTime
-    MonadUtils.liftIO $ putStrLn $ "GHC: Parsing annotations took: " ++ annExtDiff
+    let reprs1 = lbReprs <> Seq.fromList reprs'
 
     let famInstEnvs' = (fst famInstEnvs, modFamInstEnvs)
         allTCInsts   = FamInstEnv.famInstEnvElts (fst famInstEnvs')
@@ -549,12 +539,12 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
         knownConfMap = HashMap.fromList (zip knownConfNms knownConfDs)
 
     return ( allBinders
-           , lbClassOps
-           , lbUnlocatable
+           , Map.assocs lbClassOps
+           , Set.toList lbUnlocatable
            , famInstEnvs'
            , topEntities2
-           , lbPrims
-           , reprs1
+           , toList lbPrims
+           , toList reprs1
            , primGuards
            , knownConfMap
            )

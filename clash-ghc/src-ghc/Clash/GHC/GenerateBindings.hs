@@ -138,9 +138,9 @@ generateBindings startAction useColor primDirs importDirs dbs hdl modName dflags
    , customBitRepresentations
    , primGuards
    , domainConfs ) <- loadModules startAction useColor hdl modName dflagsM importDirs
+  startTime <- Clock.getCurrentTime
   primMapR <- generatePrimMap unresolvedPrims primGuards (concat [pFP, primDirs, importDirs])
   tdir <- maybe ghcLibDir (pure . GHC.topDir) dflagsM
-  startTime <- Clock.getCurrentTime
   primMapC <-
     sequence $ HashMap.map
                  (sequence . fmap (compilePrimitive importDirs dbs tdir))
