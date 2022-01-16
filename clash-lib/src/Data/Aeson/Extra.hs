@@ -8,6 +8,8 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-# OPTIONS_HADDOCK hide #-}
+
 module Data.Aeson.Extra where
 
 import           Control.Exception    (throw)

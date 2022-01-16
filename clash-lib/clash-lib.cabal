@@ -279,10 +279,14 @@ Library
 
                       Clash.Verification.Pretty
 
+                      -- Used in v16-upgrade-primitives to decode our non-standard
+                      -- JSON primitive files.
+                      Data.Aeson.Extra
+
+                      -- Used in clash-cores
                       Data.Text.Prettyprint.Doc.Extra
 
   Other-Modules:      Clash.Annotations.TopEntity.Extra
-                      Data.Aeson.Extra
                       Data.IntMap.Extra
                       Data.List.Extra
                       Data.Map.Ordered.Extra
@@ -296,6 +300,20 @@ Library
 
   if flag(debug)
     cpp-options:      -DDEBUG
+
+executable v16-upgrade-primitives
+  Main-Is:            tools/v16-upgrade-primitives.hs
+  Build-Depends:
+    base,
+    aeson,
+    yaml,
+    bytestring,
+    clash-lib,
+    containers,
+    directory,
+    Glob
+  GHC-Options:        -Wall -Wcompat
+  default-language:   Haskell2010
 
 test-suite unittests
   import:           common-options
