@@ -18,21 +18,40 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+
+#if MIN_VERSION_transformers(0,5,6)
+{-# LANGUAGE UndecidableInstances #-}
+
+{-# OPTIONS_GHC -Wno-orphans #-}
+#endif
 
 module Clash.Rewrite.Types where
 
-import Control.DeepSeq                       (NFData)
+import           Control.Applicative                   (Alternative)
+import           Control.Concurrent                    (MVar, ThreadId)
+import           Clash.Util.Supply                     (Supply, freshId)
+import           Control.DeepSeq                       (NFData)
 import Control.Lens                          (Lens', use, (.=))
 import qualified Control.Lens as Lens
+import Control.Monad.Base
+#if !MIN_VERSION_base(4,13,0)
+import Control.Monad.Fail                    (MonadFail)
+#endif
 import Control.Monad.Fix                     (MonadFix)
+import Control.Monad.IO.Class                (MonadIO)
 import Control.Monad.State.Strict            (State)
 #if MIN_VERSION_transformers(0,5,6)
 import Control.Monad.Reader                  (MonadReader (..))
 import Control.Monad.State                   (MonadState (..))
+import Control.Monad.Trans.Control
+  ( ComposeSt, MonadBaseControl(..), MonadTransControl(..)
+  , defaultLiftBaseWith, defaultRestoreM)
 import Control.Monad.Trans.RWS.CPS           (RWST)
 import qualified Control.Monad.Trans.RWS.CPS as RWS
 import Control.Monad.Writer                  (MonadWriter (..))
 #else
+import Control.Monad.Trans.Control (MonadBaseControl(..))
 import Control.Monad.Trans.RWS.Strict        (RWST)
 import qualified Control.Monad.Trans.RWS.Strict as RWS
 #endif
@@ -56,7 +75,7 @@ import Clash.Netlist.Types       (FilteredHWType, HWMap)
 import Clash.Primitives.Types    (CompiledPrimMap)
 import Clash.Rewrite.WorkFree    (isWorkFree)
 import Clash.Util
-import Clash.Util.Supply         (Supply, freshId)
+import Clash.Util.Supply         ()
 
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 
@@ -75,27 +94,40 @@ data RewriteStep
   -- ^ Term after `apply`
   } deriving (Show, Generic, NFData, Binary)
 
+{-
+Note [strictness in RewriteState]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Prior to concurrent normalization, the _bindings and _nameCounter
+all had strictness marked in the fields. However, since they are now MVar, it
+is not the field itself that needs to be strict but the contents of the MVar.
+When these are updated in rewriting, it is necessary to use `seq` or bang
+patterns to ensure that they are always forced to WHNF.
+
+Since the transform count was replaced in it's entirity with the map of
+counters, operations on the map are always forced completely with `deepseq`.
+This prevents thunks being built up on map updates, since counting the number
+of transformations applied is common when debugging.
+-}
+
 -- | State of a rewriting session
 data RewriteState extra
   = RewriteState
-    -- TODO Given we now keep transformCounters, this should just be 'fold'
-    -- over that map, otherwise the two counts could fall out of sync.
-  { _transformCounter :: {-# UNPACK #-} !Word
-  -- ^ Total number of applied transformations
-  , _transformCounters :: HashMap Text Word
+  { _transformCounters :: MVar (HashMap Text Word)
   -- ^ Map that tracks how many times each transformation is applied
-  , _bindings         :: !BindingMap
+  , _bindings         :: MVar BindingMap
   -- ^ Global binders
   , _uniqSupply       :: !Supply
   -- ^ Supply of unique numbers
-  , _curFun           :: (Id,SrcSpan) -- Initially set to undefined: no strictness annotation
-  -- ^ Function which is currently normalized
-  , _nameCounter      :: {-# UNPACK #-} !Int
+  , _curFun           :: MVar (HashMap ThreadId (Id,SrcSpan))
+  -- ^ Function which is currently normalized for each thread
+  , _nameCounter      :: MVar Int
   -- ^ Used for 'Fresh'
-  , _globalHeap       :: PrimHeap
+  , _globalHeap       :: MVar PrimHeap
   -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
-  , _workFreeBinders  :: VarEnv Bool
+  , _workFreeBinders  :: MVar (VarEnv Bool)
   -- ^ Map telling whether a binder's definition is work-free
+  , _ioLock           :: MVar ()
+  -- ^ Synchronization for logging to stdout
   , _extra            :: !extra
   -- ^ Additional state
   }
@@ -170,10 +202,15 @@ normalizeUltra = clashEnv . Lens.to (opt_ultra . envOpts)
 newtype RewriteMonad extra a = R
   { unR :: RWST RewriteEnv Any (RewriteState extra) IO a }
   deriving newtype
-    ( Applicative
+    ( Alternative
+    , Applicative
     , Functor
     , Monad
+    , MonadBase IO
+    , MonadBaseControl IO
+    , MonadFail
     , MonadFix
+    , MonadIO
     )
 #if MIN_VERSION_transformers(0,5,6) && MIN_VERSION_mtl(2,3,0)
   deriving newtype
@@ -222,6 +259,35 @@ instance MonadReader RewriteEnv (RewriteMonad extra) where
    {-# INLINE reader #-}
 #endif
 
+#if MIN_VERSION_transformers(0,5,6) && !MIN_VERSION_transformers_base(0,4,6)
+instance (Monoid w, MonadBase b m) => MonadBase b (RWST r w s m) where
+  liftBase = liftBaseDefault
+  {-# INLINE liftBase #-}
+#endif
+
+#if MIN_VERSION_transformers(0,5,6)
+-- For Control.Monad.Trans.RWS.Strict these are already defined, however
+-- the CPS version of RWS is now included in `monad-control` yet.
+
+instance (Monoid w) => MonadTransControl (RWST r w s) where
+  type StT (RWST r w s) a = (a, s, w)
+
+  liftWith f = RWS.rwsT $ \r s ->
+    fmap (\x -> (x, s, mempty)) (f (\t -> RWS.runRWST t r s))
+  {-# INLINE liftWith #-}
+
+  restoreT m = RWS.rwsT $ \_ _ -> m
+  {-# INLINE restoreT #-}
+
+instance (Monoid w, MonadBaseControl b m) => MonadBaseControl b (RWST r w s m) where
+  type StM (RWST r w s m) a = ComposeSt (RWST r w s) m a
+
+  liftBaseWith = defaultLiftBaseWith
+  {-# INLINE liftBaseWith #-}
+  restoreM = defaultRestoreM
+  {-# INLINE restoreM #-}
+#endif
+
 instance MonadUnique (RewriteMonad extra) where
   getUniqueM = do
     sup <- use uniqSupply
@@ -247,7 +313,7 @@ type Rewrite extra = Transform (RewriteMonad extra)
 
 -- Moved into Clash.Rewrite.WorkFree
 {-# SPECIALIZE isWorkFree
-      :: Lens' (RewriteState extra) (VarEnv Bool)
+      :: Lens' (RewriteState extra) (MVar (VarEnv Bool))
       -> BindingMap
       -> Term
       -> RewriteMonad extra Bool

@@ -17,6 +17,8 @@ import Clash.GHC.Evaluator
 import Clash.GHC.GenerateBindings
 import Clash.GHC.NetlistTypes
 
+import qualified Control.Concurrent.MVar as MVar
+
 #if MIN_VERSION_ghc(9,2,0)
 import qualified GHC.Driver.Monad as GHC
 import qualified GHC.Driver.Session as GHC
@@ -100,6 +102,7 @@ runNormalisationStage
   -> IO (ClashEnv, ClashDesign, Id)
 runNormalisationStage idirs src = do
   supplyN <- Supply.newSupply
+  lock <- MVar.newMVar ()
   (env, design) <- runInputStage idirs src
   let topEntityNames = fmap topId (designEntities design)
   case topEntityNames of
@@ -109,6 +112,7 @@ runNormalisationStage idirs src = do
               (ghcTypeToHWType (opt_intWidth (opts idirs)))
               ghcEvaluator
               evaluator
+              lock
               topEntityNames supplyN topEntity
       return (env, design{designBindings=transformedBindings},topEntity)
     _ -> error "no top entities"

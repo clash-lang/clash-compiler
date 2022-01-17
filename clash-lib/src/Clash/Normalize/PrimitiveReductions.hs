@@ -1,7 +1,13 @@
 {-|
   Copyright  :  (C) 2015-2016, University of Twente,
                     2016     , Myrtle Software Ltd,
+<<<<<<< HEAD
                     2021-2024, QBayLogic B.V.
+||||||| parent of 861f35008 (Add concurrent normalization)
+                    2021     , QBayLogic B.V.
+=======
+                    2021-2022, QBayLogic B.V.
+>>>>>>> 861f35008 (Add concurrent normalization)
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -445,7 +451,6 @@ reduceIterateI n aTy vTy _kn f0 a (TransformContext is0 ctx) = do
   tcm <- Lens.view tcCache
   f1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) f0
 
-  -- Generate uniq ids for element assignments.
   uniqs0 <- Lens.use uniqSupply
   let
     is1 = extendInScopeSetList is0 (collectTermIds f1)
@@ -962,6 +967,7 @@ reduceUnconcat unconcatPrimInfo n m aTy _kn sm arg (TransformContext inScope _ct
             (uniqs1,(vars,headsAndTails)) =
               second (second sconcat . NE.unzip)
                      (extractElems uniqs0 inScope consCon aTy 'U' (n*m) arg)
+
             -- Build a vector out of the first m elements
             mvec = mkVec nilCon consCon aTy m (NE.take (fromInteger m) vars)
             -- Get the vector representing the next ((n-1)*m) elements

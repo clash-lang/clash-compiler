@@ -23,7 +23,7 @@
 module Clash.Driver where
 
 import           Control.Concurrent               (MVar, modifyMVar, modifyMVar_, newMVar, withMVar)
-import           Control.Concurrent.Async         (mapConcurrently_)
+import           Control.Concurrent.Async.Lifted  (mapConcurrently_)
 import           Control.DeepSeq
 import           Control.Exception                (throw, Exception)
 import qualified Control.Monad                    as Monad
@@ -438,7 +438,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
       -- 2. Normalize topEntity
       supplyN <- Supply.newSupply
       transformedBindings <- normalizeEntity env bindingsMap typeTrans peEval
-                               eval topEntityNames supplyN topEntity
+                               eval ioLockV topEntityNames supplyN topEntity
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = reportTimeDiff normTime prevTime
@@ -1006,6 +1006,8 @@ normalizeEntity
   -- ^ Hardcoded evaluator for partial evaluation
   -> WHNF.Evaluator
   -- ^ Hardcoded evaluator for WHNF (old evaluator)
+  -> MVar ()
+  -- ^ Synchronization for stdout
   -> [Id]
   -- ^ TopEntities
   -> Supply.Supply
@@ -1013,14 +1015,14 @@ normalizeEntity
   -> Id
   -- ^ root of the hierarchy
   -> IO BindingMap
-normalizeEntity env bindingsMap typeTrans peEval eval topEntities supply tm = transformedBindings
+normalizeEntity env bindingsMap typeTrans peEval eval lock topEntities supply tm = transformedBindings
   where
     doNorm = do norm <- normalize [tm]
                 let normChecked = checkNonRecursive norm
                 cleaned <- cleanupGraph tm normChecked
                 return cleaned
     transformedBindings = runNormalization env supply bindingsMap
-                            typeTrans peEval eval emptyVarEnv
+                            typeTrans peEval eval emptyVarEnv lock
                             topEntities doNorm
 
 -- | Reverse topologically sort given top entities. Also returns a mapping that

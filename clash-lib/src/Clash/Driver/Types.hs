@@ -402,6 +402,8 @@ data ClashOpts = ClashOpts
   , opt_ignoreBrokenGhcs :: Bool
   -- ^ Don't error if we see a (potentially) broken GHC / platform combination.
   -- See the project's @README.md@ for more information.
+  , opt_concurrentNormalization :: Bool
+  -- ^ Toggle concurrent normalization (usually slower, faster on large designs)
   }
   deriving (Show, Eq, NFData, Generic, Hashable)
 
@@ -439,7 +441,8 @@ defClashOpts
   , opt_timescalePrecision  = Period 100 Fs
   -- XXX: We probe environment variables until we've found a proper solution to
   --      https://github.com/clash-lang/clash-compiler/issues/2762.
-  , opt_ignoreBrokenGhcs    = unsafeLookupEnvBool "CLASH_IGNORE_BROKEN_GHCS" False
+  , opt_ignoreBrokenGhcs        = unsafeLookupEnvBool "CLASH_IGNORE_BROKEN_GHCS" False
+  , opt_concurrentNormalization = False
   }
 
 -- | Synopsys Design Constraint (SDC) information for a component.

@@ -32,6 +32,8 @@ module Clash.Normalize.Transformations.Inline
   , inlineWorkFree
   ) where
 
+import Control.Concurrent.Lifted (myThreadId)
+import qualified Control.Concurrent.MVar.Lifted as MVar
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
 import Control.Monad ((>=>))
@@ -40,6 +42,7 @@ import Control.Monad.Writer (lift,listen)
 import Data.Default (Default(..))
 import Data.Either  (lefts)
 import qualified Data.HashMap.Lazy as HashMap
+import qualified Data.HashMap.Strict as HashMapS
 import qualified Data.List as List
 import qualified Data.Maybe as Maybe
 import qualified Data.Monoid as Monoid (Any(..))
@@ -74,7 +77,7 @@ import Clash.Core.VarEnv
   , eltsVarEnv, emptyVarEnv, extendInScopeSetList, extendVarEnv
   , foldlWithUniqueVarEnv', lookupVarEnv, lookupVarEnvDirectly, mkVarEnv
   , notElemVarSet, unionVarEnv, unionVarEnvWith, unitVarSet)
-import Clash.Debug (trace)
+import Clash.Debug (traceM)
 import Clash.Driver.Types (Binding(..))
 import Clash.Netlist.Util (representableType)
 import Clash.Primitives.Types
@@ -83,7 +86,7 @@ import Clash.Rewrite.Combinators (allR)
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, curFun, customReprs, tcCache, topEntities
   , typeTranslator, inlineConstantLimit, inlineFunctionLimit, inlineLimit
-  , inlineWFCacheLimit, primitives)
+  , inlineWFCacheLimit, primitives, ioLock)
 import Clash.Rewrite.Util
   ( changed, inlineBinders, inlineOrLiftBinders, isJoinPointIn
   , isUntranslatable, isUntranslatableType, isVoidWrapper, zoomExtra)
@@ -121,7 +124,9 @@ bindConstantVar = inlineBinders test
       True -> return (i `notElemFreeVars` e)
       _    -> do
         tcm <- Lens.view tcCache
-        (fn,_) <- Lens.use curFun
+        curFunsV <- Lens.use curFun
+        thread <- myThreadId
+        Just (fn,_) <- MVar.withMVar curFunsV (pure . HashMapS.lookup thread)
         -- Don't inline things that perform work, it increases the circuit size.
         --
         -- Also don't inline globally recursive calls, it prevents the
@@ -399,8 +404,11 @@ simply a variable reference. See issue #779 -}
 -- on functions that might be inlined later. See #3036.
 collapseRHSNoops :: HasCallStack => NormRewrite
 collapseRHSNoops _ letrec@(Let letBind body) = do
-  (curFunId, _) <- Lens.use curFun
-  curBinding <- lookupVarEnv curFunId <$> Lens.use bindings
+  curFunsV <- Lens.use curFun
+  thread <- myThreadId
+  Just (curFunId, _) <- MVar.withMVar curFunsV (pure . HashMapS.lookup thread)
+  bindingsV <- Lens.use bindings
+  curBinding <- MVar.withMVar bindingsV (pure . lookupVarEnv curFunId)
   case curBinding of
     Just binding | isNoInline (bindingSpec binding) -> do
       -- Explicitly match on Let instead of using LetRec, because we need to
@@ -417,32 +425,40 @@ collapseRHSNoops _ letrec@(Let letBind body) = do
     runCollapseNoop orig =
       runMaybeT (collapseNoop orig) >>= Maybe.maybe (return orig) changed
 
-    collapseNoop (iD,term) = do
+    collapseNoop :: (Id, Term) -> MaybeT NormalizeSession (Id, Term)
+    collapseNoop (iD, term) = do
       (Prim info,args) <- return $ collectArgs term
       identity         <- getIdentity info $ lefts args
       collapsed        <- collapseToIdentity iD identity
       return (iD,collapsed)
 
+    collapseToIdentity :: Id -> Term -> MaybeT NormalizeSession Term
     collapseToIdentity iD identity = do
       tcm <- Lens.view tcCache
       let aTy = inferCoreTypeOf tcm identity
           bTy = coreTypeOf iD
       return $ primUCo `TyApp` aTy `TyApp` bTy `App` identity
 
+    getIdentity :: PrimInfo -> [Term] -> MaybeT NormalizeSession Term
     getIdentity primInfo termArgs = do
       WorkIdentity idIdx noopIdxs <- return $ primWorkInfo primInfo
       mapM_ (getTermArg termArgs >=> isNoop >=> Monad.guard) noopIdxs
       getTermArg termArgs idIdx
 
+    getTermArg :: [Term] -> Int -> MaybeT NormalizeSession Term
     getTermArg args i = do
       Monad.guard $ i <= length args - 1
       return $ args !! i
 
+    isNoop :: Term -> MaybeT NormalizeSession Bool
     isNoop (Var i) = do
-      binding     <- MaybeT $ lookupVarEnv i <$> Lens.use bindings
-      isRecursive <- lift $ isRecursiveBndr $ bindingId binding
+      bindingsV <- Lens.use bindings
+      binding <- MVar.withMVar bindingsV (MaybeT . pure . lookupVarEnv i)
+      isRecursive <- lift $ isRecursiveBndr (bindingId binding)
+
       Monad.guard $ not isRecursive
       isNoop $ bindingTerm binding
+
     isNoop (Prim PrimInfo{primWorkInfo=WorkIdentity _ []}) = return True
     isNoop (Lam x e) = isNoopApp x (collectArgs e)
     isNoop _ = return False
@@ -522,7 +538,9 @@ inlineNonRepWorker e@(Case scrut altsTy alts)
   | (Var f, args,ticks) <- collectArgsTicks scrut
   , isGlobalId f
   = do
-    (cf,_)    <- Lens.use curFun
+    curFunsV <- Lens.use curFun
+    thread <- myThreadId
+    Just (cf,_) <- MVar.withMVar curFunsV (pure . HashMapS.lookup thread)
     isInlined <- zoomExtra (alreadyInlined f cf)
     limit     <- Lens.view inlineLimit
     tcm       <- Lens.view tcCache
@@ -535,7 +553,8 @@ inlineNonRepWorker e@(Case scrut altsTy alts)
       overLimit = notClassTy && (Maybe.fromMaybe 0 isInlined) > limit
 
 
-    bodyMaybe   <- lookupVarEnv f <$> Lens.use bindings
+    bindingsV <- Lens.use bindings
+    bodyMaybe <- MVar.withMVar bindingsV (pure . lookupVarEnv f)
     nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator
                                               <*> Lens.view customReprs
                                               <*> pure False
@@ -543,19 +562,24 @@ inlineNonRepWorker e@(Case scrut altsTy alts)
                                               <*> pure scrutTy)
     case (nonRepScrut, bodyMaybe) of
       (True, Just b) -> do
-        if overLimit then
-          trace ($(curLoc) ++ [I.i|
-            InlineNonRep: #{showPpr (varName f)} already inlined
-            #{limit} times in: #{showPpr (varName cf)}. The type of the subject
-            is:
+        if overLimit then do
+          ioLockV <- Lens.use ioLock
 
-              #{showPpr' def{displayTypes=True\} scrutTy}
+          MVar.withMVar ioLockV $ \() ->
+            traceM ($(curLoc) ++ [I.i|
+              InlineNonRep: #{showPpr (varName f)} already inlined
+              #{limit} times in: #{showPpr (varName cf)}. The type of the subject
+              is:
 
-            Function #{showPpr (varName cf)} will not reach a normal form and
-            compilation might fail.
+                #{showPpr' def{displayTypes=True\} scrutTy}
 
-            Run with '-fclash-inline-limit=N' to increase the inline limit to N.
-          |]) (return e)
+              Function #{showPpr (varName cf)} will not reach a normal form and
+              compilation might fail.
+
+              Run with '-fclash-inline-limit=N' to increase the inline limit to N.
+             |])
+
+          return e
         else do
           Monad.when notClassTy (zoomExtra (addNewInline f cf))
 
@@ -620,9 +644,11 @@ inlineSmall _ e@(collectArgsTicks -> (Var f,args,ticks)) = do
   if untranslatable || f `elemVarSet` topEnts || lv
     then return e
     else do
-      bndrs <- Lens.use bindings
       sizeLimit <- Lens.view inlineFunctionLimit
-      case lookupVarEnv f bndrs of
+      bndrsV <- Lens.use bindings
+      mBind <- MVar.withMVar bndrsV (pure . lookupVarEnv f)
+
+      case mBind of
         -- Don't inline recursive expressions
         Just b -> do
           isRecBndr <- isRecursiveBndr f
@@ -655,8 +681,9 @@ inlineWorkFree _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
     if untranslatable || isSignal || argsHaveWork || lv || isTopEnt
       then return e
       else do
-        bndrs <- Lens.use bindings
-        case lookupVarEnv f bndrs of
+        bndrsV <- Lens.use bindings
+        bndr <- MVar.withMVar bndrsV (pure . lookupVarEnv f)
+        case bndr of
           -- Don't inline recursive expressions
           Just b -> do
             isRecBndr <- isRecursiveBndr f
@@ -688,8 +715,9 @@ inlineWorkFree _ e@(Var f) = do
   let gv = isGlobalId f
   if closed && f `notElemVarSet` topEnts && not untranslatable && not isSignal && gv
     then do
-      bndrs <- Lens.use bindings
-      case lookupVarEnv f bndrs of
+      bndrsV <- Lens.use bindings
+      bndr <- MVar.withMVar bndrsV (pure . lookupVarEnv f)
+      case bndr of
         -- Don't inline recursive expressions
         Just top -> do
           isRecBndr <- isRecursiveBndr f
@@ -706,7 +734,7 @@ inlineWorkFree _ e@(Var f) = do
                 b <- normalizeTopLvlBndr False f top
                 changed (bindingTerm b)
         _ -> return e
-    else return e
+  else return e
 
 inlineWorkFree _ e = return e
 {-# SCC inlineWorkFree #-}

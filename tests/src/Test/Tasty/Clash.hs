@@ -293,6 +293,11 @@ instance IsTest ClashBinaryTest where
       , "-o", oDir </> "out"
       , "-i" <> cbSourceDirectory
       , "-outputdir", oDir
+      -- We want to test concurrent normalization, but Tasty already spawns a bunch
+      -- of threads. We therefore only make normalization run with 2, to prevent
+      -- massive oversubscription.
+      , "-fclash-concurrent-normalization"
+      , "+RTS", "-N2", "-RTS"
       ] <> commonArgs
         <> cbExtraBuildArgs
         <> [cbSourceDirectory </> cbModName <.> "hs"]

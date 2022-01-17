@@ -272,6 +272,11 @@ Clash Compiler Flags
 
 .. _`Edalize`: https://github.com/olofk/edalize
 
+-fclash-concurrent-normaliztation
+  Toggle concurrent normalization. Faster for large designs.
+
+  **Default:** False
+
 -main-is
   When using one of ``--vhdl``, ``--verilog``, or ``--systemverilog``, this
   flag refers to synthesis target. For example, running Clash with

@@ -37,10 +37,8 @@ module Clash.Normalize.Transformations.DEC
   ( disjointExpressionConsolidation
   ) where
 
-#if !MIN_VERSION_base(4,18,0)
-import Control.Applicative (liftA2)
-#endif
-import Control.Lens ((^.), _1)
+import qualified Control.Concurrent.MVar.Lifted as MVar
+import           Control.Lens ((^.), _1)
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
 import Data.Bifunctor (first, second)
@@ -334,13 +332,19 @@ collectGlobals is0 substitution seen (Case scrut ty alts) = do
 collectGlobals is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), ticks))
   | not (isConstant e) = do
     tcm <- Lens.view tcCache
-    bndrs <- Lens.use bindings
+    bndrsV <- Lens.use bindings
     evaluate <- Lens.view evaluator
     ids <- Lens.use uniqSupply
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
-    gh <- Lens.use globalHeap
-    let eval = (Lens.view Lens._3) . whnf' evaluate bndrs mempty tcm gh ids1 is0 False
+
+    ghV <- Lens.use globalHeap
+
+    eval <-
+      MVar.withMVar bndrsV $ \bndrs ->
+        MVar.withMVar ghV $ \gh ->
+          pure $ (Lens.view Lens._3) . whnf' evaluate bndrs mempty tcm gh ids1 is0 False
+
     let eTy  = inferCoreTypeOf tcm e
     untran <- isUntranslatableType False eTy
     case untran of

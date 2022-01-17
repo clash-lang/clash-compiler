@@ -23,6 +23,8 @@ module Clash.Normalize.Transformations.Letrec
   , topLet
   ) where
 
+import Control.Concurrent.Lifted (myThreadId)
+import qualified Control.Concurrent.MVar.Lifted as MVar
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
 import Control.Monad.Trans.Except (runExcept)
@@ -30,6 +32,7 @@ import Control.Monad.Writer (listen)
 import Data.Bifunctor (second)
 import qualified Data.Either as Either
 import qualified Data.HashMap.Lazy as HashMap
+import qualified Data.HashMap.Strict as HashMapS
 import Data.List ((\\))
 import qualified Data.List as List
 import qualified Data.List.Extra as List
@@ -196,11 +199,15 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
                    emptyVarEnv (`unitVarEnv` (1 :: Int))
                    body
   (is2,binds1) <- second concat <$> List.mapAccumLM go is1 binds
-  bndrs <- Lens.use bindings
+
   e1WorkFree <-
     case binds1 of
-      [(_,e1)] -> isWorkFree workFreeBinders bndrs e1
+      [(_,e1)] -> do
+        bndrsV <- Lens.use bindings
+        MVar.withMVar bndrsV (\bndrs ->isWorkFree workFreeBinders bndrs e1)
+
       _ -> pure (error "flattenLet: unreachable")
+
   case binds1 of
     -- inline binders into the body when there's only a single binder, and only
     -- if that binder doesn't perform any work or is only used once in the body
@@ -209,7 +216,7 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
          -- Except when the binder is recursive!
          then return (Letrec binds1 body)
          else let subst = extendIdSubst (mkSubst is2) id1 e1
-              in changed (substTm "flattenLet" subst body)
+               in changed (substTm "flattenLet" subst body)
     _ -> return (Letrec binds1 body)
   where
     go :: InScopeSet -> LetBinding -> NormalizeSession (InScopeSet,[LetBinding])
@@ -236,11 +243,15 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
                        emptyVarEnv (`unitVarEnv` (1 :: Int))
                        body2
           (srcTicks,nmTicks) = partitionTicks ticks
-      bndrs <- Lens.use bindings
+
       e2WorkFree <-
         case binds2 of
-          [(_,e2)] -> isWorkFree workFreeBinders bndrs e2
+          [(_,e2)] -> do
+            bndrsV <- Lens.use bindings
+            MVar.withMVar bndrsV (\bndrs ->isWorkFree workFreeBinders bndrs e2)
+
           _ -> pure (error "flattenLet: unreachable")
+
       -- Distribute the name ticks of the let-expression over all the bindings
       (isN1,) . map (second (`mkTicks` nmTicks)) <$> case binds2 of
         -- inline binders into the body when there's only a single binder, and
@@ -269,7 +280,9 @@ flattenLet _ e = return e
 -- found in the body of the top-level let-expression.
 recToLetRec :: HasCallStack => NormRewrite
 recToLetRec (TransformContext is0 []) e = do
-  (fn,_) <- Lens.use curFun
+  curFunsV <- Lens.use curFun
+  thread <- myThreadId
+  Just (fn,_) <- MVar.withMVar curFunsV (pure . HashMapS.lookup thread)
   tcm    <- Lens.view tcCache
   case splitNormalized tcm e of
     Right (args,bndrs,res) -> do
