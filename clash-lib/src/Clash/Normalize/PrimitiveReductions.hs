@@ -1,7 +1,7 @@
 {-|
   Copyright  :  (C) 2015-2016, University of Twente,
                     2016     , Myrtle Software Ltd,
-                    2021     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -428,7 +428,6 @@ reduceIterateI (TransformContext is0 ctx) n aTy vTy f0 a = do
   tcm <- Lens.view tcCache
   f1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) f0
 
-  -- Generate uniq ids for element assignments.
   uniqs0 <- Lens.use uniqSupply
   let
     is1 = extendInScopeSetList is0 (collectTermIds f1)
@@ -919,28 +918,29 @@ reduceUnconcat inScope unconcatPrimInfo n m aTy sm arg = do
             (uniqs1,(vars,headsAndTails)) =
               second (second concat . unzip)
                      (extractElems uniqs0 inScope consCon aTy 'U' (n*m) arg)
+
             -- Build a vector out of the first m elements
-            mvec = mkVec nilCon consCon aTy m (take (fromInteger m) vars)
-            -- Get the vector representing the next ((n-1)*m) elements
-            -- N.B. `extractElems (xs :: Vec 2 a)` creates:
-            -- x0  = head xs
-            -- xs0 = tail xs
-            -- x1  = head xs0
-            -- xs1 = tail xs0
-            (lbs,head -> nextVec) = splitAt ((2*fromInteger m)-1) headsAndTails
-            -- recursively call unconcat
-            nextUnconcat = mkApps (Prim unconcatPrimInfo)
-                                  [ Right (LitTy (NumTy (n-1)))
-                                  , Right (LitTy (NumTy m))
-                                  , Right aTy
-                                  , Left (Literal (NaturalLiteral (n-1)))
-                                  , Left sm
-                                  , Left (snd nextVec)
-                                  ]
-            -- let (mvec,nextVec) = splitAt sm arg
-            -- in Cons mvec (unconcat sm nextVec)
-            lBody = mkVecCons consCon innerVecTy n mvec nextUnconcat
-            lb = Letrec lbs lBody
+          let mvec = mkVec nilCon consCon aTy m (take (fromInteger m) vars)
+              -- Get the vector representing the next ((n-1)*m) elements
+              -- N.B. `extractElems (xs :: Vec 2 a)` creates:
+              -- x0  = head xs
+              -- xs0 = tail xs
+              -- x1  = head xs0
+              -- xs1 = tail xs0
+              (lbs,head -> nextVec) = splitAt ((2*fromInteger m)-1) headsAndTails
+              -- recursively call unconcat
+              nextUnconcat = mkApps (Prim unconcatPrimInfo)
+                                    [ Right (LitTy (NumTy (n-1)))
+                                    , Right (LitTy (NumTy m))
+                                    , Right aTy
+                                    , Left (Literal (NaturalLiteral (n-1)))
+                                    , Left sm
+                                    , Left (snd nextVec)
+                                    ]
+              -- let (mvec,nextVec) = splitAt sm arg
+              -- in Cons mvec (unconcat sm nextVec)
+              lBody = mkVecCons consCon innerVecTy n mvec nextUnconcat
+              lb = Letrec lbs lBody
 
           uniqSupply Lens..= uniqs1
           changed lb
@@ -1078,7 +1078,6 @@ reduceReplace_int is0 n aTy vTy v i newA = do
           (Just iTc)            = lookupUniqMap iTcNm tcm
           [iDc]                 = tyConDataCons iTc
 
-      -- Get elements from vector
           (uniqs1,(vars,elems)) = second (second concat . unzip)
                                 $ extractElems
                                     uniqs0

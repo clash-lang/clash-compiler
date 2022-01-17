@@ -392,6 +392,8 @@ data ClashOpts = ClashOpts
   , opt_renderEnums :: Bool
   -- ^ Render sum types with all zero-width fields as enums where supported, as
   -- opposed to rendering them as bitvectors.
+  , opt_concurrentNormalization :: Bool
+  -- ^ Toggle concurrent normalization (usually slower, faster on large designs)
   }
   deriving (Show)
 
@@ -424,6 +426,7 @@ instance NFData ClashOpts where
     opt_inlineWFCacheLimit o `deepseq`
     opt_edalize o `deepseq`
     opt_renderEnums o `deepseq`
+    opt_concurrentNormalization o `deepseq`
     ()
 
 instance Eq ClashOpts where
@@ -454,7 +457,8 @@ instance Eq ClashOpts where
     opt_aggressiveXOptBB s0 == opt_aggressiveXOptBB s1 &&
     opt_inlineWFCacheLimit s0 == opt_inlineWFCacheLimit s1 &&
     opt_edalize s0 == opt_edalize s1 &&
-    opt_renderEnums s0 == opt_renderEnums s1
+    opt_renderEnums s0 == opt_renderEnums s1 &&
+    opt_concurrentNormalization s0 == opt_concurrentNormalization s1
 
    where
     eqOverridingBool :: OverridingBool -> OverridingBool -> Bool
@@ -492,7 +496,8 @@ instance Hashable ClashOpts where
     opt_aggressiveXOptBB `hashWithSalt`
     opt_inlineWFCacheLimit `hashWithSalt`
     opt_edalize `hashWithSalt`
-    opt_renderEnums
+    opt_renderEnums `hashWithSalt`
+    opt_concurrentNormalization
    where
     hashOverridingBool :: Int -> OverridingBool -> Int
     hashOverridingBool s1 Auto = hashWithSalt s1 (0 :: Int)
@@ -501,36 +506,36 @@ instance Hashable ClashOpts where
     infixl 0 `hashOverridingBool`
 
 defClashOpts :: ClashOpts
-defClashOpts
-  = ClashOpts
-  { opt_werror              = False
-  , opt_inlineLimit         = 20
-  , opt_specLimit           = 20
-  , opt_inlineFunctionLimit = 15
-  , opt_inlineConstantLimit = 0
-  , opt_evaluatorFuelLimit  = 20
-  , opt_debug               = debugNone
-  , opt_cachehdl            = True
-  , opt_clear               = False
-  , opt_primWarn            = True
-  , opt_color               = Auto
-  , opt_intWidth            = WORD_SIZE_IN_BITS
-  , opt_hdlDir              = Nothing
-  , opt_hdlSyn              = Other
-  , opt_errorExtra          = False
-  , opt_importPaths         = []
-  , opt_componentPrefix     = Nothing
-  , opt_newInlineStrat      = True
-  , opt_escapedIds          = True
-  , opt_lowerCaseBasicIds   = PreserveCase
-  , opt_ultra               = False
-  , opt_forceUndefined      = Nothing
-  , opt_checkIDir           = True
-  , opt_aggressiveXOpt      = False
-  , opt_aggressiveXOptBB    = False
-  , opt_inlineWFCacheLimit  = 10 -- TODO: find "optimal" value
-  , opt_edalize             = False
-  , opt_renderEnums         = True
+defClashOpts = ClashOpts
+  { opt_werror                  = False
+  , opt_inlineLimit             = 20
+  , opt_specLimit               = 20
+  , opt_inlineFunctionLimit     = 15
+  , opt_inlineConstantLimit     = 0
+  , opt_evaluatorFuelLimit      = 20
+  , opt_debug                   = debugNone
+  , opt_cachehdl                = True
+  , opt_clear                   = False
+  , opt_primWarn                = True
+  , opt_color                   = Auto
+  , opt_intWidth                = WORD_SIZE_IN_BITS
+  , opt_hdlDir                  = Nothing
+  , opt_hdlSyn                  = Other
+  , opt_errorExtra              = False
+  , opt_importPaths             = []
+  , opt_componentPrefix         = Nothing
+  , opt_newInlineStrat          = True
+  , opt_escapedIds              = True
+  , opt_lowerCaseBasicIds       = PreserveCase
+  , opt_ultra                   = False
+  , opt_forceUndefined          = Nothing
+  , opt_checkIDir               = True
+  , opt_aggressiveXOpt          = False
+  , opt_aggressiveXOptBB        = False
+  , opt_inlineWFCacheLimit      = 10 -- TODO: find "optimal" value
+  , opt_edalize                 = False
+  , opt_renderEnums             = True
+  , opt_concurrentNormalization = False
   }
 
 -- | Synopsys Design Constraint (SDC) information for a component.

@@ -27,6 +27,16 @@
       "cabal_debian_options": ["--disable-tests"]
     },
     {
+      "name": "atomic-primops",
+      "src": {"type": "hackage", "version": "0.8.4"},
+      "cabal_debian_options": ["--disable-tests"]
+    },
+    {
+      "name": "lockfree-queue",
+      "src": {"type": "hackage", "version": "0.2.3.1"},
+      "cabal_debian_options": ["--disable-tests"]
+    },
+    {
       "name": "ghc-tcplugins-extra",
       "src": {"type": "hackage"}
     },

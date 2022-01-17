@@ -10,26 +10,34 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Normalize where
 
-import           Control.Concurrent.Supply        (Supply)
+import qualified Control.Concurrent.Async.Lifted as Async
+import           Control.Concurrent.MVar.Lifted (MVar)
+import qualified Control.Concurrent.MVar.Lifted as MVar
+import           Control.Concurrent.Supply        (Supply, splitSupply)
 import           Control.Exception                (throw)
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    (when)
+import qualified Control.Monad.IO.Class as Monad  (liftIO)
 import           Control.Monad.State.Strict       (State)
+import           Data.Bifunctor                   (second)
 import           Data.Default                     (def)
 import           Data.Either                      (lefts,partitionEithers)
-import qualified Data.IntMap                      as IntMap
+import           Data.Foldable                    (traverse_)
+import qualified Data.HashMap.Strict              as HashMap
 import           Data.List
   (intersect, mapAccumL)
 import qualified Data.Map                         as Map
 import qualified Data.Maybe                       as Maybe
 import qualified Data.Set                         as Set
 import qualified Data.Set.Lens                    as Lens
+import qualified Data.Concurrent.Queue.MichaelScott as MS
 
 #if MIN_VERSION_prettyprinter(1,7,0)
 import           Prettyprinter                    (vcat)
@@ -61,9 +69,10 @@ import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type                  (isPolyTy)
 import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
-  (VarEnv, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
-   extendVarEnv, lookupVarEnv, mapVarEnv, mapMaybeVarEnv,
-   mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
+  (VarEnv, VarSet, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv, emptyVarSet,
+   extendVarEnv, extendVarSet, lookupVarEnv, mapMaybeVarEnv,
+   mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv,
+   listToVarEnv, toListVarEnv)
 import           Clash.Debug                      (traceIf)
 import           Clash.Driver.Types
   (BindingMap, Binding(..), DebugOpts(..), ClashEnv(..))
@@ -77,8 +86,8 @@ import           Clash.Normalize.Types
 import           Clash.Normalize.Util
 import           Clash.Rewrite.Combinators        ((>->),(!->),repeatR,topdownR)
 import           Clash.Rewrite.Types
-  (RewriteEnv (..), RewriteState (..), bindings, debugOpts, extra,
-   tcCache, topEntities, newInlineStrategy)
+  (RewriteEnv (..), RewriteState (..), bindings, debugOpts, extra, uniqSupply,
+   tcCache, topEntities, newInlineStrategy, ioLock)
 import           Clash.Rewrite.Util
   (apply, isUntranslatableType, runRewriteSession)
 import           Clash.Util
@@ -88,9 +97,7 @@ import           Data.Binary                      (encode)
 import qualified Data.ByteString                  as BS
 import qualified Data.ByteString.Lazy             as BL
 
-import           System.IO.Unsafe                 (unsafePerformIO)
 import           Clash.Rewrite.Types (RewriteStep(..))
-
 
 -- | Run a NormalizeSession in a given environment
 runNormalization
@@ -108,53 +115,85 @@ runNormalization
   -- ^ Hardcoded evaluator for WHNF (old evaluator)
   -> VarEnv Bool
   -- ^ Map telling whether a components is part of a recursive group
+  -> MVar ()
+  -- ^ Synchronization on stdout
   -> [Id]
   -- ^ topEntities
   -> NormalizeSession a
   -- ^ NormalizeSession to run
   -> IO a
-runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
-  runRewriteSession rwEnv rwState
-  where
-    -- TODO The RewriteEnv should just take ClashOpts.
-    rwEnv     = RewriteEnv
-                  env
-                  typeTrans
-                  peEval
-                  eval
-                  (mkVarSet topEnts)
+runNormalization env supply globals typeTrans peEval eval rcsMap lock entities session = do
+  normState <- NormalizeState
+    <$> MVar.newMVar emptyVarEnv
+    <*> MVar.newMVar Map.empty
+    <*> MVar.newMVar emptyVarEnv
+    <*> MVar.newMVar emptyVarEnv
+    <*> MVar.newMVar Map.empty
+    <*> MVar.newMVar rcsMap
 
-    rwState   = RewriteState
-                  0
-                  mempty       -- transformCounters Map
-                  globals
-                  supply
-                  (error $ $(curLoc) ++ "Report as bug: no curFun",noSrcSpan)
-                  0
-                  (IntMap.empty, 0)
-                  emptyVarEnv
-                  normState
+  rwState <- RewriteState
+    <$> MVar.newMVar mempty
+    <*> MVar.newMVar globals
+    <*> pure supply
+    <*> MVar.newMVar HashMap.empty
+    <*> MVar.newMVar 0
+    <*> MVar.newMVar (mempty, 0)
+    <*> MVar.newMVar emptyVarEnv
+    <*> pure lock
+    <*> pure normState
 
-    normState = NormalizeState
-                  emptyVarEnv
-                  Map.empty
-                  emptyVarEnv
-                  emptyVarEnv
-                  Map.empty
-                  rcsMap
+  runRewriteSession rwEnv rwState session
+ where
+  rwEnv = RewriteEnv
+    { _clashEnv = env
+    , _typeTranslator = typeTrans
+    , _peEvaluator = peEval
+    , _evaluator = eval
+    , _topEntities = mkVarSet entities
+    }
 
-normalize
-  :: [Id]
-  -> NormalizeSession BindingMap
-normalize []  = return emptyVarEnv
-normalize top = do
-  (new,topNormalized) <- unzip <$> mapM normalize' top
-  newNormalized <- normalize (concat new)
-  return (unionVarEnv (mkVarEnv topNormalized) newNormalized)
+supplies :: Int -> Supply -> [Supply]
+supplies 0 _ = []
+supplies n s = let (s0', s1') = splitSupply s in s0' : supplies (n-1) s1'
 
-normalize' :: Id -> NormalizeSession ([Id], (Id, Binding Term))
-normalize' nm = do
-  exprM <- lookupVarEnv nm <$> Lens.use bindings
+normalize :: [Id] -> NormalizeSession BindingMap
+normalize tops = do
+  q <- Monad.liftIO MS.newQ
+  traverse_ (Monad.liftIO . MS.pushL q) tops
+  binds <- MVar.newMVar (emptyVarSet, [])
+  uniq0 <- Lens.use uniqSupply
+  let ss = supplies (length tops) uniq0
+  -- one thread per top-level binding
+  Async.mapConcurrently_ (normalizeStep q binds) ss
+  mkVarEnv . snd <$> MVar.readMVar binds
+
+normalizeStep
+    :: MS.LinkedQueue Id
+    -> MVar (VarSet, [(Id, Binding Term)])
+    -> Supply
+    -> NormalizeSession ()
+normalizeStep q binds s = do
+  uniqSupply Lens..= s
+  res <- Monad.liftIO $ MS.tryPopR q
+  case res of
+      Just id' -> do
+        (bound, pairs) <- MVar.takeMVar binds
+        if not (id' `elemVarSet` bound)
+          then do
+            -- mark that we are attempting to normalize id'
+            MVar.putMVar binds (bound `extendVarSet` id', pairs)
+            pair <- normalize' id' q
+            MVar.modifyMVar_ binds (pure . second (pair:))
+          else
+            MVar.putMVar binds (bound, pairs)
+        nextS <- Lens.use uniqSupply
+        normalizeStep q binds nextS
+      Nothing  -> pure ()
+
+normalize' :: Id -> MS.LinkedQueue Id -> NormalizeSession (Id, Binding Term)
+normalize' nm q = do
+  bndrsV <- Lens.use bindings
+  exprM <- MVar.withMVar bndrsV (pure . lookupVarEnv nm)
   let nmS = showPpr (varName nm)
   case exprM of
     Just (Binding nm' sp inl pr tm r) -> do
@@ -192,10 +231,18 @@ normalize' nm = do
                             , ") remains recursive after normalization:\n"
                             , showPpr (bindingTerm tmNorm) ])
                     (return ())
-            prevNorm <- mapVarEnv bindingId <$> Lens.use (extra.normalized)
-            let toNormalize = filter (`notElemVarSet` topEnts)
-                            $ filter (`notElemVarEnv` (extendVarEnv nm nm prevNorm)) usedBndrs
-            return (toNormalize,(nm,tmNorm))
+
+            normV <- Lens.use (extra.normalized)
+
+            toNormalize <-
+              MVar.withMVar normV $ \norm -> do
+                prevNorm <- listToVarEnv <$> traverse (\(k, v) -> (k,) . bindingId <$> MVar.readMVar v) (toListVarEnv norm)
+                let toNormalize = filter (`notElemVarSet` topEnts)
+                                $ filter (`notElemVarEnv` extendVarEnv nm nm prevNorm) usedBndrs
+                  in pure toNormalize
+
+            traverse_ (Monad.liftIO . MS.pushL q) toNormalize
+            pure (nm, tmNorm)
          else
            do
             -- Throw an error for unrepresentable topEntities and functions
@@ -217,7 +264,7 @@ normalize' nm = do
                             , showPpr (coreTypeOf nm')
                             , ") has a non-representable return type."
                             , " Not normalising:\n", showPpr tm] )
-                    (return ([],(nm,(Binding nm' sp inl pr tm r))))
+                    (return (nm,(Binding nm' sp inl pr tm r)))
 
 
     Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " not found"
@@ -349,18 +396,22 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
       -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
       opts <- Lens.view debugOpts
       let rewriteHistFile = dbg_historyFile opts
-      when (Maybe.isJust rewriteHistFile) $
-        let !_ = unsafePerformIO
-             $ BS.appendFile (Maybe.fromJust rewriteHistFile)
-             $ BL.toStrict
-             $ encode RewriteStep
-                 { t_ctx    = []
-                 , t_name   = "INLINE"
-                 , t_bndrS  = showPpr (varName nm')
-                 , t_before = tm
-                 , t_after  = tm1
-                 }
-        in pure ()
+
+      when (Maybe.isJust rewriteHistFile) $ do
+        lock <- Lens.use ioLock
+
+        MVar.withMVar lock $ \() ->
+          Monad.liftIO
+            . BS.appendFile (Maybe.fromJust rewriteHistFile)
+            . BL.toStrict
+            $ encode RewriteStep
+                { t_ctx    = []
+                , t_name   = "INLINE"
+                , t_bndrS  = showPpr (varName nm')
+                , t_before = tm
+                , t_after  = tm1
+                }
+
       rewriteExpr ("flattenExpr",flatten) (showPpr nm, tm1) (nm', sp)
   let allUsed = newUsed ++ concat il_used
   -- inline all components when the resulting expression after flattening

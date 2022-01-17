@@ -15,6 +15,7 @@ import           Clash.Netlist.Types          (TopEntityT(topId))
 
 import           Criterion.Main
 
+import qualified Control.Concurrent.MVar      as MVar
 import qualified Control.Concurrent.Supply    as Supply
 import           Control.DeepSeq              (NFData(..), rwhnf)
 import           Data.List                    (isPrefixOf, partition)
@@ -42,7 +43,7 @@ main = do
 benchFile :: [FilePath] -> FilePath -> Benchmark
 benchFile idirs src =
   env (setupEnv idirs src) $
-    \ ~(clashEnv, clashDesign, supplyN) -> do
+    \ ~(clashEnv, clashDesign, supplyN, lock) -> do
       bench ("normalization of " ++ src)
             (nfIO
               (normalizeEntity
@@ -51,6 +52,7 @@ benchFile idirs src =
                  (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
                  ghcEvaluator
                  evaluator
+                 lock
                  (fmap topId (designEntities clashDesign))
                  supplyN
                  (topId (head (designEntities clashDesign)))))
@@ -58,11 +60,12 @@ benchFile idirs src =
 setupEnv
   :: [FilePath]
   -> FilePath
-  -> IO (ClashEnv, ClashDesign, Supply.Supply)
+  -> IO (ClashEnv, ClashDesign, Supply.Supply, MVar.MVar ())
 setupEnv idirs src = do
   (clashEnv, clashDesign) <- runInputStage idirs src
   supplyN <- Supply.newSupply
-  return (clashEnv, clashDesign ,supplyN)
+  lock <- MVar.newMVar ()
+  return (clashEnv, clashDesign ,supplyN, lock)
 
 instance NFData Supply.Supply where
   rnf = rwhnf
