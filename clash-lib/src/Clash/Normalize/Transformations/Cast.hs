@@ -9,9 +9,13 @@ module Clash.Normalize.Transformations.Cast
   , splitCastWork
   ) where
 
+import Control.Concurrent.Lifted (myThreadId)
+import qualified Control.Concurrent.MVar.Lifted as MVar
 import Control.Exception (throw)
 import qualified Control.Lens as Lens
+import qualified Control.Monad as Monad (when)
 import Control.Monad.Writer (listen)
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Monoid as Monoid (Any(..))
 import GHC.Stack (HasCallStack)
 
@@ -22,11 +26,11 @@ import Clash.Core.TermInfo (isCast)
 import Clash.Core.Type (normalizeType)
 import Clash.Core.Var (isGlobalId, varName)
 import Clash.Core.VarEnv (InScopeSet)
-import Clash.Debug (trace)
+import Clash.Debug (traceM)
 import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Types
-  (TransformContext(..), bindings, curFun, tcCache, workFreeBinders)
+  (TransformContext(..), bindings, curFun, tcCache, workFreeBinders, ioLock)
 import Clash.Rewrite.Util (changed, mkDerivedName, mkTmBinderFor)
 import Clash.Rewrite.WorkFree (isWorkFree)
 import Clash.Util (ClashException(..), curLoc)
@@ -58,18 +62,23 @@ argCastSpec ctx e@(App f (stripTicks -> Cast e' _ _))
  -- We can only push casts into global binders
  , (Var g, _) <- collectArgs f
  , isGlobalId g = do
-  bndrs <- Lens.use bindings
-  isWorkFree workFreeBinders bndrs e' >>= \case
-    True -> go
-    False -> warn go
+  bndrsV <- Lens.use bindings
+  wf <- MVar.withMVar bndrsV (\bndrs -> isWorkFree workFreeBinders bndrs e')
+
+  ioLockV <- Lens.use ioLock
+
+  Monad.when (not wf) $
+    MVar.withMVar ioLockV $ \() -> traceM warn
+
+  specialize ctx e
  where
-  go = specialize ctx e
-  warn = trace (unwords
+  warn = unwords
     [ "WARNING:", $(curLoc), "specializing a function on a non work-free"
     , "cast. Generated HDL implementation might contain duplicate work."
     , "Please report this as a bug.", "\n\nExpression where this occured:"
     , "\n\n" ++ showPpr e
-    ])
+    ]
+
 argCastSpec _ e = return e
 {-# SCC argCastSpec #-}
 
@@ -96,7 +105,9 @@ elimCastCast _ c@(Cast (stripTicks -> Cast e tyA tyB) tyB' tyC) = do
   if ntyB == ntyB' && ntyA == ntyC then changed e
                                    else throwError
   where throwError = do
-          (nm,sp) <- Lens.use curFun
+          curFunsV <- Lens.use curFun
+          thread <- myThreadId
+          Just (nm,sp) <- MVar.withMVar curFunsV (pure . HashMap.lookup thread)
           throw (ClashException sp ($(curLoc) ++ showPpr nm
                   ++ ": Found 2 nested casts whose types don't line up:\n"
                   ++ showPpr c)

@@ -77,7 +77,7 @@ executable clash
 executable clashi
   Main-Is:            src-ghc/Interactive.hs
   Build-Depends:      base, clash-ghc
-  GHC-Options:        -Wall -Wcompat -rtsopts -with-rtsopts=-A128m
+  GHC-Options:        -Wall -Wcompat -threaded -rtsopts -with-rtsopts=-A128m
   if flag(dynamic)
     GHC-Options: -dynamic
   extra-libraries:    pthread

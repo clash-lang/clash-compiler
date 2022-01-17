@@ -15,6 +15,7 @@ import Clash.GHC.Evaluator
 import Clash.GHC.GenerateBindings
 import Clash.GHC.NetlistTypes
 
+import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Concurrent.Supply as Supply
 
 defaultTests :: [FilePath]
@@ -57,6 +58,7 @@ runNormalisationStage
   -> IO (ClashEnv, ClashDesign, Id)
 runNormalisationStage idirs src = do
   supplyN <- Supply.newSupply
+  lock <- MVar.newMVar ()
   (env, design) <- runInputStage idirs src
   let topEntityNames = fmap topId (designEntities design)
   let topEntity = head topEntityNames
@@ -65,5 +67,6 @@ runNormalisationStage idirs src = do
           (ghcTypeToHWType (opt_intWidth (opts idirs)))
           ghcEvaluator
           evaluator
+          lock
           topEntityNames supplyN topEntity
   return (env, design{designBindings=transformedBindings},topEntity)

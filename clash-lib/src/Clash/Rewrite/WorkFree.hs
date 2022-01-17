@@ -1,5 +1,5 @@
 {-|
-Copyright   : (C) 2020-2021, QBayLogic B.V.
+Copyright   : (C) 2020-2022, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qaylogic.com>
 
@@ -8,21 +8,25 @@ evaluation to check whether it is possible to perform changes without
 duplicating work in the result, e.g. inlining.
 -}
 
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Rewrite.WorkFree
   ( isWorkFree
+  , isWorkFreePure
   , isWorkFreeClockOrResetOrEnable
   , isWorkFreeIsh
   , isConstant
   , isConstantNotClockReset
   ) where
 
-import Control.Lens (Lens')
-import Control.Monad.Extra (allM, andM, eitherM)
+import Control.Concurrent.MVar (MVar)
+import qualified Control.Concurrent.MVar.Lifted as MVar
+import Control.Lens as Lens (Lens', use)
 import Control.Monad.State.Class (MonadState)
+import Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Data.Text.Extra as Text
 import GHC.Stack (HasCallStack)
 
@@ -35,41 +39,59 @@ import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (isPolyFunTy)
 import Clash.Core.Util
 import Clash.Core.Var (Id, isLocalId)
-import Clash.Core.VarEnv (VarEnv, lookupVarEnv)
+import Clash.Core.VarEnv (VarEnv, extendVarEnv, lookupVarEnv, unionVarEnv)
 import Clash.Driver.Types (BindingMap, Binding(..))
 import Clash.Normalize.Primitives (removedArg)
-import Clash.Util (makeCachedU)
+
+-- TODO I think isWorkFree only needs to exist within the rewriting monad, and
+-- this extra polymorphism is probably unnecessary. Needs checking. -- Alex
+
+{-# INLINABLE isWorkFree #-}
+isWorkFree
+  :: (HasCallStack, MonadState s m, MonadBaseControl IO m)
+  => Lens' s (MVar (VarEnv Bool))
+  -> BindingMap
+  -> Term
+  -> m Bool
+isWorkFree cacheL bndrs bndr = do
+  lock <- Lens.use cacheL
+  MVar.modifyMVar lock (\cache -> pure (isWorkFreePure cache bndrs bndr))
 
 -- | Determines whether a global binder is work free. Errors if binder does
 -- not exist.
 isWorkFreeBinder
-  :: (HasCallStack, MonadState s m)
-  => Lens' s (VarEnv Bool)
+  :: HasCallStack
+  => VarEnv Bool
   -> BindingMap
   -> Id
-  -> m Bool
+  -> (VarEnv Bool, Bool)
 isWorkFreeBinder cache bndrs bndr =
-  makeCachedU bndr cache $
-    case lookupVarEnv bndr bndrs of
-      Nothing -> error ("isWorkFreeBinder: couldn't find binder: " ++ showPpr bndr)
-      Just (bindingTerm -> t) ->
-        if bndr `globalIdOccursIn` t
-        then pure False
-        else isWorkFree cache bndrs t
+  case lookupVarEnv bndr cache of
+    Just value ->
+      (cache, value)
 
-{-# INLINABLE isWorkFree #-}
+    Nothing ->
+      case lookupVarEnv bndr bndrs of
+        Nothing ->
+          error ("isWorkFreeBinder: couldn't find binder: " ++ showPpr bndr)
+
+        Just (bindingTerm -> t) ->
+          if bndr `globalIdOccursIn` t
+            then (extendVarEnv bndr False cache, False)
+            else isWorkFreePure cache bndrs t
+
+{-# INLINABLE isWorkFreePure #-}
 -- | Determine whether a term does any work, i.e. adds to the size of the
 -- circuit. This function requires a cache (specified as a lens) to store the
 -- result for querying work info of global binders.
 --
-isWorkFree
-  :: forall s m
-   . (HasCallStack, MonadState s m)
-  => Lens' s (VarEnv Bool)
+isWorkFreePure
+  :: HasCallStack
+  => VarEnv Bool
   -> BindingMap
   -> Term
-  -> m Bool
-isWorkFree cache bndrs = go True
+  -> (VarEnv Bool, Bool)
+isWorkFreePure cache bndrs = go True
  where
   -- If we are in the outermost level of a term (i.e. not checking a subterm)
   -- then a term is work free if it simply refers to a local variable. This
@@ -79,7 +101,7 @@ isWorkFree cache bndrs = go True
   --
   -- as being work free, as the term bound to f may introduce work.
   --
-  go :: HasCallStack => Bool -> Term -> m Bool
+  go :: HasCallStack => Bool -> Term -> (VarEnv Bool, Bool)
   go isOutermost (collectArgs -> (fun, args)) =
     case fun of
       Var i
@@ -91,38 +113,79 @@ isWorkFree cache bndrs = go True
         -- would need to be changed to know the FVs of global binders first.
         --
         | isPolyFunTy (coreTypeOf i) ->
-            pure (isLocalId i && isOutermost && null args)
+            (cache, isLocalId i && isOutermost && null args)
         | isLocalId i ->
-            pure True
+          (cache, True)
         | otherwise ->
-            andM [isWorkFreeBinder cache bndrs i, allM goArg args]
+            let (cache', wf) = isWorkFreeBinder cache bndrs i
+                (caches, wfs) = unzip (fmap goArg args)
+             in (foldr unionVarEnv cache' caches, and (wf : wfs))
 
-      Data _ -> allM goArg args
-      Literal _ -> pure True
+      Data _ ->
+        let (caches, wfs) = unzip (fmap goArg args)
+         in (foldr unionVarEnv mempty caches, and wfs)
+
+      Literal _ ->
+        (cache, True)
+
       Prim pr ->
         case primWorkInfo pr of
           -- We can ignore arguments because the primitive outputs a constant
           -- regardless of their values.
-          WorkConstant -> pure True
-          WorkNever -> allM goArg args
-          WorkIdentity _ _ -> allM goArg args
-          WorkVariable -> pure (all isConstantArg args)
-          WorkAlways -> pure False
+          WorkConstant -> (cache, True)
+          WorkNever ->
+            let (caches, wfs) = unzip (fmap goArg args)
+             in (foldr unionVarEnv mempty caches, and wfs)
+          WorkIdentity _ _ ->
+            let (caches, wfs) = unzip (fmap goArg args)
+             in (foldr unionVarEnv mempty caches, and wfs)
+          WorkVariable -> (cache, all isConstantArg args)
+          WorkAlways -> (cache, False)
 
-      Lam _ e -> andM [go False e, allM goArg args]
-      TyLam _ e -> andM [go False e, allM goArg args]
-      Let (NonRec _ x) e -> andM [go False e, go False x, allM goArg args]
-      Let (Rec bs) e -> andM [go False e, allM (go False . snd) bs, allM goArg args]
-      Case s _ [(_, a)] -> andM [go False s, go False a, allM goArg args]
-      Case e _ _ -> andM [go False e, allM goArg args]
-      Cast e _ _ -> andM [go False e, allM goArg args]
+      Lam _ e ->
+        let (cache', wf) = go False e
+            (caches, wfs) = unzip (fmap goArg args)
+         in (foldr unionVarEnv cache' caches, and (wf : wfs))
+
+      TyLam _ e ->
+        let (cache', wf) = go False e
+            (caches, wfs) = unzip (fmap goArg args)
+         in (foldr unionVarEnv cache' caches, and (wf : wfs))
+
+      Let (NonRec _ x) e ->
+        let (cacheE, wfE) = go False e
+            (cacheX, wfX) = go False x
+            (caches, wfs) = unzip (fmap goArg args)
+         in (foldr unionVarEnv cacheE (cacheX : caches), and (wfE : wfX : wfs))
+
+      Let (Rec bs) e ->
+        let (cacheE, wfE) = go False e
+            (cacheBs, wfBs) = unzip (fmap (go False . snd) bs)
+            (caches, wfs) = unzip (fmap goArg args)
+         in (foldr unionVarEnv cacheE (cacheBs <> caches), and (wfE : (wfBs <> wfs)))
+
+      Case s _ [(_, a)] ->
+        let (cacheS, wfS) = go False s
+            (cacheA, wfA) = go False a
+            (caches, wfs) = unzip (fmap goArg args)
+         in (foldr unionVarEnv cacheS (cacheA : caches), and (wfS : wfA : wfs))
+
+      Case e _ _ ->
+        let (cache', wf) = go False e
+            (caches, wfs) = unzip (fmap goArg args)
+         in (foldr unionVarEnv cache' caches, and (wf : wfs))
+
+      Cast e _ _ ->
+        let (cache', wf) = go False e
+            (caches, wfs) = unzip (fmap goArg args)
+         in (foldr unionVarEnv cache' caches, and (wf : wfs))
 
       -- (Ty)App's and  Ticks are removed by collectArgs
       Tick _ _ -> error "isWorkFree: unexpected Tick"
       App {}   -> error "isWorkFree: unexpected App"
       TyApp {} -> error "isWorkFree: unexpected TyApp"
 
-  goArg e = eitherM (go False) (pure . const True) (pure e)
+  goArg e = either (go False) (const (cache, True)) e
   isConstantArg = either isConstant (const True)
 
 -- | Determine if a term represents a constant

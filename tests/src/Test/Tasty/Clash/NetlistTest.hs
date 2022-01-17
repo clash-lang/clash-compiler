@@ -38,6 +38,7 @@ import           Clash.GHC.NetlistTypes
 import           Clash.Netlist
 import           Clash.Netlist.Types hiding (backend, hdlDir)
 
+import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Concurrent.Supply as Supply
 import           Control.DeepSeq (force)
 import           Data.Maybe
@@ -78,12 +79,14 @@ runToNetlistStage target f src = do
       tes2    = mkVarEnv (P.zip (P.map topId (designEntities design)) (designEntities design))
 
   supplyN <- Supply.newSupply
+  lock <- MVar.newMVar ()
 
   transformedBindings <-
     normalizeEntity env (designBindings design)
       (ghcTypeToHWType (opt_intWidth opts))
       ghcEvaluator
       evaluator
+      lock
       teNames supplyN te
 
   fmap (\(_,x,_) -> force (P.map snd (OMap.assocs x))) $

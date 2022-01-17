@@ -26,6 +26,7 @@ module Clash.Normalize.Transformations.Case
   , elimExistentials
   ) where
 
+import qualified Control.Concurrent.MVar.Lifted as MVar
 import qualified Control.Lens as Lens
 import Control.Monad.State.Strict (evalState)
 import Data.Bifunctor (second)
@@ -75,7 +76,7 @@ import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Combinators ((>-!))
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, customReprs, debugOpts, tcCache
-  , typeTranslator, workFreeBinders)
+  , typeTranslator, workFreeBinders, ioLock)
 import Clash.Rewrite.Util (changed, isFromInt, whnfRW)
 import Clash.Rewrite.WorkFree
 import Clash.Util (curLoc)
@@ -237,8 +238,9 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- based on the fact on whether the argument has the potential to make
       -- the circuit larger than needed if we were to duplicate that argument.
       newBinder (isN0, substN) (x, arg) = do
-        bndrs <- Lens.use bindings
-        isWorkFree workFreeBinders bndrs arg >>= \case
+        bindingsV <- Lens.use bindings
+        wf <- MVar.withMVar bindingsV (\bndrs -> isWorkFree workFreeBinders bndrs arg)
+        case wf of
           True -> pure ((isN0, (x, arg):substN), Nothing)
           False ->
             let
@@ -316,14 +318,16 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
             -> caseCon ctx1 (Case (Literal (IntegerLiteral 0)) ty alts)
           _ -> do
             opts <- Lens.view debugOpts
+            ioLockV <- Lens.use ioLock
             -- When invariants are being checked, report missing evaluation
             -- rules for the primitive evaluator.
-            traceIf (dbg_invariants opts && isConstant subj)
-              ("Unmatchable constant as case subject: " ++ showPpr subj ++
-                 "\nWHNF is: " ++ showPpr subj1)
-              -- Otherwise check whether the entire case-expression has a
-              -- single alternative, and pick that one.
-              (caseOneAlt e)
+            MVar.withMVar ioLockV $ \() ->
+              traceIf (dbg_invariants opts && isConstant subj)
+                ("Unmatchable constant as case subject: " ++ showPpr subj ++
+                   "\nWHNF is: " ++ showPpr subj1)
+                -- Otherwise check whether the entire case-expression has a
+                -- single alternative, and pick that one.
+                (caseOneAlt e)
 
   -- The subject is a variable
   (Var v, [], _) | isNum0 (coreTypeOf v) ->

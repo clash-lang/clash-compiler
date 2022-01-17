@@ -28,17 +28,18 @@ module Clash.Normalize.Transformations.Specialize
   ) where
 
 import Control.Arrow ((***), (&&&))
-import Control.DeepSeq (deepseq)
+import Control.Concurrent.Lifted (myThreadId)
+import qualified Control.Concurrent.MVar.Lifted as MVar
+import Control.DeepSeq (force)
 import Control.Exception (throw)
-import Control.Lens ((%=))
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
-import Control.Monad.Extra (orM)
 import qualified Control.Monad.Writer as Writer (listen)
 import Data.Bifunctor (bimap)
 import Data.Coerce (coerce)
 import qualified Data.Either as Either
 import Data.Functor.Const (Const(..))
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Map.Strict as Map
 import qualified Data.Monoid as Monoid (getAny)
 import qualified Data.Set.Ordered as OSet
@@ -80,13 +81,13 @@ import Clash.Core.Var (Var(..), Id, TyVar, mkTyVar)
 import Clash.Core.VarEnv
   ( InScopeSet, extendInScopeSet, extendInScopeSetList, lookupVarEnv
   , mkInScopeSet, mkVarSet, unionInScope, elemVarSet)
-import Clash.Debug (traceIf, traceM)
+import Clash.Debug (traceM, traceWhen)
 import Clash.Driver.Types (Binding(..), TransformationInfo(..), hasTransformationInfo)
 import Clash.Netlist.Util (representableType)
 import Clash.Rewrite.Combinators (topdownR)
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, censor, curFun, customReprs, extra, tcCache
-  , typeTranslator, workFreeBinders, debugOpts, topEntities, specializationLimit)
+  , typeTranslator, workFreeBinders, debugOpts, topEntities, specializationLimit, ioLock)
 import Clash.Rewrite.Util
   ( mkBinderFor, mkDerivedName, mkFunction, mkTmBinderFor, setChanged, changed
   , normalizeTermTypes, normalizeId)
@@ -203,8 +204,10 @@ appProp ctx@(TransformContext is _) = \case
 
   go is0 (Lam v e) (Left arg:args) ticks = do
     setChanged
-    bndrs <- Lens.use bindings
-    orM [pure (isVar arg), isWorkFree workFreeBinders bndrs arg] >>= \case
+    bndrsV <- Lens.use bindings
+    wf <- MVar.withMVar bndrsV (\bndrs -> isWorkFree workFreeBinders bndrs arg)
+
+    case isVar arg || wf of
       True ->
         let subst = extendIdSubst (mkSubst is0) v arg in
         (`mkTicks` ticks) <$> go is0 (substTm "appProp.AppLam" subst e) args []
@@ -266,10 +269,12 @@ appProp ctx@(TransformContext is _) = \case
 
   goCaseArg isA0 ty0 ls0 (Left arg:args0) = do
     tcm <- Lens.view tcCache
-    bndrs <- Lens.use bindings
     let argTy = inferCoreTypeOf tcm arg
         ty1   = applyFunTy tcm ty0 argTy
-    orM [pure (isVar arg), isWorkFree workFreeBinders bndrs arg] >>= \case
+    bndrsV <- Lens.use bindings
+    wf <- MVar.withMVar bndrsV (\bndrs -> isWorkFree workFreeBinders bndrs arg)
+
+    case isVar arg || wf of
       True -> do
         (ty2,ls1,args1) <- goCaseArg isA0 ty1 ls0 args0
         return (ty2,ls1,Left arg:args1)
@@ -355,24 +360,29 @@ specialize'
 specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
   opts <- Lens.view debugOpts
   tcm <- Lens.view tcCache
+  ioLockV <- Lens.use ioLock
 
   -- Don't specialize TopEntities
   topEnts <- Lens.view topEntities
   if f `elemVarSet` topEnts
-  then do
+  then
     case specArgIn of
       Left _ -> do
-        traceM ("Not specializing TopEntity: " ++ showPpr (varName f))
+        MVar.withMVar ioLockV $ \() ->
+          traceM ("Not specializing TopEntity: " ++ showPpr (varName f))
+
         return e
-      Right tyArg ->
-        traceIf (hasTransformationInfo AppliedTerm opts) ("Dropping type application on TopEntity: " ++ showPpr (varName f) ++ "\ntype:\n" ++ showPpr tyArg) $
+      Right tyArg -> do
+        MVar.withMVar ioLockV $ \() ->
+          traceWhen (hasTransformationInfo AppliedTerm opts)
+            ("Dropping type application on TopEntity: " ++ showPpr (varName f) ++ "\ntype:\n" ++ showPpr tyArg)
         -- TopEntities aren't allowed to be semantically polymorphic.
         -- But using type equality constraints they may be syntactically polymorphic.
         -- > topEntity :: forall dom . (dom ~ "System") => Signal dom Bool -> Signal dom Bool
         -- The TyLam's in the body will have been removed by 'Clash.Normalize.Util.substWithTyEq'.
         -- So we drop the TyApp ("specializing" on it) and change the varType to match.
         let newVarTy = piResultTy tcm (coreTypeOf f) tyArg
-        in  changed (mkApps (mkTicks (Var f{varType = newVarTy}) ticks) args)
+        changed (mkApps (mkTicks (Var f{varType = newVarTy}) ticks) args)
   else do -- NondecreasingIndentation
 
   let specArg = bimap (normalizeTermTypes tcm) (normalizeType tcm) specArgIn
@@ -387,74 +397,81 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
       specAbs :: Either Term Type
       specAbs = either (Left . stripAllTicks . (`mkAbstraction` specBndrs)) (Right . id) specArg
   -- Determine if 'f' has already been specialized on (a type-normalized) 'specArg'
-  specM <- Map.lookup (f,argLen,specAbs) <$> Lens.use (extra.specialisationCache)
-  case specM of
-    -- Use previously specialized function
-    Just f' ->
-      traceIf (hasTransformationInfo AppliedTerm opts)
-        ("Using previous specialization of " ++ showPpr (varName f) ++ " on " ++
-          (either showPpr showPpr) specAbs ++ ": " ++ showPpr (varName f')) $
-        changed $ mkApps (mkTicks (Var f') ticks) (args ++ specVars)
-    -- Create new specialized function
-    Nothing -> do
-      -- Determine if we can specialize f
-      bodyMaybe <- fmap (lookupUniqMap (varName f)) $ Lens.use bindings
-      case bodyMaybe of
-        Just (Binding _ sp inl _ bodyTm _) -> do
-          -- Determine if we see a sequence of specializations on a growing argument
-          specHistM <- lookupUniqMap f <$> Lens.use (extra.specialisationHistory)
-          specLim   <- Lens.view specializationLimit
-          if maybe False (> specLim) specHistM
-            then throw (ClashException
-                        sp
-                        (unlines [ "Hit specialization limit " ++ show specLim ++ " on function `" ++ showPpr (varName f) ++ "'.\n"
-                                 , "The function `" ++ showPpr f ++ "' is most likely recursive, and looks like it is being indefinitely specialized on a growing argument.\n"
-                                 , "Body of `" ++ showPpr f ++ "':\n" ++ showPpr bodyTm ++ "\n"
-                                 , "Argument (in position: " ++ show argLen ++ ") that triggered termination:\n" ++ (either showPpr showPpr) specArg
-                                 , "Run with '-fclash-spec-limit=N' to increase the specialization limit to N."
-                                 ])
-                        Nothing)
-            else do
-              let existingNames = collectBndrsMinusApps bodyTm
-                  newNames      = [ mkUnsafeInternalName ("pTS" `Text.append` Text.pack (show n)) n
-                                  | n <- [(0::Int)..]
-                                  ]
-              -- Make new binders for existing arguments
-              (boundArgs,argVars) <- fmap (unzip . map (either (Left &&& Left . Var) (Right &&& Right . VarTy))) $
-                                     Monad.zipWithM
-                                       (mkBinderFor is0 tcm)
-                                       (existingNames ++ newNames)
-                                       args
-              -- Determine name the resulting specialized function, and the
-              -- form of the specialized-on argument
-              (fId,inl',specArg') <- case specArg of
-                Left a@(collectArgsTicks -> (Var g,gArgs,_gTicks)) -> if isPolyFun tcm a
-                    then do
-                      -- In case we are specialising on an argument that is a
-                      -- global function then we use that function's name as the
-                      -- name of the specialized higher-order function.
-                      -- Additionally, we will return the body of the global
-                      -- function, instead of a variable reference to the
-                      -- global function.
-                      --
-                      -- This will turn things like @mealy g k@ into a new
-                      -- binding @g'@ where both the body of @mealy@ and @g@
-                      -- are inlined, meaning the state-transition-function
-                      -- and the memory element will be in a single function.
-                      gTmM <- fmap (lookupUniqMap (varName g)) $ Lens.use bindings
-                      return (g,maybe inl bindingSpec gTmM, maybe specArg (Left . (`mkApps` gArgs) . bindingTerm) gTmM)
-                    else return (f,inl,specArg)
-                _ -> return (f,inl,specArg)
-              -- Create specialized functions
-              let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg'])) (boundArgs ++ specBndrs)
-              newf <- mkFunction (varName fId) sp inl' newBody
-              -- Remember specialization
-              (extra.specialisationHistory) %= extendUniqMapWith f 1 (+)
-              (extra.specialisationCache)  %= Map.insert (f,argLen,specAbs) newf
-              -- use specialized function
-              let newExpr = mkApps (mkTicks (Var newf) ticks) (args ++ specVars)
-              newf `deepseq` changed newExpr
-        Nothing -> return e
+  specCacheV <- Lens.use (extra.specialisationCache)
+
+  MVar.modifyMVar specCacheV $ \specCache ->
+    case Map.lookup (f, argLen, specAbs) specCache of
+      -- Use previously specialized function
+      Just f' -> do
+        MVar.withMVar ioLockV $ \() ->
+          traceWhen (hasTransformationInfo AppliedTerm opts)
+            ("Using previous specialization of " ++ showPpr (varName f) ++ " on " ++
+              (either showPpr showPpr) specAbs ++ ": " ++ showPpr (varName f'))
+
+        changed (specCache, mkApps (mkTicks (Var f') ticks) (args ++ specVars))
+      -- Create new specialized function
+      Nothing -> do
+        -- Determine if we can specialize f
+        bndrsV <- Lens.use bindings
+        bodyMaybe <- MVar.withMVar bndrsV (pure . lookupUniqMap (varName f))
+        case bodyMaybe of
+          Just (Binding _ sp inl _ bodyTm _) -> do
+            -- Determine if we see a sequence of specializations on a growing argument
+            specHistMV <- Lens.use (extra.specialisationHistory)
+            specHist <- MVar.takeMVar specHistMV
+            let specHistM = lookupUniqMap f specHist
+            specLim   <- Lens.view specializationLimit
+            if maybe False (> specLim) specHistM
+              then throw (ClashException
+                          sp
+                          (unlines [ "Hit specialization limit " ++ show specLim ++ " on function `" ++ showPpr (varName f) ++ "'.\n"
+                                   , "The function `" ++ showPpr f ++ "' is most likely recursive, and looks like it is being indefinitely specialized on a growing argument.\n"
+                                   , "Body of `" ++ showPpr f ++ "':\n" ++ showPpr bodyTm ++ "\n"
+                                   , "Argument (in position: " ++ show argLen ++ ") that triggered termination:\n" ++ (either showPpr showPpr) specArg
+                                   , "Run with '-fclash-spec-limit=N' to increase the specialization limit to N."
+                                   ])
+                          Nothing)
+              else do
+                let existingNames = collectBndrsMinusApps bodyTm
+                    newNames      = [ mkUnsafeInternalName ("pTS" `Text.append` Text.pack (show n)) n
+                                    | n <- [(0::Int)..]
+                                    ]
+                -- Make new binders for existing arguments
+                (boundArgs,argVars) <- fmap (unzip . map (either (Left &&& Left . Var) (Right &&& Right . VarTy))) $
+                                       Monad.zipWithM
+                                         (mkBinderFor is0 tcm)
+                                         (existingNames ++ newNames)
+                                         args
+                -- Determine name the resulting specialized function, and the
+                -- form of the specialized-on argument
+                (fId,inl',specArg') <- case specArg of
+                  Left a@(collectArgsTicks -> (Var g,gArgs,_gTicks)) -> if isPolyFun tcm a
+                      then do
+                        -- In case we are specialising on an argument that is a
+                        -- global function then we use that function's name as the
+                        -- name of the specialized higher-order function.
+                        -- Additionally, we will return the body of the global
+                        -- function, instead of a variable reference to the
+                        -- global function.
+                        --
+                        -- This will turn things like @mealy g k@ into a new
+                        -- binding @g'@ where both the body of @mealy@ and @g@
+                        -- are inlined, meaning the state-transition-function
+                        -- and the memory element will be in a single function.
+                        gTmM <- MVar.withMVar bndrsV (pure . lookupUniqMap (varName g))
+                        return (g,maybe inl bindingSpec gTmM, maybe specArg (Left . (`mkApps` gArgs) . bindingTerm) gTmM)
+                      else return (f,inl,specArg)
+                  _ -> return (f,inl,specArg)
+                -- Create specialized functions
+                let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg'])) (boundArgs ++ specBndrs)
+                newf <- force <$> mkFunction (varName fId) sp inl' newBody
+                -- Remember specialization
+                MVar.putMVar specHistMV (extendUniqMapWith f 1 (+) specHist)
+                -- use specialized function
+                let newCache = Map.insert (f, argLen, specAbs) newf specCache
+                let newExpr = mkApps (mkTicks (Var newf) ticks) (args ++ specVars)
+                changed (newCache, newExpr)
+          Nothing -> return (specCache, e)
   where
     collectBndrsMinusApps :: Term -> [Name a]
     collectBndrsMinusApps = reverse . go []
@@ -477,10 +494,14 @@ specialize' _ctx _ (appE,args,ticks) (Left specArg) = do
       newBody = mkAbstraction specArg specBndrs
   -- See if there's an existing binder that's alpha-equivalent to the
   -- specialized function
-  existing <- filterUniqMap ((`aeqTerm` newBody) . bindingTerm) <$> Lens.use bindings
+  bndrsV <- Lens.use bindings
+  existing <- MVar.withMVar bndrsV $ \bndrs ->
+    pure $ filterUniqMap ((`aeqTerm` newBody) . bindingTerm) bndrs
   -- Create a new function if an alpha-equivalent binder doesn't exist
   newf <- case eltsUniqMap existing of
-    [] -> do (cf,sp) <- Lens.use curFun
+    [] -> do curFunsV <- Lens.use curFun
+             thread <- myThreadId
+             Just (cf,sp) <- MVar.withMVar curFunsV (pure . HashMap.lookup thread)
              mkFunction (appendToName (varName cf) "_specF") sp NoUserInline newBody
     (b:_) -> return (bindingId b)
   -- Create specialized argument
@@ -571,7 +592,8 @@ nonRepSpec ctx e@(App e1 e2)
     inlineInternalSpecialisationArgument app
       | (Var f,fArgs,ticks) <- collectArgsTicks app
       = do
-        fTmM <- lookupVarEnv f <$> Lens.use bindings
+        bndrsV <- Lens.use bindings
+        fTmM <- MVar.withMVar bndrsV (pure . lookupVarEnv f)
         case fTmM of
           Just b
             | nameSort (varName (bindingId b)) == Internal

@@ -1,6 +1,6 @@
 {-|
   Copyright  :  (C) 2015-2016, University of Twente,
-                    2021,      QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -34,6 +34,7 @@ module Clash.Normalize.Transformations.DEC
   ( disjointExpressionConsolidation
   ) where
 
+import qualified Control.Concurrent.MVar.Lifted as MVar
 import Control.Concurrent.Supply (splitSupply)
 import Control.Lens ((^.), _1)
 import qualified Control.Lens as Lens
@@ -292,13 +293,19 @@ collectGlobals' is0 substitution seen (Case scrut ty alts) _eIsConstant = do
 collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), ticks)) eIsconstant
   | not eIsconstant = do
     tcm <- Lens.view tcCache
-    bndrs <- Lens.use bindings
+    bndrsV <- Lens.use bindings
     evaluate <- Lens.view evaluator
     ids <- Lens.use uniqSupply
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
-    gh <- Lens.use globalHeap
-    let eval = (Lens.view Lens._3) . whnf' evaluate bndrs tcm gh ids1 is0 False
+
+    ghV <- Lens.use globalHeap
+
+    eval <-
+      MVar.withMVar bndrsV $ \bndrs ->
+        MVar.withMVar ghV $ \gh ->
+          pure $ (Lens.view Lens._3) . whnf' evaluate bndrs tcm gh ids1 is0 False
+
     let eTy  = inferCoreTypeOf tcm e
     untran <- isUntranslatableType False eTy
     case untran of

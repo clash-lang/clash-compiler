@@ -89,6 +89,7 @@ flagsClash r = [
   , defFlag "fclash-inline-workfree-limit"       $ IntSuffix (liftEwM . setInlineWFLimit r)
   , defFlag "fclash-edalize"                     $ NoArg (liftEwM (setEdalize r))
   , defFlag "fclash-no-render-enums"             $ NoArg (liftEwM (setNoRenderEnums r))
+  , defFlag "fclash-concurrent-normalization"    $ NoArg (liftEwM (setConcurrentNormalization r))
   ]
 
 -- | Print deprecated flag warning
@@ -312,6 +313,9 @@ setAggressiveXOptBB r = modifyIORef r (\c -> c { opt_aggressiveXOptBB = True })
 
 setEdalize :: IORef ClashOpts -> IO ()
 setEdalize r = modifyIORef r (\c -> c { opt_edalize = True })
+
+setConcurrentNormalization :: IORef ClashOpts -> IO ()
+setConcurrentNormalization r = modifyIORef r (\c -> c { opt_concurrentNormalization = True })
 
 setRewriteHistoryFile :: IORef ClashOpts -> String -> IO ()
 setRewriteHistoryFile r arg = do

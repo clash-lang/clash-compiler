@@ -7,6 +7,7 @@ import           Clash.GHC.PartialEval
 import           Clash.GHC.Evaluator
 import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)
 
+import qualified Control.Concurrent.MVar      as MVar
 import qualified Control.Concurrent.Supply    as Supply
 import           Control.DeepSeq              (deepseq)
 import           Data.Binary                  (decode)
@@ -32,6 +33,7 @@ main = do
 benchFile :: [FilePath] -> FilePath -> IO ()
 benchFile idirs src = do
   supplyN <- Supply.newSupply
+  lock <- MVar.newMVar ()
   (bindingsMap,tcm,tupTcm,primMap,reprs,topEntityNames,topEntity) <- setupEnv src
   putStrLn $ "Doing normalization of " ++ src
 
@@ -47,6 +49,7 @@ benchFile idirs src = do
                    (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
                    ghcEvaluator
                    evaluator
+                   lock
                    topEntityNames supplyN topEntity
   res `deepseq` putStrLn ".. done\n"
 
