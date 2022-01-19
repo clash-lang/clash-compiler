@@ -29,6 +29,7 @@ import           Data.Attoparsec.Lazy (Result (..), parse)
 import           Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy.Char8 as BSChar
+import qualified Data.Yaml            as Yaml
 import           System.FilePath      ()
 
 import qualified Clash.Util.Interpolate as I
@@ -132,14 +133,39 @@ genLineErr lineMap fullOrig full part =
 
 -- | Parse a ByteString according to the given JSON template. Throws exception
 -- if it fails.
-decodeOrErr
+decodeOrErrYaml
   :: (HasCallStack, FromJSON a)
   => FilePath
   -- ^ Path read from (for error message)
   -> ByteString
   -- ^ Bytestring to parse
   -> a
-decodeOrErr path contents0 =
+decodeOrErrYaml path contents =
+  case Yaml.decodeEither' (BS.toStrict contents) of
+    Left (Yaml.prettyPrintParseException -> err) -> clashError [I.i|
+      Failed to decode YAML:
+
+        #{path}
+
+      Decoder reported:
+
+        #{err}
+    |]
+    Right a -> a
+ where
+  clashError msg = throw (ClashException loc msg Nothing)
+  loc = mkGeneralSrcSpan (mkFastString path)
+
+-- | Parse a ByteString according to the given JSON template. Throws exception
+-- if it fails.
+decodeOrErrJson
+  :: (HasCallStack, FromJSON a)
+  => FilePath
+  -- ^ Path read from (for error message)
+  -> ByteString
+  -- ^ Bytestring to parse
+  -> a
+decodeOrErrJson path contents0 =
   case toSpecNewlines contents0 of
     Left (DecodeError err _) -> clashError [I.i|
       Failed to decode JSON file as UTF8:

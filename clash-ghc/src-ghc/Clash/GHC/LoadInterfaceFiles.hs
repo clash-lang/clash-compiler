@@ -1,8 +1,9 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd
+                     2022,      QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
@@ -106,7 +107,7 @@ import           Clash.Annotations.Primitive
 import           Clash.Annotations.BitRepresentation (DataReprAnn)
 import           Clash.Debug                         (traceIf)
 import           Clash.Primitives.Types              (UnresolvedPrimitive, name)
-import           Clash.Primitives.Util               (decodeOrErr)
+import           Clash.Primitives.Util               (decodeOrErrJson, decodeOrErrYaml)
 import           Clash.GHC.GHC2Core                  (qualifiedNameString')
 import           Clash.Util                          (curLoc)
 import qualified Clash.Util.Interpolate              as I
@@ -406,19 +407,33 @@ getUnresolvedPrimitives
   => HDL
   -> (Annotations.CoreAnnTarget, Primitive)
   -> m [Either UnresolvedPrimitive FilePath]
-getUnresolvedPrimitives hdl targetPrim =
-  case targetPrim of
-    (_, Primitive hdls fp) | hdl `elem` hdls -> pure [Right fp]
+getUnresolvedPrimitives hdl (target, prim) | hdl `elem` primHdls prim =
+  case prim of
+    Primitive _ fp -> pure [Right fp]
 
-    (target, InlinePrimitive hdls contentOrFp) | hdl `elem` hdls ->
+    InlineYamlPrimitive _ contentOrFp ->
       case target of
         -- Module annotation, can house many primitives
         Annotations.ModuleTarget _ ->
-          liftIO (decodeOrErr contentOrFp <$> BL.readFile contentOrFp)
+          liftIO (decodeOrErrYaml contentOrFp <$> BL.readFile contentOrFp)
         Annotations.NamedTarget targetName0 ->
           let targetName1 = Text.unpack (qualifiedNameString' targetName0)
-              prim =
-                case decodeOrErr targetName1 (BLU.fromString contentOrFp) of
+              primOrErr = decodeOrErrYaml targetName1 (BLU.fromString contentOrFp)
+              primName = Text.unpack (name primOrErr) in
+
+          if primName /= targetName1
+          then inlineNameError targetName1 primName
+          else pure [Left primOrErr]
+
+    InlinePrimitive _ contentOrFp ->
+      case target of
+        -- Module annotation, can house many primitives
+        Annotations.ModuleTarget _ ->
+          liftIO (decodeOrErrJson contentOrFp <$> BL.readFile contentOrFp)
+        Annotations.NamedTarget targetName0 ->
+          let targetName1 = Text.unpack (qualifiedNameString' targetName0)
+              primOrErr =
+                case decodeOrErrJson targetName1 (BLU.fromString contentOrFp) of
                   [] -> error $ "No annotations found for " ++ targetName1
                      ++ " even though it had an InlinePrimitive annotation."
                   [p] -> p
@@ -426,19 +441,24 @@ getUnresolvedPrimitives hdl targetPrim =
                     ++ "InlinePrimitive annotation for " ++ targetName1 ++ ". "
                     ++ "Expected a single one."
 
-              primName = Text.unpack (name prim) in
+              primName = Text.unpack (name primOrErr) in
 
-          if primName /= targetName1 then
-            error $ concat
-              [ "Function " ++ targetName1 ++ " was annotated with an inline "
-              , "primitive for " ++ primName ++ ". These names "
-              , "should be the same." ]
-          else
-            pure [Left prim]
-    _ ->
-      -- Only consider the HDL (Verilog/SystemVerilog/VHDL) annotation we're
-      -- currently targeting.
-      pure []
+          if primName /= targetName1
+          then inlineNameError targetName1 primName
+          else pure [Left primOrErr]
+ where
+  inlineNameError targetName primName =
+    error $ concat
+      [ "Function " ++ targetName ++ " was annotated with an inline "
+      , "primitive for " ++ primName ++ ". These names "
+      , "should be the same." ]
+
+  primHdls = \case
+    Primitive hdls _ -> hdls
+    InlinePrimitive hdls _ -> hdls
+    InlineYamlPrimitive hdls _ -> hdls
+
+getUnresolvedPrimitives _ _  = return []
 
 loadExprFromTyThing :: CoreSyn.CoreBndr -> GHC.TyThing -> Maybe CoreSyn.CoreExpr
 loadExprFromTyThing bndr tyThing = case tyThing of

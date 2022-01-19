@@ -40,10 +40,10 @@ import Distribution.PackageDescription
 import GHC.Exts (fromList)
 import Language.Haskell.TH
 import Data.Aeson (Value (Array, String, Object))
-import Data.Aeson.Encode.Pretty (encodePretty)
+import qualified Data.Yaml as Yaml
 import Text.Printf (printf)
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Encoding as TL
+import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
 
 #if MIN_VERSION_aeson(2,0,0)
 import qualified Data.Aeson.KeyMap as KM
@@ -51,7 +51,7 @@ import qualified Data.Aeson.KeyMap as KM
 
 __COSIM_MAX_NUMBER_OF_ARGUMENTS__ = 16
 __COSIM_MAX_NUMBER_OF_CLOCKS__ = 1
-__COSIM_PRIMITIVE_PATH__ = "src/prims/verilog/Clash_CoSim_CoSimInstances.primitives"
+__COSIM_PRIMITIVE_PATH__ = "src/prims/verilog/Clash_CoSim_CoSimInstances.primitives.yaml"
 
 main = do
     setEnv "COSIM_MAX_NUMBER_OF_ARGUMENTS" $ show __COSIM_MAX_NUMBER_OF_ARGUMENTS__
@@ -160,7 +160,7 @@ cosimBuild args flags pkgDescription localBuildInfo = do
 
     writeFile
         __COSIM_PRIMITIVE_PATH__
-        (blackboxJsonString __COSIM_MAX_NUMBER_OF_CLOCKS__ __COSIM_MAX_NUMBER_OF_ARGUMENTS__)
+        (blackboxYamlString __COSIM_MAX_NUMBER_OF_CLOCKS__ __COSIM_MAX_NUMBER_OF_ARGUMENTS__)
 
 -- | Cleans binaries made by cosimPostBuild
 cosimClean
@@ -178,9 +178,10 @@ cosimClean args flags pkgDescription stub = do
 --------------------------------------
 -- | Create a blackbox object of the following structure:
 --
---        { 'name': name,
---          'type': type_,
---          'templateD': templateD }
+--    - Blackbox
+--        name: name
+--        type: type
+--        template: template
 --
 -- TODO: preferably, this function should be in Clash.CoSim.CodeGeneration. But
 -- I can't figure out how to run a function in that module from here, so this
@@ -207,14 +208,14 @@ blackboxObject bbname type_ templateD =
     ]))])
 
 -- | Create blackbox for a given number of arguments
-blackboxJson'
+blackboxYaml'
     :: Int
     -- ^ Number of clocks of coSimN
     -> Int
     -- ^ Number of arguments of coSimN
     -> Value
     -- ^ Blackbox object
-blackboxJson' clks args = blackboxObject bbname "" templateD
+blackboxYaml' clks args = blackboxObject bbname "" templateD
     where
       -- Offset where 'real' arguments start, instead of constraints
       argsOffset = 1    -- result constraint
@@ -236,22 +237,23 @@ blackboxJson' clks args = blackboxObject bbname "" templateD
       templateD = unwords [template, compname, instanc_, ";"]
 
 -- | Create blackbox for all coSim functions up to n
-blackboxJson
+blackboxYaml
     :: Int
     -- ^ Number of clock arguments
     -> Int
     -- ^ Number of non-clock arguments
     -> Value
     -- ^ Array of blackbox objects
-blackboxJson clks args = Array $ fromList [blackboxJson' clk arg | clk <- [0..clks], arg <- [1..args] ]
+blackboxYaml clks args = Array $ fromList [blackboxYaml' clk arg | clk <- [0..clks], arg <- [1..args] ]
 
 -- | Create blackbox for all coSim functions up to n. This function will encode
 -- the json structure as a string, using a pretty printer.
-blackboxJsonString
+blackboxYamlString
     :: Int
     -- ^ Number of clock arguments
     -> Int
     -- ^ Number of non-clock arguments
     -> String
     -- ^ Encoded json file
-blackboxJsonString clks = TL.unpack . TL.decodeUtf8 . encodePretty . blackboxJson clks
+blackboxYamlString clks =
+  Text.unpack . Text.decodeUtf8 . Yaml.encode . blackboxYaml clks

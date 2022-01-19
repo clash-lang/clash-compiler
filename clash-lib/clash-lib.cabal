@@ -169,7 +169,8 @@ Library
                       trifecta                >= 1.7.1.1  && < 2.2,
                       vector                  >= 0.11     && < 1.0,
                       vector-binary-instances >= 0.2.3.5  && < 0.3,
-                      unordered-containers    >= 0.2.3.3  && < 0.3
+                      unordered-containers    >= 0.2.3.3  && < 0.3,
+                      yaml                    >= 0.11     && < 0.12,
 
   if impl(ghc >= 9.0.0)
     build-depends:     ghc-bignum >=1.0 && <1.3

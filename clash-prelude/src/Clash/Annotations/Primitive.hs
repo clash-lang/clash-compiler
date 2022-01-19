@@ -1,7 +1,8 @@
 {-|
-Copyright  :  (C) 2017-2019, Myrtle Software, QBayLogic
+Copyright  :  (C) 2017-2019, Myrtle Software
+                  2022,      QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Instruct the Clash compiler to look for primitive HDL templates provided inline
 or in a specified directory. For distribution of new packages with primitive
@@ -234,7 +235,7 @@ data HDL
 -- Add more files to the @data-files@ stanza in your @.cabal@ files and more
 -- @ANN@ pragma's if you want to add more primitive templates for other HDLs
 --
--- === Example of 'InlinePrimitive'
+-- === Example of 'InlineYamlPrimitive'
 --
 -- The following example shows off an inline HDL primitive template. It uses the
 -- [interpolate](https://hackage.haskell.org/package/interpolate) package for
@@ -249,20 +250,17 @@ data HDL
 -- import           Data.String.Interpolate      (i)
 -- import           Data.String.Interpolate.Util (unindent)
 --
--- {\-\# ANN example (InlinePrimitive [VHDL] $ unindent [i|
---   [ { \"BlackBox\" :
---       { "name" : "InlinePrimitive.example"
---       , "kind": \"Declaration\"
---       , "template" :
---   "-- begin InlinePrimitive example:
---   ~GENSYM[example][0] : block
---   ~RESULT <= 1 + ~ARG[0];
---   end block;
---   -- end InlinePrimitive example"
---       }
---     }
---   ]
---   |]) \#-\}
+-- {\-\# ANN example (InlineYamlPrimitive [VHDL] $ unindent [i|
+--  BlackBox:
+--    kind: Declaration
+--    name: InlinePrimitive.example
+--    template: |-
+--      -- begin InlinePrimitive example:
+--      ~GENSYM[example][0] : block
+--      ~RESULT <= 1 + ~ARG[0];
+--      end block;
+--      end InlinePrimitive example
+-- |]) \#-\}
 -- {\-\# NOINLINE example \#-\}
 -- example :: Signal System (BitVector 2) -> Signal System (BitVector 2)
 -- example = fmap succ
@@ -271,7 +269,9 @@ data Primitive
   = Primitive [HDL] FilePath
   -- ^ Description of a primitive for a given 'HDL's in a file at 'FilePath'
   | InlinePrimitive [HDL] String
-  -- ^ Description of a primitive for a given 'HDL's as an inline 'String'
+  -- ^ Description of a primitive for a given 'HDL's as an inline JSON 'String'
+  | InlineYamlPrimitive [HDL] String
+  -- ^ Description of a primitive for a given 'HDL's as an inline YAML 'String'
   deriving (Show, Read, Data, Generic, NFData, Hashable, Eq)
 
 -- | Primitive guard to mark a value as either not translatable or as having a

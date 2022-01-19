@@ -50,7 +50,7 @@ concatMapM f = fmap concat . mapM f
 jsonToYaml :: FilePath -> IO ByteString
 jsonToYaml path = do
   contents <- ByteStringLazy.readFile path
-  let decoded = AesonExtra.decodeOrErr path contents
+  let decoded = AesonExtra.decodeOrErrJson path contents
   pure (Yaml.encode (decoded :: Aeson.Value))
 
 main :: IO ()
