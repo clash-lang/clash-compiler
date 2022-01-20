@@ -1,3 +1,0 @@
-#!/bin/sh
-old_dir=$(pwd)
-(cd $(dirname $0) && ./nix-user-chroot/nix-user-chroot -n ./nix -w $old_dir -m ./bin/:/bin -- /bin/clashi $@)
