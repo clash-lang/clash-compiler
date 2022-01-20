@@ -549,6 +549,7 @@ runClashTest = defaultMain $ clashTestRoot
           , expectClashFail=Just (NoTestExitCode, "NOT:WARNING")
           }
         , outputTest "T1996" def{hdlTargets=[VHDL]}
+        , runTest "T2040" def{hdlTargets=[VHDL],clashFlags=["-fclash-compile-ultra"]}
         ] <>
         if compiledWith == Cabal then
           -- This tests fails without environment files present, which are only

@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
   Transformations on case-expressions
@@ -62,7 +62,7 @@ import Clash.Core.Term
   , collectTicks, mkApps, mkTicks, patIds, stripTicks, Bind(..))
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (LitTy(..), Type(..), TypeView(..), coreView1, tyView)
-import Clash.Core.Util (listToLets)
+import Clash.Core.Util (listToLets, mkInternalVar)
 import Clash.Core.VarEnv
   ( InScopeSet, elemVarSet, extendInScopeSet, extendInScopeSetList, mkVarSet
   , unitVarSet, uniqAway)
@@ -513,9 +513,20 @@ caseElemNonReachable _ e = return e
 --        3 -> fromInteger 0
 -- @
 caseFlat :: HasCallStack => NormRewrite
-caseFlat _ e@(Case (collectEqArgs -> Just (scrut',_)) ty _) =
+caseFlat (TransformContext is0 _) e@(Case (collectEqArgs -> Just (scrut',val)) ty _) =
   case collectFlat scrut' e of
-    Just alts' -> changed (Case scrut' ty (last alts' : init alts'))
+    Just alts' -> case collectArgs val of
+      -- When we're pattern matching on `Int`, extract the `Int#` first before
+      -- we do the Literal matching branches.
+      (Data dc,_)
+        | nameOcc (dcName dc) == "GHC.Types.I#"
+        , [argTy] <- dcArgTys dc
+        -> do
+          wild <- mkInternalVar is0 "wild" argTy
+          changed (Case scrut' ty
+                    [(DataPat dc [] [wild]
+                     ,Case (Var wild) ty (last alts' : init alts'))])
+      _ -> changed (Case scrut' ty (last alts' : init alts'))
     Nothing -> return e
 
 caseFlat _ e = return e
