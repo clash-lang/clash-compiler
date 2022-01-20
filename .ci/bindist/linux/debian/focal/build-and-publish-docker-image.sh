@@ -2,7 +2,7 @@
 
 set -xeo pipefail
 
-REPO="docker.pkg.github.com/clash-lang/clash-compiler"
+REPO="ghcr.io/clash-lang"
 NAME="bindist-debian-focal"
 
 DIR=$(dirname "$0")
@@ -19,4 +19,3 @@ if [[ $push =~ ^[Yy]$ ]]; then
 else
         echo "Skipping push to container registry"
 fi
-
