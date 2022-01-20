@@ -43,7 +43,7 @@ hackage-sdist:
 debian-bindist:
   extends: .common
   needs: []
-  image: docker.pkg.github.com/clash-lang/clash-compiler/bindist-debian-focal:2021-06-16
+  image: ghcr.io/clash-lang/bindist-debian-focal:2022-01-20
   stage: pack
   cache:
     when: on_success
@@ -67,7 +67,7 @@ debian-bindist:
 debian-bindist-test:
   extends: .run-on-nightly-and-changes
   needs: ["debian-bindist"]
-  image: docker.pkg.github.com/clash-lang/clash-compiler/bindist-debian-focal:2021-06-16
+  image: ghcr.io/clash-lang/bindist-debian-focal:2022-01-20
   stage: pack-test
   script:
     - apt-get update
@@ -79,7 +79,7 @@ debian-bindist-test:
 
 # Use binary distribution built in `snap-bindist` to build a snap package.
 .snap:
-  image: docker.pkg.github.com/clash-lang/clash-compiler/snapcraft:2020-11-20
+  image: ghcr.io/clash-lang/snapcraft:2022-01-20
   stage: publish
   interruptible: false
   cache:

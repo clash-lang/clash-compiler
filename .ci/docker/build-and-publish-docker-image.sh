@@ -2,7 +2,7 @@
 
 set -xeo pipefail
 
-REPO="docker.pkg.github.com/clash-lang/clash-compiler"
+REPO="ghcr.io/clash-lang"
 NAME="clash-ci-"
 DIR=$(dirname "$0")
 now=$(date +%F)
