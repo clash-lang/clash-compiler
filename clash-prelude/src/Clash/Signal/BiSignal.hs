@@ -175,7 +175,7 @@ instance HasBiSignalDefault 'Floating where
 type role BiSignalIn nominal nominal nominal
 
 -- | The /in/ part of an __inout__ port.
--- BiSignalIn has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+-- BiSignalIn has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html type role>
 --
 -- >>> :i BiSignalIn
 -- type role BiSignalIn nominal nominal nominal
@@ -193,7 +193,7 @@ type role BiSignalOut nominal nominal nominal
 -- Wraps (multiple) writing signals. The semantics are such that only one of
 -- the signals may write at a single time step.
 --
--- BiSignalOut has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+-- BiSignalOut has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html type role>
 --
 -- >>> :i BiSignalOut
 -- type role BiSignalOut nominal nominal nominal

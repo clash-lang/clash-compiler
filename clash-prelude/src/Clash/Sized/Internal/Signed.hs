@@ -168,7 +168,7 @@ type role Signed nominal
 -- >>> satAdd SatSymmetric (-2) (-3) :: Signed 3
 -- -3
 --
--- Signed has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+-- Signed has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html type role>
 --
 -- >>> :i Signed
 -- type role Signed nominal

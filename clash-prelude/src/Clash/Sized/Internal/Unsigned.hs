@@ -180,7 +180,7 @@ type role Unsigned nominal
 -- >>> satSub SatSymmetric 2 3 :: Unsigned 3
 -- 0
 --
--- Unsigned has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+-- Unsigned has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html type role>
 --
 -- >>> :i Unsigned
 -- type role Unsigned nominal

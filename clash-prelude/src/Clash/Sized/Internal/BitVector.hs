@@ -211,7 +211,7 @@ type role BitVector nominal
 -- * Bit indices are descending
 -- * 'Num' instance performs /unsigned/ arithmetic.
 --
--- BitVector has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+-- BitVector has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html type role>
 --
 -- >>> :i BitVector
 -- type role BitVector nominal
