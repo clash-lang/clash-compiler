@@ -2181,10 +2181,6 @@ dup1 _      = error "empty list"
 -- @
 -- > 'sequence_' [ runUntil id testBenchA, runUntil id testBenchB ]
 -- @
-
--- The "value `seqX`" bit is to have any invocations of 'trace', such as in
--- our 'assert' (, 'outputVerifier', ...) functions, print before printing the
--- result message.
 runUntil
   :: forall dom a
    . (KnownDomain dom, NFDataX a, ShowX a)
