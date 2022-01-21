@@ -1,0 +1,1 @@
+FIXED: Expected values in assert become undefined when using `-fclash-compile-ultra` [#2040](https://github.com/clash-lang/clash-compiler/issues/2040)
