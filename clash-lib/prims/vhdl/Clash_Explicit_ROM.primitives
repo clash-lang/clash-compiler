@@ -16,7 +16,7 @@
   signal ~GENSYM[ROM][2] : ~TYP[5];
   signal ~GENSYM[rd][3]  : integer range 0 to ~LIT[1]-1;
 begin
-  ~SYM[2] <= ~LIT[5];
+  ~SYM[2] <= ~CONST[5];
 
   ~SYM[3] <= to_integer(~VAR[rdI][6](31 downto 0))
   -- pragma translate_off

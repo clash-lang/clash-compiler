@@ -2,7 +2,7 @@
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.
                   2019     , Myrtle Software Ltd,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -129,6 +129,6 @@ rom# !_ en content =
     else
       withFrozenCallStack
         (deepErrorX ("rom: address " ++ show i ++
-                     "not in range [0.." ++ show szI ++ ")"))
+                     " not in range [0.." ++ show szI ++ ")"))
   {-# INLINE safeAt #-}
 {-# NOINLINE rom# #-}
