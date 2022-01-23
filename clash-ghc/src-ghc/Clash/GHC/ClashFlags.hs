@@ -77,7 +77,7 @@ flagsClash r = [
   , defFlag "fclash-evaluator-fuel-limit"        $ IntSuffix (liftEwM . setEvaluatorFuelLimit r)
   , defFlag "fclash-intwidth"                    $ IntSuffix (setIntWidth r)
   , defFlag "fclash-error-extra"                 $ NoArg (liftEwM (setErrorExtra r))
-  , defFlag "fclash-float-support"               $ NoArg (liftEwM (setFloatSupport r))
+  , defFlag "fclash-float-support"               $ NoArg (setFloatSupport r)
   , defFlag "fclash-component-prefix"            $ SepArg (liftEwM . setComponentPrefix r)
   , defFlag "fclash-old-inline-strategy"         $ NoArg (liftEwM (setOldInlineStrategy r))
   , defFlag "fclash-no-escaped-identifiers"      $ NoArg (liftEwM (setNoEscapedIds r))
@@ -271,8 +271,9 @@ setHdlSyn r s = case readMaybe s of
 setErrorExtra :: IORef ClashOpts -> IO ()
 setErrorExtra r = modifyIORef r (\c -> c {opt_errorExtra = True})
 
-setFloatSupport :: IORef ClashOpts -> IO ()
-setFloatSupport r = modifyIORef r (\c -> c {opt_floatSupport = True})
+setFloatSupport :: IORef ClashOpts -> EwM IO ()
+setFloatSupport _ =
+  addWarn "Deprecated flag: -fclash-float-support is always enabled from Clash 1.6 and onwards"
 
 setComponentPrefix
   :: IORef ClashOpts

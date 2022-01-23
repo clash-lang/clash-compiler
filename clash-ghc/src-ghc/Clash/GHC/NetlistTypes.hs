@@ -45,8 +45,6 @@ ghcTypeToHWType
   :: Int
   -- ^ Integer width. The width Clash assumes an Integer to be (instead of it
   -- begin an arbitrarily large, runtime sized construct).
-  -> Bool
-  -- ^ Float support
   -> CustomReprs
   -- ^ Custom bit representations
   -> TyConMap
@@ -54,7 +52,7 @@ ghcTypeToHWType
   -> Type
   -- ^ Type to convert to HWType
   -> State HWMap (Maybe (Either String FilteredHWType))
-ghcTypeToHWType iw floatSupport = go
+ghcTypeToHWType iw = go
   where
     -- returnN :: HWType ->
     returnN t = return (FilteredHWType t [])
@@ -112,14 +110,14 @@ ghcTypeToHWType iw floatSupport = go
         "GHC.Prim.Word#"                -> returnN (Unsigned iw)
         "GHC.Prim.Int64#"               -> returnN (Signed 64)
         "GHC.Prim.Word64#"              -> returnN (Unsigned 64)
-        "GHC.Prim.Float#" | floatSupport -> returnN (BitVector 32)
-        "GHC.Prim.Double#" | floatSupport -> returnN (BitVector 64)
+        "GHC.Prim.Float#"               -> returnN (BitVector 32)
+        "GHC.Prim.Double#"              -> returnN (BitVector 64)
         "GHC.Prim.ByteArray#"           ->
           throwE $ "Can't translate type: " ++ showPpr ty
 
         "GHC.Types.Bool"                -> returnN Bool
-        "GHC.Types.Float" | floatSupport-> returnN (BitVector 32)
-        "GHC.Types.Double" | floatSupport -> returnN (BitVector 64)
+        "GHC.Types.Float"               -> returnN (BitVector 32)
+        "GHC.Types.Double"              -> returnN (BitVector 64)
         "GHC.Prim.~#"                   -> returnN (Void Nothing)
 
         "Clash.Signal.Internal.Signal" ->

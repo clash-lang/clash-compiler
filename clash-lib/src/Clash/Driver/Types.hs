@@ -315,9 +315,6 @@ data ClashOpts = ClashOpts
   -- ^ Synthesis target. See "HdlSyn" for available options.
   , opt_errorExtra :: Bool
   -- ^ Show additional information in error messages
-  , opt_floatSupport :: Bool
-  -- ^ Treat floats as a BitVector. Note that operations on floating are still
-  -- not supported, use vendor primitives instead.
   , opt_importPaths :: [FilePath]
   -- ^ Paths where Clash should look for modules
   , opt_componentPrefix :: Maybe Text
@@ -381,7 +378,6 @@ instance Eq ClashOpts where
     opt_hdlDir s0 == opt_hdlDir s1 &&
     opt_hdlSyn s0 == opt_hdlSyn s1 &&
     opt_errorExtra s0 == opt_errorExtra s1 &&
-    opt_floatSupport s0 == opt_floatSupport s1 &&
     opt_importPaths s0 == opt_importPaths s1 &&
     opt_componentPrefix s0 == opt_componentPrefix s1 &&
     opt_newInlineStrat s0 == opt_newInlineStrat s1 &&
@@ -419,7 +415,6 @@ instance Hashable ClashOpts where
     opt_hdlDir `hashWithSalt`
     opt_hdlSyn `hashWithSalt`
     opt_errorExtra `hashWithSalt`
-    opt_floatSupport `hashWithSalt`
     opt_importPaths `hashWithSalt`
     opt_componentPrefix `hashWithSalt`
     opt_newInlineStrat `hashWithSalt`
@@ -457,7 +452,6 @@ defClashOpts
   , opt_hdlDir              = Nothing
   , opt_hdlSyn              = Other
   , opt_errorExtra          = False
-  , opt_floatSupport        = False
   , opt_importPaths         = []
   , opt_componentPrefix     = Nothing
   , opt_newInlineStrat      = True
