@@ -1,5 +1,5 @@
-ARG RISK=edge
-ARG UBUNTU=xenial
+ARG RISK=stable
+ARG UBUNTU=focal
 
 FROM ubuntu:$UBUNTU as builder
 ARG RISK
