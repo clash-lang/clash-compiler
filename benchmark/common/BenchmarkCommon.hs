@@ -51,7 +51,7 @@ defaultTests =
 
 typeTrans :: (CustomReprs -> TyConMap -> Type ->
               State HWMap (Maybe (Either String FilteredHWType)))
-typeTrans = ghcTypeToHWType WORD_SIZE_IN_BITS True
+typeTrans = ghcTypeToHWType WORD_SIZE_IN_BITS
 
 opts :: [FilePath] -> ClashOpts
 opts idirs =
@@ -59,7 +59,6 @@ opts idirs =
       opt_cachehdl=False
     , opt_clear=True
     , opt_errorExtra = True
-    , opt_floatSupport = True
     , opt_importPaths=idirs
     , opt_specLimit=100 -- For "ManyEntitiesVaried"
     }

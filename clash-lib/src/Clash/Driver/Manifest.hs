@@ -129,12 +129,11 @@ data Manifest
   = Manifest
   { manifestHash :: ByteString
     -- ^ Hash digest of the TopEntity and all its dependencies.
-  , successFlags  :: (Int,Int,Bool)
+  , successFlags  :: (Int, Int)
     -- ^ Compiler flags used to achieve successful compilation:
     --
     --   * opt_inlineLimit
     --   * opt_specLimit
-    --   * opt_floatSupport
   , ports :: [ManifestPort]
     -- ^ Ports in the generated @TopEntity@.
   , componentNames :: [Text]
@@ -309,7 +308,7 @@ mkManifest backend domains ClashOpts{..} Component{..} components deps files top
   , componentNames = map Id.toText compNames
   , topComponent = Id.toText componentName
   , fileNames = files
-  , successFlags = (opt_inlineLimit, opt_specLimit, opt_floatSupport)
+  , successFlags = (opt_inlineLimit, opt_specLimit)
   , domains = domains
   , transitiveDependencies = map (nameOcc . varName) deps
   }
@@ -410,12 +409,9 @@ readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashMo
       -- they could affect successful compilation, and use that information
       -- to decide whether to use caching or not (see: XXXX).
       --
-      -- 1. termination measures
+      -- 5. termination measures
     , opt_inlineLimit = 20
     , opt_specLimit = 20
-
-      -- 2. Float support
-    , opt_floatSupport = False
 
       -- Finally, also ignore the HDL dir setting, because when a user moves the
       -- entire dir with generated HDL, they probably still want to use that as
@@ -434,15 +430,11 @@ readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashMo
     )
 
   checkManifest manifest@Manifest{manifestHash,successFlags}
-    | (cachedInline, cachedSpec, cachedFloat) <- successFlags
+    | (cachedInline, cachedSpec) <- successFlags
 
     -- Higher limits shouldn't affect HDL
     , cachedInline <= opt_inlineLimit
     , cachedSpec <= opt_specLimit
-
-    -- /Enabling/ float support should compile more designs. Of course, keeping
-    -- the same value for float support shouldn't invalidate caches either.
-    , ((cachedFloat && not opt_floatSupport) || (cachedFloat == opt_floatSupport))
 
     -- Callgraph hashes should correspond
     , manifestHash == topHash

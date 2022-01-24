@@ -49,7 +49,6 @@ mkClashOpts :: ClashOpts
 mkClashOpts = defClashOpts
   { opt_cachehdl     = False
   , opt_errorExtra   = True
-  , opt_floatSupport = True
   }
 
 mkBackend

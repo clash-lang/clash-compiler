@@ -2234,7 +2234,6 @@ makeHDL backend startAction optsRef srcs = do
               opts0  <- readIORef optsRef
               let opts1  = opts0 { opt_color = useColor dflags }
               let iw     = opt_intWidth opts1
-                  fp     = opt_floatSupport opts1
                   syn    = opt_hdlSyn opts1
                   color  = opt_color opts1
                   esc    = opt_escapedIds opts1
@@ -2282,7 +2281,7 @@ makeHDL backend startAction optsRef srcs = do
                   primMap
                   tcm
                   tupTcm
-                  (ghcTypeToHWType iw fp)
+                  (ghcTypeToHWType iw)
                   ghcEvaluator
                   evaluator
                   topEntities

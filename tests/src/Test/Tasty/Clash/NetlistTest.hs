@@ -65,13 +65,12 @@ typeTrans
   -> TyConMap
   -> Type
   -> State HWMap (Maybe (Either String FilteredHWType))
-typeTrans = ghcTypeToHWType WORD_SIZE_IN_BITS True
+typeTrans = ghcTypeToHWType WORD_SIZE_IN_BITS
 
 mkClashOpts :: ClashOpts
 mkClashOpts = defClashOpts
   { opt_cachehdl     = False
   , opt_errorExtra   = True
-  , opt_floatSupport = True
   }
 
 type family TargetToState (target :: HDL) where
