@@ -1,9 +1,10 @@
-# This Dockerfile is:
-#
-#   https://github.com/snapcore/snapcraft/pull/3384
-#   + xenial => focal
-#
-FROM ubuntu:focal as builder
+ARG RISK=stable
+ARG UBUNTU=focal
+
+FROM ubuntu:$UBUNTU as builder
+ARG RISK
+ARG UBUNTU
+RUN echo "Building snapcraft:$RISK in ubuntu:$UBUNTU"
 
 # Grab dependencies
 RUN apt-get update
@@ -31,9 +32,9 @@ RUN curl -L $(curl -H 'X-Ubuntu-Series: 16' 'https://api.snapcraft.io/api/v1/sna
 RUN mkdir -p /snap/core20
 RUN unsquashfs -d /snap/core20/current core20.snap
 
-# Grab the snapcraft snap from the stable channel and unpack it in the proper
-# place.
-RUN curl -L $(curl -H 'X-Ubuntu-Series: 16' 'https://api.snapcraft.io/api/v1/snaps/details/snapcraft?channel=stable' | jq '.download_url' -r) --output snapcraft.snap
+# Grab the snapcraft v6751, the last working version of snapcraft:
+# https://forum.snapcraft.io/t/snapcraft-failed-in-container/27921
+RUN curl -L https://api.snapcraft.io/api/v1/snaps/download/vMTKRaLjnOJQetI78HjntT37VuoyssFE_6751.snap --output snapcraft.snap
 RUN mkdir -p /snap/snapcraft
 RUN unsquashfs -d /snap/snapcraft/current snapcraft.snap
 
@@ -47,7 +48,7 @@ RUN chmod +x /snap/bin/snapcraft
 
 # Multi-stage build, only need the snaps from the builder. Copy them one at a
 # time so they can be cached.
-FROM ubuntu:focal
+FROM ubuntu:$UBUNTU
 COPY --from=builder /snap/core /snap/core
 COPY --from=builder /snap/core18 /snap/core18
 COPY --from=builder /snap/core20 /snap/core20
