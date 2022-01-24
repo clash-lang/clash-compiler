@@ -21,12 +21,16 @@ cradle:
       config: { cradle: {none: }}
     - path: "./clash-ghc/src-bin-881"
       config: { cradle: {none: }}
+    - path: "./clash-lib-hedgehog"
+      config: { cradle: {cabal: [{path: "./clash-lib-hedgehog/src", component: "lib:clash-lib-hedgehog"}]}}
     - path: "./clash-lib"
       config: { cradle: {cabal: [{path: "./clash-lib/src", component: "lib:clash-lib"}
                                 ,{path: "./clash-lib/test", component: "clash-lib:unittests"} ] } }
     # Clash prelude is broken for now because ghcide won't use -fobject-code
     # when loading ./clash-prelude/src/Clash/Sized/Internal/Mod.hs transitively
     # as a dependency of another module
+    - path: "./clash-prelude-hedgehog"
+      config: { cradle: {cabal: [{path: "./clash-prelude-hedgehog/src", component: "lib:clash-prelude-hedgehog"}]}}
     - path: "./clash-prelude"
       config: { cradle: {none: }}
     - path: "./clash-term"

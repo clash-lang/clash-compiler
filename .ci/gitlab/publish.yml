@@ -4,7 +4,9 @@ hackage-sdist:
   stage: pack
   script:
     - .ci/build_sdist.sh clash-prelude
+    - .ci/build_sdist.sh clash-prelude-hedgehog
     - .ci/build_sdist.sh clash-lib
+    - .ci/build_sdist.sh clash-lib-hedgehog
     - .ci/build_sdist.sh clash-ghc
   artifacts:
     paths:
@@ -21,7 +23,9 @@ hackage-sdist:
     key: hackage
   script:
     - .ci/publish_sdist.sh clash-prelude
+    - .ci/publish_sdist.sh clash-prelude-hedgehog
     - .ci/publish_sdist.sh clash-lib
+    - .ci/publish_sdist.sh clash-lib-hedgehog
     - .ci/publish_sdist.sh clash-ghc
   retry:
     max: 2

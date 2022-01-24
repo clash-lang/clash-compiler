@@ -19,7 +19,9 @@ module Clash.Core.TyCon
   , AlgTyConRhs (..)
   , mkKindTyCon
   , isTupleTyConLike
+  , isPrimTc
   , isNewTypeTc
+  , isPromotedDc
   , tyConDataCons
   )
 where
@@ -49,6 +51,13 @@ data TyCon
   , algTcRhs    :: !AlgTyConRhs -- ^ DataCon definitions
   , isClassTc   :: !Bool        -- ^ Is this a class dictionary?
   }
+  | PromotedDataCon
+  { tyConUniq   :: {-# UNPACK #-} !Unique -- invariant (same as dcUniq)
+  , tyConName   :: !TyConName   -- ^ Name of the TyCon
+  , tyConKind   :: !Kind        -- ^ Kind of the TyCon
+  , tyConArity  :: !Int         -- ^ Number of type arguments
+  , tyConData   :: !DataCon     -- ^ DataCon which is promoted
+  }
   -- | Function TyCons (e.g. type families)
   | FunTyCon
   { tyConUniq   :: {-# UNPACK #-} !Unique
@@ -64,12 +73,14 @@ data TyCon
   , tyConKind    :: !Kind       -- ^ Kind of the TyCon
   , tyConArity   :: !Int        -- ^ Number of type arguments
   }
-  deriving (Generic,NFData,Binary)
+  deriving (Show,Generic,NFData,Binary)
 
+{-
 instance Show TyCon where
   show (AlgTyCon       {tyConName = n}) = "AlgTyCon: " ++ show n
   show (FunTyCon       {tyConName = n}) = "FunTyCon: " ++ show n
   show (PrimTyCon      {tyConName = n}) = "PrimTyCon: " ++ show n
+-}
 
 instance Eq TyCon where
   (==) = (==) `on` tyConUniq
@@ -121,8 +132,20 @@ tyConDataCons (AlgTyCon {algTcRhs = DataTyCon { dataCons = cons}}) = cons
 tyConDataCons (AlgTyCon {algTcRhs = NewTyCon  { dataCon  = con }}) = [con]
 tyConDataCons _                                                    = []
 
+isPrimTc
+  :: TyCon
+  -> Bool
+isPrimTc PrimTyCon{} = True
+isPrimTc _ = False
+
 isNewTypeTc
   :: TyCon
   -> Bool
 isNewTypeTc (AlgTyCon {algTcRhs = NewTyCon {}}) = True
 isNewTypeTc _ = False
+
+isPromotedDc
+  :: TyCon
+  -> Bool
+isPromotedDc PromotedDataCon{} = True
+isPromotedDc _ = False

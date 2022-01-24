@@ -1,0 +1,69 @@
+cabal-version:      2.2
+
+name:               clash-lib-hedgehog
+version:            1.5.0
+synopsis:           Hedgehog Generators for clash-lib
+description:        Hedgehog Generators for clash-lib
+bug-reports:        https://github.com/clash-lang/clash-compiler/issues
+license:            BSD-2-Clause
+license-file:       LICENSE
+author:             QBayLogic B.V.
+maintainer:         devops@qbaylogic.com
+copyright:          Copyright © 2021, QBayLogic B.V.
+category:           Hardware
+build-type:         Simple
+
+common basic-config
+  default-language: Haskell2010
+
+  default-extensions:
+    BinaryLiterals
+    DataKinds
+    ScopedTypeVariables
+    TypeApplications
+    TypeFamilies
+    TypeOperators
+
+  if impl(ghc >= 8.6)
+    default-extensions:
+      NoStarIsType
+
+  ghc-options:
+    -Wall -Wcompat
+
+  build-depends:
+    base,
+    hedgehog,
+
+library
+  import: basic-config
+  hs-source-dirs: src
+
+  exposed-modules:
+    Clash.Hedgehog.Core.DataCon
+    Clash.Hedgehog.Core.Literal
+    Clash.Hedgehog.Core.Monad
+    Clash.Hedgehog.Core.Name
+    Clash.Hedgehog.Core.Term
+    Clash.Hedgehog.Core.TyCon
+    Clash.Hedgehog.Core.Type
+    Clash.Hedgehog.Core.Var
+    Clash.Hedgehog.Internal.Bias
+    Clash.Hedgehog.Unique
+
+  build-depends:
+    containers,
+    data-binary-ieee754,
+    fakedata >= 1.0.2,
+    ghc-typelits-knownnat,
+    ghc-typelits-natnormalise,
+    hedgehog-fakedata,
+    mmorph,
+    mtl,
+    pretty-show,
+    primitive,
+    text,
+    transformers,
+
+    clash-lib,
+

@@ -3,7 +3,13 @@ set -xueo pipefail
 
 # Generate source distributions for all our packages
 # TODO: `sdist clash-cosim` only works _after_ building it
-cabal v2-sdist clash-prelude clash-lib clash-ghc clash-cores
+cabal v2-sdist \
+    clash-cores \
+    clash-ghc \
+    clash-lib \
+    clash-lib-hedgehog \
+    clash-prelude \
+    clash-prelude-hedgehog
 
 # test that we can create a build plan with the index-state in cabal.project
 set +u
