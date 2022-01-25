@@ -51,7 +51,9 @@ common basic-config
     Glob,
     ieee754,
     neat-interpolation,
+    optparse-applicative,
     process,
+    tagged,
     tasty,
     tasty-hunit,
     temporary,
@@ -93,6 +95,7 @@ library
     Test.Tasty.Modelsim
     Test.Tasty.SymbiYosys
     Test.Tasty.Program
+    Test.Tasty.Verilator
     Test.Tasty.Clash.CollectSimResults
 
     -- From tests/shouldwork/LoadModules

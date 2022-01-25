@@ -89,6 +89,22 @@ RUN git clone https://github.com/cliffordwolf/SymbiYosys.git SymbiYosys \
  && cd .. \
  && rm -Rf SymbiYosys
 
+FROM builder AS build-verilator
+
+ARG DEPS_VERILATOR="perl python3 make autoconf g++ flex bison ccache libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlibc zlib1g zlib1g-dev"
+RUN apt-get install -y --no-install-recommends $DEPS_VERILATOR
+
+ARG verilator_version="v4.214"
+RUN git clone https://github.com/verilator/verilator verilator \
+  && cd verilator \
+  && git checkout $verilator_version \
+  && autoconf \
+  && ./configure --prefix $PREFIX \
+  && make PREFIX=$PREFIX -j$(nproc) \
+  && make PREFIX=$PREFIX install \
+  && cd ../.. \
+  && rm -Rf verilator
+
 FROM builder AS build-ghc
 
 ARG ghcup_version="0.1.15.2"
@@ -108,7 +124,7 @@ FROM ubuntu:$UBUNTU_VERSION AS run
 LABEL vendor="QBayLogic B.V." maintainer="devops@qbaylogic.com"
 ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH="$PATH:/opt/bin:/root/.ghcup/bin"
 
-ARG DEPS_RUNTIME="ca-certificates curl gcc git jq libc6-dev libgmp10-dev libgnat-9 libllvm11 libreadline8 libtinfo-dev libtcl8.6 make python3 ssh zlib1g-dev zstd"
+ARG DEPS_RUNTIME="ca-certificates ccache curl g++ gcc git jq libc6-dev libgmp10-dev libgnat-9 libllvm11 libreadline8 libtinfo-dev libtcl8.6 make perl python3 ssh zlib1g-dev zlibc zstd"
 RUN apt-get update \
  && apt-get install -y --no-install-recommends $DEPS_RUNTIME \
  && apt-get clean \
@@ -117,4 +133,5 @@ RUN apt-get update \
 COPY --from=build-ghdl /opt /opt
 COPY --from=build-iverilog /opt /opt
 COPY --from=build-symbiyosys /opt /opt
+COPY --from=build-verilator /opt /opt
 COPY --from=build-ghc /root/.ghcup /root/.ghcup

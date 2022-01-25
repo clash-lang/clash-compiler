@@ -5,7 +5,8 @@ ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8
 # Caches dependencies of scripts & CI
 ARG DEPS_SCRIPTS="devscripts cabal-install cabal-debian haskell-devscripts haskell-stack python3 equivs zstd"
 ARG DEPS_SYMBIYOSYS="pkg-config clang tclsh git python python3 build-essential bison flex libreadline-dev gawk tcl-dev libffi-dev autoconf cmake"
-RUN apt-get update && apt-get install -y $DEPS_SCRIPTS $DEPS_SYMBIYOSYS
+ARG DEPS_VERILATOR="perl python3 make autoconf g++ flex bison ccache libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlibc zlib1g zlib1g-dev"
+RUN apt-get update && apt-get install -y $DEPS_SCRIPTS $DEPS_SYMBIYOSYS $DEPS_VERILATOR
 
 ARG YOSYS_VERSION="8cfed1a97957e4c096d1e0a0304d978bcb27e116"
 RUN git clone https://github.com/YosysHQ/yosys.git yosys \
@@ -34,6 +35,17 @@ RUN git clone https://github.com/cliffordwolf/SymbiYosys.git SymbiYosys \
  && make install \
  && cd .. \
  && rm -Rf SymbiYosys
+
+ARG verilator_version="v4.214"
+RUN git clone https://github.com/verilator/verilator verilator \
+  && cd verilator \
+  && git checkout $verilator_version \
+  && autoconf \
+  && ./configure \
+  && make -j$(nproc) \
+  && make install \
+  && cd ../.. \
+  && rm -Rf verilator
 
 # First apt-get is the transitive dependencies of clash-ghc-{dev,prof}
 # Second apt-get is the result of scanning a build log for "newly installed packages"

@@ -1,5 +1,5 @@
 {
-  "docker": "ghcr.io/clash-lang/bindist-debian-focal:2022-01-20",
+  "docker": "ghcr.io/clash-lang/bindist-debian-focal:2022-01-25",
   "build-dependencies": [
     "devscripts",
     "cabal-install",

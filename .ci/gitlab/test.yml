@@ -89,3 +89,8 @@ suite:verilog:
   extends: .test-common-local
   script:
     - cabal v2-run -- clash-testsuite -j$THREADS -p .Verilog --hide-successes
+
+suite:systemverilog:
+  extends: .test-common-local
+  script:
+    - cabal v2-run -- clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim
