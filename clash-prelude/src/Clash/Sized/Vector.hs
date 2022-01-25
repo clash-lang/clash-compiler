@@ -1905,6 +1905,8 @@ rotateRightS xs d = go (snatToInteger d `mod` natVal (asNatProxy xs)) xs
 --
 -- >>> toList (1:>2:>3:>Nil)
 -- [1,2,3]
+--
+-- __NB:__ this function is not synthesizable
 toList :: Vec n a -> [a]
 toList = foldr (:) []
 {-# INLINE toList #-}
@@ -1921,8 +1923,8 @@ toList = foldr (:) []
 -- >>> Vec.fromList [1,2,3,4,5] :: Maybe (Vec 10 Int)
 -- Nothing
 --
--- __NB:__ use `listToVecTH` if you want to make a /statically known/ vector
--- __NB:__ this function is not synthesizable
+-- * __NB:__ use `listToVecTH` if you want to make a /statically known/ vector
+-- * __NB:__ this function is not synthesizable
 --
 fromList :: forall n a. (KnownNat n) => [a] -> Maybe (Vec n a)
 fromList xs
@@ -1949,8 +1951,8 @@ fromList xs
 -- 1 :> 2 :> 3 :> 4 :> 5 :> *** Exception: Clash.Sized.Vector.unsafeFromList: vector larger than list
 -- ...
 --
--- __NB:__ use `listToVecTH` if you want to make a /statically known/ vector
--- __NB:__ this function is not synthesizable
+-- * __NB:__ use `listToVecTH` if you want to make a /statically known/ vector
+-- * __NB:__ this function is not synthesizable
 --
 unsafeFromList :: forall n a. (KnownNat n) => [a] -> Vec n a
 unsafeFromList = unfoldr SNat go
