@@ -32,8 +32,8 @@ common basic-config
     -Wall -Wcompat
 
   build-depends:
-    base,
-    hedgehog,
+    base      >= 4.11  && < 5,
+    hedgehog  >= 1.0.3 && < 1.1,
 
 library
   import: basic-config
@@ -49,9 +49,9 @@ library
     Clash.Hedgehog.Sized.Vector
 
   build-depends:
-    ghc-typelits-knownnat,
-    ghc-typelits-natnormalise,
-    text,
+    ghc-typelits-knownnat     >= 0.7.2   && < 0.8,
+    ghc-typelits-natnormalise >= 0.7.2   && < 0.8,
+    text                      >= 1.2.2   && < 1.4,
 
-    clash-prelude,
+    clash-prelude             == 1.5.0,
 
