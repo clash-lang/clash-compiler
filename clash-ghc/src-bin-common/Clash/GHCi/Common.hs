@@ -1,5 +1,5 @@
 {-|
-  Copyright   :  (C) 2021, QBayLogic
+  Copyright   :  (C) 2021-2022, QBayLogic
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -17,7 +17,7 @@ module Clash.GHCi.Common
   ) where
 
 -- Clash
-import           Clash.Driver.Types     (ClashOpts (..), BindingMap)
+import           Clash.Driver.Types     (ClashOpts (..), ClashDesign(..))
 import           Clash.Netlist.Types    (TopEntityT(..))
 
 -- The GHC interface
@@ -53,27 +53,25 @@ getMainTopEntity
   :: HasCallStack
   => String
   -- ^ Module name
-  -> BindingMap
-  -- ^ Map of global binders
-  -> [TopEntityT]
-  -- ^ List of top entities loaded by LoadModules
+  -> ClashDesign
   -> String
   -- ^ string passed with -main-is
   -> IO (TopEntityT, [TopEntityT])
   -- ^ Throws exception if -main-is was set, but no such top entity was found.
   -- Otherwise, returns main top entity and all top entities (transitively) used
   -- in the main top entity.
-getMainTopEntity modName bindingMap topEnts nm =
-  case filter isNm topEnts of
+getMainTopEntity modName design nm =
+  case filter isNm (designEntities design) of
     [] -> throw $ ClashException noSrcSpan [I.i|
       Could not find top entity called #{show nm} in #{show modName}
     |] Nothing
     [t] ->
       let
+        bindingMap = designBindings design
         closure0 = collectCallGraphUniques (callGraph bindingMap (topId t))
         closure1 = HashSet.delete (getUnique (topId t)) closure0
       in
-        pure (t, filter ((`HashSet.member` closure1) . getUnique . topId) topEnts)
+        pure (t, filter ((`HashSet.member` closure1) . getUnique . topId) (designEntities design))
     ts ->
       error $ [I.i|
         Internal error: multiple top entities called #{nm} (#{map topId ts})

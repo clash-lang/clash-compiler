@@ -5,10 +5,8 @@
 
 module BenchmarkCommon where
 
-import Clash.Signal (VDomainConfiguration)
-
 import Clash.Annotations.Primitive (HDL(VHDL))
-import Clash.Annotations.BitRepresentation.Internal (CustomReprs, buildCustomReprs)
+import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import Clash.Backend
 import Clash.Backend.VHDL
 import Clash.Core.TyCon
@@ -23,20 +21,10 @@ import Clash.GHC.GenerateBindings
 import Clash.GHC.NetlistTypes
 import Clash.Netlist.BlackBox.Types (HdlSyn(Other))
 import Clash.Netlist.Types
-  (PreserveCase(..), HWMap, FilteredHWType, TopEntityT, topId)
-import Clash.Primitives.Types
-
-#if MIN_VERSION_ghc(9,0,0)
-import GHC.Utils.Misc (OverridingBool(..))
-#else
-import Util (OverridingBool(..))
-#endif
+  (PreserveCase(..), HWMap, FilteredHWType, topId)
 
 import qualified Control.Concurrent.Supply as Supply
 import Control.Monad.State.Strict   (State)
-import Data.HashMap.Strict          (HashMap)
-import Data.IntMap.Strict           (IntMap)
-import Data.Text                    (Text)
 
 defaultTests :: [FilePath]
 defaultTests =
@@ -71,43 +59,25 @@ backend = initBackend WORD_SIZE_IN_BITS HDLSYN True PreserveCase Nothing (Aggres
 
 runInputStage
   :: [FilePath]
-  -- ^ Import dirs
   -> FilePath
-  -> IO (BindingMap
-        ,TyConMap
-        ,IntMap TyConName
-        ,[TopEntityT]
-        ,CompiledPrimMap
-        ,CustomReprs
-        ,HashMap Text VDomainConfiguration
-        ,[Id]
-        ,Id
-        )
+  -> IO (ClashEnv, ClashDesign)
 runInputStage idirs src = do
+  let o = opts idirs
   pds <- primDirs backend
-  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs,domainConfs) <- generateBindings (return ()) Auto pds idirs [] (hdlKind backend) src Nothing
-  let topEntityNames = map topId topEntities
-      tm = head topEntityNames
-  return (bindingsMap,tcm,tupTcm,topEntities, primMap, buildCustomReprs reprs, domainConfs, topEntityNames,tm)
+  generateBindings o (return ()) pds (opt_importPaths o) [] (hdlKind backend) src Nothing
 
 runNormalisationStage
   :: [FilePath]
   -> String
-  -> IO (BindingMap
-        ,[TopEntityT]
-        ,CompiledPrimMap
-        ,TyConMap
-        ,CustomReprs
-        ,Id
-        )
+  -> IO (ClashEnv, ClashDesign, Id)
 runNormalisationStage idirs src = do
   supplyN <- Supply.newSupply
-  (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs,_domainConfs,topEntityNames,topEntity) <-
-    runInputStage idirs src
-  let opts1 = opts idirs
-      transformedBindings =
-        normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans
+  (env, design) <- runInputStage idirs src
+  let topEntityNames = fmap topId (designEntities design)
+  let topEntity = head topEntityNames
+  let transformedBindings =
+        normalizeEntity env (designBindings design) typeTrans
           ghcEvaluator
           evaluator
-          topEntityNames opts1 supplyN topEntity
-  return (transformedBindings,topEntities,primMap,tcm,reprs,topEntity)
+          topEntityNames supplyN topEntity
+  return (env, design{designBindings=transformedBindings},topEntity)

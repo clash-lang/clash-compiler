@@ -154,7 +154,7 @@ import           Clash.Backend.SystemVerilog (SystemVerilogState)
 import           Clash.Backend.VHDL (VHDLState)
 import           Clash.Backend.Verilog (VerilogState)
 import qualified Clash.Driver
-import           Clash.Driver.Types (ClashOpts(..))
+import           Clash.Driver.Types (ClashOpts(..), ClashEnv(..), ClashDesign(..))
 import           Clash.GHC.Evaluator
 import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
@@ -165,8 +165,6 @@ import           Clash.Netlist.Types (PreserveCase)
 import           Clash.Util (clashLibVersion, reportTimeDiff)
 import qualified Data.Time.Clock as Clock
 import qualified Paths_clash_ghc
-
-import           Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 
 -----------------------------------------------------------------------------
 
@@ -2235,7 +2233,6 @@ makeHDL backend startAction optsRef srcs = do
               let opts1  = opts0 { opt_color = useColor dflags }
               let iw     = opt_intWidth opts1
                   syn    = opt_hdlSyn opts1
-                  color  = opt_color opts1
                   esc    = opt_escapedIds opts1
                   lw     = opt_lowerCaseBasicIds opts1
                   frcUdf = opt_forceUndefined opts1
@@ -2263,30 +2260,23 @@ makeHDL backend startAction optsRef srcs = do
               forM_ srcs $ \src -> do
                 -- Generate bindings:
                 let dbs = reverse [p | PackageDB (PkgDbPath p) <- packageDBFlags dflags]
-                (bindingsMap,tcm,tupTcm,topEntities,primMap,reprs,domainConfs) <-
-                  generateBindings startAction color primDirs idirs dbs hdl src (Just dflags)
+                (clashEnv, clashDesign) <- generateBindings opts2 startAction primDirs idirs dbs hdl src (Just dflags)
 
-                let getMain = getMainTopEntity src bindingsMap topEntities
+                let getMain = getMainTopEntity src clashDesign
                 mainTopEntity <- traverse getMain (GHC.mainFunIs dflags)
-                prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
+                prepTime <- startTime `deepseq` designBindings clashDesign `deepseq` envTyConMap clashEnv `deepseq` Clock.getCurrentTime
                 let prepStartDiff = reportTimeDiff prepTime startTime
                 putStrLn $ "GHC+Clash: Loading modules cumulatively took " ++ prepStartDiff
 
                 -- Generate HDL:
                 Clash.Driver.generateHDL
-                  (buildCustomReprs reprs)
-                  domainConfs
-                  bindingsMap
+                  clashEnv
+                  clashDesign
                   (Just backend')
-                  primMap
-                  tcm
-                  tupTcm
                   (ghcTypeToHWType iw)
                   ghcEvaluator
                   evaluator
-                  topEntities
                   mainTopEntity
-                  opts2
                   startTime
 
 makeVHDL :: IORef ClashOpts -> [FilePath] -> InputT GHCi ()

@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                           2017, QBayLogic, Google Inc.,
-                          2021, QBayLogic B.V.
+                     2021-2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -44,7 +44,6 @@ import qualified GHC.Core.FamInstEnv     as GHC
 import qualified GHC.Core.TyCon          as GHC
 import qualified GHC.Core.Type           as GHC
 import qualified GHC.Builtin.Types       as GHC
-import qualified GHC.Utils.Misc          as GHC
 import qualified GHC.Settings.Constants  as GHC
 import qualified GHC.Types.Var           as GHC
 import qualified GHC.Types.SrcLoc        as GHC
@@ -61,14 +60,12 @@ import qualified Name                    as GHC hiding (varName)
 import qualified TyCon                   as GHC
 import qualified Type                    as GHC
 import qualified TysWiredIn              as GHC
-import qualified Util                    as GHC
 import qualified Var                     as GHC
 import qualified SrcLoc                  as GHC
 #endif
 
-import           Clash.Annotations.BitRepresentation.Internal (DataRepr')
+import           Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 import           Clash.Annotations.Primitive (HDL, extractPrim)
-import           Clash.Signal.Internal
 
 import           Clash.Core.Subst        (extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term         (Term (..), mkLams, mkTyLams)
@@ -82,7 +79,7 @@ import           Clash.Core.VarEnv
   ,mkVarEnv, unionVarEnv, elemVarSet, mkVarSet)
 import           Clash.Debug             (traceIf)
 import           Clash.Driver            (compilePrimitive)
-import           Clash.Driver.Types      (BindingMap, Binding(..), IsPrim(..))
+import           Clash.Driver.Types      (BindingMap, Binding(..), IsPrim(..), ClashEnv(..), ClashDesign(..), ClashOpts(..))
 import           Clash.GHC.GHC2Core
   (C2C, GHC2CoreState, GHC2CoreEnv (..), tyConMap, coreToId, coreToName, coreToTerm,
    makeAllTyCons, qualifiedNameString, emptyGHC2CoreState, srcSpan)
@@ -104,12 +101,11 @@ indexMaybe (x:_)  0 = Just x
 indexMaybe (_:xs) n = indexMaybe xs (n-1)
 
 generateBindings
-  :: GHC.Ghc ()
+  :: ClashOpts
+  -> GHC.Ghc ()
   -- ^ Allows us to have some initial action, such as sharing a linker state
   -- See https://github.com/clash-lang/clash-compiler/issues/1686 and
   -- https://mail.haskell.org/pipermail/ghc-devs/2021-March/019605.html
-  -> GHC.OverridingBool
-  -- ^ Use color
   -> [FilePath]
   -- ^ primitives (blackbox) directories
   -> [FilePath]
@@ -120,15 +116,8 @@ generateBindings
   -- ^ HDL target
   -> String
   -> Maybe GHC.DynFlags
-  -> IO ( BindingMap
-        , TyConMap
-        , IntMap TyConName
-        , [TopEntityT]
-        , CompiledPrimMap  -- The primitives found in '.' and 'primDir'
-        , [DataRepr']
-        , HashMap.HashMap Text.Text VDomainConfiguration
-        )
-generateBindings startAction useColor primDirs importDirs dbs hdl modName dflagsM = do
+  -> IO (ClashEnv, ClashDesign)
+generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = do
   (  bindings
    , clsOps
    , unlocatable
@@ -137,7 +126,7 @@ generateBindings startAction useColor primDirs importDirs dbs hdl modName dflags
    , partitionEithers -> (unresolvedPrims, pFP)
    , customBitRepresentations
    , primGuards
-   , domainConfs ) <- loadModules startAction useColor hdl modName dflagsM importDirs
+   , domainConfs ) <- loadModules startAction (opt_color opts) hdl modName dflagsM importDirs
   startTime <- Clock.getCurrentTime
   primMapR <- generatePrimMap unresolvedPrims primGuards (concat [pFP, primDirs, importDirs])
   tdir <- maybe ghcLibDir (pure . GHC.topDir) dflagsM
@@ -180,14 +169,20 @@ generateBindings startAction useColor primDirs importDirs dbs hdl modName dflags
 
   let allBindings' = setNoInlineTopEntities allBindings topEntities''
 
-  return ( allBindings'
-         , allTcCache
-         , tupTcCache
-         , topEntities''
-         , primMapC
-         , customBitRepresentations
-         , domainConfs
-         )
+  return
+    ( ClashEnv
+        { envOpts = opts
+        , envTyConMap = allTcCache
+        , envTupleTyCons = tupTcCache
+        , envPrimitives = primMapC
+        , envCustomReprs = buildCustomReprs customBitRepresentations
+        }
+    , ClashDesign
+        { designEntities = topEntities''
+        , designDomains = domainConfs
+        , designBindings = allBindings'
+        }
+    )
 
 setNoInlineTopEntities
   :: BindingMap

@@ -32,25 +32,30 @@ main = do
 
 benchFile :: [FilePath] -> FilePath -> IO ()
 benchFile idirs src = do
-  env <- setupEnv src
+  (transformedBindings,topEntities,primMap,tcm,reprs,topEntity) <- setupEnv src
   putStrLn $ "Doing netlist generation of " ++ src
-  let (transformedBindings,topEntities,primMap,tcm,reprs,topEntity) = env
-      primMap'   = fmap (fmap unremoveBBfunc) primMap
-      opts1      = opts idirs
-      iw         = opt_intWidth opts1
+
+  let clashEnv = ClashEnv
+                   { envOpts = opts idirs
+                   , envTyConMap = tcm
+                   , envTupleTyCons = mempty
+                   , envPrimitives = fmap (fmap unremoveBBfunc) primMap
+                   , envCustomReprs = reprs
+                   }
+
       topEntityS = Text.unpack (nameOcc (varName topEntity))
       modName    = takeWhile (/= '.') topEntityS
       hdlState'  = setModName (Text.pack modName) backend
-      (compNames, seen) = genTopNames opts1 hdl topEntities
+      (compNames, seen) = genTopNames (envOpts clashEnv) hdl topEntities
       topEntityMap = mkVarEnv (zip (map topId topEntities) topEntities)
       prefixM    = Nothing
       ite        = ifThenElseExpr hdlState'
-      hdlDir     = fromMaybe "." (opt_hdlDir opts1) </>
+      hdlDir     = fromMaybe "." (opt_hdlDir (envOpts clashEnv)) </>
                          Clash.Backend.name hdlState' </>
                          takeWhile (/= '.') topEntityS
   (netlist,_,_) <-
-    genNetlist False opts1 reprs transformedBindings topEntityMap compNames primMap'
-               tcm typeTrans iw ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
+    genNetlist clashEnv False transformedBindings topEntityMap compNames
+               typeTrans ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
   netlist `deepseq` putStrLn ".. done\n"
 
 setupEnv

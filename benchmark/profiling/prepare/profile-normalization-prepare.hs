@@ -6,6 +6,9 @@ import           Data.Binary (encode)
 import qualified Data.ByteString.Lazy as B
 import           Data.List                    (partition)
 
+import           Clash.Driver.Types           (ClashEnv(..), ClashDesign(..))
+import           Clash.Netlist.Types          (TopEntityT(topId))
+
 import           SerialiseInstances
 import           BenchmarkCommon
 
@@ -23,10 +26,19 @@ prepareFile :: [FilePath] -> FilePath -> IO ()
 prepareFile idirs fIn = do
   putStrLn $ "Preparing: " ++ fIn
   let fOut = fIn ++ ".bin"
-  inp <- runInputStage idirs fIn
-  let (bindingsMap,tcm,tupTcm,_topEntities,primMap,reprs,_domainConfs,topEntityNames,topEntity) = inp
-      inp' :: NormalizationInputs
-      inp' = (bindingsMap,tcm,tupTcm, fmap (fmap removeBBfunc) primMap, reprs,topEntityNames,topEntity)
+  (clashEnv, clashDesign) <- runInputStage idirs fIn
+
+  let topNames = fmap topId (designEntities clashDesign)
+
+  let inputs = ( designBindings clashDesign
+               , envTyConMap clashEnv
+               , envTupleTyCons clashEnv
+               , fmap (fmap removeBBfunc) (envPrimitives clashEnv)
+               , envCustomReprs clashEnv
+               , topNames
+               , head topNames
+               )
+
   putStrLn $ "Serialising to : " ++ fOut
-  B.writeFile fOut $ encode inp'
+  B.writeFile fOut $ encode inputs
   putStrLn "Done"

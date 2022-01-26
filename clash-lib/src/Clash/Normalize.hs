@@ -2,7 +2,7 @@
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016     , Myrtle Software Ltd,
                      2017     , Google Inc.,
-                     2021     , QBayLogic B.V.
+                     2021-2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -24,7 +24,6 @@ import           Control.Monad.State.Strict       (State)
 import           Data.Default                     (def)
 import           Data.Either                      (lefts,partitionEithers)
 import qualified Data.IntMap                      as IntMap
-import           Data.IntMap.Strict               (IntMap)
 import           Data.List
   (intersect, mapAccumL)
 import qualified Data.Map                         as Map
@@ -58,8 +57,7 @@ import           Clash.Core.Subst
 import           Clash.Core.Term                  (Term (..), collectArgsTicks
                                                   ,mkApps, mkTicks)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
-import           Clash.Core.TyCon
-  (TyConMap, TyConName)
+import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type                  (isPolyTy)
 import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
@@ -68,7 +66,7 @@ import           Clash.Core.VarEnv
    mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
 import           Clash.Debug                      (traceIf)
 import           Clash.Driver.Types
-  (BindingMap, Binding(..), ClashOpts (..), DebugOpts(..))
+  (BindingMap, Binding(..), ClashOpts (..), DebugOpts(..), ClashEnv(..))
 import           Clash.Netlist.Types
   (HWMap, FilteredHWType(..))
 import           Clash.Netlist.Util
@@ -77,7 +75,6 @@ import           Clash.Normalize.Strategy
 import           Clash.Normalize.Transformations
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
-import           Clash.Primitives.Types           (CompiledPrimMap)
 import           Clash.Rewrite.Combinators        ((>->),(!->),repeatR,topdownR)
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, debugOpts, extra,
@@ -97,8 +94,7 @@ import           Clash.Rewrite.Types (RewriteStep(..))
 
 -- | Run a NormalizeSession in a given environment
 runNormalization
-  :: ClashOpts
-  -- ^ Level of debug messages to print
+  :: ClashEnv
   -> Supply
   -- ^ UniqueSupply
   -> BindingMap
@@ -106,17 +102,10 @@ runNormalization
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded Type -> HWType translator
-  -> CustomReprs
-  -> TyConMap
-  -- ^ TyCon cache
-  -> IntMap TyConName
-  -- ^ Tuple TyCon cache
   -> PE.Evaluator
   -- ^ Hardcoded evaluator for partial evaluation
   -> WHNF.Evaluator
   -- ^ Hardcoded evaluator for WHNF (old evaluator)
-  -> CompiledPrimMap
-  -- ^ Primitive Definitions
   -> VarEnv Bool
   -- ^ Map telling whether a components is part of a recursive group
   -> [Id]
@@ -124,20 +113,21 @@ runNormalization
   -> NormalizeSession a
   -- ^ NormalizeSession to run
   -> a
-runNormalization opts supply globals typeTrans reprs tcm tupTcm peEval eval primMap rcsMap topEnts
-  = runRewriteSession rwEnv rwState
+runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
+  runRewriteSession rwEnv rwState
   where
+    -- TODO The RewriteEnv should just take ClashOpts.
     rwEnv     = RewriteEnv
-                  (opt_debug opts)
-                  (opt_aggressiveXOpt opts)
+                  (opt_debug (envOpts env))
+                  (opt_aggressiveXOpt (envOpts env))
                   typeTrans
-                  tcm
-                  tupTcm
+                  (envTyConMap env)
+                  (envTupleTyCons env)
                   peEval
                   eval
                   (mkVarSet topEnts)
-                  reprs
-                  (opt_evaluatorFuelLimit opts)
+                  (envCustomReprs env)
+                  (opt_evaluatorFuelLimit (envOpts env))
 
     rwState   = RewriteState
                   0
@@ -154,17 +144,17 @@ runNormalization opts supply globals typeTrans reprs tcm tupTcm peEval eval prim
                   emptyVarEnv
                   Map.empty
                   emptyVarEnv
-                  (opt_specLimit opts)
+                  (opt_specLimit (envOpts env))
                   emptyVarEnv
-                  (opt_inlineLimit opts)
-                  (opt_inlineFunctionLimit opts)
-                  (opt_inlineConstantLimit opts)
-                  primMap
+                  (opt_inlineLimit (envOpts env))
+                  (opt_inlineFunctionLimit (envOpts env))
+                  (opt_inlineConstantLimit (envOpts env))
+                  (envPrimitives env)
                   Map.empty
                   rcsMap
-                  (opt_newInlineStrat opts)
-                  (opt_ultra opts)
-                  (opt_inlineWFCacheLimit opts)
+                  (opt_newInlineStrat (envOpts env))
+                  (opt_ultra (envOpts env))
+                  (opt_inlineWFCacheLimit (envOpts env))
 
 
 normalize

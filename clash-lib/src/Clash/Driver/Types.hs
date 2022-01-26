@@ -2,7 +2,7 @@
   Copyright  :  (C) 2013-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017     , QBayLogic, Google Inc.
-                    2020-2021, QBayLogic
+                    2020-2022, QBayLogic
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -12,6 +12,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -20,10 +21,11 @@ module Clash.Driver.Types where
 -- For Int/Word size
 #include "MachDeps.h"
 
-import           Control.DeepSeq                (NFData)
+import           Control.DeepSeq                (NFData(rnf), deepseq)
 import           Data.Binary                    (Binary)
 import           Data.Fixed
 import           Data.Hashable
+import           Data.IntMap.Strict             (IntMap)
 import           Data.Maybe                     (isJust)
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
@@ -47,13 +49,38 @@ import           SrcLoc                         (SrcSpan)
 import           Util                           (OverridingBool(..))
 #endif
 
+import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import           Clash.Signal.Internal
 
+import           Clash.Backend                  (DomainMap)
 import           Clash.Core.Term                (Term)
+import           Clash.Core.TyCon               (TyConMap, TyConName)
 import           Clash.Core.Var                 (Id)
 import           Clash.Core.VarEnv              (VarEnv)
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
-import {-# SOURCE #-} Clash.Netlist.Types       (PreserveCase(..))
+import {-# SOURCE #-} Clash.Netlist.Types       (PreserveCase(..), TopEntityT)
+import           Clash.Primitives.Types         (CompiledPrimMap)
+
+data ClashEnv = ClashEnv
+  { envOpts        :: ClashOpts
+  , envTyConMap    :: TyConMap
+  , envTupleTyCons :: IntMap TyConName
+  , envPrimitives  :: CompiledPrimMap
+  , envCustomReprs :: CustomReprs
+  } deriving (Generic, NFData)
+
+data ClashDesign = ClashDesign
+  { designEntities :: [TopEntityT]
+  , designDomains  :: DomainMap
+  , designBindings :: BindingMap
+  }
+
+instance NFData ClashDesign where
+  rnf design =
+    designEntities design `seq`
+    designDomains design `deepseq`
+    designBindings design `deepseq`
+    ()
 
 data IsPrim
   = IsPrim
@@ -109,7 +136,7 @@ data TransformationInfo
   | TryTerm
   -- ^ Show the name and input to every transformation that is applied, and
   -- the result of every transformation that is applied.
-  deriving (Eq, Generic, Hashable, Ord, Read, Show)
+  deriving (Eq, Generic, Hashable, Ord, Read, Show, NFData)
 
 -- | Options related to debugging. See 'ClashOpts'
 data DebugOpts = DebugOpts
@@ -150,7 +177,7 @@ data DebugOpts = DebugOpts
   -- for use with @clash-term@.
   --
   -- Command line flag: -fclash-debug-history[=FILE]
-  } deriving (Show, Eq)
+  } deriving (Generic, NFData, Show, Eq)
 
 instance Hashable DebugOpts where
   hashWithSalt s DebugOpts{..} =
@@ -362,6 +389,35 @@ data ClashOpts = ClashOpts
   }
   deriving (Show)
 
+instance NFData ClashOpts where
+  rnf o =
+    opt_inlineLimit o `deepseq`
+    opt_specLimit o `deepseq`
+    opt_inlineFunctionLimit o `deepseq`
+    opt_inlineConstantLimit o `deepseq`
+    opt_evaluatorFuelLimit o `deepseq`
+    opt_cachehdl o `deepseq`
+    opt_clear o `deepseq`
+    opt_primWarn o `deepseq`
+    opt_color o `seq`
+    opt_intWidth o `deepseq`
+    opt_hdlDir o `deepseq`
+    opt_hdlSyn o `deepseq`
+    opt_errorExtra o `deepseq`
+    opt_importPaths o `deepseq`
+    opt_componentPrefix o `deepseq`
+    opt_newInlineStrat o `deepseq`
+    opt_escapedIds o `deepseq`
+    opt_lowerCaseBasicIds o `deepseq`
+    opt_ultra o `deepseq`
+    opt_forceUndefined o `deepseq`
+    opt_checkIDir o `deepseq`
+    opt_aggressiveXOpt o `deepseq`
+    opt_aggressiveXOptBB o `deepseq`
+    opt_inlineWFCacheLimit o `deepseq`
+    opt_edalize o `deepseq`
+    opt_renderEnums o `deepseq`
+    ()
 
 instance Eq ClashOpts where
   s0 == s1 =

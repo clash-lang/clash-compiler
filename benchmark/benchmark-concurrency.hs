@@ -28,8 +28,8 @@ main = do
 benchFile :: [FilePath] -> FilePath -> Benchmark
 benchFile idirs src =
   env ((,) <$> runInputStage idirs src <*> getCurrentTime) $
-    \ ~((bindingsMap,tcm,tupTcm,topEntities,primMap,reprs,domainConfs,_,_),startTime) -> do
+    \ ~((clashEnv, clashDesign),startTime) -> do
       bench ("Generating HDL: " ++ src)
-            (nfIO (generateHDL reprs domainConfs bindingsMap (Just backend)
-                               primMap tcm tupTcm typeTrans ghcEvaluator
-                               evaluator topEntities Nothing (opts idirs) startTime))
+            (nfIO (generateHDL clashEnv clashDesign (Just backend)
+                               typeTrans ghcEvaluator
+                               evaluator Nothing startTime))

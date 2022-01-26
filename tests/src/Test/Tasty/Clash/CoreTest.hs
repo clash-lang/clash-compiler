@@ -32,12 +32,6 @@ import Clash.Netlist.Types (PreserveCase(..))
 import Clash.GHC.GenerateBindings
 import Clash.GHC.PartialEval
 
-#if MIN_VERSION_ghc(9,0,0)
-import           GHC.Utils.Misc
-#else
-import           Util
-#endif
-
 import Test.Tasty.Clash
 
 type family TargetToState (target :: HDL) where
@@ -69,14 +63,13 @@ runToCoreStage
   => SBuildTarget target
   -> (ClashOpts -> ClashOpts)
   -> FilePath
-  -> IO (BindingMap, TyConMap, Supply)
+  -> IO (ClashEnv, ClashDesign, Supply)
 runToCoreStage target f src = do
   ids <- newSupply
   pds <- primDirs backend
-  (bm, tcm, _, _, _, _, _) <- generateBindings
-    (return ()) Auto pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
+  (env, design) <- generateBindings opts (return ()) pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
 
-  return (bm, tcm, ids)
+  return (env, design, ids)
  where
   backend = mkBackend target
   opts = f mkClashOpts

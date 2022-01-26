@@ -1,7 +1,7 @@
 {-|
   Copyright  :  (C) 2015-2016, University of Twente,
                     2017     , Myrtle Software Ltd, Google Inc.,
-                    2021     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -11,6 +11,7 @@
 
 module Clash.Backend where
 
+import Data.HashMap.Strict                  (HashMap)
 import Data.HashSet                         (HashSet)
 import Data.Monoid                          (Ap)
 import Data.Text                            (Text)
@@ -27,6 +28,7 @@ import SrcLoc (SrcSpan)
 import {-# SOURCE #-} Clash.Netlist.Types
 import Clash.Netlist.BlackBox.Types
 
+import Clash.Signal.Internal                (VDomainConfiguration)
 import Clash.Annotations.Primitive          (HDL)
 
 #ifdef CABAL
@@ -77,6 +79,8 @@ data HWKind
   | UserType
   -- ^ User defined type that's not interchangeable with any others, even if
   -- the underlying structures are the same. Similar to an ADT in Haskell.
+
+type DomainMap = HashMap Text VDomainConfiguration
 
 class HasIdentifierSet state => Backend state where
   -- | Initial state for state monad

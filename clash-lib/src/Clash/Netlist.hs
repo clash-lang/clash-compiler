@@ -79,7 +79,7 @@ import           Clash.Core.Var                   (Id, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
    lookupVarEnv')
-import           Clash.Driver.Types               (BindingMap, Binding(..), ClashOpts (..))
+import           Clash.Driver.Types               (BindingMap, Binding(..), ClashEnv(..), ClashOpts (..))
 import           Clash.Netlist.BlackBox
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types              as HW
@@ -91,27 +91,18 @@ import qualified Clash.Util.Interpolate           as I
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
 genNetlist
-  :: Bool
+  :: ClashEnv
+  -> Bool
   -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
-  -> ClashOpts
-  -- ^ Options Clash was called with
-  -> CustomReprs
-  -- ^ Custom bit representations for certain types
   -> BindingMap
   -- ^ Global binders
   -> VarEnv TopEntityT
   -- ^ TopEntity annotations
   -> VarEnv Identifier
   -- ^ Top entity names
-  -> CompiledPrimMap
-  -- ^ Primitive definitions
-  -> TyConMap
-  -- ^ TyCon cache
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded Type -> HWType translator
-  -> Int
-  -- ^ Int/Word/Integer bit-width
   -> Bool
   -- ^ Whether the backend supports ifThenElse expressions
   -> SomeBackend
@@ -125,14 +116,19 @@ genNetlist
   -> Id
   -- ^ Name of the @topEntity@
   -> IO (Component, ComponentMap, IdentifierSet)
-genNetlist isTb opts reprs globals tops topNames primMap tcm typeTrans iw ite be seen0 env prefixM topEntity = do
+genNetlist env isTb globals tops topNames typeTrans ite be seen0 dir prefixM topEntity = do
+  let opts = envOpts env
+  let reprs = envCustomReprs env
+  let primMap = envPrimitives env
+  let tcm = envTyConMap env
+  let iw = opt_intWidth opts
   ((_meta, topComponent), s) <-
     runNetlistMonad isTb opts reprs globals tops primMap tcm typeTrans
-                    iw ite be seen1 env componentNames_ $ genComponent topEntity
+                    iw ite be seen1 dir componentNames_ $ genComponent topEntity
   return (topComponent, _components s, seen1)
  where
   (componentNames_, seen1) =
-    genNames (opt_newInlineStrat opts) prefixM seen0 topNames globals
+    genNames (opt_newInlineStrat (envOpts env)) prefixM seen0 topNames globals
 
 -- | Run a NetlistMonad action in a given environment
 runNetlistMonad
