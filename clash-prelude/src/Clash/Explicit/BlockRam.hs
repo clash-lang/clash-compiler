@@ -2,7 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2017, Myrtle Software Ltd,
                   2017     , Google Inc.,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -1050,10 +1050,16 @@ blockRam# (Clock _) gen content = \rd wen waS wd -> runST $ do
   upd :: STArray s Int a -> Bool -> Int -> a -> ST s ()
   upd ram we waddr d = case maybeIsX we of
     Nothing -> case maybeIsX waddr of
-      Nothing -> forM_ [0..(szI-1)] (\i -> unsafeWriteSTArray ram i (seq waddr d))
-      Just wa -> safeUpdate wa d ram
+      Nothing -> -- Put the XException from `waddr` as the value in all
+                 -- locations of `ram`.
+                 forM_ [0..(szI-1)] (\i -> unsafeWriteSTArray ram i (seq waddr d))
+      Just wa -> -- Put the XException from `we` as the value at address
+                 -- `waddr`.
+                 safeUpdate wa (seq we d) ram
     Just True -> case maybeIsX waddr of
-      Nothing -> forM_ [0..(szI-1)] (\i -> unsafeWriteSTArray ram i (seq waddr d))
+      Nothing -> -- Put the XException from `waddr` as the value in all
+                 -- locations of `ram`.
+                 forM_ [0..(szI-1)] (\i -> unsafeWriteSTArray ram i (seq waddr d))
       Just wa -> safeUpdate wa d ram
     _ -> return ()
 
