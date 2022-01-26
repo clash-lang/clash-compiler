@@ -3,8 +3,8 @@ set -eu -o pipefail
 
 PASSWORD=$(echo $HACKAGE_PASSWORD | base64 --decode --ignore-garbage)
 
-SDIST=$(find $1-*.tar.gz | grep -v docs)
-DDIST=$(find $1-*.tar.gz | grep docs)
+SDIST=$(find . -type f -regex "\./$1-[0-9\.]+\.tar\.gz")
+DDIST=$(find . -type f -regex "\./$1-[0-9\.]+-docs\.tar\.gz")
 
 set +u
 
