@@ -2,7 +2,7 @@
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.
                   2019     , Myrtle Software Ltd,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -40,7 +40,8 @@ import Clash.Promoted.Nat    (SNat (..), snatToNum, pow2SNat)
 import Clash.Signal.Internal (Clock (..), Signal (..), Enable, fromEnable)
 import Clash.Signal.Internal.Ambiguous (clockPeriod)
 import Clash.Sized.Unsigned  (Unsigned)
-import Clash.XException      (errorX, maybeIsX, fromJustX, seqX)
+import Clash.XException
+  (defaultSeqX, errorX, fromJustX, maybeIsX, NFDataX)
 
 -- | Create a RAM with space for 2^@n@ elements
 --
@@ -57,6 +58,7 @@ asyncRamPow2
      , HasCallStack
      , KnownDomain wdom
      , KnownDomain rdom
+     , NFDataX a
      )
   => Clock wdom
   -- ^ 'Clock' to which to synchronize the write port of the RAM
@@ -89,6 +91,7 @@ asyncRam
      , HasCallStack
      , KnownDomain wdom
      , KnownDomain rdom
+     , NFDataX a
      )
   => Clock wdom
    -- ^ 'Clock' to which to synchronize the write port of the RAM
@@ -116,7 +119,9 @@ asyncRam#
   :: forall wdom rdom n a
    . ( HasCallStack
      , KnownDomain wdom
-     , KnownDomain rdom )
+     , KnownDomain rdom
+     , NFDataX a
+     )
   => Clock wdom
   -- ^ 'Clock' to which to synchronize the write port of the RAM
   -> Clock rdom
@@ -153,7 +158,7 @@ asyncRam# !_ !_ en sz rd we wr din = dout
     goSingle !ram (r :- rs) ~(e :- es) wt@(~(w :- ws)) dt@(~(d :- ds)) =
       let ram0 = upd ram e w d
           o    = ram `safeAt` r
-      in  o :- (o `seqX` wt `seq` dt `seq` goSingle ram0 rs es ws ds)
+      in  o :- (o `defaultSeqX` wt `seq` dt `seq` goSingle ram0 rs es ws ds)
 
     -- Given
     --   tR = absolute time of next active edge of read clock
@@ -171,7 +176,7 @@ asyncRam# !_ !_ en sz rd we wr din = dout
                       in wt `seq` dt `seq`
                          go (relTime + wPeriod) ram0 rt es ws ds
       | otherwise   = let o = ram `safeAt` r
-                      in o :- (o `seqX` go (relTime - rPeriod) ram rs et wt dt)
+                      in o :- (o `defaultSeqX` go (relTime - rPeriod) ram rs et wt dt)
 
     upd ram we0 waddr d = case maybeIsX we0 of
       Nothing -> case maybeIsX waddr of
@@ -185,7 +190,7 @@ asyncRam# !_ !_ en sz rd we wr din = dout
         Nothing -> -- Put the XException from `waddr` as the value in all
                    -- locations of `ram`.
                    seq waddr d <$ ram
-        Just wa -> d `seqX` safeUpdate wa d ram
+        Just wa -> d `defaultSeqX` safeUpdate wa d ram
       _ -> ram
 
     safeAt :: HasCallStack => Seq.Seq a -> Int -> a

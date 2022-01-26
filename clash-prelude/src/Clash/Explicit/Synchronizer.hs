@@ -2,7 +2,7 @@
 Copyright   :  (C) 2015-2016, University of Twente,
                    2016-2019, Myrtle Software Ltd,
                    2017     , Google Inc.,
-                   2021     , QBayLogic B.V.,
+                   2021-2022, QBayLogic B.V.
 License     :  BSD2 (see the file LICENSE)
 Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -98,7 +98,8 @@ dualFlipFlopSynchronizer clk1 clk2 rst en i =
 
 fifoMem
   :: ( KnownDomain wdom
-     , KnownDomain rdom )
+     , KnownDomain rdom
+     , NFDataX a )
   => Clock wdom
   -> Clock rdom
   -> Enable wdom
@@ -163,7 +164,8 @@ isFull addrSize@SNat ptr s_ptr =
 asyncFIFOSynchronizer
   :: ( KnownDomain wdom
      , KnownDomain rdom
-     , 2 <= addrSize )
+     , 2 <= addrSize
+     , NFDataX a )
   => SNat addrSize
   -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
   -- elements.

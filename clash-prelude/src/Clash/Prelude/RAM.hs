@@ -2,7 +2,7 @@
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017-2019, Myrtle Software Ltd
                   2017     , Google Inc.,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -31,6 +31,7 @@ import qualified Clash.Explicit.RAM   as E
 import           Clash.Promoted.Nat   (SNat)
 import           Clash.Signal
 import           Clash.Sized.Unsigned (Unsigned)
+import           Clash.XException     (NFDataX)
 
 
 -- | Create a RAM with space for @n@ elements.
@@ -47,6 +48,7 @@ asyncRam
      , HiddenClock dom
      , HiddenEnable dom
      , HasCallStack
+     , NFDataX a
      )
   => SNat n
   -- ^ Size @n@ of the RAM
@@ -73,7 +75,9 @@ asyncRamPow2
   :: ( KnownNat n
      , HiddenClock dom
      , HiddenEnable dom
-     , HasCallStack )
+     , HasCallStack
+     , NFDataX a
+     )
   => Signal dom (Unsigned n)
   -- ^ Read address @r@
   -> Signal dom (Maybe (Unsigned n, a))

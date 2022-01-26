@@ -1,0 +1,1 @@
+CHANGED: All `asyncRam` variants and `asyncFIFOSynchronizer` now require that the data has an `NFDataX` instance.([#2055](https://github.com/clash-lang/clash-compiler/pull/2055))
