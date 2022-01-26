@@ -38,6 +38,8 @@ import Clash.Signal.Internal
 -- -- outputs a clock running at 100 MHz
 -- altpll @@"50MHzDom" @@"100MHzDom" (SSymbol @@"altpll50to100") clk50 rst
 -- @
+--
+-- See also the [ALTPLL (Phase-Locked Loop) IP Core User Guide](https://www.intel.com/content/dam/www/programmable/us/en/pdfs/literature/ug/ug_altpll.pdf)
 altpll
   :: forall domOut domIn name
    . (KnownDomain domIn, KnownDomain domOut)
@@ -81,6 +83,8 @@ altpll !_ = knownDomain @domIn `seq` knownDomain @domOut `seq` clocks
 -- @
 --
 -- respectively.
+--
+-- See also the [Altera Phase-Locked Loop (Altera PLL) IP Core User Guide](https://www.intel.com/content/dam/www/programmable/us/en/pdfs/literature/ug/altera_pll.pdf)
 alteraPll
   :: (Clocks t, KnownDomain domIn, ClocksCxt t)
   => SSymbol name

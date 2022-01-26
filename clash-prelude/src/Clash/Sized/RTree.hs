@@ -336,7 +336,7 @@ the form of 'dtfold':
 import Data.Singletons
 import Data.Proxy
 
-data IIndex (f :: 'TyFun' Nat *) :: *
+data IIndex (f :: 'TyFun' Nat Type) :: Type
 type instance 'Apply' IIndex l = 'Index' ((2^l)+1)
 
 populationCount' :: (KnownNat k, KnownNat (2^k))
