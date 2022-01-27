@@ -2,7 +2,8 @@
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017     , QBayLogic, Google Inc.
-                     2020-2022, QBayLogic
+                     2020-2022, QBayLogic,
+                     20222    , Google Inc.
 
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -352,8 +353,9 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
     -- is kept in an MVar.
     idSet <- newMVar initIs
     edamFiles <- newMVar HashMap.empty
+    ioLock <- newMVar ()
 
-    mapConcurrently_ (go compNames idSet edamFiles deps topEntityMap) tes
+    mapConcurrently_ (go compNames idSet edamFiles ioLock deps topEntityMap) tes
 
     time <- Clock.getCurrentTime
     let diff = reportTimeDiff time startTime
@@ -363,14 +365,17 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
     :: VarEnv Id.Identifier
     -> MVar Id.IdentifierSet
     -> MVar (HashMap Unique [EdamFile])
+    -> MVar ()
     -> HashMap Unique [Unique]
     -> VarEnv TopEntityT
     -> TopEntityT
     -> IO ()
-  go compNames seenV edamFilesV deps topEntityMap (TopEntityT topEntity annM isTb) = do
+  go compNames seenV edamFilesV ioLockV deps topEntityMap (TopEntityT topEntity annM isTb) = do
   prevTime <- Clock.getCurrentTime
   let topEntityS = Data.Text.unpack (nameOcc (varName topEntity))
-  putStrLn $ "Clash: Compiling " ++ topEntityS
+
+  withMVar ioLockV . const $
+    putStrLn ("Clash: Compiling " ++ topEntityS)
 
   let modName1 = filter (\c -> isAscii c && (isAlphaNum c || c == '_')) (replaceChar '.' '_' topEntityS)
 
@@ -404,7 +409,8 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
     Just manifest0@Manifest{fileNames} | Just [] <- userModifications -> do
       -- Found a 'manifest' files. Use it to extend "seen" set. Generate EDAM
       -- files if necessary.
-      putStrLn ("Clash: Using cached result for: " ++ topEntityS)
+      withMVar ioLockV . const $
+        putStrLn ("Clash: Using cached result for: " ++ topEntityS)
 
       modifyMVar_ seenV $ \seen ->
         pure $! State.execState (mapM_ Id.addRaw (componentNames manifest0)) seen
@@ -425,7 +431,9 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
 
       topTime <- Clock.getCurrentTime
       let topDiff = reportTimeDiff topTime prevTime
-      putStrLn $ "Clash: Compiling " ++ topEntityS ++ " took " ++ topDiff
+
+      withMVar ioLockV . const $
+        putStrLn ("Clash: Compiling " ++ topEntityS ++ " took " ++ topDiff)
 
       return ()
 
@@ -447,7 +455,9 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = reportTimeDiff normTime prevTime
-      putStrLn $ "Clash: Normalization took " ++ prepNormDiff
+
+      withMVar ioLockV . const $
+        putStrLn ("Clash: Normalization took " ++ prepNormDiff)
 
       -- 3. Generate netlist for topEntity
       (topComponent, netlist) <- modifyMVar seenV $ \seen -> do
@@ -460,7 +470,9 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = reportTimeDiff netlistTime normTime
-      putStrLn $ "Clash: Netlist generation took " ++ normNetDiff
+
+      withMVar ioLockV . const $
+        putStrLn ("Clash: Netlist generation took " ++ normNetDiff)
 
       -- 4. Generate topEntity wrapper
       (hdlDocs, dfiles, mfiles) <- withMVar seenV $ \seen ->
@@ -502,8 +514,9 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
 
       topTime <- hdlDocs `seq` Clock.getCurrentTime
       let topDiff = reportTimeDiff topTime prevTime
-      putStrLn $ "Clash: Compiling " ++ topEntityS ++ " took " ++ topDiff
-      return ()
+
+      withMVar ioLockV . const $
+        putStrLn ("Clash: Compiling " ++ topEntityS ++ " took " ++ topDiff)
 
 -- | Interpret a specific function from a specific module. This action tries
 -- two things:
