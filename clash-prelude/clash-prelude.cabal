@@ -404,6 +404,7 @@ test-suite unittests
                  Clash.Tests.AutoReg
                  Clash.Tests.BitPack
                  Clash.Tests.BitVector
+                 Clash.Tests.BlockRam
                  Clash.Tests.DerivingDataRepr
                  Clash.Tests.DerivingDataReprTypes
                  Clash.Tests.Fixed

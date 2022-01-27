@@ -2,7 +2,7 @@
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.
                   2019     , Myrtle Software Ltd,
-                  2022     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -255,10 +255,16 @@ blockRamFile# (Clock _) ena !_sz file rd wen =
 
     upd ram we waddr d = case maybeIsX we of
       Nothing -> case maybeIsX waddr of
-        Nothing -> fmap (const (seq waddr d)) ram
-        Just wa -> Seq.update wa d ram
+        Nothing -> -- Put the XException from `waddr` as the value in all
+                   -- locations of `ram`.
+                   seq waddr d <$ ram
+        Just wa -> -- Put the XException from `we` as the value at address
+                   -- `waddr`.
+                   Seq.update wa (seq we d) ram
       Just True -> case maybeIsX waddr of
-        Nothing -> fmap (const (seq waddr d)) ram
+        Nothing -> -- Put the XException from `waddr` as the value in all
+                   -- locations of `ram`.
+                   seq waddr d <$ ram
         Just wa -> Seq.update wa d ram
       _ -> ram
 
