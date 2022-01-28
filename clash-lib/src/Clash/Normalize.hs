@@ -78,7 +78,7 @@ import           Clash.Normalize.Util
 import           Clash.Rewrite.Combinators        ((>->),(!->),repeatR,topdownR)
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, debugOpts, extra,
-   tcCache, topEntities)
+   tcCache, topEntities, newInlineStrategy)
 import           Clash.Rewrite.Util
   (apply, isUntranslatableType, runRewriteSession)
 import           Clash.Util
@@ -118,16 +118,11 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
   where
     -- TODO The RewriteEnv should just take ClashOpts.
     rwEnv     = RewriteEnv
-                  (opt_debug (envOpts env))
-                  (opt_aggressiveXOpt (envOpts env))
+                  env
                   typeTrans
-                  (envTyConMap env)
-                  (envTupleTyCons env)
                   peEval
                   eval
                   (mkVarSet topEnts)
-                  (envCustomReprs env)
-                  (opt_evaluatorFuelLimit (envOpts env))
 
     rwState   = RewriteState
                   0
@@ -144,18 +139,9 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
                   emptyVarEnv
                   Map.empty
                   emptyVarEnv
-                  (opt_specLimit (envOpts env))
                   emptyVarEnv
-                  (opt_inlineLimit (envOpts env))
-                  (opt_inlineFunctionLimit (envOpts env))
-                  (opt_inlineConstantLimit (envOpts env))
-                  (envPrimitives env)
                   Map.empty
                   rcsMap
-                  (opt_newInlineStrat (envOpts env))
-                  (opt_ultra (envOpts env))
-                  (opt_inlineWFCacheLimit (envOpts env))
-
 
 normalize
   :: [Id]
@@ -341,7 +327,7 @@ flattenNode b@(CBranch (nm,(Binding _ _ _ _ e _)) us) = do
                return (Right ((nm,mkApps (mkTicks fun ticks) (reverse remainder)),us))
           _ -> return (Right ((nm,e),us))
       _ -> do
-        newInlineStrat <- Lens.use (extra.newInlineStrategy)
+        newInlineStrat <- Lens.view newInlineStrategy
         if newInlineStrat || isCheapFunction e
            then return (Right ((nm,e),us))
            else return (Left b)

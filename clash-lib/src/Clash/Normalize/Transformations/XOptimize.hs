@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -36,9 +36,10 @@ import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (InScopeSet)
 import Clash.Netlist.BlackBox.Types (Element(Err))
 import Clash.Netlist.Types (BlackBox(..))
-import Clash.Normalize.Types (NormRewrite, NormalizeSession, primitives)
+import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Primitives.Types (Primitive(..))
-import Clash.Rewrite.Types (TransformContext(..), aggressiveXOpt, extra, tcCache)
+import Clash.Rewrite.Types
+  (TransformContext(..), aggressiveXOpt, tcCache, primitives)
 import Clash.Rewrite.Util (changed)
 import Clash.Util (MonadUnique, curLoc)
 
@@ -143,7 +144,7 @@ mkFieldSelector is0 subj dc tvs fieldTys nm index = do
 --
 isPrimError :: Term -> NormalizeSession Bool
 isPrimError (collectArgs -> (Prim pInfo, _)) = do
-  prim <- Lens.use (extra . primitives . Lens.at (primName pInfo))
+  prim <- Lens.view (primitives . Lens.at (primName pInfo))
 
   case prim >>= extractPrim of
     Just p  -> return (isErr p)

@@ -1,6 +1,6 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
-                    2021     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -83,7 +83,7 @@ import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
 import           Clash.Rewrite.Types
   (RewriteMonad, TransformContext(..), bindings, curFun, debugOpts, extra,
-   tcCache)
+   tcCache, primitives)
 import           Clash.Rewrite.Util
   (runRewrite, mkTmBinderFor, mkDerivedName)
 import           Clash.Unique
@@ -106,7 +106,7 @@ isConstantArg nm i = do
   case Map.lookup nm argMap of
     Nothing -> do
       -- Constant args not yet calculated, or primitive does not exist
-      prims <- Lens.use (extra.primitives)
+      prims <- Lens.view primitives
       case extractPrim =<< HashMapS.lookup nm prims of
         Nothing ->
           -- Primitive does not exist:
