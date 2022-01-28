@@ -109,7 +109,8 @@ asyncRom# content = safeAt
 -- | A ROM with a synchronous read port, with space for @n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is 'undefined'
+-- * __NB__: Initial output value is /undefined/, reading it will throw an
+-- 'Clash.XException.XException'
 --
 -- Additional helpful information:
 --
