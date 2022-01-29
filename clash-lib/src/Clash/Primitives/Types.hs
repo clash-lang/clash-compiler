@@ -129,13 +129,13 @@ data TemplateSource
   -- ^ Template source stored in file on filesystem
   | TInline Text
   -- ^ Template stored inline
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Eq, Hashable, Generic, NFData)
 
 
 data TemplateFormat
   = TTemplate
   | THaskell
-  deriving (Show, Generic, Hashable, NFData)
+  deriving (Show, Generic, Eq, Hashable, NFData)
 
 -- | Data type to indicate what arguments are in use by a BlackBox
 data UsedArguments
@@ -143,7 +143,7 @@ data UsedArguments
   -- ^ Only these are used
   | IgnoredArguments [Int]
   -- ^ All but these are used
-  deriving (Show, Generic, Hashable, NFData, Binary)
+  deriving (Show, Generic, Eq, Hashable, NFData, Binary)
 
 -- | Externally defined primitive
 data Primitive a b c d
@@ -229,7 +229,7 @@ data Primitive a b c d
   , primSort :: !Text
     -- ^ Additional information
   }
-  deriving (Show, Generic, NFData, Binary, Hashable, Functor)
+  deriving (Show, Generic, NFData, Binary, Eq, Hashable, Functor)
 
 instance FromJSON UnresolvedPrimitive where
   parseJSON (Object v) =
