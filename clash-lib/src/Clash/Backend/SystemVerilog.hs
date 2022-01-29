@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021     , QBayLogic B.V.
+                     2021-2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -23,6 +23,7 @@ import           Control.Monad                        (forM,liftM,zipWithM)
 import           Control.Monad.State                  (State)
 import           Data.Bifunctor                       (first)
 import           Data.Bits                            (Bits, testBit)
+import           Data.Coerce                          (coerce)
 import           Data.Function                        (on)
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
@@ -51,6 +52,7 @@ import           Clash.Debug                          (traceIf)
 import           Clash.Backend
 import           Clash.Backend.Verilog
   (bits, bit_char, encodingNote, exprLit, include, noEmptyInit, uselibs)
+import           Clash.Driver.Types                   (ClashOpts(..))
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
@@ -95,12 +97,12 @@ instance HasIdentifierSet SystemVerilogState where
   identifierSet = idSeen
 
 instance Backend SystemVerilogState where
-  initBackend w hdlsyn_ esc lw undefVal xOpt enums = SystemVerilogState {
-      _tyCache=HashSet.empty
+  initBackend opts = SystemVerilogState
+    { _tyCache=HashSet.empty
     , _nameCache=HashMap.empty
     , _genDepth=0
     , _modNm=""
-    , _idSeen=Id.emptyIdentifierSet esc lw SystemVerilog
+    , _idSeen=Id.emptyIdentifierSet (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) SystemVerilog
     , _oports=[]
     , _srcSpan=noSrcSpan
     , _includes=[]
@@ -109,11 +111,11 @@ instance Backend SystemVerilogState where
     , _dataFiles=[]
     , _memoryDataFiles=[]
     , _tyPkgCtx=False
-    , _intWidth=w
-    , _hdlsyn=hdlsyn_
-    , _undefValue=undefVal
-    , _aggressiveXOptBB_=xOpt
-    , _renderEnums_=enums
+    , _intWidth=opt_intWidth opts
+    , _hdlsyn=opt_hdlSyn opts
+    , _undefValue=opt_forceUndefined opts
+    , _aggressiveXOptBB_=coerce (opt_aggressiveXOptBB opts)
+    , _renderEnums_=coerce (opt_renderEnums opts)
     }
   hdlKind         = const SystemVerilog
   primDirs        = const $ do root <- primsRoot

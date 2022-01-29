@@ -95,12 +95,12 @@ import Control.Monad.Trans.Except
 
 import Data.Array
 import qualified Data.ByteString.Char8 as BS
-import Data.Coerce
 import Data.Char
 import Data.Function
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
 import Data.List ( find, group, intercalate, intersperse, isPrefixOf, nub,
                    partition, sort, sortBy )
+import Data.Proxy
 import qualified Data.Set as S
 import Data.Maybe
 import Data.Map (Map)
@@ -142,8 +142,7 @@ import GHC.TopHandler ( topHandler )
 import Clash.GHCi.Leak
 
 -- clash additions
-import qualified Clash.Backend
-import           Clash.Backend (AggressiveXOptBB, RenderEnums)
+import           Clash.Backend (Backend(initBackend, hdlKind, primDirs))
 import           Clash.Backend.SystemVerilog (SystemVerilogState)
 import           Clash.Backend.VHDL (VHDLState)
 import           Clash.Backend.Verilog (VerilogState)
@@ -155,8 +154,6 @@ import           Clash.GHC.Evaluator
 import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
 import           Clash.GHCi.Common
-import           Clash.Netlist.BlackBox.Types (HdlSyn)
-import           Clash.Netlist.Types (PreserveCase)
 import           Clash.Util (clashLibVersion, reportTimeDiff)
 import qualified Data.Time.Clock as Clock
 import qualified Paths_clash_ghc
@@ -2062,11 +2059,13 @@ runExceptGhcMonad act = handleSourceError GHC.printException $
 exceptT :: Applicative m => Either e a -> ExceptT e m a
 exceptT = ExceptT . pure
 
-makeHDL' :: Clash.Backend.Backend backend
-         => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> RenderEnums -> backend)
-         -> IORef ClashOpts
-         -> [FilePath]
-         -> InputT GHCi ()
+makeHDL'
+  :: forall backend
+   . Backend backend
+  => Proxy backend
+  -> IORef ClashOpts
+  -> [FilePath]
+  -> InputT GHCi ()
 makeHDL' backend opts lst = go =<< case lst of
   srcs@(_:_) -> return srcs
   []         -> do
@@ -2102,26 +2101,21 @@ makeHDL' backend opts lst = go =<< case lst of
     _ <- GHC.setSessionDynFlags dflags
     reloadModule ""
 
-makeHDL :: GHC.GhcMonad m
-        => Clash.Backend.Backend backend
-        => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> RenderEnums -> backend)
-        -> Ghc ()
-        -> IORef ClashOpts
-        -> [FilePath]
-        -> m ()
-makeHDL backend startAction optsRef srcs = do
+makeHDL
+  :: forall backend m
+   . (GHC.GhcMonad m, Backend backend)
+  => Proxy backend
+  -> Ghc ()
+  -> IORef ClashOpts
+  -> [FilePath]
+  -> m ()
+makeHDL Proxy startAction optsRef srcs = do
   dflags <- GHC.getSessionDynFlags
   liftIO $ do startTime <- Clock.getCurrentTime
               opts0  <- readIORef optsRef
               let opts1  = opts0 { opt_color = useColor dflags }
               let iw     = opt_intWidth opts1
-                  syn    = opt_hdlSyn opts1
-                  esc    = opt_escapedIds opts1
-                  lw     = opt_lowerCaseBasicIds opts1
-                  frcUdf = opt_forceUndefined opts1
-                  xOptBB = opt_aggressiveXOptBB opts1
-                  enums  = opt_renderEnums opts1
-                  hdl    = Clash.Backend.hdlKind backend'
+                  hdl    = hdlKind backend
                   -- determine whether `-outputdir` was used
                   outputDir = do odir <- objectDir dflags
                                  hidir <- hiDir dflags
@@ -2133,12 +2127,12 @@ makeHDL backend startAction optsRef srcs = do
                   idirs = importPaths dflags
                   opts2 = opts1 { opt_hdlDir = maybe outputDir Just (opt_hdlDir opts1)
                                 , opt_importPaths = idirs}
-                  backend' = backend iw syn esc lw frcUdf (coerce xOptBB) (coerce enums)
+                  backend = initBackend @backend opts2
 
               checkMonoLocalBinds dflags
               checkImportDirs opts0 idirs
 
-              primDirs <- Clash.Backend.primDirs backend'
+              primDirs_ <- primDirs backend
 
               forM_ srcs $ \src -> do
                 -- Generate bindings:
@@ -2155,7 +2149,7 @@ makeHDL backend startAction optsRef srcs = do
                 Clash.Driver.generateHDL
                   clashEnv
                   clashDesign
-                  (Just backend')
+                  (Just backend)
                   (ghcTypeToHWType iw)
                   ghcEvaluator
                   evaluator
@@ -2163,13 +2157,13 @@ makeHDL backend startAction optsRef srcs = do
                   startTime
 
 makeVHDL :: IORef ClashOpts -> [FilePath] -> InputT GHCi ()
-makeVHDL = makeHDL' (Clash.Backend.initBackend @VHDLState)
+makeVHDL = makeHDL' (Proxy @VHDLState)
 
 makeVerilog :: IORef ClashOpts -> [FilePath] -> InputT GHCi ()
-makeVerilog = makeHDL' (Clash.Backend.initBackend @VerilogState)
+makeVerilog = makeHDL' (Proxy @VerilogState)
 
 makeSystemVerilog :: IORef ClashOpts -> [FilePath] -> InputT GHCi ()
-makeSystemVerilog = makeHDL' (Clash.Backend.initBackend @SystemVerilogState)
+makeSystemVerilog = makeHDL' (Proxy @SystemVerilogState)
 
 -----------------------------------------------------------------------------
 -- | @:type@ command. See also Note [TcRnExprMode] in TcRnDriver.

@@ -5,6 +5,7 @@ import           Clash.Driver.Types
 
 import           Clash.GHC.PartialEval
 import           Clash.GHC.Evaluator
+import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)
 
 import qualified Control.Concurrent.Supply    as Supply
 import           Control.DeepSeq              (deepseq)
@@ -42,7 +43,8 @@ benchFile idirs src = do
                    , envCustomReprs = reprs
                    }
 
-      res = normalizeEntity clashEnv bindingsMap typeTrans
+      res = normalizeEntity clashEnv bindingsMap
+                   (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
                    ghcEvaluator
                    evaluator
                    topEntityNames supplyN topEntity

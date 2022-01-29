@@ -79,6 +79,7 @@ import System.FilePath
 import Control.Monad
 import Data.Char
 import Data.List
+import Data.Proxy
 import Data.Maybe
 
 -- clash additions
@@ -88,16 +89,13 @@ import           Exception (gcatch)
 import           Data.IORef (IORef, newIORef, readIORef)
 import qualified Data.Version (showVersion)
 
-import qualified Clash.Backend
-import           Clash.Backend (AggressiveXOptBB, RenderEnums)
+import           Clash.Backend (Backend)
 import           Clash.Backend.SystemVerilog (SystemVerilogState)
 import           Clash.Backend.VHDL    (VHDLState)
 import           Clash.Backend.Verilog (VerilogState)
 import           Clash.Driver.Types
   (ClashOpts (..), defClashOpts)
 import           Clash.GHC.ClashFlags
-import           Clash.Netlist.BlackBox.Types (HdlSyn (..))
-import           Clash.Netlist.Types (PreserveCase)
 import           Clash.Util (clashLibVersion)
 import           Clash.GHC.LoadModules (ghcLibDir, setWantedLanguageExtensions)
 import           Clash.GHC.Util (handleClashException)
@@ -973,19 +971,25 @@ abiHash strs = do
 -----------------------------------------------------------------------------
 -- HDL Generation
 
-makeHDL' :: Clash.Backend.Backend backend => (Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> RenderEnums -> backend)
-         -> Ghc () -> IORef ClashOpts -> [(String,Maybe Phase)] -> Ghc ()
-makeHDL' _       _           _ []   = throwGhcException (CmdLineError "No input files")
-makeHDL' backend startAction r srcs = makeHDL backend startAction r $ fmap fst srcs
+makeHDL'
+  :: forall backend
+   . Backend backend
+  => Proxy backend
+  -> Ghc ()
+  -> IORef ClashOpts
+  -> [(String,Maybe Phase)]
+  -> Ghc ()
+makeHDL' _     _           _ []   = throwGhcException (CmdLineError "No input files")
+makeHDL' proxy startAction r srcs = makeHDL proxy startAction r $ fmap fst srcs
 
 makeVHDL :: Ghc () -> IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
-makeVHDL = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> RenderEnums -> VHDLState)
+makeVHDL = makeHDL' (Proxy @VHDLState)
 
 makeVerilog :: Ghc () -> IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
-makeVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> RenderEnums -> VerilogState)
+makeVerilog = makeHDL' (Proxy @VerilogState)
 
 makeSystemVerilog :: Ghc () -> IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
-makeSystemVerilog = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> Bool -> PreserveCase -> Maybe (Maybe Int) -> AggressiveXOptBB -> RenderEnums -> SystemVerilogState)
+makeSystemVerilog = makeHDL' (Proxy @SystemVerilogState)
 
 -- -----------------------------------------------------------------------------
 -- Util

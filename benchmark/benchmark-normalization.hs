@@ -9,6 +9,7 @@ import           Clash.Driver.Types
 
 import           Clash.GHC.PartialEval
 import           Clash.GHC.Evaluator
+import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)
 
 import           Clash.Netlist.Types          (TopEntityT(topId))
 
@@ -46,7 +47,7 @@ benchFile idirs src =
             (nf (normalizeEntity
                    clashEnv
                    (designBindings clashDesign)
-                   typeTrans
+                   (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
                    ghcEvaluator
                    evaluator
                    (fmap topId (designEntities clashDesign))

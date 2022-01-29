@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021     , QBayLogic B.V.
+                     2021-2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -26,6 +26,7 @@ import           Control.Monad                        (forM,join,zipWithM)
 import           Control.Monad.State                  (State, StateT)
 import           Data.Bifunctor                       (first)
 import           Data.Bits                            (testBit, Bits)
+import           Data.Coerce                          (coerce)
 import           Data.Function                        (on)
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
@@ -63,6 +64,7 @@ import           Clash.Annotations.BitRepresentation.Util
 import           Clash.Backend
 import           Clash.Core.Var                       (Attr'(..),attrName)
 import           Clash.Debug                          (traceIf)
+import           Clash.Driver.Types                   (ClashOpts(..))
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
@@ -117,7 +119,7 @@ instance HasIdentifierSet VHDLState where
   identifierSet = idSeen
 
 instance Backend VHDLState where
-  initBackend w hdlsyn_ esc lw undefVal xOpt enums = VHDLState
+  initBackend opts = VHDLState
     { _tyCache=mempty
     , _nameCache=mempty
     , _modNm=""
@@ -127,15 +129,15 @@ instance Backend VHDLState where
     , _includes=[]
     , _dataFiles=[]
     , _memoryDataFiles=[]
-    , _idSeen=Id.emptyIdentifierSet esc lw VHDL
+    , _idSeen=Id.emptyIdentifierSet (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) VHDL
     , _tyPkgCtx=False
-    , _intWidth=w
-    , _hdlsyn=hdlsyn_
-    , _undefValue=undefVal
+    , _intWidth=opt_intWidth opts
+    , _hdlsyn=opt_hdlSyn opts
+    , _undefValue=opt_forceUndefined opts
     , _productFieldNameCache=mempty
     , _enumNameCache=mempty
-    , _aggressiveXOptBB_=xOpt
-    , _renderEnums_=enums
+    , _aggressiveXOptBB_=coerce (opt_aggressiveXOptBB opts)
+    , _renderEnums_=coerce (opt_renderEnums opts)
     }
   hdlKind         = const VHDL
   primDirs        = const $ do root <- primsRoot

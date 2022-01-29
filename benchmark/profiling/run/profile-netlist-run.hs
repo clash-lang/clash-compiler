@@ -1,10 +1,17 @@
+{-# LANGUAGE TypeApplications #-}
+
+module Main (main) where
+
 import           Clash.Backend
+import           Clash.Backend.VHDL (VHDLState)
 import           Clash.Core.Name
 import           Clash.Core.Var
 import           Clash.Core.VarEnv (mkVarEnv)
 import           Clash.Driver.Types
 import           Clash.Netlist
 import           Clash.Netlist.Types          hiding (backend, hdlDir)
+
+import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)
 
 import           Control.DeepSeq              (deepseq)
 import           Data.Binary                  (decode)
@@ -45,7 +52,7 @@ benchFile idirs src = do
 
       topEntityS = Text.unpack (nameOcc (varName topEntity))
       modName    = takeWhile (/= '.') topEntityS
-      hdlState'  = setModName (Text.pack modName) backend
+      hdlState'  = setModName (Text.pack modName) (initBackend @VHDLState (envOpts clashEnv))
       (compNames, seen) = genTopNames (envOpts clashEnv) hdl topEntities
       topEntityMap = mkVarEnv (zip (map topId topEntities) topEntities)
       prefixM    = Nothing
@@ -55,7 +62,8 @@ benchFile idirs src = do
                          takeWhile (/= '.') topEntityS
   (netlist,_,_) <-
     genNetlist clashEnv False transformedBindings topEntityMap compNames
-               typeTrans ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
+               (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
+               ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
   netlist `deepseq` putStrLn ".. done\n"
 
 setupEnv

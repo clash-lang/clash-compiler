@@ -1,30 +1,21 @@
-{-# LANGUAGE CPP #-}
-
-#include "MachDeps.h"
-#define HDLSYN Other
+{-# LANGUAGE TypeApplications #-}
 
 module BenchmarkCommon where
 
 import Clash.Annotations.Primitive (HDL(VHDL))
-import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import Clash.Backend
 import Clash.Backend.VHDL
-import Clash.Core.TyCon
-import Clash.Core.Type
 import Clash.Core.Var
 import Clash.Driver
 import Clash.Driver.Types
+import Clash.Netlist.Types (TopEntityT(topId))
 
 import Clash.GHC.PartialEval
 import Clash.GHC.Evaluator
 import Clash.GHC.GenerateBindings
 import Clash.GHC.NetlistTypes
-import Clash.Netlist.BlackBox.Types (HdlSyn(Other))
-import Clash.Netlist.Types
-  (PreserveCase(..), HWMap, FilteredHWType, topId)
 
 import qualified Control.Concurrent.Supply as Supply
-import Control.Monad.State.Strict   (State)
 
 defaultTests :: [FilePath]
 defaultTests =
@@ -36,10 +27,6 @@ defaultTests =
   , "tests/shouldwork/Basic/AES.hs"
   , "tests/shouldwork/Basic/T1354B.hs"
   ]
-
-typeTrans :: (CustomReprs -> TyConMap -> Type ->
-              State HWMap (Maybe (Either String FilteredHWType)))
-typeTrans = ghcTypeToHWType WORD_SIZE_IN_BITS
 
 opts :: [FilePath] -> ClashOpts
 opts idirs =
@@ -54,15 +41,13 @@ opts idirs =
 hdl :: HDL
 hdl = VHDL
 
-backend :: VHDLState
-backend = initBackend WORD_SIZE_IN_BITS HDLSYN True PreserveCase Nothing (AggressiveXOptBB False) (RenderEnums True)
-
 runInputStage
   :: [FilePath]
   -> FilePath
   -> IO (ClashEnv, ClashDesign)
 runInputStage idirs src = do
   let o = opts idirs
+  let backend = initBackend @VHDLState o
   pds <- primDirs backend
   generateBindings o (return ()) pds (opt_importPaths o) [] (hdlKind backend) src Nothing
 
@@ -76,7 +61,8 @@ runNormalisationStage idirs src = do
   let topEntityNames = fmap topId (designEntities design)
   let topEntity = head topEntityNames
   let transformedBindings =
-        normalizeEntity env (designBindings design) typeTrans
+        normalizeEntity env (designBindings design)
+          (ghcTypeToHWType (opt_intWidth (opts idirs)))
           ghcEvaluator
           evaluator
           topEntityNames supplyN topEntity

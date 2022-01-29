@@ -25,6 +25,7 @@ import           Control.DeepSeq                (NFData(rnf), deepseq)
 import           Data.Binary                    (Binary)
 import           Data.Fixed
 import           Data.Hashable
+import           Data.HashMap.Strict            (HashMap)
 import           Data.IntMap.Strict             (IntMap)
 import           Data.Maybe                     (isJust)
 import           Data.Set                       (Set)
@@ -52,7 +53,6 @@ import           Util                           (OverridingBool(..))
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import           Clash.Signal.Internal
 
-import           Clash.Backend                  (DomainMap)
 import           Clash.Core.Term                (Term)
 import           Clash.Core.TyCon               (TyConMap, TyConName)
 import           Clash.Core.Var                 (Id)
@@ -117,6 +117,7 @@ data Binding a = Binding
 --
 -- Global functions cannot be mutually recursive, only self-recursive.
 type BindingMap = VarEnv (Binding Term)
+type DomainMap = HashMap Text VDomainConfiguration
 
 -- | Information to show about transformations during compilation.
 --

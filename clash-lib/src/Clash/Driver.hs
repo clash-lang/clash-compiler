@@ -41,7 +41,6 @@ import qualified Data.ByteString                  as ByteString
 import qualified Data.ByteString.Lazy             as ByteStringLazy
 import qualified Data.ByteString.Lazy.Char8       as ByteStringLazyChar8
 import           Data.Char                        (isAscii, isAlphaNum)
-import           Data.Coerce                      (coerce)
 import           Data.Default
 import           Data.Hashable                    (hash)
 import           Data.HashMap.Strict              (HashMap)
@@ -380,13 +379,8 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
   let topNm = lookupVarEnv' compNames topEntity
       (modNameS, fmap Data.Text.pack -> prefixM) = prefixModuleName (hdlKind (undefined :: backend)) (opt_componentPrefix opts) annM modName1
       modNameT  = Data.Text.pack modNameS
-      iw        = opt_intWidth opts
-      forceUnd  = opt_forceUndefined opts
-      xOpt      = coerce (opt_aggressiveXOptBB opts)
-      enums     = coerce (opt_renderEnums opts)
       hdlState' = setModName modNameT
-                  -- TODO initBackend should just take ClashOpts as an argument.
-                $ fromMaybe (initBackend iw (opt_hdlSyn opts) (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) forceUnd xOpt enums :: backend) hdlState
+                $ fromMaybe (initBackend @backend opts) hdlState
       hdlDir    = fromMaybe (Clash.Backend.name hdlState') (opt_hdlDir opts) </> topEntityS
       manPath   = hdlDir </> manifestFilename
       ite       = ifThenElseExpr hdlState'

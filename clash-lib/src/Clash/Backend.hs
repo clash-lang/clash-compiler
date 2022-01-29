@@ -11,7 +11,6 @@
 
 module Clash.Backend where
 
-import Data.HashMap.Strict                  (HashMap)
 import Data.HashSet                         (HashSet)
 import Data.Monoid                          (Ap)
 import Data.Text                            (Text)
@@ -25,10 +24,10 @@ import GHC.Types.SrcLoc (SrcSpan)
 import SrcLoc (SrcSpan)
 #endif
 
+import Clash.Driver.Types (ClashOpts)
 import {-# SOURCE #-} Clash.Netlist.Types
 import Clash.Netlist.BlackBox.Types
 
-import Clash.Signal.Internal                (VDomainConfiguration)
 import Clash.Annotations.Primitive          (HDL)
 
 #ifdef CABAL
@@ -80,19 +79,9 @@ data HWKind
   -- ^ User defined type that's not interchangeable with any others, even if
   -- the underlying structures are the same. Similar to an ADT in Haskell.
 
-type DomainMap = HashMap Text VDomainConfiguration
-
 class HasIdentifierSet state => Backend state where
   -- | Initial state for state monad
-  initBackend
-    :: Int
-    -> HdlSyn
-    -> Bool
-    -> PreserveCase
-    -> Maybe (Maybe Int)
-    -> AggressiveXOptBB
-    -> RenderEnums
-    -> state
+  initBackend :: ClashOpts -> state
 
   -- | What HDL is the backend generating
   hdlKind :: state -> HDL
