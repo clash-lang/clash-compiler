@@ -100,7 +100,7 @@ data TopEntityT = TopEntityT
   -- ^ (Maybe) a topentity annotation
   , topIsTestBench :: Bool
   -- ^ Whether this entity is a test bench
-  } deriving (Generic, Show)
+  } deriving (Generic, Show, Eq)
 
 -- | Same as "TopEntity", but with all port names that end up in HDL specified
 data ExpandedTopEntity a = ExpandedTopEntity

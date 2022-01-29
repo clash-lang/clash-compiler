@@ -61,8 +61,8 @@ import Data.Coerce                             (coerce)
 import qualified Data.DList                    as DList
 import Data.Either                             (lefts, rights)
 import Data.Foldable                           (foldl')
+import Data.Hashable                           (Hashable)
 import Data.Maybe                              (catMaybes)
-import Data.Hashable                           (Hashable (hashWithSalt))
 import Data.List                               (nub, partition)
 import Data.Text                               (Text)
 import GHC.Generics
@@ -81,9 +81,6 @@ import {-# SOURCE #-} Clash.Core.Type          (Type)
 import Clash.Core.Var                          (Var(Id), Id, TyVar)
 import Clash.Util                              (curLoc, second)
 
-import GHC.TypeLits
-  (TypeError, ErrorMessage (Text, (:<>:)))
-
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 data Term
   = Var     !Id                             -- ^ Variable reference
@@ -100,13 +97,6 @@ data Term
   | Cast    !Term !Type !Type               -- ^ Cast a term from one type to another
   | Tick    !TickInfo !Term                 -- ^ Annotated term
   deriving (Show, Generic, NFData, Binary)
-
-instance TypeError (
-        'Text "A broken implementation of Hashable Term has been "
-  ':<>: 'Text "removed in Clash 1.4.7. If this is an issue for you, please submit "
-  ':<>: 'Text "an issue report at https://github.com/clash-lang/clash-compiler/issues."
-  ) => Hashable Term where
-    hashWithSalt = error "Term.hashWithSalt: unreachable"
 
 data TickInfo
   = SrcSpan !SrcSpan
@@ -136,7 +126,7 @@ data NameMod
 data IsMultiPrim
   = SingleResult
   | MultiResult
-  deriving (Show, Generic, NFData, Hashable, Binary)
+  deriving (Show, Generic, NFData, Eq, Hashable, Binary)
 
 data PrimInfo = PrimInfo
   { primName :: !Text

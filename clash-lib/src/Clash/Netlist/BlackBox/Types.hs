@@ -48,7 +48,7 @@ data RenderVoid
   -- ^ Render blackbox, even if result type is void
   | NoRenderVoid
   -- ^ Don't render blackbox result type is void. Default for all blackboxes.
-  deriving (Show, Generic, NFData, Binary, Hashable, FromJSON)
+  deriving (Show, Generic, NFData, Binary, Eq, Hashable, FromJSON)
 
 data TemplateKind
   = TDecl
@@ -201,7 +201,7 @@ data Element
   | CtxName
   -- ^ The "context name", name set by `Clash.Magic.setName`, defaults to the
   -- name of the closest binder
-  deriving (Show, Generic, NFData, Binary, Hashable)
+  deriving (Show, Generic, NFData, Binary, Eq, Hashable)
 
 -- | Component instantiation hole. First argument indicates which function argument
 -- to instantiate. Third argument corresponds to output and input assignments,
@@ -225,7 +225,7 @@ data Decl
       -- to zero. Haskell blackboxes can use this data type.
       [(BlackBoxTemplate,BlackBoxTemplate)]
       -- FIELD (name of signal, type of signal)
-  deriving (Show, Generic, NFData, Binary, Hashable)
+  deriving (Show, Generic, NFData, Binary, Eq, Hashable)
 
 data HdlSyn = Vivado | Quartus | Other
   deriving (Eq, Show, Read, Generic, NFData, Binary, Hashable)

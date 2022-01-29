@@ -11,6 +11,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -68,10 +69,13 @@ import           Prettyprinter
 import           Data.Text.Prettyprint.Doc
 #endif
 
+import           Data.Hashable             (Hashable (hashWithSalt))
 import qualified Data.List                 as List
 import qualified Data.List.Extra           as List
 import           Data.Ord                  (comparing)
 import           GHC.SrcLoc.Extra          ()
+import           GHC.TypeLits
+  (TypeError, ErrorMessage (Text, (:<>:)))
 
 import           Clash.Core.FreeVars
   (noFreeVarsOfType, localFVsOfTerms, tyFVsOfTypes)
@@ -1002,6 +1006,15 @@ instance Ord Type where
 
 instance Eq Term where
   (==) = aeqTerm
+
+instance TypeError (
+        'Text "A broken implementation of Hashable Term has been "
+  ':<>: 'Text "removed in Clash 1.4.7. If this is an issue for you, please submit "
+  ':<>: 'Text "an issue report at https://github.com/clash-lang/clash-compiler/issues."
+  ) => Hashable Term where
+    hashWithSalt = error "Term.hashWithSalt: unreachable"
+
+
 
 instance Ord Term where
   compare = acmpTerm
