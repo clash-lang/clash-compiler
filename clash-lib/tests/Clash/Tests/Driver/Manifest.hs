@@ -1,3 +1,5 @@
+{-# LANGUAGE NamedFieldPuns  #-}
+
 module Clash.Tests.Driver.Manifest where
 
 import qualified Data.Aeson as Aeson
@@ -83,4 +85,11 @@ tests =
           decoded = Aeson.eitherDecode encoded
 
         pure (decoded Q.=== Right manifest)
+    , Q.testProperty "FilesManifest can decode encoded Manifest" $ do
+        manifest@Manifest{fileNames} <- genManifest
+        let
+          encoded = Aeson.encodePretty manifest
+          Right (FilesManifest fileNamesDecoded) = Aeson.eitherDecode encoded
+
+        pure (fileNamesDecoded Q.=== fileNames)
     ]

@@ -120,7 +120,9 @@ import           Clash.Core.VarEnv
   (elemVarEnv, emptyVarEnv, lookupVarEnv, lookupVarEnv', mkVarEnv, lookupVarEnvDirectly, eltsVarEnv, VarEnv)
 import           Clash.Debug                      (debugIsOn)
 import           Clash.Driver.Types
-import           Clash.Driver.Manifest            (Manifest(..), readFreshManifest, UnexpectedModification, pprintUnexpectedModifications, mkManifest, writeManifest, manifestFilename)
+import           Clash.Driver.Manifest
+  (Manifest(..), readFreshManifest, UnexpectedModification, pprintUnexpectedModifications,
+   mkManifest, writeManifest, manifestFilename)
 import           Clash.Edalize.Edam
 import           Clash.Netlist                    (genNetlist, genTopNames)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
