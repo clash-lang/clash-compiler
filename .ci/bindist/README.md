@@ -28,7 +28,9 @@ triggered on any other branch a _beta_ release gets made.
 ## Releasing a new version major version (1.x)
 1. Change version numbers in:
   * `clash-prelude/clash-prelude.cabal`
+  * `clash-prelude-hedgehog/clash-prelude-hedgehog.cabal`
   * `clash-lib/clash-lib.cabal`
+  * `clash-lib-hedgehog/clash-lib-hedgehog.cabal`
   * `clash-ghc/clash-ghc.cabal`
   * `clash-ghc/clash-cores.cabal`
   * `.ci/bindist/linux/snap/snap/snapcraft.yaml`
