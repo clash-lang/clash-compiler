@@ -5,6 +5,7 @@ import           Clash.Driver.Types
 
 import           Clash.GHC.PartialEval
 import           Clash.GHC.Evaluator
+import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)
 
 import qualified Control.Concurrent.Supply    as Supply
 import           Control.DeepSeq              (deepseq)
@@ -31,15 +32,22 @@ main = do
 benchFile :: [FilePath] -> FilePath -> IO ()
 benchFile idirs src = do
   supplyN <- Supply.newSupply
-  env <- setupEnv src
+  (bindingsMap,tcm,tupTcm,primMap,reprs,topEntityNames,topEntity) <- setupEnv src
   putStrLn $ "Doing normalization of " ++ src
-  let (bindingsMap,tcm,tupTcm,primMap,reprs,topEntityNames,topEntity) = env
-      primMap' = fmap (fmap unremoveBBfunc) primMap
-      res :: BindingMap
-      res = normalizeEntity reprs bindingsMap primMap' tcm tupTcm typeTrans
+
+  let clashEnv = ClashEnv
+                   { envOpts = opts idirs
+                   , envTyConMap = tcm
+                   , envTupleTyCons = tupTcm
+                   , envPrimitives = fmap (fmap unremoveBBfunc) primMap
+                   , envCustomReprs = reprs
+                   }
+
+      res = normalizeEntity clashEnv bindingsMap
+                   (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
                    ghcEvaluator
                    evaluator
-                   topEntityNames (opts idirs) supplyN topEntity
+                   topEntityNames supplyN topEntity
   res `deepseq` putStrLn ".. done\n"
 
 setupEnv :: FilePath -> IO NormalizationInputs

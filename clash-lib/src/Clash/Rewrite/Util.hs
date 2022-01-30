@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016     , Myrtle Software Ltd,
                     2017     , Google Inc.,
-                    2021     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -81,7 +81,7 @@ import           Clash.Core.VarEnv
 import           Clash.Debug
 import           Clash.Driver.Types
   (TransformationInfo(..), DebugOpts(..), BindingMap, Binding(..), IsPrim(..),
-  hasDebugInfo, isDebugging)
+  ClashEnv(..), ClashOpts(..), hasDebugInfo, isDebugging)
 import           Clash.Netlist.Util          (representableType)
 import           Clash.Pretty                (clashPretty, showDoc)
 import           Clash.Rewrite.Types
@@ -279,9 +279,9 @@ runRewriteSession :: RewriteEnv
                   -> RewriteMonad extra a
                   -> a
 runRewriteSession r s m =
-  traceIf (dbg_countTransformations (_debugOpts r))
+  traceIf (dbg_countTransformations (opt_debug (envOpts (_clashEnv r))))
     ("Clash: Transformations:\n" ++ Text.unpack (showCounters (s' ^. transformCounters))) $
-    traceIf (None < dbg_transformationInfo (_debugOpts r))
+    traceIf (None < dbg_transformationInfo (opt_debug (envOpts (_clashEnv r))))
       ("Clash: Applied " ++ show (s' ^. transformCounter) ++ " transformations")
       a
   where

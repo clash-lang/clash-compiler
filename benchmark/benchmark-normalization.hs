@@ -4,28 +4,20 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
-import           Clash.Signal (VDomainConfiguration)
-
-import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
-import           Clash.Core.TyCon
-import           Clash.Core.Var
 import           Clash.Driver
 import           Clash.Driver.Types
 
 import           Clash.GHC.PartialEval
 import           Clash.GHC.Evaluator
+import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)
 
-import           Clash.Netlist.Types          (TopEntityT)
-import           Clash.Primitives.Types
+import           Clash.Netlist.Types          (TopEntityT(topId))
 
 import           Criterion.Main
 
 import qualified Control.Concurrent.Supply    as Supply
 import           Control.DeepSeq              (NFData(..), rwhnf)
-import           Data.HashMap.Strict          (HashMap)
-import           Data.IntMap.Strict           (IntMap)
 import           Data.List                    (isPrefixOf, partition)
-import           Data.Text                    (Text)
 import           System.Environment           (getArgs, withArgs)
 
 import BenchmarkCommon
@@ -50,27 +42,26 @@ main = do
 benchFile :: [FilePath] -> FilePath -> Benchmark
 benchFile idirs src =
   env (setupEnv idirs src) $
-    \ ~((bindingsMap,tcm,tupTcm,_topEntities,primMap,reprs,_domainConfs,topEntityNames,topEntity),supplyN) -> do
+    \ ~(clashEnv, clashDesign, supplyN) -> do
       bench ("normalization of " ++ src)
-            (nf (normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans
-                                 ghcEvaluator
-                                 evaluator
-                                 topEntityNames
-                                 (opts idirs) supplyN :: _ -> BindingMap) topEntity)
+            (nf (normalizeEntity
+                   clashEnv
+                   (designBindings clashDesign)
+                   (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
+                   ghcEvaluator
+                   evaluator
+                   (fmap topId (designEntities clashDesign))
+                   supplyN)
+                   (topId (head (designEntities clashDesign))))
 
 setupEnv
   :: [FilePath]
   -> FilePath
-  -> IO ((BindingMap, TyConMap, IntMap TyConName
-         ,[TopEntityT]
-         ,CompiledPrimMap, CustomReprs, HashMap Text VDomainConfiguration, [Id], Id
-         )
-        ,Supply.Supply
-        )
+  -> IO (ClashEnv, ClashDesign, Supply.Supply)
 setupEnv idirs src = do
-  inp <- runInputStage idirs src
+  (clashEnv, clashDesign) <- runInputStage idirs src
   supplyN <- Supply.newSupply
-  return (inp,supplyN)
+  return (clashEnv, clashDesign ,supplyN)
 
 instance NFData Supply.Supply where
   rnf = rwhnf

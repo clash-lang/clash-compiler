@@ -1,5 +1,5 @@
 {-|
-  Copyright  :  (C) 2020 QBayLogic B.V.
+  Copyright  :  (C) 2020,2022 QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -22,7 +22,7 @@ import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
 import Clash.Core.VarEnv (InScopeSet, emptyVarSet, emptyVarEnv, emptyInScopeSet)
-import Clash.Driver.Types (debugSilent)
+import Clash.Driver.Types (ClashEnv(..), ClashOpts(..), defClashOpts, debugSilent)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (runRewrite)
 import Clash.Normalize.Types
@@ -60,16 +60,17 @@ lookupTM u tm = case HashMap.lookup u tm of
 
 instance Default RewriteEnv where
   def = RewriteEnv
-    { _debugOpts=debugSilent
-    , _aggressiveXOpt=False
+    { _clashEnv = ClashEnv
+        { envOpts = defClashOpts { opt_debug = debugSilent }
+        , envTyConMap = emptyUniqMap
+        , envTupleTyCons = IntMap.empty
+        , envPrimitives = HashMap.empty
+        , envCustomReprs = buildCustomReprs []
+        }
     , _typeTranslator=error "_typeTranslator: NYI"
-    , _tcCache=emptyUniqMap
-    , _tupleTcCache=IntMap.empty
     , _peEvaluator=error "_peEvaluator: NYI"
     , _evaluator=error "_evaluator: NYI"
     , _topEntities=emptyVarSet
-    , _customReprs=buildCustomReprs []
-    , _fuelLimit=10
     }
 
 instance Default extra => Default (RewriteState extra) where
@@ -90,17 +91,9 @@ instance Default NormalizeState where
     { _normalized=emptyVarEnv
     , _specialisationCache=Map.empty
     , _specialisationHistory=emptyVarEnv
-    , _specialisationLimit=20
     , _inlineHistory=emptyVarEnv
-    , _inlineLimit=20
-    , _inlineFunctionLimit=15
-    , _inlineConstantLimit=0
-    , _primitives=HashMap.empty
     , _primitiveArgs=Map.empty
     , _recursiveComponents=emptyVarEnv
-    , _newInlineStrategy=True
-    , _normalizeUltra=False
-    , _inlineWFCacheLimit=10
     }
 
 instance Default InScopeSet where

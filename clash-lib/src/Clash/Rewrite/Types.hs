@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016     , Myrtle Software Ltd,
                     2017     , Google Inc.,
-                    2021     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -43,11 +43,12 @@ import Clash.Core.Evaluator.Types as WHNF    (Evaluator, PrimHeap)
 
 import Clash.Core.Term           (Term, Context)
 import Clash.Core.Type           (Type)
-import Clash.Core.TyCon          (TyConName, TyConMap)
+import Clash.Core.TyCon          (TyConMap, TyConName)
 import Clash.Core.Var            (Id)
 import Clash.Core.VarEnv         (InScopeSet, VarSet, VarEnv)
-import Clash.Driver.Types        (BindingMap, DebugOpts)
+import Clash.Driver.Types        (ClashEnv(..), ClashOpts(..), BindingMap, DebugOpts)
 import Clash.Netlist.Types       (FilteredHWType, HWMap)
+import Clash.Primitives.Types    (CompiledPrimMap)
 import Clash.Rewrite.WorkFree    (isWorkFree)
 import Clash.Util
 
@@ -98,32 +99,64 @@ Lens.makeLenses ''RewriteState
 -- | Read-only environment of a rewriting session
 data RewriteEnv
   = RewriteEnv
-  { _debugOpts      :: DebugOpts
-  -- ^ Options for debugging during rewriting
-  , _aggressiveXOpt :: Bool
-  -- ^ Transformations to print debugging info for
+  { _clashEnv       :: ClashEnv
+  -- ^ The global environment of the compiler
   , _typeTranslator :: CustomReprs
                     -> TyConMap
                     -> Type
                     -> State HWMap (Maybe (Either String FilteredHWType))
   -- ^ Hardcode Type -> FilteredHWType translator
-  , _tcCache        :: TyConMap
-  -- ^ TyCon cache
-  , _tupleTcCache   :: IntMap TyConName
-  -- ^ Tuple TyCon cache
   , _peEvaluator    :: PE.Evaluator
   -- ^ Hardcoded evaluator for partial evaluation
   , _evaluator      :: WHNF.Evaluator
   -- ^ Hardcoded evaluator for WHNF (old evaluator)
   , _topEntities    :: VarSet
   -- ^ Functions that are considered TopEntities
-  , _customReprs    :: CustomReprs
-  -- ^ Custom bit representations
-  , _fuelLimit      :: Word
-  -- ^ Maximum amount of fuel for the evaluator
   }
 
 Lens.makeLenses ''RewriteEnv
+
+debugOpts :: Lens.Getter RewriteEnv DebugOpts
+debugOpts = clashEnv . Lens.to (opt_debug . envOpts)
+
+aggressiveXOpt :: Lens.Getter RewriteEnv Bool
+aggressiveXOpt = clashEnv . Lens.to (opt_aggressiveXOpt . envOpts)
+
+tcCache :: Lens.Getter RewriteEnv TyConMap
+tcCache = clashEnv . Lens.to envTyConMap
+
+tupleTcCache :: Lens.Getter RewriteEnv (IntMap TyConName)
+tupleTcCache = clashEnv . Lens.to envTupleTyCons
+
+customReprs :: Lens.Getter RewriteEnv CustomReprs
+customReprs = clashEnv . Lens.to envCustomReprs
+
+fuelLimit :: Lens.Getter RewriteEnv Word
+fuelLimit = clashEnv . Lens.to (opt_evaluatorFuelLimit . envOpts)
+
+primitives :: Lens.Getter RewriteEnv CompiledPrimMap
+primitives = clashEnv . Lens.to envPrimitives
+
+inlineLimit :: Lens.Getter RewriteEnv Int
+inlineLimit = clashEnv . Lens.to (opt_inlineLimit . envOpts)
+
+inlineFunctionLimit :: Lens.Getter RewriteEnv Word
+inlineFunctionLimit = clashEnv . Lens.to (opt_inlineFunctionLimit . envOpts)
+
+inlineConstantLimit :: Lens.Getter RewriteEnv Word
+inlineConstantLimit = clashEnv . Lens.to (opt_inlineConstantLimit . envOpts)
+
+inlineWFCacheLimit :: Lens.Getter RewriteEnv Word
+inlineWFCacheLimit = clashEnv . Lens.to (opt_inlineWFCacheLimit . envOpts)
+
+newInlineStrategy :: Lens.Getter RewriteEnv Bool
+newInlineStrategy = clashEnv . Lens.to (opt_newInlineStrat . envOpts)
+
+specializationLimit :: Lens.Getter RewriteEnv Int
+specializationLimit = clashEnv . Lens.to (opt_specLimit . envOpts)
+
+normalizeUltra :: Lens.Getter RewriteEnv Bool
+normalizeUltra = clashEnv . Lens.to (opt_ultra . envOpts)
 
 -- | Monad that keeps track how many transformations have been applied and can
 -- generate fresh variables and unique identifiers. In addition, it keeps track

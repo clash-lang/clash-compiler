@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -86,14 +86,13 @@ import Clash.Netlist.Util (representableType)
 import Clash.Rewrite.Combinators (topdownR)
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, censor, curFun, customReprs, extra, tcCache
-  , typeTranslator, workFreeBinders, debugOpts, topEntities)
+  , typeTranslator, workFreeBinders, debugOpts, topEntities, specializationLimit)
 import Clash.Rewrite.Util
   ( mkBinderFor, mkDerivedName, mkFunction, mkTmBinderFor, setChanged, changed
   , normalizeTermTypes, normalizeId)
 import Clash.Rewrite.WorkFree (isWorkFree)
 import Clash.Normalize.Types
-  ( NormRewrite, NormalizeSession, specialisationCache, specialisationHistory
-  , specialisationLimit)
+  ( NormRewrite, NormalizeSession, specialisationCache, specialisationHistory)
 import Clash.Normalize.Util
   (constantSpecInfo, csrFoundConstant, csrNewBindings, csrNewTerm)
 import Clash.Unique
@@ -404,7 +403,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
         Just (Binding _ sp inl _ bodyTm _) -> do
           -- Determine if we see a sequence of specializations on a growing argument
           specHistM <- lookupUniqMap f <$> Lens.use (extra.specialisationHistory)
-          specLim   <- Lens.use (extra . specialisationLimit)
+          specLim   <- Lens.view specializationLimit
           if maybe False (> specLim) specHistM
             then throw (ClashException
                         sp

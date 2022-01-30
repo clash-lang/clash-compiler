@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -83,15 +83,14 @@ import Clash.Primitives.Types
   (CompiledPrimMap, Primitive(..), TemplateKind(..))
 import Clash.Rewrite.Combinators (allR)
 import Clash.Rewrite.Types
-  ( TransformContext(..), bindings, curFun, customReprs, extra
-  , tcCache, topEntities, typeTranslator)
+  ( TransformContext(..), bindings, curFun, customReprs, tcCache, topEntities
+  , typeTranslator, inlineConstantLimit, inlineFunctionLimit, inlineLimit
+  , inlineWFCacheLimit, primitives)
 import Clash.Rewrite.Util
   ( changed, inlineBinders, inlineOrLiftBinders, isJoinPointIn
   , isUntranslatable, isUntranslatableType, isVoidWrapper, zoomExtra)
 import Clash.Rewrite.WorkFree (isWorkFreeIsh)
-import Clash.Normalize.Types
-  ( NormRewrite, NormalizeSession, inlineConstantLimit, inlineFunctionLimit
-  , inlineLimit, inlineWFCacheLimit, primitives)
+import Clash.Normalize.Types ( NormRewrite, NormalizeSession)
 import Clash.Normalize.Util
   ( addNewInline, alreadyInlined, isRecursiveBndr, mkInlineTick
   , normalizeTopLvlBndr)
@@ -125,7 +124,7 @@ bindConstantVar = inlineBinders test
       _    -> do
         tcm <- Lens.view tcCache
         case isWorkFreeIsh tcm e of
-          True -> Lens.use (extra.inlineConstantLimit) >>= \case
+          True -> Lens.view inlineConstantLimit >>= \case
             0 -> return True
             n -> return (termSize e <= n)
           _ -> return False
@@ -292,7 +291,7 @@ inlineCast = inlineBinders test
 --   * I/O actions
 inlineCleanup :: HasCallStack => NormRewrite
 inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
-  prims <- Lens.use (extra.primitives)
+  prims <- Lens.view primitives
   -- For all let-bindings, count the number of times they are referenced.
   -- We only inline let-bindings which are referenced only once, otherwise
   -- we would lose sharing.
@@ -477,7 +476,7 @@ inlineNonRepWorker e@(Case scrut altsTy alts)
   = do
     (cf,_)    <- Lens.use curFun
     isInlined <- zoomExtra (alreadyInlined f cf)
-    limit     <- Lens.use (extra.inlineLimit)
+    limit     <- Lens.view inlineLimit
     tcm       <- Lens.view tcCache
     let
       scrutTy = inferCoreTypeOf tcm scrut
@@ -574,7 +573,7 @@ inlineSmall _ e@(collectArgsTicks -> (Var f,args,ticks)) = do
     then return e
     else do
       bndrs <- Lens.use bindings
-      sizeLimit <- Lens.use (extra.inlineFunctionLimit)
+      sizeLimit <- Lens.view inlineFunctionLimit
       case lookupVarEnv f bndrs of
         -- Don't inline recursive expressions
         Just b -> do
@@ -650,7 +649,7 @@ inlineWorkFree _ e@(Var f) = do
              then return e
              else do
               let topB = bindingTerm top
-              sizeLimit <- Lens.use (extra.inlineWFCacheLimit)
+              sizeLimit <- Lens.view inlineWFCacheLimit
               -- caching only worth it from a certain size onwards, otherwise
               -- the caching mechanism itself brings more of an overhead.
               if termSize topB < sizeLimit then

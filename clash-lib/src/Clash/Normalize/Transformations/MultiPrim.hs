@@ -2,8 +2,9 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.
+                    2022     , QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Transformations on primitives with multiple results.
 -}
@@ -30,9 +31,9 @@ import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type(..), mkPolyFunTy, splitFunForallTy)
 import Clash.Core.Util (listToLets)
 import Clash.Core.Var (mkLocalId)
-import Clash.Normalize.Types (NormRewrite, primitives)
+import Clash.Normalize.Types (NormRewrite)
 import Clash.Primitives.Types (Primitive(..))
-import Clash.Rewrite.Types (extra, tcCache)
+import Clash.Rewrite.Types (tcCache, primitives)
 import Clash.Rewrite.Util (changed)
 
 -- Note [MultiResult type]
@@ -76,7 +77,7 @@ import Clash.Rewrite.Util (changed)
 setupMultiResultPrim :: HasCallStack => NormRewrite
 setupMultiResultPrim _ctx e@(Prim pInfo@PrimInfo{primMultiResult=SingleResult}) = do
   tcm <- Lens.view tcCache
-  prim <- Lens.use (extra . primitives . Lens.at (primName pInfo))
+  prim <- Lens.view (primitives . Lens.at (primName pInfo))
 
   case prim >>= extractPrim of
     Just (BlackBoxHaskell{multiResult=True}) ->

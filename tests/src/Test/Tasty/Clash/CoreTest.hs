@@ -1,9 +1,8 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-
-#include "MachDeps.h"
 
 module Test.Tasty.Clash.CoreTest
   ( TargetToState
@@ -26,17 +25,9 @@ import Clash.Core.TyCon
 import Clash.Core.Var
 import Clash.Core.VarEnv
 import Clash.Driver.Types
-import Clash.Netlist.BlackBox.Types (HdlSyn(Other))
-import Clash.Netlist.Types (PreserveCase(..))
 
 import Clash.GHC.GenerateBindings
 import Clash.GHC.PartialEval
-
-#if MIN_VERSION_ghc(9,0,0)
-import           GHC.Utils.Misc
-#else
-import           Util
-#endif
 
 import Test.Tasty.Clash
 
@@ -51,12 +42,6 @@ mkClashOpts = defClashOpts
   , opt_errorExtra   = True
   }
 
-mkBackend
-  :: (Backend (TargetToState target))
-  => SBuildTarget target
-  -> TargetToState target
-mkBackend _ = initBackend WORD_SIZE_IN_BITS Other True PreserveCase Nothing (AggressiveXOptBB False) (RenderEnums True)
-
 -- Run clash as far as having access to core for all bindings. This is used
 -- to test operations on core, such as transformations and evaluation.
 --
@@ -65,21 +50,21 @@ mkBackend _ = initBackend WORD_SIZE_IN_BITS Other True PreserveCase Nothing (Agg
 -- problems standing in the way of this however.
 --
 runToCoreStage
-  :: (Backend (TargetToState target))
+  :: forall target
+   . (Backend (TargetToState target))
   => SBuildTarget target
   -> (ClashOpts -> ClashOpts)
   -> FilePath
-  -> IO (BindingMap, TyConMap, Supply)
-runToCoreStage target f src = do
+  -> IO (ClashEnv, ClashDesign, Supply)
+runToCoreStage _target f src = do
   ids <- newSupply
   pds <- primDirs backend
-  (bm, tcm, _, _, _, _, _) <- generateBindings
-    (return ()) Auto pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
+  (env, design) <- generateBindings opts (return ()) pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
 
-  return (bm, tcm, ids)
+  return (env, design, ids)
  where
-  backend = mkBackend target
   opts = f mkClashOpts
+  backend = initBackend @(TargetToState target) opts
 
 findBinding
   :: OccName

@@ -3,7 +3,7 @@
                      2016-2017, Myrtle Software Ltd,
                      2017     , QBayLogic, Google Inc.
                      2020-2022, QBayLogic,
-                     20222    , Google Inc.
+                     2022     , Google Inc.
 
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -41,14 +41,12 @@ import qualified Data.ByteString                  as ByteString
 import qualified Data.ByteString.Lazy             as ByteStringLazy
 import qualified Data.ByteString.Lazy.Char8       as ByteStringLazyChar8
 import           Data.Char                        (isAscii, isAlphaNum)
-import           Data.Coerce                      (coerce)
 import           Data.Default
 import           Data.Hashable                    (hash)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMap
 import qualified Data.HashSet                     as HashSet
 import           Data.Proxy                       (Proxy(..))
-import           Data.IntMap                      (IntMap)
 import           Data.List                        (intercalate)
 import           Data.Maybe                       (fromMaybe, maybeToList, mapMaybe)
 import qualified Data.Map.Ordered                 as OMap
@@ -112,7 +110,7 @@ import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr')
 import           Clash.Core.Type
   (Type(ForAllTy, LitTy, AnnType), TypeView(..), tyView, mkFunTy, LitTy(SymTy))
-import           Clash.Core.TyCon                 (TyConMap, TyConName)
+import           Clash.Core.TyCon                 (TyConMap)
 import           Clash.Core.Util                  (shouldSplit)
 import           Clash.Core.Var
   (Id, varName, varUniq, varType)
@@ -303,18 +301,9 @@ prefixModuleName hdl compPrefix annM modName =
 -- | Create a set of target HDL files for a set of functions
 generateHDL
   :: forall backend . Backend backend
-  => CustomReprs
-  -> HashMap Data.Text.Text VDomainConfiguration
-  -- ^ Known domains to configurations
-  -> BindingMap
-  -- ^ Set of functions
+  => ClashEnv
+  -> ClashDesign
   -> Maybe backend
-  -> CompiledPrimMap
-  -- ^ Primitive / BlackBox Definitions
-  -> TyConMap
-  -- ^ TyCon cache
-  -> IntMap TyConName
-  -- ^ Tuple TyCon cache
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
@@ -322,17 +311,17 @@ generateHDL
   -- ^ Hardcoded evaluator for partial evaluation
   -> WHNF.Evaluator
   -- ^ Hardcoded evaluator for WHNF (old evaluator)
-  -> [TopEntityT]
-  -- ^ All topentities
   -> Maybe (TopEntityT, [TopEntityT])
   -- ^ Main top entity to compile. If Nothing, all top entities in previous
   -- argument will be compiled.
-  -> ClashOpts
-  -- ^ Debug information level for the normalization process
   -> Clock.UTCTime
   -> IO ()
-generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans peEval eval
-  topEntities0 mainTopEntity opts startTime = do
+generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = do
+    let bindingsMap = designBindings design
+    let tcm = envTyConMap env
+    let topEntities0 = designEntities design
+    let opts = envOpts env
+
     removeHistoryFile (dbg_historyFile (opt_debug opts))
 
     unless (opt_cachehdl opts) $
@@ -371,6 +360,11 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
     -> TopEntityT
     -> IO ()
   go compNames seenV edamFilesV ioLockV deps topEntityMap (TopEntityT topEntity annM isTb) = do
+  let domainConfs = designDomains design
+  let bindingsMap = designBindings design
+  let primMap = envPrimitives env
+  let topEntities0 = designEntities design
+  let opts = envOpts env
   prevTime <- Clock.getCurrentTime
   let topEntityS = Data.Text.unpack (nameOcc (varName topEntity))
 
@@ -385,13 +379,8 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
   let topNm = lookupVarEnv' compNames topEntity
       (modNameS, fmap Data.Text.pack -> prefixM) = prefixModuleName (hdlKind (undefined :: backend)) (opt_componentPrefix opts) annM modName1
       modNameT  = Data.Text.pack modNameS
-      iw        = opt_intWidth opts
-      forceUnd  = opt_forceUndefined opts
-      xOpt      = coerce (opt_aggressiveXOptBB opts)
-      enums     = coerce (opt_renderEnums opts)
       hdlState' = setModName modNameT
-                  -- TODO initBackend should just take ClashOpts as an argument.
-                $ fromMaybe (initBackend iw (opt_hdlSyn opts) (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) forceUnd xOpt enums :: backend) hdlState
+                $ fromMaybe (initBackend @backend opts) hdlState
       hdlDir    = fromMaybe (Clash.Backend.name hdlState') (opt_hdlDir opts) </> topEntityS
       manPath   = hdlDir </> manifestFilename
       ite       = ifThenElseExpr hdlState'
@@ -449,9 +438,8 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
 
       -- 2. Normalize topEntity
       supplyN <- Supply.newSupply
-      let transformedBindings = normalizeEntity reprs bindingsMap primMap tcm tupTcm
-                                  typeTrans peEval eval topEntityNames opts supplyN
-                                  topEntity
+      let transformedBindings = normalizeEntity env bindingsMap typeTrans peEval
+                                eval topEntityNames supplyN topEntity
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = reportTimeDiff normTime prevTime
@@ -463,8 +451,8 @@ generateHDL reprs domainConfs bindingsMap hdlState primMap tcm tupTcm typeTrans 
       (topComponent, netlist) <- modifyMVar seenV $ \seen -> do
         (topComponent, netlist, seen') <-
           -- TODO My word, this has far too many arguments.
-          genNetlist isTb opts reprs transformedBindings topEntityMap compNames
-            primMap tcm typeTrans iw ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
+          genNetlist env isTb transformedBindings topEntityMap compNames
+            typeTrans ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
 
         pure (seen', (topComponent, netlist))
 
@@ -1061,15 +1049,9 @@ copyDataFiles idirs targetDir = mapM copyDataFile
 
 -- | Normalize a complete hierarchy
 normalizeEntity
-  :: CustomReprs
+  :: ClashEnv
   -> BindingMap
   -- ^ All bindings
-  -> CompiledPrimMap
-  -- ^ BlackBox HDL templates
-  -> TyConMap
-  -- ^ TyCon cache
-  -> IntMap TyConName
-  -- ^ Tuple TyCon cache
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
@@ -1079,22 +1061,19 @@ normalizeEntity
   -- ^ Hardcoded evaluator for WHNF (old evaluator)
   -> [Id]
   -- ^ TopEntities
-  -> ClashOpts
-  -- ^ Debug information level for the normalization process
   -> Supply.Supply
   -- ^ Unique supply
   -> Id
   -- ^ root of the hierarchy
   -> BindingMap
-normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans peEval eval topEntities
-  opts supply tm = transformedBindings
+normalizeEntity env bindingsMap typeTrans peEval eval topEntities supply tm = transformedBindings
   where
     doNorm = do norm <- normalize [tm]
                 let normChecked = checkNonRecursive norm
                 cleaned <- cleanupGraph tm normChecked
                 return cleaned
-    transformedBindings = runNormalization opts supply bindingsMap
-                            typeTrans reprs tcm tupTcm peEval eval primMap emptyVarEnv
+    transformedBindings = runNormalization env supply bindingsMap
+                            typeTrans peEval eval emptyVarEnv
                             topEntities doNorm
 
 -- | topologically sort the top entities

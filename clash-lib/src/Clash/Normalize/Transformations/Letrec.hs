@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -67,10 +67,10 @@ import Clash.Netlist.BlackBox.Util (getUsedArguments)
 import Clash.Netlist.Util (splitNormalized)
 import Clash.Normalize.Primitives (removedArg)
 import Clash.Normalize.Transformations.Reduce (reduceBinders)
-import Clash.Normalize.Types (NormRewrite, NormalizeSession, primitives)
+import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Primitives.Types (Primitive(..), UsedArguments(..))
 import Clash.Rewrite.Types
-  (TransformContext(..), bindings, curFun, extra, tcCache, workFreeBinders)
+  (TransformContext(..), bindings, curFun, tcCache, workFreeBinders, primitives)
 import Clash.Rewrite.Util
   (changed, isFromInt, isUntranslatable, mkTmBinderFor, removeUnusedBinders, setChanged)
 import Clash.Rewrite.WorkFree
@@ -93,7 +93,7 @@ deadCode _ e = return e
 
 removeUnusedExpr :: HasCallStack => NormRewrite
 removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
-  bbM <- HashMap.lookup (primName pInfo) <$> Lens.use (extra.primitives)
+  bbM <- HashMap.lookup (primName pInfo) <$> Lens.view primitives
   let
     usedArgs0 =
       case Monad.join (extractPrim <$> bbM) of

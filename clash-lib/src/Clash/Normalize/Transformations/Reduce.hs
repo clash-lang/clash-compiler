@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -37,9 +37,9 @@ import Clash.Core.Type (TypeView(..), mkTyConApp, tyView)
 import Clash.Core.Util (mkVec, shouldSplit, tyNatSize)
 import Clash.Normalize.PrimitiveReductions
 import Clash.Normalize.Primitives (removedArg)
-import Clash.Normalize.Types (NormRewrite, NormalizeSession, normalizeUltra)
+import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Normalize.Util (shouldReduce)
-import Clash.Rewrite.Types (TransformContext(..), extra, tcCache)
+import Clash.Rewrite.Types (TransformContext(..), tcCache, normalizeUltra)
 import Clash.Rewrite.Util (changed, isUntranslatableType, setChanged, whnfRW)
 import Clash.Unique (lookupUniqMap)
 
@@ -148,7 +148,7 @@ reduceConst _ e = return e
 reduceNonRepPrim :: HasCallStack => NormRewrite
 reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks) <- collectArgsTicks e = do
   tcm <- Lens.view tcCache
-  ultra <- Lens.use (extra.normalizeUltra)
+  ultra <- Lens.view normalizeUltra
   let eTy = inferCoreTypeOf tcm e
   case tyView eTy of
     (TyConApp vecTcNm@(nameOcc -> "Clash.Sized.Vector.Vec")

@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021     , QBayLogic B.V.
+                     2021-2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -37,6 +37,7 @@ import           Control.Monad                        (forM)
 import           Control.Monad.State                  (State)
 import           Data.Bifunctor                       (first, second)
 import           Data.Bits                            (Bits, testBit)
+import           Data.Coerce                          (coerce)
 import           Data.Function                        (on)
 import           Data.HashMap.Strict                  (HashMap)
 import qualified Data.HashMap.Strict                  as HashMap
@@ -65,6 +66,7 @@ import           Clash.Annotations.BitRepresentation.Util
 import           Clash.Core.Var                       (Attr'(..))
 import           Clash.Backend
 import           Clash.Debug                          (traceIf)
+import           Clash.Driver.Types                   (ClashOpts(..))
 import           Clash.Netlist.BlackBox.Types         (HdlSyn)
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
@@ -103,9 +105,9 @@ instance HasIdentifierSet VerilogState where
   identifierSet = idSeen
 
 instance Backend VerilogState where
-  initBackend iw hdlsyn_ esc lw undefVal xOpt _enums = VerilogState
+  initBackend opts = VerilogState
     { _genDepth=0
-    , _idSeen=Id.emptyIdentifierSet esc lw Verilog
+    , _idSeen=Id.emptyIdentifierSet (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) Verilog
     , _srcSpan=noSrcSpan
     , _includes=[]
     , _imports=HashSet.empty
@@ -113,10 +115,10 @@ instance Backend VerilogState where
     , _dataFiles=[]
     , _memoryDataFiles=[]
     , _customConstrs=HashMap.empty
-    , _intWidth=iw
-    , _hdlsyn=hdlsyn_
-    , _undefValue=undefVal
-    , _aggressiveXOptBB_=xOpt
+    , _intWidth=opt_intWidth opts
+    , _hdlsyn=opt_hdlSyn opts
+    , _undefValue=opt_forceUndefined opts
+    , _aggressiveXOptBB_=coerce (opt_aggressiveXOptBB opts)
     }
   hdlKind         = const Verilog
   primDirs        = const $ do root <- primsRoot

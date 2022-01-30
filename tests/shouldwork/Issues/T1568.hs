@@ -41,7 +41,8 @@ mainCommon
   => SBuildTarget target
   -> IO ()
 mainCommon hdl = do
-  (bm, _, _) <- runToCoreStage hdl id testPath
+  (_, design, _) <- runToCoreStage hdl id testPath
+  let bm = designBindings design
 
   checkTE "T1568.f" bm
   checkTE "T1568.topEntity" bm

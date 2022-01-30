@@ -1,8 +1,9 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                          2017, Google Inc.
+                         2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Types used in Normalize modules
 -}
@@ -11,7 +12,7 @@
 
 module Clash.Normalize.Types where
 
-import Control.Lens               (makeLenses)
+import qualified Control.Lens as Lens
 import Control.Monad.State.Strict (State)
 import Data.Map                   (Map)
 import Data.Set                   (Set)
@@ -22,7 +23,6 @@ import Clash.Core.Type        (Type)
 import Clash.Core.Var         (Id)
 import Clash.Core.VarEnv      (VarEnv)
 import Clash.Driver.Types     (BindingMap)
-import Clash.Primitives.Types (CompiledPrimMap)
 import Clash.Rewrite.Types    (Rewrite, RewriteMonad)
 
 -- | State of the 'NormalizeMonad'
@@ -38,23 +38,12 @@ data NormalizeState
   -- * Elem: (name of specialized function,type of specialized function)
   , _specialisationHistory :: VarEnv Int
   -- ^ Cache of how many times a function was specialized
-  , _specialisationLimit :: !Int
-  -- ^ Number of time a function 'f' can be specialized
   , _inlineHistory   :: VarEnv (VarEnv Int)
   -- ^ Cache of function where inlining took place:
   --
   -- * Key: function where inlining took place
   --
   -- * Elem: (functions which were inlined, number of times inlined)
-  , _inlineLimit     :: !Int
-  -- ^ Number of times a function 'f' can be inlined in a function 'g'
-  , _inlineFunctionLimit :: !Word
-  -- ^ Size of a function below which it is always inlined if it is not
-  -- recursive
-  , _inlineConstantLimit :: !Word
-  -- ^ Size of a constant below which it is always inlined; 0 = no limit
-  , _primitives :: CompiledPrimMap
-  -- ^ Primitive Definitions
   , _primitiveArgs :: Map Text (Set Int)
   -- ^ Cache for looking up constantness of blackbox arguments
   , _recursiveComponents :: VarEnv Bool
@@ -62,18 +51,9 @@ data NormalizeState
   --
   -- NB: there are only no mutually-recursive component, only self-recursive
   -- ones.
-  , _newInlineStrategy :: Bool
-  -- ^ Flattening stage should use the new (no-)inlining strategy
-  , _normalizeUltra :: Bool
-  -- ^ High-effort normalization session, trading performance improvement for
-  -- potentially much longer compile times. Follows the 'Clash.Driver.opt_ultra'
-  -- flag.
-  , _inlineWFCacheLimit :: !Word
-  -- ^ At what size do we cache normalized work-free top-level binders.
   }
 
-makeLenses ''NormalizeState
-
+Lens.makeLenses ''NormalizeState
 
 -- | State monad that stores specialisation and inlining information
 type NormalizeMonad = State NormalizeState
@@ -95,4 +75,4 @@ data TermClassification
   }
   deriving Show
 
-makeLenses ''TermClassification
+Lens.makeLenses ''TermClassification

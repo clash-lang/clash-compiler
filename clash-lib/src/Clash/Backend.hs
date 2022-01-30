@@ -1,7 +1,7 @@
 {-|
   Copyright  :  (C) 2015-2016, University of Twente,
                     2017     , Myrtle Software Ltd, Google Inc.,
-                    2021     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -24,6 +24,7 @@ import GHC.Types.SrcLoc (SrcSpan)
 import SrcLoc (SrcSpan)
 #endif
 
+import Clash.Driver.Types (ClashOpts)
 import {-# SOURCE #-} Clash.Netlist.Types
 import Clash.Netlist.BlackBox.Types
 
@@ -80,15 +81,7 @@ data HWKind
 
 class HasIdentifierSet state => Backend state where
   -- | Initial state for state monad
-  initBackend
-    :: Int
-    -> HdlSyn
-    -> Bool
-    -> PreserveCase
-    -> Maybe (Maybe Int)
-    -> AggressiveXOptBB
-    -> RenderEnums
-    -> state
+  initBackend :: ClashOpts -> state
 
   -- | What HDL is the backend generating
   hdlKind :: state -> HDL
