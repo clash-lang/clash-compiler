@@ -1,5 +1,0 @@
-# clash-lib: Add enableToBit
-
-Enable used to be a `Bool` in the Blackbox DSL, so we could use `boolToBit`.
-However it now has its own type in the DSL (`Enable domainName`), so we need a
-new conversion function in order to convert it to a Bool.
