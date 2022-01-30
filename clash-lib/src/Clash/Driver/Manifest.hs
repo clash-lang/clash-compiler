@@ -1,5 +1,5 @@
 {-|
-Copyright  : (C) 2021, QBayLogic B.V.
+Copyright  : (C) 2021-2022, QBayLogic B.V.
 License    : BSD2 (see the file LICENSE)
 Maintainer : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -124,6 +124,12 @@ instance FromJSON ManifestPort where
       <*> v .: "is_clock"
       <*> v .:? "domain"
 
+-- | Just the 'fileNames' part of 'Manifest'
+newtype FilesManifest = FilesManifest [(FilePath, ByteString)]
+
+instance FromJSON FilesManifest where
+  parseJSON = Aeson.withObject "FilesManifest" $ fmap FilesManifest . parseFiles
+
 -- | Information about the generated HDL between (sub)runs of the compiler
 data Manifest
   = Manifest
@@ -211,6 +217,16 @@ unsafeFromHexDigest =
 toHexDigest :: ByteString -> Text
 toHexDigest = Text.decodeUtf8 . Base16.encode
 
+-- | Parse @files@ part of a Manifest file
+parseFiles :: Aeson.Object -> Parser [(FilePath, ByteString)]
+parseFiles v = do
+  files <- v .: "files"
+  forM files $ \obj -> do
+    fName <- obj .: "name"
+    sha256 <- obj .: "sha256"
+    -- See Note [Failed hex digest decodes]
+    pure (fName, unsafeFromHexDigest sha256)
+
 instance FromJSON Manifest where
   parseJSON = Aeson.withObject "Manifest" $ \v ->
     let
@@ -223,13 +239,7 @@ instance FromJSON Manifest where
         <*> (topComponent >>= (.: "ports_flat"))
         <*> v .: "components"
         <*> (topComponent >>= (.: "name"))
-        <*> do
-              files <- v .: "files"
-              forM files $ \obj -> do
-                fName <- obj .: "name"
-                sha256 <- obj .: "sha256"
-                -- See Note [Failed hex digest decodes]
-                pure (fName, unsafeFromHexDigest sha256)
+        <*> parseFiles v
         <*> (v .: "domains" >>= HashMap.traverseWithKey parseDomain)
         <*> (v .: "dependencies" >>= (.: "transitive"))
    where
@@ -370,9 +380,9 @@ readFreshManifest ::
   --   , Nothing on stale cache, disabled cache, or not manifest file found )
   IO (Maybe [UnexpectedModification], Maybe Manifest, ByteString)
 readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashModDate path = do
-  manifestM <- readManifest path
-  modificationsM <- traverse (isUserModified path) manifestM
+  modificationsM <- traverse (isUserModified path) =<< readManifest path
 
+  manifestM <- readManifest path
   pure
     ( modificationsM
     , checkManifest =<< if opt_cachehdl then manifestM else Nothing
@@ -446,8 +456,8 @@ readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashMo
 -- | Determines whether the HDL directory the given 'LocatedManifest' was found
 -- in contains any user made modifications. This is used by Clash to protect the
 -- user against lost work.
-isUserModified :: FilePath -> Manifest -> IO [UnexpectedModification]
-isUserModified (takeDirectory -> topDir) Manifest{fileNames} = do
+isUserModified :: FilePath -> FilesManifest -> IO [UnexpectedModification]
+isUserModified (takeDirectory -> topDir) (FilesManifest fileNames) = do
   let
     manifestFiles = Set.fromList (map fst fileNames)
 
@@ -479,7 +489,7 @@ isUserModified (takeDirectory -> topDir) Manifest{fileNames} = do
 
 -- | Read a manifest file from disk. Returns 'Nothing' if file does not exist.
 -- Any other IO exception is re-raised.
-readManifest :: FilePath -> IO (Maybe Manifest)
+readManifest :: FromJSON a => FilePath -> IO (Maybe a)
 readManifest path = do
   contentsE <- tryJust (guard . isDoesNotExistError) (Aeson.decodeFileStrict path)
   pure (either (const Nothing) id contentsE)
