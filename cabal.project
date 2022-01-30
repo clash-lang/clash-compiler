@@ -12,7 +12,6 @@ packages:
   ./benchmark/profiling/prepare
   ./benchmark/profiling/run
   ./clash-term
-  https://github.com/alex-mckenna/fakedata/raw/aeson-2.0/fakedata-1.0.2.tar.gz
 
 -- TODO: The inclusion of a cabal sdist tarball in the packages list is the
 -- unfortunate result of a few things:
@@ -39,7 +38,7 @@ write-ghc-environment-files: always
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2021-12-28T08:52:39Z
+index-state: 2022-01-29T04:45:15Z
 
 -- For some reason the `clash-testsuite` executable fails to run without
 -- this, as it cannot find the related library...
