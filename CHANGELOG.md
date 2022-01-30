@@ -1,4 +1,18 @@
 # Changelog for the Clash project
+## 1.4.7 *Jan 30th 2022*
+Fixed:
+  * Clash now shows days in time strings for compile runs which take longer than a day [#1989](https://github.com/clash-lang/clash-compiler/compare/issue-1989).
+  * Types defined in the package head are no longer qualified in the package body when rendering VHDL [#1996](https://github.com/clash-lang/clash-compiler/issues/1996).
+  * `asyncRam` with different read and write clocks no longer produce the wrong results in Haskell simulation. [#2031](https://github.com/clash-lang/clash-compiler/pull/2031)
+  * `Clash.Explicit.RAM.asyncRam#` Haskell simulation incorrectly treated an _undefined_ write enable as asserted. It now causes an _undefined_ value to be written instead. This problem did not propagate to the other `asyncRam` functions, where the same condition would simultaneously lead to an undefined write address, which would be handled correctly. This problem also only affects Haskell simulation, not the generated HDL. [#2031](https://github.com/clash-lang/clash-compiler/pull/2031)
+
+Internal changes:
+  * Removed instances of `Hashable Term` and `Hashable Type` [#1986](https://github.com/clash-lang/clash-compiler/pull/1986)
+  * Added structural equality on `Term` (`Clash.Core.Subst.eqTerm`) and `Type` (`Clash.Core.Subst.eqType`)
+
+Internal fixes:
+  * Enable used to be a `Bool` in the Blackbox DSL, so we could use `boolToBit`. However it now has its own type in the DSL (`Enable domainName`), so we've added a new conversion function in order to convert it to a Bool.
+
 
 ## 1.4.6 *Oct 26th 2021*
 
