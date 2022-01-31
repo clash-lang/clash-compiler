@@ -46,7 +46,7 @@ import           GHC.Stack
   (HasCallStack, callStack, prettyCallStack)
 import qualified System.Console.ANSI           as ANSI
 import           System.Console.ANSI
-  ( hSetSGR, SGR(SetConsoleIntensity, SetColor), Color(Magenta)
+  ( hSetSGR, SGR(SetConsoleIntensity, SetColor), Color(Magenta, Red)
   , ConsoleIntensity(BoldIntensity), ConsoleLayer(Foreground), ColorIntensity(Vivid))
 import           System.IO
   (hPutStrLn, stderr, hFlush, hIsTerminalDevice)
@@ -88,7 +88,7 @@ import {-# SOURCE #-} Clash.Netlist
 import qualified Clash.Backend                 as Backend
 import           Clash.Debug                   (debugIsOn)
 import           Clash.Driver.Types
-  (opt_primWarn, opt_color, ClashOpts)
+  (ClashOpts(opt_primWarn, opt_color, opt_werror))
 import           Clash.Netlist.BlackBox.Types  as B
 import           Clash.Netlist.BlackBox.Util   as B
 import           Clash.Netlist.Types           as N
@@ -115,10 +115,17 @@ warn opts msg = do
       Auto   -> hIsTerminalDevice stderr
 
   hSetSGR stderr [SetConsoleIntensity BoldIntensity]
-  when useColor $ hSetSGR stderr [SetColor Foreground Vivid Magenta]
-  hPutStrLn stderr $ "[WARNING] " ++ msg
-  hSetSGR stderr [ANSI.Reset]
-  hFlush stderr
+
+  case opt_werror opts of
+    True -> do
+      when useColor $ hSetSGR stderr [SetColor Foreground Vivid Red]
+      throw (ClashException noSrcSpan msg Nothing)
+
+    False -> do
+      when useColor $ hSetSGR stderr [SetColor Foreground Vivid Magenta]
+      hPutStrLn stderr $ "[WARNING] " ++ msg
+      hSetSGR stderr [ANSI.Reset]
+      hFlush stderr
 
 -- | Generate the context for a BlackBox instantiation.
 mkBlackBoxContext
