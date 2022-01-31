@@ -103,6 +103,22 @@
     }
   }
 , { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Unsigned.toEnum#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      : "toEnum# :: KnownNat n => Int -> Unsigned n"
+    , "template"  : "resize(unsigned(std_logic_vector(~ARG[1])),~SIZE[~TYPO])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Unsigned.fromEnum#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      : "fromEnum# :: KnownNat n => Unsigned n -> Int"
+    , "template"  : "~IF~SIZE[~TYP[1]]~THENsigned(std_logic_vector(resize(~ARG[1],~SIZE[~TYPO])))~ELSEto_signed(0,~SIZE[~TYPO])~FI"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.plus#"
     , "kind"      : "Expression"
     , "type"      : "plus# :: Unsigned m -> Unsigned n -> Unsigned (1 + Max m n)"

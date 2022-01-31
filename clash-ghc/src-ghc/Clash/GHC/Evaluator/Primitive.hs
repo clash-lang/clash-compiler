@@ -2,7 +2,7 @@
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017     , QBayLogic, Google Inc.,
-                     2021     , QBayLogic B.V.
+                     2021-2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -1929,6 +1929,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "Clash.Sized.Internal.BitVector.le##" | [(0,i),(0,j)] <- bitLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i <= j))
 
+-- Enum
+  "Clash.Sized.Internal.BitVector.toEnum##"
+    | [i] <- intLiterals' args
+    -> let Bit msk val = BitVector.toEnum## (fromInteger i)
+       in reduce (mkBitLit ty (toInteger msk) (toInteger val))
+
 -- Bits
   "Clash.Sized.Internal.BitVector.and##"
     | [i,j] <- bitLiterals args
@@ -2131,6 +2137,18 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , Just val <- reifyNat kn (liftBitVector2Bool BitVector.le# ty tcm args)
     -> reduce val
 
+-- Enum
+
+  "Clash.Sized.Internal.BitVector.toEnum#"
+    | let resTyInfo@(_,_,kn) = extractTySizeInfo tcm ty tys
+    , Just val <- reifyNat kn (liftInteger2BitVector (BitVector.toEnum# . fromInteger) resTyInfo args)
+    -> reduce val
+
+  "Clash.Sized.Internal.BitVector.fromEnum#"
+    | Just (_, kn) <- extractKnownNat tcm tys
+    , Just val <- reifyNat kn (liftBitVector2Int (toInteger . BitVector.fromEnum#) args)
+    -> reduce val
+
 -- Bounded
   "Clash.Sized.Internal.BitVector.minBound#"
     | Just (nTy,len) <- extractKnownNat tcm tys
@@ -2303,6 +2321,16 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | Just (i,j) <- indexLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i <= j))
 
+-- Enum
+  "Clash.Sized.Internal.Index.toEnum#"
+    | [i] <- intLiterals' args
+    , Just (nTy, mb) <- extractKnownNat tcm tys
+    -> reduce (mkIndexLit ty nTy mb i)
+
+  "Clash.Sized.Internal.Index.fromEnum#"
+    | [i] <- indexLiterals' args
+    -> reduce (integerToIntLiteral i)
+
 -- Bounded
   "Clash.Sized.Internal.Index.maxBound#"
     | Just (nTy,mb) <- extractKnownNat tcm tys
@@ -2408,6 +2436,16 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce (boolToBoolLiteral tcm ty (i >  j))
   "Clash.Sized.Internal.Signed.le#" | Just (i,j) <- signedLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i <= j))
+
+-- Enum
+  "Clash.Sized.Internal.Signed.toEnum#"
+    | [i] <- intLiterals' args
+    , Just (litTy, mb) <- extractKnownNat tcm tys
+    -> reduce (mkSignedLit ty litTy mb i)
+
+  "Clash.Sized.Internal.Signed.fromEnum#"
+    | [i] <- signedLiterals' args
+    -> reduce (integerToIntLiteral i)
 
 -- Bounded
   "Clash.Sized.Internal.Signed.minBound#"
@@ -2615,6 +2653,16 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce (boolToBoolLiteral tcm ty (i >  j))
   "Clash.Sized.Internal.Unsigned.le#" | Just (i,j) <- unsignedLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i <= j))
+
+-- Enum
+  "Clash.Sized.Internal.Unsigned.toEnum#"
+    | [i] <- intLiterals' args
+    , Just (litTy, mb) <- extractKnownNat tcm tys
+    -> reduce (mkUnsignedLit ty litTy mb i)
+
+  "Clash.Sized.Internal.Unsigned.fromEnum#"
+    | [i] <- unsignedLiterals' args
+    -> reduce (integerToIntLiteral i)
 
 -- Bounded
   "Clash.Sized.Internal.Unsigned.minBound#"
@@ -4402,6 +4450,32 @@ liftBitVector2Bool  f ty tcm args _p
   = let val = f (toBV i) (toBV j)
     in Just $ boolToBoolLiteral tcm ty val
   | otherwise = Nothing
+
+liftInteger2BitVector
+  :: KnownNat n
+  => (Integer -> BitVector n)
+  -> (Type, Type, Integer)
+  -> [Value]
+  -> (Proxy n -> Maybe Term)
+liftInteger2BitVector f resTyInfo args _p
+  | [i] <- intLiterals' args
+  = let BV msk val = f i
+     in Just (mkBitVectorLit' resTyInfo (toInteger msk) (toInteger val))
+
+  | otherwise
+  = Nothing
+
+liftBitVector2Int
+  :: KnownNat n
+  => (BitVector n -> Integer)
+  -> [Value]
+  -> (Proxy n -> Maybe Term)
+liftBitVector2Int f args _p
+  | [i] <- bitVectorLiterals' args
+  = let val = f (toBV i)
+     in Just $ integerToIntLiteral val
+  | otherwise
+  = Nothing
 
 liftSized2 :: (KnownNat n, Integral (sized n))
            => ([Value] -> [Integer])

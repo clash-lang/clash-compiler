@@ -87,6 +87,14 @@
     }
   }
 , { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.toEnum##"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      : "toEnum## :: Int -> Bit"
+    , "template"  : "~ARG[0](0)"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.and##"
     , "kind"      : "Expression"
     , "type"      : "and## :: Bit -> Bit -> Bit"
@@ -455,6 +463,22 @@ end process;
     , "kind"      : "Expression"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Integer -> BitVector n"
     , "template"  : "std_logic_vector(resize(unsigned(std_logic_vector(~ARG[2])),~SIZE[~TYPO]))"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.toEnum#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      : "toEnum# :: KnownNat n => Int -> BitVector n"
+    , "template"  : "std_logic_vector(resize(unsigned(std_logic_vector(~ARG[1])),~SIZE[~TYPO]))"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.BitVector.fromEnum#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      : "fromEnum# :: KnownNat n => BitVector n -> Int"
+    , "template"  : "~IF~SIZE[~TYP[1]]~THENsigned(std_logic_vector(resize(unsigned(~ARG[1]),~SIZE[~TYPO])))~ELSEto_signed(0,~SIZE[~TYPO])~FI"
     }
   }
 , { "BlackBox" :

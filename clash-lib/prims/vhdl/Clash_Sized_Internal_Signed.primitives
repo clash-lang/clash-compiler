@@ -113,6 +113,22 @@
     }
   }
 , { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Signed.toEnum#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      : "toEnum# :: KnownNat n => Int -> Signed n"
+    , "template"  : "resize(signed(std_logic_vector(~ARG[1])),~SIZE[~TYPO])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Signed.fromEnum#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      : "fromEnum# :: KnownNat n => Signed n -> Int"
+    , "template"  : "~IF~SIZE[~TYP[1]]~THENresize(~ARG[1],~SIZE[~TYPO])~ELSEto_signed(0,~SIZE[~TYPO])~FI"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.plus#"
     , "kind"      : "Expression"
     , "type"      : "plus# :: Signed m -> Signed n -> Signed (1 + Max m n)"
