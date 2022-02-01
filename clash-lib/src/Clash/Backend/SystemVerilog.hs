@@ -23,6 +23,7 @@ import           Control.Monad                        (forM,liftM,zipWithM)
 import           Control.Monad.State                  (State)
 import           Data.Bifunctor                       (first)
 import           Data.Bits                            (Bits, testBit)
+import qualified Data.ByteString.Char8                as B8
 import           Data.Coerce                          (coerce)
 import           Data.Function                        (on)
 import           Data.HashMap.Lazy                    (HashMap)
@@ -53,6 +54,7 @@ import           Clash.Backend
 import           Clash.Backend.Verilog
   (bits, bit_char, encodingNote, exprLit, include, noEmptyInit, uselibs)
 import           Clash.Driver.Types                   (ClashOpts(..))
+import           Clash.Explicit.BlockRam.Internal     (unpackNats)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
@@ -133,6 +135,7 @@ instance Backend SystemVerilogState where
     Vector {} -> pure UserType
     RTree {} -> pure UserType
     Product {} -> pure UserType
+    MemBlob {} -> pure UserType
     BiDirectional _ ty -> hdlHWTypeKind ty
     Annotated _ ty -> hdlHWTypeKind ty
     _ -> pure PrimitiveType
@@ -292,6 +295,7 @@ topSortHWTys hwtys = sorted
 normaliseType :: HWType -> SystemVerilogM HWType
 normaliseType (Annotated _ ty) = normaliseType ty
 normaliseType (Vector n ty)    = Vector n <$> (normaliseType ty)
+normaliseType (MemBlob n m)    = return (Vector n (BitVector m))
 normaliseType (RTree d ty)     = RTree d <$> (normaliseType ty)
 normaliseType (Product nm lbls tys) = Product nm lbls <$> (mapM normaliseType tys)
 normaliseType ty@(SP _ elTys)      = do
@@ -593,6 +597,7 @@ tyName :: HWType -> SystemVerilogM Doc
 tyName Bool                  = "logic"
 tyName Bit                   = "logic"
 tyName (Vector n elTy)       = "array_of_" <> int n <> "_" <> tyName elTy
+tyName (MemBlob n m)         = tyName (Vector n (BitVector m))
 tyName (RTree n elTy)        = "tree_of_" <> int n <> "_" <> tyName elTy
 tyName (BitVector n)         = "logic_vector_" <> int n
 tyName t@(Index _)           = "logic_vector_" <> int (typeSize t)
@@ -1109,6 +1114,18 @@ expr_ _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2]) = case vectorChain e of
   Just es -> "'" <> listBraces (mapM (toSLV elTy) es)
   Nothing -> verilogTypeMark ty <> "_cons" <> parens (expr_ False e1 <> comma <+> expr_ False e2)
 
+expr_ _ (DataCon (MemBlob n m) _ [n0, m0, _, runs, _, ends])
+  | Literal _ (NumLit n1) <- n0
+  , n == fromInteger n1
+  , Literal _ (NumLit m1) <- m0
+  , m == fromInteger m1
+  , Literal Nothing (StringLit runs0) <- runs
+  , Literal Nothing (StringLit ends0) <- ends
+  , es <- unpackNats n m (B8.pack runs0) (B8.pack ends0) =
+    let el val = exprLitSV (Just (BitVector m, m))
+                           (BitVecLit 0 $ toInteger val)
+    in "'" <> listBraces (mapM el es)
+
 expr_ _ (DataCon (RTree 0 elTy) _ [e]) = "'" <> braces (toSLV elTy e)
 
 expr_ _ e@(DataCon ty@(RTree _ elTy) _ [e1,e2]) = case rtreeChain e of
@@ -1269,18 +1286,21 @@ toSLV :: HWType -> Expr -> SystemVerilogM Doc
 toSLV t e = case t of
   Vector _ _ -> braces (verilogTypeMark t <> "_to_lv" <> parens (expr_ False e))
   RTree _ _ -> braces (verilogTypeMark t <> "_to_lv" <> parens (expr_ False e))
+  MemBlob n m -> toSLV (Vector n (BitVector m)) e
   _ -> expr_ False e
 
 fromSLV :: HWType -> IdentifierText -> Int -> Int -> SystemVerilogM Doc
 fromSLV t@(Vector _ _) id_ start end = verilogTypeMark t <> "_from_lv" <> parens (pretty id_ <> brackets (int start <> colon <> int end))
 fromSLV t@(RTree _ _) id_ start end = verilogTypeMark t <> "_from_lv" <> parens (pretty id_ <> brackets (int start <> colon <> int end))
 fromSLV (Signed _) id_ start end = "$signed" <> parens (pretty id_ <> brackets (int start <> colon <> int end))
+fromSLV (MemBlob n m) id_ start end = fromSLV (Vector n (BitVector m)) id_ start end
 fromSLV _ id_ start end = pretty id_ <> brackets (int start <> colon <> int end)
 
 simpleFromSLV :: HWType -> IdentifierText -> SystemVerilogM Doc
 simpleFromSLV t@(Vector _ _) id_ = verilogTypeMark t <> "_from_lv" <> parens (pretty id_)
 simpleFromSLV t@(RTree _ _) id_ = verilogTypeMark t <> "_from_lv" <> parens (pretty id_)
 simpleFromSLV (Signed _) id_ = "$signed" <> parens (pretty id_)
+simpleFromSLV (MemBlob n m) id_ = simpleFromSLV (Vector n (BitVector m)) id_
 simpleFromSLV _ id_ = pretty id_
 
 expFromSLV :: HWType -> SystemVerilogM Doc -> SystemVerilogM Doc

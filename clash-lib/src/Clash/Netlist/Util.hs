@@ -683,6 +683,7 @@ typeSize (Index u) = fromMaybe 0 (clogBase 2 u)
 typeSize (Signed i) = i
 typeSize (Unsigned i) = i
 typeSize (Vector n el) = n * typeSize el
+typeSize (MemBlob n m) = n * m
 typeSize (RTree d el) = (2^d) * typeSize el
 typeSize t@(SP _ cons) = conSize t +
   maximum (map (sum . map typeSize . snd) cons)

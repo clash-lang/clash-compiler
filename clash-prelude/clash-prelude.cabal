@@ -51,7 +51,7 @@ Maintainer:           QBayLogic B.V. <devops@qbaylogic.com>
 Copyright:            Copyright © 2013-2016, University of Twente,
                                   2016-2017, Myrtle Software Ltd,
                                   2017-2019, QBayLogic B.V., Google Inc.,
-                                  2021,      QBayLogic B.V.
+                                  2021-2022, QBayLogic B.V.
 Category:             Hardware
 Build-type:           Simple
 
@@ -198,12 +198,15 @@ Library
                       Clash.Clocks.Deriving
 
                       Clash.Explicit.BlockRam
+                      Clash.Explicit.BlockRam.Blob
                       Clash.Explicit.BlockRam.File
+                      Clash.Explicit.BlockRam.Internal
                       Clash.Explicit.DDR
                       Clash.Explicit.Mealy
                       Clash.Explicit.Moore
                       Clash.Explicit.RAM
                       Clash.Explicit.ROM
+                      Clash.Explicit.ROM.Blob
                       Clash.Explicit.ROM.File
                       Clash.Explicit.Prelude
                       Clash.Explicit.Prelude.Safe
@@ -236,12 +239,14 @@ Library
                       Clash.Prelude.BitIndex
                       Clash.Prelude.BitReduction
                       Clash.Prelude.BlockRam
+                      Clash.Prelude.BlockRam.Blob
                       Clash.Prelude.BlockRam.File
                       Clash.Prelude.DataFlow
                       Clash.Prelude.Mealy
                       Clash.Prelude.Moore
                       Clash.Prelude.RAM
                       Clash.Prelude.ROM
+                      Clash.Prelude.ROM.Blob
                       Clash.Prelude.ROM.File
                       Clash.Prelude.Safe
                       Clash.Prelude.Testbench
@@ -386,6 +391,7 @@ test-suite unittests
       ghc-typelits-extra,
 
       base,
+      bytestring,
       deepseq,
       hedgehog      >= 1.0.3    && < 1.1,
       hint          >= 0.7      && < 0.10,
@@ -402,6 +408,7 @@ test-suite unittests
                  Clash.Tests.BitPack
                  Clash.Tests.BitVector
                  Clash.Tests.BlockRam
+                 Clash.Tests.BlockRam.Blob
                  Clash.Tests.Counter
                  Clash.Tests.DerivingDataRepr
                  Clash.Tests.DerivingDataReprTypes

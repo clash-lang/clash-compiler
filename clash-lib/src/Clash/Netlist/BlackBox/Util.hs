@@ -1,7 +1,7 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
-                    2021     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -429,9 +429,11 @@ renderElem b (IF c t f) = do
     check xOpt iw syn c' = case c' of
       (Size e)   -> typeSize (lineToType b [e])
       (Length e) -> case lineToType b [e] of
-                       (Vector n _)             -> n
-                       Void (Just (Vector n _)) -> n
-                       _                        -> 0 -- HACK: So we can test in splitAt if one of the
+                       (Vector n _)              -> n
+                       Void (Just (Vector n _))  -> n
+                       (MemBlob n _)             -> n
+                       Void (Just (MemBlob n _)) -> n
+                       _                         -> 0 -- HACK: So we can test in splitAt if one of the
                               -- vectors in the tuple had a zero length
       (Lit n) -> case bbInputs b !! n of
         (l,_,_)
@@ -577,7 +579,8 @@ lineToType b [(Typ (Just n))] = let (_,ty,_) = bbInputs b !! n
                                 in  ty
 lineToType b [(TypElem t)]    = case lineToType b [t] of
                                   Vector _ elTy -> elTy
-                                  _ -> error $ $(curLoc) ++ "Element type selection of a non-vector type"
+                                  MemBlob _ m -> BitVector m
+                                  _ -> error $ $(curLoc) ++ "Element type selection of a non-vector-like type"
 lineToType b [(IndexType (Lit n))] =
   case bbInputs b !! n of
     (Literal _ (NumLit n'),_,_) -> Index (fromInteger n')
@@ -667,10 +670,12 @@ renderTag b (Size e)        = return . Text.pack . show . typeSize $ lineToType 
 
 renderTag b (Length e) = return . Text.pack . show . vecLen $ lineToType b [e]
   where
-    vecLen (Vector n _)               = n
-    vecLen (Void (Just (Vector n _))) = n
+    vecLen (Vector n _)                = n
+    vecLen (Void (Just (Vector n _)))  = n
+    vecLen (MemBlob n _)               = n
+    vecLen (Void (Just (MemBlob n _))) = n
     vecLen thing =
-      error $ $(curLoc) ++ "vecLen of a non-vector type: " ++ show thing
+      error $ $(curLoc) ++ "vecLen of a non-vector-like type: " ++ show thing
 
 renderTag b (Depth e) = return . Text.pack . show . treeDepth $ lineToType b [e]
   where
@@ -681,9 +686,10 @@ renderTag b (Depth e) = return . Text.pack . show . treeDepth $ lineToType b [e]
 
 renderTag b (MaxIndex e) = return . Text.pack . show . vecLen $ lineToType b [e]
   where
-    vecLen (Vector n _) = n-1
+    vecLen (Vector n _)  = n-1
+    vecLen (MemBlob n _) = n-1
     vecLen thing =
-      error $ $(curLoc) ++ "vecLen of a non-vector type: " ++ show thing
+      error $ $(curLoc) ++ "vecLen of a non-vector-like type: " ++ show thing
 
 renderTag b e@(TypElem _)   = let ty = lineToType b [e]
                               in  renderOneLine <$> getAp (hdlType Internal ty)

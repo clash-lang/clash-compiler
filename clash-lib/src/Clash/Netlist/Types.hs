@@ -431,6 +431,8 @@ data HWType
   -- ^ Unsigned integer of a specified size
   | Vector !Size !HWType
   -- ^ Vector type
+  | MemBlob !Size !Size
+  -- ^ MemBlob type
   | RTree !Size !HWType
   -- ^ RTree type
   | Sum !Text [Text]

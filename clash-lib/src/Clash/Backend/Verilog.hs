@@ -37,6 +37,7 @@ import           Control.Monad                        (forM)
 import           Control.Monad.State                  (State)
 import           Data.Bifunctor                       (first, second)
 import           Data.Bits                            (Bits, testBit)
+import qualified Data.ByteString.Char8                as B8
 import           Data.Coerce                          (coerce)
 import           Data.Function                        (on)
 import           Data.HashMap.Strict                  (HashMap)
@@ -67,6 +68,7 @@ import           Clash.Core.Var                       (Attr'(..))
 import           Clash.Backend
 import           Clash.Debug                          (traceIf)
 import           Clash.Driver.Types                   (ClashOpts(..))
+import           Clash.Explicit.BlockRam.Internal     (unpackNats)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn)
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
@@ -989,6 +991,17 @@ expr_ _ (DataCon ty@(Vector 0 _) _ _) = verilogTypeErrValue ty
 expr_ _ (DataCon (Vector 1 _) _ [e]) = expr_ False e
 expr_ _ e@(DataCon (Vector _ _) _ es@[_,_]) =
     listBraces $ mapM (expr_ False) $ fromMaybe es $ vectorChain e
+
+expr_ _ (DataCon (MemBlob n m) _ [n0, m0, _, runs, _, ends])
+  | Literal _ (NumLit n1) <- n0
+  , n == fromInteger n1
+  , Literal _ (NumLit m1) <- m0
+  , m == fromInteger m1
+  , Literal Nothing (StringLit runs0) <- runs
+  , Literal Nothing (StringLit ends0) <- ends
+  , es <- unpackNats n m (B8.pack runs0) (B8.pack ends0) =
+    let el val = exprLitV (Just (BitVector m, m)) (BitVecLit 0 $ toInteger val)
+    in listBraces $ mapM el es
 
 expr_ _ (DataCon (RTree 0 _) _ [e]) = expr_ False e
 expr_ _ e@(DataCon (RTree _ _) _ es@[_,_]) =

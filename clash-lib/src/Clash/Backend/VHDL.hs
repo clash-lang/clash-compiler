@@ -26,6 +26,7 @@ import           Control.Monad                        (forM,join,zipWithM)
 import           Control.Monad.State                  (State, StateT)
 import           Data.Bifunctor                       (first)
 import           Data.Bits                            (testBit, Bits)
+import qualified Data.ByteString.Char8                as B8
 import           Data.Coerce                          (coerce)
 import           Data.Function                        (on)
 import           Data.HashMap.Lazy                    (HashMap)
@@ -65,6 +66,7 @@ import           Clash.Backend
 import           Clash.Core.Var                       (Attr'(..),attrName)
 import           Clash.Debug                          (traceIf)
 import           Clash.Driver.Types                   (ClashOpts(..))
+import           Clash.Explicit.BlockRam.Internal     (unpackNats)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
@@ -154,6 +156,7 @@ instance Backend VHDLState where
     Vector {} -> pure UserType
     RTree {} -> pure UserType
     Product {} -> pure UserType
+    MemBlob {} -> pure UserType
 
     Sum {} -> do
       -- If an enum is rendered, it is a user type. If not, an std_logic_vector
@@ -563,6 +566,8 @@ tyDec hwty = do
                  <+> "is"
                  <+> parens (hsep (punctuate comma variantNames))
                  <> semi
+
+    MemBlob n m -> tyDec (Vector n (BitVector m))
 
     -- Type aliases:
     Clock _           -> typAliasDec hwty
@@ -1044,6 +1049,7 @@ appendSize baseType sizedType = case sizedType of
   Unsigned n  -> baseType <> parens (int (n-1) <+> "downto 0")
   Vector n _  -> baseType <> parens ("0 to" <+> int (n-1))
   RTree d _   -> baseType <> parens ("0 to" <+> int ((2^d)-1))
+  MemBlob n _ -> baseType <> parens ("0 to" <+> int (n-1))
   Annotated _ elTy -> appendSize baseType elTy
   _           -> baseType
 
@@ -1168,6 +1174,8 @@ tyName' rec0 (filterTransparent -> t) = do
     BiDirectional _ hwTy ->
       tyName' rec0 hwTy
     FileType -> return "file"
+    ty -> return (error ($(curLoc) ++  show ty ++
+                         " not filtered by filterTransparent"))
 
 -- | Returns underlying type of given HWType. That is, the type by which it
 -- eventually will be represented in VHDL.
@@ -1191,6 +1199,7 @@ normaliseType enums@(RenderEnums e) hwty = case hwty of
   RTree _ _     -> hwty
   Product _ _ _ -> hwty
   Sum _ _       -> if e then hwty else BitVector (typeSize hwty)
+  MemBlob n m   -> Vector n (BitVector m)
 
   -- Simple types, for which a subtype (without qualifiers) will be made in VHDL:
   Clock _           -> Bit
@@ -1223,6 +1232,8 @@ filterTransparent hwty = case hwty of
   Sum _ _           -> hwty
   CustomSum _ _ _ _ -> hwty
   FileType          -> hwty
+
+  MemBlob n m       -> Vector n (BitVector m)
 
   Vector n elTy     -> Vector n (filterTransparent elTy)
   RTree n elTy      -> RTree n (filterTransparent elTy)
@@ -1600,6 +1611,17 @@ expr_ _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2]) = do
     _ -> qualTyName ty <> "'" <> case vectorChain e of
             Just es -> align (tupled (mapM (expr_ False) es))
             Nothing -> parens (qualTyName elTy <> "'" <> parens (expr_ False e1) <+> "&" <+> expr_ False e2)
+
+expr_ _ (DataCon ty@(MemBlob n m) _ [n0, m0, _, runs, _, ends])
+  | Literal _ (NumLit n1) <- n0
+  , n == fromInteger n1
+  , Literal _ (NumLit m1) <- m0
+  , m == fromInteger m1
+  , Literal Nothing (StringLit runs0) <- runs
+  , Literal Nothing (StringLit ends0) <- ends
+  , es <- unpackNats n m (B8.pack runs0) (B8.pack ends0) =
+    let el val = exprLit (Just (BitVector m, m)) (BitVecLit 0 $ toInteger val)
+    in qualTyName ty <> "'" <> (align $ tupled $ mapM el es)
 
 expr_ _ (DataCon ty@(RTree 0 elTy) _ [e]) = do
   syn <- Ap hdlSyn

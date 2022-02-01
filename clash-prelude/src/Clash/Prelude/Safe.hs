@@ -2,7 +2,7 @@
   Copyright   :  (C) 2013-2016, University of Twente,
                      2017-2019, Myrtle Software Ltd
                      2017     , Google Inc.,
-                     2021     , QBayLogic B.V.
+                     2021-2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -50,12 +50,25 @@ module Clash.Prelude.Safe
   , asyncRomPow2
   , rom
   , romPow2
+    -- ** ROMs defined by a 'MemBlob'
+  , asyncRomBlob
+  , asyncRomBlobPow2
+  , romBlob
+  , romBlobPow2
     -- * RAM primitives with a combinational read port
   , asyncRam
   , asyncRamPow2
     -- * BlockRAM primitives
   , blockRam
   , blockRamPow2
+    -- ** BlockRAM primitives initialized with a 'MemBlob'
+  , blockRamBlob
+  , blockRamBlobPow2
+    -- *** Creating and inspecting 'MemBlob'
+  , MemBlob
+  , createMemBlob
+  , memBlobTH
+  , unpackMemBlob
     -- ** BlockRAM read/write conflict resolution
   , readNew
     -- * Utility functions
@@ -128,11 +141,13 @@ import           Clash.Class.Resize
 import           Clash.Hidden
 import           Clash.NamedTypes
 import           Clash.Prelude.BlockRam
+import           Clash.Prelude.BlockRam.Blob
 import qualified Clash.Explicit.Prelude.Safe as E
 import           Clash.Prelude.Mealy         (mealy, mealyB, (<^>))
 import           Clash.Prelude.Moore         (moore, mooreB)
 import           Clash.Prelude.RAM           (asyncRam,asyncRamPow2)
 import           Clash.Prelude.ROM           (asyncRom,asyncRomPow2,rom,romPow2)
+import           Clash.Prelude.ROM.Blob
 import           Clash.Promoted.Nat
 import           Clash.Promoted.Nat.TH
 import           Clash.Promoted.Nat.Literals

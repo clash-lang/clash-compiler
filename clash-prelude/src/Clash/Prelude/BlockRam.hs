@@ -2,7 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software Ltd,
                   2017     , Google Inc.,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -692,6 +692,10 @@ prog2 = -- 0 := 4
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRam inits) rd wrM@.
+-- * A large 'Vec' for the initial content might be too inefficient, depending
+-- on how it is constructed. See 'Clash.Prelude.BlockRam.File.blockRamFile' and
+-- 'Clash.Prelude.BlockRam.Blob.blockRamBlob' for different approaches that
+-- scale well.
 blockRam
   :: ( HasCallStack
      , HiddenClock dom
@@ -790,6 +794,10 @@ blockRam1 =
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRamPow2 inits) rd wrM@.
+-- * A large 'Vec' for the initial content might be too inefficient, depending
+-- on how it is constructed. See 'Clash.Prelude.BlockRam.File.blockRamFilePow2'
+-- and 'Clash.Prelude.BlockRam.Blob.blockRamBlobPow2' for different approaches
+-- that scale well.
 blockRamPow2
   :: ( HasCallStack
      , HiddenClock dom

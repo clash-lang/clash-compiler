@@ -50,6 +50,10 @@ import Clash.XException       (deepErrorX, seqX, NFDataX)
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Explicit.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
+-- * A large 'Vec' for the content might be too inefficient, depending on how it
+-- is constructed. See 'Clash.Explicit.ROM.File.romFilePow2' and
+-- 'Clash.Explicit.ROM.Blob.romBlobPow2' for different approaches that scale
+-- well.
 romPow2
   :: (KnownDomain dom, KnownNat n, NFDataX a)
   => Clock dom
@@ -77,6 +81,9 @@ romPow2 = rom
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Explicit.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
+-- * A large 'Vec' for the content might be too inefficient, depending on how it
+-- is constructed. See 'Clash.Explicit.ROM.File.romFile' and
+-- 'Clash.Explicit.ROM.Blob.romBlob' for different approaches that scale well.
 rom
   :: (KnownDomain dom, KnownNat n, NFDataX a, Enum addr)
   => Clock dom

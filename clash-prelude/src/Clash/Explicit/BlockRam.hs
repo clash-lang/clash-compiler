@@ -738,6 +738,10 @@ prog2 = -- 0 := 4
 -- * See "Clash.Explicit.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @'readNew' clk rst ('blockRam' clk inits) rd wrM@.
+-- * A large 'Vec' for the initial content might be too inefficient, depending
+-- on how it is constructed. See 'Clash.Explicit.BlockRam.File.blockRamFile' and
+-- 'Clash.Explicit.BlockRam.Blob.blockRamBlob' for different approaches that
+-- scale well.
 blockRam
   :: ( KnownDomain dom
      , HasCallStack
@@ -785,6 +789,10 @@ blockRam = \clk gen content rd wrM ->
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @'readNew' clk rst ('blockRamPow2' clk inits) rd wrM@.
+-- * A large 'Vec' for the initial content might be too inefficient, depending
+-- on how it is constructed. See 'Clash.Explicit.BlockRam.File.blockRamFilePow2'
+-- and 'Clash.Explicit.BlockRam.Blob.blockRamBlobPow2' for different approaches
+-- that scale well.
 blockRamPow2
   :: ( KnownDomain dom
      , HasCallStack

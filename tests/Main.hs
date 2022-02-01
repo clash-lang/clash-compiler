@@ -659,6 +659,9 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "BlockRamFile" def
         , runTest "BlockRam0" def
         , runTest "BlockRam1" def
+        , clashTestGroup "BlockRam"
+          [ runTest "Blob" def
+          ]
         , runTest "AndEnable" def
 #ifdef CLASH_MULTIPLE_HIDDEN
         , runTest "AndSpecificEnable" def
@@ -691,6 +694,14 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "ResetLow" def
         , runTest "Rom" def
         , runTest "RomNegative" def
+        , clashTestGroup "ROM"
+          [ runTest "Async" def
+          , runTest "AsyncBlob" def
+          , runTest "Blob" def
+            -- TODO: When issue #2039 is fixed, it should be possible to drop
+            -- compile-ultra.
+          , runTest "BlobVec" def{clashFlags=["-fclash-compile-ultra"]}
+          ]
         , runTest "SigP" def{hdlSim=False}
         , outputTest "T1102A" def{hdlTargets=[VHDL]}
         , outputTest "T1102B" def{hdlTargets=[VHDL]}

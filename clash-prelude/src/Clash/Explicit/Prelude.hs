@@ -2,7 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.
                   2019     , Myrtle Software Ltd,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -32,7 +32,12 @@ module Clash.Explicit.Prelude
   , asyncRomPow2
   , rom
   , romPow2
-    -- ** ROMs initialized with a data file
+    -- ** ROMs defined by a 'MemBlob'
+  , asyncRomBlob
+  , asyncRomBlobPow2
+  , romBlob
+  , romBlobPow2
+    -- ** ROMs defined by a data file
   , asyncRomFile
   , asyncRomFilePow2
   , romFile
@@ -46,6 +51,14 @@ module Clash.Explicit.Prelude
   , blockRamU
   , blockRam1
   , ResetStrategy(..)
+    -- ** BlockRAM primitives initialized with a 'MemBlob'
+  , blockRamBlob
+  , blockRamBlobPow2
+    -- *** Creating and inspecting 'MemBlob'
+  , MemBlob
+  , createMemBlob
+  , memBlobTH
+  , unpackMemBlob
     -- ** BlockRAM primitives initialized with a data file
   , blockRamFile
   , blockRamFilePow2
@@ -144,11 +157,13 @@ import Clash.Class.Resize
 import Clash.Magic
 import Clash.NamedTypes
 import Clash.Explicit.BlockRam
+import Clash.Explicit.BlockRam.Blob
 import Clash.Explicit.BlockRam.File
 import Clash.Explicit.Mealy
 import Clash.Explicit.Moore
 import Clash.Explicit.RAM
 import Clash.Explicit.ROM
+import Clash.Explicit.ROM.Blob
 import Clash.Explicit.ROM.File
 import Clash.Explicit.Prelude.Safe
 import Clash.Explicit.Reset
