@@ -1,9 +1,9 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017-2019, Myrtle Software Ltd, Google Inc.
-                       2019, QBayLogic B.V.
+                  2019,2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 The Product/Signal isomorphism
 -}
@@ -32,6 +32,7 @@ import GHC.Generics
 import GHC.TypeLits                 (KnownNat)
 import Prelude                      hiding (head, map, tail)
 
+import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Signal.Bundle.Internal (deriveBundleTuples)
 import Clash.Signal.Internal        (Signal (..), Domain)
 import Clash.Sized.BitVector        (Bit, BitVector)
@@ -155,6 +156,7 @@ instance KnownNat n => Bundle (Vec n a) where
   unbundle = sequenceA . fmap lazyV
 
 {-# NOINLINE vecBundle# #-}
+{-# ANN vecBundle# hasBlackBox #-}
 vecBundle# :: Vec n (Signal t a) -> Signal t (Vec n a)
 vecBundle# = traverse# id
 

@@ -313,14 +313,6 @@ end block;
     }
   }
 , { "BlackBox" :
-    { "name"      : "Clash.Sized.Vector.maxIndex"
-    , "workInfo"  : "Constant"
-    , "kind"      : "Expression"
-    , "type"      : "maxIndex :: KnownNat n => Vec n a -> Int"
-    , "template"  : "to_signed(~LIT[0] - 1,~SIZE[~TYPO])"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.length"
     , "workInfo"  : "Constant"
     , "kind"      : "Expression"

@@ -1,8 +1,9 @@
 {-|
 Copyright  :  (C) 2018, Google Inc.
                   2019, Myrtle Software Ltd
+                  2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Utilities for tracing signals and dumping them in various ways. Example usage:
 
@@ -87,6 +88,7 @@ module Clash.Signal.Trace
   ) where
 
 -- Clash:
+import           Clash.Annotations.Primitive (hasBlackBox)
 import           Clash.Signal.Internal (fromList)
 import           Clash.Signal
   (KnownDomain(..), SDomainConfiguration(..), Signal, bundle, unbundle)
@@ -232,6 +234,7 @@ traceSignal traceName signal =
       unsafePerformIO $
         traceSignal# traceMap# (snatToNum period) traceName signal
 {-# NOINLINE traceSignal #-}
+{-# ANN traceSignal hasBlackBox #-}
 
 -- | Trace a single signal. Will emit an error if a signal with the same name
 -- was previously registered.
@@ -252,6 +255,7 @@ traceSignal1
 traceSignal1 traceName signal =
   unsafePerformIO (traceSignal# traceMap# 1 traceName signal)
 {-# NOINLINE traceSignal1 #-}
+{-# ANN traceSignal1 hasBlackBox #-}
 
 -- | Trace a single vector signal: each element in the vector will show up as
 -- a different trace. If the trace name already exists, this function will emit
@@ -278,6 +282,7 @@ traceVecSignal traceName signal =
       unsafePerformIO $
         traceVecSignal# traceMap# (snatToNum period) traceName signal
 {-# NOINLINE traceVecSignal #-}
+{-# ANN traceVecSignal hasBlackBox #-}
 
 -- | Trace a single vector signal: each element in the vector will show up as
 -- a different trace. If the trace name already exists, this function will emit
@@ -300,6 +305,7 @@ traceVecSignal1
 traceVecSignal1 traceName signal =
   unsafePerformIO $ traceVecSignal# traceMap# 1 traceName signal
 {-# NOINLINE traceVecSignal1 #-}
+{-# ANN traceVecSignal1 hasBlackBox #-}
 
 iso8601Format :: UTCTime -> String
 iso8601Format = formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S"

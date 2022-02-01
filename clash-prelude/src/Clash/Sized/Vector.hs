@@ -1,8 +1,9 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Myrtle Software Ltd
+                  2022     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
@@ -135,7 +136,7 @@ import Test.QuickCheck
 import Unsafe.Coerce              (unsafeCoerce)
 
 import Clash.Annotations.Primitive
-  (Primitive(InlinePrimitive), HDL(..), dontTranslate)
+  (Primitive(InlinePrimitive), HDL(..), dontTranslate, hasBlackBox)
 import Clash.Promoted.Nat
   (SNat (..), SNatLE (..), UNat (..), compareSNat, leToPlus, pow2SNat,
    snatProxy, snatToInteger, subSNat, withSNat, toUNat, natToInteger)
@@ -334,6 +335,7 @@ instance (KnownNat n, 1 <= n) => Traversable (Vec n) where
   traverse = traverse#
 
 {-# NOINLINE traverse# #-}
+{-# ANN traverse# hasBlackBox #-}
 traverse# :: forall a f b n . Applicative f => (a -> f b) -> Vec n a -> f (Vec n b)
 traverse# _ Nil           = pure Nil
 traverse# f (x `Cons` xs) = Cons <$> f x <*> traverse# f xs
@@ -368,6 +370,7 @@ singleton :: a -> Vec 1 a
 singleton = (`Cons` Nil)
 
 {-# NOINLINE head #-}
+{-# ANN head hasBlackBox #-}
 {- | Extract the first element of a vector
 
 >>> head (1:>2:>3:>Nil)
@@ -401,6 +404,7 @@ head :: Vec (n + 1) a -> a
 head (x `Cons` _) = x
 
 {-# NOINLINE tail #-}
+{-# ANN tail hasBlackBox #-}
 {- | Extract the elements after the head of a vector
 
 >>> tail (1:>2:>3:>Nil)
@@ -434,6 +438,7 @@ tail :: Vec (n + 1) a -> Vec n a
 tail (_ `Cons` xs) = xs
 
 {-# NOINLINE last #-}
+{-# ANN last hasBlackBox #-}
 {- | Extract the last element of a vector
 
 >>> last (1:>2:>3:>Nil)
@@ -468,6 +473,7 @@ last (x `Cons` Nil)         = x
 last (_ `Cons` y `Cons` ys) = last (y `Cons` ys)
 
 {-# NOINLINE init #-}
+{-# ANN init hasBlackBox #-}
 {- | Extract all the elements of a vector except the last element
 
 >>> init (1:>2:>3:>Nil)
@@ -635,6 +641,7 @@ infixr 5 ++
 Nil           ++ ys = ys
 (x `Cons` xs) ++ ys = x `Cons` xs ++ ys
 {-# NOINLINE (++) #-}
+{-# ANN (++) hasBlackBox #-}
 
 -- | Split a vector into two vectors at the given point.
 --
@@ -645,6 +652,7 @@ Nil           ++ ys = ys
 splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
 splitAt n xs = splitAtU (toUNat n) xs
 {-# NOINLINE splitAt #-}
+{-# ANN splitAt hasBlackBox #-}
 
 splitAtU :: UNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
 splitAtU UZero     ys            = (Nil,ys)
@@ -668,6 +676,7 @@ concat :: Vec n (Vec m a) -> Vec (n * m) a
 concat Nil           = Nil
 concat (x `Cons` xs) = x ++ concat xs
 {-# NOINLINE concat #-}
+{-# ANN concat hasBlackBox #-}
 
 -- | Map a function over all the elements of a vector and concatentate the resulting vectors.
 --
@@ -685,6 +694,7 @@ concatMap f xs = concat (map f xs)
 unconcat :: KnownNat n => SNat m -> Vec (n * m) a -> Vec n (Vec m a)
 unconcat n xs = unconcatU (withSNat toUNat) (toUNat n) xs
 {-# NOINLINE unconcat #-}
+{-# ANN unconcat hasBlackBox #-}
 
 unconcatU :: UNat n -> UNat m -> Vec (n * m) a -> Vec n (Vec m a)
 unconcatU UZero      _ _  = Nil
@@ -716,6 +726,7 @@ reverse :: Vec n a -> Vec n a
 reverse Nil           = Nil
 reverse (x `Cons` xs) = reverse xs :< x
 {-# NOINLINE reverse #-}
+{-# ANN reverse hasBlackBox #-}
 
 -- | \"'map' @f xs@\" is the vector obtained by applying /f/ to each element
 -- of /xs/, i.e.,
@@ -729,6 +740,7 @@ map :: (a -> b) -> Vec n a -> Vec n b
 map _ Nil           = Nil
 map f (x `Cons` xs) = f x `Cons` map f xs
 {-# NOINLINE map #-}
+{-# ANN map hasBlackBox #-}
 
 -- | Apply a function of every element of a vector and its index.
 --
@@ -746,10 +758,12 @@ map f (x `Cons` xs) = f x `Cons` map f xs
 imap :: forall n a b . KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b
 imap f = go 0
   where
+    -- NOTE This has a black box called imap_go
     go :: Index n -> Vec m a -> Vec m b
     go _ Nil           = Nil
     go n (x `Cons` xs) = f n x `Cons` go (n+1) xs
 {-# NOINLINE imap #-}
+{-# ANN imap hasBlackBox #-}
 
 {- | Zip two vectors with a functions that also takes the elements' indices.
 
@@ -870,6 +884,7 @@ zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
 zipWith _ Nil           _  = Nil
 zipWith f (x `Cons` xs) ys = f x (head ys) `Cons` zipWith f xs (tail ys)
 {-# NOINLINE zipWith #-}
+{-# ANN zipWith hasBlackBox #-}
 
 -- | 'zipWith3' generalizes 'zip3' by zipping with the function given
 -- as the first argument, instead of a tupling function.
@@ -979,6 +994,7 @@ foldr :: (a -> b -> b) -> b -> Vec n a -> b
 foldr _ z Nil           = z
 foldr f z (x `Cons` xs) = f x (foldr f z xs)
 {-# NOINLINE foldr #-}
+{-# ANN foldr hasBlackBox #-}
 
 -- | 'foldl', applied to a binary operator, a starting value (typically
 -- the left-identity of the operator), and a vector, reduces the vector
@@ -1328,6 +1344,7 @@ index_int xs i@(I# n0)
                                 then y
                                 else sub ys (n -# 1#)
 {-# NOINLINE index_int #-}
+{-# ANN index_int hasBlackBox #-}
 
 -- | \"@xs@ '!!' @n@\" returns the /n/'th element of /xs/.
 --
@@ -1354,6 +1371,7 @@ xs !! i = index_int xs (fromEnum i)
 length :: KnownNat n => Vec n a -> Int
 length = fromInteger . natVal . asNatProxy
 {-# NOINLINE length #-}
+{-# ANN length hasBlackBox #-}
 
 replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a
 replace_int xs i@(I# n0) a
@@ -1370,6 +1388,7 @@ replace_int xs i@(I# n0) a
                                  then b `Cons` ys
                                  else y `Cons` sub ys (n -# 1#) b
 {-# NOINLINE replace_int #-}
+{-# ANN replace_int hasBlackBox #-}
 
 -- | \"'replace' @n a xs@\" returns the vector /xs/ where the /n/'th element is
 -- replaced by /a/.
@@ -1495,6 +1514,7 @@ select f s n xs = select' (toUNat n) $ drop f xs
     select' (USucc n') vs@(x `Cons` _) = x `Cons`
                                          select' n' (drop s (unsafeCoerce vs))
 {-# NOINLINE select #-}
+{-# ANN select hasBlackBox #-}
 
 -- | \"'selectI' @f s xs@\" selects as many elements as demanded by the context
 -- with step-size /s/ and offset /f/ from /xs/.
@@ -1518,6 +1538,7 @@ selectI f s xs = withSNat (\n -> select f s n xs)
 replicate :: SNat n -> a -> Vec n a
 replicate n a = replicateU (toUNat n) a
 {-# NOINLINE replicate #-}
+{-# ANN replicate hasBlackBox #-}
 
 replicateU :: UNat n -> a -> Vec n a
 replicateU UZero     _ = Nil
@@ -1642,6 +1663,7 @@ generateI f a = iterateI f (f a)
 transpose :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)
 transpose = traverse# id
 {-# NOINLINE transpose #-}
+{-# ANN transpose hasBlackBox #-}
 
 -- | 1-dimensional stencil computations
 --
@@ -1882,6 +1904,7 @@ rotateLeftS xs d = go (snatToInteger d `mod` natVal (asNatProxy xs)) xs
     go 0 ys            = ys
     go n (y `Cons` ys) = go (n-1) (ys :< y)
 {-# NOINLINE rotateLeftS #-}
+{-# ANN rotateLeftS hasBlackBox #-}
 
 -- | /Statically/ rotate a 'Vec'tor to the right:
 --
@@ -1900,6 +1923,7 @@ rotateRightS xs d = go (snatToInteger d `mod` natVal (asNatProxy xs)) xs
     go 0 ys             = ys
     go n ys@(Cons _ _)  = go (n-1) (last ys :> init ys)
 {-# NOINLINE rotateRightS #-}
+{-# ANN rotateRightS hasBlackBox #-}
 
 -- | Convert a vector to a list.
 --
@@ -2064,6 +2088,7 @@ lazyV = lazyV' (repeat ())
     lazyV' Nil           _  = Nil
     lazyV' (_ `Cons` xs) ys = head ys `Cons` lazyV' xs (tail ys)
 {-# NOINLINE lazyV #-}
+{-# ANN lazyV hasBlackBox #-}
 
 -- | A /dependently/ typed fold.
 --
@@ -2167,6 +2192,7 @@ dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
       let s' = s `subSNat` d1
       in  f s' y (go s' ys)
 {-# NOINLINE dfold #-}
+{-# ANN dfold hasBlackBox #-}
 
 {- | A combination of 'dfold' and 'fold': a /dependently/ typed fold that
 reduces a vector in a tree-like structure.
@@ -2329,6 +2355,7 @@ dtfold _ f g = go (SNat :: SNat k)
           (xsL,xsR) = splitAt (pow2SNat sn') xs
       in  g sn' (go sn' xsL) (go sn' xsR)
 {-# NOINLINE dtfold #-}
+{-# ANN dtfold hasBlackBox #-}
 
 -- | To be used as the motive /p/ for 'dfold', when the /f/ in \"'dfold' @p f@\"
 -- is a variation on (':>'), e.g.:
@@ -2405,6 +2432,7 @@ concatBitVector# = go 0
     let sh = fromInteger (natVal (Proxy @m)) :: Int in
     go (BV (shiftL accMsk sh .|. xMsk) (shiftL accVal sh .|. xVal)) xs
 {-# NOINLINE concatBitVector# #-}
+{-# ANN concatBitVector# hasBlackBox #-}
 
 unconcatBitVector#
   :: forall n m
@@ -2420,6 +2448,7 @@ unconcatBitVector# orig = snd (go (toUNat (SNat @n)))
           (l,x) = (GHC.Magic.noinline split#) bv
       in  (l,x :> xs)
 {-# NOINLINE unconcatBitVector# #-}
+{-# ANN unconcatBitVector# hasBlackBox #-}
 
 -- | Convert a 'BitVector' to a 'Vec' of 'Bit's.
 --
@@ -2451,6 +2480,7 @@ seqV v b =
   let s () e = seq e () in
   foldl s () v `seq` b
 {-# NOINLINE seqV #-}
+{-# ANN seqV hasBlackBox #-}
 infixr 0 `seqV`
 
 -- | Evaluate all elements of a vector to WHNF
@@ -2473,6 +2503,7 @@ seqVX v b =
   let s () e = seqX e () in
   foldl s () v `seqX` b
 {-# NOINLINE seqVX #-}
+{-# ANN seqVX hasBlackBox #-}
 infixr 0 `seqVX`
 
 -- | Evaluate all elements of a vector to WHNF. Does not propagate

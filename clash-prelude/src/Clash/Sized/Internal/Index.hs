@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software Ltd,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -98,6 +98,7 @@ import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
                                    coarbitraryIntegral, shrinkIntegral)
 
+import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Class.BitPack.Internal (BitPack (..), packXWith)
 import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
@@ -161,6 +162,8 @@ newtype Index (n :: Nat) =
 #endif
   deriving (Data, Generic)
 
+{-# ANN I hasBlackBox #-}
+
 {-# NOINLINE size# #-}
 size# :: (KnownNat n, 1 <= n) => Index n -> Int
 size# = BV.size# . pack#
@@ -181,10 +184,12 @@ fromSNat :: (KnownNat m, n + 1 <= m) => SNat n -> Index m
 fromSNat = snatToNum
 
 {-# NOINLINE pack# #-}
+{-# ANN pack# hasBlackBox #-}
 pack# :: Index n -> BitVector (CLog 2 n)
 pack# (I i) = BV 0 (naturalFromInteger i)
 
 {-# NOINLINE unpack# #-}
+{-# ANN unpack# hasBlackBox #-}
 unpack# :: (KnownNat n, 1 <= n) => BitVector (CLog 2 n) -> Index n
 unpack# (BV 0 i) = fromInteger_INLINE (naturalToInteger i)
 unpack# bv = undefError "Index.unpack" [bv]
@@ -194,10 +199,12 @@ instance Eq (Index n) where
   (/=) = neq#
 
 {-# NOINLINE eq# #-}
+{-# ANN eq# hasBlackBox #-}
 eq# :: (Index n) -> (Index n) -> Bool
 (I n) `eq#` (I m) = n == m
 
 {-# NOINLINE neq# #-}
+{-# ANN neq# hasBlackBox #-}
 neq# :: (Index n) -> (Index n) -> Bool
 (I n) `neq#` (I m) = n /= m
 
@@ -209,12 +216,16 @@ instance Ord (Index n) where
 
 lt#,ge#,gt#,le# :: Index n -> Index n -> Bool
 {-# NOINLINE lt# #-}
+{-# ANN lt# hasBlackBox #-}
 lt# (I n) (I m) = n < m
 {-# NOINLINE ge# #-}
+{-# ANN ge# hasBlackBox #-}
 ge# (I n) (I m) = n >= m
 {-# NOINLINE gt# #-}
+{-# ANN gt# hasBlackBox #-}
 gt# (I n) (I m) = n > m
 {-# NOINLINE le# #-}
+{-# ANN le# hasBlackBox #-}
 le# (I n) (I m) = n <= m
 
 -- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
@@ -255,6 +266,7 @@ maxBound# =
     0 -> errorX "maxBound of 'Index 0' is undefined"
     n -> fromInteger_INLINE (n - 1)
 {-# NOINLINE maxBound# #-}
+{-# ANN maxBound# hasBlackBox #-}
 
 -- | Operators report an error on overflow and underflow
 instance KnownNat n => Num (Index n) where
@@ -268,12 +280,15 @@ instance KnownNat n => Num (Index n) where
 
 (+#),(-#),(*#) :: KnownNat n => Index n -> Index n -> Index n
 {-# NOINLINE (+#) #-}
+{-# ANN (+#) hasBlackBox #-}
 (+#) (I a) (I b) = fromInteger_INLINE $ a + b
 
 {-# NOINLINE (-#) #-}
+{-# ANN (-#) hasBlackBox #-}
 (-#) (I a) (I b) = fromInteger_INLINE $ a - b
 
 {-# NOINLINE (*#) #-}
+{-# ANN (*#) hasBlackBox #-}
 (*#) (I a) (I b) = fromInteger_INLINE $ a * b
 
 negate# :: KnownNat n => Index n -> Index n
@@ -282,6 +297,7 @@ negate# i = maxBound -# i +# 1
 
 fromInteger# :: KnownNat n => Integer -> Index n
 {-# NOINLINE fromInteger# #-}
+{-# ANN fromInteger# hasBlackBox #-}
 fromInteger# = fromInteger_INLINE
 {-# INLINE fromInteger_INLINE #-}
 fromInteger_INLINE :: forall n . (HasCallStack, KnownNat n) => Integer -> Index n
@@ -300,9 +316,11 @@ instance ExtendingNum (Index m) (Index n) where
 
 plus#, minus# :: Index m -> Index n -> Index (m + n - 1)
 {-# NOINLINE plus# #-}
+{-# ANN plus# hasBlackBox #-}
 plus# (I a) (I b) = I (a + b)
 
 {-# NOINLINE minus# #-}
+{-# ANN minus# hasBlackBox #-}
 minus# (I a) (I b) =
   let z   = a - b
       err = error ("Clash.Sized.Index.minus: result " ++ show z ++
@@ -311,6 +329,7 @@ minus# (I a) (I b) =
   in  res
 
 {-# NOINLINE times# #-}
+{-# ANN times# hasBlackBox #-}
 times# :: Index m -> Index n -> Index (((m - 1) * (n - 1)) + 1)
 times# (I a) (I b) = I (a * b)
 
@@ -416,11 +435,14 @@ instance KnownNat n => Integral (Index n) where
 
 quot#,rem# :: Index n -> Index n -> Index n
 {-# NOINLINE quot# #-}
+{-# ANN quot# hasBlackBox #-}
 (I a) `quot#` (I b) = I (a `div` b)
 {-# NOINLINE rem# #-}
+{-# ANN rem# hasBlackBox #-}
 (I a) `rem#` (I b) = I (a `rem` b)
 
 {-# NOINLINE toInteger# #-}
+{-# ANN toInteger# hasBlackBox #-}
 toInteger# :: Index n -> Integer
 toInteger# (I n) = n
 
@@ -464,6 +486,7 @@ instance Resize Index where
 resize# :: KnownNat m => Index n -> Index m
 resize# (I i) = fromInteger_INLINE i
 {-# NOINLINE resize# #-}
+{-# ANN resize# hasBlackBox #-}
 
 instance KnownNat n => Lift (Index n) where
   lift u@(I i) = sigE [| fromInteger# i |] (decIndex (natVal u))

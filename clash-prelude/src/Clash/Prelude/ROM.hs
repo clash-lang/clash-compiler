@@ -2,7 +2,7 @@
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.
                   2019     , Myrtle Software Ltd,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -35,6 +35,7 @@ import           GHC.Stack            (withFrozenCallStack)
 import           GHC.TypeLits         (KnownNat, type (^))
 import           Prelude              hiding (length)
 
+import           Clash.Annotations.Primitive (hasBlackBox)
 import qualified Clash.Explicit.ROM   as E
 import           Clash.Signal
 import           Clash.Sized.Unsigned (Unsigned)
@@ -105,6 +106,7 @@ asyncRom# content = safeAt
           (errorX ("asyncRom: address " ++ show i ++
                   " not in range [0.." ++ show szI ++ ")"))
 {-# NOINLINE asyncRom# #-}
+{-# ANN asyncRom# hasBlackBox #-}
 
 -- | A ROM with a synchronous read port, with space for @n@ elements
 --

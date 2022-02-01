@@ -1,7 +1,8 @@
 {-|
-Copyright  :  (C) 2018, Google Inc.
+Copyright  :  (C) 2018, Google Inc.,
+                  2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 This module contains:
 
@@ -58,6 +59,7 @@ import Clash.Annotations.BitRepresentation.Util
 import qualified Clash.Annotations.BitRepresentation.Util
   as Util
 
+import           Clash.Annotations.Primitive (hasBlackBox)
 import           Clash.Class.BitPack
   (BitPack, BitSize, pack, packXWith, unpack)
 import           Clash.Class.Resize         (resize)
@@ -851,6 +853,7 @@ buildPack dataRepr@(DataReprAnn _name _size constrs) = do
 dontApplyInHDL :: (a -> b) -> a -> b
 dontApplyInHDL f a = f a
 {-# NOINLINE dontApplyInHDL #-}
+{-# ANN dontApplyInHDL hasBlackBox #-}
 
 buildUnpackField
   :: Name

@@ -33,6 +33,7 @@ import GHC.Stack              (withFrozenCallStack)
 import GHC.TypeLits           (KnownNat, type (^))
 import Prelude hiding         (length)
 
+import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Signal.Internal
   (Clock (..), KnownDomain, Signal (..), Enable, fromEnable)
 import Clash.Sized.Unsigned   (Unsigned)
@@ -132,3 +133,4 @@ rom# !_ en content =
                      " not in range [0.." ++ show szI ++ ")"))
   {-# INLINE safeAt #-}
 {-# NOINLINE rom# #-}
+{-# ANN rom# hasBlackBox #-}

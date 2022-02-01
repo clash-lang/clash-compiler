@@ -1,7 +1,8 @@
 {-|
 Copyright  :  (C) 2016, University of Twente
+                  2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
@@ -65,6 +66,7 @@ import Language.Haskell.TH.Compat
 import Prelude                     hiding ((++), (!!))
 import Test.QuickCheck             (Arbitrary (..), CoArbitrary (..))
 
+import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Class.BitPack         (BitPack (..), packXWith)
 import Clash.Promoted.Nat          (SNat (..), UNat (..), pow2SNat, snatToNum,
                                     subSNat, toUNat)
@@ -114,11 +116,13 @@ textract :: RTree 0 a -> a
 textract (LR_ x)   = x
 textract (BR_ _ _) = error $ "textract: nodes hold no values"
 {-# NOINLINE textract #-}
+{-# ANN textract hasBlackBox #-}
 
 tsplit :: RTree (d+1) a -> (RTree d a,RTree d a)
 tsplit (BR_ l r) = (l,r)
 tsplit (LR_ _)   = error $ "tsplit: leaf is atomic"
 {-# NOINLINE tsplit #-}
+{-# ANN tsplit hasBlackBox #-}
 
 -- | Leaf of a perfect depth tree
 --
@@ -370,6 +374,7 @@ tdfold _ f g = go SNat
     go sn (BR_ l r) = let sn' = sn `subSNat` d1
                       in  g sn' (go sn' l) (go sn' r)
 {-# NOINLINE tdfold #-}
+{-# ANN tdfold hasBlackBox #-}
 
 data TfoldTree (a :: Type) (f :: TyFun Nat Type) :: Type
 type instance Apply (TfoldTree a) d = a
@@ -398,6 +403,7 @@ treplicate sn a = go (toUNat sn)
     go UZero      = LR a
     go (USucc un) = BR (go un) (go un)
 {-# NOINLINE treplicate #-}
+{-# ANN treplicate hasBlackBox #-}
 
 -- | \"'trepeat' @a@\" creates a tree with as many copies of /a/ as demanded by
 -- the context.

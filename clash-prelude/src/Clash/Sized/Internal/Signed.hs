@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016     , Myrtle Software Ltd,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -111,6 +111,7 @@ import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
                                        arbitraryBoundedIntegral,
                                        coarbitraryIntegral, shrinkIntegral)
 
+import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Class.BitPack            (BitPack (..), packXWith)
 import Clash.Class.Num                (ExtendingNum (..), SaturatingNum (..),
                                        SaturationMode (..))
@@ -189,11 +190,14 @@ newtype Signed (n :: Nat) =
 #endif
   deriving (Data, Generic)
 
+{-# ANN S hasBlackBox #-}
+
 instance NFDataX (Signed n) where
   deepErrorX = errorX
   rnfX = rwhnfX
 
 {-# NOINLINE size# #-}
+{-# ANN size# hasBlackBox #-}
 size# :: KnownNat n => Signed n -> Int
 size# bv = fromInteger (natVal bv)
 
@@ -220,11 +224,13 @@ instance KnownNat n => BitPack (Signed n) where
   unpack = unpack#
 
 {-# NOINLINE pack# #-}
+{-# ANN pack# hasBlackBox #-}
 pack# :: forall n . KnownNat n => Signed n -> BitVector n
 pack# (S i) = let m = 1 `shiftL0` fromInteger (natVal (Proxy @n))
               in  if i < 0 then BV 0 (naturalFromInteger (m + i)) else BV 0 (naturalFromInteger i)
 
 {-# NOINLINE unpack# #-}
+{-# ANN unpack# hasBlackBox #-}
 unpack# :: forall n . KnownNat n => BitVector n -> Signed n
 unpack# (BV 0 i) =
   let m = 1 `shiftL0` fromInteger (natVal (Proxy @n) - 1)
@@ -237,10 +243,12 @@ instance Eq (Signed n) where
   (/=) = neq#
 
 {-# NOINLINE eq# #-}
+{-# ANN eq# hasBlackBox #-}
 eq# :: Signed n -> Signed n -> Bool
 eq# (S v1) (S v2) = v1 == v2
 
 {-# NOINLINE neq# #-}
+{-# ANN neq# hasBlackBox #-}
 neq# :: Signed n -> Signed n -> Bool
 neq# (S v1) (S v2) = v1 /= v2
 
@@ -252,12 +260,16 @@ instance Ord (Signed n) where
 
 lt#,ge#,gt#,le# :: Signed n -> Signed n -> Bool
 {-# NOINLINE lt# #-}
+{-# ANN lt# hasBlackBox #-}
 lt# (S n) (S m) = n < m
 {-# NOINLINE ge# #-}
+{-# ANN ge# hasBlackBox #-}
 ge# (S n) (S m) = n >= m
 {-# NOINLINE gt# #-}
+{-# ANN gt# hasBlackBox #-}
 gt# (S n) (S m) = n > m
 {-# NOINLINE le# #-}
+{-# ANN le# hasBlackBox #-}
 le# (S n) (S m) = n <= m
 
 -- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
@@ -330,6 +342,7 @@ minBound# =
     0 -> 0
     n -> S (negate $ 2 ^ (n - 1))
 {-# NOINLINE minBound# #-}
+{-# ANN minBound# hasBlackBox #-}
 
 maxBound# :: forall n. KnownNat n => Signed n
 maxBound# =
@@ -337,6 +350,7 @@ maxBound# =
     0 -> 0
     n -> S (2 ^ (n - 1) - 1)
 {-# NOINLINE maxBound# #-}
+{-# ANN maxBound# hasBlackBox #-}
 
 -- | Operators do @wrap-around@ on overflow
 instance KnownNat n => Num (Signed n) where
@@ -351,6 +365,7 @@ instance KnownNat n => Num (Signed n) where
 
 (+#), (-#), (*#) :: forall n . KnownNat n => Signed n -> Signed n -> Signed n
 {-# NOINLINE (+#) #-}
+{-# ANN (+#) hasBlackBox #-}
 (+#) =
   \(S a) (S b) ->
     let z = a + b
@@ -364,6 +379,7 @@ instance KnownNat n => Num (Signed n) where
   m = 1 `shiftL0` fromInteger (natVal (Proxy @n) -1)
 
 {-# NOINLINE (-#) #-}
+{-# ANN (-#) hasBlackBox #-}
 (-#) =
   \(S a) (S b) ->
     let z = a - b
@@ -377,6 +393,7 @@ instance KnownNat n => Num (Signed n) where
   m  = 1 `shiftL0` fromInteger (natVal (Proxy @n) -1)
 
 {-# NOINLINE (*#) #-}
+{-# ANN (*#) hasBlackBox #-}
 (*#) = \(S a) (S b) -> fromInteger_INLINE sz mB mask (a * b)
   where sz   = fromInteger (natVal (Proxy @n)) - 1
         mB   = 1 `shiftL` sz
@@ -384,6 +401,7 @@ instance KnownNat n => Num (Signed n) where
 
 negate#,abs# :: forall n . KnownNat n => Signed n -> Signed n
 {-# NOINLINE negate# #-}
+{-# ANN negate# hasBlackBox #-}
 negate# =
   \(S n) ->
     let z = negate n
@@ -392,6 +410,7 @@ negate# =
   m = 1 `shiftL0` fromInteger (natVal (Proxy @n) -1)
 
 {-# NOINLINE abs# #-}
+{-# ANN abs# hasBlackBox #-}
 abs# =
   \(S n) ->
     let z = abs n
@@ -400,6 +419,7 @@ abs# =
   m = 1 `shiftL0` fromInteger (natVal (Proxy @n) -1)
 
 {-# NOINLINE fromInteger# #-}
+{-# ANN fromInteger# hasBlackBox #-}
 fromInteger# :: forall n . KnownNat n => Integer -> Signed (n :: Nat)
 fromInteger# = fromInteger_INLINE sz mB mask
   where sz   = fromInteger (natVal (Proxy @n)) - 1
@@ -424,12 +444,15 @@ instance ExtendingNum (Signed m) (Signed n) where
 
 plus#, minus# :: Signed m -> Signed n -> Signed (Max m n + 1)
 {-# NOINLINE plus# #-}
+{-# ANN plus# hasBlackBox #-}
 plus# (S a) (S b) = S (a + b)
 
 {-# NOINLINE minus# #-}
+{-# ANN minus# hasBlackBox #-}
 minus# (S a) (S b) = S (a - b)
 
 {-# NOINLINE times# #-}
+{-# ANN times# hasBlackBox #-}
 times# :: Signed m -> Signed n -> Signed (m + n)
 times# (S a) (S b) = S (a * b)
 
@@ -446,6 +469,7 @@ instance KnownNat n => Integral (Signed n) where
   toInteger   = toInteger#
 
 {-# NOINLINE quot# #-}
+{-# ANN quot# hasBlackBox #-}
 quot# :: forall n. KnownNat n => Signed n -> Signed n -> Signed n
 quot# (S a) (S b)
   | a == minB && b == (-1) = S minB
@@ -454,10 +478,12 @@ quot# (S a) (S b)
   S minB = minBound @(Signed n)
 
 {-# NOINLINE rem# #-}
+{-# ANN rem# hasBlackBox #-}
 rem# :: Signed n -> Signed n -> Signed n
 rem# (S a) (S b) = S (a `rem` b)
 
 {-# NOINLINE div# #-}
+{-# ANN div# hasBlackBox #-}
 div# :: forall n. KnownNat n => Signed n -> Signed n -> Signed n
 div# (S a) (S b)
   | a == minB && b == (-1) = S minB
@@ -466,10 +492,12 @@ div# (S a) (S b)
   S minB = minBound @(Signed n)
 
 {-# NOINLINE mod# #-}
+{-# ANN mod# hasBlackBox #-}
 mod# :: Signed n -> Signed n -> Signed n
 mod# (S a) (S b) = S (a `mod` b)
 
 {-# NOINLINE toInteger# #-}
+{-# ANN toInteger# hasBlackBox #-}
 toInteger# :: Signed n -> Integer
 toInteger# (S n) = n
 
@@ -502,24 +530,28 @@ instance KnownNat n => Bits (Signed n) where
 
 and#,or#,xor# :: forall n . KnownNat n => Signed n -> Signed n -> Signed n
 {-# NOINLINE and# #-}
+{-# ANN and# hasBlackBox #-}
 and# = \(S a) (S b) -> fromInteger_INLINE sz mB mask (a .&. b)
   where sz   = fromInteger (natVal (Proxy @n)) - 1
         mB   = 1 `shiftL` sz
         mask = mB - 1
 
 {-# NOINLINE or# #-}
+{-# ANN or# hasBlackBox #-}
 or# = \(S a) (S b) -> fromInteger_INLINE sz mB mask (a .|. b)
   where sz   = fromInteger (natVal (Proxy @n)) - 1
         mB   = 1 `shiftL` sz
         mask = mB - 1
 
 {-# NOINLINE xor# #-}
+{-# ANN xor# hasBlackBox #-}
 xor# = \(S a) (S b) -> fromInteger_INLINE sz mB mask (xor a b)
   where sz   = fromInteger (natVal (Proxy @n)) - 1
         mB   = 1 `shiftL` sz
         mask = mB - 1
 
 {-# NOINLINE complement# #-}
+{-# ANN complement# hasBlackBox #-}
 complement# :: forall n . KnownNat n => Signed n -> Signed n
 complement# = \(S a) -> fromInteger_INLINE sz mB mask (complement a)
   where sz   = fromInteger (natVal (Proxy @n)) - 1
@@ -528,6 +560,7 @@ complement# = \(S a) -> fromInteger_INLINE sz mB mask (complement a)
 
 shiftL#,shiftR#,rotateL#,rotateR# :: forall n . KnownNat n => Signed n -> Int -> Signed n
 {-# NOINLINE shiftL# #-}
+{-# ANN shiftL# hasBlackBox #-}
 shiftL# = \(S n) b ->
   if | b < 0     -> error $ "'shiftL' undefined for negative number: " ++ show b
      | b > sz    -> S 0
@@ -538,6 +571,7 @@ shiftL# = \(S n) b ->
   mask = mB - 1
 
 {-# NOINLINE shiftR# #-}
+{-# ANN shiftR# hasBlackBox #-}
 shiftR# =
   \(S n) b ->
     if b >= 0 then
@@ -550,6 +584,7 @@ shiftR# =
   mask = mB - 1
 
 {-# NOINLINE rotateL# #-}
+{-# ANN rotateL# hasBlackBox #-}
 rotateL# =
   \(S n) b ->
     if b >= 0 then
@@ -569,6 +604,7 @@ rotateL# =
   maskM = mB - 1
 
 {-# NOINLINE rotateR# #-}
+{-# ANN rotateR# hasBlackBox #-}
 rotateR# =
   \(S n) b ->
     if b >= 0 then
@@ -598,6 +634,7 @@ instance Resize Signed where
   truncateB    = truncateB#
 
 {-# NOINLINE resize# #-}
+{-# ANN resize# hasBlackBox #-}
 resize# :: forall m n . (KnownNat n, KnownNat m) => Signed n -> Signed m
 resize# s@(S i)
   | natToNatural @m == 0 = S 0
@@ -616,6 +653,7 @@ resize# s@(S i)
                    else S i'
 
 {-# NOINLINE truncateB# #-}
+{-# ANN truncateB# hasBlackBox #-}
 truncateB# :: forall m n . KnownNat m => Signed (m + n) -> Signed m
 truncateB# = \(S n) -> fromInteger_INLINE sz mB mask n
   where sz   = fromInteger (natVal (Proxy @m)) - 1

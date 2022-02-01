@@ -2,7 +2,7 @@
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.
                   2019     , Myrtle Software Ltd,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -35,6 +35,7 @@ import GHC.Stack             (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits          (KnownNat)
 import qualified Data.Sequence as Seq
 
+import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Explicit.Signal (unbundle, KnownDomain, andEnable)
 import Clash.Promoted.Nat    (SNat (..), snatToNum, pow2SNat)
 import Clash.Signal.Internal (Clock (..), Signal (..), Enable, fromEnable)
@@ -209,3 +210,4 @@ asyncRam# !_ !_ en sz rd we wr din = dout
         in d <$ s
     {-# INLINE safeUpdate #-}
 {-# NOINLINE asyncRam# #-}
+{-# ANN asyncRam# hasBlackBox #-}

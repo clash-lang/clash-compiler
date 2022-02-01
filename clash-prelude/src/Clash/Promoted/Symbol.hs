@@ -1,14 +1,16 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente
+                  2022     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
-{-# LANGUAGE Safe #-}
+-- Annotations are not allowed in safe Haskell
+-- {-# LANGUAGE Safe #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -20,9 +22,13 @@ import Language.Haskell.TH.Syntax
 import GHC.Show     (appPrec)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 
+import Clash.Annotations.Primitive (hasBlackBox)
+
 -- | Singleton value for a type-level string @s@
 data SSymbol (s :: Symbol) where
   SSymbol :: KnownSymbol s => SSymbol s
+
+{-# ANN SSymbol hasBlackBox #-}
 
 instance KnownSymbol s => Lift (SSymbol (s :: Symbol)) where
 --  lift :: t -> Q Exp

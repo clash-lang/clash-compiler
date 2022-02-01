@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016     , Myrtle Software Ltd,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -125,6 +125,7 @@ import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
                                        arbitraryBoundedIntegral,
                                        coarbitraryIntegral)
 
+import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Class.BitPack            (BitPack (..), packXWith, bitCoerce)
 import Clash.Class.Num                (ExtendingNum (..), SaturatingNum (..),
                                        SaturationMode (..))
@@ -201,7 +202,10 @@ newtype Unsigned (n :: Nat) =
 #endif
   deriving (Data, Generic)
 
+{-# ANN U hasBlackBox #-}
+
 {-# NOINLINE size# #-}
+{-# ANN size# hasBlackBox #-}
 size# :: KnownNat n => Unsigned n -> Int
 #if MIN_VERSION_base(4,15,0)
 size# u = fromIntegral (natVal u)
@@ -236,10 +240,12 @@ instance KnownNat n => BitPack (Unsigned n) where
   unpack = unpack#
 
 {-# NOINLINE pack# #-}
+{-# ANN pack# hasBlackBox #-}
 pack# :: Unsigned n -> BitVector n
 pack# (U i) = BV 0 i
 
 {-# NOINLINE unpack# #-}
+{-# ANN unpack# hasBlackBox #-}
 unpack# :: KnownNat n => BitVector n -> Unsigned n
 unpack# (BV 0 i) = U i
 unpack# bv = undefError "Unsigned.unpack" [bv]
@@ -249,10 +255,12 @@ instance Eq (Unsigned n) where
   (/=) = neq#
 
 {-# NOINLINE eq# #-}
+{-# ANN eq# hasBlackBox #-}
 eq# :: Unsigned n -> Unsigned n -> Bool
 eq# (U v1) (U v2) = v1 == v2
 
 {-# NOINLINE neq# #-}
+{-# ANN neq# hasBlackBox #-}
 neq# :: Unsigned n -> Unsigned n -> Bool
 neq# (U v1) (U v2) = v1 /= v2
 
@@ -264,12 +272,16 @@ instance Ord (Unsigned n) where
 
 lt#,ge#,gt#,le# :: Unsigned n -> Unsigned n -> Bool
 {-# NOINLINE lt# #-}
+{-# ANN lt# hasBlackBox #-}
 lt# (U n) (U m) = n < m
 {-# NOINLINE ge# #-}
+{-# ANN ge# hasBlackBox #-}
 ge# (U n) (U m) = n >= m
 {-# NOINLINE gt# #-}
+{-# ANN gt# hasBlackBox #-}
 gt# (U n) (U m) = n > m
 {-# NOINLINE le# #-}
+{-# ANN le# hasBlackBox #-}
 le# (U n) (U m) = n <= m
 
 -- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
@@ -344,10 +356,12 @@ instance KnownNat n => Bounded (Unsigned n) where
 minBound# :: Unsigned n
 minBound# = U 0
 {-# NOINLINE minBound# #-}
+{-# ANN minBound# hasBlackBox #-}
 
 maxBound# :: forall n. KnownNat n => Unsigned n
 maxBound# = let m = 1 `shiftL` (natToNum @n) in  U (m - 1)
 {-# NOINLINE maxBound# #-}
+{-# ANN maxBound# hasBlackBox #-}
 
 instance KnownNat n => Num (Unsigned n) where
   (+)         = (+#)
@@ -360,6 +374,7 @@ instance KnownNat n => Num (Unsigned n) where
 
 (+#),(-#),(*#) :: forall n . KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
 {-# NOINLINE (+#) #-}
+{-# ANN (+#) hasBlackBox #-}
 (+#) = \(U i) (U j) -> U (addMod m i j)
 #if MIN_VERSION_base(4,15,0)
   where m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
@@ -368,6 +383,7 @@ instance KnownNat n => Num (Unsigned n) where
 #endif
 
 {-# NOINLINE (-#) #-}
+{-# ANN (-#) hasBlackBox #-}
 (-#) = \(U i) (U j) -> U (subMod m i j)
 #if MIN_VERSION_base(4,15,0)
   where m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
@@ -376,6 +392,7 @@ instance KnownNat n => Num (Unsigned n) where
 #endif
 
 {-# NOINLINE (*#) #-}
+{-# ANN (*#) hasBlackBox #-}
 (*#) = \(U i) (U j) -> U (mulMod2 m i j)
 #if MIN_VERSION_base(4,15,0)
   where m = (1 `naturalShiftL` naturalToWord (natVal (Proxy @n))) - 1
@@ -384,6 +401,7 @@ instance KnownNat n => Num (Unsigned n) where
 #endif
 
 {-# NOINLINE negate# #-}
+{-# ANN negate# hasBlackBox #-}
 negate# :: forall n . KnownNat n => Unsigned n -> Unsigned n
 negate# = \(U i) -> U (negateMod m i)
 #if MIN_VERSION_base(4,15,0)
@@ -393,6 +411,7 @@ negate# = \(U i) -> U (negateMod m i)
 #endif
 
 {-# NOINLINE fromInteger# #-}
+{-# ANN fromInteger# hasBlackBox #-}
 fromInteger# :: forall n . KnownNat n => Integer -> Unsigned n
 #if MIN_VERSION_base(4,15,0)
 fromInteger# = \x -> U (integerToNatural (x `mod` m))
@@ -412,10 +431,12 @@ instance (KnownNat m, KnownNat n) => ExtendingNum (Unsigned m) (Unsigned n) wher
   mul = times#
 
 {-# NOINLINE plus# #-}
+{-# ANN plus# hasBlackBox #-}
 plus# :: Unsigned m -> Unsigned n -> Unsigned (Max m n + 1)
 plus# (U a) (U b) = U (a + b)
 
 {-# NOINLINE minus# #-}
+{-# ANN minus# hasBlackBox #-}
 minus# :: forall m n . (KnownNat m, KnownNat n) => Unsigned m -> Unsigned n
                                                 -> Unsigned (Max m n + 1)
 minus# = \(U a) (U b) -> U (subMod mask a b)
@@ -429,6 +450,7 @@ minus# = \(U a) (U b) -> U (subMod mask a b)
 #endif
 
 {-# NOINLINE times# #-}
+{-# ANN times# hasBlackBox #-}
 times# :: Unsigned m -> Unsigned n -> Unsigned (m + n)
 times# (U a) (U b) = U (a * b)
 
@@ -446,11 +468,14 @@ instance KnownNat n => Integral (Unsigned n) where
 
 quot#,rem# :: Unsigned n -> Unsigned n -> Unsigned n
 {-# NOINLINE quot# #-}
+{-# ANN quot# hasBlackBox #-}
 quot# (U i) (U j) = U (i `quot` j)
 {-# NOINLINE rem# #-}
+{-# ANN rem# hasBlackBox #-}
 rem# (U i) (U j) = U (i `rem` j)
 
 {-# NOINLINE toInteger# #-}
+{-# ANN toInteger# hasBlackBox #-}
 toInteger# :: Unsigned n -> Integer
 toInteger# (U i) = naturalToInteger i
 
@@ -482,24 +507,29 @@ instance KnownNat n => Bits (Unsigned n) where
   popCount u        = popCount (pack# u)
 
 {-# NOINLINE and# #-}
+{-# ANN and# hasBlackBox #-}
 and# :: Unsigned n -> Unsigned n -> Unsigned n
 and# (U v1) (U v2) = U (v1 .&. v2)
 
 {-# NOINLINE or# #-}
+{-# ANN or# hasBlackBox #-}
 or# :: Unsigned n -> Unsigned n -> Unsigned n
 or# (U v1) (U v2) = U (v1 .|. v2)
 
 {-# NOINLINE xor# #-}
+{-# ANN xor# hasBlackBox #-}
 xor# :: Unsigned n -> Unsigned n -> Unsigned n
 xor# (U v1) (U v2) = U (v1 `xor` v2)
 
 {-# NOINLINE complement# #-}
+{-# ANN complement# hasBlackBox #-}
 complement# :: forall n . KnownNat n => Unsigned n -> Unsigned n
 complement# = \(U i) -> U (complementN i)
   where complementN = complementMod (natVal (Proxy @n))
 
 shiftL#, shiftR#, rotateL#, rotateR# :: forall n .KnownNat n => Unsigned n -> Int -> Unsigned n
 {-# NOINLINE shiftL# #-}
+{-# ANN shiftL# hasBlackBox #-}
 shiftL# = \(U v) i ->
 #if MIN_VERSION_base(4,15,0)
   let i' = fromIntegral i in
@@ -519,6 +549,7 @@ shiftL# = \(U v) i ->
 #endif
 
 {-# NOINLINE shiftR# #-}
+{-# ANN shiftR# hasBlackBox #-}
 -- shiftR# doesn't need the KnownNat constraint
 -- But having the same type signature for all shift and rotate functions
 -- makes implementing the Evaluator easier.
@@ -528,6 +559,7 @@ shiftR# (U v) i
   | otherwise = U (shiftR v i)
 
 {-# NOINLINE rotateL# #-}
+{-# ANN rotateL# hasBlackBox #-}
 rotateL# =
   \(U n) b ->
     if b >= 0 then
@@ -554,6 +586,7 @@ rotateL# =
 #endif
 
 {-# NOINLINE rotateR# #-}
+{-# ANN rotateR# hasBlackBox #-}
 rotateR# =
   \(U n) b ->
     if b >= 0 then
@@ -591,6 +624,7 @@ instance Resize Unsigned where
   truncateB  = resize#
 
 {-# NOINLINE resize# #-}
+{-# ANN resize# hasBlackBox #-}
 resize# :: forall n m . KnownNat m => Unsigned n -> Unsigned m
 resize# = \(U i) -> if i >= m then U (i `mod` m) else U i
 #if MIN_VERSION_base(4,15,0)
@@ -709,6 +743,7 @@ unsignedToWord (U (NatS# u#)) = W# u#
 unsignedToWord (U (NatJ# u#)) = W# (bigNatToWord u#)
 #endif
 {-# NOINLINE unsignedToWord #-}
+{-# ANN unsignedToWord hasBlackBox #-}
 
 unsigned8toWord8 :: Unsigned 8 -> Word8
 #if MIN_VERSION_base(4,15,0)
@@ -719,6 +754,7 @@ unsigned8toWord8 (U (NatS# u#)) = W8# (narrow8Word# u#)
 unsigned8toWord8 (U (NatJ# u#)) = W8# (narrow8Word# (bigNatToWord u#))
 #endif
 {-# NOINLINE unsigned8toWord8 #-}
+{-# ANN unsigned8toWord8 hasBlackBox #-}
 
 unsigned16toWord16 :: Unsigned 16 -> Word16
 #if MIN_VERSION_base(4,15,0)
@@ -729,6 +765,7 @@ unsigned16toWord16 (U (NatS# u#)) = W16# (narrow16Word# u#)
 unsigned16toWord16 (U (NatJ# u#)) = W16# (narrow16Word# (bigNatToWord u#))
 #endif
 {-# NOINLINE unsigned16toWord16 #-}
+{-# ANN unsigned16toWord16 hasBlackBox #-}
 
 unsigned32toWord32 :: Unsigned 32 -> Word32
 #if MIN_VERSION_base(4,15,0)
@@ -739,6 +776,7 @@ unsigned32toWord32 (U (NatS# u#)) = W32# (narrow32Word# u#)
 unsigned32toWord32 (U (NatJ# u#)) = W32# (narrow32Word# (bigNatToWord u#))
 #endif
 {-# NOINLINE unsigned32toWord32 #-}
+{-# ANN unsigned32toWord32 hasBlackBox #-}
 
 {-# RULES
 "bitCoerce/Unsigned WORD_SIZE_IN_BITS -> Word" bitCoerce = unsignedToWord

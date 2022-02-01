@@ -1,5 +1,6 @@
 {-|
-  Copyright   :  (C) 2019, Google Inc
+  Copyright   :  (C) 2019, Google Inc.,
+                     2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -69,6 +70,7 @@ data SimIO a = SimIO {unSimIO :: !(IO a)}
 #else
 newtype SimIO a = SimIO {unSimIO :: IO a}
 #endif
+{-# ANN unSimIO hasBlackBox #-}
 
 instance Functor SimIO where
   fmap = fmapSimIO#
@@ -76,6 +78,7 @@ instance Functor SimIO where
 fmapSimIO# :: (a -> b) -> SimIO a -> SimIO b
 fmapSimIO# f (SimIO m) = SimIO (fmap f m)
 {-# NOINLINE fmapSimIO# #-}
+{-# ANN fmapSimIO# hasBlackBox #-}
 
 instance Applicative SimIO where
   pure  = pureSimIO#
@@ -84,10 +87,12 @@ instance Applicative SimIO where
 pureSimIO# :: a -> SimIO a
 pureSimIO# a = SimIO (pure a)
 {-# NOINLINE pureSimIO# #-}
+{-# ANN pureSimIO# hasBlackBox #-}
 
 apSimIO# :: SimIO (a -> b) -> SimIO a -> SimIO b
 apSimIO# (SimIO f) (SimIO m) = SimIO (f <*> m)
 {-# NOINLINE apSimIO# #-}
+{-# ANN apSimIO# hasBlackBox #-}
 
 instance Monad SimIO where
   return = pureSimIO#
@@ -100,6 +105,7 @@ bindSimIO# (SimIO m) k = SimIO (m >>= (\x -> x `seqX` unSimIO (k x)))
 bindSimIO# (SimIO m) k = SimIO (m >>= (\x -> x `seqX` coerce k x))
 #endif
 {-# NOINLINE bindSimIO# #-}
+{-# ANN bindSimIO# hasBlackBox #-}
 
 -- | Display a string on /stdout/
 display

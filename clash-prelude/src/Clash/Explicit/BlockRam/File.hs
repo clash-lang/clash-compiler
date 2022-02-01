@@ -2,7 +2,7 @@
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.,
                   2019     , Myrtle Software Ltd,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -116,6 +116,7 @@ import GHC.TypeLits          (KnownNat)
 import Numeric               (readInt)
 import System.IO
 
+import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Class.BitPack   (BitPack, BitSize, pack)
 import Clash.Promoted.Nat    (SNat (..), pow2SNat, natToNum, snatToNum)
 import Clash.Sized.Internal.BitVector (Bit(..), BitVector(..), undefined#)
@@ -414,6 +415,7 @@ blockRamFile# (Clock _) ena sz file = \rd wen waS wd -> runST $ do
                 Nothing -> undefined#
   parseBV' = fmap fst . listToMaybe . readInt 2 (`elem` "01") digitToInt
 {-# NOINLINE blockRamFile# #-}
+{-# ANN blockRamFile# hasBlackBox #-}
 
 -- | __NB:__ Not synthesizable
 initMem :: KnownNat n => FilePath -> IO [BitVector n]
