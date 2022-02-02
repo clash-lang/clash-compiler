@@ -49,7 +49,7 @@ tests-8.10:
 tests-9.0:
   extends: .common-trigger
   variables:
-    GHC_VERSION: 9.0.1
+    GHC_VERSION: 9.0.2
 
 stack-build:
   extends: .common

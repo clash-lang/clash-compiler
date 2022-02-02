@@ -28,13 +28,13 @@ jobs:
             ghc: 8.10.2
             multiple_hidden: yes
 
-          - name: GHC 9.0.1, Multiple Hidden
-            ghc: 9.0.1
+          - name: GHC 9.0.2, Multiple Hidden
+            ghc: 9.0.2
             multiple_hidden: yes
 
     # Run steps inside the clash CI docker image
     container:
-      image: ghcr.io/clash-lang/clash-ci-${{ matrix.ghc }}:2022-01-25
+      image: ghcr.io/clash-lang/clash-ci-${{ matrix.ghc }}:2022-02-02
 
       env:
         THREADS: 2
