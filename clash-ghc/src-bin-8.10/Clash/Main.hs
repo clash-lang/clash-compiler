@@ -52,6 +52,7 @@ import Packages         ( pprPackages, pprPackagesSimple )
 import DriverPhases
 import BasicTypes       ( failed )
 import DynFlags hiding (WarnReason(..))
+import EnumSet as EnumSet
 import ErrUtils
 import FastString
 import Outputable
@@ -88,7 +89,7 @@ import Data.Maybe
 import           Paths_clash_ghc
 import           Clash.GHCi.UI (makeHDL)
 import           Exception (gcatch)
-import           Data.IORef (IORef, newIORef, readIORef)
+import           Data.IORef (IORef, newIORef, readIORef, modifyIORef')
 import qualified Data.Version (showVersion)
 
 import           Clash.Backend (Backend)
@@ -235,6 +236,10 @@ main' postLoadMode dflags0 args flagWarnings startAction clashOpts = do
         -- Leftover ones are presumably files
   (dflags3, fileish_args, dynamicFlagWarnings) <-
       GHC.parseDynamicFlags dflags2 args
+
+  -- Propagate -Werror to Clash
+  liftIO . modifyIORef' clashOpts $ \opts ->
+    opts { opt_werror = EnumSet.member Opt_WarnIsError (generalFlags dflags3) }
 
   let dflags4 = case lang of
                 HscInterpreted | not (gopt Opt_ExternalInterpreter dflags3) ->

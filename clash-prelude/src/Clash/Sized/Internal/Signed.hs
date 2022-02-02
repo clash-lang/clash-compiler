@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016     , Myrtle Software Ltd,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -39,6 +39,9 @@ module Clash.Sized.Internal.Signed
   , ge#
   , gt#
   , le#
+    -- ** Enum
+  , toEnum#
+  , fromEnum#
     -- ** Enum (not synthesizable)
   , enumFrom#
   , enumFromThen#
@@ -111,6 +114,7 @@ import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
                                        arbitraryBoundedIntegral,
                                        coarbitraryIntegral, shrinkIntegral)
 
+import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Class.BitPack            (BitPack (..), packXWith)
 import Clash.Class.Num                (ExtendingNum (..), SaturatingNum (..),
                                        SaturationMode (..))
@@ -279,13 +283,22 @@ instance KnownNat n => Enum (Signed n) where
              <> "need other behavior."
     | otherwise = n -# fromInteger# 1
 
-  toEnum         = fromInteger# . toInteger
-  fromEnum       = fromEnum . toInteger#
+  toEnum         = toEnum#
+  fromEnum       = fromEnum#
   enumFrom       = enumFrom#
   enumFromThen   = enumFromThen#
   enumFromTo     = enumFromTo#
   enumFromThenTo = enumFromThenTo#
 
+toEnum# :: forall n. KnownNat n => Int -> Signed n
+toEnum# = fromInteger# . toInteger
+{-# NOINLINE toEnum# #-}
+{-# ANN toEnum# hasBlackBox #-}
+
+fromEnum# :: forall n. KnownNat n => Signed n -> Int
+fromEnum# = fromEnum . toInteger#
+{-# NOINLINE fromEnum# #-}
+{-# ANN fromEnum# hasBlackBox #-}
 
 enumFrom# :: forall n. KnownNat n => Signed n -> [Signed n]
 enumFrom# x = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x .. unsafeToInteger (maxBound :: Signed n)]

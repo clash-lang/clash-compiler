@@ -65,6 +65,22 @@
     }
   }
 , { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Index.toEnum#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      : "toEnum# :: KnownNat n => Int -> Index n"
+    , "template"  : "resize(unsigned(std_logic_vector(~ARG[1])),~SIZE[~TYPO])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Index.fromEnum#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      : "fromEnum# :: KnownNat n => Index n -> Int"
+    , "template"  : "~IF~SIZE[~TYP[1]]~THENsigned(std_logic_vector(resize(~ARG[1],~SIZE[~TYPO])))~ELSEto_signed(0,~SIZE[~TYPO])~FI"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Index.+#"
     , "kind"      : "Expression"
     , "type"      : "(+#) :: KnownNat n => Index n -> Index n -> Index n"

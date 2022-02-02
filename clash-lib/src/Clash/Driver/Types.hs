@@ -288,7 +288,11 @@ debugAll = debugApplied { dbg_transformationInfo = TryTerm }
 
 -- | Options passed to Clash compiler
 data ClashOpts = ClashOpts
-  { opt_inlineLimit :: Int
+  { opt_werror :: Bool
+  -- ^ Are warnings treated as errors.
+  --
+  -- Command line flag: -Werror
+  , opt_inlineLimit :: Int
   -- ^ Change the number of times a function f can undergo inlining inside
   -- some other function g. This prevents the size of g growing dramatically.
   --
@@ -392,6 +396,7 @@ data ClashOpts = ClashOpts
 
 instance NFData ClashOpts where
   rnf o =
+    opt_werror o `deepseq`
     opt_inlineLimit o `deepseq`
     opt_specLimit o `deepseq`
     opt_inlineFunctionLimit o `deepseq`
@@ -422,6 +427,7 @@ instance NFData ClashOpts where
 
 instance Eq ClashOpts where
   s0 == s1 =
+    opt_werror s0 == opt_werror s1 &&
     opt_inlineLimit s0 == opt_inlineLimit s1 &&
     opt_specLimit s0 == opt_specLimit s1 &&
     opt_inlineFunctionLimit s0 == opt_inlineFunctionLimit s1 &&
@@ -459,6 +465,7 @@ instance Eq ClashOpts where
 instance Hashable ClashOpts where
   hashWithSalt s ClashOpts {..} =
     s `hashWithSalt`
+    opt_werror `hashWithSalt`
     opt_inlineLimit `hashWithSalt`
     opt_specLimit `hashWithSalt`
     opt_inlineFunctionLimit `hashWithSalt`
@@ -495,7 +502,8 @@ instance Hashable ClashOpts where
 defClashOpts :: ClashOpts
 defClashOpts
   = ClashOpts
-  { opt_inlineLimit         = 20
+  { opt_werror              = False
+  , opt_inlineLimit         = 20
   , opt_specLimit           = 20
   , opt_inlineFunctionLimit = 15
   , opt_inlineConstantLimit = 0

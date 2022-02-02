@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software Ltd,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -42,6 +42,9 @@ module Clash.Sized.Internal.Index
   , ge#
   , gt#
   , le#
+    -- ** Enum
+  , toEnum#
+  , fromEnum#
     -- ** Enum (not synthesizable)
   , enumFrom#
   , enumFromThen#
@@ -98,6 +101,7 @@ import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
                                    coarbitraryIntegral, shrinkIntegral)
 
+import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Class.BitPack.Internal (BitPack (..), packXWith)
 import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
@@ -222,12 +226,22 @@ le# (I n) (I m) = n <= m
 instance KnownNat n => Enum (Index n) where
   succ           = (+# fromInteger# 1)
   pred           = (-# fromInteger# 1)
-  toEnum         = fromInteger# . toInteger
-  fromEnum       = fromEnum . toInteger#
+  toEnum         = toEnum#
+  fromEnum       = fromEnum#
   enumFrom       = enumFrom#
   enumFromThen   = enumFromThen#
   enumFromTo     = enumFromTo#
   enumFromThenTo = enumFromThenTo#
+
+toEnum# :: forall n. KnownNat n => Int -> Index n
+toEnum# = fromInteger# . toInteger
+{-# NOINLINE toEnum# #-}
+{-# ANN toEnum# hasBlackBox #-}
+
+fromEnum# :: forall n. KnownNat n => Index n -> Int
+fromEnum# = fromEnum . toInteger#
+{-# NOINLINE fromEnum# #-}
+{-# ANN fromEnum# hasBlackBox #-}
 
 enumFrom# :: forall n. KnownNat n => Index n -> [Index n]
 enumFrom# x = [x .. maxBound]

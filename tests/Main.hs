@@ -551,6 +551,15 @@ runClashTest = defaultMain $ clashTestRoot
           }
         , outputTest "T1996" def{hdlTargets=[VHDL]}
         , runTest "T2040" def{hdlTargets=[VHDL],clashFlags=["-fclash-compile-ultra"]}
+        -- TODO I wanted to call this T2046A since there are multiple tests
+        -- for T2046. However, doing so completely breaks HDL loading because
+        -- it completely ignores the BuildSpecific...
+        , runTest "T2046" def
+            { hdlSim=False
+            , clashFlags=["-Werror"]
+            , buildTargets=BuildSpecific["top_bit", "top_bitvector", "top_index", "top_signed", "top_unsigned"]
+            }
+        , runTest "T2046B" def{clashFlags=["-Werror"]}
         ] <>
         if compiledWith == Cabal then
           -- This tests fails without environment files present, which are only

@@ -47,6 +47,14 @@
     }
   }
 , { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Unsigned.fromEnum#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      : "fromEnum# :: KnownNat n => Unsigned n -> Int"
+    , "template"  : "~IF~SIZE[~TYP[1]]~THEN~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[1]]]~THEN$unsigned(~VAR[i][1][0+:~SIZE[~TYPO]])~ELSE$unsigned({{(~SIZE[~TYPO]-~SIZE[~TYP[1]]) {1'b0}},~VAR[i][1]})~FI~ELSE~SIZE[~TYPO]'sd0~FI"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.size#"
     , "workInfo"  : "Constant"
     , "kind"      : "Expression"
@@ -105,6 +113,14 @@
     , "workInfo"  : "Never"
     , "kind"      : "Expression"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Unsigned n"
+    , "template"  : "~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[1]]]~THEN$unsigned(~VAR[i][1][0+:~SIZE[~TYPO]])~ELSE$unsigned({{(~SIZE[~TYPO]-~SIZE[~TYP[1]]) {1'b0}},~VAR[i][1]})~FI"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Clash.Sized.Internal.Unsigned.toEnum#"
+    , "workInfo"  : "Never"
+    , "kind"      : "Expression"
+    , "type"      : "toEnum# :: KnownNat n => Int -> Unsigned n"
     , "template"  : "~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[1]]]~THEN$unsigned(~VAR[i][1][0+:~SIZE[~TYPO]])~ELSE$unsigned({{(~SIZE[~TYPO]-~SIZE[~TYP[1]]) {1'b0}},~VAR[i][1]})~FI"
     }
   }

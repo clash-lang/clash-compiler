@@ -2,7 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2019     , Gergő Érdi
                   2016-2019, Myrtle Software Ltd,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -38,6 +38,8 @@ module Clash.Sized.Internal.BitVector
   , ge##
   , gt##
   , le##
+    -- *** Enum
+  , toEnum##
     -- *** Num
   , fromInteger##
     -- *** Bits
@@ -80,6 +82,9 @@ module Clash.Sized.Internal.BitVector
   , ge#
   , gt#
   , le#
+    -- *** Enum
+  , toEnum#
+  , fromEnum#
     -- *** Enum (not synthesizable)
   , enumFrom#
   , enumFromThen#
@@ -178,6 +183,7 @@ import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
                                    coarbitraryIntegral, shrinkIntegral)
 
+import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import Clash.Class.Resize         (Resize (..))
@@ -306,8 +312,13 @@ le## b1 b2 = le# (pack# b1) (pack# b2)
 {-# NOINLINE le## #-}
 
 instance Enum Bit where
-  toEnum     = fromInteger## 0## . toInteger
+  toEnum     = toEnum##
   fromEnum b = if eq## b low then 0 else 1
+
+toEnum## :: Int -> Bit
+toEnum## = fromInteger## 0## . toInteger
+{-# NOINLINE toEnum## #-}
+{-# ANN toEnum## hasBlackBox #-}
 
 instance Bounded Bit where
   minBound = low
@@ -537,12 +548,22 @@ le#  bv1 bv2 = undefErrorI "<=" bv1 bv2
 instance KnownNat n => Enum (BitVector n) where
   succ           = (+# fromInteger# 0 1)
   pred           = (-# fromInteger# 0 1)
-  toEnum         = fromInteger# 0 . toInteger
-  fromEnum       = fromEnum . toInteger#
+  toEnum         = toEnum#
+  fromEnum       = fromEnum#
   enumFrom       = enumFrom#
   enumFromThen   = enumFromThen#
   enumFromTo     = enumFromTo#
   enumFromThenTo = enumFromThenTo#
+
+toEnum# :: forall n. KnownNat n => Int -> BitVector n
+toEnum# = fromInteger# 0 . toInteger
+{-# NOINLINE toEnum# #-}
+{-# ANN toEnum# hasBlackBox #-}
+
+fromEnum# :: forall n. KnownNat n => BitVector n -> Int
+fromEnum# = fromEnum . toInteger#
+{-# NOINLINE fromEnum# #-}
+{-# ANN fromEnum# hasBlackBox #-}
 
 enumFrom# :: forall n. KnownNat n => BitVector n -> [BitVector n]
 enumFrom# (BV 0 x) = map (BV 0 . (`mod` m)) [x .. unsafeToNatural (maxBound :: BitVector n)]
