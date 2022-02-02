@@ -1,8 +1,9 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
-                    2017     , Myrtle Software Ltd
+                    2017     , Myrtle Software Ltd,
+                    2021     , QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Parser definitions for BlackBox templates
 -}
@@ -128,6 +129,7 @@ pTagE =  Result            <$  string "~RESULT"
      <|> IsSync            <$> (string "~ISSYNC" *> brackets' natural')
      <|> IsInitDefined     <$> (string "~ISINITDEFINED" *> brackets' natural')
      <|> CtxName           <$  string "~CTXNAME"
+     <|> LongestPeriod     <$  string "~LONGESTPERIOD"
 
 natural' :: TokenParsing m => m Int
 natural' = fmap fromInteger natural

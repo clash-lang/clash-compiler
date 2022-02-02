@@ -99,6 +99,7 @@ data VerilogState =
     , _hdlsyn    :: HdlSyn
     , _undefValue :: Maybe (Maybe Int)
     , _aggressiveXOptBB_ :: AggressiveXOptBB
+    , _domainConfigurations_ :: DomainMap
     }
 
 makeLenses ''VerilogState
@@ -121,6 +122,7 @@ instance Backend VerilogState where
     , _hdlsyn=opt_hdlSyn opts
     , _undefValue=opt_forceUndefined opts
     , _aggressiveXOptBB_=coerce (opt_aggressiveXOptBB opts)
+    , _domainConfigurations_=emptyDomainMap
     }
   hdlKind         = const Verilog
   primDirs        = const $ do root <- primsRoot
@@ -184,6 +186,8 @@ instance Backend VerilogState where
   ifThenElseExpr _ = True
   aggressiveXOptBB = use aggressiveXOptBB_
   renderEnums = pure (RenderEnums False)
+  domainConfigurations = use domainConfigurations_
+  setDomainConfigurations confs s = s {_domainConfigurations_ = confs}
 
 type VerilogM a = Ap (State VerilogState) a
 

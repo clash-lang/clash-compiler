@@ -77,7 +77,7 @@ always begin
   // Delay of 1 mitigates race conditions (https://github.com/steveicarus/iverilog/issues/160)
   #1 ~SYM[0] = ~IF~ACTIVEEDGE[Rising][0]~THEN 0 ~ELSE 1 ~FI;
   `ifndef VERILATOR
-  #30000 forever begin
+  #~LONGESTPERIOD0 forever begin
     if (~ ~ARG[1]) begin
       $finish;
     end
@@ -94,7 +94,7 @@ end
 `ifdef VERILATOR
   `systemc_interface
   CData ~SYM[2](vluint32_t half_period, bool active_rising, bool result_rec) {
-    static vluint32_t init_wait = 30000;
+    static vluint32_t init_wait = ~LONGESTPERIOD0;
     static vluint32_t to_wait = 0;
     static CData clock = active_rising ? 0 : 1;
 

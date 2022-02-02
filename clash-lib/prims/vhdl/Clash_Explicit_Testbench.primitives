@@ -175,7 +175,7 @@ end block;
   constant ~GENSYM[half_periodL][2] : time := ~PERIOD[0]000 fs - ~SYM[1];
 begin
   ~RESULT <= ~IF~ACTIVEEDGE[Rising][0]~THEN'0'~ELSE'1'~FI;
-  wait for 3000 ps;
+  wait for ~LONGESTPERIOD ps;
   while ~ARG[1] loop
     ~RESULT <= not ~RESULT;
     wait for ~SYM[1];

@@ -1,0 +1,1 @@
+FIXED: Clash now generates clock generators that ensure that the amount of time between simulation start and the first active edge of the clock is equal to (/or longer than/) the period of the clock. The first active edges of the clocks do still occur simultaneously. [#2001](https://github.com/clash-lang/clash-compiler/issues/2001)

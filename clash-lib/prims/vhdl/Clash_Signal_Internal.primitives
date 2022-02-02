@@ -145,7 +145,7 @@ end process;~FI~FI
   constant ~GENSYM[half_periodL][2] : time := ~PERIOD[0]000 fs - ~SYM[1];
 begin
   ~RESULT <= ~IF~ACTIVEEDGE[Rising][0]~THEN'0'~ELSE'1'~FI;
-  wait for 3000 ps;
+  wait for ~LONGESTPERIOD ps;
   loop
     ~RESULT <= not ~RESULT;
     wait for ~SYM[1];
@@ -165,10 +165,15 @@ end process;
     , "type" : "resetGenN :: (KnownDomain dom, 1 <= n) => SNat n -> Reset dom"
     , "template" :
 "-- resetGen begin
+~GENSYM[resetGen][0] : block
+  constant ~GENSYM[reset_delay][1] : time := ~LONGESTPERIOD ps - 1 ps + (integer'(~LIT[2]) * ~PERIOD[0] ps);
+begin
 -- pragma translate_off
-~RESULT <= ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI,
-         ~IF ~ISACTIVEHIGH[0] ~THEN '0' ~ELSE '1' ~FI after ~IF~ISSYNC[0]~THEN(2999 ps + (integer'(~LIT[2]) * ~PERIOD[0] ps))~ELSE(3001 ps + integer'(~LIT[2] - 1) * ~PERIOD[0] ps)~FI;
+~RESULT
+  <= ~IF ~ISACTIVEHIGH[0] ~THEN'1'~ELSE'0'~FI,
+     ~IF ~ISACTIVEHIGH[0] ~THEN'0'~ELSE'1'~FI after ~SYM[1];
 -- pragma translate_on
+end block;
 -- resetGen end"
     }
   }

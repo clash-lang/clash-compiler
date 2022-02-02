@@ -1,7 +1,7 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd,
-                    2022     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -171,6 +171,8 @@ data Element
   -- ^ Tag of a domain.
   | Period !Int
   -- ^ Period of a domain.
+  | LongestPeriod
+  -- ^ Longest period of all known domains
   | ActiveEdge !Signal.ActiveEdge !Int
   -- ^ Test active edge of memory elements in a certain domain
   | IsSync !Int
