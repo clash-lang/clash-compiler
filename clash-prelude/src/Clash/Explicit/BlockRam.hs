@@ -377,6 +377,7 @@ This concludes the short introduction to using 'blockRam'.
 
 -}
 
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
@@ -424,6 +425,7 @@ import           GHC.Arr
 import qualified Data.Sequence          as Seq
 import           Data.Sequence          (Seq)
 import           Data.Tuple             (swap)
+import           GHC.Generics           (Generic)
 import           GHC.Stack              (HasCallStack, withFrozenCallStack)
 import           GHC.TypeLits           (KnownNat, type (^), type (<=))
 import           Unsafe.Coerce          (unsafeCoerce)
@@ -1112,6 +1114,7 @@ readNew clk rst en ram rdAddr wrM = mux wasSame wasWritten $ ram rdAddr wrM
 
 
 data RamOp n a = RamRead (Index n) | RamWrite (Index n) a
+  deriving (Generic, NFDataX)
 
 ramOpAddr :: RamOp n a -> Index n
 ramOpAddr (RamRead addr)    = addr
