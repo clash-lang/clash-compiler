@@ -1,8 +1,9 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
-                     2016-2017, Myrtle Software Ltd
+                     2016-2017, Myrtle Software Ltd,
+                     2021-2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
@@ -232,6 +233,12 @@ ghcTypeToHWType iw = go
           let filtered = [replicate sz1 (isVoid, fElHWTy)]
           return (FilteredHWType vecHWTy filtered)
 
+        "Clash.Explicit.BlockRam.Internal.MemBlob" -> do
+          let [nTy, mTy] = args
+          n0 <- liftE (tyNatSize m nTy)
+          m0 <- liftE (tyNatSize m mTy)
+          returnN (MemBlob (fromInteger n0) (fromInteger m0))
+
         "Clash.Sized.RTree.RTree" -> do
           let [szTy,elTy] = args
           sz0     <- liftE (tyNatSize m szTy)
@@ -252,6 +259,7 @@ ghcTypeToHWType iw = go
           return (FilteredHWType vecHWTy filtered)
 
         "String" -> returnN String
+        "GHC.Prim.Addr#" -> returnN String
         "GHC.Types.[]" -> case tyView (head args) of
           (TyConApp (nameOcc -> "GHC.Types.Char") []) -> returnN String
           _ -> throwE $ "Can't translate type: " ++ showPpr ty

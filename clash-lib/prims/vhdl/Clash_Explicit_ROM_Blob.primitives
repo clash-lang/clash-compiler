@@ -1,0 +1,35 @@
+[ { "BlackBox" :
+    { "name" : "Clash.Explicit.ROM.Blob.romBlob#"
+    , "kind" : "Declaration"
+    , "type" :
+"romBlob#
+  :: KnownDomain dom  --       ARG[0]
+  => Clock dom        -- clk,  ARG[1]
+  -> Enable dom       -- en,   ARG[2]
+  -> MemBlob n m      -- init, ARG[3]
+  -> Signal dom Int   -- rd,   ARG[4]
+  -> Signal dom (BitVector m)"
+    , "template" :
+"-- romBlob begin
+~GENSYM[~COMPNAME_rom][1] : block
+  signal ~GENSYM[ROM][2] : ~TYP[3];
+  signal ~GENSYM[rd][3]  : integer range 0 to ~LENGTH[~TYP[3]]-1;
+begin
+  ~SYM[2] <= ~CONST[3];
+
+  ~SYM[3] <= to_integer(~VAR[rdI][4](31 downto 0))
+  -- pragma translate_off
+                mod ~LENGTH[~TYP[3]]
+  -- pragma translate_on
+                ;
+  ~GENSYM[romSync][6] : process (~ARG[1])
+  begin
+    if (~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[1])~IF~ISACTIVEENABLE[2]~THEN and ~ARG[2]~ELSE~FI) then
+      ~RESULT <= ~SYM[2](~SYM[3]);
+    end if;
+  end process;
+end block;
+-- romBlob end"
+    }
+  }
+]

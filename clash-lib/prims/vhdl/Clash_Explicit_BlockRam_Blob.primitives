@@ -1,0 +1,46 @@
+[ { "BlackBox" :
+    { "name" : "Clash.Explicit.BlockRam.Blob.blockRamBlob#"
+    , "kind" : "Declaration"
+    , "type" :
+"blockRamBlob#
+  :: KnownDomain dom           --       ARG[0]
+  => Clock dom                 -- clk,  ARG[1]
+  -> Enable dom                -- en,   ARG[2]
+  -> MemBlob n m               -- init, ARG[3]
+  -> Signal dom Int            -- rd,   ARG[4]
+  -> Signal dom Bool           -- wren, ARG[5]
+  -> Signal dom Int            -- wr,   ARG[6]
+  -> Signal dom (BitVector m)  -- din,  ARG[7]
+  -> Signal dom (BitVector m)"
+    , "template" :
+"-- blockRamBlob begin
+~GENSYM[~RESULT_blockRam][1] : block
+  signal ~GENSYM[~RESULT_RAM][2] : ~TYP[3] := ~CONST[3];
+  signal ~GENSYM[rd][4]  : integer range 0 to ~LENGTH[~TYP[3]] - 1;
+  signal ~GENSYM[wr][5]  : integer range 0 to ~LENGTH[~TYP[3]] - 1;
+begin
+  ~SYM[4] <= to_integer(~VAR[rdI][4](31 downto 0))
+  -- pragma translate_off
+                mod ~LENGTH[~TYP[3]]
+  -- pragma translate_on
+                ;
+
+  ~SYM[5] <= to_integer(~VAR[wrI][6](31 downto 0))
+  -- pragma translate_off
+                mod ~LENGTH[~TYP[3]]
+  -- pragma translate_on
+                ;
+  ~SYM[6] : process(~ARG[1])
+  begin
+    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[1]) then
+      if ~ARG[5]~IF~ISACTIVEENABLE[2]~THEN and ~ARG[2]~ELSE~FI then
+        ~SYM[2](~SYM[5]) <= ~ARG[7];
+      end if;
+      ~RESULT <= ~SYM[2](~SYM[4]);
+    end if;
+  end process;
+end block;
+-- blockRamBlob end"
+    }
+  }
+]

@@ -1,8 +1,9 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
-                    2017     , Myrtle Software Ltd
+                    2017     , Myrtle Software Ltd,
+                    2022     , QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Types used in BlackBox modules
 -}
@@ -130,7 +131,7 @@ data Element
   | Err !(Maybe Int)
   -- ^ Error value hole
   | TypElem !Element
-  -- ^ Select element type from a vector type
+  -- ^ Select element type from a vector-like type
   | CompName
   -- ^ Hole for the name of the component in which the blackbox is instantiated
   | IncludeName !Int
@@ -139,11 +140,11 @@ data Element
   | Size !Element
   -- ^ Size of a type hole
   | Length !Element
-  -- ^ Length of a vector hole
+  -- ^ Length of a vector-like hole
   | Depth !Element
   -- ^ Depth of a tree hole
   | MaxIndex !Element
-  -- ^ Max index into a vector
+  -- ^ Max index into a vector-like type
   | FilePath !Element
   -- ^ Hole containing a filepath for a data file
   | Template [Element] [Element]

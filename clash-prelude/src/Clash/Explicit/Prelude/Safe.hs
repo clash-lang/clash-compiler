@@ -2,7 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.
                   2019     , Myrtle Software Ltd,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -34,12 +34,25 @@ module Clash.Explicit.Prelude.Safe
   , asyncRomPow2
   , rom
   , romPow2
+    -- ** ROMs defined by a 'MemBlob'
+  , asyncRomBlob
+  , asyncRomBlobPow2
+  , romBlob
+  , romBlobPow2
     -- * RAM primitives with a combinational read port
   , asyncRam
   , asyncRamPow2
     -- * BlockRAM primitives
   , blockRam
   , blockRamPow2
+    -- ** BlockRAM primitives initialized with a 'MemBlob'
+  , blockRamBlob
+  , blockRamBlobPow2
+    -- *** Creating and inspecting 'MemBlob'
+  , MemBlob
+  , createMemBlob
+  , memBlobTH
+  , unpackMemBlob
     -- ** BlockRAM read/write conflict resolution
   , readNew
     -- * Utility functions
@@ -110,14 +123,17 @@ import Clash.Class.Resize
 import Clash.NamedTypes
 
 import Clash.Explicit.BlockRam
+import Clash.Explicit.BlockRam.Blob
 import Clash.Explicit.Mealy
 import Clash.Explicit.Moore
 import Clash.Explicit.RAM
 import Clash.Explicit.ROM
+import Clash.Explicit.ROM.Blob
 import Clash.Explicit.Signal
 import Clash.Explicit.Signal.Delayed
 import Clash.Explicit.Synchronizer
   (dualFlipFlopSynchronizer, asyncFIFOSynchronizer)
+import Clash.Prelude.ROM.Blob (asyncRomBlob, asyncRomBlobPow2)
 import Clash.Prelude.ROM             (asyncRom, asyncRomPow2)
 import Clash.Promoted.Nat
 import Clash.Promoted.Nat.TH

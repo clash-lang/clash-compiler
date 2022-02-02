@@ -6,6 +6,7 @@ import qualified Clash.Tests.AutoReg
 import qualified Clash.Tests.BitPack
 import qualified Clash.Tests.BitVector
 import qualified Clash.Tests.BlockRam
+import qualified Clash.Tests.BlockRam.Blob
 import qualified Clash.Tests.Counter
 import qualified Clash.Tests.DerivingDataRepr
 import qualified Clash.Tests.Fixed
@@ -30,6 +31,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.BitPack.tests
   , Clash.Tests.BitVector.tests
   , Clash.Tests.BlockRam.tests
+  , Clash.Tests.BlockRam.Blob.tests
   , Clash.Tests.Counter.tests
   , Clash.Tests.DerivingDataRepr.tests
   , Clash.Tests.Fixed.tests

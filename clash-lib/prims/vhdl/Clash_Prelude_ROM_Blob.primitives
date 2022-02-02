@@ -1,0 +1,27 @@
+[ { "BlackBox" :
+    { "name" : "Clash.Prelude.ROM.Blob.asyncRomBlob#"
+    , "kind" : "Declaration"
+    , "type" :
+"asyncRomBlob#
+  :: MemBlob n m  -- ARG[0]
+  -> Int          -- ARG[1]
+  -> BitVector m"
+    , "template" :
+"-- asyncRomBlob begin
+~GENSYM[asyncRom][0] : block
+  signal ~GENSYM[ROM][1] : ~TYP[0];
+  signal ~GENSYM[rd][2] : integer range 0 to ~LENGTH[~TYP[0]]-1;
+begin
+  ~SYM[1] <= ~CONST[0];
+
+  ~SYM[2] <= to_integer(~VAR[rdI][1](31 downto 0))
+  -- pragma translate_off
+                      mod ~LENGTH[~TYP[0]]
+  -- pragma translate_on
+                      ;
+  ~RESULT <= ~SYM[1](~SYM[2]);
+end block;
+-- asyncRomBlob end"
+    }
+  }
+]

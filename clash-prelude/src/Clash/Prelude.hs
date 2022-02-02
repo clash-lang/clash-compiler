@@ -2,7 +2,7 @@
   Copyright   :  (C) 2013-2016, University of Twente,
                      2017-2019, Myrtle Software Ltd
                      2017     , Google Inc.,
-                     2021     , QBayLogic B.V.
+                     2021-2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -60,7 +60,12 @@ module Clash.Prelude
   , asyncRomPow2
   , rom
   , romPow2
-    -- ** ROMs initialized with a data file
+    -- ** ROMs defined by a 'MemBlob'
+  , asyncRomBlob
+  , asyncRomBlobPow2
+  , romBlob
+  , romBlobPow2
+    -- ** ROMs defined by a data file
   , asyncRomFile
   , asyncRomFilePow2
   , romFile
@@ -74,6 +79,14 @@ module Clash.Prelude
   , blockRamU
   , blockRam1
   , E.ResetStrategy(..)
+    -- ** BlockRAM primitives initialized with a 'MemBlob'
+  , blockRamBlob
+  , blockRamBlobPow2
+    -- *** Creating and inspecting 'MemBlob'
+  , MemBlob
+  , createMemBlob
+  , memBlobTH
+  , unpackMemBlob
     -- ** BlockRAM primitives initialized with a data file
   , blockRamFile
   , blockRamFilePow2
@@ -176,7 +189,9 @@ import           Clash.Hidden
 import           Clash.Magic
 import           Clash.NamedTypes
 import           Clash.Prelude.BlockRam
+import           Clash.Prelude.BlockRam.Blob
 import           Clash.Prelude.BlockRam.File
+import           Clash.Prelude.ROM.Blob
 import           Clash.Prelude.ROM.File
 import           Clash.Prelude.Safe
 #ifdef CLASH_MULTIPLE_HIDDEN
