@@ -107,7 +107,7 @@ RUN git clone https://github.com/verilator/verilator verilator \
 
 FROM builder AS build-ghc
 
-ARG ghcup_version="0.1.15.2"
+ARG ghcup_version="0.1.17.4"
 
 # Must be explicitly set
 ARG ghc_version

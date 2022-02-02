@@ -1,5 +1,5 @@
 .common:
-  image: ghcr.io/clash-lang/clash-ci-$GHC_VERSION:2022-01-25
+  image: ghcr.io/clash-lang/clash-ci-$GHC_VERSION:2022-02-02
   timeout: 2 hours
   stage: build
   variables:
