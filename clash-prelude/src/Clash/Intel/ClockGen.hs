@@ -1,8 +1,9 @@
 {-|
 Copyright  :  (C) 2017-2018, Google Inc
                   2019     , Myrtle Software
+                  2022     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 PLL and other clock-related components for Intel (Altera) FPGAs
 -}
@@ -14,6 +15,7 @@ module Clash.Intel.ClockGen
   , alteraPll
   ) where
 
+import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Clocks           (Clocks (..))
 import Clash.Promoted.Symbol  (SSymbol)
 import Clash.Signal.Internal
@@ -57,6 +59,7 @@ altpll
   -- ^ (Stable PLL clock, PLL lock)
 altpll !_ = knownDomain @domIn `seq` knownDomain @domOut `seq` clocks
 {-# NOINLINE altpll #-}
+{-# ANN altpll hasBlackBox #-}
 
 -- | A clock source that corresponds to the Intel/Quartus \"Altera PLL\"
 -- component (Arria V, Stratix V, Cyclone V) with settings to provide a stable
@@ -100,3 +103,4 @@ alteraPll
   -> t
 alteraPll !_ = clocks
 {-# NOINLINE alteraPll #-}
+{-# ANN alteraPll hasBlackBox #-}

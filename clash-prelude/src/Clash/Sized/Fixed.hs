@@ -171,7 +171,7 @@ import Clash.XException
 -- The 'Num' operators for this type saturate to 'maxBound' on overflow and
 -- 'minBound' on underflow, and use truncation as the rounding method.
 --
--- Fixed has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+-- Fixed has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html type role>
 --
 -- >>> :i Fixed
 -- type role Fixed representational nominal nominal

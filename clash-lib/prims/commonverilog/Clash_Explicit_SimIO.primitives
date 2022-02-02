@@ -126,7 +126,7 @@ $finish_and_return(~LIT[0]);
     }
   }
 , { "Primitive" :
-    { "name"     : "Clash.Explicit.SimIO.unSimIO#"
+    { "name"     : "Clash.Explicit.SimIO.unSimIO"
     , "primType" : "Function"
     }
   }

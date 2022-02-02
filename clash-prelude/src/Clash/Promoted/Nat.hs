@@ -1,8 +1,9 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016     , Myrtle Software Ltd
+                  2022     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE AllowAmbiguousTypes #-}
@@ -82,6 +83,8 @@ import Language.Haskell.TH.Compat
 #endif
 import Numeric.Natural    (Natural)
 import Unsafe.Coerce      (unsafeCoerce)
+
+import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.XException   (ShowX (..), showsPrecXWith)
 
 {- $setup
@@ -265,6 +268,7 @@ infixl 7 `mulSNat`
 powSNat :: SNat a -> SNat b -> SNat (a^b)
 powSNat SNat SNat = SNat
 {-# NOINLINE powSNat #-}
+{-# ANN powSNat hasBlackBox #-}
 infixr 8 `powSNat`
 
 -- | Division of two singleton natural numbers
@@ -292,6 +296,7 @@ flogBaseSNat :: (2 <= base, 1 <= x)
              -> SNat (FLog base x)
 flogBaseSNat SNat SNat = SNat
 {-# NOINLINE flogBaseSNat #-}
+{-# ANN flogBaseSNat hasBlackBox #-}
 
 -- | Ceiling of the logarithm of a natural number
 clogBaseSNat :: (2 <= base, 1 <= x)
@@ -300,6 +305,7 @@ clogBaseSNat :: (2 <= base, 1 <= x)
              -> SNat (CLog base x)
 clogBaseSNat SNat SNat = SNat
 {-# NOINLINE clogBaseSNat #-}
+{-# ANN clogBaseSNat hasBlackBox #-}
 
 -- | Exact integer logarithm of a natural number
 --
@@ -310,6 +316,7 @@ logBaseSNat :: (FLog base x ~ CLog base x)
             -> SNat (Log base x)
 logBaseSNat SNat SNat = SNat
 {-# NOINLINE logBaseSNat #-}
+{-# ANN logBaseSNat hasBlackBox #-}
 
 -- | Power of two of a singleton natural number
 pow2SNat :: SNat a -> SNat (2^a)

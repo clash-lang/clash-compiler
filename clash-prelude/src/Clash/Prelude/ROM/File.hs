@@ -2,7 +2,7 @@
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.,
                   2019     , Myrtle Software Ltd,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -98,6 +98,7 @@ import           Data.Array                   (listArray,(!))
 import           GHC.TypeLits                 (KnownNat)
 import           System.IO.Unsafe             (unsafePerformIO)
 
+import           Clash.Annotations.Primitive (hasBlackBox)
 import           Clash.Explicit.BlockRam.File (initMem, memFile)
 import qualified Clash.Explicit.ROM.File      as E
 import           Clash.Promoted.Nat           (SNat (..), pow2SNat, snatToNum)
@@ -253,6 +254,7 @@ asyncRomFile# sz file = (content !) -- Leave "(content !)" eta-reduced, see
     content = listArray (0,szI-1) mem
     szI     = snatToNum sz
 {-# NOINLINE asyncRomFile# #-}
+{-# ANN asyncRomFile# hasBlackBox #-}
 
 -- | A ROM with a synchronous read port, with space for @n@ elements
 --

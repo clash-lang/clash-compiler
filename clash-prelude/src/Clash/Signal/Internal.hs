@@ -675,7 +675,7 @@ because some VHDL simulators don't support fractions of picoseconds.
 * __NB__: Whether 'System' has good defaults depends on your target platform.
 Check out 'IntelSystem' and 'XilinxSystem' too!
 
-Signals have the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+Signals have the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html type role>
 
 >>> :i Signal
 type role Signal nominal representational

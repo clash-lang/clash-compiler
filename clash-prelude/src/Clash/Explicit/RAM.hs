@@ -35,6 +35,7 @@ import GHC.Stack             (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits          (KnownNat)
 import qualified Data.Sequence as Seq
 
+import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Explicit.Signal (unbundle, KnownDomain, andEnable)
 import Clash.Promoted.Nat    (SNat (..), snatToNum, pow2SNat)
 import Clash.Signal.Internal (Clock (..), Signal (..), Enable, fromEnable)
@@ -214,3 +215,4 @@ asyncRam# !_ !_ en sz rd we wr din = dout
         in d <$ s
     {-# INLINE safeUpdate #-}
 {-# NOINLINE asyncRam# #-}
+{-# ANN asyncRam# hasBlackBox #-}

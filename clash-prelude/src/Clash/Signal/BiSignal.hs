@@ -1,8 +1,9 @@
 {-|
 Copyright  :  (C) 2017, Google Inc.
                   2019, Myrtle Software Ltd
+                  2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Wires are fundamentally bidirectional, and in traditional HDLs we can exploit
 this aspect by explicitly marking the endpoint, or port, of such a wire as
@@ -119,6 +120,7 @@ import           Data.Kind                  (Type)
 import           Data.List                  (intercalate)
 import           Data.Maybe                 (fromMaybe,isJust)
 
+import           Clash.Annotations.Primitive (hasBlackBox)
 import           Clash.Class.HasDomain
 import           Clash.Class.BitPack        (BitPack (..))
 import           Clash.Sized.BitVector      (BitVector)
@@ -175,7 +177,7 @@ instance HasBiSignalDefault 'Floating where
 type role BiSignalIn nominal nominal nominal
 
 -- | The /in/ part of an __inout__ port.
--- BiSignalIn has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+-- BiSignalIn has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html type role>
 --
 -- >>> :i BiSignalIn
 -- type role BiSignalIn nominal nominal nominal
@@ -193,7 +195,7 @@ type role BiSignalOut nominal nominal nominal
 -- Wraps (multiple) writing signals. The semantics are such that only one of
 -- the signals may write at a single time step.
 --
--- BiSignalOut has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+-- BiSignalOut has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html type role>
 --
 -- >>> :i BiSignalOut
 -- type role BiSignalOut nominal nominal nominal
@@ -244,6 +246,7 @@ readFromBiSignal# (BiSignalIn ds s) =
     SPullDown  -> fromMaybe minBound <$> s
     SPullUp    -> fromMaybe maxBound <$> s
 {-# NOINLINE readFromBiSignal# #-}
+{-# ANN readFromBiSignal# hasBlackBox #-}
 
 -- | Read the value from an __inout__ port
 readFromBiSignal
@@ -263,6 +266,7 @@ mergeBiSignalOuts
   -> BiSignalOut defaultState dom m
 mergeBiSignalOuts = mconcat . V.toList
 {-# NOINLINE mergeBiSignalOuts #-}
+{-# ANN mergeBiSignalOuts hasBlackBox #-}
 
 writeToBiSignal#
   :: HasCallStack
@@ -274,6 +278,7 @@ writeToBiSignal#
 -- writeToBiSignal# = writeToBiSignal#
 writeToBiSignal# _ maybeSignal _ _ = BiSignalOut [maybeSignal]
 {-# NOINLINE writeToBiSignal# #-}
+{-# ANN writeToBiSignal# hasBlackBox #-}
 
 -- | Write to an __inout__ port
 writeToBiSignal
@@ -320,3 +325,4 @@ veryUnsafeToBiSignalIn (BiSignalOut signals) = prepend# result biSignalOut'
     -- Recursive step
     biSignalOut' = veryUnsafeToBiSignalIn $ BiSignalOut $ map tail# signals
 {-# NOINLINE veryUnsafeToBiSignalIn #-}
+{-# ANN veryUnsafeToBiSignalIn hasBlackBox #-}

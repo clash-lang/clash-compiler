@@ -91,7 +91,7 @@ let numbers
 -- | A synchronized signal with samples of type @a@, synchronized to clock
 -- @clk@, that has accumulated @delay@ amount of samples delay along its path.
 --
--- DSignal has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+-- DSignal has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html type role>
 --
 -- >>> :i DSignal
 -- type role DSignal nominal nominal representational

@@ -11,7 +11,7 @@
 wire ~TYPO ~GENSYM[ROM][0] [0:~LIT[0]-1];
 
 wire ~TYP[1] ~GENSYM[romflat][1];
-assign ~SYM[1] = ~LIT[1];
+assign ~SYM[1] = ~CONST[1];
 genvar ~GENSYM[i][2];
 ~GENERATE
 for (~SYM[2]=0; ~SYM[2] < ~LIT[0]; ~SYM[2]=~SYM[2]+1) begin : ~GENSYM[mk_array][3]

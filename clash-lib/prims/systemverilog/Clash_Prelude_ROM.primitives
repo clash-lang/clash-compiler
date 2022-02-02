@@ -9,7 +9,7 @@
     , "template" :
 "// asyncRom begin
 ~SIGD[~GENSYM[ROM][0]][1];
-assign ~SYM[0] = ~LIT[1];
+assign ~SYM[0] = ~CONST[1];
 
 assign ~RESULT = ~FROMBV[~SYM[0][\\~ARG[2]\\]][~TYPO];
 // asyncRom end"

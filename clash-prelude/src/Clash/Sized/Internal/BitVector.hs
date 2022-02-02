@@ -217,7 +217,7 @@ type role BitVector nominal
 -- * Bit indices are descending
 -- * 'Num' instance performs /unsigned/ arithmetic.
 --
--- BitVector has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/glasgow_exts.html#roles type role>
+-- BitVector has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html type role>
 --
 -- >>> :i BitVector
 -- type role BitVector nominal
@@ -233,6 +233,8 @@ data BitVector (n :: Nat) =
        }
   deriving (Data, Generic)
 
+{-# ANN BV hasBlackBox #-}
+
 -- * Bit
 
 -- | Bit
@@ -244,14 +246,18 @@ data Bit =
       }
   deriving (Data, Generic)
 
+{-# ANN Bit hasBlackBox #-}
+
 -- * Constructions
 -- ** Initialisation
 {-# NOINLINE high #-}
+{-# ANN high hasBlackBox #-}
 -- | logic '1'
 high :: Bit
 high = Bit 0 1
 
 {-# NOINLINE low #-}
+{-# ANN low hasBlackBox #-}
 -- | logic '0'
 low :: Bit
 low = Bit 0 0
@@ -290,10 +296,12 @@ instance Eq Bit where
 eq## :: Bit -> Bit -> Bool
 eq## b1 b2 = eq# (pack# b1) (pack# b2)
 {-# NOINLINE eq## #-}
+{-# ANN eq## hasBlackBox #-}
 
 neq## :: Bit -> Bit -> Bool
 neq## b1 b2 = neq# (pack# b1) (pack# b2)
 {-# NOINLINE neq## #-}
+{-# ANN neq## hasBlackBox #-}
 
 instance Ord Bit where
   (<)  = lt##
@@ -304,12 +312,16 @@ instance Ord Bit where
 lt##,ge##,gt##,le## :: Bit -> Bit -> Bool
 lt## b1 b2 = lt# (pack# b1) (pack# b2)
 {-# NOINLINE lt## #-}
+{-# ANN lt## hasBlackBox #-}
 ge## b1 b2 = ge# (pack# b1) (pack# b2)
 {-# NOINLINE ge## #-}
+{-# ANN ge## hasBlackBox #-}
 gt## b1 b2 = gt# (pack# b1) (pack# b2)
 {-# NOINLINE gt## #-}
+{-# ANN gt## hasBlackBox #-}
 le## b1 b2 = le# (pack# b1) (pack# b2)
 {-# NOINLINE le## #-}
+{-# ANN le## hasBlackBox #-}
 
 instance Enum Bit where
   toEnum     = toEnum##
@@ -339,6 +351,7 @@ instance Num Bit where
 fromInteger## :: Word# -> Integer -> Bit
 fromInteger## m# i = Bit ((W# m#) `mod` 2) (fromInteger i `mod` 2)
 {-# NOINLINE fromInteger## #-}
+{-# ANN fromInteger## hasBlackBox #-}
 
 instance Real Bit where
   toRational b = if eq## b low then 0 else 1
@@ -383,19 +396,23 @@ and##, or##, xor## :: Bit -> Bit -> Bit
 and## (Bit m1 v1) (Bit m2 v2) = Bit mask (v1 .&. v2 .&. complement mask)
   where mask = (m1.&.v2 .|. m1.&.m2 .|. m2.&.v1)
 {-# NOINLINE and## #-}
+{-# ANN and## hasBlackBox #-}
 
 or## (Bit m1 v1) (Bit m2 v2) = Bit mask ((v1 .|. v2) .&. complement mask)
   where mask = m1 .&. complement v2 .|.  m1.&.m2  .|.  m2 .&. complement v1
 {-# NOINLINE or## #-}
+{-# ANN or## hasBlackBox #-}
 
 xor## (Bit m1 v1) (Bit m2 v2) = Bit mask ((v1 `xor` v2) .&. complement mask)
   where mask = m1 .|. m2
 {-# NOINLINE xor## #-}
+{-# ANN xor## hasBlackBox #-}
 
 complement## :: Bit -> Bit
 complement## (Bit m v) = Bit m (complementB v .&. complementB m)
   where complementB (W# b#) = W# (int2Word# (eqWord# b# 0##))
 {-# NOINLINE complement## #-}
+{-# ANN complement## hasBlackBox #-}
 
 -- *** BitPack
 pack# :: Bit -> BitVector 1
@@ -405,6 +422,7 @@ pack# (Bit (W# m) (W# b)) = BV (NS m) (NS b)
 pack# (Bit (W# m) (W# b)) = BV (NatS# m) (NatS# b)
 #endif
 {-# NOINLINE pack# #-}
+{-# ANN pack# hasBlackBox #-}
 
 unpack# :: BitVector 1 -> Bit
 unpack# (BV m b) = Bit (go m) (go b)
@@ -417,6 +435,7 @@ unpack# (BV m b) = Bit (go m) (go b)
   go (NatJ# w) = W# (bigNatToWord w)
 #endif
 {-# NOINLINE unpack# #-}
+{-# ANN unpack# hasBlackBox #-}
 
 -- * Instances
 instance NFData (BitVector n) where
@@ -514,11 +533,13 @@ instance KnownNat n => Eq (BitVector n) where
   (/=) = neq#
 
 {-# NOINLINE eq# #-}
+{-# ANN eq# hasBlackBox #-}
 eq# :: KnownNat n => BitVector n -> BitVector n -> Bool
 eq# (BV 0 v1) (BV 0 v2 ) = v1 == v2
 eq# bv1 bv2 = undefErrorI "==" bv1 bv2
 
 {-# NOINLINE neq# #-}
+{-# ANN neq# hasBlackBox #-}
 neq# :: KnownNat n => BitVector n -> BitVector n -> Bool
 neq# (BV 0 v1) (BV 0 v2) = v1 /= v2
 neq# bv1 bv2 = undefErrorI "/=" bv1 bv2
@@ -531,15 +552,19 @@ instance KnownNat n => Ord (BitVector n) where
 
 lt#,ge#,gt#,le# :: KnownNat n => BitVector n -> BitVector n -> Bool
 {-# NOINLINE lt# #-}
+{-# ANN lt# hasBlackBox #-}
 lt# (BV 0 n) (BV 0 m) = n < m
 lt# bv1 bv2 = undefErrorI "<" bv1 bv2
 {-# NOINLINE ge# #-}
+{-# ANN ge# hasBlackBox #-}
 ge# (BV 0 n) (BV 0 m) = n >= m
 ge# bv1 bv2 = undefErrorI ">=" bv1 bv2
 {-# NOINLINE gt# #-}
+{-# ANN gt# hasBlackBox #-}
 gt# (BV 0 n) (BV 0 m) = n > m
 gt# bv1 bv2 = undefErrorI ">" bv1 bv2
 {-# NOINLINE le# #-}
+{-# ANN le# hasBlackBox #-}
 le# (BV 0 n) (BV 0 m) = n <= m
 le#  bv1 bv2 = undefErrorI "<=" bv1 bv2
 
@@ -633,10 +658,12 @@ instance KnownNat n => Bounded (BitVector n) where
 minBound# :: BitVector n
 minBound# = BV 0 0
 {-# NOINLINE minBound# #-}
+{-# ANN minBound# hasBlackBox #-}
 
 maxBound# :: forall n. KnownNat n => BitVector n
 maxBound# = let m = 1 `shiftL` natToNum @n in BV 0 (m-1)
 {-# NOINLINE maxBound# #-}
+{-# ANN maxBound# hasBlackBox #-}
 
 instance KnownNat n => Num (BitVector n) where
   (+)         = (+#)
@@ -649,6 +676,7 @@ instance KnownNat n => Num (BitVector n) where
 
 (+#),(-#),(*#) :: forall n . KnownNat n => BitVector n -> BitVector n -> BitVector n
 {-# NOINLINE (+#) #-}
+{-# ANN (+#) hasBlackBox #-}
 (+#) = go
   where
     go (BV 0 i) (BV 0 j) = BV 0 (addMod m i j)
@@ -661,6 +689,7 @@ instance KnownNat n => Num (BitVector n) where
 #endif
 
 {-# NOINLINE (-#) #-}
+{-# ANN (-#) hasBlackBox #-}
 (-#) = go
   where
     go (BV 0 i) (BV 0 j) = BV 0 (subMod m i j)
@@ -673,6 +702,7 @@ instance KnownNat n => Num (BitVector n) where
 #endif
 
 {-# NOINLINE (*#) #-}
+{-# ANN (*#) hasBlackBox #-}
 (*#) = go
  where
   go (BV 0 i) (BV 0 j) = BV 0 (mulMod2 m i j)
@@ -685,6 +715,7 @@ instance KnownNat n => Num (BitVector n) where
 #endif
 
 {-# NOINLINE negate# #-}
+{-# ANN negate# hasBlackBox #-}
 negate# :: forall n . KnownNat n => BitVector n -> BitVector n
 negate# = go
  where
@@ -698,6 +729,7 @@ negate# = go
 #endif
 
 {-# NOINLINE fromInteger# #-}
+{-# ANN fromInteger# hasBlackBox #-}
 fromInteger# :: KnownNat n => Natural -> Integer -> BitVector n
 fromInteger# m i = sz `seq` mx
   where
@@ -719,11 +751,13 @@ instance (KnownNat m, KnownNat n) => ExtendingNum (BitVector m) (BitVector n) wh
   mul = times#
 
 {-# NOINLINE plus# #-}
+{-# ANN plus# hasBlackBox #-}
 plus# :: (KnownNat m, KnownNat n) => BitVector m -> BitVector n -> BitVector (Max m n + 1)
 plus# (BV 0 a) (BV 0 b) = BV 0 (a + b)
 plus# bv1 bv2 = undefErrorP "add" bv1 bv2
 
 {-# NOINLINE minus# #-}
+{-# ANN minus# hasBlackBox #-}
 minus# :: forall m n . (KnownNat m, KnownNat n) => BitVector m -> BitVector n
                                                 -> BitVector (Max m n + 1)
 minus# = go
@@ -738,6 +772,7 @@ minus# = go
 #endif
 
 {-# NOINLINE times# #-}
+{-# ANN times# hasBlackBox #-}
 times# :: (KnownNat m, KnownNat n) => BitVector m -> BitVector n -> BitVector (m + n)
 times# (BV 0 a) (BV 0 b) = BV 0 (a * b)
 times# bv1 bv2 = undefErrorP "mul" bv1 bv2
@@ -756,13 +791,16 @@ instance KnownNat n => Integral (BitVector n) where
 
 quot#,rem# :: KnownNat n => BitVector n -> BitVector n -> BitVector n
 {-# NOINLINE quot# #-}
+{-# ANN quot# hasBlackBox #-}
 quot# (BV 0 i) (BV 0 j) = BV 0 (i `quot` j)
 quot# bv1 bv2 = undefErrorP "quot" bv1 bv2
 {-# NOINLINE rem# #-}
+{-# ANN rem# hasBlackBox #-}
 rem# (BV 0 i) (BV 0 j) = BV 0 (i `rem` j)
 rem# bv1 bv2 = undefErrorP "rem" bv1 bv2
 
 {-# NOINLINE toInteger# #-}
+{-# ANN toInteger# hasBlackBox #-}
 toInteger# :: KnownNat n => BitVector n -> Integer
 toInteger# (BV 0 i) = naturalToInteger i
 toInteger# bv = undefErrorU "toInteger" bv
@@ -801,6 +839,7 @@ countTrailingZerosBV = V.foldl (\l r -> if eq## r low then 1 + l else 0) 0 . V.b
 {-# INLINE countTrailingZerosBV #-}
 
 {-# NOINLINE reduceAnd# #-}
+{-# ANN reduceAnd# hasBlackBox #-}
 reduceAnd# :: KnownNat n => BitVector n -> Bit
 reduceAnd# bv@(BV 0 i) = Bit 0 (W# (int2Word# (dataToTag# check)))
   where
@@ -811,6 +850,7 @@ reduceAnd# bv@(BV 0 i) = Bit 0 (W# (int2Word# (dataToTag# check)))
 reduceAnd# bv = V.foldl (.&.) 1 (V.bv2v bv)
 
 {-# NOINLINE reduceOr# #-}
+{-# ANN reduceOr# hasBlackBox #-}
 reduceOr# :: KnownNat n => BitVector n -> Bit
 reduceOr# (BV 0 i) = Bit 0 (W# (int2Word# (dataToTag# check)))
   where
@@ -818,6 +858,7 @@ reduceOr# (BV 0 i) = Bit 0 (W# (int2Word# (dataToTag# check)))
 reduceOr# bv = V.foldl (.|.) 0 (V.bv2v bv)
 
 {-# NOINLINE reduceXor# #-}
+{-# ANN reduceXor# hasBlackBox #-}
 reduceXor# :: KnownNat n => BitVector n -> Bit
 reduceXor# (BV 0 i) = Bit 0 (fromIntegral (popCount i `mod` 2))
 reduceXor# bv = undefErrorU "reduceXor" bv
@@ -828,6 +869,7 @@ instance Default (BitVector n) where
 -- * Accessors
 -- ** Length information
 {-# NOINLINE size# #-}
+{-# ANN size# hasBlackBox #-}
 size# :: KnownNat n => BitVector n -> Int
 #if MIN_VERSION_base(4,15,0)
 size# bv = fromIntegral (natVal bv)
@@ -836,6 +878,7 @@ size# bv = fromInteger (natVal bv)
 #endif
 
 {-# NOINLINE maxIndex# #-}
+{-# ANN maxIndex# hasBlackBox #-}
 maxIndex# :: KnownNat n => BitVector n -> Int
 #if MIN_VERSION_base(4,15,0)
 maxIndex# bv = fromIntegral (natVal bv) - 1
@@ -845,6 +888,7 @@ maxIndex# bv = fromInteger (natVal bv) - 1
 
 -- ** Indexing
 {-# NOINLINE index# #-}
+{-# ANN index# hasBlackBox #-}
 index# :: KnownNat n => BitVector n -> Int -> Bit
 index# bv@(BV m v) i
     | i >= 0 && i < sz = Bit (W# (int2Word# (dataToTag# (testBit m i))))
@@ -864,6 +908,7 @@ index# bv@(BV m v) i
                          ]
 
 {-# NOINLINE msb# #-}
+{-# ANN msb# hasBlackBox #-}
 -- | MSB
 msb# :: forall n . KnownNat n => BitVector n -> Bit
 msb# (BV m v)
@@ -889,12 +934,14 @@ msb# (BV m v)
 #endif
 
 {-# NOINLINE lsb# #-}
+{-# ANN lsb# hasBlackBox #-}
 -- | LSB
 lsb# :: BitVector n -> Bit
 lsb# (BV m v) = Bit (W# (int2Word# (dataToTag# (testBit m 0))))
                     (W# (int2Word# (dataToTag# (testBit v 0))))
 
 {-# NOINLINE slice# #-}
+{-# ANN slice# hasBlackBox #-}
 slice# :: BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n)
 slice# (BV msk i) m n = BV (shiftR (msk .&. mask) n')
                            (shiftR (i   .&. mask) n')
@@ -908,6 +955,7 @@ slice# (BV msk i) m n = BV (shiftR (msk .&. mask) n')
 
 -- ** Concatenation
 {-# NOINLINE (++#) #-}
+{-# ANN (++#) hasBlackBox #-}
 -- | Concatenate two 'BitVector's
 (++#) :: KnownNat m => BitVector n -> BitVector m -> BitVector (n + m)
 (BV m1 v1) ++# bv2@(BV m2 v2) = BV (m1' .|. m2) (v1' .|. v2)
@@ -924,6 +972,7 @@ slice# (BV msk i) m n = BV (shiftR (msk .&. mask) n')
 
 -- * Modifying BitVectors
 {-# NOINLINE replaceBit# #-}
+{-# ANN replaceBit# hasBlackBox #-}
 replaceBit# :: KnownNat n => BitVector n -> Int -> Bit -> BitVector n
 replaceBit# bv@(BV m v) i (Bit mb b)
 #if MIN_VERSION_base(4,15,0)
@@ -947,6 +996,7 @@ replaceBit# bv@(BV m v) i (Bit mb b)
                           ]
 
 {-# NOINLINE setSlice# #-}
+{-# ANN setSlice# hasBlackBox #-}
 setSlice#
   :: forall m i n
    . SNat (m + 1 + i)
@@ -968,6 +1018,7 @@ setSlice# SNat =
   complementN = complementMod (natVal (Proxy @(m + 1 + i)))
 
 {-# NOINLINE split# #-}
+{-# ANN split# hasBlackBox #-}
 split#
   :: forall n m
    . KnownNat n
@@ -993,6 +1044,7 @@ split# (BV m i) =
 
 and#, or#, xor# :: forall n . KnownNat n => BitVector n -> BitVector n -> BitVector n
 {-# NOINLINE and# #-}
+{-# ANN and# hasBlackBox #-}
 and# =
   \(BV m1 v1) (BV m2 v2) ->
     let mask = (m1.&.v2 .|. m1.&.m2 .|. m2.&.v1)
@@ -1001,6 +1053,7 @@ and# =
     complementN = complementMod (natVal (Proxy @n))
 
 {-# NOINLINE or# #-}
+{-# ANN or# hasBlackBox #-}
 or# =
   \(BV m1 v1) (BV m2 v2) ->
     let mask = m1 .&. complementN v2  .|.  m1.&.m2  .|.  m2 .&. complementN v1
@@ -1009,6 +1062,7 @@ or# =
     complementN = complementMod (natVal (Proxy @n))
 
 {-# NOINLINE xor# #-}
+{-# ANN xor# hasBlackBox #-}
 xor# =
   \(BV m1 v1) (BV m2 v2) ->
     let mask  = m1 .|. m2
@@ -1017,6 +1071,7 @@ xor# =
     complementN = complementMod (natVal (Proxy @n))
 
 {-# NOINLINE complement# #-}
+{-# ANN complement# hasBlackBox #-}
 complement# :: forall n . KnownNat n => BitVector n -> BitVector n
 complement# = \(BV m v) -> BV m (complementN v .&. complementN m)
   where complementN = complementMod (natVal (Proxy @n))
@@ -1025,6 +1080,7 @@ shiftL#, shiftR#, rotateL#, rotateR#
   :: forall n . KnownNat n => BitVector n -> Int -> BitVector n
 
 {-# NOINLINE shiftL# #-}
+{-# ANN shiftL# hasBlackBox #-}
 shiftL# = \(BV msk v) i ->
   if | i < 0
      -> error $ "'shiftL' undefined for negative number: " ++ show i
@@ -1042,12 +1098,14 @@ shiftL# = \(BV msk v) i ->
 #endif
 
 {-# NOINLINE shiftR# #-}
+{-# ANN shiftR# hasBlackBox #-}
 shiftR# (BV m v) i
   | i < 0     = error
               $ "'shiftR' undefined for negative number: " ++ show i
   | otherwise = BV (shiftR m i) (shiftR v i)
 
 {-# NOINLINE rotateL# #-}
+{-# ANN rotateL# hasBlackBox #-}
 rotateL# =
   \(BV msk v) b ->
     if b >= 0 then
@@ -1082,6 +1140,7 @@ rotateL# =
 #endif
 
 {-# NOINLINE rotateR# #-}
+{-# ANN rotateR# hasBlackBox #-}
 rotateR# =
   \(BV msk v) b ->
     if b >= 0 then
@@ -1137,6 +1196,7 @@ truncateB# = \(BV msk i) -> BV (msk `mod` m) (i `mod` m)
   where m = 1 `shiftL` fromInteger (natVal (Proxy @a))
 #endif
 {-# NOINLINE truncateB# #-}
+{-# ANN truncateB# hasBlackBox #-}
 
 instance KnownNat n => Lift (BitVector n) where
   lift bv@(BV m i) = sigE [| fromInteger# m $(litE (IntegerL (toInteger i))) |] (decBitVector (natVal bv))
@@ -1274,6 +1334,7 @@ checkUnpackUndef _ bv = res
     ty = typeOf res
     res = undefError (show ty ++ ".unpack") [bv]
 {-# NOINLINE checkUnpackUndef #-}
+{-# ANN checkUnpackUndef hasBlackBox #-}
 
 -- | Create a BitVector with all its bits undefined
 undefined# :: forall n . KnownNat n => BitVector n
@@ -1285,6 +1346,7 @@ undefined# =
 #endif
   in  BV (m-1) 0
 {-# NOINLINE undefined# #-}
+{-# ANN undefined# hasBlackBox #-}
 
 -- | Check if one BitVector is similar to another, interpreting undefined bits
 -- in the second argument as being "don't care" bits. This is a more lenient

@@ -2,7 +2,7 @@
 Copyright  :  (C) 2016,      University of Twente,
                   2017,      QBayLogic, Google Inc.
                   2017-2019, Myrtle Software Ltd,
-                  2021,      QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -214,6 +214,7 @@ seqX :: a -> b -> b
 seqX a b = unsafeDupablePerformIO
   (catch (evaluate a >> return b) (\(XException _) -> return b))
 {-# NOINLINE seqX #-}
+{-# ANN seqX hasBlackBox #-}
 infixr 0 `seqX`
 
 -- | Like 'seqX', but will also catch ErrorCall exceptions which are thrown.
@@ -450,6 +451,7 @@ forceX x = x `deepseqX` x
 deepseqX :: NFDataX a => a -> b -> b
 deepseqX a b = rnfX a `seq` b
 {-# NOINLINE deepseqX #-}
+{-# ANN deepseqX hasBlackBox #-}
 infixr 0 `deepseqX`
 
 -- | Reduce to weak head normal form
