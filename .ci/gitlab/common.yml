@@ -3,7 +3,7 @@
   timeout: 2 hours
   stage: build
   variables:
-    CACHE_FALLBACK_KEY: $CI_JOB_NAME-master-$GHC_VERSION
+    CACHE_FALLBACK_KEY: $CI_JOB_NAME-master-$GHC_VERSION-3
     GIT_SUBMODULE_STRATEGY: recursive
     TERM: xterm-color
   retry:
