@@ -1,19 +1,21 @@
 {- Utility executable to convert "old-style" JSON primitives to "new-style"
    YAML ones. See https://github.com/clash-lang/clash-compiler/pull/2009.
 -}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeApplications, OverloadedStrings #-}
 
 module Main where
 
 import qualified Data.Aeson.Extra as AesonExtra
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.KeyMap as Aeson
 import qualified Data.Yaml as Yaml
-import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Lazy as ByteStringLazy
+import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.Set as Set
 
 import Control.Monad (forM_, when)
-import Data.ByteString (ByteString)
+import Data.ByteString.Lazy (ByteString)
+import Data.ByteString.Lazy.Search (replace)
+import Data.String (IsString)
 import System.Directory (removeFile)
 import System.Environment (getArgs)
 import System.FilePath.Glob (glob)
@@ -49,9 +51,42 @@ concatMapM f = fmap concat . mapM f
 -- | Read file and output YAML ByteString
 jsonToYaml :: FilePath -> IO ByteString
 jsonToYaml path = do
-  contents <- ByteStringLazy.readFile path
+  contents <- ByteString.readFile path
   let decoded = AesonExtra.decodeOrErrJson path contents
-  pure (Yaml.encode (decoded :: Aeson.Value))
+  pure . removeTempKey . ByteString.fromStrict . Yaml.encode . customSortOutput $ decoded
+
+{- NOTE [Sorting YAML object keys]
+
+'Yaml.encode' encodes object with their keys in alphabetical order.
+For readability we like `name` to be at the top, and `type` to be just above `template`.
+
+We accomplice this here by renaming those keys to something there sorts where
+we like them to be. And find-and-replace those temporary names back
+in the resulting ByteString.
+-}
+keySortingRenames :: IsString str => [(str,str)]
+keySortingRenames =
+  [ ("name", "aaaa_really_should_be_name_but_renamed_to_get_the_sorting_we_like")
+  , ("type", "really_should_be_type_but_renamed_to_get_the_sorting_we_like")
+  ]
+
+customSortOutput :: Aeson.Value -> Aeson.Value
+customSortOutput x = case x of
+  Aeson.Object o -> Aeson.Object $ fmap customSortOutput $ renameKeys $ o
+  Aeson.Array xs -> Aeson.Array $ fmap customSortOutput xs
+  _ -> x
+ where
+  renameKeys obj = foldl renameKey obj keySortingRenames
+  renameKey obj (kOld,kNew) =
+    case Aeson.lookup kOld obj of
+      Nothing -> obj
+      Just val -> Aeson.insert kNew val (Aeson.delete kOld obj)
+
+removeTempKey :: ByteString -> ByteString
+removeTempKey inp = foldl go inp keySortingRenames
+ where
+  go bs (orig,temp) = replace (ByteString.toStrict temp) orig bs
+
 
 main :: IO ()
 main = do
