@@ -685,7 +685,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "SigP" def{hdlSim=False}
         , outputTest "T1102A" def{hdlTargets=[VHDL]}
         , outputTest "T1102B" def{hdlTargets=[VHDL]}
-
+        , runTest "T2069" def
         , clashTestGroup "BiSignal"
           [ runTest "Counter" def
           , runTest "CounterHalfTuple" def

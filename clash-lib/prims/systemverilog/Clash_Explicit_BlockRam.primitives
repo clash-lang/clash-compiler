@@ -171,19 +171,19 @@ logic [~SIZE[~TYP[9]]-1:0] ~GENSYM[mem][0] [~LIT[1]-1:0];
 
 // Port A
 always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[6]) begin
-    ~SYM[1] <= ~SYM[0][~ARG[8]];
+    ~SYM[1] <= ~SYM[0][~IF~SIZE[~TYP[8]]~THEN~ARG[8]~ELSE0~FI];
     if(~ARG[7]) begin
         ~SYM[1] <= ~ARG[9];
-        ~SYM[0][~ARG[8]] <= ~ARG[9];
+        ~SYM[0][~IF~SIZE[~TYP[8]]~THEN~ARG[8]~ELSE0~FI] <= ~ARG[9];
     end
 end
 
 // Port B
 always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[10]) begin
-    ~SYM[2] <= ~SYM[0][~ARG[12]];
+    ~SYM[2] <= ~SYM[0][~IF~SIZE[~TYP[12]]~THEN~ARG[12]~ELSE0~FI];
     if(~ARG[11]) begin
         ~SYM[2] <= ~ARG[13];
-        ~SYM[0][~ARG[12]] <= ~ARG[13];
+        ~SYM[0][~IF~SIZE[~TYP[12]]~THEN~ARG[12]~ELSE0~FI] <= ~ARG[13];
     end
 end
 

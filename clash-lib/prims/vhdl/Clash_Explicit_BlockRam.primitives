@@ -213,9 +213,9 @@ begin
   begin
       if(rising_edge(~ARG[6])) then
           if(~ARG[7]) then
-              mem(to_integer(~ARG[8])) := ~ARG[9];
+              mem(~IF~SIZE[~TYP[8]]~THENto_integer(~ARG[8])~ELSE0~FI) := ~ARG[9];
           end if;
-          ~SYM[2] <= mem(to_integer(~ARG[8]));
+          ~SYM[2] <= mem(~IF~SIZE[~TYP[8]]~THENto_integer(~ARG[8])~ELSE0~FI);
       end if;
   end process;
 
@@ -224,9 +224,9 @@ begin
   begin
       if(rising_edge(~ARG[10])) then
           if(~ARG[11]) then
-              mem(to_integer(~ARG[12])) := ~ARG[13];
+              mem(~IF~SIZE[~TYP[12]]~THENto_integer(~ARG[12])~ELSE0~FI) := ~ARG[13];
           end if;
-          ~SYM[3] <= mem(to_integer(~ARG[12]));
+          ~SYM[3] <= mem(~IF~SIZE[~TYP[12]]~THENto_integer(~ARG[12])~ELSE0~FI);
       end if;
   end process;
 
