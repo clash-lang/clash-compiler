@@ -11,6 +11,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -23,14 +24,18 @@ import Control.Concurrent.Supply             (Supply, freshId)
 import Control.DeepSeq                       (NFData)
 import Control.Lens                          (Lens', use, (.=))
 import qualified Control.Lens as Lens
-#if !MIN_VERSION_base(4,13,0)
-import Control.Monad.Fail                    (MonadFail(fail))
-#endif
-import Control.Monad.Fix                     (MonadFix (..), fix)
+import Control.Monad.Fix                     (MonadFix)
+import Control.Monad.State.Strict            (State)
+#if MIN_VERSION_transformers(0,5,6)
 import Control.Monad.Reader                  (MonadReader (..))
 import Control.Monad.State                   (MonadState (..))
-import Control.Monad.State.Strict            (State)
+import Control.Monad.Trans.RWS.CPS           (RWST)
+import qualified Control.Monad.Trans.RWS.CPS as RWS
 import Control.Monad.Writer                  (MonadWriter (..))
+#else
+import Control.Monad.Trans.RWS.Strict        (RWST)
+import qualified Control.Monad.Trans.RWS.Strict as RWS
+#endif
 import Data.Binary                           (Binary)
 import Data.HashMap.Strict                   (HashMap)
 import Data.IntMap.Strict                    (IntMap)
@@ -162,47 +167,52 @@ normalizeUltra = clashEnv . Lens.to (opt_ultra . envOpts)
 -- generate fresh variables and unique identifiers. In addition, it keeps track
 -- if a transformation/rewrite has been successfully applied.
 newtype RewriteMonad extra a = R
-  { unR :: RewriteEnv -> RewriteState extra -> Any -> (a,RewriteState extra,Any) }
+  { unR :: RWST RewriteEnv Any (RewriteState extra) IO a }
+  deriving newtype
+    ( Applicative
+    , Functor
+    , Monad
+    , MonadFix
+    )
 
 -- | Run the computation in the RewriteMonad
 runR
   :: RewriteMonad extra a
   -> RewriteEnv
   -> RewriteState extra
-  -> (a, RewriteState extra, Any)
-runR m r s = unR m r s mempty
+  -> IO (a, RewriteState extra, Any)
+runR m = RWS.runRWST (unR m)
 
-instance MonadFail (RewriteMonad extra) where
-  fail err = error ("RewriteMonad.fail: " ++ err)
-
-instance Functor (RewriteMonad extra) where
-  fmap f m = R $ \ r s w -> case unR m r s w of (a, s', w') -> (f a, s', w')
-  {-# INLINE fmap #-}
-
-instance Applicative (RewriteMonad extra) where
-  pure a = R $ \ _ s w -> (a, s, w)
-  {-# INLINE pure #-}
-  R mf <*> R mx = R $ \ r s w -> case mf r s w of
-    (f,s',w') -> case mx r s' w' of
-      (x,s'',w'') -> (f x, s'', w'')
-  {-# INLINE (<*>) #-}
-
-instance Monad (RewriteMonad extra) where
-  return a = R $ \ _ s w -> (a, s, w)
-  {-# INLINE return #-}
-  m >>= k  =
-    R $ \ r s w -> case unR m r s w of
-      (a,s',w') -> unR (k a) r s' w'
-  {-# INLINE (>>=) #-}
-
+#if MIN_VERSION_transformers(0,5,6) && !MIN_VERSION_mtl(2,3,0)
+-- For Control.Monad.Trans.RWS.Strict these are already defined, however the
+-- CPS version of RWS is not included in `mtl` yet.
 
 instance MonadState (RewriteState extra) (RewriteMonad extra) where
-  get = R $ \_ s w -> (s,s,w)
+  get = R RWS.get
   {-# INLINE get #-}
-  put s = R $ \_ _ w -> ((),s,w)
+  put = R . RWS.put
   {-# INLINE put #-}
-  state f = R $ \_ s w -> case f s of (a,s') -> (a,s',w)
+  state = R . RWS.state
   {-# INLINE state #-}
+
+instance MonadWriter Any (RewriteMonad extra) where
+  writer = R . RWS.writer
+  {-# INLINE writer #-}
+  tell = R . RWS.tell
+  {-# INLINE tell #-}
+  listen = R . RWS.listen . unR
+  {-# INLINE listen #-}
+  pass = R . RWS.pass . unR
+  {-# INLINE pass #-}
+
+instance MonadReader RewriteEnv (RewriteMonad extra) where
+   ask = R RWS.ask
+   {-# INLINE ask #-}
+   local f = R . RWS.local f . unR
+   {-# INLINE local #-}
+   reader = R . RWS.reader
+   {-# INLINE reader #-}
+#endif
 
 instance MonadUnique (RewriteMonad extra) where
   getUniqueM = do
@@ -211,34 +221,9 @@ instance MonadUnique (RewriteMonad extra) where
     uniqSupply .= sup'
     a `seq` return a
 
-instance MonadWriter Any (RewriteMonad extra) where
-  writer (a,w') = R $ \_ s w -> let wt = w `mappend` w' in wt `seq` (a,s,wt)
-  {-# INLINE writer #-}
-  tell w' = R $ \_ s w -> let wt = w `mappend` w' in wt `seq` ((),s,wt)
-  {-# INLINE tell #-}
-  listen m = R $ \r s w -> case runR m r s of
-    (a,s',w') -> let wt = w `mappend` w' in wt `seq` ((a,w'),s',wt)
-  {-# INLINE listen #-}
-  pass m = R $ \r s w -> case runR m r s of
-    ((a,f),s',w') -> let wt = w `mappend` f w' in wt `seq` (a, s', wt)
-  {-# INLINE pass #-}
-
 censor :: (Any -> Any) -> RewriteMonad extra a -> RewriteMonad extra a
-censor f m = R $ \r s w -> case runR m r s of
-  (a,s',w') -> let wt = w `mappend` f w' in wt `seq` (a, s', wt)
+censor f = R . RWS.censor f . unR
 {-# INLINE censor #-}
-
-instance MonadReader RewriteEnv (RewriteMonad extra) where
-   ask = R $ \r s w -> (r,s,w)
-   {-# INLINE ask #-}
-   local f m = R $ \r s w -> unR m (f r) s w
-   {-# INLINE local #-}
-   reader f = R $ \r s w -> (f r,s,w)
-   {-# INLINE reader #-}
-
-instance MonadFix (RewriteMonad extra) where
-  mfix f = R $ \r s w -> fix $ \ ~(a,_,_) -> unR (f a) r s w
-  {-# INLINE mfix #-}
 
 data TransformContext
   = TransformContext
