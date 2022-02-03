@@ -396,7 +396,7 @@ module Clash.Prelude.BlockRam
     -- * Read/Write conflict resolution
   , readNew
   , trueDualPortBlockRam
-  ,E.RamOp (..)
+  , E.RamOp (..)
   )
 where
 
@@ -847,7 +847,7 @@ readNew = hideClockResetEnable E.readNew
 {-# INLINE readNew #-}
 
 -- | Produces vendor-agnostic HDL that will be inferred as a true, dual port
--- block ram. Any values that's being written on a particular port is also the
+-- block ram. Any values that is being written on a particular port is also the
 -- value that will be read on that port, i.e. the same-port read/write behavior
 -- is: WriteFirst. For mixed port read/write, when both ports have the same
 -- address, when there is a write on the port A, the output of port B is

@@ -14,13 +14,13 @@ import DualBlockRamTypes
 
 import Test.Tasty.Clash.CollectSimResults
 
-runTest = sampleN 330 testBench
+runTest = sampleN 250 testBench
 testBench = strictAnd <$> doneA <*> (unsafeSynchronizer clk10 clk20 doneB)
   where
     --Template haskell simulation
     processSimOutput x = replace 0 undefined# $ tail x
-    simOutA = processSimOutput $(collectSimResults 322 $ pack <$> (fst simEntityAB))
-    simOutB = processSimOutput $(collectSimResults 162 $ pack <$> (snd simEntityAB))
+    simOutA = processSimOutput $(collectSimResults 250 $ pack <$> (fst simEntityAB))
+    simOutB = processSimOutput $(collectSimResults 125 $ pack <$> (snd simEntityAB))
 
     --topEntity output
     (portA, portB) = topOut clk20 rst20 clk10 rst10

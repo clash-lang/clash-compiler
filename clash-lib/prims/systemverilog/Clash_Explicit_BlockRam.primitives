@@ -148,18 +148,19 @@ assign ~RESULT = ~FROMBV[~SYM[2]][~TYP[10]];
   , KnownDomain domA       ~ARG[2]
   , KnownDomain domB       ~ARG[3]
   , NFDataX a              ~ARG[4]
-  , BitPack a              ~ARG[5]
   ) =>
 
-  Clock domA ->                   ~ARG[6]
+  Clock domA ->                   ~ARG[5]
+  Signal domA Bool ->             ~ARG[6]
   Signal domA Bool ->             ~ARG[7]
   Signal domA (Index nAddrs) ->   ~ARG[8]
   Signal domA a ->                ~ARG[9]
 
   Clock domB ->                   ~ARG[10]
   Signal domB Bool ->             ~ARG[11]
-  Signal domB (Index nAddrs) ->   ~ARG[12]
-  Signal domB a ->                ~ARG[13]
+  Signal domB Bool ->             ~ARG[12]
+  Signal domB (Index nAddrs) ->   ~ARG[13]
+  Signal domB a ->                ~ARG[14]
   (Signal domA a, Signal domB a)"
     , "template" :
 "// trueDualPortBlockRam begin
@@ -167,23 +168,27 @@ assign ~RESULT = ~FROMBV[~SYM[2]][~TYP[10]];
 logic [~SIZE[~TYP[9]]-1:0] ~GENSYM[mem][0] [~LIT[1]-1:0];
 
 ~SIGD[~GENSYM[data_slow][1]][9];
-~SIGD[~GENSYM[data_fast][2]][13];
+~SIGD[~GENSYM[data_fast][2]][14];
 
 // Port A
-always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[6]) begin
-    ~SYM[1] <= ~SYM[0][~IF~SIZE[~TYP[8]]~THEN~ARG[8]~ELSE0~FI];
-    if(~ARG[7]) begin
-        ~SYM[1] <= ~ARG[9];
-        ~SYM[0][~IF~SIZE[~TYP[8]]~THEN~ARG[8]~ELSE0~FI] <= ~ARG[9];
+always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[5]) begin
+    if(~ARG[6]) begin
+        ~SYM[1] <= ~SYM[0][~IF~SIZE[~TYP[8]]~THEN~ARG[8]~ELSE0~FI];
+        if(~ARG[7]) begin
+            ~SYM[1] <= ~ARG[9];
+            ~SYM[0][~IF~SIZE[~TYP[8]]~THEN~ARG[8]~ELSE0~FI] <= ~ARG[9];
+        end
     end
 end
 
 // Port B
 always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[10]) begin
-    ~SYM[2] <= ~SYM[0][~IF~SIZE[~TYP[12]]~THEN~ARG[12]~ELSE0~FI];
     if(~ARG[11]) begin
-        ~SYM[2] <= ~ARG[13];
-        ~SYM[0][~IF~SIZE[~TYP[12]]~THEN~ARG[12]~ELSE0~FI] <= ~ARG[13];
+        ~SYM[2] <= ~SYM[0][~IF~SIZE[~TYP[13]]~THEN~ARG[13]~ELSE0~FI];
+        if(~ARG[12]) begin
+            ~SYM[2] <= ~ARG[14];
+            ~SYM[0][~IF~SIZE[~TYP[13]]~THEN~ARG[13]~ELSE0~FI] <= ~ARG[14];
+        end
     end
 end
 

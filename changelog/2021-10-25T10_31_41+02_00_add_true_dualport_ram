@@ -1,7 +1,11 @@
 ADDED: Added support for true dual ported block ram:
     * Implicitly clocked: `Clash.Prelude.BlockRam.trueDualPortBlockRam` and
-    * Explicitly clocked: `Clash.Explicity.BlockRam.trueDualPortBlockRam`
-Any values that's being written on a particular port is also the value that will be
-read on that port, e.i. the same-port read/write behavior is: WriteFirst. For mixed port
+    * Explicitly clocked: `Clash.Explicit.BlockRam.trueDualPortBlockRam`
+
+Any value being written on a particular port is also the value that will be read
+on that port, e.i. the same-port read/write behavior is: WriteFirst. For mixed port
 read/write, when both ports have the same address, when there is a write on the portA,
 the output of port B is undefined and vice versa.
+
+NoOp to RamOp for `Clash.Explicit.BlockRam.trueDualPortBlockRam`, which pulls the
+enable signal of trueDualPortBlockRam low for the relevant port.
