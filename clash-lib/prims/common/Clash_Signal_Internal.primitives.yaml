@@ -1,0 +1,24 @@
+- Primitive:
+    name: Clash.Signal.Internal.signal#
+    primType: Function
+    workInfo: Never
+- Primitive:
+    name: Clash.Signal.Internal.mapSignal#
+    primType: Function
+    workInfo: Never
+- Primitive:
+    name: Clash.Signal.Internal.appSignal#
+    primType: Function
+    workInfo: Never
+- Primitive:
+    name: Clash.Signal.Internal.foldr#
+    primType: Function
+    workInfo: Never
+- Primitive:
+    name: Clash.Signal.Internal.traverse#
+    primType: Function
+    workInfo: Never
+- Primitive:
+    name: Clash.Signal.Internal.joinSignal#
+    primType: Function
+    workInfo: Never

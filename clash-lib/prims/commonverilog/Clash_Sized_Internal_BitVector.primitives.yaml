@@ -1,0 +1,346 @@
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.BV
+    comment: THIS IS ONLY USED WHEN WW EXPOSES BITVECTOR INTERNALS
+    kind: Expression
+    type: 'BV :: Integer ->
+      Integer -> BitVector n'
+    template: ~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[1]]]~THEN$unsigned(~VAR[i][1][0+:~SIZE[~TYPO]])~ELSE$unsigned({{(~SIZE[~TYPO]-~SIZE[~TYP[1]])
+      {1'b0}},~VAR[i][1]})~FI
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.Bit
+    comment: THIS IS ONLY USED WHEN WW EXPOSES BIT INTERNALS
+    kind: Expression
+    type: 'Bit :: Integer
+      -> Integer -> BitVector n'
+    template: ~VAR[i][1][0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.high
+    kind: Expression
+    type: 'high :: Bit'
+    template: 1'b1
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.low
+    kind: Expression
+    type: 'low :: Bit'
+    template: 1'b0
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.pack#
+    kind: Expression
+    type: 'pack# :: Bit ->
+      BitVector 1'
+    template: ~ARG[0]
+    workInfo: Identity 0 []
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.unpack#
+    kind: Expression
+    type: 'unpack# :: BitVector
+      1 -> Bit'
+    template: ~ARG[0]
+    workInfo: Identity 0 []
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.reduceAnd#
+    kind: Expression
+    type: 'reduceAnd# :: KnownNat
+      n => BitVector n -> Bit'
+    template: ~IF~SIZE[~TYP[1]]~THEN& (~ARG[1])~ELSE1'b1~FI
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.reduceOr#
+    kind: Expression
+    type: 'reduceOr# :: KnownNat
+      n => BitVector n -> Bit'
+    template: ~IF~SIZE[~TYP[1]]~THEN| (~ARG[1])~ELSE1'b0~FI
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.reduceXor#
+    kind: Expression
+    type: 'reduceXor# :: KnownNat
+      n => BitVector n -> Bit'
+    template: ~IF~SIZE[~TYP[1]]~THEN^ (~ARG[1])~ELSE1'b0~FI
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.eq##
+    kind: Expression
+    type: 'eq## :: Bit ->
+      Bit -> Bool'
+    template: ~ARG[0] == ~ARG[1]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.neq##
+    kind: Expression
+    type: 'neq## :: Bit ->
+      Bit -> Bool'
+    template: ~ARG[0] != ~ARG[1]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.fromInteger##
+    kind: Expression
+    type: 'fromInteger## ::
+      Integer -> Integer -> Bit'
+    template: '~VAR[i][0][0] ? 1''bx : ~VAR[i][1][0]'
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.toEnum##
+    kind: Expression
+    type: 'toEnum## :: Int
+      -> Bit'
+    template: '~VAR[i][0][0] ? 1''b1 : 1''b0'
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.and##
+    kind: Expression
+    type: 'and## :: Bit ->
+      Bit -> Bit'
+    template: ~ARG[0] & ~ARG[1]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.or##
+    kind: Expression
+    type: 'or## :: Bit ->
+      Bit -> Bit'
+    template: ~ARG[0] | ~ARG[1]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.xor##
+    kind: Expression
+    type: 'xor## :: Bit ->
+      Bit -> Bit'
+    template: ~ARG[0] ^ ~ARG[1]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.complement##
+    kind: Expression
+    type: 'complement## ::
+      Bit -> Bit'
+    template: ~ ~ARG[0]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.eq#
+    kind: Expression
+    type: 'eq# :: KnownNat
+      n => BitVector n -> BitVector n -> Bool'
+    template: ~IF~SIZE[~TYP[1]]~THEN~ARG[1] == ~ARG[2]~ELSE1'b1~FI
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.neq#
+    kind: Expression
+    type: 'neq# :: KnownNat
+      n => BitVector n -> BitVector n -> Bool'
+    template: ~IF~SIZE[~TYP[1]]~THEN~ARG[1] != ~ARG[2]~ELSE1'b0~FI
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.lt#
+    kind: Expression
+    type: 'lt# :: KnownNat
+      n => BitVector n -> BitVector n -> Bool'
+    template: ~IF~SIZE[~TYP[1]]~THEN~ARG[1] < ~ARG[2]~ELSE1'b0~FI
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.ge#
+    kind: Expression
+    type: 'ge# :: KnownNat
+      n => BitVector n -> BitVector n -> Bool'
+    template: ~IF~SIZE[~TYP[1]]~THEN~ARG[1] >= ~ARG[2]~ELSE1'b1~FI
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.gt#
+    kind: Expression
+    type: 'gt# :: KnownNat
+      n => BitVector n -> BitVector n -> Bool'
+    template: ~IF~SIZE[~TYP[1]]~THEN~ARG[1] > ~ARG[2]~ELSE1'b0~FI
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.le#
+    kind: Expression
+    type: 'le# :: KnownNat
+      n => BitVector n -> BitVector n -> Bool'
+    template: ~IF~SIZE[~TYP[1]]~THEN~ARG[1] <= ~ARG[2]~ELSE1'b1~FI
+- BlackBoxHaskell:
+    name: Clash.Sized.Internal.BitVector.toInteger#
+    templateFunction: Clash.Primitives.Sized.ToInteger.bvToIntegerVerilog
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.fromEnum#
+    kind: Expression
+    type: 'fromEnum# :: KnownNat
+      n => BitVector n -> Int'
+    template: ~IF~SIZE[~TYP[1]]~THEN~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[1]]]~THEN$unsigned(~VAR[bv][1][0+:~SIZE[~TYPO]])~ELSE$unsigned({{(~SIZE[~TYPO]-~SIZE[~TYP[1]])
+      {1'b0}},~VAR[bv][1]})~FI~ELSE~SIZE[~TYPO]'sd0~FI
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.size#
+    kind: Expression
+    type: 'size# :: KnownNat
+      n => BitVector n -> Int'
+    template: ~SIZE[~TYPO]'sd~SIZE[~TYP[1]]
+    workInfo: Constant
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.maxIndex#
+    kind: Expression
+    type: 'maxIndex# :: KnownNat
+      n => BitVector n -> Int'
+    template: ~SIZE[~TYPO]'sd~SIZE[~TYP[1]] - ~SIZE[~TYPO]'sd1
+    workInfo: Constant
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.++#
+    kind: Expression
+    type: '(++#) :: KnownNat
+      m => BitVector n -> BitVector m -> BitVector (n + m)'
+    template: ~IF~AND[~SIZE[~TYP[1]],~SIZE[~TYP[2]]]~THEN{~ARG[1],~ARG[2]}~ELSE~IF~SIZE[~TYP[1]]~THEN~ARG[1]~ELSE~ARG[2]~FI~FI
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.index#
+    kind: Expression
+    type: |-
+      index# :: KnownNat n  -- ARG[0]
+              => BitVector n -- ARG[1]
+              -> Int         -- ARG[2]
+              -> Bit
+    template: ~VAR[bv][1][~ARG[2]]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.slice#
+    kind: Expression
+    type: |-
+      slice# :: BitVector (m + 1 + i) -- ARG[0]
+              -> SNat m                -- ARG[1]
+              -> SNat n                -- ARG[2]
+              -> BitVector (m + 1 - n)
+    template: '~VAR[bv][0][~LIT[1] : ~LIT[2]]'
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.msb#
+    kind: Expression
+    type: |-
+      msb# :: KnownNat n  -- ARG[0]
+            => BitVector n -- ARG[1]
+            -> Bit
+    template: ~IF ~SIZE[~TYP[1]] ~THEN ~VAR[bv][1][~SIZE[~TYP[1]]-1] ~ELSE 1'b0 ~FI
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.lsb#
+    kind: Expression
+    type: |-
+      lsb# :: BitVector n -- ARG[0]
+            -> Bit
+    template: ~IF ~SIZE[~TYP[0]] ~THEN ~VAR[bv][0][0] ~ELSE 1'b0 ~FI
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.minBound#
+    kind: Expression
+    type: 'minBound# :: BitVector
+      n'
+    template: ~SIZE[~TYPO]'d0
+    workInfo: Constant
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.maxBound#
+    kind: Expression
+    type: 'maxBound# :: KnownNat
+      n => BitVector n'
+    template: '{~SIZE[~TYPO] {1''b1}}'
+    workInfo: Constant
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.+#
+    kind: Expression
+    type: '(+#) :: KnownNat
+      n => BitVector n -> BitVector n -> BitVector n'
+    template: ~ARG[1] + ~ARG[2]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.-#
+    kind: Expression
+    type: '(-#) :: KnownNat
+      n => BitVector n -> BitVector n -> BitVector n'
+    template: ~ARG[1] - ~ARG[2]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.*#
+    kind: Expression
+    type: '(*#) :: KnownNat
+      n => BitVector n -> BitVector n -> BitVector n'
+    template: ~ARG[1] * ~ARG[2]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.negate#
+    kind: Expression
+    type: 'negate# :: KnownNat
+      n => BitVector n -> BitVector n'
+    template: -~ARG[1]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.fromInteger#
+    kind: Expression
+    type: 'fromInteger# ::
+      KnownNat n => Integer -> Integer -> BitVector n'
+    template: ~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[2]]]~THEN$unsigned(~VAR[i][2][0+:~SIZE[~TYPO]])~ELSE$unsigned({{(~SIZE[~TYPO]-~SIZE[~TYP[2]])
+      {1'b0}},~VAR[i][2]})~FI
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.toEnum#
+    kind: Expression
+    type: 'toEnum# :: KnownNat
+      n => Int -> BitVector n'
+    template: ~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[1]]]~THEN$unsigned(~VAR[i][1][0+:~SIZE[~TYPO]])~ELSE$unsigned({{(~SIZE[~TYPO]-~SIZE[~TYP[1]])
+      {1'b0}},~VAR[i][1]})~FI
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.plus#
+    kind: Declaration
+    type: 'plus# :: (KnownNat
+      m, KnownNat n) => BitVector m -> BitVector n -> BitVector (Max m n + 1)'
+    template: assign ~RESULT = ~IF~AND[~SIZE[~TYP[2]],~SIZE[~TYP[3]]]~THEN~ARG[2]
+      + ~ARG[3]~ELSE~IF~SIZE[~TYP[2]]~THEN~ARG[2]~ELSE~ARG[3]~FI~FI;
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.minus#
+    kind: Declaration
+    type: 'minus# :: (KnownNat
+      m, KnownNat n) => BitVector m -> BitVector n -> BitVector (Max m n + 1)'
+    template: assign ~RESULT = ~IF~AND[~SIZE[~TYP[2]],~SIZE[~TYP[3]]]~THEN~ARG[2]
+      - ~ARG[3]~ELSE~IF~SIZE[~TYP[2]]~THEN~ARG[2]~ELSE-~ARG[3]~FI~FI;
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.times#
+    kind: Declaration
+    type: 'times# :: (KnownNat
+      m, KnownNat n) => BitVector m -> BitVector n -> BitVector (m + n)'
+    template: assign ~RESULT = ~IF~AND[~SIZE[~TYP[2]],~SIZE[~TYP[3]]]~THEN~ARG[2]
+      * ~ARG[3]~ELSE~SIZE[~TYPO]'d0~FI;
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.quot#
+    kind: Expression
+    type: 'quot# :: KnownNat
+      n => BitVector n -> BitVector n -> BitVector n'
+    template: ~ARG[1] / ~ARG[2]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.rem#
+    kind: Expression
+    type: 'rem# :: KnownNat
+      n => BitVector n -> BitVector n -> BitVector n'
+    template: ~ARG[1] % ~ARG[2]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.and#
+    kind: Expression
+    type: 'and# :: KnownNat
+      n => BitVector n -> BitVector n -> BitVector n'
+    template: ~ARG[1] & ~ARG[2]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.or#
+    kind: Expression
+    type: 'or# :: KnownNat
+      n => BitVector n -> BitVector n -> BitVector n'
+    template: ~ARG[1] | ~ARG[2]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.xor#
+    kind: Expression
+    type: 'xor# :: KnownNat
+      => BitVector n -> BitVector n -> BitVector n'
+    template: ~ARG[1] ^ ~ARG[2]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.complement#
+    kind: Expression
+    type: 'complement# ::
+      KnownNat n => BitVector n -> BitVector n'
+    template: ~ ~ARG[1]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.shiftL#
+    kind: Expression
+    type: 'shiftL# :: KnownNat
+      n => BitVector n -> Int -> BitVector n'
+    template: ~ARG[1] << ~ARG[2]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.shiftR#
+    kind: Expression
+    type: 'shiftR# :: KnownNat
+      n => BitVector n -> Int -> BitVector n'
+    template: ~ARG[1] >> ~ARG[2]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.truncateB#
+    kind: Expression
+    type: 'truncateB# :: forall
+      a b . KnownNat a => BitVector (a + b) -> BitVector a'
+    template: ~VAR[bv][1][0+:~SIZE[~TYPO]]
+    workInfo: Never

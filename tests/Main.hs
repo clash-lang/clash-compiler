@@ -398,6 +398,7 @@ runClashTest = defaultMain $ clashTestRoot
         [ outputTest "TemplateFunction" def{hdlTargets=[VHDL]}
         , outputTest "BlackBoxFunction" def{hdlTargets=[VHDL]}
         , runTest "BlackBoxFunctionHO" def{hdlTargets=[VHDL]}
+        , outputTest "ExternalPrimitive" def{hdlTargets=[VHDL]}
         , outputTest "ZeroWidth" def{hdlTargets=[VHDL]}
         , outputTest "MultiResult" def{hdlTargets=[VHDL]}
         , runTest "MultiResult" def

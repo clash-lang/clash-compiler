@@ -17,9 +17,9 @@ Build-Type:     Custom
 --
 Data-Files:     src/cbits/cosim_vpi.vpi
                 src/cbits/cosim_vpi.sl
-                src/prims/verilog/Clash_CoSim_CoSimInstances.primitives
+                src/prims/verilog/Clash_CoSim_CoSimInstances.primitives.yaml
 
-extra-tmp-files: src/prims/verilog/Clash_CoSim_CoSimInstances.primitives
+extra-tmp-files: src/prims/verilog/Clash_CoSim_CoSimInstances.primitives.yaml
 
 Extra-Source-Files: src/cbits/comm/*.c
                     src/cbits/comm/*.h
@@ -45,14 +45,15 @@ flag pedantic
 custom-setup
 --  ghc-options:   -Wall -Werror
   setup-depends: aeson,
-                 aeson-pretty,
                  base >= 4.10 && < 5,
+                 bytestring,
+                 Cabal,
                  directory,
-                 process,
-                 text,
                  neat-interpolation >= 0.3.0,
+                 process,
                  template-haskell >= 2.0.0,
-                 Cabal
+                 text,
+                 yaml
 
 source-repository head
   type: git

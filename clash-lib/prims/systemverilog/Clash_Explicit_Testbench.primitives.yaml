@@ -1,0 +1,118 @@
+- BlackBox:
+    name: Clash.Explicit.Testbench.assert
+    kind: Declaration
+    type: |-
+      assert
+        :: (KnownDomain dom, Eq a, ShowX a)      -- (ARG[0], ARG[1], ARG[2])
+        => Clock dom                             -- ARG[3]
+        -> Reset dom                             -- ARG[4]
+        -> String                                -- ARG[5]
+        -> Signal dom a                          -- Checked value  (ARG[6])
+        -> Signal dom a                          -- Expected value (ARG[7])
+        -> Signal dom b                          -- Return valued  (ARG[8])
+        -> Signal dom b
+    template: |-
+      // assert begin
+      // pragma translate_off
+      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin
+        if (~ARG[6] !== ~ARG[7]) begin
+          $display("@%0tns: %s, expected: %b, actual: %b", $time, ~LIT[5], ~TOBV[~ARG[7]][~TYP[7]], ~TOBV[~ARG[6]][~TYP[6]]);
+          $stop;
+        end
+      end
+      // pragma translate_on
+      assign ~RESULT = ~ARG[8];
+      // assert end
+- BlackBox:
+    name: Clash.Explicit.Testbench.assertBitVector
+    kind: Declaration
+    type: |-
+      assertBitVector
+        :: ( KnownDomain dom        --                 ARG[0]
+           , KnownNat n )           --                 ARG[1]
+        => Clock dom                --                 ARG[2]
+        -> Reset dom                --                 ARG[3]
+        -> String                   --                 ARG[4]
+        -> Signal dom (BitVector n) -- Checked value  (ARG[5])
+        -> Signal dom (BitVector n) -- Expected value (ARG[6])
+        -> Signal dom b             -- Return valued  (ARG[7])
+        -> Signal dom b
+    template: |-
+      // assertBitVector begin
+      // pragma translate_off
+      wire ~TYP[6] ~GENSYM[maskXor][0]  = ~ARG[6] ^ ~ARG[6];
+      wire ~TYP[6] ~GENSYM[checked][1]  = ~ARG[5] ^ ~SYM[0];
+      wire ~TYP[6] ~GENSYM[expected][2] = ~ARG[6] ^ ~SYM[0];
+
+      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin
+        if (~SYM[1] !== ~SYM[2]) begin
+          $display("@%0tns: %s, expected: %b, actual: %b", $time, ~LIT[4], ~TOBV[~ARG[6]][~TYP[6]], ~TOBV[~ARG[5]][~TYP[5]]);
+          $stop;
+        end
+      end
+      // pragma translate_on
+      assign ~RESULT = ~ARG[7];
+      // assertBitVector end
+- BlackBox:
+    name: Clash.Explicit.Testbench.tbClockGen
+    kind: Declaration
+    type: |-
+      tbClockGen
+        :: KnownDomain dom     -- ARG[0]
+        => Signal dom Bool      -- ARG[1]
+        -> Clock dom
+    template: |-
+      // tbClockGen begin
+      // pragma translate_off
+      // 1 = 0.1ps
+      localparam ~GENSYM[half_period][0] = (~PERIOD[0]0 / 2);
+      always begin
+        ~RESULT = ~IF~ACTIVEEDGE[Rising][0]~THEN 0 ~ELSE 1 ~FI;
+        `ifndef VERILATOR
+        #~LONGESTPERIOD0 forever begin
+          if (~ ~ARG[1]) begin
+            $finish;
+          end
+          ~RESULT = ~ ~RESULT;
+          #~SYM[0];
+          ~RESULT = ~ ~RESULT;
+          #~SYM[0];
+        end
+        `else
+        ~RESULT = $c("this->~GENSYM[tb_clock_gen][1](",~SYM[0],",~IF~ACTIVEEDGE[Rising][0]~THENtrue~ELSEfalse~FI,",(~ ~ARG[1]),")");
+        `endif
+      end
+
+      `ifdef VERILATOR
+        `systemc_interface
+        CData ~SYM[1](vluint32_t half_period, bool active_rising, bool result_rec) {
+          static vluint32_t init_wait = ~LONGESTPERIOD0;
+          static vluint32_t to_wait = 0;
+          static CData clock = active_rising ? 0 : 1;
+
+          if(init_wait == 0) {
+            if(result_rec) {
+              std::exit(0);
+            }
+            else {
+              if(to_wait == 0) {
+                to_wait = half_period - 1;
+                clock = clock == 0 ? 1 : 0;
+              }
+              else {
+                to_wait = to_wait - 1;
+              }
+            }
+          }
+          else {
+            init_wait = init_wait - 1;
+          }
+
+          return clock;
+        }
+        `verilog
+      `endif
+      // pragma translate_on
+      // tbClockGen end
+    warning: Clash.Signal.Internal.tbClockGen is not synthesizable!
+    workInfo: Always

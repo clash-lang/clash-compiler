@@ -1,9 +1,0 @@
-[ { "BlackBox" :
-    { "name"      : "GHC.TypeNats.natVal"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "natVal :: forall n proxy. KnownNat n => proxy n -> Natural"
-    , "template"  : "~ARG[0]"
-    }
-  }
-]

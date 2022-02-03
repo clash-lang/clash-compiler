@@ -1,0 +1,30 @@
+- BlackBox:
+    name: Clash.Promoted.Nat.flogBaseSNat
+    kind: Expression
+    type: |-
+      Clash.Promoted.Nat.flogBaseSNat :: (2 <= base, 1 <= x)
+                                                           => SNat base -- ARG[2]
+                                                           -> SNat x    -- ARG[3]
+                                                           -> SNat (FLog base x)
+    template: integer(floor(log(real(~LIT[3]),real(~LIT[2]))))
+    workInfo: Never
+- BlackBox:
+    name: Clash.Promoted.Nat.clogBaseSNat
+    kind: Expression
+    type: |-
+      Clash.Promoted.Nat.clogBaseSNat :: (2 <= base, 1 <= x)
+                                                           => SNat base -- ARG[2]
+                                                           -> SNat x    -- ARG[3]
+                                                           -> SNat (CLog base x)
+    template: integer(ceiling(log(real(~LIT[3]),real(~LIT[2]))))
+    workInfo: Never
+- BlackBox:
+    name: Clash.Promoted.Nat.logBaseSNat
+    kind: Expression
+    type: |-
+      Clash.Promoted.Nat.logBaseSNat :: (FLog base x ~ CLog base x)
+                                                          => SNat base -- ARG[1]
+                                                          -> SNat x    -- ARG[2]
+                                                          -> SNat (Log base x)
+    template: integer(ceiling(log(real(~LIT[2]),real(~LIT[1]))))
+    workInfo: Never

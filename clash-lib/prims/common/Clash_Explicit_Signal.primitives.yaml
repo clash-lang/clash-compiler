@@ -1,0 +1,11 @@
+- BlackBox:
+    name: Clash.Explicit.Signal.veryUnsafeSynchronizer
+    kind: Expression
+    type: |-
+      veryUnsafeSynchronizer
+        :: Int                         -- ARG[0]
+        -> Int                         -- ARG[1]
+        -> Signal dom1 a               -- ARG[2]
+        -> Signal dom2 a
+    template: ~ARG[2]
+    workInfo: Never

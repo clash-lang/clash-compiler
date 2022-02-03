@@ -1,0 +1,54 @@
+- BlackBox:
+    name: Clash.Explicit.ROM.File.romFile#
+    kind: Declaration
+    type: |-
+      romFile# :: ( KnownNat m           --       ARG[0]
+                   , KnownDomain dom      --       ARG[1]
+                => Clock dom              -- clk,  ARG[2]
+                -> Enable dom             -- en,   ARG[3]
+                -> SNat n                 -- sz,   ARG[4]
+                -> FilePath               -- file, ARG[5]
+                -> Signal dom Int         -- rd,   ARG[6]
+                -> Signal dom (BitVector m)
+    template: |-
+      -- romFile begin
+      ~GENSYM[~COMPNAME_romFile][0] : block
+        type ~GENSYM[RomType][4] is array(natural range <>) of bit_vector(~LIT[0]-1 downto 0);
+
+        impure function ~GENSYM[InitRomFromFile][1] (RomFileName : in string) return ~SYM[4] is
+          FILE RomFile : text open read_mode is RomFileName;
+          variable RomFileLine : line;
+          variable ROM : ~SYM[4](0 to ~LIT[4]-1);
+        begin
+          for i in ROM'range loop
+            readline(RomFile,RomFileLine);
+            read(RomFileLine,ROM(i));
+          end loop;
+          return ROM;
+        end function;
+
+        signal ~GENSYM[ROM][2] : ~SYM[4](0 to ~LIT[4]-1) := ~SYM[1](~FILE[~LIT[5]]);
+        signal ~GENSYM[rd][3] : integer range 0 to ~LIT[4]-1;
+      begin
+        ~SYM[3] <=to_integer(~VAR[rdI][6](31 downto 0))
+        -- pragma translate_off
+                      mod ~LIT[4]
+        -- pragma translate_on
+                      ;
+        ~IF ~ISACTIVEENABLE[3] ~THEN
+        ~GENSYM[romFileSync][7] : process (~ARG[2])
+        begin
+          if (~IF~ACTIVEEDGE[Rising][1]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2])) then
+            if ~ARG[3] then
+              ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]));
+            end if;
+          end if;
+        end process;~ELSE
+        ~SYM[7] : process (~ARG[2])
+        begin
+          if (~IF~ACTIVEEDGE[Rising][1]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2])) then
+            ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]));
+          end if;
+        end process;~FI
+      end block;
+      -- romFile end

@@ -1,0 +1,128 @@
+- BlackBox:
+    name: GHC.Num.Natural.naturalMul
+    kind: Expression
+    type: 'naturalMul :: Natural
+      -> Natural -> Natural'
+    template: ~ARG[0] * ~ARG[1]
+    warning: 'GHC.Num.Natural.naturalMul: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalFromWord#
+    kind: Declaration
+    type: 'naturalFromWord#
+      :: Word# -> Natural'
+    template: assign ~RESULT = $unsigned(~ARG[0]);
+    warning: 'GHC.Num.Natural.naturalFromWord#: Naturals are dynamically sized in
+      simulation, but fixed-length after synthesis. Use carefully.'
+    workInfo: Never
+- BlackBox:
+    name: GHC.Num.Natural.naturalRem
+    kind: Expression
+    type: 'naturalRem :: Natural
+      -> Natural -> Natural'
+    template: ~ARG[0] % ~ARG[1]
+    warning: 'GHC.Num.Natural.naturalRem: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalLogBase#
+    imports:
+    - ~INCLUDENAME[0].inc
+    includes:
+    - name: naturalLogBase
+      extension: inc
+      template: |-
+        // natural logBase
+        function integer ~INCLUDENAME[0];
+        input [~SIZE[~TYP[0]]-1:0] base, value;
+        begin
+          for (~INCLUDENAME[0] = 0; value >= base; ~INCLUDENAME[0]=~INCLUDENAME[0]+1)
+            value = value / base;
+        end
+        endfunction
+    kind: Expression
+    type: 'naturalLogBase#
+      :: Natural -> Natural -> Word#'
+    template: ~INCLUDENAME[0](~ARG[0],~ARG[1])
+    warning: 'GHC.Num.Natural.naturalLogBase#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalEq#
+    kind: Expression
+    type: 'naturalEq :: Natural
+      -> Natural -> Int#'
+    template: '(~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]''d1 : ~SIZE[~TYPO]''d0'
+    warning: 'GHC.Num.Natural.naturalEq#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalNe#
+    kind: Expression
+    type: 'naturalNe# :: Natural
+      -> Natural -> Int#'
+    template: '(~ARG[0] != ~ARG[1]) ? ~SIZE[~TYPO]''d1 : ~SIZE[~TYPO]''d0'
+    warning: 'GHC.Num.Natural.naturalNe#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalLe#
+    kind: Expression
+    type: 'naturalLe :: Natural
+      -> Natural -> Int#'
+    template: '(~ARG[0] <= ~ARG[1]) ? ~SIZE[~TYPO]''d1 : ~SIZE[~TYPO]''d0'
+    warning: 'GHC.Num.Natural.naturalLe#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalGt#
+    kind: Expression
+    type: 'naturalGt# :: Natural
+      -> Natural -> Int#'
+    template: '(~ARG[0] > ~ARG[1] ? ~SIZE[~TYPO]''d1 : ~SIZE[~TYPO]''d0'
+    warning: 'GHC.Num.Natural.naturalGt#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalLt#
+    kind: Expression
+    type: 'naturalLt# :: Natural
+      -> Natural -> Int#'
+    template: '(~ARG[0] < ~ARG[1]) ? ~SIZE[~TYPO]''d1 : ~SIZE[~TYPO]''d0'
+    warning: 'GHC.Num.Natural.naturalLt#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalGe#
+    kind: Expression
+    type: 'naturalGe# :: Natural
+      -> Natural -> Int#'
+    template: '(~ARG[0] >= ~ARG[1]) ? ~SIZE[~TYPO]''d1 : ~SIZE[~TYPO]''d0'
+    warning: 'GHC.Num.Natural.naturalGe#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalShiftL#
+    kind: Expression
+    type: 'naturalShiftL#
+      :: Natural -> Word# -> Natural'
+    template: ~ARG[0] <<< ~ARG[1]
+    warning: 'GHC.Num.Natural.naturalShiftL#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalShiftR#
+    kind: Expression
+    type: 'naturalShiftR#
+      :: Natuarl -> Word# -> Natural'
+    template: ~ARG[0] >>> ~ARG[1]
+    warning: 'GHC.Num.Natural.naturalShiftR#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.NaturalCompare
+    kind: Expression
+    type: 'naturalCompare
+      :: Natural -> Natural -> Ordering'
+    template: '(~ARG[0] < ~ARG[1]) ? -~SIZE[~TYPO]''d0 : ((~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]''d1
+      : ~SIZE[~TYPO]''d2)'
+    warning: 'GHC.Num.Natural.naturalCompare: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalQuot
+    kind: Expression
+    type: 'naturalQuot ::
+      Natural -> Natural -> Natural'
+    template: ~ARG[0] / ~ARG[1]
+    warning: 'GHC.Num.Natural.naturalQuot: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'

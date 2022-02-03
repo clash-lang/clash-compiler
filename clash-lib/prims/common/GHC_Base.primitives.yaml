@@ -1,0 +1,4 @@
+- Primitive:
+    name: GHC.Base.$
+    primType: Function
+    workInfo: Never

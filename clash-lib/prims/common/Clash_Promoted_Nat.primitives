@@ -1,9 +1,0 @@
-[ { "BlackBox" :
-    { "name"      : "Clash.Promoted.Nat.powSNat"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "Clash.Promoted.Nat.powSNat :: SNat a -> SNat b -> SNat (a^b)"
-    , "template"  : "~LIT[0] ** ~LIT[1]"
-    }
-  }
-]

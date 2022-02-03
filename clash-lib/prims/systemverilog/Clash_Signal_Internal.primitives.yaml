@@ -1,0 +1,183 @@
+- BlackBox:
+    name: Clash.Signal.Internal.delay#
+    kind: Declaration
+    type: |-
+      delay#
+        :: ( KnownDomain dom        -- ARG[0]
+           , Undefined a )          -- ARG[1]
+        => Clock dom                -- ARG[2]
+        -> Enable dom               -- ARG[3]
+        -> a                        -- ARG[4]
+        -> Signal clk a             -- ARG[5]
+        -> Signal clk a
+    resultInit:
+      template: ~IF~ISINITDEFINED[0]~THEN~CONST[4]~ELSE~FI
+    resultName:
+      template: ~CTXNAME
+    template: |-
+      // delay begin~IF ~ISACTIVEENABLE[3] ~THEN
+      always_ff @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~GENSYM[~RESULT_delay][1]
+        if (~ARG[3]) begin
+          ~RESULT <= ~ARG[5];
+        end
+      end~ELSE
+      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~SYM[1]
+        ~RESULT <= ~ARG[5];
+      end~FI
+      // delay end
+- BlackBox:
+    name: Clash.Signal.Internal.asyncRegister#
+    kind: Declaration
+    type: |-
+      asyncRegister#
+        :: ( KnownDomain dom        -- ARG[0]
+           , NFDataX a )            -- ARG[1]
+        => Clock dom                -- ARG[2]
+        -> Reset dom                -- ARG[3]
+        -> Enable dom               -- ARG[4]
+        -> a                        -- ARG[5] (powerup value)
+        -> a                        -- ARG[6] (reset value)
+        -> Signal clk a             -- ARG[7]
+        -> Signal clk a
+    resultInit:
+      template: ~IF~ISINITDEFINED[0]~THEN~CONST[5]~ELSE~FI
+    resultName:
+      template: ~CTXNAME
+    template: |-
+      // async register begin
+      always_ff @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]~IF ~ISUNDEFINED[6] ~THEN ~ELSE or ~IF ~ISACTIVEHIGH[0] ~THEN posedge ~ELSE negedge ~FI ~VAR[rst][3]~FI) begin : ~GENSYM[~RESULT_register][1]
+        ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI~VAR[rst][3]) begin
+          ~RESULT <= ~CONST[6];
+        end else ~FI~IF ~ISACTIVEENABLE[4] ~THEN if (~ARG[4]) ~ELSE ~FI begin
+          ~RESULT <= ~ARG[7];
+        end
+      end
+      // async register end
+- BlackBox:
+    name: Clash.Signal.Internal.register#
+    kind: Declaration
+    type: |-
+      register#
+        :: ( KnownDomain dom        -- ARG[0]
+           , Undefined a )          -- ARG[1]
+        => Clock dom                -- ARG[2]
+        -> Reset dom                -- ARG[3]
+        -> Enable dom               -- ARG[4]
+        -> a                        -- ARG[5] (powerup value)
+        -> a                        -- ARG[6] (reset value)
+        -> Signal clk a             -- ARG[7]
+        -> Signal clk a
+    resultInit:
+      template: ~IF~ISINITDEFINED[0]~THEN~CONST[5]~ELSE~FI
+    resultName:
+      template: ~CTXNAME
+    template: |-
+      // register begin
+      always_ff @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]~IF ~ISSYNC[0] ~THEN ~ELSE~IF ~ISUNDEFINED[6] ~THEN ~ELSE or ~IF ~ISACTIVEHIGH[0] ~THEN posedge ~ELSE negedge ~FI ~VAR[rst][3]~FI~FI) begin : ~GENSYM[~RESULT_register][1]
+        ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI~VAR[rst][3]) begin
+          ~RESULT <= ~CONST[6];
+        end else ~FI~IF ~ISACTIVEENABLE[4] ~THEN if (~ARG[4]) ~ELSE ~FI begin
+          ~RESULT <= ~ARG[7];
+        end
+      end
+      // register end
+- BlackBox:
+    name: Clash.Signal.Internal.clockGen
+    kind: Declaration
+    type: |-
+      clockGen
+        :: KnownDomain dom     -- ARG[0]
+        => Clock dom
+    template: |-
+      // clockGen begin
+      // pragma translate_off
+      // 1 = 0.1ps
+      localparam ~GENSYM[half_period][0] = (~PERIOD[0]0 / 2);
+      always begin
+        ~RESULT = ~IF~ACTIVEEDGE[Rising][0]~THEN 0 ~ELSE 1 ~FI;
+        `ifndef VERILATOR
+        #~LONGESTPERIOD0 forever begin
+          ~RESULT = ~ ~RESULT;
+          #~SYM[0];
+          ~RESULT = ~ ~RESULT;
+          #~SYM[0];
+        end
+        `else
+        ~RESULT = $c("this->~GENSYM[tb_clock_gen][1](",~SYM[0],",~IF~ACTIVEEDGE[Rising][0]~THENtrue~ELSEfalse~FI)");
+        `endif
+      end
+
+      `ifdef VERILATOR
+        `systemc_interface
+        CData ~SYM[1](vluint32_t half_period, bool active_rising) {
+          static vluint32_t init_wait = ~LONGESTPERIOD0;
+          static vluint32_t to_wait = 0;
+          static CData clock = active_rising ? 0 : 1;
+
+          if(init_wait == 0) {
+            if(to_wait == 0) {
+              to_wait = half_period - 1;
+              clock = clock == 0 ? 1 : 0;
+            }
+            else {
+              to_wait = to_wait - 1;
+            }
+          }
+          else {
+            init_wait = init_wait - 1;
+          }
+
+          return clock;
+        }
+        `verilog
+      `endif
+
+      // pragma translate_on
+      // clockGen end
+    warning: Clash.Signal.Internal.clockGen is not synthesizable!
+    workInfo: Always
+- BlackBox:
+    name: Clash.Signal.Internal.resetGenN
+    kind: Declaration
+    type: 'resetGenN :: (KnownDomain
+      dom, 1 <= n) => SNat n -> Reset dom'
+    template: |-
+      // resetGen begin
+      // pragma translate_off
+      localparam ~GENSYM[reset_period][0] = ~LONGESTPERIOD0 - 10 + (~LIT[2] * ~PERIOD[0]0);
+      `ifndef VERILATOR
+      initial begin
+        #1 ~RESULT = ~IF ~ISACTIVEHIGH[0] ~THEN 1 ~ELSE 0 ~FI;
+        #~SYM[0] ~RESULT = ~IF ~ISACTIVEHIGH[0] ~THEN 0 ~ELSE 1 ~FI;
+      end
+      `else
+      always begin
+        // The redundant (~RESULT | ~ ~RESULT) is needed to ensure that this is
+        // calculated in every cycle by verilator. Without it, the reset will stop
+        // being updated and will be stuck as asserted forever.
+        ~RESULT =
+        $c("this->~GENSYM[reset_gen][1](",~SYM[0],",~IF~ISACTIVEHIGH[0]~THENtrue~ELSEfalse~FI)") & (~RESULT | ~ ~RESULT);
+      end
+      `systemc_interface
+      CData ~SYM[1](vluint32_t reset_period, bool active_high) {
+        static vluint32_t to_wait = reset_period;
+        static CData reset = active_high ? 1 : 0;
+        static bool finished = false;
+
+        if(!finished) {
+          if(to_wait == 0) {
+            reset = reset == 0 ? 1 : 0;
+            finished = true;
+          }
+          else {
+            to_wait = to_wait - 1;
+          }
+        }
+
+        return reset;
+      }
+      `verilog
+      `endif
+      // pragma translate_on
+      // resetGen end
+    workInfo: Always

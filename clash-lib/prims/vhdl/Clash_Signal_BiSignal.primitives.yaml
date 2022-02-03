@@ -1,0 +1,30 @@
+- BlackBox:
+    name: Clash.Signal.BiSignal.writeToBiSignal#
+    kind: Declaration
+    type: |-
+      writeToBiSignal#
+        :: HasCallStack                   -- ARG[0]
+        => BiSignalIn ds d n              -- ARG[1]
+        -> Signal d (Maybe (BitVector n)) -- ARG[2]
+        -> Signal d Bool                  -- ARG[3]
+        -> Signal d (BitVector n)         -- ARG[4]
+        -> BiSignalOut ds d n
+    renderVoid: RenderVoid
+    template: |-
+      -- writeToBiSignal# begin
+      ~ARG[1] <= ~ARG[4] when ~ARG[3] else (~SIZE[~TYP[1]]-1 downto 0 => 'Z');
+      -- writeToBiSignal# end
+- BlackBox:
+    name: Clash.Signal.BiSignal.readFromBiSignal#
+    kind: Declaration
+    type: |-
+      readFromBiSignal#
+        :: ( HasCallStack    -- ARG[0]
+           , KnownNat n)     -- ARG[1]
+        => BiSignalIn ds d n -- ARG[2]
+        -> Signal d (BitVector n)
+    template: |-
+      -- readFromBiSignal begin
+      ~RESULT <= ~ARG[2];
+      -- readFromBiSignal end
+    workInfo: Never

@@ -1,0 +1,8 @@
+- BlackBox:
+    name: GHC.Integer.Logarithms.integerLogBase#
+    kind: Expression
+    type: 'integerLogBase#
+      :: Integer -> Integer -> Int#'
+    template: integer(floor(log(real(~ARG[1]),real(~ARG[0]))))
+    warning: 'GHC.Integer.Logarithms.integerLogBase#: Integers are dynamically sized
+      in simulation, but fixed-length after synthesis. Use carefully.'

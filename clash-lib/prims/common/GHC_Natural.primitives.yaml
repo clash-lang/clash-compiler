@@ -1,0 +1,42 @@
+- Primitive:
+    name: GHC.Natural.NatS#
+    comment: Needed to make the evaluator handle this constructor strictly
+    primType: Constructor
+    warning: 'GHC.Natural.NatS#: Naturals are dynamically sized in simulation, but
+      fixed-length after synthesization. Use carefully.'
+    workInfo: Never
+- Primitive:
+    name: GHC.Natural.naturalToInteger
+    primType: Function
+    warning: 'GHC.Natural.naturalToInteger: No blackbox available without size inference
+      for Natural and Integer'
+    workInfo: Never
+- BlackBox:
+    name: GHC.Natural.underflowError
+    kind: Expression
+    type: 'underflowError
+      :: a'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox:
+    name: GHC.Natural.plusNatural
+    kind: Expression
+    type: 'plusNatural ::
+      Natural -> Natural -> Natural'
+    template: ~ARG[0] + ~ARG[1]
+    warning: 'GHC.Natural.plusNatural: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+- BlackBox:
+    name: GHC.Natural.minusNatural
+    kind: Expression
+    type: 'minusNatural ::
+      Natural -> Natural -> Natural'
+    template: ~ARG[0] - ~ARG[1]
+    warning: 'GHC.Natural.minusNatural: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+- Primitive:
+    name: GHC.Natural.gcdNatural
+    primType: Function
+    warning: 'GHC.Natural.gcdNatural: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+    workInfo: Never

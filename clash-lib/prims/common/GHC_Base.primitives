@@ -1,7 +1,0 @@
-[ { "Primitive" :
-    { "name"      : "GHC.Base.$"
-    , "workInfo"  : "Never"
-    , "primType"  : "Function"
-    }
-  }
-]

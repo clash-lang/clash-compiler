@@ -1,0 +1,28 @@
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.packFloat#
+    kind: Expression
+    type: 'packFloat# :: Float
+      -> BitVector 32'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.unpackFloat#
+    kind: Expression
+    type: 'packFloat# :: BitVector
+      32 -> Float'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.packDouble#
+    kind: Expression
+    type: 'packFloat# :: Double
+      -> BitVector 64'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.unpackDouble#
+    kind: Expression
+    type: 'packFloat# :: BitVector
+      64 -> Double'
+    template: ~ARG[0]
+    workInfo: Never

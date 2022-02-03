@@ -1,0 +1,7 @@
+- BlackBox:
+    name: GHC.TypeNats.natVal
+    kind: Expression
+    type: 'natVal :: forall
+      n proxy. KnownNat n => proxy n -> Natural'
+    template: ~ARG[0]
+    workInfo: Never

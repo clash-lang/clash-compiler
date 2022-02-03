@@ -1,0 +1,16 @@
+- BlackBoxHaskell:
+    name: GHC.Int.I8#
+    templateFunction: Clash.Primitives.GHC.Int.intTF
+    workInfo: Never
+- BlackBoxHaskell:
+    name: GHC.Int.I16#
+    templateFunction: Clash.Primitives.GHC.Int.intTF
+    workInfo: Never
+- BlackBoxHaskell:
+    name: GHC.Int.I32#
+    templateFunction: Clash.Primitives.GHC.Int.intTF
+    workInfo: Never
+- BlackBoxHaskell:
+    name: GHC.Int.I64#
+    templateFunction: Clash.Primitives.GHC.Int.intTF
+    workInfo: Never

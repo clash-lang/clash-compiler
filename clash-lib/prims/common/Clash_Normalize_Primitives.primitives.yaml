@@ -1,0 +1,18 @@
+- BlackBox:
+    name: Clash.Normalize.Primitives.removedArg
+    kind: Expression
+    type: 'removedArg :: a'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox:
+    name: Clash.Normalize.Primitives.undefined
+    kind: Expression
+    type: 'undefined :: forall
+      a . a'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox:
+    name: c$multiPrimSelect
+    kind: Expression
+    template: '!__SHOULD NOT BE RENDERED__! ~ARG[0]~ARG[1]'
+    workInfo: Always

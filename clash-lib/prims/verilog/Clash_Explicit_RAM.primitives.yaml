@@ -1,0 +1,29 @@
+- BlackBox:
+    name: Clash.Explicit.RAM.asyncRam#
+    kind: Declaration
+    type: |-
+      asyncRam#
+        :: ( HasCallStack      --         ARG[0]
+           , KnownDomain wdom  --         ARG[1]
+           , KnownDomain rdom  --         ARG[2]
+           , NFDataX a )       --         ARG[3]
+        => Clock wdom          -- ^ wclk, ARG[4]
+        -> Clock rdom          -- ^ rclk, ARG[5]
+        -> Enable wdom         -- ^ wen,  ARG[6]
+        -> SNat n              -- ^ sz,   ARG[7]
+        -> Signal rdom Int     -- ^ rd,   ARG[8]
+        -> Signal wdom Bool    -- ^ en,   ARG[9]
+        -> Signal wdom Int     -- ^ wr,   ARG[10]
+        -> Signal wdom a       -- ^ din,  ARG[11]
+        -> Signal rdom a
+    template: |-
+      // asyncRam begin
+      reg ~TYPO ~GENSYM[RAM][0] [0:~LIT[7]-1];
+      always @(~IF~ACTIVEEDGE[Rising][1]~THENposedge~ELSEnegedge~FI ~ARG[4]) begin : ~GENSYM[~COMPNAME_Ram][1]
+        if (~ARG[9] ~IF ~ISACTIVEENABLE[6] ~THEN & ~ARG[6] ~ELSE ~FI) begin
+          ~SYM[0][~ARG[10]] <= ~ARG[11];
+        end
+      end
+
+      assign ~RESULT = ~SYM[0][~ARG[8]];
+      // asyncRam end

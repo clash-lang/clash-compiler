@@ -1,0 +1,26 @@
+- BlackBox:
+    name: GHC.Natural.naturalFromInteger
+    kind: Expression
+    type: 'naturalFromInteger
+      :: Integer -> Natural'
+    template: $unsigned(~VAR[n][0][(~SIZE[~TYPO]-1):0])
+    warning: 'GHC.Natural.naturalFromInteger: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+    workInfo: Never
+- BlackBox:
+    name: GHC.Natural.timesNatural
+    kind: Expression
+    type: 'timesNatural ::
+      Natural -> Natural -> Natural'
+    template: ~ARG[0] * ~ARG[1]
+    warning: 'GHC.Natural.timesNatural: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+- BlackBox:
+    name: GHC.Natural.wordToNatural#
+    kind: Declaration
+    type: 'wordToNatural#
+      :: Word# -> Natural'
+    template: assign ~RESULT = $unsigned(~ARG[0]);
+    warning: 'GHC.Natural.wordToNatural#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+    workInfo: Never

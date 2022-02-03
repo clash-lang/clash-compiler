@@ -10,6 +10,7 @@
 -}
 
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -17,12 +18,14 @@ module Clash.Primitives.Util
   ( generatePrimMap
   , hashCompiledPrimMap
   , constantArgs
-  , decodeOrErr
+  , decodeOrErrJson
+  , decodeOrErrYaml
   , getFunctionPlurality
   ) where
 
 import           Control.DeepSeq        (force)
-import           Data.Aeson.Extra       (decodeOrErr)
+import           Control.Monad          (forM)
+import           Data.Aeson.Extra       (decodeOrErrJson, decodeOrErrYaml)
 import qualified Data.ByteString.Lazy   as LZ
 import qualified Data.HashMap.Lazy      as HashMap
 import qualified Data.HashMap.Strict    as HashMapStrict
@@ -115,8 +118,13 @@ resolvePrimitive
   => FilePath
   -> IO [(TS.Text, GuardedResolvedPrimitive)]
 resolvePrimitive fileName = do
-  prims <- decodeOrErr fileName <$> LZ.readFile fileName
+  prims <- decoder fileName <$> LZ.readFile fileName
   mapM (resolvePrimitive' fileName) prims
+ where
+  decoder
+   | ".primitives.yaml" `isSuffixOf` fileName = decodeOrErrYaml
+   | ".primitives" `isSuffixOf` fileName = decodeOrErrJson
+   | otherwise = error ("Unexpected filename extension in: " <> fileName)
 
 addGuards
   :: ResolvedPrimMap
@@ -161,17 +169,18 @@ generatePrimMap
   -- ^ Directories to search for primitive definitions
   -> IO ResolvedPrimMap
 generatePrimMap unresolvedPrims primGuards filePaths = do
-  primitiveFiles <- fmap concat $ mapM
-     (\filePath -> do
-         fpExists <- Directory.doesDirectoryExist filePath
-         if fpExists
-           then
-             fmap ( map (FilePath.combine filePath)
-                  . filter (isSuffixOf ".primitives")
-                  ) (Directory.getDirectoryContents filePath)
-           else
-             return []
-     ) filePaths
+  primitiveFiles <- fmap concat $ forM filePaths $ \filePath -> do
+    fpExists <- Directory.doesDirectoryExist filePath
+    if fpExists then do
+      contents <- Directory.getDirectoryContents filePath
+      let
+        jsonPrims = filter (".primitives" `isSuffixOf`) contents
+        yamlPrims = filter (".primitives.yaml" `isSuffixOf`) contents
+        relPrims = jsonPrims <> yamlPrims
+        absPrims = map (FilePath.combine filePath) relPrims
+      return absPrims
+    else
+      return []
 
   primitives0 <- concat <$> mapM resolvePrimitive primitiveFiles
   let metapaths = map (TS.unpack . name) unresolvedPrims

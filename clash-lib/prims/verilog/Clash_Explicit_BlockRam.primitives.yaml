@@ -1,0 +1,202 @@
+- BlackBox:
+    name: Clash.Explicit.BlockRam.blockRam#
+    kind: Declaration
+    outputReg: true
+    type: |-
+      blockRam#
+        :: ( KnownDomain dom        ARG[0]
+           , HasCallStack  --       ARG[1]
+           , Undefined a ) --       ARG[2]
+        => Clock dom       -- clk,  ARG[3]
+        => Enable dom      -- en,   ARG[4]
+        -> Vec n a         -- init, ARG[5]
+        -> Signal dom Int  -- rd,   ARG[6]
+        -> Signal dom Bool -- wren, ARG[7]
+        -> Signal dom Int  -- wr,   ARG[8]
+        -> Signal dom a    -- din,  ARG[9]
+        -> Signal dom a
+    template: |-
+      // blockRam begin
+      reg ~TYPO ~GENSYM[~RESULT_RAM][1] [0:~LENGTH[~TYP[5]]-1];
+
+      reg ~TYP[5] ~GENSYM[ram_init][3];
+      integer ~GENSYM[i][4];
+      initial begin
+        ~SYM[3] = ~CONST[5];
+        for (~SYM[4]=0; ~SYM[4] < ~LENGTH[~TYP[5]]; ~SYM[4] = ~SYM[4] + 1) begin
+          ~SYM[1][~LENGTH[~TYP[5]]-1-~SYM[4]] = ~SYM[3][~SYM[4]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+        end
+      end
+      ~IF ~ISACTIVEENABLE[4] ~THEN
+      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
+        if (~ARG[4]) begin
+          if (~ARG[7]) begin
+            ~SYM[1][~ARG[8]] <= ~ARG[9];
+          end
+          ~RESULT <= ~SYM[1][~ARG[6]];
+        end~ELSE
+        if (~ARG[7] & ~ARG[4]) begin
+          ~SYM[1][~ARG[8]] <= ~ARG[9];
+        end
+        if (~ARG[4]) begin
+          ~RESULT <= ~SYM[1][~ARG[6]];
+        end~FI
+      end~ELSE
+      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
+        if (~ARG[7]) begin
+          ~SYM[1][~ARG[8]] <= ~ARG[9];
+        end
+        ~RESULT <= ~SYM[1][~ARG[6]];
+      end~FI
+      // blockRam end
+- BlackBox:
+    name: Clash.Explicit.BlockRam.blockRamU#
+    kind: Declaration
+    outputReg: true
+    type: |-
+      blockRamU#
+        :: ( KnownDomain dom        ARG[0]
+           , HasCallStack  --       ARG[1]
+           , Undefined a ) --       ARG[2]
+        => Clock dom       -- clk,  ARG[3]
+        -> Enable dom      -- en,   ARG[4]
+        -> SNat n          -- len,  ARG[5]
+        -> Signal dom Int  -- rd,   ARG[6]
+        -> Signal dom Bool -- wren, ARG[7]
+        -> Signal dom Int  -- wr,   ARG[8]
+        -> Signal dom a    -- din,  ARG[9]
+        -> Signal dom a
+    template: |-
+      // blockRamU begin
+      reg ~TYPO ~GENSYM[~RESULT_RAM][0] [0:~LIT[5]-1];
+
+      ~IF ~ISACTIVEENABLE[4] ~THEN
+      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
+        if (~ARG[4]) begin
+          if (~ARG[7]) begin
+            ~SYM[0][~ARG[8]] <= ~ARG[9];
+          end
+          ~RESULT <= ~SYM[0][~ARG[6]];
+        end~ELSE
+        if (~ARG[7] & ~ARG[4]) begin
+          ~SYM[0][~ARG[8]] <= ~ARG[9];
+        end
+        if (~ARG[4]) begin
+          ~RESULT <= ~SYM[0][~ARG[6]];
+        end~FI
+      end~ELSE
+      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
+        if (~ARG[7]) begin
+          ~SYM[0][~ARG[8]] <= ~ARG[9];
+        end
+        ~RESULT <= ~SYM[0][~ARG[6]];
+      end~FI
+      // blockRamU end
+- BlackBox:
+    name: Clash.Explicit.BlockRam.blockRam1#
+    kind: Declaration
+    outputReg: true
+    type: |-
+      blockRam1#
+        :: ( KnownDomain dom        ARG[0]
+           , HasCallStack  --       ARG[1]
+           , Undefined a ) --       ARG[2]
+        => Clock dom       -- clk,  ARG[3]
+        -> Enable dom      -- en,   ARG[4]
+        -> SNat n          -- len,  ARG[5]
+        -> a               -- init, ARG[6]
+        -> Signal dom Int  -- rd,   ARG[7]
+        -> Signal dom Bool -- wren, ARG[8]
+        -> Signal dom Int  -- wr,   ARG[9]
+        -> Signal dom a    -- din,  ARG[10]
+        -> Signal dom a
+    template: |-
+      // blockRam1 begin
+      reg ~TYPO ~GENSYM[~RESULT_RAM][0] [0:~LIT[5]-1];
+      integer ~GENSYM[i][1];
+      initial begin
+          for (~SYM[1]=0;~SYM[1]<~LIT[5];~SYM[1]=~SYM[1]+1) begin
+              ~SYM[0][~SYM[1]] = ~CONST[6];
+          end
+      end
+
+      ~IF ~ISACTIVEENABLE[4] ~THEN
+      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
+        if (~ARG[4]) begin
+          if (~ARG[8]) begin
+            ~SYM[0][~ARG[9]] <= ~ARG[10];
+          end
+          ~RESULT <= ~SYM[0][~ARG[7]];
+        end~ELSE
+        if (~ARG[8] & ~ARG[4]) begin
+          ~SYM[0][~ARG[9]] <= ~ARG[10];
+        end
+        if (~ARG[4]) begin
+          ~RESULT <= ~SYM[0][~ARG[7]];
+        end~FI
+      end~ELSE
+      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
+        if (~ARG[8]) begin
+          ~SYM[0][~ARG[9]] <= ~ARG[10];
+        end
+        ~RESULT <= ~SYM[0][~ARG[7]];
+      end~FI
+      // blockRam1 end
+- BlackBox:
+    name: Clash.Explicit.BlockRam.trueDualPortBlockRam#
+    kind: Declaration
+    type: |-
+      trueDualPortBlockRam# ::
+        forall nAddrs domA domB a .
+        ( HasCallStack           ~ARG[0]
+        , KnownNat nAddrs        ~ARG[1]
+        , KnownDomain domA       ~ARG[2]
+        , KnownDomain domB       ~ARG[3]
+        , NFDataX a              ~ARG[4]
+        ) =>
+
+        Clock domA ->                   ~ARG[5]
+        Signal domA Bool ->             ~ARG[6]
+        Signal domA Bool ->             ~ARG[7]
+        Signal domA (Index nAddrs) ->   ~ARG[8]
+        Signal domA a ->                ~ARG[9]
+
+        Clock domB ->                   ~ARG[10]
+        Signal domB Bool ->             ~ARG[11]
+        Signal domB Bool ->             ~ARG[12]
+        Signal domB (Index nAddrs) ->   ~ARG[13]
+        Signal domB a ->                ~ARG[14]
+        (Signal domA a, Signal domB a)
+    template: |-
+      // trueDualPortBlockRam begin
+      // Shared memory
+      reg [~SIZE[~TYP[9]]-1:0] ~GENSYM[mem][0] [~LIT[1]-1:0];
+
+      reg ~SIGD[~GENSYM[data_slow][1]][9];
+      reg ~SIGD[~GENSYM[data_fast][2]][14];
+
+      // Port A
+      always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[5]) begin
+          if(~ARG[6]) begin
+              ~SYM[1] <= ~SYM[0][~IF~SIZE[~TYP[8]]~THEN~ARG[8]~ELSE0~FI];
+              if(~ARG[7]) begin
+                  ~SYM[1] <= ~ARG[9];
+                  ~SYM[0][~IF~SIZE[~TYP[8]]~THEN~ARG[8]~ELSE0~FI] <= ~ARG[9];
+              end
+          end
+      end
+
+      // Port B
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[10]) begin
+          if(~ARG[11]) begin
+              ~SYM[2] <= ~SYM[0][~IF~SIZE[~TYP[13]]~THEN~ARG[13]~ELSE0~FI];
+              if(~ARG[12]) begin
+                  ~SYM[2] <= ~ARG[14];
+                  ~SYM[0][~IF~SIZE[~TYP[13]]~THEN~ARG[13]~ELSE0~FI] <= ~ARG[14];
+              end
+          end
+      end
+
+      assign ~RESULT = {~SYM[1], ~SYM[2]};
+
+      // end trueDualPortBlockRam

@@ -1,0 +1,7 @@
+- BlackBox:
+    name: Debug.Trace.trace
+    kind: Expression
+    type: 'trace :: String
+      -> a -> a'
+    template: ~ARG[1]
+    workInfo: Never

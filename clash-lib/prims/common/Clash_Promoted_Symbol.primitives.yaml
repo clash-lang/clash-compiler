@@ -1,0 +1,14 @@
+- BlackBox:
+    name: Clash.Promoted.Symbol.SSymbol
+    kind: Expression
+    type: 'SSymbol :: KnownNat
+      n => Proxy n -> SSymbol n'
+    template: ~LIT[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Promoted.Symbol.symbolToString
+    kind: Expression
+    type: 'symbolToString
+      :: SSymbol n -> String'
+    template: ~LIT[0]
+    workInfo: Never

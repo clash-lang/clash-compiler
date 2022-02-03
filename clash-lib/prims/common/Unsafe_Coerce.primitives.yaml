@@ -1,0 +1,7 @@
+- BlackBox:
+    name: Unsafe.Coerce.unsafeCoerce
+    kind: Expression
+    type: 'unsafeCoerce ::
+      a -> b'
+    template: ~ARG[0]
+    workInfo: Never

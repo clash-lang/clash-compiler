@@ -1,0 +1,28 @@
+- BlackBox:
+    name: GHC.Int.I8#
+    kind: Expression
+    type: 'I8# :: Int# ->
+      Int8'
+    template: resize(~ARG[0],8)
+    workInfo: Never
+- BlackBox:
+    name: GHC.Int.I16#
+    kind: Expression
+    type: 'I16# :: Int# ->
+      Int16'
+    template: resize(~ARG[0],16)
+    workInfo: Never
+- BlackBox:
+    name: GHC.Int.I32#
+    kind: Expression
+    type: 'I32# :: Int# ->
+      Int32'
+    template: resize(~ARG[0],32)
+    workInfo: Never
+- BlackBox:
+    name: GHC.Int.I64#
+    kind: Expression
+    type: 'I64# :: Int# ->
+      Int64'
+    template: resize(~ARG[0],64)
+    workInfo: Never

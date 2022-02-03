@@ -1,0 +1,83 @@
+- BlackBox:
+    name: Clash.Explicit.DDR.ddrIn#
+    kind: Declaration
+    type: |-
+      ddrIn# :: forall a slow fast n pFast gated synchronous.
+                 ( HasCallStack          -- ARG[0]
+                 , Undefined a           -- ARG[1]
+                 , KnownConfi~ fast domf -- ARG[2]
+                 , KnownConfi~ slow doms -- ARG[3]
+              => Clock slow              -- ARG[4]
+              -> Reset slow              -- ARG[5]
+              -> Enable slow             -- ARG[6]
+              -> a                       -- ARG[7]
+              -> a                       -- ARG[8]
+              -> a                       -- ARG[9]
+              -> Signal fast a           -- ARG[10]
+              -> Signal slow (a,a)
+    template: |-
+      // ddrIn begin
+      reg ~SIGD[~GENSYM[data_Pos][1]][9];
+      reg ~SIGD[~GENSYM[data_Neg][2]][9];
+      reg ~SIGD[~GENSYM[data_Neg_Latch][3]][9];
+      always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[4]~IF~ISSYNC[3]~THEN)~ELSE or ~IF~ISACTIVEHIGH[2]~THENposedge~ELSEnegedge~FI ~ARG[5])~FI begin : ~GENSYM[~COMPNAME_ddrIn_pos][6]
+        if (~IF~ISACTIVEHIGH[2]~THEN~ARG[5]~ELSE! ~ARG[5]~FI) begin
+          ~SYM[1] <= ~ARG[8];
+        end else ~IF ~ISACTIVEENABLE[6] ~THEN if (~ARG[6]) ~ELSE ~FI begin
+          ~SYM[1] <= ~ARG[10];
+        end
+      end
+      always @(~IF~ACTIVEEDGE[Rising][2]~THENnegedge~ELSEposedge~FI ~ARG[4]~IF~ISSYNC[3]~THEN)~ELSE or ~IF~ISACTIVEHIGH[2]~THENposedge~ELSEnegedge~FI ~ARG[5])~FI begin : ~GENSYM[~COMPNAME_ddrIn_neg][7]
+        if (~IF~ISACTIVEHIGH[2]~THEN~ARG[5]~ELSE! ~ARG[5]~FI) begin
+          ~SYM[2] <= ~ARG[9];
+        end else ~IF ~ISACTIVEENABLE[6] ~THEN if (~ARG[6]) ~ELSE ~FI begin
+          ~SYM[2] <= ~ARG[10];
+        end
+      end
+      always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[4]~IF~ISSYNC[3]~THEN)~ELSE or ~IF~ISACTIVEHIGH[2]~THENposedge~ELSEnegedge~FI ~ARG[5])~FI begin : ~GENSYM[~COMPNAME_ddrIn_neg_latch][8]
+        if (~IF~ISACTIVEHIGH[2]~THEN~ARG[5]~ELSE! ~ARG[5]~FI) begin
+          ~SYM[3] <= ~ARG[7];
+        end else ~IF ~ISACTIVEENABLE[6] ~THEN if (~ARG[6]) ~ELSE ~FI begin
+          ~SYM[3] <= ~SYM[2];
+        end
+      end
+
+      assign ~RESULT = {~SYM[3], ~SYM[1]};
+      // ddrIn end
+- BlackBox:
+    name: Clash.Explicit.DDR.ddrOut#
+    kind: Declaration
+    type: |-
+      ddrOut# :: ( HasCallStack               -- ARG[0]
+                  , Undefined a                -- ARG[1]
+                  , KnownConfi~ fast domf      -- ARG[2]
+                  , KnownConfi~ slow doms      -- ARG[3]
+               => Clock slow                   -- ARG[4]
+               -> Reset slow                   -- ARG[5]
+               -> Enable slow                  -- ARG[6]
+               -> a                            -- ARG[7]
+               -> Signal slow a                -- ARG[8]
+               -> Signal slow a                -- ARG[9]
+               -> Signal fast a
+    template: |-
+      // ddrOut begin
+      reg ~SIGD[~GENSYM[data_Pos][1]][7];
+      reg ~SIGD[~GENSYM[data_Neg][2]][7];
+      always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[4]~IF~ISSYNC[3]~THEN)~ELSE or ~IF~ISACTIVEHIGH[2]~THENposedge~ELSEnegedge~FI ~ARG[5])~FI begin : ~GENSYM[~COMPNAME_ddrOut_pos][5]
+        if (~IF~ISACTIVEHIGH[2]~THEN~ARG[5]~ELSE! ~ARG[5]~FI) begin
+          ~SYM[1] <= ~ARG[7];
+        end else ~IF ~ISACTIVEENABLE[6] ~THEN if (~ARG[6]) ~ELSE ~FI begin
+          ~SYM[1] <= ~ARG[8];
+        end
+      end
+      always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[4]~IF~ISSYNC[3]~THEN)~ELSE or ~IF~ISACTIVEHIGH[2]~THENposedge~ELSEnegedge~FI ~ARG[5])~FI begin : ~GENSYM[~COMPNAME_ddrOut_neg][6]
+        if (~IF~ISACTIVEHIGH[2]~THEN~ARG[5]~ELSE! ~ARG[5]~FI) begin
+          ~SYM[2] <= ~ARG[7];
+        end else ~IF ~ISACTIVEENABLE[6] ~THEN if (~ARG[6]) ~ELSE ~FI begin
+          ~SYM[2] <= ~ARG[9];
+        end
+      end
+
+      assign ~RESULT = ~ARG[4] ? ~IF~ACTIVEEDGE[Rising][2]~THEN~SYM[1] : ~SYM[2]~ELSE~SYM[2] : ~SYM[1]~FI;
+
+      // ddrOut end

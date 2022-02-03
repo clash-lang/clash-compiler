@@ -1,0 +1,22 @@
+- BlackBox:
+    name: GHC.Integer.Logarithms.integerLogBase#
+    imports:
+    - ~INCLUDENAME[0].inc
+    includes:
+    - name: integerLogBase
+      extension: inc
+      template: |-
+        // integer logBase
+        function integer ~INCLUDENAME[0];
+          input integer base, value;
+          begin
+            for (~INCLUDENAME[0] = 0; value >= base; ~INCLUDENAME[0]=~INCLUDENAME[0]+1)
+              value = value / base;
+          end
+        endfunction
+    kind: Expression
+    type: 'integerLogBase#
+      :: Integer -> Integer -> Int#'
+    template: ~INCLUDENAME[0](~ARG[0],~ARG[1])
+    warning: 'GHC.Integer.Logarithms.integerLogBase#: Integers are dynamically sized
+      in simulation, but fixed-length after synthesization. Use carefully.'

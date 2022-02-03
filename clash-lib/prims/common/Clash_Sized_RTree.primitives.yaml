@@ -1,0 +1,4 @@
+- Primitive:
+    name: Clash.Sized.RTree.tdfold
+    primType: Function
+    workInfo: Never

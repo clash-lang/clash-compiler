@@ -1,7 +1,0 @@
-[ { "Primitive" :
-    { "name"      : "Clash.Signal.Bundle.vecBundle#"
-    , "workInfo"  : "Never"
-    , "primType"  : "Function"
-    }
-  }
-]

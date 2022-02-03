@@ -1,0 +1,64 @@
+- Primitive:
+    name: GHC.Num.Natural.NS
+    comment: Needed to make the evaluator handle this constructor strictly
+    primType: Constructor
+    warning: 'GHC.Num.Natural.NS: Naturals are dynamically sized in simulation, but
+      fixed-length after synthesization. Use carefully.'
+    workInfo: Never
+- Primitive:
+    name: GHC.Num.Natural.NB
+    comment: Needed to make the evaluator handle this constructor strictly
+    primType: Constructor
+    warning: 'GHC.Num.Natural.NB: Naturals are dynamically sized in simulation, but
+      fixed-length after synthesization. Use carefully.'
+    workInfo: Never
+- BlackBox:
+    name: GHC.Num.Natural.naturalAdd
+    kind: Expression
+    type: 'naturalSub :: Natural
+      -> Natural -> Natural'
+    template: ~ARG[0] + ~ARG[1]
+    warning: 'GHC.Num.Natural.naturalAdd: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'
+- Primitive:
+    name: GHC.Num.Natural.naturalSub
+    primType: Function
+    warning: 'GHC.Num.Natural.naturalSub: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'
+    workInfo: Never
+- BlackBox:
+    name: GHC.Num.Natural.naturalSubUnsafe
+    kind: Expression
+    type: 'naturalSubUnsafe
+      :: Natural -> Natural -> Natural'
+    template: ~ARG[0] - ~ARG[1]
+    warning: 'GHC.Num.Natural.naturalSubUnsafe: Naturals are dynamically sized in
+      simulation, but fixed-length after synthesis. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalSubThrow
+    kind: Expression
+    type: 'naturalSubThrow
+      :: Natural -> Natural -> Natural'
+    template: ~ARG[0] - ~ARG[1]
+    warning: 'GHC.Num.Natural.naturalSubThrow: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalMul
+    kind: Expression
+    type: 'naturalMul :: Natural
+      -> Natural -> Natural'
+    template: ~ARG[0] * ~ARG[1]
+    warning: 'GHC.Num.Natural.naturalMul: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'
+- Primitive:
+    name: GHC.Num.Natural.naturalGcd
+    primType: Function
+    warning: 'GHC.Num.Natural.naturalGcd: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'
+    workInfo: Never
+- Primitive:
+    name: GHC.Num.Natural.naturalLcm
+    primType: Function
+    warning: 'GHC.Num.Natural.naturalLcm: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'
+    workInfo: Never

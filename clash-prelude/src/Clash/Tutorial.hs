@@ -1033,7 +1033,7 @@ as \"regular\" primitives. The compiler looks for primitives in four locations:
 
 Where redefined primitives in the current directory or include directories will
 overwrite those in the official install location. For now, files containing
-primitive definitions must have a @.primitives@ file-extension.
+primitive definitions must have a @.primitives.yaml@ file-extension.
 
 Clash differentiates between two types of primitives, /expression/ primitives
 and /declaration/ primitives, corresponding to whether the primitive is a VHDL
@@ -1050,13 +1050,11 @@ primitives, using 'Signed' multiplication (@*@) as an example. The
 For which the VHDL /expression/ primitive is:
 
 @
-{ \"BlackBox\" :
-  { "name"     : "Clash.Sized.Internal.Signed.*#"
-  , "kind"     : \"Expression\"
-  , "type"      : "(*#) :: KnownNat n => Signed n -> Signed n -> Signed n"
-  , "template" : "resize(~ARG[1] * ~ARG[2], ~LIT[0])"
-  }
-}
+BlackBox:
+  name: \'Clash.Sized.Internal.Signed.*#\'
+  kind: \'Expression\'
+  type: \'(*#) :: KnownNat n => Signed n -> Signed n -> Signed n\'
+  template: \'resize(~ARG[1] * ~ARG[2], ~LIT[0])\'
 @
 
 The @name@ of the primitive is the /fully qualified/ name of the function you
@@ -1143,71 +1141,68 @@ blockRam# (Clock _) gen content rd wen =
 And for which the /declaration/ primitive is:
 
 @
-{ \"BlackBox\" :
-  { "name" : "Clash.Explicit.BlockRam.blockRam#"
-  , "kind" : \"Declaration\"
-  , "type" :
-"blockRam#
-  :: ( KnownDomain dom        ARG[0]
-     , HasCallStack  --       ARG[1]
-     , NFDataX a )   --       ARG[2]
-  => Clock dom       -- clk,  ARG[3]
-  -> Enable dom      -- en,   ARG[4]
-  -> Vec n a         -- init, ARG[5]
-  -> Signal dom Int  -- rd,   ARG[6]
-  -> Signal dom Bool -- wren, ARG[7]
-  -> Signal dom Int  -- wr,   ARG[8]
-  -> Signal dom a    -- din,  ARG[9]
-  -> Signal dom a"
-    , "template" :
-"-- blockRam begin
-~GENSYM[~RESULT_blockRam][1] : block
-  signal ~GENSYM[~RESULT_RAM][2] : ~TYP[5] := ~CONST[5];
-  signal ~GENSYM[rd][4]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
-  signal ~GENSYM[wr][5]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
-begin
-  ~SYM[4] <= to_integer(~ARG[6])
-  -- pragma translate_off
-                mod ~LENGTH[~TYP[5]]
-  -- pragma translate_on
-                ;
-
-  ~SYM[5] <= to_integer(~ARG[8])
-  -- pragma translate_off
-                mod ~LENGTH[~TYP[5]]
-  -- pragma translate_on
-                ;
-~IF ~VIVADO ~THEN
-  ~SYM[6] : process(~ARG[3])
-  begin
-    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-      if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
-        ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[9]][~TYP[9]];
-      end if;
-      ~RESULT <= fromSLV(~SYM[2](~SYM[4]))
+BlackBox:
+  name: Clash.Explicit.BlockRam.blockRam#
+  kind: Declaration
+  type: |-
+    blockRam#
+      :: ( KnownDomain dom        ARG[0]
+         , HasCallStack  --       ARG[1]
+         , NFDataX a )   --       ARG[2]
+      => Clock dom       -- clk,  ARG[3]
+      -> Enable dom      -- en,   ARG[4]
+      -> Vec n a         -- init, ARG[5]
+      -> Signal dom Int  -- rd,   ARG[6]
+      -> Signal dom Bool -- wren, ARG[7]
+      -> Signal dom Int  -- wr,   ARG[8]
+      -> Signal dom a    -- din,  ARG[9]
+      -> Signal dom a
+  template: |-
+    -- blockRam begin
+    ~GENSYM[~RESULT_blockRam][1] : block
+      signal ~GENSYM[~RESULT_RAM][2] : ~TYP[5] := ~CONST[5];
+      signal ~GENSYM[rd][4]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
+      signal ~GENSYM[wr][5]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
+    begin
+      ~SYM[4] <= to_integer(~ARG[6])
       -- pragma translate_off
-      after 1 ps
+                    mod ~LENGTH[~TYP[5]]
       -- pragma translate_on
-      ;
-    end if;
-  end process; ~ELSE
-  ~SYM[6] : process(~ARG[3])
-  begin
-    if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-      if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
-        ~SYM[2](~SYM[5]) <= ~ARG[9];
-      end if;
-      ~RESULT <= ~SYM[2](~SYM[4])
+                    ;
+      ~SYM[5] <= to_integer(~ARG[8])
       -- pragma translate_off
-      after 1 ps
+                    mod ~LENGTH[~TYP[5]]
       -- pragma translate_on
-      ;
-    end if;
-  end process; ~FI
-end block;
---end blockRam"
-  }
-}
+                    ;
+    ~IF ~VIVADO ~THEN
+      ~SYM[6] : process(~ARG[3])
+      begin
+        if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
+          if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
+            ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[9]][~TYP[9]];
+          end if;
+          ~RESULT <= fromSLV(~SYM[2](~SYM[4]))
+          -- pragma translate_off
+          after 1 ps
+          -- pragma translate_on
+          ;
+        end if;
+      end process; ~ELSE
+      ~SYM[6] : process(~ARG[3])
+      begin
+        if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
+          if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
+            ~SYM[2](~SYM[5]) <= ~ARG[9];
+          end if;
+          ~RESULT <= ~SYM[2](~SYM[4])
+          -- pragma translate_off
+          after 1 ps
+          -- pragma translate_on
+          ;
+        end if;
+      end process; ~FI
+    end block;
+    --end blockRam
 @
 
 Again, the @name@ of the primitive is the fully qualified name of the function
@@ -1318,71 +1313,67 @@ worlds, using e.g. VHDL's foreign function interface VHPI.
 For those who are interested, the equivalent Verilog primitives are:
 
 @
-{ \"BlackBox\" :
-  { "name"     : "Clash.Sized.Internal.Signed.*#"
-  , "kind"     : \"Expression\"
-  , "type"     : "(*#) :: KnownNat n => Signed n -> Signed n -> Signed n"
-  , "template" : "~ARG[1] * ~ARG[2]"
-  }
-}
+BlackBox:
+  name: Clash.Sized.Internal.Signed.*#
+  kind: Expression
+  type: \'(*#) :: KnownNat n => Signed n -> Signed n -> Signed n\'
+  template: ~ARG[1] * ~ARG[2]
 @
 
 and
 
 @
-{ \"BlackBox\" :
-  { "name" : "Clash.Explicit.BlockRam.blockRam#"
-  , "kind" : \"Declaration\"
-  , "type" :
-"blockRam#
-  :: ( KnownDomain dom        ARG[0]
-     , HasCallStack  --       ARG[1]
-     , NFDataX a )   --       ARG[2]
-  => Clock dom       -- clk,  ARG[3]
-  => Enable dom      -- en,   ARG[4]
-  -> Vec n a         -- init, ARG[5]
-  -> Signal dom Int  -- rd,   ARG[6]
-  -> Signal dom Bool -- wren, ARG[7]
-  -> Signal dom Int  -- wr,   ARG[8]
-  -> Signal dom a    -- din,  ARG[9]
-  -> Signal dom a"
-    , "outputReg" : true
-    , "template" :
-"// blockRam begin
-reg ~TYPO ~GENSYM[~RESULT_RAM][1] [0:~LENGTH[~TYP[5]]-1];
+BlackBox:
+  name: Clash.Explicit.BlockRam.blockRam#
+  kind: Declaration
+  outputReg: true
+  type: |-
+    blockRam#
+      :: ( KnownDomain dom        ARG[0]
+         , HasCallStack  --       ARG[1]
+         , NFDataX a )   --       ARG[2]
+      => Clock dom       -- clk,  ARG[3]
+      => Enable dom      -- en,   ARG[4]
+      -> Vec n a         -- init, ARG[5]
+      -> Signal dom Int  -- rd,   ARG[6]
+      -> Signal dom Bool -- wren, ARG[7]
+      -> Signal dom Int  -- wr,   ARG[8]
+      -> Signal dom a    -- din,  ARG[9]
+      -> Signal dom a
+  template: |-
+    // blockRam begin
+    reg ~TYPO ~GENSYM[~RESULT_RAM][1] [0:~LENGTH[~TYP[5]]-1];
 
-reg ~TYP[5] ~GENSYM[ram_init][3];
-integer ~GENSYM[i][4];
-initial begin
-  ~SYM[3] = ~CONST[5];
-  for (~SYM[4]=0; ~SYM[4] < ~LENGTH[~TYP[5]]; ~SYM[4] = ~SYM[4] + 1) begin
-    ~SYM[1][~LENGTH[~TYP[5]]-1-~SYM[4]] = ~SYM[3][~SYM[4]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
-  end
-end
-~IF ~ISACTIVEENABLE[4] ~THEN
-always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
-  if (~ARG[4]) begin
-    if (~ARG[7]) begin
-      ~SYM[1][~ARG[8]] <= ~ARG[9];
+    reg ~TYP[5] ~GENSYM[ram_init][3];
+    integer ~GENSYM[i][4];
+    initial begin
+      ~SYM[3] = ~CONST[5];
+      for (~SYM[4]=0; ~SYM[4] < ~LENGTH[~TYP[5]]; ~SYM[4] = ~SYM[4] + 1) begin
+        ~SYM[1][~LENGTH[~TYP[5]]-1-~SYM[4]] = ~SYM[3][~SYM[4]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+      end
     end
-    ~RESULT <= ~SYM[1][~ARG[6]];
-  end~ELSE
-  if (~ARG[7] & ~ARG[4]) begin
-    ~SYM[1][~ARG[8]] <= ~ARG[9];
-  end
-  if (~ARG[4]) begin
-    ~RESULT <= ~SYM[1][~ARG[6]];
-  end~FI
-end~ELSE
-always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
-  if (~ARG[7]) begin
-    ~SYM[1][~ARG[8]] <= ~ARG[9];
-  end
-  ~RESULT <= ~SYM[1][~ARG[6]];
-end~FI
-// blockRam end"
-  }
-}
+    ~IF ~ISACTIVEENABLE[4] ~THEN
+    always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
+      if (~ARG[4]) begin
+        if (~ARG[7]) begin
+          ~SYM[1][~ARG[8]] <= ~ARG[9];
+        end
+        ~RESULT <= ~SYM[1][~ARG[6]];
+      end~ELSE
+      if (~ARG[7] & ~ARG[4]) begin
+        ~SYM[1][~ARG[8]] <= ~ARG[9];
+      end
+      if (~ARG[4]) begin
+        ~RESULT <= ~SYM[1][~ARG[6]];
+      end~FI
+    end~ELSE
+    always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
+      if (~ARG[7]) begin
+        ~SYM[1][~ARG[8]] <= ~ARG[9];
+      end
+      ~RESULT <= ~SYM[1][~ARG[6]];
+    end~FI
+    // blockRam end
 @
 
 -}
@@ -1391,65 +1382,61 @@ end~FI
 And the equivalent SystemVerilog primitives are:
 
 @
-{ \"BlackBox\" :
-  { "name"     : "Clash.Sized.Internal.Signed.*#"
-  , "kind"     : \"Expression\"
-  , "type"     : "(*#) :: KnownNat n => Signed n -> Signed n -> Signed n"
-  , "template" : "~ARG[1] * ~ARG[2]"
-  }
-}
+BlackBox:
+  name: Clash.Sized.Internal.Signed.*#
+  kind: Expression
+  type: \'(*#) :: KnownNat n => Signed n -> Signed n -> Signed n\'
+  template: ~ARG[1] * ~ARG[2]
 @
 
 and
 
 @
-{ \"BlackBox\" :
-  { "name" : "Clash.Explicit.BlockRam.blockRam#"
-  , "kind" : \"Declaration\"
-  , "type" :
-"blockRam#
-  :: ( KnownDomain dom        ARG[0]
-     , HasCallStack  --       ARG[1]
-     , NFDataX a )   --       ARG[2]
-  => Clock dom       -- clk,  ARG[3]
-  -> Enable dom      -- en,   ARG[4]
-  -> Vec n a         -- init, ARG[5]
-  -> Signal dom Int  -- rd,   ARG[6]
-  -> Signal dom Bool -- wren, ARG[7]
-  -> Signal dom Int  -- wr,   ARG[8]
-  -> Signal dom a    -- din,  ARG[9]
-  -> Signal dom a"
-    , "template" :
-"// blockRam begin
-~SIGD[~GENSYM[RAM][1]][5];
-logic [~SIZE[~TYP[9]]-1:0] ~GENSYM[~RESULT_q][2];
-initial begin
-  ~SYM[1] = ~CONST[5];
-end~IF ~ISACTIVEENABLE[4] ~THEN
-always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
-  if (~ARG[4]) begin
-    if (~ARG[7]) begin
-      ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
-    end
-    ~SYM[2] <= ~SYM[1][~ARG[6]];
-  end~ELSE
-  if (~ARG[7] & ~ARG[4]) begin
-    ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
-  end
-  if (~ARG[4]) begin
-    ~SYM[2] <= ~SYM[1][~ARG[6]];
-  end~FI
-end~ELSE
-always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[3]
-  if (~ARG[7]) begin
-    ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
-  end
-  ~SYM[2] <= ~SYM[1][~ARG[6]];
-end~FI
-assign ~RESULT = ~FROMBV[~SYM[2]][~TYP[9]];
-// blockRam end"
-  }
-}
+BlackBox:
+  name: Clash.Explicit.BlockRam.blockRam#
+  kind: Declaration
+  type: |-
+    blockRam#
+      :: ( KnownDomain dom        ARG[0]
+         , HasCallStack  --       ARG[1]
+         , NFDataX a )   --       ARG[2]
+      => Clock dom       -- clk,  ARG[3]
+      -> Enable dom      -- en,   ARG[4]
+      -> Vec n a         -- init, ARG[5]
+      -> Signal dom Int  -- rd,   ARG[6]
+      -> Signal dom Bool -- wren, ARG[7]
+      -> Signal dom Int  -- wr,   ARG[8]
+      -> Signal dom a    -- din,  ARG[9]
+      -> Signal dom a
+  template: |-
+    // blockRam begin
+    ~SIGD[~GENSYM[RAM][1]][5];
+    logic [~SIZE[~TYP[9]]-1:0] ~GENSYM[~RESULT_q][2];
+    initial begin
+      ~SYM[1] = ~CONST[5];
+    end~IF ~ISACTIVEENABLE[4] ~THEN
+    always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
+      if (~ARG[4]) begin
+        if (~ARG[7]) begin
+          ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
+        end
+        ~SYM[2] <= ~SYM[1][~ARG[6]];
+      end~ELSE
+      if (~ARG[7] & ~ARG[4]) begin
+        ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
+      end
+      if (~ARG[4]) begin
+        ~SYM[2] <= ~SYM[1][~ARG[6]];
+      end~FI
+    end~ELSE
+    always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[3]
+      if (~ARG[7]) begin
+        ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
+      end
+      ~SYM[2] <= ~SYM[1][~ARG[6]];
+    end~FI
+    assign ~RESULT = ~FROMBV[~SYM[2]][~TYP[9]];
+    // blockRam end
 @
 
 -}

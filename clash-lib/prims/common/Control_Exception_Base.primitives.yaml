@@ -1,0 +1,63 @@
+- BlackBox:
+    name: Control.Exception.Base.recSelError
+    kind: Expression
+    type: 'recSelError ::
+      Addr# -> a'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox:
+    name: Control.Exception.Base.recConError
+    kind: Expression
+    type: 'recConError ::
+      Addr# -> a'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox:
+    name: Control.Exception.Base.irrefutPatError
+    kind: Expression
+    type: 'irrefutPatError
+      :: Addr# -> a'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox:
+    name: Control.Exception.Base.runtimeError
+    kind: Expression
+    type: 'runtimeError ::
+      Addr# -> a'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox:
+    name: Control.Exception.Base.nonExhaustiveGuardsError
+    kind: Expression
+    type: 'nonExhaustiveGuardsError
+      :: Addr# -> a'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox:
+    name: Control.Exception.Base.patError
+    kind: Expression
+    type: 'patError :: Addr#
+      -> a'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox:
+    name: Control.Exception.Base.noMethodBindingError
+    kind: Expression
+    type: 'noMethodBindingError
+      :: Addr# -> a'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox:
+    name: Control.Exception.Base.absentError
+    kind: Expression
+    type: 'absentError ::
+      Addr# -> a'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox:
+    name: Control.Exception.Base.typeError
+    kind: Expression
+    type: 'typeError :: Addr#
+      -> a'
+    template: ~ERRORO
+    workInfo: Constant
