@@ -1,30 +1,25 @@
-[ { "BlackBox" :
-    { "name" : "Clash.Signal.BiSignal.veryUnsafeToBiSignalIn"
-    , "workInfo" : "Never"
-    , "kind" : "Declaration"
-    , "type" :
-"veryUnsafeToBiSignalIn
-  :: ( HasCallStack                -- ARG[0]
-     , KnownNat n                  -- ARG[1]
-     , Given (SBiSignalDefault ds) -- ARG[2]
-     )
-  => BiSignalOut ds d n            -- ARG[3]
-  -> BiSignalIn ds d n"
-    , "template" : "~DEVNULL[~ARG[3]]"
-    }
-  }
-, { "BlackBox" :
-    { "name" : "Clash.Signal.BiSignal.mergeBiSignalOuts"
-    , "workInfo" : "Never"
-    , "kind" : "Expression"
-    , "type" :
-"mergeBiSignalOuts
-  :: ( HasCallStack                         -- ARG[0]
-     , KnownNat n                           -- ARG[1]
-     )
-  => Vec n (BiSignalOut defaultState dom m) -- ARG[2]
-  -> BiSignalOut defaultState dom m"
-    , "template" : "~DEVNULL[~ARG[2]]"
-    }
-  }
-]
+- BlackBox:
+    name: Clash.Signal.BiSignal.veryUnsafeToBiSignalIn
+    kind: Declaration
+    type: |-
+      veryUnsafeToBiSignalIn
+        :: ( HasCallStack                -- ARG[0]
+           , KnownNat n                  -- ARG[1]
+           , Given (SBiSignalDefault ds) -- ARG[2]
+           )
+        => BiSignalOut ds d n            -- ARG[3]
+        -> BiSignalIn ds d n
+    template: ~DEVNULL[~ARG[3]]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Signal.BiSignal.mergeBiSignalOuts
+    kind: Expression
+    type: |-
+      mergeBiSignalOuts
+        :: ( HasCallStack                         -- ARG[0]
+           , KnownNat n                           -- ARG[1]
+           )
+        => Vec n (BiSignalOut defaultState dom m) -- ARG[2]
+        -> BiSignalOut defaultState dom m
+    template: ~DEVNULL[~ARG[2]]
+    workInfo: Never

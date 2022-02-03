@@ -1,21 +1,14 @@
-[ { "BlackBox" :
-    { "name"      : "GHC.CString.unpackCString#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "template"  : "~LIT[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.CString.unpackFoldrCString#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "template"  : "~LIT[0]"
-    }
-  }
-, { "Primitive" :
-    { "name"     : "GHC.CString.unpackCStringUtf8#"
-    , "workInfo"  : "Never"
-    , "primType" : "Function"
-    }
-  }
-]
+- BlackBox:
+    name: GHC.CString.unpackCString#
+    kind: Expression
+    template: ~LIT[0]
+    workInfo: Never
+- BlackBox:
+    name: GHC.CString.unpackFoldrCString#
+    kind: Expression
+    template: ~LIT[0]
+    workInfo: Never
+- Primitive:
+    name: GHC.CString.unpackCStringUtf8#
+    primType: Function
+    workInfo: Never

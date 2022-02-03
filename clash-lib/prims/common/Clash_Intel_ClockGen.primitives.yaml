@@ -1,29 +1,22 @@
-[ { "BlackBox" :
-    { "name"      : "Clash.Intel.ClockGen.altpll"
-    , "workInfo"  : "Always"
-    , "kind"      : "Declaration"
-    , "includes"  : [ {"extension": "qsys"
-                      ,"name": "altpll"
-                      ,"format": "Haskell"
-                      ,"templateFunction": "Clash.Primitives.Intel.ClockGen.altpllQsysTF"
-                      }
-                    ]
-    , "format"    : "Haskell"
-    , "templateFunction" : "Clash.Primitives.Intel.ClockGen.altpllTF"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Intel.ClockGen.alteraPll"
-    , "workInfo"  : "Always"
-    , "kind"      : "Declaration"
-    , "includes"  : [ {"extension": "qsys"
-                      ,"name": "altera_pll"
-                      ,"format": "Haskell"
-                      ,"templateFunction": "Clash.Primitives.Intel.ClockGen.alteraPllQsysTF"
-                      }
-                    ]
-    , "format"    : "Haskell"
-    , "templateFunction" : "Clash.Primitives.Intel.ClockGen.alteraPllTF"
-    }
-  }
-]
+- BlackBox:
+    name: Clash.Intel.ClockGen.altpll
+    format: Haskell
+    includes:
+    - name: altpll
+      extension: qsys
+      format: Haskell
+      templateFunction: Clash.Primitives.Intel.ClockGen.altpllQsysTF
+    kind: Declaration
+    templateFunction: Clash.Primitives.Intel.ClockGen.altpllTF
+    workInfo: Always
+- BlackBox:
+    name: Clash.Intel.ClockGen.alteraPll
+    format: Haskell
+    includes:
+    - name: altera_pll
+      extension: qsys
+      format: Haskell
+      templateFunction: Clash.Primitives.Intel.ClockGen.alteraPllQsysTF
+    kind: Declaration
+    templateFunction: Clash.Primitives.Intel.ClockGen.alteraPllTF
+    workInfo: Always

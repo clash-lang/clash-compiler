@@ -1,20 +1,13 @@
-[ { "Primitive" :
-    { "name"      : "GHC.Magic.lazy"
-    , "workInfo"  : "Never"
-    , "primType"  : "Function"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "GHC.Magic.noinline"
-    , "workInfo"  : "Never"
-    , "type"      : "forall a. a -> a"
-    , "primType"  : "Function"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "GHC.Magic.runRW#"
-    , "workInfo"  : "Never"
-    , "primType"  : "Function"
-    }
-  }
-]
+- Primitive:
+    name: GHC.Magic.lazy
+    primType: Function
+    workInfo: Never
+- Primitive:
+    name: GHC.Magic.noinline
+    primType: Function
+    type: forall a. a -> a
+    workInfo: Never
+- Primitive:
+    name: GHC.Magic.runRW#
+    primType: Function
+    workInfo: Never

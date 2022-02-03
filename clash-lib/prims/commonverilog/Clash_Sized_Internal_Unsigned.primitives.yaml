@@ -1,212 +1,188 @@
-[ { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.eq#"
-    , "kind"      : "Expression"
-    , "type"      : "eq# :: Unsigned n -> Unsigned n -> Bool"
-    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] == ~ARG[1]~ELSE1'b1~FI"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.neq#"
-    , "kind"      : "Expression"
-    , "type"      : "neq# :: Unsigned n -> Unsigned n -> Bool"
-    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] != ~ARG[1]~ELSE1'b0~FI"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.lt#"
-    , "kind"      : "Expression"
-    , "type"      : "lt# :: Unsigned n -> Unsigned n -> Bool"
-    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSE1'b0~FI"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.ge#"
-    , "kind"      : "Expression"
-    , "type"      : "ge# :: Unsigned n -> Unsigned n -> Bool"
-    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSE1'b1~FI"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.gt#"
-    , "kind"      : "Expression"
-    , "type"      : "gt# :: Unsigned n -> Unsigned n -> Bool"
-    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSE1'b0~FI"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.le#"
-    , "kind"      : "Expression"
-    , "type"      : "le# :: Unsigned n -> Unsigned n -> Bool"
-    , "template"  : "~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSE1'b1~FI"
-    }
-  }
-, { "BlackBoxHaskell" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.toInteger#"
-    , "workInfo"  : "Never"
-    , "templateFunction" : "Clash.Primitives.Sized.ToInteger.unsignedToIntegerVerilog"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.fromEnum#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "fromEnum# :: KnownNat n => Unsigned n -> Int"
-    , "template"  : "~IF~SIZE[~TYP[1]]~THEN~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[1]]]~THEN$unsigned(~VAR[i][1][0+:~SIZE[~TYPO]])~ELSE$unsigned({{(~SIZE[~TYPO]-~SIZE[~TYP[1]]) {1'b0}},~VAR[i][1]})~FI~ELSE~SIZE[~TYPO]'sd0~FI"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.size#"
-    , "workInfo"  : "Constant"
-    , "kind"      : "Expression"
-    , "type"      : "size# :: KnownNat n => Unsigned n -> Int"
-    , "template"  : "~SIZE[~TYPO]'sd~LIT[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.pack#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "pack# :: Unsigned n -> BitVector n"
-    , "template"  : "~ARG[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.unpack#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "unpack# :: KnownNat n => BitVector n -> Unsigned n"
-    , "template"  : "~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.minBound#"
-    , "workInfo"  : "Constant"
-    , "kind"      : "Expression"
-    , "type"      : "minBound# :: Unsigned n"
-    , "template"  : "~SIZE[~TYPO]'d0"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.maxBound#"
-    , "workInfo"  : "Constant"
-    , "kind"      : "Expression"
-    , "type"      : "maxBound# :: KnownNat n => Unsigned n"
-    , "template"  : "{~LIT[0] {1'b1}}"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.*#"
-    , "kind"      : "Expression"
-    , "type"      : "(*#) :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n"
-    , "template"  : "~ARG[1] * ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.negate#"
-    , "kind"      : "Expression"
-    , "type"      : "negate# :: KnownNat n => Unsigned n -> Unsigned n"
-    , "template"  : "- ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.fromInteger#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "fromInteger# :: KnownNat n => Integer -> Unsigned n"
-    , "template"  : "~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[1]]]~THEN$unsigned(~VAR[i][1][0+:~SIZE[~TYPO]])~ELSE$unsigned({{(~SIZE[~TYPO]-~SIZE[~TYP[1]]) {1'b0}},~VAR[i][1]})~FI"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.toEnum#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "toEnum# :: KnownNat n => Int -> Unsigned n"
-    , "template"  : "~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[1]]]~THEN$unsigned(~VAR[i][1][0+:~SIZE[~TYPO]])~ELSE$unsigned({{(~SIZE[~TYPO]-~SIZE[~TYP[1]]) {1'b0}},~VAR[i][1]})~FI"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.plus#"
-    , "kind"      : "Declaration"
-    , "type"      : "plus# :: Unsigned m -> Unsigned n -> Unsigned (1 + Max m n)"
-    , "template"  : "assign ~RESULT = ~IF~AND[~SIZE[~TYP[0]],~SIZE[~TYP[1]]]~THEN~ARG[0] + ~ARG[1]~ELSE~IF~SIZE[~TYP[0]]~THEN~ARG[0]~ELSE~ARG[1]~FI~FI;"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.minus#"
-    , "kind"      : "Declaration"
-    , "type"      : "minus# :: (KnownNat m, KnownNat n) => Unsigned m -> Unsigned n -> Unsigned (1 + Max m n)"
-    , "template"  : "assign ~RESULT = ~IF~AND[~SIZE[~TYP[2]],~SIZE[~TYP[3]]]~THEN ~ARG[2] - ~ARG[3]~ELSE~IF~SIZE[~TYP[2]]~THEN ~ARG[2]~ELSE - ~ARG[3]~FI~FI;"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.times#"
-    , "kind"      : "Declaration"
-    , "type"      : "times# :: Unsigned m -> Unsigned n -> Unsigned (m + n)"
-    , "template"  : "assign ~RESULT = ~IF~AND[~SIZE[~TYP[0]],~SIZE[~TYP[1]]]~THEN~ARG[0] * ~ARG[1]~ELSE~SIZE[~TYPO]'d0~FI;"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.rem#"
-    , "kind"      : "Expression"
-    , "type"      : "rem# :: Unsigned n -> Unsigned n -> Unsigned n"
-    , "template"  : "~ARG[0] % ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.and#"
-    , "kind"      : "Expression"
-    , "type"      : "and# :: Unsigned n -> Unsigned n -> Unsigned n"
-    , "template"  : "~ARG[0] & ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.or#"
-    , "kind"      : "Expression"
-    , "type"      : "or# :: Unsigned n -> Unsigned n -> Unsigned n"
-    , "template"  : "~ARG[0] | ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.xor#"
-    , "kind"      : "Expression"
-    , "type"      : "xor# :: Unsigned n -> Unsigned n -> Unsigned n"
-    , "template"  : "~ARG[0] ^ ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.complement#"
-    , "kind"      : "Expression"
-    , "type"      : "complement# :: KnownNat n => Unsigned n -> Unsigned n"
-    , "template"  : "~ ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.shiftL#"
-    , "kind"      : "Expression"
-    , "type"      : "shiftL# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
-    , "template"  : "~ARG[1] << ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.shiftR#"
-    , "kind"      : "Expression"
-    , "type"      : "shiftR# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
-    , "template"  : "~ARG[1] >> ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.resize#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "resize# :: KnownNat m => Unsigned n -> Unsigned m"
-    , "template"  : "~IF~SIZE[~TYP[1]]~THEN~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[1]]]~THEN~VAR[bv][1][0+:~SIZE[~TYPO]]~ELSE{{(~SIZE[~TYPO]-~SIZE[~TYP[1]]) {1'b0}},~ARG[1]}~FI~ELSE~SIZE[~TYPO]'d0~FI"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.quot#"
-    , "kind"      : "Expression"
-    , "type"      : "quot# :: Unsigned n -> Unsigned n -> Unsigned n"
-    , "template"  : "~ARG[0] / ~ARG[1]"
-    }
-  }
-]
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.eq#
+    kind: Expression
+    type: 'eq# :: Unsigned
+      n -> Unsigned n -> Bool'
+    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] == ~ARG[1]~ELSE1'b1~FI
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.neq#
+    kind: Expression
+    type: 'neq# :: Unsigned
+      n -> Unsigned n -> Bool'
+    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] != ~ARG[1]~ELSE1'b0~FI
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.lt#
+    kind: Expression
+    type: 'lt# :: Unsigned
+      n -> Unsigned n -> Bool'
+    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSE1'b0~FI
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.ge#
+    kind: Expression
+    type: 'ge# :: Unsigned
+      n -> Unsigned n -> Bool'
+    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSE1'b1~FI
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.gt#
+    kind: Expression
+    type: 'gt# :: Unsigned
+      n -> Unsigned n -> Bool'
+    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSE1'b0~FI
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.le#
+    kind: Expression
+    type: 'le# :: Unsigned
+      n -> Unsigned n -> Bool'
+    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSE1'b1~FI
+- BlackBoxHaskell:
+    name: Clash.Sized.Internal.Unsigned.toInteger#
+    templateFunction: Clash.Primitives.Sized.ToInteger.unsignedToIntegerVerilog
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.fromEnum#
+    kind: Expression
+    type: 'fromEnum# :: KnownNat
+      n => Unsigned n -> Int'
+    template: ~IF~SIZE[~TYP[1]]~THEN~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[1]]]~THEN$unsigned(~VAR[i][1][0+:~SIZE[~TYPO]])~ELSE$unsigned({{(~SIZE[~TYPO]-~SIZE[~TYP[1]])
+      {1'b0}},~VAR[i][1]})~FI~ELSE~SIZE[~TYPO]'sd0~FI
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.size#
+    kind: Expression
+    type: 'size# :: KnownNat
+      n => Unsigned n -> Int'
+    template: ~SIZE[~TYPO]'sd~LIT[0]
+    workInfo: Constant
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.pack#
+    kind: Expression
+    type: 'pack# :: Unsigned
+      n -> BitVector n'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.unpack#
+    kind: Expression
+    type: 'unpack# :: KnownNat
+      n => BitVector n -> Unsigned n'
+    template: ~ARG[1]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.minBound#
+    kind: Expression
+    type: 'minBound# :: Unsigned
+      n'
+    template: ~SIZE[~TYPO]'d0
+    workInfo: Constant
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.maxBound#
+    kind: Expression
+    type: 'maxBound# :: KnownNat
+      n => Unsigned n'
+    template: '{~LIT[0] {1''b1}}'
+    workInfo: Constant
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.*#
+    kind: Expression
+    type: '(*#) :: KnownNat
+      n => Unsigned n -> Unsigned n -> Unsigned n'
+    template: ~ARG[1] * ~ARG[2]
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.negate#
+    kind: Expression
+    type: 'negate# :: KnownNat
+      n => Unsigned n -> Unsigned n'
+    template: '- ~ARG[1]'
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.fromInteger#
+    kind: Expression
+    type: 'fromInteger# ::
+      KnownNat n => Integer -> Unsigned n'
+    template: ~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[1]]]~THEN$unsigned(~VAR[i][1][0+:~SIZE[~TYPO]])~ELSE$unsigned({{(~SIZE[~TYPO]-~SIZE[~TYP[1]])
+      {1'b0}},~VAR[i][1]})~FI
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.toEnum#
+    kind: Expression
+    type: 'toEnum# :: KnownNat
+      n => Int -> Unsigned n'
+    template: ~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[1]]]~THEN$unsigned(~VAR[i][1][0+:~SIZE[~TYPO]])~ELSE$unsigned({{(~SIZE[~TYPO]-~SIZE[~TYP[1]])
+      {1'b0}},~VAR[i][1]})~FI
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.plus#
+    kind: Declaration
+    type: 'plus# :: Unsigned
+      m -> Unsigned n -> Unsigned (1 + Max m n)'
+    template: assign ~RESULT = ~IF~AND[~SIZE[~TYP[0]],~SIZE[~TYP[1]]]~THEN~ARG[0]
+      + ~ARG[1]~ELSE~IF~SIZE[~TYP[0]]~THEN~ARG[0]~ELSE~ARG[1]~FI~FI;
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.minus#
+    kind: Declaration
+    type: 'minus# :: (KnownNat
+      m, KnownNat n) => Unsigned m -> Unsigned n -> Unsigned (1 + Max m n)'
+    template: assign ~RESULT = ~IF~AND[~SIZE[~TYP[2]],~SIZE[~TYP[3]]]~THEN ~ARG[2]
+      - ~ARG[3]~ELSE~IF~SIZE[~TYP[2]]~THEN ~ARG[2]~ELSE - ~ARG[3]~FI~FI;
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.times#
+    kind: Declaration
+    type: 'times# :: Unsigned
+      m -> Unsigned n -> Unsigned (m + n)'
+    template: assign ~RESULT = ~IF~AND[~SIZE[~TYP[0]],~SIZE[~TYP[1]]]~THEN~ARG[0]
+      * ~ARG[1]~ELSE~SIZE[~TYPO]'d0~FI;
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.rem#
+    kind: Expression
+    type: 'rem# :: Unsigned
+      n -> Unsigned n -> Unsigned n'
+    template: ~ARG[0] % ~ARG[1]
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.and#
+    kind: Expression
+    type: 'and# :: Unsigned
+      n -> Unsigned n -> Unsigned n'
+    template: ~ARG[0] & ~ARG[1]
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.or#
+    kind: Expression
+    type: 'or# :: Unsigned
+      n -> Unsigned n -> Unsigned n'
+    template: ~ARG[0] | ~ARG[1]
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.xor#
+    kind: Expression
+    type: 'xor# :: Unsigned
+      n -> Unsigned n -> Unsigned n'
+    template: ~ARG[0] ^ ~ARG[1]
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.complement#
+    kind: Expression
+    type: 'complement# ::
+      KnownNat n => Unsigned n -> Unsigned n'
+    template: ~ ~ARG[1]
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.shiftL#
+    kind: Expression
+    type: 'shiftL# :: KnownNat
+      n => Unsigned n -> Int -> Unsigned n'
+    template: ~ARG[1] << ~ARG[2]
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.shiftR#
+    kind: Expression
+    type: 'shiftR# :: KnownNat
+      n => Unsigned n -> Int -> Unsigned n'
+    template: ~ARG[1] >> ~ARG[2]
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.resize#
+    kind: Expression
+    type: 'resize# :: KnownNat
+      m => Unsigned n -> Unsigned m'
+    template: ~IF~SIZE[~TYP[1]]~THEN~IF~CMPLE[~SIZE[~TYPO]][~SIZE[~TYP[1]]]~THEN~VAR[bv][1][0+:~SIZE[~TYPO]]~ELSE{{(~SIZE[~TYPO]-~SIZE[~TYP[1]])
+      {1'b0}},~ARG[1]}~FI~ELSE~SIZE[~TYPO]'d0~FI
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.quot#
+    kind: Expression
+    type: 'quot# :: Unsigned
+      n -> Unsigned n -> Unsigned n'
+    template: ~ARG[0] / ~ARG[1]

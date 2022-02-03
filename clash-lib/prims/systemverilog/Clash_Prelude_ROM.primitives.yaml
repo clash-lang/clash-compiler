@@ -1,18 +1,15 @@
-[ { "BlackBox" :
-    { "name" : "Clash.Prelude.ROM.asyncRom#"
-    , "kind" : "Declaration"
-    , "type" :
-"asyncRom# :: KnownNat n -- ^ ARG[0]
-           => Vec n a    -- ^ ARG[1]
-           -> Int        -- ^ ARG[2]
-           -> a"
-    , "template" :
-"// asyncRom begin
-~SIGD[~GENSYM[ROM][0]][1];
-assign ~SYM[0] = ~CONST[1];
+- BlackBox:
+    name: Clash.Prelude.ROM.asyncRom#
+    kind: Declaration
+    type: |-
+      asyncRom# :: KnownNat n -- ^ ARG[0]
+                 => Vec n a    -- ^ ARG[1]
+                 -> Int        -- ^ ARG[2]
+                 -> a
+    template: |-
+      // asyncRom begin
+      ~SIGD[~GENSYM[ROM][0]][1];
+      assign ~SYM[0] = ~CONST[1];
 
-assign ~RESULT = ~FROMBV[~SYM[0][\\~ARG[2]\\]][~TYPO];
-// asyncRom end"
-    }
-  }
-]
+      assign ~RESULT = ~FROMBV[~SYM[0][\~ARG[2]\]][~TYPO];
+      // asyncRom end

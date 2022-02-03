@@ -1,19 +1,14 @@
-[ { "BlackBox" :
-    { "name"      : "Clash.Signal.Internal.unsafeFromReset"
-    , "workInfo"  : "Never"
-    , "kind" : "Expression"
-    , "type" :
-"unsafeFromReset :: Reset dom -> Signal dom Bool"
-    , "template" : "~ARG[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Signal.Internal.unsafeToReset"
-    , "kind" : "Expression"
-    , "workInfo"  : "Never"
-    , "type" :
-"unsafeToReset :: Signal dom Bool -> Reset dom"
-    , "template" : "~ARG[0]"
-    }
-  }
-]
+- BlackBox:
+    name: Clash.Signal.Internal.unsafeFromReset
+    kind: Expression
+    type: 'unsafeFromReset
+      :: Reset dom -> Signal dom Bool'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Signal.Internal.unsafeToReset
+    kind: Expression
+    type: 'unsafeToReset ::
+      Signal dom Bool -> Reset dom'
+    template: ~ARG[0]
+    workInfo: Never

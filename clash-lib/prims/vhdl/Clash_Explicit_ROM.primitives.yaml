@@ -1,37 +1,34 @@
-[ { "BlackBox" :
-    { "name" : "Clash.Explicit.ROM.rom#"
-    , "kind" : "Declaration"
-    , "type" :
-"rom# :: ( KnownDomain dom        ARG[0]
-         , KnownNat n    --       ARG[1]
-         , Undefined a ) --       ARG[2]
-      => Clock dom       -- clk,  ARG[3]
-      -> Enable dom      -- en,   ARG[4]
-      -> Vec n a         -- init, ARG[5]
-      -> Signal dom Int  -- rd,   ARG[6]
-      -> Signal dom a"
-    , "template" :
-"-- rom begin
-~GENSYM[~COMPNAME_rom][1] : block
-  signal ~GENSYM[ROM][2] : ~TYP[5];
-  signal ~GENSYM[rd][3]  : integer range 0 to ~LIT[1]-1;
-begin
-  ~SYM[2] <= ~CONST[5];
+- BlackBox:
+    name: Clash.Explicit.ROM.rom#
+    kind: Declaration
+    type: |-
+      rom# :: ( KnownDomain dom        ARG[0]
+               , KnownNat n    --       ARG[1]
+               , Undefined a ) --       ARG[2]
+            => Clock dom       -- clk,  ARG[3]
+            -> Enable dom      -- en,   ARG[4]
+            -> Vec n a         -- init, ARG[5]
+            -> Signal dom Int  -- rd,   ARG[6]
+            -> Signal dom a
+    template: |-
+      -- rom begin
+      ~GENSYM[~COMPNAME_rom][1] : block
+        signal ~GENSYM[ROM][2] : ~TYP[5];
+        signal ~GENSYM[rd][3]  : integer range 0 to ~LIT[1]-1;
+      begin
+        ~SYM[2] <= ~CONST[5];
 
-  ~SYM[3] <= to_integer(~VAR[rdI][6](31 downto 0))
-  -- pragma translate_off
-                mod ~LIT[1]
-  -- pragma translate_on
-                ;
-  ~GENSYM[romSync][6] : process (~ARG[3])
-  begin
-    if (~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3])~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI) then~IF ~VIVADO ~THEN
-      ~RESULT <= ~FROMBV[~SYM[2](~SYM[3])][~TYPO];~ELSE
-      ~RESULT <= ~SYM[2](~SYM[3]);~FI
-    end if;
-  end process;
-end block;
--- rom end"
-    }
-  }
-]
+        ~SYM[3] <= to_integer(~VAR[rdI][6](31 downto 0))
+        -- pragma translate_off
+                      mod ~LIT[1]
+        -- pragma translate_on
+                      ;
+        ~GENSYM[romSync][6] : process (~ARG[3])
+        begin
+          if (~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3])~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI) then~IF ~VIVADO ~THEN
+            ~RESULT <= ~FROMBV[~SYM[2](~SYM[3])][~TYPO];~ELSE
+            ~RESULT <= ~SYM[2](~SYM[3]);~FI
+          end if;
+        end process;
+      end block;
+      -- rom end

@@ -1,25 +1,21 @@
-[ { "BlackBox" :
-    { "name"      : "GHC.Real.divZeroError"
-    , "workInfo"  : "Constant"
-    , "kind"      : "Expression"
-    , "type"      : "divZeroError :: a"
-    , "template"  : "~ERRORO"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Real.ratioZeroDenominatorError"
-    , "workInfo"  : "Constant"
-    , "kind"      : "Expression"
-    , "type"      : "ratioZeroDenominatorError :: a"
-    , "template"  : "~ERRORO"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Real.overflowError"
-    , "workInfo"  : "Constant"
-    , "kind"      : "Expression"
-    , "type"      : "overflowError :: a"
-    , "template"  : "~ERRORO"
-    }
-  }
-]
+- BlackBox:
+    name: GHC.Real.divZeroError
+    kind: Expression
+    type: 'divZeroError ::
+      a'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox:
+    name: GHC.Real.ratioZeroDenominatorError
+    kind: Expression
+    type: 'ratioZeroDenominatorError
+      :: a'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox:
+    name: GHC.Real.overflowError
+    kind: Expression
+    type: 'overflowError ::
+      a'
+    template: ~ERRORO
+    workInfo: Constant

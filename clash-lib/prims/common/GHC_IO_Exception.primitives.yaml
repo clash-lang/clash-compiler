@@ -1,14 +1,13 @@
-[ { "BlackBox" :
-    { "name"      : "GHC.IO.Exception.assertError"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "assertError :: HasCallStack => Bool -> a -> a"
-    , "comment"   : "It would be nice if we could use a HDL assertion, however,
-                     because in HDL, case alternatives are evaluated
-                     concurrently, we would end up with the assertion being
-                     triggered, even when the result of that branch is not
-                     chosen in the multiplexer"
-    , "template"  : "~ARG[2]"
-    }
-  }
-]
+- BlackBox:
+    name: GHC.IO.Exception.assertError
+    comment: |-
+      It would be nice if we could use a HDL assertion, however,
+                           because in HDL, case alternatives are evaluated
+                           concurrently, we would end up with the assertion being
+                           triggered, even when the result of that branch is not
+                           chosen in the multiplexer
+    kind: Expression
+    type: 'assertError ::
+      HasCallStack => Bool -> a -> a'
+    template: ~ARG[2]
+    workInfo: Never

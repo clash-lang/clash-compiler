@@ -1,15 +1,12 @@
-[ { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.+#"
-    , "kind"      : "Expression"
-    , "type"      : "(+#) :: KnownNat n => Signed n -> Signed n -> Signed n"
-    , "template"  : "~ARG[1] + ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Signed.-#"
-    , "kind"      : "Expression"
-    , "type"      : "(-#) :: KnownNat n => Signed n -> Signed n -> Signed n"
-    , "template"  : "~ARG[1] - ~ARG[2]"
-    }
-  }
-]
+- BlackBox:
+    name: Clash.Sized.Internal.Signed.+#
+    kind: Expression
+    type: '(+#) :: KnownNat
+      n => Signed n -> Signed n -> Signed n'
+    template: ~ARG[1] + ~ARG[2]
+- BlackBox:
+    name: Clash.Sized.Internal.Signed.-#
+    kind: Expression
+    type: '(-#) :: KnownNat
+      n => Signed n -> Signed n -> Signed n'
+    template: ~ARG[1] - ~ARG[2]

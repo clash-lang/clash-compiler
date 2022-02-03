@@ -1,78 +1,71 @@
-[ { "BlackBox" :
-    { "name"      : "Clash.Promoted.Nat.flogBaseSNat"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "Clash.Promoted.Nat.flogBaseSNat :: (2 <= base, 1 <= x)
-                                                     => SNat base -- ARG[2]
-                                                     -> SNat x    -- ARG[3]
-                                                     -> SNat (FLog base x"
-    , "imports"   : ["~INCLUDENAME[0].inc"]
-    , "includes" :
-      [ { "name" : "flogBase"
-        , "extension" : "inc"
-        , "template" :
-"// floor of logBase
-function integer ~INCLUDENAME[0];
-  input integer base, value;
-  begin
-    for (~INCLUDENAME[0] = 0; value >= base; ~INCLUDENAME[0]=~INCLUDENAME[0]+1)
-      value = value / base;
-  end
-endfunction"
-        }
-      ]
-    , "template"  : "~INCLUDENAME[0](~LIT[2],~LIT[3])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Promoted.Nat.clogBaseSNat"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "Clash.Promoted.Nat.clogBaseSNat :: (2 <= base, 1 <= x)
-                                                     => SNat base -- ARG[2]
-                                                     -> SNat x    -- ARG[3]
-                                                     -> SNat (CLog base x"
-    , "imports"   : ["~INCLUDENAME[0].inc"]
-    , "includes" :
-      [ { "name" : "clogBase"
-        , "extension" : "inc"
-        , "template" :
-"// ceiling of logBase
-function integer ~INCLUDENAME[0];
-  input integer base, value;
-  begin
-    for (~INCLUDENAME[0] = 0; base ** ~INCLUDENAME[0] < value; ~~INCLUDENAME[0]=~INCLUDENAME[0]+1);
-  end
-endfunction"
-        }
-      ]
-    , "template"  : "~INCLUDENAME[0](~LIT[2],~LIT[3])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Promoted.Nat.logBaseSNat"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "Clash.Promoted.Nat.logBaseSNat :: (FLog base x ~ CLog base x)
-                                                    => SNat base -- ARG[1]
-                                                    -> SNat x    -- ARG[2]
-                                                    -> SNat (Log base x)"
-    , "imports"   : ["~INCLUDENAME[0].inc"]
-    , "includes" :
-      [ { "name" : "clogBase"
-        , "extension" : "inc"
-        , "template" :
-"// logBaseSNat begin
-function integer ~INCLUDENAME[0];
-  input integer base, value;
-  begin
-    for (~INCLUDENAME[0] = 0; value >= base; ~INCLUDENAME[0]=~INCLUDENAME[0]+1)
-      value = value / base;
-  end
-endfunction"
-        }
-      ]
-    , "template"  :  "~INCLUDENAME[0](~LIT[1],~LIT[2])"
-    }
-  }
-]
+- BlackBox:
+    name: Clash.Promoted.Nat.flogBaseSNat
+    imports:
+    - ~INCLUDENAME[0].inc
+    includes:
+    - name: flogBase
+      extension: inc
+      template: |-
+        // floor of logBase
+        function integer ~INCLUDENAME[0];
+          input integer base, value;
+          begin
+            for (~INCLUDENAME[0] = 0; value >= base; ~INCLUDENAME[0]=~INCLUDENAME[0]+1)
+              value = value / base;
+          end
+        endfunction
+    kind: Expression
+    type: |-
+      Clash.Promoted.Nat.flogBaseSNat :: (2 <= base, 1 <= x)
+                                                           => SNat base -- ARG[2]
+                                                           -> SNat x    -- ARG[3]
+                                                           -> SNat (FLog base x
+    template: ~INCLUDENAME[0](~LIT[2],~LIT[3])
+    workInfo: Never
+- BlackBox:
+    name: Clash.Promoted.Nat.clogBaseSNat
+    imports:
+    - ~INCLUDENAME[0].inc
+    includes:
+    - name: clogBase
+      extension: inc
+      template: |-
+        // ceiling of logBase
+        function integer ~INCLUDENAME[0];
+          input integer base, value;
+          begin
+            for (~INCLUDENAME[0] = 0; base ** ~INCLUDENAME[0] < value; ~~INCLUDENAME[0]=~INCLUDENAME[0]+1);
+          end
+        endfunction
+    kind: Expression
+    type: |-
+      Clash.Promoted.Nat.clogBaseSNat :: (2 <= base, 1 <= x)
+                                                           => SNat base -- ARG[2]
+                                                           -> SNat x    -- ARG[3]
+                                                           -> SNat (CLog base x
+    template: ~INCLUDENAME[0](~LIT[2],~LIT[3])
+    workInfo: Never
+- BlackBox:
+    name: Clash.Promoted.Nat.logBaseSNat
+    imports:
+    - ~INCLUDENAME[0].inc
+    includes:
+    - name: clogBase
+      extension: inc
+      template: |-
+        // logBaseSNat begin
+        function integer ~INCLUDENAME[0];
+          input integer base, value;
+          begin
+            for (~INCLUDENAME[0] = 0; value >= base; ~INCLUDENAME[0]=~INCLUDENAME[0]+1)
+              value = value / base;
+          end
+        endfunction
+    kind: Expression
+    type: |-
+      Clash.Promoted.Nat.logBaseSNat :: (FLog base x ~ CLog base x)
+                                                          => SNat base -- ARG[1]
+                                                          -> SNat x    -- ARG[2]
+                                                          -> SNat (Log base x)
+    template: ~INCLUDENAME[0](~LIT[1],~LIT[2])
+    workInfo: Never

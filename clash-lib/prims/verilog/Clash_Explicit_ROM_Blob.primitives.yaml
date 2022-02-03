@@ -1,37 +1,34 @@
-[ { "BlackBox" :
-    { "name" : "Clash.Explicit.ROM.Blob.romBlob#"
-    , "kind" : "Declaration"
-    , "type" :
-"romBlob#
-  :: KnownDomain dom  --       ARG[0]
-  => Clock dom        -- clk,  ARG[1]
-  -> Enable dom       -- en,   ARG[2]
-  -> MemBlob n m      -- init, ARG[3]
-  -> Signal dom Int   -- rd,   ARG[4]
-  -> Signal dom (BitVector m)"
-    , "outputReg" : true
-    , "template" :
-"// romBlob begin
-reg ~TYPO ~GENSYM[ROM][1] [0:~LENGTH[~TYP[3]]-1];
+- BlackBox:
+    name: Clash.Explicit.ROM.Blob.romBlob#
+    kind: Declaration
+    outputReg: true
+    type: |-
+      romBlob#
+        :: KnownDomain dom  --       ARG[0]
+        => Clock dom        -- clk,  ARG[1]
+        -> Enable dom       -- en,   ARG[2]
+        -> MemBlob n m      -- init, ARG[3]
+        -> Signal dom Int   -- rd,   ARG[4]
+        -> Signal dom (BitVector m)
+    template: |-
+      // romBlob begin
+      reg ~TYPO ~GENSYM[ROM][1] [0:~LENGTH[~TYP[3]]-1];
 
-reg ~TYP[3] ~GENSYM[rom_init][3];
-integer ~GENSYM[i][4];
-initial begin
-  ~SYM[3] = ~CONST[3];
-  for (~SYM[4]=0; ~SYM[4] < ~LENGTH[~TYP[3]]; ~SYM[4] = ~SYM[4] + 1) begin
-    ~SYM[1][~LENGTH[~TYP[3]]-1-~SYM[4]] = ~SYM[3][~SYM[4]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
-  end
-end
-~IF ~ISACTIVEENABLE[2] ~THEN
-always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[1]) begin : ~GENSYM[~COMPNAME_rom][5]
-  if (~ARG[2]) begin
-    ~RESULT <= ~SYM[1][~ARG[4]];
-  end
-end~ELSE
-always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[1]) begin : ~SYM[5]
-  ~RESULT <= ~SYM[1][~ARG[4]];
-end~FI
-// romBlob end"
-    }
-  }
-]
+      reg ~TYP[3] ~GENSYM[rom_init][3];
+      integer ~GENSYM[i][4];
+      initial begin
+        ~SYM[3] = ~CONST[3];
+        for (~SYM[4]=0; ~SYM[4] < ~LENGTH[~TYP[3]]; ~SYM[4] = ~SYM[4] + 1) begin
+          ~SYM[1][~LENGTH[~TYP[3]]-1-~SYM[4]] = ~SYM[3][~SYM[4]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+        end
+      end
+      ~IF ~ISACTIVEENABLE[2] ~THEN
+      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[1]) begin : ~GENSYM[~COMPNAME_rom][5]
+        if (~ARG[2]) begin
+          ~RESULT <= ~SYM[1][~ARG[4]];
+        end
+      end~ELSE
+      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[1]) begin : ~SYM[5]
+        ~RESULT <= ~SYM[1][~ARG[4]];
+      end~FI
+      // romBlob end

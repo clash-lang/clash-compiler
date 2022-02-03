@@ -1,31 +1,28 @@
-[ { "BlackBox" :
-    { "name" : "Clash.Explicit.ROM.Blob.romBlob#"
-    , "kind" : "Declaration"
-    , "type" :
-"romBlob#
-  :: KnownDomain dom  --       ARG[0]
-  => Clock dom        -- clk,  ARG[1]
-  -> Enable dom       -- en,   ARG[2]
-  -> MemBlob n m      -- init, ARG[3]
-  -> Signal dom Int   -- rd,   ARG[4]
-  -> Signal dom (BitVector m)"
-    , "template" :
-"// romBlob begin
-~SIGD[~GENSYM[ROM][1]][3];
-assign ~SYM[1] = ~CONST[3];
+- BlackBox:
+    name: Clash.Explicit.ROM.Blob.romBlob#
+    kind: Declaration
+    type: |-
+      romBlob#
+        :: KnownDomain dom  --       ARG[0]
+        => Clock dom        -- clk,  ARG[1]
+        -> Enable dom       -- en,   ARG[2]
+        -> MemBlob n m      -- init, ARG[3]
+        -> Signal dom Int   -- rd,   ARG[4]
+        -> Signal dom (BitVector m)
+    template: |-
+      // romBlob begin
+      ~SIGD[~GENSYM[ROM][1]][3];
+      assign ~SYM[1] = ~CONST[3];
 
-logic [~SIZE[~TYPO]-1:0] ~GENSYM[~RESULT_q][2];~IF ~ISACTIVEENABLE[2] ~THEN
-always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[1]) begin : ~GENSYM[~COMPNAME_rom][3]
-  if (~ARG[2]) begin
-    ~SYM[2] <= ~SYM[1][~ARG[4]];
-  end
-end~ELSE
-always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[1]) begin : ~SYM[3]
-  ~SYM[2] <= ~SYM[1][~ARG[4]];
-end~FI
+      logic [~SIZE[~TYPO]-1:0] ~GENSYM[~RESULT_q][2];~IF ~ISACTIVEENABLE[2] ~THEN
+      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[1]) begin : ~GENSYM[~COMPNAME_rom][3]
+        if (~ARG[2]) begin
+          ~SYM[2] <= ~SYM[1][~ARG[4]];
+        end
+      end~ELSE
+      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[1]) begin : ~SYM[3]
+        ~SYM[2] <= ~SYM[1][~ARG[4]];
+      end~FI
 
-assign ~RESULT = ~SYM[2];
-// rom end"
-    }
-  }
-]
+      assign ~RESULT = ~SYM[2];
+      // rom end

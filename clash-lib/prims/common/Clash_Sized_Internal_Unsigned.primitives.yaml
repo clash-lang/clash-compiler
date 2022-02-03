@@ -1,39 +1,28 @@
-[ { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.+#"
-    , "kind"      : "Expression"
-    , "type"      : "(+#) :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n"
-    , "template"  : "~ARG[1] + ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.-#"
-    , "kind"      : "Expression"
-    , "type"      : "(-#) :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n"
-    , "template"  : "~ARG[1] - ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.unsignedToWord"
-    , "kind"      : "Expression"
-    , "template"  : "~ARG[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.unsigned8toWord8"
-    , "kind"      : "Expression"
-    , "template"  : "~ARG[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.unsigned16toWord16"
-    , "kind"      : "Expression"
-    , "template"  : "~ARG[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.Unsigned.unsigned32toWord32"
-    , "kind"      : "Expression"
-    , "template"  : "~ARG[0]"
-    }
-  }
-]
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.+#
+    kind: Expression
+    type: '(+#) :: KnownNat
+      n => Unsigned n -> Unsigned n -> Unsigned n'
+    template: ~ARG[1] + ~ARG[2]
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.-#
+    kind: Expression
+    type: '(-#) :: KnownNat
+      n => Unsigned n -> Unsigned n -> Unsigned n'
+    template: ~ARG[1] - ~ARG[2]
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.unsignedToWord
+    kind: Expression
+    template: ~ARG[0]
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.unsigned8toWord8
+    kind: Expression
+    template: ~ARG[0]
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.unsigned16toWord16
+    kind: Expression
+    template: ~ARG[0]
+- BlackBox:
+    name: Clash.Sized.Internal.Unsigned.unsigned32toWord32
+    kind: Expression
+    template: ~ARG[0]

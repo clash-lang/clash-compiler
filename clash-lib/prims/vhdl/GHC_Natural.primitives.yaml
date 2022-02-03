@@ -1,32 +1,27 @@
-[
-  {
-    "BlackBox": {
-      "name": "GHC.Natural.naturalFromInteger",
-      "workInfo" : "Never",
-      "kind": "Expression",
-      "type": "naturalFromInteger :: Integer -> Natural",
-      "template": "resize(unsigned(std_logic_vector(~ARG[0])),~SIZE[~TYPO])",
-      "warning": "GHC.Natural.naturalFromInteger: Naturals are dynamically sized in simulation, but fixed-length after synthesization. Use carefully."
-    }
-  },
-  {
-    "BlackBox": {
-      "name": "GHC.Natural.timesNatural",
-      "workInfo" : "Never",
-      "kind": "Expression",
-      "type": "timesNatural :: Natural -> Natural -> Natural",
-      "template": "resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])",
-      "warning": "GHC.Natural.timesNatural: Naturals are dynamically sized in simulation, but fixed-length after synthesization. Use carefully."
-    }
-  },
-  {
-    "BlackBox": {
-      "name": "GHC.Natural.wordToNatural#",
-      "workInfo" : "Never",
-      "kind": "Expression",
-      "type": "wordToNatural# :: Word# -> Natural",
-      "template": "unsigned(std_logic_vector(~ARG[0]))",
-      "warning": "GHC.Natural.wordToNatural#: Naturals are dynamically sized in simulation, but fixed-length after synthesization. Use carefully."
-    }
-  }
-]
+- BlackBox:
+    name: GHC.Natural.naturalFromInteger
+    kind: Expression
+    type: 'naturalFromInteger
+      :: Integer -> Natural'
+    template: resize(unsigned(std_logic_vector(~ARG[0])),~SIZE[~TYPO])
+    warning: 'GHC.Natural.naturalFromInteger: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+    workInfo: Never
+- BlackBox:
+    name: GHC.Natural.timesNatural
+    kind: Expression
+    type: 'timesNatural ::
+      Natural -> Natural -> Natural'
+    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+    warning: 'GHC.Natural.timesNatural: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+    workInfo: Never
+- BlackBox:
+    name: GHC.Natural.wordToNatural#
+    kind: Expression
+    type: 'wordToNatural#
+      :: Word# -> Natural'
+    template: unsigned(std_logic_vector(~ARG[0]))
+    warning: 'GHC.Natural.wordToNatural#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesization. Use carefully.'
+    workInfo: Never

@@ -1,7 +1,4 @@
-[ { "Primitive" :
-    { "name"      : "GHC.Base.$"
-    , "workInfo"  : "Never"
-    , "primType"  : "Function"
-    }
-  }
-]
+- Primitive:
+    name: GHC.Base.$
+    primType: Function
+    workInfo: Never

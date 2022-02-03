@@ -1,33 +1,28 @@
-[ { "BlackBox" :
-    { "name"      : "GHC.Word.W8#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "W8# :: Word# -> Word8"
-    , "template"  : "resize(~ARG[0],8)"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Word.W16#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "W16# :: Word# -> Word16"
-    , "template"  : "resize(~ARG[0],16)"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Word.W32#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "W32# :: Word# -> Word32"
-    , "template"  : "resize(~ARG[0],32)"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Word.W64#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "W64# :: Word# -> Word64"
-    , "template"  : "resize(~ARG[0],64)"
-    }
-  }
-]
+- BlackBox:
+    name: GHC.Word.W8#
+    kind: Expression
+    type: 'W8# :: Word# ->
+      Word8'
+    template: resize(~ARG[0],8)
+    workInfo: Never
+- BlackBox:
+    name: GHC.Word.W16#
+    kind: Expression
+    type: 'W16# :: Word# ->
+      Word16'
+    template: resize(~ARG[0],16)
+    workInfo: Never
+- BlackBox:
+    name: GHC.Word.W32#
+    kind: Expression
+    type: 'W32# :: Word# ->
+      Word32'
+    template: resize(~ARG[0],32)
+    workInfo: Never
+- BlackBox:
+    name: GHC.Word.W64#
+    kind: Expression
+    type: 'W64# :: Word# ->
+      Word64'
+    template: resize(~ARG[0],64)
+    workInfo: Never

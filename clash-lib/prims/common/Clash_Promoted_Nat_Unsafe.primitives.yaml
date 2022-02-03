@@ -1,9 +1,7 @@
-[ { "BlackBox" :
-    { "name"      : "Clash.Promoted.Nat.Unsafe.unsafeSNat"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "Clash.Promoted.Nat.Unsafe.unsafeSNat :: Integer -> SNat k"
-    , "template"  : "~LIT[0]"
-    }
-  }
-]
+- BlackBox:
+    name: Clash.Promoted.Nat.Unsafe.unsafeSNat
+    kind: Expression
+    type: 'Clash.Promoted.Nat.Unsafe.unsafeSNat
+      :: Integer -> SNat k'
+    template: ~LIT[0]
+    workInfo: Never

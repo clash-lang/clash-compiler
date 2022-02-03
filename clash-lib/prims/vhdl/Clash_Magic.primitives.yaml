@@ -1,13 +1,11 @@
-[ { "BlackBox" :
-    { "name" : "Clash.Magic.nameHint"
-    , "kind" : "Declaration"
-    , "type" :
-"nameHint
-  :: SSymbol sym  -- ARG[0]
-  -> a            -- ARG[1]
-  -> a"
-    , "resultName" : { "template" : "~NAME[0]" }
-    , "template" : "~RESULT <= ~ARG[1];"
-    }
-  }
-]
+- BlackBox:
+    name: Clash.Magic.nameHint
+    kind: Declaration
+    type: |-
+      nameHint
+        :: SSymbol sym  -- ARG[0]
+        -> a            -- ARG[1]
+        -> a
+    resultName:
+      template: ~NAME[0]
+    template: ~RESULT <= ~ARG[1];

@@ -1,29 +1,24 @@
-[
-  {
-    "BlackBox": {
-      "name": "Clash.Class.Exp.expIndex#",
-      "kind": "Expression",
-      "type": "expIndex# :: KnownNat m => Index m -> SNat n -> Index (m^n)",
-      "template": "~DEVNULL[~ARG[0]]to_unsigned(to_integer(~ARG[1]) ** ~LIT[2], ~SIZE[~TYPO])",
-      "warning": "Exponentiation is only supported on relatively small constructs (< 32 bits). Ideally, Clash should have constant folded your expression. See https://github.com/clash-lang/clash-compiler/issues/593."
-    }
-  },
-  {
-    "BlackBox": {
-      "name": "Clash.Class.Exp.expSigned#",
-      "kind": "Expression",
-      "type": "expSigned# :: KnownNat m => Signed m -> SNat n -> Signed (m*n)",
-      "template": "~DEVNULL[~ARG[0]]to_signed(to_integer(~ARG[1]) ** ~LIT[2], ~SIZE[~TYPO])",
-      "warning": "Exponentiation is only supported on relatively small constructs (< 32 bits). Ideally, Clash should have constant folded your expression. See https://github.com/clash-lang/clash-compiler/issues/593."
-    }
-  },
-  {
-    "BlackBox": {
-      "name": "Clash.Class.Exp.expUnsigned#",
-      "kind": "Expression",
-      "type": "expUnsigned# :: KnownNat m => Unsigned m -> SNat n -> Unsigned (m*n)",
-      "template": "~DEVNULL[~ARG[0]]to_unsigned(to_integer(~ARG[1]) ** ~LIT[2], ~SIZE[~TYPO])",
-      "warning": "Exponentiation is only supported on relatively small constructs (< 32 bits). Ideally, Clash should have constant folded your expression. See https://github.com/clash-lang/clash-compiler/issues/593."
-    }
-  }
-]
+- BlackBox:
+    name: Clash.Class.Exp.expIndex#
+    kind: Expression
+    type: 'expIndex# :: KnownNat
+      m => Index m -> SNat n -> Index (m^n)'
+    template: ~DEVNULL[~ARG[0]]to_unsigned(to_integer(~ARG[1]) ** ~LIT[2], ~SIZE[~TYPO])
+    warning: Exponentiation is only supported on relatively small constructs (< 32
+      bits). Ideally, Clash should have constant folded your expression. See https://github.com/clash-lang/clash-compiler/issues/593.
+- BlackBox:
+    name: Clash.Class.Exp.expSigned#
+    kind: Expression
+    type: 'expSigned# :: KnownNat
+      m => Signed m -> SNat n -> Signed (m*n)'
+    template: ~DEVNULL[~ARG[0]]to_signed(to_integer(~ARG[1]) ** ~LIT[2], ~SIZE[~TYPO])
+    warning: Exponentiation is only supported on relatively small constructs (< 32
+      bits). Ideally, Clash should have constant folded your expression. See https://github.com/clash-lang/clash-compiler/issues/593.
+- BlackBox:
+    name: Clash.Class.Exp.expUnsigned#
+    kind: Expression
+    type: 'expUnsigned# ::
+      KnownNat m => Unsigned m -> SNat n -> Unsigned (m*n)'
+    template: ~DEVNULL[~ARG[0]]to_unsigned(to_integer(~ARG[1]) ** ~LIT[2], ~SIZE[~TYPO])
+    warning: Exponentiation is only supported on relatively small constructs (< 32
+      bits). Ideally, Clash should have constant folded your expression. See https://github.com/clash-lang/clash-compiler/issues/593.

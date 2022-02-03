@@ -61,11 +61,11 @@ Extra-source-files:
   src/ClashDebug.h
 
 Data-files:
-  prims/common/*.primitives,
-  prims/commonverilog/*.primitives,
-  prims/verilog/*.primitives,
-  prims/systemverilog/*.primitives,
-  prims/vhdl/*.primitives
+  prims/common/*.primitives.yaml,
+  prims/commonverilog/*.primitives.yaml,
+  prims/verilog/*.primitives.yaml,
+  prims/systemverilog/*.primitives.yaml,
+  prims/vhdl/*.primitives.yaml
 
 source-repository head
   type: git
@@ -307,6 +307,7 @@ executable v16-upgrade-primitives
   Build-Depends:
     base,
     aeson,
+    deepseq,
     yaml,
     bytestring,
     clash-lib,

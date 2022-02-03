@@ -1,15 +1,11 @@
-[ { "Primitive" :
-    { "name"      : "GHC.Types.MkCoercible"
-    , "workInfo"  : "Never"
-    , "primType"  : "Constructor"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Types.C#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "I# :: Char# -> Char"
-    , "template"  : "~ARG[0]"
-    }
-  }
-]
+- Primitive:
+    name: GHC.Types.MkCoercible
+    primType: Constructor
+    workInfo: Never
+- BlackBox:
+    name: GHC.Types.C#
+    kind: Expression
+    type: 'I# :: Char# ->
+      Char'
+    template: ~ARG[0]
+    workInfo: Never

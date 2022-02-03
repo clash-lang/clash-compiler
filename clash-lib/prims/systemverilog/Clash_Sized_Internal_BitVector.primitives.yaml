@@ -1,79 +1,70 @@
-[ { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.replaceBit#"
-    , "kind"      : "Declaration"
-    , "type" :
-"replaceBit# :: KnownNat n  -- ARG[0]
-             => BitVector n -- ARG[1]
-             -> Int         -- ARG[2]
-             -> Bit         -- ARG[3]
-             -> BitVector n"
-    , "template" :
-"// replaceBit start
-always_comb begin
-  ~RESULT = ~ARG[1];
-  ~RESULT[~ARG[2]] = ~ARG[3];
-end
-// replaceBit end"
-    }
-  }
-, { "BlackBox" :
-    { "name" : "Clash.Sized.Internal.BitVector.setSlice#"
-    , "workInfo" : "Never"
-    , "kind" : "Declaration"
-    , "type" :
-"setSlice# :: SNat (m + 1 + i)
-           -> BitVector (m + 1 + i) -- ARG[1]
-           -> SNat m                -- ARG[2]
-           -> SNat n                -- ARG[3]
-           -> BitVector (m + 1 - n) -- ARG[4]
-           -> BitVector (m + 1 + i)"
-    , "template" :
-"// setSlice begin
-always_comb begin
-  ~RESULT = ~ARG[1];
-  ~RESULT[~LIT[2] : ~LIT[3]] = ~ARG[4];
-end
-// setSlice end"
-    }
-  }
-, { "BlackBox" :
-    { "name" : "Clash.Sized.Internal.BitVector.split#"
-    , "workInfo" : "Never"
-    , "kind" : "Declaration"
-    , "type" :
-"split# :: KnownNat n        -- ARG[0]
-        => BitVector (m + n) -- ARG[1]
-        -> (BitVector m, BitVector n)"
-    , "template" :
-"// split begin
-assign ~RESULT = { ~VAR[bv][1][$high(~VAR[bv][1]) : ~LIT[0]]
-                 , ~VAR[bv][1][(~LIT[0]-1) : 0]
-                 };
-// split end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.rotateL#"
-    , "kind"      : "Declaration"
-    , "type"      : "rotateL# :: KnownNat n => BitVector n -> Int -> BitVector n"
-    , "template"  :
-"// rotateL begin
-logic [2*~SIZE[~TYPO]-1:0] ~GENSYM[bv][0];
-assign ~SYM[0] = {~ARG[1],~ARG[1]} << (~ARG[2] % ~SIZE[~TYPO]);
-assign ~RESULT = ~SYM[0][2*~SIZE[~TYPO]-1 : ~SIZE[~TYPO]];
-// rotateL end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.rotateR#"
-    , "kind"      : "Declaration"
-    , "type"      : "rotateR# :: KnownNat n => BitVector n -> Int -> BitVector n"
-    , "template"  :
-"// rotateR begin
-logic [2*~SIZE[~TYPO]-1:0] ~GENSYM[bv][0];
-assign ~SYM[0] = {~ARG[1],~ARG[1]} >> (~ARG[2] % ~SIZE[~TYPO]);
-assign ~RESULT = ~SYM[0][~SIZE[~TYPO]-1 : 0];
-// rotateR end"
-    }
-  }
-]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.replaceBit#
+    kind: Declaration
+    type: |-
+      replaceBit# :: KnownNat n  -- ARG[0]
+                   => BitVector n -- ARG[1]
+                   -> Int         -- ARG[2]
+                   -> Bit         -- ARG[3]
+                   -> BitVector n
+    template: |-
+      // replaceBit start
+      always_comb begin
+        ~RESULT = ~ARG[1];
+        ~RESULT[~ARG[2]] = ~ARG[3];
+      end
+      // replaceBit end
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.setSlice#
+    kind: Declaration
+    type: |-
+      setSlice# :: SNat (m + 1 + i)
+                 -> BitVector (m + 1 + i) -- ARG[1]
+                 -> SNat m                -- ARG[2]
+                 -> SNat n                -- ARG[3]
+                 -> BitVector (m + 1 - n) -- ARG[4]
+                 -> BitVector (m + 1 + i)
+    template: |-
+      // setSlice begin
+      always_comb begin
+        ~RESULT = ~ARG[1];
+        ~RESULT[~LIT[2] : ~LIT[3]] = ~ARG[4];
+      end
+      // setSlice end
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.split#
+    kind: Declaration
+    type: |-
+      split# :: KnownNat n        -- ARG[0]
+              => BitVector (m + n) -- ARG[1]
+              -> (BitVector m, BitVector n)
+    template: |-
+      // split begin
+      assign ~RESULT = { ~VAR[bv][1][$high(~VAR[bv][1]) : ~LIT[0]]
+                       , ~VAR[bv][1][(~LIT[0]-1) : 0]
+                       };
+      // split end
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.rotateL#
+    kind: Declaration
+    type: 'rotateL# :: KnownNat
+      n => BitVector n -> Int -> BitVector n'
+    template: |-
+      // rotateL begin
+      logic [2*~SIZE[~TYPO]-1:0] ~GENSYM[bv][0];
+      assign ~SYM[0] = {~ARG[1],~ARG[1]} << (~ARG[2] % ~SIZE[~TYPO]);
+      assign ~RESULT = ~SYM[0][2*~SIZE[~TYPO]-1 : ~SIZE[~TYPO]];
+      // rotateL end
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.rotateR#
+    kind: Declaration
+    type: 'rotateR# :: KnownNat
+      n => BitVector n -> Int -> BitVector n'
+    template: |-
+      // rotateR begin
+      logic [2*~SIZE[~TYPO]-1:0] ~GENSYM[bv][0];
+      assign ~SYM[0] = {~ARG[1],~ARG[1]} >> (~ARG[2] % ~SIZE[~TYPO]);
+      assign ~RESULT = ~SYM[0][~SIZE[~TYPO]-1 : 0];
+      // rotateR end

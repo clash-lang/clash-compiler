@@ -1,36 +1,30 @@
-[ { "BlackBox" :
-    { "name"      : "GHC.Classes.eqInt"
-    , "kind"      : "Expression"
-    , "type"      : "eqInt :: Int -> Int -> Bool"
-    , "template"  : "~ARG[0] == ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Classes.neInt"
-    , "kind"      : "Expression"
-    , "type"      : "neInt :: Int -> Int -> Bool"
-    , "template"  : "~ARG[0] != ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Classes.&&"
-    , "kind"      : "Expression"
-    , "type"      : "(&&) :: Bool -> Bool -> Bool"
-    , "template"  : "~ARG[0] & ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Classes.||"
-    , "kind"      : "Expression"
-    , "type"      : "(||) :: Bool -> Bool -> Bool"
-    , "template"  : "~ARG[0] | ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Classes.not"
-    , "kind"      : "Expression"
-    , "type"      : "not :: Bool -> Bool"
-    , "template"  : "~ ~ARG[0]"
-    }
-  }
-]
+- BlackBox:
+    name: GHC.Classes.eqInt
+    kind: Expression
+    type: 'eqInt :: Int ->
+      Int -> Bool'
+    template: ~ARG[0] == ~ARG[1]
+- BlackBox:
+    name: GHC.Classes.neInt
+    kind: Expression
+    type: 'neInt :: Int ->
+      Int -> Bool'
+    template: ~ARG[0] != ~ARG[1]
+- BlackBox:
+    name: GHC.Classes.&&
+    kind: Expression
+    type: '(&&) :: Bool ->
+      Bool -> Bool'
+    template: ~ARG[0] & ~ARG[1]
+- BlackBox:
+    name: GHC.Classes.||
+    kind: Expression
+    type: '(||) :: Bool ->
+      Bool -> Bool'
+    template: ~ARG[0] | ~ARG[1]
+- BlackBox:
+    name: GHC.Classes.not
+    kind: Expression
+    type: 'not :: Bool ->
+      Bool'
+    template: ~ ~ARG[0]

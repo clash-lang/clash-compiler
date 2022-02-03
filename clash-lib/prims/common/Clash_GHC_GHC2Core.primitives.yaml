@@ -1,20 +1,13 @@
-[ { "BlackBox" :
-    { "name"      : "EmptyCase"
-    , "workInfo"  : "Constant"
-    , "kind"      : "Expression"
-    , "template"  : "~ERRORO"
-    }
-  }
-, { "Primitive" :
-    { "name"     : "_CO_"
-    , "workInfo"  : "Constant"
-    , "primType" : "Constructor"
-    }
-  }
-, { "Primitive" :
-    { "name"     : "_TY_"
-    , "workInfo"  : "Constant"
-    , "primType" : "Constructor"
-    }
-  }
-]
+- BlackBox:
+    name: EmptyCase
+    kind: Expression
+    template: ~ERRORO
+    workInfo: Constant
+- Primitive:
+    name: _CO_
+    primType: Constructor
+    workInfo: Constant
+- Primitive:
+    name: _TY_
+    primType: Constructor
+    workInfo: Constant

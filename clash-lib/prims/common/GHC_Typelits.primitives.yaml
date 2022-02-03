@@ -1,9 +1,7 @@
-[ { "BlackBox" :
-    { "name"      : "GHC.TypeLits.natVal"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "natVal :: forall n proxy. KnownNat n => proxy n -> Integer"
-    , "template"  : "~ARG[0]"
-    }
-  }
-]
+- BlackBox:
+    name: GHC.TypeLits.natVal
+    kind: Expression
+    type: 'natVal :: forall
+      n proxy. KnownNat n => proxy n -> Integer'
+    template: ~ARG[0]
+    workInfo: Never

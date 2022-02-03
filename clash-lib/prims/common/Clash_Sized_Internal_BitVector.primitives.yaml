@@ -1,43 +1,35 @@
-[ { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.undefined#"
-    , "workInfo"  : "Constant"
-    , "kind"      : "Expression"
-    , "type"      : "undefined# :: forall n . KnownNat n => BitVector n"
-    , "template"  : "~ERRORO"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "Clash.Sized.Internal.BitVector.checkUnpackUndef"
-    , "workInfo"  : "Never"
-    , "primType"  : "Function"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.lt##"
-    , "kind"      : "Expression"
-    , "type"      : "lt## :: Bit -> Bit -> Bool"
-    , "template"  : "~ARG[0] < ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.ge##"
-    , "kind"      : "Expression"
-    , "type"      : "ge## :: Bit -> Bit -> Bool"
-    , "template"  : "~ARG[0] >= ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.gt##"
-    , "kind"      : "Expression"
-    , "type"      : "gt## :: Bit -> Bit -> Bool"
-    , "template"  : "~ARG[0] > ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Internal.BitVector.le##"
-    , "kind"      : "Expression"
-    , "type"      : "le## :: Bit -> Bit -> Bool"
-    , "template"  : "~ARG[0] <= ~ARG[1]"
-    }
-  }
-]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.undefined#
+    kind: Expression
+    type: 'undefined# :: forall
+      n . KnownNat n => BitVector n'
+    template: ~ERRORO
+    workInfo: Constant
+- Primitive:
+    name: Clash.Sized.Internal.BitVector.checkUnpackUndef
+    primType: Function
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.lt##
+    kind: Expression
+    type: 'lt## :: Bit ->
+      Bit -> Bool'
+    template: ~ARG[0] < ~ARG[1]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.ge##
+    kind: Expression
+    type: 'ge## :: Bit ->
+      Bit -> Bool'
+    template: ~ARG[0] >= ~ARG[1]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.gt##
+    kind: Expression
+    type: 'gt## :: Bit ->
+      Bit -> Bool'
+    template: ~ARG[0] > ~ARG[1]
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.le##
+    kind: Expression
+    type: 'le## :: Bit ->
+      Bit -> Bool'
+    template: ~ARG[0] <= ~ARG[1]

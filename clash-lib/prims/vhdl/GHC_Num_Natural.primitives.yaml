@@ -1,159 +1,157 @@
-[
-  {
-    "BlackBox": {
-      "name": "GHC.Num.Natural.naturalMul",
-      "kind": "Expression",
-      "type": "timesNatural :: Natural -> Natural -> Natural",
-      "template": "resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])",
-      "warning": "GHC.Num.Natural.timesNatural: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
-    }
-  },
-  {
-    "BlackBox": {
-      "name": "GHC.Num.Natural.naturalFromWord#",
-      "workInfo" : "Never",
-      "kind": "Expression",
-      "type": "naturalFromWord# :: Word# -> Natural",
-      "template": "unsigned(std_logic_vector(~ARG[0]))",
-      "warning": "GHC.Num.Natural.naturalFromWord#: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
-    }
-  }
-  , { "BlackBox" :
-    { "name"      : "GHC.Num.Natural.naturalRem"
-    , "kind"      : "Declaration"
-    , "type"      : "naturalRem :: Natural -> Natural -> Natural"
-    , "template"  :
-"~RESULT <= ~ARG[0] rem ~ARG[1]
-    -- pragma translate_off
-    when (~ARG[1] /= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
-    , "warning": "GHC.Num.Natural.naturalRem: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
-    }
-  }
-  , { "BlackBox" :
-    { "name"      : "GHC.Num.Natural.naturalLogBase#"
-    , "kind"      : "Expression"
-    , "type"      : "naturalLogBase# :: Natural -> Natural -> Word#"
-    , "template"  : "to_unsigned(integer(floor(log(real(to_integer(~ARG[1])),real(to_integer(~ARG[0]))))),~SIZE[~TYPO])"
-    , "warning"   : "GHC.Num.Natural.naturalLogBase#: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
-    }
-  }
-, { "BlackBox" :
-  { "name"      : "GHC.Num.Natural.naturalEq#"
-  , "kind"      : "Declaration"
-  , "type"      : "naturalEq# :: Natural -> Natural -> Int#"
-  , "template"  : "~RESULT <= to_unsigned(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_unsigned(0,~SIZE[~TYPO]);"
-  , "warning"   : "GHC.Num.Natural.naturalEq#: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
-  }
-}
-, { "BlackBox" :
-  { "name"      : "GHC.Num.Natural.naturalNe#"
-  , "kind"      : "Declaration"
-  , "type"      : "naturalNe# :: Natural -> Natural -> Int#"
-  , "template"  : "~RESULT <= to_unsigned(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_unsigned(0,~SIZE[~TYPO]);"
-  , "warning"   : "GHC.Num.Natural.naturalNe#: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
-  }
-}
-, { "BlackBox" :
-  { "name"      : "GHC.Num.Natural.naturalLe#"
-  , "kind"      : "Declaration"
-  , "type"      : "naturalLe# :: Natural -> Natural -> Int#"
-  , "template"  : "~RESULT <= to_unsigned(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_unsigned(0,~SIZE[~TYPO]);"
-  , "warning"   : "GHC.Num.Natural.naturalLe#: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
-  }
-}
-, { "BlackBox" :
-  { "name"      : "GHC.Num.Natural.naturalGt#"
-  , "kind"      : "Declaration"
-  , "type"      : "naturalGt# :: Natural -> Natural -> Int#"
-  , "template"  : "~RESULT <= to_unsigned(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_unsigned(0,~SIZE[~TYPO]);"
-  , "warning"   : "GHC.Num.Natural.naturalGt#: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
-  }
-}
-, { "BlackBox" :
-  { "name"      : "GHC.Num.Natural.naturalLt#"
-  , "kind"      : "Declaration"
-  , "type"      : "naturalLt# :: Natural -> Natural -> Int#"
-  , "template"  : "~RESULT <= to_unsigned(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_unsigned(0,~SIZE[~TYPO]);"
-  , "warning"   : "GHC.Num.Natural.naturalLt#: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
-  }
-}
-, { "BlackBox" :
-  { "name"      : "GHC.Num.Natural.naturalGe#"
-  , "kind"      : "Declaration"
-  , "type"      : "naturalGe# :: Natural -> Natural -> Int#"
-  , "template"  : "~RESULT <= to_unsigned(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_unsigned(0,~SIZE[~TYPO]);"
-  , "warning"   : "GHC.Num.Natural.naturalGe#: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
-  }
-}
-, { "BlackBox" :
-  { "name"      : "GHC.Num.Natural.naturalShiftL#"
-  , "kind"      : "Declaration"
-  , "type"      : "naturalShiftL# :: Natural -> Word# -> Natural"
-  , "template"  :
-"~GENSYM[~RESULT_shiftL][0] : block
-  signal ~GENSYM[sh][1] : natural;
-begin
-  ~SYM[1] <=
-      -- pragma translate_off
-      natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
-      -- pragma translate_on
-      to_integer(~VAR[shI][1]
-      -- pragma translate_off
-      (30 downto 0)
-      -- pragma translate_on
-      );
-  ~RESULT <= shift_left(~ARG[0],~SYM[1]);
-end block;"
-  , "warning"   : "GHC.Num.Natural.naturalShiftL#: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
-  }
-}
-, { "BlackBox" :
-  { "name"      : "GHC.Num.Natural.naturalShiftR#"
-  , "kind"      : "Declaration"
-  , "type"      : "naturalShiftR# :: Natural -> Word# -> Natural"
-  , "template"  :
-"~GENSYM[~RESULT_shiftR][0] : block
-  signal ~GENSYM[sh][1] : natural;
-begin
-  ~SYM[1] <=
-      -- pragma translate_off
-      natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
-      -- pragma translate_on
-      to_integer(~VAR[shI][1]
-      -- pragma translate_off
-      (30 downto 0)
-      -- pragma translate_on
-      );
-  ~RESULT <= shift_right(~ARG[0],~SYM[1]);
-end block;"
-  , "warning"   : "GHC.Num.Natural.naturalShiftR#: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
-  }
-}
-, { "BlackBox" :
-  { "name"      : "GHC.Num.Natural.naturalCompare"
-  , "kind"      : "Declaration"
-  , "type"      : "naturalCompare :: Natural -> Natural -> Ordering"
-  , "template"  :
-"-- begin naturalCompare
-~RESULT <= \"00\" when ~ARG[0] < ~ARG[1] else
-         \"01\" when ~ARG[0] = ~ARG[1] else
-         \"10\";
--- end naturalCompare"
-  }
-}
-, { "BlackBox":
-  { "name": "GHC.Num.Natural.naturalQuot"
-  , "kind": "Declaration"
-  , "type": "naturalQuot :: Natural -> Natural -> Natural"
-  , "template"  :
-"~RESULT <= ~ARG[0] / ~ARG[1]
-    -- pragma translate_off
-    when (~ARG[1] /= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
-  , "warning": "GHC.Num.Natural.naturalQuot: Naturals are dynamically sized in simulation, but fixed-length after synthesis. Use carefully."
-  }
-}
-]
+- BlackBox:
+    name: GHC.Num.Natural.naturalMul
+    kind: Expression
+    type: 'timesNatural ::
+      Natural -> Natural -> Natural'
+    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+    warning: 'GHC.Num.Natural.timesNatural: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalFromWord#
+    kind: Expression
+    type: 'naturalFromWord#
+      :: Word# -> Natural'
+    template: unsigned(std_logic_vector(~ARG[0]))
+    warning: 'GHC.Num.Natural.naturalFromWord#: Naturals are dynamically sized in
+      simulation, but fixed-length after synthesis. Use carefully.'
+    workInfo: Never
+- BlackBox:
+    name: GHC.Num.Natural.naturalRem
+    kind: Declaration
+    type: 'naturalRem :: Natural
+      -> Natural -> Natural'
+    template: |-
+      ~RESULT <= ~ARG[0] rem ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+    warning: 'GHC.Num.Natural.naturalRem: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalLogBase#
+    kind: Expression
+    type: 'naturalLogBase#
+      :: Natural -> Natural -> Word#'
+    template: to_unsigned(integer(floor(log(real(to_integer(~ARG[1])),real(to_integer(~ARG[0]))))),~SIZE[~TYPO])
+    warning: 'GHC.Num.Natural.naturalLogBase#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalEq#
+    kind: Declaration
+    type: 'naturalEq# :: Natural
+      -> Natural -> Int#'
+    template: ~RESULT <= to_unsigned(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_unsigned(0,~SIZE[~TYPO]);
+    warning: 'GHC.Num.Natural.naturalEq#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalNe#
+    kind: Declaration
+    type: 'naturalNe# :: Natural
+      -> Natural -> Int#'
+    template: ~RESULT <= to_unsigned(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else
+      to_unsigned(0,~SIZE[~TYPO]);
+    warning: 'GHC.Num.Natural.naturalNe#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalLe#
+    kind: Declaration
+    type: 'naturalLe# :: Natural
+      -> Natural -> Int#'
+    template: ~RESULT <= to_unsigned(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else
+      to_unsigned(0,~SIZE[~TYPO]);
+    warning: 'GHC.Num.Natural.naturalLe#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalGt#
+    kind: Declaration
+    type: 'naturalGt# :: Natural
+      -> Natural -> Int#'
+    template: ~RESULT <= to_unsigned(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_unsigned(0,~SIZE[~TYPO]);
+    warning: 'GHC.Num.Natural.naturalGt#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalLt#
+    kind: Declaration
+    type: 'naturalLt# :: Natural
+      -> Natural -> Int#'
+    template: ~RESULT <= to_unsigned(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_unsigned(0,~SIZE[~TYPO]);
+    warning: 'GHC.Num.Natural.naturalLt#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalGe#
+    kind: Declaration
+    type: 'naturalGe# :: Natural
+      -> Natural -> Int#'
+    template: ~RESULT <= to_unsigned(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else
+      to_unsigned(0,~SIZE[~TYPO]);
+    warning: 'GHC.Num.Natural.naturalGe#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalShiftL#
+    kind: Declaration
+    type: 'naturalShiftL#
+      :: Natural -> Word# -> Natural'
+    template: |-
+      ~GENSYM[~RESULT_shiftL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]
+            -- pragma translate_off
+            (30 downto 0)
+            -- pragma translate_on
+            );
+        ~RESULT <= shift_left(~ARG[0],~SYM[1]);
+      end block;
+    warning: 'GHC.Num.Natural.naturalShiftL#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalShiftR#
+    kind: Declaration
+    type: 'naturalShiftR#
+      :: Natural -> Word# -> Natural'
+    template: |-
+      ~GENSYM[~RESULT_shiftR][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]
+            -- pragma translate_off
+            (30 downto 0)
+            -- pragma translate_on
+            );
+        ~RESULT <= shift_right(~ARG[0],~SYM[1]);
+      end block;
+    warning: 'GHC.Num.Natural.naturalShiftR#: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Natural.naturalCompare
+    kind: Declaration
+    type: 'naturalCompare
+      :: Natural -> Natural -> Ordering'
+    template: |-
+      -- begin naturalCompare
+      ~RESULT <= "00" when ~ARG[0] < ~ARG[1] else
+               "01" when ~ARG[0] = ~ARG[1] else
+               "10";
+      -- end naturalCompare
+- BlackBox:
+    name: GHC.Num.Natural.naturalQuot
+    kind: Declaration
+    type: 'naturalQuot ::
+      Natural -> Natural -> Natural'
+    template: |-
+      ~RESULT <= ~ARG[0] / ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+    warning: 'GHC.Num.Natural.naturalQuot: Naturals are dynamically sized in simulation,
+      but fixed-length after synthesis. Use carefully.'

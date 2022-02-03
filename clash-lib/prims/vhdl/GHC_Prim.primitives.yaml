@@ -1,1352 +1,1279 @@
-[ { "BlackBox" :
-    { "name"      : "GHC.Prim.gtChar#"
-    , "kind"      : "Declaration"
-    , "type"      : "gtChar# :: Char# -> Char# -> Int#"
-    , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.geChar#"
-    , "kind"      : "Declaration"
-    , "type"      : "geChar# :: Char# -> Char# -> Int#"
-    , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.eqChar#"
-    , "kind"      : "Declaration"
-    , "type"      : "eqChar# :: Char# -> Char# -> Int#"
-    , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.neChar#"
-    , "kind"      : "Declaration"
-    , "type"      : "neChar# :: Char# -> Char# -> Int#"
-    , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.ltChar#"
-    , "kind"      : "Declaration"
-    , "type"      : "ltChar# :: Char# -> Char# -> Int#"
-    , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.leChar#"
-    , "kind"      : "Declaration"
-    , "type"      : "leChar# :: Char# -> Char# -> Int#"
-    , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.ord#"
-    , "kind"      : "Expression"
-    , "type"      : "ord# :: Char# -> Int#"
-    , "template"  : "signed(std_logic_vector(resize(~ARG[0],~SIZE[~TYPO])))"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.*#"
-    , "kind"      : "Expression"
-    , "type"      : "(*#) :: Int# -> Int# -> Int#"
-    , "template"  : "resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.remInt#"
-    , "kind"      : "Declaration"
-    , "type"      : "remInt# :: Int# -> Int# -> Int#"
-    , "template"  :
-"~RESULT <= ~ARG[0] rem ~ARG[1]
-    -- pragma translate_off
-    when (~ARG[1] /= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.quotRemInt#"
-    , "kind"      : "Declaration"
-    , "type"      : "quotRemInt# :: Int# -> Int# -> (#Int#, Int##)"
-    , "template"  : "
-~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
-    -- pragma translate_off
-    when (~ARG[1] /= 0) else ((others => 'X'), (others => 'X'))
-    -- pragma translate_on
-    ;"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.andI#"
-    , "kind"      : "Expression"
-    , "type"      : "and# :: Int# -> Int# -> Int#"
-    , "template"  : "~ARG[0] and ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.orI#"
-    , "kind"      : "Expression"
-    , "type"      : "or# :: Int# -> Int# -> Int#"
-    , "template"  : "~ARG[0] or ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.xorI#"
-    , "kind"      : "Expression"
-    , "type"      : "xor# :: Int# -> Int# -> Int#"
-    , "template"  : "~ARG[0] xor ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.notI#"
-    , "kind"      : "Expression"
-    , "type"      : "not# :: Int# -> Int#"
-    , "template"  : "not ~ARG[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.negateInt#"
-    , "kind"      : "Expression"
-    , "type"      : "negateInt# :: Int# -> Int#"
-    , "template"  : "-~ARG[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.>#"
-    , "kind"      : "Declaration"
-    , "type"      : "(>#) :: Int# -> Int# -> Int#"
-    , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.>=#"
-    , "kind"      : "Declaration"
-    , "type"      : "(>=#) :: Int# -> Int# -> Int#"
-    , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.==#"
-    , "kind"      : "Declaration"
-    , "type"      : "(==) :: Int# -> Int# -> Int#"
-    , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim./=#"
-    , "kind"      : "Declaration"
-    , "type"      : "(/=#) :: Int# -> Int# -> Int#"
-    , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.<#"
-    , "kind"      : "Declaration"
-    , "type"      : "(<#) :: Int# -> Int# -> Int#"
-    , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.<=#"
-    , "kind"      : "Declaration"
-    , "type"      : "(<=#) :: Int# -> Int# -> Int#"
-    , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.chr#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "ord# :: Int# -> Chr#"
-    , "template"  : "resize(unsigned(std_logic_vector(~ARG[0])),21)"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.int2Word#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "word2Int# :: Int# -> Word#"
-    , "template"  : "unsigned(std_logic_vector(~ARG[0]))"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.uncheckedIShiftL#"
-    , "kind"      : "Declaration"
-    , "type"      : "uncheckedIShiftL# :: Int# -> Int# -> Int#"
-    , "template"  :
-"~GENSYM[~RESULT_shiftL][0] : block
-  signal ~GENSYM[sh][1] : natural;
-begin
-  ~SYM[1] <=
-      -- pragma translate_off
-      natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
-      -- pragma translate_on
-      to_integer(~VAR[shI][1]
-      -- pragma translate_off
-      (30 downto 0)
-      -- pragma translate_on
-      );
-  ~RESULT <= shift_left(~ARG[0],~SYM[1])
-      -- pragma translate_off
-      when (~ARG[1] >= 0) else (others => 'X')
-      -- pragma translate_on
-      ;
-end block;"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.uncheckedIShiftRA#"
-    , "kind"      : "Declaration"
-    , "type"      : "uncheckedIShiftRA# :: Int# -> Int# -> Int#"
-    , "template"  :
-"~GENSYM[~RESULT_shiftR][0] : block
-  signal ~GENSYM[sh][1] : natural;
-begin
-  ~SYM[1] <=
-      -- pragma translate_off
-      natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
-      -- pragma translate_on
-      to_integer(~VAR[shI][1]
-      -- pragma translate_off
-      (30 downto 0)
-      -- pragma translate_on
-      );
-  ~RESULT <= shift_right(~ARG[0],~SYM[1])
-      -- pragma translate_off
-      when (~ARG[1] >= 0) else (others => 'X')
-      -- pragma translate_on
-      ;
-end block;"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.uncheckedIShiftRL#"
-    , "kind"      : "Declaration"
-    , "type"      : "uncheckedIShiftRL# :: Int# -> Int# -> Int#"
-    , "template"  :
-"~GENSYM[~RESULT_shiftRL][0] : block
-  signal ~GENSYM[sh][1] : natural;
-begin
-  ~SYM[1] <=
-      -- pragma translate_off
-      natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
-      -- pragma translate_on
-      to_integer(~VAR[shI][1]
-      -- pragma translate_off
-      (30 downto 0)
-      -- pragma translate_on
-      );
-  ~RESULT <= ~ARG[0] srl ~SYM[1]
-      -- pragma translate_off
-      when (~ARG[1] >= 0) else (others => 'X')
-      -- pragma translate_on
-      ;
-end block;"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.timesWord#"
-    , "kind"      : "Expression"
-    , "type"      : "timesWord# :: Word# -> Word# -> Word#"
-    , "template"  : "resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.remWord#"
-    , "kind"      : "Declaration"
-    , "type"      : "remWord# :: Word# -> Word# -> Word#"
-    , "template"  :
-"~RESULT <= ~ARG[0] rem ~ARG[1]
-    -- pragma translate_off
-    when (~ARG[1] /= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.quotRemWord#"
-    , "kind"      : "Declaration"
-    , "type"      : "quotRemWord# :: Word# -> Word# -> (#Word#, Word##)"
-    , "template"  : "
-~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
-    -- pragma translate_off
-    when (~ARG[1] /= 0) else ((others => 'X'), (others => 'X'))
-    -- pragma translate_on
-    ;"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.and#"
-    , "kind"      : "Expression"
-    , "type"      : "and# :: Word# -> Word# -> Word#"
-    , "template"  : "~ARG[0] and ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.or#"
-    , "kind"      : "Expression"
-    , "type"      : "or# :: Word# -> Word# -> Word#"
-    , "template"  : "~ARG[0] or ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.xor#"
-    , "kind"      : "Expression"
-    , "type"      : "xor# :: Word# -> Word# -> Word#"
-    , "template"  : "~ARG[0] xor ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.not#"
-    , "kind"      : "Expression"
-    , "type"      : "not# :: Word# -> Word#"
-    , "template"  : "not ~ARG[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.uncheckedShiftL#"
-    , "kind"      : "Declaration"
-    , "type"      : "uncheckedShiftL# :: Word# -> Int# -> Word#"
-    , "template"  :
-"~GENSYM[~RESULT_shiftL][0] : block
-  signal ~GENSYM[sh][1] : natural;
-begin
-  ~SYM[1] <=
-      -- pragma translate_off
-      natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
-      -- pragma translate_on
-      to_integer(~VAR[shI][1]
-      -- pragma translate_off
-      (30 downto 0)
-      -- pragma translate_on
-      );
-  ~RESULT <= shift_left(~ARG[0],~SYM[1])
-      -- pragma translate_off
-      when (~ARG[1] >= 0) else (others => 'X')
-      -- pragma translate_on
-      ;
-end block;"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.uncheckedShiftRL#"
-    , "kind"      : "Declaration"
-    , "type"      : "uncheckedShiftR# :: Word# -> Int# -> Word#"
-    , "template"  :
-"~GENSYM[~RESULT_shiftR][0] : block
-  signal ~GENSYM[sh][1] : natural;
-begin
-  ~SYM[1] <=
-      -- pragma translate_off
-      natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
-      -- pragma translate_on
-      to_integer(~VAR[shI][1]
-      -- pragma translate_off
-      (30 downto 0)
-      -- pragma translate_on
-      );
-  ~RESULT <= shift_right(~ARG[0],~SYM[1])
-      -- pragma translate_off
-      when (~ARG[1] >= 0) else (others => 'X')
-      -- pragma translate_on
-      ;
-end block;"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.word2Int#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "word2Int# :: word# -> Int#"
-    , "template"  : "signed(std_logic_vector(~ARG[0]))"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.gtWord#"
-    , "kind"      : "Declaration"
-    , "type"      : "gtWord# :: Word# -> Word# -> Int#"
-    , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.geWord#"
-    , "kind"      : "Declaration"
-    , "type"      : "geWord# :: Word# -> Word# -> Int#"
-    , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.eqWord#"
-    , "kind"      : "Declaration"
-    , "type"      : "eqWord# :: Word# -> Word# -> Int#"
-    , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.neWord#"
-    , "kind"      : "Declaration"
-    , "type"      : "neWord# :: Word# -> Word# -> Int#"
-    , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.ltWord#"
-    , "kind"      : "Declaration"
-    , "type"      : "ltWord# :: Word# -> Word# -> Int#"
-    , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.leWord#"
-    , "kind"      : "Declaration"
-    , "type"      : "leWord# :: Word# -> Word# -> Int#"
-    , "template"  : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.popCnt8#"
-    , "kind"      : "Declaration"
-    , "type"      : "popCnt8 :: Word# -> Word#"
-    , "template"  :
-"-- popCnt8 begin
-~GENSYM[popCnt8][0] : block
-  -- given a level and a depth, calculate the corresponding index into the
-  -- intermediate array
-  function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
-  begin
-    return (2 ** levels - 2 ** depth);
-  end function;
+- BlackBox:
+    name: GHC.Prim.gtChar#
+    kind: Declaration
+    type: 'gtChar# :: Char#
+      -> Char# -> Int#'
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.geChar#
+    kind: Declaration
+    type: 'geChar# :: Char#
+      -> Char# -> Int#'
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.eqChar#
+    kind: Declaration
+    type: 'eqChar# :: Char#
+      -> Char# -> Int#'
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.neChar#
+    kind: Declaration
+    type: 'neChar# :: Char#
+      -> Char# -> Int#'
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.ltChar#
+    kind: Declaration
+    type: 'ltChar# :: Char#
+      -> Char# -> Int#'
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.leChar#
+    kind: Declaration
+    type: 'leChar# :: Char#
+      -> Char# -> Int#'
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.ord#
+    kind: Expression
+    type: 'ord# :: Char# ->
+      Int#'
+    template: signed(std_logic_vector(resize(~ARG[0],~SIZE[~TYPO])))
+- BlackBox:
+    name: GHC.Prim.*#
+    kind: Expression
+    type: '(*#) :: Int# ->
+      Int# -> Int#'
+    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+- BlackBox:
+    name: GHC.Prim.remInt#
+    kind: Declaration
+    type: 'remInt# :: Int#
+      -> Int# -> Int#'
+    template: |-
+      ~RESULT <= ~ARG[0] rem ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.quotRemInt#
+    kind: Declaration
+    type: 'quotRemInt# ::
+      Int# -> Int# -> (#Int#, Int##)'
+    template: |2-
 
-  constant ~GENSYM[width][2] : natural := 8;
-  constant ~GENSYM[levels][3] : natural := natural (ceil (log2 (real (~SYM[2]))));
-  type ~GENSYM[popCnt_res_vec][4] is array (natural range <>) of unsigned(~SYM[3] downto 0);
-  signal ~GENSYM[intermediate][5] : ~SYM[4](0 to (2*~SYM[2])-2);
-begin
-  -- put input into the first half of the intermediate array
-  ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
-    ~SYM[5](~SYM[7]) <= resize(~VAR[input][0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
-  end generate;
+      ~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else ((others => 'X'), (others => 'X'))
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.andI#
+    kind: Expression
+    type: 'and# :: Int# ->
+      Int# -> Int#'
+    template: ~ARG[0] and ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.orI#
+    kind: Expression
+    type: 'or# :: Int# ->
+      Int# -> Int#'
+    template: ~ARG[0] or ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.xorI#
+    kind: Expression
+    type: 'xor# :: Int# ->
+      Int# -> Int#'
+    template: ~ARG[0] xor ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.notI#
+    kind: Expression
+    type: 'not# :: Int# ->
+      Int#'
+    template: not ~ARG[0]
+- BlackBox:
+    name: GHC.Prim.negateInt#
+    kind: Expression
+    type: 'negateInt# :: Int#
+      -> Int#'
+    template: -~ARG[0]
+- BlackBox:
+    name: GHC.Prim.>#
+    kind: Declaration
+    type: '(>#) :: Int# ->
+      Int# -> Int#'
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.>=#
+    kind: Declaration
+    type: '(>=#) :: Int# ->
+      Int# -> Int#'
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.==#
+    kind: Declaration
+    type: '(==) :: Int# ->
+      Int# -> Int#'
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim./=#
+    kind: Declaration
+    type: '(/=#) :: Int# ->
+      Int# -> Int#'
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.<#
+    kind: Declaration
+    type: '(<#) :: Int# ->
+      Int# -> Int#'
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.<=#
+    kind: Declaration
+    type: '(<=#) :: Int# ->
+      Int# -> Int#'
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.chr#
+    kind: Expression
+    type: 'ord# :: Int# ->
+      Chr#'
+    template: resize(unsigned(std_logic_vector(~ARG[0])),21)
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.int2Word#
+    kind: Expression
+    type: 'word2Int# :: Int#
+      -> Word#'
+    template: unsigned(std_logic_vector(~ARG[0]))
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.uncheckedIShiftL#
+    kind: Declaration
+    type: 'uncheckedIShiftL#
+      :: Int# -> Int# -> Int#'
+    template: |-
+      ~GENSYM[~RESULT_shiftL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]
+            -- pragma translate_off
+            (30 downto 0)
+            -- pragma translate_on
+            );
+        ~RESULT <= shift_left(~ARG[0],~SYM[1])
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.uncheckedIShiftRA#
+    kind: Declaration
+    type: 'uncheckedIShiftRA#
+      :: Int# -> Int# -> Int#'
+    template: |-
+      ~GENSYM[~RESULT_shiftR][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]
+            -- pragma translate_off
+            (30 downto 0)
+            -- pragma translate_on
+            );
+        ~RESULT <= shift_right(~ARG[0],~SYM[1])
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.uncheckedIShiftRL#
+    kind: Declaration
+    type: 'uncheckedIShiftRL#
+      :: Int# -> Int# -> Int#'
+    template: |-
+      ~GENSYM[~RESULT_shiftRL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]
+            -- pragma translate_off
+            (30 downto 0)
+            -- pragma translate_on
+            );
+        ~RESULT <= ~ARG[0] srl ~SYM[1]
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.timesWord#
+    kind: Expression
+    type: 'timesWord# :: Word#
+      -> Word# -> Word#'
+    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+- BlackBox:
+    name: GHC.Prim.remWord#
+    kind: Declaration
+    type: 'remWord# :: Word#
+      -> Word# -> Word#'
+    template: |-
+      ~RESULT <= ~ARG[0] rem ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.quotRemWord#
+    kind: Declaration
+    type: 'quotRemWord# ::
+      Word# -> Word# -> (#Word#, Word##)'
+    template: |2-
 
-  -- Create the tree of adders
-  ~GENSYM[make_tree][8] : if ~SYM[3] /= 0 generate
-    ~GENSYM[tree_depth][9] : for ~GENSYM[d][10] in ~SYM[3]-1 downto 0 generate
-      ~GENSYM[tree_depth_loop][11] : for ~GENSYM[i][12] in 0 to (natural(2**~SYM[10]) - 1) generate
-        ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+1)+~SYM[12]) <=
-          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])) +
-          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])+1);
+      ~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else ((others => 'X'), (others => 'X'))
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.and#
+    kind: Expression
+    type: 'and# :: Word# ->
+      Word# -> Word#'
+    template: ~ARG[0] and ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.or#
+    kind: Expression
+    type: 'or# :: Word# ->
+      Word# -> Word#'
+    template: ~ARG[0] or ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.xor#
+    kind: Expression
+    type: 'xor# :: Word# ->
+      Word# -> Word#'
+    template: ~ARG[0] xor ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.not#
+    kind: Expression
+    type: 'not# :: Word# ->
+      Word#'
+    template: not ~ARG[0]
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftL#
+    kind: Declaration
+    type: 'uncheckedShiftL#
+      :: Word# -> Int# -> Word#'
+    template: |-
+      ~GENSYM[~RESULT_shiftL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]
+            -- pragma translate_off
+            (30 downto 0)
+            -- pragma translate_on
+            );
+        ~RESULT <= shift_left(~ARG[0],~SYM[1])
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftRL#
+    kind: Declaration
+    type: 'uncheckedShiftR#
+      :: Word# -> Int# -> Word#'
+    template: |-
+      ~GENSYM[~RESULT_shiftR][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]
+            -- pragma translate_off
+            (30 downto 0)
+            -- pragma translate_on
+            );
+        ~RESULT <= shift_right(~ARG[0],~SYM[1])
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.word2Int#
+    kind: Expression
+    type: 'word2Int# :: word#
+      -> Int#'
+    template: signed(std_logic_vector(~ARG[0]))
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.gtWord#
+    kind: Declaration
+    type: 'gtWord# :: Word#
+      -> Word# -> Int#'
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.geWord#
+    kind: Declaration
+    type: 'geWord# :: Word#
+      -> Word# -> Int#'
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.eqWord#
+    kind: Declaration
+    type: 'eqWord# :: Word#
+      -> Word# -> Int#'
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.neWord#
+    kind: Declaration
+    type: 'neWord# :: Word#
+      -> Word# -> Int#'
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.ltWord#
+    kind: Declaration
+    type: 'ltWord# :: Word#
+      -> Word# -> Int#'
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.leWord#
+    kind: Declaration
+    type: 'leWord# :: Word#
+      -> Word# -> Int#'
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.popCnt8#
+    kind: Declaration
+    type: 'popCnt8 :: Word#
+      -> Word#'
+    template: |-
+      -- popCnt8 begin
+      ~GENSYM[popCnt8][0] : block
+        -- given a level and a depth, calculate the corresponding index into the
+        -- intermediate array
+        function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
+        begin
+          return (2 ** levels - 2 ** depth);
+        end function;
+
+        constant ~GENSYM[width][2] : natural := 8;
+        constant ~GENSYM[levels][3] : natural := natural (ceil (log2 (real (~SYM[2]))));
+        type ~GENSYM[popCnt_res_vec][4] is array (natural range <>) of unsigned(~SYM[3] downto 0);
+        signal ~GENSYM[intermediate][5] : ~SYM[4](0 to (2*~SYM[2])-2);
+      begin
+        -- put input into the first half of the intermediate array
+        ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
+          ~SYM[5](~SYM[7]) <= resize(~VAR[input][0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
+        end generate;
+
+        -- Create the tree of adders
+        ~GENSYM[make_tree][8] : if ~SYM[3] /= 0 generate
+          ~GENSYM[tree_depth][9] : for ~GENSYM[d][10] in ~SYM[3]-1 downto 0 generate
+            ~GENSYM[tree_depth_loop][11] : for ~GENSYM[i][12] in 0 to (natural(2**~SYM[10]) - 1) generate
+              ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+1)+~SYM[12]) <=
+                ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])) +
+                ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])+1);
+            end generate;
+          end generate;
+        end generate;
+
+        -- The last element of the intermediate array holds the result
+        ~RESULT <= resize(~SYM[5]((2*~SYM[2])-2),~SIZE[~TYPO]);
+      end block;
+      -- popCnt8 end
+- BlackBox:
+    name: GHC.Prim.popCnt16#
+    kind: Declaration
+    type: 'popCnt16 :: Word#
+      -> Word#'
+    template: |-
+      -- popCnt16 begin
+      ~GENSYM[popCnt16][0] : block
+        -- given a level and a depth, calculate the corresponding index into the
+        -- intermediate array
+        function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
+        begin
+          return (2 ** levels - 2 ** depth);
+        end function;
+
+        constant ~GENSYM[width][2] : natural := 16;
+        constant ~GENSYM[levels][3] : natural := natural (ceil (log2 (real (~SYM[2]))));
+        type ~GENSYM[popCnt_res_vec][4] is array (natural range <>) of unsigned(~SYM[3] downto 0);
+        signal ~GENSYM[intermediate][5] : ~SYM[4](0 to (2*~SYM[2])-2);
+      begin
+        -- put input into the first half of the intermediate array
+        ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
+          ~SYM[5](~SYM[7]) <= resize(~VAR[input][0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
+        end generate;
+
+        -- Create the tree of adders
+        ~GENSYM[make_tree][8] : if ~SYM[3] /= 0 generate
+          ~GENSYM[tree_depth][9] : for ~GENSYM[d][10] in ~SYM[3]-1 downto 0 generate
+            ~GENSYM[tree_depth_loop][11] : for ~GENSYM[i][12] in 0 to (natural(2**~SYM[10]) - 1) generate
+              ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+1)+~SYM[12]) <=
+                ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])) +
+                ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])+1);
+            end generate;
+          end generate;
+        end generate;
+
+        -- The last element of the intermediate array holds the result
+        ~RESULT <= resize(~SYM[5]((2*~SYM[2])-2),~SIZE[~TYPO]);
+      end block;
+      -- popCnt16 end
+- BlackBox:
+    name: GHC.Prim.popCnt32#
+    kind: Declaration
+    type: 'popCnt32 :: Word#
+      -> Word#'
+    template: |-
+      -- popCnt32 begin
+      ~GENSYM[popCnt32][0] : block
+        -- given a level and a depth, calculate the corresponding index into the
+        -- intermediate array
+        function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
+        begin
+          return (2 ** levels - 2 ** depth);
+        end function;
+
+        constant ~GENSYM[width][2] : natural := 32;
+        constant ~GENSYM[levels][3] : natural := natural (ceil (log2 (real (~SYM[2]))));
+        type ~GENSYM[popCnt_res_vec][4] is array (natural range <>) of unsigned(~SYM[3] downto 0);
+        signal ~GENSYM[intermediate][5] : ~SYM[4](0 to (2*~SYM[2])-2);
+      begin
+        -- put input into the first half of the intermediate array
+        ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
+          ~SYM[5](~SYM[7]) <= resize(~VAR[input][0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
+        end generate;
+
+        -- Create the tree of adders
+        ~GENSYM[make_tree][8] : if ~SYM[3] /= 0 generate
+          ~GENSYM[tree_depth][9] : for ~GENSYM[d][10] in ~SYM[3]-1 downto 0 generate
+            ~GENSYM[tree_depth_loop][11] : for ~GENSYM[i][12] in 0 to (natural(2**~SYM[10]) - 1) generate
+              ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+1)+~SYM[12]) <=
+                ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])) +
+                ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])+1);
+            end generate;
+          end generate;
+        end generate;
+
+        -- The last element of the intermediate array holds the result
+        ~RESULT <= resize(~SYM[5]((2*~SYM[2])-2),~SIZE[~TYPO]);
+      end block;
+      -- popCnt32 end
+- BlackBox:
+    name: GHC.Prim.popCnt64#
+    kind: Declaration
+    type: 'popCnt64 :: Word#
+      -> Word#'
+    template: |-
+      -- popCnt64 begin
+      ~GENSYM[popCnt64][0] : block
+        -- given a level and a depth, calculate the corresponding index into the
+        -- intermediate array
+        function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
+        begin
+          return (2 ** levels - 2 ** depth);
+        end function;
+
+        constant ~GENSYM[width][2] : natural := 64;
+        constant ~GENSYM[levels][3] : natural := natural (ceil (log2 (real (~SYM[2]))));
+        type ~GENSYM[popCnt_res_vec][4] is array (natural range <>) of unsigned(~SYM[3] downto 0);
+        signal ~GENSYM[intermediate][5] : ~SYM[4](0 to (2*~SYM[2])-2);
+      begin
+        -- put input into the first half of the intermediate array
+        ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
+          ~SYM[5](~SYM[7]) <= resize(~VAR[input][0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
+        end generate;
+
+        -- Create the tree of adders
+        ~GENSYM[make_tree][8] : if ~SYM[3] /= 0 generate
+          ~GENSYM[tree_depth][9] : for ~GENSYM[d][10] in ~SYM[3]-1 downto 0 generate
+            ~GENSYM[tree_depth_loop][11] : for ~GENSYM[i][12] in 0 to (natural(2**~SYM[10]) - 1) generate
+              ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+1)+~SYM[12]) <=
+                ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])) +
+                ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])+1);
+            end generate;
+          end generate;
+        end generate;
+
+        -- The last element of the intermediate array holds the result
+        ~RESULT <= resize(~SYM[5]((2*~SYM[2])-2),~SIZE[~TYPO]);
+      end block;
+      -- popCnt64 end
+- BlackBox:
+    name: GHC.Prim.popCnt#
+    kind: Declaration
+    type: 'popCnt :: Word#
+      -> Word#'
+    template: |-
+      -- popCnt begin
+      ~GENSYM[popCnt][0] : block
+        -- given a level and a depth, calculate the corresponding index into the
+        -- intermediate array
+        function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
+        begin
+          return (2 ** levels - 2 ** depth);
+        end function;
+
+        constant ~GENSYM[width][2] : natural := ~SIZE[~TYPO];
+        constant ~GENSYM[levels][3] : natural := natural (ceil (log2 (real (~SYM[2]))));
+        type ~GENSYM[popCnt_res_vec][4] is array (natural range <>) of unsigned(~SYM[3] downto 0);
+        signal ~GENSYM[intermediate][5] : ~SYM[4](0 to (2*~SYM[2])-2);
+      begin
+        -- put input into the first half of the intermediate array
+        ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
+          ~SYM[5](~SYM[7]) <= resize(~VAR[input][0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
+        end generate;
+
+        -- Create the tree of adders
+        ~GENSYM[make_tree][8] : if ~SYM[3] /= 0 generate
+          ~GENSYM[tree_depth][9] : for ~GENSYM[d][10] in ~SYM[3]-1 downto 0 generate
+            ~GENSYM[tree_depth_loop][11] : for ~GENSYM[i][12] in 0 to (natural(2**~SYM[10]) - 1) generate
+              ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+1)+~SYM[12]) <=
+                ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])) +
+                ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])+1);
+            end generate;
+          end generate;
+        end generate;
+
+        -- The last element of the intermediate array holds the result
+        ~RESULT <= resize(~SYM[5]((2*~SYM[2])-2),~SIZE[~TYPO]);
+      end block;
+      -- popCnt end
+- BlackBox:
+    name: GHC.Prim.clz8#
+    kind: Declaration
+    type: 'clz8 :: Word# ->
+      Word#'
+    template: |-
+      -- clz8 begin
+      ~GENSYM[clz8][0] : block
+        function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
+        begin
+          case a is
+            when "00" => return "10";
+            when "01" => return "01";
+            when "10" => return "00";
+            when others => return "00";
+          end case;
+        end function;
+
+        function ~GENSYM[clzi][2] (
+          constant n : in natural;
+          constant i : in unsigned) return unsigned is
+          variable v : unsigned(i'length-1 downto 0):=i;
+        begin
+          if v(n-1+n)='0' then
+            return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
+          else
+            return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
+          end if;
+        end function;
+
+        function ~GENSYM[clz8][3] (constant v : unsigned(0 to 7)) return unsigned is
+          variable e : unsigned(0 to 7);     -- 8
+          variable a : unsigned(0 to 2*3-1); -- 6
+        begin
+          for i in 0 to 3 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
+          for i in 0 to 1 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
+          return ~SYM[2](3,a(0 to 5));
+        end function;
+      begin
+        ~RESULT <= resize(~SYM[3](~ARG[0](7 downto 0)),~SIZE[~TYPO]);
+      end block;
+      -- clz8 end
+- BlackBox:
+    name: GHC.Prim.clz16#
+    kind: Declaration
+    type: 'clz16 :: Word#
+      -> Word#'
+    template: |-
+      -- clz16 begin
+      ~GENSYM[clz16][0] : block
+        function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
+        begin
+          case a is
+            when "00" => return "10";
+            when "01" => return "01";
+            when "10" => return "00";
+            when others => return "00";
+          end case;
+        end function;
+
+        function ~GENSYM[clzi][2] (
+          constant n : in natural;
+          constant i : in unsigned) return unsigned is
+          variable v : unsigned(i'length-1 downto 0):=i;
+        begin
+          if v(n-1+n)='0' then
+            return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
+          else
+            return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
+          end if;
+        end function;
+
+        function ~GENSYM[clz16][3] (constant v : unsigned(0 to 15)) return unsigned is
+          variable e : unsigned(0 to 15);    -- 16
+          variable a : unsigned(0 to 4*3-1); -- 12
+          variable b : unsigned(0 to 2*4-1); -- 8
+        begin
+          for i in 0 to 7 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
+          for i in 0 to 3 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
+          for i in 0 to 1 loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5)); end loop;
+          return ~SYM[2](4,b(0 to 7));
+        end function;
+      begin
+        ~RESULT <= resize(~SYM[3](~ARG[0](15 downto 0)),~SIZE[~TYPO]);
+      end block;
+      -- clz16 end
+- BlackBox:
+    name: GHC.Prim.clz32#
+    kind: Declaration
+    type: 'clz32 :: Word#
+      -> Word#'
+    template: |-
+      -- clz32 begin
+      ~GENSYM[clz32][0] : block
+        function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
+        begin
+          case a is
+            when "00" => return "10";
+            when "01" => return "01";
+            when "10" => return "00";
+            when others => return "00";
+          end case;
+        end function;
+
+        function ~GENSYM[clzi][2] (
+          constant n : in natural;
+          constant i : in unsigned) return unsigned is
+          variable v : unsigned(i'length-1 downto 0):=i;
+        begin
+          if v(n-1+n)='0' then
+            return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
+          else
+            return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
+          end if;
+        end function;
+
+        function ~GENSYM[clz32][3] (constant v : unsigned(0 to 31)) return unsigned is
+          variable e : unsigned(0 to 31);    -- 32
+          variable a : unsigned(0 to 8*3-1); -- 24
+          variable b : unsigned(0 to 4*4-1); -- 16
+          variable c : unsigned(0 to 2*5-1); -- 10
+        begin
+          for i in 0 to 15 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
+          for i in 0 to 7  loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
+          for i in 0 to 3  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5)); end loop;
+          for i in 0 to 1  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7)); end loop;
+          return ~SYM[2](5,c(0 to 9));
+        end function;
+      begin
+        ~RESULT <= resize(~SYM[3](~ARG[0](31 downto 0)),~SIZE[~TYPO]);
+      end block;
+      -- clz32 end
+- BlackBox:
+    name: GHC.Prim.clz64#
+    kind: Declaration
+    type: 'clz64 :: Word#
+      -> Word#'
+    template: |-
+      -- clz64 begin
+      ~GENSYM[clz64][0] : block
+        function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
+        begin
+          case a is
+            when "00" => return "10";
+            when "01" => return "01";
+            when "10" => return "00";
+            when others => return "00";
+          end case;
+        end function;
+
+        function ~GENSYM[clzi][2] (
+          constant n : in natural;
+          constant i : in unsigned) return unsigned is
+          variable v : unsigned(i'length-1 downto 0):=i;
+        begin
+          if v(n-1+n)='0' then
+            return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
+          else
+            return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
+          end if;
+        end function;
+
+        function ~GENSYM[clz64][3] (constant v : unsigned(0 to 63)) return unsigned is
+          variable e : unsigned(0 to 63);     -- 64
+          variable a : unsigned(0 to 16*3-1); -- 48
+          variable b : unsigned(0 to 8*4-1);  -- 32
+          variable c : unsigned(0 to 4*5-1);  -- 20
+          variable d : unsigned(0 to 2*6-1);  -- 12
+        begin
+          for i in 0 to 31 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));      end loop;
+          for i in 0 to 15 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3));   end loop;
+          for i in 0 to 7  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5));   end loop;
+          for i in 0 to 3  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7));   end loop;
+          for i in 0 to 1  loop d(i*6 to i*6+5):=~SYM[2](5,c(i*10 to i*10+9)); end loop;
+          return ~SYM[2](6,d(0 to 11));
+        end function;
+      begin
+        ~RESULT <= resize(~SYM[3](~ARG[0]),~SIZE[~TYPO]);
+      end block;
+      -- clz64 end
+- BlackBox:
+    name: GHC.Prim.clz#
+    kind: Declaration
+    type: 'clz :: Word# ->
+      Word#'
+    template: |-
+      -- clz begin
+      ~GENSYM[clz][0] : block
+        function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
+        begin
+          case a is
+            when "00" => return "10";
+            when "01" => return "01";
+            when "10" => return "00";
+            when others => return "00";
+          end case;
+        end function;
+
+        function ~GENSYM[clzi][2] (
+          constant n : in natural;
+          constant i : in unsigned) return unsigned is
+          variable v : unsigned(i'length-1 downto 0):=i;
+        begin
+          if v(n-1+n)='0' then
+            return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
+          else
+            return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
+          end if;
+        end function;
+      ~IF ~IW64 ~THEN
+        function ~GENSYM[clz64][3] (constant v : unsigned(0 to 63)) return unsigned is
+          variable e : unsigned(0 to 63);     -- 64
+          variable a : unsigned(0 to 16*3-1); -- 48
+          variable b : unsigned(0 to 8*4-1);  -- 32
+          variable c : unsigned(0 to 4*5-1);  -- 20
+          variable d : unsigned(0 to 2*6-1);  -- 12
+        begin
+          for i in 0 to 31 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));      end loop;
+          for i in 0 to 15 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3));   end loop;
+          for i in 0 to 7  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5));   end loop;
+          for i in 0 to 3  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7));   end loop;
+          for i in 0 to 1  loop d(i*6 to i*6+5):=~SYM[2](5,c(i*10 to i*10+9)); end loop;
+          return ~SYM[2](6,d(0 to 11));
+        end function;
+      ~ELSE
+        function ~GENSYM[clz32][4] (constant v : unsigned(0 to 31)) return unsigned is
+          variable e : unsigned(0 to 31);    -- 32
+          variable a : unsigned(0 to 8*3-1); -- 24
+          variable b : unsigned(0 to 4*4-1); -- 16
+          variable c : unsigned(0 to 2*5-1); -- 10
+        begin
+          for i in 0 to 15 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
+          for i in 0 to 7  loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
+          for i in 0 to 3  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5)); end loop;
+          for i in 0 to 1  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7)); end loop;
+          return ~SYM[2](5,c(0 to 9));
+        end function;
+      ~FI
+      begin
+      ~IF ~IW64 ~THEN
+        ~RESULT <= resize(~SYM[3](~ARG[0]),~SIZE[~TYPO]);
+      ~ELSE
+        ~RESULT <= resize(~SYM[4](~ARG[0]),~SIZE[~TYPO]);
+      ~FI
+      end block;
+      -- clz end
+- BlackBox:
+    name: GHC.Prim.ctz8#
+    kind: Declaration
+    type: 'ctz8 :: Word# ->
+      Word#'
+    template: |-
+      -- ctz8 begin
+      ~GENSYM[ctz8][0] : block
+        function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
+        begin
+          case a is
+            when "00" => return "10";
+            when "01" => return "01";
+            when "10" => return "00";
+            when others => return "00";
+          end case;
+        end function;
+
+        function ~GENSYM[clzi][2] (
+          constant n : in natural;
+          constant i : in unsigned) return unsigned is
+          variable v : unsigned(i'length-1 downto 0):=i;
+        begin
+          if v(n-1+n)='0' then
+            return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
+          else
+            return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
+          end if;
+        end function;
+
+        function ~GENSYM[clz8][3] (constant v : unsigned(0 to 7)) return unsigned is
+          variable e : unsigned(0 to 7);     -- 8
+          variable a : unsigned(0 to 2*3-1); -- 6
+        begin
+          for i in 0 to 3 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
+          for i in 0 to 1 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
+          return ~SYM[2](3,a(0 to 5));
+        end function;
+
+        signal ~GENSYM[w_reversed][5] : ~TYP[0];
+      begin
+        ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~VAR[w][0]'range generate
+          ~SYM[5](~VAR[w][0]'high - ~SYM[7]) <= ~VAR[w][0](~SYM[7]);
+        end generate;
+      ~IF ~IW64 ~THEN
+        ~RESULT <= resize(~SYM[3](~SYM[5](63 downto 56)),~SIZE[~TYPO]);
+      ~ELSE
+        ~RESULT <= resize(~SYM[3](~SYM[5](31 downto 24)),~SIZE[~TYPO]);
+      ~FI
+      end block;
+      -- ctz8 end
+- BlackBox:
+    name: GHC.Prim.ctz16#
+    kind: Declaration
+    type: 'ctz16 :: Word#
+      -> Word#'
+    template: |-
+      -- ctz16 begin
+      ~GENSYM[ctz16][0] : block
+        function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
+        begin
+          case a is
+            when "00" => return "10";
+            when "01" => return "01";
+            when "10" => return "00";
+            when others => return "00";
+          end case;
+        end function;
+
+        function ~GENSYM[clzi][2] (
+          constant n : in natural;
+          constant i : in unsigned) return unsigned is
+          variable v : unsigned(i'length-1 downto 0):=i;
+        begin
+          if v(n-1+n)='0' then
+            return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
+          else
+            return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
+          end if;
+        end function;
+
+        function ~GENSYM[clz16][3] (constant v : unsigned(0 to 15)) return unsigned is
+          variable e : unsigned(0 to 15);    -- 16
+          variable a : unsigned(0 to 4*3-1); -- 12
+          variable b : unsigned(0 to 2*4-1); -- 8
+        begin
+          for i in 0 to 7 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
+          for i in 0 to 3 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
+          for i in 0 to 1 loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5)); end loop;
+          return ~SYM[2](4,b(0 to 7));
+        end function;
+
+        signal ~GENSYM[w_reversed][5] : ~TYP[0];
+      begin
+        ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~VAR[w][0]'range generate
+          ~SYM[5](~VAR[w][0]'high - ~SYM[7]) <= ~VAR[w][0](~SYM[7]);
+        end generate;
+      ~IF ~IW64 ~THEN
+        ~RESULT <= resize(~SYM[3](~SYM[5](63 downto 48)),~SIZE[~TYPO]);
+      ~ELSE
+        ~RESULT <= resize(~SYM[3](~SYM[5](31 downto 16)),~SIZE[~TYPO]);
+      ~FI
+      end block;
+      -- ctz16 end
+- BlackBox:
+    name: GHC.Prim.ctz32#
+    kind: Declaration
+    type: 'ctz32 :: Word#
+      -> Word#'
+    template: |-
+      -- ctz32 begin
+      ~GENSYM[ctz32][0] : block
+        function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
+        begin
+          case a is
+            when "00" => return "10";
+            when "01" => return "01";
+            when "10" => return "00";
+            when others => return "00";
+          end case;
+        end function;
+
+        function ~GENSYM[clzi][2] (
+          constant n : in natural;
+          constant i : in unsigned) return unsigned is
+          variable v : unsigned(i'length-1 downto 0):=i;
+        begin
+          if v(n-1+n)='0' then
+            return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
+          else
+            return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
+          end if;
+        end function;
+
+        function ~GENSYM[clz32][3] (constant v : unsigned(0 to 31)) return unsigned is
+          variable e : unsigned(0 to 31);    -- 32
+          variable a : unsigned(0 to 8*3-1); -- 24
+          variable b : unsigned(0 to 4*4-1); -- 16
+          variable c : unsigned(0 to 2*5-1); -- 10
+        begin
+          for i in 0 to 15 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
+          for i in 0 to 7  loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
+          for i in 0 to 3  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5)); end loop;
+          for i in 0 to 1  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7)); end loop;
+          return ~SYM[2](5,c(0 to 9));
+        end function;
+
+        signal ~GENSYM[w_reversed][5] : ~TYP[0];
+      begin
+        ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~VAR[w][0]'range generate
+          ~SYM[5](~VAR[w][0]'high - ~SYM[7]) <= ~VAR[w][0](~SYM[3]);
+        end generate;
+      ~IF ~IW64 ~THEN
+        ~RESULT <= resize(~SYM[3](~SYM[5](63 downto 32)),~SIZE[~TYPO]);
+      ~ELSE
+        ~RESULT <= resize(~SYM[3](~SYM[5]),~SIZE[~TYPO]);
+      ~FI
+      end block;
+      -- ctz32 end
+- BlackBox:
+    name: GHC.Prim.ctz64#
+    kind: Declaration
+    type: 'ctz64 :: Word#
+      -> Word#'
+    template: |-
+      -- ctz64 begin
+      ~GENSYM[ctz64][0] : block
+        function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
+        begin
+          case a is
+            when "00" => return "10";
+            when "01" => return "01";
+            when "10" => return "00";
+            when others => return "00";
+          end case;
+        end function;
+
+        function ~GENSYM[clzi][2] (
+          constant n : in natural;
+          constant i : in unsigned) return unsigned is
+          variable v : unsigned(i'length-1 downto 0):=i;
+        begin
+          if v(n-1+n)='0' then
+            return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
+          else
+            return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
+          end if;
+        end function;
+
+        function ~GENSYM[clz64][3] (constant v : unsigned(0 to 63)) return unsigned is
+          variable e : unsigned(0 to 63);     -- 64
+          variable a : unsigned(0 to 16*3-1); -- 48
+          variable b : unsigned(0 to 8*4-1);  -- 32
+          variable c : unsigned(0 to 4*5-1);  -- 20
+          variable d : unsigned(0 to 2*6-1);  -- 12
+        begin
+          for i in 0 to 31 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));      end loop;
+          for i in 0 to 15 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3));   end loop;
+          for i in 0 to 7  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5));   end loop;
+          for i in 0 to 3  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7));   end loop;
+          for i in 0 to 1  loop d(i*6 to i*6+5):=~SYM[2](5,c(i*10 to i*10+9)); end loop;
+          return ~SYM[2](6,d(0 to 11));
+        end function;
+
+        signal ~GENSYM[w_reversed][5] : ~TYP[0];
+      begin
+        ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~VAR[w][0]'range generate
+          ~SYM[5](~VAR[w][0]'high - ~SYM[7]) <= ~VAR[w][0](~SYM[7]);
+        end generate;
+
+        ~RESULT <= resize(~SYM[3](~SYM[5]),~SIZE[~TYPO]);
+      end block;
+      -- ctz64 end
+- BlackBox:
+    name: GHC.Prim.ctz#
+    kind: Declaration
+    type: 'ctz :: Word# ->
+      Word#'
+    template: |-
+      -- ctz begin
+      ~GENSYM[ctz][0] : block
+        function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
+        begin
+          case a is
+            when "00" => return "10";
+            when "01" => return "01";
+            when "10" => return "00";
+            when others => return "00";
+          end case;
+        end function;
+
+        function ~GENSYM[clzi][2] (
+          constant n : in natural;
+          constant i : in unsigned) return unsigned is
+          variable v : unsigned(i'length-1 downto 0):=i;
+        begin
+          if v(n-1+n)='0' then
+            return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
+          else
+            return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
+          end if;
+        end function;
+
+      ~IF ~IW64 ~THEN
+        function ~GENSYM[clz64][3] (constant v : unsigned(0 to 63)) return unsigned is
+          variable e : unsigned(0 to 63);     -- 64
+          variable a : unsigned(0 to 16*3-1); -- 48
+          variable b : unsigned(0 to 8*4-1);  -- 32
+          variable c : unsigned(0 to 4*5-1);  -- 20
+          variable d : unsigned(0 to 2*6-1);  -- 12
+        begin
+          for i in 0 to 31 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));      end loop;
+          for i in 0 to 15 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3));   end loop;
+          for i in 0 to 7  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5));   end loop;
+          for i in 0 to 3  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7));   end loop;
+          for i in 0 to 1  loop d(i*6 to i*6+5):=~SYM[2](5,c(i*10 to i*10+9)); end loop;
+          return ~SYM[2](6,d(0 to 11));
+        end function;
+      ~ELSE
+        function ~GENSYM[clz32][4] (constant v : unsigned(0 to 31)) return unsigned is
+          variable e : unsigned(0 to 31);    -- 32
+          variable a : unsigned(0 to 8*3-1); -- 24
+          variable b : unsigned(0 to 4*4-1); -- 16
+          variable c : unsigned(0 to 2*5-1); -- 10
+        begin
+          for i in 0 to 15 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
+          for i in 0 to 7  loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
+          for i in 0 to 3  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5)); end loop;
+          for i in 0 to 1  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7)); end loop;
+          return ~SYM[2](5,c(0 to 9));
+        end function;
+      ~FI
+
+        signal ~GENSYM[w_reversed][6] : ~TYP[0];
+      begin
+        ~GENSYM[reverse_loop][7] : for ~GENSYM[n][8] in ~VAR[w][0]'range generate
+          ~SYM[6](~VAR[w][0]'high - ~SYM[8]) <= ~VAR[w][0](~SYM[8]);
+        end generate;
+      ~IF ~IW64 ~THEN
+        ~RESULT <= resize(~SYM[3](~SYM[6]),~SIZE[~TYPO]);
+      ~ELSE
+        ~RESULT <= resize(~SYM[4](~SYM[6]),~SIZE[~TYPO]);
+      ~FI
+      end block;
+      -- ctz end
+- BlackBox:
+    name: GHC.Prim.byteSwap16#
+    kind: Declaration
+    type: 'byteSwap16# ::
+      Word# -> Word#'
+    template: |-
+      -- byteSwap16 begin~IF ~IW64 ~THEN
+      ~RESULT <= ~VAR[w][0](63 downto 16) & ~VAR[w][0](7 downto 0) & ~VAR[w][0](15 downto 8);~ELSE
+      ~RESULT <= ~VAR[w][0](31 downto 16) & ~VAR[w][0](7 downto 0) & ~VAR[w][0](15 downto 8);~FI
+      -- byteSwap16 end
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.byteSwap32#
+    kind: Declaration
+    type: 'byteSwap32# ::
+      Word# -> Word#'
+    template: |-
+      -- byteSwap32 begin~IF ~IW64 ~THEN
+      ~RESULT <= ~VAR[w][0](63 downto 32) & ~VAR[w][0](7  downto 0 ) & ~VAR[w][0](15 downto 8)
+                                          & ~VAR[w][0](23 downto 16) & ~VAR[w][0](31 downto 24);~ELSE
+      ~RESULT <= ~VAR[w][0](7  downto 0 ) & ~VAR[w][0](15 downto 8)
+               & ~VAR[w][0](23 downto 16) & ~VAR[w][0](31 downto 24);~FI
+      -- byteSwap32 end
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.byteSwap64#
+    kind: Declaration
+    type: 'byteSwap64# ::
+      Word# -> Word#'
+    template: |-
+      -- byteSwap64 begin
+      ~RESULT <= ~VAR[w][0](7  downto 0 ) & ~VAR[w][0](15 downto 8)
+               & ~VAR[w][0](23 downto 16) & ~VAR[w][0](31 downto 24)
+               & ~VAR[w][0](39 downto 32) & ~VAR[w][0](47 downto 40)
+               & ~VAR[w][0](55 downto 48) & ~VAR[w][0](63 downto 56);
+      -- byteSwap64 end
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.byteSwap#
+    kind: Declaration
+    type: 'byteSwap# :: Word#
+      -> Word#'
+    template: |-
+      -- byteSwap begin ~IF ~IW64 ~THEN
+      ~RESULT <= ~VAR[w][0](7  downto 0 ) & ~VAR[w][0](15 downto 8)
+               & ~VAR[w][0](23 downto 16) & ~VAR[w][0](31 downto 24)
+               & ~VAR[w][0](39 downto 32) & ~VAR[w][0](47 downto 40)
+               & ~VAR[w][0](55 downto 48) & ~VAR[w][0](63 downto 56);~ELSE
+      ~RESULT <= ~VAR[w][0](7  downto 0 ) & ~VAR[w][0](15 downto 8)
+               & ~VAR[w][0](23 downto 16) & ~VAR[w][0](31 downto 24);~FI
+      -- byteSwap end
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.narrow8Int#
+    kind: Expression
+    type: 'narrow8Int# ::
+      Int# -> Int#'
+    template: resize(~VAR[i][0](7 downto 0),~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.narrow16Int#
+    kind: Expression
+    type: 'narrow16Int# ::
+      Int# -> Int#'
+    template: resize(~VAR[i][0](15 downto 0),~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.narrow32Int#
+    kind: Expression
+    type: 'narrow32Int# ::
+      Int# -> Int#'
+    template: resize(~VAR[i][0](31 downto 0),~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.narrow8Word#
+    kind: Expression
+    type: 'narrow8Word# ::
+      Word# -> Word#'
+    template: resize(~VAR[w][0](7 downto 0),~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.narrow16Word#
+    kind: Expression
+    type: 'narrow16Word# ::
+      Word# -> Word#'
+    template: resize(~VAR[w][0](15 downto 0),~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.narrow32Word#
+    kind: Expression
+    type: 'narrow32Word# ::
+      Word# -> Word#'
+    template: resize(~VAR[w][0](31 downto 0),~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.bitReverse#
+    kind: Declaration
+    type: 'bitReverse# ::
+      Word# -> Word#'
+    template: |-
+      -- bitReverse begin
+      ~GENSYM[bitReverse][0] : for ~GENSYM[i][1] in 0 to ~IF ~IW64 ~THEN 63 ~ELSE 31 ~FI generate
+      begin
+      ~RESULT(~SYM[1]) <= ~VAR[x][0](~IF ~IW64 ~THEN 63 ~ELSE 31 ~FI-~SYM[1]);
       end generate;
-    end generate;
-  end generate;
-
-  -- The last element of the intermediate array holds the result
-  ~RESULT <= resize(~SYM[5]((2*~SYM[2])-2),~SIZE[~TYPO]);
-end block;
--- popCnt8 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.popCnt16#"
-    , "kind"      : "Declaration"
-    , "type"      : "popCnt16 :: Word# -> Word#"
-    , "template"  :
-"-- popCnt16 begin
-~GENSYM[popCnt16][0] : block
-  -- given a level and a depth, calculate the corresponding index into the
-  -- intermediate array
-  function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
-  begin
-    return (2 ** levels - 2 ** depth);
-  end function;
-
-  constant ~GENSYM[width][2] : natural := 16;
-  constant ~GENSYM[levels][3] : natural := natural (ceil (log2 (real (~SYM[2]))));
-  type ~GENSYM[popCnt_res_vec][4] is array (natural range <>) of unsigned(~SYM[3] downto 0);
-  signal ~GENSYM[intermediate][5] : ~SYM[4](0 to (2*~SYM[2])-2);
-begin
-  -- put input into the first half of the intermediate array
-  ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
-    ~SYM[5](~SYM[7]) <= resize(~VAR[input][0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
-  end generate;
-
-  -- Create the tree of adders
-  ~GENSYM[make_tree][8] : if ~SYM[3] /= 0 generate
-    ~GENSYM[tree_depth][9] : for ~GENSYM[d][10] in ~SYM[3]-1 downto 0 generate
-      ~GENSYM[tree_depth_loop][11] : for ~GENSYM[i][12] in 0 to (natural(2**~SYM[10]) - 1) generate
-        ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+1)+~SYM[12]) <=
-          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])) +
-          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])+1);
+      -- bitReverse end
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.bitReverse8#
+    kind: Declaration
+    type: 'bitReverse8# ::
+      Word# -> Word#'
+    template: |-
+      -- bitReverse8 begin
+      ~GENSYM[bitReverse8][0] : for ~GENSYM[i][1] in 0 to 7 generate
+      begin
+      ~RESULT(~SYM[1]) <= ~VAR[x][0](7-~SYM[1]);
       end generate;
-    end generate;
-  end generate;
-
-  -- The last element of the intermediate array holds the result
-  ~RESULT <= resize(~SYM[5]((2*~SYM[2])-2),~SIZE[~TYPO]);
-end block;
--- popCnt16 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.popCnt32#"
-    , "kind"      : "Declaration"
-    , "type"      : "popCnt32 :: Word# -> Word#"
-    , "template"  :
-"-- popCnt32 begin
-~GENSYM[popCnt32][0] : block
-  -- given a level and a depth, calculate the corresponding index into the
-  -- intermediate array
-  function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
-  begin
-    return (2 ** levels - 2 ** depth);
-  end function;
-
-  constant ~GENSYM[width][2] : natural := 32;
-  constant ~GENSYM[levels][3] : natural := natural (ceil (log2 (real (~SYM[2]))));
-  type ~GENSYM[popCnt_res_vec][4] is array (natural range <>) of unsigned(~SYM[3] downto 0);
-  signal ~GENSYM[intermediate][5] : ~SYM[4](0 to (2*~SYM[2])-2);
-begin
-  -- put input into the first half of the intermediate array
-  ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
-    ~SYM[5](~SYM[7]) <= resize(~VAR[input][0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
-  end generate;
-
-  -- Create the tree of adders
-  ~GENSYM[make_tree][8] : if ~SYM[3] /= 0 generate
-    ~GENSYM[tree_depth][9] : for ~GENSYM[d][10] in ~SYM[3]-1 downto 0 generate
-      ~GENSYM[tree_depth_loop][11] : for ~GENSYM[i][12] in 0 to (natural(2**~SYM[10]) - 1) generate
-        ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+1)+~SYM[12]) <=
-          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])) +
-          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])+1);
+      -- bitReverse8 end
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.bitReverse16#
+    kind: Declaration
+    type: 'bitReverse16# ::
+      Word# -> Word#'
+    template: |-
+      -- bitReverse16 begin
+      ~GENSYM[bitReverse16][0] : for ~GENSYM[i][1] in 0 to 15 generate
+      begin
+      ~RESULT(~SYM[1]) <= ~VAR[x][0](15-~SYM[1]);
       end generate;
-    end generate;
-  end generate;
-
-  -- The last element of the intermediate array holds the result
-  ~RESULT <= resize(~SYM[5]((2*~SYM[2])-2),~SIZE[~TYPO]);
-end block;
--- popCnt32 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.popCnt64#"
-    , "kind"      : "Declaration"
-    , "type"      : "popCnt64 :: Word# -> Word#"
-    , "template"  :
-"-- popCnt64 begin
-~GENSYM[popCnt64][0] : block
-  -- given a level and a depth, calculate the corresponding index into the
-  -- intermediate array
-  function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
-  begin
-    return (2 ** levels - 2 ** depth);
-  end function;
-
-  constant ~GENSYM[width][2] : natural := 64;
-  constant ~GENSYM[levels][3] : natural := natural (ceil (log2 (real (~SYM[2]))));
-  type ~GENSYM[popCnt_res_vec][4] is array (natural range <>) of unsigned(~SYM[3] downto 0);
-  signal ~GENSYM[intermediate][5] : ~SYM[4](0 to (2*~SYM[2])-2);
-begin
-  -- put input into the first half of the intermediate array
-  ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
-    ~SYM[5](~SYM[7]) <= resize(~VAR[input][0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
-  end generate;
-
-  -- Create the tree of adders
-  ~GENSYM[make_tree][8] : if ~SYM[3] /= 0 generate
-    ~GENSYM[tree_depth][9] : for ~GENSYM[d][10] in ~SYM[3]-1 downto 0 generate
-      ~GENSYM[tree_depth_loop][11] : for ~GENSYM[i][12] in 0 to (natural(2**~SYM[10]) - 1) generate
-        ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+1)+~SYM[12]) <=
-          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])) +
-          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])+1);
+      -- bitReverse16 end
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.bitReverse32#
+    kind: Declaration
+    type: 'bitReverse32# ::
+      Word# -> Word#'
+    template: |-
+      -- bitReverse32 begin
+      ~GENSYM[bitReverse32][0] : for ~GENSYM[i][1] in 0 to 31 generate
+      begin
+      ~RESULT(~SYM[1]) <= ~VAR[x][0](31-~SYM[1]);
       end generate;
-    end generate;
-  end generate;
-
-  -- The last element of the intermediate array holds the result
-  ~RESULT <= resize(~SYM[5]((2*~SYM[2])-2),~SIZE[~TYPO]);
-end block;
--- popCnt64 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.popCnt#"
-    , "kind"      : "Declaration"
-    , "type"      : "popCnt :: Word# -> Word#"
-    , "template"  :
-"-- popCnt begin
-~GENSYM[popCnt][0] : block
-  -- given a level and a depth, calculate the corresponding index into the
-  -- intermediate array
-  function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
-  begin
-    return (2 ** levels - 2 ** depth);
-  end function;
-
-  constant ~GENSYM[width][2] : natural := ~SIZE[~TYPO];
-  constant ~GENSYM[levels][3] : natural := natural (ceil (log2 (real (~SYM[2]))));
-  type ~GENSYM[popCnt_res_vec][4] is array (natural range <>) of unsigned(~SYM[3] downto 0);
-  signal ~GENSYM[intermediate][5] : ~SYM[4](0 to (2*~SYM[2])-2);
-begin
-  -- put input into the first half of the intermediate array
-  ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
-    ~SYM[5](~SYM[7]) <= resize(~VAR[input][0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
-  end generate;
-
-  -- Create the tree of adders
-  ~GENSYM[make_tree][8] : if ~SYM[3] /= 0 generate
-    ~GENSYM[tree_depth][9] : for ~GENSYM[d][10] in ~SYM[3]-1 downto 0 generate
-      ~GENSYM[tree_depth_loop][11] : for ~GENSYM[i][12] in 0 to (natural(2**~SYM[10]) - 1) generate
-        ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+1)+~SYM[12]) <=
-          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])) +
-          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])+1);
+      -- bitReverse32 end
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.bitReverse64#
+    kind: Declaration
+    type: 'bitReverse64# ::
+      Word# -> Word#'
+    template: |-
+      -- bitReverse64 begin
+      ~GENSYM[bitReverse64][0] : for ~GENSYM[i][1] in 0 to 63 generate
+      begin
+      ~RESULT(~SYM[1]) <= ~VAR[x][0](63-~SYM[1]);
       end generate;
-    end generate;
-  end generate;
-
-  -- The last element of the intermediate array holds the result
-  ~RESULT <= resize(~SYM[5]((2*~SYM[2])-2),~SIZE[~TYPO]);
-end block;
--- popCnt end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.clz8#"
-    , "kind"      : "Declaration"
-    , "type"      : "clz8 :: Word# -> Word#"
-    , "template"  :
-"-- clz8 begin
-~GENSYM[clz8][0] : block
-  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
-  begin
-    case a is
-      when \"00\" => return \"10\";
-      when \"01\" => return \"01\";
-      when \"10\" => return \"00\";
-      when others => return \"00\";
-    end case;
-  end function;
-
-  function ~GENSYM[clzi][2] (
-    constant n : in natural;
-    constant i : in unsigned) return unsigned is
-    variable v : unsigned(i'length-1 downto 0):=i;
-  begin
-    if v(n-1+n)='0' then
-      return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
-    else
-      return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
-    end if;
-  end function;
-
-  function ~GENSYM[clz8][3] (constant v : unsigned(0 to 7)) return unsigned is
-    variable e : unsigned(0 to 7);     -- 8
-    variable a : unsigned(0 to 2*3-1); -- 6
-  begin
-    for i in 0 to 3 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
-    for i in 0 to 1 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
-    return ~SYM[2](3,a(0 to 5));
-  end function;
-begin
-  ~RESULT <= resize(~SYM[3](~ARG[0](7 downto 0)),~SIZE[~TYPO]);
-end block;
--- clz8 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.clz16#"
-    , "kind"      : "Declaration"
-    , "type"      : "clz16 :: Word# -> Word#"
-    , "template"  :
-"-- clz16 begin
-~GENSYM[clz16][0] : block
-  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
-  begin
-    case a is
-      when \"00\" => return \"10\";
-      when \"01\" => return \"01\";
-      when \"10\" => return \"00\";
-      when others => return \"00\";
-    end case;
-  end function;
-
-  function ~GENSYM[clzi][2] (
-    constant n : in natural;
-    constant i : in unsigned) return unsigned is
-    variable v : unsigned(i'length-1 downto 0):=i;
-  begin
-    if v(n-1+n)='0' then
-      return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
-    else
-      return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
-    end if;
-  end function;
-
-  function ~GENSYM[clz16][3] (constant v : unsigned(0 to 15)) return unsigned is
-    variable e : unsigned(0 to 15);    -- 16
-    variable a : unsigned(0 to 4*3-1); -- 12
-    variable b : unsigned(0 to 2*4-1); -- 8
-  begin
-    for i in 0 to 7 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
-    for i in 0 to 3 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
-    for i in 0 to 1 loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5)); end loop;
-    return ~SYM[2](4,b(0 to 7));
-  end function;
-begin
-  ~RESULT <= resize(~SYM[3](~ARG[0](15 downto 0)),~SIZE[~TYPO]);
-end block;
--- clz16 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.clz32#"
-    , "kind"      : "Declaration"
-    , "type"      : "clz32 :: Word# -> Word#"
-    , "template"  :
-"-- clz32 begin
-~GENSYM[clz32][0] : block
-  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
-  begin
-    case a is
-      when \"00\" => return \"10\";
-      when \"01\" => return \"01\";
-      when \"10\" => return \"00\";
-      when others => return \"00\";
-    end case;
-  end function;
-
-  function ~GENSYM[clzi][2] (
-    constant n : in natural;
-    constant i : in unsigned) return unsigned is
-    variable v : unsigned(i'length-1 downto 0):=i;
-  begin
-    if v(n-1+n)='0' then
-      return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
-    else
-      return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
-    end if;
-  end function;
-
-  function ~GENSYM[clz32][3] (constant v : unsigned(0 to 31)) return unsigned is
-    variable e : unsigned(0 to 31);    -- 32
-    variable a : unsigned(0 to 8*3-1); -- 24
-    variable b : unsigned(0 to 4*4-1); -- 16
-    variable c : unsigned(0 to 2*5-1); -- 10
-  begin
-    for i in 0 to 15 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
-    for i in 0 to 7  loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
-    for i in 0 to 3  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5)); end loop;
-    for i in 0 to 1  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7)); end loop;
-    return ~SYM[2](5,c(0 to 9));
-  end function;
-begin
-  ~RESULT <= resize(~SYM[3](~ARG[0](31 downto 0)),~SIZE[~TYPO]);
-end block;
--- clz32 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.clz64#"
-    , "kind"      : "Declaration"
-    , "type"      : "clz64 :: Word# -> Word#"
-    , "template"  :
-"-- clz64 begin
-~GENSYM[clz64][0] : block
-  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
-  begin
-    case a is
-      when \"00\" => return \"10\";
-      when \"01\" => return \"01\";
-      when \"10\" => return \"00\";
-      when others => return \"00\";
-    end case;
-  end function;
-
-  function ~GENSYM[clzi][2] (
-    constant n : in natural;
-    constant i : in unsigned) return unsigned is
-    variable v : unsigned(i'length-1 downto 0):=i;
-  begin
-    if v(n-1+n)='0' then
-      return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
-    else
-      return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
-    end if;
-  end function;
-
-  function ~GENSYM[clz64][3] (constant v : unsigned(0 to 63)) return unsigned is
-    variable e : unsigned(0 to 63);     -- 64
-    variable a : unsigned(0 to 16*3-1); -- 48
-    variable b : unsigned(0 to 8*4-1);  -- 32
-    variable c : unsigned(0 to 4*5-1);  -- 20
-    variable d : unsigned(0 to 2*6-1);  -- 12
-  begin
-    for i in 0 to 31 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));      end loop;
-    for i in 0 to 15 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3));   end loop;
-    for i in 0 to 7  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5));   end loop;
-    for i in 0 to 3  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7));   end loop;
-    for i in 0 to 1  loop d(i*6 to i*6+5):=~SYM[2](5,c(i*10 to i*10+9)); end loop;
-    return ~SYM[2](6,d(0 to 11));
-  end function;
-begin
-  ~RESULT <= resize(~SYM[3](~ARG[0]),~SIZE[~TYPO]);
-end block;
--- clz64 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.clz#"
-    , "kind"      : "Declaration"
-    , "type"      : "clz :: Word# -> Word#"
-    , "template"  :
-"-- clz begin
-~GENSYM[clz][0] : block
-  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
-  begin
-    case a is
-      when \"00\" => return \"10\";
-      when \"01\" => return \"01\";
-      when \"10\" => return \"00\";
-      when others => return \"00\";
-    end case;
-  end function;
-
-  function ~GENSYM[clzi][2] (
-    constant n : in natural;
-    constant i : in unsigned) return unsigned is
-    variable v : unsigned(i'length-1 downto 0):=i;
-  begin
-    if v(n-1+n)='0' then
-      return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
-    else
-      return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
-    end if;
-  end function;
-~IF ~IW64 ~THEN
-  function ~GENSYM[clz64][3] (constant v : unsigned(0 to 63)) return unsigned is
-    variable e : unsigned(0 to 63);     -- 64
-    variable a : unsigned(0 to 16*3-1); -- 48
-    variable b : unsigned(0 to 8*4-1);  -- 32
-    variable c : unsigned(0 to 4*5-1);  -- 20
-    variable d : unsigned(0 to 2*6-1);  -- 12
-  begin
-    for i in 0 to 31 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));      end loop;
-    for i in 0 to 15 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3));   end loop;
-    for i in 0 to 7  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5));   end loop;
-    for i in 0 to 3  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7));   end loop;
-    for i in 0 to 1  loop d(i*6 to i*6+5):=~SYM[2](5,c(i*10 to i*10+9)); end loop;
-    return ~SYM[2](6,d(0 to 11));
-  end function;
-~ELSE
-  function ~GENSYM[clz32][4] (constant v : unsigned(0 to 31)) return unsigned is
-    variable e : unsigned(0 to 31);    -- 32
-    variable a : unsigned(0 to 8*3-1); -- 24
-    variable b : unsigned(0 to 4*4-1); -- 16
-    variable c : unsigned(0 to 2*5-1); -- 10
-  begin
-    for i in 0 to 15 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
-    for i in 0 to 7  loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
-    for i in 0 to 3  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5)); end loop;
-    for i in 0 to 1  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7)); end loop;
-    return ~SYM[2](5,c(0 to 9));
-  end function;
-~FI
-begin
-~IF ~IW64 ~THEN
-  ~RESULT <= resize(~SYM[3](~ARG[0]),~SIZE[~TYPO]);
-~ELSE
-  ~RESULT <= resize(~SYM[4](~ARG[0]),~SIZE[~TYPO]);
-~FI
-end block;
--- clz end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.ctz8#"
-    , "kind"      : "Declaration"
-    , "type"      : "ctz8 :: Word# -> Word#"
-    , "template"  :
-"-- ctz8 begin
-~GENSYM[ctz8][0] : block
-  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
-  begin
-    case a is
-      when \"00\" => return \"10\";
-      when \"01\" => return \"01\";
-      when \"10\" => return \"00\";
-      when others => return \"00\";
-    end case;
-  end function;
-
-  function ~GENSYM[clzi][2] (
-    constant n : in natural;
-    constant i : in unsigned) return unsigned is
-    variable v : unsigned(i'length-1 downto 0):=i;
-  begin
-    if v(n-1+n)='0' then
-      return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
-    else
-      return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
-    end if;
-  end function;
-
-  function ~GENSYM[clz8][3] (constant v : unsigned(0 to 7)) return unsigned is
-    variable e : unsigned(0 to 7);     -- 8
-    variable a : unsigned(0 to 2*3-1); -- 6
-  begin
-    for i in 0 to 3 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
-    for i in 0 to 1 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
-    return ~SYM[2](3,a(0 to 5));
-  end function;
-
-  signal ~GENSYM[w_reversed][5] : ~TYP[0];
-begin
-  ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~VAR[w][0]'range generate
-    ~SYM[5](~VAR[w][0]'high - ~SYM[7]) <= ~VAR[w][0](~SYM[7]);
-  end generate;
-~IF ~IW64 ~THEN
-  ~RESULT <= resize(~SYM[3](~SYM[5](63 downto 56)),~SIZE[~TYPO]);
-~ELSE
-  ~RESULT <= resize(~SYM[3](~SYM[5](31 downto 24)),~SIZE[~TYPO]);
-~FI
-end block;
--- ctz8 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.ctz16#"
-    , "kind"      : "Declaration"
-    , "type"      : "ctz16 :: Word# -> Word#"
-    , "template"  :
-"-- ctz16 begin
-~GENSYM[ctz16][0] : block
-  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
-  begin
-    case a is
-      when \"00\" => return \"10\";
-      when \"01\" => return \"01\";
-      when \"10\" => return \"00\";
-      when others => return \"00\";
-    end case;
-  end function;
-
-  function ~GENSYM[clzi][2] (
-    constant n : in natural;
-    constant i : in unsigned) return unsigned is
-    variable v : unsigned(i'length-1 downto 0):=i;
-  begin
-    if v(n-1+n)='0' then
-      return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
-    else
-      return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
-    end if;
-  end function;
-
-  function ~GENSYM[clz16][3] (constant v : unsigned(0 to 15)) return unsigned is
-    variable e : unsigned(0 to 15);    -- 16
-    variable a : unsigned(0 to 4*3-1); -- 12
-    variable b : unsigned(0 to 2*4-1); -- 8
-  begin
-    for i in 0 to 7 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
-    for i in 0 to 3 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
-    for i in 0 to 1 loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5)); end loop;
-    return ~SYM[2](4,b(0 to 7));
-  end function;
-
-  signal ~GENSYM[w_reversed][5] : ~TYP[0];
-begin
-  ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~VAR[w][0]'range generate
-    ~SYM[5](~VAR[w][0]'high - ~SYM[7]) <= ~VAR[w][0](~SYM[7]);
-  end generate;
-~IF ~IW64 ~THEN
-  ~RESULT <= resize(~SYM[3](~SYM[5](63 downto 48)),~SIZE[~TYPO]);
-~ELSE
-  ~RESULT <= resize(~SYM[3](~SYM[5](31 downto 16)),~SIZE[~TYPO]);
-~FI
-end block;
--- ctz16 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.ctz32#"
-    , "kind"      : "Declaration"
-    , "type"      : "ctz32 :: Word# -> Word#"
-    , "template"  :
-"-- ctz32 begin
-~GENSYM[ctz32][0] : block
-  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
-  begin
-    case a is
-      when \"00\" => return \"10\";
-      when \"01\" => return \"01\";
-      when \"10\" => return \"00\";
-      when others => return \"00\";
-    end case;
-  end function;
-
-  function ~GENSYM[clzi][2] (
-    constant n : in natural;
-    constant i : in unsigned) return unsigned is
-    variable v : unsigned(i'length-1 downto 0):=i;
-  begin
-    if v(n-1+n)='0' then
-      return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
-    else
-      return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
-    end if;
-  end function;
-
-  function ~GENSYM[clz32][3] (constant v : unsigned(0 to 31)) return unsigned is
-    variable e : unsigned(0 to 31);    -- 32
-    variable a : unsigned(0 to 8*3-1); -- 24
-    variable b : unsigned(0 to 4*4-1); -- 16
-    variable c : unsigned(0 to 2*5-1); -- 10
-  begin
-    for i in 0 to 15 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
-    for i in 0 to 7  loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
-    for i in 0 to 3  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5)); end loop;
-    for i in 0 to 1  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7)); end loop;
-    return ~SYM[2](5,c(0 to 9));
-  end function;
-
-  signal ~GENSYM[w_reversed][5] : ~TYP[0];
-begin
-  ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~VAR[w][0]'range generate
-    ~SYM[5](~VAR[w][0]'high - ~SYM[7]) <= ~VAR[w][0](~SYM[3]);
-  end generate;
-~IF ~IW64 ~THEN
-  ~RESULT <= resize(~SYM[3](~SYM[5](63 downto 32)),~SIZE[~TYPO]);
-~ELSE
-  ~RESULT <= resize(~SYM[3](~SYM[5]),~SIZE[~TYPO]);
-~FI
-end block;
--- ctz32 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.ctz64#"
-    , "kind"      : "Declaration"
-    , "type"      : "ctz64 :: Word# -> Word#"
-    , "template"  :
-"-- ctz64 begin
-~GENSYM[ctz64][0] : block
-  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
-  begin
-    case a is
-      when \"00\" => return \"10\";
-      when \"01\" => return \"01\";
-      when \"10\" => return \"00\";
-      when others => return \"00\";
-    end case;
-  end function;
-
-  function ~GENSYM[clzi][2] (
-    constant n : in natural;
-    constant i : in unsigned) return unsigned is
-    variable v : unsigned(i'length-1 downto 0):=i;
-  begin
-    if v(n-1+n)='0' then
-      return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
-    else
-      return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
-    end if;
-  end function;
-
-  function ~GENSYM[clz64][3] (constant v : unsigned(0 to 63)) return unsigned is
-    variable e : unsigned(0 to 63);     -- 64
-    variable a : unsigned(0 to 16*3-1); -- 48
-    variable b : unsigned(0 to 8*4-1);  -- 32
-    variable c : unsigned(0 to 4*5-1);  -- 20
-    variable d : unsigned(0 to 2*6-1);  -- 12
-  begin
-    for i in 0 to 31 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));      end loop;
-    for i in 0 to 15 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3));   end loop;
-    for i in 0 to 7  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5));   end loop;
-    for i in 0 to 3  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7));   end loop;
-    for i in 0 to 1  loop d(i*6 to i*6+5):=~SYM[2](5,c(i*10 to i*10+9)); end loop;
-    return ~SYM[2](6,d(0 to 11));
-  end function;
-
-  signal ~GENSYM[w_reversed][5] : ~TYP[0];
-begin
-  ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~VAR[w][0]'range generate
-    ~SYM[5](~VAR[w][0]'high - ~SYM[7]) <= ~VAR[w][0](~SYM[7]);
-  end generate;
-
-  ~RESULT <= resize(~SYM[3](~SYM[5]),~SIZE[~TYPO]);
-end block;
--- ctz64 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.ctz#"
-    , "kind"      : "Declaration"
-    , "type"      : "ctz :: Word# -> Word#"
-    , "template"  :
-"-- ctz begin
-~GENSYM[ctz][0] : block
-  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
-  begin
-    case a is
-      when \"00\" => return \"10\";
-      when \"01\" => return \"01\";
-      when \"10\" => return \"00\";
-      when others => return \"00\";
-    end case;
-  end function;
-
-  function ~GENSYM[clzi][2] (
-    constant n : in natural;
-    constant i : in unsigned) return unsigned is
-    variable v : unsigned(i'length-1 downto 0):=i;
-  begin
-    if v(n-1+n)='0' then
-      return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
-    else
-      return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
-    end if;
-  end function;
-
-~IF ~IW64 ~THEN
-  function ~GENSYM[clz64][3] (constant v : unsigned(0 to 63)) return unsigned is
-    variable e : unsigned(0 to 63);     -- 64
-    variable a : unsigned(0 to 16*3-1); -- 48
-    variable b : unsigned(0 to 8*4-1);  -- 32
-    variable c : unsigned(0 to 4*5-1);  -- 20
-    variable d : unsigned(0 to 2*6-1);  -- 12
-  begin
-    for i in 0 to 31 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));      end loop;
-    for i in 0 to 15 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3));   end loop;
-    for i in 0 to 7  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5));   end loop;
-    for i in 0 to 3  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7));   end loop;
-    for i in 0 to 1  loop d(i*6 to i*6+5):=~SYM[2](5,c(i*10 to i*10+9)); end loop;
-    return ~SYM[2](6,d(0 to 11));
-  end function;
-~ELSE
-  function ~GENSYM[clz32][4] (constant v : unsigned(0 to 31)) return unsigned is
-    variable e : unsigned(0 to 31);    -- 32
-    variable a : unsigned(0 to 8*3-1); -- 24
-    variable b : unsigned(0 to 4*4-1); -- 16
-    variable c : unsigned(0 to 2*5-1); -- 10
-  begin
-    for i in 0 to 15 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
-    for i in 0 to 7  loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
-    for i in 0 to 3  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5)); end loop;
-    for i in 0 to 1  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7)); end loop;
-    return ~SYM[2](5,c(0 to 9));
-  end function;
-~FI
-
-  signal ~GENSYM[w_reversed][6] : ~TYP[0];
-begin
-  ~GENSYM[reverse_loop][7] : for ~GENSYM[n][8] in ~VAR[w][0]'range generate
-    ~SYM[6](~VAR[w][0]'high - ~SYM[8]) <= ~VAR[w][0](~SYM[8]);
-  end generate;
-~IF ~IW64 ~THEN
-  ~RESULT <= resize(~SYM[3](~SYM[6]),~SIZE[~TYPO]);
-~ELSE
-  ~RESULT <= resize(~SYM[4](~SYM[6]),~SIZE[~TYPO]);
-~FI
-end block;
--- ctz end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.byteSwap16#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Declaration"
-    , "type"      : "byteSwap16# :: Word# -> Word#"
-    , "template"  :
-"-- byteSwap16 begin~IF ~IW64 ~THEN
-~RESULT <= ~VAR[w][0](63 downto 16) & ~VAR[w][0](7 downto 0) & ~VAR[w][0](15 downto 8);~ELSE
-~RESULT <= ~VAR[w][0](31 downto 16) & ~VAR[w][0](7 downto 0) & ~VAR[w][0](15 downto 8);~FI
--- byteSwap16 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.byteSwap32#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Declaration"
-    , "type"      : "byteSwap32# :: Word# -> Word#"
-    , "template"  :
-"-- byteSwap32 begin~IF ~IW64 ~THEN
-~RESULT <= ~VAR[w][0](63 downto 32) & ~VAR[w][0](7  downto 0 ) & ~VAR[w][0](15 downto 8)
-                                    & ~VAR[w][0](23 downto 16) & ~VAR[w][0](31 downto 24);~ELSE
-~RESULT <= ~VAR[w][0](7  downto 0 ) & ~VAR[w][0](15 downto 8)
-         & ~VAR[w][0](23 downto 16) & ~VAR[w][0](31 downto 24);~FI
--- byteSwap32 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.byteSwap64#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Declaration"
-    , "type"      : "byteSwap64# :: Word# -> Word#"
-    , "template"  :
-"-- byteSwap64 begin
-~RESULT <= ~VAR[w][0](7  downto 0 ) & ~VAR[w][0](15 downto 8)
-         & ~VAR[w][0](23 downto 16) & ~VAR[w][0](31 downto 24)
-         & ~VAR[w][0](39 downto 32) & ~VAR[w][0](47 downto 40)
-         & ~VAR[w][0](55 downto 48) & ~VAR[w][0](63 downto 56);
--- byteSwap64 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.byteSwap#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Declaration"
-    , "type"      : "byteSwap# :: Word# -> Word#"
-    , "template"  :
-"-- byteSwap begin ~IF ~IW64 ~THEN
-~RESULT <= ~VAR[w][0](7  downto 0 ) & ~VAR[w][0](15 downto 8)
-         & ~VAR[w][0](23 downto 16) & ~VAR[w][0](31 downto 24)
-         & ~VAR[w][0](39 downto 32) & ~VAR[w][0](47 downto 40)
-         & ~VAR[w][0](55 downto 48) & ~VAR[w][0](63 downto 56);~ELSE
-~RESULT <= ~VAR[w][0](7  downto 0 ) & ~VAR[w][0](15 downto 8)
-         & ~VAR[w][0](23 downto 16) & ~VAR[w][0](31 downto 24);~FI
--- byteSwap end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.narrow8Int#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "narrow8Int# :: Int# -> Int#"
-    , "template"  : "resize(~VAR[i][0](7 downto 0),~SIZE[~TYPO])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.narrow16Int#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "narrow16Int# :: Int# -> Int#"
-    , "template"  : "resize(~VAR[i][0](15 downto 0),~SIZE[~TYPO])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.narrow32Int#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "narrow32Int# :: Int# -> Int#"
-    , "template"  : "resize(~VAR[i][0](31 downto 0),~SIZE[~TYPO])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.narrow8Word#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "narrow8Word# :: Word# -> Word#"
-    , "template"  : "resize(~VAR[w][0](7 downto 0),~SIZE[~TYPO])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.narrow16Word#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "narrow16Word# :: Word# -> Word#"
-    , "template"  : "resize(~VAR[w][0](15 downto 0),~SIZE[~TYPO])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.narrow32Word#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "narrow32Word# :: Word# -> Word#"
-    , "template"  : "resize(~VAR[w][0](31 downto 0),~SIZE[~TYPO])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.bitReverse#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Declaration"
-    , "type"      : "bitReverse# :: Word# -> Word#"
-    , "template"  :
-"-- bitReverse begin
-~GENSYM[bitReverse][0] : for ~GENSYM[i][1] in 0 to ~IF ~IW64 ~THEN 63 ~ELSE 31 ~FI generate
-begin
-~RESULT(~SYM[1]) <= ~VAR[x][0](~IF ~IW64 ~THEN 63 ~ELSE 31 ~FI-~SYM[1]);
-end generate;
--- bitReverse end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.bitReverse8#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Declaration"
-    , "type"      : "bitReverse8# :: Word# -> Word#"
-    , "template"  :
-"-- bitReverse8 begin
-~GENSYM[bitReverse8][0] : for ~GENSYM[i][1] in 0 to 7 generate
-begin
-~RESULT(~SYM[1]) <= ~VAR[x][0](7-~SYM[1]);
-end generate;
--- bitReverse8 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.bitReverse16#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Declaration"
-    , "type"      : "bitReverse16# :: Word# -> Word#"
-    , "template"  :
-"-- bitReverse16 begin
-~GENSYM[bitReverse16][0] : for ~GENSYM[i][1] in 0 to 15 generate
-begin
-~RESULT(~SYM[1]) <= ~VAR[x][0](15-~SYM[1]);
-end generate;
--- bitReverse16 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.bitReverse32#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Declaration"
-    , "type"      : "bitReverse32# :: Word# -> Word#"
-    , "template"  :
-"-- bitReverse32 begin
-~GENSYM[bitReverse32][0] : for ~GENSYM[i][1] in 0 to 31 generate
-begin
-~RESULT(~SYM[1]) <= ~VAR[x][0](31-~SYM[1]);
-end generate;
--- bitReverse32 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.bitReverse64#"
-    , "workInfo"  : "Never"
-    , "kind"      : "Declaration"
-    , "type"      : "bitReverse64# :: Word# -> Word#"
-    , "template"  :
-"-- bitReverse64 begin
-~GENSYM[bitReverse64][0] : for ~GENSYM[i][1] in 0 to 63 generate
-begin
-~RESULT(~SYM[1]) <= ~VAR[x][0](63-~SYM[1]);
-end generate;
--- bitReverse64 end"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.quotInt#"
-    , "kind"      : "Declaration"
-    , "type"      : "quotInt# :: Int# -> Int# -> Int#"
-    , "template"  :
-"~RESULT <= ~ARG[0] / ~ARG[1]
-    -- pragma translate_off
-    when (~ARG[1] /= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Prim.quotWord#"
-    , "kind"      : "Declaration"
-    , "type"      : "quotWord# :: Word# -> Word# -> Word#"
-    , "template"  :
-"~RESULT <= ~ARG[0] / ~ARG[1]
-    -- pragma translate_off
-    when (~ARG[1] /= 0) else (others => 'X')
-    -- pragma translate_on
-    ;"
-    }
-  }
-]
+      -- bitReverse64 end
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.quotInt#
+    kind: Declaration
+    type: 'quotInt# :: Int#
+      -> Int# -> Int#'
+    template: |-
+      ~RESULT <= ~ARG[0] / ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.quotWord#
+    kind: Declaration
+    type: 'quotWord# :: Word#
+      -> Word# -> Word#'
+    template: |-
+      ~RESULT <= ~ARG[0] / ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;

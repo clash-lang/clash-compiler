@@ -1,47 +1,33 @@
-[
-  {
-    "BlackBox": {
-      "name": "Clash.Sized.Vector.lazyV",
-      "workInfo" : "Never",
-      "kind": "Expression",
-      "type": "lazyV :: KnownNat n => Vec n a -> Vec n a",
-      "template": "~ARG[1]"
-    }
-  },
-  {
-    "BlackBox": {
-      "name": "Clash.Sized.Vector.seqV",
-      "workInfo" : "Never",
-      "kind": "Expression",
-      "type": "seqV :: KnownNat n => Vec n a -> b -> b",
-      "template": "~ARG[2]"
-    }
-  },
-  {
-    "BlackBox": {
-      "name": "Clash.Sized.Vector.seqVX",
-      "workInfo" : "Never",
-      "kind": "Expression",
-      "type": "seqVX :: KnownNat n => Vec n a -> b -> b",
-      "template": "~ARG[2]"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "Clash.Sized.Vector.dfold"
-    , "workInfo"  : "Never"
-    , "primType"  : "Function"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "Clash.Sized.Vector.dtfold"
-    , "workInfo"  : "Never"
-    , "primType"  : "Function"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "Clash.Sized.Vector.traverse#"
-    , "workInfo"  : "Never"
-    , "primType"  : "Function"
-    }
-  }
-]
+- BlackBox:
+    name: Clash.Sized.Vector.lazyV
+    kind: Expression
+    type: 'lazyV :: KnownNat
+      n => Vec n a -> Vec n a'
+    template: ~ARG[1]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Vector.seqV
+    kind: Expression
+    type: 'seqV :: KnownNat
+      n => Vec n a -> b -> b'
+    template: ~ARG[2]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Sized.Vector.seqVX
+    kind: Expression
+    type: 'seqVX :: KnownNat
+      n => Vec n a -> b -> b'
+    template: ~ARG[2]
+    workInfo: Never
+- Primitive:
+    name: Clash.Sized.Vector.dfold
+    primType: Function
+    workInfo: Never
+- Primitive:
+    name: Clash.Sized.Vector.dtfold
+    primType: Function
+    workInfo: Never
+- Primitive:
+    name: Clash.Sized.Vector.traverse#
+    primType: Function
+    workInfo: Never

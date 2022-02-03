@@ -1,17 +1,14 @@
-[ { "BlackBox" :
-    { "name"      : "Clash.Sized.Vector.maxIndex"
-    , "workInfo"  : "Constant"
-    , "kind"      : "Expression"
-    , "type"      : "maxIndex :: KnownNat n => Vec n a -> Int"
-    , "template"  : "~SIZE[~TYPO]'sd~LIT[0] - ~SIZE[~TYPO]'sd1"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "Clash.Sized.Vector.length"
-    , "workInfo"  : "Constant"
-    , "kind"      : "Expression"
-    , "type"      : "length :: KnownNat n => Vec n a -> Int"
-    , "template"  : "~SIZE[~TYPO]'sd~LIT[0]"
-    }
-  }
-]
+- BlackBox:
+    name: Clash.Sized.Vector.maxIndex
+    kind: Expression
+    type: 'maxIndex :: KnownNat
+      n => Vec n a -> Int'
+    template: ~SIZE[~TYPO]'sd~LIT[0] - ~SIZE[~TYPO]'sd1
+    workInfo: Constant
+- BlackBox:
+    name: Clash.Sized.Vector.length
+    kind: Expression
+    type: 'length :: KnownNat
+      n => Vec n a -> Int'
+    template: ~SIZE[~TYPO]'sd~LIT[0]
+    workInfo: Constant

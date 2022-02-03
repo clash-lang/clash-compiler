@@ -1,9 +1,7 @@
-[ { "BlackBox" :
-    { "name"      : "Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL"
-    , "workInfo"  : "Never"
-    , "kind"      : "Expression"
-    , "type"      : "dontApplyInHDL :: (a -> b) -> a -> b"
-    , "template"  : "~ARG[1]"
-    }
-  }
-]
+- BlackBox:
+    name: Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL
+    kind: Expression
+    type: 'dontApplyInHDL
+      :: (a -> b) -> a -> b'
+    template: ~ARG[1]
+    workInfo: Never

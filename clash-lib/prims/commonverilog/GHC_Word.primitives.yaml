@@ -1,30 +1,16 @@
-[
-  {
-    "BlackBoxHaskell": {
-      "name": "GHC.Word.W8#",
-      "workInfo" : "Never",
-      "templateFunction": "Clash.Primitives.GHC.Word.wordTF"
-    }
-  },
-  {
-    "BlackBoxHaskell": {
-      "name": "GHC.Word.W16#",
-      "workInfo" : "Never",
-      "templateFunction": "Clash.Primitives.GHC.Word.wordTF"
-    }
-  },
-  {
-    "BlackBoxHaskell": {
-      "name": "GHC.Word.W32#",
-      "workInfo" : "Never",
-      "templateFunction": "Clash.Primitives.GHC.Word.wordTF"
-    }
-  },
-  {
-    "BlackBoxHaskell": {
-      "name": "GHC.Word.W64#",
-      "workInfo" : "Never",
-      "templateFunction": "Clash.Primitives.GHC.Word.wordTF"
-    }
-  }
-]
+- BlackBoxHaskell:
+    name: GHC.Word.W8#
+    templateFunction: Clash.Primitives.GHC.Word.wordTF
+    workInfo: Never
+- BlackBoxHaskell:
+    name: GHC.Word.W16#
+    templateFunction: Clash.Primitives.GHC.Word.wordTF
+    workInfo: Never
+- BlackBoxHaskell:
+    name: GHC.Word.W32#
+    templateFunction: Clash.Primitives.GHC.Word.wordTF
+    workInfo: Never
+- BlackBoxHaskell:
+    name: GHC.Word.W64#
+    templateFunction: Clash.Primitives.GHC.Word.wordTF
+    workInfo: Never
