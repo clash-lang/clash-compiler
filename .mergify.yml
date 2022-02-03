@@ -24,31 +24,14 @@ pull_request_rules:
         branches:
           - "1.4"
 
-  # For more information https://doc.mergify.io/actions.html#merge
-  - name: auto merge on green CI and auto-merge label
+  - name: backport patches to 1.6
     conditions:
-      - "status-success=ci/circleci: nix-build"
-      - "status-success=ci/circleci: stack-build"
-      - status-success=ci/gitlab/gitlab.com
-      - label=auto-merge
+      - base=master
+      - label=backport 1.6
+      - merged
     actions:
-      merge:
-        method: merge
-  - name: auto squash on green CI and auto-squash label
-    conditions:
-      - "status-success=ci/circleci: nix-build"
-      - "status-success=ci/circleci: stack-build"
-      - status-success=ci/gitlab/gitlab.com
-      - label=auto-squash
-    actions:
-      merge:
-        method: squash
-  - name: auto rebase on green CI and auto-rebase label
-    conditions:
-      - "status-success=ci/circleci: nix-build"
-      - "status-success=ci/circleci: stack-build"
-      - status-success=ci/gitlab/gitlab.com
-      - label=auto-rebase
-    actions:
-      merge:
-        method: rebase
+      copy:
+        ignore_conflicts: True
+        branches:
+          - "1.6"
+
