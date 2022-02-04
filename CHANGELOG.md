@@ -1,4 +1,77 @@
 # Changelog for the Clash project
+## 1.6.0 *Feb 10th 2022*
+Added:
+  * `Clash.Class.Counter`: a class that defines a odometer-style supercounter. [#1763](https://github.com/clash-lang/clash-compiler/pull/1763)
+  * `isLike` function for BitPack types. [#1774](https://github.com/clash-lang/clash-compiler/pull/1774)
+  * 'seqErrorX' for catching both `XException` and `ErrorCall`. [#1774](https://github.com/clash-lang/clash-compiler/pull/1774)
+  * `Clash.Explicit.BlockRam.File.memFile`, a function for creating the contents of the data files this blockRAM uses. Can also be imported from `Clash.Prelude.BlockRam.File`, `Clash.Prelude.ROM.File` and `Clash.Explicit.ROM.File`. [#1840](https://github.com/clash-lang/clash-compiler/pull/1840)
+  * Support for Yosys compatible SVA to `Clash.Verification`. This enables formal verification using SymbiYosis for Verilog and SystemVerilog. [#1798](https://github.com/clash-lang/clash-compiler/pull/1798)
+  * `Clash.Explicit.Signal.Delayed.forward`, a function that can be used to retime a `DSignal` into the future without applying any logic. [#1882](https://github.com/clash-lang/clash-compiler/pull/1882)
+  * `Clash.Signal.andEnable` is the `HiddenEnable` version of `Clash.Explicit.Signal.andEnable` (formerly known as `enable`) [#1849](https://github.com/clash-lang/clash-compiler/pull/1849)
+  * `runUntil`, a function to sample a signal until it returns a value that satisfies the user-given test. It is a convenience function that, among others, allow easy running of a `testBench` style function in Haskell simulation, logging assertion failures to stderr. [#1940](https://github.com/clash-lang/clash-compiler/pull/1940)
+  * Support for true dual ported block ram through `Clash.Prelude.BlockRam.trueDualPortBlockRam` and `Clash.Explicit.BlockRam.trueDualPortBlockRam`. [#1726](https://github.com/clash-lang/clash-compiler/pull/1726) [#1975](https://github.com/clash-lang/clash-compiler/pull/1975)
+  * `clash-{prelude,lib}-hedgehog` packages which provide generators for types in `clash-prelude` and `clash-lib`. The former is published on Hackage. [#1976](https://github.com/clash-lang/clash-compiler/pull/1976)
+  * Clash now contains black boxes which are verilator compatible. When running with `--verilog` or `--systemverilog` a C++ shim is automatically produced which can be used to quickly generate a verilated executable. Users who wish to interact with verilator simulations are recommended to use [clashilator](https://github.com/gergoerdi/clashilator). [#2019](https://github.com/clash-lang/clash-compiler/pull/2019)
+  * Support for YAML blackboxes. Clash will now pickup on files with a `.primitives.yaml` extension. While we recommend upgrading your primitive files to the new format, old style primitives are still supported. We've included a tool to automatically upgrade your JSON files, see [#2037](https://github.com/clash-lang/clash-compiler/pull/2037)
+  * `MemBlob`: a datastructure for efficient constants, typically used for initializing memories. [#2041](https://github.com/clash-lang/clash-compiler/pull/2041)
+
+Fixed:
+
+  * BlockRam simulation is now less strict. [#1458](https://github.com/clash-lang/clash-compiler/issues/1458)
+  * Don't overflow VHDL's integer type when addressing RAM/ROM in simulation.Addresses are masked to 32 bits to be sure to keep it within the simulator's range. [#1875](https://github.com/clash-lang/clash-compiler/pull/1875)
+  * `show` on `BitVector 0` no longer results in an empty string. [#1785](https://github.com/clash-lang/clash-compiler/pull/1785)
+  * Clash now preserves transfinite floating numbers (NaN, Infinity) when packing/unpacking [#1803](https://github.com/clash-lang/clash-compiler/issues/1803)
+  * `SynthesisAnnotation`s can now be defined in type synoynms without being excluded from the generated HDL [#1771](https://github.com/clash-lang/clash-compiler/issues/1771)
+  * Manifest files now correctly list bidirectional ports as "inout" rather than "in" [#1843](https://github.com/clash-lang/clash-compiler/issues/1843)
+  * `div`/`rem`/`mod` now avoid division by zero during VHDL simulation. Due to the use of concurrent statements, even unreachable code would previously result in simulation error [#1873](https://github.com/clash-lang/clash-compiler/pull/1873)
+  * Don't overflow the range of VHDL's natural type in shift/rotate, leading to simulation issues. Shift now saturates to a 31-bit shift amount. For rotate, in simulation only, the rotate amount is modulo the word width of the rotated value [#1874](https://github.com/clash-lang/clash-compiler/pull/1874)
+  * `shiftL` for Clash datatypes does not cause a crash anymore when running Clash code with a really large shift amount [#1874](https://github.com/clash-lang/clash-compiler/pull/1874)
+  * VHDL generated for `Signed.fromInteger` now truncates, like the Clash simulation, when the result is smaller than the argument [#1874](https://github.com/clash-lang/clash-compiler/pull/1874)
+  * Clash now preserves boolean combinatorial logic better when generating HDL [#1881](https://github.com/clash-lang/clash-compiler/issues/1881)
+  * `valid` field of `TemplateFunction` is now checked for includes [#1945](https://github.com/clash-lang/clash-compiler/issues/1945)
+  * Clash now generates clock generators that ensure that the amount of time between simulation start and the first active edge of the clock is equal to (/or longer than/) the period of the clock. The first active edges of the clocks do still occur simultaneously. [#2001](https://github.com/clash-lang/clash-compiler/issues/2001)
+  * Expected values in assert become undefined when using `-fclash-compile-ultra` [#2040](https://github.com/clash-lang/clash-compiler/issues/2040)
+  * `toEnum`/`fromEnum` on sized types is now less eager to report warnings about integer functions being used [#2046](https://github.com/clash-lang/clash-compiler/issues/2046)
+
+Changed:
+
+  * `Clash.Verification.PrettyPrinters` has been moved from clash-prelude to to `Clash.Verification.Pretty` in `clash-lib`. [#1798](https://github.com/clash-lang/clash-compiler/pull/1798)
+  * RAM/ROM functions: They now throw `XExeception` for out-of-bounds address inputs, so this condition no longer aborts simulation. [#1875](https://github.com/clash-lang/clash-compiler/pull/1875)
+  * `Vec`'s show instance now generates valid Haskell. [#1776](https://github.com/clash-lang/clash-compiler/issues/1776)
+  * `ShowX` and its functions now produce valid Haskell [#1782](https://github.com/clash-lang/clash-compiler/issues/1782)
+  * `bLit` now infers the size of the generated BitVector from the string given to it. This means you don't have to give it an explicit type signature anymore. This does slightly modify the syntax needed to invoke `bLit`. E.g., `$$(bLit "00..1") :: BitVector 5` should be rewritten as `$(bLit "00..1")`. If you relied on the size inference, wrap the new invocation in `resize`. For example: `resize $(bLit "00..1")`. [#1784](https://github.com/clash-lang/clash-compiler/pull/1784)
+  * `NumericUnderscores` is now enabled by default in `clash`, `clashi`, and starter projects using Clash >=1.6. [#1785](https://github.com/clash-lang/clash-compiler/pull/1785)
+  * `Show` instance of `BitVector` now includes a `0b` prefix, making it a copyable expression for fully defined vectors. [#1785](https://github.com/clash-lang/clash-compiler/pull/1785)
+  * `blockRam` uses `STArray` as the underlying representation to improve simulation performance [#1878](https://github.com/clash-lang/clash-compiler/pull/1878)
+  * `asyncRom` now throws `XException` for out-of-bounds addressing, no longer aborting simulation [#1878](https://github.com/clash-lang/clash-compiler/pull/1878)
+  * Clash now renders ADTs with all zero-width fields as enumerations in VHDL [#1879](https://github.com/clash-lang/clash-compiler/pull/1879)
+  * A warning about possible hard-to-debug issues has been added to the `Clash.Signal` documentation on hidden clocks, resets, and enables, in the form of the section named "Monomorphism restriction leads to surprising behavior" [#1960](https://github.com/clash-lang/clash-compiler/pull/1960)
+  * `Clash.Explicit.Testbench.outputVerifier` and `outputVerifierBitVector` now emit a warning if they are used improperly. This situation only arises when they are used in synthesized code rather than a test bench context. When the clock domains `circuitDom` and `testDom` are two different domains, the clock crossing inside `outputVerifier` is only suitable inside a test bench, not inside a synthesized circuit. Clash now emits a warning for this case. [#1931](https://github.com/clash-lang/clash-compiler/pull/1931)
+  * `resetSynchronizer` now no longer takes an `Enable` argument. The argument was already marked for removal and was ignored. [#1964](https://github.com/clash-lang/clash-compiler/pull/1964)
+  * Clash can now compile multiple entities concurrently, providing speedups to designs with multiple entities to build [#2034](https://github.com/clash-lang/clash-compiler/pull/2034)
+  * All `asyncRam` variants and `asyncFIFOSynchronizer` now require that the data has an `NFDataX` instance. [#2055](https://github.com/clash-lang/clash-compiler/pull/2055)
+  * Clash now respects the `-Werror` option from GHC [#2066](https://github.com/clash-lang/clash-compiler/pull/2066)
+  * `asyncFIFOSynchronizer` now uses the synchronous dual-ported RAM `trueDualPortBlockRam`, where it previously used a dual-ported RAM with an asynchronous read port `asyncRam`. With this change it's nearly guaranteed that `asyncFIFOSynchronizer` actually synthesizes to a circuit that uses the dual-ported RAMs found on most FPGAs. [#2083](https://github.com/clash-lang/clash-compiler/pull/2083)
+
+Deprecated:
+  * The function `Clash.Explicit.Signal.enable` is renamed to `andEnable` and the existing name deprecated [#1849](https://github.com/clash-lang/clash-compiler/pull/1849)
+  * '-fclash-float-support': it is now on by default and can't be turned off. [#2048](https://github.com/clash-lang/clash-compiler/pull/2048)
+
+Removed:
+
+  * GHC 8.4 is no longer supported. Users should upgrade to at least GHC 8.6. [#1762](https://github.com/clash-lang/clash-compiler/pull/1762)
+
+Internal changes:
+  * `clash-lib` now uses `Data.Monoid.Ap` instead of `Data.Semigroup.Monad.Mon`. This means users defining primitives with `TemplateFunction` will need to replace `Mon`/`getMon` with `Ap`/`getAp`. [#1835](https://github.com/clash-lang/clash-compiler/pull/1835)
+  * Clash now supports more expressive debug options at the command line [#1800](https://github.com/clash-lang/clash-compiler/issues/1800).
+  * Added `zeroWidthSpec` transformation [#1891](https://github.com/clash-lang/clash-compiler/pull/1891)
+  * Added `collapseRHSNoops` inlining stage and `WorkIdentity` constructor [#1896](https://github.com/clash-lang/clash-compiler/pull/1896)
+  * Added `HasType` and `InferType` classes for getting / inferring core types from data representing some typed "thing" [#1915](https://github.com/clash-lang/clash-compiler/pull/1915)
+  * Added `HasFreeVars` class for getting free variables from data "containing" variables [#1917](https://github.com/clash-lang/clash-compiler/pull/1917)
+  * Added the primitive equality type (`~#`) to `Clash.Core.TysPrim`. In order to make this change, `undefinedTy` and `unsafeCoerceTy` were moved from `Clash.Core.Type` to `Clash.Core.Util`. [#1955](https://github.com/clash-lang/clash-compiler/pull/1955)
+  * Clash now keeps information about which let bindings are recursive from GHC core. This can be used to avoid performing free variable calculations, or sorting bindings in normalization. [#1980](https://github.com/clash-lang/clash-compiler/pull/1980) [#2000](https://github.com/clash-lang/clash-compiler/pull/2000)
+  *  Manifest files now use SHA256 for a cache invalidation digest [#1985](https://github.com/clash-lang/clash-compiler/pull/1985)
+
 ## 1.4.7 *Jan 30th 2022*
 Fixed:
   * Clash now shows days in time strings for compile runs which take longer than a day [#1989](https://github.com/clash-lang/clash-compiler/compare/issue-1989).

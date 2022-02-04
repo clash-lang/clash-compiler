@@ -1,1 +1,0 @@
-CHANGED: `asyncFIFOSynchronizer` now uses the synchronous dual-ported RAM `trueDualPortBlockRam`, where it previously used a dual-ported RAM with an asynchronous read port `asyncRam`. With this change it's nearly guaranteed that `asyncFIFOSynchronizer` actually synthesizes to a circuit that uses the dual-ported RAMs found on most FPGAs.

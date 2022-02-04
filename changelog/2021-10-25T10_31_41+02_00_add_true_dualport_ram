@@ -1,3 +1,0 @@
-ADDED: Added support for true dual-port block RAM:
-    * Implicitly clocked: `Clash.Prelude.BlockRam.trueDualPortBlockRam` and
-    * Explicitly clocked: `Clash.Explicit.BlockRam.trueDualPortBlockRam`

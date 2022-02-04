@@ -1,1 +1,0 @@
-ADDED: The `MemBlob` structure: efficient constants for initializing memories. Depending on how the content is constructed, a `Vec` for the initial memory content can turn out to be prohibitively slow. In these cases, `MemBlob` can store your content efficiently. [#2041](https://github.com/clash-lang/clash-compiler/pull/2041)

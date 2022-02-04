@@ -1,1 +1,0 @@
-FIXED: VHDL generated for Signed.fromInteger now truncates, like the Clash simulation, when the result is smaller than the argument
