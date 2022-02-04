@@ -6,6 +6,7 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 Monad for random generation of clash-core types.
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -29,7 +30,9 @@ module Clash.Hedgehog.Core.Monad
 
 import Control.Applicative (Alternative(..))
 import Control.Monad.IO.Class (MonadIO)
+#if __GLASGOW_HASKELL__ <= 806
 import Control.Monad.Fail (MonadFail)
+#endif
 import Control.Monad.Reader (MonadReader(..), ReaderT, runReaderT)
 import Control.Monad.Trans (MonadTrans)
 import Hedgehog (MonadGen(..))
