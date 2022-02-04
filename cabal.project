@@ -48,9 +48,6 @@ package clash-ghc
   ghc-options: +RTS -qn4 -A128M -RTS -j4
   executable-dynamic: True
 
-package clash-hedgehog
-  flags: +debug
-
 package clash-prelude
   ghc-options: +RTS -qn4 -A128M -RTS -j4
   -- workaround for plugins not loading in Haddock with GHC-8.6
