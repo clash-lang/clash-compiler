@@ -1,1 +1,0 @@
-FIXED: valid field of TemplateFunction isn't checked for includes [#1945](https://github.com/clash-lang/clash-compiler/issues/1945)

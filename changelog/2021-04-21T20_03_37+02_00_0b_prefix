@@ -1,1 +1,0 @@
-CHANGED: `Show` instance of `BitVector` now includes a `0b` prefix, making it a copyable expression for fully defined vectors
