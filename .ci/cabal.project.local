@@ -36,6 +36,14 @@ package clash-cores
   ghc-options: -Werror
   tests: True
 
+package clash-prelude-hedgehog
+  ghc-options: -Werror
+  tests: True
+
+package clash-lib-hedgehog
+  ghc-options: -Werror
+  tests: True
+
 package clash-testsuite
   ghc-options: -Werror
   -- enable cosim
