@@ -64,6 +64,9 @@ module Clash.Explicit.Prelude
   , blockRamFilePow2
   -- ** BlockRAM read/write conflict resolution
   , readNew
+    -- ** True dual-port block RAM
+  , trueDualPortBlockRam
+  , RamOp(..)
     -- * Utility functions
   , window
   , windowD

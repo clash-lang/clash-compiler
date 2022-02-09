@@ -1,31 +1,27 @@
-{-# OPTIONS_GHC -fconstraint-solver-iterations=0 #-}
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
 
 module DualBlockRam0 where
 
-import qualified Prelude as P
-
 import Clash.Explicit.Prelude
-import Clash.Explicit.BlockRam
 import Clash.Explicit.Testbench
-import Data.Bifunctor (bimap)
-import Clash.Sized.Internal.BitVector
-import DualBlockRamDefinitions
-import DualBlockRamTypes
 
 import Test.Tasty.Clash.CollectSimResults
 
-runTest = sampleN 250 testBench
+import DualBlockRamDefinitions
+import DualBlockRamTypes
+
+topEntity :: TdpRam A B
+topEntity = tdpRam
+{-#NOINLINE topEntity #-}
+
 testBench = strictAnd <$> doneA <*> (unsafeSynchronizer clk10 clk20 doneB)
   where
     --Template haskell simulation
-    processSimOutput x = replace 0 undefined# $ tail x
-    simOutA = processSimOutput $(collectSimResults 250 $ pack <$> (fst simEntityAB))
-    simOutB = processSimOutput $(collectSimResults 125 $ pack <$> (snd simEntityAB))
+    simOutA = $(collectSimResults (length opsA) $ pack <$> (fst simEntityAB))
+    simOutB = $(collectSimResults (length opsB) $ pack <$> (snd simEntityAB))
 
     --topEntity output
-    (portA, portB) = topOut clk20 rst20 clk10 rst10
-    actualOutputA = ignoreFor clk20 rst20 enableGen d1 (unpack $ head simOutA) portA
-    actualOutputB = ignoreFor clk10 rst10 enableGen d1 (unpack $ head simOutB) portB
+    (portA, portB) = topOut topEntity clk20 noRst20 clk10 noRst10
 
     --Verification
     outputVerifierA = outputVerifierWith
@@ -33,13 +29,12 @@ testBench = strictAnd <$> doneA <*> (unsafeSynchronizer clk10 clk20 doneB)
     outoutVerifierB = outputVerifierWith
      (\clk rst -> assertBitVector clk rst "outputVerifierBitVector Port B")
 
-    doneA  = outputVerifierA clk20 rst20 simOutA $ pack <$> actualOutputA
-    doneA' = not <$> doneA
-    doneB  = outoutVerifierB clk10 rst10 simOutB $ pack <$> actualOutputB
-    doneB' = not <$> doneB
+    doneA  = outputVerifierA clk20 noRst20 simOutA $ pack <$> portA
+    doneB  = outoutVerifierB clk10 noRst10 simOutB $ pack <$> portB
 
     -- Testbench clocks
     clk20 :: Clock A
-    clk20 = tbClockGen @A doneA'
+    clk20 = tbClockGen (not <$> doneA)
     clk10 :: Clock B
-    clk10 = tbClockGen @B doneB'
+    clk10 = tbClockGen (not <$> doneB)
+{-# NOINLINE testBench #-}
