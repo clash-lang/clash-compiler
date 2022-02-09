@@ -3,7 +3,7 @@ module AsyncBlob where
 import Clash.Explicit.Prelude
 import Clash.Explicit.Testbench
 
-createMemBlob @8 "content" Nothing [1 .. 16]
+createMemBlob "content" Nothing [1 :: Unsigned 8 .. 16]
 
 topEntity
   :: Signal System (Unsigned 4)
