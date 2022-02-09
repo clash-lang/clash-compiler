@@ -404,6 +404,7 @@ test-suite unittests
       template-haskell
 
   Other-Modules:
+                 Clash.Tests.AsyncFIFOSynchronizer
                  Clash.Tests.AutoReg
                  Clash.Tests.BitPack
                  Clash.Tests.BitVector
