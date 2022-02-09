@@ -71,6 +71,9 @@ module Clash.Prelude.Safe
   , unpackMemBlob
     -- ** BlockRAM read/write conflict resolution
   , readNew
+    -- ** True dual-port block RAM
+  , trueDualPortBlockRam
+  , RamOp(..)
     -- * Utility functions
   , isRising
   , isFalling
