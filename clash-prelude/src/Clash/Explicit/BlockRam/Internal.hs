@@ -8,6 +8,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Clash.Explicit.BlockRam.Internal where
 
@@ -23,6 +24,7 @@ import GHC.TypeLits (KnownNat, Nat)
 import Numeric.Natural (Natural)
 import System.IO.Unsafe (unsafePerformIO)
 
+import Clash.Class.BitPack.Internal (BitPack, BitSize, pack)
 import Clash.Promoted.Nat (natToNum)
 import Clash.Sized.Internal.BitVector (Bit(..), BitVector(..))
 
@@ -43,8 +45,8 @@ data MemBlob (n :: Nat) (m :: Nat) where
 
 instance Show (MemBlob n m) where
   showsPrec _ x@MemBlob{} =
-    ("$(memBlobTH @" ++) . shows (natToNum @m @Int) . (" Nothing " ++) .
-      shows (unpackMemBlob x) . (')':)
+    ("$(memBlobTH @(BitVector " ++) . shows (natToNum @m @Int) .
+      (") Nothing " ++) . shows (unpackMemBlob x) . (')':)
 
 -- | Convert a 'MemBlob' back to a list
 --
@@ -66,24 +68,24 @@ unpackMemBlob0 MemBlob{..} = do
     unpackNats (natToNum @n) (natToNum @m) runsB endsB
 
 packBVs
-  :: forall m f
+  :: forall a f
    . ( Foldable f
-     , KnownNat m
+     , BitPack a
      )
   => Maybe Bit
-  -> f (BitVector m)
+  -> f a
   -> Either String (Int, L.ByteString, L.ByteString)
 packBVs care es =
   case lenOrErr of
     Nothing  -> Left err
-    Just len -> let (runs, ends) = packAsNats mI knownBVVal es
+    Just len -> let (runs, ends) = packAsNats mI (knownBVVal . pack) es
                 in Right (len, runs, ends)
  where
   lenOrErr = case care of
                Just (Bit 0 _) -> Just $ length es
                _              -> foldl' lenOrErr0 (Just 0) es
-  lenOrErr0 (Just len) (BV 0 _) = Just $ len + 1
-  lenOrErr0 _          _        = Nothing
+  lenOrErr0 (Just len) (pack -> BV 0 _) = Just $ len + 1
+  lenOrErr0 _          _                = Nothing
 
   knownBVVal bv@(BV _ val) = case care of
     Just (Bit 0 bm) -> maskBVVal bm bv
@@ -93,7 +95,7 @@ packBVs care es =
   maskBVVal 0 (BV mask val) = val .&. (mask `xor` fullMask)
   maskBVVal _ (BV mask val) = val .|. mask
 
-  mI = natToNum @m @Int
+  mI = natToNum @(BitSize a) @Int
   fullMask = (1 `shiftL` mI) - 1
   err = "packBVs: cannot convert don't care values. " ++
         "Please specify a mapping to a definite value."

@@ -6,7 +6,7 @@ module Blob where
 import Clash.Explicit.Prelude
 import Clash.Explicit.Testbench
 
-createMemBlob @4 "content" Nothing [4 .. 7]
+createMemBlob "content" Nothing [4 :: Unsigned 4 .. 7]
 
 topEntity
   :: Clock System
