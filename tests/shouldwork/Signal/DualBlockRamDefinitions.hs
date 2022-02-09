@@ -1,49 +1,29 @@
-{-# OPTIONS_GHC -Wno-orphans -fconstraint-solver-iterations=0#-}
+{-# OPTIONS_GHC -Wno-orphans -Wno-missing-signatures #-}
 {-# LANGUAGE BangPatterns #-}
+
 module DualBlockRamDefinitions where
 
 import qualified Prelude as P
-
 import Clash.Explicit.Prelude
-import Clash.Explicit.BlockRam
-import Clash.Explicit.Testbench
-import Data.Bifunctor (bimap)
+
 import DualBlockRamTypes
 
 createDomain vSystem{vName="A", vPeriod=hzToPeriod 20e6} -- fast
 createDomain vSystem{vName="B", vPeriod=hzToPeriod 10e6} -- slow
 createDomain vSystem{vName="C", vPeriod=hzToPeriod 7e6} -- slower
 
-topEntity ::
-  ( KnownDomain domA
-  , KnownDomain domB
-  ) =>
-
-  -- Clocks
-  Clock  domA ->
-  Clock  domB ->
-
-  --Operations
-  Signal domA (RamOp 73 ThisOrThat) ->
-  Signal domB (RamOp 73 ThisOrThat) ->
-
-  --Output
-  ( Signal domA ThisOrThat
-  , Signal domB ThisOrThat )
-
-topEntity = trueDualPortBlockRam
-{-#NOINLINE topEntity #-}
+tdpRam :: (KnownDomain domA, KnownDomain domB) => TdpRam domA domB
+tdpRam = trueDualPortBlockRam
 
 {- Testvectors
-Setup 0 - 2: Setup cycles
-Test0 3 - 12: Write to different addresses and check if value is present at output.
-Test1 13 -22: Read stored values written by A from A, same for B.
-Test2 23 - 32: Read stored values written by B from A, same for B.
-Test3 33 - 42: Conflict R R - No problem
-Test4 43 - 52: Conflict W R - (Value, undefined)
-Test5 53 - 62: Conflict R W - (undefined, value)
-Test6 63 - 72: Conflict W W - (undefined, undefined)
-Test7 73 - 82: Multiple writes to same address with different values
+Test0 : Write to different addresses and check if value is present at output.
+Test1 : Read stored values written by A from A, same for B.
+Test2 : Read stored values written by B from A, same for B.
+Test3 : Conflict R R - No problem
+Test4 : Conflict W R - (Value, undefined)
+Test5 : Conflict R W - (undefined, value)
+Test6 : Conflict W W - (undefined, undefined)
+Test7 : Multiple writes to same address with different values
 Test8 : R N
 Test9 : N R
 Test10 : W N
@@ -98,36 +78,36 @@ opsB7 = zipWith RamWrite (replicate d10 $ head addrsB) valuesB
 
 -- Test 8
 opsA8 = fmap RamRead addrsA
-opsB8 = replicate d10 NoOp
+opsB8 = replicate d10 RamNoOp
 
 -- Test 9
-opsA9 = replicate d20 NoOp
+opsA9 = replicate d20 RamNoOp
 opsB9 = fmap RamRead addrsB
 
 -- Test 10
 opsA10 = zipWith RamWrite addrsA $ twice valuesB
-opsB10 = replicate d10 NoOp
+opsB10 = replicate d10 RamNoOp
 
 -- Test 11
-opsA11 = replicate d20 NoOp
+opsA11 = replicate d20 RamNoOp
 opsB11 = zipWith RamWrite addrsB $ take d10 valuesA
 
 -- Test12
-opsA12 = replicate d20 NoOp
-opsB12 = replicate d10 NoOp
+opsA12 = replicate d20 RamNoOp
+opsB12 = replicate d10 RamNoOp
 
---All operations
+-- All operations
 opsA = opsA0 ++ opsA1 ++ opsA2 ++ opsA3 ++ opsA4 ++ opsA5 ++ opsA6
  ++ opsA7 ++ opsA8 ++ opsA9 ++ opsA10 ++ opsA11 ++ opsA12
 opsB = opsB0 ++ opsB1 ++ opsB2 ++ opsB3 ++ opsB4 ++ opsB5 ++ opsB6
  ++ opsB7 ++ opsB8 ++ opsB9 ++ opsB10 ++ opsB11 ++ opsB12
 
-topOut clkA rstA clkB rstB = out
+topOut top clkA rstA clkB rstB = out
   where
-    out = topEntity clkA clkB (inputWritesA clkA rstA )  (inputWritesB clkB rstB)
+    out = top clkA clkB (inputWritesA clkA rstA )  (inputWritesB clkB rstB)
 
-simEntityAB = topOut clk20TH rst20 clk10TH rst10
-simEntityBC = topOut clk10TH rst10 clk7TH rst7
+simEntityAB = topOut tdpRam clk20TH noRst20 clk10TH noRst10
+simEntityBC = topOut tdpRam clk10TH noRst10 clk7TH noRst7
 
 inputWritesA clk rst = stimuliGenerator clk rst opsA
 inputWritesB clk rst = stimuliGenerator clk rst opsB
@@ -136,12 +116,12 @@ clk20TH = clockGen @A
 clk10TH = clockGen @B
 clk7TH = clockGen @C
 
-rst20 :: Reset A
-rst20 = resetGen @A
-rst10 :: Reset B
-rst10 = resetGen @B
-rst7 :: Reset C
-rst7 = resetGen @C
+noRst20 :: Reset A
+noRst20 = unsafeFromHighPolarity (pure False)
+noRst10 :: Reset B
+noRst10 = unsafeFromHighPolarity (pure False)
+noRst7 :: Reset C
+noRst7 = unsafeFromHighPolarity (pure False)
 
 twice = concatMap (replicate d2)
 strictAnd !a !b = (&&) a b

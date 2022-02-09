@@ -386,7 +386,7 @@ This concludes the short introduction to using 'blockRam'.
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
--- Prevent generation of eta port names for trueDualPortBlockRam
+-- See [Note: eta port names for trueDualPortBlockRam]
 {-# OPTIONS_GHC -fno-do-lambda-eta-expansion #-}
 
 -- See: https://github.com/clash-lang/clash-compiler/commit/721fcfa9198925661cd836668705f817bddaae3c
@@ -399,11 +399,13 @@ module Clash.Explicit.BlockRam
   , blockRamPow2
   , blockRamU
   , blockRam1
+  , ResetStrategy(..)
+    -- ** Read/write conflict resolution
+  , readNew
+    -- * True dual-port block RAM
+    -- $tdpbram
   , trueDualPortBlockRam
   , RamOp(..)
-  , ResetStrategy(..)
-    -- * Read/Write conflict resolution
-  , readNew
     -- * Internal
   , blockRam#
   , trueDualPortBlockRam#
@@ -446,6 +448,17 @@ import qualified Clash.Sized.Vector     as CV
 import           Clash.XException
   (maybeIsX, NFDataX(deepErrorX), defaultSeqX, fromJustX, undefined,
    XException (..), seqX, isX, errorX)
+
+{- $tdpbram
+A true dual-port block RAM has two fully independent, fully functional access
+ports: port A and port B. Either port can do both RAM reads and writes. These
+two ports can even be on distinct clock domains, but the memory itself is shared
+between the ports. This also makes a true dual-port block RAM suitable as a
+component in a domain crossing circuit (but it needs additional logic for it to
+be safe, see e.g. 'Clash.Explicit.Synchronizer.asyncFIFOSynchronizer').
+
+A version with implicit clocks can be found in "Clash.Prelude.BlockRam".
+-}
 
 -- start benchmark only
 -- import GHC.Arr (listArray, unsafeThawSTArray)
@@ -1120,14 +1133,20 @@ readNew clk rst en ram rdAddr wrM = mux wasSame wasWritten $ ram rdAddr wrM
           unbundle (register clk rst en (False, undefined)
                              (readNewT <$> rdAddr <*> wrM))
 
-
-data RamOp n a = RamRead (Index n) | RamWrite (Index n) a | NoOp
-  deriving (Generic, NFDataX)
+-- | Port operation
+data RamOp n a
+  = RamRead (Index n)
+  -- ^ Read from address
+  | RamWrite (Index n) a
+  -- ^ Write data to address
+  | RamNoOp
+  -- ^ No operation
+  deriving (Generic, NFDataX, Show)
 
 ramOpAddr :: RamOp n a -> Index n
 ramOpAddr (RamRead addr)    = addr
 ramOpAddr (RamWrite addr _) = addr
-ramOpAddr NoOp              = errorX "Address for No operation undefined"
+ramOpAddr RamNoOp           = errorX "Address for No operation undefined"
 
 isRamWrite :: RamOp n a -> Bool
 isRamWrite (RamWrite {}) = True
@@ -1138,16 +1157,16 @@ ramOpWriteVal (RamWrite _ val) = Just val
 ramOpWriteVal _                = Nothing
 
 isOp :: RamOp n a -> Bool
-isOp NoOp = False
-isOp _    = True
+isOp RamNoOp = False
+isOp _       = True
 
--- | Produces vendor-agnostic HDL that will be inferred as a true, dual port
--- block ram. Any values that's being written on a particular port is also the
+-- | Produces vendor-agnostic HDL that will be inferred as a true dual-port
+-- block RAM
+--
+-- Any value that is being written on a particular port is also the
 -- value that will be read on that port, i.e. the same-port read/write behavior
--- is: WriteFirst. For mixed port read/write, when both ports have the same
--- address, when there is a write on the port A, the output of port B is
--- undefined, and visa versa. Implicitly clocked version is
--- `Clash.Prelude.BlockRam.trueDualPortBlockRam`
+-- is: WriteFirst. For mixed-port read/write, when port A writes to the address
+-- port B reads from, the output of port B is undefined, and vice versa.
 trueDualPortBlockRam ::
   forall nAddrs domA domB a .
   ( HasCallStack
@@ -1161,9 +1180,9 @@ trueDualPortBlockRam ::
   -> Clock domB
   -- ^ Clock for port B
   -> Signal domA (RamOp nAddrs a)
-  -- ^ ram operation for port A
+  -- ^ RAM operation for port A
   -> Signal domB (RamOp nAddrs a)
-  -- ^ ram operation for port B
+  -- ^ RAM operation for port B
   -> (Signal domA a, Signal domB a)
   -- ^ Outputs data on /next/ cycle. When writing, the data written
   -- will be echoed. When reading, the read data is returned.
@@ -1206,6 +1225,19 @@ mergeConflicts conflict1 conflict2 = Conflict
   mergeWrite a b = mergeX (||) a b
   mergeAddress a b = mergeX const a b
 
+-- [Note: eta port names for trueDualPortBlockRam]
+--
+-- By naming all the arguments and setting the -fno-do-lambda-eta-expansion GHC
+-- option for this module, the generated HDL also contains names based on the
+-- argument names used here. This greatly improves readability of the HDL.
+
+-- [Note: true dual-port blockRAM separate architecture]
+--
+-- A multi-clock true dual-port block RAM is only inferred from the generated HDL
+-- when it lives in its own Verilog module / VHDL architecture. Add any other
+-- logic to the module / architecture, and synthesis will no longer infer a
+-- multi-clock true dual-port block RAM. This wrapper pushes the primitive out
+-- into its own module / architecture.
 trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
   trueDualPortBlockRam# clkA enA weA addrA datA clkB enB weB addrB datB
 {-# NOINLINE trueDualPortBlockRamWrapper #-}
@@ -1243,7 +1275,8 @@ trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
 
   -> (Signal domA a, Signal domB a)
   -- ^ Outputs data on /next/ cycle. If write enable is @True@, the data written
-  -- will be echoed. If write enable is @False@, the read data is returned.
+  -- will be echoed. If write enable is @False@, the read data is returned. If
+  -- port enable is @False@, it is /undefined/.
 trueDualPortBlockRam# clkA enA weA addrA datA clkB enB weB addrB datB
   | snatToNum @Int (clockPeriod @domA) < snatToNum @Int (clockPeriod @domB)
   = swap (trueDualPortBlockRamModel clkB enB weB addrB datB clkA enA weA addrA datA)
