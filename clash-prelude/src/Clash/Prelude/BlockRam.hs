@@ -393,10 +393,12 @@ module Clash.Prelude.BlockRam
   , blockRamU
   , blockRam1
   , E.ResetStrategy(..)
-    -- * Read/Write conflict resolution
+    -- ** Read/Write conflict resolution
   , readNew
+    -- * True dual-port block RAM
+    -- $tdpbram
   , trueDualPortBlockRam
-  , E.RamOp (..)
+  , E.RamOp(..)
   )
 where
 
@@ -412,6 +414,17 @@ import           Clash.Sized.Index       (Index)
 import           Clash.Sized.Unsigned    (Unsigned)
 import           Clash.Sized.Vector      (Vec)
 import           Clash.XException        (NFDataX)
+
+{- $tdpbram
+A true dual-port block RAM has two fully independent, fully functional access
+ports: port A and port B. Either port can do both RAM reads and writes. These
+two ports can even be on distinct clock domains, but the memory itself is shared
+between the ports. This also makes a true dual-port block RAM suitable as a
+component in a domain crossing circuit (but it needs additional logic for it to
+be safe, see e.g. 'Clash.Explicit.Synchronizer.asyncFIFOSynchronizer').
+
+A version with explicit clocks can be found in "Clash.Explicit.BlockRam".
+-}
 
 {- $setup
 >>> import Clash.Prelude as C
@@ -846,13 +859,13 @@ readNew
 readNew = hideClockResetEnable E.readNew
 {-# INLINE readNew #-}
 
--- | Produces vendor-agnostic HDL that will be inferred as a true, dual port
--- block ram. Any values that is being written on a particular port is also the
+-- | Produces vendor-agnostic HDL that will be inferred as a true dual-port
+-- block RAM
+--
+-- Any value that is being written on a particular port is also the
 -- value that will be read on that port, i.e. the same-port read/write behavior
--- is: WriteFirst. For mixed port read/write, when both ports have the same
--- address, when there is a write on the port A, the output of port B is
--- undefined, and visa versa. Explicitly clocked version is
--- `Clash.Explicit.BlockRam.trueDualPortBlockRam`
+-- is: WriteFirst. For mixed-port read/write, when port A writes to the address
+-- port B reads from, the output of port B is undefined, and vice versa.
 trueDualPortBlockRam ::
 #ifdef CLASH_MULTIPLE_HIDDEN
   forall nAddrs dom1 dom2 a .
@@ -863,14 +876,14 @@ trueDualPortBlockRam ::
   , NFDataX a
   )
   => Signal dom1 (E.RamOp nAddrs a)
-  -- ^ ram operation for port A
+  -- ^ RAM operation for port A
   -> Signal dom2 (E.RamOp nAddrs a)
-  -- ^ ram operation for port B
+  -- ^ RAM operation for port B
   -> (Signal dom1 a, Signal dom2 a)
   -- ^ Outputs data on /next/ cycle. When writing, the data written
   -- will be echoed. When reading, the read data is returned.
-trueDualPortBlockRam inA inB = E.trueDualPortBlockRam (hasClock @dom1) (hasClock @dom2)
- inA inB
+trueDualPortBlockRam inA inB =
+  E.trueDualPortBlockRam (hasClock @dom1) (hasClock @dom2) inA inB
 #else
   forall nAddrs dom a .
   ( HasCallStack
@@ -879,12 +892,11 @@ trueDualPortBlockRam inA inB = E.trueDualPortBlockRam (hasClock @dom1) (hasClock
   , NFDataX a
   )
   => Signal dom (E.RamOp nAddrs a)
-  -- ^ ram operation for port A
+  -- ^ RAM operation for port A
   -> Signal dom (E.RamOp nAddrs a)
-  -- ^ ram operation for port B
+  -- ^ RAM operation for port B
   -> (Signal dom a, Signal dom a)
   -- ^ Outputs data on /next/ cycle. When writing, the data written
   -- will be echoed. When reading, the read data is returned.
-trueDualPortBlockRam inA inB = E.trueDualPortBlockRam hasClock hasClock
- inA inB
+trueDualPortBlockRam inA inB = E.trueDualPortBlockRam hasClock hasClock inA inB
 #endif
