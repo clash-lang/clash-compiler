@@ -52,6 +52,7 @@ import Language.Haskell.TH
    stringPrimL, valD, varP)
 
 import Clash.Annotations.Primitive (hasBlackBox)
+import Clash.Class.BitPack.Internal (BitPack, BitSize)
 import Clash.Explicit.BlockRam.Internal
   (MemBlob(..), packBVs, unpackMemBlob, unpackMemBlob0)
 import Clash.Explicit.Signal (KnownDomain, Enable, fromEnable)
@@ -240,7 +241,7 @@ blockRamBlob# !_ gen content@MemBlob{} = \rd wen waS wd -> runST $ do
 -- === __Example__
 --
 -- @
--- 'createMemBlob' @8 "content" 'Nothing' [15 .. 17]
+-- 'createMemBlob' "content" 'Nothing' [15 :: Unsigned 8 .. 17]
 --
 -- ram clk en = 'blockRamBlob' clk en content
 -- @
@@ -250,7 +251,7 @@ blockRamBlob# !_ gen content@MemBlob{} = \rd wen waS wd -> runST $ do
 -- 1 can be used, and both are valid representations of the data.
 --
 -- >>> import qualified Prelude as P
--- >>> let es = P.map pack [ Nothing, Just (7 :: Unsigned 8), Just 8 ]
+-- >>> let es = [ Nothing, Just (7 :: Unsigned 8), Just 8 ]
 -- >>> :{
 -- createMemBlob "content0" (Just 0) es
 -- createMemBlob "content1" (Just 1) es
@@ -258,7 +259,7 @@ blockRamBlob# !_ gen content@MemBlob{} = \rd wen waS wd -> runST $ do
 -- :}
 --
 -- >>> let pr = mapM_ (putStrLn . show)
--- >>> pr es
+-- >>> pr $ P.map pack es
 -- 0b0_...._....
 -- 0b1_0000_0111
 -- 0b1_0000_1000
@@ -282,16 +283,16 @@ blockRamBlob# !_ gen content@MemBlob{} = \rd wen waS wd -> runST $ do
 -- declarations by including a dummy declaration @x = 1@. Without this trick,
 -- @clashi@ would expect an expression and the Template Haskell would not work.
 createMemBlob
-  :: forall m f
+  :: forall a f
    . ( Foldable f
-     , KnownNat m
+     , BitPack a
      )
   => String
   -- ^ Name of the binding to generate
   -> Maybe Bit
   -- ^ Value to map don't care bits to. 'Nothing' means throwing an error on
   -- don't care bits.
-  -> f (BitVector m)
+  -> f a
   -- ^ The content for the 'MemBlob'
   -> DecsQ
 createMemBlob name care es =
@@ -308,7 +309,7 @@ createMemBlob name care es =
  where
   name0 = mkName name
   n = litT . numTyLit . toInteger $ len
-  m = litT . numTyLit $ natToInteger @m
+  m = litT . numTyLit $ natToInteger @(BitSize a)
   runsLen = litE . integerL . toInteger $ L.length runsB
   runs = litE . stringPrimL $ L.unpack runsB
   endsLen = litE . integerL . toInteger $ L.length endsB
@@ -324,7 +325,7 @@ createMemBlob name care es =
 -- === __Example__
 --
 -- @
--- ram clk en = 'blockRamBlob' clk en $(memBlobTH @8 Nothing [15 .. 17])
+-- ram clk en = 'blockRamBlob' clk en $(memBlobTH Nothing [15 :: Unsigned 8 .. 17])
 -- @
 --
 -- The 'Data.Maybe.Maybe' datatype has don't care bits, where the actual value
@@ -332,11 +333,11 @@ createMemBlob name care es =
 -- 1 can be used, and both are valid representations of the data.
 --
 -- >>> import qualified Prelude as P
--- >>> let es = P.map pack [ Nothing, Just (7 :: Unsigned 8), Just 8 ]
+-- >>> let es = [ Nothing, Just (7 :: Unsigned 8), Just 8 ]
 -- >>> content0 = $(memBlobTH (Just 0) es)
 -- >>> content1 = $(memBlobTH (Just 1) es)
 -- >>> let pr = mapM_ (putStrLn . show)
--- >>> pr es
+-- >>> pr $ P.map pack es
 -- 0b0_...._....
 -- 0b1_0000_0111
 -- 0b1_0000_1000
@@ -354,14 +355,14 @@ createMemBlob name care es =
 --     • packBVs: cannot convert don't care values. Please specify a mapping to a definite value.
 --     • In the untyped splice: $(memBlobTH Nothing es)
 memBlobTH
-  :: forall m f
+  :: forall a f
    . ( Foldable f
-     , KnownNat m
+     , BitPack a
      )
   => Maybe Bit
   -- ^ Value to map don't care bits to. 'Nothing' means throwing an error on
   -- don't care bits.
-  -> f (BitVector m)
+  -> f a
   -- ^ The content for the 'MemBlob'
   -> ExpQ
 memBlobTH care es =
@@ -375,7 +376,7 @@ memBlobTH care es =
                     :: MemBlob $(n) $(m) |]
  where
   n = litT . numTyLit . toInteger $ len
-  m = litT . numTyLit $ natToInteger @m
+  m = litT . numTyLit $ natToInteger @(BitSize a)
   runsLen = litE . integerL . toInteger $ L.length runsB
   runs = litE . stringPrimL $ L.unpack runsB
   endsLen = litE . integerL . toInteger $ L.length endsB
