@@ -10,9 +10,9 @@ topEntity
 
 topEntity clk addr = bundle $ romBlob clk enableGen <$> blobs <*> pure addr
  where
-  blobs =    $(memBlobTH @8 Nothing [ 1 .. 15])
-          :> $(memBlobTH @8 Nothing [17 .. 31])
-          :> $(memBlobTH @8 Nothing [33 .. 47])
+  blobs =    $(memBlobTH Nothing [ 1 :: BitVector 8 .. 15])
+          :> $(memBlobTH Nothing [17 :: BitVector 8 .. 31])
+          :> $(memBlobTH Nothing [33 :: BitVector 8 .. 47])
           :> Nil
 {-# NOINLINE topEntity #-}
 
