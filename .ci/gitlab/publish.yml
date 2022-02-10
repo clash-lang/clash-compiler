@@ -78,7 +78,7 @@ debian-bindist-test:
     - apt-get update
     - cd .ci/bindist/linux/debian/focal/build && apt-get -y install ./*/*.deb && cd -
     - apt-get -y install iverilog
-    - clash-testsuite -p .Verilog --hide-successes
+    - clash-testsuite -p '$(NF-3) == "Vector" && $(NF-1) == "Verilog"' --no-verilator
   tags:
     - local
 
