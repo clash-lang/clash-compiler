@@ -54,6 +54,7 @@ debian-bindist:
     key:
       files:
         - .ci/bindist/linux/debian/focal/buildinfo.json
+        - .ci/bindist/linux/debian/scripts/build.py
       prefix: ${CI_JOB_NAME}
   artifacts:
     when: always
