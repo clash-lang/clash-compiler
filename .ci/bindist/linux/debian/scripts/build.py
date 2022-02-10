@@ -69,6 +69,7 @@ def local_get(name, unpack_to, dir):
 def build_debs(name, cabal_debian_options=()):
   # Create debian/
   cmd = ["cabal-debian"]
+  cmd += ["--disable-profiling"]
   cmd += ["--native"]
   cmd += ["--dep-map", "pthread:libpthread-stubs0-dev"]
   cmd += ["--revision", "-" + NOW]
