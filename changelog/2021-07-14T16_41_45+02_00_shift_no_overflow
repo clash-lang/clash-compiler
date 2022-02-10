@@ -1,1 +1,0 @@
-FIXED: Don't overflow the range of VHDL's natural type in shift/rotate, leading to simulation issues. Shift now saturates to a 31-bit shift amount. For rotate, in simulation only, the rotate amount is modulo the word width of the rotated value.

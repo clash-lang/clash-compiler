@@ -1,1 +1,0 @@
-CHANGED: `Vec`'s show instance now generates valid Haskell [#1776](https://github.com/clash-lang/clash-compiler/issues/1776)

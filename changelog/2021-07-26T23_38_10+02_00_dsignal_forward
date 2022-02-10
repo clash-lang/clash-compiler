@@ -1,1 +1,0 @@
-ADDED: Added `Clash.Explicit.Signal.Delayed.forward`, a function that can be used to retime a dsignal into the future without applying any logic.
