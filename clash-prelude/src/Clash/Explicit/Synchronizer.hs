@@ -16,6 +16,7 @@ Synchronizer circuits for safe clock domain crossings
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Extra.Solver    #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -27,25 +28,24 @@ module Clash.Explicit.Synchronizer
   )
 where
 
-import Control.Applicative         (liftA2)
 import Data.Bits                   (complement, shiftR, xor)
 import Data.Constraint             ((:-)(..), Dict (..))
 import Data.Constraint.Nat         (leTrans)
 import Data.Maybe                  (isJust)
-import GHC.TypeLits                (type (+), type (-), type (<=))
+import GHC.TypeLits                (type (+), type (-), type (<=), type (^), KnownNat)
 
-import Clash.Class.BitPack         (boolToBV)
+import Clash.Class.BitPack         (boolToBV, unpack)
 import Clash.Class.Resize          (truncateB)
 import Clash.Class.BitPack.BitIndex (slice)
 import Clash.Explicit.Mealy        (mealyB)
-import Clash.Explicit.RAM          (asyncRam)
+import Clash.Explicit.BlockRam     (RamOp (..), trueDualPortBlockRam)
 import Clash.Explicit.Signal
-  (Clock, Reset, Signal, Enable, register, unsafeSynchronizer)
-import Clash.Promoted.Nat          (SNat (..), pow2SNat)
+  (Clock, Reset, Signal, Enable, register, unsafeSynchronizer, fromEnable, (.&&.))
+import Clash.Promoted.Nat          (SNat (..))
 import Clash.Promoted.Nat.Literals (d0)
 import Clash.Signal                (mux, KnownDomain)
 import Clash.Sized.BitVector       (BitVector, (++#))
-import Clash.XException            (NFDataX)
+import Clash.XException            (NFDataX, fromJustX)
 
 -- * Dual flip-flop synchronizer
 
@@ -97,27 +97,62 @@ dualFlipFlopSynchronizer clk1 clk2 rst en i =
 -- * Asynchronous FIFO synchronizer
 
 fifoMem
-  :: ( KnownDomain wdom
+  :: forall wdom rdom a addrSize
+   . ( KnownDomain wdom
      , KnownDomain rdom
-     , NFDataX a )
+     , NFDataX a
+     , KnownNat addrSize
+     , 1 <= addrSize )
   => Clock wdom
   -> Clock rdom
   -> Enable wdom
-  -> SNat addrSize
+  -> Enable rdom
   -> Signal wdom Bool
   -> Signal rdom (BitVector addrSize)
-  -> Signal wdom (Maybe (BitVector addrSize, a))
+  -> Signal wdom (BitVector addrSize)
+  -> Signal wdom (Maybe a)
   -> Signal rdom a
-fifoMem wclk rclk en addrSize@SNat full raddr writeM =
-  asyncRam
-    wclk rclk en
-    (pow2SNat addrSize)
-    raddr
-    (mux full (pure Nothing) writeM)
+fifoMem wclk rclk wen ren full raddr waddr wdataM =
+  fst $ trueDualPortBlockRam
+    rclk wclk portA portB
+ where
+   portA :: Signal rdom (RamOp (2 ^ addrSize) a)
+   portA = mux (fromEnable ren)
+               (RamRead . unpack <$> raddr)
+               (pure RamNoOp)
+   portB :: Signal wdom (RamOp (2 ^ addrSize) a)
+   portB = mux (fromEnable wen .&&. fmap not full .&&. fmap isJust wdataM)
+               (RamWrite <$> fmap unpack waddr <*> fmap fromJustX wdataM)
+               (pure RamNoOp)
 
-ptrCompareT
-  :: SNat addrSize
-  -> (BitVector (addrSize + 1) -> BitVector (addrSize + 1) -> Bool)
+readPtrCompareT
+  :: KnownNat addrSize
+  => ( BitVector (addrSize + 1)
+     , BitVector (addrSize + 1)
+     , Bool )
+  -> ( BitVector (addrSize + 1)
+     , Bool )
+  -> ( ( BitVector (addrSize + 1)
+       , BitVector (addrSize + 1)
+       , Bool )
+     , ( Bool
+       , BitVector addrSize
+       , BitVector (addrSize + 1)
+       )
+     )
+readPtrCompareT (bin, ptr, flag) (s_ptr, inc) =
+  ((bin', ptr', flag'), (flag, addr, ptr))
+ where
+  -- GRAYSTYLE2 pointer
+  bin' = bin + boolToBV (inc && not flag)
+  ptr' = (bin' `shiftR` 1) `xor` bin'
+  addr = truncateB bin'
+
+  flag' = ptr' == s_ptr
+
+writePtrCompareT
+  :: (2 <= addrSize)
+  => SNat addrSize
   -> ( BitVector (addrSize + 1)
      , BitVector (addrSize + 1)
      , Bool )
@@ -131,7 +166,7 @@ ptrCompareT
        , BitVector (addrSize + 1)
        )
      )
-ptrCompareT SNat flagGen (bin, ptr, flag) (s_ptr, inc) =
+writePtrCompareT addrSize@SNat (bin, ptr, flag) (s_ptr, inc) =
   ((bin', ptr', flag'), (flag, addr, ptr))
  where
   -- GRAYSTYLE2 pointer
@@ -139,9 +174,9 @@ ptrCompareT SNat flagGen (bin, ptr, flag) (s_ptr, inc) =
   ptr' = (bin' `shiftR` 1) `xor` bin'
   addr = truncateB bin
 
-  flag' = flagGen ptr' s_ptr
+  flag' = isFull addrSize ptr' s_ptr
 
--- FIFO full: when next pntr == synchonized {~wptr[addrSize:addrSize-1],wptr[addrSize-1:0]}
+-- FIFO full: when next pntr == synchronized {~wptr[addrSize:addrSize-1],wptr[addrSize-2:0]}
 isFull
   :: forall addrSize
    . (2 <= addrSize)
@@ -156,11 +191,17 @@ isFull addrSize@SNat ptr s_ptr =
           a2 = SNat @(addrSize - 2)
       in  ptr == (complement (slice addrSize a1 s_ptr) ++# slice a2 d0 s_ptr)
 
--- | Synchronizer implemented as a FIFO around an asynchronous RAM. Based on the
+-- | Synchronizer implemented as a FIFO around a synchronous RAM. Based on the
 -- design described in "Clash.Tutorial#multiclock", which is itself based on the
 -- design described in <http://www.sunburst-design.com/papers/CummingsSNUG2002SJ_FIFO1.pdf>.
+-- However, this FIFO uses a synchronous dual-ported RAM which, unlike those
+-- designs using RAM with an asynchronous read port, is nearly guaranteed to
+-- actually synthesize into one of the dual-ported RAMs found on most FPGAs.
 --
 -- __NB__: This synchronizer can be used for __word__-synchronization.
+-- __NB__: This synchronizer will only work safely when you set up the proper
+-- bus skew and maximum delay constraints inside your synthesis tool for the
+-- clock domain crossings of the gray pointers.
 asyncFIFOSynchronizer
   :: ( KnownDomain wdom
      , KnownDomain rdom
@@ -191,20 +232,20 @@ asyncFIFOSynchronizer addrSize@SNat wclk rclk wrst rrst wen ren rinc wdataM =
 
   rdata =
     fifoMem
-      wclk rclk wen
-      addrSize wfull raddr
-      (liftA2 (,) <$> (pure <$> waddr) <*> wdataM)
+      wclk rclk wen ren
+      wfull raddr
+      waddr wdataM
 
   (rempty, raddr, rptr) =
     mealyB
       rclk rrst ren
-      (ptrCompareT addrSize (==))
+      readPtrCompareT
       (0, 0, True)
       (s_wptr, rinc)
 
   (wfull, waddr, wptr) =
     mealyB
       wclk wrst wen
-      (ptrCompareT addrSize (isFull addrSize))
+      (writePtrCompareT addrSize)
       (0, 0, False)
       (s_rptr, isJust <$> wdataM)

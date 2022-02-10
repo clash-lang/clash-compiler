@@ -420,7 +420,6 @@ import           Control.Monad.ST       (ST, runST)
 import           Control.Monad.ST.Unsafe (unsafeInterleaveST, unsafeIOToST, unsafeSTToIO)
 import           Data.Array.MArray      (newListArray)
 import qualified Data.List              as L
-import           Data.Either            (isLeft)
 import           Data.Maybe             (isJust, fromMaybe)
 import           GHC.Arr
   (STArray, unsafeReadSTArray, unsafeWriteSTArray)
@@ -1331,13 +1330,16 @@ trueDualPortBlockRamModel !_clkA enA weA addrA datA !_clkB enB weB addrB datB =
   initElement n =
     deepErrorX ("Unknown initial element; position " <> show n)
 
-  unknownEnableAndAddr :: Int -> a
-  unknownEnableAndAddr n =
-    deepErrorX ("Write enable and data unknown; position " <> show n)
+  unknownEnableAndAddr :: String -> String -> Int -> a
+  unknownEnableAndAddr enaMsg addrMsg n =
+    deepErrorX ("Write enable and data unknown; position " <> show n <>
+                "\nWrite enable error message: " <> enaMsg <>
+                "\nAddress error message: " <> addrMsg)
 
-  unknownAddr :: Int -> a
-  unknownAddr n =
-    deepErrorX ("Write enabled, but address unknown; position " <> show n)
+  unknownAddr :: String -> Int -> a
+  unknownAddr msg n =
+    deepErrorX ("Write enabled, but address unknown; position " <> show n <>
+                "\nAddress error message: " <> msg)
 
   getConflict :: Bool -> Int -> Bool -> Int -> Maybe Conflict
   getConflict enableA addrA_ enableB addrB_ =
@@ -1365,21 +1367,29 @@ trueDualPortBlockRamModel !_clkA enA weA addrA datA !_clkB enB weB addrB datB =
 
   writeRam :: Bool -> Int -> a -> Seq a -> (Maybe a, Seq a)
   writeRam enable addr dat mem
-    | enableUndefined && addrUndefined
-    = ( Just (deepErrorX "Unknown enable and address")
-      , Seq.fromFunction (natToNum @nAddrs) unknownEnableAndAddr )
-    | addrUndefined
+    | Left enaMsg <- enableUndefined
+    , Left addrMsg <- addrUndefined
+    = let msg = "Unknown enable and address" <>
+                "\nWrite enable error message: " <> enaMsg <>
+                "\nAddress error message: " <> addrMsg
+       in ( Just (deepErrorX msg)
+          , Seq.fromFunction (natToNum @nAddrs)
+                             (unknownEnableAndAddr enaMsg addrMsg) )
+    | Left enaMsg <- enableUndefined
+    = let msg = "Write enable unknown; position" <> show addr <>
+                "\nWrite enable error message: " <> enaMsg
+       in writeRam True addr (deepErrorX msg) mem
+    | enable
+    , Left addrMsg <- addrUndefined
     = ( Just (deepErrorX "Unknown address")
-      , Seq.fromFunction (natToNum @nAddrs) unknownAddr )
-    | enableUndefined
-    = writeRam True addr (deepErrorX ("Write unknown; position" <> show addr)) mem
+      , Seq.fromFunction (natToNum @nAddrs) (unknownAddr addrMsg) )
     | enable
     = (Just dat, Seq.update addr dat mem)
     | otherwise
     = (Nothing, mem)
    where
-    enableUndefined = isLeft (isX enable)
-    addrUndefined = isLeft (isX addr)
+    enableUndefined = isX enable
+    addrUndefined = isX addr
 
   go ::
     Maybe Conflict ->
