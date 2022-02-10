@@ -1,1 +1,0 @@
-FIXED: Don't overflow VHDL's integer type when addressing RAM/ROM in simulation.Addresses are masked to 32 bits to be sure to keep it within the simulator's range.

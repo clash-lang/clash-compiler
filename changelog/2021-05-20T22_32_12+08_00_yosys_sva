@@ -1,5 +1,0 @@
-Add support for Yosys compatible SVA to `Clash.Verification`. This enables
-formal verification using SymbiYosis for Verilog and SystemVerilog.
-
-Clash.Verification.PrettyPrinters has been moved from clash-prelude to to
-Clash.Verification.Pretty in clash-lib

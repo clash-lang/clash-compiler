@@ -1,1 +1,0 @@
-NEW: `runUntil`, a function to sample a signal until it returns a value that satisfies the user-given test. It is a convenience function that, among others, allow easy running of a `testBench` style function in Haskell simulation, logging assertion failures to stderr.

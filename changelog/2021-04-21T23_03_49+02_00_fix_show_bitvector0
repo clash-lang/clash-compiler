@@ -1,1 +1,0 @@
-FIXED: `show` on `BitVector 0` no longer results in an empty string
