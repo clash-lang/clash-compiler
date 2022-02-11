@@ -30,16 +30,29 @@ CI_COMMIT_TAG=${CI_COMMIT_TAG:-}
 version=$(echo $versions | tr ' ' '\n' | head -n 1)
 tag_version=${CI_COMMIT_TAG:1:${#CI_COMMIT_TAG}-1}  # Strip first character (v0.99 -> 0.99)
 
-if [[ ${tag_version} != "" && ${version} != ${tag_version} ]]; then
-    if [[ "${CI_COMMIT_TAG:0:1}" == "v" ]]; then
-        echo "Tag name and distribution's release number should match:"
-        echo "  Tag version:          ${CI_COMMIT_TAG}"
-        echo "  Distribution version: v${version}"
-        exit 1;
-    else
-        echo "\$CI_COMMIT_TAG should start with a 'v'. Found: ${CI_COMMIT_TAG}"
+# `tag_version` is set when a tag has been created on GitHub. We use this to
+# trigger a release pipeline (release to Snap / Hackage).
+if [[ ${tag_version} != "" ]]; then
+
+    if [[ ${version} != ${tag_version} ]]; then
+        if [[ "${CI_COMMIT_TAG:0:1}" == "v" ]]; then
+            echo "Tag name and distribution's release number should match:"
+            echo "  Tag version:          ${CI_COMMIT_TAG}"
+            echo "  Distribution version: v${version}"
+            exit 1;
+        else
+            echo "\$CI_COMMIT_TAG should start with a 'v'. Found: ${CI_COMMIT_TAG}"
+            exit 1;
+        fi
+    fi
+
+    set +e
+    grep "flag multiple-hidden" -A 7 clash-prelude/clash-prelude.cabal | grep -q "default: False"
+    if [[ $? != 0 ]]; then
+        echo "multiple_hidden flag should be disabled by default on releases!"
         exit 1;
     fi
+    set -e
 fi
 
 # Print out versions for debugging purposes
