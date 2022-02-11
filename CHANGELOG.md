@@ -1,4 +1,11 @@
 # Changelog for the Clash project
+## 1.6.1 *Feb 11th 2022*
+Changed:
+  * We accidentally released `v1.6.0` with the Cabal flag `multiple-hidden` enabled. This is an experimental feature, supposed to be disabled by default for releases. `v1.6.1` disables it again.
+
+Added:
+  * `Clash.Class.HasDomain.TryDomain` instances for Clash sized types
+
 ## 1.6.0 *Feb 10th 2022*
 Added:
   * `Clash.Class.Counter`: a class that defines a odometer-style supercounter. [#1763](https://github.com/clash-lang/clash-compiler/pull/1763)
