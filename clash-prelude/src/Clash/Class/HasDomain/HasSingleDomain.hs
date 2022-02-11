@@ -1,7 +1,8 @@
 {-|
 Copyright  :  (C) 2019, Myrtle Software Ltd
+                  2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Internals for "Clash.Class.HasDomain"
 -}
@@ -24,12 +25,21 @@ import           Clash.Class.HasDomain.CodeGen    (mkTryDomainTuples)
 
 import           Clash.Sized.Vector               (Vec)
 import           Clash.Sized.RTree                (RTree)
+import           Clash.Sized.Index                (Index)
+import           Clash.Sized.Unsigned             (Unsigned)
+import           Clash.Sized.Signed               (Signed)
+import           Clash.Sized.BitVector            (BitVector, Bit)
+import           Clash.Sized.Fixed                (Fixed)
+
 import           Clash.Signal.Internal
   (Signal, Domain, Clock, Reset, Enable)
 import           Clash.Signal.Delayed.Internal    (DSignal)
 
+import           Numeric.Natural                  (Natural)
+
 import           Data.Kind                        (Type)
 import           Data.Proxy                       (Proxy)
+import           GHC.TypeLits                     (type (+))
 import           Type.Errors
   (DelayError, TypeError, IfStuck, Pure)
 
@@ -144,25 +154,24 @@ type instance TryDomain t (Enable dom)          = 'Found dom
 type instance TryDomain t (Proxy dom)           = 'Found dom
 type instance TryDomain t (Vec n a)             = TryDomain t a
 type instance TryDomain t (RTree d a)           = TryDomain t a
+type instance TryDomain t (Index n)             = 'NotFound
+type instance TryDomain t (Unsigned n)          = 'NotFound
+type instance TryDomain t (Signed n)            = 'NotFound
+type instance TryDomain t (BitVector n)         = 'NotFound
+type instance TryDomain t Bit                   = 'NotFound
+type instance TryDomain t (Fixed a n m)         = TryDomain t (a (n + m))
 type instance TryDomain t (a -> b)              = Merge t a b
 type instance TryDomain t (a, b)                = Merge t a b
 
 type instance TryDomain t ()                    = 'NotFound
 type instance TryDomain t Bool                  = 'NotFound
 type instance TryDomain t Integer               = 'NotFound
+type instance TryDomain t Natural               = 'NotFound
 type instance TryDomain t Int                   = 'NotFound
 type instance TryDomain t Float                 = 'NotFound
 type instance TryDomain t Double                = 'NotFound
 type instance TryDomain t (Maybe a)             = TryDomain t a
 type instance TryDomain t (Either a b)          = Merge t a b
-
--- TODO: Add more instances, including:
---type instance TryDomain t Bit                   = 'NotFound
---type instance TryDomain t (BitVector n)         = 'NotFound
---type instance TryDomain t (Index n)             = 'NotFound
---type instance TryDomain t (Fixed rep int frac)  = 'NotFound
---type instance TryDomain t (Signed n)            = 'NotFound
---type instance TryDomain t (Unsigned n)          = 'NotFound
 
 -- | Type family that searches a type and checks whether all subtypes that can
 -- contain a domain (for example, Signal) contain the /same/ domain. Its
