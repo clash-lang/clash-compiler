@@ -35,8 +35,10 @@ parts:
       - prepare
     stage-packages:
       - clash
-      - clash-prof
       - cabal-install-3.2
+      # To save time on CI, we currently don't build profiling packages anymore. We should
+      # probably selectively build them on release branches and nightlies.
+      #- clash-prof
     override-prime: |
       snapcraftctl prime
       apt-get install -y ghc
