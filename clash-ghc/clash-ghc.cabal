@@ -141,7 +141,6 @@ library
                       directory                 >= 1.2      && < 1.4,
                       extra                     >= 1.6      && < 1.8,
                       filepath                  >= 1.3      && < 1.5,
-                      ghc                       >= 8.6.0    && < 9.1,
                       process                   >= 1.2      && < 1.7,
                       hashable                  >= 1.1.2.3  && < 1.5,
                       haskeline                 >= 0.7.0.3  && < 0.9,
@@ -169,6 +168,17 @@ library
                       template-haskell          >= 2.8.0.0  && < 2.18,
                       utf8-string               >= 1.0.0.0  && < 1.1.0.0,
                       vector                    >= 0.11     && < 1.0
+
+  if os(windows)
+    -- 8.8 is broken on Windows - it randomly segfaults
+    Build-Depends: ghc >= 8.6.0 && < 8.8.0 || >= 8.10.0 && < 9.1
+  elif os(darwin)
+    -- 8.10 is broken on macOS - it exits tests with status code -11
+    Build-Depends: ghc >= 8.6.0 && < 8.10.0 || >= 9.0.0 && < 9.1
+  else
+    -- Unix
+    Build-Depends: ghc >= 8.6.0 && < 9.1
+
   if impl(ghc >= 8.10.0)
     Build-Depends:    exceptions                >= 0.10.4   && < 0.11,
 
@@ -182,7 +192,7 @@ library
     CPP-Options:      -DUSE_GHC_PATHS=1
 
   if os(windows)
-    Build-Depends:    Win32                     >= 2.3.1    && < 2.12
+    Build-Depends:    Win32                     >= 2.3.1    && < 2.14
   else
     Build-Depends:    unix                      >= 2.7.1    && < 2.9
 

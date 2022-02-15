@@ -1,0 +1,14 @@
+resolver: nightly-2022-02-19
+
+packages:
+- clash-prelude
+- clash-prelude-hedgehog
+- clash-lib
+- clash-lib-hedgehog
+- clash-ghc
+- clash-cores
+- tests
+
+extra-deps:
+- tasty-1.2.3@sha256:bba67074e5326d57e8f53fc1dabcb6841daa4dc51b053506eb7f40a6f49a0497,2517
+

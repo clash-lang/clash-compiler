@@ -8,10 +8,6 @@ packages:
   ./clash-prelude
   ./clash-prelude-hedgehog
   ./tests
-  ./benchmark
-  ./benchmark/profiling/prepare
-  ./benchmark/profiling/run
-  ./clash-term
 
 -- TODO: The inclusion of a cabal sdist tarball in the packages list is the
 -- unfortunate result of a few things:
@@ -63,8 +59,12 @@ package clash-lib
   flags: +debug
 
 optional-packages:
+  ./benchmark
+  ./benchmark/profiling/prepare
+  ./benchmark/profiling/run
   ./clash-cosim
   ./clash-cores
+  ./clash-term
 
 allow-newer:
   brick:base,

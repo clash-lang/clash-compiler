@@ -1,11 +1,70 @@
 name: CI
-on: pull_request_target
+on: pull_request
 
 concurrency:
   group: ${{ github.head_ref }}
   cancel-in-progress: true
 
 jobs:
+  build_mac_windows:
+    name: Build and run limited tests
+    runs-on: ${{ matrix.os }}-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["macOS", "windows"]
+        ghc: ["8.6.5", "8.8.4", "8.10.7", "9.0.2"]
+        exclude:
+          # Some tests fail with a mysterious -11 error code.
+          - os: macOS
+            ghc: 8.10.7
+
+          # Windows gets non-deterministically gets stuck in infinite loops
+          # or segfaults while running the testcase.
+          - os: windows
+            ghc: 8.8.4
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: haskell/actions/setup@v1
+        id: setup-haskell
+        with:
+          ghc-version: ${{ matrix.ghc }}
+          enable-stack: true
+
+      - name: Install IVerilog (macOS)
+        if: matrix.os == 'macOS'
+        run: brew install icarus-verilog
+
+      - name: Install IVerilog (Windows)
+        if: matrix.os == 'windows'
+        run: choco install --no-progress iverilog
+
+      - name: General Setup
+        run: |
+          cp .ci/stack-${{ matrix.ghc }}.yaml stack.yaml
+
+      - name: Cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ${{ steps.setup-haskell.outputs.stack-root }}
+            .stack-work/
+          key: ${{ matrix.os }}-${{ matrix.ghc }}-${{ hashFiles('stack.yaml', '**/*.cabal') }}
+          restore-keys: ${{ matrix.os }}-${{ matrix.ghc }}-
+
+      # https://gitlab.haskell.org/haskell/ghcup-hs/-/issues/188
+      # https://github.com/commercialhaskell/stack/issues/4937
+      # - name: Use system GHC
+      #   run: stack config set system-ghc --global true
+
+      - name: Build with Stack
+        run: stack build
+
+      - name: Run Vector testsuite
+        run: stack run -- clash-testsuite --hide-successes -p .Vector. --no-ghdl --no-verilator --no-modelsim
+
   build_and_test:
     # Only run for external PRs
     if: github.event.pull_request.head.repo.full_name != github.repository
