@@ -1,0 +1,1 @@
+Fixed: Clash now compiles for users of Clang - i.e., all macOS users.
