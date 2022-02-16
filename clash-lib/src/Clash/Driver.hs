@@ -810,11 +810,11 @@ pprVerilatorShim (Id.toText -> topNm) =
   -- the outlines lines in the file. It doesn't matter for code inside main,
   -- but is fatal for the #include directives.
   pretty $ Data.Text.pack [i|
-    #include <cstdlib>
+    \#include <cstdlib>
 
-    #include <verilated.h>
+    \#include <verilated.h>
 
-    #include "V#{topNm}.h"
+    \#include "V#{topNm}.h"
 
     int main(int argc, char **argv) {
       Verilated::commandArgs(argc, argv);
