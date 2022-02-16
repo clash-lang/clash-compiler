@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
@@ -5,9 +7,14 @@
 
 module Clash.Tests.AsyncFIFOSynchronizer (tests) where
 
+import Data.Maybe (isJust, catMaybes)
 import qualified Prelude as P
 
+import Hedgehog as H
+import qualified Hedgehog.Range as Range
+import qualified Hedgehog.Gen as Gen
 import Test.Tasty
+import Test.Tasty.Hedgehog
 import Test.Tasty.HUnit
 
 import Clash.Explicit.Prelude
@@ -963,6 +970,155 @@ test6W7 = testW sync6W7
   , (Nothing,False)
   ]
 
+createDomain vSystem{vName="A", vPeriod=hzToPeriod 20e6} -- fast
+createDomain vSystem{vName="B", vPeriod=hzToPeriod 10e6} -- slow
+createDomain vSystem{vName="C", vPeriod=hzToPeriod 7e6} -- slower
+
+data DomProxy (dom :: Domain) where
+  DomProxy
+    :: KnownDomain dom
+    => DomProxy dom
+
+-- A more useful Show instance than the one for 'Proxy'
+instance Show (DomProxy dom) where
+  showsPrec d dom@DomProxy =
+    showParen (d > app_prec) $ ("DomProxy @" <>) . (symbolVal dom <>)
+   where app_prec = 10
+
+data NamedTest a = NamedTest
+  { namedTest :: a
+  , testName :: String
+  }
+
+instance Show (NamedTest a) where
+  show nt = testName nt
+
+testNameShowsPrec
+  :: Int
+  -> ShowS
+  -> DomProxy dom1
+  -> DomProxy dom2
+  -> ShowS
+testNameShowsPrec d baseName dom1 dom2 =
+  showParen (d > app_prec) $ baseName . (' ':) . showsPrec 11 dom1 .
+    (' ':) . showsPrec 11 dom2
+ where app_prec = 10
+
+forAllNamedTestProperties
+  :: [NamedTest (PropertyT IO ())]
+  -> Property
+
+forAllNamedTestProperties nts = property $ do
+  t <- fmap namedTest . forAllWith show . Gen.resize 99 $ Gen.element nts
+  t
+
+data WriteAction =
+    Write
+  | WNoOp
+  | WGated
+  | GatedWrite
+  deriving (Eq, Enum, Bounded, Show, Generic, NFDataX)
+
+data ReadAction =
+    Read
+  | RNoOp
+  | RGated
+  | GatedRead
+  deriving (Eq, Enum, Bounded, Show, Generic, NFDataX)
+
+fifoOperations
+  :: forall wdom rdom
+   . (KnownDomain wdom, KnownDomain rdom)
+  => [ReadAction]
+  -> [WriteAction]
+  -> ( Signal rdom ( Bool
+                     -- Test fully done
+                   , Maybe Int
+                     -- Element read from FIFO
+                   )
+     , Signal wdom ( Bool
+                     -- Test fully done
+                   , Maybe Int
+                    -- Element written to FIFO
+                   )
+     )
+fifoOperations racts wacts = (bundle (rAllDone, rel), bundle (wAllDone, wel))
+ where
+  (rdata, rempty, wfull) =
+    asyncFIFOSynchronizer d3 wclk rclk noWRst noRRst (toEnable wen)
+      (toEnable ren) rinc wDataM
+  rclk = clockGen @rdom
+  wclk = clockGen @wdom
+  -- Not resetting makes the test easier to interpret and actual proper testing
+  -- of reset behaviour is a lot more involved.
+  noRRst = unsafeFromHighPolarity @rdom (pure False)
+  noWRst = unsafeFromHighPolarity @wdom (pure False)
+  (wdone, wact) =
+    unbundle $ fromList $ P.zip (P.repeat False) wacts <> P.repeat (True, WNoOp)
+  (rdone, ract) =
+    unbundle $ fromList $ P.zip (P.repeat False) racts <> P.repeat (True, RNoOp)
+  (wen, wDataM) = unbundle $
+    liftA2 (\wact0 d -> case wact0 of
+                          Write      -> (True , Just d )
+                          WNoOp      -> (True , Nothing)
+                          WGated     -> (False, Nothing)
+                          GatedWrite -> (False, Just d )
+           ) wact wdata
+  wdata = regEn wclk noWRst enableGen 1 (isJust <$> wDataM) (wdata + 1)
+  (ren, rinc) = unbundle $
+    fmap (\ract0 -> case ract0 of
+                      Read       -> (True , True )
+                      RNoOp      -> (True , False)
+                      RGated     -> (False, False)
+                      GatedRead  -> (False, True)
+         ) ract1
+  mainDone = rdone .&&. unsafeSynchronizer wclk rclk wdone
+  -- Empty FIFO after main test
+  ract1 = mux mainDone (pure Read) ract
+  flushCnt = regEn rclk noRRst enableGen (1 :: Int) mainDone (flushCnt + 1)
+  -- Surely in 20 cycles we have seen all of the FIFO even if something has gone
+  -- wrong with the pointers
+  rAllDone = fmap (> 20) flushCnt
+  wAllDone = unsafeSynchronizer rclk wclk rAllDone
+  rel = mux (liftA3 (\en inc em -> en && inc && not em) ren rinc rempty)
+            (Just <$> rdata) (pure Nothing)
+  wel = mux (liftA3 (\en wdm fu -> en && isJust wdm && not fu) wen wDataM wfull)
+            (Just <$> wdata) (pure Nothing)
+
+fifoFunctionalTest
+  :: forall wdom rdom m
+   . Monad m
+  => DomProxy wdom
+  -> DomProxy rdom
+  -> NamedTest (PropertyT m ())
+fifoFunctionalTest wdom@DomProxy rdom@DomProxy =
+  NamedTest { namedTest=test0, testName = name }
+ where
+  name = testNameShowsPrec 0 (shows 'fifoFunctionalTest) wdom rdom ""
+  genInput :: (Bounded e, Enum e, Show e) => PropertyT m [e]
+  genInput = fmap P.concat . forAll . Gen.list (Range.linear 1 10) .
+               Gen.list (Range.linear 0 20) $ Gen.enumBounded
+  test0 = do
+    racts <- genInput
+    wacts <- genInput
+    let
+      results = fifoOperations @wdom @rdom racts wacts
+      catValids = catMaybes . P.map snd . P.takeWhile (not . fst)
+      rels = catValids . sample $ fst results
+      wels = catValids . sample $ snd results
+    rels === wels
+
+fifoFunctionalTestCombinations :: Monad m => [NamedTest (PropertyT m ())]
+fifoFunctionalTestCombinations =
+  [ fifoFunctionalTest (DomProxy @A) (DomProxy @A)
+  , fifoFunctionalTest (DomProxy @A) (DomProxy @B)
+  , fifoFunctionalTest (DomProxy @A) (DomProxy @C)
+  , fifoFunctionalTest (DomProxy @B) (DomProxy @A)
+  , fifoFunctionalTest (DomProxy @B) (DomProxy @C)
+  , fifoFunctionalTest (DomProxy @C) (DomProxy @A)
+  , fifoFunctionalTest (DomProxy @C) (DomProxy @B)
+  ]
+
 tests :: TestTree
 tests = testGroup "asyncFIFOSynchronizer"
   [ testCase "Test 1.1 Read" test1R1
@@ -993,4 +1149,5 @@ tests = testGroup "asyncFIFOSynchronizer"
   , testCase "Test 5.7 Write" test5W7
   , testCase "Test 6.7 Read" test6R7
   , testCase "Test 6.7 Write" test6W7
+  , testProperty "Functional test" $ forAllNamedTestProperties fifoFunctionalTestCombinations
   ]
