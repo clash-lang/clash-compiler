@@ -1,0 +1,110 @@
+cabal-version:      2.2
+
+name:               clash-ffi
+version:            1.5.0
+synopsis:           Interact with Simulators from Clash
+description:        Interact with Simulators from Clash
+bug-reports:        https://github.com/clash-lang/clash-compiler/issues
+license:            BSD-2-Clause
+license-file:       LICENSE
+author:             QBayLogic B.V.
+maintainer:         devops@qbaylogic.com
+copyright:          Copyright © 2022, QBayLogic B.V.
+category:           Hardware
+build-type:         Custom
+
+common basic-config
+  default-language: Haskell2010
+
+  default-extensions:
+    BangPatterns
+    DeriveAnyClass
+    DeriveGeneric
+    DerivingStrategies
+    GeneralizedNewtypeDeriving
+    ScopedTypeVariables
+    TypeApplications
+
+  include-dirs:
+    include
+
+  ghc-options:
+    -Wall -Wcompat -g
+
+  build-depends:
+    base                    >= 4.11     && < 5,
+    bytestring              >= 0.10.0.2 && < 0.12,
+    deepseq                 >= 1.4      && < 1.5,
+    derive-storable         >= 0.3.0.0  && < 0.4,
+    derive-storable-plugin  >= 0.2.3    && < 0.3,
+    mtl                     >= 2.2.2    && < 2.3,
+    pretty-show             >= 1.10     && < 1.11,
+
+    clash-prelude           >= 1.2      && < 2,
+
+  other-modules:
+    Clash.FFI.Monad
+    Clash.FFI.View
+
+common vpi-config
+  includes:
+    vpi_user.h
+
+  c-sources:
+    cbits/entry_vpi.c
+
+  cpp-options:
+    -DVERILOG=1
+
+  other-modules:
+    Clash.FFI.VPI.Callback
+    Clash.FFI.VPI.Callback.Reason
+    Clash.FFI.VPI.Control
+    Clash.FFI.VPI.Error
+    Clash.FFI.VPI.Error.Level
+    Clash.FFI.VPI.Error.State
+    Clash.FFI.VPI.Info
+    Clash.FFI.VPI.IO
+    Clash.FFI.VPI.Object
+    Clash.FFI.VPI.Object.Type
+    Clash.FFI.VPI.Module
+    Clash.FFI.VPI.Net
+    Clash.FFI.VPI.Parameter
+    Clash.FFI.VPI.Port
+    Clash.FFI.VPI.Property
+    Clash.FFI.VPI.Property.Type
+    Clash.FFI.VPI.Reg
+    Clash.FFI.VPI.Time
+    Clash.FFI.VPI.Value
+    Clash.FFI.VPI.Value.Delay
+    Clash.FFI.VPI.Value.Format
+    Clash.FFI.VPI.Value.Scalar
+    Clash.FFI.VPI.Value.Vector
+
+custom-setup
+  setup-depends:
+    base        >= 4.11  && < 5,
+    Cabal       >= 3.4.1 && < 3.5,
+    directory   >= 1.3.6 && < 1.4,
+    filepath    >= 1.4.2 && < 1.5,
+
+-- To accomodate differences between different simulators when defining the
+-- generic interface, different foreign libraries are produced for each tool.
+-- The code is shared between all simulators and each library defines it's name
+-- and includes the source files it needs for it's interface.
+
+foreign-library clash-iverilog-vpi
+  import: basic-config, vpi-config
+  type: native-shared
+  lib-version-info: 0:0:0
+  hs-source-dirs: src
+
+  cpp-options:
+    -DIVERILOG=1
+    -DVERILOG_2001=1
+    -DVERILOG_2005=1
+    -DVPI_VECVAL=1
+
+  other-modules:
+    Clash.FFI.Iverilog
+

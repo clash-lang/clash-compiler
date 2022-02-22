@@ -1,0 +1,5 @@
+lib/
+*.v
+*.vvp
+*.vpl
+*.so
