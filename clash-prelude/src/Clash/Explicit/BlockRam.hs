@@ -1201,28 +1201,10 @@ toMaybeX a =
 data MaybeX a = IsX | IsDefined !a
 
 data Conflict = Conflict
-  { cfWrite :: !(MaybeX Bool)
+  { cfRWA     :: !(MaybeX Bool) -- ^ Read/Write conflict for output A
+  , cfRWB     :: !(MaybeX Bool) -- ^ Read/Write conflict for output B
+  , cfWW      :: !(MaybeX Bool) -- ^ Write/Write conflict
   , cfAddress :: !(MaybeX Int) }
-
-instance Semigroup Conflict where
-  (<>) = mergeConflicts
-
--- | "Stronger" conflict wins:
---
---   * Writes over read
---   * Undefineds over anything
---
-mergeConflicts :: Conflict -> Conflict -> Conflict
-mergeConflicts conflict1 conflict2 = Conflict
-  { cfWrite = mergeWrite (cfWrite conflict1) (cfWrite conflict2)
-  , cfAddress = mergeAddress (cfAddress conflict1) (cfAddress conflict2) }
- where
-  mergeX _ IsX _ = IsX
-  mergeX _ _ IsX = IsX
-  mergeX f (IsDefined a) (IsDefined b) = IsDefined (f a b)
-
-  mergeWrite a b = mergeX (||) a b
-  mergeAddress a b = mergeX const a b
 
 -- [Note: eta port names for trueDualPortBlockRam]
 --
@@ -1317,19 +1299,24 @@ trueDualPortBlockRamModel ::
 
   (Signal domSlow a, Signal domFast a)
 trueDualPortBlockRamModel labelA !_clkA enA weA addrA datA labelB !_clkB enB weB addrB datB =
-  ( deepErrorX ("trueDualPortBlockRam: " <> labelA <> ": First value undefined") :- outA
-  , deepErrorX ("trueDualPortBlockRam: " <> labelB <> ": First value undefined") :- outB )
+  ( startA :- outA
+  , startB :- outB )
  where
   (outA, outB) =
     go
-      Nothing
       (Seq.fromFunction (natToNum @nAddrs) initElement)
-      tA -- ensure 'go' hits fast clock first
+      tB -- ensure 'go' hits fast clock first for 1 cycle, then execute slow
+         -- clock for 1 cycle, followed by the regular cadence of 'ceil(tA / tB)'
+         -- cycles for the fast clock followed by 1 cycle of the slow clock
       (bundle (enA, weA, fromIntegral <$> addrA, datA))
       (bundle (enB, weB, fromIntegral <$> addrB, datB))
+      startA startB
 
   tA = snatToNum @Int (clockPeriod @domSlow)
   tB = snatToNum @Int (clockPeriod @domFast)
+
+  startA = deepErrorX $ "trueDualPortBlockRam: " <> labelA <> ": First value undefined"
+  startB = deepErrorX $ "trueDualPortBlockRam: " <> labelB <> ": First value undefined"
 
   initElement :: Int -> a
   initElement n =
@@ -1346,23 +1333,24 @@ trueDualPortBlockRamModel labelA !_clkA enA weA addrA datA labelB !_clkB enB weB
     deepErrorX ("Write enabled, but address unknown; position " <> show n <>
                 "\nAddress error message: " <> msg)
 
-  getConflict :: Bool -> Int -> Bool -> Int -> Maybe Conflict
-  getConflict enableA addrA_ enableB addrB_ =
+  getConflict :: Bool -> Bool -> Bool -> Int -> Bool -> Int -> Maybe Conflict
+  getConflict enA_ enB_ wenA addrA_ wenB addrB_ =
     -- If port A or port B is writing on (potentially!) the same address,
     -- there's a conflict
-    if sameAddr then maybeConflict else Nothing
+    if sameAddr then Just conflict else Nothing
    where
-    conflict = Conflict
-      { cfWrite = toMaybeX enableA
-      , cfAddress = toMaybeX addrA_ }
+    wenAX = toMaybeX wenA
+    wenBX = toMaybeX wenB
 
-    maybeConflict =
-      case (isX enableA, isX enableB) of
-        (Left _, _)     -> Just conflict
-        (Right True, _) -> Just conflict
-        (_, Left _)     -> Just conflict
-        (_, Right True) -> Just conflict
-        _               -> Nothing
+    mergeX IsX b = b
+    mergeX a IsX = a
+    mergeX (IsDefined a) (IsDefined b) = IsDefined (a && b)
+
+    conflict = Conflict
+      { cfRWA     = if enB_ then wenBX else IsDefined False
+      , cfRWB     = if enA_ then wenAX else IsDefined False
+      , cfWW      = if enA_ && enB_ then mergeX wenAX wenBX else IsDefined False
+      , cfAddress = toMaybeX addrA_ }
 
     sameAddr =
       case (isX addrA_, isX addrB_) of
@@ -1397,47 +1385,74 @@ trueDualPortBlockRamModel labelA !_clkA enA weA addrA datA labelB !_clkB enB weB
     addrUndefined = isX addr
 
   go ::
-    Maybe Conflict ->
     Seq a ->
     Int ->
     Signal domSlow (Bool, Bool, Int, a) ->
     Signal domFast (Bool, Bool, Int, a) ->
+    a -> a ->
     (Signal domSlow a, Signal domFast a)
-  go conflict0 ram0 relativeTime as0 bs0 =
-    if relativeTime <= 0 then goSlow else goFast
+  go ram0 relativeTime as0 bs0 =
+    case compare relativeTime 0 of
+      LT -> goSlow
+      EQ -> goBoth
+      GT -> goFast
    where
     (enA_, weA_, addrA_, datA_) :- as1 = as0
     (enB_, weB_, addrB_, datB_) :- bs1 = bs0
 
+    goBoth prevA prevB = outA2 `seqX` outB2 `seqX` (outA2 :- as2, outB2 :- bs2)
+     where
+      conflict = getConflict enA_ enB_ weA_ addrA_ weB_ addrB_
+
+      (datA1_,datB1_) = case conflict of
+        Just Conflict{cfWW=IsDefined True} ->
+          ( deepErrorX "trueDualPortBlockRam: conflicting write/write queries"
+          , deepErrorX "trueDualPortBlockRam: conflicting write/write queries" )
+        Just Conflict{cfWW=IsX} ->
+          ( deepErrorX "trueDualPortBlockRam: conflicting write/write queries"
+          , deepErrorX "trueDualPortBlockRam: conflicting write/write queries" )
+        _ -> (datA_,datB_)
+
+      (wroteA,ram1) = writeRam weA_ addrA_ datA1_ ram0
+      (wroteB,ram2) = writeRam weB_ addrB_ datB1_ ram1
+
+      outA1 = case conflict of
+        Just Conflict{cfRWA=IsDefined True} ->
+          deepErrorX "trueDualPortBlockRam: conflicting read/write queries"
+        Just Conflict{cfRWA=IsX} ->
+          deepErrorX "trueDualPortBlockRam: conflicting read/write queries"
+        _ -> fromMaybe (ram0 `Seq.index` addrA_) wroteA
+
+      outB1 = case conflict of
+        Just Conflict{cfRWB=IsDefined True} ->
+          deepErrorX "trueDualPortBlockRam: conflicting read/write queries"
+        Just Conflict{cfRWB=IsX} ->
+          deepErrorX "trueDualPortBlockRam: conflicting read/write queries"
+        _ -> fromMaybe (ram0 `Seq.index` addrB_) wroteB
+
+      outA2 = if enA_ then outA1 else prevA
+      outB2 = if enB_ then outB1 else prevB
+      (as2,bs2) = go ram2 (relativeTime - tB + tA) as1 bs1 outA2 outB2
+
     -- 1 iteration here, as this is the slow clock.
-    goSlow = out1 `seqX` (out1 :- as2, bs2)
+    goSlow _ prevB | enA_ = out0 `seqX` (out0 :- as2, bs2)
      where
       (wrote, !ram1) = writeRam weA_ addrA_ datA_ ram0
       out0 = fromMaybe (ram1 `Seq.index` addrA_) wrote
-      (as2, bs2) = go Nothing ram1 (relativeTime + tA) as1 bs0
-      out1 =
-        case conflict0 of
-          Just Conflict{cfWrite=IsDefined True} ->
-            deepErrorX "trueDualPortBlockRam: conflicting read/write queries"
-          Just Conflict{cfWrite=IsX} ->
-            deepErrorX "trueDualPortBlockRam: conflicting read/write queries"
-          _ -> out0
+      (as2, bs2) = go ram1 (relativeTime + tA) as1 bs0 out0 prevB
+
+    goSlow prevA prevB = (prevA :- as2, bs2)
+      where
+        (as2,bs2) = go ram0 (relativeTime + tA) as1 bs0 prevA prevB
 
     -- 1 or more iterations here, as this is the fast clock. First iteration
     -- happens here.
-    goFast = out1 `seqX` (as2, out1 :- bs2)
+    goFast prevA _ | enB_ = out0 `seqX` (as2, out0 :- bs2)
      where
-      conflict1 | enA_ && enB_ = getConflict weB_ addrB_ weA_ addrA_
-                | otherwise    = Nothing
       (wrote, !ram1) = writeRam weB_ addrB_ datB_ ram0
       out0 = fromMaybe (ram1 `Seq.index` addrB_) wrote
-      conflict2 = conflict0 <> conflict1
-      (as2, bs2) = go conflict2 ram1 (relativeTime - tB) as0 bs1
-      out1 =
-        case conflict1 of
-          Just Conflict{cfWrite=IsDefined False} ->
-            deepErrorX "trueDualPortBlockRam: conflicting read/write queries"
-          Just Conflict{cfWrite=IsX} ->
-            deepErrorX "trueDualPortBlockRam: conflicting read/write queries"
-          _ ->
-            out0
+      (as2, bs2) = go ram1 (relativeTime - tB) as0 bs1 prevA out0
+
+    goFast prevA prevB = (as2, prevB :- bs2)
+     where
+       (as2,bs2) = go ram0 (relativeTime - tB) as0 bs1 prevA prevB

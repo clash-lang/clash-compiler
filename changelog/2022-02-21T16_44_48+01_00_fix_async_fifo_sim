@@ -1,0 +1,3 @@
+FIXED: The `trueDualPortBlockRam` model did not accurately simulate concurrent active ports, thus causing a Haskell/HDL simulation mismatch for `asyncFIFOSynchronizer`.
+CHANGED: The `trueDualPortBlockRam` model now only models read/write conflicts for concurrent active ports
+CHANGED: The `trueDualPortBlockRam` model now models write/write conflicts for concurrent active ports
