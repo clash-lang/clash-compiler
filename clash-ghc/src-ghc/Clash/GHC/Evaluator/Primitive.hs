@@ -96,7 +96,7 @@ import           Clash.Core.TyCon
   (TyConMap, TyConName, tyConDataCons)
 import           Clash.Core.TysPrim
 import           Clash.Core.Util
-  (mkRTree,mkVec,tyNatSize,dataConInstArgTys,primCo, mkSelectorCase)
+  (mkRTree,mkVec,tyNatSize,dataConInstArgTys,primCo, mkSelectorCase,undefinedPrims)
 import           Clash.Core.Var      (mkLocalId, mkTyVar)
 import           Clash.Debug
 import           Clash.GHC.GHC2Core  (modNameM)
@@ -121,9 +121,7 @@ import {-# SOURCE #-} Clash.GHC.Evaluator
 
 isUndefinedPrimVal :: Value -> Bool
 isUndefinedPrimVal (PrimVal (PrimInfo{primName}) _ _) =
-  primName `elem` [ Text.pack (show 'NP.undefined)
-                  ,"Clash.XException.errorX"
-                  ,"Control.Exception.Base.absentError"]
+  primName `elem` undefinedPrims
 isUndefinedPrimVal _ = False
 
 -- | Evaluation of primitive operations.
