@@ -1278,9 +1278,12 @@ trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
   -- port enable is @False@, it is /undefined/.
 trueDualPortBlockRam# clkA enA weA addrA datA clkB enB weB addrB datB
   | snatToNum @Int (clockPeriod @domA) < snatToNum @Int (clockPeriod @domB)
-  = swap (trueDualPortBlockRamModel clkB enB weB addrB datB clkA enA weA addrA datA)
+  = swap (trueDualPortBlockRamModel labelB clkB enB weB addrB datB labelA clkA enA weA addrA datA)
   | otherwise
-  =       trueDualPortBlockRamModel clkA enA weA addrA datA clkB enB weB addrB datB
+  =       trueDualPortBlockRamModel labelA clkA enA weA addrA datA labelB clkB enB weB addrB datB
+ where
+  labelA = "Port A"
+  labelB = "Port B"
 {-# NOINLINE trueDualPortBlockRam# #-}
 {-# ANN trueDualPortBlockRam# hasBlackBox #-}
 
@@ -1298,12 +1301,14 @@ trueDualPortBlockRamModel ::
   , NFDataX a
   ) =>
 
+  String ->
   Clock domSlow ->
   Signal domSlow Bool ->
   Signal domSlow Bool ->
   Signal domSlow (Index nAddrs) ->
   Signal domSlow a ->
 
+  String ->
   Clock domFast ->
   Signal domFast Bool ->
   Signal domFast Bool ->
@@ -1311,9 +1316,9 @@ trueDualPortBlockRamModel ::
   Signal domFast a ->
 
   (Signal domSlow a, Signal domFast a)
-trueDualPortBlockRamModel !_clkA enA weA addrA datA !_clkB enB weB addrB datB =
-  ( deepErrorX "trueDualPortBlockRam: Port A: First value undefined" :- outA
-  , deepErrorX "trueDualPortBlockRam: Port B: First value undefined" :- outB )
+trueDualPortBlockRamModel labelA !_clkA enA weA addrA datA labelB !_clkB enB weB addrB datB =
+  ( deepErrorX ("trueDualPortBlockRam: " <> labelA <> ": First value undefined") :- outA
+  , deepErrorX ("trueDualPortBlockRam: " <> labelB <> ": First value undefined") :- outB )
  where
   (outA, outB) =
     go
