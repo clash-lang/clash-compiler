@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016     , Myrtle Software Ltd,
-                     2021     , QBayLogic B.V.
+                     2021-2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -356,16 +356,16 @@ instance PrettyPrec Literal where
       | i < 0          -> parens (pretty i)
       | otherwise      -> pretty i
     IntLiteral i
-      | i < 0          -> parens (pretty i)
-      | otherwise      -> pretty i
+      | i < 0          -> parens (pretty i <> "#")
+      | otherwise      -> pretty i <> "#"
     Int64Literal i
-      | i < 0          -> parens (pretty i)
-      | otherwise      -> pretty i
-    WordLiteral w      -> pretty w
-    Word64Literal w    -> pretty w
-    FloatLiteral w     -> pretty $ wordToFloat w
-    DoubleLiteral w    -> pretty $ wordToDouble w
-    CharLiteral c      -> pretty c
+      | i < 0          -> parens (pretty i <> "#")
+      | otherwise      -> pretty i <> "#"
+    WordLiteral w      -> pretty w <> "##"
+    Word64Literal w    -> pretty w <> "##"
+    FloatLiteral w     -> pretty (wordToFloat w) <> "#"
+    DoubleLiteral w    -> pretty (wordToDouble w) <> "##"
+    CharLiteral c      -> pretty c <> "#"
     StringLiteral s    -> vcat $ map pretty $ showMultiLineString s
     NaturalLiteral n   -> pretty n
     ByteArrayLiteral s -> pretty $ show s
