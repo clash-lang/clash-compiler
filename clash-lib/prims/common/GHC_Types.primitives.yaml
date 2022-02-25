@@ -2,10 +2,3 @@
     name: GHC.Types.MkCoercible
     primType: Constructor
     workInfo: Never
-- BlackBox:
-    name: GHC.Types.C#
-    kind: Expression
-    type: 'I# :: Char# ->
-      Char'
-    template: ~ARG[0]
-    workInfo: Never

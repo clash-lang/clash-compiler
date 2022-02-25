@@ -1585,14 +1585,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [Lit (NaturalLiteral n), _] <- args
     -> reduce (Literal (NaturalLiteral n))
 
-  "GHC.Types.C#"
-    | isSubj
-    , [Lit (CharLiteral c)] <- args
-    ->  let (_,tyView -> TyConApp charTcNm []) = splitFunForallTy ty
-            (Just charTc) = lookupUniqMap charTcNm tcm
-            [charDc] = tyConDataCons charTc
-        in  reduce (mkApps (Data charDc) [Left (Literal (CharLiteral c))])
-
   "GHC.Int.I8#"
     | isSubj
     , [Lit (IntLiteral i)] <- args
