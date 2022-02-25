@@ -1788,11 +1788,15 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   "Clash.Class.BitPack.Internal.unpackFloat#"
     | [i] <- bitVectorLiterals' args
-    -> reduce . Literal . FloatLiteral $ unpack (toBV i :: BitVector 32)
+    -> let resTy = getResultTy tcm ty tys
+           val = unpack (toBV i :: BitVector 32)
+        in reduce (mkFloatCLit tcm val resTy)
 
   "Clash.Class.BitPack.Internal.unpackDouble#"
     | [i] <- bitVectorLiterals' args
-    -> reduce . Literal . DoubleLiteral $ unpack (toBV i :: BitVector 64)
+    -> let resTy = getResultTy tcm ty tys
+           val = unpack (toBV i :: BitVector 64)
+        in reduce (mkDoubleCLit tcm val resTy)
 
   -- expIndex#
   --   :: KnownNat m
@@ -4185,6 +4189,22 @@ bitVectorLitIntLit tcm tys args
   = Just (nTy,kn,(m,i),j)
   | otherwise
   = Nothing
+
+mkFloatCLit :: TyConMap -> Word32 -> Type -> Term
+mkFloatCLit tcm lit resTy =
+  App (Data floatDc) (Literal (FloatLiteral lit))
+ where
+  (_, tyView -> TyConApp floatTcNm []) = splitFunForallTy resTy
+  (Just floatTc) = lookupUniqMap floatTcNm tcm
+  [floatDc] = tyConDataCons floatTc
+
+mkDoubleCLit :: TyConMap -> Word64 -> Type -> Term
+mkDoubleCLit tcm lit resTy =
+  App (Data doubleDc) (Literal (DoubleLiteral lit))
+ where
+  (_, tyView -> TyConApp doubleTcNm []) = splitFunForallTy resTy
+  (Just doubleTc) = lookupUniqMap doubleTcNm tcm
+  [doubleDc] = tyConDataCons doubleTc
 
 -- From an argument list to function of type
 --   forall n. KnownNat n => ...
