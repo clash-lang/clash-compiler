@@ -1,4 +1,17 @@
 # Changelog for the Clash project
+
+## 1.6.2 *Fed 25th 2022*
+Fixed:
+  * Clash now compiles for users of Clang - i.e., all macOS users.
+  * The `trueDualPortBlockRam` model did not accurately simulate concurrent active ports, thus causing a Haskell/HDL simulation mismatch for `asyncFIFOSynchronizer`.
+  * `trueDualPortBlockRam` Haskell/HDL simulation mismatch for port enable.
+  * Sometimes `trueDualPortBlockRam` swapped the names of the ports in exception messages. [#2102](https://github.com/clash-lang/clash-compiler/pull/2102)
+  * The evaluator rule for unpack{Float,Double}# are now corrected to return boxed float and double instead of unboxed literals. [#2097](https://github.com/clash-lang/clash-compiler/issues/2097)
+
+Changed:
+  * The `trueDualPortBlockRam` model now only models read/write conflicts for concurrent active ports
+  * The `trueDualPortBlockRam` model now models write/write conflicts for concurrent active ports
+
 ## 1.6.1 *Feb 11th 2022*
 Changed:
   * We accidentally released `v1.6.0` with the Cabal flag `multiple-hidden` enabled. This is an experimental feature, supposed to be disabled by default for releases. `v1.6.1` disables it again.

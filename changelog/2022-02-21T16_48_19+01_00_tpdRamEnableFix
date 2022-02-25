@@ -1,1 +1,0 @@
-FIXED: `trueDualPortBlockRam` Haskell/HDL simulation mismatch for port enable.
