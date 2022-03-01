@@ -62,7 +62,7 @@ import Clash.Signal.Internal (Clock, Signal(..), (.&&.))
 import Clash.Sized.Internal.BitVector (Bit(..), BitVector(..))
 import Clash.Sized.Internal.Unsigned (Unsigned)
 import Clash.XException
-  (maybeIsX, deepErrorX, defaultSeqX, fromJustX, XException (..), seqX)
+  (maybeIsX, deepErrorX, defaultSeqX, fromJustX, NFDataX, XException (..), seqX)
 
 -- $setup
 -- >>> :set -XTemplateHaskell
@@ -89,6 +89,7 @@ blockRamBlob
   :: forall dom addr m n
    . ( KnownDomain dom
      , Enum addr
+     , NFDataX addr
      )
   => Clock dom
   -- ^ 'Clock' to synchronize to
@@ -104,7 +105,7 @@ blockRamBlob
   -- ^ (write address @w@, value to write)
   -> Signal dom (BitVector m)
   -- ^ Value of the blockRAM at address @r@ from the previous clock cycle
-blockRamBlob = \clk gen content rd wrM ->
+blockRamBlob = \clk gen content@MemBlob{} rd wrM ->
   let en       = isJust <$> wrM
       (wr,din) = unbundle (fromJustX <$> wrM)
   in blockRamBlob# clk gen content (fromEnum <$> rd) en (fromEnum <$> wr) din

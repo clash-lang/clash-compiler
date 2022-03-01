@@ -124,7 +124,7 @@ import Clash.Signal.Internal
   (Clock(..), Signal (..), Enable, KnownDomain, fromEnable, (.&&.))
 import Clash.Signal.Bundle   (unbundle)
 import Clash.Sized.Unsigned  (Unsigned)
-import Clash.XException      (errorX, maybeIsX, seqX, fromJustX, XException (..))
+import Clash.XException      (errorX, maybeIsX, seqX, fromJustX, NFDataX, XException (..))
 
 -- start benchmark only
 -- import GHC.Arr (unsafeFreezeSTArray, unsafeThawSTArray)
@@ -214,7 +214,7 @@ blockRamFilePow2 = \clk en file rd wrM -> withFrozenCallStack
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for more ideas on how to create
 -- your own data files.
 blockRamFile
-  :: (KnownDomain dom, KnownNat m, Enum addr, HasCallStack)
+  :: (KnownDomain dom, KnownNat m, Enum addr, NFDataX addr, HasCallStack)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom

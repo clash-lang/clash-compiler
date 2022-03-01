@@ -89,6 +89,7 @@ asyncRamPow2 = \wclk rclk en rd wrM -> withFrozenCallStack
 -- RAM.
 asyncRam
   :: ( Enum addr
+     , NFDataX addr
      , HasCallStack
      , KnownDomain wdom
      , KnownDomain rdom

@@ -715,7 +715,7 @@ blockRam
      , HiddenEnable dom
      , NFDataX a
      , Enum addr
-     )
+     , NFDataX addr )
   => Vec n a
   -- ^ Initial content of the BRAM, also determines the size, @n@, of the BRAM.
   --
@@ -739,6 +739,7 @@ blockRamU
      , HiddenClockResetEnable dom
      , NFDataX a
      , Enum addr
+     , NFDataX addr
      , 1 <= n )
   => E.ResetStrategy r
   -- ^ Whether to clear BRAM on asserted reset ('Clash.Explicit.BlockRam.ClearOnReset')
@@ -767,6 +768,7 @@ blockRam1
      , HiddenClockResetEnable dom
      , NFDataX a
      , Enum addr
+     , NFDataX addr
      , 1 <= n )
   => E.ResetStrategy r
   -- ^ Whether to clear BRAM on asserted reset ('Clash.Explicit.BlockRam.ClearOnReset')

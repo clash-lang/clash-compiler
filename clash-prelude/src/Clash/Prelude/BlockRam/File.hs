@@ -102,6 +102,7 @@ import           Clash.Signal
   (HiddenClock, HiddenEnable, Signal, hideClock, hideEnable)
 import           Clash.Sized.BitVector        (BitVector)
 import           Clash.Sized.Unsigned         (Unsigned)
+import           Clash.XException             (NFDataX)
 
 -- | Create a blockRAM with space for 2^@n@ elements
 --
@@ -180,6 +181,7 @@ blockRamFilePow2 = \fp rd wrM -> withFrozenCallStack
 blockRamFile
   :: ( KnownNat m
      , Enum addr
+     , NFDataX addr
      , HiddenClock dom
      , HiddenEnable dom
      , HasCallStack )

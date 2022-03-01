@@ -40,6 +40,7 @@ import qualified Clash.Explicit.BlockRam.Blob as E
 import Clash.Signal (hideClock, hideEnable, HiddenClock, HiddenEnable, Signal)
 import Clash.Sized.BitVector (BitVector)
 import Clash.Sized.Unsigned (Unsigned)
+import Clash.XException (NFDataX)
 
 -- | Create a blockRAM with space for @n@ elements
 --
@@ -60,6 +61,7 @@ blockRamBlob
    . ( HiddenClock dom
      , HiddenEnable dom
      , Enum addr
+     , NFDataX addr
      )
   => E.MemBlob n m
   -- ^ Initial content of the RAM, also determines the size, @n@, of the RAM
