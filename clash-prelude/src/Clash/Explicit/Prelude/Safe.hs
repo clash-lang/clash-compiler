@@ -42,10 +42,10 @@ module Clash.Explicit.Prelude.Safe
     -- * RAM primitives with a combinational read port
   , asyncRam
   , asyncRamPow2
-    -- * BlockRAM primitives
+    -- * Block RAM primitives
   , blockRam
   , blockRamPow2
-    -- ** BlockRAM primitives initialized with a 'MemBlob'
+    -- ** Block RAM primitives initialized with a 'MemBlob'
   , blockRamBlob
   , blockRamBlobPow2
     -- *** Creating and inspecting 'MemBlob'
@@ -53,7 +53,7 @@ module Clash.Explicit.Prelude.Safe
   , createMemBlob
   , memBlobTH
   , unpackMemBlob
-    -- ** BlockRAM read/write conflict resolution
+    -- ** Block RAM read/write conflict resolution
   , readNew
     -- ** True dual-port block RAM
   , trueDualPortBlockRam
