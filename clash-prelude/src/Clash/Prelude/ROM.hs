@@ -41,7 +41,7 @@ import           Clash.Signal
 import           Clash.Sized.Unsigned (Unsigned)
 import           Clash.Sized.Vector   (Vec, length, toList)
 
-import           Clash.XException     (NFDataX, errorX)
+import           Clash.XException     (NFDataX, deepErrorX)
 
 -- | An asynchronous/combinational ROM with space for @n@ elements
 --
@@ -54,7 +54,10 @@ import           Clash.XException     (NFDataX, errorX)
 -- 'Clash.Prelude.ROM.Blob.asyncRomBlob' for different approaches that scale
 -- well.
 asyncRom
-  :: (KnownNat n, Enum addr)
+  :: ( KnownNat n
+     , Enum addr
+     , NFDataX a
+     )
   => Vec n a
   -- ^ ROM content, also determines the size, @n@, of the ROM
   --
@@ -77,7 +80,9 @@ asyncRom = \content rd -> asyncRom# content (fromEnum rd)
 -- 'Clash.Prelude.ROM.Blob.asyncRomBlobPow2' for different approaches that scale
 -- well.
 asyncRomPow2
-  :: KnownNat n
+  :: ( KnownNat n
+     , NFDataX a
+     )
   => Vec (2^n) a
   -- ^ ROM content
   --
@@ -91,7 +96,10 @@ asyncRomPow2 = asyncRom
 
 -- | asyncROM primitive
 asyncRom#
-  :: forall n a . KnownNat n
+  :: forall n a
+   . ( KnownNat n
+     , NFDataX a
+     )
   => Vec n a
   -- ^ ROM content, also determines the size, @n@, of the ROM
   --
@@ -111,8 +119,8 @@ asyncRom# content = safeAt
         unsafeAt arr i
       else
         withFrozenCallStack
-          (errorX ("asyncRom: address " ++ show i ++
-                  " not in range [0.." ++ show szI ++ ")"))
+          (deepErrorX ("asyncRom: address " ++ show i ++
+                       " not in range [0.." ++ show szI ++ ")"))
 {-# NOINLINE asyncRom# #-}
 {-# ANN asyncRom# hasBlackBox #-}
 

@@ -1,0 +1,1 @@
+CHANGED: All memory functions now use `deepErrorX` for `XException`s. This adds `NFDataX` constraints to `asyncRom`, `asyncRomPow2` and `asyncRom#`. [#2113](https://github.com/clash-lang/clash-compiler/pull/2113)

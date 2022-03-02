@@ -124,7 +124,7 @@ import Clash.Signal.Internal
   (Clock(..), Signal (..), Enable, KnownDomain, fromEnable, (.&&.))
 import Clash.Signal.Bundle   (unbundle)
 import Clash.Sized.Unsigned  (Unsigned)
-import Clash.XException      (errorX, maybeIsX, seqX, fromJustX, NFDataX, XException (..))
+import Clash.XException      (maybeIsX, seqX, fromJustX, NFDataX(..), XException (..))
 
 -- start benchmark only
 -- import GHC.Arr (unsafeFreezeSTArray, unsafeThawSTArray)
@@ -346,7 +346,7 @@ blockRamFile# (Clock _) ena sz file = \rd wen waS wd -> runST $ do
   -- end benchmark only
   go
     ramStart
-    (withFrozenCallStack (errorX "blockRamFile: intial value undefined"))
+    (withFrozenCallStack (deepErrorX "blockRamFile: intial value undefined"))
     (fromEnable ena)
     rd
     (fromEnable ena .&&. wen)
@@ -400,18 +400,19 @@ blockRamFile# (Clock _) ena sz file = \rd wen waS wd -> runST $ do
       unsafeReadSTArray s i
     else pure $
       withFrozenCallStack
-        (errorX ("blockRamFile: read address " <> show i <>
+        (deepErrorX ("blockRamFile: read address " <> show i <>
                 " not in range [0.." <> show szI <> ")"))
   {-# INLINE safeAt #-}
 
-  safeUpdate :: HasCallStack => Int -> a -> STArray s Int a -> ST s ()
+  safeUpdate :: HasCallStack => Int -> BitVector m
+             -> STArray s Int (BitVector m) -> ST s ()
   safeUpdate i a s =
     if (0 <= i) && (i < szI) then
       unsafeWriteSTArray s i a
     else
       let d = withFrozenCallStack
-                (errorX ("blockRamFile: write address " <> show i <>
-                        " not in range [0.." <> show szI <> ")"))
+                (deepErrorX ("blockRamFile: write address " <> show i <>
+                             " not in range [0.." <> show szI <> ")"))
       in forM_ [0..(szI-1)] (\j -> unsafeWriteSTArray s j d)
   {-# INLINE safeUpdate #-}
 

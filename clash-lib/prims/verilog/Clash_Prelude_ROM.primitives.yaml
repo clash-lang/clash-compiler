@@ -2,16 +2,18 @@
     name: Clash.Prelude.ROM.asyncRom#
     kind: Declaration
     type: |-
-      asyncRom# :: KnownNat n -- ^ ARG[0]
-                 => Vec n a    -- ^ ARG[1]
-                 -> Int        -- ^ ARG[2]
-                 -> a
+      asyncRom#
+        :: ( KnownNat n  -- ARG[0]
+           , NFDataX a)  -- ARG[1]
+        => Vec n a       -- ARG[2]
+        -> Int           -- ARG[3]
+        -> a
     template: |-
       // asyncRom begin
       wire ~TYPO ~GENSYM[ROM][0] [0:~LIT[0]-1];
 
-      wire ~TYP[1] ~GENSYM[romflat][1];
-      assign ~SYM[1] = ~CONST[1];
+      wire ~TYP[2] ~GENSYM[romflat][1];
+      assign ~SYM[1] = ~CONST[2];
       genvar ~GENSYM[i][2];
       ~GENERATE
       for (~SYM[2]=0; ~SYM[2] < ~LIT[0]; ~SYM[2]=~SYM[2]+1) begin : ~GENSYM[mk_array][3]
@@ -19,5 +21,5 @@
       end
       ~ENDGENERATE
 
-      assign ~RESULT = ~SYM[0][~ARG[2]];
+      assign ~RESULT = ~SYM[0][~ARG[3]];
       // asyncRom end
