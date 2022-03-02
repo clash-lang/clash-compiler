@@ -758,7 +758,8 @@ blockRam
   :: ( KnownDomain dom
      , HasCallStack
      , NFDataX a
-     , Enum addr )
+     , Enum addr
+     , NFDataX addr )
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -841,6 +842,7 @@ blockRamU
      , HasCallStack
      , NFDataX a
      , Enum addr
+     , NFDataX addr
      , 1 <= n )
   => Clock dom
   -- ^ 'Clock' to synchronize to
@@ -932,6 +934,7 @@ blockRam1
      , HasCallStack
      , NFDataX a
      , Enum addr
+     , NFDataX addr
      , 1 <= n )
   => Clock dom
   -- ^ 'Clock' to synchronize to

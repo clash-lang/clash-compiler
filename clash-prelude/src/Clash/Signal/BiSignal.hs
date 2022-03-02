@@ -127,7 +127,7 @@ import           Clash.Sized.BitVector      (BitVector)
 import qualified Clash.Sized.Vector         as V
 import           Clash.Sized.Vector         (Vec)
 import           Clash.Signal.Internal      (Signal(..), Domain, head#, tail#)
-import           Clash.XException           (errorX, fromJustX)
+import           Clash.XException           (errorX, fromJustX, NFDataX)
 
 import           GHC.TypeLits               (KnownNat, Nat)
 import           GHC.Stack                  (HasCallStack)
@@ -282,7 +282,7 @@ writeToBiSignal# _ maybeSignal _ _ = BiSignalOut [maybeSignal]
 
 -- | Write to an __inout__ port
 writeToBiSignal
-  :: (HasCallStack, BitPack a)
+  :: (HasCallStack, BitPack a, NFDataX a)
   => BiSignalIn ds d (BitSize a)
   -> Signal d (Maybe a)
   -- ^ Value to write

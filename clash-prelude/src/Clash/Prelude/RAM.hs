@@ -45,6 +45,7 @@ import           Clash.XException     (NFDataX)
 -- RAM.
 asyncRam
   :: ( Enum addr
+     , NFDataX addr
      , HiddenClock dom
      , HiddenEnable dom
      , HasCallStack

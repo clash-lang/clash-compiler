@@ -42,7 +42,7 @@ import Clash.Signal.Internal (Clock (..), Signal (..), Enable, fromEnable)
 import Clash.Signal.Internal.Ambiguous (clockPeriod)
 import Clash.Sized.Unsigned  (Unsigned)
 import Clash.XException
-  (defaultSeqX, errorX, fromJustX, maybeIsX, NFDataX)
+  (defaultSeqX, deepErrorX, fromJustX, maybeIsX, NFDataX)
 
 -- | Create a RAM with space for 2^@n@ elements
 --
@@ -89,6 +89,7 @@ asyncRamPow2 = \wclk rclk en rd wrM -> withFrozenCallStack
 -- RAM.
 asyncRam
   :: ( Enum addr
+     , NFDataX addr
      , HasCallStack
      , KnownDomain wdom
      , KnownDomain rdom
@@ -145,7 +146,7 @@ asyncRam# !_ !_ en sz rd we wr din = dout
   where
     ramI = Seq.replicate
               szI
-              (withFrozenCallStack (errorX "asyncRam#: initial value undefined"))
+              (withFrozenCallStack (deepErrorX "asyncRam#: initial value undefined"))
     en0 = fromEnable (andEnable en we)
     dout = if rPeriod == wPeriod
            then goSingle ramI rd en0 wr din
@@ -200,7 +201,7 @@ asyncRam# !_ !_ en sz rd we wr din = dout
         Seq.index s i
       else
         withFrozenCallStack
-          (errorX ("asyncRam: read address " ++ show i ++
+          (deepErrorX ("asyncRam: read address " ++ show i ++
                    " not in range [0.." ++ show szI ++ ")"))
     {-# INLINE safeAt #-}
 
@@ -210,7 +211,7 @@ asyncRam# !_ !_ en sz rd we wr din = dout
         Seq.update i a s
       else
         let d = withFrozenCallStack
-                  (errorX ("asyncRam: write address " ++ show i ++
+                  (deepErrorX ("asyncRam: write address " ++ show i ++
                            " not in range [0.." ++ show szI ++ ")"))
         in d <$ s
     {-# INLINE safeUpdate #-}
