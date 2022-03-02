@@ -49,9 +49,8 @@ jobs:
         uses: actions/cache@v2
         with:
           path: |
-            ${{ steps.setup-haskell.outputs.stack-root }}
-            .stack-work/
-          key: ${{ matrix.os }}-${{ matrix.ghc }}-${{ hashFiles('stack.yaml', '**/*.cabal') }}
+            ${{ steps.setup-haskell.outputs.stack-root }}/snapshots
+          key: ${{ matrix.os }}-${{ matrix.ghc }}-${{ hashFiles('stack.yaml', '**/*.cabal', '.github/workflows/ci.yml') }}
           restore-keys: ${{ matrix.os }}-${{ matrix.ghc }}-
 
       # https://gitlab.haskell.org/haskell/ghcup-hs/-/issues/188
