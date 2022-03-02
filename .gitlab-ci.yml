@@ -12,6 +12,11 @@ variables:
   # Hackage.
   GHC_VERSION: 8.10.7
 
+  # https://docs.gitlab.com/runner/executors/custom.html#system-failure
+  GET_SOURCES_ATTEMPTS: 5
+  RESTORE_CACHE_ATTEMPTS: 5
+  ARTIFACT_DOWNLOAD_ATTEMPTS: 5
+
 stages:
   - pre
   - test
