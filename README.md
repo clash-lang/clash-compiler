@@ -74,7 +74,7 @@ Note that release branches might contain non-released patches.
 † GHC 9.2 contains a regression, rendering Clash error messages indecipherable. This change will be reverted in 9.4.
 
 ## Cabal
-To use Cabal you need both Cabal and GHC installed on your system. For Linux and MacOS users we recommend using [ghcup](https://www.haskell.org/ghcup/). Windows users are recommended to use the [Haskell Platform](https://www.haskell.org/platform/windows.html).
+To use Cabal you need both Cabal and GHC installed on your system. We recommend using [ghcup](https://www.haskell.org/ghcup/). For more information, see [https://www.haskell.org/downloads/](https://www.haskell.org/downloads/).
 
 To run `clash` use:
 
