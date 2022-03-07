@@ -62,8 +62,19 @@ git checkout 1.2
 
 Note that release branches might contain non-released patches.
 
+## GHC compatability
+|      | Linux | Windows | macOS |
+|------|-------|---------|-------|
+| 8.6  | ✔️     | ✔️      | ✔️     |
+| 8.8  | ✔️     | ❌      | ✔️     |
+| 8.10 | ✔️     | ✔️      | ❌     |
+| 9.0  | ✔️     | ✔️      | ✔️     |
+| 9.2† | ❌     | ❌      | ❌     |
+
+† GHC 9.2 contains a regression, rendering Clash error messages indecipherable. This change will be reverted in 9.4.
+
 ## Cabal
-To use Cabal you need both Cabal and GHC installed on your system. For Linux and MacOS users we recommend using [ghcup](https://www.haskell.org/ghcup/). Windows users are recommended to use the [Haskell Platform](https://www.haskell.org/platform/windows.html).
+To use Cabal you need both Cabal and GHC installed on your system. We recommend using [ghcup](https://www.haskell.org/ghcup/). For more information, see [https://www.haskell.org/downloads/](https://www.haskell.org/downloads/).
 
 To run `clash` use:
 
@@ -96,7 +107,7 @@ nix-shell
 * [Clash Protocols](https://gitlab.com/clash-lang/clash-protocols): experimental library for writing Clash circuits with bidirectional communication - such as AXI or Avalon.
 * [Clash Starters](https://github.com/clash-lang/clash-starters): starter projects to quickly get you up and running.
 * [Clash WaveDrom](https://github.com/expipiplus1/clash-wavedrom): generate wave diagrams from Clash using [WaveDrom](https://wavedrom.com/)
- 
+
 # Projects built with Clash
 
 * [Contranomy](https://github.com/christiaanb/contranomy): a RISCV implementation verified using the [RISC-V Formal Verification Framework](https://github.com/SymbioticEDA/riscv-formal).

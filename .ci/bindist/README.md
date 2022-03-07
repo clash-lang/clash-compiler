@@ -49,14 +49,18 @@ triggered on any other branch a _beta_ release gets made.
    their releases.
      * [Preview on Hackage](http://hackage.haskell.org/package/clash-prelude/candidates/)
      * [Preview on Snap](https://snapcraft.io/clash)
-6. Create a release on [GitHub's new release page](https://github.com/clash-lang/clash-compiler/releases/new)
-7. Update these docs if anything is missing :-)
-8. Enjoy!
+6. Update the [starter projects](https://github.com/clash-lang/stack-templates/)
+7. Write release notes for: Twitter, LinkedIn, and clash-lang.org.
+8. Create a release on [GitHub's new release page](https://github.com/clash-lang/clash-compiler/releases/new)
+9. Update these docs if anything is missing :-)
+10. Enjoy!
 
 ## Releasing a new version minor version (1.x.x)
 1. Change version numbers in:
   * `clash-prelude/clash-prelude.cabal`
+  * `clash-prelude-hedgehog/clash-prelude-hedgehog.cabal`
   * `clash-lib/clash-lib.cabal`
+  * `clash-lib-hedgehog/clash-lib-hedgehog.cabal`
   * `clash-ghc/clash-ghc.cabal`
   * `clash-ghc/clash-cores.cabal`
   * `.ci/bindist/linux/snap/snap/snapcraft.yaml`
