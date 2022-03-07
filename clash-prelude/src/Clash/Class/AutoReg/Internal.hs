@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2019     , Google Inc.,
                      2021     , QBayLogic B.V.
-                     2021     , Myrtle.ai
+                     2021-2022, Myrtle.ai
   License     :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -389,6 +389,7 @@ constraintsWantedFor clsNm [ty] = case ty of
       [VarT _] -> False  -- gets copied by "filter isOk" above
       [ConT _] -> False  -- we can just drop constraints like: "AutoReg Bool => ..."
       [LitT _] -> False  -- or "KnownNat 4 =>"
+      [TupleT 0] -> False  -- handle Unit ()
       [_] -> error ( "Error while deriveAutoReg: don't know how to handle: "
                   ++ pprint cls ++ " (" ++ pprint tys ++ ")" )
       _ -> False  -- see [NOTE: MultiParamTypeClasses]
