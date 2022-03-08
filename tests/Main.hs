@@ -409,6 +409,12 @@ runClashTest = defaultMain $ clashTestRoot
           , buildTargets=BuildSpecific ["testEnableTB", "testBoolTB"]
           }
         , outputTest "LITrendering" def{hdlTargets=[Verilog]}
+        , runTest "T2117" def{
+            clashFlags=["-fclash-aggressive-x-optimization-blackboxes"]
+          , hdlTargets=[VHDL]
+          , buildTargets=BuildSpecific [ "testBenchUndefBV"
+                                       , "testBenchUndefTup"
+                                       , "testBenchPartialDefTup"]}
         ]
       , clashTestGroup "BoxedFunctions"
         [ runTest "DeadRecursiveBoxed" def{hdlSim=False}

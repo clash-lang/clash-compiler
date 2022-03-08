@@ -474,10 +474,8 @@ renderElem b (IF c t f) = do
                       _            -> 0
 
       (IsUndefined n) ->
-        let (e, _, _) = bbInputs b !! n in
-        case (xOpt, e) of
-          (True, BlackBoxE _ _ _ _ (N.BBTemplate [Err _]) _ _) -> 1
-          _ -> 0
+        let (e, _, _) = bbInputs b !! n
+        in if xOpt && checkUndefined e then 1 else 0
 
       (IsActiveEnable n) ->
         let (e, ty, _) = bbInputs b !! n in
@@ -1147,3 +1145,16 @@ onBlackBox
   -> r
 onBlackBox f _ (N.BBTemplate t) = f t
 onBlackBox _ g (N.BBFunction n h t) = g n h t
+
+-- | Is the value of the 'Expr' fully undefined?
+checkUndefined :: Expr -> Bool
+checkUndefined = \case
+  BlackBoxE _ _ _ _ (N.BBTemplate [Err _]) _ _ -> True
+  BlackBoxE "Clash.Sized.Internal.BitVector.fromInteger#" [] [] [] _ bbCtx _
+    | [sz, mask, _val] <- bbInputs bbCtx
+    , (Literal _ (NumLit sz0), _, True) <- sz
+    , (Literal _ (NumLit mask0), _, True) <- mask
+    , mask0 == 2^sz0 - 1
+    -> True
+  DataCon (Product _ _ _) _ es -> and (map checkUndefined es)
+  _ -> False

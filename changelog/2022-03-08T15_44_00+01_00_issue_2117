@@ -1,0 +1,1 @@
+FIXED: Handle `~ISUNDEFINED` hole in black boxes for `BitVector` and for product types. This means that with `-fclash-aggressive-x-optimization-blackboxes`, resets are now omitted for _undefined_ reset values of such types as well. [#2117](https://github.com/clash-lang/clash-compiler/issues/2117)
