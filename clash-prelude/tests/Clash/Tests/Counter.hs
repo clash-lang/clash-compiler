@@ -16,7 +16,7 @@ import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
 import           Test.Tasty
-import qualified Test.Tasty.Hedgehog as H
+import qualified Test.Tasty.Hedgehog.Extra as H
 import           Test.Tasty.HUnit
 
 genUnsigned :: SNat n -> H.Gen (Unsigned n)
@@ -86,12 +86,12 @@ quadTest proxy = testGroup (show (typeRep proxy))
 
 tests :: TestTree
 tests = testGroup "All"
-  [ H.testProperty "packSuccTest @2 @2"    (packSuccTest2 @2   @2 Proxy Proxy)
-  , H.testProperty "packSuccTest @3 @2"    (packSuccTest2 @3   @2 Proxy Proxy)
-  , H.testProperty "packSuccTest2 @129 @5" (packSuccTest2 @129 @5 Proxy Proxy)
-  , H.testProperty "packPredTest @2 @2"    (packPredTest2 @2   @2 Proxy Proxy)
-  , H.testProperty "packPredTest @3 @2"    (packPredTest2 @3   @2 Proxy Proxy)
-  , H.testProperty "packPredTest2 @129 @5" (packPredTest2 @129 @5 Proxy Proxy)
+  [ H.testPropertyXXX "packSuccTest @2 @2"    (packSuccTest2 @2   @2 Proxy Proxy)
+  , H.testPropertyXXX "packSuccTest @3 @2"    (packSuccTest2 @3   @2 Proxy Proxy)
+  , H.testPropertyXXX "packSuccTest2 @129 @5" (packSuccTest2 @129 @5 Proxy Proxy)
+  , H.testPropertyXXX "packPredTest @2 @2"    (packPredTest2 @2   @2 Proxy Proxy)
+  , H.testPropertyXXX "packPredTest @3 @2"    (packPredTest2 @3   @2 Proxy Proxy)
+  , H.testPropertyXXX "packPredTest2 @129 @5" (packPredTest2 @129 @5 Proxy Proxy)
 
   , quadTest (Proxy @(Signed 5))
   , quadTest (Proxy @(Signed 5, Signed 5))

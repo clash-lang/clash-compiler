@@ -10,7 +10,7 @@ import Data.Bits (isSigned)
 import Data.Proxy (Proxy(..))
 
 import Test.Tasty
-import Test.Tasty.Hedgehog
+import Test.Tasty.Hedgehog.Extra
 
 import Clash.Class.Num
 import Clash.Sized.Fixed (Fixed(..), FracFixedC, NumFixedC, SFixed, UFixed)
@@ -123,8 +123,8 @@ saturatingNumLaws
   => Gen a
   -> [TestTree]
 saturatingNumLaws genA =
-  [ testProperty "satSucc" $ satSuccProperty genA
-  , testProperty "satPred" $ satPredProperty genA
+  [ testPropertyXXX "satSucc" $ satSuccProperty genA
+  , testPropertyXXX "satPred" $ satPredProperty genA
   ]
 
 testSaturationLaws
@@ -462,12 +462,12 @@ enumProperties
   => Proxy f
   -> [TestTree]
 enumProperties pf =
-  [ testProperty "pred" $ predProperty pf
-  , testProperty "succ" $ succProperty pf
-  , testProperty "enumFrom" $ enumFromProperty pf
-  , testProperty "enumFromThen" $ enumFromThenProperty pf
-  , testProperty "enumFromTo" $ enumFromToProperty pf
-  , testProperty "enumFromThenTo" $ enumFromThenToProperty pf
+  [ testPropertyXXX "pred" $ predProperty pf
+  , testPropertyXXX "succ" $ succProperty pf
+  , testPropertyXXX "enumFrom" $ enumFromProperty pf
+  , testPropertyXXX "enumFromThen" $ enumFromThenProperty pf
+  , testPropertyXXX "enumFromTo" $ enumFromToProperty pf
+  , testPropertyXXX "enumFromThenTo" $ enumFromThenToProperty pf
   ]
 
 testEnumProperties

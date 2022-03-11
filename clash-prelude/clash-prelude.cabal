@@ -393,11 +393,11 @@ test-suite unittests
       base,
       bytestring,
       deepseq,
-      hedgehog      >= 1.0.3    && < 1.1,
+      hedgehog      >= 1.0.3    && < 1.2,
       hint          >= 0.7      && < 0.10,
       quickcheck-classes-base >= 0.6 && < 1.0,
       tasty         >= 1.2      && < 1.5,
-      tasty-hedgehog,
+      tasty-hedgehog >= 1.2.0,
       tasty-hunit,
       tasty-th,
       tasty-quickcheck,
@@ -433,6 +433,7 @@ test-suite unittests
                  Hedgehog.Extra
 
                  Test.Tasty.HUnit.Extra
+                 Test.Tasty.Hedgehog.Extra
                  Test.QuickCheck.Extra
 
 benchmark benchmark-clash-prelude
