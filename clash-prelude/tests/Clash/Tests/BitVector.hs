@@ -19,7 +19,7 @@ import GHC.TypeNats (KnownNat, SomeNat (..), natVal, someNatVal)
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import qualified Test.Tasty.Hedgehog as H
+import qualified Test.Tasty.Hedgehog.Extra as H
 import qualified Test.Tasty.QuickCheck as Q
 
 import Clash.Prelude
@@ -97,13 +97,13 @@ tests = localOption (Q.QuickCheckMaxRatio 2) $ testGroup "All"
     , testCase "minBound :: BitVector 0" $ minBound @(BitVector 0) @?= 0
     ]
   , testGroup "MSB"
-    [ H.testProperty "msb @(BitVector 1)" (msbTest @1)
-    , H.testProperty "msb @(BitVector 2)" (msbTest @2)
-    , H.testProperty "msb @(BitVector 3)" (msbTest @3)
-    , H.testProperty "msb @(BitVector 37)" (msbTest @37)
-    , H.testProperty "msb @(BitVector 64)" (msbTest @64)
-    , H.testProperty "msb @(BitVector 128)" (msbTest @128)
-    , H.testProperty "msb @(BitVector 129)" (msbTest @129)
+    [ H.testPropertyXXX "msb @(BitVector 1)" (msbTest @1)
+    , H.testPropertyXXX "msb @(BitVector 2)" (msbTest @2)
+    , H.testPropertyXXX "msb @(BitVector 3)" (msbTest @3)
+    , H.testPropertyXXX "msb @(BitVector 37)" (msbTest @37)
+    , H.testPropertyXXX "msb @(BitVector 64)" (msbTest @64)
+    , H.testPropertyXXX "msb @(BitVector 128)" (msbTest @128)
+    , H.testPropertyXXX "msb @(BitVector 129)" (msbTest @129)
     ]
   , testGroup "show"
     [ testCase "show0"  $ show @(BitVector 0) 0b0 @?= "0"

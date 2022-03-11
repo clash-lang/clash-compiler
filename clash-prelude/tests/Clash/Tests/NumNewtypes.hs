@@ -15,7 +15,7 @@ import qualified Hedgehog.Range as Range
 import Hedgehog.Extra
 import Hedgehog.Internal.Exception (tryEvaluate)
 import Test.Tasty
-import Test.Tasty.Hedgehog
+import Test.Tasty.Hedgehog.Extra
 
 import Clash.Class.Num
 import Clash.Num.Erroring
@@ -64,17 +64,17 @@ testIntegral
   -> TestTree
 testIntegral name mode gen =
   testGroup name
-    [ testProperty "Addition" $ checkIntegral2 mode gen (+)
-    , testProperty "Subtraction" $ checkIntegral2 mode gen (-)
-    , testProperty "Multiplication" $ checkIntegral2 mode gen (*)
-    , testProperty "Negation" $ checkIntegral mode gen negate
-    , testProperty "Absolute" $ checkIntegral mode gen abs
-    , testProperty "Successor" $ checkIntegral mode gen succ
-    , testProperty "Predecessor" $ checkIntegral mode gen pred
-    , testProperty "Division" $ checkIntegral2 mode gen div
-    , testProperty "Modulo" $ checkIntegral2 mode gen mod
-    , testProperty "Quotient" $ checkIntegral2 mode gen quot
-    , testProperty "Remainder" $ checkIntegral2 mode gen rem
+    [ testPropertyXXX "Addition" $ checkIntegral2 mode gen (+)
+    , testPropertyXXX "Subtraction" $ checkIntegral2 mode gen (-)
+    , testPropertyXXX "Multiplication" $ checkIntegral2 mode gen (*)
+    , testPropertyXXX "Negation" $ checkIntegral mode gen negate
+    , testPropertyXXX "Absolute" $ checkIntegral mode gen abs
+    , testPropertyXXX "Successor" $ checkIntegral mode gen succ
+    , testPropertyXXX "Predecessor" $ checkIntegral mode gen pred
+    , testPropertyXXX "Division" $ checkIntegral2 mode gen div
+    , testPropertyXXX "Modulo" $ checkIntegral2 mode gen mod
+    , testPropertyXXX "Quotient" $ checkIntegral2 mode gen quot
+    , testPropertyXXX "Remainder" $ checkIntegral2 mode gen rem
     ]
 
 data Mode :: (Type -> Type) -> Type where

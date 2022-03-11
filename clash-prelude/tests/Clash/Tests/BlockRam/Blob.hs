@@ -8,7 +8,7 @@ import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 import Numeric.Natural
 import Test.Tasty
-import Test.Tasty.Hedgehog
+import Test.Tasty.Hedgehog.Extra
 
 import Clash.Explicit.BlockRam.Internal (packAsNats, unpackNats)
 
@@ -32,5 +32,5 @@ roundTripProperty = property $ do
 tests :: TestTree
 tests = testGroup "BlockRam"
   [ testGroup "Blob"
-    [ testProperty "Round trip" roundTripProperty ]
+    [ testPropertyXXX "Round trip" roundTripProperty ]
   ]
