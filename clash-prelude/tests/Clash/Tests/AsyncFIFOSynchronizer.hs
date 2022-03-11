@@ -14,7 +14,7 @@ import Hedgehog as H
 import qualified Hedgehog.Range as Range
 import qualified Hedgehog.Gen as Gen
 import Test.Tasty
-import Test.Tasty.Hedgehog
+import Test.Tasty.Hedgehog.Extra
 import Test.Tasty.HUnit
 
 import Clash.Explicit.Prelude
@@ -1149,5 +1149,5 @@ tests = testGroup "asyncFIFOSynchronizer"
   , testCase "Test 5.7 Write" test5W7
   , testCase "Test 6.7 Read" test6R7
   , testCase "Test 6.7 Write" test6W7
-  , testProperty "Functional test" $ forAllNamedTestProperties fifoFunctionalTestCombinations
+  , testPropertyXXX "Functional test" $ forAllNamedTestProperties fifoFunctionalTestCombinations
   ]

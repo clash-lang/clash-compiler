@@ -7,7 +7,7 @@
 module Clash.Tests.Laws.SaturatingNum (tests) where
 
 import Test.Tasty
-import Test.Tasty.Hedgehog
+import Test.Tasty.Hedgehog.Extra
 import Test.Tasty.HUnit
 import Test.Tasty.HUnit.Extra
 
@@ -111,9 +111,9 @@ saturatingNumLaws testEnum genA =
     ]
   else
     []) <>
-  [ testProperty "satAddTotal" (isTotal satAdd genA)
-  , testProperty "satSubTotal" (isTotal satSub genA)
-  , testProperty "satMulTotal" (isTotal satMul genA)
+  [ testPropertyXXX "satAddTotal" (isTotal satAdd genA)
+  , testPropertyXXX "satSubTotal" (isTotal satSub genA)
+  , testPropertyXXX "satMulTotal" (isTotal satMul genA)
   ]
 
 testSaturationLaws ::
