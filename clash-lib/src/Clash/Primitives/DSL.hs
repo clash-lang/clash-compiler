@@ -805,10 +805,18 @@ andExpr
   -- ^ a
   -> State (BlockState backend) TExpr
   -- ^ a && b
-andExpr _ T bExpr = pure bExpr
-andExpr _ F _     = pure F
-andExpr _ aExpr T = pure aExpr
-andExpr _ _ F     = pure F
+andExpr _ (TExpr aTy _) (TExpr bTy _)
+  | aTy /= bTy
+  = error $ "andExpr: Expected both argument to be of the same type but got: \"" <>
+      show aTy <> "\" and \"" <> show bTy <> "\""
+andExpr _ T    bExpr = pure bExpr
+andExpr _ High bExpr = pure bExpr
+andExpr _ F    _     = pure F
+andExpr _ Low  _     = pure Low
+andExpr _ aExpr T    = pure aExpr
+andExpr _ aExpr High = pure aExpr
+andExpr _ _     F    = pure F
+andExpr _ _     Low  = pure Low
 andExpr nm a b = do
   aIdent <- Id.toText <$> toIdentifier' (nm <> "_a") a
   bIdent <- Id.toText <$> toIdentifier' (nm <> "_b") b
@@ -822,7 +830,7 @@ andExpr nm a b = do
       VHDL          -> aIdent <> " and " <> bIdent
       Verilog       -> aIdent <> " && " <> bIdent
       SystemVerilog -> aIdent <> " && " <> bIdent
-  assign nm $ TExpr Bool (Identifier (Id.unsafeMake andTxt) Nothing)
+  assign nm $ TExpr (ety a) (Identifier (Id.unsafeMake andTxt) Nothing)
 
 -- | Negate @(not)@ an expression, assigning it to a new identifier.
 notExpr
