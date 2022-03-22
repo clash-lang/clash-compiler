@@ -1,5 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
-
 module T2046B where
 
 import Clash.Prelude
