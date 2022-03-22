@@ -9,3 +9,12 @@ type T2046B =
   , (BitVector 1, BitVector 2)
   , Bit
   )
+
+type T2046C =
+  ( (Int, Int)
+  , (Int, Int)
+  , (Int, Int)
+  , (Int, Int)
+  , Int
+  )
+
