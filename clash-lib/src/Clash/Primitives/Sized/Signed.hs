@@ -23,10 +23,11 @@ fromIntegerTF = TemplateFunction used valid fromIntegerTFTemplate
  where
   used = [0,1]
   valid bbCtx = case bbInputs bbCtx of
-    [kn,_] -> case kn of
-      (Literal _ (NumLit _),_,True) -> True
-      _ -> False
-    _ -> False
+    [(Literal _ (NumLit _),_,True),v] -> case v of
+      (Identifier {}, Signed {}, False) -> True
+      (Literal {}, _, True) -> True
+      _ -> error (show (bbInputs bbCtx))
+    _ -> error (show (bbInputs bbCtx))
 
 fromIntegerTFTemplate
   :: Backend s
