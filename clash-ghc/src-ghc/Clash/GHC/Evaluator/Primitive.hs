@@ -1925,7 +1925,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
 -- Enum
   "Clash.Sized.Internal.BitVector.toEnum##"
-    | [i] <- intLiterals' args
+    | [i] <- intCLiterals' args
     -> let Bit msk val = BitVector.toEnum## (fromInteger i)
        in reduce (mkBitLit ty (toInteger msk) (toInteger val))
 
@@ -2140,7 +2140,8 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   "Clash.Sized.Internal.BitVector.fromEnum#"
     | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftBitVector2Int (toInteger . BitVector.fromEnum#) args)
+    , let resTy = getResultTy tcm ty tys
+    , Just val <- reifyNat kn (liftBitVector2CInt tcm resTy (toInteger . BitVector.fromEnum#) args)
     -> reduce val
 
 -- Bounded
@@ -2317,13 +2318,14 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
 -- Enum
   "Clash.Sized.Internal.Index.toEnum#"
-    | [i] <- intLiterals' args
+    | [i] <- intCLiterals' args
     , Just (nTy, mb) <- extractKnownNat tcm tys
     -> reduce (mkIndexLit ty nTy mb i)
 
   "Clash.Sized.Internal.Index.fromEnum#"
     | [i] <- indexLiterals' args
-    -> reduce (integerToIntLiteral i)
+    -> let resTy = getResultTy tcm ty tys
+        in reduce (mkIntCLit tcm i resTy)
 
 -- Bounded
   "Clash.Sized.Internal.Index.maxBound#"
@@ -2433,13 +2435,14 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
 -- Enum
   "Clash.Sized.Internal.Signed.toEnum#"
-    | [i] <- intLiterals' args
+    | [i] <- intCLiterals' args
     , Just (litTy, mb) <- extractKnownNat tcm tys
     -> reduce (mkSignedLit ty litTy mb i)
 
   "Clash.Sized.Internal.Signed.fromEnum#"
     | [i] <- signedLiterals' args
-    -> reduce (integerToIntLiteral i)
+    -> let resTy = getResultTy tcm ty tys
+        in reduce (mkIntCLit tcm i resTy)
 
 -- Bounded
   "Clash.Sized.Internal.Signed.minBound#"
@@ -2650,13 +2653,14 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
 -- Enum
   "Clash.Sized.Internal.Unsigned.toEnum#"
-    | [i] <- intLiterals' args
+    | [i] <- intCLiterals' args
     , Just (litTy, mb) <- extractKnownNat tcm tys
     -> reduce (mkUnsignedLit ty litTy mb i)
 
   "Clash.Sized.Internal.Unsigned.fromEnum#"
     | [i] <- unsignedLiterals' args
-    -> reduce (integerToIntLiteral i)
+    -> let resTy = getResultTy tcm ty tys
+        in reduce (mkIntCLit tcm i resTy)
 
 -- Bounded
   "Clash.Sized.Internal.Unsigned.minBound#"
@@ -4047,6 +4051,9 @@ intLiterals = pairOf intLiteral
 intLiterals' :: [Value] -> [Integer]
 intLiterals' = listOf intLiteral
 
+intCLiterals' :: [Value] -> [Integer]
+intCLiterals' = listOf intCLiteral
+
 intLiteral :: Value -> Maybe Integer
 intLiteral x = case x of
   Lit (IntLiteral i) -> Just i
@@ -4181,6 +4188,14 @@ bitVectorLitIntLit tcm tys args
   = Just (nTy,kn,(m,i),j)
   | otherwise
   = Nothing
+
+mkIntCLit :: TyConMap -> Integer -> Type -> Term
+mkIntCLit tcm lit resTy =
+  App (Data intDc) (Literal (IntLiteral lit))
+ where
+  (_, tyView -> TyConApp intTcNm []) = splitFunForallTy resTy
+  Just intTc = lookupUniqMap intTcNm tcm
+  [intDc] = tyConDataCons intTc
 
 mkFloatCLit :: TyConMap -> Word32 -> Type -> Term
 mkFloatCLit tcm lit resTy =
@@ -4468,22 +4483,24 @@ liftInteger2BitVector
   -> [Value]
   -> (Proxy n -> Maybe Term)
 liftInteger2BitVector f resTyInfo args _p
-  | [i] <- intLiterals' args
+  | [i] <- intCLiterals' args
   = let BV msk val = f i
      in Just (mkBitVectorLit' resTyInfo (toInteger msk) (toInteger val))
 
   | otherwise
   = Nothing
 
-liftBitVector2Int
+liftBitVector2CInt
   :: KnownNat n
-  => (BitVector n -> Integer)
+  => TyConMap
+  -> Type
+  -> (BitVector n -> Integer)
   -> [Value]
   -> (Proxy n -> Maybe Term)
-liftBitVector2Int f args _p
+liftBitVector2CInt tcm resTy f args _p
   | [i] <- bitVectorLiterals' args
   = let val = f (toBV i)
-     in Just $ integerToIntLiteral val
+     in Just $ mkIntCLit tcm val resTy
   | otherwise
   = Nothing
 

@@ -567,6 +567,7 @@ runClashTest = defaultMain $ clashTestRoot
             , buildTargets=BuildSpecific["top_bit", "top_bitvector", "top_index", "top_signed", "top_unsigned"]
             }
         , runTest "T2046B" def{clashFlags=["-Werror"]}
+        , runTest "T2046C" def{hdlSim=False,clashFlags=["-Werror"],buildTargets=BuildSpecific["topEntity"]}
         , runTest "T2097" def{hdlSim=False}
         ] <>
         if compiledWith == Cabal then
