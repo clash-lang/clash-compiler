@@ -1,5 +1,5 @@
 {-|
-Copyright   : (C) 2021, QBayLogic B.V.
+Copyright   : (C) 2021-2022, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -33,6 +33,9 @@ genNonEmptyRTree = genRTree
 
 data SomeRTree atLeast a where
   SomeRTree :: SNat n -> RTree (atLeast + n) a -> SomeRTree atLeast a
+
+instance (KnownNat atLeast, Show a) => Show (SomeRTree atLeast a) where
+  show (SomeRTree SNat x) = show x
 
 genSomeRTree
   :: (MonadGen m, KnownNat atLeast)
