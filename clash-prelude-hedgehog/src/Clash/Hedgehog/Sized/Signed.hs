@@ -29,8 +29,8 @@ genSigned :: (MonadGen m, KnownNat n) => Range (Signed n) -> m (Signed n)
 genSigned range =
   Gen.frequency
     [ (60, Gen.integral range)
-    , (20, Gen.constant minBound)
-    , (20, Gen.constant maxBound)
+    , (20, Gen.constant (Range.lowerBound 99 range))
+    , (20, Gen.constant (Range.upperBound 99 range))
     ]
 
 data SomeSigned atLeast where
