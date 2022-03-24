@@ -31,6 +31,7 @@ import           Data.Maybe                     (isJust)
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
 import           Data.Text                      (Text)
+import qualified Data.Text as Text              (dropAround)
 
 #if MIN_VERSION_prettyprinter(1,7,0)
 import           Prettyprinter
@@ -548,7 +549,7 @@ pprSDC = vcat . fmap go . sdcClock
   go (i, dom) =
         -- VDomainConfiguration stores period in ps, SDC expects it in ns.
     let p        = MkFixed (toInteger $ vPeriod dom) :: Fixed E3
-        name     = braces (pretty i)
+        name     = braces (pretty (Text.dropAround (== '\\') i))
         period   = viaShow p
         waveform = braces ("0.000" <+> viaShow (p / 2))
         targets  = brackets ("get_ports" <+> name)
