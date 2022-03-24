@@ -1,5 +1,5 @@
 {-|
-Copyright   : (C) 2021, QBayLogic B.V.
+Copyright   : (C) 2021-2022, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -42,6 +42,9 @@ genNonEmptyVec = genVec
 
 data SomeVec atLeast a where
   SomeVec :: SNat n -> Vec (atLeast + n) a -> SomeVec atLeast a
+
+instance (KnownNat atLeast, Show a) => Show (SomeVec atLeast a) where
+  show (SomeVec SNat xs) = show xs
 
 genSomeVec
   :: (MonadGen m, KnownNat atLeast)

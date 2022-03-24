@@ -1,5 +1,5 @@
 {-|
-Copyright   : (C) 2021, QBayLogic B.V.
+Copyright   : (C) 2021-2022, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -68,6 +68,9 @@ genBitVector =
 
 data SomeBitVector atLeast where
   SomeBitVector :: SNat n -> BitVector (atLeast + n) -> SomeBitVector atLeast
+
+instance KnownNat atLeast => Show (SomeBitVector atLeast) where
+  show (SomeBitVector SNat bv) = show bv
 
 genSomeBitVector
   :: forall m atLeast
