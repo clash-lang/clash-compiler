@@ -29,7 +29,7 @@ library
 executable clash-benchmark-normalization
   main-is:             benchmark-normalization.hs
   default-language:    Haskell2010
-  ghc-options:         -O2 -Wall -Wcompat -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:         -O2 -Wall -Wcompat -threaded -rtsopts "-with-rtsopts=-N -A128m"
   build-depends:       base,
                        concurrent-supply,
                        containers,
@@ -48,7 +48,7 @@ executable clash-benchmark-normalization
 executable clash-benchmark-concurrency
   main-is:             benchmark-concurrency.hs
   default-language:    Haskell2010
-  ghc-options:         -O2 -Wall -Wcompat -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:         -O2 -Wall -Wcompat -threaded -rtsopts "-with-rtsopts=-N -A128m"
   build-depends:       base,
                        criterion,
                        time,
