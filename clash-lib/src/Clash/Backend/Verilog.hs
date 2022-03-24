@@ -84,6 +84,7 @@ data VerilogState =
   VerilogState
     { _genDepth  :: Int -- ^ Depth of current generative block
     , _idSeen    :: IdentifierSet
+    , _topNm     :: Identifier
     , _srcSpan   :: SrcSpan
     , _includes  :: [(String,Doc)]
     , _imports   :: HashSet Text.Text
@@ -111,6 +112,7 @@ instance Backend VerilogState where
   initBackend opts = VerilogState
     { _genDepth=0
     , _idSeen=Id.emptyIdentifierSet (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) Verilog
+    , _topNm=Id.unsafeMake ""
     , _srcSpan=noSrcSpan
     , _includes=[]
     , _imports=HashSet.empty
@@ -163,6 +165,8 @@ instance Backend VerilogState where
     _ -> string e
   hdlSyn          = use hdlsyn
   setModName _    = id
+  setTopName nm s = s {_topNm = nm}
+  getTopName      = use topNm
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
   blockDecl _ ds  = do

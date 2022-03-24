@@ -383,6 +383,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
       modNameT  = Data.Text.pack modNameS
       hdlState' = setDomainConfigurations domainConfs
                 $ setModName modNameT
+                $ setTopName topNm
                 $ fromMaybe (initBackend @backend opts) hdlState
       hdlDir    = fromMaybe (Clash.Backend.name hdlState') (opt_hdlDir opts) </> topEntityS
       manPath   = hdlDir </> manifestFilename

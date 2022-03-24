@@ -302,9 +302,13 @@ renderBlackBox libs imps includes bb bbCtx = do
                                   return (const t'))
                                inc
       iw <- iwWidth
+      topNm <- getTopName
       let incHash = hash (incForHash 0)
           nm'     = Text.concat
-                      [ Text.fromStrict nm
+                      [ Text.fromStrict (Id.toText topNm)
+                      , "_"
+                      , Text.fromStrict nm
+                      , "_"
                       , Text.pack (printf ("%0" ++ show (iw `div` 4) ++ "X") incHash)
                       ]
       pure nm'
