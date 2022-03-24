@@ -1129,7 +1129,7 @@ mkTopInput (ExpandedPortName hwty0 i0) = do
   return ([(i0, hwty1)], decls, expr, i1)
 
 mkTopInput epp@(ExpandedPortProduct p hwty ps) = do
-  pN <- Id.make p
+  pN <- Id.makeBasic p
   let netdecl = NetDecl Nothing pN hwty
   case hwty of
     Vector sz eHwty -> do
@@ -1272,7 +1272,7 @@ mkTopOutput (ExpandedPortName hwty0 i0) = do
     return ([(i0, hwty1)], [Assignment i0 bvExpr, NetDecl Nothing i1 hwty0], i1)
 
 mkTopOutput epp@(ExpandedPortProduct p hwty ps) = do
-  pN <- Id.make p
+  pN <- Id.makeBasic p
   let netdecl = NetDecl Nothing pN hwty
   case hwty of
     Vector {} -> do
@@ -1411,7 +1411,7 @@ mkTopInstInput (ExpandedPortName hwty0 pN) = do
           , pN' )
 
 mkTopInstInput epp@(ExpandedPortProduct pNameHint hwty0 ps) = do
-  pName <- Id.make pNameHint
+  pName <- Id.makeBasic pNameHint
 
   let
     pDecl = NetDecl Nothing pName hwty0
@@ -1508,7 +1508,7 @@ mkTopInstOutput (ExpandedPortName hwty0 portName) = do
           , assignName1 )
 
 mkTopInstOutput epp@(ExpandedPortProduct productNameHint hwty ps) = do
-  pName <- Id.make productNameHint
+  pName <- Id.makeBasic productNameHint
   let pDecl = NetDecl Nothing pName hwty
       (attrs, hwty') = stripAttributes hwty
   case hwty' of
@@ -1755,7 +1755,7 @@ expandTopEntityOrErr is ihwtys ohwty topM = do
         is not a product!
       |])
     Right eTop ->
-      evalState (traverse (either Id.addRaw Id.make) eTop) (Id.clearSet is)
+      evalState (traverse (either Id.addRaw Id.makeBasic) eTop) (Id.clearSet is)
 
 -- | Take a top entity and /expand/ its port names. I.e., make sure that every
 -- port that should be generated in the HDL is part of the data structure. It
