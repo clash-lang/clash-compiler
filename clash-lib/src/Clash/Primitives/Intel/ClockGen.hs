@@ -1,6 +1,6 @@
 {-|
-  Copyright   :  (C) 2018, Google Inc.,
-                     2021, QBayLogic B.V.
+  Copyright   :  (C) 2018     , Google Inc.,
+                     2021-2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -80,7 +80,7 @@ alteraPllTemplate bbCtx = do
  alteraPll <- Id.makeBasic "altera_pll_block"
  alteraPll_inst <- Id.makeBasic instname0
 
- clocks <- Id.nextN (length tys - 1) =<< Id.make "pllOut"
+ clocks <- Id.nextN (length tys) =<< Id.make "pllOut"
 
   -- TODO: unsafeMake is dubious here: I don't think we take names in
   -- TODO: bbQsysIncName into account when generating fresh ids
@@ -89,15 +89,15 @@ alteraPllTemplate bbCtx = do
  let outclkPorts = map (\n -> instPort ("outclk_" <> showt n)) [(0 :: Int)..length clocks-1]
 
  getAp $ blockDecl alteraPll $ concat
-  [[ NetDecl Nothing locked  rstTy
+  [[ NetDecl Nothing locked Bit
    , NetDecl' Nothing Reg pllLock (Right Bool) Nothing]
   ,[ NetDecl Nothing clkNm ty | (clkNm,ty) <- zip clocks tys]
   ,[ InstDecl Comp Nothing [] compName alteraPll_inst [] $ NamedPortMap $ concat
       [ [ (instPort "refclk", In, clkTy, clk)
         , (instPort "rst", In, rstTy, rst)]
       , [ (p, Out, ty, Identifier k Nothing) | (k, ty, p) <- zip3 clocks tys outclkPorts ]
-      , [(instPort "locked", Out, rstTy, Identifier locked Nothing)]]
-   , CondAssignment pllLock Bool (Identifier locked Nothing) rstTy
+      , [(instPort "locked", Out, Bit, Identifier locked Nothing)]]
+   , CondAssignment pllLock Bool (Identifier locked Nothing) Bit
       [(Just (BitLit H),Literal Nothing (BoolLit True))
       ,(Nothing        ,Literal Nothing (BoolLit False))]
    , Assignment result (DataCon resTy (DC (resTy,0)) $ concat
@@ -136,7 +136,7 @@ altpllTemplate bbCtx = do
       , (instPort "areset", In, rstTy, rst)
       , (instPort "c0", Out, clkOutTy, Identifier pllOut Nothing)
       , (instPort "locked", Out, Bit, Identifier locked Nothing)]
-  , CondAssignment pllLock Bool (Identifier locked Nothing) rstTy
+  , CondAssignment pllLock Bool (Identifier locked Nothing) Bit
       [(Just (BitLit H),Literal Nothing (BoolLit True))
       ,(Nothing        ,Literal Nothing (BoolLit False))]
   , Assignment result (DataCon resTy (DC (resTy,0))
