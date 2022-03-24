@@ -140,6 +140,10 @@ class HasIdentifierSet state => Backend state where
   hdlSyn           :: State state HdlSyn
   -- | setModName
   setModName       :: ModName -> state -> state
+  -- | Set the name of the current top entity
+  setTopName       :: Identifier -> state -> state
+  -- | Get the name of the current top entity
+  getTopName       :: State state Identifier
   -- | setSrcSpan
   setSrcSpan       :: SrcSpan -> State state ()
   -- | getSrcSpan

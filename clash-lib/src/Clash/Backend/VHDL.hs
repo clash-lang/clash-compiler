@@ -90,6 +90,7 @@ data VHDLState =
   -- ^ Cache for type names. Bool indicates whether this name includes length
   -- information in its first "part". See `tyName'` for more information.
   , _modNm     :: ModName
+  , _topNm     :: Identifier
   , _srcSpan   :: SrcSpan
   , _libraries :: [T.Text]
   , _packages  :: [T.Text]
@@ -126,6 +127,7 @@ instance Backend VHDLState where
     { _tyCache=mempty
     , _nameCache=mempty
     , _modNm=""
+    , _topNm=Id.unsafeMake ""
     , _srcSpan=noSrcSpan
     , _libraries=[]
     , _packages=[]
@@ -233,6 +235,8 @@ instance Backend VHDLState where
       qualTyName t <> "'" <> parens (pretty nm <> "_types.fromSLV" <> parens (pretty id_))
   hdlSyn          = use hdlsyn
   setModName nm s = s {_modNm = nm}
+  setTopName nm s = s {_topNm = nm}
+  getTopName      = use topNm
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
   blockDecl nm ds = do
