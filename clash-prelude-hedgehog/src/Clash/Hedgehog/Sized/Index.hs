@@ -1,5 +1,5 @@
 {-|
-Copyright   : (C) 2021, QBayLogic B.V.
+Copyright   : (C) 2021-2022, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -35,6 +35,9 @@ genIndex range =
 
 data SomeIndex atLeast where
   SomeIndex :: SNat n -> Index (atLeast + n) -> SomeIndex atLeast
+
+instance KnownNat atLeast => Show (SomeIndex atLeast) where
+  show (SomeIndex SNat ix) = show ix
 
 genSomeIndex
   :: (MonadGen m, KnownNat atLeast)

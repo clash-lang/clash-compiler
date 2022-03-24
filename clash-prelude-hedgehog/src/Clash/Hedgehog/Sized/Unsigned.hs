@@ -1,5 +1,5 @@
 {-|
-Copyright   : (C) 2021, QBayLogic B.V.
+Copyright   : (C) 2021-2022, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -35,6 +35,9 @@ genUnsigned range =
 
 data SomeUnsigned atLeast where
   SomeUnsigned :: SNat n -> Unsigned (atLeast + n) -> SomeUnsigned atLeast
+
+instance KnownNat atLeast => Show (SomeUnsigned atLeast) where
+  show (SomeUnsigned SNat x) = show x
 
 genSomeUnsigned
   :: (MonadGen m, KnownNat atLeast)
