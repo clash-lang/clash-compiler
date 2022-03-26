@@ -1,0 +1,6 @@
+@import "linuwial.css";
+
+/* Re-enable wordwrapping in (parts of) type signatures */
+#interface td.src {
+  white-space: normal !important;
+}
