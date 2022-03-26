@@ -31,6 +31,11 @@ package clash-prelude
   -- Don't pollute docs with 1024 SNat literals
   haddock-options: --optghc=-DHADDOCK_ONLY
 
+  -- Tweak haddock stylesheet to enable word wrapping of types.
+  -- We specify the default Linuwial theme as an alnernate
+  -- so we're able to import its css file from the custom theme.
+  haddock-options: --theme=doc/linuwial-wrap-types.css --theme=Linuwial
+
 package clash-testsuite
   flags: +cosim
 
