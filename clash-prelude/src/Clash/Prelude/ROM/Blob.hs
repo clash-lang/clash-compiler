@@ -57,7 +57,7 @@ import Clash.XException (deepErrorX)
 
 -- | An asynchronous/combinational ROM with space for @n@ elements
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and
 -- "Clash.Prelude.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.
@@ -76,7 +76,7 @@ asyncRomBlob = \content rd -> asyncRomBlob# content (fromEnum rd)
 
 -- | An asynchronous/combinational ROM with space for 2^@n@ elements
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and
 -- "Clash.Prelude.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.
@@ -93,7 +93,7 @@ asyncRomBlobPow2
 asyncRomBlobPow2 = asyncRomBlob
 {-# INLINE asyncRomBlobPow2 #-}
 
--- | asyncROM primitive
+-- | asyncRomBlob primitive
 asyncRomBlob#
   :: forall m n
    . MemBlob n m
@@ -126,7 +126,7 @@ asyncRomBlob# content@MemBlob{} = safeAt
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and
 -- "Clash.Explicit.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.
@@ -153,7 +153,7 @@ romBlob = hideEnable (hideClock E.romBlob)
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and
 -- "Clash.Explicit.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.

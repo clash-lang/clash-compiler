@@ -6,9 +6,9 @@ Copyright  :  (C) 2015-2016, University of Twente,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-= Initializing a BlockRAM with a data file #usingramfiles#
+= Initializing a block RAM with a data file #usingramfiles#
 
-BlockRAM primitives that can be initialized with a data file. The BNF grammar
+Block RAM primitives that can be initialized with a data file. The BNF grammar
 for this data file is simple:
 
 @
@@ -19,7 +19,7 @@ BIT  = '0'
 @
 
 Consecutive @LINE@s correspond to consecutive memory addresses starting at @0@.
-For example, a data file @memory.bin@ containing the 9-bit unsigned number
+For example, a data file @memory.bin@ containing the 9-bit unsigned numbers
 @7@ to @13@ looks like:
 
 @
@@ -38,17 +38,18 @@ Such a file can be produced with 'memFile':
 writeFile "memory.bin" (memFile Nothing [7 :: Unsigned 9 .. 13])
 @
 
-We can instantiate a BlockRAM using the content of the above file like so:
+We can instantiate a block RAM using the contents of the file above like so:
 
 @
-f :: Clock  dom
+f :: KnownDomain dom
+  => Clock  dom
   -> Enable dom
   -> Signal dom (Unsigned 3)
   -> Signal dom (Unsigned 9)
-f clk ena rd = 'Clash.Class.BitPack.unpack' '<$>' 'blockRamFile' clk ena d7 \"memory.bin\" rd (signal Nothing)
+f clk en rd = 'Clash.Class.BitPack.unpack' '<$>' 'blockRamFile' clk en d7 \"memory.bin\" rd (signal Nothing)
 @
 
-In the example above, we basically treat the BlockRAM as an synchronous ROM.
+In the example above, we basically treat the block RAM as a synchronous ROM.
 We can see that it works as expected:
 
 @
@@ -61,11 +62,12 @@ However, we can also interpret the same data as a tuple of a 6-bit unsigned
 number, and a 3-bit signed number:
 
 @
-g :: Clock  dom
+g :: KnownDomain dom
+  => Clock  dom
   -> Enable dom
   -> Signal dom (Unsigned 3)
   -> Signal dom (Unsigned 6,Signed 3)
-g clk ena rd = 'Clash.Class.BitPack.unpack' '<$>' 'blockRamFile' clk ena d7 \"memory.bin\" rd (signal Nothing)
+g clk en rd = 'Clash.Class.BitPack.unpack' '<$>' 'blockRamFile' clk en d7 \"memory.bin\" rd (signal Nothing)
 @
 
 And then we would see:
@@ -91,7 +93,7 @@ __>>> L.tail $ sampleN 4 $ g systemClockGen enableGen (fromList [3..5])__
 {-# OPTIONS_GHC -fno-cpr-anal #-}
 
 module Clash.Explicit.BlockRam.File
-  ( -- * BlockRAM synchronized to an arbitrary clock
+  ( -- * Block RAM synchronized to an arbitrary clock
     blockRamFile
   , blockRamFilePow2
     -- * Producing files
@@ -138,7 +140,7 @@ import Clash.XException      (maybeIsX, seqX, fromJustX, NFDataX(..), XException
 -- >>> import Clash.Prelude.BlockRam.File
 
 
--- | Create a blockRAM with space for 2^@n@ elements
+-- | Create a block RAM with space for 2^@n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
@@ -147,22 +149,23 @@ import Clash.XException      (maybeIsX, seqX, fromJustX, NFDataX(..), XException
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
---     @
---                    | VHDL     | Verilog  | SystemVerilog |
---     ===============+==========+==========+===============+
---     Altera/Quartus | Broken   | Works    | Works         |
---     Xilinx/ISE     | Works    | Works    | Works         |
---     ASIC           | Untested | Untested | Untested      |
---     ===============+==========+==========+===============+
---     @
+-- +----------------+----------+----------+---------------+
+-- |                | VHDL     | Verilog  | SystemVerilog |
+-- +================+==========+==========+===============+
+-- | Altera/Quartus | Broken   | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | Xilinx/ISE     | Works    | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | ASIC           | Untested | Untested | Untested      |
+-- +----------------+----------+----------+---------------+
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
--- Block RAM.
+-- block RAM.
 -- * Use the adapter 'Clash.Explicit.BlockRam.readNew' for obtaining write-before-read semantics like this: @'Clash.Explicit.BlockRam.readNew' clk rst en (blockRamFilePow2' clk en file) rd wrM@.
 -- * See "Clash.Explicit.BlockRam.File#usingramfiles" for more information on how
--- to instantiate a Block RAM with the contents of a data file.
+-- to instantiate a block RAM with the contents of a data file.
 -- * See 'memFile' for creating a data file with Clash.
 -- * See "Clash.Explicit.Fixed#creatingdatafiles" for more ideas on how to
 -- create your own data files.
@@ -172,20 +175,20 @@ blockRamFilePow2
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
-  -- ^ Global enable
+  -- ^ 'Enable' line
   -> FilePath
-  -- ^ File describing the initial content of the blockRAM
+  -- ^ File describing the initial content of the BRAM
   -> Signal dom (Unsigned n)
   -- ^ Read address @r@
   -> Signal dom (Maybe (Unsigned n, BitVector m))
   -- ^ (write address @w@, value to write)
   -> Signal dom (BitVector m)
-  -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
+  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
 blockRamFilePow2 = \clk en file rd wrM -> withFrozenCallStack
   (blockRamFile clk en (pow2SNat (SNat @n)) file rd wrM)
 {-# INLINE blockRamFilePow2 #-}
 
--- | Create a blockRAM with space for @n@ elements
+-- | Create a block RAM with space for @n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
@@ -194,22 +197,23 @@ blockRamFilePow2 = \clk en file rd wrM -> withFrozenCallStack
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
---     @
---                    | VHDL     | Verilog  | SystemVerilog |
---     ===============+==========+==========+===============+
---     Altera/Quartus | Broken   | Works    | Works         |
---     Xilinx/ISE     | Works    | Works    | Works         |
---     ASIC           | Untested | Untested | Untested      |
---     ===============+==========+==========+===============+
---     @
+-- +----------------+----------+----------+---------------+
+-- |                | VHDL     | Verilog  | SystemVerilog |
+-- +================+==========+==========+===============+
+-- | Altera/Quartus | Broken   | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | Xilinx/ISE     | Works    | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | ASIC           | Untested | Untested | Untested      |
+-- +----------------+----------+----------+---------------+
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Explicit.BlockRam#usingrams" for more information on how to use a
--- Block RAM.
+-- block RAM.
 -- * Use the adapter 'Clash.Explicit.BlockRam.readNew' for obtaining write-before-read semantics like this: @'Clash.Explicit.BlockRam.readNew' clk rst en ('blockRamFile' clk en size file) rd wrM@.
 -- * See "Clash.Explicit.BlockRam.File#usingramfiles" for more information on how
--- to instantiate a Block RAM with the contents of a data file.
+-- to instantiate a block RAM with the contents of a data file.
 -- * See 'memFile' for creating a data file with Clash.
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for more ideas on how to create
 -- your own data files.
@@ -218,18 +222,17 @@ blockRamFile
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
-  -- ^ Global enable
+  -- ^ 'Enable' line
   -> SNat n
-  -- ^ Size of the blockRAM
+  -- ^ Size of the BRAM
   -> FilePath
-  -- ^ File describing the initial content of the blockRAM
+  -- ^ File describing the initial content of the BRAM
   -> Signal dom addr
   -- ^ Read address @r@
   -> Signal dom (Maybe (addr, BitVector m))
   -- ^ (write address @w@, value to write)
   -> Signal dom (BitVector m)
-  -- ^ Value of the @blockRAM@ at address @r@ from the previous
-  -- clock cycle
+  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
 blockRamFile = \clk gen sz file rd wrM ->
   let en       = isJust <$> wrM
       (wr,din) = unbundle (fromJustX <$> wrM)
@@ -237,9 +240,9 @@ blockRamFile = \clk gen sz file rd wrM ->
       (blockRamFile# clk gen sz file (fromEnum <$> rd) en (fromEnum <$> wr) din)
 {-# INLINE blockRamFile #-}
 
--- | Convert data to the String contents of a memory file.
+-- | Convert data to the 'String' contents of a memory file.
 --
--- * __NB:__ Not synthesizable
+-- * __NB__: Not synthesizable
 -- * The following document the several ways to instantiate components with
 -- files:
 --
@@ -277,12 +280,12 @@ memFile
      , Foldable f
      , HasCallStack)
   => Maybe Bit
-  -- ^ Value to map don't care bits to. Nothing means throwing an error on
+  -- ^ Value to map don't care bits to. 'Nothing' means throwing an error on
   -- don't care bits.
   -> f a
-  -- ^ Values to convert.
+  -- ^ Values to convert
   -> String
-  -- ^ Contents of the memory file.
+  -- ^ Contents of the memory file
 memFile care = foldr (\e -> showsBV $ pack e) ""
  where
   showsBV :: BitVector (BitSize a) -> String -> String
@@ -318,11 +321,11 @@ blockRamFile#
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
-  -- ^ Global enable
+  -- ^ 'Enable' line
   -> SNat n
-  -- ^ Size of the blockRAM
+  -- ^ Size of the BRAM
   -> FilePath
-  -- ^ File describing the initial content of the blockRAM
+  -- ^ File describing the initial content of the BRAM
   -> Signal dom Int
   -- ^ Read address @r@
   -> Signal dom Bool
@@ -332,7 +335,7 @@ blockRamFile#
   -> Signal dom (BitVector m)
   -- ^ Value to write (at address @w@)
   -> Signal dom (BitVector m)
-  -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
+  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
 blockRamFile# (Clock _) ena sz file = \rd wen waS wd -> runST $ do
   ramStart <- newArray_ (0,szI)
   unsafeIOToST (withFile file ReadMode (\h ->
