@@ -73,6 +73,7 @@ data SystemVerilogState =
     , _nameCache :: HashMap HWType Identifier -- ^ Cache for previously generated product type names
     , _genDepth  :: Int -- ^ Depth of current generative block
     , _modNm     :: ModName
+    , _topNm     :: Identifier
     , _idSeen    :: IdentifierSet
     , _oports    :: [Identifier]
     , _srcSpan   :: SrcSpan
@@ -105,6 +106,7 @@ instance Backend SystemVerilogState where
     , _nameCache=HashMap.empty
     , _genDepth=0
     , _modNm=""
+    , _topNm=Id.unsafeMake ""
     , _idSeen=Id.emptyIdentifierSet (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) SystemVerilog
     , _oports=[]
     , _srcSpan=noSrcSpan
@@ -163,6 +165,8 @@ instance Backend SystemVerilogState where
   fromBV hty id_  = simpleFromSLV hty (Text.toStrict id_)
   hdlSyn          = use hdlsyn
   setModName nm s = s {_modNm = nm}
+  setTopName nm s = s {_topNm = nm}
+  getTopName      = use topNm
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
   blockDecl _ ds  = do
