@@ -2,13 +2,13 @@
 Copyright  :  (C) 2015-2016, University of Twente,
                   2019     , Myrtle Software Ltd,
                   2017     , Google Inc.,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-= Initializing a BlockRAM with a data file #usingramfiles#
+= Initializing a block RAM with a data file #usingramfiles#
 
-BlockRAM primitives that can be initialized with a data file. The BNF grammar
+Block RAM primitives that can be initialized with a data file. The BNF grammar
 for this data file is simple:
 
 @
@@ -19,7 +19,7 @@ BIT  = '0'
 @
 
 Consecutive @LINE@s correspond to consecutive memory addresses starting at @0@.
-For example, a data file @memory.bin@ containing the 9-bit unsigned number
+For example, a data file @memory.bin@ containing the 9-bit unsigned numbers
 @7@ to @13@ looks like:
 
 @
@@ -38,7 +38,7 @@ Such a file can be produced with 'E.memFile':
 writeFile "memory.bin" (memFile Nothing [7 :: Unsigned 9 .. 13])
 @
 
-We can instantiate a BlockRAM using the content of the above file like so:
+We can instantiate a block RAM using the contents of the file above like so:
 
 @
 f :: (HiddenClock dom, HiddenEnable dom)
@@ -47,7 +47,7 @@ f :: (HiddenClock dom, HiddenEnable dom)
 f rd = 'Clash.Class.BitPack.unpack' '<$>' 'blockRamFile' d7 \"memory.bin\" rd (pure Nothing)
 @
 
-In the example above, we basically treat the BlockRAM as an synchronous ROM.
+In the example above, we basically treat the block RAM as a synchronous ROM.
 We can see that it works as expected:
 
 @
@@ -84,7 +84,7 @@ __>>> L.tail $ sampleN 4 $ g (fromList [3..5])__
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module Clash.Prelude.BlockRam.File
-  ( -- * BlockRAM synchronized to an arbitrary clock
+  ( -- * Block RAM synchronized to an arbitrary clock
     blockRamFile
   , blockRamFilePow2
     -- * Producing files
@@ -103,7 +103,7 @@ import           Clash.Signal
 import           Clash.Sized.BitVector        (BitVector)
 import           Clash.Sized.Unsigned         (Unsigned)
 
--- | Create a blockRAM with space for 2^@n@ elements
+-- | Create a block RAM with space for 2^@n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
@@ -112,22 +112,23 @@ import           Clash.Sized.Unsigned         (Unsigned)
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
---     @
---                    | VHDL     | Verilog  | SystemVerilog |
---     ===============+==========+==========+===============+
---     Altera/Quartus | Broken   | Works    | Works         |
---     Xilinx/ISE     | Works    | Works    | Works         |
---     ASIC           | Untested | Untested | Untested      |
---     ===============+==========+==========+===============+
---     @
+-- +----------------+----------+----------+---------------+
+-- |                | VHDL     | Verilog  | SystemVerilog |
+-- +================+==========+==========+===============+
+-- | Altera/Quartus | Broken   | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | Xilinx/ISE     | Works    | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | ASIC           | Untested | Untested | Untested      |
+-- +----------------+----------+----------+---------------+
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
--- Block RAM.
+-- block RAM.
 -- * Use the adapter 'Clash.Prelude.BlockRam.readNew' for obtaining write-before-read semantics like this: @'Clash.Prelude.BlockRam.readNew' ('blockRamFilePow2' file) rd wrM@.
 -- * See "Clash.Prelude.BlockRam.File#usingramfiles" for more information on how
--- to instantiate a Block RAM with the contents of a data file.
+-- to instantiate a block RAM with the contents of a data file.
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 blockRamFilePow2
@@ -138,19 +139,18 @@ blockRamFilePow2
      , HiddenEnable dom
      , HasCallStack )
   => FilePath
-  -- ^ File describing the initial content of the blockRAM
+  -- ^ File describing the initial content of the BRAM
   -> Signal dom (Unsigned n)
   -- ^ Read address @r@
   -> Signal dom (Maybe (Unsigned n, BitVector m))
   -- ^ (write address @w@, value to write)
   -> Signal dom (BitVector m)
-  -- ^ Value of the @blockRAM@ at address @r@ from the previous
-  -- clock cycle
+  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
 blockRamFilePow2 = \fp rd wrM -> withFrozenCallStack
   (hideEnable (hideClock E.blockRamFilePow2) fp rd wrM)
 {-# INLINE blockRamFilePow2 #-}
 
--- | Create a blockRAM with space for @n@ elements
+-- | Create a block RAM with space for @n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
@@ -159,22 +159,23 @@ blockRamFilePow2 = \fp rd wrM -> withFrozenCallStack
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
---     @
---                    | VHDL     | Verilog  | SystemVerilog |
---     ===============+==========+==========+===============+
---     Altera/Quartus | Broken   | Works    | Works         |
---     Xilinx/ISE     | Works    | Works    | Works         |
---     ASIC           | Untested | Untested | Untested      |
---     ===============+==========+==========+===============+
---     @
+-- +----------------+----------+----------+---------------+
+-- |                | VHDL     | Verilog  | SystemVerilog |
+-- +================+==========+==========+===============+
+-- | Altera/Quartus | Broken   | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | Xilinx/ISE     | Works    | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | ASIC           | Untested | Untested | Untested      |
+-- +----------------+----------+----------+---------------+
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
--- Block RAM.
+-- block RAM.
 -- * Use the adapter 'Clash.Prelude.BlockRam.readNew' for obtaining write-before-read semantics like this: @'Clash.Prelude.BlockRam.readNew' ('blockRamFile' size file) rd wrM@.
 -- * See "Clash.Prelude.BlockRam.File#usingramfiles" for more information on how
--- to instantiate a Block RAM with the contents of a data file.
+-- to instantiate a block RAM with the contents of a data file.
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 blockRamFile
@@ -184,16 +185,15 @@ blockRamFile
      , HiddenEnable dom
      , HasCallStack )
   => SNat n
-  -- ^ Size of the blockRAM
+  -- ^ Size of the BRAM
   -> FilePath
-  -- ^ File describing the initial content of the blockRAM
+  -- ^ File describing the initial content of the BRAM
   -> Signal dom addr
   -- ^ Read address @r@
   -> Signal dom (Maybe (addr, BitVector m))
   -- ^ (write address @w@, value to write)
   -> Signal dom (BitVector m)
-  -- ^ Value of the @blockRAM@ at address @r@ from the previous
-  -- clock cycle
+  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
 blockRamFile = \sz fp rd wrM -> withFrozenCallStack
   (hideEnable (hideClock E.blockRamFile) sz fp rd wrM)
 {-# INLINE blockRamFile #-}

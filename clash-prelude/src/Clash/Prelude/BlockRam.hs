@@ -6,20 +6,20 @@ Copyright  :  (C) 2013-2016, University of Twente,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-BlockRAM primitives
+Block RAM primitives
 
 = Using RAMs #usingrams#
 
 We will show a rather elaborate example on how you can, and why you might want
-to use 'blockRam's. We will build a \"small\" CPU+Memory+Program ROM where we
-will slowly evolve to using blockRams. Note that the code is /not/ meant as a
-de-facto standard on how to do CPU design in Clash.
+to use 'blockRam's. We will build a \"small\" CPU + Memory + Program ROM where
+we will slowly evolve to using 'blockRam's. Note that the code is /not/ meant as
+a de-facto standard on how to do CPU design in Clash.
 
 We start with the definition of the Instructions, Register names and machine
 codes:
 
 @
-{\-\# LANGUAGE RecordWildCards, TupleSections, DeriveAnyClass, TypeApplications \#-\}
+{\-\# LANGUAGE RecordWildCards, TupleSections, DeriveAnyClass \#-\}
 
 module CPU where
 
@@ -79,11 +79,12 @@ nullCode =
 Next we define the CPU and its ALU:
 
 @
-cpu :: Vec 7 Value          -- ^ Register bank
-    -> (Value,Instruction)  -- ^ (Memory output, Current instruction)
-    -> ( Vec 7 Value
-       , (MemAddr, Maybe (MemAddr,Value), InstrAddr)
-       )
+cpu
+  :: Vec 7 Value          -- ^ Register bank
+  -> (Value,Instruction)  -- ^ (Memory output, Current instruction)
+  -> ( Vec 7 Value
+     , (MemAddr, Maybe (MemAddr,Value), InstrAddr)
+     )
 cpu regbank (memOut, instr) =
   (regbank', (rdAddr, (,aluOut) 'Prelude.<$>' wrAddrM, fromIntegral ipntr))
  where
@@ -157,10 +158,10 @@ system
   => Vec n Instruction
   -> Signal dom Value
 system instrs = memOut
-  where
-    memOut = dataMem rdAddr dout
-    (rdAddr, dout, ipntr) = 'Clash.Prelude.Mealy.mealyB' cpu ('Clash.Sized.Vector.replicate' d7 0) (memOut,instr)
-    instr  = 'Clash.Prelude.ROM.asyncRom' instrs 'Prelude.<$>' ipntr
+ where
+  memOut = dataMem rdAddr dout
+  (rdAddr, dout, ipntr) = 'Clash.Prelude.Mealy.mealyB' cpu ('Clash.Sized.Vector.replicate' d7 0) (memOut,instr)
+  instr  = 'Clash.Prelude.ROM.asyncRom' instrs 'Prelude.<$>' ipntr
 @
 
 Create a simple program that calculates the GCD of 4 and 6:
@@ -224,10 +225,10 @@ system2
   => Vec n Instruction
   -> Signal dom Value
 system2 instrs = memOut
-  where
-    memOut = 'Clash.Prelude.RAM.asyncRam' d32 rdAddr dout
-    (rdAddr,dout,ipntr) = 'Clash.Prelude.mealyB' cpu ('Clash.Sized.Vector.replicate' d7 0) (memOut,instr)
-    instr  = 'Clash.Prelude.ROM.asyncRom' instrs 'Prelude.<$>' ipntr
+ where
+  memOut = 'Clash.Prelude.RAM.asyncRam' d32 rdAddr dout
+  (rdAddr,dout,ipntr) = 'Clash.Prelude.mealyB' cpu ('Clash.Sized.Vector.replicate' d7 0) (memOut,instr)
+  instr  = 'Clash.Prelude.ROM.asyncRom' instrs 'Prelude.<$>' ipntr
 @
 
 Again, we can simulate our system and see that it works. This time however,
@@ -235,7 +236,7 @@ we need to disregard the first few output samples, because the initial content o
 'Clash.Prelude.RAM.asyncRam' is /undefined/, and consequently, the first few
 output samples are also /undefined/. We use the utility function
 'Clash.XException.printX' to conveniently filter out the undefinedness and
-replace it with the string @\"undefined\"@ in the few leading outputs.
+replace it with the string @\"undefined\"@ in the first few leading outputs.
 
 @
 >>> printX $ sampleN @System 32 (system2 prog)
@@ -247,30 +248,28 @@ replace it with the string @\"undefined\"@ in the few leading outputs.
 
 Finally we get to using 'blockRam'. On FPGAs, 'Clash.Prelude.RAM.asyncRam' will
 be implemented in terms of LUTs, and therefore take up logic resources. FPGAs
-also have large(r) memory structures called /Block RAMs/, which are preferred,
+also have large(r) memory structures called /block RAMs/, which are preferred,
 especially as the memories we need for our application get bigger. The
-'blockRam' function will be translated to such a /Block RAM/.
+'blockRam' function will be translated to such a /block RAM/.
 
-One important aspect of Block RAMs have a /synchronous/ read port, meaning that,
-unlike the behavior of 'Clash.Prelude.RAM.asyncRam', given a read address @r@
-at time @t@, the value @v@ in the RAM at address @r@ is only available at time
-@t+1@.
+One important aspect of block RAMs is that they have a /synchronous/ read port,
+meaning that, unlike the behavior of 'Clash.Prelude.RAM.asyncRam', given a read
+address @r@ at time @t@, the value @v@ in the RAM at address @r@ is only
+available at time @t+1@.
 
 For us that means we need to change the design of our CPU. Right now, upon a
 load instruction we generate a read address for the memory, and the value at
 that read address is immediately available to be put in the register bank.
-Because we will be using a BlockRAM, the value is delayed until the next cycle.
-We hence need to also delay the register address to which the memory address
-is loaded:
+Because we will be using a block RAM, the value is delayed until the next cycle.
+Thus, we will need to also delay the register address to which the memory
+address is loaded:
 
 @
 cpu2
-  :: (Vec 7 Value,Reg)
-  -- ^ (Register bank, Load reg addr)
-  -> (Value, Instruction)
-  -- ^ (Memory output, Current instruction)
-  -> ( (Vec 7 Value,Reg)
-     , (MemAddr, Maybe (MemAddr, Value), InstrAddr)
+  :: (Vec 7 Value,Reg)    -- ^ (Register bank, Load reg addr)
+  -> (Value,Instruction)  -- ^ (Memory output, Current instruction)
+  -> ( (Vec 7 Value, Reg)
+     , (MemAddr, Maybe (MemAddr,Value), InstrAddr)
      )
 cpu2 (regbank,ldRegD) (memOut,instr) =
   ((regbank', ldRegD'), (rdAddr, (,aluOut) 'Prelude.<$>' wrAddrM, fromIntegral ipntr))
@@ -316,17 +315,17 @@ system3
   => Vec n Instruction
   -> Signal dom Value
 system3 instrs = memOut
-  where
-    memOut = 'blockRam' (replicate d32 0) rdAddr dout
-    (rdAddr,dout,ipntr) = 'Clash.Prelude.mealyB' cpu2 (('Clash.Sized.Vector.replicate' d7 0),Zero) (memOut,instr)
-    instr  = 'Clash.Prelude.ROM.asyncRom' instrs 'Prelude.<$>' ipntr
+ where
+  memOut = 'blockRam' (replicate d32 0) rdAddr dout
+  (rdAddr,dout,ipntr) = 'Clash.Prelude.mealyB' cpu2 (('Clash.Sized.Vector.replicate' d7 0),Zero) (memOut,instr)
+  instr  = 'Clash.Prelude.ROM.asyncRom' instrs 'Prelude.<$>' ipntr
 @
 
 We are, however, not done. We will also need to update our program. The reason
 being that values that we try to load in our registers won't be loaded into the
 register until the next cycle. This is a problem when the next instruction
-immediately depended on this memory value. In our case, this was only the case
-when the loaded the value @6@, which was stored at address @1@, into @RegB@.
+immediately depends on this memory value. In our case, this was only the case
+when we loaded the value @6@, which was stored at address @1@, into @RegB@.
 Our updated program is thus:
 
 @
@@ -685,12 +684,23 @@ prog2 = -- 0 := 4
 
 -}
 
--- | Create a blockRAM with space for @n@ elements.
+-- | Create a block RAM with space for @n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
+-- === See also:
+--
+-- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
+-- Block RAM.
+-- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @'readNew' ('blockRam' inits) rd wrM@.
+-- * A large 'Vec' for the initial content may be too inefficient, depending
+-- on how it is constructed. See 'Clash.Prelude.BlockRam.File.blockRamFile' and
+-- 'Clash.Prelude.BlockRam.Blob.blockRamBlob' for different approaches that
+-- scale well.
+--
+-- === __Example__
 -- @
 -- bram40
 --   :: 'HiddenClock' dom
@@ -699,16 +709,6 @@ prog2 = -- 0 := 4
 --   -> 'Signal' dom 'Clash.Sized.BitVector.Bit'
 -- bram40 = 'blockRam' ('Clash.Sized.Vector.replicate' d40 1)
 -- @
---
--- Additional helpful information:
---
--- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
--- Block RAM.
--- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRam inits) rd wrM@.
--- * A large 'Vec' for the initial content might be too inefficient, depending
--- on how it is constructed. See 'Clash.Prelude.BlockRam.File.blockRamFile' and
--- 'Clash.Prelude.BlockRam.Blob.blockRamBlob' for different approaches that
--- scale well.
 blockRam
   :: ( HasCallStack
      , HiddenClock dom
@@ -717,22 +717,21 @@ blockRam
      , Enum addr
      )
   => Vec n a
-  -- ^ Initial content of the BRAM, also determines the size, @n@, of the BRAM.
+  -- ^ Initial content of the BRAM, also determines the size, @n@, of the BRAM
   --
-  -- __NB__: __MUST__ be a constant.
+  -- __NB__: __MUST__ be a constant
   -> Signal dom addr
   -- ^ Read address @r@
   -> Signal dom (Maybe (addr, a))
    -- ^ (write address @w@, value to write)
   -> Signal dom a
-  -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
-  -- cycle
+  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
 blockRam = \cnt rd wrM -> withFrozenCallStack
   (hideEnable (hideClock E.blockRam) cnt rd wrM)
 {-# INLINE blockRam #-}
 
--- | Version of blockram that has no default values set. May be cleared to a
--- arbitrary state using a reset function.
+-- | A version of 'blockRam' that has no default values set. May be cleared to
+-- an arbitrary state using a reset function.
 blockRamU
    :: forall n dom a r addr
    . ( HasCallStack
@@ -742,25 +741,25 @@ blockRamU
      , 1 <= n )
   => E.ResetStrategy r
   -- ^ Whether to clear BRAM on asserted reset ('Clash.Explicit.BlockRam.ClearOnReset')
-  -- or not ('Clash.Explicit.BlockRam.NoClearOnReset'). Reset needs to be
-  -- asserted at least /n/ cycles to clear the BRAM.
+  -- or not ('Clash.Explicit.BlockRam.NoClearOnReset'). The reset needs to be
+  -- asserted for at least /n/ cycles to clear the BRAM.
   -> SNat n
   -- ^ Number of elements in BRAM
   -> (Index n -> a)
-  -- ^ If applicable (see first argument), reset BRAM using this function.
+  -- ^ If applicable (see first argument), reset BRAM using this function
   -> Signal dom addr
   -- ^ Read address @r@
   -> Signal dom (Maybe (addr, a))
   -- ^ (write address @w@, value to write)
   -> Signal dom a
-  -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
+  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
 blockRamU =
   \rstStrategy cnt initF rd wrM -> withFrozenCallStack
     (hideClockResetEnable E.blockRamU) rstStrategy cnt initF rd wrM
 {-# INLINE blockRamU #-}
 
--- | Version of blockram that is initialized with the same value on all
--- memory positions.
+-- | A version of 'blockRam' that is initialized with the same value on all
+-- memory positions
 blockRam1
    :: forall n dom a r addr
    . ( HasCallStack
@@ -770,8 +769,8 @@ blockRam1
      , 1 <= n )
   => E.ResetStrategy r
   -- ^ Whether to clear BRAM on asserted reset ('Clash.Explicit.BlockRam.ClearOnReset')
-  -- or not ('Clash.Explicit.BlockRam.NoClearOnReset'). Reset needs to be
-  -- asserted at least /n/ cycles to clear the BRAM.
+  -- or not ('Clash.Explicit.BlockRam.NoClearOnReset'). The reset needs to be
+  -- asserted for at least /n/ cycles to clear the BRAM.
   -> SNat n
   -- ^ Number of elements in BRAM
   -> a
@@ -781,18 +780,29 @@ blockRam1
   -> Signal dom (Maybe (addr, a))
   -- ^ (write address @w@, value to write)
   -> Signal dom a
-  -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
+  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
 blockRam1 =
   \rstStrategy cnt initValue rd wrM -> withFrozenCallStack
     (hideClockResetEnable E.blockRam1) rstStrategy cnt initValue rd wrM
 {-# INLINE blockRam1 #-}
 
--- | Create a blockRAM with space for 2^@n@ elements
+-- | Create a block RAM with space for 2^@n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
+-- === See also:
+--
+-- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
+-- block RAM.
+-- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @'readNew' ('blockRamPow2' inits) rd wrM@.
+-- * A large 'Vec' for the initial content may be too inefficient, depending
+-- on how it is constructed. See 'Clash.Prelude.BlockRam.File.blockRamFilePow2'
+-- and 'Clash.Prelude.BlockRam.Blob.blockRamBlobPow2' for different approaches
+-- that scale well.
+--
+-- === __Example__
 -- @
 -- bram32
 --   :: 'HiddenClock' dom
@@ -801,16 +811,6 @@ blockRam1 =
 --   -> 'Signal' dom 'Clash.Sized.BitVector.Bit'
 -- bram32 = 'blockRamPow2' ('Clash.Sized.Vector.replicate' d32 1)
 -- @
---
--- Additional helpful information:
---
--- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
--- Block RAM.
--- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRamPow2 inits) rd wrM@.
--- * A large 'Vec' for the initial content might be too inefficient, depending
--- on how it is constructed. See 'Clash.Prelude.BlockRam.File.blockRamFilePow2'
--- and 'Clash.Prelude.BlockRam.Blob.blockRamBlobPow2' for different approaches
--- that scale well.
 blockRamPow2
   :: ( HasCallStack
      , HiddenClock dom
@@ -833,9 +833,8 @@ blockRamPow2 = \cnt rd wrM -> withFrozenCallStack
   (hideEnable (hideClock E.blockRamPow2) cnt rd wrM)
 {-# INLINE blockRamPow2 #-}
 
--- | Create read-after-write blockRAM from a read-before-write one (synchronized to system clock)
+-- | Create a read-after-write block RAM from a read-before-write one
 --
--- >>> import Clash.Prelude
 -- >>> :t readNew (blockRam (0 :> 1 :> Nil))
 -- readNew (blockRam (0 :> 1 :> Nil))
 --   :: ...
@@ -849,13 +848,13 @@ readNew
      , NFDataX a
      , Eq addr )
   => (Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a)
-  -- ^ The @ram@ component
+  -- ^ The BRAM component
   -> Signal dom addr
   -- ^ Read address @r@
   -> Signal dom (Maybe (addr, a))
   -- ^ (Write address @w@, value to write)
   -> Signal dom a
-  -- ^ Value of the @ram@ at address @r@ from the previous clock cycle
+  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
 readNew = hideClockResetEnable E.readNew
 {-# INLINE readNew #-}
 

@@ -49,7 +49,7 @@ import Clash.XException
 -- * __NB__: Initial content of the RAM is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- RAM.
@@ -62,17 +62,17 @@ asyncRamPow2
      , NFDataX a
      )
   => Clock wdom
-  -- ^ 'Clock' to which to synchronize the write port of the RAM
+   -- ^ 'Clock' to which the write port of the RAM is synchronized
   -> Clock rdom
-  -- ^ 'Clock' to which the read address signal, @r@, is synchronized
+   -- ^ 'Clock' to which the read address signal, @r@, is synchronized
   -> Enable wdom
-  -- ^ Global enable
+  -- ^ 'Enable' line for the write port
   -> Signal rdom (Unsigned n)
   -- ^ Read address @r@
   -> Signal wdom (Maybe (Unsigned n, a))
   -- ^ (write address @w@, value to write)
   -> Signal rdom a
-  -- ^ Value of the @RAM@ at address @r@
+  -- ^ Value of the RAM at address @r@
 asyncRamPow2 = \wclk rclk en rd wrM -> withFrozenCallStack
   (asyncRam wclk rclk en (pow2SNat (SNat @n)) rd wrM)
 {-# INLINE asyncRamPow2 #-}
@@ -83,7 +83,7 @@ asyncRamPow2 = \wclk rclk en rd wrM -> withFrozenCallStack
 -- * __NB__: Initial content of the RAM is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Explicit.BlockRam#usingrams" for more information on how to use a
 -- RAM.
@@ -95,11 +95,11 @@ asyncRam
      , NFDataX a
      )
   => Clock wdom
-   -- ^ 'Clock' to which to synchronize the write port of the RAM
+   -- ^ 'Clock' to which the write port of the RAM is synchronized
   -> Clock rdom
-   -- ^ 'Clock' to which the read address signal, @r@, is synchronized to
+   -- ^ 'Clock' to which the read address signal, @r@, is synchronized
   -> Enable wdom
-  -- ^ Global enable
+  -- ^ 'Enable' line for the write port
   -> SNat n
   -- ^ Size @n@ of the RAM
   -> Signal rdom addr
@@ -107,7 +107,7 @@ asyncRam
   -> Signal wdom (Maybe (addr, a))
   -- ^ (write address @w@, value to write)
   -> Signal rdom a
-   -- ^ Value of the @RAM@ at address @r@
+   -- ^ Value of the RAM at address @r@
 asyncRam = \wclk rclk gen sz rd wrM ->
   let en       = isJust <$> wrM
       (wr,din) = unbundle (fromJustX <$> wrM)
@@ -124,11 +124,11 @@ asyncRam#
      , NFDataX a
      )
   => Clock wdom
-  -- ^ 'Clock' to which to synchronize the write port of the RAM
+   -- ^ 'Clock' to which the write port of the RAM is synchronized
   -> Clock rdom
-  -- ^ 'Clock' to which the read address signal, @r@, is synchronized
+   -- ^ 'Clock' to which the read address signal, @r@, is synchronized
   -> Enable wdom
-  -- ^ Global enable
+  -- ^ 'Enable' line for the write port
   -> SNat n
   -- ^ Size @n@ of the RAM
   -> Signal rdom Int
@@ -140,12 +140,12 @@ asyncRam#
   -> Signal wdom a
   -- ^ Value to write (at address @w@)
   -> Signal rdom a
-  -- ^ Value of the @RAM@ at address @r@
+  -- ^ Value of the RAM at address @r@
 asyncRam# !_ !_ en sz rd we wr din = dout
   where
     ramI = Seq.replicate
               szI
-              (withFrozenCallStack (errorX "asyncRam#: initial value undefined"))
+              (withFrozenCallStack (errorX "asyncRam: initial value undefined"))
     en0 = fromEnable (andEnable en we)
     dout = if rPeriod == wPeriod
            then goSingle ramI rd en0 wr din

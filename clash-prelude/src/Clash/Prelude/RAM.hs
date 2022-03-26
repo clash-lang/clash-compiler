@@ -6,7 +6,7 @@ Copyright  :  (C) 2015-2016, University of Twente,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-RAM primitives with a combinational read port.
+RAM primitives with a combinational read port
 -}
 
 {-# LANGUAGE CPP #-}
@@ -34,12 +34,12 @@ import           Clash.Sized.Unsigned (Unsigned)
 import           Clash.XException     (NFDataX)
 
 
--- | Create a RAM with space for @n@ elements.
+-- | Create a RAM with space for @n@ elements
 --
 -- * __NB__: Initial content of the RAM is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- RAM.
@@ -57,7 +57,7 @@ asyncRam
   -> Signal dom (Maybe (addr, a))
    -- ^ (write address @w@, value to write)
   -> Signal dom a
-   -- ^ Value of the @RAM@ at address @r@
+   -- ^ Value of the RAM at address @r@
 asyncRam = \sz rd wrM -> withFrozenCallStack
   (hideEnable (\en -> hideClock (\clk -> E.asyncRam clk clk en sz rd wrM)))
 {-# INLINE asyncRam #-}
@@ -67,7 +67,7 @@ asyncRam = \sz rd wrM -> withFrozenCallStack
 -- * __NB__: Initial content of the RAM is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- RAM.
@@ -83,7 +83,7 @@ asyncRamPow2
   -> Signal dom (Maybe (Unsigned n, a))
   -- ^ (write address @w@, value to write)
   -> Signal dom a
-  -- ^ Value of the @RAM@ at address @r@
+  -- ^ Value of the RAM at address @r@
 asyncRamPow2 = \rd wrM -> withFrozenCallStack
   (hideEnable (\en -> (hideClock (\clk -> E.asyncRamPow2 clk clk en rd wrM))))
 {-# INLINE asyncRamPow2 #-}

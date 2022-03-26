@@ -45,11 +45,11 @@ import           Clash.XException     (NFDataX, errorX)
 
 -- | An asynchronous/combinational ROM with space for @n@ elements
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
--- for ideas on how to use ROMs and RAMs
--- * A large 'Vec' for the content might be too inefficient, depending on how it
+-- for ideas on how to use ROMs and RAMs.
+-- * A large 'Vec' for the content may be too inefficient, depending on how it
 -- is constructed. See 'Clash.Prelude.ROM.File.asyncRomFile' and
 -- 'Clash.Prelude.ROM.Blob.asyncRomBlob' for different approaches that scale
 -- well.
@@ -58,21 +58,21 @@ asyncRom
   => Vec n a
   -- ^ ROM content, also determines the size, @n@, of the ROM
   --
-  -- __NB:__ must be a constant
+  -- __NB__: __MUST__ be a constant
   -> addr
-  -- ^ Read address @rd@
+  -- ^ Read address @r@
   -> a
-  -- ^ The value of the ROM at address @rd@
+  -- ^ The value of the ROM at address @r@
 asyncRom = \content rd -> asyncRom# content (fromEnum rd)
 {-# INLINE asyncRom #-}
 
 -- | An asynchronous/combinational ROM with space for 2^@n@ elements
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
--- for ideas on how to use ROMs and RAMs
--- * A large 'Vec' for the content might be too inefficient, depending on how it
+-- for ideas on how to use ROMs and RAMs.
+-- * A large 'Vec' for the content may be too inefficient, depending on how it
 -- is constructed. See 'Clash.Prelude.ROM.File.asyncRomFilePow2' and
 -- 'Clash.Prelude.ROM.Blob.asyncRomBlobPow2' for different approaches that scale
 -- well.
@@ -81,25 +81,25 @@ asyncRomPow2
   => Vec (2^n) a
   -- ^ ROM content
   --
-  -- __NB:__ must be a constant
+  -- __NB__: __MUST__ be a constant
   -> Unsigned n
-  -- ^ Read address @rd@
+  -- ^ Read address @r@
   -> a
-  -- ^ The value of the ROM at address @rd@
+  -- ^ The value of the ROM at address @r@
 asyncRomPow2 = asyncRom
 {-# INLINE asyncRomPow2 #-}
 
--- | asyncROM primitive
+-- | asyncRom primitive
 asyncRom#
   :: forall n a . KnownNat n
   => Vec n a
   -- ^ ROM content, also determines the size, @n@, of the ROM
   --
-  -- __NB:__ must be a constant
+  -- __NB__: __MUST__ be a constant
   -> Int
-  -- ^ Read address @rd@
+  -- ^ Read address @r@
   -> a
-  -- ^ The value of the ROM at address @rd@
+  -- ^ The value of the ROM at address @r@
 asyncRom# content = safeAt
   where
     szI = length content
@@ -122,11 +122,11 @@ asyncRom# content = safeAt
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
--- for ideas on how to use ROMs and RAMs
--- * A large 'Vec' for the content might be too inefficient, depending on how it
+-- for ideas on how to use ROMs and RAMs.
+-- * A large 'Vec' for the content may be too inefficient, depending on how it
 -- is constructed. See 'Clash.Prelude.ROM.File.romFile' and
 -- 'Clash.Prelude.ROM.Blob.romBlob' for different approaches that scale well.
 rom
@@ -139,11 +139,11 @@ rom
   => Vec n a
   -- ^ ROM content, also determines the size, @n@, of the ROM
   --
-  -- __NB:__ must be a constant
+  -- __NB__: __MUST__ be a constant
   -> Signal dom (Unsigned m)
-  -- ^ Read address @rd@
+  -- ^ Read address @r@
   -> Signal dom a
-  -- ^ The value of the ROM at address @rd@
+  -- ^ The value of the ROM at address @r@ from the previous clock cycle
 rom = hideEnable (hideClock E.rom)
 {-# INLINE rom #-}
 
@@ -153,11 +153,11 @@ rom = hideEnable (hideClock E.rom)
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
--- for ideas on how to use ROMs and RAMs
--- * A large 'Vec' for the content might be too inefficient, depending on how it
+-- for ideas on how to use ROMs and RAMs.
+-- * A large 'Vec' for the content may be too inefficient, depending on how it
 -- is constructed. See 'Clash.Prelude.ROM.File.romFilePow2' and
 -- 'Clash.Prelude.ROM.Blob.romBlobPow2' for different approaches that scale
 -- well.
@@ -170,10 +170,10 @@ romPow2
   => Vec (2^n) a
   -- ^ ROM content
   --
-  -- __NB:__ must be a constant
+  -- __NB__: __MUST__ be a constant
   -> Signal dom (Unsigned n)
-  -- ^ Read address @rd@
+  -- ^ Read address @r@
   -> Signal dom a
-  -- ^ The value of the ROM at address @rd@
+  -- ^ The value of the ROM at address @r@ from the previous clock cycle
 romPow2 = hideEnable (hideClock E.romPow2)
 {-# INLINE romPow2 #-}
