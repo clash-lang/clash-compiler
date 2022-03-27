@@ -5,7 +5,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 = Efficient bundling of initial RAM content with the compiled code
 
-Leveraging Template Haskell, the initial content for the blockRAM components in
+Leveraging Template Haskell, the initial content for the block RAM components in
 this module is stored alongside the compiled Haskell code. It covers use cases
 where passing the initial content as a 'Clash.Sized.Vector.Vec' turns out to be
 problematically slow.
@@ -25,7 +25,7 @@ compatible with all tools consuming the generated HDL.
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module Clash.Explicit.BlockRam.Blob
-  ( -- * BlockRAMs initialized with a 'MemBlob'
+  ( -- * Block RAMs initialized with a 'MemBlob'
     blockRamBlob
   , blockRamBlobPow2
     -- * Creating and inspecting 'MemBlob'
@@ -71,17 +71,17 @@ import Clash.XException
 -- >>> :m -Prelude
 -- >>> import Clash.Explicit.Prelude
 
--- | Create a blockRAM with space for @n@ elements
+-- | Create a block RAM with space for @n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
--- Block RAM.
+-- block RAM.
 -- * Use the adapter 'Clash.Explicit.BlockRam.readNew' for obtaining
 -- write-before-read semantics like this: @'Clash.Explicit.BlockRam.readNew'
 -- clk rst en ('blockRamBlob' clk en content) rd wrM@.
@@ -95,7 +95,7 @@ blockRamBlob
   -> Enable dom
   -- ^ 'Enable' line
   -> MemBlob n m
-  -- ^ Initial content of the RAM, also determines the size, @n@, of the RAM
+  -- ^ Initial content of the BRAM, also determines the size, @n@, of the BRAM
   --
   -- __NB__: __MUST__ be a constant
   -> Signal dom addr
@@ -103,23 +103,23 @@ blockRamBlob
   -> Signal dom (Maybe (addr, BitVector m))
   -- ^ (write address @w@, value to write)
   -> Signal dom (BitVector m)
-  -- ^ Value of the blockRAM at address @r@ from the previous clock cycle
+  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
 blockRamBlob = \clk gen content rd wrM ->
   let en       = isJust <$> wrM
       (wr,din) = unbundle (fromJustX <$> wrM)
   in blockRamBlob# clk gen content (fromEnum <$> rd) en (fromEnum <$> wr) din
 {-# INLINE blockRamBlob #-}
 
--- | Create a blockRAM with space for 2^@n@ elements
+-- | Create a block RAM with space for 2^@n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
--- Block RAM.
+-- block RAM.
 -- * Use the adapter 'Clash.Explicit.BlockRam.readNew' for obtaining
 -- write-before-read semantics like this: @'Clash.Explicit.BlockRam.readNew'
 -- clk rst en ('blockRamBlobPow2' clk en content) rd wrM@.
@@ -133,7 +133,7 @@ blockRamBlobPow2
   -> Enable dom
   -- ^ 'Enable' line
   -> MemBlob (2^n) m
-  -- ^ Initial content of the RAM, also determines the size, 2^@n@, of the RAM
+  -- ^ Initial content of the BRAM, also determines the size, 2^@n@, of the BRAM
   --
   -- __NB__: __MUST__ be a constant
   -> Signal dom (Unsigned n)
@@ -141,11 +141,11 @@ blockRamBlobPow2
   -> Signal dom (Maybe (Unsigned n, BitVector m))
   -- ^ (write address @w@, value to write)
   -> Signal dom (BitVector m)
-  -- ^ Value of the blockRAM at address @r@ from the previous clock cycle
+  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
 blockRamBlobPow2 = blockRamBlob
 {-# INLINE blockRamBlobPow2 #-}
 
--- | BlockRAM primitive
+-- | blockRAMBlob primitive
 blockRamBlob#
   :: forall dom m n
    . KnownDomain dom
@@ -154,7 +154,7 @@ blockRamBlob#
   -> Enable dom
   -- ^ 'Enable' line
   -> MemBlob n m
-  -- ^ Initial content of the RAM, also determines the size, @n@, of the RAM
+  -- ^ Initial content of the BRAM, also determines the size, @n@, of the BRAM
   --
   -- __NB__: __MUST__ be a constant
   -> Signal dom Int
@@ -166,7 +166,7 @@ blockRamBlob#
   -> Signal dom (BitVector m)
   -- ^ Value to write (at address @w@)
   -> Signal dom (BitVector m)
-  -- ^ Value of the blockRAM at address @r@ from the previous clock cycle
+  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
 blockRamBlob# !_ gen content@MemBlob{} = \rd wen waS wd -> runST $ do
   bvList <- unsafeIOToST (unpackMemBlob0 content)
   ramStart <- newListArray (0,szI-1) bvList

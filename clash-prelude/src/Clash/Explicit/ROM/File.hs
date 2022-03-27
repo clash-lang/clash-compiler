@@ -18,7 +18,7 @@ BIT  = '0'
 @
 
 Consecutive @LINE@s correspond to consecutive memory addresses starting at @0@.
-For example, a data file @memory.bin@ containing the 9-bit unsigned number
+For example, a data file @memory.bin@ containing the 9-bit unsigned numbers
 @7@ to @13@ looks like:
 
 @
@@ -37,15 +37,16 @@ Such a file can be produced with 'memFile':
 writeFile "memory.bin" (memFile Nothing [7 :: Unsigned 9 .. 13])
 @
 
-We can instantiate a synchronous ROM using the content of the above file like
+We can instantiate a synchronous ROM using the contents of the file above like
 so:
 
 @
-f :: Clock  dom
+f :: KnownDomain dom
+  => Clock  dom
   -> Enable dom
   -> Signal dom (Unsigned 3)
   -> Signal dom (Unsigned 9)
-f clk ena rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' clk ena d7 \"memory.bin\" rd
+f clk en rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' clk en d7 \"memory.bin\" rd
 @
 
 And see that it works as expected:
@@ -60,11 +61,11 @@ However, we can also interpret the same data as a tuple of a 6-bit unsigned
 number, and a 3-bit signed number:
 
 @
-g :: Clock  dom
-  -> Enable dom
+g :: KnownDomain dom
+  => Clock  dom
   -> Signal dom (Unsigned 3)
   -> Signal dom (Unsigned 6,Signed 3)
-g clk ena rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' clk ena d7 \"memory.bin\" rd
+g clk en rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' clk en d7 \"memory.bin\" rd
 @
 
 And then we would see:
@@ -116,16 +117,17 @@ import Clash.XException             (NFDataX(deepErrorX))
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
---     @
---                    | VHDL     | Verilog  | SystemVerilog |
---     ===============+==========+==========+===============+
---     Altera/Quartus | Broken   | Works    | Works         |
---     Xilinx/ISE     | Works    | Works    | Works         |
---     ASIC           | Untested | Untested | Untested      |
---     ===============+==========+==========+===============+
---     @
+-- +----------------+----------+----------+---------------+
+-- |                | VHDL     | Verilog  | SystemVerilog |
+-- +================+==========+==========+===============+
+-- | Altera/Quartus | Broken   | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | Xilinx/ISE     | Works    | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | ASIC           | Untested | Untested | Untested      |
+-- +----------------+----------+----------+---------------+
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Explicit.ROM.File#usingromfiles" for more information on how
 -- to instantiate a ROM with the contents of a data file.
@@ -138,14 +140,13 @@ romFilePow2
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
-  -- ^ Global enable
+  -- ^ 'Enable' line
   -> FilePath
-  -- ^ File describing the content of
-  -- the ROM
+  -- ^ File describing the content of the ROM
   -> Signal dom (Unsigned n)
-  -- ^ Read address @rd@
+  -- ^ Read address @r@
   -> Signal dom (BitVector m)
-  -- ^ The value of the ROM at address @rd@ from the previous clock cycle
+  -- ^ The value of the ROM at address @r@ from the previous clock cycle
 romFilePow2 = \clk en -> romFile clk en (pow2SNat (SNat @n))
 {-# INLINE romFilePow2 #-}
 
@@ -158,19 +159,21 @@ romFilePow2 = \clk en -> romFile clk en (pow2SNat (SNat @n))
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
---     @
---                    | VHDL     | Verilog  | SystemVerilog |
---     ===============+==========+==========+===============+
---     Altera/Quartus | Broken   | Works    | Works         |
---     Xilinx/ISE     | Works    | Works    | Works         |
---     ASIC           | Untested | Untested | Untested      |
---     ===============+==========+==========+===============+
---     @
+-- +----------------+----------+----------+---------------+
+-- |                | VHDL     | Verilog  | SystemVerilog |
+-- +================+==========+==========+===============+
+-- | Altera/Quartus | Broken   | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | Xilinx/ISE     | Works    | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | ASIC           | Untested | Untested | Untested      |
+-- +----------------+----------+----------+---------------+
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Explicit.ROM.File#usingromfiles" for more information on how
 -- to instantiate a ROM with the contents of a data file.
+-- * See 'memFile' for creating a data file with Clash.
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 romFile
@@ -178,15 +181,15 @@ romFile
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
-  -- ^ Global enable
+  -- ^ 'Enable' line
   -> SNat n
   -- ^ Size of the ROM
   -> FilePath
   -- ^ File describing the content of the ROM
   -> Signal dom addr
-  -- ^ Read address @rd@
+  -- ^ Read address @r@
   -> Signal dom (BitVector m)
-  -- ^ The value of the ROM at address @rd@ from the previous clock cycle
+  -- ^ The value of the ROM at address @r@ from the previous clock cycle
 romFile = \clk en sz file rd -> romFile# clk en sz file (fromEnum <$> rd)
 {-# INLINE romFile #-}
 
@@ -197,15 +200,15 @@ romFile#
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
-  -- ^ Global enable
+  -- ^ 'Enable' line
   -> SNat n
   -- ^ Size of the ROM
   -> FilePath
   -- ^ File describing the content of the ROM
   -> Signal dom Int
-  -- ^ Read address @rd@
+  -- ^ Read address @r@
   -> Signal dom (BitVector m)
-  -- ^ The value of the ROM at address @rd@ from the previous clock cycle
+  -- ^ The value of the ROM at address @r@ from the previous clock cycle
 romFile# clk en sz file rd =
   delay clk en (deepErrorX "First value of romFile is undefined")
         (safeAt <$> rd)

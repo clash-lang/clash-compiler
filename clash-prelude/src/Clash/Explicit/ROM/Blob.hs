@@ -57,10 +57,10 @@ import Clash.XException (deepErrorX, seqX)
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and
--- "Clash.Explicit.BlockRam#usingrams" for ideas on how to use ROMs and RAMs
+-- "Clash.Explicit.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.
 romBlob
   :: forall dom addr m n
    . ( KnownDomain dom
@@ -87,10 +87,10 @@ romBlob = \clk en content rd -> romBlob# clk en content (fromEnum <$> rd)
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and
--- "Clash.Explicit.BlockRam#usingrams" for ideas on how to use ROMs and RAMs
+-- "Clash.Explicit.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.
 romBlobPow2
   :: forall dom m n
    . ( KnownDomain dom
