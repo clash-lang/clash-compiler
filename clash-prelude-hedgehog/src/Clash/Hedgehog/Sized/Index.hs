@@ -28,9 +28,8 @@ import Clash.Sized.Internal.Index
 genIndex :: (MonadGen m, KnownNat n) => Range (Index n) -> m (Index n)
 genIndex range =
   Gen.frequency
-    [ (60, Gen.integral range)
-    , (20, Gen.constant minBound)
-    , (20, Gen.constant maxBound)
+    [ (70, Gen.integral range)
+    , (30, Gen.constant (Range.upperBound 99 range))
     ]
 
 data SomeIndex atLeast where
