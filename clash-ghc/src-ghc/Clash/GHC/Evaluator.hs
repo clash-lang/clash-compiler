@@ -165,8 +165,17 @@ stepApp x y m tcm =
                         (m1,j) = newLetBinding tcm m0 a1
                     in  ghcPrimStep tcm (forcePrims m) p [] [Suspend (Var i), Suspend (Var j)] m1
 
-              (e':es) ->
-                Just . setTerm e' $ stackPush (PrimApply p (rights args) [] es) m
+              (e':es)
+                | primName p `elem` undefinedPrims
+                -- The above primitives are (bottoming) values, whose arguments
+                -- are never used anywhere in the rest of the compiler. So
+                -- instead of pushing a PrimApply frame on the stack to evaluate
+                -- those arguments, we instead just unwind the stack with the
+                -- primitive value and leave its arguments in an unevaluated
+                -- state (Suspend).
+                -> ghcUnwind (PrimVal p (rights args) (map Suspend (e':es))) m tcm
+                | otherwise
+                -> Just . setTerm e' $ stackPush (PrimApply p (rights args) [] es) m
 
               _ -> error "internal error"
 
