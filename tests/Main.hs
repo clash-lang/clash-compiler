@@ -312,6 +312,7 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "Basic"
         [ runTest "AES" def{hdlSim=False}
         , runTest "BangData" def{hdlSim=False}
+        , runTest "CaseOfErr" def{hdlTargets=[VHDL],hdlSim=False}
         , runTest "Trace" def{hdlSim=False}
         , runTest "DivMod" def{hdlSim=False}
         , runTest "DivZero" def
