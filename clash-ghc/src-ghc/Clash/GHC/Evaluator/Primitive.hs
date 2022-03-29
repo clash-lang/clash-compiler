@@ -1585,6 +1585,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [Lit (NaturalLiteral n), _] <- args
     -> reduce (Literal (NaturalLiteral n))
 
+  "GHC.TypeNats.someNatVal"
+    | [Lit (NaturalLiteral n)] <- args
+    -> let resTy = getResultTy tcm ty tys
+        in reduce (mkSomeNat tcm n resTy)
+
   "GHC.Int.I8#"
     | isSubj
     , [Lit (IntLiteral i)] <- args
@@ -4212,6 +4217,31 @@ mkDoubleCLit tcm lit resTy =
   (_, tyView -> TyConApp doubleTcNm []) = splitFunForallTy resTy
   (Just doubleTc) = lookupUniqMap doubleTcNm tcm
   [doubleDc] = tyConDataCons doubleTc
+
+mkSomeNat :: TyConMap -> Integer -> Type -> Term
+mkSomeNat tcm lit resTy =
+  mkApps (Data someNatDc)
+         [ Right (LitTy (NumTy lit))
+         , Left (Literal (NaturalLiteral lit))
+         , Left proxy
+         ]
+ where
+  -- Get the SomeNat data constructor
+  TyConApp someNatTcNm [] = tyView resTy
+  (Just someNatTc) = lookupUniqMap someNatTcNm tcm
+  [someNatDc] = tyConDataCons someNatTc
+
+  -- Get the Proxy data constructor
+  (_:_:Right (tyView -> TyConApp proxyTcNm [natTy,_]):_,_) =
+    splitFunForallTy (dcType someNatDc)
+  (Just proxyTc) = lookupUniqMap proxyTcNm tcm
+  [proxyDc] = tyConDataCons proxyTc
+
+  -- Build the Proxy argument
+  proxy = mkApps (Data proxyDc)
+                 [ Right natTy
+                 , Right (LitTy (NumTy lit))
+                 ]
 
 -- From an argument list to function of type
 --   forall n. KnownNat n => ...

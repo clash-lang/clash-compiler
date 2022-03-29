@@ -346,6 +346,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Time" def
         , runTest "Shift" def{hdlSim=False}
         , runTest "SimpleConstructor" def{hdlSim=False}
+        , runTest "SomeNatVal" def{hdlTargets=[VHDL],hdlSim=False}
         , runTest "TyEqConstraints" def{
             hdlSim=False
           , buildTargets=BuildSpecific ["top1"]
