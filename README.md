@@ -62,7 +62,7 @@ git checkout 1.2
 
 Note that release branches might contain non-released patches.
 
-## GHC compatability
+## GHC compatibility
 |      | Linux | Windows | macOS |
 |------|-------|---------|-------|
 | 8.6  | ✔️     | ✔️      | ✔️     |
