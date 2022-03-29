@@ -80,8 +80,8 @@ let macT s (x,y) = (s',s)
 --   -> 'Signal' dom Int
 -- dualMac clk rst en (a,b) (x,y) = s1 + s2
 --   where
---     s1 = 'mealy' clk rst en mac 0 ('bundle' (a,x))
---     s2 = 'mealy' clk rst en mac 0 ('bundle' (b,y))
+--     s1 = 'mealy' clk rst en macT 0 ('bundle' (a,x))
+--     s2 = 'mealy' clk rst en macT 0 ('bundle' (b,y))
 -- @
 mealy
   :: ( KnownDomain dom
