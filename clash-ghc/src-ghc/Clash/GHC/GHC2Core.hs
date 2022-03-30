@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
-                     2017-2818, Google Inc.
+                     2017-2022, Google Inc.
                      2021,      QBayLogic B.V.,
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -159,8 +159,9 @@ import qualified Clash.Core.Name             as C
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.TyCon            as C
 import qualified Clash.Core.Type             as C
-import qualified Clash.Core.Util             as C (undefinedTy)
+import qualified Clash.Core.Util             as C (undefinedTy, undefinedXPrims)
 import qualified Clash.Core.Var              as C
+import           Clash.Normalize.Primitives  as C
 import           Clash.Primitives.Types
 import qualified Clash.Unique                as C
 import           Clash.Util
@@ -381,9 +382,6 @@ coreToTerm primMap unlocs = term
         go "GHC.Stack.withFrozenCallStack"     args
           | length args == 3
           = term (App (args!!2) (args!!1))
-        go "Clash.Class.BitPack.Internal.packXWith" args
-          | [_nTy,_aTy,_kn,f] <- args
-          = term f
         go "Clash.Sized.BitVector.Internal.checkUnpackUndef" args
           | [_nTy,_aTy,_kn,_typ,f] <- args
           = term f
@@ -461,9 +459,34 @@ coreToTerm primMap unlocs = term
         x' <- coreToIdSP sp x
         return (x',b')
 
-    term' (Case _ _ ty [])  =
-      C.TyApp (C.Prim (C.PrimInfo (pack "EmptyCase") C.undefinedTy C.WorkNever C.SingleResult C.NoUnfolding))
-        <$> coreToType ty
+    term' (Case s _ ty [])  = do
+      s'  <- term' s
+      ty' <- coreToType ty
+      case C.collectArgs s' of
+        (C.Prim p, _) | C.primName p `elem` C.undefinedXPrims ->
+          -- GHC translates things like:
+          --
+          --   xToBV (Index.pack# (errorX @TY "QQ"))
+          --
+          -- to
+          --
+          --   xToBV (case (errorX @TY "QQ") of {})
+          --
+          --
+          -- Here we then translate
+          --
+          --   case (errorX @TY "QQ") of {}
+          --
+          -- to
+          --
+          --   undefinedX @TY
+          --
+          -- So that the evaluator rule for 'xToBV' can recognize things that
+          -- would normally throw XException
+          return (C.TyApp (C.Prim C.undefinedX) ty')
+        _ ->
+          return (C.TyApp (C.Prim C.undefined) ty')
+
     term' (Case e b ty alts) = do
      let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (== b))
                   $ rhssOfAlts alts
@@ -550,7 +573,6 @@ coreToTerm primMap unlocs = term
               | f == "GHC.Magic.noinline"               -> return (idTerm xType)
               | f == "GHC.Magic.lazy"                   -> return (idTerm xType)
               | f == "GHC.Magic.runRW#"                 -> return (runRWTerm xType)
-              | f == "Clash.Class.BitPack.Internal.packXWith"    -> return (packXWithTerm xType)
               | f == "Clash.Sized.Internal.BitVector.checkUnpackUndef" -> return (checkUnpackUndefTerm xType)
               | f == "Clash.Magic.prefixName"
               -> return (nameModTerm C.PrefixName xType)
@@ -1342,32 +1364,6 @@ runRWTerm (C.ForAllTy rTV (C.ForAllTy oTV funTy)) =
     rwNm             = pack "GHC.Prim.realWorld#"
 
 runRWTerm ty = error $ $(curLoc) ++ show ty
-
--- | Given type type:
---
--- @forall (n :: Nat) (a :: Type) .Knownnat n => (a -> BitVector n) -> a -> BitVector n@
---
--- Generate the term:
---
--- @/\(n:Nat)./\(a:TYPE r).\(kn:KnownNat n).\(f:a -> BitVector n).f@
-packXWithTerm
-  :: C.Type
-  -> C.Term
-packXWithTerm (C.ForAllTy nTV (C.ForAllTy aTV funTy)) =
-  C.TyLam nTV (
-  C.TyLam aTV (
-  C.Lam knId (
-  C.Lam fId (
-  C.Var fId))))
-  where
-    C.FunTy knTy rTy = C.tyView funTy
-    C.FunTy fTy _    = C.tyView rTy
-    knName           = C.mkUnsafeSystemName "kn" 0
-    fName            = C.mkUnsafeSystemName "f" 1
-    knId             = C.mkLocalId knTy knName
-    fId              = C.mkLocalId fTy fName
-
-packXWithTerm ty = error $ $(curLoc) ++ show ty
 
 -- | Given type type:
 --

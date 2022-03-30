@@ -1,0 +1,1 @@
+FIXED: Simulation/Synthesis mismatch for X-exception to undefined bitvector conversion [#2154](https://github.com/clash-lang/clash-compiler/issues/2154)

@@ -1,6 +1,7 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
-                     2021     , QBayLogic B.V.
+                     2021     , QBayLogic B.V.,
+                     2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -466,10 +467,8 @@ primUCo =
 undefinedPrims :: [T.Text]
 undefinedPrims =
   [ "Clash.Normalize.Primitives.undefined"
-  , "Clash.XException.errorX"
   , "Control.Exception.Base.absentError"
   , "Control.Exception.Base.patError"
-  , "EmptyCase"
   , "GHC.Err.error"
   , "GHC.Err.errorWithoutStackTrace"
   , "GHC.Err.undefined"
@@ -477,6 +476,12 @@ undefinedPrims =
   , "GHC.Real.overflowError"
   , "GHC.Real.ratioZeroDenominatorError"
   , "GHC.Real.underflowError"
+  ]
+
+undefinedXPrims :: [T.Text]
+undefinedXPrims =
+  [ "Clash.Normalize.Primitives.undefinedX"
+  , "Clash.XException.errorX"
   ]
 
 substArgTys

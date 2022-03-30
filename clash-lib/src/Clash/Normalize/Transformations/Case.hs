@@ -1,7 +1,7 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
-                    2017-2018, Google Inc.,
+                    2017-2022, Google Inc.,
                     2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -70,7 +70,7 @@ import Clash.Debug (traceIf)
 import Clash.Driver.Types (DebugOpts(dbg_invariants))
 import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
 import Clash.Netlist.Util (coreTypeToHWType, representableType)
-import qualified Clash.Normalize.Primitives as NP (undefined)
+import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Combinators ((>-!))
 import Clash.Rewrite.Types
@@ -290,8 +290,7 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- means the entire case-expression is _|_
       (Prim pInfo,[_],ticks)
         | primName pInfo `elem` [ Text.showt 'NP.undefined
-                                , "Clash.GHC.Evaluator.undefined"
-                                , "EmptyCase"] ->
+                                , Text.showt 'NP.undefinedX ] ->
         let e1 = mkApps (mkTicks (Prim pInfo) ticks) [Right ty]
         in changed e1
       -- WHNF of subject is _|_, in the form of `errorX`: that means that

@@ -1,5 +1,6 @@
 {-|
-Copyright   : (C) 2021, QBayLogic B.V.
+Copyright   : (C) 2021, QBayLogic B.V.,
+                  2022, Google Inc.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -11,6 +12,7 @@ Special primitives created during the normalization process.
 module Clash.Normalize.Primitives
   ( removedArg
   , undefined
+  , undefinedX
   ) where
 
 import Prelude hiding (undefined)
@@ -41,6 +43,18 @@ removedArg = PrimInfo
 undefined :: PrimInfo
 undefined = PrimInfo
   { primName = Text.showt 'undefined
+  , primType = undefinedTy
+  , primWorkInfo = WorkNever
+  , primMultiResult = SingleResult
+  , primUnfolding = NoUnfolding
+  }
+
+-- | The undefinedX primitive represents an X-exception throwing value that was
+-- identified during normalization.
+--
+undefinedX :: PrimInfo
+undefinedX = PrimInfo
+  { primName = Text.showt 'undefinedX
   , primType = undefinedTy
   , primWorkInfo = WorkNever
   , primMultiResult = SingleResult

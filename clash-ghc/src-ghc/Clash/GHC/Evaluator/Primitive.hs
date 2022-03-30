@@ -1,8 +1,8 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
-                     2017     , QBayLogic, Google Inc.,
-                     2021-2022, QBayLogic B.V.
+                     2017-2022, Google Inc.,
+                     2017-2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -20,6 +20,7 @@ module Clash.GHC.Evaluator.Primitive
   ( ghcPrimStep
   , ghcPrimUnwind
   , isUndefinedPrimVal
+  , isUndefinedXPrimVal
   ) where
 
 import           Control.Concurrent.Supply  (Supply,freshId)
@@ -88,7 +89,7 @@ import           Clash.Core.Name
 import           Clash.Core.Pretty   (showPpr)
 import           Clash.Core.Term
   (IsMultiPrim (..), Pat (..), PrimInfo (..), Term (..), WorkInfo (..), mkApps,
-   PrimUnfolding(..))
+   PrimUnfolding(..), collectArgs)
 import           Clash.Core.Type
   (Type (..), ConstTy (..), LitTy (..), TypeView (..), mkFunTy, mkTyConApp,
    splitFunForallTy, tyView)
@@ -96,7 +97,8 @@ import           Clash.Core.TyCon
   (TyConMap, TyConName, tyConDataCons)
 import           Clash.Core.TysPrim
 import           Clash.Core.Util
-  (mkRTree,mkVec,tyNatSize,dataConInstArgTys,primCo, mkSelectorCase,undefinedPrims)
+  (mkRTree,mkVec,tyNatSize,dataConInstArgTys,primCo, mkSelectorCase,undefinedPrims,
+   undefinedXPrims)
 import           Clash.Core.Var      (mkLocalId, mkTyVar)
 import           Clash.Debug
 import           Clash.GHC.GHC2Core  (modNameM)
@@ -124,6 +126,11 @@ isUndefinedPrimVal (PrimVal (PrimInfo{primName}) _ _) =
   primName `elem` undefinedPrims
 isUndefinedPrimVal _ = False
 
+isUndefinedXPrimVal :: Value -> Bool
+isUndefinedXPrimVal (PrimVal (PrimInfo{primName}) _ _) =
+  primName `elem` undefinedXPrims
+isUndefinedXPrimVal _ = False
+
 -- | Evaluation of primitive operations.
 ghcPrimUnwind :: PrimUnwind
 ghcPrimUnwind tcm p tys vs v [] m
@@ -132,6 +139,7 @@ ghcPrimUnwind tcm p tys vs v [] m
                        , Text.pack (show 'NP.removedArg)
                        , "GHC.Prim.MutableByteArray#"
                        , Text.pack (show 'NP.undefined)
+                       , Text.pack (show 'NP.undefinedX)
                        ]
               -- The above primitives are actually values, and not operations.
   = ghcUnwind (PrimVal p tys (vs ++ [v])) m tcm
@@ -160,10 +168,18 @@ ghcPrimUnwind tcm p tys vs v [] m
         tmArgs = map (Left . valToTerm) (vs ++ [v])
     in  Just $ flip setTerm m $ TyApp (Prim NP.undefined) $
           applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
+  | isUndefinedXPrimVal v
+  = let tyArgs = map Right tys
+        tmArgs = map (Left . valToTerm) (vs ++ [v])
+    in  Just $ flip setTerm m $ TyApp (Prim NP.undefinedX) $
+          applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
   | otherwise
   = ghcPrimStep tcm (forcePrims m) p tys (vs ++ [v]) m
 
 ghcPrimUnwind tcm p tys vs v [e] m0
+  -- Note [Lazy primitives]
+  -- ~~~~~~~~~~~~~~~~~~~~~~
+  --
   -- Primitives are usually considered undefined when one of their arguments is
   -- (unless they're unused). _Some_ primitives can still yield a result even
   -- though one of their arguments is undefined. It turns out that all primitives
@@ -174,6 +190,7 @@ ghcPrimUnwind tcm p tys vs v [e] m0
                        , "Clash.Sized.Vector.replace_int"
                        , "GHC.Classes.&&"
                        , "GHC.Classes.||"
+                       , "Clash.Class.BitPack.Internal.xToBV"
                        ]
   = if isUndefinedPrimVal v then
       let tyArgs = map Right tys
@@ -1794,6 +1811,29 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let resTy = getResultTy tcm ty tys
            val = unpack (toBV i :: BitVector 64)
         in reduce (mkDoubleCLit tcm val resTy)
+
+  "Clash.Class.BitPack.Internal.xToBV"
+    | isSubj
+    , Just (nTy, kn) <- extractKnownNat tcm tys
+    -- The second argument to `xToBV` is always going to be suspended.
+    -- See Note [Lazy primitives]
+    , [ _, (Suspend arg) ] <- args
+    , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+    , mach1@Machine{mStack=[],mTerm=argWHNF} <-
+        whnf eval tcm True (setTerm arg (stackClear mach))
+    , let undefBitVector =
+            Just $ mach1
+                 { mStack = mStack mach
+                 , mTerm  = mkBitVectorLit ty nTy kn (bit (fromInteger kn)-1) 0
+                 }
+    -> case isX argWHNF of
+         Left _ -> undefBitVector
+         _ -> case collectArgs argWHNF of
+           (Prim p,_) | primName p `elem` undefinedXPrims -> undefBitVector
+           _ -> Just $ mach1
+                     { mStack = mStack mach
+                     , mTerm  = argWHNF
+                     }
 
   -- expIndex#
   --   :: KnownNat m

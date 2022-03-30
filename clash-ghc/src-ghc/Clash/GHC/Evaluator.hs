@@ -1,6 +1,6 @@
 {-|
-  Copyright   :  (C) 2017, Google Inc.,
-                     2021, QBayLogic B.V.
+  Copyright   :  (C) 2017-2022, Google Inc.,
+                     2021     , QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -49,7 +49,7 @@ import           Clash.Core.Util
 import           Clash.Core.Var
 import           Clash.Core.VarEnv
 import           Clash.Debug
-import qualified Clash.Normalize.Primitives as NP (undefined)
+import qualified Clash.Normalize.Primitives as NP (removedArg, undefined, undefinedX)
 import           Clash.Unique
 import           Clash.Util                              (curLoc)
 
@@ -166,7 +166,7 @@ stepApp x y m tcm =
                     in  ghcPrimStep tcm (forcePrims m) p [] [Suspend (Var i), Suspend (Var j)] m1
 
               (e':es)
-                | primName p `elem` undefinedPrims
+                | primName p `elem` (undefinedXPrims ++ undefinedPrims)
                 -- The above primitives are (bottoming) values, whose arguments
                 -- are never used anywhere in the rest of the compiler. So
                 -- instead of pushing a PrimApply frame on the stack to evaluate
@@ -204,8 +204,9 @@ stepTyApp x ty m tcm =
       let tys = fst $ splitFunForallTy (primType p)
        in case compare (length args) (length tys) of
             EQ -> case lefts args of
-                    [] | primName p `elem` [ "Clash.Normalize.Primitives.removedArg"
-                                           , "Clash.Normalize.Primitives.undefined" ] ->
+                    [] | primName p `elem` fmap primName [ NP.removedArg
+                                                         , NP.undefined
+                                                         , NP.undefinedX ] ->
                             ghcUnwind (PrimVal p (rights args) []) m tcm
 
                        | otherwise ->
@@ -321,6 +322,8 @@ apply _tcm (Lambda x' e) x m =
   subst  = extendIdSubst subst0 x' (Var x)
   subst0 = mkSubst $ extendInScopeSet (mScopeNames m) x
 apply tcm pVal@(PrimVal (PrimInfo{primType}) tys vs) x m
+  | isUndefinedXPrimVal pVal
+  = setTerm (TyApp (Prim NP.undefinedX) ty) m
   | isUndefinedPrimVal pVal
   = setTerm (TyApp (Prim NP.undefined) ty) m
  where
@@ -337,6 +340,8 @@ instantiate _tcm (TyLambda x e) ty m =
   subst0 = mkSubst iss0
   iss0   = mkInScopeSet (freeVarsOf e `unionUniqSet` freeVarsOf ty)
 instantiate tcm pVal@(PrimVal (PrimInfo{primType}) tys []) ty m
+  | isUndefinedXPrimVal pVal
+  = setTerm (TyApp (Prim NP.undefinedX) (piResultTys tcm primType (tys ++ [ty]))) m
   | isUndefinedPrimVal pVal
   = setTerm (TyApp (Prim NP.undefined) (piResultTys tcm primType (tys ++ [ty]))) m
 
@@ -411,6 +416,8 @@ scrutinise (DC dc xs) _altTy alts m
   = setTerm altE m
 
 scrutinise v@(PrimVal p _ vs) altTy alts m
+  | isUndefinedXPrimVal v
+  = setTerm (TyApp (Prim NP.undefinedX) altTy) m
   | isUndefinedPrimVal v
   = setTerm (TyApp (Prim NP.undefined) altTy) m
 
