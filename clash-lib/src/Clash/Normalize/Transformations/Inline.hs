@@ -1,7 +1,7 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
-                    2017-2018, Google Inc.,
+                    2017-2022, Google Inc.,
                     2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -425,7 +425,31 @@ collapseRHSNoops _ (Letrec binds body) = do
       Monad.guard $ not isRecursive
       isNoop $ bindingTerm binding
     isNoop (Prim PrimInfo{primWorkInfo=WorkIdentity _ []}) = return True
+    isNoop (Lam x e) = isNoopApp x (collectArgs e)
     isNoop _ = return False
+
+    -- Check whether we have a term of the form:
+    --
+    -- primX a (primY b (primZ c (... x ...))))
+    --
+    -- Where primX, primY and primZ are either:
+    --
+    --  1. xToBV, or
+    --  2. Primitives that are the identity on their argument
+    --
+    -- And that the variable 'x' is used by the last primitive in the chain.
+    isNoopApp x (Var y,[]) = return (x == y)
+    isNoopApp x (Prim PrimInfo{primWorkInfo=WorkIdentity i []},args) = do
+      arg <- getTermArg (lefts args) i
+      isNoopApp x (collectArgs arg)
+    isNoopApp x (Prim PrimInfo{primName="Clash.Class.BitPack.Internal.xToBV"},args) = do
+      -- We don't make 'xToBV' something of 'WorkIdentity 1 []' because we don't
+      -- want 'getIdentity' to replace "naked" occurances of 'xToBV' by
+      -- 'unsafeCoerce#'. We don't want that since 'xToBV' has a special evaluator
+      -- rule that can translate XExceptions to 'undefined# :: BitVector n'.
+      arg@(App {}) <- getTermArg (lefts args) 1
+      isNoopApp x (collectArgs arg)
+    isNoopApp _ _ = return False
 
 collapseRHSNoops _ e = return e
 {-# SCC collapseRHSNoops #-}
