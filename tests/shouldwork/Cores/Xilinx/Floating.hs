@@ -1,5 +1,5 @@
 {-|
-Copyright  :  (C) 2021,      QBayLogic B.V.,
+Copyright  :  (C) 2021-2022, QBayLogic B.V.,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -27,13 +27,13 @@ instance ShowX FloatVerifier where
   showsPrecX = showsPrecXWith showsPrec
 
 instance Show FloatVerifier where
-  showsPrec = floatVerifierShowsPrec#
+  showsPrec = floatVerifierShowsPrec
 
-floatVerifierShowsPrec#
+floatVerifierShowsPrec
   :: Int
   -> FloatVerifier
   -> ShowS
-floatVerifierShowsPrec# _ (FloatVerifier x)
+floatVerifierShowsPrec _ (FloatVerifier x)
   | isNaN x = nanSign . nanString . showHex payload . (')':)
   | otherwise = shows x
  where
@@ -53,12 +53,11 @@ playSampleRom
      )
   => Clock dom
   -> Reset dom
-  -> SNat n
-  -> FilePath
+  -> MemBlob n (BitSize a)
   -> (Signal dom Bool, Signal dom a)
-playSampleRom clk rst n file = (done, out)
+playSampleRom clk rst content = (done, out)
  where
-  out = unpack . asyncRomFile n file <$> cnt
+  out = unpack . asyncRomBlob content <$> cnt
   done = CEP.register clk rst enableGen False $ (== maxBound) <$> cnt
   cnt :: Signal dom (Index n)
   cnt = CEP.register clk rst enableGen 0 $ satSucc SatBound <$> cnt
@@ -67,6 +66,7 @@ basicBinaryTB
   :: forall n d
    . ( KnownNat n
      , KnownNat d
+     , 1 <= n
      )
   => (   Clock XilinxSystem
       -> DSignal XilinxSystem 0 Float
@@ -100,12 +100,11 @@ basicRomTB
       -> DSignal XilinxSystem 0 Float
       -> DSignal XilinxSystem d Float
      )
-  -> SNat n
-  -> FilePath
+  -> MemBlob n (BitSize (Float, Float, Float))
   -> Signal XilinxSystem Bool
-basicRomTB comp n sampleFile = done
+basicRomTB comp sampleBlob = done
  where
-  (done0, samples) = playSampleRom clk rst n sampleFile
+  (done0, samples) = playSampleRom clk rst sampleBlob
   (inputX, inputY, expectedOutput) = unbundle samples
   -- Only assert while not finished
   done = mux done0 done0
@@ -129,9 +128,7 @@ addBasic clk x y = withClock clk $ withEnable enableGen $ F.add x y
 {-# ANN addBasic (binTopAnn "addBasic") #-}
 
 addBasicTB :: Signal XilinxSystem Bool
-addBasicTB =
-  uncurry (basicRomTB addBasic)
-          $(romDataFromFile "add-samplerom.bin" addBasicSamples)
+addBasicTB = basicRomTB addBasic $(memBlobTH Nothing addBasicSamples)
 {-# ANN addBasicTB (TestBench 'addBasic) #-}
 
 addEnable
@@ -203,9 +200,7 @@ subBasic clk x y = withClock clk $ withEnable enableGen $ F.sub x y
 {-# ANN subBasic (binTopAnn "subBasic") #-}
 
 subBasicTB :: Signal XilinxSystem Bool
-subBasicTB =
-  uncurry (basicRomTB subBasic)
-          $(romDataFromFile "sub-samplerom.bin" subBasicSamples)
+subBasicTB = basicRomTB subBasic $(memBlobTH Nothing subBasicSamples)
 {-# ANN subBasicTB (TestBench 'subBasic) #-}
 
 mulBasic
@@ -218,9 +213,7 @@ mulBasic clk x y = withClock clk $ withEnable enableGen $ F.mul x y
 {-# ANN mulBasic (binTopAnn "mulBasic") #-}
 
 mulBasicTB :: Signal XilinxSystem Bool
-mulBasicTB =
-  uncurry (basicRomTB mulBasic)
-          $(romDataFromFile "mul-samplerom.bin" mulBasicSamples)
+mulBasicTB = basicRomTB mulBasic $(memBlobTH Nothing mulBasicSamples)
 {-# ANN mulBasicTB (TestBench 'mulBasic) #-}
 
 divBasic
@@ -233,7 +226,5 @@ divBasic clk x y = withClock clk $ withEnable enableGen $ F.div x y
 {-# ANN divBasic (binTopAnn "divBasic") #-}
 
 divBasicTB :: Signal XilinxSystem Bool
-divBasicTB =
-  uncurry (basicRomTB divBasic)
-          $(romDataFromFile "div-samplerom.bin" divBasicSamples)
+divBasicTB = basicRomTB divBasic $(memBlobTH Nothing divBasicSamples)
 {-# ANN divBasicTB (TestBench 'divBasic) #-}

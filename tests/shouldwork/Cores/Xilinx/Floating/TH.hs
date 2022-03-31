@@ -1,5 +1,5 @@
 {-|
-Copyright  :  (C) 2021,      QBayLogic B.V.,
+Copyright  :  (C) 2021-2022, QBayLogic B.V.,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -8,29 +8,14 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 module Floating.TH where
 
-import Clash.Prelude (BitPack, natToNum, SNat(..), unpack)
-import Clash.Prelude.ROM.File (memFile)
+import Clash.Prelude (natToNum, unpack)
 
 import Prelude
-import Language.Haskell.TH
-  (appTypeE, conE, ExpQ, litE, litT, numTyLit, stringL, tupE)
-import Language.Haskell.TH.Syntax (qRunIO)
 import Numeric.IEEE
   (epsilon, infinity, maxFinite, minDenormal, minNormal)
 
 import Clash.Cores.Xilinx.Floating as F
 import Clash.Cores.Xilinx.Floating.Internal as F
-
-romDataFromFile
-  :: BitPack a
-  => FilePath
-  -> [a]
-  -> ExpQ
-romDataFromFile file es =
-  qRunIO (writeFile file $ memFile (Just 0) es)
-  >> tupE [ appTypeE (conE 'SNat) (litT . numTyLit . toInteger $ length es)
-          , litE $ stringL file
-          ]
 
 delayOutput
   :: Int
