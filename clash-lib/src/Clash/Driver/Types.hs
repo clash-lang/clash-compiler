@@ -338,7 +338,7 @@ data ClashOpts = ClashOpts
   , opt_color :: OverridingBool
   -- ^ Show colors in debug output
   --
-  -- Command line flag: -fclash-no-prim-warn
+  -- Command line flag: -fdiagnostics-color
   , opt_intWidth :: Int
   -- ^ Set the bit width for the Int/Word/Integer types. The only allowed values
   -- are 32 or 64.
