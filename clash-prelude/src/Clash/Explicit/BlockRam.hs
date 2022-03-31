@@ -416,6 +416,8 @@ module Clash.Explicit.BlockRam
   , RamOp(..)
     -- * Internal
   , blockRam#
+  , blockRamU#
+  , blockRam1#
   , trueDualPortBlockRam#
   )
 where
