@@ -39,6 +39,15 @@ parts:
       # To save time on CI, we currently don't build profiling packages anymore. We should
       # probably selectively build them on release branches and nightlies.
       #- clash-prof
+      # The below packages are included in core20, but their -dev packages are
+      # not.  Include them here to avoid broken symlinks from dev sonames.
+      - libbsd0
+      - libffi7
+      - libgmp10
+      - libncurses6
+      - libncursesw6
+      - libtinfo6
+      - libyaml-0-2
     override-prime: |
       snapcraftctl prime
       apt-get install -y ghc
