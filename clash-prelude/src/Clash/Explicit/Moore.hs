@@ -72,8 +72,8 @@ import           Clash.XException                 (NFDataX)
 --   -> 'Signal' dom Int
 -- dualMac clk rst en (a,b) (x,y) = s1 + s2
 --   where
---     s1 = 'moore' clk rst en mac id 0 ('bundle' (a,x))
---     s2 = 'moore' clk rst en mac id 0 ('bundle' (b,y))
+--     s1 = 'moore' clk rst en macT id 0 ('bundle' (a,x))
+--     s2 = 'moore' clk rst en macT id 0 ('bundle' (b,y))
 -- @
 moore
   :: ( KnownDomain dom

@@ -1,10 +1,18 @@
+{-|
+Copyright  :  (C) 2021-2022, QBayLogic B.V.
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Clash.Num.Overflowing
-  ( Overflowing(fromOverflowing, hasOverflowed)
+  ( Overflowing
+  , fromOverflowing
+  , hasOverflowed
   , toOverflowing
   , clearOverflow
   ) where
@@ -31,7 +39,9 @@ import Clash.XException (NFDataX, ShowX)
 --
 data Overflowing a = Overflowing
   { fromOverflowing :: a
+    -- ^ Retrieve the value
   , hasOverflowed :: Bool
+    -- ^ 'True' when a computation has overflowed
   }
   deriving stock (Generic, Show)
   deriving anyclass (Binary, Hashable, NFData, NFDataX, ShowX)

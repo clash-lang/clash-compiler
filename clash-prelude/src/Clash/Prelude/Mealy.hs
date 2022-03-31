@@ -71,8 +71,8 @@ let macT s (x,y) = (s',s)
 --   -> 'Signal' dom Int
 -- dualMac (a,b) (x,y) = s1 + s2
 --   where
---     s1 = 'mealy' mac 0 ('Clash.Signal.bundle' (a,x))
---     s2 = 'mealy' mac 0 ('Clash.Signal.bundle' (b,y))
+--     s1 = 'mealy' macT 0 ('Clash.Signal.bundle' (a,x))
+--     s2 = 'mealy' macT 0 ('Clash.Signal.bundle' (b,y))
 -- @
 mealy
   :: ( HiddenClockResetEnable dom

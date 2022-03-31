@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2019     , Google Inc.,
-                     2021     , QBayLogic B.V.
+                     2021-2022, QBayLogic B.V.,
                      2021-2022, Myrtle.ai
   License     :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -107,7 +107,7 @@ import           Control.Lens.Internal.TH     (bndrName)
 class NFDataX a => AutoReg a where
   -- | For documentation see class 'AutoReg'.
   --
-  -- This is version with explicit clock/reset/enable,
+  -- This is the version with explicit clock\/reset\/enable inputs,
   -- "Clash.Prelude" exports an implicit version of this: 'Clash.Prelude.autoReg'
   autoReg
     :: (HasCallStack, KnownDomain dom)

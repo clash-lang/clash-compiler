@@ -25,7 +25,7 @@ module Clash.Primitives.DSL
     BlackBoxHaskellOpts(..)
   , blackBoxHaskell
 
-  -- * declarations
+  -- * Declarations
   , BlockState (..)
   , TExpr
   , declaration
@@ -139,10 +139,10 @@ instance Default BlackBoxHaskellOpts where
 -- | Create a blackBoxHaskell primitive. To be used as part of an annotation:
 --
 -- @
--- {-# ANN myFunction (blackBoxHaskell 'myFunction 'myBBF def{_ignoredArguments=[2,3]}) #-}
+-- {-\# ANN myFunction (blackBoxHaskell 'myFunction 'myBBF def{_ignoredArguments=[1,2]}) \#-}
 -- @
 --
--- [2,3] would mean this blackbox __ignores__ its second and third argument.
+-- @[1,2]@ would mean this blackbox __ignores__ its second and third argument.
 blackBoxHaskell
   :: Name
   -- ^ blackbox name

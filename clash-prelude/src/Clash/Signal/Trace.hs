@@ -262,7 +262,7 @@ traceSignal1 traceName signal =
 -- an error.
 --
 -- __NB__ Works correctly when creating VCD files from traced signal in
--- multi-clock circuits. However 'traceSignal1' might be more convinient to
+-- multi-clock circuits. However 'traceSignal1' might be more convenient to
 -- use when the domain of your circuit is polymorphic.
 traceVecSignal
   :: forall dom a  n
