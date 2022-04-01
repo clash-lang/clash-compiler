@@ -3,14 +3,14 @@
     comment: Needed to make the evaluator handle this constructor strictly
     primType: Constructor
     warning: 'GHC.Num.Natural.NS: Naturals are dynamically sized in simulation, but
-      fixed-length after synthesization. Use carefully.'
+      fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - Primitive:
     name: GHC.Num.Natural.NB
     comment: Needed to make the evaluator handle this constructor strictly
     primType: Constructor
     warning: 'GHC.Num.Natural.NB: Naturals are dynamically sized in simulation, but
-      fixed-length after synthesization. Use carefully.'
+      fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
     name: GHC.Num.Natural.naturalAdd

@@ -19,4 +19,4 @@
       :: Integer -> Integer -> Int#'
     template: ~INCLUDENAME[0](~ARG[0],~ARG[1])
     warning: 'GHC.Integer.Logarithms.integerLogBase#: Integers are dynamically sized
-      in simulation, but fixed-length after synthesization. Use carefully.'
+      in simulation, but fixed-length after synthesis. Use carefully.'

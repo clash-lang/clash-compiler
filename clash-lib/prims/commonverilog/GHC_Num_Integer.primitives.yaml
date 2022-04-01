@@ -32,7 +32,7 @@
       Integer -> Int#'
     template: assign ~RESULT = $signed(~ARG[0]);
     warning: 'GHC.Num.Integer.integerToInt#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
     name: GHC.Num.Integer.integerMul
@@ -41,7 +41,7 @@
       -> Integer -> Integer'
     template: ~ARG[0] * ~ARG[1]
     warning: 'GHC.Num.Integer.integerMul: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerNegate
     kind: Expression
@@ -49,7 +49,7 @@
       Integer -> Integer'
     template: -~ARG[0]
     warning: 'GHC.Num.Integer.integerNegate: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerAbs
     kind: Expression
@@ -57,7 +57,7 @@
       -> Integer'
     template: '(~ARG[0] < ~SIZE[~TYPO]''sd0) ? -~ARG[0] : ~ARG[0]'
     warning: 'GHC.Num.Integer.integerAbs: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerRem
     kind: Expression
@@ -65,7 +65,7 @@
       -> Integer -> Integer'
     template: ~ARG[0] % ~ARG[1]
     warning: 'GHC.Num.Integer.integerRem: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerEq
     kind: Expression
@@ -73,7 +73,7 @@
       -> Integer -> Bool'
     template: ~ARG[0] == ~ARG[1]
     warning: 'GHC.Num.Integer.integerEq: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerNe
     kind: Expression
@@ -81,7 +81,7 @@
       -> Integer -> Bool'
     template: ~ARG[0] != ~ARG[1]
     warning: 'GHC.Num.Integer.integerNe: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerEq#
     kind: Expression
@@ -89,7 +89,7 @@
       -> Integer -> Int#'
     template: '(~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]''sd1 : ~SIZE[~TYPO]''sd0'
     warning: 'GHC.Num.Integer.integerEq#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerNe#
     kind: Expression
@@ -97,7 +97,7 @@
       -> Integer -> Int#'
     template: '(~ARG[0] != ~ARG[1]) ? ~SIZE[~TYPO]''sd1 : ~SIZE[~TYPO]''sd0'
     warning: 'GHC.Num.Integer.integerNe#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerLe#
     kind: Expression
@@ -105,7 +105,7 @@
       -> Integer -> Int#'
     template: '(~ARG[0] <= ~ARG[1]) ? ~SIZE[~TYPO]''sd1 : ~SIZE[~TYPO]''sd0'
     warning: 'GHC.Num.Integer.integerLe#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerGt#
     kind: Expression
@@ -113,7 +113,7 @@
       -> Integer -> Int#'
     template: '(~ARG[0] > ~ARG[1] ? ~SIZE[~TYPO]''sd1 : ~SIZE[~TYPO]''sd0'
     warning: 'GHC.Num.Integer.integerGt#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerLt#
     kind: Expression
@@ -121,7 +121,7 @@
       -> Integer -> Int#'
     template: '(~ARG[0] < ~ARG[1]) ? ~SIZE[~TYPO]''sd1 : ~SIZE[~TYPO]''sd0'
     warning: 'GHC.Num.Integer.integerLt#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerGe#
     kind: Expression
@@ -129,7 +129,7 @@
       -> Integer -> Int#'
     template: '(~ARG[0] >= ~ARG[1]) ? ~SIZE[~TYPO]''sd1 : ~SIZE[~TYPO]''sd0'
     warning: 'GHC.Num.Integer.integerGe#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerShiftR#
     kind: Expression
@@ -137,7 +137,7 @@
       Integer -> Word# -> Integer'
     template: ~ARG[0] >>> ~ARG[1]
     warning: 'GHC.Num.Integer.integerShiftR#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerShiftL#
     kind: Expression
@@ -145,7 +145,7 @@
       Integer -> Word# -> Integer'
     template: ~ARG[0] <<< ~ARG[1]
     warning: 'GHC.Num.Integer.integerShiftL#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerTestBit#
     kind: Expression
@@ -153,7 +153,7 @@
       :: Integer -> Word# -> Bool'
     template: ~VAR[input][0][~ARG[1]] == 1'b1
     warning: 'GHC.Num.Integer.integerTestBit#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerFromWord#
     kind: Declaration
@@ -161,7 +161,7 @@
       :: Word# -> Integer'
     template: assign ~RESULT = $signed(~ARG[0]);
     warning: 'GHC.Num.Integer.integerFromWord#: Integers are dynamically sized in
-      simulation, but fixed-length after synthesization. Use carefully.'
+      simulation, but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
     name: GHC.Num.Integer.integerToWord#
@@ -170,7 +170,7 @@
       :: Integer -> Word#'
     template: assign ~RESULT = $unsigned(~ARG[0]);
     warning: 'GHC.Num.Integer.integerToWord#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
     name: GHC.Num.Integer.integerToWord64#
@@ -180,7 +180,7 @@
       :: Integer -> Word64#'
     template: assign ~RESULT = $unsigned(~ARG[0]);
     warning: 'GHC.Num.Integer.integerToWord64#: Integers are dynamically sized in
-      simulation, but fixed-length after synthesization. Use carefully.'
+      simulation, but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
     name: GHC.Num.Integer.integerBit#
@@ -189,7 +189,7 @@
       Word# -> Integer'
     template: 1 << ~ARG[0]
     warning: 'GHC.Num.Integer.integerBit#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerComplement
     kind: Expression
@@ -197,7 +197,7 @@
       :: Integer -> Integer'
     template: ~ ~ARG[0]
     warning: 'GHC.Num.Integer.integerComplement: Integers are dynamically sized in
-      simulation, but fixed-length after synthesization. Use carefully.'
+      simulation, but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerXor
     kind: Expression
@@ -205,7 +205,7 @@
       -> Integer -> Integer'
     template: ~ARG[0] ^ ~ARG[1]
     warning: 'GHC.Num.Integer.integerXor: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerOr
     kind: Expression
@@ -213,7 +213,7 @@
       -> Integer -> Integer'
     template: ~ARG[0] | ~ARG[1]
     warning: 'GHC.Num.Integer.integerOr: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerAnd
     kind: Expression
@@ -221,7 +221,7 @@
       -> Integer -> Integer'
     template: ~ARG[0] & ~ARG[1]
     warning: 'GHC.Num.Integer.integerAnd: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerSignum
     kind: Expression
@@ -230,7 +230,7 @@
     template: '(~ARG[0] < ~SIZE[~TYPO]''sd0) ? -~SIZE[~TYPO]''sd1 : ((~ARG[0] == ~SIZE[~TYPO]''sd0)
       ? ~SIZE[~TYPO]''sd0 : ~SIZE[~TYPO]''sd1)'
     warning: 'GHC.Num.Integer.integerSignum: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.$wintegerSignum
     kind: Expression
@@ -239,7 +239,7 @@
     template: '(~ARG[0] < ~SIZE[~TYPO]''sd0) ? -~SIZE[~TYPO]''sd1 : ((~ARG[0] == ~SIZE[~TYPO]''sd0)
       ? ~SIZE[~TYPO]''sd0 : ~SIZE[~TYPO]''sd1)'
     warning: 'GHC.Num.Integer.$wintegerSignum: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerLogBase#
     imports:
@@ -261,7 +261,7 @@
       :: Integer -> Integer -> Word#'
     template: ~INCLUDENAME[0](~ARG[0],~ARG[1])
     warning: 'GHC.Num.Integer.integerLogBase#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerCompare
     kind: Expression
@@ -270,7 +270,7 @@
     template: '(~ARG[0] < ~ARG[1]) ? -~SIZE[~TYPO]''d0 : ((~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]''d1
       : ~SIZE[~TYPO]''d2)'
     warning: 'GHC.Num.Integer.integerCompare: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerQuot
     kind: Expression
@@ -278,4 +278,4 @@
       Integer -> Integer -> Integer'
     template: ~ARG[0] / ~ARG[1]
     warning: 'GHC.Num.Integer.integerQuot: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'

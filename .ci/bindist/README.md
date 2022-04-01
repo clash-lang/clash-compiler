@@ -35,40 +35,48 @@ triggered on any other branch a _beta_ release gets made.
   * `clash-ghc/clash-cores.cabal`
   * `.ci/bindist/linux/snap/snap/snapcraft.yaml`
   * `docs/conf.py`
-2. Change the defaults of cabal flags in `clash-prelude/clash-prelude.cabal`
-   where necessary. At the time of writing this applies only to
-   `-fmultiple-hidden`.
-3. Update the CHANGELOG (see changelog/README.md).
-4. Create a release branch named after the major version of Clash you're trying to
+2. Update the CHANGELOG (see changelog/README.md).
+3. Create a release branch named after the major version of Clash you're trying to
    release. For example, if you're planning on releasing Clash 1.6.0, create a
    branch called `1.6`.
-5. Ask someone with admin permissions on GitLab to create a new nightly schedule
+4. Repeat step (1) in the new release branch.
+5. Change the defaults of cabal flags in `clash-prelude/clash-prelude.cabal`
+   where necessary. At the time of writing this applies only to
+   `-fmultiple-hidden`.
+6. Ask someone with admin permissions on GitLab to create a new nightly schedule
    and trigger a test release build on [GitLab CI](https://gitlab.com/clash-lang/clash-compiler/pipeline_schedules).
    The new schedule should be the same as the old one, but targeting the new
    release branch. Verify that both Snap and Hackage release fine, and preview
    their releases.
      * [Preview on Hackage](http://hackage.haskell.org/package/clash-prelude/candidates/)
      * [Preview on Snap](https://snapcraft.io/clash)
-6. Create a release on [GitHub's new release page](https://github.com/clash-lang/clash-compiler/releases/new)
-7. Update these docs if anything is missing :-)
-8. Enjoy!
+7. Write release notes for: Twitter, LinkedIn, and clash-lang.org.
+8. Create a release on [GitHub's new release page](https://github.com/clash-lang/clash-compiler/releases/new)
+9. After the release is on Hackage: run `changelog/comment-gh.py` and execute the commands it lists. This will inform users subscribed to specific issues that a fix for their issue is now in a released version.
+10. Update the [starter projects](https://github.com/clash-lang/stack-templates/)
+11. Update these docs if anything is missing :-)
+12. Enjoy!
 
 ## Releasing a new version minor version (1.x.x)
 1. Change version numbers in:
   * `clash-prelude/clash-prelude.cabal`
+  * `clash-prelude-hedgehog/clash-prelude-hedgehog.cabal`
   * `clash-lib/clash-lib.cabal`
+  * `clash-lib-hedgehog/clash-lib-hedgehog.cabal`
   * `clash-ghc/clash-ghc.cabal`
   * `clash-ghc/clash-cores.cabal`
   * `.ci/bindist/linux/snap/snap/snapcraft.yaml`
   * `docs/conf.py`
 2. Update the CHANGELOG (see changelog/README.md).
-3. Ask someone with admin permissions on GitLab to trigger a nightly scheduele,
+3. Ask someone with admin permissions on GitLab to trigger a nightly schedule,
    or simply wait a day. Verify that both Snap and Hackage release fine, and
    preview heir releases.
      * [Preview on Hackage](http://hackage.haskell.org/package/clash-prelude/candidates/)
      * [Preview on Snap](https://snapcraft.io/clash)
 
 4. Create a release on [GitHub's new release page](https://github.com/clash-lang/clash-compiler/releases/new)
-5. Cherry-pick commit made in (2) to `master`
-6. Update these docs if anything is missing :-)
-7. Enjoy!
+5. Update the [starter projects](https://github.com/clash-lang/stack-templates/)
+6. Cherry-pick commit made in (2) to `master`
+7. After the release is on Hackage: run `changelog/comment-gh.py` and execute the commands it lists. This will inform users subscribed to specific issues that a fix for their issue is now in a released version.
+8. Update these docs if anything is missing :-)
+9. Enjoy!

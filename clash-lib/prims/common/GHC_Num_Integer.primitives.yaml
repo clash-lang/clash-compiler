@@ -3,21 +3,21 @@
     comment: Needed to make the evaluator handle this constructor strictly
     primType: Constructor
     warning: 'GHC.Num.Integer.IS: Integers are dynamically sized in simulation, but
-      fixed-length after synthesization. Use carefully.'
+      fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - Primitive:
     name: GHC.Num.Integer.IP
     comment: Needed to make the evaluator handle this constructor strictly
     primType: Constructor
     warning: 'GHC.Num.Integer.IP: Integers are dynamically sized in simulation, but
-      fixed-length after synthesization. Use carefully.'
+      fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - Primitive:
     name: GHC.Num.Integer.IN
     comment: Needed to make the evaluator handle this constructor strictly
     primType: Constructor
     warning: 'GHC.Num.Integer.IN: Integers are dynamically sized in simulation, but
-      fixed-length after synthesization. Use carefully.'
+      fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - Primitive:
     name: GHC.Num.Integer.integerFromNatural
@@ -32,7 +32,7 @@
       -> Integer -> Integer'
     template: ~ARG[0] + ~ARG[1]
     warning: 'GHC.Num.Integer.integerAdd: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerSub
     kind: Expression
@@ -40,7 +40,7 @@
       -> Integer -> Integer'
     template: ~ARG[0] - ~ARG[1]
     warning: 'GHC.Num.Integer.integerSub: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerLe
     kind: Expression
@@ -48,7 +48,7 @@
       -> Integer -> Bool'
     template: ~ARG[0] <= ~ARG[1]
     warning: 'GHC.Num.Integer.integerLe: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerGt
     kind: Expression
@@ -56,7 +56,7 @@
       -> Integer -> Bool'
     template: ~ARG[0] > ~ARG[1]
     warning: 'GHC.Num.Integer.integerGt: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerLt
     kind: Expression
@@ -64,7 +64,7 @@
       -> Integer -> Bool'
     template: ~ARG[0] < ~ARG[1]
     warning: 'GHC.Num.Integer.integerLt: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerGe
     kind: Expression
@@ -72,4 +72,4 @@
       -> Integer -> Bool'
     template: ~ARG[0] >= ~ARG[1]
     warning: 'GHC.Num.Integer.integerGe: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
