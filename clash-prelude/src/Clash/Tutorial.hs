@@ -1248,11 +1248,15 @@ a general listing of the available template holes:
 * @~IF \<CONDITION\> ~THEN \<THEN\> ~ELSE \<ELSE\> ~FI@: renders the @\<ELSE\>@
   part when @\<CONDITION\>@ evaluates to /0/, and renders the @\<THEN\>@ in all
   other cases. Valid @\<CONDITION\>@s are @~LENGTH[\<HOLE\>]@, @~SIZE[\<HOLE\>]@,
+  @~CMPLE[\<HOLE1\>][\<HOLE2\>]@,
   @~DEPTH[\<HOLE\>]@, @~VIVADO@, @~IW64@, @~ISLIT[N]@, @~ISVAR[N]@, @~ISACTIVEENABLE[N]@,
   @~ISSYNC[N]@, and @~AND[\<HOLE1\>,\<HOLE2\>,..]@.
 * @~VIVADO@: /1/ when Clash compiler is invoked with the @-fclash-xilinx@ or
   @-fclash-vivado@ flag. To be used with in an @~IF .. ~THEN .. ~ELSE .. ~FI@
   statement.
+* @~CMPLE[\<HOLE1\>][\<HOLE2\>]@: /1/ when @\<HOLE1\> \<= \<HOLE2\>@, otherwise /0/
+* @~IW64@: /1/ when Int/Word/Integer types are represented with 64 bits in HDL.
+  /0/ when they're represented by 32 bits.
 * @~TOBV[\<HOLE\>][\<TYPE\>]@: create conversion code that so that the
   expression in @\<HOLE\>@ is converted to a bit vector (@std_logic_vector@).
   The @\<TYPE\>@ hole indicates the type of the expression and must be either
@@ -1281,7 +1285,6 @@ a general listing of the available template holes:
   which is not a 'KnownDomain' or 'KnownConf'.
 * @~ISACTIVEENABLE[N]@: Is the @(N+1)@'th argument a an Enable line NOT set to a
   constant True. Can be used instead of deprecated (and removed) template tag
-  @~ISGATED@. Errors when called on an argument which is not a signal of bools.
 * @~ISSYNC[N]@: Does synthesis domain at the @(N+1)@'th argument have synchronous resets. Errors
   when called on an argument which is not a 'KnownDomain' or 'KnownConf'.
 * @~ISINITDEFINED[N]@: Does synthesis domain at the @(N+1)@'th argument have defined initial
