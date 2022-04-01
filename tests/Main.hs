@@ -634,6 +634,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Strict" def
         , runTest "T1019" def{hdlSim=False}
         , runTest "T1351" def
+        , runTest "T2149" def
         , outputTest "UndefinedConstantFolding" def{ghcFlags=["-itests/shouldwork/Numbers"]}
         , runTest "UnsignedZero" def
         ]

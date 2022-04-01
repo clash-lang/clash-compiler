@@ -596,7 +596,7 @@ knownTemplateFunctions =
     , ('P.alteraPllQsysTF, P.alteraPllQsysTF)
     , ('P.alteraPllTF, P.alteraPllTF)
     , ('P.altpllTF, P.altpllTF)
-    , ('P.fromIntegerTF, P.fromIntegerTF)
+    , ('P.fromIntegerTFvhdl, P.fromIntegerTFvhdl)
     ]
 
 -- | Compiles blackbox functions and parses blackbox templates.
