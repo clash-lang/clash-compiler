@@ -312,6 +312,7 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "Basic"
         [ runTest "AES" def{hdlSim=False}
         , runTest "BangData" def{hdlSim=False}
+        , runTest "CaseOfErr" def{hdlTargets=[VHDL],hdlSim=False}
         , runTest "Trace" def{hdlSim=False}
         , runTest "DivMod" def{hdlSim=False}
         , runTest "DivZero" def
@@ -346,6 +347,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Time" def
         , runTest "Shift" def{hdlSim=False}
         , runTest "SimpleConstructor" def{hdlSim=False}
+        , runTest "SomeNatVal" def{hdlTargets=[VHDL],hdlSim=False}
         , runTest "TyEqConstraints" def{
             hdlSim=False
           , buildTargets=BuildSpecific ["top1"]
@@ -569,6 +571,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T2046B" def{clashFlags=["-Werror"]}
         , runTest "T2046C" def{hdlSim=False,clashFlags=["-Werror"],buildTargets=BuildSpecific["topEntity"]}
         , runTest "T2097" def{hdlSim=False}
+        , runTest "T2154" def{hdlTargets=[VHDL], hdlSim=False}
         ] <>
         if compiledWith == Cabal then
           -- This tests fails without environment files present, which are only

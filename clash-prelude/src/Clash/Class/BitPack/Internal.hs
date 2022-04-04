@@ -1,7 +1,8 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2017, Myrtle Software Ltd,
-                  2021,      QBayLogic B.V.
+                  2021,      QBayLogic B.V.,
+                  2022,      Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -142,10 +143,15 @@ packXWith
   => (a -> BitVector n)
   -> a
   -> BitVector n
-packXWith f x =
-  unsafeDupablePerformIO (catch (f <$> evaluate x)
+packXWith f = xToBV . f
+{-# INLINE packXWith #-}
+
+xToBV :: KnownNat n => BitVector n -> BitVector n
+xToBV x =
+  unsafeDupablePerformIO (catch (evaluate x)
                                 (\(XException _) -> return undefined#))
-{-# NOINLINE packXWith #-}
+{-# NOINLINE xToBV #-}
+{-# ANN xToBV hasBlackBox #-}
 
 -- | Pack both arguments to a 'BitVector' and use
 -- 'Clash.Sized.Internal.BitVector.isLike#' to compare them. This is a more

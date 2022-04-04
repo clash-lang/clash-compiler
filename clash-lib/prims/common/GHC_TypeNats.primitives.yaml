@@ -5,3 +5,8 @@
       n proxy. KnownNat n => proxy n -> Natural'
     template: ~ARG[0]
     workInfo: Never
+- Primitive:
+    name: GHC.TypeNats.someNatVal
+    primType: Functions
+    type: 'someNatVal :: Natural -> SomeNat'
+    workInfo: Never
