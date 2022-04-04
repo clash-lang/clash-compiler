@@ -1,5 +1,6 @@
 {-|
-Copyright   : (C) 2020-2021, QBayLogic B.V.
+Copyright   : (C) 2020-2021, QBayLogic B.V.,
+                  2022     , Google Inc.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -49,7 +50,7 @@ import           Clash.Core.Type
 import           Clash.Core.TysPrim (integerPrimTy)
 import           Clash.Core.Var
 import           Clash.Driver.Types (Binding(..), IsPrim(..))
-import qualified Clash.Normalize.Primitives as NP (undefined)
+import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
 import           Clash.Unique (lookupUniqMap')
 
 -- | Evaluate a term to WHNF.
@@ -290,7 +291,9 @@ caseCon subject ty alts = do
   forcedSubject <- keepLifted (forceEval subject)
 
   -- If the subject is undefined, the whole expression is undefined.
-  case isUndefined forcedSubject of
+  case isUndefinedX forcedSubject of
+   True -> eval (TyApp (Prim NP.undefinedX) ty)
+   False -> case isUndefined forcedSubject of
     True -> eval (TyApp (Prim NP.undefined) ty)
     False ->
       case stripValue forcedSubject of

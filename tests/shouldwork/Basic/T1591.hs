@@ -32,8 +32,7 @@ data NextLineMask this that =
   } deriving (Generic)
 
 nextLineMask :: forall this that. (KnownNat this, KnownNat that) => Index (CountStates this that) -> NextLineMask this that
-nextLineMask =
-  errorX ""
+nextLineMask x = NextLineMask x
 
 topEntity :: Signal System (Index (CountStates 3 4))
           -> Signal System (NextLineMask 3 4)

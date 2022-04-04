@@ -5,8 +5,6 @@
 
 module PortGeneration where
 
-import qualified Prelude as P
-
 import Clash.Prelude
 import Clash.Annotations.TH
 
@@ -55,7 +53,7 @@ data Passthrough a b = Passthrough a b
 topEntity1 :: "in1" ::: Signal System Int
            -> "in2" ::: Signal System Bool
            -> "out" ::: Signal System Int
-topEntity1 = undefined
+topEntity1 _ _ = pure (deepErrorX "out")
 makeTopEntity 'topEntity1
 
 topEntity2 :: "int"      ::: Signal System Int
@@ -65,7 +63,7 @@ topEntity2 :: "int"      ::: Signal System Int
            -> "named"    ::: Signal System Named
            -> "embedded" ::: Signal System Embedded
            -> "out"      ::: Signal System Bool
-topEntity2 = undefined
+topEntity2 _ _ _ _ _ = pure (deepErrorX "out")
 makeTopEntity 'topEntity2
 
 topEntity3 :: "clk" ::: Clock System
@@ -77,7 +75,7 @@ topEntity3 :: "clk" ::: Clock System
            -> "tup4" ::: ("int":::Signal System Int, "bool":::Signal System Bool)
            -> "custom" ::: Signal System Named
            -> "outTup" ::: Signal System ("outint":::Int, "outbool":::Bool)
-topEntity3 = undefined
+topEntity3 _ _ _ _ _ _ _ _ = pure (deepErrorX "outTup")
 makeTopEntity 'topEntity3
 
 topEntity4 :: Signal System (Gadt Int)
@@ -89,13 +87,13 @@ topEntity4 :: Signal System (Gadt Int)
            -> Signal System (X Int Int Int)
            -> Signal System (X Bool Int Int)
            -> Signal System Single
-topEntity4 = undefined
+topEntity4 _ _ _ _ _ _ _ _ = pure (errorX "out")
 makeTopEntity 'topEntity4
 
 topEntity5 :: "in1" ::: Signal System SuccessTy
            -> "ab"     ::: Signal System (Passthrough (Passthrough Simple Simple) Simple)
            -> "out" ::: Signal System Int
-topEntity5 = undefined
+topEntity5 _ _ = pure (deepErrorX "out")
 makeTopEntity 'topEntity5
 
 topEntity7 :: (HiddenClockResetEnable System)
@@ -103,14 +101,14 @@ topEntity7 :: (HiddenClockResetEnable System)
            -> "in2" ::: Signal System (Vec 3 Simple)
            -> "passthrough" ::: Signal System (Passthrough Single Single)
            -> "out" ::: Signal System Int
-topEntity7 = undefined
+topEntity7 _ _  = pure (deepErrorX "out")
 makeTopEntity 'topEntity7
 
 topEntity8 :: (HiddenClockResetEnable System)
            => "pair" ::: Signal System (Pair Bool)
            -> "pair" ::: Signal System (Pair Single)
            -> "out" ::: Signal System Int
-topEntity8 = undefined
+topEntity8 _ _ = pure (deepErrorX "out")
 makeTopEntity 'topEntity8
 
 -- Only check for successful Clash compilation, not content

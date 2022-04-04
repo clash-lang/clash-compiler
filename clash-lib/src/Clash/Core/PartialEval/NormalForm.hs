@@ -1,5 +1,6 @@
 {-|
-Copyright   : (C) 2020-2021, QBayLogic B.V.
+Copyright   : (C) 2020-2021, QBayLogic B.V.,
+                  2022     , Google Inc.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -24,6 +25,7 @@ module Clash.Core.PartialEval.NormalForm
   , stripValue
   , collectValueTicks
   , isUndefined
+  , isUndefinedX
   , Normal(..)
   , LocalEnv(..)
   , GlobalEnv(..)
@@ -40,7 +42,7 @@ import Clash.Core.Literal
 import Clash.Core.Term (Bind, Term(..), PrimInfo(primName), TickInfo, Pat)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type, TyVar)
-import Clash.Core.Util (undefinedPrims)
+import Clash.Core.Util (undefinedPrims, undefinedXPrims)
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (VarEnv, InScopeSet)
 import Clash.Driver.Types (Binding(..))
@@ -124,6 +126,13 @@ isUndefined :: Value -> Bool
 isUndefined = \case
   VNeutral (NePrim pr _) ->
     primName pr `elem` undefinedPrims
+
+  _ -> False
+
+isUndefinedX :: Value -> Bool
+isUndefinedX = \case
+  VNeutral (NePrim pr _) ->
+    primName pr `elem` undefinedXPrims
 
   _ -> False
 

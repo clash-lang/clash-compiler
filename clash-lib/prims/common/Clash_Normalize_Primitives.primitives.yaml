@@ -12,6 +12,12 @@
     template: ~ERRORO
     workInfo: Constant
 - BlackBox:
+    name: Clash.Normalize.Primitives.undefinedX
+    kind: Expression
+    type: 'undefinedX :: forall a . a'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox:
     name: c$multiPrimSelect
     kind: Expression
     template: '!__SHOULD NOT BE RENDERED__! ~ARG[0]~ARG[1]'
