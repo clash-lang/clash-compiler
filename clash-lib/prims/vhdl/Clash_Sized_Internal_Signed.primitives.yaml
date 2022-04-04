@@ -97,7 +97,7 @@
     kind: Expression
     type: 'fromInteger# ::
       KnownNat n => Integer -> Signed (n :: Nat)'
-    templateFunction: Clash.Primitives.Sized.Signed.fromIntegerTF
+    templateFunction: Clash.Primitives.Sized.Signed.fromIntegerTFvhdl
     workInfo: Never
 - BlackBox:
     name: Clash.Sized.Internal.Signed.toEnum#
