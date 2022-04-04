@@ -1,5 +1,5 @@
 {-|
-  Copyright   :  (C) 2021 QBayLogic
+  Copyright   :  (C) 2021-2022, QBayLogic
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -7,7 +7,7 @@
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
-module Clash.Primitives.Sized.Signed (fromIntegerTF) where
+module Clash.Primitives.Sized.Signed (fromIntegerTFvhdl) where
 
 import Control.Monad.State (State)
 import Data.Monoid (Ap(getAp))
@@ -18,8 +18,8 @@ import Clash.Netlist.Types
   (BlackBoxContext (..), Expr (..), HWType (..), Literal (..), Modifier (..),
    TemplateFunction (..))
 
-fromIntegerTF :: TemplateFunction
-fromIntegerTF = TemplateFunction used valid fromIntegerTFTemplate
+fromIntegerTFvhdl :: TemplateFunction
+fromIntegerTFvhdl = TemplateFunction used valid fromIntegerTFTemplateVhdl
  where
   used = [0,1]
   valid bbCtx = case bbInputs bbCtx of
@@ -28,16 +28,19 @@ fromIntegerTF = TemplateFunction used valid fromIntegerTFTemplate
       _ -> False
     _ -> False
 
-fromIntegerTFTemplate
+fromIntegerTFTemplateVhdl
   :: Backend s
   => BlackBoxContext
   -> State s Doc
-fromIntegerTFTemplate bbCtx = getAp $ do
-  let [(Literal _ (NumLit sz),_,_), (i@(Identifier iV m), Signed szI, _)] = bbInputs bbCtx
+fromIntegerTFTemplateVhdl bbCtx = getAp $ do
+  let [(Literal _ (NumLit sz),_,_), (i, Signed szI, _)] = bbInputs bbCtx
   case compare sz (toInteger szI) of
-    LT -> let sl = Sliced (Signed szI,fromInteger sz-1,0)
-              m1 = Just (maybe sl (`Nested` sl) m)
-           in expr False (Identifier iV m1)
+    LT -> case i of
+           Identifier iV m ->
+            let sl = Sliced (Signed szI,fromInteger sz-1,0)
+                m1 = Just (maybe sl (`Nested` sl) m)
+            in expr False (Identifier iV m1)
+           _ -> "signed(std_logic_vector(resize(unsigned(std_logic_vector(" <> expr False i <> "))," <> expr False (Literal Nothing (NumLit sz)) <> ")))"
     EQ -> expr False i
     GT -> "resize" <> tupled (sequenceA [expr False i
                                         ,expr False (Literal Nothing (NumLit sz))])
