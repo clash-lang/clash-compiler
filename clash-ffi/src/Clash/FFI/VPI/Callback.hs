@@ -16,6 +16,7 @@ import           Foreign.Ptr (FunPtr, Ptr)
 import qualified Foreign.Ptr as FFI (nullPtr)
 import           GHC.TypeNats (KnownNat, type (<=))
 
+import qualified Clash.FFI.Monad as Sim (heapPtr, stackPtr)
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Callback.Reason
 import           Clash.FFI.VPI.Object
@@ -31,8 +32,6 @@ data CCallback = forall n. (KnownNat n, 1 <= n) => CCallback
   , ccbIndex    :: CInt
   , ccbData     :: CString
   }
-
--- TODO ^ This needs a storable instance
 
 data Callback extra = forall n. (KnownNat n, 1 <= n) => Callback
   { cbReason  :: CallbackReason
@@ -55,25 +54,23 @@ instance (UnsafeSend extra, Sent extra ~ CString) => UnsafeSend (Callback extra)
   type Sent (Callback extra) = CCallback
 
   unsafeSend Callback{..} = do
-    reason <- unsafeSend cbReason
-    routine <- IO.liftIO (sendRoutine cbRoutine)
-    time <- unsafeSend cbTime
-    value <- unsafeSend cbValue
-    let index = fromIntegral cbIndex
+    (creason, chandle, ctime, cfmt) <- unsafeSend cbReason
+    croutine <- IO.liftIO (sendRoutine cbRoutine)
+    cvalue <- (\v -> v) <$> Sim.stackPtr
+    let cindex = fromIntegral cbIndex
     bytes <- unsafeSend cbData
 
-    pure (CCallback reason routine cbObject time value index bytes)
+    pure (CCallback creason croutine chandle ctime cvalue cindex bytes)
 
 instance (Send extra, Sent extra ~ CString) => Send (Callback extra) where
   send Callback{..} = do
-    reason <- send cbReason
-    routine <- IO.liftIO (sendRoutine cbRoutine)
-    time <- send cbTime
-    value <- send cbValue
-    let index = fromIntegral cbIndex
+    (creason, chandle, ctime, cfmt) <- send cbReason
+    croutine <- IO.liftIO (sendRoutine cbRoutine)
+    value <- (\v -> v) <$> Sim.heapPtr
+    let cindex = fromIntegral cbIndex
     bytes <- send cbData
 
-    pure (CCallback reason routine cbObject time value index bytes)
+    pure (CCallback creason croutine chandle ctime cvalue cindex bytes)
 
 foreign import ccall "dynamic"
   receiveRoutine :: FunPtr (Ptr CCallback -> IO CInt) -> Ptr CCallback -> IO CInt

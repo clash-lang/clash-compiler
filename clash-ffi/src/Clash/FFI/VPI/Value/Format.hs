@@ -27,6 +27,10 @@ import           GHC.TypeNats (KnownNat, type (<=), natVal, sameNat)
 
 import           Clash.FFI.View
 
+-- TODO Should valueformat just be existential? It would make it a bit easier
+-- to wrangle when we have to look up the size of a type from the property
+-- and convert it into SomeNat.
+
 data ValueFormat n where
   BinStrFmt :: 1 <= n => ValueFormat n
   OctStrFmt :: 1 <= n => ValueFormat n
