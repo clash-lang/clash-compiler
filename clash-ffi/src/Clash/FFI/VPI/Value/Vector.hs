@@ -15,7 +15,6 @@
 
 module Clash.FFI.VPI.Value.Vector
   ( CVector(..)
-  , Vector
   , vectorToCVectorList
   , cvectorListToVector
   , bitVectorToVector
@@ -51,16 +50,18 @@ data CVector = CVector
   deriving stock (Generic, Show)
   deriving anyclass (GStorable)
 
-type Vector n = Vec n Scalar
-
-vectorToCVectorList :: forall n. (HasCallStack, KnownNat n, 1 <= n) => Vector n -> [CVector]
+vectorToCVectorList
+  :: forall n
+   . (HasCallStack, KnownNat n)
+  => Vec n Scalar
+  -> [CVector]
 vectorToCVectorList vec =
   let
       size = fromIntegral (natVal (Proxy @n))
       len  = div (size - 1) 32 + 1
    in
       -- Default to all bits being undefined.
-      go (List.replicate len (CVector 1 1)) (size - 1) vec
+      go (List.replicate len (CVector (-1) (-1))) (size - 1) vec
  where
   go :: forall m. [CVector] -> Int -> Vec m Scalar -> [CVector]
   go acc n = \case
@@ -92,17 +93,17 @@ vectorToCVectorList vec =
   replaceScalar _ _ _ =
     error "replaceScalar: Index and list not consistent"
 
-instance (KnownNat n, 1 <= n) => UnsafeSend (Vector n) where
-  type Sent (Vector n) = Sent [CVector]
+instance (KnownNat n) => UnsafeSend (Vec n Scalar) where
+  type Sent (Vec n Scalar) = Sent [CVector]
 
   unsafeSend =
     unsafeSend . vectorToCVectorList
 
-instance (KnownNat n, 1 <= n) => Send (Vector n) where
+instance (KnownNat n) => Send (Vec n Scalar) where
   send =
     send . vectorToCVectorList
 
-cvectorListToVector :: forall n. (HasCallStack, KnownNat n, 1 <= n) => [CVector] -> Vector n
+cvectorListToVector :: forall n. (HasCallStack, KnownNat n) => [CVector] -> Vec n Scalar
 cvectorListToVector =
   let size = fromIntegral (natVal (Proxy @n))
    in go (Vec.repeat SX) size 0
@@ -130,15 +131,15 @@ cvectorListToVector =
       (False, True)  -> SZ
       (True,  True)  -> SX
 
-instance (KnownNat n, 1 <= n) => UnsafeReceive (Vector n) where
-  type Received (Vector n) = Ptr CVector
+instance (KnownNat n) => UnsafeReceive (Vec n Scalar) where
+  type Received (Vec n Scalar) = Ptr CVector
 
   unsafeReceive =
     let size = fromIntegral (natVal (Proxy @n))
         len  = div (size - 1) 32 + 1
      in fmap cvectorListToVector . IO.liftIO . FFI.peekArray len
 
-instance (KnownNat n, 1 <= n) => Receive (Vector n) where
+instance (KnownNat n) => Receive (Vec n Scalar) where
   receive =
     let size = fromIntegral (natVal (Proxy @n))
         len  = div (size - 1) 32 + 1
@@ -146,24 +147,34 @@ instance (KnownNat n, 1 <= n) => Receive (Vector n) where
 
 -- Orphan instances for BitVector
 
-bitVectorToVector :: KnownNat n => BitVector n -> Vector n
+bitVectorToVector :: KnownNat n => BitVector n -> Vec n Scalar
 bitVectorToVector =
   fmap bitToScalar . unpack
 
-vectorToBitVector :: forall n. KnownNat n => Vector n -> BitVector n
+vectorToBitVector :: forall n. KnownNat n => Vec n Scalar -> BitVector n
 vectorToBitVector vec =
   Vec.ifoldr go (deepErrorX "vectorToBitVector") vec
  where
   go :: Index n -> Scalar -> BitVector n -> BitVector n
   go ix s = replaceBit ix (scalarToBit s)
 
-instance (KnownNat n, 1 <= n) => UnsafeReceive (BitVector n) where
-  type Received (BitVector n) = Received (Vector n)
+instance (KnownNat n) => UnsafeSend (BitVector n) where
+  type Sent (BitVector n) = Sent (Vec n Scalar)
+
+  unsafeSend =
+    unsafeSend . bitVectorToVector
+
+instance (KnownNat n) => Send (BitVector n) where
+  send =
+    send . bitVectorToVector
+
+instance (KnownNat n) => UnsafeReceive (BitVector n) where
+  type Received (BitVector n) = Received (Vec n Scalar)
 
   unsafeReceive =
     fmap vectorToBitVector . unsafeReceive
 
-instance (KnownNat n, 1 <= n) => Receive (BitVector n) where
+instance (KnownNat n) => Receive (BitVector n) where
   receive =
     fmap vectorToBitVector . receive
 

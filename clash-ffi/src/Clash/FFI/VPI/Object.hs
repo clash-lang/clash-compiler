@@ -24,16 +24,14 @@ import           Foreign.C.Types
 import qualified Foreign.Concurrent as FFI (newForeignPtr)
 import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
 
-#if !MIN_VERSION_base(4,15,0)
-import qualified Foreign.ForeignPtr as FFI (withForeignPtr)
-#endif
-
 import           Foreign.Ptr (Ptr)
 import qualified Foreign.Ptr as FFI (nullPtr)
 import           Foreign.Storable (Storable)
 
 #if MIN_VERSION_base(4,15,0)
 import qualified GHC.ForeignPtr as FFI (unsafeWithForeignPtr)
+#else
+import qualified Foreign.ForeignPtr as FFI (withForeignPtr)
 #endif
 
 import           Clash.FFI.Monad (SimCont)

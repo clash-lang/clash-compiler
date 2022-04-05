@@ -10,7 +10,6 @@
 module Clash.FFI.VPI.Value
   ( CValue(..)
   , Value(..)
-  , SomeValue(..)
   , getValue
   , unsafeSendValue
   , sendValue
@@ -31,19 +30,19 @@ import qualified Control.Exception as IO (throwIO)
 import qualified Control.Monad as Monad (void)
 import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.ByteString (ByteString)
-import           Data.Proxy (Proxy(..))
-import           Data.Type.Equality ((:~:)(..))
+import qualified Data.ByteString.Internal as BS (c_strlen)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CDouble, CInt(..))
 import           Foreign.Ptr (Ptr)
 import           Foreign.Storable as FFI (Storable(..))
 import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
-import           GHC.TypeNats (KnownNat, type (<=), natVal, sameNat)
+import           GHC.TypeNats
 
+import           Clash.Promoted.Nat (SNat(..), snatProxy)
 import           Clash.Sized.BitVector (Bit, BitVector)
 
 import           Clash.FFI.Monad (SimCont)
-import qualified Clash.FFI.Monad as Sim (heapPtr, stackPtr, throw, withNewPtr)
+import qualified Clash.FFI.Monad as Sim (heapPtr, stackPtr, withNewPtr)
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Object (Handle(..))
 import           Clash.FFI.VPI.Time (CTime, Time)
@@ -55,29 +54,25 @@ import           Clash.FFI.VPI.Value.Scalar
 import           Clash.FFI.VPI.Value.Vector
 #endif
 
-data CValue n where
-  CBinStrVal :: CString -> CValue n
-  COctStrVal :: CString -> CValue n
-  CDecStrVal :: CString -> CValue n
-  CHexStrVal :: CString -> CValue n
-  CScalarVal :: CInt -> CValue 1
-  CIntVal :: CInt -> CValue 32
-#if defined(IVERILOG)
-  CRealVal :: CDouble -> CValue 1
-#else
-  CRealVal :: CDouble -> CValue 64
-#endif
-  CStringVal :: CString -> CValue n
+data CValue
+  = CBinStrVal CString
+  | COctStrVal CString
+  | CDecStrVal CString
+  | CHexStrVal CString
+  | CScalarVal CInt
+  | CIntVal CInt
+  | CRealVal CDouble
+  | CStringVal CString
 #if defined(VERILOG_2005) && defined(VPI_VECVAL)
-  CVectorVal :: Ptr CVector -> CValue n
+  | CVectorVal (Ptr CVector)
 #endif
-  CTimeVal :: Ptr CTime -> CValue 64
-  CMiscVal :: CString -> CValue n
+  | CTimeVal (Ptr CTime)
+  | CMiscVal CString
+  deriving stock (Show)
 
-deriving stock instance Show (CValue n)
-
-data InvalidFormat where
-  InvalidFormat :: ValueFormat n -> CallStack -> InvalidFormat
+data InvalidFormat
+  = InvalidFormat ValueFormat CallStack
+  deriving anyclass (Exception)
 
 instance Show InvalidFormat where
   show (InvalidFormat f c) =
@@ -89,10 +84,9 @@ instance Show InvalidFormat where
       , prettyCallStack c
       ]
 
-deriving anyclass instance Exception InvalidFormat
-
-data InvalidValue where
-  InvalidValue :: CValue n -> CallStack -> InvalidValue
+data InvalidValue
+  = InvalidValue CValue CallStack
+  deriving anyclass (Exception)
 
 instance Show InvalidValue where
   show (InvalidValue v c) =
@@ -103,14 +97,12 @@ instance Show InvalidValue where
       , prettyCallStack c
       ]
 
-deriving anyclass instance Exception InvalidValue
-
-instance (KnownNat n, 1 <= n) => Storable (CValue n) where
+instance Storable CValue where
   sizeOf _ = 16
   alignment _ = 8
 
   peek ptr =
-    FFI.peekByteOff @(ValueFormat n) ptr 0 >>= \case
+    FFI.peekByteOff @ValueFormat ptr 0 >>= \case
       BinStrFmt ->
         CBinStrVal <$> FFI.peekByteOff ptr 8
 
@@ -148,16 +140,16 @@ instance (KnownNat n, 1 <= n) => Storable (CValue n) where
 
   poke ptr = \case
     CBinStrVal bin ->
-      FFI.pokeByteOff ptr 0 (BinStrFmt @n) *> FFI.pokeByteOff ptr 8 bin
+      FFI.pokeByteOff ptr 0 BinStrFmt *> FFI.pokeByteOff ptr 8 bin
 
     COctStrVal oct ->
-      FFI.pokeByteOff ptr 0 (OctStrFmt @n) *> FFI.pokeByteOff ptr 8 oct
+      FFI.pokeByteOff ptr 0 OctStrFmt *> FFI.pokeByteOff ptr 8 oct
 
     CDecStrVal dec ->
-      FFI.pokeByteOff ptr 0 (DecStrFmt @n) *> FFI.pokeByteOff ptr 8 dec
+      FFI.pokeByteOff ptr 0 DecStrFmt *> FFI.pokeByteOff ptr 8 dec
 
     CHexStrVal hex ->
-      FFI.pokeByteOff ptr 0 (HexStrFmt @n) *> FFI.pokeByteOff ptr 8 hex
+      FFI.pokeByteOff ptr 0 HexStrFmt *> FFI.pokeByteOff ptr 8 hex
 
     CScalarVal scalar ->
       FFI.pokeByteOff ptr 0 ScalarFmt *> FFI.pokeByteOff ptr 8 scalar
@@ -169,44 +161,51 @@ instance (KnownNat n, 1 <= n) => Storable (CValue n) where
       FFI.pokeByteOff ptr 0 RealFmt *> FFI.pokeByteOff ptr 8 real
 
     CStringVal str ->
-      FFI.pokeByteOff ptr 0 (StringFmt @n) *> FFI.pokeByteOff ptr 8 str
+      FFI.pokeByteOff ptr 0 StringFmt *> FFI.pokeByteOff ptr 8 str
 
 #if defined(VERILOG_2005) && defined(VPI_VECVAL)
     CVectorVal vec ->
-      FFI.pokeByteOff ptr 0 (VectorFmt @n) *> FFI.pokeByteOff ptr 8 vec
+      FFI.pokeByteOff ptr 0 VectorFmt *> FFI.pokeByteOff ptr 8 vec
 #endif
 
     CTimeVal time ->
       FFI.pokeByteOff ptr 0 TimeFmt *> FFI.pokeByteOff ptr 8 time
 
-    val ->
-      IO.throwIO (InvalidValue val callStack)
+    value ->
+      IO.throwIO (InvalidValue value callStack)
 
-data Value n where
-  BitVal :: Bit -> Value 1
-  BitVectorVal :: BitVector n -> Value n
-  IntVal :: Int -> Value 32
-#if defined(IVERILOG)
-  RealVal :: Double -> Value 1
-#else
-  RealVal :: Double -> Value 64
-#endif
-  StringVal :: ByteString -> Value n
-  TimeVal :: Time -> Value 64
-  MiscVal :: ByteString -> Value n
+data Value where
+  BitVal       :: Bit -> Value
+  BitVectorVal :: SNat n -> BitVector n -> Value
+  IntVal       :: Int -> Value
+  RealVal      :: Double -> Value
+  StringVal    :: SNat n -> ByteString -> Value
+  TimeVal      :: Time -> Value
+  MiscVal      :: SNat n -> ByteString -> Value
 
-deriving stock instance KnownNat n => Show (Value n)
+instance Show Value where
+  show = \case
+    BitVal bit -> show bit
+    BitVectorVal SNat bv -> show bv
+    IntVal int -> show int
+    RealVal real -> show real
+    StringVal _ str -> show str
+    TimeVal time -> show time
+    MiscVal _ bytes -> show bytes
 
-instance (KnownNat n, 1 <= n) => UnsafeSend (Value n) where
-  type Sent (Value n) = CValue n
+instance UnsafeSend Value where
+  type Sent Value = CValue
 
   unsafeSend = \case
     BitVal bit ->
       CScalarVal <$> unsafeSend (bitToScalar bit)
 
-    BitVectorVal bv ->
-      let list = vectorToCVectorList (bitVectorToVector bv)
-       in CVectorVal <$> unsafeSend list
+    BitVectorVal SNat bv ->
+#if defined(VERILOG_2005) && defined(VPI_VECVAL)
+      CVectorVal <$> unsafeSend bv
+#else
+      error "UnsafeSend.Value: BitVector without VPI_VECVAL"
+#endif
 
     IntVal int ->
       pure (CIntVal (fromIntegral int))
@@ -214,26 +213,25 @@ instance (KnownNat n, 1 <= n) => UnsafeSend (Value n) where
     RealVal real ->
       pure (CRealVal (realToFrac real))
 
-    StringVal str ->
+    StringVal _size str ->
       CStringVal <$> unsafeSend str
 
     TimeVal time -> do
       ctime <- unsafeSend @Time time
-      ptr   <- fst <$> Sim.withNewPtr Sim.stackPtr (`FFI.poke` ctime)
+      ptr <- fst <$> Sim.withNewPtr Sim.stackPtr (`FFI.poke` ctime)
 
       pure (CTimeVal ptr)
 
-    MiscVal bytes ->
+    MiscVal _size bytes ->
       CMiscVal <$> unsafeSend bytes
 
-instance (KnownNat n, 1 <= n) => Send (Value n) where
+instance Send Value where
   send = \case
     BitVal bit ->
       CScalarVal <$> send (bitToScalar bit)
 
-    BitVectorVal bv ->
-      let list = vectorToCVectorList (bitVectorToVector bv)
-       in CVectorVal <$> send list
+    BitVectorVal SNat bv ->
+      CVectorVal <$> send bv
 
     IntVal int ->
       pure (CIntVal (fromIntegral int))
@@ -241,7 +239,7 @@ instance (KnownNat n, 1 <= n) => Send (Value n) where
     RealVal real ->
       pure (CRealVal (realToFrac real))
 
-    StringVal str ->
+    StringVal _size str ->
       CStringVal <$> send str
 
     TimeVal time -> do
@@ -250,11 +248,11 @@ instance (KnownNat n, 1 <= n) => Send (Value n) where
 
       pure (CTimeVal ptr)
 
-    MiscVal bytes ->
+    MiscVal _size bytes ->
       CMiscVal <$> send bytes
 
-instance (KnownNat n, 1 <= n) => UnsafeReceive (Value n) where
-  type Received (Value n) = CValue n
+instance UnsafeReceive Value where
+  type Received Value = CValue
 
   unsafeReceive = \case
     CBinStrVal _bin ->
@@ -270,49 +268,36 @@ instance (KnownNat n, 1 <= n) => UnsafeReceive (Value n) where
       undefined -- TODO parser
 
     CScalarVal scalar ->
-      case sameNat (Proxy @1) (Proxy @n) of
-        Just Refl -> BitVal . scalarToBit <$> unsafeReceive scalar
-        Nothing   -> let size = natVal (Proxy @n)
-                      in Sim.throw (InvalidSize 1 size callStack)
+      BitVal . scalarToBit <$> unsafeReceive scalar
 
     CIntVal int ->
-      case sameNat (Proxy @32) (Proxy @n) of
-        Just Refl -> pure (IntVal (fromIntegral int))
-        Nothing   -> let size = natVal (Proxy @n)
-                      in Sim.throw (InvalidSize 32 size callStack)
+      pure (IntVal (fromIntegral int))
 
     CRealVal real ->
-#if defined(IVERILOG)
-      case sameNat (Proxy @1) (Proxy @n) of
-#else
-      case sameNat (Proxy @64) (Proxy @n) of
-#endif
-        Just Refl -> pure (RealVal (realToFrac real))
-        Nothing   -> let size = natVal (Proxy @n)
-#if defined(IVERILOG)
-                      in Sim.throw (InvalidSize 1 size callStack)
-#else
-                      in Sim.throw (InvalidSize 64 size callStack)
-#endif
+      pure (RealVal (realToFrac real))
 
-    CStringVal str ->
-      StringVal <$> unsafeReceive str
+    CStringVal str -> do
+      size <- fromIntegral <$> IO.liftIO (BS.c_strlen str)
+      case someNatVal size of
+        SomeNat proxy -> StringVal (snatProxy proxy) <$> unsafeReceive str
 
 #if defined(VERILOG_2005) && defined(VPI_VECVAL)
-    CVectorVal vec -> do
-      BitVectorVal <$> unsafeReceive vec
+    CVectorVal vec ->
+      -- TODO I don't know how large this is meant to be unless I can get
+      -- access to the vpiSize property, but then I need a handle here...
+      undefined -- BitVectorVal _ <$> unsafeReceive vec
 #endif
 
     CTimeVal time ->
-      case sameNat (Proxy @64) (Proxy @n) of
-        Just Refl -> TimeVal <$> unsafePeekReceive time
-        Nothing   -> let size = natVal (Proxy @n)
-                      in Sim.throw (InvalidSize 64 size callStack)
+      TimeVal <$> unsafePeekReceive time
 
-    CMiscVal bytes ->
-      MiscVal <$> unsafeReceive bytes
+    CMiscVal bytes -> do
+      -- TODO This is unsafe because it assumes the bytes are null-terminated
+      size <- fromIntegral <$> IO.liftIO (BS.c_strlen bytes)
+      case someNatVal size of
+        SomeNat proxy -> MiscVal (snatProxy proxy) <$> unsafeReceive bytes
 
-instance (KnownNat n, 1 <= n) => Receive (Value n) where
+instance Receive Value where
   receive = \case
     CBinStrVal _bin ->
       undefined -- TODO parser
@@ -327,63 +312,42 @@ instance (KnownNat n, 1 <= n) => Receive (Value n) where
       undefined -- TODO parser
 
     CScalarVal scalar ->
-      case sameNat (Proxy @1) (Proxy @n) of
-        Just Refl -> BitVal . scalarToBit <$> receive scalar
-        Nothing   -> let size = natVal (Proxy @n)
-                      in Sim.throw (InvalidSize 1 size callStack)
+      BitVal . scalarToBit <$> receive scalar
 
     CIntVal int ->
-      case sameNat (Proxy @32) (Proxy @n) of
-        Just Refl -> pure (IntVal (fromIntegral int))
-        Nothing   -> let size = natVal (Proxy @n)
-                      in Sim.throw (InvalidSize 32 size callStack)
+      pure (IntVal (fromIntegral int))
 
     CRealVal real ->
-#if defined(IVERILOG)
-      case sameNat (Proxy @1) (Proxy @n) of
-#else
-      case sameNat (Proxy @64) (Proxy @n) of
-#endif
-        Just Refl -> pure (RealVal (realToFrac real))
-        Nothing   -> let size = natVal (Proxy @n)
-#if defined(IVERILOG)
-                      in Sim.throw (InvalidSize 1 size callStack)
-#else
-                      in Sim.throw (InvalidSize 64 size callStack)
-#endif
+      pure (RealVal (realToFrac real))
 
-    CStringVal str ->
-      StringVal <$> receive str
+    CStringVal str -> do
+      size <- fromIntegral <$> IO.liftIO (BS.c_strlen str)
+      case someNatVal size of
+        SomeNat proxy -> StringVal (snatProxy proxy) <$> receive str
 
 #if defined(VERILOG_2005) && defined(VPI_VECVAL)
     CVectorVal vec ->
-      BitVectorVal <$> receive vec
+      undefined -- BitVectorVal _ <$> receive vec
 #endif
 
     CTimeVal time ->
-      case sameNat (Proxy @64) (Proxy @n) of
-        Just Refl -> TimeVal <$> peekReceive time
-        Nothing   -> let size = natVal (Proxy @n)
-                      in Sim.throw (InvalidSize 64 size callStack)
+      TimeVal <$> peekReceive time
 
-    CMiscVal bytes ->
-      MiscVal <$> receive bytes
-
-data SomeValue where
-  SomeValue :: KnownNat n => Value n -> SomeValue
-
-instance Show SomeValue where
-  show (SomeValue val) = show val
+    CMiscVal bytes -> do
+      -- TODO This is unsafe because it assumes the bytes are null-terminated
+      size <- fromIntegral <$> IO.liftIO (BS.c_strlen bytes)
+      case someNatVal size of
+        SomeNat proxy -> MiscVal (snatProxy proxy) <$> receive bytes
 
 foreign import ccall "vpi_user.h vpi_get_value"
-  c_vpi_get_value :: Handle -> Ptr (CValue n) -> IO ()
+  c_vpi_get_value :: Handle -> Ptr CValue -> IO ()
 
 getValue
-  :: (HasCallStack, KnownNat n, 1 <= n)
-  => SimCont o (Ptr (CValue n))
-  -> ValueFormat n
+  :: HasCallStack
+  => SimCont o (Ptr CValue)
+  -> ValueFormat
   -> Handle
-  -> SimCont o (Ptr (CValue n))
+  -> SimCont o (Ptr CValue)
 getValue alloc fmt handle = do
   cfmt <- unsafeSend fmt
 
@@ -394,23 +358,23 @@ getValue alloc fmt handle = do
     pure ()
 
 unsafeReceiveValue
-  :: (HasCallStack, KnownNat n, 1 <= n)
-  => ValueFormat n
+  :: HasCallStack
+  => ValueFormat
   -> Handle
-  -> SimCont o (Value n)
+  -> SimCont o Value
 unsafeReceiveValue fmt handle =
   getValue Sim.stackPtr fmt handle >>= unsafePeekReceive
 
 receiveValue
-  :: (HasCallStack, KnownNat n, 1 <= n)
-  => ValueFormat n
+  :: HasCallStack
+  => ValueFormat
   -> Handle
-  -> SimCont o (Value n)
+  -> SimCont o Value
 receiveValue fmt handle =
   getValue Sim.heapPtr fmt handle >>= peekReceive
 
 foreign import ccall "vpi_user.h vpi_put_value"
-  c_vpi_put_value :: Handle -> Ptr (CValue n) -> Ptr CTime -> CInt -> IO Handle
+  c_vpi_put_value :: Handle -> Ptr CValue -> Ptr CTime -> CInt -> IO Handle
 
 {-
 NOTE [vpi_put_value and events]
@@ -427,9 +391,9 @@ a valid handle would never be returned anyway.
 -}
 
 unsafeSendValue
-  :: (HasCallStack, KnownNat n, 1 <= n)
+  :: HasCallStack
   => Handle
-  -> Value n
+  -> Value
   -> DelayMode
   -> SimCont o ()
 unsafeSendValue handle value delay = do
@@ -440,9 +404,9 @@ unsafeSendValue handle value delay = do
     c_vpi_put_value handle valuePtr timePtr flags
 
 sendValue
-  :: (HasCallStack, KnownNat n, 1 <= n)
+  :: HasCallStack
   => Handle
-  -> Value n
+  -> Value
   -> DelayMode
   -> SimCont o ()
 sendValue handle value delay = do

@@ -1,112 +1,153 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Clash.FFI.VPI.Callback
-  ( module Clash.FFI.VPI.Callback.Reason
+  ( CCallbackInfo(..)
+  , CallbackInfo(..)
+  , Callback(..)
+  , registerCallback
+  , removeCallback
+#ifndef IVERILOG
+  , callbackInfo
+#endif
+  , module Clash.FFI.VPI.Callback.Reason
   ) where
 
+import           Control.Exception (Exception)
+import qualified Control.Monad as Monad (unless)
 import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CInt(..))
 import           Foreign.Ptr (FunPtr, Ptr)
-import qualified Foreign.Ptr as FFI (nullPtr)
-import           GHC.TypeNats (KnownNat, type (<=))
+import           Foreign.Storable.Generic (GStorable)
+import           GHC.Generics (Generic)
+import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
 
-import qualified Clash.FFI.Monad as Sim (heapPtr, stackPtr)
+import           Clash.FFI.Monad (SimCont)
+import qualified Clash.FFI.Monad as Sim
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Callback.Reason
 import           Clash.FFI.VPI.Object
 import           Clash.FFI.VPI.Time
 import           Clash.FFI.VPI.Value
 
-data CCallback = forall n. (KnownNat n, 1 <= n) => CCallback
+data CCallbackInfo = CCallbackInfo
   { ccbReason   :: CInt
-  , ccbRoutine  :: FunPtr (Ptr CCallback -> IO CInt)
+  , ccbRoutine  :: FunPtr (Ptr CCallbackInfo -> IO CInt)
   , ccbObject   :: Handle
   , ccbTime     :: Ptr CTime
-  , ccbValue    :: Ptr (CValue n)
+  , ccbValue    :: Ptr CValue
   , ccbIndex    :: CInt
   , ccbData     :: CString
   }
+  deriving stock (Generic)
+  deriving anyclass (GStorable)
 
-data Callback extra = forall n. (KnownNat n, 1 <= n) => Callback
+data CallbackInfo extra = CallbackInfo
   { cbReason  :: CallbackReason
-  , cbRoutine :: Ptr CCallback -> IO CInt
-  , cbObject  :: Handle
-  , cbTime    :: Maybe Time
-  , cbValue   :: Maybe (Value n)
+  , cbRoutine :: Ptr CCallbackInfo -> IO CInt
   , cbIndex   :: Int
   , cbData    :: extra
   }
 
--- TODO CallbackReason should contain the handle, the time format and the
--- value format when needed for that particular type of reason. Based on the
--- reason we can say whether these are needed or just set to NULL.
-
 foreign import ccall "wrapper"
-  sendRoutine :: (Ptr CCallback -> IO CInt) -> IO (FunPtr (Ptr CCallback -> IO CInt))
+  sendRoutine :: (Ptr CCallbackInfo -> IO CInt) -> IO (FunPtr (Ptr CCallbackInfo -> IO CInt))
 
-instance (UnsafeSend extra, Sent extra ~ CString) => UnsafeSend (Callback extra) where
-  type Sent (Callback extra) = CCallback
+instance (UnsafeSend extra, Sent extra ~ CString) => UnsafeSend (CallbackInfo extra) where
+  type Sent (CallbackInfo extra) = CCallbackInfo
 
-  unsafeSend Callback{..} = do
-    (creason, chandle, ctime, cfmt) <- unsafeSend cbReason
+  unsafeSend CallbackInfo{..} = do
+    (creason, chandle, ctime, cvalue) <- unsafeSend cbReason
     croutine <- IO.liftIO (sendRoutine cbRoutine)
-    cvalue <- (\v -> v) <$> Sim.stackPtr
     let cindex = fromIntegral cbIndex
     bytes <- unsafeSend cbData
 
-    pure (CCallback creason croutine chandle ctime cvalue cindex bytes)
+    pure (CCallbackInfo creason croutine chandle ctime cvalue cindex bytes)
 
-instance (Send extra, Sent extra ~ CString) => Send (Callback extra) where
-  send Callback{..} = do
-    (creason, chandle, ctime, cfmt) <- send cbReason
+instance (Send extra, Sent extra ~ CString) => Send (CallbackInfo extra) where
+  send CallbackInfo{..} = do
+    (creason, chandle, ctime, cvalue) <- send cbReason
     croutine <- IO.liftIO (sendRoutine cbRoutine)
-    value <- (\v -> v) <$> Sim.heapPtr
     let cindex = fromIntegral cbIndex
     bytes <- send cbData
 
-    pure (CCallback creason croutine chandle ctime cvalue cindex bytes)
+    pure (CCallbackInfo creason croutine chandle ctime cvalue cindex bytes)
 
 foreign import ccall "dynamic"
-  receiveRoutine :: FunPtr (Ptr CCallback -> IO CInt) -> Ptr CCallback -> IO CInt
+  receiveRoutine :: FunPtr (Ptr CCallbackInfo -> IO CInt) -> Ptr CCallbackInfo -> IO CInt
 
-instance (UnsafeReceive extra, Received extra ~ CString) => UnsafeReceive (Callback extra) where
-  type Received (Callback extra) = CCallback
+instance (UnsafeReceive extra, Received extra ~ CString) => UnsafeReceive (CallbackInfo extra) where
+  type Received (CallbackInfo extra) = CCallbackInfo
 
-  unsafeReceive CCallback{..} = do
-    reason <- unsafeReceive ccbReason
+  unsafeReceive CCallbackInfo{..} = do
+    reason <- unsafeReceive (ccbReason, ccbObject, ccbTime, ccbValue)
     let routine = receiveRoutine ccbRoutine
-    time <- unsafeReceive ccbTime
-    value <- unsafeReceive ccbValue
     let index = fromIntegral ccbIndex
     extra <- unsafeReceive ccbData
 
-    pure (Callback reason routine ccbObject time value index extra)
+    pure (CallbackInfo reason routine index extra)
 
-instance (Receive extra, Received extra ~ CString) => Receive (Callback extra) where
-  receive CCallback{..} = do
-    reason <- receive ccbReason
+instance (Receive extra, Received extra ~ CString) => Receive (CallbackInfo extra) where
+  receive CCallbackInfo{..} = do
+    reason <- receive (ccbReason, ccbObject, ccbTime, ccbValue)
     let routine = receiveRoutine ccbRoutine
-    time <- receive ccbTime
-    value <- receive ccbValue
     let index = fromIntegral ccbIndex
     extra <- receive ccbData
 
-    pure (Callback reason routine ccbObject time value index extra)
+    pure (CallbackInfo reason routine index extra)
 
 foreign import ccall "vpi_user.h vpi_register_cb"
-  c_vpi_register_cb :: Ptr CCallback -> IO Handle
+  c_vpi_register_cb :: Ptr CCallbackInfo -> IO Handle
+
+newtype Callback = Callback { callbackHandle :: Handle }
+
+registerCallback
+  :: (UnsafeSend extra, Sent extra ~ CString)
+  => CallbackInfo extra
+  -> SimCont o Callback
+registerCallback cb = do
+  ptr <- unsafePokeSend cb
+  Callback <$> IO.liftIO (c_vpi_register_cb ptr)
+
+data CouldNotUnregisterCallback
+  = CouldNotUnregisterCallback Handle CallStack
+  deriving anyclass (Exception)
+
+instance Show CouldNotUnregisterCallback where
+  show (CouldNotUnregisterCallback h c) =
+    mconcat
+      [ "Could not unregister callback: "
+      , show h
+      , "\n"
+      , prettyCallStack c
+      ]
 
 foreign import ccall "vpi_user.h vpi_remove_cb"
   c_vpi_remove_cb :: Handle -> IO Bool
 
+removeCallback :: HasCallStack => Callback -> SimCont o ()
+removeCallback (Callback handle) = do
+  status <- IO.liftIO (c_vpi_remove_cb handle)
+
+  Monad.unless status $
+    Sim.throw (CouldNotUnregisterCallback handle callStack)
+
+  pure ()
+
 #ifndef IVERILOG
 foreign import ccall "vpi_user.h vpi_get_cb_info"
-  c_vpi_get_cb_info :: Handle -> Ptr CCallback -> IO ()
+  c_vpi_get_cb_info :: Handle -> Ptr CCallbackInfo -> IO ()
+
+callbackInfo
+  :: (Receive extra, Received extra ~ CString)
+  => Callback
+  -> SimCont o (CallbackInfo extra)
+callbackInfo (Callback handle) =
+  Sim.withNewPtr Sim.stackPtr $ \ptr -> do
+    IO.liftIO (c_vpi_get_cb_info handle ptr)
+    peekReceive ptr
 #endif
 

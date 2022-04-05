@@ -46,6 +46,8 @@ import           Clash.FFI.VPI.Value
 
 newtype Parameter = Parameter { parameterHandle :: Handle }
 
+-- TODO Make this an ADT so it shows nicely.
+
 newtype ConstantType = ConstantType CInt
 
 pattern DecimalConst :: ConstantType
@@ -94,21 +96,21 @@ parameterIsSigned :: HasCallStack => Parameter -> SimCont o Bool
 parameterIsSigned = getProperty VpiSigned . parameterHandle
 #endif
 
-parameterValue :: HasCallStack => Parameter -> SimCont o SomeValue
+parameterValue :: HasCallStack => Parameter -> SimCont o Value
 parameterValue param = do
   size <- parameterSize param
 
   case someNatVal size of
     SomeNat (proxy :: Proxy sz) ->
       case compareSNat (SNat @1) (snatProxy proxy) of
-        SNatLE -> SomeValue <$> parameterValueAs (ObjTypeFmt @sz) param
+        SNatLE -> parameterValueAs ObjTypeFmt param
         SNatGT -> Sim.throw (ZeroWidthValue callStack)
 
 parameterValueAs
-  :: (HasCallStack, KnownNat n, 1 <= n)
-  => ValueFormat n
+  :: HasCallStack
+  => ValueFormat
   -> Parameter
-  -> SimCont o (Value n)
+  -> SimCont o Value
 parameterValueAs fmt =
   receiveValue fmt . parameterHandle
 

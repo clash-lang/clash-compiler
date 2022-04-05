@@ -55,6 +55,9 @@ import qualified Clash.FFI.Monad as Sim (throw)
 import           Clash.FFI.View (UnsafeReceive(..), Receive(..))
 import           Clash.FFI.VPI.Object (Handle(..), ObjectType)
 
+-- TODO Redo this to be a normal ADT with a storable instance, so we can get
+-- nice errors when a property does not belong to a handle.
+
 newtype Property value = Property CInt
   deriving newtype (Eq, Show, Storable)
 

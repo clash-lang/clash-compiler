@@ -52,21 +52,21 @@ regIsSigned = getProperty VpiSigned . regHandle
 regSize :: (HasCallStack, Integral n) => Reg -> SimCont o n
 regSize = fmap fromIntegral . getProperty VpiSize . regHandle
 
-regValue :: HasCallStack => Reg -> SimCont o SomeValue
+regValue :: HasCallStack => Reg -> SimCont o Value
 regValue reg = do
   size <- regSize reg
 
   case someNatVal size of
     SomeNat (proxy :: Proxy sz) ->
       case compareSNat (SNat @1) (snatProxy proxy) of
-        SNatLE -> SomeValue <$> regValueAs (ObjTypeFmt @sz) reg
+        SNatLE -> regValueAs ObjTypeFmt reg
         SNatGT -> Sim.throw (ZeroWidthValue callStack)
 
 regValueAs
-  :: (HasCallStack, KnownNat n, 1 <= n)
-  => ValueFormat n
+  :: HasCallStack
+  => ValueFormat
   -> Reg
-  -> SimCont o (Value n)
+  -> SimCont o Value
 regValueAs fmt =
   receiveValue fmt . regHandle
 

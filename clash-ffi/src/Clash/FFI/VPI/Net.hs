@@ -52,21 +52,21 @@ netIsSigned :: HasCallStack => Net -> SimCont o Bool
 netIsSigned = getProperty VpiSigned . netHandle
 #endif
 
-netValue :: HasCallStack => Net -> SimCont o SomeValue
+netValue :: HasCallStack => Net -> SimCont o Value
 netValue net = do
   size <- netSize net
 
   case someNatVal size of
     SomeNat (proxy :: Proxy sz) ->
       case compareSNat (SNat @1) (snatProxy proxy) of
-        SNatLE -> SomeValue <$> netValueAs (ObjTypeFmt @sz) net
+        SNatLE -> netValueAs ObjTypeFmt net
         SNatGT -> Sim.throw (ZeroWidthValue callStack)
 
 netValueAs
-  :: (HasCallStack, KnownNat n, 1 <= n)
-  => ValueFormat n
+  :: HasCallStack
+  => ValueFormat
   -> Net
-  -> SimCont o (Value n)
+  -> SimCont o Value
 netValueAs fmt =
   receiveValue fmt . netHandle
 
