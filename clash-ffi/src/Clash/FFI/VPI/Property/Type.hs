@@ -4,7 +4,6 @@ module Clash.FFI.VPI.Property.Type
   ( Property(..)
   ) where
 
-import Data.Int (Int64)
 import Foreign.C.String (CString)
 import Foreign.C.Types (CInt)
 

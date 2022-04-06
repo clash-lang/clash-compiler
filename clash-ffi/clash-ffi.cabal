@@ -29,7 +29,7 @@ common basic-config
     include
 
   ghc-options:
-    -Wall -Wcompat -g
+    -Wall -Wcompat -g -debug
 
   build-depends:
     base                    >= 4.11     && < 5,

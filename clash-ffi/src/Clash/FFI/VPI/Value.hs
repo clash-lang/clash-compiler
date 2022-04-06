@@ -30,7 +30,6 @@ import qualified Control.Exception as IO (throwIO)
 import qualified Control.Monad as Monad (void)
 import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.ByteString (ByteString)
-import qualified Data.ByteString.Internal as BS (c_strlen)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CDouble, CInt(..))
 import           Foreign.Ptr (Ptr)
@@ -45,6 +44,7 @@ import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim (heapPtr, stackPtr, withNewPtr)
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Object (Handle(..))
+import           Clash.FFI.VPI.Property
 import           Clash.FFI.VPI.Time (CTime, Time)
 import           Clash.FFI.VPI.Value.Delay
 import           Clash.FFI.VPI.Value.Format
@@ -244,7 +244,7 @@ instance Send Value where
 
     TimeVal time -> do
       ctime <- send time
-      ptr   <- fst <$> Sim.withNewPtr Sim.heapPtr (`FFI.poke` ctime)
+      ptr <- fst <$> Sim.withNewPtr Sim.heapPtr (`FFI.poke` ctime)
 
       pure (CTimeVal ptr)
 
@@ -252,92 +252,88 @@ instance Send Value where
       CMiscVal <$> send bytes
 
 instance UnsafeReceive Value where
-  type Received Value = CValue
+  type Received Value = (CValue, CInt)
 
-  unsafeReceive = \case
-    CBinStrVal _bin ->
-      undefined -- TODO parser
+  unsafeReceive (cvalue, size) =
+    case cvalue of
+      CBinStrVal _bin ->
+        undefined -- TODO parser
 
-    COctStrVal _oct ->
-      undefined -- TODO parser
+      COctStrVal _oct ->
+        undefined -- TODO parser
 
-    CDecStrVal _dec ->
-      undefined -- TODO parser
+      CDecStrVal _dec ->
+        undefined -- TODO parser
 
-    CHexStrVal _hex ->
-      undefined -- TODO parser
+      CHexStrVal _hex ->
+        undefined -- TODO parser
 
-    CScalarVal scalar ->
-      BitVal . scalarToBit <$> unsafeReceive scalar
+      CScalarVal scalar ->
+        BitVal . scalarToBit <$> unsafeReceive scalar
 
-    CIntVal int ->
-      pure (IntVal (fromIntegral int))
+      CIntVal int ->
+        pure (IntVal (fromIntegral int))
 
-    CRealVal real ->
-      pure (RealVal (realToFrac real))
+      CRealVal real ->
+        pure (RealVal (realToFrac real))
 
-    CStringVal str -> do
-      size <- fromIntegral <$> IO.liftIO (BS.c_strlen str)
-      case someNatVal size of
-        SomeNat proxy -> StringVal (snatProxy proxy) <$> unsafeReceive str
+      CStringVal str -> do
+        case someNatVal (fromIntegral size) of
+          SomeNat proxy -> StringVal (snatProxy proxy) <$> unsafeReceive str
 
 #if defined(VERILOG_2005) && defined(VPI_VECVAL)
-    CVectorVal vec ->
-      -- TODO I don't know how large this is meant to be unless I can get
-      -- access to the vpiSize property, but then I need a handle here...
-      undefined -- BitVectorVal _ <$> unsafeReceive vec
+      CVectorVal vec ->
+        case someNatVal (fromIntegral size) of
+          SomeNat proxy -> BitVectorVal (snatProxy proxy) <$> unsafeReceive vec
 #endif
 
-    CTimeVal time ->
-      TimeVal <$> unsafePeekReceive time
+      CTimeVal time ->
+        TimeVal <$> unsafePeekReceive time
 
-    CMiscVal bytes -> do
-      -- TODO This is unsafe because it assumes the bytes are null-terminated
-      size <- fromIntegral <$> IO.liftIO (BS.c_strlen bytes)
-      case someNatVal size of
-        SomeNat proxy -> MiscVal (snatProxy proxy) <$> unsafeReceive bytes
+      CMiscVal bytes -> do
+        case someNatVal (fromIntegral size) of
+          SomeNat proxy -> MiscVal (snatProxy proxy) <$> unsafeReceive bytes
 
 instance Receive Value where
-  receive = \case
-    CBinStrVal _bin ->
-      undefined -- TODO parser
+  receive (cvalue, size) =
+    case cvalue of
+      CBinStrVal _bin ->
+        undefined -- TODO parser
 
-    COctStrVal _oct ->
-      undefined -- TODO parser
+      COctStrVal _oct ->
+        undefined -- TODO parser
 
-    CDecStrVal _dec ->
-      undefined -- TODO parser
+      CDecStrVal _dec ->
+        undefined -- TODO parser
 
-    CHexStrVal _hex ->
-      undefined -- TODO parser
+      CHexStrVal _hex ->
+        undefined -- TODO parser
 
-    CScalarVal scalar ->
-      BitVal . scalarToBit <$> receive scalar
+      CScalarVal scalar ->
+        BitVal . scalarToBit <$> receive scalar
 
-    CIntVal int ->
-      pure (IntVal (fromIntegral int))
+      CIntVal int ->
+        pure (IntVal (fromIntegral int))
 
-    CRealVal real ->
-      pure (RealVal (realToFrac real))
+      CRealVal real ->
+        pure (RealVal (realToFrac real))
 
-    CStringVal str -> do
-      size <- fromIntegral <$> IO.liftIO (BS.c_strlen str)
-      case someNatVal size of
-        SomeNat proxy -> StringVal (snatProxy proxy) <$> receive str
+      CStringVal str -> do
+        case someNatVal (fromIntegral size) of
+          SomeNat proxy -> StringVal (snatProxy proxy) <$> receive str
 
 #if defined(VERILOG_2005) && defined(VPI_VECVAL)
-    CVectorVal vec ->
-      undefined -- BitVectorVal _ <$> receive vec
+      CVectorVal vec ->
+        case someNatVal (fromIntegral size) of
+          SomeNat proxy -> BitVectorVal (snatProxy proxy) <$> receive vec
 #endif
 
-    CTimeVal time ->
-      TimeVal <$> peekReceive time
+      CTimeVal time ->
+        TimeVal <$> peekReceive time
 
-    CMiscVal bytes -> do
-      -- TODO This is unsafe because it assumes the bytes are null-terminated
-      size <- fromIntegral <$> IO.liftIO (BS.c_strlen bytes)
-      case someNatVal size of
-        SomeNat proxy -> MiscVal (snatProxy proxy) <$> receive bytes
+      CMiscVal bytes -> do
+        case someNatVal (fromIntegral size) of
+          SomeNat proxy -> MiscVal (snatProxy proxy) <$> receive bytes
 
 foreign import ccall "vpi_user.h vpi_get_value"
   c_vpi_get_value :: Handle -> Ptr CValue -> IO ()
@@ -362,16 +358,24 @@ unsafeReceiveValue
   => ValueFormat
   -> Handle
   -> SimCont o Value
-unsafeReceiveValue fmt handle =
-  getValue Sim.stackPtr fmt handle >>= unsafePeekReceive
+unsafeReceiveValue fmt handle = do
+  ptr <- getValue Sim.stackPtr fmt handle
+  cvalue <- IO.liftIO (FFI.peek ptr)
+  size <- getProperty VpiSize handle
+
+  unsafeReceive (cvalue, size)
 
 receiveValue
   :: HasCallStack
   => ValueFormat
   -> Handle
   -> SimCont o Value
-receiveValue fmt handle =
-  getValue Sim.heapPtr fmt handle >>= peekReceive
+receiveValue fmt handle = do
+  ptr <- getValue Sim.heapPtr fmt handle
+  cvalue <- IO.liftIO (FFI.peek ptr)
+  size <- getProperty VpiSize handle
+
+  receive (cvalue, size)
 
 foreign import ccall "vpi_user.h vpi_put_value"
   c_vpi_put_value :: Handle -> Ptr CValue -> Ptr CTime -> CInt -> IO Handle

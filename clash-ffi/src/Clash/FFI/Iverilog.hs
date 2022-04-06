@@ -4,17 +4,25 @@
 
 module Clash.FFI.Iverilog where
 
+import qualified Control.Monad as Monad (void)
+import qualified Control.Monad.IO.Class as IO (liftIO)
+import           Data.ByteString (ByteString)
 import           Data.Foldable (for_)
 import           Data.String (fromString)
+import qualified Foreign.Storable as FFI
 
+import qualified Clash.FFI.VPI.Callback as VPI
 import qualified Clash.FFI.VPI.IO as VPI
 import qualified Clash.FFI.VPI.Info as VPI
 import qualified Clash.FFI.VPI.Module as VPI
 import qualified Clash.FFI.VPI.Net as VPI
+import qualified Clash.FFI.VPI.Object as VPI
 import qualified Clash.FFI.VPI.Parameter as VPI
+import qualified Clash.FFI.VPI.Property as VPI
 import qualified Clash.FFI.VPI.Port as VPI
 import qualified Clash.FFI.VPI.Reg as VPI
 import qualified Clash.FFI.VPI.Time as VPI
+import qualified Clash.FFI.VPI.Value as VPI
 import qualified Clash.FFI.Monad as Sim
 import           Clash.FFI.View
 
@@ -75,4 +83,30 @@ clashMain =
 
         VPI.simPutStrLn
           ("Found reg: " <> rName <> ", size " <> fromString (show rSize) <> ", value: " <> fromString (show rVal))
+
+        Monad.void $ VPI.registerCallback (monitorCallback (VPI.regHandle r))
+        -- VPI.freeHandle (VPI.callbackHandle rCb)
+
+monitorCallback :: VPI.Handle -> VPI.CallbackInfo ByteString
+monitorCallback handle = VPI.CallbackInfo
+  { VPI.cbReason  = VPI.AfterValueChange handle VPI.Sim VPI.VectorFmt
+  , VPI.cbRoutine = routine
+  , VPI.cbIndex   = 0
+  , VPI.cbData    = ""
+  }
+ where
+  routine ptr =
+    Sim.runSimAction $ do
+      hName  <- VPI.receiveProperty VPI.VpiName handle
+      size   <- VPI.getProperty VPI.VpiSize handle
+
+      cinfo  <- IO.liftIO (FFI.peek ptr)
+      time   <- peekReceive @VPI.Time (VPI.ccbTime cinfo)
+      cvalue <- IO.liftIO (FFI.peek (VPI.ccbValue cinfo))
+      value  <- receive @VPI.Value (cvalue, size)
+
+      VPI.simPutStrLn
+        ("[" <> fromString (show time) <> "]: " <> hName <> " = " <> fromString (show value))
+
+      pure 0
 
