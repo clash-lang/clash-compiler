@@ -65,7 +65,8 @@ import Clash.Core.Pretty (PrettyOptions(..), showPpr, showPpr')
 import Clash.Core.Subst
 import Clash.Core.Term
   ( CoreContext(..), Pat(..), PrimInfo(..), Term(..), WorkInfo(..), collectArgs
-  , collectArgsTicks, mkApps , mkTicks, stripTicks)
+  , collectArgsTicks, mkApps , mkTicks, stripTicks, bindToList)
+import qualified Clash.Core.Term as Term (Bind(..))
 import Clash.Core.TermInfo (isLocalVar, termSize)
 import Clash.Core.Type
   (TypeView(..), isClassTy, isPolyFunCoreTy, tyView)
@@ -290,24 +291,35 @@ inlineCast = inlineBinders test
 --   * a data constructor
 --   * I/O actions
 inlineCleanup :: HasCallStack => NormRewrite
-inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
+inlineCleanup (TransformContext is0 _) e@(Let bind body) = do
   prims <- Lens.view primitives
   -- For all let-bindings, count the number of times they are referenced.
   -- We only inline let-bindings which are referenced only once, otherwise
   -- we would lose sharing.
-  let is1       = extendInScopeSetList is0 (map fst binds)
-      bindsFvs  = map (\(v,e) -> (v,((v,e),countFreeOccurances e))) binds
-      allOccs   = List.foldl' (unionVarEnvWith (+)) emptyVarEnv
-                $ map (snd.snd) bindsFvs
-      bodyFVs   = Lens.foldMapOf freeLocalIds unitVarSet body
-      (il,keep) = List.partition (isInteresting allOccs prims bodyFVs)
-                                 bindsFvs
-      keep'     = inlineBndrsCleanup is1 (mkVarEnv il) emptyVarEnv
-                $ map snd keep
 
-  if | null il -> return  (Letrec binds body)
+  -- TODO We don't want to use bindToList here, it would be nicer to refactor
+  -- inlineBndrsCleanup and avoid doing recursion checks on binders when they
+  -- are NonRec...
+  let bindList  = bindToList bind
+      is1       = extendInScopeSetList is0 (map fst bindList)
+      bindsFvs  = map (\(v,x) -> (v,((v,x),countFreeOccurances x))) bindList
+      allOccs   = List.foldl' (unionVarEnvWith (+)) emptyVarEnv $ map (snd.snd) bindsFvs
+      bodyFVs   = Lens.foldMapOf freeLocalIds unitVarSet body
+      (il,keep) = List.partition (isInteresting allOccs prims bodyFVs) bindsFvs
+      keep'     = inlineBndrsCleanup is1 (mkVarEnv il) emptyVarEnv $ map snd keep
+
+  if | null il -> return e
      | null keep' -> changed body
-     | otherwise -> changed (Letrec keep' body)
+     -- If there is only one binding left, and the original let expression was
+     -- non-recursive then the result is also non-recursive.
+     | [(i, x)] <- keep'
+     , Term.NonRec{} <- bind
+     -> changed (Let (Term.NonRec i x) body)
+
+     -- There is more than one binding left or the original let expression
+     -- was recursive, so the result is also recursive
+     | otherwise
+     -> changed (Let (Term.Rec keep') body)
   where
     -- Determine whether a let-binding is interesting to inline
     isInteresting

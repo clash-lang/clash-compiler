@@ -29,6 +29,7 @@ module Clash.Core.Term
   , TmName
   , varToId
   , Bind(..)
+  , bindToList -- TODO Eventually all Letrec are removed and this isn't needed.
   , LetBinding
   , Pat (..)
   , patIds
