@@ -33,24 +33,24 @@ import           Clash.FFI.VPI.Value
 newtype Reg = Reg { regHandle :: Handle }
 
 regName :: HasCallStack => Reg -> SimCont o ByteString
-regName = receiveProperty VpiName . regHandle
+regName = receiveProperty Name . regHandle
 
 regFullName :: HasCallStack => Reg -> SimCont o ByteString
-regFullName = receiveProperty VpiFullName . regHandle
+regFullName = receiveProperty FullName . regHandle
 
 regIsScalar :: HasCallStack => Reg -> SimCont o Bool
-regIsScalar = getProperty VpiScalar . regHandle
+regIsScalar = getProperty IsScalar . regHandle
 
 regIsVector :: HasCallStack => Reg -> SimCont o Bool
-regIsVector = getProperty VpiVector . regHandle
+regIsVector = getProperty IsVector . regHandle
 
 #if defined(VERILOG_2001)
 regIsSigned :: HasCallStack => Reg -> SimCont o Bool
-regIsSigned = getProperty VpiSigned . regHandle
+regIsSigned = getProperty IsSigned . regHandle
 #endif
 
 regSize :: (HasCallStack, Integral n) => Reg -> SimCont o n
-regSize = fmap fromIntegral . getProperty VpiSize . regHandle
+regSize = fmap fromIntegral . getProperty Size . regHandle
 
 regValue :: HasCallStack => Reg -> SimCont o Value
 regValue reg = do

@@ -6,6 +6,7 @@ module Clash.FFI.VPI.Control
   ( Control(..)
   , StopValue(..)
   , DiagnosticLevel(..)
+  , CouldNotControl(..)
   , controlSimulator
   ) where
 

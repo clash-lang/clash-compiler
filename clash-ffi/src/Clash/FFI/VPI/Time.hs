@@ -9,6 +9,8 @@ module Clash.FFI.VPI.Time
   ( CTime(..)
   , Time(..)
   , TimeType(..)
+  , UnknownTimeType(..)
+  , InvalidTimeType(..)
   , simulationTime
   ) where
 

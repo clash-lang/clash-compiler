@@ -33,23 +33,23 @@ import           Clash.FFI.VPI.Value
 newtype Net = Net { netHandle :: Handle }
 
 netName :: HasCallStack => Net -> SimCont o ByteString
-netName = receiveProperty VpiName . netHandle
+netName = receiveProperty Name . netHandle
 
 netFullName :: HasCallStack => Net -> SimCont o ByteString
-netFullName = receiveProperty VpiFullName . netHandle
+netFullName = receiveProperty FullName . netHandle
 
 netSize :: (HasCallStack, Integral n) => Net -> SimCont o n
-netSize = fmap fromIntegral . getProperty VpiSize . netHandle
+netSize = fmap fromIntegral . getProperty Size . netHandle
 
 netIsScalar :: HasCallStack => Net -> SimCont o Bool
-netIsScalar = getProperty VpiScalar . netHandle
+netIsScalar = getProperty IsScalar . netHandle
 
 netIsVector :: HasCallStack => Net -> SimCont o Bool
-netIsVector = getProperty VpiVector . netHandle
+netIsVector = getProperty IsVector . netHandle
 
 #if defined(VERILOG_2001)
 netIsSigned :: HasCallStack => Net -> SimCont o Bool
-netIsSigned = getProperty VpiSigned . netHandle
+netIsSigned = getProperty IsSigned . netHandle
 #endif
 
 netValue :: HasCallStack => Net -> SimCont o Value

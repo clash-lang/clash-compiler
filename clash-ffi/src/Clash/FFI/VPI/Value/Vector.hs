@@ -15,10 +15,6 @@
 
 module Clash.FFI.VPI.Value.Vector
   ( CVector(..)
-  , vectorToCVectorList
-  , cvectorListToVector
-  , bitVectorToVector
-  , vectorToBitVector
   ) where
 
 import qualified Control.Monad.IO.Class as IO (liftIO)

@@ -4,7 +4,6 @@
 
 module Clash.FFI.Iverilog where
 
-import qualified Control.Monad as Monad (void)
 import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.ByteString (ByteString)
 import           Data.Foldable (for_)
@@ -84,8 +83,8 @@ clashMain =
         VPI.simPutStrLn
           ("Found reg: " <> rName <> ", size " <> fromString (show rSize) <> ", value: " <> fromString (show rVal))
 
-        Monad.void $ VPI.registerCallback (monitorCallback (VPI.regHandle r))
-        -- VPI.freeHandle (VPI.callbackHandle rCb)
+        rCb <- VPI.registerCallback (monitorCallback (VPI.regHandle r))
+        VPI.freeHandle (VPI.callbackHandle rCb)
 
 monitorCallback :: VPI.Handle -> VPI.CallbackInfo ByteString
 monitorCallback handle = VPI.CallbackInfo
@@ -97,8 +96,8 @@ monitorCallback handle = VPI.CallbackInfo
  where
   routine ptr =
     Sim.runSimAction $ do
-      hName  <- VPI.receiveProperty VPI.VpiName handle
-      size   <- VPI.getProperty VPI.VpiSize handle
+      hName  <- VPI.receiveProperty VPI.Name handle
+      size   <- VPI.getProperty VPI.Size handle
 
       cinfo  <- IO.liftIO (FFI.peek ptr)
       time   <- peekReceive @VPI.Time (VPI.ccbTime cinfo)

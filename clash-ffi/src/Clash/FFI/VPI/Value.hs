@@ -361,7 +361,7 @@ unsafeReceiveValue
 unsafeReceiveValue fmt handle = do
   ptr <- getValue Sim.stackPtr fmt handle
   cvalue <- IO.liftIO (FFI.peek ptr)
-  size <- getProperty VpiSize handle
+  size <- getProperty Size handle
 
   unsafeReceive (cvalue, size)
 
@@ -373,7 +373,7 @@ receiveValue
 receiveValue fmt handle = do
   ptr <- getValue Sim.heapPtr fmt handle
   cvalue <- IO.liftIO (FFI.peek ptr)
-  size <- getProperty VpiSize handle
+  size <- getProperty Size handle
 
   receive (cvalue, size)
 

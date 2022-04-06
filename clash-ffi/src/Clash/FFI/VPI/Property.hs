@@ -7,29 +7,12 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module Clash.FFI.VPI.Property
-  ( Property
-      ( VpiObjectType
-      , VpiName
-      , VpiFullName
-      , VpiSize
-      , VpiFile
-      , VpiLineNo
-      , VpiScalar
-      , VpiVector
-      , VpiDirection
-      , VpiNetType
-      , VpiPortIndex
-      , VpiConstType
-#if defined(VERILOG_2001)
-      , VpiSigned
-      , VpiLocalParam
-#endif
-      )
-  , PropertyType(..)
+  ( PropertyType(..)
   , coerceProperty
   , unsafeReceiveProperty
   , receiveProperty
   , UndefinedProperty(..)
+  , module Clash.FFI.VPI.Property.Type
   ) where
 
 import           Control.Exception (Exception)
@@ -47,74 +30,25 @@ import           Foreign.C.String (CString)
 import           Foreign.C.Types (CInt(..))
 import qualified Foreign.Marshal.Utils as FFI (toBool)
 import qualified Foreign.Ptr as FFI (nullPtr)
-import           Foreign.Storable (Storable)
 import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
+import           Unsafe.Coerce
 
 import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim (throw)
-import           Clash.FFI.View (UnsafeReceive(..), Receive(..))
-import           Clash.FFI.VPI.Object (Handle(..), ObjectType)
-
--- TODO Redo this to be a normal ADT with a storable instance, so we can get
--- nice errors when a property does not belong to a handle.
-
-newtype Property value = Property CInt
-  deriving newtype (Eq, Show, Storable)
-
-pattern VpiObjectType :: Property ObjectType
-pattern VpiObjectType = Property 1
-
-pattern VpiName :: Property CString
-pattern VpiName = Property 2
-
-pattern VpiFullName :: Property CString
-pattern VpiFullName = Property 3
-
-pattern VpiSize :: Property CInt
-pattern VpiSize = Property 4
-
-pattern VpiFile :: Property CString
-pattern VpiFile = Property 5
-
-pattern VpiLineNo :: Property CInt
-pattern VpiLineNo = Property 6
-
-pattern VpiScalar :: Property Bool
-pattern VpiScalar = Property 17
-
-pattern VpiVector :: Property Bool
-pattern VpiVector = Property 18
-
-pattern VpiDirection :: Property CInt
-pattern VpiDirection = Property 20
-
-pattern VpiNetType :: Property CInt
-pattern VpiNetType = Property 22
-
-pattern VpiPortIndex :: Property CInt
-pattern VpiPortIndex = Property 29
-
-pattern VpiConstType :: Property CInt
-pattern VpiConstType = Property 40
-
-#if defined(VERILOG_2001)
-pattern VpiSigned :: Property Bool
-pattern VpiSigned = Property 65
-
-pattern VpiLocalParam :: Property Bool
-pattern VpiLocalParam = Property 70
-#endif
+import           Clash.FFI.View
+import           Clash.FFI.VPI.Object (Handle(..))
+import           Clash.FFI.VPI.Property.Type
 
 foreign import ccall "vpi_user.h vpi_get"
-  c_vpi_get :: Property CInt -> Handle -> IO CInt
+  c_vpi_get :: CInt -> Handle -> IO CInt
 
 #if defined(SYSTEMVERILOG)
 foreign import ccall "vpi_user.h vpi_get64"
-  c_vpi_get64 :: Property Int64 -> Handle -> IO Int64
+  c_vpi_get64 :: CInt -> Handle -> IO Int64
 #endif
 
 foreign import ccall "vpi_user.h vpi_get_str"
-  c_vpi_get_str :: Property CString -> Handle -> IO CString
+  c_vpi_get_str :: CInt -> Handle -> IO CString
 
 data UndefinedProperty a
   = UndefinedProperty (Property a) Handle CallStack
@@ -136,13 +70,14 @@ class PropertyType a where
 
 getPropertyWith
   :: (HasCallStack, Eq a, Show a, Typeable a)
-  => (Property a -> Handle -> IO a)
+  => (CInt -> Handle -> IO a)
   -> a
   -> Property a
   -> Handle
   -> SimCont o a
 getPropertyWith f err prop hdl = do
-  value <- IO.liftIO (f prop hdl)
+  cprop <- unsafeSend prop
+  value <- IO.liftIO (f cprop hdl)
 
   Monad.when (value == err) $
     Sim.throw (UndefinedProperty prop hdl callStack)
@@ -154,8 +89,10 @@ instance PropertyType CInt where
     getPropertyWith c_vpi_get (-1)
 
 instance PropertyType Bool where
-  getProperty (Property prop) =
-    fmap FFI.toBool . getProperty @CInt (Property prop)
+  getProperty prop =
+    -- This use of unsafeCoerce is safe because the parameter is phantom,
+    -- and FFI calls which return booleans in the spec actually return CInt.
+    fmap FFI.toBool . getProperty @CInt (unsafeCoerce prop)
 
 #if defined(SYSTEMVERILOG)
 instance PropertyType Int64 where

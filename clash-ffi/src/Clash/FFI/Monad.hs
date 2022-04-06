@@ -78,12 +78,10 @@ unsafeFreePtr = unsafeFreeWith FFI.free
 -- requires a destructor other than 'FFI.free', or a type other than 'Ptr a'
 -- then 'unsafeFreeWith' should be used instead.
 freePtr :: HasCallStack => Ptr a -> SimCont b ()
-freePtr =
-  unsafeFreeWith (\p -> Monad.unless (p == FFI.nullPtr) (FFI.free p))
+freePtr = unsafeFreeWith (\p -> Monad.unless (p == FFI.nullPtr) (FFI.free p))
 
 -- | Throw an exception in simulation. Unless caught this will cause the GHC
 -- RTS to exit, which will cause the simulator to stop / hang / enter a prompt.
 throw :: (HasCallStack, Exception e) => e -> SimCont b a
-throw ex =
-  IO.liftIO (IO.throwIO ex)
+throw ex = IO.liftIO (IO.throwIO ex)
 

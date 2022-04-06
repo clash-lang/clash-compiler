@@ -3,6 +3,7 @@
 
 module Clash.FFI.VPI.Error.State
   ( ErrorState(..)
+  , UnknownErrorState(..)
   ) where
 
 import           Control.Exception (Exception)

@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -- Used to improve the performance of derived instances.
@@ -9,10 +8,10 @@
 module Clash.FFI.VPI.Error
   ( CVpiError(..)
   , VpiError(..)
-  , ErrorState(..)
-  , ErrorLevel(..)
   , simulationError
   , simulationErrorLevel
+  , module Clash.FFI.VPI.Error.Level
+  , module Clash.FFI.VPI.Error.State
   ) where
 
 import           Data.ByteString (ByteString)
@@ -25,8 +24,8 @@ import           GHC.Generics (Generic)
 import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim (stackPtr, withNewPtr)
 import           Clash.FFI.View (Receive(..), UnsafeReceive(..), receiveString)
-import           Clash.FFI.VPI.Error.Level (ErrorLevel(..))
-import           Clash.FFI.VPI.Error.State (ErrorState(..))
+import           Clash.FFI.VPI.Error.Level
+import           Clash.FFI.VPI.Error.State
 
 data CVpiError = CVpiError
   { cerrorState   :: CInt

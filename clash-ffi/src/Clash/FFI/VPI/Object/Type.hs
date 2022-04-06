@@ -1,10 +1,10 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Clash.FFI.VPI.Object.Type
   ( ObjectType(..)
+  , UnknownObjectType(..)
   ) where
 
 import           Control.Exception (Exception)

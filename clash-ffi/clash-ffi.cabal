@@ -63,14 +63,16 @@ common vpi-config
     Clash.FFI.VPI.Error
     Clash.FFI.VPI.Error.Level
     Clash.FFI.VPI.Error.State
-    Clash.FFI.VPI.Info
     Clash.FFI.VPI.IO
-    Clash.FFI.VPI.Object
-    Clash.FFI.VPI.Object.Type
+    Clash.FFI.VPI.Info
+    Clash.FFI.VPI.Iterator
     Clash.FFI.VPI.Module
     Clash.FFI.VPI.Net
+    Clash.FFI.VPI.Object
+    Clash.FFI.VPI.Object.Type
     Clash.FFI.VPI.Parameter
     Clash.FFI.VPI.Port
+    Clash.FFI.VPI.Port.Direction
     Clash.FFI.VPI.Property
     Clash.FFI.VPI.Property.Type
     Clash.FFI.VPI.Reg

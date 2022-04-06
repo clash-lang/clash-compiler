@@ -1,10 +1,10 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Clash.FFI.VPI.Callback.Reason
   ( CallbackReason(..)
+  , UnknownCallbackReason(..)
   ) where
 
 import           Control.Exception (Exception)
@@ -22,41 +22,41 @@ import           Clash.FFI.VPI.Object
 import           Clash.FFI.VPI.Time
 import           Clash.FFI.VPI.Value
 
-data CallbackReason where
-  AfterValueChange :: Handle -> TimeType -> ValueFormat -> CallbackReason
-  BeforeStatement :: Handle -> TimeType -> CallbackReason
-  AfterForce :: Maybe Handle -> TimeType -> ValueFormat -> CallbackReason
-  AfterRelease :: Maybe Handle -> TimeType -> ValueFormat -> CallbackReason
-  AtStartOfSimTime :: Maybe Handle -> Time -> CallbackReason
-  ReadWriteSynch :: Maybe Handle -> Time -> CallbackReason
-  ReadOnlySynch :: Maybe Handle -> Time -> CallbackReason
-  NextSimTime :: Maybe Handle -> TimeType -> CallbackReason
-  AfterDelay :: Maybe Handle -> Time -> CallbackReason
-  EndOfCompile :: CallbackReason
-  StartOfSimulation :: CallbackReason
-  EndOfSimulation :: CallbackReason
-  RuntimeError :: CallbackReason
-  TchkViolation :: CallbackReason
-  StartOfSave :: CallbackReason
-  EndOfSave :: CallbackReason
-  StartOfRestart :: CallbackReason
-  EndOfRestart :: CallbackReason
-  StartOfReset :: CallbackReason
-  EndOfReset :: CallbackReason
-  EnterInteractive :: CallbackReason
-  ExitInteractive :: CallbackReason
-  InteractiveScopeChange :: CallbackReason
-  UnresolvedSysTf :: CallbackReason
+data CallbackReason
+  = AfterValueChange Handle TimeType ValueFormat
+  | BeforeStatement Handle TimeType
+  | AfterForce (Maybe Handle) TimeType ValueFormat
+  | AfterRelease (Maybe Handle) TimeType ValueFormat
+  | AtStartOfSimTime (Maybe Handle) Time
+  | ReadWriteSynch (Maybe Handle) Time
+  | ReadOnlySynch (Maybe Handle) Time
+  | NextSimTime (Maybe Handle) TimeType
+  | AfterDelay (Maybe Handle) Time
+  | EndOfCompile
+  | StartOfSimulation
+  | EndOfSimulation
+  | RuntimeError
+  | TchkViolation
+  | StartOfSave
+  | EndOfSave
+  | StartOfRestart
+  | EndOfRestart
+  | StartOfReset
+  | EndOfReset
+  | EnterInteractive
+  | ExitInteractive
+  | InteractiveScopeChange
+  | UnresolvedSysTf
 #if defined(VERILOG_2001)
-  AfterAssign :: Handle -> TimeType -> ValueFormat -> CallbackReason
-  AfterDeassign :: Handle -> TimeType -> ValueFormat -> CallbackReason
-  AfterDisable :: Handle -> TimeType -> ValueFormat -> CallbackReason
-  PliError :: CallbackReason
-  Signal :: CallbackReason
+  | AfterAssign Handle TimeType ValueFormat
+  | AfterDeassign Handle TimeType ValueFormat
+  | AfterDisable Handle TimeType ValueFormat
+  | PliError
+  | Signal
 #endif
 #if defined(VERILOG_2005)
-  NbaSynch :: Maybe Handle -> Time -> CallbackReason
-  AtEndOfSimTime :: Maybe Handle -> Time -> CallbackReason
+  | NbaSynch (Maybe Handle) Time
+  | AtEndOfSimTime (Maybe Handle) Time
 #endif
 
 instance UnsafeSend CallbackReason where
@@ -636,5 +636,5 @@ instance Receive CallbackReason where
         pure (AtEndOfSimTime mHandle time)
 #endif
 
-      n  -> Sim.throw (UnknownCallbackReason n callStack)
+      n -> Sim.throw (UnknownCallbackReason n callStack)
 

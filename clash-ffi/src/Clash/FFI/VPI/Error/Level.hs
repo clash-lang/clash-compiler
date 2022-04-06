@@ -3,6 +3,7 @@
 
 module Clash.FFI.VPI.Error.Level
   ( ErrorLevel(..)
+  , UnknownErrorLevel(..)
   ) where
 
 import           Control.Exception (Exception)

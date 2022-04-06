@@ -6,8 +6,9 @@
 
 module Clash.FFI.VPI.Value.Scalar
   ( Scalar(..)
-  , bitToScalar
+  , UnknownScalarValue(..)
   , scalarToBit
+  , bitToScalar
   ) where
 
 import           Control.Exception (Exception)

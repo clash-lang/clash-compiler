@@ -77,23 +77,23 @@ pattern TimeConst :: ConstantType
 pattern TimeConst = ConstantType 8
 
 parameterName :: HasCallStack => Parameter -> SimCont o ByteString
-parameterName = receiveProperty VpiName . parameterHandle
+parameterName = receiveProperty Name . parameterHandle
 
 parameterFullName :: HasCallStack => Parameter -> SimCont o ByteString
-parameterFullName = receiveProperty VpiFullName . parameterHandle
+parameterFullName = receiveProperty FullName . parameterHandle
 
 parameterSize :: (HasCallStack, Integral n) => Parameter -> SimCont o n
-parameterSize = fmap fromIntegral . getProperty VpiSize . parameterHandle
+parameterSize = fmap fromIntegral . getProperty Size . parameterHandle
 
 parameterType :: HasCallStack => Parameter -> SimCont o ConstantType
-parameterType = coerceProperty VpiConstType . parameterHandle
+parameterType = coerceProperty ConstType . parameterHandle
 
 #if defined(VERILOG_2001)
 parameterIsLocal :: HasCallStack => Parameter -> SimCont o Bool
-parameterIsLocal = getProperty VpiLocalParam . parameterHandle
+parameterIsLocal = getProperty IsLocalParam . parameterHandle
 
 parameterIsSigned :: HasCallStack => Parameter -> SimCont o Bool
-parameterIsSigned = getProperty VpiSigned . parameterHandle
+parameterIsSigned = getProperty IsSigned . parameterHandle
 #endif
 
 parameterValue :: HasCallStack => Parameter -> SimCont o Value

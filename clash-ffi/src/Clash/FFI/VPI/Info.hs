@@ -7,6 +7,7 @@
 module Clash.FFI.VPI.Info
   ( CInfo(..)
   , Info(..)
+  , UnknownSimulator(..)
   , simulatorInfo
   ) where
 
