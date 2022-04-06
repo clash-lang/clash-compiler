@@ -200,7 +200,7 @@ int getModuleSpecs (vpiHandle handle, struct vpiState *state)
             // get the ports in this module
             if (getPortSpecs(mod_handle, state, mod_name) < 0) return -1;
             
-            // explicitely free the module name
+            // explicitly free the module name
             free(mod_name);
                 
             // set flag that module is found
