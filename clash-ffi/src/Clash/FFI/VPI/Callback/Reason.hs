@@ -18,20 +18,21 @@ import           GHC.Stack (CallStack, callStack, prettyCallStack)
 
 import qualified Clash.FFI.Monad as Sim
 import           Clash.FFI.View
+import           Clash.FFI.VPI.Handle
 import           Clash.FFI.VPI.Object
 import           Clash.FFI.VPI.Time
 import           Clash.FFI.VPI.Value
 
 data CallbackReason
-  = AfterValueChange Handle TimeType ValueFormat
-  | BeforeStatement Handle TimeType
-  | AfterForce (Maybe Handle) TimeType ValueFormat
-  | AfterRelease (Maybe Handle) TimeType ValueFormat
-  | AtStartOfSimTime (Maybe Handle) Time
-  | ReadWriteSynch (Maybe Handle) Time
-  | ReadOnlySynch (Maybe Handle) Time
-  | NextSimTime (Maybe Handle) TimeType
-  | AfterDelay (Maybe Handle) Time
+  = AfterValueChange Object TimeType ValueFormat
+  | BeforeStatement Object TimeType
+  | AfterForce (Maybe Object) TimeType ValueFormat
+  | AfterRelease (Maybe Object) TimeType ValueFormat
+  | AtStartOfSimTime (Maybe Object) Time
+  | ReadWriteSynch (Maybe Object) Time
+  | ReadOnlySynch (Maybe Object) Time
+  | NextSimTime (Maybe Object) TimeType
+  | AfterDelay (Maybe Object) Time
   | EndOfCompile
   | StartOfSimulation
   | EndOfSimulation
@@ -48,19 +49,19 @@ data CallbackReason
   | InteractiveScopeChange
   | UnresolvedSysTf
 #if defined(VERILOG_2001)
-  | AfterAssign Handle TimeType ValueFormat
-  | AfterDeassign Handle TimeType ValueFormat
-  | AfterDisable Handle TimeType ValueFormat
+  | AfterAssign Object TimeType ValueFormat
+  | AfterDeassign Object TimeType ValueFormat
+  | AfterDisable Object TimeType ValueFormat
   | PliError
   | Signal
 #endif
 #if defined(VERILOG_2005)
-  | NbaSynch (Maybe Handle) Time
-  | AtEndOfSimTime (Maybe Handle) Time
+  | NbaSynch (Maybe Object) Time
+  | AtEndOfSimTime (Maybe Object) Time
 #endif
 
 instance UnsafeSend CallbackReason where
-  type Sent CallbackReason = (CInt, Handle, Ptr CTime, Ptr CValue)
+  type Sent CallbackReason = (CInt, Object, Ptr CTime, Ptr CValue)
 
   unsafeSend =
     \case
@@ -79,8 +80,8 @@ instance UnsafeSend CallbackReason where
 
         pure (2, handle, ctime, FFI.nullPtr)
 
-      AfterForce mHandle timeTy valueFmt -> do
-        let handle = fromMaybe nullHandle mHandle
+      AfterForce mObject timeTy valueFmt -> do
+        let handle = fromMaybe nullHandle mObject
 
         ctimeTy <- unsafeSend timeTy
         ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
@@ -90,8 +91,8 @@ instance UnsafeSend CallbackReason where
 
         pure (3, handle, ctime, cvalue)
 
-      AfterRelease mHandle timeTy valueFmt -> do
-        let handle = fromMaybe nullHandle mHandle
+      AfterRelease mObject timeTy valueFmt -> do
+        let handle = fromMaybe nullHandle mObject
 
         ctimeTy <- unsafeSend timeTy
         ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
@@ -101,31 +102,31 @@ instance UnsafeSend CallbackReason where
 
         pure (4, handle, ctime, cvalue)
 
-      AtStartOfSimTime mHandle time -> do
-        let handle = fromMaybe nullHandle mHandle
+      AtStartOfSimTime mObject time -> do
+        let handle = fromMaybe nullHandle mObject
         ctime <- unsafePokeSend time
         pure (5, handle, ctime, FFI.nullPtr)
 
-      ReadWriteSynch mHandle time -> do
-        let handle = fromMaybe nullHandle mHandle
+      ReadWriteSynch mObject time -> do
+        let handle = fromMaybe nullHandle mObject
         ctime <- unsafePokeSend time
         pure (6, handle, ctime, FFI.nullPtr)
 
-      ReadOnlySynch mHandle time -> do
-        let handle = fromMaybe nullHandle mHandle
+      ReadOnlySynch mObject time -> do
+        let handle = fromMaybe nullHandle mObject
         ctime <- unsafePokeSend time
         pure (7, handle, ctime, FFI.nullPtr)
 
-      NextSimTime mHandle timeTy -> do
-        let handle = fromMaybe nullHandle mHandle
+      NextSimTime mObject timeTy -> do
+        let handle = fromMaybe nullHandle mObject
 
         ctimeTy <- unsafeSend timeTy
         ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
 
         pure (8, handle, ctime, FFI.nullPtr)
 
-      AfterDelay mHandle time -> do
-        let handle = fromMaybe nullHandle mHandle
+      AfterDelay mObject time -> do
+        let handle = fromMaybe nullHandle mObject
         ctime <- unsafePokeSend time
         pure (7, handle, ctime, FFI.nullPtr)
 
@@ -209,13 +210,13 @@ instance UnsafeSend CallbackReason where
         pure (29, nullHandle, FFI.nullPtr, FFI.nullPtr)
 #endif
 #if defined(VERILOG_2005)
-      NbaSynch mHandle time -> do
-        let handle = fromMaybe nullHandle mHandle
+      NbaSynch mObject time -> do
+        let handle = fromMaybe nullHandle mObject
         ctime <- unsafePokeSend time
         pure (31, handle, ctime, FFI.nullPtr)
 
-      AtEndOfSimTime mHandle time -> do
-        let handle = fromMaybe nullHandle mHandle
+      AtEndOfSimTime mObject time -> do
+        let handle = fromMaybe nullHandle mObject
         ctime <- unsafePokeSend time
         pure (31, handle, ctime, FFI.nullPtr)
 #endif
@@ -238,8 +239,8 @@ instance Send CallbackReason where
 
         pure (2, handle, ctime, FFI.nullPtr)
 
-      AfterForce mHandle timeTy valueFmt -> do
-        let handle = fromMaybe nullHandle mHandle
+      AfterForce mObject timeTy valueFmt -> do
+        let handle = fromMaybe nullHandle mObject
 
         ctimeTy <- send timeTy
         ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
@@ -249,8 +250,8 @@ instance Send CallbackReason where
 
         pure (3, handle, ctime, cvalue)
 
-      AfterRelease mHandle timeTy valueFmt -> do
-        let handle = fromMaybe nullHandle mHandle
+      AfterRelease mObject timeTy valueFmt -> do
+        let handle = fromMaybe nullHandle mObject
 
         ctimeTy <- send timeTy
         ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
@@ -260,31 +261,31 @@ instance Send CallbackReason where
 
         pure (4, handle, ctime, cvalue)
 
-      AtStartOfSimTime mHandle time -> do
-        let handle = fromMaybe nullHandle mHandle
+      AtStartOfSimTime mObject time -> do
+        let handle = fromMaybe nullHandle mObject
         ctime <- pokeSend time
         pure (5, handle, ctime, FFI.nullPtr)
 
-      ReadWriteSynch mHandle time -> do
-        let handle = fromMaybe nullHandle mHandle
+      ReadWriteSynch mObject time -> do
+        let handle = fromMaybe nullHandle mObject
         ctime <- pokeSend time
         pure (6, handle, ctime, FFI.nullPtr)
 
-      ReadOnlySynch mHandle time -> do
-        let handle = fromMaybe nullHandle mHandle
+      ReadOnlySynch mObject time -> do
+        let handle = fromMaybe nullHandle mObject
         ctime <- pokeSend time
         pure (7, handle, ctime, FFI.nullPtr)
 
-      NextSimTime mHandle timeTy -> do
-        let handle = fromMaybe nullHandle mHandle
+      NextSimTime mObject timeTy -> do
+        let handle = fromMaybe nullHandle mObject
 
         ctimeTy <- send timeTy
         ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
 
         pure (8, handle, ctime, FFI.nullPtr)
 
-      AfterDelay mHandle time -> do
-        let handle = fromMaybe nullHandle mHandle
+      AfterDelay mObject time -> do
+        let handle = fromMaybe nullHandle mObject
         ctime <- pokeSend time
         pure (9, handle, ctime, FFI.nullPtr)
 
@@ -368,13 +369,13 @@ instance Send CallbackReason where
         pure (29, nullHandle, FFI.nullPtr, FFI.nullPtr)
 #endif
 #if defined(VERILOG_2005)
-      NbaSynch mHandle time -> do
-        let handle = fromMaybe nullHandle mHandle
+      NbaSynch mObject time -> do
+        let handle = fromMaybe nullHandle mObject
         ctime <- pokeSend time
         pure (31, handle, ctime, FFI.nullPtr)
 
-      AtEndOfSimTime mHandle time -> do
-        let handle = fromMaybe nullHandle mHandle
+      AtEndOfSimTime mObject time -> do
+        let handle = fromMaybe nullHandle mObject
         ctime <- pokeSend time
         pure (31, handle, ctime, FFI.nullPtr)
 #endif
@@ -393,10 +394,10 @@ instance Show UnknownCallbackReason where
       ]
 
 instance UnsafeReceive CallbackReason where
-  type Received CallbackReason = (CInt, Handle, Ptr CTime, Ptr CValue)
+  type Received CallbackReason = (CInt, Object, Ptr CTime, Ptr CValue)
 
   unsafeReceive (creason, handle, ctime, cvalue) =
-    let mHandle = if isNullHandle handle then Nothing else Just handle in
+    let mObject = if isNullHandle handle then Nothing else Just handle in
     case creason of
       1 -> do
         timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= unsafeReceive
@@ -410,32 +411,32 @@ instance UnsafeReceive CallbackReason where
       3 -> do
         timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= unsafeReceive
         valueFmt <- IO.liftIO (FFI.peekByteOff cvalue 0) >>= unsafeReceive
-        pure (AfterForce mHandle timeTy valueFmt)
+        pure (AfterForce mObject timeTy valueFmt)
 
       4 -> do
         timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= unsafeReceive
         valueFmt <- IO.liftIO (FFI.peekByteOff cvalue 0) >>= unsafeReceive
-        pure (AfterRelease mHandle timeTy valueFmt)
+        pure (AfterRelease mObject timeTy valueFmt)
 
       5 -> do
         time <- unsafePeekReceive ctime
-        pure (AtStartOfSimTime mHandle time)
+        pure (AtStartOfSimTime mObject time)
 
       6 -> do
         time <- unsafePeekReceive ctime
-        pure (ReadWriteSynch mHandle time)
+        pure (ReadWriteSynch mObject time)
 
       7 -> do
         time <- unsafePeekReceive ctime
-        pure (ReadOnlySynch mHandle time)
+        pure (ReadOnlySynch mObject time)
 
       8 -> do
         timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= unsafeReceive
-        pure (NextSimTime mHandle timeTy)
+        pure (NextSimTime mObject timeTy)
 
       9 -> do
         time <- unsafePeekReceive ctime
-        pure (AfterDelay mHandle time)
+        pure (AfterDelay mObject time)
 
       10 ->
         pure EndOfCompile
@@ -507,18 +508,18 @@ instance UnsafeReceive CallbackReason where
 #if defined(VERILOG_2005)
       30 -> do
         time <- unsafePeekReceive ctime
-        pure (NbaSynch mHandle time)
+        pure (NbaSynch mObject time)
 
       31 -> do
         time <- unsafePeekReceive ctime
-        pure (AtEndOfSimTime mHandle time)
+        pure (AtEndOfSimTime mObject time)
 #endif
 
       n  -> Sim.throw (UnknownCallbackReason n callStack)
 
 instance Receive CallbackReason where
   receive (creason, handle, ctime, cvalue) =
-    let mHandle = if isNullHandle handle then Nothing else Just handle in
+    let mObject = if isNullHandle handle then Nothing else Just handle in
     case creason of
       1 -> do
         timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
@@ -532,32 +533,32 @@ instance Receive CallbackReason where
       3 -> do
         timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
         valueFmt <- IO.liftIO (FFI.peekByteOff cvalue 0) >>= receive
-        pure (AfterForce mHandle timeTy valueFmt)
+        pure (AfterForce mObject timeTy valueFmt)
 
       4 -> do
         timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
         valueFmt <- IO.liftIO (FFI.peekByteOff cvalue 0) >>= receive
-        pure (AfterRelease mHandle timeTy valueFmt)
+        pure (AfterRelease mObject timeTy valueFmt)
 
       5 -> do
         time <- peekReceive ctime
-        pure (AtStartOfSimTime mHandle time)
+        pure (AtStartOfSimTime mObject time)
 
       6 -> do
         time <- peekReceive ctime
-        pure (ReadWriteSynch mHandle time)
+        pure (ReadWriteSynch mObject time)
 
       7 -> do
         time <- peekReceive ctime
-        pure (ReadOnlySynch mHandle time)
+        pure (ReadOnlySynch mObject time)
 
       8 -> do
         timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
-        pure (NextSimTime mHandle timeTy)
+        pure (NextSimTime mObject timeTy)
 
       9 -> do
         time <- peekReceive ctime
-        pure (AfterDelay mHandle time)
+        pure (AfterDelay mObject time)
 
       10 ->
         pure EndOfCompile
@@ -629,11 +630,11 @@ instance Receive CallbackReason where
 #if defined(VERILOG_2005)
       30 -> do
         time <- peekReceive ctime
-        pure (NbaSynch mHandle time)
+        pure (NbaSynch mObject time)
 
       31 -> do
         time <- peekReceive ctime
-        pure (AtEndOfSimTime mHandle time)
+        pure (AtEndOfSimTime mObject time)
 #endif
 
       n -> Sim.throw (UnknownCallbackReason n callStack)

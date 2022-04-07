@@ -6,22 +6,9 @@
 
 module Clash.FFI.VPI.Parameter
   ( Parameter(..)
-  , ConstantType
-      ( DecimalConst
-      , RealConst
-      , BinaryConst
-      , OctalConst
-      , HexConst
-      , StringConst
-#if defined(VERILOG_2001)
-      , IntConst
-#endif
-      , TimeConst
-      )
   , parameterName
   , parameterFullName
   , parameterSize
-  , parameterType
 #if defined(VERILOG_2001)
   , parameterIsLocal
   , parameterIsSigned
@@ -32,7 +19,7 @@ module Clash.FFI.VPI.Parameter
 
 import           Data.ByteString (ByteString)
 import           Data.Proxy (Proxy)
-import           Foreign.C.Types (CInt)
+import           Foreign.Storable (Storable)
 import           GHC.Stack (HasCallStack, callStack)
 import           GHC.TypeNats
 
@@ -40,60 +27,34 @@ import           Clash.Promoted.Nat
 
 import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim (throw)
+import           Clash.FFI.VPI.Handle
 import           Clash.FFI.VPI.Object
 import           Clash.FFI.VPI.Property
 import           Clash.FFI.VPI.Value
 
-newtype Parameter = Parameter { parameterHandle :: Handle }
+newtype Parameter
+  = Parameter { parameterObject :: Object }
+  deriving stock (Show)
+  deriving newtype (Handle, Storable)
 
--- TODO Make this an ADT so it shows nicely.
-
-newtype ConstantType = ConstantType CInt
-
-pattern DecimalConst :: ConstantType
-pattern DecimalConst = ConstantType 1
-
-pattern RealConst :: ConstantType
-pattern RealConst = ConstantType 2
-
-pattern BinaryConst :: ConstantType
-pattern BinaryConst = ConstantType 3
-
-pattern OctalConst :: ConstantType
-pattern OctalConst = ConstantType 4
-
-pattern HexConst :: ConstantType
-pattern HexConst = ConstantType 5
-
-pattern StringConst :: ConstantType
-pattern StringConst = ConstantType 6
-
-#if defined(VERILOG_2001)
-pattern IntConst :: ConstantType
-pattern IntConst = ConstantType 7
-#endif
-
-pattern TimeConst :: ConstantType
-pattern TimeConst = ConstantType 8
+instance HandleObject Parameter where
+  handleAsObject = parameterObject
 
 parameterName :: HasCallStack => Parameter -> SimCont o ByteString
-parameterName = receiveProperty Name . parameterHandle
+parameterName = receiveProperty Name
 
 parameterFullName :: HasCallStack => Parameter -> SimCont o ByteString
-parameterFullName = receiveProperty FullName . parameterHandle
+parameterFullName = receiveProperty FullName
 
 parameterSize :: (HasCallStack, Integral n) => Parameter -> SimCont o n
-parameterSize = fmap fromIntegral . getProperty Size . parameterHandle
-
-parameterType :: HasCallStack => Parameter -> SimCont o ConstantType
-parameterType = coerceProperty ConstType . parameterHandle
+parameterSize = fmap fromIntegral . getProperty Size
 
 #if defined(VERILOG_2001)
 parameterIsLocal :: HasCallStack => Parameter -> SimCont o Bool
-parameterIsLocal = getProperty IsLocalParam . parameterHandle
+parameterIsLocal = getProperty IsLocalParam
 
 parameterIsSigned :: HasCallStack => Parameter -> SimCont o Bool
-parameterIsSigned = getProperty IsSigned . parameterHandle
+parameterIsSigned = getProperty IsSigned
 #endif
 
 parameterValue :: HasCallStack => Parameter -> SimCont o Value
@@ -112,5 +73,5 @@ parameterValueAs
   -> Parameter
   -> SimCont o Value
 parameterValueAs fmt =
-  receiveValue fmt . parameterHandle
+  receiveValue fmt . parameterObject
 

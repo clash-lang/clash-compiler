@@ -15,30 +15,34 @@ import Foreign.Storable (Storable)
 import GHC.Stack (HasCallStack)
 
 import Clash.FFI.Monad (SimCont)
-import Clash.FFI.VPI.Object (Handle)
+import Clash.FFI.VPI.Handle
+import Clash.FFI.VPI.Object
 import Clash.FFI.VPI.Port.Direction
 import Clash.FFI.VPI.Property
 
 newtype Port
-  = Port { portHandle :: Handle }
+  = Port { portObject :: Object }
   deriving stock (Show)
-  deriving newtype (Storable)
+  deriving newtype (Handle, Storable)
+
+instance HandleObject Port where
+  handleAsObject = portObject
 
 portName :: Port -> SimCont o ByteString
-portName = receiveProperty Name . portHandle
+portName = receiveProperty Name
 
 portDirection :: HasCallStack => Port -> SimCont o Direction
-portDirection = receiveProperty Direction . portHandle
+portDirection = receiveProperty Direction
 
 portIndex :: HasCallStack => Port -> SimCont o CInt
-portIndex = getProperty PortIndex . portHandle
+portIndex = getProperty PortIndex
 
 portSize :: HasCallStack => Port -> SimCont o CInt
-portSize = getProperty Size . portHandle
+portSize = getProperty Size
 
 portIsVector :: HasCallStack => Port -> SimCont o Bool
-portIsVector = getProperty IsVector . portHandle
+portIsVector = getProperty IsVector
 
 portIsScalar :: HasCallStack => Port -> SimCont o Bool
-portIsScalar = getProperty IsScalar . portHandle
+portIsScalar = getProperty IsScalar
 

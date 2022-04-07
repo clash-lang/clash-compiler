@@ -16,16 +16,15 @@ module Clash.FFI.VPI.Property
   ) where
 
 import           Control.Exception (Exception)
-import           Control.Monad ((>=>))
 import qualified Control.Monad as Monad (when)
 import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.Coerce
+import           Data.Typeable (Typeable)
 
 #if defined(SYSTEMVERILOG)
 import           Data.Int (Int64)
 #endif
 
-import           Data.Typeable (Typeable)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CInt(..))
 import qualified Foreign.Marshal.Utils as FFI (toBool)
@@ -36,51 +35,51 @@ import           Unsafe.Coerce
 import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim (throw)
 import           Clash.FFI.View
-import           Clash.FFI.VPI.Object (Handle(..))
+import           Clash.FFI.VPI.Object
 import           Clash.FFI.VPI.Property.Type
 
 foreign import ccall "vpi_user.h vpi_get"
-  c_vpi_get :: CInt -> Handle -> IO CInt
+  c_vpi_get :: CInt -> Object -> IO CInt
 
 #if defined(SYSTEMVERILOG)
 foreign import ccall "vpi_user.h vpi_get64"
-  c_vpi_get64 :: CInt -> Handle -> IO Int64
+  c_vpi_get64 :: CInt -> Object -> IO Int64
 #endif
 
 foreign import ccall "vpi_user.h vpi_get_str"
-  c_vpi_get_str :: CInt -> Handle -> IO CString
+  c_vpi_get_str :: CInt -> Object -> IO CString
 
-data UndefinedProperty a
-  = UndefinedProperty (Property a) Handle CallStack
+data UndefinedProperty p a
+  = UndefinedProperty (Property p) a CallStack
   deriving anyclass (Exception)
 
-instance Show (UndefinedProperty a) where
-  show (UndefinedProperty p h c) =
+instance (Show a) => Show (UndefinedProperty p a) where
+  show (UndefinedProperty p a c) =
     mconcat
       [ "Undefined property "
       , show p
       , " for the handle "
-      , show h
+      , show a
       , "\n"
       , prettyCallStack c
       ]
 
 class PropertyType a where
-  getProperty :: HasCallStack => Property a -> Handle -> SimCont o a
+  getProperty :: (HasCallStack, Show handle, Typeable handle, HandleObject handle) => Property a -> handle -> SimCont o a
 
 getPropertyWith
-  :: (HasCallStack, Eq a, Show a, Typeable a)
-  => (CInt -> Handle -> IO a)
+  :: (HasCallStack, Show handle, Typeable handle, HandleObject handle, Eq a, Show a, Typeable a)
+  => (CInt -> Object -> IO a)
   -> a
   -> Property a
-  -> Handle
+  -> handle
   -> SimCont o a
-getPropertyWith f err prop hdl = do
+getPropertyWith f err prop handle = do
   cprop <- unsafeSend prop
-  value <- IO.liftIO (f cprop hdl)
+  value <- IO.liftIO (f cprop (handleAsObject handle))
 
   Monad.when (value == err) $
-    Sim.throw (UndefinedProperty prop hdl callStack)
+    Sim.throw (UndefinedProperty prop handle callStack)
 
   pure value
 
@@ -105,26 +104,26 @@ instance PropertyType CString where
     getPropertyWith c_vpi_get_str FFI.nullPtr
 
 coerceProperty
-  :: (HasCallStack, PropertyType a, Coercible a b)
+  :: (HasCallStack, PropertyType a, Coercible a b, Show handle, Typeable handle, HandleObject handle)
   => Property a
-  -> Handle
+  -> handle
   -> SimCont o b
 coerceProperty prop =
-  fmap coerce . getProperty prop
+  fmap coerce . getProperty prop . handleAsObject
 
 unsafeReceiveProperty
-  :: (HasCallStack, UnsafeReceive a, PropertyType (Received a))
+  :: (HasCallStack, UnsafeReceive a, PropertyType (Received a), HandleObject handle, Show handle, Typeable handle)
   => Property (Received a)
-  -> Handle
+  -> handle
   -> SimCont o a
-unsafeReceiveProperty prop =
-  getProperty prop >=> unsafeReceive
+unsafeReceiveProperty prop handle =
+  getProperty prop (handleAsObject handle) >>= unsafeReceive
 
 receiveProperty
-  :: (HasCallStack, Receive a, PropertyType (Received a))
+  :: (HasCallStack, Receive a, PropertyType (Received a), HandleObject handle, Show handle, Typeable handle)
   => Property (Received a)
-  -> Handle
+  -> handle
   -> SimCont o a
-receiveProperty prop =
-  getProperty prop >=> receive
+receiveProperty prop handle =
+  getProperty prop (handleAsObject handle) >>= receive
 

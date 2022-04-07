@@ -29,7 +29,8 @@ import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
 import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim (throw, withNewPtr)
 import           Clash.FFI.View
-import           Clash.FFI.VPI.Object (Handle(..), nullHandle)
+import           Clash.FFI.VPI.Handle (Handle(..))
+import           Clash.FFI.VPI.Object
 
 data CTime = CTime
   { ctimeType :: CInt
@@ -147,13 +148,13 @@ instance Receive Time where
   receive = unsafeReceive
 
 foreign import ccall "vpi_user.h vpi_get_time"
-  c_vpi_get_time :: Handle -> Ptr CTime -> IO ()
+  c_vpi_get_time :: Object -> Ptr CTime -> IO ()
 
 simulationTime
-  :: HasCallStack
+  :: (HasCallStack, HandleObject handle)
   => SimCont o (Ptr CTime)
   -> TimeType
-  -> Maybe Handle
+  -> Maybe handle
   -> SimCont o (Ptr CTime)
 simulationTime alloc ty mHandle = do
   Monad.when (ty == Suppress) $
@@ -164,5 +165,5 @@ simulationTime alloc ty mHandle = do
   fmap fst . Sim.withNewPtr alloc $ \ptr -> do
     let handle = fromMaybe nullHandle mHandle
     FFI.poke ptr (CTime cty 0 0 0.0)
-    c_vpi_get_time handle ptr
+    c_vpi_get_time (handleAsObject handle) ptr
 

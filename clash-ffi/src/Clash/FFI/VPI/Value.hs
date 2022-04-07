@@ -10,7 +10,6 @@
 module Clash.FFI.VPI.Value
   ( CValue(..)
   , Value(..)
-  , getValue
   , unsafeSendValue
   , sendValue
   , unsafeReceiveValue
@@ -30,6 +29,7 @@ import qualified Control.Exception as IO (throwIO)
 import qualified Control.Monad as Monad (void)
 import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.ByteString (ByteString)
+import           Data.Typeable (Typeable)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CDouble, CInt(..))
 import           Foreign.Ptr (Ptr)
@@ -43,7 +43,7 @@ import           Clash.Sized.BitVector (Bit, BitVector)
 import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim (heapPtr, stackPtr, withNewPtr)
 import           Clash.FFI.View
-import           Clash.FFI.VPI.Object (Handle(..))
+import           Clash.FFI.VPI.Object
 import           Clash.FFI.VPI.Property
 import           Clash.FFI.VPI.Time (CTime, Time)
 import           Clash.FFI.VPI.Value.Delay
@@ -336,27 +336,31 @@ instance Receive Value where
           SomeNat proxy -> MiscVal (snatProxy proxy) <$> receive bytes
 
 foreign import ccall "vpi_user.h vpi_get_value"
-  c_vpi_get_value :: Handle -> Ptr CValue -> IO ()
+  c_vpi_get_value :: Object -> Ptr CValue -> IO ()
 
 getValue
   :: HasCallStack
+  => HandleObject handle
   => SimCont o (Ptr CValue)
   -> ValueFormat
-  -> Handle
+  -> handle
   -> SimCont o (Ptr CValue)
 getValue alloc fmt handle = do
   cfmt <- unsafeSend fmt
 
   fmap fst . Sim.withNewPtr alloc $ \ptr -> do
     FFI.pokeByteOff ptr 0 cfmt
-    c_vpi_get_value handle ptr
+    c_vpi_get_value (handleAsObject handle) ptr
 
     pure ()
 
 unsafeReceiveValue
   :: HasCallStack
+  => HandleObject handle
+  => Show handle
+  => Typeable handle
   => ValueFormat
-  -> Handle
+  -> handle
   -> SimCont o Value
 unsafeReceiveValue fmt handle = do
   ptr <- getValue Sim.stackPtr fmt handle
@@ -367,8 +371,11 @@ unsafeReceiveValue fmt handle = do
 
 receiveValue
   :: HasCallStack
+  => HandleObject handle
+  => Show handle
+  => Typeable handle
   => ValueFormat
-  -> Handle
+  -> handle
   -> SimCont o Value
 receiveValue fmt handle = do
   ptr <- getValue Sim.heapPtr fmt handle
@@ -378,7 +385,7 @@ receiveValue fmt handle = do
   receive (cvalue, size)
 
 foreign import ccall "vpi_user.h vpi_put_value"
-  c_vpi_put_value :: Handle -> Ptr CValue -> Ptr CTime -> CInt -> IO Handle
+  c_vpi_put_value :: Object -> Ptr CValue -> Ptr CTime -> CInt -> IO Object
 
 {-
 NOTE [vpi_put_value and events]
@@ -396,7 +403,8 @@ a valid handle would never be returned anyway.
 
 unsafeSendValue
   :: HasCallStack
-  => Handle
+  => HandleObject handle
+  => handle
   -> Value
   -> DelayMode
   -> SimCont o ()
@@ -405,11 +413,12 @@ unsafeSendValue handle value delay = do
   (timePtr, flags) <- unsafeSend delay
 
   Monad.void . IO.liftIO $
-    c_vpi_put_value handle valuePtr timePtr flags
+    c_vpi_put_value (handleAsObject handle) valuePtr timePtr flags
 
 sendValue
   :: HasCallStack
-  => Handle
+  => HandleObject handle
+  => handle
   -> Value
   -> DelayMode
   -> SimCont o ()
@@ -418,5 +427,5 @@ sendValue handle value delay = do
   (timePtr, flags) <- send delay
 
   Monad.void . IO.liftIO $
-    c_vpi_put_value handle valuePtr timePtr flags
+    c_vpi_put_value (handleAsObject handle) valuePtr timePtr flags
 

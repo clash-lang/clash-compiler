@@ -25,7 +25,6 @@ data Property a where
   Direction :: Property CInt
   NetType :: Property CInt
   PortIndex :: Property CInt
-  ConstType :: Property CInt
 #if defined(VERILOG_2001)
   IsSigned :: Property Bool
   IsLocalParam :: Property Bool
@@ -49,7 +48,6 @@ instance UnsafeSend (Property a) where
       Direction -> 20
       NetType -> 22
       PortIndex -> 29
-      ConstType -> 40
 #if defined(VERILOG_2001)
       IsSigned -> 65
       IsLocalParam -> 70

@@ -1,143 +1,137 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
 module Clash.FFI.VPI.Object
-  ( Handle(..)
-  , nullHandle
-  , isNullHandle
-  , freeHandle
-  , compareHandles
-  , HandleRef(..)
-  , UnknownHandle(..)
-  , ObjectType(..)
+  ( Object(..)
+  , HandleObject(..)
+  , module Clash.FFI.VPI.Object.Type
   ) where
 
-import           Control.Exception (Exception)
 import qualified Control.Monad as Monad (unless, void, when)
 import qualified Control.Monad.IO.Class as IO (liftIO)
 import qualified Data.List as List (genericLength)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types
-import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
+import           GHC.Stack (callStack)
 
 import           Foreign.Ptr (Ptr)
 import qualified Foreign.Ptr as FFI (nullPtr)
 import           Foreign.Storable (Storable)
 
-import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim (throw)
 import           Clash.FFI.View (unsafeSend)
+import           Clash.FFI.VPI.Handle
 import           Clash.FFI.VPI.Object.Type
 
-newtype Handle = Handle { handleToPtr :: Ptr Handle }
-  deriving newtype (Show, Storable)
+class Handle a => HandleObject a where
+  handleAsObject :: a -> Object
 
-nullHandle :: Handle
-nullHandle = Handle FFI.nullPtr
+newtype Object
+  = Object { objectPtr :: Ptr Object }
+  deriving stock (Show)
+  deriving newtype (Storable)
 
-isNullHandle :: Handle -> Bool
-isNullHandle (Handle ptr) =
-  ptr == FFI.nullPtr
+instance HandleObject Object where
+  handleAsObject = id
 
 #if defined(VERILOG)
 foreign import ccall "vpi_user.h vpi_free_object"
-  c_vpi_free_object :: Handle -> IO CInt
-#endif
-
-#if defined(SYSTEMVERILOG)
-foreign import ccall "vpi_user.h vpi_release_handle"
-  c_vpi_release_handle :: Handle -> IO CInt
-#endif
-
-c_vpi_free :: Handle -> IO CInt
-c_vpi_free =
-#if defined(VERILOG)
-  c_vpi_free_object
+  c_vpi_free_object :: Object -> IO CInt
 #elif defined(SYSTEMVERILOG)
-  c_vpi_release_handle
+foreign import ccall "vpi_user.h vpi_release_handle"
+  c_vpi_release_handle :: Object -> IO CInt
 #else
-  error "VPI: Neither VERILOG or SYSTEMVERILOG is defined"
+#error "Neither VERILOG or SYSTEMVERILOG is defined in VPI implementation"
 #endif
-
-freeHandle :: HasCallStack => Handle -> SimCont o ()
-freeHandle handle =
-  Monad.unless (isNullHandle handle) $
-    IO.liftIO $ Monad.void (c_vpi_free handle)
 
 foreign import ccall "vpi_user.h vpi_compare_objects"
-  c_vpi_compare_objects :: Handle -> Handle -> IO Bool
+  c_vpi_compare_objects :: Object -> Object -> IO Bool
 
-compareHandles :: Handle -> Handle -> SimCont o Bool
-compareHandles x y =
-  IO.liftIO (c_vpi_compare_objects x y)
+instance Handle Object where
+  nullHandle = Object FFI.nullPtr
+
+  isNullHandle obj =
+    objectPtr obj == FFI.nullPtr
+
+  freeHandle obj =
+    Monad.unless (isNullHandle obj)
+      . IO.liftIO
+      . Monad.void
+#if defined(VERILOG)
+      $ c_vpi_free_object obj
+#elif defined(SYSTEMVERILOG)
+      $ c_vpi_release_handle obj
+#else
+#error "Neither VERILOG or SYSTEMVERILOG is defined in VPI implementation"
+#endif
+
+  compareHandles x y =
+    IO.liftIO (c_vpi_compare_objects x y)
 
 foreign import ccall "vpi_user.h vpi_handle"
-  c_vpi_handle :: CInt -> Handle -> IO Handle
+  c_vpi_handle :: CInt -> Object -> IO Object
 
-foreign import ccall "vpi_user.h vpi_handle_by_name"
-  c_vpi_handle_by_name :: CString -> Handle -> IO Handle
+-- TODO Should I have another one here with Method instead of ObjectType? The
+-- VPI spec seems to conflate the two but methods can only be used for
+-- traversing the hierarchy from some known point *I think*
+instance HandleChild ObjectType Object where
+  -- TODO Maybe we could know this if we make ObjectType a GADT
+  type ChildHandle ObjectType Object = Object
 
-foreign import ccall "vpi_user.h vpi_handle_by_index"
-  c_vpi_handle_by_index :: Handle -> CInt -> IO Handle
-
-foreign import ccall "vpi_user.h vpi_handle_by_multi_index"
-  c_vpi_handle_by_multi_index :: Handle -> CInt -> Ptr CInt -> IO Handle
-
-data UnknownHandle a
-  = UnknownHandle a Handle CallStack
-  deriving anyclass (Exception)
-
-instance (Show a) => Show (UnknownHandle a) where
-  show (UnknownHandle x h c) =
-    mconcat
-      [ "Unknown child for handle "
-      , show h
-      , " accessed via the type/name/index "
-      , show x
-      , "\n"
-      , prettyCallStack c
-      ]
-
-class HandleRef a where
-  childHandle :: HasCallStack => a -> Handle -> SimCont o Handle
-
-instance HandleRef ObjectType where
-  childHandle ty parent = do
-    cty <- unsafeSend ty
-    child <- IO.liftIO (c_vpi_handle cty parent)
+  childHandle objTy parent = do
+    cobjTy <- unsafeSend objTy
+    child <- IO.liftIO (c_vpi_handle cobjTy parent)
 
     Monad.when (isNullHandle child) $
-      Sim.throw (UnknownHandle ty parent callStack)
+      Sim.throw (UnknownChild objTy parent callStack)
 
     pure child
 
-instance HandleRef CString where
+foreign import ccall "vpi_user.h vpi_handle_by_name"
+  c_vpi_handle_by_name :: CString -> Object -> IO Object
+
+instance HandleChild CString Object where
+  type ChildHandle CString Object = Object
+
   childHandle str parent = do
     child <- IO.liftIO (c_vpi_handle_by_name str parent)
 
     Monad.when (isNullHandle child) $
-      Sim.throw (UnknownHandle str parent callStack)
+      Sim.throw (UnknownChild str parent callStack)
 
     pure child
 
-instance HandleRef CInt where
+foreign import ccall "vpi_user.h vpi_handle_by_index"
+  c_vpi_handle_by_index :: Object -> CInt -> IO Object
+
+instance HandleChild CInt Object where
+  -- We don't know any better than "Object" here
+  type ChildHandle CInt Object = Object
+
   childHandle ix parent = do
     child <- IO.liftIO (c_vpi_handle_by_index parent ix)
 
     Monad.when (isNullHandle child) $
-      Sim.throw (UnknownHandle ix parent callStack)
+      Sim.throw (UnknownChild ix parent callStack)
 
     pure child
 
-instance HandleRef [CInt] where
+foreign import ccall "vpi_user.h vpi_handle_by_multi_index"
+  c_vpi_handle_by_multi_index :: Object -> CInt -> Ptr CInt -> IO Object
+
+instance HandleChild [CInt] Object where
+  type ChildHandle [CInt] Object = Object
+
   childHandle ixs parent = do
     let len = List.genericLength ixs
     ptr <- unsafeSend ixs
     child <- IO.liftIO (c_vpi_handle_by_multi_index parent len ptr)
 
     Monad.when (isNullHandle child) $
-      Sim.throw (UnknownHandle ixs parent callStack)
+      Sim.throw (UnknownChild ixs parent callStack)
 
     pure child
 

@@ -34,11 +34,9 @@ common basic-config
   build-depends:
     base                    >= 4.11     && < 5,
     bytestring              >= 0.10.0.2 && < 0.12,
-    deepseq                 >= 1.4      && < 1.5,
     derive-storable         >= 0.3.0.0  && < 0.4,
     derive-storable-plugin  >= 0.2.3    && < 0.3,
     mtl                     >= 2.2.2    && < 2.3,
-    pretty-show             >= 1.10     && < 1.11,
 
     clash-prelude           >= 1.2      && < 2,
 
@@ -63,6 +61,7 @@ common vpi-config
     Clash.FFI.VPI.Error
     Clash.FFI.VPI.Error.Level
     Clash.FFI.VPI.Error.State
+    Clash.FFI.VPI.Handle
     Clash.FFI.VPI.IO
     Clash.FFI.VPI.Info
     Clash.FFI.VPI.Iterator

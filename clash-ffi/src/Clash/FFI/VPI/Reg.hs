@@ -19,6 +19,7 @@ module Clash.FFI.VPI.Reg
 
 import           Data.ByteString (ByteString)
 import           Data.Proxy (Proxy)
+import           Foreign.Storable (Storable)
 import           GHC.Stack (HasCallStack, callStack)
 import           GHC.TypeNats
 
@@ -26,31 +27,38 @@ import           Clash.Promoted.Nat
 
 import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim (throw)
+import           Clash.FFI.VPI.Handle
 import           Clash.FFI.VPI.Object
 import           Clash.FFI.VPI.Property
 import           Clash.FFI.VPI.Value
 
-newtype Reg = Reg { regHandle :: Handle }
+newtype Reg
+  = Reg { regObject :: Object }
+  deriving stock (Show)
+  deriving newtype (Handle, Storable)
+
+instance HandleObject Reg where
+  handleAsObject = regObject
 
 regName :: HasCallStack => Reg -> SimCont o ByteString
-regName = receiveProperty Name . regHandle
+regName = receiveProperty Name
 
 regFullName :: HasCallStack => Reg -> SimCont o ByteString
-regFullName = receiveProperty FullName . regHandle
+regFullName = receiveProperty FullName
 
 regIsScalar :: HasCallStack => Reg -> SimCont o Bool
-regIsScalar = getProperty IsScalar . regHandle
+regIsScalar = getProperty IsScalar
 
 regIsVector :: HasCallStack => Reg -> SimCont o Bool
-regIsVector = getProperty IsVector . regHandle
+regIsVector = getProperty IsVector
 
 #if defined(VERILOG_2001)
 regIsSigned :: HasCallStack => Reg -> SimCont o Bool
-regIsSigned = getProperty IsSigned . regHandle
+regIsSigned = getProperty IsSigned
 #endif
 
 regSize :: (HasCallStack, Integral n) => Reg -> SimCont o n
-regSize = fmap fromIntegral . getProperty Size . regHandle
+regSize = fmap fromIntegral . getProperty Size
 
 regValue :: HasCallStack => Reg -> SimCont o Value
 regValue reg = do
@@ -68,5 +76,5 @@ regValueAs
   -> Reg
   -> SimCont o Value
 regValueAs fmt =
-  receiveValue fmt . regHandle
+  receiveValue fmt . regObject
 

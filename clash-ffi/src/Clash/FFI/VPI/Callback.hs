@@ -22,6 +22,7 @@ import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CInt(..))
 import           Foreign.Ptr (FunPtr, Ptr)
+import           Foreign.Storable (Storable)
 import           Foreign.Storable.Generic (GStorable)
 import           GHC.Generics (Generic)
 import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
@@ -30,6 +31,7 @@ import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Callback.Reason
+import           Clash.FFI.VPI.Handle
 import           Clash.FFI.VPI.Object
 import           Clash.FFI.VPI.Time
 import           Clash.FFI.VPI.Value
@@ -37,7 +39,7 @@ import           Clash.FFI.VPI.Value
 data CCallbackInfo = CCallbackInfo
   { ccbReason   :: CInt
   , ccbRoutine  :: FunPtr (Ptr CCallbackInfo -> IO CInt)
-  , ccbObject   :: Handle
+  , ccbObject   :: Object
   , ccbTime     :: Ptr CTime
   , ccbValue    :: Ptr CValue
   , ccbIndex    :: CInt
@@ -100,9 +102,15 @@ instance (Receive extra, Received extra ~ CString) => Receive (CallbackInfo extr
     pure (CallbackInfo reason routine index extra)
 
 foreign import ccall "vpi_user.h vpi_register_cb"
-  c_vpi_register_cb :: Ptr CCallbackInfo -> IO Handle
+  c_vpi_register_cb :: Ptr CCallbackInfo -> IO Callback
 
-newtype Callback = Callback { callbackHandle :: Handle }
+newtype Callback
+  = Callback { callbackObject :: Object }
+  deriving stock (Show)
+  deriving newtype (Handle, Storable)
+
+instance HandleObject Callback where
+  handleAsObject = callbackObject
 
 registerCallback
   :: (UnsafeSend extra, Sent extra ~ CString)
@@ -110,10 +118,10 @@ registerCallback
   -> SimCont o Callback
 registerCallback cb = do
   ptr <- unsafePokeSend cb
-  Callback <$> IO.liftIO (c_vpi_register_cb ptr)
+  IO.liftIO (c_vpi_register_cb ptr)
 
 data CouldNotUnregisterCallback
-  = CouldNotUnregisterCallback Handle CallStack
+  = CouldNotUnregisterCallback Callback CallStack
   deriving anyclass (Exception)
 
 instance Show CouldNotUnregisterCallback where
@@ -126,20 +134,20 @@ instance Show CouldNotUnregisterCallback where
       ]
 
 foreign import ccall "vpi_user.h vpi_remove_cb"
-  c_vpi_remove_cb :: Handle -> IO Bool
+  c_vpi_remove_cb :: Callback -> IO Bool
 
 removeCallback :: HasCallStack => Callback -> SimCont o ()
-removeCallback (Callback handle) = do
-  status <- IO.liftIO (c_vpi_remove_cb handle)
+removeCallback cb = do
+  status <- IO.liftIO (c_vpi_remove_cb cb)
 
   Monad.unless status $
-    Sim.throw (CouldNotUnregisterCallback handle callStack)
+    Sim.throw (CouldNotUnregisterCallback cb callStack)
 
   pure ()
 
 #ifndef IVERILOG
 foreign import ccall "vpi_user.h vpi_get_cb_info"
-  c_vpi_get_cb_info :: Handle -> Ptr CCallbackInfo -> IO ()
+  c_vpi_get_cb_info :: Callback -> Ptr CCallbackInfo -> IO ()
 
 callbackInfo
   :: (Receive extra, Received extra ~ CString)

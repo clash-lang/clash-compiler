@@ -11,13 +11,13 @@ import           Data.String (fromString)
 import qualified Foreign.Storable as FFI
 
 import qualified Clash.FFI.VPI.Callback as VPI
+import qualified Clash.FFI.VPI.Handle as VPI
 import qualified Clash.FFI.VPI.IO as VPI
 import qualified Clash.FFI.VPI.Info as VPI
 import qualified Clash.FFI.VPI.Module as VPI
 import qualified Clash.FFI.VPI.Net as VPI
 import qualified Clash.FFI.VPI.Object as VPI
 import qualified Clash.FFI.VPI.Parameter as VPI
-import qualified Clash.FFI.VPI.Property as VPI
 import qualified Clash.FFI.VPI.Port as VPI
 import qualified Clash.FFI.VPI.Reg as VPI
 import qualified Clash.FFI.VPI.Time as VPI
@@ -37,7 +37,7 @@ clashMain =
     info     <- unsafePeekReceive @VPI.Info cinfoPtr
     VPI.simPutStrLn ("Found simulator: " <> fromString (show info))
 
-    ctimePtr <- VPI.simulationTime Sim.stackPtr VPI.Sim Nothing
+    ctimePtr <- VPI.simulationTime @VPI.Object Sim.stackPtr VPI.Sim Nothing
     time     <- unsafePeekReceive @VPI.Time ctimePtr
     VPI.simPutStrLn ("Current time: " <> fromString (show time))
 
@@ -83,12 +83,12 @@ clashMain =
         VPI.simPutStrLn
           ("Found reg: " <> rName <> ", size " <> fromString (show rSize) <> ", value: " <> fromString (show rVal))
 
-        rCb <- VPI.registerCallback (monitorCallback (VPI.regHandle r))
-        VPI.freeHandle (VPI.callbackHandle rCb)
+        rCb <- VPI.registerCallback (monitorCallback r)
+        VPI.freeHandle rCb
 
-monitorCallback :: VPI.Handle -> VPI.CallbackInfo ByteString
-monitorCallback handle = VPI.CallbackInfo
-  { VPI.cbReason  = VPI.AfterValueChange handle VPI.Sim VPI.VectorFmt
+monitorCallback :: VPI.Reg -> VPI.CallbackInfo ByteString
+monitorCallback reg = VPI.CallbackInfo
+  { VPI.cbReason  = VPI.AfterValueChange (VPI.handleAsObject reg) VPI.Sim VPI.VectorFmt
   , VPI.cbRoutine = routine
   , VPI.cbIndex   = 0
   , VPI.cbData    = ""
@@ -96,8 +96,8 @@ monitorCallback handle = VPI.CallbackInfo
  where
   routine ptr =
     Sim.runSimAction $ do
-      hName  <- VPI.receiveProperty VPI.Name handle
-      size   <- VPI.getProperty VPI.Size handle
+      hName  <- VPI.regName reg
+      size   <- VPI.regSize reg
 
       cinfo  <- IO.liftIO (FFI.peek ptr)
       time   <- peekReceive @VPI.Time (VPI.ccbTime cinfo)

@@ -45,57 +45,57 @@ All interaction with a simulator follows the same general process:
 
 General Functions
 
-| VPI Definition            | Supported | Haskell API Function(s)             |
-| :---                      | :---:     | :---                                |
-| vpi_chk_error             | YES       |                                     |
-| vpi_compare_objects       | YES       |                                     |
-| vpi_control               | YES       |                                     |
-| vpi_flush                 | NO        |                                     |
-| vpi_get                   | YES       |                                     |
-| vpi_get_cb_info           | YES       |                                     |
-| vpi_get_data              | NO        |                                     |
-| vpi_get_delays            | NO        |                                     |
-| vpi_get_str               | YES       |                                     |
-| vpi_get_systf_info        | NO        |                                     |
-| vpi_get_time              | YES       |                                     |
-| vpi_get_userdata          | NO        |                                     |
-| vpi_get_value             | YES       |                                     |
-| vpi_get_vlog_info         | YES       |                                     |
-| vpi_handle                | YES       |                                     |
-| vpi_handle_by_index       | YES       |                                     |
-| vpi_handle_by_multi_index | YES       |                                     |
-| vpi_handle_by_name        | YES       |                                     |
-| vpi_handle_multi          | NO        |                                     |
-| vpi_iterate               | YES       |                                     |
-| vpi_mcd_close             | NO        |                                     |
-| vpi_mcd_flush             | NO        |                                     |
-| vpi_mcd_name              | NO        |                                     |
-| vpi_mcd_open              | NO        |                                     |
-| vpi_mcd_printf            | NO        |                                     |
-| vpi_mcd_vprintf           | NO        |                                     |
-| vpi_printf                | YES       |                                     |
-| vpi_put_data              | NO        |                                     |
-| vpi_put_delays            | NO        |                                     |
-| vpi_put_userdata          | NO        |                                     |
-| vpi_put_value             | YES       |                                     |
-| vpi_register_cb           | NO        |                                     |
-| vpi_register_systf        | NO        |                                     |
-| vpi_remove_cb             | NO        |                                     |
-| vpi_scan                  | YES*      |                                     |
-| vpi_vprintf               | NO        |                                     |
+| VPI Definition            | Supported | Haskell API Function(s)               |
+| :---                      | :---:     | :---                                  |
+| vpi_chk_error             | YES       | simulationError, simulationErrorLevel |
+| vpi_compare_objects       | YES       | compareHandles                        |
+| vpi_control               | YES       | controlSimulator                      |
+| vpi_flush                 | NO        |                                       |
+| vpi_get                   | YES       | getProperty                           |
+| vpi_get_cb_info           | YES       | callbackInfo                          |
+| vpi_get_data              | NO        |                                       |
+| vpi_get_delays            | NO        |                                       |
+| vpi_get_str               | YES       | getProperty                           |
+| vpi_get_systf_info        | NO        |                                       |
+| vpi_get_time              | YES       | simulationTime                        |
+| vpi_get_userdata          | NO        |                                       |
+| vpi_get_value             | YES       | receiveValue, unsafeReceiveValue      |
+| vpi_get_vlog_info         | YES       | simulatorInfo                         |
+| vpi_handle                | YES       | childHandle                           |
+| vpi_handle_by_index       | YES       | childHandle                           |
+| vpi_handle_by_multi_index | YES       | childHandle                           |
+| vpi_handle_by_name        | YES       | childHandle                           |
+| vpi_handle_multi          | NO        |                                       |
+| vpi_iterate               | YES       | iterate, iterateAll                   |
+| vpi_mcd_close             | NO        |                                       |
+| vpi_mcd_flush             | NO        |                                       |
+| vpi_mcd_name              | NO        |                                       |
+| vpi_mcd_open              | NO        |                                       |
+| vpi_mcd_printf            | NO        |                                       |
+| vpi_mcd_vprintf           | NO        |                                       |
+| vpi_printf                | YES       | simPutStr, simPutStrLn                | 
+| vpi_put_data              | NO        |                                       |
+| vpi_put_delays            | NO        |                                       |
+| vpi_put_userdata          | NO        |                                       |
+| vpi_put_value             | YES       | sendValue, unsafeSendValue            |
+| vpi_register_cb           | YES       | registerCallback                      |
+| vpi_register_systf        | NO        |                                       |
+| vpi_remove_cb             | YES       | removeCallback                        |
+| vpi_scan                  | YES       | scan                                  |
+| vpi_vprintf               | NO        |                                       |
 
 Specific to IEEE 1364
 
-| VPI Definition            | Supported | Haskell API Function(s)             |
-| :---                      | :---:     | :---                                |
-| vpi_free_object           | YES       |                                     |
+| VPI Definition            | Supported | Haskell API Function(s)               |
+| :---                      | :---:     | :---                                  |
+| vpi_free_object           | YES       | freeHandle                            |
 
 Specific to IEEE 1800
 
-| VPI Definition            | Supported | Haskell API Function(s)             |
-| :---                      | :---:     | :---                                |
-| vpi_get64                 | YES       |                                     |
-| vpi_release_handle        | YES       |                                     |
+| VPI Definition            | Supported | Haskell API Function(s)               |
+| :---                      | :---:     | :---                                  |
+| vpi_get64                 | YES       | getProperty                           |
+| vpi_release_handle        | YES       | freeHandle                            |
 
 ### VHPI
 

@@ -14,6 +14,7 @@ import Foreign.Storable (Storable)
 import GHC.Stack (HasCallStack)
 
 import Clash.FFI.Monad (SimCont)
+import Clash.FFI.VPI.Handle
 import Clash.FFI.VPI.Iterator
 import Clash.FFI.VPI.Object
 import Clash.FFI.VPI.Net (Net(..))
@@ -23,28 +24,31 @@ import Clash.FFI.VPI.Property
 import Clash.FFI.VPI.Reg (Reg(..))
 
 newtype Module
-  = Module { moduleHandle :: Handle }
+  = Module { moduleObject :: Object }
   deriving stock (Show)
-  deriving newtype (Storable)
+  deriving newtype (Handle, Storable)
+
+instance HandleObject Module where
+  handleAsObject = moduleObject
 
 topModules :: HasCallStack => SimCont o [Module]
-topModules = fmap Module <$> iterateAll ObjModule Nothing
+topModules = iterateAll @Object ObjModule Nothing
 
 moduleName :: HasCallStack => Module -> SimCont o ByteString
-moduleName = receiveProperty Name . moduleHandle
+moduleName = receiveProperty Name
 
 moduleFullName :: HasCallStack => Module -> SimCont o ByteString
-moduleFullName = receiveProperty FullName . moduleHandle
+moduleFullName = receiveProperty FullName
 
 moduleNets :: HasCallStack => Module -> SimCont o [Net]
-moduleNets = fmap (fmap Net) . iterateAll ObjNet . Just . moduleHandle
+moduleNets = iterateAll ObjNet . Just
 
 moduleParameters :: HasCallStack => Module -> SimCont o [Parameter]
-moduleParameters = fmap (fmap Parameter) . iterateAll ObjParameter . Just . moduleHandle
+moduleParameters = iterateAll ObjParameter . Just
 
 modulePorts :: HasCallStack => Module -> SimCont o [Port]
-modulePorts = fmap (fmap Port) . iterateAll ObjPort . Just . moduleHandle
+modulePorts = iterateAll ObjPort . Just
 
 moduleRegs :: HasCallStack => Module -> SimCont o [Reg]
-moduleRegs = fmap (fmap Reg) . iterateAll ObjReg . Just . moduleHandle
+moduleRegs = iterateAll ObjReg . Just
 

@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module Clash.FFI.VPI.Iterator
   ( Iterator(..)
   , iterate
@@ -8,42 +10,59 @@ module Clash.FFI.VPI.Iterator
 import           Prelude hiding (iterate)
 
 import qualified Control.Monad.IO.Class as IO (liftIO)
-import           Data.Maybe (fromMaybe)
+import           Data.Coerce
 import           Foreign.C.Types (CInt(..))
 import           Foreign.Storable (Storable)
 
 import           Clash.FFI.Monad (SimCont)
 import           Clash.FFI.View
+import           Clash.FFI.VPI.Handle (Handle(..))
 import           Clash.FFI.VPI.Object
 
 newtype Iterator
-  = Iterator { iteratorHandle :: Handle }
+  = Iterator { iteratorObject :: Object }
   deriving stock (Show)
-  deriving newtype (Storable)
+  deriving newtype (Handle, Storable)
+
+instance HandleObject Iterator where
+  handleAsObject = iteratorObject
 
 foreign import ccall "vpi_user.h vpi_iterate"
-  c_vpi_iterate :: CInt -> Handle -> IO Iterator
+  c_vpi_iterate :: CInt -> Object -> IO Iterator
 
-iterate :: ObjectType -> Maybe Handle -> SimCont o Iterator
+iterate
+  :: HandleObject parent
+  => ObjectType
+  -> Maybe parent
+  -> SimCont o Iterator
 iterate objTy parent = do
   cobjTy <- unsafeSend objTy
-  let handle = fromMaybe nullHandle parent
+  let object = maybe nullHandle handleAsObject parent
 
-  IO.liftIO (c_vpi_iterate cobjTy handle)
+  IO.liftIO (c_vpi_iterate cobjTy object)
 
 foreign import ccall "vpi_user.h vpi_scan"
-  c_vpi_scan :: Iterator -> IO Handle
+  c_vpi_scan :: Iterator -> IO Object
 
-scan :: Iterator -> SimCont o (Maybe Handle)
+scan
+  :: (Coercible Object child, Handle child)
+  => Iterator
+  -> SimCont o (Maybe child)
 scan iterator
-  | isNullHandle (iteratorHandle iterator)
+  | isNullHandle (handleAsObject iterator)
   = pure Nothing
 
   | otherwise
   = do next <- IO.liftIO (c_vpi_scan iterator)
-       pure (if isNullHandle next then Nothing else Just next)
+       pure (if isNullHandle next then Nothing else Just (coerce next))
 
-iterateAll :: ObjectType -> Maybe Handle -> SimCont o [Handle]
+iterateAll
+  :: HandleObject parent
+  => Coercible Object child
+  => Handle child
+  => ObjectType
+  -> Maybe parent
+  -> SimCont o [child]
 iterateAll objTy parent = do
   iterator <- iterate objTy parent
   takeWhileNonNull iterator

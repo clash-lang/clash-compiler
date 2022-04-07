@@ -19,6 +19,7 @@ module Clash.FFI.VPI.Net
 
 import           Data.ByteString (ByteString)
 import           Data.Proxy (Proxy)
+import           Foreign.Storable (Storable)
 import           GHC.Stack (HasCallStack, callStack)
 import           GHC.TypeNats
 
@@ -26,30 +27,37 @@ import           Clash.Promoted.Nat
 
 import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim (throw)
+import           Clash.FFI.VPI.Handle
 import           Clash.FFI.VPI.Object
 import           Clash.FFI.VPI.Property
 import           Clash.FFI.VPI.Value
 
-newtype Net = Net { netHandle :: Handle }
+newtype Net
+  = Net { netObject :: Object }
+  deriving stock (Show)
+  deriving newtype (Handle, Storable)
+
+instance HandleObject Net where
+  handleAsObject = netObject
 
 netName :: HasCallStack => Net -> SimCont o ByteString
-netName = receiveProperty Name . netHandle
+netName = receiveProperty Name
 
 netFullName :: HasCallStack => Net -> SimCont o ByteString
-netFullName = receiveProperty FullName . netHandle
+netFullName = receiveProperty FullName
 
 netSize :: (HasCallStack, Integral n) => Net -> SimCont o n
-netSize = fmap fromIntegral . getProperty Size . netHandle
+netSize = fmap fromIntegral . getProperty Size
 
 netIsScalar :: HasCallStack => Net -> SimCont o Bool
-netIsScalar = getProperty IsScalar . netHandle
+netIsScalar = getProperty IsScalar
 
 netIsVector :: HasCallStack => Net -> SimCont o Bool
-netIsVector = getProperty IsVector . netHandle
+netIsVector = getProperty IsVector
 
 #if defined(VERILOG_2001)
 netIsSigned :: HasCallStack => Net -> SimCont o Bool
-netIsSigned = getProperty IsSigned . netHandle
+netIsSigned = getProperty IsSigned
 #endif
 
 netValue :: HasCallStack => Net -> SimCont o Value
@@ -68,5 +76,5 @@ netValueAs
   -> Net
   -> SimCont o Value
 netValueAs fmt =
-  receiveValue fmt . netHandle
+  receiveValue fmt . netObject
 
