@@ -85,7 +85,7 @@ common vpi-config
 custom-setup
   setup-depends:
     base        >= 4.11  && < 5,
-    Cabal       >= 3.4.1 && < 3.5,
+    Cabal       >= 2.4   && < 3.5,
     directory   >= 1.3.6 && < 1.4,
     filepath    >= 1.4.2 && < 1.5,
 
