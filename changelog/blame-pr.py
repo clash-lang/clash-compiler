@@ -31,11 +31,12 @@ def get_pr(digest):
     html = requests.get(commit_url(digest)).content
     doc = lxml.html.fromstring(html)
     prs = doc.cssselect(".pull-request > a")
-    prs = tuple(int(pr.text.strip()[1:]) for pr in prs)
+    prs = tuple({int(pr.text.strip()[1:]) for pr in prs})
     if len(prs) == 1:
         return prs[0]
     elif len(prs) > 1:
-        raise ValueError(f"Multiple PRs for {digest}")
+        prs = ", ".join(str(pr) for pr in prs)
+        raise ValueError(f"Multiple PRs for {digest}: {prs}")
     else:
         raise ValueError(f"No PR for {digest}")
 

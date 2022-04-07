@@ -1,1 +1,0 @@
-FIXED: The `alteraPll` primitive was unusable since commit d325557750 (release v1.4.0), it now works again. [#2136](https://github.com/clash-lang/clash-compiler/pull/2136)
