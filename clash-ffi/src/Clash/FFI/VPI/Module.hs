@@ -28,11 +28,8 @@ newtype Module
   deriving stock (Show)
   deriving newtype (Handle, Storable)
 
-instance HandleObject Module where
-  handleAsObject = moduleObject
-
 topModules :: HasCallStack => SimCont o [Module]
-topModules = iterateAll @Object ObjModule Nothing
+topModules = iterateAll @_ @Object ObjModule Nothing
 
 moduleName :: HasCallStack => Module -> SimCont o ByteString
 moduleName = receiveProperty Name

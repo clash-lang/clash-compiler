@@ -24,20 +24,18 @@ newtype Iterator
   deriving stock (Show)
   deriving newtype (Handle, Storable)
 
-instance HandleObject Iterator where
-  handleAsObject = iteratorObject
-
 foreign import ccall "vpi_user.h vpi_iterate"
   c_vpi_iterate :: CInt -> Object -> IO Iterator
 
 iterate
-  :: HandleObject parent
+  :: forall p o
+   . Coercible p Object
   => ObjectType
-  -> Maybe parent
+  -> Maybe p
   -> SimCont o Iterator
 iterate objTy parent = do
   cobjTy <- unsafeSend objTy
-  let object = maybe nullHandle handleAsObject parent
+  let object = maybe nullHandle coerce parent
 
   IO.liftIO (c_vpi_iterate cobjTy object)
 
@@ -45,11 +43,13 @@ foreign import ccall "vpi_user.h vpi_scan"
   c_vpi_scan :: Iterator -> IO Object
 
 scan
-  :: (Coercible Object child, Handle child)
+  :: forall c o
+   . Handle c
+  => Coercible Object c
   => Iterator
-  -> SimCont o (Maybe child)
+  -> SimCont o (Maybe c)
 scan iterator
-  | isNullHandle (handleAsObject iterator)
+  | isNullHandle (iteratorObject iterator)
   = pure Nothing
 
   | otherwise
@@ -57,12 +57,13 @@ scan iterator
        pure (if isNullHandle next then Nothing else Just (coerce next))
 
 iterateAll
-  :: HandleObject parent
-  => Coercible Object child
-  => Handle child
+  :: forall c p o
+   . Handle c
+  => Coercible Object c
+  => Coercible p Object
   => ObjectType
-  -> Maybe parent
-  -> SimCont o [child]
+  -> Maybe p
+  -> SimCont o [c]
 iterateAll objTy parent = do
   iterator <- iterate objTy parent
   takeWhileNonNull iterator

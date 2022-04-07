@@ -78,14 +78,17 @@ instance Receive VpiError where
 foreign import ccall "vpi_user.h vpi_chk_error"
   c_vpi_chk_error :: Ptr CVpiError -> IO CInt
 
-simulationError :: SimCont o (Ptr CVpiError) -> SimCont o (Ptr CVpiError, ErrorLevel)
+simulationError
+  :: forall o
+   . SimCont o (Ptr CVpiError)
+  -> SimCont o (Ptr CVpiError, ErrorLevel)
 simulationError alloc = do
   (ptr, clevel) <- Sim.withNewPtr alloc c_vpi_chk_error
   level <- receive clevel
 
   pure (ptr, level)
 
-simulationErrorLevel :: SimCont o ErrorLevel
+simulationErrorLevel :: forall o. SimCont o ErrorLevel
 simulationErrorLevel =
   snd <$> simulationError Sim.stackPtr
 

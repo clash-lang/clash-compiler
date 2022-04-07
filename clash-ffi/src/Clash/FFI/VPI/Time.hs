@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -17,8 +18,8 @@ module Clash.FFI.VPI.Time
 import           Control.Exception (Exception)
 import qualified Control.Monad as Monad (when)
 import           Data.Bits ((.|.), unsafeShiftL, unsafeShiftR)
+import           Data.Coerce
 import           Data.Int (Int64)
-import           Data.Maybe (fromMaybe)
 import           Foreign.C.Types (CDouble(..), CInt(..), CUInt(..))
 import           Foreign.Ptr (Ptr)
 import qualified Foreign.Storable as FFI (poke)
@@ -151,10 +152,12 @@ foreign import ccall "vpi_user.h vpi_get_time"
   c_vpi_get_time :: Object -> Ptr CTime -> IO ()
 
 simulationTime
-  :: (HasCallStack, HandleObject handle)
+  :: forall h o
+   . HasCallStack
+  => Coercible h Object
   => SimCont o (Ptr CTime)
   -> TimeType
-  -> Maybe handle
+  -> Maybe h
   -> SimCont o (Ptr CTime)
 simulationTime alloc ty mHandle = do
   Monad.when (ty == Suppress) $
@@ -163,7 +166,7 @@ simulationTime alloc ty mHandle = do
   cty <- unsafeSend ty
 
   fmap fst . Sim.withNewPtr alloc $ \ptr -> do
-    let handle = fromMaybe nullHandle mHandle
+    let object = maybe nullHandle coerce mHandle
     FFI.poke ptr (CTime cty 0 0 0.0)
-    c_vpi_get_time (handleAsObject handle) ptr
+    c_vpi_get_time object ptr
 

@@ -25,9 +25,6 @@ newtype Port
   deriving stock (Show)
   deriving newtype (Handle, Storable)
 
-instance HandleObject Port where
-  handleAsObject = portObject
-
 portName :: Port -> SimCont o ByteString
 portName = receiveProperty Name
 

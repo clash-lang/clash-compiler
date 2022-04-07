@@ -48,7 +48,8 @@ data CVector = CVector
 
 vectorToCVectorList
   :: forall n
-   . (HasCallStack, KnownNat n)
+   . HasCallStack
+  => KnownNat n
   => Vec n Scalar
   -> [CVector]
 vectorToCVectorList vec =
@@ -99,7 +100,12 @@ instance (KnownNat n) => Send (Vec n Scalar) where
   send =
     send . vectorToCVectorList
 
-cvectorListToVector :: forall n. (HasCallStack, KnownNat n) => [CVector] -> Vec n Scalar
+cvectorListToVector
+  :: forall n
+   . HasCallStack
+  => KnownNat n
+  => [CVector]
+  -> Vec n Scalar
 cvectorListToVector =
   let size = fromIntegral (natVal (Proxy @n))
    in go (Vec.repeat SX) size 0
@@ -143,11 +149,19 @@ instance (KnownNat n) => Receive (Vec n Scalar) where
 
 -- Orphan instances for BitVector
 
-bitVectorToVector :: KnownNat n => BitVector n -> Vec n Scalar
+bitVectorToVector
+  :: forall n
+   . KnownNat n
+  => BitVector n
+  -> Vec n Scalar
 bitVectorToVector =
   fmap bitToScalar . unpack
 
-vectorToBitVector :: forall n. KnownNat n => Vec n Scalar -> BitVector n
+vectorToBitVector
+  :: forall n
+   . KnownNat n
+  => Vec n Scalar
+  -> BitVector n
 vectorToBitVector vec =
   Vec.ifoldr go (deepErrorX "vectorToBitVector") vec
  where

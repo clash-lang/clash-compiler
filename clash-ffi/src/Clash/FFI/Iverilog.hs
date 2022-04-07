@@ -88,7 +88,7 @@ clashMain =
 
 monitorCallback :: VPI.Reg -> VPI.CallbackInfo ByteString
 monitorCallback reg = VPI.CallbackInfo
-  { VPI.cbReason  = VPI.AfterValueChange (VPI.handleAsObject reg) VPI.Sim VPI.VectorFmt
+  { VPI.cbReason  = VPI.AfterValueChange reg VPI.Sim VPI.VectorFmt
   , VPI.cbRoutine = routine
   , VPI.cbIndex   = 0
   , VPI.cbData    = ""
@@ -106,6 +106,8 @@ monitorCallback reg = VPI.CallbackInfo
 
       VPI.simPutStrLn
         ("[" <> fromString (show time) <> "]: " <> hName <> " = " <> fromString (show value))
+
+      VPI.simFlushIO
 
       pure 0
 

@@ -50,7 +50,7 @@ General Functions
 | vpi_chk_error             | YES       | simulationError, simulationErrorLevel |
 | vpi_compare_objects       | YES       | compareHandles                        |
 | vpi_control               | YES       | controlSimulator                      |
-| vpi_flush                 | NO        |                                       |
+| vpi_flush                 | YES       | simFlushIO                            |
 | vpi_get                   | YES       | getProperty                           |
 | vpi_get_cb_info           | YES       | callbackInfo                          |
 | vpi_get_data              | NO        |                                       |

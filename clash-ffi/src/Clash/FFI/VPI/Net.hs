@@ -1,7 +1,5 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 
 module Clash.FFI.VPI.Net
   ( Net(..)
@@ -17,28 +15,20 @@ module Clash.FFI.VPI.Net
   , netValueAs
   ) where
 
-import           Data.ByteString (ByteString)
-import           Data.Proxy (Proxy)
-import           Foreign.Storable (Storable)
-import           GHC.Stack (HasCallStack, callStack)
-import           GHC.TypeNats
+import Data.ByteString (ByteString)
+import Foreign.Storable (Storable)
+import GHC.Stack (HasCallStack)
 
-import           Clash.Promoted.Nat
-
-import           Clash.FFI.Monad (SimCont)
-import qualified Clash.FFI.Monad as Sim (throw)
-import           Clash.FFI.VPI.Handle
-import           Clash.FFI.VPI.Object
-import           Clash.FFI.VPI.Property
-import           Clash.FFI.VPI.Value
+import Clash.FFI.Monad (SimCont)
+import Clash.FFI.VPI.Handle
+import Clash.FFI.VPI.Object
+import Clash.FFI.VPI.Property
+import Clash.FFI.VPI.Value
 
 newtype Net
   = Net { netObject :: Object }
   deriving stock (Show)
   deriving newtype (Handle, Storable)
-
-instance HandleObject Net where
-  handleAsObject = netObject
 
 netName :: HasCallStack => Net -> SimCont o ByteString
 netName = receiveProperty Name
@@ -61,14 +51,7 @@ netIsSigned = getProperty IsSigned
 #endif
 
 netValue :: HasCallStack => Net -> SimCont o Value
-netValue net = do
-  size <- netSize net
-
-  case someNatVal size of
-    SomeNat (proxy :: Proxy sz) ->
-      case compareSNat (SNat @1) (snatProxy proxy) of
-        SNatLE -> netValueAs ObjTypeFmt net
-        SNatGT -> Sim.throw (ZeroWidthValue callStack)
+netValue = netValueAs ObjTypeFmt
 
 netValueAs
   :: HasCallStack
@@ -76,5 +59,5 @@ netValueAs
   -> Net
   -> SimCont o Value
 netValueAs fmt =
-  receiveValue fmt . netObject
+  receiveValue fmt
 

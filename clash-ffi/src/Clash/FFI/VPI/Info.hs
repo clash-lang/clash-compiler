@@ -77,7 +77,11 @@ instance Show UnknownSimulator where
       , prettyCallStack c
       ]
 
-simulatorInfo :: HasCallStack => SimCont o (Ptr CInfo) -> SimCont o (Ptr CInfo)
+simulatorInfo
+  :: forall o
+   . HasCallStack
+  => SimCont o (Ptr CInfo)
+  -> SimCont o (Ptr CInfo)
 simulatorInfo alloc =
   fmap fst . Sim.withNewPtr alloc $ \ptr -> do
     isSuccess <- c_vpi_get_vlog_info ptr

@@ -1,11 +1,8 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 
 module Clash.FFI.VPI.Value
   ( CValue(..)
@@ -29,6 +26,7 @@ import qualified Control.Exception as IO (throwIO)
 import qualified Control.Monad as Monad (void)
 import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.ByteString (ByteString)
+import           Data.Coerce
 import           Data.Typeable (Typeable)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CDouble, CInt(..))
@@ -340,7 +338,7 @@ foreign import ccall "vpi_user.h vpi_get_value"
 
 getValue
   :: HasCallStack
-  => HandleObject handle
+  => Coercible handle Object
   => SimCont o (Ptr CValue)
   -> ValueFormat
   -> handle
@@ -350,13 +348,13 @@ getValue alloc fmt handle = do
 
   fmap fst . Sim.withNewPtr alloc $ \ptr -> do
     FFI.pokeByteOff ptr 0 cfmt
-    c_vpi_get_value (handleAsObject handle) ptr
+    c_vpi_get_value (coerce handle) ptr
 
     pure ()
 
 unsafeReceiveValue
   :: HasCallStack
-  => HandleObject handle
+  => Coercible handle Object
   => Show handle
   => Typeable handle
   => ValueFormat
@@ -371,7 +369,7 @@ unsafeReceiveValue fmt handle = do
 
 receiveValue
   :: HasCallStack
-  => HandleObject handle
+  => Coercible handle Object
   => Show handle
   => Typeable handle
   => ValueFormat
@@ -403,7 +401,7 @@ a valid handle would never be returned anyway.
 
 unsafeSendValue
   :: HasCallStack
-  => HandleObject handle
+  => Coercible handle Object
   => handle
   -> Value
   -> DelayMode
@@ -413,11 +411,11 @@ unsafeSendValue handle value delay = do
   (timePtr, flags) <- unsafeSend delay
 
   Monad.void . IO.liftIO $
-    c_vpi_put_value (handleAsObject handle) valuePtr timePtr flags
+    c_vpi_put_value (coerce handle) valuePtr timePtr flags
 
 sendValue
   :: HasCallStack
-  => HandleObject handle
+  => Coercible handle Object
   => handle
   -> Value
   -> DelayMode
@@ -427,5 +425,5 @@ sendValue handle value delay = do
   (timePtr, flags) <- send delay
 
   Monad.void . IO.liftIO $
-    c_vpi_put_value (handleAsObject handle) valuePtr timePtr flags
+    c_vpi_put_value (coerce handle) valuePtr timePtr flags
 

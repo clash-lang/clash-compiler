@@ -6,7 +6,6 @@
 
 module Clash.FFI.VPI.Object
   ( Object(..)
-  , HandleObject(..)
   , module Clash.FFI.VPI.Object.Type
   ) where
 
@@ -26,16 +25,10 @@ import           Clash.FFI.View (unsafeSend)
 import           Clash.FFI.VPI.Handle
 import           Clash.FFI.VPI.Object.Type
 
-class Handle a => HandleObject a where
-  handleAsObject :: a -> Object
-
 newtype Object
   = Object { objectPtr :: Ptr Object }
   deriving stock (Show)
   deriving newtype (Storable)
-
-instance HandleObject Object where
-  handleAsObject = id
 
 #if defined(VERILOG)
 foreign import ccall "vpi_user.h vpi_free_object"
@@ -74,9 +67,6 @@ instance Handle Object where
 foreign import ccall "vpi_user.h vpi_handle"
   c_vpi_handle :: CInt -> Object -> IO Object
 
--- TODO Should I have another one here with Method instead of ObjectType? The
--- VPI spec seems to conflate the two but methods can only be used for
--- traversing the hierarchy from some known point *I think*
 instance HandleChild ObjectType Object where
   -- TODO Maybe we could know this if we make ObjectType a GADT
   type ChildHandle ObjectType Object = Object
@@ -108,7 +98,6 @@ foreign import ccall "vpi_user.h vpi_handle_by_index"
   c_vpi_handle_by_index :: Object -> CInt -> IO Object
 
 instance HandleChild CInt Object where
-  -- We don't know any better than "Object" here
   type ChildHandle CInt Object = Object
 
   childHandle ix parent = do

@@ -66,7 +66,7 @@ foreign import ccall "vpi_user.h vpi_control"
 foreign import ccall "vpi_user.h vpi_control"
   c_vpi_control_restart :: CInt -> CInt -> CInt -> CInt -> IO Bool
 
-controlSimulator :: Control -> SimCont o ()
+controlSimulator :: forall o. Control -> SimCont o ()
 controlSimulator control =
   liftOrThrow $
     case control of

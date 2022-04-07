@@ -65,10 +65,10 @@ instance (Show a) => Show (UndefinedProperty p a) where
       ]
 
 class PropertyType a where
-  getProperty :: (HasCallStack, Show handle, Typeable handle, HandleObject handle) => Property a -> handle -> SimCont o a
+  getProperty :: (HasCallStack, Show handle, Typeable handle, Coercible handle Object) => Property a -> handle -> SimCont o a
 
 getPropertyWith
-  :: (HasCallStack, Show handle, Typeable handle, HandleObject handle, Eq a, Show a, Typeable a)
+  :: (HasCallStack, Show handle, Typeable handle, Coercible handle Object, Eq a, Show a, Typeable a)
   => (CInt -> Object -> IO a)
   -> a
   -> Property a
@@ -76,7 +76,7 @@ getPropertyWith
   -> SimCont o a
 getPropertyWith f err prop handle = do
   cprop <- unsafeSend prop
-  value <- IO.liftIO (f cprop (handleAsObject handle))
+  value <- IO.liftIO (f cprop (coerce handle))
 
   Monad.when (value == err) $
     Sim.throw (UndefinedProperty prop handle callStack)
@@ -104,26 +104,26 @@ instance PropertyType CString where
     getPropertyWith c_vpi_get_str FFI.nullPtr
 
 coerceProperty
-  :: (HasCallStack, PropertyType a, Coercible a b, Show handle, Typeable handle, HandleObject handle)
+  :: (HasCallStack, PropertyType a, Coercible a b, Show handle, Typeable handle, Coercible handle Object)
   => Property a
   -> handle
   -> SimCont o b
 coerceProperty prop =
-  fmap coerce . getProperty prop . handleAsObject
+  fmap coerce . getProperty prop
 
 unsafeReceiveProperty
-  :: (HasCallStack, UnsafeReceive a, PropertyType (Received a), HandleObject handle, Show handle, Typeable handle)
+  :: (HasCallStack, UnsafeReceive a, PropertyType (Received a), Coercible handle Object, Show handle, Typeable handle)
   => Property (Received a)
   -> handle
   -> SimCont o a
 unsafeReceiveProperty prop handle =
-  getProperty prop (handleAsObject handle) >>= unsafeReceive
+  getProperty prop handle >>= unsafeReceive
 
 receiveProperty
-  :: (HasCallStack, Receive a, PropertyType (Received a), HandleObject handle, Show handle, Typeable handle)
+  :: (HasCallStack, Receive a, PropertyType (Received a), Coercible handle Object, Show handle, Typeable handle)
   => Property (Received a)
   -> handle
   -> SimCont o a
 receiveProperty prop handle =
-  getProperty prop (handleAsObject handle) >>= receive
+  getProperty prop handle >>= receive
 

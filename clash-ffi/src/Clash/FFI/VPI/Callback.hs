@@ -56,7 +56,9 @@ data CallbackInfo extra = CallbackInfo
   }
 
 foreign import ccall "wrapper"
-  sendRoutine :: (Ptr CCallbackInfo -> IO CInt) -> IO (FunPtr (Ptr CCallbackInfo -> IO CInt))
+  sendRoutine
+    :: (Ptr CCallbackInfo -> IO CInt)
+    -> IO (FunPtr (Ptr CCallbackInfo -> IO CInt))
 
 instance (UnsafeSend extra, Sent extra ~ CString) => UnsafeSend (CallbackInfo extra) where
   type Sent (CallbackInfo extra) = CCallbackInfo
@@ -79,7 +81,9 @@ instance (Send extra, Sent extra ~ CString) => Send (CallbackInfo extra) where
     pure (CCallbackInfo creason croutine chandle ctime cvalue cindex bytes)
 
 foreign import ccall "dynamic"
-  receiveRoutine :: FunPtr (Ptr CCallbackInfo -> IO CInt) -> Ptr CCallbackInfo -> IO CInt
+  receiveRoutine
+    :: FunPtr (Ptr CCallbackInfo -> IO CInt)
+    -> (Ptr CCallbackInfo -> IO CInt)
 
 instance (UnsafeReceive extra, Received extra ~ CString) => UnsafeReceive (CallbackInfo extra) where
   type Received (CallbackInfo extra) = CCallbackInfo
@@ -109,11 +113,10 @@ newtype Callback
   deriving stock (Show)
   deriving newtype (Handle, Storable)
 
-instance HandleObject Callback where
-  handleAsObject = callbackObject
-
 registerCallback
-  :: (UnsafeSend extra, Sent extra ~ CString)
+  :: forall extra o
+   . UnsafeSend extra
+  => Sent extra ~ CString
   => CallbackInfo extra
   -> SimCont o Callback
 registerCallback cb = do
@@ -136,7 +139,7 @@ instance Show CouldNotUnregisterCallback where
 foreign import ccall "vpi_user.h vpi_remove_cb"
   c_vpi_remove_cb :: Callback -> IO Bool
 
-removeCallback :: HasCallStack => Callback -> SimCont o ()
+removeCallback :: forall o. HasCallStack => Callback -> SimCont o ()
 removeCallback cb = do
   status <- IO.liftIO (c_vpi_remove_cb cb)
 
@@ -150,7 +153,9 @@ foreign import ccall "vpi_user.h vpi_get_cb_info"
   c_vpi_get_cb_info :: Callback -> Ptr CCallbackInfo -> IO ()
 
 callbackInfo
-  :: (Receive extra, Received extra ~ CString)
+  :: forall extra o
+   . Receive extra
+  => Received extra ~ CString
   => Callback
   -> SimCont o (CallbackInfo extra)
 callbackInfo (Callback handle) =

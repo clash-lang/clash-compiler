@@ -17,28 +17,20 @@ module Clash.FFI.VPI.Parameter
   , parameterValueAs
   ) where
 
-import           Data.ByteString (ByteString)
-import           Data.Proxy (Proxy)
-import           Foreign.Storable (Storable)
-import           GHC.Stack (HasCallStack, callStack)
-import           GHC.TypeNats
+import Data.ByteString (ByteString)
+import Foreign.Storable (Storable)
+import GHC.Stack (HasCallStack)
 
-import           Clash.Promoted.Nat
-
-import           Clash.FFI.Monad (SimCont)
-import qualified Clash.FFI.Monad as Sim (throw)
-import           Clash.FFI.VPI.Handle
-import           Clash.FFI.VPI.Object
-import           Clash.FFI.VPI.Property
-import           Clash.FFI.VPI.Value
+import Clash.FFI.Monad (SimCont)
+import Clash.FFI.VPI.Handle
+import Clash.FFI.VPI.Object
+import Clash.FFI.VPI.Property
+import Clash.FFI.VPI.Value
 
 newtype Parameter
   = Parameter { parameterObject :: Object }
   deriving stock (Show)
   deriving newtype (Handle, Storable)
-
-instance HandleObject Parameter where
-  handleAsObject = parameterObject
 
 parameterName :: HasCallStack => Parameter -> SimCont o ByteString
 parameterName = receiveProperty Name
@@ -58,14 +50,7 @@ parameterIsSigned = getProperty IsSigned
 #endif
 
 parameterValue :: HasCallStack => Parameter -> SimCont o Value
-parameterValue param = do
-  size <- parameterSize param
-
-  case someNatVal size of
-    SomeNat (proxy :: Proxy sz) ->
-      case compareSNat (SNat @1) (snatProxy proxy) of
-        SNatLE -> parameterValueAs ObjTypeFmt param
-        SNatGT -> Sim.throw (ZeroWidthValue callStack)
+parameterValue = parameterValueAs ObjTypeFmt
 
 parameterValueAs
   :: HasCallStack
@@ -73,5 +58,5 @@ parameterValueAs
   -> Parameter
   -> SimCont o Value
 parameterValueAs fmt =
-  receiveValue fmt . parameterObject
+  receiveValue fmt
 
