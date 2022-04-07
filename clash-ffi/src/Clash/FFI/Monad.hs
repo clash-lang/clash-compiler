@@ -6,6 +6,7 @@ module Clash.FFI.Monad
   , stackPtr
   , heapPtr
   , withNewPtr
+  , readPtr
   , unsafeFreeWith
   , unsafeFreePtr
   , freePtr
@@ -23,6 +24,7 @@ import qualified Foreign.Marshal.Alloc as FFI (alloca, free, malloc)
 import           Foreign.Ptr (Ptr)
 import qualified Foreign.Ptr as FFI (nullPtr)
 import           Foreign.Storable (Storable)
+import qualified Foreign.Storable as FFI (peek)
 import           GHC.Stack (HasCallStack)
 
 newtype SimCont o i = SimCont (ContT o IO i)
@@ -56,6 +58,9 @@ withNewPtr alloc set = do
   ptr <- alloc
   res <- IO.liftIO (set ptr)
   pure (ptr, res)
+
+readPtr :: HasCallStack => Storable a => Ptr a -> SimCont b a
+readPtr = IO.liftIO . FFI.peek
 
 -- | Free allocated memory using the provided function. If the memory was
 -- allocated with 'heapPtr' then 'unsafeFreePtr' should be used instead.

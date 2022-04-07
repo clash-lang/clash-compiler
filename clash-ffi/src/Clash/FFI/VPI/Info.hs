@@ -9,6 +9,8 @@ module Clash.FFI.VPI.Info
   , Info(..)
   , UnknownSimulator(..)
   , simulatorInfo
+  , unsafeReceiveSimulatorInfo
+  , receiveSimulatorInfo
   ) where
 
 import           Control.Exception (Exception)
@@ -24,7 +26,7 @@ import           GHC.Generics (Generic)
 import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
 
 import           Clash.FFI.Monad (SimCont)
-import qualified Clash.FFI.Monad as Sim (withNewPtr)
+import qualified Clash.FFI.Monad as Sim (stackPtr, withNewPtr)
 import           Clash.FFI.View
 
 data CInfo = CInfo
@@ -90,4 +92,19 @@ simulatorInfo alloc =
       IO.throwIO (UnknownSimulator callStack)
 
     pure isSuccess
+
+unsafeReceiveSimulatorInfo
+  :: forall o
+   . HasCallStack
+  => SimCont o Info
+unsafeReceiveSimulatorInfo =
+  simulatorInfo Sim.stackPtr >>= unsafePeekReceive
+
+receiveSimulatorInfo
+  :: forall o
+   . HasCallStack
+  => SimCont o Info
+receiveSimulatorInfo =
+  -- This is safe, since receive will make a copy.
+  simulatorInfo Sim.stackPtr >>= peekReceive
 

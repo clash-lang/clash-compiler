@@ -12,7 +12,9 @@ module Clash.FFI.VPI.Time
   , TimeType(..)
   , UnknownTimeType(..)
   , InvalidTimeType(..)
-  , simulationTime
+  , getTime
+  , unsafeReceiveTime
+  , receiveTime
   ) where
 
 import           Control.Exception (Exception)
@@ -28,7 +30,7 @@ import           GHC.Generics (Generic)
 import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
 
 import           Clash.FFI.Monad (SimCont)
-import qualified Clash.FFI.Monad as Sim (throw, withNewPtr)
+import qualified Clash.FFI.Monad as Sim (stackPtr, throw, withNewPtr)
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Handle (Handle(..))
 import           Clash.FFI.VPI.Object
@@ -151,7 +153,7 @@ instance Receive Time where
 foreign import ccall "vpi_user.h vpi_get_time"
   c_vpi_get_time :: Object -> Ptr CTime -> IO ()
 
-simulationTime
+getTime
   :: forall h o
    . HasCallStack
   => Coercible h Object
@@ -159,7 +161,7 @@ simulationTime
   -> TimeType
   -> Maybe h
   -> SimCont o (Ptr CTime)
-simulationTime alloc ty mHandle = do
+getTime alloc ty mHandle = do
   Monad.when (ty == Suppress) $
     Sim.throw (InvalidTimeType ty callStack)
 
@@ -170,3 +172,22 @@ simulationTime alloc ty mHandle = do
     FFI.poke ptr (CTime cty 0 0 0.0)
     c_vpi_get_time object ptr
 
+unsafeReceiveTime
+  :: forall h o
+   . HasCallStack
+  => Coercible h Object
+  => TimeType
+  -> Maybe h
+  -> SimCont o Time
+unsafeReceiveTime timeTy mHandle =
+  getTime Sim.stackPtr timeTy mHandle >>= unsafePeekReceive
+
+receiveTime
+  :: forall h o
+   . HasCallStack
+  => Coercible h Object
+  => TimeType
+  -> Maybe h
+  -> SimCont o Time
+receiveTime timeTy mHandle =
+  getTime Sim.stackPtr timeTy mHandle >>= peekReceive

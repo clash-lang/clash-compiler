@@ -1,14 +1,10 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.FFI.Iverilog where
 
-import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.ByteString (ByteString)
 import           Data.Foldable (for_)
 import           Data.String (fromString)
-import qualified Foreign.Storable as FFI
 
 import qualified Clash.FFI.VPI.Callback as VPI
 import qualified Clash.FFI.VPI.Handle as VPI
@@ -33,12 +29,10 @@ clashMain =
   Sim.runSimAction $ do
     VPI.simPutStrLn "Hello from Haskell"
 
-    cinfoPtr <- VPI.simulatorInfo Sim.stackPtr
-    info     <- unsafePeekReceive @VPI.Info cinfoPtr
+    info <- VPI.unsafeReceiveSimulatorInfo
     VPI.simPutStrLn ("Found simulator: " <> fromString (show info))
 
-    ctimePtr <- VPI.simulationTime @VPI.Object Sim.stackPtr VPI.Sim Nothing
-    time     <- unsafePeekReceive @VPI.Time ctimePtr
+    time <- VPI.unsafeReceiveTime @VPI.Object VPI.Sim Nothing
     VPI.simPutStrLn ("Current time: " <> fromString (show time))
 
     modules <- VPI.topModules
@@ -99,9 +93,9 @@ monitorCallback reg = VPI.CallbackInfo
       hName  <- VPI.regName reg
       size   <- VPI.regSize reg
 
-      cinfo  <- IO.liftIO (FFI.peek ptr)
+      cinfo  <- Sim.readPtr ptr
       time   <- peekReceive @VPI.Time (VPI.ccbTime cinfo)
-      cvalue <- IO.liftIO (FFI.peek (VPI.ccbValue cinfo))
+      cvalue <- Sim.readPtr (VPI.ccbValue cinfo)
       value  <- receive @VPI.Value (cvalue, size)
 
       VPI.simPutStrLn
