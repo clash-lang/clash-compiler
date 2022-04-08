@@ -1,5 +1,19 @@
 # Changelog for the Clash project
-## 1.6.2 *Fed 25th 2022*
+## 1.6.3 *Apr 7th 2022*
+Fixed:
+  * Handle `~ISUNDEFINED` hole in black boxes for `BitVector` and for product types. This means that with `-fclash-aggressive-x-optimization-blackboxes`, resets are now omitted for _undefined_ reset values of such types as well. [#2117](https://github.com/clash-lang/clash-compiler/issues/2117)
+  * The `alteraPll` primitive was unusable since commit `d325557750` (release v1.4.0), it now works again. [#2136](https://github.com/clash-lang/clash-compiler/pull/2136)
+  * Simulation/Synthesis mismatch for X-exception to undefined bitvector conversion [#2154](https://github.com/clash-lang/clash-compiler/issues/2154)
+  * The VHDL blackbox for `Signed.fromInteger` can now handle any `Netlist Expr` as input [#2149](https://github.com/clash-lang/clash-compiler/issues/2149)
+  * Clash no longer escapes extended identifiers when rendering SDC files. [#2142](https://github.com/clash-lang/clash-compiler/pull/2142)
+  * The types defined in `clash-prelude-hedgehog` now come with `Show` instances [#2133](https://github.com/clash-lang/clash-compiler/issues/2133)
+  * Extreme values are now generated from the input range instead of the type's bounds [#2138](https://github.com/clash-lang/clash-compiler/issues/2138)
+
+Internal change:
+  * Clash now always generates non-extended identifiers for port names, so that generated names play nicer with different vendor tools. [#2142](https://github.com/clash-lang/clash-compiler/pull/2142)
+  * Top entity name available in netlist context. Top entity name used in generated name for include files. [#2146](https://github.com/clash-lang/clash-compiler/pull/2146)
+
+## 1.6.2 *Feb 25th 2022*
 Fixed:
   * Clash now compiles for users of Clang - i.e., all macOS users.
   * The `trueDualPortBlockRam` model did not accurately simulate concurrent active ports, thus causing a Haskell/HDL simulation mismatch for `asyncFIFOSynchronizer`.

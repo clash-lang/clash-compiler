@@ -1,1 +1,0 @@
-FIXED: The VHDL BB for Signed.fromInteger can now handle any Netlist Expr as input [#2149](https://github.com/clash-lang/clash-compiler/issues/2149)

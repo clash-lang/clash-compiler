@@ -52,8 +52,9 @@ triggered on any other branch a _beta_ release gets made.
 6. Update the [starter projects](https://github.com/clash-lang/stack-templates/)
 7. Write release notes for: Twitter, LinkedIn, and clash-lang.org.
 8. Create a release on [GitHub's new release page](https://github.com/clash-lang/clash-compiler/releases/new)
-9. Update these docs if anything is missing :-)
-10. Enjoy!
+9. After the release is on Hackage: run `changelog/comment-gh.py` and execute the commands it lists. This will inform users subscribed to specific issues that a fix for their issue is now in a released version.
+10. Update these docs if anything is missing :-)
+11. Enjoy!
 
 ## Releasing a new version minor version (1.x.x)
 1. Change version numbers in:
@@ -74,5 +75,6 @@ triggered on any other branch a _beta_ release gets made.
 
 4. Create a release on [GitHub's new release page](https://github.com/clash-lang/clash-compiler/releases/new)
 5. Cherry-pick commit made in (2) to `master`
-6. Update these docs if anything is missing :-)
-7. Enjoy!
+6. After the release is on Hackage: run `changelog/comment-gh.py` and execute the commands it lists. This will inform users subscribed to specific issues that a fix for their issue is now in a released version.
+7. Update these docs if anything is missing :-)
+8. Enjoy!
