@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -6,23 +7,37 @@
 
 module Clash.FFI.VPI.Object
   ( Object(..)
+  , IsProperty(..)
+  , coerceProperty
+  , receiveProperty
+  , unsafeReceiveProperty
+  , module Clash.FFI.VPI.Object.Property
   , module Clash.FFI.VPI.Object.Type
   ) where
 
 import qualified Control.Monad as Monad (unless, void, when)
 import qualified Control.Monad.IO.Class as IO (liftIO)
+import           Data.Coerce
+
+#if defined(SYSTEMVERILOG)
+import           Data.Int (Int64)
+#endif
+
 import qualified Data.List as List (genericLength)
+import           Data.Typeable (Typeable)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types
-import           GHC.Stack (callStack)
-
+import qualified Foreign.Marshal.Utils as FFI (toBool)
 import           Foreign.Ptr (Ptr)
 import qualified Foreign.Ptr as FFI (nullPtr)
 import           Foreign.Storable (Storable)
+import           GHC.Stack (HasCallStack, callStack)
 
+import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim (throw)
-import           Clash.FFI.View (unsafeSend)
+import           Clash.FFI.View
 import           Clash.FFI.VPI.Handle
+import           Clash.FFI.VPI.Object.Property
 import           Clash.FFI.VPI.Object.Type
 
 newtype Object
@@ -152,4 +167,107 @@ This is somewhat of a burden, so instead for the time being we leave these
 relationships inaccessible. Most relationships are 1-N or 1-1 in practice, so
 this is not a particularly large limitation.
 -}
+
+class IsProperty p where
+  getProperty
+    :: HasCallStack
+    => Coercible a Object
+    => Show a
+    => Typeable a
+    => Property p
+    -> a
+    -> SimCont o p
+
+foreign import ccall "vpi_user.h vpi_get"
+  c_vpi_get :: CInt -> Object -> IO CInt
+
+instance IsProperty CInt where
+  getProperty prop handle = do
+    cprop <- unsafeSend prop
+    value <- IO.liftIO (c_vpi_get cprop (coerce handle))
+
+    Monad.when (value == -1) $
+      Sim.throw (UndefinedProperty prop handle callStack)
+
+    pure value
+
+instance IsProperty Bool where
+  getProperty prop handle = do
+    cprop <- unsafeSend prop
+    value <- IO.liftIO (c_vpi_get cprop (coerce handle))
+
+    Monad.when (value == -1) $
+      Sim.throw (UndefinedProperty prop handle callStack)
+
+    pure (FFI.toBool value)
+
+#if defined(SYSTEMVERILOG)
+foreign import ccall "vpi_user.h vpi_get64"
+  c_vpi_get64 :: CInt -> Object -> IO Int64
+
+instance IsProperty Int64 where
+  getProperty prop handle = do
+    cprop <- unsafeSend prop
+    value <- IO.liftIO (c_vpi_get64 cprop (coerce handle))
+
+    Monad.when (value == -1) $
+      Sim.throw (UndefinedProperty prop handle callStack)
+
+    pure value
+#endif
+
+foreign import ccall "vpi_user.h vpi_get_str"
+  c_vpi_get_str :: CInt -> Object -> IO CString
+
+instance IsProperty CString where
+  getProperty prop handle = do
+    cprop <- unsafeSend prop
+    value <- IO.liftIO (c_vpi_get_str cprop (coerce handle))
+
+    Monad.when (value == FFI.nullPtr) $
+      Sim.throw (UndefinedProperty prop handle callStack)
+
+    pure value
+
+coerceProperty
+  :: forall p q a o
+   . HasCallStack
+  => IsProperty p
+  => Coercible p q
+  => Coercible a Object
+  => Show a
+  => Typeable a
+  => Property p
+  -> a
+  -> SimCont o q
+coerceProperty prop =
+  fmap coerce . getProperty prop
+
+unsafeReceiveProperty
+  :: forall p a o
+   . HasCallStack
+  => UnsafeReceive p
+  => IsProperty (Received p)
+  => Coercible a Object
+  => Show a
+  => Typeable a
+  => Property (Received p)
+  -> a
+  -> SimCont o p
+unsafeReceiveProperty prop handle =
+  getProperty prop handle >>= unsafeReceive
+
+receiveProperty
+  :: forall p a o
+   . HasCallStack
+  => Receive p
+  => IsProperty (Received p)
+  => Coercible a Object
+  => Show a
+  => Typeable a
+  => Property (Received p)
+  -> a
+  -> SimCont o p
+receiveProperty prop handle =
+  getProperty prop handle >>= receive
 

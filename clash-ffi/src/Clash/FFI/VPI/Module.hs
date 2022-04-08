@@ -20,7 +20,6 @@ import Clash.FFI.VPI.Object
 import Clash.FFI.VPI.Net (Net(..))
 import Clash.FFI.VPI.Parameter (Parameter(..))
 import Clash.FFI.VPI.Port (Port(..))
-import Clash.FFI.VPI.Property
 import Clash.FFI.VPI.Reg (Reg(..))
 
 newtype Module

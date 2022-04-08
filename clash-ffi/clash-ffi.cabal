@@ -38,7 +38,7 @@ common basic-config
     derive-storable-plugin  >= 0.2.3    && < 0.3,
     mtl                     >= 2.2.2    && < 2.3,
 
-    clash-prelude           >= 1.2      && < 2,
+    clash-prelude           >= 1.2      && < 1.8,
 
   other-modules:
     Clash.FFI.Monad
@@ -68,12 +68,11 @@ common vpi-config
     Clash.FFI.VPI.Module
     Clash.FFI.VPI.Net
     Clash.FFI.VPI.Object
+    Clash.FFI.VPI.Object.Property
     Clash.FFI.VPI.Object.Type
     Clash.FFI.VPI.Parameter
     Clash.FFI.VPI.Port
     Clash.FFI.VPI.Port.Direction
-    Clash.FFI.VPI.Property
-    Clash.FFI.VPI.Property.Type
     Clash.FFI.VPI.Reg
     Clash.FFI.VPI.Time
     Clash.FFI.VPI.Value

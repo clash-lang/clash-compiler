@@ -1,15 +1,17 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Clash.FFI.VPI.Property.Type
-  ( Property(..)
-  ) where
+module Clash.FFI.VPI.Object.Property where
 
+import Control.Exception (Exception)
 import Foreign.C.String (CString)
 import Foreign.C.Types (CInt)
+import GHC.Stack (CallStack, prettyCallStack)
 
 import Clash.FFI.View
 
@@ -55,4 +57,19 @@ instance UnsafeSend (Property a) where
 
 instance Send (Property a) where
   send = unsafeSend
+
+data UndefinedProperty p a
+  = UndefinedProperty (Property p) a CallStack
+  deriving anyclass (Exception)
+
+instance (Show a) => Show (UndefinedProperty p a) where
+  show (UndefinedProperty p a c) =
+    mconcat
+      [ "Undefined property "
+      , show p
+      , " for the handle "
+      , show a
+      , "\n"
+      , prettyCallStack c
+      ]
 

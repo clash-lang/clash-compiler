@@ -42,7 +42,6 @@ import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim (heapPtr, stackPtr, withNewPtr)
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Object
-import           Clash.FFI.VPI.Property
 import           Clash.FFI.VPI.Time (CTime, Time)
 import           Clash.FFI.VPI.Value.Delay
 import           Clash.FFI.VPI.Value.Format
@@ -353,7 +352,8 @@ getValue alloc fmt handle = do
     pure ()
 
 unsafeReceiveValue
-  :: HasCallStack
+  :: forall handle o
+   . HasCallStack
   => Coercible handle Object
   => Show handle
   => Typeable handle
@@ -361,14 +361,15 @@ unsafeReceiveValue
   -> handle
   -> SimCont o Value
 unsafeReceiveValue fmt handle = do
-  ptr <- getValue Sim.stackPtr fmt handle
+  ptr <- getValue Sim.stackPtr fmt (coerce @handle @Object handle)
   cvalue <- IO.liftIO (FFI.peek ptr)
   size <- getProperty Size handle
 
   unsafeReceive (cvalue, size)
 
 receiveValue
-  :: HasCallStack
+  :: forall handle o
+   . HasCallStack
   => Coercible handle Object
   => Show handle
   => Typeable handle
@@ -376,7 +377,7 @@ receiveValue
   -> handle
   -> SimCont o Value
 receiveValue fmt handle = do
-  ptr <- getValue Sim.heapPtr fmt handle
+  ptr <- getValue Sim.heapPtr fmt (coerce @handle @Object handle)
   cvalue <- IO.liftIO (FFI.peek ptr)
   size <- getProperty Size handle
 

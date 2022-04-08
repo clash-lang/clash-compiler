@@ -18,7 +18,6 @@ import Clash.FFI.Monad (SimCont)
 import Clash.FFI.VPI.Handle
 import Clash.FFI.VPI.Object
 import Clash.FFI.VPI.Port.Direction
-import Clash.FFI.VPI.Property
 
 newtype Port
   = Port { portObject :: Object }
