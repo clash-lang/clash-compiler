@@ -43,7 +43,7 @@ clashMain =
 
       params <- VPI.moduleParameters m
 
-      for_ @_ @_ @_ @() params $ \p -> do
+      for_ params $ \p -> do
         pName <- VPI.parameterName p
         pSize <- VPI.parameterSize @Int p
         pVal  <- VPI.parameterValue p
@@ -59,7 +59,7 @@ clashMain =
 
       nets <- VPI.moduleNets m
 
-      for_ @_ @_ @_ @() nets $ \n -> do
+      for_ nets $ \n -> do
         nName <- VPI.netName n
         nSize <- VPI.netSize @Int n
         nVal  <- VPI.netValue n
@@ -69,7 +69,7 @@ clashMain =
 
       regs <- VPI.moduleRegs m
 
-      for_ @_ @_ @_ @() regs $ \r -> do
+      for_ regs $ \r -> do
         rName <- VPI.regName r
         rSize <- VPI.regSize @Int r
         rVal  <- VPI.regValue r
