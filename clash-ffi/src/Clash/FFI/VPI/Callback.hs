@@ -31,7 +31,6 @@ import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Callback.Reason
-import           Clash.FFI.VPI.Handle
 import           Clash.FFI.VPI.Object
 
 data CCallbackInfo = CCallbackInfo
@@ -62,21 +61,21 @@ instance (UnsafeSend extra, Sent extra ~ CString) => UnsafeSend (CallbackInfo ex
   type Sent (CallbackInfo extra) = CCallbackInfo
 
   unsafeSend CallbackInfo{..} = do
-    (creason, chandle, ctime, cvalue) <- unsafeSend cbReason
+    (creason, cobject, ctime, cvalue) <- unsafeSend cbReason
     croutine <- IO.liftIO (sendRoutine cbRoutine)
     let cindex = fromIntegral cbIndex
     bytes <- unsafeSend cbData
 
-    pure (CCallbackInfo creason croutine chandle ctime cvalue cindex bytes)
+    pure (CCallbackInfo creason croutine cobject ctime cvalue cindex bytes)
 
 instance (Send extra, Sent extra ~ CString) => Send (CallbackInfo extra) where
   send CallbackInfo{..} = do
-    (creason, chandle, ctime, cvalue) <- send cbReason
+    (creason, cobject, ctime, cvalue) <- send cbReason
     croutine <- IO.liftIO (sendRoutine cbRoutine)
     let cindex = fromIntegral cbIndex
     bytes <- send cbData
 
-    pure (CCallbackInfo creason croutine chandle ctime cvalue cindex bytes)
+    pure (CCallbackInfo creason croutine cobject ctime cvalue cindex bytes)
 
 foreign import ccall "dynamic"
   receiveRoutine
@@ -109,7 +108,7 @@ foreign import ccall "vpi_user.h vpi_register_cb"
 newtype Callback
   = Callback { callbackObject :: Object }
   deriving stock (Show)
-  deriving newtype (Handle, Storable)
+  deriving newtype (IsObject, Storable)
 
 registerCallback
   :: forall extra o
@@ -156,9 +155,9 @@ callbackInfo
   => Received extra ~ CString
   => Callback
   -> SimCont o (CallbackInfo extra)
-callbackInfo (Callback handle) =
+callbackInfo (Callback object) =
   Sim.withNewPtr Sim.stackPtr $ \ptr -> do
-    IO.liftIO (c_vpi_get_cb_info handle ptr)
+    IO.liftIO (c_vpi_get_cb_info object ptr)
     peekReceive ptr
 #endif
 

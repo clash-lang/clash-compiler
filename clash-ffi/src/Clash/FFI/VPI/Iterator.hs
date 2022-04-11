@@ -16,13 +16,12 @@ import           Foreign.Storable (Storable)
 
 import           Clash.FFI.Monad (SimCont)
 import           Clash.FFI.View
-import           Clash.FFI.VPI.Handle (Handle(..))
 import           Clash.FFI.VPI.Object
 
 newtype Iterator
   = Iterator { iteratorObject :: Object }
   deriving stock (Show)
-  deriving newtype (Handle, Storable)
+  deriving newtype (IsObject, Storable)
 
 foreign import ccall "vpi_user.h vpi_iterate"
   c_vpi_iterate :: CInt -> Object -> IO Iterator
@@ -35,7 +34,7 @@ iterate
   -> SimCont o Iterator
 iterate objTy parent = do
   cobjTy <- unsafeSend objTy
-  let object = maybe nullHandle coerce parent
+  let object = maybe nullObject coerce parent
 
   IO.liftIO (c_vpi_iterate cobjTy object)
 
@@ -44,21 +43,21 @@ foreign import ccall "vpi_user.h vpi_scan"
 
 scan
   :: forall c o
-   . Handle c
+   . IsObject c
   => Coercible Object c
   => Iterator
   -> SimCont o (Maybe c)
 scan iterator
-  | isNullHandle (iteratorObject iterator)
+  | isNullObject (iteratorObject iterator)
   = pure Nothing
 
   | otherwise
   = do next <- IO.liftIO (c_vpi_scan iterator)
-       pure (if isNullHandle next then Nothing else Just (coerce next))
+       pure (if isNullObject next then Nothing else Just (coerce next))
 
 iterateAll
   :: forall c p o
-   . Handle c
+   . IsObject c
   => Coercible Object c
   => Coercible p Object
   => ObjectType

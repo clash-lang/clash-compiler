@@ -20,13 +20,12 @@ import Foreign.Storable (Storable)
 import GHC.Stack (HasCallStack)
 
 import Clash.FFI.Monad (SimCont)
-import Clash.FFI.VPI.Handle
 import Clash.FFI.VPI.Object
 
 newtype Reg
   = Reg { regObject :: Object }
   deriving stock (Show)
-  deriving newtype (Handle, Storable)
+  deriving newtype (IsObject, Storable)
 
 regName :: HasCallStack => Reg -> SimCont o ByteString
 regName = receiveProperty Name

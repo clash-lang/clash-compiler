@@ -61,7 +61,6 @@ common vpi-config
     Clash.FFI.VPI.Error
     Clash.FFI.VPI.Error.Level
     Clash.FFI.VPI.Error.State
-    Clash.FFI.VPI.Handle
     Clash.FFI.VPI.IO
     Clash.FFI.VPI.Info
     Clash.FFI.VPI.Iterator

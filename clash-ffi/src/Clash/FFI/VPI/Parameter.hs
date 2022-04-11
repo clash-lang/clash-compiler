@@ -22,13 +22,12 @@ import Foreign.Storable (Storable)
 import GHC.Stack (HasCallStack)
 
 import Clash.FFI.Monad (SimCont)
-import Clash.FFI.VPI.Handle
 import Clash.FFI.VPI.Object
 
 newtype Parameter
   = Parameter { parameterObject :: Object }
   deriving stock (Show)
-  deriving newtype (Handle, Storable)
+  deriving newtype (IsObject, Storable)
 
 parameterName :: HasCallStack => Parameter -> SimCont o ByteString
 parameterName = receiveProperty Name

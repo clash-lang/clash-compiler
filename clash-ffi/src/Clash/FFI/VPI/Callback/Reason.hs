@@ -20,16 +20,15 @@ import           GHC.Stack (CallStack, callStack, prettyCallStack)
 
 import qualified Clash.FFI.Monad as Sim
 import           Clash.FFI.View
-import           Clash.FFI.VPI.Handle
 import           Clash.FFI.VPI.Object
 
 {-
-NOTE [handle in `CallbackReason`]
+NOTE [object in `CallbackReason`]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When a callback reason is related to some object, we use an existential type
-to allow any valid handle type to be used. However, this can only be used when
+to allow any valid object type to be used. However, this can only be used when
 creating a reason to send, when receiving we do not know the type of the
-handle the callback acts on. This means any received callback will simply use
+object the callback acts on. This means any received callback will simply use
 Object and needs to be coerced into the correct type. This coercion is
 obviously unchecked / unsafe, so must be performed carefully.
 -}
@@ -74,321 +73,319 @@ data CallbackReason
 instance UnsafeSend CallbackReason where
   type Sent CallbackReason = (CInt, Object, Ptr CTime, Ptr CValue)
 
-  unsafeSend =
-    \case
-      AfterValueChange handle timeTy valueFmt -> do
-        ctimeTy <- unsafeSend timeTy
-        ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+  unsafeSend = \case
+    AfterValueChange object timeTy valueFmt -> do
+      ctimeTy <- unsafeSend timeTy
+      ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
 
-        cfmt <- unsafeSend valueFmt
-        cvalue <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
+      cfmt <- unsafeSend valueFmt
+      cvalue <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
 
-        pure (1, coerce handle, ctime, cvalue)
+      pure (1, coerce object, ctime, cvalue)
 
-      BeforeStatement handle timeTy -> do
-        ctimeTy <- unsafeSend timeTy
-        ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+    BeforeStatement object timeTy -> do
+      ctimeTy <- unsafeSend timeTy
+      ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
 
-        pure (2, coerce handle, ctime, FFI.nullPtr)
+      pure (2, coerce object, ctime, FFI.nullPtr)
 
-      AfterForce mHandle timeTy valueFmt -> do
-        let object = maybe nullHandle coerce mHandle
+    AfterForce mObject timeTy valueFmt -> do
+      let object = maybe nullObject coerce mObject
 
-        ctimeTy <- unsafeSend timeTy
-        ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+      ctimeTy <- unsafeSend timeTy
+      ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
 
-        cfmt <- unsafeSend valueFmt
-        cvalue <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
+      cfmt <- unsafeSend valueFmt
+      cvalue <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
 
-        pure (3, object, ctime, cvalue)
+      pure (3, object, ctime, cvalue)
 
-      AfterRelease mHandle timeTy valueFmt -> do
-        let object = maybe nullHandle coerce mHandle
+    AfterRelease mObject timeTy valueFmt -> do
+      let object = maybe nullObject coerce mObject
 
-        ctimeTy <- unsafeSend timeTy
-        ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+      ctimeTy <- unsafeSend timeTy
+      ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
 
-        cfmt <- unsafeSend valueFmt
-        cvalue <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
+      cfmt <- unsafeSend valueFmt
+      cvalue <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
 
-        pure (4, object, ctime, cvalue)
+      pure (4, object, ctime, cvalue)
 
-      AtStartOfSimTime mHandle time -> do
-        let object = maybe nullHandle coerce mHandle
-        ctime <- unsafePokeSend time
-        pure (5, object, ctime, FFI.nullPtr)
+    AtStartOfSimTime mObject time -> do
+      let object = maybe nullObject coerce mObject
+      ctime <- unsafePokeSend time
+      pure (5, object, ctime, FFI.nullPtr)
 
-      ReadWriteSynch mHandle time -> do
-        let object = maybe nullHandle coerce mHandle
-        ctime <- unsafePokeSend time
-        pure (6, object, ctime, FFI.nullPtr)
+    ReadWriteSynch mObject time -> do
+      let object = maybe nullObject coerce mObject
+      ctime <- unsafePokeSend time
+      pure (6, object, ctime, FFI.nullPtr)
 
-      ReadOnlySynch mHandle time -> do
-        let object = maybe nullHandle coerce mHandle
-        ctime <- unsafePokeSend time
-        pure (7, object, ctime, FFI.nullPtr)
+    ReadOnlySynch mObject time -> do
+      let object = maybe nullObject coerce mObject
+      ctime <- unsafePokeSend time
+      pure (7, object, ctime, FFI.nullPtr)
 
-      NextSimTime mHandle timeTy -> do
-        let object = maybe nullHandle coerce mHandle
+    NextSimTime mObject timeTy -> do
+      let object = maybe nullObject coerce mObject
 
-        ctimeTy <- unsafeSend timeTy
-        ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+      ctimeTy <- unsafeSend timeTy
+      ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
 
-        pure (8, object, ctime, FFI.nullPtr)
+      pure (8, object, ctime, FFI.nullPtr)
 
-      AfterDelay mHandle time -> do
-        let object = maybe nullHandle coerce mHandle
-        ctime <- unsafePokeSend time
-        pure (7, object, ctime, FFI.nullPtr)
+    AfterDelay mObject time -> do
+      let object = maybe nullObject coerce mObject
+      ctime <- unsafePokeSend time
+      pure (7, object, ctime, FFI.nullPtr)
 
-      EndOfCompile ->
-        pure (10, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    EndOfCompile ->
+      pure (10, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      StartOfSimulation ->
-        pure (11, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    StartOfSimulation ->
+      pure (11, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      EndOfSimulation ->
-        pure (12, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    EndOfSimulation ->
+      pure (12, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      RuntimeError ->
-        pure (13, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    RuntimeError ->
+      pure (13, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      TchkViolation ->
-        pure (14, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    TchkViolation ->
+      pure (14, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      StartOfSave ->
-        pure (15, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    StartOfSave ->
+      pure (15, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      EndOfSave ->
-        pure (16, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    EndOfSave ->
+      pure (16, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      StartOfRestart ->
-        pure (17, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    StartOfRestart ->
+      pure (17, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      EndOfRestart ->
-        pure (18, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    EndOfRestart ->
+      pure (18, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      StartOfReset ->
-        pure (19, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    StartOfReset ->
+      pure (19, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      EndOfReset ->
-        pure (20, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    EndOfReset ->
+      pure (20, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      EnterInteractive ->
-        pure (21, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    EnterInteractive ->
+      pure (21, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      ExitInteractive ->
-        pure (22, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    ExitInteractive ->
+      pure (22, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      InteractiveScopeChange ->
-        pure (23, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    InteractiveScopeChange ->
+      pure (23, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      UnresolvedSysTf ->
-        pure (24, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    UnresolvedSysTf ->
+      pure (24, nullObject, FFI.nullPtr, FFI.nullPtr)
 
 #if defined(VERILOG_2001)
-      AfterAssign handle timeTy valueFmt -> do
-        ctimeTy <- unsafeSend timeTy
-        ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+    AfterAssign object timeTy valueFmt -> do
+      ctimeTy <- unsafeSend timeTy
+      ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
 
-        cfmt <- unsafeSend valueFmt
-        cvalue <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
+      cfmt <- unsafeSend valueFmt
+      cvalue <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
 
-        pure (25, coerce handle, ctime, cvalue)
+      pure (25, coerce object, ctime, cvalue)
 
-      AfterDeassign handle timeTy valueFmt -> do
-        ctimeTy <- unsafeSend timeTy
-        ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+    AfterDeassign object timeTy valueFmt -> do
+      ctimeTy <- unsafeSend timeTy
+      ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
 
-        cfmt <- unsafeSend valueFmt
-        cvalue <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
+      cfmt <- unsafeSend valueFmt
+      cvalue <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
 
-        pure (26, coerce handle, ctime, cvalue)
+      pure (26, coerce object, ctime, cvalue)
 
-      AfterDisable handle timeTy valueFmt -> do
-        ctimeTy <- unsafeSend timeTy
-        ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+    AfterDisable object timeTy valueFmt -> do
+      ctimeTy <- unsafeSend timeTy
+      ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
 
-        cfmt <- unsafeSend valueFmt
-        cvalue <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
+      cfmt <- unsafeSend valueFmt
+      cvalue <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
 
-        pure (27, coerce handle, ctime, cvalue)
+      pure (27, coerce object, ctime, cvalue)
 
-      PliError ->
-        pure (28, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    PliError ->
+      pure (28, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      Signal ->
-        pure (29, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    Signal ->
+      pure (29, nullObject, FFI.nullPtr, FFI.nullPtr)
 #endif
 #if defined(VERILOG_2005)
-      NbaSynch mHandle time -> do
-        let object = maybe nullHandle coerce mHandle
-        ctime <- unsafePokeSend time
-        pure (31, object, ctime, FFI.nullPtr)
+    NbaSynch mObject time -> do
+      let object = maybe nullObject coerce mObject
+      ctime <- unsafePokeSend time
+      pure (31, object, ctime, FFI.nullPtr)
 
-      AtEndOfSimTime mHandle time -> do
-        let object = maybe nullHandle coerce mHandle
-        ctime <- unsafePokeSend time
-        pure (31, object, ctime, FFI.nullPtr)
+    AtEndOfSimTime mObject time -> do
+      let object = maybe nullObject coerce mObject
+      ctime <- unsafePokeSend time
+      pure (31, object, ctime, FFI.nullPtr)
 #endif
 
 instance Send CallbackReason where
-  send =
-    \case
-      AfterValueChange handle timeTy valueFmt -> do
-        ctimeTy <- send timeTy
-        ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+  send = \case
+    AfterValueChange object timeTy valueFmt -> do
+      ctimeTy <- send timeTy
+      ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
 
-        cfmt <- send valueFmt
-        cvalue <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
+      cfmt <- send valueFmt
+      cvalue <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
 
-        pure (1, coerce handle, ctime, cvalue)
+      pure (1, coerce object, ctime, cvalue)
 
-      BeforeStatement handle timeTy -> do
-        ctimeTy <- send timeTy
-        ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+    BeforeStatement object timeTy -> do
+      ctimeTy <- send timeTy
+      ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
 
-        pure (2, coerce handle, ctime, FFI.nullPtr)
+      pure (2, coerce object, ctime, FFI.nullPtr)
 
-      AfterForce mHandle timeTy valueFmt -> do
-        let object = maybe nullHandle coerce mHandle
+    AfterForce mObject timeTy valueFmt -> do
+      let object = maybe nullObject coerce mObject
 
-        ctimeTy <- send timeTy
-        ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+      ctimeTy <- send timeTy
+      ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
 
-        cfmt <- send valueFmt
-        cvalue <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
+      cfmt <- send valueFmt
+      cvalue <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
 
-        pure (3, object, ctime, cvalue)
+      pure (3, object, ctime, cvalue)
 
-      AfterRelease mHandle timeTy valueFmt -> do
-        let object = maybe nullHandle coerce mHandle
+    AfterRelease mObject timeTy valueFmt -> do
+      let object = maybe nullObject coerce mObject
 
-        ctimeTy <- send timeTy
-        ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+      ctimeTy <- send timeTy
+      ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
 
-        cfmt <- send valueFmt
-        cvalue <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
+      cfmt <- send valueFmt
+      cvalue <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
 
-        pure (4, object, ctime, cvalue)
+      pure (4, object, ctime, cvalue)
 
-      AtStartOfSimTime mHandle time -> do
-        let object = maybe nullHandle coerce mHandle
-        ctime <- pokeSend time
-        pure (5, object, ctime, FFI.nullPtr)
+    AtStartOfSimTime mObject time -> do
+      let object = maybe nullObject coerce mObject
+      ctime <- pokeSend time
+      pure (5, object, ctime, FFI.nullPtr)
 
-      ReadWriteSynch mHandle time -> do
-        let object = maybe nullHandle coerce mHandle
-        ctime <- pokeSend time
-        pure (6, object, ctime, FFI.nullPtr)
+    ReadWriteSynch mObject time -> do
+      let object = maybe nullObject coerce mObject
+      ctime <- pokeSend time
+      pure (6, object, ctime, FFI.nullPtr)
 
-      ReadOnlySynch mHandle time -> do
-        let object = maybe nullHandle coerce mHandle
-        ctime <- pokeSend time
-        pure (7, object, ctime, FFI.nullPtr)
+    ReadOnlySynch mObject time -> do
+      let object = maybe nullObject coerce mObject
+      ctime <- pokeSend time
+      pure (7, object, ctime, FFI.nullPtr)
 
-      NextSimTime mHandle timeTy -> do
-        let object = maybe nullHandle coerce mHandle
+    NextSimTime mObject timeTy -> do
+      let object = maybe nullObject coerce mObject
 
-        ctimeTy <- send timeTy
-        ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+      ctimeTy <- send timeTy
+      ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
 
-        pure (8, object, ctime, FFI.nullPtr)
+      pure (8, object, ctime, FFI.nullPtr)
 
-      AfterDelay mHandle time -> do
-        let object = maybe nullHandle coerce mHandle
-        ctime <- pokeSend time
-        pure (9, object, ctime, FFI.nullPtr)
+    AfterDelay mObject time -> do
+      let object = maybe nullObject coerce mObject
+      ctime <- pokeSend time
+      pure (9, object, ctime, FFI.nullPtr)
 
-      EndOfCompile ->
-        pure (10, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    EndOfCompile ->
+      pure (10, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      StartOfSimulation ->
-        pure (11, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    StartOfSimulation ->
+      pure (11, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      EndOfSimulation ->
-        pure (12, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    EndOfSimulation ->
+      pure (12, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      RuntimeError ->
-        pure (13, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    RuntimeError ->
+      pure (13, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      TchkViolation ->
-        pure (14, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    TchkViolation ->
+      pure (14, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      StartOfSave ->
-        pure (15, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    StartOfSave ->
+      pure (15, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      EndOfSave ->
-        pure (16, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    EndOfSave ->
+      pure (16, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      StartOfRestart ->
-        pure (17, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    StartOfRestart ->
+      pure (17, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      EndOfRestart ->
-        pure (18, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    EndOfRestart ->
+      pure (18, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      StartOfReset ->
-        pure (19, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    StartOfReset ->
+      pure (19, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      EndOfReset ->
-        pure (20, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    EndOfReset ->
+      pure (20, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      EnterInteractive ->
-        pure (21, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    EnterInteractive ->
+      pure (21, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      ExitInteractive ->
-        pure (22, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    ExitInteractive ->
+      pure (22, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      InteractiveScopeChange ->
-        pure (23, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    InteractiveScopeChange ->
+      pure (23, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      UnresolvedSysTf ->
-        pure (24, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    UnresolvedSysTf ->
+      pure (24, nullObject, FFI.nullPtr, FFI.nullPtr)
 
 #if defined(VERILOG_2001)
-      AfterAssign handle timeTy valueFmt -> do
-        ctimeTy <- send timeTy
-        ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+    AfterAssign object timeTy valueFmt -> do
+      ctimeTy <- send timeTy
+      ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
 
-        cfmt <- send valueFmt
-        cvalue <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
+      cfmt <- send valueFmt
+      cvalue <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
 
-        pure (25, coerce handle, ctime, cvalue)
+      pure (25, coerce object, ctime, cvalue)
 
-      AfterDeassign handle timeTy valueFmt -> do
-        ctimeTy <- send timeTy
-        ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+    AfterDeassign object timeTy valueFmt -> do
+      ctimeTy <- send timeTy
+      ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
 
-        cfmt <- send valueFmt
-        cvalue <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
+      cfmt <- send valueFmt
+      cvalue <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
 
-        pure (26, coerce handle, ctime, cvalue)
+      pure (26, coerce object, ctime, cvalue)
 
-      AfterDisable handle timeTy valueFmt -> do
-        ctimeTy <- send timeTy
-        ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+    AfterDisable object timeTy valueFmt -> do
+      ctimeTy <- send timeTy
+      ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
 
-        cfmt <- send valueFmt
-        cvalue <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
+      cfmt <- send valueFmt
+      cvalue <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
 
-        pure (27, coerce handle, ctime, cvalue)
+      pure (27, coerce object, ctime, cvalue)
 
-      PliError ->
-        pure (28, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    PliError ->
+      pure (28, nullObject, FFI.nullPtr, FFI.nullPtr)
 
-      Signal ->
-        pure (29, nullHandle, FFI.nullPtr, FFI.nullPtr)
+    Signal ->
+      pure (29, nullObject, FFI.nullPtr, FFI.nullPtr)
 #endif
 #if defined(VERILOG_2005)
-      NbaSynch mHandle time -> do
-        let object = maybe nullHandle coerce mHandle
-        ctime <- pokeSend time
-        pure (31, object, ctime, FFI.nullPtr)
+    NbaSynch mObject time -> do
+      let object = maybe nullObject coerce mObject
+      ctime <- pokeSend time
+      pure (31, object, ctime, FFI.nullPtr)
 
-      AtEndOfSimTime mHandle time -> do
-        let object = maybe nullHandle coerce mHandle
-        ctime <- pokeSend time
-        pure (31, object, ctime, FFI.nullPtr)
+    AtEndOfSimTime mObject time -> do
+      let object = maybe nullObject coerce mObject
+      ctime <- pokeSend time
+      pure (31, object, ctime, FFI.nullPtr)
 #endif
 
 data UnknownCallbackReason
@@ -408,7 +405,7 @@ instance UnsafeReceive CallbackReason where
   type Received CallbackReason = (CInt, Object, Ptr CTime, Ptr CValue)
 
   unsafeReceive (creason, object, ctime, cvalue) =
-    let mObject = if isNullHandle object then Nothing else Just object in
+    let mObject = if isNullObject object then Nothing else Just object in
     case creason of
       1 -> do
         timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= unsafeReceive
@@ -530,7 +527,7 @@ instance UnsafeReceive CallbackReason where
 
 instance Receive CallbackReason where
   receive (creason, object, ctime, cvalue) =
-    let mObject = if isNullHandle object then Nothing else Just object in
+    let mObject = if isNullObject object then Nothing else Just object in
     case creason of
       1 -> do
         timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive

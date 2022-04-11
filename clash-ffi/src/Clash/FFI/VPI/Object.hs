@@ -7,6 +7,7 @@
 
 module Clash.FFI.VPI.Object
   ( Object(..)
+  , IsObject(..)
   , module Clash.FFI.VPI.Object.Type
     -- * Child Objects
   , IsChildRef(..)
@@ -55,7 +56,6 @@ import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
 import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim (heapPtr, stackPtr, throw, withNewPtr)
 import           Clash.FFI.View
-import           Clash.FFI.VPI.Handle
 import           Clash.FFI.VPI.Object.Property
 import           Clash.FFI.VPI.Object.Time
 import           Clash.FFI.VPI.Object.Type
@@ -79,14 +79,21 @@ foreign import ccall "vpi_user.h vpi_release_handle"
 foreign import ccall "vpi_user.h vpi_compare_objects"
   c_vpi_compare_objects :: Object -> Object -> IO Bool
 
-instance Handle Object where
-  nullHandle = Object FFI.nullPtr
+class IsObject a where
+  nullObject :: a
+  isNullObject :: a -> Bool
 
-  isNullHandle obj =
+  freeObject :: a -> SimCont o ()
+  compareObjects :: a -> a -> SimCont o Bool
+
+instance IsObject Object where
+  nullObject = Object FFI.nullPtr
+
+  isNullObject obj =
     objectPtr obj == FFI.nullPtr
 
-  freeHandle obj =
-    Monad.unless (isNullHandle obj)
+  freeObject obj =
+    Monad.unless (isNullObject obj)
       . IO.liftIO
       . Monad.void
 #if defined(VERILOG)
@@ -97,7 +104,7 @@ instance Handle Object where
 #error "Neither VERILOG or SYSTEMVERILOG is defined in VPI implementation"
 #endif
 
-  compareHandles x y =
+  compareObjects x y =
     IO.liftIO (c_vpi_compare_objects x y)
 
 class IsChildRef i where
@@ -121,7 +128,7 @@ instance (Show i, Show a) => Show (UnknownChild i a) where
     mconcat
       [ "Unknown child "
       , show i
-      , " for handle "
+      , " for object "
       , show a
       , "\n"
       , prettyCallStack c
@@ -135,7 +142,7 @@ instance IsChildRef ObjectType where
     cobjTy <- unsafeSend objTy
     child <- IO.liftIO (c_vpi_handle cobjTy (coerce parent))
 
-    Monad.when (isNullHandle child) $
+    Monad.when (isNullObject child) $
       Sim.throw (UnknownChild objTy parent callStack)
 
     pure (coerce child)
@@ -147,7 +154,7 @@ instance IsChildRef CString where
   getChild str parent = do
     child <- IO.liftIO (c_vpi_handle_by_name str (coerce parent))
 
-    Monad.when (isNullHandle child) $
+    Monad.when (isNullObject child) $
       Sim.throw (UnknownChild str parent callStack)
 
     pure (coerce child)
@@ -159,7 +166,7 @@ instance IsChildRef CInt where
   getChild ix parent = do
     child <- IO.liftIO (c_vpi_handle_by_index (coerce parent) ix)
 
-    Monad.when (isNullHandle child) $
+    Monad.when (isNullObject child) $
       Sim.throw (UnknownChild ix parent callStack)
 
     pure (coerce child)
@@ -173,7 +180,7 @@ instance IsChildRef [CInt] where
     ptr <- unsafeSend ixs
     child <- IO.liftIO (c_vpi_handle_by_multi_index (coerce parent) len ptr)
 
-    Monad.when (isNullHandle child) $
+    Monad.when (isNullObject child) $
       Sim.throw (UnknownChild ixs parent callStack)
 
     pure (coerce child)
@@ -190,8 +197,8 @@ unsafeSendChildRef
   => i
   -> a
   -> SimCont o b
-unsafeSendChildRef ref handle =
-  unsafeSend ref >>= (`getChild` handle)
+unsafeSendChildRef ref object =
+  unsafeSend ref >>= (`getChild` object)
 
 sendChildRef
   :: forall i a b o
@@ -205,8 +212,8 @@ sendChildRef
   => i
   -> a
   -> SimCont o b
-sendChildRef ref handle =
-  send ref >>= (`getChild` handle)
+sendChildRef ref object =
+  send ref >>= (`getChild` object)
 
 {-
 NOTE [vpi_handle_multi]
@@ -227,10 +234,10 @@ Since vpi_handle_multi uses varargs instead of an array for input, it cannot
 be conveniently imported. We would need to add imports such as
 
     foreign import ccall ...
-      c_vpi_handle_multi_2 :: VpiHandle -> VpiHandle -> IO VpiHandle
+      c_vpi_handle_multi_2 :: Object -> Object -> IO Object
 
     foreign import ccall ...
-      c_vpi_handle_multi_3 :: VpiHandle -> VpiHandle -> VpiHandle -> IO VpiHandle
+      c_vpi_handle_multi_3 :: Object -> Object -> Object -> IO Object
 
 This is somewhat of a burden, so instead for the time being we leave these
 relationships inaccessible. Most relationships are 1-N or 1-1 in practice, so
@@ -251,22 +258,22 @@ foreign import ccall "vpi_user.h vpi_get"
   c_vpi_get :: CInt -> Object -> IO CInt
 
 instance IsProperty CInt where
-  getProperty prop handle = do
+  getProperty prop object = do
     cprop <- unsafeSend prop
-    value <- IO.liftIO (c_vpi_get cprop (coerce handle))
+    value <- IO.liftIO (c_vpi_get cprop (coerce object))
 
     Monad.when (value == -1) $
-      Sim.throw (UndefinedProperty prop handle callStack)
+      Sim.throw (UndefinedProperty prop object callStack)
 
     pure value
 
 instance IsProperty Bool where
-  getProperty prop handle = do
+  getProperty prop object = do
     cprop <- unsafeSend prop
-    value <- IO.liftIO (c_vpi_get cprop (coerce handle))
+    value <- IO.liftIO (c_vpi_get cprop (coerce object))
 
     Monad.when (value == -1) $
-      Sim.throw (UndefinedProperty prop handle callStack)
+      Sim.throw (UndefinedProperty prop object callStack)
 
     pure (FFI.toBool value)
 
@@ -275,12 +282,12 @@ foreign import ccall "vpi_user.h vpi_get64"
   c_vpi_get64 :: CInt -> Object -> IO Int64
 
 instance IsProperty Int64 where
-  getProperty prop handle = do
+  getProperty prop object = do
     cprop <- unsafeSend prop
-    value <- IO.liftIO (c_vpi_get64 cprop (coerce handle))
+    value <- IO.liftIO (c_vpi_get64 cprop (coerce object))
 
     Monad.when (value == -1) $
-      Sim.throw (UndefinedProperty prop handle callStack)
+      Sim.throw (UndefinedProperty prop object callStack)
 
     pure value
 #endif
@@ -289,12 +296,12 @@ foreign import ccall "vpi_user.h vpi_get_str"
   c_vpi_get_str :: CInt -> Object -> IO CString
 
 instance IsProperty CString where
-  getProperty prop handle = do
+  getProperty prop object = do
     cprop <- unsafeSend prop
-    value <- IO.liftIO (c_vpi_get_str cprop (coerce handle))
+    value <- IO.liftIO (c_vpi_get_str cprop (coerce object))
 
     Monad.when (value == FFI.nullPtr) $
-      Sim.throw (UndefinedProperty prop handle callStack)
+      Sim.throw (UndefinedProperty prop object callStack)
 
     pure value
 
@@ -323,8 +330,8 @@ unsafeReceiveProperty
   => Property (Received p)
   -> a
   -> SimCont o p
-unsafeReceiveProperty prop handle =
-  getProperty prop handle >>= unsafeReceive
+unsafeReceiveProperty prop object =
+  getProperty prop object >>= unsafeReceive
 
 receiveProperty
   :: forall p a o
@@ -337,8 +344,8 @@ receiveProperty
   => Property (Received p)
   -> a
   -> SimCont o p
-receiveProperty prop handle =
-  getProperty prop handle >>= receive
+receiveProperty prop object =
+  getProperty prop object >>= receive
 
 foreign import ccall "vpi_user.h vpi_get_time"
   c_vpi_get_time :: Object -> Ptr CTime -> IO ()
@@ -351,14 +358,14 @@ getTime
   -> TimeType
   -> Maybe a
   -> SimCont o (Ptr CTime)
-getTime alloc ty mHandle = do
+getTime alloc ty mObject = do
   Monad.when (ty == Suppress) $
     Sim.throw (InvalidTimeType ty callStack)
 
   cty <- unsafeSend ty
 
   fmap fst . Sim.withNewPtr alloc $ \ptr -> do
-    let object = maybe nullHandle coerce mHandle
+    let object = maybe nullObject coerce mObject
     FFI.poke ptr (CTime cty 0 0 0.0)
     c_vpi_get_time object ptr
 
@@ -369,8 +376,8 @@ unsafeReceiveTime
   => TimeType
   -> Maybe a
   -> SimCont o Time
-unsafeReceiveTime timeTy mHandle =
-  getTime Sim.stackPtr timeTy mHandle >>= unsafePeekReceive
+unsafeReceiveTime timeTy mObject =
+  getTime Sim.stackPtr timeTy mObject >>= unsafePeekReceive
 
 receiveTime
   :: forall a o
@@ -379,57 +386,57 @@ receiveTime
   => TimeType
   -> Maybe a
   -> SimCont o Time
-receiveTime timeTy mHandle =
-  getTime Sim.stackPtr timeTy mHandle >>= peekReceive
+receiveTime timeTy mObject =
+  getTime Sim.stackPtr timeTy mObject >>= peekReceive
 
 foreign import ccall "vpi_user.h vpi_get_value"
   c_vpi_get_value :: Object -> Ptr CValue -> IO ()
 
 getValue
   :: HasCallStack
-  => Coercible handle Object
+  => Coercible a Object
   => SimCont o (Ptr CValue)
   -> ValueFormat
-  -> handle
+  -> a
   -> SimCont o (Ptr CValue)
-getValue alloc fmt handle = do
+getValue alloc fmt object = do
   cfmt <- unsafeSend fmt
 
   fmap fst . Sim.withNewPtr alloc $ \ptr -> do
     FFI.pokeByteOff ptr 0 cfmt
-    c_vpi_get_value (coerce handle) ptr
+    c_vpi_get_value (coerce object) ptr
 
     pure ()
 
 unsafeReceiveValue
-  :: forall handle o
+  :: forall a o
    . HasCallStack
-  => Coercible handle Object
-  => Show handle
-  => Typeable handle
+  => Coercible a Object
+  => Show a
+  => Typeable a
   => ValueFormat
-  -> handle
+  -> a
   -> SimCont o Value
-unsafeReceiveValue fmt handle = do
-  ptr <- getValue Sim.stackPtr fmt (coerce @handle @Object handle)
+unsafeReceiveValue fmt object = do
+  ptr <- getValue Sim.stackPtr fmt (coerce @a @Object object)
   cvalue <- IO.liftIO (FFI.peek ptr)
-  size <- getProperty Size handle
+  size <- getProperty Size object
 
   unsafeReceive (cvalue, size)
 
 receiveValue
-  :: forall handle o
+  :: forall a o
    . HasCallStack
-  => Coercible handle Object
-  => Show handle
-  => Typeable handle
+  => Coercible a Object
+  => Show a
+  => Typeable a
   => ValueFormat
-  -> handle
+  -> a
   -> SimCont o Value
-receiveValue fmt handle = do
-  ptr <- getValue Sim.heapPtr fmt (coerce @handle @Object handle)
+receiveValue fmt object = do
+  ptr <- getValue Sim.heapPtr fmt (coerce @a @Object object)
   cvalue <- IO.liftIO (FFI.peek ptr)
-  size <- getProperty Size handle
+  size <- getProperty Size object
 
   receive (cvalue, size)
 
@@ -439,42 +446,42 @@ foreign import ccall "vpi_user.h vpi_put_value"
 {-
 NOTE [vpi_put_value and events]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In IEEE 1364, it mentions that the return value from vpi_put_value is a handle
-to the event scheduled by the FFI call (i.e. an event to perform the value
-change). This is returned when the vpiReturnEvent flag is set in the call,
-otherwise it always returns NULL.
+In IEEE 1364, it mentions that the return value from vpi_put_value is the event
+scheduled by the FFI call (i.e. an event to perform the value change). This is
+returned when the vpiReturnEvent flag is set in the call, otherwise it always
+returns NULL.
 
 Currently, clash-ffi has no need to be able to cancel events before they are
-executed. Instead of returning a handle from putValue, we silently discard the
+executed. Instead of returning an object from putValue, we silently discard the
 result, and do not allow the high level API to set the vpiReturnEvent flag, so
-a valid handle would never be returned anyway.
+a valid object would never be returned anyway.
 -}
 
 unsafeSendValue
   :: HasCallStack
-  => Coercible handle Object
-  => handle
+  => Coercible a Object
+  => a
   -> Value
   -> DelayMode
   -> SimCont o ()
-unsafeSendValue handle value delay = do
+unsafeSendValue object value delay = do
   valuePtr <- unsafePokeSend value
   (timePtr, flags) <- unsafeSend delay
 
   Monad.void . IO.liftIO $
-    c_vpi_put_value (coerce handle) valuePtr timePtr flags
+    c_vpi_put_value (coerce object) valuePtr timePtr flags
 
 sendValue
   :: HasCallStack
-  => Coercible handle Object
-  => handle
+  => Coercible a Object
+  => a
   -> Value
   -> DelayMode
   -> SimCont o ()
-sendValue handle value delay = do
+sendValue object value delay = do
   valuePtr <- pokeSend value
   (timePtr, flags) <- send delay
 
   Monad.void . IO.liftIO $
-    c_vpi_put_value (coerce handle) valuePtr timePtr flags
+    c_vpi_put_value (coerce object) valuePtr timePtr flags
 

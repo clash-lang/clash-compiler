@@ -7,7 +7,6 @@ import           Data.Foldable (for_)
 import           Data.String (fromString)
 
 import qualified Clash.FFI.VPI.Callback as VPI
-import qualified Clash.FFI.VPI.Handle as VPI
 import qualified Clash.FFI.VPI.IO as VPI
 import qualified Clash.FFI.VPI.Info as VPI
 import qualified Clash.FFI.VPI.Module as VPI
@@ -76,7 +75,7 @@ clashMain =
           ("Found reg: " <> rName <> ", size " <> fromString (show rSize) <> ", value: " <> fromString (show rVal))
 
         rCb <- VPI.registerCallback (monitorCallback r)
-        VPI.freeHandle rCb
+        VPI.freeObject rCb
 
 monitorCallback :: VPI.Reg -> VPI.CallbackInfo ByteString
 monitorCallback reg = VPI.CallbackInfo

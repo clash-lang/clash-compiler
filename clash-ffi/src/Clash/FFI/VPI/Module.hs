@@ -14,7 +14,6 @@ import Foreign.Storable (Storable)
 import GHC.Stack (HasCallStack)
 
 import Clash.FFI.Monad (SimCont)
-import Clash.FFI.VPI.Handle
 import Clash.FFI.VPI.Iterator
 import Clash.FFI.VPI.Object
 import Clash.FFI.VPI.Net (Net(..))
@@ -25,7 +24,7 @@ import Clash.FFI.VPI.Reg (Reg(..))
 newtype Module
   = Module { moduleObject :: Object }
   deriving stock (Show)
-  deriving newtype (Handle, Storable)
+  deriving newtype (IsObject, Storable)
 
 topModules :: HasCallStack => SimCont o [Module]
 topModules = iterateAll @_ @Object ObjModule Nothing

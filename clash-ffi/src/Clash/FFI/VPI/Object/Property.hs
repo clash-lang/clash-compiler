@@ -67,7 +67,7 @@ instance (Show a) => Show (UndefinedProperty p a) where
     mconcat
       [ "Undefined property "
       , show p
-      , " for the handle "
+      , " for the object "
       , show a
       , "\n"
       , prettyCallStack c

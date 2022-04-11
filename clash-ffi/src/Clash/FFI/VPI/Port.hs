@@ -15,14 +15,13 @@ import Foreign.Storable (Storable)
 import GHC.Stack (HasCallStack)
 
 import Clash.FFI.Monad (SimCont)
-import Clash.FFI.VPI.Handle
 import Clash.FFI.VPI.Object
 import Clash.FFI.VPI.Port.Direction
 
 newtype Port
   = Port { portObject :: Object }
   deriving stock (Show)
-  deriving newtype (Handle, Storable)
+  deriving newtype (IsObject, Storable)
 
 portName :: Port -> SimCont o ByteString
 portName = receiveProperty Name
