@@ -22,7 +22,6 @@ import GHC.Stack (HasCallStack)
 import Clash.FFI.Monad (SimCont)
 import Clash.FFI.VPI.Handle
 import Clash.FFI.VPI.Object
-import Clash.FFI.VPI.Value
 
 newtype Reg
   = Reg { regObject :: Object }

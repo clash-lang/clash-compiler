@@ -71,15 +71,15 @@ common vpi-config
     Clash.FFI.VPI.Object.Property
     Clash.FFI.VPI.Object.Time
     Clash.FFI.VPI.Object.Type
+    Clash.FFI.VPI.Object.Value
+    Clash.FFI.VPI.Object.Value.Delay
+    Clash.FFI.VPI.Object.Value.Format
+    Clash.FFI.VPI.Object.Value.Scalar
+    Clash.FFI.VPI.Object.Value.Vector
     Clash.FFI.VPI.Parameter
     Clash.FFI.VPI.Port
     Clash.FFI.VPI.Port.Direction
     Clash.FFI.VPI.Reg
-    Clash.FFI.VPI.Value
-    Clash.FFI.VPI.Value.Delay
-    Clash.FFI.VPI.Value.Format
-    Clash.FFI.VPI.Value.Scalar
-    Clash.FFI.VPI.Value.Vector
 
 custom-setup
   setup-depends:

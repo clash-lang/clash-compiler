@@ -6,9 +6,10 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Clash.FFI.VPI.Value.Format
+module Clash.FFI.VPI.Object.Value.Format
   ( ValueFormat(..)
   , UnknownFormat(..)
+  , InvalidFormat(..)
   , InvalidSize(..)
   , ZeroWidthValue(..)
   ) where
@@ -52,6 +53,20 @@ instance Show UnknownFormat where
       [ "Unknown format constant "
       , show f
       , "\n"
+      , prettyCallStack c
+      ]
+
+data InvalidFormat
+  = InvalidFormat ValueFormat CallStack
+  deriving anyclass (Exception)
+
+instance Show InvalidFormat where
+  show (InvalidFormat f c) =
+    mconcat
+      [ "The value format "
+      , show f
+      , " can not be used in all calls.\n"
+      , "Please consult the (System)Verilog specification for details.\n"
       , prettyCallStack c
       ]
 

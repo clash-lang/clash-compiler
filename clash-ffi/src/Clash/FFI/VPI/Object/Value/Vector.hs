@@ -13,7 +13,7 @@
 {-# OPTIONS_GHC -fplugin=Foreign.Storable.Generic.Plugin #-}
 {-# OPTIONS_GHC -fplugin-opt=Foreign.Storable.Generic.Plugin:-v0 #-}
 
-module Clash.FFI.VPI.Value.Vector
+module Clash.FFI.VPI.Object.Value.Vector
   ( CVector(..)
   ) where
 
@@ -37,7 +37,7 @@ import qualified Clash.Sized.Vector as Vec
 import           Clash.XException (deepErrorX)
 
 import           Clash.FFI.View
-import           Clash.FFI.VPI.Value.Scalar
+import           Clash.FFI.VPI.Object.Value.Scalar
 
 data CVector = CVector
   { cvectorA :: CInt

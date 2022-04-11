@@ -16,7 +16,6 @@ import qualified Clash.FFI.VPI.Object as VPI
 import qualified Clash.FFI.VPI.Parameter as VPI
 import qualified Clash.FFI.VPI.Port as VPI
 import qualified Clash.FFI.VPI.Reg as VPI
-import qualified Clash.FFI.VPI.Value as VPI
 import qualified Clash.FFI.Monad as Sim
 import           Clash.FFI.View
 

@@ -1,53 +1,43 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Clash.FFI.VPI.Value
+module Clash.FFI.VPI.Object.Value
   ( CValue(..)
   , Value(..)
-  , unsafeSendValue
-  , sendValue
-  , unsafeReceiveValue
-  , receiveValue
-  , InvalidFormat(..)
   , InvalidValue(..)
 
-  , module Clash.FFI.VPI.Value.Format
-  , module Clash.FFI.VPI.Value.Scalar
+  , module Clash.FFI.VPI.Object.Value.Delay
+  , module Clash.FFI.VPI.Object.Value.Format
+  , module Clash.FFI.VPI.Object.Value.Scalar
 #if defined(VERILOG_2005) && defined(VPI_VECVAL)
-  , module Clash.FFI.VPI.Value.Vector
+  , module Clash.FFI.VPI.Object.Value.Vector
 #endif
   ) where
 
 import           Control.Exception (Exception)
 import qualified Control.Exception as IO (throwIO)
-import qualified Control.Monad as Monad (void)
-import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.ByteString (ByteString)
-import           Data.Coerce
-import           Data.Typeable (Typeable)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CDouble, CInt(..))
 import           Foreign.Ptr (Ptr)
 import           Foreign.Storable as FFI (Storable(..))
-import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
-import           GHC.TypeNats
+import           GHC.Stack (CallStack, callStack, prettyCallStack)
+import           GHC.TypeNats (SomeNat(..), someNatVal)
 
 import           Clash.Promoted.Nat (SNat(..), snatProxy)
 import           Clash.Sized.BitVector (Bit, BitVector)
 
-import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim (heapPtr, stackPtr, withNewPtr)
 import           Clash.FFI.View
-import           Clash.FFI.VPI.Object
-import           Clash.FFI.VPI.Value.Delay
-import           Clash.FFI.VPI.Value.Format
-import           Clash.FFI.VPI.Value.Scalar
+import           Clash.FFI.VPI.Object.Time
+import           Clash.FFI.VPI.Object.Value.Delay
+import           Clash.FFI.VPI.Object.Value.Format
+import           Clash.FFI.VPI.Object.Value.Scalar
 
 #if defined(VERILOG_2005) && defined(VPI_VECVAL)
-import           Clash.FFI.VPI.Value.Vector
+import           Clash.FFI.VPI.Object.Value.Vector
 #endif
 
 data CValue
@@ -65,20 +55,6 @@ data CValue
   | CTimeVal (Ptr CTime)
   | CMiscVal CString
   deriving stock (Show)
-
-data InvalidFormat
-  = InvalidFormat ValueFormat CallStack
-  deriving anyclass (Exception)
-
-instance Show InvalidFormat where
-  show (InvalidFormat f c) =
-    mconcat
-      [ "The value format "
-      , show f
-      , " can not be used in all calls.\n"
-      , "Please consult the (System)Verilog specification for details.\n"
-      , prettyCallStack c
-      ]
 
 data InvalidValue
   = InvalidValue CValue CallStack
@@ -331,99 +307,4 @@ instance Receive Value where
         case someNatVal (fromIntegral size) of
           SomeNat proxy -> MiscVal (snatProxy proxy) <$> receive bytes
 
-foreign import ccall "vpi_user.h vpi_get_value"
-  c_vpi_get_value :: Object -> Ptr CValue -> IO ()
-
-getValue
-  :: HasCallStack
-  => Coercible handle Object
-  => SimCont o (Ptr CValue)
-  -> ValueFormat
-  -> handle
-  -> SimCont o (Ptr CValue)
-getValue alloc fmt handle = do
-  cfmt <- unsafeSend fmt
-
-  fmap fst . Sim.withNewPtr alloc $ \ptr -> do
-    FFI.pokeByteOff ptr 0 cfmt
-    c_vpi_get_value (coerce handle) ptr
-
-    pure ()
-
-unsafeReceiveValue
-  :: forall handle o
-   . HasCallStack
-  => Coercible handle Object
-  => Show handle
-  => Typeable handle
-  => ValueFormat
-  -> handle
-  -> SimCont o Value
-unsafeReceiveValue fmt handle = do
-  ptr <- getValue Sim.stackPtr fmt (coerce @handle @Object handle)
-  cvalue <- IO.liftIO (FFI.peek ptr)
-  size <- getProperty Size handle
-
-  unsafeReceive (cvalue, size)
-
-receiveValue
-  :: forall handle o
-   . HasCallStack
-  => Coercible handle Object
-  => Show handle
-  => Typeable handle
-  => ValueFormat
-  -> handle
-  -> SimCont o Value
-receiveValue fmt handle = do
-  ptr <- getValue Sim.heapPtr fmt (coerce @handle @Object handle)
-  cvalue <- IO.liftIO (FFI.peek ptr)
-  size <- getProperty Size handle
-
-  receive (cvalue, size)
-
-foreign import ccall "vpi_user.h vpi_put_value"
-  c_vpi_put_value :: Object -> Ptr CValue -> Ptr CTime -> CInt -> IO Object
-
-{-
-NOTE [vpi_put_value and events]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In IEEE 1364, it mentions that the return value from vpi_put_value is a handle
-to the event scheduled by the FFI call (i.e. an event to perform the value
-change). This is returned when the vpiReturnEvent flag is set in the call,
-otherwise it always returns NULL.
-
-Currently, clash-ffi has no need to be able to cancel events before they are
-executed. Instead of returning a handle from putValue, we silently discard the
-result, and do not allow the high level API to set the vpiReturnEvent flag, so
-a valid handle would never be returned anyway.
--}
-
-unsafeSendValue
-  :: HasCallStack
-  => Coercible handle Object
-  => handle
-  -> Value
-  -> DelayMode
-  -> SimCont o ()
-unsafeSendValue handle value delay = do
-  valuePtr <- unsafePokeSend value
-  (timePtr, flags) <- unsafeSend delay
-
-  Monad.void . IO.liftIO $
-    c_vpi_put_value (coerce handle) valuePtr timePtr flags
-
-sendValue
-  :: HasCallStack
-  => Coercible handle Object
-  => handle
-  -> Value
-  -> DelayMode
-  -> SimCont o ()
-sendValue handle value delay = do
-  valuePtr <- pokeSend value
-  (timePtr, flags) <- send delay
-
-  Monad.void . IO.liftIO $
-    c_vpi_put_value (coerce handle) valuePtr timePtr flags
 

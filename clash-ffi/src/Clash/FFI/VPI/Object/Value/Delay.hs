@@ -2,7 +2,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Clash.FFI.VPI.Value.Delay
+module Clash.FFI.VPI.Object.Value.Delay
   ( DelayMode(..)
   ) where
 

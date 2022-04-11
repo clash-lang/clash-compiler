@@ -23,6 +23,13 @@ module Clash.FFI.VPI.Object
   , getTime
   , receiveTime
   , unsafeReceiveTime
+    -- * Value
+  , module Clash.FFI.VPI.Object.Value
+  , getValue
+  , receiveValue
+  , unsafeReceiveValue
+  , sendValue
+  , unsafeSendValue
   ) where
 
 import           Control.Exception (Exception)
@@ -42,16 +49,17 @@ import qualified Foreign.Marshal.Utils as FFI (toBool)
 import           Foreign.Ptr (Ptr)
 import qualified Foreign.Ptr as FFI (nullPtr)
 import           Foreign.Storable (Storable)
-import qualified Foreign.Storable as FFI (poke)
+import qualified Foreign.Storable as FFI
 import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
 
 import           Clash.FFI.Monad (SimCont)
-import qualified Clash.FFI.Monad as Sim (stackPtr, throw, withNewPtr)
+import qualified Clash.FFI.Monad as Sim (heapPtr, stackPtr, throw, withNewPtr)
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Handle
 import           Clash.FFI.VPI.Object.Property
 import           Clash.FFI.VPI.Object.Time
 import           Clash.FFI.VPI.Object.Type
+import           Clash.FFI.VPI.Object.Value
 
 newtype Object
   = Object { objectPtr :: Ptr Object }
@@ -373,4 +381,100 @@ receiveTime
   -> SimCont o Time
 receiveTime timeTy mHandle =
   getTime Sim.stackPtr timeTy mHandle >>= peekReceive
+
+foreign import ccall "vpi_user.h vpi_get_value"
+  c_vpi_get_value :: Object -> Ptr CValue -> IO ()
+
+getValue
+  :: HasCallStack
+  => Coercible handle Object
+  => SimCont o (Ptr CValue)
+  -> ValueFormat
+  -> handle
+  -> SimCont o (Ptr CValue)
+getValue alloc fmt handle = do
+  cfmt <- unsafeSend fmt
+
+  fmap fst . Sim.withNewPtr alloc $ \ptr -> do
+    FFI.pokeByteOff ptr 0 cfmt
+    c_vpi_get_value (coerce handle) ptr
+
+    pure ()
+
+unsafeReceiveValue
+  :: forall handle o
+   . HasCallStack
+  => Coercible handle Object
+  => Show handle
+  => Typeable handle
+  => ValueFormat
+  -> handle
+  -> SimCont o Value
+unsafeReceiveValue fmt handle = do
+  ptr <- getValue Sim.stackPtr fmt (coerce @handle @Object handle)
+  cvalue <- IO.liftIO (FFI.peek ptr)
+  size <- getProperty Size handle
+
+  unsafeReceive (cvalue, size)
+
+receiveValue
+  :: forall handle o
+   . HasCallStack
+  => Coercible handle Object
+  => Show handle
+  => Typeable handle
+  => ValueFormat
+  -> handle
+  -> SimCont o Value
+receiveValue fmt handle = do
+  ptr <- getValue Sim.heapPtr fmt (coerce @handle @Object handle)
+  cvalue <- IO.liftIO (FFI.peek ptr)
+  size <- getProperty Size handle
+
+  receive (cvalue, size)
+
+foreign import ccall "vpi_user.h vpi_put_value"
+  c_vpi_put_value :: Object -> Ptr CValue -> Ptr CTime -> CInt -> IO Object
+
+{-
+NOTE [vpi_put_value and events]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In IEEE 1364, it mentions that the return value from vpi_put_value is a handle
+to the event scheduled by the FFI call (i.e. an event to perform the value
+change). This is returned when the vpiReturnEvent flag is set in the call,
+otherwise it always returns NULL.
+
+Currently, clash-ffi has no need to be able to cancel events before they are
+executed. Instead of returning a handle from putValue, we silently discard the
+result, and do not allow the high level API to set the vpiReturnEvent flag, so
+a valid handle would never be returned anyway.
+-}
+
+unsafeSendValue
+  :: HasCallStack
+  => Coercible handle Object
+  => handle
+  -> Value
+  -> DelayMode
+  -> SimCont o ()
+unsafeSendValue handle value delay = do
+  valuePtr <- unsafePokeSend value
+  (timePtr, flags) <- unsafeSend delay
+
+  Monad.void . IO.liftIO $
+    c_vpi_put_value (coerce handle) valuePtr timePtr flags
+
+sendValue
+  :: HasCallStack
+  => Coercible handle Object
+  => handle
+  -> Value
+  -> DelayMode
+  -> SimCont o ()
+sendValue handle value delay = do
+  valuePtr <- pokeSend value
+  (timePtr, flags) <- send delay
+
+  Monad.void . IO.liftIO $
+    c_vpi_put_value (coerce handle) valuePtr timePtr flags
 

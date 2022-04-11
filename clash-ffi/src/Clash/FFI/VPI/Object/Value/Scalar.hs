@@ -4,7 +4,7 @@
 
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-module Clash.FFI.VPI.Value.Scalar
+module Clash.FFI.VPI.Object.Value.Scalar
   ( Scalar(..)
   , UnknownScalarValue(..)
   , scalarToBit
