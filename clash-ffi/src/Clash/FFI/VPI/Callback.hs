@@ -33,7 +33,6 @@ import           Clash.FFI.View
 import           Clash.FFI.VPI.Callback.Reason
 import           Clash.FFI.VPI.Handle
 import           Clash.FFI.VPI.Object
-import           Clash.FFI.VPI.Time
 import           Clash.FFI.VPI.Value
 
 data CCallbackInfo = CCallbackInfo

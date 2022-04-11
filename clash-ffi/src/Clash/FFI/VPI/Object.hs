@@ -7,14 +7,25 @@
 
 module Clash.FFI.VPI.Object
   ( Object(..)
+  , module Clash.FFI.VPI.Object.Type
+    -- * Child Objects
+  , IsChildRef(..)
+  , sendChildRef
+  , unsafeSendChildRef
+    -- * Properties
+  , module Clash.FFI.VPI.Object.Property
   , IsProperty(..)
   , coerceProperty
   , receiveProperty
   , unsafeReceiveProperty
-  , module Clash.FFI.VPI.Object.Property
-  , module Clash.FFI.VPI.Object.Type
+    -- * Time
+  , module Clash.FFI.VPI.Object.Time
+  , getTime
+  , receiveTime
+  , unsafeReceiveTime
   ) where
 
+import           Control.Exception (Exception)
 import qualified Control.Monad as Monad (unless, void, when)
 import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.Coerce
@@ -26,18 +37,20 @@ import           Data.Int (Int64)
 import qualified Data.List as List (genericLength)
 import           Data.Typeable (Typeable)
 import           Foreign.C.String (CString)
-import           Foreign.C.Types
+import           Foreign.C.Types (CInt(..))
 import qualified Foreign.Marshal.Utils as FFI (toBool)
 import           Foreign.Ptr (Ptr)
 import qualified Foreign.Ptr as FFI (nullPtr)
 import           Foreign.Storable (Storable)
-import           GHC.Stack (HasCallStack, callStack)
+import qualified Foreign.Storable as FFI (poke)
+import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
 
 import           Clash.FFI.Monad (SimCont)
-import qualified Clash.FFI.Monad as Sim (throw)
+import qualified Clash.FFI.Monad as Sim (stackPtr, throw, withNewPtr)
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Handle
 import           Clash.FFI.VPI.Object.Property
+import           Clash.FFI.VPI.Object.Time
 import           Clash.FFI.VPI.Object.Type
 
 newtype Object
@@ -79,65 +92,113 @@ instance Handle Object where
   compareHandles x y =
     IO.liftIO (c_vpi_compare_objects x y)
 
+class IsChildRef i where
+  getChild
+    :: forall a b o
+     . HasCallStack
+    => Coercible a Object
+    => Show a
+    => Typeable a
+    => Coercible Object b
+    => i
+    -> a
+    -> SimCont o b
+
+data UnknownChild i a
+  = UnknownChild i a CallStack
+  deriving anyclass (Exception)
+
+instance (Show i, Show a) => Show (UnknownChild i a) where
+  show (UnknownChild i a c) =
+    mconcat
+      [ "Unknown child "
+      , show i
+      , " for handle "
+      , show a
+      , "\n"
+      , prettyCallStack c
+      ]
+
 foreign import ccall "vpi_user.h vpi_handle"
   c_vpi_handle :: CInt -> Object -> IO Object
 
-instance HandleChild ObjectType Object where
-  -- TODO Maybe we could know this if we make ObjectType a GADT
-  type ChildHandle ObjectType Object = Object
-
-  childHandle objTy parent = do
+instance IsChildRef ObjectType where
+  getChild objTy parent = do
     cobjTy <- unsafeSend objTy
-    child <- IO.liftIO (c_vpi_handle cobjTy parent)
+    child <- IO.liftIO (c_vpi_handle cobjTy (coerce parent))
 
     Monad.when (isNullHandle child) $
       Sim.throw (UnknownChild objTy parent callStack)
 
-    pure child
+    pure (coerce child)
 
 foreign import ccall "vpi_user.h vpi_handle_by_name"
   c_vpi_handle_by_name :: CString -> Object -> IO Object
 
-instance HandleChild CString Object where
-  type ChildHandle CString Object = Object
-
-  childHandle str parent = do
-    child <- IO.liftIO (c_vpi_handle_by_name str parent)
+instance IsChildRef CString where
+  getChild str parent = do
+    child <- IO.liftIO (c_vpi_handle_by_name str (coerce parent))
 
     Monad.when (isNullHandle child) $
       Sim.throw (UnknownChild str parent callStack)
 
-    pure child
+    pure (coerce child)
 
 foreign import ccall "vpi_user.h vpi_handle_by_index"
   c_vpi_handle_by_index :: Object -> CInt -> IO Object
 
-instance HandleChild CInt Object where
-  type ChildHandle CInt Object = Object
-
-  childHandle ix parent = do
-    child <- IO.liftIO (c_vpi_handle_by_index parent ix)
+instance IsChildRef CInt where
+  getChild ix parent = do
+    child <- IO.liftIO (c_vpi_handle_by_index (coerce parent) ix)
 
     Monad.when (isNullHandle child) $
       Sim.throw (UnknownChild ix parent callStack)
 
-    pure child
+    pure (coerce child)
 
 foreign import ccall "vpi_user.h vpi_handle_by_multi_index"
   c_vpi_handle_by_multi_index :: Object -> CInt -> Ptr CInt -> IO Object
 
-instance HandleChild [CInt] Object where
-  type ChildHandle [CInt] Object = Object
-
-  childHandle ixs parent = do
+instance IsChildRef [CInt] where
+  getChild ixs parent = do
     let len = List.genericLength ixs
     ptr <- unsafeSend ixs
-    child <- IO.liftIO (c_vpi_handle_by_multi_index parent len ptr)
+    child <- IO.liftIO (c_vpi_handle_by_multi_index (coerce parent) len ptr)
 
     Monad.when (isNullHandle child) $
       Sim.throw (UnknownChild ixs parent callStack)
 
-    pure child
+    pure (coerce child)
+
+unsafeSendChildRef
+  :: forall i a b o
+   . HasCallStack
+  => UnsafeSend i
+  => IsChildRef (Sent i)
+  => Coercible a Object
+  => Show a
+  => Typeable a
+  => Coercible Object b
+  => i
+  -> a
+  -> SimCont o b
+unsafeSendChildRef ref handle =
+  unsafeSend ref >>= (`getChild` handle)
+
+sendChildRef
+  :: forall i a b o
+   . HasCallStack
+  => Send i
+  => IsChildRef (Sent i)
+  => Coercible a Object
+  => Show a
+  => Typeable a
+  => Coercible Object b
+  => i
+  -> a
+  -> SimCont o b
+sendChildRef ref handle =
+  send ref >>= (`getChild` handle)
 
 {-
 NOTE [vpi_handle_multi]
@@ -270,4 +331,46 @@ receiveProperty
   -> SimCont o p
 receiveProperty prop handle =
   getProperty prop handle >>= receive
+
+foreign import ccall "vpi_user.h vpi_get_time"
+  c_vpi_get_time :: Object -> Ptr CTime -> IO ()
+
+getTime
+  :: forall a o
+   . HasCallStack
+  => Coercible a Object
+  => SimCont o (Ptr CTime)
+  -> TimeType
+  -> Maybe a
+  -> SimCont o (Ptr CTime)
+getTime alloc ty mHandle = do
+  Monad.when (ty == Suppress) $
+    Sim.throw (InvalidTimeType ty callStack)
+
+  cty <- unsafeSend ty
+
+  fmap fst . Sim.withNewPtr alloc $ \ptr -> do
+    let object = maybe nullHandle coerce mHandle
+    FFI.poke ptr (CTime cty 0 0 0.0)
+    c_vpi_get_time object ptr
+
+unsafeReceiveTime
+  :: forall a o
+   . HasCallStack
+  => Coercible a Object
+  => TimeType
+  -> Maybe a
+  -> SimCont o Time
+unsafeReceiveTime timeTy mHandle =
+  getTime Sim.stackPtr timeTy mHandle >>= unsafePeekReceive
+
+receiveTime
+  :: forall a o
+   . HasCallStack
+  => Coercible a Object
+  => TimeType
+  -> Maybe a
+  -> SimCont o Time
+receiveTime timeTy mHandle =
+  getTime Sim.stackPtr timeTy mHandle >>= peekReceive
 

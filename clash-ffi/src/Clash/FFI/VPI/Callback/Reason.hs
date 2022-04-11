@@ -22,7 +22,6 @@ import qualified Clash.FFI.Monad as Sim
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Handle
 import           Clash.FFI.VPI.Object
-import           Clash.FFI.VPI.Time
 import           Clash.FFI.VPI.Value
 
 {-

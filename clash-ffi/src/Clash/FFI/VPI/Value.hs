@@ -42,7 +42,6 @@ import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim (heapPtr, stackPtr, withNewPtr)
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Object
-import           Clash.FFI.VPI.Time (CTime, Time)
 import           Clash.FFI.VPI.Value.Delay
 import           Clash.FFI.VPI.Value.Format
 import           Clash.FFI.VPI.Value.Scalar

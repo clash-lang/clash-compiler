@@ -11,7 +11,7 @@ import           Foreign.Ptr (Ptr)
 import qualified Foreign.Ptr as FFI (nullPtr)
 
 import           Clash.FFI.View (Send(..), UnsafeSend(..), unsafePokeSend, pokeSend)
-import           Clash.FFI.VPI.Time (CTime, Time)
+import           Clash.FFI.VPI.Object.Time (CTime, Time)
 
 data DelayMode
   = NoDelay
