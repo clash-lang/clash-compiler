@@ -1,18 +1,10 @@
 module Clash.FFI.VPI.Port
   ( Port(..)
-  , portName
-  , portDirection
-  , portIndex
-  , portSize
-  , portIsVector
-  , portIsScalar
+  , direction
   , module Clash.FFI.VPI.Port.Direction
   ) where
 
-import Data.ByteString (ByteString)
-import Foreign.C.Types (CInt)
 import Foreign.Storable (Storable)
-import GHC.Stack (HasCallStack)
 
 import Clash.FFI.Monad (SimCont)
 import Clash.FFI.VPI.Object
@@ -23,21 +15,6 @@ newtype Port
   deriving stock (Show)
   deriving newtype (IsObject, Storable)
 
-portName :: Port -> SimCont o ByteString
-portName = receiveProperty Name
-
-portDirection :: HasCallStack => Port -> SimCont o Direction
-portDirection = receiveProperty Direction
-
-portIndex :: HasCallStack => Port -> SimCont o CInt
-portIndex = getProperty PortIndex
-
-portSize :: HasCallStack => Port -> SimCont o CInt
-portSize = getProperty Size
-
-portIsVector :: HasCallStack => Port -> SimCont o Bool
-portIsVector = getProperty IsVector
-
-portIsScalar :: HasCallStack => Port -> SimCont o Bool
-portIsScalar = getProperty IsScalar
+direction :: Port -> SimCont o Direction
+direction = receiveProperty Direction
 

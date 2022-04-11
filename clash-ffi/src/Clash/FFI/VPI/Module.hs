@@ -1,15 +1,12 @@
 module Clash.FFI.VPI.Module
   ( Module(..)
   , topModules
-  , moduleName
-  , moduleFullName
   , moduleNets
   , moduleParameters
   , modulePorts
   , moduleRegs
   ) where
 
-import Data.ByteString (ByteString)
 import Foreign.Storable (Storable)
 import GHC.Stack (HasCallStack)
 
@@ -28,12 +25,6 @@ newtype Module
 
 topModules :: HasCallStack => SimCont o [Module]
 topModules = iterateAll @_ @Object ObjModule Nothing
-
-moduleName :: HasCallStack => Module -> SimCont o ByteString
-moduleName = receiveProperty Name
-
-moduleFullName :: HasCallStack => Module -> SimCont o ByteString
-moduleFullName = receiveProperty FullName
 
 moduleNets :: HasCallStack => Module -> SimCont o [Net]
 moduleNets = iterateAll ObjNet . Just

@@ -35,15 +35,15 @@ clashMain =
     modules <- VPI.topModules
 
     for_ modules $ \m -> do
-      mName <- VPI.moduleFullName m
+      mName <- VPI.receiveProperty VPI.Name m
       VPI.simPutStrLn ("Found module: " <> mName)
 
       params <- VPI.moduleParameters m
 
       for_ params $ \p -> do
-        pName <- VPI.parameterName p
-        pSize <- VPI.parameterSize @Int p
-        pVal  <- VPI.parameterValue p
+        pName <- VPI.receiveProperty VPI.Name p
+        pSize <- VPI.getProperty VPI.Size p
+        pVal  <- VPI.receiveValue VPI.ObjTypeFmt p
 
         VPI.simPutStrLn
           ("Found parameter: " <> pName <> ", size " <> fromString (show pSize) <> ", value: " <> fromString (show pVal))
@@ -51,15 +51,15 @@ clashMain =
       ports <- VPI.modulePorts m
 
       for_ ports $ \p -> do
-        pName <- VPI.portName p
+        pName <- VPI.receiveProperty VPI.Name p
         VPI.simPutStrLn ("Found port: " <> pName)
 
       nets <- VPI.moduleNets m
 
       for_ nets $ \n -> do
-        nName <- VPI.netName n
-        nSize <- VPI.netSize @Int n
-        nVal  <- VPI.netValue n
+        nName <- VPI.receiveProperty VPI.Name n
+        nSize <- VPI.getProperty VPI.Size n
+        nVal  <- VPI.receiveValue VPI.ObjTypeFmt n
 
         VPI.simPutStrLn
           ("Found net: " <> nName <> ", size " <> fromString (show nSize) <> ", value: " <> fromString (show nVal))
@@ -67,9 +67,9 @@ clashMain =
       regs <- VPI.moduleRegs m
 
       for_ regs $ \r -> do
-        rName <- VPI.regName r
-        rSize <- VPI.regSize @Int r
-        rVal  <- VPI.regValue r
+        rName <- VPI.receiveProperty VPI.Name r
+        rSize <- VPI.getProperty VPI.Size r
+        rVal  <- VPI.receiveValue VPI.ObjTypeFmt r
 
         VPI.simPutStrLn
           ("Found reg: " <> rName <> ", size " <> fromString (show rSize) <> ", value: " <> fromString (show rVal))
@@ -87,8 +87,8 @@ monitorCallback reg = VPI.CallbackInfo
  where
   routine ptr =
     Sim.runSimAction $ do
-      hName  <- VPI.regName reg
-      size   <- VPI.regSize reg
+      hName  <- VPI.receiveProperty VPI.Name reg
+      size   <- VPI.getProperty VPI.Size reg
 
       cinfo  <- Sim.readPtr ptr
       time   <- peekReceive @VPI.Time (VPI.ccbTime cinfo)
