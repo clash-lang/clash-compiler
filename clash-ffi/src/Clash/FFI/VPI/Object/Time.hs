@@ -1,3 +1,9 @@
+{-|
+Copyright:    (C) 2022 Google Inc.
+License:      BSD2 (see the file LICENSE)
+Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -24,6 +30,12 @@ import           GHC.Stack (CallStack, callStack, prettyCallStack)
 import qualified Clash.FFI.Monad as Sim (throw)
 import           Clash.FFI.View
 
+-- | The low level representation of a VPI time value, as sent and received by
+-- VPI calls. This can optionally be converted to a 'Time' using 'Receive'.
+--
+-- For the high-level representation of time values that can be obtained using
+-- 'Receive', see 'Time'.
+--
 data CTime = CTime
   { ctimeType :: CInt
   , ctimeHigh :: CUInt
@@ -33,12 +45,25 @@ data CTime = CTime
   deriving stock (Generic)
   deriving anyclass (GStorable)
 
+-- | The type of a time value, used for API calls where only the format of time
+-- is needed instead of a specific time value. There are two formats of time:
+--
+--   * scaled real time, which gives time in seconds as a double
+--   * simulation time, which gives the time in units of some precision
+--
+-- Additionally, there is the special @SuppressTime@ format, which specifies no
+-- time value will be given by the simulator. This is used for callbacks when
+-- the time is not needed in the callback routine.
+--
 data TimeType
   = ScaledReal
   | Sim
-  | Suppress
+  | SuppressTime
   deriving stock (Eq, Show)
 
+-- | An exception thrown when decoding a time format if an invalid value is
+-- given for the C enum that specifies the constructor of 'TimeType'.
+--
 data UnknownTimeType
   = UnknownTimeType CInt CallStack
   deriving anyclass (Exception)
@@ -59,7 +84,7 @@ instance UnsafeSend TimeType where
     pure . \case
       ScaledReal -> 1
       Sim -> 2
-      Suppress -> 3
+      SuppressTime -> 3
 
 instance Send TimeType where
   send = unsafeSend
@@ -70,12 +95,20 @@ instance UnsafeReceive TimeType where
   unsafeReceive = \case
     1 -> pure ScaledReal
     2 -> pure Sim
-    3 -> pure Suppress
+    3 -> pure SuppressTime
     n -> Sim.throw (UnknownTimeType n callStack)
 
 instance Receive TimeType where
   receive = unsafeReceive
 
+-- | A value of time, used as either the current point in time or a duration
+-- depending on the context. This represents time as either the number of units
+-- of the time precision (@SimTime@), or the amount of seconds the simulation
+-- has been running for (@RealTime@).
+--
+-- For the low-level representation of time values that are sent / received by
+-- VPI calls, see 'CTime'.
+--
 data Time
   = SimTime Int64
   | RealTime Double
@@ -105,6 +138,10 @@ instance Send Time where
       let creal = realToFrac real
        in CTime <$> send ScaledReal <*> pure 0 <*> pure 0 <*> pure creal
 
+-- | An exception thrown when requesting time in a format that is not supported
+-- by an operation. Typically this occurs from attempting to suppress time
+-- where it is not allowed.
+--
 data InvalidTimeType
   = InvalidTimeType TimeType CallStack
   deriving anyclass (Exception)
@@ -133,10 +170,9 @@ instance UnsafeReceive Time where
             low  = fromIntegral (ctimeLow ctime)
          in pure (SimTime (high .|. low))
 
-      Suppress ->
-        Sim.throw (InvalidTimeType Suppress callStack)
+      SuppressTime ->
+        Sim.throw (InvalidTimeType SuppressTime callStack)
 
 instance Receive Time where
   receive = unsafeReceive
-
 

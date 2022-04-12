@@ -1,3 +1,9 @@
+{-|
+Copyright:    (C) 2022 Google Inc.
+License:      BSD2 (see the file LICENSE)
+Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -13,13 +19,27 @@ import qualified Foreign.Ptr as FFI (nullPtr)
 import           Clash.FFI.View (Send(..), UnsafeSend(..), unsafePokeSend, pokeSend)
 import           Clash.FFI.VPI.Object.Time (CTime, Time)
 
+-- | The delay mode specifies how the value of an object is updated in a call
+-- to @vpi_put_value@. The mode selected influences how the next value of the
+-- object is determined (in the event of multiple attempted writes per step).
+--
 data DelayMode
   = NoDelay
+  -- ^ The value is immediately updated.
   | InertialDelay Time
+  -- ^ The value is updated after all events at the given time are executed.
   | TransportDelay Time
+  -- ^ All scheduled events that occur later than the given time are removed
+  -- and the value is updated.
   | PureTransportDelay Time
+  -- ^ No scheduled events are removed and the value is updated.
   | Force
+  -- ^ The object is forced to the new value without delay. This behaves the
+  -- same as the verilog procedural @force@ keyword.
   | Release
+  -- ^ The object is released from a forced value, then updated to the new
+  -- value without delay. This behaves the same as the verilog procedural
+  -- @release@ keyword.
 
 instance UnsafeSend DelayMode where
   type Sent DelayMode = (Ptr CTime, CInt)

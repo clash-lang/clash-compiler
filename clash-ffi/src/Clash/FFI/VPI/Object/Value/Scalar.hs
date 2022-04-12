@@ -1,3 +1,9 @@
+{-|
+Copyright:    (C) 2022 Google Inc.
+License:      BSD2 (see the file LICENSE)
+Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -21,8 +27,23 @@ import           Clash.XException (hasUndefined)
 import qualified Clash.FFI.Monad as Sim (throw)
 import           Clash.FFI.View
 
+-- | A VPI scalar value. This is similar to the 9-value logic type from VHDL,
+-- in that scalar values have an associated strength.
+--
+-- While we expose this type, the default 'Receive' instance for
+-- 'Clash.FFI.VPI.Object.Value' will receive values as types from
+-- @clash-prelude@ instead of using this type. However, since this type has a
+-- 'Receive' instance, values can still be decoded to this type manually if
+-- needed.
+--
 data Scalar
-  = S0 | S1 | SZ | SX | SH | SL | S_
+  = S0 -- Strong 0
+  | S1 -- Strong 1
+  | SZ -- High impedence
+  | SX -- Undefined
+  | SH -- Weak 1
+  | SL -- Weak 0
+  | S_ -- Don't care
   deriving stock (Show)
 
 instance UnsafeSend Scalar where
@@ -41,6 +62,9 @@ instance UnsafeSend Scalar where
 instance Send Scalar where
   send = unsafeSend
 
+-- | An exception thrown when decoding a scalar value if an invalid value is
+-- given for the C enum that specifies the constructor of 'Scalar'.
+--
 data UnknownScalarValue
   = UnknownScalarValue CInt CallStack
   deriving anyclass (Exception)
@@ -69,8 +93,6 @@ instance UnsafeReceive Scalar where
 
 instance Receive Scalar where
   receive = unsafeReceive
-
--- Orphan instances for Bit
 
 bitToScalar :: Bit -> Scalar
 bitToScalar b

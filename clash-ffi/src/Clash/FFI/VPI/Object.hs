@@ -1,3 +1,9 @@
+{-|
+Copyright:    (C) 2022 Google Inc.
+License:      BSD2 (see the file LICENSE)
+Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -11,14 +17,13 @@ module Clash.FFI.VPI.Object
   , module Clash.FFI.VPI.Object.Type
     -- * Child Objects
   , IsChildRef(..)
+  , UnknownChild(..)
   , sendChildRef
   , unsafeSendChildRef
     -- * Properties
   , module Clash.FFI.VPI.Object.Property
   , IsProperty(..)
-  , coerceProperty
   , receiveProperty
-  , unsafeReceiveProperty
     -- * Time
   , module Clash.FFI.VPI.Object.Time
   , getTime
@@ -33,6 +38,7 @@ module Clash.FFI.VPI.Object
   , unsafeSendValue
   ) where
 
+import           Control.DeepSeq (NFData)
 import           Control.Exception (Exception)
 import qualified Control.Monad as Monad (unless, void, when)
 import qualified Control.Monad.IO.Class as IO (liftIO)
@@ -61,10 +67,23 @@ import           Clash.FFI.VPI.Object.Time
 import           Clash.FFI.VPI.Object.Type
 import           Clash.FFI.VPI.Object.Value
 
+-- | The base object type. Every VPI function is defined on this type, although
+-- the supported functions are determined by the @vpiType@ property of an
+-- object.
+--
+-- For some object types this library provides more meaningful newtypes which
+-- may have more specific operations implemented for them. See
+-- 'Clash.FFI.VPI.Module.Module', 'Clash.FFI.VPI.Iterator.Iterator', and
+-- 'Clash.FFI.VPI.Port.Port' for examples of this.
+--
+-- Operations on objects are implemented by accepting any type which _coerces_
+-- to @Object@. This means that the full VPI API can always be used, but users
+-- are responsible for making sure calls are safe.
+--
 newtype Object
   = Object { objectPtr :: Ptr Object }
   deriving stock (Show)
-  deriving newtype (Storable)
+  deriving newtype (NFData, Storable)
 
 #if defined(VERILOG)
 foreign import ccall "vpi_user.h vpi_free_object"
@@ -79,11 +98,34 @@ foreign import ccall "vpi_user.h vpi_release_handle"
 foreign import ccall "vpi_user.h vpi_compare_objects"
   c_vpi_compare_objects :: Object -> Object -> IO Bool
 
+-- | All VPI objects support a common set of operations, which are used when
+-- implementing other VPI functions. Any new VPI object type should derive
+-- this class using @-XGeneralizedNewtypeDeriving@, as there is only one
+-- implementation which is guarunteed to be consistent with the simulator.
+--
 class IsObject a where
+  -- | The null object of a given object type. All object types have the same
+  -- null object.
+  --
   nullObject :: a
+
+  -- | Check if the object is the null object. This does not need to be used
+  -- directly for most applications, as the VPI API functions in this library
+  -- will use it where appropriate (e.g. to determine when a result is
+  -- @Nothing@ or @Just in functions that return @Maybe@, or to identify when
+  -- to throw exceptions).
+  --
   isNullObject :: a -> Bool
 
+  -- | Deallocate the object. The object should not be used for any calls after
+  -- this is called, as the object is no longer valid.
+  --
   freeObject :: a -> SimCont o ()
+
+  -- | Equality on VPI objects. This function is not pure, as the current
+  -- assignment of identifiers to objects in the simulator may change over time
+  -- (so a deallocated object's identifier may be used for a new object).
+  --
   compareObjects :: a -> a -> SimCont o Bool
 
 instance IsObject Object where
@@ -123,7 +165,30 @@ this is that any call can be made, provided the input and output object types
 are given by the user.
 -}
 
+-- | In VPI, there are different ways to access child objects of some parent
+-- object:
+--
+--   * @vpi_handle@, which takes the object type of the child
+--   * @vpi_handle_by_name@, which takes the name (or full name) of the child
+--   * @vpi_handle_by_index@, which takes the integer index of the child
+--   * @vpi_handle_by_multi_index@, which takes a list of indices to the child
+--
+-- While the C API is forced to provide multiple functions, @clash-ffi@
+-- abstracts this to a class of child reference types, which allows a uniform
+-- API for accessing child objects.
+--
 class IsChildRef i where
+  -- | Get the child object for the given parent using some reference type.
+  -- If no parent object is given, the child is a child of the top-level of
+  -- the design. This allows specific top-level objects to be accessed by
+  -- reference, i.e. accessing a module by its name.
+  --
+  -- If a high-level representation of the reference can be used then consider
+  -- using 'sendChildRef' or 'unsafeSendChildRef' instead.
+  --
+  -- If no child with the given reference exists under the parent object, then
+  -- an 'UnknownChild' exception is thrown.
+  --
   getChild
     :: forall a b o
      . HasCallStack
@@ -132,9 +197,12 @@ class IsChildRef i where
     => Typeable a
     => Coercible Object b
     => i
-    -> a
+    -> Maybe a
     -> SimCont o b
 
+-- | An exception thrown when attempting to access a child object using a
+-- reference of type @i@ which does not exist under the parent object @a@.
+--
 data UnknownChild i a
   = UnknownChild i a CallStack
   deriving anyclass (Exception)
@@ -154,9 +222,10 @@ foreign import ccall "vpi_user.h vpi_handle"
   c_vpi_handle :: CInt -> Object -> IO Object
 
 instance IsChildRef ObjectType where
-  getChild objTy parent = do
+  getChild objTy mParent = do
     cobjTy <- unsafeSend objTy
-    child <- IO.liftIO (c_vpi_handle cobjTy (coerce parent))
+    let parent = maybe nullObject coerce mParent
+    child <- IO.liftIO (c_vpi_handle cobjTy parent)
 
     Monad.when (isNullObject child) $
       Sim.throw (UnknownChild objTy parent callStack)
@@ -167,8 +236,9 @@ foreign import ccall "vpi_user.h vpi_handle_by_name"
   c_vpi_handle_by_name :: CString -> Object -> IO Object
 
 instance IsChildRef CString where
-  getChild str parent = do
-    child <- IO.liftIO (c_vpi_handle_by_name str (coerce parent))
+  getChild str mParent = do
+    let parent = maybe nullObject coerce mParent
+    child <- IO.liftIO (c_vpi_handle_by_name str parent)
 
     Monad.when (isNullObject child) $
       Sim.throw (UnknownChild str parent callStack)
@@ -179,8 +249,9 @@ foreign import ccall "vpi_user.h vpi_handle_by_index"
   c_vpi_handle_by_index :: Object -> CInt -> IO Object
 
 instance IsChildRef CInt where
-  getChild ix parent = do
-    child <- IO.liftIO (c_vpi_handle_by_index (coerce parent) ix)
+  getChild ix mParent = do
+    let parent = maybe nullObject coerce mParent
+    child <- IO.liftIO (c_vpi_handle_by_index parent ix)
 
     Monad.when (isNullObject child) $
       Sim.throw (UnknownChild ix parent callStack)
@@ -191,16 +262,28 @@ foreign import ccall "vpi_user.h vpi_handle_by_multi_index"
   c_vpi_handle_by_multi_index :: Object -> CInt -> Ptr CInt -> IO Object
 
 instance IsChildRef [CInt] where
-  getChild ixs parent = do
+  getChild ixs mParent = do
     let len = List.genericLength ixs
     ptr <- unsafeSend ixs
-    child <- IO.liftIO (c_vpi_handle_by_multi_index (coerce parent) len ptr)
+    let parent = maybe nullObject coerce mParent
+    child <- IO.liftIO (c_vpi_handle_by_multi_index parent len ptr)
 
     Monad.when (isNullObject child) $
       Sim.throw (UnknownChild ixs parent callStack)
 
     pure (coerce child)
 
+-- | Get a child object by a reference of type @i@ from an optional parent
+-- object of type @a@. The reference given is a high-level representation which
+-- is unsafely converted into a low-level representation suitable for the VPI
+-- call used. As the call is unsafe, changes to the high-level representation
+-- may lead to an error if they occur before the VPI call is made.
+--
+-- If no child with the given reference exists under the parent object, then
+-- an 'UnknownChild' exception is thrown.
+--
+-- For more information about safety, see 'Send' and 'UnsafeSend'.
+--
 unsafeSendChildRef
   :: forall i a b o
    . HasCallStack
@@ -211,11 +294,21 @@ unsafeSendChildRef
   => Typeable a
   => Coercible Object b
   => i
-  -> a
+  -> Maybe a
   -> SimCont o b
-unsafeSendChildRef ref object =
-  unsafeSend ref >>= (`getChild` object)
+unsafeSendChildRef ref parent =
+  unsafeSend ref >>= (`getChild` parent)
 
+-- | Get a child object by reference of type @i@ from an optional parent object
+-- of type @a@. The reference given is a high-level representation which is
+-- safely converted into a low-level representation. This means the high-level
+-- type can be deallocated before the FFI call is made without causing errors.
+--
+-- If no child with the given reference exists under the parent object, then
+-- an 'UnknownChild' exception is thrown.
+--
+-- For more information about safety, see 'Send' and 'UnsafeSend'.
+--
 sendChildRef
   :: forall i a b o
    . HasCallStack
@@ -226,10 +319,10 @@ sendChildRef
   => Typeable a
   => Coercible Object b
   => i
-  -> a
+  -> Maybe a
   -> SimCont o b
-sendChildRef ref object =
-  send ref >>= (`getChild` object)
+sendChildRef ref parent =
+  send ref >>= (`getChild` parent)
 
 {-
 NOTE [vpi_handle_multi]
@@ -260,7 +353,29 @@ relationships inaccessible. Most relationships are 1-N or 1-1 in practice, so
 this is not a particularly large limitation.
 -}
 
+-- | In VPI, there are different ways to access properties of objects:
+--
+--   * @vpi_get@, which returns an @int@ (which may be encoding a boolean)
+--   * @vpi_get_str@, which returns a string
+--   * @vpi_get64@ (SystemVerilog only), which returns a @int64_t@
+--
+-- While the C API is forced to provide multiple functions, @clash-ffi@
+-- abstracts this to a class of property value types, which allows a uniform
+-- API for accessing properties of an object.
+--
 class IsProperty p where
+  -- | Get the property associated with the given object. The properties which
+  -- exist for an object depend on the type of the object, although the
+  -- 'Clash.FFI.VPI.Object.Property.Type' property can be used to get the
+  -- 'ObjectType' to ensure that invalid properties are not accessed for an
+  -- object.
+  --
+  -- If a high-level representation of the property value is desired then
+  -- consider using 'receiveProperty'.
+  --
+  -- If the property does not exist for the given object, then an
+  -- 'InvalidProperty' exception is thrown.
+  --
   getProperty
     :: HasCallStack
     => Coercible a Object
@@ -279,7 +394,7 @@ instance IsProperty CInt where
     value <- IO.liftIO (c_vpi_get cprop (coerce object))
 
     Monad.when (value == -1) $
-      Sim.throw (UndefinedProperty prop object callStack)
+      Sim.throw (InvalidProperty prop object callStack)
 
     pure value
 
@@ -289,7 +404,7 @@ instance IsProperty Bool where
     value <- IO.liftIO (c_vpi_get cprop (coerce object))
 
     Monad.when (value == -1) $
-      Sim.throw (UndefinedProperty prop object callStack)
+      Sim.throw (InvalidProperty prop object callStack)
 
     pure (FFI.toBool value)
 
@@ -303,7 +418,7 @@ instance IsProperty Int64 where
     value <- IO.liftIO (c_vpi_get64 cprop (coerce object))
 
     Monad.when (value == -1) $
-      Sim.throw (UndefinedProperty prop object callStack)
+      Sim.throw (InvalidProperty prop object callStack)
 
     pure value
 #endif
@@ -317,39 +432,17 @@ instance IsProperty CString where
     value <- IO.liftIO (c_vpi_get_str cprop (coerce object))
 
     Monad.when (value == FFI.nullPtr) $
-      Sim.throw (UndefinedProperty prop object callStack)
+      Sim.throw (InvalidProperty prop object callStack)
 
     pure value
 
-coerceProperty
-  :: forall p q a o
-   . HasCallStack
-  => IsProperty p
-  => Coercible p q
-  => Coercible a Object
-  => Show a
-  => Typeable a
-  => Property p
-  -> a
-  -> SimCont o q
-coerceProperty prop =
-  fmap coerce . getProperty prop
-
-unsafeReceiveProperty
-  :: forall p a o
-   . HasCallStack
-  => UnsafeReceive p
-  => IsProperty (Received p)
-  => Coercible a Object
-  => Show a
-  => Typeable a
-  => Typeable o
-  => Property (Received p)
-  -> a
-  -> SimCont o p
-unsafeReceiveProperty prop object =
-  getProperty prop object >>= unsafeReceive
-
+-- | Get the value of a property on the given object. The value is safely read,
+-- as the VPI specification says that the result of calls to @vpi_get_str@ are
+-- stored in a static buffer which is overwritten on each call. Due to this
+-- there is no @unsafeReceiveProperty@.
+--
+-- For more information about safety, see 'Receive' and 'UnsafeReceive'.
+--
 receiveProperty
   :: forall p a o
    . HasCallStack
@@ -368,6 +461,18 @@ receiveProperty prop object =
 foreign import ccall "vpi_user.h vpi_get_time"
   c_vpi_get_time :: Object -> Ptr CTime -> IO ()
 
+-- | Get a pointer to the low-level representation of the current simulation
+-- time. The pointer is allocated using the given allocation function. The time
+-- returned is given in the specified format, and is either the global
+-- simulation time or the time of a particular object in the simulation.
+--
+-- The 'SuppressTime' format cannot be used for this function. Requesting this
+-- as the format will throw an 'InvalidTimeType' exception.
+--
+-- The retuned value can be converted to the high-level representation using
+-- 'Receive'. If only the high-level representation is needed then consider
+-- using 'receiveTime' or 'unsafeReceiveTime' instead.
+--
 getTime
   :: forall a o
    . HasCallStack
@@ -377,7 +482,7 @@ getTime
   -> Maybe a
   -> SimCont o (Ptr CTime)
 getTime alloc ty mObject = do
-  Monad.when (ty == Suppress) $
+  Monad.when (ty == SuppressTime) $
     Sim.throw (InvalidTimeType ty callStack)
 
   cty <- unsafeSend ty
@@ -387,6 +492,18 @@ getTime alloc ty mObject = do
     FFI.poke ptr (CTime cty 0 0 0.0)
     c_vpi_get_time object ptr
 
+-- | Get the high-level representation of the current simulation time. The
+-- value is unsafely read, meaning it may become corrupted if the low-level
+-- representation is deallocated.
+--
+-- The 'SuppressTime' format cannot be used for this function. Requesting this
+-- as the format will throw an 'InvalidTimeType' exception.
+--
+-- The low-level representation is allocated on the stack, meaning it will not
+-- survive past the end of the current callback.
+--
+-- For more information about safety, see 'Receive' and 'UnsafeReceive'.
+--
 unsafeReceiveTime
   :: forall a o
    . HasCallStack
@@ -398,6 +515,15 @@ unsafeReceiveTime
 unsafeReceiveTime timeTy mObject =
   getTime Sim.stackPtr timeTy mObject >>= unsafePeekReceive
 
+-- | Get the high-level representation of the current simulation time. The
+-- value is safely read, meaning it will not become corrupted if the low-level
+-- representation is deallocated.
+--
+-- The 'SuppressTime' format cannot be used for this function. Requesting this
+-- as the format will throw an 'InvalidTimeType' exception.
+--
+-- For more information about safety, see 'Receive' and 'UnsafeReceive'.
+--
 receiveTime
   :: forall a o
    . HasCallStack
@@ -412,6 +538,17 @@ receiveTime timeTy mObject =
 foreign import ccall "vpi_user.h vpi_get_value"
   c_vpi_get_value :: Object -> Ptr CValue -> IO ()
 
+-- | Get a pointer to the low-level representation of the current value
+-- associated with the given object. The pointer is allocated using the given
+-- allocation function. The value is returned in the requested format.
+--
+-- The 'SuppressValue' format cannot be used for this function. Requesting this
+-- as the format will throw an 'InvalidFormat' exception.
+--
+-- The returned value can be converted to the high-level representation using
+-- 'Receive'. If only the high-level representation is needed then consider
+-- using 'receiveValue' or 'unsafeReceiveValue' instead.
+--
 getValue
   :: HasCallStack
   => Coercible a Object
@@ -428,6 +565,18 @@ getValue alloc fmt object = do
 
     pure ()
 
+-- | Get the high-level representation of the current value associated with the
+-- given object. The value is converted from a low-level representation with
+-- the requested format.
+--
+-- The 'SuppressValue' format cannot be used for this function. Requesting this
+-- as the format will throw an 'InvalidFormat' exception.
+--
+-- The low-level representation is allocated on the stack, meaning it will not
+-- survive past the end of the current callback.
+--
+-- For more information about safety, see 'Receive' and 'UnsafeReceive'.
+--
 unsafeReceiveValue
   :: forall a o
    . HasCallStack
@@ -445,6 +594,15 @@ unsafeReceiveValue fmt object = do
 
   unsafeReceive (cvalue, size)
 
+-- | Get the high-level representation of the current value associated with the
+-- given object. The value is converted from a low-level representation with
+-- the requested format.
+--
+-- The 'SuppressValue' format cannot be used for this function. Requesting this
+-- as the format will throw an 'InvalidFormat' exception.
+--
+-- For more information about safety, see 'Receive' and 'UnsafeReceive'.
+--
 receiveValue
   :: forall a o
    . HasCallStack
@@ -479,6 +637,16 @@ result, and do not allow the high level API to set the vpiReturnEvent flag, so
 a valid object would never be returned anyway.
 -}
 
+-- | Update the value of the given object via the given 'DelayMode'. The value
+-- is unsafely sent, meaning if the high-level representation is reclaimed by
+-- the garbage collector, the behaviour of the FFI call is undefined.
+--
+-- The 'SuppressTime' format and 'ObjTypeFmt' formats cannot be used for this
+-- function. Attempting to send a value with these formats will throw an
+-- 'InvalidFormat' exception.
+--
+-- For more information about safety, see 'Send' and 'UnsafeSend'.
+--
 unsafeSendValue
   :: HasCallStack
   => Coercible a Object
@@ -494,6 +662,16 @@ unsafeSendValue object value delay = do
   Monad.void . IO.liftIO $
     c_vpi_put_value (coerce object) valuePtr timePtr flags
 
+-- | Update the value of the given object via the given 'DelayMode'. The value
+-- is safely sent, meaning the FFI call will succeed if the inputs to this
+-- function are valid.
+--
+-- The 'SuppressTime' format and 'ObjTypeFmt' formats cannot be used for this
+-- function. Attempting to send a value with these formats will throw an
+-- 'InvalidFormat' exception.
+--
+-- For more information about safety, see 'Send' and 'UnsafeSend'.
+--
 sendValue
   :: HasCallStack
   => Coercible a Object

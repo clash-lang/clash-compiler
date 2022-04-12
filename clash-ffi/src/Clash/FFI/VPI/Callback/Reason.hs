@@ -1,3 +1,9 @@
+{-|
+Copyright:    (C) 2022 Google Inc.
+License:      BSD2 (see the file LICENSE)
+Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -33,41 +39,116 @@ Object and needs to be coerced into the correct type. This coercion is
 obviously unchecked / unsafe, so must be performed carefully.
 -}
 
+-- | A callback reason is used when defining a callback to say when it should
+-- fire, and included in the input to a callback routine when triggered so the
+-- callback can identify why it was fired.
+--
+-- Callback reasons are divided into three groups in the VPI specification:
+--
+--   [Simulation event callbacks]: These are callbacks which trigger before or
+--   after some simulation event is performed. Events are things like values
+--   being changed, or evalation of a particular HDL statement. Event callbacks
+--   typically have an associated VPI object (although in some cases this may
+--   be optional if the callback can be triggered on all relevant objects such
+--   as @AfterForce@ and @AfterRelease@). Event callbacks can also return time
+--   values when they are triggered, and the format of that value is specified
+--   here.
+--
+--   [Simulation time callbacks]: These are callbacks which trigger at a certain
+--   point in time, which may be absolute, relative to the current simulation
+--   time, or related to the Verilog scheduler (i.e. @NextSimTime@, which
+--   triggers at the start of a time step). Time callbacks may in some cases
+--   refer to an object, as objects carry their own internal time value.
+--
+--   [Simulator action / feature callbacks]: These are callbacks which are
+--   triggered by the simulation tool when it performs some operation. They do
+--   not have any associated handle or time value, as they relate to the
+--   simulator tool instead of the simulation running in the tool. The
+--   specification differentiates actions and features. An action is required
+--   for a compliant VPI implementation but a feature is optional and may not
+--   be implemented in all tools.
+--
 data CallbackReason
-  = forall h. Coercible h Object => AfterValueChange h TimeType ValueFormat
-  | forall h. Coercible h Object => BeforeStatement h TimeType
-  | forall h. Coercible h Object => AfterForce (Maybe h) TimeType ValueFormat
-  | forall h. Coercible h Object => AfterRelease (Maybe h) TimeType ValueFormat
-  | forall h. Coercible h Object => AtStartOfSimTime (Maybe h) Time
-  | forall h. Coercible h Object => ReadWriteSynch (Maybe h) Time
-  | forall h. Coercible h Object => ReadOnlySynch (Maybe h) Time
-  | forall h. Coercible h Object => NextSimTime (Maybe h) TimeType
-  | forall h. Coercible h Object => AfterDelay (Maybe h) Time
+  = forall a. Coercible a Object => AfterValueChange a TimeType ValueFormat
+  -- ^ Triggered after the value of the object @a@ changes.
+  | forall a. Coercible a Object => BeforeStatement a TimeType
+  -- ^ Triggered before the statement @a@ is about to be executed.
+  --
+  -- *NOTE:* @a@ must have an object type which is a behavioural statement.
+  | forall a. Coercible a Object => AfterForce (Maybe a) TimeType ValueFormat
+  -- ^ Triggered after a force event (potentially on a specific object)
+  | forall a. Coercible a Object => AfterRelease (Maybe a) TimeType ValueFormat
+  -- ^ Triggered after a release event (potentially on a specific object)
+  | forall a. Coercible a Object => AtStartOfSimTime (Maybe a) Time
+  -- ^ Triggered before events in a time queue are executed. If no object is
+  -- given, the global time queue is used.
+  --
+  -- *NOTE:* @a@ must have an object type which is a time queue.
+  | forall a. Coercible a Object => ReadWriteSynch (Maybe a) Time
+  -- ^ Triggered before or after non-blocking events are executed for the
+  -- specified time (optionally on the object @a@). The callback is allowed to
+  -- write values and schedule events.
+  | forall a. Coercible a Object => ReadOnlySynch (Maybe a) Time
+  -- ^ Triggered before or after non-blocking events are executed for the
+  -- specified time (optionally on the object @a@). The callback is not allowed
+  -- to write values or schedule events.
+  | forall a. Coercible a Object => NextSimTime (Maybe a) TimeType
+  -- ^ Triggered before events in the next event queue are executed.
+  | forall a. Coercible a Object => AfterDelay (Maybe a) Time
+  -- ^ Triggered after a given amount of time, before execution of events in
+  -- the specified time queue. The callback can be set for any time, even if no
+  -- event is present.
   | EndOfCompile
+  -- ^ Triggered when the simulator has finished compiling source files.
   | StartOfSimulation
+  -- ^ Triggered when the simulator starts the cycle at time 0.
   | EndOfSimulation
+  -- ^ Triggered when there are no more events in the simulator event queue, or
+  -- the @$finish@ PLI task is called.
   | RuntimeError
+  -- ^ Triggered when an error occurs during simulation.
   | TchkViolation
+  -- ^ Triggers when a timing-check error occurs.
   | StartOfSave
+  -- ^ Triggered before the simulator creates a save state.
   | EndOfSave
+  -- ^ Triggered after the simulator creates a save state.
   | StartOfRestart
+  -- ^ Triggered before the simulator restarts simulation from a save state.
   | EndOfRestart
+  -- ^ Triggered after the simulator restarts simulation from a save state.
   | StartOfReset
+  -- ^ Triggered before the simulator is reset to an initial state.
   | EndOfReset
+  -- ^ Triggered after the simulator is reset to an initial state.
   | EnterInteractive
+  -- ^ Triggered when the simulator enters interactive mode.
   | ExitInteractive
+  -- ^ Triggered when the simulator exits interactive mode.
   | InteractiveScopeChange
+  -- ^ Triggered when the scope is changed while in interactive mode.
   | UnresolvedSysTf
+  -- ^ Triggered when an unknown system task / function is called.
 #if defined(VERILOG_2001)
-  | forall h. Coercible h Object => AfterAssign h TimeType ValueFormat
-  | forall h. Coercible h Object => AfterDeassign h TimeType ValueFormat
-  | forall h. Coercible h Object => AfterDisable h TimeType ValueFormat
+  | forall a. Coercible a Object => AfterAssign a TimeType ValueFormat
+  -- ^ Triggered after a procedural assign statement is executed.
+  | forall a. Coercible a Object => AfterDeassign a TimeType ValueFormat
+  -- ^ Triggered after a procedural deassign statement is executed.
+  | forall a. Coercible a Object => AfterDisable a TimeType ValueFormat
+  -- ^ Triggered after a named block or task containing a system task or
+  -- function has been disabled.
   | PliError
+  -- ^ Triggered when an error occurs during a PLI/VPI call.
   | Signal
+  -- ^ Triggered when a signal (i.e. SIGINT) occurs during simulation.
 #endif
 #if defined(VERILOG_2005)
-  | forall h. Coercible h Object => NbaSynch (Maybe h) Time
-  | forall h. Coercible h Object => AtEndOfSimTime (Maybe h) Time
+  | forall a. Coercible a Object => NbaSynch (Maybe a) Time
+  -- ^ Triggered immediately before non-blocking assignment events are processed
+  -- in a time step.
+  | forall a. Coercible a Object => AtEndOfSimTime (Maybe a) Time
+  -- ^ Triggered after non-blocking events in a time step are executed, but
+  -- before read-only events are processed.
 #endif
 
 instance UnsafeSend CallbackReason where
@@ -388,6 +469,9 @@ instance Send CallbackReason where
       pure (31, object, ctime, FFI.nullPtr)
 #endif
 
+-- | An exception thrown when decoding a callback reason if an invalid value is
+-- given for the C enum that specifies the constructor of 'CallbackReason'.
+--
 data UnknownCallbackReason
   = UnknownCallbackReason CInt CallStack
   deriving anyclass (Exception)

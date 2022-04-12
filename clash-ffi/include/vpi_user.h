@@ -856,7 +856,7 @@ typedef struct t_cb_data
 /**************************** FUNCTION DECLARATIONS ***************************/
 
 /* Include compatibility mode macro definitions. */
-#include "vpi_compatibility.h"
+/* #include "vpi_compatibility.h" */
 
 /* callback related */
 

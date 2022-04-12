@@ -1,3 +1,12 @@
+{-|
+Copyright:    (C) 2022 Google Inc.
+License:      BSD2 (see the file LICENSE)
+Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
+{-# LANGUAGE CPP #-}
+
+#if defined(VERILOG_2005) && defined(VPI_VECVAL)
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
@@ -38,6 +47,22 @@ import           Clash.XException (deepErrorX)
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Object.Value.Scalar
 
+-- | A bit vector encoded using the a/b encoding as specified in the Verilog
+-- 2005 standard. This encodes bit vectors as an array of pairs of words, where
+-- the value of each bit is given by the value of the A and B bits:
+--
+-- +---+---+-----------+
+-- | A | B | Bit Value |
+-- +===+===+===========+
+-- | 0 | 0 | 0         |
+-- +---+---+-----------+
+-- | 1 | 0 | 1         |
+-- +---+---+-----------+
+-- | 0 | 1 | Z         |
+-- +---+---+-----------+
+-- | 1 | 1 | X         |
+-- +---+---+-----------+
+--
 data CVector = CVector
   { cvectorA :: CInt
   , cvectorB :: CInt
@@ -146,8 +171,6 @@ instance (KnownNat n) => Receive (Vec n Scalar) where
         len  = div (size - 1) 32 + 1
      in fmap cvectorListToVector . IO.liftIO . FFI.peekArray len
 
--- Orphan instances for BitVector
-
 bitVectorToVector
   :: forall n
    . KnownNat n
@@ -186,4 +209,7 @@ instance (KnownNat n) => UnsafeReceive (BitVector n) where
 instance (KnownNat n) => Receive (BitVector n) where
   receive =
     fmap vectorToBitVector . receive
+#else
+module Clash.FFI.VPI.Object.Value.Vector () where
+#endif
 

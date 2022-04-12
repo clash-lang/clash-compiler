@@ -1,3 +1,9 @@
+{-|
+Copyright:    (C) 2022 Google Inc.
+License:      BSD2 (see the file LICENSE)
+Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -30,6 +36,9 @@ import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim
 import           Clash.FFI.VPI.Object.Value.Format (ValueFormat(..))
 
+-- | An exception thrown when the bit string to parse contains characters
+-- which should not appear for the given format.
+--
 data InvalidBitString
   = InvalidBitString ValueFormat String CallStack
   deriving anyclass (Exception)
@@ -66,6 +75,25 @@ parseBinStr size bin = do
 
   Monad.foldM go (deepErrorX "parseBinStr: undefined") (zip is str)
 
+-- | An exception thrown when the bit string does not preserve all information
+-- about the current value of a bit vector. This can only be thrown when
+-- attempting to read values as octal or hexadecimal.
+--
+-- Consider the following bit string:
+--
+--   @
+--   9'b.0.1.1001
+--   @
+--
+-- Attempting to read this as octal or hexadecimal results in a loss of
+-- precision in the value, giving @XX1@ and @xX9@. When @\'X\'@ (or @\'Z\'@)
+-- appear in the string it means some bits for a octal / hexadecimal digit are
+-- defined and others are undefined, but does not specify which were defined.
+--
+-- This loss of precision may be undesirable for certain applications, so we
+-- provide a way to recover. If this exception is caught, the catcher can
+-- amend the string, and call the supplied continuation to retry the parse.
+--
 data ImpreciseBitString n o = ImpreciseBitString
   { sourceFormat :: ValueFormat
   , sourceString :: String

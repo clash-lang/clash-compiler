@@ -1,3 +1,9 @@
+{-|
+Copyright:    (C) 2022 Google Inc.
+License:      BSD2 (see the file LICENSE)
+Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -14,6 +20,10 @@ import           GHC.Stack (CallStack, callStack, prettyCallStack)
 import qualified Clash.FFI.Monad as Sim (throw)
 import           Clash.FFI.View
 
+-- | The type of the object according to the VPI specification. This can be
+-- queried using the @vpiType@ property, and the value used to identify when
+-- it is safe to coerce into a type in the higher-level VPI API.
+--
 data ObjectType
   = ObjModule
   | ObjNet
@@ -42,6 +52,11 @@ instance UnsafeSend ObjectType where
 instance Send ObjectType where
   send = unsafeSend
 
+-- | An exception thrown when decoding an object type if an invalid value is
+-- given for the C enum that specifies the constructor of 'ObjectType'. Note
+-- that there are many object types in the specification not included in these
+-- bindings, so an unknown type is likely a library issue to report.
+--
 data UnknownObjectType
   = UnknownObjectType CInt CallStack
   deriving anyclass (Exception)

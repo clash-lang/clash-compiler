@@ -48,9 +48,6 @@ PLI_INT32 init_ghc(p_cb_data data) {
 #endif
 
     HASKELL_INITIALIZED = true;
-
-    // TODO We want some entry point to trampoline into that's defined in all
-    // things which use clash-ffi, e.g. testbenches.
     clash_ffi_main();
 
     return 0;

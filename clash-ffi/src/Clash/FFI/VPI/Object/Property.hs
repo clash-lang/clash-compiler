@@ -1,12 +1,21 @@
+{-|
+Copyright:    (C) 2022 Google Inc.
+License:      BSD2 (see the file LICENSE)
+Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+-- {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Clash.FFI.VPI.Object.Property where
+module Clash.FFI.VPI.Object.Property
+  ( Property(..)
+  , InvalidProperty(..)
+  ) where
 
 import Control.Exception (Exception)
 import Foreign.C.String (CString)
@@ -15,6 +24,17 @@ import GHC.Stack (CallStack, prettyCallStack)
 
 import Clash.FFI.View
 
+-- | VPI objects can have different data associated with them, which is indexed
+-- by property. Properties can have different types, with VPI supporting
+--
+--   * Integer properties (with 64-bit integer supported in SystemVerilog)
+--   * Boolean properties
+--   * String properties
+--
+-- Not every property is available on every type of object. Users should be
+-- careful to check that the type of object supports the requested property.
+-- If it does not, attempting to access the property throws 'InvalidProperty'.
+--
 data Property a where
   TypeOf :: Property CInt
   Name :: Property CString
@@ -58,16 +78,19 @@ instance UnsafeSend (Property a) where
 instance Send (Property a) where
   send = unsafeSend
 
-data UndefinedProperty p a
-  = UndefinedProperty (Property p) a CallStack
+-- | An exception thrown when attempting to get the value of a property which
+-- is not defined for the given object.
+--
+data InvalidProperty p a
+  = InvalidProperty (Property p) a CallStack
   deriving anyclass (Exception)
 
-instance (Show a) => Show (UndefinedProperty p a) where
-  show (UndefinedProperty p a c) =
+instance (Show a) => Show (InvalidProperty p a) where
+  show (InvalidProperty p a c) =
     mconcat
-      [ "Undefined property "
+      [ "The property "
       , show p
-      , " for the object "
+      , " is not defined for the object "
       , show a
       , "\n"
       , prettyCallStack c

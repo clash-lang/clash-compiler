@@ -1,4 +1,11 @@
+{-|
+Copyright:    (C) 2022 Google Inc.
+License:      BSD2 (see the file LICENSE)
+Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -6,7 +13,6 @@
 module Clash.FFI.VPI.Object.Value
   ( CValue(..)
   , Value(..)
-  , InvalidValue(..)
 
   , module Clash.FFI.VPI.Object.Value.Delay
   , module Clash.FFI.VPI.Object.Value.Format
@@ -16,18 +22,18 @@ module Clash.FFI.VPI.Object.Value
 #endif
   ) where
 
-import           Control.Exception (Exception)
 import qualified Control.Exception as IO (throwIO)
 import           Data.ByteString (ByteString)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CDouble, CInt(..))
 import           Foreign.Ptr (Ptr)
 import           Foreign.Storable as FFI (Storable(..))
-import           GHC.Stack (CallStack, callStack, prettyCallStack)
+import           GHC.Stack (callStack)
 import           GHC.TypeNats (SomeNat(..), someNatVal)
 
 import           Clash.Promoted.Nat (SNat(..), snatProxy)
 import           Clash.Sized.BitVector (Bit, BitVector)
+import           Clash.Sized.Signed (Signed)
 
 import qualified Clash.FFI.Monad as Sim (heapPtr, stackPtr, withNewPtr)
 import           Clash.FFI.View
@@ -41,6 +47,9 @@ import           Clash.FFI.VPI.Object.Value.Scalar
 import           Clash.FFI.VPI.Object.Value.Vector
 #endif
 
+-- | The low level representation of a VPI value, as sent and received by VPI
+-- calls. This can optionally be converted to a 'Value' using 'Receive'.
+--
 data CValue
   = CBinStrVal CString
   | COctStrVal CString
@@ -54,21 +63,7 @@ data CValue
   | CVectorVal (Ptr CVector)
 #endif
   | CTimeVal (Ptr CTime)
-  | CMiscVal CString
   deriving stock (Show)
-
-data InvalidValue
-  = InvalidValue CValue CallStack
-  deriving anyclass (Exception)
-
-instance Show InvalidValue where
-  show (InvalidValue v c) =
-    mconcat
-      [ "Attempt to send/receive a value "
-      , show v
-      , " which has a format with no data.\n"
-      , prettyCallStack c
-      ]
 
 instance Storable CValue where
   sizeOf _ = 16
@@ -144,17 +139,21 @@ instance Storable CValue where
     CTimeVal time ->
       FFI.pokeByteOff ptr 0 TimeFmt *> FFI.pokeByteOff ptr 8 time
 
-    value ->
-      IO.throwIO (InvalidValue value callStack)
-
+-- | A value is a Clash-compatible representation of a given VPI value. This
+-- represents values with the corresponding type from @clash-prelude@ where
+-- possible, or the higher-level representation from this library (in the case
+-- of things like time values).
+--
+-- For the low-level representation of values that is sent / received by VPI
+-- calls, see 'CValue'.
+--
 data Value where
   BitVal       :: Bit -> Value
   BitVectorVal :: SNat n -> BitVector n -> Value
-  IntVal       :: Int -> Value
+  IntVal       :: Signed 32 -> Value
   RealVal      :: Double -> Value
   StringVal    :: SNat n -> ByteString -> Value
   TimeVal      :: Time -> Value
-  MiscVal      :: SNat n -> ByteString -> Value
 
 instance Show Value where
   show = \case
@@ -164,7 +163,6 @@ instance Show Value where
     RealVal real -> show real
     StringVal _ str -> show str
     TimeVal time -> show time
-    MiscVal _ bytes -> show bytes
 
 instance UnsafeSend Value where
   type Sent Value = CValue
@@ -195,9 +193,6 @@ instance UnsafeSend Value where
 
       pure (CTimeVal ptr)
 
-    MiscVal _size bytes ->
-      CMiscVal <$> unsafeSend bytes
-
 instance Send Value where
   send = \case
     BitVal bit ->
@@ -224,9 +219,6 @@ instance Send Value where
       ptr <- fst <$> Sim.withNewPtr Sim.heapPtr (`FFI.poke` ctime)
 
       pure (CTimeVal ptr)
-
-    MiscVal _size bytes ->
-      CMiscVal <$> send bytes
 
 instance UnsafeReceive Value where
   type Received Value = (CValue, CInt)
@@ -275,10 +267,6 @@ instance UnsafeReceive Value where
       CTimeVal time ->
         TimeVal <$> unsafePeekReceive time
 
-      CMiscVal bytes -> do
-        case someNatVal (fromIntegral size) of
-          SomeNat proxy -> MiscVal (snatProxy proxy) <$> unsafeReceive bytes
-
 instance Receive Value where
   receive (cvalue, size) =
     case cvalue of
@@ -323,9 +311,4 @@ instance Receive Value where
 
       CTimeVal time ->
         TimeVal <$> peekReceive time
-
-      CMiscVal bytes -> do
-        case someNatVal (fromIntegral size) of
-          SomeNat proxy -> MiscVal (snatProxy proxy) <$> receive bytes
-
 
