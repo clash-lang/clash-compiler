@@ -30,6 +30,7 @@ import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS (length, packCString)
 import qualified Data.ByteString.Unsafe as BS
+import           Data.Typeable (Typeable)
 import           Foreign.C.String (CString)
 import qualified Foreign.C.String as FFI
 import qualified Foreign.Marshal.Alloc as FFI (mallocBytes)
@@ -142,10 +143,10 @@ instance Send ByteString where
 class UnsafeReceive a where
   type Received a
 
-  unsafeReceive :: HasCallStack => Received a -> SimCont b a
+  unsafeReceive :: (HasCallStack, Typeable b) => Received a -> SimCont b a
 
 class UnsafeReceive a => Receive a where
-  receive :: HasCallStack => Received a -> SimCont b a
+  receive :: (HasCallStack, Typeable b) => Received a -> SimCont b a
 
 instance (UnsafeReceive a, Storable (Received a)) => UnsafeReceive (Maybe a) where
   type Received (Maybe a) = Ptr (Received a)
@@ -176,21 +177,21 @@ instance Receive ByteString where
     IO.liftIO . BS.packCString
 
 unsafePeekReceive
-  :: (UnsafeReceive a, Storable (Received a))
+  :: (UnsafeReceive a, Storable (Received a), Typeable b)
   => Ptr (Received a)
   -> SimCont b a
 unsafePeekReceive ptr =
   IO.liftIO (FFI.peek ptr) >>= unsafeReceive
 
 peekReceive
-  :: (Receive a, Storable (Received a))
+  :: (Receive a, Storable (Received a), Typeable b)
   => Ptr (Received a)
   -> SimCont b a
 peekReceive ptr =
   IO.liftIO (FFI.peek ptr) >>= receive
 
 unsafeReceiveArray0
-  :: (UnsafeReceive a, Eq (Received a), Storable (Received a))
+  :: (UnsafeReceive a, Eq (Received a), Storable (Received a), Typeable b)
   => Received a
   -> Ptr (Received a)
   -> SimCont b [a]
@@ -198,7 +199,7 @@ unsafeReceiveArray0 end ptr =
   IO.liftIO (FFI.peekArray0 end ptr) >>= traverse unsafeReceive
 
 receiveArray0
-  :: (Receive a, Eq (Received a), Storable (Received a))
+  :: (Receive a, Eq (Received a), Storable (Received a), Typeable b)
   => Received a
   -> Ptr (Received a)
   -> SimCont b [a]
@@ -206,7 +207,7 @@ receiveArray0 end ptr =
   IO.liftIO (FFI.peekArray0 end ptr) >>= traverse receive
 
 unsafeReceiveArrayN
-  :: (UnsafeReceive a, Storable (Received a))
+  :: (UnsafeReceive a, Storable (Received a), Typeable b)
   => Int
   -> Ptr (Received a)
   -> SimCont b [a]
@@ -214,7 +215,7 @@ unsafeReceiveArrayN len ptr =
   IO.liftIO (FFI.peekArray len ptr) >>= traverse unsafeReceive
 
 receiveArrayN
-  :: (Receive a, Storable (Received a))
+  :: (Receive a, Storable (Received a), Typeable b)
   => Int
   -> Ptr (Received a)
   -> SimCont b [a]

@@ -17,6 +17,7 @@ import           Control.Exception (Exception)
 import qualified Control.Exception as IO (throwIO)
 import qualified Control.Monad as Monad (unless)
 import           Data.ByteString (ByteString)
+import           Data.Typeable (Typeable)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CInt(..))
 import           Foreign.Ptr (Ptr)
@@ -96,6 +97,7 @@ simulatorInfo alloc =
 unsafeReceiveSimulatorInfo
   :: forall o
    . HasCallStack
+  => Typeable o
   => SimCont o Info
 unsafeReceiveSimulatorInfo =
   simulatorInfo Sim.stackPtr >>= unsafePeekReceive
@@ -103,6 +105,7 @@ unsafeReceiveSimulatorInfo =
 receiveSimulatorInfo
   :: forall o
    . HasCallStack
+  => Typeable o
   => SimCont o Info
 receiveSimulatorInfo =
   -- This is safe, since receive will make a copy.

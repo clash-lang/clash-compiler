@@ -107,6 +107,22 @@ instance IsObject Object where
   compareObjects x y =
     IO.liftIO (c_vpi_compare_objects x y)
 
+{-
+NOTE [use of Coercible in public API]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+While VPI has an object model, objects are always represented internally as a
+`vpiHandle`, which is a pointer to the object provided by the simulator. This
+means in `clash-ffi`, the base object type is a pointer, and any more specific
+object types are newtypes around this base object.
+
+Rather than duplicate the API for each object, we take a more lenaint approach.
+Any operation can be used on an object, provided it can be coerced into the
+base object type, and any object can be returned as a result of an FFI call
+provided it can be coerced into from the base object type. The advantage of
+this is that any call can be made, provided the input and output object types
+are given by the user.
+-}
+
 class IsChildRef i where
   getChild
     :: forall a b o
@@ -327,6 +343,7 @@ unsafeReceiveProperty
   => Coercible a Object
   => Show a
   => Typeable a
+  => Typeable o
   => Property (Received p)
   -> a
   -> SimCont o p
@@ -341,6 +358,7 @@ receiveProperty
   => Coercible a Object
   => Show a
   => Typeable a
+  => Typeable o
   => Property (Received p)
   -> a
   -> SimCont o p
@@ -373,6 +391,7 @@ unsafeReceiveTime
   :: forall a o
    . HasCallStack
   => Coercible a Object
+  => Typeable o
   => TimeType
   -> Maybe a
   -> SimCont o Time
@@ -383,6 +402,7 @@ receiveTime
   :: forall a o
    . HasCallStack
   => Coercible a Object
+  => Typeable o
   => TimeType
   -> Maybe a
   -> SimCont o Time
@@ -414,6 +434,7 @@ unsafeReceiveValue
   => Coercible a Object
   => Show a
   => Typeable a
+  => Typeable o
   => ValueFormat
   -> a
   -> SimCont o Value
@@ -430,6 +451,7 @@ receiveValue
   => Coercible a Object
   => Show a
   => Typeable a
+  => Typeable o
   => ValueFormat
   -> a
   -> SimCont o Value
@@ -464,6 +486,7 @@ unsafeSendValue
   -> Value
   -> DelayMode
   -> SimCont o ()
+  -- No return object, see NOTE [vpi_put_value and events]
 unsafeSendValue object value delay = do
   valuePtr <- unsafePokeSend value
   (timePtr, flags) <- unsafeSend delay
@@ -478,6 +501,7 @@ sendValue
   -> Value
   -> DelayMode
   -> SimCont o ()
+  -- No return object, see NOTE [vpi_put_value and events]
 sendValue object value delay = do
   valuePtr <- pokeSend value
   (timePtr, flags) <- send delay

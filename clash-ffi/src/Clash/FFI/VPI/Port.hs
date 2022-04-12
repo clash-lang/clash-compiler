@@ -4,6 +4,7 @@ module Clash.FFI.VPI.Port
   , module Clash.FFI.VPI.Port.Direction
   ) where
 
+import Data.Typeable (Typeable)
 import Foreign.Storable (Storable)
 
 import Clash.FFI.Monad (SimCont)
@@ -15,6 +16,6 @@ newtype Port
   deriving stock (Show)
   deriving newtype (IsObject, Storable)
 
-direction :: Port -> SimCont o Direction
+direction :: Typeable o => Port -> SimCont o Direction
 direction = receiveProperty Direction
 

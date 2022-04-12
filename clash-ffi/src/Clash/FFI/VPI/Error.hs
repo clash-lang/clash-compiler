@@ -15,6 +15,7 @@ module Clash.FFI.VPI.Error
   ) where
 
 import           Data.ByteString (ByteString)
+import           Data.Typeable (Typeable)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CInt(..))
 import           Foreign.Ptr (Ptr)
@@ -80,7 +81,8 @@ foreign import ccall "vpi_user.h vpi_chk_error"
 
 simulationError
   :: forall o
-   . SimCont o (Ptr CVpiError)
+   . Typeable o
+  => SimCont o (Ptr CVpiError)
   -> SimCont o (Ptr CVpiError, ErrorLevel)
 simulationError alloc = do
   (ptr, clevel) <- Sim.withNewPtr alloc c_vpi_chk_error
@@ -88,7 +90,10 @@ simulationError alloc = do
 
   pure (ptr, level)
 
-simulationErrorLevel :: forall o. SimCont o ErrorLevel
+simulationErrorLevel
+  :: forall o
+   . Typeable o
+  => SimCont o ErrorLevel
 simulationErrorLevel =
   snd <$> simulationError Sim.stackPtr
 

@@ -73,6 +73,7 @@ common vpi-config
     Clash.FFI.VPI.Object.Value
     Clash.FFI.VPI.Object.Value.Delay
     Clash.FFI.VPI.Object.Value.Format
+    Clash.FFI.VPI.Object.Value.Parse
     Clash.FFI.VPI.Object.Value.Scalar
     Clash.FFI.VPI.Object.Value.Vector
     Clash.FFI.VPI.Parameter

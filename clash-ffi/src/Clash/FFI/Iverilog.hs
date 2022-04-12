@@ -43,7 +43,7 @@ clashMain =
       for_ params $ \p -> do
         pName <- VPI.receiveProperty VPI.Name p
         pSize <- VPI.getProperty VPI.Size p
-        pVal  <- VPI.receiveValue VPI.ObjTypeFmt p
+        pVal  <- VPI.receiveValue VPI.OctStrFmt p
 
         VPI.simPutStrLn
           ("Found parameter: " <> pName <> ", size " <> fromString (show pSize) <> ", value: " <> fromString (show pVal))
@@ -69,7 +69,7 @@ clashMain =
       for_ regs $ \r -> do
         rName <- VPI.receiveProperty VPI.Name r
         rSize <- VPI.getProperty VPI.Size r
-        rVal  <- VPI.receiveValue VPI.ObjTypeFmt r
+        rVal  <- VPI.receiveValue VPI.DecStrFmt r
 
         VPI.simPutStrLn
           ("Found reg: " <> rName <> ", size " <> fromString (show rSize) <> ", value: " <> fromString (show rVal))

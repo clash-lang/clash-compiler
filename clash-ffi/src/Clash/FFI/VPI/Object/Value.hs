@@ -34,6 +34,7 @@ import           Clash.FFI.View
 import           Clash.FFI.VPI.Object.Time
 import           Clash.FFI.VPI.Object.Value.Delay
 import           Clash.FFI.VPI.Object.Value.Format
+import           Clash.FFI.VPI.Object.Value.Parse
 import           Clash.FFI.VPI.Object.Value.Scalar
 
 #if defined(VERILOG_2005) && defined(VPI_VECVAL)
@@ -203,7 +204,11 @@ instance Send Value where
       CScalarVal <$> send (bitToScalar bit)
 
     BitVectorVal SNat bv ->
+#if defined(VERILOG_2005) && defined(VPI_VECVAL)
       CVectorVal <$> send bv
+#else
+      error "Send.Value: BitVector without VPI_VECVAL"
+#endif
 
     IntVal int ->
       pure (CIntVal (fromIntegral int))
@@ -228,17 +233,25 @@ instance UnsafeReceive Value where
 
   unsafeReceive (cvalue, size) =
     case cvalue of
-      CBinStrVal _bin ->
-        undefined -- TODO parser
+      CBinStrVal bin ->
+        case someNatVal (fromIntegral size) of
+          SomeNat proxy ->
+            BitVectorVal (snatProxy proxy) <$> parseBinStr size bin
 
-      COctStrVal _oct ->
-        undefined -- TODO parser
+      COctStrVal oct ->
+        case someNatVal (fromIntegral size) of
+          SomeNat proxy ->
+            BitVectorVal (snatProxy proxy) <$> parseOctStr size oct
 
-      CDecStrVal _dec ->
-        undefined -- TODO parser
+      CDecStrVal dec -> do
+        case someNatVal (fromIntegral size) of
+          SomeNat proxy ->
+            BitVectorVal (snatProxy proxy) <$> parseDecStr size dec
 
-      CHexStrVal _hex ->
-        undefined -- TODO parser
+      CHexStrVal hex ->
+        case someNatVal (fromIntegral size) of
+          SomeNat proxy ->
+            BitVectorVal (snatProxy proxy) <$> parseHexStr size hex
 
       CScalarVal scalar ->
         BitVal . scalarToBit <$> unsafeReceive scalar
@@ -269,17 +282,25 @@ instance UnsafeReceive Value where
 instance Receive Value where
   receive (cvalue, size) =
     case cvalue of
-      CBinStrVal _bin ->
-        undefined -- TODO parser
+      CBinStrVal bin ->
+        case someNatVal (fromIntegral size) of
+          SomeNat proxy ->
+            BitVectorVal (snatProxy proxy) <$> parseBinStr size bin
 
-      COctStrVal _oct ->
-        undefined -- TODO parser
+      COctStrVal oct ->
+        case someNatVal (fromIntegral size) of
+          SomeNat proxy ->
+            BitVectorVal (snatProxy proxy) <$> parseOctStr size oct
 
-      CDecStrVal _dec ->
-        undefined -- TODO parser
+      CDecStrVal dec -> do
+        case someNatVal (fromIntegral size) of
+          SomeNat proxy ->
+            BitVectorVal (snatProxy proxy) <$> parseDecStr size dec
 
-      CHexStrVal _hex ->
-        undefined -- TODO parser
+      CHexStrVal hex ->
+        case someNatVal (fromIntegral size) of
+          SomeNat proxy ->
+            BitVectorVal (snatProxy proxy) <$> parseHexStr size hex
 
       CScalarVal scalar ->
         BitVal . scalarToBit <$> receive scalar
