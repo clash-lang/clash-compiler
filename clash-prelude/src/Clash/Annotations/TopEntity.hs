@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.,
-                  2021     , QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -206,21 +206,25 @@ See the documentation of 'Synthesize' for the meaning of all its fields.
 
 === 'TestBench' annotation
 
-Tell what binder is the 'TestBench' for a 'Synthesize'-annotated binder.
-
-So in the following example, /f/ has a 'Synthesize' annotation, and /g/ is
-the HDL test bench for /f/.
+Tell what binder is the test bench for a 'Synthesize'-annotated binder.
 
 @
-f :: Bool -> Bool
-f = ...
-{\-\# ANN f (defSyn "f") \#-\}
-{\-\# ANN f (TestBench \'g) \#-\}
+entityBeingTested :: ...
+entityBeingTested = ...
+{\-\# NOINLINE entityBeingTested \#-\}
+{\-\# ANN entityBeingTested (defSyn "entityBeingTested") \#-\}
 
-g :: Signal Bool
-g = ...
+
+myTestBench :: Signal System Bool
+myTestBench = ... entityBeingTested ...
+{\-\# NOINLINE myTestBench \#-\}
+{\-\# ANN myTestBench (TestBench \'entityBeingTested) \#-\}
 @
 
+The 'TestBench' annotation actually already implies a 'Synthesize' annotation on
+the device under test, so the 'defSyn' in the example could have been omitted.
+We recommend you supply 'defSyn' explicitly nonetheless. In any case, it will
+still need the @NOINLINE@ annotation.
 -}
 
 {-# LANGUAGE CPP #-}
@@ -266,17 +270,9 @@ data TopEntity
   }
   -- | Tell what binder is the 'TestBench' for a 'Synthesize'-annotated binder.
   --
-  -- So in the following example, /f/ has a 'Synthesize' annotation, and /g/ is
-  -- the HDL test bench for /f/.
-  --
   -- @
-  -- f :: Bool -> Bool
-  -- f = ...
-  -- {\-\# ANN f (defSyn "f") \#-\}
-  -- {\-\# ANN f (TestBench \'g) \#-\}
-  --
-  -- g :: Signal Bool
-  -- g = ...
+  -- {\-\# NOINLINE myTestBench \#-\}
+  -- {\-\# ANN myTestBench (TestBench \'entityBeingTested) \#-\}
   -- @
   | TestBench TH.Name
   deriving (Eq,Data,Show,Generic)
