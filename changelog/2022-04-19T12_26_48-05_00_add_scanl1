@@ -1,0 +1,1 @@
+CHANGED: Before this release, `scanl1` was re-exported from the Haskell Prelude. Clash's Prelude now exports a `Vec` specialized version.
