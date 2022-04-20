@@ -77,7 +77,7 @@ module Clash.Sized.Vector
     -- ** Specialized folds
   , dfold, dtfold, vfold
     -- * Prefix sums (scans)
-  , scanl, scanr, postscanl, postscanr
+  , scanl, scanl1, scanr, scanr1, postscanl, postscanr
   , mapAccumL, mapAccumR
     -- * Stencil computations
   , stencil1d, stencil2d
@@ -127,8 +127,9 @@ import Prelude                    hiding ((++), (!!), concat, concatMap, drop,
                                           foldl, foldl1, foldr, foldr1, head,
                                           init, iterate, last, length, map,
                                           repeat, replicate, reverse, scanl,
-                                          scanr, splitAt, tail, take, unzip,
-                                          unzip3, zip, zip3, zipWith, zipWith3)
+                                          scanl1, scanr, scanr1, splitAt, tail,
+                                          take, unzip, unzip3, zip, zip3, zipWith,
+                                          zipWith3)
 import qualified Data.String.Interpolate as I
 import qualified Prelude          as P
 import Test.QuickCheck
@@ -1110,6 +1111,22 @@ scanl f z xs = ws
   where
     ws = z `Cons` zipWith (flip f) xs (init ws)
 {-# INLINE scanl #-}
+
+-- | 'scanl' with no seed value
+--
+-- >>> scanl1 (-) (1 :> 2 :> 3 :> 4 :> Nil)
+-- 1 :> -1 :> -4 :> -8 :> Nil
+scanl1 :: KnownNat n => (a -> a -> a) -> Vec (n+1) a -> Vec (n+1) a
+scanl1 op (v:>vs) = scanl op v vs
+{-# INLINE scanl1 #-}
+
+-- | 'scanr' with no seed value
+--
+-- >>> scanr1 (-) (1 :> 2 :> 3 :> 4 :> Nil)
+-- -2 :> 3 :> -1 :> 4 :> Nil
+scanr1 :: KnownNat n => (a -> a -> a) -> Vec (n+1) a -> Vec (n+1) a
+scanr1 op vs = scanr op (last vs) (init vs)
+{-# INLINE scanr1 #-}
 
 -- | 'postscanl' is a variant of 'scanl' where the first result is dropped:
 --
