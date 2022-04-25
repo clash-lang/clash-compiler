@@ -505,6 +505,10 @@ data PortMap
   --
   deriving (Show)
 
+isAssignment :: Declaration -> Bool
+isAssignment Assignment{} = True
+isAssignment _ = False
+
 -- | Internals of a Component
 data Declaration
   -- | Signal assignment
@@ -562,18 +566,46 @@ data Declaration
       [Declaration]
   deriving Show
 
+data Sensitivity
+  = ClockEdge Expr ActiveEdge
+  -- ^ The clock and edge that a process is sensitive to
+  | ValueChanges [IdentifierText]
+  -- ^ The value which a process is sensitive to
+  deriving Show
+
+{-
+NOTE [assignments in `Initial` blocks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In verilog code it is common to see initial blocks used for initial assignment
+of values to registers, i.e.
+
+    initial begin
+      x_1 = v_1;
+      x_2 = v_2;
+      ...
+      x_n = v_n;
+
+Equivalently this can be written as initial values on the declaration
+
+    reg x_1 = v_1;
+    reg x_2 = v_2;
+    ...
+    reg x_n = v_n;
+
+In VHDL, there are no `initial` blocks. However, you are still allowed to
+assign initial values to signals when they are declared. To prevent Clash from
+losing these initial values, assignments in initial blocks should be removed
+and the declaration updated to include the initial value.
+-}
+
 -- | Sequential statements
 data Seq
-  -- | Clocked sequential statements
-  = AlwaysClocked
-      ActiveEdge -- ^ Edge of the clock the statement should be executed
-      Expr       -- ^ Clock expression
-      [Seq]      -- ^ Statements to be executed on the active clock edge
   -- | Statements running at simulator start
-  | Initial
+  = Initial
       [Seq] -- ^ Statements to run at simulator start
   -- | Statements to run always
-  | AlwaysComb
+  | Always
+      Sensitivity -- ^ Changes that force evaluation of the process
       [Seq] -- ^ Statements to run always
   -- | Declaration in sequential form
   | SeqDecl
@@ -584,6 +616,21 @@ data Seq
       !HWType                  -- ^ Type of the scrutinized expression
       [(Maybe Literal,[Seq])]  -- ^ List of: (Maybe match, RHS of Alternative)
   deriving Show
+
+{-
+TODO [Declaration and Seq]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Currently, the Decalration and Seq types allow invalid netlist to be
+constructed. A notable example is that you can nest procedural blocks like so:
+
+  Seq [Always _ [SeqDecl (Seq [Always _ ...
+
+It would be nice to properly distinguish between declarations, concurrent
+statements and sequential statements in the netlist types - with the types
+defined in such a way that invalid elements like this cannot be constructed.
+This is somewhat of a job right now as it would mean some fiddly rewrites to
+different parts of netlist generation.
+-}
 
 data EntityOrComponent = Entity | Comp | Empty
   deriving Show
@@ -697,7 +744,10 @@ isConstExpr = \case
   DataCon _ _ es -> all isConstExpr es
   Identifier{} -> False
   DataTag{} -> False
-  BlackBoxE{} -> False
+  BlackBoxE nm _ _ _ _ ctx _
+    | nm == "Clash.Explicit.SimIO.reg" ->
+        all (\(e, _, _) -> isConstExpr e) (bbInputs ctx)
+    | otherwise -> False
   ToBv _ _ e -> isConstExpr e
   FromBv _ _ e -> isConstExpr e
   IfThenElse{} -> False

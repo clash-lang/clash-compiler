@@ -923,7 +923,7 @@ customReprDataCon dataRepr constrRepr args =
                int fsize <> squote <> parens rotated
 
 seq_ :: Seq -> SystemVerilogM Doc
-seq_ (AlwaysClocked edge clk ds) =
+seq_ (Always (ClockEdge clk edge) ds) =
   "always @" <>
     parens (case edge of {Rising -> "posedge"; _ -> "negedge"} <+>
             expr_ False clk) <+> "begin" <> line <>
@@ -935,8 +935,8 @@ seq_ (Initial ds) =
   indent 2 (seqs ds) <> line <>
   "end"
 
-seq_ (AlwaysComb ds) =
-  "always @* begin" <> line <>
+seq_ (Always (ValueChanges _) ds) =
+  "always_comb begin" <> line <>
   indent 2 (seqs ds) <> line <>
   "end"
 

@@ -1,9 +1,8 @@
-{-# LANGUAGE NamedFieldPuns #-}
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017     , Google Inc.,
-                    2021     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -13,6 +12,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -52,9 +52,9 @@ import           System.Console.ANSI
 import           System.IO
   (hPutStrLn, stderr, hFlush, hIsTerminalDevice)
 #if MIN_VERSION_ghc(9,0,0)
-import           GHC.Utils.Misc                (OverridingBool(..))
+import qualified GHC.Utils.Misc as GHC         (OverridingBool(..))
 #else
-import           Util                          (OverridingBool(..))
+import qualified Util as GHC                   (OverridingBool(..))
 #endif
 
 import           Clash.Annotations.Primitive
@@ -112,9 +112,9 @@ warn opts msg = do
   -- TODO: Put in appropriate module
   useColor <-
     case opt_color opts of
-      Always -> return True
-      Never  -> return False
-      Auto   -> hIsTerminalDevice stderr
+      GHC.Always -> return True
+      GHC.Never  -> return False
+      GHC.Auto   -> hIsTerminalDevice stderr
 
   hSetSGR stderr [SetConsoleIntensity BoldIntensity]
 
@@ -581,7 +581,7 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                   (_,bindDecls) <- mkExpr True Sequential dst arg0
                   return (Noop, bindDecls)
 
-          | pNm == "Clash.Explicit.SimIO.unSimIO#" ->
+          | pNm == "Clash.Explicit.SimIO.unSimIO" ->
               case lefts args of
                 (arg:_) -> mkExpr False Sequential dst arg
                 _ -> error "internal error: insufficient arguments"
@@ -817,7 +817,9 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
           _ -> mkExpr False Concurrent dst (C.Var result)
       let resAssn = case resExpr of
             Noop -> []
-            _ -> [Seq [AlwaysComb [SeqDecl (Assignment dstNm resExpr)]]]
+            _ ->
+              let sensitivity = ValueChanges (usedVariables resExpr)
+               in [Seq [Always sensitivity [SeqDecl (Assignment dstNm resExpr)]]]
 
       -- Create the declarations for the "initial state" block
       let sDst = case sBinders of
@@ -861,14 +863,34 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
       -- collect the declarations related to the input
       let netDeclsInp1 = netDeclsInp ++ inpDeclsMisc
 
+      -- Filter out Assignment to newly declared signals and instead declare
+      -- signals with initial values. If we put assignments in initial blocks
+      -- then rendering VHDL will discard them. An exception to this is
+      -- assignments where the RHS is a blackbox call, since things like $fopen
+      -- in verilog can't be used in the initial register value.
+      --
+      -- See NOTE [assignments in `Initial` blocks] in Clash.Netlist.Types.
+
+      -- let (assignDecls, otherDecls) = List.partition isAssignment initDeclsOther
+
+      let (assigns, initOther) = partition isAssignment (initDeclsOther ++ initAssign)
+      let (netDeclsSeq2, initAssign1) = foldr updateDecl (netDeclsSeq1, []) assigns
+
+      let initDecls1 = initAssign1 ++ initOther
+
+      let processes = if null initDecls1
+                        then [ Seq [Always (ClockEdge clkExpr edge) (map SeqDecl seqDeclsOther)]
+                             ]
+                        else [ Seq [Initial (map SeqDecl initDecls1)]
+                             , Seq [Always (ClockEdge clkExpr edge) (map SeqDecl seqDeclsOther)]
+                             ]
+
       -- Collate everything
-      return (clkDecls ++ netDeclsSeq1 ++ netDeclsInp1 ++
+      return (clkDecls ++ netDeclsSeq2 ++ netDeclsInp1 ++
                 [ case iBinders of
                     ((i,_):_) -> Assignment (id2identifier i) exprArg
                     _ -> error "internal error: insufficient iBinders"
-                , Seq [Initial (map SeqDecl (initDeclsOther ++ initAssign))]
-                , Seq [AlwaysClocked edge clkExpr (map SeqDecl seqDeclsOther)]
-                ] ++ resAssn)
+                ] ++ processes ++ resAssn)
     _ -> error "internal error"
  where
   isNet NetDecl{} = True
@@ -876,6 +898,23 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
 
   toReg (NetDecl cmM _ r ty eM) = NetDecl cmM Blocking r ty eM
   toReg d = d
+
+  updateDecl a@(Assignment i e) (ds,as)
+    -- Only assign if the expression is constant. This means it is not an
+    -- identifier referring to another signal, nor a procedure like $fopen in
+    -- Verilog which performs an IO action.
+    | isConstExpr e
+    = let ds' = flip map ds $ \case
+                  NetDecl mc wr j ty _
+                    |  i == j -> NetDecl mc wr j ty (Just e)
+
+                  d -> d
+       in (ds', as)
+
+    | otherwise
+    = (ds, a:as)
+
+  updateDecl _ _ = error "updateDecl: internal error"
 
 collectMealy _ _ _ _ = error "internal error"
 
@@ -960,7 +999,7 @@ unSimIO tcm arg =
   in  case tyView argTy of
         TyConApp _ [tcArg] ->
           mkApps (Prim (PrimInfo
-                          "Clash.Explicit.SimIO.unSimIO#"
+                          "Clash.Explicit.SimIO.unSimIO"
                           (mkFunTy argTy tcArg)
                           WorkNever
                           SingleResult

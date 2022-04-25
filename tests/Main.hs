@@ -733,6 +733,20 @@ runClashTest = defaultMain $ clashTestRoot
                           , verilate=SimOnly
                           }
            in runTest "Test00" _opts
+        , let _opts = def { hdlTargets=[Verilog,SystemVerilog]
+                          , vvpStdoutNonEmptyFail=False
+                          , buildTargets=BuildSpecific ["topEntity"]
+                          , verilate=SimOnly
+                          }
+           in runTest "Reg" _opts
+          -- Different options for VHDL, since pre-2008 we don't have a proper
+          -- analogue to $finish. Instead we report the exit status with the
+          -- failure severity to stop simulation...
+        , let _opts = def { hdlTargets=[VHDL]
+                          , buildTargets=BuildSpecific ["topEntity"]
+                          , expectSimFail=Just(def, "Exit: 0")
+                          }
+           in runTest "Reg" _opts
         ]
       , clashTestGroup "SynthesisAttributes"
         [ outputTest "Simple" def

@@ -1,5 +1,6 @@
 {-|
 Copyright  :  (C) 2019, Myrtle Software Ltd
+                  2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -21,7 +22,7 @@ module Clash.Verification.Pretty
 import           Clash.Annotations.Primitive      (HDL(..))
 import           Clash.Signal.Internal            (ActiveEdge, ActiveEdge(..))
 import           Clash.Verification.Internal      hiding (assertion)
-import           Clash.Netlist.Types              (Declaration(..), Seq(..), Expr, CommentOrDirective(..))
+import           Clash.Netlist.Types              (Declaration(..), Seq(..), Expr, CommentOrDirective(..), Sensitivity(..))
 import           Data.Maybe                       (fromMaybe)
 import           Data.Text                        (Text)
 import qualified Data.Text as Text                (pack)
@@ -267,7 +268,7 @@ pprYosysSvaProperty
   -> Declaration
 pprYosysSvaProperty propName clk edge assertion = ConditionalDecl
   "FORMAL"
-  [Seq [AlwaysClocked edge clk [SeqDecl (TickDecl directive)]]]
+  [Seq [Always (ClockEdge clk edge) [SeqDecl (TickDecl directive)]]]
  where
   directive = Directive
     (propName <> ": " <> coverOrAssert <> " property (" <> prop <> ")")
