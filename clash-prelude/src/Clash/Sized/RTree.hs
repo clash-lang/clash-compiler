@@ -19,7 +19,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 module Clash.Sized.RTree
   ( -- * 'RTree' data type
-    RTree (LR, BR)
+    RTree (LR, BR, RLeaf, RBranch)
     -- * Construction
   , treplicate
   , trepeat
@@ -105,26 +105,26 @@ let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index
 -- * Only has elements at the leaf of the tree
 -- * A tree of depth /d/ has /2^d/ elements.
 data RTree :: Nat -> Type -> Type where
-  LR_ :: a -> RTree 0 a
-  BR_ :: RTree d a -> RTree d a -> RTree (d+1) a
+  RLeaf :: a -> RTree 0 a
+  RBranch :: RTree d a -> RTree d a -> RTree (d+1) a
 
 instance NFData a => NFData (RTree d a) where
-    rnf (LR_ x) = rnf x
-    rnf (BR_ l r ) = rnf l `seq` rnf r
+    rnf (RLeaf x) = rnf x
+    rnf (RBranch l r ) = rnf l `seq` rnf r
 
 textract :: RTree 0 a -> a
-textract (LR_ x)   = x
-textract (BR_ _ _) = error $ "textract: nodes hold no values"
+textract (RLeaf x)   = x
+textract (RBranch _ _) = error $ "textract: nodes hold no values"
 {-# NOINLINE textract #-}
 {-# ANN textract hasBlackBox #-}
 
 tsplit :: RTree (d+1) a -> (RTree d a,RTree d a)
-tsplit (BR_ l r) = (l,r)
-tsplit (LR_ _)   = error $ "tsplit: leaf is atomic"
+tsplit (RBranch l r) = (l,r)
+tsplit (RLeaf _)   = error $ "tsplit: leaf is atomic"
 {-# NOINLINE tsplit #-}
 {-# ANN tsplit hasBlackBox #-}
 
--- | Leaf of a perfect depth tree
+-- | RLeaf of a perfect depth tree
 --
 -- >>> LR 1
 -- 1
@@ -142,9 +142,9 @@ tsplit (LR_ _)   = error $ "tsplit: leaf is atomic"
 pattern LR :: a -> RTree 0 a
 pattern LR x <- (textract -> x)
   where
-    LR x = LR_ x
+    LR x = RLeaf x
 
--- | Branch of a perfect depth tree
+-- | RBranch of a perfect depth tree
 --
 -- >>> BR (LR 1) (LR 2)
 -- <1,2>
@@ -162,7 +162,7 @@ pattern LR x <- (textract -> x)
 pattern BR :: RTree d a -> RTree d a -> RTree (d+1) a
 pattern BR l r <- ((\t -> (tsplit t)) -> (l,r))
   where
-    BR l r = BR_ l r
+    BR l r = RBranch l r
 
 instance (KnownNat d, Eq a) => Eq (RTree d a) where
   (==) t1 t2 = (==) (t2v t1) (t2v t2)
@@ -171,15 +171,15 @@ instance (KnownNat d, Ord a) => Ord (RTree d a) where
   compare t1 t2 = compare (t2v t1) (t2v t2)
 
 instance Show a => Show (RTree n a) where
-  showsPrec _ (LR_ a)   = shows a
-  showsPrec _ (BR_ l r) = \s -> '<':shows l (',':shows r ('>':s))
+  showsPrec _ (RLeaf a)   = shows a
+  showsPrec _ (RBranch l r) = \s -> '<':shows l (',':shows r ('>':s))
 
 instance ShowX a => ShowX (RTree n a) where
   showsPrecX = showsPrecXWith go
     where
       go :: Int -> RTree d a -> ShowS
-      go _ (LR_ a)   = showsX a
-      go _ (BR_ l r) = \s -> '<':showsX l (',':showsX r ('>':s))
+      go _ (RLeaf a)   = showsX a
+      go _ (RBranch l r) = \s -> '<':showsX l (',':showsX r ('>':s))
 
 instance KnownNat d => Functor (RTree d) where
   fmap = tmap
@@ -215,8 +215,8 @@ instance (KnownNat d, Default a) => Default (RTree d a) where
   def = trepeat def
 
 instance Lift a => Lift (RTree d a) where
-  lift (LR_ a)     = [| LR_ a |]
-  lift (BR_ t1 t2) = [| BR_ $(lift t1) $(lift t2) |]
+  lift (RLeaf a)     = [| RLeaf a |]
+  lift (RBranch t1 t2) = [| RBranch $(lift t1) $(lift t2) |]
 #if MIN_VERSION_template_haskell(2,16,0)
   liftTyped = liftTypedFromUntyped
 #endif
@@ -234,14 +234,14 @@ instance (KnownNat d, NFDataX a) => NFDataX (RTree d a) where
   rnfX t = if isLeft (isX t) then () else go t
    where
     go :: RTree d a -> ()
-    go (LR_ x)   = rnfX x
-    go (BR_ l r) = rnfX l `seq` rnfX r
+    go (RLeaf x)   = rnfX x
+    go (RBranch l r) = rnfX l `seq` rnfX r
 
   hasUndefined t = if isLeft (isX t) then True else go t
    where
     go :: RTree d a -> Bool
-    go (LR_ x)   = hasUndefined x
-    go (BR_ l r) = hasUndefined l || hasUndefined r
+    go (RLeaf x)   = hasUndefined x
+    go (RBranch l r) = hasUndefined l || hasUndefined r
 
   ensureSpine = fmap ensureSpine . lazyT
 
@@ -370,8 +370,8 @@ tdfold :: forall p k a . KnownNat k
 tdfold _ f g = go SNat
   where
     go :: SNat m -> RTree m a -> (p @@ m)
-    go _  (LR_ a)   = f a
-    go sn (BR_ l r) = let sn' = sn `subSNat` d1
+    go _  (RLeaf a)   = f a
+    go sn (RBranch l r) = let sn' = sn `subSNat` d1
                       in  g sn' (go sn' l) (go sn' r)
 {-# NOINLINE tdfold #-}
 {-# ANN tdfold hasBlackBox #-}
