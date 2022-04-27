@@ -24,6 +24,8 @@ module Clash.Sized.RTree
   , treplicate
   , trepeat
     -- * Accessors
+  , thead
+  , tlast
     -- ** Indexing
   , indexTree
   , tindices
@@ -41,6 +43,12 @@ module Clash.Sized.RTree
   , tfold
     -- ** Specialised folds
   , tdfold
+    -- ** Prefix sums (scans)
+    -- $scans
+  , scanlPar
+  , tscanl
+  , scanrPar
+  , tscanr
     -- * Conversions
   , v2t
   , t2v
@@ -63,13 +71,13 @@ import Language.Haskell.TH.Syntax  (Lift(..))
 #if MIN_VERSION_template_haskell(2,16,0)
 import Language.Haskell.TH.Compat
 #endif
-import Prelude                     hiding ((++), (!!))
+import Prelude                     hiding ((++), (!!), map)
 import Test.QuickCheck             (Arbitrary (..), CoArbitrary (..))
 
 import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Class.BitPack         (BitPack (..), packXWith)
-import Clash.Promoted.Nat          (SNat (..), UNat (..), pow2SNat, snatToNum,
-                                    subSNat, toUNat)
+import Clash.Promoted.Nat          (SNat (..), UNat (..),
+                                    pow2SNat, snatToNum, subSNat, toUNat)
 import Clash.Promoted.Nat.Literals (d1)
 import Clash.Sized.Index           (Index)
 import Clash.Sized.Vector          (Vec (..), (!!), (++), dtfold, replace)
@@ -537,3 +545,126 @@ lazyT :: KnownNat d
       => RTree d a
       -> RTree d a
 lazyT = tzipWith (flip const) (trepeat ())
+
+-- | Extract the first element of a tree
+--
+-- The first element is defined to be the bottom-left leaf.
+--
+-- >>> thead $ BR (BR (LR 1) (LR 2)) (BR (LR 3) (LR 4))
+-- 1
+thead :: RTree n a -> a
+thead (RLeaf x) = x
+thead (RBranch x _) = thead x
+
+-- | Extract the last element of a tree
+--
+-- The last element is defined to be the bottom-right leaf.
+--
+-- >>> tlast $ BR (BR (LR 1) (LR 2)) (BR (LR 3) (LR 4))
+-- 4
+tlast :: RTree n a -> a
+tlast (RLeaf x) = x
+tlast (RBranch _ y) = tlast y
+
+{- $scans #scans#
+
+Scans (`Clash.Sized.Vector.scanl`, `Clash.Sized.Vector.scanr`) are similar to
+folds (`Clash.Sized.Vector.foldl`, `Clash.Sized.Vector.foldr`) but return a list
+of successive reduced values. When the binary reduction operator @f@ is
+associative, the scan functions in this module can be characterized as follows:
+
+> tscanl f [x1, x2, x3, ...] == [x1, x1 `f` x2, x1 `f` x2 `f` x3, ...]
+
+> tscanr f [..., xn2, xn1, xn] == [..., xn2 `f` xn1 `f` xn, xn1 `f` xn, xn]
+
+The scan functions in this module provide a different trade-off between circuit
+size and logic depth than the default `Clash.Sized.Vector.scanl` and
+`Clash.Sized.Vector.scanr` functions. When \(n\) is the number of elements,
+circuit size is \(\mathcal{O}(n \cdot \log n)\), but logic depth is \(\mathcal{O}(\log n)\).
+This means the resource usage will likely increase, but the maximum clock
+frequency also increases due to the reduced logic depth. The exact amount of
+instantiations of @f@ given a tree of depth /d/ is:
+
+> work 0 = 0
+> work d = 2 ^ (d - 1) + 2 * work (d - 1)
+
+-}
+
+-- | `tscanl` applied to `Vec`
+--
+-- >>> scanlPar (+) (1 :> 2 :> 3 :> 4 :> Nil)
+-- 1 :> 3 :> 6 :> 10 :> Nil
+scanlPar ::
+  KnownNat n =>
+  -- | Must be associative
+  (a -> a -> a) ->
+  Vec (2^n) a ->
+  Vec (2^n) a
+scanlPar op = t2v . tscanl op . v2t
+{-# INLINE scanlPar #-}
+
+-- | `tscanr` applied to `Vec`
+--
+-- >>> scanrPar (+) (1 :> 2 :> 3 :> 4 :> Nil)
+-- 10 :> 9 :> 7 :> 4 :> Nil
+scanrPar ::
+  KnownNat n =>
+   -- | Must be associative
+  (a -> a -> a) ->
+  Vec (2^n) a ->
+  Vec (2^n) a
+scanrPar op = t2v . tscanr op . v2t
+{-# INLINE scanrPar #-}
+
+-- | Low-depth left scan
+--
+-- `tscanl` is similar to `Clash.Sized.Vector.foldl`, but returns a tree of
+-- successive reduced values from the left:
+--
+-- > tscanl f [x1, x2, x3, ...] == [x1, x1 `f` x2, x1 `f` x2 `f` x3, ...]
+--
+-- >>> tscanl (+) (v2t (1 :> 2 :> 3 :> 4 :> Nil))
+-- <<1,3>,<6,10>>
+--
+-- <<doc/scanlPar.svg>>
+tscanl ::
+  forall a n.
+  KnownNat n =>
+  -- | Must be associative
+  (a -> a -> a) ->
+  RTree n a ->
+  RTree n a
+tscanl op tr =
+  case tr of
+    RLeaf x -> LR x
+    RBranch x y ->
+      let
+        x' = tscanl op x
+        y' = tscanl op y
+        l = tlast x'
+      in BR x' (fmap (l `op`) y')
+
+-- | Low-depth right scan
+--
+-- `tscanr` is similar to `Clash.Sized.Vector.foldr`, but returns a tree of
+-- successive reduced values from the left:
+--
+-- > tscanr f [..., xn2, xn1, xn] == [..., xn2 `f` xn1 `f` xn, xn1 `f` xn, xn]
+--
+-- >>> tscanr (+) (v2t (1 :> 2 :> 3 :> 4 :> Nil))
+-- <<10,9>,<7,4>>
+tscanr ::
+  forall a n.
+  KnownNat n =>
+  (a -> a -> a) ->
+  RTree n a ->
+  RTree n a
+tscanr op tr =
+  case tr of
+    RLeaf x -> LR x
+    RBranch x y ->
+        let
+          x' = tscanr op x
+          y' = tscanr op y
+          l = thead y'
+        in BR (fmap (l `op`) x') y'
