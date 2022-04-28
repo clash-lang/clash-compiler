@@ -19,11 +19,13 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 module Clash.Sized.RTree
   ( -- * 'RTree' data type
-    RTree (LR, BR)
+    RTree (LR, BR, RLeaf, RBranch)
     -- * Construction
   , treplicate
   , trepeat
     -- * Accessors
+  , thead
+  , tlast
     -- ** Indexing
   , indexTree
   , tindices
@@ -41,6 +43,12 @@ module Clash.Sized.RTree
   , tfold
     -- ** Specialised folds
   , tdfold
+    -- ** Prefix sums (scans)
+    -- $scans
+  , scanlPar
+  , tscanl
+  , scanrPar
+  , tscanr
     -- * Conversions
   , v2t
   , t2v
@@ -63,13 +71,13 @@ import Language.Haskell.TH.Syntax  (Lift(..))
 #if MIN_VERSION_template_haskell(2,16,0)
 import Language.Haskell.TH.Compat
 #endif
-import Prelude                     hiding ((++), (!!))
+import Prelude                     hiding ((++), (!!), map)
 import Test.QuickCheck             (Arbitrary (..), CoArbitrary (..))
 
 import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Class.BitPack         (BitPack (..), packXWith)
-import Clash.Promoted.Nat          (SNat (..), UNat (..), pow2SNat, snatToNum,
-                                    subSNat, toUNat)
+import Clash.Promoted.Nat          (SNat (..), UNat (..),
+                                    pow2SNat, snatToNum, subSNat, toUNat)
 import Clash.Promoted.Nat.Literals (d1)
 import Clash.Sized.Index           (Index)
 import Clash.Sized.Vector          (Vec (..), (!!), (++), dtfold, replace)
@@ -105,26 +113,26 @@ let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index
 -- * Only has elements at the leaf of the tree
 -- * A tree of depth /d/ has /2^d/ elements.
 data RTree :: Nat -> Type -> Type where
-  LR_ :: a -> RTree 0 a
-  BR_ :: RTree d a -> RTree d a -> RTree (d+1) a
+  RLeaf :: a -> RTree 0 a
+  RBranch :: RTree d a -> RTree d a -> RTree (d+1) a
 
 instance NFData a => NFData (RTree d a) where
-    rnf (LR_ x) = rnf x
-    rnf (BR_ l r ) = rnf l `seq` rnf r
+    rnf (RLeaf x) = rnf x
+    rnf (RBranch l r ) = rnf l `seq` rnf r
 
 textract :: RTree 0 a -> a
-textract (LR_ x)   = x
-textract (BR_ _ _) = error $ "textract: nodes hold no values"
+textract (RLeaf x)   = x
+textract (RBranch _ _) = error $ "textract: nodes hold no values"
 {-# NOINLINE textract #-}
 {-# ANN textract hasBlackBox #-}
 
 tsplit :: RTree (d+1) a -> (RTree d a,RTree d a)
-tsplit (BR_ l r) = (l,r)
-tsplit (LR_ _)   = error $ "tsplit: leaf is atomic"
+tsplit (RBranch l r) = (l,r)
+tsplit (RLeaf _)   = error $ "tsplit: leaf is atomic"
 {-# NOINLINE tsplit #-}
 {-# ANN tsplit hasBlackBox #-}
 
--- | Leaf of a perfect depth tree
+-- | RLeaf of a perfect depth tree
 --
 -- >>> LR 1
 -- 1
@@ -142,9 +150,9 @@ tsplit (LR_ _)   = error $ "tsplit: leaf is atomic"
 pattern LR :: a -> RTree 0 a
 pattern LR x <- (textract -> x)
   where
-    LR x = LR_ x
+    LR x = RLeaf x
 
--- | Branch of a perfect depth tree
+-- | RBranch of a perfect depth tree
 --
 -- >>> BR (LR 1) (LR 2)
 -- <1,2>
@@ -162,7 +170,7 @@ pattern LR x <- (textract -> x)
 pattern BR :: RTree d a -> RTree d a -> RTree (d+1) a
 pattern BR l r <- ((\t -> (tsplit t)) -> (l,r))
   where
-    BR l r = BR_ l r
+    BR l r = RBranch l r
 
 instance (KnownNat d, Eq a) => Eq (RTree d a) where
   (==) t1 t2 = (==) (t2v t1) (t2v t2)
@@ -171,15 +179,15 @@ instance (KnownNat d, Ord a) => Ord (RTree d a) where
   compare t1 t2 = compare (t2v t1) (t2v t2)
 
 instance Show a => Show (RTree n a) where
-  showsPrec _ (LR_ a)   = shows a
-  showsPrec _ (BR_ l r) = \s -> '<':shows l (',':shows r ('>':s))
+  showsPrec _ (RLeaf a)   = shows a
+  showsPrec _ (RBranch l r) = \s -> '<':shows l (',':shows r ('>':s))
 
 instance ShowX a => ShowX (RTree n a) where
   showsPrecX = showsPrecXWith go
     where
       go :: Int -> RTree d a -> ShowS
-      go _ (LR_ a)   = showsX a
-      go _ (BR_ l r) = \s -> '<':showsX l (',':showsX r ('>':s))
+      go _ (RLeaf a)   = showsX a
+      go _ (RBranch l r) = \s -> '<':showsX l (',':showsX r ('>':s))
 
 instance KnownNat d => Functor (RTree d) where
   fmap = tmap
@@ -215,8 +223,8 @@ instance (KnownNat d, Default a) => Default (RTree d a) where
   def = trepeat def
 
 instance Lift a => Lift (RTree d a) where
-  lift (LR_ a)     = [| LR_ a |]
-  lift (BR_ t1 t2) = [| BR_ $(lift t1) $(lift t2) |]
+  lift (RLeaf a)     = [| RLeaf a |]
+  lift (RBranch t1 t2) = [| RBranch $(lift t1) $(lift t2) |]
 #if MIN_VERSION_template_haskell(2,16,0)
   liftTyped = liftTypedFromUntyped
 #endif
@@ -234,14 +242,14 @@ instance (KnownNat d, NFDataX a) => NFDataX (RTree d a) where
   rnfX t = if isLeft (isX t) then () else go t
    where
     go :: RTree d a -> ()
-    go (LR_ x)   = rnfX x
-    go (BR_ l r) = rnfX l `seq` rnfX r
+    go (RLeaf x)   = rnfX x
+    go (RBranch l r) = rnfX l `seq` rnfX r
 
   hasUndefined t = if isLeft (isX t) then True else go t
    where
     go :: RTree d a -> Bool
-    go (LR_ x)   = hasUndefined x
-    go (BR_ l r) = hasUndefined l || hasUndefined r
+    go (RLeaf x)   = hasUndefined x
+    go (RBranch l r) = hasUndefined l || hasUndefined r
 
   ensureSpine = fmap ensureSpine . lazyT
 
@@ -370,8 +378,8 @@ tdfold :: forall p k a . KnownNat k
 tdfold _ f g = go SNat
   where
     go :: SNat m -> RTree m a -> (p @@ m)
-    go _  (LR_ a)   = f a
-    go sn (BR_ l r) = let sn' = sn `subSNat` d1
+    go _  (RLeaf a)   = f a
+    go sn (RBranch l r) = let sn' = sn `subSNat` d1
                       in  g sn' (go sn' l) (go sn' r)
 {-# NOINLINE tdfold #-}
 {-# ANN tdfold hasBlackBox #-}
@@ -537,3 +545,126 @@ lazyT :: KnownNat d
       => RTree d a
       -> RTree d a
 lazyT = tzipWith (flip const) (trepeat ())
+
+-- | Extract the first element of a tree
+--
+-- The first element is defined to be the bottom-left leaf.
+--
+-- >>> thead $ BR (BR (LR 1) (LR 2)) (BR (LR 3) (LR 4))
+-- 1
+thead :: RTree n a -> a
+thead (RLeaf x) = x
+thead (RBranch x _) = thead x
+
+-- | Extract the last element of a tree
+--
+-- The last element is defined to be the bottom-right leaf.
+--
+-- >>> tlast $ BR (BR (LR 1) (LR 2)) (BR (LR 3) (LR 4))
+-- 4
+tlast :: RTree n a -> a
+tlast (RLeaf x) = x
+tlast (RBranch _ y) = tlast y
+
+{- $scans #scans#
+
+Scans (`Clash.Sized.Vector.scanl`, `Clash.Sized.Vector.scanr`) are similar to
+folds (`Clash.Sized.Vector.foldl`, `Clash.Sized.Vector.foldr`) but return a list
+of successive reduced values. When the binary reduction operator @f@ is
+associative, the scan functions in this module can be characterized as follows:
+
+> tscanl f [x1, x2, x3, ...] == [x1, x1 `f` x2, x1 `f` x2 `f` x3, ...]
+
+> tscanr f [..., xn2, xn1, xn] == [..., xn2 `f` xn1 `f` xn, xn1 `f` xn, xn]
+
+The scan functions in this module provide a different trade-off between circuit
+size and logic depth than the default `Clash.Sized.Vector.scanl` and
+`Clash.Sized.Vector.scanr` functions. When \(n\) is the number of elements,
+circuit size is \(\mathcal{O}(n \cdot \log n)\), but logic depth is \(\mathcal{O}(\log n)\).
+This means the resource usage will likely increase, but the maximum clock
+frequency also increases due to the reduced logic depth. The exact amount of
+instantiations of @f@ given a tree of depth /d/ is:
+
+> work 0 = 0
+> work d = 2 ^ (d - 1) + 2 * work (d - 1)
+
+-}
+
+-- | `tscanl` applied to `Vec`
+--
+-- >>> scanlPar (+) (1 :> 2 :> 3 :> 4 :> Nil)
+-- 1 :> 3 :> 6 :> 10 :> Nil
+scanlPar ::
+  KnownNat n =>
+  -- | Must be associative
+  (a -> a -> a) ->
+  Vec (2^n) a ->
+  Vec (2^n) a
+scanlPar op = t2v . tscanl op . v2t
+{-# INLINE scanlPar #-}
+
+-- | `tscanr` applied to `Vec`
+--
+-- >>> scanrPar (+) (1 :> 2 :> 3 :> 4 :> Nil)
+-- 10 :> 9 :> 7 :> 4 :> Nil
+scanrPar ::
+  KnownNat n =>
+   -- | Must be associative
+  (a -> a -> a) ->
+  Vec (2^n) a ->
+  Vec (2^n) a
+scanrPar op = t2v . tscanr op . v2t
+{-# INLINE scanrPar #-}
+
+-- | Low-depth left scan
+--
+-- `tscanl` is similar to `Clash.Sized.Vector.foldl`, but returns a tree of
+-- successive reduced values from the left:
+--
+-- > tscanl f [x1, x2, x3, ...] == [x1, x1 `f` x2, x1 `f` x2 `f` x3, ...]
+--
+-- >>> tscanl (+) (v2t (1 :> 2 :> 3 :> 4 :> Nil))
+-- <<1,3>,<6,10>>
+--
+-- <<doc/scanlPar.svg>>
+tscanl ::
+  forall a n.
+  KnownNat n =>
+  -- | Must be associative
+  (a -> a -> a) ->
+  RTree n a ->
+  RTree n a
+tscanl op tr =
+  case tr of
+    RLeaf x -> LR x
+    RBranch x y ->
+      let
+        x' = tscanl op x
+        y' = tscanl op y
+        l = tlast x'
+      in BR x' (fmap (l `op`) y')
+
+-- | Low-depth right scan
+--
+-- `tscanr` is similar to `Clash.Sized.Vector.foldr`, but returns a tree of
+-- successive reduced values from the left:
+--
+-- > tscanr f [..., xn2, xn1, xn] == [..., xn2 `f` xn1 `f` xn, xn1 `f` xn, xn]
+--
+-- >>> tscanr (+) (v2t (1 :> 2 :> 3 :> 4 :> Nil))
+-- <<10,9>,<7,4>>
+tscanr ::
+  forall a n.
+  KnownNat n =>
+  (a -> a -> a) ->
+  RTree n a ->
+  RTree n a
+tscanr op tr =
+  case tr of
+    RLeaf x -> LR x
+    RBranch x y ->
+        let
+          x' = tscanr op x
+          y' = tscanr op y
+          l = thead y'
+        in BR (fmap (l `op`) x') y'
