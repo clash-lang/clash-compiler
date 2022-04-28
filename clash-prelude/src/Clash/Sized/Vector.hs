@@ -1103,9 +1103,12 @@ fold f vs = fold' (toList vs)
 --
 -- <<doc/scanl.svg>>
 --
--- __NB__:
+-- * __NB__:
 --
--- > last (scanl f z xs) == foldl f z xs
+--     > last (scanl f z xs) == foldl f z xs
+--
+-- * For a different trade-off between circuit size and logic depth for
+-- associative operators, see "Clash.Sized.RTree#scans"
 scanl :: (b -> a -> b) -> b -> Vec n a -> Vec (n + 1) b
 scanl f z xs = ws
   where
@@ -1154,9 +1157,12 @@ postscanl f z xs = tail (scanl f z xs)
 --
 -- <<doc/scanr.svg>>
 --
--- __NB__:
+-- * __NB__:
 --
--- > head (scanr f z xs) == foldr f z xs
+--     > head (scanr f z xs) == foldr f z xs
+--
+-- * For a different trade-off between circuit size and logic depth for
+-- associative operators, see "Clash.Sized.RTree#scans"
 scanr :: (a -> b -> b) -> b -> Vec n a -> Vec (n + 1) b
 scanr f z xs = ws
   where
