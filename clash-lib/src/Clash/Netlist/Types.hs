@@ -23,7 +23,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Netlist.Types
-  ( Declaration (..,NetDecl)
+  ( Declaration (.., SignalDecl, VarDecl)
   , module Clash.Netlist.Types
   )
 where
@@ -37,7 +37,7 @@ import Control.Monad.Fail                   (MonadFail)
 import Control.Monad.Reader                 (ReaderT, MonadReader)
 import qualified Control.Monad.State        as Lazy (State)
 import qualified Control.Monad.State.Strict as Strict
-  (State, MonadIO, MonadState, StateT)
+  (State, MonadIO, MonadState, StateT, gets)
 import Data.Bits                            (testBit)
 import Data.Binary                          (Binary(..))
 import Data.Function                        (on)
@@ -68,7 +68,7 @@ import SrcLoc                               (SrcSpan)
 import Clash.Annotations.BitRepresentation  (FieldAnn)
 import Clash.Annotations.Primitive          (HDL(..))
 import Clash.Annotations.TopEntity          (TopEntity)
-import Clash.Backend                        (Backend)
+import Clash.Backend                        (Backend(hdlKind))
 import Clash.Core.HasType
 import Clash.Core.Type                      (Type)
 import Clash.Core.Var                       (Attr', Id)
@@ -372,7 +372,7 @@ data Component
   = Component
   { componentName :: !Identifier -- ^ Name of the component
   , inputs        :: [(Identifier,HWType)] -- ^ Input ports
-  , outputs       :: [(WireOrReg,(Identifier,HWType),Maybe Expr)] -- ^ Output ports
+  , outputs       :: [(Blocking,(Identifier,HWType),Maybe Expr)] -- ^ Output ports
   , declarations  :: [Declaration] -- ^ Internal declarations
   }
   deriving (Show, Generic, NFData)
@@ -539,10 +539,10 @@ data Declaration
       !BlackBox                -- ^ Template tokens
       BlackBoxContext          -- ^ Context in which tokens should be rendered
 
-  -- | Signal declaration
-  | NetDecl'
+  -- | Signal or variable declaration
+  | NetDecl
       (Maybe Comment)                -- ^ Note; will be inserted as a comment in target hdl
-      WireOrReg                      -- ^ Wire or register
+      Blocking                       -- ^ Wire or register
       !Identifier                    -- ^ Name of signal
       (Either IdentifierText HWType) -- ^ Pointer to type of signal or type of signal
       (Maybe Expr)                   -- ^ Initial value
@@ -588,22 +588,55 @@ data Seq
 data EntityOrComponent = Entity | Comp | Empty
   deriving Show
 
-data WireOrReg = Wire | Reg
-  deriving (Show,Generic)
+-- | Indicate whether a declaration is blocking (like `variable` in VHDL or
+-- `reg` in Verilog), or non-blocking (like `signal` in VHDL or `wire` in
+-- Verilog). This affects how values are updated, and may impact where
+-- delclataions occur in generated HDL.
+--
+data Blocking
+  = Blocking
+  -- ^ Assignment occurs immediately
+  | NonBlocking
+  -- ^ Assignment occurs in the next time step
+  deriving (Generic, NFData, Show)
 
-instance NFData WireOrReg
-
-pattern NetDecl
+-- | Declare a new net which is non-blocking.
+pattern SignalDecl
   :: Maybe Comment
   -- ^ Note; will be inserted as a comment in target hdl
   -> Identifier
   -- ^ Name of signal
   -> HWType
   -- ^ Type of signal
+  -> Maybe Expr
+  -- ^ Initial value
   -> Declaration
-pattern NetDecl note d ty <- NetDecl' note Wire d (Right ty) _
-  where
-    NetDecl note d ty = NetDecl' note Wire d (Right ty) Nothing
+pattern SignalDecl note d ty e =
+  NetDecl note NonBlocking d (Right ty) e
+
+-- | Declare a new net which is blocking.
+pattern VarDecl
+  :: Maybe Comment
+  -> Identifier
+  -> HWType
+  -> Maybe Expr
+  -> Declaration
+pattern VarDecl note d ty e =
+  NetDecl note Blocking d (Right ty) e
+
+-- | Render a net as a reg in Verilog or a signal in VHDL.
+regOrSignal
+  :: Maybe Comment
+  -> Identifier
+  -> HWType
+  -> Maybe Expr
+  -> NetlistMonad Declaration
+regOrSignal note i ty e = do
+  SomeBackend b <- Strict.gets _backend
+
+  case hdlKind b of
+    VHDL -> pure (SignalDecl note i ty e)
+    _ -> pure (VarDecl note i ty e)
 
 data PortDirection = In | Out
   deriving (Eq,Ord,Show,Generic,NFData,Hashable)
@@ -658,6 +691,18 @@ data Expr
 instance NFData Expr where
   rnf x = x `seq` ()
 
+isConstExpr :: Expr -> Bool
+isConstExpr = \case
+  Literal{} -> True
+  DataCon _ _ es -> all isConstExpr es
+  Identifier{} -> False
+  DataTag{} -> False
+  BlackBoxE{} -> False
+  ToBv _ _ e -> isConstExpr e
+  FromBv _ _ e -> isConstExpr e
+  IfThenElse{} -> False
+  Noop -> False
+
 -- | Literals used in an expression
 data Literal
   = NumLit    !Integer          -- ^ Number literal
@@ -696,7 +741,7 @@ data BlackBoxContext
   , bbInputs :: [(Expr,HWType,Bool)]
   -- ^ Argument names, types, and whether it is a literal
   , bbFunctions :: IntMap [(Either BlackBox (Identifier,[Declaration])
-                          ,WireOrReg
+                          ,Blocking
                           ,[BlackBoxTemplate]
                           ,[BlackBoxTemplate]
                           ,[((Text,Text),BlackBox)]

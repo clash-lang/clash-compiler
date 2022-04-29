@@ -13,6 +13,7 @@
 
 module Clash.Primitives.Intel.ClockGen where
 
+import Clash.Annotations.Primitive (HDL(VHDL))
 import Clash.Backend
 import Clash.Netlist.BlackBox.Util
 import qualified Clash.Netlist.Id as Id
@@ -88,10 +89,15 @@ alteraPllTemplate bbCtx = do
 
  let outclkPorts = map (\n -> instPort ("outclk_" <> showt n)) [(0 :: Int)..length clocks-1]
 
+ hdl <- gets hdlKind
+ let blockingIfVerilog = case hdl of
+                           VHDL -> NonBlocking
+                           _ -> Blocking
+
  getAp $ blockDecl alteraPll $ concat
-  [[ NetDecl Nothing locked Bit
-   , NetDecl' Nothing Reg pllLock (Right Bool) Nothing]
-  ,[ NetDecl Nothing clkNm ty | (clkNm,ty) <- zip clocks tys]
+  [[ SignalDecl Nothing locked Bit Nothing
+   , NetDecl Nothing blockingIfVerilog pllLock (Right Bool) Nothing]
+  ,[ SignalDecl Nothing clkNm ty Nothing | (clkNm,ty) <- zip clocks tys]
   ,[ InstDecl Comp Nothing [] compName alteraPll_inst [] $ NamedPortMap $ concat
       [ [ (instPort "refclk", In, clkTy, clk)
         , (instPort "rst", In, rstTy, rst)]
@@ -127,10 +133,15 @@ altpllTemplate bbCtx = do
  -- TODO: bbQsysIncName into account when generating fresh ids
  let compName = Id.unsafeMake (head (bbQsysIncName bbCtx))
 
+ hdl <- gets hdlKind
+ let blockingIfVerilog = case hdl of
+                           VHDL -> NonBlocking
+                           _ -> Blocking
+
  getAp $ blockDecl alteraPll
-  [ NetDecl Nothing locked  Bit
-  , NetDecl' Nothing Reg pllLock (Right Bool) Nothing
-  , NetDecl Nothing pllOut clkOutTy
+  [ SignalDecl Nothing locked Bit Nothing
+  , NetDecl Nothing blockingIfVerilog pllLock (Right Bool) Nothing
+  , SignalDecl Nothing pllOut clkOutTy Nothing
   , InstDecl Comp Nothing [] compName alteraPll_inst [] $ NamedPortMap $
       [ (instPort "clk", In, clkTy, clk)
       , (instPort "areset", In, rstTy, rst)

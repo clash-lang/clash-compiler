@@ -1,5 +1,5 @@
 {-|
-  Copyright   :  (C) 2020-2021 QBayLogic
+  Copyright   :  (C) 2020-2022 QBayLogic
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -44,11 +44,11 @@ import           Clash.Netlist.BlackBox.Types
 import           Clash.Netlist.Types
   (Identifier, TemplateFunction, BlackBoxContext, HWType(Vector),
    Declaration(..), Expr(Literal, Identifier,DataCon), Literal(NumLit),
-   BlackBox(BBTemplate, BBFunction), TemplateFunction(..), WireOrReg(Wire),
+   BlackBox(BBTemplate, BBFunction), TemplateFunction(..), Blocking(NonBlocking),
    Modifier(Indexed, Nested, DC), HWType(..), bbInputs, bbResults, emptyBBContext, tcCache,
    bbFunctions)
 import qualified Clash.Netlist.Id                   as Id
-import           Clash.Netlist.Util                 (typeSize)
+import           Clash.Netlist.Util                 (typeSize, mkAssign)
 import qualified Clash.Primitives.DSL               as Prim
 import           Clash.Primitives.DSL
   (declarationReturn, instHO, tInputs, tExprToInteger)
@@ -142,8 +142,7 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
   vecIds <- replicateM n (Id.next baseId)
 
   vecId <- Id.make "vec"
-  let vecDecl = sigDecl vecType Wire vecId
-      vecAssign = Assignment vecId vec
+  let vecDecl = mkAssign vecId vecType vec
       elemAssigns = zipWith Assignment vecIds (map (iIndex vecId) [0..])
       resultId =
         case bbResults bbCtx of
@@ -158,7 +157,7 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
       wr = case IntMap.lookup 0 (bbFunctions bbCtx) of
              Just ((_,rw,_,_,_,_):_) -> rw
              _ -> error "internal error"
-      sigDecls = zipWith (sigDecl aTy) (wr:replicate n Wire ++ repeat wr)
+      sigDecls = zipWith (sigDecl aTy) (wr:replicate n NonBlocking ++ repeat wr)
                                        (result : intermediateResultIds)
       resultAssign = Assignment resultId (Identifier result Nothing)
 
@@ -167,8 +166,7 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
 
   getAp $ blockDecl foldNm $
     resultAssign :
-    vecAssign :
-    vecDecl :
+    vecDecl ++
     elemAssigns ++
     sigDecls ++
     callDecls
@@ -229,8 +227,8 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
     pure ([], rest)
 
   -- Simple wire without comment
-  sigDecl :: HWType -> WireOrReg -> Identifier -> Declaration
-  sigDecl typ rw nm = NetDecl' Nothing rw nm (Right typ) Nothing
+  sigDecl :: HWType -> Blocking -> Identifier -> Declaration
+  sigDecl typ rw nm = NetDecl Nothing rw nm (Right typ) Nothing
 
   -- Index the intermediate vector. This uses a hack in Clash: the 10th
   -- constructor of Vec doesn't exist; using it will be interpreted by the

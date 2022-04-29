@@ -223,7 +223,7 @@ genVerilog sp seen c = do
     timescale = "`timescale 100fs/100fs"
 
 sigPort
-  :: Maybe WireOrReg
+  :: Maybe Blocking
   -> Identifier
   -> HWType
   -> Maybe Expr
@@ -234,8 +234,8 @@ sigPort wor (Id.toText -> pName) hwType iEM =
   where
     portType = case wor of
                  Nothing   -> if isBiSignalIn hwType then "inout" else "input"
-                 Just Wire -> "output" <+> "wire"
-                 Just Reg  -> "output" <+> "reg"
+                 Just NonBlocking -> "output" <+> "wire"
+                 Just Blocking  -> "output" <+> "reg"
 
     iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM
 
@@ -292,10 +292,10 @@ uselibs xs = line <>
   indent 2 (string "`uselib" <+> (hsep (mapM (\l -> ("lib=" <> string l)) xs)))
   <> line <> line
 
-wireRegFileDoc :: WireOrReg -> (Either a HWType) -> VerilogM Doc
+wireRegFileDoc :: Blocking -> (Either a HWType) -> VerilogM Doc
 wireRegFileDoc _    (Right FileType) = "integer"
-wireRegFileDoc Wire _                = "wire"
-wireRegFileDoc Reg  _                = "reg"
+wireRegFileDoc NonBlocking _                = "wire"
+wireRegFileDoc Blocking  _                = "reg"
 
 verilogType :: HWType -> VerilogM Doc
 verilogType t = case t of
@@ -361,7 +361,7 @@ renderAttr (BoolAttr'    key False) = pack $ concat [key, " = ", "0"]
 renderAttr (Attr'        key      ) = pack $ key
 
 decl :: Declaration -> VerilogM (Maybe Doc)
-decl (NetDecl' noteM wr id_ tyE iEM) =
+decl (NetDecl noteM wr id_ tyE iEM) =
   Just A.<$> maybe id addNote noteM (addAttrs attrs (wireRegFileDoc wr tyE <+> tyDec tyE))
   where
     tyDec (Left  ty) = stringS ty <+> pretty id_ <> iE
@@ -531,7 +531,7 @@ inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
 
 inst_ (Seq ds) = Just <$> seqs ds
 
-inst_ (NetDecl' {}) = return Nothing
+inst_ (NetDecl{}) = return Nothing
 
 inst_ (ConditionalDecl cond ds) = Just <$>
   "`ifdef" <+> pretty cond <> line <> indent 2 (insts ds) <> line <> "`endif"

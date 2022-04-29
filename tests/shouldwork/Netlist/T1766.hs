@@ -58,7 +58,7 @@ assertNoDuplicateSignals (Component nm inps outs ds) =
         then pure ()
         else error ("Signals: " <> show signals <> ", unique names: " <> show unique)
  where
-  netName (NetDecl' _ _ i _ _) = Just i
+  netName (NetDecl _ _ i _ _) = Just i
   netName _ = Nothing
 
 mainVHDL :: IO ()

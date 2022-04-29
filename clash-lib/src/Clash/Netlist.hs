@@ -55,11 +55,12 @@ import           Outputable                       (ppr, showSDocUnsafe)
 import           SrcLoc                           (isGoodSrcSpan)
 #endif
 
-import           Clash.Annotations.Primitive      (extractPrim, HDL)
+import           Clash.Annotations.Primitive      (extractPrim, HDL(VHDL))
 import           Clash.Annotations.BitRepresentation.ClashLib
   (coreToType')
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, DataRepr'(..), ConstrRepr'(..), getDataRepr, getConstrRepr)
+import           Clash.Backend                    (hdlKind)
 import           Clash.Core.DataCon               (DataCon (..))
 import           Clash.Core.HasType
 import           Clash.Core.Literal               (Literal (..))
@@ -300,17 +301,17 @@ genComponentT compName0 componentExpr = do
 
   case resultM of
     Just result -> do
-      [NetDecl' _ rw _ _ rIM] <- case filter ((==result) . fst) binders of
+      [NetDecl _ rw _ _ rIM] <- case filter ((==result) . fst) binders of
         b:_ -> mkNetDecl b
         _ -> error "internal error: couldn't find result binder"
 
       let (compOutps',resUnwrappers') = case compOutps of
             [oport] -> ([(rw,oport,rIM)],resUnwrappers)
-            _       -> let NetDecl n res resTy = case resUnwrappers of
+            _       -> let SignalDecl n res resTy _ = case resUnwrappers of
                              decl:_ -> decl
                              _ -> error "internal error: insufficient resUnwrappers"
-                       in  (map (Wire,,Nothing) compOutps
-                           ,NetDecl' n rw res (Right resTy) Nothing:tail resUnwrappers
+                       in  (map (NonBlocking,,Nothing) compOutps
+                           ,NetDecl n rw res (Right resTy) Nothing:tail resUnwrappers
                            )
           component      = Component compName1 compInps compOutps'
                              (netDecls ++ argWrappers ++ decls ++ resUnwrappers')
@@ -342,18 +343,18 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
         mpInfo = multiPrimInfo' tcm pInfo
         (_, res) = splitMultiPrimArgs mpInfo args0
         netdecl i typ resInit =
-          -- TODO: Dehardcode Wire. Would entail changing 'outputReg' to a
+          -- TODO: Dehardcode SignalDecl. Would entail changing 'outputReg' to a
           -- list.
-          NetDecl' srcNote Wire (id2identifier i) (Right typ) resInit
+          SignalDecl srcNote (id2identifier i) typ resInit
 
       hwTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) (mpi_resultTypes mpInfo)
       pure (zipWith3 netdecl res hwTys resInits1)
 
 
     singleDecl hwTy = do
-      wr <- termToWireOrReg tm
+      wr <- termToBlocking tm
       rIM <- listToMaybe <$> getResInits (id_, tm)
-      return (NetDecl' srcNote wr (id2identifier id_) (Right hwTy) rIM)
+      return (NetDecl srcNote wr (id2identifier id_) (Right hwTy) rIM)
 
     addSrcNote loc
       | isGoodSrcSpan loc = Just (StrictText.pack (showSDocUnsafe (ppr loc)))
@@ -374,22 +375,32 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
       | isMultiPrimSelect t = False
       | otherwise = True
 
-    termToWireOrReg :: Term -> NetlistMonad WireOrReg
-    termToWireOrReg (stripTicks -> Case scrut _ alts0@(_:_:_)) = do
+    termToBlocking :: Term -> NetlistMonad Blocking
+    termToBlocking (stripTicks -> Case scrut _ alts0@(_:_:_)) = do
       tcm <- Lens.use tcCache
       let scrutTy = inferCoreTypeOf tcm scrut
       scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
       ite <- Lens.use backEndITE
+      SomeBackend b <- Lens.use backend
+      let blockIfVerilog = case hdlKind b of
+                             VHDL -> NonBlocking
+                             _ -> Blocking
+
       case iteAlts scrutHTy alts0 of
-        Just _ | ite -> return Wire
-        _ -> return Reg
-    termToWireOrReg (collectArgs -> (Prim p,_)) = do
+        Just _ | ite -> return NonBlocking
+        _ -> return blockIfVerilog
+    termToBlocking (collectArgs -> (Prim p,_)) = do
+      SomeBackend b <- Lens.use backend
+      let blockIfVerilog = case hdlKind b of
+                             VHDL -> NonBlocking
+                             _ -> Blocking
+
       bbM <- HashMap.lookup (primName p) <$> Lens.use primitives
       case bbM of
-        Just (extractPrim -> Just BlackBox {..}) | outputReg -> return Reg
-        _ | primName p == "Clash.Explicit.SimIO.mealyIO" -> return Reg
-        _ -> return Wire
-    termToWireOrReg _ = return Wire
+        Just (extractPrim -> Just BlackBox {..}) | outputReg -> return blockIfVerilog
+        _ | primName p == "Clash.Explicit.SimIO.mealyIO" -> return blockIfVerilog
+        _ -> return NonBlocking
+    termToBlocking _ = return NonBlocking
 
     -- Set the initialization value of a signal when a primitive wants to set it
     getResInits :: (Id, Term) -> NetlistMonad [Expr]
@@ -602,7 +613,7 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
         assn = case expr of { Noop -> []; _ -> [SeqDecl (Assignment i expr)] }
     in  (nets,(m,map SeqDecl rest ++ assn))
    where
-    isNet NetDecl' {} = True
+    isNet NetDecl {} = True
     isNet _ = False
 
 -- GHC puts default patterns in the first position, we want them in the
@@ -822,9 +833,8 @@ toSimpleVar _ (e@(Identifier _ Nothing),_) = return (e,[])
 toSimpleVar dstId (e,ty) = do
   argNm <- Id.suffix dstId "fun_arg"
   hTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
-  let argDecl         = NetDecl Nothing argNm hTy
-      argAssn         = Assignment argNm e
-  return (Identifier argNm Nothing,[argDecl,argAssn])
+  let argDecl = mkAssign argNm hTy e
+  return (Identifier argNm Nothing, argDecl)
 
 -- | Generate an expression for a term occurring on the RHS of a let-binder
 mkExpr :: HasCallStack
@@ -881,7 +891,7 @@ mkExpr bbEasD declType bndr app =
             return (Noop, decls)
           else
             return ( Identifier argNm Nothing
-                   , NetDecl' Nothing Wire argNm (Right hwTyA) Nothing:decls)
+                   , SignalDecl Nothing argNm hwTyA Nothing:decls)
     Case scrut ty' [alt] -> mkProjection bbEasD bndr scrut ty' alt
     Case scrut tyA alts -> do
       tcm <- Lens.use tcCache
@@ -889,8 +899,8 @@ mkExpr bbEasD declType bndr app =
       scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
       ite <- Lens.use backEndITE
       let wr = case iteAlts scrutHTy alts of
-                 Just _ | ite -> Wire
-                 _ -> Reg
+                 Just _ | ite -> NonBlocking
+                 _ -> Blocking
       argNm <- Id.suffix (netlistId1 id id2identifier bndr) "sel_arg"
       decls  <- mkSelection declType (NetlistId argNm (netlistTypes1 bndr))
                             scrut tyA alts tickDecls
@@ -898,7 +908,7 @@ mkExpr bbEasD declType bndr app =
         return (Noop, decls)
       else
         return ( Identifier argNm Nothing
-               , NetDecl' Nothing wr argNm (Right hwTyA) Nothing:decls)
+               , NetDecl Nothing wr argNm (Right hwTyA) Nothing:decls)
     Letrec binders body -> do
       netDecls <- concatMapM mkNetDecl binders
       decls    <- concatMapM (uncurry mkDeclarations) binders
@@ -950,9 +960,8 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
         -- TODO: seems useless?
         pure (Left newDecls)
       _ -> do
-        let scrutDecl = NetDecl Nothing scrutNm sHwTy
-            scrutAssn = Assignment scrutNm scrutExpr
-        pure (Right (scrutNm, Nothing, newDecls ++ [scrutDecl, scrutAssn]))
+        let scrutNet = mkAssign scrutNm sHwTy scrutExpr
+        pure (Right (scrutNm, Nothing, newDecls ++ scrutNet))
 
   case scrutRendered of
     Left newDecls -> pure (Noop, newDecls)
@@ -988,9 +997,8 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
       case bndr of
         NetlistId scrutNm _ | mkDec -> do
           scrutNm' <- Id.next scrutNm
-          let scrutDecl = NetDecl Nothing scrutNm' vHwTy
-              scrutAssn = Assignment scrutNm' extractExpr
-          return (Identifier scrutNm' Nothing,scrutDecl:scrutAssn:decls)
+          let scrutNet = mkAssign scrutNm' vHwTy extractExpr
+          return (Identifier scrutNm' Nothing, scrutNet ++ decls)
         MultiId {} -> error "mkProjection: MultiId"
         _ -> return (extractExpr,decls)
   where

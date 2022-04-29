@@ -1,5 +1,6 @@
 {-|
   Copyright   :  (C) 2019, Foamspace corp
+                     2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -70,8 +71,8 @@ sbioTemplate bbCtx = do
         ]
 
   getAp $ blockDecl sbio $
-    [ NetDecl Nothing dIn0 Bit
-    , NetDecl Nothing dIn1 Bit
+    [ SignalDecl Nothing dIn0 Bit Nothing
+    , SignalDecl Nothing dIn1 Bit Nothing
     , InstDecl Comp Nothing [] compName sbio_inst
       [ (instPort "PIN_TYPE", BitVector 6, pinConfig)
       ]

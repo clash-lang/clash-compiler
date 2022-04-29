@@ -39,7 +39,7 @@ assertOneDecl (Component _ _ _ ds) =
       error $ "Expected one declaration of a signal named "
            <> "\"someSignalName\", got " <> show (P.length is)
  where
-  isSigDecl (NetDecl' _ _ i@(isInfixOf "someSignalName" . Id.toText -> True) _ _) = [i]
+  isSigDecl (SignalDecl _ i@(isInfixOf "someSignalName" . Id.toText -> True) _ _) = [i]
   isSigDecl _ = []
 
   isSigAssignment i (Assignment _ (Identifier i' _)) = i == i'

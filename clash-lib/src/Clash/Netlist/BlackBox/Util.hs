@@ -62,7 +62,7 @@ import           Clash.Netlist.Types
    Declaration(BlackBoxD))
 import qualified Clash.Netlist.Id                as Id
 import qualified Clash.Netlist.Types             as N
-import           Clash.Netlist.Util              (typeSize, isVoid, stripVoid)
+import           Clash.Netlist.Util              (typeSize, isVoid, stripVoid, mkAssign)
 import           Clash.Signal.Internal
   (ResetKind(..), ResetPolarity(..), InitBehavior(..), VDomainConfiguration (..))
 import           Clash.Util
@@ -180,9 +180,7 @@ setSym bbCtx l = do
               nm' <- lift (Id.make (Text.toStrict (concatT (Text "c$":nm))))
               let decls = case typeSize hwTy of
                     0 -> []
-                    _ -> [N.NetDecl Nothing nm' hwTy
-                         ,N.Assignment nm' e'
-                         ]
+                    _ -> mkAssign nm' hwTy e'
               _2 %= (IntMap.insert i (Id.toText nm',decls))
               return (ToVar [Text (Id.toLazyText nm')] i)
             Just (nm',_) ->
@@ -733,7 +731,7 @@ renderTag b (IncludeName n) = case indexMaybe (bbQsysIncName b) n of
   Just nm -> return (Text.fromStrict nm)
   _ -> error $ $(curLoc) ++ "~INCLUDENAME[" ++ show n ++ "] does not correspond to any index of the 'includes' field that is specified in the primitive definition"
 renderTag b (OutputWireReg n) = case IntMap.lookup n (bbFunctions b) of
-  Just ((_,rw,_,_,_,_):_) -> case rw of {N.Wire -> return "wire"; N.Reg -> return "reg"}
+  Just ((_,rw,_,_,_,_):_) -> case rw of {N.NonBlocking -> return "wire"; N.Blocking -> return "reg"}
   _ -> error $ $(curLoc) ++ "~OUTPUTWIREREG[" ++ show n ++ "] used where argument " ++ show n ++ " is not a function"
 renderTag b (Repeat [es] [i]) = do
   i'  <- Text.unpack <$> renderTag b i

@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd
                     2017-2018, Google Inc.
-                    2021     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -1071,7 +1071,13 @@ prefixParent parent (PortProduct "" ps) = PortProduct parent ps
 prefixParent parent (PortProduct p ps)  = PortProduct (parent <> "_" <> p) ps
 
 mkAssign :: Identifier -> HWType -> Expr -> [Declaration]
-mkAssign id_ hwty expr = [NetDecl Nothing id_ hwty, Assignment id_ expr]
+mkAssign id_ hwty expr
+  -- We can assign when declaring if the initial value is a constant expr.
+  | isConstExpr expr
+  = [SignalDecl Nothing id_ hwty (Just expr)]
+
+  | otherwise
+  = [SignalDecl Nothing id_ hwty Nothing, Assignment id_ expr]
 
 -- | See 'toPrimitiveType' / 'fromPrimitiveType'
 convPrimitiveType :: HWType -> a -> NetlistMonad a -> NetlistMonad a
@@ -1130,7 +1136,7 @@ mkTopInput (ExpandedPortName hwty0 i0) = do
 
 mkTopInput epp@(ExpandedPortProduct p hwty ps) = do
   pN <- Id.makeBasic p
-  let netdecl = NetDecl Nothing pN hwty
+  let netdecl = SignalDecl Nothing pN hwty Nothing
   case hwty of
     Vector sz eHwty -> do
       (ports, _, exprs, _) <- unzip4 <$> mapM mkTopInput ps
@@ -1269,11 +1275,11 @@ mkTopOutput (ExpandedPortName hwty0 i0) = do
     return ([(i0, hwty0)], [], i0)
   else
     -- Type conversion happened, so we must use intermediate variable.
-    return ([(i0, hwty1)], [Assignment i0 bvExpr, NetDecl Nothing i1 hwty0], i1)
+    return ([(i0, hwty1)], [Assignment i0 bvExpr, SignalDecl Nothing i1 hwty0 Nothing], i1)
 
 mkTopOutput epp@(ExpandedPortProduct p hwty ps) = do
   pN <- Id.makeBasic p
-  let netdecl = NetDecl Nothing pN hwty
+  let netdecl = SignalDecl Nothing pN hwty Nothing
   case hwty of
     Vector {} -> do
       (ports, decls, ids) <- unzip3 <$> mapM mkTopOutput ps
@@ -1407,14 +1413,14 @@ mkTopInstInput (ExpandedPortName hwty0 pN) = do
   pN' <- Id.next pN
   (decls, pN'', _bvExpr, hwty1) <- toPrimitiveType pN' hwty0
   return ( [InstancePort pN'' hwty1]
-          , NetDecl Nothing pN' hwty0 : decls
+          , SignalDecl Nothing pN' hwty0 Nothing : decls
           , pN' )
 
 mkTopInstInput epp@(ExpandedPortProduct pNameHint hwty0 ps) = do
   pName <- Id.makeBasic pNameHint
 
   let
-    pDecl = NetDecl Nothing pName hwty0
+    pDecl = SignalDecl Nothing pName hwty0 Nothing
     (attrs, hwty1) = stripAttributes hwty0
     indexPN constr n = Identifier pName (Just (Indexed (hwty0, constr, n)))
 
@@ -1504,12 +1510,12 @@ mkTopInstOutput (ExpandedPortName hwty0 portName) = do
   assignName0 <- Id.next portName
   (decls, assignName1, _expr, hwty1) <- fromPrimitiveType assignName0 hwty0
   return ( [InstancePort assignName0 hwty1]
-          , NetDecl Nothing assignName0 hwty1 : decls
+          , SignalDecl Nothing assignName0 hwty1 Nothing : decls
           , assignName1 )
 
 mkTopInstOutput epp@(ExpandedPortProduct productNameHint hwty ps) = do
   pName <- Id.makeBasic productNameHint
-  let pDecl = NetDecl Nothing pName hwty
+  let pDecl = SignalDecl Nothing pName hwty Nothing
       (attrs, hwty') = stripAttributes hwty
   case hwty' of
     Vector sz hwty'' -> do
