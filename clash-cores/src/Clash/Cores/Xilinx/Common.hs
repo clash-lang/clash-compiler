@@ -1,3 +1,11 @@
+{-|
+  Copyright   :  (C) 2022 Google Inc
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Common utilities for defining Xilinx IP primitives.
+-}
+
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE QuasiQuotes #-}
 

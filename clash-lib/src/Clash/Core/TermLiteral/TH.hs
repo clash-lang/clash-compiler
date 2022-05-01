@@ -1,3 +1,12 @@
+{-|
+Copyright   :  (C) 2019, Myrtle Software Ltd,
+                   2021, QBayLogic B.V.
+                   2022, Google Inc
+License     :  BSD2 (see the file LICENSE)
+Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+Template Haskell utilities for "Clash.Core.TermLiteral".
+-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Core.TermLiteral.TH

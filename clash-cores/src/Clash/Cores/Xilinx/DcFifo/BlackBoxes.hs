@@ -1,3 +1,11 @@
+{-|
+  Copyright   :  (C) 2022 Google Inc
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Blackbox implementation for primitives in "Clash.Cores.Xilinx.DcFifo.Explicit".
+-}
+
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
