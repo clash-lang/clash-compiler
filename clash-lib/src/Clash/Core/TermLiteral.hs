@@ -16,6 +16,7 @@ module Clash.Core.TermLiteral
   ( TermLiteral
   , termToData
   , termToDataError
+  , TermLiteralSNat(..)
   ) where
 
 import           Data.Bifunctor                  (bimap)
@@ -78,6 +79,14 @@ instance TermLiteral Char where
 instance TermLiteral Natural where
   termToData (collectArgs -> (_, [Left (Literal (NaturalLiteral n))])) =
     Right (fromInteger n)
+  termToData t = Left t
+
+newtype TermLiteralSNat = TermLiteralSNat Natural
+  deriving (Show)
+
+instance TermLiteral TermLiteralSNat where
+  termToData (collectArgs -> (_, [_, Left (Literal (NaturalLiteral n))])) =
+    Right (TermLiteralSNat (fromInteger n))
   termToData t = Left t
 
 instance (TermLiteral a, TermLiteral b) => TermLiteral (a, b) where

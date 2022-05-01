@@ -33,6 +33,7 @@ deriveTermToData typName = do
   pure (deriveTermToData1 (map toConstr' constrs))
  where
   toConstr' (NormalC cName fields) = (cName, length fields)
+  toConstr' (RecC cName fields) = (cName, length fields)
   toConstr' c = error $ "Unexpected constructor: " ++ show c
 
 deriveTermToData1 :: [(Name, Int)] -> Exp
@@ -95,4 +96,3 @@ deriveTermToData1 constrs =
   argsName = mkName "args"
   argNames = [mkName ("arg" ++ show n) | n <- [0..nArgs-1]]
   nameName = mkName "nm"
-

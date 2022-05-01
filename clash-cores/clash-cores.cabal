@@ -75,6 +75,10 @@ library
   hs-source-dirs: src
 
   exposed-modules:
+    Clash.Cores.Xilinx.Common
+    Clash.Cores.Xilinx.DcFifo.BlackBoxes
+    Clash.Cores.Xilinx.DcFifo.Explicit
+    Clash.Cores.Xilinx.DcFifo.Instances
     Clash.Cores.Xilinx.Floating
     Clash.Cores.Xilinx.Floating.Annotations
     Clash.Cores.Xilinx.Floating.BlackBoxes
