@@ -701,6 +701,7 @@ renderTag b (MaxIndex e) = return . Text.pack . show . vecLen $ lineToType b [e]
 
 renderTag b e@(TypElem _)   = let ty = lineToType b [e]
                               in  renderOneLine <$> getAp (hdlType Internal ty)
+renderTag _ (Gen b)         = renderOneLine <$> genStmt b
 renderTag _ (GenSym [Text t] _) = return t
 
 -- Determine variables used in argument /n/.
@@ -897,6 +898,7 @@ prettyElem (MaxIndex e) = do
 prettyElem (FilePath e) = do
   e' <- prettyElem e
   renderOneLine <$> (string "~FILE" <> brackets (string e'))
+prettyElem (Gen b) = if b then return "~GENERATE" else return "~ENDGENERATE"
 prettyElem (IF b esT esF) = do
   b' <- prettyElem b
   esT' <- prettyBlackBox esT
@@ -1029,6 +1031,7 @@ walkElement f el = maybeToList (f el) ++ walked
         Length e -> go e
         Depth e -> go e
         MaxIndex e -> go e
+        Gen _ -> []
         And es -> concatMap go es
         CmpLE e1 e2 -> go e1 ++ go e2
         IW64 -> []
@@ -1112,6 +1115,7 @@ getUsedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
         DevNull _ -> Nothing
         Err _ -> Nothing
         FilePath _ -> Nothing
+        Gen _ -> Nothing
         GenSym _ _ -> Nothing
         HdlSyn _ -> Nothing
         IF _ _ _ -> Nothing
