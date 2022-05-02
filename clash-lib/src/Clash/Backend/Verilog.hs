@@ -32,7 +32,7 @@ module Clash.Backend.Verilog
 where
 
 import qualified Control.Applicative                  as A
-import           Control.Lens                         (Lens',(+=),(-=),(.=),(%=), makeLenses, use)
+import           Control.Lens                         (Lens',(.=),(%=), makeLenses, use)
 import           Control.Monad                        (forM)
 import           Control.Monad.State                  (State)
 import           Data.Bifunctor                       (first, second)
@@ -82,8 +82,7 @@ import           Clash.Util
 -- | State for the 'Clash.Backend.Verilog.VerilogM' monad:
 data VerilogState =
   VerilogState
-    { _genDepth  :: Int -- ^ Depth of current generative block
-    , _idSeen    :: IdentifierSet
+    { _idSeen    :: IdentifierSet
     , _topNm     :: Identifier
     , _srcSpan   :: SrcSpan
     , _includes  :: [(String,Doc)]
@@ -110,8 +109,7 @@ instance HasIdentifierSet VerilogState where
 
 instance Backend VerilogState where
   initBackend opts = VerilogState
-    { _genDepth=0
-    , _idSeen=Id.emptyIdentifierSet (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) Verilog
+    { _idSeen=Id.emptyIdentifierSet (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) Verilog
     , _topNm=Id.unsafeMake ""
     , _srcSpan=noSrcSpan
     , _includes=[]
@@ -144,16 +142,6 @@ instance Backend VerilogState where
   hdlTypeMark     = verilogTypeMark
   hdlRecSel       = verilogRecSel
   hdlSig t ty     = sigDecl (string t) ty
-  genStmt True    = do cnt <- use genDepth
-                       genDepth += 1
-                       if cnt > 0
-                          then emptyDoc
-                          else "generate"
-  genStmt False   = do genDepth -= 1
-                       cnt <- use genDepth
-                       if cnt > 0
-                          then emptyDoc
-                          else "endgenerate"
   inst            = inst_
   expr            = expr_
   iwWidth         = use intWidth

@@ -122,8 +122,6 @@ class HasIdentifierSet state => Backend state where
   hdlRecSel        :: HWType -> Int -> Ap (State state) Doc
   -- | Create a signal declaration from an identifier (Text) and Netlist HWType
   hdlSig           :: LT.Text -> HWType -> Ap (State state) Doc
-  -- | Create a generative block statement marker
-  genStmt          :: Bool -> State state Doc
   -- | Turn a Netlist Declaration to a HDL concurrent block
   inst             :: Declaration  -> Ap (State state) (Maybe Doc)
   -- | Turn a Netlist expression into a HDL expression
