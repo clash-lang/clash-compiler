@@ -47,7 +47,7 @@ import Clash.Cores.Xilinx.Common (toTclBool, renderTcl, defIpConfig, IpConfig (p
 dcFifoBBF :: HasCallStack => BlackBoxFunction
 dcFifoBBF _isD _primName args _resTys = do
   let
-    [  _knownNatN, _knownDomainWrite, _knownDomainRead
+    [  _knownNatN, _knownDomainWrite, _knownDomainRead, _knownNatDepth
      , _constraint1, _constraint2
      , either error id . termToDataError -> dcConfig
      , _wClk, _rClk, _rst, _wData
@@ -91,7 +91,7 @@ dcFifoTF dcFifoName DcConfig{..} = TemplateFunction [] (const True) $ \bbCtx -> 
   let
     TermLiteralSNat (fromIntegral -> depth) = dcDepth
 
-    [  _knownNatN, _knownDomainWrite, _knownDomainRead
+    [  _knownNatN, _knownDomainWrite, _knownDomainRead, _knownNatDepth
      , _constraint1, _constraint2
      , _dcConfig
      , wClk, rClk, rst, wData

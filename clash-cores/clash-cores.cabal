@@ -68,7 +68,8 @@ common basic-config
     ghc-typelits-knownnat     >= 0.6,
     interpolate               >= 0.2,
     QuickCheck,
-    template-haskell
+    template-haskell,
+    containers                >=0.5    && <0.7
 
 library
   import: basic-config
