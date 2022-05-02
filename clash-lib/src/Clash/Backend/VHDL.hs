@@ -117,6 +117,7 @@ data VHDLState =
   , _aggressiveXOptBB_ :: AggressiveXOptBB
   , _renderEnums_ :: RenderEnums
   , _domainConfigurations_ :: DomainMap
+  , _declTypes :: HashMap Identifier Blocking
   }
 
 makeLenses ''VHDLState
@@ -146,6 +147,7 @@ instance Backend VHDLState where
     , _aggressiveXOptBB_=coerce (opt_aggressiveXOptBB opts)
     , _renderEnums_=coerce (opt_renderEnums opts)
     , _domainConfigurations_=emptyDomainMap
+    , _declTypes=mempty
     }
   hdlKind         = const VHDL
   primDirs        = const $ do root <- primsRoot
@@ -1348,8 +1350,10 @@ decls ds = do
       _  -> vcat (pure dsDoc)
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
-decl l (NetDecl noteM b id_ ty iEM) = Just <$> (,fromIntegral (TextS.length (Id.toText id_))) <$>
-  maybe id addNote noteM (kw <+> fill l (pretty id_) <+> colon <+> either pretty sizedQualTyName ty <> iE <> semi)
+decl l (NetDecl noteM b id_ ty iEM) = do
+  declTypes %= HashMap.insert id_ b
+  Just <$> (,fromIntegral (TextS.length (Id.toText id_))) <$>
+    maybe id addNote noteM (kw <+> fill l (pretty id_) <+> colon <+> either pretty sizedQualTyName ty <> iE <> semi)
   where
     kw = case b of { Blocking -> "variable" ; NonBlocking -> "signal" }
     addNote n = mappend ("--" <+> pretty n <> line)
@@ -1468,8 +1472,18 @@ inst_' id_ scrut scrutTy es = fmap Just $
 
 -- | Turn a Netlist Declaration to a VHDL concurrent block
 inst_ :: Declaration -> VHDLM (Maybe Doc)
-inst_ (Assignment id_ e) = fmap Just $
-  pretty id_ <+> larrow <+> align (expr_ False e) <> semi
+inst_ (Assignment id_ e) = do
+  dts <- use declTypes
+
+  case HashMap.lookup id_ dts of
+    Just Blocking ->
+      fmap Just $ pretty id_ <+> ":=" <+> align (expr_ False e) <> semi
+
+    -- This is catch-all since the "result" var which implicitly exists means
+    -- we can't just fail on undeclared identifiers.
+    _ ->
+      fmap Just $ pretty id_ <+> larrow <+> align (expr_ False e) <> semi
+
 
 inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
   pretty id_ <+> larrow

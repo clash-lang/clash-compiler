@@ -819,7 +819,7 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
             Noop -> []
             _ ->
               let sensitivity = ValueChanges (usedVariables resExpr)
-               in [Seq [Always sensitivity [SeqDecl (Assignment dstNm resExpr)]]]
+               in [Seq [Always sensitivity [] [SeqDecl (Assignment dstNm resExpr)]]]
 
       -- Create the declarations for the "initial state" block
       let sDst = case sBinders of
@@ -879,14 +879,14 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
       let initDecls1 = initAssign1 ++ initOther
 
       let processes = if null initDecls1
-                        then [ Seq [Always (ClockEdge clkExpr edge) (map SeqDecl seqDeclsOther)]
+                        then [ Seq [Always (ClockEdge clkExpr edge) netDeclsSeq2 (map SeqDecl seqDeclsOther)]
                              ]
                         else [ Seq [Initial (map SeqDecl initDecls1)]
-                             , Seq [Always (ClockEdge clkExpr edge) (map SeqDecl seqDeclsOther)]
+                             , Seq [Always (ClockEdge clkExpr edge) netDeclsSeq2 (map SeqDecl seqDeclsOther)]
                              ]
 
       -- Collate everything
-      return (clkDecls ++ netDeclsSeq2 ++ netDeclsInp1 ++
+      return (clkDecls ++ netDeclsInp1 ++
                 [ case iBinders of
                     ((i,_):_) -> Assignment (id2identifier i) exprArg
                     _ -> error "internal error: insufficient iBinders"

@@ -268,7 +268,7 @@ pprYosysSvaProperty
   -> Declaration
 pprYosysSvaProperty propName clk edge assertion = ConditionalDecl
   "FORMAL"
-  [Seq [Always (ClockEdge clk edge) [SeqDecl (TickDecl directive)]]]
+  [Seq [Always (ClockEdge clk edge) [] [SeqDecl (TickDecl directive)]]]
  where
   directive = Directive
     (propName <> ": " <> coverOrAssert <> " property (" <> prop <> ")")

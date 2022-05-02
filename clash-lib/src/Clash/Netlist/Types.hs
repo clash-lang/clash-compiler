@@ -606,6 +606,7 @@ data Seq
   -- | Statements to run always
   | Always
       Sensitivity -- ^ Changes that force evaluation of the process
+      [Declaration] -- ^ Variable declarations
       [Seq] -- ^ Statements to run always
   -- | Declaration in sequential form
   | SeqDecl

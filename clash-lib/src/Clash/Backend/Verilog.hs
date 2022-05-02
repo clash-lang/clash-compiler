@@ -537,7 +537,8 @@ inst_ (ConditionalDecl cond ds) = Just <$>
   "`ifdef" <+> pretty cond <> line <> indent 2 (insts ds) <> line <> "`endif"
 
 seq_ :: Seq -> VerilogM Doc
-seq_ (Always (ClockEdge clk edge) ds) =
+seq_ (Always (ClockEdge clk edge) vs ds) =
+  decls vs <> line <> line <>
   "always @" <>
     parens (case edge of {Rising -> "posedge"; _ -> "negedge"} <+>
             expr_ False clk) <+> "begin" <> line <>
@@ -549,7 +550,8 @@ seq_ (Initial ds) =
   indent 2 (seqs ds) <> line <>
   "end"
 
-seq_ (Always (ValueChanges _) ds) =
+seq_ (Always (ValueChanges _) vs ds) =
+  decls vs <> line <> line <>
   "always @* begin" <> line <>
   indent 2 (seqs ds) <> line <>
   "end"
