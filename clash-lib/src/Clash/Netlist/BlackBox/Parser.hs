@@ -1,7 +1,7 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd,
-                    2021-2022, QBayLogic B.V.
+                    2021     , QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -97,6 +97,8 @@ pTagE =  Result            <$  string "~RESULT"
      <|> Depth             <$> (string "~DEPTH" *> brackets' pTagE)
      <|> MaxIndex          <$> (string "~MAXINDEX" *> brackets' pTagE)
      <|> FilePath          <$> (string "~FILE" *> brackets' pTagE)
+     <|> Gen               <$> (True <$ string "~GENERATE")
+     <|> Gen               <$> (False <$ string "~ENDGENERATE")
      <|> (`SigD` Nothing)  <$> (string "~SIGDO" *> brackets' pSigD)
      <|> SigD              <$> (string "~SIGD" *> brackets' pSigD) <*> (Just <$> (brackets' natural'))
      <|> IW64              <$  string "~IW64"
@@ -128,10 +130,6 @@ pTagE =  Result            <$  string "~RESULT"
      <|> IsInitDefined     <$> (string "~ISINITDEFINED" *> brackets' natural')
      <|> CtxName           <$  string "~CTXNAME"
      <|> LongestPeriod     <$  string "~LONGESTPERIOD"
-
-     -- Removed (parsed for backcompat):
-     <|> Text ""           <$ string "~GENERATE"
-     <|> Text ""           <$ string "~ENDGENERATE"
 
 natural' :: TokenParsing m => m Int
 natural' = fmap fromInteger natural
