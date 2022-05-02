@@ -2,6 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2021-2022, QBayLogic B.V.
+                    2022     , LUMI GUIDE FIETSDETECTIE B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -23,7 +24,7 @@ import           Control.Exception               (throw)
 import           Control.Lens
   (use, (%=), _1, _2, element, (^?))
 import           Control.Monad                   (forM, (<=<))
-import           Control.Monad.State             (State, StateT (..), lift)
+import           Control.Monad.State             (State, StateT (..), lift, gets)
 import           Data.Bitraversable              (bitraverse)
 import           Data.Bool                       (bool)
 import           Data.Coerce                     (coerce)
@@ -54,7 +55,7 @@ import           Text.Read                       (readEither)
 import           Text.Trifecta.Result            hiding (Err)
 
 import           Clash.Backend
-  (Backend (..), Usage (..), AggressiveXOptBB(..))
+  (Backend (..), Usage (..), AggressiveXOptBB(..), RenderEnums(..))
 import           Clash.Netlist.BlackBox.Parser
 import           Clash.Netlist.BlackBox.Types
 import           Clash.Netlist.Types
@@ -67,6 +68,8 @@ import           Clash.Signal.Internal
   (ResetKind(..), ResetPolarity(..), InitBehavior(..), VDomainConfiguration (..))
 import           Clash.Util
 import qualified Clash.Util.Interpolate          as I
+
+import           Clash.Annotations.Primitive     (HDL(VHDL))
 
 inputHole :: Element -> Maybe Int
 inputHole = \case
@@ -430,13 +433,15 @@ renderElem b (Tag n) = do
 
 renderElem b (IF c t f) = do
   iw <- iwWidth
+  hdl <- gets hdlKind
   syn <- hdlSyn
+  enums <- renderEnums
   xOpt <- aggressiveXOptBB
-  let c' = check (coerce xOpt) iw syn c
+  let c' = check (coerce xOpt) iw hdl syn enums c
   if c' > 0 then renderTemplate b t else renderTemplate b f
   where
-    check :: Bool -> Int -> HdlSyn -> Element -> Int
-    check xOpt iw syn c' = case c' of
+    check :: Bool -> Int -> HDL -> HdlSyn -> RenderEnums -> Element -> Int
+    check xOpt iw hdl syn enums c' = case c' of
       (Size e)   -> typeSize (lineToType b [e])
       (Length e) -> case lineToType b [e] of
                        (Vector n _)              -> n
@@ -476,6 +481,15 @@ renderElem b (IF c t f) = do
                       Literal {}   -> 1
                       BlackBoxE {} -> 1
                       _            -> 0
+      (IsScalar n) -> let (_,ty,_) = bbInputs b !! n
+                          isScalar _ Bit          = 1
+                          isScalar _ Bool         = 1
+                          isScalar VHDL Integer   = 1
+                          isScalar VHDL (Sum _ _) = case enums of
+                                                       RenderEnums True  -> 1
+                                                       RenderEnums False -> 0
+                          isScalar _ _            = 0
+                      in isScalar hdl ty
 
       (IsUndefined n) ->
         let (e, _, _) = bbInputs b !! n
@@ -539,13 +553,13 @@ renderElem b (IF c t f) = do
                 | t1 == Text.pack t2 -> 1
                 | otherwise -> 0
               Nothing -> error $ $(curLoc) ++ "Expected a string literal: " ++ show e
-      (And es)   -> if all (/=0) (map (check xOpt iw syn) es)
+      (And es)   -> if all (/=0) (map (check xOpt iw hdl syn enums) es)
                        then 1
                        else 0
-      CmpLE e1 e2 -> if check xOpt iw syn e1 <= check xOpt iw syn e2
+      CmpLE e1 e2 -> if check xOpt iw hdl syn enums e1 <= check xOpt iw hdl syn enums e2
                         then 1
                         else 0
-      _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGTH, IW64, LIT, ISLIT, or ISARG"
+      _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGTH, IW64, LIT, ISLIT, ISSCALAR, or ISARG"
 
 renderElem b e = fmap const (renderTag b e)
 
@@ -933,6 +947,7 @@ prettyElem (Sel e i) = do
   renderOneLine <$> (string "~SEL" <> brackets (string e') <> brackets (int i))
 prettyElem (IsLit i) = renderOneLine <$> (string "~ISLIT" <> brackets (int i))
 prettyElem (IsVar i) = renderOneLine <$> (string "~ISVAR" <> brackets (int i))
+prettyElem (IsScalar i) = renderOneLine <$> (string "~ISSCALAR" <> brackets (int i))
 prettyElem (IsActiveHigh i) = renderOneLine <$> (string "~ISACTIVEHIGH" <> brackets (int i))
 prettyElem (IsActiveEnable i) = renderOneLine <$> (string "~ISACTIVEENABLE" <> brackets (int i))
 prettyElem (IsUndefined i) = renderOneLine <$> (string "~ISUNDEFINED" <> brackets (int i))
@@ -1039,6 +1054,7 @@ walkElement f el = maybeToList (f el) ++ walked
         Sel e _ -> go e
         IsLit _ -> []
         IsVar _ -> []
+        IsScalar _ -> []
         Tag _ -> []
         Period _ -> []
         LongestPeriod -> []
@@ -1123,6 +1139,7 @@ getUsedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
         IndexType _ -> Nothing
         IsActiveHigh _ -> Nothing
         IsVar _ -> Nothing
+        IsScalar _ -> Nothing
         IW64 -> Nothing
         Length _ -> Nothing
         MaxIndex _ -> Nothing

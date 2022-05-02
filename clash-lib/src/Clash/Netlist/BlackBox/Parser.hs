@@ -110,6 +110,7 @@ pTagE =  Result            <$  string "~RESULT"
      <|> Sel               <$> (string "~SEL" *> brackets' pTagE) <*> brackets' natural'
      <|> IsLit             <$> (string "~ISLIT" *> brackets' natural')
      <|> IsVar             <$> (string "~ISVAR" *> brackets' natural')
+     <|> IsScalar          <$> (string "~ISSCALAR" *> brackets' natural')
      <|> IsActiveHigh      <$> (string "~ISACTIVEHIGH" *> brackets' natural')
      <|> IsActiveEnable    <$> (string "~ISACTIVEENABLE" *> brackets' natural')
      <|> IsUndefined       <$> (string "~ISUNDEFINED" *> brackets' natural')
