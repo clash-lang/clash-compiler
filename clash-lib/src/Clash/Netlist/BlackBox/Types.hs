@@ -149,8 +149,6 @@ data Element
   -- ^ Hole containing a filepath for a data file
   | Template [Element] [Element]
   -- ^ Create data file <HOLE0> with contents <HOLE1>
-  | Gen !Bool
-  -- ^ Hole marking beginning (True) or end (False) of a generative construct
   | IF !Element [Element] [Element]
   | And [Element]
   | IW64

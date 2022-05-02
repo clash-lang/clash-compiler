@@ -71,7 +71,6 @@ data SystemVerilogState =
   SystemVerilogState
     { _tyCache   :: HashSet HWType -- ^ Previously encountered  HWTypes
     , _nameCache :: HashMap HWType Identifier -- ^ Cache for previously generated product type names
-    , _genDepth  :: Int -- ^ Depth of current generative block
     , _modNm     :: ModName
     , _topNm     :: Identifier
     , _idSeen    :: IdentifierSet
@@ -104,7 +103,6 @@ instance Backend SystemVerilogState where
   initBackend opts = SystemVerilogState
     { _tyCache=HashSet.empty
     , _nameCache=HashMap.empty
-    , _genDepth=0
     , _modNm=""
     , _topNm=Id.unsafeMake ""
     , _idSeen=Id.emptyIdentifierSet (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) SystemVerilog
@@ -148,16 +146,6 @@ instance Backend SystemVerilogState where
   hdlTypeMark     = verilogTypeMark
   hdlRecSel       = verilogRecSel
   hdlSig t ty     = sigDecl (string t) ty
-  genStmt True    = do cnt <- use genDepth
-                       genDepth += 1
-                       if cnt > 0
-                          then emptyDoc
-                          else "generate"
-  genStmt False   = do genDepth -= 1
-                       cnt <- use genDepth
-                       if cnt > 0
-                          then emptyDoc
-                          else "endgenerate"
   inst            = inst_
   expr            = expr_
   iwWidth         = use intWidth
