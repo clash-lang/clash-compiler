@@ -210,6 +210,7 @@ instance Backend VHDLState where
   hdlTypeMark     = qualTyName
   hdlRecSel       = vhdlRecSel
   hdlSig t ty     = sigDecl (pretty t) ty
+  genStmt         = const emptyDoc
   inst            = inst_
   expr            = expr_
   iwWidth         = use intWidth
