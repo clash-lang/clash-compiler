@@ -39,6 +39,7 @@ takeState ::
   Bool ->
   (ResetBusy, Empty, DataCount depth, BitVector n) ->
   (Bool, (Maybe (BitVector n), Bool))
+takeState _ (1, _, _, _) = (False, (Nothing, False))
 takeState readLastCycle (_, fifoEmpty, _, d) = (readThisCycle, (nextData, readThisCycle))
   where
     readThisCycle = fifoEmpty == low
@@ -48,6 +49,7 @@ feedState ::
   [BitVector 32] ->
   (ResetBusy, Full, DataCount 5) ->
   ([BitVector 32], (BitVector 32, Bool))
+feedState xs (1, _, _) = (xs, (deepErrorX "Resetting", False))
 feedState [] _ = ([], (deepErrorX "No more data", False))
 feedState (x:xs) (_, full, _) =
   if full == high
@@ -65,7 +67,7 @@ throughFifo wrDataList = rdDataList
     (wrData, wrEna) = mealyB clk rst ena feedState wrDataList (wrRstBusy, wrFull, wrCnt)
     (rdDataMaybe, rdEna) = mealyB clk rst ena takeState False (rdRstBusy, rdEmpty, rdCnt, rdData)
 
-    rdDataList = (mapMaybe fst . P.filter snd) $ sampleN (P.length wrDataList*10) $ bundle (rdDataMaybe, rdEna)
+    rdDataList = catMaybes $ sampleN (P.length wrDataList*10) $ bundle rdDataMaybe
 
     (wrRstBusy, wrFull, wrCnt, rdRstBusy, rdEmpty, rdCnt, rdData) =
       dcFifo defConfig clk clk rst wrData wrEna rdEna

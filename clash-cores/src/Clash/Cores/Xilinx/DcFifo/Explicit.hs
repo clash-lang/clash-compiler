@@ -8,7 +8,6 @@ Support for the [FIFO Generator v13.2](https://docs.xilinx.com/v/u/en-US/pg057-f
 
 -}
 
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE QuasiQuotes #-}
 
@@ -31,12 +30,13 @@ module Clash.Cores.Xilinx.DcFifo.Explicit
   , DataCount
   ) where
 
-import Clash.Explicit.Prelude
-import Clash.Annotations.Primitive (Primitive(InlineYamlPrimitive))
-import Clash.Signal.Internal (Signal (..))
+import           Clash.Annotations.Primitive (Primitive (InlineYamlPrimitive))
+import           Clash.Explicit.Prelude
+import           Clash.Signal.Internal       (Signal (..))
 
-import Data.String.Interpolate (i)
-import qualified Data.Sequence as Seq
+import qualified Data.Sequence               as Seq
+import           Data.String.Interpolate     (i)
+import           Debug.Trace
 
 -- We want constructor names to correspond 1:1 to Xilinx options it ease
 -- blackbox implementation.
@@ -79,7 +79,7 @@ defConfig = DcConfig
 data FifoState n = FifoState
   { hsQueue      :: Seq.Seq (BitVector n)
   , relativeTime :: Int
-  }
+  } deriving Show
 
 -- |
 dcFifo ::
@@ -113,19 +113,21 @@ dcFifo ::
   , Signal read (DataCount depth)
   , Signal read (BitVector n)
   )
-dcFifo DcConfig{..} !_wClk !_rClk !_rst writeData wEnable rEnable =
+dcFifo DcConfig{..} wClk rClk rst writeData wEnable rEnable =
   let
-    (wFull, wCnt, rEmpty, rCnt, rData) = go start wEnable rEnable writeData
+    (wRstBusy, wFull, wCnt, rRstBusy, rEmpty, rCnt, rData) = go rstSignalR rstSignalW start wEnable rEnable writeData
   in
-    ( pure 0
+    ( wRstBusy
     , wFull
     , if dcWriteDataCount then wCnt else deepErrorX "Write data count disabled"
-    , pure 0
+    , rRstBusy
     , rEmpty
     , if dcReadDataCount then rCnt else deepErrorX "Read data count disabled"
-    , rData
+    , deepErrorX "No sample" :- rData
     )
  where
+  rstSignalR = unsafeToHighPolarity rst
+  rstSignalW = unsafeSynchronizer rClk wClk $ unsafeToHighPolarity rst
 
   -- reified depth
   rD = snatToNum @Int (powSNat (SNat @2) (SNat @depth))
@@ -136,27 +138,38 @@ dcFifo DcConfig{..} !_wClk !_rClk !_rst writeData wEnable rEnable =
   -- https://github.com/clash-lang/clash-compiler/blob/ea114d8edd6a110f72d148203b9db2454cae8f37/clash-prelude/src/Clash/Explicit/BlockRam.hs#L1276-L1280
 
   go ::
+    Signal read Bool ->
+    Signal write Bool ->
+
     FifoState n ->
     Signal write Bool ->
     Signal read Bool ->
     Signal write (BitVector n) ->
-    ( Signal write Full
+    ( Signal write ResetBusy
+    , Signal write Full
     , Signal write (DataCount depth)
+
+    , Signal read ResetBusy
     , Signal read Empty
     , Signal read (DataCount depth)
     , Signal read (BitVector n)
     )
-  go st@(FifoState _ rt) wEna rEna =
+  go rstR rstW st@(FifoState _ rt) wEna rEna =
     if rt < tWr
-      then goRead st wEna rEna
-      else goWrite st wEna rEna
+      then goRead rstR rstW st wEna rEna
+      else goWrite rstR rstW st wEna rEna
+    -- TODO: goBoth case?
 
-  goWrite (FifoState q rt) wEna rEna wData =
-    (full, wCnt, fifoEmpty, rCnt, rData)
+  goWrite rstR (True :- rstWNext) (FifoState _ rt) (_ :- wEna) rEna (_ :- wData) =
+      (1 :- wRstBusy, 0 :- preFull, 0 :- preWCnt, rRstBusy, fifoEmpty, rCnt, rData)
     where
-      (preFull, preWCnt, fifoEmpty, rCnt, rData) = go (FifoState q' (rt-tWr)) wEna' rEna wData'
+      (wRstBusy, preFull, preWCnt, rRstBusy, fifoEmpty, rCnt, rData) = go rstR rstWNext (FifoState mempty (rt-tWr)) wEna rEna wData
+
+  goWrite rstR (_ :- rstW) (FifoState q rt) wEna rEna wData =
+    (0 :- wRstBusy, full, wCnt, rRstBusy, fifoEmpty, rCnt, rData)
+    where
+      (wRstBusy, preFull, preWCnt, rRstBusy, fifoEmpty, rCnt, rData) = go rstR rstW (FifoState q' (rt-tWr)) wEna' rEna wData'
       wCnt = sDepth q :- preWCnt
-      -- TODO: is this one cycle late?
       full = (if Seq.length q == rD then high else low) :- preFull
       (en :- wEna') = wEna
       (wDatum :- wData') = wData
@@ -167,24 +180,24 @@ dcFifo DcConfig{..} !_wClk !_rClk !_rst writeData wEnable rEnable =
 
   sDepth = fromIntegral . Seq.length
 
-  goRead (FifoState q rt) wEna rEna wData =
-    (full, wCnt, fifoEmpty, rCnt, rData)
+  goRead (rstR :- rstRNext) rstW (FifoState q rt) wEna rEna wData =
+    (wRstBusy, full, wCnt, (if rstR then 1 else 0) :- rRstBusy, fifoEmpty, rCnt, rData)
     where
-      -- TODO: is this one cycle late?
-      fifoEmpty = (if Seq.length q == 0 then high else low) :- preEmpty
       rCnt = sDepth q :- preRCnt
-      (full, wCnt, preEmpty, preRCnt, preRData) = go (FifoState q' (rt+tR)) wEna rEna' wData
+      fifoEmpty = (if Seq.length q == 0 then high else low) :- preEmpty
+      rData = nextData :- preRData
+      (wRstBusy, full, wCnt, rRstBusy, preEmpty, preRCnt, preRData) = go rstRNext rstW (FifoState q' (rt+tR)) wEna rEna' wData
       (en :- rEna') = rEna
-      (q', rData) =
-        if en
+      (q', nextData) =
+        if en && not rstR
           then
-            case Seq.viewl q of
-              Seq.EmptyL -> (q, deepErrorX "FIFO empty" :- preRData)
-              qDatum Seq.:< qData -> (qData, qDatum :- preRData)
-          else (q, deepErrorX "Enable off" :- preRData)
+            case Seq.viewr q of
+              Seq.EmptyR -> (q, deepErrorX "FIFO empty")
+              qData Seq.:> qDatum -> (qData, qDatum)
+          else (q, deepErrorX "Enable off or resetting")
 
   start :: FifoState n
-  start = FifoState Seq.empty 0 -- T_fast https://github.com/clash-lang/clash-compiler/blob/ea114d8edd6a110f72d148203b9db2454cae8f37/clash-prelude/src/Clash/Explicit/BlockRam.hs#L1323
+  start = FifoState Seq.empty 0
 
   tWr = snatToNum @Int (clockPeriod @write)
   tR = snatToNum @Int (clockPeriod @read)
