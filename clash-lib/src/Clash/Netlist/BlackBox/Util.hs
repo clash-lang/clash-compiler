@@ -73,14 +73,57 @@ import           Clash.Annotations.Primitive     (HDL(VHDL))
 
 inputHole :: Element -> Maybe Int
 inputHole = \case
-  Arg n         -> pure n
-  Lit n         -> pure n
-  Const n       -> pure n
-  Name n        -> pure n
-  Typ (Just n)  -> pure n
-  TypM (Just n) -> pure n
-  Err (Just n)  -> pure n
-  _             -> Nothing
+  Text _           -> Nothing
+  Component _      -> Nothing
+  Result           -> Nothing
+  Arg n            -> pure n
+  ArgGen _ n       -> pure n
+  Const n          -> pure n
+  Lit n            -> pure n
+  Name n           -> pure n
+  ToVar _ n        -> pure n
+  Sym _ _          -> Nothing
+  Typ nM           -> nM
+  TypM nM          -> nM
+  Err nM           -> nM
+  TypElem _        -> Nothing
+  CompName         -> Nothing
+  IncludeName _    -> Nothing
+  IndexType _      -> Nothing
+  Size _           -> Nothing
+  Length _         -> Nothing
+  Depth _          -> Nothing
+  MaxIndex _       -> Nothing
+  FilePath _       -> Nothing
+  Template _ _     -> Nothing
+  Gen _            -> Nothing
+  IF _ _ _         -> Nothing
+  And _            -> Nothing
+  IW64             -> Nothing
+  CmpLE _ _        -> Nothing
+  HdlSyn _         -> Nothing
+  BV _ _ _         -> Nothing
+  Sel _ _          -> Nothing
+  IsLit n          -> pure n
+  IsVar n          -> pure n
+  IsScalar n       -> pure n
+  IsActiveHigh n   -> pure n
+  Tag n            -> pure n
+  Period n         -> pure n
+  LongestPeriod    -> Nothing
+  ActiveEdge _ n   -> pure n
+  IsSync n         -> pure n
+  IsInitDefined n  -> pure n
+  IsActiveEnable n -> pure n
+  IsUndefined n    -> pure n
+  StrCmp _ n       -> pure n
+  OutputWireReg n  -> pure n
+  Vars n           -> pure n
+  GenSym _ _       -> Nothing
+  Repeat _ _       -> Nothing
+  DevNull _        -> Nothing
+  SigD _ nM        -> nM
+  CtxName          -> Nothing
 
 -- | Determine if the number of normal/literal/function inputs of a blackbox
 -- context at least matches the number of argument that is expected by the
