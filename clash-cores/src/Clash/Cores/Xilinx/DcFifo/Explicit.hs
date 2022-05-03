@@ -184,7 +184,7 @@ dcFifo DcConfig{..} !_wClk !_rClk !_rst writeData wEnable rEnable =
           else (q, deepErrorX "Enable off" :- preRData)
 
   start :: FifoState n
-  start = FifoState Seq.empty tR -- TODO: I think we want T_fast (period in fast clock domain)
+  start = FifoState Seq.empty 0 -- T_fast https://github.com/clash-lang/clash-compiler/blob/ea114d8edd6a110f72d148203b9db2454cae8f37/clash-prelude/src/Clash/Explicit/BlockRam.hs#L1323
 
   tWr = snatToNum @Int (clockPeriod @write)
   tR = snatToNum @Int (clockPeriod @read)
