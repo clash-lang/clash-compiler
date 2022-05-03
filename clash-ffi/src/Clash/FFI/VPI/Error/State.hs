@@ -17,10 +17,10 @@ import           Foreign.C.Types (CInt)
 import           GHC.Stack (CallStack, callStack, prettyCallStack)
 
 import qualified Clash.FFI.Monad as Sim (throw)
-import           Clash.FFI.View (Receive(..), UnsafeReceive(..))
+import           Clash.FFI.View (CRepr, Receive(..))
 
--- | The state of the simulator when an error occured. This specifies whether
--- the error occured before a simulation started, while in a PLI/VPI call, or
+-- | The state of the simulator when an error occurred. This specifies whether
+-- the error occurred before a simulation started, while in a PLI/VPI call, or
 -- while the simulation was running.
 --
 data ErrorState
@@ -45,15 +45,11 @@ instance Show UnknownErrorState where
       , prettyCallStack c
       ]
 
-instance UnsafeReceive ErrorState where
-  type Received ErrorState = CInt
+type instance CRepr ErrorState = CInt
 
-  unsafeReceive = \case
+instance Receive ErrorState where
+  receive = \case
     1 -> pure CompileError
     2 -> pure PliError
     3 -> pure RunError
     n -> Sim.throw (UnknownErrorState n callStack)
-
-instance Receive ErrorState where
-  receive = unsafeReceive
-

@@ -8,7 +8,6 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
--- {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -54,10 +53,10 @@ data Property a where
 
 deriving stock instance Show (Property a)
 
-instance UnsafeSend (Property a) where
-  type Sent (Property a) = CInt
+type instance CRepr (Property _) = CInt
 
-  unsafeSend =
+instance Send (Property a) where
+  send =
     pure . \case
       TypeOf -> 1
       Name -> 2
@@ -74,9 +73,6 @@ instance UnsafeSend (Property a) where
       IsSigned -> 65
       IsLocalParam -> 70
 #endif
-
-instance Send (Property a) where
-  send = unsafeSend
 
 -- | An exception thrown when attempting to get the value of a property which
 -- is not defined for the given object.
@@ -95,4 +91,3 @@ instance (Show a) => Show (InvalidProperty p a) where
       , "\n"
       , prettyCallStack c
       ]
-

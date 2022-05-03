@@ -35,10 +35,10 @@ data ObjectType
 #endif
   deriving stock (Eq, Show)
 
-instance UnsafeSend ObjectType where
-  type Sent ObjectType = CInt
+type instance CRepr ObjectType = CInt
 
-  unsafeSend =
+instance Send ObjectType where
+  send =
     pure . \case
       ObjModule -> 32
       ObjNet -> 36
@@ -48,9 +48,6 @@ instance UnsafeSend ObjectType where
 #if defined(VERILOG_2001)
       ObjCallback -> 107
 #endif
-
-instance Send ObjectType where
-  send = unsafeSend
 
 -- | An exception thrown when decoding an object type if an invalid value is
 -- given for the C enum that specifies the constructor of 'ObjectType'. Note
@@ -70,10 +67,8 @@ instance Show UnknownObjectType where
       , prettyCallStack c
       ]
 
-instance UnsafeReceive ObjectType where
-  type Received ObjectType = CInt
-
-  unsafeReceive = \case
+instance Receive ObjectType where
+  receive = \case
     32 -> pure ObjModule
     36 -> pure ObjNet
     41 -> pure ObjParameter
@@ -83,7 +78,3 @@ instance UnsafeReceive ObjectType where
     107 -> pure ObjCallback
 #endif
     ty -> Sim.throw (UnknownObjectType ty callStack)
-
-instance Receive ObjectType where
-  receive = unsafeReceive
-

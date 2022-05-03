@@ -78,4 +78,3 @@ modulePorts = iterateAll ObjPort . Just
 --
 moduleRegs :: HasCallStack => Module -> SimCont o [Reg]
 moduleRegs = iterateAll ObjReg . Just
-

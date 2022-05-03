@@ -25,4 +25,3 @@ newtype Parameter
   = Parameter { parameterObject :: Object }
   deriving stock (Show)
   deriving newtype (IsObject, NFData, Storable)
-

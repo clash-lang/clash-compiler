@@ -161,21 +161,10 @@ instance Storable ValueFormat where
     let cintPtr = FFI.castPtr @_ @CInt ptr
      in poke cintPtr . formatToCInt
 
-instance UnsafeSend ValueFormat where
-  type Sent ValueFormat = CInt
-
-  unsafeSend =
-    pure . formatToCInt
+type instance CRepr ValueFormat = CInt
 
 instance Send ValueFormat where
-  send = unsafeSend
-
-instance UnsafeReceive ValueFormat where
-  type Received ValueFormat = CInt
-
-  unsafeReceive =
-    IO.liftIO . cintToFormat
+  send = pure . formatToCInt
 
 instance Receive ValueFormat where
-  receive = unsafeReceive
-
+  receive = IO.liftIO . cintToFormat

@@ -71,4 +71,3 @@ simFlushIO = do
     Sim.throw (CouldNotFlushIO callStack)
 
   pure ()
-

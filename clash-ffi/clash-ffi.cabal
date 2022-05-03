@@ -29,17 +29,16 @@ common basic-config
     include
 
   ghc-options:
-    -Wall -Wcompat -g -debug
+    -Wall -Wcompat
 
   build-depends:
-    base                    >= 4.11     && < 5,
-    bytestring              >= 0.10.0.2 && < 0.12,
-    deepseq                 >= 1.4.5    && < 1.5,
-    derive-storable         >= 0.3.0.0  && < 0.4,
-    derive-storable-plugin  >= 0.2.3    && < 0.3,
-    mtl                     >= 2.2.2    && < 2.3,
-
-    clash-prelude           >= 1.2      && < 1.8,
+    base                    >= 4.11 && < 4.17,
+    bytestring              >= 0.10 && < 0.11,
+    clash-prelude           >= 1.2  && < 1.8,
+    deepseq                 >= 1.4  && < 1.5,
+    derive-storable         >= 0.3  && < 0.4,
+    derive-storable-plugin  >= 0.2  && < 0.3,
+    mtl                     >= 2.2  && < 2.3,
 
   other-modules:
     Clash.FFI.Monad
@@ -97,7 +96,7 @@ custom-setup
 foreign-library clash-iverilog-vpi
   import: basic-config, vpi-config
   type: native-shared
-  lib-version-info: 0:0:0
+  lib-version-info: 0:1:0
   hs-source-dirs: src
 
   cpp-options:
@@ -105,4 +104,3 @@ foreign-library clash-iverilog-vpi
     -DVERILOG_2001=1
     -DVERILOG_2005=1
     -DVPI_VECVAL=1
-

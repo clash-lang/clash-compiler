@@ -54,6 +54,9 @@ instance Show InvalidBitString where
       , prettyCallStack c
       ]
 
+-- TODO: These parsers are all defined in terms of replaceBit, however that
+-- may be a bottleneck in applications reading a lot of values / large values.
+
 parseBinStr
   :: forall n o
    . HasCallStack
@@ -234,4 +237,3 @@ parseHexStr size hex = do
 
     | otherwise
     = replaceBit (i + 3) w . replaceBit (i + 2) x . replaceBit (i + 1) y . replaceBit i z
-

@@ -31,7 +31,6 @@ import qualified Data.List as List (replicate)
 import           Data.Proxy
 import           Foreign.C.Types (CInt)
 import qualified Foreign.Marshal.Array as FFI (peekArray)
-import           Foreign.Ptr (Ptr)
 import           Foreign.Storable.Generic (GStorable)
 import           GHC.Generics (Generic)
 import           GHC.Stack (HasCallStack)
@@ -114,15 +113,13 @@ vectorToCVectorList vec =
   replaceScalar _ _ _ =
     error "replaceScalar: Index and list not consistent"
 
-instance (KnownNat n) => UnsafeSend (Vec n Scalar) where
-  type Sent (Vec n Scalar) = Sent [CVector]
+type instance CRepr (Vec _ Scalar) = CRepr [CVector]
 
-  unsafeSend =
-    unsafeSend . vectorToCVectorList
+instance (KnownNat n) => UnsafeSend (Vec n Scalar) where
+  unsafeSend = unsafeSend . vectorToCVectorList
 
 instance (KnownNat n) => Send (Vec n Scalar) where
-  send =
-    send . vectorToCVectorList
+  send = send . vectorToCVectorList
 
 cvectorListToVector
   :: forall n
@@ -158,8 +155,6 @@ cvectorListToVector =
       (True,  True)  -> SX
 
 instance (KnownNat n) => UnsafeReceive (Vec n Scalar) where
-  type Received (Vec n Scalar) = Ptr CVector
-
   unsafeReceive =
     let size = fromIntegral (natVal (Proxy @n))
         len  = div (size - 1) 32 + 1
@@ -190,26 +185,19 @@ vectorToBitVector vec =
   go :: Index n -> Scalar -> BitVector n -> BitVector n
   go ix s = replaceBit ix (scalarToBit s)
 
-instance (KnownNat n) => UnsafeSend (BitVector n) where
-  type Sent (BitVector n) = Sent (Vec n Scalar)
+type instance CRepr (BitVector n) = CRepr (Vec n Scalar)
 
-  unsafeSend =
-    unsafeSend . bitVectorToVector
+instance (KnownNat n) => UnsafeSend (BitVector n) where
+  unsafeSend = unsafeSend . bitVectorToVector
 
 instance (KnownNat n) => Send (BitVector n) where
-  send =
-    send . bitVectorToVector
+  send = send . bitVectorToVector
 
 instance (KnownNat n) => UnsafeReceive (BitVector n) where
-  type Received (BitVector n) = Received (Vec n Scalar)
-
-  unsafeReceive =
-    fmap vectorToBitVector . unsafeReceive
+  unsafeReceive = fmap vectorToBitVector . unsafeReceive
 
 instance (KnownNat n) => Receive (BitVector n) where
-  receive =
-    fmap vectorToBitVector . receive
+  receive = fmap vectorToBitVector . receive
 #else
 module Clash.FFI.VPI.Object.Value.Vector () where
 #endif
-

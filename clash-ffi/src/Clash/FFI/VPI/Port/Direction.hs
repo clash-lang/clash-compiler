@@ -48,15 +48,11 @@ instance Show UnknownDirection where
       , prettyCallStack c
       ]
 
-instance UnsafeReceive Direction where
-  type Received Direction = CInt
+type instance CRepr Direction = CInt
 
-  unsafeReceive = \case
+instance Receive Direction where
+  receive = \case
     1 -> pure Input
     2 -> pure Output
     3 -> pure InOut
     n -> Sim.throw (UnknownDirection n callStack)
-
-instance Receive Direction where
-  receive = unsafeReceive
-

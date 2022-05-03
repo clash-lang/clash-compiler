@@ -73,7 +73,7 @@ General Functions
 | vpi_mcd_open              | NO        |                                       |
 | vpi_mcd_printf            | NO        |                                       |
 | vpi_mcd_vprintf           | NO        |                                       |
-| vpi_printf                | YES       | simPutStr, simPutStrLn                | 
+| vpi_printf                | YES       | simPutStr, simPutStrLn                |
 | vpi_put_data              | NO        |                                       |
 | vpi_put_delays            | NO        |                                       |
 | vpi_put_userdata          | NO        |                                       |
@@ -104,4 +104,3 @@ VHPI is not supported at this time.
 ### FLI
 
 FLI is not supported at this time.
-

@@ -25,4 +25,3 @@ newtype Reg
   = Reg { regObject :: Object }
   deriving stock (Show)
   deriving newtype (IsObject, NFData, Storable)
-

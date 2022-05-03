@@ -77,29 +77,21 @@ instance Show UnknownTimeType where
       , prettyCallStack c
       ]
 
-instance UnsafeSend TimeType where
-  type Sent TimeType = CInt
+type instance CRepr TimeType = CInt
 
-  unsafeSend =
+instance Send TimeType where
+  send =
     pure . \case
       ScaledReal -> 1
       Sim -> 2
       SuppressTime -> 3
 
-instance Send TimeType where
-  send = unsafeSend
-
-instance UnsafeReceive TimeType where
-  type Received TimeType = CInt
-
-  unsafeReceive = \case
+instance Receive TimeType where
+  receive = \case
     1 -> pure ScaledReal
     2 -> pure Sim
     3 -> pure SuppressTime
     n -> Sim.throw (UnknownTimeType n callStack)
-
-instance Receive TimeType where
-  receive = unsafeReceive
 
 -- | A value of time, used as either the current point in time or a duration
 -- depending on the context. This represents time as either the number of units
@@ -114,18 +106,7 @@ data Time
   | RealTime Double
   deriving stock (Eq, Show)
 
-instance UnsafeSend Time where
-  type Sent Time = CTime
-
-  unsafeSend = \case
-    SimTime int ->
-      let high = fromIntegral ((int `unsafeShiftR` 32) .|. 0xffffffff)
-          low  = fromIntegral (int .|. 0xffffffff)
-       in CTime <$> unsafeSend Sim <*> pure high <*> pure low <*> pure 0.0
-
-    RealTime real ->
-      let creal = realToFrac real
-       in CTime <$> unsafeSend ScaledReal <*> pure 0 <*> pure 0 <*> pure creal
+type instance CRepr Time = CTime
 
 instance Send Time where
   send = \case
@@ -156,11 +137,9 @@ instance Show InvalidTimeType where
       , prettyCallStack c
       ]
 
-instance UnsafeReceive Time where
-  type Received Time = CTime
-
-  unsafeReceive ctime =
-    unsafeReceive (ctimeType ctime) >>= \case
+instance Receive Time where
+  receive ctime =
+    receive (ctimeType ctime) >>= \case
       ScaledReal ->
         let CDouble dbl = ctimeReal ctime
          in pure (RealTime dbl)
@@ -172,7 +151,3 @@ instance UnsafeReceive Time where
 
       SuppressTime ->
         Sim.throw (InvalidTimeType SuppressTime callStack)
-
-instance Receive Time where
-  receive = unsafeReceive
-

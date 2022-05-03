@@ -10,6 +10,10 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
+-- Used to improve the performance of derived instances.
+{-# OPTIONS_GHC -fplugin=Foreign.Storable.Generic.Plugin #-}
+{-# OPTIONS_GHC -fplugin-opt=Foreign.Storable.Generic.Plugin:-v0 #-}
+
 module Clash.FFI.VPI.Callback
   ( CCallbackInfo(..)
   , CallbackInfo(..)
@@ -75,9 +79,9 @@ foreign import ccall "wrapper"
     :: (Ptr CCallbackInfo -> IO CInt)
     -> IO (FunPtr (Ptr CCallbackInfo -> IO CInt))
 
-instance (UnsafeSend extra, Sent extra ~ Ptr a) => UnsafeSend (CallbackInfo extra) where
-  type Sent (CallbackInfo extra) = CCallbackInfo
+type instance CRepr (CallbackInfo _) = CCallbackInfo
 
+instance (UnsafeSend extra, CRepr extra ~ Ptr a) => UnsafeSend (CallbackInfo extra) where
   unsafeSend CallbackInfo{..} = do
     (creason, cobject, ctime, cvalue) <- unsafeSend cbReason
     croutine <- IO.liftIO (sendRoutine cbRoutine)
@@ -86,7 +90,7 @@ instance (UnsafeSend extra, Sent extra ~ Ptr a) => UnsafeSend (CallbackInfo extr
 
     pure (CCallbackInfo creason croutine cobject ctime cvalue cindex bytes)
 
-instance (Send extra, Sent extra ~ Ptr a) => Send (CallbackInfo extra) where
+instance (Send extra, CRepr extra ~ Ptr a) => Send (CallbackInfo extra) where
   send CallbackInfo{..} = do
     (creason, cobject, ctime, cvalue) <- send cbReason
     croutine <- IO.liftIO (sendRoutine cbRoutine)
@@ -100,9 +104,7 @@ foreign import ccall "dynamic"
     :: FunPtr (Ptr CCallbackInfo -> IO CInt)
     -> (Ptr CCallbackInfo -> IO CInt)
 
-instance (UnsafeReceive extra, Received extra ~ Ptr a) => UnsafeReceive (CallbackInfo extra) where
-  type Received (CallbackInfo extra) = CCallbackInfo
-
+instance (UnsafeReceive extra, CRepr extra ~ Ptr a) => UnsafeReceive (CallbackInfo extra) where
   unsafeReceive CCallbackInfo{..} = do
     reason <- unsafeReceive (ccbReason, ccbObject, ccbTime, ccbValue)
     let routine = receiveRoutine ccbRoutine
@@ -111,7 +113,7 @@ instance (UnsafeReceive extra, Received extra ~ Ptr a) => UnsafeReceive (Callbac
 
     pure (CallbackInfo reason routine index extra)
 
-instance (Receive extra, Received extra ~ Ptr a) => Receive (CallbackInfo extra) where
+instance (Receive extra, CRepr extra ~ Ptr a) => Receive (CallbackInfo extra) where
   receive CCallbackInfo{..} = do
     reason <- receive (ccbReason, ccbObject, ccbTime, ccbValue)
     let routine = receiveRoutine ccbRoutine
@@ -143,7 +145,7 @@ newtype Callback
 registerCallback
   :: forall extra o
    . UnsafeSend extra
-  => Sent extra ~ CString
+  => CRepr extra ~ CString
   => CallbackInfo extra
   -> SimCont o Callback
 registerCallback cb = do
@@ -211,13 +213,13 @@ getCallbackInfo alloc callback =
 unsafeReceiveCallbackInfo
   :: forall extra a o
    . UnsafeReceive extra
-  => Received extra ~ Ptr a
+  => CRepr extra ~ Ptr a
   => Callback
   -> SimCont o (CallbackInfo extra)
 unsafeReceiveCallbackInfo callback =
   getCallbackInfo Sim.stackPtr callback >>= unsafeReceive
 
--- | Get the high-level representation of the inforamtion for the given
+-- | Get the high-level representation of the information for the given
 -- callback object. The value is safely read meaning it will not become
 -- corrupted if the low-level representation is deallocated.
 --
@@ -226,10 +228,9 @@ unsafeReceiveCallbackInfo callback =
 receiveCallbackInfo
   :: forall extra a o
    . Receive extra
-  => Received extra ~ Ptr a
+  => CRepr extra ~ Ptr a
   => Callback
   -> SimCont o (CallbackInfo extra)
 receiveCallbackInfo callback =
   getCallbackInfo Sim.stackPtr callback >>= receive
 #endif
-

@@ -5,6 +5,7 @@ set -xueo pipefail
 # TODO: `sdist clash-cosim` only works _after_ building it
 cabal v2-sdist \
     clash-cores \
+    clash-ffi \
     clash-ghc \
     clash-lib \
     clash-lib-hedgehog \

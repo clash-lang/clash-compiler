@@ -24,4 +24,3 @@ newtype Net
   = Net { netObject :: Object }
   deriving stock (Show)
   deriving newtype (IsObject, NFData, Storable)
-

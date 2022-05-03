@@ -61,9 +61,9 @@ data Info = Info
   }
   deriving stock (Show)
 
-instance UnsafeReceive Info where
-  type Received Info = CInfo
+type instance CRepr Info = CInfo
 
+instance UnsafeReceive Info where
   unsafeReceive cinfo = do
     -- When passing +RTS to some simulators, they may replace the whole
     -- argument with NULL, so we check for that instead of using argc.
@@ -146,4 +146,3 @@ receiveSimulatorInfo
   => SimCont o Info
 receiveSimulatorInfo =
   getInfo Sim.stackPtr >>= peekReceive
-

@@ -17,7 +17,7 @@ import           Foreign.C.Types (CInt)
 import           GHC.Stack (CallStack, callStack, prettyCallStack)
 
 import qualified Clash.FFI.Monad as Sim (throw)
-import           Clash.FFI.View (Receive(..), UnsafeReceive(..))
+import           Clash.FFI.View (CRepr, Receive(..))
 
 -- | The level, or severity of an error returned by a call to @vpi_chk_error@.
 --
@@ -48,10 +48,10 @@ instance Show UnknownErrorLevel where
       , prettyCallStack c
       ]
 
-instance UnsafeReceive ErrorLevel where
-  type Received ErrorLevel = CInt
+type instance CRepr ErrorLevel = CInt
 
-  unsafeReceive = \case
+instance Receive ErrorLevel where
+  receive = \case
     0 -> pure Success
     1 -> pure Notice
     2 -> pure Warning
@@ -59,7 +59,3 @@ instance UnsafeReceive ErrorLevel where
     4 -> pure System
     5 -> pure Internal
     n -> Sim.throw (UnknownErrorLevel n callStack)
-
-instance Receive ErrorLevel where
-  receive = unsafeReceive
-

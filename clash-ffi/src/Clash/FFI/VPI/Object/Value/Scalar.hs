@@ -39,17 +39,17 @@ import           Clash.FFI.View
 data Scalar
   = S0 -- Strong 0
   | S1 -- Strong 1
-  | SZ -- High impedence
+  | SZ -- High impedance
   | SX -- Undefined
   | SH -- Weak 1
   | SL -- Weak 0
   | S_ -- Don't care
   deriving stock (Show)
 
-instance UnsafeSend Scalar where
-  type Sent Scalar = CInt
+type instance CRepr Scalar = CInt
 
-  unsafeSend =
+instance Send Scalar where
+  send =
     pure . \case
       S0 -> 0
       S1 -> 1
@@ -58,9 +58,6 @@ instance UnsafeSend Scalar where
       SH -> 4
       SL -> 5
       S_ -> 6
-
-instance Send Scalar where
-  send = unsafeSend
 
 -- | An exception thrown when decoding a scalar value if an invalid value is
 -- given for the C enum that specifies the constructor of 'Scalar'.
@@ -78,10 +75,8 @@ instance Show UnknownScalarValue where
       , prettyCallStack c
       ]
 
-instance UnsafeReceive Scalar where
-  type Received Scalar = CInt
-
-  unsafeReceive = \case
+instance Receive Scalar where
+  receive = \case
     0 -> pure S0
     1 -> pure S1
     2 -> pure SZ
@@ -91,9 +86,6 @@ instance UnsafeReceive Scalar where
     6 -> pure S_
     n -> Sim.throw (UnknownScalarValue n callStack)
 
-instance Receive Scalar where
-  receive = unsafeReceive
-
 bitToScalar :: Bit -> Scalar
 bitToScalar b
   | hasUndefined b  = SX
@@ -101,15 +93,10 @@ bitToScalar b
   | b == high       = S1
   | otherwise       = SX
 
-instance UnsafeSend Bit where
-  type Sent Bit = Sent Scalar
-
-  unsafeSend =
-    unsafeSend . bitToScalar
+type instance CRepr Bit = CRepr Scalar
 
 instance Send Bit where
-  send =
-    send . bitToScalar
+  send = send . bitToScalar
 
 scalarToBit :: Scalar -> Bit
 scalarToBit = \case
@@ -119,13 +106,5 @@ scalarToBit = \case
   SL -> low
   _  -> Bit 1 0
 
-instance UnsafeReceive Bit where
-  type Received Bit = Received Scalar
-
-  unsafeReceive =
-    fmap scalarToBit . unsafeReceive
-
 instance Receive Bit where
-  receive =
-    fmap scalarToBit . receive
-
+  receive = fmap scalarToBit . receive

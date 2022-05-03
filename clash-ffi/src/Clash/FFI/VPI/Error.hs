@@ -70,12 +70,12 @@ data ErrorInfo = ErrorInfo
   , errorLine     :: Int
   }
 
-instance UnsafeReceive ErrorInfo where
-  type Received ErrorInfo = CErrorInfo
+type instance CRepr ErrorInfo = CErrorInfo
 
+instance UnsafeReceive ErrorInfo where
   unsafeReceive cerror = do
-    state <- unsafeReceive (cerrorState cerror)
-    level <- unsafeReceive (cerrorLevel cerror)
+    state <- receive (cerrorState cerror)
+    level <- receive (cerrorLevel cerror)
     msg <- unsafeReceive (cerrorMessage cerror)
     prod <- unsafeReceive (cerrorProduct cerror)
     code <- unsafeReceive (cerrorCode cerror)
@@ -152,4 +152,3 @@ receiveErrorLevel
   => SimCont o ErrorLevel
 receiveErrorLevel =
   IO.liftIO (c_vpi_chk_error FFI.nullPtr) >>= receive
-

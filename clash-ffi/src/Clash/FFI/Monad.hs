@@ -61,7 +61,7 @@ same way, e.g.
 -- | The type of FFI actions with an input @i@ and an output @o@. For arbitrary
 -- actions to be run in FFI, the type will be @SimCont o A@, where @A@ is the
 -- result of the action (since this API is continuation-based the output of
--- one action is the input to the contination).
+-- one action is the input to the continuation).
 --
 -- For the "main" action performed by @clash-ffi@, there is no input and no
 -- output. The 'SimAction' synonym is intended for this case. Consequently,
@@ -82,7 +82,7 @@ type SimAction = SimCont () ()
 runSimAction :: SimAction -> IO ()
 runSimAction (SimCont cont) = Cont.runContT cont pure
 
--- | Lift a continuation into a simuation FFI action.
+-- | Lift a continuation into a simulation FFI action.
 --
 liftCont :: ((i -> IO o) -> IO o) -> SimCont o i
 liftCont = SimCont . ContT
@@ -154,4 +154,3 @@ throw :: (HasCallStack, Exception e) => e -> SimCont b a
 throw ex = IO.liftIO (IO.throwIO ex)
 
 -- TODO I should also provide catch here, and probably bracket
-

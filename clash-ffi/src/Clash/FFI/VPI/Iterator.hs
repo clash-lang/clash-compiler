@@ -59,7 +59,7 @@ iterate
   -> Maybe p
   -> SimCont o Iterator
 iterate objTy parent = do
-  cobjTy <- unsafeSend objTy
+  cobjTy <- send objTy
   let object = maybe nullObject coerce parent
 
   IO.liftIO (c_vpi_iterate cobjTy object)
@@ -103,7 +103,7 @@ iterateAll objTy parent = do
   iterator <- iterate objTy parent
   items <- takeWhileNonNull iterator
 
-  -- We have to evalute to NF here to prevent leaking the iterator if the list
+  -- We have to evaluate to NF here to prevent leaking the iterator if the list
   -- is not fully forced by the caller.
   items `deepseq` pure items
  where
@@ -115,4 +115,3 @@ iterateAll objTy parent = do
     case scanned of
       Just next -> fmap (next :) (takeWhileNonNull iterator)
       Nothing   -> pure []
-

@@ -10,10 +10,11 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 
 module Clash.FFI.View
   ( -- * Views on Data for FFI
-    UnsafeSend(..)
-  , UnsafeReceive(..)
+    CRepr
   , Send(..)
+  , UnsafeSend(..)
   , Receive(..)
+  , UnsafeReceive(..)
     -- * Pointers
   , unsafePokeSend
   , pokeSend
@@ -47,12 +48,22 @@ import           GHC.Stack (HasCallStack)
 import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim
 
+-- | A type family for determining the representation of a type @a@ when it is
+-- sent / received over FFI. Types are converted to their C representation
+-- using 'Send' and converted from their C representation using 'Receive'.
+--
+type family CRepr a
+
+type instance CRepr ByteString = CString
+type instance CRepr [a] = Ptr a
+type instance CRepr (Maybe a) = Ptr (CRepr a)
+
 -- TODO Should these classes be `SafeX a => UnsafeX a` instead? For things like
 -- C enum tags, there is no unsafe way to convert values, so x == unsafeX.
 
 -- | A class for data with raw values which can be unsafely sent over the FFI.
 -- It may be desirable to send values unsafely, as unsafe sending allows data
--- to be sent without needing to create a new copy. Callers are reponsible for
+-- to be sent without needing to create a new copy. Callers are responsible for
 -- making sure that data is never unsafely sent to a VPI function which takes
 -- ownership of a pointer, as any modification to this value will silently
 -- modify the original value, potentially corrupting the Haskell RTS state.
@@ -61,9 +72,7 @@ import qualified Clash.FFI.Monad as Sim
 -- see 'Receive' and 'UnsafeReceive'.
 --
 class UnsafeSend a where
-  type Sent a
-
-  unsafeSend :: HasCallStack => a -> SimCont b (Sent a)
+  unsafeSend :: HasCallStack => a -> SimCont b (CRepr a)
 
 -- | A class for data with raw values which can be safely sent over the FFI.
 -- Safely sending data involves making new copies where necessary, so the
@@ -73,37 +82,29 @@ class UnsafeSend a where
 -- If the data being sent is never mutated by the FFI, consider using
 -- 'UnsafeSend' instead as it does not need to copy the data first.
 --
-class UnsafeSend a => Send a where
-  send :: HasCallStack => a -> SimCont b (Sent a)
+class Send a where
+  send :: HasCallStack => a -> SimCont b (CRepr a)
 
 instance Storable a => UnsafeSend [a] where
-  type Sent [a] = Ptr a
-
-  unsafeSend xs =
-    Sim.liftCont (FFI.withArray xs)
+  unsafeSend xs = Sim.liftCont (FFI.withArray xs)
 
 instance Storable a => Send [a] where
-  send =
-    IO.liftIO . FFI.newArray
+  send = IO.liftIO . FFI.newArray
 
-instance (UnsafeSend a, Storable (Sent a)) => UnsafeSend (Maybe a) where
-  type Sent (Maybe a) = Ptr (Sent a)
+instance (UnsafeSend a, Storable (CRepr a)) => UnsafeSend (Maybe a) where
+  unsafeSend = maybe (pure FFI.nullPtr) unsafePokeSend
 
-  unsafeSend =
-    maybe (pure FFI.nullPtr) unsafePokeSend
-
-instance (Send a, Storable (Sent a)) => Send (Maybe a) where
-  send =
-    maybe (pure FFI.nullPtr) pokeSend
+instance (Send a, Storable (CRepr a)) => Send (Maybe a) where
+  send = maybe (pure FFI.nullPtr) pokeSend
 
 -- | Unsafely send a value, then allocate a new pointer on the stack and assign
 -- this value to the pointer. Since the value pointed to is unsafely sent, it
 -- should not need deallocating.
 --
 unsafePokeSend
-  :: (UnsafeSend a, Storable (Sent a))
+  :: (UnsafeSend a, Storable (CRepr a))
   => a
-  -> SimCont b (Ptr (Sent a))
+  -> SimCont b (Ptr (CRepr a))
 unsafePokeSend x = do
   raw <- unsafeSend x
   fst <$> Sim.withNewPtr Sim.stackPtr (`FFI.poke` raw)
@@ -113,9 +114,9 @@ unsafePokeSend x = do
 -- value pointed at by the returned pointer if necessary.
 --
 pokeSend
-  :: (Send a, Storable (Sent a))
+  :: (Send a, Storable (CRepr a))
   => a
-  -> SimCont b (Ptr (Sent a))
+  -> SimCont b (Ptr (CRepr a))
 pokeSend x = do
   raw <- send x
   fst <$> Sim.withNewPtr Sim.stackPtr (`FFI.poke` raw)
@@ -123,20 +124,15 @@ pokeSend x = do
 -- | Send a string by taking a temporary view of the String as a CString.
 --
 unsafeSendString :: String -> SimCont b CString
-unsafeSendString str =
-  Sim.liftCont (FFI.withCString str)
+unsafeSendString str = Sim.liftCont (FFI.withCString str)
 
 -- | Send a string by allocating a new CString which must be explicitly freed.
 --
 sendString :: String -> SimCont b CString
-sendString str =
-  IO.liftIO (FFI.newCString str)
+sendString str = IO.liftIO (FFI.newCString str)
 
 instance UnsafeSend ByteString where
-  type Sent ByteString = CString
-
-  unsafeSend str =
-    Sim.liftCont (BS.unsafeUseAsCString str)
+  unsafeSend str = Sim.liftCont (BS.unsafeUseAsCString str)
 
 instance Send ByteString where
   send str = do
@@ -160,9 +156,7 @@ instance Send ByteString where
 -- see 'Send' and 'UnsafeSend'.
 --
 class UnsafeReceive a where
-  type Received a
-
-  unsafeReceive :: (HasCallStack, Typeable b) => Received a -> SimCont b a
+  unsafeReceive :: (HasCallStack, Typeable b) => CRepr a -> SimCont b a
 
 -- | A class for data with raw values which can be safely received over the FFI.
 -- Safely receiving data involves making new copies where necessary, so the
@@ -172,12 +166,10 @@ class UnsafeReceive a where
 -- If the data being received is newly allocated by the FFI call, consider
 -- using 'UnsafeReceive', provided it will not be later mutated.
 --
-class UnsafeReceive a => Receive a where
-  receive :: (HasCallStack, Typeable b) => Received a -> SimCont b a
+class Receive a where
+  receive :: (HasCallStack, Typeable b) => CRepr a -> SimCont b a
 
-instance (UnsafeReceive a, Storable (Received a)) => UnsafeReceive (Maybe a) where
-  type Received (Maybe a) = Ptr (Received a)
-
+instance (UnsafeReceive a, Storable (CRepr a)) => UnsafeReceive (Maybe a) where
   unsafeReceive ptr
     | ptr == FFI.nullPtr
     = pure Nothing
@@ -185,7 +177,7 @@ instance (UnsafeReceive a, Storable (Received a)) => UnsafeReceive (Maybe a) whe
     | otherwise
     = Just <$> unsafePeekReceive ptr
 
-instance (Receive a, Storable (Received a)) => Receive (Maybe a) where
+instance (Receive a, Storable (CRepr a)) => Receive (Maybe a) where
   receive ptr
     | ptr == FFI.nullPtr
     = pure Nothing
@@ -194,22 +186,18 @@ instance (Receive a, Storable (Received a)) => Receive (Maybe a) where
     = Just <$> peekReceive ptr
 
 instance UnsafeReceive ByteString where
-  type Received ByteString = CString
-
-  unsafeReceive =
-    IO.liftIO . BS.unsafePackCString
+  unsafeReceive = IO.liftIO . BS.unsafePackCString
 
 instance Receive ByteString where
-  receive =
-    IO.liftIO . BS.packCString
+  receive = IO.liftIO . BS.packCString
 
 -- | Deference a pointer, then unsafely receive the value of the pointer. Since
 -- the value is unsafely received, any change to the pointed to value will
 -- corrupt the received value.
 --
 unsafePeekReceive
-  :: (UnsafeReceive a, Storable (Received a), Typeable b)
-  => Ptr (Received a)
+  :: (UnsafeReceive a, Storable (CRepr a), Typeable b)
+  => Ptr (CRepr a)
   -> SimCont b a
 unsafePeekReceive ptr =
   IO.liftIO (FFI.peek ptr) >>= unsafeReceive
@@ -218,8 +206,8 @@ unsafePeekReceive ptr =
 -- caller is responsible for deallocating the received value if necessary.
 --
 peekReceive
-  :: (Receive a, Storable (Received a), Typeable b)
-  => Ptr (Received a)
+  :: (Receive a, Storable (CRepr a), Typeable b)
+  => Ptr (CRepr a)
   -> SimCont b a
 peekReceive ptr =
   IO.liftIO (FFI.peek ptr) >>= receive
@@ -228,9 +216,9 @@ peekReceive ptr =
 -- the given final element. Each element of the array is unsafely received.
 --
 unsafeReceiveArray0
-  :: (UnsafeReceive a, Eq (Received a), Storable (Received a), Typeable b)
-  => Received a
-  -> Ptr (Received a)
+  :: (UnsafeReceive a, Eq (CRepr a), Storable (CRepr a), Typeable b)
+  => CRepr a
+  -> Ptr (CRepr a)
   -> SimCont b [a]
 unsafeReceiveArray0 end ptr =
   IO.liftIO (FFI.peekArray0 end ptr) >>= traverse unsafeReceive
@@ -240,9 +228,9 @@ unsafeReceiveArray0 end ptr =
 -- elements of the array if necessary.
 --
 receiveArray0
-  :: (Receive a, Eq (Received a), Storable (Received a), Typeable b)
-  => Received a
-  -> Ptr (Received a)
+  :: (Receive a, Eq (CRepr a), Storable (CRepr a), Typeable b)
+  => CRepr a
+  -> Ptr (CRepr a)
   -> SimCont b [a]
 receiveArray0 end ptr =
   IO.liftIO (FFI.peekArray0 end ptr) >>= traverse receive
@@ -253,4 +241,3 @@ receiveArray0 end ptr =
 receiveString :: CString -> SimCont b String
 receiveString =
   IO.liftIO . FFI.peekCString
-

@@ -38,4 +38,3 @@ newtype Port
 --
 direction :: Typeable o => Port -> SimCont o Direction
 direction = receiveProperty Direction
-
