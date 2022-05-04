@@ -3,6 +3,7 @@ Copyright : © 2014-2016, Christiaan Baaij,
               2017-2019, Myrtle Software Ltd
               2017     , QBayLogic, Google Inc.,
               2021     , QBayLogic B.V.
+              2022     , LUMI GUIDE FIETSDETECTIE B.V.
 
 Licence   : Creative Commons 4.0 (CC BY 4.0) (https://creativecommons.org/licenses/by/4.0/)
 Maintainer:  QBayLogic B.V. <devops@qbaylogic.com>
@@ -1270,6 +1271,10 @@ a general listing of the available template holes:
 * @~ISLIT[N]@: Is the @(N+1)@'th argument to the function a literal.
 * @~ISVAR[N]@: Is the @(N+1)@'th argument to the function explicitly not a
   literal.
+* @~ISSCALAR[N]@: Is the @(N+1)@'th argument to the function a scalar. Note
+  that this means different things for different HDLs. In (System)Verilog only
+  @Bit@ and @Bool@ are considered scalar. In VHDL, in addition to those two,
+  enumeration types and integers are considered scalar.
 * @~TAG[N]@: Name of given domain. Errors when called on an argument which is not
   a 'KnownDomain', 'Reset', or 'Clock'.
 * @~PERIOD[N]@: Clock period of given domain. Errors when called on an argument
