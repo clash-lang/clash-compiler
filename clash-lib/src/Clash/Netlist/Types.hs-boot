@@ -16,7 +16,6 @@ import Data.Hashable
 data IdentifierType
 data Identifier
 data IdentifierSet
-data HWType
 data Declaration
 data Component
 data Expr

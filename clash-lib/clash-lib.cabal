@@ -220,6 +220,7 @@ Library
                       Clash.Edalize.Edam
 
                       Clash.Netlist
+                      Clash.Netlist.Ast.Type
                       Clash.Netlist.BlackBox
                       Clash.Netlist.BlackBox.Parser
                       Clash.Netlist.BlackBox.Types

@@ -8,6 +8,7 @@ module T1182B where
 import qualified Prelude as P
 
 import Clash.Prelude
+import qualified Clash.Netlist.Ast.Type as N
 import qualified Clash.Netlist.Types as N
 import qualified Clash.Netlist.Id as Id
 import Clash.Annotations.TH

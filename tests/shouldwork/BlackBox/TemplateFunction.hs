@@ -13,6 +13,7 @@ import System.Environment (getArgs)
 import System.FilePath ((</>))
 
 import Clash.Backend (blockDecl)
+import Clash.Netlist.Ast.Type (HWType(Bool))
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
 

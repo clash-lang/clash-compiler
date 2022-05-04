@@ -80,6 +80,8 @@ import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
    lookupVarEnv')
 import           Clash.Driver.Types               (BindingMap, Binding(..), ClashEnv(..), ClashOpts (..))
+import           Clash.Netlist.Ast.Type
+  (FilteredHWType, HWType(..), PortDirection(..), isVoid, isVoidMaybe)
 import           Clash.Netlist.BlackBox
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types              as HW

@@ -66,6 +66,8 @@ import           Clash.Core.HasType
 import           Clash.Core.Literal            as L (Literal (..))
 import           Clash.Core.Name
   (Name (..), mkUnsafeSystemName)
+import           Clash.Netlist.Ast.Type
+  (HWType(..), PortDirection(..), flattenFiltered, isVoid, stripFiltered, stripVoid)
 import qualified Clash.Netlist.Id              as Id
 import           Clash.Core.Pretty             (showPpr)
 import           Clash.Core.Subst              (extendIdSubst, mkSubst, substTm)

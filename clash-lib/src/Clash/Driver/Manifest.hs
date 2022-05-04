@@ -57,11 +57,10 @@ import           Clash.Core.Name (nameOcc)
 import           Clash.Driver.Types
 import           Clash.Primitives.Types
 import           Clash.Core.Var (Id, varName)
-import           Clash.Netlist.Types
-  (TopEntityT, Component(..), HWType (Clock), hwTypeDomain)
+import           Clash.Netlist.Ast.Type (HWType(Clock), hwTypeDomain, typeSize)
+import           Clash.Netlist.Types (TopEntityT, Component(..))
 import qualified Clash.Netlist.Types as Netlist
 import qualified Clash.Netlist.Id as Id
-import           Clash.Netlist.Util (typeSize)
 import           Clash.Primitives.Util (hashCompiledPrimMap)
 import           Clash.Signal (VDomainConfiguration(..))
 import           Clash.Util.Graph (callGraphBindings)

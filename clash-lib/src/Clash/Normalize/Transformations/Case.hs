@@ -68,7 +68,7 @@ import Clash.Core.VarEnv
   , unitVarSet, uniqAway)
 import Clash.Debug (traceIf)
 import Clash.Driver.Types (DebugOpts(dbg_invariants))
-import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
+import Clash.Netlist.Ast.Type (FilteredHWType(..), HWType(..))
 import Clash.Netlist.Util (coreTypeToHWType, representableType)
 import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)

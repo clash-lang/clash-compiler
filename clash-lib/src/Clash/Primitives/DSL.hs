@@ -103,6 +103,8 @@ import           Clash.Annotations.Primitive     (HDL (..), Primitive (..))
 import           Clash.Backend                   hiding (fromBV, toBV)
 import           Clash.Backend.VHDL              (VHDLState)
 import           Clash.Core.Var                  (Attr')
+import           Clash.Netlist.Ast.Type
+  (HWType(..), PortDirection(..), Size, typeSize)
 import           Clash.Netlist.BlackBox.Util     (exprToString, renderElem)
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxTemplate, Element(Component, Text), Decl(..))

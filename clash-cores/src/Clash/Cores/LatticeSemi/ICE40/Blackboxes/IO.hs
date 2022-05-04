@@ -19,6 +19,7 @@ import           GHC.Stack
   (HasCallStack, prettyCallStack, callStack)
 
 import           Clash.Backend
+import           Clash.Netlist.Ast.Type (HWType(..), PortDirection(..))
 import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.Types
 import           Clash.Netlist.Util (instPort)

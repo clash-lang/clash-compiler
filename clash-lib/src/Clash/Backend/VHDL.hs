@@ -67,6 +67,7 @@ import           Clash.Core.Var                       (Attr'(..),attrName)
 import           Clash.Debug                          (traceIf)
 import           Clash.Driver.Types                   (ClashOpts(..))
 import           Clash.Explicit.BlockRam.Internal     (unpackNats)
+import           Clash.Netlist.Ast.Type
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)

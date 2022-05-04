@@ -123,11 +123,12 @@ import           Clash.Driver.Manifest
    mkManifest, writeManifest, manifestFilename)
 import           Clash.Edalize.Edam
 import           Clash.Netlist                    (genNetlist, genTopNames)
+import           Clash.Netlist.Ast.Type (FilteredHWType)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types
-  (IdentifierText, BlackBox (..), Component (..), FilteredHWType, HWMap, SomeBackend (..),
+  (IdentifierText, BlackBox (..), Component (..), HWMap, SomeBackend (..),
    TopEntityT(..), TemplateFunction, ComponentMap, findClocks, ComponentMeta(..))
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)

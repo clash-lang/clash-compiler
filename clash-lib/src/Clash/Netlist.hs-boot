@@ -21,8 +21,9 @@ import Clash.Core.DataCon   (DataCon)
 import Clash.Core.Term      (Alt,LetBinding,Term)
 import Clash.Core.Type      (Type)
 import Clash.Core.Var       (Id)
+import Clash.Netlist.Ast.Type (HWType)
 import Clash.Netlist.Types
-  (Expr, HWType, Identifier, NetlistMonad, Declaration, NetlistId,
+  (Expr, Identifier, NetlistMonad, Declaration, NetlistId,
    DeclarationType, ComponentMeta, Component)
 
 import GHC.Stack (HasCallStack)

@@ -15,9 +15,10 @@ import System.Environment (getArgs)
 import System.FilePath ((</>))
 
 import Clash.Backend (blockDecl)
+import Clash.Netlist.Ast.Type (HWType(..), PortDirection(..), typeSize)
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
-import Clash.Netlist.Util (typeSize, instPort)
+import Clash.Netlist.Util (instPort)
 
 import Clash.Prelude
 import Clash.Backend (Backend)

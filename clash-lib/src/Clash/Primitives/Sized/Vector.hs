@@ -35,6 +35,7 @@ import           Clash.Backend
 import           Clash.Core.TermInfo                (isVar)
 import           Clash.Core.Type
   (Type(LitTy), LitTy(NumTy), coreView)
+import           Clash.Netlist.Ast.Type (HWType(..), typeSize)
 import           Clash.Netlist.BlackBox             (isLiteral)
 import           Clash.Netlist.BlackBox.Util        (renderElem)
 import           Clash.Netlist.BlackBox.Parser      (runParse)
@@ -42,13 +43,12 @@ import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TExpr, TDecl),
    Element(Component, Typ, TypElem, Text), Decl(Decl), emptyBlackBoxMeta)
 import           Clash.Netlist.Types
-  (Identifier, TemplateFunction, BlackBoxContext, HWType(Vector),
+  (Identifier, TemplateFunction, BlackBoxContext,
    Declaration(..), Expr(Literal, Identifier,DataCon), Literal(NumLit),
    BlackBox(BBTemplate, BBFunction), TemplateFunction(..), WireOrReg(Wire),
-   Modifier(Indexed, Nested, DC), HWType(..), bbInputs, bbResults, emptyBBContext, tcCache,
+   Modifier(Indexed, Nested, DC), bbInputs, bbResults, emptyBBContext, tcCache,
    bbFunctions)
 import qualified Clash.Netlist.Id                   as Id
-import           Clash.Netlist.Util                 (typeSize)
 import qualified Clash.Primitives.DSL               as Prim
 import           Clash.Primitives.DSL
   (declarationReturn, instHO, tInputs, tExprToInteger)

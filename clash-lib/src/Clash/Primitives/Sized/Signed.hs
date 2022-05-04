@@ -14,8 +14,9 @@ import Data.Monoid (Ap(getAp))
 import Data.Text.Prettyprint.Doc.Extra (Doc, tupled)
 
 import Clash.Backend (Backend, expr)
+import Clash.Netlist.Ast.Type (HWType(..))
 import Clash.Netlist.Types
-  (BlackBoxContext (..), Expr (..), HWType (..), Literal (..), Modifier (..),
+  (BlackBoxContext (..), Expr (..), Literal (..), Modifier (..),
    TemplateFunction (..))
 
 fromIntegerTFvhdl :: TemplateFunction

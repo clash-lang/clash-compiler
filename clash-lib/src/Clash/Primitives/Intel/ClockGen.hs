@@ -14,6 +14,7 @@
 module Clash.Primitives.Intel.ClockGen where
 
 import Clash.Backend
+import Clash.Netlist.Ast.Type (HWType(..), PortDirection(..), stripVoid)
 import Clash.Netlist.BlackBox.Util
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types

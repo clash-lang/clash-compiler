@@ -67,8 +67,8 @@ import           Clash.Core.VarEnv
 import           Clash.Debug                      (traceIf)
 import           Clash.Driver.Types
   (BindingMap, Binding(..), DebugOpts(..), ClashEnv(..))
-import           Clash.Netlist.Types
-  (HWMap, FilteredHWType(..))
+import           Clash.Netlist.Ast.Type (FilteredHWType(..))
+import           Clash.Netlist.Types (HWMap)
 import           Clash.Netlist.Util
   (splitNormalized)
 import           Clash.Normalize.Strategy

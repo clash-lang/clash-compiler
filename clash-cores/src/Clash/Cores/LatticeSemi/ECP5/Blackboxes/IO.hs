@@ -12,6 +12,7 @@
 module Clash.Cores.LatticeSemi.ECP5.Blackboxes.IO (bbTF) where
 
 import           Clash.Backend
+import           Clash.Netlist.Ast.Type (HWType(..), PortDirection(..))
 import           Clash.Netlist.BlackBox.Util
 import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types

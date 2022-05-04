@@ -23,8 +23,9 @@ import Data.String (fromString, IsString)
 import Data.String.Interpolate (i)
 
 import Clash.Backend (Backend)
+import Clash.Netlist.Ast.Type (HWType(..))
 import Clash.Netlist.Types
-  (BlackBoxContext(..), Expr(..), HWType(..), Literal(..), Modifier(..),
+  (BlackBoxContext(..), Expr(..), Literal(..), Modifier(..),
    TemplateFunction(..))
 import Data.Text.Prettyprint.Doc.Extra (Doc)
 

@@ -20,12 +20,13 @@ import           Clash.Core.Term                 (Term(Var), varToId)
 import           Clash.Core.TermLiteral          (termToDataError)
 import           Clash.Util                      (indexNote)
 import           Clash.Netlist                   (mkExpr)
-import           Clash.Netlist.Util              (stripVoid, id2identifier)
+import           Clash.Netlist.Ast.Type (HWType(Bool, KnownDomain), stripVoid)
+import           Clash.Netlist.Util              (id2identifier)
 import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types
   (BlackBox(BBFunction), TemplateFunction(..), BlackBoxContext, Identifier,
    NetlistMonad, Declaration(Assignment, NetDecl'),
-   HWType(Bool, KnownDomain), WireOrReg(Wire), NetlistId(..),
+   WireOrReg(Wire), NetlistId(..),
    DeclarationType(Concurrent), tcCache, bbInputs, Expr(Identifier))
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TDecl), RenderVoid(..),

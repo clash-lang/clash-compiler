@@ -30,9 +30,10 @@ import Clash.Core.TyCon                 (TyConMap, tyConDataCons)
 import Clash.Core.Type
   (LitTy (..), Type (..), TypeView (..), coreView, coreView1, tyView)
 import Clash.Core.Util                  (tyNatSize, substArgTys)
-import Clash.Netlist.Util               (coreTypeToHWType, stripFiltered)
-import Clash.Netlist.Types
-  (HWType(..), HWMap, FilteredHWType(..), PortDirection (..))
+import Clash.Netlist.Ast.Type
+  (FilteredHWType(..), HWType(..), PortDirection(..), stripFiltered)
+import Clash.Netlist.Util               (coreTypeToHWType)
+import Clash.Netlist.Types (HWMap)
 import Clash.Signal.Internal
   (ResetPolarity(..), ActiveEdge(..), ResetKind(..)
   ,InitBehavior(..))

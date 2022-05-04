@@ -56,14 +56,14 @@ import           Text.Trifecta.Result            hiding (Err)
 
 import           Clash.Backend
   (Backend (..), Usage (..), AggressiveXOptBB(..), RenderEnums(..))
+import           Clash.Netlist.Ast.Type (HWType(..), isVoid, stripVoid, typeSize)
 import           Clash.Netlist.BlackBox.Parser
 import           Clash.Netlist.BlackBox.Types
 import           Clash.Netlist.Types
-  (BlackBoxContext (..), Expr (..), HWType (..), Literal (..), Modifier (..),
+  (BlackBoxContext (..), Expr (..), Literal (..), Modifier (..),
    Declaration(BlackBoxD))
 import qualified Clash.Netlist.Id                as Id
 import qualified Clash.Netlist.Types             as N
-import           Clash.Netlist.Util              (typeSize, isVoid, stripVoid)
 import           Clash.Signal.Internal
   (ResetKind(..), ResetPolarity(..), InitBehavior(..), VDomainConfiguration (..))
 import           Clash.Util

@@ -100,8 +100,9 @@ import           Clash.Core.Var
   (Id, Var (..), mkLocalId, modifyVarName, Attr')
 import           Clash.Core.VarEnv
   (InScopeSet, extendInScopeSetList, uniqAway, lookupVarEnv)
+import Clash.Netlist.Ast.Type
 import {-# SOURCE #-} Clash.Netlist.BlackBox
-import {-# SOURCE #-} Clash.Netlist.BlackBox.Util
+import           Clash.Netlist.BlackBox.Util
 import           Clash.Netlist.BlackBox.Types
   (bbResultNames, BlackBoxMeta(BlackBoxMeta))
 import qualified Clash.Netlist.Id as Id
@@ -134,33 +135,6 @@ hmFindWithDefault = HashMap.lookupDefault
 -- you can build an Expr manually.
 instPort :: Text -> Expr
 instPort pn = Identifier (Id.unsafeMake pn) Nothing
-
--- | Throw away information indicating which constructor fields were filtered
--- due to being void.
-stripFiltered :: FilteredHWType -> HWType
-stripFiltered (FilteredHWType hwty _filtered) = hwty
-
--- | Strip as many "Void" layers as possible. Might still return a Void if the
--- void doesn't contain a hwtype.
-stripVoid :: HWType -> HWType
-stripVoid (Void (Just e)) = stripVoid e
-stripVoid e = e
-
-flattenFiltered :: FilteredHWType -> [[Bool]]
-flattenFiltered (FilteredHWType _hwty filtered) = map (map fst) filtered
-
-isVoidMaybe :: Bool -> Maybe HWType -> Bool
-isVoidMaybe dflt Nothing = dflt
-isVoidMaybe _dflt (Just t) = isVoid t
-
--- | Determines if type is a zero-width construct ("void")
-isVoid :: HWType -> Bool
-isVoid Void {} = True
-isVoid _       = False
-
--- | Same as @isVoid@, but on @FilteredHWType@ instead of @HWType@
-isFilteredVoid :: FilteredHWType -> Bool
-isFilteredVoid = isVoid . stripFiltered
 
 squashLets :: Term -> Term
 squashLets (Letrec xs (Letrec ys e)) =
@@ -662,46 +636,6 @@ representableType builtInTranslation reprs stringRepresentable m =
       Annotated _ ty    -> isRepresentable ty
       _                 -> True
 
--- | Determines the bitsize of a type. For types that don't get turned
--- into real values in hardware (string, integer) the size is 0.
-typeSize :: HWType
-         -> Int
-typeSize (Void {}) = 0
-typeSize FileType = 32 -- (ref. page 287 of IEEE 1364-2005)
-typeSize String = 0
-typeSize Integer = 0
-typeSize (KnownDomain {}) = 0
-typeSize Bool = 1
-typeSize Bit = 1
-typeSize (Clock _) = 1
-typeSize (Reset _) = 1
-typeSize (Enable _) = 1
-typeSize (BitVector i) = i
-typeSize (Index 0) = 0
-typeSize (Index 1) = 1
-typeSize (Index u) = fromMaybe 0 (clogBase 2 u)
-typeSize (Signed i) = i
-typeSize (Unsigned i) = i
-typeSize (Vector n el) = n * typeSize el
-typeSize (MemBlob n m) = n * m
-typeSize (RTree d el) = (2^d) * typeSize el
-typeSize t@(SP _ cons) = conSize t +
-  maximum (map (sum . map typeSize . snd) cons)
-typeSize (Sum _ dcs) = fromMaybe 0 . clogBase 2 . toInteger $ length dcs
-typeSize (Product _ _ tys) = sum $ map typeSize tys
-typeSize (BiDirectional In h) = typeSize h
-typeSize (BiDirectional Out _) = 0
-typeSize (CustomSP _ _ size _) = fromIntegral size
-typeSize (CustomSum _ _ size _) = fromIntegral size
-typeSize (CustomProduct _ _ size _ _) = fromIntegral size
-typeSize (Annotated _ ty) = typeSize ty
-
--- | Determines the bitsize of the constructor of a type
-conSize :: HWType
-        -> Int
-conSize (SP _ cons) = fromMaybe 0 . clogBase 2 . toInteger $ length cons
-conSize t           = typeSize t
-
 -- | Gives the HWType corresponding to a term. Returns an error if the term has
 -- a Core type that is not translatable to a HWType.
 termHWType :: String
@@ -722,24 +656,6 @@ termHWTypeM e = do
   m  <- Lens.use tcCache
   let ty = inferCoreTypeOf m e
   coreTypeToHWTypeM ty
-
-isBiSignalIn :: HWType -> Bool
-isBiSignalIn (BiDirectional In _) = True
-isBiSignalIn _                    = False
-
-isBiSignalOut :: HWType -> Bool
-isBiSignalOut (BiDirectional Out _) = True
-isBiSignalOut _                     = False
-
-containsBiSignalIn
-  :: HWType
-  -> Bool
-containsBiSignalIn (BiDirectional In _) = True
-containsBiSignalIn (Product _ _ tys) = any containsBiSignalIn tys
-containsBiSignalIn (SP _ tyss)       = any (any containsBiSignalIn . snd) tyss
-containsBiSignalIn (Vector _ ty)     = containsBiSignalIn ty
-containsBiSignalIn (RTree _ ty)      = containsBiSignalIn ty
-containsBiSignalIn _                 = False
 
 -- | Uniquely rename all the variables and their references in a normalized
 -- term
@@ -1242,18 +1158,6 @@ genTopName prefixM ann =
       Id.addRaw (Text.concat [prefix, "_", Text.pack (t_name ann)])
     _ ->
       Id.addRaw (Text.pack (t_name ann))
-
--- | Strips one or more layers of attributes from a HWType; stops at first
--- non-Annotated. Accumulates all attributes of nested annotations.
-stripAttributes
-  :: HWType
-  -> ([Attr'], HWType)
--- Recursively strip type, accumulate attrs:
-stripAttributes (Annotated attrs typ) =
-  let (attrs', typ') = stripAttributes typ
-  in (attrs ++ attrs', typ')
--- Not an annotated type, so just return it:
-stripAttributes typ = ([], typ)
 
 -- | Create output port names for the declaration of a top entity. For
 -- /instantiation/ see 'mkTopInstOutput'.

@@ -8,6 +8,7 @@ import qualified Prelude as P
 import Clash.Prelude
 import Clash.Explicit.Testbench
 
+import qualified Clash.Netlist.Ast.Type as N
 import qualified Clash.Netlist.Types as N
 import qualified Clash.Netlist.BlackBox.Types as N
 import           Clash.Netlist.BlackBox.Types

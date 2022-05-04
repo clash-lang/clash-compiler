@@ -49,8 +49,8 @@ import Clash.Netlist.BlackBox.Parser (runParse)
 import Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta (bbKind), TemplateKind (TExpr),
    emptyBlackBoxMeta)
-import Clash.Netlist.Types
-  (BlackBox (BBTemplate), HWType (..), curCompNm, intWidth)
+import Clash.Netlist.Ast.Type (HWType(..))
+import Clash.Netlist.Types (BlackBox (BBTemplate), curCompNm, intWidth)
 import Clash.Util (clogBase)
 
 bvToIntegerVerilog, bvToIntegerVHDL, indexToIntegerVerilog,

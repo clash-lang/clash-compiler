@@ -27,6 +27,7 @@ import SrcLoc (SrcSpan)
 
 import Clash.Driver.Types (ClashOpts)
 import {-# SOURCE #-} Clash.Netlist.Types
+import Clash.Netlist.Ast.Type (HWType)
 import Clash.Netlist.BlackBox.Types
 
 import Clash.Signal.Internal                (VDomainConfiguration)
