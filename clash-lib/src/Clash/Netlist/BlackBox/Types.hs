@@ -2,6 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd,
                     2021-2022, QBayLogic B.V.
+                    2022     , LUMI GUIDE FIETSDETECTIE B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -97,6 +98,7 @@ type BlackBoxTemplate = [Element]
 --  - Clash.Netlist.BlackBox.Types.renderElem
 --  - Clash.Netlist.BlackBox.Types.renderTag
 --  - Clash.Netlist.BlackBox.Types.setSym
+--  - Clash.Netlist.BlackBox.Util.inputHole
 --  - Clash.Netlist.BlackBox.Types.getUsedArguments
 --  - Clash.Netlist.BlackBox.Types.usedVariables
 --  - Clash.Netlist.BlackBox.Types.verifyBlackBoxContext
@@ -165,6 +167,8 @@ data Element
   -- ^ Record selector of a type
   | IsLit !Int
   | IsVar !Int
+  | IsScalar !Int
+  -- ^ Whether element is scalar
   | IsActiveHigh !Int
   -- ^ Whether a domain's reset lines are synchronous.
   | Tag !Int
