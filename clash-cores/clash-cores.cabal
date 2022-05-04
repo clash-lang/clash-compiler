@@ -125,4 +125,4 @@ test-suite unittests
     tasty-hunit,
     tasty-quickcheck,
     hedgehog,
-    tasty-hedgehog
+    tasty-hedgehog >= 1.2.0
