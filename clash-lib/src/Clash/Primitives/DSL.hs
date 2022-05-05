@@ -405,7 +405,18 @@ boolFromBit
   -- ^ Name hint for intermediate signal
   -> TExpr
   -> State (BlockState VHDLState) TExpr
-boolFromBit = outputCoerce Bit Bool (<> " = '1'")
+boolFromBit boolName = \case
+  High -> pure T
+  Low -> pure F
+  TExpr Bit bitExpr -> do
+    texp@(~(TExpr _ (Identifier uniqueBoolName Nothing))) <- declare boolName Wire Bool
+    addDeclaration $
+      CondAssignment uniqueBoolName Bool bitExpr Bit
+        [ (Just (BitLit H), Literal Nothing (BoolLit True))
+        , (Nothing        , Literal Nothing (BoolLit False))
+        ]
+    pure texp
+  tExpr -> error $ "boolFromBit: Got \"" <> show tExpr <> "\" expected Bit"
 
 -- | Used to create an output `Bool` from a `BitVector` of given size.
 -- Works in a similar way to `boolFromBit` above.
