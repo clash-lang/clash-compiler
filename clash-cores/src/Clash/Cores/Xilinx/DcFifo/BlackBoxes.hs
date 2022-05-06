@@ -109,6 +109,9 @@ dcFifoTF dcFifoName DcConfig{..} = TemplateFunction [] (const True) $ \bbCtx -> 
     rdDataCount <- DSL.declare "rd_data_count" N.Wire (N.BitVector depth)
     rdDout      <- DSL.declare "rd_dout"       N.Wire (DSL.ety wData)
 
+    wrFullBool  <- DSL.boolFromBit "wr_full_bool" wrFull
+    rdEmptyBool <- DSL.boolFromBit "rd_empty_bool" rdEmpty
+
     wEnableBit <- DSL.boolToBit "wr_enable" wEnable
     rEnableBit <- DSL.boolToBit "rd_enable" rEnable
 
@@ -144,8 +147,8 @@ dcFifoTF dcFifoName DcConfig{..} = TemplateFunction [] (const True) $ \bbCtx -> 
     DSL.instDecl N.Entity dcFifoName dcFifoInstName [] inps outs
 
     pure [DSL.tuple
-      [ wrResetBusy, wrFull, wrDataCount
-      , rdResetBusy, rdEmpty, rdDataCount, rdDout
+      [ wrResetBusy, wrFullBool, wrDataCount
+      , rdResetBusy, rdEmptyBool, rdDataCount, rdDout
       ]]
 
 -- | Generate TCL file that calls Xilinx's `create_ip` with the options supplied

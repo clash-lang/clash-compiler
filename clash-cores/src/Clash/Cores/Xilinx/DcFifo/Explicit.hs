@@ -43,8 +43,8 @@ import           Data.String.Interpolate     (i)
 {-# HLINT ignore "Use camelCase" #-}
 
 type ResetBusy = Bit
-type Full = Bit
-type Empty = Bit
+type Full = Bool
+type Empty = Bool
 type DataCount n = Unsigned n
 
 data ReadMode
@@ -202,7 +202,7 @@ dcFifo# DcConfig{..} wClk rClk rst writeData wEnable rEnable =
     -- TODO: goBoth case?
 
   goWrite (FifoState _ rt) rstR rEna (True :- rstWNext) (_ :- wEna) (_ :- wData) =
-      (1 :- wRstBusy, 0 :- preFull, 0 :- preWCnt, rRstBusy, fifoEmpty, rCnt, rData)
+      (1 :- wRstBusy, False :- preFull, 0 :- preWCnt, rRstBusy, fifoEmpty, rCnt, rData)
     where
       (wRstBusy, preFull, preWCnt, rRstBusy, fifoEmpty, rCnt, rData) =
         go (FifoState mempty (rt-tWr)) rstR rEna rstWNext wEna wData
@@ -214,7 +214,7 @@ dcFifo# DcConfig{..} wClk rClk rst writeData wEnable rEnable =
         go (FifoState q' (rt-tWr)) rstR rEna rstW wEnas1 wDats1
 
       wCnt = sDepth q :- preWCnt
-      full = (if Seq.length q == rD then high else low) :- preFull
+      full = (Seq.length q == rD) :- preFull
       (wDat :- wDats1) = wDats0
       (wEna :- wEnas1) = wEnas0
       q' =
@@ -228,7 +228,7 @@ dcFifo# DcConfig{..} wClk rClk rst writeData wEnable rEnable =
     (wRstBusy, full, wCnt, (if rstR then 1 else 0) :- rRstBusy, fifoEmpty, rCnt, rData)
     where
       rCnt = sDepth q :- preRCnt
-      fifoEmpty = (if Seq.length q == 0 then high else low) :- preEmpty
+      fifoEmpty = (Seq.length q == 0) :- preEmpty
       rData = nextData :- preRData
 
       (wRstBusy, full, wCnt, rRstBusy, preEmpty, preRCnt, preRData) =

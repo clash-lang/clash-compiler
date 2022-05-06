@@ -401,10 +401,11 @@ enableToBit bitName = \case
 --   Returns a reference to a declared `Bit` that should get assigned
 --   by something (usually the output port of an entity).
 boolFromBit
-  :: Text
+  :: (HasCallStack, Backend backend)
+  => Text
   -- ^ Name hint for intermediate signal
   -> TExpr
-  -> State (BlockState VHDLState) TExpr
+  -> State (BlockState backend) TExpr
 boolFromBit boolName = \case
   High -> pure T
   Low -> pure F

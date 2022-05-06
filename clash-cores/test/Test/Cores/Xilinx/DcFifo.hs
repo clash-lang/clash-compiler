@@ -63,7 +63,7 @@ takeState (readLastCycle, True:stalls) (_, _, _, d) =
 takeState (readLastCycle, _:stalls) (_, fifoEmpty, _, d) =
     ((readThisCycle, stalls), (nextData, readThisCycle))
   where
-    readThisCycle = fifoEmpty == low
+    readThisCycle = not fifoEmpty
     nextData = if readLastCycle then Just d else Nothing
 
 feedState ::
@@ -74,7 +74,7 @@ feedState xs (1, _, _) = (xs, (deepErrorX "Resetting", False))
 feedState [] _ = ([], (deepErrorX "No more data", False))
 feedState (Nothing:xs) (_, _, _) = (xs, (deepErrorX "Stall simulation", False))
 feedState (Just x:xs) (_, full, _) =
-  if full == high
+  if full
     then (Just x:xs, (deepErrorX "FIFO full, waiting", False))
     else (xs, (x, True))
 
