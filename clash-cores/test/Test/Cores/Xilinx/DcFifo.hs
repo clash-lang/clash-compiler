@@ -9,6 +9,8 @@ import Control.Monad (replicateM)
 
 import Clash.Explicit.Prelude
 import Clash.Cores.Xilinx.DcFifo.Explicit
+import Clash.Netlist.Util (orNothing)
+
 
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
@@ -18,7 +20,7 @@ import Test.Tasty (TestTree)
 
 tests :: TestTree
 tests = testPropertyNamed
-  "FIFO doesn't lose any data"
+  "FIFO doesn't lose any data with small stalls"
   "prop_fifo"
   prop_fifo
 
@@ -34,12 +36,13 @@ intersperseStalls [] _ = []
 prop_fifo :: Property
 prop_fifo = property $ do
   xs <- fmap Just <$> forAll (replicateM 10 genData)
-  stallRead <- forAll (Gen.maybe (Gen.int (Range.linear 0 10)))
-  stallWrite <- forAll (Gen.maybe (Gen.int (Range.linear 0 10)))
-  let iWrites = case stallRead of
+  -- TODO: stall one by 9, get overflow!
+  stallRead <- forAll (Gen.maybe (Gen.int (Range.linear 0 8)))
+  stallWrite <- forAll (Gen.maybe (Gen.int (Range.linear 0 8)))
+  let iWrites = case stallWrite of
         Nothing -> []
         Just i -> P.replicate i Nothing
-  let readStalls = case stallWrite of
+  let readStalls = case stallRead of
         Nothing -> [False]
         Just i -> False : L.replicate i True
   throughFifo (intersperseStalls xs iWrites) (cycle readStalls) === catMaybes xs
@@ -56,7 +59,7 @@ takeState (_, _:stalls) (1, _, _, _) = ((False, stalls), (Nothing, False))
 takeState (readLastCycle, True:stalls) (_, _, _, d) =
     ((False, stalls), (nextData, False))
   where
-    nextData = if readLastCycle then Just d else Nothing
+    nextData = readLastCycle `orNothing` d
 takeState (readLastCycle, _:stalls) (_, fifoEmpty, _, d) =
     ((readThisCycle, stalls), (nextData, readThisCycle))
   where

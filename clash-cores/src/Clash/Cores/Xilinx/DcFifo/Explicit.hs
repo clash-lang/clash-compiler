@@ -157,7 +157,7 @@ dcFifo# ::
 dcFifo# DcConfig{..} wClk rClk rst writeData wEnable rEnable =
   let
     (wRstBusy, wFull, wCnt, rRstBusy, rEmpty, rCnt, rData) =
-      go rstSignalR rstSignalW start wEnable rEnable writeData
+      go initState rstSignalR rEnable rstSignalW wEnable writeData
   in
     ( wRstBusy
     , wFull
@@ -180,13 +180,12 @@ dcFifo# DcConfig{..} wClk rClk rst writeData wEnable rEnable =
   -- https://github.com/clash-lang/clash-compiler/blob/ea114d8edd6a110f72d148203b9db2454cae8f37/clash-prelude/src/Clash/Explicit/BlockRam.hs#L1276-L1280
 
   go ::
-    Signal read Bool ->
-    Signal write Bool ->
-
     FifoState n ->
-    Signal write Bool ->
-    Signal read Bool ->
-    Signal write (BitVector n) ->
+    Signal read Bool -> -- reset
+    Signal read Bool -> -- read enabled
+    Signal write Bool -> -- reset
+    Signal write Bool -> -- write enable
+    Signal write (BitVector n) -> -- write data
     ( Signal write ResetBusy
     , Signal write Full
     , Signal write (DataCount depth)
@@ -196,36 +195,36 @@ dcFifo# DcConfig{..} wClk rClk rst writeData wEnable rEnable =
     , Signal read (DataCount depth)
     , Signal read (BitVector n)
     )
-  go rstR rstW st@(FifoState _ rt) wEna rEna =
+  go st@(FifoState _ rt) rstR rEna rstW =
     if rt < tWr
-      then goRead rstR rstW st wEna rEna
-      else goWrite rstR rstW st wEna rEna
+      then goRead st rstR rEna rstW
+      else goWrite st rstR rEna rstW
     -- TODO: goBoth case?
 
-  goWrite rstR (True :- rstWNext) (FifoState _ rt) (_ :- wEna) rEna (_ :- wData) =
+  goWrite (FifoState _ rt) rstR rEna (True :- rstWNext) (_ :- wEna) (_ :- wData) =
       (1 :- wRstBusy, 0 :- preFull, 0 :- preWCnt, rRstBusy, fifoEmpty, rCnt, rData)
     where
       (wRstBusy, preFull, preWCnt, rRstBusy, fifoEmpty, rCnt, rData) =
-        go rstR rstWNext (FifoState mempty (rt-tWr)) wEna rEna wData
+        go (FifoState mempty (rt-tWr)) rstR rEna rstWNext wEna wData
 
-  goWrite rstR (_ :- rstW) (FifoState q rt) wEna rEna wData =
+  goWrite (FifoState q rt) rstR rEna (_ :- rstW) wEnas0 wDats0 =
     (0 :- wRstBusy, full, wCnt, rRstBusy, fifoEmpty, rCnt, rData)
     where
       (wRstBusy, preFull, preWCnt, rRstBusy, fifoEmpty, rCnt, rData) =
-        go rstR rstW (FifoState q' (rt-tWr)) wEna' rEna wData'
+        go (FifoState q' (rt-tWr)) rstR rEna rstW wEnas1 wDats1
 
       wCnt = sDepth q :- preWCnt
       full = (if Seq.length q == rD then high else low) :- preFull
-      (en :- wEna') = wEna
-      (wDatum :- wData') = wData
+      (wDat :- wDats1) = wDats0
+      (wEna :- wEnas1) = wEnas0
       q' =
-        if Seq.length q + 1 <= rD && en
-          then wDatum Seq.<| q
+        if Seq.length q + 1 <= rD && wEna
+          then wDat Seq.<| q
           else q
 
   sDepth = fromIntegral . Seq.length
 
-  goRead (rstR :- rstRNext) rstW (FifoState q rt) wEna rEna wData =
+  goRead (FifoState q rt) (rstR :- rstRNext) rEnas0 rstW wEna wData =
     (wRstBusy, full, wCnt, (if rstR then 1 else 0) :- rRstBusy, fifoEmpty, rCnt, rData)
     where
       rCnt = sDepth q :- preRCnt
@@ -233,19 +232,19 @@ dcFifo# DcConfig{..} wClk rClk rst writeData wEnable rEnable =
       rData = nextData :- preRData
 
       (wRstBusy, full, wCnt, rRstBusy, preEmpty, preRCnt, preRData) =
-        go rstRNext rstW (FifoState q' (rt+tR)) wEna rEna' wData
+        go (FifoState q' (rt+tR)) rstRNext rEnas1 rstW wEna wData
 
-      (en :- rEna') = rEna
+      (rEna :- rEnas1) = rEnas0
       (q', nextData) =
-        if en && not rstR
+        if rEna && not rstR
           then
             case Seq.viewr q of
               Seq.EmptyR -> (q, deepErrorX "FIFO empty")
               qData Seq.:> qDatum -> (qData, qDatum)
           else (q, deepErrorX "Enable off or resetting")
 
-  start :: FifoState n
-  start = FifoState Seq.empty 0
+  initState :: FifoState n
+  initState = FifoState Seq.empty 0
 
   tWr = snatToNum @Int (clockPeriod @write)
   tR = snatToNum @Int (clockPeriod @read)
