@@ -1,0 +1,1 @@
+ADDED: Added support for records and infix constructors when using `Clash.Annotations.BitRepresentation.Deriving.deriveAnnotation`.
