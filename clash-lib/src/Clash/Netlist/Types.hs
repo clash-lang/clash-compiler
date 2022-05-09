@@ -67,7 +67,7 @@ import SrcLoc                               (SrcSpan)
 
 import Clash.Annotations.Primitive          (HDL(..))
 import Clash.Annotations.TopEntity          (TopEntity)
-import Clash.Backend                        (Backend)
+import Clash.Backend                        (Backend, SomeBackend)
 import Clash.Core.HasType
 import Clash.Core.Type                      (Type)
 import Clash.Core.Var                       (Attr', Id)
@@ -352,10 +352,6 @@ data ComponentPrefix
   , componentPrefixOther :: Maybe Text
     -- ^ Prefix for all other components
   } deriving Show
-
--- | Existentially quantified backend
-data SomeBackend where
-  SomeBackend :: Backend backend => backend -> SomeBackend
 
 type Comment = Text
 type Directive = Text

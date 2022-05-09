@@ -73,7 +73,7 @@ import           Clash.Annotations.BitRepresentation.ClashLib
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, ConstrRepr'(..), DataRepr'(..), getDataRepr,
    uncheckedGetConstrRepr)
-import           Clash.Backend           (HWKind(..), hdlHWTypeKind)
+import           Clash.Backend           (HWKind(..), SomeBackend(..), hdlHWTypeKind)
 import           Clash.Core.DataCon      (DataCon (..))
 import           Clash.Core.EqSolver     (typeEq)
 import           Clash.Core.FreeVars     (typeFreeVars, typeFreeVars')

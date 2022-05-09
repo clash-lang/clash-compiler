@@ -60,6 +60,7 @@ import           Clash.Annotations.BitRepresentation.ClashLib
   (coreToType')
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, DataRepr'(..), ConstrRepr'(..), getDataRepr, getConstrRepr)
+import           Clash.Backend (SomeBackend)
 import           Clash.Core.DataCon               (DataCon (..))
 import           Clash.Core.HasType
 import           Clash.Core.Literal               (Literal (..))

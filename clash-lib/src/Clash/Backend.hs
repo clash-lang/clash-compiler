@@ -7,6 +7,7 @@
 -}
 
 {-# LANGUAGE CPP               #-}
+{-# LANGUAGE GADTs             #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Backend where
@@ -86,6 +87,10 @@ type DomainMap = HashMap Text VDomainConfiguration
 
 emptyDomainMap :: DomainMap
 emptyDomainMap = empty
+
+-- | Existentially quantified backend
+data SomeBackend where
+  SomeBackend :: Backend backend => backend -> SomeBackend
 
 class HasIdentifierSet state => Backend state where
   -- | Initial state for state monad
