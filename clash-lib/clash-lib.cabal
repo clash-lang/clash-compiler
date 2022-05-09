@@ -220,6 +220,8 @@ Library
                       Clash.Edalize.Edam
 
                       Clash.Netlist
+                      Clash.Netlist.Ast.Concurrent
+                      Clash.Netlist.Ast.Sequential
                       Clash.Netlist.Ast.Type
                       Clash.Netlist.BlackBox
                       Clash.Netlist.BlackBox.Parser
