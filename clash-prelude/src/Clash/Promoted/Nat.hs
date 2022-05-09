@@ -328,6 +328,8 @@ data SNatLE a b where
   SNatLE :: forall a b . a <= b => SNatLE a b
   SNatGT :: forall a b . (b+1) <= a => SNatLE a b
 
+deriving instance Show (SNatLE a b)
+
 -- | Get an ordering relation between two SNats
 compareSNat :: forall a b . SNat a -> SNat b -> SNatLE a b
 compareSNat a b =
