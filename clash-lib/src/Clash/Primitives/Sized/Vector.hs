@@ -42,8 +42,9 @@ import           Clash.Netlist.BlackBox.Parser      (runParse)
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TExpr, TDecl),
    Element(Component, Typ, TypElem, Text), Decl(Decl), emptyBlackBoxMeta)
+import           Clash.Netlist.Id (Identifier)
 import           Clash.Netlist.Types
-  (Identifier, TemplateFunction, BlackBoxContext,
+  (TemplateFunction, BlackBoxContext,
    Declaration(..), Expr(Literal, Identifier,DataCon), Literal(NumLit),
    BlackBox(BBTemplate, BBFunction), TemplateFunction(..), WireOrReg(Wire),
    Modifier(Indexed, Nested, DC), bbInputs, bbResults, emptyBBContext, tcCache,

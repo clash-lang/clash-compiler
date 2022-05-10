@@ -105,6 +105,7 @@ import {-# SOURCE #-} Clash.Netlist.BlackBox
 import           Clash.Netlist.BlackBox.Util
 import           Clash.Netlist.BlackBox.Types
   (bbResultNames, BlackBoxMeta(BlackBoxMeta))
+import           Clash.Netlist.Id (Identifier(..))
 import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.Types     as HW
 import           Clash.Primitives.Types
@@ -1145,7 +1146,7 @@ genComponentName newInlineStrat prefixM nm =
   prefix = fromMaybe (if newInlineStrat then [] else init nm0) (pure <$> prefixM)
 
 genTopName
-  :: IdentifierSetMonad m
+  :: Id.IdentifierSetMonad m
   => Maybe Text
   -- ^ Top entity name prefix
   -> TopEntity
@@ -1600,7 +1601,7 @@ data ExpandError
 -- | Same as 'expandTopEntity', but also adds identifiers to the identifier
 -- set of the monad.
 expandTopEntityOrErrM
-  :: (HasCallStack, IdentifierSetMonad m)
+  :: (HasCallStack, Id.IdentifierSetMonad m)
   => [(Maybe Id, FilteredHWType)]
   -- ^ Arguments. Ids are used as name hints.
   -> (Maybe Id, FilteredHWType)
@@ -1613,7 +1614,7 @@ expandTopEntityOrErrM
   -- identifiers in the expanded top entity will be added to NetlistState's
   -- IdentifierSet.
 expandTopEntityOrErrM ihwtys ohwty topM = do
-  is <- identifierSetM id
+  is <- Id.identifierSetM id
   let ett = expandTopEntityOrErr is ihwtys ohwty topM
   Id.addMultiple (toList ett)
   pure ett
@@ -1622,7 +1623,7 @@ expandTopEntityOrErrM ihwtys ohwty topM = do
 -- port that should be generated in the HDL is part of the data structure.
 expandTopEntityOrErr
   :: HasCallStack
-  => IdentifierSet
+  => Id.IdentifierSet
   -- ^ Settings of this IdentifierSet will be used to generate valid
   -- identifiers. Note that the generated identifiers are /not/ guaranteed to be
   -- unique w.r.t. this set.

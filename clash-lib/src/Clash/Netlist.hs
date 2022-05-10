@@ -84,6 +84,7 @@ import           Clash.Driver.Types               (BindingMap, Binding(..), Clas
 import           Clash.Netlist.Ast.Type
   (FilteredHWType, HWType(..), PortDirection(..), isVoid, isVoidMaybe)
 import           Clash.Netlist.BlackBox
+import           Clash.Netlist.Id (Identifier, IdentifierSet)
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types              as HW
 import           Clash.Netlist.Util

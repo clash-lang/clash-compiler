@@ -22,9 +22,10 @@ import           Clash.Util                      (indexNote)
 import           Clash.Netlist                   (mkExpr)
 import           Clash.Netlist.Ast.Type (HWType(Bool, KnownDomain), stripVoid)
 import           Clash.Netlist.Util              (id2identifier)
+import           Clash.Netlist.Id (Identifier)
 import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types
-  (BlackBox(BBFunction), TemplateFunction(..), BlackBoxContext, Identifier,
+  (BlackBox(BBFunction), TemplateFunction(..), BlackBoxContext,
    NetlistMonad, Declaration(Assignment, NetDecl'),
    WireOrReg(Wire), NetlistId(..),
    DeclarationType(Concurrent), tcCache, bbInputs, Expr(Identifier))

@@ -126,9 +126,10 @@ import           Clash.Netlist                    (genNetlist, genTopNames)
 import           Clash.Netlist.Ast.Type (FilteredHWType)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
+import           Clash.Netlist.Id (IdentifierText)
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types
-  (IdentifierText, BlackBox (..), Component (..), HWMap,
+  (BlackBox (..), Component (..), HWMap,
    TopEntityT(..), TemplateFunction, ComponentMap, findClocks, ComponentMeta(..))
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)

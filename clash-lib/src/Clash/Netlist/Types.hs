@@ -30,26 +30,19 @@ where
 
 import Control.DeepSeq
 import qualified Control.Lens               as Lens
-import Control.Lens                         (Lens', (.=))
 #if !MIN_VERSION_base(4,13,0)
 import Control.Monad.Fail                   (MonadFail)
 #endif
 import Control.Monad.Reader                 (ReaderT, MonadReader)
 import qualified Control.Monad.State        as Lazy (State)
 import qualified Control.Monad.State.Strict as Strict
-  (State, MonadIO, MonadState, StateT)
+  (State, MonadIO, MonadState, StateT, state)
 import Data.Bits                            (testBit)
 import Data.Binary                          (Binary(..))
-import Data.Function                        (on)
-import Data.Hashable                        (Hashable(hash,hashWithSalt))
-import Data.HashMap.Strict                  (HashMap)
-import Data.HashSet                         (HashSet)
-import qualified Data.List                  as List
 import Data.IntMap                          (IntMap, empty)
 import Data.Map.Ordered                     (OMap)
 import Data.Map                             (Map)
 import Data.Maybe                           (mapMaybe)
-import Data.Monoid                          (Ap(..))
 import qualified Data.Set                   as Set
 import Data.Text                            (Text)
 
@@ -76,13 +69,14 @@ import Clash.Core.VarEnv                    (VarEnv)
 import Clash.Driver.Types                   (BindingMap, ClashOpts)
 import Clash.Netlist.Ast.Type
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
+import Clash.Netlist.Id
+import qualified Clash.Netlist.Id as Id
 import Clash.Primitives.Types               (CompiledPrimMap)
 import Clash.Signal.Internal                (ActiveEdge)
 import Clash.Unique                         (Unique)
 
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 
-import {-# SOURCE #-} qualified Clash.Netlist.Id as Id
 
 -- | Structure describing a top entity: it's id and its port annotations.
 data TopEntityT = TopEntityT
@@ -125,145 +119,14 @@ newtype NetlistMonad a =
   deriving newtype (Functor, Monad, Applicative, MonadReader NetlistEnv,
                     Strict.MonadState NetlistState, Strict.MonadIO, MonadFail)
 
+instance IdentifierSetMonad NetlistMonad where
+  identifierSetM f =
+    Strict.state $ \st ->
+      let is = f (_seenIds st)
+       in (is, st { _seenIds = is })
+  {-# INLINE identifierSetM #-}
+
 type HWMap = Map Type (Either String FilteredHWType)
-
--- | See 'is_freshCache'
-type FreshCache = HashMap Text (IntMap Word)
-
-type IdentifierText = Text
-
--- | Whether to preserve casing in ids or converted everything to
---  lowercase. Influenced by '-fclash-lower-case-basic-identifiers'
-data PreserveCase
-  = PreserveCase
-  | ToLower
-  deriving (Show, Generic, NFData, Eq, Binary, Hashable)
-
--- See: http://vhdl.renerta.com/mobile/source/vhd00037.htm
---      http://www.verilog.renerta.com/source/vrg00018.htm
-data IdentifierType
-  = Basic
-  -- ^ A basic identifier: does not have to be escaped in order to be a valid
-  -- identifier in HDL.
-  | Extended
-  -- ^ An extended identifier: has to be escaped, wrapped, or otherwise
-  -- postprocessed before writhing it to HDL.
-  deriving (Show, Generic, NFData, Eq)
-
--- | A collection of unique identifiers. Allows for fast fresh identifier
--- generation.
---
--- __NB__: use the functions in Clash.Netlist.Id. Don't use the constructor directly.
-data IdentifierSet
-  = IdentifierSet {
-      is_allowEscaped :: !Bool
-      -- ^ Allow escaped ids? If set to False, "make" will always behave like
-      -- "makeBasic".
-    , is_lowerCaseBasicIds :: !PreserveCase
-      -- ^ Force all generated basic identifiers to lowercase.
-    , is_hdl :: !HDL
-      -- ^ HDL to generate fresh identifiers for
-    , is_freshCache :: !FreshCache
-      -- ^ Maps an 'i_baseNameCaseFold' to a map mapping the number of
-      -- extensions (in 'i_extensionsRev') to the maximum word at that
-      -- basename/level. For example, if a set would contain the identifiers:
-      --
-      --   [foo, foo_1, foo_2, bar_5, bar_7_8]
-      --
-      -- the map would look like:
-      --
-      --   [(foo, [(0, 0), (1, 2)]), (bar, [(1, 5), (2, 8)])]
-      --
-      -- This mapping makes sure we can quickly generate fresh identifiers. For
-      -- example, generating a new id for "foo_1" would be a matter of looking
-      -- up the base name in this map, concluding that the maximum identifier
-      -- with this basename and this number of extensions is "foo_2",
-      -- subsequently generating "foo_3".
-      --
-      -- Note that an identifier with no extensions is also stored in this map
-      -- for practical purposes, but the maximum ext is invalid.
-    , is_store :: !(HashSet Identifier)
-      -- ^ Identifier store
-    } deriving (Generic, NFData, Show)
-
--- | HDL identifier. Consists of a base name and a number of extensions. An
--- identifier with a base name of "foo" and a list of extensions [1, 2] will be
--- rendered as "foo_1_2".
---
--- Note: The Eq instance of "Identifier" is case insensitive! E.g., two
--- identifiers with base names 'fooBar' and 'FoObAR' are considered the same.
--- However, identifiers are stored case preserving. This means Clash won't
--- generate two identifiers with differing case, but it will try to keep
--- capitalization.
---
--- The goal of this data structure is to greatly simplify how Clash deals with
--- identifiers internally. Any Identifier should be trivially printable to any
--- HDL.
---
--- __NB__: use the functions in Clash.Netlist.Id. Don't use these constructors
--- directly.
-data Identifier
-  -- | Unparsed identifier. Used for things such as port names, which should
-  -- appear in the HDL exactly as the user specified.
-  = RawIdentifier
-      !Text
-      -- ^ An identifier exactly as given by the user
-      (Maybe Identifier)
-      -- ^ Parsed version of raw identifier. Will not be populated if this
-      -- identifier was created with an unsafe function.
-      !CallStack
-      -- ^ Stores where this identifier was generated. Tracking is only enabled
-      -- is 'debugIsOn', otherwise this field will be populated by an empty
-      -- callstack.
-
-  -- | Parsed and sanitized identifier. See various fields for more information
-  -- on its invariants.
-  | UniqueIdentifier {
-      i_baseName :: !Text
-    -- ^ Base name of identifier. 'make' makes sure this field:
-    --
-    --    * does not end in '_num' where 'num' is a digit.
-    --    * is solely made up of printable ASCII characters
-    --    * has no leading or trailing whitespace
-    --
-    , i_baseNameCaseFold :: !Text
-    -- ^ Same as 'i_baseName', but can be used for equality testing that doesn't
-    -- depend on capitalization.
-    , i_extensionsRev :: [Word]
-    -- ^ Extensions applied to base identifier. E.g., an identifier with a base
-    -- name of 'foo' and an extension of [6, 5] would render as 'foo_5_6'. Note
-    -- that extensions are stored in reverse order for easier manipulation.
-    , i_idType :: !IdentifierType
-    -- ^ See "IdentifierType".
-    , i_hdl :: !HDL
-    -- ^ HDL this identifier is generated for.
-    , i_provenance :: !CallStack
-    -- ^ Stores where this identifier was generated. Tracking is only enabled
-    -- is 'debugIsOn', otherwise this field will be populated by an empty
-    -- callstack.
-    } deriving (Show, Generic, NFData)
-
-identifierKey# :: Identifier -> ((Text, Bool), [Word])
-identifierKey# (RawIdentifier t _id _) = ((t, True), [])
-identifierKey# id_ = ((i_baseNameCaseFold id_, False), i_extensionsRev id_)
-
-instance Hashable Identifier where
-  hashWithSalt salt = hashWithSalt salt . hash
-  hash = uncurry hash# . identifierKey#
-   where
-    hash# a extensions =
-      -- 'hash' has an identity around zero, e.g. `hash (0, 2) == 2`. Because a
-      -- lot of zeros can be expected, extensions are fuzzed in order to keep
-      -- efficient `HashMap`s.
-      let fuzz fuzzFactor ext = fuzzFactor * fuzzFactor * ext in
-      hash (a, List.foldl' fuzz 2 extensions)
-
-instance Eq Identifier where
-  i1 == i2 = identifierKey# i1 == identifierKey# i2
-  i1 /= i2 = identifierKey# i1 /= identifierKey# i2
-
-instance Ord Identifier where
-  compare = compare `on` identifierKey#
 
 -- | Environment of the NetlistMonad
 data NetlistEnv
@@ -727,39 +590,3 @@ emptyBBContext name
 
 Lens.makeLenses ''NetlistEnv
 Lens.makeLenses ''NetlistState
-
--- | Structures that hold an 'IdentifierSet'
-class HasIdentifierSet s where
-  identifierSet :: Lens' s IdentifierSet
-
-instance HasIdentifierSet IdentifierSet where
-  identifierSet = ($)
-
--- | An "IdentifierSetMonad" supports unique name generation for Clash Netlist
-class Monad m => IdentifierSetMonad m where
-  identifierSetM :: (IdentifierSet -> IdentifierSet) -> m IdentifierSet
-
-instance IdentifierSetMonad NetlistMonad where
-  identifierSetM f = do
-    is0 <- Lens.use seenIds
-    let is1 = f is0
-    seenIds .= is1
-    pure is1
-  {-# INLINE identifierSetM #-}
-
-instance HasIdentifierSet s => IdentifierSetMonad (Strict.State s) where
-  identifierSetM f = do
-    is0 <- Lens.use identifierSet
-    identifierSet .= f is0
-    Lens.use identifierSet
-  {-# INLINE identifierSetM #-}
-
-instance HasIdentifierSet s => IdentifierSetMonad (Lazy.State s) where
-  identifierSetM f = do
-    is0 <- Lens.use identifierSet
-    identifierSet .= f is0
-    Lens.use identifierSet
-  {-# INLINE identifierSetM #-}
-
-instance IdentifierSetMonad m => IdentifierSetMonad (Ap m) where
-  identifierSetM = Ap . identifierSetM

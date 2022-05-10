@@ -8,6 +8,7 @@ import Clash.Core.Var (Attr')
 import Clash.Netlist.Ast.Declaration
 import Clash.Netlist.Ast.Sequential
 import Clash.Netlist.Ast.Type
+import Clash.Netlist.Id (Identifier)
 import Clash.Netlist.BlackBox.Types (BlackBoxTemplate)
 
 import Clash.Netlist.Types hiding (Declaration)

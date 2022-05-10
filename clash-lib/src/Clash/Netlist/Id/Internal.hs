@@ -1,22 +1,31 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-{-# OPTIONS_GHC -Wno-orphans #-}
-
 module Clash.Netlist.Id.Internal where
 
-import           Clash.Annotations.Primitive (HDL (..))
-import           Clash.Core.Name (Name(nameOcc))
-import           Clash.Core.Var (Id, varName)
-import           Clash.Debug (debugIsOn)
-import {-# SOURCE #-} Clash.Netlist.Types
-  (PreserveCase(..), IdentifierSet(..), Identifier(..), FreshCache,
-   IdentifierType(..))
+import           Control.DeepSeq (NFData)
 import           Control.Arrow (second)
+import           Data.Binary (Binary)
 import qualified Data.Char as Char
+import           Data.Function (on)
+import           Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HashMap
+import           Data.HashSet (HashSet)
+import qualified Data.HashSet as HashSet
+import           Data.Hashable (Hashable(..))
+import           Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
 import qualified Data.List as List
+import qualified Data.Maybe as Maybe
+import           Data.Text (Text)
+import qualified Data.Text as Text
+import           Data.Text.Extra (showt)
+import           GHC.Generics (Generic)
+import           GHC.Stack
+import           Text.Read (readMaybe)
 
 #if MIN_VERSION_prettyprinter(1,7,0)
 import qualified Prettyprinter as PP
@@ -24,21 +33,150 @@ import qualified Prettyprinter as PP
 import qualified Data.Text.Prettyprint.Doc as PP
 #endif
 
-import qualified Data.Text as Text
-import           Data.Text (Text)
-import           Data.Text.Extra (showt)
-import qualified Data.Maybe as Maybe
-import           Text.Read (readMaybe)
-import           GHC.Stack
-
-import qualified Data.IntMap as IntMap
-import qualified Data.HashMap.Strict as HashMap
-import qualified Data.HashSet as HashSet
-
+import           Clash.Annotations.Primitive (HDL (..))
+import           Clash.Core.Name (Name(nameOcc))
+import           Clash.Core.Var (Id, varName)
+import           Clash.Debug (debugIsOn)
+-- import {-# SOURCE #-} Clash.Netlist.Id
 import qualified Clash.Netlist.Id.SystemVerilog as SystemVerilog
 import qualified Clash.Netlist.Id.Verilog as Verilog
 import qualified Clash.Netlist.Id.VHDL as VHDL
 import qualified Clash.Netlist.Id.Common as Common
+
+-- | Whether to preserve casing in ids or converted everything to
+--  lowercase. Influenced by '-fclash-lower-case-basic-identifiers'
+data PreserveCase
+  = PreserveCase
+  | ToLower
+  deriving (Show, Generic, NFData, Eq, Binary, Hashable)
+
+-- | A collection of unique identifiers. Allows for fast fresh identifier
+-- generation.
+--
+-- __NB__: use the functions in Clash.Netlist.Id. Don't use the constructor directly.
+data IdentifierSet
+  = IdentifierSet {
+      is_allowEscaped :: !Bool
+      -- ^ Allow escaped ids? If set to False, "make" will always behave like
+      -- "makeBasic".
+    , is_lowerCaseBasicIds :: !PreserveCase
+      -- ^ Force all generated basic identifiers to lowercase.
+    , is_hdl :: !HDL
+      -- ^ HDL to generate fresh identifiers for
+    , is_freshCache :: !FreshCache
+      -- ^ Maps an 'i_baseNameCaseFold' to a map mapping the number of
+      -- extensions (in 'i_extensionsRev') to the maximum word at that
+      -- basename/level. For example, if a set would contain the identifiers:
+      --
+      --   [foo, foo_1, foo_2, bar_5, bar_7_8]
+      --
+      -- the map would look like:
+      --
+      --   [(foo, [(0, 0), (1, 2)]), (bar, [(1, 5), (2, 8)])]
+      --
+      -- This mapping makes sure we can quickly generate fresh identifiers. For
+      -- example, generating a new id for "foo_1" would be a matter of looking
+      -- up the base name in this map, concluding that the maximum identifier
+      -- with this basename and this number of extensions is "foo_2",
+      -- subsequently generating "foo_3".
+      --
+      -- Note that an identifier with no extensions is also stored in this map
+      -- for practical purposes, but the maximum ext is invalid.
+    , is_store :: !(HashSet Identifier)
+      -- ^ Identifier store
+    } deriving (Generic, NFData, Show)
+
+-- | See 'is_freshCache'
+type FreshCache = HashMap Text (IntMap Word)
+
+-- See: http://vhdl.renerta.com/mobile/source/vhd00037.htm
+--      http://www.verilog.renerta.com/source/vrg00018.htm
+data IdentifierType
+  = Basic
+  -- ^ A basic identifier: does not have to be escaped in order to be a valid
+  -- identifier in HDL.
+  | Extended
+  -- ^ An extended identifier: has to be escaped, wrapped, or otherwise
+  -- postprocessed before writhing it to HDL.
+  deriving (Show, Generic, NFData, Eq)
+
+-- | HDL identifier. Consists of a base name and a number of extensions. An
+-- identifier with a base name of "foo" and a list of extensions [1, 2] will be
+-- rendered as "foo_1_2".
+--
+-- Note: The Eq instance of "Identifier" is case insensitive! E.g., two
+-- identifiers with base names 'fooBar' and 'FoObAR' are considered the same.
+-- However, identifiers are stored case preserving. This means Clash won't
+-- generate two identifiers with differing case, but it will try to keep
+-- capitalization.
+--
+-- The goal of this data structure is to greatly simplify how Clash deals with
+-- identifiers internally. Any Identifier should be trivially printable to any
+-- HDL.
+--
+-- __NB__: use the functions in Clash.Netlist.Id. Don't use these constructors
+-- directly.
+data Identifier
+  -- | Unparsed identifier. Used for things such as port names, which should
+  -- appear in the HDL exactly as the user specified.
+  = RawIdentifier
+      !Text
+      -- ^ An identifier exactly as given by the user
+      (Maybe Identifier)
+      -- ^ Parsed version of raw identifier. Will not be populated if this
+      -- identifier was created with an unsafe function.
+      !CallStack
+      -- ^ Stores where this identifier was generated. Tracking is only enabled
+      -- is 'debugIsOn', otherwise this field will be populated by an empty
+      -- callstack.
+
+  -- | Parsed and sanitized identifier. See various fields for more information
+  -- on its invariants.
+  | UniqueIdentifier {
+      i_baseName :: !Text
+    -- ^ Base name of identifier. 'make' makes sure this field:
+    --
+    --    * does not end in '_num' where 'num' is a digit.
+    --    * is solely made up of printable ASCII characters
+    --    * has no leading or trailing whitespace
+    --
+    , i_baseNameCaseFold :: !Text
+    -- ^ Same as 'i_baseName', but can be used for equality testing that doesn't
+    -- depend on capitalization.
+    , i_extensionsRev :: [Word]
+    -- ^ Extensions applied to base identifier. E.g., an identifier with a base
+    -- name of 'foo' and an extension of [6, 5] would render as 'foo_5_6'. Note
+    -- that extensions are stored in reverse order for easier manipulation.
+    , i_idType :: !IdentifierType
+    -- ^ See 'IdentifierType'.
+    , i_hdl :: !HDL
+    -- ^ HDL this identifier is generated for.
+    , i_provenance :: !CallStack
+    -- ^ Stores where this identifier was generated. Tracking is only enabled
+    -- is 'debugIsOn', otherwise this field will be populated by an empty
+    -- callstack.
+    } deriving (Show, Generic, NFData)
+
+identifierKey# :: Identifier -> ((Text, Bool), [Word])
+identifierKey# (RawIdentifier t _id _) = ((t, True), [])
+identifierKey# id_ = ((i_baseNameCaseFold id_, False), i_extensionsRev id_)
+
+instance Hashable Identifier where
+  hashWithSalt salt = hashWithSalt salt . hash
+  hash = uncurry hash# . identifierKey#
+   where
+    hash# a extensions =
+      -- 'hash' has an identity around zero, e.g. `hash (0, 2) == 2`. Because a
+      -- lot of zeros can be expected, extensions are fuzzed in order to keep
+      -- efficient `HashMap`s.
+      let fuzz fuzzFactor ext = fuzzFactor * fuzzFactor * ext in
+      hash (a, List.foldl' fuzz 2 extensions)
+
+instance Eq Identifier where
+  (==) = (==) `on` identifierKey#
+
+instance Ord Identifier where
+  compare = compare `on` identifierKey#
 
 -- | Return identifier with highest extension for given identifier. See
 -- 'is_freshCache' for more information.

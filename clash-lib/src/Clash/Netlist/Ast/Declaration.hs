@@ -3,6 +3,7 @@ module Clash.Netlist.Ast.Declaration where
 import Data.Text (Text)
 
 import Clash.Netlist.Ast.Type
+import Clash.Netlist.Id (Identifier)
 import Clash.Netlist.Types
 
 data Declaration

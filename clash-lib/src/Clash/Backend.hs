@@ -30,6 +30,7 @@ import Clash.Driver.Types (ClashOpts)
 import {-# SOURCE #-} Clash.Netlist.Types
 import Clash.Netlist.Ast.Type (HWType)
 import Clash.Netlist.BlackBox.Types
+import Clash.Netlist.Id
 
 import Clash.Signal.Internal                (VDomainConfiguration)
 import Clash.Annotations.Primitive          (HDL)

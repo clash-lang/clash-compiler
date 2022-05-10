@@ -16,7 +16,7 @@ import           Data.Maybe (isJust, fromMaybe)
 import           Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 
-import           Clash.Netlist.Types (IdentifierType(..))
+import {-# SOURCE #-} Clash.Netlist.Id.Internal (IdentifierType(..))
 
 -- | Identifiers which are imported from the following:
 --

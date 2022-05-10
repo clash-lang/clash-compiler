@@ -1,6 +1,7 @@
 module Clash.Netlist.Ast.Sequential where
 
 import Clash.Netlist.Ast.Type
+import Clash.Netlist.Id (Identifier)
 import Clash.Netlist.Types
 
 data SequentialStmt

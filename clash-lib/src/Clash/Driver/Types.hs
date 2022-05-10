@@ -59,7 +59,8 @@ import           Clash.Core.TyCon               (TyConMap, TyConName)
 import           Clash.Core.Var                 (Id)
 import           Clash.Core.VarEnv              (VarEnv)
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
-import {-# SOURCE #-} Clash.Netlist.Types       (PreserveCase(..), TopEntityT)
+import           Clash.Netlist.Id               (PreserveCase(..))
+import {-# SOURCE #-} Clash.Netlist.Types       (TopEntityT)
 import           Clash.Primitives.Types         (CompiledPrimMap)
 
 data ClashEnv = ClashEnv

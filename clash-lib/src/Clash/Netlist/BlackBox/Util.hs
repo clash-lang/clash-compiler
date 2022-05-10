@@ -210,8 +210,8 @@ setSym bbCtx l = do
 
     setSym'
       :: Element
-      -> StateT ( IntMap.IntMap N.IdentifierText
-                , IntMap.IntMap (N.IdentifierText, [N.Declaration]))
+      -> StateT ( IntMap.IntMap Id.IdentifierText
+                , IntMap.IntMap (Id.IdentifierText, [N.Declaration]))
                 m
                 Element
     setSym' e = case e of
@@ -1116,7 +1116,7 @@ walkElement f el = maybeToList (f el) ++ walked
 
 -- | Determine variables used in an expression. Used for VHDL sensitivity list.
 -- Also see: https://github.com/clash-lang/clash-compiler/issues/365
-usedVariables :: Expr -> [N.IdentifierText]
+usedVariables :: Expr -> [Id.IdentifierText]
 usedVariables Noop              = []
 usedVariables (Identifier i _)  = [Id.toText i]
 usedVariables (DataCon _ _ es)  = concatMap usedVariables es

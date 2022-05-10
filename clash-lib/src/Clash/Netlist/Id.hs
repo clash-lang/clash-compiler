@@ -13,7 +13,9 @@
 
 module Clash.Netlist.Id
   ( -- * Utilities to use IdentifierSet
-    IdentifierSet
+    IdentifierSet(..)
+  , PreserveCase(..)
+  , FreshCache
   , IdentifierSetMonad(..)
   , HasIdentifierSet(..)
   , emptyIdentifierSet
@@ -21,7 +23,8 @@ module Clash.Netlist.Id
   , clearSet
 
     -- * Unsafe creation and extracting identifiers
-  , Identifier
+  , Identifier(..)
+  , IdentifierText
   , IdentifierType (..)
   , unsafeMake
   , toText
@@ -53,20 +56,22 @@ module Clash.Netlist.Id
   )
 where
 
-import           Clash.Annotations.Primitive (HDL (..))
-import           Clash.Core.Var (Id)
-import           Clash.Debug (debugIsOn)
-import {-# SOURCE #-} Clash.Netlist.Types
-  (PreserveCase(..), HasIdentifierSet(..), IdentifierSet(..), Identifier(..),
-   IdentifierType(..), IdentifierSetMonad(identifierSetM))
+import           Control.Lens (Lens', (.=))
+import qualified Control.Lens as Lens
+import qualified Control.Monad.State.Lazy as Lazy
+import qualified Control.Monad.State.Strict as Strict
 import qualified Data.HashSet as HashSet
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as List
+import           Data.Monoid (Ap(..))
 import           Data.Text (Text)
 import qualified Data.Text.Lazy as LT
 import           GHC.Stack
 
+import           Clash.Annotations.Primitive (HDL (..))
+import           Clash.Core.Var (Id)
+import           Clash.Debug (debugIsOn)
 import qualified Clash.Netlist.Id.VHDL as VHDL
 import           Clash.Netlist.Id.Internal
 
@@ -115,6 +120,8 @@ clearSet (IdentifierSet escL lwL hdlL _ _) =
 
 toList :: IdentifierSet -> [Identifier]
 toList (IdentifierSet _ _ _ _ idStore) = HashSet.toList idStore
+
+type IdentifierText = Text
 
 -- | Convert an identifier to string. Use 'unmake' if you need the
 -- "IdentifierType" too.
@@ -235,3 +242,31 @@ prefix id0 prefix_ = withIdentifierSetM (\is id1 -> prefix# is id1 prefix_) id0
 -- is unique.
 fromCoreId :: (HasCallStack, IdentifierSetMonad m) => Id -> m Identifier
 fromCoreId = withIdentifierSetM fromCoreId#
+
+-- | Structures that hold an 'IdentifierSet'
+class HasIdentifierSet s where
+  identifierSet :: Lens' s IdentifierSet
+
+instance HasIdentifierSet IdentifierSet where
+  identifierSet = ($)
+
+-- | An "IdentifierSetMonad" supports unique name generation for Clash Netlist
+class Monad m => IdentifierSetMonad m where
+  identifierSetM :: (IdentifierSet -> IdentifierSet) -> m IdentifierSet
+
+instance (HasIdentifierSet s, Monad m) => IdentifierSetMonad (Strict.StateT s m) where
+  identifierSetM f = do
+    is0 <- Lens.use identifierSet
+    identifierSet .= f is0
+    Lens.use identifierSet
+  {-# INLINE identifierSetM #-}
+
+instance (HasIdentifierSet s, Monad m) => IdentifierSetMonad (Lazy.StateT s m) where
+  identifierSetM f = do
+    is0 <- Lens.use identifierSet
+    identifierSet .= f is0
+    Lens.use identifierSet
+  {-# INLINE identifierSetM #-}
+
+instance IdentifierSetMonad m => IdentifierSetMonad (Ap m) where
+  identifierSetM = Ap . identifierSetM

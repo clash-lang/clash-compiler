@@ -16,7 +16,7 @@ import           Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 
 import           Clash.Netlist.Id.Common
-import           Clash.Netlist.Types (IdentifierType(..))
+import {-# SOURCE #-} Clash.Netlist.Id.Internal (IdentifierType(..))
 
 -- List of reserved Verilog-2005 keywords
 keywords :: HashSet Text

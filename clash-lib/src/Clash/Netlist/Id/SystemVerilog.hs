@@ -13,7 +13,7 @@ import           Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 import qualified Clash.Netlist.Id.Verilog as Verilog
 
-import           Clash.Netlist.Types (IdentifierType)
+import {-# SOURCE #-} Clash.Netlist.Id.Internal (IdentifierType)
 
 -- List of reserved SystemVerilog-2012 keywords
 keywords :: HashSet Text

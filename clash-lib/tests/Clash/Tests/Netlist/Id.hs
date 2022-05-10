@@ -10,7 +10,6 @@ module Clash.Tests.Netlist.Id (
     module Clash.Tests.Netlist.Id
   ) where
 
-import qualified Clash.Netlist.Types as Id
 import qualified Clash.Netlist.Id as Id
 
 import Clash.Annotations.Primitive

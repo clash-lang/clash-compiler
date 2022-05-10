@@ -108,6 +108,8 @@ import           Clash.Netlist.Ast.Type
 import           Clash.Netlist.BlackBox.Util     (exprToString, renderElem)
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxTemplate, Element(Component, Text), Decl(..))
+import           Clash.Netlist.Id
+  (HasIdentifierSet(..), Identifier, IdentifierSet)
 import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types             hiding (Component, toBit)
 import           Clash.Netlist.Util

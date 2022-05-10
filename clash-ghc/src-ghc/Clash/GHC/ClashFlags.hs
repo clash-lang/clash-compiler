@@ -35,7 +35,7 @@ import           Text.Read                      (readMaybe)
 
 import           Clash.Driver.Types
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
-import           Clash.Netlist.Types            (PreserveCase (ToLower))
+import           Clash.Netlist.Id               (PreserveCase (ToLower))
 
 parseClashFlags :: IORef ClashOpts -> [Located String]
                 -> IO ([Located String],[Warn])
