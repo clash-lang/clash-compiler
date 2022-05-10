@@ -221,6 +221,7 @@ Library
 
                       Clash.Netlist
                       Clash.Netlist.Ast.Concurrent
+                      Clash.Netlist.Ast.Declaration
                       Clash.Netlist.Ast.Sequential
                       Clash.Netlist.Ast.Type
                       Clash.Netlist.BlackBox

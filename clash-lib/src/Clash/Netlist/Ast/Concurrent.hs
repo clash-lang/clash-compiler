@@ -5,11 +5,12 @@ import Data.Text (Text)
 import Clash.Signal (ActiveEdge)
 
 import Clash.Core.Var (Attr')
+import Clash.Netlist.Ast.Declaration
 import Clash.Netlist.Ast.Sequential
 import Clash.Netlist.Ast.Type
 import Clash.Netlist.BlackBox.Types (BlackBoxTemplate)
 
-import Clash.Netlist.Types
+import Clash.Netlist.Types hiding (Declaration)
 
 data ConcurrentStmt
   -- | Unconditional continuous assignment
@@ -44,10 +45,14 @@ data ConcurrentStmt
   -- | Generate construct
   | Generate !Generate
 
+  -- | Concurrent block
+  | ConcurrentBlock
+      (Block [ConcurrentStmt])
+
   -- | Sequential block
   | SequentialBlock
       (Maybe Sensitivity)
-      [SequentialStmt]
+      (Block [SequentialStmt])
 
   -- | HDL tick
   | Tick !CommentOrDirective
@@ -68,5 +73,12 @@ data Sensitivity
   = ClockEdge Expr ActiveEdge
   -- | Evaluate when one of the mentioned identifiers changes
   | ValueChange [Text]
+  deriving Show
+
+-- | A block is a scope over some netlist which contains local declarations.
+-- In HDL which support local scoping like this, it allows declarations to
+-- appear closer to their use sites.
+data Block a
+  = Block [Declaration] a
   deriving Show
 
