@@ -26,7 +26,7 @@ testPath = "tests/shouldwork/Naming/NameHint.hs"
 -- | Assert that a signal named "someSignalName", optionally expanded, is
 -- declared once and used in an assignment once.
 assertOneDecl :: Component -> IO ()
-assertOneDecl (Component _ _ _ ds) =
+assertOneDecl (Component _ _ _ ds _ _ _) =
   case P.concatMap isSigDecl ds of
     [i] ->
       case P.length (filter (isSigAssignment i) ds) of
@@ -48,9 +48,9 @@ assertOneDecl (Component _ _ _ ds) =
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
-  mapM_ (assertOneDecl . snd) netlist
+  mapM_ assertOneDecl netlist
 
 mainVerilog :: IO ()
 mainVerilog = do
   netlist <- runToNetlistStage SVerilog id testPath
-  mapM_ (assertOneDecl . snd) netlist
+  mapM_ assertOneDecl netlist

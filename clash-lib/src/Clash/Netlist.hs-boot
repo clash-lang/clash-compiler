@@ -25,13 +25,13 @@ import Clash.Netlist.Ast.Type (HWType)
 import Clash.Netlist.Id (Identifier)
 import Clash.Netlist.Types
   (Expr, NetlistMonad, Declaration, NetlistId,
-   DeclarationType, ComponentMeta, Component)
+   DeclarationType, Component)
 
 import GHC.Stack (HasCallStack)
 
 genComponent :: HasCallStack
              => Id
-             -> NetlistMonad (ComponentMeta, Component)
+             -> NetlistMonad Component
 
 mkExpr :: HasCallStack
        => Bool

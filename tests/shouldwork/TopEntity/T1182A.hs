@@ -36,7 +36,7 @@ testPath :: FilePath
 testPath = "tests/shouldwork/TopEntity/T1182A.hs"
 
 assertInputs :: N.HWType -> N.Component -> IO ()
-assertInputs expType (N.Component _ [(clk,N.Clock _)] [(N.Wire,(ssan,actType),Nothing)] ds)
+assertInputs expType (N.Component _ [(clk,N.Clock _)] [(N.Wire,(ssan,actType),Nothing)] ds _ _ _)
   | Id.toText clk == T.pack "CLK"
   , Id.toText ssan == T.pack "SS_AN"
   = pure ()
@@ -45,14 +45,14 @@ assertInputs _ c = error $ "Component mismatch: " P.++ show c
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
-  mapM_ (assertInputs (N.BitVector 8) . snd) netlist
+  mapM_ (assertInputs (N.BitVector 8)) netlist
 
 mainVerilog :: IO ()
 mainVerilog = do
   netlist <- runToNetlistStage SVerilog id testPath
-  mapM_ (assertInputs (N.Vector 8 N.Bool) . snd) netlist
+  mapM_ (assertInputs (N.Vector 8 N.Bool)) netlist
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
   netlist <- runToNetlistStage SSystemVerilog id testPath
-  mapM_ (assertInputs (N.BitVector 8) . snd) netlist
+  mapM_ (assertInputs (N.BitVector 8)) netlist

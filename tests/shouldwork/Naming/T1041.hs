@@ -62,7 +62,7 @@ testPath :: FilePath
 testPath = "tests/shouldwork/Naming/T1041.hs"
 
 assertOneVGA :: Component -> IO ()
-assertOneVGA (Component _ _ _ ds)
+assertOneVGA (Component _ _ _ ds _ _ _)
   | vgas == 1 = pure ()
   | otherwise = error $ "Expected one declaration of VGA wire: got " <> show vgas
  where
@@ -78,14 +78,14 @@ assertOneVGA (Component _ _ _ ds)
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
-  mapM_ (assertOneVGA . snd) netlist
+  mapM_ assertOneVGA netlist
 
 mainVerilog :: IO ()
 mainVerilog = do
   netlist <- runToNetlistStage SVerilog id testPath
-  mapM_ (assertOneVGA . snd) netlist
+  mapM_ assertOneVGA netlist
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
   netlist <- runToNetlistStage SSystemVerilog id testPath
-  mapM_ (assertOneVGA . snd) netlist
+  mapM_ assertOneVGA netlist

@@ -50,7 +50,7 @@ testPath :: FilePath
 testPath = "tests/shouldwork/Netlist/T1766.hs"
 
 assertNoDuplicateSignals :: Component -> IO ()
-assertNoDuplicateSignals (Component nm inps outs ds) =
+assertNoDuplicateSignals (Component nm inps outs ds _ _ _) =
   let names = mapMaybe netName ds
       signals = Prelude.length names
       unique = Prelude.length (nub names)
@@ -64,14 +64,14 @@ assertNoDuplicateSignals (Component nm inps outs ds) =
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
-  mapM_ (assertNoDuplicateSignals . snd) netlist
+  mapM_ assertNoDuplicateSignals netlist
 
 mainVerilog :: IO ()
 mainVerilog = do
   netlist <- runToNetlistStage SVerilog id testPath
-  mapM_ (assertNoDuplicateSignals . snd) netlist
+  mapM_ assertNoDuplicateSignals netlist
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
   netlist <- runToNetlistStage SSystemVerilog id testPath
-  mapM_ (assertNoDuplicateSignals . snd) netlist
+  mapM_ assertNoDuplicateSignals netlist

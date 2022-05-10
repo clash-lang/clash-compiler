@@ -42,14 +42,14 @@ enableXOpt c = c { opt_aggressiveXOpt = True }
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL enableXOpt testPath
-  mapM_ (assertOneAltPerDefined . snd) netlist
+  mapM_ assertOneAltPerDefined netlist
 
 mainVerilog :: IO ()
 mainVerilog = do
   netlist <- runToNetlistStage SVerilog enableXOpt testPath
-  mapM_ (assertOneAltPerDefined . snd) netlist
+  mapM_ assertOneAltPerDefined netlist
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
   netlist <- runToNetlistStage SSystemVerilog enableXOpt testPath
-  mapM_ (assertOneAltPerDefined . snd) netlist
+  mapM_ assertOneAltPerDefined netlist

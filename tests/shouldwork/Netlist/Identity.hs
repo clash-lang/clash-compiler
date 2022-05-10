@@ -18,7 +18,7 @@ testPath :: FilePath
 testPath = "tests/shouldwork/Netlist/Identity.hs"
 
 assertAssignsInOut :: Component -> IO ()
-assertAssignsInOut (Component _ [i] [o] ds) =
+assertAssignsInOut (Component _ [i] [o] ds _ _ _) =
   case ds of
     [Assignment oName (Identifier iName Nothing)]
       | Id.toText iName == Id.toText (fst i)
@@ -46,14 +46,14 @@ getComponent (_, _, _, x) = x
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
-  mapM_ (assertAssignsInOut . snd) netlist
+  mapM_ assertAssignsInOut netlist
 
 mainVerilog :: IO ()
 mainVerilog = do
   netlist <- runToNetlistStage SVerilog id testPath
-  mapM_ (assertAssignsInOut . snd) netlist
+  mapM_ assertAssignsInOut netlist
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
   netlist <- runToNetlistStage SSystemVerilog id testPath
-  mapM_ (assertAssignsInOut . snd) netlist
+  mapM_ assertAssignsInOut netlist

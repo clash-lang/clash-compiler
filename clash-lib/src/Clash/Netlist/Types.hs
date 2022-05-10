@@ -139,13 +139,7 @@ data NetlistEnv
   -- ^ (Maybe) user given instance/register name
   }
 
-data ComponentMeta = ComponentMeta
-  { cmWereVoids :: [Bool]
-  , cmLoc :: SrcSpan
-  , cmScope :: IdentifierSet
-  } deriving (Generic, Show, NFData)
-
-type ComponentMap = OMap Unique (ComponentMeta, Component)
+type ComponentMap = OMap Unique Component
 
 -- | State of the NetlistMonad
 data NetlistState
@@ -231,6 +225,9 @@ data Component
   , inputs        :: [(Identifier,HWType)] -- ^ Input ports
   , outputs       :: [(WireOrReg,(Identifier,HWType),Maybe Expr)] -- ^ Output ports
   , declarations  :: [Declaration] -- ^ Internal declarations
+  , componentVoids :: [Bool]
+  , componentLoc :: SrcSpan
+  , componentScope :: IdentifierSet
   }
   deriving (Show, Generic, NFData)
 
@@ -243,8 +240,7 @@ isBiDirectional _ = False
 -- | Find the name and domain name of each clock argument of a component.
 --
 findClocks :: Component -> [(Text, Text)]
-findClocks (Component _ is _ _) =
-  mapMaybe isClock is
+findClocks = mapMaybe isClock . inputs
  where
   isClock (i, Clock d) = Just (Id.toText i, d)
   isClock (i, Annotated _ t) = isClock (i,t)

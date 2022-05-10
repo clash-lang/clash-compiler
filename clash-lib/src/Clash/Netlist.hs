@@ -126,7 +126,7 @@ genNetlist env isTb globals tops topNames typeTrans ite be seen0 dir prefixM top
   let primMap = envPrimitives env
   let tcm = envTyConMap env
   let iw = opt_intWidth opts
-  ((_meta, topComponent), s) <-
+  (topComponent, s) <-
     runNetlistMonad isTb opts reprs globals tops primMap tcm typeTrans
                     iw ite be seen1 dir componentNames_ $ genComponent topEntity
   return (topComponent, _components s, seen1)
@@ -256,7 +256,7 @@ genComponent
   :: HasCallStack
   => Id
   -- ^ Name of the function
-  -> NetlistMonad (ComponentMeta, Component)
+  -> NetlistMonad Component
 genComponent compName = do
   compExprM <- lookupVarEnv compName <$> Lens.use bindings
   case compExprM of
@@ -273,7 +273,7 @@ genComponentT
   -- ^ Name of the function
   -> Term
   -- ^ Corresponding term
-  -> NetlistMonad (ComponentMeta, Component)
+  -> NetlistMonad Component
 genComponentT compName0 componentExpr = do
   tcm <- Lens.use tcCache
   compName1 <- (`lookupVarEnv'` compName0) <$> Lens.use componentNames
@@ -301,6 +301,7 @@ genComponentT compName0 componentExpr = do
 
   netDecls <- concatMapM mkNetDecl (filter (maybe (const True) (/=) resultM . fst) binders)
   decls    <- concat <$> mapM (uncurry mkDeclarations) binders
+  ids <- Lens.use seenIds
 
   case resultM of
     Just result -> do
@@ -316,17 +317,15 @@ genComponentT compName0 componentExpr = do
                        in  (map (Wire,,Nothing) compOutps
                            ,NetDecl' n rw res (Right resTy) Nothing:tail resUnwrappers
                            )
-          component      = Component compName1 compInps compOutps'
-                             (netDecls ++ argWrappers ++ decls ++ resUnwrappers')
-      ids <- Lens.use seenIds
-      return (ComponentMeta wereVoids sp ids, component)
+
+      pure $ Component compName1 compInps compOutps'
+        (netDecls ++ argWrappers ++ decls ++ resUnwrappers') wereVoids sp ids
+
     -- No result declaration means that the result is empty, this only happens
     -- when the TopEntity has an empty result. We just create an empty component
     -- in this case.
     Nothing -> do
-      let component = Component compName1 compInps [] (netDecls ++ argWrappers ++ decls)
-      ids <- Lens.use seenIds
-      return (ComponentMeta wereVoids sp ids, component)
+      pure $ Component compName1 compInps [] (netDecls ++ argWrappers ++ decls) wereVoids sp ids
 
 mkNetDecl :: (Id, Term) -> NetlistMonad [Declaration]
 mkNetDecl (id_,tm) = preserveVarEnv $ do
@@ -741,7 +740,7 @@ mkFunApp dstId fun args tickDecls = do
             #{showPpr fun}
         |]
         Just (Binding{bindingTerm}) -> do
-          (_, Component compName compInps co _) <- preserveVarEnv $ genComponent fun
+          Component compName compInps co _ _ _ _ <- preserveVarEnv $ genComponent fun
           let argTys = map (inferCoreTypeOf tcm) args
           argHWTys <- mapM coreTypeToHWTypeM' argTys
 

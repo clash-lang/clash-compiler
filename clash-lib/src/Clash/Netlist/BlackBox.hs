@@ -1117,14 +1117,13 @@ mkFunInput resId e =
                   normalized <- Lens.use bindings
                   case lookupVarEnv fun normalized of
                     Just _ -> do
-                      (meta,N.Component compName compInps [(_,compOutp,_)] _) <-
+                      N.Component compName compInps [(_,compOutp,_)] _ voids _ _ <-
                         preserveVarEnv $ genComponent fun
 
                       let
-                        ComponentMeta{cmWereVoids} = meta
                         inpAssign (i, t) e' = (Identifier i Nothing, In, t, e')
                         inpVar i = Id.unsafeMake ("~VAR[arg" <> showt i <> "][" <> showt i <> "]")
-                        inpVars = [Identifier (inpVar i)  Nothing | i <- originalIndices cmWereVoids]
+                        inpVars = [Identifier (inpVar i)  Nothing | i <- originalIndices voids]
                         inpAssigns = zipWith inpAssign compInps inpVars
                         outpAssign =
                           ( Identifier (fst compOutp) Nothing

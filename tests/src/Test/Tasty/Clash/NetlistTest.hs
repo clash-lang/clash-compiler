@@ -67,7 +67,7 @@ runToNetlistStage
   -- ^ Function to modify the default clash options
   -> FilePath
   -- ^ Module to load
-  -> IO [(ComponentMeta, Component)]
+  -> IO [Component]
 runToNetlistStage target f src = do
   pds <- primDirs backend
   (env, design) <- generateBindings opts (return ()) pds (opt_importPaths opts) [] (hdlKind backend) src Nothing

@@ -66,4 +66,4 @@ assertNoSLVInPortMap =
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
-  mapM_ (assertNoSLVInPortMap . snd) netlist
+  mapM_ assertNoSLVInPortMap netlist

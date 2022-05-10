@@ -130,7 +130,7 @@ import           Clash.Netlist.Id (IdentifierText)
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types
   (BlackBox (..), Component (..), HWMap,
-   TopEntityT(..), TemplateFunction, ComponentMap, findClocks, ComponentMeta(..))
+   TopEntityT(..), TemplateFunction, ComponentMap, findClocks)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
@@ -479,7 +479,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
       memoryFilesDigests <- writeMemoryDataFiles hdlDir mfiles
 
       let
-        components = map (snd . snd) (OMap.assocs netlist)
+        components = map snd (OMap.assocs netlist)
         filesAndDigests0 =
              zip (map fst hdlDocs) hdlDocDigests
           <> zip (map fst dfiles) dataFilesDigests
@@ -768,8 +768,8 @@ createHDL backend modName seen components domainConfs top topName = flip evalSta
   let componentsL = map snd (OMap.assocs components)
   (hdlNmDocs,incs) <-
     fmap unzip $
-      forM componentsL $ \(ComponentMeta{cmLoc, cmScope}, comp) ->
-         genHDL modName cmLoc (Id.union seen cmScope) comp
+      forM componentsL $ \comp ->
+         genHDL modName (componentLoc comp) (Id.union seen (componentScope comp)) comp
 
   hwtys <- HashSet.toList <$> extractTypes <$> Ap get
   typesPkg <- mkTyPackage modName hwtys

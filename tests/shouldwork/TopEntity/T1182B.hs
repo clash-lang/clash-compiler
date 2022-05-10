@@ -45,7 +45,7 @@ assertInputs exp1 exp2 (N.Component _ [(clk, N.Clock _)]
   [ (N.Wire, (ssan, act1), Nothing)
   , (N.Wire, (ssseg, act2), Nothing)
   , (N.Wire, (ssdp, N.Bool), Nothing)
-  ] ds)
+  ] ds _ _ _)
   | Id.toText clk == T.pack "CLK"
   , Id.toText ssan == T.pack "SS_AN"
   , Id.toText ssseg == T.pack "SS_SEG"
@@ -56,14 +56,14 @@ assertInputs _ _ c = error $ "Component mismatch: " P.++ show c
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
-  mapM_ (assertInputs (N.BitVector 8) (N.BitVector 7) . snd) netlist
+  mapM_ (assertInputs (N.BitVector 8) (N.BitVector 7)) netlist
 
 mainVerilog :: IO ()
 mainVerilog = do
   netlist <- runToNetlistStage SVerilog id testPath
-  mapM_ (assertInputs (N.Vector 8 N.Bool) (N.Vector 7 N.Bool) . snd) netlist
+  mapM_ (assertInputs (N.Vector 8 N.Bool) (N.Vector 7 N.Bool)) netlist
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
   netlist <- runToNetlistStage SSystemVerilog id testPath
-  mapM_ (assertInputs (N.BitVector 8) (N.BitVector 7) . snd) netlist
+  mapM_ (assertInputs (N.BitVector 8) (N.BitVector 7)) netlist

@@ -49,7 +49,7 @@ isTwiceInst (InstDecl Entity Nothing [] (Id.toText -> "twice") _ _ _) = True
 isTwiceInst _ = False
 
 assertNumTwiceInsts :: Component -> IO ()
-assertNumTwiceInsts (Component nm inps outs ds) =
+assertNumTwiceInsts (Component nm inps outs ds _ _ _) =
   case Id.toText nm of
     "f" | nTwiceInsts == 1 -> pure ()
         | otherwise ->
@@ -69,4 +69,4 @@ assertNumTwiceInsts (Component nm inps outs ds) =
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
-  mapM_ (assertNumTwiceInsts . snd) netlist
+  mapM_ assertNumTwiceInsts netlist

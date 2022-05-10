@@ -47,11 +47,11 @@ testPath :: FilePath
 testPath = "tests/shouldwork/Issues/T1439.hs"
 
 noRotateRight :: Component -> IO ()
-noRotateRight (Component nm _ _ _)
+noRotateRight (Component nm _ _ _ _ _ _)
   | Id.toText nm == "rotate_right" = error ("No component should be called rotate_right")
   | otherwise = pure ()
 
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath
-  mapM_ (noRotateRight . snd) netlist
+  mapM_ noRotateRight netlist

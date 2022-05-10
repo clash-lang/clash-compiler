@@ -25,7 +25,7 @@ testPath :: FilePath
 testPath = "tests/shouldwork/Issues/T508.hs"
 
 abIsConstant :: Component -> IO ()
-abIsConstant (Component nm _ _ ds)
+abIsConstant (Component nm _ _ ds _ _ _)
   | Id.toText nm == "ab" =
       case ds of
         [Assignment{}] -> pure ()
@@ -36,7 +36,7 @@ abIsConstant (Component nm _ _ ds)
 mainCommon :: (Backend (TargetToState hdl)) => SBuildTarget hdl -> IO ()
 mainCommon hdl = do
   netlist <- runToNetlistStage hdl id testPath
-  mapM_ (abIsConstant . snd) netlist
+  mapM_ abIsConstant netlist
 
 mainVHDL :: IO ()
 mainVHDL = mainCommon SVHDL

@@ -30,4 +30,4 @@ assertAllCollpased = mapM_ checkCollapse . declarations
 mainVerilog :: IO ()
 mainVerilog = do
   netlist <- runToNetlistStage SVerilog id testPath
-  mapM_ (assertAllCollpased . snd) netlist
+  mapM_ assertAllCollpased netlist

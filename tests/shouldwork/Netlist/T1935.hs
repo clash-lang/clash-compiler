@@ -26,7 +26,7 @@ testPath :: FilePath
 testPath = "tests/shouldwork/Netlist/T1935.hs"
 
 countRegisters :: Component -> Int
-countRegisters (Component _nm _inps _outs ds) =
+countRegisters (Component _nm _inps _outs ds _ _ _) =
   let regs = filter isRegister ds
    in P.length regs
  where
@@ -37,7 +37,7 @@ countRegisters (Component _nm _inps _outs ds) =
 mainGeneric :: Backend (TargetToState target) => SBuildTarget target -> IO ()
 mainGeneric hdl = do
   netlist <- runToNetlistStage hdl id testPath
-  let regs = sum $ fmap (countRegisters . snd) netlist
+  let regs = sum $ fmap countRegisters netlist
   when (regs /= 1) $ error ("Expected 1 register, but found: " <> show regs)
 
 mainVHDL :: IO ()
