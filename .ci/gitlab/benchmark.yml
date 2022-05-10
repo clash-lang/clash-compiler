@@ -19,7 +19,7 @@
       - runner_system_failure
       - stuck_or_timeout_failure
   cache:
-    key: cabal-store-$CI_JOB_NAME.bump1
+    key: cabal-store-$CI_JOB_NAME-$CI_JOB_IMAGE
     when: always
     paths:
       - cabal-store/
