@@ -57,6 +57,7 @@ module Clash.Primitives.DSL
   , deconstructProduct
   , untuple
   , unvec
+  , deconstructMaybe
 
   -- ** Conversion
   , toBV
@@ -296,6 +297,40 @@ unvec vName v@(ety -> Vector vSize eType) = do
   let vIndex i = Identifier vUniqueName (Just (Indexed (ety v, 10, i)))
   pure (map (TExpr eType . vIndex) [0..vSize-1])
 unvec _ e = error $ "unvec: cannot be called on non-vector: " <> show (ety e)
+
+-- | Deconstruct a 'Maybe' into its constructor 'Bit' and contents of its 'Just'
+-- field. Note that the contents might be undefined, if the constructor bit is
+-- set to 'Nothing'.
+deconstructMaybe ::
+  (HasCallStack, Backend backend) =>
+  -- | Maybe expression
+  TExpr ->
+  -- | Name hint for constructor bit, data
+  (Text, Text) ->
+  -- | Constructor represented as a Bit, contents of Just
+  State (BlockState backend) (TExpr, TExpr)
+deconstructMaybe e@TExpr{ety} (bitName, contentName)
+  | SP tyName [(_nothing, []),(_just, [aTy])] <- ety
+  , tyName == fromString (show ''Maybe)
+  = do
+    eBv <- toBV (bitName <> "_and_" <> contentName <> "_bv") e
+    eId <- toIdentifier' (bitName <> "_and_" <> contentName) eBv
+    let eSize = typeSize ety
+
+    bitExpr <- fromBV bitName Bit TExpr
+      { eex = Identifier eId (Just (Sliced (BitVector eSize, eSize - 1, eSize - 1)))
+      , ety = BitVector 1
+      }
+
+    contentExpr <- fromBV contentName aTy TExpr
+      { eex = Identifier eId (Just (Sliced (BitVector eSize, eSize - 1 - 1, 0)))
+      , ety = BitVector (eSize - 1)
+      }
+
+    pure (bitExpr, contentExpr)
+
+deconstructMaybe e _ =
+  error $ "deconstructMaybe: cannot be called on non-Maybe: " <> show (ety e)
 
 -- | Extract the fields of a product type and return expressions
 --   to them. These new expressions are given unique names and get
