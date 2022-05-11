@@ -432,16 +432,16 @@ boolFromBitVector n =
 
 -- | Used to create an output `Unsigned` from a `BitVector` of given
 -- size. Works in a similar way to `boolFromBit` above.
---
--- TODO: Implement for (System)Verilog
-unsignedFromBitVector
-  :: Size
-  -> Text
-  -- ^ Name hint for intermediate signal
-  -> TExpr
-  -> State (BlockState VHDLState) TExpr
-unsignedFromBitVector n =
-  outputCoerce (BitVector n) (Unsigned n) (\i -> "unsigned(" <> i <> ")")
+unsignedFromBitVector ::
+  Backend backend =>
+  -- | Name hint for intermediate signal
+  Text ->
+  -- | BitVector expression
+  TExpr ->
+  -- | Unsigned expression
+  State (BlockState backend) TExpr
+unsignedFromBitVector = fromBV
+{-# DEPRECATED unsignedFromBitVector "Use fromBV instead" #-}
 
 -- | Used to create an output `Bool` from a number of `Bit`s, using
 -- conjunction. Similarly to `untuple`, it returns a list of
