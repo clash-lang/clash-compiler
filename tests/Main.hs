@@ -403,6 +403,7 @@ runClashTest = defaultMain $ clashTestRoot
         , outputTest "ExternalPrimitive" def{hdlTargets=[VHDL]}
         , outputTest "ZeroWidth" def{hdlTargets=[VHDL]}
         , outputTest "MultiResult" def{hdlTargets=[VHDL]}
+        , runTest "DSL" def
         , runTest "MultiResult" def
         , runTest "T919" def{hdlSim=False}
         , runTest "T1524" def

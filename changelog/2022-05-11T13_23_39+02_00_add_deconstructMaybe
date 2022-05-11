@@ -1,0 +1,1 @@
+INTERNAL NEW: Added `Clash.Primitives.DSL.deconstructMaybe`. This DSL function makes it easy to deconstruct a `Maybe` into its constructor bit and data. This is often useful for primitives taking 'enable' and 'data' signals. 
