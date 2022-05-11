@@ -59,6 +59,14 @@
         "url": "https://github.com/clash-lang/ghc-typelits-natnormalise/archive/91d80e63378ac4009f0475f54c54f81eca4de0ed.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
+    "tasty-hedgehog": {
+        "homepage": null,
+        "rev": "1.2.0.0",
+        "sha256": "sha256:0yqw2sjvfr8msqfwywssp4wyx754jvjbc9yhjz8qn5kxg7j3vzs3",
+        "type": "tarball",
+        "url": "https://hackage.haskell.org/package/tasty-hedgehog-1.2.0.0/tasty-hedgehog-1.2.0.0.tar.gz",
+        "url_template": "https://hackage.haskell.org/package/tasty-hedgehog-<rev>/tasty-hedgehog-<rev>.tar.gz"
+    },
     "gitignore": {
         "branch": "master",
         "description": "Nix function for filtering local git sources",
