@@ -181,6 +181,72 @@
         , NFDataX a              ~ARG[4]
         ) =>
 
+        Vec nAddrs a ->                 ~ARG[5]
+
+        Clock domA ->                   ~ARG[6]
+        Signal domA Bool ->             ~ARG[7]
+        Signal domA Bool ->             ~ARG[8]
+        Signal domA (Index nAddrs) ->   ~ARG[9]
+        Signal domA a ->                ~ARG[10]
+
+        Clock domB ->                   ~ARG[11]
+        Signal domB Bool ->             ~ARG[12]
+        Signal domB Bool ->             ~ARG[13]
+        Signal domB (Index nAddrs) ->   ~ARG[14]
+        Signal domB a ->                ~ARG[15]
+        (Signal domA a, Signal domB a)
+    template: |-
+      -- trueDualPortBlockRam begin
+      ~GENSYM[~RESULT_trueDualPortBlockRam][1] : block
+        -- Shared memory
+        type mem_type is array ( ~LIT[1]-1 downto 0 ) of ~TYP[10];
+        shared variable mem : mem_type := ~CONST[5];
+        signal ~GENSYM[a_dout][2] : ~TYP[10];
+        signal ~GENSYM[b_dout][3] : ~TYP[15];
+      begin
+
+        -- Port A
+        process(~ARG[6])
+        begin
+            if(rising_edge(~ARG[6])) then
+                  if(~ARG[7]) then
+                    if(~ARG[8]) then
+                        mem(~IF~SIZE[~TYP[9]]~THENto_integer(~ARG[9])~ELSE0~FI) := ~ARG[10];
+                    end if;
+                    ~SYM[2] <= mem(~IF~SIZE[~TYP[9]]~THENto_integer(~ARG[9])~ELSE0~FI);
+                end if;
+            end if;
+        end process;
+
+        -- Port B
+        process(~ARG[11])
+        begin
+            if(rising_edge(~ARG[11])) then
+                if(~ARG[12]) then
+                    if(~ARG[13]) then
+                        mem(~IF~SIZE[~TYP[14]]~THENto_integer(~ARG[14])~ELSE0~FI) := ~ARG[15];
+                    end if;
+                    ~SYM[3] <= mem(~IF~SIZE[~TYP[14]]~THENto_integer(~ARG[14])~ELSE0~FI);
+                end if;
+            end if;
+        end process;
+
+        ~RESULT <= (~SYM[2], ~SYM[3]);
+      end block;
+      -- end trueDualPortBlockRam
+- BlackBox:
+    name: Clash.Explicit.BlockRam.trueDualPortBlockRamU#
+    kind: Declaration
+    type: |-
+      trueDualPortBlockRamU# ::
+        forall nAddrs domA domB a .
+        ( HasCallStack           ~ARG[0]
+        , KnownNat nAddrs        ~ARG[1]
+        , KnownDomain domA       ~ARG[2]
+        , KnownDomain domB       ~ARG[3]
+        , NFDataX a              ~ARG[4]
+        ) =>
+
         Clock domA ->                   ~ARG[5]
         Signal domA Bool ->             ~ARG[6]
         Signal domA Bool ->             ~ARG[7]
@@ -194,7 +260,7 @@
         Signal domB a ->                ~ARG[14]
         (Signal domA a, Signal domB a)
     template: |-
-      -- trueDualPortBlockRam begin
+      -- trueDualPortBlockRamU begin
       ~GENSYM[~RESULT_trueDualPortBlockRam][1] : block
         -- Shared memory
         type mem_type is array ( ~LIT[1]-1 downto 0 ) of ~TYP[9];
@@ -231,4 +297,4 @@
 
         ~RESULT <= (~SYM[2], ~SYM[3]);
       end block;
-      -- end trueDualPortBlockRam
+      -- end trueDualPortBlockRamU

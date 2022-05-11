@@ -10,7 +10,7 @@ topEntity
   -> Signal System (RamOp 1 (Unsigned 8))
   -> Signal System (RamOp 1 (Unsigned 8))
   -> (Signal System (Unsigned 8), Signal System (Unsigned 8))
-topEntity = trueDualPortBlockRam
+topEntity = trueDualPortBlockRamU
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool

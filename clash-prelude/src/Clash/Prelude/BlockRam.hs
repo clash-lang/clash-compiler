@@ -397,6 +397,7 @@ module Clash.Prelude.BlockRam
     -- * True dual-port block RAM
     -- $tdpbram
   , trueDualPortBlockRam
+  , trueDualPortBlockRamU
   , E.RamOp(..)
   )
 where
@@ -876,6 +877,50 @@ trueDualPortBlockRam ::
   , HiddenClock dom2
   , NFDataX a
   )
+  => Vec nAddrs a
+  -- ^ Initial content of the BRAM, also determines the size, @nAddrs@, of the BRAM
+  --
+  -- __NB__: __MUST__ be a constant
+  -> Signal dom1 (E.RamOp nAddrs a)
+  -- ^ RAM operation for port A
+  -> Signal dom2 (E.RamOp nAddrs a)
+  -- ^ RAM operation for port B
+  -> (Signal dom1 a, Signal dom2 a)
+  -- ^ Outputs data on /next/ cycle. When writing, the data written
+  -- will be echoed. When reading, the read data is returned.
+trueDualPortBlockRam contents inA inB =
+  E.trueDualPortBlockRam contents (hasClock @dom1) (hasClock @dom2) inA inB
+#else
+  forall nAddrs dom a .
+  ( HasCallStack
+  , KnownNat nAddrs
+  , HiddenClock dom
+  , NFDataX a
+  )
+  => Vec nAddrs a
+  -- ^ Initial content of the BRAM, also determines the size, @nAddrs@, of the BRAM
+  --
+  -- __NB__: __MUST__ be a constant
+  -> Signal dom (E.RamOp nAddrs a)
+  -- ^ RAM operation for port A
+  -> Signal dom (E.RamOp nAddrs a)
+  -- ^ RAM operation for port B
+  -> (Signal dom a, Signal dom a)
+  -- ^ Outputs data on /next/ cycle. When writing, the data written
+  -- will be echoed. When reading, the read data is returned.
+trueDualPortBlockRam contents inA inB = E.trueDualPortBlockRam contents hasClock hasClock inA inB
+#endif
+
+-- | A version of 'trueDualPortBlockRam' that has no default values set.
+trueDualPortBlockRamU ::
+#ifdef CLASH_MULTIPLE_HIDDEN
+  forall nAddrs dom1 dom2 a .
+  ( HasCallStack
+  , KnownNat nAddrs
+  , HiddenClock dom1
+  , HiddenClock dom2
+  , NFDataX a
+  )
   => Signal dom1 (E.RamOp nAddrs a)
   -- ^ RAM operation for port A
   -> Signal dom2 (E.RamOp nAddrs a)
@@ -883,8 +928,8 @@ trueDualPortBlockRam ::
   -> (Signal dom1 a, Signal dom2 a)
   -- ^ Outputs data on /next/ cycle. When writing, the data written
   -- will be echoed. When reading, the read data is returned.
-trueDualPortBlockRam inA inB =
-  E.trueDualPortBlockRam (hasClock @dom1) (hasClock @dom2) inA inB
+trueDualPortBlockRamU inA inB =
+  E.trueDualPortBlockRamU (hasClock @dom1) (hasClock @dom2) inA inB
 #else
   forall nAddrs dom a .
   ( HasCallStack
@@ -899,5 +944,5 @@ trueDualPortBlockRam inA inB =
   -> (Signal dom a, Signal dom a)
   -- ^ Outputs data on /next/ cycle. When writing, the data written
   -- will be echoed. When reading, the read data is returned.
-trueDualPortBlockRam inA inB = E.trueDualPortBlockRam hasClock hasClock inA inB
+trueDualPortBlockRamU inA inB = E.trueDualPortBlockRamU hasClock hasClock inA inB
 #endif

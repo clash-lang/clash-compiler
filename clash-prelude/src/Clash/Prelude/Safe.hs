@@ -73,6 +73,7 @@ module Clash.Prelude.Safe
   , readNew
     -- ** True dual-port block RAM
   , trueDualPortBlockRam
+  , trueDualPortBlockRamU
   , RamOp(..)
     -- * Utility functions
   , isRising

@@ -93,7 +93,7 @@ module Clash.Prelude
     -- ** Block RAM read/write conflict resolution
   , readNew
     -- ** True dual-port block RAM
-  , trueDualPortBlockRam
+  , trueDualPortBlockRamU
   , RamOp(..)
     -- * Utility functions
   , window
