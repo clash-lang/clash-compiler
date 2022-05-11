@@ -43,13 +43,17 @@ cabalClashBinDir = makeAbsolute rel_path
   platform = "x86_64-linux" :: String -- XXX: Hardcoded
   templ = "dist-newstyle/build/%s/ghc-%s/clash-ghc-%s/x/clash/build/clash/" :: String
 
--- | Set GHC_PACKAGE_PATH for local Cabal install. Currently hardcoded for Unix.
+-- | Set GHC_PACKAGE_PATH for local Cabal install. Currently hardcoded for Unix;
+-- override by setting @store_dir@ to point to local cabal installation.
 setCabalPackagePaths :: IO ()
 setCabalPackagePaths = do
-  home <- getEnv "HOME"
+  ch <- lookupEnv "store_dir"
+  storeDir <- case ch of
+    Just dir -> pure dir
+    Nothing -> (<> "/.cabal/store") <$> getEnv "HOME"
   here <- getCurrentDirectory
   setEnv "GHC_PACKAGE_PATH" $
-       home <> "/.cabal/store/ghc-" <> ghcVersion3 <> "/package.db"
+       storeDir <> "/ghc-" <> ghcVersion3 <> "/package.db"
     <> ":"
     <> here <> "/dist-newstyle/packagedb/ghc-" <> ghcVersion3
     <> ":"
