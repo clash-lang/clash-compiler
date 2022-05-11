@@ -27,6 +27,9 @@ let
         doctest-parallel =
          self.callCabal2nix "doctest-parallel" sources.doctest-parallel {};
 
+        tasty-hedgehog =
+         self.callCabal2nix "tasty-hedgehog" sources.tasty-hedgehog {};
+
         # Internal overrides
         clash-lib = import ../clash-lib { inherit nixpkgs; };
         clash-ghc = import ../clash-ghc { inherit nixpkgs; };
