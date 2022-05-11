@@ -2,6 +2,7 @@
   Copyright   :  (C) 2019, Myrtle Software Ltd.
                      2020-2021, QBayLogic B.V.
                      2021, Myrtle.ai
+                     2022, Google Inc
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -398,11 +399,23 @@ enableToBit bitName = \case
 --   Returns a reference to a declared `Bit` that should get assigned
 --   by something (usually the output port of an entity).
 boolFromBit
-  :: Text
+  :: (HasCallStack, Backend backend)
+  => Text
   -- ^ Name hint for intermediate signal
   -> TExpr
-  -> State (BlockState VHDLState) TExpr
-boolFromBit = outputCoerce Bit Bool (<> " = '1'")
+  -> State (BlockState backend) TExpr
+boolFromBit boolName = \case
+  High -> pure T
+  Low -> pure F
+  TExpr Bit bitExpr -> do
+    texp@(~(TExpr _ (Identifier uniqueBoolName Nothing))) <- declare boolName Wire Bool
+    addDeclaration $
+      CondAssignment uniqueBoolName Bool bitExpr Bit
+        [ (Just (BitLit H), Literal Nothing (BoolLit True))
+        , (Nothing        , Literal Nothing (BoolLit False))
+        ]
+    pure texp
+  tExpr -> error $ "boolFromBit: Got \"" <> show tExpr <> "\" expected Bit"
 
 -- | Used to create an output `Bool` from a `BitVector` of given size.
 -- Works in a similar way to `boolFromBit` above.
