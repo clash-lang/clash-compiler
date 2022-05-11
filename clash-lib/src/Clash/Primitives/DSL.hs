@@ -28,9 +28,11 @@ module Clash.Primitives.DSL
 
   -- * Declarations
   , BlockState (..)
-  , TExpr
+  , TExpr(..)
+  , addDeclaration
   , declaration
   , declarationReturn
+  , declare
   , instDecl
   , instHO
   , viaAnnotatedSignal
