@@ -11,6 +11,7 @@ instantiations.
 -}
 
 {-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms   #-}
@@ -442,8 +443,10 @@ unsignedFromBitVector ::
   TExpr ->
   -- | Unsigned expression
   State (BlockState backend) TExpr
-unsignedFromBitVector = fromBV
-{-# DEPRECATED unsignedFromBitVector "Use fromBV instead" #-}
+unsignedFromBitVector nameHint e@TExpr{ety=BitVector n} =
+  fromBV nameHint (Unsigned n) e
+unsignedFromBitVector _nameHint TExpr{ety} =
+  error $ "unsignedFromBitVector: Expected BitVector, got: " <> show ety
 
 -- | Used to create an output `Bool` from a number of `Bit`s, using
 -- conjunction. Similarly to `untuple`, it returns a list of
@@ -562,41 +565,35 @@ exprToInteger (DataCon _ _ [n]) = exprToInteger n
 exprToInteger (Literal _ (NumLit n)) = Just n
 exprToInteger _ = Nothing
 
--- | Assign an input bitvector to an expression. Declares a new
---   bitvector if the expression is not already a bitvector.
-toBV
-  :: Backend backend
-  => Text
-  -- ^ BitVector name hint
-  -> TExpr
-  -- ^ expression
-  -> State (BlockState backend) TExpr
-  -- ^ BitVector expression
+-- | Convert an expression to a BitVector
+toBV ::
+  Backend backend =>
+  -- | BitVector name hint
+  Text ->
+  -- | Expression to convert to BitVector
+  TExpr ->
+  -- | BitVector expression
+  State (BlockState backend) TExpr
 toBV bvName a = case a of
   TExpr BitVector{} _ -> pure a
   TExpr aTy aExpr     -> assign bvName $
     TExpr (BitVector (typeSize aTy)) (ToBv Nothing aTy aExpr)
 
--- | Assign an output bitvector to an expression. Declares a new
---   bitvector if the expression is not already a bitvector.
+-- | Convert an expression from a BitVector into some type
 fromBV
-  :: (HasCallStack, Backend backend)
-  => Text
-  -- ^ BitVector name hint
-  -> TExpr
-  -- ^ expression
-  -> State (BlockState backend) TExpr
-  -- ^ bv expression
-fromBV _ a@(TExpr BitVector{} _) = pure a
-fromBV bvName (TExpr aTy (Identifier aName Nothing)) = do
-  bvName' <- Id.makeBasic bvName
-  let bvExpr = FromBv Nothing aTy (Identifier bvName' Nothing)
-      bvTy   = BitVector (typeSize aTy)
-  addDeclaration (NetDecl Nothing bvName' bvTy)
-  addDeclaration (Assignment aName bvExpr)
-  pure (TExpr bvTy (Identifier bvName' Nothing))
-fromBV _ texpr = error $
-  "fromBV: the expression " <> show texpr <> "must be an Identifier"
+  :: (HasCallStack, Backend backend) =>
+  -- | Result name hint
+  Text ->
+  -- | Type to convert to
+  HWType ->
+  -- | BitVector expression
+  TExpr ->
+  -- | Converted BitVector expression
+  State (BlockState backend) TExpr
+fromBV resultName resultType TExpr{eex, ety = BitVector _} =
+  assign resultName (TExpr resultType (FromBv Nothing resultType eex))
+
+fromBV _ _ TExpr{ety} = error $ "fromBV: expected BitVector, got: " <> show ety
 
 clog2 :: Num i => Integer -> i
 clog2 = fromIntegral . fromMaybe 0 . clogBase 2
