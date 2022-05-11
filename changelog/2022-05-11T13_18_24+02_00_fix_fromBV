@@ -1,0 +1,1 @@
+INTERNAL CHANGE/FIX: `Clash.Primitives.DSL.fromBV` now converts some `BitVector` expression into some type.

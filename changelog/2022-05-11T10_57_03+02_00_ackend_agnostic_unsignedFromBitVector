@@ -1,2 +1,1 @@
 INTERNAL CHANGE: `Clash.Primitives.DSL.unsignedFromBitVector` is now polymorphic in its HDL backend.
-INTERNAL DEPRECATION: `Clash.Primitives.DSL.unsignedFromBitVector` is marked deprecated, as it's just an alias for `Clash.Primitives.DSL.fromBV`
