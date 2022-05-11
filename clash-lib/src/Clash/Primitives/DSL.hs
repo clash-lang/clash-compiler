@@ -2,6 +2,7 @@
   Copyright   :  (C) 2019, Myrtle Software Ltd.
                      2020-2021, QBayLogic B.V.
                      2021, Myrtle.ai
+                     2022, Google Inc
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -10,6 +11,7 @@ instantiations.
 -}
 
 {-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms   #-}
@@ -27,9 +29,11 @@ module Clash.Primitives.DSL
 
   -- * Declarations
   , BlockState (..)
-  , TExpr
+  , TExpr(..)
+  , addDeclaration
   , declaration
   , declarationReturn
+  , declare
   , instDecl
   , instHO
   , viaAnnotatedSignal
@@ -53,6 +57,7 @@ module Clash.Primitives.DSL
   , deconstructProduct
   , untuple
   , unvec
+  , deconstructMaybe
 
   -- ** Conversion
   , toBV
@@ -293,6 +298,40 @@ unvec vName v@(ety -> Vector vSize eType) = do
   pure (map (TExpr eType . vIndex) [0..vSize-1])
 unvec _ e = error $ "unvec: cannot be called on non-vector: " <> show (ety e)
 
+-- | Deconstruct a 'Maybe' into its constructor 'Bit' and contents of its 'Just'
+-- field. Note that the contents might be undefined, if the constructor bit is
+-- set to 'Nothing'.
+deconstructMaybe ::
+  (HasCallStack, Backend backend) =>
+  -- | Maybe expression
+  TExpr ->
+  -- | Name hint for constructor bit, data
+  (Text, Text) ->
+  -- | Constructor represented as a Bit, contents of Just
+  State (BlockState backend) (TExpr, TExpr)
+deconstructMaybe e@TExpr{ety} (bitName, contentName)
+  | SP tyName [(_nothing, []),(_just, [aTy])] <- ety
+  , tyName == fromString (show ''Maybe)
+  = do
+    eBv <- toBV (bitName <> "_and_" <> contentName <> "_bv") e
+    eId <- toIdentifier' (bitName <> "_and_" <> contentName) eBv
+    let eSize = typeSize ety
+
+    bitExpr <- fromBV bitName Bit TExpr
+      { eex = Identifier eId (Just (Sliced (BitVector eSize, eSize - 1, eSize - 1)))
+      , ety = BitVector 1
+      }
+
+    contentExpr <- fromBV contentName aTy TExpr
+      { eex = Identifier eId (Just (Sliced (BitVector eSize, eSize - 1 - 1, 0)))
+      , ety = BitVector (eSize - 1)
+      }
+
+    pure (bitExpr, contentExpr)
+
+deconstructMaybe e _ =
+  error $ "deconstructMaybe: cannot be called on non-Maybe: " <> show (ety e)
+
 -- | Extract the fields of a product type and return expressions
 --   to them. These new expressions are given unique names and get
 --   declared in the block scope.
@@ -398,11 +437,23 @@ enableToBit bitName = \case
 --   Returns a reference to a declared `Bit` that should get assigned
 --   by something (usually the output port of an entity).
 boolFromBit
-  :: Text
+  :: (HasCallStack, Backend backend)
+  => Text
   -- ^ Name hint for intermediate signal
   -> TExpr
-  -> State (BlockState VHDLState) TExpr
-boolFromBit = outputCoerce Bit Bool (<> " = '1'")
+  -> State (BlockState backend) TExpr
+boolFromBit boolName = \case
+  High -> pure T
+  Low -> pure F
+  TExpr Bit bitExpr -> do
+    texp@(~(TExpr _ (Identifier uniqueBoolName Nothing))) <- declare boolName Wire Bool
+    addDeclaration $
+      CondAssignment uniqueBoolName Bool bitExpr Bit
+        [ (Just (BitLit H), Literal Nothing (BoolLit True))
+        , (Nothing        , Literal Nothing (BoolLit False))
+        ]
+    pure texp
+  tExpr -> error $ "boolFromBit: Got \"" <> show tExpr <> "\" expected Bit"
 
 -- | Used to create an output `Bool` from a `BitVector` of given size.
 -- Works in a similar way to `boolFromBit` above.
@@ -419,16 +470,18 @@ boolFromBitVector n =
 
 -- | Used to create an output `Unsigned` from a `BitVector` of given
 -- size. Works in a similar way to `boolFromBit` above.
---
--- TODO: Implement for (System)Verilog
-unsignedFromBitVector
-  :: Size
-  -> Text
-  -- ^ Name hint for intermediate signal
-  -> TExpr
-  -> State (BlockState VHDLState) TExpr
-unsignedFromBitVector n =
-  outputCoerce (BitVector n) (Unsigned n) (\i -> "unsigned(" <> i <> ")")
+unsignedFromBitVector ::
+  Backend backend =>
+  -- | Name hint for intermediate signal
+  Text ->
+  -- | BitVector expression
+  TExpr ->
+  -- | Unsigned expression
+  State (BlockState backend) TExpr
+unsignedFromBitVector nameHint e@TExpr{ety=BitVector n} =
+  fromBV nameHint (Unsigned n) e
+unsignedFromBitVector _nameHint TExpr{ety} =
+  error $ "unsignedFromBitVector: Expected BitVector, got: " <> show ety
 
 -- | Used to create an output `Bool` from a number of `Bit`s, using
 -- conjunction. Similarly to `untuple`, it returns a list of
@@ -547,41 +600,35 @@ exprToInteger (DataCon _ _ [n]) = exprToInteger n
 exprToInteger (Literal _ (NumLit n)) = Just n
 exprToInteger _ = Nothing
 
--- | Assign an input bitvector to an expression. Declares a new
---   bitvector if the expression is not already a bitvector.
-toBV
-  :: Backend backend
-  => Text
-  -- ^ BitVector name hint
-  -> TExpr
-  -- ^ expression
-  -> State (BlockState backend) TExpr
-  -- ^ BitVector expression
+-- | Convert an expression to a BitVector
+toBV ::
+  Backend backend =>
+  -- | BitVector name hint
+  Text ->
+  -- | Expression to convert to BitVector
+  TExpr ->
+  -- | BitVector expression
+  State (BlockState backend) TExpr
 toBV bvName a = case a of
   TExpr BitVector{} _ -> pure a
   TExpr aTy aExpr     -> assign bvName $
     TExpr (BitVector (typeSize aTy)) (ToBv Nothing aTy aExpr)
 
--- | Assign an output bitvector to an expression. Declares a new
---   bitvector if the expression is not already a bitvector.
+-- | Convert an expression from a BitVector into some type
 fromBV
-  :: (HasCallStack, Backend backend)
-  => Text
-  -- ^ BitVector name hint
-  -> TExpr
-  -- ^ expression
-  -> State (BlockState backend) TExpr
-  -- ^ bv expression
-fromBV _ a@(TExpr BitVector{} _) = pure a
-fromBV bvName (TExpr aTy (Identifier aName Nothing)) = do
-  bvName' <- Id.makeBasic bvName
-  let bvExpr = FromBv Nothing aTy (Identifier bvName' Nothing)
-      bvTy   = BitVector (typeSize aTy)
-  addDeclaration (NetDecl Nothing bvName' bvTy)
-  addDeclaration (Assignment aName bvExpr)
-  pure (TExpr bvTy (Identifier bvName' Nothing))
-fromBV _ texpr = error $
-  "fromBV: the expression " <> show texpr <> "must be an Identifier"
+  :: (HasCallStack, Backend backend) =>
+  -- | Result name hint
+  Text ->
+  -- | Type to convert to
+  HWType ->
+  -- | BitVector expression
+  TExpr ->
+  -- | Converted BitVector expression
+  State (BlockState backend) TExpr
+fromBV resultName resultType TExpr{eex, ety = BitVector _} =
+  assign resultName (TExpr resultType (FromBv Nothing resultType eex))
+
+fromBV _ _ TExpr{ety} = error $ "fromBV: expected BitVector, got: " <> show ety
 
 clog2 :: Num i => Integer -> i
 clog2 = fromIntegral . fromMaybe 0 . clogBase 2
