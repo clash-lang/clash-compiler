@@ -20,12 +20,11 @@ import           Clash.Core.Term                 (Term(Var), varToId)
 import           Clash.Core.TermLiteral          (termToDataError)
 import           Clash.Util                      (indexNote)
 import           Clash.Netlist                   (mkExpr)
-import           Clash.Netlist.Util              (stripVoid, id2identifier)
+import           Clash.Netlist.Util              (stripVoid, id2identifier, mkAssign)
 import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types
   (BlackBox(BBFunction), TemplateFunction(..), BlackBoxContext, Identifier,
-   NetlistMonad, Declaration(Assignment, NetDecl'),
-   HWType(Bool, KnownDomain), WireOrReg(Wire), NetlistId(..),
+   NetlistMonad, Declaration, HWType(Bool, KnownDomain), NetlistId(..),
    DeclarationType(Concurrent), tcCache, bbInputs, Expr(Identifier))
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TDecl), RenderVoid(..),
@@ -75,11 +74,7 @@ checkBBF _isD _primName args _ty =
     (expr0, decls) <- mkExpr False Concurrent (NetlistId newId (inferCoreTypeOf tcm t)) t
     pure
       ( newId
-      , decls ++ [sigDecl Bool newId, Assignment newId expr0] )
-
-  -- Simple wire without comment
-  sigDecl :: HWType -> Identifier -> Declaration
-  sigDecl typ nm = NetDecl' Nothing Wire nm (Right typ) Nothing
+      , decls ++ mkAssign newId Bool expr0)
 
 checkTF
   :: [Declaration]

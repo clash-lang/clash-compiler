@@ -675,7 +675,7 @@ decls ds = do
       _  -> punctuate' semi (A.pure dsDoc)
 
 decl :: Declaration -> SystemVerilogM (Maybe Doc)
-decl (NetDecl' noteM _ id_ tyE iEM) =
+decl (NetDecl noteM _ id_ tyE iEM) =
   Just A.<$> maybe id addNote noteM (addAttrs attrs (typ tyE))
   where
     typ (Left  ty) = stringS ty <+> pretty id_ <> iE
@@ -873,7 +873,7 @@ inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
 
 inst_ (Seq ds) = Just <$> seqs ds
 
-inst_ (NetDecl' {}) = return Nothing
+inst_ (NetDecl{}) = return Nothing
 
 inst_ (ConditionalDecl cond ds) = Just <$>
   "`ifdef" <+> pretty cond <> line <> indent 2 (insts ds) <> line <> "`endif"
@@ -923,7 +923,8 @@ customReprDataCon dataRepr constrRepr args =
                int fsize <> squote <> parens rotated
 
 seq_ :: Seq -> SystemVerilogM Doc
-seq_ (AlwaysClocked edge clk ds) =
+seq_ (Always (ClockEdge clk edge) vs ds) =
+  decls vs <> line <> line <>
   "always @" <>
     parens (case edge of {Rising -> "posedge"; _ -> "negedge"} <+>
             expr_ False clk) <+> "begin" <> line <>
@@ -935,8 +936,9 @@ seq_ (Initial ds) =
   indent 2 (seqs ds) <> line <>
   "end"
 
-seq_ (AlwaysComb ds) =
-  "always @* begin" <> line <>
+seq_ (Always (ValueChanges _) vs ds) =
+  decls vs <> line <> line <>
+  "always_comb begin" <> line <>
   indent 2 (seqs ds) <> line <>
   "end"
 

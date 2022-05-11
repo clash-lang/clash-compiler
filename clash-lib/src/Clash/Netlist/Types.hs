@@ -23,7 +23,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Netlist.Types
-  ( Declaration (..,NetDecl)
+  ( Declaration (.., SignalDecl, VarDecl)
   , module Clash.Netlist.Types
   )
 where
@@ -37,7 +37,7 @@ import Control.Monad.Fail                   (MonadFail)
 import Control.Monad.Reader                 (ReaderT, MonadReader)
 import qualified Control.Monad.State        as Lazy (State)
 import qualified Control.Monad.State.Strict as Strict
-  (State, MonadIO, MonadState, StateT)
+  (State, MonadIO, MonadState, StateT, gets)
 import Data.Bits                            (testBit)
 import Data.Binary                          (Binary(..))
 import Data.Function                        (on)
@@ -68,7 +68,7 @@ import SrcLoc                               (SrcSpan)
 import Clash.Annotations.BitRepresentation  (FieldAnn)
 import Clash.Annotations.Primitive          (HDL(..))
 import Clash.Annotations.TopEntity          (TopEntity)
-import Clash.Backend                        (Backend)
+import Clash.Backend                        (Backend(hdlKind))
 import Clash.Core.HasType
 import Clash.Core.Type                      (Type)
 import Clash.Core.Var                       (Attr', Id)
@@ -372,7 +372,7 @@ data Component
   = Component
   { componentName :: !Identifier -- ^ Name of the component
   , inputs        :: [(Identifier,HWType)] -- ^ Input ports
-  , outputs       :: [(WireOrReg,(Identifier,HWType),Maybe Expr)] -- ^ Output ports
+  , outputs       :: [(Blocking,(Identifier,HWType),Maybe Expr)] -- ^ Output ports
   , declarations  :: [Declaration] -- ^ Internal declarations
   }
   deriving (Show, Generic, NFData)
@@ -505,6 +505,10 @@ data PortMap
   --
   deriving (Show)
 
+isAssignment :: Declaration -> Bool
+isAssignment Assignment{} = True
+isAssignment _ = False
+
 -- | Internals of a Component
 data Declaration
   -- | Signal assignment
@@ -539,10 +543,10 @@ data Declaration
       !BlackBox                -- ^ Template tokens
       BlackBoxContext          -- ^ Context in which tokens should be rendered
 
-  -- | Signal declaration
-  | NetDecl'
+  -- | Signal or variable declaration
+  | NetDecl
       (Maybe Comment)                -- ^ Note; will be inserted as a comment in target hdl
-      WireOrReg                      -- ^ Wire or register
+      Blocking                       -- ^ Wire or register
       !Identifier                    -- ^ Name of signal
       (Either IdentifierText HWType) -- ^ Pointer to type of signal or type of signal
       (Maybe Expr)                   -- ^ Initial value
@@ -562,18 +566,47 @@ data Declaration
       [Declaration]
   deriving Show
 
+data Sensitivity
+  = ClockEdge Expr ActiveEdge
+  -- ^ The clock and edge that a process is sensitive to
+  | ValueChanges [IdentifierText]
+  -- ^ The value which a process is sensitive to
+  deriving Show
+
+{-
+NOTE [assignments in `Initial` blocks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In verilog code it is common to see initial blocks used for initial assignment
+of values to registers, i.e.
+
+    initial begin
+      x_1 = v_1;
+      x_2 = v_2;
+      ...
+      x_n = v_n;
+
+Equivalently this can be written as initial values on the declaration
+
+    reg x_1 = v_1;
+    reg x_2 = v_2;
+    ...
+    reg x_n = v_n;
+
+In VHDL, there are no `initial` blocks. However, you are still allowed to
+assign initial values to signals when they are declared. To prevent Clash from
+losing these initial values, assignments in initial blocks should be removed
+and the declaration updated to include the initial value.
+-}
+
 -- | Sequential statements
 data Seq
-  -- | Clocked sequential statements
-  = AlwaysClocked
-      ActiveEdge -- ^ Edge of the clock the statement should be executed
-      Expr       -- ^ Clock expression
-      [Seq]      -- ^ Statements to be executed on the active clock edge
   -- | Statements running at simulator start
-  | Initial
+  = Initial
       [Seq] -- ^ Statements to run at simulator start
   -- | Statements to run always
-  | AlwaysComb
+  | Always
+      Sensitivity -- ^ Changes that force evaluation of the process
+      [Declaration] -- ^ Variable declarations
       [Seq] -- ^ Statements to run always
   -- | Declaration in sequential form
   | SeqDecl
@@ -585,25 +618,73 @@ data Seq
       [(Maybe Literal,[Seq])]  -- ^ List of: (Maybe match, RHS of Alternative)
   deriving Show
 
+{-
+TODO [Declaration and Seq]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Currently, the Decalration and Seq types allow invalid netlist to be
+constructed. A notable example is that you can nest procedural blocks like so:
+
+  Seq [Always _ [SeqDecl (Seq [Always _ ...
+
+It would be nice to properly distinguish between declarations, concurrent
+statements and sequential statements in the netlist types - with the types
+defined in such a way that invalid elements like this cannot be constructed.
+This is somewhat of a job right now as it would mean some fiddly rewrites to
+different parts of netlist generation.
+-}
+
 data EntityOrComponent = Entity | Comp | Empty
   deriving Show
 
-data WireOrReg = Wire | Reg
-  deriving (Show,Generic)
+-- | Indicate whether a declaration is blocking (like `variable` in VHDL or
+-- `reg` in Verilog), or non-blocking (like `signal` in VHDL or `wire` in
+-- Verilog). This affects how values are updated, and may impact where
+-- delclataions occur in generated HDL.
+--
+data Blocking
+  = Blocking
+  -- ^ Assignment occurs immediately
+  | NonBlocking
+  -- ^ Assignment occurs in the next time step
+  deriving (Generic, NFData, Show)
 
-instance NFData WireOrReg
-
-pattern NetDecl
+-- | Declare a new net which is non-blocking.
+pattern SignalDecl
   :: Maybe Comment
   -- ^ Note; will be inserted as a comment in target hdl
   -> Identifier
   -- ^ Name of signal
   -> HWType
   -- ^ Type of signal
+  -> Maybe Expr
+  -- ^ Initial value
   -> Declaration
-pattern NetDecl note d ty <- NetDecl' note Wire d (Right ty) _
-  where
-    NetDecl note d ty = NetDecl' note Wire d (Right ty) Nothing
+pattern SignalDecl note d ty e =
+  NetDecl note NonBlocking d (Right ty) e
+
+-- | Declare a new net which is blocking.
+pattern VarDecl
+  :: Maybe Comment
+  -> Identifier
+  -> HWType
+  -> Maybe Expr
+  -> Declaration
+pattern VarDecl note d ty e =
+  NetDecl note Blocking d (Right ty) e
+
+-- | Render a net as a reg in Verilog or a signal in VHDL.
+regOrSignal
+  :: Maybe Comment
+  -> Identifier
+  -> HWType
+  -> Maybe Expr
+  -> NetlistMonad Declaration
+regOrSignal note i ty e = do
+  SomeBackend b <- Strict.gets _backend
+
+  case hdlKind b of
+    VHDL -> pure (SignalDecl note i ty e)
+    _ -> pure (VarDecl note i ty e)
 
 data PortDirection = In | Out
   deriving (Eq,Ord,Show,Generic,NFData,Hashable)
@@ -658,6 +739,21 @@ data Expr
 instance NFData Expr where
   rnf x = x `seq` ()
 
+isConstExpr :: Expr -> Bool
+isConstExpr = \case
+  Literal{} -> True
+  DataCon _ _ es -> all isConstExpr es
+  Identifier{} -> False
+  DataTag{} -> False
+  BlackBoxE nm _ _ _ _ ctx _
+    | nm == "Clash.Explicit.SimIO.reg" ->
+        all (\(e, _, _) -> isConstExpr e) (bbInputs ctx)
+    | otherwise -> False
+  ToBv _ _ e -> isConstExpr e
+  FromBv _ _ e -> isConstExpr e
+  IfThenElse{} -> False
+  Noop -> False
+
 -- | Literals used in an expression
 data Literal
   = NumLit    !Integer          -- ^ Number literal
@@ -696,7 +792,7 @@ data BlackBoxContext
   , bbInputs :: [(Expr,HWType,Bool)]
   -- ^ Argument names, types, and whether it is a literal
   , bbFunctions :: IntMap [(Either BlackBox (Identifier,[Declaration])
-                          ,WireOrReg
+                          ,Blocking
                           ,[BlackBoxTemplate]
                           ,[BlackBoxTemplate]
                           ,[((Text,Text),BlackBox)]

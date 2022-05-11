@@ -41,9 +41,9 @@ testPath = "tests/shouldwork/TopEntity/T1182B.hs"
 
 assertInputs :: N.HWType-> N.HWType -> N.Component -> IO ()
 assertInputs exp1 exp2 (N.Component _ [(clk, N.Clock _)]
-  [ (N.Wire, (ssan, act1), Nothing)
-  , (N.Wire, (ssseg, act2), Nothing)
-  , (N.Wire, (ssdp, N.Bool), Nothing)
+  [ (N.NonBlocking, (ssan, act1), Nothing)
+  , (N.NonBlocking, (ssseg, act2), Nothing)
+  , (N.NonBlocking, (ssdp, N.Bool), Nothing)
   ] ds)
   | Id.toText clk == T.pack "CLK"
   , Id.toText ssan == T.pack "SS_AN"

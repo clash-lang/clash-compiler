@@ -37,7 +37,7 @@ import qualified Data.HashSet                         as HashSet
 import           Data.List
   (mapAccumL, nub, nubBy, intersperse, group, sort)
 import           Data.List.Extra                      ((<:>), equalLength, zipEqual)
-import           Data.Maybe                           (catMaybes,mapMaybe)
+import           Data.Maybe                           (catMaybes,mapMaybe,fromMaybe)
 import           Data.Monoid                          (Ap(Ap))
 import           Data.Monoid.Extra                    ()
 import qualified Data.Text.Lazy                       as T
@@ -54,6 +54,8 @@ import           Data.Text.Prettyprint.Doc.Extra
 import           GHC.Stack                            (HasCallStack)
 import qualified System.FilePath
 import           Text.Printf
+
+import           Clash.Signal.Internal (ActiveEdge(..))
 
 import           Clash.Annotations.Primitive          (HDL (..))
 import           Clash.Annotations.BitRepresentation.Internal
@@ -115,6 +117,7 @@ data VHDLState =
   , _aggressiveXOptBB_ :: AggressiveXOptBB
   , _renderEnums_ :: RenderEnums
   , _domainConfigurations_ :: DomainMap
+  , _declTypes :: HashMap Identifier Blocking
   }
 
 makeLenses ''VHDLState
@@ -144,6 +147,7 @@ instance Backend VHDLState where
     , _aggressiveXOptBB_=coerce (opt_aggressiveXOptBB opts)
     , _renderEnums_=coerce (opt_renderEnums opts)
     , _domainConfigurations_=emptyDomainMap
+    , _declTypes=mempty
     }
   hdlKind         = const VHDL
   primDirs        = const $ do root <- primsRoot
@@ -242,7 +246,7 @@ instance Backend VHDLState where
   blockDecl nm ds = do
     decs <- decls ds
     let attrs = [ (id_, attr)
-                | NetDecl' _ _ id_ (Right hwtype) _ <- ds
+                | NetDecl _ _ id_ (Right hwtype) _ <- ds
                 , attr <- hwTypeAttrs hwtype]
     if isEmpty decs
        then insts ds
@@ -947,12 +951,12 @@ architecture c = do {
   }
  where
    netdecls    = filter isNetDecl (declarations c)
-   declAttrs   = [(id_, attr) | NetDecl' _ _ id_ (Right hwtype) _ <- netdecls, attr <- hwTypeAttrs hwtype]
+   declAttrs   = [(id_, attr) | NetDecl _ _ id_ (Right hwtype) _ <- netdecls, attr <- hwTypeAttrs hwtype]
    inputAttrs  = [(id_, attr) | (id_, hwtype) <- inputs c, attr <- hwTypeAttrs hwtype]
    outputAttrs = [(id_, attr) | (_wireOrReg, (id_, hwtype), _) <- outputs c, attr <- hwTypeAttrs hwtype]
 
    isNetDecl :: Declaration -> Bool
-   isNetDecl (NetDecl' _ _ _ (Right _) _) = True
+   isNetDecl (NetDecl _ _ _ (Right _) _) = True
    isNetDecl _                            = False
 
 attrType
@@ -1346,9 +1350,12 @@ decls ds = do
       _  -> vcat (pure dsDoc)
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
-decl l (NetDecl' noteM _ id_ ty iEM) = Just <$> (,fromIntegral (TextS.length (Id.toText id_))) <$>
-  maybe id addNote noteM ("signal" <+> fill l (pretty id_) <+> colon <+> either pretty sizedQualTyName ty <> iE <> semi)
+decl l (NetDecl noteM b id_ ty iEM) = do
+  declTypes %= HashMap.insert id_ b
+  Just <$> (,fromIntegral (TextS.length (Id.toText id_))) <$>
+    maybe id addNote noteM (kw <+> fill l (pretty id_) <+> colon <+> either pretty sizedQualTyName ty <> iE <> semi)
   where
+    kw = case b of { Blocking -> "variable" ; NonBlocking -> "signal" }
     addNote n = mappend ("--" <+> pretty n <> line)
     iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM
 
@@ -1465,8 +1472,18 @@ inst_' id_ scrut scrutTy es = fmap Just $
 
 -- | Turn a Netlist Declaration to a VHDL concurrent block
 inst_ :: Declaration -> VHDLM (Maybe Doc)
-inst_ (Assignment id_ e) = fmap Just $
-  pretty id_ <+> larrow <+> align (expr_ False e) <> semi
+inst_ (Assignment id_ e) = do
+  dts <- use declTypes
+
+  case HashMap.lookup id_ dts of
+    Just Blocking ->
+      fmap Just $ pretty id_ <+> ":=" <+> align (expr_ False e) <> semi
+
+    -- This is catch-all since the "result" var which implicitly exists means
+    -- we can't just fail on undeclared identifiers.
+    _ ->
+      fmap Just $ pretty id_ <+> larrow <+> align (expr_ False e) <> semi
+
 
 inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
   pretty id_ <+> larrow
@@ -1525,6 +1542,8 @@ inst_ (InstDecl entOrComp libM _ nm lbl gens pms0) = do
 inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
   fmap Just (Ap (column (renderBlackBox libs imps inc bs bbCtx)))
 
+inst_ (Seq ds) = Just <$> seqs ds
+
 inst_ (ConditionalDecl cond _) = do
   traceM
     $ "WARNING: Conditional compilation is not supported in VHDL. Discarding code conditional on "
@@ -1532,6 +1551,106 @@ inst_ (ConditionalDecl cond _) = do
   return Nothing
 
 inst_ _ = return Nothing
+
+seq_ :: Seq -> VHDLM Doc
+seq_ (Always (ClockEdge clk edge) vs ds) =
+  "process" <+> parens (expr_ False clk) <+> "is" <> line <>
+  indent 2 (decls vs) <> line <> "begin" <> line <>
+  indent 2 ("if" <+> edgeFn <> parens (expr_ False clk) <+> "then" <> line <>
+  indent 2 (seqs ds) <> line <> "end if;") <> line <> "end process;"
+ where
+  edgeFn =
+    case edge of
+      Rising -> "rising_edge"
+      Falling -> "falling_edge"
+
+seq_ (Always (ValueChanges vals) vs ds) =
+  "process" <+> tupled (traverse pretty vals) <+> "is" <> line <>
+  indent 2 (decls vs) <> line <> "begin" <> line <>
+  indent 2 (seqs ds) <> line <> "end process;"
+
+seq_ (Branch scrut scrutTy es) =
+  "case" <+> expr_ False scrut <+> "is" <> line <>
+    indent 2 (vcat $ conds es) <> line <> "end case;"
+ where
+  conds [] =
+    pure []
+
+  conds [(_, sq)] =
+    let body = if null sq then "null;" else seqs sq
+     in "when others =>" <> line <> indent 2 body <> line <:> pure []
+
+  conds ((Nothing, sq):_) =
+    let body = if null sq then "null;" else seqs sq
+     in "when others =>" <> line <> indent 2 body <> line <:> pure []
+
+  conds ((Just c, sq):es') =
+    let body = if null sq then "null;" else seqs sq
+     in "when" <+> patLit scrutTy c <+> "=>" <> line
+          <> indent 2 body <> line <:> conds es'
+
+seq_ (SeqDecl sd) = do
+  dts <- use declTypes
+
+  case sd of
+    Assignment id_ e ->
+      case HashMap.lookup id_ dts of
+        Just Blocking ->
+          pretty id_ <+> ":=" <+> expr False e <> semi
+
+        _ ->
+          pretty id_ <+> "<=" <+> expr False e <> semi
+
+    -- TODO When the scrutTy is boolean, generate
+    --
+    --   if ... then ... elsif ... then ... else ...
+    --
+    CondAssignment id_ _ scrut scrutTy es ->
+      "case" <+> expr_ False scrut <+> "is" <> line <>
+        indent 2 (vcat $ conds dts id_ scrutTy es) <> line <> "end case;"
+
+    BlackBoxD{} ->
+      fromMaybe <$> emptyDoc <*> inst_ sd
+
+    Seq ds ->
+      seqs ds
+
+    _ ->
+      error ("seq_: " <> show sd)
+ where
+  conds _ _ _ [] =
+    pure []
+
+  conds dts i _ [(_, e)] =
+    let inner = case HashMap.lookup i dts of
+                  Just Blocking -> pretty i <+> ":=" <+> expr_ False e
+                  _ -> pretty i <+> "<=" <$> expr_ False e
+     in "when others =>" <> line <> indent 2 inner <> line <:> pure []
+
+  conds dts i _ ((Nothing, e):_) =
+    let inner = case HashMap.lookup i dts of
+                  Just Blocking -> pretty i <+> ":=" <+> expr_ False e
+                  _ -> pretty i <+> "<=" <$> expr_ False e
+     in "when others =>" <> line <> indent 2 inner <> line <:> pure []
+
+  conds dts i scrutTy ((Just c, e):xs) =
+    let inner = case HashMap.lookup i dts of
+                  Just Blocking -> pretty i <+> ":=" <+> expr_ False e
+                  _ -> pretty i <+> "<=" <$> expr_ False e
+     in "when" <+> patLit scrutTy c <+> "=>" <> line <> indent 2 inner <> line <:> conds dts i scrutTy xs
+
+seq_ (Initial ds) =
+  "process begin" <> line
+    <> indent 2 (seqs ds <> "wait;") <> line <> "end process;"
+
+seqs :: [Seq] -> VHDLM Doc
+seqs [] = emptyDoc
+seqs (SeqDecl (TickDecl (Comment c)):ds) = comment "--" c <> line <> seqs ds
+seqs (SeqDecl (TickDecl (Directive _)):ds) = do
+  traceM "WARNING: VHDL does not support directives, discarding"
+  seqs ds
+
+seqs (d:ds) = seq_ d <> line <> line <> seqs ds
 
 -- | Render a data constructor application for data constructors having a
 -- custom bit representation.

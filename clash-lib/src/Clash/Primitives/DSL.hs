@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2019, Myrtle Software Ltd.
-                     2020-2021, QBayLogic B.V.
+                     2020-2022, QBayLogic B.V.
                      2021, Myrtle.ai
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -230,12 +230,16 @@ declaration blockName s = do
 addDeclaration :: Declaration -> State (BlockState backend) ()
 addDeclaration dec = bsDeclarations %= cons dec
 
+-- | Add declarations to the state.
+addDeclarations :: [Declaration] -> State (BlockState backend) ()
+addDeclarations decs = bsDeclarations %= (`mappend` decs)
+
 -- | Declare a new signal with the given name and type.
 declare'
   :: Backend backend
   => Text
   -- ^ Name hint
-  -> WireOrReg
+  -> Blocking
   -- ^ Should signal be declared as a wire or a reg
   -> HWType
   -- ^ Type of new signal
@@ -243,7 +247,7 @@ declare'
   -- ^ Expression pointing the the new signal
 declare' decName wireOrReg ty = do
   uniqueName <- Id.makeBasic decName
-  addDeclaration (NetDecl' Nothing wireOrReg uniqueName (Right ty) Nothing)
+  addDeclaration (NetDecl Nothing wireOrReg uniqueName (Right ty) Nothing)
   pure uniqueName
 
 -- | Declare a new signal with the given name and type.
@@ -251,7 +255,7 @@ declare
   :: Backend backend
   => Text
   -- ^ Name hint
-  -> WireOrReg
+  -> Blocking
   -- ^ Should signal be declared as a wire or a reg
   -> HWType
   -- ^ Type of new signal
@@ -272,7 +276,7 @@ assign
   -> State (BlockState backend) TExpr
   -- ^ the identifier of the expression that actually got assigned
 assign aName (TExpr ty aExpr) = do
-  texp@(~(TExpr _ (Identifier uniqueName Nothing))) <- declare aName Wire ty
+  texp@(~(TExpr _ (Identifier uniqueName Nothing))) <- declare aName NonBlocking ty
   addDeclaration (Assignment uniqueName aExpr)
   pure texp
 
@@ -304,7 +308,7 @@ deconstructProduct
   -- ^ Name hints for element assignments
   -> State (BlockState backend) [TExpr]
 deconstructProduct (TExpr ty@(Product _ _ tys) (Identifier resName _)) vals = do
-  newNames <- zipWithM (flip declare Wire) vals tys
+  newNames <- zipWithM (flip declare NonBlocking) vals tys
   addDeclaration $ Assignment resName $ DataCon ty (DC (ty, 0)) (fmap eex newNames)
   pure newNames
 deconstructProduct e i =
@@ -365,7 +369,7 @@ boolToBit bitName = \case
   T -> pure High
   F -> pure Low
   TExpr Bool boolExpr -> do
-    texp@(~(TExpr _ (Identifier uniqueBitName Nothing))) <- declare bitName Wire Bit
+    texp@(~(TExpr _ (Identifier uniqueBitName Nothing))) <- declare bitName NonBlocking Bit
     addDeclaration $
       CondAssignment uniqueBitName Bit boolExpr Bool
         [ (Just (BoolLit True), Literal Nothing (BitLit H))
@@ -383,7 +387,7 @@ enableToBit
   -> State (BlockState backend) TExpr
 enableToBit bitName = \case
   TExpr ena@(Enable _) enableExpr -> do
-    texp@(~(TExpr _ (Identifier uniqueBitName Nothing))) <- declare bitName Wire Bit
+    texp@(~(TExpr _ (Identifier uniqueBitName Nothing))) <- declare bitName NonBlocking Bit
     addDeclaration $
       CondAssignment uniqueBitName Bit enableExpr ena
         -- Enable normalizes to Bool for all current backends
@@ -463,7 +467,7 @@ outputCoerce fromType toType exprStringFn inName0 expr_
       inName1 <- Id.makeBasic inName0
       let inName2 = Id.unsafeMake (exprStringFn (Id.toText inName1))
           exprIdent = Identifier inName2 Nothing
-      addDeclaration (NetDecl Nothing inName1 fromType)
+      addDeclaration (SignalDecl Nothing inName1 fromType Nothing)
       addDeclaration (Assignment outName exprIdent)
       pure (TExpr fromType (Identifier inName1 Nothing))
 outputCoerce _ toType _ _ texpr = error $ "outputCoerce: the expression " <> show texpr
@@ -488,7 +492,7 @@ outputFn fromTypes toType exprFn inNames0 (TExpr outType (Identifier outName Not
       inNames1 <- mapM Id.makeBasic inNames0
       let idExpr = Id.unsafeMake (exprFn (map Id.toText inNames1))
           exprIdent = Identifier idExpr Nothing
-      sequenceOf_ each [ addDeclaration (NetDecl Nothing nm t)
+      sequenceOf_ each [ addDeclaration (SignalDecl Nothing nm t Nothing)
                        | (nm, t) <- zip inNames1 fromTypes ]
       addDeclaration (Assignment outName exprIdent)
       pure [ TExpr t (Identifier nm Nothing)
@@ -577,7 +581,7 @@ fromBV bvName (TExpr aTy (Identifier aName Nothing)) = do
   bvName' <- Id.makeBasic bvName
   let bvExpr = FromBv Nothing aTy (Identifier bvName' Nothing)
       bvTy   = BitVector (typeSize aTy)
-  addDeclaration (NetDecl Nothing bvName' bvTy)
+  addDeclaration (SignalDecl Nothing bvName' bvTy Nothing)
   addDeclaration (Assignment aName bvExpr)
   pure (TExpr bvTy (Identifier bvName' Nothing))
 fromBV _ texpr = error $
@@ -740,8 +744,7 @@ viaAnnotatedSignal
   -> State (BlockState backend) ()
 viaAnnotatedSignal sigNm (TExpr fromTy fromExpr) (TExpr toTy (Identifier outNm Nothing)) attrs
   | fromTy == toTy = do
-      addDeclaration (NetDecl Nothing sigNm (Annotated attrs fromTy))
-      addDeclaration (Assignment sigNm fromExpr)
+      addDeclarations (mkAssign sigNm (Annotated attrs fromTy) fromExpr)
       addDeclaration (Assignment outNm (Identifier sigNm Nothing))
 viaAnnotatedSignal _ inTExpr outTExpr@(TExpr _ (Identifier _ _)) _ =
   error $ "viaAnnotatedSignal: The in and out expressions \"" <> show inTExpr <>
