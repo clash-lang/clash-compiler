@@ -1194,7 +1194,7 @@ trueDualPortBlockRam ::
   , NFDataX a
   )
   => Vec nAddrs a
-  -- ^ Initial content of the BRAM, also determines the size, @n@, of the BRAM
+  -- ^ Initial content of the BRAM
   --
   -- __NB__: __MUST__ be a constant
   -> Clock domA
@@ -1291,7 +1291,7 @@ trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
   , NFDataX a
   )
   => Vec nAddrs a
-  -- ^ Initial content of the BRAM, also determines the size, @n@, of the BRAM
+  -- ^ Initial content of the BRAM
   --
   -- __NB__: __MUST__ be a constant
   -> Clock domA

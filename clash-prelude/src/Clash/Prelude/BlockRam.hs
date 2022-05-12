@@ -878,7 +878,7 @@ trueDualPortBlockRam ::
   , NFDataX a
   )
   => Vec nAddrs a
-  -- ^ Initial content of the BRAM, also determines the size, @nAddrs@, of the BRAM
+  -- ^ Initial content of the BRAM
   --
   -- __NB__: __MUST__ be a constant
   -> Signal dom1 (E.RamOp nAddrs a)
@@ -898,7 +898,7 @@ trueDualPortBlockRam contents inA inB =
   , NFDataX a
   )
   => Vec nAddrs a
-  -- ^ Initial content of the BRAM, also determines the size, @nAddrs@, of the BRAM
+  -- ^ Initial content of the BRAM
   --
   -- __NB__: __MUST__ be a constant
   -> Signal dom (E.RamOp nAddrs a)
