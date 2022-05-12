@@ -29,3 +29,11 @@ data RGB
 
 deriveDefaultAnnotation [t| RGB |]
 deriveBitPack [t| RGB |]
+
+data Headphones
+  = InEar
+      { _wireless :: Bool }
+  | OverEar
+      { _impedance :: SmallInt }
+
+data EarCup = SmallInt :<>: SmallInt

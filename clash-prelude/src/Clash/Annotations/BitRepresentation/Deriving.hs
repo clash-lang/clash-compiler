@@ -1,6 +1,7 @@
 {-|
 Copyright  :  (C) 2018, Google Inc.,
                   2022, QBayLogic B.V.
+                  2022, LUMI GUIDE FIETSDETECTIE B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -183,6 +184,10 @@ resolve _nmap t = error $ "Unexpected type: " ++ show t
 resolveCon :: NameMap -> Con -> Con
 resolveCon nmap (NormalC t (unzip -> (bangs, fTypes))) =
   NormalC t $ zip bangs $ map (resolve nmap) fTypes
+resolveCon nmap (RecC t (unzip3 -> (name, bangs, fTypes))) =
+  RecC t $ zip3 name bangs $ map (resolve nmap) fTypes
+resolveCon nmap (InfixC (leftB, leftTy) t (rightB, rightTy)) =
+  InfixC (leftB, resolve nmap leftTy) t (rightB, resolve nmap rightTy)
 resolveCon _name constr =
   error $ "Unexpected constructor: " ++ show constr
 
