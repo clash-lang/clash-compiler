@@ -117,7 +117,6 @@ inputHole = \case
   IsActiveEnable n -> pure n
   IsUndefined n    -> pure n
   StrCmp _ n       -> pure n
-  OutputWireReg n  -> pure n
   Vars n           -> pure n
   GenSym _ _       -> Nothing
   Repeat _ _       -> Nothing
@@ -789,9 +788,6 @@ renderTag b (FilePath e)    = case e of
 renderTag b (IncludeName n) = case indexMaybe (bbQsysIncName b) n of
   Just nm -> return (Text.fromStrict nm)
   _ -> error $ $(curLoc) ++ "~INCLUDENAME[" ++ show n ++ "] does not correspond to any index of the 'includes' field that is specified in the primitive definition"
-renderTag b (OutputWireReg n) = case IntMap.lookup n (bbFunctions b) of
-  Just ((_,rw,_,_,_,_):_) -> case rw of {N.Wire -> return "wire"; N.Reg -> return "reg"}
-  _ -> error $ $(curLoc) ++ "~OUTPUTWIREREG[" ++ show n ++ "] used where argument " ++ show n ++ " is not a function"
 renderTag b (Repeat [es] [i]) = do
   i'  <- Text.unpack <$> renderTag b i
   es' <- renderTag b es
@@ -1033,7 +1029,6 @@ prettyElem (SigD es mI) = do
            (((string "~SIGD" <> brackets (string es')) <>) . int)
            mI)
 prettyElem (Vars i) = renderOneLine <$> (string "~VARS" <> brackets (int i))
-prettyElem (OutputWireReg i) = renderOneLine <$> (string "~RESULTWIREREG" <> brackets (int i))
 prettyElem (ArgGen n x) =
   renderOneLine <$> (string "~ARGN" <> brackets (int n) <> brackets (int x))
 prettyElem (Template bbname source) = do
@@ -1108,7 +1103,6 @@ walkElement f el = maybeToList (f el) ++ walked
         IsActiveEnable _ -> []
         IsUndefined _ -> []
         StrCmp es _ -> concatMap go es
-        OutputWireReg _ -> []
         Vars _ -> []
         Repeat es1 es2 ->
           concatMap go es1 ++ concatMap go es2
@@ -1186,7 +1180,6 @@ getUsedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
         IW64 -> Nothing
         Length _ -> Nothing
         MaxIndex _ -> Nothing
-        OutputWireReg _ -> Nothing
         Repeat _ _ -> Nothing
         Result -> Nothing
         Sel _ _ -> Nothing

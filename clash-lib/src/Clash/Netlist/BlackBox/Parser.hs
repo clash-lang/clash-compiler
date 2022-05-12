@@ -115,7 +115,6 @@ pTagE =  Result            <$  string "~RESULT"
      <|> IsActiveEnable    <$> (string "~ISACTIVEENABLE" *> brackets' natural')
      <|> IsUndefined       <$> (string "~ISUNDEFINED" *> brackets' natural')
      <|> StrCmp            <$> (string "~STRCMP" *> brackets' pSigD) <*> brackets' natural'
-     <|> OutputWireReg     <$> (string "~OUTPUTWIREREG" *> brackets' natural')
      <|> GenSym            <$> (string "~GENSYM" *> brackets' pSigD) <*> brackets' natural'
      <|> Template          <$> (string "~TEMPLATE" *> brackets' pSigD) <*> brackets' pSigD
      <|> Repeat            <$> (string "~REPEAT" *> brackets' pSigD) <*> brackets' pSigD

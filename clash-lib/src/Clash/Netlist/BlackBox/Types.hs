@@ -192,7 +192,6 @@ data Element
   -- always return 0 (False) if `-fclash-aggressive-x-optimization-blackboxes`
   -- is NOT set.
   | StrCmp [Element] !Int
-  | OutputWireReg !Int
   | Vars !Int
   | GenSym [Element] !Int
   | Repeat [Element] [Element]
