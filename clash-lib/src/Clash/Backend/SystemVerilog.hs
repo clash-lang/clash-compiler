@@ -527,7 +527,7 @@ module_ c =
   modEnding  = "endmodule"
 
   inPorts  = sequence [ sigPort (Nothing,isBiSignalIn ty) (i,ty) Nothing | (i,ty)  <- inputs c  ]
-  outPorts = sequence [ sigPort (Just wr,False) p iEM | (wr, p, iEM) <- outputs c ]
+  outPorts = sequence [ sigPort (Just (),False) p iEM | (p, iEM) <- outputs c ]
 
   -- NOTE [net types and data types]
   --
@@ -678,7 +678,7 @@ decls ds = do
       _  -> punctuate' semi (A.pure dsDoc)
 
 decl :: Declaration -> SystemVerilogM (Maybe Doc)
-decl (NetDecl' noteM _ id_ tyE iEM) =
+decl (NetDecl' noteM id_ tyE iEM) =
   Just A.<$> maybe id addNote noteM (addAttrs attrs (typ tyE))
   where
     typ (Left  ty) = stringS ty <+> pretty id_ <> iE

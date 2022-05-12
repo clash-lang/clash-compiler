@@ -244,15 +244,13 @@ declare'
   :: Backend backend
   => Text
   -- ^ Name hint
-  -> WireOrReg
-  -- ^ Should signal be declared as a wire or a reg
   -> HWType
   -- ^ Type of new signal
   -> State (BlockState backend) Identifier
   -- ^ Expression pointing the the new signal
-declare' decName wireOrReg ty = do
+declare' decName ty = do
   uniqueName <- Id.makeBasic decName
-  addDeclaration (NetDecl' Nothing wireOrReg uniqueName (Right ty) Nothing)
+  addDeclaration (NetDecl' Nothing uniqueName (Right ty) Nothing)
   pure uniqueName
 
 -- | Declare a new signal with the given name and type.
@@ -260,14 +258,12 @@ declare
   :: Backend backend
   => Text
   -- ^ Name hint
-  -> WireOrReg
-  -- ^ Should signal be declared as a wire or a reg
   -> HWType
   -- ^ Type of new signal
   -> State (BlockState backend) TExpr
   -- ^ Expression pointing the the new signal
-declare decName wireOrReg ty = do
-  uniqueName <- declare' decName wireOrReg ty
+declare decName ty = do
+  uniqueName <- declare' decName ty
   pure (TExpr ty (Identifier uniqueName Nothing))
 
 -- | Assign an expression to an identifier, returns the new typed
@@ -281,7 +277,7 @@ assign
   -> State (BlockState backend) TExpr
   -- ^ the identifier of the expression that actually got assigned
 assign aName (TExpr ty aExpr) = do
-  texp@(~(TExpr _ (Identifier uniqueName Nothing))) <- declare aName Wire ty
+  texp@(~(TExpr _ (Identifier uniqueName Nothing))) <- declare aName ty
   addDeclaration (Assignment uniqueName aExpr)
   pure texp
 
@@ -347,7 +343,7 @@ deconstructProduct
   -- ^ Name hints for element assignments
   -> State (BlockState backend) [TExpr]
 deconstructProduct (TExpr ty@(Product _ _ tys) (Identifier resName _)) vals = do
-  newNames <- zipWithM (flip declare Wire) vals tys
+  newNames <- zipWithM declare vals tys
   addDeclaration $ Assignment resName $ DataCon ty (DC (ty, 0)) (fmap eex newNames)
   pure newNames
 deconstructProduct e i =
@@ -408,7 +404,7 @@ boolToBit bitName = \case
   T -> pure High
   F -> pure Low
   TExpr Bool boolExpr -> do
-    texp@(~(TExpr _ (Identifier uniqueBitName Nothing))) <- declare bitName Wire Bit
+    texp@(~(TExpr _ (Identifier uniqueBitName Nothing))) <- declare bitName Bit
     addDeclaration $
       CondAssignment uniqueBitName Bit boolExpr Bool
         [ (Just (BoolLit True), Literal Nothing (BitLit H))
@@ -426,7 +422,7 @@ enableToBit
   -> State (BlockState backend) TExpr
 enableToBit bitName = \case
   TExpr ena@(Enable _) enableExpr -> do
-    texp@(~(TExpr _ (Identifier uniqueBitName Nothing))) <- declare bitName Wire Bit
+    texp@(~(TExpr _ (Identifier uniqueBitName Nothing))) <- declare bitName Bit
     addDeclaration $
       CondAssignment uniqueBitName Bit enableExpr ena
         -- Enable normalizes to Bool for all current backends
@@ -450,7 +446,7 @@ boolFromBit boolName = \case
   High -> pure T
   Low -> pure F
   TExpr Bit bitExpr -> do
-    texp@(~(TExpr _ (Identifier uniqueBoolName Nothing))) <- declare boolName Wire Bool
+    texp@(~(TExpr _ (Identifier uniqueBoolName Nothing))) <- declare boolName Bool
     addDeclaration $
       CondAssignment uniqueBoolName Bool bitExpr Bit
         [ (Just (BitLit H), Literal Nothing (BoolLit True))
@@ -696,15 +692,8 @@ instHO bbCtx fPos (resTy, bbResTy) argsWithTypes = do
   let
     args2 = map (pure . Text . Id.toLazyText) args1
 
-    -- Create result identifier
-    -- See https://github.com/clash-lang/clash-compiler/issues/919 for info on
-    -- logic of 'resWireOrReg'
-    resWireOrReg =
-      case IntMap.lookup fPos (bbFunctions bbCtx) of
-        Just ((_,rw,_,_,_,_):_) -> rw
-        _ -> error "internal error"
   resName <- declare' (ctxName <> "_" <> "ho" <> showt fPos <> "_"
-                               <> showt fSubPos <> "_res") resWireOrReg resTy
+                               <> showt fSubPos <> "_res") resTy
   let res = ([Text (Id.toLazyText resName)], bbResTy)
 
   -- Render HO argument to plain text

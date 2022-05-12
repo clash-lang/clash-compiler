@@ -226,19 +226,22 @@ genVerilog sp seen c = do
     timescale = "`timescale 100fs/100fs"
 
 sigPort
-  :: Maybe WireOrReg
+  :: Maybe () -- TODO This should be replaced with Maybe Usage
   -> Identifier
   -> HWType
   -> Maybe Expr
   -> VerilogM Doc
-sigPort wor (Id.toText -> pName) hwType iEM =
+sigPort usage (Id.toText -> pName) hwType iEM =
     addAttrs (hwTypeAttrs hwType)
       (portType <+> verilogType hwType <+> stringS pName <> iE <> encodingNote hwType)
   where
-    portType = case wor of
+    portType = case usage of
+                 _ -> error "sigPort: Determine wire/reg from usage"
+                {-
                  Nothing   -> if isBiSignalIn hwType then "inout" else "input"
                  Just Wire -> "output" <+> "wire"
                  Just Reg  -> "output" <+> "reg"
+                -}
 
     iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM
 
@@ -261,7 +264,7 @@ module_ c =
     modEnding  = "endmodule"
 
     inPorts  = sequence [ sigPort Nothing id_ hwType Nothing | (id_, hwType) <- inputs c  ]
-    outPorts = sequence [ sigPort (Just wireOrReg) id_ hwType iEM | (wireOrReg, (id_, hwType), iEM) <- outputs c ]
+    outPorts = sequence [ sigPort (Just ()) id_ hwType iEM | ((id_, hwType), iEM) <- outputs c ]
 
     -- slightly more readable than 'tupled', makes the output Haskell-y-er
     commafy v = (comma <> space) <> pure v
@@ -295,10 +298,9 @@ uselibs xs = line <>
   indent 2 (string "`uselib" <+> (hsep (mapM (\l -> ("lib=" <> string l)) xs)))
   <> line <> line
 
-wireRegFileDoc :: WireOrReg -> (Either a HWType) -> VerilogM Doc
+wireRegFileDoc :: () -> (Either a HWType) -> VerilogM Doc
 wireRegFileDoc _    (Right FileType) = "integer"
-wireRegFileDoc Wire _                = "wire"
-wireRegFileDoc Reg  _                = "reg"
+wireRegFileDoc ()   _                = error "wireRegFileDoc: TODO"
 
 verilogType :: HWType -> VerilogM Doc
 verilogType t = case t of
@@ -364,8 +366,8 @@ renderAttr (BoolAttr'    key False) = pack $ concat [key, " = ", "0"]
 renderAttr (Attr'        key      ) = pack $ key
 
 decl :: Declaration -> VerilogM (Maybe Doc)
-decl (NetDecl' noteM wr id_ tyE iEM) =
-  Just A.<$> maybe id addNote noteM (addAttrs attrs (wireRegFileDoc wr tyE <+> tyDec tyE))
+decl (NetDecl' noteM id_ tyE iEM) =
+  Just A.<$> maybe id addNote noteM (addAttrs attrs (wireRegFileDoc () tyE <+> tyDec tyE))
   where
     tyDec (Left  ty) = stringS ty <+> pretty id_ <> iE
     tyDec (Right ty) = sigDecl (pretty id_) ty <> iE

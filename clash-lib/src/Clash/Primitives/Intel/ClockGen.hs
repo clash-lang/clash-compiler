@@ -91,7 +91,7 @@ alteraPllTemplate bbCtx = do
 
  getAp $ blockDecl alteraPll $ concat
   [[ NetDecl Nothing locked Bit
-   , NetDecl' Nothing Reg pllLock (Right Bool) Nothing]
+   , NetDecl Nothing pllLock Bool]
   ,[ NetDecl Nothing clkNm ty | (clkNm,ty) <- zip clocks tys]
   ,[ InstDecl Comp Nothing [] compName alteraPll_inst [] $ NamedPortMap $ concat
       [ [ (instPort "refclk", In, clkTy, clk)
@@ -130,7 +130,7 @@ altpllTemplate bbCtx = do
 
  getAp $ blockDecl alteraPll
   [ NetDecl Nothing locked  Bit
-  , NetDecl' Nothing Reg pllLock (Right Bool) Nothing
+  , NetDecl Nothing pllLock Bool
   , NetDecl Nothing pllOut clkOutTy
   , InstDecl Comp Nothing [] compName alteraPll_inst [] $ NamedPortMap $
       [ (instPort "clk", In, clkTy, clk)

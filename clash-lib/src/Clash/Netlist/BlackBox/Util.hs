@@ -395,7 +395,7 @@ renderElem b (Component (Decl n subN (l:ls))) = do
       errr = concat [ "renderElem: not enough functions rendered? Needed "
                     , show (subN +1 ), " got only ", show (length (fromJust func0)) ]
       func1 = indexNote' errr subN <$> func0
-      Just (templ0,_,libs,imps,inc,pCtx) = func1
+      Just (templ0,libs,imps,inc,pCtx) = func1
       b' = pCtx { bbResults = [(o,oTy)], bbInputs = bbInputs pCtx ++ is }
       layoutOptions = LayoutOptions (AvailablePerLine 120 0.4)
       render = N.BBTemplate . parseFail . renderLazy . layoutPretty layoutOptions

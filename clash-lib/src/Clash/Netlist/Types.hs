@@ -223,7 +223,7 @@ data Component
   = Component
   { componentName :: !Identifier -- ^ Name of the component
   , inputs        :: [(Identifier,HWType)] -- ^ Input ports
-  , outputs       :: [(WireOrReg,(Identifier,HWType),Maybe Expr)] -- ^ Output ports
+  , outputs       :: [((Identifier,HWType),Maybe Expr)] -- ^ Output ports
   , declarations  :: [Declaration] -- ^ Internal declarations
   , componentVoids :: [Bool]
   , componentLoc :: SrcSpan
@@ -307,7 +307,6 @@ data Declaration
   -- | Signal declaration
   | NetDecl'
       (Maybe Comment)                -- ^ Note; will be inserted as a comment in target hdl
-      WireOrReg                      -- ^ Wire or register
       !Identifier                    -- ^ Name of signal
       (Either IdentifierText HWType) -- ^ Pointer to type of signal or type of signal
       (Maybe Expr)                   -- ^ Initial value
@@ -353,11 +352,6 @@ data Seq
 data EntityOrComponent = Entity | Comp | Empty
   deriving Show
 
-data WireOrReg = Wire | Reg
-  deriving (Show,Generic)
-
-instance NFData WireOrReg
-
 pattern NetDecl
   :: Maybe Comment
   -- ^ Note; will be inserted as a comment in target hdl
@@ -366,9 +360,9 @@ pattern NetDecl
   -> HWType
   -- ^ Type of signal
   -> Declaration
-pattern NetDecl note d ty <- NetDecl' note Wire d (Right ty) _
+pattern NetDecl note d ty <- NetDecl' note d (Right ty) _
   where
-    NetDecl note d ty = NetDecl' note Wire d (Right ty) Nothing
+    NetDecl note d ty = NetDecl' note d (Right ty) Nothing
 
 
 instance NFData Declaration where
@@ -459,7 +453,6 @@ data BlackBoxContext
   , bbInputs :: [(Expr,HWType,Bool)]
   -- ^ Argument names, types, and whether it is a literal
   , bbFunctions :: IntMap [(Either BlackBox (Identifier,[Declaration])
-                          ,WireOrReg
                           ,[BlackBoxTemplate]
                           ,[BlackBoxTemplate]
                           ,[((Text,Text),BlackBox)]

@@ -31,7 +31,6 @@ import           Data.Bifunctor                   (first, second)
 import           Data.Char                        (ord)
 import           Data.Either                      (partitionEithers, rights)
 import           Data.Foldable                    (foldlM)
-import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (elemIndex, partition, sortOn)
 import           Data.List.Extra                  (zipEqual)
 import           Data.Maybe
@@ -55,7 +54,7 @@ import           Outputable                       (ppr, showSDocUnsafe)
 import           SrcLoc                           (isGoodSrcSpan)
 #endif
 
-import           Clash.Annotations.Primitive      (extractPrim, HDL)
+import           Clash.Annotations.Primitive      (HDL)
 import           Clash.Annotations.BitRepresentation.ClashLib
   (coreToType')
 import           Clash.Annotations.BitRepresentation.Internal
@@ -305,17 +304,17 @@ genComponentT compName0 componentExpr = do
 
   case resultM of
     Just result -> do
-      [NetDecl' _ rw _ _ rIM] <- case filter ((==result) . fst) binders of
+      [NetDecl' _ _ _ rIM] <- case filter ((==result) . fst) binders of
         b:_ -> mkNetDecl b
         _ -> error "internal error: couldn't find result binder"
 
       let (compOutps',resUnwrappers') = case compOutps of
-            [oport] -> ([(rw,oport,rIM)],resUnwrappers)
+            [oport] -> ([(oport,rIM)],resUnwrappers)
             _       -> let NetDecl n res resTy = case resUnwrappers of
                              decl:_ -> decl
                              _ -> error "internal error: insufficient resUnwrappers"
-                       in  (map (Wire,,Nothing) compOutps
-                           ,NetDecl' n rw res (Right resTy) Nothing:tail resUnwrappers
+                       in  (map (,Nothing) compOutps
+                           ,NetDecl' n res (Right resTy) Nothing:tail resUnwrappers
                            )
 
       pure $ Component compName1 compInps compOutps'
@@ -345,18 +344,15 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
         mpInfo = multiPrimInfo' tcm pInfo
         (_, res) = splitMultiPrimArgs mpInfo args0
         netdecl i typ resInit =
-          -- TODO: Dehardcode Wire. Would entail changing 'outputReg' to a
-          -- list.
-          NetDecl' srcNote Wire (id2identifier i) (Right typ) resInit
+          NetDecl' srcNote (id2identifier i) (Right typ) resInit
 
       hwTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) (mpi_resultTypes mpInfo)
       pure (zipWith3 netdecl res hwTys resInits1)
 
 
     singleDecl hwTy = do
-      wr <- termToWireOrReg tm
       rIM <- listToMaybe <$> getResInits (id_, tm)
-      return (NetDecl' srcNote wr (id2identifier id_) (Right hwTy) rIM)
+      return (NetDecl' srcNote (id2identifier id_) (Right hwTy) rIM)
 
     addSrcNote loc
       | isGoodSrcSpan loc = Just (StrictText.pack (showSDocUnsafe (ppr loc)))
@@ -376,23 +372,6 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
       | isVoid ty = False
       | isMultiPrimSelect t = False
       | otherwise = True
-
-    termToWireOrReg :: Term -> NetlistMonad WireOrReg
-    termToWireOrReg (stripTicks -> Case scrut _ alts0@(_:_:_)) = do
-      tcm <- Lens.use tcCache
-      let scrutTy = inferCoreTypeOf tcm scrut
-      scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
-      ite <- Lens.use backEndITE
-      case iteAlts scrutHTy alts0 of
-        Just _ | ite -> return Wire
-        _ -> return Reg
-    termToWireOrReg (collectArgs -> (Prim p,_)) = do
-      bbM <- HashMap.lookup (primName p) <$> Lens.use primitives
-      case bbM of
-        Just (extractPrim -> Just BlackBox {..}) | outputReg -> return Reg
-        _ | primName p == "Clash.Explicit.SimIO.mealyIO" -> return Reg
-        _ -> return Wire
-    termToWireOrReg _ = return Wire
 
     -- Set the initialization value of a signal when a primitive wants to set it
     getResInits :: (Id, Term) -> NetlistMonad [Expr]
@@ -753,7 +732,7 @@ mkFunApp dstId fun args tickDecls = do
             argTypeExprs = zip argHWTys (zip argExprs argTys)
             filteredTypeExprs = fmap snd $ filter (not . isVoidMaybe True . fst) argTypeExprs
 
-          let compOutp = (\(_,x,_) -> x) <$> listToMaybe co
+          let compOutp = fst <$> listToMaybe co
           if length filteredTypeExprs == length compInps
             then do
               (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dstId) filteredTypeExprs
@@ -884,16 +863,9 @@ mkExpr bbEasD declType bndr app =
             return (Noop, decls)
           else
             return ( Identifier argNm Nothing
-                   , NetDecl' Nothing Wire argNm (Right hwTyA) Nothing:decls)
+                   , NetDecl' Nothing argNm (Right hwTyA) Nothing:decls)
     Case scrut ty' [alt] -> mkProjection bbEasD bndr scrut ty' alt
     Case scrut tyA alts -> do
-      tcm <- Lens.use tcCache
-      let scrutTy = inferCoreTypeOf tcm scrut
-      scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
-      ite <- Lens.use backEndITE
-      let wr = case iteAlts scrutHTy alts of
-                 Just _ | ite -> Wire
-                 _ -> Reg
       argNm <- Id.suffix (netlistId1 id id2identifier bndr) "sel_arg"
       decls  <- mkSelection declType (NetlistId argNm (netlistTypes1 bndr))
                             scrut tyA alts tickDecls
@@ -901,7 +873,7 @@ mkExpr bbEasD declType bndr app =
         return (Noop, decls)
       else
         return ( Identifier argNm Nothing
-               , NetDecl' Nothing wr argNm (Right hwTyA) Nothing:decls)
+               , NetDecl' Nothing argNm (Right hwTyA) Nothing:decls)
     Letrec binders body -> do
       netDecls <- concatMapM mkNetDecl binders
       decls    <- concatMapM (uncurry mkDeclarations) binders

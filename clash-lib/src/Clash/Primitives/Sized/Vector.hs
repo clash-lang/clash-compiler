@@ -16,7 +16,6 @@ import           Control.Monad                      (replicateM)
 import           Control.Monad.State                (State, zipWithM)
 import qualified Control.Lens                       as Lens
 import           Data.Either                        (rights)
-import qualified Data.IntMap                        as IntMap
 import           Data.List.Extra                    (iterateNM)
 import           Data.Maybe                         (fromMaybe)
 import           Data.Monoid                        (Ap(getAp))
@@ -46,9 +45,8 @@ import           Clash.Netlist.Id (Identifier)
 import           Clash.Netlist.Types
   (TemplateFunction, BlackBoxContext,
    Declaration(..), Expr(Literal, Identifier,DataCon), Literal(NumLit),
-   BlackBox(BBTemplate, BBFunction), TemplateFunction(..), WireOrReg(Wire),
-   Modifier(Indexed, Nested, DC), bbInputs, bbResults, emptyBBContext, tcCache,
-   bbFunctions)
+   BlackBox(BBTemplate, BBFunction), TemplateFunction(..),
+   Modifier(Indexed, Nested, DC), bbInputs, bbResults, emptyBBContext, tcCache)
 import qualified Clash.Netlist.Id                   as Id
 import qualified Clash.Primitives.DSL               as Prim
 import           Clash.Primitives.DSL
@@ -143,7 +141,7 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
   vecIds <- replicateM n (Id.next baseId)
 
   vecId <- Id.make "vec"
-  let vecDecl = sigDecl vecType Wire vecId
+  let vecDecl = sigDecl vecType vecId
       vecAssign = Assignment vecId vec
       elemAssigns = zipWith Assignment vecIds (map (iIndex vecId) [0..])
       resultId =
@@ -156,11 +154,7 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
   (concat -> fCalls, result) <- mkTree 1 vecIds
 
   let intermediateResultIds = concatMap (\(FCall l r _) -> [l, r]) fCalls
-      wr = case IntMap.lookup 0 (bbFunctions bbCtx) of
-             Just ((_,rw,_,_,_,_):_) -> rw
-             _ -> error "internal error"
-      sigDecls = zipWith (sigDecl aTy) (wr:replicate n Wire ++ repeat wr)
-                                       (result : intermediateResultIds)
+      sigDecls = fmap (sigDecl aTy) (result : intermediateResultIds)
       resultAssign = Assignment resultId (Identifier result Nothing)
 
   callDecls <- zipWithM callDecl [0..] fCalls
@@ -230,8 +224,8 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
     pure ([], rest)
 
   -- Simple wire without comment
-  sigDecl :: HWType -> WireOrReg -> Identifier -> Declaration
-  sigDecl typ rw nm = NetDecl' Nothing rw nm (Right typ) Nothing
+  sigDecl :: HWType -> Identifier -> Declaration
+  sigDecl typ nm = NetDecl' Nothing nm (Right typ) Nothing
 
   -- Index the intermediate vector. This uses a hack in Clash: the 10th
   -- constructor of Vec doesn't exist; using it will be interpreted by the

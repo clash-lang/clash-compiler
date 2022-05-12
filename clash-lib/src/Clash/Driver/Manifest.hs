@@ -339,7 +339,7 @@ mkManifest backend domains ClashOpts{..} Component{..} components deps files top
     [mkManifestPort backend pName pType InOut | p@(pName, pType) <- inputs, Netlist.isBiDirectional p]
 
   outPorts =
-    [mkManifestPort backend pName pType Out | (_, (pName, pType), _) <- outputs]
+    [mkManifestPort backend pName pType Out | ((pName, pType), _) <- outputs]
 
 -- | Pretty print an unexpected modification as a list item.
 pprintUnexpectedModification :: UnexpectedModification -> String

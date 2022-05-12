@@ -27,8 +27,7 @@ import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types
   (BlackBox(BBFunction), TemplateFunction(..), BlackBoxContext,
    NetlistMonad, Declaration(Assignment, NetDecl'),
-   WireOrReg(Wire), NetlistId(..),
-   DeclarationType(Concurrent), tcCache, bbInputs, Expr(Identifier))
+   NetlistId(..), DeclarationType(Concurrent), tcCache, bbInputs, Expr(Identifier))
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TDecl), RenderVoid(..),
    emptyBlackBoxMeta)
@@ -81,7 +80,7 @@ checkBBF _isD _primName args _ty =
 
   -- Simple wire without comment
   sigDecl :: HWType -> Identifier -> Declaration
-  sigDecl typ nm = NetDecl' Nothing Wire nm (Right typ) Nothing
+  sigDecl typ nm = NetDecl' Nothing nm (Right typ) Nothing
 
 checkTF
   :: [Declaration]

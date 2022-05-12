@@ -36,7 +36,7 @@ testPath :: FilePath
 testPath = "tests/shouldwork/TopEntity/T1182A.hs"
 
 assertInputs :: N.HWType -> N.Component -> IO ()
-assertInputs expType (N.Component _ [(clk,N.Clock _)] [(N.Wire,(ssan,actType),Nothing)] ds _ _ _)
+assertInputs expType (N.Component _ [(clk,N.Clock _)] [((ssan,actType),Nothing)] ds _ _ _)
   | Id.toText clk == T.pack "CLK"
   , Id.toText ssan == T.pack "SS_AN"
   = pure ()

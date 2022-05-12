@@ -245,7 +245,7 @@ instance Backend VHDLState where
   blockDecl nm ds = do
     decs <- decls ds
     let attrs = [ (id_, attr)
-                | NetDecl' _ _ id_ (Right hwtype) _ <- ds
+                | NetDecl' _ id_ (Right hwtype) _ <- ds
                 , attr <- hwTypeAttrs hwtype]
     if isEmpty decs
        then insts ds
@@ -922,14 +922,14 @@ entity c = do
       )
   where
     ports l = sequence $ [port iName hwType "in" l Nothing | (iName, hwType) <- inputs c]
-                      ++ [port oName hwType "out" l iEM | (_, (oName, hwType), iEM) <- outputs c]
+                      ++ [port oName hwType "out" l iEM | ((oName, hwType), iEM) <- outputs c]
 
     rports p = "port" <> (parens (align (vcat (punctuate semi (pure p))))) <> semi
 
     rattrs      = renderAttrs (TextS.pack "signal") attrs
     attrs       = inputAttrs ++ outputAttrs
     inputAttrs  = [(id_, attr) | (id_, hwtype) <- inputs c, attr <- hwTypeAttrs hwtype]
-    outputAttrs = [(id_, attr) | (_wireOrReg, (id_, hwtype), _) <- outputs c, attr <- hwTypeAttrs hwtype]
+    outputAttrs = [(id_, attr) | ((id_, hwtype), _) <- outputs c, attr <- hwTypeAttrs hwtype]
 
 
 architecture :: Component -> VHDLM Doc
@@ -950,13 +950,13 @@ architecture c = do {
   }
  where
    netdecls    = filter isNetDecl (declarations c)
-   declAttrs   = [(id_, attr) | NetDecl' _ _ id_ (Right hwtype) _ <- netdecls, attr <- hwTypeAttrs hwtype]
+   declAttrs   = [(id_, attr) | NetDecl' _ id_ (Right hwtype) _ <- netdecls, attr <- hwTypeAttrs hwtype]
    inputAttrs  = [(id_, attr) | (id_, hwtype) <- inputs c, attr <- hwTypeAttrs hwtype]
-   outputAttrs = [(id_, attr) | (_wireOrReg, (id_, hwtype), _) <- outputs c, attr <- hwTypeAttrs hwtype]
+   outputAttrs = [(id_, attr) | ((id_, hwtype), _) <- outputs c, attr <- hwTypeAttrs hwtype]
 
    isNetDecl :: Declaration -> Bool
-   isNetDecl (NetDecl' _ _ _ (Right _) _) = True
-   isNetDecl _                            = False
+   isNetDecl (NetDecl' _ _ (Right _) _) = True
+   isNetDecl _                          = False
 
 attrType
   :: t ~ HashMap T.Text T.Text
@@ -1349,7 +1349,7 @@ decls ds = do
       _  -> vcat (pure dsDoc)
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
-decl l (NetDecl' noteM _ id_ ty iEM) = Just <$> (,fromIntegral (TextS.length (Id.toText id_))) <$>
+decl l (NetDecl' noteM id_ ty iEM) = Just <$> (,fromIntegral (TextS.length (Id.toText id_))) <$>
   maybe id addNote noteM ("signal" <+> fill l (pretty id_) <+> colon <+> either pretty sizedQualTyName ty <> iE <> semi)
   where
     addNote n = mappend ("--" <+> pretty n <> line)

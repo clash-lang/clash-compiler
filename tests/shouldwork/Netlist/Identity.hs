@@ -22,7 +22,7 @@ assertAssignsInOut (Component _ [i] [o] ds _ _ _) =
   case ds of
     [Assignment oName (Identifier iName Nothing)]
       | Id.toText iName == Id.toText (fst i)
-      , Id.toText oName == Id.toText (fst ((\(_,x,_) -> x) o))
+      , Id.toText oName == Id.toText (fst (fst o))
       -> return ()
       | otherwise -> P.error [I.i|
           Incorrect input/output names:

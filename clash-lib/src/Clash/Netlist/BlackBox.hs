@@ -847,7 +847,7 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
           (netDeclsInit,initDeclsOther)   = partition isNet initDecls
       -- All assignments happens within a sequential block, so the nets need to
       -- be of type 'reg' in Verilog nomenclature
-      let netDeclsSeq1 = map toReg (netDeclsSeq ++ netDeclsSeqMisc ++ netDeclsInit)
+      let netDeclsSeq1 = netDeclsSeq ++ netDeclsSeqMisc ++ netDeclsInit
 
       -- We run mealy block in the opposite clock edge of the the ambient system
       -- because we're basically clocked logic; so we need to have our outputs
@@ -876,9 +876,6 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
  where
   isNet NetDecl' {} = True
   isNet _ = False
-
-  toReg (NetDecl' cmM _ r ty eM) = NetDecl' cmM Reg r ty eM
-  toReg d = d
 
 collectMealy _ _ _ _ = error "internal error"
 
@@ -983,7 +980,6 @@ mkFunInput
   -- ^ The function argument term
   -> NetlistMonad
       ((Either BlackBox (Identifier,[Declaration])
-       ,WireOrReg
        ,[BlackBoxTemplate]
        ,[BlackBoxTemplate]
        ,[((TextS.Text,TextS.Text),BlackBox)]
@@ -1042,7 +1038,7 @@ mkFunInput resId e =
                   let nonVoidArgI = fromJust (elemIndex False areVoids)
                   let arg = Id.unsafeMake (TextS.concat ["~ARG[", showt nonVoidArgI, "]"])
                   let assign = Assignment (Id.unsafeMake "~RESULT") (Identifier arg Nothing)
-                  return (Right ((Id.unsafeMake "", tickDecls ++ [assign]), Wire))
+                  return (Right (Id.unsafeMake "", tickDecls ++ [assign]))
 
                 -- Because we filter void constructs, the argument indices and
                 -- the field indices don't necessarily correspond anymore. We
@@ -1057,7 +1053,7 @@ mkFunInput resId e =
                       dcInps    = [Identifier (mkArg x) Nothing | x <- originalIndices areVoids1]
                       dcApp     = DataCon resHTy (DC (resHTy,dcI)) dcInps
                       dcAss     = Assignment (Id.unsafeMake "~RESULT") dcApp
-                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]),Wire))
+                  return (Right (Id.unsafeMake "",tickDecls ++ [dcAss]))
 
                 -- CustomSP the same as SP, but with a user-defined bit
                 -- level representation
@@ -1069,7 +1065,7 @@ mkFunInput resId e =
                       dcInps    = [Identifier (mkArg x) Nothing | x <- originalIndices areVoids1]
                       dcApp     = DataCon resHTy (DC (resHTy,dcI)) dcInps
                       dcAss     = Assignment (Id.unsafeMake "~RESULT") dcApp
-                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]),Wire))
+                  return (Right (Id.unsafeMake "",tickDecls ++ [dcAss]))
 
                 -- Like SP, we have to retrieve the index BEFORE filtering voids
                 Just (resHTy@(Product _ _ _), areVoids1:_) -> do
@@ -1077,7 +1073,7 @@ mkFunInput resId e =
                       dcInps    = [ Identifier (mkArg x) Nothing | x <- originalIndices areVoids1]
                       dcApp     = DataCon resHTy (DC (resHTy,0)) dcInps
                       dcAss     = Assignment (Id.unsafeMake "~RESULT") dcApp
-                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]),Wire))
+                  return (Right (Id.unsafeMake "",tickDecls ++ [dcAss]))
 
                 -- Vectors never have defined areVoids (or all set to False), as
                 -- it would be converted to Void otherwise. We can therefore
@@ -1087,21 +1083,21 @@ mkFunInput resId e =
                       dcInps = [ Identifier (mkArg x) Nothing | x <- [(1::Int)..2] ]
                       dcApp  = DataCon resHTy (DC (resHTy,1)) dcInps
                       dcAss  = Assignment (Id.unsafeMake "~RESULT") dcApp
-                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]),Wire))
+                  return (Right (Id.unsafeMake "",tickDecls ++ [dcAss]))
 
                 -- Sum types OR a Sum type after filtering empty types:
                 Just (resHTy@(Sum _ _), _areVoids) -> do
                   let dcI   = dcTag dc - 1
                       dcApp = DataCon resHTy (DC (resHTy,dcI)) []
                       dcAss = Assignment (Id.unsafeMake "~RESULT") dcApp
-                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]),Wire))
+                  return (Right (Id.unsafeMake "",tickDecls ++ [dcAss]))
 
                 -- Same as Sum, but with user defined bit level representation
                 Just (resHTy@(CustomSum {}), _areVoids) -> do
                   let dcI   = dcTag dc - 1
                       dcApp = DataCon resHTy (DC (resHTy,dcI)) []
                       dcAss = Assignment (Id.unsafeMake "~RESULT") dcApp
-                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]),Wire))
+                  return (Right (Id.unsafeMake "",tickDecls ++ [dcAss]))
 
                 Just (Void {}, _areVoids) ->
                   return (error $ $(curLoc) ++ "Encountered Void in mkFunInput."
@@ -1117,7 +1113,7 @@ mkFunInput resId e =
                   normalized <- Lens.use bindings
                   case lookupVarEnv fun normalized of
                     Just _ -> do
-                      N.Component compName compInps [(_,compOutp,_)] _ voids _ _ <-
+                      N.Component compName compInps [(compOutp,_)] _ voids _ _ <-
                         preserveVarEnv $ genComponent fun
 
                       let
@@ -1134,30 +1130,30 @@ mkFunInput resId e =
                       let
                         portMap = NamedPortMap (outpAssign:inpAssigns)
                         instDecl = InstDecl Entity Nothing [] compName instLabel [] portMap
-                      return (Right ((Id.unsafeMake "",tickDecls ++ [instDecl]),Wire))
+                      return (Right (Id.unsafeMake "",tickDecls ++ [instDecl]))
                     Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
             C.Lam {} -> do
               let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet appE)
-              either Left (Right . first (second (tickDecls ++))) <$> go is0 0 appE
+              second (second (tickDecls ++)) <$> go is0 0 appE
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
   let pNm = case appE of
               Prim p -> primName p
               _ -> "__INTERNAL__"
   (bbCtx,dcls) <- mkBlackBoxContext pNm [resId] args
   case templ of
-    Left (TDecl,oreg,libs,imps,inc,_,templ') -> do
+    Left (TDecl,_,libs,imps,inc,_,templ') -> do
       (l',templDecl)
         <- onBlackBox
             (fmap (first BBTemplate) . setSym bbCtx)
             (\bbName bbHash bbFunc -> pure $ (BBFunction bbName bbHash bbFunc, []))
             templ'
-      return ((Left l',if oreg then Reg else Wire,libs,imps,inc,bbCtx),dcls ++ templDecl)
+      return ((Left l',libs,imps,inc,bbCtx),dcls ++ templDecl)
     Left (TExpr,_,libs,imps,inc,nm,templ') -> do
       onBlackBox
         (\t -> do t' <- getAp (prettyBlackBox t)
                   let t'' = Id.unsafeMake (Text.toStrict t')
                       assn = Assignment (Id.unsafeMake "~RESULT") (Identifier t'' Nothing)
-                  return ((Right (Id.unsafeMake "",[assn]),Wire,libs,imps,inc,bbCtx),dcls))
+                  return ((Right (Id.unsafeMake "",[assn]),libs,imps,inc,bbCtx),dcls))
         (\bbName bbHash (TemplateFunction k g _) -> do
           let f' bbCtx' = do
                 let assn = Assignment (Id.unsafeMake "~RESULT")
@@ -1165,7 +1161,6 @@ mkFunInput resId e =
                 p <- getAp (Backend.blockDecl (Id.unsafeMake "") [assn])
                 return p
           return ((Left (BBFunction bbName bbHash (TemplateFunction k g f'))
-                  ,Wire
                   ,[]
                   ,[]
                   ,[]
@@ -1175,8 +1170,8 @@ mkFunInput resId e =
                  )
         )
         templ'
-    Right (decl,wr) ->
-      return ((Right decl,wr,[],[],[],bbCtx),dcls)
+    Right decl ->
+      return ((Right decl,[],[],[],bbCtx),dcls)
   where
     goExpr app@(collectArgsTicks -> (C.Var fun,args@(_:_),ticks)) = do
       tcm <- Lens.use tcCache
@@ -1190,7 +1185,7 @@ mkFunInput resId e =
             let assn = [ Assignment (Id.unsafeMake "~RESULT") (Identifier resNm Nothing)
                        , NetDecl Nothing resNm resTy ]
             nm <- Id.makeBasic "block"
-            return (Right ((nm,assn++appDecls),Wire))
+            return (Right (nm,assn++appDecls))
         else do
           (_,sp) <- Lens.use curCompNm
           throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
@@ -1202,7 +1197,7 @@ mkFunInput resId e =
       nm <- if null appDecls
                then return (Id.unsafeMake "")
                else Id.makeBasic "block"
-      return (Right ((nm,appDecls ++ [assn]),Wire))
+      return (Right (nm,appDecls ++ [assn]))
 
     go is0 n (Lam id_ e') = do
       lvl <- Lens.use curBBlvl
@@ -1216,7 +1211,7 @@ mkFunInput resId e =
 
     go _ _ (C.Var v) = do
       let assn = Assignment (Id.unsafeMake "~RESULT") (Identifier (id2identifier v) Nothing)
-      return (Right ((Id.unsafeMake "",[assn]),Wire))
+      return (Right (Id.unsafeMake "",[assn]))
 
     go _ _ (Case scrut ty [alt]) = do
       tcm <- Lens.use tcCache
@@ -1226,27 +1221,19 @@ mkFunInput resId e =
       nm <- if null decls
                then return (Id.unsafeMake "")
                else Id.makeBasic "projection"
-      return (Right ((nm,decls ++ [assn]),Wire))
+      return (Right (nm,decls ++ [assn]))
 
     go _ _ (Case scrut ty alts@(_:_:_)) = do
-      tcm <- Lens.use tcCache
-      let scrutTy = inferCoreTypeOf tcm scrut
-      scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
-      ite <- Lens.use backEndITE
-      let wr = case iteAlts scrutHTy alts of
-                 Just _ | ite -> Wire
-                 _ -> Reg
-
       resNm <- Id.make "result"
       -- It's safe to use 'mkUnsafeSystemName' here: only the name, not the
       -- unique, will be used
       let resId'  = NetlistId resNm ty
       selectionDecls <- mkSelection Concurrent resId' scrut ty alts []
       resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
-      let assn = [ NetDecl' Nothing wr resNm (Right resTy) Nothing
+      let assn = [ NetDecl Nothing resNm resTy
                  , Assignment (Id.unsafeMake "~RESULT") (Identifier resNm Nothing) ]
       nm <- Id.makeBasic "selection"
-      return (Right ((nm,assn++selectionDecls),Wire))
+      return (Right (nm,assn++selectionDecls))
 
     go is0 _ e'@(Let{}) = do
       tcm <- Lens.use tcCache
@@ -1267,8 +1254,8 @@ mkFunInput resId e =
           -- creates "useless" assignments. We should investigate whether we can
           -- get the old behavior back.
           let resDecl = Assignment (Id.unsafeMake "~RESULT") (Identifier resultId Nothing)
-          return (Right ((nm,resDecl:netDecls ++ decls),Wire))
-        Nothing -> return (Right ((Id.unsafeMake "",[]),Wire))
+          return (Right (nm,resDecl:netDecls ++ decls))
+        Nothing -> return (Right (Id.unsafeMake "",[]))
 
     go is0 n (Tick _ e') = go is0 n e'
 
