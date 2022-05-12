@@ -10,7 +10,7 @@ import Test.Tasty.HUnit
 import Prelude ((=<<), ($))
 import Clash.Annotations.BitRepresentation
 import Clash.Annotations.BitRepresentation.Deriving
-import Clash.Tests.DerivingDataReprTypes (Train(..), RGB(..))
+import Clash.Tests.DerivingDataReprTypes (Train(..), RGB(..), Headphones(..), EarCup(..))
 import Data.Maybe (Maybe(..))
 
 ---------------------------------------------------------
@@ -29,6 +29,29 @@ oneHotOverlapRepr' =
     , ConstrRepr 'Maintenance 64  64  []
     , ConstrRepr 'Toy         128 128 []
     ]
+
+oneHotOverlapReprRec :: DataReprAnn
+oneHotOverlapReprRec = $( (simpleDerivator OneHot OverlapL) =<< [t| Headphones |] )
+
+oneHotOverlapReprRec' :: DataReprAnn
+oneHotOverlapReprRec' =
+  DataReprAnn
+    $(liftQ [t| Headphones |])
+    4
+    [ ConstrRepr 'InEar   4  4  [0b10]
+    , ConstrRepr 'OverEar 8  8  [0b11]
+    ]
+
+oneHotOverlapReprInfix :: DataReprAnn
+oneHotOverlapReprInfix = $( (simpleDerivator OneHot OverlapL) =<< [t| EarCup |] )
+
+oneHotOverlapReprInfix' :: DataReprAnn
+oneHotOverlapReprInfix' =
+  DataReprAnn
+    $(liftQ [t| EarCup |])
+    5
+    [ ConstrRepr '(:<>:) 16  16  [0b1100,0b0011] ]
+
 
 oneHotWideRepr :: DataReprAnn
 oneHotWideRepr = $( (simpleDerivator OneHot Wide) =<< [t| Train |] )
@@ -109,10 +132,12 @@ packedMaybeRGB' =
 -- MAIN
 tests :: TestTree
 tests = testGroup "DerivingDataRepr"
-  [ testCase "OneHotOverlap" $ oneHotOverlapRepr @?= oneHotOverlapRepr'
-  , testCase "OneHotWide"    $ oneHotWideRepr    @?= oneHotWideRepr'
-  , testCase "BinaryOverlap" $ countOverlapRepr  @?= countOverlapRepr'
-  , testCase "BinaryWide"    $ countWideRepr     @?= countWideRepr'
-  , testCase "Packed"        $ packedRepr        @?= packedRepr'
-  , testCase "PackedMaybe"   $ packedMaybeRGB    @?= packedMaybeRGB'
+  [ testCase "OneHotOverlap"      $ oneHotOverlapRepr      @?= oneHotOverlapRepr'
+  , testCase "OneHotOverlapRec"   $ oneHotOverlapReprRec   @?= oneHotOverlapReprRec'
+  , testCase "OneHotOverlapInfix" $ oneHotOverlapReprInfix @?= oneHotOverlapReprInfix'
+  , testCase "OneHotWide"         $ oneHotWideRepr         @?= oneHotWideRepr'
+  , testCase "BinaryOverlap"      $ countOverlapRepr       @?= countOverlapRepr'
+  , testCase "BinaryWide"         $ countWideRepr          @?= countWideRepr'
+  , testCase "Packed"             $ packedRepr             @?= packedRepr'
+  , testCase "PackedMaybe"        $ packedMaybeRGB         @?= packedMaybeRGB'
   ]
