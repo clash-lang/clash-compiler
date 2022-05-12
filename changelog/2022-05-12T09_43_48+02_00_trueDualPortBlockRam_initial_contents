@@ -1,0 +1,5 @@
+CHANGED: the `trueDualPortBlockRam` function now accepts a vector containing the
+initial block-RAM contents.
+ADDED: the function `trueDualPortBlockRamU` function was added which which
+initialises all RAM content to an undefined value. This is the same behaviour as
+the `trueDualPortBlockRam` function had before this change.
