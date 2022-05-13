@@ -10,7 +10,7 @@ include:
 variables:
   # Default GHC / Cabal version. Used for generating Haddock and releasing to
   # Hackage.
-  GHC_VERSION: 8.10.2
+  GHC_VERSION: 8.10.7
 
   # https://docs.gitlab.com/runner/executors/custom.html#system-failure
   GET_SOURCES_ATTEMPTS: 5
@@ -49,7 +49,7 @@ tests-8.8:
 tests-8.10:
   extends: .common-trigger
   variables:
-    GHC_VERSION: 8.10.2
+    GHC_VERSION: 8.10.7
 
 tests-9.0:
   extends: .common-trigger
@@ -61,7 +61,7 @@ stack-build:
   needs: []
   stage: test
   variables:
-    GHC_VERSION: 8.10.2
+    GHC_VERSION: 8.10.7
   script:
     - .ci/stack_build.sh
   # Run on shared runners
@@ -89,6 +89,8 @@ haddock:
   extends: .common
   needs: []
   stage: test
+  variables:
+    GHC_VERSION: 9.0.2
   artifacts:
     paths:
       - hadocs/*/*

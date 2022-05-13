@@ -1,5 +1,5 @@
 .benchmark:
-  image: ghcr.io/clash-lang/clash-ci-$GHC_VERSION:2022-02-02
+  image: ghcr.io/clash-lang/clash-ci-$GHC_VERSION:2022-05-10
   stage: test
   timeout: 2 hours
   variables:
@@ -19,7 +19,7 @@
       - runner_system_failure
       - stuck_or_timeout_failure
   cache:
-    key: cabal-store-$CI_JOB_NAME.bump1
+    key: cabal-store-$CI_JOB_NAME-$CI_JOB_IMAGE
     when: always
     paths:
       - cabal-store/
