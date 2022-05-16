@@ -60,33 +60,35 @@ import Clash.Annotations.BitRepresentation.Util
 import qualified Clash.Annotations.BitRepresentation.Util
   as Util
 
-import           Clash.Annotations.Primitive (hasBlackBox)
+import           Clash.Annotations.Primitive  (hasBlackBox)
 import           Clash.Class.BitPack
   (BitPack, BitSize, pack, packXWith, unpack)
-import           Clash.Class.Resize         (resize)
-import           Language.Haskell.TH.Compat (mkTySynInstD)
-import           Clash.Sized.BitVector      (BitVector, low, (++#))
+import           Clash.Class.Resize           (resize)
+import           Language.Haskell.TH.Compat   (mkTySynInstD)
+import           Clash.Sized.BitVector        (BitVector, low, (++#))
 import           Clash.Sized.Internal.BitVector (undefined#)
-import           Control.DeepSeq            (NFData)
-import           Control.Monad              (forM)
+import           Control.Applicative          (liftA3)
+import           Control.DeepSeq              (NFData)
+import           Control.Monad                (forM)
 import           Data.Bits
   (shiftL, shiftR, complement, (.&.), (.|.), zeroBits, popCount, bit, testBit,
    Bits, setBit)
-import           Data.Data                  (Data)
-import           Data.Containers.ListUtils  (nubOrd)
+import           Data.Data                    (Data)
+import           Data.Containers.ListUtils    (nubOrd)
 import           Data.List
   (mapAccumL, zipWith4, sortOn, partition)
-import           Data.Typeable              (Typeable)
-import qualified Data.Map                   as Map
-import           Data.Maybe                 (fromMaybe)
-import qualified Data.Set                   as Set
-import           Data.Proxy                 (Proxy(..))
-import           GHC.Exts                   (Int(I#))
-import           GHC.Generics               (Generic)
-import           GHC.Integer.Logarithms     (integerLog2#)
-import           GHC.TypeLits               (natVal)
+import           Data.Typeable                (Typeable)
+import qualified Data.Map                     as Map
+import           Data.Maybe                   (fromMaybe)
+import qualified Data.Set                     as Set
+import           Data.Proxy                   (Proxy(..))
+import           GHC.Exts                     (Int(I#))
+import           GHC.Generics                 (Generic)
+import           GHC.Integer.Logarithms       (integerLog2#)
+import           GHC.TypeLits                 (natVal)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
+import           Language.Haskell.TH.Datatype (resolveTypeSynonyms)
 
 -- | Used to track constructor bits in packed derivation
 data BitMaskOrigin
@@ -449,8 +451,10 @@ deriveDataRepr constrDerivator fieldsDerivator typ = do
                           constrMasks
                           constrValues
 
+      resolvedType <- resolveTypeSynonyms typ
+
       letE decls [| DataReprAnn
-          $(liftQ $ return typ)
+          $(liftQ $ return resolvedType)
           ($dataSizeExp + constrSize)
           $(listE constrReprs) |]
     _ ->
@@ -781,8 +785,11 @@ derivePackedAnnotation = deriveAnnotation packedDerivator
 collectDataReprs :: Q [DataReprAnn]
 collectDataReprs = do
   thisMod <- thisModule
-  go [thisMod] Set.empty []
+  unresolved <- go [thisMod] Set.empty []
+  mapM resolveTyps unresolved
   where
+    resolveTyps (DataReprAnn t s c)
+      = liftA3 DataReprAnn (resolveTypeSynonyms t) (pure s) (pure c)
     go []     _visited acc = return acc
     go (x:xs) visited  acc
       | x `Set.member` visited = go xs visited acc
@@ -983,8 +990,9 @@ deriveBitPack :: Q Type -> Q [Dec]
 deriveBitPack typQ = do
   anns <- collectDataReprs
   typ  <- typQ
+  rTyp <- resolveTypeSynonyms typ
 
-  ann <- case filter (\(DataReprAnn t _ _) -> t == typ) anns of
+  ann <- case filter (\(DataReprAnn t _ _) -> t == rTyp) anns of
               [a] -> return a
               []  -> fail "No custom bit annotation found."
               _   -> fail "Overlapping bit annotations found."
