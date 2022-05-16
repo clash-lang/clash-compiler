@@ -1,5 +1,6 @@
 {-|
 Copyright  :  (C) 2018, Google Inc.
+                  2022, LUMI GUIDE FIETSDETECTIE B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -15,12 +16,13 @@ module Clash.Annotations.BitRepresentation.ClashLib
   ) where
 
 import           Clash.Annotations.BitRepresentation.Internal
-  (Type'(AppTy',ConstTy',LitTy'))
+  (Type'(..))
 import qualified Clash.Annotations.BitRepresentation.Util as BitRepresentation
 import qualified Clash.Core.Type                          as C
 import           Clash.Core.Name                          (nameOcc)
 import qualified Clash.Netlist.Types                      as Netlist
 import           Clash.Util                               (curLoc)
+import qualified Data.Text as T                           (pack)
 
 -- Convert Core type to BitRepresentation type
 coreToType'
@@ -37,6 +39,8 @@ coreToType' (C.ConstTy (C.TyCon name)) =
   return $ ConstTy' (nameOcc name)
 coreToType' (C.LitTy (C.NumTy n)) =
   return $ LitTy' n
+coreToType' (C.LitTy (C.SymTy lit)) =
+  return $ SymLitTy' (T.pack lit)
 coreToType' e =
   Left $ $(curLoc) ++ "Unexpected type: " ++ show e
 

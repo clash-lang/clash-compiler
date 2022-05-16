@@ -1,0 +1,1 @@
+FIXED: Added support for symbols in types while deriving bit representation.
