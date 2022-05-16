@@ -93,6 +93,7 @@ thTypeToType' :: TH.Type -> Type'
 thTypeToType' ty = go ty
   where
     go (TH.ConT name')   = ConstTy' (thToText name')
+    go (TH.PromotedT name') = ConstTy' (thToText name')
     go (TH.AppT ty1 ty2) = AppTy' (go ty1) (go ty2)
     go (TH.LitT (TH.NumTyLit n)) = LitTy' n
     go (TH.LitT (TH.StrTyLit lit)) = SymLitTy' (Text.pack lit)
