@@ -81,10 +81,10 @@ trueDualPortBlockRamVerilog _isD _primName args _ty = return bb
         // Port A WriteFirst
         always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[7]) begin
             if(~ARG[8]) begin
-                ~SYM[1] <= ~SYM[0][~ARG[10]];
+                ~SYM[1] <= ~SYM[0][~IF~SIZE[~TYP[10]]~THEN~ARG[10]~ELSE0~FI];
                 if(~ARG[9]) begin
                     ~SYM[1] <= ~ARG[11];
-                    ~SYM[0][~ARG[10]] <= ~ARG[11];
+                    ~SYM[0][~IF~SIZE[~TYP[10]]~THEN~ARG[10]~ELSE0~FI] <= ~ARG[11];
                 end
             end
         end|]
@@ -92,9 +92,9 @@ trueDualPortBlockRamVerilog _isD _primName args _ty = return bb
         // Port A ReadFirst
             always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[7]) begin
                 if(~ARG[8]) begin
-                    ~SYM[1] <= ~SYM[0][~ARG[10]];
+                    ~SYM[1] <= ~SYM[0][~IF~SIZE[~TYP[10]]~THEN~ARG[10]~ELSE0~FI];
                     if(~ARG[9]) begin
-                        ~SYM[0][~ARG[10]] <= ~ARG[11];
+                        ~SYM[0][~IF~SIZE[~TYP[10]]~THEN~ARG[10]~ELSE0~FI] <= ~ARG[11];
                     end
                 end
             end|]
@@ -103,9 +103,9 @@ trueDualPortBlockRamVerilog _isD _primName args _ty = return bb
             always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[7]) begin
                 if(~ARG[8]) begin
                     if(~ARG[9]) begin
-                        ~SYM[0][~ARG[10]] <= ~ARG[11];
+                        ~SYM[0][~IF~SIZE[~TYP[10]]~THEN~ARG[10]~ELSE0~FI] <= ~ARG[11];
                     end else begin
-                        ~SYM[1] <= ~SYM[0][~ARG[10]];
+                        ~SYM[1] <= ~SYM[0][~IF~SIZE[~TYP[10]]~THEN~ARG[10]~ELSE0~FI];
                     end
                 end
             end|]
@@ -116,10 +116,10 @@ trueDualPortBlockRamVerilog _isD _primName args _ty = return bb
         // Port B WriteFirst
         always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[12]) begin
             if(~ARG[13]) begin
-                ~SYM[2] <= ~SYM[0][~ARG[15]];
+                ~SYM[2] <= ~SYM[0][~IF~SIZE[~TYP[15]]~THEN~ARG[15]~ELSE0~FI];
                 if(~ARG[14]) begin
                     ~SYM[2] <= ~ARG[16];
-                    ~SYM[0][~ARG[15]] <= ~ARG[16];
+                    ~SYM[0][~IF~SIZE[~TYP[15]]~THEN~ARG[15]~ELSE0~FI] <= ~ARG[16];
                 end
             end
         end|]
@@ -127,9 +127,9 @@ trueDualPortBlockRamVerilog _isD _primName args _ty = return bb
         // Port B ReadFirst
             always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[12]) begin
                 if(~ARG[13]) begin
-                    ~SYM[2] <= ~SYM[0][~ARG[15]];
+                    ~SYM[2] <= ~SYM[0][~IF~SIZE[~TYP[15]]~THEN~ARG[15]~ELSE0~FI];
                     if(~ARG[14]) begin
-                        ~SYM[0][~ARG[15]] <= ~ARG[16];
+                        ~SYM[0][~IF~SIZE[~TYP[15]]~THEN~ARG[15]~ELSE0~FI] <= ~ARG[16];
                     end
                 end
             end|]
@@ -138,9 +138,9 @@ trueDualPortBlockRamVerilog _isD _primName args _ty = return bb
             always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[12]) begin
                 if(~ARG[13]) begin
                     if(~ARG[14]) begin
-                        ~SYM[0][~ARG[15]] <= ~ARG[16];
+                        ~SYM[0][~IF~SIZE[~TYP[15]]~THEN~ARG[15]~ELSE0~FI] <= ~ARG[16];
                     end else begin
-                        ~SYM[2] <= ~SYM[0][~ARG[15]];
+                        ~SYM[2] <= ~SYM[0][~IF~SIZE[~TYP[15]]~THEN~ARG[15]~ELSE0~FI];
                     end
                 end
             end|]

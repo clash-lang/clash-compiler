@@ -1477,19 +1477,29 @@ trueDualPortBlockRamModel labelSlow wmSlow !_clkSlow enSlow weSlow addrSlow datS
 
       readWriteConflict label =
         deepErrorX $ "trueDualPortBlockRam " <> label <> ": conflicting read/write queries"
-      outSlow1 = case conflict of
-        Just Conflict{cfRWA=IsDefined True} ->
+      outSlow1 = case (conflict, wmSlow) of
+        (Just Conflict{cfRWA=IsDefined True}, _) ->
           readWriteConflict labelSlow
-        Just Conflict{cfRWA=IsX} ->
+        (Just Conflict{cfRWA=IsX}, _) ->
           readWriteConflict labelFast
-        _ -> fromMaybe (ram0 `Seq.index` addrSlow_) wroteA
+        (_, WriteFirst) ->
+          fromMaybe (ram0 `Seq.index` addrSlow_) wroteA
+        (_, ReadFirst) ->
+          ram0 `Seq.index` addrSlow_
+        _ -> -- (_, NoChange)
+          if weFast_ then prevFast else ram0 `Seq.index` addrSlow_
 
-      outFast1 = case conflict of
-        Just Conflict{cfRWB=IsDefined True} ->
+      outFast1 = case (conflict, wmFast) of
+        (Just Conflict{cfRWB=IsDefined True}, _) ->
           readWriteConflict labelSlow
-        Just Conflict{cfRWB=IsX} ->
+        (Just Conflict{cfRWB=IsX}, _) ->
           readWriteConflict labelFast
-        _ -> fromMaybe (ram0 `Seq.index` addrFast_) wroteB
+        (_, WriteFirst) ->
+          fromMaybe (ram0 `Seq.index` addrFast_) wroteB
+        (_, ReadFirst) ->
+          ram0 `Seq.index` addrFast_
+        _ -> -- (_, NoChange)
+          if weFast_ then prevFast else ram0 `Seq.index` addrFast_
 
       outSlow2 = if enSlow_ then outSlow1 else prevSlow
       outFast2 = if enFast_ then outFast1 else prevFast
