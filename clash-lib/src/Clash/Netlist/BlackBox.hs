@@ -4,6 +4,7 @@
                     2016-2017, Myrtle Software Ltd,
                     2017     , Google Inc.,
                     2021-2022, QBayLogic B.V.
+                    2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -1241,7 +1242,7 @@ mkFunInput resId e =
       let resId'  = NetlistId resNm ty
       selectionDecls <- mkSelection Concurrent resId' scrut ty alts []
       resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
-      let assn = [ NetDecl' Nothing wr resNm (Right resTy) Nothing
+      let assn = [ NetDecl' Nothing wr resNm resTy Nothing
                  , Assignment (Id.unsafeMake "~RESULT") (Identifier resNm Nothing) ]
       nm <- Id.makeBasic "selection"
       return (Right ((nm,assn++selectionDecls),Wire))

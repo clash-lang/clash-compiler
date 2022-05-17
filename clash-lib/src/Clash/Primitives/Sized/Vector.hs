@@ -1,5 +1,6 @@
 {-|
   Copyright   :  (C) 2020-2022 QBayLogic B.V.
+                     2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -230,7 +231,7 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
 
   -- Simple wire without comment
   sigDecl :: HWType -> WireOrReg -> Identifier -> Declaration
-  sigDecl typ rw nm = NetDecl' Nothing rw nm (Right typ) Nothing
+  sigDecl typ rw nm = NetDecl' Nothing rw nm typ Nothing
 
   -- Index the intermediate vector. This uses a hack in Clash: the 10th
   -- constructor of Vec doesn't exist; using it will be interpreted by the

@@ -3,6 +3,7 @@
                      2016-2017, Myrtle Software Ltd,
                      2017-2018, Google Inc.,
                      2021-2022, QBayLogic B.V.
+                     2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -290,7 +291,7 @@ genComponentT compName0 componentExpr = do
                              decl:_ -> decl
                              _ -> error "internal error: insufficient resUnwrappers"
                        in  (map (Wire,,Nothing) compOutps
-                           ,NetDecl' n rw res (Right resTy) Nothing:tail resUnwrappers
+                           ,NetDecl' n rw res resTy Nothing:tail resUnwrappers
                            )
           component      = Component compName1 compInps compOutps'
                              (netDecls ++ argWrappers ++ decls ++ resUnwrappers')
@@ -324,7 +325,7 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
         netdecl i typ resInit =
           -- TODO: Dehardcode Wire. Would entail changing 'outputReg' to a
           -- list.
-          NetDecl' srcNote Wire (id2identifier i) (Right typ) resInit
+          NetDecl' srcNote Wire (id2identifier i) typ resInit
 
       hwTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) (mpi_resultTypes mpInfo)
       pure (zipWith3 netdecl res hwTys resInits1)
@@ -333,7 +334,7 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
     singleDecl hwTy = do
       wr <- termToWireOrReg tm
       rIM <- listToMaybe <$> getResInits (id_, tm)
-      return (NetDecl' srcNote wr (id2identifier id_) (Right hwTy) rIM)
+      return (NetDecl' srcNote wr (id2identifier id_) hwTy rIM)
 
     addSrcNote loc
       | isGoodSrcSpan loc = Just (StrictText.pack (showSDocUnsafe (ppr loc)))
@@ -861,7 +862,7 @@ mkExpr bbEasD declType bndr app =
             return (Noop, decls)
           else
             return ( Identifier argNm Nothing
-                   , NetDecl' Nothing Wire argNm (Right hwTyA) Nothing:decls)
+                   , NetDecl' Nothing Wire argNm hwTyA Nothing:decls)
     Case scrut ty' [alt] -> mkProjection bbEasD bndr scrut ty' alt
     Case scrut tyA alts -> do
       tcm <- Lens.view tcCache
@@ -878,7 +879,7 @@ mkExpr bbEasD declType bndr app =
         return (Noop, decls)
       else
         return ( Identifier argNm Nothing
-               , NetDecl' Nothing wr argNm (Right hwTyA) Nothing:decls)
+               , NetDecl' Nothing wr argNm hwTyA Nothing:decls)
     Letrec binders body -> do
       netDecls <- concatMapM mkNetDecl binders
       decls    <- concatMapM (uncurry mkDeclarations) binders
