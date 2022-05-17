@@ -2,6 +2,7 @@
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
                      2021-2022, QBayLogic B.V.
+                     2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -242,7 +243,7 @@ instance Backend VHDLState where
   blockDecl nm ds = do
     decs <- decls ds
     let attrs = [ (id_, attr)
-                | NetDecl' _ _ id_ (Right hwtype) _ <- ds
+                | NetDecl' _ _ id_ hwtype _ <- ds
                 , attr <- hwTypeAttrs hwtype]
     if isEmpty decs
        then insts ids
@@ -956,13 +957,13 @@ architecture c = do {
   }
  where
    netdecls    = filter isNetDecl (declarations c)
-   declAttrs   = [(id_, attr) | NetDecl' _ _ id_ (Right hwtype) _ <- netdecls, attr <- hwTypeAttrs hwtype]
+   declAttrs   = [(id_, attr) | NetDecl' _ _ id_ hwtype _ <- netdecls, attr <- hwTypeAttrs hwtype]
    inputAttrs  = [(id_, attr) | (id_, hwtype) <- inputs c, attr <- hwTypeAttrs hwtype]
    outputAttrs = [(id_, attr) | (_wireOrReg, (id_, hwtype), _) <- outputs c, attr <- hwTypeAttrs hwtype]
 
    isNetDecl :: Declaration -> Bool
-   isNetDecl (NetDecl' _ _ _ (Right _) _) = True
-   isNetDecl _                            = False
+   isNetDecl NetDecl'{} = True
+   isNetDecl _          = False
 
 attrType
   :: t ~ HashMap T.Text T.Text
@@ -1356,7 +1357,7 @@ decls ds = do
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
 decl l (NetDecl' noteM _ id_ ty iEM) = Just <$> (,fromIntegral (TextS.length (Id.toText id_))) <$>
-  maybe id addNote noteM ("signal" <+> fill l (pretty id_) <+> colon <+> either pretty sizedQualTyName ty <> iE <> semi)
+  maybe id addNote noteM ("signal" <+> fill l (pretty id_) <+> colon <+> sizedQualTyName ty <> iE <> semi)
   where
     addNote n = mappend ("--" <+> pretty n <> line)
     iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM

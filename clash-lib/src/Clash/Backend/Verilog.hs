@@ -2,6 +2,7 @@
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
                      2021-2022, QBayLogic B.V.
+                     2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -334,10 +335,10 @@ uselibs xs = line <>
   indent 2 (string "`uselib" <+> (hsep (mapM (\l -> ("lib=" <> string l)) xs)))
   <> line <> line
 
-wireRegFileDoc :: WireOrReg -> (Either a HWType) -> VerilogM Doc
-wireRegFileDoc _    (Right FileType) = "integer"
-wireRegFileDoc Wire _                = "wire"
-wireRegFileDoc Reg  _                = "reg"
+wireRegFileDoc :: WireOrReg -> HWType -> VerilogM Doc
+wireRegFileDoc _    FileType  = "integer"
+wireRegFileDoc Wire _         = "wire"
+wireRegFileDoc Reg  _         = "reg"
 
 verilogType :: HWType -> VerilogM Doc
 verilogType t = case t of
@@ -406,10 +407,9 @@ decl :: Declaration -> VerilogM (Maybe Doc)
 decl (NetDecl' noteM wr id_ tyE iEM) =
   Just A.<$> maybe id addNote noteM (addAttrs attrs (wireRegFileDoc wr tyE <+> tyDec tyE))
   where
-    tyDec (Left  ty) = stringS ty <+> pretty id_ <> iE
-    tyDec (Right ty) = sigDecl (pretty id_) ty <> iE
+    tyDec ty = sigDecl (pretty id_) ty <> iE
     addNote n = mappend ("//" <+> stringS n <> line)
-    attrs = fromMaybe [] (hwTypeAttrs A.<$> either (const Nothing) Just tyE)
+    attrs = fromMaybe [] (hwTypeAttrs A.<$> Just tyE)
     iE    = maybe emptyDoc (noEmptyInit . expr_ False) iEM
 
 decl _ = return Nothing

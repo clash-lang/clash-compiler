@@ -256,7 +256,7 @@ declare'
   -- ^ Expression pointing the the new signal
 declare' decName wireOrReg ty = do
   uniqueName <- Id.makeBasic decName
-  addDeclaration (NetDecl' Nothing wireOrReg uniqueName (Right ty) Nothing)
+  addDeclaration (NetDecl' Nothing wireOrReg uniqueName ty Nothing)
   pure uniqueName
 
 -- | Declare a new signal with the given name and type.

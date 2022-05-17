@@ -2,6 +2,7 @@
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
                      2021-2022, QBayLogic B.V.
+                     2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -678,10 +679,9 @@ decl :: Declaration -> SystemVerilogM (Maybe Doc)
 decl (NetDecl' noteM _ id_ tyE iEM) =
   Just A.<$> maybe id addNote noteM (addAttrs attrs (typ tyE))
   where
-    typ (Left  ty) = stringS ty <+> pretty id_ <> iE
-    typ (Right ty) = sigDecl (pretty id_) ty <> iE
+    typ ty = sigDecl (pretty id_) ty <> iE
     addNote n = mappend ("//" <+> stringS n <> line)
-    attrs = fromMaybe [] (hwTypeAttrs A.<$> either (const Nothing) Just tyE)
+    attrs = fromMaybe [] (hwTypeAttrs A.<$> Just tyE)
     iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM
 
 decl _ = return Nothing

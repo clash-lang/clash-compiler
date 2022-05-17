@@ -3,6 +3,7 @@
                     2017     , Myrtle Software Ltd,
                     2017-2018, Google Inc.
                     2020-2022, QBayLogic B.V.
+                    2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -545,7 +546,7 @@ data Declaration
       (Maybe Comment)                -- ^ Note; will be inserted as a comment in target hdl
       WireOrReg                      -- ^ Wire or register
       !Identifier                    -- ^ Name of signal
-      (Either IdentifierText HWType) -- ^ Pointer to type of signal or type of signal
+      HWType                         -- ^ Type of signal
       (Maybe Expr)                   -- ^ Initial value
       -- ^ Signal declaration
 
@@ -602,9 +603,9 @@ pattern NetDecl
   -> HWType
   -- ^ Type of signal
   -> Declaration
-pattern NetDecl note d ty <- NetDecl' note Wire d (Right ty) _
+pattern NetDecl note d ty <- NetDecl' note Wire d ty _
   where
-    NetDecl note d ty = NetDecl' note Wire d (Right ty) Nothing
+    NetDecl note d ty = NetDecl' note Wire d ty Nothing
 
 data PortDirection = In | Out
   deriving (Eq,Ord,Show,Generic,NFData,Hashable)

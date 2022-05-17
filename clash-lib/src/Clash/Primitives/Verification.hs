@@ -79,7 +79,7 @@ checkBBF _isD _primName args _ty =
 
   -- Simple wire without comment
   sigDecl :: HWType -> Identifier -> Declaration
-  sigDecl typ nm = NetDecl' Nothing Wire nm (Right typ) Nothing
+  sigDecl typ nm = NetDecl' Nothing Wire nm typ Nothing
 
 checkTF
   :: [Declaration]
