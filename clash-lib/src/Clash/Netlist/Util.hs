@@ -3,6 +3,7 @@
                     2017     , Myrtle Software Ltd
                     2017-2018, Google Inc.
                     2021-2022, QBayLogic B.V.
+                    2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -997,10 +998,7 @@ idToPort var = do
   hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (coreTypeOf var)
   if isVoid hwTy
     then return Nothing
-    else return (Just (id2identifier var, hwTy))
-
-id2identifier :: Id -> Identifier
-id2identifier = Id.unsafeMake . nameOcc . varName
+    else return (Just (Id.unsafeFromCoreId var, hwTy))
 
 setRepName :: Text -> Name a -> Name a
 setRepName s (Name sort' _ i loc) = Name sort' s i loc
@@ -1778,8 +1776,8 @@ expandTopEntity ihwtys (oId, ohwty) topEntityM = do
   -- TODO 2: Warn about duplicate fields
   let
     Synthesize{..} = fromMaybe (defSyn (error $(curLoc))) topEntityM
-    argHints = map (maybe "arg" (Id.toText . id2identifier) . fst) ihwtys
-    resHint = maybe "result" (Id.toText . id2identifier) oId
+    argHints = map (maybe "arg" (nameOcc . varName) . fst) ihwtys
+    resHint = maybe "result" (nameOcc . varName) oId
 
   inputs <- zipWith3M goInput argHints (map snd ihwtys) (extendPorts t_inputs)
 
