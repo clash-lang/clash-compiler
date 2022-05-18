@@ -325,7 +325,7 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
         netdecl i typ resInit =
           -- TODO: Dehardcode Wire. Would entail changing 'outputReg' to a
           -- list.
-          NetDecl' srcNote Wire (id2identifier i) typ resInit
+          NetDecl' srcNote Wire (Id.unsafeFromCoreId i) typ resInit
 
       hwTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) (mpi_resultTypes mpInfo)
       pure (zipWith3 netdecl res hwTys resInits1)
@@ -334,7 +334,7 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
     singleDecl hwTy = do
       wr <- termToWireOrReg tm
       rIM <- listToMaybe <$> getResInits (id_, tm)
-      return (NetDecl' srcNote wr (id2identifier id_) hwTy rIM)
+      return (NetDecl' srcNote wr (Id.unsafeFromCoreId id_) hwTy rIM)
 
     addSrcNote loc
       | isGoodSrcSpan loc = Just (StrictText.pack (showSDocUnsafe (ppr loc)))
@@ -433,7 +433,7 @@ mkDeclarations'
   -> NetlistMonad [Declaration]
 mkDeclarations' _declType bndr (collectTicks -> (Var v,ticks)) =
   withTicks ticks $ \tickDecls -> do
-  mkFunApp (id2identifier bndr) v [] tickDecls
+  mkFunApp (Id.unsafeFromCoreId bndr) v [] tickDecls
 
 mkDeclarations' _declType _bndr e@(collectTicks -> (Case _ _ [],_)) = do
   (_,sp) <- Lens.use curCompNm
@@ -455,13 +455,13 @@ mkDeclarations' declType bndr app = do
       (args,tyArgs) = partitionEithers args0
   case appF of
     Var f
-      | null tyArgs -> withTicks ticks (mkFunApp (id2identifier bndr) f args)
+      | null tyArgs -> withTicks ticks (mkFunApp (Id.unsafeFromCoreId bndr) f args)
       | otherwise   -> do
         (_,sp) <- Lens.use curCompNm
         throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
     _ -> do
       (exprApp,declsApp0) <- mkExpr False declType (CoreId bndr) app
-      let dstId = id2identifier bndr
+      let dstId = Id.unsafeFromCoreId bndr
           assn  =
             case exprApp of
               Identifier _ Nothing ->
@@ -493,7 +493,7 @@ mkSelection
   -> [Declaration]
   -> NetlistMonad [Declaration]
 mkSelection declType bndr scrut altTy alts0 tickDecls = do
-  let dstId = netlistId1 id id2identifier bndr
+  let dstId = netlistId1 id Id.unsafeFromCoreId bndr
   tcm <- Lens.view tcCache
   let scrutTy = inferCoreTypeOf tcm scrut
   scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
@@ -552,7 +552,7 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
  where
   mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe HW.Literal,Expr),[Declaration])
   mkCondExpr scrutHTy (pat,alt) = do
-    altId <- Id.suffix (netlistId1 id id2identifier bndr) "sel_alt"
+    altId <- Id.suffix (netlistId1 id Id.unsafeFromCoreId bndr) "sel_alt"
     (altExpr,altDecls) <- mkExpr False declType (NetlistId altId altTy) alt
     (,altDecls) <$> case pat of
       DefaultPat           -> return (Nothing,altExpr)
@@ -772,7 +772,7 @@ mkFunApp dstId fun args tickDecls = do
       case args of
         [] ->
           -- TODO: Figure out what to do with zero-width constructs
-          return [Assignment dstId (Identifier (id2identifier fun) Nothing)]
+          return [Assignment dstId (Identifier (Id.unsafeFromCoreId fun) Nothing)]
         _ -> error [I.i|
           Netlist generation encountered a local function. This should not
           happen. Function:
@@ -851,12 +851,12 @@ mkExpr bbEasD declType bndr app =
           if isVoid hwTyA then
             return (Noop, [])
           else
-            return (Identifier (id2identifier f) Nothing, [])
+            return (Identifier (Id.unsafeFromCoreId f) Nothing, [])
       | not (null tyArgs) ->
           throw (ClashException sp ($(curLoc) ++ "Not in normal form: "
             ++ "Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
       | otherwise -> do
-          argNm <- Id.suffix (netlistId1 id id2identifier bndr) "fun_arg"
+          argNm <- Id.suffix (netlistId1 id Id.unsafeFromCoreId bndr) "fun_arg"
           decls  <- mkFunApp argNm f tmArgs tickDecls
           if isVoid hwTyA then
             return (Noop, decls)
@@ -872,7 +872,7 @@ mkExpr bbEasD declType bndr app =
       let wr = case iteAlts scrutHTy alts of
                  Just _ | ite -> Wire
                  _ -> Reg
-      argNm <- Id.suffix (netlistId1 id id2identifier bndr) "sel_arg"
+      argNm <- Id.suffix (netlistId1 id Id.unsafeFromCoreId bndr) "sel_arg"
       decls  <- mkSelection declType (NetlistId argNm (netlistTypes1 bndr))
                             scrut tyA alts tickDecls
       if isVoid hwTyA then
@@ -918,7 +918,7 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
     scrutNm <-
       netlistId1
         Id.next
-        (\b -> Id.suffix (id2identifier b) "projection")
+        (\b -> Id.suffix (Id.unsafeFromCoreId b) "projection")
         bndr
     (scrutExpr,newDecls) <- mkExpr False Concurrent (NetlistId scrutNm scrutTy) scrut
     case scrutExpr of
@@ -938,7 +938,7 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
   case scrutRendered of
     Left newDecls -> pure (Noop, newDecls)
     Right (selId, modM, decls) -> do
-      let altVarId = id2identifier varTm
+      let altVarId = Id.unsafeFromCoreId varTm
       modifier <- case pat of
         DataPat dc exts tms -> do
           let
@@ -997,7 +997,7 @@ mkDcApplication [dstHType] bndr dc args = do
   let dcNm = nameOcc (dcName dc)
   tcm <- Lens.view tcCache
   let argTys = map (inferCoreTypeOf tcm) args
-  argNm <- netlistId1 return (\b -> Id.suffix (id2identifier b) "_dc_arg") bndr
+  argNm <- netlistId1 return (\b -> Id.suffix (Id.unsafeFromCoreId b) "_dc_arg") bndr
   argHWTys <- mapM coreTypeToHWTypeM' argTys
 
   (argExprs, concat -> argDecls) <- unzip <$>
@@ -1142,7 +1142,7 @@ mkDcApplication dstHTypes (MultiId argNms) _ args = do
   if length dstHTypes == length argExprs then do
     let assns = mapMaybe
                   (\case (_,Noop) -> Nothing
-                         (dstId,e) -> let nm = netlistId1 id id2identifier dstId
+                         (dstId,e) -> let nm = netlistId1 id Id.unsafeFromCoreId dstId
                                       in  case e of
                                             Identifier nm0 Nothing
                                               | nm == nm0 -> Nothing

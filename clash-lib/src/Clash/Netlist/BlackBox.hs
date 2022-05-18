@@ -141,7 +141,7 @@ mkBlackBoxContext
 mkBlackBoxContext bbName resIds args@(lefts -> termArgs) = do
     -- Make context inputs
     let
-      resNms = map id2identifier resIds
+      resNms = map Id.unsafeFromCoreId resIds
       resNm = fromMaybe (error "mkBlackBoxContext: head") (listToMaybe resNms)
     resTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc) . coreTypeOf) resIds
     (imps,impDecls) <- unzip <$> zipWithM (mkArgument bbName resNm) [0..] termArgs
@@ -248,7 +248,7 @@ mkArgument bbName bndr nArg e = do
         -> return ((error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg), Void Nothing, False), [])
       Just hwTy -> case collectArgsTicks e of
         (C.Var v,[],_) ->
-          return ((Identifier (id2identifier v) Nothing,hwTy,False),[])
+          return ((Identifier (Id.unsafeFromCoreId v) Nothing,hwTy,False),[])
         (C.Literal (IntegerLiteral i),[],_) ->
           return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
         (C.Literal (IntLiteral i), [],_) ->
@@ -830,7 +830,7 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
             Identifier _ Nothing -> []
             Noop -> []
             _ -> case sBinders of
-              ((b,_):_) -> [Assignment (id2identifier b) exprInit]
+              ((b,_):_) -> [Assignment (Id.unsafeFromCoreId b) exprInit]
               _ -> error "internal error: insufficient sBinders"
 
       -- Create the declarations that corresponding to the input
@@ -865,7 +865,7 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
       -- Collate everything
       return (clkDecls ++ netDeclsSeq1 ++ netDeclsInp1 ++
                 [ case iBinders of
-                    ((i,_):_) -> Assignment (id2identifier i) exprArg
+                    ((i,_):_) -> Assignment (Id.unsafeFromCoreId i) exprArg
                     _ -> error "internal error: insufficient iBinders"
                 , Seq [Initial (map SeqDecl (initDeclsOther ++ initAssign))]
                 , Seq [AlwaysClocked edge clkExpr (map SeqDecl seqDeclsOther)]
@@ -899,7 +899,7 @@ collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
         (_,_,[],_,[],binders,Just result) -> do
           ds1 <- concatMapM (uncurry (mkDeclarations' Sequential)) binders
           netDecls <- concatMapM mkNetDecl binders
-          return (Identifier (id2identifier result) Nothing, netDecls ++ ds0 ++ ds1)
+          return (Identifier (Id.unsafeFromCoreId result) Nothing, netDecls ++ ds0 ++ ds1)
         _ -> error "internal error"
     _ -> case substTm "collectBindIO2" subst e of
       Letrec {} -> error "internal error"
@@ -1214,7 +1214,7 @@ mkFunInput resId e =
       go is1 (n+(1::Int)) e''
 
     go _ _ (C.Var v) = do
-      let assn = Assignment (Id.unsafeMake "~RESULT") (Identifier (id2identifier v) Nothing)
+      let assn = Assignment (Id.unsafeMake "~RESULT") (Identifier (Id.unsafeFromCoreId v) Nothing)
       return (Right ((Id.unsafeMake "",[assn]),Wire))
 
     go _ _ (Case scrut ty [alt]) = do
@@ -1259,7 +1259,7 @@ mkFunInput resId e =
           netDecls <- concatMapM mkNetDecl $ binders
           decls    <- concatMapM (uncurry mkDeclarations) binders
           nm <- Id.makeBasic "fun"
-          let resultId = id2identifier result
+          let resultId = Id.unsafeFromCoreId result
           -- TODO: Due to reasons lost in the mists of time, #1265 creates an
           -- assignement here, whereas it previously wouldn't. With the PR in
           -- tests break when reverting to the old behavior. In some cases this
