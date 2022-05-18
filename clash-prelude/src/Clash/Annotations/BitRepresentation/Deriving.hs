@@ -60,32 +60,35 @@ import Clash.Annotations.BitRepresentation.Util
 import qualified Clash.Annotations.BitRepresentation.Util
   as Util
 
-import           Clash.Annotations.Primitive (hasBlackBox)
+import           Clash.Annotations.Primitive  (hasBlackBox)
 import           Clash.Class.BitPack
   (BitPack, BitSize, pack, packXWith, unpack)
-import           Clash.Class.Resize         (resize)
-import           Language.Haskell.TH.Compat (mkTySynInstD)
-import           Clash.Sized.BitVector      (BitVector, low, (++#))
+import           Clash.Class.Resize           (resize)
+import           Language.Haskell.TH.Compat   (mkTySynInstD)
+import           Clash.Sized.BitVector        (BitVector, low, (++#))
 import           Clash.Sized.Internal.BitVector (undefined#)
-import           Control.DeepSeq            (NFData)
-import           Control.Monad              (forM)
+import           Control.Applicative          (liftA3)
+import           Control.DeepSeq              (NFData)
+import           Control.Monad                (forM)
 import           Data.Bits
   (shiftL, shiftR, complement, (.&.), (.|.), zeroBits, popCount, bit, testBit,
    Bits, setBit)
-import           Data.Data                  (Data)
+import           Data.Data                    (Data)
+import           Data.Containers.ListUtils    (nubOrd)
 import           Data.List
   (mapAccumL, zipWith4, sortOn, partition)
-import           Data.Typeable              (Typeable)
-import qualified Data.Map                   as Map
-import           Data.Maybe                 (fromMaybe)
-import qualified Data.Set                   as Set
-import           Data.Proxy                 (Proxy(..))
-import           GHC.Exts                   (Int(I#))
-import           GHC.Generics               (Generic)
-import           GHC.Integer.Logarithms     (integerLog2#)
-import           GHC.TypeLits               (natVal)
+import           Data.Typeable                (Typeable)
+import qualified Data.Map                     as Map
+import           Data.Maybe                   (fromMaybe)
+import qualified Data.Set                     as Set
+import           Data.Proxy                   (Proxy(..))
+import           GHC.Exts                     (Int(I#))
+import           GHC.Generics                 (Generic)
+import           GHC.Integer.Logarithms       (integerLog2#)
+import           GHC.TypeLits                 (natVal)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
+import           Language.Haskell.TH.Datatype (resolveTypeSynonyms)
 
 -- | Used to track constructor bits in packed derivation
 data BitMaskOrigin
@@ -253,11 +256,23 @@ conName c = case c of
   InfixC _ nm _ -> nm
   _ -> error $ "No GADT support"
 
-constrFieldSizes
-  :: Con
-  -> (Name, [Q Exp])
-constrFieldSizes con = do
-  (conName con, map typeSize $ fieldTypes con)
+mkLet :: String -> Q Exp -> (Q Dec, Q Exp)
+mkLet nm qe = do
+  let nm' = mkName nm
+  (valD (varP nm') (normalB qe) [], varE nm')
+
+fieldSizeLets :: [[Type]] -> ([Q Dec], [[Q Exp]])
+fieldSizeLets fieldtypess = (fieldSizeDecls, fieldSizessExps)
+  where
+    nums = map show [(0 :: Int)..]
+    uqFieldTypes = nubOrd (concat fieldtypess)
+    uqFieldSizes = map typeSize uqFieldTypes
+    (fieldSizeDecls, szVars) = unzip $ zipWith
+                                 (\i sz -> mkLet ("_f" ++ i) sz)
+                                 nums
+                                 uqFieldSizes
+    tySizeMap = Map.fromList (zip uqFieldTypes szVars)
+    fieldSizessExps = map (map (tySizeMap Map.!)) fieldtypess
 
 complementInteger :: Int -> Integer -> Integer
 complementInteger 0 _i = 0
@@ -309,59 +324,82 @@ oneHotConstructor ns = zip values values
   where
     values = [shiftL 1 n | n <- ns]
 
-overlapFieldAnnsL :: [[Q Exp]] -> [[Q Exp]]
-overlapFieldAnnsL fieldSizess = map go fieldSizess
+overlapFieldAnnsL :: [[Q Exp]] -> ([Q Dec], [[Q Exp]])
+overlapFieldAnnsL fieldSizess = ([maxDecl],  resExp)
   where
-    fieldSizess'  = listE $ map listE fieldSizess
-    constructorSizes = [| map sum $fieldSizess' |]
-    go fieldSizes =
+    (maxDecl, maxExp) = mkLet "_maxf" maxConstrSize
+    resExp = map go fieldSizess
+    fieldSizess' = listE $ map listE fieldSizess
+    constructorSizes = [| map (sum @[] @Int) $fieldSizess' |]
+    maxConstrSize = [| maximum $constructorSizes - 1 |]
+    go fieldsizes =
       snd $
       mapAccumL
         (\start size -> ([| $start - $size |], [| bitmask $start $size |]))
-        [| maximum $constructorSizes - 1 |]
-        fieldSizes
+        maxExp
+        fieldsizes
 
-overlapFieldAnnsR :: [[Q Exp]] -> [[Q Exp]]
-overlapFieldAnnsR fieldSizess = map go fieldSizess
+overlapFieldAnnsR :: [[Q Exp]] -> ([Q Dec], [[Q Exp]])
+overlapFieldAnnsR fieldSizess = (sumFieldDecl, resExp)
   where
-    fieldSizess'  = listE $ map listE fieldSizess
-    constructorSizes = [| map sum $fieldSizess' |]
-    go fieldSizes =
+    resExp = zipWith go fieldSizess sumFieldExp
+
+    nums = map show [(0 :: Int) ..]
+
+    (sumFieldDecl, sumFieldExp)
+      = unzip $ zipWith
+          (\fs i -> mkLet ("_sumf" ++ i) [|sum @[] @Int $(listE fs)|])
+          fieldSizess
+          nums
+
+    go fieldSizes sumFieldsSize =
       snd $
       mapAccumL
         (\start size -> ([| $start - $size |], [| bitmask $start $size |]))
-        [| maximum $constructorSizes - (maximum $constructorSizes - sum $(listE fieldSizes)) - 1 |]
+        [| $sumFieldsSize - 1 |]
         fieldSizes
 
-wideFieldAnns :: [[Q Exp]] -> [[Q Exp]]
-wideFieldAnns fieldSizess = zipWith id (map go constructorOffsets) fieldSizess
+wideFieldAnns :: [[Q Exp]] -> ([Q Dec], [[Q Exp]])
+wideFieldAnns fieldSizess = (decs, resExp)
   where
-    constructorSizes =
-      map (AppE (VarE 'sum) <$>) (map listE fieldSizess)
+    decs = (dataSizeDec:constrSizeDecs) ++ constrOffsetDecs
+    resExp = zipWith id (map go constrOffsetsExps) fieldSizess
+    nums = map show [(0 :: Int) ..]
 
-    constructorOffsets :: [Q Exp]
-    constructorOffsets =
-      init $
-      scanl
-        (\offset size -> [| $offset + $size |])
-        [| 0 |]
-        constructorSizes
+    constrSizeExps :: [Q Exp]
+    (constrSizeDecs, constrSizeExps)
+      = unzip $ zipWith
+          (\fs i -> mkLet ("_sumf" ++ i) [|sum @[] @Int $(listE fs)|])
+          fieldSizess
+          nums
 
-    dataSize = [| sum $(listE constructorSizes) |]
+    constrOffsetsExps :: [Q Exp]
+    (last -> constrOffsetDecs, constrOffsetsExps) =
+      unzip $ init $ scanl
+        (\(ds, offset) (size, i) ->
+          let e = [| $offset + $size |]
+              (d, ve) = mkLet ("_constroffset" ++ i) e
+          in (d:ds, ve)
+        )
+        ([], [| 0 |])
+        (zip constrSizeExps nums)
 
+    dataSizeExp :: Q Exp
+    (dataSizeDec, dataSizeExp)
+      = mkLet "_widedatasize" [| sum @[] @Int $(listE constrSizeExps) - 1 |]
     go :: Q Exp -> [Q Exp] -> [Q Exp]
     go offset fieldSizes =
       snd $
       mapAccumL
         (\start size -> ([| $start - $size |], [| bitmask $start $size |]))
-        [| $dataSize - 1 - $offset |]
+        [| $dataSizeExp - $offset |]
         fieldSizes
 
 -- | Derive DataRepr' for a specific type.
 deriveDataRepr
   :: ([Int] -> [(BitMask, Value)])
   -- ^ Constructor derivator
-  -> ([[Q Exp]] -> [[Q Exp]])
+  -> ([[Q Exp]] -> ([Q Dec], [[Q Exp]]) )
   -- ^ Field derivator
   -> Derivator
 deriveDataRepr constrDerivator fieldsDerivator typ = do
@@ -370,34 +408,54 @@ deriveDataRepr constrDerivator fieldsDerivator typ = do
     (TyConI (DataD [] _constrName vars _kind dConstructors _clauses)) ->
       let varMap = Map.fromList $ zip (map tyVarBndrName vars) typeArgs in
       let resolvedConstructors = map (resolveCon varMap) dConstructors in do
+      let nums = map show [(0 :: Int)..]
+      let fieldtypess = map fieldTypes resolvedConstructors
+
+      let (fieldSzDecs, fieldSizess) = fieldSizeLets fieldtypess
 
       -- Get sizes and names of all constructors
-      let
-        (constrNames, fieldSizess) =
-          unzip $ map constrFieldSizes resolvedConstructors
+      let constrNames = map conName resolvedConstructors
 
       let
         (constrMasks, constrValues) =
           unzip $ constrDerivator [0..length dConstructors - 1]
 
-      let constrSize    = 1 + (msb $ maximum constrMasks)
-      let fieldAnns     = fieldsDerivator fieldSizess
-      let fieldAnnsFlat = listE $ concat fieldAnns
+      let constrSize = 1 + (msb $ maximum @[] @Integer constrMasks)
+      let (fieldDecs, fieldAnns) = fieldsDerivator fieldSizess
+
+      -- extract field annotations into declarations
+      let mkAnnDecl i j an = mkLet ("_fa" ++ i ++ "_" ++ j) an
+      let
+        fieldAnnTup =
+          zipWith (\i -> zipWith (mkAnnDecl i) nums) nums fieldAnns
+
+      let
+        (fieldAnnDecs, fieldAnnVars) =
+          (concat $ map (map fst) fieldAnnTup, map (map snd) fieldAnnTup)
+
+      let fieldAnnsFlat = listE $ concat fieldAnnVars
 
       let dataSize | null $ concat fieldAnns = [| 0 |]
-                   | otherwise = [| 1 + (msb $ maximum $ $fieldAnnsFlat) |]
+                   | otherwise = [| 1 + (msb $ maximum @[] @Integer $ $fieldAnnsFlat) |]
+
+      -- Extract data size into a declaration
+      let (dataSizeDec, dataSizeExp) = mkLet "_datasize" dataSize
+
+      let decls = (dataSizeDec:fieldSzDecs) ++ fieldDecs ++ fieldAnnDecs
 
       -- Determine at which bits various fields start
       let constrReprs = zipWith4
-                          (buildConstrRepr dataSize)
+                          (buildConstrRepr dataSizeExp)
                           constrNames
-                          fieldAnns
+                          fieldAnnVars
                           constrMasks
                           constrValues
 
-      [| DataReprAnn
-          $(liftQ $ return typ)
-          ($dataSize + constrSize)
+      resolvedType <- resolveTypeSynonyms typ
+
+      letE decls [| DataReprAnn
+          $(liftQ $ return resolvedType)
+          ($dataSizeExp + constrSize)
           $(listE constrReprs) |]
     _ ->
       fail $ "Could not derive dataRepr for: " ++ show info
@@ -727,8 +785,11 @@ derivePackedAnnotation = deriveAnnotation packedDerivator
 collectDataReprs :: Q [DataReprAnn]
 collectDataReprs = do
   thisMod <- thisModule
-  go [thisMod] Set.empty []
+  unresolved <- go [thisMod] Set.empty []
+  mapM resolveTyps unresolved
   where
+    resolveTyps (DataReprAnn t s c)
+      = liftA3 DataReprAnn (resolveTypeSynonyms t) (pure s) (pure c)
     go []     _visited acc = return acc
     go (x:xs) visited  acc
       | x `Set.member` visited = go xs visited acc
@@ -929,8 +990,9 @@ deriveBitPack :: Q Type -> Q [Dec]
 deriveBitPack typQ = do
   anns <- collectDataReprs
   typ  <- typQ
+  rTyp <- resolveTypeSynonyms typ
 
-  ann <- case filter (\(DataReprAnn t _ _) -> t == typ) anns of
+  ann <- case filter (\(DataReprAnn t _ _) -> t == rTyp) anns of
               [a] -> return a
               []  -> fail "No custom bit annotation found."
               _   -> fail "Overlapping bit annotations found."

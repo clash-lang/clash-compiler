@@ -1,5 +1,6 @@
 {-|
 Copyright  :  (C) 2018, Google Inc.
+                  2022, LUMI GUIDE FIETSDETECTIE B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -44,6 +45,8 @@ data Type'
   -- ^ Qualified name of type
   | LitTy' Integer
   -- ^ Numeral literal (used in BitVector 10, for example)
+  | SymLitTy' Text.Text
+  -- ^ Symbol literal (used in for example (Signal "System" Int))
   deriving (Generic, NFData, Eq, Typeable, Hashable, Ord, Show)
 
 -- | Internal version of DataRepr
@@ -90,8 +93,10 @@ thTypeToType' :: TH.Type -> Type'
 thTypeToType' ty = go ty
   where
     go (TH.ConT name')   = ConstTy' (thToText name')
+    go (TH.PromotedT name') = ConstTy' (thToText name')
     go (TH.AppT ty1 ty2) = AppTy' (go ty1) (go ty2)
     go (TH.LitT (TH.NumTyLit n)) = LitTy' n
+    go (TH.LitT (TH.StrTyLit lit)) = SymLitTy' (Text.pack lit)
     go _ = error $ "Unsupported type: " ++ show ty
 
 -- | Convenience type for index built by buildCustomReprs

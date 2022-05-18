@@ -1,0 +1,1 @@
+FIXED: `Clash.Annotations.BitRepresentation.Deriving.deriveAnnotation` no longer has quadratic complexity in the size of the constructors and fields.
