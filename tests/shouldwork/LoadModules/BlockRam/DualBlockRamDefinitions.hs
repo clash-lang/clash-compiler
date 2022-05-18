@@ -28,29 +28,6 @@ rst10 = resetGen @B
 rst7 :: Reset C
 rst7 = resetGen @C
 
-topEntity ::
-  ( KnownDomain domA
-  , KnownDomain domB
-  ) =>
-  -- Configuration
-  TDPConfig ->
-
-  -- Clocks
-  Clock  domA ->
-  Clock  domB ->
-  Enable domA ->
-  Enable domB ->
-  --Operations
-  Signal domA (RamOp 30 ThisOrThat) ->
-  Signal domB (RamOp 30 ThisOrThat) ->
-
-  --Output
-  ( Signal domA ThisOrThat
-  , Signal domB ThisOrThat )
-
-topEntity = trueDualPortBlockRam
-{-#NOINLINE topEntity #-}
-
 twice = concatMap (replicate d2)
 strictAnd !a !b = (&&) a b
 
@@ -153,5 +130,6 @@ inputWritesA, inputWritesB :: KnownDomain dom => Clock dom -> Reset dom -> Signa
 inputWritesA clk rst = stimuliGenerator clk rst opsA
 inputWritesB clk rst = stimuliGenerator clk rst opsB
 
-topOut clkA clkB wmA wmB rstA rstB =
-  topEntity (tdpDefault{writeModeA = wmA, writeModeB = wmB}) clkA clkB enableGen enableGen (inputWritesA clkA rstA ) (inputWritesB clkB rstB)
+topOut wmA wmB rstA rstB clkA clkB =
+  trueDualPortBlockRam (tdpDefault{writeModeA = wmA, writeModeB = wmB}) clkA clkB enableGen enableGen (inputWritesA clkA rstA) (inputWritesB clkB rstB)
+{-# INLINE topOut #-}
