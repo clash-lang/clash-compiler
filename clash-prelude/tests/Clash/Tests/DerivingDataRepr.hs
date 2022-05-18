@@ -16,15 +16,29 @@ import Data.Maybe (Maybe(..))
 ---------------------------------------------------------
 ------------ DERIVING SIMPLE REPRESENTATIONS ------------
 ---------------------------------------------------------
-oneHotOverlapRepr :: DataReprAnn
-oneHotOverlapRepr = $( (simpleDerivator OneHot OverlapL) =<< [t| Train |] )
+oneHotOverlapLRepr :: DataReprAnn
+oneHotOverlapLRepr = $( (simpleDerivator OneHot OverlapL) =<< [t| Train |] )
 
-oneHotOverlapRepr' :: DataReprAnn
-oneHotOverlapRepr' =
+oneHotOverlapLRepr' :: DataReprAnn
+oneHotOverlapLRepr' =
   DataReprAnn
     $(liftQ [t| Train |])
     8
     [ ConstrRepr 'Passenger   16  16  [0b1100]
+    , ConstrRepr 'Freight     32  32  [0b1100, 0b0011]
+    , ConstrRepr 'Maintenance 64  64  []
+    , ConstrRepr 'Toy         128 128 []
+    ]
+
+oneHotOverlapRRepr :: DataReprAnn
+oneHotOverlapRRepr = $( (simpleDerivator OneHot OverlapR) =<< [t| Train |] )
+
+oneHotOverlapRRepr' :: DataReprAnn
+oneHotOverlapRRepr' =
+  DataReprAnn
+    $(liftQ [t| Train |])
+    8
+    [ ConstrRepr 'Passenger   16  16  [0b0011]
     , ConstrRepr 'Freight     32  32  [0b1100, 0b0011]
     , ConstrRepr 'Maintenance 64  64  []
     , ConstrRepr 'Toy         128 128 []
@@ -132,7 +146,8 @@ packedMaybeRGB' =
 -- MAIN
 tests :: TestTree
 tests = testGroup "DerivingDataRepr"
-  [ testCase "OneHotOverlap"      $ oneHotOverlapRepr      @?= oneHotOverlapRepr'
+  [ testCase "OneHotOverlapL"     $ oneHotOverlapLRepr     @?= oneHotOverlapLRepr'
+  , testCase "OneHotOverlapR"     $ oneHotOverlapRRepr     @?= oneHotOverlapRRepr'
   , testCase "OneHotOverlapRec"   $ oneHotOverlapReprRec   @?= oneHotOverlapReprRec'
   , testCase "OneHotOverlapInfix" $ oneHotOverlapReprInfix @?= oneHotOverlapReprInfix'
   , testCase "OneHotWide"         $ oneHotWideRepr         @?= oneHotWideRepr'

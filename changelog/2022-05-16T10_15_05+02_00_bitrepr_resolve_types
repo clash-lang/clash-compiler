@@ -1,0 +1,1 @@
+FIXED: Fully resolve type synonyms when deriving bit representations.
