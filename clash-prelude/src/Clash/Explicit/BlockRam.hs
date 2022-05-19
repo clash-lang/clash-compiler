@@ -1368,12 +1368,19 @@ trueDualPortBlockRamModel labelSlow wmSlow !_clkSlow enSlow weSlow addrSlow datS
   (outSlow', outFast') =
     go
       (Seq.fromFunction (natToNum @nAddrs) initElement)
-      tFast -- ensure 'go' hits fast clock first for 1 cycle, then execute slow
-         -- clock for 1 cycle, followed by the regular cadence of 'ceil(tA / tB)'
-         -- cycles for the fast clock followed by 1 cycle of the slow clock
-      (bundle (fromEnable enSlow, weSlow, fromIntegral <$> addrSlow, datSlow))
-      (bundle (fromEnable enFast, weFast, fromIntegral <$> addrFast, datFast))
+      (tSlow - tFast) -- this assumes that both clocks had a rising edge directly before t=0
+                      --   (TODO @ someone reviewing the PR: is this correct? it passes the tests)
+        -- in general, this param represents (time until next slow rising edge - time until next fast rising edge)
+        -- also TODO @ someone reviewing this PR: I think this used to be the only part of the function
+        --    that made any differentiation between the "fast" port and the "slow" port.
+        --    Am I right in saying that, and does this mean we can drop the requirement that one port be faster than the other?
+      inputSlow'
+      inputFast'
       startSlow startFast
+
+  -- drop the first command
+  (_ :- inputSlow') = bundle (fromEnable enSlow, weSlow, fromIntegral <$> addrSlow, datSlow)
+  (_ :- inputFast') = bundle (fromEnable enFast, weFast, fromIntegral <$> addrFast, datFast)
 
   tSlow = snatToNum @Int (clockPeriod @domSlow)
   tFast = snatToNum @Int (clockPeriod @domFast)
@@ -1472,8 +1479,8 @@ trueDualPortBlockRamModel labelSlow wmSlow !_clkSlow enSlow weSlow addrSlow datS
           (writeWriteConflict labelFast, writeWriteConflict labelSlow)
         _ -> (datSlow_,datFast_)
 
-      (wroteA,ram1) = writeRam weSlow_ addrSlow_ datSlow1_ ram0
-      (wroteB,ram2) = writeRam weFast_ addrFast_ datFast_ ram1
+      (wroteA,ram1) = writeRam (weSlow_ && enSlow_) addrSlow_ datSlow1_ ram0
+      (wroteB,ram2) = writeRam (weFast_ && enFast_) addrFast_ datFast1_ ram1
 
       readWriteConflict label =
         deepErrorX $ "trueDualPortBlockRam " <> label <> ": conflicting read/write queries"
@@ -1487,7 +1494,7 @@ trueDualPortBlockRamModel labelSlow wmSlow !_clkSlow enSlow weSlow addrSlow datS
         (_, ReadFirst) ->
           ram0 `Seq.index` addrSlow_
         _ -> -- (_, NoChange)
-          if weFast_ then prevFast else ram0 `Seq.index` addrSlow_
+          if weSlow_ then prevSlow else ram0 `Seq.index` addrSlow_
 
       outFast1 = case (conflict, wmFast) of
         (Just Conflict{cfRWB=IsDefined True}, _) ->
@@ -1510,14 +1517,13 @@ trueDualPortBlockRamModel labelSlow wmSlow !_clkSlow enSlow weSlow addrSlow datS
       | enSlow_   = out0 `seqX` (out0 :- as2, bs2)
       | otherwise = (prevSlow :- as2, bs2)
      where
-      (wrote, !ram1) = writeRam weSlow_ addrSlow_ datSlow_ ram0
+      (wrote, !ram1) = writeRam (weSlow_ && enSlow_) addrSlow_ datSlow_ ram0
 
       out0 = case wmSlow of
         WriteFirst -> fromMaybe (ram1 `Seq.index` addrSlow_) wrote
         ReadFirst  -> ram0 `Seq.index` addrSlow_
         NoChange   -> if weSlow_ then prevSlow else ram0 `Seq.index` addrSlow_
 
-      writing = if weSlow_ then (Just addrSlow_) else Nothing
       out1 = if enSlow_ then out0 else prevSlow
       (as2, bs2) = go ram1 (relativeTime + tSlow) as1 bs0 out1 prevFast
 
@@ -1527,7 +1533,7 @@ trueDualPortBlockRamModel labelSlow wmSlow !_clkSlow enSlow weSlow addrSlow datS
       | enFast_   = out0 `seqX` (as2, out0 :- bs2)
       | otherwise = (as2, prevFast :- bs2)
      where
-      (wrote, !ram1) = writeRam weFast_ addrFast_ datFast_ ram0
+      (wrote, !ram1) = writeRam (weFast_ && enFast_) addrFast_ datFast_ ram0
 
       out0 = case wmFast of
         WriteFirst -> fromMaybe (ram1 `Seq.index` addrFast_) wrote

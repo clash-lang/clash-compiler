@@ -145,75 +145,75 @@ topEntity_NC_NC_BC = topOut NoChange NoChange rst10 rst7
 
 -- Expected output generation for all configurations with Template Haskell
 processSimOutput x = replace (0 ::Integer) undefined# $ tail x
-simOutA_WF_WF_AB = processSimOutput $(collectSimResults 300 $ pack <$> (fst $ topOut WriteFirst WriteFirst rst20 rst10 clk20 clk10))
+simOutA_WF_WF_AB = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut WriteFirst WriteFirst rst20 rst10 clk20 clk10))
 {-# INLINE simOutA_WF_WF_AB #-}
-simOutA_WF_WF_BC = processSimOutput $(collectSimResults 300 $ pack <$> (fst $ topOut WriteFirst WriteFirst rst10 rst7 clk10 clk7))
+simOutA_WF_WF_BC = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut WriteFirst WriteFirst rst10 rst7 clk10 clk7))
 {-# INLINE simOutA_WF_WF_BC #-}
-simOutA_WF_RF_AB = processSimOutput $(collectSimResults 300 $ pack <$> (fst $ topOut WriteFirst ReadFirst rst20 rst10 clk20 clk10))
+simOutA_WF_RF_AB = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut WriteFirst ReadFirst rst20 rst10 clk20 clk10))
 {-# INLINE simOutA_WF_RF_AB #-}
-simOutA_WF_RF_BC = processSimOutput $(collectSimResults 300 $ pack <$> (fst $ topOut WriteFirst ReadFirst rst10 rst7 clk10 clk7))
+simOutA_WF_RF_BC = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut WriteFirst ReadFirst rst10 rst7 clk10 clk7))
 {-# INLINE simOutA_WF_RF_BC #-}
-simOutA_WF_NC_AB = processSimOutput $(collectSimResults 300 $ pack <$> (fst $ topOut WriteFirst NoChange rst20 rst10 clk20 clk10))
+simOutA_WF_NC_AB = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut WriteFirst NoChange rst20 rst10 clk20 clk10))
 {-# INLINE simOutA_WF_NC_AB #-}
-simOutA_WF_NC_BC = processSimOutput $(collectSimResults 300 $ pack <$> (fst $ topOut WriteFirst NoChange rst10 rst7 clk10 clk7))
+simOutA_WF_NC_BC = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut WriteFirst NoChange rst10 rst7 clk10 clk7))
 {-# INLINE simOutA_WF_NC_BC #-}
-simOutA_RF_WF_AB = processSimOutput $(collectSimResults 300 $ pack <$> (fst $ topOut ReadFirst WriteFirst rst20 rst10 clk20 clk10))
+simOutA_RF_WF_AB = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut ReadFirst WriteFirst rst20 rst10 clk20 clk10))
 {-# INLINE simOutA_RF_WF_AB #-}
-simOutA_RF_WF_BC = processSimOutput $(collectSimResults 300 $ pack <$> (fst $ topOut ReadFirst WriteFirst rst10 rst7 clk10 clk7))
+simOutA_RF_WF_BC = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut ReadFirst WriteFirst rst10 rst7 clk10 clk7))
 {-# INLINE simOutA_RF_WF_BC #-}
-simOutA_RF_RF_AB = processSimOutput $(collectSimResults 300 $ pack <$> (fst $ topOut ReadFirst ReadFirst rst20 rst10 clk20 clk10))
+simOutA_RF_RF_AB = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut ReadFirst ReadFirst rst20 rst10 clk20 clk10))
 {-# INLINE simOutA_RF_RF_AB #-}
-simOutA_RF_RF_BC = processSimOutput $(collectSimResults 300 $ pack <$> (fst $ topOut ReadFirst ReadFirst rst10 rst7 clk10 clk7))
+simOutA_RF_RF_BC = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut ReadFirst ReadFirst rst10 rst7 clk10 clk7))
 {-# INLINE simOutA_RF_RF_BC #-}
-simOutA_RF_NC_AB = processSimOutput $(collectSimResults 300 $ pack <$> (fst $ topOut ReadFirst NoChange rst20 rst10 clk20 clk10))
+simOutA_RF_NC_AB = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut ReadFirst NoChange rst20 rst10 clk20 clk10))
 {-# INLINE simOutA_RF_NC_AB #-}
-simOutA_RF_NC_BC = processSimOutput $(collectSimResults 300 $ pack <$> (fst $ topOut ReadFirst NoChange rst10 rst7 clk10 clk7))
+simOutA_RF_NC_BC = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut ReadFirst NoChange rst10 rst7 clk10 clk7))
 {-# INLINE simOutA_RF_NC_BC #-}
-simOutA_NC_WF_AB = processSimOutput $(collectSimResults 300 $ pack <$> (fst $ topOut NoChange WriteFirst rst20 rst10 clk20 clk10))
+simOutA_NC_WF_AB = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut NoChange WriteFirst rst20 rst10 clk20 clk10))
 {-# INLINE simOutA_NC_WF_AB #-}
-simOutA_NC_WF_BC = processSimOutput $(collectSimResults 300 $ pack <$> (fst $ topOut NoChange WriteFirst rst10 rst7 clk10 clk7))
+simOutA_NC_WF_BC = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut NoChange WriteFirst rst10 rst7 clk10 clk7))
 {-# INLINE simOutA_NC_WF_BC #-}
-simOutA_NC_RF_AB = processSimOutput $(collectSimResults 300 $ pack <$> (fst $ topOut NoChange ReadFirst rst20 rst10 clk20 clk10))
+simOutA_NC_RF_AB = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut NoChange ReadFirst rst20 rst10 clk20 clk10))
 {-# INLINE simOutA_NC_RF_AB #-}
-simOutA_NC_RF_BC = processSimOutput $(collectSimResults 300 $ pack <$> (fst $ topOut NoChange ReadFirst rst10 rst7 clk10 clk7))
+simOutA_NC_RF_BC = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut NoChange ReadFirst rst10 rst7 clk10 clk7))
 {-# INLINE simOutA_NC_RF_BC #-}
-simOutA_NC_NC_AB = processSimOutput $(collectSimResults 300 $ pack <$> (fst $ topOut NoChange NoChange rst20 rst10 clk20 clk10))
+simOutA_NC_NC_AB = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut NoChange NoChange rst20 rst10 clk20 clk10))
 {-# INLINE simOutA_NC_NC_AB #-}
-simOutA_NC_NC_BC = processSimOutput $(collectSimResults 300 $ pack <$> (fst $ topOut NoChange NoChange rst10 rst7 clk10 clk7))
+simOutA_NC_NC_BC = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut NoChange NoChange rst10 rst7 clk10 clk7))
 {-# INLINE simOutA_NC_NC_BC #-}
-simOutB_WF_WF_AB = processSimOutput $(collectSimResults 300 $ pack <$> (snd $ topOut WriteFirst WriteFirst rst20 rst10 clk20 clk10))
+simOutB_WF_WF_AB = $(collectSimResults (length opsB+1) $ pack <$> (snd $ topOut WriteFirst WriteFirst rst20 rst10 clk20 clk10))
 {-# INLINE simOutB_WF_WF_AB #-}
-simOutB_WF_WF_BC = processSimOutput $(collectSimResults 300 $ pack <$> (snd $ topOut WriteFirst WriteFirst rst10 rst7 clk10 clk7))
+simOutB_WF_WF_BC = $(collectSimResults (length opsB+1) $ pack <$> (snd $ topOut WriteFirst WriteFirst rst10 rst7 clk10 clk7))
 {-# INLINE simOutB_WF_WF_BC #-}
-simOutB_WF_RF_AB = processSimOutput $(collectSimResults 300 $ pack <$> (snd $ topOut WriteFirst ReadFirst rst20 rst10 clk20 clk10))
+simOutB_WF_RF_AB = $(collectSimResults (length opsB+1) $ pack <$> (snd $ topOut WriteFirst ReadFirst rst20 rst10 clk20 clk10))
 {-# INLINE simOutB_WF_RF_AB #-}
-simOutB_WF_RF_BC = processSimOutput $(collectSimResults 300 $ pack <$> (snd $ topOut WriteFirst ReadFirst rst10 rst7 clk10 clk7))
+simOutB_WF_RF_BC = $(collectSimResults (length opsB+1) $ pack <$> (snd $ topOut WriteFirst ReadFirst rst10 rst7 clk10 clk7))
 {-# INLINE simOutB_WF_RF_BC #-}
-simOutB_WF_NC_AB = processSimOutput $(collectSimResults 300 $ pack <$> (snd $ topOut WriteFirst NoChange rst20 rst10 clk20 clk10))
+simOutB_WF_NC_AB = $(collectSimResults (length opsB+1) $ pack <$> (snd $ topOut WriteFirst NoChange rst20 rst10 clk20 clk10))
 {-# INLINE simOutB_WF_NC_AB #-}
-simOutB_WF_NC_BC = processSimOutput $(collectSimResults 300 $ pack <$> (snd $ topOut WriteFirst NoChange rst10 rst7 clk10 clk7))
+simOutB_WF_NC_BC = $(collectSimResults (length opsB+1) $ pack <$> (snd $ topOut WriteFirst NoChange rst10 rst7 clk10 clk7))
 {-# INLINE simOutB_WF_NC_BC #-}
-simOutB_RF_WF_AB = processSimOutput $(collectSimResults 300 $ pack <$> (snd $ topOut ReadFirst WriteFirst rst20 rst10 clk20 clk10))
+simOutB_RF_WF_AB = $(collectSimResults (length opsB+1) $ pack <$> (snd $ topOut ReadFirst WriteFirst rst20 rst10 clk20 clk10))
 {-# INLINE simOutB_RF_WF_AB #-}
-simOutB_RF_WF_BC = processSimOutput $(collectSimResults 300 $ pack <$> (snd $ topOut ReadFirst WriteFirst rst10 rst7 clk10 clk7))
+simOutB_RF_WF_BC = $(collectSimResults (length opsB+1) $ pack <$> (snd $ topOut ReadFirst WriteFirst rst10 rst7 clk10 clk7))
 {-# INLINE simOutB_RF_WF_BC #-}
-simOutB_RF_RF_AB = processSimOutput $(collectSimResults 300 $ pack <$> (snd $ topOut ReadFirst ReadFirst rst20 rst10 clk20 clk10))
+simOutB_RF_RF_AB = $(collectSimResults (length opsB+1) $ pack <$> (snd $ topOut ReadFirst ReadFirst rst20 rst10 clk20 clk10))
 {-# INLINE simOutB_RF_RF_AB #-}
-simOutB_RF_RF_BC = processSimOutput $(collectSimResults 300 $ pack <$> (snd $ topOut ReadFirst ReadFirst rst10 rst7 clk10 clk7))
+simOutB_RF_RF_BC = $(collectSimResults (length opsB+1) $ pack <$> (snd $ topOut ReadFirst ReadFirst rst10 rst7 clk10 clk7))
 {-# INLINE simOutB_RF_RF_BC #-}
-simOutB_RF_NC_AB = processSimOutput $(collectSimResults 300 $ pack <$> (snd $ topOut ReadFirst NoChange rst20 rst10 clk20 clk10))
+simOutB_RF_NC_AB = $(collectSimResults (length opsB+1) $ pack <$> (snd $ topOut ReadFirst NoChange rst20 rst10 clk20 clk10))
 {-# INLINE simOutB_RF_NC_AB #-}
-simOutB_RF_NC_BC = processSimOutput $(collectSimResults 300 $ pack <$> (snd $ topOut ReadFirst NoChange rst10 rst7 clk10 clk7))
+simOutB_RF_NC_BC = $(collectSimResults (length opsB+1) $ pack <$> (snd $ topOut ReadFirst NoChange rst10 rst7 clk10 clk7))
 {-# INLINE simOutB_RF_NC_BC #-}
-simOutB_NC_WF_AB = processSimOutput $(collectSimResults 300 $ pack <$> (snd $ topOut NoChange WriteFirst rst20 rst10 clk20 clk10))
+simOutB_NC_WF_AB = $(collectSimResults (length opsB+1) $ pack <$> (snd $ topOut NoChange WriteFirst rst20 rst10 clk20 clk10))
 {-# INLINE simOutB_NC_WF_AB #-}
-simOutB_NC_WF_BC = processSimOutput $(collectSimResults 300 $ pack <$> (snd $ topOut NoChange WriteFirst rst10 rst7 clk10 clk7))
+simOutB_NC_WF_BC = $(collectSimResults (length opsB+1) $ pack <$> (snd $ topOut NoChange WriteFirst rst10 rst7 clk10 clk7))
 {-# INLINE simOutB_NC_WF_BC #-}
-simOutB_NC_RF_AB = processSimOutput $(collectSimResults 300 $ pack <$> (snd $ topOut NoChange ReadFirst rst20 rst10 clk20 clk10))
+simOutB_NC_RF_AB = $(collectSimResults (length opsB+1) $ pack <$> (snd $ topOut NoChange ReadFirst rst20 rst10 clk20 clk10))
 {-# INLINE simOutB_NC_RF_AB #-}
-simOutB_NC_RF_BC = processSimOutput $(collectSimResults 300 $ pack <$> (snd $ topOut NoChange ReadFirst rst10 rst7 clk10 clk7))
+simOutB_NC_RF_BC = $(collectSimResults (length opsB+1) $ pack <$> (snd $ topOut NoChange ReadFirst rst10 rst7 clk10 clk7))
 {-# INLINE simOutB_NC_RF_BC #-}
-simOutB_NC_NC_AB = processSimOutput $(collectSimResults 300 $ pack <$> (snd $ topOut NoChange NoChange rst20 rst10 clk20 clk10))
+simOutB_NC_NC_AB = $(collectSimResults (length opsB+1) $ pack <$> (snd $ topOut NoChange NoChange rst20 rst10 clk20 clk10))
 {-# INLINE simOutB_NC_NC_AB #-}
-simOutB_NC_NC_BC = processSimOutput $(collectSimResults 300 $ pack <$> (snd $ topOut NoChange NoChange rst10 rst7 clk10 clk7))
+simOutB_NC_NC_BC = $(collectSimResults (length opsB+1) $ pack <$> (snd $ topOut NoChange NoChange rst10 rst7 clk10 clk7))
 {-# INLINE simOutB_NC_NC_BC #-}
