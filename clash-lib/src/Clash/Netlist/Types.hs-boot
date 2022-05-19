@@ -1,6 +1,7 @@
 {-|
   Copyright   :  (C) 2018, Google Inc,
                      2022, QBayLogic B.V.
+                     2022, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -11,7 +12,11 @@ module Clash.Netlist.Types where
 
 import Control.DeepSeq (NFData)
 import Control.Lens (Lens')
-import Data.Hashable
+import Data.Aeson (FromJSON)
+import Data.Binary (Binary)
+import Data.Hashable (Hashable)
+import Data.Map (Map)
+import Data.Text (Text)
 
 data IdentifierType
 data Identifier
@@ -38,3 +43,26 @@ instance Hashable PreserveCase
 instance Eq PreserveCase
 instance Show PreserveCase
 instance NFData PreserveCase
+
+data Blocking
+  = NonBlocking
+  | Blocking
+
+instance Binary Blocking
+instance Eq Blocking
+instance Hashable Blocking
+instance NFData Blocking
+instance Show Blocking
+
+data Usage
+  = Cont
+  | Proc Blocking
+
+instance Binary Usage
+instance Eq Usage
+instance FromJSON Usage
+instance Hashable Usage
+instance NFData Usage
+instance Show Usage
+
+type UsageMap = Map Text Usage

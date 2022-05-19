@@ -2,6 +2,7 @@
   Copyright  :  (C) 2015-2016, University of Twente,
                     2017     , Myrtle Software Ltd, Google Inc.,
                     2021-2022, QBayLogic B.V.
+                    2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -26,7 +27,7 @@ import SrcLoc (SrcSpan)
 #endif
 
 import Clash.Driver.Types (ClashOpts)
-import {-# SOURCE #-} Clash.Netlist.Types
+import {-# SOURCE #-} Clash.Netlist.Types hiding (Usage)
 import Clash.Netlist.BlackBox.Types
 
 import Clash.Signal.Internal                (VDomainConfiguration)
@@ -107,7 +108,7 @@ class HasIdentifierSet state => Backend state where
   extractTypes     :: state -> HashSet HWType
 
   -- | Generate HDL for a Netlist component
-  genHDL           :: ModName -> SrcSpan -> IdentifierSet -> Component -> Ap (State state) ((String, Doc),[(String,Doc)])
+  genHDL           :: ModName -> SrcSpan -> IdentifierSet -> UsageMap -> Component -> Ap (State state) ((String, Doc),[(String,Doc)])
   -- | Generate a HDL package containing type definitions for the given HWTypes
   mkTyPackage      :: ModName -> [HWType] -> Ap (State state) [(String, Doc)]
   -- | Convert a Netlist HWType to a target HDL type

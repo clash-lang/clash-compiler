@@ -91,7 +91,7 @@ alteraPllTemplate bbCtx = do
 
  getAp $ blockDecl alteraPll $ concat
   [[ NetDecl Nothing locked Bit
-   , NetDecl' Nothing Reg pllLock Bool Nothing]
+   , NetDecl Nothing pllLock Bool]
   ,[ NetDecl Nothing clkNm ty | (clkNm,ty) <- zip clocks tys]
   ,[ InstDecl Comp Nothing [] compName alteraPll_inst [] $ NamedPortMap $ concat
       [ [ (instPort "refclk", In, clkTy, clk)
@@ -101,7 +101,7 @@ alteraPllTemplate bbCtx = do
    , CondAssignment pllLock Bool (Identifier locked Nothing) Bit
       [(Just (BitLit H),Literal Nothing (BoolLit True))
       ,(Nothing        ,Literal Nothing (BoolLit False))]
-   , Assignment result (DataCon resTy (DC (resTy,0)) $ concat
+   , Assignment result Cont (DataCon resTy (DC (resTy,0)) $ concat
                           [[Identifier k Nothing | k <- clocks]
                           ,[Identifier pllLock Nothing]])
 
@@ -130,7 +130,7 @@ altpllTemplate bbCtx = do
 
  getAp $ blockDecl alteraPll
   [ NetDecl Nothing locked  Bit
-  , NetDecl' Nothing Reg pllLock Bool Nothing
+  , NetDecl Nothing pllLock Bool
   , NetDecl Nothing pllOut clkOutTy
   , InstDecl Comp Nothing [] compName alteraPll_inst [] $ NamedPortMap $
       [ (instPort "clk", In, clkTy, clk)
@@ -140,7 +140,7 @@ altpllTemplate bbCtx = do
   , CondAssignment pllLock Bool (Identifier locked Nothing) Bit
       [(Just (BitLit H),Literal Nothing (BoolLit True))
       ,(Nothing        ,Literal Nothing (BoolLit False))]
-  , Assignment result (DataCon resTy (DC (resTy,0))
+  , Assignment result Cont (DataCon resTy (DC (resTy,0))
                         [Identifier pllOut Nothing
                         ,Identifier pllLock Nothing])
 

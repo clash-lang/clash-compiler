@@ -71,8 +71,8 @@ assertOneVGA (Component _ _ _ ds)
   -- Multiple cases as mkUniqueIdentifier Basic
   -- in VHDL changes names to be lowercase.
   --
-  isVGADecl (NetDecl' _ Wire (Id.toText -> "vga") _ _) = True
-  isVGADecl (NetDecl' _ Wire (Id.toText -> "VGA") _ _) = True
+  isVGADecl (NetDecl' _ (Id.toText -> "vga") _ _) = True
+  isVGADecl (NetDecl' _ (Id.toText -> "VGA") _ _) = True
   isVGADecl _ = False
 
 mainVHDL :: IO ()

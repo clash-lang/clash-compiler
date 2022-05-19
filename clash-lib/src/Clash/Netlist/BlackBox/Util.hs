@@ -3,6 +3,7 @@
                     2016-2017, Myrtle Software Ltd,
                     2021-2022, QBayLogic B.V.
                     2022     , LUMI GUIDE FIETSDETECTIE B.V.
+                    2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -117,7 +118,7 @@ inputHole = \case
   IsActiveEnable n -> pure n
   IsUndefined n    -> pure n
   StrCmp _ n       -> pure n
-  OutputWireReg n  -> pure n
+  OutputUsage n    -> pure n
   Vars n           -> pure n
   GenSym _ _       -> Nothing
   Repeat _ _       -> Nothing
@@ -227,7 +228,7 @@ setSym bbCtx l = do
               let decls = case typeSize hwTy of
                     0 -> []
                     _ -> [N.NetDecl Nothing nm' hwTy
-                         ,N.Assignment nm' e'
+                         ,N.Assignment nm' N.Cont e' -- TODO De-hardcode Cont
                          ]
               _2 %= (IntMap.insert i (Id.toText nm',decls))
               return (ToVar [Text (Id.toLazyText nm')] i)
@@ -789,9 +790,19 @@ renderTag b (FilePath e)    = case e of
 renderTag b (IncludeName n) = case indexMaybe (bbQsysIncName b) n of
   Just nm -> return (Text.fromStrict nm)
   _ -> error $ $(curLoc) ++ "~INCLUDENAME[" ++ show n ++ "] does not correspond to any index of the 'includes' field that is specified in the primitive definition"
-renderTag b (OutputWireReg n) = case IntMap.lookup n (bbFunctions b) of
-  Just ((_,rw,_,_,_,_):_) -> case rw of {N.Wire -> return "wire"; N.Reg -> return "reg"}
-  _ -> error $ $(curLoc) ++ "~OUTPUTWIREREG[" ++ show n ++ "] used where argument " ++ show n ++ " is not a function"
+renderTag b (OutputUsage n) = do
+  hdl <- gets hdlKind
+
+  let u = case IntMap.lookup n (bbFunctions b) of
+            Just ((_,u',_,_,_,_):_) -> u'
+            _ -> error $ $(curLoc) ++ "~OUTPUTUSAGE[" ++ show n ++ "] used where argument " ++ show n ++ " is not a function"
+
+  pure $ case (hdl, u) of
+    (VHDL, N.Proc N.Blocking) -> "variable"
+    (VHDL, _) -> "signal"
+
+    (_, N.Cont) -> "wire"
+    (_, _) -> "reg"
 renderTag b (Repeat [es] [i]) = do
   i'  <- Text.unpack <$> renderTag b i
   es' <- renderTag b es
@@ -1033,7 +1044,7 @@ prettyElem (SigD es mI) = do
            (((string "~SIGD" <> brackets (string es')) <>) . int)
            mI)
 prettyElem (Vars i) = renderOneLine <$> (string "~VARS" <> brackets (int i))
-prettyElem (OutputWireReg i) = renderOneLine <$> (string "~RESULTWIREREG" <> brackets (int i))
+prettyElem (OutputUsage n) = renderOneLine <$> (string "~OUTPUTUSAGE" <> brackets (int n))
 prettyElem (ArgGen n x) =
   renderOneLine <$> (string "~ARGN" <> brackets (int n) <> brackets (int x))
 prettyElem (Template bbname source) = do
@@ -1108,7 +1119,7 @@ walkElement f el = maybeToList (f el) ++ walked
         IsActiveEnable _ -> []
         IsUndefined _ -> []
         StrCmp es _ -> concatMap go es
-        OutputWireReg _ -> []
+        OutputUsage _ -> []
         Vars _ -> []
         Repeat es1 es2 ->
           concatMap go es1 ++ concatMap go es2
@@ -1186,7 +1197,7 @@ getUsedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
         IW64 -> Nothing
         Length _ -> Nothing
         MaxIndex _ -> Nothing
-        OutputWireReg _ -> Nothing
+        OutputUsage _ -> Nothing
         Repeat _ _ -> Nothing
         Result -> Nothing
         Sel _ _ -> Nothing

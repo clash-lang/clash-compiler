@@ -1,6 +1,7 @@
 - BlackBox:
     name: Clash.Signal.Internal.delay#
     kind: Declaration
+    outputUsage: NonBlocking
     type: |-
       delay#
         :: ( KnownDomain dom        -- ARG[0]
@@ -28,6 +29,7 @@
 - BlackBox:
     name: Clash.Signal.Internal.asyncRegister#
     kind: Declaration
+    outputUsage: NonBlocking
     type: |-
       asyncRegister#
         :: ( KnownDomain dom        -- ARG[0]
@@ -56,6 +58,7 @@
 - BlackBox:
     name: Clash.Signal.Internal.register#
     kind: Declaration
+    outputUsage: NonBlocking
     type: |-
       register#
         :: ( KnownDomain dom        -- ARG[0]
@@ -84,6 +87,7 @@
 - BlackBox:
     name: Clash.Signal.Internal.clockGen
     kind: Declaration
+    outputUsage: Blocking
     type: |-
       clockGen
         :: KnownDomain dom     -- ARG[0]
@@ -139,6 +143,7 @@
 - BlackBox:
     name: Clash.Signal.Internal.resetGenN
     kind: Declaration
+    outputUsage: Blocking
     type: 'resetGenN :: (KnownDomain
       dom, 1 <= n) => SNat n -> Reset dom'
     template: |-

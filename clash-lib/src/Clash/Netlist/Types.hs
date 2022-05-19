@@ -39,6 +39,8 @@ import Control.Monad.Reader                 (ReaderT, MonadReader)
 import qualified Control.Monad.State        as Lazy (State)
 import qualified Control.Monad.State.Strict as Strict
   (State, MonadIO, MonadState, StateT)
+import Data.Aeson                           (FromJSON(..))
+import qualified Data.Aeson as Aeson
 import Data.Bits                            (testBit)
 import Data.Binary                          (Binary(..))
 import Data.Function                        (on)
@@ -49,6 +51,7 @@ import qualified Data.List                  as List
 import Data.IntMap                          (IntMap, empty)
 import Data.Map.Ordered                     (OMap)
 import Data.Map                             (Map)
+import qualified Data.Map as Map
 import Data.Maybe                           (mapMaybe)
 import Data.Monoid                          (Ap(..))
 import qualified Data.Set                   as Set
@@ -284,6 +287,7 @@ data ComponentMeta = ComponentMeta
   { cmWereVoids :: [Bool]
   , cmLoc :: SrcSpan
   , cmScope :: IdentifierSet
+  , cmUsage :: UsageMap
   } deriving (Generic, Show, NFData)
 
 type ComponentMap = OMap Unique (ComponentMeta, Component)
@@ -339,6 +343,10 @@ data NetlistState
   , _backend :: SomeBackend
   -- ^ The current HDL backend
   , _htyCache :: HWMap
+  , _usageMap :: UsageMap
+  -- ^ The current way signals are assigned in netlist. This is used to
+  -- determine how signals are rendered in HDL (i.e. wire/reg in Verilog, or
+  -- signal/variable in VHDL).
   }
 
 data ComponentPrefix
@@ -366,7 +374,7 @@ data Component
   = Component
   { componentName :: !Identifier -- ^ Name of the component
   , inputs        :: [(Identifier,HWType)] -- ^ Input ports
-  , outputs       :: [(WireOrReg,(Identifier,HWType),Maybe Expr)] -- ^ Output ports
+  , outputs       :: [(Usage,(Identifier,HWType),Maybe Expr)] -- ^ Output ports
   , declarations  :: [Declaration] -- ^ Internal declarations
   }
   deriving (Show, Generic, NFData)
@@ -504,6 +512,7 @@ data Declaration
   -- | Signal assignment
   = Assignment
       !Identifier -- ^ Signal to assign
+      !Usage      -- ^ How the signal is assigned
       !Expr       -- ^ Assigned expression
 
   -- | Conditional signal assignment:
@@ -536,7 +545,6 @@ data Declaration
   -- | Signal declaration
   | NetDecl'
       (Maybe Comment)                -- ^ Note; will be inserted as a comment in target hdl
-      WireOrReg                      -- ^ Wire or register
       !Identifier                    -- ^ Name of signal
       HWType                         -- ^ Type of signal
       (Maybe Expr)                   -- ^ Initial value
@@ -579,13 +587,110 @@ data Seq
       [(Maybe Literal,[Seq])]  -- ^ List of: (Maybe match, RHS of Alternative)
   deriving Show
 
+-- | Procedural assignment in HDL can be blocking or non-blocking. This
+-- determines when the assignment takes place in simulation. The name refers to
+-- whether evaluation of the remaining statements in a process is blocked
+-- until the assignment is performed or not.
+--
+-- See Also:
+--
+-- IEEE 1364-2001, sections 9.2.1 and 9.2.2
+-- IEEE 1076-1993, sections 8.4 and 8.5
+--
+data Blocking
+  = NonBlocking
+  -- ^ A non-blocking assignment means the new value is not observed until the
+  -- next time step in simulation. Using the signal later in the process will
+  -- continue to return the old value.
+  | Blocking
+  -- ^ A blocking assignment means the new value is observed immediately. Using
+  -- the signal later in the process will return the new value.
+  deriving (Binary, Eq, Generic, Hashable, NFData, Show)
+
+-- NOTE [`Semigroup` instances for `Blocking` and `Usage`]
+instance Semigroup Blocking where
+  NonBlocking <> y = y
+  Blocking    <> _ = Blocking
+
+-- | The usage of a signal refers to how the signal is written to in netlist.
+-- This is used to determine if the signal should be a @wire@ or @reg@ in
+-- (System)Verilog, or a @signal@ or @variable@ in VHDL.
+--
+data Usage
+  = Cont
+  -- ^ Continuous assignment, which occurs in a concurrent context.
+  | Proc Blocking
+  -- ^ Procedural assignment, which occurs in a sequential context.
+  deriving (Binary, Eq, Generic, Hashable, NFData, Show)
+
+-- NOTE [`Semigroup` instances for `Blocking` and `Usage`]
+instance Semigroup Usage where
+  Cont    <> y      = y
+  Proc x  <> Proc y = Proc (x <> y)
+  Proc x  <> _      = Proc x
+
+{-
+NOTE [`Semigroup` instances for `Blocking` and `Usage`]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Usages (and Blocking) are combined by taking the most restrictive usage, where
+most restrictive means "has the most influence over the choice of declaration".
+Clash produces three types of assignment:
+
+  * continuous
+  * prodecural non-blocking
+  * prodecural blocking
+
+Both VHDl and (System)Verilog have a type of declaration which only admits one
+type of assignment. This is the most restrictive for that HDL. However, since
+that would involve knowing the HDL type in these Semigroup instances, the
+most restrictive here is based on ordering where the most restrictive for each
+HDL is an extreme value (max for VHDL, min for Verilog). i.e.
+
+          |-------------------------------------|
+          | Continuous | NonBlocking | Blocking |
+|---------|-------------------------------------|
+|    VHDL |         signal           | variable |
+|---------|-------------------------------------|
+| Verilog |   wire     |          reg           |
+|---------|-------------------------------------|
+-}
+
+instance FromJSON Usage where
+  parseJSON = Aeson.withText "Usage" $ \case
+    "Continuous"  -> pure Cont
+    "NonBlocking" -> pure (Proc NonBlocking)
+    "Blocking"    -> pure (Proc Blocking)
+    str           -> fail $ mconcat
+      [ "Could not parse usage: "
+      , show str
+      , "\nRecognized values are 'Continuous', 'NonBlocking' and 'Blocking'"
+      ]
+
+-- See NOTE [`Text` key for `UsageMap`]
+type UsageMap = Map Text Usage
+
+lookupUsage :: Identifier -> UsageMap -> Maybe Usage
+lookupUsage i = Map.lookup (Id.toText i)
+
+{-
+NOTE [`Text` key for `UsageMap`]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We would like to use netlist identifiers as the key for the usage map, since
+concepturally it is a map from an identifier to how it is used in assignments.
+However, in practice we commonly end up with the same textual identifier
+appearing in different ways in the netlist.
+
+The most obvious example of this are identifiers that appear as both
+`UniqueIdentifier` and `RawIdentifier`. If we track the usage on the raw
+identifier, but the `NetDecl` uses the `UniqueIdentifier` then the wrong
+declaration may be used in the rendered HDL.
+
+Attempting to fix this by not generating the same textual identifier in
+different ways proved difficult, so for now the key type is `Text` instead.
+-}
+
 data EntityOrComponent = Entity | Comp | Empty
   deriving Show
-
-data WireOrReg = Wire | Reg
-  deriving (Show,Generic)
-
-instance NFData WireOrReg
 
 pattern NetDecl
   :: Maybe Comment
@@ -595,9 +700,9 @@ pattern NetDecl
   -> HWType
   -- ^ Type of signal
   -> Declaration
-pattern NetDecl note d ty <- NetDecl' note Wire d ty _
+pattern NetDecl note d ty <- NetDecl' note d ty _
   where
-    NetDecl note d ty = NetDecl' note Wire d ty Nothing
+    NetDecl note d ty = NetDecl' note d ty Nothing
 
 data PortDirection = In | Out
   deriving (Eq,Ord,Show,Generic,NFData,Hashable)
@@ -652,6 +757,24 @@ data Expr
 instance NFData Expr where
   rnf x = x `seq` ()
 
+isConstExpr :: Expr -> Bool
+isConstExpr = \case
+  Literal{} -> True
+  DataCon _ _ es -> all isConstExpr es
+  Identifier{} -> False
+  DataTag{} -> False
+  BlackBoxE nm _ _ _ _ ctx _
+    -- When using SimIO, `reg` creates (in Haskell) the mutable reference to
+    -- some value. The blackbox for this however is simply `~ARG[0]`, so if
+    -- the argument given is constant, the rendered HDL will also be constant.
+    | nm == "Clash.Explicit.SimIO.reg" ->
+        all (\(e, _, _) -> isConstExpr e) (bbInputs ctx)
+    | otherwise -> False
+  ToBv _ _ e -> isConstExpr e
+  FromBv _ _ e -> isConstExpr e
+  IfThenElse{} -> False
+  Noop -> False
+
 -- | Literals used in an expression
 data Literal
   = NumLit    !Integer          -- ^ Number literal
@@ -690,7 +813,7 @@ data BlackBoxContext
   , bbInputs :: [(Expr,HWType,Bool)]
   -- ^ Argument names, types, and whether it is a literal
   , bbFunctions :: IntMap [(Either BlackBox (Identifier,[Declaration])
-                          ,WireOrReg
+                          ,Usage
                           ,[BlackBoxTemplate]
                           ,[BlackBoxTemplate]
                           ,[((Text,Text),BlackBox)]
@@ -759,7 +882,7 @@ data NetlistId
   | MultiId [Id]
   -- ^ A split identifier (into several sub-identifiers), needed to assign
   -- expressions of types that have to be split apart (e.g. tuples of Files)
-  deriving Show
+  deriving (Eq, Show)
 
 -- | Eliminator for 'NetlistId', fails on 'MultiId'
 netlistId1
@@ -839,6 +962,9 @@ class HasIdentifierSet s where
 
 instance HasIdentifierSet IdentifierSet where
   identifierSet = ($)
+
+instance HasIdentifierSet s => HasIdentifierSet (s, a) where
+  identifierSet = Lens._1 . identifierSet
 
 -- | An "IdentifierSetMonad" supports unique name generation for Clash Netlist
 class Monad m => IdentifierSetMonad m where

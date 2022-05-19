@@ -241,6 +241,7 @@
 - BlackBox:
     name: Clash.Sized.Vector.replace_int
     kind: Declaration
+    outputUsage: Blocking
     type: 'replace_int ::
       KnownNat n => Vec n a -> Int -> a -> Vec n a'
     template: |-

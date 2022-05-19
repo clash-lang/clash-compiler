@@ -47,6 +47,7 @@
 - BlackBox:
     name: Clash.Explicit.DDR.ddrOut#
     kind: Declaration
+    outputUsage: Blocking
     type: |-
       ddrOut# :: ( HasCallStack               -- ARG[0]
                   , Undefined a                -- ARG[1]
