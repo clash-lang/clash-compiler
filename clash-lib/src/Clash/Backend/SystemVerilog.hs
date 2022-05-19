@@ -94,6 +94,7 @@ data SystemVerilogState =
     , _aggressiveXOptBB_ :: AggressiveXOptBB
     , _renderEnums_ :: RenderEnums
     , _domainConfigurations_ :: DomainMap
+    , _usages :: UsageMap
     }
 
 makeLenses ''SystemVerilogState
@@ -123,6 +124,7 @@ instance Backend SystemVerilogState where
     , _aggressiveXOptBB_=coerce (opt_aggressiveXOptBB opts)
     , _renderEnums_=coerce (opt_renderEnums opts)
     , _domainConfigurations_=emptyDomainMap
+    , _usages=mempty
     }
   hdlKind         = const SystemVerilog
   primDirs        = const $ do root <- primsRoot
@@ -201,17 +203,20 @@ genSystemVerilog
   :: ModName
   -> SrcSpan
   -> IdentifierSet
+  -> UsageMap
   -> Component
   -> SystemVerilogM ((String, Doc), [(String, Doc)])
-genSystemVerilog _ sp seen c = do
+genSystemVerilog _ sp seen us c = do
     -- Don't have type names conflict with module names or with previously
     -- generated type names.
     --
     -- TODO: Collect all type names up front, to prevent relatively costly union.
     -- TODO: Investigate whether type names / signal names collide in the first place
-    Ap $ idSeen %= Id.union seen
+    Ap $ do
+      idSeen %= Id.union seen
+      usages .= us
+      setSrcSpan sp
 
-    Ap $ setSrcSpan sp
     v    <- verilog
     incs <- Ap $ use includes
     return ((TextS.unpack (Id.toText cName), v), incs)
@@ -525,7 +530,7 @@ module_ c =
   modEnding  = "endmodule"
 
   inPorts  = sequence [ sigPort (Nothing,isBiSignalIn ty) (i,ty) Nothing | (i,ty)  <- inputs c  ]
-  outPorts = sequence [ sigPort (Just wr,False) p iEM | (wr, p, iEM) <- outputs c ]
+  outPorts = sequence [ sigPort (Just u,False) p iEM | (u, p, iEM) <- outputs c ]
 
   -- NOTE [net types and data types]
   --
@@ -676,7 +681,7 @@ decls ds = do
       _  -> punctuate' semi (A.pure dsDoc)
 
 decl :: Declaration -> SystemVerilogM (Maybe Doc)
-decl (NetDecl' noteM _ id_ tyE iEM) =
+decl (NetDecl' noteM id_ tyE iEM) =
   Just A.<$> maybe id addNote noteM (addAttrs attrs (typ tyE))
   where
     typ ty = sigDecl (pretty id_) ty <> iE
@@ -789,7 +794,7 @@ inst_ (TickDecl {}) = return Nothing
 
 inst_ (CompDecl {}) = return Nothing
 
-inst_ (Assignment id_ e) = fmap Just $
+inst_ (Assignment id_ Cont e) = fmap Just $
   "assign" <+> pretty id_ <+> equals <+> align (expr_ False e <> semi)
 
 inst_ (CondAssignment id_ ty scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $ do
@@ -880,6 +885,9 @@ inst_ (NetDecl' {}) = return Nothing
 inst_ (ConditionalDecl cond ds) = Just <$>
   "`ifdef" <+> pretty cond <> line <> indent 2 (insts ds) <> line <> "`endif"
 
+inst_ d =
+  error ("inst_: " ++ show d)
+
 -- | Render a data constructor application for data constructors having a
 -- custom bit representation.
 customReprDataCon
@@ -964,8 +972,9 @@ seq_ (Branch scrut scrutTy es) =
           "end") <:> conds es'
 
 seq_ (SeqDecl sd) = case sd of
-  Assignment id_ e ->
-    pretty id_ <+> equals <+> expr_ False e <> semi
+  Assignment id_ (Proc b) e ->
+    let sym = case b of { Blocking -> equals; NonBlocking -> "<=" }
+     in pretty id_ <+> sym <+> expr_ False e <> semi
 
   BlackBoxD {} ->
     fromMaybe <$> emptyDoc <*> inst_ sd

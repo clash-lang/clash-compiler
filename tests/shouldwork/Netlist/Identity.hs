@@ -20,9 +20,9 @@ testPath = "tests/shouldwork/Netlist/Identity.hs"
 assertAssignsInOut :: Component -> IO ()
 assertAssignsInOut (Component _ [i] [o] ds) =
   case ds of
-    [Assignment oName (Identifier iName Nothing)]
+    [Assignment oName _ (Identifier iName Nothing)]
       | Id.toText iName == Id.toText (fst i)
-      , Id.toText oName == Id.toText (fst ((\(_,x,_) -> x) o))
+      , Id.toText oName == Id.toText ((\(_,(n,_),_) -> n) o)
       -> return ()
       | otherwise -> P.error [I.i|
           Incorrect input/output names:

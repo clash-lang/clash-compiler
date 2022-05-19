@@ -74,7 +74,7 @@ import           Clash.Netlist.BlackBox.Types         (HdlSyn)
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
 import qualified Clash.Netlist.Id                     as Id
-import           Clash.Netlist.Types                  hiding (intWidth)
+import           Clash.Netlist.Types as N             hiding (intWidth)
 import           Clash.Netlist.Util
 import           Clash.Signal.Internal                (ActiveEdge (..))
 import           Clash.Util
@@ -102,6 +102,7 @@ data VerilogState =
     , _undefValue :: Maybe (Maybe Int)
     , _aggressiveXOptBB_ :: AggressiveXOptBB
     , _domainConfigurations_ :: DomainMap
+    , _usages :: UsageMap
     }
 
 makeLenses ''VerilogState
@@ -126,6 +127,7 @@ instance Backend VerilogState where
     , _undefValue=opt_forceUndefined opts
     , _aggressiveXOptBB_=coerce (opt_aggressiveXOptBB opts)
     , _domainConfigurations_=emptyDomainMap
+    , _usages=mempty
     }
   hdlKind         = const Verilog
   primDirs        = const $ do root <- primsRoot
@@ -200,17 +202,20 @@ type VerilogM a = Ap (State VerilogState) a
 genVerilog
   :: SrcSpan
   -> IdentifierSet
+  -> UsageMap
   -> Component
   -> VerilogM ((String, Doc), [(String, Doc)])
-genVerilog sp seen c = do
+genVerilog sp seen usage c = do
     -- Don't have type names conflict with module names or with previously
     -- generated type names.
     --
     -- TODO: Collect all type names up front, to prevent relatively costly union.
     -- TODO: Investigate whether type names / signal names collide in the first place
-    Ap $ idSeen %= Id.union seen
+    Ap $ do
+      idSeen %= Id.union seen
+      usages .= usage
+      setSrcSpan sp
 
-    Ap (setSrcSpan sp)
     v    <- commentHeader <> line <> nettype <> line <> timescale <> line <> module_ c
     incs <- Ap $ use includes
     return ((TextS.unpack (Id.toText cName), v), incs)
@@ -224,20 +229,27 @@ genVerilog sp seen c = do
     timescale = "`timescale 100fs/100fs"
 
 sigPort
-  :: Maybe WireOrReg
+  :: VerilogM Doc
+  -> Maybe N.Usage
   -> Identifier
   -> HWType
   -> Maybe Expr
   -> VerilogM Doc
-sigPort wor (Id.toText -> pName) hwType iEM =
+sigPort def mu (Id.toText -> pName) hwType iEM = do
     addAttrs (hwTypeAttrs hwType)
       (portType <+> verilogType hwType <+> stringS pName <> iE <> encodingNote hwType)
   where
-    portType = case wor of
-                 -- See NOTE [net and variable ports]
-                 Nothing   -> if isBiSignalIn hwType then "inout wire" else "input wire"
-                 Just Wire -> "output" <+> "wire"
-                 Just Reg  -> "output" <+> "reg"
+    portType =
+      -- See NOTE [net and variable ports]
+      case mu of
+        Just Cont ->
+          "output wire"
+
+        Just Proc{} ->
+          "output reg"
+
+        Nothing ->
+          if isBiSignalIn hwType then "inout wire" else def <+> "wire"
 
     iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM
 
@@ -300,8 +312,11 @@ module_ c =
     modBody    = indent 2 (decls (declarations c)) <> line <> line <> indent 2 (insts (declarations c))
     modEnding  = "endmodule"
 
-    inPorts  = sequence [ sigPort Nothing id_ hwType Nothing | (id_, hwType) <- inputs c  ]
-    outPorts = sequence [ sigPort (Just wireOrReg) id_ hwType iEM | (wireOrReg, (id_, hwType), iEM) <- outputs c ]
+    inPorts  = sequence [ sigPort "input" Nothing id_ hwType Nothing | (id_, hwType) <- inputs c  ]
+    outPorts = do
+      us <- use usages
+      let useOf i u = lookupUsage i us <> Just u
+      sequence [ sigPort "output" (useOf id_ u) id_ hwType iEM | (u,(id_, hwType), iEM) <- outputs c ]
 
     -- slightly more readable than 'tupled', makes the output Haskell-y-er
     commafy v = (comma <> space) <> pure v
@@ -335,10 +350,10 @@ uselibs xs = line <>
   indent 2 (string "`uselib" <+> (hsep (mapM (\l -> ("lib=" <> string l)) xs)))
   <> line <> line
 
-wireRegFileDoc :: WireOrReg -> HWType -> VerilogM Doc
-wireRegFileDoc _    FileType  = "integer"
-wireRegFileDoc Wire _         = "wire"
-wireRegFileDoc Reg  _         = "reg"
+usageFileDoc :: Maybe N.Usage -> HWType -> VerilogM Doc
+usageFileDoc _             FileType  = "integer"
+usageFileDoc (Just Proc{}) _         = "reg"
+usageFileDoc _             _         = "wire"
 
 verilogType :: HWType -> VerilogM Doc
 verilogType t = case t of
@@ -404,8 +419,10 @@ renderAttr (BoolAttr'    key False) = pack $ concat [key, " = ", "0"]
 renderAttr (Attr'        key      ) = pack $ key
 
 decl :: Declaration -> VerilogM (Maybe Doc)
-decl (NetDecl' noteM wr id_ tyE iEM) =
-  Just A.<$> maybe id addNote noteM (addAttrs attrs (wireRegFileDoc wr tyE <+> tyDec tyE))
+decl (NetDecl' noteM id_ tyE iEM) = do
+  us <- use usages
+  let u = lookupUsage id_ us
+  Just A.<$> maybe id addNote noteM (addAttrs attrs (usageFileDoc u tyE <+> tyDec tyE))
   where
     tyDec ty = sigDecl (pretty id_) ty <> iE
     addNote n = mappend ("//" <+> stringS n <> line)
@@ -515,7 +532,7 @@ inst_' id_ scrut scrutTy es = fmap Just $
 inst_ :: Declaration -> VerilogM (Maybe Doc)
 inst_ (TickDecl {}) = return Nothing
 inst_ (CompDecl {}) = return Nothing
-inst_ (Assignment id_ e) = fmap Just $
+inst_ (Assignment id_ Cont e) = fmap Just $
   "assign" <+> pretty id_ <+> equals <+> expr_ False e <> semi
 
 inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
@@ -579,6 +596,9 @@ inst_ (NetDecl' {}) = return Nothing
 inst_ (ConditionalDecl cond ds) = Just <$>
   "`ifdef" <+> pretty cond <> line <> indent 2 (insts ds) <> line <> "`endif"
 
+inst_ d =
+  error ("inst_: " ++ show d)
+
 seq_ :: Seq -> VerilogM Doc
 seq_ (AlwaysClocked edge clk ds) =
   "always @" <>
@@ -619,8 +639,9 @@ seq_ (Branch scrut scrutTy es) =
       "end") <:> conds es'
 
 seq_ (SeqDecl sd) = case sd of
-  Assignment id_ e ->
-    pretty id_ <+> equals <+> expr_ False e <> semi
+  Assignment id_ (Proc b) e ->
+    let op = case b of { Blocking -> equals; NonBlocking -> "<=" }
+     in pretty id_ <+> op <+> expr_ False e <> semi
 
   BlackBoxD {} ->
     fromMaybe <$> emptyDoc <*> inst_ sd

@@ -3,6 +3,7 @@
                     2017     , Myrtle Software Ltd
                     2018     , Google Inc.
                     2021     , QBayLogic B.V.
+                    2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -61,8 +62,8 @@ import           Clash.Netlist.BlackBox.Types
 hashCompiledPrimitive :: CompiledPrimitive -> Int
 hashCompiledPrimitive (Primitive {name, primSort}) = hash (name, primSort)
 hashCompiledPrimitive (BlackBoxHaskell {function}) = fst function
-hashCompiledPrimitive (BlackBox {name, kind, outputReg, libraries, imports, includes, template}) =
-  hash (name, kind, outputReg, libraries, imports, includes', hashBlackbox template)
+hashCompiledPrimitive (BlackBox {name, kind, outputUsage, libraries, imports, includes, template}) =
+  hash (name, kind, outputUsage, libraries, imports, includes', hashBlackbox template)
     where
       includes' = map (\(nms, bb) -> (nms, hashBlackbox bb)) includes
       hashBlackbox (BBTemplate bbTemplate) = hash bbTemplate
@@ -99,7 +100,7 @@ resolvePrimitive' _metaPath (Primitive name wf primType) =
   return (name, HasBlackBox [] (Primitive name wf primType))
 resolvePrimitive' metaPath BlackBox{template=t, includes=i, resultNames=r, resultInits=ri, ..} = do
   let resolveSourceM = traverse (traverse (resolveTemplateSource metaPath))
-  bb <- BlackBox name workInfo renderVoid multiResult kind () outputReg libraries imports functionPlurality
+  bb <- BlackBox name workInfo renderVoid multiResult kind () outputUsage libraries imports functionPlurality
           <$> mapM (traverse resolveSourceM) i
           <*> traverse resolveSourceM r
           <*> traverse resolveSourceM ri

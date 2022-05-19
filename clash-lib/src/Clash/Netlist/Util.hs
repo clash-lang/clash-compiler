@@ -12,6 +12,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 #if !MIN_VERSION_ghc(8,8,0)
 {-# LANGUAGE MonadFailDesugaring #-}
@@ -27,7 +28,7 @@ module Clash.Netlist.Util where
 
 import           Data.Coerce             (coerce)
 import           Control.Exception       (throw)
-import           Control.Lens            ((.=))
+import           Control.Lens            ((.=), (%=))
 import qualified Control.Lens            as Lens
 import           Control.Monad           (when, zipWithM)
 import           Control.Monad.Extra     (concatMapM)
@@ -40,6 +41,7 @@ import           Control.Monad.Trans.Except
 import           Data.Bifunctor          (second)
 import           Data.Either             (partitionEithers)
 import           Data.Foldable           (Foldable(toList))
+import           Data.Functor            (($>))
 import           Data.Hashable           (Hashable)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
@@ -74,7 +76,8 @@ import           Clash.Annotations.BitRepresentation.ClashLib
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, ConstrRepr'(..), DataRepr'(..), getDataRepr,
    uncheckedGetConstrRepr)
-import           Clash.Backend           (HWKind(..), hdlHWTypeKind)
+import           Clash.Annotations.Primitive (HDL(VHDL))
+import           Clash.Backend           (HWKind(..), hdlHWTypeKind, hdlKind)
 import           Clash.Core.DataCon      (DataCon (..))
 import           Clash.Core.EqSolver     (typeEq)
 import           Clash.Core.FreeVars     (typeFreeVars, typeFreeVars')
@@ -786,7 +789,6 @@ mkUniqueNormalized is0 topMM (args, binds, res) = do
   resM <- mkUniqueResult substArgs etopM res
   case resM of
     Just (oports, owrappers, res1, subst0) -> do
-
       -- Collect new names, see 'renameBinder' for more information
       (listToMaybe -> resRenameM0, HashMap.fromList -> renames0) <-
         partition ((== res) . fst) <$> concatMapM renameBinder binds
@@ -1035,7 +1037,7 @@ preserveState action = do
   State.put state
   pure val
 
--- | Preserve the Netlist '_curCompNm','_seenIds' when executing
+-- | Preserve the Netlist '_curCompNm','_seenIds','_usageMap' when executing
 -- a monadic action
 preserveVarEnv
   :: NetlistMonad a
@@ -1044,11 +1046,13 @@ preserveVarEnv action = do
   -- store state
   vComp <- Lens.use curCompNm
   vSeen <- Lens.use seenIds
+  vUses <- Lens.use usageMap
   -- perform action
   val <- action
   -- restore state
   curCompNm .= vComp
   seenIds   .= vSeen
+  usageMap  .= vUses
   return val
 
 dcToLiteral :: HWType -> Int -> Literal
@@ -1068,8 +1072,205 @@ prefixParent parent (PortName p)        = PortName (parent <> "_" <> p)
 prefixParent parent (PortProduct "" ps) = PortProduct parent ps
 prefixParent parent (PortProduct p ps)  = PortProduct (parent <> "_" <> p) ps
 
-mkAssign :: Identifier -> HWType -> Expr -> [Declaration]
-mkAssign id_ hwty expr = [NetDecl Nothing id_ hwty, Assignment id_ expr]
+-- | Make a new signal which is assigned with an initial value. This should be
+-- used in place of NetDecl directly, as it also updates the usage map to
+-- include the new identifier and usage.
+--
+mkInit
+  :: HasCallStack
+  => DeclarationType
+  -- ^ Are we in a concurrent or sequential context?
+  -> Usage
+  -- ^ How is the initial value assigned if the assignment is separate
+  -> Identifier
+  -- ^ The identifier of the declared net
+  -> HWType
+  -- ^ The typr of the declared net
+  -> Expr
+  -- ^ The value assigned to the net
+  -> NetlistMonad [Declaration]
+  -- ^ The declarations needed to declare and assign the net
+mkInit _ _ i ty e
+  -- When the initial value is a constant, we can set the value at the same
+  -- point the declaration happens. Initial assignments of this form do not
+  -- count as a usage as they are always allowed.
+  | isConstExpr e
+  = pure [NetDecl' Nothing i ty (Just e)]
+
+mkInit Concurrent Cont i ty e = do
+  usageMap %= Map.insert (Id.toText i) Cont
+  pure [NetDecl' Nothing i ty Nothing, Assignment i Cont e]
+
+mkInit Concurrent proc i ty e = do
+  usageMap %= Map.insert (Id.toText i) proc
+  pure
+    [ NetDecl' Nothing i ty Nothing
+    , Seq [Initial [SeqDecl (Assignment i proc e)]]
+    ]
+
+mkInit Sequential Cont _ _ _ =
+  error "mkInit: Cannot continuously assign in a sequential block"
+
+mkInit Sequential proc i ty e = do
+  usageMap %= Map.insert (Id.toText i) proc
+  pure
+    [ NetDecl' Nothing i ty Nothing
+    , Seq [SeqDecl (Assignment i proc e)]
+    ]
+
+-- | Determine if for the specified HDL, the type of assignment wanted can be
+-- performed on a signal which has been assigned another way. This identifies
+-- when a new intermediary signal needs to be created, e.g.
+--
+--   * when attempting to use blocking and non-blocking procedural assignment
+--     on the same signal in VHDL
+--
+--   * when attempting to use continuous and procedural assignment on the same
+--     signal in (System)Verilog
+--
+canUse :: HDL -> Usage -> Usage -> Bool
+canUse VHDL (Proc Blocking) = \case
+  Proc Blocking -> True
+  _ -> False
+
+canUse VHDL _ = \case
+  Proc Blocking -> False
+  _ -> True
+
+canUse _ Cont = \case
+  Cont -> True
+  _ -> False
+
+canUse _ _ = \case
+  Cont -> False
+  _ -> True
+
+declareUse :: Usage -> Identifier -> NetlistMonad ()
+declareUse u i = usageMap %= Map.insertWith (<>) (Id.toText i) u
+
+-- | Declare uses which occur as a result of a component being instantiated,
+-- for example the following design (verilog)
+--
+--    @
+--    module f ( input p; output reg r ) ... endmodule
+--
+--    module top ( ... )
+--      ...
+--      f f_inst ( .p(p), .r(foo));
+--      ...
+--    endmodule
+--    @
+--
+-- would declare a usage of foo, since it is assigned by @f_inst@.
+--
+declareInstUses
+  :: [(Expr, PortDirection, HWType, Expr)]
+  -- ^ The port mappings (named)
+  -> NetlistMonad ()
+declareInstUses =
+  mapM_ declare
+ where
+  -- Modifiers don't matter for these identifiers
+  declare (Identifier _ _, Out, _, Identifier n _) =
+    -- See NOTE [output ports are continuously assigned]
+    declareUse Cont n
+
+  declare (_, In, _, _) =
+    pure ()
+
+  declare portMapping =
+    error ("declareInstUses: Unexpected port mapping: " <> show portMapping)
+
+{-
+NOTE [output ports are continuously assigned]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a module is instantiated in Verilog, the output of the module is always
+continuously assigned. This means if I have the module
+
+  module f ( ..., output reg result)
+
+and an instantiation
+
+  f f_inst ( ..., .result(foo) );
+
+then the assignment of result to foo is a continuous assignment. This may seem
+strange, but consider
+
+  * instantiations can only occur in a concurrent context, and concurrent
+    contexts only admit continuous assignment
+
+  * the usage being tracked is not for the result port, but for foo. Whenever
+    the value of the port changes, the value of foo will change (i.e. there is
+    a wire between them, it cannot "hold" state).
+
+This means when we declare uses that occur as a result of an instantiation in
+netlist, the uses are always continuous assignment, and not the usage of the
+output port as given in the `outputs` field of the `Component` type.
+-}
+
+assignmentWith
+  :: HasCallStack
+  => (Identifier -> Declaration)
+  -> Usage
+  -> Identifier
+  -> NetlistMonad Declaration
+assignmentWith assign new i = do
+  usages <- Lens.use usageMap
+  SomeBackend b <- Lens.use backend
+
+  case lookupUsage i usages of
+    Just old | not $ canUse (hdlKind b) new old ->
+      error $ mconcat
+        [ "assignmentWith: Cannot assign as "
+        , show new
+        , " after "
+        , show old
+        , " for "
+        , show i
+        ]
+
+    _ ->
+      declareUse new i $> assign i
+
+-- | Attempt to continuously assign an expression to the given identifier. If
+-- the assignment is not allowed for the backend being used, a new signal is
+-- created which allows the assignment. The identifier which holds the result
+-- of the assignment is returned alongside the new declarations.
+--
+-- This function assumes the identifier being assigned is already declared. If
+-- the identifier is not in the usage map then an error is thrown.
+--
+contAssign
+  :: HasCallStack
+  => Identifier
+  -> Expr
+  -> NetlistMonad Declaration
+contAssign dst expr =
+  assignmentWith (\i -> Assignment i Cont expr) Cont dst
+
+procAssign
+  :: HasCallStack
+  => Blocking
+  -> Identifier
+  -> Expr
+  -> NetlistMonad Declaration
+procAssign block dst expr =
+  assignmentWith (\i -> Assignment i (Proc block) expr) (Proc block) dst
+
+condAssign
+  :: Identifier
+  -> HWType
+  -> Expr
+  -> HWType
+  -> [(Maybe Literal, Expr)]
+  -> NetlistMonad Declaration
+condAssign dst dstTy scrut scrutTy alts = do
+  -- Currently, all CondAssignment get rendered as `always @*` blocks in
+  -- (System)Verilog. This means when we target these HDL, this is _really_ a
+  -- blocking procedural assignment.
+  SomeBackend b <- Lens.use backend
+  let use = case hdlKind b of { VHDL -> Cont ; _ -> Proc Blocking }
+  assignmentWith (\i -> CondAssignment i dstTy scrut scrutTy alts) use dst
 
 -- | See 'toPrimitiveType' / 'fromPrimitiveType'
 convPrimitiveType :: HWType -> a -> NetlistMonad a -> NetlistMonad a
@@ -1092,7 +1293,8 @@ toPrimitiveType
   -> NetlistMonad ([Declaration], Identifier, Expr, HWType)
 toPrimitiveType id0 hwty0 = convPrimitiveType hwty0 dflt $ do
   id1 <- Id.next id0
-  pure (mkAssign id1 hwty1 expr, id1, expr, hwty1)
+  ds  <- mkInit Concurrent Cont id1 hwty1 expr
+  pure (ds, id1, expr, hwty1)
  where
   dflt = ([], id0, Identifier id0 Nothing, hwty0)
   hwty1 = BitVector (typeSize hwty0)
@@ -1109,7 +1311,8 @@ fromPrimitiveType
   -> NetlistMonad ([Declaration], Identifier, Expr, HWType)
 fromPrimitiveType id0 hwty0 = convPrimitiveType hwty0 dflt $ do
   id1 <- Id.next id0
-  pure (mkAssign id1 hwty0 expr, id1, expr, hwty1)
+  ds <- mkInit Concurrent Cont id1 hwty0 expr
+  pure (ds, id1, expr, hwty1)
  where
   dflt = ([], id0, Identifier id0 Nothing, hwty0)
   hwty1 = BitVector (typeSize hwty0)
@@ -1128,32 +1331,29 @@ mkTopInput (ExpandedPortName hwty0 i0) = do
 
 mkTopInput epp@(ExpandedPortProduct p hwty ps) = do
   pN <- Id.makeBasic p
-  let netdecl = NetDecl Nothing pN hwty
   case hwty of
     Vector sz eHwty -> do
       (ports, _, exprs, _) <- unzip4 <$> mapM mkTopInput ps
       let vecExpr  = mkVectorChain sz eHwty exprs
-          netassgn = Assignment pN vecExpr
-      return (concat ports, [netdecl, netassgn], vecExpr, pN)
+      decls <- mkInit Concurrent Cont pN hwty vecExpr
+      return (concat ports, decls, vecExpr, pN)
 
     RTree d eHwty -> do
       (ports, _, exprs, _) <- unzip4 <$> mapM mkTopInput ps
       let trExpr   = mkRTreeChain d eHwty exprs
-          netassgn = Assignment pN trExpr
-      return (concat ports, [netdecl, netassgn], trExpr, pN)
+      decls <- mkInit Concurrent Cont pN hwty trExpr
+      return (concat ports, decls, trExpr, pN)
 
     Product _ _ _ -> do
       (ports, _, exprs, _) <- unzip4 <$> mapM mkTopInput ps
       case exprs of
-        [expr] ->
-          let netassgn = Assignment pN expr in
-          return (concat ports, [netdecl, netassgn], expr, pN)
-        _ ->
-          let
-            dcExpr   = DataCon hwty (DC (hwty, 0)) exprs
-            netassgn = Assignment pN dcExpr
-          in
-            return (concat ports, [netdecl, netassgn], dcExpr, pN)
+        [expr] -> do
+          decls <- mkInit Concurrent Cont pN hwty expr
+          return (concat ports, decls, expr, pN)
+        _ -> do
+          let dcExpr = DataCon hwty (DC (hwty, 0)) exprs
+          decls <- mkInit Concurrent Cont pN hwty dcExpr
+          return (concat ports, decls, dcExpr, pN)
 
     SP _ ((concat . map snd) -> [elTy]) -> do
       (ports, _, exprs, _) <- unzip4 <$> mapM mkTopInput ps
@@ -1161,8 +1361,8 @@ mkTopInput epp@(ExpandedPortProduct p hwty ps) = do
         [conExpr, elExpr] -> do
           let dcExpr   = DataCon hwty (DC (BitVector (typeSize hwty), 0))
                           [conExpr, ToBv Nothing elTy elExpr]
-              netassgn = Assignment pN dcExpr
-          return (concat ports, [netdecl, netassgn], dcExpr, pN)
+          decls <- mkInit Concurrent Cont pN hwty dcExpr
+          return (concat ports, decls, dcExpr, pN)
         _ -> error $ $(curLoc) ++ "Internal error"
 
     _ ->
@@ -1265,55 +1465,58 @@ mkTopOutput (ExpandedPortName hwty0 i0) = do
     -- No type conversion happened, so we can just request caller to assign to
     -- port name directly.
     return ([(i0, hwty0)], [], i0)
-  else
+  else do
     -- Type conversion happened, so we must use intermediate variable.
-    return ([(i0, hwty1)], [Assignment i0 bvExpr, NetDecl Nothing i1 hwty0], i1)
+    assn <- contAssign i0 bvExpr
+    pure ( [(i0, hwty1)], [NetDecl' Nothing i1 hwty0 Nothing, assn], i1)
 
 mkTopOutput epp@(ExpandedPortProduct p hwty ps) = do
   pN <- Id.makeBasic p
-  let netdecl = NetDecl Nothing pN hwty
+  let netdecl = NetDecl' Nothing pN hwty Nothing
   case hwty of
     Vector {} -> do
       (ports, decls, ids) <- unzip3 <$> mapM mkTopOutput ps
-      let assigns = zipWith (assignId pN hwty 10) ids [0..]
-      return (concat ports, netdecl:assigns ++ concat decls, pN)
+      assigns <- zipWithM (\i n -> assignId pN hwty 10 i n) ids [0..]
+      return (concat ports, netdecl : assigns ++ concat decls, pN)
 
     RTree {} -> do
       (ports, decls, ids) <- unzip3 <$> mapM mkTopOutput ps
-      let assigns = zipWith (assignId pN hwty 10) ids [0..]
-      return (concat ports, netdecl:assigns ++ concat decls, pN)
+      assigns <- zipWithM (\i n -> assignId pN hwty 10 i n) ids [0..]
+      return (concat ports, netdecl : assigns ++ concat decls, pN)
 
     Product {} -> do
       (ports, decls, ids) <- unzip3 <$> mapM mkTopOutput ps
       case ids of
-        [i] -> let assign  = Assignment i (Identifier pN Nothing)
-               in  return (concat ports, netdecl:assign:concat decls, pN)
+        [i] -> do
+          assn <- contAssign i (Identifier pN Nothing)
+          pure (concat ports, netdecl : assn : concat decls, pN)
 
-        _   -> let assigns = zipWith (assignId pN hwty 0) ids [0..]
-               in return (concat ports, netdecl:assigns ++ concat decls, pN)
+        _   -> do
+          assigns <- zipWithM (\i n -> assignId pN hwty 0 i n) ids [0..]
+          pure (concat ports, netdecl : assigns ++ concat decls, pN)
 
     SP _ ((concat . map snd) -> [elTy]) -> do
       (ports, decls, ids) <- unzip3 <$> mapM mkTopOutput ps
       case ids of
-        [conId, elId] ->
+        [conId, elId] -> do
           let conIx   = Sliced ( BitVector (typeSize hwty)
                                , typeSize hwty - 1
                                , typeSize elTy )
               elIx    = Sliced ( BitVector (typeSize hwty)
                                , typeSize elTy - 1
                                , 0 )
-              assigns = [ Assignment conId (Identifier pN (Just conIx))
-                        , Assignment elId  (FromBv Nothing elTy
-                                            (Identifier pN (Just elIx)))
-                        ]
-          in  return (concat ports, netdecl:assigns ++ concat decls, pN)
+
+          conAssgn <- contAssign conId (Identifier pN (Just conIx))
+          elAssgn <- contAssign elId (FromBv Nothing elTy (Identifier pN (Just elIx)))
+
+          pure (concat ports, netdecl:conAssgn:elAssgn:concat decls, pN)
         _ -> error $ $(curLoc) ++ "Internal error"
     -- 'expandTopEntity' should have made sure this isn't possible
     _ -> error $ $(curLoc) ++ "Internal error: " ++ show epp
 
  where
   assignId p_ hwty_ con i n =
-    Assignment i (Identifier p_ (Just (Indexed (hwty_, con, n))))
+    contAssign i (Identifier p_ (Just (Indexed (hwty_, con, n))))
 
 mkTopCompDecl
   :: Maybe Text
@@ -1364,11 +1567,11 @@ mkTopUnWrapper topEntity annM dstId args tickDecls = do
 
   -- inputs
   (iports, wrappers, idsI) <- unzip3 <$> mapM mkTopInstInput (catMaybes (et_inputs annM))
-  let inpAssigns = zipWith Assignment idsI (map fst args)
+  inpAssigns <- zipWithM (\i e -> contAssign i e) idsI (fst <$> args)
 
   -- output
   let
-    iResult = inpAssigns ++ concat wrappers
+    iResult = inpAssigns : wrappers
     instLabel0 = Text.concat [topName, "_", Id.toText (fst dstId)]
 
   instLabel1 <- fromMaybe instLabel0 <$> Lens.view setName
@@ -1380,10 +1583,10 @@ mkTopUnWrapper topEntity annM dstId args tickDecls = do
 
   case topOutputM of
     Nothing ->
-      pure (topDecl [] : iResult)
+      pure (topDecl [] : concat iResult)
     Just (oports, unwrappers, id0) -> do
-      let outpAssign = Assignment (fst dstId) (Identifier id0 Nothing)
-      pure (iResult ++ tickDecls ++ (topDecl oports:unwrappers) ++ [outpAssign])
+      outpAssign <- contAssign (fst dstId) (Identifier id0 Nothing)
+      pure (concat iResult ++ tickDecls ++ (topDecl oports:unwrappers) ++ [outpAssign])
 
 data InstancePort = InstancePort
   { ip_id :: Identifier
@@ -1391,7 +1594,7 @@ data InstancePort = InstancePort
   -- arguments, so this doesn't hold a port name.
   , ip_type :: HWType
   -- ^ Type assigned to port
-  }
+  } deriving Show
 
 -- | Generate input port(s) associated with a single argument for an
 -- instantiation of a top entity. This function composes the input ports into
@@ -1405,21 +1608,21 @@ mkTopInstInput (ExpandedPortName hwty0 pN) = do
   pN' <- Id.next pN
   (decls, pN'', _bvExpr, hwty1) <- toPrimitiveType pN' hwty0
   return ( [InstancePort pN'' hwty1]
-          , NetDecl Nothing pN' hwty0 : decls
+          , NetDecl' Nothing pN' hwty0 Nothing : decls
           , pN' )
 
 mkTopInstInput epp@(ExpandedPortProduct pNameHint hwty0 ps) = do
   pName <- Id.makeBasic pNameHint
+  let pDecl = NetDecl' Nothing pName hwty0 Nothing
 
   let
-    pDecl = NetDecl Nothing pName hwty0
     (attrs, hwty1) = stripAttributes hwty0
     indexPN constr n = Identifier pName (Just (Indexed (hwty0, constr, n)))
 
   case hwty1 of
     Vector {} -> do
       (ports, decls, ids) <- unzip3 <$> mapM mkTopInstInput ps
-      let assigns = zipWith Assignment ids (map (indexPN 10) [0..])
+      let assigns = zipWith3 Assignment ids (repeat Cont) (map (indexPN 10) [0..])
       if null attrs then
         return (concat ports, pDecl:assigns ++ concat decls, pName)
       else
@@ -1427,7 +1630,7 @@ mkTopInstInput epp@(ExpandedPortProduct pNameHint hwty0 ps) = do
 
     RTree {} -> do
       (ports, decls, ids) <- unzip3 <$> mapM mkTopInstInput ps
-      let assigns = zipWith Assignment ids (map (indexPN 10) [0..])
+      let assigns = zipWith3 Assignment ids (repeat Cont) (map (indexPN 10) [0..])
       if null attrs then
         return (concat ports, pDecl:assigns ++ concat decls, pName)
       else
@@ -1435,7 +1638,7 @@ mkTopInstInput epp@(ExpandedPortProduct pNameHint hwty0 ps) = do
 
     Product {} -> do
       (ports, decls, ids) <- unzip3 <$> mapM mkTopInstInput ps
-      let assigns = zipWith Assignment ids (map (indexPN 0) [0..])
+      let assigns = zipWith3 Assignment ids (repeat Cont) (map (indexPN 0) [0..])
       if null attrs then
         return (concat ports, pDecl:assigns ++ concat decls, pName)
       else
@@ -1457,8 +1660,8 @@ mkTopInstInput epp@(ExpandedPortProduct pNameHint hwty0 ps) = do
               , 0 )
 
             assigns =
-              [ Assignment conId (Identifier pName (Just conIx))
-              , Assignment elId  (FromBv Nothing elTy (Identifier pName (Just elIx))) ]
+              [ Assignment conId Cont (Identifier pName (Just conIx))
+              , Assignment elId  Cont (FromBv Nothing elTy (Identifier pName (Just elIx))) ]
 
           return (concat ports, pDecl:assigns ++ concat decls, pName)
         _ -> error "Internal error: Unexpected error for PortProduct"
@@ -1501,19 +1704,18 @@ mkTopInstOutput
 mkTopInstOutput (ExpandedPortName hwty0 portName) = do
   assignName0 <- Id.next portName
   (decls, assignName1, _expr, hwty1) <- fromPrimitiveType assignName0 hwty0
-  return ( [InstancePort assignName0 hwty1]
-          , NetDecl Nothing assignName0 hwty1 : decls
-          , assignName1 )
+  let net = NetDecl' Nothing assignName0 hwty1 Nothing
+  return ([InstancePort assignName0 hwty1], net : decls, assignName1)
 
 mkTopInstOutput epp@(ExpandedPortProduct productNameHint hwty ps) = do
   pName <- Id.makeBasic productNameHint
-  let pDecl = NetDecl Nothing pName hwty
-      (attrs, hwty') = stripAttributes hwty
+  let pDecl = NetDecl' Nothing pName hwty Nothing
+  let (attrs, hwty') = stripAttributes hwty
   case hwty' of
     Vector sz hwty'' -> do
       (ports, decls, ids0) <- unzip3 <$> mapM mkTopInstOutput ps
       let ids1 = map (flip Identifier Nothing) ids0
-          netassgn = Assignment pName (mkVectorChain sz hwty'' ids1)
+          netassgn = Assignment pName Cont (mkVectorChain sz hwty'' ids1)
       if null attrs then
         return (concat ports, pDecl:netassgn:concat decls, pName)
       else
@@ -1522,7 +1724,7 @@ mkTopInstOutput epp@(ExpandedPortProduct productNameHint hwty ps) = do
     RTree d hwty'' -> do
       (ports, decls, ids0) <- unzip3 <$> mapM mkTopInstOutput ps
       let ids1 = map (flip Identifier Nothing) ids0
-          netassgn = Assignment pName (mkRTreeChain d hwty'' ids1)
+          netassgn = Assignment pName Cont (mkRTreeChain d hwty'' ids1)
       if null attrs then
         return (concat ports, pDecl:netassgn:concat decls, pName)
       else
@@ -1531,7 +1733,7 @@ mkTopInstOutput epp@(ExpandedPortProduct productNameHint hwty ps) = do
     Product {} -> do
       (ports, decls, ids0) <- unzip3 <$> mapM mkTopInstOutput ps
       let ids1 = map (flip Identifier Nothing) ids0
-          netassgn = Assignment pName (DataCon hwty (DC (hwty,0)) ids1)
+          netassgn = Assignment pName Cont (DataCon hwty (DC (hwty,0)) ids1)
       if null attrs then
         return (concat ports, pDecl:netassgn:concat decls, pName)
       else
@@ -1543,7 +1745,7 @@ mkTopInstOutput epp@(ExpandedPortProduct productNameHint hwty ps) = do
           ids2 = case ids1 of
                   [conId, elId] -> [conId, ToBv Nothing elTy elId]
                   _ -> error "Unexpected error for PortProduct"
-          netassgn = Assignment pName (DataCon hwty (DC (BitVector (typeSize hwty),0)) ids2)
+          netassgn = Assignment pName Cont (DataCon hwty (DC (BitVector (typeSize hwty),0)) ids2)
       return (concat ports, pDecl:netassgn:concat decls, pName)
 
     _ ->
@@ -1694,7 +1896,7 @@ data ExpandError
 -- | Same as 'expandTopEntity', but also adds identifiers to the identifier
 -- set of the monad.
 expandTopEntityOrErrM
-  :: (HasCallStack, IdentifierSetMonad m)
+  :: HasCallStack
   => [(Maybe Id, FilteredHWType)]
   -- ^ Arguments. Ids are used as name hints.
   -> (Maybe Id, FilteredHWType)
@@ -1702,36 +1904,13 @@ expandTopEntityOrErrM
   -> Maybe TopEntity
   -- ^ If /Nothing/, an expanded top entity will be generated as if /defSyn/
   -- was passed.
-  -> m (ExpandedTopEntity Identifier)
+  -> NetlistMonad (ExpandedTopEntity Identifier)
   -- ^ Either some error (see "ExpandError") or and expanded top entity. All
   -- identifiers in the expanded top entity will be added to NetlistState's
   -- IdentifierSet.
 expandTopEntityOrErrM ihwtys ohwty topM = do
   is <- identifierSetM id
-  let ett = expandTopEntityOrErr is ihwtys ohwty topM
-  Id.addMultiple (toList ett)
-  pure ett
 
--- | Take a top entity and /expand/ its port names. I.e., make sure that every
--- port that should be generated in the HDL is part of the data structure.
-expandTopEntityOrErr
-  :: HasCallStack
-  => IdentifierSet
-  -- ^ Settings of this IdentifierSet will be used to generate valid
-  -- identifiers. Note that the generated identifiers are /not/ guaranteed to be
-  -- unique w.r.t. this set.
-  -> [(Maybe Id, FilteredHWType)]
-  -- ^ Arguments. Ids are used as name hints.
-  -> (Maybe Id, FilteredHWType)
-  -- ^ Result. Id is used as name hint.
-  -> Maybe TopEntity
-  -- ^ If /Nothing/, an expanded top entity will be generated as if /defSyn/
-  -- was passed.
-  -> ExpandedTopEntity Identifier
-  -- ^ Either some error (see "ExpandError") or and expanded top entity. All
-  -- identifiers in the expanded top entity will be added to NetlistState's
-  -- IdentifierSet.
-expandTopEntityOrErr is ihwtys ohwty topM = do
   case expandTopEntity ihwtys ohwty topM of
     Left (AttrError attrs) ->
       (error [I.i|
@@ -1752,8 +1931,10 @@ expandTopEntityOrErr is ihwtys ohwty topM = do
 
         is not a product!
       |])
-    Right eTop ->
-      evalState (traverse (either Id.addRaw Id.makeBasic) eTop) (Id.clearSet is)
+    Right eTop -> do
+      let ete = evalState (traverse (either Id.addRaw Id.makeBasic) eTop) (Id.clearSet is)
+      Id.addMultiple (toList ete)
+      pure ete
 
 -- | Take a top entity and /expand/ its port names. I.e., make sure that every
 -- port that should be generated in the HDL is part of the data structure. It
@@ -1776,8 +1957,8 @@ expandTopEntity ihwtys (oId, ohwty) topEntityM = do
   -- TODO 2: Warn about duplicate fields
   let
     Synthesize{..} = fromMaybe (defSyn (error $(curLoc))) topEntityM
-    argHints = map (maybe "arg" (nameOcc . varName) . fst) ihwtys
-    resHint = maybe "result" (nameOcc . varName) oId
+    argHints = map (maybe "arg" (Id.toText . Id.unsafeFromCoreId) . fst) ihwtys
+    resHint = maybe "result" (Id.toText . Id.unsafeFromCoreId) oId
 
   inputs <- zipWith3M goInput argHints (map snd ihwtys) (extendPorts t_inputs)
 

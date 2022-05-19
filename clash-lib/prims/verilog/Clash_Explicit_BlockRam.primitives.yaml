@@ -1,7 +1,7 @@
 - BlackBox:
     name: Clash.Explicit.BlockRam.blockRam#
     kind: Declaration
-    outputReg: true
+    outputUsage: NonBlocking
     type: |-
       blockRam#
         :: ( KnownDomain dom        ARG[0]
@@ -52,7 +52,7 @@
 - BlackBox:
     name: Clash.Explicit.BlockRam.blockRamU#
     kind: Declaration
-    outputReg: true
+    outputUsage: NonBlocking
     type: |-
       blockRamU#
         :: ( KnownDomain dom        ARG[0]
@@ -95,7 +95,7 @@
 - BlackBox:
     name: Clash.Explicit.BlockRam.blockRam1#
     kind: Declaration
-    outputReg: true
+    outputUsage: NonBlocking
     type: |-
       blockRam1#
         :: ( KnownDomain dom        ARG[0]

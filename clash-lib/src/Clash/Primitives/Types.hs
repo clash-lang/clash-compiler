@@ -3,6 +3,7 @@
                     2016-2017, Myrtle Software Ltd
                     2018     , Google Inc.
                     2021     , QBayLogic B.V.
+                    2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -39,14 +40,17 @@ import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxTemplate, TemplateKind (..), RenderVoid(..))
 import           Control.Applicative          ((<|>))
 import           Control.DeepSeq              (NFData)
+import           Control.Monad                (when)
 import           Data.Aeson
   (FromJSON (..), Value (..), (.:), (.:?), (.!=))
+import           Data.Aeson.Types             (Parser)
 import           Data.Binary                  (Binary)
 import           Data.Char                    (isUpper, isLower, isAlphaNum)
 import           Data.Either                  (lefts)
 import           Data.Hashable                (Hashable)
 import qualified Data.HashMap.Strict          as H
 import           Data.List                    (intercalate)
+import           Data.Maybe                   (isJust)
 import qualified Data.Text                    as S
 import           Data.Text.Lazy               (Text)
 import           GHC.Generics                 (Generic)
@@ -165,10 +169,10 @@ data Primitive a b c d
     -- ^ A warning to be outputted when the primitive is instantiated.
     -- This is intended to be used as a warning for primitives that are not
     -- synthesizable, but may also be used for other purposes.
-  , outputReg :: Bool
-    -- ^ Verilog only: whether the result should be a /reg/(@True@) or /wire/
-    -- (@False@); when not specified in the /.primitives/ file, the value will default
-    -- to @False@ (i.e. /wire/).
+  , outputUsage :: Usage
+    -- ^ How the result is assigned in HDL. This is used to determine the
+    -- type of declaration used to render the result (wire/reg or
+    -- signal/variable). The default usage is continuous assignment.
   , libraries :: [a]
     -- ^ VHDL only: add /library/ declarations for the given names
   , imports   :: [a]
@@ -260,14 +264,22 @@ instance FromJSON UnresolvedPrimitive where
                  <|> (pure Nothing)
             fName' <- either fail return (parseBBFN fName)
             return (BlackBoxHaskell name' wf args multiResult fName' templ)
-          "BlackBox"  ->
+          "BlackBox"  -> do
+            outReg <- conVal .:? "outputReg" :: Parser (Maybe Bool)
+
+            when (isJust outReg) .
+              fail $ mconcat
+                [ "[9] 'outputReg' is no longer a recognized key.\n"
+                , "Use 'outputUsage: Continuous|NonBlocking|Blocking' instead."
+                ]
+
             BlackBox <$> conVal .: "name"
                      <*> (conVal .:? "workInfo" >>= maybe (pure Nothing) parseWorkInfo) .!= WorkVariable
                      <*> conVal .:? "renderVoid" .!= NoRenderVoid
                      <*> conVal .:? "multiResult" .!= False
                      <*> (conVal .: "kind" >>= parseTemplateKind)
                      <*> conVal .:? "warning"
-                     <*> conVal .:? "outputReg" .!= False
+                     <*> conVal .:? "outputUsage" .!= Cont
                      <*> conVal .:? "libraries" .!= []
                      <*> conVal .:? "imports" .!= []
                      <*> pure [] -- functionPlurality not supported in json

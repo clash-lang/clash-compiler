@@ -1,7 +1,8 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente
+                     2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 {-# LANGUAGE CPP #-}
 
@@ -39,7 +40,8 @@ mkExpr :: HasCallStack
        -> NetlistMonad (Expr,[Declaration])
 
 mkDcApplication :: HasCallStack
-                => [HWType]
+                => DeclarationType
+                -> [HWType]
                 -> NetlistId
                 -> DataCon
                 -> [Term]

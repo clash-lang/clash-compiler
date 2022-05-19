@@ -662,14 +662,14 @@ compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf usedArgs multiRe
       loadImportAndInterpret idirs args topDir qualMod funcName "BlackBoxFunction"
 
 compilePrimitive idirs pkgDbs topDir
-  (BlackBox pNm wf rVoid multiRes tkind () oReg libM imps fPlural incs rM riM templ) = do
+  (BlackBox pNm wf rVoid multiRes tkind () outputUsage libM imps fPlural incs rM riM templ) = do
   libM'  <- mapM parseTempl libM
   imps'  <- mapM parseTempl imps
   incs'  <- mapM (traverse parseBB) incs
   templ' <- parseBB templ
   rM'    <- traverse parseBB rM
   riM'   <- traverse parseBB riM
-  return (BlackBox pNm wf rVoid multiRes tkind () oReg libM' imps' fPlural incs' rM' riM' templ')
+  return (BlackBox pNm wf rVoid multiRes tkind () outputUsage libM' imps' fPlural incs' rM' riM' templ')
  where
   iArgs = concatMap (("-package-db":) . (:[])) pkgDbs
 
@@ -766,8 +766,8 @@ createHDL backend modName seen components domainConfs top topName = flip evalSta
   let componentsL = map snd (OMap.assocs components)
   (hdlNmDocs,incs) <-
     fmap unzip $
-      forM componentsL $ \(ComponentMeta{cmLoc, cmScope}, comp) ->
-         genHDL modName cmLoc (Id.union seen cmScope) comp
+      forM componentsL $ \(ComponentMeta{cmLoc, cmScope,cmUsage}, comp) ->
+         genHDL modName cmLoc (Id.union seen cmScope) cmUsage comp
 
   hwtys <- HashSet.toList <$> extractTypes <$> Ap get
   typesPkg <- mkTyPackage modName hwtys
