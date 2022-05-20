@@ -171,10 +171,10 @@ trueDualPortBlockRamSystemVerilog _isD _primName args _ty = return bb
         // Port A WriteFirst
         always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[7]) begin
             if(~ARG[8]) begin
-                ~SYM[1] <= ~SYM[0][~ARG[10]];
+                ~SYM[1] <= ~SYM[0][~IF~SIZE[~TYP[10]]~THEN~ARG[10]~ELSE0~FI];
                 if(~ARG[9]) begin
                     ~SYM[1] <= ~ARG[11];
-                    ~SYM[0][~ARG[10]] <= ~ARG[11];
+                    ~SYM[0][~IF~SIZE[~TYP[10]]~THEN~ARG[10]~ELSE0~FI] <= ~ARG[11];
                 end
             end
         end|]
@@ -182,9 +182,9 @@ trueDualPortBlockRamSystemVerilog _isD _primName args _ty = return bb
         // Port A ReadFirst
             always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[7]) begin
                 if(~ARG[8]) begin
-                    ~SYM[1] <= ~SYM[0][~ARG[10]];
+                    ~SYM[1] <= ~SYM[0][~IF~SIZE[~TYP[10]]~THEN~ARG[10]~ELSE0~FI];
                     if(~ARG[9]) begin
-                        ~SYM[0][~ARG[10]] <= ~ARG[11];
+                        ~SYM[0][~IF~SIZE[~TYP[10]]~THEN~ARG[10]~ELSE0~FI] <= ~ARG[11];
                     end
                 end
             end|]
@@ -193,9 +193,9 @@ trueDualPortBlockRamSystemVerilog _isD _primName args _ty = return bb
             always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[7]) begin
                 if(~ARG[8]) begin
                     if(~ARG[9]) begin
-                        ~SYM[0][~ARG[10]] <= ~ARG[11];
+                        ~SYM[0][~IF~SIZE[~TYP[10]]~THEN~ARG[10]~ELSE0~FI] <= ~ARG[11];
                     end else begin
-                        ~SYM[1] <= ~SYM[0][~ARG[10]];
+                        ~SYM[1] <= ~SYM[0][~IF~SIZE[~TYP[10]]~THEN~ARG[10]~ELSE0~FI];
                     end
                 end
             end|]
@@ -206,10 +206,10 @@ trueDualPortBlockRamSystemVerilog _isD _primName args _ty = return bb
         // Port B WriteFirst
         always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[12]) begin
             if(~ARG[13]) begin
-                ~SYM[2] <= ~SYM[0][~ARG[15]];
+                ~SYM[2] <= ~SYM[0][~IF~SIZE[~TYP[15]]~THEN~ARG[15]~ELSE0~FI];
                 if(~ARG[14]) begin
                     ~SYM[2] <= ~ARG[16];
-                    ~SYM[0][~ARG[15]] <= ~ARG[16];
+                    ~SYM[0][~IF~SIZE[~TYP[15]]~THEN~ARG[15]~ELSE0~FI] <= ~ARG[16];
                 end
             end
         end|]
@@ -217,9 +217,9 @@ trueDualPortBlockRamSystemVerilog _isD _primName args _ty = return bb
         // Port B ReadFirst
             always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[12]) begin
                 if(~ARG[13]) begin
-                    ~SYM[2] <= ~SYM[0][~ARG[15]];
+                    ~SYM[2] <= ~SYM[0][~IF~SIZE[~TYP[15]]~THEN~ARG[15]~ELSE0~FI];
                     if(~ARG[14]) begin
-                        ~SYM[0][~ARG[15]] <= ~ARG[16];
+                        ~SYM[0][~IF~SIZE[~TYP[15]]~THEN~ARG[15]~ELSE0~FI] <= ~ARG[16];
                     end
                 end
             end|]
@@ -228,9 +228,9 @@ trueDualPortBlockRamSystemVerilog _isD _primName args _ty = return bb
             always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[12]) begin
                 if(~ARG[13]) begin
                     if(~ARG[14]) begin
-                        ~SYM[0][~ARG[15]] <= ~ARG[16];
+                        ~SYM[0][~IF~SIZE[~TYP[15]]~THEN~ARG[15]~ELSE0~FI] <= ~ARG[16];
                     end else begin
-                        ~SYM[2] <= ~SYM[0][~ARG[15]];
+                        ~SYM[2] <= ~SYM[0][~IF~SIZE[~TYP[15]]~THEN~ARG[15]~ELSE0~FI];
                     end
                 end
             end|]
@@ -266,9 +266,9 @@ trueDualPortBlockRamVHDL _isD _primName args _ty = return bb
             if(rising_edge(~ARG[7])) then
                   if(~ARG[8]) then
                     if(~ARG[9]) then
-                        mem(to_integer(~ARG[10])) := ~ARG[11];
+                        mem(~IF~SIZE[~TYP[10]]~THENto_integer(~ARG[10])~ELSE0~FI) := ~ARG[11];
                     end if;
-                    ~SYM[2] <= mem(to_integer(~ARG[10]));
+                    ~SYM[2] <= mem(~IF~SIZE[~TYP[10]]~THENto_integer(~ARG[10])~ELSE0~FI);
                 end if;
             end if;
         end process;|]
@@ -278,9 +278,9 @@ trueDualPortBlockRamVHDL _isD _primName args _ty = return bb
         begin
             if(rising_edge(~ARG[7])) then
                   if(~ARG[8]) then
-                    ~SYM[2] <= mem(to_integer(~ARG[10]));
+                    ~SYM[2] <= mem(~IF~SIZE[~TYP[10]]~THENto_integer(~ARG[10])~ELSE0~FI);
                     if(~ARG[9]) then
-                        mem(to_integer(~ARG[10])) := ~ARG[11];
+                        mem(~IF~SIZE[~TYP[10]]~THENto_integer(~ARG[10])~ELSE0~FI) := ~ARG[11];
                     end if;
                 end if;
             end if;
@@ -292,9 +292,9 @@ trueDualPortBlockRamVHDL _isD _primName args _ty = return bb
             if(rising_edge(~ARG[7])) then
                   if(~ARG[8]) then
                     if(~ARG[9]) then
-                        mem(to_integer(~ARG[10])) := ~ARG[11];
+                        mem(~IF~SIZE[~TYP[10]]~THENto_integer(~ARG[10])~ELSE0~FI) := ~ARG[11];
                     else
-                        ~SYM[2] <= mem(to_integer(~ARG[10]));
+                        ~SYM[2] <= mem(~IF~SIZE[~TYP[10]]~THENto_integer(~ARG[10])~ELSE0~FI);
                     end if;
                 end if;
             end if;
@@ -309,9 +309,9 @@ trueDualPortBlockRamVHDL _isD _primName args _ty = return bb
             if(rising_edge(~ARG[12])) then
                   if(~ARG[13]) then
                     if(~ARG[14]) then
-                        mem(to_integer(~ARG[15])) := ~ARG[16];
+                        mem(~IF~SIZE[~TYP[15]]~THENto_integer(~ARG[15])~ELSE0~FI) := ~ARG[16];
                     end if;
-                    ~SYM[3] <= mem(to_integer(~ARG[15]));
+                    ~SYM[3] <= mem(~IF~SIZE[~TYP[15]]~THENto_integer(~ARG[15])~ELSE0~FI);
                 end if;
             end if;
         end process;|]
@@ -321,9 +321,9 @@ trueDualPortBlockRamVHDL _isD _primName args _ty = return bb
         begin
             if(rising_edge(~ARG[12])) then
                   if(~ARG[13]) then
-                    ~SYM[3] <= mem(to_integer(~ARG[15]));
+                    ~SYM[3] <= mem(~IF~SIZE[~TYP[15]]~THENto_integer(~ARG[15])~ELSE0~FI);
                     if(~ARG[14]) then
-                        mem(to_integer(~ARG[15])) := ~ARG[16];
+                        mem(~IF~SIZE[~TYP[15]]~THENto_integer(~ARG[15])~ELSE0~FI) := ~ARG[16];
                     end if;
                 end if;
             end if;
@@ -335,9 +335,9 @@ trueDualPortBlockRamVHDL _isD _primName args _ty = return bb
             if(rising_edge(~ARG[12])) then
                   if(~ARG[13]) then
                     if(~ARG[14]) then
-                        mem(to_integer(~ARG[15])) := ~ARG[16];
+                        mem(~IF~SIZE[~TYP[15]]~THENto_integer(~ARG[15])~ELSE0~FI) := ~ARG[16];
                     else
-                        ~SYM[3] <= mem(to_integer(~ARG[15]));
+                        ~SYM[3] <= mem(~IF~SIZE[~TYP[15]]~THENto_integer(~ARG[15])~ELSE0~FI);
                     end if;
                 end if;
             end if;
