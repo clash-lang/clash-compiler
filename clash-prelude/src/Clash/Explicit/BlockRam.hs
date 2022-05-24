@@ -1365,22 +1365,17 @@ trueDualPortBlockRamModel labelSlow wmSlow !_clkSlow enSlow weSlow addrSlow datS
   startSlow = deepErrorX $ "trueDualPortBlockRam: " <> labelSlow <> ": First value undefined"
   startFast = deepErrorX $ "trueDualPortBlockRam: " <> labelFast <> ": First value undefined"
 
-  (outSlow', outFast') =
+  (_ :- outSlow', _ :- outFast') =
     go
       (Seq.fromFunction (natToNum @nAddrs) initElement)
-      (tSlow - tFast) -- this assumes that both clocks had a rising edge directly before t=0
-                      --   (TODO @ someone reviewing the PR: is this correct? it passes the tests)
+      0 -- this assumes that both clocks have a rising edge at t=0
         -- in general, this param represents (time until next slow rising edge - time until next fast rising edge)
         -- also TODO @ someone reviewing this PR: I think this used to be the only part of the function
         --    that made any differentiation between the "fast" port and the "slow" port.
         --    Am I right in saying that, and does this mean we can drop the requirement that one port be faster than the other?
-      inputSlow'
-      inputFast'
+      (bundle (fromEnable enSlow, weSlow, fromIntegral <$> addrSlow, datSlow))
+      (bundle (fromEnable enFast, weFast, fromIntegral <$> addrFast, datFast))
       startSlow startFast
-
-  -- drop the first command
-  (_ :- inputSlow') = bundle (fromEnable enSlow, weSlow, fromIntegral <$> addrSlow, datSlow)
-  (_ :- inputFast') = bundle (fromEnable enFast, weFast, fromIntegral <$> addrFast, datFast)
 
   tSlow = snatToNum @Int (clockPeriod @domSlow)
   tFast = snatToNum @Int (clockPeriod @domFast)
