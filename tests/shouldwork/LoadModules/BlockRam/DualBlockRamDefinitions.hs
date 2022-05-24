@@ -118,7 +118,7 @@ opsA12 = twice (RamRead 1 :> Nil) ++ (fmap RamRead addrsA)
 opsB12 = RamRead 1 :>  (fmap RamRead addrsB)
 
 --All operations
-opsA = (RamNoOp :> opsA0) ++ opsA1 ++ opsA2 ++ opsA3 ++ opsA4 ++ opsA5 ++ opsA6
+opsA = (RamNoOp :> RamNoOp :> opsA0) ++ opsA1 ++ opsA2 ++ opsA3 ++ opsA4 ++ opsA5 ++ opsA6
  ++ opsA7 ++ opsA8 ++ opsA9 ++ opsA10 ++ opsA11 ++ opsA12
 opsB = (RamNoOp :> opsB0) ++ opsB1 ++ opsB2 ++ opsB3 ++ opsB4 ++ opsB5 ++ opsB6
  ++ opsB7 ++ opsB8 ++ opsB9 ++ opsB10 ++ opsB11 ++ opsB12
