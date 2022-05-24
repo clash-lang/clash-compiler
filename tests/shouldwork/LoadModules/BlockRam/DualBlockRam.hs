@@ -144,7 +144,6 @@ topEntity_NC_NC_BC = topOut NoChange NoChange rst10 rst7
 {-# ANN topEntity_NC_NC_BC (defSyn "topEntity_NC_NC_BC") #-}
 
 -- Expected output generation for all configurations with Template Haskell
-processSimOutput x = replace (0 ::Integer) undefined# $ tail x
 simOutA_WF_WF_AB = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut WriteFirst WriteFirst rst20 rst10 clk20 clk10))
 {-# INLINE simOutA_WF_WF_AB #-}
 simOutA_WF_WF_BC = $(collectSimResults (length opsA+1) $ pack <$> (fst $ topOut WriteFirst WriteFirst rst10 rst7 clk10 clk7))
