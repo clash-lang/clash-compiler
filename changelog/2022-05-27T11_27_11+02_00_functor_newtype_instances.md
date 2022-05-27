@@ -1,0 +1,1 @@
+ADDED: Clash now contains instances for `ShowX`, `NFDataX` and `BitPack` on the newtypes from the Data.Functor modules (`Identity`, `Const`, `Compose`, `Product` and `Sum`) [#2218](https://github.com/clash-lang/clash-compiler/issues/2218).

@@ -53,6 +53,11 @@ import           Control.DeepSeq     (NFData, rnf)
 import           Data.Complex        (Complex)
 import           Data.Either         (isLeft)
 import           Data.Foldable       (toList)
+import           Data.Functor.Compose (Compose)
+import           Data.Functor.Const  (Const)
+import           Data.Functor.Identity (Identity)
+import           Data.Functor.Product (Product)
+import           Data.Functor.Sum    (Sum)
 import           Data.Int            (Int8, Int16, Int32, Int64)
 import           Data.Ord            (Down (Down))
 import           Data.Ratio          (Ratio, numerator, denominator)
@@ -369,6 +374,11 @@ printX :: ShowX a => a -> IO ()
 printX x = putStrLn $ showX x
 
 instance ShowX ()
+instance ShowX a => ShowX (Identity a)
+instance ShowX a => ShowX (Const a b)
+instance (ShowX (f a), ShowX (g a)) => ShowX (Product f g a)
+instance (ShowX (f a), ShowX (g a)) => ShowX (Sum f g a)
+instance (ShowX (f (g a))) => ShowX (Compose f g a)
 
 instance {-# OVERLAPPABLE #-} ShowX a => ShowX [a] where
   showsPrecX _ = showListX
@@ -532,6 +542,11 @@ instance NFDataX Bool
 instance NFDataX a => NFDataX [a]
 instance (NFDataX a, NFDataX b) => NFDataX (Either a b)
 instance NFDataX a => NFDataX (Maybe a)
+instance NFDataX a => NFDataX (Identity a)
+instance NFDataX a => NFDataX (Const a b)
+instance (NFDataX (f a), NFDataX (g a)) => NFDataX (Product f g a)
+instance (NFDataX (f a), NFDataX (g a)) => NFDataX (Sum f g a)
+instance (NFDataX (f (g a))) => NFDataX (Compose f g a)
 
 instance NFDataX Char where
   deepErrorX = errorX
