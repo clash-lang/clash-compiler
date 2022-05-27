@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2017, Myrtle Software Ltd,
-                  2021,      QBayLogic B.V.,
+                  2021-2022  QBayLogic B.V.,
                   2022,      Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -31,6 +31,11 @@ import Data.Binary.IEEE754            (doubleToWord, floatToWord, wordToDouble,
                                        wordToFloat)
 
 import Data.Complex                   (Complex)
+import Data.Functor.Compose           (Compose)
+import Data.Functor.Const             (Const)
+import Data.Functor.Identity          (Identity)
+import Data.Functor.Product           (Product)
+import Data.Functor.Sum               (Sum)
 import Data.Int
 import Data.Ord                       (Down)
 import Data.Word
@@ -448,6 +453,12 @@ instance BitPack a => BitPack (Maybe a)
 
 instance BitPack a => BitPack (Complex a)
 instance BitPack a => BitPack (Down a)
+
+instance BitPack a => BitPack (Identity a)
+instance BitPack a => BitPack (Const a b)
+instance (BitPack (f a), BitPack (g a)) => BitPack (Product f g a)
+instance (BitPack (f a), BitPack (g a)) => BitPack (Sum f g a)
+instance BitPack (f (g a)) => BitPack (Compose f g a)
 
 -- | Zero-extend a 'Bool'ean value to a 'BitVector' of the appropriate size.
 --
