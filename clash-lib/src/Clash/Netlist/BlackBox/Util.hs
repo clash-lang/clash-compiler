@@ -783,9 +783,9 @@ renderTag b (FilePath e)    = case e of
         return (Text.pack (show s'))
       _ -> do
         e2  <- getAp (prettyElem e)
-        error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
+        error $ $(curLoc) ++ "argument of ~FILE:" ++ show e2 ++  "does not reduce to a string"
   _ -> do e' <- getAp (prettyElem e)
-          error $ $(curLoc) ++ "~FILEPATH expects a ~LIT[N] argument, but got: " ++ show e'
+          error $ $(curLoc) ++ "~FILE expects a ~LIT[N] argument, but got: " ++ show e'
 renderTag b (IncludeName n) = case indexMaybe (bbQsysIncName b) n of
   Just nm -> return (Text.fromStrict nm)
   _ -> error $ $(curLoc) ++ "~INCLUDENAME[" ++ show n ++ "] does not correspond to any index of the 'includes' field that is specified in the primitive definition"
