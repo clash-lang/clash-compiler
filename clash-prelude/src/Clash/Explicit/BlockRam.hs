@@ -36,7 +36,7 @@ data Instruction
   | Load MemAddr Reg
   | Store Reg MemAddr
   | Nop
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, NFDataX)
 
 data Reg
   = Zero
@@ -49,7 +49,7 @@ data Reg
   deriving (Eq, Show, Enum, Generic, NFDataX)
 
 data Operator = Add | Sub | Incr | Imm | CmpGt
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, NFDataX)
 
 data MachCode
   = MachCode
@@ -494,7 +494,7 @@ data Reg
 
 >>> :{
 data Operator = Add | Sub | Incr | Imm | CmpGt
-  deriving (Eq,Show)
+  deriving (Eq, Show, Generic, NFDataX)
 :}
 
 >>> :{
@@ -505,7 +505,7 @@ data Instruction
   | Load MemAddr Reg
   | Store Reg MemAddr
   | Nop
-  deriving (Eq,Show)
+  deriving (Eq, Show, Generic, NFDataX)
 :}
 
 >>> :{
