@@ -155,11 +155,19 @@ data Manifest
   , fileNames :: [(FilePath, ByteString)]
     -- ^ Names and hashes of all the generated files for the @TopEntity@. Hashes
     -- are SHA256.
+    --
+    -- This list is reverse topologically sorted. I.e., a component might depend
+    -- on any component listed before it, but not after it.
   , domains :: HashMap Text VDomainConfiguration
     -- ^ Domains encountered in design
   , transitiveDependencies :: [Text]
     -- ^ Dependencies of this design (fully qualified binder names). Is a
     -- transitive closure of all dependencies.
+    --
+    -- This list is topologically sorted. I.e., a dependency might depend
+    -- on any dependency listed after it, but not before it.
+    --
+    -- TODO: this ordered differs from `fileNames` and `componentNames`. Fix?
   } deriving (Show,Read,Eq)
 
 instance ToJSON Manifest where
