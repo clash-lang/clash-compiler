@@ -1262,7 +1262,7 @@ a general listing of the available template holes:
   is converted to type indicated by @\<TYPE\>@. The @\<TYPE\>@ hole must be
   either @~TYP[N]@, @~TYPO@, or @~TYPEL[\<HOLE\>]@.
 * @~INCLUDENAME[N]@: the generated name of the @N@'th included component.
-* @~FILEPATH[\<HOLE\>]@: The argument mentioned in @\<HOLE\>@ is a file which
+* @~FILE[\<HOLE\>]@: The argument mentioned in @\<HOLE\>@ is a file which
   must be copied to the location of the generated HDL.
 * @~GENERATE@: Verilog: create a /generate/ statement, except when already in
   a /generate/ context.
