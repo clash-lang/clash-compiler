@@ -151,7 +151,7 @@ failMsg s = "TopEntity generation error: " ++ s
 errorContext :: Tracked Q String
 errorContext = asks snd
 
--- | Failure message with prefix in a 'Tracked' context
+-- Failure message with prefix in a 'Tracked' context
 failMsgWithContext :: String -> Tracked Q String
 failMsgWithContext s = (++) (failMsg s) <$> errorContext
 
@@ -402,7 +402,7 @@ gatherNames
 gatherNames =
   para typeTreeToPorts . guardPorts
 
--- | Build a possible failing 'PortName' tree and unwrap the 'Naming' result.
+-- Build a possible failing 'PortName' tree and unwrap the 'Naming' result.
 buildPorts
   :: Type
   -- ^ Type to investigate

@@ -1,9 +1,9 @@
 .common:
-  image: ghcr.io/clash-lang/clash-ci-$GHC_VERSION:2022-02-02
+  image: ghcr.io/clash-lang/clash-ci-$GHC_VERSION:2022-05-10
   timeout: 2 hours
   stage: build
   variables:
-    CACHE_FALLBACK_KEY: $CI_JOB_NAME-master-$GHC_VERSION-3
+    CACHE_FALLBACK_KEY: $CI_JOB_NAME-master-$CI_JOB_IMAGE-3
     GIT_SUBMODULE_STRATEGY: recursive
     TERM: xterm-color
   retry:
@@ -12,7 +12,7 @@
       - runner_system_failure
       - stuck_or_timeout_failure
   cache:
-    key: $CI_JOB_NAME-$CI_COMMIT_REF_SLUG-$GHC_VERSION
+    key: $CI_JOB_NAME-$CI_COMMIT_REF_SLUG-$CI_JOB_IMAGE
     when: always
     paths:
       - cache.tar.zst

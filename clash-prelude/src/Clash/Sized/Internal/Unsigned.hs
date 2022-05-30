@@ -194,7 +194,7 @@ type role Unsigned nominal
 -- width, use the functions in the 'Clash.Class.Resize.Resize' class.
 #if MIN_VERSION_base(4,15,0)
 data Unsigned (n :: Nat) =
-    -- | The constructor, 'U', and the field, 'unsafeToInteger', are not
+    -- | The constructor, 'U', and the field, 'unsafeToNatural', are not
     -- synthesizable.
     U { unsafeToNatural :: !Natural }
 #else

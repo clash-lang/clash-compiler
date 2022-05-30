@@ -20,7 +20,7 @@ hackage-sdist:
   interruptible: false
   stage: publish
   cache:
-    key: hackage
+    key: hackage-$CI_JOB_IMAGE
   script:
     - .ci/publish_sdist.sh clash-prelude
     - .ci/publish_sdist.sh clash-prelude-hedgehog
@@ -55,7 +55,7 @@ debian-bindist:
       files:
         - .ci/bindist/linux/debian/focal/buildinfo.json
         - .ci/bindist/linux/debian/scripts/build.py
-      prefix: ${CI_JOB_NAME}
+      prefix: ${CI_JOB_NAME}-${CI_JOB_IMAGE}
   artifacts:
     when: always
     paths:
