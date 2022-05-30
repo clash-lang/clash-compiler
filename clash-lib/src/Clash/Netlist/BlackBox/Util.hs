@@ -602,8 +602,8 @@ renderElem b (IF c t f) = do
       CmpLE e1 e2 -> if check xOpt iw hdl syn enums e1 <= check xOpt iw hdl syn enums e2
                         then 1
                         else 0
-      _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGTH, IW64, LIT, ISLIT, ISSCALAR, or ISARG"
-
+      _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGTH, LIT, DEPTH, IW64, VIVADO, OTHERSYN, ISVAR, ISLIT, ISUNDEFINED, ISACTIVEENABLE, ACTIVEEDGE, ISSYNC, ISINITDEFINED, ISACTIVEHIGH, STRCMP, AND, ISSCALAR or CMPLE."
+                             ++ "\nGot: " ++ show c'
 renderElem b e = fmap const (renderTag b e)
 
 parseFail :: Text -> BlackBoxTemplate
@@ -783,9 +783,9 @@ renderTag b (FilePath e)    = case e of
         return (Text.pack (show s'))
       _ -> do
         e2  <- getAp (prettyElem e)
-        error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
+        error $ $(curLoc) ++ "argument of ~FILE:" ++ show e2 ++  "does not reduce to a string"
   _ -> do e' <- getAp (prettyElem e)
-          error $ $(curLoc) ++ "~FILEPATH expects a ~LIT[N] argument, but got: " ++ show e'
+          error $ $(curLoc) ++ "~FILE expects a ~LIT[N] argument, but got: " ++ show e'
 renderTag b (IncludeName n) = case indexMaybe (bbQsysIncName b) n of
   Just nm -> return (Text.fromStrict nm)
   _ -> error $ $(curLoc) ++ "~INCLUDENAME[" ++ show n ++ "] does not correspond to any index of the 'includes' field that is specified in the primitive definition"

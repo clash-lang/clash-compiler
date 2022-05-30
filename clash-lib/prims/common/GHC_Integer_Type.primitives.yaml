@@ -5,7 +5,7 @@
       Integer -> Integer -> Integer'
     template: ~ARG[0] + ~ARG[1]
     warning: 'GHC.Integer.Type.plusInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.minusInteger
     kind: Expression
@@ -13,7 +13,7 @@
       Integer -> Integer -> Integer'
     template: ~ARG[0] - ~ARG[1]
     warning: 'GHC.Integer.Type.minusInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.leInteger
     kind: Expression
@@ -21,7 +21,7 @@
       -> Integer -> Bool'
     template: ~ARG[0] <= ~ARG[1]
     warning: 'GHC.Integer.Type.leInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.gtInteger
     kind: Expression
@@ -29,7 +29,7 @@
       -> Integer -> Bool'
     template: ~ARG[0] > ~ARG[1]
     warning: 'GHC.Integer.Type.gtInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.ltInteger
     kind: Expression
@@ -37,7 +37,7 @@
       -> Integer -> Bool'
     template: ~ARG[0] < ~ARG[1]
     warning: 'GHC.Integer.Type.ltInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.geInteger
     kind: Expression
@@ -45,4 +45,4 @@
       -> Integer -> Bool'
     template: ~ARG[0] >= ~ARG[1]
     warning: 'GHC.Integer.Type.geInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'

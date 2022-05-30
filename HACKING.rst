@@ -32,7 +32,7 @@ provide a complete compiler. Primarily, this consists of
   implements the ``clash`` and ``clashi`` executables.
 
   A lot of the code in this library is separated by the version of GHC it works
-  with. For example, ``src-841`` is specific to GHC 8.4.x.
+  with. For example, ``src-bin-9.0`` is specific to GHC 9.0.x.
 
 ``clash-lib``
 
@@ -55,8 +55,8 @@ functionality which is not required, or are not yet production-ready. These are
 ``clash-cores``
 
   A collection of IP cores for use in Clash designs. Currently, this includes
-  only Lattice Ice IO cores, and SPI (with slaves implemented with the Lattice
-  SBIO found on Lattice FPGAs).
+  Lattice Ice IO cores, SPI (with slaves implemented with the Lattice
+  SBIO found on Lattice FPGAs), a UART and support for Xilinx floating point IP.
 
   .. note:: This library is optional, and is not required to use Clash. In
     the future it may be extended with additional IP cores.
@@ -74,3 +74,11 @@ functionality which is not required, or are not yet production-ready. These are
   A development tool for analysing how the normalizer in ``clash-lib`` affects
   the core of a particular design. It allows the result of each different
   optimizer pass to be seen for debugging purposes.
+
+``clash-lib-hedgehog``
+
+  Hedgehog Generators for ``clash-lib``.
+
+``clash-prelude-hedgehog``
+
+  Hedgehog Generators for ``clash-prelude``.

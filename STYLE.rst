@@ -32,7 +32,7 @@ Indentation
 ~~~~~~~~~~~
 
 Tabs are illegal. Use spaces for indenting. Indent your code blocks with
-*2 spaces*. Indent the ``where`` keyword two spaces to set it apart from
+*2 spaces*. Indent the ``where`` keyword 1 space to set it apart from
 the rest of the code and indent the definitions in a ``where`` clause 1
 space. Some examples:
 

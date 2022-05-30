@@ -1000,7 +1000,7 @@ writeMemoryDataFiles dir files =
   forM files $ \(fname, content) ->
     writeAndHash (dir </> fname) (ByteStringLazyChar8.pack content)
 
--- | Copy data files added with ~FILEPATH
+-- | Copy data files added with ~FILE
 copyDataFiles
   :: [FilePath]
   -- ^ Import directories passed in with @-i@
