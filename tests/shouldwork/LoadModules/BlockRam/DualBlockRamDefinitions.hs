@@ -13,7 +13,7 @@ import DualBlockRamTypes
 -- Creating domains A, B and C
 createDomain vSystem{vName="A", vPeriod=50000} -- fast
 createDomain vSystem{vName="B", vPeriod=100000} -- slow
-createDomain vSystem{vName="C", vPeriod=140000}--hzToPeriod 7e6} -- slower
+createDomain vSystem{vName="C", vPeriod=140000} -- slower
 
 -- Clocks for domains A, B and C
 clk20 = clockGen @A
@@ -46,7 +46,7 @@ Test8 : W N
 Test9 : N W
 Test10 : R N
 Test11 : N R
-Test12 : N N
+Test12 : R R
 -}
 
 addrsA = $(listToVecTH $ P.take 20 [0 :: Addr ..])

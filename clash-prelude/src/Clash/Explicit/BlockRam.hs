@@ -446,10 +446,9 @@ import           Unsafe.Coerce          (unsafeCoerce)
 
 import           Clash.Annotations.Primitive
   (hasBlackBox)
-import           Clash.Class.BitPack.Internal (unpack, BitPack)
 import           Clash.Class.Num        (SaturationMode(SatBound), satSucc)
 import           Clash.Explicit.Signal
-  (KnownDomain, Enable, register, fromEnable, toEnable, unsafeToHighPolarity)
+  (andEnable, KnownDomain, Enable, register, fromEnable)
 import           Clash.Signal.Internal
   (Clock(..), Reset, Signal (..), invertReset, (.&&.), mux)
 import           Clash.Promoted.Nat     (SNat(..), snatToNum, natToNum)
@@ -1206,7 +1205,6 @@ trueDualPortBlockRam ::
   , KnownDomain domA
   , KnownDomain domB
   , NFDataX a
-  , BitPack a
   )
   => TDPConfig
   -- ^ Configuration of the TDP Blockram
@@ -1232,12 +1230,12 @@ trueDualPortBlockRam = \config clkA clkB enA enB opA opB ->
     (writeModeA config)
     (writeModeB config)
     clkA
-    (toEnable $ (\en op -> en && (isOp op)) <$> (fromEnable enA) <*> opA)
+    (andEnable enA (isOp <$> opA))
     (isRamWrite <$> opA)
     (ramOpAddr <$> opA)
     (fromJustX . ramOpWriteVal <$> opA)
     clkB
-    (toEnable $ (\en op -> en && (isOp op)) <$> (fromEnable enB) <*> opB)
+    (andEnable enB (isOp <$> opB))
     (isRamWrite <$> opB)
     (ramOpAddr <$> opB)
     (fromJustX . ramOpWriteVal <$> opB)
@@ -1270,7 +1268,7 @@ data Conflict = Conflict
 -- multi-clock true dual-port block RAM. This wrapper pushes the primitive out
 -- into its own module / architecture.
 trueDualPortBlockRamWrapper wmA wmB clkA enA weA addrA datA clkB enB weB addrB datB =
- trueDualPortBlockRam# wmA wmB clkA enA weA addrA datA clkB enB weB addrB datB
+  trueDualPortBlockRam# wmA wmB clkA enA weA addrA datA clkB enB weB addrB datB
 {-# NOINLINE trueDualPortBlockRamWrapper #-}
 
 -- | Primitive of 'trueDualPortBlockRam'.
@@ -1312,7 +1310,7 @@ trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
   -- ^ Outputs data on /next/ cycle. If write enable is @True@, the data written
   -- will be echoed. If write enable is @False@, the read data is returned.
 trueDualPortBlockRam# wmA wmB clkA enA weA addrA datA
- clkB enB weB addrB datB
+    clkB enB weB addrB datB
   | snatToNum @Int (clockPeriod @domA) < snatToNum @Int (clockPeriod @domB)
   = swap (trueDualPortBlockRamModel labelB wmB clkB enB weB addrB datB labelA wmA clkA enA weA addrA datA)
   | otherwise

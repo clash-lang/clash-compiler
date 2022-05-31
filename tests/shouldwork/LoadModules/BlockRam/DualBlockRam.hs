@@ -9,7 +9,6 @@ module DualBlockRam where
 import Clash.Explicit.Prelude
 import Clash.Explicit.BlockRam(WriteMode(..))
 import Clash.Explicit.Testbench
-import Clash.Sized.Internal.BitVector
 import DualBlockRamDefinitions
 import Test.Tasty.Clash.CollectSimResults
 

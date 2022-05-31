@@ -113,7 +113,6 @@ instance TermLiteral WriteMode where
     _         -> Left (Data dc)
   termToData e = Left e
 
-
 -- | Same as 'termToData', but returns printable error message if it couldn't
 -- translate a term.
 termToDataError :: forall a. TermLiteral a => Term -> Either String a
