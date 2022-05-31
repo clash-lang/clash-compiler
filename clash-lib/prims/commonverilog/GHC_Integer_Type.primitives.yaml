@@ -5,7 +5,7 @@
       Int# -> Integer'
     template: assign ~RESULT = $signed(~ARG[0]);
     warning: 'GHC.Integer.Type.smallInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
     name: GHC.Integer.Type.integerToInt
@@ -14,7 +14,7 @@
       Integer -> Int#'
     template: assign ~RESULT = $signed(~ARG[0]);
     warning: 'GHC.Integer.Type.integerToInt: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
     name: GHC.Integer.Type.timesInteger
@@ -23,7 +23,7 @@
       Integer -> Integer -> Integer'
     template: ~ARG[0] * ~ARG[1]
     warning: 'GHC.Integer.Type.timesInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.negateInteger
     kind: Expression
@@ -31,7 +31,7 @@
       Integer -> Integer'
     template: -~ARG[0]
     warning: 'GHC.Integer.Type.negateInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.absInteger
     kind: Expression
@@ -39,7 +39,7 @@
       -> Integer'
     template: '(~ARG[0] < ~SIZE[~TYPO]''sd0) ? -~ARG[0] : ~ARG[0]'
     warning: 'GHC.Integer.Type.absInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.remInteger
     kind: Expression
@@ -47,7 +47,7 @@
       -> Integer -> Integer'
     template: ~ARG[0] % ~ARG[1]
     warning: 'GHC.Integer.Type.remInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.eqInteger
     kind: Expression
@@ -55,7 +55,7 @@
       -> Integer -> Bool'
     template: ~ARG[0] == ~ARG[1]
     warning: 'GHC.Integer.Type.eqInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.neqInteger
     kind: Expression
@@ -63,7 +63,7 @@
       -> Integer -> Bool'
     template: ~ARG[0] != ~ARG[1]
     warning: 'GHC.Integer.Type.neqInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.eqInteger#
     kind: Expression
@@ -71,7 +71,7 @@
       -> Integer -> Bool'
     template: '(~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]''sd1 : ~SIZE[~TYPO]''sd0'
     warning: 'GHC.Integer.Type.eqInteger#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.neqInteger#
     kind: Expression
@@ -79,7 +79,7 @@
       -> Integer -> Bool'
     template: '(~ARG[0] != ~ARG[1]) ? ~SIZE[~TYPO]''sd1 : ~SIZE[~TYPO]''sd0'
     warning: 'GHC.Integer.Type.neqInteger#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.leInteger#
     kind: Expression
@@ -87,7 +87,7 @@
       -> Integer -> Bool'
     template: '(~ARG[0] <= ~ARG[1]) ? ~SIZE[~TYPO]''sd1 : ~SIZE[~TYPO]''sd0'
     warning: 'GHC.Integer.Type.leInteger#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.gtInteger#
     kind: Expression
@@ -95,7 +95,7 @@
       -> Integer -> Bool'
     template: '(~ARG[0] > ~ARG[1] ? ~SIZE[~TYPO]''sd1 : ~SIZE[~TYPO]''sd0'
     warning: 'GHC.Integer.Type.gtInteger#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.ltInteger#
     kind: Expression
@@ -103,7 +103,7 @@
       -> Integer -> Bool'
     template: '(~ARG[0] < ~ARG[1]) ? ~SIZE[~TYPO]''sd1 : ~SIZE[~TYPO]''sd0'
     warning: 'GHC.Integer.Type.ltInteger#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.geInteger#
     kind: Expression
@@ -111,7 +111,7 @@
       -> Integer -> Bool'
     template: '(~ARG[0] >= ~ARG[1]) ? ~SIZE[~TYPO]''sd1 : ~SIZE[~TYPO]''sd0'
     warning: 'GHC.Integer.Type.geInteger#: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.shiftRInteger
     kind: Expression
@@ -119,7 +119,7 @@
       Integer -> Int# -> Integer'
     template: ~ARG[0] >>> ~ARG[1]
     warning: 'GHC.Integer.Type.shiftRInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.shiftLInteger
     kind: Expression
@@ -127,7 +127,7 @@
       Integer -> Int# -> Integer'
     template: ~ARG[0] <<< ~ARG[1]
     warning: 'GHC.Integer.Type.shiftLInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.testBitInteger
     kind: Expression
@@ -135,7 +135,7 @@
       :: Integer -> Int# -> Bool'
     template: ~VAR[input][0][~ARG[1]] == 1'b1
     warning: 'GHC.Integer.Type.testBitInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.wordToInteger
     kind: Declaration
@@ -143,7 +143,7 @@
       Word# -> Integer'
     template: assign ~RESULT = $signed(~ARG[0]);
     warning: 'GHC.Integer.Type.wordToInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
     name: GHC.Integer.Type.integerToWord
@@ -152,7 +152,7 @@
       Integer -> Word#'
     template: assign ~RESULT = $unsigned(~ARG[0]);
     warning: 'GHC.Integer.Type.integerToWord: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
     name: GHC.Integer.Type.integerToWord64
@@ -162,7 +162,7 @@
       Integer -> Word64#'
     template: assign ~RESULT = $unsigned(~ARG[0]);
     warning: 'GHC.Integer.Type.integerToWord64: Integers are dynamically sized in
-      simulation, but fixed-length after synthesization. Use carefully.'
+      simulation, but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
     name: GHC.Integer.Type.bitInteger
@@ -171,7 +171,7 @@
       -> Integer'
     template: 1 << ~ARG[0]
     warning: 'GHC.Integer.Type.bitInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.complementInteger
     kind: Expression
@@ -179,7 +179,7 @@
       :: Integer -> Integer'
     template: ~ ~ARG[0]
     warning: 'GHC.Integer.Type.complementInteger: Integers are dynamically sized in
-      simulation, but fixed-length after synthesization. Use carefully.'
+      simulation, but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.xorInteger
     kind: Expression
@@ -187,7 +187,7 @@
       -> Integer -> Integer'
     template: ~ARG[0] ^ ~ARG[1]
     warning: 'GHC.Integer.Type.xorInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.orInteger
     kind: Expression
@@ -195,7 +195,7 @@
       -> Integer -> Integer'
     template: ~ARG[0] | ~ARG[1]
     warning: 'GHC.Integer.Type.orInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.andInteger
     kind: Expression
@@ -203,7 +203,7 @@
       -> Integer -> Integer'
     template: ~ARG[0] & ~ARG[1]
     warning: 'GHC.Integer.Type.andInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.$wsignumInteger
     kind: Expression
@@ -212,7 +212,7 @@
     template: '(~ARG[0] < ~SIZE[~TYPO]''sd0) ? -~SIZE[~TYPO]''sd1 : ((~ARG[0] == ~SIZE[~TYPO]''sd0)
       ? ~SIZE[~TYPO]''sd0 : ~SIZE[~TYPO]''sd1)'
     warning: 'GHC.Integer.Type.$wsignumInteger: Integers are dynamically sized in
-      simulation, but fixed-length after synthesization. Use carefully.'
+      simulation, but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Integer.Type.quotInteger
     kind: Expression
@@ -220,4 +220,4 @@
       Integer -> Integer -> Integer'
     template: ~ARG[0] / ~ARG[1]
     warning: 'GHC.Integer.Type.quotInteger: Integers are dynamically sized in simulation,
-      but fixed-length after synthesization. Use carefully.'
+      but fixed-length after synthesis. Use carefully.'

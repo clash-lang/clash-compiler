@@ -473,7 +473,7 @@ boolToBV = zeroExtend . pack
 boolToBit :: Bool -> Bit
 boolToBit = bitCoerce
 
--- | Convert a Bool to a Bit
+-- | Convert a Bit to a Bool
 bitToBool :: Bit -> Bool
 bitToBool = bitCoerce
 
