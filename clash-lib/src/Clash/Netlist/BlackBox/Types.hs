@@ -11,6 +11,7 @@
 -}
 
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Netlist.BlackBox.Types
  ( BlackBoxMeta(..)
@@ -18,14 +19,17 @@ module Clash.Netlist.BlackBox.Types
  , BlackBoxFunction
  , BlackBoxTemplate
  , TemplateKind (..)
+ , BlackBoxUsage(..)
  , Element(..)
  , Decl(..)
  , HdlSyn(..)
  , RenderVoid(..)
  ) where
 
+import                Control.Applicative        (Alternative((<|>)))
 import                Control.DeepSeq            (NFData)
-import                Data.Aeson                 (FromJSON)
+import                Data.Aeson                 (FromJSON(..), (.:))
+import qualified      Data.Aeson as Aeson
 import                Data.Binary                (Binary)
 import                Data.Hashable              (Hashable)
 import                Data.Text.Lazy             (Text)
@@ -53,10 +57,48 @@ data TemplateKind
   | TExpr
   deriving (Show, Eq, Generic, NFData, Binary, Hashable)
 
+-- | How is the output used in assignments may differ if the blackbox is being
+-- used in a concurrent or sequential context. For example, rendering a
+-- function like @fmap@ may use a @generate@ statement and continuous
+-- assignments, or a @for@ loop in a process and procedural assignments.
+--
+-- When writing templates, it can be specified as either:
+--
+--   @
+--   outputUsage:
+--     concurrent: continuous
+--     sequential: blocking
+--   @
+--
+-- or
+--
+--   @
+--   outputUsage: blocking
+--   @
+--
+-- where the second form can be used when both styles have the same usage.
+--
+data BlackBoxUsage = BlackBoxUsage
+  { bbConcurrent :: Usage
+  , bbSequential :: Usage
+  } deriving (Binary, Eq, Generic, Hashable, NFData, Show)
+
+instance FromJSON BlackBoxUsage where
+  parseJSON =
+    (<|>) <$> goSimple <*> goComplex
+   where
+    goSimple x = do
+      use <- parseJSON x
+      pure (BlackBoxUsage use use)
+
+    goComplex =
+      Aeson.withObject "output usage" $ \obj ->
+        BlackBoxUsage <$> obj .: "concurrent" <*> obj .: "sequential"
+
 -- | See @Clash.Primitives.Types.BlackBox@ for documentation on this record's
 -- fields. (They are intentionally renamed to prevent name clashes.)
 data BlackBoxMeta =
-  BlackBoxMeta { bbOutputUsage :: Usage
+  BlackBoxMeta { bbOutputUsage :: BlackBoxUsage
                , bbKind :: TemplateKind
                , bbLibrary :: [BlackBoxTemplate]
                , bbImports :: [BlackBoxTemplate]
@@ -70,7 +112,8 @@ data BlackBoxMeta =
 -- | Use this value in your blackbox template function if you do want to
 -- accept the defaults as documented in @Clash.Primitives.Types.BlackBox@.
 emptyBlackBoxMeta :: BlackBoxMeta
-emptyBlackBoxMeta = BlackBoxMeta Cont TExpr [] [] [] [] NoRenderVoid [] []
+emptyBlackBoxMeta =
+  BlackBoxMeta (BlackBoxUsage Cont Cont) TExpr [] [] [] [] NoRenderVoid [] []
 
 -- | A BlackBox function generates a blackbox template, given the inputs and
 -- result type of the function it should provide a blackbox for. This is useful

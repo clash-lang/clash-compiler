@@ -457,7 +457,12 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                   (templ,templDecl) <- prepareBlackBox pNm template bbCtx
                   let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
                                            (includes p) templ bbCtx
-                  declareUse outputUsage dstNm
+                  declType <- Lens.view hdlStyle
+                  let use = case declType of
+                              Concurrent -> bbConcurrent outputUsage
+                              Sequential -> bbSequential outputUsage
+
+                  declareUse use dstNm
                   return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
 
                 -- Render declarations as a Noop when requested
@@ -1045,6 +1050,7 @@ mkFunInput resId e =
  let (appE,args,ticks) = collectArgsTicks e
  in  withTicks ticks $ \tickDecls -> do
   tcm <- Lens.view tcCache
+  declType <- Lens.view hdlStyle
   -- TODO: Rewrite this function to use blackbox functions. Right now it
   -- TODO: generates strings that are later parsed/interpreted again. Silly!
   templ <- case appE of
@@ -1052,7 +1058,10 @@ mkFunInput resId e =
               bb  <- extractPrimWarnOrFail (primName p)
               case bb of
                 P.BlackBox {..} ->
-                  pure (Left (kind,outputUsage,libraries,imports,includes,primName p,template))
+                  let use = case declType of
+                              Concurrent -> bbConcurrent outputUsage
+                              Sequential -> bbSequential outputUsage
+                   in pure (Left (kind,use,libraries,imports,includes,primName p,template))
                 P.Primitive pn _ pt ->
                   error $ $(curLoc) ++ "Unexpected blackbox type: "
                                     ++ "Primitive " ++ show pn
@@ -1077,9 +1086,12 @@ mkFunInput resId e =
                       error $ $(curLoc) ++ show fName ++ " yielded an error: "
                                         ++ err
                     Right (BlackBoxMeta{..}, template) ->
-                      pure $
-                        Left ( bbKind, bbOutputUsage, bbLibrary, bbImports
-                             , bbIncludes, pName, template)
+                      let use = case declType of
+                                  Concurrent -> bbConcurrent bbOutputUsage
+                                  Sequential -> bbSequential bbOutputUsage
+                       in pure $
+                            Left ( bbKind, use, bbLibrary, bbImports
+                                 , bbIncludes, pName, template)
             Data dc -> do
               let eTy = inferCoreTypeOf tcm e
                   (_,resTy) = splitFunTys tcm eTy

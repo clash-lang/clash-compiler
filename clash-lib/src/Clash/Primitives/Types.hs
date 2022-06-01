@@ -37,7 +37,7 @@ import {-# SOURCE #-} Clash.Netlist.Types
 import           Clash.Annotations.Primitive  (PrimitiveGuard)
 import           Clash.Core.Term (WorkInfo (..))
 import           Clash.Netlist.BlackBox.Types
-  (BlackBoxFunction, BlackBoxTemplate, TemplateKind (..), RenderVoid(..))
+  (BlackBoxFunction, BlackBoxTemplate, TemplateKind (..), RenderVoid(..), BlackBoxUsage(..))
 import           Control.Applicative          ((<|>))
 import           Control.DeepSeq              (NFData)
 import           Control.Monad                (when)
@@ -169,7 +169,7 @@ data Primitive a b c d
     -- ^ A warning to be outputted when the primitive is instantiated.
     -- This is intended to be used as a warning for primitives that are not
     -- synthesizable, but may also be used for other purposes.
-  , outputUsage :: Usage
+  , outputUsage :: BlackBoxUsage
     -- ^ How the result is assigned in HDL. This is used to determine the
     -- type of declaration used to render the result (wire/reg or
     -- signal/variable). The default usage is continuous assignment.
@@ -279,7 +279,7 @@ instance FromJSON UnresolvedPrimitive where
                      <*> conVal .:? "multiResult" .!= False
                      <*> (conVal .: "kind" >>= parseTemplateKind)
                      <*> conVal .:? "warning"
-                     <*> conVal .:? "outputUsage" .!= Cont
+                     <*> conVal .:? "outputUsage" .!= BlackBoxUsage Cont Cont
                      <*> conVal .:? "libraries" .!= []
                      <*> conVal .:? "imports" .!= []
                      <*> pure [] -- functionPlurality not supported in json
