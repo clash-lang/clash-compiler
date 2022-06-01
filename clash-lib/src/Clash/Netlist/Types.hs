@@ -36,6 +36,7 @@ import Control.Lens                         (Lens', (.=))
 import Control.Monad.Fail                   (MonadFail)
 #endif
 import Control.Monad.Reader                 (ReaderT, MonadReader)
+import qualified Control.Monad.Reader as Reader (local)
 import qualified Control.Monad.State        as Lazy (State)
 import qualified Control.Monad.State.Strict as Strict
   (State, MonadIO, MonadState, StateT)
@@ -281,7 +282,15 @@ data NetlistEnv
   -- ^ Postfix for instance/register names
   , _setName :: Maybe Text
   -- ^ (Maybe) user given instance/register name
+  , _hdlStyle :: DeclarationType
+  -- ^ The style of code to generate
   }
+
+-- | Change the style of HDL generated within a scope between concurrent and
+-- sequential.
+withHdlStyle :: DeclarationType -> NetlistMonad a -> NetlistMonad a
+withHdlStyle style =
+  Reader.local (\env -> env { _hdlStyle = style })
 
 data ComponentMeta = ComponentMeta
   { cmWereVoids :: [Bool]

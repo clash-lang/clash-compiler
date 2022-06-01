@@ -26,7 +26,7 @@ import           Clash.Netlist.Types
   (BlackBox(BBFunction), TemplateFunction(..), BlackBoxContext, Identifier,
    NetlistMonad, Declaration(Assignment, NetDecl), Usage(Cont),
    HWType(Bool, KnownDomain), NetlistId(..),
-   DeclarationType(Concurrent), tcCache, bbInputs, Expr(Identifier))
+   tcCache, bbInputs, Expr(Identifier))
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TDecl), RenderVoid(..),
    emptyBlackBoxMeta)
@@ -72,7 +72,7 @@ checkBBF _isD _primName args _ty =
   bindMaybe (Just nm) t = do
     tcm <- Lens.view tcCache
     newId <- Id.make (Text.pack nm)
-    (expr0, decls) <- mkExpr False Concurrent (NetlistId newId (inferCoreTypeOf tcm t)) t
+    (expr0, decls) <- mkExpr False (NetlistId newId (inferCoreTypeOf tcm t)) t
     pure
       ( newId
       , decls ++ [sigDecl Bool newId, Assignment newId Cont expr0] )

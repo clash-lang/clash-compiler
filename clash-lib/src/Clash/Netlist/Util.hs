@@ -1078,9 +1078,7 @@ prefixParent parent (PortProduct p ps)  = PortProduct (parent <> "_" <> p) ps
 --
 mkInit
   :: HasCallStack
-  => DeclarationType
-  -- ^ Are we in a concurrent or sequential context?
-  -> Usage
+  => Usage
   -- ^ How is the initial value assigned if the assignment is separate
   -> Identifier
   -- ^ The identifier of the declared net
@@ -1090,33 +1088,33 @@ mkInit
   -- ^ The value assigned to the net
   -> NetlistMonad [Declaration]
   -- ^ The declarations needed to declare and assign the net
-mkInit _ _ i ty e
+mkInit _ i ty e
   -- When the initial value is a constant, we can set the value at the same
   -- point the declaration happens. Initial assignments of this form do not
   -- count as a usage as they are always allowed.
   | isConstExpr e
   = pure [NetDecl' Nothing i ty (Just e)]
 
-mkInit Concurrent Cont i ty e = do
-  usageMap %= Map.insert (Id.toText i) Cont
-  pure [NetDecl' Nothing i ty Nothing, Assignment i Cont e]
+mkInit Cont i ty e = do
+  style <- Lens.view hdlStyle
 
-mkInit Concurrent proc i ty e = do
+  case style of
+    Concurrent -> do
+      usageMap %= Map.insert (Id.toText i) Cont
+      pure [NetDecl' Nothing i ty Nothing, Assignment i Cont e]
+
+    Sequential ->
+      error "mkInit: Cannot continuously assign in a sequential block"
+
+mkInit proc i ty e = do
   usageMap %= Map.insert (Id.toText i) proc
-  pure
-    [ NetDecl' Nothing i ty Nothing
-    , Seq [Initial [SeqDecl (Assignment i proc e)]]
-    ]
+  let net = NetDecl' Nothing i ty Nothing
 
-mkInit Sequential Cont _ _ _ =
-  error "mkInit: Cannot continuously assign in a sequential block"
+  style <- Lens.view hdlStyle
 
-mkInit Sequential proc i ty e = do
-  usageMap %= Map.insert (Id.toText i) proc
-  pure
-    [ NetDecl' Nothing i ty Nothing
-    , Seq [SeqDecl (Assignment i proc e)]
-    ]
+  case style of
+    Concurrent -> pure [net, Seq [Initial [SeqDecl (Assignment i proc e)]]]
+    Sequential -> pure [net, Seq [SeqDecl (Assignment i proc e)]]
 
 -- | Determine if for the specified HDL, the type of assignment wanted can be
 -- performed on a signal which has been assigned another way. This identifies
@@ -1293,7 +1291,7 @@ toPrimitiveType
   -> NetlistMonad ([Declaration], Identifier, Expr, HWType)
 toPrimitiveType id0 hwty0 = convPrimitiveType hwty0 dflt $ do
   id1 <- Id.next id0
-  ds  <- mkInit Concurrent Cont id1 hwty1 expr
+  ds  <- mkInit Cont id1 hwty1 expr
   pure (ds, id1, expr, hwty1)
  where
   dflt = ([], id0, Identifier id0 Nothing, hwty0)
@@ -1311,7 +1309,7 @@ fromPrimitiveType
   -> NetlistMonad ([Declaration], Identifier, Expr, HWType)
 fromPrimitiveType id0 hwty0 = convPrimitiveType hwty0 dflt $ do
   id1 <- Id.next id0
-  ds <- mkInit Concurrent Cont id1 hwty0 expr
+  ds <- mkInit Cont id1 hwty0 expr
   pure (ds, id1, expr, hwty1)
  where
   dflt = ([], id0, Identifier id0 Nothing, hwty0)
@@ -1335,24 +1333,24 @@ mkTopInput epp@(ExpandedPortProduct p hwty ps) = do
     Vector sz eHwty -> do
       (ports, _, exprs, _) <- unzip4 <$> mapM mkTopInput ps
       let vecExpr  = mkVectorChain sz eHwty exprs
-      decls <- mkInit Concurrent Cont pN hwty vecExpr
+      decls <- mkInit Cont pN hwty vecExpr
       return (concat ports, decls, vecExpr, pN)
 
     RTree d eHwty -> do
       (ports, _, exprs, _) <- unzip4 <$> mapM mkTopInput ps
       let trExpr   = mkRTreeChain d eHwty exprs
-      decls <- mkInit Concurrent Cont pN hwty trExpr
+      decls <- mkInit Cont pN hwty trExpr
       return (concat ports, decls, trExpr, pN)
 
     Product _ _ _ -> do
       (ports, _, exprs, _) <- unzip4 <$> mapM mkTopInput ps
       case exprs of
         [expr] -> do
-          decls <- mkInit Concurrent Cont pN hwty expr
+          decls <- mkInit Cont pN hwty expr
           return (concat ports, decls, expr, pN)
         _ -> do
           let dcExpr = DataCon hwty (DC (hwty, 0)) exprs
-          decls <- mkInit Concurrent Cont pN hwty dcExpr
+          decls <- mkInit Cont pN hwty dcExpr
           return (concat ports, decls, dcExpr, pN)
 
     SP _ ((concat . map snd) -> [elTy]) -> do
@@ -1361,7 +1359,7 @@ mkTopInput epp@(ExpandedPortProduct p hwty ps) = do
         [conExpr, elExpr] -> do
           let dcExpr   = DataCon hwty (DC (BitVector (typeSize hwty), 0))
                           [conExpr, ToBv Nothing elTy elExpr]
-          decls <- mkInit Concurrent Cont pN hwty dcExpr
+          decls <- mkInit Cont pN hwty dcExpr
           return (concat ports, decls, dcExpr, pN)
         _ -> error $ $(curLoc) ++ "Internal error"
 
@@ -1881,7 +1879,7 @@ affixName
   :: Text
   -> NetlistMonad Text
 affixName nm0 = do
-  NetlistEnv _ pre suf _ <- ask
+  NetlistEnv _ pre suf _ _ <- ask
   let nm1 = if Text.null pre then nm0 else pre <> "_" <> nm0
       nm2 = if Text.null suf then nm1 else nm1 <> "_" <> suf
   return nm2

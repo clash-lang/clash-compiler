@@ -152,7 +152,7 @@ runNetlistMonad
   -- ^ Action to run
   -> IO (a, NetlistState)
 runNetlistMonad env isTb s tops typeTrans ite be seenIds_ dir componentNames_
-  = flip runReaderT (NetlistEnv env "" "" Nothing)
+  = flip runReaderT (NetlistEnv env "" "" Nothing Concurrent)
   . flip runStateT s'
   . runNetlist
   where
@@ -395,8 +395,8 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
                 #{nmD}
             |] Nothing)
 
--- | Generate a list of concurrent Declarations for a let-binder, return an
--- empty list if the bound expression is represented by 0 bits
+-- | Generate a list of Declarations for a let-binder, return an empty list if
+-- the bound expression is represented by 0 bits
 mkDeclarations
   :: HasCallStack
   => Id
@@ -404,23 +404,10 @@ mkDeclarations
   -> Term
   -- ^ RHS of the let-binder
   -> NetlistMonad [Declaration]
-mkDeclarations = mkDeclarations' Concurrent
-
--- | Generate a list of Declarations for a let-binder, return an empty list if
--- the bound expression is represented by 0 bits
-mkDeclarations'
-  :: HasCallStack
-  => DeclarationType
-  -- ^ Concurrent of sequential declaration
-  -> Id
-  -- ^ LHS of the let-binder
-  -> Term
-  -- ^ RHS of the let-binder
-  -> NetlistMonad [Declaration]
-mkDeclarations' _declType bndr (collectTicks -> (Var v,ticks)) =
+mkDeclarations bndr (collectTicks -> (Var v,ticks)) =
   withTicks ticks (mkFunApp (Id.unsafeFromCoreId bndr) v [])
 
-mkDeclarations' _declType _bndr e@(collectTicks -> (Case _ _ [],_)) = do
+mkDeclarations _bndr e@(collectTicks -> (Case _ _ [],_)) = do
   (_,sp) <- Lens.use curCompNm
   throw $ ClashException
           sp
@@ -431,10 +418,10 @@ mkDeclarations' _declType _bndr e@(collectTicks -> (Case _ _ [],_)) = do
                     ])
           Nothing
 
-mkDeclarations' declType bndr (collectTicks -> (Case scrut altTy alts@(_:_:_),ticks)) =
-  withTicks ticks (mkSelection declType (CoreId bndr) scrut altTy alts)
+mkDeclarations bndr (collectTicks -> (Case scrut altTy alts@(_:_:_),ticks)) =
+  withTicks ticks (mkSelection (CoreId bndr) scrut altTy alts)
 
-mkDeclarations' declType bndr app = do
+mkDeclarations bndr app = do
   let (appF,args0,ticks) = collectArgsTicks app
       (args,tyArgs) = partitionEithers args0
   case appF of
@@ -445,8 +432,9 @@ mkDeclarations' declType bndr app = do
         (_,sp) <- Lens.use curCompNm
         throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
     _ -> do
-      (exprApp,declsApp0) <- mkExpr False declType (CoreId bndr) app
+      (exprApp,declsApp0) <- mkExpr False (CoreId bndr) app
       let dstId = Id.unsafeFromCoreId bndr
+      declType <- Lens.view hdlStyle
       assn  <- case exprApp of
                  Identifier _ Nothing ->
                    -- Supplied 'bndr' was used to assign a result to, so we
@@ -475,14 +463,14 @@ mkDeclarations' declType bndr app = do
 -- | Generate a declaration that selects an alternative based on the value of
 -- the scrutinee
 mkSelection
-  :: DeclarationType
-  -> NetlistId
+  :: NetlistId
   -> Term
   -> Type
   -> [Alt]
   -> [Declaration]
   -> NetlistMonad [Declaration]
-mkSelection declType bndr scrut altTy alts0 tickDecls = do
+mkSelection bndr scrut altTy alts0 tickDecls = do
+  declType <- Lens.view hdlStyle
   let dstId = netlistId1 id Id.unsafeFromCoreId bndr
   tcm <- Lens.view tcCache
   let scrutTy = inferCoreTypeOf tcm scrut
@@ -498,12 +486,12 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
       -> do
       (scrutExpr,scrutDecls) <- case scrutHTy of
         SP {} -> first (mkScrutExpr sp scrutHTy (fst (last alts0))) <$>
-                   mkExpr True declType (NetlistId scrutId scrutTy) scrut
-        _ -> mkExpr False declType (NetlistId scrutId scrutTy) scrut
+                   mkExpr True (NetlistId scrutId scrutTy) scrut
+        _ -> mkExpr False (NetlistId scrutId scrutTy) scrut
       altTId <- Id.suffix dstId "sel_alt_t"
       altFId <- Id.suffix dstId "sel_alt_f"
-      (altTExpr,altTDecls) <- mkExpr False declType (NetlistId altTId altTy) altT
-      (altFExpr,altFDecls) <- mkExpr False declType (NetlistId altFId altTy) altF
+      (altTExpr,altTDecls) <- mkExpr False (NetlistId altTId altTy) altT
+      (altFExpr,altFDecls) <- mkExpr False (NetlistId altFId altTy) altF
       -- This logic (and the same logic a few lines below) is faulty in the
       -- sense that it won't generate "void decls" if the alternatives' type
       -- is void, but the type of the scrut isn't. Ideally, we'd like to pass
@@ -522,7 +510,7 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
       reprs <- Lens.view customReprs
       let alts1 = (reorderDefault . reorderCustom tcm reprs scrutTy) alts0
       (scrutExpr,scrutDecls) <- first (mkScrutExpr sp scrutHTy (fst (head alts1))) <$>
-                                  mkExpr True declType (NetlistId scrutId scrutTy) scrut
+                                  mkExpr True (NetlistId scrutId scrutTy) scrut
       (exprs,altsDecls)      <- unzip <$> mapM (mkCondExpr scrutHTy) alts1
       case declType of
         Sequential -> do
@@ -542,7 +530,7 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
   mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe HW.Literal,Expr),[Declaration])
   mkCondExpr scrutHTy (pat,alt) = do
     altId <- Id.suffix (netlistId1 id Id.unsafeFromCoreId bndr) "sel_alt"
-    (altExpr,altDecls) <- mkExpr False declType (NetlistId altId altTy) alt
+    (altExpr,altDecls) <- mkExpr False (NetlistId altId altTy) alt
     (,altDecls) <$> case pat of
       DefaultPat           -> return (Nothing,altExpr)
       DataPat dc _ _ -> return (Just (dcToLiteral scrutHTy (dcTag dc)),altExpr)
@@ -645,7 +633,7 @@ mkFunApp dstId fun args tickDecls = do
       -> do
         argHWTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) fArgTys1
         (argExprs, concat -> argDecls) <- unzip <$>
-          mapM (\(e,t) -> mkExpr False Concurrent (NetlistId dstId t) e)
+          mapM (\(e,t) -> mkExpr False (NetlistId dstId t) e)
                                  (zip args fArgTys1)
 
         -- Filter void arguments, but make sure to render their declarations:
@@ -717,7 +705,7 @@ mkFunApp dstId fun args tickDecls = do
           argHWTys <- mapM coreTypeToHWTypeM' argTys
 
           (argExprs, concat -> argDecls) <- unzip <$>
-            mapM (\(e,t) -> mkExpr False Concurrent (NetlistId dstId t) e)
+            mapM (\(e,t) -> mkExpr False (NetlistId dstId t) e)
                  (zip args argTys)
 
           -- Filter void arguments, but make sure to render their declarations:
@@ -799,18 +787,16 @@ toSimpleVar _ (e@(Identifier _ Nothing),_) = return (e,[])
 toSimpleVar dstId (e,ty) = do
   argNm <- Id.suffix dstId "fun_arg"
   hTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
-  argDecl <- mkInit Concurrent Cont argNm hTy e
+  argDecl <- mkInit Cont argNm hTy e
   return (Identifier argNm Nothing, argDecl)
 
 -- | Generate an expression for a term occurring on the RHS of a let-binder
 mkExpr :: HasCallStack
        => Bool -- ^ Treat BlackBox expression as declaration
-       -> DeclarationType
-       -- ^ Should the returned declarations be concurrent or sequential?
        -> NetlistId -- ^ Name hint for the id to (potentially) assign the result to
        -> Term -- ^ Term to convert to an expression
        -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
-mkExpr _ _ _ (stripTicks -> Core.Literal l) = do
+mkExpr _ _ (stripTicks -> Core.Literal l) = do
   iw <- Lens.view intWidth
   case l of
     IntegerLiteral i -> return (HW.Literal (Just (Signed iw,iw)) $ NumLit i, [])
@@ -829,7 +815,7 @@ mkExpr _ _ _ (stripTicks -> Core.Literal l) = do
 #endif
     StringLiteral s  -> return (HW.Literal Nothing $ StringLit s, [])
 
-mkExpr bbEasD declType bndr app =
+mkExpr bbEasD bndr app =
  let (appF,args,ticks) = collectArgsTicks app
      (tmArgs,tyArgs) = partitionEithers args
  in  withTicks ticks $ \tickDecls -> do
@@ -839,8 +825,8 @@ mkExpr bbEasD declType bndr app =
         hwTy:_ -> hwTy
         _ -> error ("internal error: unable to extract sufficient hwTys from: " <> show bndr)
   case appF of
-    Data dc -> mkDcApplication declType hwTys bndr dc tmArgs
-    Prim pInfo -> mkPrimitive False bbEasD declType bndr pInfo args tickDecls
+    Data dc -> mkDcApplication hwTys bndr dc tmArgs
+    Prim pInfo -> mkPrimitive False bbEasD bndr pInfo args tickDecls
     Var f
       | null tmArgs ->
           if isVoid hwTyA then
@@ -862,7 +848,7 @@ mkExpr bbEasD declType bndr app =
     Case scrut ty' [alt] -> mkProjection bbEasD bndr scrut ty' alt
     Case scrut tyA alts -> do
       argNm <- Id.suffix (netlistId1 id Id.unsafeFromCoreId bndr) "sel_arg"
-      decls  <- mkSelection declType (NetlistId argNm (netlistTypes1 bndr))
+      decls  <- mkSelection (NetlistId argNm (netlistTypes1 bndr))
                             scrut tyA alts tickDecls
       if isVoid hwTyA then
         return (Noop, decls)
@@ -872,8 +858,8 @@ mkExpr bbEasD declType bndr app =
                , NetDecl' Nothing argNm hwTyA Nothing:decls)
     Letrec binders body -> do
       netDecls <- concatMapM mkNetDecl binders
-      decls    <- concatMapM (uncurry (mkDeclarations' declType)) binders
-      (bodyE,bodyDecls) <- mkExpr bbEasD declType bndr (mkApps (mkTicks body ticks) args)
+      decls    <- concatMapM (uncurry mkDeclarations) binders
+      (bodyE,bodyDecls) <- mkExpr bbEasD bndr (mkApps (mkTicks body ticks) args)
       return (bodyE,netDecls ++ decls ++ bodyDecls)
     _ -> throw (ClashException sp ($(curLoc) ++ "Not in normal form: application of a Lambda-expression\n\n" ++ showPpr app) Nothing)
 
@@ -910,7 +896,7 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
         Id.next
         (\b -> Id.suffix (Id.unsafeFromCoreId b) "projection")
         bndr
-    (scrutExpr,newDecls) <- mkExpr False Concurrent (NetlistId scrutNm scrutTy) scrut
+    (scrutExpr,newDecls) <- mkExpr False (NetlistId scrutNm scrutTy) scrut
     case scrutExpr of
       Identifier newId modM ->
         pure (Right (newId, modM, newDecls))
@@ -921,7 +907,7 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
         -- TODO: seems useless?
         pure (Left newDecls)
       _ -> do
-        scrutDecl <- mkInit Concurrent Cont scrutNm sHwTy scrutExpr
+        scrutDecl <- mkInit Cont scrutNm sHwTy scrutExpr
         pure (Right (scrutNm, Nothing, newDecls ++ scrutDecl))
 
   case scrutRendered of
@@ -958,7 +944,7 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
       case bndr of
         NetlistId scrutNm _ | mkDec -> do
           scrutNm' <- Id.next scrutNm
-          scrutDecl <- mkInit Concurrent Cont scrutNm' vHwTy extractExpr
+          scrutDecl <- mkInit Cont scrutNm' vHwTy extractExpr
           return (Identifier scrutNm' Nothing, scrutDecl ++ decls)
         MultiId {} -> error "mkProjection: MultiId"
         _ -> return (extractExpr,decls)
@@ -970,8 +956,7 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
 -- | Generate an expression for a DataCon application occurring on the RHS of a let-binder
 mkDcApplication
     :: HasCallStack
-    => DeclarationType
-    -> [HWType]
+    => [HWType]
     -- ^ HWType of the LHS of the let-binder, can multiple types when we're
     -- creating a "split" product type (e.g. a tuple of a Clock and Reset)
     -> NetlistId
@@ -982,7 +967,7 @@ mkDcApplication
     -- ^ DataCon Arguments
     -> NetlistMonad (Expr,[Declaration])
     -- ^ Returned expression and a list of generate BlackBox declarations
-mkDcApplication declType [dstHType] bndr dc args = do
+mkDcApplication [dstHType] bndr dc args = do
   let dcNm = nameOcc (dcName dc)
   tcm <- Lens.view tcCache
   let argTys = map (inferCoreTypeOf tcm) args
@@ -990,7 +975,7 @@ mkDcApplication declType [dstHType] bndr dc args = do
   argHWTys <- mapM coreTypeToHWTypeM' argTys
 
   (argExprs, concat -> argDecls) <- unzip <$>
-    mapM (\(e,t) -> mkExpr False declType (NetlistId argNm t) e) (zip args argTys)
+    mapM (\(e,t) -> mkExpr False (NetlistId argNm t) e) (zip args argTys)
 
   -- Filter void arguments, but make sure to render their declarations:
   let
@@ -1117,8 +1102,9 @@ mkDcApplication declType [dstHType] bndr dc args = do
         error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys)
 
 -- Handle MultiId assignment
-mkDcApplication declType dstHTypes (MultiId argNms) _ args = do
-  tcm                 <- Lens.view tcCache
+mkDcApplication dstHTypes (MultiId argNms) _ args = do
+  declType <- Lens.view hdlStyle
+  tcm <- Lens.view tcCache
   let argTys          = map (inferCoreTypeOf tcm) args
   argHWTys            <- mapM coreTypeToHWTypeM' argTys
   -- Filter out the arguments of hwtype `Void` and only translate
@@ -1127,7 +1113,7 @@ mkDcApplication declType dstHTypes (MultiId argNms) _ args = do
       (_hWTysFiltered,argsFiltered) = unzip
         (filter (maybe True (not . isVoid) . fst) argsBundled)
   (argExprs,argDecls) <- fmap (second concat . unzip) $!
-                         mapM (uncurry (mkExpr False declType)) argsFiltered
+                         mapM (uncurry (mkExpr False)) argsFiltered
   if length dstHTypes == length argExprs then do
     assns <- mapMaybeM
                   (\case (_,Noop) -> pure Nothing
@@ -1143,4 +1129,4 @@ mkDcApplication declType dstHTypes (MultiId argNms) _ args = do
   else
     error "internal error"
 
-mkDcApplication _ _ _ _ _ = error "internal error"
+mkDcApplication _ _ _ _ = error "internal error"
