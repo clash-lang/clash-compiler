@@ -843,6 +843,9 @@ data BlackBoxContext
   , bbCtxName :: Maybe IdentifierText
   -- ^ The "context name", name set by `Clash.Magic.setName`, defaults to the
   -- name of the closest binder
+  , bbHdlStyle :: DeclarationType
+  -- ^ Whether the black box is being rendered in a concurrent or sequential
+  -- context. Used to evaluate the @~ISSEQUENTIAL@ tag.
   }
   deriving Show
 
@@ -931,9 +934,10 @@ netlistTypes1 = \case
 data DeclarationType
   = Concurrent
   | Sequential
+  deriving Show
 
-emptyBBContext :: Text -> BlackBoxContext
-emptyBBContext name
+emptyBBContext :: Text -> DeclarationType -> BlackBoxContext
+emptyBBContext name style
   = Context
   { bbName        = name
   , bbResults     = []
@@ -945,6 +949,7 @@ emptyBBContext name
                       "__NOCOMPNAME__" "__NOCOMPNAME__" []
                       Basic VHDL emptyCallStack
   , bbCtxName     = Nothing
+  , bbHdlStyle    = style
   }
 
 Lens.makeLenses ''NetlistEnv

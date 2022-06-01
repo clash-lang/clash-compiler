@@ -705,7 +705,8 @@ instHO bbCtx fPos (resTy, bbResTy) argsWithTypes = do
     BlackBoxD
       ("__INST_" <> bbName bbCtx <> "_BB_INTERNAL__") [] [] []
       (BBTemplate [Text rendered1])
-      (emptyBBContext ("__INST_" <> bbName bbCtx <> "_BB_INTERNAL__"))
+      -- TODO I think this is always concurrent, but I don't *know*
+      (emptyBBContext ("__INST_" <> bbName bbCtx <> "_BB_INTERNAL__") Concurrent)
 
   pure (TExpr resTy (Identifier resName Nothing))
 

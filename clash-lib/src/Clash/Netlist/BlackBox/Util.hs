@@ -125,6 +125,7 @@ inputHole = \case
   DevNull _        -> Nothing
   SigD _ nM        -> nM
   CtxName          -> Nothing
+  IsSequential     -> Nothing
 
 -- | Determine if the number of normal/literal/function inputs of a blackbox
 -- context at least matches the number of argument that is expected by the
@@ -1054,6 +1055,7 @@ prettyElem (Template bbname source) = do
                                   <> brackets (string $ Text.concat bbname')
                                   <> brackets (string $ Text.concat source'))
 prettyElem CtxName = return "~CTXNAME"
+prettyElem IsSequential = return "~ISSEQUENTIAL"
 
 -- | Recursively walk @Element@, applying @f@ to each element in the tree.
 walkElement
@@ -1124,6 +1126,7 @@ walkElement f el = maybeToList (f el) ++ walked
         Repeat es1 es2 ->
           concatMap go es1 ++ concatMap go es2
         CtxName -> []
+        IsSequential -> []
 
 -- | Determine variables used in an expression. Used for VHDL sensitivity list.
 -- Also see: https://github.com/clash-lang/clash-compiler/issues/365
@@ -1212,6 +1215,7 @@ getUsedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
         TypM _ -> Nothing
         Vars _ -> Nothing
         CtxName -> Nothing
+        IsSequential -> Nothing
 
 onBlackBox
   :: (BlackBoxTemplate -> r)

@@ -45,7 +45,8 @@ import           Clash.Netlist.Types
   (Identifier, TemplateFunction, BlackBoxContext, HWType(Vector), Usage(Cont),
    Declaration(..), Expr(Literal, Identifier,DataCon), Literal(NumLit),
    BlackBox(BBTemplate, BBFunction), TemplateFunction(..),
-   Modifier(Indexed, Nested, DC), HWType(..), bbInputs, bbResults, emptyBBContext, tcCache)
+   Modifier(Indexed, Nested, DC), HWType(..), bbInputs, bbResults, emptyBBContext,
+   tcCache, DeclarationType(Concurrent))
 import qualified Clash.Netlist.Id                   as Id
 import           Clash.Netlist.Util                 (typeSize)
 import qualified Clash.Primitives.DSL               as Prim
@@ -179,7 +180,8 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
         "__FOLD_BB_INTERNAL__"
         [] [] []
         (BBTemplate [Text rendered1])
-        (emptyBBContext "__FOLD_BB_INTERNAL__")
+        -- TODO I think this is always Concurrent, but I don't *know*
+        (emptyBBContext "__FOLD_BB_INTERNAL__" Concurrent)
         )
    where
     call  = Component (Decl fPos fSubPos (resEl:aEl:[bEl]))

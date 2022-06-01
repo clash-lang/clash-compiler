@@ -131,6 +131,7 @@ pTagE =  Result            <$  string "~RESULT"
      <|> IsInitDefined     <$> (string "~ISINITDEFINED" *> brackets' natural')
      <|> CtxName           <$  string "~CTXNAME"
      <|> LongestPeriod     <$  string "~LONGESTPERIOD"
+     <|> IsSequential      <$  string "~ISSEQUENTIAL"
 
 natural' :: TokenParsing m => m Int
 natural' = fmap fromInteger natural

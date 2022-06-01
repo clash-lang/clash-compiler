@@ -164,8 +164,9 @@ mkBlackBoxContext bbName resIds args@(lefts -> termArgs) = do
     -- Update "context name" with prefixes and suffixes set by
     -- `Clash.Magic.prefixName` and `Clash.Magic.suffixName`
     ctxName2 <- mapM affixName ctxName1
+    declType <- Lens.view hdlStyle
 
-    return ( Context bbName (zip ress resTys) imps funs [] lvl nm (listToMaybe ctxName2)
+    return ( Context bbName (zip ress resTys) imps funs [] lvl nm (listToMaybe ctxName2) declType
            , concat impDecls ++ concat funDecls
            )
   where
@@ -694,10 +695,11 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                 N.Literal Nothing (NumLit _) -> return (expr,decls)
                 _ -> error "non-constant ByteArray# not supported"
 
-          | otherwise ->
+          | otherwise -> do
+              declType <- Lens.view hdlStyle
               return (BlackBoxE "" [] [] []
                         (BBTemplate [Text $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]])
-                        (emptyBBContext pNm) False,[])
+                        (emptyBBContext pNm declType) False,[])
 
     -- Do we need to create a new identifier to assign the result?
     --

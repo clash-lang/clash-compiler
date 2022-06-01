@@ -235,6 +235,9 @@ data Element
   -- removed argument, or primitive that is undefined. This template tag will
   -- always return 0 (False) if `-fclash-aggressive-x-optimization-blackboxes`
   -- is NOT set.
+  | IsSequential
+  -- ^ Whether the black box is being instantiated inside a concurrent or
+  -- sequential block in HDL.
   | StrCmp [Element] !Int
   | OutputUsage !Int
   | Vars !Int
