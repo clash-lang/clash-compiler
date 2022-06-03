@@ -1,6 +1,7 @@
 {-|
   Copyright  :  (C) 2015-2016, University of Twente,
                     2021,      QBayLogic B.V.
+                    2022,      LumiGuide Fietsdetectie B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -38,7 +39,7 @@ import Control.Concurrent.Supply (splitSupply)
 import Control.Lens ((^.), _1)
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
-import Data.Bifunctor (second)
+import Data.Bifunctor (first, second)
 import Data.Bits ((.&.), complement)
 import Data.Coerce (coerce)
 import qualified Data.Either as Either
@@ -77,7 +78,7 @@ import Clash.Core.Literal (Literal(..))
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Term
   ( Alt, LetBinding, Pat(..), PrimInfo(..), Term(..), TickInfo(..)
-  , collectArgs, collectArgsTicks, mkApps, mkTicks, patIds)
+  , collectArgs, collectArgsTicks, mkApps, mkTicks, patIds, stripTicks)
 import Clash.Core.TyCon (TyConMap, TyConName, tyConDataCons)
 import Clash.Core.Type (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
 import Clash.Core.Util (mkInternalVar, mkSelectorCase, sccLetBindings)
@@ -473,7 +474,7 @@ mkDisjointGroup
 mkDisjointGroup inScope (fun,(seen,cs)) = do
     let argss    = Foldable.toList cs
         argssT   = zip [0..] (List.transpose argss)
-        (sharedT,distinctT) = List.partition (areShared inScope . snd) argssT
+        (sharedT,distinctT) = List.partition (areShared inScope . fmap (first stripTicks) . snd) argssT
         shared   = map (second head) sharedT
         distinct = map (Either.lefts) (List.transpose (map snd distinctT))
         cs'      = fmap (zip [0..]) cs
