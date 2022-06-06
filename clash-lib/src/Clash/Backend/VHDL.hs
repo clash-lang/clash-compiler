@@ -239,7 +239,7 @@ instance Backend VHDLState where
   getTopName      = use topNm
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
-  blockDecl nm ds = do
+  blockDecl nm cs ds = do
     decs <- decls ds
     let attrs = [ (id_, attr)
                 | NetDecl' _ _ id_ (Right hwtype) _ <- ds
@@ -253,7 +253,8 @@ instance Backend VHDLState where
                 then emptyDoc
                 else line <> line <> renderAttrs (TextS.pack "signal") attrs) <> line <>
             nest 2
-              ("begin" <> line <>
+              (renderCompDecls cs
+              <> "begin" <> line <>
                 insts ds) <> line <>
             "end block" <> semi
   addIncludes inc = includes %= (inc++)
@@ -1430,6 +1431,14 @@ patLitCustom _ x y = error $ $(curLoc) ++ unwords
   [ "You can only pass CustomSP / CustomSum and a NumLit to this function,"
   , "not", show x, "and", show y]
 
+renderCompDecls :: [CompDecl] -> VHDLM Doc
+renderCompDecls [] = emptyDoc
+renderCompDecls (c0:cs) = do
+  c1 <- renderCompDecl c0
+  case c1 of
+    Just doc -> pure doc <> line <> line <> renderCompDecls cs
+    _ -> renderCompDecls cs
+
 insts :: [Declaration] -> VHDLM Doc
 insts [] = emptyDoc
 insts (TickDecl (Comment c):ds) = comment "--" c <> line <> insts ds
@@ -1462,6 +1471,14 @@ inst_' id_ scrut scrutTy es = fmap Just $
                                               <+> patLitCustom var scrutTy c
                                               <+> "else"
                                               <:> conds es'
+
+renderCompDecl :: CompDecl -> VHDLM (Maybe Doc)
+renderCompDecl (VHDLComp nm ps0) =
+  fmap Just $ "component" <+> pretty nm <+>
+    nest 2 ("port" <> line <> tupledSemi ps <> semi)
+    <> line <> "end component" <> semi
+  where ps = traverse (\(t,pd,ty) -> pretty t <+> ":" <+> ppd pd <+> qualTyName ty) ps0
+        ppd = \case { In -> "in"; Out -> "out"}
 
 -- | Turn a Netlist Declaration to a VHDL concurrent block
 inst_ :: Declaration -> VHDLM (Maybe Doc)

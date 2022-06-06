@@ -149,7 +149,10 @@ class HasIdentifierSet state => Backend state where
   -- | getSrcSpan
   getSrcSpan       :: State state SrcSpan
   -- | Block of declarations
-  blockDecl        :: Identifier -> [Declaration] -> Ap (State state) Doc
+  blockDecl        :: Identifier
+                   -> [CompDecl] -- ^ Component declarations for the block, used in VHDL
+                   -> [Declaration]
+                   -> Ap (State state) Doc
   addIncludes      :: [(String, Doc)] -> State state ()
   addLibraries     :: [LT.Text] -> State state ()
   addImports       :: [LT.Text] -> State state ()

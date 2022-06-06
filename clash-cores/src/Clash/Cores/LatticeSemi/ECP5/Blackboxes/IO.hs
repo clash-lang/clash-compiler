@@ -41,7 +41,7 @@ bbTemplate bbCtx = do
 
   compName <- Id.addRaw (TextS.pack compName')
 
-  getAp $ blockDecl bb $
+  getAp $ blockDecl bb [] $
     [ NetDecl Nothing dIn Bit
     , InstDecl Comp Nothing [] compName bb_inst
       [

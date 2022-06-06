@@ -17,6 +17,7 @@ data IdentifierType
 data Identifier
 data IdentifierSet
 data HWType
+data CompDecl
 data Declaration
 data Component
 data Expr

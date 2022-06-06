@@ -24,6 +24,7 @@
 
 module Clash.Netlist.Types
   ( Declaration (..,NetDecl)
+  , CompDecl (..)
   , module Clash.Netlist.Types
   )
 where
@@ -497,6 +498,13 @@ data PortMap
   --       , .bitCtrl (bitCtrl_0) );
   --
   deriving (Show)
+
+-- | @component@ declaration, VHDL-only.
+--
+-- These are necessary to specify type, port direction, see
+-- [this reference](https://www.ics.uci.edu/~jmoorkan/vhdlref/compdec.html)
+-- on components in VHDL.
+data CompDecl = VHDLComp !Text [(Text, PortDirection, HWType)]
 
 -- | Internals of a Component
 data Declaration

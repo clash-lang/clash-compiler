@@ -31,6 +31,7 @@ module Clash.Primitives.DSL
   , BlockState (..)
   , TExpr(..)
   , addDeclaration
+  , compInBlock
   , declaration
   , declarationReturn
   , declare
@@ -174,7 +175,9 @@ blackBoxHaskell bb tf BlackBoxHaskellOpts{..} =
 -- | The state of a block. Contains a list of declarations and a the
 --   backend state.
 data BlockState backend = BlockState
-  { _bsDeclarations :: [Declaration]
+  { _blockComponents :: [CompDecl]
+    -- ^ Components declarations for the block.
+  , _bsDeclarations :: [Declaration]
     -- ^ Declarations store
   , _bsHigherOrderCalls :: IntMap Int
     -- ^ Tracks how many times a higher order function has been instantiated.
@@ -202,17 +205,27 @@ declarationReturn
   => BlackBoxContext
   -> Text.Text
   -- ^ block name
+  -> State (BlockState backend) ()
+  -- ^ action to lay a component declaration in the appropriate place
   -> State (BlockState backend) [TExpr]
   -- ^ block builder yielding an expression that should be assigned to the
   -- result variable in the blackbox context
   -> State backend Doc
   -- ^ pretty printed block
-declarationReturn bbCtx blockName blockBuilder =
-  declaration blockName $ do
+declarationReturn bbCtx blockName compDecl blockBuilder =
+  declaration blockName compDecl $ do
     res <- blockBuilder
     forM_ (zip (bbResults bbCtx) res) $ \(rNm, r) -> do
       let (Identifier resultNm Nothing, _) = rNm
       addDeclaration (Assignment resultNm (eex r))
+
+emptyBlockState :: backend -> BlockState backend
+emptyBlockState bck = BlockState
+  { _blockComponents = []
+  , _bsDeclarations = []
+  , _bsHigherOrderCalls = IntMap.empty
+  , _bsBackend = bck
+  }
 
 -- | Run a block declaration.
 declaration
@@ -220,20 +233,26 @@ declaration
   => Text.Text
   -- ^ block name
   -> State (BlockState backend) ()
+  -- ^ action to lay a component declaration in the appropriate place (VHDL)
+  -> State (BlockState backend) ()
   -- ^ block builder
   -> State backend Doc
   -- ^ pretty printed block
-declaration blockName s = do
+declaration blockName c s = do
   backend0 <- get
-  let initState = BlockState [] IntMap.empty backend0
-      BlockState decs _hoCalls backend1 = execState s initState
-  put backend1
+  let initState = emptyBlockState backend0
+      (BlockState {..}) = execState (c*>s) initState
+  put _bsBackend
   blockNameUnique <- Id.makeBasic blockName
-  getAp $ blockDecl blockNameUnique (reverse decs)
+  getAp $ blockDecl blockNameUnique (reverse _blockComponents) (reverse _bsDeclarations)
 
 -- | Add a declaration to the state.
 addDeclaration :: Declaration -> State (BlockState backend) ()
 addDeclaration dec = bsDeclarations %= cons dec
+
+-- | Add component to block state (VHDL-relevant only)
+addComponent :: CompDecl -> State (BlockState backend) ()
+addComponent comp = blockComponents %= cons comp
 
 -- | Declare a new signal with the given name and type.
 declare'
@@ -719,6 +738,40 @@ instHO bbCtx fPos (resTy, bbResTy) argsWithTypes = do
       (emptyBBContext ("__INST_" <> bbName bbCtx <> "_BB_INTERNAL__"))
 
   pure (TExpr resTy (Identifier resName Nothing))
+
+-- | This creates a component declaration (for VHDL) given in and out port
+-- names, updating the 'BlockState backend' stored in the 'State' monad.
+--
+-- A typical result is that
+--
+-- @
+-- component fifo port
+--    ( rst : in std_logic
+--    ...
+--    ; full : out std_logic
+--    ; empty : out std_logic );
+--  end component;
+-- @
+--
+-- would be added to the block in the appropriate place.
+compInBlock
+  :: forall backend
+   . Backend backend
+  => Text
+  -- ^ Component name
+  -> [(Text, HWType)]
+  -- ^ in ports
+  -> [(Text, HWType)]
+  -- ^ out ports
+  -> State (BlockState backend) ()
+compInBlock compName inPorts outPorts =
+
+  let inPorts' = mkPort In <$> inPorts
+      outPorts' = mkPort Out <$> outPorts
+  in addComponent $ VHDLComp compName (inPorts' ++ outPorts')
+
+ where
+  mkPort inOut (nm,ty) = (nm,inOut,ty)
 
 -- | Instantiate a component/entity in a block state.
 instDecl

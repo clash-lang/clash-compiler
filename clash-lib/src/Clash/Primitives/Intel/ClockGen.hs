@@ -88,7 +88,7 @@ alteraPllTemplate bbCtx = do
 
  let outclkPorts = map (\n -> instPort ("outclk_" <> showt n)) [(0 :: Int)..length clocks-1]
 
- getAp $ blockDecl alteraPll $ concat
+ getAp $ blockDecl alteraPll [] $ concat
   [[ NetDecl Nothing locked Bit
    , NetDecl' Nothing Reg pllLock (Right Bool) Nothing]
   ,[ NetDecl Nothing clkNm ty | (clkNm,ty) <- zip clocks tys]
@@ -127,7 +127,7 @@ altpllTemplate bbCtx = do
  -- TODO: bbQsysIncName into account when generating fresh ids
  let compName = Id.unsafeMake (head (bbQsysIncName bbCtx))
 
- getAp $ blockDecl alteraPll
+ getAp $ blockDecl alteraPll []
   [ NetDecl Nothing locked  Bit
   , NetDecl' Nothing Reg pllLock (Right Bool) Nothing
   , NetDecl Nothing pllOut clkOutTy

@@ -37,7 +37,7 @@ tieOffShDdrBBF _isD _primName _args _ty = pure (Right (meta, bb))
 tieOffShDdrTF :: N.TemplateFunction
 tieOffShDdrTF = N.TemplateFunction [] (const True) $ \bbCtx -> do
   let [(clk, N.Clock _), (reset, N.Reset _), (inp, inpType)] = tInputs bbCtx
-  declarationReturn bbCtx "myBlock" (pure [inp, inp])
+  declarationReturn bbCtx "myBlock" (pure ()) (pure [inp, inp])
 
 topEntity ::
   Clock System ->

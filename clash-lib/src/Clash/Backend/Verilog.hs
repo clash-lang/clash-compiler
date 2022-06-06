@@ -169,7 +169,7 @@ instance Backend VerilogState where
   getTopName      = use topNm
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
-  blockDecl _ ds  = do
+  blockDecl _ _ ds  = do
     decs <- decls ds
     if isEmpty decs
       then insts ds

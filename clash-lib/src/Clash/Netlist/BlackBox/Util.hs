@@ -407,7 +407,7 @@ renderElem b (Component (Decl n subN (l:ls))) = do
         return t
       Right (nm0,ds) -> do
         nm1 <- Id.next nm0
-        block <- getAp (blockDecl nm1 ds)
+        block <- getAp (blockDecl nm1 [] ds)
         return (render block)
 
   templ4 <-
@@ -423,7 +423,7 @@ renderElem b (Component (Decl n subN (l:ls))) = do
             nm1 <- Id.toText <$> Id.makeBasic "bb"
             nm2 <- Id.makeBasic "bb"
             let bbD = BlackBoxD nm1 libs imps inc (N.BBTemplate templ3) b'
-            block <- getAp (blockDecl nm2 (templDecls ++ [bbD]))
+            block <- getAp (blockDecl nm2 [] (templDecls ++ [bbD]))
             return (render block)
 
   case verifyBlackBoxContext b' templ4 of

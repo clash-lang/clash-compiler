@@ -1160,7 +1160,7 @@ mkFunInput resId e =
           let f' bbCtx' = do
                 let assn = Assignment (Id.unsafeMake "~RESULT")
                             (BlackBoxE nm libs imps inc templ' bbCtx' False)
-                p <- getAp (Backend.blockDecl (Id.unsafeMake "") [assn])
+                p <- getAp (Backend.blockDecl (Id.unsafeMake "") [] [assn])
                 return p
           return ((Left (BBFunction bbName bbHash (TemplateFunction k g f'))
                   ,Wire
