@@ -130,6 +130,6 @@ inputWritesA, inputWritesB :: KnownDomain dom => Clock dom -> Reset dom -> Signa
 inputWritesA clk rst = stimuliGenerator clk rst opsA
 inputWritesB clk rst = stimuliGenerator clk rst opsB
 
-topOut wmA wmB rstA rstB clkA clkB =
-  trueDualPortBlockRam (tdpDefault{writeModeA = wmA, writeModeB = wmB}) clkA clkB enableGen enableGen (inputWritesA clkA rstA) (inputWritesB clkB rstB)
+topOut wmA wmB regA regB rstA rstB clkA clkB =
+  trueDualPortBlockRam (tdpDefault{writeModeA = wmA, writeModeB = wmB, outputRegA = regA, outputRegB = regB}) clkA clkB enableGen enableGen (inputWritesA clkA rstA) (inputWritesB clkB rstB)
 {-# INLINE topOut #-}
