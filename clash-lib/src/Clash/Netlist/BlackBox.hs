@@ -1220,19 +1220,20 @@ mkFunInput resId e =
             templ'
       return ((Left l',outputUsage,libs,imps,inc,bbCtx),dcls ++ templDecl)
     Left (TExpr,_,libs,imps,inc,nm,templ') -> do
+      let u = case declType of { Concurrent -> Cont ; Sequential -> Proc Blocking }
       onBlackBox
         (\t -> do t' <- getAp (prettyBlackBox t)
                   let t'' = Id.unsafeMake (Text.toStrict t')
-                      assn = Assignment (Id.unsafeMake "~RESULT") Cont (Identifier t'' Nothing)
-                  return ((Right (Id.unsafeMake "",[assn]),Cont,libs,imps,inc,bbCtx),dcls))
+                      assn = Assignment (Id.unsafeMake "~RESULT") u (Identifier t'' Nothing)
+                  return ((Right (Id.unsafeMake "",[assn]),u,libs,imps,inc,bbCtx),dcls))
         (\bbName bbHash (TemplateFunction k g _) -> do
           let f' bbCtx' = do
-                let assn = Assignment (Id.unsafeMake "~RESULT") Cont
+                let assn = Assignment (Id.unsafeMake "~RESULT") u
                             (BlackBoxE nm libs imps inc templ' bbCtx' False)
                 p <- getAp (Backend.blockDecl (Id.unsafeMake "") [assn])
                 return p
           return ((Left (BBFunction bbName bbHash (TemplateFunction k g f'))
-                  ,Cont
+                  ,u
                   ,[]
                   ,[]
                   ,[]
@@ -1254,10 +1255,12 @@ mkFunInput resId e =
           withTicks ticks $ \tickDecls -> do
             resNm <- Id.make "result"
             appDecls <- mkFunApp resNm fun tmArgs tickDecls
-            let assn = [ Assignment (Id.unsafeMake "~RESULT") Cont (Identifier resNm Nothing)
+            declType <- Lens.view hdlStyle
+            let u = case declType of { Concurrent -> Cont ; Sequential -> Proc Blocking }
+            let assn = [ Assignment (Id.unsafeMake "~RESULT") u (Identifier resNm Nothing)
                        , NetDecl Nothing resNm resTy ]
             nm <- Id.makeBasic "block"
-            return (Right ((nm,assn++appDecls), Cont))
+            return (Right ((nm,assn++appDecls), u))
         else do
           (_,sp) <- Lens.use curCompNm
           throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
@@ -1265,11 +1268,13 @@ mkFunInput resId e =
       tcm <- Lens.view tcCache
       let eType = inferCoreTypeOf tcm e'
       (appExpr,appDecls) <- mkExpr False (NetlistId (Id.unsafeMake "c$bb_res") eType) e'
-      let assn = Assignment (Id.unsafeMake "~RESULT") Cont appExpr
+      declType <- Lens.view hdlStyle
+      let u = case declType of { Concurrent -> Cont ; Sequential -> Proc Blocking }
+      let assn = Assignment (Id.unsafeMake "~RESULT") u appExpr
       nm <- if null appDecls
                then return (Id.unsafeMake "")
                else Id.makeBasic "block"
-      return (Right ((nm,appDecls ++ [assn]), Cont))
+      return (Right ((nm,appDecls ++ [assn]), u))
 
     go is0 n (Lam id_ e') = do
       lvl <- Lens.use curBBlvl
@@ -1282,34 +1287,40 @@ mkFunInput resId e =
       go is1 (n+(1::Int)) e''
 
     go _ _ (C.Var v) = do
-      let assn = Assignment (Id.unsafeMake "~RESULT") Cont (Identifier (Id.unsafeFromCoreId v) Nothing)
-      return (Right ((Id.unsafeMake "",[assn]), Cont))
+      declType <- Lens.view hdlStyle
+      let u = case declType of { Concurrent -> Cont ; Sequential -> Proc Blocking }
+      let assn = Assignment (Id.unsafeMake "~RESULT") u (Identifier (Id.unsafeFromCoreId v) Nothing)
+      return (Right ((Id.unsafeMake "",[assn]), u))
 
     go _ _ (Case scrut ty [alt]) = do
       tcm <- Lens.view tcCache
+      declType <- Lens.view hdlStyle
+      let u = case declType of { Concurrent -> Cont ; Sequential -> Proc Blocking }
       let sTy = inferCoreTypeOf tcm scrut
       (projection,decls) <- mkProjection False (NetlistId (Id.unsafeMake "c$bb_res") sTy) scrut ty alt
-      let assn = Assignment (Id.unsafeMake "~RESULT") Cont projection
+      let assn = Assignment (Id.unsafeMake "~RESULT") u projection
       nm <- if null decls
                then return (Id.unsafeMake "")
                else Id.makeBasic "projection"
-      return (Right ((nm,decls ++ [assn]), Cont))
+      return (Right ((nm,decls ++ [assn]), u))
 
     go _ _ (Case scrut ty alts@(_:_:_)) = do
       resNm <- Id.make "result"
       resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
-      -- It's safe to use 'mkUnsafeSystemName' here: only the name, not the
-      -- unique, will be used
       let resId'  = NetlistId resNm ty
       selectionDecls <- mkSelection resId' scrut ty alts []
+      declType <- Lens.view hdlStyle
+      let u = case declType of { Concurrent -> Cont ; Sequential -> Proc Blocking }
       let assn = [ NetDecl' Nothing resNm resTy Nothing
-                 , Assignment (Id.unsafeMake "~RESULT") Cont (Identifier resNm Nothing) ]
+                 , Assignment (Id.unsafeMake "~RESULT") u (Identifier resNm Nothing) ]
       nm <- Id.makeBasic "selection"
-      return (Right ((nm,assn++selectionDecls), Cont))
+      return (Right ((nm,assn++selectionDecls), u))
 
     go is0 _ e'@(Let{}) = do
       tcm <- Lens.view tcCache
       let normE = splitNormalized tcm e'
+      declType <- Lens.view hdlStyle
+      let u = case declType of { Concurrent -> Cont ; Sequential -> Proc Blocking }
       (_,[],[],_,[],binders,resultM) <- case normE of
         Right norm -> mkUniqueNormalized is0 Nothing norm
         Left err -> error err
@@ -1325,9 +1336,9 @@ mkFunInput resId e =
           -- tests break when reverting to the old behavior. In some cases this
           -- creates "useless" assignments. We should investigate whether we can
           -- get the old behavior back.
-          let resDecl = Assignment (Id.unsafeMake "~RESULT") Cont (Identifier resultId Nothing)
-          return (Right ((nm,resDecl:netDecls ++ decls), Cont))
-        Nothing -> return (Right ((Id.unsafeMake "",[]), Cont))
+          let resDecl = Assignment (Id.unsafeMake "~RESULT") u (Identifier resultId Nothing)
+          return (Right ((nm,resDecl:netDecls ++ decls), u))
+        Nothing -> return (Right ((Id.unsafeMake "",[]), u))
 
     go is0 n (Tick _ e') = go is0 n e'
 

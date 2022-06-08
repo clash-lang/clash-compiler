@@ -46,7 +46,7 @@ import           Clash.Netlist.Types
    Declaration(..), Expr(Literal, Identifier,DataCon), Literal(NumLit),
    BlackBox(BBTemplate, BBFunction), TemplateFunction(..),
    Modifier(Indexed, Nested, DC), HWType(..), bbInputs, bbResults, emptyBBContext,
-   tcCache, DeclarationType(Concurrent))
+   tcCache, DeclarationType(Concurrent), bbHdlStyle)
 import qualified Clash.Netlist.Id                   as Id
 import           Clash.Netlist.Util                 (typeSize)
 import qualified Clash.Primitives.DSL               as Prim
@@ -180,8 +180,7 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
         "__FOLD_BB_INTERNAL__"
         [] [] []
         (BBTemplate [Text rendered1])
-        -- TODO I think this is always Concurrent, but I don't *know*
-        (emptyBBContext "__FOLD_BB_INTERNAL__" Concurrent)
+        (emptyBBContext "__FOLD_BB_INTERNAL__" (bbHdlStyle bbCtx))
         )
    where
     call  = Component (Decl fPos fSubPos (resEl:aEl:[bEl]))
@@ -258,6 +257,9 @@ indexIntVerilog _isD _primName args _ty = return bb
 
   bbText = [I.i|
     // index begin
+    ~IF ~ISSEQUENTIAL ~THEN
+    // TODO: sequential index_int
+    ~ELSE
     ~IF~SIZE[~TYP[1]]~THENwire ~TYPO ~GENSYM[vecArray][0] [0:~LIT[0]-1];
     genvar ~GENSYM[i][2];
     ~GENERATE
@@ -266,6 +268,7 @@ indexIntVerilog _isD _primName args _ty = return bb
     end
     ~ENDGENERATE
     assign ~RESULT = ~SYM[0][~ARG[2]];~ELSEassign ~RESULT = ~ERRORO;~FI
+    ~FI
     // index end|]
 
   bbTextLitIx = [I.i|

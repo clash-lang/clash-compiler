@@ -89,6 +89,9 @@ import           Clash.Primitives.Types           as P
 import           Clash.Util
 import qualified Clash.Util.Interpolate           as I
 
+import Clash.Debug -- TODO
+import Text.Show.Pretty (ppShow)
+
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
 genNetlist
@@ -907,7 +910,9 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
         -- TODO: seems useless?
         pure (Left newDecls)
       _ -> do
-        scrutDecl <- mkInit Cont scrutNm sHwTy scrutExpr
+        declType <- Lens.view hdlStyle
+        let use = case declType of { Concurrent -> Cont ; Sequential -> Proc Blocking }
+        scrutDecl <- mkInit use scrutNm sHwTy scrutExpr
         pure (Right (scrutNm, Nothing, newDecls ++ scrutDecl))
 
   case scrutRendered of

@@ -215,7 +215,7 @@ data Primitive a b c d
   , usedArguments :: UsedArguments
   -- ^ Arguments used by blackbox. Used to remove arguments during normalization.
   , multiResult :: Bool
-  -- ^ Wether this blackbox assigns its results to multiple variables. See
+  -- ^ Whether this blackbox assigns its results to multiple variables. See
   -- 'Clash.Normalize.Transformations.setupMultiResultPrim'
   , functionName :: BlackBoxFunctionName
   , function :: d

@@ -72,6 +72,8 @@ import qualified Clash.Util.Interpolate          as I
 
 import           Clash.Annotations.Primitive     (HDL(VHDL))
 
+import Clash.Debug
+
 inputHole :: Element -> Maybe Int
 inputHole = \case
   Text _           -> Nothing
@@ -226,10 +228,13 @@ setSym bbCtx l = do
           case varM of
             Nothing -> do
               nm' <- lift (Id.make (Text.toStrict (concatT (Text "c$":nm))))
+              let u = case bbHdlStyle bbCtx of
+                          N.Concurrent -> N.Cont
+                          N.Sequential -> N.Proc N.Blocking
               let decls = case typeSize hwTy of
                     0 -> []
                     _ -> [N.NetDecl Nothing nm' hwTy
-                         ,N.Assignment nm' N.Cont e' -- TODO De-hardcode Cont
+                         ,N.Assignment nm' u e'
                          ]
               _2 %= (IntMap.insert i (Id.toText nm',decls))
               return (ToVar [Text (Id.toLazyText nm')] i)
@@ -399,18 +404,23 @@ renderElem b (Component (Decl n subN (l:ls))) = do
                     , show (subN +1 ), " got only ", show (length (fromJust func0)) ]
       func1 = indexNote' errr subN <$> func0
       Just (templ0,_,libs,imps,inc,pCtx) = func1
-      b' = pCtx { bbResults = [(o,oTy)], bbInputs = bbInputs pCtx ++ is }
+      b' = pCtx { bbResults = [(o,oTy)], bbInputs = bbInputs pCtx ++ is, bbHdlStyle = bbHdlStyle b }
       layoutOptions = LayoutOptions (AvailablePerLine 120 0.4)
       render = N.BBTemplate . parseFail . renderLazy . layoutPretty layoutOptions
+
+  traceM ("func1: " <> show (bbName pCtx))
 
   templ1 <-
     case templ0 of
       Left t ->
-        return t
+        traceM "templ0: Left" >> return t
       Right (nm0,ds) -> do
+        traceM "templ0: Right"
         nm1 <- Id.next nm0
         block <- getAp (blockDecl nm1 ds)
         return (render block)
+
+  traceM ("templ1: " <> show templ1)
 
   templ4 <-
     case templ1 of
@@ -604,6 +614,10 @@ renderElem b (IF c t f) = do
       CmpLE e1 e2 -> if check xOpt iw hdl syn enums e1 <= check xOpt iw hdl syn enums e2
                         then 1
                         else 0
+
+      IsSequential -> case bbHdlStyle b of
+                        N.Concurrent -> 0
+                        N.Sequential -> 1
       _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGTH, LIT, DEPTH, IW64, VIVADO, OTHERSYN, ISVAR, ISLIT, ISUNDEFINED, ISACTIVEENABLE, ACTIVEEDGE, ISSYNC, ISINITDEFINED, ISACTIVEHIGH, STRCMP, AND, ISSCALAR or CMPLE."
                              ++ "\nGot: " ++ show c'
 renderElem b e = fmap const (renderTag b e)

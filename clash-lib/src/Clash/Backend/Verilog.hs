@@ -80,6 +80,8 @@ import           Clash.Signal.Internal                (ActiveEdge (..))
 import           Clash.Util
   (SrcSpan, noSrcSpan, curLoc, indexNote, makeCached)
 
+import Debug.Trace -- TODO
+
 -- | State for the 'Clash.Backend.Verilog.VerilogM' monad:
 data VerilogState =
   VerilogState
@@ -533,6 +535,13 @@ inst_ :: Declaration -> VerilogM (Maybe Doc)
 inst_ (TickDecl {}) = return Nothing
 inst_ (Assignment id_ Cont e) = fmap Just $
   "assign" <+> pretty id_ <+> equals <+> expr_ False e <> semi
+
+-- TODO This is a bit of a hack. In normal HDL generation I don't think there
+-- is ever a reason to call it. However, when rendering a black box which is
+-- in a sequential context it may be hit by code produced in mkFunInput.
+inst_ (Assignment id_ (Proc b) e) = fmap Just $
+  let sym = case b of { Blocking -> "=" ; NonBlocking -> "<=" }
+   in pretty id_ <+> sym <+> expr_ False e <> semi
 
 inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
    "always @(*) begin" <> line <>
