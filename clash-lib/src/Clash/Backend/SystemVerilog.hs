@@ -107,7 +107,7 @@ instance Backend SystemVerilogState where
     , _genDepth=0
     , _modNm=""
     , _topNm=Id.unsafeMake ""
-    , _idSeen=Id.emptyIdentifierSet (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) SystemVerilog
+    , _idSeen=Id.emptyIdentifierSet (_opt_escapedIds opts) (_opt_lowerCaseBasicIds opts) SystemVerilog
     , _oports=[]
     , _srcSpan=noSrcSpan
     , _includes=[]
@@ -116,11 +116,11 @@ instance Backend SystemVerilogState where
     , _dataFiles=[]
     , _memoryDataFiles=[]
     , _tyPkgCtx=False
-    , _intWidth=opt_intWidth opts
-    , _hdlsyn=opt_hdlSyn opts
-    , _undefValue=opt_forceUndefined opts
-    , _aggressiveXOptBB_=coerce (opt_aggressiveXOptBB opts)
-    , _renderEnums_=coerce (opt_renderEnums opts)
+    , _intWidth=_opt_intWidth opts
+    , _hdlsyn=_opt_hdlSyn opts
+    , _undefValue=_opt_forceUndefined opts
+    , _aggressiveXOptBB_=coerce (_opt_aggressiveXOptBB opts)
+    , _renderEnums_=coerce (_opt_renderEnums opts)
     , _domainConfigurations_=emptyDomainMap
     }
   hdlKind         = const SystemVerilog

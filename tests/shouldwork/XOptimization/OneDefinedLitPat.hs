@@ -26,7 +26,7 @@ testPath :: FilePath
 testPath = "tests/shouldwork/XOptimization/OneDefinedLitPat.hs"
 
 enableXOpt :: ClashOpts -> ClashOpts
-enableXOpt c = c { opt_aggressiveXOpt = True }
+enableXOpt c = c { _opt_aggressiveXOpt = True }
 
 mainVHDL :: IO ()
 mainVHDL = do

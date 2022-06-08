@@ -212,7 +212,7 @@ normalize' nm = do
             -- (GHC-8.4 does this with tests/shouldwork/Numbers/Exp.hs)
             -- It will later be inlined by flattenCallTree.
             opts <- Lens.view debugOpts
-            traceIf (dbg_invariants opts)
+            traceIf (_dbg_invariants opts)
                     (concat [$(curLoc), "Expr belonging to bndr: ", nmS, " (:: "
                             , showPpr (coreTypeOf nm')
                             , ") has a non-representable return type."
@@ -348,7 +348,7 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
 
       -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
       opts <- Lens.view debugOpts
-      let rewriteHistFile = dbg_historyFile opts
+      let rewriteHistFile = _dbg_historyFile opts
       when (Maybe.isJust rewriteHistFile) $
         let !_ = unsafePerformIO
              $ BS.appendFile (Maybe.fromJust rewriteHistFile)

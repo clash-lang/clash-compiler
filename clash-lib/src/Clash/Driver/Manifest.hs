@@ -138,8 +138,8 @@ data Manifest
   , successFlags  :: (Int, Int)
     -- ^ Compiler flags used to achieve successful compilation:
     --
-    --   * opt_inlineLimit
-    --   * opt_specLimit
+    --   * _opt_inlineLimit
+    --   * _opt_specLimit
   , ports :: [ManifestPort]
     -- ^ Ports in the generated @TopEntity@.
   , componentNames :: [Text]
@@ -326,7 +326,7 @@ mkManifest backend domains ClashOpts{..} Component{..} components deps files top
   , componentNames = map Id.toText compNames
   , topComponent = Id.toText componentName
   , fileNames = files
-  , successFlags = (opt_inlineLimit, opt_specLimit)
+  , successFlags = (_opt_inlineLimit, _opt_specLimit)
   , domains = domains
   , transitiveDependencies = map (nameOcc . varName) deps
   }
@@ -393,7 +393,7 @@ readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashMo
   manifestM <- readManifest path
   pure
     ( modificationsM
-    , checkManifest =<< if opt_cachehdl then manifestM else Nothing
+    , checkManifest =<< if _opt_cachehdl then manifestM else Nothing
     , topHash
     )
 
@@ -402,23 +402,23 @@ readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashMo
       -- Ignore the following settings, they don't affect the generated HDL:
 
       -- 1. Debug
-      opt_debug = opt_debug
-        { dbg_invariants = False
-        , dbg_transformations = Set.empty
-        , dbg_historyFile = Nothing
+      _opt_debug = _opt_debug
+        { _dbg_invariants = False
+        , _dbg_transformations = Set.empty
+        , _dbg_historyFile = Nothing
         }
 
       -- 2. Caching
-    , opt_cachehdl = True
+    , _opt_cachehdl = True
 
       -- 3. Warnings
-    , opt_primWarn = True
-    , opt_color = Auto
-    , opt_errorExtra = False
-    , opt_checkIDir = True
+    , _opt_primWarn = True
+    , _opt_color = Auto
+    , _opt_errorExtra = False
+    , _opt_checkIDir = True
 
       -- 4. Optional output
-    , opt_edalize = False
+    , _opt_edalize = False
 
       -- Ignore the following settings, they don't affect the generated HDL. However,
       -- they do influence whether HDL can be generated at all.
@@ -428,13 +428,13 @@ readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashMo
       -- to decide whether to use caching or not (see: XXXX).
       --
       -- 5. termination measures
-    , opt_inlineLimit = 20
-    , opt_specLimit = 20
+    , _opt_inlineLimit = 20
+    , _opt_specLimit = 20
 
       -- Finally, also ignore the HDL dir setting, because when a user moves the
       -- entire dir with generated HDL, they probably still want to use that as
       -- a cache
-    , opt_hdlDir = Nothing
+    , _opt_hdlDir = Nothing
     }
 
   -- TODO: Binary encoding does not account for alpha equivalence (nor should
@@ -451,8 +451,8 @@ readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashMo
     | (cachedInline, cachedSpec) <- successFlags
 
     -- Higher limits shouldn't affect HDL
-    , cachedInline <= opt_inlineLimit
-    , cachedSpec <= opt_specLimit
+    , cachedInline <= _opt_inlineLimit
+    , cachedSpec <= _opt_specLimit
 
     -- Callgraph hashes should correspond
     , manifestHash == topHash

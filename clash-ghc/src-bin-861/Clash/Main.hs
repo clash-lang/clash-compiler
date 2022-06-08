@@ -238,7 +238,7 @@ main' postLoadMode dflags0 args flagWarnings startAction clashOpts = do
 
   -- Propagate -Werror to Clash
   liftIO . modifyIORef' clashOpts $ \opts ->
-    opts { opt_werror = EnumSet.member Opt_WarnIsError (generalFlags dflags3) }
+    opts { _opt_werror = EnumSet.member Opt_WarnIsError (generalFlags dflags3) }
 
   let dflags4 = case lang of
                 HscInterpreted | not (gopt Opt_ExternalInterpreter dflags3) ->

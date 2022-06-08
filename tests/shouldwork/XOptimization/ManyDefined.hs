@@ -37,7 +37,7 @@ testPath :: FilePath
 testPath = "tests/shouldwork/XOptimization/ManyDefined.hs"
 
 enableXOpt :: ClashOpts -> ClashOpts
-enableXOpt c = c { opt_aggressiveXOpt = True }
+enableXOpt c = c { _opt_aggressiveXOpt = True }
 
 mainVHDL :: IO ()
 mainVHDL = do

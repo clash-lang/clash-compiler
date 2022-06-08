@@ -38,8 +38,8 @@ type family TargetToState (target :: HDL) where
 
 mkClashOpts :: ClashOpts
 mkClashOpts = defClashOpts
-  { opt_cachehdl     = False
-  , opt_errorExtra   = True
+  { _opt_cachehdl     = False
+  , _opt_errorExtra   = True
   }
 
 -- Run clash as far as having access to core for all bindings. This is used
@@ -59,7 +59,7 @@ runToCoreStage
 runToCoreStage _target f src = do
   ids <- newSupply
   pds <- primDirs backend
-  (env, design) <- generateBindings opts (return ()) pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
+  (env, design) <- generateBindings opts (return ()) pds (_opt_importPaths opts) [] (hdlKind backend) src Nothing
 
   return (env, design, ids)
  where

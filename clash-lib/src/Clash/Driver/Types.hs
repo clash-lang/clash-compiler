@@ -15,6 +15,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Driver.Types where
 
@@ -22,6 +23,7 @@ module Clash.Driver.Types where
 #include "MachDeps.h"
 
 import           Control.DeepSeq                (NFData(rnf), deepseq)
+import           Control.Lens                   (makeLenses)
 import           Data.Binary                    (Binary)
 import           Data.Fixed
 import           Data.Hashable
@@ -61,14 +63,6 @@ import           Clash.Core.VarEnv              (VarEnv)
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
 import {-# SOURCE #-} Clash.Netlist.Types       (PreserveCase(..), TopEntityT)
 import           Clash.Primitives.Types         (CompiledPrimMap)
-
-data ClashEnv = ClashEnv
-  { envOpts        :: ClashOpts
-  , envTyConMap    :: TyConMap
-  , envTupleTyCons :: IntMap TyConName
-  , envPrimitives  :: CompiledPrimMap
-  , envCustomReprs :: CustomReprs
-  } deriving (Generic, NFData)
 
 data ClashDesign = ClashDesign
   { designEntities :: [TopEntityT]
@@ -142,55 +136,56 @@ data TransformationInfo
 
 -- | Options related to debugging. See 'ClashOpts'
 data DebugOpts = DebugOpts
-  { dbg_invariants :: Bool
+  { _dbg_invariants :: Bool
   -- ^ Check that the results of applied transformations do not violate the
   -- invariants for rewriting (e.g. no accidental shadowing, or type changes).
   --
   -- Command line flag: -fclash-debug-invariants
-  , dbg_transformationInfo :: TransformationInfo
+  , _dbg_transformationInfo :: TransformationInfo
   -- ^ The information to show when debugging a transformation. See the
   -- 'TransformationInfo' type for different configurations.
   --
   -- Command line flag: -fclash-debug-info (None|FinalTerm|AppliedName|AppliedTerm|TryName|TryTerm)
-  , dbg_transformations :: Set String
+  , _dbg_transformations :: Set String
   -- ^ List the transformations that are being debugged. When the set is empty,
   -- all transformations are debugged.
   --
   -- Command line flag: -fclash-debug-transformations t1[,t2...]
-  , dbg_countTransformations :: Bool
+  , _dbg_countTransformations :: Bool
   -- ^ Count how many times transformations are applied and provide a summary
   -- at the end of normalization. This includes all transformations, not just
-  -- those in 'dbg_transformations'.
+  -- those in '_dbg_transformations'.
   --
   -- Command line flag: -fclash-debug-count-transformations
-  , dbg_transformationsFrom :: Maybe Word
+  , _dbg_transformationsFrom :: Maybe Word
   -- ^ Debug transformations applied after the nth transformation applied. This
-  -- includes all transformations, not just those in 'dbg_transformations'.
+  -- includes all transformations, not just those in '_dbg_transformations'.
   --
   -- Command line flag: -fclash-debug-transformations-from=N
-  , dbg_transformationsLimit :: Maybe Word
+  , _dbg_transformationsLimit :: Maybe Word
   -- ^ Debug up to the nth applied transformation. If this limit is exceeded
   -- then Clash will error. This includes all transformations, not just those
-  -- in 'dbg_transformations'.
+  -- in '_dbg_transformations'.
   --
   -- Command line flag: -fclash-debug-transformations-limit=N
-  , dbg_historyFile :: Maybe FilePath
+  , _dbg_historyFile :: Maybe FilePath
   -- ^ Save information about all applied transformations to a history file
   -- for use with @clash-term@.
   --
   -- Command line flag: -fclash-debug-history[=FILE]
   } deriving (Generic, NFData, Show, Eq)
+makeLenses ''DebugOpts
 
 instance Hashable DebugOpts where
   hashWithSalt s DebugOpts{..} =
     s `hashWithSalt`
-    dbg_invariants `hashWithSalt`
-    dbg_transformationInfo `hashSet`
-    dbg_transformations `hashWithSalt`
-    dbg_countTransformations `hashWithSalt`
-    dbg_transformationsFrom `hashWithSalt`
-    dbg_transformationsLimit `hashWithSalt`
-    dbg_historyFile
+    _dbg_invariants `hashWithSalt`
+    _dbg_transformationInfo `hashSet`
+    _dbg_transformations `hashWithSalt`
+    _dbg_countTransformations `hashWithSalt`
+    _dbg_transformationsFrom `hashWithSalt`
+    _dbg_transformationsLimit `hashWithSalt`
+    _dbg_historyFile
    where
     hashSet = Set.foldl' hashWithSalt
     infixl 0 `hashSet`
@@ -210,10 +205,10 @@ instance Hashable DebugOpts where
 -- will need to be changed.
 isDebugging :: DebugOpts -> Bool
 isDebugging opts = or
-  [ dbg_invariants opts
-  , dbg_transformationInfo opts > None
-  , dbg_countTransformations opts
-  , isJust (dbg_transformationsLimit opts)
+  [ _dbg_invariants opts
+  , _dbg_transformationInfo opts > None
+  , _dbg_countTransformations opts
+  , isJust (_dbg_transformationsLimit opts)
   ]
 
 -- | Check whether the requested information is available to the specified
@@ -230,7 +225,7 @@ hasDebugInfo info name opts =
   isDebugged name && hasTransformationInfo info opts
  where
   isDebugged n =
-    let set = dbg_transformations opts
+    let set = _dbg_transformations opts
      in Set.null set || Set.member n set
 
 -- | Check that the transformation info shown supports the requested info.
@@ -238,7 +233,7 @@ hasDebugInfo info name opts =
 -- 'hasDebugInfo' should be used instead.
 hasTransformationInfo :: TransformationInfo -> DebugOpts -> Bool
 hasTransformationInfo info opts =
-  info <= dbg_transformationInfo opts
+  info <= _dbg_transformationInfo opts
 
 -- NOTE [debugging options]
 --
@@ -250,80 +245,80 @@ hasTransformationInfo info opts =
 -- | -fclash-debug DebugNone
 debugNone :: DebugOpts
 debugNone = DebugOpts
-  { dbg_invariants = False
-  , dbg_transformationInfo = None
-  , dbg_transformations = Set.empty
-  , dbg_countTransformations = False
-  , dbg_transformationsFrom = Nothing
-  , dbg_transformationsLimit = Nothing
-  , dbg_historyFile = Nothing
+  { _dbg_invariants = False
+  , _dbg_transformationInfo = None
+  , _dbg_transformations = Set.empty
+  , _dbg_countTransformations = False
+  , _dbg_transformationsFrom = Nothing
+  , _dbg_transformationsLimit = Nothing
+  , _dbg_historyFile = Nothing
   }
 
 -- | -fclash-debug DebugSilent
 debugSilent :: DebugOpts
-debugSilent = debugNone { dbg_invariants = True }
+debugSilent = debugNone { _dbg_invariants = True }
 
 -- | -fclash-debug DebugFinal
 debugFinal :: DebugOpts
-debugFinal = debugSilent { dbg_transformationInfo = FinalTerm }
+debugFinal = debugSilent { _dbg_transformationInfo = FinalTerm }
 
 -- | -fclash-debug DebugCount
 debugCount :: DebugOpts
-debugCount = debugFinal { dbg_countTransformations = True }
+debugCount = debugFinal { _dbg_countTransformations = True }
 
 -- | -fclash-debug DebugName
 debugName :: DebugOpts
-debugName = debugCount { dbg_transformationInfo = AppliedName }
+debugName = debugCount { _dbg_transformationInfo = AppliedName }
 
 -- | -fclash-debug DebugTry
 debugTry :: DebugOpts
-debugTry = debugName { dbg_transformationInfo = TryName }
+debugTry = debugName { _dbg_transformationInfo = TryName }
 
 -- | -fclash-debug DebugApplied
 debugApplied :: DebugOpts
-debugApplied = debugTry { dbg_transformationInfo = AppliedTerm }
+debugApplied = debugTry { _dbg_transformationInfo = AppliedTerm }
 
 -- | -fclash-debug DebugAll
 debugAll :: DebugOpts
-debugAll = debugApplied { dbg_transformationInfo = TryTerm }
+debugAll = debugApplied { _dbg_transformationInfo = TryTerm }
 
 -- | Options passed to Clash compiler
 data ClashOpts = ClashOpts
-  { opt_werror :: Bool
+  { _opt_werror :: Bool
   -- ^ Are warnings treated as errors.
   --
   -- Command line flag: -Werror
-  , opt_inlineLimit :: Int
+  , _opt_inlineLimit :: Int
   -- ^ Change the number of times a function f can undergo inlining inside
   -- some other function g. This prevents the size of g growing dramatically.
   --
   -- Command line flag: -fclash-inline-limit
-  , opt_specLimit :: Int
+  , _opt_specLimit :: Int
   -- ^ Change the number of times a function can undergo specialization.
   --
   -- Command line flag: -fclash-spec-limit
-  , opt_inlineFunctionLimit :: Word
+  , _opt_inlineFunctionLimit :: Word
   -- ^ Set the threshold for function size. Below this threshold functions are
   -- always inlined (if it is not recursive).
   --
   -- Command line flag: -fclash-inline-function-limit
-  , opt_inlineConstantLimit :: Word
+  , _opt_inlineConstantLimit :: Word
   -- ^ Set the threshold for constant size. Below this threshold constants are
   -- always inlined. A value of 0 inlines all constants.
   --
   -- Command line flag: -fclash-inline-constant-limit
-  , opt_evaluatorFuelLimit :: Word
+  , _opt_evaluatorFuelLimit :: Word
   -- ^ Set the threshold for maximum unfolding depth in the evaluator. A value
   -- of zero means no potentially non-terminating binding is unfolded.
   --
   -- Command line flag: -fclash-evaluator-fuel-limit
-  , opt_debug :: DebugOpts
+  , _opt_debug :: DebugOpts
   -- ^ Options which control debugging. See 'DebugOpts'.
-  , opt_cachehdl :: Bool
+  , _opt_cachehdl :: Bool
   -- ^ Reuse previously generated output from Clash. Only caches topentities.
   --
   -- Command line flag: -fclash-no-cache
-  , opt_clear :: Bool
+  , _opt_clear :: Bool
   -- ^ Remove HDL directories before writing to them. By default, Clash will
   -- only write to non-empty directories if it can prove all files in it are
   -- generated by a previous run. This option applies to directories of the
@@ -331,44 +326,44 @@ data ClashOpts = ClashOpts
   -- in with @-fclash-hdldir@. Note that Clash will still use a cache if it can.
   --
   -- Command line flag: @-fclash-clear@
-  , opt_primWarn :: Bool
+  , _opt_primWarn :: Bool
   -- ^ Disable warnings for primitives
   --
   -- Command line flag: -fclash-no-prim-warn
-  , opt_color :: OverridingBool
+  , _opt_color :: OverridingBool
   -- ^ Show colors in debug output
   --
   -- Command line flag: -fdiagnostics-color
-  , opt_intWidth :: Int
+  , _opt_intWidth :: Int
   -- ^ Set the bit width for the Int/Word/Integer types. The only allowed values
   -- are 32 or 64.
-  , opt_hdlDir :: Maybe String
+  , _opt_hdlDir :: Maybe String
   -- ^ Directory to save HDL files to
-  , opt_hdlSyn :: HdlSyn
+  , _opt_hdlSyn :: HdlSyn
   -- ^ Synthesis target. See "HdlSyn" for available options.
-  , opt_errorExtra :: Bool
+  , _opt_errorExtra :: Bool
   -- ^ Show additional information in error messages
-  , opt_importPaths :: [FilePath]
+  , _opt_importPaths :: [FilePath]
   -- ^ Paths where Clash should look for modules
-  , opt_componentPrefix :: Maybe Text
+  , _opt_componentPrefix :: Maybe Text
   -- ^ Prefix components with given string
-  , opt_newInlineStrat :: Bool
+  , _opt_newInlineStrat :: Bool
   -- ^ Use new inline strategy. Functions marked NOINLINE will get their own
   -- HDL module.
-  , opt_escapedIds :: Bool
+  , _opt_escapedIds :: Bool
   -- ^ Use escaped identifiers in HDL. See:
   --
   --  * http://vhdl.renerta.com/mobile/source/vhd00037.htm
   --  * http://verilog.renerta.com/source/vrg00018.htm
-  , opt_lowerCaseBasicIds :: PreserveCase
+  , _opt_lowerCaseBasicIds :: PreserveCase
   -- ^ Force all generated basic identifiers to lowercase. Among others, this
   -- affects module and file names.
-  , opt_ultra :: Bool
+  , _opt_ultra :: Bool
   -- ^ Perform a high-effort compile, trading improved performance for
   -- potentially much longer compile times.
   --
   -- Name inspired by Design Compiler's /compile_ultra/ flag.
-  , opt_forceUndefined :: Maybe (Maybe Int)
+  , _opt_forceUndefined :: Maybe (Maybe Int)
   -- ^
   -- * /Nothing/: generate undefined's in the HDL
   --
@@ -376,85 +371,86 @@ data ClashOpts = ClashOpts
   -- compiler decides what's best
   --
   -- * /Just (Just x)/: replace undefined's by /x/ in the HDL
-  , opt_checkIDir :: Bool
-  -- ^ Check whether paths specified in 'opt_importPaths' exists on the
+  , _opt_checkIDir :: Bool
+  -- ^ Check whether paths specified in '_opt_importPaths' exists on the
   -- filesystem.
-  , opt_aggressiveXOpt :: Bool
+  , _opt_aggressiveXOpt :: Bool
   -- ^ Enable aggressive X optimization, which may remove undefineds from
   -- generated HDL by replaced with defined alternatives.
-  , opt_aggressiveXOptBB :: Bool
+  , _opt_aggressiveXOptBB :: Bool
   -- ^ Enable aggressive X optimization, which may remove undefineds from
   -- HDL generated by blackboxes. This enables the ~ISUNDEFINED template tag.
-  , opt_inlineWFCacheLimit :: Word
+  , _opt_inlineWFCacheLimit :: Word
   -- ^ At what size do we cache normalized work-free top-level binders.
-  , opt_edalize :: Bool
+  , _opt_edalize :: Bool
   -- ^ Generate an EDAM file for use with Edalize.
-  , opt_renderEnums :: Bool
+  , _opt_renderEnums :: Bool
   -- ^ Render sum types with all zero-width fields as enums where supported, as
   -- opposed to rendering them as bitvectors.
   }
   deriving (Show)
+makeLenses ''ClashOpts
 
 instance NFData ClashOpts where
   rnf o =
-    opt_werror o `deepseq`
-    opt_inlineLimit o `deepseq`
-    opt_specLimit o `deepseq`
-    opt_inlineFunctionLimit o `deepseq`
-    opt_inlineConstantLimit o `deepseq`
-    opt_evaluatorFuelLimit o `deepseq`
-    opt_cachehdl o `deepseq`
-    opt_clear o `deepseq`
-    opt_primWarn o `deepseq`
-    opt_color o `seq`
-    opt_intWidth o `deepseq`
-    opt_hdlDir o `deepseq`
-    opt_hdlSyn o `deepseq`
-    opt_errorExtra o `deepseq`
-    opt_importPaths o `deepseq`
-    opt_componentPrefix o `deepseq`
-    opt_newInlineStrat o `deepseq`
-    opt_escapedIds o `deepseq`
-    opt_lowerCaseBasicIds o `deepseq`
-    opt_ultra o `deepseq`
-    opt_forceUndefined o `deepseq`
-    opt_checkIDir o `deepseq`
-    opt_aggressiveXOpt o `deepseq`
-    opt_aggressiveXOptBB o `deepseq`
-    opt_inlineWFCacheLimit o `deepseq`
-    opt_edalize o `deepseq`
-    opt_renderEnums o `deepseq`
+    _opt_werror o `deepseq`
+    _opt_inlineLimit o `deepseq`
+    _opt_specLimit o `deepseq`
+    _opt_inlineFunctionLimit o `deepseq`
+    _opt_inlineConstantLimit o `deepseq`
+    _opt_evaluatorFuelLimit o `deepseq`
+    _opt_cachehdl o `deepseq`
+    _opt_clear o `deepseq`
+    _opt_primWarn o `deepseq`
+    _opt_color o `seq`
+    _opt_intWidth o `deepseq`
+    _opt_hdlDir o `deepseq`
+    _opt_hdlSyn o `deepseq`
+    _opt_errorExtra o `deepseq`
+    _opt_importPaths o `deepseq`
+    _opt_componentPrefix o `deepseq`
+    _opt_newInlineStrat o `deepseq`
+    _opt_escapedIds o `deepseq`
+    _opt_lowerCaseBasicIds o `deepseq`
+    _opt_ultra o `deepseq`
+    _opt_forceUndefined o `deepseq`
+    _opt_checkIDir o `deepseq`
+    _opt_aggressiveXOpt o `deepseq`
+    _opt_aggressiveXOptBB o `deepseq`
+    _opt_inlineWFCacheLimit o `deepseq`
+    _opt_edalize o `deepseq`
+    _opt_renderEnums o `deepseq`
     ()
 
 instance Eq ClashOpts where
   s0 == s1 =
-    opt_werror s0 == opt_werror s1 &&
-    opt_inlineLimit s0 == opt_inlineLimit s1 &&
-    opt_specLimit s0 == opt_specLimit s1 &&
-    opt_inlineFunctionLimit s0 == opt_inlineFunctionLimit s1 &&
-    opt_inlineConstantLimit s0 == opt_inlineConstantLimit s1 &&
-    opt_evaluatorFuelLimit s0 == opt_evaluatorFuelLimit s1 &&
-    opt_cachehdl s0 == opt_cachehdl s1 &&
-    opt_clear s0 == opt_clear s1 &&
-    opt_primWarn s0 == opt_primWarn s1 &&
-    (opt_color s0 `eqOverridingBool` opt_color s1) &&
-    opt_intWidth s0 == opt_intWidth s1 &&
-    opt_hdlDir s0 == opt_hdlDir s1 &&
-    opt_hdlSyn s0 == opt_hdlSyn s1 &&
-    opt_errorExtra s0 == opt_errorExtra s1 &&
-    opt_importPaths s0 == opt_importPaths s1 &&
-    opt_componentPrefix s0 == opt_componentPrefix s1 &&
-    opt_newInlineStrat s0 == opt_newInlineStrat s1 &&
-    opt_escapedIds s0 == opt_escapedIds s1 &&
-    opt_lowerCaseBasicIds s0 == opt_lowerCaseBasicIds s1 &&
-    opt_ultra s0 == opt_ultra s1 &&
-    opt_forceUndefined s0 == opt_forceUndefined s1 &&
-    opt_checkIDir s0 == opt_checkIDir s1 &&
-    opt_aggressiveXOpt s0 == opt_aggressiveXOpt s1 &&
-    opt_aggressiveXOptBB s0 == opt_aggressiveXOptBB s1 &&
-    opt_inlineWFCacheLimit s0 == opt_inlineWFCacheLimit s1 &&
-    opt_edalize s0 == opt_edalize s1 &&
-    opt_renderEnums s0 == opt_renderEnums s1
+    _opt_werror s0 == _opt_werror s1 &&
+    _opt_inlineLimit s0 == _opt_inlineLimit s1 &&
+    _opt_specLimit s0 == _opt_specLimit s1 &&
+    _opt_inlineFunctionLimit s0 == _opt_inlineFunctionLimit s1 &&
+    _opt_inlineConstantLimit s0 == _opt_inlineConstantLimit s1 &&
+    _opt_evaluatorFuelLimit s0 == _opt_evaluatorFuelLimit s1 &&
+    _opt_cachehdl s0 == _opt_cachehdl s1 &&
+    _opt_clear s0 == _opt_clear s1 &&
+    _opt_primWarn s0 == _opt_primWarn s1 &&
+    (_opt_color s0 `eqOverridingBool` _opt_color s1) &&
+    _opt_intWidth s0 == _opt_intWidth s1 &&
+    _opt_hdlDir s0 == _opt_hdlDir s1 &&
+    _opt_hdlSyn s0 == _opt_hdlSyn s1 &&
+    _opt_errorExtra s0 == _opt_errorExtra s1 &&
+    _opt_importPaths s0 == _opt_importPaths s1 &&
+    _opt_componentPrefix s0 == _opt_componentPrefix s1 &&
+    _opt_newInlineStrat s0 == _opt_newInlineStrat s1 &&
+    _opt_escapedIds s0 == _opt_escapedIds s1 &&
+    _opt_lowerCaseBasicIds s0 == _opt_lowerCaseBasicIds s1 &&
+    _opt_ultra s0 == _opt_ultra s1 &&
+    _opt_forceUndefined s0 == _opt_forceUndefined s1 &&
+    _opt_checkIDir s0 == _opt_checkIDir s1 &&
+    _opt_aggressiveXOpt s0 == _opt_aggressiveXOpt s1 &&
+    _opt_aggressiveXOptBB s0 == _opt_aggressiveXOptBB s1 &&
+    _opt_inlineWFCacheLimit s0 == _opt_inlineWFCacheLimit s1 &&
+    _opt_edalize s0 == _opt_edalize s1 &&
+    _opt_renderEnums s0 == _opt_renderEnums s1
 
    where
     eqOverridingBool :: OverridingBool -> OverridingBool -> Bool
@@ -466,33 +462,33 @@ instance Eq ClashOpts where
 instance Hashable ClashOpts where
   hashWithSalt s ClashOpts {..} =
     s `hashWithSalt`
-    opt_werror `hashWithSalt`
-    opt_inlineLimit `hashWithSalt`
-    opt_specLimit `hashWithSalt`
-    opt_inlineFunctionLimit `hashWithSalt`
-    opt_inlineConstantLimit `hashWithSalt`
-    opt_evaluatorFuelLimit `hashWithSalt`
-    opt_cachehdl `hashWithSalt`
-    opt_clear `hashWithSalt`
-    opt_primWarn `hashOverridingBool`
-    opt_color `hashWithSalt`
-    opt_intWidth `hashWithSalt`
-    opt_hdlDir `hashWithSalt`
-    opt_hdlSyn `hashWithSalt`
-    opt_errorExtra `hashWithSalt`
-    opt_importPaths `hashWithSalt`
-    opt_componentPrefix `hashWithSalt`
-    opt_newInlineStrat `hashWithSalt`
-    opt_escapedIds `hashWithSalt`
-    opt_lowerCaseBasicIds `hashWithSalt`
-    opt_ultra `hashWithSalt`
-    opt_forceUndefined `hashWithSalt`
-    opt_checkIDir `hashWithSalt`
-    opt_aggressiveXOpt `hashWithSalt`
-    opt_aggressiveXOptBB `hashWithSalt`
-    opt_inlineWFCacheLimit `hashWithSalt`
-    opt_edalize `hashWithSalt`
-    opt_renderEnums
+    _opt_werror `hashWithSalt`
+    _opt_inlineLimit `hashWithSalt`
+    _opt_specLimit `hashWithSalt`
+    _opt_inlineFunctionLimit `hashWithSalt`
+    _opt_inlineConstantLimit `hashWithSalt`
+    _opt_evaluatorFuelLimit `hashWithSalt`
+    _opt_cachehdl `hashWithSalt`
+    _opt_clear `hashWithSalt`
+    _opt_primWarn `hashOverridingBool`
+    _opt_color `hashWithSalt`
+    _opt_intWidth `hashWithSalt`
+    _opt_hdlDir `hashWithSalt`
+    _opt_hdlSyn `hashWithSalt`
+    _opt_errorExtra `hashWithSalt`
+    _opt_importPaths `hashWithSalt`
+    _opt_componentPrefix `hashWithSalt`
+    _opt_newInlineStrat `hashWithSalt`
+    _opt_escapedIds `hashWithSalt`
+    _opt_lowerCaseBasicIds `hashWithSalt`
+    _opt_ultra `hashWithSalt`
+    _opt_forceUndefined `hashWithSalt`
+    _opt_checkIDir `hashWithSalt`
+    _opt_aggressiveXOpt `hashWithSalt`
+    _opt_aggressiveXOptBB `hashWithSalt`
+    _opt_inlineWFCacheLimit `hashWithSalt`
+    _opt_edalize `hashWithSalt`
+    _opt_renderEnums
    where
     hashOverridingBool :: Int -> OverridingBool -> Int
     hashOverridingBool s1 Auto = hashWithSalt s1 (0 :: Int)
@@ -503,34 +499,34 @@ instance Hashable ClashOpts where
 defClashOpts :: ClashOpts
 defClashOpts
   = ClashOpts
-  { opt_werror              = False
-  , opt_inlineLimit         = 20
-  , opt_specLimit           = 20
-  , opt_inlineFunctionLimit = 15
-  , opt_inlineConstantLimit = 0
-  , opt_evaluatorFuelLimit  = 20
-  , opt_debug               = debugNone
-  , opt_cachehdl            = True
-  , opt_clear               = False
-  , opt_primWarn            = True
-  , opt_color               = Auto
-  , opt_intWidth            = WORD_SIZE_IN_BITS
-  , opt_hdlDir              = Nothing
-  , opt_hdlSyn              = Other
-  , opt_errorExtra          = False
-  , opt_importPaths         = []
-  , opt_componentPrefix     = Nothing
-  , opt_newInlineStrat      = True
-  , opt_escapedIds          = True
-  , opt_lowerCaseBasicIds   = PreserveCase
-  , opt_ultra               = False
-  , opt_forceUndefined      = Nothing
-  , opt_checkIDir           = True
-  , opt_aggressiveXOpt      = False
-  , opt_aggressiveXOptBB    = False
-  , opt_inlineWFCacheLimit  = 10 -- TODO: find "optimal" value
-  , opt_edalize             = False
-  , opt_renderEnums         = True
+  { _opt_werror              = False
+  , _opt_inlineLimit         = 20
+  , _opt_specLimit           = 20
+  , _opt_inlineFunctionLimit = 15
+  , _opt_inlineConstantLimit = 0
+  , _opt_evaluatorFuelLimit  = 20
+  , _opt_debug               = debugNone
+  , _opt_cachehdl            = True
+  , _opt_clear               = False
+  , _opt_primWarn            = True
+  , _opt_color               = Auto
+  , _opt_intWidth            = WORD_SIZE_IN_BITS
+  , _opt_hdlDir              = Nothing
+  , _opt_hdlSyn              = Other
+  , _opt_errorExtra          = False
+  , _opt_importPaths         = []
+  , _opt_componentPrefix     = Nothing
+  , _opt_newInlineStrat      = True
+  , _opt_escapedIds          = True
+  , _opt_lowerCaseBasicIds   = PreserveCase
+  , _opt_ultra               = False
+  , _opt_forceUndefined      = Nothing
+  , _opt_checkIDir           = True
+  , _opt_aggressiveXOpt      = False
+  , _opt_aggressiveXOptBB    = False
+  , _opt_inlineWFCacheLimit  = 10 -- TODO: find "optimal" value
+  , _opt_edalize             = False
+  , _opt_renderEnums         = True
   }
 
 -- | Synopsys Design Constraint (SDC) information for a component.
@@ -539,6 +535,14 @@ defClashOpts
 newtype SdcInfo = SdcInfo
   { sdcClock :: [(Text, VDomainConfiguration)]
   }
+
+data ClashEnv = ClashEnv
+  { envOpts        :: ClashOpts
+  , envTyConMap    :: TyConMap
+  , envTupleTyCons :: IntMap TyConName
+  , envPrimitives  :: CompiledPrimMap
+  , envCustomReprs :: CustomReprs
+  } deriving (Generic, NFData)
 
 -- | Render an SDC file from an SdcInfo.
 -- The clock periods, waveforms, and targets are all hardcoded.

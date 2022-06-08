@@ -88,7 +88,7 @@ import {-# SOURCE #-} Clash.Netlist
 import qualified Clash.Backend                 as Backend
 import           Clash.Debug                   (debugIsOn)
 import           Clash.Driver.Types
-  (ClashOpts(opt_primWarn, opt_color, opt_werror))
+  (ClashOpts(_opt_primWarn, _opt_color, _opt_werror))
 import           Clash.Netlist.BlackBox.Types  as B
 import           Clash.Netlist.BlackBox.Util   as B
 import           Clash.Netlist.Types           as N
@@ -109,14 +109,14 @@ warn
 warn opts msg = do
   -- TODO: Put in appropriate module
   useColor <-
-    case opt_color opts of
+    case _opt_color opts of
       Always -> return True
       Never  -> return False
       Auto   -> hIsTerminalDevice stderr
 
   hSetSGR stderr [SetConsoleIntensity BoldIntensity]
 
-  case opt_werror opts of
+  case _opt_werror opts of
     True -> do
       when useColor $ hSetSGR stderr [SetColor Foreground Vivid Red]
       throw (ClashException noSrcSpan msg Nothing)
@@ -328,7 +328,7 @@ extractPrimWarnOrFail nm = do
     -> NetlistMonad CompiledPrimitive
 
   go ((WarnAlways warning):ws) cp = do
-    primWarn <- opt_primWarn <$> Lens.use clashOpts
+    primWarn <- _opt_primWarn <$> Lens.use clashOpts
     seen <- Set.member nm <$> Lens.use seenPrimitives
     opts <- Lens.use clashOpts
 

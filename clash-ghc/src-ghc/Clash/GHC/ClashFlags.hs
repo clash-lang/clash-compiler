@@ -110,46 +110,46 @@ deprecated wrong right f a = do
 setInlineLimit :: IORef ClashOpts
                -> Int
                -> IO ()
-setInlineLimit r n = modifyIORef r (\c -> c {opt_inlineLimit = n})
+setInlineLimit r n = modifyIORef r (\c -> c {_opt_inlineLimit = n})
 
 setInlineFunctionLimit
   :: IORef ClashOpts
   -> Int
   -> IO ()
-setInlineFunctionLimit r n = modifyIORef r (\c -> c {opt_inlineFunctionLimit = toEnum n})
+setInlineFunctionLimit r n = modifyIORef r (\c -> c {_opt_inlineFunctionLimit = toEnum n})
 
 setInlineConstantLimit
   :: IORef ClashOpts
   -> Int
   -> IO ()
-setInlineConstantLimit r n = modifyIORef r (\c -> c {opt_inlineConstantLimit = toEnum n})
+setInlineConstantLimit r n = modifyIORef r (\c -> c {_opt_inlineConstantLimit = toEnum n})
 
 setEvaluatorFuelLimit
   :: IORef ClashOpts
   -> Int
   -> IO ()
-setEvaluatorFuelLimit r n = modifyIORef r (\c -> c {opt_evaluatorFuelLimit = toEnum n})
+setEvaluatorFuelLimit r n = modifyIORef r (\c -> c {_opt_evaluatorFuelLimit = toEnum n})
 
 setInlineWFLimit
   :: IORef ClashOpts
   -> Int
   -> IO ()
-setInlineWFLimit r n = modifyIORef r (\c -> c {opt_inlineWFCacheLimit = toEnum n})
+setInlineWFLimit r n = modifyIORef r (\c -> c {_opt_inlineWFCacheLimit = toEnum n})
 
 setSpecLimit :: IORef ClashOpts
              -> Int
              -> IO ()
-setSpecLimit r n = modifyIORef r (\c -> c {opt_specLimit = n})
+setSpecLimit r n = modifyIORef r (\c -> c {_opt_specLimit = n})
 
 setDebugInvariants :: IORef ClashOpts -> IO ()
 setDebugInvariants r =
   modifyIORef r $ \c ->
-    c { opt_debug = (opt_debug c) { dbg_invariants = True } }
+    c { _opt_debug = (_opt_debug c) { _dbg_invariants = True } }
 
 setDebugCountTransformations :: IORef ClashOpts -> IO ()
 setDebugCountTransformations r =
   modifyIORef r $ \c ->
-    c { opt_debug = (opt_debug c) { dbg_countTransformations = True } }
+    c { _opt_debug = (_opt_debug c) { _dbg_countTransformations = True } }
 
 setDebugTransformations :: IORef ClashOpts -> String -> EwM IO ()
 setDebugTransformations r s =
@@ -159,21 +159,21 @@ setDebugTransformations r s =
   trim = dropWhileEnd isSpace . dropWhile isSpace
 
   setTransformations xs opts =
-    opts { opt_debug = (opt_debug opts) { dbg_transformations = xs } }
+    opts { _opt_debug = (_opt_debug opts) { _dbg_transformations = xs } }
 
 setDebugTransformationsFrom :: IORef ClashOpts -> Int -> EwM IO ()
 setDebugTransformationsFrom r n =
   liftEwM (modifyIORef r (setFrom (fromIntegral n)))
  where
   setFrom from opts =
-    opts { opt_debug = (opt_debug opts) { dbg_transformationsFrom = Just from } }
+    opts { _opt_debug = (_opt_debug opts) { _dbg_transformationsFrom = Just from } }
 
 setDebugTransformationsLimit :: IORef ClashOpts -> Int -> EwM IO ()
 setDebugTransformationsLimit r n =
   liftEwM (modifyIORef r (setLimit (fromIntegral n)))
  where
   setLimit limit opts =
-    opts { opt_debug = (opt_debug opts) { dbg_transformationsLimit = Just limit } }
+    opts { _opt_debug = (_opt_debug opts) { _dbg_transformationsLimit = Just limit } }
 
 setDebugLevel :: IORef ClashOpts -> String -> EwM IO ()
 setDebugLevel r s =
@@ -212,7 +212,7 @@ setDebugLevel r s =
       addWarn (s ++ " is an invalid debug level")
  where
   setLevel lvl opts =
-    opts { opt_debug = lvl }
+    opts { _opt_debug = lvl }
 
 setDebugInfo :: IORef ClashOpts -> String -> EwM IO ()
 setDebugInfo r s =
@@ -226,50 +226,50 @@ setDebugInfo r s =
       addWarn (s ++ " is an invalid debug info")
  where
   setInfo info opts =
-    opts { opt_debug = (opt_debug opts) { dbg_transformationInfo = info } }
+    opts { _opt_debug = (_opt_debug opts) { _dbg_transformationInfo = info } }
 
 setNoCache :: IORef ClashOpts -> IO ()
-setNoCache r = modifyIORef r (\c -> c {opt_cachehdl = False})
+setNoCache r = modifyIORef r (\c -> c {_opt_cachehdl = False})
 
 setNoIDirCheck :: IORef ClashOpts -> IO ()
-setNoIDirCheck r = modifyIORef r (\c -> c {opt_checkIDir = False})
+setNoIDirCheck r = modifyIORef r (\c -> c {_opt_checkIDir = False})
 
 setNoClean :: a -> EwM IO ()
 setNoClean _ = addWarn "-fclash-no-clean has been removed"
 
 setClear :: IORef ClashOpts -> IO ()
-setClear r = modifyIORef r (\c -> c {opt_clear = True})
+setClear r = modifyIORef r (\c -> c {_opt_clear = True})
 
 setNoPrimWarn :: IORef ClashOpts -> IO ()
-setNoPrimWarn r = modifyIORef r (\c -> c {opt_primWarn = False})
+setNoPrimWarn r = modifyIORef r (\c -> c {_opt_primWarn = False})
 
 setIntWidth :: IORef ClashOpts
             -> Int
             -> EwM IO ()
 setIntWidth r n =
   if n == 32 || n == 64
-     then liftEwM $ modifyIORef r (\c -> c {opt_intWidth = n})
+     then liftEwM $ modifyIORef r (\c -> c {_opt_intWidth = n})
      else addWarn (show n ++ " is an invalid Int/Word/Integer bit-width. Allowed widths: 32, 64.")
 
 setHdlDir :: IORef ClashOpts
           -> String
           -> EwM IO ()
-setHdlDir r s = liftEwM $ modifyIORef r (\c -> c {opt_hdlDir = Just s})
+setHdlDir r s = liftEwM $ modifyIORef r (\c -> c {_opt_hdlDir = Just s})
 
 setHdlSyn :: IORef ClashOpts
           -> String
           -> EwM IO ()
 setHdlSyn r s = case readMaybe s of
-  Just hdlSyn -> liftEwM $ modifyIORef r (\c -> c {opt_hdlSyn = hdlSyn})
+  Just hdlSyn -> liftEwM $ modifyIORef r (\c -> c {_opt_hdlSyn = hdlSyn})
   Nothing -> case s of
-    "Xilinx"  -> liftEwM $ modifyIORef r (\c -> c {opt_hdlSyn = Vivado})
-    "ISE"     -> liftEwM $ modifyIORef r (\c -> c {opt_hdlSyn = Vivado})
-    "Altera"  -> liftEwM $ modifyIORef r (\c -> c {opt_hdlSyn = Quartus})
-    "Intel"   -> liftEwM $ modifyIORef r (\c -> c {opt_hdlSyn = Quartus})
+    "Xilinx"  -> liftEwM $ modifyIORef r (\c -> c {_opt_hdlSyn = Vivado})
+    "ISE"     -> liftEwM $ modifyIORef r (\c -> c {_opt_hdlSyn = Vivado})
+    "Altera"  -> liftEwM $ modifyIORef r (\c -> c {_opt_hdlSyn = Quartus})
+    "Intel"   -> liftEwM $ modifyIORef r (\c -> c {_opt_hdlSyn = Quartus})
     _         -> addWarn (s ++ " is an unknown hdl synthesis tool")
 
 setErrorExtra :: IORef ClashOpts -> IO ()
-setErrorExtra r = modifyIORef r (\c -> c {opt_errorExtra = True})
+setErrorExtra r = modifyIORef r (\c -> c {_opt_errorExtra = True})
 
 setFloatSupport :: IORef ClashOpts -> EwM IO ()
 setFloatSupport _ =
@@ -280,38 +280,38 @@ setComponentPrefix
   -> String
   -> IO ()
 setComponentPrefix r s =
-  modifyIORef r (\c -> c {opt_componentPrefix = Just (Text.pack s)})
+  modifyIORef r (\c -> c {_opt_componentPrefix = Just (Text.pack s)})
 
 setOldInlineStrategy :: IORef ClashOpts -> IO ()
-setOldInlineStrategy r = modifyIORef r (\c -> c {opt_newInlineStrat = False})
+setOldInlineStrategy r = modifyIORef r (\c -> c {_opt_newInlineStrat = False})
 
 setNoEscapedIds :: IORef ClashOpts -> IO ()
-setNoEscapedIds r = modifyIORef r (\c -> c {opt_escapedIds = False})
+setNoEscapedIds r = modifyIORef r (\c -> c {_opt_escapedIds = False})
 
 setLowerCaseBasicIds :: IORef ClashOpts -> IO ()
-setLowerCaseBasicIds r = modifyIORef r (\c -> c {opt_lowerCaseBasicIds = ToLower})
+setLowerCaseBasicIds r = modifyIORef r (\c -> c {_opt_lowerCaseBasicIds = ToLower})
 
 setUltra :: IORef ClashOpts -> IO ()
-setUltra r = modifyIORef r (\c -> c {opt_ultra = True})
+setUltra r = modifyIORef r (\c -> c {_opt_ultra = True})
 
 setUndefined :: IORef ClashOpts -> Maybe Int -> EwM IO ()
 setUndefined _ (Just x) | x < 0 || x > 1 =
   addWarn ("-fclash-force-undefined=" ++ show x ++ " ignored, " ++ show x ++
            " not in range [0,1]")
 setUndefined r iM =
-  liftEwM (modifyIORef r (\c -> c {opt_forceUndefined = Just iM}))
+  liftEwM (modifyIORef r (\c -> c {_opt_forceUndefined = Just iM}))
 
 setAggressiveXOpt :: IORef ClashOpts -> IO ()
 setAggressiveXOpt r = do
-  modifyIORef r (\c -> c { opt_aggressiveXOpt = True })
+  modifyIORef r (\c -> c { _opt_aggressiveXOpt = True })
   setAggressiveXOptBB r
 
 
 setAggressiveXOptBB :: IORef ClashOpts -> IO ()
-setAggressiveXOptBB r = modifyIORef r (\c -> c { opt_aggressiveXOptBB = True })
+setAggressiveXOptBB r = modifyIORef r (\c -> c { _opt_aggressiveXOptBB = True })
 
 setEdalize :: IORef ClashOpts -> IO ()
-setEdalize r = modifyIORef r (\c -> c { opt_edalize = True })
+setEdalize r = modifyIORef r (\c -> c { _opt_edalize = True })
 
 setRewriteHistoryFile :: IORef ClashOpts -> String -> IO ()
 setRewriteHistoryFile r arg = do
@@ -321,7 +321,7 @@ setRewriteHistoryFile r arg = do
   modifyIORef r (setFile fileNm)
  where
   setFile file opts =
-    opts { opt_debug = (opt_debug opts) { dbg_historyFile = Just file } }
+    opts { _opt_debug = (_opt_debug opts) { _dbg_historyFile = Just file } }
 
 setNoRenderEnums :: IORef ClashOpts -> IO ()
-setNoRenderEnums r = modifyIORef r (\c -> c { opt_renderEnums = False })
+setNoRenderEnums r = modifyIORef r (\c -> c { _opt_renderEnums = False })

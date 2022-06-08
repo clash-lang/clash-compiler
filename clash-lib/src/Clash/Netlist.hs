@@ -121,14 +121,14 @@ genNetlist env isTb globals tops topNames typeTrans ite be seen0 dir prefixM top
   let reprs = envCustomReprs env
   let primMap = envPrimitives env
   let tcm = envTyConMap env
-  let iw = opt_intWidth opts
+  let iw = _opt_intWidth opts
   ((_meta, topComponent), s) <-
     runNetlistMonad isTb opts reprs globals tops primMap tcm typeTrans
                     iw ite be seen1 dir componentNames_ $ genComponent topEntity
   return (topComponent, _components s, seen1)
  where
   (componentNames_, seen1) =
-    genNames (opt_newInlineStrat (envOpts env)) prefixM seen0 topNames globals
+    genNames (_opt_newInlineStrat (envOpts env)) prefixM seen0 topNames globals
 
 -- | Run a NetlistMonad action in a given environment
 runNetlistMonad
@@ -232,9 +232,9 @@ genTopNames opts hdl tops =
     env1 <- foldlM goNonFixed env0 nonFixedTops
     pure env1
  where
-  prefixM = opt_componentPrefix opts
-  esc = opt_escapedIds opts
-  lw = opt_lowerCaseBasicIds opts
+  prefixM = _opt_componentPrefix opts
+  esc = _opt_escapedIds opts
+  lw = _opt_lowerCaseBasicIds opts
 
   fixedTops = [(topId, ann) | TopEntityT{topId, topAnnotation=Just ann} <- tops]
   nonFixedTops = [topId | TopEntityT{topId, topAnnotation=Nothing} <- tops]

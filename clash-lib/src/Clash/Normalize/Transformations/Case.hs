@@ -67,7 +67,7 @@ import Clash.Core.VarEnv
   ( InScopeSet, elemVarSet, extendInScopeSet, extendInScopeSetList, mkVarSet
   , unitVarSet, uniqAway)
 import Clash.Debug (traceIf)
-import Clash.Driver.Types (DebugOpts(dbg_invariants))
+import Clash.Driver.Types (DebugOpts(_dbg_invariants))
 import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
 import Clash.Netlist.Util (coreTypeToHWType, representableType)
 import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
@@ -318,7 +318,7 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
             opts <- Lens.view debugOpts
             -- When invariants are being checked, report missing evaluation
             -- rules for the primitive evaluator.
-            traceIf (dbg_invariants opts && isConstant subj)
+            traceIf (_dbg_invariants opts && isConstant subj)
               ("Unmatchable constant as case subject: " ++ showPpr subj ++
                  "\nWHNF is: " ++ showPpr subj1)
               -- Otherwise check whether the entire case-expression has a

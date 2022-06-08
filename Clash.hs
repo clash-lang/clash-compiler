@@ -58,13 +58,13 @@ doHDL Proxy opts src = do
   putStrLn $ "Loading dependencies took " ++ prepStartDiff
 
   generateHDL clashEnv clashDesign (Just backend)
-    (ghcTypeToHWType (opt_intWidth opts)) ghcEvaluator evaluator Nothing startTime
+    (ghcTypeToHWType (_opt_intWidth opts)) ghcEvaluator evaluator Nothing startTime
 
 main :: IO ()
 main =
   let opts = defClashOpts
-               { opt_cachehdl = False
-               , opt_debug = debugSilent
-               , opt_clear = True
+               { _opt_cachehdl = False
+               , _opt_debug = debugSilent
+               , _opt_clear = True
                }
    in genVHDL opts "./examples/FIR.hs"

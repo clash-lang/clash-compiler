@@ -324,9 +324,9 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
     let topEntities0 = designEntities design
     let opts = envOpts env
 
-    removeHistoryFile (dbg_historyFile (opt_debug opts))
+    removeHistoryFile (_dbg_historyFile (_opt_debug opts))
 
-    unless (opt_cachehdl opts) $
+    unless (_opt_cachehdl opts) $
       putStrLn "Clash: Ignoring previously made caches"
 
     let topEntities1 = fmap (removeForAll . splitTopEntityT tcm bindingsMap)
@@ -379,13 +379,13 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
     pure $! State.execState (Id.addRaw (Data.Text.pack modName1)) seen
 
   let topNm = lookupVarEnv' compNames topEntity
-      (modNameS, fmap Data.Text.pack -> prefixM) = prefixModuleName (hdlKind (undefined :: backend)) (opt_componentPrefix opts) annM modName1
+      (modNameS, fmap Data.Text.pack -> prefixM) = prefixModuleName (hdlKind (undefined :: backend)) (_opt_componentPrefix opts) annM modName1
       modNameT  = Data.Text.pack modNameS
       hdlState' = setDomainConfigurations domainConfs
                 $ setModName modNameT
                 $ setTopName topNm
                 $ fromMaybe (initBackend @backend opts) hdlState
-      hdlDir    = fromMaybe (Clash.Backend.name hdlState') (opt_hdlDir opts) </> topEntityS
+      hdlDir    = fromMaybe (Clash.Backend.name hdlState') (_opt_hdlDir opts) </> topEntityS
       manPath   = hdlDir </> manifestFilename
       ite       = ifThenElseExpr hdlState'
       topNmT    = Id.toText topNm
@@ -409,7 +409,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
         pure $! State.execState (mapM_ Id.addRaw (componentNames manifest0)) seen
 
       fileNames1 <- modifyMVar edamFilesV $ \edamFiles ->
-        if opt_edalize opts
+        if _opt_edalize opts
           then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles fileNames
           else pure (edamFiles, fileNames)
 
@@ -473,7 +473,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
       -- TODO: Data files should go into their own directory
       -- FIXME: Files can silently overwrite each other
       hdlDocDigests <- mapM (writeHDL hdlDir) hdlDocs
-      dataFilesDigests <- copyDataFiles (opt_importPaths opts) hdlDir dfiles
+      dataFilesDigests <- copyDataFiles (_opt_importPaths opts) hdlDir dfiles
       memoryFilesDigests <- writeMemoryDataFiles hdlDir mfiles
 
       let
@@ -484,7 +484,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
           <> zip (map fst mfiles) memoryFilesDigests
 
       filesAndDigests1 <- modifyMVar edamFilesV $ \edamFiles ->
-        if opt_edalize opts
+        if _opt_edalize opts
           then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles filesAndDigests0
           else pure (edamFiles, filesAndDigests0)
 
@@ -903,7 +903,7 @@ prepareDir ::
   -- | Did directory contain unexpected modifications? See 'readFreshManifest'
   Maybe [UnexpectedModification] ->
   IO ()
-prepareDir hdlDir ClashOpts{opt_clear} mods = do
+prepareDir hdlDir ClashOpts{_opt_clear} mods = do
   ifM
     (doesPathExist hdlDir)
     (ifM
@@ -934,7 +934,7 @@ prepareDir hdlDir ClashOpts{opt_clear} mods = do
       Just [] ->
         -- No unexpected changes, so no user work will get lost
         removeDirectoryRecursive hdlDir
-      _ | opt_clear ->
+      _ | _opt_clear ->
         -- Unexpected changes / non-empty directory, but @-fclash-clear@ was
         -- set, so remove directory anyway.
         removeDirectoryRecursive hdlDir

@@ -57,12 +57,12 @@ benchFile idirs src = do
       topEntityMap = mkVarEnv (zip (map topId topEntities) topEntities)
       prefixM    = Nothing
       ite        = ifThenElseExpr hdlState'
-      hdlDir     = fromMaybe "." (opt_hdlDir (envOpts clashEnv)) </>
+      hdlDir     = fromMaybe "." (_opt_hdlDir (envOpts clashEnv)) </>
                          Clash.Backend.name hdlState' </>
                          takeWhile (/= '.') topEntityS
   (netlist,_,_) <-
     genNetlist clashEnv False transformedBindings topEntityMap compNames
-               (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
+               (ghcTypeToHWType (_opt_intWidth (envOpts clashEnv)))
                ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
   netlist `deepseq` putStrLn ".. done\n"
 

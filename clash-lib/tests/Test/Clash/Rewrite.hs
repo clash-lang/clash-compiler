@@ -61,7 +61,7 @@ lookupTM u tm = case HashMap.lookup u tm of
 instance Default RewriteEnv where
   def = RewriteEnv
     { _clashEnv = ClashEnv
-        { envOpts = defClashOpts { opt_debug = debugSilent }
+        { envOpts = defClashOpts { _opt_debug = debugSilent }
         , envTyConMap = emptyUniqMap
         , envTupleTyCons = IntMap.empty
         , envPrimitives = HashMap.empty

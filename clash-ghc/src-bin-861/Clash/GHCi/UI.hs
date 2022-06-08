@@ -2022,8 +2022,8 @@ makeHDL Proxy startAction optsRef srcs = do
   dflags <- GHC.getSessionDynFlags
   liftIO $ do startTime <- Clock.getCurrentTime
               opts0 <- readIORef optsRef
-              let opts1  = opts0 { opt_color = useColor dflags }
-                  iw     = opt_intWidth opts1
+              let opts1  = opts0 { _opt_color = useColor dflags }
+                  iw     = _opt_intWidth opts1
                   hdl    = hdlKind backend
                   -- determine whether `-outputdir` was used
                   outputDir = do odir <- objectDir dflags
@@ -2034,8 +2034,8 @@ makeHDL Proxy startAction optsRef srcs = do
                                     then Just odir
                                     else Nothing
                   idirs = importPaths dflags
-                  opts2 = opts1 { opt_hdlDir = maybe outputDir Just (opt_hdlDir opts1)
-                                , opt_importPaths = idirs}
+                  opts2 = opts1 { _opt_hdlDir = maybe outputDir Just (_opt_hdlDir opts1)
+                                , _opt_importPaths = idirs}
                   backend = initBackend @backend opts2
 
               checkMonoLocalBinds dflags

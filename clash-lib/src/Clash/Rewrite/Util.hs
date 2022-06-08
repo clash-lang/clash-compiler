@@ -154,7 +154,7 @@ apply = \s rewrite ctx expr0 -> do
   Monad.when hasChanged (transformCounter += 1)
 
   -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
-  let rewriteHistFile = dbg_historyFile opts
+  let rewriteHistFile = _dbg_historyFile opts
   Monad.when (isJust rewriteHistFile && hasChanged) $ do
     (curBndr, _) <- Lens.use curFun
     let !_ = unsafePerformIO
@@ -188,8 +188,8 @@ applyDebug name exprOld hasChanged exprNew = do
   nTrans <- Lens.use transformCounter
   opts <- Lens.view debugOpts
 
-  let from = fromMaybe 0 (dbg_transformationsFrom opts)
-  let limit = fromMaybe maxBound (dbg_transformationsLimit opts)
+  let from = fromMaybe 0 (_dbg_transformationsFrom opts)
+  let limit = fromMaybe maxBound (_dbg_transformationsLimit opts)
 
   if | nTrans - from > limit ->
          error "-fclash-debug-transformations-limit exceeded"
@@ -201,10 +201,10 @@ applyDebug name exprOld hasChanged exprNew = do
   go opts = traceIf (hasDebugInfo TryTerm name opts) ("Tried: " ++ name ++ " on:\n" ++ before) $ do
     nTrans <- pred <$> Lens.use transformCounter
 
-    Monad.when (dbg_countTransformations opts && hasChanged) $ do
+    Monad.when (_dbg_countTransformations opts && hasChanged) $ do
       transformCounters %= HashMap.insertWith (const succ) (Text.pack name) 1
 
-    Monad.when (dbg_invariants opts && hasChanged) $ do
+    Monad.when (_dbg_invariants opts && hasChanged) $ do
       tcm                  <- Lens.view tcCache
       let beforeTy          = inferCoreTypeOf tcm exprOld
           beforeFV          = Lens.setOf freeLocalVars exprOld
@@ -249,7 +249,7 @@ applyDebug name exprOld hasChanged exprNew = do
               )
 
     let exprNotEqual = not (fastEqBy eqTerm exprOld exprNew)
-    Monad.when (dbg_invariants opts && not hasChanged && exprNotEqual) $
+    Monad.when (_dbg_invariants opts && not hasChanged && exprNotEqual) $
       error $ $(curLoc) ++ "Expression changed without notice(" ++ name ++  "): before"
                         ++ before ++ "\nafter:\n" ++ after
 
@@ -282,9 +282,9 @@ runRewriteSession :: RewriteEnv
                   -> IO a
 runRewriteSession r s m = do
   (a, s', _) <- runR m r s
-  traceIf (dbg_countTransformations (opt_debug (envOpts (_clashEnv r))))
+  traceIf (_dbg_countTransformations (_opt_debug (envOpts (_clashEnv r))))
     ("Clash: Transformations:\n" ++ Text.unpack (showCounters (s' ^. transformCounters))) $
-    traceIf (None < dbg_transformationInfo (opt_debug (envOpts (_clashEnv r))))
+    traceIf (None < _dbg_transformationInfo (_opt_debug (envOpts (_clashEnv r))))
       ("Clash: Applied " ++ show (s' ^. transformCounter) ++ " transformations")
       pure a
   where

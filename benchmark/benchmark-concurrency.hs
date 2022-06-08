@@ -41,5 +41,5 @@ benchFile idirs src =
       bench ("Generating HDL: " ++ src)
             (nfIO (generateHDL clashEnv clashDesign
                      (Just (initBackend @VHDLState (envOpts clashEnv)))
-                     (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
+                     (ghcTypeToHWType (_opt_intWidth (envOpts clashEnv)))
                      ghcEvaluator evaluator Nothing startTime))

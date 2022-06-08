@@ -49,8 +49,8 @@ import           Test.Tasty.Clash
 
 mkClashOpts :: ClashOpts
 mkClashOpts = defClashOpts
-  { opt_cachehdl     = False
-  , opt_errorExtra   = True
+  { _opt_cachehdl     = False
+  , _opt_errorExtra   = True
   }
 
 type family TargetToState (target :: HDL) where
@@ -70,7 +70,7 @@ runToNetlistStage
   -> IO [(ComponentMeta, Component)]
 runToNetlistStage target f src = do
   pds <- primDirs backend
-  (env, design) <- generateBindings opts (return ()) pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
+  (env, design) <- generateBindings opts (return ()) pds (_opt_importPaths opts) [] (hdlKind backend) src Nothing
 
   let (compNames, initIs) = genTopNames opts hdl (designEntities design)
       teNames = fmap topId (designEntities design)
@@ -81,7 +81,7 @@ runToNetlistStage target f src = do
 
   transformedBindings <-
     normalizeEntity env (designBindings design)
-      (ghcTypeToHWType (opt_intWidth opts))
+      (ghcTypeToHWType (_opt_intWidth opts))
       ghcEvaluator
       evaluator
       teNames supplyN te
@@ -95,7 +95,7 @@ runToNetlistStage target f src = do
   hdl = buildTargetToHdl target
 
   netlistFrom (env, bm, tes, compNames, te, seen, domainConfs) =
-    genNetlist env False bm tes compNames (ghcTypeToHWType (opt_intWidth opts))
+    genNetlist env False bm tes compNames (ghcTypeToHWType (_opt_intWidth opts))
       ite (SomeBackend hdlSt) seen hdlDir Nothing te
    where
     teS     = Text.unpack . nameOcc $ varName te
@@ -103,6 +103,6 @@ runToNetlistStage target f src = do
     hdlSt   = setDomainConfigurations domainConfs
             $ setModName (Text.pack modN) backend
     ite     = ifThenElseExpr hdlSt
-    hdlDir  = fromMaybe "." (opt_hdlDir opts)
+    hdlDir  = fromMaybe "." (_opt_hdlDir opts)
       </> Backend.name hdlSt
       </> takeWhile (/= '.') teS

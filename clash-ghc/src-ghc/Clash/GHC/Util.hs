@@ -41,7 +41,7 @@ handleClashException df opts e = case fromException e of
   Just (ClashException sp s eM) -> do
     let srcInfo' | isGoodSrcSpan sp = srcInfo
                  | otherwise = empty
-    throwOneError (mkPlainErrMsg df sp (blankLine $$ textLines s $$ blankLine $$ srcInfo' $$ showExtra (opt_errorExtra opts) eM))
+    throwOneError (mkPlainErrMsg df sp (blankLine $$ textLines s $$ blankLine $$ srcInfo' $$ showExtra (_opt_errorExtra opts) eM))
   _ -> case fromException e of
     Just (ErrorCallWithLocation _ _) ->
       throwOneError (mkPlainErrMsg df noSrcSpan (text "Clash error call:" $$ textLines (show e)))

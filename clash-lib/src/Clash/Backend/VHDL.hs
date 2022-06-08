@@ -134,15 +134,15 @@ instance Backend VHDLState where
     , _includes=[]
     , _dataFiles=[]
     , _memoryDataFiles=[]
-    , _idSeen=Id.emptyIdentifierSet (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) VHDL
+    , _idSeen=Id.emptyIdentifierSet (_opt_escapedIds opts) (_opt_lowerCaseBasicIds opts) VHDL
     , _tyPkgCtx=False
-    , _intWidth=opt_intWidth opts
-    , _hdlsyn=opt_hdlSyn opts
-    , _undefValue=opt_forceUndefined opts
+    , _intWidth=_opt_intWidth opts
+    , _hdlsyn=_opt_hdlSyn opts
+    , _undefValue=_opt_forceUndefined opts
     , _productFieldNameCache=mempty
     , _enumNameCache=mempty
-    , _aggressiveXOptBB_=coerce (opt_aggressiveXOptBB opts)
-    , _renderEnums_=coerce (opt_renderEnums opts)
+    , _aggressiveXOptBB_=coerce (_opt_aggressiveXOptBB opts)
+    , _renderEnums_=coerce (_opt_renderEnums opts)
     , _domainConfigurations_=emptyDomainMap
     }
   hdlKind         = const VHDL

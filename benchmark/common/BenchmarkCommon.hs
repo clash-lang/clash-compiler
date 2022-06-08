@@ -31,11 +31,11 @@ defaultTests =
 opts :: [FilePath] -> ClashOpts
 opts idirs =
   defClashOpts{
-      opt_cachehdl=False
-    , opt_clear=True
-    , opt_errorExtra = True
-    , opt_importPaths=idirs
-    , opt_specLimit=100 -- For "ManyEntitiesVaried"
+      _opt_cachehdl=False
+    , _opt_clear=True
+    , _opt_errorExtra = True
+    , _opt_importPaths=idirs
+    , _opt_specLimit=100 -- For "ManyEntitiesVaried"
     }
 
 hdl :: HDL
@@ -49,7 +49,7 @@ runInputStage idirs src = do
   let o = opts idirs
   let backend = initBackend @VHDLState o
   pds <- primDirs backend
-  generateBindings o (return ()) pds (opt_importPaths o) [] (hdlKind backend) src Nothing
+  generateBindings o (return ()) pds (_opt_importPaths o) [] (hdlKind backend) src Nothing
 
 runNormalisationStage
   :: [FilePath]
@@ -62,7 +62,7 @@ runNormalisationStage idirs src = do
   let topEntity = head topEntityNames
   transformedBindings <-
         normalizeEntity env (designBindings design)
-          (ghcTypeToHWType (opt_intWidth (opts idirs)))
+          (ghcTypeToHWType (_opt_intWidth (opts idirs)))
           ghcEvaluator
           evaluator
           topEntityNames supplyN topEntity

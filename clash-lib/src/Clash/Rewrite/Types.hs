@@ -122,10 +122,10 @@ data RewriteEnv
 Lens.makeLenses ''RewriteEnv
 
 debugOpts :: Lens.Getter RewriteEnv DebugOpts
-debugOpts = clashEnv . Lens.to (opt_debug . envOpts)
+debugOpts = clashEnv . Lens.to (_opt_debug . envOpts)
 
 aggressiveXOpt :: Lens.Getter RewriteEnv Bool
-aggressiveXOpt = clashEnv . Lens.to (opt_aggressiveXOpt . envOpts)
+aggressiveXOpt = clashEnv . Lens.to (_opt_aggressiveXOpt . envOpts)
 
 tcCache :: Lens.Getter RewriteEnv TyConMap
 tcCache = clashEnv . Lens.to envTyConMap
@@ -137,31 +137,31 @@ customReprs :: Lens.Getter RewriteEnv CustomReprs
 customReprs = clashEnv . Lens.to envCustomReprs
 
 fuelLimit :: Lens.Getter RewriteEnv Word
-fuelLimit = clashEnv . Lens.to (opt_evaluatorFuelLimit . envOpts)
+fuelLimit = clashEnv . Lens.to (_opt_evaluatorFuelLimit . envOpts)
 
 primitives :: Lens.Getter RewriteEnv CompiledPrimMap
 primitives = clashEnv . Lens.to envPrimitives
 
 inlineLimit :: Lens.Getter RewriteEnv Int
-inlineLimit = clashEnv . Lens.to (opt_inlineLimit . envOpts)
+inlineLimit = clashEnv . Lens.to (_opt_inlineLimit . envOpts)
 
 inlineFunctionLimit :: Lens.Getter RewriteEnv Word
-inlineFunctionLimit = clashEnv . Lens.to (opt_inlineFunctionLimit . envOpts)
+inlineFunctionLimit = clashEnv . Lens.to (_opt_inlineFunctionLimit . envOpts)
 
 inlineConstantLimit :: Lens.Getter RewriteEnv Word
-inlineConstantLimit = clashEnv . Lens.to (opt_inlineConstantLimit . envOpts)
+inlineConstantLimit = clashEnv . Lens.to (_opt_inlineConstantLimit . envOpts)
 
 inlineWFCacheLimit :: Lens.Getter RewriteEnv Word
-inlineWFCacheLimit = clashEnv . Lens.to (opt_inlineWFCacheLimit . envOpts)
+inlineWFCacheLimit = clashEnv . Lens.to (_opt_inlineWFCacheLimit . envOpts)
 
 newInlineStrategy :: Lens.Getter RewriteEnv Bool
-newInlineStrategy = clashEnv . Lens.to (opt_newInlineStrat . envOpts)
+newInlineStrategy = clashEnv . Lens.to (_opt_newInlineStrat . envOpts)
 
 specializationLimit :: Lens.Getter RewriteEnv Int
-specializationLimit = clashEnv . Lens.to (opt_specLimit . envOpts)
+specializationLimit = clashEnv . Lens.to (_opt_specLimit . envOpts)
 
 normalizeUltra :: Lens.Getter RewriteEnv Bool
-normalizeUltra = clashEnv . Lens.to (opt_ultra . envOpts)
+normalizeUltra = clashEnv . Lens.to (_opt_ultra . envOpts)
 
 -- | Monad that keeps track how many transformations have been applied and can
 -- generate fresh variables and unique identifiers. In addition, it keeps track

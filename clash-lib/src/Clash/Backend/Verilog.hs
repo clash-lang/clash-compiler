@@ -111,7 +111,7 @@ instance HasIdentifierSet VerilogState where
 instance Backend VerilogState where
   initBackend opts = VerilogState
     { _genDepth=0
-    , _idSeen=Id.emptyIdentifierSet (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) Verilog
+    , _idSeen=Id.emptyIdentifierSet (_opt_escapedIds opts) (_opt_lowerCaseBasicIds opts) Verilog
     , _topNm=Id.unsafeMake ""
     , _srcSpan=noSrcSpan
     , _includes=[]
@@ -120,10 +120,10 @@ instance Backend VerilogState where
     , _dataFiles=[]
     , _memoryDataFiles=[]
     , _customConstrs=HashMap.empty
-    , _intWidth=opt_intWidth opts
-    , _hdlsyn=opt_hdlSyn opts
-    , _undefValue=opt_forceUndefined opts
-    , _aggressiveXOptBB_=coerce (opt_aggressiveXOptBB opts)
+    , _intWidth=_opt_intWidth opts
+    , _hdlsyn=_opt_hdlSyn opts
+    , _undefValue=_opt_forceUndefined opts
+    , _aggressiveXOptBB_=coerce (_opt_aggressiveXOptBB opts)
     , _domainConfigurations_=emptyDomainMap
     }
   hdlKind         = const Verilog

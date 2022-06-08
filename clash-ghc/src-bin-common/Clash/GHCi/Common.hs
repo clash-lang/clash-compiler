@@ -114,7 +114,7 @@ active :: LangExt.Extension -> GHC.DynFlags -> Bool
 active ext = GHC.member ext . GHC.extensionFlags
 
 checkImportDirs :: Foldable t => ClashOpts -> t FilePath -> IO ()
-checkImportDirs opts idirs = when (opt_checkIDir opts) $
+checkImportDirs opts idirs = when (_opt_checkIDir opts) $
   forM_ idirs $ \dir -> do
     doesDirectoryExist dir >>= \case
       False -> throwGhcException (CmdLineError $ "Missing directory: " ++ dir)
