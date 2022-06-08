@@ -1153,13 +1153,17 @@ readNew clk rst en ram rdAddr wrM = mux wasSame wasWritten $ ram rdAddr wrM
 
 data TDPConfig = TDPConfig {
   writeModeA :: WriteMode,
-  writeModeB :: WriteMode
+  writeModeB :: WriteMode,
+  outputRegA :: Bool,
+  outputRegB :: Bool
   }
 
 tdpDefault :: TDPConfig
 tdpDefault = TDPConfig {
   writeModeA = WriteFirst,
-  writeModeB = WriteFirst
+  writeModeB = WriteFirst,
+  outputRegA = False,
+  outputRegB = False
   }
 
 -- | Port operation
@@ -1229,6 +1233,8 @@ trueDualPortBlockRam = \config clkA clkB enA enB opA opB ->
   trueDualPortBlockRamWrapper
     (writeModeA config)
     (writeModeB config)
+    (outputRegA config)
+    (outputRegB config)
     clkA
     (andEnable enA (isOp <$> opA))
     (isRamWrite <$> opA)
@@ -1267,8 +1273,8 @@ data Conflict = Conflict
 -- logic to the module / architecture, and synthesis will no longer infer a
 -- multi-clock true dual-port block RAM. This wrapper pushes the primitive out
 -- into its own module / architecture.
-trueDualPortBlockRamWrapper wmA wmB clkA enA weA addrA datA clkB enB weB addrB datB =
-  trueDualPortBlockRam# wmA wmB clkA enA weA addrA datA clkB enB weB addrB datB
+trueDualPortBlockRamWrapper wmA wmB regA regB clkA enA weA addrA datA clkB enB weB addrB datB =
+  trueDualPortBlockRam# wmA wmB regA regB clkA enA weA addrA datA clkB enB weB addrB datB
 {-# NOINLINE trueDualPortBlockRamWrapper #-}
 
 -- | Primitive of 'trueDualPortBlockRam'.
@@ -1284,6 +1290,10 @@ trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
   -- ^ Write mode for port A
   -> WriteMode
   -- ^ Write mode for port B
+  -> Bool
+  -- ^ Optional output register for port A
+  -> Bool
+  -- ^ Optional output register for port B
   -> Clock domA
   -- ^ Clock for port A
   -> Enable domA
@@ -1309,12 +1319,12 @@ trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
   -> (Signal domA a, Signal domB a)
   -- ^ Outputs data on /next/ cycle. If write enable is @True@, the data written
   -- will be echoed. If write enable is @False@, the read data is returned.
-trueDualPortBlockRam# wmA wmB clkA enA weA addrA datA
+trueDualPortBlockRam# wmA wmB regA regB clkA enA weA addrA datA
     clkB enB weB addrB datB
   | snatToNum @Int (clockPeriod @domA) < snatToNum @Int (clockPeriod @domB)
-  = swap (trueDualPortBlockRamModel labelB wmB clkB enB weB addrB datB labelA wmA clkA enA weA addrA datA)
+  = swap (trueDualPortBlockRamModel labelB wmB regB clkB enB weB addrB datB labelA wmA regA clkA enA weA addrA datA)
   | otherwise
-  =       trueDualPortBlockRamModel labelA wmA clkA enA weA addrA datA labelB wmB clkB enB weB addrB datB
+  =       trueDualPortBlockRamModel labelA wmA regA clkA enA weA addrA datA labelB wmB regB clkB enB weB addrB datB
  where
   labelA = "Port A"
   labelB = "Port B"
@@ -1337,6 +1347,7 @@ trueDualPortBlockRamModel ::
 
   String ->
   WriteMode ->
+  Bool ->
   Clock domSlow ->
   Enable domSlow ->
   Signal domSlow Bool ->
@@ -1345,6 +1356,7 @@ trueDualPortBlockRamModel ::
 
   String ->
   WriteMode ->
+  Bool ->
   Clock domFast ->
   Enable domFast ->
   Signal domFast Bool ->
@@ -1352,13 +1364,16 @@ trueDualPortBlockRamModel ::
   Signal domFast a ->
 
   (Signal domSlow a, Signal domFast a)
-trueDualPortBlockRamModel labelSlow wmSlow !_clkSlow enSlow weSlow addrSlow datSlow
-                          labelFast wmFast !_clkFast enFast weFast addrFast datFast
+trueDualPortBlockRamModel labelSlow wmSlow regSlow !_clkSlow enSlow weSlow addrSlow datSlow
+                          labelFast wmFast regFast !_clkFast enFast weFast addrFast datFast
                           = (outSlow, outFast)
  where
   (outSlow, outFast) =
-   ( startSlow :- outSlow'
-   , startFast :- outFast')
+   ( delayInp startSlow outSlow' regSlow
+   , delayInp startFast outFast' regFast)
+
+  delayInp start out False = start :- out
+  delayInp start out True = start :- start :- out
 
   startSlow = deepErrorX $ "trueDualPortBlockRam: " <> labelSlow <> ": First value undefined"
   startFast = deepErrorX $ "trueDualPortBlockRam: " <> labelFast <> ": First value undefined"
