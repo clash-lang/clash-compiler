@@ -78,7 +78,7 @@
     kind: Expression
     type: 'toEnum## :: Int
       -> Bit'
-    template: ~ARG[0](0)
+    template: ~VAR[i][0](0)
     workInfo: Never
 - BlackBox:
     name: Clash.Sized.Internal.BitVector.and##
