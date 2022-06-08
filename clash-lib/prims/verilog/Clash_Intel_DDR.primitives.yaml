@@ -34,7 +34,7 @@
           .aclr (1'b0),~ELSE
           .aclr (~ARG[6]),
           .sclr (1'b0),~FI
-          .datain (~ARG[8]),~
+          .datain (~ARG[8]),
           .inclock (~ARG[5]),
           .inclocken (~IF ~ISACTIVEENABLE[7] ~THEN ~ARG[7] ~ELSE 1'b1 ~FI),
           .dataout_h (~SYM[2]),
