@@ -20,54 +20,31 @@ trueDualPortBlockRamVerilog :: BlackBoxFunction
 trueDualPortBlockRamVerilog _isD _primName args _ty = return bb
   where
     meta bbKi = emptyBlackBoxMeta{bbKind=bbKi}
-    [ _nAddr
-      , _domA
-      , _domB
-      , _a
-      , _hasCallStack
-      , _KnownNatnAddrs
-      , _KnownDomaindomA
-      , _KnownDomaindomB
-      , _NFDataX
-      , Left wmA
-      , Left wmB
-      , Left regA
-      , Left regB
-      , _clkA
-      , _enA
-      , _wEnA
-      , _nAddrA
-      , _datA
-      , _clkB
-      ,  _enB
-      , _wEnB
-      , _nAddrB
-      , _datB] = case args of
-        [ _nAddr             -- tyVar
-          , _dom             -- tyVar
-          , _domB            -- tyVar
-          , _a               -- tyVar
-          , _hasCallStacc    -- 0
-          , _KnownNatnAddrs  -- 1
-          , _KnownDomaindomA -- 2
-          , _KnownDomaindomB -- 3
-          , _NFDataX         -- 4
-          , Left wmA         -- 5
-          , Left wmB         -- 6
-          , Left regA        -- 7
-          , Left regB        -- 8
-          , _clkA            -- 9
-          , _enA             -- 10
-          , _wEnA            -- 11
-          , _nAddrA          -- 12
-          , _datA            -- 13
-          , _clkB            -- 14
-          , _enB             -- 15
-          , _wEnB            -- 16
-          , _nAddrB          -- 17
-          , _datB]           -- 18
-          -> args
-        _ -> error $ unlines $ map show args
+    [
+        _nAddr           -- tyVar
+      , _dom             -- tyVar
+      , _domB            -- tyVar
+      , _a               -- tyVar
+      , _hasCallStacc    -- 0
+      , _KnownNatnAddrs  -- 1
+      , _KnownDomaindomA -- 2
+      , _KnownDomaindomB -- 3
+      , _NFDataX         -- 4
+      , Left wmA         -- 5
+      , Left wmB         -- 6
+      , Left regA        -- 7
+      , Left regB        -- 8
+      , _clkA            -- 9
+      , _enA             -- 10
+      , _wEnA            -- 11
+      , _nAddrA          -- 12
+      , _datA            -- 13
+      , _clkB            -- 14
+      , _enB             -- 15
+      , _wEnB            -- 16
+      , _nAddrB          -- 17
+      , _datB            -- 18
+      ] = args
 
     bb = case runParse (pack $ I.unindent $ pre ++ assignRegA ++ assignRegB ++ portA ++ portB ++ post) of
        Success t    -> Right (meta TDecl, BBTemplate t)
