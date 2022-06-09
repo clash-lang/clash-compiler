@@ -36,7 +36,7 @@ data Instruction
   | Load MemAddr Reg
   | Store Reg MemAddr
   | Nop
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, NFDataX)
 
 data Reg
   = Zero
@@ -498,7 +498,7 @@ data Reg
 
 >>> :{
 data Operator = Add | Sub | Incr | Imm | CmpGt
-  deriving (Eq,Show)
+  deriving (Eq,Show,C.Generic,NFDataX)
 :}
 
 >>> :{
@@ -509,7 +509,7 @@ data Instruction
   | Load MemAddr Reg
   | Store Reg MemAddr
   | Nop
-  deriving (Eq,Show)
+  deriving (Eq,Show,C.Generic,NFDataX)
 :}
 
 >>> :{
