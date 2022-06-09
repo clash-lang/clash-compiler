@@ -1,0 +1,2 @@
+CHANGED: It's no longer required to provide a name to ~VAR. [#2237](https://github.com/clash-lang/clash-compiler/issues/2237)
+FIXED: The blackbox parser will make sure it fully parses its input, and report an error when it can't. [#2237](https://github.com/clash-lang/clash-compiler/issues/2237)

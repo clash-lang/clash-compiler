@@ -77,7 +77,7 @@ pTagE =  Result            <$  string "~RESULT"
      <|> Const             <$> (string "~CONST" *> brackets' natural')
      <|> Lit               <$> (string "~LIT" *> brackets' natural')
      <|> Name              <$> (string "~NAME" *> brackets' natural')
-     <|> ToVar             <$> try (string "~VAR" *> brackets' pSigD) <*> brackets' natural'
+     <|> ToVar             <$> try (string "~VAR" *> brackets' pSigDorEmpty) <*> brackets' natural'
      <|> (Sym Text.empty)  <$> (string "~SYM" *> brackets' natural')
      <|> Typ Nothing       <$  string "~TYPO"
      <|> (Typ . Just)      <$> try (string "~TYP" *> brackets' natural')
@@ -151,3 +151,6 @@ pSigD = some (pTagE <|> (Text (pack "[") <$ (pack <$> string "[\\"))
                     <|> (Text (pack "]") <$ (pack <$> string "\\]"))
                     <|> (Text <$> (pack <$> some (satisfyRange '\000' '\90')))
                     <|> (Text <$> (pack <$> some (satisfyRange '\94' '\125'))))
+
+pSigDorEmpty :: Parser [Element]
+pSigDorEmpty = pSigD <|> mempty
