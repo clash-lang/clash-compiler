@@ -39,7 +39,7 @@ import Clash.Class.Resize          (truncateB)
 import Clash.Class.BitPack.BitIndex (slice)
 import Clash.Explicit.Mealy        (mealyB)
 import Clash.Explicit.BlockRam
-  (RamOp (..), trueDualPortBlockRam, tdpDefault)
+  (RamOp (..), trueDualPortBlockRam, tdpDefault, TDPConfig(..))
 import Clash.Explicit.Signal
   (Clock, Reset, Signal, Enable, register, unsafeSynchronizer, (.&&.))
 import Clash.Promoted.Nat          (SNat (..))
@@ -114,7 +114,7 @@ fifoMem
   -> Signal wdom (Maybe a)
   -> Signal rdom a
 fifoMem wclk rclk wen ren full raddr waddr wdataM =
-  fst $ trueDualPortBlockRam tdpDefault
+  fst $ trueDualPortBlockRam (tdpDefault{ outputRegA=True, outputRegB=True })
     rclk wclk ren wen portA portB
  where
    portA :: Signal rdom (RamOp (2 ^ addrSize) a)
