@@ -1294,6 +1294,7 @@ a general listing of the available template holes:
   argument which is not a 'KnownDomain' or 'KnownConf'.
 * @~AND[\<HOLE1\>,\<HOLE2\>,..]@: Logically /and/ the conditions in the @\<HOLE\>@'s
 * @~VAR[\<NAME\>][N]@: Like @~ARG[N]@ but binds the argument to a variable named NAME.
+  The @\<NAME\>@ can be left blank, then clash will come up with a (unique) name.
 * @~VARS[N]@: VHDL: Return the variables at the @(N+1)@'th argument.
 * @~NAME[N]@: Render the @(N+1)@'th string literal argument as an identifier
   instead of a string literal. Fails when the @(N+1)@'th argument is not a
