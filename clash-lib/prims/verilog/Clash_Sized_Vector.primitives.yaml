@@ -90,8 +90,26 @@
     kind: Declaration
     type: 'map :: (a -> b)
       -> Vec n a -> Vec n b'
+    outputUsage:
+      concurrent: continuous
+      sequential: blocking
     template: |-
       // map begin
+      ~IF~ISSEQUENTIAL~THEN
+      begin : ~GENSYM[map][5]
+        integer ~GENSYM[i][6];
+        ~IF~SIZE[~TYP[1]]~THENreg ~GENSYM[map_in][7];~ELSE~FI
+        reg ~TYPEL[~TYPO] ~GENSYM[map_out][8];
+        for (~SYM[6]=0; ~SYM[6] < ~LENGTH[~TYPO]; ~SYM[6] = ~SYM[6] + 1) begin
+          ~IF~SIZE[~TYP[1]]~THEN~SYM[7] = ~VAR[vec][1][~SYM[6]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]];~ELSE~FI
+          ~INST 0
+            ~OUTPUT <= ~SYM[8]~ ~TYPEL[~TYPO]~
+            ~INPUT  <= ~SYM[7]~ ~TYPEL[~TYP[1]]~
+          ~INST
+          ~RESULT[~SYM[6]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]] = ~SYM[8];
+        end
+      end
+      ~ELSE
       genvar ~GENSYM[i][1];
       ~GENERATE
       for (~SYM[1]=0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[map][2]~IF~SIZE[~TYP[1]]~THEN
@@ -105,6 +123,7 @@
         assign ~RESULT[~SYM[1]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]] = ~SYM[4];
       end
       ~ENDGENERATE
+      ~FI
       // map end
     workInfo: Identity 1 [0]
 - BlackBox:
@@ -219,20 +238,36 @@
     workInfo: Never
 - BlackBoxHaskell:
     name: Clash.Sized.Vector.index_int
+    outputUsage:
+      concurrent: continuous
+      sequential: blocking
     templateFunction: Clash.Primitives.Sized.Vector.indexIntVerilog
 - BlackBox:
     name: Clash.Sized.Vector.replace_int
     kind: Declaration
+    outputUsage:
+      concurrent: continuous
+      sequential: blocking
     type: 'replace_int ::
       KnownNat n => Vec n a -> Int -> a -> Vec n a'
     template: |-
       // vector replace begin
+      ~IF ~ISSEQUENTIAL ~THEN
+      begin : ~GENSYM[vector_replace][2]
+        integer ~GENSYM[i][3];
+
+        for (~SYM[3] = 0; ~SYM[3] < ~LENGTH[~TYPO]; ~SYM[3] = ~SYM[3] + 1) begin
+          ~RESULT[(~MAXINDEX[~TYPO]-~SYM[3])*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]] = ~ARG[2] == ~SYM[3] ? ~ARG[3] : ~VAR[vec][1][(~MAXINDEX[~TYPO]-~SYM[3])*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]];
+        end
+      end
+      ~ELSE
       genvar ~GENSYM[i][0];
       ~GENERATE
       for (~SYM[0]=0;~SYM[0]<~LENGTH[~TYPO];~SYM[0]=~SYM[0]+1) begin : ~GENSYM[vector_replace][1]
         assign ~RESULT[(~MAXINDEX[~TYPO]-~SYM[0])*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]] = ~ARG[2] == ~SYM[0] ? ~ARG[3] : ~VAR[vec][1][(~MAXINDEX[~TYPO]-~SYM[0])*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]];
       end
       ~ENDGENERATE
+      ~FI
       // vector replace end
 - BlackBox:
     name: Clash.Sized.Vector.maxIndex

@@ -40,13 +40,14 @@ import           Clash.Netlist.BlackBox.Util        (renderElem)
 import           Clash.Netlist.BlackBox.Parser      (runParse)
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TExpr, TDecl),
-   Element(Component, Typ, TypElem, Text), Decl(Decl), emptyBlackBoxMeta)
+   Element(Component, Typ, TypElem, Text), Decl(Decl), emptyBlackBoxMeta,
+  BlackBoxUsage(..))
 import           Clash.Netlist.Types
   (Identifier, TemplateFunction, BlackBoxContext, HWType(Vector), Usage(Cont),
    Declaration(..), Expr(Literal, Identifier,DataCon), Literal(NumLit),
    BlackBox(BBTemplate, BBFunction), TemplateFunction(..),
    Modifier(Indexed, Nested, DC), HWType(..), bbInputs, bbResults, emptyBBContext,
-   tcCache, DeclarationType(Concurrent), bbHdlStyle)
+   tcCache, DeclarationType(Concurrent), bbHdlStyle, Usage(..), Blocking(..))
 import qualified Clash.Netlist.Id                   as Id
 import           Clash.Netlist.Util                 (typeSize)
 import qualified Clash.Primitives.DSL               as Prim
@@ -240,7 +241,10 @@ foldTF' args =
 indexIntVerilog ::  BlackBoxFunction
 indexIntVerilog _isD _primName args _ty = return bb
  where
-  meta bbKi = emptyBlackBoxMeta{bbKind=bbKi}
+  meta bbKi = emptyBlackBoxMeta
+    { bbKind=bbKi
+    , bbOutputUsage=BlackBoxUsage Cont (Proc Blocking)
+    }
 
   bb = case args of
     [_nTy,_aTy,_kn,Left v,Left ix] | isLiteral ix && isVar v ->
@@ -257,8 +261,21 @@ indexIntVerilog _isD _primName args _ty = return bb
 
   bbText = [I.i|
     // index begin
-    ~IF ~ISSEQUENTIAL ~THEN
-    // TODO: sequential index_int
+    ~IF~ISSEQUENTIAL~THEN
+    ~IF~SIZE[~TYP[1]]~THEN
+    begin : ~GENSYM[mk_array][4]
+      integer ~GENSYM[i][5];
+      reg ~TYPO ~GENSYM[vecArray][6] [0:~LIT[0]-1];
+
+      for (~SYM[5] = 0; ~SYM[5] < ~LIT[0]; ~SYM[5] = ~SYM[5] + 1) begin
+        ~SYM[6][(~LIT[0]-1)-~SYM[5]] = ~VAR[vecFlat][1][~SYM[5]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+      end
+
+      ~RESULT = ~SYM[6][~ARG[2]];
+    end
+    ~ELSE
+    ~RESULT = ~ERRORO;
+    ~FI
     ~ELSE
     ~IF~SIZE[~TYP[1]]~THENwire ~TYPO ~GENSYM[vecArray][0] [0:~LIT[0]-1];
     genvar ~GENSYM[i][2];
@@ -273,9 +290,12 @@ indexIntVerilog _isD _primName args _ty = return bb
 
   bbTextLitIx = [I.i|
     // index lit begin
+    ~IF~ISSEQUENTIAL~THEN
+    ~IF~SIZE[~TYP[1]]~THEN~RESULT = ~VAR[vec][1][~SIZE[~TYP[1]]-1-~LIT[2]*~SIZE[~TYPO] -: ~SIZE[~TYPO]];~ELSE~RESULT = ~ERRORO;~FI
+    ~ELSE
     ~IF~SIZE[~TYP[1]]~THENassign ~RESULT = ~VAR[vec][1][~SIZE[~TYP[1]]-1-~LIT[2]*~SIZE[~TYPO] -: ~SIZE[~TYPO]];~ELSEassign ~RESULT = ~ERRORO;~FI
+    ~FI
     // index lit end|]
-
 
 indexIntVerilogTF :: TemplateFunction
 indexIntVerilogTF = TemplateFunction used valid indexIntVerilogTemplate
