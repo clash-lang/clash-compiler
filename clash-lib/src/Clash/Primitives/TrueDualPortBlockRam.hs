@@ -339,10 +339,11 @@ trueDualPortBlockRamVHDL _isD _primName args _ty = return bb
         begin
             if(rising_edge(~ARG[9])) then
                   if(~ARG[10]) then
+                    ~SYM[2] <= mem(~IF~SIZE[~TYP[12]]~THENto_integer(~ARG[12])~ELSE0~FI);
                     if(~ARG[11]) then
+                        ~SYM[2] <= ~ARG[13];
                         mem(~IF~SIZE[~TYP[12]]~THENto_integer(~ARG[12])~ELSE0~FI) := ~ARG[13];
                     end if;
-                    ~SYM[2] <= mem(~IF~SIZE[~TYP[12]]~THENto_integer(~ARG[12])~ELSE0~FI);
                 end if;
             end if;
         end process;|]
@@ -377,20 +378,21 @@ trueDualPortBlockRamVHDL _isD _primName args _ty = return bb
 
     portB = case termToData wmB of
       Right WriteFirst -> [I.i|
-        -- Port A WriteFirst
+        -- Port B WriteFirst
         process(~ARG[14])
         begin
             if(rising_edge(~ARG[14])) then
                   if(~ARG[15]) then
+                    ~SYM[3] <= mem(~IF~SIZE[~TYP[17]]~THENto_integer(~ARG[17])~ELSE0~FI);
                     if(~ARG[16]) then
+                        ~SYM[3] <= ~ARG[18];
                         mem(~IF~SIZE[~TYP[17]]~THENto_integer(~ARG[17])~ELSE0~FI) := ~ARG[18];
                     end if;
-                    ~SYM[3] <= mem(~IF~SIZE[~TYP[17]]~THENto_integer(~ARG[17])~ELSE0~FI);
                 end if;
             end if;
         end process;|]
       Right ReadFirst -> [I.i|
-        -- Port A ReadFirst
+        -- Port B ReadFirst
         process(~ARG[14])
         begin
             if(rising_edge(~ARG[14])) then
@@ -403,7 +405,7 @@ trueDualPortBlockRamVHDL _isD _primName args _ty = return bb
             end if;
         end process;|]
       Right NoChange -> [I.i|
-        -- Port A NoChange
+        -- Port B NoChange
         process(~ARG[14])
         begin
             if(rising_edge(~ARG[14])) then
