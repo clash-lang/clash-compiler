@@ -240,7 +240,7 @@ data Identifier
     -- name of 'foo' and an extension of [6, 5] would render as 'foo_5_6'. Note
     -- that extensions are stored in reverse order for easier manipulation.
     , i_idType :: !IdentifierType
-    -- ^ See "IdentifierType".
+    -- ^ See 'IdentifierType'.
     , i_hdl :: !HDL
     -- ^ HDL this identifier is generated for.
     , i_provenance :: !CallStack

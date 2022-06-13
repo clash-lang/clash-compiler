@@ -231,7 +231,7 @@ type role BitVector nominal
 -- as it is not safe to coerce between different sizes of BitVector. To change
 -- the size, use the functions in the 'Resize' class.
 data BitVector (n :: Nat) =
-    -- | The constructor, 'BV', and  the field, 'unsafeToNatural', are not
+    -- | The constructor, 'BV', and  the fields, 'unsafeMask' and 'unsafeToNatural', are not
     -- synthesizable.
     BV { unsafeMask      :: !Natural
        , unsafeToNatural :: !Natural
@@ -249,7 +249,7 @@ data BitVector (n :: Nat) =
 -- 'Integer' which is arbitrarily bounded in HDL. Instead use
 -- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
 data Bit =
-  -- | The constructor, 'Bit', and  the field, 'unsafeToInteger#', are not
+  -- | The constructor, 'Bit', and  the fields, 'unsafeMask#' and 'unsafeToInteger#', are not
   -- synthesizable.
   Bit { unsafeMask#      :: {-# unpack #-} !Word
       , unsafeToInteger# :: {-# unpack #-} !Word
