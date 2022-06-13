@@ -1321,10 +1321,7 @@ trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
   -- will be echoed. If write enable is @False@, the read data is returned.
 trueDualPortBlockRam# wmA wmB regA regB clkA enA weA addrA datA
     clkB enB weB addrB datB
-  | snatToNum @Int (clockPeriod @domA) < snatToNum @Int (clockPeriod @domB)
-  = swap (trueDualPortBlockRamModel labelB wmB regB clkB enB weB addrB datB labelA wmA regA clkA enA weA addrA datA)
-  | otherwise
-  =       trueDualPortBlockRamModel labelA wmA regA clkA enA weA addrA datA labelB wmB regB clkB enB weB addrB datB
+  = trueDualPortBlockRamModel labelA wmA regA clkA enA weA addrA datA labelB wmB regB clkB enB weB addrB datB
  where
   labelA = "Port A"
   labelB = "Port B"
@@ -1333,65 +1330,59 @@ trueDualPortBlockRam# wmA wmB regA regB clkA enA weA addrA datA
 
 
 -- | Haskell model for the primitive 'trueDualPortBlockRam#'.
---
--- Warning: this model only works if @domFast@'s clock is faster (or equal to)
--- @domSlow@'s clock.
 trueDualPortBlockRamModel ::
-  forall nAddrs domFast domSlow a .
+  forall nAddrs domB domA a .
   ( HasCallStack
   , KnownNat nAddrs
-  , KnownDomain domSlow
-  , KnownDomain domFast
+  , KnownDomain domA
+  , KnownDomain domB
   , NFDataX a
   ) =>
 
   String ->
   WriteMode ->
   Bool ->
-  Clock domSlow ->
-  Enable domSlow ->
-  Signal domSlow Bool ->
-  Signal domSlow (Index nAddrs) ->
-  Signal domSlow a ->
+  Clock domA ->
+  Enable domA ->
+  Signal domA Bool ->
+  Signal domA (Index nAddrs) ->
+  Signal domA a ->
 
   String ->
   WriteMode ->
   Bool ->
-  Clock domFast ->
-  Enable domFast ->
-  Signal domFast Bool ->
-  Signal domFast (Index nAddrs) ->
-  Signal domFast a ->
+  Clock domB ->
+  Enable domB ->
+  Signal domB Bool ->
+  Signal domB (Index nAddrs) ->
+  Signal domB a ->
 
-  (Signal domSlow a, Signal domFast a)
-trueDualPortBlockRamModel labelSlow wmSlow regSlow !_clkSlow enSlow weSlow addrSlow datSlow
-                          labelFast wmFast regFast !_clkFast enFast weFast addrFast datFast
-                          = (outSlow, outFast)
+  (Signal domA a, Signal domB a)
+trueDualPortBlockRamModel labelA wmA regA !_clkA enA weA addrA datA
+                          labelB wmB regB !_clkB enB weB addrB datB
+                          = (outA, outB)
  where
-  (outSlow, outFast) =
-   ( delayInp startSlow outSlow' regSlow
-   , delayInp startFast outFast' regFast)
+  (outA, outB) =
+   ( delayInp startA outA' regA
+   , delayInp startB outB' regB)
 
   delayInp start out False = start :- out
   delayInp start out True = start :- start :- out
 
-  startSlow = deepErrorX $ "trueDualPortBlockRam: " <> labelSlow <> ": First value undefined"
-  startFast = deepErrorX $ "trueDualPortBlockRam: " <> labelFast <> ": First value undefined"
+  startA = deepErrorX $ "trueDualPortBlockRam: " <> labelA <> ": First value undefined"
+  startB = deepErrorX $ "trueDualPortBlockRam: " <> labelB <> ": First value undefined"
 
-  (_ :- outSlow', _ :- outFast') =
+  (_ :- outA', _ :- outB') =
     go
       (Seq.fromFunction (natToNum @nAddrs) initElement)
       0 -- this assumes that both clocks have a rising edge at t=0
-        -- in general, this param represents (time until next slow rising edge - time until next fast rising edge)
-        -- also TODO @ someone reviewing this PR: I think this used to be the only part of the function
-        --    that made any differentiation between the "fast" port and the "slow" port.
-        --    Am I right in saying that, and does this mean we can drop the requirement that one port be faster than the other?
-      (bundle (fromEnable enSlow, weSlow, fromIntegral <$> addrSlow, datSlow))
-      (bundle (fromEnable enFast, weFast, fromIntegral <$> addrFast, datFast))
-      startSlow startFast
+        -- in general, this param represents (time until next A rising edge minus time until next B rising edge)
+      (bundle (fromEnable enA, weA, fromIntegral <$> addrA, datA))
+      (bundle (fromEnable enB, weB, fromIntegral <$> addrB, datB))
+      startA startB
 
-  tSlow = snatToNum @Int (clockPeriod @domSlow)
-  tFast = snatToNum @Int (clockPeriod @domFast)
+  tA = snatToNum @Int (clockPeriod @domA)
+  tB = snatToNum @Int (clockPeriod @domB)
 
   initElement :: Int -> a
   initElement n =
@@ -1409,29 +1400,29 @@ trueDualPortBlockRamModel labelSlow wmSlow regSlow !_clkSlow enSlow weSlow addrS
                 "\nAddress error message: " <> msg)
 
   getConflict :: Bool -> Bool -> Bool -> Int -> Bool -> Int -> Maybe Conflict
-  getConflict enSlow_ enFast_ wenSlow addrSlow_ wenFast addrFast_ =
+  getConflict enA_ enB_ wenA addrA_ wenB addrB_ =
     -- If port A or port B is writing on (potentially!) the same address,
     -- there's a conflict
     if sameAddr then Just conflict else Nothing
    where
-    wenSlowX = toMaybeX wenSlow
-    wenFastX = toMaybeX wenFast
+    wenAX = toMaybeX wenA
+    wenBX = toMaybeX wenB
 
     mergeX IsX b = b
     mergeX a IsX = a
     mergeX (IsDefined a) (IsDefined b) = IsDefined (a && b)
 
     conflict = Conflict
-      { cfRWA     = if enFast_ then wenFastX else IsDefined False
-      , cfRWB     = if enSlow_ then wenSlowX else IsDefined False
-      , cfWW      = if enSlow_ && enFast_ then mergeX wenSlowX wenFastX else IsDefined False
-      , cfAddress = toMaybeX addrSlow_ }
+      { cfRWA     = if enB_ then wenBX else IsDefined False
+      , cfRWB     = if enA_ then wenAX else IsDefined False
+      , cfWW      = if enA_ && enB_ then mergeX wenAX wenBX else IsDefined False
+      , cfAddress = toMaybeX addrA_ }
 
     sameAddr =
-      case (isX addrSlow_, isX addrFast_) of
+      case (isX addrA_, isX addrB_) of
         (Left _, _) -> True
         (_, Left _) -> True
-        _           -> addrSlow_ == addrFast_
+        _           -> addrA_ == addrB_
 
   writeRam :: Bool -> Int -> a -> Seq a -> (Maybe a, Seq a)
   writeRam enable addr dat mem
@@ -1462,91 +1453,88 @@ trueDualPortBlockRamModel labelSlow wmSlow regSlow !_clkSlow enSlow weSlow addrS
   go ::
     Seq a ->
     Int ->
-    Signal domSlow (Bool, Bool, Int, a) ->
-    Signal domFast (Bool, Bool, Int, a) ->
+    Signal domA (Bool, Bool, Int, a) ->
+    Signal domB (Bool, Bool, Int, a) ->
     a -> a ->
-    (Signal domSlow a, Signal domFast a)
-  go ram0 relativeTime as0 bs0 prevSlow prevFast  =
+    (Signal domA a, Signal domB a)
+  go ram0 relativeTime as0 bs0 prevA prevB  =
     case compare relativeTime 0 of
-      LT -> goSlow
+      LT -> goA
       EQ -> goBoth
-      GT -> goFast
+      GT -> goB
    where
-    (enSlow_, weSlow_, addrSlow_, datSlow_) :- as1 = as0
-    (enFast_, weFast_, addrFast_, datFast_) :- bs1 = bs0
+    (enA_, weA_, addrA_, datA_) :- as1 = as0
+    (enB_, weB_, addrB_, datB_) :- bs1 = bs0
 
-    goBoth = outSlow2 `seqX` outFast2 `seqX` (outSlow2 :- as2, outFast2 :- bs2)
+    goBoth = outA2 `seqX` outB2 `seqX` (outA2 :- as2, outB2 :- bs2)
      where
-      conflict = getConflict enSlow_ enFast_ weSlow_ addrSlow_ weFast_ addrFast_
+      conflict = getConflict enA_ enB_ weA_ addrA_ weB_ addrB_
       writeWriteConflict label =
         deepErrorX $ "trueDualPortBlockRam " <> label <> ": conflicting write/write queries"
-      (datSlow1_,datFast1_) = case conflict of
+      (datA1_,datB1_) = case conflict of
         Just Conflict{cfWW=IsDefined True} ->
-          (writeWriteConflict labelFast, writeWriteConflict labelSlow)
+          (writeWriteConflict labelB, writeWriteConflict labelA)
         Just Conflict{cfWW=IsX} ->
-          (writeWriteConflict labelFast, writeWriteConflict labelSlow)
-        _ -> (datSlow_,datFast_)
+          (writeWriteConflict labelB, writeWriteConflict labelA)
+        _ -> (datA_,datB_)
 
-      (wroteA,ram1) = writeRam (weSlow_ && enSlow_) addrSlow_ datSlow1_ ram0
-      (wroteB,ram2) = writeRam (weFast_ && enFast_) addrFast_ datFast1_ ram1
+      (wroteA,ram1) = writeRam (weA_ && enA_) addrA_ datA1_ ram0
+      (wroteB,ram2) = writeRam (weB_ && enB_) addrB_ datB1_ ram1
 
       readWriteConflict label =
         deepErrorX $ "trueDualPortBlockRam " <> label <> ": conflicting read/write queries"
-      outSlow1 = case (conflict, wmSlow) of
+      outA1 = case (conflict, wmA) of
         (Just Conflict{cfRWA=IsDefined True}, _) ->
-          readWriteConflict labelSlow
+          readWriteConflict labelA
         (Just Conflict{cfRWA=IsX}, _) ->
-          readWriteConflict labelFast
+          readWriteConflict labelB
         (_, WriteFirst) ->
-          fromMaybe (ram0 `Seq.index` addrSlow_) wroteA
+          fromMaybe (ram0 `Seq.index` addrA_) wroteA
         (_, ReadFirst) ->
-          ram0 `Seq.index` addrSlow_
+          ram0 `Seq.index` addrA_
         _ -> -- (_, NoChange)
-          if weSlow_ then prevSlow else ram0 `Seq.index` addrSlow_
+          if weA_ then prevA else ram0 `Seq.index` addrA_
 
-      outFast1 = case (conflict, wmFast) of
+      outB1 = case (conflict, wmB) of
         (Just Conflict{cfRWB=IsDefined True}, _) ->
-          readWriteConflict labelSlow
+          readWriteConflict labelA
         (Just Conflict{cfRWB=IsX}, _) ->
-          readWriteConflict labelFast
+          readWriteConflict labelB
         (_, WriteFirst) ->
-          fromMaybe (ram0 `Seq.index` addrFast_) wroteB
+          fromMaybe (ram0 `Seq.index` addrB_) wroteB
         (_, ReadFirst) ->
-          ram0 `Seq.index` addrFast_
+          ram0 `Seq.index` addrB_
         _ -> -- (_, NoChange)
-          if weFast_ then prevFast else ram0 `Seq.index` addrFast_
+          if weB_ then prevB else ram0 `Seq.index` addrB_
 
-      outSlow2 = if enSlow_ then outSlow1 else prevSlow
-      outFast2 = if enFast_ then outFast1 else prevFast
-      (as2,bs2) = go ram2 (relativeTime - tFast + tSlow) as1 bs1 outSlow2 outFast2
+      outA2 = if enA_ then outA1 else prevA
+      outB2 = if enB_ then outB1 else prevB
+      (as2,bs2) = go ram2 (relativeTime - tB + tA) as1 bs1 outA2 outB2
 
-    -- 1 iteration here, as this is the slow clock.
-    goSlow
-      | enSlow_   = out0 `seqX` (out0 :- as2, bs2)
-      | otherwise = (prevSlow :- as2, bs2)
+    goA
+      | enA_   = out0 `seqX` (out0 :- as2, bs2)
+      | otherwise = (prevA :- as2, bs2)
      where
-      (wrote, !ram1) = writeRam (weSlow_ && enSlow_) addrSlow_ datSlow_ ram0
+      (wrote, !ram1) = writeRam (weA_ && enA_) addrA_ datA_ ram0
 
-      out0 = case wmSlow of
-        WriteFirst -> fromMaybe (ram1 `Seq.index` addrSlow_) wrote
-        ReadFirst  -> ram0 `Seq.index` addrSlow_
-        NoChange   -> if weSlow_ then prevSlow else ram0 `Seq.index` addrSlow_
+      out0 = case wmA of
+        WriteFirst -> fromMaybe (ram1 `Seq.index` addrA_) wrote
+        ReadFirst  -> ram0 `Seq.index` addrA_
+        NoChange   -> if weA_ then prevA else ram0 `Seq.index` addrA_
 
-      out1 = if enSlow_ then out0 else prevSlow
-      (as2, bs2) = go ram1 (relativeTime + tSlow) as1 bs0 out1 prevFast
+      out1 = if enA_ then out0 else prevA
+      (as2, bs2) = go ram1 (relativeTime + tA) as1 bs0 out1 prevB
 
-    -- 1 or more iterations here, as this is the fast clock. First iteration
-    -- happens here.
-    goFast
-      | enFast_   = out0 `seqX` (as2, out0 :- bs2)
-      | otherwise = (as2, prevFast :- bs2)
+    goB
+      | enB_   = out0 `seqX` (as2, out0 :- bs2)
+      | otherwise = (as2, prevB :- bs2)
      where
-      (wrote, !ram1) = writeRam (weFast_ && enFast_) addrFast_ datFast_ ram0
+      (wrote, !ram1) = writeRam (weB_ && enB_) addrB_ datB_ ram0
 
-      out0 = case wmFast of
-        WriteFirst -> fromMaybe (ram1 `Seq.index` addrFast_) wrote
-        ReadFirst  -> ram0 `Seq.index` addrFast_
-        NoChange   -> if weFast_ then prevFast else ram0 `Seq.index` addrFast_
+      out0 = case wmB of
+        WriteFirst -> fromMaybe (ram1 `Seq.index` addrB_) wrote
+        ReadFirst  -> ram0 `Seq.index` addrB_
+        NoChange   -> if weB_ then prevB else ram0 `Seq.index` addrB_
 
-      out1 = if enFast_ then out0 else prevFast
-      (as2, bs2) = go ram1 (relativeTime - tFast) as0 bs1 prevSlow out1
+      out1 = if enB_ then out0 else prevB
+      (as2, bs2) = go ram1 (relativeTime - tB) as0 bs1 prevA out1

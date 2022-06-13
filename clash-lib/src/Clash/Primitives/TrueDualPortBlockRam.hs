@@ -54,12 +54,12 @@ trueDualPortBlockRamVerilog _isD _primName args _ty = return bb
         // Shared memory
         reg [~SIZE[~TYP[13]]-1:0] ~GENSYM[mem][0] [~LIT[1]-1:0];
 
-        reg ~SIGD[~GENSYM[data_slow][1]][13];
-        reg ~SIGD[~GENSYM[data_fast][2]][18];
+        reg ~SIGD[~GENSYM[data_a][1]][13];
+        reg ~SIGD[~GENSYM[data_b][2]][18];
 
         // optional output registers, unused if the option is turned off
-        reg ~SIGD[~GENSYM[otp_reg_slow][3]][13];
-        reg ~SIGD[~GENSYM[otp_reg_fast][4]][18];|]
+        reg ~SIGD[~GENSYM[otp_reg_a][3]][13];
+        reg ~SIGD[~GENSYM[otp_reg_b][4]][18];|]
 
     regA' = case termToData regA of
       Right t -> t
@@ -178,12 +178,12 @@ trueDualPortBlockRamSystemVerilog _isD _primName args _ty = return bb
         // Shared memory
         logic [~SIZE[~TYP[13]]-1:0] ~GENSYM[mem][0] [~LIT[1]-1:0];
 
-        ~SIGD[~GENSYM[data_slow][1]][13];
-        ~SIGD[~GENSYM[data_fast][2]][18];
+        ~SIGD[~GENSYM[data_a][1]][13];
+        ~SIGD[~GENSYM[data_b][2]][18];
 
         // optional output registers, unused if the option is turned off
-        ~SIGD[~GENSYM[otp_reg_slow][3]][13];
-        ~SIGD[~GENSYM[otp_reg_fast][4]][18];|]
+        ~SIGD[~GENSYM[otp_reg_a][3]][13];
+        ~SIGD[~GENSYM[otp_reg_b][4]][18];|]
 
     regA' = case termToData regA of
       Right t -> t
@@ -303,11 +303,11 @@ trueDualPortBlockRamVHDL _isD _primName args _ty = return bb
           -- Shared memory
           type mem_type is array (~LIT[1]-1 downto 0 ) of ~TYP[13];
           shared variable mem : mem_type;
-          signal ~GENSYM[data_slow][2] : ~TYP[13];
-          signal ~GENSYM[data_fast][3] : ~TYP[18];
+          signal ~GENSYM[data_a][2] : ~TYP[13];
+          signal ~GENSYM[data_b][3] : ~TYP[18];
           -- optional output registers, unused if the option is turned off
-          signal ~GENSYM[otp_reg_slow][4] : ~TYP[13];
-          signal ~GENSYM[otp_reg_fast][5] : ~TYP[18];
+          signal ~GENSYM[otp_reg_a][4] : ~TYP[13];
+          signal ~GENSYM[otp_reg_b][5] : ~TYP[18];
         begin
         |]
     regA' = case termToData regA of
