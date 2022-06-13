@@ -48,7 +48,7 @@ mainVerilog = do
   [topDir] <- getArgs
   content  <- readFile (topDir </> show 'f </> "f.v")
 
-  assertIn "input  en // enable" content
+  assertIn "input wire  en // enable" content
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do

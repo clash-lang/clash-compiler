@@ -46,11 +46,11 @@ mainVerilog = do
   content  <- readFile (topDir </> show 'topEntity </> "PortNamesWithSingletonVector_topEntity.v")
 
   mapM_ (`assertIn` content)
-    [ "input  inp0"
-    , "input [0:0] inp1"
-    , "input [0:0] inp2"
-    , "input [0:0] inp3"
-    , "input [0:0] inp4"
-    , "input [0:0] inp5"
-    , "input [0:0] inp6"
+    [ "input wire  inp0"
+    , "input wire [0:0] inp1"
+    , "input wire [0:0] inp2"
+    , "input wire [0:0] inp3"
+    , "input wire [0:0] inp4"
+    , "input wire [0:0] inp5"
+    , "input wire [0:0] inp6"
     ]
