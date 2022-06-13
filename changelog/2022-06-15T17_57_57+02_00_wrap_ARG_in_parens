@@ -1,0 +1,1 @@
+FIXED: Wrap ~ARG[n] in ( ). Fixes [#2213](https://github.com/clash-lang/clash-compiler/issues/2213)

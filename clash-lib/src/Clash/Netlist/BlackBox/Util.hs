@@ -664,7 +664,7 @@ renderTag b (Result)    = do
   fmap renderOneLine . getAp . expr False . fst $ bbResult "~RESULT" b
 renderTag b (Arg n)  = do
   let (e,_,_) = bbInputs b !! n
-  renderOneLine <$> getAp (expr False e)
+  renderOneLine <$> getAp (expr True e)
 
 renderTag b (Const n)  = do
   let (e,_,_) = bbInputs b !! n
