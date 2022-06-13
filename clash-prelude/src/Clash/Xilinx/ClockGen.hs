@@ -35,6 +35,8 @@ import Unsafe.Coerce
 -- -- outputs a clock running at 100 MHz
 -- clockWizard @@Dom100MHz (SSymbol @@"clkWizard50to100") clk50 rst
 -- @
+--
+-- See also the [Clocking Wizard LogiCORE IP Product Guide](https://docs.xilinx.com/r/en-US/pg065-clk-wiz)
 clockWizard
   :: forall domIn domOut periodIn periodOut edge init polarity name
    . ( KnownConfiguration domIn  ('DomainConfiguration domIn periodIn edge 'Asynchronous init polarity)
@@ -76,6 +78,8 @@ clockWizard !_ clk rst =
 -- -- outputs a clock running at 100 MHz
 -- clockWizardDifferential @@Dom100MHz (SSymbol @@"clkWizardD50to100") clk50N clk50P rst
 -- @
+--
+-- See also the [Clocking Wizard LogiCORE IP Product Guide](https://docs.xilinx.com/r/en-US/pg065-clk-wiz)
 clockWizardDifferential
   :: forall domIn domOut periodIn periodOut edge init polarity name
    . ( KnownConfiguration domIn ('DomainConfiguration domIn periodIn edge 'Asynchronous init polarity)

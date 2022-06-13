@@ -596,7 +596,7 @@ delayEn = \clk gen dflt en i ->
   delay# clk (enable gen en) dflt i
 {-# INLINE delayEn #-}
 
--- | \"@'register' clk rst i s@\" delays the values in 'Signal' /s/ for one
+-- | \"@'register' clk rst en i s@\" delays the values in 'Signal' /s/ for one
 -- cycle, and sets the value to @i@ the moment the reset becomes 'False'.
 --
 -- >>> sampleN 5 (register systemClockGen resetGen enableGen 8 (fromList [1,1,2,3,4]))
