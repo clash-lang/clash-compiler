@@ -536,7 +536,7 @@ module_ c =
 
   wr2ty (Nothing,isBidirectional)
     | isBidirectional
-    = "inout"
+    = "inout" -- no net type here, it gets added by verilogType.
     | otherwise
     = "input wire" -- See NOTE [net types and data types]
   wr2ty (Just _,_)

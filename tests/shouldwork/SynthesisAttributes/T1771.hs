@@ -54,9 +54,9 @@ mainVerilog = do
   [topDir] <- getArgs
   content <- readFile (topDir </> show 'topEntity </> "topEntity.v")
 
-  assertIn "(* foo = \"AA\" *) input [0:0] pin_a" content
-  assertIn "(* foo = \"BB\", bar = 1 *) input [0:0] pin_b" content
-  assertIn "(* foo = \"CC\" *) input [0:0] pin_c" content
+  assertIn "(* foo = \"AA\" *) input wire [0:0] pin_a" content
+  assertIn "(* foo = \"BB\", bar = 1 *) input wire [0:0] pin_b" content
+  assertIn "(* foo = \"CC\" *) input wire [0:0] pin_c" content
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
