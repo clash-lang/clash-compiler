@@ -127,7 +127,10 @@ library
     T1796
     DualBlockRamTypes
     DualBlockRamDefinitions
-    DualBlockRam
+    DualBlockRam_A
+    DualBlockRam_B
+    DualBlockRam_C
+    DualBlockRam_D
 
   build-depends:
     deepseq,

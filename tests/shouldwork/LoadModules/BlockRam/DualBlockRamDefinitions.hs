@@ -10,6 +10,8 @@ import Clash.Explicit.Prelude
 import Clash.Explicit.BlockRam
 import DualBlockRamTypes
 
+import Clash.Explicit.Testbench
+
 -- Creating domains A, B and C
 createDomain vSystem{vName="A", vPeriod=50000} -- fast
 createDomain vSystem{vName="B", vPeriod=100000} -- slow
@@ -133,3 +135,23 @@ inputWritesB clk rst = stimuliGenerator clk rst opsB
 topOut wmA wmB regA regB rstA rstB clkA clkB =
   trueDualPortBlockRam (tdpDefault{writeModeA = wmA, writeModeB = wmB, outputRegA = regA, outputRegB = regB}) clkA clkB enableGen enableGen (inputWritesA clkA rstA) (inputWritesB clkB rstB)
 {-# INLINE topOut #-}
+
+genTestBench top rstA rstB simOutA simOutB =
+ strictAnd <$> doneA <*> (unsafeSynchronizer clkB clkA doneB)
+  where
+    --topEntity output
+    (portA, portB) = top clkA clkB
+
+    --Verification
+    outputVerifierA = outputVerifierWith
+     (\clk rst -> assertBitVector clk rst "outputVerifierBitVector Port A")
+    outoutVerifierB = outputVerifierWith
+     (\clk rst -> assertBitVector clk rst "outputVerifierBitVector Port B")
+
+    doneA  = outputVerifierA clkA rstA simOutA $ pack <$> portA
+    doneB  = outoutVerifierB clkB rstB simOutB $ pack <$> portB
+
+    (clkA, clkB) = (tbClockGen (not <$> doneA), tbClockGen (not <$> doneB))
+    -- Testbench clocks
+{-# INLINE genTestBench #-}
+
