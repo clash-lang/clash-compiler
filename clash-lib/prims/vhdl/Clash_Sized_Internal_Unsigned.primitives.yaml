@@ -177,11 +177,7 @@
             -- pragma translate_off
             natural'high when (~VAR[shI][2](~SIZE[~TYP[2]]-1 downto 31) /= 0) else
             -- pragma translate_on
-            to_integer(~VAR[shI][2]
-            -- pragma translate_off
-            (30 downto 0)
-            -- pragma translate_on
-            );
+            to_integer(~VAR[shI][2]);
         ~RESULT <= shift_left(~ARG[1],~SYM[1])
             -- pragma translate_off
             when (~ARG[2] >= 0) else (others => 'X')
@@ -201,11 +197,7 @@
             -- pragma translate_off
             natural'high when (~VAR[shI][2](~SIZE[~TYP[2]]-1 downto 31) /= 0) else
             -- pragma translate_on
-            to_integer(~VAR[shI][2]
-            -- pragma translate_off
-            (30 downto 0)
-            -- pragma translate_on
-            );
+            to_integer(~VAR[shI][2]);
         ~RESULT <= shift_right(~ARG[1],~SYM[1])
             -- pragma translate_off
             when (~ARG[2] >= 0) else (others => 'X')
