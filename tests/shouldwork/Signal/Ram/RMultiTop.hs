@@ -15,5 +15,6 @@ topEntity = ram
 
 testBench
   :: Signal P10 Bool
-testBench = tb $(listToVecTH $ sampleN 20 $ tbOutput clockGen clockGen)
+testBench = tb topEntity
+               $(listToVecTH $ sampleN 20 $ tbOutput ram clockGen clockGen)
 {-# NOINLINE testBench #-}
