@@ -438,7 +438,6 @@ import           GHC.Arr
   (STArray, unsafeReadSTArray, unsafeWriteSTArray)
 import qualified Data.Sequence          as Seq
 import           Data.Sequence          (Seq)
-import           Data.Tuple             (swap)
 import           GHC.Generics           (Generic)
 import           GHC.Stack              (HasCallStack, withFrozenCallStack)
 import           GHC.TypeLits           (KnownNat, type (^), type (<=))
