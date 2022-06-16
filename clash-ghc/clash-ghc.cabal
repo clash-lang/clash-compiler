@@ -204,6 +204,10 @@ library
   Exposed-Modules:
     Clash.Main
 
+    -- exposed for tests (why don't we just export everything?)
+    Clash.GHC.ClashFlag
+    Clash.GHC.ClashFlags
+
     -- exposed for use by the benchmarks
     Clash.GHC.Evaluator
     Clash.GHC.Evaluator.Primitive
@@ -227,11 +231,35 @@ library
     Clash.GHCi.UI.Monad
     Clash.GHCi.UI.Tags
 
-    Clash.GHC.ClashFlags
     Clash.GHC.GHC2Core
     Clash.GHC.LoadInterfaceFiles
     Clash.GHC.Util
     Paths_clash_ghc
 
   if impl(ghc >= 8.8.0)
-    Other-Modules:    Clash.GHCi.Util
+    Other-Modules:
+      Clash.GHCi.Util
+
+test-suite unittests
+  import:           common-options
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  main-is:          unittests.hs
+  ghc-options:      -Wall -Wcompat -threaded -with-rtsopts=-N
+  hs-source-dirs:   tests
+
+  build-depends:
+      base
+    , clash-lib
+    , clash-ghc
+    , ghc
+    , hedgehog
+    , lens
+    , tasty
+    , tasty-hunit
+    , tasty-hedgehog
+    , tasty-th
+    , text
+
+  Other-Modules:
+    Clash.Tests.GHC.ClashFlags

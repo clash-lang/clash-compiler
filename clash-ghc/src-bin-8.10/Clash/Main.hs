@@ -886,7 +886,7 @@ showOptions isInteractive = putStr . unlines . availableOptions
       availableOptions opts = concat
         [ flagsForCompletion isInteractive
         , map ('-':) (getFlagNames mode_flags)
-        , map ('-':) (getFlagNames (flagsClash opts))
+        , map ('-':) (getFlagNames (ghcClashFlags opts))
         ]
       getFlagNames opts         = map flagName opts
 

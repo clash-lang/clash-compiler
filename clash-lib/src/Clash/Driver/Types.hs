@@ -132,7 +132,7 @@ data TransformationInfo
   | TryTerm
   -- ^ Show the name and input to every transformation that is applied, and
   -- the result of every transformation that is applied.
-  deriving (Eq, Generic, Hashable, Ord, Read, Show, NFData)
+  deriving (Eq, Generic, Hashable, Ord, Read, Show, NFData, Enum, Bounded)
 
 -- | Options related to debugging. See 'ClashOpts'
 data DebugOpts = DebugOpts

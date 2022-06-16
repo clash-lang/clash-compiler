@@ -139,7 +139,15 @@ type IdentifierText = Text
 data PreserveCase
   = PreserveCase
   | ToLower
-  deriving (Show, Generic, NFData, Eq, Binary, Hashable)
+  deriving (Show, Generic, NFData, Eq, Binary, Hashable, Bounded, Enum)
+
+preserveCaseToBool :: PreserveCase -> Bool
+preserveCaseToBool PreserveCase = True
+preserveCaseToBool ToLower = False
+
+boolToPreserveCase :: Bool -> PreserveCase
+boolToPreserveCase True = PreserveCase
+boolToPreserveCase False = ToLower
 
 -- See: http://vhdl.renerta.com/mobile/source/vhd00037.htm
 --      http://www.verilog.renerta.com/source/vrg00018.htm

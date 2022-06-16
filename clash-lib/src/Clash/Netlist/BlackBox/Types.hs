@@ -230,4 +230,4 @@ data Decl
   deriving (Show, Generic, NFData, Binary, Eq, Hashable)
 
 data HdlSyn = Vivado | Quartus | Other
-  deriving (Eq, Show, Read, Generic, NFData, Binary, Hashable)
+  deriving (Eq, Show, Read, Generic, NFData, Binary, Hashable, Enum, Bounded)

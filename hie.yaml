@@ -11,7 +11,8 @@ cradle:
                                 ,{path: "./clash-cosim/test", component: "clash-cosim:test"}]}}
     - path: "./clash-ghc"
       config: { cradle: {cabal: [{path: "./clash-ghc/src-ghc", component: "lib:clash-ghc"}
-                                ,{path: "./clash-ghc/src-ghc-common", component: "lib:clash-ghc"}]}}
+                                ,{path: "./clash-ghc/src-ghc-common", component: "lib:clash-ghc"}
+                                ,{path: "./clash-ghc/tests", component: "clash-ghc:unittests"}]}}
     # The src-bin directories are GHC version dependant, so don't load them
     - path: "./clash-ghc/src-bin-8.10"
       config: { cradle: {none: }}

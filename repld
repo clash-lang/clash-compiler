@@ -22,6 +22,7 @@
 #   * `c`, `cores`, `clash-cores`
 #   * `c:tests`, `cores:tests`, `clash-cores:tests`
 #   * `g`, `ghc`, `clash-ghc`
+#   * `g:tests`, `ghc:tests`, `clash-ghc:tests`
 #   * `dev`, `clash-dev`
 #
 # That means the following will start a repl-loop for clash-lib:
@@ -56,6 +57,9 @@ elif [[ $1 == "c:tests" || $1 == "cores:tests" || $1 == "clash-cores:tests" ]]; 
 elif [[ $1 == "g" || $1 == "ghc" || $1 == "clash-ghc" ]]; then
   target="cabal v2-repl clash-ghc --repl-options=-fobject-code --repl-options=-fforce-recomp"
   watch="clash-prelude clash-lib clash-ghc/clash-ghc.cabal"
+elif [[ $1 == "g:tests" || $1 == "ghc:tests" || $1 == "clash-ghc:tests" ]]; then
+  target="cabal v2-repl clash-ghc:unittests"
+  watch="clash-prelude clash-lib clash-ghc/src-ghc clash-ghc/clash-ghc.cabal"
 elif [[ $1 == "dev" || $1 == "clash-dev" ]]; then
   target="./clash-dev"
   watch="clash-prelude clash-lib/clash-lib.cabal clash-ghc/clash-ghc.cabal"
@@ -66,6 +70,7 @@ else
   echo "  l, lib, clash-lib"                                 > /dev/stderr
   echo "  l:tests, lib:tests, clash-lib:tests"               > /dev/stderr
   echo "  g, ghc, clash-ghc"                                 > /dev/stderr
+  echo "  g:tests, ghc:tests, clash-ghc:tests"               > /dev/stderr
   echo "  c, cores, clash-cores"                             > /dev/stderr
   echo "  c:tests, cores:tests, clash-cores:tests"           > /dev/stderr
   echo "  dev, clash-dev"                                    > /dev/stderr
