@@ -201,32 +201,37 @@ library
 
   Autogen-Modules:    Paths_clash_ghc
 
-  Exposed-Modules:    Clash.Main
+  Exposed-Modules:
+    Clash.Main
 
-                      -- exposed for use by the benchmarks
-                      Clash.GHC.Evaluator
-                      Clash.GHC.Evaluator.Primitive
-                      Clash.GHC.GenerateBindings
-                      Clash.GHC.LoadModules
-                      Clash.GHC.NetlistTypes
+    -- exposed for use by the benchmarks
+    Clash.GHC.Evaluator
+    Clash.GHC.Evaluator.Primitive
+    Clash.GHC.GenerateBindings
+    Clash.GHC.LoadModules
+    Clash.GHC.NetlistTypes
 
-                      Clash.GHC.PartialEval
-                      Clash.GHC.PartialEval.Eval
-                      Clash.GHC.PartialEval.Quote
-                      Clash.GHC.PartialEval.Primitive
+    Clash.GHC.PartialEval
+    Clash.GHC.PartialEval.Eval
+    Clash.GHC.PartialEval.Quote
+    Clash.GHC.PartialEval.Primitive
 
-                      Clash.GHCi.Common
+    Clash.GHCi.Common
 
-  Other-Modules:      Clash.GHCi.Leak
-                      Clash.GHCi.UI
-                      Clash.GHCi.UI.Info
-                      Clash.GHCi.UI.Monad
-                      Clash.GHCi.UI.Tags
+  Other-Modules:
+    Control.Lens.Extra
 
-                      Clash.GHC.ClashFlags
-                      Clash.GHC.GHC2Core
-                      Clash.GHC.LoadInterfaceFiles
-                      Clash.GHC.Util
-                      Paths_clash_ghc
+    Clash.GHCi.Leak
+    Clash.GHCi.UI
+    Clash.GHCi.UI.Info
+    Clash.GHCi.UI.Monad
+    Clash.GHCi.UI.Tags
+
+    Clash.GHC.ClashFlags
+    Clash.GHC.GHC2Core
+    Clash.GHC.LoadInterfaceFiles
+    Clash.GHC.Util
+    Paths_clash_ghc
+
   if impl(ghc >= 8.8.0)
     Other-Modules:    Clash.GHCi.Util
