@@ -118,7 +118,6 @@ library
 executable clash-testsuite
   import:              basic-config
   main-is:             Main.hs
-  ghc-options:         -threaded -with-rtsopts=-N
 
   build-tool-depends:
     clash-ghc:clash
