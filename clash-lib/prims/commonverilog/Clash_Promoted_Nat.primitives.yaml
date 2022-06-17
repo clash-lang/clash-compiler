@@ -34,7 +34,7 @@
         function integer ~INCLUDENAME[0];
           input integer base, value;
           begin
-            for (~INCLUDENAME[0] = 0; base ** ~INCLUDENAME[0] < value; ~~INCLUDENAME[0]=~INCLUDENAME[0]+1);
+            for (~INCLUDENAME[0] = 0; base ** ~INCLUDENAME[0] < value; ~INCLUDENAME[0]=~INCLUDENAME[0]+1);
           end
         endfunction
     kind: Expression

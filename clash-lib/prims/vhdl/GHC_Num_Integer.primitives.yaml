@@ -241,11 +241,7 @@
             -- pragma translate_off
             natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
             -- pragma translate_on
-            to_integer(~VAR[shI][1]
-            -- pragma translate_off
-            (30 downto 0)
-            -- pragma translate_on
-            );
+            to_integer(~VAR[shI][1]);
         ~RESULT <= shift_right(~ARG[0],~SYM[1]);
       end block;
     warning: 'GHC.Num.Integer.integerShiftR#: Integers are dynamically sized in simulation,
@@ -263,11 +259,7 @@
             -- pragma translate_off
             natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
             -- pragma translate_on
-            to_integer(~VAR[shI][1]
-            -- pragma translate_off
-            (30 downto 0)
-            -- pragma translate_on
-            );
+            to_integer(~VAR[shI][1]);
         ~RESULT <= shift_left(~ARG[0],~SYM[1]);
       end block;
     warning: 'GHC.Num.Integer.integerShiftL#: Integers are dynamically sized in simulation,

@@ -1,0 +1,1 @@
+FIXED: The VHDL shift primitives no longer generate bound check failures. Fixes [#2215](https://github.com/clash-lang/clash-compiler/issues/2215)
