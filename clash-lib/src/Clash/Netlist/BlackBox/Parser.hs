@@ -1,7 +1,7 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd,
-                    2021     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -25,11 +25,8 @@ import           Clash.Netlist.BlackBox.Types
 
 -- | Parse a text as a BlackBoxTemplate, returns a list of errors in case
 -- parsing fails
--- runParse :: Text -> (BlackBoxTemplate, [Error LineColPos])
--- runParse = PCC.parse ((,) <$> pBlackBoxD <*> pEnd)
---          . createStr (LineColPos 0 0 0)
 runParse :: Text -> Result BlackBoxTemplate
-runParse = parseString pBlackBoxD (Directed "" 0 0 0 0) . unpack
+runParse = parseString (pBlackBoxD <* eof) (Directed "" 0 0 0 0) . unpack
 
 -- | Parse a BlackBoxTemplate (Declarations and Expressions)
 pBlackBoxD :: Parser BlackBoxTemplate
@@ -80,7 +77,7 @@ pTagE =  Result            <$  string "~RESULT"
      <|> Const             <$> (string "~CONST" *> brackets' natural')
      <|> Lit               <$> (string "~LIT" *> brackets' natural')
      <|> Name              <$> (string "~NAME" *> brackets' natural')
-     <|> ToVar             <$> try (string "~VAR" *> brackets' pSigD) <*> brackets' natural'
+     <|> ToVar             <$> try (string "~VAR" *> brackets' pSigDorEmpty) <*> brackets' natural'
      <|> (Sym Text.empty)  <$> (string "~SYM" *> brackets' natural')
      <|> Typ Nothing       <$  string "~TYPO"
      <|> (Typ . Just)      <$> try (string "~TYP" *> brackets' natural')
@@ -154,3 +151,6 @@ pSigD = some (pTagE <|> (Text (pack "[") <$ (pack <$> string "[\\"))
                     <|> (Text (pack "]") <$ (pack <$> string "\\]"))
                     <|> (Text <$> (pack <$> some (satisfyRange '\000' '\90')))
                     <|> (Text <$> (pack <$> some (satisfyRange '\94' '\125'))))
+
+pSigDorEmpty :: Parser [Element]
+pSigDorEmpty = pSigD <|> mempty
