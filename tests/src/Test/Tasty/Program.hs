@@ -94,6 +94,7 @@ data ExpectOutput a
   | ExpectStdErr a
   | ExpectEither a
   | ExpectNotStdErr a
+  | ExpectNotStdOut a
   | ExpectNothing
   deriving Functor
 
@@ -356,6 +357,8 @@ runFailingProgram testExitCode program args stdO errOnEmptyStderr expectedCode e
                 unexpectedStd "stdout or stderr" program args code stderrT stdoutT r
               ExpectNotStdErr r | cleanNewlines r `T.isInfixOf` cleanNewlines stderrT ->
                 unexpectedNonEmptyStderr program args code stderrT stdoutT
+              ExpectNotStdOut r | cleanNewlines r `T.isInfixOf` cleanNewlines stdoutT ->
+                unexpectedNonEmptyStdout program args code stderrT stdoutT
               _ ->
                 if testExitCode then
                   case expectedCode of

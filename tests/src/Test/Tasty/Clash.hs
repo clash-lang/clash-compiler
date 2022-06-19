@@ -30,6 +30,7 @@ import           Test.Tasty.Iverilog
 import           Test.Tasty.Modelsim
 import           Test.Tasty.SymbiYosys
 import           Test.Tasty.Verilator
+import           Test.Tasty.Vivado
 
 {- Note [copy data files hack]
 
@@ -129,6 +130,8 @@ data TestOptions =
     , verilate :: Verilate
     -- ^ Whether to run compatible tests through verilator as well as / in
     -- place of the simulator that would ordinarily be used.
+    , vivado :: Bool
+    -- ^ Whether to simulate via Vivado (such as when one depends on Xilinx IP)
     }
 
 allTargets :: [HDL]
@@ -149,6 +152,7 @@ instance Default TestOptions where
       , buildTargets=BuildAuto
       , vvpStdoutNonEmptyFail=True
       , verilate=SimAndVerilate
+      , vivado=True
       }
 
 -- | Directory where testbenches live.
@@ -383,6 +387,20 @@ verilatorTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
     | t <- getBuildTargets opts
     ]
 
+-- | When we need Xilinx IP
+vivadoTests
+  :: HDL
+  -> TestOptions
+  -> IO FilePath
+  -> String
+  -> [(TestName, TestTree)]
+vivadoTests target opts tmpDir modName =
+  [ ( "Vivado"
+    , singleTest "Vivado" (VivadoTest target tmpDir modName t)
+    )
+  | t <- getBuildTargets opts
+  ]
+
 -- | Generate a test tree for running SymbiYosys
 sbyTests :: TestOptions -> IO FilePath -> ([(TestName, TestTree)])
 sbyTests opts@TestOptions {..} tmpDir =
@@ -407,6 +425,10 @@ runTest1 modName opts@TestOptions{..} path target =
         <> (case verificationTool of
               Nothing -> []
               Just SymbiYosys -> tail $ sequenceTests (show target : path) (clashTest tmpDir : sbyTests opts tmpDir))
+        <> if vivado
+          then
+            tail (sequenceTests (show target : path) (clashTest tmpDir : vivadoTests target opts tmpDir modName))
+          else []
  where
   mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
   sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))

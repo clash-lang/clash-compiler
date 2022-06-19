@@ -57,3 +57,9 @@ allow-newer:
   vector-binary-instances:base,
   cryptohash-sha256:base,
   hashable
+
+source-repository-package
+  type: git
+  location: https://github.com/martijnbastiaan/tasty.git
+  tag: 3b13d83cd0aab40e5d196458d7b01abb87a104f3
+  subdir: core
