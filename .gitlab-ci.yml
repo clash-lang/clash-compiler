@@ -35,21 +35,22 @@ stages:
     include: .ci/gitlab/test.yml
     strategy: depend
 
-tests-8.6:
-  extends: .common-trigger
-  variables:
-    GHC_VERSION: 8.6.5
-    MULTIPLE_HIDDEN: "no"
+# Temporarily disabled to save resources while experimenting with this PR:
+# tests-8.6:
+#   extends: .common-trigger
+#   variables:
+#     GHC_VERSION: 8.6.5
+#     MULTIPLE_HIDDEN: "no"
 
-tests-8.8:
-  extends: .common-trigger
-  variables:
-    GHC_VERSION: 8.8.4
+# tests-8.8:
+#   extends: .common-trigger
+#   variables:
+#     GHC_VERSION: 8.8.4
 
-tests-8.10:
-  extends: .common-trigger
-  variables:
-    GHC_VERSION: 8.10.7
+# tests-8.10:
+#   extends: .common-trigger
+#   variables:
+#     GHC_VERSION: 8.10.7
 
 tests-9.0:
   extends: .common-trigger
