@@ -847,7 +847,15 @@ reduceAnd# bv@(BV 0 i) = Bit 0 (W# (int2Word# (dataToTag# check)))
 
     sz    = natVal bv
     maxI  = (2 ^ sz) - 1
-reduceAnd# bv = V.foldl (.&.) 1 (V.bv2v bv)
+reduceAnd# bv@(BV m i) =
+    -- If any defined bit is 0, i.e., 'm .|. i /= maxI', then the result is
+    -- '0' (Bit 0 0), otherwise the result is '.' (Bit 1 0).
+    Bit (W# (int2Word# (dataToTag# check))) 0
+  where
+    check = m .|. i == maxI
+
+    sz    = natVal bv
+    maxI  = (2 ^ sz) - 1
 
 {-# NOINLINE reduceOr# #-}
 {-# ANN reduceOr# hasBlackBox #-}
@@ -855,13 +863,17 @@ reduceOr# :: KnownNat n => BitVector n -> Bit
 reduceOr# (BV 0 i) = Bit 0 (W# (int2Word# (dataToTag# check)))
   where
     check = i /= 0
-reduceOr# bv = V.foldl (.|.) 0 (V.bv2v bv)
+reduceOr# bv@(BV m i) | defI /= 0 = Bit 0 1
+                      | otherwise = Bit 1 0
+ where
+  complementN = complementMod $ natVal bv
+  defI = i .&. (complementN m)
 
 {-# NOINLINE reduceXor# #-}
 {-# ANN reduceXor# hasBlackBox #-}
 reduceXor# :: KnownNat n => BitVector n -> Bit
 reduceXor# (BV 0 i) = Bit 0 (fromIntegral (popCount i `mod` 2))
-reduceXor# bv = undefErrorU "reduceXor" bv
+reduceXor# _ = Bit 1 0
 
 instance Default (BitVector n) where
   def = minBound#
