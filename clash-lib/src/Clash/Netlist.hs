@@ -89,9 +89,6 @@ import           Clash.Primitives.Types           as P
 import           Clash.Util
 import qualified Clash.Util.Interpolate           as I
 
-import Clash.Debug -- TODO
-import Text.Show.Pretty (ppShow)
-
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
 genNetlist

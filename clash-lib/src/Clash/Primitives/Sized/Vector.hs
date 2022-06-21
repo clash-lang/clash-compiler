@@ -47,7 +47,7 @@ import           Clash.Netlist.Types
    Declaration(..), Expr(Literal, Identifier,DataCon), Literal(NumLit),
    BlackBox(BBTemplate, BBFunction), TemplateFunction(..),
    Modifier(Indexed, Nested, DC), HWType(..), bbInputs, bbResults, emptyBBContext,
-   tcCache, DeclarationType(Concurrent), bbHdlStyle, Usage(..), Blocking(..))
+   tcCache, bbHdlStyle, Usage(..), Blocking(..))
 import qualified Clash.Netlist.Id                   as Id
 import           Clash.Netlist.Util                 (typeSize)
 import qualified Clash.Primitives.DSL               as Prim

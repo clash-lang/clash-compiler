@@ -80,8 +80,6 @@ import           Clash.Signal.Internal                (ActiveEdge (..))
 import           Clash.Util
   (SrcSpan, noSrcSpan, curLoc, indexNote, makeCached)
 
-import Debug.Trace -- TODO
-
 -- | State for the 'Clash.Backend.Verilog.VerilogM' monad:
 data VerilogState =
   VerilogState
@@ -603,9 +601,6 @@ inst_ (NetDecl' {}) = return Nothing
 
 inst_ (ConditionalDecl cond ds) = Just <$>
   "`ifdef" <+> pretty cond <> line <> indent 2 (insts ds) <> line <> "`endif"
-
-inst_ d =
-  error ("inst_: " ++ show d)
 
 seq_ :: Seq -> VerilogM Doc
 seq_ (AlwaysClocked edge clk ds) =

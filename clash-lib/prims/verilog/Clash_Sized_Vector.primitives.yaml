@@ -91,8 +91,8 @@
     type: 'map :: (a -> b)
       -> Vec n a -> Vec n b'
     outputUsage:
-      concurrent: continuous
-      sequential: blocking
+      concurrent: Continuous
+      sequential: Blocking
     template: |-
       // map begin
       ~IF~ISSEQUENTIAL~THEN
@@ -239,15 +239,15 @@
 - BlackBoxHaskell:
     name: Clash.Sized.Vector.index_int
     outputUsage:
-      concurrent: continuous
-      sequential: blocking
+      concurrent: Continuous
+      sequential: Blocking
     templateFunction: Clash.Primitives.Sized.Vector.indexIntVerilog
 - BlackBox:
     name: Clash.Sized.Vector.replace_int
     kind: Declaration
     outputUsage:
-      concurrent: continuous
-      sequential: blocking
+      concurrent: Continuous
+      sequential: Blocking
     type: 'replace_int ::
       KnownNat n => Vec n a -> Int -> a -> Vec n a'
     template: |-
