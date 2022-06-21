@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd
                     2017-2018, Google Inc.
-                    2021     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -218,8 +218,8 @@ unsafeCoreTypeToHWTypeM
 unsafeCoreTypeToHWTypeM loc ty = do
   (_,cmpNm) <- Lens.use curCompNm
   tt        <- Lens.use typeTranslator
-  reprs     <- Lens.use customReprs
-  tcm       <- Lens.use tcCache
+  reprs     <- Lens.view customReprs
+  tcm       <- Lens.view tcCache
   htm0      <- Lens.use htyCache
   let (hty,htm1) = runState (unsafeCoreTypeToHWType cmpNm loc tt reprs tcm ty) htm0
   htyCache Lens..= htm1
@@ -241,8 +241,8 @@ coreTypeToHWTypeM
   -> NetlistMonad (Maybe FilteredHWType)
 coreTypeToHWTypeM ty = do
   tt    <- Lens.use typeTranslator
-  reprs <- Lens.use customReprs
-  tcm   <- Lens.use tcCache
+  reprs <- Lens.view customReprs
+  tcm   <- Lens.view tcCache
   htm0  <- Lens.use htyCache
   let (hty,htm1) = runState (coreTypeToHWType tt reprs tcm ty) htm0
   htyCache Lens..= htm1
@@ -708,7 +708,7 @@ termHWType :: String
            -> Term
            -> NetlistMonad HWType
 termHWType loc e = do
-  m <- Lens.use tcCache
+  m <- Lens.view tcCache
   let ty = inferCoreTypeOf m e
   stripFiltered <$> unsafeCoreTypeToHWTypeM loc ty
 
@@ -719,7 +719,7 @@ termHWTypeM
   -- ^ Term to convert to HWType
   -> NetlistMonad (Maybe FilteredHWType)
 termHWTypeM e = do
-  m  <- Lens.use tcCache
+  m  <- Lens.view tcCache
   let ty = inferCoreTypeOf m e
   coreTypeToHWTypeM ty
 
@@ -854,7 +854,7 @@ renameBinder (i, collectArgsTicks -> (k, args, ticks)) = withTicks ticks $ \_ ->
   -- 'Clash.Normalize.Transformations.setupMultiResultPrim'.
   goMulti :: PrimInfo -> CompiledPrimitive -> NetlistMonad [(Id, Id)]
   goMulti pInfo (BlackBoxHaskell{function=(_, function)}) = do
-    tcm <- Lens.use tcCache
+    tcm <- Lens.view tcCache
     let mpInfo@MultiPrimInfo{mpi_resultTypes} = multiPrimInfo' tcm pInfo
     let (args1, resIds) = splitMultiPrimArgs mpInfo args
     funRes <- preserveVarEnv (function False (primName pInfo) args1 mpi_resultTypes)
@@ -1659,7 +1659,7 @@ withTicks ticks0 k = do
     go (TickDecl (Comment (Text.pack (showSDocUnsafe (ppr sp)))):decls) ticks
 
   go decls (NameMod m nm0:ticks) = do
-    tcm <- Lens.use tcCache
+    tcm <- Lens.view tcCache
     case runExcept (tyLitShow tcm nm0) of
       Right nm1 -> local (modName m nm1) (go decls ticks)
       _ -> go decls ticks
@@ -1681,7 +1681,7 @@ affixName
   :: Text
   -> NetlistMonad Text
 affixName nm0 = do
-  NetlistEnv pre suf _ <- ask
+  NetlistEnv _ pre suf _ <- ask
   let nm1 = if Text.null pre then nm0 else pre <> "_" <> nm0
       nm2 = if Text.null suf then nm1 else nm1 <> "_" <> suf
   return nm2
