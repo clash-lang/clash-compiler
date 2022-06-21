@@ -601,6 +601,10 @@ runClashTest = defaultMain $ clashTestRoot
           , clashLibTest "NoDeDup" def{hdlTargets=[VHDL]}
           , clashLibTest "T1766" def
           , clashLibTest "T1935" def
+          , clashTestGroup "ConcurrentSequential"
+              [ runTest "Plus" def{hdlTargets=[Verilog,SystemVerilog]}
+              , runTest "VecMap" def{hdlTargets=[Verilog,SystemVerilog]}
+              ]
           ]
       , clashTestGroup "Numbers"
         [ runTest "BitInteger" def

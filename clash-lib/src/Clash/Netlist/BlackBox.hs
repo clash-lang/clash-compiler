@@ -103,6 +103,9 @@ import           Clash.Unique                  (lookupUniqMap')
 import           Clash.Util
 import qualified Clash.Util.Interpolate        as I
 
+import Debug.Trace -- TODO
+import Text.Show.Pretty (ppShow)
+
 -- | Emits (colorized) warning to stderr
 warn
   :: ClashOpts
@@ -1204,8 +1207,11 @@ mkFunInput resId e =
                       return (Right ((Id.unsafeMake "",tickDecls ++ [instDecl]), Cont))
                     Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
             C.Lam {} -> do
+              traceM ("mkFunInput.Lam.e:\n" <> showPpr e)
               let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet appE)
-              either Left (Right . first (second (tickDecls ++))) <$> go is0 0 appE
+              res <- second (first (second (tickDecls ++))) <$> go is0 0 appE
+              traceM ("mkFunInput.Lam.res:\n" ++ ppShow res)
+              return res
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
   let pNm = case appE of
               Prim p -> primName p
