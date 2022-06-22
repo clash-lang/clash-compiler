@@ -71,7 +71,7 @@ import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
 import qualified Clash.Netlist.Id                     as Id
-import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
+import           Clash.Netlist.Types                  hiding (intWidth)
 import           Clash.Netlist.Util
 import           Clash.Util
   (SrcSpan, noSrcSpan, clogBase, curLoc, makeCached, indexNote)

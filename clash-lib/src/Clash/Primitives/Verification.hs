@@ -70,7 +70,7 @@ checkBBF _isD _primName args _ty =
   bindMaybe _ (Var vId) = pure (id2identifier vId, [])
   bindMaybe Nothing t = bindMaybe (Just "s") t
   bindMaybe (Just nm) t = do
-    tcm <- Lens.use tcCache
+    tcm <- Lens.view tcCache
     newId <- Id.make (Text.pack nm)
     (expr0, decls) <- mkExpr False Concurrent (NetlistId newId (inferCoreTypeOf tcm t)) t
     pure

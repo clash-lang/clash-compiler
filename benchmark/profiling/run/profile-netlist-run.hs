@@ -42,7 +42,7 @@ benchFile idirs src = do
   (transformedBindings,topEntities,primMap,tcm,reprs,topEntity) <- setupEnv src
   putStrLn $ "Doing netlist generation of " ++ src
 
-  let clashEnv = ClashEnv
+  let env = ClashEnv
                    { envOpts = opts idirs
                    , envTyConMap = tcm
                    , envTupleTyCons = mempty
@@ -52,17 +52,17 @@ benchFile idirs src = do
 
       topEntityS = Text.unpack (nameOcc (varName topEntity))
       modName    = takeWhile (/= '.') topEntityS
-      hdlState'  = setModName (Text.pack modName) (initBackend @VHDLState (envOpts clashEnv))
-      (compNames, seen) = genTopNames (envOpts clashEnv) hdl topEntities
+      hdlState'  = setModName (Text.pack modName) (initBackend @VHDLState (envOpts env))
+      (compNames, seen) = genTopNames (envOpts env) hdl topEntities
       topEntityMap = mkVarEnv (zip (map topId topEntities) topEntities)
       prefixM    = Nothing
       ite        = ifThenElseExpr hdlState'
-      hdlDir     = fromMaybe "." (opt_hdlDir (envOpts clashEnv)) </>
+      hdlDir     = fromMaybe "." (opt_hdlDir (envOpts env)) </>
                          Clash.Backend.name hdlState' </>
                          takeWhile (/= '.') topEntityS
   (netlist,_,_) <-
-    genNetlist clashEnv False transformedBindings topEntityMap compNames
-               (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
+    genNetlist env False transformedBindings topEntityMap compNames
+               (ghcTypeToHWType (opt_intWidth (envOpts env)))
                ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
   netlist `deepseq` putStrLn ".. done\n"
 

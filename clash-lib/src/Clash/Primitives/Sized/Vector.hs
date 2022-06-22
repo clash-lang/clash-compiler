@@ -1,5 +1,5 @@
 {-|
-  Copyright   :  (C) 2020-2021 QBayLogic
+  Copyright   :  (C) 2020-2022 QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -58,7 +58,7 @@ import           Clash.Util                         (curLoc)
 -- | Blackbox function for 'Clash.Sized.Vector.iterateI'
 iterateBBF :: HasCallStack => BlackBoxFunction
 iterateBBF _isD _primName args _resTy = do
-  tcm <- Lens.use tcCache
+  tcm <- Lens.view tcCache
   pure (Right (meta tcm, bb))
  where
   bb = BBFunction "Clash.Primitives.Sized.Vector.iterateBBF" 0 iterateTF
@@ -115,7 +115,7 @@ foldFunctionPlurality n
 -- | Blackbox function for 'Clash.Sized.Vector.fold'
 foldBBF :: HasCallStack => BlackBoxFunction
 foldBBF _isD _primName args _resTy = do
-  tcm <- Lens.use tcCache
+  tcm <- Lens.view tcCache
   pure (Right (meta tcm, bb))
  where
   bb = BBFunction "Clash.Primitives.Sized.Vector.foldTF" 0 foldTF

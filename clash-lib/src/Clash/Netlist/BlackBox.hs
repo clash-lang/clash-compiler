@@ -3,7 +3,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017     , Google Inc.,
-                    2021     , QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -168,11 +168,11 @@ mkBlackBoxContext bbName resIds args@(lefts -> termArgs) = do
            )
   where
     addFunction resTys im (arg,i) = do
-      tcm <- Lens.use tcCache
+      tcm <- Lens.view tcCache
       if isFun tcm arg then do
         -- Only try to calculate function plurality when primitive actually
         -- exists. Here to prevent crashes on __INTERNAL__ primitives.
-        prim <- HashMap.lookup bbName <$> Lens.use primitives
+        prim <- HashMap.lookup bbName <$> Lens.view primitives
         funcPlurality <-
           case extractPrim <$> prim of
             Just (Just p) ->
@@ -233,9 +233,9 @@ mkArgument
                   , [Declaration]
                   )
 mkArgument bbName bndr nArg e = do
-    tcm   <- Lens.use tcCache
+    tcm   <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm e
-    iw    <- Lens.use intWidth
+    iw    <- Lens.view intWidth
     hwTyM <- fmap stripFiltered <$> N.termHWTypeM e
     let eTyMsg = "(" ++ showPpr e ++ " :: " ++ showPpr ty ++ ")"
     ((e',t,l),d) <- case hwTyM of
@@ -299,7 +299,7 @@ extractPrimWarnOrFail
   -- ^ Name of primitive
   -> NetlistMonad CompiledPrimitive
 extractPrimWarnOrFail nm = do
-  prim <- HashMap.lookup nm <$> Lens.use primitives
+  prim <- HashMap.lookup nm <$> Lens.view primitives
   case prim of
     Just (HasBlackBox warnings compiledPrim) ->
       -- See if we need to warn the user
@@ -328,9 +328,9 @@ extractPrimWarnOrFail nm = do
     -> NetlistMonad CompiledPrimitive
 
   go ((WarnAlways warning):ws) cp = do
-    primWarn <- opt_primWarn <$> Lens.use clashOpts
+    opts <- Lens.view clashOpts
+    let primWarn = opt_primWarn opts
     seen <- Set.member nm <$> Lens.use seenPrimitives
-    opts <- Lens.use clashOpts
 
     when (primWarn && not seen)
       $ liftIO
@@ -401,7 +401,7 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
           -- Multi result primitives assign their results to signals
           -- provided as arguments. Hence, we ignore any declarations
           -- from 'resBndr1'.
-          tcm <- Lens.use tcCache
+          tcm <- Lens.view tcCache
           let (args1, resArgs) = splitMultiPrimArgs (multiPrimInfo' tcm pInfo) args
           (bbCtx, ctxDcls) <- mkBlackBoxContext (primName pInfo) resArgs args1
           (templ, templDecl) <- prepareBlackBox name template bbCtx
@@ -493,13 +493,13 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
               hwTy <- N.unsafeCoreTypeToHWTypeM' $(curLoc) ty
               case args of
                 [Right (ConstTy (TyCon tcN)), Left (C.Literal (IntLiteral i))] -> do
-                  tcm <- Lens.use tcCache
+                  tcm <- Lens.view tcCache
                   let dcs = tyConDataCons (tcm `lookupUniqMap'` tcN)
                       dc  = dcs !! fromInteger i
                   (exprN,dcDecls) <- mkDcApplication [hwTy] dst dc []
                   return (exprN,dcDecls)
                 [Right _, Left scrut] -> do
-                  tcm     <- Lens.use tcCache
+                  tcm     <- Lens.view tcCache
                   let scrutTy = inferCoreTypeOf tcm scrut
                   (scrutExpr,scrutDecls) <-
                     mkExpr False Concurrent (NetlistId (Id.unsafeMake "c$tte_rhs") scrutTy) scrut
@@ -514,10 +514,10 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                 _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showPpr showPpr) args)
           | pNm == "GHC.Prim.dataToTag#" -> case args of
               [Right _,Left (Data dc)] -> do
-                iw <- Lens.use intWidth
+                iw <- Lens.view intWidth
                 return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
               [Right _,Left scrut] -> do
-                tcm      <- Lens.use tcCache
+                tcm      <- Lens.view tcCache
                 let scrutTy = inferCoreTypeOf tcm scrut
                 scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
                 (scrutExpr,scrutDecls) <-
@@ -535,7 +535,7 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
               resM <- resBndr1 True dst
               case resM of
                 Just (_,dstNm,dstDecl) -> do
-                  tcm <- Lens.use tcCache
+                  tcm <- Lens.view tcCache
                   mealyDecls <- collectMealy dstNm dst tcm (lefts args)
                   return (Noop, dstDecl ++ mealyDecls)
                 Nothing -> return (Noop,[])
@@ -562,7 +562,7 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
               resM <- resBndr1 True dst
               case resM of
                 Just (_,dstNm,dstDecl) -> do
-                  tcm <- Lens.use tcCache
+                  tcm <- Lens.view tcCache
                   let (fun0:arg0:_) = lefts args
                       arg1 = unSimIO tcm arg0
                       fun1 = case fun0 of
@@ -607,7 +607,7 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
               (expr,decls) <- case lefts args of
                 (arg:_) -> mkExpr False Concurrent dst arg
                 _ -> error "internal error: insufficient arguments"
-              iw <- Lens.use intWidth
+              iw <- Lens.view intWidth
               return (N.DataCon (Signed iw) (DC (Void Nothing,-1)) [expr],decls)
 
           | pNm == "GHC.Num.Integer.IP" -> do
@@ -631,7 +631,7 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
               (expr,decls) <- case lefts args of
                 (arg:_) -> mkExpr False Concurrent dst arg
                 _ -> error "internal error: insufficient arguments"
-              iw <- Lens.use intWidth
+              iw <- Lens.view intWidth
               return (N.DataCon (Unsigned iw) (DC (Void Nothing,-1)) [expr],decls)
 
           | pNm == "GHC.Num.Integer.NB" -> do
@@ -886,7 +886,7 @@ collectBindIO dst (m:Lam x q@e:_) = do
 #else
 collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
 #endif
-  tcm <- Lens.use tcCache
+  tcm <- Lens.view tcCache
   (ds0,subst) <- collectAction tcm
   let qS = substTm "collectBindIO1" subst q
   case splitNormalized tcm qS of
@@ -936,7 +936,7 @@ collectBindIO _ es = error ("internal error:\n" ++ showPpr es)
 collectAppIO :: NetlistId -> [Term] -> [Term] -> NetlistMonad (Expr,[Declaration])
 collectAppIO dst (fun1:arg1:_) rest = case collectArgs fun1 of
   (Prim (PrimInfo "Clash.Explicit.SimIO.fmapSimIO#" _ _ _ _),(lefts -> (fun0:arg0:_))) -> do
-    tcm <- Lens.use tcCache
+    tcm <- Lens.view tcCache
     let argN = map (Left . unSimIO tcm) (arg0:arg1:rest)
     mkExpr False Sequential dst (mkApps fun0 argN)
   (Prim (PrimInfo "Clash.Explicit.SimIO.apSimIO#" _ _ _ _),(lefts -> args)) -> do
@@ -989,7 +989,7 @@ mkFunInput
 mkFunInput resId e =
  let (appE,args,ticks) = collectArgsTicks e
  in  withTicks ticks $ \tickDecls -> do
-  tcm <- Lens.use tcCache
+  tcm <- Lens.view tcCache
   -- TODO: Rewrite this function to use blackbox functions. Right now it
   -- TODO: generates strings that are later parsed/interpreted again. Silly!
   templ <- case appE of
@@ -1177,7 +1177,7 @@ mkFunInput resId e =
       return ((Right decl,wr,[],[],[],bbCtx),dcls)
   where
     goExpr app@(collectArgsTicks -> (C.Var fun,args@(_:_),ticks)) = do
-      tcm <- Lens.use tcCache
+      tcm <- Lens.view tcCache
       resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (inferCoreTypeOf tcm app)
       let (tmArgs,tyArgs) = partitionEithers args
       if null tyArgs
@@ -1193,7 +1193,7 @@ mkFunInput resId e =
           (_,sp) <- Lens.use curCompNm
           throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
     goExpr e' = do
-      tcm <- Lens.use tcCache
+      tcm <- Lens.view tcCache
       let eType = inferCoreTypeOf tcm e'
       (appExpr,appDecls) <- mkExpr False Concurrent (NetlistId (Id.unsafeMake "c$bb_res") eType) e'
       let assn = Assignment (Id.unsafeMake "~RESULT") appExpr
@@ -1217,7 +1217,7 @@ mkFunInput resId e =
       return (Right ((Id.unsafeMake "",[assn]),Wire))
 
     go _ _ (Case scrut ty [alt]) = do
-      tcm <- Lens.use tcCache
+      tcm <- Lens.view tcCache
       let sTy = inferCoreTypeOf tcm scrut
       (projection,decls) <- mkProjection False (NetlistId (Id.unsafeMake "c$bb_res") sTy) scrut ty alt
       let assn = Assignment (Id.unsafeMake "~RESULT") projection
@@ -1227,7 +1227,7 @@ mkFunInput resId e =
       return (Right ((nm,decls ++ [assn]),Wire))
 
     go _ _ (Case scrut ty alts@(_:_:_)) = do
-      tcm <- Lens.use tcCache
+      tcm <- Lens.view tcCache
       let scrutTy = inferCoreTypeOf tcm scrut
       scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
       ite <- Lens.use backEndITE
@@ -1247,7 +1247,7 @@ mkFunInput resId e =
       return (Right ((nm,assn++selectionDecls),Wire))
 
     go is0 _ e'@(Let{}) = do
-      tcm <- Lens.use tcCache
+      tcm <- Lens.view tcCache
       let normE = splitNormalized tcm e'
       (_,[],[],_,[],binders,resultM) <- case normE of
         Right norm -> mkUniqueNormalized is0 Nothing norm

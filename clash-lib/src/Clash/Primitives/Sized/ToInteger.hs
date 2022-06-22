@@ -1,5 +1,5 @@
 {-|
-  Copyright   :  (C) 2020 QBayLogic
+  Copyright   :  (C) 2020,2022 QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -70,7 +70,7 @@ toIntegerBB :: HDL -> HWType -> BlackBoxFunction
 toIntegerBB hdl hty _isD _primName args _ty = do
   case args of
     (Right (LitTy (NumTy i)):_) -> do
-      iw <- Lens.use intWidth
+      iw <- Lens.view intWidth
       let i1 = width i
       when (fromInteger i1 > iw) $ do
         (_,sp) <- Lens.use curCompNm
