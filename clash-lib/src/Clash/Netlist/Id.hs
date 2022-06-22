@@ -1,5 +1,6 @@
 {-|
   Copyright  :  (C) 2020, QBayLogic B.V.
+                    2022, Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -24,6 +25,7 @@ module Clash.Netlist.Id
   , Identifier
   , IdentifierType (..)
   , unsafeMake
+  , unsafeFromCoreId
   , toText
   , toLazyText
   , toList
@@ -54,7 +56,8 @@ module Clash.Netlist.Id
 where
 
 import           Clash.Annotations.Primitive (HDL (..))
-import           Clash.Core.Var (Id)
+import           Clash.Core.Name (nameOcc)
+import           Clash.Core.Var (Id, varName)
 import           Clash.Debug (debugIsOn)
 import {-# SOURCE #-} Clash.Netlist.Types
   (PreserveCase(..), HasIdentifierSet(..), IdentifierSet(..), Identifier(..),
@@ -235,3 +238,10 @@ prefix id0 prefix_ = withIdentifierSetM (\is id1 -> prefix# is id1 prefix_) id0
 -- is unique.
 fromCoreId :: (HasCallStack, IdentifierSetMonad m) => Id -> m Identifier
 fromCoreId = withIdentifierSetM fromCoreId#
+
+-- | Like 'fromCoreId, 'unsafeFromCoreId' creates an identifier that will be
+-- spliced at verbatim in the HDL. As opposed to 'fromCoreId', the resulting
+-- Identifier might be generated at a later point as it is NOT added to an
+-- IdentifierSet.
+unsafeFromCoreId :: HasCallStack => Id -> Identifier
+unsafeFromCoreId = unsafeMake . nameOcc . varName

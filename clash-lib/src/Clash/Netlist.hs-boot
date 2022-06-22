@@ -1,7 +1,8 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente
+                     2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 {-# LANGUAGE CPP #-}
 
@@ -10,7 +11,6 @@ module Clash.Netlist
   ,mkExpr
   ,mkDcApplication
   ,mkDeclarations
-  ,mkDeclarations'
   ,mkNetDecl
   ,mkProjection
   ,mkSelection
@@ -23,7 +23,7 @@ import Clash.Core.Type      (Type)
 import Clash.Core.Var       (Id)
 import Clash.Netlist.Types
   (Expr, HWType, Identifier, NetlistMonad, Declaration, NetlistId,
-   DeclarationType, ComponentMeta, Component)
+   ComponentMeta, Component)
 
 import GHC.Stack (HasCallStack)
 
@@ -33,7 +33,6 @@ genComponent :: HasCallStack
 
 mkExpr :: HasCallStack
        => Bool
-       -> DeclarationType
        -> NetlistId
        -> Term
        -> NetlistMonad (Expr,[Declaration])
@@ -54,8 +53,7 @@ mkProjection
   -> NetlistMonad (Expr, [Declaration])
 
 mkSelection
-  :: DeclarationType
-  -> NetlistId
+  :: NetlistId
   -> Term
   -> Type
   -> [Alt]
@@ -65,7 +63,6 @@ mkSelection
 mkNetDecl :: LetBinding -> NetlistMonad [Declaration]
 
 mkDeclarations :: HasCallStack => Id -> Term -> NetlistMonad [Declaration]
-mkDeclarations' :: HasCallStack => DeclarationType -> Id -> Term -> NetlistMonad [Declaration]
 
 mkFunApp
   :: HasCallStack

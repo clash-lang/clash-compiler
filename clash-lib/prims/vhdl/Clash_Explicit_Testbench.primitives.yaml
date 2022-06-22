@@ -154,6 +154,7 @@
       ModelSim and Vivado seem to round time values to an integer number of picoseconds.
               Use two half periods to prevent rounding errors from affecting the full period.
     kind: Declaration
+    outputUsage: NonBlocking
     type: |-
       tbClockGen
         :: KnownDomain dom     -- ARG[0]

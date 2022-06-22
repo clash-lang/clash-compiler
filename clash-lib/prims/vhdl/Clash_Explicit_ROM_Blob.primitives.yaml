@@ -1,6 +1,7 @@
 - BlackBox:
     name: Clash.Explicit.ROM.Blob.romBlob#
     kind: Declaration
+    outputUsage: NonBlocking
     type: |-
       romBlob#
         :: KnownDomain dom  --       ARG[0]

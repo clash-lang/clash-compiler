@@ -1,7 +1,7 @@
 - BlackBox:
     name: Clash.Explicit.ROM.rom#
     kind: Declaration
-    outputReg: true
+    outputUsage: NonBlocking
     type: |-
       rom# :: ( KnownDomain dom        ARG[0]
                , KnownNat n    --       ARG[1]

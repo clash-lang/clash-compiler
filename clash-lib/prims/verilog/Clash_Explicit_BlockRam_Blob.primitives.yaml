@@ -1,7 +1,7 @@
 - BlackBox:
     name: Clash.Explicit.BlockRam.Blob.blockRamBlob#
     kind: Declaration
-    outputReg: true
+    outputUsage: NonBlocking
     type: |-
       blockRamBlob#
         :: KnownDomain dom           --       ARG[0]

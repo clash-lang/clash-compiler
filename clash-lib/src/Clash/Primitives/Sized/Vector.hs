@@ -1,5 +1,6 @@
 {-|
   Copyright   :  (C) 2020-2022 QBayLogic B.V.
+                     2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -16,7 +17,6 @@ import           Control.Monad                      (replicateM)
 import           Control.Monad.State                (State, zipWithM)
 import qualified Control.Lens                       as Lens
 import           Data.Either                        (rights)
-import qualified Data.IntMap                        as IntMap
 import           Data.List.Extra                    (iterateNM)
 import           Data.Maybe                         (fromMaybe)
 import           Data.Monoid                        (Ap(getAp))
@@ -40,13 +40,14 @@ import           Clash.Netlist.BlackBox.Util        (renderElem)
 import           Clash.Netlist.BlackBox.Parser      (runParse)
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TExpr, TDecl),
-   Element(Component, Typ, TypElem, Text), Decl(Decl), emptyBlackBoxMeta)
+   Element(Component, Typ, TypElem, Text), Decl(Decl), emptyBlackBoxMeta,
+  BlackBoxUsage(..))
 import           Clash.Netlist.Types
-  (Identifier, TemplateFunction, BlackBoxContext, HWType(Vector),
+  (Identifier, TemplateFunction, BlackBoxContext, HWType(Vector), Usage(Cont),
    Declaration(..), Expr(Literal, Identifier,DataCon), Literal(NumLit),
-   BlackBox(BBTemplate, BBFunction), TemplateFunction(..), WireOrReg(Wire),
-   Modifier(Indexed, Nested, DC), HWType(..), bbInputs, bbResults, emptyBBContext, tcCache,
-   bbFunctions)
+   BlackBox(BBTemplate, BBFunction), TemplateFunction(..),
+   Modifier(Indexed, Nested, DC), HWType(..), bbInputs, bbResults, emptyBBContext,
+   tcCache, bbHdlStyle, Usage(..), Blocking(..))
 import qualified Clash.Netlist.Id                   as Id
 import           Clash.Netlist.Util                 (typeSize)
 import qualified Clash.Primitives.DSL               as Prim
@@ -142,9 +143,9 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
   vecIds <- replicateM n (Id.next baseId)
 
   vecId <- Id.make "vec"
-  let vecDecl = sigDecl vecType Wire vecId
-      vecAssign = Assignment vecId vec
-      elemAssigns = zipWith Assignment vecIds (map (iIndex vecId) [0..])
+  let vecDecl = sigDecl vecType vecId
+      vecAssign = Assignment vecId Cont vec
+      elemAssigns = zipWith3 Assignment vecIds (repeat Cont) (map (iIndex vecId) [0..])
       resultId =
         case bbResults bbCtx of
           [(Identifier t _, _)] -> t
@@ -155,12 +156,8 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
   (concat -> fCalls, result) <- mkTree 1 vecIds
 
   let intermediateResultIds = concatMap (\(FCall l r _) -> [l, r]) fCalls
-      wr = case IntMap.lookup 0 (bbFunctions bbCtx) of
-             Just ((_,rw,_,_,_,_):_) -> rw
-             _ -> error "internal error"
-      sigDecls = zipWith (sigDecl aTy) (wr:replicate n Wire ++ repeat wr)
-                                       (result : intermediateResultIds)
-      resultAssign = Assignment resultId (Identifier result Nothing)
+      sigDecls = fmap (sigDecl aTy) (result : intermediateResultIds)
+      resultAssign = Assignment resultId Cont (Identifier result Nothing)
 
   callDecls <- zipWithM callDecl [0..] fCalls
   foldNm <- Id.make "fold"
@@ -184,7 +181,7 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
         "__FOLD_BB_INTERNAL__"
         [] [] []
         (BBTemplate [Text rendered1])
-        (emptyBBContext "__FOLD_BB_INTERNAL__")
+        (emptyBBContext "__FOLD_BB_INTERNAL__" (bbHdlStyle bbCtx))
         )
    where
     call  = Component (Decl fPos fSubPos (resEl:aEl:[bEl]))
@@ -229,8 +226,8 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
     pure ([], rest)
 
   -- Simple wire without comment
-  sigDecl :: HWType -> WireOrReg -> Identifier -> Declaration
-  sigDecl typ rw nm = NetDecl' Nothing rw nm (Right typ) Nothing
+  sigDecl :: HWType -> Identifier -> Declaration
+  sigDecl typ nm = NetDecl Nothing nm typ
 
   -- Index the intermediate vector. This uses a hack in Clash: the 10th
   -- constructor of Vec doesn't exist; using it will be interpreted by the
@@ -244,7 +241,10 @@ foldTF' args =
 indexIntVerilog ::  BlackBoxFunction
 indexIntVerilog _isD _primName args _ty = return bb
  where
-  meta bbKi = emptyBlackBoxMeta{bbKind=bbKi}
+  meta bbKi = emptyBlackBoxMeta
+    { bbKind=bbKi
+    , bbOutputUsage=BlackBoxUsage Cont (Proc Blocking)
+    }
 
   bb = case args of
     [_nTy,_aTy,_kn,Left v,Left ix] | isLiteral ix && isVar v ->
@@ -261,6 +261,22 @@ indexIntVerilog _isD _primName args _ty = return bb
 
   bbText = [I.i|
     // index begin
+    ~IF~ISSEQUENTIAL~THEN
+    ~IF~SIZE[~TYP[1]]~THEN
+    begin : ~GENSYM[mk_array][4]
+      integer ~GENSYM[i][5];
+      reg ~TYPO ~GENSYM[vecArray][6] [0:~LIT[0]-1];
+
+      for (~SYM[5] = 0; ~SYM[5] < ~LIT[0]; ~SYM[5] = ~SYM[5] + 1) begin
+        ~SYM[6][(~LIT[0]-1)-~SYM[5]] = ~VAR[vecFlat][1][~SYM[5]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+      end
+
+      ~RESULT = ~SYM[6][~ARG[2]];
+    end
+    ~ELSE
+    ~RESULT = ~ERRORO;
+    ~FI
+    ~ELSE
     ~IF~SIZE[~TYP[1]]~THENwire ~TYPO ~GENSYM[vecArray][0] [0:~LIT[0]-1];
     genvar ~GENSYM[i][2];
     ~GENERATE
@@ -269,13 +285,17 @@ indexIntVerilog _isD _primName args _ty = return bb
     end
     ~ENDGENERATE
     assign ~RESULT = ~SYM[0][~ARG[2]];~ELSEassign ~RESULT = ~ERRORO;~FI
+    ~FI
     // index end|]
 
   bbTextLitIx = [I.i|
     // index lit begin
+    ~IF~ISSEQUENTIAL~THEN
+    ~IF~SIZE[~TYP[1]]~THEN~RESULT = ~VAR[vec][1][~SIZE[~TYP[1]]-1-~LIT[2]*~SIZE[~TYPO] -: ~SIZE[~TYPO]];~ELSE~RESULT = ~ERRORO;~FI
+    ~ELSE
     ~IF~SIZE[~TYP[1]]~THENassign ~RESULT = ~VAR[vec][1][~SIZE[~TYP[1]]-1-~LIT[2]*~SIZE[~TYPO] -: ~SIZE[~TYPO]];~ELSEassign ~RESULT = ~ERRORO;~FI
+    ~FI
     // index lit end|]
-
 
 indexIntVerilogTF :: TemplateFunction
 indexIntVerilogTF = TemplateFunction used valid indexIntVerilogTemplate

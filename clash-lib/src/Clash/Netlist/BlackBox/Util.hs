@@ -3,6 +3,7 @@
                     2016-2017, Myrtle Software Ltd,
                     2021-2022, QBayLogic B.V.
                     2022     , LUMI GUIDE FIETSDETECTIE B.V.
+                    2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -71,6 +72,8 @@ import qualified Clash.Util.Interpolate          as I
 
 import           Clash.Annotations.Primitive     (HDL(VHDL))
 
+import Clash.Debug
+
 inputHole :: Element -> Maybe Int
 inputHole = \case
   Text _           -> Nothing
@@ -117,13 +120,14 @@ inputHole = \case
   IsActiveEnable n -> pure n
   IsUndefined n    -> pure n
   StrCmp _ n       -> pure n
-  OutputWireReg n  -> pure n
+  OutputUsage n    -> pure n
   Vars n           -> pure n
   GenSym _ _       -> Nothing
   Repeat _ _       -> Nothing
   DevNull _        -> Nothing
   SigD _ nM        -> nM
   CtxName          -> Nothing
+  IsSequential     -> Nothing
 
 -- | Determine if the number of normal/literal/function inputs of a blackbox
 -- context at least matches the number of argument that is expected by the
@@ -224,10 +228,13 @@ setSym bbCtx l = do
           case varM of
             Nothing -> do
               nm' <- lift (Id.make (Text.toStrict (concatT (Text "c$":nm))))
+              let u = case bbHdlStyle bbCtx of
+                          N.Concurrent -> N.Cont
+                          N.Sequential -> N.Proc N.Blocking
               let decls = case typeSize hwTy of
                     0 -> []
                     _ -> [N.NetDecl Nothing nm' hwTy
-                         ,N.Assignment nm' e'
+                         ,N.Assignment nm' u e'
                          ]
               _2 %= (IntMap.insert i (Id.toText nm',decls))
               return (ToVar [Text (Id.toLazyText nm')] i)
@@ -397,18 +404,23 @@ renderElem b (Component (Decl n subN (l:ls))) = do
                     , show (subN +1 ), " got only ", show (length (fromJust func0)) ]
       func1 = indexNote' errr subN <$> func0
       Just (templ0,_,libs,imps,inc,pCtx) = func1
-      b' = pCtx { bbResults = [(o,oTy)], bbInputs = bbInputs pCtx ++ is }
+      b' = pCtx { bbResults = [(o,oTy)], bbInputs = bbInputs pCtx ++ is, bbHdlStyle = bbHdlStyle b }
       layoutOptions = LayoutOptions (AvailablePerLine 120 0.4)
       render = N.BBTemplate . parseFail . renderLazy . layoutPretty layoutOptions
+
+  traceM ("func1: " <> show (bbName pCtx))
 
   templ1 <-
     case templ0 of
       Left t ->
-        return t
+        traceM "templ0: Left" >> return t
       Right (nm0,ds) -> do
+        traceM "templ0: Right"
         nm1 <- Id.next nm0
         block <- getAp (blockDecl nm1 ds)
         return (render block)
+
+  traceM ("templ1: " <> show templ1)
 
   templ4 <-
     case templ1 of
@@ -602,6 +614,10 @@ renderElem b (IF c t f) = do
       CmpLE e1 e2 -> if check xOpt iw hdl syn enums e1 <= check xOpt iw hdl syn enums e2
                         then 1
                         else 0
+
+      IsSequential -> case bbHdlStyle b of
+                        N.Concurrent -> 0
+                        N.Sequential -> 1
       _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGTH, LIT, DEPTH, IW64, VIVADO, OTHERSYN, ISVAR, ISLIT, ISUNDEFINED, ISACTIVEENABLE, ACTIVEEDGE, ISSYNC, ISINITDEFINED, ISACTIVEHIGH, STRCMP, AND, ISSCALAR or CMPLE."
                              ++ "\nGot: " ++ show c'
 renderElem b e = fmap const (renderTag b e)
@@ -789,9 +805,19 @@ renderTag b (FilePath e)    = case e of
 renderTag b (IncludeName n) = case indexMaybe (bbQsysIncName b) n of
   Just nm -> return (Text.fromStrict nm)
   _ -> error $ $(curLoc) ++ "~INCLUDENAME[" ++ show n ++ "] does not correspond to any index of the 'includes' field that is specified in the primitive definition"
-renderTag b (OutputWireReg n) = case IntMap.lookup n (bbFunctions b) of
-  Just ((_,rw,_,_,_,_):_) -> case rw of {N.Wire -> return "wire"; N.Reg -> return "reg"}
-  _ -> error $ $(curLoc) ++ "~OUTPUTWIREREG[" ++ show n ++ "] used where argument " ++ show n ++ " is not a function"
+renderTag b (OutputUsage n) = do
+  hdl <- gets hdlKind
+
+  let u = case IntMap.lookup n (bbFunctions b) of
+            Just ((_,u',_,_,_,_):_) -> u'
+            _ -> error $ $(curLoc) ++ "~OUTPUTUSAGE[" ++ show n ++ "] used where argument " ++ show n ++ " is not a function"
+
+  pure $ case (hdl, u) of
+    (VHDL, N.Proc N.Blocking) -> "variable"
+    (VHDL, _) -> "signal"
+
+    (_, N.Cont) -> "wire"
+    (_, _) -> "reg"
 renderTag b (Repeat [es] [i]) = do
   i'  <- Text.unpack <$> renderTag b i
   es' <- renderTag b es
@@ -1033,7 +1059,7 @@ prettyElem (SigD es mI) = do
            (((string "~SIGD" <> brackets (string es')) <>) . int)
            mI)
 prettyElem (Vars i) = renderOneLine <$> (string "~VARS" <> brackets (int i))
-prettyElem (OutputWireReg i) = renderOneLine <$> (string "~RESULTWIREREG" <> brackets (int i))
+prettyElem (OutputUsage n) = renderOneLine <$> (string "~OUTPUTUSAGE" <> brackets (int n))
 prettyElem (ArgGen n x) =
   renderOneLine <$> (string "~ARGN" <> brackets (int n) <> brackets (int x))
 prettyElem (Template bbname source) = do
@@ -1043,6 +1069,7 @@ prettyElem (Template bbname source) = do
                                   <> brackets (string $ Text.concat bbname')
                                   <> brackets (string $ Text.concat source'))
 prettyElem CtxName = return "~CTXNAME"
+prettyElem IsSequential = return "~ISSEQUENTIAL"
 
 -- | Recursively walk @Element@, applying @f@ to each element in the tree.
 walkElement
@@ -1108,11 +1135,12 @@ walkElement f el = maybeToList (f el) ++ walked
         IsActiveEnable _ -> []
         IsUndefined _ -> []
         StrCmp es _ -> concatMap go es
-        OutputWireReg _ -> []
+        OutputUsage _ -> []
         Vars _ -> []
         Repeat es1 es2 ->
           concatMap go es1 ++ concatMap go es2
         CtxName -> []
+        IsSequential -> []
 
 -- | Determine variables used in an expression. Used for VHDL sensitivity list.
 -- Also see: https://github.com/clash-lang/clash-compiler/issues/365
@@ -1186,7 +1214,7 @@ getUsedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
         IW64 -> Nothing
         Length _ -> Nothing
         MaxIndex _ -> Nothing
-        OutputWireReg _ -> Nothing
+        OutputUsage _ -> Nothing
         Repeat _ _ -> Nothing
         Result -> Nothing
         Sel _ _ -> Nothing
@@ -1201,6 +1229,7 @@ getUsedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
         TypM _ -> Nothing
         Vars _ -> Nothing
         CtxName -> Nothing
+        IsSequential -> Nothing
 
 onBlackBox
   :: (BlackBoxTemplate -> r)
