@@ -117,14 +117,9 @@ genNetlist
   -- ^ Name of the @topEntity@
   -> IO (Component, ComponentMap, IdentifierSet)
 genNetlist env isTb globals tops topNames typeTrans ite be seen0 dir prefixM topEntity = do
-  let opts = envOpts env
-  let reprs = envCustomReprs env
-  let primMap = envPrimitives env
-  let tcm = envTyConMap env
-  let iw = opt_intWidth opts
   ((_meta, topComponent), s) <-
-    runNetlistMonad isTb opts reprs globals tops primMap tcm typeTrans
-                    iw ite be seen1 dir componentNames_ $ genComponent topEntity
+    runNetlistMonad env isTb globals tops typeTrans ite be seen1 dir componentNames_
+      $ genComponent topEntity
   return (topComponent, _components s, seen1)
  where
   (componentNames_, seen1) =
@@ -132,25 +127,16 @@ genNetlist env isTb globals tops topNames typeTrans ite be seen0 dir prefixM top
 
 -- | Run a NetlistMonad action in a given environment
 runNetlistMonad
-  :: Bool
+  :: ClashEnv
+  -> Bool
   -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
-  -> ClashOpts
-  -- ^ Options Clash was called with
-  -> CustomReprs
-  -- ^ Custom bit representations for certain types
   -> BindingMap
   -- ^ Global binders
   -> VarEnv TopEntityT
   -- ^ TopEntity annotations
-  -> CompiledPrimMap
-  -- ^ Primitive Definitions
-  -> TyConMap
-  -- ^ TyCon cache
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcode Type -> HWType translator
-  -> Int
-  -- ^ Int/Word/Integer bit-width
   -> Bool
   -- ^ Whether the backend supports ifThenElse expressions
   -> SomeBackend
@@ -164,9 +150,8 @@ runNetlistMonad
   -> NetlistMonad a
   -- ^ Action to run
   -> IO (a, NetlistState)
-runNetlistMonad isTb opts reprs s tops p tcm typeTrans iw
-                ite be seenIds_ env componentNames_
-  = flip runReaderT (NetlistEnv "" "" Nothing)
+runNetlistMonad env isTb s tops typeTrans ite be seenIds_ dir componentNames_
+  = flip runReaderT (NetlistEnv env "" "" Nothing)
   . flip runStateT s'
   . runNetlist
   where
@@ -174,20 +159,15 @@ runNetlistMonad isTb opts reprs s tops p tcm typeTrans iw
       NetlistState
         { _bindings=s
         , _components=OMap.empty
-        , _primitives=p
         , _typeTranslator=typeTrans
-        , _tcCache=tcm
         , _curCompNm=(error "genComponent should have set _curCompNm", noSrcSpan)
-        , _intWidth=iw
         , _seenIds=seenIds_
         , _seenComps=seenIds_
         , _seenPrimitives=Set.empty
         , _componentNames=componentNames_
         , _topEntityAnns=tops
-        , _hdlDir=env
+        , _hdlDir=dir
         , _curBBlvl=0
-        , _customReprs=reprs
-        , _clashOpts=opts
         , _isTestBench=isTb
         , _backEndITE=ite
         , _backend=be
@@ -271,7 +251,7 @@ genComponentT
   -- ^ Corresponding term
   -> NetlistMonad (ComponentMeta, Component)
 genComponentT compName0 componentExpr = do
-  tcm <- Lens.use tcCache
+  tcm <- Lens.view tcCache
   compName1 <- (`lookupVarEnv'` compName0) <$> Lens.use componentNames
   sp <- (bindingLoc . (`lookupVarEnv'` compName0)) <$> Lens.use bindings
   curCompNm .= (compName1, sp)
@@ -335,7 +315,7 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
 
   where
     multiDecls pInfo args0 = do
-      tcm <- Lens.use tcCache
+      tcm <- Lens.view tcCache
       resInits0 <- getResInits (id_, tm)
       let
         resInits1 = map Just resInits0 <> repeat Nothing
@@ -376,7 +356,7 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
 
     termToWireOrReg :: Term -> NetlistMonad WireOrReg
     termToWireOrReg (stripTicks -> Case scrut _ alts0@(_:_:_)) = do
-      tcm <- Lens.use tcCache
+      tcm <- Lens.view tcCache
       let scrutTy = inferCoreTypeOf tcm scrut
       scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
       ite <- Lens.use backEndITE
@@ -384,7 +364,7 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
         Just _ | ite -> return Wire
         _ -> return Reg
     termToWireOrReg (collectArgs -> (Prim p,_)) = do
-      bbM <- HashMap.lookup (primName p) <$> Lens.use primitives
+      bbM <- HashMap.lookup (primName p) <$> Lens.view primitives
       case bbM of
         Just (extractPrim -> Just BlackBox {..}) | outputReg -> return Reg
         _ | primName p == "Clash.Explicit.SimIO.mealyIO" -> return Reg
@@ -398,7 +378,7 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
       _ -> return []
      where
       go pInfo (BlackBox {resultInits=nmDs, multiResult=True}) = withTicks ticks $ \_ -> do
-        tcm <- Lens.use tcCache
+        tcm <- Lens.view tcCache
         let (args1, res) = splitMultiPrimArgs (multiPrimInfo' tcm pInfo) args0
         (bbCtx, _) <- mkBlackBoxContext (primName pInfo) res args1
         mapM (go' (primName pInfo) bbCtx) nmDs
@@ -513,7 +493,7 @@ mkSelection
   -> NetlistMonad [Declaration]
 mkSelection declType bndr scrut altTy alts0 tickDecls = do
   let dstId = netlistId1 id id2identifier bndr
-  tcm <- Lens.use tcCache
+  tcm <- Lens.view tcCache
   let scrutTy = inferCoreTypeOf tcm scrut
   scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
   scrutId  <- Id.suffix dstId "selection"
@@ -548,7 +528,7 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
           -> return $! scrutDecls ++ altTDecls ++ altFDecls ++ tickDecls ++
                 [Assignment dstId (IfThenElse scrutExpr altTExpr altFExpr)]
     _ -> do
-      reprs <- Lens.use customReprs
+      reprs <- Lens.view customReprs
       let alts1 = (reorderDefault . reorderCustom tcm reprs scrutTy) alts0
       (scrutExpr,scrutDecls) <- first (mkScrutExpr sp scrutHTy (fst (head alts1))) <$>
                                   mkExpr True declType (NetlistId scrutId scrutTy) scrut
@@ -657,7 +637,7 @@ mkFunApp
   -> NetlistMonad [Declaration]
 mkFunApp dstId fun args tickDecls = do
   topAnns <- Lens.use topEntityAnns
-  tcm     <- Lens.use tcCache
+  tcm     <- Lens.view tcCache
   case (isGlobalId fun, lookupVarEnv fun topAnns) of
     (True, Just topEntity)
       | let ty = coreTypeOf (topId topEntity)
@@ -835,7 +815,7 @@ mkExpr :: HasCallStack
        -> Term -- ^ Term to convert to an expression
        -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
 mkExpr _ _ _ (stripTicks -> Core.Literal l) = do
-  iw <- Lens.use intWidth
+  iw <- Lens.view intWidth
   case l of
     IntegerLiteral i -> return (HW.Literal (Just (Signed iw,iw)) $ NumLit i, [])
     IntLiteral i     -> return (HW.Literal (Just (Signed iw,iw)) $ NumLit i, [])
@@ -884,7 +864,7 @@ mkExpr bbEasD declType bndr app =
                    , NetDecl' Nothing Wire argNm (Right hwTyA) Nothing:decls)
     Case scrut ty' [alt] -> mkProjection bbEasD bndr scrut ty' alt
     Case scrut tyA alts -> do
-      tcm <- Lens.use tcCache
+      tcm <- Lens.view tcCache
       let scrutTy = inferCoreTypeOf tcm scrut
       scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
       ite <- Lens.use backEndITE
@@ -922,7 +902,7 @@ mkProjection
   -- ^ The field to be projected
   -> NetlistMonad (Expr, [Declaration])
 mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
-  tcm <- Lens.use tcCache
+  tcm <- Lens.view tcCache
   let scrutTy = inferCoreTypeOf tcm scrut
       e = Case scrut scrutTy [alt]
   (_,sp) <- Lens.use curCompNm
@@ -1014,7 +994,7 @@ mkDcApplication
     -- ^ Returned expression and a list of generate BlackBox declarations
 mkDcApplication [dstHType] bndr dc args = do
   let dcNm = nameOcc (dcName dc)
-  tcm <- Lens.use tcCache
+  tcm <- Lens.view tcCache
   let argTys = map (inferCoreTypeOf tcm) args
   argNm <- netlistId1 return (\b -> Id.suffix (id2identifier b) "_dc_arg") bndr
   argHWTys <- mapM coreTypeToHWTypeM' argTys
@@ -1148,7 +1128,7 @@ mkDcApplication [dstHType] bndr dc args = do
 
 -- Handle MultiId assignment
 mkDcApplication dstHTypes (MultiId argNms) _ args = do
-  tcm                 <- Lens.use tcCache
+  tcm                 <- Lens.view tcCache
   let argTys          = map (inferCoreTypeOf tcm) args
   argHWTys            <- mapM coreTypeToHWTypeM' argTys
   -- Filter out the arguments of hwtype `Void` and only translate
