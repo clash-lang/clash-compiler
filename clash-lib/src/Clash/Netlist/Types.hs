@@ -74,7 +74,7 @@ import Clash.Core.Type                      (Type)
 import Clash.Core.Var                       (Attr', Id)
 import Clash.Core.TyCon                     (TyConMap)
 import Clash.Core.VarEnv                    (VarEnv)
-import Clash.Driver.Types                   (BindingMap, ClashOpts)
+import Clash.Driver.Types                   (BindingMap, ClashEnv(..), ClashOpts(..))
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Primitives.Types               (CompiledPrimMap)
 import Clash.Signal.Internal
@@ -270,7 +270,8 @@ instance Ord Identifier where
 -- | Environment of the NetlistMonad
 data NetlistEnv
   = NetlistEnv
-  { _prefixName  :: Text
+  { _clashEnv :: ClashEnv
+  , _prefixName  :: Text
   -- ^ Prefix for instance/register names
   , _suffixName :: Text
   -- ^ Postfix for instance/register names
@@ -294,15 +295,10 @@ data NetlistState
   , _components     :: ComponentMap
   -- ^ Cached components. Is an insertion ordered map to preserve a topologically
   -- sorted component list for the manifest file.
-  , _primitives     :: CompiledPrimMap
-  -- ^ Primitive Definitions
   , _typeTranslator :: CustomReprs -> TyConMap -> Type
                     -> Strict.State HWMap (Maybe (Either String FilteredHWType))
   -- ^ Hardcoded Type -> HWType translator
-  , _tcCache        :: TyConMap
-  -- ^ TyCon cache
   , _curCompNm      :: !(Identifier,SrcSpan)
-  , _intWidth       :: Int
   , _seenIds        :: IdentifierSet
   -- ^ All names currently in scope.
   , _seenComps      :: IdentifierSet
@@ -335,9 +331,6 @@ data NetlistState
   , _hdlDir         :: FilePath
   , _curBBlvl       :: Int
   -- ^ The current scoping level assigned to black box contexts
-  , _customReprs    :: CustomReprs
-  , _clashOpts      :: ClashOpts
-  -- ^ Settings Clash was called with
   , _isTestBench    :: Bool
   -- ^ Whether we're compiling a testbench (suppresses some warnings)
   , _backEndITE :: Bool
@@ -823,6 +816,21 @@ emptyBBContext name
 
 Lens.makeLenses ''NetlistEnv
 Lens.makeLenses ''NetlistState
+
+intWidth :: Lens.Getter NetlistEnv Int
+intWidth = clashEnv . Lens.to (opt_intWidth . envOpts)
+
+customReprs :: Lens.Getter NetlistEnv CustomReprs
+customReprs = clashEnv . Lens.to envCustomReprs
+
+tcCache :: Lens.Getter NetlistEnv TyConMap
+tcCache = clashEnv . Lens.to envTyConMap
+
+primitives :: Lens.Getter NetlistEnv CompiledPrimMap
+primitives = clashEnv . Lens.to envPrimitives
+
+clashOpts :: Lens.Getter NetlistEnv ClashOpts
+clashOpts = clashEnv . Lens.to envOpts
 
 -- | Structures that hold an 'IdentifierSet'
 class HasIdentifierSet s where
