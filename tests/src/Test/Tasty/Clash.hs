@@ -395,11 +395,13 @@ vivadoTests
   -> String
   -> [(TestName, TestTree)]
 vivadoTests target opts tmpDir modName =
-  [ ( "Vivado"
+  [ ( buildName t
     , singleTest "Vivado" (VivadoTest target tmpDir modName t)
     )
   | t <- getBuildTargets opts
   ]
+ where
+  buildName t = "Vivado (sim " <> t <> ")"
 
 -- | Generate a test tree for running SymbiYosys
 sbyTests :: TestOptions -> IO FilePath -> ([(TestName, TestTree)])
