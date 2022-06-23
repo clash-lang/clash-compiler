@@ -764,14 +764,12 @@ compInBlock
   -> [(Text, HWType)]
   -- ^ out ports
   -> State (BlockState backend) ()
-compInBlock compName inPorts outPorts =
-
-  let inPorts' = mkPort In <$> inPorts
-      outPorts' = mkPort Out <$> outPorts
-  in addComponent $ VHDLComp compName (inPorts' ++ outPorts')
-
+compInBlock compName inPorts0 outPorts0 =
+  addComponent (VHDLComp compName (inPorts1 ++ outPorts1))
  where
-  mkPort inOut (nm,ty) = (nm,inOut,ty)
+  mkPort inOut (nm, ty) = (nm, inOut, ty)
+  inPorts1 = mkPort In <$> inPorts0
+  outPorts1 = mkPort Out <$> outPorts0
 
 -- | Instantiate a component/entity in a block state.
 instDecl
