@@ -1,6 +1,5 @@
 {-|
   Copyright   :  (C) 2020, Foamspace corp & Christoph Mayer
-                     2022, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  hcab14@gmail.com
 
@@ -42,7 +41,7 @@ bbTemplate bbCtx = do
 
   compName <- Id.addRaw (TextS.pack compName')
 
-  getAp $ blockDecl bb [] $
+  getAp $ blockDecl bb $
     [ NetDecl Nothing dIn Bit
     , InstDecl Comp Nothing [] compName bb_inst
       [

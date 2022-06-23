@@ -35,7 +35,7 @@ import qualified Data.HashMap.Strict                  as HashMapS
 import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
 import           Data.List
-  (mapAccumL, nub, nubBy, intersperse, group, sort)
+  (mapAccumL, nub, nubBy, partition, intersperse, group, sort)
 import           Data.List.Extra                      ((<:>), equalLength, zipEqual)
 import           Data.Maybe                           (catMaybes,mapMaybe)
 import           Data.Monoid                          (Ap(Ap))
@@ -239,24 +239,32 @@ instance Backend VHDLState where
   getTopName      = use topNm
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
-  blockDecl nm cs ds = do
+  blockDecl nm ds = do
     decs <- decls ds
     let attrs = [ (id_, attr)
                 | NetDecl' _ _ id_ (Right hwtype) _ <- ds
                 , attr <- hwTypeAttrs hwtype]
     if isEmpty decs
-       then insts ds
+       then insts ids
        else nest 2
               (pretty nm <+> colon <+> "block" <> line <>
                pure decs <>
-               if null attrs
+               (if null attrs
                 then emptyDoc
-                else line <> line <> renderAttrs (TextS.pack "signal") attrs) <> line <>
+                else line <> line <> renderAttrs (TextS.pack "signal") attrs) <>
+               if null cds
+                then emptyDoc
+                else line <> line <> insts cds) <>
             nest 2
-              (renderCompDecls cs
-              <> "begin" <> line <>
-                insts ds) <> line <>
+              ("begin" <> line <>
+                insts ids) <> line <>
             "end block" <> semi
+   where
+     (cds, ids) = partition isCompDecl ds
+
+     isCompDecl (CompDecl {}) = True
+     isCompDecl _             = False
+
   addIncludes inc = includes %= (inc++)
   addLibraries libs = libraries %= (libs ++)
   addImports imps = packages %= (imps ++)
@@ -1431,14 +1439,6 @@ patLitCustom _ x y = error $ $(curLoc) ++ unwords
   [ "You can only pass CustomSP / CustomSum and a NumLit to this function,"
   , "not", show x, "and", show y]
 
-renderCompDecls :: [CompDecl] -> VHDLM Doc
-renderCompDecls [] = emptyDoc
-renderCompDecls (c0:cs) = do
-  c1 <- renderCompDecl c0
-  case c1 of
-    Just doc -> pure doc <> line <> line <> renderCompDecls cs
-    _ -> renderCompDecls cs
-
 insts :: [Declaration] -> VHDLM Doc
 insts [] = emptyDoc
 insts (TickDecl (Comment c):ds) = comment "--" c <> line <> insts ds
@@ -1472,18 +1472,17 @@ inst_' id_ scrut scrutTy es = fmap Just $
                                               <+> "else"
                                               <:> conds es'
 
-renderCompDecl :: CompDecl -> VHDLM (Maybe Doc)
-renderCompDecl (VHDLComp nm ps0) =
-  fmap Just $ "component" <+> pretty nm <+>
-    nest 2 ("port" <> line <> tupledSemi ps <> semi)
-    <> line <> "end component" <> semi
-  where ps = traverse (\(t,pd,ty) -> pretty t <+> ":" <+> ppd pd <+> qualTyName ty) ps0
-        ppd = \case { In -> "in"; Out -> "out"}
-
 -- | Turn a Netlist Declaration to a VHDL concurrent block
 inst_ :: Declaration -> VHDLM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
   pretty id_ <+> larrow <+> align (expr_ False e) <> semi
+
+inst_ (CompDecl nm ps0) =
+  fmap Just $ "component" <+> pretty nm <+>
+    ("port" <> line <> indent 2 (tupledSemi ps <> semi))
+    <> line <> "end component" <> semi
+  where ps = traverse (\(t,pd,ty) -> pretty t <+> ":" <+> ppd pd <+> qualTyName ty) ps0
+        ppd = \case { In -> "in"; Out -> "out"}
 
 inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
   pretty id_ <+> larrow

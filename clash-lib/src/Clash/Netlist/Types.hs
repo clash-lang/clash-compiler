@@ -24,7 +24,6 @@
 
 module Clash.Netlist.Types
   ( Declaration (..,NetDecl)
-  , CompDecl (..)
   , module Clash.Netlist.Types
   )
 where
@@ -499,13 +498,6 @@ data PortMap
   --
   deriving (Show)
 
--- | @component@ declaration, VHDL-only.
---
--- These are necessary to specify type, port direction, see
--- [this reference](https://www.ics.uci.edu/~jmoorkan/vhdlref/compdec.html)
--- on components in VHDL.
-data CompDecl = VHDLComp !Text [(Text, PortDirection, HWType)]
-
 -- | Internals of a Component
 data Declaration
   -- | Signal assignment
@@ -539,6 +531,14 @@ data Declaration
       [((Text,Text),BlackBox)] -- ^ Intel Quartus only: create a @.qsys@ file from given template
       !BlackBox                -- ^ Template tokens
       BlackBoxContext          -- ^ Context in which tokens should be rendered
+
+  -- | @component@ declaration (VHDL).
+  --
+  -- See [this tutorial](https://www.ics.uci.edu/~jmoorkan/vhdlref/compdec.html);
+  -- refer to §4.5 of IEEE 1076-1993
+  | CompDecl
+      !Text
+      [(Text, PortDirection, HWType)]
 
   -- | Signal declaration
   | NetDecl'

@@ -28,7 +28,7 @@ funcTF = N.TemplateFunction [] (const True) $ \bbCtx -> do
     [maybeInput] = P.map fst (DSL.tInputs bbCtx)
     [tResult] = P.map DSL.ety (DSL.tResults bbCtx)
 
-  DSL.declarationReturn bbCtx "func_block" (pure ()) $ do
+  DSL.declarationReturn bbCtx "func_block" $ do
     (constrBit, contents) <- DSL.deconstructMaybe maybeInput ("enable", "data")
     pure [DSL.constructProduct tResult [constrBit, contents]]
 

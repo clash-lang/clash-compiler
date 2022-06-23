@@ -42,7 +42,7 @@ myAddTemplate bbCtx = do
   blockId <- Id.make "my_add_block"
   myAddInstId <- Id.make "my_add_inst"
   let myAddId = Id.unsafeMake "my_add"
-  getAp $ blockDecl blockId []
+  getAp $ blockDecl blockId
     [ InstDecl Comp Nothing [] myAddId myAddInstId
         [ (instPort "size", Integer, Literal Nothing (NumLit . fromIntegral $ typeSize xTy))
         ]

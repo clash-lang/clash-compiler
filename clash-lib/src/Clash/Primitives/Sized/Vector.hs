@@ -91,7 +91,7 @@ iterateTF' bbCtx
     ] <- tInputs bbCtx
   , let aTemplateType = [TypElem (Typ (Just 2))]
   , let inst arg = instHO bbCtx 1 (aType, aTemplateType) [(arg, aTemplateType)]
-  = declarationReturn bbCtx "iterateI" (pure ()) (fmap pure . Prim.vec =<< iterateNM (fromInteger n) inst a)
+  = declarationReturn bbCtx "iterateI" (fmap pure . Prim.vec =<< iterateNM (fromInteger n) inst a)
   | otherwise
   =  error $ "Unexpected number of arguments: " ++ show (length (bbInputs bbCtx))
 
@@ -165,7 +165,7 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
   callDecls <- zipWithM callDecl [0..] fCalls
   foldNm <- Id.make "fold"
 
-  getAp $ blockDecl foldNm [] $
+  getAp $ blockDecl foldNm $
     resultAssign :
     vecAssign :
     vecDecl :

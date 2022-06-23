@@ -169,7 +169,7 @@ instance Backend SystemVerilogState where
   getTopName      = use topNm
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
-  blockDecl _ _ ds  = do
+  blockDecl _ ds  = do
     decs <- decls ds
     if isEmpty decs
       then insts ds
@@ -786,6 +786,8 @@ inst_' id_ scrut scrutTy es = fmap Just $
 -- | Turn a Netlist Declaration to a SystemVerilog concurrent block
 inst_ :: Declaration -> SystemVerilogM (Maybe Doc)
 inst_ (TickDecl {}) = return Nothing
+
+inst_ (CompDecl {}) = return Nothing
 
 inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> pretty id_ <+> equals <+> align (expr_ False e <> semi)

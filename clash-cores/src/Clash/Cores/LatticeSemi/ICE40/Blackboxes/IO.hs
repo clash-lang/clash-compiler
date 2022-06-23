@@ -1,6 +1,5 @@
 {-|
   Copyright   :  (C) 2019, Foamspace corp
-                     2022, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -70,7 +69,7 @@ sbioTemplate bbCtx = do
         , Identifier dIn1 Nothing
         ]
 
-  getAp $ blockDecl sbio [] $
+  getAp $ blockDecl sbio $
     [ NetDecl Nothing dIn0 Bit
     , NetDecl Nothing dIn1 Bit
     , InstDecl Comp Nothing [] compName sbio_inst

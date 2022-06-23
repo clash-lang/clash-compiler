@@ -33,7 +33,7 @@ myMultiplyTemplate
 myMultiplyTemplate bbCtx = do
   x <- Id.make "x123456"
   y <- Id.make "y123456"
-  getAp $ blockDecl x [] [NetDecl Nothing y Bool]
+  getAp $ blockDecl x [NetDecl Nothing y Bool]
 
 
 {-# ANN myMultiply (InlinePrimitive [VHDL] "[ { \"BlackBox\" : { \"name\" : \"TemplateFunction.myMultiply\", \"kind\": \"Declaration\", \"format\": \"Haskell\", \"templateFunction\": \"TemplateFunction.myMultiplyTF\"}} ]") #-}

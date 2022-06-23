@@ -106,7 +106,7 @@ checkTF'
   -> State s Doc
 checkTF' decls (clk, clkId) propName renderAs prop bbCtx = do
   blockName <- Id.makeBasic (propName <> "_block")
-  getAp (blockDecl blockName [] (renderedPslProperty : decls))
+  getAp (blockDecl blockName (renderedPslProperty : decls))
 
  where
   hdl = hdlKind (undefined :: s)
