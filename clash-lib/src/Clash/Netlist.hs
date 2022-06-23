@@ -83,6 +83,7 @@ import           Clash.Core.VarEnv
 import           Clash.Driver.Types               (BindingMap, Binding(..), ClashEnv(..), ClashOpts (..))
 import           Clash.Netlist.BlackBox
 import qualified Clash.Netlist.Id                 as Id
+import           Clash.Netlist.Scope              (emptyScope)
 import           Clash.Netlist.Types              as HW
 import           Clash.Netlist.Util
 import           Clash.Primitives.Types           as P
@@ -174,6 +175,7 @@ runNetlistMonad env isTb s tops typeTrans ite be seenIds_ dir componentNames_
         , _backend=be
         , _htyCache=mempty
         , _usageMap=mempty
+        , _scope=emptyScope
         }
 
 -- | Generate names for all binders in "BindingMap", except for the ones already
@@ -258,6 +260,7 @@ genComponentT compName0 componentExpr = do
   sp <- (bindingLoc . (`lookupVarEnv'` compName0)) <$> Lens.use bindings
   curCompNm .= (compName1, sp)
   usageMap .= mempty
+  scope .= emptyScope
 
   topEntityTM <- lookupVarEnv compName0 <$> Lens.use topEntityAnns
   let topAnnMM = topAnnotation <$> topEntityTM

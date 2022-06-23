@@ -28,6 +28,11 @@ data Expr
 data BlackBox
 data TopEntityT
 
+data DeclarationType = Concurrent | Sequential
+
+instance Eq DeclarationType
+instance Show Declaration
+instance Show DeclarationType
 instance NFData BlackBox
 
 class Monad m => IdentifierSetMonad m where

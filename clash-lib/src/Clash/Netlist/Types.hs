@@ -80,6 +80,7 @@ import Clash.Core.TyCon                     (TyConMap)
 import Clash.Core.VarEnv                    (VarEnv)
 import Clash.Driver.Types                   (BindingMap, ClashEnv(..), ClashOpts(..))
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
+import Clash.Netlist.Scope                  (Scope)
 import Clash.Primitives.Types               (CompiledPrimMap)
 import Clash.Signal.Internal
   (ResetPolarity, ActiveEdge, ResetKind, InitBehavior)
@@ -343,10 +344,15 @@ data NetlistState
   , _backend :: SomeBackend
   -- ^ The current HDL backend
   , _htyCache :: HWMap
+  -- ^ Cache of results from calls to 'coreTypeToHWTypeM' and
+  -- 'unsafeCoreTypeToHWTypeM'.
   , _usageMap :: UsageMap
   -- ^ The current way signals are assigned in netlist. This is used to
   -- determine how signals are rendered in HDL (i.e. wire/reg in Verilog, or
   -- signal/variable in VHDL).
+  , _scope :: Scope
+  -- ^ Currently generated netlist, stored in a type which allows convenient
+  -- rearranging of netlist within lexical scopes.
   }
 
 data ComponentPrefix
@@ -922,6 +928,7 @@ netlistTypes1 = \case
 data DeclarationType
   = Concurrent
   | Sequential
+  deriving (Eq, Show)
 
 emptyBBContext :: Text -> BlackBoxContext
 emptyBBContext name
