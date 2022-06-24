@@ -1,0 +1,1 @@
++CHANGED: Use `$stop` in `assert` instead of `$finish`. This harmonizes VHDL and SystemVerilog simulations and will properly set an exit code. See [#2258](https://github.com/clash-lang/clash-compiler/pull/2258).
