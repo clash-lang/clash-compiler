@@ -86,7 +86,7 @@ import           Clash.Core.VarEnv
   (extendInScopeSet, mkInScopeSet, lookupVarEnv, uniqAway, unitVarSet)
 import {-# SOURCE #-} Clash.Netlist
   (genComponent, mkDcApplication, mkDeclarations, mkExpr, mkNetDecl,
-   mkProjection, mkSelection, mkFunApp, mkDeclarations')
+   mkProjection, mkSelection, mkFunApp)
 import qualified Clash.Backend                 as Backend
 import           Clash.Debug                   (debugIsOn)
 import           Clash.Driver.Types
@@ -305,18 +305,18 @@ mkArgument bbName bndr nArg e = do
         (C.Literal (NaturalLiteral n), [],_) ->
           return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit n),hwTy,True),[])
         (Prim pinfo,args,ticks) -> withTicks ticks $ \tickDecls -> do
-          (e',d) <- mkPrimitive True False Concurrent (NetlistId bndr ty) pinfo args tickDecls
+          (e',d) <- mkPrimitive True False (NetlistId bndr ty) pinfo args tickDecls
           case e' of
             (Identifier _ _) -> return ((e',hwTy,False), d)
             _                -> return ((e',hwTy,isLiteral e), d)
         (Data dc, args,_) -> do
-          (exprN,dcDecls) <- mkDcApplication Concurrent [hwTy] (NetlistId bndr ty) dc (lefts args)
+          (exprN,dcDecls) <- mkDcApplication [hwTy] (NetlistId bndr ty) dc (lefts args)
           return ((exprN,hwTy,isLiteral e),dcDecls)
         (Case scrut ty' [alt],[],_) -> do
           (projection,decls) <- mkProjection False (NetlistId bndr ty) scrut ty' alt
           return ((projection,hwTy,False),decls)
         (Let _bnds _term, [], _ticks) -> do
-          (exprN, letDecls) <- mkExpr False Concurrent (NetlistId bndr ty) e
+          (exprN, letDecls) <- mkExpr False (NetlistId bndr ty) e
           return ((exprN,hwTy,False),letDecls)
         _ -> do
           let errMsg = [I.i|
@@ -396,8 +396,6 @@ mkPrimitive
   -- ^ Put BlackBox expression in parenthesis
   -> Bool
   -- ^ Treat BlackBox expression as declaration
-  -> DeclarationType
-  -- ^ Are we concurrent or sequential?
   -> NetlistId
   -- ^ Id to assign the result to
   -> PrimInfo
@@ -407,7 +405,7 @@ mkPrimitive
   -> [Declaration]
   -- ^ Tick declarations
   -> NetlistMonad (Expr,[Declaration])
-mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
+mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
   go =<< extractPrimWarnOrFail (primName pInfo)
   where
     tys = netlistTypes dst
@@ -483,6 +481,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                       (bbCtx,ctxDcls) <- mkBlackBoxContext (primName pInfo) [dst'] args
                       (bbTempl,templDecl) <- prepareBlackBox pNm template bbCtx
                       let bbE =  BlackBoxE pNm (libraries p) (imports p) (includes p) bbTempl bbCtx bbEParen
+                      declType <- Lens.use hdlStyle
                       tmpAssgn <- case declType of
                         Concurrent -> contAssign dstNm bbE
                         Sequential -> procAssign Blocking dstNm bbE
@@ -539,20 +538,20 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                   tcm <- Lens.view tcCache
                   let dcs = tyConDataCons (tcm `lookupUniqMap'` tcN)
                       dc  = dcs !! fromInteger i
-                  (exprN,dcDecls) <- mkDcApplication declType [hwTy] dst dc []
+                  (exprN,dcDecls) <- mkDcApplication [hwTy] dst dc []
                   return (exprN,dcDecls)
                 [Right _, Left scrut] -> do
                   tcm     <- Lens.view tcCache
                   let scrutTy = inferCoreTypeOf tcm scrut
                   (scrutExpr,scrutDecls) <-
-                    mkExpr False Concurrent (NetlistId (Id.unsafeMake "c$tte_rhs") scrutTy) scrut
+                    mkExpr False (NetlistId (Id.unsafeMake "c$tte_rhs") scrutTy) scrut
                   case scrutExpr of
                     Identifier id_ Nothing -> return (DataTag hwTy (Left id_),scrutDecls)
                     _ -> do
                       scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
                       tmpRhs <- Id.make "c$tte_rhs"
                       let assignTy = case declType of { Concurrent -> Cont ; Sequential -> Proc Blocking }
-                      netDecl <- N.mkInit declType assignTy tmpRhs scrutHTy scrutExpr
+                      netDecl <- N.mkInit assignTy tmpRhs scrutHTy scrutExpr
                       return (DataTag hwTy (Left tmpRhs), netDecl ++ scrutDecls)
                 _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showPpr showPpr) args)
           | pNm == "GHC.Prim.dataToTag#" -> case args of
@@ -564,13 +563,13 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                 let scrutTy = inferCoreTypeOf tcm scrut
                 scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
                 (scrutExpr,scrutDecls) <-
-                  mkExpr False Concurrent (NetlistId (Id.unsafeMake "c$dtt_rhs") scrutTy) scrut
+                  mkExpr False (NetlistId (Id.unsafeMake "c$dtt_rhs") scrutTy) scrut
                 case scrutExpr of
                   Identifier id_ Nothing -> return (DataTag scrutHTy (Right id_),scrutDecls)
                   _ -> do
                     tmpRhs <- Id.make "c$dtt_rhs"
                     let assignTy = case declType of { Concurrent -> Cont ; Sequential -> Proc Blocking }
-                    netDecl <- N.mkInit declType assignTy tmpRhs scrutHTy scrutExpr
+                    netDecl <- N.mkInit assignTy tmpRhs scrutHTy scrutExpr
                     return (DataTag scrutHTy (Right tmpRhs),netDecl ++ scrutDecls)
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
 
@@ -615,7 +614,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                               subst = extendIdSubst (mkSubst is0) b arg1
                           in  substTm "mkPrimitive.fmapSimIO" subst bE
                         _ -> mkApps fun0 [Left arg1]
-                  (expr,bindDecls) <- mkExpr False Sequential dst fun1
+                  (expr,bindDecls) <- mkExpr False dst fun1
                   assn <- case expr of
                             Noop -> pure []
                             _ -> do declareUse (Proc Blocking) dstNm
@@ -623,17 +622,17 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                   return (Identifier dstNm Nothing, dstDecl ++ bindDecls ++ assn)
                 Nothing -> do
                   let (_:arg0:_) = lefts args
-                  (_,bindDecls) <- mkExpr True Sequential dst arg0
+                  (_,bindDecls) <- mkExpr True dst arg0
                   return (Noop, bindDecls)
 
           | pNm == "Clash.Explicit.SimIO.unSimIO#" ->
               case lefts args of
-                (arg:_) -> mkExpr False Sequential dst arg
+                (arg:_) -> mkExpr False dst arg
                 _ -> error "internal error: insufficient arguments"
 
           | pNm == "Clash.Explicit.SimIO.pureSimIO#" -> do
               (expr,decls) <- case lefts args of
-                (arg:_) -> mkExpr False Sequential dst arg
+                (arg:_) -> mkExpr False dst arg
                 _ -> error "internal error: insufficient arguments"
               resM <- resBndr True dst
               case resM of
@@ -651,14 +650,14 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
 
           | pNm == "GHC.Num.Integer.IS" -> do
               (expr,decls) <- case lefts args of
-                (arg:_) -> mkExpr False Concurrent dst arg
+                (arg:_) -> mkExpr False dst arg
                 _ -> error "internal error: insufficient arguments"
               iw <- Lens.view intWidth
               return (N.DataCon (Signed iw) (DC (Void Nothing,-1)) [expr],decls)
 
           | pNm == "GHC.Num.Integer.IP" -> do
               (expr,decls) <- case lefts args of
-                (arg:_) -> mkExpr False Concurrent dst arg
+                (arg:_) -> mkExpr False dst arg
                 _ -> error "internal error: insufficient arguments"
               case expr of
                 N.Literal Nothing (NumLit _) -> return (expr,decls)
@@ -666,7 +665,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
 
           | pNm == "GHC.Num.Integer.IN" -> do
               (expr,decls) <- case lefts args of
-                (arg:_) -> mkExpr False Concurrent dst arg
+                (arg:_) -> mkExpr False dst arg
                 _ -> error "internal error: insufficient arguments"
               case expr of
                 N.Literal Nothing (NumLit i) ->
@@ -675,14 +674,14 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
 
           | pNm == "GHC.Num.Natural.NS" -> do
               (expr,decls) <- case lefts args of
-                (arg:_) -> mkExpr False Concurrent dst arg
+                (arg:_) -> mkExpr False dst arg
                 _ -> error "internal error: insufficient arguments"
               iw <- Lens.view intWidth
               return (N.DataCon (Unsigned iw) (DC (Void Nothing,-1)) [expr],decls)
 
           | pNm == "GHC.Num.Integer.NB" -> do
               (expr,decls) <- case lefts args of
-                (arg:_) -> mkExpr False Concurrent dst arg
+                (arg:_) -> mkExpr False dst arg
                 _ -> error "internal error: insufficient arguments"
               case expr of
                 N.Literal Nothing (NumLit _) -> return (expr,decls)
@@ -853,16 +852,30 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
                           -- See above why we do this.
                           CoreId u0 -> init binders2 ++ [(u0,snd (last binders2))]
                           _ -> binders2
-      seqDecls <- concat <$> mapM (uncurry (mkDeclarations' Sequential)) bindersE
+
+      -- TODO To use scopes correctly, this functions needs to be rearranged so
+      -- that it
+      --
+      --   (1) opens a new subscope for the sequential body of the process
+      --   (2) closes the subscope adding the process to the parent scope
+      --   (3) adds the concurrent statements to assign the result
+      --
+      -- If we enter this function already in a sequential scope then something
+      -- has gone wrong. We could maybe fix this by allowing a statement to
+      -- be floated when it's subscope is closed (i.e. make the process inside
+      -- another process, then when collapsing to a single declaration floating
+      -- that declaration up to a concurrent scope).
+
+      seqDecls <- concat <$> mapM (uncurry mkDeclarations) bindersE
 
       -- When the body the let-expression of 'mealyFun' was variable reference,
       -- or in case we had to create a new identifier because the original LHS
       -- was not available: then we need to assign
       (resExpr,resDecls) <- case res0 of
-        Letrec _ (C.Var {}) -> mkExpr False Concurrent dst (C.Var result)
+        Letrec _ (C.Var {}) -> mkExpr False dst (C.Var result)
         _ -> case dst of
           CoreId {} -> pure (Noop,[])
-          _ -> mkExpr False Sequential dst (C.Var result)
+          _ -> mkExpr False dst (C.Var result)
 
       resAssn <- case resExpr of
             Noop -> pure []
@@ -876,7 +889,7 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
                    [(b,_)] -> CoreId b
                    _       -> MultiId (map fst sBinders)
 
-      (exprInit,initDecls) <- mkExpr False Sequential sDst mealyInit
+      (exprInit,initDecls) <- mkExpr False sDst mealyInit
 
       initAssign <- case exprInit of
         Identifier _ Nothing -> pure []
@@ -892,7 +905,7 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
                    [(b,_)] -> CoreId b
                    _       -> MultiId (map fst iBinders)
 
-      (exprArg,inpDeclsMisc) <- mkExpr False Concurrent iDst mealyIn
+      (exprArg,inpDeclsMisc) <- mkExpr False iDst mealyIn
 
       argAssign <- case iBinders of
         ((i,_):_) -> do assn <- contAssign (Id.unsafeFromCoreId i) exprArg
@@ -916,7 +929,7 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
                    KnownDomain _ _ Falling _ _ _ -> Rising
                    _ -> error "internal error"
       (clkExpr,clkDecls) <-
-        mkExpr False Concurrent (NetlistId (Id.unsafeMake "__MEALY_CLK__") (inferCoreTypeOf tcm clk)) clk
+        mkExpr False (NetlistId (Id.unsafeMake "__MEALY_CLK__") (inferCoreTypeOf tcm clk)) clk
 
       -- collect the declarations related to the input
       let netDeclsInp1 = netDeclsInp ++ inpDeclsMisc
