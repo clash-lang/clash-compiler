@@ -787,6 +787,8 @@ inst_' id_ scrut scrutTy es = fmap Just $
 inst_ :: Declaration -> SystemVerilogM (Maybe Doc)
 inst_ (TickDecl {}) = return Nothing
 
+inst_ (CompDecl {}) = return Nothing
+
 inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> pretty id_ <+> equals <+> align (expr_ False e <> semi)
 

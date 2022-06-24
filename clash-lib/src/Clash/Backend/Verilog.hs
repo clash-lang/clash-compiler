@@ -514,6 +514,7 @@ inst_' id_ scrut scrutTy es = fmap Just $
 -- | Turn a Netlist Declaration to a Verilog concurrent block
 inst_ :: Declaration -> VerilogM (Maybe Doc)
 inst_ (TickDecl {}) = return Nothing
+inst_ (CompDecl {}) = return Nothing
 inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> pretty id_ <+> equals <+> expr_ False e <> semi
 

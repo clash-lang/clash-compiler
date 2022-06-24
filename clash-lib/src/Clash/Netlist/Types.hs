@@ -532,6 +532,14 @@ data Declaration
       !BlackBox                -- ^ Template tokens
       BlackBoxContext          -- ^ Context in which tokens should be rendered
 
+  -- | @component@ declaration (VHDL).
+  --
+  -- See [this tutorial](https://www.ics.uci.edu/~jmoorkan/vhdlref/compdec.html);
+  -- refer to §4.5 of IEEE 1076-1993
+  | CompDecl
+      !Text
+      [(Text, PortDirection, HWType)]
+
   -- | Signal declaration
   | NetDecl'
       (Maybe Comment)                -- ^ Note; will be inserted as a comment in target hdl

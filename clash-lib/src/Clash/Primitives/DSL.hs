@@ -31,6 +31,7 @@ module Clash.Primitives.DSL
   , BlockState (..)
   , TExpr(..)
   , addDeclaration
+  , compInBlock
   , declaration
   , declarationReturn
   , declare
@@ -214,6 +215,13 @@ declarationReturn bbCtx blockName blockBuilder =
       let (Identifier resultNm Nothing, _) = rNm
       addDeclaration (Assignment resultNm (eex r))
 
+emptyBlockState :: backend -> BlockState backend
+emptyBlockState bck = BlockState
+  { _bsDeclarations = []
+  , _bsHigherOrderCalls = IntMap.empty
+  , _bsBackend = bck
+  }
+
 -- | Run a block declaration.
 declaration
   :: Backend backend
@@ -225,11 +233,11 @@ declaration
   -- ^ pretty printed block
 declaration blockName s = do
   backend0 <- get
-  let initState = BlockState [] IntMap.empty backend0
-      BlockState decs _hoCalls backend1 = execState s initState
-  put backend1
+  let initState = emptyBlockState backend0
+      (BlockState {..}) = execState s initState
+  put _bsBackend
   blockNameUnique <- Id.makeBasic blockName
-  getAp $ blockDecl blockNameUnique (reverse decs)
+  getAp $ blockDecl blockNameUnique (reverse _bsDeclarations)
 
 -- | Add a declaration to the state.
 addDeclaration :: Declaration -> State (BlockState backend) ()
@@ -719,6 +727,38 @@ instHO bbCtx fPos (resTy, bbResTy) argsWithTypes = do
       (emptyBBContext ("__INST_" <> bbName bbCtx <> "_BB_INTERNAL__"))
 
   pure (TExpr resTy (Identifier resName Nothing))
+
+-- | This creates a component declaration (for VHDL) given in and out port
+-- names, updating the 'BlockState backend' stored in the 'State' monad.
+--
+-- A typical result is that a
+--
+-- @
+-- component fifo port
+--    ( rst : in std_logic
+--    ...
+--    ; full : out std_logic
+--    ; empty : out std_logic );
+--  end component;
+-- @
+--
+-- declaration would be added in the appropriate place.
+compInBlock
+  :: forall backend
+   . Backend backend
+  => Text
+  -- ^ Component name
+  -> [(Text, HWType)]
+  -- ^ in ports
+  -> [(Text, HWType)]
+  -- ^ out ports
+  -> State (BlockState backend) ()
+compInBlock compName inPorts0 outPorts0 =
+  addDeclaration (CompDecl compName (inPorts1 ++ outPorts1))
+ where
+  mkPort inOut (nm, ty) = (nm, inOut, ty)
+  inPorts1 = mkPort In <$> inPorts0
+  outPorts1 = mkPort Out <$> outPorts0
 
 -- | Instantiate a component/entity in a block state.
 instDecl
