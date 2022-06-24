@@ -1,7 +1,7 @@
 - BlackBox:
     name: Clash.Signal.Internal.delay#
     kind: Declaration
-    outputReg: true
+    outputUsage: NonBlocking
     type: |-
       delay#
         :: ( KnownDomain dom        -- ARG[0]
@@ -29,7 +29,7 @@
 - BlackBox:
     name: Clash.Signal.Internal.asyncRegister#
     kind: Declaration
-    outputReg: true
+    outputUsage: NonBlocking
     type: |-
       asyncRegister#
         :: ( KnownDomain dom        -- ARG[0]
@@ -58,7 +58,7 @@
 - BlackBox:
     name: Clash.Signal.Internal.register#
     kind: Declaration
-    outputReg: true
+    outputUsage: NonBlocking
     type: |-
       register#
         :: ( KnownDomain dom        -- ARG[0]

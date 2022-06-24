@@ -1,6 +1,7 @@
 - BlackBox:
     name: Clash.Sized.Internal.BitVector.replaceBit#
     kind: Declaration
+    outputUsage: Blocking
     type: |-
       replaceBit# :: KnownNat n  -- ARG[0]
                    => BitVector n -- ARG[1]
@@ -17,6 +18,7 @@
 - BlackBox:
     name: Clash.Sized.Internal.BitVector.setSlice#
     kind: Declaration
+    outputUsage: Blocking
     type: |-
       setSlice# :: SNat (m + 1 + i)
                  -> BitVector (m + 1 + i) -- ARG[1]

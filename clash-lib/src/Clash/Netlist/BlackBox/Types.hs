@@ -3,6 +3,7 @@
                     2017     , Myrtle Software Ltd,
                     2021-2022, QBayLogic B.V.
                     2022     , LUMI GUIDE FIETSDETECTIE B.V.
+                    2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -34,7 +35,7 @@ import                GHC.Generics               (Generic)
 import                Clash.Core.Term            (Term)
 import                Clash.Core.Type            (Type)
 import {-# SOURCE #-} Clash.Netlist.Types
-  (BlackBox, NetlistMonad)
+  (BlackBox, NetlistMonad, Usage(Cont))
 
 import qualified      Clash.Signal.Internal      as Signal
 
@@ -55,7 +56,7 @@ data TemplateKind
 -- | See @Clash.Primitives.Types.BlackBox@ for documentation on this record's
 -- fields. (They are intentionally renamed to prevent name clashes.)
 data BlackBoxMeta =
-  BlackBoxMeta { bbOutputReg :: Bool
+  BlackBoxMeta { bbOutputUsage :: Usage
                , bbKind :: TemplateKind
                , bbLibrary :: [BlackBoxTemplate]
                , bbImports :: [BlackBoxTemplate]
@@ -69,7 +70,7 @@ data BlackBoxMeta =
 -- | Use this value in your blackbox template function if you do want to
 -- accept the defaults as documented in @Clash.Primitives.Types.BlackBox@.
 emptyBlackBoxMeta :: BlackBoxMeta
-emptyBlackBoxMeta = BlackBoxMeta False TExpr [] [] [] [] NoRenderVoid [] []
+emptyBlackBoxMeta = BlackBoxMeta Cont TExpr [] [] [] [] NoRenderVoid [] []
 
 -- | A BlackBox function generates a blackbox template, given the inputs and
 -- result type of the function it should provide a blackbox for. This is useful
@@ -192,7 +193,7 @@ data Element
   -- always return 0 (False) if `-fclash-aggressive-x-optimization-blackboxes`
   -- is NOT set.
   | StrCmp [Element] !Int
-  | OutputWireReg !Int
+  | OutputUsage !Int
   | Vars !Int
   | GenSym [Element] !Int
   | Repeat [Element] [Element]

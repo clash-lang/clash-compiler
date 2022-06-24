@@ -2,6 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd,
                     2021-2022, QBayLogic B.V.
+                    2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -112,7 +113,9 @@ pTagE =  Result            <$  string "~RESULT"
      <|> IsActiveEnable    <$> (string "~ISACTIVEENABLE" *> brackets' natural')
      <|> IsUndefined       <$> (string "~ISUNDEFINED" *> brackets' natural')
      <|> StrCmp            <$> (string "~STRCMP" *> brackets' pSigD) <*> brackets' natural'
-     <|> OutputWireReg     <$> (string "~OUTPUTWIREREG" *> brackets' natural')
+     -- Parse ~OUTPUTWIREREG for backwards compatibility
+     <|> OutputUsage       <$> (string "~OUTPUTWIREREG" *> brackets' natural')
+     <|> OutputUsage       <$> (string "~OUTPUTUSAGE" *> brackets' natural')
      <|> GenSym            <$> (string "~GENSYM" *> brackets' pSigD) <*> brackets' natural'
      <|> Template          <$> (string "~TEMPLATE" *> brackets' pSigD) <*> brackets' pSigD
      <|> Repeat            <$> (string "~REPEAT" *> brackets' pSigD) <*> brackets' pSigD

@@ -29,6 +29,7 @@
     name: Clash.Explicit.SimIO.writeReg
     kind: Declaration
     renderVoid: RenderVoid
+    outputUsage: Blocking
     template: ~ARG[0] = ~ARG[1];
 - BlackBox:
     name: Clash.Explicit.SimIO.openFile
@@ -51,6 +52,7 @@
 - BlackBox:
     name: Clash.Explicit.SimIO.getLine
     kind: Declaration
+    outputUsage: Blocking
     template: ~RESULT = $fgets(~ARG[2],~ARG[1]);
 - BlackBox:
     name: Clash.Explicit.SimIO.isEOF
@@ -64,10 +66,12 @@
 - BlackBox:
     name: Clash.Explicit.SimIO.seek
     kind: Declaration
+    outputUsage: Blocking
     template: ~RESULT = $fseek(~ARG[0],~ARG[1],~ARG[2]);
 - BlackBox:
     name: Clash.Explicit.SimIO.rewind
     kind: Declaration
+    outputUsage: Blocking
     template: ~RESULT = $rewind(~ARG[0]);
 - BlackBox:
     name: Clash.Explicit.SimIO.tell

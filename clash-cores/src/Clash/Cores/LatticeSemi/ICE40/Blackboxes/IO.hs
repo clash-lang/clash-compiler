@@ -91,7 +91,7 @@ sbioTemplate bbCtx = do
       , (instPort "D_IN_0", Out, Bit, Identifier dIn0 Nothing)
       , (instPort "D_IN_1", Out, Bit, Identifier dIn1 Nothing)
       ])
-    , Assignment result resultTuple
+    , Assignment result Cont resultTuple
     ]
  where
   [ _HasCallStack

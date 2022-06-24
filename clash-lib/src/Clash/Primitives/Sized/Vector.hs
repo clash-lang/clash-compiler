@@ -1,5 +1,6 @@
 {-|
   Copyright   :  (C) 2020-2022 QBayLogic B.V.
+                     2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -16,7 +17,6 @@ import           Control.Monad                      (replicateM)
 import           Control.Monad.State                (State, zipWithM)
 import qualified Control.Lens                       as Lens
 import           Data.Either                        (rights)
-import qualified Data.IntMap                        as IntMap
 import           Data.List.Extra                    (iterateNM)
 import           Data.Maybe                         (fromMaybe)
 import           Data.Monoid                        (Ap(getAp))
@@ -42,11 +42,10 @@ import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TExpr, TDecl),
    Element(Component, Typ, TypElem, Text), Decl(Decl), emptyBlackBoxMeta)
 import           Clash.Netlist.Types
-  (Identifier, TemplateFunction, BlackBoxContext, HWType(Vector),
+  (Identifier, TemplateFunction, BlackBoxContext, HWType(Vector), Usage(Cont),
    Declaration(..), Expr(Literal, Identifier,DataCon), Literal(NumLit),
-   BlackBox(BBTemplate, BBFunction), TemplateFunction(..), WireOrReg(Wire),
-   Modifier(Indexed, Nested, DC), HWType(..), bbInputs, bbResults, emptyBBContext, tcCache,
-   bbFunctions)
+   BlackBox(BBTemplate, BBFunction), TemplateFunction(..),
+   Modifier(Indexed, Nested, DC), HWType(..), bbInputs, bbResults, emptyBBContext, tcCache)
 import qualified Clash.Netlist.Id                   as Id
 import           Clash.Netlist.Util                 (typeSize)
 import qualified Clash.Primitives.DSL               as Prim
@@ -142,9 +141,9 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
   vecIds <- replicateM n (Id.next baseId)
 
   vecId <- Id.make "vec"
-  let vecDecl = sigDecl vecType Wire vecId
-      vecAssign = Assignment vecId vec
-      elemAssigns = zipWith Assignment vecIds (map (iIndex vecId) [0..])
+  let vecDecl = sigDecl vecType vecId
+      vecAssign = Assignment vecId Cont vec
+      elemAssigns = zipWith3 Assignment vecIds (repeat Cont) (map (iIndex vecId) [0..])
       resultId =
         case bbResults bbCtx of
           [(Identifier t _, _)] -> t
@@ -155,12 +154,8 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
   (concat -> fCalls, result) <- mkTree 1 vecIds
 
   let intermediateResultIds = concatMap (\(FCall l r _) -> [l, r]) fCalls
-      wr = case IntMap.lookup 0 (bbFunctions bbCtx) of
-             Just ((_,rw,_,_,_,_):_) -> rw
-             _ -> error "internal error"
-      sigDecls = zipWith (sigDecl aTy) (wr:replicate n Wire ++ repeat wr)
-                                       (result : intermediateResultIds)
-      resultAssign = Assignment resultId (Identifier result Nothing)
+      sigDecls = fmap (sigDecl aTy) (result : intermediateResultIds)
+      resultAssign = Assignment resultId Cont (Identifier result Nothing)
 
   callDecls <- zipWithM callDecl [0..] fCalls
   foldNm <- Id.make "fold"
@@ -229,8 +224,8 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
     pure ([], rest)
 
   -- Simple wire without comment
-  sigDecl :: HWType -> WireOrReg -> Identifier -> Declaration
-  sigDecl typ rw nm = NetDecl' Nothing rw nm (Right typ) Nothing
+  sigDecl :: HWType -> Identifier -> Declaration
+  sigDecl typ nm = NetDecl Nothing nm typ
 
   -- Index the intermediate vector. This uses a hack in Clash: the 10th
   -- constructor of Vec doesn't exist; using it will be interpreted by the

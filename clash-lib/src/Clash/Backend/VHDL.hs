@@ -2,6 +2,7 @@
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
                      2021-2022, QBayLogic B.V.
+                     2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -115,6 +116,7 @@ data VHDLState =
   , _aggressiveXOptBB_ :: AggressiveXOptBB
   , _renderEnums_ :: RenderEnums
   , _domainConfigurations_ :: DomainMap
+  , _usages :: UsageMap
   }
 
 makeLenses ''VHDLState
@@ -144,6 +146,7 @@ instance Backend VHDLState where
     , _aggressiveXOptBB_=coerce (opt_aggressiveXOptBB opts)
     , _renderEnums_=coerce (opt_renderEnums opts)
     , _domainConfigurations_=emptyDomainMap
+    , _usages=mempty
     }
   hdlKind         = const VHDL
   primDirs        = const $ do root <- primsRoot
@@ -242,7 +245,7 @@ instance Backend VHDLState where
   blockDecl nm ds = do
     decs <- decls ds
     let attrs = [ (id_, attr)
-                | NetDecl' _ _ id_ (Right hwtype) _ <- ds
+                | NetDecl' _ id_ hwtype _ <- ds
                 , attr <- hwTypeAttrs hwtype]
     if isEmpty decs
        then insts ids
@@ -385,17 +388,20 @@ genVHDL
   :: ModName
   -> SrcSpan
   -> IdentifierSet
+  -> UsageMap
   -> Component
   -> VHDLM ((String, Doc), [(String, Doc)])
-genVHDL nm sp seen c = do
+genVHDL nm sp seen us c = do
     -- Don't have type names conflict with module names or with previously
     -- generated type names.
     --
     -- TODO: Collect all type names up front, to prevent relatively costly union.
     -- TODO: Investigate whether type names / signal names collide in the first place
-    Ap $ idSeen %= Id.union seen
+    Ap $ do
+      idSeen %= Id.union seen
+      usages .= us
+      setSrcSpan sp
 
-    Ap $ setSrcSpan sp
     v <- vhdl
     i <- Ap $ use includes
     Ap $ libraries .= []
@@ -935,7 +941,7 @@ entity c = do
     rattrs      = renderAttrs (TextS.pack "signal") attrs
     attrs       = inputAttrs ++ outputAttrs
     inputAttrs  = [(id_, attr) | (id_, hwtype) <- inputs c, attr <- hwTypeAttrs hwtype]
-    outputAttrs = [(id_, attr) | (_wireOrReg, (id_, hwtype), _) <- outputs c, attr <- hwTypeAttrs hwtype]
+    outputAttrs = [(id_, attr) | (_, (id_, hwtype), _) <- outputs c, attr <- hwTypeAttrs hwtype]
 
 
 architecture :: Component -> VHDLM Doc
@@ -956,13 +962,13 @@ architecture c = do {
   }
  where
    netdecls    = filter isNetDecl (declarations c)
-   declAttrs   = [(id_, attr) | NetDecl' _ _ id_ (Right hwtype) _ <- netdecls, attr <- hwTypeAttrs hwtype]
+   declAttrs   = [(id_, attr) | NetDecl' _ id_ hwtype _ <- netdecls, attr <- hwTypeAttrs hwtype]
    inputAttrs  = [(id_, attr) | (id_, hwtype) <- inputs c, attr <- hwTypeAttrs hwtype]
-   outputAttrs = [(id_, attr) | (_wireOrReg, (id_, hwtype), _) <- outputs c, attr <- hwTypeAttrs hwtype]
+   outputAttrs = [(id_, attr) | (_, (id_, hwtype), _) <- outputs c, attr <- hwTypeAttrs hwtype]
 
    isNetDecl :: Declaration -> Bool
-   isNetDecl (NetDecl' _ _ _ (Right _) _) = True
-   isNetDecl _                            = False
+   isNetDecl NetDecl'{} = True
+   isNetDecl _          = False
 
 attrType
   :: t ~ HashMap T.Text T.Text
@@ -1355,8 +1361,8 @@ decls ds = do
       _  -> vcat (pure dsDoc)
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
-decl l (NetDecl' noteM _ id_ ty iEM) = Just <$> (,fromIntegral (TextS.length (Id.toText id_))) <$>
-  maybe id addNote noteM ("signal" <+> fill l (pretty id_) <+> colon <+> either pretty sizedQualTyName ty <> iE <> semi)
+decl l (NetDecl' noteM id_ ty iEM) = Just <$> (,fromIntegral (TextS.length (Id.toText id_))) <$>
+  maybe id addNote noteM ("signal" <+> fill l (pretty id_) <+> colon <+> sizedQualTyName ty <> iE <> semi)
   where
     addNote n = mappend ("--" <+> pretty n <> line)
     iE = maybe emptyDoc (noEmptyInit . expr_ False) iEM
@@ -1474,7 +1480,7 @@ inst_' id_ scrut scrutTy es = fmap Just $
 
 -- | Turn a Netlist Declaration to a VHDL concurrent block
 inst_ :: Declaration -> VHDLM (Maybe Doc)
-inst_ (Assignment id_ e) = fmap Just $
+inst_ (Assignment id_ Cont e) = fmap Just $
   pretty id_ <+> larrow <+> align (expr_ False e) <> semi
 
 inst_ (CompDecl nm ps0) =

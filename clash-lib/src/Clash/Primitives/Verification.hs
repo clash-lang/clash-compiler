@@ -20,12 +20,12 @@ import           Clash.Core.Term                 (Term(Var), varToId)
 import           Clash.Core.TermLiteral          (termToDataError)
 import           Clash.Util                      (indexNote)
 import           Clash.Netlist                   (mkExpr)
-import           Clash.Netlist.Util              (stripVoid, id2identifier)
+import           Clash.Netlist.Util              (stripVoid)
 import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types
   (BlackBox(BBFunction), TemplateFunction(..), BlackBoxContext, Identifier,
-   NetlistMonad, Declaration(Assignment, NetDecl'),
-   HWType(Bool, KnownDomain), WireOrReg(Wire), NetlistId(..),
+   NetlistMonad, Declaration(Assignment, NetDecl), Usage(Cont),
+   HWType(Bool, KnownDomain), NetlistId(..),
    DeclarationType(Concurrent), tcCache, bbInputs, Expr(Identifier))
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TDecl), RenderVoid(..),
@@ -48,8 +48,8 @@ checkBBF _isD _primName args _ty =
   -- TODO: blackbox generated them.
   clk = indexNote "clk" (lefts args) 1
   clkExpr = Identifier clkId Nothing
-  (id2identifier -> clkId) = varToId clk
-  (id2identifier -> _clkId) = varToId (indexNote "rst" (lefts args) 2)
+  (Id.unsafeFromCoreId -> clkId) = varToId clk
+  (Id.unsafeFromCoreId -> _clkId) = varToId (indexNote "rst" (lefts args) 2)
 
   litArgs = do
     propName <- termToDataError (indexNote "propName" (lefts args) 3)
@@ -67,7 +67,7 @@ checkBBF _isD _primName args _ty =
     -- ^ Term to bind. Does not bind if it's already a reference to a signal
     -> NetlistMonad (Identifier, [Declaration])
     -- ^ ([new] reference to signal, [declarations need to get it in scope])
-  bindMaybe _ (Var vId) = pure (id2identifier vId, [])
+  bindMaybe _ (Var vId) = pure (Id.unsafeFromCoreId vId, [])
   bindMaybe Nothing t = bindMaybe (Just "s") t
   bindMaybe (Just nm) t = do
     tcm <- Lens.view tcCache
@@ -75,11 +75,11 @@ checkBBF _isD _primName args _ty =
     (expr0, decls) <- mkExpr False Concurrent (NetlistId newId (inferCoreTypeOf tcm t)) t
     pure
       ( newId
-      , decls ++ [sigDecl Bool newId, Assignment newId expr0] )
+      , decls ++ [sigDecl Bool newId, Assignment newId Cont expr0] )
 
   -- Simple wire without comment
   sigDecl :: HWType -> Identifier -> Declaration
-  sigDecl typ nm = NetDecl' Nothing Wire nm (Right typ) Nothing
+  sigDecl typ nm = NetDecl Nothing nm typ
 
 checkTF
   :: [Declaration]

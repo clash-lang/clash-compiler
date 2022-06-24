@@ -4,6 +4,7 @@
                     2016-2017, Myrtle Software Ltd,
                     2017     , Google Inc.,
                     2021-2022, QBayLogic B.V.
+                    2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -30,6 +31,7 @@ import           Control.Monad.IO.Class        (liftIO)
 import           Data.Bifunctor                (first, second)
 import           Data.Char                     (ord)
 import           Data.Either                   (lefts, partitionEithers)
+import           Data.Foldable                 (for_)
 import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
 import           Data.List                     (elemIndex, partition)
@@ -59,7 +61,7 @@ import           Util                          (OverridingBool(..))
 import           Clash.Annotations.Primitive
   ( PrimitiveGuard(HasBlackBox, DontTranslate)
   , PrimitiveWarning(WarnNonSynthesizable, WarnAlways)
-  , extractPrim)
+  , extractPrim, HDL(VHDL))
 import           Clash.Core.DataCon            as D (dcTag)
 import           Clash.Core.FreeVars           (freeIds)
 import           Clash.Core.HasType
@@ -79,7 +81,7 @@ import           Clash.Core.TyCon              as C (TyConMap, tyConDataCons)
 import           Clash.Core.Util
   (inverseTopSortLetBindings, splitShouldSplit)
 import           Clash.Core.Var                as V
-  (Id, Var (..), mkLocalId, modifyVarName)
+  (Id, mkLocalId, modifyVarName)
 import           Clash.Core.VarEnv
   (extendInScopeSet, mkInScopeSet, lookupVarEnv, uniqAway, unitVarSet)
 import {-# SOURCE #-} Clash.Netlist
@@ -140,7 +142,7 @@ mkBlackBoxContext
 mkBlackBoxContext bbName resIds args@(lefts -> termArgs) = do
     -- Make context inputs
     let
-      resNms = map id2identifier resIds
+      resNms = fmap Id.unsafeFromCoreId resIds
       resNm = fromMaybe (error "mkBlackBoxContext: head") (listToMaybe resNms)
     resTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc) . coreTypeOf) resIds
     (imps,impDecls) <- unzip <$> zipWithM (mkArgument bbName resNm) [0..] termArgs
@@ -204,6 +206,7 @@ prepareBlackBox _pNm templ bbCtx =
           (fmap (first BBTemplate) . setSym bbCtx)
           (\bbName bbHash bbFunc -> pure (BBFunction bbName bbHash bbFunc, []))
           templ
+      for_ decls goDecl
       return (t2,decls)
     Just err0 -> do
       (_,sp) <- Lens.use curCompNm
@@ -211,6 +214,43 @@ prepareBlackBox _pNm templ bbCtx =
                         , Data.Text.unpack (bbName bbCtx), ". Verification "
                         , "procedure reported:\n\n" ++ err0 ]
       throw (ClashException sp ($(curLoc) ++ err1) Nothing)
+ where
+  -- Right now we assume that (1) a blackbox doesn't assign to a signal
+  -- declared outside the black box template and (2) all uses of a signal
+  -- within a blackbox are correct for the targeted HDL (i.e. we don't try
+  -- to generate new signals when a signal is used incorrectly).
+  goDecl = \case
+    Assignment i u _ ->
+      declareUse u i
+
+    CondAssignment i _ _ _ _ -> do
+      -- Currently, all CondAssignment get rendered as `always @*` blocks in
+      -- (System)Verilog. This means when we target these HDL, this is _really_
+      -- a blocking procedural assignment.
+      SomeBackend b <- Lens.use backend
+      let use = case Backend.hdlKind b of { VHDL -> Cont ; _ -> Proc Blocking }
+      declareUse use i
+
+    Seq seqs -> for_ seqs goSeq
+
+    _ -> pure ()
+
+  goSeq = \case
+    AlwaysClocked _ _ seqs ->
+      for_ seqs goSeq
+
+    Initial seqs ->
+      for_ seqs goSeq
+
+    AlwaysComb seqs ->
+      for_ seqs goSeq
+
+    SeqDecl conc ->
+      goDecl conc
+
+    Branch _ _ alts ->
+      let seqs = concatMap snd alts
+       in for_ seqs goSeq
 
 -- | Determine if a term represents a literal
 isLiteral :: Term -> Bool
@@ -246,8 +286,8 @@ mkArgument bbName bndr nArg e = do
         | otherwise
         -> return ((error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg), Void Nothing, False), [])
       Just hwTy -> case collectArgsTicks e of
-        (C.Var v,[],_) ->
-          return ((Identifier (id2identifier v) Nothing,hwTy,False),[])
+        (C.Var v,[],_) -> do
+          return ((Identifier (Id.unsafeFromCoreId v) Nothing,hwTy,False),[])
         (C.Literal (IntegerLiteral i),[],_) ->
           return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
         (C.Literal (IntLiteral i), [],_) ->
@@ -265,12 +305,12 @@ mkArgument bbName bndr nArg e = do
         (C.Literal (NaturalLiteral n), [],_) ->
           return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit n),hwTy,True),[])
         (Prim pinfo,args,ticks) -> withTicks ticks $ \tickDecls -> do
-          (e',d) <- mkPrimitive True False (NetlistId bndr ty) pinfo args tickDecls
+          (e',d) <- mkPrimitive True False Concurrent (NetlistId bndr ty) pinfo args tickDecls
           case e' of
             (Identifier _ _) -> return ((e',hwTy,False), d)
             _                -> return ((e',hwTy,isLiteral e), d)
         (Data dc, args,_) -> do
-          (exprN,dcDecls) <- mkDcApplication [hwTy] (NetlistId bndr ty) dc (lefts args)
+          (exprN,dcDecls) <- mkDcApplication Concurrent [hwTy] (NetlistId bndr ty) dc (lefts args)
           return ((exprN,hwTy,isLiteral e),dcDecls)
         (Case scrut ty' [alt],[],_) -> do
           (projection,decls) <- mkProjection False (NetlistId bndr ty) scrut ty' alt
@@ -356,6 +396,8 @@ mkPrimitive
   -- ^ Put BlackBox expression in parenthesis
   -> Bool
   -- ^ Treat BlackBox expression as declaration
+  -> DeclarationType
+  -- ^ Are we concurrent or sequential?
   -> NetlistId
   -- ^ Id to assign the result to
   -> PrimInfo
@@ -365,7 +407,7 @@ mkPrimitive
   -> [Declaration]
   -- ^ Tick declarations
   -> NetlistMonad (Expr,[Declaration])
-mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
+mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
   go =<< extractPrimWarnOrFail (primName pInfo)
   where
     tys = netlistTypes dst
@@ -391,7 +433,7 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
               -- Blackbox template generation successful. Rerun 'go', but this time
               -- around with a 'normal' @BlackBox@
               go (P.BlackBox
-                    bbName wf bbRenderVoid multiResult bbKind () bbOutputReg
+                    bbName wf bbRenderVoid multiResult bbKind () bbOutputUsage
                     bbLibrary bbImports bbFunctionPlurality bbIncludes
                     bbResultNames bbResultInits bbTemplate)
         -- See 'setupMultiResultPrim' in "Clash.Normalize.Transformations":
@@ -407,7 +449,7 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
           (templ, templDecl) <- prepareBlackBox name template bbCtx
           let bbDecl = N.BlackBoxD name (libraries p) (imports p) (includes p) templ bbCtx
           return (Noop, ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
-        p@P.BlackBox {template, name=pNm, kind} ->
+        p@(P.BlackBox {template, name=pNm, kind,outputUsage}) ->
           case kind of
             TDecl -> do
               resM <- resBndr1 True dst
@@ -417,6 +459,7 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                   (templ,templDecl) <- prepareBlackBox pNm template bbCtx
                   let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
                                            (includes p) templ bbCtx
+                  declareUse outputUsage dstNm
                   return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
 
                 -- Render declarations as a Noop when requested
@@ -437,12 +480,12 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                   resM <- resBndr1 True dst
                   case resM of
                     Just (dst',dstNm,dstDecl) -> do
-                      (bbCtx,ctxDcls)     <- mkBlackBoxContext (primName pInfo) [dst'] args
+                      (bbCtx,ctxDcls) <- mkBlackBoxContext (primName pInfo) [dst'] args
                       (bbTempl,templDecl) <- prepareBlackBox pNm template bbCtx
-                      let tmpAssgn = Assignment dstNm
-                                        (BlackBoxE pNm (libraries p) (imports p)
-                                                   (includes p) bbTempl bbCtx
-                                                   bbEParen)
+                      let bbE =  BlackBoxE pNm (libraries p) (imports p) (includes p) bbTempl bbCtx bbEParen
+                      tmpAssgn <- case declType of
+                        Concurrent -> contAssign dstNm bbE
+                        Sequential -> procAssign Blocking dstNm bbE
                       return (Identifier dstNm Nothing, dstDecl ++ ctxDcls ++ templDecl ++ [tmpAssgn])
 
                     -- Render expression as a Noop when requested
@@ -496,7 +539,7 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                   tcm <- Lens.view tcCache
                   let dcs = tyConDataCons (tcm `lookupUniqMap'` tcN)
                       dc  = dcs !! fromInteger i
-                  (exprN,dcDecls) <- mkDcApplication [hwTy] dst dc []
+                  (exprN,dcDecls) <- mkDcApplication declType [hwTy] dst dc []
                   return (exprN,dcDecls)
                 [Right _, Left scrut] -> do
                   tcm     <- Lens.view tcCache
@@ -508,9 +551,9 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                     _ -> do
                       scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
                       tmpRhs <- Id.make "c$tte_rhs"
-                      let netDeclRhs   = NetDecl Nothing tmpRhs scrutHTy
-                          netAssignRhs = Assignment tmpRhs scrutExpr
-                      return (DataTag hwTy (Left tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
+                      let assignTy = case declType of { Concurrent -> Cont ; Sequential -> Proc Blocking }
+                      netDecl <- N.mkInit declType assignTy tmpRhs scrutHTy scrutExpr
+                      return (DataTag hwTy (Left tmpRhs), netDecl ++ scrutDecls)
                 _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showPpr showPpr) args)
           | pNm == "GHC.Prim.dataToTag#" -> case args of
               [Right _,Left (Data dc)] -> do
@@ -526,9 +569,9 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                   Identifier id_ Nothing -> return (DataTag scrutHTy (Right id_),scrutDecls)
                   _ -> do
                     tmpRhs <- Id.make "c$dtt_rhs"
-                    let netDeclRhs   = NetDecl Nothing tmpRhs scrutHTy
-                        netAssignRhs = Assignment tmpRhs scrutExpr
-                    return (DataTag scrutHTy (Right tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
+                    let assignTy = case declType of { Concurrent -> Cont ; Sequential -> Proc Blocking }
+                    netDecl <- N.mkInit declType assignTy tmpRhs scrutHTy scrutExpr
+                    return (DataTag scrutHTy (Right tmpRhs),netDecl ++ scrutDecls)
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
 
           | pNm == "Clash.Explicit.SimIO.mealyIO" -> do
@@ -548,9 +591,10 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                   Noop ->
                     return (Noop,decls)
                   _ -> case dstNms of
-                    [dstNm] ->
+                    [dstNm] -> do
+                      declareUse (Proc Blocking) dstNm
                       return ( Identifier dstNm Nothing
-                             , dstDecl ++ decls ++ [Assignment dstNm expr])
+                             , dstDecl ++ decls ++ [Assignment dstNm (Proc Blocking) expr])
                     _ -> error $ $(curLoc) ++ "bindSimIO: " ++ show resM
                 _ ->
                   return (Noop,decls)
@@ -572,9 +616,10 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                           in  substTm "mkPrimitive.fmapSimIO" subst bE
                         _ -> mkApps fun0 [Left arg1]
                   (expr,bindDecls) <- mkExpr False Sequential dst fun1
-                  let assn = case expr of
-                               Noop -> []
-                               _ -> [Assignment dstNm expr]
+                  assn <- case expr of
+                            Noop -> pure []
+                            _ -> do declareUse (Proc Blocking) dstNm
+                                    pure [Assignment dstNm (Proc Blocking) expr]
                   return (Identifier dstNm Nothing, dstDecl ++ bindDecls ++ assn)
                 Nothing -> do
                   let (_:arg0:_) = lefts args
@@ -596,9 +641,10 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                   Noop ->
                     return (Noop,decls)
                   _ -> case dstNms of
-                    [dstNm] ->
+                    [dstNm] -> do
+                      declareUse (Proc Blocking) dstNm
                       return ( Identifier dstNm Nothing
-                             , dstDecl ++ decls ++ [Assignment dstNm expr])
+                             , dstDecl ++ decls ++ [Assignment dstNm (Proc Blocking) expr])
                     _ -> error "internal error"
                 _ ->
                   return (Noop,decls)
@@ -683,17 +729,18 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
         pure Nothing
       else
         case dst' of
-          NetlistId dstL _ -> case mkDec of
+          NetlistId dstL ty' -> case mkDec of
             False -> do
               -- TODO: check that it's okay to use `mkUnsafeSystemName`
               let nm' = mkUnsafeSystemName (Id.toText dstL) 0
-                  id_ = mkLocalId ty nm'
+                  id_ = mkLocalId ty' nm'
               return (Just ([id_],[dstL],[]))
             True -> do
               nm2 <- Id.suffix dstL "res"
               -- TODO: check that it's okay to use `mkUnsafeInternalName`
               let nm3 = mkUnsafeSystemName (Id.toText nm2) 0
                   id_ = mkLocalId ty nm3
+
               idDeclM <- mkNetDecl (id_, mkApps (Prim pInfo) args)
               case idDeclM of
                 [] -> return Nothing
@@ -706,10 +753,11 @@ mkPrimitive bbEParen bbEasD dst pInfo args tickDecls =
                   Multi primitive should only appear on the RHS of a
                   let-binding. Please report this as a bug.
                 |]
+
           CoreId dstR ->
-            return (Just ([dstR], [Id.unsafeMake . nameOcc . varName $ dstR], []))
+            return (Just ([dstR], [Id.unsafeFromCoreId dstR], []))
           MultiId ids ->
-            return (Just (ids, map (Id.unsafeMake . nameOcc . varName) ids, []))
+            return (Just (ids, map Id.unsafeFromCoreId ids, []))
 
     -- Like resBndr, but fails on MultiId
     resBndr1
@@ -814,37 +862,49 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
         Letrec _ (C.Var {}) -> mkExpr False Concurrent dst (C.Var result)
         _ -> case dst of
           CoreId {} -> pure (Noop,[])
-          _ -> mkExpr False Concurrent dst (C.Var result)
-      let resAssn = case resExpr of
-            Noop -> []
-            _ -> [Seq [AlwaysComb [SeqDecl (Assignment dstNm resExpr)]]]
+          _ -> mkExpr False Sequential dst (C.Var result)
+
+      resAssn <- case resExpr of
+            Noop -> pure []
+            _ -> do
+              assign <- SeqDecl <$> procAssign Blocking dstNm resExpr
+              pure [Seq [AlwaysComb [assign]]]
 
       -- Create the declarations for the "initial state" block
       let sDst = case sBinders of
                    [] -> error "internal error: insufficient sBinders"
                    [(b,_)] -> CoreId b
                    _       -> MultiId (map fst sBinders)
+
       (exprInit,initDecls) <- mkExpr False Sequential sDst mealyInit
-      let initAssign = case exprInit of
-            Identifier _ Nothing -> []
-            Noop -> []
-            _ -> case sBinders of
-              ((b,_):_) -> [Assignment (id2identifier b) exprInit]
-              _ -> error "internal error: insufficient sBinders"
+
+      initAssign <- case exprInit of
+        Identifier _ Nothing -> pure []
+        Noop -> pure []
+        _ -> case sBinders of
+          ((b,_):_) -> do assn <- procAssign Blocking (Id.unsafeFromCoreId b) exprInit
+                          pure [assn]
+          _ -> error "internal error: insufficient sBinders"
 
       -- Create the declarations that corresponding to the input
       let iDst = case iBinders of
                    []      -> error "internal error: insufficient iBinders"
                    [(b,_)] -> CoreId b
                    _       -> MultiId (map fst iBinders)
+
       (exprArg,inpDeclsMisc) <- mkExpr False Concurrent iDst mealyIn
+
+      argAssign <- case iBinders of
+        ((i,_):_) -> do assn <- contAssign (Id.unsafeFromCoreId i) exprArg
+                        pure [assn]
+        _ -> error "internal error: insufficient iBinders"
 
       -- Split netdecl declarations and other declarations
       let (netDeclsSeqMisc,seqDeclsOther) = partition isNet (seqDecls ++ resDecls)
           (netDeclsInit,initDeclsOther)   = partition isNet initDecls
       -- All assignments happens within a sequential block, so the nets need to
       -- be of type 'reg' in Verilog nomenclature
-      let netDeclsSeq1 = map toReg (netDeclsSeq ++ netDeclsSeqMisc ++ netDeclsInit)
+      let netDeclsSeq1 = netDeclsSeq ++ netDeclsSeqMisc ++ netDeclsInit
 
       -- We run mealy block in the opposite clock edge of the the ambient system
       -- because we're basically clocked logic; so we need to have our outputs
@@ -862,20 +922,14 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
       let netDeclsInp1 = netDeclsInp ++ inpDeclsMisc
 
       -- Collate everything
-      return (clkDecls ++ netDeclsSeq1 ++ netDeclsInp1 ++
-                [ case iBinders of
-                    ((i,_):_) -> Assignment (id2identifier i) exprArg
-                    _ -> error "internal error: insufficient iBinders"
-                , Seq [Initial (map SeqDecl (initDeclsOther ++ initAssign))]
+      return (clkDecls ++ netDeclsSeq1 ++ netDeclsInp1 ++ argAssign ++
+                [ Seq [Initial (map SeqDecl (initDeclsOther ++ initAssign))]
                 , Seq [AlwaysClocked edge clkExpr (map SeqDecl seqDeclsOther)]
                 ] ++ resAssn)
     _ -> error "internal error"
  where
   isNet NetDecl' {} = True
   isNet _ = False
-
-  toReg (NetDecl' cmM _ r ty eM) = NetDecl' cmM Reg r ty eM
-  toReg d = d
 
 collectMealy _ _ _ _ = error "internal error"
 
@@ -898,7 +952,7 @@ collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
         (_,_,[],_,[],binders,Just result) -> do
           ds1 <- concatMapM (uncurry (mkDeclarations' Sequential)) binders
           netDecls <- concatMapM mkNetDecl binders
-          return (Identifier (id2identifier result) Nothing, netDecls ++ ds0 ++ ds1)
+          return (Identifier (Id.unsafeFromCoreId result) Nothing, netDecls ++ ds0 ++ ds1)
         _ -> error "internal error"
     _ -> case substTm "collectBindIO2" subst e of
       Letrec {} -> error "internal error"
@@ -980,7 +1034,7 @@ mkFunInput
   -- ^ The function argument term
   -> NetlistMonad
       ((Either BlackBox (Identifier,[Declaration])
-       ,WireOrReg
+       ,Usage
        ,[BlackBoxTemplate]
        ,[BlackBoxTemplate]
        ,[((TextS.Text,TextS.Text),BlackBox)]
@@ -997,7 +1051,7 @@ mkFunInput resId e =
               bb  <- extractPrimWarnOrFail (primName p)
               case bb of
                 P.BlackBox {..} ->
-                  pure (Left (kind,outputReg,libraries,imports,includes,primName p,template))
+                  pure (Left (kind,outputUsage,libraries,imports,includes,primName p,template))
                 P.Primitive pn _ pt ->
                   error $ $(curLoc) ++ "Unexpected blackbox type: "
                                     ++ "Primitive " ++ show pn
@@ -1023,7 +1077,7 @@ mkFunInput resId e =
                                         ++ err
                     Right (BlackBoxMeta{..}, template) ->
                       pure $
-                        Left ( bbKind, bbOutputReg, bbLibrary, bbImports
+                        Left ( bbKind, bbOutputUsage, bbLibrary, bbImports
                              , bbIncludes, pName, template)
             Data dc -> do
               let eTy = inferCoreTypeOf tcm e
@@ -1038,8 +1092,8 @@ mkFunInput resId e =
                 Just (_resHTy, [areVoids@(countEq False -> 1)]) -> do
                   let nonVoidArgI = fromJust (elemIndex False areVoids)
                   let arg = Id.unsafeMake (TextS.concat ["~ARG[", showt nonVoidArgI, "]"])
-                  let assign = Assignment (Id.unsafeMake "~RESULT") (Identifier arg Nothing)
-                  return (Right ((Id.unsafeMake "", tickDecls ++ [assign]), Wire))
+                  let assign = Assignment (Id.unsafeMake "~RESULT") Cont (Identifier arg Nothing)
+                  return (Right ((Id.unsafeMake "", tickDecls ++ [assign]), Cont))
 
                 -- Because we filter void constructs, the argument indices and
                 -- the field indices don't necessarily correspond anymore. We
@@ -1053,8 +1107,8 @@ mkFunInput resId e =
                       mkArg i   = Id.unsafeMake ("~ARG[" <> showt i <> "]")
                       dcInps    = [Identifier (mkArg x) Nothing | x <- originalIndices areVoids1]
                       dcApp     = DataCon resHTy (DC (resHTy,dcI)) dcInps
-                      dcAss     = Assignment (Id.unsafeMake "~RESULT") dcApp
-                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]),Wire))
+                      dcAss     = Assignment (Id.unsafeMake "~RESULT") Cont dcApp
+                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]), Cont))
 
                 -- CustomSP the same as SP, but with a user-defined bit
                 -- level representation
@@ -1065,16 +1119,16 @@ mkFunInput resId e =
                       mkArg i   = Id.unsafeMake ("~ARG[" <> showt i <> "]")
                       dcInps    = [Identifier (mkArg x) Nothing | x <- originalIndices areVoids1]
                       dcApp     = DataCon resHTy (DC (resHTy,dcI)) dcInps
-                      dcAss     = Assignment (Id.unsafeMake "~RESULT") dcApp
-                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]),Wire))
+                      dcAss     = Assignment (Id.unsafeMake "~RESULT") Cont dcApp
+                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]), Cont))
 
                 -- Like SP, we have to retrieve the index BEFORE filtering voids
                 Just (resHTy@(Product _ _ _), areVoids1:_) -> do
                   let mkArg i    = Id.unsafeMake ("~ARG[" <> showt i <> "]")
                       dcInps    = [ Identifier (mkArg x) Nothing | x <- originalIndices areVoids1]
                       dcApp     = DataCon resHTy (DC (resHTy,0)) dcInps
-                      dcAss     = Assignment (Id.unsafeMake "~RESULT") dcApp
-                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]),Wire))
+                      dcAss     = Assignment (Id.unsafeMake "~RESULT") Cont dcApp
+                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]), Cont))
 
                 -- Vectors never have defined areVoids (or all set to False), as
                 -- it would be converted to Void otherwise. We can therefore
@@ -1083,22 +1137,22 @@ mkFunInput resId e =
                   let mkArg i = Id.unsafeMake ("~ARG[" <> showt i <> "]")
                       dcInps = [ Identifier (mkArg x) Nothing | x <- [(1::Int)..2] ]
                       dcApp  = DataCon resHTy (DC (resHTy,1)) dcInps
-                      dcAss  = Assignment (Id.unsafeMake "~RESULT") dcApp
-                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]),Wire))
+                      dcAss  = Assignment (Id.unsafeMake "~RESULT") Cont dcApp
+                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]), Cont))
 
                 -- Sum types OR a Sum type after filtering empty types:
                 Just (resHTy@(Sum _ _), _areVoids) -> do
                   let dcI   = dcTag dc - 1
                       dcApp = DataCon resHTy (DC (resHTy,dcI)) []
-                      dcAss = Assignment (Id.unsafeMake "~RESULT") dcApp
-                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]),Wire))
+                      dcAss = Assignment (Id.unsafeMake "~RESULT") Cont dcApp
+                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]), Cont))
 
                 -- Same as Sum, but with user defined bit level representation
                 Just (resHTy@(CustomSum {}), _areVoids) -> do
                   let dcI   = dcTag dc - 1
                       dcApp = DataCon resHTy (DC (resHTy,dcI)) []
-                      dcAss = Assignment (Id.unsafeMake "~RESULT") dcApp
-                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]),Wire))
+                      dcAss = Assignment (Id.unsafeMake "~RESULT") Cont dcApp
+                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]), Cont))
 
                 Just (Void {}, _areVoids) ->
                   return (error $ $(curLoc) ++ "Encountered Void in mkFunInput."
@@ -1132,7 +1186,7 @@ mkFunInput resId e =
                       let
                         portMap = NamedPortMap (outpAssign:inpAssigns)
                         instDecl = InstDecl Entity Nothing [] compName instLabel [] portMap
-                      return (Right ((Id.unsafeMake "",tickDecls ++ [instDecl]),Wire))
+                      return (Right ((Id.unsafeMake "",tickDecls ++ [instDecl]), Cont))
                     Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
             C.Lam {} -> do
               let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet appE)
@@ -1143,27 +1197,27 @@ mkFunInput resId e =
               _ -> "__INTERNAL__"
   (bbCtx,dcls) <- mkBlackBoxContext pNm [resId] args
   case templ of
-    Left (TDecl,oreg,libs,imps,inc,_,templ') -> do
+    Left (TDecl,outputUsage,libs,imps,inc,_,templ') -> do
       (l',templDecl)
         <- onBlackBox
             (fmap (first BBTemplate) . setSym bbCtx)
             (\bbName bbHash bbFunc -> pure $ (BBFunction bbName bbHash bbFunc, []))
             templ'
-      return ((Left l',if oreg then Reg else Wire,libs,imps,inc,bbCtx),dcls ++ templDecl)
+      return ((Left l',outputUsage,libs,imps,inc,bbCtx),dcls ++ templDecl)
     Left (TExpr,_,libs,imps,inc,nm,templ') -> do
       onBlackBox
         (\t -> do t' <- getAp (prettyBlackBox t)
                   let t'' = Id.unsafeMake (Text.toStrict t')
-                      assn = Assignment (Id.unsafeMake "~RESULT") (Identifier t'' Nothing)
-                  return ((Right (Id.unsafeMake "",[assn]),Wire,libs,imps,inc,bbCtx),dcls))
+                      assn = Assignment (Id.unsafeMake "~RESULT") Cont (Identifier t'' Nothing)
+                  return ((Right (Id.unsafeMake "",[assn]),Cont,libs,imps,inc,bbCtx),dcls))
         (\bbName bbHash (TemplateFunction k g _) -> do
           let f' bbCtx' = do
-                let assn = Assignment (Id.unsafeMake "~RESULT")
+                let assn = Assignment (Id.unsafeMake "~RESULT") Cont
                             (BlackBoxE nm libs imps inc templ' bbCtx' False)
                 p <- getAp (Backend.blockDecl (Id.unsafeMake "") [assn])
                 return p
           return ((Left (BBFunction bbName bbHash (TemplateFunction k g f'))
-                  ,Wire
+                  ,Cont
                   ,[]
                   ,[]
                   ,[]
@@ -1173,8 +1227,8 @@ mkFunInput resId e =
                  )
         )
         templ'
-    Right (decl,wr) ->
-      return ((Right decl,wr,[],[],[],bbCtx),dcls)
+    Right (decl,u) ->
+      return ((Right decl,u,[],[],[],bbCtx),dcls)
   where
     goExpr app@(collectArgsTicks -> (C.Var fun,args@(_:_),ticks)) = do
       tcm <- Lens.view tcCache
@@ -1185,10 +1239,10 @@ mkFunInput resId e =
           withTicks ticks $ \tickDecls -> do
             resNm <- Id.make "result"
             appDecls <- mkFunApp resNm fun tmArgs tickDecls
-            let assn = [ Assignment (Id.unsafeMake "~RESULT") (Identifier resNm Nothing)
+            let assn = [ Assignment (Id.unsafeMake "~RESULT") Cont (Identifier resNm Nothing)
                        , NetDecl Nothing resNm resTy ]
             nm <- Id.makeBasic "block"
-            return (Right ((nm,assn++appDecls),Wire))
+            return (Right ((nm,assn++appDecls), Cont))
         else do
           (_,sp) <- Lens.use curCompNm
           throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
@@ -1196,11 +1250,11 @@ mkFunInput resId e =
       tcm <- Lens.view tcCache
       let eType = inferCoreTypeOf tcm e'
       (appExpr,appDecls) <- mkExpr False Concurrent (NetlistId (Id.unsafeMake "c$bb_res") eType) e'
-      let assn = Assignment (Id.unsafeMake "~RESULT") appExpr
+      let assn = Assignment (Id.unsafeMake "~RESULT") Cont appExpr
       nm <- if null appDecls
                then return (Id.unsafeMake "")
                else Id.makeBasic "block"
-      return (Right ((nm,appDecls ++ [assn]),Wire))
+      return (Right ((nm,appDecls ++ [assn]), Cont))
 
     go is0 n (Lam id_ e') = do
       lvl <- Lens.use curBBlvl
@@ -1213,38 +1267,30 @@ mkFunInput resId e =
       go is1 (n+(1::Int)) e''
 
     go _ _ (C.Var v) = do
-      let assn = Assignment (Id.unsafeMake "~RESULT") (Identifier (id2identifier v) Nothing)
-      return (Right ((Id.unsafeMake "",[assn]),Wire))
+      let assn = Assignment (Id.unsafeMake "~RESULT") Cont (Identifier (Id.unsafeFromCoreId v) Nothing)
+      return (Right ((Id.unsafeMake "",[assn]), Cont))
 
     go _ _ (Case scrut ty [alt]) = do
       tcm <- Lens.view tcCache
       let sTy = inferCoreTypeOf tcm scrut
       (projection,decls) <- mkProjection False (NetlistId (Id.unsafeMake "c$bb_res") sTy) scrut ty alt
-      let assn = Assignment (Id.unsafeMake "~RESULT") projection
+      let assn = Assignment (Id.unsafeMake "~RESULT") Cont projection
       nm <- if null decls
                then return (Id.unsafeMake "")
                else Id.makeBasic "projection"
-      return (Right ((nm,decls ++ [assn]),Wire))
+      return (Right ((nm,decls ++ [assn]), Cont))
 
     go _ _ (Case scrut ty alts@(_:_:_)) = do
-      tcm <- Lens.view tcCache
-      let scrutTy = inferCoreTypeOf tcm scrut
-      scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
-      ite <- Lens.use backEndITE
-      let wr = case iteAlts scrutHTy alts of
-                 Just _ | ite -> Wire
-                 _ -> Reg
-
       resNm <- Id.make "result"
+      resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
       -- It's safe to use 'mkUnsafeSystemName' here: only the name, not the
       -- unique, will be used
       let resId'  = NetlistId resNm ty
       selectionDecls <- mkSelection Concurrent resId' scrut ty alts []
-      resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
-      let assn = [ NetDecl' Nothing wr resNm (Right resTy) Nothing
-                 , Assignment (Id.unsafeMake "~RESULT") (Identifier resNm Nothing) ]
+      let assn = [ NetDecl' Nothing resNm resTy Nothing
+                 , Assignment (Id.unsafeMake "~RESULT") Cont (Identifier resNm Nothing) ]
       nm <- Id.makeBasic "selection"
-      return (Right ((nm,assn++selectionDecls),Wire))
+      return (Right ((nm,assn++selectionDecls), Cont))
 
     go is0 _ e'@(Let{}) = do
       tcm <- Lens.view tcCache
@@ -1258,15 +1304,15 @@ mkFunInput resId e =
           netDecls <- concatMapM mkNetDecl $ binders
           decls    <- concatMapM (uncurry mkDeclarations) binders
           nm <- Id.makeBasic "fun"
-          let resultId = id2identifier result
+          let resultId = Id.unsafeFromCoreId result
           -- TODO: Due to reasons lost in the mists of time, #1265 creates an
           -- assignement here, whereas it previously wouldn't. With the PR in
           -- tests break when reverting to the old behavior. In some cases this
           -- creates "useless" assignments. We should investigate whether we can
           -- get the old behavior back.
-          let resDecl = Assignment (Id.unsafeMake "~RESULT") (Identifier resultId Nothing)
-          return (Right ((nm,resDecl:netDecls ++ decls),Wire))
-        Nothing -> return (Right ((Id.unsafeMake "",[]),Wire))
+          let resDecl = Assignment (Id.unsafeMake "~RESULT") Cont (Identifier resultId Nothing)
+          return (Right ((nm,resDecl:netDecls ++ decls), Cont))
+        Nothing -> return (Right ((Id.unsafeMake "",[]), Cont))
 
     go is0 n (Tick _ e') = go is0 n e'
 

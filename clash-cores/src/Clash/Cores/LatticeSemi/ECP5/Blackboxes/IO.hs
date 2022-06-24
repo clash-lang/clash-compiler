@@ -54,7 +54,7 @@ bbTemplate bbCtx = do
         , (instPort "I", In,  Bit, dOut)
         , (instPort "O", Out, Bit, Identifier dIn Nothing)
         ])
-    , Assignment result (Identifier dIn Nothing)
+    , Assignment result Cont (Identifier dIn Nothing)
     ]
  where
   [  _HasCallStack
