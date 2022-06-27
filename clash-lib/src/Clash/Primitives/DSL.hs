@@ -13,6 +13,7 @@ instantiations.
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms   #-}
 {-# LANGUAGE QuasiQuotes       #-}
@@ -70,6 +71,9 @@ module Clash.Primitives.DSL
   , unsignedFromBitVector
   , boolFromBits
 
+  , unsafeToHighPolarity
+  , unsafeToLowPolarity
+
   -- ** Operations
   , andExpr
   , notExpr
@@ -104,6 +108,7 @@ import           Clash.Annotations.Primitive     (HDL (..), Primitive (..))
 import           Clash.Backend                   hiding (Usage, fromBV, toBV)
 import           Clash.Backend.VHDL              (VHDLState)
 import           Clash.Core.Var                  (Attr')
+import           Clash.Explicit.Signal           (ResetPolarity(..))
 import           Clash.Netlist.BlackBox.Util     (exprToString, renderElem)
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxTemplate, Element(Component, Text), Decl(..))
@@ -231,10 +236,10 @@ declaration
   -- ^ block builder
   -> State backend Doc
   -- ^ pretty printed block
-declaration blockName s = do
+declaration blockName c = do
   backend0 <- get
   let initState = emptyBlockState backend0
-      (BlockState {..}) = execState s initState
+      (BlockState {..}) = execState c initState
   put _bsBackend
   blockNameUnique <- Id.makeBasic blockName
   getAp $ blockDecl blockNameUnique (reverse _bsDeclarations)
@@ -895,6 +900,40 @@ andExpr nm a b = do
       Verilog       -> aIdent <> " && " <> bIdent
       SystemVerilog -> aIdent <> " && " <> bIdent
   assign nm $ TExpr Bool (Identifier (Id.unsafeMake andTxt) Nothing)
+
+-- | Massage a reset to work as active-high reset.
+unsafeToHighPolarity
+  :: Backend backend
+  => Text
+  -- ^ Name hint
+  -> HWType
+  -- ^ 'KnownDomain'
+  -> TExpr
+  -- ^ Reset signal
+  -> State (BlockState backend) TExpr
+unsafeToHighPolarity nm dom rExpr =
+  case extrResetPolarity dom of
+    ActiveHigh -> pure rExpr
+    ActiveLow -> notExpr nm rExpr
+
+extrResetPolarity :: HWType -> ResetPolarity
+extrResetPolarity (Void (Just (KnownDomain _ _ _ _ _ p))) = p
+extrResetPolarity p = error ("Internal error: expected KnownDomain, got: " <> show p)
+
+-- | Massage a reset to work as active-low reset.
+unsafeToLowPolarity
+  :: Backend backend
+  => Text
+  -- ^ Name hint
+  -> HWType
+  -- ^ 'KnownDomain'
+  -> TExpr
+  -- ^ Reset signal
+  -> State (BlockState backend) TExpr
+unsafeToLowPolarity nm dom rExpr =
+  case extrResetPolarity dom of
+    ActiveLow -> pure rExpr
+    ActiveHigh -> notExpr nm rExpr
 
 -- | Negate @(not)@ an expression, assigning it to a new identifier.
 notExpr

@@ -15,6 +15,12 @@ category:            Hardware
 build-type:          Simple
 extra-source-files:  CHANGELOG.md
 
+flag doctests
+  description:
+    You can disable testing with doctests using `-f-doctests`.
+  default: True
+  manual: True
+
 flag unittests
   description:
     You can disable testing with unittests using `-f-unittests`.
@@ -33,6 +39,7 @@ common basic-config
   default-extensions:
     BinaryLiterals
     DataKinds
+    DefaultSignatures
     DeriveAnyClass
     DeriveGeneric
     DerivingStrategies
@@ -69,13 +76,19 @@ common basic-config
     ghc-typelits-knownnat     >= 0.6,
     string-interpolate        ^>= 0.3,
     QuickCheck,
-    template-haskell
+    template-haskell,
+    containers                >=0.5    && <0.7
 
 library
   import: basic-config
   hs-source-dirs: src
 
   exposed-modules:
+    Clash.Cores.Xilinx.Internal
+    Clash.Cores.Xilinx.DcFifo
+    Clash.Cores.Xilinx.DcFifo.Internal.BlackBoxes
+    Clash.Cores.Xilinx.DcFifo.Internal.Instances
+    Clash.Cores.Xilinx.DcFifo.Internal.Types
     Clash.Cores.Xilinx.Floating
     Clash.Cores.Xilinx.Floating.Annotations
     Clash.Cores.Xilinx.Floating.BlackBoxes
@@ -94,9 +107,10 @@ library
 
   build-depends:
     clash-lib,
-    mtl       >= 2.1.1 && < 2.3,
-    reducers  >= 3.12.2 && < 4.0,
-    text      >= 1.2.2 && < 1.3
+    mtl                     >= 2.1.1 && < 2.3,
+    prettyprinter           >= 1.2.0.1  && < 1.8,
+    reducers                >= 3.12.2 && < 4.0,
+    text                    >= 1.2.2 && < 1.3
 
 test-suite unittests
   import: basic-config
@@ -113,9 +127,29 @@ test-suite unittests
     Test.Cores.SPI
     Test.Cores.UART
     Test.Cores.SPI.MultiSlave
+    Test.Cores.Xilinx.DcFifo
 
   build-depends:
     clash-cores,
+    clash-lib,
     tasty        >= 1.2 && < 1.5,
     tasty-hunit,
-    tasty-quickcheck
+    tasty-quickcheck,
+    hedgehog,
+    tasty-hedgehog >= 1.2.0
+
+test-suite doctests
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  main-is:          doctests.hs
+  ghc-options:      -Wall -Wcompat -threaded
+  hs-source-dirs:   test
+
+  if !flag(doctests)
+    buildable: False
+  else
+    build-depends:
+      base,
+      clash-prelude,
+      doctest-parallel >= 0.2 && < 0.3,
+      filepath
