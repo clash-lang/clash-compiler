@@ -13,6 +13,7 @@ instantiations.
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms   #-}
 {-# LANGUAGE QuasiQuotes       #-}
@@ -234,10 +235,10 @@ declaration
   -- ^ block builder
   -> State backend Doc
   -- ^ pretty printed block
-declaration blockName s = do
+declaration blockName c = do
   backend0 <- get
   let initState = emptyBlockState backend0
-      (BlockState {..}) = execState s initState
+      (BlockState {..}) = execState c initState
   put _bsBackend
   blockNameUnique <- Id.makeBasic blockName
   getAp $ blockDecl blockNameUnique (reverse _bsDeclarations)

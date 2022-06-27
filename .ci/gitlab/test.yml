@@ -80,6 +80,7 @@ prelude:doctests:
     - cabal v2-run -- clash-prelude:doctests -j${THREADS}
 
 # Tests run on local fast machines:
+
 suite:vhdl:
   extends: .test-common-local
   script:

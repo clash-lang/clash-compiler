@@ -132,10 +132,10 @@ runClashTest = defaultMain $ clashTestRoot
                       , buildTargets=BuildSpecific ["test_testBench"]
                       , hdlSim=hdlSimExcludeVivado
                       }
-       in runTest "FIR" _opts
        -- TODO: when BuildSpecific takes a fully qualified name, re-enable Vivado
        --
        -- see: https://github.com/clash-lang/clash-compiler/issues/2264#issue-1292390786
+       in runTest "FIR" _opts
     , runTest "Fifo" def{hdlSim=[]}
     , runTest "MAC" def
     , runTest "MatrixVect" def
@@ -266,7 +266,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "SymbiYosys" def{
             hdlTargets=[Verilog, SystemVerilog]
           , buildTargets=BuildSpecific ["topEntity"]
-          , hdlLoad=False
+          , hdlLoad=LoadNone
           , verificationTool=Just SymbiYosys
           , expectVerificationFail=Just (def, "Unreached cover statement at B")
           }
@@ -373,7 +373,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1254" def{hdlTargets=[VHDL,SystemVerilog],hdlSim=[]}
         , runTest "T1242" def{hdlSim=[]}
         , runTest "T1292" def{hdlTargets=[VHDL]}
-        , let _opts = def { hdlTargets = [VHDL], hdlLoad = False, hdlSim=[] }
+        , let _opts = def { hdlTargets = [VHDL], hdlLoad = LoadNone }
            in runTest "T1304" _opts
         , let _opts = def { hdlTargets=[VHDL]
                           , hdlSim=[]
@@ -445,17 +445,23 @@ runClashTest = defaultMain $ clashTestRoot
       -- The Cores.Xilinx.Floating tests require Vivado (and take much time to
       -- run).
       --
-      -- , clashTestGroup "Cores"
-      --   [ clashTestGroup "Xilinx"
-      --     [ runTest "Floating" def{ clashFlags=["-fclash-float-support"]
-      --                             , buildTargets=[ "addBasicTB"
-      --                                            , "addEnableTB"
-      --                                            , "addShortPLTB"
-      --                                            , "subBasicTB"
-      --                                            , "mulBasicTB"
-      --                                            , "divBasicTB"]}
-      --     ]
-      --   ]
+      , clashTestGroup "Cores"
+        [ clashTestGroup "Xilinx"
+          -- -- [ runTest "Floating" def{ clashFlags=["-fclash-float-support"]
+                                  -- -- , buildTargets=[ "addBasicTB"
+                                                 -- -- , "addEnableTB"
+                                                 -- -- , "addShortPLTB"
+                                                 -- -- , "subBasicTB"
+                                                 -- -- , "mulBasicTB"
+                                                 -- -- , "divBasicTB"]}
+          [ runTest "DcFifo" def{
+              clashFlags=["-fclash-hdlsyn", "Vivado"]
+            , hdlTargets=[VHDL, Verilog]
+            , hdlLoad=Bypass
+            , verilate=SimOnly
+            , hdlSim=[Vivado]}
+          ]
+        ]
       , clashTestGroup "CSignal"
         [ runTest "MAC" def{hdlSim=[]}
         , runTest "CBlockRamTest" def{hdlSim=[]}
@@ -895,7 +901,7 @@ runClashTest = defaultMain $ clashTestRoot
           runTest "SymbiYosys" def{
             hdlTargets=[Verilog, SystemVerilog]
           , buildTargets=BuildSpecific ["topEntity"]
-          , hdlLoad=False
+          , hdlLoad=LoadNone
           , verificationTool=Just SymbiYosys
           }
         ]

@@ -18,6 +18,14 @@
       "src": {"type": "hackage", "version": "2.0.0.0"}
     },
     {
+      "name": "hedgehog",
+      "src": {"type": "hackage", "version": "1.0.5"}
+    },
+    {
+      "name": "tasty-hedgehog",
+      "src": {"type": "hackage", "version": "1.2.0.0"}
+    },
+    {
       "name": "generic-lens",
       "src": {"type": "hackage", "version": "2.0.0.0"}
     },
@@ -84,6 +92,11 @@
         "--cabal-flag", "dynamic"
       ],
       "src": {"type": "local", "dir": "../../../../../clash-ghc"}
+    },
+    {
+      "name": "clash-cores",
+      "cabal_debian_options": ["--disable-haddock", "--disable-tests"],
+      "src": {"type": "local", "dir": "../../../../../clash-cores"}
     },
     {
       "name": "clash-testsuite",
