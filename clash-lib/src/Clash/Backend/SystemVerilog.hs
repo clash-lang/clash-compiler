@@ -60,7 +60,7 @@ import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
 import qualified Clash.Netlist.Id                     as Id
-import           Clash.Netlist.Types                  hiding (intWidth)
+import           Clash.Netlist.Types                  hiding (intWidth, usages, _usages)
 import           Clash.Netlist.Util
 import           Clash.Signal.Internal                (ActiveEdge (..))
 import           Clash.Util
@@ -101,6 +101,9 @@ makeLenses ''SystemVerilogState
 
 instance HasIdentifierSet SystemVerilogState where
   identifierSet = idSeen
+
+instance HasUsageMap SystemVerilogState where
+  usageMap = usages
 
 instance Backend SystemVerilogState where
   initBackend opts = SystemVerilogState

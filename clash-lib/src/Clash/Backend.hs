@@ -14,6 +14,7 @@ module Clash.Backend where
 
 import Data.HashMap.Strict                  (HashMap, empty)
 import Data.HashSet                         (HashSet)
+import Control.Lens                         (Lens')
 import Data.Monoid                          (Ap)
 import Data.Text                            (Text)
 import qualified Data.Text.Lazy             as LT
@@ -87,7 +88,10 @@ type DomainMap = HashMap Text VDomainConfiguration
 emptyDomainMap :: DomainMap
 emptyDomainMap = empty
 
-class HasIdentifierSet state => Backend state where
+class HasUsageMap s where
+  usageMap :: Lens' s UsageMap
+
+class (HasUsageMap state, HasIdentifierSet state) => Backend state where
   -- | Initial state for state monad
   initBackend :: ClashOpts -> state
 

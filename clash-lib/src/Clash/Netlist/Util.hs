@@ -77,7 +77,7 @@ import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, ConstrRepr'(..), DataRepr'(..), getDataRepr,
    uncheckedGetConstrRepr)
 import           Clash.Annotations.Primitive (HDL(VHDL))
-import           Clash.Backend           (HWKind(..), hdlHWTypeKind, hdlKind)
+import           Clash.Backend           (HWKind(..), hdlHWTypeKind, hdlKind, usageMap)
 import           Clash.Core.DataCon      (DataCon (..))
 import           Clash.Core.EqSolver     (typeEq)
 import           Clash.Core.FreeVars     (typeFreeVars, typeFreeVars')
@@ -1215,10 +1215,10 @@ assignmentWith
   -> Identifier
   -> NetlistMonad Declaration
 assignmentWith assign new i = do
-  usages <- Lens.use usageMap
+  u <- Lens.use usageMap
   SomeBackend b <- Lens.use backend
 
-  case lookupUsage i usages of
+  case lookupUsage i u of
     Just old | not $ canUse (hdlKind b) new old ->
       error $ mconcat
         [ "assignmentWith: Cannot assign as "

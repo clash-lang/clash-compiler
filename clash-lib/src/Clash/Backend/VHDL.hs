@@ -72,7 +72,7 @@ import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
 import qualified Clash.Netlist.Id                     as Id
-import           Clash.Netlist.Types                  hiding (intWidth)
+import           Clash.Netlist.Types                  hiding (intWidth, usages, _usages)
 import           Clash.Netlist.Util
 import           Clash.Util
   (SrcSpan, noSrcSpan, clogBase, curLoc, makeCached, indexNote)
@@ -123,6 +123,9 @@ makeLenses ''VHDLState
 
 instance HasIdentifierSet VHDLState where
   identifierSet = idSeen
+
+instance HasUsageMap VHDLState where
+  usageMap = usages
 
 instance Backend VHDLState where
   initBackend opts = VHDLState
