@@ -115,6 +115,6 @@ test-suite unittests
 
   build-depends:
     clash-cores,
-    tasty        >= 1.2 && < 1.3,
+    tasty        >= 1.2 && < 1.5,
     tasty-hunit,
     tasty-quickcheck

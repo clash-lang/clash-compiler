@@ -83,14 +83,53 @@ prelude:doctests:
 suite:vhdl:
   extends: .test-common-local
   script:
-    - cabal v2-run -- clash-testsuite -j$THREADS -p .VHDL --hide-successes
+    - cabal v2-run -- clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-vivado
 
 suite:verilog:
   extends: .test-common-local
   script:
-    - cabal v2-run -- clash-testsuite -j$THREADS -p .Verilog --hide-successes
+    - cabal v2-run -- clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-vivado
 
 suite:systemverilog:
   extends: .test-common-local
   script:
-    - cabal v2-run -- clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim
+    - cabal v2-run -- clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim --no-vivado
+
+# Vivado is quite slow, so we only run a subset of the tests on development branches
+# with it. The full testsuite gets run with Vivado every night on 'master'.
+suite:cores:
+  extends: .test-common-local
+  script:
+    - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
+    - cabal v2-run -- clash-testsuite -j$THREADS -p Cores --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+  tags:
+    - local
+    - vivado-2022.1-standard
+
+
+# Tests run on local fast machines with Vivado installed. We only run these at night
+# to save resources - as Vivado is quite slow to execute.
+.test-common-local-nightly:
+  extends: .test-common-local
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"  # When schedueled (at night)
+    - if: $CI_PIPELINE_SOURCE == "trigger"   # When triggered (manual triggers)
+    - if: '$CI_COMMIT_TAG != null'           # When tags are set (releases)
+
+suite:vivado:vhdl:
+  extends: .test-common-local-nightly
+  script:
+    - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
+    - cabal v2-run -- clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+  tags:
+    - local
+    - vivado-2022.1-standard
+
+suite:vivado:verilog:
+  extends: .test-common-local-nightly
+  script:
+    - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
+    - cabal v2-run -- clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+  tags:
+    - local
+    - vivado-2022.1-standard

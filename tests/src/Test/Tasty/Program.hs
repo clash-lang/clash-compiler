@@ -80,12 +80,15 @@ import Data.Typeable           ( Typeable                                 )
 import Data.Maybe              ( fromMaybe, isNothing                     )
 import System.FilePath.Glob    ( globDir1, compile                        )
 import System.Directory        ( findExecutable, getCurrentDirectory      )
+import System.Environment      ( getEnvironment                           )
 import System.Exit             ( ExitCode(..)                             )
-import System.Process          ( cwd, readCreateProcessWithExitCode, proc )
+import System.Process          ( cwd, env, readCreateProcessWithExitCode,
+                                 proc                                     )
 import Test.Tasty.Providers    ( IsTest (..), Result, TestName, TestTree,
                                  singleTest, testPassed, testFailed       )
 
 import NeatInterpolation    ( text )
+import Text.Regex.TDFA.Text ( Regex, execute )
 
 import qualified Data.Text    as T
 
@@ -94,6 +97,7 @@ data ExpectOutput a
   | ExpectStdErr a
   | ExpectEither a
   | ExpectNotStdErr a
+  | ExpectNotMatchStdOut !Regex
   | ExpectNothing
   deriving Functor
 
@@ -126,6 +130,8 @@ data TestProgram =
     -- ^ Whether a non-empty stdout means failure
     (Maybe FilePath)
     -- ^ Work directory
+    [(String, String)]
+    -- ^ Additional environment variables
       deriving (Typeable)
 
 data TestFailingProgram =
@@ -148,6 +154,8 @@ data TestFailingProgram =
     -- ^ Expected string in stderr
     (Maybe FilePath)
     -- ^ Work directory
+    [(String, String)]
+    -- ^ Additional environment variables
       deriving (Typeable)
 
 testOutput
@@ -202,7 +210,7 @@ testProgram
   -- ^ Optional working directory
   -> TestTree
 testProgram testName program opts glob stdO stdF workDir =
-  singleTest testName (TestProgram program opts glob stdO stdF workDir)
+  singleTest testName (TestProgram program opts glob stdO stdF workDir [])
 
 cleanNewlines :: T.Text -> T.Text
 cleanNewlines = T.replace "  " " " . T.replace "\n" " "
@@ -233,10 +241,10 @@ testFailingProgram
   -- ^ Optional working directory
   -> TestTree
 testFailingProgram testExitCode testName program opts glob stdO stdF errCode expectedOutput workDir =
-  singleTest testName (TestFailingProgram testExitCode program opts glob stdO stdF errCode expectedOutput workDir)
+  singleTest testName (TestFailingProgram testExitCode program opts glob stdO stdF errCode expectedOutput workDir [])
 
 instance IsTest TestProgram where
-  run opts (TestProgram program args glob stdO stdF workDir) _ = do
+  run opts (TestProgram program args glob stdO stdF workDir addEnv) _ = do
     execFound <- findExecutable program
 
     args' <- globArgs glob workDir args
@@ -244,12 +252,12 @@ instance IsTest TestProgram where
     -- Execute program
     case execFound of
       Nothing       -> return $ execNotFoundFailure program
-      Just progPath -> runProgram progPath args' stdO stdF workDir
+      Just progPath -> runProgram progPath args' stdO stdF workDir addEnv
 
   testOptions = return []
 
 instance IsTest TestFailingProgram where
-  run _opts (TestFailingProgram testExitCode program args glob stdO stdF errCode expectedOutput workDir) _ = do
+  run _opts (TestFailingProgram testExitCode program args glob stdO stdF errCode expectedOutput workDir addEnv) _ = do
     execFound <- findExecutable program
 
     args' <- globArgs glob workDir args
@@ -257,7 +265,7 @@ instance IsTest TestFailingProgram where
     -- Execute program
     case execFound of
       Nothing       -> return $ execNotFoundFailure program
-      Just progPath -> runFailingProgram testExitCode progPath args stdO stdF errCode expectedOutput workDir
+      Just progPath -> runFailingProgram testExitCode progPath args stdO stdF errCode expectedOutput workDir addEnv
 
   testOptions = return []
 
@@ -274,9 +282,12 @@ runProgram
   -- ^ Whether a non-empty stdout means failure
   -> Maybe FilePath
   -- ^ Optional working directory
+  -> [(String, String)]
+  -- ^ Additional environment variables
   -> IO Result
-runProgram program args stdO stdF workDir = do
-  let cp = (proc program args) { cwd = workDir }
+runProgram program args stdO stdF workDir addEnv = do
+  e <- getEnvironment
+  let cp = (proc program args) { cwd = workDir, env = Just (addEnv ++ e) }
   (exitCode, stdout, stderr) <- readCreateProcessWithExitCode cp ""
 
   -- For debugging: Uncomment this to print executable and and its arguments
@@ -315,9 +326,12 @@ runFailingProgram
   -- ^ Expected string in stderr
   -> Maybe FilePath
   -- ^ Optional working directory
+  -> [(String, String)]
+  -- ^ Additional environment variables
   -> IO Result
-runFailingProgram testExitCode program args stdO errOnEmptyStderr expectedCode expectedStderr workDir = do
-  let cp = (proc program args) { cwd = workDir }
+runFailingProgram testExitCode program args stdO errOnEmptyStderr expectedCode expectedStderr workDir addEnv = do
+  e <- getEnvironment
+  let cp = (proc program args) { cwd = workDir, env = Just (addEnv ++ e) }
   (exitCode0, stdout, stderr) <- readCreateProcessWithExitCode cp ""
 
   -- For debugging: Uncomment this to print executable and and its arguments
@@ -356,6 +370,10 @@ runFailingProgram testExitCode program args stdO errOnEmptyStderr expectedCode e
                 unexpectedStd "stdout or stderr" program args code stderrT stdoutT r
               ExpectNotStdErr r | cleanNewlines r `T.isInfixOf` cleanNewlines stderrT ->
                 unexpectedNonEmptyStderr program args code stderrT stdoutT
+              ExpectNotMatchStdOut re | Right (Just{}) <- execute re stdoutT ->
+                unexpectedNonEmptyStdout program args code stderrT stdoutT
+              ExpectNotMatchStdOut re | Left err <- execute re stdoutT ->
+                testFailed err
               _ ->
                 if testExitCode then
                   case expectedCode of

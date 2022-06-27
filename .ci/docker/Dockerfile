@@ -124,11 +124,12 @@ FROM ubuntu:$UBUNTU_VERSION AS run
 LABEL vendor="QBayLogic B.V." maintainer="devops@qbaylogic.com"
 ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH="$PATH:/opt/bin:/root/.ghcup/bin"
 
-ARG DEPS_RUNTIME="ca-certificates ccache curl g++ gcc git jq libc6-dev libgmp10-dev libgnat-9 libllvm11 libreadline8 libtinfo-dev libtcl8.6 make perl python3 ssh zlib1g-dev zlibc zstd"
+ARG DEPS_RUNTIME="ca-certificates ccache curl g++ gcc git jq libc6-dev libgmp10-dev libgnat-9 libllvm11 libreadline8 libtinfo-dev libtcl8.6 make perl python3 ssh zlib1g-dev zlibc zstd locales libtinfo5 libx11-6"
 RUN apt-get update \
  && apt-get install -y --no-install-recommends $DEPS_RUNTIME \
  && apt-get clean \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ && locale-gen en_US.UTF-8
 
 COPY --from=build-ghdl /opt /opt
 COPY --from=build-iverilog /opt /opt

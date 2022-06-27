@@ -74,7 +74,7 @@ instance IsTest VerilatorMakeTest where
         <> srcs
 
     verilator workDir args =
-      TestProgram "verilator" args NoGlob PrintNeither False (Just workDir)
+      TestProgram "verilator" args NoGlob PrintNeither False (Just workDir) []
 
     runVerilator workDir args =
       run optionSet (verilator workDir args) progressCallback
@@ -109,11 +109,11 @@ instance IsTest VerilatorSimTest where
         pure (testPassed "Ignoring test due to --no-verilator")
    where
     verilated workDir exe =
-      TestProgram exe [] NoGlob PrintNeither nonEmptyFail (Just workDir)
+      TestProgram exe [] NoGlob PrintNeither nonEmptyFail (Just workDir) []
 
     failingVerilated workDir exe (exit, expectedErr) =
       TestFailingProgram (testExitCode exit) exe [] NoGlob PrintNeither False
-        (specificExitCode exit) (ExpectEither expectedErr) (Just workDir)
+        (specificExitCode exit) (ExpectEither expectedErr) (Just workDir) []
 
   testOptions =
     coerce (coerce (testOptions @TestProgram) <> [Option (Proxy @Verilator)])
