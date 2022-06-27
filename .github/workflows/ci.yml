@@ -62,7 +62,7 @@ jobs:
         run: stack build
 
       - name: Run Vector testsuite
-        run: stack run -- clash-testsuite --hide-successes -p .Vector. --no-ghdl --no-verilator --no-modelsim
+        run: stack run -- clash-testsuite --hide-successes -p .Vector. --no-ghdl --no-verilator --no-modelsim --no-vivado
 
   build_and_test:
     # Only run for external PRs
@@ -92,7 +92,7 @@ jobs:
 
     # Run steps inside the clash CI docker image
     container:
-      image: ghcr.io/clash-lang/clash-ci-${{ matrix.ghc }}:2022-05-10
+      image: ghcr.io/clash-lang/clash-ci-${{ matrix.ghc }}:2022-06-23
 
       env:
         THREADS: 2
@@ -139,10 +139,10 @@ jobs:
           cabal v2-test clash-cosim
 
       - name: Testsuite (VHDL)
-        run: cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .VHDL
+        run: cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .VHDL --no-vivado
 
       - name: Testsuite (Verilog)
-        run: cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .Verilog
+        run: cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .Verilog --no-vivado
 
       - name: Testsuite (SystemVerilog)
-        run: cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .SystemVerilog --no-modelsim
+        run: cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .SystemVerilog --no-modelsim --no-vivado

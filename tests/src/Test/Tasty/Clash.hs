@@ -27,9 +27,10 @@ import           Test.Tasty.Runners
 import           Test.Tasty.Common
 import           Test.Tasty.Ghdl
 import           Test.Tasty.Iverilog
-import           Test.Tasty.Modelsim
+import           Test.Tasty.Modelsim hiding (ModelSim)
 import           Test.Tasty.SymbiYosys
-import           Test.Tasty.Verilator
+import           Test.Tasty.Verilator hiding (Verilator)
+import           Test.Tasty.Vivado hiding (Vivado)
 
 {- Note [copy data files hack]
 
@@ -84,7 +85,7 @@ getBuildTargets (TestOptions{buildTargets=BuildSpecific targets}) = targets
 getBuildTargets TestOptions{hdlSim, buildTargets=BuildAuto}
   -- We could be clever by adding test bench info to manifest files and
   -- using that in this testsuite
-  | hdlSim = ["testBench"]
+  | not (null hdlSim) = ["testBench"]
   | otherwise = ["topEntity"]
 
 -- | Possible verification tools
@@ -95,9 +96,11 @@ data VerificationTool = SymbiYosys
 -- a test is only relevant with one type of tool.
 data Verilate = SimAndVerilate | VerilateOnly | SimOnly
 
+data Sim = Vivado | GHDL | ModelSim | Verilator deriving Eq
+
 data TestOptions =
   TestOptions
-    { hdlSim :: Bool
+    { hdlSim :: [Sim]
     -- ^ Run hdl simulators (GHDL, ModelSim, etc.)
     , hdlLoad :: Bool
     -- ^ Load hdl into simulator (GHDL, ModelSim, etc.). Disabling this will
@@ -137,7 +140,7 @@ allTargets = [VHDL, Verilog, SystemVerilog]
 instance Default TestOptions where
   def =
     TestOptions
-      { hdlSim=True
+      { hdlSim=[GHDL, ModelSim, Vivado]
       , hdlLoad=True
       , expectClashFail=Nothing
       , expectSimFail=Nothing
@@ -150,6 +153,10 @@ instance Default TestOptions where
       , vvpStdoutNonEmptyFail=True
       , verilate=SimAndVerilate
       }
+
+-- | All 'Sim's excluding Vivado
+hdlSimExcludeVivado :: [Sim]
+hdlSimExcludeVivado = [GHDL, ModelSim]
 
 -- | Directory where testbenches live.
 sourceDirectory :: String
@@ -228,7 +235,7 @@ instance IsTest ClashGenTest where
       Just exit -> run optionSet (failingProgram oDir exit) progressCallback
    where
     program oDir =
-      TestProgram "clash" (args oDir) NoGlob PrintNeither False Nothing
+      TestProgram "clash" (args oDir) NoGlob PrintNeither False Nothing []
 
     failingProgram oDir (testExit, expectedErr) = let
         -- TODO: there's no easy way to test for the absence of something in stderr
@@ -238,7 +245,7 @@ instance IsTest ClashGenTest where
       in
       TestFailingProgram
         (testExitCode testExit) "clash" (args oDir) NoGlob PrintNeither False
-        (specificExitCode testExit) expected Nothing
+        (specificExitCode testExit) expected Nothing []
 
     args oDir =
       [ target
@@ -277,7 +284,7 @@ instance IsTest ClashBinaryTest where
       else pure buildRes
    where
     buildProgram oDir =
-      TestProgram "clash" (buildArgs oDir) NoGlob PrintStdErr False Nothing
+      TestProgram "clash" (buildArgs oDir) NoGlob PrintStdErr False Nothing []
 
     buildArgs oDir =
       [ "-package", "clash-testsuite"
@@ -289,7 +296,7 @@ instance IsTest ClashBinaryTest where
       ]
 
     execProgram oDir =
-      TestProgram (oDir </> "out") (oDir:cbExtraExecArgs) NoGlob PrintStdErr False Nothing
+      TestProgram (oDir </> "out") (oDir:cbExtraExecArgs) NoGlob PrintStdErr False Nothing []
 
   testOptions = coerce (testOptions @TestProgram)
 
@@ -383,6 +390,28 @@ verilatorTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
     | t <- getBuildTargets opts
     ]
 
+-- | Generate a test tree for running Vivado.
+--
+-- Skips simulation tests if a failure is expected (may have a different error
+-- message from other simulators)
+vivadoTests
+  :: HDL
+  -> TestOptions
+  -> IO FilePath
+  -> String
+  -> ( [(TestName, TestTree)]
+     , [(TestName, TestTree)]
+     )
+vivadoTests target opts@TestOptions{..} tmpDir modName = ([], simTests)
+ where
+  simTests =
+    [ ( buildName t
+      , singleTest "Vivado" (VivadoTest target tmpDir modName t)
+      )
+    | t <- getBuildTargets opts, False <- [isJust expectSimFail]
+    ]
+  buildName t = "Vivado (sim " <> t <> ")"
+
 -- | Generate a test tree for running SymbiYosys
 sbyTests :: TestOptions -> IO FilePath -> ([(TestName, TestTree)])
 sbyTests opts@TestOptions {..} tmpDir =
@@ -407,6 +436,7 @@ runTest1 modName opts@TestOptions{..} path target =
         <> (case verificationTool of
               Nothing -> []
               Just SymbiYosys -> tail $ sequenceTests (show target : path) (clashTest tmpDir : sbyTests opts tmpDir))
+        <> tail (sequenceTests (show target : path) (clashTest tmpDir : vivado tmpDir))
  where
   mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
   sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))
@@ -421,12 +451,11 @@ runTest1 modName opts@TestOptions{..} path target =
     , cgOutputDirectory=tmpDir
     }))
 
-  buildAndSimTests (buildTests, simTests) =
+  buildAndSimTests sim (buildTests, simTests) =
     case (isJust expectClashFail, hdlLoad, hdlSim) of
       (True, _, _) -> []
       (_, False, _) -> []
-      (_, _, False) -> buildTests
-      _ -> buildTests <> simTests
+      (_, _, sims) -> buildTests <> (if sim `elem` sims then simTests else [])
 
   -- HACK: We want to run verilator and simulator tests independently if they
   -- are both going to be run, otherwise failures from whichever comes first
@@ -449,18 +478,23 @@ runTest1 modName opts@TestOptions{..} path target =
   -- where groups B and C are independent of each other, but both dependent on
   -- the success of Task A1.
 
+  vivado tmpDir =
+    case target of
+      SystemVerilog -> []
+      _ -> buildAndSimTests Vivado (vivadoTests target opts tmpDir modName)
+
   nonVerilator tmpDir =
     case target of
-      VHDL -> buildAndSimTests (vhdlTests opts tmpDir)
+      VHDL -> buildAndSimTests GHDL (vhdlTests opts tmpDir)
       Verilog ->
         case verilate of
           VerilateOnly -> []
-          _ -> buildAndSimTests (verilogTests opts tmpDir)
+          _ -> buildAndSimTests ModelSim (verilogTests opts tmpDir)
 
       SystemVerilog ->
         case verilate of
           VerilateOnly -> []
-          _ -> buildAndSimTests (systemVerilogTests opts tmpDir)
+          _ -> buildAndSimTests ModelSim (systemVerilogTests opts tmpDir)
 
   verilator tmpDir =
     case target of
@@ -468,7 +502,7 @@ runTest1 modName opts@TestOptions{..} path target =
       _ ->
         case verilate of
           SimOnly -> []
-          _ -> buildAndSimTests (verilatorTests opts tmpDir)
+          _ -> buildAndSimTests Verilator (verilatorTests opts tmpDir)
 
 runTest
   :: String

@@ -22,6 +22,14 @@
       "src": {"type": "hackage", "version": "2.0.0.0"}
     },
     {
+      "name": "regex-base",
+      "src": {"type": "hackage", "version": "0.94.0.2"}
+    },
+    {
+      "name": "regex-tdfa",
+      "src": {"type": "hackage", "version": "1.3.1.2"}
+    },
+    {
       "name": "concurrent-extra",
       "src": {"type": "hackage", "version": "0.7.0.12"},
       "cabal_debian_options": ["--disable-tests"]
@@ -86,7 +94,7 @@
         "--depends", "haskell-clash-testsuite-utils:ghdl-llvm"
       ],
       "after_install": {
-        "cmd": ["clash-testsuite", "-p", "Calculator.Verilog"],
+        "cmd": ["clash-testsuite", "-p", "Calculator.Verilog", "--no-vivado"],
         "env": {"USE_GLOBAL_CLASH": "1"},
         "cwd": "../../../../..",
         "comment": "Sanity check"

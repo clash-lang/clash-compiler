@@ -118,39 +118,45 @@ clashTestGroup testName testTrees =
 runClashTest :: IO ()
 runClashTest = defaultMain $ clashTestRoot
   [ clashTestGroup "examples"
-    [ runTest "ALU" def{hdlSim=False}
-    , let _opts = def { hdlSim=False
+    [ runTest "ALU" def{hdlSim=[]}
+    , let _opts = def { hdlSim=[]
                       , hdlTargets=[VHDL]
                       , buildTargets=BuildSpecific ["blinker"]
                       }
        in runTest "Blinker" _opts
-    , runTest "BlockRamTest" def{hdlSim=False}
+    , runTest "BlockRamTest" def{hdlSim=[]}
     , runTest "Calculator" def
-    , runTest "CHIP8" def{hdlSim=False}
-    , runTest "CochleaPlus" def{hdlSim=False}
+    , runTest "CHIP8" def{hdlSim=[]}
+    , runTest "CochleaPlus" def{hdlSim=[]}
     , let _opts = def { clashFlags=["-fclash-component-prefix", "test"]
                       , buildTargets=BuildSpecific ["test_testBench"]
+                      , hdlSim=hdlSimExcludeVivado
                       }
        in runTest "FIR" _opts
-    , runTest "Fifo" def{hdlSim=False}
+       -- TODO: when BuildSpecific takes a fully qualified name, re-enable Vivado
+       --
+       -- see: https://github.com/clash-lang/clash-compiler/issues/2264#issue-1292390786
+    , runTest "Fifo" def{hdlSim=[]}
     , runTest "MAC" def
     , runTest "MatrixVect" def
-    , runTest "Queens" def{hdlSim=False}
-    , runTest "Reducer" def{hdlSim=False}
-    , runTest "Sprockell" def{hdlSim=False}
-    , runTest "Windows" def{hdlSim=False}
+    , runTest "Queens" def{hdlSim=[]}
+    , runTest "Reducer" def{hdlSim=[]}
+    , runTest "Sprockell" def{hdlSim=[]}
+    , runTest "Windows" def{hdlSim=[]}
     , clashTestGroup "crc32"
         [ runTest "CRC32" def
         ]
     , clashTestGroup "i2c"
         [ let _opts = def { clashFlags=["-O2","-fclash-component-prefix","test"]
                         , buildTargets=BuildSpecific ["test_i2c"]
-                        , hdlSim=False
+                        , hdlSim=[]
                         }
            in runTest "I2C" _opts
+           -- TODO: this uses finish_and_return, with is Icarus Verilog only.
+           -- see: https://github.com/clash-lang/clash-compiler/issues/2265
         , let _opts = def { buildTargets = BuildSpecific ["system"]
                           , hdlTargets = [Verilog]
-                          , hdlSim = True
+                          , hdlSim = hdlSimExcludeVivado
                           , vvpStdoutNonEmptyFail = False
                           , verilate = SimOnly
                           }
@@ -246,7 +252,7 @@ runClashTest = defaultMain $ clashTestRoot
                           , buildTargets=BuildSpecific ["fails" <> show i | i <- [(1::Int)..n]]
                           -- Only QuestaSim supports simulating SVA/PSL, but ModelSim does check
                           -- for syntax errors.
-                          , hdlSim=False
+                          , hdlSim=[]
                           }
            in runTest "NonTemporalPSL" _opts
         , let is = [(1::Int)..13] \\ [4, 6, 7, 8, 10, 11, 12] in
@@ -255,7 +261,7 @@ runClashTest = defaultMain $ clashTestRoot
           , buildTargets=BuildSpecific ["fails" <> show i | i <- is]
           -- Only QuestaSim supports simulating SVA/PSL, but ModelSim does check
           -- for syntax errors.
-          , hdlSim=False
+          , hdlSim=[]
           }
         , runTest "SymbiYosys" def{
             hdlTargets=[Verilog, SystemVerilog]
@@ -309,27 +315,27 @@ runClashTest = defaultMain $ clashTestRoot
     , clashTestGroup "shouldwork"
       [ clashTestGroup "AutoReg"
         [ outputTest "AutoReg" def
-        , runTest "T1507" def{hdlSim=False}
-        , let _opts = def{hdlSim=False, hdlTargets=[VHDL]}
+        , runTest "T1507" def{hdlSim=[]}
+        , let _opts = def{hdlSim=[], hdlTargets=[VHDL]}
            in runTest "T1632" _opts
         ]
       , clashTestGroup "Basic"
-        [ runTest "AES" def{hdlSim=False}
-        , runTest "BangData" def{hdlSim=False}
-        , runTest "CaseOfErr" def{hdlTargets=[VHDL],hdlSim=False}
-        , runTest "Trace" def{hdlSim=False}
-        , runTest "DivMod" def{hdlSim=False}
+        [ runTest "AES" def{hdlSim=[]}
+        , runTest "BangData" def{hdlSim=[]}
+        , runTest "CaseOfErr" def{hdlTargets=[VHDL],hdlSim=[]}
+        , runTest "Trace" def{hdlSim=[]}
+        , runTest "DivMod" def{hdlSim=[]}
         , runTest "DivZero" def
-        , runTest "LambdaDrop" def{hdlSim=False}
-        , runTest "IrrefError" def{hdlSim=False}
+        , runTest "LambdaDrop" def{hdlSim=[]}
+        , runTest "IrrefError" def{hdlSim=[]}
 #ifdef CLASH_MULTIPLE_HIDDEN
         , runTest "MultipleHidden" def
 #endif
         , outputTest "NameInlining" def
-        , runTest "NameInstance" def{hdlSim=False}
+        , runTest "NameInstance" def{hdlSim=[]}
         , outputTest "NameInstance" def
         , outputTest "SetName" def{hdlTargets=[VHDL]}
-        , runTest "PatError" def{hdlSim=False}
+        , runTest "PatError" def{hdlSim=[]}
         , runTest "ByteSwap32" def
         , runTest "CharTest" def
         , runTest "ClassOps" def
@@ -337,68 +343,72 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "DeepseqX" def
         , runTest "LotOfStates" def
         , let _opts = def { buildTargets = BuildSpecific ["nameoverlap"]
-                          , hdlSim = False
+                          , hdlSim = []
                           }
            in runTest "NameOverlap" _opts
-        , runTest "NestedPrimitives" def{hdlSim=False}
-        , runTest "NestedPrimitives2" def{hdlSim=False}
+        , runTest "NestedPrimitives" def{hdlSim=[]}
+        , runTest "NestedPrimitives2" def{hdlSim=[]}
         , runTest "NORX" def
-        , runTest "Parameters" def{hdlTargets=[VHDL]}
+        -- TODO: Vivado infrastructure tries to simulate topEntity.testBench
+        -- instead of testBench.testBench
+        --
+        -- tracked: https://github.com/clash-lang/clash-compiler/issues/2266
+        , runTest "Parameters" def{hdlTargets=[VHDL], hdlSim=hdlSimExcludeVivado}
         , runTest "PopCount" def
-        , runTest "RecordSumOfProducts" def{hdlSim=False}
+        , runTest "RecordSumOfProducts" def{hdlSim=[]}
         , runTest "Replace" def
-        , runTest "TestIndex" def{hdlSim=False}
+        , runTest "TestIndex" def{hdlSim=[]}
         , runTest "Time" def
-        , runTest "Shift" def{hdlSim=False}
-        , runTest "SimpleConstructor" def{hdlSim=False}
-        , runTest "SomeNatVal" def{hdlTargets=[VHDL],hdlSim=False}
+        , runTest "Shift" def{hdlSim=[]}
+        , runTest "SimpleConstructor" def{hdlSim=[]}
+        , runTest "SomeNatVal" def{hdlTargets=[VHDL],hdlSim=[]}
         , runTest "TyEqConstraints" def{
-            hdlSim=False
+            hdlSim=[]
           , buildTargets=BuildSpecific ["top1"]
           }
-        , runTest "T1012" def{hdlSim=False}
-        , runTest "T1240" def{hdlSim=False}
-        , let _opts = def {hdlTargets = [VHDL], hdlSim = False}
+        , runTest "T1012" def{hdlSim=[]}
+        , runTest "T1240" def{hdlSim=[]}
+        , let _opts = def {hdlTargets = [VHDL], hdlSim = []}
            in runTest "T1297" _opts
-        , runTest "T1254" def{hdlTargets=[VHDL,SystemVerilog],hdlSim=False}
-        , runTest "T1242" def{hdlSim=False}
+        , runTest "T1254" def{hdlTargets=[VHDL,SystemVerilog],hdlSim=[]}
+        , runTest "T1242" def{hdlSim=[]}
         , runTest "T1292" def{hdlTargets=[VHDL]}
-        , let _opts = def { hdlTargets = [VHDL], hdlLoad = False }
+        , let _opts = def { hdlTargets = [VHDL], hdlLoad = False, hdlSim=[] }
            in runTest "T1304" _opts
         , let _opts = def { hdlTargets=[VHDL]
-                          , hdlSim=False
+                          , hdlSim=[]
                           , clashFlags=["-main-is", "plus"]
                           , buildTargets=BuildSpecific ["plus"]
                           }
            in runTest "T1305" _opts
-        , let _opts = def {hdlTargets = [VHDL], hdlSim = False}
+        , let _opts = def {hdlTargets = [VHDL], hdlSim = []}
            in runTest "T1316" _opts
         , runTest "T1322" def{hdlTargets=[VHDL]}
-        , let _opts = def {hdlTargets = [VHDL], hdlSim = False}
+        , let _opts = def {hdlTargets = [VHDL], hdlSim = []}
            in runTest "T1340" _opts
-        , let _opts = def { hdlTargets = [VHDL], hdlSim = False}
+        , let _opts = def { hdlTargets = [VHDL], hdlSim = []}
            in runTest "T1354A" _opts
-        , let _opts = def { hdlTargets = [VHDL], hdlSim = False}
+        , let _opts = def { hdlTargets = [VHDL], hdlSim = []}
            in runTest "T1354B" _opts
         , runTest "T1402" def{clashFlags=["-O"]}
-        , runTest "T1402b" def{hdlTargets=[VHDL], hdlSim=False}
+        , runTest "T1402b" def{hdlTargets=[VHDL], hdlSim=[]}
         , runTest "T1556" def
-        , runTest "T1591" def{hdlTargets=[VHDL], hdlSim=False}
-        , runTest "TagToEnum" def{hdlSim=False}
-        , runTest "TwoFunctions" def{hdlSim=False}
-        , runTest "XToError" def{hdlSim=False}
+        , runTest "T1591" def{hdlTargets=[VHDL], hdlSim=[]}
+        , runTest "TagToEnum" def{hdlSim=[]}
+        , runTest "TwoFunctions" def{hdlSim=[]}
+        , runTest "XToError" def{hdlSim=[]}
         ]
       , clashTestGroup "BitVector"
         [ runTest "Box" def
         , runTest "BoxGrow" def
         , runTest "CLZ" def
-        , runTest "RePack" def{hdlSim=False}
+        , runTest "RePack" def{hdlSim=[]}
         , runTest "ReduceZero" def
         , runTest "ReduceOne" def
         , runTest "ExtendingNumZero" def
         , runTest "AppendZero" def
         , runTest "GenericBitPack" def{clashFlags=["-fconstraint-solver-iterations=15"]}
-        , runTest "UnpackUndefined" def{hdlSim=False}
+        , runTest "UnpackUndefined" def{hdlSim=[]}
         ]
       , clashTestGroup "BlackBox"
         [ outputTest "TemplateFunction" def{hdlTargets=[VHDL]}
@@ -409,22 +419,28 @@ runClashTest = defaultMain $ clashTestRoot
         , outputTest "MultiResult" def{hdlTargets=[VHDL]}
         , runTest "DSL" def
         , runTest "MultiResult" def
-        , runTest "T919" def{hdlSim=False}
+        , runTest "T919" def{hdlSim=[]}
         , runTest "T1524" def
         , runTest "T1786" def{
             hdlTargets=[VHDL]
           , buildTargets=BuildSpecific ["testEnableTB", "testBoolTB"]
+          , hdlSim=hdlSimExcludeVivado -- triggers error in vivado
+          -- TODO: this also runs up against problems with BuildSpecific names,
+          -- see https://github.com/clash-lang/clash-compiler/issues/2264
           }
         , outputTest "LITrendering" def{hdlTargets=[Verilog]}
         , runTest "T2117" def{
             clashFlags=["-fclash-aggressive-x-optimization-blackboxes"]
           , hdlTargets=[VHDL]
+          , hdlSim=hdlSimExcludeVivado
+          -- TODO: Enable Vivado tests
+          -- See https://github.com/clash-lang/clash-compiler/issues/2264
           , buildTargets=BuildSpecific [ "testBenchUndefBV"
                                        , "testBenchUndefTup"
                                        , "testBenchPartialDefTup"]}
         ]
       , clashTestGroup "BoxedFunctions"
-        [ runTest "DeadRecursiveBoxed" def{hdlSim=False}
+        [ runTest "DeadRecursiveBoxed" def{hdlSim=[]}
         ]
       -- The Cores.Xilinx.Floating tests require Vivado (and take much time to
       -- run).
@@ -441,8 +457,8 @@ runClashTest = defaultMain $ clashTestRoot
       --     ]
       --   ]
       , clashTestGroup "CSignal"
-        [ runTest "MAC" def{hdlSim=False}
-        , runTest "CBlockRamTest" def{hdlSim=False}
+        [ runTest "MAC" def{hdlSim=[]}
+        , runTest "CBlockRamTest" def{hdlSim=[]}
         ]
 #ifdef COSIM
       , clashTestGroup "CoSim"
@@ -476,9 +492,9 @@ runClashTest = defaultMain $ clashTestRoot
         ]
       , clashTestGroup "CustomReprs"
         [ clashTestGroup "ZeroWidth"
-          [ runTest "ZeroWidth" def{hdlSim=False}
+          [ runTest "ZeroWidth" def{hdlSim=[]}
           ]
-        , runTest "T694" def{hdlSim=False,hdlTargets=[VHDL]}
+        , runTest "T694" def{hdlSim=[],hdlTargets=[VHDL]}
         ]
       , clashTestGroup "DDR"
         [ runTest "DDRinGA" def
@@ -504,11 +520,11 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "Fixed"
         [ runTest "Mixer" def
         , runTest "SFixedTest" def
-        , runTest "SatWrap" def{hdlSim=False}
+        , runTest "SatWrap" def{hdlSim=[]}
         , runTest "ZeroInt" def
         ]
       , clashTestGroup "Floating"
-        [ runTest "FloatPack" def{hdlSim=False, clashFlags=["-fclash-float-support"]}
+        [ runTest "FloatPack" def{hdlSim=[], clashFlags=["-fclash-float-support"]}
         , runTest "FloatConstFolding" def{clashFlags=["-fclash-float-support"]}
         , runTest "T1803" def{clashFlags=["-fclash-float-support"]}
         ]
@@ -521,8 +537,8 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Tail" def
         , runTest "TailM" def
         , runTest "TailOfTail" def
-        , runTest "T1310" def{hdlSim=False}
-        , runTest "T1536" def{hdlSim=False}
+        , runTest "T1310" def{hdlSim=[]}
+        , runTest "T1536" def{hdlSim=[]}
         ]
       , clashTestGroup "HOPrim"
         [ runTest "HOIdx" def
@@ -535,30 +551,30 @@ runClashTest = defaultMain $ clashTestRoot
       ]
       , clashTestGroup "Issues" $
         [ clashLibTest "T508" def
-        , let _opts = def { hdlSim = False, hdlTargets = [Verilog] }
+        , let _opts = def { hdlSim = [], hdlTargets = [Verilog] }
            in runTest "T1187" _opts
         , clashLibTest "T1388" def{hdlTargets=[VHDL]}
         , outputTest "T1171" def
         , clashLibTest "T1439" def{hdlTargets=[VHDL]}
-        , runTest "T1477" def{hdlSim=False}
-        , runTest "T1506A" def{hdlSim=False, clashFlags=["-fclash-aggressive-x-optimization-blackboxes"]}
+        , runTest "T1477" def{hdlSim=[]}
+        , runTest "T1506A" def{hdlSim=[], clashFlags=["-fclash-aggressive-x-optimization-blackboxes"]}
         , outputTest "T1506B" def
             { clashFlags=["-fclash-aggressive-x-optimization-blackboxes"]
             , ghcFlags=["-itests/shouldwork/Issues"]
             }
-        , runTest "T1615" def{hdlSim=False, hdlTargets=[Verilog]}
-        , runTest "T1663" def{hdlTargets=[VHDL], hdlSim=False}
+        , runTest "T1615" def{hdlSim=[], hdlTargets=[Verilog]}
+        , runTest "T1663" def{hdlTargets=[VHDL], hdlSim=[]}
         , runTest "T1669_DEC" def{hdlTargets=[VHDL]}
         , runTest "T1715" def
-        , runTest "T1721" def{hdlSim=False}
-        , runTest "T1606A" def{hdlSim=False}
-        , runTest "T1606B" def{hdlSim=False}
-        , runTest "T1742" def{hdlSim=False, buildTargets=BuildSpecific ["shell"]}
-        , runTest "T1756" def{hdlSim=False}
+        , runTest "T1721" def{hdlSim=[]}
+        , runTest "T1606A" def{hdlSim=[]}
+        , runTest "T1606B" def{hdlSim=[]}
+        , runTest "T1742" def{hdlSim=[], buildTargets=BuildSpecific ["shell"]}
+        , runTest "T1756" def{hdlSim=[]}
         , outputTest "T431" def{hdlTargets=[VHDL]}
         , clashLibTest "T779" def{hdlTargets=[Verilog]}
-        , outputTest "T1881" def{hdlSim=False}
-        , runTest "T1921" def{hdlTargets=[Verilog], hdlSim=False}
+        , outputTest "T1881" def{hdlSim=[]}
+        , runTest "T1921" def{hdlTargets=[Verilog], hdlSim=[]}
         , runTest "T1933" def{
             hdlTargets=[VHDL]
           , expectClashFail=Just (NoTestExitCode, "NOT:WARNING")
@@ -569,14 +585,14 @@ runClashTest = defaultMain $ clashTestRoot
         -- for T2046. However, doing so completely breaks HDL loading because
         -- it completely ignores the BuildSpecific...
         , runTest "T2046" def
-            { hdlSim=False
+            { hdlSim=[]
             , clashFlags=["-Werror"]
             , buildTargets=BuildSpecific["top_bit", "top_bitvector", "top_index", "top_signed", "top_unsigned"]
             }
         , runTest "T2046B" def{clashFlags=["-Werror"]}
-        , runTest "T2046C" def{hdlSim=False,clashFlags=["-Werror"],buildTargets=BuildSpecific["topEntity"]}
-        , runTest "T2097" def{hdlSim=False}
-        , runTest "T2154" def{hdlTargets=[VHDL], hdlSim=False}
+        , runTest "T2046C" def{hdlSim=[],clashFlags=["-Werror"],buildTargets=BuildSpecific["topEntity"]}
+        , runTest "T2097" def{hdlSim=[]}
+        , runTest "T2154" def{hdlTargets=[VHDL], hdlSim=[]}
         ] <>
         if compiledWith == Cabal then
           -- This tests fails without environment files present, which are only
@@ -587,12 +603,12 @@ runClashTest = defaultMain $ clashTestRoot
         else
           []
       , clashTestGroup "LoadModules"
-        [ runTest "T1796" def{hdlSim=False}
+        [ runTest "T1796" def{hdlSim=[]}
         ]
       , clashTestGroup "Naming"
-        [ runTest "T967a" def{hdlSim=False}
-        , runTest "T967b" def{hdlSim=False}
-        , runTest "T967c" def{hdlSim=False}
+        [ runTest "T967a" def{hdlSim=[]}
+        , runTest "T967b" def{hdlSim=[]}
+        , runTest "T967c" def{hdlSim=[]}
         , clashLibTest "T1041" def
         , clashLibTest "NameHint" def{hdlTargets=[VHDL,Verilog]}
         ]
@@ -607,16 +623,18 @@ runClashTest = defaultMain $ clashTestRoot
 #if MIN_VERSION_base(4,14,0)
         , runTest "BitReverse" def
 #endif
-        , runTest "Bounds" def
+        , runTest "Bounds" def { hdlSim=hdlSimExcludeVivado } -- vivado segfaults
         , runTest "DivideByZero" def
         , let _opts = def { clashFlags=["-fconstraint-solver-iterations=15"] }
            in runTest "ExpWithGhcCF" _opts
         , let _opts = def { clashFlags=["-fconstraint-solver-iterations=15"] }
            in runTest "ExpWithClashCF" _opts
         , outputTest "ExpWithClashCF" def{ghcFlags=["-itests/shouldwork/Numbers"]}
-        , let _opts = def { hdlTargets = [VHDL], hdlSim = False }
+        , let _opts = def { hdlTargets = [VHDL], hdlSim = [] }
            in runTest "HalfAsBlackboxArg" _opts
-        , runTest "IntegralTB" def
+        , runTest "IntegralTB" def{hdlSim=hdlSimExcludeVivado}
+        -- see https://github.com/clash-lang/clash-compiler/issues/2262,
+        -- Vivado's mod misbehaves on negative dividend
         , runTest "NumConstantFoldingTB_1" def{clashFlags=["-itests/shouldwork/Numbers"]}
         , outputTest "NumConstantFolding_1" def
             { clashFlags=["-fconstraint-solver-iterations=15"]
@@ -628,29 +646,29 @@ runClashTest = defaultMain $ clashTestRoot
             , ghcFlags=["-itests/shouldwork/Numbers"]
             }
         , runTest "Naturals" def
-        , runTest "NaturalToInteger" def{hdlSim=False}
+        , runTest "NaturalToInteger" def{hdlSim=[]}
         , runTest "NegativeLits" def
         , runTest "Resize" def
         , runTest "Resize2" def
         , runTest "Resize3" def
-        , runTest "SatMult" def{hdlSim=False}
+        , runTest "SatMult" def{hdlSim=[]}
         , runTest "ShiftRotate" def
         , runTest "ShiftRotateNegative" def{hdlTargets=[VHDL]}
         , runTest "SignedProjectionTB" def
         , runTest "SignedZero" def
         , runTest "Signum" def
-        , runTest "Strict" def
-        , runTest "T1019" def{hdlSim=False}
+        , runTest "Strict" def{hdlSim=hdlSimExcludeVivado} -- vivado segfaults
+        , runTest "T1019" def{hdlSim=[]}
         , runTest "T1351" def
         , runTest "T2149" def
         , outputTest "UndefinedConstantFolding" def{ghcFlags=["-itests/shouldwork/Numbers"]}
         , runTest "UnsignedZero" def
         ]
       , clashTestGroup "Polymorphism"
-        [ runTest "ExistentialBoxed" def{hdlSim=False}
+        [ runTest "ExistentialBoxed" def{hdlSim=[]}
         , runTest "FunctionInstances" def
-        , runTest "GADTExistential" def{hdlSim=False}
-        , runTest "LocalPoly" def{hdlSim=False}
+        , runTest "GADTExistential" def{hdlSim=[]}
+        , runTest "LocalPoly" def{hdlSim=[]}
         ]
       , clashTestGroup "PrimitiveGuards"
         [ runTest "WarnAlways" def{
@@ -663,8 +681,8 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "ReplaceInt" def
         ]
       , clashTestGroup "RTree"
-        [ runTest "TZip" def{hdlSim=False}
-        , runTest "TFold" def{hdlSim=False}
+        [ runTest "TZip" def{hdlSim=[]}
+        , runTest "TFold" def{hdlSim=[]}
         , runTest "TRepeat" def
         , runTest "TRepeat2" def
         ]
@@ -672,9 +690,9 @@ runClashTest = defaultMain $ clashTestRoot
         [ runTest "T990" def
         ]
       , clashTestGroup "Signal"
-        [ runTest "AlwaysHigh" def{hdlSim=False}
+        [ runTest "AlwaysHigh" def{hdlSim=[]}
         , runTest "BangPatterns" def
-        , runTest "BlockRamFile" def
+        , runTest "BlockRamFile" def{hdlSim=hdlSimExcludeVivado}
         , runTest "BlockRam0" def
         , runTest "BlockRam1" def
         , clashTestGroup "BlockRam"
@@ -682,7 +700,9 @@ runClashTest = defaultMain $ clashTestRoot
           ]
         , runTest "AndEnable" def
 #ifdef CLASH_MULTIPLE_HIDDEN
-        , runTest "AndSpecificEnable" def
+          -- TODO: Vivado is disabled because it gives different results, see
+          -- https://github.com/clash-lang/clash-compiler/issues/2267
+        , runTest "AndSpecificEnable" def{hdlSim=hdlSimExcludeVivado}
 #endif
         , runTest "Ram" def
         , clashTestGroup "Ram"
@@ -691,15 +711,18 @@ runClashTest = defaultMain $ clashTestRoot
           , runTest "RWMulti53" def
           ]
         , runTest "ResetGen" def
-        , runTest "RomFile" def
+        , runTest "RomFile" def{hdlSim=hdlSimExcludeVivado}
+          -- TODO: we do not support memory files in Vivado
+          --
+          -- see: https://github.com/clash-lang/clash-compiler/issues/2269
         , outputTest "BlockRamLazy" def
-        , runTest "BlockRamTest" def{hdlSim=False}
+        , runTest "BlockRamTest" def{hdlSim=[]}
         , runTest "Compression" def
         , runTest "DelayedReset" def
-        , runTest "DualBlockRam0" def{verilate=SimOnly}
-        , runTest "DualBlockRam1" def{verilate=SimOnly}
+        , runTest "DualBlockRam0" def{verilate=SimOnly, hdlSim=hdlSimExcludeVivado} -- vivado segfaults
+        , runTest "DualBlockRam1" def{verilate=SimOnly, hdlSim=hdlSimExcludeVivado} -- vivado segfaults
         , let _opts = def { buildTargets=BuildSpecific ["example"]
-                          , hdlSim=False
+                          , hdlSim=[]
                           }
            in runTest "NoCPR" _opts
         , runTest "Oversample" def
@@ -718,9 +741,11 @@ runClashTest = defaultMain $ clashTestRoot
           , runTest "Blob" def
             -- TODO: When issue #2039 is fixed, it should be possible to drop
             -- compile-ultra.
-          , runTest "BlobVec" def{clashFlags=["-fclash-compile-ultra"]}
+          , runTest "BlobVec" def{clashFlags=["-fclash-compile-ultra"], hdlSim=hdlSimExcludeVivado}
+            -- TODO: Vivado is disabled because it gives different results, see
+            -- https://github.com/clash-lang/clash-compiler/issues/2268
           ]
-        , runTest "SigP" def{hdlSim=False}
+        , runTest "SigP" def{hdlSim=[]}
         , outputTest "T1102A" def{hdlTargets=[VHDL]}
         , outputTest "T1102B" def{hdlTargets=[VHDL]}
         , runTest "T2069" def
@@ -729,12 +754,13 @@ runClashTest = defaultMain $ clashTestRoot
           , runTest "CounterHalfTuple" def
           , runTest "CounterHalfTupleRev" def
           ]
-        , runTest "T1007" def{hdlSim=False}
+        , runTest "T1007" def{hdlSim=[]}
         ]
       , clashTestGroup "SimIO"
         [ let _opts = def { hdlTargets=[Verilog]
                           , vvpStdoutNonEmptyFail=False
                           , buildTargets=BuildSpecific ["topEntity"]
+                          , hdlSim=hdlSimExcludeVivado
                           , verilate=SimOnly
                           }
            in runTest "Test00" _opts
@@ -751,16 +777,16 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "SyncTB" def
         ]
       , clashTestGroup "Types"
-        [ runTest "TypeFamilyReduction" def{hdlSim=False}
-        , runTest "NatExp" def{hdlSim=False}
+        [ runTest "TypeFamilyReduction" def{hdlSim=[]}
+        , runTest "NatExp" def{hdlSim=[]}
         ]
       , clashTestGroup "TopEntity"
         -- VHDL tests disabled for now: I can't figure out how to generate a static name whilst retaining the ability to actually test..
         [ outputTest "PortGeneration" def
         , outputTest "PortNamesWithSingletonVector" def{hdlTargets=[Verilog]}
-        , runTest "TopEntHOArg" def{buildTargets=BuildSpecific ["f"], hdlSim=False}
-        , runTest "T701" def {hdlSim=False}
-        , runTest "T1033" def {hdlSim=False,buildTargets=BuildSpecific ["top"]}
+        , runTest "TopEntHOArg" def{buildTargets=BuildSpecific ["f"], hdlSim=[]}
+        , runTest "T701" def {hdlSim=[]}
+        , runTest "T1033" def {hdlSim=[],buildTargets=BuildSpecific ["top"]}
         , outputTest "T1033" def
         , outputTest "T1072" def
         , outputTest "T1074" def
@@ -772,7 +798,7 @@ runClashTest = defaultMain $ clashTestRoot
             { hdlTargets = [VHDL]
             , clashFlags = ["-main-is", "topEntity3"]
             }
-        , runTest "T1139" def{hdlSim=False}
+        , runTest "T1139" def{hdlSim=[]}
         , let _opts = def { hdlTargets=[Verilog]
                           , buildTargets=BuildSpecific ["PortNames_testBench"]
                           }
@@ -816,53 +842,53 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "ZipWithUnitSP2" def
         ]
       , clashTestGroup "Vector"
-        [ runTest "EnumTypes" def{hdlSim=False}
-        , runTest "HOCon" def{hdlSim=False}
-        , runTest "VMapAccum" def{hdlSim=False}
-        , runTest "VScan" def{hdlSim=False}
-        , runTest "VZip" def{hdlSim=False}
-        , runTest "VecConst" def{hdlSim=False}
-        , runTest "FirOddSize" def
+        [ runTest "EnumTypes" def{hdlSim=[]}
+        , runTest "HOCon" def{hdlSim=[]}
+        , runTest "VMapAccum" def{hdlSim=[]}
+        , runTest "VScan" def{hdlSim=[]}
+        , runTest "VZip" def{hdlSim=[]}
+        , runTest "VecConst" def{hdlSim=[]}
+        , runTest "FirOddSize" def{hdlSim=hdlSimExcludeVivado} -- vivado segfaults
         , runTest "IndexInt" def
-        , runTest "IndexInt2" def
+        , runTest "IndexInt2" def{hdlSim=hdlSimExcludeVivado}
         , outputTest "IndexInt2" def{hdlTargets=[Verilog]}
         , runTest "Concat" def
         , runTest "DFold" def{verilate=SimOnly}
         , runTest "DFold2" def
         , runTest "DTFold" def
-        , runTest "FindIndex" def
+        , runTest "FindIndex" def{hdlSim=hdlSimExcludeVivado} -- vivado segfaults
         , runTest "Fold" def
-        , runTest "FoldlFuns" def{hdlSim=False}
+        , runTest "FoldlFuns" def{hdlSim=[]}
         , runTest "Foldr" def
         , runTest "FoldrEmpty" def
-        , runTest "HOClock" def{hdlSim=False}
-        , runTest "HOPrim" def{hdlSim=False}
+        , runTest "HOClock" def{hdlSim=[]}
+        , runTest "HOPrim" def{hdlSim=[]}
         , runTest "Indices" def
         , runTest "Iterate" def
         , outputTest "IterateCF" def{hdlTargets=[VHDL]}
         , runTest "Minimum" def
-        , runTest "MovingAvg" def{hdlSim=False}
-        , runTest "PatHOCon" def{hdlSim=False}
+        , runTest "MovingAvg" def{hdlSim=[]}
+        , runTest "PatHOCon" def{hdlSim=[]}
         , runTest "Scatter" def
-        , runTest "Split" def{hdlSim=False}
+        , runTest "Split" def{hdlSim=[]}
         , runTest "ToList" def
         , runTest "Unconcat" def
-        , runTest "VACC" def{hdlSim=False}
+        , runTest "VACC" def{hdlSim=[]}
         , runTest "VEmpty" def
-        , runTest "VIndex" def{hdlSim=False}
+        , runTest "VIndex" def{hdlSim=[]}
         , runTest "VIndicesI" def
-        , runTest "VFold" def
+        , runTest "VFold" def{hdlSim=hdlSimExcludeVivado} -- vivado segfaults
         , runTest "VMerge" def
         , runTest "VReplace" def
         , runTest "VReverse" def
         , runTest "VRotate" def
         , runTest "VSelect" def
-        , runTest "VecOfSum" def{hdlSim=False}
-        , runTest "T452" def{hdlSim=False}
-        , runTest "T478" def{hdlSim=False}
-        , let _opts = def { hdlSim = False, hdlTargets = [VHDL]}
+        , runTest "VecOfSum" def{hdlSim=[]}
+        , runTest "T452" def{hdlSim=[]}
+        , runTest "T478" def{hdlSim=[]}
+        , let _opts = def { hdlSim = [], hdlTargets = [VHDL]}
            in runTest "T895" _opts
-        , let _opts = def { hdlSim = False, hdlTargets = [VHDL], clashFlags = ["-fclash-hdlsyn", "Vivado"]}
+        , let _opts = def { hdlSim = [], hdlTargets = [VHDL], clashFlags = ["-fclash-hdlsyn", "Vivado"]}
            in runTest "T1360" _opts
         ] -- end vector
       , clashTestGroup "Verification" [
