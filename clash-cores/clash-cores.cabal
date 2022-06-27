@@ -68,13 +68,19 @@ common basic-config
     ghc-typelits-knownnat     >= 0.6,
     interpolate               >= 0.2,
     QuickCheck,
-    template-haskell
+    template-haskell,
+    containers                >=0.5    && <0.7
 
 library
   import: basic-config
   hs-source-dirs: src
 
   exposed-modules:
+    Clash.Cores.Xilinx.Common
+    Clash.Cores.Xilinx.DcFifo
+    Clash.Cores.Xilinx.DcFifo.BlackBoxes
+    Clash.Cores.Xilinx.DcFifo.Explicit
+    Clash.Cores.Xilinx.DcFifo.Instances
     Clash.Cores.Xilinx.Floating
     Clash.Cores.Xilinx.Floating.Annotations
     Clash.Cores.Xilinx.Floating.BlackBoxes
@@ -112,9 +118,13 @@ test-suite unittests
     Test.Cores.SPI
     Test.Cores.UART
     Test.Cores.SPI.MultiSlave
+    Test.Cores.Xilinx.DcFifo
 
   build-depends:
     clash-cores,
+    clash-lib,
     tasty        >= 1.2 && < 1.5,
     tasty-hunit,
-    tasty-quickcheck
+    tasty-quickcheck,
+    hedgehog,
+    tasty-hedgehog >= 1.2.0

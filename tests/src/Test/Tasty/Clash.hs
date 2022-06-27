@@ -98,13 +98,15 @@ data Verilate = SimAndVerilate | VerilateOnly | SimOnly
 
 data Sim = Vivado | GHDL | ModelSim | Verilator deriving Eq
 
+data Load = LoadAll | LoadNone | Bypass
+
 data TestOptions =
   TestOptions
     { hdlSim :: [Sim]
     -- ^ Run hdl simulators (GHDL, ModelSim, etc.)
-    , hdlLoad :: Bool
-    -- ^ Load hdl into simulator (GHDL, ModelSim, etc.). Disabling this will
-    -- disable 'hdlSim' too.
+    , hdlLoad :: Load
+    -- ^ Load hdl into simulator (GHDL, ModelSim, etc.). 'LoadNone' will disable
+    -- 'hdlSim' but 'Bypass' will disable loading but allow simulators
     , expectSimFail :: Maybe (TestExitCode, T.Text)
     -- ^ Expect simulation to fail: Nothing if simulation is expected to run
     -- without errors, or Just (part of) the error message the simulation is
@@ -141,7 +143,7 @@ instance Default TestOptions where
   def =
     TestOptions
       { hdlSim=[GHDL, ModelSim, Vivado]
-      , hdlLoad=True
+      , hdlLoad=LoadAll
       , expectClashFail=Nothing
       , expectSimFail=Nothing
       , expectVerificationFail=Nothing
@@ -453,7 +455,9 @@ runTest1 modName opts@TestOptions{..} path target =
   buildAndSimTests sim (buildTests, simTests) =
     case (isJust expectClashFail, hdlLoad, hdlSim) of
       (True, _, _) -> []
-      (_, False, _) -> []
+      (_, LoadNone, _) -> []
+      (_, Bypass, sims) | sim `elem` sims -> simTests
+                        | otherwise -> []
       (_, _, sims) -> buildTests <> (if sim `elem` sims then simTests else [])
 
   -- HACK: We want to run verilator and simulator tests independently if they
