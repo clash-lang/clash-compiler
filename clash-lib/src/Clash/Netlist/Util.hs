@@ -1148,7 +1148,7 @@ canUse _ _ = \case
 declareUse :: Usage -> Identifier -> NetlistMonad ()
 declareUse u i = usageMap %= Map.insertWith (<>) (Id.toText i) u
 
--- | As a sanity check, this will throw an exception if we run into a name
+-- | Like 'declareUse', but will throw an exception if we run into a name
 -- collision.
 declareUseOnce :: HasUsageMap s => Usage -> Identifier -> State.State s ()
 declareUseOnce u i = usageMap %= Map.alter go (Id.toText i)
