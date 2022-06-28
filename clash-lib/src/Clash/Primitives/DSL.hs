@@ -90,7 +90,6 @@ import           Data.IntMap                     (IntMap)
 import qualified Data.IntMap                     as IntMap
 import           Data.List                       (intersperse)
 import           Data.List.Extra                 (zipEqual)
-import qualified Data.Map                        as Map
 import           Data.Maybe                      (fromMaybe)
 import           Data.Monoid                     (Ap(getAp))
 import           Data.Semigroup                  hiding (Product)
@@ -441,9 +440,6 @@ enableToBit bitName = \case
     declareUseOnce (Proc NonBlocking) uniqueBitName
     pure texp
   tExpr -> error $ "enableToBit: Got \"" <> show tExpr <> "\" expected Enable"
-
-declareUseOnce :: HasUsageMap s => Usage -> Identifier -> State s ()
-declareUseOnce u i = usageMap %= Map.insert (Id.toText i) u
 
 -- | Use to create an output `Bool` from a `Bit`. The expression given
 --   must be the identifier of the bool you wish to get assigned.
