@@ -101,7 +101,7 @@ import           Data.Text.Prettyprint.Doc.Extra
 import           GHC.Stack                       (HasCallStack)
 
 import           Clash.Annotations.Primitive     (HDL (..), Primitive (..))
-import           Clash.Backend                   hiding (fromBV, toBV)
+import           Clash.Backend                   hiding (Usage, fromBV, toBV)
 import           Clash.Backend.VHDL              (VHDLState)
 import           Clash.Core.Var                  (Attr')
 import           Clash.Netlist.BlackBox.Util     (exprToString, renderElem)
@@ -188,6 +188,9 @@ makeLenses ''BlockState
 instance Backend backend => HasIdentifierSet (BlockState backend) where
   identifierSet :: Lens' (BlockState backend) IdentifierSet
   identifierSet = bsBackend . identifierSet
+
+instance HasUsageMap backend => HasUsageMap (BlockState backend) where
+  usageMap = bsBackend.usageMap
 
 -- | A typed expression.
 data TExpr = TExpr
@@ -414,6 +417,7 @@ boolToBit bitName = \case
         [ (Just (BoolLit True), Literal Nothing (BitLit H))
         , (Nothing            , Literal Nothing (BitLit L))
         ]
+    declareUseOnce (Proc NonBlocking) uniqueBitName
     pure texp
   tExpr -> error $ "boolToBit: Got \"" <> show tExpr <> "\" expected Bool"
 
@@ -433,6 +437,7 @@ enableToBit bitName = \case
         [ (Just (BoolLit True), Literal Nothing (BitLit H))
         , (Nothing            , Literal Nothing (BitLit L))
         ]
+    declareUseOnce (Proc NonBlocking) uniqueBitName
     pure texp
   tExpr -> error $ "enableToBit: Got \"" <> show tExpr <> "\" expected Enable"
 
@@ -456,6 +461,7 @@ boolFromBit boolName = \case
         [ (Just (BitLit H), Literal Nothing (BoolLit True))
         , (Nothing        , Literal Nothing (BoolLit False))
         ]
+    declareUseOnce (Proc NonBlocking) uniqueBoolName
     pure texp
   tExpr -> error $ "boolFromBit: Got \"" <> show tExpr <> "\" expected Bit"
 

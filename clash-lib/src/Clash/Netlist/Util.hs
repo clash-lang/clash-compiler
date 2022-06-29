@@ -77,7 +77,7 @@ import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, ConstrRepr'(..), DataRepr'(..), getDataRepr,
    uncheckedGetConstrRepr)
 import           Clash.Annotations.Primitive (HDL(VHDL))
-import           Clash.Backend           (HWKind(..), hdlHWTypeKind, hdlKind)
+import           Clash.Backend           (HasUsageMap (..), HWKind(..), hdlHWTypeKind, hdlKind)
 import           Clash.Core.DataCon      (DataCon (..))
 import           Clash.Core.EqSolver     (typeEq)
 import           Clash.Core.FreeVars     (typeFreeVars, typeFreeVars')
@@ -1148,6 +1148,14 @@ canUse _ _ = \case
 declareUse :: Usage -> Identifier -> NetlistMonad ()
 declareUse u i = usageMap %= Map.insertWith (<>) (Id.toText i) u
 
+-- | Like 'declareUse', but will throw an exception if we run into a name
+-- collision.
+declareUseOnce :: HasUsageMap s => Usage -> Identifier -> State.State s ()
+declareUseOnce u i = usageMap %= Map.alter go (Id.toText i)
+ where
+  go Nothing = Just u
+  go Just{}  = error ("Internal error: unexpected re-declaration of usage for" ++ show i)
+
 -- | Declare uses which occur as a result of a component being instantiated,
 -- for example the following design (verilog)
 --
@@ -1215,10 +1223,10 @@ assignmentWith
   -> Identifier
   -> NetlistMonad Declaration
 assignmentWith assign new i = do
-  usages <- Lens.use usageMap
+  u <- Lens.use usageMap
   SomeBackend b <- Lens.use backend
 
-  case lookupUsage i usages of
+  case lookupUsage i u of
     Just old | not $ canUse (hdlKind b) new old ->
       error $ mconcat
         [ "assignmentWith: Cannot assign as "

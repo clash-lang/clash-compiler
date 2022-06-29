@@ -72,7 +72,7 @@ import SrcLoc                               (SrcSpan)
 import Clash.Annotations.BitRepresentation  (FieldAnn)
 import Clash.Annotations.Primitive          (HDL(..))
 import Clash.Annotations.TopEntity          (TopEntity)
-import Clash.Backend                        (Backend)
+import Clash.Backend                        (Backend, HasUsageMap (..))
 import Clash.Core.HasType
 import Clash.Core.Type                      (Type)
 import Clash.Core.Var                       (Attr', Id)
@@ -343,7 +343,7 @@ data NetlistState
   , _backend :: SomeBackend
   -- ^ The current HDL backend
   , _htyCache :: HWMap
-  , _usageMap :: UsageMap
+  , _usages :: UsageMap
   -- ^ The current way signals are assigned in netlist. This is used to
   -- determine how signals are rendered in HDL (i.e. wire/reg in Verilog, or
   -- signal/variable in VHDL).
@@ -970,6 +970,9 @@ class HasIdentifierSet s where
 
 instance HasIdentifierSet IdentifierSet where
   identifierSet = ($)
+
+instance HasUsageMap NetlistState where
+  usageMap = usages
 
 instance HasIdentifierSet s => HasIdentifierSet (s, a) where
   identifierSet = Lens._1 . identifierSet

@@ -173,7 +173,7 @@ runNetlistMonad env isTb s tops typeTrans ite be seenIds_ dir componentNames_
         , _backEndITE=ite
         , _backend=be
         , _htyCache=mempty
-        , _usageMap=mempty
+        , _usages=mempty
         }
 
 -- | Generate names for all binders in "BindingMap", except for the ones already
@@ -257,7 +257,7 @@ genComponentT compName0 componentExpr = do
   compName1 <- (`lookupVarEnv'` compName0) <$> Lens.use componentNames
   sp <- (bindingLoc . (`lookupVarEnv'` compName0)) <$> Lens.use bindings
   curCompNm .= (compName1, sp)
-  usageMap .= mempty
+  usages .= mempty
 
   topEntityTM <- lookupVarEnv compName0 <$> Lens.use topEntityAnns
   let topAnnMM = topAnnotation <$> topEntityTM
@@ -287,8 +287,8 @@ genComponentT compName0 componentExpr = do
         b:_ -> mkNetDecl b
         _ -> error "internal error: couldn't find result binder"
 
-      usages <- Lens.use usageMap
-      let useOf i = fromMaybe Cont $ lookupUsage (fst i) usages
+      u <- Lens.use usages
+      let useOf i = fromMaybe Cont $ lookupUsage (fst i) u
 
       let (compOutps',resUnwrappers') = case compOutps of
             [oport] -> ([(useOf oport,oport,rIM)],resUnwrappers)
@@ -301,15 +301,15 @@ genComponentT compName0 componentExpr = do
           component      = Component compName1 compInps compOutps'
                              (netDecls ++ argWrappers ++ decls ++ resUnwrappers')
       ids <- Lens.use seenIds
-      return (ComponentMeta wereVoids sp ids usages, component)
+      return (ComponentMeta wereVoids sp ids u, component)
     -- No result declaration means that the result is empty, this only happens
     -- when the TopEntity has an empty result. We just create an empty component
     -- in this case.
     Nothing -> do
       let component = Component compName1 compInps [] (netDecls ++ argWrappers ++ decls)
       ids <- Lens.use seenIds
-      usages <- Lens.use usageMap
-      return (ComponentMeta wereVoids sp ids usages, component)
+      u <- Lens.use usages
+      return (ComponentMeta wereVoids sp ids u, component)
 
 mkNetDecl :: (Id, Term) -> NetlistMonad [Declaration]
 mkNetDecl (id_,tm) = preserveVarEnv $ do
