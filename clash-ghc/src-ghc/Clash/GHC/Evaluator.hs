@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2017-2022, Google Inc.,
-                     2021     , QBayLogic B.V.
+                     2021-2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -339,11 +339,31 @@ instantiate _tcm (TyLambda x e) ty m =
   subst  = extendTvSubst subst0 x ty
   subst0 = mkSubst iss0
   iss0   = mkInScopeSet (freeVarsOf e `unionUniqSet` freeVarsOf ty)
-instantiate tcm pVal@(PrimVal (PrimInfo{primType}) tys []) ty m
+-- The evaluator is setup in such a way that under normal conditions anything
+-- of type 'forall a . ty' must be a ty-lambda.
+--
+-- However, sometimes we evaluate to an error /value/. When this happens,
+-- instead of doing a regural type substitition we:
+--
+-- 1. Calculate the 'forall a . ty' type of the error value
+-- 2. Substitute the 'a' by the applied type.
+-- 3. Create a new error value of the shape: 'undefined @substituted_type'
+--    Where this particular 'undefined' has type 'forall a . a'. We destinquish
+--    between error values throwing X exceptions and other error values, and
+--    create appropriate error values that we return. We make this distinctions
+--    in onder to enable conversion of X-exception throwing code to undefined
+--    bitvectors.
+instantiate tcm pVal@(PrimVal (PrimInfo{primType}) tys es) ty m
   | isUndefinedXPrimVal pVal
-  = setTerm (TyApp (Prim NP.undefinedX) (piResultTys tcm primType (tys ++ [ty]))) m
+  = setTerm (TyApp (Prim NP.undefinedX) primType1) m
   | isUndefinedPrimVal pVal
-  = setTerm (TyApp (Prim NP.undefined) (piResultTys tcm primType (tys ++ [ty]))) m
+  = setTerm (TyApp (Prim NP.undefined) primType1) m
+ where
+  esTys = map (inferCoreTypeOf tcm) es
+  -- Calculate the type of: prim @ty0 .. @tyN e0 .. eN @ty
+  --
+  -- This combines the above-mentioned step 1 and 2
+  primType1 = piResultTys tcm primType (tys ++ esTys ++ [ty])
 
 instantiate _ p _ _ = error $ "Evaluator.instantiate: Not a tylambda: " ++ show p
 
