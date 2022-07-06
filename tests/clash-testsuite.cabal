@@ -12,6 +12,8 @@ maintainer:          Christiaan Baaij <christiaan.baaij@gmail.com>
 copyright:           Copyright © 2015 University of Twente
 category:            Testing
 build-type:          Simple
+data-files:
+  data-files/tcl/clash_namespace.tcl
 
 flag cosim
    description:
@@ -96,10 +98,18 @@ library
     Test.Tasty.SymbiYosys
     Test.Tasty.Program
     Test.Tasty.Verilator
+    Test.Tasty.Vivado
+    Test.Tasty.Vivado.GenTcl
     Test.Tasty.Clash.CollectSimResults
 
     -- From tests/shouldwork/LoadModules
     T1796
+
+  other-modules:
+    Paths_clash_testsuite
+
+  autogen-modules:
+    Paths_clash_testsuite
 
   build-depends:
     deepseq,
@@ -112,7 +122,8 @@ library
     unordered-containers,
     ordered-containers,
     containers,
-    template-haskell
+    template-haskell,
+    regex-tdfa >=1.3.1.0
 
 
 executable clash-testsuite

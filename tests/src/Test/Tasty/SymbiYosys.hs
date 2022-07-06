@@ -61,12 +61,12 @@ instance IsTest SbyVerificationTest where
     | otherwise =
         pure (testPassed "Ignoring test due to --no-symbiyosys")
    where
-    sby workDir args = TestProgram "sby" args NoGlob PrintNeither False (Just workDir)
+    sby workDir args = TestProgram "sby" args NoGlob PrintNeither False (Just workDir) []
 
     failingSby workDir args (testExit, expectedErr) =
       TestFailingProgram
         (testExitCode testExit) "sby" args NoGlob PrintNeither False
-        (specificExitCode testExit) (ExpectEither expectedErr) (Just workDir)
+        (specificExitCode testExit) (ExpectEither expectedErr) (Just workDir) []
 
   testOptions =
     coerce (coerce (testOptions @TestProgram) <> [Option (Proxy @Symbiyosys)])
