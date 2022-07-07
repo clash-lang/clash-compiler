@@ -463,7 +463,25 @@ runClashTest = defaultMain $ clashTestRoot
                                                  -- -- , "subBasicTB"
                                                  -- -- , "mulBasicTB"
                                                  -- -- , "divBasicTB"]}
-          [ runTest "DcFifo" def{
+          [ runTest "DcFifo0" def{
+              clashFlags=["-fclash-hdlsyn", "Vivado"]
+            , hdlTargets=[VHDL, Verilog]
+            , hdlLoad=Bypass
+            , verilate=SimOnly
+            , hdlSim=[Vivado]}
+          , runTest "DcFifo1" def{
+              clashFlags=["-fclash-hdlsyn", "Vivado"]
+            , hdlTargets=[VHDL, Verilog]
+            , hdlLoad=Bypass
+            , verilate=SimOnly
+            , hdlSim=[Vivado]}
+          , runTest "DcFifo2" def{
+              clashFlags=["-fclash-hdlsyn", "Vivado"]
+            , hdlTargets=[VHDL, Verilog]
+            , hdlLoad=Bypass
+            , verilate=SimOnly
+            , hdlSim=[Vivado]}
+          , runTest "DcFifoBroken" def{
               clashFlags=["-fclash-hdlsyn", "Vivado"]
             , hdlTargets=[VHDL, Verilog]
             , hdlLoad=Bypass

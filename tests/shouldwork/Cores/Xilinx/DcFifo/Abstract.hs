@@ -1,6 +1,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
-module DcFifo where
+module DcFifo.Abstract where
 
 import Clash.Explicit.Prelude
 import Clash.Cores.Xilinx.DcFifo
@@ -12,8 +12,8 @@ type Stall = Bool
 type ExpectedToRead n = BitVector n
 type UnexpectedRead = Bool
 
-type WriteDom = XilinxSystem
-type ReadDom = XilinxSystem
+createDomain vSystem{vName="Dom2", vPeriod=hzToPeriod 3e7}
+createDomain vSystem{vName="Dom3", vPeriod=hzToPeriod 5e7}
 
 -- | Produce a 'Just' when predicate is True, else Nothing
 orNothing :: Bool -> a -> Maybe a
@@ -87,21 +87,19 @@ fifoDriver clk rst ena stalls inps =
     willWrite = not stall && not full
     n1 = if willWrite then succ n0 else n0
 
-topEntity ::
-  Clock WriteDom -> Clock ReadDom ->
+type ConfiguredFifo read write =
+  Clock write -> Clock read ->
   -- | Asynchronous reset
-  Reset ReadDom ->
+  Reset read ->
 
   -- | Write data
-  Signal WriteDom (Maybe (BitVector 16)) ->
+  Signal write (Maybe (BitVector 16)) ->
   -- | Read enable
-  Signal ReadDom Bool ->
-  XilinxFifo ReadDom WriteDom 4 16
-topEntity = dcFifo defConfig
-{-# NOINLINE topEntity #-}
+  Signal read Bool ->
+  XilinxFifo read write 4 16
 
-testBench :: Signal ReadDom Bool
-testBench = done
+mkTestBench :: (KnownDomain write, KnownDomain read) => ConfiguredFifo read write -> Signal read Bool
+mkTestBench cFifo = done
  where
   (rClk, wClk) = biTbClockGen (not <$> done)
   rRst = resetGen
@@ -120,11 +118,11 @@ testBench = done
       fifoSampler rClk rRst rEna rLfsr (bundle (readReset, isEmpty, readCount, fifoData))
 
   XilinxFifo{writeReset, isFull, writeCount, readReset, isEmpty, readCount, fifoData} =
-    topEntity rClk wClk rRst writeData readEnable
+    cFifo wClk rClk rRst writeData readEnable
 
   errorFound = fifoVerifier rClk rRst rEna maybeReadData
   done = outputVerifier' rClk rRst (repeat @100 False) errorFound
-{-# NOINLINE testBench #-}
+{-# INLINE mkTestBench #-}
 
 fifoVerifier ::
   KnownDomain dom =>
