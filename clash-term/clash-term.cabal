@@ -33,3 +33,5 @@ executable clash-term
   GHC-Options:        -Wall -Wcompat -threaded
   extra-libraries:    pthread
   default-language:   Haskell2010
+  if os(windows)
+    buildable: False
