@@ -96,7 +96,8 @@ data VerificationTool = SymbiYosys
 -- a test is only relevant with one type of tool.
 data Verilate = SimAndVerilate | VerilateOnly | SimOnly
 
-data Sim = Vivado | GHDL | ModelSim | Verilator deriving Eq
+data Sim = Vivado | GHDL | IVerilog | ModelSim | Verilator
+  deriving (Show, Eq, Bounded, Enum)
 
 data TestOptions =
   TestOptions
@@ -140,7 +141,7 @@ allTargets = [VHDL, Verilog, SystemVerilog]
 instance Default TestOptions where
   def =
     TestOptions
-      { hdlSim=[GHDL, ModelSim, Vivado]
+      { hdlSim=[minBound ..]
       , hdlLoad=True
       , expectClashFail=Nothing
       , expectSimFail=Nothing
@@ -153,10 +154,6 @@ instance Default TestOptions where
       , vvpStdoutNonEmptyFail=True
       , verilate=SimAndVerilate
       }
-
--- | All 'Sim's excluding Vivado
-hdlSimExcludeVivado :: [Sim]
-hdlSimExcludeVivado = [GHDL, ModelSim]
 
 -- | Directory where testbenches live.
 sourceDirectory :: String
@@ -490,7 +487,7 @@ runTest1 modName opts@TestOptions{..} path target =
       Verilog ->
         case verilate of
           VerilateOnly -> []
-          _ -> buildAndSimTests ModelSim (verilogTests opts tmpDir)
+          _ -> buildAndSimTests IVerilog (verilogTests opts tmpDir)
 
       SystemVerilog ->
         case verilate of

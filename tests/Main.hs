@@ -135,7 +135,7 @@ runClashTest = defaultMain $ clashTestRoot
       -- see: https://github.com/clash-lang/clash-compiler/issues/2264
       let _opts = def { clashFlags=["-fclash-component-prefix", "test"]
                       , buildTargets=BuildSpecific ["test_testBench"]
-                      , hdlSim=hdlSimExcludeVivado
+                      , hdlSim=hdlSim def \\ [Vivado]
                       }
        in runTest "FIR" _opts
 
@@ -360,7 +360,10 @@ runClashTest = defaultMain $ clashTestRoot
           -- tracked: https://github.com/clash-lang/clash-compiler/issues/2266
           runTest "NORX" def
 
-        , runTest "Parameters" def{hdlTargets=[VHDL], hdlSim=hdlSimExcludeVivado}
+        , let _opts = def { hdlTargets=[VHDL]
+                          , hdlSim=hdlSim def \\ [Vivado]
+                          }
+          in runTest "Parameters" _opts
         , runTest "PopCount" def
         , runTest "RecordSumOfProducts" def{hdlSim=[]}
         , runTest "Replace" def
@@ -434,13 +437,13 @@ runClashTest = defaultMain $ clashTestRoot
           , -- TODO: this also runs up against problems with BuildSpecific
             -- names, see
             -- https://github.com/clash-lang/clash-compiler/issues/2264
-            hdlSim=hdlSimExcludeVivado -- triggers error in vivado
+            hdlSim=hdlSim def \\ [Vivado] -- triggers error in vivado
           }
         , outputTest "LITrendering" def{hdlTargets=[Verilog]}
         , runTest "T2117" def{
             clashFlags=["-fclash-aggressive-x-optimization-blackboxes"]
           , hdlTargets=[VHDL]
-          , hdlSim=hdlSimExcludeVivado
+          , hdlSim=hdlSim def \\ [Vivado]
           , -- TODO: Refactor BuildSpecific so Vivado can run
             -- See https://github.com/clash-lang/clash-compiler/issues/2264
             buildTargets=BuildSpecific [ "testBenchUndefBV"
@@ -633,7 +636,10 @@ runClashTest = defaultMain $ clashTestRoot
 #if MIN_VERSION_base(4,14,0)
         , runTest "BitReverse" def
 #endif
-        , runTest "Bounds" def { hdlSim=hdlSimExcludeVivado } -- vivado segfaults
+        ,
+          -- vivado segfaults
+          runTest "Bounds" def { hdlSim=hdlSim def \\ [Vivado] }
+
         , runTest "DivideByZero" def
         , let _opts = def { clashFlags=["-fconstraint-solver-iterations=15"] }
            in runTest "ExpWithGhcCF" _opts
@@ -645,7 +651,7 @@ runClashTest = defaultMain $ clashTestRoot
         ,
           -- see https://github.com/clash-lang/clash-compiler/issues/2262,
           -- Vivado's mod misbehaves on negative dividend
-          runTest "IntegralTB" def{hdlSim=hdlSimExcludeVivado}
+          runTest "IntegralTB" def{hdlSim=hdlSim def \\ [Vivado]}
 
         , runTest "NumConstantFoldingTB_1" def{clashFlags=["-itests/shouldwork/Numbers"]}
         , outputTest "NumConstantFolding_1" def
@@ -669,7 +675,10 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "SignedProjectionTB" def
         , runTest "SignedZero" def
         , runTest "Signum" def
-        , runTest "Strict" def{hdlSim=hdlSimExcludeVivado} -- vivado segfaults
+        ,
+          -- vivado segfaults
+          runTest "Strict" def{hdlSim=hdlSim def \\ [Vivado]}
+
         , runTest "T1019" def{hdlSim=[]}
         , runTest "T1351" def
         , runTest "T2149" def
@@ -704,7 +713,7 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "Signal"
         [ runTest "AlwaysHigh" def{hdlSim=[]}
         , runTest "BangPatterns" def
-        , runTest "BlockRamFile" def{hdlSim=hdlSimExcludeVivado}
+        , runTest "BlockRamFile" def{hdlSim=hdlSim def \\ [Vivado]}
         , runTest "BlockRam0" def
         , runTest "BlockRam1" def
         , clashTestGroup "BlockRam"
@@ -715,7 +724,7 @@ runClashTest = defaultMain $ clashTestRoot
         ,
           -- TODO: Vivado is disabled because it gives different results, see
           -- https://github.com/clash-lang/clash-compiler/issues/2267
-          runTest "AndSpecificEnable" def{hdlSim=hdlSimExcludeVivado}
+          runTest "AndSpecificEnable" def{hdlSim=hdlSim def \\ [Vivado]}
 
 #endif
         , runTest "Ram" def
@@ -729,7 +738,7 @@ runClashTest = defaultMain $ clashTestRoot
           -- TODO: we do not support memory files in Vivado
           --
           -- see: https://github.com/clash-lang/clash-compiler/issues/2269
-          runTest "RomFile" def{hdlSim=hdlSimExcludeVivado}
+          runTest "RomFile" def{hdlSim=hdlSim def \\ [Vivado]}
 
         , outputTest "BlockRamLazy" def
         , runTest "BlockRamTest" def{hdlSim=[]}
@@ -761,7 +770,7 @@ runClashTest = defaultMain $ clashTestRoot
             -- TODO: Vivado is disabled because it gives different results, see
             -- https://github.com/clash-lang/clash-compiler/issues/2268
             let _opts = def { clashFlags=["-fclash-compile-ultra"]
-                            , hdlSim=hdlSimExcludeVivado
+                            , hdlSim=hdlSim def \\ [Vivado]
                             }
             in runTest "BlobVec" _opts
           ]
@@ -868,15 +877,21 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "VScan" def{hdlSim=[]}
         , runTest "VZip" def{hdlSim=[]}
         , runTest "VecConst" def{hdlSim=[]}
-        , runTest "FirOddSize" def{hdlSim=hdlSimExcludeVivado} -- vivado segfaults
+        ,
+          -- vivado segfaults
+          runTest "FirOddSize" def{hdlSim=hdlSim def \\ [Vivado]}
+
         , runTest "IndexInt" def
-        , runTest "IndexInt2" def{hdlSim=hdlSimExcludeVivado}
+        , runTest "IndexInt2" def{hdlSim=hdlSim def \\ [Vivado]}
         , outputTest "IndexInt2" def{hdlTargets=[Verilog]}
         , runTest "Concat" def
         , runTest "DFold" def{verilate=SimOnly}
         , runTest "DFold2" def
         , runTest "DTFold" def
-        , runTest "FindIndex" def{hdlSim=hdlSimExcludeVivado} -- vivado segfaults
+        ,
+          -- vivado segfaults
+          runTest "FindIndex" def{hdlSim=hdlSim def \\ [Vivado]}
+
         , runTest "Fold" def
         , runTest "FoldlFuns" def{hdlSim=[]}
         , runTest "Foldr" def
@@ -897,7 +912,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "VEmpty" def
         , runTest "VIndex" def{hdlSim=[]}
         , runTest "VIndicesI" def
-        , runTest "VFold" def{hdlSim=hdlSimExcludeVivado} -- vivado segfaults
+        , runTest "VFold" def{hdlSim=hdlSim def \\ [Vivado]} -- vivado segfaults
         , runTest "VMerge" def
         , runTest "VReplace" def
         , runTest "VReverse" def
