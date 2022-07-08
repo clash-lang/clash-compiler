@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2014, Jan Stolarek,
                      2015-2016, University of Twente,
-                     2017-2021, QBayLogic
+                     2017-2022, QBayLogic
   License     :
     All rights reserved.
 
@@ -76,11 +76,15 @@ module Test.Tasty.Program (
 import qualified Clash.Util.Interpolate  as I
 import qualified Data.List as List
 
+import Control.Applicative     ( Alternative (..) )
 import Data.Typeable           ( Typeable                                 )
-import Data.Maybe              ( fromMaybe, isNothing                     )
+import Data.Maybe              ( fromMaybe, isNothing, listToMaybe        )
 import System.FilePath.Glob    ( globDir1, compile                        )
-import System.Directory        ( findExecutable, getCurrentDirectory      )
-import System.Environment      ( getEnvironment                           )
+import System.FilePath.Posix   ( getSearchPath )
+import System.Directory        ( findExecutable,
+                                 findExecutablesInDirectories,
+                                 getCurrentDirectory )
+import System.Environment      ( getEnvironment,                          )
 import System.Exit             ( ExitCode(..)                             )
 import System.Process          ( cwd, env, readCreateProcessWithExitCode,
                                  proc                                     )
@@ -243,9 +247,28 @@ testFailingProgram
 testFailingProgram testExitCode testName program opts glob stdO stdF errCode expectedOutput workDir =
   singleTest testName (TestFailingProgram testExitCode program opts glob stdO stdF errCode expectedOutput workDir [])
 
+-- | Find the location of a program.
+--
+-- On Windows, 'findExecutable' uses Windows native search locations (things
+-- like the @Program Files@ directory) and the System PATH variable. This
+-- System PATH variable is distinct from the User PATH variable, so when the
+-- User PATH contains more search directories than the System PATH,
+-- 'findExecutable' won't look in those additional directories.
+--
+-- This function does look in the User PATH when a program isn't found using
+-- the native system way.
+--
+-- On Linux, this function behaves exactly like 'findExecutable'.
+findExecutableAlt :: String -> IO (Maybe FilePath)
+findExecutableAlt program = do
+  execFoundSystem <- findExecutable program
+  path <- getSearchPath
+  execFoundPath <- listToMaybe <$> (findExecutablesInDirectories path program)
+  return (execFoundSystem <|> execFoundPath)
+
 instance IsTest TestProgram where
   run opts (TestProgram program args glob stdO stdF workDir addEnv) _ = do
-    execFound <- findExecutable program
+    execFound <- findExecutableAlt program
 
     args' <- globArgs glob workDir args
 
@@ -258,7 +281,7 @@ instance IsTest TestProgram where
 
 instance IsTest TestFailingProgram where
   run _opts (TestFailingProgram testExitCode program args glob stdO stdF errCode expectedOutput workDir addEnv) _ = do
-    execFound <- findExecutable program
+    execFound <- findExecutableAlt program
 
     args' <- globArgs glob workDir args
 

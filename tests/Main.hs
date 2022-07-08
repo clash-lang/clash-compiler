@@ -40,7 +40,10 @@ cabalClashBinDir :: IO String
 cabalClashBinDir = makeAbsolute rel_path
  where
   rel_path = printf templ platform ghcVersion3 (VERSION_clash_ghc :: String)
-  platform = "x86_64-linux" :: String -- XXX: Hardcoded
+  platform :: String -- XXX: Hardcoded
+  platform = case os of
+     "mingw32" -> arch <> "-windows"
+     _ -> arch <> "-" <> os
   templ = "dist-newstyle/build/%s/ghc-%s/clash-ghc-%s/x/clash/build/clash/" :: String
 
 -- | Set GHC_PACKAGE_PATH for local Cabal install. Currently hardcoded for Unix;
@@ -50,7 +53,9 @@ setCabalPackagePaths = do
   ch <- lookupEnv "store_dir"
   storeDir <- case ch of
     Just dir -> pure dir
-    Nothing -> (<> "/.cabal/store") <$> getEnv "HOME"
+    Nothing -> case os of
+      "mingw32" -> pure "C:/cabal/store" -- default ghcup location
+      _ ->  (<> "/.cabal/store") <$> getEnv "HOME"
   here <- getCurrentDirectory
   setEnv "GHC_PACKAGE_PATH" $
        storeDir <> "/ghc-" <> ghcVersion3 <> "/package.db"
@@ -94,7 +99,8 @@ setClashEnvs Stack = pure ()
 setClashEnvs Cabal = do
   binDir <- cabalClashBinDir
   path <- getEnv "PATH"
-  setEnv "PATH" (binDir <> ":" <> path)
+  let seperator = case os of { "mingw32" -> ";"; _ -> ":" }
+  setEnv "PATH" (binDir <> seperator <> path)
   setCabalPackagePaths
 
 clashTestRoot
