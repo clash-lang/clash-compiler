@@ -27,8 +27,8 @@ NCPUS=4
 # Number of runners to use. Each runner will get NCPUS
 NRUNNERS=1
 
-# Get this key from https://gitlab.com/clash-lang/clash-compiler/-/settings/ci_cd
-# under "Runners".
+# Get this key from https://gitlab.com/groups/clash-lang/-/runners
+# under "Register a group runner".
 REGISTER_KEY=XXXXXXXXXXXXXXXXX
 
 # Points to a MINIO instance. If you're in the office, use the cache on
