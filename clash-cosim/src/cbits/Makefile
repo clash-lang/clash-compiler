@@ -7,7 +7,7 @@ CFLAGS = -Wall -O2
 
 UNAME = $(shell uname)
 ifeq ($(UNAME),Darwin)
-  LDFLAGS = -dylib -export_dynamic -flat_namespace -undefined suppress -macosx_version_min 10.14
+  LDFLAGS = -L /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/ -lSystem -dylib -export_dynamic -flat_namespace -undefined suppress -macosx_version_min 10.14
 else
   LDFLAGS = -shared -E
 endif
