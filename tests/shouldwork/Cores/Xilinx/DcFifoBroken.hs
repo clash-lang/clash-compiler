@@ -8,7 +8,7 @@ import Clash.Explicit.Testbench
 
 import DcFifo.Abstract
 
-topEntity :: ConfiguredFifo Dom2 Dom2
+topEntity :: ConfiguredFifo Dom2 Dom17
 topEntity = dcFifo defConfig
 {-# NOINLINE topEntity #-}
 

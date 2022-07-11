@@ -5,7 +5,7 @@ import Clash.Explicit.Prelude
 
 import DcFifo.Abstract
 
-topEntity :: ConfiguredFifo Dom2 Dom3
+topEntity :: ConfiguredFifo Dom2 Dom17
 topEntity = dcFifo defConfig
 {-# NOINLINE topEntity #-}
 

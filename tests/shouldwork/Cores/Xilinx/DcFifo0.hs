@@ -5,10 +5,10 @@ import Clash.Explicit.Prelude
 
 import DcFifo.Abstract
 
-topEntity :: ConfiguredFifo Dom3 Dom2
+topEntity :: ConfiguredFifo Dom17 Dom2
 topEntity = dcFifo defConfig
 {-# NOINLINE topEntity #-}
 
-testBench :: Signal Dom3 Bool
+testBench :: Signal Dom17 Bool
 testBench = mkTestBench topEntity
 {-# NOINLINE testBench #-}

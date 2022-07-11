@@ -12,8 +12,9 @@ type Stall = Bool
 type ExpectedToRead n = BitVector n
 type UnexpectedRead = Bool
 
-createDomain vSystem{vName="Dom2", vPeriod=hzToPeriod 3e7}
-createDomain vSystem{vName="Dom3", vPeriod=hzToPeriod 5e7}
+createDomain vSystem{vName="Dom2", vPeriod=hzToPeriod 2e7}
+createDomain vSystem{vName="Dom3", vPeriod=hzToPeriod 3e7}
+createDomain vSystem{vName="Dom17", vPeriod=hzToPeriod 17e7}
 
 -- | Produce a 'Just' when predicate is True, else Nothing
 orNothing :: Bool -> a -> Maybe a
