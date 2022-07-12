@@ -103,9 +103,10 @@ data TestOptions =
   TestOptions
     { hdlSim :: [Sim]
     -- ^ Run hdl simulators (GHDL, ModelSim, etc.)
-    , hdlLoad :: Bool
-    -- ^ Load hdl into simulator (GHDL, ModelSim, etc.). Disabling this will
-    -- disable 'hdlSim' too.
+    , hdlLoad :: [Sim]
+    -- ^ Load hdl into simulators (GHDL, ModelSim, etc.). All simulators except
+    -- Vivado need to be listed in `hdlLoad` for `hdlSim` to be able to run. For
+    -- Vivado, listing it here is a no-op.
     , expectSimFail :: Maybe (TestExitCode, T.Text)
     -- ^ Expect simulation to fail: Nothing if simulation is expected to run
     -- without errors, or Just (part of) the error message the simulation is
@@ -142,7 +143,7 @@ instance Default TestOptions where
   def =
     TestOptions
       { hdlSim=[minBound ..]
-      , hdlLoad=True
+      , hdlLoad=[minBound ..]
       , expectClashFail=Nothing
       , expectSimFail=Nothing
       , expectVerificationFail=Nothing
@@ -209,7 +210,7 @@ sequenceTests path (unzip -> (testNames, testTrees)) =
       -- Test patterns for all given tests such that each executes sequentially
       testPatterns = init (map (fmap pat) (Nothing : map Just testNames))
 
-      -- | Generate pattenrs given parent patterns and item patterns
+      -- | Generate patterns given parent patterns and item patterns
       applyAfter :: Maybe String -> TestTree -> TestTree
       applyAfter Nothing  tt = tt
       applyAfter (Just p) tt = after AllSucceed p tt
@@ -387,10 +388,8 @@ verilatorTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
     | t <- getBuildTargets opts
     ]
 
--- | Generate a test tree for running Vivado.
---
--- Skips simulation tests if a failure is expected (may have a different error
--- message from other simulators)
+-- | Generate a test tree for running Vivado. Depending on 'hdlSim' it will be
+-- executed or not.
 vivadoTests
   :: TestOptions
   -> IO FilePath
@@ -398,13 +397,13 @@ vivadoTests
   -> ( [(TestName, TestTree)]
      , [(TestName, TestTree)]
      )
-vivadoTests opts@TestOptions{..} tmpDir modName = ([], simTests)
+vivadoTests opts tmpDir modName = ([], simTests)
  where
   simTests =
     [ ( buildName t
       , singleTest "Vivado" (VivadoTest tmpDir modName t)
       )
-    | t <- getBuildTargets opts, False <- [isJust expectSimFail]
+    | t <- getBuildTargets opts
     ]
   buildName t = "Vivado (sim " <> t <> ")"
 
@@ -447,11 +446,11 @@ runTest1 modName opts@TestOptions{..} path target =
     , cgOutputDirectory=tmpDir
     }))
 
-  buildAndSimTests sim (buildTests, simTests) =
-    case (isJust expectClashFail, hdlLoad, hdlSim) of
-      (True, _, _) -> []
-      (_, False, _) -> []
-      (_, _, sims) -> buildTests <> (if sim `elem` sims then simTests else [])
+  buildAndSimTests sim (buildTests, simTests)
+    | isJust expectClashFail = []
+    | otherwise              =
+      (if sim `elem` hdlLoad then buildTests else []) <>
+      (if sim `elem` hdlSim then simTests else [])
 
   -- HACK: We want to run verilator and simulator tests independently if they
   -- are both going to be run, otherwise failures from whichever comes first

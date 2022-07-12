@@ -249,6 +249,8 @@ runClashTest = defaultMain $ clashTestRoot
         [ let n = 9 -- GHDL only has VERY basic PSL support
               _opts = def { hdlTargets=[VHDL]
                           , buildTargets=BuildSpecific ["fails" <> show i | i <- [(1::Int)..n]]
+                          , hdlLoad=[GHDL]
+                          , hdlSim=[GHDL]
                           , expectSimFail=Just (def, "psl assertion failed")
                           }
            in runTest "NonTemporalPSL" _opts
@@ -257,6 +259,7 @@ runClashTest = defaultMain $ clashTestRoot
                           , buildTargets=BuildSpecific ["fails" <> show i | i <- [(1::Int)..n]]
                           -- Only QuestaSim supports simulating SVA/PSL, but ModelSim does check
                           -- for syntax errors.
+                          , hdlLoad=[ModelSim]
                           , hdlSim=[]
                           }
            in runTest "NonTemporalPSL" _opts
@@ -266,12 +269,14 @@ runClashTest = defaultMain $ clashTestRoot
           , buildTargets=BuildSpecific ["fails" <> show i | i <- is]
           -- Only QuestaSim supports simulating SVA/PSL, but ModelSim does check
           -- for syntax errors.
+          , hdlLoad=[ModelSim]
           , hdlSim=[]
           }
         , runTest "SymbiYosys" def{
             hdlTargets=[Verilog, SystemVerilog]
           , buildTargets=BuildSpecific ["topEntity"]
-          , hdlLoad=False
+          , hdlLoad=[]
+          , hdlSim=[]
           , verificationTool=Just SymbiYosys
           , expectVerificationFail=Just (def, "Unreached cover statement at B")
           }
@@ -383,7 +388,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1254" def{hdlTargets=[VHDL,SystemVerilog],hdlSim=[]}
         , runTest "T1242" def{hdlSim=[]}
         , runTest "T1292" def{hdlTargets=[VHDL]}
-        , let _opts = def { hdlTargets = [VHDL], hdlLoad = False, hdlSim=[] }
+        , let _opts = def { hdlTargets = [VHDL], hdlLoad = [], hdlSim=[] }
            in runTest "T1304" _opts
         , let _opts = def { hdlTargets=[VHDL]
                           , hdlSim=[]
@@ -930,7 +935,8 @@ runClashTest = defaultMain $ clashTestRoot
           runTest "SymbiYosys" def{
             hdlTargets=[Verilog, SystemVerilog]
           , buildTargets=BuildSpecific ["topEntity"]
-          , hdlLoad=False
+          , hdlLoad=[]
+          , hdlSim=[]
           , verificationTool=Just SymbiYosys
           }
         ]
