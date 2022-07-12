@@ -572,6 +572,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T2046C" def{hdlSim=False,clashFlags=["-Werror"],buildTargets=BuildSpecific["topEntity"]}
         , runTest "T2097" def{hdlSim=False}
         , runTest "T2154" def{hdlTargets=[VHDL], hdlSim=False}
+        , runTest "T2272" def{hdlTargets=[VHDL], hdlSim=False}
         ] <>
         if compiledWith == Cabal then
           -- This tests fails without environment files present, which are only

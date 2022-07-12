@@ -1,8 +1,9 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 {-|
-  Copyright     : (C) 2020-2021, QBayLogic B.V.
+  Copyright     : (C) 2020-2022, QBayLogic B.V.
   License       : BSD2 (see the file LICENSE)
   Maintainer    : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -22,13 +23,13 @@ import Prettyprinter (hsep)
 import Data.Text.Prettyprint.Doc (hsep)
 #endif
 
-import Clash.Core.DataCon (DataCon)
+import Clash.Core.DataCon (DataCon, dcType)
 import Clash.Core.HasType
 import Clash.Core.Literal (Literal(CharLiteral))
 import Clash.Core.Pretty (fromPpr, ppr, showPpr)
-import Clash.Core.Term (Term(..), PrimInfo(..), TickInfo, Alt)
+import Clash.Core.Term (Term(..), PrimInfo(..), TickInfo, Alt, mkApps)
 import Clash.Core.TyCon (TyConMap)
-import Clash.Core.Type (Type)
+import Clash.Core.Type (Type (..), mkFunTy)
 import Clash.Core.Var (Id, IdScope(..), TyVar)
 import Clash.Core.VarEnv
 import Clash.Driver.Types (BindingMap, bindingTerm)
@@ -264,6 +265,25 @@ data Value
   | CastValue Value Type Type
   -- ^ Preserve casts from Terms in Values
   deriving Show
+
+instance InferType Value where
+  inferCoreTypeOf tcm = go
+   where
+    go = \case
+      Lambda i t -> mkFunTy (coreTypeOf i) (inferCoreTypeOf tcm t)
+      TyLambda v t -> ForAllTy v (inferCoreTypeOf tcm t)
+      DC dc args -> applyTypeToArgs (mkApps (Data dc) args) tcm (dcType dc) args
+      Lit l -> coreTypeOf l
+      PrimVal p tys vals ->
+        let args = map Right tys ++ map (Left . valToTerm) vals
+         in applyTypeToArgs
+              (mkApps (Prim p) args)
+              tcm
+              (primType p)
+              args
+      Suspend t -> inferCoreTypeOf tcm t
+      TickValue _ v -> go v
+      CastValue _ _ t -> t
 
 valToTerm :: Value -> Term
 valToTerm v = case v of
