@@ -63,7 +63,7 @@ stack-build:
   tags:
 
 nix-build:
-  image: nixos/nix
+  image: nixos/nix:2.9.2
   needs: []
   stage: test
   before_script:
