@@ -160,9 +160,9 @@ runClashTest = defaultMain $ clashTestRoot
           -- see: https://github.com/clash-lang/clash-compiler/issues/2265
           let _opts = def { buildTargets = BuildSpecific ["system"]
                           , hdlTargets = [Verilog]
-                          , hdlSim = hdlSimExcludeVivado
+                          , hdlLoad = hdlLoad def \\ [Verilator, Vivado]
+                          , hdlSim = hdlSim def \\ [Verilator, Vivado]
                           , vvpStdoutNonEmptyFail = False
-                          , verilate = SimOnly
                           }
            in runTest "I2Ctest" _opts
 
@@ -663,7 +663,11 @@ runClashTest = defaultMain $ clashTestRoot
             { clashFlags=["-fconstraint-solver-iterations=15"]
             , ghcFlags=["-itests/shouldwork/Numbers"]
             }
-        , runTest "NumConstantFoldingTB_2" def{clashFlags=["-itests/shouldwork/Numbers"], verilate=SimOnly}
+        , let _opts = def { clashFlags=["-itests/shouldwork/Numbers"]
+                          , hdlLoad = hdlLoad def \\ [Verilator]
+                          , hdlSim = hdlSim def \\ [Verilator]
+                          }
+          in runTest "NumConstantFoldingTB_2" _opts
         , outputTest "NumConstantFolding_2" def
             { clashFlags=["-fconstraint-solver-iterations=15"]
             , ghcFlags=["-itests/shouldwork/Numbers"]
@@ -749,8 +753,16 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "BlockRamTest" def{hdlSim=[]}
         , runTest "Compression" def
         , runTest "DelayedReset" def
-        , runTest "DualBlockRam0" def{verilate=SimOnly, hdlSim=hdlSimExcludeVivado} -- vivado segfaults
-        , runTest "DualBlockRam1" def{verilate=SimOnly, hdlSim=hdlSimExcludeVivado} -- vivado segfaults
+        , let _opts = def { -- vivado segfaults
+                            hdlLoad = hdlLoad def \\ [Verilator, Vivado]
+                          , hdlSim = hdlSim def \\ [Verilator, Vivado]
+                          }
+          in runTest "DualBlockRam0" _opts
+        , let _opts = def { -- vivado segfaults
+                            hdlLoad = hdlLoad def \\ [Verilator, Vivado]
+                          , hdlSim = hdlSim def \\ [Verilator, Vivado]
+                          }
+          in runTest "DualBlockRam1" _opts
         , let _opts = def { buildTargets=BuildSpecific ["example"]
                           , hdlSim=[]
                           }
@@ -794,8 +806,8 @@ runClashTest = defaultMain $ clashTestRoot
         [ let _opts = def { hdlTargets=[Verilog]
                           , vvpStdoutNonEmptyFail=False
                           , buildTargets=BuildSpecific ["topEntity"]
-                          , hdlSim=hdlSimExcludeVivado
-                          , verilate=SimOnly
+                          , hdlLoad = hdlLoad def \\ [Verilator, Vivado]
+                          , hdlSim = hdlSim def \\ [Verilator, Vivado]
                           }
            in runTest "Test00" _opts
         ]
@@ -890,7 +902,10 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "IndexInt2" def{hdlSim=hdlSim def \\ [Vivado]}
         , outputTest "IndexInt2" def{hdlTargets=[Verilog]}
         , runTest "Concat" def
-        , runTest "DFold" def{verilate=SimOnly}
+        , let _opts = def { hdlLoad = hdlLoad def \\ [Verilator]
+                          , hdlSim = hdlSim def \\ [Verilator]
+                          }
+          in runTest "DFold" _opts
         , runTest "DFold2" def
         , runTest "DTFold" def
         ,
