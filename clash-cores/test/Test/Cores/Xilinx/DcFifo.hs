@@ -209,6 +209,7 @@ type Feed d =
   (ResetBusy, Full, DataCount d) ->
   ([Either Int (BitVector 32)], Maybe (BitVector 32))
 
+-- | Driver for input to FIFO, takes stalls and data
 feedState ::
   SNat d ->
   [Either Int (BitVector 32)] ->
@@ -223,6 +224,8 @@ feedState _ (Right x:xs) (_, full, _) =
     then (Right x:xs, Nothing)
     else (xs, Just x)
 
+-- | Driver for input to FIFO, takes stalls and data and ignores full signals
+-- out of the FIFO.
 feedClumsy ::
   SNat d ->
   [Either Int (BitVector 32)] ->

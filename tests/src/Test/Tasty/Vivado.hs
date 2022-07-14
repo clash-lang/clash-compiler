@@ -2,12 +2,11 @@
 
 module Test.Tasty.Vivado where
 
-import Control.Monad (unless)
 import Data.Coerce (coerce)
 import Data.Tagged (Tagged (..))
 import Data.Proxy (Proxy (..))
 
-import System.Directory (createDirectory, doesDirectoryExist)
+import System.Directory (createDirectory)
 import System.FilePath ((</>))
 import Test.Tasty.Providers (IsTest (..), testPassed)
 import Test.Tasty.Options (IsOption (..), safeReadBool, flagCLParser, lookupOption, OptionDescription (..))
@@ -33,17 +32,12 @@ data VivadoTest = VivadoTest
   , entity :: String
   }
 
-createDirIfNotExists :: FilePath -> IO ()
-createDirIfNotExists fp = do
-  b <- doesDirectoryExist fp
-  unless b (createDirectory fp)
-
 instance IsTest VivadoTest where
   run optionSet (VivadoTest dir m top) progressCallback
     | Vivado True <- lookupOption optionSet = do
         hdlDir <- dir
-        createDirIfNotExists $ hdlDir </> "ip"
-        createDirIfNotExists $ hdlDir </> "project"
+        createDirectory $ hdlDir </> "ip"
+        createDirectory $ hdlDir </> "project"
         let tclFp = hdlDir </> "sim.tcl"
         tcl <- tclFromManifest hdlDir m top
         writeFile tclFp tcl

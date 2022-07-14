@@ -20,8 +20,6 @@ module Clash.Cores.Xilinx.DcFifo.Explicit
 
     -- * Customizing IP
   , DcConfig(..)
-  , DcImplementation(..)
-  , ReadMode(..)
   , defConfig
 
     -- * Helper type aliases
@@ -48,33 +46,21 @@ type Full = Bool
 type Empty = Bool
 type DataCount n = Unsigned n
 
-data ReadMode
-  = Standard_FIFO
-  | First_Word_Fall_Through
-  deriving (Show, Generic)
-
-data DcImplementation
-  = Independent_Clocks_Block_RAM
-  | Independent_Clocks_Distributed_RAM
-  | Independent_Clocks_Builtin_FIFO
-  deriving (Show, Generic)
-
+-- | Parameters for the FIFO generator; toggle various signals.
 data DcConfig depth = DcConfig
   { dcDepth          :: !depth
-  , dcImplementation :: !DcImplementation
-  , dcReadMode       :: !ReadMode
-  , dcReadDataCount  :: !Bool
-  , dcWriteDataCount :: !Bool
-  , dcOverflow       :: !Bool
-  , dcUnderflow      :: !Bool
+  , dcReadDataCount  :: !Bool -- ^ Enable @rd_cnt@ signal
+  , dcWriteDataCount :: !Bool -- ^ Enable @wr_cnt@ signal
+  , dcOverflow       :: !Bool -- ^ Enable @overflow@ signal
+  , dcUnderflow      :: !Bool -- ^ Enable @underflow@ signal
   }
   deriving (Show, Generic)
 
+-- | Default config. Read\/write data counts are enabled but over-\/underflow are
+-- not.
 defConfig :: KnownNat depth => DcConfig (SNat depth)
 defConfig = DcConfig
   { dcDepth = SNat
-  , dcImplementation = Independent_Clocks_Block_RAM
-  , dcReadMode = Standard_FIFO
   , dcReadDataCount = True
   , dcWriteDataCount = True
   , dcOverflow = False
@@ -90,15 +76,47 @@ data FifoState n = FifoState
 
 data XilinxFifo read write depth n =
   XilinxFifo
-    { writeReset :: Signal write ResetBusy -- ^ @wr_rst@
-    , isFull :: Signal write Full -- ^ @full@
-    , isOverflow :: Signal write Bool -- ^ @overflow@
-    , writeCount :: Signal write (DataCount depth) -- ^ @wr_data_count@
-    , readReset :: Signal read ResetBusy -- ^ @rd_rst@
-    , isEmpty :: Signal read Empty -- ^ @empty@
-    , isUnderflow :: Signal read Bool -- ^ @underflow@
-    , readCount :: Signal read (DataCount depth) -- ^ @rd_data_count@
-    , fifoData :: Signal read (BitVector n) -- ^ @dout@
+    { -- | @wr_rst_busy@. When asserted, this signal indicates that the write domain
+      -- is in reset state.
+      writeReset :: Signal write ResetBusy
+    -- | @full@. Full Flag: When asserted, this signal indicates that the FIFO
+    -- is full. Write requests are ignored when the FIFO is full, initiating a write when
+    -- the FIFO is full is not destructive to the contents of the FIFO.
+    , isFull :: Signal write Full
+    -- | @overflow@. Overflow: This signal indicates that a write request
+    -- (wr_en) during the prior clock cycle was rejected, because the FIFO is full.
+    -- Overflowing the FIFO is not destructive to the FIFO.
+    , isOverflow :: Signal write Bool
+    -- | @wr_data_count@. Write Data Count: This bus indicates the number of words
+    -- written into the FIFO. The count is guaranteed to never under-report the number
+    -- of words in the FIFO, to ensure you never overflow the FIFO. The exception to
+    -- this behavior is when a write operation occurs at the rising edge of wr_clk/ clk,
+    -- that write operation will only be reflected on wr_data_count at the next rising clock edge.
+    --
+    -- If D is less than log2(FIFO depth)-1, the bus is truncated by removing the least-significant bits.
+    , writeCount :: Signal write (DataCount depth)
+    -- | @rd_rst_busy@. When asserted, this signal indicates that the read
+    -- domain is in reset state.
+    , readReset :: Signal read ResetBusy
+    -- | @empty@. Empty Flag: When asserted, this signal indicates that the FIFO is empty.
+    -- Read requests are ignored when the FIFO is empty, initiating a read while empty
+    -- is not destructive to the FIFO.
+    , isEmpty :: Signal read Empty
+    -- | @underflow@. Underflow: Indicates that read request (rd_en) during the
+    -- previous clock cycle was rejected because the FIFO is empty. Underflowing the FIFO
+    -- is not destructive to the FIFO.
+    , isUnderflow :: Signal read Bool
+    -- | @rd_data_count@. Read Data Count: This bus indicates the number of words
+    -- available for reading in the FIFO. The count is guaranteed to never over-report the
+    -- number of words available for reading, to ensure that you do not underflow the FIFO.
+    -- The exception to this behavior is when the read operation occurs at the rising edge
+    -- of rd_clk/clk, that read operation is only reflected on rd_data_count at the next
+    -- rising clock edge.
+    --
+    -- If C is less than log2(FIFO depth)-1, the bus is truncated by removing the least-significant bits.
+    , readCount :: Signal read (DataCount depth)
+    -- | @dout@. Data Output: The output data bus is driven when reading the FIFO.
+    , fifoData :: Signal read (BitVector n)
     }
 
 -- | Xilinx FIFO, see [documentation](https://docs.xilinx.com/v/u/en-US/pg057-fifo-generator)

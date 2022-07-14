@@ -210,8 +210,8 @@ dcFifoTclTF width dcFifoName DcConfig{..} =
   TermLiteralSNat depth = dcDepth
 
   props =
-    [ ("Fifo_Implementation",    show dcImplementation)
-    , ("Performance_Options",    show dcReadMode)
+    [ ("Fifo_Implementation",    "Independent_Clocks_Block_RAM")
+    , ("Performance_Options",    "Standard_FIFO")
     , ("Reset_Type",             "Asynchronous_Reset")
     , ("Full_Flags_Reset_Value", "1")
     , ("Input_Data_Width",       show width)
