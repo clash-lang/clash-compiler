@@ -42,13 +42,14 @@ driveClumsy clk rst ena stalls inps =
 fifoVerifyBad::
   KnownDomain dom =>
   Clock dom -> Reset dom -> Enable dom ->
-  Signal dom (Maybe (BitVector 16)) ->
+  Signal dom (Unsigned 4, Maybe (BitVector 16)) ->
   Signal dom Bool
 fifoVerifyBad clk rst ena = mealy clk rst ena go 0
  where
-  go :: BitVector 16 -> Maybe (BitVector 16) -> (BitVector 16, Bool)
-  go expected Nothing = (expected, False)
-  go expected (Just actual) = (succ actual, expected < actual)
+  go :: BitVector 16 -> (Unsigned 4, Maybe (BitVector 16)) -> (BitVector 16, Bool)
+  go expected (_, Nothing) = (expected, False)
+  go expected (15, Just actual) = (succ actual, False)
+  go expected (_, Just actual) = (succ actual, expected < actual)
 {-# NOINLINE fifoVerifyBad #-}
 
 testBench :: Signal Dom2 Bool
@@ -73,5 +74,5 @@ testBench = done
   XilinxFifo{isFull, writeCount, isEmpty, readCount, fifoData} =
     topEntity wClk rClk rRst writeData readEnable
 
-  errorFound = fifoVerifyBad rClk rRst rEna maybeReadData
+  errorFound = fifoVerifyBad rClk rRst rEna (bundle (readCount, maybeReadData))
   done = outputVerifier' rClk rRst (repeat @100 False) errorFound
