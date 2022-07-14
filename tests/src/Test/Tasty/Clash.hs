@@ -91,20 +91,17 @@ getBuildTargets TestOptions{hdlSim, buildTargets=BuildAuto}
 -- | Possible verification tools
 data VerificationTool = SymbiYosys
 
--- | Specify whether a test will use a traditional simulator, verilator, or
--- both when executing. By default both are used, but this can be changed when
--- a test is only relevant with one type of tool.
-data Verilate = SimAndVerilate | VerilateOnly | SimOnly
-
-data Sim = Vivado | GHDL | ModelSim | Verilator deriving Eq
+data Sim = Vivado | GHDL | IVerilog | ModelSim | Verilator
+  deriving (Show, Eq, Bounded, Enum)
 
 data TestOptions =
   TestOptions
     { hdlSim :: [Sim]
     -- ^ Run hdl simulators (GHDL, ModelSim, etc.)
-    , hdlLoad :: Bool
-    -- ^ Load hdl into simulator (GHDL, ModelSim, etc.). Disabling this will
-    -- disable 'hdlSim' too.
+    , hdlLoad :: [Sim]
+    -- ^ Load hdl into simulators (GHDL, ModelSim, etc.). All simulators except
+    -- Vivado need to be listed in `hdlLoad` for `hdlSim` to be able to run. For
+    -- Vivado, listing it here is a no-op.
     , expectSimFail :: Maybe (TestExitCode, T.Text)
     -- ^ Expect simulation to fail: Nothing if simulation is expected to run
     -- without errors, or Just (part of) the error message the simulation is
@@ -129,9 +126,6 @@ data TestOptions =
     -- if 'hdlSim' is set, otherwise @["topEntity"]@.
     , vvpStdoutNonEmptyFail :: Bool
     -- ^ Whether a non-empty stdout means test failure when running VVP
-    , verilate :: Verilate
-    -- ^ Whether to run compatible tests through verilator as well as / in
-    -- place of the simulator that would ordinarily be used.
     }
 
 allTargets :: [HDL]
@@ -140,8 +134,8 @@ allTargets = [VHDL, Verilog, SystemVerilog]
 instance Default TestOptions where
   def =
     TestOptions
-      { hdlSim=[GHDL, ModelSim, Vivado]
-      , hdlLoad=True
+      { hdlSim=[minBound ..]
+      , hdlLoad=[minBound ..]
       , expectClashFail=Nothing
       , expectSimFail=Nothing
       , expectVerificationFail=Nothing
@@ -151,12 +145,7 @@ instance Default TestOptions where
       , clashFlags=[]
       , buildTargets=BuildAuto
       , vvpStdoutNonEmptyFail=True
-      , verilate=SimAndVerilate
       }
-
--- | All 'Sim's excluding Vivado
-hdlSimExcludeVivado :: [Sim]
-hdlSimExcludeVivado = [GHDL, ModelSim]
 
 -- | Directory where testbenches live.
 sourceDirectory :: String
@@ -178,21 +167,6 @@ sourceDirectory =
   unsafePerformIO Directory.getCurrentDirectory
 {-# NOINLINE sourceDirectory #-}
 
--- | Gather all files with specific extension
-hdlFiles
-  :: String
-  -- ^ Extension
-  -> FilePath
-  -- ^ Directory to search
-  -> FilePath
-  -- ^ Subdirectory to search
-  -> IO [FilePath]
-  -- ^ Files with subdirectory as prefix
-hdlFiles ext dir subdir = do
-  allFiles <- Directory.getDirectoryContents (dir </> subdir)
-  return $ map (subdir </>) (filter (List.isSuffixOf ext) allFiles)
-{-# NOINLINE hdlFiles #-}
-
 -- | Given a number of test trees, make sure each one of them is executed
 -- one after the other. To prevent naming collisions, parent group names can
 -- be included. Parent group names should be ordered outer -> inner.
@@ -212,7 +186,7 @@ sequenceTests path (unzip -> (testNames, testTrees)) =
       -- Test patterns for all given tests such that each executes sequentially
       testPatterns = init (map (fmap pat) (Nothing : map Just testNames))
 
-      -- | Generate pattenrs given parent patterns and item patterns
+      -- | Generate patterns given parent patterns and item patterns
       applyAfter :: Maybe String -> TestTree -> TestTree
       applyAfter Nothing  tt = tt
       applyAfter (Just p) tt = after AllSucceed p tt
@@ -300,17 +274,18 @@ instance IsTest ClashBinaryTest where
 
   testOptions = coerce (testOptions @TestProgram)
 
--- | Generate two test trees for testing VHDL: one for building designs and one
--- for running them. Depending on 'hdlSim' the latter will be executed or not.
-vhdlTests
+-- | Generate two test trees for running GHDL: one for building designs and one
+-- for running them. It depends on 'hdlLoad' and 'hdlSim' what will be
+-- executed.
+ghdlTests
   :: TestOptions
   -> IO FilePath
   -> ( [(TestName, TestTree)] -- build tests
      , [(TestName, TestTree)] -- simulation tests
      )
-vhdlTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
+ghdlTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
  where
-  importName = "GHDL (import)"
+  importName = "ghdl (import)"
   makeName t = "ghdl (make " <> t <> ")"
   buildTests = concat
     [ [ (importName, singleTest importName (GhdlImportTest tmpDir)) ]
@@ -324,15 +299,16 @@ vhdlTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
     | t <- getBuildTargets opts
     ]
 
--- | Generate two test trees for testing Verilog: one for building designs and one
--- for running them. Depending on 'hdlSim' the latter will be executed or not.
-verilogTests
+-- | Generate two test trees for running Icarus Verilog: one for building
+-- designs and one for running them. It depends on 'hdlLoad' and 'hdlSim' what
+-- will be executed.
+iverilogTests
   :: TestOptions
   -> IO FilePath
   -> ( [(TestName, TestTree)] -- build tests
      , [(TestName, TestTree)] -- simulation tests
      )
-verilogTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
+iverilogTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
  where
   makeNameIvl t = "iverilog (make " <> t <> ")"
   buildTests =
@@ -346,15 +322,16 @@ verilogTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
     | t <- getBuildTargets opts
     ]
 
--- | Generate two test trees for testing SystemVerilog: one for building designs and
--- one for running them. Depending on 'hdlSim' the latter will be executed or not.
-systemVerilogTests
+-- | Generate two test trees for running ModelSim: one for building designs and
+-- one for running them. It depends on 'hdlLoad' and 'hdlSim' what will be
+-- executed.
+modelsimTests
   :: TestOptions
   -> IO FilePath
   -> ( [(TestName, TestTree)] -- build tests
      , [(TestName, TestTree)] -- simulation tests
      )
-systemVerilogTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
+modelsimTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
  where
   vlibName = "modelsim (vlib)"
   vlogName = "modelsim (vlog)"
@@ -369,6 +346,9 @@ systemVerilogTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
     | t <- getBuildTargets opts
     ]
 
+-- | Generate two test trees for running Verilator: one for building designs and
+-- one for running them. It depends on 'hdlLoad' and 'hdlSim' what will be
+-- executed.
 verilatorTests
   :: TestOptions
   -> IO FilePath
@@ -390,10 +370,8 @@ verilatorTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
     | t <- getBuildTargets opts
     ]
 
--- | Generate a test tree for running Vivado.
---
--- Skips simulation tests if a failure is expected (may have a different error
--- message from other simulators)
+-- | Generate a test tree for running Vivado. Depending on 'hdlSim' it will be
+-- executed or not.
 vivadoTests
   :: TestOptions
   -> IO FilePath
@@ -401,13 +379,13 @@ vivadoTests
   -> ( [(TestName, TestTree)]
      , [(TestName, TestTree)]
      )
-vivadoTests opts@TestOptions{..} tmpDir modName = ([], simTests)
+vivadoTests opts tmpDir modName = ([], simTests)
  where
   simTests =
     [ ( buildName t
       , singleTest "Vivado" (VivadoTest tmpDir modName t)
       )
-    | t <- getBuildTargets opts, False <- [isJust expectSimFail]
+    | t <- getBuildTargets opts
     ]
   buildName t = "Vivado (sim " <> t <> ")"
 
@@ -428,14 +406,13 @@ runTest1
   -> HDL
   -> TestTree
 runTest1 modName opts@TestOptions{..} path target =
-  withResource mkTmpDir Directory.removeDirectoryRecursive $ \tmpDir -> do
+  withResource mkTmpDir Directory.removeDirectoryRecursive $ \tmpDir ->
     testGroup (show target) $
-      sequenceTests (show target : path) (clashTest tmpDir : nonVerilator tmpDir)
-        <> tail (sequenceTests (show target : path) (clashTest tmpDir : verilator tmpDir))
-        <> (case verificationTool of
-              Nothing -> []
-              Just SymbiYosys -> tail $ sequenceTests (show target : path) (clashTest tmpDir : sbyTests opts tmpDir))
-        <> tail (sequenceTests (show target : path) (clashTest tmpDir : vivado tmpDir))
+      sequenceIndependent (clashTest tmpDir) $
+           (case verificationTool of
+             Nothing -> []
+             Just SymbiYosys -> sbyTests opts tmpDir)
+         : hdlTests tmpDir
  where
   mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
   sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))
@@ -450,11 +427,11 @@ runTest1 modName opts@TestOptions{..} path target =
     , cgOutputDirectory=tmpDir
     }))
 
-  buildAndSimTests sim (buildTests, simTests) =
-    case (isJust expectClashFail, hdlLoad, hdlSim) of
-      (True, _, _) -> []
-      (_, False, _) -> []
-      (_, _, sims) -> buildTests <> (if sim `elem` sims then simTests else [])
+  buildAndSimTests sim (buildTests, simTests)
+    | isJust expectClashFail = []
+    | otherwise              =
+      (if sim `elem` hdlLoad then buildTests else []) <>
+      (if sim `elem` hdlSim then simTests else [])
 
   -- HACK: We want to run verilator and simulator tests independently if they
   -- are both going to be run, otherwise failures from whichever comes first
@@ -476,34 +453,34 @@ runTest1 modName opts@TestOptions{..} path target =
   --
   -- where groups B and C are independent of each other, but both dependent on
   -- the success of Task A1.
+  sequenceIndependent
+    :: (TestName, TestTree)
+    -- ^ The tree everything else depends on ("clash (gen)")
+    -> [[(TestName, TestTree)]]
+    -- ^ All the independent trees to run after "clash (gen)"
+    -> [TestTree]
+  sequenceIndependent gen = go
+   where
+    go [] = sequenceOne []
+    go (l:ls) = sequenceOne l <> concatMap (tail . sequenceOne) ls
+    sequenceOne ts = sequenceTests (show target : path) (gen : ts)
 
-  vivado tmpDir =
-    case target of
-      SystemVerilog ->
-        -- TODO: Get SystemVerilog working on Vivado
-        []
-      _ -> buildAndSimTests Vivado (vivadoTests opts tmpDir modName)
-
-  nonVerilator tmpDir =
-    case target of
-      VHDL -> buildAndSimTests GHDL (vhdlTests opts tmpDir)
-      Verilog ->
-        case verilate of
-          VerilateOnly -> []
-          _ -> buildAndSimTests ModelSim (verilogTests opts tmpDir)
-
-      SystemVerilog ->
-        case verilate of
-          VerilateOnly -> []
-          _ -> buildAndSimTests ModelSim (systemVerilogTests opts tmpDir)
-
-  verilator tmpDir =
-    case target of
-      VHDL -> []
-      _ ->
-        case verilate of
-          SimOnly -> []
-          _ -> buildAndSimTests Verilator (verilatorTests opts tmpDir)
+  -- | The tests that are switched by `hdlLoad` and `hdlSim`
+  hdlTests tmpDir = case target of
+    VHDL ->
+      [ buildAndSimTests GHDL (ghdlTests opts tmpDir)
+      , buildAndSimTests Vivado (vivadoTests opts tmpDir modName)
+      ]
+    Verilog ->
+      [ buildAndSimTests IVerilog (iverilogTests opts tmpDir)
+      , buildAndSimTests Verilator (verilatorTests opts tmpDir)
+      , buildAndSimTests Vivado (vivadoTests opts tmpDir modName)
+      ]
+    SystemVerilog ->
+      [ -- TODO: ModelSim can do VHDL and Verilog too. Add that?
+        buildAndSimTests ModelSim (modelsimTests opts tmpDir)
+      , buildAndSimTests Verilator (verilatorTests opts tmpDir)
+      ]
 
 runTest
   :: String
