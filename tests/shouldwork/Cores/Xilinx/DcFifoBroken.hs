@@ -21,7 +21,7 @@ driveClumsy ::
   -- | Stall circuit? For this test case, this signal comes from 'lfsrF'
   Signal dom Stall ->
   -- | Signals from FIFO
-  Signal dom (ResetBusy, Full, DataCount depth) ->
+  Signal dom (Full, DataCount depth) ->
   -- | Maybe write input to FIFO
   Signal dom (Maybe (BitVector n))
 driveClumsy clk rst ena stalls inps =
@@ -29,10 +29,9 @@ driveClumsy clk rst ena stalls inps =
  where
   go ::
     BitVector n ->
-    (Stall, (ResetBusy, Full, DataCount depth)) ->
+    (Stall, (Full, DataCount depth)) ->
     (BitVector n, Maybe (BitVector n))
-  go n0 (_,     (True, _,    _         )) = (n0, Nothing)
-  go n0 (stall, (_,    _, _dataCount)) = (n1, maybeWrite)
+  go n0 (stall, (_, _dataCount)) = (n1, maybeWrite)
    where
     maybeWrite = willWrite `orNothing` n0
     willWrite = not stall
@@ -63,15 +62,15 @@ testBench = done
 
   -- Driver
   wLfsr = bitToBool <$> lfsrF wClk wRst wEna 0xDEAD
-  writeData = driveClumsy wClk wRst wEna wLfsr (bundle (writeReset, isFull, writeCount))
+  writeData = driveClumsy wClk wRst wEna wLfsr (bundle (isFull, writeCount))
 
   -- Sampler
   rLfsr = bitToBool <$> lfsrF rClk rRst rEna 0xBEEF
   (readEnable, maybeReadData) =
     unbundle $
-      fifoSampler rClk rRst rEna rLfsr (bundle (readReset, isEmpty, readCount, fifoData))
+      fifoSampler rClk rRst rEna rLfsr (bundle (isEmpty, readCount, fifoData))
 
-  XilinxFifo{writeReset, isFull, writeCount, readReset, isEmpty, readCount, fifoData} =
+  XilinxFifo{isFull, writeCount, isEmpty, readCount, fifoData} =
     topEntity wClk rClk rRst writeData readEnable
 
   errorFound = fifoVerifyBad rClk rRst rEna maybeReadData

@@ -23,7 +23,6 @@ module Clash.Cores.Xilinx.DcFifo.Explicit
   , defConfig
 
     -- * Helper type aliases
-  , ResetBusy
   , Full
   , Empty
   , DataCount
@@ -41,7 +40,6 @@ import           Data.String.Interpolate     (i)
 -- blackbox implementation.
 {-# HLINT ignore "Use camelCase" #-}
 
-type ResetBusy = Bool
 type Full = Bool
 type Empty = Bool
 type DataCount n = Unsigned n
@@ -76,13 +74,11 @@ data FifoState n = FifoState
 
 data XilinxFifo read write depth n =
   XilinxFifo
-    { -- | @wr_rst_busy@. When asserted, this signal indicates that the write domain
-      -- is in reset state.
-      writeReset :: Signal write ResetBusy
+    {
     -- | @full@. Full Flag: When asserted, this signal indicates that the FIFO
     -- is full. Write requests are ignored when the FIFO is full, initiating a write when
     -- the FIFO is full is not destructive to the contents of the FIFO.
-    , isFull :: Signal write Full
+      isFull :: Signal write Full
     -- | @overflow@. Overflow: This signal indicates that a write request
     -- (wr_en) during the prior clock cycle was rejected, because the FIFO is full.
     -- Overflowing the FIFO is not destructive to the FIFO.
@@ -95,9 +91,6 @@ data XilinxFifo read write depth n =
     --
     -- If D is less than log2(FIFO depth)-1, the bus is truncated by removing the least-significant bits.
     , writeCount :: Signal write (DataCount depth)
-    -- | @rd_rst_busy@. When asserted, this signal indicates that the read
-    -- domain is in reset state.
-    , readReset :: Signal read ResetBusy
     -- | @empty@. Empty Flag: When asserted, this signal indicates that the FIFO is empty.
     -- Read requests are ignored when the FIFO is empty, initiating a read while empty
     -- is not destructive to the FIFO.
@@ -152,14 +145,12 @@ dcFifo ::
   XilinxFifo read write depth n
 dcFifo DcConfig{..} wClk rClk rst writeData rEnable =
   let
-    (wRstBusy, wFull, wOver, wCnt, rRstBusy, rEmpty, rUnder, rCnt, rData) =
+    (wFull, wOver, wCnt, rEmpty, rUnder, rCnt, rData) =
       go initState rstSignalR rEnable rstSignalW writeData
   in XilinxFifo
-      wRstBusy
       wFull
       (if dcOverflow then wOver else deepErrorX "Overflow disabled")
       (if dcWriteDataCount then wCnt else deepErrorX "Write data count disabled")
-      rRstBusy
       rEmpty
       (if dcUnderflow then rUnder else deepErrorX "Underflow disabled")
       (if dcReadDataCount then rCnt else deepErrorX "Read data count disabled")
@@ -178,12 +169,10 @@ dcFifo DcConfig{..} wClk rClk rst writeData rEnable =
     Signal read Bool -> -- read enabled
     Signal write Bool -> -- reset
     Signal write (Maybe (BitVector n)) -> -- write data
-    ( Signal write ResetBusy
-    , Signal write Full
+    ( Signal write Full
     , Signal write Bool
     , Signal write (DataCount depth)
 
-    , Signal read ResetBusy
     , Signal read Empty
     , Signal read Bool
     , Signal read (DataCount depth)
@@ -195,15 +184,15 @@ dcFifo DcConfig{..} wClk rClk rst writeData rEnable =
       else goWrite st rstR rEna rstW
 
   goWrite (FifoState _ rt) rstR rEna (True :- rstWNext) (_ :- wData) =
-      (True :- wRstBusy, False :- preFull, False :- preOver, 0 :- preWCnt, rRstBusy, fifoEmpty, under, rCnt, rData)
+      (False :- preFull, False :- preOver, 0 :- preWCnt, fifoEmpty, under, rCnt, rData)
     where
-      (wRstBusy, preFull, preOver, preWCnt, rRstBusy, fifoEmpty, under, rCnt, rData) =
+      (preFull, preOver, preWCnt, fifoEmpty, under, rCnt, rData) =
         go (FifoState mempty (rt-tWr)) rstR rEna rstWNext wData
 
   goWrite (FifoState q rt) rstR rEna (_ :- rstW) (wDat :- wDats1) =
-    (False :- wRstBusy, full, over, wCnt, rRstBusy, fifoEmpty, under, rCnt, rData)
+    (full, over, wCnt, fifoEmpty, under, rCnt, rData)
     where
-      (wRstBusy, preFull, preOver, preWCnt, rRstBusy, fifoEmpty, under, rCnt, rData) =
+      (preFull, preOver, preWCnt, fifoEmpty, under, rCnt, rData) =
         go (FifoState q' (rt-tWr)) rstR rEna rstW wDats1
 
       wCnt = sDepth q :- preWCnt
@@ -216,24 +205,24 @@ dcFifo DcConfig{..} wClk rClk rst writeData rEnable =
   sDepth = fromIntegral . Seq.length
 
   goRead (FifoState _ rt) (True :- rstRNext) (_ :- rEnas1) rstW wData =
-    (wRstBusy, full, over, wCnt, True :- rRstBusy, fifoEmpty, under, rCnt, rData)
+    (full, over, wCnt, fifoEmpty, under, rCnt, rData)
     where
       rData = deepErrorX "Reset" :- preRData
       fifoEmpty = True :- preEmpty
       rCnt = 0 :- preRCnt
       under = False :- preUnder
 
-      (wRstBusy, full, over, wCnt, rRstBusy, preEmpty, preUnder, preRCnt, preRData) =
+      (full, over, wCnt, preEmpty, preUnder, preRCnt, preRData) =
         go (FifoState mempty (rt+tR)) rstRNext rEnas1 rstW wData
 
   goRead (FifoState q rt) (_ :- rstRNext) (rEna :- rEnas1) rstW wData =
-    (wRstBusy, full, over, wCnt, False :- rRstBusy, fifoEmpty, under, rCnt, rData)
+    (full, over, wCnt, fifoEmpty, under, rCnt, rData)
     where
       rCnt = sDepth q :- preRCnt
       fifoEmpty = (Seq.length q == 0) :- preEmpty
       rData = nextData :- preRData
 
-      (wRstBusy, full, over, wCnt, rRstBusy, preEmpty, preUnder, preRCnt, preRData) =
+      (full, over, wCnt, preEmpty, preUnder, preRCnt, preRData) =
         go (FifoState q' (rt+tR)) rstRNext rEnas1 rstW wData
 
       (q', nextData, under) =

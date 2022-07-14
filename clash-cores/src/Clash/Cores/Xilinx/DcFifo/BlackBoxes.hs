@@ -78,11 +78,9 @@ dcFifoBBF _isD _primName args _resTys = do
     -- TODO: Make this blackbox return multiple results, instead of a tuple. See:
     --       https://github.com/clash-lang/clash-compiler/pull/1560
     -- , N.bbResultNames =
-    --   [ N.BBTemplate [N.Text "wr_reset_busy"]
     --   , N.BBTemplate [N.Text "wr_full"]
     --   , N.BBTemplate [N.Text "wr_data_count"]
 
-    --   , N.BBTemplate [N.Text "rd_reset_busy"]
     --   , N.BBTemplate [N.Text "rd_empty"]
     --   , N.BBTemplate [N.Text "rd_data_count"]
     --   , N.BBTemplate [N.Text "rd_dout"]
@@ -124,8 +122,6 @@ dcFifoTF dcFifoName DcConfig{..} = TemplateFunction [] (const True) $ \bbCtx -> 
       [ Just ("dout", dataTy)
       , Just ("full", N.Bit)
       , Just ("empty", N.Bit)
-      , Just ("wr_rst_busy", N.Bit)
-      , Just ("rd_rst_busy", N.Bit)
       , dcReadDataCount `orNothing` ("rd_data_count", N.BitVector depth)
       , dcWriteDataCount `orNothing` ("wr_data_count", N.BitVector depth)
       , dcUnderflow `orNothing` ("underflow", N.Bit)
@@ -138,11 +134,9 @@ dcFifoTF dcFifoName DcConfig{..} = TemplateFunction [] (const True) $ \bbCtx -> 
 
     (wEna, wData) <- DSL.deconstructMaybe wDataM ("wr_ena", "rd_din")
 
-    wrResetBusy <- DSL.declare "wr_reset_busy" N.Bit
     wrFull      <- DSL.declare "wr_full"       N.Bit
     wrOver      <- DSL.declare "wr_overflow"   N.Bit
     wrDataCount <- DSL.declare "wr_data_count" (N.BitVector depth)
-    rdResetBusy <- DSL.declare "rd_reset_busy" N.Bit
     rdEmpty     <- DSL.declare "rd_empty"      N.Bit
     rdDataCount <- DSL.declare "rd_data_count" (N.BitVector depth)
     rdUnder     <- DSL.declare "rd_underflow"  N.Bit
@@ -158,9 +152,6 @@ dcFifoTF dcFifoName DcConfig{..} = TemplateFunction [] (const True) $ \bbCtx -> 
     wrDataCountUnsigned <- DSL.unsignedFromBitVector "wr_data_count_unsigned" wrDataCount
     rdDataCountUnsigned <- DSL.unsignedFromBitVector "rd_data_count_unsigned" rdDataCount
 
-    wrResetBusyBool <- DSL.boolFromBit "wr_reset_busy_bool" wrResetBusy
-    rdResetBusyBool <- DSL.boolFromBit "rd_reset_busy_bool" rdResetBusy
-
     let
       inps =
         [ ("rst", rst)
@@ -172,9 +163,7 @@ dcFifoTF dcFifoName DcConfig{..} = TemplateFunction [] (const True) $ \bbCtx -> 
         ]
 
       outs = catMaybes
-        [ Just ("wr_rst_busy", wrResetBusy)
-        , Just ("rd_rst_busy", rdResetBusy)
-        , Just ("full", wrFull)
+        [ Just ("full", wrFull)
         , Just ("empty", rdEmpty)
         , Just ("dout", rdDout)
         , dcReadDataCount  `orNothing` ("rd_data_count", rdDataCount)
@@ -196,8 +185,8 @@ dcFifoTF dcFifoName DcConfig{..} = TemplateFunction [] (const True) $ \bbCtx -> 
 
     pure [DSL.constructProduct
       tResult
-      [ wrResetBusyBool, wrFullBool,  wrOverBool, wrDataCountUnsigned
-      , rdResetBusyBool, rdEmptyBool, rdUnderBool, rdDataCountUnsigned, rdDout
+      [ wrFullBool,  wrOverBool, wrDataCountUnsigned
+      , rdEmptyBool, rdUnderBool, rdDataCountUnsigned, rdDout
       ]]
 
 -- | Generate TCL file that calls Xilinx's `create_ip` with the options supplied

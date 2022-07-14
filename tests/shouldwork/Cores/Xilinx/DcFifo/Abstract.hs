@@ -44,7 +44,7 @@ fifoSampler ::
   -- | Stall circuit? For this test case, this signal comes from 'lfsrF'
   Signal dom Stall ->
   -- | Signals from FIFO
-  Signal dom (ResetBusy, Empty, DataCount depth, BitVector n) ->
+  Signal dom (Empty, DataCount depth, BitVector n) ->
   -- | Maybe output read from FIFO
   Signal dom (Bool, Maybe (BitVector n))
 fifoSampler clk rst ena stalls inps =
@@ -52,10 +52,9 @@ fifoSampler clk rst ena stalls inps =
  where
   go ::
     ReadLastCycle ->
-    (Stall, (ResetBusy, Empty, DataCount depth, BitVector n)) ->
+    (Stall, (Empty, DataCount depth, BitVector n)) ->
     (ReadLastCycle, (Bool, Maybe (BitVector n)))
-  go _             (_,     (True,      _,     _,         _       )) = (False, (False, Nothing))
-  go readLastCycle (stall, (_resetBusy, fifoEmpty, _dataCount, readData)) = (readNow, (readNow, maybeData))
+  go readLastCycle (stall, (fifoEmpty, _dataCount, readData)) = (readNow, (readNow, maybeData))
    where
     maybeData = readLastCycle `orNothing` readData
     readNow = not stall && not fifoEmpty
@@ -71,7 +70,7 @@ fifoDriver ::
   -- | Stall circuit? For this test case, this signal comes from 'lfsrF'
   Signal dom Stall ->
   -- | Signals from FIFO
-  Signal dom (ResetBusy, Full, DataCount depth) ->
+  Signal dom (Full, DataCount depth) ->
   -- | Maybe write input to FIFO
   Signal dom (Maybe (BitVector n))
 fifoDriver clk rst ena stalls inps =
@@ -79,10 +78,9 @@ fifoDriver clk rst ena stalls inps =
  where
   go ::
     BitVector n ->
-    (Stall, (ResetBusy, Full, DataCount depth)) ->
+    (Stall, (Full, DataCount depth)) ->
     (BitVector n, Maybe (BitVector n))
-  go n0 (_,     (True, _,    _         )) = (n0, Nothing)
-  go n0 (stall, (_,    full, _dataCount)) = (n1, maybeWrite)
+  go n0 (stall, (full, _dataCount)) = (n1, maybeWrite)
    where
     maybeWrite = willWrite `orNothing` n0
     willWrite = not stall && not full
@@ -110,15 +108,15 @@ mkTestBench cFifo = done
 
   -- Driver
   wLfsr = bitToBool <$> lfsrF wClk wRst wEna 0xDEAD
-  writeData = fifoDriver wClk wRst wEna wLfsr (bundle (writeReset, isFull, writeCount))
+  writeData = fifoDriver wClk wRst wEna wLfsr (bundle (isFull, writeCount))
 
   -- Sampler
   rLfsr = bitToBool <$> lfsrF rClk rRst rEna 0xBEEF
   (readEnable, maybeReadData) =
     unbundle $
-      fifoSampler rClk rRst rEna rLfsr (bundle (readReset, isEmpty, readCount, fifoData))
+      fifoSampler rClk rRst rEna rLfsr (bundle (isEmpty, readCount, fifoData))
 
-  XilinxFifo{writeReset, isFull, writeCount, readReset, isEmpty, readCount, fifoData} =
+  XilinxFifo{isFull, writeCount, isEmpty, readCount, fifoData} =
     cFifo wClk rClk rRst writeData readEnable
 
   errorFound = fifoVerifier rClk rRst rEna maybeReadData

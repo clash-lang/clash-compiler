@@ -167,21 +167,20 @@ genData = Gen.enumBounded
 
 type Drain depth n =
   (Bool, [Maybe Int]) ->
-  (ResetBusy, Empty, DataCount depth, BitVector n) ->
+  (Empty, DataCount depth, BitVector n) ->
   ((Bool, [Maybe Int]), (Maybe (BitVector n), Bool))
 
 -- | Mealy machine which stalls reading from the FIFO based on ['Maybe'
 -- 'Int']
 takeState ::
   (Bool, [Maybe Int]) ->
-  (ResetBusy, Empty, DataCount depth, BitVector n) ->
+  (Empty, DataCount depth, BitVector n) ->
   ((Bool, [Maybe Int]), (Maybe (BitVector n), Bool))
-takeState (_, stalls) (True, _, _, _) = ((False, stalls), (Nothing, False))
-takeState (readLastCycle, Just n:stalls) (_, _, _, d) | n > 0 =
+takeState (readLastCycle, Just n:stalls) (_, _, d) | n > 0 =
     ((False, Just (n-1):stalls), (nextData, False))
   where
     nextData = readLastCycle `orNothing` d
-takeState (readLastCycle, stalls) (_, fifoEmpty, _, d) =
+takeState (readLastCycle, stalls) (fifoEmpty, _, d) =
     ((readThisCycle, L.drop 1 stalls), (nextData, readThisCycle))
   where
     readThisCycle = not fifoEmpty
@@ -191,14 +190,13 @@ takeState (readLastCycle, stalls) (_, fifoEmpty, _, d) =
 -- 'Int']. This ignores @empty@ signals out of the FIFO.
 takeClumsy ::
   (Bool, [Maybe Int]) ->
-  (ResetBusy, Empty, DataCount depth, BitVector n) ->
+  (Empty, DataCount depth, BitVector n) ->
   ((Bool, [Maybe Int]), (Maybe (BitVector n), Bool))
-takeClumsy (_, stalls) (True, _, _, _) = ((False, stalls), (Nothing, False))
-takeClumsy (readLastCycle, Just n:stalls) (_, _, _, d) | n > 0 =
+takeClumsy (readLastCycle, Just n:stalls) (_, _, d) | n > 0 =
     ((False, Just (n-1):stalls), (nextData, False))
   where
     nextData = readLastCycle `orNothing` d
-takeClumsy (readLastCycle, stalls) (_, _, _, d) =
+takeClumsy (readLastCycle, stalls) (_, _, d) =
     ((True, L.drop 1 stalls), (nextData, True))
   where
     nextData = readLastCycle `orNothing` d
@@ -206,20 +204,19 @@ takeClumsy (readLastCycle, stalls) (_, _, _, d) =
 type Feed d =
   SNat d ->
   [Either Int (BitVector 32)] ->
-  (ResetBusy, Full, DataCount d) ->
+  (Full, DataCount d) ->
   ([Either Int (BitVector 32)], Maybe (BitVector 32))
 
 -- | Driver for input to FIFO, takes stalls and data
 feedState ::
   SNat d ->
   [Either Int (BitVector 32)] ->
-  (ResetBusy, Full, DataCount d) ->
+  (Full, DataCount d) ->
   ([Either Int (BitVector 32)], Maybe (BitVector 32))
-feedState _ xs (True, _, _) = (xs, Nothing)
 feedState _ [] _ = ([], Nothing)
-feedState _ (Left 0:xs) (_, _, _) = (xs, Nothing)
-feedState _ (Left i:xs) (_, _, _) = (Left (i-1):xs, Nothing)
-feedState _ (Right x:xs) (_, full, _) =
+feedState _ (Left 0:xs) (_, _) = (xs, Nothing)
+feedState _ (Left i:xs) (_, _) = (Left (i-1):xs, Nothing)
+feedState _ (Right x:xs) (full, _) =
   if full
     then (Right x:xs, Nothing)
     else (xs, Just x)
@@ -229,13 +226,12 @@ feedState _ (Right x:xs) (_, full, _) =
 feedClumsy ::
   SNat d ->
   [Either Int (BitVector 32)] ->
-  (ResetBusy, Full, DataCount d) ->
+  (Full, DataCount d) ->
   ([Either Int (BitVector 32)], Maybe (BitVector 32))
-feedClumsy _ xs (True, _, _) = (xs, Nothing)
 feedClumsy _ [] _ = ([], Nothing)
-feedClumsy _ (Left 0:xs) (_, _, _) = (xs, Nothing)
-feedClumsy _ (Left i:xs) (_, _, _) = (Left (i-1):xs, Nothing)
-feedClumsy _ (Right x:xs) (_, _, _) =
+feedClumsy _ (Left 0:xs) (_, _) = (xs, Nothing)
+feedClumsy _ (Left i:xs) (_, _) = (Left (i-1):xs, Nothing)
+feedClumsy _ (Right x:xs) (_, _) =
     (xs, Just x)
 
 throughFifo
@@ -271,15 +267,15 @@ throughFifo d _ _ feed drain wrDataList rdStalls = rdDataList
 
     wrData =
       -- The reset to the mealy machine must be the same reset fed to the FIFO
-      mealyB wrClk wrRst wrEna (feed d) wrDataList (wrRstBusy, wrFull, wrCnt)
+      mealyB wrClk wrRst wrEna (feed d) wrDataList (wrFull, wrCnt)
 
     (rdDataMaybe, rdEnaB) =
-      mealyB rdClk rdRst rdEna drain (False, rdStalls) (rdRstBusy, rdEmpty, rdCnt, rdData)
+      mealyB rdClk rdRst rdEna drain (False, rdStalls) (rdEmpty, rdCnt, rdData)
 
     rdDataList =
       catMaybes
         $ sampleN (P.length wrDataList*10)
         $ bundle rdDataMaybe
 
-    (XilinxFifo wrRstBusy wrFull _ wrCnt rdRstBusy rdEmpty _ rdCnt rdData) =
+    (XilinxFifo wrFull _ wrCnt rdEmpty _ rdCnt rdData) =
       dcFifo defConfig wrClk rdClk rdRst wrData rdEnaB
