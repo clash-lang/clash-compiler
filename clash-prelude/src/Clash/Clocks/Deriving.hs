@@ -18,6 +18,13 @@ import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Lib
 import Unsafe.Coerce               (unsafeCoerce)
 
+conPatternNoTypes :: Name -> [Pat] -> Pat
+#if MIN_VERSION_template_haskell(2,18,0)
+conPatternNoTypes nm pats = ConP nm [] pats
+#else
+conPatternNoTypes nm pats = ConP nm pats
+#endif
+
 -- Derive instance for /n/ clocks
 derive' :: Int -> Q Dec
 derive' n = do
@@ -39,11 +46,23 @@ derive' n = do
   let rst = mkName "rst"
 
   -- Implementation of 'clocks'
-  let noInline  = PragmaD $ InlineP (mkName "clocks") NoInline FunLike AllPhases
-  let clkImpls  = replicate n (clkImpl clk)
-  let instTuple = mkTupE $ clkImpls ++ [AppE (VarE 'unsafeCoerce) (VarE rst)]
-  let funcBody  = NormalB instTuple
-  let instFunc  = FunD (mkName "clocks") [Clause [VarP clk, VarP rst] funcBody []]
+  let
+    noInline  = PragmaD $ InlineP (mkName "clocks") NoInline FunLike AllPhases
+    clkImpls  = replicate n (clkImpl clk)
+    instTuple = mkTupE $ clkImpls ++ [AppE (VarE 'unsafeCoerce) (VarE rst)]
+    funcBody  = NormalB instTuple
+    errMsg    = "clocks: dynamic clocks unsupported"
+    errBody   = NormalB ((VarE 'error) `AppE` (LitE (StringL errMsg)))
+    instFunc  = FunD (mkName "clocks")
+      [ Clause
+          [ AsP
+              clk
+              (conPatternNoTypes 'Clock [WildP, conPatternNoTypes 'Nothing []])
+          , VarP rst]
+          funcBody
+          []
+      , Clause [WildP, WildP] errBody []
+      ]
 
   return $ InstanceD Nothing [] instHead [cxtTy, instFunc, noInline]
 

@@ -52,8 +52,10 @@ clockWizard
   -- ^ Reset for the PLL
   -> (Clock domOut, Enable domOut)
   -- ^ (Stable PLL clock, PLL lock)
-clockWizard !_ clk rst =
+clockWizard !_ clk@(Clock _ Nothing) rst =
   (unsafeCoerce clk, unsafeCoerce (toEnable (unsafeToHighPolarity rst)))
+clockWizard _ _ _ =
+  error "clockWizard: no support for dynamic clocks"
 {-# NOINLINE clockWizard #-}
 {-# ANN clockWizard hasBlackBox #-}
 
@@ -95,7 +97,9 @@ clockWizardDifferential
   -- ^ Reset for the PLL
   -> (Clock domOut, Enable domOut)
   -- ^ (Stable PLL clock, PLL lock)
-clockWizardDifferential !_name (Clock _) (Clock _) rst =
-  (Clock SSymbol, unsafeCoerce (toEnable (unsafeToHighPolarity rst)))
+clockWizardDifferential !_name (Clock _ Nothing) (Clock _ Nothing) rst =
+  (Clock SSymbol Nothing, unsafeCoerce (toEnable (unsafeToHighPolarity rst)))
+clockWizardDifferential !_name _ _ _ =
+  error "clockWizardDifferential: no support for dynamic clocks"
 {-# NOINLINE clockWizardDifferential #-}
 {-# ANN clockWizardDifferential hasBlackBox #-}

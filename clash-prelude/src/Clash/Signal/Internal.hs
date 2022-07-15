@@ -13,6 +13,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -837,16 +838,25 @@ enableGen :: Enable dom
 enableGen = toEnable (pure True)
 
 -- | A clock signal belonging to a domain named /dom/.
-data Clock (dom :: Domain) = Clock (SSymbol dom)
+data Clock (dom :: Domain) = Clock
+  { -- | Domain associated with the clock
+    clockDom :: SSymbol dom
+
+    -- | Periods of the clock. This is an experimental feature used to simulate
+    -- clock frequency correction mechanisms. Currently, all ways to contruct
+    -- such a clock are hidden from the public API.
+  , clockPeriods :: Maybe (Signal dom Natural)
+  }
 
 instance Show (Clock dom) where
-  show (Clock dom) = "<Clock: " ++ ssymbolToString dom ++ ">"
+  show (Clock dom Nothing) = "<Clock: " ++ ssymbolToString dom ++ ">"
+  show (Clock dom _) = "<Dynamic clock: " ++ ssymbolToString dom ++ ">"
 
 -- | Extract dom symbol from Clock
 clockTag
   :: Clock dom
   -> SSymbol dom
-clockTag (Clock dom) = dom
+clockTag (Clock dom _) = dom
 
 -- | Clock generator for simulations. Do __not__ use this clock generator for
 -- the /testBench/ function, use 'Clash.Explicit.Testbench.tbClockGen' instead.
@@ -861,7 +871,7 @@ clockTag (Clock dom) = dom
 clockGen
   :: KnownDomain dom
   => Clock dom
-clockGen = Clock SSymbol
+clockGen = Clock SSymbol Nothing
 {-# NOINLINE clockGen #-}
 {-# ANN clockGen hasBlackBox #-}
 
@@ -1089,7 +1099,7 @@ delay#
   -> a
   -> Signal dom a
   -> Signal dom a
-delay# (Clock dom) (fromEnable -> en) powerUpVal0 =
+delay# (Clock dom _) (fromEnable -> en) powerUpVal0 =
     go powerUpVal1 en
   where
     powerUpVal1 :: a
@@ -1131,7 +1141,7 @@ register#
   -- ^ Reset value
   -> Signal dom a
   -> Signal dom a
-register# clk@(Clock dom) rst ena powerUpVal resetVal =
+register# clk@(Clock dom _) rst ena powerUpVal resetVal =
   case knownDomainByName dom of
     SDomainConfiguration _name _period _edge SSynchronous _init _polarity ->
       syncRegister# clk rst ena powerUpVal resetVal
@@ -1150,7 +1160,7 @@ registerPowerup#
   => Clock dom
   -> a
   -> a
-registerPowerup# (Clock dom) a =
+registerPowerup# (Clock dom _) a =
   case knownDomainByName dom of
     SDomainConfiguration _dom _period _edge _sync SDefined _polarity -> a
     SDomainConfiguration _dom _period _edge _sync SUnknown _polarity ->

@@ -213,8 +213,8 @@ outputVerifier'
   -- ^ Signal to verify
   -> Signal dom Bool
   -- ^ Indicator that all samples are verified
-outputVerifier' =
-  outputVerifier @l @a @dom @dom
+outputVerifier' clk =
+  outputVerifier @l @a clk clk
 {-# INLINE outputVerifier' #-}
 
 -- | Compare a signal (coming from a circuit) to a vector of samples. If a
@@ -275,6 +275,8 @@ outputVerifier
   => Clock testDom
   -- ^ Clock to which the test bench is synchronized (but not necessarily
   -- the circuit under test)
+  -> Clock circuitDom
+  -- ^ Clock to which the circuit under test is synchronized
   -> Reset testDom
   -- ^ Reset line of test bench
   -> Vec l a
@@ -305,8 +307,8 @@ outputVerifierBitVector'
   -- ^ Signal to verify
   -> Signal dom Bool
   -- ^ Indicator that all samples are verified
-outputVerifierBitVector' =
-  outputVerifierBitVector @l @n @dom @dom
+outputVerifierBitVector' clk =
+  outputVerifierBitVector @l @n clk clk
 {-# INLINE outputVerifierBitVector' #-}
 
 -- | Same as 'outputVerifier', but can handle don't care bits in its
@@ -322,6 +324,8 @@ outputVerifierBitVector
   => Clock testDom
   -- ^ Clock to which the test bench is synchronized (but not necessarily
   -- the circuit under test)
+  -> Clock circuitDom
+  -- ^ Clock to which the circuit under test is synchronized
   -> Reset testDom
   -- ^ Reset line of test bench
   -> Vec l (BitVector n)
@@ -355,6 +359,8 @@ outputVerifierWith
   -> Clock testDom
   -- ^ Clock to which the test bench is synchronized (but not necessarily
   -- the circuit under test)
+  -> Clock circuitDom
+  -- ^ Clock to which the circuit under test is synchronized
   -> Reset testDom
   -- ^ Reset line of test bench
   -> Vec l a
@@ -363,14 +369,14 @@ outputVerifierWith
   -- ^ Signal to verify
   -> Signal testDom Bool
   -- ^ True if all samples are verified
-outputVerifierWith assertF clk rst samples i0 =
+outputVerifierWith assertF clkTest clkCircuit rst samples i0 =
     let i1    = sync i0
         en    = toEnable (pure True)
-        (s,o) = unbundle (genT <$> register clk rst en 0 s)
+        (s,o) = unbundle (genT <$> register clkTest rst en 0 s)
         (e,f) = unbundle o
-        f'    = register clk rst en False f
+        f'    = register clkTest rst en False f
         -- Only assert while not finished
-    in  mux f' f' $ assertF clk rst i1 e f'
+    in  mux f' f' $ assertF clkTest rst i1 e f'
   where
     genT :: Index l -> (Index l,(a,Bool))
     genT s = (s',(samples !! s,finished))
@@ -381,7 +387,7 @@ outputVerifierWith assertF clk rst samples i0 =
          -> Signal testDom a
     sync = case sameSymbol (Proxy @circuitDom) (Proxy @testDom) of
              Just Refl -> id
-             Nothing   -> unsafeSimSynchronizer (Clock SSymbol) clk
+             Nothing   -> unsafeSimSynchronizer clkCircuit clkTest
 {-# INLINABLE outputVerifierWith #-}
 
 -- | Ignore signal for a number of cycles, while outputting a static value.
@@ -472,7 +478,7 @@ tbClockGen
   :: KnownDomain testDom
   => Signal testDom Bool
   -> Clock testDom
-tbClockGen done = Clock (done `seq` SSymbol)
+tbClockGen done = Clock (done `seq` SSymbol) Nothing
 {-# NOINLINE tbClockGen #-}
 {-# ANN tbClockGen hasBlackBox #-}
 
