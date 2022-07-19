@@ -57,3 +57,9 @@ allow-newer:
   vector-binary-instances:base,
   cryptohash-sha256:base,
   hashable
+
+-- Works around: https://github.com/recursion-schemes/recursion-schemes/issues/128. This
+-- shouldn't harm (runtime) performance of Clash, as we only use recursion-schemes with
+-- TemplateHaskell.
+package recursion-schemes
+    optimization: 0
