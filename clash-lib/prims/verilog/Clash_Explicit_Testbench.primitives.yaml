@@ -73,7 +73,7 @@
         `ifndef VERILATOR
         #~LONGESTPERIOD0 forever begin
           if (~ ~ARG[1]) begin
-            $finish;
+            $finish(0);
           end
           ~SYM[0] = ~ ~SYM[0];
           #~SYM[1];

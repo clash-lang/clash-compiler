@@ -8,8 +8,9 @@ import Data.Proxy
 import Data.Tagged
 import Data.Text (Text)
 import System.Directory (copyFile, doesDirectoryExist, listDirectory)
-import System.FilePath ((</>))
+import System.FilePath ((</>), takeFileName)
 import System.FilePath.Glob (glob)
+import System.Info (os)
 
 import Test.Tasty.Common
 import Test.Tasty.Options
@@ -36,20 +37,20 @@ instance IsTest VerilatorMakeTest where
   run optionSet (VerilatorMakeTest getDir top) progressCallback
     | Verilator True <- lookupOption optionSet = do
         dir <- getDir
-        libs <- listDirectory dir >>= filterM (doesDirectoryExist . (dir </>))
+        libs <- listDirectory dir >>= filterM doesDirectoryExist . fmap (dir </>)
 
         -- Only pass the sources for the shim and the entity to simulate. The other
         -- modules will be found in the included directories. The path to the C++
         -- shim MUST include the subdirectories below the working directory
         -- explicitly.
         cSrc <- glob (dir </> "*" </> top <> "_shim.cpp")
-        vSrc <- glob (dir </> "*" </> top <> ".v")
+        vSrc <- fmap takeFileName <$> glob (dir </> "*" </> top <> ".v")
 
         -- Types modules have to be given first, or verilator will complain that
         -- they are not already declared when it sees them being imported.
         svSrc <- mappend
-          <$> glob (dir </> "*" </> "*_types.sv")
-          <*> glob (dir </> "*" </> top <> ".sv")
+          <$> (fmap takeFileName <$> glob (dir </> "*" </> "*_types.sv"))
+          <*> (fmap takeFileName <$> glob (dir </> "*" </> top <> ".sv"))
 
         -- Clash by default will not mix HDLs in it's output. If this ever changes,
         -- and it is possible to have `clash` output both Verilog and SystemVerilog
@@ -63,6 +64,8 @@ instance IsTest VerilatorMakeTest where
       ["-I" <> lib | lib <- libs]
         <> [ "-Wno-fatal"         -- Do not abort on warnings
            , "-Wall"
+           -- https://veripool.org/guide/latest/faq.html#why-do-i-get-undefined-reference-to-sc-time-stamp
+           , "-CFLAGS", "-DVL_TIME_CONTEXT"
            , "+1364-2001ext+v"    -- Default to Verilog 2001
            , "+1800-2005ext+sv"   -- Default to SystemVerilog 2005
            , "--top"              -- This is used to set the C++ class names
@@ -74,7 +77,8 @@ instance IsTest VerilatorMakeTest where
         <> srcs
 
     verilator workDir args =
-      TestProgram "verilator" args NoGlob PrintNeither False (Just workDir) []
+      let program = case os of {"mingw32" -> "verilator_bin"; _ -> "verilator"}
+       in TestProgram program args NoGlob PrintNeither False (Just workDir) []
 
     runVerilator workDir args =
       run optionSet (verilator workDir args) progressCallback
