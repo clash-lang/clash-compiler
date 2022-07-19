@@ -97,6 +97,8 @@ infixr 0 `defaultSeqX`
 -- out with an exception.
 errorX :: HasCallStack => String -> a
 errorX msg = throw (XException ("X: " ++ msg ++ "\n" ++ prettyCallStack callStack))
+{-# NOINLINE errorX #-}
+{-# ANN errorX hasBlackBox #-}
 
 -- | Convert 'XException' to 'ErrorCall'
 --
