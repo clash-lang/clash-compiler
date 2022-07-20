@@ -63,3 +63,6 @@ allow-newer:
 -- TemplateHaskell.
 package recursion-schemes
     optimization: 0
+
+package regex-tdfa
+    optimization: 2
