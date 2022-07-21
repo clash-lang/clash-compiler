@@ -742,11 +742,25 @@ funDec (RenderEnums enums) _ t@(Sum _ _) | enums = Just
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> qualTyName t <+> "is" <> line <>
     "begin" <> line <>
     indent 2
-      ( "return" <+> qualTyName t <> "'val" <>
-        parens ("to_integer" <>
-          parens ("unsigned" <> parens "slv"))) <> semi <> line <>
+      (
+      translate_off (
+      "if unsigned(slv) <= " <> qualTyName t <> "'pos("<> qualTyName t <> "'high) then"
+      ) <> line <>
+        indent 2
+          ( "return" <+> qualTyName t <> "'val" <>
+            parens ("to_integer" <>
+              parens ("unsigned" <> parens "slv"))) <> semi <> line <>
+      translate_off (
+        "else" <> line <>
+        indent 2
+          ( "return" <+> qualTyName t <> "'val(0)") <> semi <> line <>
+        "end if" <> semi
+      )
+      ) <> line <>
     "end" <> semi
   )
+  where
+    translate_off body = "-- pragma translate_off" <> line <> body <> line <> "-- pragma translate_on"
 
 funDec _ syn t@(Vector _ elTy) = Just
   ( "function" <+> "toSLV" <+> parens ("value : " <+> qualTyName t) <+> "return std_logic_vector" <> semi <> line <>
