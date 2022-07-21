@@ -1,0 +1,1 @@
+FIXED: Fix out of bound errors in toEnum/fromSLV for sum types[#2220](https://github.com/clash-lang/clash-compiler/issues/2220)

@@ -616,6 +616,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T2046C" def{hdlSim=[],clashFlags=["-Werror"],buildTargets=BuildSpecific["topEntity"]}
         , runTest "T2097" def{hdlSim=[]}
         , runTest "T2154" def{hdlTargets=[VHDL], hdlSim=[]}
+        , runTest "T2220_toEnumOOB" def{hdlTargets=[VHDL]}
         , runTest "T2272" def{hdlTargets=[VHDL], hdlSim=[]}
         ] <>
         if compiledWith == Cabal then
