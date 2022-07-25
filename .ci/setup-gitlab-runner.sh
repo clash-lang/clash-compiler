@@ -16,10 +16,6 @@ set -x
 #    sudo systemctl stop gitlab-runner
 #    sudo systemctl restart gitlab-runner
 #
-# If you plan on adding more than one runner to your system, run this script
-# multiple times, but don't forget to change RUNNER NAME (see comment at the
-# end of this file).
-
 
 # Number of CPUs to limit a docker instance to
 NCPUS=4
