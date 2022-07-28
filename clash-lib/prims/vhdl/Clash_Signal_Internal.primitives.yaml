@@ -129,18 +129,19 @@
       end process;~FI~FI
       -- register end
 - BlackBox:
-    name: Clash.Signal.Internal.clockGen
+    name: Clash.Signal.Internal.tbClockGen
     comment: |-
       ModelSim and Vivado seem to round time values to an integer number of picoseconds.
               Use two half periods to prevent rounding errors from affecting the full period.
     kind: Declaration
     outputUsage: NonBlocking
     type: |-
-      clockGen
+      tbClockGen
         :: KnownDomain dom     -- ARG[0]
-        => Clock dom
+        => Signal dom Bool     -- ARG[1]
+        -> Clock dom
     template: |-
-      -- clockGen begin
+      -- tbClockGen begin
       -- pragma translate_off
       ~GENSYM[clkGen][0] : process is
         constant ~GENSYM[half_periodH][1] : time := ~PERIOD[0]000 fs / 2;
@@ -148,7 +149,7 @@
       begin
         ~RESULT <= ~IF~ACTIVEEDGE[Rising][0]~THEN'0'~ELSE'1'~FI;
         wait for ~LONGESTPERIOD ps;
-        loop
+        ~IF~ISACTIVEENABLE[1]~THENwhile ~ARG[1] ~ELSE~FIloop
           ~RESULT <= not ~RESULT;
           wait for ~SYM[1];
           ~RESULT <= not ~RESULT;
@@ -157,8 +158,48 @@
         wait;
       end process;
       -- pragma translate_on
-      -- clockGen end
-    warning: Clash.Signal.Internal.clockGen is not synthesizable!
+      -- tbClockGen end
+    warning: Clash.Signal.Internal.tbClockGen is not synthesizable!
+    workInfo: Always
+- BlackBox:
+    name: Clash.Signal.Internal.tbDynamicClockGen
+    comment: |-
+      ModelSim and Vivado seem to round time values to an integer number of picoseconds.
+              Use two half periods to prevent rounding errors from affecting the full period.
+    kind: Declaration
+    outputUsage: NonBlocking
+    type: |-
+      tbDynamicClockGen
+        :: KnownDomain dom     -- ARG[0]
+        => Signal dom Natural  -- ARG[1]
+        -> Signal dom Bool     -- ARG[2]
+        -> Clock dom
+    template: |-
+      -- tbDynamicClockGen begin
+      -- pragma translate_off
+      ~GENSYM[dynClkGen][0] : process is
+        variable ~GENSYM[whole_period][1] : time;
+        variable ~GENSYM[half_periodH][2] : time;
+        variable ~GENSYM[half_periodL][3] : time;
+      begin
+        ~RESULT <= ~IF~ACTIVEEDGE[Rising][0]~THEN'0'~ELSE'1'~FI;
+        wait for ~LONGESTPERIOD ps;
+
+        ~IF~ISACTIVEENABLE[2]~THENwhile ~ARG[2] ~ELSE~FIloop
+          ~SYM[1] := to_integer(~VAR[periods][1]) * 1000 * 1 fs;
+          ~SYM[2] := ~SYM[1] / 2;
+          ~SYM[3] := ~SYM[1] - ~SYM[2];
+
+          ~RESULT <= not ~RESULT;
+          wait for ~SYM[2];
+          ~RESULT <= not ~RESULT;
+          wait for ~SYM[3];
+        end loop;
+        wait;
+      end process;
+      -- pragma translate_on
+      -- tbDynamicClockGen end
+    warning: Clash.Signal.Internal.tbDynamicClockGen is not synthesizable!
     workInfo: Always
 - BlackBox:
     name: Clash.Signal.Internal.resetGenN

@@ -1,6 +1,6 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
-                  2017     , Google Inc.
+                  2017-2022, Google Inc.
                   2019     , Myrtle Software Ltd,
                   2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
@@ -39,20 +39,17 @@ where
 
 import Control.Exception     (catch, evaluate)
 import Debug.Trace           (trace)
-import Data.Type.Equality    ((:~:)(..))
-import Data.Proxy            (Proxy(..))
-import GHC.TypeLits          (KnownNat, type (+), sameSymbol, type (<=))
+import GHC.TypeLits          (KnownNat, type (+), type (<=))
 import Prelude               hiding ((!!), length)
 import System.IO.Unsafe      (unsafeDupablePerformIO)
 
 import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Class.Num       (satSucc, SaturationMode(SatBound))
 import Clash.Promoted.Nat    (SNat(..))
-import Clash.Promoted.Symbol (SSymbol (..))
 import Clash.Explicit.Signal
   (Clock, Reset, System, Signal, toEnable, fromList, register,
   unbundle, unsafeSynchronizer)
-import Clash.Signal.Internal (Clock (..), Reset (..))
+import Clash.Signal.Internal (Reset (..), tbClockGen)
 import Clash.Signal          (mux, KnownDomain, Enable)
 import Clash.Sized.Index     (Index)
 import Clash.Sized.Internal.BitVector
@@ -370,7 +367,7 @@ outputVerifierWith
   -> Signal testDom Bool
   -- ^ True if all samples are verified
 outputVerifierWith assertF clkTest clkCircuit rst samples i0 =
-    let i1    = sync i0
+    let i1    = unsafeSimSynchronizer clkCircuit clkTest i0
         en    = toEnable (pure True)
         (s,o) = unbundle (genT <$> register clkTest rst en 0 s)
         (e,f) = unbundle o
@@ -383,11 +380,6 @@ outputVerifierWith assertF clkTest clkCircuit rst samples i0 =
       where
         s' = satSucc SatBound s
         finished = s == maxBound
-    sync :: Signal circuitDom a
-         -> Signal testDom a
-    sync = case sameSymbol (Proxy @circuitDom) (Proxy @testDom) of
-             Just Refl -> id
-             Nothing   -> unsafeSimSynchronizer clkCircuit clkTest
 {-# INLINABLE outputVerifierWith #-}
 
 -- | Ignore signal for a number of cycles, while outputting a static value.
@@ -427,61 +419,6 @@ biTbClockGen done = (testClk, circuitClk)
   testClk = tbClockGen done
   circuitClk = tbClockGen (unsafeSynchronizer testClk circuitClk done)
 
--- | Clock generator to be used in the /testBench/ function.
---
--- To be used like:
---
--- @
--- clkSystem en = tbClockGen @System en
--- @
---
--- === __Example__
---
--- @
--- module Example where
---
--- import "Clash.Explicit.Prelude"
--- import "Clash.Explicit.Testbench"
---
--- -- Fast domain: twice as fast as \"Slow\"
--- 'Clash.Explicit.Prelude.createDomain' 'Clash.Explicit.Prelude.vSystem'{vName=\"Fast\", vPeriod=10}
---
--- -- Slow domain: twice as slow as \"Fast\"
--- 'Clash.Explicit.Prelude.createDomain' 'Clash.Explicit.Prelude.vSystem'{vName=\"Slow\", vPeriod=20}
---
--- topEntity
---   :: 'Clock' \"Fast\"
---   -> 'Reset' \"Fast\"
---   -> 'Enable' \"Fast\"
---   -> 'Clock' \"Slow\"
---   -> 'Signal' \"Fast\" (Unsigned 8)
---   -> 'Signal' \"Slow\" (Unsigned 8, Unsigned 8)
--- topEntity clk1 rst1 en1 clk2 i =
---   let h = register clk1 rst1 en1 0 (register clk1 rst1 en1 0 i)
---       l = register clk1 rst1 en1 0 i
---   in  unsafeSynchronizer clk1 clk2 (bundle (h, l))
---
--- testBench
---   :: 'Signal' \"Slow\" Bool
--- testBench = done
---   where
---     testInput      = 'Clash.Explicit.Testbench.stimuliGenerator' clkA1 rstA1 $('Clash.Sized.Vector.listToVecTH' [1::Unsigned 8,2,3,4,5,6,7,8])
---     expectedOutput = 'Clash.Explicit.Testbench.outputVerifier'   clkB2 rstB2 $('Clash.Sized.Vector.listToVecTH' [(0,0) :: (Unsigned 8, Unsigned 8),(1,2),(3,4),(5,6),(7,8)])
---     done           = expectedOutput (topEntity clkA1 rstA1 enableGen clkB2 testInput)
---     notDone        = not \<$\> done
---     clkA1          = 'tbClockGen' \@\"Fast\" (unsafeSynchronizer clkB2 clkA1 notDone)
---     clkB2          = 'tbClockGen' \@\"Slow\" notDone
---     rstA1          = 'Clash.Signal.resetGen' \@\"Fast\"
---     rstB2          = 'Clash.Signal.resetGen' \@\"Slow\"
--- @
-tbClockGen
-  :: KnownDomain testDom
-  => Signal testDom Bool
-  -> Clock testDom
-tbClockGen done = Clock (done `seq` SSymbol) Nothing
-{-# NOINLINE tbClockGen #-}
-{-# ANN tbClockGen hasBlackBox #-}
-
 -- | Enable signal that's always enabled. Because it has a blackbox definition
 -- this enable signal is opaque to other blackboxes. It will therefore never
 -- be optimized away.
@@ -504,7 +441,7 @@ tbEnableGen = toEnable (pure True)
 -- testBench = done
 --   where
 --     testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
---     expectedOutput = outputVerifier ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
+--     expectedOutput = outputVerifier' ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
 --     done           = exposeClockResetEnable (expectedOutput (topEntity <$> testInput)) clk rst
 --     clk            = 'tbSystemClockGen' (not <\$\> done)
 --     rst            = systemResetGen

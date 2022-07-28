@@ -49,7 +49,7 @@ expectedOutput
   -> Reset Dom2
   -> Signal Dom2 (BitVector 8)
   -> Signal Dom2 Bool
-expectedOutput clkB rstB = outputVerifier clkB rstB
+expectedOutput clkB rstB = outputVerifier' clkB rstB
   (  replicate d3 1 ++ replicate d4 2
   ++ replicate d3 3 ++ replicate d4 4
   ++ replicate d3 5 ++ replicate d4 6

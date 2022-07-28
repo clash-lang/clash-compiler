@@ -29,7 +29,7 @@ test = (div0,quot0,mod0,rem0)
 testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput = outputVerifier clk rst $ (undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined) :> Nil
+    expectedOutput = outputVerifier' clk rst $ (undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined) :> Nil
     done           = expectedOutput topEntity
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

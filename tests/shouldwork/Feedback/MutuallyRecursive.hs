@@ -2,7 +2,7 @@
 
 module MutuallyRecursive where
 
-import           Clash.Explicit.Testbench (biTbClockGen, outputVerifier)
+import           Clash.Explicit.Testbench (biTbClockGen, outputVerifier')
 import           Clash.Prelude.Testbench  (stimuliGenerator)
 import qualified Clash.Explicit.Prelude   as Explicit
 import           Clash.Prelude
@@ -60,4 +60,4 @@ expectedOutput
   => Signal System (BitVector 8)
   -> Signal System Bool
 expectedOutput =
-  outputVerifier hasClock hasReset (0 :> 0 :> 1 :> Nil)
+  outputVerifier' hasClock hasReset (0 :> 0 :> 1 :> Nil)

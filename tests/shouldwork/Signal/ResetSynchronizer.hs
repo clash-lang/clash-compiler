@@ -76,7 +76,7 @@ polyTestBench ::
 polyTestBench Proxy = (done, sampleN 20 (polyTopEntity cClk cRst))
  where
   rOr' = flip rOr (resetKind @circuitDom)
-  expectedOutput = outputVerifier tbClk tbRst
+  expectedOutput = outputVerifier tbClk cClk tbRst
     ( RRRRRRR :> RRRRRRR :> RRRRRRR :> RRRRRRR :> rOr' 0
    :> rOr' 1  :> rOr' 2  :> RRRRRRR :> Count 0 :> rOr' 1
    :> rOr' 2  :> rOr' 3  :> RRRRRRR :> Count 0 :> Count 1 :> Count 2

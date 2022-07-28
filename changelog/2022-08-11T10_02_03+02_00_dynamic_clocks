@@ -1,0 +1,1 @@
+ADDED: An experimental feature allowing clocks to vary their periods over time, called "dynamic clocks". Given that this is an experimental feature, it is not part of the public API.

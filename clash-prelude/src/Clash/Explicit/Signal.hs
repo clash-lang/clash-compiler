@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software,
-                  2017     , Google Inc.
+                  2017-2022, Google Inc.
                   2020     , Ben Gamari,
                   2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
@@ -446,11 +446,18 @@ unsafeSynchronizer
   -- ^ 'Clock' of the outgoing signal
   -> Signal dom1 a
   -> Signal dom2 a
-unsafeSynchronizer _clk1 _clk2 =
-  veryUnsafeSynchronizer
-    (snatToNum (clockPeriod @dom1))
-    (snatToNum (clockPeriod @dom2))
-{-# INLINE unsafeSynchronizer #-}
+unsafeSynchronizer clk1 clk2 =
+  veryUnsafeSynchronizer (toEither clk1) (toEither clk2)
+ where
+  toEither :: forall dom. KnownDomain dom => Clock dom -> Either Int (Signal dom Int)
+  toEither (Clock _ maybePeriods)
+    | Just periods <- maybePeriods = Right (fromIntegral <$> periods)
+    | otherwise = Left (snatToNum (clockPeriod @dom))
+-- XXX: 'unsafeSynchronizer' shouldn't need a blackbox, but Clash doesn't currently
+--      clean up the 'toEither' logic correctly, leading to translation errors. We
+--      should improve dead code elimination and run it more often to fix this.
+{-# NOINLINE unsafeSynchronizer #-}
+{-# ANN unsafeSynchronizer hasBlackBox #-}
 
 -- | Same as 'unsafeSynchronizer', but with manually supplied clock periods.
 --
@@ -472,26 +479,36 @@ unsafeSynchronizer _clk1 _clk2 =
 --
 -- with values appearing from the "future".
 veryUnsafeSynchronizer
-  :: Int
-  -- ^ Period of clock belonging to @dom1@
-  -> Int
-  -- ^ Period of clock belonging to @dom2@
+  :: Either Int (Signal dom1 Int)
+  -- ^ Period of clock belonging to @dom1@. 'Left' if clock has a static period,
+  -- 'Right' if periods are dynamic.
+  -> Either Int (Signal dom2 Int)
+  -- ^ Period of clock belonging to @dom2@. 'Left' if clock has a static period,
+  -- 'Right' if periods are dynamic.
   -> Signal dom1 a
   -> Signal dom2 a
-veryUnsafeSynchronizer t1 t2
-  -- this case is just an optimization for when the periods are the same
-  | t1 == t2 = same
+veryUnsafeSynchronizer t1e t2e =
+  case (t1e, t2e) of
+    (Left  t1, Left  t2) | t1 == t2 -> same
+    (Left  t1, Left  t2) -> goStatic t1 t2 0
+    (Right t1, Right t2) -> goDynamic 0 t1 t2
+    (Left  t1, Right t2) -> veryUnsafeSynchronizer (Right (pure t1)) (Right t2)
+    (Right t1, Left  t2) -> veryUnsafeSynchronizer (Right t1) (Right (pure t2))
 
-  | otherwise = go 0
-
-  where
+ where
+  -- If clock frequencies line up, we can return the signal unchanged
   same :: Signal dom1 a -> Signal dom2 a
   same (s :- ss) = s :- same ss
 
-  go :: Int -> Signal dom1 a -> Signal dom2 a
-  go relativeTime (a :- s)
-    | relativeTime <= 0 = a :- go (relativeTime + t2) (a :- s)
-    | otherwise = go (relativeTime - t1) s
+  goDynamic :: Int -> Signal dom1 Int -> Signal dom2 Int -> Signal dom1 a -> Signal dom2 a
+  goDynamic relativeTime (t1 :- ts1) (t2 :- ts2) (a :- as)
+    | relativeTime <= 0 = a :- goDynamic (relativeTime + t2) (t1 :- ts1) ts2 (a :- as)
+    | otherwise = goDynamic (relativeTime - t1) ts1 (t2 :- ts2) as
+
+  goStatic :: Int -> Int -> Int -> Signal dom1 a -> Signal dom2 a
+  goStatic t1 t2 relativeTime (a :- s)
+    | relativeTime <= 0 = a :- goStatic t1 t2 (relativeTime + t2) (a :- s)
+    | otherwise = goStatic t1 t2 (relativeTime - t1) s
 {-# NOINLINE veryUnsafeSynchronizer #-}
 {-# ANN veryUnsafeSynchronizer hasBlackBox #-}
 

@@ -72,7 +72,7 @@ testBenchUS = done
   where
     testInput      = stimuliGenerator clkReal rstReal input
     actualOutput   = ignoreFor clkDDR rstDDR enableGen d1 dummy (topEntityUS clkReal rstReal testInput)
-    expectedOutput = outputVerifier clkTest rstTest expected
+    expectedOutput = outputVerifier clkTest clkDDR rstTest expected
     done           = expectedOutput actualOutput
     notDone        = not <$> done
 
@@ -115,7 +115,7 @@ testBenchGS = done
   where
     testInput      = stimuliGenerator clkReal rstReal input
     actualOutput   = ignoreFor clkDDR rstDDR enableGen d1 dummy (topEntityGS clkReal rstReal testInput)
-    expectedOutput = outputVerifier clkTest rstTest expected
+    expectedOutput = outputVerifier clkTest clkDDR rstTest expected
     done           = expectedOutput actualOutput
     notDone        = not <$> done
 

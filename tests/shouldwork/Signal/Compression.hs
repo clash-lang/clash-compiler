@@ -77,7 +77,7 @@ outputVerifierR
 outputVerifierR clk rst iR samples i0 =
     let t1    = snatToNum (clockPeriod @circuitDom)
         t2    = snatToNum (clockPeriod @testDom)
-        i1    = veryUnsafeSynchronizer t1 t2 i0
+        i1    = veryUnsafeSynchronizer (Left t1) (Left t2) i0
         en    = toEnable (pure True)
         (s,o) = unbundle (genT iR <$> register clk rst en 0 s <*> unsafeFromReset rst)
         (e,f) = unbundle o

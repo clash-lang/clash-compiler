@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017-2019, Myrtle Software Ltd
-                  2017     , Google Inc.,
+                  2017-2022, Google Inc.,
                   2021-2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -77,7 +77,6 @@ module Clash.Signal.Internal
   , createDomain
     -- * Clocks
   , Clock (..)
-  , clockTag
   , hzToPeriod
   , periodToHz
     -- ** Enabling
@@ -103,6 +102,9 @@ module Clash.Signal.Internal
   , mux
     -- * Simulation and testbench functions
   , clockGen
+  , tbClockGen
+  , tbDynamicClockGen -- experimental, do not expose in public API
+  , dynamicClockGen   -- experimental, do not expose in public API
   , resetGen
   , resetGenN
     -- * Boolean connectives
@@ -840,7 +842,7 @@ enableGen = toEnable (pure True)
 -- | A clock signal belonging to a domain named /dom/.
 data Clock (dom :: Domain) = Clock
   { -- | Domain associated with the clock
-    clockDom :: SSymbol dom
+    clockTag :: SSymbol dom
 
     -- | Periods of the clock. This is an experimental feature used to simulate
     -- clock frequency correction mechanisms. Currently, all ways to contruct
@@ -852,14 +854,8 @@ instance Show (Clock dom) where
   show (Clock dom Nothing) = "<Clock: " ++ ssymbolToString dom ++ ">"
   show (Clock dom _) = "<Dynamic clock: " ++ ssymbolToString dom ++ ">"
 
--- | Extract dom symbol from Clock
-clockTag
-  :: Clock dom
-  -> SSymbol dom
-clockTag (Clock dom _) = dom
-
 -- | Clock generator for simulations. Do __not__ use this clock generator for
--- the /testBench/ function, use 'Clash.Explicit.Testbench.tbClockGen' instead.
+-- the /testBench/ function, use 'tbClockGen' instead.
 --
 -- To be used like:
 --
@@ -871,10 +867,96 @@ clockTag (Clock dom _) = dom
 clockGen
   :: KnownDomain dom
   => Clock dom
-clockGen = Clock SSymbol Nothing
-{-# NOINLINE clockGen #-}
-{-# ANN clockGen hasBlackBox #-}
+clockGen = tbClockGen (pure True)
 
+-- | Clock generator to be used in the /testBench/ function.
+--
+-- To be used like:
+--
+-- @
+-- clkSystem en = tbClockGen @System en
+-- @
+--
+-- === __Example__
+--
+-- @
+-- module Example where
+--
+-- import "Clash.Explicit.Prelude"
+-- import "Clash.Explicit.Testbench"
+--
+-- -- Fast domain: twice as fast as \"Slow\"
+-- 'Clash.Explicit.Prelude.createDomain' 'Clash.Explicit.Prelude.vSystem'{vName=\"Fast\", vPeriod=10}
+--
+-- -- Slow domain: twice as slow as \"Fast\"
+-- 'Clash.Explicit.Prelude.createDomain' 'Clash.Explicit.Prelude.vSystem'{vName=\"Slow\", vPeriod=20}
+--
+-- topEntity
+--   :: 'Clock' \"Fast\"
+--   -> 'Reset' \"Fast\"
+--   -> 'Enable' \"Fast\"
+--   -> 'Clock' \"Slow\"
+--   -> 'Signal' \"Fast\" (Unsigned 8)
+--   -> 'Signal' \"Slow\" (Unsigned 8, Unsigned 8)
+-- topEntity clk1 rst1 en1 clk2 i =
+--   let h = register clk1 rst1 en1 0 (register clk1 rst1 en1 0 i)
+--       l = register clk1 rst1 en1 0 i
+--   in  unsafeSynchronizer clk1 clk2 (bundle (h, l))
+--
+-- testBench
+--   :: 'Signal' \"Slow\" Bool
+-- testBench = done
+--   where
+--     testInput      = 'Clash.Explicit.Testbench.stimuliGenerator' clkA1 rstA1 $('Clash.Sized.Vector.listToVecTH' [1::Unsigned 8,2,3,4,5,6,7,8])
+--     expectedOutput = 'Clash.Explicit.Testbench.outputVerifier'   clkB2 rstB2 $('Clash.Sized.Vector.listToVecTH' [(0,0) :: (Unsigned 8, Unsigned 8),(1,2),(3,4),(5,6),(7,8)])
+--     done           = expectedOutput (topEntity clkA1 rstA1 enableGen clkB2 testInput)
+--     notDone        = not \<$\> done
+--     clkA1          = 'tbClockGen' \@\"Fast\" (unsafeSynchronizer clkB2 clkA1 notDone)
+--     clkB2          = 'tbClockGen' \@\"Slow\" notDone
+--     rstA1          = 'Clash.Signal.resetGen' \@\"Fast\"
+--     rstB2          = 'Clash.Signal.resetGen' \@\"Slow\"
+-- @
+tbClockGen
+  :: KnownDomain testDom
+  => Signal testDom Bool
+  -> Clock testDom
+tbClockGen done = Clock (done `seq` SSymbol) Nothing
+{-# NOINLINE tbClockGen #-}
+{-# ANN tbClockGen hasBlackBox #-}
+
+-- | Clock generator with dynamic clock periods for simulations. This is an
+-- experimental feature and hence not part of the public API.
+--
+-- To be used like:
+--
+-- @
+-- clkSystem = dynamicClockGen @System
+-- @
+--
+-- See 'DomainConfiguration' for more information on how to use synthesis domains.
+dynamicClockGen :: KnownDomain dom => Signal dom Natural -> Clock dom
+dynamicClockGen periods = tbDynamicClockGen periods (pure True)
+
+-- | Clock generator with dynamic clock periods for simulations. This is an
+-- experimental feature and hence not part of the public API. Like 'tbClockGen'
+--
+--
+-- To be used like:
+--
+-- @
+-- clkSystem = dynamicClockGen @System
+-- @
+--
+-- See 'DomainConfiguration' for more information on how to use synthesis domains.
+tbDynamicClockGen ::
+  KnownDomain dom =>
+  Signal dom Natural ->
+  Signal dom Bool ->
+  Clock dom
+tbDynamicClockGen periods ena =
+  Clock (ena `seq` periods `seq` SSymbol) (Just periods)
+{-# NOINLINE tbDynamicClockGen #-}
+{-# ANN tbDynamicClockGen hasBlackBox #-}
 
 
 -- | Reset generator

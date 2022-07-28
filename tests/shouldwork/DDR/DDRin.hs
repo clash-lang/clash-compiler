@@ -75,7 +75,7 @@ testBenchUS :: Signal TB Bool
 testBenchUS = done
   where
     testInput      = stimuliGenerator clkDDR rstDDR testinput
-    expectedOutput = outputVerifier clkTest rstTest testoutput
+    expectedOutput = outputVerifier clkTest clkReal rstTest testoutput
     actualOutput   = ignoreFor clkReal rstReal enableGen d1 (dummy, dummy) (topEntityUS clkReal rstReal testInput)
     done           = expectedOutput actualOutput
     notDone        = not <$> done
@@ -106,7 +106,7 @@ testBenchGS :: Signal TB Bool
 testBenchGS = done
   where
     testInput      = stimuliGenerator clkDDR rstDDR testinput
-    expectedOutput = outputVerifier clkTest rstTest testoutput
+    expectedOutput = outputVerifier clkTest clkReal rstTest testoutput
     actualOutput   = ignoreFor clkReal rstReal enableGen d1 (dummy, dummy) (topEntityGS clkReal rstReal testInput)
     done           = expectedOutput actualOutput
     notDone        = not <$> done

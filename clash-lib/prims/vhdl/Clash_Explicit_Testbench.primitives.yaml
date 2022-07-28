@@ -149,39 +149,6 @@
       end block;
       -- assertBitVector end
 - BlackBox:
-    name: Clash.Explicit.Testbench.tbClockGen
-    comment: |-
-      ModelSim and Vivado seem to round time values to an integer number of picoseconds.
-              Use two half periods to prevent rounding errors from affecting the full period.
-    kind: Declaration
-    outputUsage: NonBlocking
-    type: |-
-      tbClockGen
-        :: KnownDomain dom     -- ARG[0]
-        => Signal dom Bool     -- ARG[1]
-        -> Clock dom
-    template: |-
-      -- tbClockGen begin
-      -- pragma translate_off
-      ~GENSYM[clkGen][0] : process is
-        constant ~GENSYM[half_periodH][1] : time := ~PERIOD[0]000 fs / 2;
-        constant ~GENSYM[half_periodL][2] : time := ~PERIOD[0]000 fs - ~SYM[1];
-      begin
-        ~RESULT <= ~IF~ACTIVEEDGE[Rising][0]~THEN'0'~ELSE'1'~FI;
-        wait for ~LONGESTPERIOD ps;
-        while ~ARG[1] loop
-          ~RESULT <= not ~RESULT;
-          wait for ~SYM[1];
-          ~RESULT <= not ~RESULT;
-          wait for ~SYM[2];
-        end loop;
-        wait;
-      end process;
-      -- pragma translate_on
-      -- tbClockGen end
-    warning: Clash.Signal.Internal.tbClockGen is not synthesizable!
-    workInfo: Always
-- BlackBox:
     name: Clash.Explicit.Testbench.tbEnableGen
     kind: Declaration
     type: 'tbEnableGen ::

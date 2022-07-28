@@ -85,14 +85,15 @@
       end
       // register end
 - BlackBox:
-    name: Clash.Signal.Internal.clockGen
+    name: Clash.Signal.Internal.tbClockGen
     kind: Declaration
     type: |-
-      clockGen
+      tbClockGen
         :: KnownDomain dom     -- ARG[0]
-        => Clock dom
+        => Signal dom Bool     -- ARG[1]
+        -> Clock dom
     template: |-
-      // clockGen begin
+      // tbClockGen begin
       // pragma translate_off
       reg ~TYPO ~GENSYM[clk][0];
       // 1 = 0.1ps
@@ -102,30 +103,40 @@
         #1 ~SYM[0] = ~IF~ACTIVEEDGE[Rising][0]~THEN 0 ~ELSE 1 ~FI;
         `ifndef VERILATOR
         #~LONGESTPERIOD0 forever begin
+          ~IF~ISACTIVEENABLE[1]~THEN
+          if (~ ~ARG[1]) begin
+            $finish(0);
+          end
+          ~ELSE~FI
           ~SYM[0] = ~ ~SYM[0];
           #~SYM[1];
           ~SYM[0] = ~ ~SYM[0];
           #~SYM[1];
         end
         `else
-        ~SYM[0] = $c("this->~GENSYM[tb_clock_gen][2](",~SYM[1],",~IF~ACTIVEEDGE[Rising][0]~THENtrue~ELSEfalse~FI)");
+        ~SYM[0] = $c("this->~GENSYM[tb_clock_gen][2](",~SYM[1],",~IF~ACTIVEEDGE[Rising][0]~THENtrue~ELSEfalse~FI,",(~ ~ARG[1]),")");
         `endif
       end
 
       `ifdef VERILATOR
         `systemc_interface
-        CData ~SYM[2](vluint32_t half_period, bool active_rising) {
+        CData ~SYM[2](vluint32_t half_period, bool active_rising, bool result_rec) {
           static vluint32_t init_wait = ~LONGESTPERIOD0;
           static vluint32_t to_wait = 0;
           static CData clock = active_rising ? 0 : 1;
 
           if(init_wait == 0) {
-            if(to_wait == 0) {
-              to_wait = half_period - 1;
-              clock = clock == 0 ? 1 : 0;
+            if(result_rec) {
+              std::exit(0);
             }
             else {
-              to_wait = to_wait - 1;
+              if(to_wait == 0) {
+                to_wait = half_period - 1;
+                clock = clock == 0 ? 1 : 0;
+              }
+              else {
+                to_wait = to_wait - 1;
+              }
             }
           }
           else {
@@ -139,8 +150,46 @@
 
       assign ~RESULT = ~SYM[0];
       // pragma translate_on
-      // clockGen end
-    warning: Clash.Signal.Internal.clockGen is not synthesizable!
+      // tbClockGen end
+    warning: Clash.Signal.Internal.tbClockGen is not synthesizable!
+    workInfo: Always
+- BlackBox:
+    name: Clash.Signal.Internal.tbDynamicClockGen
+    kind: Declaration
+    type: |-
+      clockGen
+        :: KnownDomain dom     -- ARG[0]
+        -> Signal dom Natural  -- ARG[1]
+        -> Signal dom Bool     -- ARG[2]
+        => Clock dom
+    template: |-
+      // tbDynamicClockGen begin
+      // pragma translate_off
+      reg ~TYPO ~GENSYM[clk][0];
+      time ~GENSYM[half_period][1];
+      always begin
+        // Delay of 1 mitigates race conditions (https://github.com/steveicarus/iverilog/issues/160)
+        #1 ~SYM[0] = ~IF~ACTIVEEDGE[Rising][0]~THEN 0 ~ELSE 1 ~FI;
+        #~LONGESTPERIOD0 forever begin
+          ~IF~ISACTIVEENABLE[2]~THEN
+          if (~ ~ARG[2]) begin
+            $finish(0);
+          end
+          ~ELSE~FI
+          // 1 = 0.1ps
+          ~SYM[1] = ((~VAR[periods][1] * 10) / 2);
+
+          ~SYM[0] = ~ ~SYM[0];
+          #~SYM[1];
+          ~SYM[0] = ~ ~SYM[0];
+          #~SYM[1];
+        end
+      end
+
+      assign ~RESULT = ~SYM[0];
+      // pragma translate_on
+      // tbDynamicClockGen end
+    warning: Clash.Signal.Internal.tbDynamicClockGen is not synthesizable!
     workInfo: Always
 - BlackBox:
     name: Clash.Signal.Internal.resetGenN

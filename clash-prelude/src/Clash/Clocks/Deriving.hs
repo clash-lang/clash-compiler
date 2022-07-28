@@ -1,6 +1,6 @@
 {-|
-Copyright  :  (C) 2018, Google Inc
-                  2019, Myrtle Software Ltd
+Copyright  :  (C) 2018-2022, Google Inc
+                  2019,      Myrtle Software Ltd
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}

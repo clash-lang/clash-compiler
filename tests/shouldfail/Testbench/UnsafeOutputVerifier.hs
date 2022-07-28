@@ -5,7 +5,8 @@ import Clash.Explicit.Testbench
 
 topEntity
   :: Clock XilinxSystem
+  -> Clock IntelSystem
   -> Reset XilinxSystem
   -> Signal IntelSystem Int   -- Note different domain
   -> Signal XilinxSystem Bool
-topEntity clk rst = outputVerifier clk rst (0 :> Nil)
+topEntity clkX clkI rst = outputVerifier clkX clkI rst (0 :> Nil)
