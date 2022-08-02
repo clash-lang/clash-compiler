@@ -8,6 +8,7 @@ packages:
   ./clash-lib-hedgehog
   ./clash-prelude
   ./clash-prelude-hedgehog
+  ./clash-cores
   ./tests
 
 write-ghc-environment-files: always
@@ -44,12 +45,17 @@ package clash-lib
   ghc-options: +RTS -qn4 -A128M -RTS -j4
   flags: +debug
 
+package clash-cores
+  -- Tweak haddock stylesheet to enable word wrapping of types.
+  -- We specify the default Linuwial theme as an alnernate
+  -- so we're able to import its css file from the custom theme.
+  haddock-options: --theme=doc/linuwial-wrap-types.css --theme=Linuwial
+
 optional-packages:
   ./benchmark
   ./benchmark/profiling/prepare
   ./benchmark/profiling/run
   ./clash-cosim
-  ./clash-cores
   ./clash-term
 
 allow-newer:
