@@ -104,7 +104,7 @@ nix-shell
 # Related libraries and initiatives
 
 * [Clashilator](https://github.com/gergoerdi/clashilator): tooling to integrate Clash with Verilator. Enables fast, multithreaded simulation by compiling Clash designs to C++.
-* [Clash Protocols](https://gitlab.com/clash-lang/clash-protocols): experimental library for writing Clash circuits with bidirectional communication - such as AXI or Avalon.
+* [Clash Protocols](https://github.com/clash-lang/clash-protocols): experimental library for writing Clash circuits with bidirectional communication - such as AXI or Avalon.
 * [Clash Starters](https://github.com/clash-lang/clash-starters): starter projects to quickly get you up and running.
 * [Clash WaveDrom](https://github.com/expipiplus1/clash-wavedrom): generate wave diagrams from Clash using [WaveDrom](https://wavedrom.com/)
 
