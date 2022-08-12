@@ -1,0 +1,3 @@
+INTERNAL CHANGE/FIX: Black box functions declare their usage, necessary for
+implicit netlist usage analysis implemented in
+[#2230](https://github.com/clash-lang/clash-compiler/pull/2230)
