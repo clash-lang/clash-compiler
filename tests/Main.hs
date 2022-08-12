@@ -629,6 +629,7 @@ runClashTest = defaultMain $ clashTestRoot
           []
       , clashTestGroup "LoadModules"
         [ runTest "T1796" def{hdlSim=[]}
+        , runTest "T2289" def{hdlTargets=[Verilog], hdlSim=[]}
         ]
       , clashTestGroup "Naming"
         [ runTest "T967a" def{hdlSim=[]}
