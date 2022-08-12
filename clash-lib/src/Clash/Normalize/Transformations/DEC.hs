@@ -1,6 +1,6 @@
 {-|
   Copyright  :  (C) 2015-2016, University of Twente,
-                    2021,      QBayLogic B.V.
+                    2021-2022, QBayLogic B.V.
                     2022,      LumiGuide Fietsdetectie B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -29,6 +29,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Normalize.Transformations.DEC
@@ -80,7 +81,8 @@ import Clash.Core.Term
   ( Alt, LetBinding, Pat(..), PrimInfo(..), Term(..), TickInfo(..)
   , collectArgs, collectArgsTicks, mkApps, mkTicks, patIds, stripTicks)
 import Clash.Core.TyCon (TyConMap, TyConName, tyConDataCons)
-import Clash.Core.Type (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
+import Clash.Core.Type
+  (Type, TypeView (..), isPolyFunTy, mkTyConApp, splitFunForallTy, tyView)
 import Clash.Core.Util (mkInternalVar, mkSelectorCase, sccLetBindings)
 import Clash.Core.Var (isGlobalId, isLocalId, varName)
 import Clash.Core.VarEnv
@@ -472,9 +474,10 @@ mkDisjointGroup
   -- ^ Case-tree of arguments belonging to the applied term.
   -> NormalizeSession (Term,[Term])
 mkDisjointGroup inScope (fun,(seen,cs)) = do
+    tcm <- Lens.view tcCache
     let argss    = Foldable.toList cs
         argssT   = zip [0..] (List.transpose argss)
-        (sharedT,distinctT) = List.partition (areShared inScope . fmap (first stripTicks) . snd) argssT
+        (sharedT,distinctT) = List.partition (areShared tcm inScope . fmap (first stripTicks) . snd) argssT
         shared   = map (second head) sharedT
         distinct = map (Either.lefts) (List.transpose (map snd distinctT))
         cs'      = fmap (zip [0..]) cs
@@ -483,7 +486,6 @@ mkDisjointGroup inScope (fun,(seen,cs)) = do
                         (if null shared
                            then cs'
                            else fmap (filter (`notElem` shared)) cs')
-    tcm <- Lens.view tcCache
     (distinctCaseM,distinctProjections) <- case distinct of
       -- only shared arguments: do nothing.
       [] -> return (Nothing,[])
@@ -549,10 +551,19 @@ disJointSelProj inScope argTys cs = do
 -- | Arguments are shared between invocations if:
 --
 -- * They contain _no_ references to locally-bound variables
--- * Are all equal
-areShared :: InScopeSet -> [Either Term Type] -> Bool
-areShared _       []       = True
-areShared inScope xs@(x:_) = noFV1 && allEqual xs
+-- * Are either:
+--     1. All equal
+--     2. A proof of an equality: we don't care about the shape of a proof.
+--
+--        Whether we have `Refl : True ~ True` or `SomeAxiom : (1 <=? 2) ~ True`
+--        it doesn't matter, since when we normalize both sides we always end
+--        up with a proof of `True ~ True`.
+--        Since DEC only fires for applications where all the type arguments
+--        are equal, we can deduce that all equality arguments witness the same
+--        equality, hence we don't have to care about the shape of the proof.
+areShared :: TyConMap -> InScopeSet -> [Either Term Type] -> Bool
+areShared _   _       []       = True
+areShared tcm inScope xs@(x:_) = noFV1 && (isProof x || allEqual xs)
  where
   noFV1 = case x of
     Right ty -> getAll (Lens.foldMapOf (typeFreeVars' isLocallyBound IntSet.empty)
@@ -561,6 +572,11 @@ areShared inScope xs@(x:_) = noFV1 && allEqual xs
                                        (const (All False)) tm)
 
   isLocallyBound v = isLocalId v && v `notElemInScopeSet` inScope
+
+  isProof (Left co) = case tyView (inferCoreTypeOf tcm co) of
+    TyConApp (nameOcc -> "GHC.Types.~") _ -> True
+    _ -> False
+  isProof _ = False
 
 -- | Create a list of arguments given a map of positions to common arguments,
 -- and a list of arguments
