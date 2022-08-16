@@ -22,8 +22,5 @@ if [[ "$GHC_HEAD" != "yes" ]]; then
 fi
 set -u
 
-# Build with installed constraints for packages in global-db
-echo cabal v2-build $(ghc-pkg list --global --simple-output --names-only | sed 's/\([a-zA-Z0-9-]\{1,\}\) */--constraint="\1 installed" /g') all | sh
-
 # Build with default constraints
 cabal v2-build all --write-ghc-environment-files=always
