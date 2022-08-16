@@ -23,8 +23,20 @@ if [[ "$GHC_HEAD" != "yes" ]]; then
 fi
 set -u
 
-# Build with installed constraints for packages in global-db
-echo cabal v2-build $(ghc-pkg list --global --simple-output --names-only | sed 's/\([a-zA-Z0-9-]\{1,\}\) */--constraint="\1 installed" /g') all | sh
+# Build compiler _libraries_, but not the executable. This makes sure the executable
+# is being built by the job that is going to use it too. In turn, this prevents
+# weird errors where executables cannot find some shared libraries.
+cabal v2-build \
+  lib:clash-prelude \
+  lib:clash-prelude-hedgehog \
+  lib:clash-lib \
+  lib:clash-lib-hedgehog \
+  lib:clash-ghc \
+  lib:clash-cores \
+  lib:clash-testsuite
 
-# Build with default constraints
-cabal v2-build all --write-ghc-environment-files=always
+# Make sure all dependencies of all packages in the clash-compiler project are
+# compiled. This makes sure no future CI job is going to build it. Furthermore,
+# this command makes sure we transfer all the right dependencies as artifacts -
+# as they will end up in Cabal's 'plan.json'.
+cabal v2-build all --only-dependencies

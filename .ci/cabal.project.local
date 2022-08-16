@@ -5,17 +5,11 @@ index-state: HEAD
 package *
   documentation: False
 
-  -- Dynamic executables save oozles of space when archiving it on CI
-  executable-dynamic: True
-
 package clash-prelude
   ghc-options: -Werror
   flags: +doctests +multiple-hidden
   tests: True
   benchmarks: True
-
-  -- clash-prelude unittests fail with dynamic executables
-  executable-dynamic: False
 
 package clash-lib
   ghc-options: -Werror
@@ -28,9 +22,6 @@ package clash-ghc
 package clash-cosim
   ghc-options: -Werror
   tests: True
-
-  -- clash-cosim unittests fail with dynamic executables
-  executable-dynamic: False
 
 package clash-cores
   ghc-options: -Werror
