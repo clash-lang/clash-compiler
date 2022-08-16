@@ -58,6 +58,11 @@ jobs:
       # - name: Use system GHC
       #   run: stack config set system-ghc --global true
 
+      # Retry Stack initialization, see:
+      # https://github.com/commercialhaskell/stack/issues/5770
+      - name: Initialize Stack
+        run: ./.ci/initialize_stack.sh
+
       - name: Build with Stack
         run: stack build
 
