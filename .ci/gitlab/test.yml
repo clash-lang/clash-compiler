@@ -54,13 +54,6 @@ build-clash-dev:
   script:
     - .ci/build_clash_dev.sh
 
-# Makes sure we build everything - even if they don't have explicit tests. See
-# https://github.com/clash-lang/clash-compiler/pull/2299 for more information.
-build-all:
-  extends: .test-common
-  script:
-    - cabal v2-build all
-
 cores:unittests:
   extends: .test-common
   script:
