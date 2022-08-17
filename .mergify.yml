@@ -34,4 +34,5 @@ pull_request_rules:
         ignore_conflicts: True
         branches:
           - "1.6"
-
+      queue:
+        update_method: rebase
