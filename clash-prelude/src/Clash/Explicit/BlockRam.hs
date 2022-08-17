@@ -1052,7 +1052,7 @@ blockRam#
   -- ^ Value to write (at address @w@)
   -> Signal dom a
   -- ^ Value of the BRAM at address @r@ from the previous clock cycle
-blockRam# (Clock _) gen content = \rd wen waS wd -> runST $ do
+blockRam# (Clock _ Nothing) gen content = \rd wen waS wd -> runST $ do
   ramStart <- newListArray (0,szI-1) contentL
   -- start benchmark only
   -- ramStart <- unsafeThawSTArray ramArr
@@ -1120,6 +1120,7 @@ blockRam# (Clock _) gen content = \rd wen waS wd -> runST $ do
                              " not in range [0.." <> show szI <> ")"))
        in forM_ [0..(szI-1)] (\j -> unsafeWriteSTArray s j d)
   {-# INLINE safeUpdate #-}
+blockRam# _ _ _ = error "blockRam#: dynamic clocks not supported"
 {-# ANN blockRam# hasBlackBox #-}
 {-# NOINLINE blockRam# #-}
 

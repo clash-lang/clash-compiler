@@ -92,7 +92,7 @@ ddrIn#
   -> a
   -> Signal fast a
   -> Signal slow (a,a)
-ddrIn# (Clock _) (unsafeToHighPolarity -> hRst) (fromEnable -> ena) i0 i1 i2 =
+ddrIn# (Clock _ Nothing) (unsafeToHighPolarity -> hRst) (fromEnable -> ena) i0 i1 i2 =
   case resetKind @fast of
     SAsynchronous ->
       goAsync
@@ -133,6 +133,8 @@ ddrIn# (Clock _) (unsafeToHighPolarity -> hRst) (fromEnable -> ena) i0 i1 i2 =
            :- (as `seq` if e then goAsync (o2',o3',o4') rs es xs
                              else goAsync (o0',o1',o2') rs es xs)
 
+ddrIn# _ _ _ _ _ _ =
+  error "ddrIn#: dynamic clocks not supported"
 {-# NOINLINE ddrIn# #-}
 {-# ANN ddrIn# hasBlackBox #-}
 

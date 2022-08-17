@@ -29,7 +29,7 @@ testBench = done
   gen0 = toEnable $ stimuliGenerator clk rst gen
   enM0 = stimuliGenerator clk rst enM
   inp = E.delay clk enableGen 0 $ inp + 1
-  expectedOutput = outputVerifier clk rst
+  expectedOutput = outputVerifier' clk rst
     $    (0, 0) :> (1, 1) :> (2, 2) :> (2, 2) :> (4, 4) :>  (5, 4) :> (6, 6)
       :> (6, 6) :> (8, 8) :> Nil
   done = expectedOutput $ topEntity clk rst gen0 enM0 inp

@@ -559,7 +559,7 @@ renderElem b (IF c t f) = do
               Literal Nothing (BoolLit False) -> 1
               _                               -> 1
           _ ->
-            error $ $(curLoc) ++ "IsActiveEnable: Expected Bool, not: " ++ show ty
+            error $ $(curLoc) ++ "IsActiveEnable: Expected Bool or Enable, not: " ++ show ty
 
       (ActiveEdge edgeRequested n) ->
         let (_, ty, _) = bbInputs b !! n in

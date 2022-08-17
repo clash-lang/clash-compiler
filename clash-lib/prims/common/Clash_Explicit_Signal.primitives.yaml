@@ -3,9 +3,22 @@
     kind: Expression
     type: |-
       veryUnsafeSynchronizer
-        :: Int                         -- ARG[0]
-        -> Int                         -- ARG[1]
-        -> Signal dom1 a               -- ARG[2]
+        :: Either Int (Signal dom1 Int) -- ARG[0]
+        -> Either Int (Signal dom2 Int) -- ARG[1]
+        -> Signal dom1 a                -- ARG[2]
         -> Signal dom2 a
     template: ~ARG[2]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Explicit.Signal.unsafeSynchronizer
+    kind: Expression
+    type: |-
+      unsafeSynchronizer
+        :: ( KnownDomain dom1    -- ARG[0]
+           , KnownDomain dom2 )  -- ARG[1]
+        => Clock dom1            -- ARG[2]
+        -> Clock dom2            -- ARG[3]
+        -> Signal dom1 a         -- ARG[4]
+        -> Signal dom2 a
+    template: ~ARG[4]
     workInfo: Never

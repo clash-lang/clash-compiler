@@ -38,6 +38,6 @@ topEntitySR clk rst = topEntity clk srst
 testBench :: Signal System Bool
 testBench = done
   where
-    expectedOutput        = outputVerifier testClk resetGen (1 :> 1 :> 2 :> 3 :> 1 :> 1 :> 2 :> 3 :> Nil)
+    expectedOutput        = outputVerifier testClk circuitClk resetGen (1 :> 1 :> 2 :> 3 :> 1 :> 1 :> 2 :> 3 :> Nil)
     done                  = expectedOutput (topEntitySR circuitClk resetGen)
     (testClk, circuitClk) = biTbClockGen @System @XilinxSystem (not <$> done)

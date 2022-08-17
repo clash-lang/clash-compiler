@@ -774,6 +774,10 @@ runClashTest = defaultMain $ clashTestRoot
                           , hdlSim=[]
                           }
            in runTest "NoCPR" _opts
+        , runTest "DynamicClocks" def
+            { hdlLoad = hdlLoad def \\ [Verilator]
+            , hdlSim = hdlSim def \\ [Verilator]
+            }
         , runTest "Oversample" def
         , runTest "RegisterAR" def
         , runTest "RegisterSR" def

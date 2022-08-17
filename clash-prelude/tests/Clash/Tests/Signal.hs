@@ -1,5 +1,6 @@
 {-|
 Copyright  :  (C) 2019, Myrtle Software Ltd
+                  2022, Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -8,15 +9,22 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Clash.Tests.Signal where
 
-import           Clash.Signal                   hiding (sample)
-import           Clash.Signal.Internal          (sample)
+import qualified Prelude as P
+import           Prelude hiding (undefined)
 
-import           Control.Applicative            (liftA2)
+import qualified Clash.Explicit.Prelude         as E
+import           Clash.Prelude                  hiding (sample)
+
+import           Clash.Signal.Internal          (dynamicClockGen, sample)
+
 import           Control.Exception              (evaluate)
 import           Data.List                      (isInfixOf)
 import           Test.Tasty
@@ -24,6 +32,9 @@ import           Test.Tasty.HUnit
 
 import qualified Language.Haskell.Interpreter   as Hint
 import           Language.Haskell.Interpreter   (OptionVal((:=)))
+
+createDomain vSystem{vName="H11", vPeriod=hzToPeriod 11}
+createDomain vSystem{vName="H77", vPeriod=hzToPeriod 77}
 
 customTypeMark :: String
 customTypeMark = "You tried to apply an explicitly routed clock, reset, or enable line"
@@ -48,7 +59,7 @@ assertCustomTypeError expectedErr expr = do
       else
         assertFailure $
              "Expression failed to typecheck as expected, but did not contain "
-          ++ "expected type error. Instead it contained: " ++ show err
+          <> "expected type error. Instead it contained: " <> show err
     Right () ->
       assertFailure "Expression should have failed to typecheck, but succeeded."
 
@@ -166,6 +177,10 @@ tests =
             in
               evaluate a >> pure ()
         ]
+    , testGroup "unsafeSynchronizer"
+      [ testCase "case_dynamicStaticEq" case_dynamicStaticEq
+      , testCase "case_dynamicHasEffect" case_dynamicHasEffect
+      ]
     ]
 
 -- Tests below should survive compilation:
@@ -185,3 +200,46 @@ test4ok_3 = withSpecificReset (resetGen @System) (test4 @_ @_ @System @_)
 
 test5ok_0 = withSpecificReset (resetGen @System) (test5 @System @_)
 #endif
+
+-- | Asserts that static clocks behave the same as dynamic clocks with a static
+-- period signal passed into it.
+case_dynamicStaticEq :: Assertion
+case_dynamicStaticEq = do
+  let
+    sampleMagicN = P.take 500 . sample
+
+    clk11 = clockGen @H11
+    clk77 = clockGen @H77
+    dclk11 = dynamicClockGen @H11 (pure (hzToPeriod 11))
+    dclk77 = dynamicClockGen @H77 (pure (hzToPeriod 77))
+
+    counter :: forall dom. Signal dom Int
+    counter = fromList [0..]
+
+  assertEqual
+    "clk11+clk77 == dclk11+dclk77"
+    (sampleMagicN (E.unsafeSynchronizer clk11 clk77 counter))
+    (sampleMagicN (E.unsafeSynchronizer dclk11 dclk77 counter))
+
+  assertEqual
+    "clk11+dclk77 == dclk11+clk77"
+    (sampleMagicN (E.unsafeSynchronizer clk11 dclk77 counter))
+    (sampleMagicN (E.unsafeSynchronizer dclk11 clk77 counter))
+
+-- | Asserts that "lying" about a clock's frequency has effect.
+case_dynamicHasEffect :: Assertion
+case_dynamicHasEffect = do
+  let
+    sampleMagicN = P.take 500 . sample
+
+    clk11 = clockGen @H11
+    clk77 = clockGen @H77
+    dclk11 = dynamicClockGen @H11 (pure (hzToPeriod 11))
+    dclk77lying = dynamicClockGen @H77 (pure (hzToPeriod 78))
+
+    counter :: forall dom. Signal dom Int
+    counter = fromList [0..]
+
+  assertBool "clk11+clk77 /= dclk11+dclk77lying" $
+       (sampleMagicN (E.unsafeSynchronizer clk11 clk77 counter))
+    /= (sampleMagicN (E.unsafeSynchronizer dclk11 dclk77lying counter))

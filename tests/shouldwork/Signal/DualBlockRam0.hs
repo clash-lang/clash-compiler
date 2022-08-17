@@ -29,8 +29,8 @@ testBench = strictAnd <$> doneA <*> (unsafeSynchronizer clk10 clk20 doneB)
     outoutVerifierB = outputVerifierWith
      (\clk rst -> assertBitVector clk rst "outputVerifierBitVector Port B")
 
-    doneA  = outputVerifierA clk20 noRst20 simOutA $ pack <$> portA
-    doneB  = outoutVerifierB clk10 noRst10 simOutB $ pack <$> portB
+    doneA  = outputVerifierA clk20 clk20 noRst20 simOutA $ pack <$> portA
+    doneB  = outoutVerifierB clk10 clk10 noRst10 simOutB $ pack <$> portB
 
     -- Testbench clocks
     clk20 :: Clock A
