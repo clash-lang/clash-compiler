@@ -171,19 +171,25 @@ data Element
   | IsScalar !Int
   -- ^ Whether element is scalar
   | IsActiveHigh !Int
-  -- ^ Whether a domain's reset lines are synchronous.
+  -- ^ Whether a domain's reset lines are active high. Errors if not applied to
+  -- a @KnownDomain@ or @KnownConfiguration@.
   | Tag !Int
   -- ^ Tag of a domain.
   | Period !Int
-  -- ^ Period of a domain.
+  -- ^ Period of a domain. Errors if not applied to a @KnownDomain@ or
+  -- @KnownConfiguration@.
   | LongestPeriod
   -- ^ Longest period of all known domains
   | ActiveEdge !Signal.ActiveEdge !Int
-  -- ^ Test active edge of memory elements in a certain domain
+  -- ^ Test active edge of memory elements in a certain domain. Errors if not
+  -- applied to a @KnownDomain@ or @KnownConfiguration@.
   | IsSync !Int
   -- ^ Whether a domain's reset lines are synchronous. Errors if not applied to
-  -- a KnownDomain.
+  -- a @KnownDomain@ or @KnownConfiguration@.
   | IsInitDefined !Int
+  -- ^ Whether the initial (or "power up") value of memory elements in a domain
+  -- are configurable to a specific value rather than unknown\/undefined. Errors
+  -- if not applied to a @KnownDomain@ or @KnownConfiguration@.
   | IsActiveEnable !Int
   -- ^ Whether given enable line is active. More specifically, whether the
   -- enable line is NOT set to a constant 'True'.
