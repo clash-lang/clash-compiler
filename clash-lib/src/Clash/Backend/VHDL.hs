@@ -1504,7 +1504,7 @@ inst_ (CompDecl nm ps0) =
   fmap Just $ "component" <+> pretty nm <+>
     ("port" <> line <> indent 2 (tupledSemi ps <> semi))
     <> line <> "end component" <> semi
-  where ps = traverse (\(t,pd,ty) -> pretty t <+> ":" <+> ppd pd <+> qualTyName ty) ps0
+  where ps = traverse (\(t,pd,ty) -> pretty t <+> ":" <+> ppd pd <+> sizedQualTyName ty) ps0
         ppd = \case { In -> "in"; Out -> "out"}
 
 inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
