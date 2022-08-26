@@ -50,9 +50,9 @@ import Clash.Annotations.Primitive    (hasBlackBox)
 import Clash.Class.BitPack.Internal.TH (deriveBitPackTuples)
 import Clash.Class.Resize             (zeroExtend, resize)
 import Clash.Promoted.Nat             (SNat(..), snatToNum)
-import Clash.Sized.BitVector          (Bit, BitVector, (++#))
 import Clash.Sized.Internal.BitVector
-  (pack#, split#, checkUnpackUndef, undefined#, unpack#, unsafeToNatural, isLike#)
+  (pack#, split#, checkUnpackUndef, undefined#, unpack#, unsafeToNatural, isLike#,
+   BitVector, Bit, (++#))
 import Clash.XException
 
 {- $setup

@@ -1,0 +1,1 @@
+ADDED: The prelude now exports `+>>.` and `.<<+`, which can be used to shift in a bit into a `BitVector` from the left or right respectively - similar to `+>>` and `<<+` for `Vec`s.
