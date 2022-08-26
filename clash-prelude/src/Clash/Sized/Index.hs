@@ -15,11 +15,11 @@ module Clash.Sized.Index
   (Index, bv2i, fromSNat)
 where
 
-import GHC.TypeLits               (KnownNat, type (^))
-import GHC.TypeLits.Extra         (CLog) -- documentation only
+import GHC.TypeLits (KnownNat, type (^))
+import GHC.TypeLits.Extra (CLog) -- documentation only
 
-import Clash.Promoted.Nat         (SNat (..), pow2SNat)
-import Clash.Sized.BitVector      (BitVector)
+import Clash.Promoted.Nat (SNat (..), pow2SNat)
+import Clash.Sized.Internal.BitVector (BitVector)
 import Clash.Sized.Internal.Index
 
 -- | An alternative implementation of 'Clash.Class.BitPack.unpack' for the
