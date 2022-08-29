@@ -1,1 +1,0 @@
-FIXED: Disregard ticks when determining whether terms are shared. Fixes [#2233](https://github.com/clash-lang/clash-compiler/issues/2233).
