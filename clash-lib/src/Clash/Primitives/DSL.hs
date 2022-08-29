@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2019, Myrtle Software Ltd.
-                     2020-2021, QBayLogic B.V.
+                     2020-2022, QBayLogic B.V.
                      2021, Myrtle.ai
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -280,7 +280,7 @@ assign aName (TExpr ty aExpr) = do
 -- to them. If given expression is not an identifier, an intermediate variable
 -- will be used to assign the given expression to which is subsequently indexed.
 unvec
-  :: Backend backend
+  :: (HasCallStack, Backend backend)
   => Text
   -- ^ Name hint for intermediate signal
   -> TExpr
@@ -422,7 +422,8 @@ boolFromBitVector n =
 --
 -- TODO: Implement for (System)Verilog
 unsignedFromBitVector
-  :: Size
+  :: HasCallStack
+  => Size
   -> Text
   -- ^ Name hint for intermediate signal
   -> TExpr
@@ -519,7 +520,7 @@ constructProduct ty els =
   TExpr ty (DataCon ty (DC (ty,0)) (map eex els))
 
 -- | Create an n-tuple of 'TExpr'
-tuple :: [TExpr] -> TExpr
+tuple :: HasCallStack => [TExpr] -> TExpr
 tuple [] = error $ "nTuple: Cannot create empty tuple"
 tuple [_] =
   -- If we don't put this in: tuple . untuple /= id
