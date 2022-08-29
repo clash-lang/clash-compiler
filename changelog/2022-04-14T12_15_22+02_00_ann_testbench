@@ -1,1 +1,0 @@
-DOCUMENTATION: The documentation for `ANN TestBench` had it backwards; now it correctly indicates the annotation is on the test bench, not the device under test. [#1750](https://github.com/clash-lang/clash-compiler/issues/1750)
