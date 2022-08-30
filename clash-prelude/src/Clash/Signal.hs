@@ -1304,6 +1304,7 @@ andEnable = \en f -> andSpecificEnable en (const f) (Proxy @dom)
 -- See Note [Going from WithSingleDomain to WithSpecificDomain]
 {-# INLINE andEnable #-}
 
+#ifdef CLASH_MULTIPLE_HIDDEN
 {- | Merge enable signal with signal of bools by applying the boolean AND
 operation.
 
@@ -1320,7 +1321,6 @@ examples for more information.
 
 <#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 
-#ifdef CLASH_MULTIPLE_HIDDEN
 === __Example__
 'andSpecificEnable' can only be used when it can find the specified domain
 in /r/:
@@ -1336,8 +1336,8 @@ Type variables work too, if they are in scope. For example:
 reg = 'register' @@dom 5 (reg + 1)
 f en = 'andSpecificEnable' @@dom en reg
 @
-#endif
 -}
+#endif
 andSpecificEnable
   :: forall dom r
    . ( HiddenEnable dom
