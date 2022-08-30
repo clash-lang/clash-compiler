@@ -1,1 +1,0 @@
-ADDED: The GADT constructors for `RTree` (`RLeaf` and `RBranch`) are now exported directly in addition to the patterns `LR` and `BR`. [#2177](https://github.com/clash-lang/clash-compiler/pull/2177)

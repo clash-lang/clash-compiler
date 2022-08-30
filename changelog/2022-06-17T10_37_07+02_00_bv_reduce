@@ -1,1 +1,0 @@
-CHANGED: `reduceXor` now produces a result if the argument has undefined bits instead of throwing an `XException` (the result is an undefined bit). `reduceAnd` and `reduceOr` already always produced a result. [#2244](https://github.com/clash-lang/clash-compiler/pull/2244)
