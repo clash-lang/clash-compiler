@@ -1,1 +1,0 @@
-ADDED: Added the `~ISSCALAR` template which can be used to check if an argument is rendered to a scalar in HDL.

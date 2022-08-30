@@ -1,4 +1,33 @@
 # Changelog for the Clash project
+## 1.6.4 *Aug 30th 2022*
+Fixed:
+
+ * Input validation of the used arguments in blackboxes is now complete. [#2184](https://github.com/clash-lang/clash-compiler/pull/2184)
+ * `Clash.Annotations.BitRepresentation.Deriving.deriveAnnotation` no longer has quadratic complexity in the size of the constructors and fields. [#2209](https://github.com/clash-lang/clash-compiler/pull/2209)
+ * Fully resolve type synonyms when deriving bit representations. [#2209](https://github.com/clash-lang/clash-compiler/pull/2209)
+ * Disregard ticks when determining whether terms are shared. Fixes [#2233](https://github.com/clash-lang/clash-compiler/issues/2233).
+ * The blackbox parser will make sure it fully parses its input, and report an error when it can't. [#2237](https://github.com/clash-lang/clash-compiler/issues/2237)
+ * Wrap ~ARG[n] in parentheses. Fixes [#2213](https://github.com/clash-lang/clash-compiler/issues/2213)
+ * The VHDL shift primitives no longer generate bound check failures. Fixes [#2215](https://github.com/clash-lang/clash-compiler/issues/2215)
+ * Evaluator fails impredicative type instantiation of error values [#2272](https://github.com/clash-lang/clash-compiler/issues/2272)
+ * Fix out of bound errors in toEnum/fromSLV for sum types [#2220](https://github.com/clash-lang/clash-compiler/issues/2220)
+ * Netlist generation fails for certain uses of GADTs [#2289](https://github.com/clash-lang/clash-compiler/issues/2289)
+ * The documentation for `ANN TestBench` had it backwards; it now correctly indicates the annotation is on the test bench, not the device under test. [#1750](https://github.com/clash-lang/clash-compiler/issues/1750)
+
+Fixes with minor changes:
+
+ * `reduceXor` now produces a result if the argument has undefined bits instead of throwing an `XException` (the result is an undefined bit). `reduceAnd` and `reduceOr` already always produced a result. [#2244](https://github.com/clash-lang/clash-compiler/pull/2244)
+
+Added:
+
+ * Support for symbols in types while deriving bit representations. [#2209](https://github.com/clash-lang/clash-compiler/pull/2209)
+ * Support for promoted data types while deriving bit representations. [#2209](https://github.com/clash-lang/clash-compiler/pull/2209)
+ * `scanlPar` and `scanrPar` in Clash's Prelude, as well as the `RTree` versions `tscanl` and `tscanr`. These variants of `scanl1` and `scanr1` compile to a binary tree of operations, with a depth of `O(log(n))` (`n` being the length of the vector) rather than a depth of `n` for `scanl1` and `scanr1`. [#2177](https://github.com/clash-lang/clash-compiler/pull/2177)
+ * The GADT constructors for `RTree` (`RLeaf` and `RBranch`) are now exported directly in addition to the patterns `LR` and `BR`. [#2177](https://github.com/clash-lang/clash-compiler/pull/2177)
+ * Added the `~ISSCALAR` template which can be used to check if an argument is rendered to a scalar in HDL. [#2184](https://github.com/clash-lang/clash-compiler/pull/2184)
+ * Added support for records and infix constructors when using `Clash.Annotations.BitRepresentation.Deriving.deriveAnnotation`. [#2191](https://github.com/clash-lang/clash-compiler/pull/2191)
+ * Clash now contains instances for `ShowX`, `NFDataX` and `BitPack` on the newtypes from the Data.Functor modules (`Identity`, `Const`, `Compose`, `Product` and `Sum`). [#2218](https://github.com/clash-lang/clash-compiler/issues/2218)
+
 ## 1.6.3 *Apr 7th 2022*
 Fixed:
   * Handle `~ISUNDEFINED` hole in black boxes for `BitVector` and for product types. This means that with `-fclash-aggressive-x-optimization-blackboxes`, resets are now omitted for _undefined_ reset values of such types as well. [#2117](https://github.com/clash-lang/clash-compiler/issues/2117)
