@@ -10,7 +10,7 @@ package *
 
 package clash-prelude
   ghc-options: -Werror
-  flags: +doctests +multiple-hidden
+  flags: +doctests
   tests: True
   benchmarks: True
 
@@ -47,7 +47,7 @@ package clash-lib-hedgehog
 package clash-testsuite
   ghc-options: -Werror
   -- enable cosim
-  flags: +cosim +multiple-hidden
+  flags: +cosim
 
 package clash-benchmark
   ghc-options: -Werror
