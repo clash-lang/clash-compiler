@@ -215,6 +215,7 @@ Library
 
                       Clash.Driver
                       Clash.Driver.Manifest
+                      Clash.Driver.LocatedManifest
                       Clash.Driver.Types
 
                       Clash.Edalize.Edam

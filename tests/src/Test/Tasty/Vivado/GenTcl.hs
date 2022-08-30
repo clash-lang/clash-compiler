@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -8,11 +9,13 @@ module Test.Tasty.Vivado.GenTcl ( HdlSource (..), tclFromManifest ) where
 
 import Data.Char (isLower)
 import Data.List (isSuffixOf)
+import Data.Maybe (mapMaybe)
 import qualified Data.Text as T
 import Data.String.Interpolate (i)
 import System.FilePath ((</>))
 
 import Clash.Driver.Manifest (Manifest (..))
+import Clash.Driver.LocatedManifest (LocatedManifest (..), entityDirectory)
 
 import Paths_clash_testsuite (getDataDir)
 import Test.Tasty.Common (getManifests)
@@ -29,23 +32,35 @@ data HdlSource = HdlSource
 
 type SimProj = [HdlSource]
 
-thread :: [a -> a] -> a -> a
-thread = foldr (.) id
-
-mSimProj :: FilePath -> T.Text -> FilePath -> SimProj -> SimProj
-mSimProj dir lib fp p
-  | ".vhdl" `isSuffixOf` fp = add VhdlSource
-  | ".v" `isSuffixOf` fp = add VerilogSource
-  | ".sv" `isSuffixOf` fp = add SystemVerilogSource
-  | ".tcl" `isSuffixOf` fp = add TclSource
-  | otherwise = p
+-- | Given a file from a Manifest file, convert it into a more digestible 'HdlSource'
+-- data structure. Supports all file types mentioned in 'SourceType'.
+toHdlSource ::
+  -- | Directory with HDL files
+  FilePath ->
+  -- | VHDL/SystemVerilog library name
+  T.Text ->
+  -- | Filename of file in directory given earlier
+  FilePath ->
+  -- | @Just HdlSource@ if file extension was recognized, otherwise @Nothing@
+  Maybe HdlSource
+toHdlSource dir lib filename
+  | ".vhdl" `isSuffixOf` filename = go VhdlSource
+  | ".v"    `isSuffixOf` filename = go VerilogSource
+  | ".sv"   `isSuffixOf` filename = go SystemVerilogSource
+  | ".tcl"  `isSuffixOf` filename = go TclSource
+  | otherwise = Nothing
  where
-  add ty = HdlSource { hdlType=ty, hdlLib=lib, hdlFile=dir </> fp } : p
+  go ty = Just (HdlSource { hdlType=ty, hdlLib=lib, hdlFile=dir </> filename })
 
-asSimProj :: FilePath -> Manifest -> SimProj
-asSimProj dir m =
-  let fps = fst <$> fileNames m
-    in thread (mSimProj dir (topComponent m) <$> fps) mempty
+-- | Convert all generated files into 'HdlSource's for a given HDL directory and
+-- corresponding 'Manifest'.
+asSimProj :: LocatedManifest -> [HdlSource]
+asSimProj manifest@LocatedManifest{lmManifest}=
+  let
+    paths = fst <$> fileNames lmManifest
+    lib = topComponent lmManifest
+  in
+    mapMaybe (toHdlSource (entityDirectory manifest) lib) paths
 
 -- | From @PortProductsSum_testBench@, extract @testBench@ (for instance)
 stripEntity ::
@@ -62,10 +77,11 @@ simProjFromClashEntities ::
   String ->
   IO SimProj
 simProjFromClashEntities hdlDir qualName = do
-  [(_,mHdl)] <- getManifests (hdlDir </> qualName </> "clash-manifest.json")
+  let manifestPath = hdlDir </> qualName </> "clash-manifest.json"
+  [(_, mHdl)] <- getManifests manifestPath
   let deps = T.unpack <$> transitiveDependencies mHdl
   nextSimProj <- traverse (simProjFromClashEntities hdlDir) deps
-  pure $ mconcat nextSimProj <> asSimProj qualName mHdl
+  pure $ mconcat nextSimProj <> asSimProj (LocatedManifest manifestPath mHdl)
 
 -- | Read @clash-manifest.json@ and create a TCL script to instantiate relevant
 -- IP, read sources.
