@@ -101,7 +101,8 @@ suite:cores:
   extends: .test-common-local
   script:
     - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-    - cabal v2-run -- clash-testsuite -j$THREADS -p Cores --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+    # TODO: Change 'Vector' to 'Cores' after merging #2270
+    - cabal v2-run -- clash-testsuite -j$THREADS -p Vector --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
   tags:
     - local
     - vivado-2022.1-standard
