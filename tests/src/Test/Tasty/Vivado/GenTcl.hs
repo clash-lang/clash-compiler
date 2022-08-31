@@ -30,8 +30,6 @@ data HdlSource = HdlSource
   , hdlFile :: FilePath
   } deriving Show
 
-type SimProj = [HdlSource]
-
 -- | Given a file from a Manifest file, convert it into a more digestible 'HdlSource'
 -- data structure. Supports all file types mentioned in 'SourceType'.
 toHdlSource ::
@@ -54,8 +52,8 @@ toHdlSource dir lib filename
 
 -- | Convert all generated files into 'HdlSource's for a given HDL directory and
 -- corresponding 'Manifest'.
-asSimProj :: LocatedManifest -> [HdlSource]
-asSimProj manifest@LocatedManifest{lmManifest}=
+manifestToHdlSources :: LocatedManifest -> [HdlSource]
+manifestToHdlSources manifest@LocatedManifest{lmManifest}=
   let
     paths = fst <$> fileNames lmManifest
     lib = topComponent lmManifest
@@ -75,13 +73,13 @@ simProjFromClashEntities ::
   FilePath ->
   -- | Qualified name
   String ->
-  IO SimProj
+  IO [HdlSource]
 simProjFromClashEntities hdlDir qualName = do
   let manifestPath = hdlDir </> qualName </> "clash-manifest.json"
   [(_, mHdl)] <- getManifests manifestPath
   let deps = T.unpack <$> transitiveDependencies mHdl
   nextSimProj <- traverse (simProjFromClashEntities hdlDir) deps
-  pure $ mconcat nextSimProj <> asSimProj (LocatedManifest manifestPath mHdl)
+  pure $ mconcat nextSimProj <> manifestToHdlSources (LocatedManifest manifestPath mHdl)
 
 -- | Read @clash-manifest.json@ and create a TCL script to instantiate relevant
 -- IP, read sources.
@@ -106,9 +104,9 @@ mkTcl ::
   FilePath ->
   -- | Entity
   String ->
-  SimProj ->
+  [HdlSource] ->
   String
-mkTcl cabalDir entity sp =
+mkTcl cabalDir entity hdlSources =
   [i|
 set_msg_config -severity {CRITICAL WARNING} -new_severity ERROR
 
@@ -151,14 +149,15 @@ launch_simulation
 |]
  where
   tclDataFile = cabalDir </> "data-files" </> "tcl" </> "clash_namespace.tcl"
+
   loadTclIfs =
-    flip concatMap sp $ \HdlSource{..} ->
+    flip concatMap hdlSources $ \HdlSource{..} ->
       case hdlType of
         TclSource -> [i|clash::loadTclIface {#{hdlLib}} {#{hdlFile}}\n|]
         _ -> []
 
   readSources =
-    flip concatMap sp $ \HdlSource{..} ->
+    flip concatMap hdlSources $ \HdlSource{..} ->
       case hdlType of
         VhdlSource ->
           [i|read_vhdl -library {#{hdlLib}} {#{hdlFile}}\n|]
