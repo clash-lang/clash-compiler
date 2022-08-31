@@ -11,6 +11,7 @@ import Data.Char (isLower)
 import Data.List (isSuffixOf)
 import Data.Maybe (mapMaybe)
 import Data.String.Interpolate (i)
+import Data.String.Interpolate.Util (unindent)
 import System.FilePath ((</>))
 
 import Clash.Driver.LocatedManifest
@@ -100,18 +101,16 @@ tclFromManifest ::
 tclFromManifest src moduleName entity = do
   proj <- simProjFromClashEntities src (moduleName ++ "." ++ hsEntity)
   cabalDir <- getDataDir
-  pure $ mkTcl cabalDir entity proj
+  pure $ mkSimulationTcl cabalDir entity proj
  where
   hsEntity = T.unpack (stripEntity (T.pack entity))
 
-mkTcl ::
+mkBaseTcl ::
   -- | Cabal @data@ dir
   FilePath ->
-  -- | Entity
-  String ->
   [HdlSource] ->
   String
-mkTcl cabalDir entity hdlSources =
+mkBaseTcl cabalDir hdlSources =
   [i|
 set_msg_config -severity {CRITICAL WARNING} -new_severity ERROR
 
@@ -143,14 +142,6 @@ if {$tmpclash::ips ne {}} {
   ++ [i|
 # Compiler doesn't topologically sort source files (bug)
 update_compile_order -fileset [current_fileset]
-
-set_property TOP {#{entity}} [current_fileset -sim]
-
-save_project_as sim project -force
-
-set_property RUNTIME all [current_fileset -sim]
-
-launch_simulation
 |]
  where
   tclDataFile = cabalDir </> "data-files" </> "tcl" </> "clash_namespace.tcl"
@@ -169,3 +160,21 @@ launch_simulation
         VerilogSource ->
           [i|read_verilog {#{hdlFile}}\n|]
         _ -> []
+
+mkSimulationTcl ::
+  -- | Cabal @data@ dir
+  FilePath ->
+  -- | Entity
+  String ->
+  [HdlSource] ->
+  String
+mkSimulationTcl cabalDir entity hdlSources =
+  mkBaseTcl cabalDir hdlSources <> unindent [i|
+    set_property TOP {#{entity}} [current_fileset -sim]
+
+    save_project_as sim project -force
+
+    set_property RUNTIME all [current_fileset -sim]
+
+    launch_simulation
+  |]
