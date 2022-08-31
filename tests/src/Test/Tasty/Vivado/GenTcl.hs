@@ -5,21 +5,21 @@
 -- | Generate a TCL script to simulate generated VHDL
 --
 -- Run with @vivado -mode batch -source ...@
-module Test.Tasty.Vivado.GenTcl ( HdlSource (..), tclFromManifest ) where
+module Test.Tasty.Vivado.GenTcl where
 
 import Data.Char (isLower)
 import Data.List (isSuffixOf)
 import Data.Maybe (mapMaybe)
-import qualified Data.Text as T
 import Data.String.Interpolate (i)
 import System.FilePath ((</>))
 
+import Clash.Driver.LocatedManifest
+  (LocatedManifest (..), entityDirectory, manifestLocationFromStrName)
 import Clash.Driver.Manifest (Manifest (..))
-import Clash.Driver.LocatedManifest (LocatedManifest (..), entityDirectory)
-
 import Paths_clash_testsuite (getDataDir)
 import Test.Tasty.Common (getManifests)
 
+import qualified Data.Text as T
 
 data SourceType = VhdlSource | VerilogSource | SystemVerilogSource | TclSource
   deriving (Eq, Show)
@@ -60,6 +60,11 @@ manifestToHdlSources manifest@LocatedManifest{lmManifest}=
   in
     mapMaybe (toHdlSource (entityDirectory manifest) lib) paths
 
+-- | Convert all generated files into 'HdlSource's for a given HDL directory and
+-- corresponding 'Manifest's.
+manifestsToHdlSources :: [LocatedManifest] -> [HdlSource]
+manifestsToHdlSources = concatMap manifestToHdlSources
+
 -- | From @PortProductsSum_testBench@, extract @testBench@ (for instance)
 stripEntity ::
   T.Text ->
@@ -75,7 +80,7 @@ simProjFromClashEntities ::
   String ->
   IO [HdlSource]
 simProjFromClashEntities hdlDir qualName = do
-  let manifestPath = hdlDir </> qualName </> "clash-manifest.json"
+  let manifestPath = manifestLocationFromStrName hdlDir qualName
   [(_, mHdl)] <- getManifests manifestPath
   let deps = T.unpack <$> transitiveDependencies mHdl
   nextSimProj <- traverse (simProjFromClashEntities hdlDir) deps
