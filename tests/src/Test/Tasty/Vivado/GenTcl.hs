@@ -84,6 +84,9 @@ simProjFromClashEntities hdlDir qualName = do
   let manifestPath = manifestLocationFromStrName hdlDir qualName
   [(_, mHdl)] <- getManifests manifestPath
   let deps = T.unpack <$> transitiveDependencies mHdl
+  -- XXX: 'transitiveDependencies' contains a flat list of the whole dependency
+  --      tree. Reinvoking 'simProjFromClashEntities' therefore risks duplicate
+  --      'HdlSource' entries.
   nextSimProj <- traverse (simProjFromClashEntities hdlDir) deps
   pure $ mconcat nextSimProj <> manifestToHdlSources (LocatedManifest manifestPath mHdl)
 
