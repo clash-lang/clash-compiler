@@ -152,15 +152,16 @@ launch_simulation
  where
   tclDataFile = cabalDir </> "data-files" </> "tcl" </> "clash_namespace.tcl"
   loadTclIfs =
-    concatMap (\HdlSource{..} -> case hdlType of
+    flip concatMap sp $ \HdlSource{..} ->
+      case hdlType of
         TclSource -> [i|clash::loadTclIface {#{hdlLib}} {#{hdlFile}}\n|]
         _ -> []
-      ) sp
+
   readSources =
-    concatMap (\HdlSource{..} -> case hdlType of
+    flip concatMap sp $ \HdlSource{..} ->
+      case hdlType of
         VhdlSource ->
           [i|read_vhdl -library {#{hdlLib}} {#{hdlFile}}\n|]
         VerilogSource ->
           [i|read_verilog {#{hdlFile}}\n|]
         _ -> []
-      ) sp
