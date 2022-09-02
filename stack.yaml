@@ -1,4 +1,4 @@
-resolver: lts-18.24
+resolver: lts-19.21
 
 packages:
 - clash-prelude
