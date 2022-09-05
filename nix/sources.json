@@ -5,10 +5,10 @@
         "homepage": null,
         "owner": "martijnbastiaan",
         "repo": "doctest-parallel",
-        "rev": "f75c2973f889ef99f0458317430641148ad8b1ea",
-        "sha256": "0rp0gag4vy4pxx2hlyxp73kdy99ikvpb17zq8nr9b5zc2k50a5sf",
+        "rev": "36c82ff2c7b18b265a680ffd22e38786184cee62",
+        "sha256": "1fc7ir9gniqcbcpi3wwkmz9qvcgcxbikrsxngs45gy7xp3bqxj2w",
         "type": "tarball",
-        "url": "https://github.com/martijnbastiaan/doctest-parallel/archive/f75c2973f889ef99f0458317430641148ad8b1ea.tar.gz",
+        "url": "https://github.com/martijnbastiaan/doctest-parallel/archive/36c82ff2c7b18b265a680ffd22e38786184cee62.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "ghc-tcplugins-extra": {
@@ -17,10 +17,10 @@
         "homepage": null,
         "owner": "clash-lang",
         "repo": "ghc-tcplugins-extra",
-        "rev": "380e4510ae94e6b6cfb1bcacf633437e2c7226a4",
-        "sha256": "0fwfjvqw4k9lk23xrysiw54khfcif2s2cg52zwkgd0wbhjg6rrmd",
+        "rev": "631facf6160f87e481c25ea76094c8a01d85f990",
+        "sha256": "0mhf86japnxrqahlj68w4s12lss637pi3xyysvaz0xrf4yr1wa1m",
         "type": "tarball",
-        "url": "https://github.com/clash-lang/ghc-tcplugins-extra/archive/380e4510ae94e6b6cfb1bcacf633437e2c7226a4.tar.gz",
+        "url": "https://github.com/clash-lang/ghc-tcplugins-extra/archive/631facf6160f87e481c25ea76094c8a01d85f990.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "ghc-typelits-extra": {
@@ -29,10 +29,10 @@
         "homepage": null,
         "owner": "clash-lang",
         "repo": "ghc-typelits-extra",
-        "rev": "2f1ee7c0e5322177b8a20151d51b358dd2691b1f",
-        "sha256": "04akli0l7xd49hl0k23xbwhpijsl33jd59dcpkrnfjljby7nd398",
+        "rev": "fe80881503c8ba80c86f17fbdaf481dcd1304d44",
+        "sha256": "1vg9kj34iyjdbmvs71nr3jh11r963an1c8vcx4j1zr3w8h3sbjkj",
         "type": "tarball",
-        "url": "https://github.com/clash-lang/ghc-typelits-extra/archive/2f1ee7c0e5322177b8a20151d51b358dd2691b1f.tar.gz",
+        "url": "https://github.com/clash-lang/ghc-typelits-extra/archive/fe80881503c8ba80c86f17fbdaf481dcd1304d44.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "ghc-typelits-knownnat": {
@@ -41,10 +41,10 @@
         "homepage": null,
         "owner": "clash-lang",
         "repo": "ghc-typelits-knownnat",
-        "rev": "7801a3485769eb26ee7a00d1e4989a04b19a1850",
-        "sha256": "1m0kmkgcw0kf6w95fg8cf29r50i1br4xp078iwf3hkb1kzs9z9m7",
+        "rev": "fb94131ac8beaf6167fc2cc5f94602cc881950df",
+        "sha256": "1mknsldr99qp4494vxqdjw0v97mzjhsmi3mfcp0h5qbdv11z1qhc",
         "type": "tarball",
-        "url": "https://github.com/clash-lang/ghc-typelits-knownnat/archive/7801a3485769eb26ee7a00d1e4989a04b19a1850.tar.gz",
+        "url": "https://github.com/clash-lang/ghc-typelits-knownnat/archive/fb94131ac8beaf6167fc2cc5f94602cc881950df.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "ghc-typelits-natnormalise": {
@@ -53,10 +53,46 @@
         "homepage": null,
         "owner": "clash-lang",
         "repo": "ghc-typelits-natnormalise",
-        "rev": "91d80e63378ac4009f0475f54c54f81eca4de0ed",
-        "sha256": "1dy9kilvc9nfql64fs79pxaa57dh8dvhkmlx79ghwlgxn6v2ksva",
+        "rev": "48c69dfe3e7c523b1e5268008571fd17d89d2d58",
+        "sha256": "0r0ky6fcwpabj2kdb8yb8h4731vc06qz3gf89c44mjc042pnmd5q",
         "type": "tarball",
-        "url": "https://github.com/clash-lang/ghc-typelits-natnormalise/archive/91d80e63378ac4009f0475f54c54f81eca4de0ed.tar.gz",
+        "url": "https://github.com/clash-lang/ghc-typelits-natnormalise/archive/48c69dfe3e7c523b1e5268008571fd17d89d2d58.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "gitignore": {
+        "branch": "master",
+        "description": "Nix function for filtering local git sources",
+        "homepage": "",
+        "owner": "hercules-ci",
+        "repo": "gitignore",
+        "rev": "a20de23b925fd8264fd7fad6454652e142fd7f73",
+        "sha256": "07vg2i9va38zbld9abs9lzqblz193vc5wvqd6h7amkmwf66ljcgh",
+        "type": "tarball",
+        "url": "https://github.com/hercules-ci/gitignore/archive/a20de23b925fd8264fd7fad6454652e142fd7f73.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "niv": {
+        "branch": "master",
+        "description": "Easy dependency management for Nix projects",
+        "homepage": "https://github.com/nmattia/niv",
+        "owner": "nmattia",
+        "repo": "niv",
+        "rev": "82e5cd1ad3c387863f0545d7591512e76ab0fc41",
+        "sha256": "090l219mzc0gi33i3psgph6s2pwsc8qy4lyrqjdj4qzkvmaj65a7",
+        "type": "tarball",
+        "url": "https://github.com/nmattia/niv/archive/82e5cd1ad3c387863f0545d7591512e76ab0fc41.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "nixpkgs": {
+        "branch": "release-22.05",
+        "description": "Nixpkgs/NixOS branches that track the Nixpkgs/NixOS channels",
+        "homepage": null,
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "3321eea12a97a31a04b419108564ca1b8cca193c",
+        "sha256": "12pil3zaq7ap9q9782zqxgbr1b8mwlnc0mwlbh0paacbgkgc3sbf",
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/3321eea12a97a31a04b419108564ca1b8cca193c.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "tasty-hedgehog": {
@@ -66,41 +102,5 @@
         "type": "tarball",
         "url": "https://hackage.haskell.org/package/tasty-hedgehog-1.2.0.0/tasty-hedgehog-1.2.0.0.tar.gz",
         "url_template": "https://hackage.haskell.org/package/tasty-hedgehog-<rev>/tasty-hedgehog-<rev>.tar.gz"
-    },
-    "gitignore": {
-        "branch": "master",
-        "description": "Nix function for filtering local git sources",
-        "homepage": "",
-        "owner": "hercules-ci",
-        "repo": "gitignore",
-        "rev": "c4662e662462e7bf3c2a968483478a665d00e717",
-        "sha256": "1npnx0h6bd0d7ql93ka7azhj40zgjp815fw2r6smg8ch9p7mzdlx",
-        "type": "tarball",
-        "url": "https://github.com/hercules-ci/gitignore/archive/c4662e662462e7bf3c2a968483478a665d00e717.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
-    "niv": {
-        "branch": "master",
-        "description": "Easy dependency management for Nix projects",
-        "homepage": "https://github.com/nmattia/niv",
-        "owner": "nmattia",
-        "repo": "niv",
-        "rev": "9d35b9e4837ab88517210b1701127612c260eccf",
-        "sha256": "0q50xhnm8g2yfyakrh0nly4swyygxpi0a8cb9gp65wcakcgvzvdh",
-        "type": "tarball",
-        "url": "https://github.com/nmattia/niv/archive/9d35b9e4837ab88517210b1701127612c260eccf.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
-    "nixpkgs": {
-        "branch": "nixos-20.09",
-        "description": "Nixpkgs/NixOS branches that track the Nixpkgs/NixOS channels",
-        "homepage": null,
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "edb26126d98bc696f4f3e206583faa65d3d6e818",
-        "sha256": "1cl4ka4kk7kh3bl78g06dhiidazf65q8miyzaxi9930d6gwyzkci",
-        "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/edb26126d98bc696f4f3e206583faa65d3d6e818.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }

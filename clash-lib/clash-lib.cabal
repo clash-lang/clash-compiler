@@ -51,7 +51,7 @@ Author:               The Clash Authors
 Maintainer:           QBayLogic B.V. <devops@qbaylogic.com>
 Copyright:            Copyright © 2012-2016, University of Twente,
                                   2016-2019, Myrtle Software Ltd,
-                                  2017-2019, QBayLogic B.V., Google Inc.
+                                  2017-2022, QBayLogic B.V., Google Inc.
 Category:             Hardware
 Build-type:           Simple
 
@@ -61,6 +61,7 @@ Extra-source-files:
   src/ClashDebug.h
 
 Data-files:
+  data-files/tcl/clashConnector.tcl
   prims/common/*.primitives.yaml,
   prims/commonverilog/*.primitives.yaml,
   prims/verilog/*.primitives.yaml,
@@ -211,6 +212,8 @@ Library
                       Clash.Core.Var
                       Clash.Core.VarEnv
 
+                      Clash.DataFiles
+
                       Clash.Debug
 
                       Clash.Driver
@@ -315,6 +318,19 @@ executable v16-upgrade-primitives
     directory,
     stringsearch,
     Glob
+  GHC-Options:        -Wall -Wcompat
+  default-language:   Haskell2010
+
+executable static-files
+  Main-Is:            tools/static-files.hs
+  Build-Depends:
+    base,
+    clash-lib,
+    directory,
+    docopt                  ^>= 0.7,
+    extra,
+    filepath
+  Other-Modules:      Paths_clash_lib
   GHC-Options:        -Wall -Wcompat
   default-language:   Haskell2010
 
