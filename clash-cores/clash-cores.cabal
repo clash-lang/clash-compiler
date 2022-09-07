@@ -10,6 +10,7 @@ license-file:        LICENSE
 author:              QBayLogic B.V.
 maintainer:          devops@qbaylogic.com
 copyright:           Copyright © 2019, Foamspace Corp.
+                                 2022, QBayLogic B.V.
 category:            Hardware
 build-type:          Simple
 extra-source-files:  CHANGELOG.md
@@ -66,7 +67,7 @@ common basic-config
     ghc-typelits-natnormalise >= 0.6,
     ghc-typelits-extra        >= 0.3.2,
     ghc-typelits-knownnat     >= 0.6,
-    interpolate               >= 0.2,
+    string-interpolate        ^>= 0.3,
     QuickCheck,
     template-haskell
 

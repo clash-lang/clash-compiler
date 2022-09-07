@@ -22,7 +22,7 @@ import Clash.Netlist.Util
 
 import Control.Monad.State
 import Data.Monoid (Ap(getAp))
-import qualified Data.String.Interpolate.IsString as I
+import qualified Data.String.Interpolate as I
 import Data.Text.Prettyprint.Doc.Extra
 
 import qualified Data.Text as TextS
@@ -170,79 +170,81 @@ altpllQsysTemplate bbCtx = pure bbText
   -- "altpll" IP. Module parameters were then stripped on a trial-and-error
   -- basis to get a template that has the minimal number of parameters, but
   -- still has the desired, working, configuration.
-  bbText = [I.i|<?xml version="1.0" encoding="UTF-8"?>
-<system name="$${FILENAME}">
-  <module
-    name="altpll0"
-    kind="altpll"
-    enabled="1"
-    autoexport="1">
-  <parameter name="AVALON_USE_SEPARATE_SYSCLK" value="NO" />
-  <parameter name="BANDWIDTH" value="" />
-  <parameter name="BANDWIDTH_TYPE" value="AUTO" />
-  <parameter name="CLK0_DIVIDE_BY" value="#{clkdiv}" />
-  <parameter name="CLK0_DUTY_CYCLE" value="50" />
-  <parameter name="CLK0_MULTIPLY_BY" value="#{clkmult}" />
-  <parameter name="CLK0_PHASE_SHIFT" value="0" />
-  <parameter name="COMPENSATE_CLOCK" value="CLK0" />
-  <parameter name="INCLK0_INPUT_FREQUENCY" value="#{clkInPeriod}" />
-  <parameter name="OPERATION_MODE" value="NORMAL" />
-  <parameter name="PLL_TYPE" value="AUTO" />
-  <parameter name="PORT_ARESET" value="PORT_USED" />
-  <parameter name="PORT_INCLK0" value="PORT_USED" />
-  <parameter name="PORT_LOCKED" value="PORT_USED" />
-  <parameter name="PORT_clk0" value="PORT_USED" />
-  <parameter name="HIDDEN_IS_FIRST_EDIT" value="0" />
-  <parameter name="HIDDEN_CONSTANTS">
-    CT#PORT_clk0 PORT_USED
-    CT#CLK0_MULTIPLY_BY #{clkmult}
-    CT#WIDTH_CLOCK 5
-    CT#LPM_TYPE altpll
-    CT#PLL_TYPE AUTO
-    CT#CLK0_PHASE_SHIFT 0
-    CT#OPERATION_MODE NORMAL
-    CT#COMPENSATE_CLOCK CLK0
-    CT#INCLK0_INPUT_FREQUENCY #{clkInPeriod}
-    CT#PORT_INCLK0 PORT_USED
-    CT#PORT_ARESET PORT_USED
-    CT#BANDWIDTH_TYPE AUTO
-    CT#CLK0_DUTY_CYCLE 50
-    CT#CLK0_DIVIDE_BY #{clkdiv}
-    CT#PORT_LOCKED PORT_USED</parameter>
-  <parameter name="HIDDEN_IF_PORTS">
-    IF#phasecounterselect {input 4}
-    IF#locked {output 0}
-    IF#reset {input 0}
-    IF#clk {input 0}
-    IF#phaseupdown {input 0}
-    IF#scandone {output 0}
-    IF#readdata {output 32}
-    IF#write {input 0}
-    IF#scanclk {input 0}
-    IF#phasedone {output 0}
-    IF#address {input 2}
-    IF#c0 {output 0}
-    IF#writedata {input 32}
-    IF#read {input 0}
-    IF#areset {input 0}
-    IF#scanclkena {input 0}
-    IF#scandataout {output 0}
-    IF#configupdate {input 0}
-    IF#phasestep {input 0}
-    IF#scandata {input 0}</parameter>
-  <parameter name="HIDDEN_MF_PORTS">
-    MF#areset 1
-    MF#clk 1
-    MF#locked 1
-    MF#inclk 1</parameter>
-  <parameter name="HIDDEN_PRIVATES">
-    PT#PHASE_SHIFT0 0.00000000
-    PT#DIV_FACTOR0 #{clkdiv}
-    PT#EFF_OUTPUT_FREQ_VALUE0 #{clkOutFreq}
-    PT#MULT_FACTOR0 #{clkmult}
-    PT#DUTY_CYCLE0 50.00000000</parameter>
-  </module>
-</system>|]
+  bbText = [I.__i|
+    <?xml version="1.0" encoding="UTF-8"?>
+    <system name="$${FILENAME}">
+      <module
+        name="altpll0"
+        kind="altpll"
+        enabled="1"
+        autoexport="1">
+      <parameter name="AVALON_USE_SEPARATE_SYSCLK" value="NO" />
+      <parameter name="BANDWIDTH" value="" />
+      <parameter name="BANDWIDTH_TYPE" value="AUTO" />
+      <parameter name="CLK0_DIVIDE_BY" value="#{clkdiv}" />
+      <parameter name="CLK0_DUTY_CYCLE" value="50" />
+      <parameter name="CLK0_MULTIPLY_BY" value="#{clkmult}" />
+      <parameter name="CLK0_PHASE_SHIFT" value="0" />
+      <parameter name="COMPENSATE_CLOCK" value="CLK0" />
+      <parameter name="INCLK0_INPUT_FREQUENCY" value="#{clkInPeriod}" />
+      <parameter name="OPERATION_MODE" value="NORMAL" />
+      <parameter name="PLL_TYPE" value="AUTO" />
+      <parameter name="PORT_ARESET" value="PORT_USED" />
+      <parameter name="PORT_INCLK0" value="PORT_USED" />
+      <parameter name="PORT_LOCKED" value="PORT_USED" />
+      <parameter name="PORT_clk0" value="PORT_USED" />
+      <parameter name="HIDDEN_IS_FIRST_EDIT" value="0" />
+      <parameter name="HIDDEN_CONSTANTS">
+        CT\#PORT_clk0 PORT_USED
+        CT\#CLK0_MULTIPLY_BY #{clkmult}
+        CT\#WIDTH_CLOCK 5
+        CT\#LPM_TYPE altpll
+        CT\#PLL_TYPE AUTO
+        CT\#CLK0_PHASE_SHIFT 0
+        CT\#OPERATION_MODE NORMAL
+        CT\#COMPENSATE_CLOCK CLK0
+        CT\#INCLK0_INPUT_FREQUENCY #{clkInPeriod}
+        CT\#PORT_INCLK0 PORT_USED
+        CT\#PORT_ARESET PORT_USED
+        CT\#BANDWIDTH_TYPE AUTO
+        CT\#CLK0_DUTY_CYCLE 50
+        CT\#CLK0_DIVIDE_BY #{clkdiv}
+        CT\#PORT_LOCKED PORT_USED</parameter>
+      <parameter name="HIDDEN_IF_PORTS">
+        IF\#phasecounterselect {input 4}
+        IF\#locked {output 0}
+        IF\#reset {input 0}
+        IF\#clk {input 0}
+        IF\#phaseupdown {input 0}
+        IF\#scandone {output 0}
+        IF\#readdata {output 32}
+        IF\#write {input 0}
+        IF\#scanclk {input 0}
+        IF\#phasedone {output 0}
+        IF\#address {input 2}
+        IF\#c0 {output 0}
+        IF\#writedata {input 32}
+        IF\#read {input 0}
+        IF\#areset {input 0}
+        IF\#scanclkena {input 0}
+        IF\#scandataout {output 0}
+        IF\#configupdate {input 0}
+        IF\#phasestep {input 0}
+        IF\#scandata {input 0}</parameter>
+      <parameter name="HIDDEN_MF_PORTS">
+        MF\#areset 1
+        MF\#clk 1
+        MF\#locked 1
+        MF\#inclk 1</parameter>
+      <parameter name="HIDDEN_PRIVATES">
+        PT\#PHASE_SHIFT0 0.00000000
+        PT\#DIV_FACTOR0 #{clkdiv}
+        PT\#EFF_OUTPUT_FREQ_VALUE0 #{clkOutFreq}
+        PT\#MULT_FACTOR0 #{clkmult}
+        PT\#DUTY_CYCLE0 50.00000000</parameter>
+      </module>
+    </system>
+    |]
 
 alteraPllQsysTemplate
   :: Backend s
@@ -260,25 +262,27 @@ alteraPllQsysTemplate bbCtx = pure bbText
     = (1.0 / (fromInteger p * 1.0e-12 :: Double)) / 1e6
   cklFreq _ = error "internal error: not a KnownDomain"
 
-  clkOuts = TextS.unlines
-    [[I.i|<parameter name="gui_output_clock_frequency#{n}" value="#{f}"/>|]
+  clkOuts = TextS.intercalate "\n"
+    [[I.i|  <parameter name="gui_output_clock_frequency#{n}" value="#{f}"/>|]
     | (n,f) <- zip [(0 :: Word)..] (map cklFreq kdOuts)
     ]
 
   -- See Note [QSys file templates] on how this qsys template was derived.
-  bbText = [I.i|<?xml version="1.0" encoding="UTF-8"?>
-<system name="$${FILENAME}">
- <module
-    name="pll_0"
-    kind="altera_pll"
-    enabled="1"
-    autoexport="1">
-  <parameter name="gui_feedback_clock" value="Global Clock" />
-  <parameter name="gui_number_of_clocks" value="#{length kdOuts}" />
-  <parameter name="gui_operation_mode" value="direct" />
-  #{clkOuts}
-  <parameter name="gui_pll_mode" value="Integer-N PLL" />
-  <parameter name="gui_reference_clock_frequency" value="#{cklFreq kdIn}" />
-  <parameter name="gui_use_locked" value="true" />
- </module>
-</system>|]
+  bbText = [I.__i|
+    <?xml version="1.0" encoding="UTF-8"?>
+    <system name="$${FILENAME}">
+     <module
+        name="pll_0"
+        kind="altera_pll"
+        enabled="1"
+        autoexport="1">
+      <parameter name="gui_feedback_clock" value="Global Clock" />
+      <parameter name="gui_number_of_clocks" value="#{length kdOuts}" />
+      <parameter name="gui_operation_mode" value="direct" />
+    #{clkOuts}
+      <parameter name="gui_pll_mode" value="Integer-N PLL" />
+      <parameter name="gui_reference_clock_frequency" value="#{cklFreq kdIn}" />
+      <parameter name="gui_use_locked" value="true" />
+     </module>
+    </system>
+    |]

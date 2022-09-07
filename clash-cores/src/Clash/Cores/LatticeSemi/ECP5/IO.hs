@@ -1,5 +1,6 @@
 {-|
   Copyright   :  (C) 2020, Foamspace corp & Christoph Mayer
+                     2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  hcab14@gmail.com
 
@@ -20,8 +21,7 @@ module Clash.Cores.LatticeSemi.ECP5.IO
 import           Clash.Annotations.Primitive  (Primitive(..), HDL(..), hasBlackBox)
 import           Clash.Prelude
 import           Clash.Signal.BiSignal
-import           Data.String.Interpolate      (i)
-import           Data.String.Interpolate.Util (unindent)
+import           Data.String.Interpolate      (__i)
 import           GHC.Stack                    (HasCallStack())
 
 -- | BB primitive
@@ -76,13 +76,10 @@ bbECP5 _intrinsicName pkgPinIn output notOutputEnable
      toMaybe False _ = Nothing
 {-# NOINLINE bbECP5 #-}
 {-# ANN bbECP5 hasBlackBox #-}
-{-# ANN bbECP5 (InlinePrimitive [VHDL,Verilog,SystemVerilog] $ unindent [i|
-   [ { "BlackBox" :
-        { "name" : "Clash.Cores.LatticeSemi.ECP5.IO.bbECP5",
-          "kind" : "Declaration",
-          "format": "Haskell",
-          "templateFunction": "Clash.Cores.LatticeSemi.ECP5.Blackboxes.IO.bbTF"
-        }
-     }
-   ]
-   |]) #-}
+{-# ANN bbECP5 (InlineYamlPrimitive [VHDL,Verilog,SystemVerilog] [__i|
+  BlackBox:
+    name: Clash.Cores.LatticeSemi.ECP5.IO.bbECP5
+    kind: Declaration
+    format: Haskell
+    templateFunction: Clash.Cores.LatticeSemi.ECP5.Blackboxes.IO.bbTF
+  |]) #-}

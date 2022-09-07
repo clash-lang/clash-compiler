@@ -112,7 +112,6 @@ import           Clash.Netlist.Types             hiding (Component, toBit)
 import           Clash.Netlist.Util
 import           Clash.Util                      (clogBase)
 import qualified Data.String.Interpolate         as I
-import           Data.String.Interpolate.Util    (unindent)
 import           Language.Haskell.TH             (Name)
 import           Prelude
 
@@ -145,7 +144,7 @@ instance Default BlackBoxHaskellOpts where
 -- | Create a blackBoxHaskell primitive. To be used as part of an annotation:
 --
 -- @
--- {-\# ANN myFunction (blackBoxHaskell 'myFunction 'myBBF def{_ignoredArguments=[1,2]}) \#-}
+-- {-\# ANN myFunction (blackBoxHaskell 'myFunction 'myBBF def{bo_ignoredArguments=[1,2]}) \#-}
 -- @
 --
 -- @[1,2]@ would mean this blackbox __ignores__ its second and third argument.
@@ -158,19 +157,17 @@ blackBoxHaskell
   -- ^ Options, see data structure for more information
   -> Primitive
 blackBoxHaskell bb tf BlackBoxHaskellOpts{..} =
-  InlinePrimitive bo_supportedHdls $ unindent [I.i|
-  [ { "BlackBoxHaskell" :
-      { "name" : "#{bb}"
-      , "templateFunction" : "#{tf}"
-      , "ignoredArguments" : #{show bo_ignoredArguments}
-      , "multiResult" : #{toJsonBool bo_multiResult}
-      }
-    }
-  ] |]
+  InlineYamlPrimitive bo_supportedHdls [I.__i|
+    BlackBoxHaskell:
+      name: #{bb}
+      templateFunction: #{tf}
+      ignoredArguments : #{bo_ignoredArguments}
+      multiResult : #{toYamlBool bo_multiResult}
+    |]
  where
-  toJsonBool :: Bool -> String
-  toJsonBool True = "true"
-  toJsonBool False = "false"
+  toYamlBool :: Bool -> String
+  toYamlBool True = "true"
+  toYamlBool False = "false"
 
 -- | The state of a block. Contains a list of declarations and a the
 --   backend state.

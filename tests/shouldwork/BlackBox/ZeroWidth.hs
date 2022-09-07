@@ -7,8 +7,7 @@ import           Control.Monad                (forM_)
 import           Clash.Annotations.Primitive
 import           Clash.Prelude
 import           GHC.Exts
-import           Data.String.Interpolate      (i)
-import           Data.String.Interpolate.Util (unindent)
+import           Data.String.Interpolate      (__i)
 import           Data.List                    (isInfixOf)
 import           System.Environment           (getArgs)
 import           System.FilePath              ((</>), takeDirectory)
@@ -24,7 +23,7 @@ answer = "A nervous wreck."
 comment :: String -> ()
 comment !_s = ()
 {-# NOINLINE comment #-}
-{-# ANN comment (InlinePrimitive [VHDL] $ unindent [i|
+{-# ANN comment (InlinePrimitive [VHDL] [__i|
   [ { "BlackBox" :
       { "name"      : "ZeroWidth.comment"
       , "kind"      : "Declaration"

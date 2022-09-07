@@ -6,8 +6,7 @@ import           Clash.Prelude
 import           Clash.Explicit.Testbench
 import           Clash.Annotations.Primitive
 
-import           Data.String.Interpolate.IsString (i)
-import           Data.String.Interpolate.Util     (unindent)
+import           Data.String.Interpolate (__i)
 
 testEnable :: Signal System Bool
 testEnable = testAlwaysEnabled enableGen
@@ -19,7 +18,7 @@ testAlwaysEnabled
   -> Signal System Bool
 testAlwaysEnabled !_ = pure True
 {-# NOINLINE testAlwaysEnabled #-}
-{-# ANN testAlwaysEnabled (InlinePrimitive [VHDL] $ unindent [i|
+{-# ANN testAlwaysEnabled (InlinePrimitive [VHDL] [__i|
   [ { "BlackBox" :
       { "name"      : "T1786.testAlwaysEnabled"
       , "kind"      : "Expression"
@@ -48,7 +47,7 @@ testAlwaysEnabledBool
   -> Signal System Bool
 testAlwaysEnabledBool !_ = pure True
 {-# NOINLINE testAlwaysEnabledBool #-}
-{-# ANN testAlwaysEnabledBool (InlinePrimitive [VHDL] $ unindent [i|
+{-# ANN testAlwaysEnabledBool (InlinePrimitive [VHDL] [__i|
   [ { "BlackBox" :
       { "name"      : "T1786.testAlwaysEnabledBool"
       , "kind"      : "Expression"

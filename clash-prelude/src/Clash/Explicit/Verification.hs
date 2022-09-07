@@ -1,5 +1,6 @@
 {-|
 Copyright  :  (C) 2019, Myrtle Software Ltd
+                  2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -12,6 +13,7 @@ The verification API is currently experimental and subject to change.
 -}
 
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Clash.Explicit.Verification
   ( -- * Types
@@ -57,9 +59,10 @@ import           Prelude
 
 import           Data.Text  (Text)
 import           Data.Maybe (Maybe(Just))
+import           Data.String.Interpolate (__i)
 
 import           Clash.Annotations.Primitive
-  (Primitive(InlinePrimitive), HDL(..))
+  (Primitive(InlineYamlPrimitive), HDL(..))
 import           Clash.Signal.Internal (KnownDomain, Signal, Clock, Reset)
 import           Clash.XException      (errorX, hwSeqX)
 
@@ -257,7 +260,11 @@ check !_clk !_rst !_propName !_renderAs !_prop =
       "Simulation for Clash.Verification not yet implemented. If you need this,"
     , " create an issue at https://github.com/clash-compiler/clash-lang/issues." ]))
 {-# NOINLINE check #-}
-{-# ANN check (InlinePrimitive [Verilog, SystemVerilog, VHDL] "[ { \"BlackBoxHaskell\" : { \"name\" : \"Clash.Explicit.Verification.check\", \"templateFunction\" : \"Clash.Primitives.Verification.checkBBF\"}} ]") #-}
+{-# ANN check (InlineYamlPrimitive [Verilog, SystemVerilog, VHDL] [__i|
+  BlackBoxHaskell:
+    name: Clash.Explicit.Verification.check
+    templateFunction: Clash.Primitives.Verification.checkBBF
+  |]) #-}
 
 -- | Same as 'check', but doesn't require a design to explicitly carried to
 -- top-level.

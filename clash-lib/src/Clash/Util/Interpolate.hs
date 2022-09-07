@@ -1,6 +1,6 @@
 {-|
-Copyright  :  (C) 2019, QBayLogic B.V.
-                  2013, Nikita Volkov
+Copyright  :  (C) 2019-2022, QBayLogic B.V.
+                  2013     , Nikita Volkov
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -42,8 +42,8 @@ OTHER DEALINGS IN THE SOFTWARE.
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 
--- TODO: only export the @i@ quasiquotor when `ghcide` stop type-checking
--- exanded quasiquote splices
+-- TODO: only export the @i@ quasiquoter when `ghcide` stops type-checking
+-- expanded quasiquote splices
 module Clash.Util.Interpolate (i, format, toString) where
 
 import           Language.Haskell.Meta.Parse (parseExp)
@@ -203,6 +203,30 @@ nodesToLines =
   joinLiterals (Literal s0:Literal s1:ss) = joinLiterals (Literal (s0 ++ s1):ss)
   joinLiterals (n:ns) = n:joinLiterals ns
 
+{-|
+@i@ will reflow the quasi-quoted text to 90 columns wide. If an interpolation
+variable is on its own line and expands to a multi-line string, the interpolated
+text will be indented the same as the interpolation variable was:
+
+>>> :set -XQuasiQuotes
+>>> :{
+>>> a = "Multi\nLine\nString"
+>>> b = [i|
+>>>     This line will be reflowed
+>>>     and the interpolated
+>>>     multi-line string here:
+>>>         #{a}
+>>>     will be indented. This
+>>>     text is outdented again.
+>>>   |]
+>>> :}
+>>> putStrLn b
+This line will be reflowed and the interpolated multi-line string here:
+    Multi
+    Line
+    String
+will be indented. This text is outdented again.
+-}
 i :: QuasiQuoter
 i = QuasiQuoter {
     quoteExp = (varE 'format `appE`) . toExp . parseNodes . decodeNewlines
@@ -250,6 +274,7 @@ parseNodes = go ""
 
 -------------------------------------------------------------------
 -- Everything below this line is unchanged from neat-interpolate --
+-- apart from updated module identifier strings                  --
 -------------------------------------------------------------------
 decodeNewlines :: String -> String
 decodeNewlines = go
@@ -363,9 +388,9 @@ unescape = go
     readHex :: String -> Int
     readHex xs = case N.readHex xs of
       [(n, "")] -> n
-      _ -> error "Data.String.Interpolate.Util.readHex: no parse"
+      _ -> error $ (show 'unescape) <> " readHex: no parse"
 
     readOct :: String -> Int
     readOct xs = case N.readOct xs of
       [(n, "")] -> n
-      _ -> error "Data.String.Interpolate.Util.readHex: no parse"
+      _ -> error $ (show 'unescape) <> " readOct: no parse"

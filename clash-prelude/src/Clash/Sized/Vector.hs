@@ -137,7 +137,7 @@ import Test.QuickCheck
 import Unsafe.Coerce              (unsafeCoerce)
 
 import Clash.Annotations.Primitive
-  (Primitive(InlinePrimitive), HDL(..), dontTranslate, hasBlackBox)
+  (Primitive(InlineYamlPrimitive), HDL(..), dontTranslate, hasBlackBox)
 import Clash.Promoted.Nat
   (SNat (..), SNatLE (..), UNat (..), compareSNat, leToPlus, pow2SNat,
    snatProxy, snatToInteger, subSNat, withSNat, toUNat, natToInteger)
@@ -1089,7 +1089,11 @@ fold f vs = fold' (toList vs)
       where
         (ys,zs) = P.splitAt (P.length xs `div` 2) xs
 {-# NOINLINE fold #-}
-{-# ANN fold (InlinePrimitive [VHDL,Verilog,SystemVerilog] "[ { \"BlackBoxHaskell\" : { \"name\" : \"Clash.Sized.Vector.fold\", \"templateFunction\" : \"Clash.Primitives.Sized.Vector.foldBBF\"}} ]") #-}
+{-# ANN fold (InlineYamlPrimitive [VHDL,Verilog,SystemVerilog] [I.__i|
+  BlackBoxHaskell:
+    name: Clash.Sized.Vector.fold
+    templateFunction: Clash.Primitives.Sized.Vector.foldBBF
+  |]) #-}
 
 -- | 'scanl' is similar to 'foldl', but returns a vector of successive reduced
 -- values from the left:
@@ -1592,7 +1596,7 @@ iterate :: SNat n -> (a -> a) -> a -> Vec n a
 iterate SNat = iterateI
 {-# INLINE iterate #-}
 
--- | \"'iterate' @f x@\" returns a vector starting with @x@ followed by @n@
+-- | \"'iterateI' @f x@\" returns a vector starting with @x@ followed by @n@
 -- repeated applications of @f@ to @x@, where @n@ is determined by the context.
 --
 -- > iterateI f x :: Vec 3 a == (x :> f x :> f (f x) :> Nil)
@@ -1609,11 +1613,11 @@ iterateI f a = xs
     xs = init (a `Cons` ws)
     ws = map f (lazyV xs)
 {-# NOINLINE iterateI #-}
-{-# ANN iterateI (InlinePrimitive [VHDL,Verilog,SystemVerilog] [I.i| [{
-    "BlackBoxHaskell": {
-        "name": "Clash.Sized.Vector.iterateI"
-      , "templateFunction": "Clash.Primitives.Sized.Vector.iterateBBF"
-    }}] |]) #-}
+{-# ANN iterateI (InlineYamlPrimitive [VHDL,Verilog,SystemVerilog] [I.__i|
+  BlackBoxHaskell:
+    name: Clash.Sized.Vector.iterateI
+    templateFunction: Clash.Primitives.Sized.Vector.iterateBBF
+  |]) #-}
 
 -- | \"'unfoldr @n f s@\" builds a vector of length @n@ from a seed value @s@,
 -- where every element @a@ is created by successive calls of @f@ on @s@. Unlike

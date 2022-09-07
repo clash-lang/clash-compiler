@@ -4,8 +4,7 @@ module T2117 where
 import Clash.Prelude
 import Clash.Explicit.Testbench
 import Clash.Annotations.Primitive
-import Data.String.Interpolate.IsString (i)
-import Data.String.Interpolate.Util (unindent)
+import Data.String.Interpolate (__i)
 
 undefBV
   :: Signal System Bool
@@ -54,7 +53,7 @@ testUndefined
   -> Signal System Bool
 testUndefined !_ = pure True
 {-# NOINLINE testUndefined #-}
-{-# ANN testUndefined (InlinePrimitive [VHDL] $ unindent [i|
+{-# ANN testUndefined (InlinePrimitive [VHDL] [__i|
   [ { "BlackBox" :
       { "name"      : "T2117.testUndefined"
       , "kind"      : "Expression"
@@ -72,7 +71,7 @@ testDefined
   -> Signal System Bool
 testDefined !_ = pure True
 {-# NOINLINE testDefined #-}
-{-# ANN testDefined (InlinePrimitive [VHDL] $ unindent [i|
+{-# ANN testDefined (InlinePrimitive [VHDL] [__i|
   [ { "BlackBox" :
       { "name"      : "T2117.testDefined"
       , "kind"      : "Expression"
