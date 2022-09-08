@@ -1,5 +1,6 @@
 {-|
   Copyright   :  (C) 2019, Foamspace corp
+                     2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -26,8 +27,7 @@ import           GHC.Stack                    (HasCallStack())
 import           Clash.Annotations.Primitive  (Primitive(..), HDL(..), hasBlackBox)
 import           Clash.Prelude
 
-import           Data.String.Interpolate      (i)
-import           Data.String.Interpolate.Util (unindent)
+import           Data.String.Interpolate      (__i)
 
 toMaybe :: Bool -> a -> Maybe a
 toMaybe True a = Just a
@@ -232,13 +232,10 @@ sbio pinConf pkgPinIn latchInput dOut_0 _dOut_1 outputEnable0 =
       (toMaybe <$> outputEnable1 <*> pkgPinWriteInput)
 {-# NOINLINE sbio #-}
 {-# ANN sbio hasBlackBox #-}
-{-# ANN sbio (InlinePrimitive [VHDL,Verilog,SystemVerilog] $ unindent [i|
-   [ { "BlackBox" :
-        { "name" : "Clash.Cores.LatticeSemi.ICE40.IO.sbio",
-          "kind" : "Declaration",
-          "format": "Haskell",
-          "templateFunction": "Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO.sbioTF"
-        }
-     }
-   ]
+{-# ANN sbio (InlineYamlPrimitive [VHDL,Verilog,SystemVerilog] [__i|
+   BlackBox:
+    name: Clash.Cores.LatticeSemi.ICE40.IO.sbio
+    kind: Declaration
+    format: Haskell
+    templateFunction: Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO.sbioTF
    |]) #-}

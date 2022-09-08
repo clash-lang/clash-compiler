@@ -122,7 +122,7 @@ if {$tmpclash::ips ne {}} {
   ++ readSources
 
   ++ [i|
-# Compiler doesn't topologically sort source files (bug)
+\# Compiler doesn't topologically sort source files (bug)
 update_compile_order -fileset [current_fileset]
 
 set_property TOP {#{entity}} [current_fileset -sim]

@@ -1,5 +1,5 @@
 {-|
-Copyright  :  (C) 2021,      QBayLogic B.V.,
+Copyright  :  (C) 2021-2022, QBayLogic B.V.,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -149,7 +149,7 @@ tclTemplate (HasCustom {..}) operType bbCtx = pure bbText
     replicate 25 ' ' ++ name ++ ' ': value ++ " \\\n" ++ s
 
   bbText =
-    fromString [i|create_ip -name floating_point -vendor xilinx.com -library ip \\
+    [i|create_ip -name floating_point -vendor xilinx.com -library ip \\
           -version 7.1 -module_name {#{compName}}
 set_property -dict [list \\
 #{props}                   ] \\

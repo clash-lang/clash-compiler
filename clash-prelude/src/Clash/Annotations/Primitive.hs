@@ -238,8 +238,8 @@ data HDL
 -- === Example of 'InlineYamlPrimitive'
 --
 -- The following example shows off an inline HDL primitive template. It uses the
--- [interpolate](https://hackage.haskell.org/package/interpolate) package for
--- nicer multiline strings.
+-- [string-interpolate](https://hackage.haskell.org/package/string-interpolate)
+-- package for nicer multiline strings.
 --
 -- @
 -- {\-\# LANGUAGE QuasiQuotes \#-\}
@@ -247,20 +247,19 @@ data HDL
 --
 -- import           Clash.Annotations.Primitive
 -- import           Clash.Prelude
--- import           Data.String.Interpolate      (i)
--- import           Data.String.Interpolate.Util (unindent)
+-- import           Data.String.Interpolate      (__i)
 --
--- {\-\# ANN example (InlineYamlPrimitive [VHDL] $ unindent [i|
---  BlackBox:
---    kind: Declaration
---    name: InlinePrimitive.example
---    template: |-
---      -- begin InlinePrimitive example:
---      ~GENSYM[example][0] : block
---      ~RESULT <= 1 + ~ARG[0];
---      end block;
---      end InlinePrimitive example
--- |]) \#-\}
+-- {\-\# ANN example (InlineYamlPrimitive [VHDL] [__i|
+--   BlackBox:
+--     kind: Declaration
+--     name: InlinePrimitive.example
+--     template: |-
+--       -- begin InlinePrimitive example:
+--       ~GENSYM[example][0] : block
+--       ~RESULT <= 1 + ~ARG[0];
+--       end block;
+--       end InlinePrimitive example
+--   |]) \#-\}
 -- {\-\# NOINLINE example \#-\}
 -- example :: Signal System (BitVector 2) -> Signal System (BitVector 2)
 -- example = fmap succ

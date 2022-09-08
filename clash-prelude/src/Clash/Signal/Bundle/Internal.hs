@@ -1,14 +1,16 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Signal.Bundle.Internal (deriveBundleTuples, idPrimitive) where
 
 import           Control.Monad.Extra         (concatMapM)
-import           Clash.Annotations.Primitive (Primitive(InlinePrimitive))
+import           Clash.Annotations.Primitive (Primitive(InlineYamlPrimitive))
 import           Clash.CPP                   (maxTupleSize)
 import           Clash.Signal.Internal       (Signal((:-)))
 import           Clash.XException            (seqX)
 import           Data.List                   (foldl')
+import           Data.String.Interpolate     (__i)
 import qualified Language.Haskell.TH.Syntax  as TH
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Compat
@@ -17,8 +19,11 @@ idPrimitive :: TH.Name -> DecQ
 idPrimitive nm =
   PragmaD . AnnP (ValueAnnotation nm) <$> TH.liftData ip
  where
-  ipJson = "[{\"Primitive\": {\"name\": \"" ++ show nm ++ "\", \"primType\": \"Function\"}}]"
-  ip = InlinePrimitive [minBound..maxBound] ipJson
+  ip = InlineYamlPrimitive [minBound..] [__i|
+         Primitive:
+           name: #{nm}
+           primType: Function
+         |]
 
 -- | Contruct all the tuple instances for Bundle.
 deriveBundleTuples

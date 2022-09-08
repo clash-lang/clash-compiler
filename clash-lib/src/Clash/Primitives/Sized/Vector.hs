@@ -21,13 +21,11 @@ import           Data.List.Extra                    (iterateNM)
 import           Data.Maybe                         (fromMaybe)
 import           Data.Monoid                        (Ap(getAp))
 import           Data.Text.Extra                    (showt)
-import           Data.Text.Lazy                     (pack)
 import           Data.Text.Prettyprint.Doc.Extra
   (Doc, string, renderLazy, layoutPretty, LayoutOptions(..),
    PageWidth(AvailablePerLine))
 import           Text.Trifecta.Result               (Result(Success))
 import qualified Data.String.Interpolate            as I
-import qualified Data.String.Interpolate.Util       as I
 import           GHC.Stack                          (HasCallStack)
 
 import           Clash.Backend
@@ -245,16 +243,16 @@ indexIntVerilog _isD _primName args _ty = return bb
     [_nTy,_aTy,_kn,Left v,Left ix] | isLiteral ix && isVar v ->
       Right (meta TExpr, BBFunction "Clash.Primitives.Sized.Vector.indexIntVerilogTF" 0 indexIntVerilogTF)
     [_nTy,_aTy,_kn,_v,Left ix] | isLiteral ix ->
-      case runParse (pack (I.unindent bbTextLitIx)) of
+      case runParse bbTextLitIx of
         Success t -> Right (meta TDecl, BBTemplate t)
         _         -> Left "internal error: parse fail"
 
     _ ->
-      case runParse (pack (I.unindent bbText)) of
+      case runParse bbText of
         Success t -> Right (meta TDecl, BBTemplate t)
         _         -> Left "internal error: parse fail"
 
-  bbText = [I.i|
+  bbText = [I.__i|
     // index begin
     ~IF~SIZE[~TYP[1]]~THENwire ~TYPO ~GENSYM[vecArray][0] [0:~LIT[0]-1];
     genvar ~GENSYM[i][2];
@@ -264,12 +262,14 @@ indexIntVerilog _isD _primName args _ty = return bb
     end
     ~ENDGENERATE
     assign ~RESULT = ~SYM[0][~ARG[2]];~ELSEassign ~RESULT = ~ERRORO;~FI
-    // index end|]
+    // index end
+    |]
 
-  bbTextLitIx = [I.i|
+  bbTextLitIx = [I.__i|
     // index lit begin
     ~IF~SIZE[~TYP[1]]~THENassign ~RESULT = ~VAR[vec][1][~SIZE[~TYP[1]]-1-~LIT[2]*~SIZE[~TYPO] -: ~SIZE[~TYPO]];~ELSEassign ~RESULT = ~ERRORO;~FI
-    // index lit end|]
+    // index lit end
+    |]
 
 
 indexIntVerilogTF :: TemplateFunction

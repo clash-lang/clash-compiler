@@ -333,7 +333,7 @@ Library
                       ghc-typelits-natnormalise >= 0.7.2   && < 0.8,
                       hashable                  >= 1.2.1.0  && < 1.5,
                       half                      >= 0.2.2.3 && < 1.0,
-                      interpolate               >= 0.2     && < 0.3,
+                      string-interpolate        ^>= 0.3,
                       lens                      >= 4.10    && < 5.2.0,
                       recursion-schemes         >= 5.1     && < 5.3,
                       QuickCheck                >= 2.7     && < 2.15,

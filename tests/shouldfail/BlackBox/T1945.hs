@@ -5,14 +5,13 @@ import           Clash.Annotations.Primitive  (Primitive(..), HDL(..), hasBlackB
 import           Clash.Netlist.Types          (TemplateFunction (..))
 import           Clash.Prelude
 
-import           Data.String.Interpolate      (i)
-import           Data.String.Interpolate.Util (unindent)
+import           Data.String.Interpolate      (__i)
 
 bb :: a -> a
 bb x = x
 {-# NOINLINE bb #-}
 {-# ANN bb hasBlackBox #-}
-{-# ANN bb (InlinePrimitive [VHDL,Verilog,SystemVerilog] $ unindent [i|
+{-# ANN bb (InlinePrimitive [VHDL,Verilog,SystemVerilog] [__i|
    [ { "BlackBox" :
         { "name" : "T1945.bb",
           "kind" : "Expression",

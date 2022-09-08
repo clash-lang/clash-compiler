@@ -91,7 +91,7 @@ import System.Process          ( cwd, env, readCreateProcessWithExitCode,
 import Test.Tasty.Providers    ( IsTest (..), Result, TestName, TestTree,
                                  singleTest, testPassed, testFailed       )
 
-import NeatInterpolation    ( text )
+import Data.String.Interpolate ( __i )
 import Text.Regex.TDFA.Text ( Regex, execute )
 
 import qualified Data.Text    as T
@@ -173,12 +173,12 @@ testOutput
 testOutput PrintNeither _stderr _stdout = T.empty
 testOutput PrintStdErr   stderr _stdout = stderr
 testOutput PrintStdOut  _stderr  stdout = stdout
-testOutput PrintBoth     stderr  stdout = [text|
+testOutput PrintBoth     stderr  stdout = [__i|
   Stderr was:
-  $stderr
+  #{stderr}
 
   Stdout was:
-  $stdout
+  #{stdout}
   |]
 
 globArgs
@@ -532,13 +532,13 @@ unexpectedEmptyStderr
   -> T.Text
   -- ^ stdout
   -> Result
-unexpectedEmptyStderr (T.pack -> file) (showT -> code) stdout =
-  testFailed $ T.unpack $ [text|
-    Program $file (return code: $code) did not print anything
+unexpectedEmptyStderr file code stdout =
+  testFailed [__i|
+    Program #{file} (return code: #{code}) did not print anything
     to stderr unexpectedly.
 
     Stdout was:
-    $stdout
+    #{stdout}
   |]
 
 unexpectedCode
@@ -553,15 +553,15 @@ unexpectedCode
   -> T.Text
   -- ^ stdout
   -> Result
-unexpectedCode (T.pack -> file) (showT -> code) (showT -> expectedCode) stderr stdout =
-  testFailed $ T.unpack $ [text|
-    Program $file exited with code $code, but we expected $expectedCode.
+unexpectedCode file code expectedCode stderr stdout =
+  testFailed [__i|
+    Program #{file} exited with code #{code}, but we expected #{expectedCode}.
 
     Stderr was:
-    $stderr
+    #{stderr}
 
     Stdout was:
-    $stdout
+    #{stdout}
   |]
 
 unexpectedSuccess
@@ -572,16 +572,13 @@ unexpectedSuccess
   -> T.Text
   -- stdout
   -> Result
-unexpectedSuccess (T.pack -> file) stderr stdout =
-  testFailed $ T.unpack $ [text|
-    Program $file exited succesfully, but we expected an error.
+unexpectedSuccess file stderr stdout =
+  testFailed [__i|
+    Program #{file} exited succesfully, but we expected an error.
 
     Stderr was:
-    $stderr
+    #{stderr}
 
     Stdout was:
-    $stdout
+    #{stdout}
   |]
-
-showT :: Show a => a -> T.Text
-showT = T.pack . show

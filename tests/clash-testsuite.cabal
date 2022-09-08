@@ -10,6 +10,7 @@ license-file:        LICENSE
 author:              Christiaan Baaij
 maintainer:          Christiaan Baaij <christiaan.baaij@gmail.com>
 copyright:           Copyright © 2015 University of Twente
+                                 2022 QBayLogic B.V.
 category:            Testing
 build-type:          Simple
 data-files:
@@ -52,7 +53,7 @@ common basic-config
     ghc,
     Glob,
     ieee754,
-    neat-interpolation,
+    string-interpolate,
     optparse-applicative,
     process,
     tagged,
@@ -116,7 +117,6 @@ library
     concurrent-extra,
     singletons,
     generic-lens,
-    interpolate,
     mtl,
     concurrent-supply,
     unordered-containers,

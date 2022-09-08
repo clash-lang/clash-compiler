@@ -12,8 +12,7 @@ import           Control.Monad.State
 import           GHC.Stack
 import           Data.List                       (isInfixOf)
 import           Data.Monoid                     (Ap(getAp))
-import           Data.String.Interpolate         (i)
-import           Data.String.Interpolate.Util    (unindent)
+import           Data.String.Interpolate         (__i)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Data.Text.Prettyprint.Doc.Extra (Doc (..))
@@ -50,7 +49,7 @@ myBlackBox
   -> Signal System Int
 myBlackBox _ = pure (errorX "not implemented")
 {-# NOINLINE myBlackBox #-}
-{-# ANN myBlackBox (InlinePrimitive [VHDL,Verilog,SystemVerilog] $ unindent [i|
+{-# ANN myBlackBox (InlinePrimitive [VHDL,Verilog,SystemVerilog] [__i|
    [ { "BlackBox" :
         { "name" : "InstDeclAnnotations.myBlackBox",
           "kind" : "Declaration",
