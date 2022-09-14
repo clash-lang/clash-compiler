@@ -33,6 +33,8 @@ import           GHC.Stack
 import           Clash.Core.Term                 (Term(Literal), collectArgs)
 import           Clash.Core.Literal
 import           Clash.Core.Pretty               (showPpr)
+import           Clash.Promoted.Nat
+import           Clash.Promoted.Nat.Unsafe
 import qualified Clash.Util.Interpolate          as I
 import qualified Clash.Verification.Internal     as Cv
 
@@ -103,6 +105,24 @@ instance TermLiteral Natural where
   termToData (collectArgs -> (_, [Left (Literal (NaturalLiteral n))])) =
     Right (fromInteger n)
   termToData t = Left t
+
+-- | Unsafe warning: If you use this instance in a monomorphic context (e.g.,
+-- @TermLiteral (SNat 5)@), you need to make very sure that the term corresponds
+-- to the literal. If you don't, there will be a mismatch between type level
+-- variables and the proof carried in 'SNat's 'KnownNat'. Typical usage of this
+-- instance will therefore leave the /n/ polymorphic.
+--
+instance TermLiteral (SNat n) where
+  termToData (collectArgs -> (_, [_, Left (Literal (NaturalLiteral n))])) =
+    Right (unsafeSNat n)
+  termToData t = Left t
+
+  showsTypePrec n _
+    -- We don't know the literal /n/ at this point. However, we can't simply put
+    -- and /n/ here either, as it might collide with other type variables. To
+    -- prevent confusion, we put an underscore. This is obviously "wrong", but
+    -- good enough for error messages - the main purpose of this function.
+    = showParen (n > 10) $ showString "SNat _"
 
 instance (TermLiteral a, TermLiteral b) => TermLiteral (a, b) where
   termToData (collectArgs -> (_, lefts -> [a, b])) = do
