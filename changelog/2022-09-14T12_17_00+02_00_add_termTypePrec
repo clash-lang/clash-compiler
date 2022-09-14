@@ -1,0 +1,14 @@
+Internal change: Added `showsTypePrec` to `TermLiteral` to make `TermLiteral SNat` work as expected. Deriving an instance is now a bit simpler. Instances which previously had to be defined as:
+
+```haskell
+instance TermLiteral Bool where
+  termToData = $(deriveTermToData ''Bool)
+```
+
+can now be defined using:
+
+```haskell
+deriveTermLiteral ''Bool
+```
+
+Internal add: Added `TermLiteral` instance for `Either`.

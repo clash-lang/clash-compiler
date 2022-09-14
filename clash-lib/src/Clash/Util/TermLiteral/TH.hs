@@ -27,7 +27,7 @@ termToDataName = mkName "Clash.Util.TermLiteral.termToData"
 
 deriveTermToData :: Name -> Q Exp
 deriveTermToData typName = do
-  TyConI (DataD _ _ _ _ constrs _) <- reify typName
+  TyConI (DataD _ _ tyVars _ constrs _) <- reify typName
   pure (deriveTermToData1 (map toConstr' constrs))
  where
   toConstr' (NormalC cName fields) = (cName, length fields)
@@ -91,4 +91,3 @@ deriveTermToData1 constrs =
   argsName = mkName "args"
   argNames = [mkName ("arg" ++ show n) | n <- [0..nArgs-1]]
   nameName = mkName "nm"
-
