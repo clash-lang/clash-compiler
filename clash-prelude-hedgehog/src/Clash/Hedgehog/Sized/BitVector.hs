@@ -24,17 +24,15 @@ module Clash.Hedgehog.Sized.BitVector
 import GHC.Natural (Natural)
 import GHC.TypeNats
 import Hedgehog (MonadGen, Range)
-import Hedgehog.Internal.Range (constantBounded)
+import Hedgehog.Internal.Range (constantBounded, constant)
 import qualified Hedgehog.Gen as Gen
 
 import Clash.Class.BitPack (pack)
 import Clash.Promoted.Nat
 import Clash.Sized.Internal.BitVector
-import Clash.Sized.Vector (v2bv)
 import Clash.XException (errorX)
 
 import Clash.Hedgehog.Sized.Unsigned
-import Clash.Hedgehog.Sized.Vector (genVec)
 
 -- | Generate a bit which is guaranteed to be defined.
 -- This will either have the value 'low' or 'high'.
@@ -55,14 +53,16 @@ genDefinedBitVector = pack <$> genUnsigned constantBounded
 
 -- | Generate a bit vector where some bits may be undefined.
 --
-genBitVector :: (MonadGen m, KnownNat n) => m (BitVector n)
+genBitVector :: forall m n . (MonadGen m, KnownNat n) => m (BitVector n)
 genBitVector =
   Gen.frequency
-    [ (55, fmap v2bv (genVec genBit))
-    , (15, Gen.constant minBound)
-    , (15, Gen.constant maxBound)
-    , (15, Gen.constant undefined#)
+    [ (70, (\a b -> BV{unsafeMask =a, unsafeToNatural =b} ) <$> genNatural <*> genNatural)
+    , (10, Gen.constant minBound)
+    , (10, Gen.constant maxBound)
+    , (10, Gen.constant undefined#)
     ]
+ where
+  genNatural = Gen.integral $ constant 0 (2^ (natToNatural @n))
 
 data SomeBitVector atLeast where
   SomeBitVector :: SNat n -> BitVector (atLeast + n) -> SomeBitVector atLeast
