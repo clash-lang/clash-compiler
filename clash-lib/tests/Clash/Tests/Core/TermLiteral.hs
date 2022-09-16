@@ -7,6 +7,8 @@ Tests for 'Clash.Core.TermLiteral'.
 -}
 {-# LANGUAGE TemplateHaskell #-}
 
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 module Clash.Tests.Core.TermLiteral where
 
 import Data.Proxy
@@ -16,7 +18,10 @@ import Test.Tasty.HUnit
 import Test.Tasty.TH
 
 import Clash.Core.TermLiteral
+import Clash.Core.TermLiteral.TH
 import Clash.Promoted.Nat
+
+import Clash.Tests.Core.TermLiteral.Types
 
 showTypeable :: Typeable a => Proxy a -> String
 showTypeable proxy = showsPrec 0 (typeRep proxy) ""
@@ -53,6 +58,11 @@ case_snat = "SNat _" @=? showType (Proxy @(SNat 5))
 
 case_maybe_snat :: Assertion
 case_maybe_snat = "Maybe (SNat _)" @=? showType (Proxy @(Maybe (SNat 5)))
+
+deriveTermLiteral ''NatTypeArg
+
+case_natTypeArg :: Assertion
+case_natTypeArg = "NatTypeArg _" @=? showType (Proxy @(NatTypeArg 10))
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.TermLiteral" [$(testGroupGenerator)]

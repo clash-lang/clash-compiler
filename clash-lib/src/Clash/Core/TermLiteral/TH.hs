@@ -4,7 +4,7 @@
 
 module Clash.Core.TermLiteral.TH
   ( deriveTermToData
-  , deriveshowsTypePrec
+  , deriveShowsTypePrec
   , deriveTermLiteral
      -- Stop exporting @dcName'@  once `ghcide` stops type-checking expanded
      -- TH splices
@@ -15,6 +15,7 @@ import           Data.Either
 import qualified Data.Text                       as Text
 import           Data.List                       (intersperse)
 import           Data.Proxy
+import           Data.Maybe                      (isNothing)
 import           Language.Haskell.TH.Syntax
 import           Language.Haskell.TH.Lib         hiding (match)
 
@@ -52,32 +53,32 @@ showsTypePrecName =
 termLiteralName :: Name
 termLiteralName = mkName "Clash.Core.TermLiteral.TermLiteral"
 
--- | Extracts variable names from a 'TyVarBndr', errors if it is not a simply
--- typed variable name.
-typeVarName :: CompatTyVarBndr -> Q Name
+-- | Extracts variable names from a 'TyVarBndr'.
+typeVarName :: CompatTyVarBndr -> Q (Name, Maybe Type)
 typeVarName = \case
 #if __GLASGOW_HASKELL__ >= 900
-  PlainTV typVarName () -> pure typVarName
-  KindedTV typVarName () StarT -> pure typVarName
+  PlainTV typVarName ()        -> pure (typVarName, Nothing)
+  KindedTV typVarName () StarT -> pure (typVarName, Nothing)
+  KindedTV typVarName () kind  -> pure (typVarName, Just kind)
 #else
-  PlainTV typVarName -> pure typVarName
-  KindedTV typVarName StarT -> pure typVarName
+  PlainTV typVarName        -> pure (typVarName, Nothing)
+  KindedTV typVarName StarT -> pure (typVarName, Nothing)
+  KindedTV typVarName kind  -> pure (typVarName, Just kind)
 #endif
-  k@(KindedTV {}) -> fail $ "Not supported: KindedTV: " <> show k
 
 -- | Derive a t'Clash.Core.TermLiteral.TermLiteral' instance for given type
 deriveTermLiteral :: Name -> Q [Dec]
 deriveTermLiteral typName = do
   TyConI (DataD _ _ typeVars _ _ _) <- reify typName
   typeVarNames <- mapM typeVarName typeVars
-  showsTypePrec <- deriveshowsTypePrec typName typeVarNames
+  showsTypePrec <- deriveShowsTypePrec typName typeVarNames
   termToDataBody <- deriveTermToData typName
   let
     termToData = FunD termToDataName [Clause [] (NormalB termToDataBody) []]
-    innerInstanceType = foldl AppT (ConT typName) (map VarT typeVarNames)
+    innerInstanceType = foldl AppT (ConT typName) (map (VarT . fst) typeVarNames)
     instanceType = ConT termLiteralName `AppT` innerInstanceType
     constraint typVarName = [t| $(conT termLiteralName) $(varT typVarName) |]
-  constraints <- mapM constraint typeVarNames
+  constraints <- mapM (constraint . fst) (filter (isNothing . snd) typeVarNames)
   pure $ [InstanceD Nothing constraints instanceType [showsTypePrec, termToData]]
 
 -- | For 'Maybe', constructs:
@@ -91,10 +92,9 @@ deriveTermLiteral typName = do
 -- >     in
 -- >       showParen (n > 10) showType
 --
-deriveshowsTypePrec :: Name -> [Name] -> Q Dec
-deriveshowsTypePrec typName typeVarNames = do
-  TyConI (DataD _ _ typeVars _ _ _) <- reify typName
-  showTypeBody <- mkShowTypeBody typeVars
+deriveShowsTypePrec :: Name -> [(Name, Maybe Type)] -> Q Dec
+deriveShowsTypePrec typName typeVars = do
+  showTypeBody <- mkShowTypeBody
   pure (FunD showsTypePrecName [Clause [VarP nName, WildP] (NormalB showTypeBody) []])
  where
   showTypeName = [| showString $(litE (StringL (nameBase typName))) |]
@@ -107,8 +107,13 @@ deriveshowsTypePrec typName typeVarNames = do
   -- is set to indicate "function" application. I.e., it instructs the call to
   -- wrap the type string in parentheses.
   --
-  mkTypePrecCall typVarName =
-    [| $(varE showsTypePrecName) 11 (Proxy @($(varT typVarName))) |]
+  mkTypePrecCall = \case
+    (typVarName, Nothing) ->
+      [| $(varE showsTypePrecName) 11 (Proxy @($(varT typVarName))) |]
+    (_, Just _) ->
+      -- XXX: Not sure how to deal with non-Type type variables so we do the dumb
+      --      thing and insert an underscore.
+      [| showString "_" |]
 
   -- Constructs:
   --
@@ -117,8 +122,8 @@ deriveshowsTypePrec typName typeVarNames = do
   -- This is wrapped in an if-statement wrapping the result in parentheses if the
   -- incoming prec is more than 10 (function application).
   --
-  mkShowTypeBody :: [CompatTyVarBndr] -> Q Exp
-  mkShowTypeBody typeVars =
+  mkShowTypeBody :: Q Exp
+  mkShowTypeBody =
     case typeVars of
       [] ->
         -- We seq on `n` here to prevent _unused variable_ warnings. This is a
@@ -128,7 +133,7 @@ deriveshowsTypePrec typName typeVarNames = do
       _  -> [|
         let
           showSpace = showChar ' '
-          precCalls = $(listE (map mkTypePrecCall typeVarNames))
+          precCalls = $(listE (map mkTypePrecCall typeVars))
           interspersedPrecCalls = intersperse showSpace precCalls
           showType = foldl (.) $(showTypeName) (showSpace : interspersedPrecCalls)
         in
