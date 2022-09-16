@@ -377,6 +377,7 @@ test-suite unittests
   Other-Modules: Clash.Tests.Core.FreeVars
                  Clash.Tests.Core.Subst
                  Clash.Tests.Core.TermLiteral
+                 Clash.Tests.Core.TermLiteral.Types
                  Clash.Tests.Driver.Manifest
                  Clash.Tests.Netlist.Id
                  Clash.Tests.Util.Interpolate
