@@ -166,6 +166,10 @@ termToDataError term = bimap err id (termToData term)
 
       #{showPpr failedTerm}
 
+    In its non-pretty-printed form:
+
+      #{show failedTerm}
+
     In the full term:
 
       #{showPpr term}
