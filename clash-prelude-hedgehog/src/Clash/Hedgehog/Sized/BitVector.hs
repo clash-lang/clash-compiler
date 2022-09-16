@@ -24,13 +24,16 @@ module Clash.Hedgehog.Sized.BitVector
 import GHC.Natural (Natural)
 import GHC.TypeNats
 import Hedgehog (MonadGen, Range)
+import Hedgehog.Internal.Range (constantBounded)
 import qualified Hedgehog.Gen as Gen
 
+import Clash.Class.BitPack (pack)
 import Clash.Promoted.Nat
 import Clash.Sized.Internal.BitVector
 import Clash.Sized.Vector (v2bv)
 import Clash.XException (errorX)
 
+import Clash.Hedgehog.Sized.Unsigned
 import Clash.Hedgehog.Sized.Vector (genVec)
 
 -- | Generate a bit which is guaranteed to be defined.
@@ -48,12 +51,7 @@ genBit = Gen.element [low, high, errorX "X"]
 -- | Generate a bit vector where all bits are defined.
 --
 genDefinedBitVector :: (MonadGen m, KnownNat n) => m (BitVector n)
-genDefinedBitVector =
-  Gen.frequency
-    [ (60, fmap v2bv (genVec genDefinedBit))
-    , (20, Gen.constant minBound)
-    , (20, Gen.constant maxBound)
-    ]
+genDefinedBitVector = pack <$> genUnsigned constantBounded
 
 -- | Generate a bit vector where some bits may be undefined.
 --
