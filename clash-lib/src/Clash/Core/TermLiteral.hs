@@ -8,6 +8,7 @@ Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 Tools to convert a 'Term' into its "real" representation
 -}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -113,9 +114,9 @@ instance TermLiteral Natural where
 -- instance will therefore leave the /n/ polymorphic.
 --
 instance TermLiteral (SNat n) where
-  termToData (collectArgs -> (_, [_, Left (Literal (NaturalLiteral n))])) =
-    Right (unsafeSNat n)
-  termToData t = Left t
+  termToData = \case
+    Literal (NaturalLiteral n) -> Right (unsafeSNat n)
+    t                          -> Left t
 
   showsTypePrec n _
     -- We don't know the literal /n/ at this point. However, we can't simply put
