@@ -56,13 +56,13 @@ genDefinedBitVector = pack <$> genUnsigned constantBounded
 genBitVector :: forall m n . (MonadGen m, KnownNat n) => m (BitVector n)
 genBitVector =
   Gen.frequency
-    [ (70, (\a b -> BV{unsafeMask =a, unsafeToNatural =b} ) <$> genNatural <*> genNatural)
+    [ (70, BV <$> genNatural <*> genNatural)
     , (10, Gen.constant minBound)
     , (10, Gen.constant maxBound)
     , (10, Gen.constant undefined#)
     ]
  where
-  genNatural = Gen.integral $ constant 0 (2^ (natToNatural @n))
+  genNatural = Gen.integral $ constant 0 (2^natToNatural @n)
 
 data SomeBitVector atLeast where
   SomeBitVector :: SNat n -> BitVector (atLeast + n) -> SomeBitVector atLeast
