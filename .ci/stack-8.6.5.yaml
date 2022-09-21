@@ -1,5 +1,8 @@
 resolver: lts-14.27
 
+ghc-options:
+  "$locals": -Wall -Wcompat
+
 packages:
 - clash-prelude
 - clash-prelude-hedgehog

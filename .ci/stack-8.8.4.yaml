@@ -1,5 +1,8 @@
 resolver: lts-16.31
 
+ghc-options:
+  "$locals": -Wall -Wcompat
+
 packages:
 - clash-prelude
 - clash-prelude-hedgehog
@@ -10,7 +13,6 @@ packages:
 - tests
 
 extra-deps:
-- tasty-1.2.3@sha256:bba67074e5326d57e8f53fc1dabcb6841daa4dc51b053506eb7f40a6f49a0497,2517
 - arrows-0.4.4.2@sha256:a260222b766da922657e302aa7c0409451913e1e503798a47a213a61ba382460,1235
 - fakedata-1.0.2@sha256:37c93be9a81acbc9109e2c0b300a793d9c1f5ead1d34330d869d76568191f428,24593
 - hedgehog-fakedata-0.0.1.4@sha256:bd826430f9fd17d4f226c917328c429add0ff410a88384d2fef2d4374382cf95,1361
