@@ -15,8 +15,6 @@ cradle:
     # The src-bin directories are GHC version dependant, so don't load them
     - path: "./clash-ghc/src-bin-8.10"
       config: { cradle: {none: }}
-    - path: "./clash-ghc/src-bin-841"
-      config: { cradle: {none: }}
     - path: "./clash-ghc/src-bin-861"
       config: { cradle: {none: }}
     - path: "./clash-ghc/src-bin-881"

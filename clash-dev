@@ -1,10 +1,5 @@
 #!/bin/sh
 GHC_VERSION=$(ghc --numeric-version)
-GHC_MAJOR_VERSION=$(echo ${GHC_VERSION} | tr -d '.' | head -c2)
-
-if [ ${GHC_MAJOR_VERSION} != 84 ]; then
-  XNoStarIsType="-XNoStarIsType"
-fi
 
 ghci \
   -fobject-code \
@@ -15,7 +10,7 @@ ghci \
   -XBangPatterns -XBinaryLiterals -XDataKinds -XDefaultSignatures \
   -XDeriveDataTypeable -XDeriveFoldable -XDeriveFunctor -XDeriveGeneric \
   -XDeriveLift -XDeriveTraversable -XDerivingStrategies -XInstanceSigs \
-  -XKindSignatures ${XNoStarIsType} -XPostfixOperators -XScopedTypeVariables \
+  -XKindSignatures -XNoStarIsType -XPostfixOperators -XScopedTypeVariables \
   -XStandaloneDeriving -XTupleSections -XTypeApplications -XTypeOperators \
   -XViewPatterns -XNoPolyKinds -DDEBUG \
   Clash.hs
