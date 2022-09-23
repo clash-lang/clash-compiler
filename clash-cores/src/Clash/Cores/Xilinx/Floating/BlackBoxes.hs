@@ -146,15 +146,23 @@ tclTemplate (HasCustom {..}) operType bbCtx = pure bbText
       ]
   prop (False, _, _) s = s
   prop (True, name, value) s =
-    replicate 25 ' ' ++ name ++ ' ': value ++ " \\\n" ++ s
+    replicate 31 ' ' ++ name ++ ' ': value ++ " \\\n" ++ s
 
-  bbText =
-    [i|create_ip -name floating_point -vendor xilinx.com -library ip \\
-          -version 7.1 -module_name {#{compName}}
-set_property -dict [list \\
-#{props}                   ] \\
-                   [get_ips {#{compName}}]
-generate_target {synthesis simulation} [get_ips {#{compName}}]|]
+  bbText = [i|proc createNamespace ns {
+  namespace eval $ns {
+    variable api 1
+    variable scriptPurpose createIp
+    variable ipName {#{compName}}
+
+    proc createIp {ipName0 args} {
+      create_ip -name floating_point -vendor xilinx.com -library ip \\
+          -version 7.1 -module_name $ipName0 {*}$args
+
+      set_property -dict [list \\
+#{props}                         ] [get_ips $ipName0]
+    }
+  }
+}|]
 
 show0 :: (Show a, IsString s) => a -> s
 show0 = fromString . show
