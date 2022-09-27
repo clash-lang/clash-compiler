@@ -1,5 +1,6 @@
 {-|
 Copyright  :  (C) 2021-2022, QBayLogic B.V.,
+                  2022     , Google Inc.,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -125,7 +126,7 @@ addBasic
   -> DSignal XilinxSystem F.AddDefDelay Float
 addBasic clk x y = withClock clk $ withEnable enableGen $ F.add x y
 {-# NOINLINE addBasic #-}
-{-# ANN addBasic (binTopAnn "addBasic") #-}
+{-# ANN addBasic (binaryTopAnn "addBasic") #-}
 
 addBasicTB :: Signal XilinxSystem Bool
 addBasicTB = basicRomTB addBasic $(memBlobTH Nothing addBasicSamples)
@@ -139,7 +140,7 @@ addEnable
   -> DSignal XilinxSystem 11 Float
 addEnable clk en x y = withClock clk $ withEnable en $ F.add x y
 {-# NOINLINE addEnable #-}
-{-# ANN addEnable (binEnTopAnn "addEnable") #-}
+{-# ANN addEnable (binaryEnTopAnn "addEnable") #-}
 
 addEnableTB :: Signal XilinxSystem Bool
 addEnableTB = done
@@ -179,7 +180,7 @@ addShortPL
 addShortPL clk x y =
   withClock clk $ withEnable enableGen $ F.addWith F.defConfig x y
 {-# NOINLINE addShortPL #-}
-{-# ANN addShortPL (binTopAnn "addShortPL") #-}
+{-# ANN addShortPL (binaryTopAnn "addShortPL") #-}
 
 addShortPLTB :: Signal XilinxSystem Bool
 addShortPLTB =
@@ -197,7 +198,7 @@ subBasic
   -> DSignal XilinxSystem F.SubDefDelay Float
 subBasic clk x y = withClock clk $ withEnable enableGen $ F.sub x y
 {-# NOINLINE subBasic #-}
-{-# ANN subBasic (binTopAnn "subBasic") #-}
+{-# ANN subBasic (binaryTopAnn "subBasic") #-}
 
 subBasicTB :: Signal XilinxSystem Bool
 subBasicTB = basicRomTB subBasic $(memBlobTH Nothing subBasicSamples)
@@ -210,7 +211,7 @@ mulBasic
   -> DSignal XilinxSystem F.MulDefDelay Float
 mulBasic clk x y = withClock clk $ withEnable enableGen $ F.mul x y
 {-# NOINLINE mulBasic #-}
-{-# ANN mulBasic (binTopAnn "mulBasic") #-}
+{-# ANN mulBasic (binaryTopAnn "mulBasic") #-}
 
 mulBasicTB :: Signal XilinxSystem Bool
 mulBasicTB = basicRomTB mulBasic $(memBlobTH Nothing mulBasicSamples)
@@ -223,8 +224,66 @@ divBasic
   -> DSignal XilinxSystem F.DivDefDelay Float
 divBasic clk x y = withClock clk $ withEnable enableGen $ F.div x y
 {-# NOINLINE divBasic #-}
-{-# ANN divBasic (binTopAnn "divBasic") #-}
+{-# ANN divBasic (binaryTopAnn "divBasic") #-}
 
 divBasicTB :: Signal XilinxSystem Bool
 divBasicTB = basicRomTB divBasic $(memBlobTH Nothing divBasicSamples)
 {-# ANN divBasicTB (TestBench 'divBasic) #-}
+
+fromUBasic
+  :: Clock XilinxSystem
+  -> DSignal XilinxSystem 0 (Unsigned 32)
+  -> DSignal XilinxSystem F.FromU32DefDelay Float
+fromUBasic clk x = withClock clk $ withEnable enableGen $ F.fromU32 x
+{-# NOINLINE fromUBasic #-}
+{-# ANN fromUBasic (unaryTopAnn "fromUBasic") #-}
+
+fromUBasicTB :: Signal XilinxSystem Bool
+fromUBasicTB = done
+ where
+  (done0, samples) =
+    playSampleRom clk rst $(memBlobTH Nothing fromUBasicSamples)
+  (input, expectedOutput) = unbundle samples
+  -- Only assert while not finished
+  done = mux done0 done0 $
+    assert clk rst "fromUBasicTB" out expectedOutput done0
+  out = ignoreFor clk rst en (SNat @F.FromU32DefDelay) 0 . toSignal .
+    fromUBasic clk $ fromSignal input
+  clk = tbClockGen (not <$> done)
+  rst = resetGen
+  en = enableGen
+{-# ANN fromUBasicTB (TestBench 'fromUBasic) #-}
+
+fromUEnable
+  :: Clock XilinxSystem
+  -> Enable XilinxSystem
+  -> DSignal XilinxSystem 0 (Unsigned 32)
+  -> DSignal XilinxSystem 5 Float
+fromUEnable clk en x = withClock clk $ withEnable en $ F.fromU32 x
+{-# NOINLINE fromUEnable #-}
+{-# ANN fromUEnable (unaryEnTopAnn "fromUEnable") #-}
+
+fromUEnableTB :: Signal XilinxSystem Bool
+fromUEnableTB = done
+ where
+  testInput = fromSignal $
+    stimuliGenerator clk rst $(listToVecTH [1 :: Unsigned 32 .. 20])
+  en = toEnable $ stimuliGenerator clk rst
+        ((replicate d5 True ++ replicate d4 True ++ replicate d4 False) :< True)
+  expectedOutput = replicate d5 0 ++
+    $(listToVecTH $
+         [1 :: Float .. 4]
+      -- Stall for four cycles
+      <> P.replicate 4 5
+      -- Still in the pipeline (5 deep) from before the stall.
+      <> P.take 5 [5 .. 20]
+      -- We "lose" four samples of what remains due to not being enabled
+      -- for those inputs.
+      <> P.drop 4 (P.drop 5 [5 .. 20])
+    )
+  expectOutput = outputVerifier' clk rst expectedOutput
+  done = expectOutput . ignoreFor clk rst enableGen d5 0 . toSignal $
+    fromUEnable clk en testInput
+  clk = tbClockGen (not <$> done)
+  rst = resetGen
+{-# ANN fromUEnableTB (TestBench 'fromUEnable) #-}

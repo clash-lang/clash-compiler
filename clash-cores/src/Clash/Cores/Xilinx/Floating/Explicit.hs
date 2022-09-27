@@ -1,5 +1,6 @@
 {-|
 Copyright  :  (C) 2021,      QBayLogic B.V.,
+                  2022,      Google Inc.,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -58,6 +59,9 @@ module Clash.Cores.Xilinx.Floating.Explicit
   , divWith
   , div
   , DivDefDelay
+  , fromU32With
+  , fromU32
+  , FromU32DefDelay
     -- * Customizing IP
   , Config(..)
   , defConfig
@@ -229,6 +233,43 @@ div = withFrozenCallStack $ divWith defConfig
 
 -- | The default delay for floating point division with default customization.
 type DivDefDelay = 28
+
+-- | Customizable conversion of @Unsigned 32@ to @Float@
+--
+-- Only the delay is configurable, so this function does not take a @Config@
+-- argument.
+fromU32With
+  :: forall d dom n
+   . ( KnownDomain dom
+     , KnownNat d
+     , HasCallStack
+     )
+  => Clock dom
+  -> Enable dom
+  -> DSignal dom n (Unsigned 32)
+  -> DSignal dom (n + d) Float
+fromU32With clk en = delayI und en clk . fmap fromIntegral
+ where
+  und = withFrozenCallStack $ errorX "Initial values of fromU32 undefined"
+{-# NOINLINE fromU32With #-}
+{-# ANN fromU32With (vhdlFromUPrim 'fromU32With "fromU32") #-}
+{-# ANN fromU32With (veriFromUPrim 'fromU32With "fromU32") #-}
+
+-- | Conversion of @Unsigned 32@ to @Float@, with default delay
+fromU32
+  :: forall dom n
+   . ( KnownDomain dom
+     , HasCallStack
+     )
+  => Clock dom
+  -> Enable dom
+  -> DSignal dom n (Unsigned 32)
+  -> DSignal dom (n + FromU32DefDelay) Float
+fromU32 = withFrozenCallStack fromU32With
+{-# INLINE fromU32 #-}
+
+-- | The default delay for conversion of @Unsigned 32@ to @Float@
+type FromU32DefDelay = 5
 
 -- | Default customization options.
 --

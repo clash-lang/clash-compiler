@@ -468,17 +468,24 @@ runClashTest = defaultMain $ clashTestRoot
       -- run).
       -- TODO: Make these test benches compatible with our Vivado CI
       --
-      -- , clashTestGroup "Cores"
-      --   [ clashTestGroup "Xilinx"
-      --     [ runTest "Floating" def{ clashFlags=["-fclash-float-support"]
-      --                             , buildTargets=[ "addBasicTB"
-      --                                            , "addEnableTB"
-      --                                            , "addShortPLTB"
-      --                                            , "subBasicTB"
-      --                                            , "mulBasicTB"
-      --                                            , "divBasicTB"]}
-      --     ]
-      --   ]
+--       , clashTestGroup "Cores"
+--         [ clashTestGroup "Xilinx"
+--           [ let _opts = def{ hdlTargets=[VHDL, Verilog]
+--                            , hdlLoad=[Vivado]
+--                            , hdlSim=[Vivado]
+--                            , buildTargets=BuildSpecific [ "addBasicTB"
+--                                                         , "addEnableTB"
+--                                                         , "addShortPLTB"
+--                                                         , "subBasicTB"
+--                                                         , "mulBasicTB"
+--                                                         , "divBasicTB"
+--                                                         , "fromUBasicTB"
+--                                                         , "fromUEnableTB"
+--                                                         ]
+--                            }
+--             in runTest "Floating" _opts
+--           ]
+--         ]
       , clashTestGroup "CSignal"
         [ runTest "MAC" def{hdlSim=[]}
         , runTest "CBlockRamTest" def{hdlSim=[]}
