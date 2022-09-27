@@ -413,12 +413,14 @@ module Clash.Explicit.BlockRam
     -- * True dual-port block RAM
     -- $tdpbram
   , trueDualPortBlockRam
+  , trueDualPortBlockRamU
   , RamOp(..)
     -- * Internal
   , blockRam#
   , blockRamU#
   , blockRam1#
   , trueDualPortBlockRam#
+  , trueDualPortBlockRamU#
   )
 where
 
@@ -452,7 +454,7 @@ import           Clash.Signal.Bundle    (unbundle, bundle)
 import           Clash.Signal.Internal.Ambiguous (clockPeriod)
 import           Clash.Sized.Unsigned   (Unsigned)
 import           Clash.Sized.Index      (Index)
-import           Clash.Sized.Vector     (Vec, replicate, iterateI)
+import           Clash.Sized.Vector     (Vec, replicate, iterateI, toList)
 import qualified Clash.Sized.Vector     as CV
 import           Clash.XException
   (maybeIsX, NFDataX(deepErrorX), defaultSeqX, fromJustX, undefined,
@@ -1175,6 +1177,8 @@ isOp :: RamOp n a -> Bool
 isOp RamNoOp = False
 isOp _       = True
 
+
+
 -- | Produces vendor-agnostic HDL that will be inferred as a true dual-port
 -- block RAM
 --
@@ -1183,6 +1187,39 @@ isOp _       = True
 -- is: WriteFirst. For mixed-port read/write, when port A writes to the address
 -- port B reads from, the output of port B is undefined, and vice versa.
 trueDualPortBlockRam ::
+  forall nAddrs domA domB a .
+  ( HasCallStack
+  , KnownNat nAddrs
+  , KnownDomain domA
+  , KnownDomain domB
+  , NFDataX a
+  )
+  => Vec nAddrs a
+  -- ^ Initial content of the BRAM
+  --
+  -- __NB__: __MUST__ be a constant
+  -> Clock domA
+  -- ^ Clock for port A
+  -> Clock domB
+  -- ^ Clock for port B
+  -> Signal domA (RamOp nAddrs a)
+  -- ^ RAM operation for port A
+  -> Signal domB (RamOp nAddrs a)
+  -- ^ RAM operation for port B
+  -> (Signal domA a, Signal domB a)
+  -- ^ Outputs data on /next/ cycle. When writing, the data written
+  -- will be echoed. When reading, the read data is returned.
+
+{-# INLINE trueDualPortBlockRam #-}
+trueDualPortBlockRam = \content clkA clkB opA opB ->
+  trueDualPortBlockRamWrapper content
+    clkA (isOp <$> opA) (isRamWrite <$> opA) (ramOpAddr <$> opA) (fromJustX . ramOpWriteVal <$> opA)
+    clkB (isOp <$> opB) (isRamWrite <$> opB) (ramOpAddr <$> opB) (fromJustX . ramOpWriteVal <$> opB)
+
+
+
+-- | A version of 'trueDualPortBlockRam' that has no default values set.
+trueDualPortBlockRamU ::
   forall nAddrs domA domB a .
   ( HasCallStack
   , KnownNat nAddrs
@@ -1202,9 +1239,9 @@ trueDualPortBlockRam ::
   -- ^ Outputs data on /next/ cycle. When writing, the data written
   -- will be echoed. When reading, the read data is returned.
 
-{-# INLINE trueDualPortBlockRam #-}
-trueDualPortBlockRam = \clkA clkB opA opB ->
-  trueDualPortBlockRamWrapper
+{-# INLINE trueDualPortBlockRamU #-}
+trueDualPortBlockRamU = \clkA clkB opA opB ->
+  trueDualPortBlockRamUWrapper
     clkA (isOp <$> opA) (isRamWrite <$> opA) (ramOpAddr <$> opA) (fromJustX . ramOpWriteVal <$> opA)
     clkB (isOp <$> opB) (isRamWrite <$> opB) (ramOpAddr <$> opB) (fromJustX . ramOpWriteVal <$> opB)
 
@@ -1222,7 +1259,7 @@ data Conflict = Conflict
   , cfWW      :: !(MaybeX Bool) -- ^ Write/Write conflict
   , cfAddress :: !(MaybeX Int) }
 
--- [Note: eta port names for trueDualPortBlockRam]
+-- [Note: eta port names for trueDualPortBlockRam and trueDualPortBlockRamU]
 --
 -- By naming all the arguments and setting the -fno-do-lambda-eta-expansion GHC
 -- option for this module, the generated HDL also contains names based on the
@@ -1235,12 +1272,70 @@ data Conflict = Conflict
 -- logic to the module / architecture, and synthesis will no longer infer a
 -- multi-clock true dual-port block RAM. This wrapper pushes the primitive out
 -- into its own module / architecture.
-trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
-  trueDualPortBlockRam# clkA enA weA addrA datA clkB enB weB addrB datB
+trueDualPortBlockRamWrapper content clkA enA weA addrA datA clkB enB weB addrB datB =
+  trueDualPortBlockRam# content clkA enA weA addrA datA clkB enB weB addrB datB
 {-# NOINLINE trueDualPortBlockRamWrapper #-}
+
+
+trueDualPortBlockRamUWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
+  trueDualPortBlockRamU# clkA enA weA addrA datA clkB enB weB addrB datB
+{-# NOINLINE trueDualPortBlockRamUWrapper #-}
+
 
 -- | Primitive of 'trueDualPortBlockRam'.
 trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
+  forall nAddrs domA domB a .
+  ( HasCallStack
+  , KnownNat nAddrs
+  , KnownDomain domA
+  , KnownDomain domB
+  , NFDataX a
+  )
+  => Vec nAddrs a
+  -- ^ Initial content of the BRAM
+  --
+  -- __NB__: __MUST__ be a constant
+  -> Clock domA
+  -- ^ Clock for port A
+  -> Signal domA Bool
+  -- ^ Enable for port A
+  -> Signal domA Bool
+  -- ^ Write enable for port A
+  -> Signal domA (Index nAddrs)
+  -- ^ Address to read from or write to on port A
+  -> Signal domA a
+  -- ^ Data in for port A; ignored when /write enable/ is @False@
+
+  -> Clock domB
+  -- ^ Clock for port B
+  -> Signal domB Bool
+  -- ^ Enable for port B
+  -> Signal domB Bool
+  -- ^ Write enable for port B
+  -> Signal domB (Index nAddrs)
+  -- ^ Address to read from or write to on port B
+  -> Signal domB a
+  -- ^ Data in for port B; ignored when /write enable/ is @False@
+
+  -> (Signal domA a, Signal domB a)
+  -- ^ Outputs data on /next/ cycle. If write enable is @True@, the data written
+  -- will be echoed. If write enable is @False@, the read data is returned. If
+  -- port enable is @False@, it is /undefined/.
+trueDualPortBlockRam# contents clkA enA weA addrA datA clkB enB weB addrB datB
+  | snatToNum @Int (clockPeriod @domA) < snatToNum @Int (clockPeriod @domB)
+  = swap (trueDualPortBlockRamModel contents' labelB clkB enB weB addrB datB labelA clkA enA weA addrA datA)
+  | otherwise
+  =       trueDualPortBlockRamModel contents' labelA clkA enA weA addrA datA labelB clkB enB weB addrB datB
+ where
+  labelA    = "Port A"
+  labelB    = "Port B"
+  contents' = Seq.fromList (toList contents)
+{-# NOINLINE trueDualPortBlockRam# #-}
+{-# ANN trueDualPortBlockRam# hasBlackBox #-}
+
+
+-- | Primitive of 'trueDualPortBlockRamU'.
+trueDualPortBlockRamU#, trueDualPortBlockRamUWrapper ::
   forall nAddrs domA domB a .
   ( HasCallStack
   , KnownNat nAddrs
@@ -1274,19 +1369,22 @@ trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
   -- ^ Outputs data on /next/ cycle. If write enable is @True@, the data written
   -- will be echoed. If write enable is @False@, the read data is returned. If
   -- port enable is @False@, it is /undefined/.
-trueDualPortBlockRam# clkA enA weA addrA datA clkB enB weB addrB datB
+trueDualPortBlockRamU# clkA enA weA addrA datA clkB enB weB addrB datB
   | snatToNum @Int (clockPeriod @domA) < snatToNum @Int (clockPeriod @domB)
-  = swap (trueDualPortBlockRamModel labelB clkB enB weB addrB datB labelA clkA enA weA addrA datA)
+  = swap (trueDualPortBlockRamModel contents labelB clkB enB weB addrB datB labelA clkA enA weA addrA datA)
   | otherwise
-  =       trueDualPortBlockRamModel labelA clkA enA weA addrA datA labelB clkB enB weB addrB datB
+  =       trueDualPortBlockRamModel contents labelA clkA enA weA addrA datA labelB clkB enB weB addrB datB
  where
-  labelA = "Port A"
-  labelB = "Port B"
-{-# NOINLINE trueDualPortBlockRam# #-}
-{-# ANN trueDualPortBlockRam# hasBlackBox #-}
+  labelA   = "Port A"
+  labelB   = "Port B"
+  contents = Seq.fromFunction (natToNum @nAddrs) initElement
+
+  initElement n = deepErrorX ("Unknown initial element; position " <> show n)
+{-# NOINLINE trueDualPortBlockRamU# #-}
+{-# ANN trueDualPortBlockRamU# hasBlackBox #-}
 
 
--- | Haskell model for the primitive 'trueDualPortBlockRam#'.
+-- | Haskell model for the primitives 'trueDualPortBlockRam#' and 'trueDualPortBlockRamU#'.
 --
 -- Warning: this model only works if @domFast@'s clock is faster (or equal to)
 -- @domSlow@'s clock.
@@ -1298,6 +1396,8 @@ trueDualPortBlockRamModel ::
   , KnownDomain domFast
   , NFDataX a
   ) =>
+
+  Seq a ->
 
   String ->
   Clock domSlow ->
@@ -1314,13 +1414,13 @@ trueDualPortBlockRamModel ::
   Signal domFast a ->
 
   (Signal domSlow a, Signal domFast a)
-trueDualPortBlockRamModel labelA !_clkA enA weA addrA datA labelB !_clkB enB weB addrB datB =
+trueDualPortBlockRamModel contents labelA !_clkA enA weA addrA datA labelB !_clkB enB weB addrB datB =
   ( startA :- outA
   , startB :- outB )
  where
   (outA, outB) =
     go
-      (Seq.fromFunction (natToNum @nAddrs) initElement)
+      contents
       tB -- ensure 'go' hits fast clock first for 1 cycle, then execute slow
          -- clock for 1 cycle, followed by the regular cadence of 'ceil(tA / tB)'
          -- cycles for the fast clock followed by 1 cycle of the slow clock
@@ -1334,9 +1434,7 @@ trueDualPortBlockRamModel labelA !_clkA enA weA addrA datA labelB !_clkB enB weB
   startA = deepErrorX $ "trueDualPortBlockRam: " <> labelA <> ": First value undefined"
   startB = deepErrorX $ "trueDualPortBlockRam: " <> labelB <> ": First value undefined"
 
-  initElement :: Int -> a
-  initElement n =
-    deepErrorX ("Unknown initial element; position " <> show n)
+
 
   unknownEnableAndAddr :: String -> String -> Int -> a
   unknownEnableAndAddr enaMsg addrMsg n =

@@ -155,6 +155,75 @@
         , NFDataX a              ~ARG[4]
         ) =>
 
+        Vec nAddrs a ->                 ~ARG[5]
+
+        Clock domA ->                   ~ARG[6]
+        Signal domA Bool ->             ~ARG[7]
+        Signal domA Bool ->             ~ARG[8]
+        Signal domA (Index nAddrs) ->   ~ARG[9]
+        Signal domA a ->                ~ARG[10]
+
+        Clock domB ->                   ~ARG[11]
+        Signal domB Bool ->             ~ARG[12]
+        Signal domB Bool ->             ~ARG[13]
+        Signal domB (Index nAddrs) ->   ~ARG[14]
+        Signal domB a ->                ~ARG[15]
+        (Signal domA a, Signal domB a)
+    template: |-
+      // trueDualPortBlockRam begin
+      // Shared memory
+      reg [~SIZE[~TYP[10]]-1:0] ~GENSYM[mem][0] [~LIT[1]-1:0];
+
+      reg ~SIGD[~GENSYM[data_slow][1]][10];
+      reg ~SIGD[~GENSYM[data_fast][2]][15];
+
+      reg ~TYP[5] ~GENSYM[ram_init][3];
+      integer ~GENSYM[i][4];
+      initial begin
+        ~SYM[3] = ~CONST[5];
+        for (~SYM[4]=0; ~SYM[4] < ~LENGTH[~TYP[5]]; ~SYM[4] = ~SYM[4] + 1) begin
+          ~SYM[1][~LENGTH[~TYP[5]]-1-~SYM[4]] = ~SYM[3][~SYM[4]*~SIZE[~TYP[10]]+:~SIZE[~TYP[10]]];
+        end
+      end
+
+      // Port A
+      always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[6]) begin
+          if(~ARG[7]) begin
+              ~SYM[1] <= ~SYM[0][~IF~SIZE[~TYP[9]]~THEN~ARG[9]~ELSE0~FI];
+              if(~ARG[8]) begin
+                  ~SYM[1] <= ~ARG[10];
+                  ~SYM[0][~IF~SIZE[~TYP[9]]~THEN~ARG[9]~ELSE0~FI] <= ~ARG[10];
+              end
+          end
+      end
+
+      // Port B
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[11]) begin
+          if(~ARG[12]) begin
+              ~SYM[2] <= ~SYM[0][~IF~SIZE[~TYP[14]]~THEN~ARG[14]~ELSE0~FI];
+              if(~ARG[13]) begin
+                  ~SYM[2] <= ~ARG[15];
+                  ~SYM[0][~IF~SIZE[~TYP[14]]~THEN~ARG[14]~ELSE0~FI] <= ~ARG[15];
+              end
+          end
+      end
+
+      assign ~RESULT = {~SYM[1], ~SYM[2]};
+
+      // end trueDualPortBlockRam
+- BlackBox:
+    name: Clash.Explicit.BlockRam.trueDualPortBlockRamU#
+    kind: Declaration
+    type: |-
+      trueDualPortBlockRamU# ::
+        forall nAddrs domA domB a .
+        ( HasCallStack           ~ARG[0]
+        , KnownNat nAddrs        ~ARG[1]
+        , KnownDomain domA       ~ARG[2]
+        , KnownDomain domB       ~ARG[3]
+        , NFDataX a              ~ARG[4]
+        ) =>
+
         Clock domA ->                   ~ARG[5]
         Signal domA Bool ->             ~ARG[6]
         Signal domA Bool ->             ~ARG[7]
@@ -168,7 +237,7 @@
         Signal domB a ->                ~ARG[14]
         (Signal domA a, Signal domB a)
     template: |-
-      // trueDualPortBlockRam begin
+      // trueDualPortBlockRamU begin
       // Shared memory
       reg [~SIZE[~TYP[9]]-1:0] ~GENSYM[mem][0] [~LIT[1]-1:0];
 
@@ -199,4 +268,4 @@
 
       assign ~RESULT = {~SYM[1], ~SYM[2]};
 
-      // end trueDualPortBlockRam
+      // end trueDualPortBlockRamU

@@ -1,11 +1,13 @@
 {-# OPTIONS_GHC -Wno-orphans -Wno-missing-signatures #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module DualBlockRamDefinitions where
 
 import qualified Prelude as P
-import Clash.Explicit.Prelude
-
+import Clash.Explicit.Prelude hiding (fromList)
+import Clash.Sized.Vector(fromList)
+import Language.Haskell.TH
 import DualBlockRamTypes
 
 createDomain vSystem{vName="A", vPeriod=hzToPeriod 20e6} -- fast
@@ -13,7 +15,9 @@ createDomain vSystem{vName="B", vPeriod=hzToPeriod 10e6} -- slow
 createDomain vSystem{vName="C", vPeriod=hzToPeriod 7e6} -- slower
 
 tdpRam :: (KnownDomain domA, KnownDomain domB) => TdpRam domA domB
-tdpRam = trueDualPortBlockRam
+tdpRam = trueDualPortBlockRam content
+ where
+  Just content =  $(lift $ fromList @73 $ P.take 73 ((cycle [This, That . truncateB]) <*> [0..]))
 
 {- Testvectors
 Test0 : Write to different addresses and check if value is present at output.
