@@ -1,4 +1,7 @@
-resolver: lts-19.21
+resolver: lts-19.25
+
+ghc-options:
+  "$locals": -Wall -Wcompat
 
 packages:
 - clash-prelude
