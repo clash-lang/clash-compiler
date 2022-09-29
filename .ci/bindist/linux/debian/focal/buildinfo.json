@@ -94,6 +94,11 @@
       "src": {"type": "local", "dir": "../../../../../clash-ghc"}
     },
     {
+      "name": "clash-cores",
+      "cabal_debian_options": ["--disable-haddock", "--disable-tests"],
+      "src": {"type": "local", "dir": "../../../../../clash-cores"}
+    },
+    {
       "name": "clash-testsuite",
       "src": {"type": "local", "dir": "../../../../../tests"},
       "cabal_debian_options": [

@@ -1,5 +1,6 @@
 {-|
 Copyright  :  (C) 2021-2022, QBayLogic B.V.,
+                  2022     , Google Inc.,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -13,6 +14,7 @@ module Clash.Cores.Xilinx.Floating.BlackBoxes
   , subTclTF
   , mulTclTF
   , divTclTF
+  , fromUTclTF
   ) where
 
 import Prelude
@@ -20,7 +22,7 @@ import Prelude
 import Control.Monad.State (State)
 import Data.Maybe (isJust, fromJust)
 import Data.String (fromString, IsString)
-import Data.String.Interpolate (i)
+import Data.String.Interpolate (i, __i)
 
 import Clash.Backend (Backend)
 import Clash.Netlist.Types
@@ -146,15 +148,71 @@ tclTemplate (HasCustom {..}) operType bbCtx = pure bbText
       ]
   prop (False, _, _) s = s
   prop (True, name, value) s =
-    replicate 25 ' ' ++ name ++ ' ': value ++ " \\\n" ++ s
+    replicate 31 ' ' ++ name ++ ' ': value ++ " \\\n" ++ s
 
-  bbText =
-    [i|create_ip -name floating_point -vendor xilinx.com -library ip \\
-          -version 7.1 -module_name {#{compName}}
-set_property -dict [list \\
-#{props}                   ] \\
-                   [get_ips {#{compName}}]
-generate_target {synthesis simulation} [get_ips {#{compName}}]|]
+  bbText = [i|proc createNamespace ns {
+  namespace eval $ns {
+    variable api 1
+    variable scriptPurpose createIp
+    variable ipName {#{compName}}
+
+    proc createIp {ipName0 args} {
+      create_ip -name floating_point -vendor xilinx.com -library ip \\
+          -version 7.1 -module_name $ipName0 {*}$args
+
+      set_property -dict [list \\
+#{props}                         ] [get_ips $ipName0]
+    }
+  }
+}|]
+
+fromUTclTF :: TemplateFunction
+fromUTclTF = TemplateFunction used valid fromUTclTemplate
+ where
+  used = [1,4,5]
+  valid = const True
+
+fromUTclTemplate
+  :: Backend s
+  => BlackBoxContext
+  -> State s Doc
+fromUTclTemplate bbCtx = pure bbText
+ where
+  [compName] = bbQsysIncName bbCtx
+  (Literal _ (NumLit latency), _, _) = bbInputs bbCtx !! 1
+  tclClkEn :: String
+  tclClkEn =
+    case bbInputs bbCtx !! 4 of
+      (DataCon _ _ [Literal Nothing (BoolLit True)], _, _) -> "false"
+      _                                                    -> "true"
+  (_, Unsigned inpLen, _) = bbInputs bbCtx !! 5
+
+  bbText = [__i|
+    proc createNamespace ns {
+      namespace eval $ns {
+        variable api 1
+        variable scriptPurpose createIp
+        variable ipName {#{compName}}
+
+        proc createIp {ipName0 args} {
+          create_ip -name floating_point -vendor xilinx.com -library ip \\
+              -version 7.1 -module_name $ipName0 {*}$args
+
+          set_property -dict [list \\
+                                   CONFIG.Operation_Type Fixed_to_float \\
+                                   CONFIG.A_Precision_Type Uint#{inpLen} \\
+                                   CONFIG.Flow_Control NonBlocking \\
+                                   CONFIG.Has_ACLKEN #{tclClkEn} \\
+                                   CONFIG.C_A_Exponent_Width #{inpLen} \\
+                                   CONFIG.C_A_Fraction_Width 0 \\
+                                   CONFIG.Has_RESULT_TREADY false \\
+                                   CONFIG.C_Latency #{latency} \\
+                                   CONFIG.C_Rate 1 \\
+                                   CONFIG.Maximum_Latency false \\
+                             ] [get_ips $ipName0]
+        }
+      }
+    }|]
 
 show0 :: (Show a, IsString s) => a -> s
 show0 = fromString . show

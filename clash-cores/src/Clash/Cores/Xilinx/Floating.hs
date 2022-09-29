@@ -1,5 +1,6 @@
 {-|
 Copyright  :  (C) 2021,      QBayLogic B.V.,
+                  2022,      Google Inc.,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -55,6 +56,9 @@ module Clash.Cores.Xilinx.Floating
   , divWith
   , div
   , E.DivDefDelay
+  , fromU32With
+  , fromU32
+  , E.FromU32DefDelay
     -- * Customizing IP
   , E.Config(..)
   , E.defConfig
@@ -172,3 +176,29 @@ div
   -> DSignal dom (n + E.DivDefDelay) Float
 div = withFrozenCallStack $ hideEnable $ hideClock E.div
 {-# INLINE div #-}
+
+-- | Customizable conversion of @Unsigned 32@ to @Float@
+--
+-- Only the delay is configurable, so this function does not take a @Config@
+-- argument.
+fromU32With
+  :: ( HiddenClock dom
+     , HiddenEnable dom
+     , KnownNat d
+     , HasCallStack
+     )
+  => DSignal dom n (Unsigned 32)
+  -> DSignal dom (n + d) Float
+fromU32With = withFrozenCallStack $ hideEnable $ hideClock E.fromU32With
+{-# INLINE fromU32With #-}
+
+-- | Conversion of @Unsigned 32@ to @Float@, with default delay
+fromU32
+  :: ( HiddenClock dom
+     , HiddenEnable dom
+     , HasCallStack
+     )
+  => DSignal dom n (Unsigned 32)
+  -> DSignal dom (n + E.FromU32DefDelay) Float
+fromU32 = withFrozenCallStack $ hideEnable $ hideClock E.fromU32
+{-# INLINE fromU32 #-}

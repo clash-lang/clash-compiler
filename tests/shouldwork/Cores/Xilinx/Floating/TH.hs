@@ -1,5 +1,6 @@
 {-|
-Copyright  :  (C) 2021,      QBayLogic B.V.,
+Copyright  :  (C) 2021-2022, QBayLogic B.V.,
+                  2022     , Google Inc.,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -8,29 +9,14 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 module Floating.TH where
 
-import Clash.Prelude (BitPack, natToNum, SNat(..), unpack)
-import Clash.Prelude.ROM.File (memFile)
+import Clash.Prelude (natToNum, unpack, Unsigned)
 
 import Prelude
-import Language.Haskell.TH
-  (appTypeE, conE, ExpQ, litE, litT, numTyLit, stringL, tupE)
-import Language.Haskell.TH.Syntax (qRunIO)
 import Numeric.IEEE
   (epsilon, infinity, maxFinite, minDenormal, minNormal)
 
 import Clash.Cores.Xilinx.Floating as F
 import Clash.Cores.Xilinx.Floating.Internal as F
-
-romDataFromFile
-  :: BitPack a
-  => FilePath
-  -> [a]
-  -> ExpQ
-romDataFromFile file es =
-  qRunIO (writeFile file $ memFile (Just 0) es)
-  >> tupE [ appTypeE (conE 'SNat) (litT . numTyLit . toInteger $ length es)
-          , litE $ stringL file
-          ]
 
 delayOutput
   :: Int
@@ -535,6 +521,39 @@ nanTest =
     , (1, nan, F.xilinxNaN)
     , (nan, nan, F.xilinxNaN)
     ]
+
+fromUBasicSamples :: [(Unsigned 32, Float)]
+fromUBasicSamples = delayOutput0 (natToNum @F.FromU32DefDelay) $
+  map (\x -> (x, fromIntegral x))
+    [ 0
+    , 1
+    , maxBound
+
+      -- Patterns 0xaa and 0x55, but treating the "sign bit" separately. Floats
+      -- are stored in sign/magnitude form so signed and unsigned numbers are
+      -- not interchangeable like with two's complement. All these numbers
+      -- should be unsigned, verify that they are treated as such.
+    , 0b0010_1010_1010_1010_1010_1010_1010_1010
+    , 0b0101_0101_0101_0101_0101_0101_0101_0101
+    , 0b1010_1010_1010_1010_1010_1010_1010_1010
+    , 0b1101_0101_0101_0101_0101_0101_0101_0101
+
+    , -- Longest exactly representable
+      0b0000_0000_1111_1111_1111_1111_1111_1111
+
+    , -- Smallest with rounding
+      0b0000_0001_0000_0000_0000_0000_0000_0001
+
+      -- More rounding tests
+    , 0b0000_0001_0000_0000_0000_0000_0000_0011
+    , 0b0000_0010_0000_0000_0000_0000_0000_0001
+    ]
+ where
+  delayOutput0 d es = zip is os
+   where
+    (is0, os0) = unzip es
+    is = is0 ++ repeat (last is0)
+    os = replicate d 0 ++ os0
 
 -- Maximum subnormal value
 maxDenormal :: Float
