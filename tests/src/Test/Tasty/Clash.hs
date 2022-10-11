@@ -375,15 +375,14 @@ verilatorTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
 vivadoTests
   :: TestOptions
   -> IO FilePath
-  -> String
   -> ( [(TestName, TestTree)]
      , [(TestName, TestTree)]
      )
-vivadoTests opts tmpDir modName = ([], simTests)
+vivadoTests opts tmpDir = ([], simTests)
  where
   simTests =
     [ ( buildName t
-      , singleTest "Vivado" (VivadoTest tmpDir modName t)
+      , singleTest (buildName t) $ VivadoTest tmpDir (T.pack t)
       )
     | t <- getBuildTargets opts
     ]
@@ -469,12 +468,12 @@ runTest1 modName opts@TestOptions{..} path target =
   hdlTests tmpDir = case target of
     VHDL ->
       [ buildAndSimTests GHDL (ghdlTests opts tmpDir)
-      , buildAndSimTests Vivado (vivadoTests opts tmpDir modName)
+      , buildAndSimTests Vivado (vivadoTests opts tmpDir)
       ]
     Verilog ->
       [ buildAndSimTests IVerilog (iverilogTests opts tmpDir)
       , buildAndSimTests Verilator (verilatorTests opts tmpDir)
-      , buildAndSimTests Vivado (vivadoTests opts tmpDir modName)
+      , buildAndSimTests Vivado (vivadoTests opts tmpDir)
       ]
     SystemVerilog ->
       [ -- TODO: ModelSim can do VHDL and Verilog too. Add that?
