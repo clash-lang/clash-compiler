@@ -100,9 +100,9 @@ import           Clash.Core.Util
   (mkRTree,mkVec,tyNatSize,dataConInstArgTys,primCo, mkSelectorCase,undefinedPrims,
    undefinedXPrims)
 import           Clash.Core.Var      (mkLocalId, mkTyVar)
+import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug
 import           Clash.GHC.GHC2Core  (modNameM)
-import           Clash.Unique        (lookupUniqMap)
 import           Clash.Util
   (MonadUnique (..), clogBase, flogBase, curLoc)
 import           Clash.Normalize.PrimitiveReductions
@@ -262,7 +262,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce $ catchDivByZero (integerToIntLiteral (i `rem` j))
   "GHC.Prim.quotRemInt#" | Just (i,j) <- intLiterals args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            (q,r)   = quotRem i j
            ret     = mkApps (Data tupDc) (map Right tyArgs ++
@@ -285,7 +285,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   "GHC.Prim.addIntC#" | Just (i,j) <- intLiterals args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            !(I# a)  = fromInteger i
            !(I# b)  = fromInteger j
@@ -296,7 +296,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                    , Left (Literal . IntLiteral . toInteger $ I# c)])
   "GHC.Prim.subIntC#" | Just (i,j) <- intLiterals args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            !(I# a)  = fromInteger i
            !(I# b)  = fromInteger j
@@ -365,7 +365,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   "GHC.Prim.subWordC#" | Just (i,j) <- wordLiterals args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            !(W# a)  = fromInteger i
            !(W# b)  = fromInteger j
@@ -377,7 +377,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   "GHC.Prim.plusWord2#" | Just (i,j) <- wordLiterals args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            !(W# a)  = fromInteger i
            !(W# b)  = fromInteger j
@@ -394,7 +394,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   "GHC.Prim.timesWord2#" | Just (i,j) <- wordLiterals args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            !(W# a)  = fromInteger i
            !(W# b)  = fromInteger j
@@ -410,7 +410,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce $ catchDivByZero (integerToWordLiteral (i `rem` j))
   "GHC.Prim.quotRemWord#" | Just (i,j) <- wordLiterals args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            (q,r)   = quotRem i j
            ret     = mkApps (Data tupDc) (map Right tyArgs ++
@@ -419,7 +419,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce ret
   "GHC.Prim.quotRemWord2#" | [i,j,k'] <- wordLiterals' args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            !(W# a)  = fromInteger i
            !(W# b)  = fromInteger j
@@ -627,7 +627,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 -- decodeDouble_2Int# :: Double# -> (#Int#, Word#, Word#, Int##)
   "GHC.Prim.decodeDouble_2Int#" | [i] <- doubleLiterals' args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            !(D# a) = wordToDouble i
            !(# p, q, r, s #) = decodeDouble_2Int# a
@@ -640,7 +640,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 -- decodeDouble_Int64# :: Double# -> (# Int64#, Int# #)
   "GHC.Prim.decodeDouble_Int64#" | [i] <- doubleLiterals' args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            !(D# a) = wordToDouble i
            !(# p, q #) = decodeDouble_Int64# a
@@ -742,7 +742,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [iV,PrimVal rwTy _ _] <- args
     , [i] <- intLiterals' [iV]
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            p = primCount mach
            lit = Literal (ByteArrayLiteral (fromList (List.genericReplicate i 0)))
@@ -796,7 +796,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       ] <- args
     , [ba] <-  intLiterals' [baV]
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            Just ba' = primLookup (fromInteger ba) mach
        in  reduce $ mkApps (Data tupDc) (map Right tyArgs ++
@@ -820,7 +820,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       ] <- args
     , [ba] <- intLiterals' [baV]
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            Just (Literal (ByteArrayLiteral ba')) = primLookup (fromInteger ba) mach
            lit = Literal (IntLiteral (toInteger (BA.sizeofByteArray ba')))
@@ -835,7 +835,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       ] <- args
     , [ba,i] <- intLiterals' [baV,iV]
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            p = primCount mach
            Just (Literal (ByteArrayLiteral ba1))
@@ -897,7 +897,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       ] <- args
     , [ba,off] <- intLiterals' [baV,offV]
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            Just (Literal (ByteArrayLiteral ba1)) =
               primLookup (fromInteger ba) mach
@@ -915,7 +915,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 -- decodeFloat_Int# :: Float# -> (#Int#, Int##)
   "GHC.Prim.decodeFloat_Int#" | [i] <- floatLiterals' args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            !(F# a) = wordToFloat i
            !(# p, q #) = decodeFloat_Int# a
@@ -927,7 +927,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "GHC.Prim.tagToEnum#"
     | [ConstTy (TyCon tcN)] <- tys
     , [Lit (IntLiteral i)]  <- args
-    -> let dc = do { tc <- lookupUniqMap tcN tcm
+    -> let dc = do { tc <- UniqMap.lookup tcN tcm
                    ; let dcs = tyConDataCons tc
                    ; List.find ((== (i+1)) . toInteger . dcTag) dcs
                    }
@@ -1054,7 +1054,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 #endif
     | [Lit (DoubleLiteral i)] <- args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            !(D# a)  = wordToDouble i
            !(# b, c #) = decodeDoubleInteger a
@@ -1090,7 +1090,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 #endif
     | [i, j] <- integerLiterals' args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            (q,r) = quotRem i j
     in reduce $
@@ -1169,7 +1169,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 #endif
     | Just (i,j) <- integerLiterals args
     -> let (_,tyView -> TyConApp ubTupTcNm [liftedKi,_,intTy,_]) = splitFunForallTy ty
-           (Just ubTupTc) = lookupUniqMap ubTupTcNm tcm
+           (Just ubTupTc) = UniqMap.lookup ubTupTcNm tcm
            [ubTupDc] = tyConDataCons ubTupTc
            (d,m) = divMod i j
        in  reduce $
@@ -1284,7 +1284,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let -- Get the required result type (viewed as an applied type constructor name)
            (_,tyView -> TyConApp tupTcNm []) = splitFunForallTy ty
            -- Find the type constructor from the name
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            -- Get the data constructors of that type
            -- The type is 'Ordering', so they are: 'LT', 'EQ', 'GT'
            [ltDc, eqDc, gtDc] = tyConDataCons tupTc
@@ -1485,7 +1485,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "GHC.Num.Natural.naturalQuotRem#" -- :: Natural -> Natural -> (#Natural, Natural#)
     | [i, j] <- naturalLiterals' args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            (q,r) = quotRem (fromInteger i) (fromInteger j)
     in reduce $
@@ -1552,7 +1552,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let -- Get the required result type (viewed as an applied type constructor name)
            (_,tyView -> TyConApp tupTcNm []) = splitFunForallTy ty
            -- Find the type constructor from the name
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            -- Get the data constructors of that type
            -- The type is 'Ordering', so they are: 'LT', 'EQ', 'GT'
            [ltDc, eqDc, gtDc] = tyConDataCons tupTc
@@ -1611,28 +1611,28 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | isSubj
     , [Lit (IntLiteral i)] <- args
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
-            (Just intTc) = lookupUniqMap intTcNm tcm
+            (Just intTc) = UniqMap.lookup intTcNm tcm
             [intDc] = tyConDataCons intTc
         in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
   "GHC.Int.I16#"
     | isSubj
     , [Lit (IntLiteral i)] <- args
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
-            (Just intTc) = lookupUniqMap intTcNm tcm
+            (Just intTc) = UniqMap.lookup intTcNm tcm
             [intDc] = tyConDataCons intTc
         in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
   "GHC.Int.I32#"
     | isSubj
     , [Lit (IntLiteral i)] <- args
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
-            (Just intTc) = lookupUniqMap intTcNm tcm
+            (Just intTc) = UniqMap.lookup intTcNm tcm
             [intDc] = tyConDataCons intTc
         in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
   "GHC.Int.I64#"
     | isSubj
     , [Lit (IntLiteral i)] <- args
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
-            (Just intTc) = lookupUniqMap intTcNm tcm
+            (Just intTc) = UniqMap.lookup intTcNm tcm
             [intDc] = tyConDataCons intTc
         in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
 
@@ -1640,28 +1640,28 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | isSubj
     , [Lit (WordLiteral c)] <- args
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-            (Just wordTc) = lookupUniqMap wordTcNm tcm
+            (Just wordTc) = UniqMap.lookup wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
         in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
   "GHC.Word.W16#"
     | isSubj
     , [Lit (WordLiteral c)] <- args
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-            (Just wordTc) = lookupUniqMap wordTcNm tcm
+            (Just wordTc) = UniqMap.lookup wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
         in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
   "GHC.Word.W32#"
     | isSubj
     , [Lit (WordLiteral c)] <- args
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-            (Just wordTc) = lookupUniqMap wordTcNm tcm
+            (Just wordTc) = UniqMap.lookup wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
         in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
   "GHC.Word.W64#"
     | isSubj
     , [Lit (WordLiteral c)] <- args
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-            (Just wordTc) = lookupUniqMap wordTcNm tcm
+            (Just wordTc) = UniqMap.lookup wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
         in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
 
@@ -1871,7 +1871,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                  2 -> 1 `shiftL` (fromInteger b)
                  _ -> a ^ b
            (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-           (Just snatTc) = lookupUniqMap snatTcNm tcm
+           (Just snatTc) = UniqMap.lookup snatTcNm tcm
            [snatDc] = tyConDataCons snatTc
        in  reduce $
            mkApps (Data snatDc) [ Right (LitTy (NumTy c))
@@ -1882,7 +1882,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , Just c <- flogBase a b
     , let c' = toInteger c
     -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-           (Just snatTc) = lookupUniqMap snatTcNm tcm
+           (Just snatTc) = UniqMap.lookup snatTcNm tcm
            [snatDc] = tyConDataCons snatTc
        in  reduce $
            mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
@@ -1893,7 +1893,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , Just c <- clogBase a b
     , let c' = toInteger c
     -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-           (Just snatTc) = lookupUniqMap snatTcNm tcm
+           (Just snatTc) = UniqMap.lookup snatTcNm tcm
            [snatDc] = tyConDataCons snatTc
        in  reduce $
            mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
@@ -1906,7 +1906,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , Just c <- flogBase a b
     , let c' = toInteger c
     -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-           (Just snatTc) = lookupUniqMap snatTcNm tcm
+           (Just snatTc) = UniqMap.lookup snatTcNm tcm
            [snatDc] = tyConDataCons snatTc
        in  reduce $
            mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
@@ -1930,13 +1930,13 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "Clash.Sized.Internal.BitVector.size#"
     | Just (_, kn) <- extractKnownNat tcm tys
     -> let (_,tyView -> TyConApp intTcNm _) = splitFunForallTy ty
-           (Just intTc) = lookupUniqMap intTcNm tcm
+           (Just intTc) = UniqMap.lookup intTcNm tcm
            [intCon] = tyConDataCons intTc
        in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral kn))])
   "Clash.Sized.Internal.BitVector.maxIndex#"
     | Just (_, kn) <- extractKnownNat tcm tys
     -> let (_,tyView -> TyConApp intTcNm _) = splitFunForallTy ty
-           (Just intTc) = lookupUniqMap intTcNm tcm
+           (Just intTc) = UniqMap.lookup intTcNm tcm
            [intCon] = tyConDataCons intTc
        in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral (kn-1)))])
 
@@ -2096,7 +2096,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , [(mski,i)] <- bitVectorLiterals' args
     -> let ty' = piResultTys tcm ty tys
            (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty'
-           (Just tupTc) = lookupUniqMap tupTcNm tcm
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
            bvTy : _ = tyArgs
            valM = i `shiftR` fromInteger n
@@ -2440,7 +2440,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "Clash.Sized.Internal.Signed.size#"
     | Just (_, kn) <- extractKnownNat tcm tys
     -> let (_,tyView -> TyConApp intTcNm _) = splitFunForallTy ty
-           (Just intTc) = lookupUniqMap intTcNm tcm
+           (Just intTc) = UniqMap.lookup intTcNm tcm
            [intCon] = tyConDataCons intTc
        in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral kn))])
 
@@ -2662,7 +2662,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | Just (_, kn) <- extractKnownNat tcm tys
     -> let (_,ty') = splitFunForallTy ty
            (TyConApp intTcNm _) = tyView ty'
-           (Just intTc) = lookupUniqMap intTcNm tcm
+           (Just intTc) = UniqMap.lookup intTcNm tcm
            [intCon] = tyConDataCons intTc
        in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral kn))])
 
@@ -2845,7 +2845,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , [a] <- unsignedLiterals' args
     -> let b = Unsigned.unsignedToWord (U (fromInteger a))
            (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-           (Just wordTc) = lookupUniqMap wordTcNm tcm
+           (Just wordTc) = UniqMap.lookup wordTcNm tcm
            [wordDc] = tyConDataCons wordTc
        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
 
@@ -2854,7 +2854,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , [a] <- unsignedLiterals' args
     -> let b = Unsigned.unsigned8toWord8 (U (fromInteger a))
            (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-           (Just wordTc) = lookupUniqMap wordTcNm tcm
+           (Just wordTc) = UniqMap.lookup wordTcNm tcm
            [wordDc] = tyConDataCons wordTc
        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
 
@@ -2863,7 +2863,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , [a] <- unsignedLiterals' args
     -> let b = Unsigned.unsigned16toWord16 (U (fromInteger a))
            (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-           (Just wordTc) = lookupUniqMap wordTcNm tcm
+           (Just wordTc) = UniqMap.lookup wordTcNm tcm
            [wordDc] = tyConDataCons wordTc
        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
 
@@ -2872,7 +2872,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , [a] <- unsignedLiterals' args
     -> let b = Unsigned.unsigned32toWord32 (U (fromInteger a))
            (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-           (Just wordTc) = lookupUniqMap wordTcNm tcm
+           (Just wordTc) = UniqMap.lookup wordTcNm tcm
            [wordDc] = tyConDataCons wordTc
        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
 
@@ -2895,7 +2895,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , [DC _ tArgs] <- args
     , (tyArgs,tyView -> TyConApp tupTcNm _) <- splitFunForallTy ty
     , TyConApp treeTcNm _ <- tyView (Either.rights tyArgs !! 0)
-    -> let (Just tupTc) = lookupUniqMap tupTcNm tcm
+    -> let (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc]      = tyConDataCons tupTc
        in  reduce $
            mkApps (Data tupDc)
@@ -2917,7 +2917,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                   (tyArgs,_)  = splitFunForallTy ty
                   (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 3)
                   TyConApp snatTcNm _ = tyView (Either.rights tyArgs' !! 0)
-                  Just snatTc = lookupUniqMap snatTcNm tcm
+                  Just snatTc = UniqMap.lookup snatTcNm tcm
                   [snatDc]    = tyConDataCons snatTc
               in  reduceWHNF $
                   mkApps (valToTerm g)
@@ -2952,7 +2952,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , let ty' = piResultTys tcm ty tys
     , (_,tyView -> TyConApp treeTcNm [lenTy,argTy]) <- splitFunForallTy ty'
     , Right len <- runExcept (tyNatSize tcm lenTy)
-    -> let (Just treeTc) = lookupUniqMap treeTcNm tcm
+    -> let (Just treeTc) = UniqMap.lookup treeTcNm tcm
            [lrCon,brCon] = tyConDataCons treeTc
        in  reduce (mkRTree lrCon brCon argTy len (replicate (2^len) (valToTerm (last args))))
 
@@ -2964,7 +2964,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , [nTy, _] <- tys
     , Right n <-runExcept (tyNatSize tcm nTy)
     -> let (_, tyView -> TyConApp intTcNm _) = splitFunForallTy ty
-           (Just intTc) = lookupUniqMap intTcNm tcm
+           (Just intTc) = UniqMap.lookup intTcNm tcm
            [intCon] = tyConDataCons intTc
        in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral (toInteger n)))])
 
@@ -2973,7 +2973,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , [nTy, _] <- tys
     , Right n <- runExcept (tyNatSize tcm nTy)
     -> let (_, tyView -> TyConApp intTcNm _) = splitFunForallTy ty
-           (Just intTc) = lookupUniqMap intTcNm tcm
+           (Just intTc) = UniqMap.lookup intTcNm tcm
            [intCon] = tyConDataCons intTc
        in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral (toInteger (n - 1))))])
 
@@ -3112,11 +3112,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                      ]
     where
       (tyArgs,tyView -> TyConApp vecTcNm _) = splitFunForallTy ty
-      Just vecTc          = lookupUniqMap vecTcNm tcm
+      Just vecTc          = UniqMap.lookup vecTcNm tcm
       [nilCon,consCon]    = tyConDataCons vecTc
       TyConApp snatTcNm _ = tyView (Either.rights tyArgs !! 1)
       tupTcNm            = ghcTyconToTyConName (tupleTyCon Boxed 2)
-      (Just tupTc)       = lookupUniqMap tupTcNm tcm
+      (Just tupTc)       = UniqMap.lookup tupTcNm tcm
       [tupDc]            = tyConDataCons tupTc
 -- - Splitting
   "Clash.Sized.Vector.splitAt" -- :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
@@ -3127,11 +3127,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            -- Get the tuple data-constructor
            ty1 = piResultTys tcm ty tys
            (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty1
-           (Just tupTc)       = lookupUniqMap tupTcNm tcm
+           (Just tupTc)       = UniqMap.lookup tupTcNm tcm
            [tupDc]            = tyConDataCons tupTc
            -- Get the vector data-constructors
            TyConApp vecTcNm _ = tyView (head tyArgs)
-           Just vecTc         = lookupUniqMap vecTcNm tcm
+           Just vecTc         = UniqMap.lookup vecTcNm tcm
            [nilCon,consCon]   = tyConDataCons vecTc
            -- Recursive call to @splitAt@
            splitAtRec v =
@@ -3184,10 +3184,10 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , Lit (NaturalLiteral n) <- kn
     -> let ( Either.rights -> argTys, tyView -> TyConApp vecTcNm _) =
               splitFunForallTy ty
-           Just vecTc = lookupUniqMap vecTcNm tcm
+           Just vecTc = UniqMap.lookup vecTcNm tcm
            [nilCon,consCon]   = tyConDataCons vecTc
            tupTcNm            = ghcTyconToTyConName (tupleTyCon Boxed 2)
-           (Just tupTc)       = lookupUniqMap tupTcNm tcm
+           (Just tupTc)       = UniqMap.lookup tupTcNm tcm
            [tupDc]            = tyConDataCons tupTc
            TyConApp snatTcNm _ = tyView (argTys !! 1)
            n1mTy  = mkTyConApp typeNatMul
@@ -3232,7 +3232,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , let (_,resTy) = splitFunForallTy ty'
     , (TyConApp vecTcNm [lenTy,argTy]) <- tyView resTy
     , Right len <- runExcept (tyNatSize tcm lenTy)
-    -> let (Just vecTc) = lookupUniqMap vecTcNm tcm
+    -> let (Just vecTc) = UniqMap.lookup vecTcNm tcm
            [nilCon,consCon] = tyConDataCons vecTc
        in  reduce $
            mkVec nilCon consCon argTy len
@@ -3320,7 +3320,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
          Right 0 -> reduce (mkVecNil vecDc aTy)
          Right n
            | (_,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
-           , let (Just vecTc) = lookupUniqMap vecTcNm tcm
+           , let (Just vecTc) = UniqMap.lookup vecTcNm tcm
            , let [nilCon,consCon] = tyConDataCons vecTc
            -> reduceWHNF $
               mkApps (vecAppendPrim vecTcNm)
@@ -3344,12 +3344,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , Right n <- runExcept (tyNatSize tcm nTy)
     , Right m <- runExcept (tyNatSize tcm mTy)
     -> case m of
-      0 -> let (Just vecTc)     = lookupUniqMap vecTcNm tcm
+      0 -> let (Just vecTc)     = UniqMap.lookup vecTcNm tcm
                [nilCon,consCon] = tyConDataCons vecTc
            in  reduce $
                mkVec nilCon consCon (mkTyConApp vecTcNm [mTy,aTy]) n
                 (replicate (fromInteger n) (mkVec nilCon consCon aTy 0 []))
-      m' -> let (Just vecTc)     = lookupUniqMap vecTcNm tcm
+      m' -> let (Just vecTc)     = UniqMap.lookup vecTcNm tcm
                 [_,consCon] = tyConDataCons vecTc
                 Just (consCoTy : _) = dataConInstArgTys consCon
                                         [mTy,aTy,LitTy (NumTy (m'-1))]
@@ -3388,7 +3388,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
             -> case (d2 `mod` n) of
                  0  -> reduce (valToTerm xs)
                  d3 -> let (_,tyView -> TyConApp vecTcNm _) = splitFunForallTy ty
-                           (Just vecTc)     = lookupUniqMap vecTcNm tcm
+                           (Just vecTc)     = UniqMap.lookup vecTcNm tcm
                            [nilCon,consCon] = tyConDataCons vecTc
                        in  reduceWHNF' mach2 $
                            mkApps (Prim pInfo)
@@ -3517,7 +3517,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     ->
       let
         TyConApp vecTcNm _ = tyView (getResultTy tcm ty tys)
-        Just vecTc = lookupUniqMap vecTcNm tcm
+        Just vecTc = UniqMap.lookup vecTcNm tcm
         [nilCon, consCon] = tyConDataCons vecTc
       in case n of
          0 -> reduce (mkVecNil nilCon aTy)
@@ -3597,7 +3597,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
          _ -> let (tyArgs,_)         = splitFunForallTy ty
                   TyConApp vecTcNm _ = tyView (Either.rights tyArgs !! 1)
                   tupTcNm      = ghcTyconToTyConName (tupleTyCon Boxed 2)
-                  (Just tupTc) = lookupUniqMap tupTcNm tcm
+                  (Just tupTc) = UniqMap.lookup tupTcNm tcm
                   [tupDc]      = tyConDataCons tupTc
                   n'     = n+1
                   m      = n' `div` 2
@@ -3648,11 +3648,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let -- Get the tuple data-constructor
            ty1 = piResultTys tcm ty tys
            (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty1
-           (Just tupTc)       = lookupUniqMap tupTcNm tcm
+           (Just tupTc)       = UniqMap.lookup tupTcNm tcm
            [tupDc]            = tyConDataCons tupTc
            -- Get the vector data-constructors
            TyConApp vecTcNm _ = tyView (head tyArgs)
-           Just vecTc         = lookupUniqMap vecTcNm tcm
+           Just vecTc         = UniqMap.lookup vecTcNm tcm
            [nilCon,consCon]   = tyConDataCons vecTc
            -- Recursive call to @splitAt@
            splitAtRec v =
@@ -3706,7 +3706,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
          _ -> let (tyArgs,_)  = splitFunForallTy ty
                   (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 2)
                   TyConApp snatTcNm _ = tyView (Either.rights tyArgs' !! 0)
-                  Just snatTc = lookupUniqMap snatTcNm tcm
+                  Just snatTc = UniqMap.lookup snatTcNm tcm
                   [snatDc]    = tyConDataCons snatTc
                   k'ty        = LitTy (NumTy (k'-1))
               in  reduceWHNF $
@@ -3739,10 +3739,10 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                   TyConApp vecTcNm _ = tyView (Either.rights tyArgs !! 4)
                   (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 3)
                   TyConApp snatTcNm _ = tyView (Either.rights tyArgs' !! 0)
-                  Just snatTc = lookupUniqMap snatTcNm tcm
+                  Just snatTc = UniqMap.lookup snatTcNm tcm
                   [snatDc]    = tyConDataCons snatTc
                   tupTcNm     = ghcTyconToTyConName (tupleTyCon Boxed 2)
-                  (Just tupTc) = lookupUniqMap tupTcNm tcm
+                  (Just tupTc) = UniqMap.lookup tupTcNm tcm
                   [tupDc]     = tyConDataCons tupTc
                   k'ty        = LitTy (NumTy (k'-1))
                   k2ty        = LitTy (NumTy (2^(k'-1)))
@@ -3798,10 +3798,10 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , (_,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
     , Right n <- runExcept (tyNatSize tcm nTy)
     -> case n of
-         0  -> let (Just vecTc) = lookupUniqMap vecTcNm tcm
+         0  -> let (Just vecTc) = UniqMap.lookup vecTcNm tcm
                    [nilCon,_]   = tyConDataCons vecTc
                in  reduce (mkVecNil nilCon aTy)
-         n' -> let (Just vecTc) = lookupUniqMap vecTcNm tcm
+         n' -> let (Just vecTc) = UniqMap.lookup vecTcNm tcm
                    [_,consCon]  = tyConDataCons vecTc
                in  reduce $ mkVecCons consCon aTy n'
                      (mkApps (vecHeadPrim vecTcNm)
@@ -3906,14 +3906,14 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , Right n <- runExcept (tyNatSize tcm nTy)
     -> case n of
          0 ->
-          let (Just vecTc) = lookupUniqMap vecTcNm tcm
+          let (Just vecTc) = UniqMap.lookup vecTcNm tcm
               [nilCon,_] = tyConDataCons vecTc
           in  reduce (mkVecNil nilCon (mkTyConApp bvTcNm [mTy]))
          n' | Right m <- runExcept (tyNatSize tcm mTy) ->
-          let Just vecTc  = lookupUniqMap vecTcNm tcm
+          let Just vecTc  = UniqMap.lookup vecTcNm tcm
               [_,consCon] = tyConDataCons vecTc
               tupTcNm     = ghcTyconToTyConName (tupleTyCon Boxed 2)
-              Just tupTc  = lookupUniqMap tupTcNm tcm
+              Just tupTc  = UniqMap.lookup tupTcNm tcm
               [tupDc]     = tyConDataCons tupTc
               splitCall   =
                 mkApps (bvSplitPrim bvTcNm)
@@ -4239,7 +4239,7 @@ mkIntCLit tcm lit resTy =
   App (Data intDc) (Literal (IntLiteral lit))
  where
   (_, tyView -> TyConApp intTcNm []) = splitFunForallTy resTy
-  Just intTc = lookupUniqMap intTcNm tcm
+  Just intTc = UniqMap.lookup intTcNm tcm
   [intDc] = tyConDataCons intTc
 
 mkFloatCLit :: TyConMap -> Word32 -> Type -> Term
@@ -4247,7 +4247,7 @@ mkFloatCLit tcm lit resTy =
   App (Data floatDc) (Literal (FloatLiteral lit))
  where
   (_, tyView -> TyConApp floatTcNm []) = splitFunForallTy resTy
-  (Just floatTc) = lookupUniqMap floatTcNm tcm
+  (Just floatTc) = UniqMap.lookup floatTcNm tcm
   [floatDc] = tyConDataCons floatTc
 
 mkDoubleCLit :: TyConMap -> Word64 -> Type -> Term
@@ -4255,7 +4255,7 @@ mkDoubleCLit tcm lit resTy =
   App (Data doubleDc) (Literal (DoubleLiteral lit))
  where
   (_, tyView -> TyConApp doubleTcNm []) = splitFunForallTy resTy
-  (Just doubleTc) = lookupUniqMap doubleTcNm tcm
+  (Just doubleTc) = UniqMap.lookup doubleTcNm tcm
   [doubleDc] = tyConDataCons doubleTc
 
 mkSomeNat :: TyConMap -> Integer -> Type -> Term
@@ -4268,13 +4268,13 @@ mkSomeNat tcm lit resTy =
  where
   -- Get the SomeNat data constructor
   TyConApp someNatTcNm [] = tyView resTy
-  (Just someNatTc) = lookupUniqMap someNatTcNm tcm
+  (Just someNatTc) = UniqMap.lookup someNatTcNm tcm
   [someNatDc] = tyConDataCons someNatTc
 
   -- Get the Proxy data constructor
   (_:_:Right (tyView -> TyConApp proxyTcNm [natTy,_]):_,_) =
     splitFunForallTy (dcType someNatDc)
-  (Just proxyTc) = lookupUniqMap proxyTcNm tcm
+  (Just proxyTc) = UniqMap.lookup proxyTcNm tcm
   [proxyDc] = tyConDataCons proxyTc
 
   -- Build the Proxy argument
@@ -4431,7 +4431,7 @@ boolToIntLiteral b = if b then Literal (IntLiteral 1) else Literal (IntLiteral 0
 boolToBoolLiteral :: TyConMap -> Type -> Bool -> Term
 boolToBoolLiteral tcm ty b =
  let (_,tyView -> TyConApp boolTcNm []) = splitFunForallTy ty
-     (Just boolTc) = lookupUniqMap boolTcNm tcm
+     (Just boolTc) = UniqMap.lookup boolTcNm tcm
      [falseDc,trueDc] = tyConDataCons boolTc
      retDc = if b then trueDc else falseDc
  in  Data retDc

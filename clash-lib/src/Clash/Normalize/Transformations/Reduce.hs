@@ -35,13 +35,13 @@ import Clash.Core.Term
 import Clash.Core.TyCon (tyConDataCons)
 import Clash.Core.Type (TypeView(..), mkTyConApp, tyView)
 import Clash.Core.Util (mkVec, shouldSplit, tyNatSize)
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Normalize.PrimitiveReductions
 import Clash.Normalize.Primitives (removedArg)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Normalize.Util (shouldReduce)
 import Clash.Rewrite.Types (TransformContext(..), tcCache, normalizeUltra)
 import Clash.Rewrite.Util (changed, isUntranslatableType, setChanged, whnfRW)
-import Clash.Unique (lookupUniqMap)
 
 -- | XXX: is given inverse topologically sorted binders, but returns
 -- topologically sorted binders
@@ -153,7 +153,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
   case tyView eTy of
     (TyConApp vecTcNm@(nameOcc -> "Clash.Sized.Vector.Vec")
               [runExcept . tyNatSize tcm -> Right 0, aTy]) -> do
-      let (Just vecTc) = lookupUniqMap vecTcNm tcm
+      let (Just vecTc) = UniqMap.lookup vecTcNm tcm
           [nilCon,consCon] = tyConDataCons vecTc
           nilE = mkVec nilCon consCon aTy 0 []
       changed (mkTicks nilE ticks)
@@ -439,7 +439,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
         case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy), tv) of
           (Right n, Right m, TyConApp tupTcNm [lTy,rTy])
             | n == 0 -> do
-              let (Just tupTc) = lookupUniqMap tupTcNm tcm
+              let (Just tupTc) = UniqMap.lookup tupTcNm tcm
                   [tupDc]      = tyConDataCons tupTc
                   tup          = mkApps (Data tupDc)
                                     [Right lTy
@@ -450,7 +450,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
 
               changed (mkTicks tup ticks)
             | m == 0 -> do
-              let (Just tupTc) = lookupUniqMap tupTcNm tcm
+              let (Just tupTc) = UniqMap.lookup tupTcNm tcm
                   [tupDc]      = tyConDataCons tupTc
                   tup          = mkApps (Data tupDc)
                                     [Right lTy
@@ -465,7 +465,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
         | ([_,_],[nTy]) <- Either.partitionEithers args
         , Right 0 <- runExcept (tyNatSize tcm nTy)
         , TyConApp boolTcNm [] <- tv
-        -> let (Just boolTc) = lookupUniqMap boolTcNm tcm
+        -> let (Just boolTc) = UniqMap.lookup boolTcNm tcm
                [_falseDc,trueDc] = tyConDataCons boolTc
            in  changed (mkTicks (Data trueDc) ticks)
       _ -> return e

@@ -32,7 +32,6 @@ module Clash.Core.TysPrim
   )
 where
 
-import qualified Data.List            as List
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Builtin.Names
@@ -46,7 +45,7 @@ import           Clash.Core.Name
 import           Clash.Core.TyCon
 import           Clash.Core.Type
 import           Clash.Core.Var (mkTyVar)
-import           Clash.Unique
+import qualified Clash.Data.UniqMap as UniqMap
 
 -- | Builtin Name
 liftedTypeKindTyConName, typeNatKindTyConName, typeSymbolKindTyConName :: TyConName
@@ -156,7 +155,7 @@ byteArrayPrimTy = mkTyConTy byteArrayPrimTyConName
 eqPrimTy = mkTyConTy eqPrimTyConName
 
 tysPrimMap :: TyConMap
-tysPrimMap = List.foldl' (\s (k,x) -> extendUniqMap k x s) emptyUniqMap
+tysPrimMap = UniqMap.fromList
   [  (liftedTypeKindTyConName , liftedTypeKindTc)
   ,  (typeNatKindTyConName , typeNatKindTc)
   ,  (typeSymbolKindTyConName , typeSymbolKindTc)

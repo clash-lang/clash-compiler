@@ -62,6 +62,7 @@ import Clash.Core.Var (isGlobalId)
 import Clash.Core.VarEnv
   ( InScopeSet, elemInScopeSet, emptyVarEnv, extendInScopeSetList, lookupVarEnv
   , unionVarEnvWith, unitVarEnv, mkVarSet)
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Netlist.BlackBox.Types ()
 import Clash.Netlist.BlackBox.Util (getUsedArguments)
 import Clash.Netlist.Util (splitNormalized)
@@ -74,7 +75,6 @@ import Clash.Rewrite.Types
 import Clash.Rewrite.Util
   (changed, isFromInt, isUntranslatable, mkTmBinderFor, removeUnusedBinders, setChanged)
 import Clash.Rewrite.WorkFree
-import Clash.Unique (lookupUniqMap)
 
 {- [Note: Name re-creation]
 The names of heap bound variables are safely generate with mkUniqSystemId in
@@ -161,7 +161,7 @@ removeUnusedExpr _ e@(collectArgsTicks -> (Data dc, [_,Right aTy,Right nTy,_,Lef
         , not (isCon con)
         -> let eTy = inferCoreTypeOf tcm e
                (TyConApp vecTcNm _) = tyView eTy
-               (Just vecTc) = lookupUniqMap vecTcNm tcm
+               (Just vecTc) = UniqMap.lookup vecTcNm tcm
                [nilCon,consCon] = tyConDataCons vecTc
                v = mkTicks (mkVec nilCon consCon aTy 1 [a]) ticks
            in  changed v

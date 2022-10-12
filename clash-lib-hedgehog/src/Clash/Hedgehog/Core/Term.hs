@@ -25,7 +25,8 @@ import Clash.Core.Type
 import Clash.Core.TysPrim (liftedTypeKind, typeSymbolKind)
 import Clash.Core.Util (listToLets)
 import Clash.Core.Var
-import Clash.Unique
+import Clash.Data.UniqMap (UniqMap)
+import qualified Clash.Data.UniqMap as UniqMap
 
 import Clash.Hedgehog.Core.Literal
 import Clash.Hedgehog.Core.Monad
@@ -61,7 +62,7 @@ sampleDataConOr tcm hole genSub genOr =
     -- kinds other than Type, i.e. no type params / poly kinds. See the
     -- 'genAlgTyCon' function and NOTE [finding more complex fits].
     let dcs = concatMap tyConDataCons tcm
-    let dcm = listToUniqMap (zip dcs dcs)
+    let dcm = UniqMap.fromList (zip dcs dcs)
     (dc, holes) <- sampleUniqMap (const True) hole dcm
     holeFills <- traverse genSub holes
 
@@ -87,7 +88,7 @@ sampleIdOr env hole genSub genOr =
   sampleId <|> genOr
  where
   sampleId = do
-    let tmEnv = mapMaybeUniqMap (either (const Nothing) Just) env
+    let tmEnv = UniqMap.mapMaybe (either (const Nothing) Just) env
     (i, holes) <- sampleUniqMap (const True) hole tmEnv
     holeFills <- traverse genSub holes
 
@@ -155,7 +156,7 @@ genFreshTerm tcm env hole =
     -- Hole: forall i. a
     normHole@(ForAllTy i a) ->
       Gen.recursive Gen.choice
-        [TyLam i <$> genTermFrom tcm (extendUniqMap i (Left i) env) a]
+        [TyLam i <$> genTermFrom tcm (UniqMap.insert i (Left i) env) a]
         [Tick <$> genTickInfo tcm <*> genFreshTerm tcm env normHole]
 
     AnnType _ a ->
@@ -166,14 +167,14 @@ genFreshTerm tcm env hole =
         -- Hole: a -> b
         FunTy a b ->
           Gen.recursive Gen.choice
-            [do i <- genLocalId a (genFreshName (uniqMapToUniqSet env) genVarName)
-                Gen.subterm (genTermFrom tcm (extendUniqMap i (Right i) env) b) (Lam i)
+            [do i <- genLocalId a (genFreshName env genVarName)
+                Gen.subterm (genTermFrom tcm (UniqMap.insert i (Right i) env) b) (Lam i)
             ]
             [Tick <$> genTickInfo tcm <*> genFreshTerm tcm env normHole]
 
         -- Hole: Primitive type constructor.
         TyConApp tcn []
-          |  Just PrimTyCon{} <- lookupUniqMap tcn tcm
+          |  Just PrimTyCon{} <- UniqMap.lookup tcn tcm
           -> Gen.recursive Gen.choice
                [Literal <$> genLiteralFrom normHole]
                -- We may fail to generate a case expression if there is nothing
@@ -185,7 +186,7 @@ genFreshTerm tcm env hole =
 
         -- Hole: Algebraic type constructor.
         TyConApp tcn _
-          |  Just AlgTyCon{} <- lookupUniqMap tcn tcm
+          |  Just AlgTyCon{} <- UniqMap.lookup tcn tcm
           -- We may have got here by trying to fill the hole with an identifier, so
           -- it makes sense to try again. If we got here by sampleDataConOr, the
           -- data constructor is isomorphic to Void, and we will hit the error.
@@ -219,7 +220,7 @@ genLet
 genLet tcm env hole = do
   binds <- genLetBindings tcm env
   let vars = fmap fst binds
-  let env' = extendListUniqMap env (zip vars (fmap Right vars))
+  let env' = UniqMap.insertMany (zip vars (fmap Right vars)) env
 
   body <- genTermFrom tcm env' hole
 
@@ -232,7 +233,7 @@ genLetBindings
   -> UniqMap (Either TyVar Id)
   -> CoreGenT m [LetBinding]
 genLetBindings tcm env = do
-  let tyEnv = mapMaybeUniqMap (either Just (const Nothing)) env
+  let tyEnv = UniqMap.mapMaybe (either Just (const Nothing)) env
   -- Limit the number of new bindings to 8 to prevent an explosion in the
   -- number of sub-holes to generate.
   types <- Gen.list (Range.linear 1 8) (genMonoTypeFrom tcm tyEnv liftedTypeKind)
@@ -242,7 +243,7 @@ genLetBindings tcm env = do
     -- Bindings can be indirectly recursive, but not directly recursive. This
     -- stops the generator from generating let x = x in ...
     let vars' = filter (/= v) vars
-        env' = extendListUniqMap env (zip vars' (fmap Right vars'))
+        env' = UniqMap.insertMany (zip vars' (fmap Right vars')) env
      in (v,) <$> genTermFrom tcm env' ty
 
 {-
@@ -285,13 +286,13 @@ genCase tcm env altTy = do
   -- I need to select something as the subject. It can be any type, but should
   -- bias towards something from the environment where possible. It may not be
   -- possible though, so I should be able to fallback to just building a term.
-  let tmEnv = mapMaybeUniqMap (either (const Nothing) Just) env
+  let tmEnv = UniqMap.mapMaybe (either (const Nothing) Just) env
   subj <- sampleSubjFrom tmEnv
   let subjTy = inferCoreTypeOf tcm subj
 
   case fmap fst (splitTyConAppM subjTy) of
     Just tcn ->
-      case lookupUniqMap tcn tcm of
+      case UniqMap.lookup tcn tcm of
         Just tc@AlgTyCon{} -> do
           dcs <- Gen.subsequence (tyConDataCons tc)
           dcPats <- traverse genDataPatFrom dcs
@@ -335,7 +336,7 @@ genCase tcm env altTy = do
     let toIdBind x = (varUniq x, Right x)
 
     -- Generate the terms in alternatives with the newly bound vars in scope.
-    let env' = extendListUniqMap env (fmap toTvBind tvs <> fmap toIdBind ids)
+    let env' = UniqMap.insertMany (fmap toTvBind tvs <> fmap toIdBind ids) env
     term <- genTermFrom tcm env' altTy
 
     pure (pat, term)

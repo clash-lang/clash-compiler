@@ -30,13 +30,13 @@ import Clash.Core.TyCon                 (TyConMap, tyConDataCons)
 import Clash.Core.Type
   (LitTy (..), Type (..), TypeView (..), coreView, coreView1, tyView)
 import Clash.Core.Util                  (tyNatSize, substArgTys)
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Netlist.Util               (coreTypeToHWType, stripFiltered)
 import Clash.Netlist.Types
   (HWType(..), HWMap, FilteredHWType(..), PortDirection (..))
 import Clash.Signal.Internal
   (ResetPolarity(..), ActiveEdge(..), ResetKind(..)
   ,InitBehavior(..))
-import Clash.Unique                     (lookupUniqMap')
 import Clash.Util                       (curLoc)
 
 import Clash.Annotations.BitRepresentation.Internal
@@ -70,7 +70,7 @@ ghcTypeToHWType iw = go
         "GHC.Int.Int32"                 -> returnN (Signed 32)
         "GHC.Int.Int64"                 ->
           if iw < 64
-             then case tyConDataCons (m `lookupUniqMap'` tc) of
+             then case tyConDataCons (UniqMap.find tc m) of
                     [dc] -> case dcArgTys dc of
                       [tyView -> TyConApp nm _]
                         | nameOcc nm == "GHC.Prim.Int#"   ->
@@ -87,7 +87,7 @@ ghcTypeToHWType iw = go
         "GHC.Word.Word32"               -> returnN (Unsigned 32)
         "GHC.Word.Word64"               ->
           if iw < 64
-             then case tyConDataCons (m `lookupUniqMap'` tc) of
+             then case tyConDataCons (UniqMap.find tc m) of
                     [dc] -> case dcArgTys dc of
                       [tyView -> TyConApp nm _]
                         | nameOcc nm == "GHC.Prim.Word#"   ->
@@ -153,7 +153,7 @@ ghcTypeToHWType iw = go
 
 
         "Clash.Signal.Internal.KnownDomain"
-          -> case tyConDataCons (m `lookupUniqMap'` tc) of
+          -> case tyConDataCons (UniqMap.find tc m) of
                [dc] -> case substArgTys dc args of
                  [_,tyView -> TyConApp _ [_,dom]] -> case tyView (coreView m dom) of
                    TyConApp _ [tag0, period0, edge0, rstKind0, init0, polarity0] -> do

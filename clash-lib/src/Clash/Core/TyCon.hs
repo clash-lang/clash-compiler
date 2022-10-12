@@ -38,6 +38,7 @@ import Clash.Core.DataCon                     (DataCon)
 import Clash.Core.Name
 import {-# SOURCE #-} Clash.Core.Type         (Kind, Type)
 import Clash.Core.Var                         (TyVar)
+import Clash.Data.UniqMap (UniqMap)
 import Clash.Unique
 
 -- | Type Constructor

@@ -88,13 +88,13 @@ import Clash.Core.Var (isGlobalId, isLocalId, varName)
 import Clash.Core.VarEnv
   ( InScopeSet, elemInScopeSet, extendInScopeSet, extendInScopeSetList
   , notElemInScopeSet, unionInScope)
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Normalize.Transformations.Letrec (deadCode)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Combinators (bottomupR)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (changed, isUntranslatableType)
 import Clash.Rewrite.WorkFree (isConstant)
-import Clash.Unique (lookupUniqMap)
 import Clash.Util (MonadUnique, curLoc)
 
 -- | This transformation lifts applications of global binders out of
@@ -621,7 +621,7 @@ findTup :: TyConMap -> IntMap TyConName -> Int -> (TyConName,DataCon)
 findTup tcm tupTcm n = (tupTcNm,tupDc)
   where
     tupTcNm      = Maybe.fromMaybe (error $ $curLoc ++ "Can't find " ++ show n ++ "-tuple") $ IntMap.lookup n tupTcm
-    Just tupTc   = lookupUniqMap tupTcNm tcm
+    Just tupTc   = UniqMap.lookup tupTcNm tcm
     [tupDc]      = tyConDataCons tupTc
 
 mkBigTupTm :: TyConMap -> IntMap TyConName -> [(Type,Term)] -> Term

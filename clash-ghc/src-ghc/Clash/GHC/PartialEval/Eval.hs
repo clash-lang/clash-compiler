@@ -49,9 +49,9 @@ import           Clash.Core.TyCon (tyConDataCons)
 import           Clash.Core.Type
 import           Clash.Core.TysPrim (integerPrimTy)
 import           Clash.Core.Var
+import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Driver.Types (Binding(..), IsPrim(..))
 import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
-import           Clash.Unique (lookupUniqMap')
 
 -- | Evaluate a term to WHNF.
 --
@@ -461,10 +461,10 @@ matchLiteral lit alt@(pat, _) =
 #endif
     tcm <- getTyConMap
     let Just integerTcName = fmap fst (splitTyConAppM integerPrimTy)
-        [_, jpDc, _] = tyConDataCons (lookupUniqMap' tcm integerTcName)
+        [_, jpDc, _] = tyConDataCons (UniqMap.find integerTcName tcm)
         ([bnTy], _) = splitFunTys tcm (dcType jpDc)
         Just bnTcName = fmap fst (splitTyConAppM bnTy)
-        [bnDc] = tyConDataCons (lookupUniqMap' tcm bnTcName)
+        [bnDc] = tyConDataCons (UniqMap.find bnTcName tcm)
 
     let arr = ByteArrayLiteral (ByteArray ba)
     val <- VData bnDc [Left (VLiteral arr)] <$> getLocalEnv

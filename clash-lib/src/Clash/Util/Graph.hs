@@ -19,8 +19,8 @@ import qualified Data.IntSet           as IntSet
 
 import           Clash.Core.Var (Id)
 import           Clash.Core.Term (Term)
+import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Driver.Types (BindingMap, Binding (bindingTerm))
-import           Clash.Unique (lookupUniqMap', keysUniqMap)
 import           Clash.Normalize.Util (callGraph)
 
 data Marker
@@ -145,6 +145,6 @@ callGraphBindings
   -- ^ Root of the call graph
   -> [Term]
 callGraphBindings bindingsMap tm =
-  map (bindingTerm . (bindingsMap `lookupUniqMap'`)) (keysUniqMap cg)
+  map (bindingTerm . (`UniqMap.find` bindingsMap)) (UniqMap.keys cg)
   where
     cg = callGraph bindingsMap tm

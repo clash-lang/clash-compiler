@@ -104,7 +104,7 @@ import           Clash.Core.Name
 import {-# SOURCE #-} Clash.Core.Subst
 import           Clash.Core.TyCon
 import           Clash.Core.Var
-import           Clash.Unique
+import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Util
 
 #if __GLASGOW_HASKELL__ <= 806
@@ -263,7 +263,7 @@ coreView1 tcMap ty = case tyView ty of
     , [_,elTy] <- args
     -> Just elTy
     | otherwise
-    -> case tcMap `lookupUniqMap'` tcNm of
+    -> case UniqMap.find tcNm tcMap of
          AlgTyCon {algTcRhs = (NewTyCon _ nt)}
            -> newTyConInstRhs nt args
          _ -> reduceTypeFamily tcMap ty
@@ -525,9 +525,9 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
   | nameUniq tc == getKey typeNatLeqTyFamNameKey
   = case mapMaybe (litView tcm) tys of
       [i1, i2]
-        | Just (FunTyCon {tyConKind = tck}) <- lookupUniqMap tc tcm
+        | Just (FunTyCon {tyConKind = tck}) <- UniqMap.lookup tc tcm
         , (_,tyView -> TyConApp boolTcNm []) <- splitFunTys tcm tck
-        , Just boolTc <- lookupUniqMap boolTcNm tcm
+        , Just boolTc <- UniqMap.lookup boolTcNm tcm
         -> let [falseTc,trueTc] = map (coerce . dcName) (tyConDataCons boolTc)
             in  if i1 <= i2 then Just (mkTyConApp trueTc [])
                             else Just (mkTyConApp falseTc [])
@@ -614,7 +614,7 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
         -> Just (LitTy (NumTy (i1 `mod` i2)))
       _ -> Nothing
 
-  | Just (FunTyCon {tyConSubst = tcSubst}) <- lookupUniqMap tc tcm
+  | Just (FunTyCon {tyConSubst = tcSubst}) <- UniqMap.lookup tc tcm
   = let -- See [Note: Eager type families]
         tysR = map (argView tcm) tys
      in findFunSubst tcm tcSubst tysR
@@ -624,7 +624,7 @@ reduceTypeFamily _ _ = Nothing
 -- |
 isTypeFamilyApplication ::  TyConMap -> Type -> Bool
 isTypeFamilyApplication tcm (tyView -> TyConApp tcNm _args)
-  | Just (FunTyCon {}) <- lookupUniqMap tcNm tcm = True
+  | Just (FunTyCon {}) <- UniqMap.lookup tcNm tcm = True
 isTypeFamilyApplication _tcm _type = False
 
 argView :: TyConMap -> Type -> Type
@@ -663,7 +663,7 @@ normalizeType tcMap = go
         nameOcc tcNm == "Clash.Sized.Internal.Unsigned.Unsigned"
       -> mkTyConApp tcNm (map go args)
       | otherwise
-      -> case lookupUniqMap' tcMap tcNm of
+      -> case UniqMap.find tcNm tcMap of
           AlgTyCon {algTcRhs = (NewTyCon _ nt)}
              -> case newTyConInstRhs nt args of
                   Just ty' -> go ty'
@@ -691,7 +691,7 @@ isClassTy
   -> Type
   -> Bool
 isClassTy tcm (tyView -> TyConApp tcNm _) =
-  case lookupUniqMap tcNm tcm of
+  case UniqMap.lookup tcNm tcm of
     Just (AlgTyCon {isClassTc}) -> isClassTc
     _ -> False
 isClassTy _ _ = False

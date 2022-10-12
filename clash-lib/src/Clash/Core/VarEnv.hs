@@ -115,6 +115,8 @@ import           GHC.Stack                 (HasCallStack)
 
 import           Clash.Core.Pretty         ()
 import           Clash.Core.Var
+import           Clash.Data.UniqMap        (UniqMap)
+import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug               (debugIsOn)
 import           Clash.Unique
 import           Clash.Util
@@ -128,28 +130,28 @@ type VarEnv a = UniqMap a
 -- | Empty map
 emptyVarEnv
   :: VarEnv a
-emptyVarEnv = emptyUniqMap
+emptyVarEnv = UniqMap.empty
 
 -- | Environment containing a single variable-value pair
 unitVarEnv
   :: Var b
   -> a
   -> VarEnv a
-unitVarEnv = unitUniqMap
+unitVarEnv = UniqMap.singleton
 
 -- | Look up a value based on the variable
 lookupVarEnv
   :: Var b
   -> VarEnv a
   -> Maybe a
-lookupVarEnv = lookupUniqMap
+lookupVarEnv = UniqMap.lookup
 
 -- | Lookup a value based on the unique of a variable
 lookupVarEnvDirectly
   :: Unique
   -> VarEnv a
   -> Maybe a
-lookupVarEnvDirectly = lookupUniqMap
+lookupVarEnvDirectly = UniqMap.lookup
 
 -- | Lookup a value based on the variable
 --
@@ -159,21 +161,21 @@ lookupVarEnv'
   => VarEnv a
   -> Var b
   -> a
-lookupVarEnv' = lookupUniqMap'
+lookupVarEnv' = flip UniqMap.find
 
 -- | Remove a variable-value pair from the environment
 delVarEnv
   :: VarEnv a
   -> Var b
   -> VarEnv a
-delVarEnv = delUniqMap
+delVarEnv = flip UniqMap.delete
 
 -- | Remove a list of variable-value pairs from the environment
 delVarEnvList
   :: VarEnv a
   -> [Var b]
   -> VarEnv a
-delVarEnvList = delListUniqMap
+delVarEnvList = flip UniqMap.deleteMany
 
 -- | Add a variable-value pair to the environment; overwrites the value if the
 -- variable already exists
@@ -182,7 +184,7 @@ extendVarEnv
   -> a
   -> VarEnv a
   -> VarEnv a
-extendVarEnv = extendUniqMap
+extendVarEnv = UniqMap.insert
 
 -- | Add a variable-value pair to the environment; if the variable already
 -- exists, the two values are merged with the given function
@@ -192,7 +194,8 @@ extendVarEnvWith
   -> (a -> a -> a)
   -> VarEnv a
   -> VarEnv a
-extendVarEnvWith = extendUniqMapWith
+extendVarEnvWith k v f =
+  UniqMap.insertWith f k v
 
 -- | Add a list of variable-value pairs; the values of existing keys will be
 -- overwritten
@@ -200,20 +203,20 @@ extendVarEnvList
   :: VarEnv a
   -> [(Var b, a)]
   -> VarEnv a
-extendVarEnvList = extendListUniqMap
+extendVarEnvList = flip UniqMap.insertMany
 
 -- | Is the environment empty
 nullVarEnv
   :: VarEnv a
   -> Bool
-nullVarEnv = nullUniqMap
+nullVarEnv = UniqMap.null
 
 -- | Get the (left-biased) union of two environments
 unionVarEnv
   :: VarEnv a
   -> VarEnv a
   -> VarEnv a
-unionVarEnv = unionUniqMap
+unionVarEnv = (<>)
 
 -- | Get the union of two environments, mapped values existing in both
 -- environments will be merged with the given function.
@@ -222,20 +225,20 @@ unionVarEnvWith
   -> VarEnv a
   -> VarEnv a
   -> VarEnv a
-unionVarEnvWith = unionUniqMapWith
+unionVarEnvWith = UniqMap.unionWith
 
 -- | Create an environment given a list of var-value pairs
 mkVarEnv
   :: [(Var a,b)]
   -> VarEnv b
-mkVarEnv = listToUniqMap
+mkVarEnv = UniqMap.fromList
 
 -- | Apply a function to every element in the environment
 mapVarEnv
   :: (a -> b)
   -> VarEnv a
   -> VarEnv b
-mapVarEnv = mapUniqMap
+mapVarEnv = fmap
 
 -- | Apply a function to every element in the environment; values for which the
 -- function returns 'Nothing' are removed from the environment
@@ -243,7 +246,7 @@ mapMaybeVarEnv
   :: (a -> Maybe b)
   -> VarEnv a
   -> VarEnv b
-mapMaybeVarEnv = mapMaybeUniqMap
+mapMaybeVarEnv = UniqMap.mapMaybe
 
 -- | Strict left-fold over an environment using both the unique of the
 -- the variable and the value
@@ -252,78 +255,78 @@ foldlWithUniqueVarEnv'
   -> a
   -> VarEnv b
   -> a
-foldlWithUniqueVarEnv' = foldlWithUnique'
+foldlWithUniqueVarEnv' = UniqMap.foldlWithUnique'
 
 -- | Extract the elements
 eltsVarEnv
   :: VarEnv a
   -> [a]
-eltsVarEnv = eltsUniqMap
+eltsVarEnv = UniqMap.elems
 
 -- | Does the variable exist in the environment
 elemVarEnv
   :: Var a
   -> VarEnv b
   -> Bool
-elemVarEnv = elemUniqMap
+elemVarEnv = UniqMap.elem
 
 -- | Does the variable not exist in the environment
 notElemVarEnv
   :: Var a
   -> VarEnv b
   -> Bool
-notElemVarEnv = notElemUniqMap
+notElemVarEnv = UniqMap.notElem
 
 -- * VarSet
 
 -- | Set of variables
-type VarSet = UniqSet (Var Any)
+type VarSet = UniqMap (Var Any)
 
 -- | The empty set
 emptyVarSet
   :: VarSet
-emptyVarSet = emptyUniqSet
+emptyVarSet = UniqMap.empty
 
 -- | The set of a single variable
 unitVarSet
   :: Var a
   -> VarSet
-unitVarSet v = unitUniqSet (coerce v)
+unitVarSet v = UniqMap.singletonUnique (coerce v)
 
 -- | Add a variable to the set
 extendVarSet
   :: VarSet
   -> Var a
   -> VarSet
-extendVarSet env v = extendUniqSet env (coerce v)
+extendVarSet env v = UniqMap.insertUnique (coerce v) env
 
 -- | Union two sets
 unionVarSet
   :: VarSet
   -> VarSet
   -> VarSet
-unionVarSet = unionUniqSet
+unionVarSet = (<>)
 
 -- | Take the difference of two sets
 differenceVarSet
   :: VarSet
   -> VarSet
   -> VarSet
-differenceVarSet = differenceUniqSet
+differenceVarSet = UniqMap.difference
 
 -- | Is the variable an element in the set
 elemVarSet
   :: Var a
   -> VarSet
   -> Bool
-elemVarSet v = elemUniqSet (coerce v)
+elemVarSet v = UniqMap.elem (getUnique v)
 
 -- | Is the variable not an element in the set
 notElemVarSet
   :: Var a
   -> VarSet
   -> Bool
-notElemVarSet v = notElemUniqSet (coerce v)
+notElemVarSet v = UniqMap.notElem (getUnique v)
 
 -- | Is the set of variables A a subset of the variables B
 subsetVarSet
@@ -332,45 +335,45 @@ subsetVarSet
   -> VarSet
   -- ^ Set of variables B
   -> Bool
-subsetVarSet = subsetUniqSet
+subsetVarSet = UniqMap.submap
 
 -- | Are the sets of variables disjoint
 disjointVarSet
   :: VarSet
   -> VarSet
   -> Bool
-disjointVarSet = disjointUniqSet
+disjointVarSet = UniqMap.disjoint
 
 -- | Check whether a varset is empty
 nullVarSet
   :: VarSet
   -> Bool
-nullVarSet = nullUniqSet
+nullVarSet = UniqMap.null
 
 -- | Look up a variable in the set, returns it if it exists
 lookupVarSet
   :: Var a
   -> VarSet
   -> Maybe (Var Any)
-lookupVarSet = lookupUniqSet
+lookupVarSet = UniqMap.lookup
 
 -- | Remove a variable from the set based on its 'Unique'
 delVarSetByKey
   :: Unique
   -> VarSet
   -> VarSet
-delVarSetByKey = delUniqSetDirectly
+delVarSetByKey = UniqMap.delete
 
 -- | Create a set from a list of variables
 mkVarSet
   :: [Var a]
   -> VarSet
-mkVarSet xs = mkUniqSet (coerce xs)
+mkVarSet xs = UniqMap.fromList $ fmap (\x -> (getUnique x, coerce x)) xs
 
 eltsVarSet
   :: VarSet
   -> [Var Any]
-eltsVarSet = eltsUniqSet
+eltsVarSet = UniqMap.elems
 
 -- * InScopeSet
 
@@ -440,7 +443,7 @@ elemUniqInScopeSet
   :: Unique
   -> InScopeSet
   -> Bool
-elemUniqInScopeSet u (InScopeSet s _) = u `elemUniqSetDirectly` s
+elemUniqInScopeSet u (InScopeSet s _) = UniqMap.elem u s
 
 -- | Is the variable not in scope
 notElemInScopeSet
@@ -467,7 +470,7 @@ uniqAway
   -> a
   -> a
 uniqAway (InScopeSet set n) a =
-  uniqAway' (`elemUniqSetDirectly` set) n a
+  uniqAway' (`UniqMap.elem` set) n a
 
 uniqAway'
   :: (Uniquable a, ClashPretty a)

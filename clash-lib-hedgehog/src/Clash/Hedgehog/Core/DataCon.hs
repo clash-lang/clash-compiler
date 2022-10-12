@@ -25,7 +25,7 @@ import Clash.Core.Name
 import Clash.Core.TyCon
 import Clash.Core.Type
 import Clash.Core.TysPrim (liftedTypeKind)
-import Clash.Unique
+import qualified Clash.Data.UniqMap as UniqMap
 
 import Clash.Hedgehog.Core.Monad
 import Clash.Hedgehog.Core.Name
@@ -119,7 +119,7 @@ genRecordDataCons tcm tcn univTvs =
   go :: ConTag -> DcName -> CoreGenT m DataCon
   go tag name = do
     let resTy = mkTyConApp tcn (fmap VarTy univTvs)
-    let bound = listToUniqMap (zip univTvs univTvs)
+    let bound = UniqMap.fromList (zip univTvs univTvs)
     let argGen = genMonoTypeFrom tcm bound liftedTypeKind -- TODO Make polymorphic
     ty <- genWithCodomain resTy argGen
 
@@ -157,7 +157,7 @@ genAnyDataCons tcm tcn univTvs =
   go :: ConTag -> DcName -> CoreGenT m DataCon
   go tag name = do
     let resTy = mkTyConApp tcn (fmap VarTy univTvs)
-    let bound = listToUniqMap (zip univTvs univTvs)
+    let bound = UniqMap.fromList (zip univTvs univTvs)
     let argGen = genMonoTypeFrom tcm bound liftedTypeKind -- TODO Make polymorphic.
     ty <- genWithCodomain resTy argGen
 
@@ -194,7 +194,7 @@ genStrictness tcm kn
   -- Assume that any primitive type constructor is always strict. This may
   -- overapproximate strictness, as it means Type, Nat and Symbol are strict.
   | TyConApp tc [] <- tyView kn
-  , Just PrimTyCon{} <- lookupUniqMap tc tcm
+  , Just PrimTyCon{} <- UniqMap.lookup tc tcm
   = pure Strict
 
   -- Shrink towards laziness as this is the default in Haskell (assuming no

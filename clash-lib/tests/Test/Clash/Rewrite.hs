@@ -26,7 +26,6 @@ import Clash.Driver.Types (ClashEnv(..), ClashOpts(..), defClashOpts, debugSilen
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (runRewrite)
 import Clash.Normalize.Types
-import Clash.Unique (emptyUniqMap)
 import qualified Clash.Util.Interpolate as I
 
 import Control.Applicative ((<|>))
@@ -62,7 +61,7 @@ instance Default RewriteEnv where
   def = RewriteEnv
     { _clashEnv = ClashEnv
         { envOpts = defClashOpts { opt_debug = debugSilent }
-        , envTyConMap = emptyUniqMap
+        , envTyConMap = mempty
         , envTupleTyCons = IntMap.empty
         , envPrimitives = HashMap.empty
         , envCustomReprs = buildCustomReprs []

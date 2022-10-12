@@ -55,8 +55,8 @@ import Clash.Core.Type
 import Clash.Core.TysPrim                (liftedTypeKind, typeNatKind)
 import Clash.Core.Var                    (Id, Var(..), mkLocalId, mkTyVar)
 import Clash.Core.VarEnv
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug                       (traceIf)
-import Clash.Unique
 import Clash.Util
 
 -- | Rebuild a let expression / let expressions by taking the SCCs of a list
@@ -315,7 +315,7 @@ isSignalType tcm ty = go HashSet.empty ty
       "Clash.Signal.BiSignal.BiSignalIn"  -> True
       "Clash.Signal.BiSignal.BiSignalOut" -> True
       _ | tcNm `HashSet.member` tcSeen    -> False -- Do not follow rec types
-        | otherwise -> case lookupUniqMap tcNm tcm of
+        | otherwise -> case UniqMap.lookup tcNm tcm of
             Just tc -> let dcs         = tyConDataCons tc
                            dcInsArgTys = concat
                                        $ mapMaybe (`dataConInstArgTys` args) dcs
@@ -552,7 +552,7 @@ shouldSplit0
   -> TypeView
   -> Maybe ([Term] -> Term, Projections, [Type])
 shouldSplit0 tcm (TyConApp tcNm tyArgs)
-  | Just tc <- lookupUniqMap tcNm tcm
+  | Just tc <- UniqMap.lookup tcNm tcm
   , [dc] <- tyConDataCons tc
   , let dcArgs = substArgTys dc tyArgs
   , let dcArgsLen = length dcArgs
@@ -571,7 +571,7 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
   , [nTy,argTy] <- tyArgs
   , Right n <- runExcept (tyNatSize tcm nTy)
   , n > 1
-  , Just tc <- lookupUniqMap tcNm tcm
+  , Just tc <- UniqMap.lookup tcNm tcm
   , [nil,cons] <- tyConDataCons tc
   = if shouldSplitTy (tyView (coreView tcm argTy)) then
       Just ( mkVec nil cons argTy n
@@ -714,7 +714,7 @@ mkSelectorCase caller inScope tcm scrut dcI fieldI = go (inferCoreTypeOf tcm scr
   where
     go (coreView1 tcm -> Just ty') = go ty'
     go scrutTy@(tyView -> TyConApp tc args) =
-      case tyConDataCons (lookupUniqMap' tcm tc) of
+      case tyConDataCons (UniqMap.find tc tcm) of
         [] -> cantCreate $(curLoc) ("TyCon has no DataCons: " ++ show tc ++ " " ++ showPpr tc) scrutTy
         dcs | dcI > length dcs -> cantCreate $(curLoc) "DC index exceeds max" scrutTy
             | otherwise -> do

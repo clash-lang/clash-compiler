@@ -44,8 +44,8 @@ import Clash.Core.Type
 import Clash.Core.TysPrim
 import Clash.Core.Var (Var(varType))
 import Clash.Core.VarEnv
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug (debugIsOn)
-import Clash.Unique (lookupUniqMap')
 import Clash.Util (curLoc, pprPanic)
 import qualified Clash.Util.Interpolate as I
 
@@ -111,7 +111,7 @@ instance InferType Type where
         liftedTypeKind
 
       TyConApp tc args ->
-        piResultTys tcm (tyConKind (lookupUniqMap' tcm tc)) args
+        piResultTys tcm (tyConKind (UniqMap.find tc tcm)) args
 
       OtherType{} ->
         case ty of

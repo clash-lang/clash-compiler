@@ -161,9 +161,9 @@ import qualified Clash.Core.TyCon            as C
 import qualified Clash.Core.Type             as C
 import qualified Clash.Core.Util             as C (undefinedTy, undefinedXPrims)
 import qualified Clash.Core.Var              as C
+import qualified Clash.Data.UniqMap          as C
 import           Clash.Normalize.Primitives  as C
 import           Clash.Primitives.Types
-import qualified Clash.Unique                as C
 import           Clash.Util
 
 instance Hashable Name where
@@ -186,7 +186,7 @@ data GHC2CoreEnv
 makeLenses ''GHC2CoreEnv
 
 emptyGHC2CoreState :: GHC2CoreState
-emptyGHC2CoreState = GHC2CoreState C.emptyUniqMap HashMap.empty
+emptyGHC2CoreState = GHC2CoreState mempty HashMap.empty
 
 newtype SrcSpanRB = SrcSpanRB {unSrcSpanRB :: SrcSpan}
 
@@ -208,13 +208,13 @@ makeAllTyCons
 makeAllTyCons hm fiEnvs = go hm hm
   where
     go old new
-        | C.nullUniqMap (new ^. tyConMap) = C.emptyUniqMap
-        | otherwise                       = tcm `C.unionUniqMap` tcm'
+        | C.null (new ^. tyConMap) = mempty
+        | otherwise                = tcm <> tcm'
       where
         (tcm,old', _) = RWS.runRWS (T.mapM makeTyCon (new ^. tyConMap))
                                    (GHC2CoreEnv noSrcSpan fiEnvs)
                                    old
-        tcm'          = go old' (old' & tyConMap %~ (`C.differenceUniqMap` (old ^. tyConMap)))
+        tcm'          = go old' (old' & tyConMap %~ (`C.difference` (old ^. tyConMap)))
 
 makeTyCon :: TyCon
           -> C2C C.TyCon
@@ -966,7 +966,7 @@ coreToType' (TyConApp tc args)
                         foldl C.AppTy <$> coreToType synTy' <*> mapM coreToType remArgs
                       _ -> do
                         tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
-                        tyConMap %= (C.extendUniqMap tcName tc)
+                        tyConMap %= (C.insert tcName tc)
                         C.mkTyConApp <$> (pure tcName) <*> mapM coreToType args
 #if MIN_VERSION_ghc(8,8,0)
 coreToType' (ForAllTy (Bndr tv _) ty)   = C.ForAllTy <$> coreToTyVar tv <*> coreToType ty

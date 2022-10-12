@@ -104,6 +104,7 @@ import           Clash.Core.Var
   (Id, Var (..), mkLocalId, modifyVarName, Attr')
 import           Clash.Core.VarEnv
   (InScopeSet, extendInScopeSetList, uniqAway, lookupVarEnv)
+import qualified Clash.Data.UniqMap as UniqMap
 import {-# SOURCE #-} Clash.Netlist.BlackBox
 import {-# SOURCE #-} Clash.Netlist.BlackBox.Util
 import           Clash.Netlist.BlackBox.Types
@@ -111,7 +112,6 @@ import           Clash.Netlist.BlackBox.Types
 import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.Types     as HW
 import           Clash.Primitives.Types
-import           Clash.Unique
 import           Clash.Util
 import qualified Clash.Util.Interpolate  as I
 
@@ -436,7 +436,7 @@ mkADT _ _ m tyString tc _
   | isRecursiveTy m tc
   = throwE $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
 
-mkADT builtInTranslation reprs m tyString tc args = case tyConDataCons (m `lookupUniqMap'` tc) of
+mkADT builtInTranslation reprs m tyString tc args = case tyConDataCons (UniqMap.find tc m) of
   []  -> return (FilteredHWType (Void Nothing) [])
   dcs -> do
     let tcName           = nameOcc tc
@@ -580,7 +580,7 @@ hasUnconstrainedExistential tcm dc =
               Bool
             isGenerative t efvs = case tyView t of
               TyConApp tcNm _
-                | Just (FunTyCon {}) <- lookupUniqMap tcNm tcm
+                | Just (FunTyCon {}) <- UniqMap.lookup tcNm tcm
                 -- For type families we can only "calculate" the `eTV` if it is
                 -- the only free variable. e.g. we can work out from `n + 1 ~ 4`
                 -- that `n ~ 3`, but can't do anything for `n + m ~ 4`.
@@ -630,7 +630,7 @@ hasUnconstrainedExistential tcm dc =
 -- Without looking through type families, we would think that /SList/ is not
 -- recursive. This lead to issue #1921
 isRecursiveTy :: TyConMap -> TyConName -> Bool
-isRecursiveTy m tc = case tyConDataCons (m `lookupUniqMap'` tc) of
+isRecursiveTy m tc = case tyConDataCons (UniqMap.find tc m) of
     []  -> False
     dcs -> let argTyss   = map dcArgTys dcs
                argTycons = (map fst . catMaybes)

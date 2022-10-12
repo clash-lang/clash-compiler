@@ -3,25 +3,20 @@ Copyright  :  (C) 2020, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# LANGUAGE QuasiQuotes #-}
 
 module Clash.Tests.Normalize.Transformations where
 
 import Clash.Normalize.Transformations (inlineBndrsCleanup)
 import Clash.Core.VarEnv
-  (mkInScopeSet, mkVarSet, mkVarEnv, emptyVarEnv, extendInScopeSetList)
+  (mkInScopeSet, mkVarSet, mkVarEnv, emptyVarEnv)
 import Clash.Core.FreeVars (countFreeOccurances)
 import Clash.Core.Term
-import Clash.Unique (UniqSet, extendUniqSet, unitUniqSet)
 
 import Test.Tasty
 import Test.Tasty.HUnit
 
 import Test.Clash.Rewrite (parseToTermQQ, parseToTerm)
-
-import Debug.Trace
-import Clash.Core.Pretty (showPpr)
 
 t1337a :: Term
 t1337a = Letrec keep1 result
