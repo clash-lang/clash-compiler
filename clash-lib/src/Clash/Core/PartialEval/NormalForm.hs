@@ -12,9 +12,7 @@ evaluator see Clash.Core.PartialEval.
 -}
 
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Core.PartialEval.NormalForm
   ( Arg

@@ -9,7 +9,6 @@ result of evaluation.
 -}
 
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Core.PartialEval.AsTerm
   ( AsTerm(..)
