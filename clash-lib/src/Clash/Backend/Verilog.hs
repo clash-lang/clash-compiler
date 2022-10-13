@@ -67,6 +67,7 @@ import           Clash.Annotations.BitRepresentation.Util
   (BitOrigin(Lit, Field), bitOrigins, bitRanges)
 import           Clash.Core.Var                       (Attr'(..))
 import           Clash.Backend
+import           Clash.DataFiles                      (primsRoot)
 import           Clash.Debug                          (traceIf)
 import           Clash.Driver.Types                   (ClashOpts(..))
 import           Clash.Explicit.BlockRam.Internal     (unpackNats)

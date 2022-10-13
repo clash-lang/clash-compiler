@@ -54,6 +54,7 @@ import           Clash.Debug                          (traceIf)
 import           Clash.Backend
 import           Clash.Backend.Verilog
   (bits, bit_char, encodingNote, exprLit, include, noEmptyInit, uselibs)
+import           Clash.DataFiles                      (primsRoot)
 import           Clash.Driver.Types                   (ClashOpts(..))
 import           Clash.Explicit.BlockRam.Internal     (unpackNats)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))

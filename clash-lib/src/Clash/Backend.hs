@@ -41,13 +41,6 @@ import qualified Data.Version
 import qualified System.FilePath
 #endif
 
-primsRoot :: IO FilePath
-#ifdef CABAL
-primsRoot = Paths_clash_lib.getDataFileName "prims"
-#else
-primsRoot = return ("clash-lib" System.FilePath.</> "prims")
-#endif
-
 clashVer :: String
 #ifdef CABAL
 clashVer = Data.Version.showVersion Paths_clash_lib.version
