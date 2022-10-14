@@ -81,6 +81,7 @@ import           GHC.TypeLits
 
 import           Clash.Core.HasFreeVars
 import           Clash.Core.Pretty         (ppr, fromPpr)
+import           Clash.Core.Rename
 import           Clash.Core.Term
   (Bind(..), Pat (..), Term (..), TickInfo (..), PrimInfo(primName))
 import           Clash.Core.Type           (Type (..))

@@ -80,28 +80,12 @@ module Clash.Core.VarEnv
     -- ** Unique generation
   , uniqAway
   , uniqAway'
-    -- * Dual renaming
-  , RnEnv
-    -- ** Construction
-  , mkRnEnv
-    -- ** Renaming
-  , rnTmBndr
-  , rnTyBndr
-  , rnTmBndrs
-  , rnTyBndrs
-  , rnOccLId
-  , rnOccRId
-  , rnOccLTy
-  , rnOccRTy
-  )
-where
+  ) where
 
 import           Control.DeepSeq           (NFData)
 import           Data.Binary               (Binary)
 import           Data.Coerce               (coerce)
 import qualified Data.List                 as List
-import qualified Data.List.Extra           as List
-import           Data.Maybe                (fromMaybe)
 
 #if MIN_VERSION_prettyprinter(1,7,0)
 import           Prettyprinter
@@ -508,127 +492,4 @@ deriveUnique i delta = i + delta
 
 -- * RnEnv
 
--- | Rename environment for e.g. alpha equivalence
---
--- When going under binders for e.g.
---
--- @
--- \x -> e1  `aeq` \y -> e2
--- @
---
--- We want to rename @[x -> y]@  or @[y -> x]@, but we have to pick a binder
--- that is neither free in @e1@ nor @e2@ or we risk accidental capture.
---
--- So we must maintain:
---
---   1. A renaming for the left term
---
---   2. A renaming for the right term
---
---   3. A set of in scope variables
-data RnEnv
-  = RnEnv
-  { rn_envLTy  :: VarEnv TyVar
-    -- ^ Type renaming for the left term
-  , rn_envLTm  :: VarEnv Id
-    -- ^ Term renaming for the left term
-  , rn_envRTy  :: VarEnv TyVar
-    -- ^ Type renaming for the right term
-  , rn_envRTm  :: VarEnv Id
-    -- ^ Term renaming for the right term
-  , rn_inScope :: InScopeSet
-    -- ^ In scope in left or right terms
-  }
 
--- | Create an empty renaming environment
-mkRnEnv
-  :: InScopeSet -> RnEnv
-mkRnEnv vars
-  = RnEnv
-  { rn_envLTy  = emptyVarEnv
-  , rn_envLTm  = emptyVarEnv
-  , rn_envRTy  = emptyVarEnv
-  , rn_envRTm  = emptyVarEnv
-  , rn_inScope = vars
-  }
-
--- | Look up the renaming of an type-variable occurrence in the left term
-rnOccLTy
-  :: RnEnv -> TyVar -> TyVar
-rnOccLTy rn v = fromMaybe v (lookupVarEnv v (rn_envLTy rn))
-
--- | Look up the renaming of an type-variable occurrence in the right term
-rnOccRTy
-  :: RnEnv -> TyVar -> TyVar
-rnOccRTy rn v = fromMaybe v (lookupVarEnv v (rn_envRTy rn))
-
--- | Simultaneously go under the type-variable binder /bTvL/ and type-variable
--- binder /bTvR/, finds a new binder /newTvB/, and return an environment mapping
--- @[bTvL -> newB]@ and @[bTvR -> newB]@
-rnTyBndr
-  :: RnEnv -> TyVar -> TyVar -> RnEnv
-rnTyBndr rv@(RnEnv {rn_envLTy = lenv, rn_envRTy = renv, rn_inScope = inScope}) bL bR =
-  rv { rn_envLTy = extendVarEnv bL newB lenv -- See Note [Rebinding and shadowing]
-     , rn_envRTy = extendVarEnv bR newB renv
-     , rn_inScope = extendInScopeSet inScope newB }
- where
-  -- Find a new type-binder not in scope in either term
-  newB | not (bL `elemInScopeSet` inScope) = bL
-       | not (bR `elemInScopeSet` inScope) = bR
-       | otherwise                         = uniqAway inScope bL
-
-{- Note [Rebinding and shadowing]
-Imagine:
-
-@
-\x -> \x -> e1  `aeq` \y -> \x -> e2
-@
-
-Then inside
-
-@
-\x \y  { [x->p] [y->p]  {p} }
-\x \z  { [x->q] [y->p, z->q] {p,q} }
-@
-
-i.e. if the new var is the same as the old var, the renaming is deleted by
-'extendVarEnv'
--}
-
--- | Applies 'rnTyBndr' to several variables: the two variable lists must be of
--- equal length.
-rnTyBndrs
-  :: RnEnv -> [TyVar] -> [TyVar] -> RnEnv
-rnTyBndrs env tvs1 tvs2 =
-  List.foldl' (\s (l,r) -> rnTyBndr s l r) env (List.zipEqual tvs1 tvs2)
-
--- | Look up the renaming of an occurrence in the left term
-rnOccLId
-  :: RnEnv -> Id -> Id
-rnOccLId rn v = fromMaybe v (lookupVarEnv v (rn_envLTm rn))
-
--- | Look up the renaming of an occurrence in the left term
-rnOccRId
-  :: RnEnv -> Id -> Id
-rnOccRId rn v = fromMaybe v (lookupVarEnv v (rn_envRTm rn))
-
--- | Simultaneously go under the binder /bL/ and binder /bR/, finds a new binder
--- /newTvB/, and return an environment mapping @[bL -> newB]@ and @[bR -> newB]@
-rnTmBndr
-  :: RnEnv -> Id -> Id -> RnEnv
-rnTmBndr rv@(RnEnv {rn_envLTm = lenv, rn_envRTm = renv, rn_inScope = inScope}) bL bR =
-  rv { rn_envLTm = extendVarEnv bL newB lenv -- See Note [Rebinding and shadowing]
-     , rn_envRTm = extendVarEnv bR newB renv
-     , rn_inScope = extendInScopeSet inScope newB }
- where
-  -- Find a new type-binder not in scope in either term
-  newB | not (bL `elemInScopeSet` inScope) = bL
-       | not (bR `elemInScopeSet` inScope) = bR
-       | otherwise                         = uniqAway inScope bL
-
--- | Applies 'rnTmBndr' to several variables: the two variable lists must be of
--- equal length.
-rnTmBndrs
-  :: RnEnv -> [Id] -> [Id] -> RnEnv
-rnTmBndrs env ids1 ids2 =
-  List.foldl' (\s (l,r) -> rnTmBndr s l r) env (List.zipEqual ids1 ids2)

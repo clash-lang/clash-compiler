@@ -201,6 +201,7 @@ Library
                       Clash.Core.PartialEval.Monad
                       Clash.Core.PartialEval.NormalForm
                       Clash.Core.Pretty
+                      Clash.Core.Rename
                       Clash.Core.Subst
                       Clash.Core.Term
                       Clash.Core.TermInfo
