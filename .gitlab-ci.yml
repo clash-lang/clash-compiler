@@ -79,6 +79,8 @@ nix-build:
 
   script:
     - nix-build -j$(./.ci/effective_cpus.sh)
+  tags:
+    - local
 
 haddock:
   extends: .common
