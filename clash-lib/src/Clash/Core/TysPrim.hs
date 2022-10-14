@@ -29,8 +29,10 @@ module Clash.Core.TysPrim
   , byteArrayPrimTy
   , eqPrimTy
   , tysPrimMap
-  )
-where
+  , typeNatAdd
+  , typeNatMul
+  , typeNatSub
+  ) where
 
 
 #if MIN_VERSION_ghc(9,0,0)
@@ -153,6 +155,18 @@ doublePrimTy  = mkTyConTy doublePrimTyConName
 naturalPrimTy = mkTyConTy naturalPrimTyConName
 byteArrayPrimTy = mkTyConTy byteArrayPrimTyConName
 eqPrimTy = mkTyConTy eqPrimTyConName
+
+typeNatAdd :: TyConName
+typeNatAdd =
+  mkUnsafeSystemName "GHC.TypeNats.+" (getKey typeNatAddTyFamNameKey)
+
+typeNatMul :: TyConName
+typeNatMul =
+  mkUnsafeSystemName "GHC.TypeNats.*" (getKey typeNatMulTyFamNameKey)
+
+typeNatSub :: TyConName
+typeNatSub =
+  mkUnsafeSystemName "GHC.TypeNats.-" (getKey typeNatSubTyFamNameKey)
 
 tysPrimMap :: TyConMap
 tysPrimMap = UniqMap.fromList

@@ -106,7 +106,7 @@ import           Clash.GHC.GHC2Core  (modNameM)
 import           Clash.Util
   (MonadUnique (..), clogBase, flogBase, curLoc)
 import           Clash.Normalize.PrimitiveReductions
-  (typeNatMul, typeNatSub, typeNatAdd, vecLastPrim, vecInitPrim, vecHeadPrim,
+  (vecLastPrim, vecInitPrim, vecHeadPrim,
    vecTailPrim, mkVecCons, mkVecNil)
 
 import qualified Clash.Normalize.Primitives as NP

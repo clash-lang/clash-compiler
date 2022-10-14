@@ -48,24 +48,18 @@ import           Data.Text.Extra                  (showt)
 import           GHC.Stack                        (HasCallStack)
 
 #if MIN_VERSION_ghc(9,0,0)
-import           GHC.Builtin.Names
-  (boolTyConKey, typeNatAddTyFamNameKey, typeNatMulTyFamNameKey,
-   typeNatSubTyFamNameKey)
+import           GHC.Builtin.Names (boolTyConKey)
 import           GHC.Types.Unique                 (getKey)
-import           GHC.Types.SrcLoc                 (wiredInSrcSpan)
 #else
-import           PrelNames
-  (boolTyConKey, typeNatAddTyFamNameKey, typeNatMulTyFamNameKey,
-   typeNatSubTyFamNameKey)
+import           PrelNames (boolTyConKey)
 import           Unique                           (getKey)
-import           SrcLoc                           (wiredInSrcSpan)
 #endif
 
 import           Clash.Core.DataCon               (DataCon)
 import           Clash.Core.HasType
 import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Name
-  (nameOcc, Name(..), NameSort(User), mkUnsafeSystemName)
+  (nameOcc, Name(..), mkUnsafeSystemName)
 import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term
   (IsMultiPrim (..), CoreContext (..), PrimInfo (..), Term (..), WorkInfo (..), Pat (..),
@@ -77,7 +71,7 @@ import           Clash.Core.Type                  (LitTy (..), Type (..),
 import           Clash.Core.TyCon
   (TyConMap, TyConName, tyConDataCons, tyConName)
 import           Clash.Core.TysPrim
-  (integerPrimTy, typeNatKind, liftedTypeKind)
+  (integerPrimTy, typeNatKind, liftedTypeKind, typeNatAdd)
 import           Clash.Core.Util
   (appendToVec, extractElems, extractTElems, mkRTree,
    mkUniqInternalId, mkUniqSystemTyVar, mkVec, dataConInstArgTys, primCo)
@@ -92,18 +86,6 @@ import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
 import           Clash.Util
 import qualified Clash.Util.Interpolate           as I
-
-typeNatAdd :: TyConName
-typeNatAdd =
-  Name User "GHC.TypeNats.+" (getKey typeNatAddTyFamNameKey) wiredInSrcSpan
-
-typeNatMul :: TyConName
-typeNatMul =
-  Name User "GHC.TypeNats.*" (getKey typeNatMulTyFamNameKey) wiredInSrcSpan
-
-typeNatSub :: TyConName
-typeNatSub =
-  Name User "GHC.TypeNats.-" (getKey typeNatSubTyFamNameKey) wiredInSrcSpan
 
 vecHeadPrim
   :: TyConName
