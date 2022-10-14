@@ -30,10 +30,9 @@ import           GHC.Stack                          (HasCallStack)
 
 import           Clash.Backend
   (Backend, hdlTypeErrValue, expr, blockDecl)
-import           Clash.Core.TermInfo                (isVar)
+import           Clash.Core.TermInfo                (isConstant, isVar)
 import           Clash.Core.Type
   (Type(LitTy), LitTy(NumTy), coreView)
-import           Clash.Netlist.BlackBox             (isLiteral)
 import           Clash.Netlist.BlackBox.Util        (renderElem)
 import           Clash.Netlist.BlackBox.Parser      (runParse)
 import           Clash.Netlist.BlackBox.Types
@@ -240,9 +239,9 @@ indexIntVerilog _isD _primName args _ty = return bb
   meta bbKi = emptyBlackBoxMeta{bbKind=bbKi}
 
   bb = case args of
-    [_nTy,_aTy,_kn,Left v,Left ix] | isLiteral ix && isVar v ->
+    [_nTy,_aTy,_kn,Left v,Left ix] | isConstant ix && isVar v ->
       Right (meta TExpr, BBFunction "Clash.Primitives.Sized.Vector.indexIntVerilogTF" 0 indexIntVerilogTF)
-    [_nTy,_aTy,_kn,_v,Left ix] | isLiteral ix ->
+    [_nTy,_aTy,_kn,_v,Left ix] | isConstant ix ->
       case runParse bbTextLitIx of
         Success t -> Right (meta TDecl, BBTemplate t)
         _         -> Left "internal error: parse fail"

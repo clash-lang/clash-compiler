@@ -87,6 +87,15 @@ isFun m t = isFunTy m (inferCoreTypeOf m t)
 isPolyFun :: TyConMap -> Term -> Bool
 isPolyFun m t = isPolyFunCoreTy m (inferCoreTypeOf m t)
 
+-- | Determine if a term represents a constant expression
+isConstant :: Term -> Bool
+isConstant e =
+  case collectArgs e of
+    (Data _, args) -> all (either isConstant (const True)) args
+    (Prim _, args) -> all (either isConstant (const True)) args
+    (Literal _,_)  -> True
+    _              -> False
+
 -- | Is a term a recursive let-binding?
 isLet :: Term -> Bool
 isLet Let{} = True

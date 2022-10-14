@@ -252,14 +252,6 @@ prepareBlackBox _pNm templ bbCtx =
       let seqs = concatMap snd alts
        in for_ seqs goSeq
 
--- | Determine if a term represents a literal
-isLiteral :: Term -> Bool
-isLiteral e = case collectArgs e of
-  (Data _, args)   -> all (either isLiteral (const True)) args
-  (Prim _, args) -> all (either isLiteral (const True)) args
-  (C.Literal _,_)  -> True
-  _                -> False
-
 mkArgument
   :: TextS.Text
   -- ^ Blackbox function name
@@ -308,10 +300,10 @@ mkArgument bbName bndr nArg e = do
           (e',d) <- mkPrimitive True False Concurrent (NetlistId bndr ty) pinfo args tickDecls
           case e' of
             (Identifier _ _) -> return ((e',hwTy,False), d)
-            _                -> return ((e',hwTy,isLiteral e), d)
+            _                -> return ((e',hwTy,isConstant e), d)
         (Data dc, args,_) -> do
           (exprN,dcDecls) <- mkDcApplication Concurrent [hwTy] (NetlistId bndr ty) dc (lefts args)
-          return ((exprN,hwTy,isLiteral e),dcDecls)
+          return ((exprN,hwTy,isConstant e),dcDecls)
         (Case scrut ty' [alt],[],_) -> do
           (projection,decls) <- mkProjection False (NetlistId bndr ty) scrut ty' alt
           return ((projection,hwTy,False),decls)
