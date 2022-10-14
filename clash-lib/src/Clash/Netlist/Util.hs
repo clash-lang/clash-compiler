@@ -97,7 +97,7 @@ import           Clash.Core.TermInfo
 import           Clash.Core.TyCon
   (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type
-  (Type (..), TyVar, TypeView (..), coreView1, normalizeType, splitTyConAppM, tyView)
+  (Type (..), TyVar, TypeView (..), coreView1, tyView, isRecursiveTyCon)
 import           Clash.Core.Util
   (substArgTys, tyLitShow)
 import           Clash.Core.Var
@@ -433,7 +433,7 @@ mkADT
   -- ^ An error string or a tuple with the type and possibly a list of
   -- removed arguments.
 mkADT _ _ m tyString tc _
-  | isRecursiveTy m tc
+  | isRecursiveTyCon m tc
   = throwE $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
 
 mkADT builtInTranslation reprs m tyString tc args = case tyConDataCons (UniqMap.find tc m) of
@@ -612,33 +612,6 @@ hasUnconstrainedExistential tcm dc =
 
   in  not (null unconstrainedETVs)
 
-
--- | Simple check if a TyCon is recursively defined.
---
--- Note [Look through type families in recursivity check]
---
--- Consider:
---
--- @
--- data SList :: [Type] -> Type where
---   SNil  :: SList []
---   CSons :: a -> Sing (as :: [k]) -> SList (a:as)
---
--- type family Sing [a] = SList [a]
--- @
---
--- Without looking through type families, we would think that /SList/ is not
--- recursive. This lead to issue #1921
-isRecursiveTy :: TyConMap -> TyConName -> Bool
-isRecursiveTy m tc = case tyConDataCons (UniqMap.find tc m) of
-    []  -> False
-    dcs -> let argTyss   = map dcArgTys dcs
-               argTycons = (map fst . catMaybes)
-                         $ (concatMap . map)
-                               -- Note [Look through type families in recursivity check]
-                               (splitTyConAppM . normalizeType m)
-                               argTyss
-           in tc `elem` argTycons
 
 -- | Determines if a Core type is translatable to a HWType given a function that
 -- translates certain builtin types.

@@ -44,6 +44,7 @@ module Clash.Core.Type
   , isPolyFunTy
   , isPolyFunCoreTy
   , isPolyTy
+  , isRecursiveTyCon
   , isTypeFamilyApplication
   , isFunTy
   , isClassTy
@@ -64,7 +65,7 @@ import           Data.Coerce            (coerce)
 import           Data.Hashable          (Hashable (hashWithSalt))
 import           Data.List              (foldl')
 import           Data.List.Extra        (splitAtList)
-import           Data.Maybe             (isJust, mapMaybe)
+import           Data.Maybe             (catMaybes, isJust, mapMaybe)
 import           GHC.Base               (isTrue#,(==#))
 import           GHC.Generics           (Generic(..))
 import           GHC.Integer            (smallInteger)
@@ -306,6 +307,35 @@ isPolyTy :: Type -> Bool
 isPolyTy (ForAllTy _ _)          = True
 isPolyTy (tyView -> FunTy _ res) = isPolyTy res
 isPolyTy _                       = False
+
+-- | Simple check if a TyCon is recursively defined.
+--
+-- Note [Look through type families in recursivity check]
+--
+-- Consider:
+--
+-- @
+-- data SList :: [Type] -> Type where
+--   SNil  :: SList []
+--   CSons :: a -> Sing (as :: [k]) -> SList (a:as)
+--
+-- type family Sing [a] = SList [a]
+-- @
+--
+-- Without looking through type families, we would think that /SList/ is not
+-- recursive. This lead to issue #1921
+isRecursiveTyCon :: TyConMap -> TyConName -> Bool
+isRecursiveTyCon m tc =
+  case tyConDataCons (UniqMap.find tc m) of
+    []  -> False
+    dcs ->
+      let argTyss   = map dcArgTys dcs
+          argTycons = (map fst . catMaybes)
+                    $ (concatMap . map)
+                    -- Note [Look through type families in recursivity check]
+                      (splitTyConAppM . normalizeType m)
+                      argTyss
+       in tc `elem` argTycons
 
 -- | Split a function type in an argument and result type
 splitFunTy :: TyConMap
