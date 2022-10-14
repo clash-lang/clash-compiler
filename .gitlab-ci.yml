@@ -60,7 +60,9 @@ stack-build:
   script:
     - .ci/stack_build.sh
   # Run on shared runners
+  # XXX: Temporarily on local runners
   tags:
+   - local
 
 nix-build:
   image: nixos/nix:2.9.2
@@ -147,6 +149,9 @@ snap-stable:
   image: curlimages/curl
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
+  # XXX: Temporarily on local runners
+  tags:
+   - local
 
 set_pending:
   extends: .github_status
