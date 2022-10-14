@@ -55,6 +55,7 @@ import           Unique                  (getKey)
 #endif
 
 import           Clash.Annotations.Primitive (extractPrim)
+import           Clash.Core.Binding      (Binding(..), BindingMap)
 import           Clash.Core.FreeVars
   (globalIds, globalIdOccursIn)
 import           Clash.Core.HasFreeVars  (isClosed)
@@ -77,7 +78,7 @@ import           Clash.Core.VarEnv
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug             (traceIf)
 import           Clash.Driver.Types
-  (BindingMap, Binding(..), TransformationInfo(FinalTerm), hasTransformationInfo)
+  (TransformationInfo(FinalTerm), hasTransformationInfo)
 import           Clash.Normalize.Primitives (removedArg)
 import {-# SOURCE #-} Clash.Normalize.Strategy (normalization)
 import           Clash.Normalize.Types
@@ -354,7 +355,7 @@ collectCallGraphUniques cg = HashSet.fromList (us0 ++ us1)
 
 -- | Create a call graph for a set of global binders, given a root
 callGraph
-  :: BindingMap
+  :: BindingMap Term
   -> Id
   -> CallGraph
 callGraph bndrs rt = go emptyVarEnv (varUniq rt)

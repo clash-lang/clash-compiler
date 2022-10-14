@@ -17,9 +17,10 @@ import qualified Clash.Netlist.BlackBox.Types                 as CL
 import qualified Data.HashMap.Strict                          as HM
 
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
+import           Clash.Core.Binding (BindingMap)
+import           Clash.Core.Term (Term)
 import           Clash.Core.Var (Id)
 import           Clash.Core.TyCon (TyConMap,TyConName)
-import           Clash.Driver.Types (BindingMap)
 import           Data.IntMap.Strict (IntMap)
 
 
@@ -45,7 +46,7 @@ instance (Binary k, Binary v, Eq k, Hashable k) => Binary (HM.HashMap k v) where
   get = HM.fromList <$> get
 
 -- data that's serialised to file between profile-normalization-prepare  and profile-normalization-run
-type NormalizationInputs = (BindingMap,TyConMap,IntMap TyConName,CompiledPrimMap',CustomReprs,[Id],Id)
+type NormalizationInputs = (BindingMap Term,TyConMap,IntMap TyConName,CompiledPrimMap',CustomReprs,[Id],Id)
 
 -- data that's serialised to file between profile-netlist-prepare  and profile-netlist-run
-type NetlistInputs = (BindingMap,[CL.TopEntityT],CompiledPrimMap',TyConMap,CustomReprs,Id)
+type NetlistInputs = (BindingMap Term,[CL.TopEntityT],CompiledPrimMap',TyConMap,CustomReprs,Id)

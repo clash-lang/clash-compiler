@@ -61,6 +61,7 @@ import           Clash.Annotations.BitRepresentation.ClashLib
   (coreToType')
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, DataRepr'(..), ConstrRepr'(..), getDataRepr, getConstrRepr)
+import           Clash.Core.Binding               (Binding(..), BindingMap)
 import           Clash.Core.DataCon               (DataCon (..))
 import           Clash.Core.HasType
 import           Clash.Core.Literal               (Literal (..))
@@ -80,7 +81,7 @@ import           Clash.Core.Var                   (Id, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
    lookupVarEnv')
-import           Clash.Driver.Types               (BindingMap, Binding(..), ClashEnv(..), ClashOpts (..))
+import           Clash.Driver.Types               (ClashEnv(..), ClashOpts (..))
 import           Clash.Netlist.BlackBox
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types              as HW
@@ -95,7 +96,7 @@ genNetlist
   :: ClashEnv
   -> Bool
   -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
-  -> BindingMap
+  -> BindingMap Term
   -- ^ Global binders
   -> VarEnv TopEntityT
   -- ^ TopEntity annotations
@@ -131,7 +132,7 @@ runNetlistMonad
   :: ClashEnv
   -> Bool
   -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
-  -> BindingMap
+  -> BindingMap Term
   -- ^ Global binders
   -> VarEnv TopEntityT
   -- ^ TopEntity annotations
@@ -187,7 +188,7 @@ genNames
   -- ^ Identifier set to extend
   -> VarEnv Identifier
   -- ^ Pre-generated names
-  -> BindingMap
+  -> BindingMap Term
   -> (VarEnv Identifier, IdentifierSet)
 genNames newInlineStrat prefixM is env bndrs =
   runState (foldlM go env bndrs) is

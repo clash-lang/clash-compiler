@@ -37,6 +37,7 @@ import           GHC.Types.Basic (InlineSpec(..))
 import           BasicTypes (InlineSpec(..))
 #endif
 
+import           Clash.Core.Binding (Binding(..), IsPrim(..))
 import           Clash.Core.DataCon (DataCon(..))
 import           Clash.Core.HasType
 import           Clash.Core.Literal (Literal(..))
@@ -49,8 +50,7 @@ import           Clash.Core.TyCon (tyConDataCons)
 import           Clash.Core.Type
 import           Clash.Core.TysPrim (integerPrimTy)
 import           Clash.Core.Var
-import qualified Clash.Data.UniqMap as UniqMap
-import           Clash.Driver.Types (Binding(..), IsPrim(..))
+import qualified Clash.Data.UniqMap as UniqMap (find)
 import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
 
 -- | Evaluate a term to WHNF.

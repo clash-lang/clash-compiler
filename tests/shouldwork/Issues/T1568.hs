@@ -7,6 +7,7 @@ import qualified Data.List as List (find)
 import Clash.Prelude
 
 import Clash.Backend
+import Clash.Core.Binding (Binding(..))
 import Clash.Core.Name
 import Clash.Core.Var
 import Clash.Core.VarEnv

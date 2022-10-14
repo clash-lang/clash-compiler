@@ -187,6 +187,7 @@ Library
                       Clash.Backend.Verilog
                       Clash.Backend.VHDL
 
+                      Clash.Core.Binding
                       Clash.Core.DataCon
                       Clash.Core.EqSolver
                       Clash.Core.Evaluator.Types

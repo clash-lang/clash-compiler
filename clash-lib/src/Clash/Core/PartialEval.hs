@@ -14,6 +14,7 @@ module Clash.Core.PartialEval where
 import Control.Concurrent.Supply (Supply)
 import Data.IntMap.Strict (IntMap)
 
+import Clash.Core.Binding (Binding(..), BindingMap)
 import Clash.Core.PartialEval.AsTerm
 import Clash.Core.PartialEval.Monad
 import Clash.Core.PartialEval.NormalForm
@@ -21,7 +22,6 @@ import Clash.Core.Term (Term)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (InScopeSet)
-import Clash.Driver.Types (Binding(..), BindingMap)
 
 -- | An evaluator for Clash core. This consists of two functions: one to
 -- evaluate a term to weak-head normal form (WHNF) and another to recursively
@@ -76,7 +76,7 @@ nf e g isSubj i x =
    in runEval g l (asTerm <$> (evalWhnf e x >>= quoteNf e))
 
 mkGlobalEnv
-  :: BindingMap
+  :: BindingMap Term
   -- ^ Global bindings available to the evaluator.
   -> TyConMap
   -- ^ The type constructors known by Clash.

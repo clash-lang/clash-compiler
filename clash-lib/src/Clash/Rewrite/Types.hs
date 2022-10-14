@@ -46,12 +46,13 @@ import GHC.Generics
 import Clash.Core.PartialEval as PE          (Evaluator)
 import Clash.Core.Evaluator.Types as WHNF    (Evaluator, PrimHeap)
 
+import Clash.Core.Binding        (BindingMap)
 import Clash.Core.Term           (Term, Context)
 import Clash.Core.Type           (Type)
 import Clash.Core.TyCon          (TyConMap, TyConName)
 import Clash.Core.Var            (Id)
 import Clash.Core.VarEnv         (InScopeSet, VarSet, VarEnv)
-import Clash.Driver.Types        (ClashEnv(..), ClashOpts(..), BindingMap, DebugOpts)
+import Clash.Driver.Types        (ClashEnv(..), ClashOpts(..), DebugOpts)
 import Clash.Netlist.Types       (FilteredHWType, HWMap)
 import Clash.Primitives.Types    (CompiledPrimMap)
 import Clash.Rewrite.WorkFree    (isWorkFree)
@@ -83,7 +84,7 @@ data RewriteState extra
   -- ^ Total number of applied transformations
   , _transformCounters :: HashMap Text Word
   -- ^ Map that tracks how many times each transformation is applied
-  , _bindings         :: !BindingMap
+  , _bindings         :: !(BindingMap Term)
   -- ^ Global binders
   , _uniqSupply       :: !Supply
   -- ^ Supply of unique numbers
@@ -240,7 +241,7 @@ type Rewrite extra = Transform (RewriteMonad extra)
 -- Moved into Clash.Rewrite.WorkFree
 {-# SPECIALIZE isWorkFree
       :: Lens' (RewriteState extra) (VarEnv Bool)
-      -> BindingMap
+      -> BindingMap Term
       -> Term
       -> RewriteMonad extra Bool
   #-}

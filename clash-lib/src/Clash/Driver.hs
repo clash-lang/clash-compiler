@@ -103,11 +103,13 @@ import           Clash.Annotations.TopEntity
   (TopEntity (..), PortName(PortName, PortProduct))
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
+import           Clash.Core.Binding (Binding(..), BindingMap)
 import           Clash.Core.PartialEval as PE     (Evaluator)
 import           Clash.Core.Evaluator.Types as WHNF (Evaluator)
 import           Clash.Core.HasType
 import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr')
+import           Clash.Core.Term (Term)
 import           Clash.Core.Type
   (Type(ForAllTy, LitTy, AnnType), TypeView(..), tyView, mkFunTy, LitTy(SymTy))
 import           Clash.Core.TyCon                 (TyConMap)
@@ -229,7 +231,7 @@ splitTopAnn _tcm _sp _typ t = t
 splitTopEntityT
   :: HasCallStack
   => TyConMap
-  -> BindingMap
+  -> BindingMap Term
   -> TopEntityT
   -> TopEntityT
 splitTopEntityT tcm bindingsMap tt@(TopEntityT id_ (Just t@(Synthesize {})) _) =
@@ -1054,7 +1056,7 @@ copyDataFiles idirs targetDir = mapM copyDataFile
 -- | Normalize a complete hierarchy
 normalizeEntity
   :: ClashEnv
-  -> BindingMap
+  -> BindingMap Term
   -- ^ All bindings
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
@@ -1069,7 +1071,7 @@ normalizeEntity
   -- ^ Unique supply
   -> Id
   -- ^ root of the hierarchy
-  -> IO BindingMap
+  -> IO (BindingMap Term)
 normalizeEntity env bindingsMap typeTrans peEval eval topEntities supply tm = transformedBindings
   where
     doNorm = do norm <- normalize [tm]
@@ -1082,7 +1084,7 @@ normalizeEntity env bindingsMap typeTrans peEval eval topEntities supply tm = tr
 
 -- | topologically sort the top entities
 sortTop
-  :: BindingMap
+  :: BindingMap Term
   -> [TopEntityT]
   -> ([TopEntityT], HashMap Unique [Unique])
 sortTop bindingsMap topEntities =

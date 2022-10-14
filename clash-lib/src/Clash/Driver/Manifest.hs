@@ -53,7 +53,9 @@ import           Text.Read (readMaybe)
 
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend (Backend (hdlType), Usage (External))
+import           Clash.Core.Binding (BindingMap)
 import           Clash.Core.Name (nameOcc)
+import           Clash.Core.Term (Term)
 import           Clash.Driver.Types
 import           Clash.Primitives.Types
 import           Clash.Core.Var (Id, varName)
@@ -375,7 +377,7 @@ readFreshManifest ::
   [TopEntityT] ->
   -- | Core expressions and entry point. Any changes in the call graph will
   -- trigger a recompile.
-  (BindingMap, Id) ->
+  (BindingMap Term, Id) ->
   -- | Any changes in any primitive will trigger a recompile.
   CompiledPrimMap ->
   -- | Certain options will trigger recompiles if changed

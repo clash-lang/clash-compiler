@@ -18,6 +18,7 @@ import Clash.Backend
 import Clash.Backend.SystemVerilog
 import Clash.Backend.Verilog
 import Clash.Backend.VHDL
+import Clash.Core.Binding
 import Clash.Core.PartialEval
 import Clash.Core.Name
 import Clash.Core.Term
@@ -68,7 +69,7 @@ runToCoreStage _target f src = do
 
 findBinding
   :: OccName
-  -> (BindingMap, TyConMap, Supply)
+  -> (BindingMap Term, TyConMap, Supply)
   -> IO Term
 findBinding nm (bm, tcm, ids) =
   case List.find byName (eltsVarEnv bm) of

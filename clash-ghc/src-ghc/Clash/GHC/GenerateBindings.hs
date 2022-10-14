@@ -67,6 +67,7 @@ import qualified SrcLoc                  as GHC
 import           Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 import           Clash.Annotations.Primitive (HDL, extractPrim)
 
+import           Clash.Core.Binding
 import           Clash.Core.Subst        (extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term         (Term (..), mkLams, mkTyLams)
 import           Clash.Core.Type         (Type (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
@@ -80,7 +81,7 @@ import           Clash.Core.VarEnv
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug             (traceIf)
 import           Clash.Driver            (compilePrimitive)
-import           Clash.Driver.Types      (BindingMap, Binding(..), IsPrim(..), ClashEnv(..), ClashDesign(..), ClashOpts(..))
+import           Clash.Driver.Types      (ClashEnv(..), ClashDesign(..), ClashOpts(..))
 import           Clash.GHC.GHC2Core
   (C2C, GHC2CoreState, GHC2CoreEnv (..), tyConMap, coreToId, coreToName, coreToTerm,
    makeAllTyCons, qualifiedNameString, emptyGHC2CoreState, srcSpan)
@@ -184,9 +185,9 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
     )
 
 setNoInlineTopEntities
-  :: BindingMap
+  :: BindingMap Term
   -> [TopEntityT]
-  -> BindingMap
+  -> BindingMap Term
 setNoInlineTopEntities bm tes =
   fmap go bm
  where
@@ -209,7 +210,7 @@ mkBindings
   -- Class operations
   -> [GHC.CoreBndr]
   -- Unlocatable Expressions
-  -> C2C ( BindingMap
+  -> C2C ( BindingMap Term
          , VarEnv (Id,Int)
          )
 mkBindings primMap bindings clsOps unlocatable = do

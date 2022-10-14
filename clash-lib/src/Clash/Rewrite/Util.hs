@@ -62,6 +62,7 @@ import           GHC.Types.Basic             (InlineSpec (..))
 import           BasicTypes                  (InlineSpec (..))
 #endif
 
+import           Clash.Core.Binding
 import           Clash.Core.Evaluator.Types  (PureHeap, whnf')
 import           Clash.Core.FreeVars
   (freeLocalVars, termFreeVars', freeLocalIds, globalIdOccursIn)
@@ -84,7 +85,7 @@ import           Clash.Data.UniqMap (UniqMap)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug
 import           Clash.Driver.Types
-  (TransformationInfo(..), DebugOpts(..), BindingMap, Binding(..), IsPrim(..),
+  (TransformationInfo(..), DebugOpts(..),
   ClashEnv(..), ClashOpts(..), hasDebugInfo, isDebugging)
 import           Clash.Netlist.Util          (representableType)
 import           Clash.Pretty                (clashPretty, showDoc)
@@ -669,7 +670,7 @@ cloneNameWithInScopeSet is nm = do
 -- unique is guaranteed to not be in the given BindingMap.
 cloneNameWithBindingMap
   :: (MonadUnique m)
-  => BindingMap
+  => BindingMap Term
   -> Name a
   -> m (Name a)
 cloneNameWithBindingMap binders nm = do

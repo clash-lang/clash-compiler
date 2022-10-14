@@ -55,6 +55,7 @@ import qualified Clash.Explicit.SimIO as SimIO
 import qualified Clash.Sized.Internal.BitVector as BV (Bit(Bit), BitVector(BV))
 
 import Clash.Annotations.Primitive (extractPrim)
+import Clash.Core.Binding (Binding(..))
 import Clash.Core.DataCon (DataCon(..))
 import Clash.Core.FreeVars
   (countFreeOccurances, freeLocalIds)
@@ -77,7 +78,6 @@ import Clash.Core.VarEnv
   , foldlWithUniqueVarEnv', lookupVarEnv, lookupVarEnvDirectly, mkVarEnv
   , notElemVarSet, unionVarEnv, unionVarEnvWith, unitVarSet)
 import Clash.Debug (trace)
-import Clash.Driver.Types (Binding(..))
 import Clash.Netlist.Util (representableType)
 import Clash.Primitives.Types
   (CompiledPrimMap, Primitive(..), TemplateKind(..))

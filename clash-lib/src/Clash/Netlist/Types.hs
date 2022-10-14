@@ -73,12 +73,14 @@ import Clash.Annotations.BitRepresentation  (FieldAnn)
 import Clash.Annotations.Primitive          (HDL(..))
 import Clash.Annotations.TopEntity          (TopEntity)
 import Clash.Backend                        (Backend, HasUsageMap (..))
+import Clash.Core.Binding                   (BindingMap)
 import Clash.Core.HasType
+import Clash.Core.Term                      (Term)
 import Clash.Core.Type                      (Type)
 import Clash.Core.Var                       (Attr', Id)
 import Clash.Core.TyCon                     (TyConMap)
 import Clash.Core.VarEnv                    (VarEnv)
-import Clash.Driver.Types                   (BindingMap, ClashEnv(..), ClashOpts(..))
+import Clash.Driver.Types                   (ClashEnv(..), ClashOpts(..))
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Primitives.Types               (CompiledPrimMap)
 import Clash.Signal.Internal
@@ -295,7 +297,7 @@ type ComponentMap = OMap Unique (ComponentMeta, Component)
 -- | State of the NetlistMonad
 data NetlistState
   = NetlistState
-  { _bindings       :: BindingMap
+  { _bindings       :: BindingMap Term
   -- ^ Global binders
   , _components     :: ComponentMap
   -- ^ Cached components. Is an insertion ordered map to preserve a topologically

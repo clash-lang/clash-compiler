@@ -26,6 +26,7 @@ import Control.Monad.State.Class (MonadState)
 import qualified Data.Text.Extra as Text
 import GHC.Stack (HasCallStack)
 
+import Clash.Core.Binding (BindingMap, Binding(..))
 import Clash.Core.HasFreeVars
 import Clash.Core.FreeVars
 import Clash.Core.HasType
@@ -36,7 +37,6 @@ import Clash.Core.Type (isPolyFunTy)
 import Clash.Core.Util
 import Clash.Core.Var (Id, isLocalId)
 import Clash.Core.VarEnv (VarEnv, lookupVarEnv)
-import Clash.Driver.Types (BindingMap, Binding(..))
 import Clash.Normalize.Primitives (removedArg)
 import Clash.Util (makeCachedU)
 
@@ -45,7 +45,7 @@ import Clash.Util (makeCachedU)
 isWorkFreeBinder
   :: (HasCallStack, MonadState s m)
   => Lens' s (VarEnv Bool)
-  -> BindingMap
+  -> BindingMap Term
   -> Id
   -> m Bool
 isWorkFreeBinder cache bndrs bndr =
@@ -66,7 +66,7 @@ isWorkFree
   :: forall s m
    . (HasCallStack, MonadState s m)
   => Lens' s (VarEnv Bool)
-  -> BindingMap
+  -> BindingMap Term
   -> Term
   -> m Bool
 isWorkFree cache bndrs = go True

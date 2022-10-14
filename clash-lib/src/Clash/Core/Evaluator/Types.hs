@@ -23,6 +23,7 @@ import Prettyprinter (hsep)
 import Data.Text.Prettyprint.Doc (hsep)
 #endif
 
+import Clash.Core.Binding (BindingMap, Binding(bindingTerm))
 import Clash.Core.DataCon (DataCon, dcType)
 import Clash.Core.HasType
 import Clash.Core.Literal (Literal(CharLiteral))
@@ -32,12 +33,11 @@ import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type (..), mkFunTy)
 import Clash.Core.Var (Id, IdScope(..), TyVar)
 import Clash.Core.VarEnv
-import Clash.Driver.Types (BindingMap, bindingTerm)
 import Clash.Pretty (ClashPretty(..), fromPretty, showDoc)
 
 whnf'
   :: Evaluator
-  -> BindingMap
+  -> BindingMap Term
   -> TyConMap
   -> PrimHeap
   -> Supply

@@ -73,6 +73,7 @@ import qualified Control.Monad.RWS.Strict as RWS
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Map.Strict as Map
 
+import           Clash.Core.Binding (Binding(..))
 import           Clash.Core.HasFreeVars
 import           Clash.Core.Name (OccName)
 import           Clash.Core.PartialEval.AsTerm
@@ -83,7 +84,6 @@ import           Clash.Core.Type (Kind, KindOrType, Type)
 import           Clash.Core.Util (mkUniqSystemId, mkUniqSystemTyVar)
 import           Clash.Core.Var (Id, TyVar, Var)
 import           Clash.Core.VarEnv
-import           Clash.Driver.Types (Binding(..))
 import           Clash.Rewrite.WorkFree (isWorkFree)
 
 {-

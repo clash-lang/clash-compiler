@@ -58,6 +58,7 @@ import qualified Clash.Sized.Internal.Index as I (Index, fromInteger#)
 import qualified Clash.Sized.Internal.Signed as S (Signed, fromInteger#)
 import qualified Clash.Sized.Internal.Unsigned as U (Unsigned, fromInteger#)
 
+import Clash.Core.Binding (Binding(..))
 import Clash.Core.DataCon (DataCon(dcArgTys))
 import Clash.Core.FreeVars (freeLocalVars, termFreeTyVars, typeFreeVars)
 import Clash.Core.HasType
@@ -82,7 +83,7 @@ import Clash.Core.VarEnv
   , mkInScopeSet, mkVarSet, unionInScope, elemVarSet)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug (traceIf, traceM)
-import Clash.Driver.Types (Binding(..), TransformationInfo(..), hasTransformationInfo)
+import Clash.Driver.Types (TransformationInfo(..), hasTransformationInfo)
 import Clash.Netlist.Util (representableType)
 import Clash.Rewrite.Combinators (topdownR)
 import Clash.Rewrite.Types

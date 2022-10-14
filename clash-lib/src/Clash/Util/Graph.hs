@@ -17,10 +17,10 @@ import           Data.Foldable         (foldlM)
 import qualified Data.IntMap.Strict    as IntMap
 import qualified Data.IntSet           as IntSet
 
+import           Clash.Core.Binding (BindingMap, Binding (bindingTerm))
 import           Clash.Core.Var (Id)
 import           Clash.Core.Term (Term)
-import qualified Clash.Data.UniqMap as UniqMap
-import           Clash.Driver.Types (BindingMap, Binding (bindingTerm))
+import qualified Clash.Data.UniqMap as UniqMap (find, keys)
 import           Clash.Normalize.Util (callGraph)
 
 data Marker
@@ -139,7 +139,7 @@ reverseTopSort nodes edges =
 
 -- | Get all the terms corresponding to a call graph
 callGraphBindings
-  :: BindingMap
+  :: BindingMap Term
   -- ^ All bindings
   -> Id
   -- ^ Root of the call graph

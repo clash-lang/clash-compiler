@@ -18,17 +18,17 @@ import Data.Map                   (Map)
 import Data.Set                   (Set)
 import Data.Text                  (Text)
 
+import Clash.Core.Binding     (BindingMap)
 import Clash.Core.Term        (Term)
 import Clash.Core.Type        (Type)
 import Clash.Core.Var         (Id)
 import Clash.Core.VarEnv      (VarEnv)
-import Clash.Driver.Types     (BindingMap)
 import Clash.Rewrite.Types    (Rewrite, RewriteMonad)
 
 -- | State of the 'NormalizeMonad'
 data NormalizeState
   = NormalizeState
-  { _normalized          :: BindingMap
+  { _normalized          :: BindingMap Term
   -- ^ Global binders
   , _specialisationCache :: Map (Id,Int,Either Term Type) Id
   -- ^ Cache of previously specialized functions:

@@ -45,6 +45,7 @@ import           BasicTypes                       (InlineSpec (..))
 
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
+import           Clash.Core.Binding (Binding(..), BindingMap)
 import           Clash.Core.Evaluator.Types as WHNF (Evaluator)
 import           Clash.Core.FreeVars
   (freeLocalIds, globalIds)
@@ -66,7 +67,7 @@ import           Clash.Core.VarEnv
    mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
 import           Clash.Debug                      (traceIf)
 import           Clash.Driver.Types
-  (BindingMap, Binding(..), DebugOpts(..), ClashEnv(..))
+  (DebugOpts(..), ClashEnv(..))
 import           Clash.Netlist.Types
   (HWMap, FilteredHWType(..))
 import           Clash.Netlist.Util
@@ -97,7 +98,7 @@ runNormalization
   :: ClashEnv
   -> Supply
   -- ^ UniqueSupply
-  -> BindingMap
+  -> BindingMap Term
   -- ^ Global Binders
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
@@ -145,7 +146,7 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
 
 normalize
   :: [Id]
-  -> NormalizeSession BindingMap
+  -> NormalizeSession (BindingMap Term)
 normalize []  = return emptyVarEnv
 normalize top = do
   (new,topNormalized) <- unzip <$> mapM normalize' top
@@ -225,9 +226,9 @@ normalize' nm = do
 -- | Check whether the normalized bindings are non-recursive. Errors when one
 -- of the components is recursive.
 checkNonRecursive
-  :: BindingMap
+  :: BindingMap Term
   -- ^ List of normalized binders
-  -> BindingMap
+  -> BindingMap Term
 checkNonRecursive norm = case mapMaybeVarEnv go norm of
   rcs | nullVarEnv rcs  -> norm
   rcs -> error $ $(curLoc) ++ "Callgraph after normalization contains following recursive components: "
@@ -244,8 +245,8 @@ checkNonRecursive norm = case mapMaybeVarEnv go norm of
 --   * Inlining functions that simply \"wrap\" another function
 cleanupGraph
   :: Id
-  -> BindingMap
-  -> NormalizeSession BindingMap
+  -> BindingMap Term
+  -> NormalizeSession (BindingMap Term)
 cleanupGraph topEntity norm
   | Just ct <- mkCallTree [] norm topEntity
   = do ctFlat <- flattenCallTree ct
@@ -262,7 +263,7 @@ data CallTree
 mkCallTree
   :: [Id]
   -- ^ Visited
-  -> BindingMap
+  -> BindingMap Term
   -- ^ Global binders
   -> Id
   -- ^ Root of the call graph

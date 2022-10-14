@@ -35,6 +35,7 @@ import Control.Lens (Lens', lens)
 import Data.IntMap.Strict (IntMap)
 import Data.Map.Strict (Map)
 
+import Clash.Core.Binding (Binding(..))
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal
 import Clash.Core.Term (Bind, Term(..), PrimInfo(primName), TickInfo, Pat)
@@ -43,7 +44,6 @@ import Clash.Core.Type (Type, TyVar)
 import Clash.Core.Util (undefinedPrims, undefinedXPrims)
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (VarEnv, InScopeSet)
-import Clash.Driver.Types (Binding(..))
 
 type Args a
   = [Arg a]

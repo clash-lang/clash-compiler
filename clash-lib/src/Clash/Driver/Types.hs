@@ -22,7 +22,6 @@ module Clash.Driver.Types where
 #include "MachDeps.h"
 
 import           Control.DeepSeq                (NFData(rnf), deepseq)
-import           Data.Binary                    (Binary)
 import           Data.Fixed
 import           Data.Hashable
 import           Data.HashMap.Strict            (HashMap)
@@ -42,22 +41,17 @@ import           Data.Text.Prettyprint.Doc
 import           GHC.Generics                   (Generic)
 
 #if MIN_VERSION_ghc(9,0,0)
-import           GHC.Types.Basic                (InlineSpec)
-import           GHC.Types.SrcLoc               (SrcSpan)
 import           GHC.Utils.Misc                 (OverridingBool(..))
 #else
-import           BasicTypes                     (InlineSpec)
-import           SrcLoc                         (SrcSpan)
 import           Util                           (OverridingBool(..))
 #endif
 
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import           Clash.Signal.Internal
 
+import           Clash.Core.Binding             (BindingMap)
 import           Clash.Core.Term                (Term)
 import           Clash.Core.TyCon               (TyConMap, TyConName)
-import           Clash.Core.Var                 (Id)
-import           Clash.Core.VarEnv              (VarEnv)
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
 import {-# SOURCE #-} Clash.Netlist.Types       (PreserveCase(..), TopEntityT)
 import           Clash.Primitives.Types         (CompiledPrimMap)
@@ -73,7 +67,7 @@ data ClashEnv = ClashEnv
 data ClashDesign = ClashDesign
   { designEntities :: [TopEntityT]
   , designDomains  :: DomainMap
-  , designBindings :: BindingMap
+  , designBindings :: BindingMap Term
   }
 
 instance NFData ClashDesign where
@@ -83,41 +77,9 @@ instance NFData ClashDesign where
     designBindings design `deepseq`
     ()
 
-data IsPrim
-  = IsPrim
-    -- ^ The binding is the unfolding for a primitive.
-  | IsFun
-    -- ^ The binding is an ordinary function.
-  deriving (Binary, Eq, Generic, NFData, Show)
-
--- A function binder in the global environment.
---
-data Binding a = Binding
-  { bindingId :: Id
-    -- ^ The core identifier for this binding.
-  , bindingLoc :: SrcSpan
-    -- ^ The source location of this binding in the original source code.
-  , bindingSpec :: InlineSpec
-    -- ^ the inline specification for this binding, in the original source code.
-  , bindingIsPrim :: IsPrim
-    -- ^ Is the binding a core term corresponding to a primitive with a known
-    -- implementation? If so, it can potentially be inlined despite being
-    -- marked as NOINLINE in source.
-  , bindingTerm :: a
-    -- ^ The term representation for this binding. This is polymorphic so
-    -- alternate representations can be used if more appropriate (i.e. in the
-    -- evaluator this can be Value for evaluated bindings).
-  , bindingRecursive :: Bool
-    -- ^ Whether the binding is recursive.
-    --
-    -- TODO Ideally the BindingMap would store recursive and non-recursive
-    -- bindings in a way similar to Let / Letrec. GHC also does this.
-  } deriving (Binary, Functor, Generic, NFData, Show)
-
 -- | Global function binders
 --
 -- Global functions cannot be mutually recursive, only self-recursive.
-type BindingMap = VarEnv (Binding Term)
 type DomainMap = HashMap Text VDomainConfiguration
 
 -- | Information to show about transformations during compilation.
