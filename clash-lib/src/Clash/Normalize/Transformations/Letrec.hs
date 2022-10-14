@@ -34,7 +34,6 @@ import Data.List ((\\))
 import qualified Data.List as List
 import qualified Data.List.Extra as List
 import qualified Data.Monoid as Monoid (Any(..))
-import qualified Data.Text as Text
 import qualified Data.Text.Extra as Text
 import GHC.Stack (HasCallStack)
 
@@ -55,7 +54,7 @@ import Clash.Core.Term
 import Clash.Core.TermInfo (isCon, isLet, isLocalVar, isTick)
 import Clash.Core.TyCon (tyConDataCons)
 import Clash.Core.Type
-  (Type(..), TypeView(..), normalizeType
+  (TypeView(..), normalizeType, isClassTy
   , splitFunForallTy, tyView)
 import Clash.Core.Util (inverseTopSortLetBindings, mkVec, tyNatSize)
 import Clash.Core.Var (isGlobalId)
@@ -317,7 +316,7 @@ recToLetRec (TransformContext is0 []) e = do
       | let t1 = normalizeType tcm (inferCoreTypeOf tcm v1)
       , let t2 = normalizeType tcm (inferCoreTypeOf tcm v2)
       , t1 == t2
-      = if isClassConstraint t1 then
+      = if isClassTy tcm t1 then
           -- Class constraints are equal if their types are equal, so we can
           -- take a shortcut here.
           True
@@ -373,19 +372,6 @@ recToLetRec (TransformContext is0 []) e = do
 
 recToLetRec _ e = return e
 {-# SCC recToLetRec #-}
-
-isClassConstraint :: Type -> Bool
-isClassConstraint (tyView -> TyConApp nm0 _) =
-  if -- Constraint tuple:
-     | "GHC.Classes.(%" `Text.isInfixOf` nm1 -> True
-     -- Constraint class:
-     | "C:" `Text.isInfixOf` nm2 -> True
-     | otherwise -> False
- where
-  nm1 = nameOcc nm0
-  nm2 = snd (Text.breakOnEnd "." nm1)
-
-isClassConstraint _ = False
 
 -- | Simplified CSE, only works on let-bindings, does an inverse topological
 -- sort of the let-bindings and then works from top to bottom
