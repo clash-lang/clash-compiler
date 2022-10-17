@@ -62,11 +62,13 @@ import           Data.Text.Prettyprint.Doc.Extra
 import           GHC.Stack               (HasCallStack)
 
 #if MIN_VERSION_ghc(9,0,0)
+import           GHC.Types.SrcLoc        (SrcSpan)
 import           GHC.Utils.Monad         (zipWith3M)
 import           GHC.Utils.Outputable    (ppr, showSDocUnsafe)
 #else
 import           MonadUtils              (zipWith3M)
 import           Outputable              (ppr, showSDocUnsafe)
+import           SrcLoc                  (SrcSpan)
 #endif
 
 import           Clash.Annotations.TopEntity

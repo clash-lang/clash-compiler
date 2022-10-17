@@ -50,10 +50,10 @@ import           GHC.Integer.GMP.Internals        (Integer (..), BigNat (..))
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Utils.Outputable             (ppr, showSDocUnsafe)
-import           GHC.Types.SrcLoc                 (isGoodSrcSpan)
+import           GHC.Types.SrcLoc                 (SrcSpan, isGoodSrcSpan, noSrcSpan)
 #else
 import           Outputable                       (ppr, showSDocUnsafe)
-import           SrcLoc                           (isGoodSrcSpan)
+import           SrcLoc                           (SrcSpan, isGoodSrcSpan, noSrcSpan)
 #endif
 
 import           Clash.Annotations.Primitive      (HDL)

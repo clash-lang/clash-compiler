@@ -106,6 +106,7 @@ import qualified GHC.Types.Name as Name
 import qualified GHC.Types.Name.Occurrence as OccName
 import           GHC.Utils.Outputable (ppr)
 import qualified GHC.Utils.Outputable as Outputable
+import           GHC.Types.SrcLoc (noSrcSpan)
 import qualified GHC.Types.Unique.Set as UniqSet
 import           GHC.Utils.Misc (OverridingBool)
 import qualified GHC.Types.Var as Var
@@ -129,6 +130,7 @@ import qualified HscTypes
 import qualified MonadUtils
 import qualified Panic
 import qualified GhcPlugins                      (deserializeWithData, installedUnitIdString)
+import           SrcSpan (noSrcSpan)
 import qualified TcRnMonad
 import qualified TcRnTypes
 import qualified TidyPgm
@@ -154,7 +156,7 @@ import           Clash.GHC.LoadInterfaceFiles
   (loadExternalExprs, getUnresolvedPrimitives, loadExternalBinders,
    LoadedBinders(..))
 import           Clash.GHCi.Common                            (checkMonoLocalBindsMod)
-import           Clash.Util                                   (curLoc, noSrcSpan, reportTimeDiff
+import           Clash.Util                                   (curLoc, reportTimeDiff
                                                               ,wantedLanguageExtensions, unwantedLanguageExtensions)
 import           Clash.Annotations.BitRepresentation.Internal
   (DataRepr', dataReprAnnToDataRepr')

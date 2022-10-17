@@ -23,12 +23,14 @@ import           Clash.Netlist.Types    (TopEntityT(..))
 -- The GHC interface
 #if MIN_VERSION_ghc(9,0,0)
 import qualified GHC.Data.EnumSet       as GHC (member)
+import           GHC.Types.SrcLoc       (noSrcSpan)
 import           GHC.Utils.Panic        (GhcException (..), throwGhcException)
 import qualified GHC
   (DynFlags, ModSummary (..), extensionFlags, moduleName, moduleNameString)
 #else
 import qualified EnumSet                as GHC (member)
 import           Panic                  (GhcException (..), throwGhcException)
+import           SrcLoc                 (noSrcSpan)
 import qualified GHC                    (DynFlags, ModSummary (..), Module (..),
                                          extensionFlags, moduleNameString)
 #endif
@@ -36,7 +38,7 @@ import           Clash.Core.Name        (nameOcc)
 import           Clash.Core.Var         (varName)
 import           Clash.Normalize.Util   (collectCallGraphUniques, callGraph)
 import qualified Clash.Util.Interpolate as I
-import           Clash.Util             (ClashException(..), noSrcSpan)
+import           Clash.Util             (ClashException(..))
 import           Clash.Unique           (getUnique)
 import           Control.Exception      (throw)
 import           Data.List              (isSuffixOf)

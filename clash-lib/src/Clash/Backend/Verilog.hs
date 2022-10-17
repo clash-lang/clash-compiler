@@ -58,6 +58,12 @@ import           Data.Text.Prettyprint.Doc.Extra
 import qualified System.FilePath
 import           GHC.Stack                            (HasCallStack)
 
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Types.SrcLoc                    (SrcSpan, noSrcSpan)
+#else
+import           SrcLoc                              (SrcSpan, noSrcSpan)
+#endif
+
 import           Clash.Annotations.Primitive          (HDL (..))
 import           Clash.Annotations.BitRepresentation.ClashLib
   (bitsToBits)
@@ -78,8 +84,7 @@ import qualified Clash.Netlist.Id                     as Id
 import           Clash.Netlist.Types as N             hiding (intWidth, usages, _usages)
 import           Clash.Netlist.Util
 import           Clash.Signal.Internal                (ActiveEdge (..))
-import           Clash.Util
-  (SrcSpan, noSrcSpan, curLoc, indexNote, makeCached)
+import           Clash.Util (curLoc, indexNote, makeCached)
 
 -- | State for the 'Clash.Backend.Verilog.VerilogM' monad:
 data VerilogState =

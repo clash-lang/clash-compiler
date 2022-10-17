@@ -58,8 +58,10 @@ import qualified Data.ByteString.Lazy        as BL
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Types.Basic             (InlineSpec (..))
+import           GHC.Types.SrcLoc            (SrcSpan)
 #else
 import           BasicTypes                  (InlineSpec (..))
+import           SrcLoc                      (SrcSpan)
 #endif
 
 import           Clash.Core.Binding

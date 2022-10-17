@@ -48,9 +48,11 @@ import qualified Data.Text.Extra as Text
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Builtin.Names       (eqTyConKey)
+import           GHC.Types.SrcLoc        (SrcSpan)
 import           GHC.Types.Unique        (getKey)
 #else
 import           PrelNames               (eqTyConKey)
+import           SrcLoc                  (SrcSpan)
 import           Unique                  (getKey)
 #endif
 
@@ -89,7 +91,7 @@ import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
   (runRewrite, mkTmBinderFor, mkDerivedName)
 import           Clash.Unique
-import           Clash.Util              (SrcSpan, makeCachedU)
+import           Clash.Util              (makeCachedU)
 
 -- | Determine if argument should reduce to a constant given a primitive and
 -- an argument number. Caches results.

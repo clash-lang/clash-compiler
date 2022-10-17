@@ -48,9 +48,11 @@ import Data.Text.Prettyprint.Doc.Internal
 import GHC.Show                         (showMultiLineString)
 import GHC.Stack                        (HasCallStack)
 #if MIN_VERSION_ghc(9,0,0)
+import GHC.Types.SrcLoc               (SrcSpan)
 import qualified GHC.Utils.Outputable   as GHC
 #else
 import qualified Outputable             as GHC
+import SrcLoc                         (SrcSpan)
 #endif
 import System.Environment               (lookupEnv)
 import System.IO.Unsafe                 (unsafePerformIO)
@@ -66,7 +68,6 @@ import Clash.Core.Type                  (ConstTy (..), Kind, LitTy (..),
                                          Type (..), TypeView (..), tyView,mkTyConApp)
 import Clash.Core.Var                   (Id, TyVar, Var (..), IdScope(..))
 import Clash.Debug                      (trace)
-import Clash.Util
 import qualified Clash.Util.Interpolate as I
 import Clash.Pretty
 

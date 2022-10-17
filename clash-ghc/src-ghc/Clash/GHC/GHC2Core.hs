@@ -76,7 +76,7 @@ import GHC.Builtin.Names  (integerTyConKey, naturalTyConKey)
 import GHC.Types.Name.Occurrence (occNameString)
 import GHC.Utils.Outputable (showPpr)
 import GHC.Data.Pair (Pair (..))
-import GHC.Types.SrcLoc (SrcSpan (..), isGoodSrcSpan)
+import GHC.Types.SrcLoc (SrcSpan (..), isGoodSrcSpan, noSrcSpan)
 import GHC.Core.TyCon
   (AlgTyConRhs (..), TyCon, tyConName, algTyConRhs, isAlgTyCon, isFamilyTyCon,
    isFunTyCon, isNewTyCon, isPrimTyCon, isTupleTyCon,
@@ -127,7 +127,7 @@ import PrelNames  (integerTyConKey, naturalTyConKey)
 import OccName    (occNameString)
 import Outputable (showPpr)
 import Pair       (Pair (..))
-import SrcLoc     (SrcSpan (..), isGoodSrcSpan)
+import SrcLoc     (SrcSpan (..), isGoodSrcSpan, noSrcSpan)
 import TyCon      (AlgTyConRhs (..), TyCon, tyConName,
                    algTyConRhs, isAlgTyCon, isFamilyTyCon,
                    isFunTyCon, isNewTyCon, isPromotedDataCon_maybe,

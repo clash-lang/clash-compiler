@@ -39,8 +39,10 @@ import           Data.Text.Prettyprint.Doc        (vcat)
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Types.Basic                  (InlineSpec (..))
+import           GHC.Types.SrcLoc                 (noSrcSpan)
 #else
 import           BasicTypes                       (InlineSpec (..))
+import           SrcLoc                           (noSrcSpan)
 #endif
 
 import           Clash.Annotations.BitRepresentation.Internal

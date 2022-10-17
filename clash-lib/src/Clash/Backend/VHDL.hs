@@ -45,6 +45,12 @@ import qualified Data.Text.Lazy                       as T
 import qualified Data.Text                            as TextS
 import           Data.Text.Extra
 
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Types.SrcLoc                     (SrcSpan, noSrcSpan)
+#else
+import           SrcLoc                               (SrcSpan, noSrcSpan)
+#endif
+
 #if MIN_VERSION_prettyprinter(1,7,0)
 import qualified Prettyprinter                        as PP
 #else
@@ -75,8 +81,7 @@ import           Clash.Netlist.BlackBox.Util
 import qualified Clash.Netlist.Id                     as Id
 import           Clash.Netlist.Types                  hiding (intWidth, usages, _usages)
 import           Clash.Netlist.Util
-import           Clash.Util
-  (SrcSpan, noSrcSpan, clogBase, curLoc, makeCached, indexNote)
+import           Clash.Util (clogBase, curLoc, makeCached, indexNote)
 import qualified Clash.Util.Interpolate               as I
 import           Clash.Util.Graph                     (reverseTopSort)
 

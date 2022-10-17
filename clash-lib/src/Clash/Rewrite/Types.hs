@@ -43,6 +43,12 @@ import Data.Monoid                           (Any)
 import Data.Text                             (Text)
 import GHC.Generics
 
+#if MIN_VERSION_ghc(9,0,0)
+import GHC.Types.SrcLoc               (SrcSpan)
+#else
+import SrcLoc                         (SrcSpan)
+#endif
+
 import Clash.Core.PartialEval as PE          (Evaluator)
 import Clash.Core.Evaluator.Types as WHNF    (Evaluator, PrimHeap)
 
@@ -57,7 +63,6 @@ import Clash.Netlist.Types       (FilteredHWType, HWMap)
 import Clash.Primitives.Types    (CompiledPrimMap)
 import Clash.Rewrite.WorkFree    (isWorkFree)
 import Clash.Unique              (MonadUnique(..))
-import Clash.Util
 
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 

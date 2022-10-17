@@ -53,8 +53,10 @@ import           System.Console.ANSI
 import           System.IO
   (hPutStrLn, stderr, hFlush, hIsTerminalDevice)
 #if MIN_VERSION_ghc(9,0,0)
+import           GHC.Types.SrcLoc              (noSrcSpan)
 import           GHC.Utils.Misc                (OverridingBool(..))
 #else
+import           SrcLoc                        (noSrcSpan)
 import           Util                          (OverridingBool(..))
 #endif
 

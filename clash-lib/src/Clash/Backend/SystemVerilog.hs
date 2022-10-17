@@ -42,6 +42,12 @@ import           Data.Text.Prettyprint.Doc.Extra
 import qualified Data.Text.Prettyprint.Doc.Extra      as PP
 import qualified System.FilePath
 
+#if MIN_VERSION_ghc(9,0,0)
+import           GHC.Types.SrcLoc                     (SrcSpan, noSrcSpan)
+#else
+import           SrcLoc                               (SrcSpan, noSrcSpan)
+#endif
+
 import           Clash.Annotations.Primitive          (HDL (..))
 import           Clash.Annotations.BitRepresentation.Internal
   (ConstrRepr'(..), DataRepr'(..))
@@ -64,8 +70,7 @@ import qualified Clash.Netlist.Id                     as Id
 import           Clash.Netlist.Types                  hiding (intWidth, usages, _usages)
 import           Clash.Netlist.Util
 import           Clash.Signal.Internal                (ActiveEdge (..))
-import           Clash.Util
-  (SrcSpan, noSrcSpan, curLoc, makeCached, indexNote)
+import           Clash.Util (curLoc, makeCached, indexNote)
 import           Clash.Util.Graph                     (reverseTopSort)
 
 -- | State for the 'Clash.Backend.SystemVerilog.SystemVerilogM' monad:
