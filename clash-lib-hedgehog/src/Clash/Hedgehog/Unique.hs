@@ -13,7 +13,6 @@ module Clash.Hedgehog.Unique
   , genUniqMap
   , sampleUniqMap
   , sampleAnyUniqMap
-  , genUniqSet
   , Bias(..)
   , sampleUniqMapBiased
   ) where
@@ -27,6 +26,8 @@ import qualified Hedgehog.Range as Range
 import Clash.Core.HasType
 import Clash.Core.Subst (aeqType)
 import Clash.Core.Type
+import Clash.Data.UniqMap (UniqMap)
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Unique
 
 import Clash.Hedgehog.Internal.Bias
@@ -42,7 +43,7 @@ genUniqMap
   -> m v
   -> m (UniqMap v)
 genUniqMap range genKey genValue =
-  listToUniqMap <$> Gen.list range ((,) <$> genKey <*> genValue)
+  UniqMap.fromList <$> Gen.list range ((,) <$> genKey <*> genValue)
 
 sampleAnyUniqMap
   :: forall m v
@@ -50,9 +51,9 @@ sampleAnyUniqMap
   => UniqMap v
   -> m (v, [Type])
 sampleAnyUniqMap xs =
-  let xs' = filterUniqMap (not . isPolyTy . coreTypeOf) xs
-   in if nullUniqMap xs' then empty else do
-     x <- Gen.element (eltsUniqMap xs')
+  let xs' = UniqMap.filter (not . isPolyTy . coreTypeOf) xs
+   in if UniqMap.null xs' then empty else do
+     x <- Gen.element (UniqMap.elems xs')
      let holes = rights . fst $ splitFunForallTy (coreTypeOf x)
 
      pure (x, holes)
@@ -65,8 +66,8 @@ sampleUniqMap
   -> UniqMap v
   -> m (v, [Type])
 sampleUniqMap p hole xs =
-  let xs' = mapMaybeUniqMap findFit (filterUniqMap p xs)
-   in if nullUniqMap xs' then empty else Gen.element (eltsUniqMap xs')
+  let xs' = UniqMap.mapMaybe findFit (UniqMap.filter p xs)
+   in if UniqMap.null xs' then empty else Gen.element (UniqMap.elems xs')
  where
   findFit x =
     fmap (x,) (findFitArgs (coreTypeOf x))
@@ -101,7 +102,7 @@ sampleUniqMapBiased
   -> UniqMap v
   -> m (v, [Type])
 sampleUniqMapBiased p hole xs =
-  let xs' = eltsUniqMap $ mapMaybeUniqMap findFit (filterUniqMap p xs)
+  let xs' = UniqMap.elems $ UniqMap.mapMaybe findFit (UniqMap.filter p xs)
       bs  = fmap (biasOf . fst) xs'
    in if null xs' then empty else Gen.frequency (zip bs (Gen.constant <$> xs'))
   where
@@ -112,12 +113,3 @@ sampleUniqMapBiased p hole xs =
     | aeqType hole a        = Just []
     | FunTy b c <- tyView a = fmap (b :) (findFitArgs c)
     | otherwise             = Nothing
-
-genUniqSet
-  :: forall m v
-   . (MonadGen m, Uniquable v)
-  => Range Int
-  -> m v
-  -> m (UniqSet v)
-genUniqSet range genValue =
-  mkUniqSet <$> Gen.list range genValue

@@ -212,6 +212,8 @@ Library
                       Clash.Core.Var
                       Clash.Core.VarEnv
 
+                      Clash.Data.UniqMap
+
                       Clash.DataFiles
 
                       Clash.Debug

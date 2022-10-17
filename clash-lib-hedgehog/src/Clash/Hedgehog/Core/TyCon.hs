@@ -27,7 +27,8 @@ import Clash.Core.Type (Kind, Type(VarTy), mkTyConApp, splitFunForallTy)
 import Clash.Core.TysPrim (liftedTypeKind, tysPrimMap)
 import Clash.Core.Var
 import Clash.Core.VarEnv
-import Clash.Unique
+import Clash.Data.UniqMap (UniqMap)
+import qualified Clash.Data.UniqMap as UniqMap
 
 import Clash.Hedgehog.Core.DataCon
 import Clash.Hedgehog.Core.Monad
@@ -104,7 +105,7 @@ genTyConMap numDcs = go tysPrimMap
         ]
       False -> Gen.choice [genAlgTyConFrom numDcs tcm]
 
-    pure (unionUniqMap tcm new)
+    pure (tcm <> new)
 
 -- | Generate a new algebraic type constructor using the types that are already
 -- in scope. This will also promote data constructors if the configuration
@@ -117,7 +118,7 @@ genAlgTyConFrom
   -> TyConMap
   -> CoreGenT m TyConMap
 genAlgTyConFrom range tcm = do
-  let used = uniqMapToUniqSet (fmap tyConUniq tcm)
+  let used = fmap tyConUniq tcm
   name <- genFreshName used genTyConName
 
   -- TODO We want to use this, but we cannot sample polymorphic constructors
@@ -143,10 +144,10 @@ genAlgTyConFrom range tcm = do
     True ->
       -- Promote all the data constructors in the TyCon.
       let dcs = tyConDataCons tc
-       in pure (listToUniqMap ((name, tc) : fmap promoteDataCon dcs))
+       in pure (UniqMap.fromList ((name, tc) : fmap promoteDataCon dcs))
 
     False ->
-      pure (unitUniqMap name tc)
+      pure (UniqMap.singleton name tc)
  where
    promoteDataCon dc =
      let tcn = coerce (dcName dc)
@@ -167,7 +168,7 @@ genFunTyConFrom
   => TyConMap
   -> CoreGenT m TyConMap
 genFunTyConFrom tcm = do
-  let used = uniqMapToUniqSet (fmap tyConUniq tcm)
+  let used = fmap tyConUniq tcm
   name <- genFreshName used genTyConName
 
   kn <- genClosedKindFrom tcm liftedTypeKind
@@ -177,21 +178,21 @@ genFunTyConFrom tcm = do
   substs <- genSubsts name (rights argKns) resKn
 
   let tc = FunTyCon (nameUniq name) name kn arity substs
-  pure (unitUniqMap name tc)
+  pure (UniqMap.singleton name tc)
  where
   genSubsts :: TyConName -> [Kind] -> Kind -> CoreGenT m [([Type], Type)]
   genSubsts _ [] rhsKn = do
     -- Nullary type family, we only need to generate the RHS type
-    let tcm' = filterUniqMap (not . isPrimTc) tcm
-    rhs <- genMonoTypeFrom tcm' emptyUniqMap rhsKn
+    let tcm' = UniqMap.filter (not . isPrimTc) tcm
+    rhs <- genMonoTypeFrom tcm' mempty rhsKn
 
     pure [([], rhs)]
 
   genSubsts name argKns rhsKn = do
-    let tcm' = filterUniqMap (not . isPrimTc) tcm
+    let tcm' = UniqMap.filter (not . isPrimTc) tcm
 
     tvs <- genVars genTyVar argKns genVarName
-    let acc = fmap (\x -> (unitUniqMap x x, VarTy x)) tvs
+    let acc = fmap (\x -> (UniqMap.singletonUnique x, VarTy x)) tvs
 
     lhss <- refineArgs tcm acc
 
@@ -247,13 +248,13 @@ refineArg
   -> Type
   -> m (UniqMap TyVar, Type)
 refineArg tcm free ty
-  | nullUniqMap free
+  | UniqMap.null free
   = pure (free, ty)
 
   | otherwise
   = do -- Pick a free variable and remove it from free vars
        fv <- fst <$> sampleAnyUniqMap free
-       let free' = delUniqMap free fv
+       let free' = UniqMap.delete fv free
 
        -- Pick a type constructor that fits that free variable. This cannot be
        -- an unboxed primitive type, so for now all primitive types are excluded.
@@ -262,11 +263,11 @@ refineArg tcm free ty
 
        -- Take any holes for that constructor and make them new free variables.
        holeVars <- genVars genTyVar holes genVarName
-       let free'' = extendListUniqMap free' (zip holeVars holeVars)
+       let free'' = UniqMap.insertMany (zip holeVars holeVars) free'
 
        -- Substitute the removed free variable for the type constructor with
        -- any new free variables applied to it.
-       let inScope = extendInScopeSetList emptyInScopeSet (eltsUniqMap free'')
+       let inScope = extendInScopeSetList emptyInScopeSet (UniqMap.elems free'')
        let substTv = unitVarEnv fv (mkTyConApp (tyConName tc) (fmap VarTy holeVars))
        let subst = mkTvSubst inScope substTv
 

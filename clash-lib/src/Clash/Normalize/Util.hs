@@ -74,6 +74,7 @@ import           Clash.Core.Var          (Id, TyVar, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
    lookupVarEnv, unionVarEnvWith, unitVarEnv, extendInScopeSetList, mkInScopeSet, mkVarSet)
+import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug             (traceIf)
 import           Clash.Driver.Types
   (BindingMap, Binding(..), TransformationInfo(FinalTerm), hasTransformationInfo)
@@ -348,8 +349,8 @@ type CallGraph = VarEnv (VarEnv Word)
 collectCallGraphUniques :: CallGraph -> HashSet.HashSet Unique
 collectCallGraphUniques cg = HashSet.fromList (us0 ++ us1)
  where
-  us0 = keysUniqMap cg
-  us1 = concatMap keysUniqMap (eltsUniqMap cg)
+  us0 = UniqMap.keys cg
+  us1 = concatMap UniqMap.keys (UniqMap.elems cg)
 
 -- | Create a call graph for a set of global binders, given a root
 callGraph
@@ -359,12 +360,12 @@ callGraph
 callGraph bndrs rt = go emptyVarEnv (varUniq rt)
   where
     go cg root
-      | Nothing     <- lookupUniqMap root cg
-      , Just rootTm <- lookupUniqMap root bndrs =
+      | Nothing     <- UniqMap.lookup root cg
+      , Just rootTm <- UniqMap.lookup root bndrs =
       let used = Lens.foldMapByOf globalIds (unionVarEnvWith (+))
-                  emptyVarEnv (`unitUniqMap` 1) (bindingTerm rootTm)
-          cg'  = extendUniqMap root used cg
-      in  List.foldl' go cg' (keysUniqMap used)
+                  emptyVarEnv (`UniqMap.singleton` 1) (bindingTerm rootTm)
+          cg'  = UniqMap.insert root used cg
+      in  List.foldl' go cg' (UniqMap.keys used)
     go cg _ = cg
 
 -- | Give a "performance/size" classification of a function in normal form.

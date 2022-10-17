@@ -88,6 +88,7 @@ import {-# SOURCE #-} Clash.Netlist
   (genComponent, mkDcApplication, mkDeclarations, mkExpr, mkNetDecl,
    mkProjection, mkSelection, mkFunApp, mkDeclarations')
 import qualified Clash.Backend                 as Backend
+import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug                   (debugIsOn)
 import           Clash.Driver.Types
   (ClashOpts(opt_primWarn, opt_color, opt_werror))
@@ -99,7 +100,6 @@ import           Clash.Normalize.Primitives    (removedArg)
 import           Clash.Primitives.Types        as P
 import qualified Clash.Primitives.Util         as P
 import           Clash.Signal.Internal         (ActiveEdge (..))
-import           Clash.Unique                  (lookupUniqMap')
 import           Clash.Util
 import qualified Clash.Util.Interpolate        as I
 
@@ -537,7 +537,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
               case args of
                 [Right (ConstTy (TyCon tcN)), Left (C.Literal (IntLiteral i))] -> do
                   tcm <- Lens.view tcCache
-                  let dcs = tyConDataCons (tcm `lookupUniqMap'` tcN)
+                  let dcs = tyConDataCons (UniqMap.find tcN tcm)
                       dc  = dcs !! fromInteger i
                   (exprN,dcDecls) <- mkDcApplication declType [hwTy] dst dc []
                   return (exprN,dcDecls)

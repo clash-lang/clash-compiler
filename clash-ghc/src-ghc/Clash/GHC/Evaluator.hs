@@ -338,7 +338,7 @@ instantiate _tcm (TyLambda x e) ty m =
  where
   subst  = extendTvSubst subst0 x ty
   subst0 = mkSubst iss0
-  iss0   = mkInScopeSet (freeVarsOf e `unionUniqSet` freeVarsOf ty)
+  iss0   = mkInScopeSet (freeVarsOf e <> freeVarsOf ty)
 -- The evaluator is setup in such a way that under normal conditions anything
 -- of type 'forall a . ty' must be a ty-lambda.
 --

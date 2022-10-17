@@ -77,6 +77,7 @@ import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet
   ,mkVarEnv, unionVarEnv, elemVarSet, mkVarSet)
+import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug             (traceIf)
 import           Clash.Driver            (compilePrimitive)
 import           Clash.Driver.Types      (BindingMap, Binding(..), IsPrim(..), ClashEnv(..), ClashDesign(..), ClashOpts(..))
@@ -89,8 +90,6 @@ import           Clash.Netlist.Types     (TopEntityT(..))
 import           Clash.Primitives.Types
   (Primitive (..), CompiledPrimMap)
 import           Clash.Primitives.Util   (generatePrimMap)
-import           Clash.Unique
-  (listToUniqMap, lookupUniqMap, mapUniqMap, unionUniqMap, uniqMapToUniqSet)
 import           Clash.Util              (reportTimeDiff)
 import qualified Clash.Util.Interpolate as I
 
@@ -140,13 +139,13 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
                    emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
       tcCache                       = makeAllTyCons tcMap' fiEnvs
-      allTcCache                    = tysPrimMap `unionUniqMap` tcCache
-      inScope0 = mkInScopeSet (uniqMapToUniqSet
-                      ((mapUniqMap (coerce . bindingId) bindingsMap) `unionUniqMap`
-                       (mapUniqMap (coerce . bindingId) clsMap)))
+      allTcCache                    = tysPrimMap <> tcCache
+      inScope0 = mkInScopeSet (
+                      (fmap (coerce . bindingId) bindingsMap) <>
+                      (fmap (coerce . bindingId) clsMap))
                                     -- Recursion info is always False for class
                                     -- selectors, no need to check free vars.
-      clsMap                        = mapUniqMap (\(v,i) -> (Binding v GHC.noSrcSpan GHC.Inline IsFun (mkClassSelector inScope0 allTcCache (varType v) i) False)) clsVMap
+      clsMap                        = fmap (\(v,i) -> (Binding v GHC.noSrcSpan GHC.Inline IsFun (mkClassSelector inScope0 allTcCache (varType v) i) False)) clsVMap
       allBindings                   = bindingsMap `unionVarEnv` clsMap
       topEntities'                  =
         (\m -> fst (RWS.evalRWS m (GHC2CoreEnv GHC.noSrcSpan fiEnvs) tcMap')) $
@@ -155,7 +154,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
             return (topEnt', annM, isTb)) topEntities
       topEntities'' =
         map (\(topEnt, annM, isTb) ->
-                case lookupUniqMap topEnt allBindings of
+                case UniqMap.lookup topEnt allBindings of
                   Just b -> TopEntityT (bindingId b) annM isTb
                   Nothing -> GHC.pgmError [I.i|
                     No top entity called '#{topEnt}' found. Make sure you are
@@ -359,7 +358,7 @@ mkClassSelector inScope0 tcm ty sel = newExpr
                        $ splitFunForallTy ty
     newExpr = case tyView dictTy of
       (TyConApp tcNm _)
-        | Just tc <- lookupUniqMap tcNm tcm
+        | Just tc <- UniqMap.lookup tcNm tcm
         , not (isNewTypeTc tc)
         -> flip State.evalState (0 :: Int) $ do
                           dcId <- mkInternalVar inScope0 "dict" dictTy
@@ -384,5 +383,5 @@ mkTupTyCons tcMap = (tcMap'',tupTcCache)
                  (GHC2CoreEnv GHC.noSrcSpan GHC.emptyFamInstEnvs)
                  tcMap
     tupTcCache       = IMS.fromList (zip [2..GHC.mAX_TUPLE_SIZE] (drop 3 tcNames))
-    tupHM            = listToUniqMap (zip tcNames tupTyCons)
-    tcMap''          = tcMap' & tyConMap %~ (`unionUniqMap` tupHM)
+    tupHM            = UniqMap.fromList (zip tcNames tupTyCons)
+    tcMap''          = tcMap' & tyConMap %~ (<> tupHM)

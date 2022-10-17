@@ -22,7 +22,7 @@ import Clash.Core.Name (Name(nameUniq))
 import Clash.Core.Term (TmName)
 import Clash.Core.Type (Kind, KindOrType, TyName, Type)
 import Clash.Core.Var (Attr'(..), Id, IdScope(..), TyVar, Var(..))
-import Clash.Unique
+import qualified Clash.Data.UniqMap as UniqMap
 
 import Clash.Hedgehog.Core.Name (genFreshName)
 
@@ -87,8 +87,8 @@ genVars
   -> m (Name a)
   -> m [Var a]
 genVars genVar kts genName =
-  snd <$> mapAccumLM go emptyUniqSet kts
+  snd <$> mapAccumLM go mempty kts
  where
   go used kt = do
     var <- genVar kt (genFreshName used genName)
-    pure (extendUniqSet used var, var)
+    pure (UniqMap.insertUnique var used, var)

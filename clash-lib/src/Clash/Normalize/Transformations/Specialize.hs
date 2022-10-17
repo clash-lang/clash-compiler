@@ -80,6 +80,7 @@ import Clash.Core.Var (Var(..), Id, TyVar, mkTyVar)
 import Clash.Core.VarEnv
   ( InScopeSet, extendInScopeSet, extendInScopeSetList, lookupVarEnv
   , mkInScopeSet, mkVarSet, unionInScope, elemVarSet)
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug (traceIf, traceM)
 import Clash.Driver.Types (Binding(..), TransformationInfo(..), hasTransformationInfo)
 import Clash.Netlist.Util (representableType)
@@ -95,9 +96,6 @@ import Clash.Normalize.Types
   ( NormRewrite, NormalizeSession, specialisationCache, specialisationHistory)
 import Clash.Normalize.Util
   (constantSpecInfo, csrFoundConstant, csrNewBindings, csrNewTerm)
-import Clash.Unique
-  ( eltsUniqMap, eltsUniqSet, extendUniqMapWith, unitUniqSet, filterUniqMap
-  , lookupUniqMap)
 import Clash.Util (ClashException(..))
 
 -- | Propagate arguments of application inwards; except for 'Lam' where the
@@ -398,11 +396,11 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
     -- Create new specialized function
     Nothing -> do
       -- Determine if we can specialize f
-      bodyMaybe <- fmap (lookupUniqMap (varName f)) $ Lens.use bindings
+      bodyMaybe <- fmap (UniqMap.lookup f) $ Lens.use bindings
       case bodyMaybe of
         Just (Binding _ sp inl _ bodyTm _) -> do
           -- Determine if we see a sequence of specializations on a growing argument
-          specHistM <- lookupUniqMap f <$> Lens.use (extra.specialisationHistory)
+          specHistM <- UniqMap.lookup f <$> Lens.use (extra.specialisationHistory)
           specLim   <- Lens.view specializationLimit
           if maybe False (> specLim) specHistM
             then throw (ClashException
@@ -441,7 +439,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
                       -- binding @g'@ where both the body of @mealy@ and @g@
                       -- are inlined, meaning the state-transition-function
                       -- and the memory element will be in a single function.
-                      gTmM <- fmap (lookupUniqMap (varName g)) $ Lens.use bindings
+                      gTmM <- fmap (UniqMap.lookup g) $ Lens.use bindings
                       return (g,maybe inl bindingSpec gTmM, maybe specArg (Left . (`mkApps` gArgs) . bindingTerm) gTmM)
                     else return (f,inl,specArg)
                 _ -> return (f,inl,specArg)
@@ -449,7 +447,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
               let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg'])) (boundArgs ++ specBndrs)
               newf <- mkFunction (varName fId) sp inl' newBody
               -- Remember specialization
-              (extra.specialisationHistory) %= extendUniqMapWith f 1 (+)
+              (extra.specialisationHistory) %= UniqMap.insertWith (+) f 1
               (extra.specialisationCache)  %= Map.insert (f,argLen,specAbs) newf
               -- use specialized function
               let newExpr = mkApps (mkTicks (Var newf) ticks) (args ++ specVars)
@@ -477,9 +475,9 @@ specialize' _ctx _ (appE,args,ticks) (Left specArg) = do
       newBody = mkAbstraction specArg specBndrs
   -- See if there's an existing binder that's alpha-equivalent to the
   -- specialized function
-  existing <- filterUniqMap ((`aeqTerm` newBody) . bindingTerm) <$> Lens.use bindings
+  existing <- UniqMap.filter ((`aeqTerm` newBody) . bindingTerm) <$> Lens.use bindings
   -- Create a new function if an alpha-equivalent binder doesn't exist
-  newf <- case eltsUniqMap existing of
+  newf <- case UniqMap.elems existing of
     [] -> do (cf,sp) <- Lens.use curFun
              mkFunction (appendToName (varName cf) "_specF") sp NoUserInline newBody
     (b:_) -> return (bindingId b)
@@ -528,7 +526,9 @@ specArgBndrsAndVars specArg =
       (specFTVs,specFVs) = case specArg of
         Left tm  -> (OSet.toListL *** OSet.toListL) . getConst $
                     Lens.foldMapOf freeLocalVars unitFV tm
-        Right ty -> (eltsUniqSet (Lens.foldMapOf typeFreeVars unitUniqSet ty),[] :: [Id])
+        Right ty -> ( UniqMap.elems
+                        (Lens.foldMapOf typeFreeVars (\x -> UniqMap.singletonUnique (coerce x)) ty)
+                    , [] :: [Id])
 
       specTyBndrs = map Right specFTVs
       specTmBndrs = map Left  specFVs
@@ -646,7 +646,7 @@ zeroWidthTypeElem tcm ty = do
      -- where all fields are also zero-width.
      | otherwise
      -> do
-       tc <- lookupUniqMap tcNm tcm
+       tc <- UniqMap.lookup tcNm tcm
 
        case tyConDataCons tc of
          [dc] -> do

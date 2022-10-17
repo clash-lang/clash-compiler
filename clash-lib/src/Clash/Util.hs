@@ -59,6 +59,8 @@ import GHC.Types.SrcLoc               (SrcSpan, noSrcSpan)
 import SrcLoc                         (SrcSpan, noSrcSpan)
 #endif
 
+import Clash.Data.UniqMap (UniqMap)
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug
 import Clash.Unique
 
@@ -180,11 +182,11 @@ makeCachedU
   -> m v
 makeCachedU key l create = do
   cache <- use l
-  case lookupUniqMap key cache of
+  case UniqMap.lookup key cache of
     Just value -> return value
     Nothing -> do
       value <- create
-      l %= extendUniqMap key value
+      l %= UniqMap.insert key value
       return value
 
 -- | Cache the result of a monadic action using a 'OMap'

@@ -30,7 +30,8 @@ import Clash.Core.Term (TmName)
 import Clash.Core.TyCon (TyConName)
 import Clash.Core.Type (KiName, TyName)
 import Clash.Core.Name
-import Clash.Unique (UniqSet, elemUniqSetDirectly, emptyUniqSet, extendUniqSet)
+import Clash.Data.UniqMap (UniqMap)
+import qualified Clash.Data.UniqMap as UniqMap
 
 import Clash.Hedgehog.Unique (genUnique)
 
@@ -70,16 +71,16 @@ genVarName :: forall m a. MonadGen m => m (Name a)
 genVarName = genName (genOccNameWith Text.toLower)
 
 -- | Generate a name using the given generator, while ensuring the unique of
--- the generated name does not occur in the given @UniqSet@.
+-- the generated name does not occur in the given @UniqMap@.
 --
 genFreshName
   :: forall m a b
    . MonadGen m
-  => UniqSet b
+  => UniqMap b
   -> m (Name a)
   -> m (Name a)
 genFreshName used =
-  Gen.filterT (not . flip elemUniqSetDirectly used . nameUniq)
+  Gen.filterT (not . flip UniqMap.elem used . nameUniq)
 
 mapAccumLM
   :: forall m acc x y
@@ -106,8 +107,8 @@ genNames
   -> m (Name a)
   -> m [Name a]
 genNames n gen =
-  snd <$> mapAccumLM go emptyUniqSet [1..n]
+  snd <$> mapAccumLM go mempty [1..n]
  where
    go used _ = do
     name <- genFreshName used gen
-    pure (extendUniqSet used name, name)
+    pure (UniqMap.insertUnique name used, name)

@@ -80,6 +80,8 @@ import           Clash.Core.VarEnv
   (InScopeSet, extendInScopeSet, extendInScopeSetList, mkInScopeSet,
    uniqAway, uniqAway', mapVarEnv, eltsVarEnv, unitVarSet, emptyVarEnv,
    mkVarEnv, eltsVarSet, elemVarEnv, lookupVarEnv, extendVarEnv, elemVarSet)
+import           Clash.Data.UniqMap (UniqMap)
+import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug
 import           Clash.Driver.Types
   (TransformationInfo(..), DebugOpts(..), BindingMap, Binding(..), IsPrim(..),
@@ -554,9 +556,9 @@ liftBinding :: LetBinding
             -> RewriteMonad extra LetBinding
 liftBinding (var@Id {varName = idName} ,e) = do
   -- Get all local FVs, excluding the 'idName' from the let-binding
-  let unitFV :: Var a -> Const (UniqSet TyVar,UniqSet Id) (Var a)
-      unitFV v@(Id {})    = Const (emptyUniqSet,unitUniqSet (coerce v))
-      unitFV v@(TyVar {}) = Const (unitUniqSet (coerce v),emptyUniqSet)
+  let unitFV :: Var a -> Const (UniqMap TyVar,UniqMap Id) (Var a)
+      unitFV v@(Id {})    = Const (UniqMap.empty,UniqMap.singletonUnique (coerce v))
+      unitFV v@(TyVar {}) = Const (UniqMap.singletonUnique (coerce v),UniqMap.empty)
 
       interesting :: Var a -> Bool
       interesting Id {idScope = GlobalId} = False
@@ -565,8 +567,8 @@ liftBinding (var@Id {varName = idName} ,e) = do
 
       (boundFTVsSet,boundFVsSet) =
         getConst (Lens.foldMapOf (termFreeVars' interesting) unitFV e)
-      boundFTVs = eltsUniqSet boundFTVsSet
-      boundFVs  = eltsUniqSet boundFVsSet
+      boundFTVs = UniqMap.elems boundFTVsSet
+      boundFVs  = UniqMap.elems boundFVsSet
 
   -- Make a new global ID
   tcm       <- Lens.view tcCache
@@ -594,12 +596,12 @@ liftBinding (var@Id {varName = idName} ,e) = do
       newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
 
   -- Check if an alpha-equivalent global binder already exists
-  aeqExisting <- (eltsUniqMap . filterUniqMap ((`aeqTerm` newBody) . bindingTerm)) <$> Lens.use bindings
+  aeqExisting <- (UniqMap.elems . UniqMap.filter ((`aeqTerm` newBody) . bindingTerm)) <$> Lens.use bindings
   case aeqExisting of
     -- If it doesn't, create a new binder
     [] -> do -- Add the created function to the list of global bindings
              let r = newBodyId `globalIdOccursIn` newBody
-             bindings %= extendUniqMap newBodyNm
+             bindings %= UniqMap.insert newBodyNm
                                     -- We mark this function as internal so that
                                     -- it can be inlined at the very end of
                                     -- the normalisation pipeline as part of the
@@ -650,7 +652,7 @@ addGlobalBind
 addGlobalBind vNm ty sp inl body = do
   let vId = mkGlobalId ty vNm
       r = vId `globalIdOccursIn` body
-  (ty,body) `deepseq` bindings %= extendUniqMap vNm (Binding vId sp inl IsFun body r)
+  (ty,body) `deepseq` bindings %= UniqMap.insert vNm (Binding vId sp inl IsFun body r)
 
 -- | Create a new name out of the given name, but with another unique. Resulting
 -- unique is guaranteed to not be in the given InScopeSet.
@@ -672,7 +674,7 @@ cloneNameWithBindingMap
   -> m (Name a)
 cloneNameWithBindingMap binders nm = do
   i <- getUniqueM
-  return (uniqAway' (`elemUniqMapDirectly` binders) i (setUnique nm i))
+  return (uniqAway' (`UniqMap.elem` binders) i (setUnique nm i))
 
 {-# INLINE isUntranslatable #-}
 -- | Determine if a term cannot be represented in hardware
@@ -787,7 +789,7 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
     is1 = extendInScopeSetList is0 heapIds
     ctx = TransformContext is1 (LetBody heapIds : hist)
 
-    bndrs = map toLetBinding $ toListUniqMap heap
+    bndrs = map toLetBinding $ UniqMap.toList heap
 
     toLetBinding :: (Unique,Term) -> LetBinding
     toLetBinding (uniq,term) = (nm, term)

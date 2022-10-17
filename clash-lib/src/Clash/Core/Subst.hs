@@ -86,8 +86,8 @@ import           Clash.Core.Term
 import           Clash.Core.Type           (Type (..))
 import           Clash.Core.VarEnv
 import           Clash.Core.Var            (Id, Var (..), TyVar, isGlobalId)
+import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug               (debugIsOn)
-import           Clash.Unique
 import           Clash.Util
 import           Clash.Pretty
 
@@ -457,7 +457,7 @@ checkValidSubst subst@(TvSubst inScope tenv) tys a =
        "needsInScope" <+> clashPretty needsInScope)
   a
  where
-  needsInScope = foldrWithUnique (\k _ s -> delVarSetByKey k s)
+  needsInScope = UniqMap.foldrWithUnique (\k _ s -> delVarSetByKey k s)
                    (freeVarsOf tys)
                    tenv
   tysFVsInSope = needsInScope `varSetInScope` inScope

@@ -15,7 +15,7 @@ import Clash.Core.Term
 import Clash.Core.TyCon (tyConDataCons, TyConMap)
 import Clash.Core.Type
 import Clash.Core.Var
-import Clash.Unique (lookupUniqMap)
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Util.Interpolate as I
 
 termSize :: Term -> Word
@@ -71,7 +71,7 @@ multiPrimInfo tcm primInfo
   , TyConApp tupTcNm tupEls <- tyView primResTy
     -- XXX: Hardcoded for tuples
   , "GHC.Tuple.(," `isInfixOf` nameOcc tupTcNm
-  , Just tupTc <- lookupUniqMap tupTcNm tcm
+  , Just tupTc <- UniqMap.lookup tupTcNm tcm
   , [tupDc] <- tyConDataCons tupTc
   = Just $ MultiPrimInfo
     { mpi_primInfo = primInfo

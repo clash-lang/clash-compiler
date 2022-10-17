@@ -31,7 +31,8 @@ import Clash.Core.Subst (aeqType)
 import Clash.Core.TyCon
 import Clash.Core.Type
 import Clash.Core.TysPrim
-import Clash.Unique
+import Clash.Data.UniqMap (UniqMap)
+import qualified Clash.Data.UniqMap as UniqMap
 
 import Clash.Hedgehog.Core.Monad
 import Clash.Hedgehog.Core.Name
@@ -75,9 +76,9 @@ classify isKind tcm = go
         mempty { cRankN = Any (isPolyTy a) } <> go a <> go b
 
       TyConApp tcn args ->
-        let tc = lookupUniqMap' tcm tcn
+        let tc = UniqMap.find tcn tcm
             isPoly = isPolyTy (piResultTys tcm (tyConKind tc) args)
-         in case lookupUniqMap' tcm tcn of
+         in case UniqMap.find tcn tcm of
               AlgTyCon{} ->
                 -- If the constructor is algebraic then we have -XDataKinds if
                 -- we are classifying a Kind instead of a Type.
@@ -191,7 +192,7 @@ genClosedKindFrom
   -> Kind
   -> CoreGenT m Kind
 genClosedKindFrom tcm =
-  genKindFrom tcm emptyUniqMap
+  genKindFrom tcm mempty
 
 -- | Generate a kind which is valid for the given 'TyConMap'. The kind may
 -- contain free variables which are given in a 'UniqMap', and is a valid fit
@@ -244,7 +245,7 @@ genClosedPolyType
   -> Kind
   -> CoreGenT m Type
 genClosedPolyType tcm =
-  genPolyTypeFrom tcm emptyUniqMap
+  genPolyTypeFrom tcm mempty
 
 -- | Generate a polymorphic type which is valid for the given environment.
 -- The generated type should have the specified kind, and may contain the
@@ -278,7 +279,7 @@ genClosedMonoType
   -> Kind
   -> CoreGenT m Type
 genClosedMonoType tcm =
-  genMonoTypeFrom tcm emptyUniqMap
+  genMonoTypeFrom tcm mempty
 
 -- | Generate a monomorphic type which is valid for the given environment.
 -- The generated type should have the specified kind, and may contain the
@@ -359,8 +360,8 @@ genForAll
   -> (UniqMap TyVar -> Kind -> CoreGenT m KindOrType)
   -> CoreGenT m KindOrType
 genForAll env k1 k2 genSub = do
-  v <- genTyVar k1 (genFreshName (uniqMapToUniqSet env) genVarName)
-  Gen.subterm (genSub (extendUniqMap v v env) k2) (ForAllTy v)
+  v <- genTyVar k1 (genFreshName env genVarName)
+  Gen.subterm (genSub (UniqMap.insertUnique v env) k2) (ForAllTy v)
 
 -- | Generate a "fresh" kind. This involves using the shape of the hole to
 -- generate a layer of the result kind, then solving any subgoal with either
@@ -392,7 +393,7 @@ genPolyKind
 genPolyKind tcm env hole
   -- Hole: forall v. a
   | ForAllTy v a <- hole
-  = let env' = extendUniqMap v v env
+  = let env' = UniqMap.insertUnique v env
      in Gen.subterm (genKindFrom tcm env' a) (ForAllTy v)
 
   -- Hole: a -> b
@@ -438,7 +439,7 @@ genMonoKind
 genMonoKind tcm env hole
   -- Hole: C
   | ConstTy (TyCon tcn) <- hole
-  , Just tc <- lookupUniqMap tcn tcm
+  , Just tc <- UniqMap.lookup tcn tcm
   , let dcs = tyConDataCons tc
   , not (null dcs)
   = do dc <- Gen.element dcs
@@ -477,7 +478,7 @@ genFreshPolyType
   -> CoreGenT m Type
 genFreshPolyType tcm env hole
   | ForAllTy tv kn <- hole
-  = let env' = extendUniqMap tv tv env
+  = let env' = UniqMap.insertUnique tv env
      in Gen.subterm (genPolyTypeFrom tcm env' kn) (ForAllTy tv)
 
   | FunTy a b <- tyView hole
@@ -514,7 +515,7 @@ genFreshMonoType
   -> CoreGenT m Type
 genFreshMonoType tcm env hole
   | ConstTy (TyCon tcn) <- hole
-  , Just tc <- lookupUniqMap tcn tcm
+  , Just tc <- UniqMap.lookup tcn tcm
   , let dcs = tyConDataCons tc
   , not (null dcs)
   = do dc <- Gen.element dcs

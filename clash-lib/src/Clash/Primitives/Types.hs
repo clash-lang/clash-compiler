@@ -13,7 +13,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Primitives.Types
@@ -245,10 +244,10 @@ instance FromJSON UnresolvedPrimitive where
       [(conKey,Object conVal)] ->
         case conKey of
           "BlackBoxHaskell"  -> do
-            usedArguments <- conVal .:? "usedArguments"
-            ignoredArguments <- conVal .:? "ignoredArguments"
+            usedArgs <- conVal .:? "usedArguments"
+            ignoredArgs <- conVal .:? "ignoredArguments"
             args <-
-              case (usedArguments, ignoredArguments) of
+              case (usedArgs, ignoredArgs) of
                 (Nothing, Nothing) -> pure (IgnoredArguments [])
                 (Just a, Nothing) -> pure (UsedArguments a)
                 (Nothing, Just a) -> pure (IgnoredArguments a)
@@ -258,12 +257,12 @@ instance FromJSON UnresolvedPrimitive where
             name' <- conVal .: "name"
             wf    <- ((conVal .:? "workInfo" >>= maybe (pure Nothing) parseWorkInfo) .!= WorkVariable)
             fName <- conVal .: "templateFunction"
-            multiResult <- conVal .:? "multiResult" .!= False
+            isMultiResult <- conVal .:? "multiResult" .!= False
             templ <- (Just . TInline <$> conVal .: "template")
                  <|> (Just . TFile   <$> conVal .: "file")
                  <|> (pure Nothing)
             fName' <- either fail return (parseBBFN fName)
-            return (BlackBoxHaskell name' wf args multiResult fName' templ)
+            return (BlackBoxHaskell name' wf args isMultiResult fName' templ)
           "BlackBox"  -> do
             outReg <- conVal .:? "outputReg" :: Parser (Maybe Bool)
 
