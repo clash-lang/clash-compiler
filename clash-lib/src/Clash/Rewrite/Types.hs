@@ -56,6 +56,7 @@ import Clash.Driver.Types        (ClashEnv(..), ClashOpts(..), DebugOpts)
 import Clash.Netlist.Types       (FilteredHWType, HWMap)
 import Clash.Primitives.Types    (CompiledPrimMap)
 import Clash.Rewrite.WorkFree    (isWorkFree)
+import Clash.Unique              (MonadUnique(..))
 import Clash.Util
 
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs)

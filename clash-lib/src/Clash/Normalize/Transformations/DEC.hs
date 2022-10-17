@@ -95,7 +95,8 @@ import Clash.Rewrite.Combinators (bottomupR)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (changed, isUntranslatableType)
 import Clash.Rewrite.WorkFree (isConstant)
-import Clash.Util (MonadUnique, curLoc)
+import Clash.Unique (MonadUnique)
+import Clash.Util (curLoc)
 
 -- | This transformation lifts applications of global binders out of
 -- alternatives of case-statements.

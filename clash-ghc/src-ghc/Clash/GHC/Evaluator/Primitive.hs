@@ -103,8 +103,8 @@ import           Clash.Core.Var      (mkLocalId, mkTyVar)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug
 import           Clash.GHC.GHC2Core  (modNameM)
-import           Clash.Util
-  (MonadUnique (..), clogBase, flogBase, curLoc)
+import           Clash.Unique (MonadUnique(..))
+import           Clash.Util (clogBase, flogBase, curLoc)
 import           Clash.Normalize.PrimitiveReductions
   (vecLastPrim, vecInitPrim, vecHeadPrim,
    vecTailPrim, mkVecCons, mkVecNil)

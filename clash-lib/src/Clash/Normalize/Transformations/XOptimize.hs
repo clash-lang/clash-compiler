@@ -41,7 +41,8 @@ import Clash.Primitives.Types (Primitive(..))
 import Clash.Rewrite.Types
   (TransformContext(..), aggressiveXOpt, tcCache, primitives)
 import Clash.Rewrite.Util (changed)
-import Clash.Util (MonadUnique, curLoc)
+import Clash.Unique (MonadUnique)
+import Clash.Util (curLoc)
 
 -- | Remove all undefined alternatives from case expressions, replacing them
 -- with the value of another defined alternative. If there is one defined

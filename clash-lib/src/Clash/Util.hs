@@ -7,24 +7,15 @@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-
-module Clash.Util
-  ( module Clash.Util
-  , SrcSpan
-  , noSrcSpan
-  )
-where
+module Clash.Util where
 
 import qualified Control.Exception    as Exception
 import Control.Lens
-import Control.Monad.State            (MonadState,StateT)
-import qualified Control.Monad.State  as State
+import Control.Monad.State            (MonadState)
 import Data.Hashable                  (Hashable)
 import Data.HashMap.Lazy              (HashMap)
 import qualified Data.HashMap.Lazy    as HashMapL
@@ -136,17 +127,6 @@ pprDebugAndThen cont heading prettyMsg =
   cont (renderString (layoutPretty defaultLayoutOptions doc))
  where
   doc = sep [heading, nest 2 prettyMsg]
-
--- | A class that can generate unique numbers
-class Monad m => MonadUnique m where
-  -- | Get a new unique
-  getUniqueM :: m Int
-
-instance Monad m => MonadUnique (StateT Int m) where
-  getUniqueM = do
-    supply <- State.get
-    State.modify (+1)
-    return supply
 
 -- | Create a TH expression that returns the a formatted string containing the
 -- name of the module 'curLoc' is spliced into, and the line where it was spliced.

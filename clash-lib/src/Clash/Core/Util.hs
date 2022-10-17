@@ -57,6 +57,7 @@ import Clash.Core.Var                    (Id, Var(..), mkLocalId, mkTyVar)
 import Clash.Core.VarEnv
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug                       (traceIf)
+import Clash.Unique (MonadUnique(..))
 import Clash.Util
 
 -- | Rebuild a let expression / let expressions by taking the SCCs of a list
