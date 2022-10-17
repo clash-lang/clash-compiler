@@ -1353,10 +1353,6 @@ dcToExpr ty i = Literal (Just (ty,conSize ty)) (NumLit (toInteger i))
 listBraces :: Monad m => m [Doc] -> m Doc
 listBraces = align . encloseSep lbrace rbrace comma
 
-parenIf :: Monad m => Bool -> m Doc -> m Doc
-parenIf True  = parens
-parenIf False = id
-
 punctuate' :: Monad m => Ap m Doc -> Ap m [Doc] -> Ap m Doc
 punctuate' s d = vcat (punctuate s d) <> s
 

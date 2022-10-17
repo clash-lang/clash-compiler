@@ -92,6 +92,9 @@ lparen = pure PP.lparen
 rparen :: Applicative f => f Doc
 rparen = pure PP.rparen
 
+parenIf :: Functor f => Bool -> f Doc -> f Doc
+parenIf p = if p then parens else id
+
 space :: Applicative f => f Doc
 space = pure PP.space
 

@@ -2026,10 +2026,6 @@ larrow = "<="
 rarrow :: VHDLM Doc
 rarrow = "=>"
 
-parenIf :: Monad m => Bool -> Ap m Doc -> Ap m Doc
-parenIf True  = parens
-parenIf False = id
-
 punctuate' :: Monad m => Ap m Doc -> Ap m [Doc] -> Ap m Doc
 punctuate' s d = vcat (punctuate s d) <> s
 
