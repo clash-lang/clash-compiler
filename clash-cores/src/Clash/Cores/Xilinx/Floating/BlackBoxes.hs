@@ -148,21 +148,20 @@ tclTemplate (HasCustom {..}) operType bbCtx = pure bbText
       ]
   prop (False, _, _) s = s
   prop (True, name, value) s =
-    replicate 31 ' ' ++ name ++ ' ': value ++ " \\\n" ++ s
+    replicate 29 ' ' ++ name ++ ' ': value ++ " \\\n" ++ s
 
-  bbText = [i|proc createNamespace ns {
-  namespace eval $ns {
-    variable api 1
-    variable scriptPurpose createIp
-    variable ipName {#{compName}}
+  bbText = [i|namespace eval $tclIface {
+  variable api 1
+  variable scriptPurpose createIp
+  variable ipName {#{compName}}
 
-    proc createIp {ipName0 args} {
-      create_ip -name floating_point -vendor xilinx.com -library ip \\
-          -version 7.1 -module_name $ipName0 {*}$args
+  proc createIp {ipName0 args} {
+    create_ip -name floating_point -vendor xilinx.com -library ip \\
+        -version 7.1 -module_name $ipName0 {*}$args
 
-      set_property -dict [list \\
-#{props}                         ] [get_ips $ipName0]
-    }
+    set_property -dict [list \\
+#{props}                       ] [get_ips $ipName0]
+    return
   }
 }|]
 
@@ -188,29 +187,28 @@ fromUTclTemplate bbCtx = pure bbText
   (_, Unsigned inpLen, _) = bbInputs bbCtx !! 5
 
   bbText = [__i|
-    proc createNamespace ns {
-      namespace eval $ns {
-        variable api 1
-        variable scriptPurpose createIp
-        variable ipName {#{compName}}
+    namespace eval $tclIface {
+      variable api 1
+      variable scriptPurpose createIp
+      variable ipName {#{compName}}
 
-        proc createIp {ipName0 args} {
-          create_ip -name floating_point -vendor xilinx.com -library ip \\
-              -version 7.1 -module_name $ipName0 {*}$args
+      proc createIp {ipName0 args} {
+        create_ip -name floating_point -vendor xilinx.com -library ip \\
+            -version 7.1 -module_name $ipName0 {*}$args
 
-          set_property -dict [list \\
-                                   CONFIG.Operation_Type Fixed_to_float \\
-                                   CONFIG.A_Precision_Type Uint#{inpLen} \\
-                                   CONFIG.Flow_Control NonBlocking \\
-                                   CONFIG.Has_ACLKEN #{tclClkEn} \\
-                                   CONFIG.C_A_Exponent_Width #{inpLen} \\
-                                   CONFIG.C_A_Fraction_Width 0 \\
-                                   CONFIG.Has_RESULT_TREADY false \\
-                                   CONFIG.C_Latency #{latency} \\
-                                   CONFIG.C_Rate 1 \\
-                                   CONFIG.Maximum_Latency false \\
-                             ] [get_ips $ipName0]
-        }
+        set_property -dict [list \\
+                                 CONFIG.Operation_Type Fixed_to_float \\
+                                 CONFIG.A_Precision_Type Uint#{inpLen} \\
+                                 CONFIG.Flow_Control NonBlocking \\
+                                 CONFIG.Has_ACLKEN #{tclClkEn} \\
+                                 CONFIG.C_A_Exponent_Width #{inpLen} \\
+                                 CONFIG.C_A_Fraction_Width 0 \\
+                                 CONFIG.Has_RESULT_TREADY false \\
+                                 CONFIG.C_Latency #{latency} \\
+                                 CONFIG.C_Rate 1 \\
+                                 CONFIG.Maximum_Latency false \\
+                           ] [get_ips $ipName0]
+        return
       }
     }|]
 

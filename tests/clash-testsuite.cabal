@@ -101,7 +101,6 @@ library
     Test.Tasty.Program
     Test.Tasty.Verilator
     Test.Tasty.Vivado
-    Test.Tasty.Vivado.GenTcl
     Test.Tasty.Clash.CollectSimResults
 
     -- From tests/shouldwork/LoadModules

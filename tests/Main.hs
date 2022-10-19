@@ -135,10 +135,7 @@ runClashTest = defaultMain $ clashTestRoot
     , runTest "CHIP8" def{hdlSim=[]}
     , runTest "CochleaPlus" def{hdlSim=[]}
     ,
-      -- TODO: when BuildSpecific takes a fully qualified name, re-enable
-      -- Vivado
-      --
-      -- see: https://github.com/clash-lang/clash-compiler/issues/2264
+      -- Vivado segfaults
       let _opts = def { clashFlags=["-fclash-component-prefix", "test"]
                       , buildTargets=BuildSpecific ["test_testBench"]
                       , hdlSim=hdlSim def \\ [Vivado]
@@ -166,8 +163,8 @@ runClashTest = defaultMain $ clashTestRoot
           -- see: https://github.com/clash-lang/clash-compiler/issues/2265
           let _opts = def { buildTargets = BuildSpecific ["system"]
                           , hdlTargets = [Verilog]
-                          , hdlLoad = hdlLoad def \\ [Verilator, Vivado]
-                          , hdlSim = hdlSim def \\ [Verilator, Vivado]
+                          , hdlLoad = [IVerilog]
+                          , hdlSim = [IVerilog]
                           , vvpStdoutNonEmptyFail = False
                           }
            in runTest "I2Ctest" _opts
@@ -280,7 +277,6 @@ runClashTest = defaultMain $ clashTestRoot
           }
         , runTest "SymbiYosys" def{
             hdlTargets=[Verilog, SystemVerilog]
-          , buildTargets=BuildSpecific ["topEntity"]
           , hdlLoad=[]
           , hdlSim=[]
           , verificationTool=Just SymbiYosys
@@ -364,14 +360,13 @@ runClashTest = defaultMain $ clashTestRoot
            in runTest "NameOverlap" _opts
         , runTest "NestedPrimitives" def{hdlSim=[]}
         , runTest "NestedPrimitives2" def{hdlSim=[]}
+        , runTest "NORX" def
         ,
           -- TODO: Vivado infrastructure tries to simulate topEntity.testBench
           -- instead of testBench.testBench
           --
           -- tracked: https://github.com/clash-lang/clash-compiler/issues/2266
-          runTest "NORX" def
-
-        , let _opts = def { hdlTargets=[VHDL]
+          let _opts = def { hdlTargets=[VHDL]
                           , hdlSim=hdlSim def \\ [Vivado]
                           }
           in runTest "Parameters" _opts
@@ -445,19 +440,16 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1786" def{
             hdlTargets=[VHDL]
           , buildTargets=BuildSpecific ["testEnableTB", "testBoolTB"]
-          , -- TODO: this also runs up against problems with BuildSpecific
-            -- names, see
-            -- https://github.com/clash-lang/clash-compiler/issues/2264
+          , -- TODO: Enable multiple build targets for Vivado
             hdlSim=hdlSim def \\ [Vivado] -- triggers error in vivado
           }
         , outputTest "LITrendering" def{hdlTargets=[Verilog]}
         , runTest "T2117" def{
             clashFlags=["-fclash-aggressive-x-optimization-blackboxes"]
           , hdlTargets=[VHDL]
-          , hdlSim=hdlSim def \\ [Vivado]
-          , -- TODO: Refactor BuildSpecific so Vivado can run
-            -- See https://github.com/clash-lang/clash-compiler/issues/2264
-            buildTargets=BuildSpecific [ "testBenchUndefBV"
+          , -- TODO: Enable multiple build targets for Vivado
+            hdlSim=hdlSim def \\ [Vivado]
+          , buildTargets=BuildSpecific [ "testBenchUndefBV"
                                        , "testBenchUndefTup"
                                        , "testBenchPartialDefTup"]}
         ]
@@ -466,7 +458,7 @@ runClashTest = defaultMain $ clashTestRoot
         ]
       -- The Cores.Xilinx.Floating tests require Vivado (and take much time to
       -- run).
-      -- TODO: Make these test benches compatible with our Vivado CI
+      -- TODO: Enable multiple build targets for Vivado
       --
 --       , clashTestGroup "Cores"
 --         [ clashTestGroup "Xilinx"
@@ -620,7 +612,7 @@ runClashTest = defaultMain $ clashTestRoot
             , buildTargets=BuildSpecific["top_bit", "top_bitvector", "top_index", "top_signed", "top_unsigned"]
             }
         , runTest "T2046B" def{clashFlags=["-Werror"]}
-        , runTest "T2046C" def{hdlSim=[],clashFlags=["-Werror"],buildTargets=BuildSpecific["topEntity"]}
+        , runTest "T2046C" def{hdlSim=[],clashFlags=["-Werror"]}
         , runTest "T2097" def{hdlSim=[]}
         , runTest "T2154" def{hdlTargets=[VHDL], hdlSim=[]}
         , runTest "T2220_toEnumOOB" def{hdlTargets=[VHDL]}
@@ -736,7 +728,12 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "Signal"
         [ runTest "AlwaysHigh" def{hdlSim=[]}
         , runTest "BangPatterns" def
-        , runTest "BlockRamFile" def{hdlSim=hdlSim def \\ [Vivado]}
+        ,
+          -- TODO: we do not support memory files in Vivado
+          --
+          -- see: https://github.com/clash-lang/clash-compiler/issues/2269
+          runTest "BlockRamFile" def{hdlSim=hdlSim def \\ [Vivado]}
+
         , runTest "BlockRam0" def
         , runTest "BlockRam1" def
         , clashTestGroup "BlockRam"
@@ -824,8 +821,8 @@ runClashTest = defaultMain $ clashTestRoot
         [ let _opts = def { hdlTargets=[Verilog]
                           , vvpStdoutNonEmptyFail=False
                           , buildTargets=BuildSpecific ["topEntity"]
-                          , hdlLoad = hdlLoad def \\ [Verilator, Vivado]
-                          , hdlSim = hdlSim def \\ [Verilator, Vivado]
+                          , hdlLoad = [IVerilog]
+                          , hdlSim = [IVerilog]
                           }
            in runTest "Test00" _opts
         ]
@@ -917,7 +914,10 @@ runClashTest = defaultMain $ clashTestRoot
           runTest "FirOddSize" def{hdlSim=hdlSim def \\ [Vivado]}
 
         , runTest "IndexInt" def
-        , runTest "IndexInt2" def{hdlSim=hdlSim def \\ [Vivado]}
+        ,
+          -- Vivado segfaults
+          runTest "IndexInt2" def {hdlSim=hdlSim def \\ [Vivado]}
+
         , outputTest "IndexInt2" def{hdlTargets=[Verilog]}
         , runTest "Concat" def
         , let _opts = def { hdlLoad = hdlLoad def \\ [Verilator]
