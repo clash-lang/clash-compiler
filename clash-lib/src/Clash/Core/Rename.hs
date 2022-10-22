@@ -18,8 +18,10 @@ import qualified Data.List as List (foldl')
 import qualified Data.List.Extra as List (zipEqual)
 import           Data.Maybe (fromMaybe)
 
-import           Clash.Core.Var (Id, TyVar, Var)
-import           Clash.Core.VarEnv
+import           Clash.Core.InScopeSet (InScopeSet)
+import qualified Clash.Core.InScopeSet as InScopeSet
+import           Clash.Core.Var (Id, TyVar, Var, VarEnv)
+import qualified Clash.Data.UniqMap as VarEnv
 
 -- | Rename environment for e.g. alpha equivalence
 --
@@ -55,16 +57,16 @@ data RnEnv = RnEnv
 -- | Create an empty renaming environment
 mkRnEnv :: InScopeSet -> RnEnv
 mkRnEnv vars = RnEnv
-  { rnEnvLTy = emptyVarEnv
-  , rnEnvLTm = emptyVarEnv
-  , rnEnvRTy = emptyVarEnv
-  , rnEnvRTm = emptyVarEnv
+  { rnEnvLTy = mempty
+  , rnEnvLTm = mempty
+  , rnEnvRTy = mempty
+  , rnEnvRTm = mempty
   , rnEnvIss = vars
   }
 
 -- | Look up the renaming an an occurrence in the given map.
 rnOcc :: (RnEnv -> VarEnv (Var a)) -> RnEnv -> Var a -> Var a
-rnOcc f rn v = fromMaybe v (lookupVarEnv v (f rn))
+rnOcc f rn v = fromMaybe v (VarEnv.lookup v (f rn))
 
 -- | Look up the renaming of an type-variable occurrence in the left term
 rnOccLTy :: RnEnv -> TyVar -> TyVar
@@ -99,7 +101,7 @@ Then inside
 @
 
 i.e. if the new var is the same as the old var, the renaming is deleted by
-'extendVarEnv'
+'VarEnv.insert'
 -}
 
 -- | Simultaneously go under the type-variable binders /bL/ and /bR/, find a
@@ -108,30 +110,30 @@ i.e. if the new var is the same as the old var, the renaming is deleted by
 rnTyBndr :: RnEnv -> TyVar -> TyVar -> RnEnv
 rnTyBndr rv@(RnEnv lenv _ renv _ inScope) bL bR =
   -- See Note [Rebinding and shadowing]
-  rv { rnEnvLTy = extendVarEnv bL newB lenv
-     , rnEnvRTy = extendVarEnv bR newB renv
-     , rnEnvIss = extendInScopeSet inScope newB
+  rv { rnEnvLTy = VarEnv.insert bL newB lenv
+     , rnEnvRTy = VarEnv.insert bR newB renv
+     , rnEnvIss = InScopeSet.insert newB inScope
      }
  where
   -- Find a new binder not in scope in either type
-  newB | not (bL `elemInScopeSet` inScope) = bL
-       | not (bR `elemInScopeSet` inScope) = bR
-       | otherwise                         = uniqAway inScope bL
+  newB | not (bL `InScopeSet.elem` inScope) = bL
+       | not (bR `InScopeSet.elem` inScope) = bR
+       | otherwise                         = InScopeSet.uniqAway inScope bL
 
 -- | Simultaneously go under the binders /bL/ and /bR/, find a new binder
 -- /newB/, and return an environment mapping @[bL -> newB]@ and @[bR -> newB]@.
 rnTmBndr :: RnEnv -> Id -> Id -> RnEnv
 rnTmBndr rv@(RnEnv _ lenv _ renv inScope) bL bR =
   -- See Note [Rebinding and shadowing]
-  rv { rnEnvLTm = extendVarEnv bL newB lenv
-     , rnEnvRTm = extendVarEnv bR newB renv
-     , rnEnvIss = extendInScopeSet inScope newB
+  rv { rnEnvLTm = VarEnv.insert bL newB lenv
+     , rnEnvRTm = VarEnv.insert bR newB renv
+     , rnEnvIss = InScopeSet.insert newB inScope
      }
  where
   -- Find a new binder not in scope in either term
-  newB | not (bL `elemInScopeSet` inScope) = bL
-       | not (bR `elemInScopeSet` inScope) = bR
-       | otherwise                         = uniqAway inScope bL
+  newB | not (bL `InScopeSet.elem` inScope) = bL
+       | not (bR `InScopeSet.elem` inScope) = bR
+       | otherwise                         = InScopeSet.uniqAway inScope bL
 
 rnBndrs :: (RnEnv -> a -> a -> RnEnv) -> RnEnv -> [a] -> [a] -> RnEnv
 rnBndrs f env xs ys =

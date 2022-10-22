@@ -77,10 +77,8 @@ import           Clash.Core.Type
   (Type (..), coreView1, splitFunForallTy, splitCoreFunForallTy)
 import           Clash.Core.TyCon                 (TyConMap)
 import           Clash.Core.Util                  (splitShouldSplit)
-import           Clash.Core.Var                   (Id, Var (..), isGlobalId)
-import           Clash.Core.VarEnv
-  (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
-   lookupVarEnv')
+import           Clash.Core.Var                   (Id, Var (..), isGlobalId, VarEnv)
+import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Driver.Types               (ClashEnv(..), ClashOpts (..))
 import           Clash.Netlist.BlackBox
 import qualified Clash.Netlist.Id                 as Id
@@ -194,11 +192,11 @@ genNames newInlineStrat prefixM is env bndrs =
   runState (foldlM go env bndrs) is
  where
   go env_ (bindingId -> id_) =
-    case lookupVarEnv id_ env_ of
+    case UniqMap.lookup id_ env_ of
       Just _ -> pure env_
       Nothing -> do
         nm <- Id.makeBasic (genComponentName newInlineStrat prefixM id_)
-        pure (extendVarEnv id_ nm env_)
+        pure (UniqMap.insert id_ nm env_)
 
 -- | Generate names for top entities. Should be executed at the very start of
 -- the synthesis process and shared between all passes.
@@ -211,7 +209,7 @@ genTopNames
 genTopNames opts hdl tops =
   -- TODO: Report error if fixed top entities have conflicting names
   flip runState (Id.emptyIdentifierSet esc lw hdl) $ do
-    env0 <- foldlM goFixed emptyVarEnv fixedTops
+    env0 <- foldlM goFixed mempty fixedTops
     env1 <- foldlM goNonFixed env0 nonFixedTops
     pure env1
  where
@@ -224,11 +222,11 @@ genTopNames opts hdl tops =
 
   goFixed env (topId, ann) = do
     topNm <- genTopName prefixM ann
-    pure (extendVarEnv topId topNm env)
+    pure (UniqMap.insert topId topNm env)
 
   goNonFixed env id_ = do
     topNm <- Id.makeBasic (genComponentName True prefixM id_)
-    pure (extendVarEnv id_ topNm env)
+    pure (UniqMap.insert id_ topNm env)
 
 -- | Generate a component for a given function (caching)
 genComponent
@@ -237,7 +235,7 @@ genComponent
   -- ^ Name of the function
   -> NetlistMonad (ComponentMeta, Component)
 genComponent compName = do
-  compExprM <- lookupVarEnv compName <$> Lens.use bindings
+  compExprM <- UniqMap.lookup compName <$> Lens.use bindings
   case compExprM of
     Nothing -> do
       (_,sp) <- Lens.use curCompNm
@@ -255,12 +253,12 @@ genComponentT
   -> NetlistMonad (ComponentMeta, Component)
 genComponentT compName0 componentExpr = do
   tcm <- Lens.view tcCache
-  compName1 <- (`lookupVarEnv'` compName0) <$> Lens.use componentNames
-  sp <- (bindingLoc . (`lookupVarEnv'` compName0)) <$> Lens.use bindings
+  compName1 <- UniqMap.find compName0 <$> Lens.use componentNames
+  sp <- (bindingLoc . UniqMap.find compName0) <$> Lens.use bindings
   curCompNm .= (compName1, sp)
   usages .= mempty
 
-  topEntityTM <- lookupVarEnv compName0 <$> Lens.use topEntityAnns
+  topEntityTM <- UniqMap.lookup compName0 <$> Lens.use topEntityAnns
   let topAnnMM = topAnnotation <$> topEntityTM
       topVarTypeM = snd . splitCoreFunForallTy tcm . coreTypeOf . topId <$> topEntityTM
 
@@ -270,7 +268,7 @@ genComponentT compName0 componentExpr = do
       Right (args, binds, res) -> do
         let varType1 = fromMaybe (coreTypeOf res) topVarTypeM
         mkUniqueNormalized
-          emptyInScopeSet
+          mempty
           topAnnMM
           -- HACK: Determine resulttype of this function by looking at its definition
           -- instead of looking at its last binder (which obscures any attributes
@@ -635,7 +633,7 @@ mkFunApp
 mkFunApp dstId fun args tickDecls = do
   topAnns <- Lens.use topEntityAnns
   tcm     <- Lens.view tcCache
-  case (isGlobalId fun, lookupVarEnv fun topAnns) of
+  case (isGlobalId fun, UniqMap.lookup fun topAnns) of
     (True, Just topEntity)
       | let ty = coreTypeOf (topId topEntity)
       , let (fArgTys0,fResTy) = splitFunForallTy ty
@@ -674,7 +672,7 @@ mkFunApp dstId fun args tickDecls = do
         --       The current workaround is to not rely on named arguments, using
         --       positional ones instead when instantiating a top entity.
         --
-        -- funTerm <- fmap bindingTerm . lookupVarEnv fun <$> Lens.use bindings
+        -- funTerm <- fmap bindingTerm . UniqMap.lookup fun <$> Lens.use bindings
         --
         -- expandedTopEntity <-
         --   case splitNormalized tcm <$> funTerm of
@@ -706,7 +704,7 @@ mkFunApp dstId fun args tickDecls = do
       | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity: " ++ showPpr fun
     (True, Nothing) -> do
       normalized <- Lens.use bindings
-      case lookupVarEnv fun normalized of
+      case UniqMap.lookup fun normalized of
         Nothing -> error [I.i|
           Internal error: unknown normalized binder:
 

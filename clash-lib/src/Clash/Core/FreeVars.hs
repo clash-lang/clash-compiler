@@ -38,16 +38,15 @@ import Data.Monoid                      (All (..), Any (..))
 import Clash.Core.Term                  (Pat (..), Term (..), TickInfo (..), Bind(..))
 import Clash.Core.Type                  (Type (..))
 import Clash.Core.Var
-  (Id, IdScope (..), TyVar, Var (..), isLocalId)
-import Clash.Core.VarEnv
-  (VarEnv, emptyVarEnv, unionVarEnvWith, unitVarEnv)
+  (Id, IdScope (..), TyVar, Var (..), VarEnv, isLocalId)
+import qualified Clash.Data.UniqMap as VarEnv
 
 -- | Gives the free type-variables in a Type, implemented as a 'Fold'
 --
 -- The 'Fold' is closed over the types of its variables, so:
 --
 -- @
--- foldMapOf typeFreeVars unitVarSet ((a:* -> k) Int) = {a, k}
+-- foldMapOf typeFreeVars VarSet.singleton ((a:* -> k) Int) = {a, k}
 -- @
 typeFreeVars :: Fold Type TyVar
 typeFreeVars = typeFreeVars' (const True) IntSet.empty
@@ -57,7 +56,7 @@ typeFreeVars = typeFreeVars' (const True) IntSet.empty
 -- The 'Fold' is closed over the types of variables, so:
 --
 -- @
--- foldMapOf (typeFreeVars' (const True) IntSet.empty) unitVarSet ((a:* -> k) Int) = {a, k}
+-- foldMapOf (typeFreeVars' (const True) IntSet.empty) VarSet.singleton ((a:* -> k) Int) = {a, k}
 -- @
 --
 -- Note [Closing over kind variables]
@@ -155,7 +154,7 @@ globalIds = termFreeVars' isGlobalId where
 -- The 'Fold' is closed over the types of variables, so:
 --
 -- @
--- foldMapOf termFreeTyVars unitVarSet (case (x : (a:* -> k) Int)) of {}) = {a, k}
+-- foldMapOf termFreeTyVars VarSet.singleton (case (x : (a:* -> k) Int)) of {}) = {a, k}
 -- @
 termFreeTyVars :: Fold Term TyVar
 termFreeTyVars = termFreeVars' isTV where
@@ -167,7 +166,7 @@ termFreeTyVars = termFreeVars' isTV where
 -- The 'Fold' is closed over the types of variables, so:
 --
 -- @
--- foldMapOf (termFreeVars' (const True)) unitVarSet (case (x : (a:* -> k) Int)) of {}) = {x, a, k}
+-- foldMapOf (termFreeVars' (const True)) VarSet.singleton (case (x : (a:* -> k) Int)) of {}) = {x, a, k}
 -- @
 --
 -- Note [Closing over type variables]
@@ -275,5 +274,5 @@ countFreeOccurances
   :: Term
   -> VarEnv Int
 countFreeOccurances =
-  Lens.foldMapByOf freeLocalIds (unionVarEnvWith (+)) emptyVarEnv
-                   (`unitVarEnv` (1 :: Int))
+  Lens.foldMapByOf freeLocalIds (VarEnv.unionWith (+)) mempty
+                   (`VarEnv.singleton` (1 :: Int))

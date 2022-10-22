@@ -29,8 +29,7 @@ import BasicTypes (InlineSpec)
 import SrcLoc (SrcSpan)
 #endif
 
-import Clash.Core.Var (Id)
-import Clash.Core.VarEnv (VarEnv)
+import Clash.Core.Var (Id, VarEnv)
 
 data IsPrim
   = IsPrim

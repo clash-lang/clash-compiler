@@ -38,6 +38,7 @@ import           Clash.Core.DataCon
 import           Clash.Core.Evaluator.Types
 import           Clash.Core.HasFreeVars
 import           Clash.Core.HasType
+import qualified Clash.Core.InScopeSet as InScopeSet
 import           Clash.Core.Literal
 import           Clash.Core.Name
 import           Clash.Core.Pretty
@@ -47,7 +48,7 @@ import           Clash.Core.TyCon
 import           Clash.Core.Type
 import           Clash.Core.Util
 import           Clash.Core.Var
-import           Clash.Core.VarEnv
+import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug
 import qualified Clash.Normalize.Primitives as NP (removedArg, undefined, undefinedX)
 import           Clash.Unique
@@ -320,7 +321,7 @@ apply _tcm (Lambda x' e) x m =
   setTerm (substTm "Evaluator.apply" subst e) m
  where
   subst  = extendIdSubst subst0 x' (Var x)
-  subst0 = mkSubst $ extendInScopeSet (mScopeNames m) x
+  subst0 = mkSubst $ InScopeSet.insert x (mScopeNames m)
 apply tcm pVal@(PrimVal (PrimInfo{primType}) tys vs) x m
   | isUndefinedXPrimVal pVal
   = setTerm (TyApp (Prim NP.undefinedX) ty) m
@@ -338,7 +339,7 @@ instantiate _tcm (TyLambda x e) ty m =
  where
   subst  = extendTvSubst subst0 x ty
   subst0 = mkSubst iss0
-  iss0   = mkInScopeSet (freeVarsOf e <> freeVarsOf ty)
+  iss0   = InScopeSet.fromVarSet (freeVarsOf e <> freeVarsOf ty)
 -- The evaluator is setup in such a way that under normal conditions anything
 -- of type 'forall a . ty' must be a ty-lambda.
 --
@@ -407,7 +408,7 @@ scrutinise (Lit l) _altTy alts m = case alts of
           in  Just (ByteArrayLiteral ba1)
        _ -> Nothing
     = let inScope = freeVarsOf altE
-          subst0  = mkSubst (mkInScopeSet inScope)
+          subst0  = mkSubst (InScopeSet.fromVarSet inScope)
           subst1  = extendIdSubst subst0 x (Literal patE)
       in  substTm "Evaluator.scrutinise" subst1 altE
     | NaturalLiteral l1  <- l
@@ -424,7 +425,7 @@ scrutinise (Lit l) _altTy alts m = case alts of
           in  Just (ByteArrayLiteral ba1)
        _ -> Nothing
     = let inScope = freeVarsOf altE
-          subst0  = mkSubst (mkInScopeSet inScope)
+          subst0  = mkSubst (InScopeSet.fromVarSet inScope)
           subst1  = extendIdSubst subst0 x (Literal patE)
       in  substTm "Evaluator.scrutinise" subst1 altE
   go def (_:alts1) = go def alts1
@@ -475,26 +476,26 @@ substInAlt dc tvs xs args e = substTm "Evaluator.substInAlt" subst e
   tms        = lefts args
   substTyMap = zip tvs (drop (length (dcUnivTyVars dc)) tys)
   substTmMap = zip xs tms
-  inScope    = freeVarsOf tys `unionVarSet` freeVarsOf (e:tms)
+  inScope    = freeVarsOf tys <> freeVarsOf (e:tms)
   subst      = extendTvSubstList (extendIdSubstList subst0 substTmMap) substTyMap
-  subst0     = mkSubst (mkInScopeSet inScope)
+  subst0     = mkSubst (InScopeSet.fromVarSet inScope)
 
 -- | Allocate let-bindings on the heap
 allocate :: [LetBinding] -> Term -> Machine -> Machine
 allocate xes e m =
-  m { mHeapLocal = extendVarEnvList (mHeapLocal m) xes'
+  m { mHeapLocal = UniqMap.insertMany xes' (mHeapLocal m)
     , mSupply = ids'
     , mScopeNames = isN
     , mTerm = e'
     }
  where
   xNms      = fmap fst xes
-  is1       = extendInScopeSetList (mScopeNames m) xNms
+  is1       = InScopeSet.insertMany xNms (mScopeNames m)
   (ids', s) = mapAccumL (letSubst (mHeapLocal m)) (mSupply m) xNms
   (nms, s') = unzip s
-  isN       = extendInScopeSetList is1 nms
+  isN       = InScopeSet.insertMany nms is1
   subst     = extendIdSubstList subst0 s'
-  subst0    = mkSubst (foldl' extendInScopeSet is1 nms)
+  subst0    = mkSubst (foldl' (flip InScopeSet.insert) is1 nms)
   xes'      = zip nms (fmap (substTm "Evaluator.allocate0" subst . snd) xes)
   e'        = substTm "Evaluator.allocate1" subst e
 
@@ -510,7 +511,7 @@ letSubst h acc id0 =
  where
   mkUniqueHeapId :: PureHeap -> Supply -> Id -> (Supply, Id)
   mkUniqueHeapId h' ids x =
-    maybe (ids', x') (const $ mkUniqueHeapId h' ids' x) (lookupVarEnv x' h')
+    maybe (ids', x') (const $ mkUniqueHeapId h' ids' x) (UniqMap.lookup x' h')
    where
     (i,ids') = freshId ids
     x'       = modifyVarName (`setUnique` i) x

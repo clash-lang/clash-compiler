@@ -85,6 +85,8 @@ import           Clash.Core.EqSolver     (typeEq)
 import           Clash.Core.FreeVars     (typeFreeVars, typeFreeVars')
 import           Clash.Core.HasFreeVars  (elemFreeVars)
 import           Clash.Core.HasType
+import           Clash.Core.InScopeSet (InScopeSet)
+import qualified Clash.Core.InScopeSet as InScopeSet
 import qualified Clash.Core.Literal      as C
 import           Clash.Core.Name
   (Name (..), appendToName, nameOcc)
@@ -104,8 +106,6 @@ import           Clash.Core.Util
   (substArgTys, tyLitShow)
 import           Clash.Core.Var
   (Id, Var (..), mkLocalId, modifyVarName, Attr')
-import           Clash.Core.VarEnv
-  (InScopeSet, extendInScopeSetList, uniqAway, lookupVarEnv)
 import qualified Clash.Data.UniqMap as UniqMap
 import {-# SOURCE #-} Clash.Netlist.BlackBox
 import {-# SOURCE #-} Clash.Netlist.BlackBox.Util
@@ -754,7 +754,7 @@ mkUniqueNormalized is0 topMM (args, binds, res) = do
 
   -- Make arguments unique
   let (bndrs, exprs) = unzip binds
-  let is1 = is0 `extendInScopeSetList` (args ++ bndrs)
+  let is1 = InScopeSet.insertMany (args ++ bndrs) is0
   (wereVoids, iports, iwrappers, substArgs) <-
     mkUniqueArguments (mkSubst is1) etopM args
 
@@ -995,7 +995,7 @@ mkUnique = go []
     go processed subst []     = return (reverse processed,subst)
     go processed subst@(Subst isN _ _ _) (i:is) = do
       iN <- Id.toText <$> Id.fromCoreId i
-      let i' = uniqAway isN (modifyVarName (setRepName iN) i)
+      let i' = InScopeSet.uniqAway isN (modifyVarName (setRepName iN) i)
           subst' = extendInScopeId (extendIdSubst subst i (Var i')) i'
       go (i':processed)
          subst'
@@ -1539,7 +1539,7 @@ mkTopUnWrapper
   -> NetlistMonad [Declaration]
 mkTopUnWrapper topEntity annM dstId args tickDecls = do
   -- component name
-  compNameM <- lookupVarEnv topEntity <$> Lens.use componentNames
+  compNameM <- UniqMap.lookup topEntity <$> Lens.use componentNames
   let
     topName = Id.toText topIdentifier
     topIdentifier = flip fromMaybe compNameM (error [I.i|

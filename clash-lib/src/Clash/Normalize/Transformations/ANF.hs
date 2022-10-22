@@ -33,6 +33,8 @@ import Clash.Signal.Internal (Signal(..))
 import Clash.Core.DataCon (DataCon(..))
 import Clash.Core.HasFreeVars (disjointFreeVars)
 import Clash.Core.HasType
+import Clash.Core.InScopeSet (InScopeSet)
+import qualified Clash.Core.InScopeSet as InScopeSet
 import Clash.Core.Name (mkUnsafeSystemName, nameOcc)
 import Clash.Core.Subst (deshadowLetExpr, freshenTm)
 import Clash.Core.Term
@@ -43,7 +45,7 @@ import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type, TypeView(..), coreView, tyView)
 import Clash.Core.Util (mkSelectorCase)
 import Clash.Core.Var (Id)
-import Clash.Core.VarEnv (InScopeSet, extendInScopeSet, extendInScopeSetList, mkVarSet)
+import qualified Clash.Core.VarSet as VarSet
 import Clash.Netlist.Util (bindsExistentials)
 import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
@@ -136,7 +138,7 @@ not the complete names. So we use mkUnsafeSystemName to recreate the same Name.
 -- constants do not become let-bound.
 makeANF :: HasCallStack => NormRewrite
 makeANF (TransformContext is0 ctx) (Lam bndr e) = do
-  let ctx' = TransformContext (extendInScopeSet is0 bndr) (LamBody bndr : ctx)
+  let ctx' = TransformContext (InScopeSet.insert bndr is0) (LamBody bndr : ctx)
   e' <- makeANF ctx' e
   return (Lam bndr e')
 
@@ -169,11 +171,11 @@ type NormRewriteW = Transform (StateT ([LetBinding],InScopeSet) NormalizeSession
 
 -- | See Note [ANF InScopeSet]
 tellBinders :: [LetBinding] -> StateT ([LetBinding],InScopeSet) NormalizeSession ()
-tellBinders bs = modify ((bs ++) *** (`extendInScopeSetList` (map fst bs)))
+tellBinders bs = modify ((bs ++) *** (InScopeSet.insertMany (fmap fst bs)))
 
 -- | See Note [ANF InScopeSet]; only extends the inscopeset
 notifyBinders :: Monad m => [LetBinding] -> StateT ([LetBinding],InScopeSet) m ()
-notifyBinders bs = modify (second (`extendInScopeSetList` (map fst bs)))
+notifyBinders bs = modify (second (InScopeSet.insertMany (fmap fst bs)))
 
 -- | Is the given type IO-like
 isSimIOTy
@@ -220,7 +222,7 @@ isStateTokenTy tcm ty = case tyView (coreView tcm ty) of
 -- Initially we start with the local InScopeSet and add the global variables:
 --
 -- @
--- is1 <- unionInScope is0 <$> Lens.use globalInScope
+-- is1 <- mappend is0 <$> Lens.use globalInScope
 -- @
 --
 -- Which will gives us the (superset of) free variables of the expression. Then
@@ -336,7 +338,7 @@ collectANF ctx (Case subj ty alts) = do
 
     case alts' of
       [(DataPat _ [] xs,altExpr)]
-        | mkVarSet xs `disjointFreeVars` altExpr || isSimIOAlt
+        | VarSet.fromList xs `disjointFreeVars` altExpr || isSimIOAlt
         -> return altExpr
       _ -> return (Case subj' ty alts')
   where

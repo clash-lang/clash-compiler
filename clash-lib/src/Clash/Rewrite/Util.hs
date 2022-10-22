@@ -70,6 +70,8 @@ import           Clash.Core.FreeVars
   (freeLocalVars, termFreeVars', freeLocalIds, globalIdOccursIn)
 import           Clash.Core.HasFreeVars      (elemFreeVars, notElemFreeVars)
 import           Clash.Core.HasType
+import           Clash.Core.InScopeSet (InScopeSet)
+import qualified Clash.Core.InScopeSet as InScopeSet
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
@@ -79,10 +81,7 @@ import           Clash.Core.TyCon            (TyConMap)
 import           Clash.Core.Type             (Type (..), normalizeType)
 import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), mkGlobalId, mkLocalId, mkTyVar)
-import           Clash.Core.VarEnv
-  (InScopeSet, extendInScopeSet, extendInScopeSetList, mkInScopeSet,
-   uniqAway, uniqAway', mapVarEnv, eltsVarEnv, unitVarSet, emptyVarEnv,
-   mkVarEnv, eltsVarSet, elemVarEnv, lookupVarEnv, extendVarEnv, elemVarSet)
+import qualified Clash.Core.VarSet as VarSet
 import           Clash.Data.UniqMap (UniqMap)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug
@@ -359,7 +358,7 @@ inlineBinders condition (TransformContext inScope0 _) expr@(Let (NonRec i x) res
   inline <- condition expr (i, x)
 
   if inline && elemFreeVars i res then
-    let inScope1 = extendInScopeSet inScope0 i
+    let inScope1 = InScopeSet.insert i inScope0
         subst = extendIdSubst (mkSubst inScope1) i x
      in changed (substTm "inlineBinders" subst res)
   else
@@ -370,7 +369,7 @@ inlineBinders condition (TransformContext inScope0 _) expr@(Let (Rec xes) res) =
   case toInline of
     [] -> return expr
     _  -> do
-      let inScope1 = extendInScopeSetList inScope0 (map fst xes)
+      let inScope1 = InScopeSet.insertMany (fmap fst xes) inScope0
           (toInlRec,(toKeep1,res1)) =
             substituteBinders inScope1 toInline toKeep res
       case toInlRec ++ toKeep1 of
@@ -462,7 +461,7 @@ substituteBinders inScope toInline toKeep body =
   go !subst !inlRec ((x,e):toInl) =
     let e1      = substTm "substInl" subst e
         substE  = extendIdSubst (mkSubst inScope) x e1
-        subst1  = subst { substTmEnv = mapVarEnv (substTm "substSubst" substE)
+        subst1  = subst { substTmEnv = fmap (substTm "substSubst" substE)
                                                  (substTmEnv subst)}
         subst2  = extendIdSubst subst1 x e1
     in  if x `elemFreeVars` e1 then
@@ -493,7 +492,7 @@ liftAndSubsituteBinders inScope toLift toKeep body = do
     let e1 = substTm "liftInl" subst e
     (_,e2) <- liftBinding (x,e1)
     let substE = extendIdSubst (mkSubst inScope) x e2
-        subst1 = subst { substTmEnv = mapVarEnv (substTm "liftSubst" substE)
+        subst1 = subst { substTmEnv = fmap (substTm "liftSubst" substE)
                                                 (substTmEnv subst) }
         subst2 = extendIdSubst subst1 x e2
     if x `elemFreeVars` e2 then do
@@ -535,7 +534,7 @@ inlineOrLiftBinders condition inlineOrLift (TransformContext inScope0 _) e@(Letr
   case toReplace of
     [] -> return e
     _  -> do
-      let inScope1 = extendInScopeSetList inScope0 (map fst bndrs)
+      let inScope1 = InScopeSet.insertMany (fmap fst bndrs) inScope0
       let (toInline,toLift) = partition (inlineOrLift e) toReplace
       -- We first substitute the binders that we can inline both the binders
       -- that we intend to lift, the other binders, and the body
@@ -590,9 +589,9 @@ liftBinding (var@Id {varName = idName} ,e) = do
                   (mkTyApps (Var newBodyId)
                             (map VarTy boundFTVs))
                   (map Var boundFVs)
-      inScope0 = mkInScopeSet (coerce boundFVsSet)
-      inScope1 = extendInScopeSetList inScope0 [var,newBodyId]
-  let subst    = extendIdSubst (mkSubst inScope1) var newExpr
+      inScope0 = InScopeSet.fromVarSet (coerce boundFVsSet)
+      inScope1 = InScopeSet.insertMany [var, newBodyId] inScope0
+      subst    = extendIdSubst (mkSubst inScope1) var newExpr
       -- Substitute the recursive calls by the new expression
       e' = substTm "liftBinding" subst e
       -- Create a new body that abstracts over the free variables
@@ -666,7 +665,7 @@ cloneNameWithInScopeSet
   -> m (Name a)
 cloneNameWithInScopeSet is nm = do
   i <- getUniqueM
-  return (uniqAway is (setUnique nm i))
+  return (InScopeSet.uniqAway is (setUnique nm i))
 
 -- | Create a new name out of the given name, but with another unique. Resulting
 -- unique is guaranteed to not be in the given BindingMap.
@@ -677,7 +676,7 @@ cloneNameWithBindingMap
   -> m (Name a)
 cloneNameWithBindingMap binders nm = do
   i <- getUniqueM
-  return (uniqAway' (`UniqMap.elem` binders) i (setUnique nm i))
+  return (InScopeSet.uniqAway' (`UniqMap.elem` binders) i (setUnique nm i))
 
 {-# INLINE isUntranslatable #-}
 -- | Determine if a term cannot be represented in hardware
@@ -789,7 +788,7 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
     return e1
   where
     heapIds = map fst bndrs
-    is1 = extendInScopeSetList is0 heapIds
+    is1 = InScopeSet.insertMany heapIds is0
     ctx = TransformContext is1 (LetBody heapIds : hist)
 
     bndrs = map toLetBinding $ UniqMap.toList heap
@@ -809,29 +808,29 @@ removeUnusedBinders
   -> Term
   -> Maybe Term
 removeUnusedBinders (NonRec i _) body =
-  let bodyFVs = Lens.foldMapOf freeLocalIds unitVarSet body
-   in if i `elemVarSet` bodyFVs then Nothing else Just body
+  let bodyFVs = Lens.foldMapOf freeLocalIds VarSet.singleton body
+   in if i `VarSet.elem` bodyFVs then Nothing else Just body
 
 removeUnusedBinders (Rec binds) body =
-  case eltsVarEnv used of
+  case UniqMap.elems used of
     [] -> Just body
     qqL | not (List.equalLength qqL binds)
         -> Just (Letrec qqL body)
         | otherwise
         -> Nothing
  where
-  bodyFVs = Lens.foldMapOf freeLocalIds unitVarSet body
-  used = List.foldl' collectUsed emptyVarEnv (eltsVarSet bodyFVs)
-  bindsEnv = mkVarEnv (map (\(x,e0) -> (x,(x,e0))) binds)
+  bodyFVs = Lens.foldMapOf freeLocalIds VarSet.singleton body
+  used = List.foldl' collectUsed mempty (VarSet.toList bodyFVs)
+  bindsEnv = UniqMap.fromList (map (\(x,e0) -> (x,(x,e0))) binds)
 
   collectUsed env v =
-    if v `elemVarEnv` env then
+    if v `UniqMap.elem` env then
       env
     else
-      case lookupVarEnv v bindsEnv of
+      case UniqMap.lookup v bindsEnv of
         Just (x,e0) ->
-          let eFVs = Lens.foldMapOf freeLocalIds unitVarSet e0
+          let eFVs = Lens.foldMapOf freeLocalIds VarSet.singleton e0
           in  List.foldl' collectUsed
-                          (extendVarEnv x (x,e0) env)
-                          (eltsVarSet eFVs)
+                          (UniqMap.insert x (x,e0) env)
+                          (VarSet.toList eFVs)
         Nothing -> env

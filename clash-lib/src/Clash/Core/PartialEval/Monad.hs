@@ -75,6 +75,8 @@ import qualified Data.Map.Strict as Map
 
 import           Clash.Core.Binding (Binding(..))
 import           Clash.Core.HasFreeVars
+import           Clash.Core.InScopeSet (InScopeSet)
+import qualified Clash.Core.InScopeSet as InScopeSet
 import           Clash.Core.Name (OccName)
 import           Clash.Core.PartialEval.AsTerm
 import           Clash.Core.PartialEval.NormalForm
@@ -83,7 +85,8 @@ import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type (Kind, KindOrType, Type)
 import           Clash.Core.Util (mkUniqSystemId, mkUniqSystemTyVar)
 import           Clash.Core.Var (Id, TyVar, Var)
-import           Clash.Core.VarEnv
+import qualified Clash.Core.VarSet as VarSet
+import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Rewrite.WorkFree (isWorkFree)
 
 {-
@@ -174,8 +177,8 @@ withTyVar i a x = do
   modifyLocalEnv goLocal x
  where
   goGlobal env@GlobalEnv{genvInScope=inScope} =
-    let fvs = unitVarSet i `unionVarSet` freeVarsOf a
-        iss = mkInScopeSet fvs `unionInScope` inScope
+    let fvs = VarSet.insert i (freeVarsOf a)
+        iss = InScopeSet.fromVarSet fvs <> inScope
      in env { genvInScope = iss }
 
   goLocal env@LocalEnv{lenvTypes=types} =
@@ -188,7 +191,7 @@ getTvSubst :: Eval Subst
 getTvSubst = do
   inScope <- getInScope
   tys <- lenvTypes <$> getLocalEnv
-  let vars = mkVarEnv (Map.toList tys)
+  let vars = UniqMap.fromList (Map.toList tys)
 
   pure (mkTvSubst inScope vars)
 
@@ -202,8 +205,8 @@ withId i v x = do
  where
   goGlobal env@GlobalEnv{genvInScope=inScope} =
     -- TODO Change this to use an instance HasFreeVars Value
-    let fvs = unitVarSet i `unionVarSet` freeVarsOf (asTerm v)
-        iss = mkInScopeSet fvs `unionInScope` inScope
+    let fvs = VarSet.insert i (freeVarsOf (asTerm v))
+        iss = InScopeSet.fromVarSet fvs <> inScope
      in env { genvInScope = iss }
 
   goLocal env@LocalEnv{lenvValues=values} =
@@ -219,13 +222,13 @@ withoutId i = modifyLocalEnv go
     env { lenvValues = Map.delete i values }
 
 findBinding :: Id -> Eval (Maybe (Binding Value))
-findBinding i = lookupVarEnv i . genvBindings <$> getGlobalEnv
+findBinding i = UniqMap.lookup i . genvBindings <$> getGlobalEnv
 
 replaceBinding :: Binding Value -> Eval ()
 replaceBinding b = modifyGlobalEnv go
  where
   go env@GlobalEnv{genvBindings=bindings} =
-    env { genvBindings = extendVarEnv (bindingId b) b bindings }
+    env { genvBindings = UniqMap.insert (bindingId b) b bindings }
 
 getRef :: Int -> Eval Value
 getRef addr = do

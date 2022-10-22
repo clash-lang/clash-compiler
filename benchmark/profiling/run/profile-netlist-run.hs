@@ -6,7 +6,7 @@ import           Clash.Backend
 import           Clash.Backend.VHDL (VHDLState)
 import           Clash.Core.Name
 import           Clash.Core.Var
-import           Clash.Core.VarEnv (mkVarEnv)
+import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Driver.Types
 import           Clash.Netlist
 import           Clash.Netlist.Types          hiding (backend, hdlDir)
@@ -54,7 +54,7 @@ benchFile idirs src = do
       modName    = takeWhile (/= '.') topEntityS
       hdlState'  = setModName (Text.pack modName) (initBackend @VHDLState (envOpts env))
       (compNames, seen) = genTopNames (envOpts env) hdl topEntities
-      topEntityMap = mkVarEnv (zip (map topId topEntities) topEntities)
+      topEntityMap = UniqMap.fromList (zip (map topId topEntities) topEntities)
       prefixM    = Nothing
       ite        = ifThenElseExpr hdlState'
       hdlDir     = fromMaybe "." (opt_hdlDir (envOpts env)) </>

@@ -62,6 +62,7 @@ import           Clash.Core.FreeVars
   (globalIds, globalIdOccursIn)
 import           Clash.Core.HasFreeVars  (isClosed)
 import           Clash.Core.HasType
+import qualified Clash.Core.InScopeSet as InScopeSet
 import           Clash.Core.Name         (Name(nameOcc,nameUniq))
 import           Clash.Core.Pretty       (showPpr)
 import           Clash.Core.Subst
@@ -73,10 +74,8 @@ import           Clash.Core.Type
    splitTyConAppM, mkPolyFunTy)
 import           Clash.Core.Util
   (isClockOrReset)
-import           Clash.Core.Var          (Id, TyVar, Var (..), isGlobalId)
-import           Clash.Core.VarEnv
-  (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
-   lookupVarEnv, unionVarEnvWith, unitVarEnv, extendInScopeSetList, mkInScopeSet, mkVarSet)
+import           Clash.Core.Var          (Id, TyVar, Var (..), isGlobalId, VarEnv)
+import qualified Clash.Core.VarSet as VarSet
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug             (traceIf)
 import           Clash.Driver.Types
@@ -144,9 +143,9 @@ alreadyInlined
   -> NormalizeMonad (Maybe Int)
 alreadyInlined f cf = do
   inlinedHM <- Lens.use inlineHistory
-  case lookupVarEnv cf inlinedHM of
+  case UniqMap.lookup cf inlinedHM of
     Nothing       -> return Nothing
-    Just inlined' -> return (lookupVarEnv f inlined')
+    Just inlined' -> return (UniqMap.lookup f inlined')
 
 -- | Record a new inlining in the `inlineHistory`
 addNewInline
@@ -156,10 +155,10 @@ addNewInline
   -- ^ Function in which we're inlining it
   -> NormalizeMonad ()
 addNewInline f cf =
-  inlineHistory %= extendVarEnvWith
+  inlineHistory %= UniqMap.insertWith
+                     (\_ hm -> UniqMap.insertWith (+) f 1 hm)
                      cf
-                     (unitVarEnv f 1)
-                     (\_ hm -> extendVarEnvWith f 1 (+) hm)
+                     (UniqMap.singleton f 1)
 
 -- | Test whether a given term represents a non-recursive global variable
 isNonRecursiveGlobalVar
@@ -177,10 +176,10 @@ isRecursiveBndr
   -> NormalizeSession Bool
 isRecursiveBndr f = do
   cg <- Lens.use (extra.recursiveComponents)
-  case lookupVarEnv f cg of
+  case UniqMap.lookup f cg of
     Just isR -> return isR
     Nothing -> do
-      fBodyM <- lookupVarEnv f <$> Lens.use bindings
+      fBodyM <- UniqMap.lookup f <$> Lens.use bindings
       case fBodyM of
         Nothing -> return False
         Just b -> do
@@ -188,7 +187,7 @@ isRecursiveBndr f = do
           -- ones, so checking whether 'f' is part of the free variables of the
           -- body of 'f' is sufficient.
           let isR = f `globalIdOccursIn` bindingTerm b
-          (extra.recursiveComponents) %= extendVarEnv f isR
+          (extra.recursiveComponents) %= UniqMap.insert f isR
           return isR
 
 data ConstantSpecInfo =
@@ -270,7 +269,7 @@ mergeCsrs ctx ticks oldTerm proposedTerm subTerms = do
   constantSpecInfoFolder localCtx@(TransformContext is0 tfCtx) (Left term) = do
     specInfo <- constantSpecInfo localCtx term
     let newIds = map fst (csrNewBindings specInfo)
-    let is1 = extendInScopeSetList is0 newIds
+    let is1 = InScopeSet.insertMany newIds is0
     pure (TransformContext is1 tfCtx, Left specInfo)
 
 
@@ -360,13 +359,13 @@ callGraph
   :: BindingMap Term
   -> Id
   -> CallGraph
-callGraph bndrs rt = go emptyVarEnv (varUniq rt)
+callGraph bndrs rt = go mempty (varUniq rt)
   where
     go cg root
       | Nothing     <- UniqMap.lookup root cg
       , Just rootTm <- UniqMap.lookup root bndrs =
-      let used = Lens.foldMapByOf globalIds (unionVarEnvWith (+))
-                  emptyVarEnv (`UniqMap.singleton` 1) (bindingTerm rootTm)
+      let used = Lens.foldMapByOf globalIds (UniqMap.unionWith (+))
+                  mempty (`UniqMap.singleton` 1) (bindingTerm rootTm)
           cg'  = UniqMap.insert root used cg
       in  List.foldl' go cg' (UniqMap.keys used)
     go cg _ = cg
@@ -420,7 +419,7 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = makeCachedU nm (extr
   -- global binder, sometimes causing the inliner to go
   -- into a loop. Deshadowing freshens all the bindings
   -- to avoid this.
-  let tm1 = deShadowTerm emptyInScopeSet tm
+  let tm1 = deShadowTerm mempty tm
       tm2 = if isTop then substWithTyEq tm1 else tm1
   old <- Lens.use curFun
   tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
@@ -457,7 +456,7 @@ substWithTyEq e0 = go [] False e0
     , Right tv `elem` args
     = let
         tvs = rights args
-        subst0 = extendTvSubst (mkSubst $ mkInScopeSet $ mkVarSet tvs) tv ty
+        subst0 = extendTvSubst (mkSubst $ InScopeSet.fromVarSet $ VarSet.fromList tvs) tv ty
         removedTy = substTy subst0 $ coreTypeOf v
         subst1 = extendIdSubst subst0 v (TyApp (Prim removedArg) removedTy)
       in go (Left (substId subst0 v) : (args List.\\ [Right tv])) True (substTm "substWithTyEq e" subst1 e)
@@ -486,7 +485,7 @@ tvSubstWithTyEq ty0 = go [] False ty0
     , Just (tv,ty) <- tvFirst tcArgs
     = let
         argsOut2 = Right arg : (argsOut List.\\ [Left tv])
-        subst = extendTvSubst (mkSubst $ mkInScopeSet $ mkVarSet $ lefts argsOut2) tv ty
+        subst = extendTvSubst (mkSubst $ InScopeSet.fromVarSet $ VarSet.fromList $ lefts argsOut2) tv ty
       in go argsOut2 True  (substTy subst tyRes)
     | otherwise = go (Right arg : argsOut) changed tyRes
   go _ False _ = ty0 -- no eq constraints, returning original type
@@ -504,7 +503,7 @@ rewriteExpr (nrwS,nrw) (bndrS,expr) (nm, sp) = do
   let expr' = traceIf (hasTransformationInfo FinalTerm opts)
                 (bndrS ++ " before " ++ nrwS ++ ":\n\n" ++ before ++ "\n")
                 expr
-  rewritten <- runRewrite nrwS emptyInScopeSet nrw expr'
+  rewritten <- runRewrite nrwS mempty nrw expr'
   let after = showPpr rewritten
   traceIf (hasTransformationInfo FinalTerm opts)
     (bndrS ++ " after " ++ nrwS ++ ":\n\n" ++ after ++ "\n") $

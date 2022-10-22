@@ -19,7 +19,8 @@ import Clash.Core.FreeVars
 import Clash.Core.Term (Term)
 import Clash.Core.Type (Type(..))
 import Clash.Core.Var (Var)
-import Clash.Core.VarEnv
+import Clash.Core.VarSet (VarSet)
+import qualified Clash.Core.VarSet as VarSet
 
 class HasFreeVars a where
   {-# MINIMAL freeVarsOf #-}
@@ -30,36 +31,36 @@ class HasFreeVars a where
   -- | Something is closed if it has no free variables.
   -- This function may be replaced with a more efficient implementation.
   isClosed :: a -> Bool
-  isClosed = nullVarSet . freeVarsOf
+  isClosed = VarSet.null . freeVarsOf
 
   {-# INLINE elemFreeVars #-}
   -- | Check if a variable is free in the given value.
   -- This function may be replaced with a more efficient implementation.
   elemFreeVars :: Var a -> a -> Bool
-  elemFreeVars v = elemVarSet v . freeVarsOf
+  elemFreeVars v = VarSet.elem v . freeVarsOf
 
   {-# INLINE notElemFreeVars #-}
   -- | Check if a variable is not free in the given value.
   -- This function may be replaced with a more efficient implementation.
   notElemFreeVars :: Var a -> a -> Bool
-  notElemFreeVars x = notElemVarSet x . freeVarsOf
+  notElemFreeVars x = VarSet.notElem x . freeVarsOf
 
   {-# INLINE subsetFreeVars #-}
   -- | Check if all variables in a set are free in the given value.
   -- This function may be replaced with a more efficient implementation.
   subsetFreeVars :: VarSet -> a -> Bool
-  subsetFreeVars xs = subsetVarSet xs . freeVarsOf
+  subsetFreeVars xs = VarSet.subset xs . freeVarsOf
 
   {-# INLINE disjointFreeVars #-}
   -- | Check if no variables in a set are free in the given value.
   -- This function may be replaced with a more efficient implementation.
   disjointFreeVars :: VarSet -> a -> Bool
-  disjointFreeVars xs = disjointVarSet xs . freeVarsOf
+  disjointFreeVars xs = VarSet.disjoint xs . freeVarsOf
 
 instance HasFreeVars Term where
   {-# INLINE freeVarsOf #-}
   freeVarsOf =
-    Lens.foldMapOf freeLocalVars unitVarSet
+    Lens.foldMapOf freeLocalVars VarSet.singleton
 
   elemFreeVars v e =
     getAny (Lens.foldMapOf freeLocalVars (Any . (== v)) e)
@@ -68,12 +69,12 @@ instance HasFreeVars Term where
     getAll (Lens.foldMapOf freeLocalVars (All . (/= v)) e)
 
   disjointFreeVars vs e =
-    getAll (Lens.foldMapOf freeLocalVars (All . (`notElem` vs)) e)
+    getAll (Lens.foldMapOf freeLocalVars (All . (`VarSet.notElem` vs)) e)
 
 instance HasFreeVars Type where
   {-# INLINE freeVarsOf #-}
   freeVarsOf =
-    Lens.foldMapOf typeFreeVars unitVarSet
+    Lens.foldMapOf typeFreeVars VarSet.singleton
 
   isClosed ty =
     case ty of

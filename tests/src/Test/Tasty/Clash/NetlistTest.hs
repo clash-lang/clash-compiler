@@ -27,7 +27,7 @@ import           Clash.Backend.VHDL
 import           Clash.Backend.Verilog
 import           Clash.Core.Name
 import           Clash.Core.Var
-import           Clash.Core.VarEnv
+import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Driver as Driver
 import           Clash.Driver.Types
 
@@ -75,7 +75,7 @@ runToNetlistStage target f src = do
   let (compNames, initIs) = genTopNames opts hdl (designEntities design)
       teNames = fmap topId (designEntities design)
       te      = topId (P.head (designEntities design))
-      tes2    = mkVarEnv (P.zip (P.map topId (designEntities design)) (designEntities design))
+      tes2    = UniqMap.fromList (P.zip (P.map topId (designEntities design)) (designEntities design))
 
   supplyN <- Supply.newSupply
 

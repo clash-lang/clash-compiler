@@ -34,6 +34,7 @@ import GHC.Stack (HasCallStack)
 
 import Clash.Core.DataCon (DataCon(dcType))
 import Clash.Core.HasFreeVars
+import qualified Clash.Core.InScopeSet as InScopeSet
 import Clash.Core.Literal (Literal(..))
 import Clash.Core.Name (Name(nameOcc))
 import Clash.Core.Pretty
@@ -43,7 +44,6 @@ import Clash.Core.TyCon (TyCon(tyConKind), TyConMap)
 import Clash.Core.Type
 import Clash.Core.TysPrim
 import Clash.Core.Var (Var(varType))
-import Clash.Core.VarEnv
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug (debugIsOn)
 import Clash.Util (curLoc, pprPanic)
@@ -242,11 +242,11 @@ piResultTys m ty origArgs@(arg:args)
     else
       piResultTys m res args
   | ForAllTy tv res <- ty
-  = go (extendVarEnv tv arg emptyVarEnv) res args
+  = go (UniqMap.singleton tv arg) res args
   | otherwise
   = pprPanic "piResultTys1" (ppr ty <> line <> ppr origArgs)
  where
-  inScope = mkInScopeSet (freeVarsOf (ty:origArgs))
+  inScope = InScopeSet.fromVarSet (freeVarsOf (ty:origArgs))
 
   go env ty' [] = substTy (mkTvSubst inScope env) ty'
   go env ty' allArgs@(arg':args')
@@ -255,9 +255,9 @@ piResultTys m ty origArgs@(arg:args)
     | FunTy _ res <- tyView ty'
     = go env res args'
     | ForAllTy tv res <- ty'
-    = go (extendVarEnv tv arg' env) res args'
+    = go (UniqMap.insert tv arg' env) res args'
     | VarTy tv <- ty'
-    , Just ty'' <- lookupVarEnv tv env
+    , Just ty'' <- UniqMap.lookup tv env
       -- Deals with (piResultTys  (forall a.a) [forall b.b, Int])
     = piResultTys m ty'' allArgs
     | otherwise

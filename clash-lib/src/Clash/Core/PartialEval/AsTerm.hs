@@ -19,7 +19,7 @@ import Data.Bifunctor (first, second)
 import Clash.Core.HasFreeVars
 import Clash.Core.PartialEval.NormalForm
 import Clash.Core.Term (Bind(..), Term(..), Pat, Alt, mkApps)
-import Clash.Core.VarEnv (elemVarSet)
+import Clash.Core.VarSet as VarSet
 
 -- | Convert a term in some normal form back into a Term. This is important,
 -- as it may perform substitutions which have not yet been performed (i.e. when
@@ -45,8 +45,8 @@ removeUnusedBindings bs x
   free = freeVarsOf x
 
   isUsed = \case
-    NonRec i _ -> elemVarSet i free
-    Rec xs -> any (flip elemVarSet free . fst) xs
+    NonRec i _ -> VarSet.elem i free
+    Rec xs -> any (flip VarSet.elem free . fst) xs
 
 instance AsTerm Value where
   asTerm = \case

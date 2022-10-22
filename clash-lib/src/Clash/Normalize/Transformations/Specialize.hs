@@ -62,6 +62,8 @@ import Clash.Core.Binding (Binding(..))
 import Clash.Core.DataCon (DataCon(dcArgTys))
 import Clash.Core.FreeVars (freeLocalVars, termFreeTyVars, typeFreeVars)
 import Clash.Core.HasType
+import Clash.Core.InScopeSet (InScopeSet)
+import qualified Clash.Core.InScopeSet as InScopeSet
 import Clash.Core.Literal (Literal(..))
 import Clash.Core.Name
   (NameSort(..), Name(..), appendToName, mkUnsafeInternalName, mkUnsafeSystemName)
@@ -78,9 +80,7 @@ import Clash.Core.Type
 import Clash.Core.TysPrim
 import Clash.Core.Util (listToLets)
 import Clash.Core.Var (Var(..), Id, TyVar, mkTyVar)
-import Clash.Core.VarEnv
-  ( InScopeSet, extendInScopeSet, extendInScopeSetList, lookupVarEnv
-  , mkInScopeSet, mkVarSet, unionInScope, elemVarSet)
+import qualified Clash.Core.VarSet as VarSet
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug (traceIf, traceM)
 import Clash.Driver.Types (TransformationInfo(..), hasTransformationInfo)
@@ -208,19 +208,19 @@ appProp ctx@(TransformContext is _) = \case
         let subst = extendIdSubst (mkSubst is0) v arg in
         (`mkTicks` ticks) <$> go is0 (substTm "appProp.AppLam" subst e) args []
       False ->
-        let is1 = extendInScopeSet is0 v in
+        let is1 = InScopeSet.insert v is0 in
         Let (NonRec v arg) <$> go is1 (deShadowTerm is1 e) args ticks
 
   go is0 (Let (NonRec i x) e) args@(_:_) ticks = do
     setChanged
-    let is1 = extendInScopeSet is0 i
+    let is1 = InScopeSet.insert i is0
     -- XXX: binding should already be deshadowed w.r.t. 'is0'
     Let (NonRec i x) <$> go is1 e args ticks
 
   go is0 (Let (Rec vs) e) args@(_:_) ticks = do
     setChanged
     let vbs  = map fst vs
-        is1  = extendInScopeSetList is0 vbs
+        is1  = InScopeSet.insertMany vbs is0
     -- XXX: 'vs' should already be deshadowed w.r.t. 'is0'
     Let (Rec vs) <$> go is1 e args ticks
 
@@ -231,15 +231,14 @@ appProp ctx@(TransformContext is _) = \case
 
   go is0 (Case scrut ty0 alts) args0@(_:_) ticks = do
     setChanged
-    let isA1 = unionInScope
-                 is0
-                 ((mkInScopeSet . mkVarSet . concatMap (patVars . fst)) alts)
+    let isA1 = is0 <>
+                 ((InScopeSet.fromVarSet . VarSet.fromList . concatMap (patVars . fst)) alts)
     (ty1,vs,args1) <- goCaseArg isA1 ty0 [] args0
     case vs of
       [] -> (`mkTicks` ticks) . Case scrut ty1 <$> mapM (goAlt is0 args1) alts
       _  -> do
         let vbs   = map fst vs
-            is1   = extendInScopeSetList is0 vbs
+            is1   = InScopeSet.insertMany vbs is0
             alts1 = map (deShadowAlt is1) alts
         -- TODO I should have a mkNonRecLets :: [LetBinding] -> Term -> Term
         -- function which makes a chain of non-recursive let expressions without
@@ -254,7 +253,7 @@ appProp ctx@(TransformContext is _) = \case
 
   goAlt is0 args0 (p,e) = do
     let (tvs,ids) = patIds p
-        is1       = extendInScopeSetList (extendInScopeSetList is0 tvs) ids
+        is1       = InScopeSet.insertMany ids (InScopeSet.insertMany tvs is0)
     (p,) <$> go is1 e args0 []
 
   goCaseArg isA ty0 ls0 (Right t:args0) = do
@@ -274,7 +273,7 @@ appProp ctx@(TransformContext is _) = \case
         return (ty2,ls1,Left arg:args1)
       False -> do
         boundArg <- mkTmBinderFor isA0 tcm (mkDerivedName ctx "app_arg") arg
-        let isA1 = extendInScopeSet isA0 boundArg
+        let isA1 = InScopeSet.insert boundArg isA0
         (ty2,ls1,args1) <- goCaseArg isA1 ty1 ls0 args0
         return (ty2,(boundArg,arg):ls1,Left (Var boundArg):args1)
 
@@ -296,7 +295,7 @@ constantSpec ctx@(TransformContext is0 tfCtx) e@(App e1 e2)
            specialize ctx (App e1 e2)
          else do
            -- Parts of e2 are constant
-           let is1 = extendInScopeSetList is0 (fst <$> csrNewBindings specInfo)
+           let is1 = InScopeSet.insertMany (fst <$> csrNewBindings specInfo) is0
            (body, isSpec) <- Writer.listen $ specialize
              (TransformContext is1 tfCtx)
              (App e1 (csrNewTerm specInfo))
@@ -357,7 +356,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
 
   -- Don't specialize TopEntities
   topEnts <- Lens.view topEntities
-  if f `elemVarSet` topEnts
+  if f `VarSet.elem` topEnts
   then do
     case specArgIn of
       Left _ -> do
@@ -572,7 +571,7 @@ nonRepSpec ctx e@(App e1 e2)
     inlineInternalSpecialisationArgument app
       | (Var f,fArgs,ticks) <- collectArgsTicks app
       = do
-        fTmM <- lookupVarEnv f <$> Lens.use bindings
+        fTmM <- UniqMap.lookup f <$> Lens.use bindings
         case fTmM of
           Just b
             | nameSort (varName (bindingId b)) == Internal

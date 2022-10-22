@@ -23,12 +23,13 @@ import qualified Data.Maybe as Maybe
 import GHC.Stack (HasCallStack)
 
 import Clash.Core.HasType
+import qualified Clash.Core.InScopeSet as InScopeSet
 import Clash.Core.Term (Bind(..), CoreContext(..), Term(..), collectArgs, mkLams)
 import Clash.Core.TermInfo (isFun)
 import Clash.Core.Type (splitFunTy)
 import Clash.Core.Util (mkInternalVar)
 import Clash.Core.Var (Id)
-import Clash.Core.VarEnv (elemVarSet, extendInScopeSet, extendInScopeSetList)
+import qualified Clash.Core.VarSet as VarSet
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.Types (TransformContext(..), tcCache, topEntities)
 import Clash.Rewrite.Util (changed)
@@ -40,7 +41,7 @@ etaExpandSyn :: HasCallStack => NormRewrite
 etaExpandSyn (TransformContext is0 ctx) e@(collectArgs -> (Var f, _)) = do
   topEnts <- Lens.view topEntities
   tcm <- Lens.view tcCache
-  let isTopEnt = f `elemVarSet` topEnts
+  let isTopEnt = f `VarSet.elem` topEnts
       isAppFunCtx =
         \case
           AppFun:_ -> True
@@ -66,12 +67,12 @@ stripLambda e = ([], e)
 -- | Eta-expand top-level lambda's (DON'T use in a traversal!)
 etaExpansionTL :: HasCallStack => NormRewrite
 etaExpansionTL (TransformContext is0 ctx) (Lam bndr e) = do
-  let ctx' = TransformContext (extendInScopeSet is0 bndr) (LamBody bndr : ctx)
+  let ctx' = TransformContext (InScopeSet.insert bndr is0) (LamBody bndr : ctx)
   e' <- etaExpansionTL ctx' e
   return $ Lam bndr e'
 
 etaExpansionTL (TransformContext is0 ctx) (Let (NonRec i x) e) = do
-  let ctx' = TransformContext (extendInScopeSet is0 i) (LetBody [i] : ctx)
+  let ctx' = TransformContext (InScopeSet.insert i is0) (LetBody [i] : ctx)
   e' <- etaExpansionTL ctx' e
   case stripLambda e' of
     (bs@(_:_),e2) -> do
@@ -81,7 +82,7 @@ etaExpansionTL (TransformContext is0 ctx) (Let (NonRec i x) e) = do
 
 etaExpansionTL (TransformContext is0 ctx) (Let (Rec xes) e) = do
   let bndrs = map fst xes
-      ctx' = TransformContext (extendInScopeSetList is0 bndrs) (LetBody bndrs : ctx)
+      ctx' = TransformContext (InScopeSet.insertMany bndrs is0) (LetBody bndrs : ctx)
   e' <- etaExpansionTL ctx' e
   case stripLambda e' of
     (bs@(_:_),e2) -> do
@@ -100,7 +101,7 @@ etaExpansionTL (TransformContext is0 ctx) e
                     . inferCoreTypeOf tcm
                     ) e
         newId <- mkInternalVar is0 "arg" argTy
-        let ctx' = TransformContext (extendInScopeSet is0 newId) (LamBody newId : ctx)
+        let ctx' = TransformContext (InScopeSet.insert newId is0) (LamBody newId : ctx)
         e' <- etaExpansionTL ctx' (App e (Var newId))
         changed (Lam newId e')
       else return e

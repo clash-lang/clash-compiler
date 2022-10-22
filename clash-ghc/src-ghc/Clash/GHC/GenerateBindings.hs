@@ -68,16 +68,16 @@ import           Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 import           Clash.Annotations.Primitive (HDL, extractPrim)
 
 import           Clash.Core.Binding
+import           Clash.Core.InScopeSet (InScopeSet)
+import qualified Clash.Core.InScopeSet as InScopeSet
 import           Clash.Core.Subst        (extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term         (Term (..), mkLams, mkTyLams)
 import           Clash.Core.Type         (Type (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
 import           Clash.Core.TyCon        (TyConMap, TyConName, isNewTypeTc)
 import           Clash.Core.TysPrim      (tysPrimMap)
 import           Clash.Core.Util         (mkInternalVar, mkSelectorCase)
-import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope)
-import           Clash.Core.VarEnv
-  (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet
-  ,mkVarEnv, unionVarEnv, elemVarSet, mkVarSet)
+import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope, VarEnv)
+import qualified Clash.Core.VarSet as VarSet
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug             (traceIf)
 import           Clash.Driver            (compilePrimitive)
@@ -141,13 +141,13 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
       tcCache                       = makeAllTyCons tcMap' fiEnvs
       allTcCache                    = tysPrimMap <> tcCache
-      inScope0 = mkInScopeSet (
+      inScope0 = InScopeSet.fromVarSet (
                       (fmap (coerce . bindingId) bindingsMap) <>
                       (fmap (coerce . bindingId) clsMap))
                                     -- Recursion info is always False for class
                                     -- selectors, no need to check free vars.
       clsMap                        = fmap (\(v,i) -> (Binding v GHC.noSrcSpan GHC.Inline IsFun (mkClassSelector inScope0 allTcCache (varType v) i) False)) clsVMap
-      allBindings                   = bindingsMap `unionVarEnv` clsMap
+      allBindings                   = bindingsMap <> clsMap
       topEntities'                  =
         (\m -> fst (RWS.evalRWS m (GHC2CoreEnv GHC.noSrcSpan fiEnvs) tcMap')) $
           mapM (\(topEnt,annM,isTb) -> do
@@ -191,10 +191,10 @@ setNoInlineTopEntities
 setNoInlineTopEntities bm tes =
   fmap go bm
  where
-  ids = mkVarSet (fmap topId tes)
+  ids = VarSet.fromList (fmap topId tes)
 
   go b@Binding{bindingId}
-    | bindingId `elemVarSet` ids = b { bindingSpec = GHC.NoInline }
+    | bindingId `VarSet.elem` ids = b { bindingSpec = GHC.NoInline }
     | otherwise = b
 
 -- TODO This function should be changed to provide the information that
@@ -242,7 +242,7 @@ mkBindings primMap bindings clsOps unlocatable = do
         -- See NOTE [bindings in recursive groups]
         _ -> let vsL   = map (setIdScope LocalId . bindingId) tms
                  vsV   = map Var vsL
-                 subst = extendGblSubstList (mkSubst emptyInScopeSet) (zip vsL vsV)
+                 subst = extendGblSubstList (mkSubst mempty) (zip vsL vsV)
                  lbs   = zipWith (\b vL -> (vL,substTm "mkBindings" subst (bindingTerm b))) tms vsL
                  tms1  = zipWith (\b (i, _) -> (bindingId b, b { bindingTerm = Letrec lbs (Var i), bindingRecursive = False })) tms lbs
              in  return tms1
@@ -252,7 +252,7 @@ mkBindings primMap bindings clsOps unlocatable = do
                           return (v', (v',i))
                        ) clsOps
 
-  return (mkVarEnv (concat bindingsList), mkVarEnv clsOpList)
+  return (UniqMap.fromList (concat bindingsList), UniqMap.fromList clsOpList)
 
 {-
 NOTE [bindings in recursive groups]
@@ -363,7 +363,7 @@ mkClassSelector inScope0 tcm ty sel = newExpr
         , not (isNewTypeTc tc)
         -> flip State.evalState (0 :: Int) $ do
                           dcId <- mkInternalVar inScope0 "dict" dictTy
-                          let inScope1 = extendInScopeSet inScope0 dcId
+                          let inScope1 = InScopeSet.insert dcId inScope0
                           selE <- mkSelectorCase "mkClassSelector" inScope1 tcm (Var dcId) 1 sel
                           return (mkTyLams (mkLams selE [dcId]) tvs)
       (FunTy arg res) -> flip State.evalState (0 :: Int) $ do

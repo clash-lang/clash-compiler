@@ -61,6 +61,8 @@ import Clash.Core.FreeVars
   (countFreeOccurances, freeLocalIds)
 import Clash.Core.HasFreeVars
 import Clash.Core.HasType
+import Clash.Core.InScopeSet (InScopeSet)
+import qualified Clash.Core.InScopeSet as InScopeSet
 import Clash.Core.Name (Name(..), NameSort(..))
 import Clash.Core.Pretty (PrettyOptions(..), showPpr, showPpr')
 import Clash.Core.Subst
@@ -71,12 +73,10 @@ import Clash.Core.TermInfo (isLocalVar, termSize)
 import Clash.Core.Type
   (TypeView(..), isClassTy, isPolyFunCoreTy, tyView)
 import Clash.Core.Util (isSignalType, primUCo)
-import Clash.Core.Var (Id, Var(..), isGlobalId, isLocalId)
-import Clash.Core.VarEnv
-  ( InScopeSet, VarEnv, VarSet, elemUniqInScopeSet, elemVarEnv, elemVarSet
-  , eltsVarEnv, emptyVarEnv, extendInScopeSetList, extendVarEnv
-  , foldlWithUniqueVarEnv', lookupVarEnv, lookupVarEnvDirectly, mkVarEnv
-  , notElemVarSet, unionVarEnv, unionVarEnvWith, unitVarSet)
+import Clash.Core.Var (Id, Var(..), isGlobalId, isLocalId, VarEnv)
+import Clash.Core.VarSet (VarSet)
+import qualified Clash.Core.VarSet as VarSet
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug (trace)
 import Clash.Netlist.Util (representableType)
 import Clash.Primitives.Types
@@ -154,15 +154,15 @@ reduceBindersCleanup
   -> Unique
   -- ^ The unique of the let-binding that we want to simplify
   -> Int
-  -- ^ Ignore, artifact of 'foldlWithUniqueVarEnv'
+  -- ^ Ignore, artifact of 'UnqiMap.foldlWithUnique'
   -> (Maybe Subst,VarEnv Int,VarEnv ((Id,Term),VarEnv Int,Mark))
   -- ^ Same as the third argument
 reduceBindersCleanup isN origInl (!substM,!substFVs,!doneInl) u _ =
-  case lookupVarEnvDirectly u doneInl of
-    Nothing -> case lookupVarEnvDirectly u origInl of
+  case UniqMap.lookup u doneInl of
+    Nothing -> case UniqMap.lookup u origInl of
       Nothing ->
         -- let-binding not found, cannot extend the substitution
-        if elemUniqInScopeSet u isN then
+        if InScopeSet.elem u isN then
           (substM,substFVs,doneInl)
         else
           error [I.i|
@@ -173,7 +173,7 @@ reduceBindersCleanup isN origInl (!substM,!substFVs,!doneInl) u _ =
       Just ((v,e),eFVs) ->
         -- Simplify the transitive dependencies
         let (sM,substFVsE,doneInl1) =
-              foldlWithUniqueVarEnv'
+              UniqMap.foldlWithUnique'
                 (reduceBindersCleanup isN origInl)
                 ( Nothing
                 -- It's okay/needed to over-approximate the free variables of
@@ -190,11 +190,11 @@ reduceBindersCleanup isN origInl (!substM,!substFVs,!doneInl) u _ =
                 -- Temporarily extend the processing environment with the
                 -- let-binding so we don't end up in a loop in case there is a
                 -- recursive group.
-                , extendVarEnv v ((v,e),eFVs,Temp) doneInl)
+                , UniqMap.insert v ((v,e),eFVs,Temp) doneInl)
                 eFVs
 
             e1 = maybeSubstTm "reduceBindersCleanup" sM e
-        in  if v `elemVarEnv` substFVsE then
+        in  if v `UniqMap.elem` substFVsE then
               -- We cannot inline recursive let-bindings, so we do not extend
               -- the substitution environment.
               ( substM
@@ -202,20 +202,20 @@ reduceBindersCleanup isN origInl (!substM,!substFVs,!doneInl) u _ =
               -- And we explicitly mark the let-binding as recursive in the
               -- processing environment. So that it will be kept around at the
               -- end of 'inlineCleanup'
-              , extendVarEnv v ((v,e1),substFVsE,Rec) doneInl1
+              , UniqMap.insert v ((v,e1),substFVsE,Rec) doneInl1
               )
             else
               -- Extend the substitution
               ( Just (extendIdSubst (Maybe.fromMaybe (mkSubst isN) substM) v e1)
-              , unionVarEnv substFVsE substFVs
+              , substFVsE <> substFVs
               -- Mark the let-binding a fully "reduced", so we don't repeat
               -- this process when we encounter it again.
-              , extendVarEnv v ((v,e1),substFVsE,Done) doneInl1
+              , UniqMap.insert v ((v,e1),substFVsE,Done) doneInl1
               )
     -- It's already been processed, just extend the substitution environment
     Just ((v,e),eFVs,Done) ->
       ( Just (extendIdSubst (Maybe.fromMaybe (mkSubst isN) substM) v e)
-      , unionVarEnv eFVs substFVs
+      , eFVs <> substFVs
       , doneInl
       )
 
@@ -255,17 +255,17 @@ inlineBndrsCleanup isN origInl = go
     -- recursive, then we have to keep those around as well, as we weren't able
     -- to inline them. Furthermore, for every recursive binder there might still
     -- be non-inlined variables left, see #1337.
-    flip map [ (ve, eFvs) | (ve,eFvs,Rec) <- eltsVarEnv doneInl ] $ \((v, e), eFvs) ->
+    flip map [ (ve, eFvs) | (ve,eFvs,Rec) <- UniqMap.elems doneInl ] $ \((v, e), eFvs) ->
       let
-        (substM, _, _) = foldlWithUniqueVarEnv'
-                           (reduceBindersCleanup isN emptyVarEnv)
-                           (Nothing, emptyVarEnv, doneInl)
+        (substM, _, _) = UniqMap.foldlWithUnique'
+                           (reduceBindersCleanup isN mempty)
+                           (Nothing, mempty, doneInl)
                            eFvs
       in (v, maybeSubstTm "inlineBndrsCleanup_0" substM e)
   go !doneInl_0 (((v,e),eFVs):il) =
-    let (sM,_,doneInl_1) = foldlWithUniqueVarEnv'
+    let (sM,_,doneInl_1) = UniqMap.foldlWithUnique'
                             (reduceBindersCleanup isN origInl)
-                            (Nothing, emptyVarEnv, doneInl_0)
+                            (Nothing, mempty, doneInl_0)
                             eFVs
         e1 = maybeSubstTm "inlineBndrsCleanup_1" sM e
     in  (v,e1):go doneInl_1 il
@@ -295,14 +295,14 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
   -- For all let-bindings, count the number of times they are referenced.
   -- We only inline let-bindings which are referenced only once, otherwise
   -- we would lose sharing.
-  let is1       = extendInScopeSetList is0 (map fst binds)
+  let is1       = InScopeSet.insertMany (map fst binds) is0
       bindsFvs  = map (\(v,e) -> (v,((v,e),countFreeOccurances e))) binds
-      allOccs   = List.foldl' (unionVarEnvWith (+)) emptyVarEnv
+      allOccs   = List.foldl' (UniqMap.unionWith (+)) mempty
                 $ map (snd.snd) bindsFvs
-      bodyFVs   = Lens.foldMapOf freeLocalIds unitVarSet body
+      bodyFVs   = Lens.foldMapOf freeLocalIds VarSet.singleton body
       (il,keep) = List.partition (isInteresting allOccs prims bodyFVs)
                                  bindsFvs
-      keep'     = inlineBndrsCleanup is1 (mkVarEnv il) emptyVarEnv
+      keep'     = inlineBndrsCleanup is1 (UniqMap.fromList il) mempty
                 $ map snd keep
 
   if | null il -> return  (Letrec binds body)
@@ -333,13 +333,13 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
       --
       -- In that case, there's no harm in inlining f_arg.
       | nameSort (varName id_) /= User
-      , id_ `notElemVarSet` bodyFVs
+      , id_ `VarSet.notElem` bodyFVs
       = case tm of
           Prim pInfo
             | let nm = primName pInfo
             , Just (extractPrim -> Just p@(BlackBox {})) <- HashMap.lookup nm prims
             , TExpr <- kind p
-            , Just occ <- lookupVarEnv id_ allOccs
+            , Just occ <- UniqMap.lookup id_ allOccs
             , occ < 2
             -> True
             | otherwise
@@ -351,7 +351,7 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
             , nameOcc nm == Text.showt ''SimIO.SimIO
             -> True
           _ -> False
-      | id_ `notElemVarSet` bodyFVs
+      | id_ `VarSet.notElem` bodyFVs
       = case tm of
           Prim pInfo
             | primName pInfo `elem`
@@ -359,7 +359,7 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
                         , Text.showt 'SimIO.getChar
                         , Text.showt 'SimIO.isEOF
                         ]
-            , Just occ <- lookupVarEnv id_ allOccs
+            , Just occ <- UniqMap.lookup id_ allOccs
             , occ < 2
             -> True
             | otherwise
@@ -420,7 +420,7 @@ collapseRHSNoops _ (Letrec binds body) = do
       return $ args !! i
 
     isNoop (Var i) = do
-      binding     <- MaybeT $ lookupVarEnv i <$> Lens.use bindings
+      binding     <- MaybeT $ UniqMap.lookup i <$> Lens.use bindings
       isRecursive <- lift $ isRecursiveBndr $ bindingId binding
       Monad.guard $ not isRecursive
       isNoop $ bindingTerm binding
@@ -511,7 +511,7 @@ inlineNonRepWorker e@(Case scrut altsTy alts)
       overLimit = notClassTy && (Maybe.fromMaybe 0 isInlined) > limit
 
 
-    bodyMaybe   <- lookupVarEnv f <$> Lens.use bindings
+    bodyMaybe   <- UniqMap.lookup f <$> Lens.use bindings
     nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator
                                               <*> Lens.view customReprs
                                               <*> pure False
@@ -572,7 +572,7 @@ inlineOrLiftNonRep ctx eLet@(Letrec _ body) =
           --    it makes CSE a whole lot more difficult.
           --
           -- XXX: Check whether we can extend this to the binders as well
-        , maybe False (>1) (lookupVarEnv id_ bodyFreeOccs)
+        , maybe False (>1) (UniqMap.lookup id_ bodyFreeOccs)
         ]
 
 inlineOrLiftNonRep _ e = return e
@@ -593,12 +593,12 @@ inlineSmall _ e@(collectArgsTicks -> (Var f,args,ticks)) = do
   untranslatable <- isUntranslatable True e
   topEnts <- Lens.view topEntities
   let lv = isLocalId f
-  if untranslatable || f `elemVarSet` topEnts || lv
+  if untranslatable || f `VarSet.elem` topEnts || lv
     then return e
     else do
       bndrs <- Lens.use bindings
       sizeLimit <- Lens.view inlineFunctionLimit
-      case lookupVarEnv f bndrs of
+      case UniqMap.lookup f bndrs of
         -- Don't inline recursive expressions
         Just b -> do
           isRecBndr <- isRecursiveBndr f
@@ -627,12 +627,12 @@ inlineWorkFree _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
     topEnts <- Lens.view topEntities
     let isSignal = isSignalType tcm eTy
     let lv = isLocalId f
-    let isTopEnt = elemVarSet f topEnts
+    let isTopEnt = VarSet.elem f topEnts
     if untranslatable || isSignal || argsHaveWork || lv || isTopEnt
       then return e
       else do
         bndrs <- Lens.use bindings
-        case lookupVarEnv f bndrs of
+        case UniqMap.lookup f bndrs of
           -- Don't inline recursive expressions
           Just b -> do
             isRecBndr <- isRecursiveBndr f
@@ -662,10 +662,10 @@ inlineWorkFree _ e@(Var f) = do
   untranslatable <- isUntranslatableType True fTy
   topEnts <- Lens.view topEntities
   let gv = isGlobalId f
-  if closed && f `notElemVarSet` topEnts && not untranslatable && not isSignal && gv
+  if closed && f `VarSet.notElem` topEnts && not untranslatable && not isSignal && gv
     then do
       bndrs <- Lens.use bindings
-      case lookupVarEnv f bndrs of
+      case UniqMap.lookup f bndrs of
         -- Don't inline recursive expressions
         Just top -> do
           isRecBndr <- isRecursiveBndr f

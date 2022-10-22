@@ -12,11 +12,11 @@ import           SrcLoc                  (noSrcSpan)
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
+import qualified Clash.Core.InScopeSet as InScopeSet
 import           Clash.Core.Name         (Name(..), NameSort(..))
 import           Clash.Core.Term         (Term(Var))
 import           Clash.Core.Type         (ConstTy(..), Type(ConstTy))
 import           Clash.Core.Subst
-import           Clash.Core.VarEnv
 import           Clash.Core.Var          (IdScope(..), Var(..))
 
 fakeName :: Name a
@@ -47,5 +47,5 @@ tests =
   testGroup
     "Clash.Tests.Core.Subst"
     [ testCase "deShadow type/term" $
-        term1 @=? deShadowTerm (extendInScopeSet emptyInScopeSet termVar) term1
+        term1 @=? deShadowTerm (InScopeSet.singleton termVar) term1
     ]

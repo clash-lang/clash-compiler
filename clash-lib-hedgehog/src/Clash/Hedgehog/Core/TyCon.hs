@@ -20,13 +20,14 @@ import qualified Hedgehog.Gen as Gen
 
 import Clash.Core.DataCon
 import Clash.Core.HasType
+import qualified Clash.Core.InScopeSet as InScopeSet
 import Clash.Core.Name (nameUniq)
 import Clash.Core.Subst
 import Clash.Core.TyCon
 import Clash.Core.Type (Kind, Type(VarTy), mkTyConApp, splitFunForallTy)
 import Clash.Core.TysPrim (liftedTypeKind, tysPrimMap)
 import Clash.Core.Var
-import Clash.Core.VarEnv
+import qualified Clash.Core.VarSet as VarSet
 import Clash.Data.UniqMap (UniqMap)
 import qualified Clash.Data.UniqMap as UniqMap
 
@@ -267,8 +268,8 @@ refineArg tcm free ty
 
        -- Substitute the removed free variable for the type constructor with
        -- any new free variables applied to it.
-       let inScope = extendInScopeSetList emptyInScopeSet (UniqMap.elems free'')
-       let substTv = unitVarEnv fv (mkTyConApp (tyConName tc) (fmap VarTy holeVars))
+       let inScope = InScopeSet.fromVarSet $ VarSet.fromList (UniqMap.elems free'')
+       let substTv = UniqMap.singleton fv (mkTyConApp (tyConName tc) (fmap VarTy holeVars))
        let subst = mkTvSubst inScope substTv
 
        -- Return the refined type and free variable environment.

@@ -28,9 +28,8 @@ module Clash.Core.Var
   , isGlobalId
   , isLocalId
   , attrName
-  )
-where
-
+  , VarEnv
+  ) where
 
 import Control.DeepSeq                  (NFData (..))
 import Data.Binary                      (Binary)
@@ -40,8 +39,10 @@ import GHC.Generics                     (Generic)
 import Clash.Core.Name                  (Name (..))
 import {-# SOURCE #-} Clash.Core.Term   (Term, TmName)
 import {-# SOURCE #-} Clash.Core.Type   (Kind, Type, TyName)
+import Clash.Data.UniqMap               (UniqMap)
 import Clash.Unique
 
+type VarEnv a = UniqMap a
 
 -- | Interal version of Clash.Annotations.SynthesisAttributes.Attr.
 --

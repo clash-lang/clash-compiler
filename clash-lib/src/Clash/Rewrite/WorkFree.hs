@@ -35,8 +35,8 @@ import Clash.Core.Term
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (isPolyFunTy)
 import Clash.Core.Util
-import Clash.Core.Var (Id, isLocalId)
-import Clash.Core.VarEnv (VarEnv, lookupVarEnv)
+import Clash.Core.Var (Id, isLocalId, VarEnv)
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Normalize.Primitives (removedArg)
 import Clash.Util (makeCachedU)
 
@@ -50,7 +50,7 @@ isWorkFreeBinder
   -> m Bool
 isWorkFreeBinder cache bndrs bndr =
   makeCachedU bndr cache $
-    case lookupVarEnv bndr bndrs of
+    case UniqMap.lookup bndr bndrs of
       Nothing -> error ("isWorkFreeBinder: couldn't find binder: " ++ showPpr bndr)
       Just (bindingTerm -> t) ->
         if bndr `globalIdOccursIn` t

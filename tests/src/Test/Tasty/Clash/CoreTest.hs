@@ -24,7 +24,7 @@ import Clash.Core.Name
 import Clash.Core.Term
 import Clash.Core.TyCon
 import Clash.Core.Var
-import Clash.Core.VarEnv
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types
 
 import Clash.GHC.GenerateBindings
@@ -72,9 +72,9 @@ findBinding
   -> (BindingMap Term, TyConMap, Supply)
   -> IO Term
 findBinding nm (bm, tcm, ids) =
-  case List.find byName (eltsVarEnv bm) of
+  case List.find byName (UniqMap.elems bm) of
     Just bd ->
-      let env = mkGlobalEnv bm tcm emptyInScopeSet ids 20 mempty 0
+      let env = mkGlobalEnv bm tcm mempty ids 20 mempty 0
        in fst <$> nf ghcEvaluator env False (bindingId bd) (bindingTerm bd)
 
     Nothing -> error ("Not in binding map: " <> show nm)

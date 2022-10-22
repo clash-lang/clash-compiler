@@ -194,6 +194,7 @@ Library
                       Clash.Core.FreeVars
                       Clash.Core.HasType
                       Clash.Core.HasFreeVars
+                      Clash.Core.InScopeSet
                       Clash.Core.Literal
                       Clash.Core.Name
                       Clash.Core.PartialEval
@@ -212,7 +213,7 @@ Library
                       Clash.Core.TysPrim
                       Clash.Core.Util
                       Clash.Core.Var
-                      Clash.Core.VarEnv
+                      Clash.Core.VarSet
 
                       Clash.Data.UniqMap
 

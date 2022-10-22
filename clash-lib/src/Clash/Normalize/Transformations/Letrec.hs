@@ -45,6 +45,8 @@ import Clash.Core.DataCon (DataCon(..))
 import Clash.Core.FreeVars (freeLocalIds)
 import Clash.Core.HasFreeVars
 import Clash.Core.HasType
+import Clash.Core.InScopeSet (InScopeSet)
+import qualified Clash.Core.InScopeSet as InScopeSet
 import Clash.Core.Name (mkUnsafeSystemName, nameOcc)
 import Clash.Core.Subst
 import Clash.Core.Term
@@ -58,9 +60,7 @@ import Clash.Core.Type
   , splitFunForallTy, tyView)
 import Clash.Core.Util (inverseTopSortLetBindings, mkVec, tyNatSize)
 import Clash.Core.Var (isGlobalId)
-import Clash.Core.VarEnv
-  ( InScopeSet, elemInScopeSet, emptyVarEnv, extendInScopeSetList, lookupVarEnv
-  , unionVarEnvWith, unitVarEnv, mkVarSet)
+import qualified Clash.Core.VarSet as VarSet
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Netlist.BlackBox.Types ()
 import Clash.Netlist.BlackBox.Util (getUsedArguments)
@@ -144,7 +144,7 @@ removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
              else return  (Left tm : args'')
 
 removeUnusedExpr _ e@(Case _ _ [(DataPat _ [] xs,altExpr)]) =
-  if mkVarSet xs `disjointFreeVars` altExpr
+  if VarSet.fromList xs `disjointFreeVars` altExpr
      then changed altExpr
      else return e
 
@@ -179,17 +179,17 @@ removeUnusedExpr _ e = return e
 flattenLet :: HasCallStack => NormRewrite
 flattenLet ctx@(TransformContext is0 _) (Letrec binds0 body0@Letrec{}) = do
   -- deshadow binds1, so binds0 and binds1 don't conflict when merged
-  let is1 = extendInScopeSetList is0 (fmap fst binds0)
+  let is1 = InScopeSet.insertMany (fmap fst binds0) is0
       Letrec binds1 body1 = deShadowTerm is1 body0
 
   setChanged
   flattenLet ctx{tfInScope=is1} (Letrec (binds0 <> binds1) body1)
 
 flattenLet (TransformContext is0 _) (Letrec binds body) = do
-  let is1 = extendInScopeSetList is0 (map fst binds)
+  let is1 = InScopeSet.insertMany (map fst binds) is0
       bodyOccs = Lens.foldMapByOf
-                   freeLocalIds (unionVarEnvWith (+))
-                   emptyVarEnv (`unitVarEnv` (1 :: Int))
+                   freeLocalIds (UniqMap.unionWith (+))
+                   mempty (`UniqMap.singleton` (1 :: Int))
                    body
   (is2,binds1) <- second concat <$> List.mapAccumLM go is1 binds
   bndrs <- Lens.use bindings
@@ -200,7 +200,7 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
   case binds1 of
     -- inline binders into the body when there's only a single binder, and only
     -- if that binder doesn't perform any work or is only used once in the body
-    [(id1,e1)] | Just occ <- lookupVarEnv id1 bodyOccs, e1WorkFree || occ < 2 ->
+    [(id1,e1)] | Just occ <- UniqMap.lookup id1 bodyOccs, e1WorkFree || occ < 2 ->
       if id1 `elemFreeVars` e1
          -- Except when the binder is recursive!
          then return (Letrec binds1 body)
@@ -220,14 +220,14 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
             --
             -- This is much better than blindly calling freshenTm, and saves
             -- almost 30% run-time of the normalization phase on some examples.
-            if any (`elemInScopeSet` isN) bs1 then
+            if any (`InScopeSet.elem` isN) bs1 then
               let Letrec bindsN bodyN = deShadowTerm isN (Letrec binds1 body1)
-              in  (bindsN,bodyN,extendInScopeSetList isN (map fst bindsN))
+              in  (bindsN,bodyN,InScopeSet.insertMany (map fst bindsN) isN)
             else
-              (binds1,body1,extendInScopeSetList isN bs1)
+              (binds1,body1,InScopeSet.insertMany bs1 isN)
       let bodyOccs = Lens.foldMapByOf
-                       freeLocalIds (unionVarEnvWith (+))
-                       emptyVarEnv (`unitVarEnv` (1 :: Int))
+                       freeLocalIds (UniqMap.unionWith (+))
+                       mempty (`UniqMap.singleton` (1 :: Int))
                        body2
           (srcTicks,nmTicks) = partitionTicks ticks
       bndrs <- Lens.use bindings
@@ -240,7 +240,7 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
         -- inline binders into the body when there's only a single binder, and
         -- only if that binder doesn't perform any work or is only used once in
         -- the body
-        [(id2,e2)] | Just occ <- lookupVarEnv id2 bodyOccs, e2WorkFree || occ < 2 ->
+        [(id2,e2)] | Just occ <- UniqMap.lookup id2 bodyOccs, e2WorkFree || occ < 2 ->
           if id2 `elemFreeVars` e2
              -- Except when the binder is recursive!
              then changed ([(id2,e2),(id1, body2)])
@@ -272,7 +272,7 @@ recToLetRec (TransformContext is0 []) e = do
           resV              = Var res
       case (toInline,others) of
         (_:_,_:_) -> do
-          let is1          = extendInScopeSetList is0 (args ++ map fst bndrs)
+          let is1          = InScopeSet.insertMany (args ++ map fst bndrs) is0
           let substsInline = extendIdSubstList (mkSubst is1)
                            $ map (second (const resV)) toInline
               others'      = map (second (substTm "recToLetRec" substsInline))
@@ -386,7 +386,7 @@ recToLetRec _ e = return e
 simpleCSE :: HasCallStack => NormRewrite
 simpleCSE (TransformContext is0 _) term@Letrec{} = do
   let Letrec bndrs body = inverseTopSortLetBindings term
-  let is1 = extendInScopeSetList is0 (map fst bndrs)
+  let is1 = InScopeSet.insertMany (map fst bndrs) is0
   ((subst,bndrs1), change) <- listen $ reduceBinders (mkSubst is1) [] bndrs
   -- TODO: check whether a substitution over the body is enough, the reason I'm
   -- doing a substitution over the the binders as well is that I don't know in
@@ -430,7 +430,7 @@ topLet (TransformContext is0 ctx) e@(Letrec binds body)
       then return e
       else do
         tcm <- Lens.view tcCache
-        let is2 = extendInScopeSetList is0 (fmap fst binds)
+        let is2 = InScopeSet.insertMany (fmap fst binds) is0
         argId <- mkTmBinderFor is2 tcm (mkUnsafeSystemName "result" 0) body
 
         -- TODO We would like this to be

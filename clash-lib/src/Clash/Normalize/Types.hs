@@ -21,8 +21,7 @@ import Data.Text                  (Text)
 import Clash.Core.Binding     (BindingMap)
 import Clash.Core.Term        (Term)
 import Clash.Core.Type        (Type)
-import Clash.Core.Var         (Id)
-import Clash.Core.VarEnv      (VarEnv)
+import Clash.Core.Var         (Id, VarEnv)
 import Clash.Rewrite.Types    (Rewrite, RewriteMonad)
 
 -- | State of the 'NormalizeMonad'

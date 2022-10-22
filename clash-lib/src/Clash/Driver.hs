@@ -115,9 +115,8 @@ import           Clash.Core.Type
 import           Clash.Core.TyCon                 (TyConMap)
 import           Clash.Core.Util                  (shouldSplit)
 import           Clash.Core.Var
-  (Id, varName, varUniq, varType)
-import           Clash.Core.VarEnv
-  (elemVarEnv, emptyVarEnv, lookupVarEnv, lookupVarEnv', mkVarEnv, lookupVarEnvDirectly, eltsVarEnv, VarEnv)
+  (Id, varName, varUniq, varType, VarEnv)
+import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug                      (debugIsOn)
 import           Clash.Driver.Types
 import           Clash.Driver.Manifest
@@ -235,7 +234,7 @@ splitTopEntityT
   -> TopEntityT
   -> TopEntityT
 splitTopEntityT tcm bindingsMap tt@(TopEntityT id_ (Just t@(Synthesize {})) _) =
-  case lookupVarEnv id_ bindingsMap of
+  case UniqMap.lookup id_ bindingsMap of
     Just (Binding _id sp _ _ _ _) ->
       tt{topAnnotation=Just (splitTopAnn tcm sp (coreTypeOf id_) t)}
     Nothing ->
@@ -340,7 +339,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
     -- TODO This is here because of some minimal effort refactoring. At some
     -- point generateHDL should be better laid out so this can be closer to
     -- the few places it is needed.
-    let topEntityMap = mkVarEnv (fmap (\x -> (topId x, x)) topEntities1)
+    let topEntityMap = UniqMap.fromList (fmap (\x -> (topId x, x)) topEntities1)
 
     -- Data which is updated and used when updating the different top entities
     -- is kept in an MVar.
@@ -380,7 +379,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
   modifyMVar_ seenV $ \seen ->
     pure $! State.execState (Id.addRaw (Data.Text.pack modName1)) seen
 
-  let topNm = lookupVarEnv' compNames topEntity
+  let topNm = UniqMap.find topEntity compNames
       (modNameS, fmap Data.Text.pack -> prefixM) = prefixModuleName (hdlKind (undefined :: backend)) (opt_componentPrefix opts) annM modName1
       modNameT  = Data.Text.pack modNameS
       hdlState' = setDomainConfigurations domainConfs
@@ -398,7 +397,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
   (userModifications, maybeManifest, topHash) <-
     readFreshManifest topEntities0 (bindingsMap, topEntity) primMap opts clashModDate manPath
 
-  let topEntityNames = map topId (eltsVarEnv topEntityMap)
+  let topEntityNames = map topId (UniqMap.elems topEntityMap)
 
   case maybeManifest of
     Just manifest0@Manifest{fileNames} | Just [] <- userModifications -> do
@@ -497,7 +496,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
 
       let
         depUniques = fromMaybe [] (HashMap.lookup (getUnique topEntity) deps)
-        depBindings = mapMaybe (flip lookupVarEnvDirectly bindingsMap) depUniques
+        depBindings = mapMaybe (flip UniqMap.lookup bindingsMap) depUniques
         depIds = map bindingId depBindings
 
         manifest =
@@ -1079,7 +1078,7 @@ normalizeEntity env bindingsMap typeTrans peEval eval topEntities supply tm = tr
                 cleaned <- cleanupGraph tm normChecked
                 return cleaned
     transformedBindings = runNormalization env supply bindingsMap
-                            typeTrans peEval eval emptyVarEnv
+                            typeTrans peEval eval mempty
                             topEntities doNorm
 
 -- | topologically sort the top entities
@@ -1103,7 +1102,7 @@ sortTop bindingsMap topEntities =
     let cg = callGraph bindingsMap i_
     in
       filter
-        (\t -> topId t /= top && topId t /= i_ && topId t `elemVarEnv` cg)
+        (\t -> topId t /= top && topId t /= i_ && topId t `UniqMap.elem` cg)
         topEntities
 
   mapFrom = HashMap.fromListWith mappend . fmap (fmap pure)

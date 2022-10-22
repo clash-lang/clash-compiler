@@ -80,14 +80,16 @@ import           GHC.TypeLits
   (TypeError, ErrorMessage (Text, (:<>:)))
 
 import           Clash.Core.HasFreeVars
+import           Clash.Core.InScopeSet (InScopeSet)
+import qualified Clash.Core.InScopeSet as InScopeSet
 import           Clash.Core.Pretty         (ppr, fromPpr)
 import           Clash.Core.Rename
 import           Clash.Core.Term
   (Bind(..), Pat (..), Term (..), TickInfo (..), PrimInfo(primName))
 import           Clash.Core.Type           (Type (..))
-import           Clash.Core.VarEnv
-import           Clash.Core.Var            (Id, Var (..), TyVar, isGlobalId)
-import qualified Clash.Data.UniqMap as UniqMap
+import qualified Clash.Core.VarSet as VarSet
+import           Clash.Core.Var            (Id, Var (..), TyVar, VarEnv, isGlobalId)
+import qualified Clash.Data.UniqMap as VarEnv
 import           Clash.Debug               (debugIsOn)
 import           Clash.Util
 import           Clash.Pretty
@@ -100,7 +102,7 @@ import           Clash.Pretty
 -- See 'TvSubst' for the invariants that must hold
 --
 -- This invariant allows a short-cut when the subst env is empty: if the
--- TvSubstEnv is empty, i.e. @nullVarEnv TvSubstEnv@ holds, then
+-- TvSubstEnv is empty, i.e. @VarEnv.null TvSubstEnv@ holds, then
 -- (substTy subst ty) does nothing.
 --
 -- For example, consider:
@@ -236,20 +238,20 @@ data Subst
 
 emptySubst
   :: Subst
-emptySubst = Subst emptyInScopeSet emptyVarEnv emptyVarEnv emptyVarEnv
+emptySubst = Subst mempty mempty mempty mempty
 
 -- | An empty substitution, starting the variables currently in scope
 mkSubst
   :: InScopeSet
   -> Subst
-mkSubst is = Subst is emptyVarEnv emptyVarEnv emptyVarEnv
+mkSubst is = Subst is mempty mempty mempty
 
 -- | Create a type substitution
 mkTvSubst
   :: InScopeSet
   -> VarEnv Type
   -> Subst
-mkTvSubst is env = Subst is emptyVarEnv env emptyVarEnv
+mkTvSubst is env = Subst is mempty env mempty
 
 -- | Generates the in-scope set for the 'Subst' from the types in the incoming
 -- environment.
@@ -265,7 +267,7 @@ zipTvSubst tvs tys
   , not (List.equalLength tvs tys)
   = pprTrace "zipTvSubst" (ppr tvs <> line <> ppr tys) emptySubst
   | otherwise
-  = Subst (mkInScopeSet (freeVarsOf tys)) emptyVarEnv tenv emptyVarEnv
+  = Subst (InScopeSet.fromVarSet (freeVarsOf tys)) mempty tenv mempty
  where
   tenv = zipTyEnv tvs tys
 
@@ -273,7 +275,7 @@ zipTyEnv
   :: [TyVar]
   -> [Type]
   -> VarEnv Type
-zipTyEnv tvs tys = mkVarEnv (List.zipEqual tvs tys)
+zipTyEnv tvs tys = VarEnv.fromList (List.zipEqual tvs tys)
 
 -- | Extend the substitution environment with a new 'Id' substitution
 extendIdSubst
@@ -282,7 +284,7 @@ extendIdSubst
   -> Term
   -> Subst
 extendIdSubst (Subst is env tenv genv) i e =
-  Subst is (extendVarEnv i e env) tenv genv
+  Subst is (VarEnv.insert i e env) tenv genv
 
 -- | Extend the substitution environment with a list of 'Id' substitutions
 extendIdSubstList
@@ -290,7 +292,7 @@ extendIdSubstList
   -> [(Id,Term)]
   -> Subst
 extendIdSubstList (Subst is env tenv genv) es =
-  Subst is (extendVarEnvList env es) tenv genv
+  Subst is (VarEnv.insertMany es env) tenv genv
 
 -- | Extend the substitution environment with a list of global 'Id' substitutions
 extendGblSubstList
@@ -298,7 +300,7 @@ extendGblSubstList
   -> [(Id,Term)]
   -> Subst
 extendGblSubstList (Subst is env tenv genv) es =
-  Subst is env tenv (extendVarEnvList genv es)
+  Subst is env tenv (VarEnv.insertMany es genv)
 
 -- | Extend the substitution environment with a new 'TyVar' substitution
 extendTvSubst
@@ -307,7 +309,7 @@ extendTvSubst
   -> Type
   -> Subst
 extendTvSubst (Subst is env tenv genv) tv t =
-  Subst is env (extendVarEnv tv t tenv) genv
+  Subst is env (VarEnv.insert tv t tenv) genv
 
 -- | Extend the substitution environment with a list of 'TyVar' substitutions
 extendTvSubstList
@@ -315,7 +317,7 @@ extendTvSubstList
   -> [(TyVar, Type)]
   -> Subst
 extendTvSubstList (Subst is env tenv genv) ts =
-  Subst is env (extendVarEnvList tenv ts) genv
+  Subst is env (VarEnv.insertMany ts tenv) genv
 
 -- | Add an 'Id' to the in-scope set: as a side effect, remove any existing
 -- substitutions for it.
@@ -326,8 +328,8 @@ extendInScopeId
 extendInScopeId (Subst inScope env tenv genv) id' =
   Subst inScope' env' tenv genv
  where
-  inScope' = extendInScopeSet inScope id'
-  env'     = delVarEnv env id'
+  inScope' = InScopeSet.insert id' inScope
+  env'     = VarEnv.delete id' env
 
 -- | Add 'Id's to the in-scope set. See also 'extendInScopeId'
 extendInScopeIdList
@@ -337,8 +339,8 @@ extendInScopeIdList
 extendInScopeIdList (Subst inScope env tenv genv) ids =
   Subst inScope' env' tenv genv
  where
-  inScope' = extendInScopeSetList inScope ids
-  env'     = delVarEnvList env ids
+  inScope' = InScopeSet.insertMany ids inScope
+  env'     = VarEnv.deleteMany ids env
 
 -- | Substitute within a 'Type'
 --
@@ -350,7 +352,7 @@ substTy
   -> Type
   -> Type
 substTy (Subst inScope _ tvS _) ty
-  | nullVarEnv tvS
+  | VarEnv.null tvS
   = ty
   | otherwise
   = checkValidSubst s' [ty] (substTy' s' ty)
@@ -375,7 +377,7 @@ substTyUnchecked
   -> Type
   -> Type
 substTyUnchecked subst@(TvSubst _ tvS) ty
-  | nullVarEnv tvS
+  | VarEnv.null tvS
   = ty
   | otherwise
   = substTy' subst ty
@@ -395,7 +397,7 @@ substGlobalsInExistentials is exts substs0 = result
   -- TODO: Is is actually possible that existentials shadow each other? If they
   -- TODO: can't, we can remove this function
   where
-    iss     = scanl extendInScopeSet is exts
+    iss     = scanr InScopeSet.insert is exts
     substs1 = map (\is_ -> extendTvSubstList (mkSubst is_) substs0) iss
     result  = zipWith substTyInVar substs1 exts
 
@@ -458,10 +460,10 @@ checkValidSubst subst@(TvSubst inScope tenv) tys a =
        "needsInScope" <+> clashPretty needsInScope)
   a
  where
-  needsInScope = UniqMap.foldrWithUnique (\k _ s -> delVarSetByKey k s)
+  needsInScope = VarEnv.foldrWithUnique (\k _ s -> VarSet.delete k s)
                    (freeVarsOf tys)
                    tenv
-  tysFVsInSope = needsInScope `varSetInScope` inScope
+  tysFVsInSope = needsInScope `InScopeSet.varSetInScope` inScope
 
 -- | When calling 'substTy' it should be the case that the in-scope set in the
 -- substitution is a superset of the free variables of the range of the
@@ -471,7 +473,7 @@ checkValidSubst subst@(TvSubst inScope tenv) tys a =
 isValidSubst
   :: TvSubst
   -> Bool
-isValidSubst (TvSubst inScope tenv) = tenvFVs `varSetInScope` inScope
+isValidSubst (TvSubst inScope tenv) = tenvFVs `InScopeSet.varSetInScope` inScope
  where
   tenvFVs = freeVarsOf tenv
 
@@ -496,7 +498,7 @@ substTyVar
   :: TvSubst
   -> TyVar
   -> Type
-substTyVar (TvSubst _ tenv) tv = case lookupVarEnv tv tenv of
+substTyVar (TvSubst _ tenv) tv = case VarEnv.lookup tv tenv of
   Just ty -> ty
   _       -> VarTy tv
 
@@ -512,13 +514,13 @@ substTyVarBndr subst@(TvSubst inScope tenv) oldVar =
   ASSERT2( no_capture, clashPretty oldVar <> line
                     <> clashPretty newVar <> line
                     <> clashPretty subst )
-  (TvSubst (inScope `extendInScopeSet` newVar) newEnv, newVar)
+  (TvSubst (InScopeSet.insert newVar inScope) newEnv, newVar)
  where
-  newEnv | noChange  = delVarEnv tenv oldVar
-         | otherwise = extendVarEnv oldVar (VarTy newVar) tenv
+  newEnv | noChange  = VarEnv.delete oldVar tenv
+         | otherwise = VarEnv.insert oldVar (VarTy newVar) tenv
 
   -- Assertion that we're not capturing something in the substitution
-  no_capture = not (newVar `elemVarSet` freeVarsOf tenv)
+  no_capture = not (newVar `VarSet.elem` freeVarsOf tenv)
 
   oldKi        = varType oldVar
   -- verify that the kind is closed
@@ -537,8 +539,8 @@ substTyVarBndr subst@(TvSubst inScope tenv) oldVar =
   noChange     = noKindChange && (newVar == oldVar)
 
   -- uniqAway ensures that the new variable is not already in scope
-  newVar | noKindChange = uniqAway inScope oldVar
-         | otherwise    = uniqAway inScope
+  newVar | noKindChange = InScopeSet.uniqAway inScope oldVar
+         | otherwise    = InScopeSet.uniqAway inScope
                             (oldVar {varType = substTyUnchecked subst oldKi})
 
 -- | Substitute within a 'Term'. Just return original term if given
@@ -616,10 +618,10 @@ lookupIdSubst
   -> Id
   -> Term
 lookupIdSubst doc (Subst inScope tmS _ genv) v
-  | isGlobalId v = case lookupVarEnv v genv of
+  | isGlobalId v = case VarEnv.lookup v genv of
                      Just e -> e
                      _      -> Var v
-  | Just e <- lookupVarEnv v tmS = e
+  | Just e <- VarEnv.lookup v tmS = e
   -- Vital! See 'IdSubstEnv' Note [Extending the Subst]
   --
   -- TODO: We match on Id here to workaround an issue where type variables
@@ -628,7 +630,7 @@ lookupIdSubst doc (Subst inScope tmS _ genv) v
   -- TODO:
   -- TODO:   https://github.com/clash-lang/clash-compiler/issues/1046
   -- TODO:
-  | Just v'@(Id {}) <- lookupInScope inScope v = Var (coerce v')
+  | Just v'@(Id {}) <- InScopeSet.lookup v inScope = Var (coerce v')
   | otherwise = WARN(True, "Subst.lookupIdSubst" <+> doc <+> fromPpr v)
                 Var v
 
@@ -641,14 +643,14 @@ substIdBndr
   -> Id
   -> (Subst,Id)
 substIdBndr subst@(Subst inScope env tenv genv) oldId =
-  (Subst (inScope `extendInScopeSet` newId) newEnv tenv genv, newId)
+  (Subst (InScopeSet.insert newId inScope) newEnv tenv genv, newId)
  where
-  id1 = uniqAway inScope oldId
+  id1 = InScopeSet.uniqAway inScope oldId
   newId | noTypeChange = id1
         | otherwise    = id1 {varType = substTy subst (varType id1)}
 
   oldTy = varType oldId
-  noTypeChange = nullVarEnv tenv || isClosed oldTy
+  noTypeChange = VarEnv.null tenv || isClosed oldTy
 
   -- Extend the substitution if the unique has changed.
   --
@@ -659,8 +661,8 @@ substIdBndr subst@(Subst inScope env tenv genv) oldId =
   --   (\x.e) with subst = [x | -> e']
   --
   -- Here we must simply zap the substitution for x
-  newEnv | noChange  = delVarEnv env oldId
-         | otherwise = extendVarEnv oldId (Var newId) env
+  newEnv | noChange  = VarEnv.delete oldId env
+         | otherwise = VarEnv.insert oldId (Var newId) env
 
   -- See Note [Extending the Subst] why it's not necessary to check noTypeChange
   noChange = id1 == oldId
@@ -784,7 +786,7 @@ freshenTm is0 = go (mkSubst is0) where
   goBind subst0 (NonRec i x) =
     let (subst1, i') = substIdBndr subst0 i
         (is2, x') = go subst0 x
-     in (subst1 { substInScope = extendInScopeSet is2 i' }, NonRec i' x')
+     in (subst1 { substInScope = InScopeSet.insert i' is2 }, NonRec i' x')
 
   goBind subst0 (Rec xs) =
     let (bndrs,rhss)    = unzip xs
@@ -814,7 +816,7 @@ aeqType
   -> Bool
 aeqType t1 t2 = acmpType' rnEnv t1 t2 == EQ
  where
-  rnEnv = mkRnEnv (mkInScopeSet (freeVarsOf [t1,t2]))
+  rnEnv = mkRnEnv (InScopeSet.fromVarSet (freeVarsOf [t1,t2]))
 
 -- | Alpha comparison for types
 acmpType
@@ -823,7 +825,7 @@ acmpType
   -> Ordering
 acmpType t1 t2 = acmpType' (mkRnEnv inScope) t1 t2
  where
-  inScope = mkInScopeSet (freeVarsOf [t1,t2])
+  inScope = InScopeSet.fromVarSet (freeVarsOf [t1,t2])
 
 -- | Alpha comparison for types. Faster than 'acmpType' as it doesn't need to
 -- calculate the free variables to create the 'InScopeSet'
@@ -876,7 +878,7 @@ aeqTerm
   -> Bool
 aeqTerm t1 t2 = aeqTerm' inScope t1 t2
  where
-  inScope = mkInScopeSet (freeVarsOf [t1,t2])
+  inScope = InScopeSet.fromVarSet (freeVarsOf [t1,t2])
 
 -- | Alpha equality for terms. Faster than 'aeqTerm' as it doesn't need to
 -- calculate the free variables to create the 'InScopeSet'
@@ -895,7 +897,7 @@ acmpTerm
   -> Ordering
 acmpTerm t1 t2 = acmpTerm' inScope t1 t2
  where
-  inScope = mkInScopeSet (freeVarsOf [t1,t2])
+  inScope = InScopeSet.fromVarSet (freeVarsOf [t1,t2])
 
 -- | Alpha comparison for types. Faster than 'acmpTerm' as it doesn't need to
 -- calculate the free variables to create the 'InScopeSet'

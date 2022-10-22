@@ -57,6 +57,8 @@ import           Unique                           (getKey)
 
 import           Clash.Core.DataCon               (DataCon)
 import           Clash.Core.HasType
+import           Clash.Core.InScopeSet            (InScopeSet)
+import qualified Clash.Core.InScopeSet as InScopeSet
 import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Name
   (nameOcc, Name(..), mkUnsafeSystemName)
@@ -76,8 +78,6 @@ import           Clash.Core.Util
   (appendToVec, extractElems, extractTElems, mkRTree,
    mkUniqInternalId, mkUniqSystemTyVar, mkVec, dataConInstArgTys, primCo)
 import           Clash.Core.Var                   (mkTyVar, mkLocalId)
-import           Clash.Core.VarEnv
-  (InScopeSet, extendInScopeSetList)
 import qualified Clash.Data.UniqMap as UniqMap
 import qualified Clash.Normalize.Primitives as NP (undefined)
 import {-# SOURCE #-} Clash.Normalize.Strategy
@@ -366,7 +366,7 @@ reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
       = do
         uniqs0 <- Lens.use uniqSupply
         fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
-        let is1 = extendInScopeSetList is0 (collectTermIds fun1)
+        let is1 = InScopeSet.insertMany (collectTermIds fun1) is0
             (uniqs1,nTv) = mkUniqSystemTyVar (uniqs0,is1) ("n",typeNatKind)
             (uniqs2,(vars,elems)) = second (second concat . unzip)
                                   $ uncurry extractElems uniqs1 consCon argElTy 'I' n arg
@@ -413,7 +413,7 @@ reduceIterateI (TransformContext is0 ctx) n aTy vTy f0 a = do
   -- Generate uniq ids for element assignments.
   uniqs0 <- Lens.use uniqSupply
   let
-    is1 = extendInScopeSetList is0 (collectTermIds f1)
+    is1 = InScopeSet.insertMany (collectTermIds f1) is0
     ((uniqs1, _is2), elementIds) =
       mapAccumR
         mkUniqInternalId
@@ -466,7 +466,7 @@ reduceTraverse (TransformContext is0 ctx) n aTy fTy bTy dict fun arg = do
       = do
         uniqs0 <- Lens.use uniqSupply
         fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
-        let is1 = extendInScopeSetList is0 (collectTermIds fun1)
+        let is1 = InScopeSet.insertMany (collectTermIds fun1) is0
             (Just apDictTc)    = UniqMap.lookup apDictTcNm tcm
             [apDictCon]        = tyConDataCons apDictTc
             (Just apDictIdTys) = dataConInstArgTys apDictCon [fTy]
@@ -644,7 +644,7 @@ reduceFold (TransformContext is0 ctx) n aTy fun arg = do
       = do
         uniqs0 <- Lens.use uniqSupply
         fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
-        let is1 = extendInScopeSetList is0 (collectTermIds fun1)
+        let is1 = InScopeSet.insertMany (collectTermIds fun1) is0
             (uniqs1,(vars,elems)) = second (second concat . unzip)
                                   $ extractElems uniqs0 is1 consCon aTy 'F' n arg
             lbody            = foldV fun1 vars
@@ -688,7 +688,7 @@ reduceDFold is0 n aTy fun start arg = do
       , [_,consCon]  <- tyConDataCons vecTc
       = do
         uniqs0 <- Lens.use uniqSupply
-        let is1 = extendInScopeSetList is0 (collectTermIds fun)
+        let is1 = InScopeSet.insertMany (collectTermIds fun) is0
             -- TODO: Should 'constantPropagation' be used on 'fun'? It seems to
             -- TOOD: be used for every other function in this module.
             (uniqs1,(vars,elems)) = second (second concat . unzip)

@@ -21,6 +21,7 @@ import qualified Data.Monoid as Monoid
 import GHC.Stack (HasCallStack)
 
 import Clash.Core.HasType
+import qualified Clash.Core.InScopeSet as InScopeSet
 import Clash.Core.Name (Name(..))
 import Clash.Core.Subst (extendIdSubst, mkSubst, substTm)
 import Clash.Core.Term (Term(..), collectArgsTicks, mkApps, mkLams, mkTicks)
@@ -28,7 +29,6 @@ import Clash.Core.Type (Type, mkPolyFunTy, splitFunForallTy)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Util (Projections (..), shouldSplit)
 import Clash.Core.Var (Id, TyVar, Var (..), isGlobalId, mkLocalId)
-import Clash.Core.VarEnv (extendInScopeSet, uniqAway)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Types (TransformContext(..), tcCache)
 import Clash.Rewrite.Util (changed, mkDerivedName)
@@ -113,8 +113,8 @@ separateLambda tcm ctx@(TransformContext is0 _) b eb0 =
  where
   newBinder isN0 x =
     let
-      x' = uniqAway isN0 x
-      isN1 = extendInScopeSet isN0 x'
+      x' = InScopeSet.uniqAway isN0 x
+      isN1 = InScopeSet.insert x' isN0
     in
       (isN1, x')
 {-# SCC separateLambda #-}

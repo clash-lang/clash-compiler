@@ -16,12 +16,12 @@
 module Test.Clash.Rewrite where
 
 import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
+import Clash.Core.InScopeSet (InScopeSet)
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
-import Clash.Core.VarEnv (InScopeSet, emptyVarSet, emptyVarEnv, emptyInScopeSet)
 import Clash.Driver.Types (ClashEnv(..), ClashOpts(..), defClashOpts, debugSilent)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (runRewrite)
@@ -69,34 +69,34 @@ instance Default RewriteEnv where
     , _typeTranslator=error "_typeTranslator: NYI"
     , _peEvaluator=error "_peEvaluator: NYI"
     , _evaluator=error "_evaluator: NYI"
-    , _topEntities=emptyVarSet
+    , _topEntities=mempty
     }
 
 instance Default extra => Default (RewriteState extra) where
   def = RewriteState
     { _transformCounter=0
     , _transformCounters=mempty
-    , _bindings=emptyVarEnv
+    , _bindings=mempty
     , _uniqSupply=unsafePerformIO newSupply
     , _curFun=error "_curFun: NYI"
     , _nameCounter=2
-    , _workFreeBinders=emptyVarEnv
+    , _workFreeBinders=mempty
     , _globalHeap=error "_globalHeap: NYI"
     , _extra=def
     }
 
 instance Default NormalizeState where
   def = NormalizeState
-    { _normalized=emptyVarEnv
+    { _normalized=mempty
     , _specialisationCache=Map.empty
-    , _specialisationHistory=emptyVarEnv
-    , _inlineHistory=emptyVarEnv
+    , _specialisationHistory=mempty
+    , _inlineHistory=mempty
     , _primitiveArgs=Map.empty
-    , _recursiveComponents=emptyVarEnv
+    , _recursiveComponents=mempty
     }
 
 instance Default InScopeSet where
-  def = emptyInScopeSet
+  def = mempty
 
 -- | Run a single transformation given a certain context
 runSingleTransformation

@@ -75,6 +75,8 @@ import Clash.Core.Evaluator.Types  (whnf')
 import Clash.Core.FreeVars
   (termFreeVars', typeFreeVars', localVarsDoNotOccurIn)
 import Clash.Core.HasType
+import Clash.Core.InScopeSet (InScopeSet)
+import qualified Clash.Core.InScopeSet as InScopeSet
 import Clash.Core.Literal (Literal(..))
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Term
@@ -85,9 +87,6 @@ import Clash.Core.Type
   (Type, TypeView (..), isPolyFunTy, mkTyConApp, splitFunForallTy, tyView)
 import Clash.Core.Util (mkInternalVar, mkSelectorCase, sccLetBindings)
 import Clash.Core.Var (isGlobalId, isLocalId, varName)
-import Clash.Core.VarEnv
-  ( InScopeSet, elemInScopeSet, extendInScopeSet, extendInScopeSetList
-  , notElemInScopeSet, unionInScope)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Normalize.Transformations.Letrec (deadCode)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
@@ -159,7 +158,7 @@ disjointExpressionConsolidation ctx@(TransformContext isCtx _) e@(Case _scrut _t
          -- For all of the lifted expression: substitute occurrences of the
          -- disjoint expressions (f X Y) by a variable reference to the lifted
          -- expression (f_out)
-         let isCtx1 = extendInScopeSetList isCtx funOutIds
+         let isCtx1 = InScopeSet.insertMany funOutIds isCtx
          lifted1 <- substLifted isCtx1 substitution lifted
          -- Do the same for the actual case expression
          (e1,_,_) <- collectGlobals isCtx1 substitution [] e
@@ -179,7 +178,7 @@ disjointExpressionConsolidation ctx@(TransformContext isCtx _) e@(Case _scrut _t
                    _          -> "complex_expression_"
           nm1 = last (Text.splitOn "." nm) `Text.append` "Out"
       nm2 <- mkInternalVar isN nm1 ty
-      return (extendInScopeSet isN nm2,nm2)
+      return (InScopeSet.insert nm2 isN, nm2)
 
     -- Substitute inside the lifted expressions
     --
@@ -290,7 +289,7 @@ collectGlobals' is0 substitution seen (Case scrut ty alts) _eIsConstant = do
       (scrut1, isScrut, collectedScrut) <-
         collectGlobals is0 substitution (map fst collectedAlts ++ seen) scrut
   return ( Case scrut1 ty alts1
-         , unionInScope isAlts isScrut
+         , isAlts <> isScrut
          , collectedAlts ++ collectedScrut )
 
 collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), ticks)) eIsconstant
@@ -333,13 +332,13 @@ collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), t
 --
 -- I think we should be able to do better, but perhaps we cannot fix it here.
 collectGlobals' is0 substitution seen (Letrec lbs body) _eIsConstant = do
-  let is1 = extendInScopeSetList is0 (map fst lbs)
+  let is1 = InScopeSet.insertMany (fmap fst lbs) is0
   (body1,isBody,collectedBody) <-
     collectGlobals is1 substitution seen body
   (lbs1,isBndrs,collectedBndrs) <-
     collectGlobalsLbs is1 substitution (map fst collectedBody ++ seen) lbs
   return ( Letrec lbs1 body1
-         , unionInScope isBody isBndrs
+         , isBody <> isBndrs
          , map (second (second (LB lbs1))) (collectedBody ++ collectedBndrs)
          )
 
@@ -411,7 +410,7 @@ collectGlobalsAlts is0 substitution seen scrut alts = do
     return (alts',is1,collected')
   where
     go isN0 (p,e) = do
-      let isN1 = extendInScopeSetList isN0 (snd (patIds p))
+      let isN1 = InScopeSet.insertMany (snd (patIds p)) isN0
       (e',isN2,collected) <- collectGlobals isN1 substitution seen e
       return (isN2,((p,e'),map (second (second (p,))) collected))
 
@@ -572,7 +571,7 @@ areShared tcm inScope xs@(x:_) = noFV1 && (isProof x || allEqual xs)
     Left tm  -> getAll (Lens.foldMapOf (termFreeVars' isLocallyBound)
                                        (const (All False)) tm)
 
-  isLocallyBound v = isLocalId v && v `notElemInScopeSet` inScope
+  isLocallyBound v = isLocalId v && v `InScopeSet.notElem` inScope
 
   isProof (Left co) = case tyView (inferCoreTypeOf tcm co) of
     TyConApp (nameOcc -> "GHC.Types.~") _ -> True
@@ -699,7 +698,7 @@ interestingToLift
   -- ^ Tick annoations
   -> RewriteMonad extra (Maybe Term)
 interestingToLift inScope _ e@(Var v) _ ticks =
-  if NoDeDup `notElem` ticks && (isGlobalId v ||  v `elemInScopeSet` inScope)
+  if NoDeDup `notElem` ticks && (isGlobalId v ||  v `InScopeSet.elem` inScope)
      then pure (Just e)
      else pure Nothing
 interestingToLift inScope eval e@(Prim pInfo) args ticks

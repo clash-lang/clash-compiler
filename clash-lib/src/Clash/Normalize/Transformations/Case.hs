@@ -53,6 +53,8 @@ import Clash.Core.DataCon (DataCon(..))
 import Clash.Core.EqSolver
 import Clash.Core.FreeVars (freeLocalIds, localVarsDoNotOccurIn)
 import Clash.Core.HasType
+import Clash.Core.InScopeSet (InScopeSet)
+import qualified Clash.Core.InScopeSet as InScopeSet
 import Clash.Core.Literal (Literal(..))
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty (showPpr)
@@ -63,9 +65,7 @@ import Clash.Core.Term
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (LitTy(..), Type(..), TypeView(..), coreView1, tyView)
 import Clash.Core.Util (listToLets, mkInternalVar)
-import Clash.Core.VarEnv
-  ( InScopeSet, elemVarSet, extendInScopeSet, extendInScopeSetList, mkVarSet
-  , unitVarSet, uniqAway)
+import qualified Clash.Core.VarSet as VarSet
 import Clash.Debug (traceIf)
 import Clash.Driver.Types (DebugOpts(dbg_invariants))
 import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
@@ -193,8 +193,8 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- Create an initial set of let-binders for all variables used in the
       -- RHS of the alternative. We might later decide to substitute instead
       -- of let-bind in case the RHS of the let-binder is work-free.
-      fvs = Lens.foldMapOf freeLocalIds unitVarSet altE
-      (binds,_) = List.partition ((`elemVarSet` fvs) . fst)
+      fvs = Lens.foldMapOf freeLocalIds VarSet.singleton altE
+      (binds,_) = List.partition ((`VarSet.elem` fvs) . fst)
                 $ List.zipEqual xs1 (Either.lefts args)
       binds1 = fmap (second (`mkTicks` ticks)) binds
      altE1 <-
@@ -206,7 +206,7 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
           -- See Note [CaseCon deshadow]
           let
             -- Only let-bind expression that perform work.
-            is1 = extendInScopeSetList (extendInScopeSetList is0 tvs) xs1
+            is1 = InScopeSet.insertMany xs1 (InScopeSet.insertMany tvs is0)
           ((is3,substIds),binds2) <- List.mapAccumLM newBinder (is1,[]) binds1
           let
             -- Create a substitution for all the existential type variables
@@ -242,8 +242,8 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
           True -> pure ((isN0, (x, arg):substN), Nothing)
           False ->
             let
-              x' = uniqAway isN0 x
-              isN1 = extendInScopeSet isN0 x'
+              x' = InScopeSet.uniqAway isN0 x
+              isN1 = InScopeSet.insert x' isN0
             in
               pure ((isN1, (x, Var x'):substN), Just (x', arg))
 
@@ -373,9 +373,9 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
   go ((DataPat dc [] [x],e):alts')
     | dcTag dc == 1
     , l >= ((-2)^(63::Int)) &&  l < 2^(63::Int)
-    = let fvs = Lens.foldMapOf freeLocalIds unitVarSet e
+    = let fvs = Lens.foldMapOf freeLocalIds VarSet.singleton e
           bind = NonRec x (Literal (IntLiteral l))
-       in if x `elemVarSet` fvs
+       in if x `VarSet.elem` fvs
             then changed (Let bind e)
             else changed e
     | dcTag dc == 2
@@ -386,9 +386,9 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
     = let !(Jp# !(BN# ba)) = l
 #endif
           ba'       = BA.ByteArray ba
-          fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
+          fvs       = Lens.foldMapOf freeLocalIds VarSet.singleton e
           bind      = NonRec x (Literal (ByteArrayLiteral ba'))
-       in if x `elemVarSet` fvs
+       in if x `VarSet.elem` fvs
             then changed (Let bind e)
             else changed e
     | dcTag dc == 3
@@ -399,9 +399,9 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
     = let !(Jn# !(BN# ba)) = l
 #endif
           ba'       = BA.ByteArray ba
-          fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
+          fvs       = Lens.foldMapOf freeLocalIds VarSet.singleton e
           bind      = NonRec x (Literal (ByteArrayLiteral ba'))
-       in if x `elemVarSet` fvs
+       in if x `VarSet.elem` fvs
             then changed (Let bind e)
             else changed e
     | otherwise
@@ -419,9 +419,9 @@ matchLiteralContructor c (NaturalLiteral l) alts = go (reverse alts)
   go ((DataPat dc [] [x],e):alts')
     | dcTag dc == 1
     , l >= 0 && l < 2^(64::Int)
-    = let fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
+    = let fvs       = Lens.foldMapOf freeLocalIds VarSet.singleton e
           bind      = NonRec x (Literal (WordLiteral l))
-       in if x `elemVarSet` fvs
+       in if x `VarSet.elem` fvs
             then changed (Let bind e)
             else changed e
     | dcTag dc == 2
@@ -432,9 +432,9 @@ matchLiteralContructor c (NaturalLiteral l) alts = go (reverse alts)
     = let !(Jp# !(BN# ba)) = l
 #endif
           ba'       = BA.ByteArray ba
-          fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
+          fvs       = Lens.foldMapOf freeLocalIds VarSet.singleton e
           bind      = NonRec x (Literal (ByteArrayLiteral ba'))
-       in if x `elemVarSet` fvs
+       in if x `VarSet.elem` fvs
             then changed (Let bind e)
             else changed e
     | otherwise
@@ -688,7 +688,7 @@ elimExistentials (TransformContext is0 _) (Case scrut altsTy alts0) = do
     -- Eliminate free type variables if possible
     go :: InScopeSet -> TyConMap -> Alt -> NormalizeSession Alt
     go is2 tcm alt@(pat@(DataPat dc exts0 xs0), term0) =
-      case solveNonAbsurds tcm (mkVarSet exts0) (patEqs tcm pat) of
+      case solveNonAbsurds tcm (VarSet.fromList exts0) (patEqs tcm pat) of
         -- No equations solved:
         [] -> return alt
         -- One or more equations solved:
@@ -696,12 +696,12 @@ elimExistentials (TransformContext is0 _) (Case scrut altsTy alts0) = do
           changed =<< go is2 tcm (DataPat dc exts1 xs1, term1)
           where
             -- Substitute solution in existentials and applied types
-            is3 = extendInScopeSetList is2 exts0
+            is3 = InScopeSet.insertMany exts0 is2
             xs1 = fmap (substTyInVar (extendTvSubstList (mkSubst is3) sols)) xs0
             exts1 = substInExistentialsList is2 exts0 sols
 
             -- Substitute solution in term.
-            is4 = extendInScopeSetList is3 xs1
+            is4 = InScopeSet.insertMany xs1 is3
             subst = extendTvSubstList (mkSubst is4) sols
             term1 = substTm "Replacing tyVar due to solved eq" subst term0
 

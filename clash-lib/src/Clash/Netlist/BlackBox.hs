@@ -67,6 +67,7 @@ import           Clash.Annotations.Primitive
 import           Clash.Core.DataCon            as D (dcTag)
 import           Clash.Core.FreeVars           (freeIds)
 import           Clash.Core.HasType
+import qualified Clash.Core.InScopeSet         as InScopeSet
 import           Clash.Core.Literal            as L (Literal (..))
 import           Clash.Core.Name
   (Name (..), mkUnsafeSystemName)
@@ -84,8 +85,7 @@ import           Clash.Core.Util
   (inverseTopSortLetBindings, splitShouldSplit)
 import           Clash.Core.Var                as V
   (Id, mkLocalId, modifyVarName)
-import           Clash.Core.VarEnv
-  (extendInScopeSet, mkInScopeSet, lookupVarEnv, uniqAway, unitVarSet)
+import qualified Clash.Core.VarSet             as VarSet
 import {-# SOURCE #-} Clash.Netlist
   (genComponent, mkDcApplication, mkDeclarations, mkExpr, mkNetDecl,
    mkProjection, mkSelection, mkFunApp, mkDeclarations')
@@ -605,7 +605,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                       arg1 = unSimIO tcm arg0
                       fun1 = case fun0 of
                         Lam b bE ->
-                          let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet fun0)
+                          let is0 = InScopeSet.fromVarSet (Lens.foldMapOf freeIds VarSet.singleton fun0)
                               subst = extendIdSubst (mkSubst is0) b arg1
                           in  substTm "mkPrimitive.fmapSimIO" subst bE
                         _ -> mkApps fun0 [Left arg1]
@@ -778,9 +778,9 @@ collectMealy
   -> NetlistMonad [Declaration]
 collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
   let (lefts -> args0,res0) = collectBndrs mealyFun
-      is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet res0 <>
-                          Lens.foldMapOf freeIds unitVarSet mealyInit <>
-                          Lens.foldMapOf freeIds unitVarSet mealyIn)
+      is0 = InScopeSet.fromVarSet (Lens.foldMapOf freeIds VarSet.singleton res0 <>
+                          Lens.foldMapOf freeIds VarSet.singleton mealyInit <>
+                          Lens.foldMapOf freeIds VarSet.singleton mealyIn)
       -- Given that we're creating a sequential list of statements from the
       -- let-bindings, make sure that everything is inverse topologically sorted
       (bs,res) = case inverseTopSortLetBindings res0 of
@@ -788,14 +788,14 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
         Letrec bsN e ->
           let u = case dst of
                     CoreId u0 -> u0
-                    _ -> uniqAway is0
+                    _ -> InScopeSet.uniqAway is0
                            (mkLocalId (inferCoreTypeOf tcm e)
                                       (mkUnsafeSystemName "mealyres" 0))
           in  (bsN ++ [(u,e)], u)
         e ->
           let u = case dst of
                     CoreId u0 -> u0
-                    _ -> uniqAway is0
+                    _ -> InScopeSet.uniqAway is0
                            (mkLocalId (inferCoreTypeOf tcm e)
                                       (mkUnsafeSystemName "mealyres" 0))
           in  ([(u,e)], u)
@@ -940,7 +940,7 @@ collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
   case splitNormalized tcm qS of
     Right (args,bs0,res) -> do
       let Letrec bs _ = inverseTopSortLetBindings (Letrec bs0 (C.Var res))
-      let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet qS)
+      let is0 = InScopeSet.fromVarSet (Lens.foldMapOf freeIds VarSet.singleton qS)
       normE <- mkUniqueNormalized is0 Nothing (args,bs,res)
       case normE of
         (_,_,[],_,[],binders,Just result) -> do
@@ -961,7 +961,7 @@ collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
   collectAction tcm = case splitNormalized tcm m of
     Right (args,bs0,res) -> do
       let Letrec bs _ = inverseTopSortLetBindings (Letrec bs0 (C.Var res))
-      let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet m)
+      let is0 = InScopeSet.fromVarSet (Lens.foldMapOf freeIds VarSet.singleton m)
       normE <- mkUniqueNormalized is0 Nothing (args,(x,m):bs,res)
       case normE of
         (_,_,[],_,[],binders@(b:_),Just result) -> do
@@ -976,7 +976,7 @@ collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
       ds1 <- mkDeclarations' Sequential x' m
       return (netDecls ++ ds1,s)
 
-  eInScopeSet = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet e)
+  eInScopeSet = InScopeSet.fromVarSet (Lens.foldMapOf freeIds VarSet.singleton e)
 
 collectBindIO _ es = error ("internal error:\n" ++ showPpr es)
 
@@ -1155,12 +1155,12 @@ mkFunInput resId e =
                 _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
             C.Var fun -> do
               topAnns <- Lens.use topEntityAnns
-              case lookupVarEnv fun topAnns of
+              case UniqMap.lookup fun topAnns of
                 Just _ ->
                   error $ $(curLoc) ++ "Cannot make function input for partially applied Synthesize-annotated: " ++ showPpr e
                 _ -> do
                   normalized <- Lens.use bindings
-                  case lookupVarEnv fun normalized of
+                  case UniqMap.lookup fun normalized of
                     Just _ -> do
                       (meta,N.Component compName compInps [(_,compOutp,_)] _) <-
                         preserveVarEnv $ genComponent fun
@@ -1183,7 +1183,7 @@ mkFunInput resId e =
                       return (Right ((Id.unsafeMake "",tickDecls ++ [instDecl]), Cont))
                     Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
             C.Lam {} -> do
-              let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet appE)
+              let is0 = InScopeSet.fromVarSet (Lens.foldMapOf freeIds VarSet.singleton appE)
               either Left (Right . first (second (tickDecls ++))) <$> go is0 0 appE
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
   let pNm = case appE of
@@ -1254,10 +1254,10 @@ mkFunInput resId e =
       lvl <- Lens.use curBBlvl
       let nm    = TextS.concat
                     ["~ARGN[",TextS.pack (show lvl),"][",TextS.pack (show n),"]"]
-          v'    = uniqAway is0 (modifyVarName (\v -> v {nameOcc = nm}) id_)
+          v'    = InScopeSet.uniqAway is0 (modifyVarName (\v -> v {nameOcc = nm}) id_)
           subst = extendIdSubst (mkSubst is0) id_ (C.Var v')
           e''   = substTm "mkFunInput.goLam" subst e'
-          is1   = extendInScopeSet is0 v'
+          is1   = InScopeSet.insert v' is0
       go is1 (n+(1::Int)) e''
 
     go _ _ (C.Var v) = do

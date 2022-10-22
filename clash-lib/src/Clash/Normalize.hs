@@ -62,11 +62,9 @@ import           Clash.Core.Term                  (Term (..), collectArgsTicks
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type                  (isPolyTy)
-import           Clash.Core.Var                   (Id, varName, varType)
-import           Clash.Core.VarEnv
-  (VarEnv, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
-   extendVarEnv, lookupVarEnv, mapVarEnv, mapMaybeVarEnv,
-   mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
+import           Clash.Core.Var                   (Id, varName, varType, VarEnv)
+import qualified Clash.Core.VarSet as VarSet
+import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug                      (traceIf)
 import           Clash.Driver.Types
   (DebugOpts(..), ClashEnv(..))
@@ -125,7 +123,7 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
                   typeTrans
                   peEval
                   eval
-                  (mkVarSet topEnts)
+                  (VarSet.fromList topEnts)
 
     rwState   = RewriteState
                   0
@@ -135,35 +133,35 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
                   (error $ $(curLoc) ++ "Report as bug: no curFun",noSrcSpan)
                   0
                   (IntMap.empty, 0)
-                  emptyVarEnv
+                  mempty
                   normState
 
     normState = NormalizeState
-                  emptyVarEnv
+                  mempty
                   Map.empty
-                  emptyVarEnv
-                  emptyVarEnv
+                  mempty
+                  mempty
                   Map.empty
                   rcsMap
 
 normalize
   :: [Id]
   -> NormalizeSession (BindingMap Term)
-normalize []  = return emptyVarEnv
+normalize []  = return mempty
 normalize top = do
   (new,topNormalized) <- unzip <$> mapM normalize' top
   newNormalized <- normalize (concat new)
-  return (unionVarEnv (mkVarEnv topNormalized) newNormalized)
+  return (UniqMap.fromList topNormalized <> newNormalized)
 
 normalize' :: Id -> NormalizeSession ([Id], (Id, Binding Term))
 normalize' nm = do
-  exprM <- lookupVarEnv nm <$> Lens.use bindings
+  exprM <- UniqMap.lookup nm <$> Lens.use bindings
   let nmS = showPpr (varName nm)
   case exprM of
     Just (Binding nm' sp inl pr tm r) -> do
       tcm <- Lens.view tcCache
       topEnts <- Lens.view topEntities
-      let isTop = nm `elemVarSet` topEnts
+      let isTop = nm `VarSet.elem` topEnts
           ty0 = coreTypeOf nm'
           ty1 = if isTop then tvSubstWithTyEq ty0 else ty0
 
@@ -182,7 +180,7 @@ normalize' nm = do
 
       -- check for unrepresentable result type
       let (args,resTy) = splitCoreFunForallTy tcm ty1
-          isTopEnt = nm `elemVarSet` topEnts
+          isTopEnt = nm `VarSet.elem` topEnts
           isFunction = not $ null $ lefts args
       resTyRep <- not <$> isUntranslatableType False resTy
       if resTyRep
@@ -195,9 +193,9 @@ normalize' nm = do
                             , ") remains recursive after normalization:\n"
                             , showPpr (bindingTerm tmNorm) ])
                     (return ())
-            prevNorm <- mapVarEnv bindingId <$> Lens.use (extra.normalized)
-            let toNormalize = filter (`notElemVarSet` topEnts)
-                            $ filter (`notElemVarEnv` (extendVarEnv nm nm prevNorm)) usedBndrs
+            prevNorm <- fmap bindingId <$> Lens.use (extra.normalized)
+            let toNormalize = filter (`VarSet.notElem` topEnts)
+                            $ filter (`UniqMap.notElem` (UniqMap.insertUnique nm prevNorm)) usedBndrs
             return (toNormalize,(nm,tmNorm))
          else
            do
@@ -231,11 +229,11 @@ checkNonRecursive
   :: BindingMap Term
   -- ^ List of normalized binders
   -> BindingMap Term
-checkNonRecursive norm = case mapMaybeVarEnv go norm of
-  rcs | nullVarEnv rcs  -> norm
+checkNonRecursive norm = case UniqMap.mapMaybe go norm of
+  rcs | UniqMap.null rcs  -> norm
   rcs -> error $ $(curLoc) ++ "Callgraph after normalization contains following recursive components: "
                    ++ show (vcat [ ppr a <> ppr b
-                                 | (a,b) <- eltsVarEnv rcs
+                                 | (a,b) <- UniqMap.elems rcs
                                  ])
  where
   go (Binding nm _ _ _ tm r) =
@@ -252,7 +250,7 @@ cleanupGraph
 cleanupGraph topEntity norm
   | Just ct <- mkCallTree [] norm topEntity
   = do ctFlat <- flattenCallTree ct
-       return (mkVarEnv $ snd $ callTreeToList [] ctFlat)
+       return (UniqMap.fromList $ snd $ callTreeToList [] ctFlat)
 cleanupGraph _ norm = return norm
 
 -- | A tree of identifiers and their bindings, with branches containing
@@ -271,7 +269,7 @@ mkCallTree
   -- ^ Root of the call graph
   -> Maybe CallTree
 mkCallTree visited bindingMap root
-  | Just rootTm <- lookupVarEnv root bindingMap
+  | Just rootTm <- UniqMap.lookup root bindingMap
   = let used   = Set.toList $ Lens.setOf globalIds $ (bindingTerm rootTm)
         other  = Maybe.mapMaybe (mkCallTree (root:visited) bindingMap) (filter (`notElem` visited) used)
     in  case used of
@@ -303,7 +301,7 @@ flattenNode
   -> NormalizeSession (Either CallTree ((Id,Term),[CallTree]))
 flattenNode c@(CLeaf (_,(Binding _ _ NoInline _ _ _))) = return (Left c)
 flattenNode c@(CLeaf (nm,(Binding _ _ _ _ e _))) = do
-  isTopEntity <- elemVarSet nm <$> Lens.view topEntities
+  isTopEntity <- VarSet.elem nm <$> Lens.view topEntities
   if isTopEntity then return (Left c) else do
     tcm  <- Lens.view tcCache
     let norm = splitNormalized tcm e
@@ -318,7 +316,7 @@ flattenNode c@(CLeaf (nm,(Binding _ _ _ _ e _))) = do
 flattenNode b@(CBranch (_,(Binding _ _ NoInline _ _ _)) _) =
   return (Left b)
 flattenNode b@(CBranch (nm,(Binding _ _ _ _ e _)) us) = do
-  isTopEntity <- elemVarSet nm <$> Lens.view topEntities
+  isTopEntity <- VarSet.elem nm <$> Lens.view topEntities
   if isTopEntity then return (Left b) else do
     tcm  <- Lens.view tcCache
     let norm = splitNormalized tcm e
@@ -343,7 +341,7 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
   flattenedUsed   <- mapM flattenCallTree used
   (newUsed,il_ct) <- partitionEithers <$> mapM flattenNode flattenedUsed
   let (toInline,il_used) = unzip il_ct
-      subst = extendGblSubstList (mkSubst emptyInScopeSet) toInline
+      subst = extendGblSubstList (mkSubst mempty) toInline
   newExpr <- case toInline of
     [] -> return tm
     _  -> do
@@ -372,7 +370,7 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
   if inl /= NoInline && isCheapFunction newExpr
      then do
         let (toInline',allUsed') = unzip (map goCheap allUsed)
-            subst' = extendGblSubstList (mkSubst emptyInScopeSet)
+            subst' = extendGblSubstList (mkSubst mempty)
                                         (Maybe.catMaybes toInline')
         let tm1 = substTm "flattenCallTree.flattenCheap" subst' newExpr
         newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1) (nm', sp)

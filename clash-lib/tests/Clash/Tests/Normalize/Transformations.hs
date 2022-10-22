@@ -8,10 +8,11 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 module Clash.Tests.Normalize.Transformations where
 
 import Clash.Normalize.Transformations (inlineBndrsCleanup)
-import Clash.Core.VarEnv
-  (mkInScopeSet, mkVarSet, mkVarEnv, emptyVarEnv)
+import qualified Clash.Core.InScopeSet as InScopeSet
+import qualified Clash.Core.VarSet as VarSet
 import Clash.Core.FreeVars (countFreeOccurances)
 import Clash.Core.Term
+import qualified Clash.Data.UniqMap as UniqMap
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -22,9 +23,9 @@ t1337a :: Term
 t1337a = Letrec keep1 result
  where
   (keep0:inlines)= map (\(v,e) -> (v,((v,e),countFreeOccurances e))) binds
-  is = mkInScopeSet (mkVarSet (map fst binds))
+  is = InScopeSet.fromVarSet (VarSet.fromList (map fst binds))
 
-  keep1 = inlineBndrsCleanup is (mkVarEnv inlines) emptyVarEnv [snd keep0]
+  keep1 = inlineBndrsCleanup is (UniqMap.fromList inlines) mempty [snd keep0]
 
   Letrec binds result =
     [parseToTermQQ|
@@ -55,9 +56,9 @@ t1337b :: Term
 t1337b = Letrec keep1 result
  where
   (keep0:inlines)= map (\(v,e) -> (v,((v,e),countFreeOccurances e))) binds
-  is = mkInScopeSet (mkVarSet (map fst binds))
+  is = InScopeSet.fromVarSet (VarSet.fromList (map fst binds))
 
-  keep1 = inlineBndrsCleanup is (mkVarEnv inlines) emptyVarEnv [snd keep0]
+  keep1 = inlineBndrsCleanup is (UniqMap.fromList inlines) mempty [snd keep0]
 
   Letrec binds result =
     [parseToTermQQ|
@@ -90,9 +91,9 @@ t1337c = Letrec keep1 result
  where
   (keep0:inlines)= map (\(v,e) -> (v,((v,e),countFreeOccurances e))) binds
   Var fv = parseToTerm "freevar_5 :: Int"
-  is = mkInScopeSet (mkVarSet (fv : map fst binds))
+  is = InScopeSet.fromVarSet (VarSet.fromList (fv : map fst binds))
 
-  keep1 = inlineBndrsCleanup is (mkVarEnv inlines) emptyVarEnv [snd keep0]
+  keep1 = inlineBndrsCleanup is (UniqMap.fromList inlines) mempty [snd keep0]
 
   Letrec binds result =
     [parseToTermQQ|

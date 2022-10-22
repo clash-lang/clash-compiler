@@ -45,6 +45,8 @@ import Clash.Core.EqSolver
 import Clash.Core.FreeVars               (freeLocalIds)
 import Clash.Core.HasFreeVars
 import Clash.Core.HasType
+import Clash.Core.InScopeSet (InScopeSet)
+import qualified Clash.Core.InScopeSet as InScopeSet
 import Clash.Core.Name
   (Name (..), OccName, mkUnsafeInternalName, mkUnsafeSystemName)
 import Clash.Core.Pretty                 (showPpr)
@@ -54,7 +56,7 @@ import Clash.Core.TyCon                  (TyConMap, tyConDataCons)
 import Clash.Core.Type
 import Clash.Core.TysPrim                (liftedTypeKind, typeNatKind)
 import Clash.Core.Var                    (Id, Var(..), mkLocalId, mkTyVar)
-import Clash.Core.VarEnv
+import qualified Clash.Core.VarSet as VarSet
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug                       (traceIf)
 import Clash.Unique (MonadUnique(..))
@@ -362,33 +364,33 @@ mkUniqSystemTyVar
   -> (OccName, Kind)
   -> ((Supply, InScopeSet), TyVar)
 mkUniqSystemTyVar (supply,inScope) (nm, ki) =
-  ((supply',extendInScopeSet inScope v'), v')
+  ((supply', InScopeSet.insert v' inScope), v')
  where
   (u,supply') = freshId supply
   v           = mkTyVar ki (mkUnsafeSystemName nm u)
-  v'          = uniqAway inScope v
+  v'          = InScopeSet.uniqAway inScope v
 
 mkUniqSystemId
   :: (Supply, InScopeSet)
   -> (OccName, Type)
   -> ((Supply,InScopeSet), Id)
 mkUniqSystemId (supply,inScope) (nm, ty) =
-  ((supply',extendInScopeSet inScope v'), v')
+  ((supply', InScopeSet.insert v' inScope), v')
  where
   (u,supply') = freshId supply
   v           = mkLocalId ty (mkUnsafeSystemName nm u)
-  v'          = uniqAway inScope v
+  v'          = InScopeSet.uniqAway inScope v
 
 mkUniqInternalId
   :: (Supply, InScopeSet)
   -> (OccName, Type)
   -> ((Supply,InScopeSet), Id)
 mkUniqInternalId (supply,inScope) (nm, ty) =
-  ((supply',extendInScopeSet inScope v'), v')
+  ((supply', InScopeSet.insert v' inScope), v')
  where
   (u,supply') = freshId supply
   v           = mkLocalId ty (mkUnsafeInternalName nm u)
-  v'          = uniqAway inScope v
+  v'          = InScopeSet.uniqAway inScope v
 
 
 -- | Same as @dataConInstArgTys@, but it tries to compute existentials too,
@@ -404,15 +406,15 @@ dataConInstArgTysE
 dataConInstArgTysE is0 tcm (MkData { dcArgTys, dcExtTyVars, dcUnivTyVars }) inst_tys = do
   -- TODO: Check if all existentials were solved (they should be, or the wouldn't have
   -- TODO: been solved in the caseElemExistentials transformation)
-  let is1   = extendInScopeSetList is0 dcExtTyVars
-      is2   = unionInScope is1 (mkInScopeSet (freeVarsOf inst_tys))
+  let is1   = InScopeSet.insertMany dcExtTyVars is0
+      is2   = is1 <> InScopeSet.fromVarSet (freeVarsOf inst_tys)
       subst = extendTvSubstList (mkSubst is2) (zipEqual dcUnivTyVars inst_tys)
   go
     (substGlobalsInExistentials is0 dcExtTyVars (zipEqual dcUnivTyVars inst_tys))
     (map (substTy subst) dcArgTys)
 
  where
-  exts = mkVarSet dcExtTyVars
+  exts = VarSet.fromList dcExtTyVars
   go
     :: [TyVar]
     -- ^ Existentials
@@ -429,7 +431,7 @@ dataConInstArgTysE is0 tcm (MkData { dcArgTys, dcExtTyVars, dcUnivTyVars }) inst
         go exts1 args1
         where
           exts1 = substInExistentialsList is0 exts0 sols
-          is2   = extendInScopeSetList is0 exts1
+          is2   = InScopeSet.insertMany exts1 is0
           subst = extendTvSubstList (mkSubst is2) sols
           args1 = map (substTy subst) args0
 
@@ -493,7 +495,7 @@ substArgTys dc args =
   let univTVs = dcUnivTyVars dc
       extTVs  = dcExtTyVars dc
       argsFVs = freeVarsOf args
-      is      = mkInScopeSet (argsFVs `unionVarSet` mkVarSet extTVs)
+      is      = InScopeSet.fromVarSet (argsFVs <> VarSet.fromList extTVs)
       -- See Note [The substitution invariant]
       subst   = extendTvSubstList (mkSubst is) (univTVs `zipEqual` args)
   in  map (substTy subst) (dcArgTys dc)
@@ -754,4 +756,4 @@ mkInternalVar
 mkInternalVar inScope name ty = do
   i <- getUniqueM
   let nm = mkUnsafeInternalName name i
-  return (uniqAway inScope (mkLocalId ty nm))
+  return (InScopeSet.uniqAway inScope (mkLocalId ty nm))

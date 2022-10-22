@@ -23,9 +23,8 @@ import           Control.Monad               ((>=>))
 import qualified Control.Monad.Writer        as Writer
 import qualified Data.Monoid                 as Monoid
 
+import qualified Clash.Core.InScopeSet as InScopeSet
 import           Clash.Core.Term             (Term (..), CoreContext (..), primArg, patIds)
-import           Clash.Core.VarEnv
-  (extendInScopeSet, extendInScopeSetList)
 import           Clash.Rewrite.Types
 
 -- | Apply a transformation on the subtrees of an term
@@ -36,10 +35,10 @@ allR
   -- ^ The transformation to apply to the subtrees
   -> Transform m
 allR trans (TransformContext is c) (Lam v e) =
-  Lam v <$> trans (TransformContext (extendInScopeSet is v) (LamBody v:c)) e
+  Lam v <$> trans (TransformContext (InScopeSet.insert v is) (LamBody v:c)) e
 
 allR trans (TransformContext is c) (TyLam tv e) =
-  TyLam tv <$> trans (TransformContext (extendInScopeSet is tv) (TyLamBody tv:c)) e
+  TyLam tv <$> trans (TransformContext (InScopeSet.insert tv is) (TyLamBody tv:c)) e
 
 allR trans (TransformContext is c) (App e1 e2) = do
   e1' <- trans (TransformContext is (AppFun:c)) e1
@@ -58,7 +57,7 @@ allR trans (TransformContext is c) (Letrec xes e) = do
   return (Letrec xes' e')
  where
   bndrs              = map fst xes
-  is'                = extendInScopeSetList is (map fst xes)
+  is'                = InScopeSet.insertMany (map fst xes) is
   rewriteBind (b,e') = (b,) <$> trans (TransformContext is' (LetBinding b bndrs:c)) e'
 
 allR trans (TransformContext is c) (Case scrut ty alts) =
@@ -68,7 +67,7 @@ allR trans (TransformContext is c) (Case scrut ty alts) =
  where
   rewriteAlt (p,e) =
     let (tvs,ids) = patIds p
-        is'       = extendInScopeSetList (extendInScopeSetList is tvs) ids
+        is'       = InScopeSet.insertMany ids (InScopeSet.insertMany tvs is)
     in  (p,) <$> trans (TransformContext is' (CaseAlt p : c)) e
 
 allR trans (TransformContext is c) (Tick sp e) =

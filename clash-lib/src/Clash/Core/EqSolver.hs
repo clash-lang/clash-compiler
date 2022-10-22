@@ -17,7 +17,8 @@ import Clash.Core.Term
 import Clash.Core.TyCon
 import Clash.Core.Type
 import Clash.Core.Var
-import Clash.Core.VarEnv (VarSet, elemVarSet, emptyVarSet, mkVarSet)
+import Clash.Core.VarSet (VarSet)
+import qualified Clash.Core.VarSet as VarSet
 #if MIN_VERSION_ghc(9,0,0)
 import Clash.Core.DataCon (dcUniq)
 import GHC.Builtin.Names (unsafeReflDataConKey)
@@ -60,10 +61,10 @@ solveNonAbsurds tcm solveSet (eq:eqs) =
 solveEq :: TyConMap -> VarSet -> (Type, Type) -> [TypeEqSolution]
 solveEq tcm solveSet (coreView tcm -> left, coreView tcm -> right) =
   case (left, right) of
-    (VarTy tyVar, ConstTy {}) | elemVarSet tyVar solveSet ->
+    (VarTy tyVar, ConstTy {}) | VarSet.elem tyVar solveSet ->
       -- a ~ 3
       [Solution (tyVar, right)]
-    (ConstTy {}, VarTy tyVar) | elemVarSet tyVar solveSet ->
+    (ConstTy {}, VarTy tyVar) | VarSet.elem tyVar solveSet ->
       -- 3 ~ a
       [Solution (tyVar, left)]
     (ConstTy {}, ConstTy {}) ->
@@ -97,7 +98,7 @@ solveAdd
   -> TypeEqSolution
 solveAdd solveSet ab =
   case normalizeAdd ab of
-    Just (n, m, VarTy tyVar) | elemVarSet tyVar solveSet ->
+    Just (n, m, VarTy tyVar) | VarSet.elem tyVar solveSet ->
       if n >= 0 && m >= 0 && n - m >= 0 then
         Solution (tyVar, (LitTy (NumTy (n - m))))
       else
@@ -146,8 +147,8 @@ isAbsurdPat tcm pat =
   any (isAbsurdEq tcm exts) (patEqs tcm pat)
  where
   exts = case pat of
-    DataPat _dc extNms _ids -> mkVarSet extNms
-    _ -> emptyVarSet
+    DataPat _dc extNms _ids -> VarSet.fromList extNms
+    _ -> mempty
 
 -- | Determines if an "equation" obtained through @patEqs@ or @typeEq@ is
 -- absurd. That is, it tests if two types that are definitely not equal are

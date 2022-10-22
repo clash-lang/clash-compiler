@@ -26,13 +26,14 @@ import Data.Text.Prettyprint.Doc (hsep)
 import Clash.Core.Binding (BindingMap, Binding(bindingTerm))
 import Clash.Core.DataCon (DataCon, dcType)
 import Clash.Core.HasType
+import Clash.Core.InScopeSet (InScopeSet)
 import Clash.Core.Literal (Literal(CharLiteral))
 import Clash.Core.Pretty (fromPpr, ppr, showPpr)
 import Clash.Core.Term (Term(..), PrimInfo(..), TickInfo, Alt, mkApps)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type (..), mkFunTy)
-import Clash.Core.Var (Id, IdScope(..), TyVar)
-import Clash.Core.VarEnv
+import Clash.Core.Var (Id, IdScope(..), TyVar, VarEnv)
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Pretty (ClashPretty(..), fromPretty, showDoc)
 
 whnf'
@@ -50,8 +51,8 @@ whnf' eval bm tcm ph ids is isSubj e =
  where
   toResult x = (mHeapPrim x, mHeapLocal x, mTerm x)
 
-  m  = Machine ph gh emptyVarEnv [] ids is e
-  gh = mapVarEnv bindingTerm bm
+  m  = Machine ph gh mempty [] ids is e
+  gh = fmap bindingTerm bm
 
 -- | Evaluate to WHNF given an existing Heap and Stack
 whnf
@@ -337,24 +338,24 @@ primUpdate i x m =
 
 heapLookup :: IdScope -> Id -> Machine -> Maybe Term
 heapLookup GlobalId i m =
-  lookupVarEnv i $ mHeapGlobal m
+  UniqMap.lookup i $ mHeapGlobal m
 heapLookup LocalId i m =
-  lookupVarEnv i $ mHeapLocal m
+  UniqMap.lookup i $ mHeapLocal m
 
 heapContains :: IdScope -> Id -> Machine -> Bool
 heapContains scope i = isJust . heapLookup scope i
 
 heapInsert :: IdScope -> Id -> Term -> Machine -> Machine
 heapInsert GlobalId i x m =
-  m { mHeapGlobal = extendVarEnv i x (mHeapGlobal m) }
+  m { mHeapGlobal = UniqMap.insert i x (mHeapGlobal m) }
 heapInsert LocalId i x m =
-  m { mHeapLocal = extendVarEnv i x (mHeapLocal m) }
+  m { mHeapLocal = UniqMap.insert i x (mHeapLocal m) }
 
 heapDelete :: IdScope -> Id -> Machine -> Machine
 heapDelete GlobalId i m =
-  m { mHeapGlobal = delVarEnv (mHeapGlobal m) i }
+  m { mHeapGlobal = UniqMap.delete i (mHeapGlobal m) }
 heapDelete LocalId i m =
-  m { mHeapLocal = delVarEnv (mHeapLocal m) i }
+  m { mHeapLocal = UniqMap.delete i (mHeapLocal m) }
 
 stackPush :: StackFrame -> Machine -> Machine
 stackPush f m = m { mStack = f : mStack m }
