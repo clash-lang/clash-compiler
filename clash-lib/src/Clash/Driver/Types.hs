@@ -40,18 +40,13 @@ import           Data.Text.Prettyprint.Doc
 
 import           GHC.Generics                   (Generic)
 
-#if MIN_VERSION_ghc(9,0,0)
-import           GHC.Utils.Misc                 (OverridingBool(..))
-#else
-import           Util                           (OverridingBool(..))
-#endif
-
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import           Clash.Signal.Internal
 
 import           Clash.Core.Binding             (BindingMap)
 import           Clash.Core.Term                (Term)
 import           Clash.Core.TyCon               (TyConMap, TyConName)
+import           Clash.Data.OverridingBool      (OverridingBool(..))
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
 import {-# SOURCE #-} Clash.Netlist.Types       (PreserveCase(..), TopEntityT)
 import           Clash.Primitives.Types         (CompiledPrimMap)
@@ -355,112 +350,7 @@ data ClashOpts = ClashOpts
   -- ^ Render sum types with all zero-width fields as enums where supported, as
   -- opposed to rendering them as bitvectors.
   }
-  deriving (Show)
-
-instance NFData ClashOpts where
-  rnf o =
-    opt_werror o `deepseq`
-    opt_inlineLimit o `deepseq`
-    opt_specLimit o `deepseq`
-    opt_inlineFunctionLimit o `deepseq`
-    opt_inlineConstantLimit o `deepseq`
-    opt_evaluatorFuelLimit o `deepseq`
-    opt_cachehdl o `deepseq`
-    opt_clear o `deepseq`
-    opt_primWarn o `deepseq`
-    opt_color o `seq`
-    opt_intWidth o `deepseq`
-    opt_hdlDir o `deepseq`
-    opt_hdlSyn o `deepseq`
-    opt_errorExtra o `deepseq`
-    opt_importPaths o `deepseq`
-    opt_componentPrefix o `deepseq`
-    opt_newInlineStrat o `deepseq`
-    opt_escapedIds o `deepseq`
-    opt_lowerCaseBasicIds o `deepseq`
-    opt_ultra o `deepseq`
-    opt_forceUndefined o `deepseq`
-    opt_checkIDir o `deepseq`
-    opt_aggressiveXOpt o `deepseq`
-    opt_aggressiveXOptBB o `deepseq`
-    opt_inlineWFCacheLimit o `deepseq`
-    opt_edalize o `deepseq`
-    opt_renderEnums o `deepseq`
-    ()
-
-instance Eq ClashOpts where
-  s0 == s1 =
-    opt_werror s0 == opt_werror s1 &&
-    opt_inlineLimit s0 == opt_inlineLimit s1 &&
-    opt_specLimit s0 == opt_specLimit s1 &&
-    opt_inlineFunctionLimit s0 == opt_inlineFunctionLimit s1 &&
-    opt_inlineConstantLimit s0 == opt_inlineConstantLimit s1 &&
-    opt_evaluatorFuelLimit s0 == opt_evaluatorFuelLimit s1 &&
-    opt_cachehdl s0 == opt_cachehdl s1 &&
-    opt_clear s0 == opt_clear s1 &&
-    opt_primWarn s0 == opt_primWarn s1 &&
-    (opt_color s0 `eqOverridingBool` opt_color s1) &&
-    opt_intWidth s0 == opt_intWidth s1 &&
-    opt_hdlDir s0 == opt_hdlDir s1 &&
-    opt_hdlSyn s0 == opt_hdlSyn s1 &&
-    opt_errorExtra s0 == opt_errorExtra s1 &&
-    opt_importPaths s0 == opt_importPaths s1 &&
-    opt_componentPrefix s0 == opt_componentPrefix s1 &&
-    opt_newInlineStrat s0 == opt_newInlineStrat s1 &&
-    opt_escapedIds s0 == opt_escapedIds s1 &&
-    opt_lowerCaseBasicIds s0 == opt_lowerCaseBasicIds s1 &&
-    opt_ultra s0 == opt_ultra s1 &&
-    opt_forceUndefined s0 == opt_forceUndefined s1 &&
-    opt_checkIDir s0 == opt_checkIDir s1 &&
-    opt_aggressiveXOpt s0 == opt_aggressiveXOpt s1 &&
-    opt_aggressiveXOptBB s0 == opt_aggressiveXOptBB s1 &&
-    opt_inlineWFCacheLimit s0 == opt_inlineWFCacheLimit s1 &&
-    opt_edalize s0 == opt_edalize s1 &&
-    opt_renderEnums s0 == opt_renderEnums s1
-
-   where
-    eqOverridingBool :: OverridingBool -> OverridingBool -> Bool
-    eqOverridingBool Auto Auto = True
-    eqOverridingBool Always Always = True
-    eqOverridingBool Never Never = True
-    eqOverridingBool _ _ = False
-
-instance Hashable ClashOpts where
-  hashWithSalt s ClashOpts {..} =
-    s `hashWithSalt`
-    opt_werror `hashWithSalt`
-    opt_inlineLimit `hashWithSalt`
-    opt_specLimit `hashWithSalt`
-    opt_inlineFunctionLimit `hashWithSalt`
-    opt_inlineConstantLimit `hashWithSalt`
-    opt_evaluatorFuelLimit `hashWithSalt`
-    opt_cachehdl `hashWithSalt`
-    opt_clear `hashWithSalt`
-    opt_primWarn `hashOverridingBool`
-    opt_color `hashWithSalt`
-    opt_intWidth `hashWithSalt`
-    opt_hdlDir `hashWithSalt`
-    opt_hdlSyn `hashWithSalt`
-    opt_errorExtra `hashWithSalt`
-    opt_importPaths `hashWithSalt`
-    opt_componentPrefix `hashWithSalt`
-    opt_newInlineStrat `hashWithSalt`
-    opt_escapedIds `hashWithSalt`
-    opt_lowerCaseBasicIds `hashWithSalt`
-    opt_ultra `hashWithSalt`
-    opt_forceUndefined `hashWithSalt`
-    opt_checkIDir `hashWithSalt`
-    opt_aggressiveXOpt `hashWithSalt`
-    opt_aggressiveXOptBB `hashWithSalt`
-    opt_inlineWFCacheLimit `hashWithSalt`
-    opt_edalize `hashWithSalt`
-    opt_renderEnums
-   where
-    hashOverridingBool :: Int -> OverridingBool -> Int
-    hashOverridingBool s1 Auto = hashWithSalt s1 (0 :: Int)
-    hashOverridingBool s1 Always = hashWithSalt s1 (1 :: Int)
-    hashOverridingBool s1 Never = hashWithSalt s1 (2 :: Int)
-    infixl 0 `hashOverridingBool`
+  deriving (Eq, Generic, Hashable, NFData, Show)
 
 defClashOpts :: ClashOpts
 defClashOpts

@@ -81,7 +81,7 @@ import Linker
 import Maybes ( orElse, expectJust )
 import NameSet
 import Panic hiding ( showException )
-import Util
+import Util as Util
 import qualified GHC.LanguageExtensions as LangExt
 import Bag (unitBag)
 
@@ -149,6 +149,7 @@ import           Clash.Backend (Backend(initBackend, hdlKind, primDirs))
 import           Clash.Backend.SystemVerilog (SystemVerilogState)
 import           Clash.Backend.VHDL (VHDLState)
 import           Clash.Backend.Verilog (VerilogState)
+import qualified Clash.Data.OverridingBool as OB
 import qualified Clash.Driver
 import           Clash.Driver.Types (ClashOpts(..), ClashEnv(..), ClashDesign(..))
 
@@ -2191,7 +2192,11 @@ makeHDL Proxy startAction optsRef srcs = do
   dflags <- GHC.getSessionDynFlags
   liftIO $ do startTime <- Clock.getCurrentTime
               opts0  <- readIORef optsRef
-              let opts1  = opts0 { opt_color = useColor dflags }
+              let opts1  = opts0 { opt_color = case useColor dflags of
+                                                 Util.Auto -> OB.Auto
+                                                 Util.Always -> OB.Always
+                                                 Util.Never -> OB.Never
+                                 }
               let iw     = opt_intWidth opts1
                   hdl    = hdlKind backend
                   -- determine whether `-outputdir` was used

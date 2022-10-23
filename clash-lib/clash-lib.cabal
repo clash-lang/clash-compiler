@@ -215,6 +215,7 @@ Library
                       Clash.Core.Var
                       Clash.Core.VarSet
 
+                      Clash.Data.OverridingBool
                       Clash.Data.UniqMap
 
                       Clash.DataFiles

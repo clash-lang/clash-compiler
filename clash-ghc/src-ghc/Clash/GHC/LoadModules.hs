@@ -108,7 +108,7 @@ import           GHC.Utils.Outputable (ppr)
 import qualified GHC.Utils.Outputable as Outputable
 import           GHC.Types.SrcLoc (noSrcSpan)
 import qualified GHC.Types.Unique.Set as UniqSet
-import           GHC.Utils.Misc (OverridingBool)
+import qualified GHC.Utils.Misc as Util
 import qualified GHC.Types.Var as Var
 import qualified GHC.Driver.Ways as Ways
 import qualified GHC.Unit.Module.Env as ModuleEnv
@@ -146,11 +146,12 @@ import qualified OccName
 import           Outputable                      (ppr)
 import qualified Outputable
 import qualified UniqSet
-import           Util (OverridingBool)
+import qualified Util
 import qualified Var
 #endif
 
 -- Internal Modules
+import           Clash.Data.OverridingBool
 import           Clash.GHC.GHC2Core                           (modNameM, qualifiedNameString')
 import           Clash.GHC.LoadInterfaceFiles
   (loadExternalExprs, getUnresolvedPrimitives, loadExternalBinders,
@@ -252,7 +253,10 @@ setupGhc useColor dflagsM idirs = do
             dfPlug = df1 { DynFlags.pluginModNames = nub $
                                 ghcTyLitNormPlugin : ghcTyLitExtrPlugin :
                                 ghcTyLitKNPlugin : DynFlags.pluginModNames df1
-                           , DynFlags.useColor = useColor
+                           , DynFlags.useColor = case useColor of
+                                                   Auto -> Util.Auto
+                                                   Always -> Util.Always
+                                                   Never -> Util.Never
                            , DynFlags.importPaths = idirs
                            }
         return dfPlug

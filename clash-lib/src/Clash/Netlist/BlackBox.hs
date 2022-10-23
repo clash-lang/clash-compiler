@@ -54,10 +54,8 @@ import           System.IO
   (hPutStrLn, stderr, hFlush, hIsTerminalDevice)
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Types.SrcLoc              (noSrcSpan)
-import           GHC.Utils.Misc                (OverridingBool(..))
 #else
 import           SrcLoc                        (noSrcSpan)
-import           Util                          (OverridingBool(..))
 #endif
 
 import           Clash.Annotations.Primitive
@@ -86,6 +84,7 @@ import           Clash.Core.Util
 import           Clash.Core.Var                as V
   (Id, mkLocalId, modifyVarName)
 import qualified Clash.Core.VarSet             as VarSet
+import           Clash.Data.OverridingBool (OverridingBool(..))
 import {-# SOURCE #-} Clash.Netlist
   (genComponent, mkDcApplication, mkDeclarations, mkExpr, mkNetDecl,
    mkProjection, mkSelection, mkFunApp, mkDeclarations')
