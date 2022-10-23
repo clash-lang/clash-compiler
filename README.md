@@ -79,7 +79,7 @@ To use Cabal you need both Cabal and GHC installed on your system. We recommend 
 To run `clash` use:
 
 ```
-cabal v2-run --write-ghc-environment-files=always -- clash
+cabal v2-run -- clash
 ```
 
 If this fails, make sure you've got an up-to-date package index:
