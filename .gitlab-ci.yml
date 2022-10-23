@@ -60,25 +60,20 @@ stack-build:
   script:
     - .ci/stack_build.sh
   # Run on shared runners
+  # XXX: Temporarily on local runners
   tags:
+   - local
 
 nix-build:
   image: nixos/nix:2.9.2
   needs: []
   stage: test
   before_script:
-    # Circle CI needs git/ssh in /usr/bin
-    - nix-env -i git findutils gnugrep gnused coreutils openssh bash-4.4-p23 zstd
-
-    #                                 bin         nix pkg        multiple may exist
-    - ln -s $(find /nix -type f -name git  | grep libexec      | head -n1) /usr/bin
-    - ln -s $(find /nix -type f -name ssh  | grep openssh      | head -n1) /usr/bin
-    - ln -s $(find /nix -type f -name sed  | grep gnused       | head -n1) /usr/bin
-    - ln -s $(find /nix -type f -name zstd | grep zstd         | head -n1) /usr/bin
-    - ln -s $(find /nix -type f -name bash | grep bash-4.4-p23 | head -n1) /bin
-
+   - nix-env -i gawk
   script:
     - nix-build -j$(./.ci/effective_cpus.sh)
+  tags:
+    - local
 
 haddock:
   extends: .common
@@ -145,6 +140,9 @@ snap-stable:
   image: curlimages/curl
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
+  # XXX: Temporarily on local runners
+  tags:
+   - local
 
 set_pending:
   extends: .github_status
