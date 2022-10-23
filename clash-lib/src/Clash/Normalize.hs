@@ -38,16 +38,14 @@ import           Data.Text.Prettyprint.Doc        (vcat)
 #endif
 
 #if MIN_VERSION_ghc(9,0,0)
-import           GHC.Types.Basic                  (InlineSpec (..))
 import           GHC.Types.SrcLoc                 (noSrcSpan)
 #else
-import           BasicTypes                       (InlineSpec (..))
 import           SrcLoc                           (noSrcSpan)
 #endif
 
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
-import           Clash.Core.Binding (Binding(..), BindingMap)
+import           Clash.Core.Binding (Binding(..), BindingMap, InlineSpec(..))
 import           Clash.Core.Evaluator.Types as WHNF (Evaluator)
 import           Clash.Core.FreeVars
   (freeLocalIds, globalIds)

@@ -9,7 +9,6 @@
   Transformations for inlining
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
@@ -45,17 +44,11 @@ import qualified Data.Text as Text
 import qualified Data.Text.Extra as Text
 import GHC.Stack (HasCallStack)
 
-#if MIN_VERSION_ghc(9,0,0)
-import GHC.Types.Basic             (InlineSpec (..))
-#else
-import BasicTypes                  (InlineSpec (..))
-#endif
-
 import qualified Clash.Explicit.SimIO as SimIO
 import qualified Clash.Sized.Internal.BitVector as BV (Bit(Bit), BitVector(BV))
 
 import Clash.Annotations.Primitive (extractPrim)
-import Clash.Core.Binding (Binding(..))
+import Clash.Core.Binding (Binding(..), InlineSpec(..))
 import Clash.Core.DataCon (DataCon(..))
 import Clash.Core.FreeVars
   (countFreeOccurances, freeLocalIds)

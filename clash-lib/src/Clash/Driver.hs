@@ -93,7 +93,6 @@ import           Unique                  (getKey)
 
 import           SrcLoc                           (SrcSpan)
 #endif
-import           GHC.BasicTypes.Extra             ()
 
 import           Clash.Annotations.Primitive
   (HDL (..))

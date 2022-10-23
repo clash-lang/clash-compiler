@@ -20,6 +20,7 @@ module Clash.GHC.GHC2Core
   , GHC2CoreEnv (..)
   , srcSpan
   , tyConMap
+  , coreToInlineSpec
   , coreToTerm
   , coreToId
   , coreToName
@@ -66,6 +67,7 @@ import GHC.Driver.Session (unsafeGlobalDynFlags)
 import GHC.Core.FamInstEnv
   (FamInst (..), FamInstEnvs, familyInstances, normaliseType, emptyFamInstEnvs)
 import GHC.Data.FastString (unpackFS, bytesFS)
+import GHC.Types.Basic (InlineSpec(..))
 import GHC.Types.Id (isDataConId_maybe)
 import GHC.Types.Id.Info (IdDetails (..), unfoldingInfo)
 import GHC.Types.Literal (Literal (..), LitNumType (..))
@@ -90,6 +92,7 @@ import GHC.Types.Var
    varUnique, idInfo, isGlobalId)
 import GHC.Types.Var.Set (isEmptyVarSet)
 #else
+import BasicTypes (InlineSpec(..))
 import CoAxiom    (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs),
                    fromBranches, Role (Nominal))
 import Coercion   (coercionType,coercionKind)
@@ -153,6 +156,7 @@ import VarSet     (isEmptyVarSet)
 
 -- Local imports
 import           Clash.Annotations.Primitive (extractPrim)
+import qualified Clash.Core.Binding          as C
 import qualified Clash.Core.DataCon          as C
 import qualified Clash.Core.Literal          as C
 import qualified Clash.Core.Name             as C
@@ -335,6 +339,13 @@ makeAlgTyConRhs algTcRhs = case algTcRhs of
                                                )
   AbstractTyCon {} -> return Nothing
   TupleTyCon {}    -> error "Cannot handle tuple tycons"
+
+coreToInlineSpec :: InlineSpec -> C2C C.InlineSpec
+coreToInlineSpec inl =
+  pure $ case inl of
+    Inline -> C.Inline
+    NoInline -> C.NoInline
+    _ -> C.MaybeInline
 
 coreToTerm
   :: CompiledPrimMap

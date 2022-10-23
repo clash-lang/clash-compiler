@@ -9,7 +9,6 @@
   Transformations for specialisation.
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
@@ -47,18 +46,12 @@ import qualified Data.Text as Text
 import qualified Data.Text.Extra as Text
 import GHC.Stack (HasCallStack)
 
-#if MIN_VERSION_ghc(9,0,0)
-import GHC.Types.Basic (InlineSpec (..))
-#else
-import BasicTypes (InlineSpec (..))
-#endif
-
 import qualified Clash.Sized.Internal.BitVector as BV (BitVector, fromInteger#)
 import qualified Clash.Sized.Internal.Index as I (Index, fromInteger#)
 import qualified Clash.Sized.Internal.Signed as S (Signed, fromInteger#)
 import qualified Clash.Sized.Internal.Unsigned as U (Unsigned, fromInteger#)
 
-import Clash.Core.Binding (Binding(..))
+import Clash.Core.Binding (Binding(..), InlineSpec(..))
 import Clash.Core.DataCon (DataCon(dcArgTys))
 import Clash.Core.FreeVars (freeLocalVars, termFreeTyVars, typeFreeVars)
 import Clash.Core.HasType
@@ -479,7 +472,7 @@ specialize' _ctx _ (appE,args,ticks) (Left specArg) = do
   -- Create a new function if an alpha-equivalent binder doesn't exist
   newf <- case UniqMap.elems existing of
     [] -> do (cf,sp) <- Lens.use curFun
-             mkFunction (appendToName (varName cf) "_specF") sp NoUserInline newBody
+             mkFunction (appendToName (varName cf) "_specF") sp MaybeInline newBody
     (b:_) -> return (bindingId b)
   -- Create specialized argument
   let newArg  = Left $ mkApps (Var newf) specVars

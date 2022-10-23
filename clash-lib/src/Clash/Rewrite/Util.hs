@@ -57,10 +57,8 @@ import qualified Data.ByteString             as BS
 import qualified Data.ByteString.Lazy        as BL
 
 #if MIN_VERSION_ghc(9,0,0)
-import           GHC.Types.Basic             (InlineSpec (..))
 import           GHC.Types.SrcLoc            (SrcSpan)
 #else
-import           BasicTypes                  (InlineSpec (..))
 import           SrcLoc                      (SrcSpan)
 #endif
 
@@ -612,7 +610,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
                                     -- function at this moment for a reason!
                                     -- (termination, CSE and DEC oppertunities,
                                     -- ,etc.)
-                                    (Binding newBodyId sp NoUserInline IsFun newBody r)
+                                    (Binding newBodyId sp MaybeInline IsFun newBody r)
              -- Return the new binder
              return (var, newExpr)
     -- If it does, use the existing binder

@@ -303,7 +303,6 @@ Library
                       Data.Primitive.ByteArray.Extra
                       Data.Set.Ordered.Extra
                       Data.Text.Extra
-                      GHC.BasicTypes.Extra
                       GHC.SrcLoc.Extra
                       Paths_clash_lib
 

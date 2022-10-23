@@ -15,6 +15,7 @@ module Clash.Core.Binding
   ( Binding(..)
   , BindingMap
   , IsPrim(..)
+  , InlineSpec(..)
   ) where
 
 import Control.DeepSeq (NFData)
@@ -22,10 +23,8 @@ import Data.Binary (Binary)
 import GHC.Generics (Generic)
 
 #if MIN_VERSION_ghc(9,0,0)
-import GHC.Types.Basic (InlineSpec)
 import GHC.Types.SrcLoc (SrcSpan)
 #else
-import BasicTypes (InlineSpec)
 import SrcLoc (SrcSpan)
 #endif
 
@@ -36,6 +35,15 @@ data IsPrim
     -- ^ The binding is the unfolding for a primitive.
   | IsFun
     -- ^ The binding is an ordinary function.
+  deriving (Binary, Eq, Generic, NFData, Show)
+
+data InlineSpec
+  = Inline
+    -- ^ Always inline
+  | MaybeInline
+    -- ^ Inline unless there is a good reason not to
+  | NoInline
+    -- ^ Never inline
   deriving (Binary, Eq, Generic, NFData, Show)
 
 -- A function binder in the global environment.

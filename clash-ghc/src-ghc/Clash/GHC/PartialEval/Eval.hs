@@ -31,13 +31,7 @@ import           GHC.Num.Integer (Integer (..))
 import           GHC.Integer.GMP.Internals (BigNat(..), Integer(..))
 #endif
 
-#if MIN_VERSION_ghc(9,0,0)
-import           GHC.Types.Basic (InlineSpec(..))
-#else
-import           BasicTypes (InlineSpec(..))
-#endif
-
-import           Clash.Core.Binding (Binding(..), IsPrim(..))
+import           Clash.Core.Binding (Binding(..), IsPrim(..), InlineSpec(..))
 import           Clash.Core.DataCon (DataCon(..))
 import           Clash.Core.HasType
 import           Clash.Core.Literal (Literal(..))

@@ -83,8 +83,6 @@ import           Clash.Debug             (traceIf)
 import           Clash.Driver            (compilePrimitive)
 import           Clash.Driver.Types      (ClashEnv(..), ClashDesign(..), ClashOpts(..))
 import           Clash.GHC.GHC2Core
-  (C2C, GHC2CoreState, GHC2CoreEnv (..), tyConMap, coreToId, coreToName, coreToTerm,
-   makeAllTyCons, qualifiedNameString, emptyGHC2CoreState, srcSpan)
 import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
 import           Clash.Netlist.BlackBox.Util (getUsedArguments)
 import           Clash.Netlist.Types     (TopEntityT(..))
@@ -146,7 +144,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
                       (fmap (coerce . bindingId) clsMap))
                                     -- Recursion info is always False for class
                                     -- selectors, no need to check free vars.
-      clsMap                        = fmap (\(v,i) -> (Binding v GHC.noSrcSpan GHC.Inline IsFun (mkClassSelector inScope0 allTcCache (varType v) i) False)) clsVMap
+      clsMap                        = fmap (\(v,i) -> (Binding v GHC.noSrcSpan Inline IsFun (mkClassSelector inScope0 allTcCache (varType v) i) False)) clsVMap
       allBindings                   = bindingsMap <> clsMap
       topEntities'                  =
         (\m -> fst (RWS.evalRWS m (GHC2CoreEnv GHC.noSrcSpan fiEnvs) tcMap')) $
@@ -194,7 +192,7 @@ setNoInlineTopEntities bm tes =
   ids = VarSet.fromList (fmap topId tes)
 
   go b@Binding{bindingId}
-    | bindingId `VarSet.elem` ids = b { bindingSpec = GHC.NoInline }
+    | bindingId `VarSet.elem` ids = b { bindingSpec = NoInline }
     | otherwise = b
 
 -- TODO This function should be changed to provide the information that
@@ -219,21 +217,23 @@ mkBindings primMap bindings clsOps unlocatable = do
       let sp = GHC.getSrcSpan v
           inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
       tm <- RWS.local (srcSpan .~ sp) (coreToTerm primMap unlocatable e)
+      inl' <- coreToInlineSpec inl
       v' <- coreToId v
       nm <- qualifiedNameString (GHC.varName v)
       let pr = if HashMap.member nm primMap then IsPrim else IsFun
       checkPrimitive primMap v
-      return [(v', (Binding v' sp inl pr tm False))]
+      return [(v', (Binding v' sp inl' pr tm False))]
     GHC.Rec bs -> do
       tms <- mapM (\(v,e) -> do
                     let sp  = GHC.getSrcSpan v
                         inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
                     tm <- RWS.local (srcSpan .~ sp) (coreToTerm primMap unlocatable e)
+                    inl' <- coreToInlineSpec inl
                     v' <- coreToId v
                     nm <- qualifiedNameString (GHC.varName v)
                     let pr = if HashMap.member nm primMap then IsPrim else IsFun
                     checkPrimitive primMap v
-                    return (Binding v' sp inl pr tm True)
+                    return (Binding v' sp inl' pr tm True)
                   ) bs
       case tms of
         [Binding v sp inl pr tm r] -> return [(v, Binding v sp inl pr tm r)]
