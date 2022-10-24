@@ -478,6 +478,30 @@ runClashTest = defaultMain $ clashTestRoot
 --             in runTest "Floating" _opts
 --           ]
 --         ]
+      , clashTestGroup "Cores"
+        [ clashTestGroup "Xilinx"
+          [ runTest "DcFifo0" def{
+              hdlTargets=[VHDL, Verilog]
+            , hdlLoad=[]
+            , hdlSim=[Vivado]}
+          , runTest "DcFifo1" def{
+              hdlTargets=[VHDL, Verilog]
+            , hdlLoad=[]
+            , hdlSim=[Vivado]}
+          , runTest "DcFifo2" def{
+              hdlTargets=[VHDL, Verilog]
+            , hdlLoad=[]
+            , hdlSim=[Vivado]}
+          , clashTestGroup "DcFifo" [
+              let _opts =
+                    def{ hdlTargets=[VHDL, Verilog]
+                       , hdlLoad=[]
+                       , hdlSim=[Vivado]
+                       }
+              in runTest "Basic" _opts
+            ]
+          ]
+        ]
       , clashTestGroup "CSignal"
         [ runTest "MAC" def{hdlSim=[]}
         , runTest "CBlockRamTest" def{hdlSim=[]}
@@ -959,9 +983,9 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "VecOfSum" def{hdlSim=[]}
         , runTest "T452" def{hdlSim=[]}
         , runTest "T478" def{hdlSim=[]}
-        , let _opts = def { hdlSim = [], hdlTargets = [VHDL]}
+        , let _opts = def {hdlSim = [], hdlTargets = [VHDL]}
            in runTest "T895" _opts
-        , let _opts = def { hdlSim = [], hdlTargets = [VHDL], clashFlags = ["-fclash-hdlsyn", "Vivado"]}
+        , let _opts = def {hdlSim = [], hdlTargets = [VHDL]}
            in runTest "T1360" _opts
         ] -- end vector
       , clashTestGroup "Verification" [
