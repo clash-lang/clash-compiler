@@ -62,6 +62,9 @@ module Clash.Cores.Xilinx.Floating.Explicit
   , fromU32With
   , fromU32
   , FromU32DefDelay
+  , fromS32With
+  , fromS32
+  , FromS32DefDelay
     -- * Customizing IP
   , Config(..)
   , defConfig
@@ -270,6 +273,43 @@ fromU32 = withFrozenCallStack fromU32With
 
 -- | The default delay for conversion of @Unsigned 32@ to @Float@
 type FromU32DefDelay = 5
+
+-- | Customizable conversion of @Signed 32@ to @Float@
+--
+-- Only the delay is configurable, so this function does not take a @Config@
+-- argument.
+fromS32With
+  :: forall d dom n
+   . ( KnownDomain dom
+     , KnownNat d
+     , HasCallStack
+     )
+  => Clock dom
+  -> Enable dom
+  -> DSignal dom n (Signed 32)
+  -> DSignal dom (n + d) Float
+fromS32With clk en = delayI und en clk . fmap fromIntegral
+ where
+  und = withFrozenCallStack $ errorX "Initial values of fromS32 undefined"
+{-# NOINLINE fromS32With #-}
+{-# ANN fromS32With (vhdlFromSPrim 'fromS32With "fromS32") #-}
+{-# ANN fromS32With (veriFromSPrim 'fromS32With "fromS32") #-}
+
+-- | Conversion of @Signed 32@ to @Float@, with default delay
+fromS32
+  :: forall dom n
+   . ( KnownDomain dom
+     , HasCallStack
+     )
+  => Clock dom
+  -> Enable dom
+  -> DSignal dom n (Signed 32)
+  -> DSignal dom (n + FromS32DefDelay) Float
+fromS32 = withFrozenCallStack fromS32With
+{-# INLINE fromS32 #-}
+
+-- | The default delay for conversion of @Signed 32@ to @Float@
+type FromS32DefDelay = 6
 
 -- | Default customization options.
 --

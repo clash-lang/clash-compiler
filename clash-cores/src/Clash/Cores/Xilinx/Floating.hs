@@ -59,6 +59,9 @@ module Clash.Cores.Xilinx.Floating
   , fromU32With
   , fromU32
   , E.FromU32DefDelay
+  , fromS32With
+  , fromS32
+  , E.FromS32DefDelay
     -- * Customizing IP
   , E.Config(..)
   , E.defConfig
@@ -202,3 +205,29 @@ fromU32
   -> DSignal dom (n + E.FromU32DefDelay) Float
 fromU32 = withFrozenCallStack $ hideEnable $ hideClock E.fromU32
 {-# INLINE fromU32 #-}
+
+-- | Customizable conversion of @Signed 32@ to @Float@
+--
+-- Only the delay is configurable, so this function does not take a @Config@
+-- argument.
+fromS32With
+  :: ( HiddenClock dom
+     , HiddenEnable dom
+     , KnownNat d
+     , HasCallStack
+     )
+  => DSignal dom n (Signed 32)
+  -> DSignal dom (n + d) Float
+fromS32With = withFrozenCallStack $ hideEnable $ hideClock E.fromS32With
+{-# INLINE fromS32With #-}
+
+-- | Conversion of @Signed 32@ to @Float@, with default delay
+fromS32
+  :: ( HiddenClock dom
+     , HiddenEnable dom
+     , HasCallStack
+     )
+  => DSignal dom n (Signed 32)
+  -> DSignal dom (n + E.FromS32DefDelay) Float
+fromS32 = withFrozenCallStack $ hideEnable $ hideClock E.fromS32
+{-# INLINE fromS32 #-}
