@@ -473,6 +473,8 @@ runClashTest = defaultMain $ clashTestRoot
 --                                                         , "divBasicTB"
 --                                                         , "fromUBasicTB"
 --                                                         , "fromUEnableTB"
+--                                                         , "fromSBasicTB"
+--                                                         , "fromSEnableTB"
 --                                                         ]
 --                            }
 --             in runTest "Floating" _opts

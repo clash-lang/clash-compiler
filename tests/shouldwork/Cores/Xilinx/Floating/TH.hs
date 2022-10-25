@@ -9,7 +9,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 module Floating.TH where
 
-import Clash.Prelude (natToNum, unpack, Unsigned)
+import Clash.Prelude (natToNum, unpack, Signed, Unsigned)
 
 import Prelude
 import Numeric.IEEE
@@ -549,6 +549,42 @@ fromUBasicSamples = delayOutput0 (natToNum @F.FromU32DefDelay) $
     , 0b0000_0010_0000_0000_0000_0000_0000_0001
     ]
  where
+  delayOutput0 d es = zip is os
+   where
+    (is0, os0) = unzip es
+    is = is0 ++ repeat (last is0)
+    os = replicate d 0 ++ os0
+
+fromSBasicSamples :: [(Signed 32, Float)]
+fromSBasicSamples = delayOutput0 (natToNum @F.FromS32DefDelay) $
+  map (\x -> (x, fromIntegral x)) (specials ++ map (* (-1)) specials)
+
+ where
+  specials =
+    [ 0
+    , 1
+    , minBound
+    , maxBound
+
+      -- Patterns 0xaa and 0x55, but treating the "sign bit" separately. Floats
+      -- are stored in sign/magnitude form so signed and unsigned numbers are
+      -- not interchangeable like with two's complement.
+    , 0b0010_1010_1010_1010_1010_1010_1010_1010
+    , 0b0101_0101_0101_0101_0101_0101_0101_0101
+    , 0b1010_1010_1010_1010_1010_1010_1010_1010
+    , 0b1101_0101_0101_0101_0101_0101_0101_0101
+
+    , -- Longest exactly representable
+      0b0000_0000_1111_1111_1111_1111_1111_1111
+
+    , -- Smallest with rounding
+      0b0000_0001_0000_0000_0000_0000_0000_0001
+
+      -- More rounding tests
+    , 0b0000_0001_0000_0000_0000_0000_0000_0011
+    , 0b0000_0010_0000_0000_0000_0000_0000_0001
+    ]
+
   delayOutput0 d es = zip is os
    where
     (is0, os0) = unzip es

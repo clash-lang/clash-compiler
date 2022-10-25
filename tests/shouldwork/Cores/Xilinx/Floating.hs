@@ -287,3 +287,61 @@ fromUEnableTB = done
   clk = tbClockGen (not <$> done)
   rst = resetGen
 {-# ANN fromUEnableTB (TestBench 'fromUEnable) #-}
+
+fromSBasic
+  :: Clock XilinxSystem
+  -> DSignal XilinxSystem 0 (Signed 32)
+  -> DSignal XilinxSystem F.FromS32DefDelay Float
+fromSBasic clk x = withClock clk $ withEnable enableGen $ F.fromS32 x
+{-# NOINLINE fromSBasic #-}
+{-# ANN fromSBasic (unaryTopAnn "fromSBasic") #-}
+
+fromSBasicTB :: Signal XilinxSystem Bool
+fromSBasicTB = done
+ where
+  (done0, samples) =
+    playSampleRom clk rst $(memBlobTH Nothing fromSBasicSamples)
+  (input, expectedOutput) = unbundle samples
+  -- Only assert while not finished
+  done = mux done0 done0 $
+    assert clk rst "fromSBasicTB" out expectedOutput done0
+  out = ignoreFor clk rst en (SNat @F.FromS32DefDelay) 0 . toSignal .
+    fromSBasic clk $ fromSignal input
+  clk = tbClockGen (not <$> done)
+  rst = resetGen
+  en = enableGen
+{-# ANN fromSBasicTB (TestBench 'fromSBasic) #-}
+
+fromSEnable
+  :: Clock XilinxSystem
+  -> Enable XilinxSystem
+  -> DSignal XilinxSystem 0 (Signed 32)
+  -> DSignal XilinxSystem 6 Float
+fromSEnable clk en x = withClock clk $ withEnable en $ F.fromS32 x
+{-# NOINLINE fromSEnable #-}
+{-# ANN fromSEnable (unaryEnTopAnn "fromSEnable") #-}
+
+fromSEnableTB :: Signal XilinxSystem Bool
+fromSEnableTB = done
+ where
+  testInput = fromSignal $
+    stimuliGenerator clk rst $(listToVecTH [1 :: Signed 32 .. 21])
+  en = toEnable $ stimuliGenerator clk rst
+        ((replicate d6 True ++ replicate d4 True ++ replicate d4 False) :< True)
+  expectedOutput = replicate d6 0 ++
+    $(listToVecTH $
+         [1 :: Float .. 4]
+      -- Stall for four cycles
+      <> P.replicate 4 5
+      -- Still in the pipeline (6 deep) from before the stall.
+      <> P.take 6 [5 .. 21]
+      -- We "lose" four samples of what remains due to not being enabled
+      -- for those inputs.
+      <> P.drop 4 (P.drop 6 [5 .. 21])
+    )
+  expectOutput = outputVerifier' clk rst expectedOutput
+  done = expectOutput . ignoreFor clk rst enableGen d6 0 . toSignal $
+    fromSEnable clk en testInput
+  clk = tbClockGen (not <$> done)
+  rst = resetGen
+{-# ANN fromSEnableTB (TestBench 'fromSEnable) #-}
