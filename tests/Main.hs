@@ -464,6 +464,8 @@ runClashTest = defaultMain $ clashTestRoot
                                                         , "subBasicTB"
                                                         , "mulBasicTB"
                                                         , "divBasicTB"
+                                                        , "compareBasicTB"
+                                                        , "compareEnableTB"
                                                         , "fromUBasicTB"
                                                         , "fromUEnableTB"
                                                         , "fromSBasicTB"

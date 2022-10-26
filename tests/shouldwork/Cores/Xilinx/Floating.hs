@@ -5,10 +5,13 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
+{-# OPTIONS_GHC -fconstraint-solver-iterations=10 -Wall -Werror #-}
+
 module Floating where
 
 import Clash.Prelude
 import qualified Clash.Explicit.Prelude as CEP
+import qualified Clash.Signal.Delayed as D
 import Clash.Explicit.Testbench
 
 import qualified Prelude as P
@@ -20,6 +23,7 @@ import Floating.Annotations
 import Floating.TH
 
 newtype FloatVerifier = FloatVerifier Float
+  deriving (Generic, BitPack)
 
 instance Eq FloatVerifier where
   (FloatVerifier x) == (FloatVerifier y) = pack x == pack y
@@ -64,26 +68,28 @@ playSampleRom clk rst content = (done, out)
   cnt = CEP.register clk rst enableGen 0 $ satSucc SatBound <$> cnt
 
 basicBinaryTB
-  :: forall n d
+  :: forall n d x y z
    . ( KnownNat n
      , KnownNat d
+     , Eq z, ShowX z
      , 1 <= n
      )
   => (   Clock XilinxSystem
-      -> DSignal XilinxSystem 0 Float
-      -> DSignal XilinxSystem 0 Float
-      -> DSignal XilinxSystem d Float
+      -> DSignal XilinxSystem 0 x
+      -> DSignal XilinxSystem 0 y
+      -> DSignal XilinxSystem d z
      )
-  -> Vec n (Float, Float, Float)
+  -> z
+  -> Vec n (x, y, z)
   -> Signal XilinxSystem Bool
-basicBinaryTB comp samples = done
+basicBinaryTB comp zDef samples = done
  where
   (inputX, inputY, expectedOutput) = unzip3 samples
   testInputX = fromSignal $ stimuliGenerator clk rst inputX
   testInputY = fromSignal $ stimuliGenerator clk rst inputY
-  expectOutput = outputVerifier' clk rst (repeat @d 0 ++ expectedOutput)
+  expectOutput = outputVerifier' clk rst (repeat @d zDef ++ expectedOutput)
   done =
-      expectOutput . ignoreFor clk rst en (SNat @d) 0
+      expectOutput . ignoreFor clk rst en (SNat @d) zDef
     . toSignal $ comp clk testInputX testInputY
   clk = tbClockGen (not <$> done)
   rst = resetGen
@@ -91,28 +97,32 @@ basicBinaryTB comp samples = done
 {-# INLINE basicBinaryTB #-}
 
 basicRomTB
-  :: forall d n
+  :: forall d n x y z
    . ( KnownNat n
      , KnownNat d
+     , BitPack x
+     , BitPack y
+     , Eq z, ShowX z, BitPack z
      , 1 <= n
      )
   => (   Clock XilinxSystem
-      -> DSignal XilinxSystem 0 Float
-      -> DSignal XilinxSystem 0 Float
-      -> DSignal XilinxSystem d Float
+      -> DSignal XilinxSystem 0 x
+      -> DSignal XilinxSystem 0 y
+      -> DSignal XilinxSystem d z
      )
-  -> MemBlob n (BitSize (Float, Float, Float))
+  -> z
+  -> MemBlob n (BitSize (x, y, z))
   -> Signal XilinxSystem Bool
-basicRomTB comp sampleBlob = done
+basicRomTB comp resDef sampleBlob = done
  where
   (done0, samples) = playSampleRom clk rst sampleBlob
   (inputX, inputY, expectedOutput) = unbundle samples
   -- Only assert while not finished
   done = mux done0 done0
-    $ assert clk rst "basicRomTB" out (fmap FloatVerifier expectedOutput)
+    $ assert clk rst "basicRomTB" out expectedOutput
              done0
   out =
-      fmap FloatVerifier . ignoreFor clk rst en (SNat @d) 0
+      ignoreFor clk rst en (SNat @d) resDef
     . toSignal $ comp clk (fromSignal inputX) (fromSignal inputY)
   clk = tbClockGen (not <$> done)
   rst = resetGen
@@ -129,7 +139,11 @@ addBasic clk x y = withClock clk $ withEnable enableGen $ F.add x y
 {-# ANN addBasic (binaryTopAnn "addBasic") #-}
 
 addBasicTB :: Signal XilinxSystem Bool
-addBasicTB = basicRomTB addBasic $(memBlobTH Nothing addBasicSamples)
+addBasicTB =
+  basicRomTB
+    (\clk a b -> FloatVerifier <$> addBasic clk a b)
+    (FloatVerifier 0.0)
+    $(memBlobTH Nothing addBasicSamples)
 {-# ANN addBasicTB (TestBench 'addBasic) #-}
 
 addEnable
@@ -184,7 +198,7 @@ addShortPL clk x y =
 
 addShortPLTB :: Signal XilinxSystem Bool
 addShortPLTB =
-  basicBinaryTB addShortPL
+  basicBinaryTB addShortPL 0.0
     $(listToVecTH [ (1, 4, 5) :: (Float, Float, Float)
                   , (2, 5, 7)
                   , (3, 6, 9)
@@ -201,7 +215,11 @@ subBasic clk x y = withClock clk $ withEnable enableGen $ F.sub x y
 {-# ANN subBasic (binaryTopAnn "subBasic") #-}
 
 subBasicTB :: Signal XilinxSystem Bool
-subBasicTB = basicRomTB subBasic $(memBlobTH Nothing subBasicSamples)
+subBasicTB =
+  basicRomTB
+    (\clk a b -> FloatVerifier <$> subBasic clk a b)
+    (FloatVerifier 0.0)
+    $(memBlobTH Nothing subBasicSamples)
 {-# ANN subBasicTB (TestBench 'subBasic) #-}
 
 mulBasic
@@ -214,7 +232,11 @@ mulBasic clk x y = withClock clk $ withEnable enableGen $ F.mul x y
 {-# ANN mulBasic (binaryTopAnn "mulBasic") #-}
 
 mulBasicTB :: Signal XilinxSystem Bool
-mulBasicTB = basicRomTB mulBasic $(memBlobTH Nothing mulBasicSamples)
+mulBasicTB =
+  basicRomTB
+    (\clk a b -> FloatVerifier <$> mulBasic clk a b)
+    (FloatVerifier 0.0)
+    $(memBlobTH Nothing mulBasicSamples)
 {-# ANN mulBasicTB (TestBench 'mulBasic) #-}
 
 divBasic
@@ -227,8 +249,53 @@ divBasic clk x y = withClock clk $ withEnable enableGen $ F.div x y
 {-# ANN divBasic (binaryTopAnn "divBasic") #-}
 
 divBasicTB :: Signal XilinxSystem Bool
-divBasicTB = basicRomTB divBasic $(memBlobTH Nothing divBasicSamples)
+divBasicTB =
+  basicRomTB
+    (\clk a b -> FloatVerifier <$> divBasic clk a b)
+    (FloatVerifier 0.0)
+    $(memBlobTH Nothing divBasicSamples)
 {-# ANN divBasicTB (TestBench 'divBasic) #-}
+
+compareBasic
+  :: Clock XilinxSystem
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem F.CompareDefDelay F.Ordering
+compareBasic clk x y =
+  withClock clk $ withEnable enableGen $ F.compare x y
+{-# NOINLINE compareBasic #-}
+{-# ANN compareBasic (binaryTopAnn "compareBasic") #-}
+
+compareBasicTB :: Signal XilinxSystem Bool
+compareBasicTB =
+  basicRomTB compareBasic F.NaN $(memBlobTH Nothing compareBasicSamples)
+{-# ANN compareBasicTB (TestBench 'compareBasic) #-}
+
+compareEnable
+  :: Clock XilinxSystem
+  -> Enable XilinxSystem
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem F.CompareDefDelay F.Ordering
+compareEnable clk en x y = withClock clk $ withEnable en $ F.compare x y
+{-# NOINLINE compareEnable #-}
+{-# ANN compareEnable (binaryEnTopAnn "compareEnable") #-}
+
+compareEnableTB :: Signal XilinxSystem Bool
+compareEnableTB = done
+ where
+  done = outputVerifier' clk rst $(listToVecTH compareFloatsEnableExpected) actual1
+
+  actual1 = ignoreFor clk rst enableGen d6 F.EQ (D.toSignal actual0)
+  actual0 = compareEnable clk ena (D.fromSignal testInputA) (D.fromSignal testInputB)
+
+  clk = tbClockGen (not <$> done)
+  rst = resetGen
+  ena = toEnable $ CEP.stimuliGenerator clk rst $(listToVecTH compareFloatsEnableInput)
+
+  testInputA = CEP.stimuliGenerator clk rst $(listToVecTH compareFloatsEnableInputA)
+  testInputB = CEP.stimuliGenerator clk rst $(listToVecTH compareFloatsEnableInputB)
+{-# ANN compareEnableTB (TestBench 'compareEnable) #-}
 
 fromUBasic
   :: Clock XilinxSystem

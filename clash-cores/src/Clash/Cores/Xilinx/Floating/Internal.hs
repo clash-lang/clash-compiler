@@ -4,17 +4,28 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
+{-# LANGUAGE DeriveLift #-}
+{-# LANGUAGE LambdaCase #-}
+
 module Clash.Cores.Xilinx.Floating.Internal
   ( Config(..)
   , ArchOpt(..)
   , DspUsage(..)
   , BMemUsage(..)
+  , Ordering(..)
   , xilinxNaN
   , conditionFloat
   , conditionFloatF
+  , xilinxCompare
+  , toMaybeOrdering
   ) where
 
-import Clash.Prelude
+import Clash.Prelude hiding (Ordering(..))
+import qualified Prelude as P
+
+import Clash.Annotations.BitRepresentation.Deriving
+  ( deriveAnnotation, simpleDerivator, ConstructorType(OneHot), FieldsType(Wide)
+  , deriveBitPack )
 
 -- | Customize Xilinx floating point IP.
 --
@@ -93,3 +104,35 @@ conditionFloatF
   => f Float
   -> f Float
 conditionFloatF = fmap conditionFloat
+
+-- | One-hot encoded version of 'P.Ordering'. The order of fields is chosen to
+-- match the ordering picked by Xilinx's Floating Point comparison IP.
+data Ordering
+  = EQ
+  | LT
+  | GT
+  | NaN
+  deriving (Generic, NFDataX, Eq, ShowX, Show, Lift)
+deriveAnnotation (simpleDerivator OneHot Wide) [t| Ordering |]
+deriveBitPack [t| Ordering |]
+
+-- | Converts 'Ordering' to Prelude's 'P.Ordering'. If the given ordering is
+-- 'NaN', 'Nothing' is returned.
+toMaybeOrdering :: Ordering -> Maybe P.Ordering
+toMaybeOrdering = \case
+  EQ -> Just P.EQ
+  LT -> Just P.LT
+  GT -> Just P.GT
+  NaN -> Nothing
+
+-- | Perform comparison on two 'Float's. The type returned is a locally defined
+-- version of 'Ordering'. If you want prelude's 'P.Ordering', see 'toMaybeOrdering'.
+xilinxCompare :: Float -> Float -> Ordering
+xilinxCompare x y
+  | isNaN x = NaN
+  | isNaN y = NaN
+  | otherwise =
+      case compare (conditionFloat x) (conditionFloat y) of
+        P.LT -> LT
+        P.EQ -> EQ
+        P.GT -> GT

@@ -59,6 +59,11 @@ module Clash.Cores.Xilinx.Floating
   , fromU32With
   , fromU32
   , E.FromU32DefDelay
+  , E.Ordering(..)
+  , E.toMaybeOrdering
+  , compare
+  , compareWith
+  , E.CompareDefDelay
   , fromS32With
   , fromS32
   , E.FromS32DefDelay
@@ -70,7 +75,7 @@ module Clash.Cores.Xilinx.Floating
   , E.BMemUsage(..)
   ) where
 
-import Clash.Prelude hiding (add, sub, mul, div)
+import Clash.Prelude hiding (Ordering(..), add, sub, mul, div, compare)
 
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 
@@ -179,6 +184,42 @@ div
   -> DSignal dom (n + E.DivDefDelay) Float
 div = withFrozenCallStack $ hideEnable $ hideClock E.div
 {-# INLINE div #-}
+
+-- | Customizable floating point comparison
+--
+-- Produces 'NaN' if any of the inputs is NaN. Otherwise, it behaves like
+-- Haskell's 'P.compare'.
+--
+-- Only the delay is configurable, so this function does not take a @Config@
+-- argument.
+compareWith
+  :: forall d dom n
+   . ( HiddenClock dom
+     , HiddenEnable dom
+     , KnownNat d
+     , HasCallStack
+     )
+  => DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + d) E.Ordering
+compareWith = E.compareWith hasClock hasEnable
+{-# INLINE compareWith #-}
+
+-- | Floating point comparison, with default delay
+--
+-- Produces 'NaN' if any of the inputs is NaN. Otherwise, it behaves like
+-- Haskell's 'P.compare'.
+compare
+  :: forall dom n
+   . ( HiddenClock dom
+     , HiddenEnable dom
+     , HasCallStack
+     )
+  => DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + E.CompareDefDelay) E.Ordering
+compare = compareWith
+{-# INLINE compare #-}
 
 -- | Customizable conversion of @Unsigned 32@ to @Float@
 --

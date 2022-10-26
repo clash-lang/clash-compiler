@@ -539,6 +539,7 @@ instance NFDataX a => NFDataX (Down a) where
   ensureSpine ~(Down x) = Down (ensureSpine x)
 
 instance NFDataX Bool
+instance NFDataX Ordering
 instance NFDataX a => NFDataX [a]
 instance (NFDataX a, NFDataX b) => NFDataX (Either a b)
 instance NFDataX a => NFDataX (Maybe a)

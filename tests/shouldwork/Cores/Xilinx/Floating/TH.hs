@@ -5,6 +5,11 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
+{-# OPTIONS_GHC -Wall -Werror #-}
+
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module Floating.TH where
@@ -18,20 +23,51 @@ import Numeric.IEEE
 import Clash.Cores.Xilinx.Floating as F
 import Clash.Cores.Xilinx.Floating.Internal as F
 
+-- | For @compareEnableTB@. Obtained by running an RNG.
+compareFloatsEnableInputA :: [Float]
+compareFloatsEnableInputA =
+  [ 63, 73, 85, 68, 14, 36, 52, 38, 97, 60, 80, 10, 94, 58, 47, 59, 70, 9, 64
+  , 79, 5, 49, 88, 93, 43, 90, 99, 56, 98, 12, 11, 20, 100, 57, 37, 33, 74, 83
+  , 19, 84, 95, 53, 34, 89, 75, 55, 76, 44, 18, 28
+  ]
+
+-- | For @compareEnableTB@. Obtained by running an RNG.
+compareFloatsEnableInputB :: [Float]
+compareFloatsEnableInputB =
+  [ 74, 62, 11, 12, 41, 10, 76, 90, 26, 93, 43, 29, 33, 79, 77, 80, 57, 70, 22
+  , 19, 14, 8, 37, 2, 85, 89, 36, 86, 91, 17, 53, 4, 25, 97, 72, 24, 50, 9, 99
+  , 95, 65, 30, 63, 7, 92, 15, 28, 82, 87, 84
+  ]
+
+-- | For @compareEnableTB@.
+compareFloatsEnableInput :: [Bool]
+compareFloatsEnableInput = map (<= 50) compareFloatsEnableInputA
+
+-- | For @compareEnableTB@. Obtained by sampling Haskell model.
+compareFloatsEnableExpected :: [F.Ordering]
+compareFloatsEnableExpected =
+  [ F.EQ, F.EQ, F.EQ, F.EQ, F.EQ, F.EQ -- First samples undefined, replaced by EQ in TB
+  , F.LT, F.LT, F.GT, F.GT, F.GT, F.GT, F.LT, F.LT, F.LT, F.LT, F.LT, F.LT, F.LT
+  , F.LT, F.LT, F.LT, F.LT, F.LT, F.LT, F.GT, F.GT, F.GT, F.GT, F.GT, F.LT, F.LT
+  , F.LT, F.LT, F.LT, F.GT, F.LT, F.LT, F.LT, F.GT, F.GT, F.GT, F.GT, F.LT, F.LT
+  , F.LT, F.LT, F.LT, F.LT, F.LT
+  ]
+
 delayOutput
   :: Int
-  -> [(Float, Float, Float)]
-  -> [(Float, Float, Float)]
-delayOutput d es = zip3 xs ys rs
+  -> a
+  -> [(Float, Float, a)]
+  -> [(Float, Float, a)]
+delayOutput d aDef es = zip3 xs ys rs
  where
   (xs0, ys0, rs0) = unzip3 es
   xs = xs0 ++ repeat (last xs0)
   ys = ys0 ++ repeat (last ys0)
-  rs = replicate d 0 ++ rs0
+  rs = replicate d aDef ++ rs0
 
 addBasicSamples :: [(Float, Float, Float)]
 addBasicSamples =
-  delayOutput (natToNum @F.AddDefDelay) $
+  delayOutput (natToNum @F.AddDefDelay) 0.0 $
   [ (1, 4, 5)
   , (2, 5, 7)
   , (3, 6, 9)
@@ -44,7 +80,7 @@ addBasicSamples =
 
 subBasicSamples :: [(Float, Float, Float)]
 subBasicSamples =
-  delayOutput (natToNum @F.SubDefDelay) $
+  delayOutput (natToNum @F.SubDefDelay) 0.0 $
   [ (1, 6, -5)
   , (2, 5, -3)
   , (3, 4, -1)
@@ -221,7 +257,7 @@ addSubBasicSamples =
 
 mulBasicSamples :: [(Float, Float, Float)]
 mulBasicSamples =
-  delayOutput (natToNum @F.MulDefDelay) $
+  delayOutput (natToNum @F.MulDefDelay) 0.0 $
   [ (1, 4, 4)
   , (2, 5, 10)
   , (3, 6, 18)
@@ -378,7 +414,7 @@ mulBasicSamples =
 
 divBasicSamples :: [(Float, Float, Float)]
 divBasicSamples =
-  delayOutput (natToNum @F.DivDefDelay) $
+  delayOutput (natToNum @F.DivDefDelay) 0.0 $
   [ (1, 2, 0.5)
   , (3, 4, 0.75)
   , (7, 8, 0.875)
@@ -455,6 +491,16 @@ divBasicSamples =
   digits = floatDigits (undefined :: Float)
   (_, maxExp) = floatRange (undefined :: Float)
   model (conditionFloat -> x) (conditionFloat -> y) = conditionFloat $ x / y
+
+compareBasicSamples :: [(Float, Float, F.Ordering)]
+compareBasicSamples =
+    delayOutput (natToNum @F.CompareDefDelay) F.NaN
+  $ [ (1.0,         2.0,         F.LT)
+    , (2.0,         1.0,         F.GT)
+    , (1.0,         1.0,         F.EQ)
+    , (F.xilinxNaN, 1.0,         F.NaN)
+    , (1.0,         F.xilinxNaN, F.NaN)
+    ] ++ cartesianProductTest xilinxCompare interesting interesting
 
 cartesianProductTest
   :: (a -> b -> c)
