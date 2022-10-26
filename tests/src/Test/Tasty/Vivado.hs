@@ -20,7 +20,7 @@ import Text.Regex.TDFA.Text (compile)
 import Clash.Driver.Manifest (topComponent, manifestFilename)
 import Clash.DataFiles (tclConnector)
 
-import Test.Tasty.Common (getManifests)
+import Test.Tasty.Common
 import Test.Tasty.Program
 
 -- | @--vivado@ flag for enabling tests that use vivado.
@@ -34,13 +34,15 @@ instance IsOption Vivado where
   optionCLParser = flagCLParser Nothing (Vivado False)
 
 data VivadoTest = VivadoTest
-  { hdlDir :: IO FilePath
+  { parentDir :: IO FilePath
+  , hdlDir :: IO FilePath
   , topEntity :: Text
   }
 
 instance IsTest VivadoTest where
   run optionSet VivadoTest{..} progressCallback
     | Vivado True <- lookupOption optionSet = do
+        buildTargetDir parentDir hdlDir
         dir <- hdlDir
         createDirectory $ dir </> "ip"
         createDirectory $ dir </> "project"
@@ -53,7 +55,11 @@ instance IsTest VivadoTest where
    where
     vivado workDir args =
       TestFailingProgram True "vivado" args NoGlob PrintNeither False (Just 0)
-        (ExpectNotMatchStdOut re) (Just workDir) [("XILINX_LOCAL_USER_DATA", "no")]
+        (ExpectNotMatchStdOut re) (Just workDir)
+        -- Without XILINX_LOCAL_USER_DATA=no, concurrently running instances of
+        -- Vivado might error out while accessing the Xilinx Tcl App Store at
+        -- ~/.Xilinx. https://support.xilinx.com/s/article/63253
+        [("XILINX_LOCAL_USER_DATA", "no")]
       where re = either error id
               (compile defaultCompOpt (ExecOption False) "^\\s*(@|(Error))")
     runVivado workDir args =

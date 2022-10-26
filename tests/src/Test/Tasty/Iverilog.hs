@@ -41,15 +41,18 @@ instance IsOption Iverilog where
 -- @
 --
 data IVerilogMakeTest = IVerilogMakeTest
-  { ivmSourceDirectory :: IO FilePath
-    -- ^ Directory containing VHDL files produced by Clash
+  { ivmParentDirectory :: IO FilePath
+    -- ^ Shared temporary directory
+  , ivmSourceDirectory :: IO FilePath
+    -- ^ Directory to work from
   , ivmTop :: String
     -- ^ Entry point to be compiled
   }
 
 instance IsTest IVerilogMakeTest where
-  run optionSet IVerilogMakeTest{ivmSourceDirectory,ivmTop} progressCallback
+  run optionSet IVerilogMakeTest{..} progressCallback
     | Iverilog True <- lookupOption optionSet = do
+        buildTargetDir ivmParentDirectory ivmSourceDirectory
         src <- ivmSourceDirectory
         libs <- listDirectory src
         verilogFiles <- glob (src </> "*" </> "*.v")

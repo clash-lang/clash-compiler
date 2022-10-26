@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Test.Tasty.Verilator where
@@ -29,28 +30,30 @@ instance IsOption Verilator where
   optionCLParser = flagCLParser Nothing (Verilator False)
 
 data VerilatorMakeTest = VerilatorMakeTest
-  { vmDirectory :: IO FilePath
+  { vmParentDirectory :: IO FilePath
+  , vmDirectory :: IO FilePath
   , vmTop :: String
   }
 
 instance IsTest VerilatorMakeTest where
-  run optionSet (VerilatorMakeTest getDir top) progressCallback
+  run optionSet VerilatorMakeTest{..} progressCallback
     | Verilator True <- lookupOption optionSet = do
-        dir <- getDir
+        buildTargetDir vmParentDirectory vmDirectory
+        dir <- vmDirectory
         libs <- listDirectory dir >>= filterM doesDirectoryExist . fmap (dir </>)
 
         -- Only pass the sources for the shim and the entity to simulate. The other
         -- modules will be found in the included directories. The path to the C++
         -- shim MUST include the subdirectories below the working directory
         -- explicitly.
-        cSrc <- glob (dir </> "*" </> top <> "_shim.cpp")
-        vSrc <- fmap takeFileName <$> glob (dir </> "*" </> top <> ".v")
+        cSrc <- glob (dir </> "*" </> vmTop <> "_shim.cpp")
+        vSrc <- fmap takeFileName <$> glob (dir </> "*" </> vmTop <> ".v")
 
         -- Types modules have to be given first, or verilator will complain that
         -- they are not already declared when it sees them being imported.
         svSrc <- mappend
           <$> (fmap takeFileName <$> glob (dir </> "*" </> "*_types.sv"))
-          <*> (fmap takeFileName <$> glob (dir </> "*" </> top <> ".sv"))
+          <*> (fmap takeFileName <$> glob (dir </> "*" </> vmTop <> ".sv"))
 
         -- Clash by default will not mix HDLs in it's output. If this ever changes,
         -- and it is possible to have `clash` output both Verilog and SystemVerilog
@@ -69,7 +72,7 @@ instance IsTest VerilatorMakeTest where
            , "+1364-2001ext+v"    -- Default to Verilog 2001
            , "+1800-2005ext+sv"   -- Default to SystemVerilog 2005
            , "--top"              -- This is used to set the C++ class names
-           , top
+           , vmTop
            , "--cc"               -- Build for C++, not SystemC
            , "--build"            -- Build the verilated code immediately
            , "--exe"              -- Create an executable instead of a library

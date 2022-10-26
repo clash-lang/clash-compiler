@@ -31,8 +31,10 @@ instance IsOption Symbiyosys where
 data SbyVerificationTest = SbyVerificationTest
   { svtExpectFail :: Maybe (TestExitCode, T.Text)
     -- ^ Expected failure code and output (if any)
+  , svtParentDirectory :: IO FilePath
+    -- ^ Shared temporary directory
   , svtSourceDirectory :: IO FilePath
-    -- ^ Directory containing files produced by Clash
+    -- ^ Directory to work from
   , svtTop :: String
     -- ^ Entry point to be verified
   }
@@ -40,6 +42,7 @@ data SbyVerificationTest = SbyVerificationTest
 instance IsTest SbyVerificationTest where
   run optionSet SbyVerificationTest {..} progressCallback
     | Symbiyosys True <- lookupOption optionSet = do
+        buildTargetDir svtParentDirectory svtSourceDirectory
         src <- svtSourceDirectory
         [(manifestFile, Manifest {..})] <- getManifests (src </> "*" </> manifestFilename)
 

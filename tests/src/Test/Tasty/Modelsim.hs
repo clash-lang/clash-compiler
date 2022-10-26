@@ -31,13 +31,16 @@ instance IsOption ModelSim where
   optionCLParser = flagCLParser Nothing (ModelSim False)
 
 data ModelsimVlibTest = ModelsimVlibTest
-  { mvtSourceDirectory :: IO FilePath
-    -- ^ Directory containing VHDL files produced by Clash
+  { mvtParentDirectory :: IO FilePath
+    -- ^ Shared temporary directory
+  , mvtSourceDirectory :: IO FilePath
+    -- ^ Directory to work from
   }
 
 instance IsTest ModelsimVlibTest where
-  run optionSet ModelsimVlibTest{mvtSourceDirectory} progressCallback
+  run optionSet ModelsimVlibTest{..} progressCallback
     | ModelSim True <- lookupOption optionSet = do
+        buildTargetDir mvtParentDirectory mvtSourceDirectory
         src <- mvtSourceDirectory
         runVlib src ["work"]
 
