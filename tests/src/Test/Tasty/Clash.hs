@@ -191,6 +191,37 @@ sequenceTests path (unzip -> (testNames, testTrees)) =
       applyAfter Nothing  tt = tt
       applyAfter (Just p) tt = after AllSucceed p tt
 
+targetTempPath
+  :: IO FilePath
+  -- ^ Parent temporary directory
+  -> String
+  -- ^ HDL tool
+  -> String
+  -- ^ Build target
+  -> IO FilePath
+targetTempPath parent tool target =
+  fmap (</> (tool <> "-" <> target)) parent
+
+stepName
+  :: String
+  -- ^ Tool name
+  -> String
+  -- ^ Step name
+  -> String
+  -- ^ Build target
+  -> String
+stepName tool step target = tool <> " (" <> step <> " " <> target <> ")"
+
+-- | Simulation test for a specific build target
+--
+-- Simulation tests usually consist of two test trees: one for building designs
+-- and one for running them. It depends on 'hdlLoad' and 'hdlSim' what will be
+-- executed.
+data TestTarget = TestTarget
+  { buildTests :: [(TestName, TestTree)]
+  , simTests :: [(TestName, TestTree)]
+  }
+
 data ClashGenTest = ClashGenTest
   { cgExpectFailure :: Maybe (TestExitCode, T.Text)
     -- ^ Expected failure code and output (if any)
@@ -199,33 +230,38 @@ data ClashGenTest = ClashGenTest
   , cgExtraArgs :: [String]
   , cgModName :: String
   , cgOutputDirectory :: IO FilePath
+  , cgHdlDirectory :: IO FilePath
   }
 
 instance IsTest ClashGenTest where
   run optionSet ClashGenTest{..} progressCallback = do
     oDir <- cgOutputDirectory
+    hdlDir <- cgHdlDirectory
     case cgExpectFailure of
-      Nothing -> run optionSet (program oDir) progressCallback
-      Just exit -> run optionSet (failingProgram oDir exit) progressCallback
+      Nothing ->
+        run optionSet (program oDir hdlDir) progressCallback
+      Just exit ->
+        run optionSet (failingProgram oDir hdlDir exit) progressCallback
    where
-    program oDir =
-      TestProgram "clash" (args oDir) NoGlob PrintNeither False Nothing []
+    program oDir hdlDir =
+      TestProgram
+        "clash" (args oDir hdlDir) NoGlob PrintNeither False Nothing []
 
-    failingProgram oDir (testExit, expectedErr) = let
+    failingProgram oDir hdlDir (testExit, expectedErr) = let
         -- TODO: there's no easy way to test for the absence of something in stderr
         expected = case T.splitAt 4 expectedErr of
                      ("NOT:", rest) -> ExpectNotStdErr rest
                      _ -> ExpectStdErr expectedErr
       in
       TestFailingProgram
-        (testExitCode testExit) "clash" (args oDir) NoGlob PrintNeither False
-        (specificExitCode testExit) expected Nothing []
+        (testExitCode testExit) "clash" (args oDir hdlDir) NoGlob PrintNeither
+        False (specificExitCode testExit) expected Nothing []
 
-    args oDir =
+    args oDir hdlDir =
       [ target
       , "-i" <> cgSourceDirectory
       , cgModName
-      , "-fclash-hdldir", oDir
+      , "-fclash-hdldir", hdlDir
       , "-odir", oDir
       , "-hidir", oDir
       , "-fclash-debug", "DebugSilent"
@@ -274,100 +310,107 @@ instance IsTest ClashBinaryTest where
 
   testOptions = coerce (testOptions @TestProgram)
 
--- | Generate two test trees for running GHDL: one for building designs and one
--- for running them. It depends on 'hdlLoad' and 'hdlSim' what will be
--- executed.
+-- | Generate test trees for running GHDL
 ghdlTests
   :: TestOptions
   -> IO FilePath
-  -> ( [(TestName, TestTree)] -- build tests
-     , [(TestName, TestTree)] -- simulation tests
-     )
-ghdlTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
+  -> [TestTarget]
+ghdlTests opts@TestOptions{..} parentTmp =
+  flip map (getBuildTargets opts) (\t ->
+    TestTarget { buildTests = build t
+               , simTests = sim t
+               })
  where
-  importName = "ghdl (import)"
-  makeName t = "ghdl (make " <> t <> ")"
-  buildTests = concat
-    [ [ (importName, singleTest importName (GhdlImportTest tmpDir)) ]
-    , [ (makeName t, singleTest (makeName t) (GhdlMakeTest tmpDir t))
-      | t <- getBuildTargets opts ]
+  dir = targetTempPath parentTmp "ghdl"
+  toolName = stepName "ghdl"
+  importName = toolName "import"
+  makeName = toolName "make"
+  simName = toolName "sim"
+  build t =
+    [ ( importName t
+      , singleTest (importName t) $ GhdlImportTest parentTmp (dir t))
+    , ( makeName t
+      , singleTest (makeName t) $ GhdlMakeTest (dir t) t)
+    ]
+  sim t =
+    [ (simName t, singleTest (simName t) $ GhdlSimTest expectSimFail (dir t) t)
     ]
 
-  simName t = "ghdl (sim " <> t <> ")"
-  simTests =
-    [ (simName t, singleTest (simName t) (GhdlSimTest expectSimFail tmpDir t))
-    | t <- getBuildTargets opts
-    ]
-
--- | Generate two test trees for running Icarus Verilog: one for building
--- designs and one for running them. It depends on 'hdlLoad' and 'hdlSim' what
--- will be executed.
+-- | Generate test trees for running Icarus Verilog
 iverilogTests
   :: TestOptions
   -> IO FilePath
-  -> ( [(TestName, TestTree)] -- build tests
-     , [(TestName, TestTree)] -- simulation tests
-     )
-iverilogTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
+  -> [TestTarget]
+iverilogTests opts@TestOptions{..} parentTmp =
+  flip map (getBuildTargets opts) (\t ->
+    TestTarget { buildTests = build t
+               , simTests = sim t
+               })
  where
-  makeNameIvl t = "iverilog (make " <> t <> ")"
-  buildTests =
-    [ (makeNameIvl t, singleTest (makeNameIvl t) (IVerilogMakeTest tmpDir t))
-    | t <- getBuildTargets opts
+  dir = targetTempPath parentTmp "iverilog"
+  toolName = stepName "iverilog"
+  makeName = toolName "make"
+  simName = toolName "sim"
+  build t =
+    [ ( makeName t
+      , singleTest (makeName t) $ IVerilogMakeTest parentTmp (dir t) t)
+    ]
+  sim t =
+    [ ( simName t
+      , singleTest (simName t) $
+          IVerilogSimTest expectSimFail vvpStdoutNonEmptyFail (dir t) t)
     ]
 
-  simNameIvl t = "iverilog (sim " <> t <> ")"
-  simTests =
-    [ (simNameIvl t, singleTest (simNameIvl t) (IVerilogSimTest expectSimFail vvpStdoutNonEmptyFail tmpDir t))
-    | t <- getBuildTargets opts
-    ]
-
--- | Generate two test trees for running ModelSim: one for building designs and
--- one for running them. It depends on 'hdlLoad' and 'hdlSim' what will be
--- executed.
+-- | Generate test trees for running ModelSim
 modelsimTests
   :: TestOptions
   -> IO FilePath
-  -> ( [(TestName, TestTree)] -- build tests
-     , [(TestName, TestTree)] -- simulation tests
-     )
-modelsimTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
+  -> [TestTarget]
+modelsimTests opts@TestOptions{..} parentTmp =
+  flip map (getBuildTargets opts) (\t ->
+    TestTarget { buildTests = build t
+               , simTests = sim t
+               })
  where
-  vlibName = "modelsim (vlib)"
-  vlogName = "modelsim (vlog)"
-  buildTests =
-    [ (vlibName, singleTest vlibName (ModelsimVlibTest tmpDir))
-    , (vlogName, singleTest vlogName (ModelsimVlogTest tmpDir))
+  dir = targetTempPath parentTmp "modelsim"
+  toolName = stepName "modelsim"
+  vlibName = toolName "vlib"
+  vlogName = toolName "vlog"
+  simName = toolName "sim"
+  build t =
+    [ ( vlibName t
+      , singleTest (vlibName t) $ ModelsimVlibTest parentTmp (dir t))
+    , ( vlogName t
+      , singleTest (vlogName t) $ ModelsimVlogTest (dir t))
+    ]
+  sim t =
+    [ ( simName t
+      , singleTest (simName t) $ ModelsimSimTest expectSimFail (dir t) t)
     ]
 
-  simName t = "modelsim (sim " <> t <> ")"
-  simTests =
-    [ (simName t, singleTest (simName t) (ModelsimSimTest expectSimFail tmpDir t))
-    | t <- getBuildTargets opts
-    ]
-
--- | Generate two test trees for running Verilator: one for building designs and
--- one for running them. It depends on 'hdlLoad' and 'hdlSim' what will be
--- executed.
+-- | Generate test trees for running Verilator
 verilatorTests
   :: TestOptions
   -> IO FilePath
-  -> ( [(TestName, TestTree)]
-     , [(TestName, TestTree)]
-     )
-verilatorTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
+  -> [TestTarget]
+verilatorTests opts@TestOptions{..} parentTmp =
+  flip map (getBuildTargets opts) (\t ->
+    TestTarget { buildTests = build t
+               , simTests = sim t
+               })
  where
-  buildName t = "verilator (make " <> t <> ")"
-  simName t = "verilator (sim " <> t <> ")"
-
-  buildTests =
-    [ (buildName t, singleTest (buildName t) (VerilatorMakeTest tmpDir t))
-    | t <- getBuildTargets opts
+  dir = targetTempPath parentTmp "verilator"
+  toolName = stepName "verilator"
+  makeName = toolName "make"
+  simName = toolName "sim"
+  build t =
+    [ ( makeName t
+      , singleTest (makeName t) $ VerilatorMakeTest parentTmp (dir t) t)
     ]
-
-  simTests =
-    [ (simName t, singleTest (simName t) (VerilatorSimTest expectSimFail vvpStdoutNonEmptyFail tmpDir t))
-    | t <- getBuildTargets opts
+  sim t =
+    [ ( simName t
+      , singleTest (simName t) $
+          VerilatorSimTest expectSimFail vvpStdoutNonEmptyFail (dir t) t)
     ]
 
 -- | Generate a test tree for running Vivado. Depending on 'hdlSim' it will be
@@ -375,28 +418,35 @@ verilatorTests opts@TestOptions{..} tmpDir = (buildTests, simTests)
 vivadoTests
   :: TestOptions
   -> IO FilePath
-  -> ( [(TestName, TestTree)]
-     , [(TestName, TestTree)]
-     )
-vivadoTests opts tmpDir = ([], simTests)
+  -> [TestTarget]
+vivadoTests opts parentTmp =
+  flip map (getBuildTargets opts) (\t ->
+    TestTarget { buildTests = []
+               , simTests = sim t
+               })
  where
-  simTests =
-    [ ( buildName t
-      , singleTest (buildName t) $ VivadoTest tmpDir (T.pack t)
-      )
-    | t <- getBuildTargets opts
+  dir = targetTempPath parentTmp "vivado"
+  simName = stepName "vivado" "sim"
+  sim t =
+    [ ( simName t
+      , singleTest (simName t) $ VivadoTest parentTmp (dir t) (T.pack t))
     ]
-  buildName t = "Vivado (sim " <> t <> ")"
 
 -- | Generate a test tree for running SymbiYosys
-sbyTests :: TestOptions -> IO FilePath -> ([(TestName, TestTree)])
-sbyTests opts@TestOptions {..} tmpDir =
-  [ ( "SymbiYosys"
-    , singleTest "SymbiYosys"
-                 (SbyVerificationTest expectVerificationFail tmpDir t)
+sbyTests
+  :: TestOptions
+  -> IO FilePath
+  -> [(TestName, TestTree)]
+sbyTests opts@TestOptions {..} parentTmp =
+  [ ( sbyName t
+    , singleTest (sbyName t) $
+        SbyVerificationTest expectVerificationFail parentTmp (dir t) t
     )
   | t <- getBuildTargets opts
   ]
+ where
+  dir = targetTempPath parentTmp "symbiyosys"
+  sbyName t = "symbiyosys (" <> t <> ")"
 
 runTest1
   :: String
@@ -424,19 +474,21 @@ runTest1 modName opts@TestOptions{..} path target =
     , cgExtraArgs=clashFlags
     , cgModName=modName
     , cgOutputDirectory=tmpDir
+    , cgHdlDirectory=fmap (</> "hdl") tmpDir
     }))
 
-  buildAndSimTests sim (buildTests, simTests)
+  buildAndSimTests :: Sim -> [TestTarget] -> [[(TestName, TestTree)]]
+  buildAndSimTests sim tests
     | isJust expectClashFail = []
-    | otherwise              =
+    | otherwise              = flip map tests $ \TestTarget{..} ->
       (if sim `elem` hdlLoad then buildTests else []) <>
       (if sim `elem` hdlSim then simTests else [])
 
-  -- HACK: We want to run verilator and simulator tests independently if they
-  -- are both going to be run, otherwise failures from whichever comes first
-  -- will mean the second is skipped. In lieu of a better way to sequence tests
-  -- we can sequence tests for multiple simulators, then drop the first test
-  -- tree for all but the first simulator (as it will be copies of clash gen).
+  -- HACK: We want to run simulators independently if multiple are going to be
+  -- run, otherwise failures from whichever comes first will mean the second is
+  -- skipped. In lieu of a better way to sequence tests we can sequence tests
+  -- for multiple simulators, then drop the first test tree for all but the
+  -- first simulator (as it will be copies of clash gen).
   --
   -- TODO: Since tasty doesn't provide one, we should really provide a better
   -- set of combinators for describing test dependencies. That way we can have
@@ -466,16 +518,16 @@ runTest1 modName opts@TestOptions{..} path target =
 
   -- | The tests that are switched by `hdlLoad` and `hdlSim`
   hdlTests tmpDir = case target of
-    VHDL ->
+    VHDL -> concat
       [ buildAndSimTests GHDL (ghdlTests opts tmpDir)
       , buildAndSimTests Vivado (vivadoTests opts tmpDir)
       ]
-    Verilog ->
+    Verilog -> concat
       [ buildAndSimTests IVerilog (iverilogTests opts tmpDir)
       , buildAndSimTests Verilator (verilatorTests opts tmpDir)
       , buildAndSimTests Vivado (vivadoTests opts tmpDir)
       ]
-    SystemVerilog ->
+    SystemVerilog -> concat
       [ -- TODO: ModelSim can do VHDL and Verilog too. Add that?
         buildAndSimTests ModelSim (modelsimTests opts tmpDir)
       , buildAndSimTests Verilator (verilatorTests opts tmpDir)
@@ -524,6 +576,7 @@ outputTest' modName target extraClashArgs extraGhcArgs path =
     , cgExtraArgs=extraClashArgs
     , cgModName=modName
     , cgOutputDirectory=workDir
+    , cgHdlDirectory=workDir
     }))
 
   clashBuild workDir = ("clash (exec)", singleTest "clash (exec)" (ClashBinaryTest {

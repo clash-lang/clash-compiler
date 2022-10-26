@@ -440,15 +440,11 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T1786" def{
             hdlTargets=[VHDL]
           , buildTargets=BuildSpecific ["testEnableTB", "testBoolTB"]
-          , -- TODO: Enable multiple build targets for Vivado
-            hdlSim=hdlSim def \\ [Vivado] -- triggers error in vivado
           }
         , outputTest "LITrendering" def{hdlTargets=[Verilog]}
         , runTest "T2117" def{
             clashFlags=["-fclash-aggressive-x-optimization-blackboxes"]
           , hdlTargets=[VHDL]
-          , -- TODO: Enable multiple build targets for Vivado
-            hdlSim=hdlSim def \\ [Vivado]
           , buildTargets=BuildSpecific [ "testBenchUndefBV"
                                        , "testBenchUndefTup"
                                        , "testBenchPartialDefTup"]}
@@ -456,30 +452,27 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "BoxedFunctions"
         [ runTest "DeadRecursiveBoxed" def{hdlSim=[]}
         ]
-      -- The Cores.Xilinx.Floating tests require Vivado (and take much time to
-      -- run).
-      -- TODO: Enable multiple build targets for Vivado
-      --
---       , clashTestGroup "Cores"
---         [ clashTestGroup "Xilinx"
---           [ let _opts = def{ hdlTargets=[VHDL, Verilog]
---                            , hdlLoad=[Vivado]
---                            , hdlSim=[Vivado]
---                            , buildTargets=BuildSpecific [ "addBasicTB"
---                                                         , "addEnableTB"
---                                                         , "addShortPLTB"
---                                                         , "subBasicTB"
---                                                         , "mulBasicTB"
---                                                         , "divBasicTB"
---                                                         , "fromUBasicTB"
---                                                         , "fromUEnableTB"
---                                                         , "fromSBasicTB"
---                                                         , "fromSEnableTB"
---                                                         ]
---                            }
---             in runTest "Floating" _opts
---           ]
---         ]
+      , clashTestGroup "Cores"
+        [ clashTestGroup "Xilinx"
+          [ let _opts = def{ hdlTargets=[VHDL, Verilog]
+                           , hdlLoad=[Vivado]
+                           , hdlSim=[Vivado]
+                             -- addShortPLTB now segfaults :-(
+                           , buildTargets=BuildSpecific [ "addBasicTB"
+                                                        , "addEnableTB"
+                                                        -- , "addShortPLTB"
+                                                        , "subBasicTB"
+                                                        , "mulBasicTB"
+                                                        , "divBasicTB"
+                                                        , "fromUBasicTB"
+                                                        , "fromUEnableTB"
+                                                        , "fromSBasicTB"
+                                                        , "fromSEnableTB"
+                                                        ]
+                           }
+            in runTest "Floating" _opts
+          ]
+        ]
       , clashTestGroup "Cores"
         [ clashTestGroup "Xilinx"
           [ runTest "DcFifo0" def{

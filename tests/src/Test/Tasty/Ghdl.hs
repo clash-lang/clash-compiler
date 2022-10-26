@@ -49,13 +49,16 @@ instance IsOption Ghdl where
 -- produce @topEntity@ and @testBench@ instead.
 --
 data GhdlImportTest = GhdlImportTest
-  { gitSourceDirectory :: IO FilePath
-    -- ^ Directory containing VHDL files produced by Clash
+  { gitParentDirectory :: IO FilePath
+    -- ^ Shared temporary directory
+  , gitSourceDirectory :: IO FilePath
+    -- ^ Directory to work from
   }
 
 instance IsTest GhdlImportTest where
-  run optionSet GhdlImportTest{gitSourceDirectory} progressCallback
+  run optionSet GhdlImportTest{..} progressCallback
     | Ghdl True <- lookupOption optionSet = do
+        buildTargetDir gitParentDirectory gitSourceDirectory
         src <- gitSourceDirectory
         let workDir = src </> "work"
         createDirectory workDir

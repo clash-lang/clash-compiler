@@ -113,6 +113,7 @@ library
     Paths_clash_testsuite
 
   build-depends:
+    extra,
     deepseq,
     concurrent-extra,
     singletons,
