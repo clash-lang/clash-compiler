@@ -158,6 +158,10 @@ data Manifest
     --
     -- This list is reverse topologically sorted. I.e., a component might depend
     -- on any component listed before it, but not after it.
+    --
+    -- FIXME: Dependencies for include files and memory files are not tracked.
+    -- Instead, memory files are listed first followed by include files followed
+    -- by generated HDL. This will usually suffice.
   , domains :: HashMap Text VDomainConfiguration
     -- ^ Domains encountered in design
   , transitiveDependencies :: [Text]

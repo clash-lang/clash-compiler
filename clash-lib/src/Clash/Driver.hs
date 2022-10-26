@@ -479,9 +479,11 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
       let
         components = map (snd . snd) (OMap.assocs netlist)
         filesAndDigests0 =
-             zip (map fst hdlDocs) hdlDocDigests
+          -- FIXME: We should track dependencies of `mfiles` and `dfiles` and
+          -- maintain the proper topological sort of all these.
+             zip (map fst mfiles) memoryFilesDigests
           <> zip (map fst dfiles) dataFilesDigests
-          <> zip (map fst mfiles) memoryFilesDigests
+          <> zip (map fst hdlDocs) hdlDocDigests
 
       filesAndDigests1 <- modifyMVar edamFilesV $ \edamFiles ->
         if opt_edalize opts
