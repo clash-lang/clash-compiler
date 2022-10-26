@@ -92,4 +92,12 @@ genSimTcl dir top = do
     save_project_as sim project -force
     set_property RUNTIME all [current_fileset -sim]
     launch_simulation
+
+    \# Uncomment if you want to dump all signals to /tmp/log.vcd
+    \# restart
+    \# open_vcd /tmp/log.vcd
+    \# log_vcd /*
+    \# run -all
+    \# flush_vcd
+    \# close_vcd
     |]
