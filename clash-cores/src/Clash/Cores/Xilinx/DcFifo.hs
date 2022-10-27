@@ -198,8 +198,8 @@ dcFifo DcConfig{..} wClk wRst rClk rRst writeData rEnable =
     , Signal read (DataCount depth)
     , Signal read a
     )
-  go st@(FifoState _ rt) rdClk wrClk@(tWr :- _) =
-    if rt < fromIntegral tWr
+  go st@(FifoState _ rt) rdClk wrClk =
+    if rt <= 0
       then goRead st rdClk wrClk
       else goWrite st rdClk wrClk
 
