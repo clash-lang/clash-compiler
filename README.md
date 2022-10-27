@@ -68,10 +68,12 @@ Note that release branches might contain non-released patches.
 | 8.6  | ✔️     | ✔️      | ✔️     |
 | 8.8  | ✔️     | ❌      | ✔️     |
 | 8.10 | ✔️     | ✔️      | ❌     |
-| 9.0  | ✔️     | ✔️      | ✔️     |
+| 9.0  | ✔️     | ✔️‡     | ✔️     |
 | 9.2† | ❌     | ❌      | ❌     |
 
 † GHC 9.2 contains a regression, rendering Clash error messages indecipherable. This change will be reverted in 9.4.
+
+‡ GHC 9.0.2 on Windows fails to compile `clash-cores`. We therefore don't run the Clash testsuite on CI for this combination.
 
 ## Cabal
 To use Cabal you need both Cabal and GHC installed on your system. We recommend using [ghcup](https://www.haskell.org/ghcup/). For more information, see [https://www.haskell.org/downloads/](https://www.haskell.org/downloads/).

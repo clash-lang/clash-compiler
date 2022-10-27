@@ -25,6 +25,11 @@ jobs:
           - os: windows
             ghc: 8.8.4
 
+          # GHC 9.0.2 fails to compile clash-cores due to a template haskell
+          # failure
+          - os: windows
+            ghc: 9.0.2
+
     steps:
       - uses: actions/checkout@v2
       - uses: haskell/actions/setup@v1

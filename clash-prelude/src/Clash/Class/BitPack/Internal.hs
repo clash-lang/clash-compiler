@@ -445,6 +445,8 @@ instance GBitPack U1 where
   gUnpack _c _cc _b = U1
 
 -- Instances derived using Generic
+instance BitPack Ordering
+
 instance ( BitPack a
          , BitPack b
          ) => BitPack (Either a b)

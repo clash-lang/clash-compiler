@@ -59,6 +59,11 @@ module Clash.Cores.Xilinx.Floating.Explicit
   , divWith
   , div
   , DivDefDelay
+  , Ordering(..)
+  , toMaybeOrdering
+  , compare
+  , compareWith
+  , CompareDefDelay
   , fromU32With
   , fromU32
   , FromU32DefDelay
@@ -75,7 +80,7 @@ module Clash.Cores.Xilinx.Floating.Explicit
   , xilinxNaN
   ) where
 
-import Clash.Explicit.Prelude hiding (add, sub, mul, div)
+import Clash.Explicit.Prelude hiding (Ordering(..), add, sub, mul, div, compare)
 
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 
@@ -310,6 +315,51 @@ fromS32 = withFrozenCallStack fromS32With
 
 -- | The default delay for conversion of @Signed 32@ to @Float@
 type FromS32DefDelay = 6
+
+-- | Customizable floating point comparison
+--
+-- Produces 'NaN' if any of the inputs is NaN. Otherwise, it behaves like
+-- Haskell's 'P.compare'.
+--
+-- Only the delay is configurable, so this function does not take a @Config@
+-- argument.
+compareWith
+  :: forall d dom n
+   . ( KnownDomain dom
+     , KnownNat d
+     , HasCallStack
+     )
+  => Clock dom
+  -> Enable dom
+  -> DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + d) Ordering
+compareWith clk ena a b = delayI und ena clk (xilinxCompare <$> a <*> b)
+ where
+  und = withFrozenCallStack $ errorX "Initial values of compare undefined"
+{-# NOINLINE compareWith #-}
+{-# ANN compareWith (vhdlComparePrim 'compareWith 'compareTclTF "compare") #-}
+{-# ANN compareWith (veriComparePrim 'compareWith 'compareTclTF "compare") #-}
+
+-- | Floating point comparison, with default delay
+--
+-- Produces 'NaN' if any of the inputs is NaN. Otherwise, it behaves like
+-- Haskell's 'P.compare'.
+compare
+  :: forall dom n
+   . ( KnownDomain dom
+     , HasCallStack
+     )
+  => Clock dom
+  -> Enable dom
+  -> DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + CompareDefDelay) Ordering
+compare = compareWith
+{-# INLINE compare #-}
+
+-- | The default delay for @Float@ comparison
+type CompareDefDelay = 2
 
 -- | Default customization options.
 --
