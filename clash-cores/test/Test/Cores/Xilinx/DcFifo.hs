@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans -fno-warn-unused-top-binds #-}
@@ -7,6 +8,9 @@ module Test.Cores.Xilinx.DcFifo ( tests ) where
 
 import qualified Prelude as P
 import qualified Data.List as L
+
+import Control.DeepSeq (rnf)
+import Data.Bool (bool)
 import Data.Maybe (catMaybes)
 import Data.Proxy (Proxy (..))
 
@@ -19,12 +23,19 @@ import qualified Hedgehog.Range as Range
 import Hedgehog (Gen, MonadGen, (===), property, forAll, Property)
 import qualified Hedgehog as H
 import Test.Tasty.Hedgehog (testPropertyNamed)
-import Test.Tasty.HUnit (testCase, assertBool)
+import Test.Tasty.HUnit (Assertion, testCase, assertBool)
 import Test.Tasty (testGroup, TestTree)
 
 createDomain vXilinxSystem{vName="D3", vPeriod=3}
 createDomain vXilinxSystem{vName="D5", vPeriod=5}
 createDomain vXilinxSystem{vName="D11", vPeriod=11}
+
+createDomain vXilinxSystem{vName="F1", vPeriod=20}
+createDomain vXilinxSystem{vName="F2", vPeriod=100}
+createDomain vXilinxSystem{vName="F3", vPeriod=7}
+createDomain vXilinxSystem{vName="F4", vPeriod=47}
+createDomain vXilinxSystem{vName="F5", vPeriod=31}
+createDomain vXilinxSystem{vName="F6", vPeriod=250}
 
 tests :: TestTree
 tests = testGroup "FIFO tests"
@@ -65,7 +76,81 @@ tests = testGroup "FIFO tests"
       "prop_fifoOrder"
       (prop_noException (SNat @4) (Proxy @D3) (Proxy @D11) feedState takeClumsy)
   , testOverflow
+
+  , testGroup "Can be used in feedback loops"
+    -- It's fairly hard to predict which combination of read/write domains cause
+    -- feedback issues, so this just tests the carthesian product of domains F1
+    -- up to and including F6. Usually that'd would have been a map-map, but given
+    -- that we iterate over type variables, we just write it out.
+    [ testCase "test_feedback_F1_F1" (test_feedback @F1 @F1 Proxy Proxy)
+    , testCase "test_feedback_F1_F2" (test_feedback @F1 @F2 Proxy Proxy)
+    , testCase "test_feedback_F1_F3" (test_feedback @F1 @F3 Proxy Proxy)
+    , testCase "test_feedback_F1_F4" (test_feedback @F1 @F4 Proxy Proxy)
+    , testCase "test_feedback_F1_F5" (test_feedback @F1 @F5 Proxy Proxy)
+    , testCase "test_feedback_F1_F6" (test_feedback @F1 @F6 Proxy Proxy)
+    , testCase "test_feedback_F2_F1" (test_feedback @F2 @F1 Proxy Proxy)
+    , testCase "test_feedback_F2_F2" (test_feedback @F2 @F2 Proxy Proxy)
+    , testCase "test_feedback_F2_F3" (test_feedback @F2 @F3 Proxy Proxy)
+    , testCase "test_feedback_F2_F4" (test_feedback @F2 @F4 Proxy Proxy)
+    , testCase "test_feedback_F2_F5" (test_feedback @F2 @F5 Proxy Proxy)
+    , testCase "test_feedback_F2_F6" (test_feedback @F2 @F6 Proxy Proxy)
+    , testCase "test_feedback_F3_F1" (test_feedback @F3 @F1 Proxy Proxy)
+    , testCase "test_feedback_F3_F2" (test_feedback @F3 @F2 Proxy Proxy)
+    , testCase "test_feedback_F3_F3" (test_feedback @F3 @F3 Proxy Proxy)
+    , testCase "test_feedback_F3_F4" (test_feedback @F3 @F4 Proxy Proxy)
+    , testCase "test_feedback_F3_F5" (test_feedback @F3 @F5 Proxy Proxy)
+    , testCase "test_feedback_F3_F6" (test_feedback @F3 @F6 Proxy Proxy)
+    , testCase "test_feedback_F4_F1" (test_feedback @F4 @F1 Proxy Proxy)
+    , testCase "test_feedback_F4_F2" (test_feedback @F4 @F2 Proxy Proxy)
+    , testCase "test_feedback_F4_F3" (test_feedback @F4 @F3 Proxy Proxy)
+    , testCase "test_feedback_F4_F4" (test_feedback @F4 @F4 Proxy Proxy)
+    , testCase "test_feedback_F4_F5" (test_feedback @F4 @F5 Proxy Proxy)
+    , testCase "test_feedback_F4_F6" (test_feedback @F4 @F6 Proxy Proxy)
+    , testCase "test_feedback_F5_F1" (test_feedback @F5 @F1 Proxy Proxy)
+    , testCase "test_feedback_F5_F2" (test_feedback @F5 @F2 Proxy Proxy)
+    , testCase "test_feedback_F5_F3" (test_feedback @F5 @F3 Proxy Proxy)
+    , testCase "test_feedback_F5_F4" (test_feedback @F5 @F4 Proxy Proxy)
+    , testCase "test_feedback_F5_F5" (test_feedback @F5 @F5 Proxy Proxy)
+    , testCase "test_feedback_F5_F6" (test_feedback @F5 @F6 Proxy Proxy)
+    , testCase "test_feedback_F6_F1" (test_feedback @F6 @F1 Proxy Proxy)
+    , testCase "test_feedback_F6_F2" (test_feedback @F6 @F2 Proxy Proxy)
+    , testCase "test_feedback_F6_F3" (test_feedback @F6 @F3 Proxy Proxy)
+    , testCase "test_feedback_F6_F4" (test_feedback @F6 @F4 Proxy Proxy)
+    , testCase "test_feedback_F6_F5" (test_feedback @F6 @F5 Proxy Proxy)
+    , testCase "test_feedback_F6_F6" (test_feedback @F6 @F6 Proxy Proxy)
+    ]
   ]
+
+-- | Tests whether 'dcFifo's over and underflow signals can be used in a
+-- feedback loop with 'dualFlipFlopSynchronizer'.
+test_feedback ::
+  forall readDom writeDom .
+  (KnownDomain readDom, KnownDomain writeDom) =>
+  Proxy readDom ->
+  Proxy writeDom ->
+  Assertion
+test_feedback Proxy Proxy = do
+  () <- pure $ rnf $ P.last $ sampleN 1000 overflowSynced
+  () <- pure $ rnf $ P.last $ sampleN 1000 underflowSynced
+  pure ()
+ where
+  (clkR, rstR, enaR) = (clockGen @readDom, resetGen, enableGen)
+  (clkW, rstW, enaW) = (clockGen @writeDom, resetGen, enableGen)
+
+  writes = pure (Just True)
+  noWrites = pure Nothing
+  writeMaybe = bool <$> noWrites <*> writes <*> writeEnable
+
+  config = (defConfig @8){dcOverflow=True, dcUnderflow=True}
+  FifoOut{..} = dcFifo config clkW rstW clkR rstR writeMaybe readEnable
+  overflowSynced = dualFlipFlopSynchronizer clkW clkR rstR enaR False isOverflow
+  underflowSynced = dualFlipFlopSynchronizer clkR clkW rstW enaW False isUnderflow
+
+  readEnable =
+    mealy clkR rstR enaR (\() b -> ((), b)) () overflowSynced
+
+  writeEnable =
+    mealy clkW rstW enaW (\() b -> ((), b)) () underflowSynced
 
 -- | Must generate the same number of stalls and data
 intersperseStalls ::
