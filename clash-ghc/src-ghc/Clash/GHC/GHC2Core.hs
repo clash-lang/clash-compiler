@@ -56,13 +56,20 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.Coercion (Role (Nominal), coercionType, coercionKind)
 import GHC.Core.FVs  (exprSomeFreeVars)
 import GHC.Core
-  (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..), Tickish (..),
+  (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..),
+#if MIN_VERSION_ghc(9,2,0)
+   Alt(..),
+#else
+   Tickish (..),
+#endif
    collectArgs, rhssOfAlts, unfoldingTemplate)
+#if MIN_VERSION_ghc(9,2,0)
+import GHC.Types.Tickish (GenTickish (..))
+#endif
 import GHC.Core.DataCon
   (DataCon, dataConExTyCoVars, dataConName, dataConRepArgTys, dataConTag,
    dataConTyCon, dataConUnivTyVars, dataConWorkId, dataConFieldLabels, flLabel,
    HsImplBang(..), dataConImplBangs)
-import GHC.Driver.Session (unsafeGlobalDynFlags)
 import GHC.Core.FamInstEnv
   (FamInst (..), FamInstEnvs, familyInstances, normaliseType, emptyFamInstEnvs)
 import GHC.Data.FastString (unpackFS, bytesFS)
@@ -74,7 +81,6 @@ import GHC.Types.Name
   (Name, nameModule_maybe, nameOccName, nameUnique, getSrcSpan)
 import GHC.Builtin.Names  (integerTyConKey, naturalTyConKey)
 import GHC.Types.Name.Occurrence (occNameString)
-import GHC.Utils.Outputable (showPpr)
 import GHC.Data.Pair (Pair (..))
 import GHC.Types.SrcLoc (SrcSpan (..), isGoodSrcSpan)
 import GHC.Core.TyCon
@@ -107,7 +113,6 @@ import DataCon    (DataCon, HsImplBang(..),
                    dataConTag, dataConTyCon,
                    dataConUnivTyVars, dataConWorkId,
                    dataConFieldLabels, flLabel, dataConImplBangs)
-import DynFlags   (unsafeGlobalDynFlags)
 import FamInstEnv (FamInst (..), FamInstEnvs,
                    familyInstances, normaliseType, emptyFamInstEnvs)
 
@@ -125,7 +130,6 @@ import Name       (Name, nameModule_maybe,
                    nameOccName, nameUnique, getSrcSpan)
 import PrelNames  (integerTyConKey, naturalTyConKey)
 import OccName    (occNameString)
-import Outputable (showPpr)
 import Pair       (Pair (..))
 import SrcLoc     (SrcSpan (..), isGoodSrcSpan)
 import TyCon      (AlgTyConRhs (..), TyCon, tyConName,
@@ -165,6 +169,7 @@ import qualified Clash.Data.UniqMap          as C
 import           Clash.Normalize.Primitives  as C
 import           Clash.Primitives.Types
 import           Clash.Util
+import           Clash.GHC.Util
 
 instance Hashable Name where
   hashWithSalt s = hashWithSalt s . getKey . nameUnique
@@ -554,8 +559,8 @@ coreToTerm primMap unlocs = term
                           CoreUnfolding {} -> do
                             sp <- view srcSpan
                             RWS.censor (const (SrcSpanRB sp)) (term (unfoldingTemplate unfolding))
-                          NoUnfolding -> error ("No unfolding for DC wrapper: " ++ showPpr unsafeGlobalDynFlags x)
-                          _ -> error ("Unexpected unfolding for DC wrapper: " ++ showPpr unsafeGlobalDynFlags x)
+                          NoUnfolding -> error ("No unfolding for DC wrapper: " ++ showPprUnsafe x)
+                          _ -> error ("Unexpected unfolding for DC wrapper: " ++ showPprUnsafe x)
               else C.Data <$> coreToDataCon dc
           Nothing -> case lookupPrim xNameS of
             Just (Just (Primitive f wi _))
@@ -609,9 +614,15 @@ coreToTerm primMap unlocs = term
               | otherwise
               -> C.Var <$> coreToId x
 
+#if MIN_VERSION_ghc(9,2,0)
+    alt _   (Alt DEFAULT      _  e) = (C.DefaultPat,) <$> term e
+    alt _   (Alt (LitAlt l)   _  e) = (C.LitPat (coreToLiteral l),) <$> term e
+    alt sp0 (Alt (DataAlt dc) xs e) = case span isTyVar xs of
+#else
     alt _   (DEFAULT   , _ , e) = (C.DefaultPat,) <$> term e
     alt _   (LitAlt l  , _ , e) = (C.LitPat (coreToLiteral l),) <$> term e
     alt sp0 (DataAlt dc, xs, e) = case span isTyVar xs of
+#endif
       (tyvs,tmvs) -> do
         (e',sp1) <- termSP sp0 e
         (,) <$> (C.DataPat <$> coreToDataCon dc
@@ -625,7 +636,7 @@ coreToTerm primMap unlocs = term
 #if MIN_VERSION_ghc(8,8,0)
       LitString  fs  -> C.StringLiteral (Char8.unpack fs)
       LitChar    c   -> C.CharLiteral c
-      LitRubbish     ->
+      LitRubbish{}   ->
         error $ "coreToTerm: Encountered LibRubbish. This is a bug in Clash. "
              ++ "Report on https://github.com/clash-lang/clash-compiler/issues."
 #else
@@ -643,6 +654,14 @@ coreToTerm primMap unlocs = term
         LitNumInt64   -> C.IntLiteral i
         LitNumWord    -> C.WordLiteral i
         LitNumWord64  -> C.WordLiteral i
+#if MIN_VERSION_ghc(9,2,0)
+        LitNumInt8    -> C.Int8Literal i
+        LitNumInt16   -> C.Int16Literal i
+        LitNumInt32   -> C.Int32Literal i
+        LitNumWord8   -> C.Word8Literal i
+        LitNumWord16  -> C.Word16Literal i
+        LitNumWord32  -> C.Word32Literal i
+#endif
 #if MIN_VERSION_ghc(8,8,0)
       LitFloat r    -> C.FloatLiteral . floatToWord $ fromRational r
       LitDouble r   -> C.DoubleLiteral . doubleToWord $ fromRational r
@@ -813,19 +832,19 @@ boolTypeToBool (TyConApp constructor _args) = do
     _ -> error $ "Expected boolean constructor, got:" ++ constructorName
 boolTypeToBool s =
   error $ unwords [ "Could not unpack given type to bool:"
-                  , showPpr unsafeGlobalDynFlags s ]
+                  , showPprUnsafe s ]
 
 -- | Returns string of (LitTy (StrTyLit s)) construction.
 tyLitToString :: Type -> String
 tyLitToString (LitTy (StrTyLit s)) = unpackFS s
 tyLitToString s = error $ unwords [ "Could not unpack given type to string:"
-                                  , showPpr unsafeGlobalDynFlags s ]
+                                  , showPprUnsafe s ]
 
 -- | Returns integer of (LitTy (NumTyLit n)) construction.
 tyLitToInteger :: Type -> Integer
 tyLitToInteger (LitTy (NumTyLit n)) = n
 tyLitToInteger s = error $ unwords [ "Could not unpack given type to integer:"
-                                   , showPpr unsafeGlobalDynFlags s ]
+                                   , showPprUnsafe s ]
 
 -- | Try to interpret a Type as an Attr
 coreToAttr
@@ -856,7 +875,7 @@ coreToAttr t@(TyConApp ty args) = do
 
 coreToAttr t =
   error $ unwords [ "Expected type constructor (TyConApp), but got:"
-                  , showPpr unsafeGlobalDynFlags t ]
+                  , showPprUnsafe t ]
 
 coreToAttrs'
     :: [Type]
@@ -907,11 +926,11 @@ coreToAttrs' [annotationType, realType, attributes] = allAttrs
                             , "but got:", tystr ]
       _ ->
         error $ $(curLoc) ++ unwords [ "Expected TyConApp, not:"
-                                     , showPpr unsafeGlobalDynFlags annotationType]
+                                     , showPprUnsafe annotationType]
 
 coreToAttrs' illegal =
   error $ "Expected list with three items (as Annotate has three arguments), but got: "
-      ++ show (map (showPpr unsafeGlobalDynFlags) illegal)
+      ++ show (map (showPprUnsafe) illegal)
 
 -- | If this type has an annotate type synonym, return list of attributes.
 coreToAttrs
@@ -985,13 +1004,17 @@ coreToType' (FunTy ty1 ty2)             = C.mkFunTy <$> coreToType ty1 <*> coreT
 #endif
 coreToType' (LitTy tyLit)    = return $ C.LitTy (coreToTyLit tyLit)
 coreToType' (AppTy ty1 ty2)  = C.AppTy <$> coreToType ty1 <*> coreToType' ty2
-coreToType' t@(CastTy _ _)   = error ("Cannot handle CastTy " ++ showPpr unsafeGlobalDynFlags t)
-coreToType' t@(CoercionTy _) = error ("Cannot handle CoercionTy " ++ showPpr unsafeGlobalDynFlags t)
+coreToType' (CastTy t (Refl{})) = coreToType' t
+coreToType' t@(CastTy _ _)   = error ("Cannot handle CastTy " ++ showPprUnsafe t)
+coreToType' t@(CoercionTy _) = error ("Cannot handle CoercionTy " ++ showPprUnsafe t)
 
 coreToTyLit :: TyLit
             -> C.LitTy
 coreToTyLit (NumTyLit i) = C.NumTy (fromInteger i)
 coreToTyLit (StrTyLit s) = C.SymTy (unpackFS s)
+#if MIN_VERSION_ghc(9,2,0)
+coreToTyLit (CharTyLit c) = C.CharTy c
+#endif
 
 coreToTyVar :: TyVar
             -> C2C C.TyVar
@@ -1116,21 +1139,22 @@ bundleUnbundleTerm nTyVarsExpected = go []
 -- @
 mapSignalTerm :: C.Type
               -> C.Term
-mapSignalTerm (C.ForAllTy aTV (C.ForAllTy bTV (C.ForAllTy clkTV funTy))) =
-    C.TyLam aTV (
-    C.TyLam bTV (
-    C.TyLam clkTV (
-    C.Lam   fId (
-    C.Lam   xId (
-    C.App (C.Var fId) (C.Var xId))))))
-  where
-    (C.FunTy _ funTy'') = C.tyView funTy
-    (C.FunTy aTy bTy)   = C.tyView funTy''
-    fName = C.mkUnsafeSystemName "f" 0
-    xName = C.mkUnsafeSystemName "x" 1
-    fTy   = C.mkFunTy aTy bTy
-    fId   = C.mkLocalId fTy fName
-    xId   = C.mkLocalId aTy xName
+mapSignalTerm (C.ForAllTy aTV (C.ForAllTy bTV (C.ForAllTy clkTV funTy)))
+  | (C.FunTy _ funTy'') <- C.tyView funTy
+  , (C.FunTy aTy bTy)   <- C.tyView funTy''
+  = let
+      fName = C.mkUnsafeSystemName "f" 0
+      xName = C.mkUnsafeSystemName "x" 1
+      fTy   = C.mkFunTy aTy bTy
+      fId   = C.mkLocalId fTy fName
+      xId   = C.mkLocalId aTy xName
+    in
+      C.TyLam aTV (
+      C.TyLam bTV (
+      C.TyLam clkTV (
+      C.Lam   fId (
+      C.Lam   xId (
+      C.App (C.Var fId) (C.Var xId))))))
 
 mapSignalTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1143,15 +1167,16 @@ mapSignalTerm ty = error $ $(curLoc) ++ show ty
 -- @/\(a:*)./\(dom:Domain).\(x:Signal dom a).x@
 signalTerm :: C.Type
            -> C.Term
-signalTerm (C.ForAllTy aTV (C.ForAllTy domTV funTy)) =
-    C.TyLam aTV (
-    C.TyLam domTV (
-    C.Lam   xId (
-    C.Var   xId)))
-  where
-    (C.FunTy _ saTy) = C.tyView funTy
-    xName = C.mkUnsafeSystemName "x" 0
-    xId   = C.mkLocalId saTy xName
+signalTerm (C.ForAllTy aTV (C.ForAllTy domTV funTy))
+  | (C.FunTy _ saTy) <- C.tyView funTy
+  = let
+      xName = C.mkUnsafeSystemName "x" 0
+      xId   = C.mkLocalId saTy xName
+    in
+      C.TyLam aTV (
+      C.TyLam domTV (
+      C.Lam   xId (
+      C.Var   xId)))
 
 signalTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1170,21 +1195,22 @@ signalTerm ty = error $ $(curLoc) ++ show ty
 -- @
 appSignalTerm :: C.Type
               -> C.Term
-appSignalTerm (C.ForAllTy domTV (C.ForAllTy aTV (C.ForAllTy bTV funTy))) =
-    C.TyLam domTV (
-    C.TyLam aTV (
-    C.TyLam bTV (
-    C.Lam   fId (
-    C.Lam   xId (
-    C.App (C.Var fId) (C.Var xId))))))
-  where
-    (C.FunTy _ funTy'') = C.tyView funTy
-    (C.FunTy saTy sbTy)   = C.tyView funTy''
-    fName = C.mkUnsafeSystemName "f" 0
-    xName = C.mkUnsafeSystemName "x" 1
-    fTy   = C.mkFunTy saTy sbTy
-    fId   = C.mkLocalId fTy fName
-    xId   = C.mkLocalId saTy xName
+appSignalTerm (C.ForAllTy domTV (C.ForAllTy aTV (C.ForAllTy bTV funTy)))
+  | (C.FunTy _ funTy'') <- C.tyView funTy
+  , (C.FunTy saTy sbTy) <- C.tyView funTy''
+  = let
+      fName = C.mkUnsafeSystemName "f" 0
+      xName = C.mkUnsafeSystemName "x" 1
+      fTy   = C.mkFunTy saTy sbTy
+      fId   = C.mkLocalId fTy fName
+      xId   = C.mkLocalId saTy xName
+    in
+      C.TyLam domTV (
+      C.TyLam aTV (
+      C.TyLam bTV (
+      C.Lam   fId (
+      C.Lam   xId (
+      C.App (C.Var fId) (C.Var xId))))))
 
 appSignalTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1202,16 +1228,17 @@ appSignalTerm ty = error $ $(curLoc) ++ show ty
 -- @
 vecUnwrapTerm :: C.Type
               -> C.Term
-vecUnwrapTerm (C.ForAllTy tTV (C.ForAllTy nTV (C.ForAllTy aTV funTy))) =
-    C.TyLam tTV (
-    C.TyLam nTV (
-    C.TyLam aTV (
-    C.Lam   vsId (
-    C.Var vsId))))
-  where
-    (C.FunTy _ vsTy) = C.tyView funTy
-    vsName           = C.mkUnsafeSystemName "vs" 0
-    vsId             = C.mkLocalId vsTy vsName
+vecUnwrapTerm (C.ForAllTy tTV (C.ForAllTy nTV (C.ForAllTy aTV funTy)))
+  | (C.FunTy _ vsTy) <- C.tyView funTy
+  = let
+        vsName = C.mkUnsafeSystemName "vs" 0
+        vsId   = C.mkLocalId vsTy vsName
+    in
+        C.TyLam tTV (
+        C.TyLam nTV (
+        C.TyLam aTV (
+        C.Lam   vsId (
+        C.Var vsId))))
 
 vecUnwrapTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1230,25 +1257,26 @@ vecUnwrapTerm ty = error $ $(curLoc) ++ show ty
 -- @
 traverseTerm :: C.Type
              -> C.Term
-traverseTerm (C.ForAllTy fTV (C.ForAllTy aTV (C.ForAllTy bTV (C.ForAllTy domTV funTy)))) =
-    C.TyLam fTV (
-    C.TyLam aTV (
-    C.TyLam bTV (
-    C.TyLam domTV (
-    C.Lam   dictId (
-    C.Lam   gId (
-    C.Lam   xId (
-    C.App (C.Var gId) (C.Var xId))))))))
-  where
-    (C.FunTy dictTy funTy1) = C.tyView funTy
-    (C.FunTy gTy    funTy2) = C.tyView funTy1
-    (C.FunTy xTy    _)      = C.tyView funTy2
-    dictName = C.mkUnsafeSystemName "dict" 0
-    gName    = C.mkUnsafeSystemName "g" 1
-    xName    = C.mkUnsafeSystemName "x" 2
-    dictId   = C.mkLocalId dictTy dictName
-    gId      = C.mkLocalId gTy gName
-    xId      = C.mkLocalId xTy xName
+traverseTerm (C.ForAllTy fTV (C.ForAllTy aTV (C.ForAllTy bTV (C.ForAllTy domTV funTy))))
+    | (C.FunTy dictTy funTy1) <- C.tyView funTy
+    , (C.FunTy gTy    funTy2) <- C.tyView funTy1
+    , (C.FunTy xTy    _)      <- C.tyView funTy2
+    = let
+        dictName = C.mkUnsafeSystemName "dict" 0
+        gName    = C.mkUnsafeSystemName "g" 1
+        xName    = C.mkUnsafeSystemName "x" 2
+        dictId   = C.mkLocalId dictTy dictName
+        gId      = C.mkLocalId gTy gName
+        xId      = C.mkLocalId xTy xName
+      in
+        C.TyLam fTV (
+        C.TyLam aTV (
+        C.TyLam bTV (
+        C.TyLam domTV (
+        C.Lam   dictId (
+        C.Lam   gId (
+        C.Lam   xId (
+        C.App (C.Var gId) (C.Var xId))))))))
 
 traverseTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1267,20 +1295,21 @@ traverseTerm ty = error $ $(curLoc) ++ show ty
 -- @/\(r:Rep)/\(a:TYPE Lifted)./\(b:TYPE r).\(f : (a -> b)).\(x : a).f x@
 dollarTerm :: C.Type
            -> C.Term
-dollarTerm (C.ForAllTy rTV (C.ForAllTy aTV (C.ForAllTy bTV funTy))) =
-    C.TyLam rTV (
-    C.TyLam aTV (
-    C.TyLam bTV (
-    C.Lam   fId (
-    C.Lam   xId (
-    C.App (C.Var fId) (C.Var xId))))))
-  where
-    (C.FunTy fTy funTy'') = C.tyView funTy
-    (C.FunTy aTy _)       = C.tyView funTy''
-    fName = C.mkUnsafeSystemName "f" 0
-    xName = C.mkUnsafeSystemName "x" 1
-    fId   = C.mkLocalId fTy fName
-    xId   = C.mkLocalId aTy xName
+dollarTerm (C.ForAllTy rTV (C.ForAllTy aTV (C.ForAllTy bTV funTy)))
+  | (C.FunTy fTy funTy'') <- C.tyView funTy
+  , (C.FunTy aTy _)       <- C.tyView funTy''
+  = let
+      fName = C.mkUnsafeSystemName "f" 0
+      xName = C.mkUnsafeSystemName "x" 1
+      fId   = C.mkLocalId fTy fName
+      xId   = C.mkLocalId aTy xName
+    in
+      C.TyLam rTV (
+      C.TyLam aTV (
+      C.TyLam bTV (
+      C.Lam   fId (
+      C.Lam   xId (
+      C.App (C.Var fId) (C.Var xId))))))
 
 dollarTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1306,17 +1335,18 @@ joinTerm ty = error $ $(curLoc) ++ show ty
 withFrozenCallStackTerm
   :: C.Type
   -> C.Term
-withFrozenCallStackTerm (C.ForAllTy aTV funTy) =
-  C.TyLam  aTV (
-  C.Lam    callStackId (
-  C.Lam    fId (
-  C.App (C.Var fId) (C.Var callStackId))))
-  where
-    (C.FunTy callStackTy fTy) = C.tyView funTy
-    callStackName = C.mkUnsafeSystemName "callStack" 0
-    fName         = C.mkUnsafeSystemName "f" 1
-    callStackId   = C.mkLocalId callStackTy callStackName
-    fId           = C.mkLocalId fTy fName
+withFrozenCallStackTerm (C.ForAllTy aTV funTy)
+  | (C.FunTy callStackTy fTy) <- C.tyView funTy
+  = let
+      callStackName = C.mkUnsafeSystemName "callStack" 0
+      fName         = C.mkUnsafeSystemName "f" 1
+      callStackId   = C.mkLocalId callStackTy callStackName
+      fId           = C.mkLocalId fTy fName
+    in
+      C.TyLam  aTV (
+      C.Lam    callStackId (
+      C.Lam    fId (
+      C.App (C.Var fId) (C.Var callStackId))))
 
 withFrozenCallStackTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1330,14 +1360,15 @@ withFrozenCallStackTerm ty = error $ $(curLoc) ++ show ty
 idTerm
   :: C.Type
   -> C.Term
-idTerm (C.ForAllTy aTV funTy) =
-  C.TyLam aTV (
-  C.Lam   xId (
-  C.Var xId))
-  where
-    (C.FunTy xTy _) = C.tyView funTy
-    xName           = C.mkUnsafeSystemName "x" 0
-    xId             = C.mkLocalId xTy xName
+idTerm (C.ForAllTy aTV funTy)
+  | (C.FunTy xTy _) <- C.tyView funTy
+  = let
+      xName           = C.mkUnsafeSystemName "x" 0
+      xId             = C.mkLocalId xTy xName
+    in
+      C.TyLam aTV (
+      C.Lam   xId (
+      C.Var xId))
 
 idTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1351,17 +1382,19 @@ idTerm ty = error $ $(curLoc) ++ show ty
 runRWTerm
   :: C.Type
   -> C.Term
-runRWTerm (C.ForAllTy rTV (C.ForAllTy oTV funTy)) =
-  C.TyLam rTV (
-  C.TyLam oTV (
-  C.Lam   fId (
-  (C.App (C.Var fId) (C.Prim (C.PrimInfo rwNm rwTy C.WorkNever C.SingleResult C.NoUnfolding))))))
- where
-    (C.FunTy fTy _)  = C.tyView funTy
-    (C.FunTy rwTy _) = C.tyView fTy
-    fName            = C.mkUnsafeSystemName "f" 0
-    fId              = C.mkLocalId fTy fName
-    rwNm             = pack "GHC.Prim.realWorld#"
+runRWTerm (C.ForAllTy rTV (C.ForAllTy oTV funTy))
+  | (C.FunTy fTy _)  <- C.tyView funTy
+  , (C.FunTy rwTy _) <- C.tyView fTy
+  = let
+      fName            = C.mkUnsafeSystemName "f" 0
+      fId              = C.mkLocalId fTy fName
+      rwNm             = pack "GHC.Prim.realWorld#"
+    in
+      C.TyLam rTV (
+      C.TyLam oTV (
+      C.Lam   fId (
+      (C.App (C.Var fId)
+             (C.Prim (C.PrimInfo rwNm rwTy C.WorkNever C.SingleResult C.NoUnfolding))))))
 
 runRWTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1375,23 +1408,24 @@ runRWTerm ty = error $ $(curLoc) ++ show ty
 checkUnpackUndefTerm
   :: C.Type
   -> C.Term
-checkUnpackUndefTerm (C.ForAllTy nTV (C.ForAllTy aTV funTy)) =
-  C.TyLam nTV (
-  C.TyLam aTV (
-  C.Lam knId (
-  C.Lam tpId (
-  C.Lam fId (
-  C.Var fId)))))
-  where
-    C.FunTy knTy r0Ty = C.tyView funTy
-    C.FunTy tpTy r1Ty = C.tyView r0Ty
-    C.FunTy fTy _     = C.tyView r1Ty
-    knName            = C.mkUnsafeSystemName "kn" 0
-    tpName            = C.mkUnsafeSystemName "tp" 1
-    fName             = C.mkUnsafeSystemName "f" 2
-    knId              = C.mkLocalId knTy knName
-    tpId              = C.mkLocalId tpTy tpName
-    fId               = C.mkLocalId fTy fName
+checkUnpackUndefTerm (C.ForAllTy nTV (C.ForAllTy aTV funTy))
+  | C.FunTy knTy r0Ty <- C.tyView funTy
+  , C.FunTy tpTy r1Ty <- C.tyView r0Ty
+  , C.FunTy fTy _     <- C.tyView r1Ty
+  = let
+      knName            = C.mkUnsafeSystemName "kn" 0
+      tpName            = C.mkUnsafeSystemName "tp" 1
+      fName             = C.mkUnsafeSystemName "f" 2
+      knId              = C.mkLocalId knTy knName
+      tpId              = C.mkLocalId tpTy tpName
+      fId               = C.mkLocalId fTy fName
+    in
+      C.TyLam nTV (
+      C.TyLam aTV (
+      C.Lam knId (
+      C.Lam tpId (
+      C.Lam fId (
+      C.Var fId)))))
 
 checkUnpackUndefTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1406,17 +1440,18 @@ nameModTerm
   :: C.NameMod
   -> C.Type
   -> C.Term
-nameModTerm sa (C.ForAllTy nmTV (C.ForAllTy aTV funTy)) =
-  C.TyLam nmTV (
-  C.TyLam aTV (
-  C.Lam   xId (
-  (C.Tick (C.NameMod sa (C.VarTy nmTV)) (C.Var xId)))))
-  where
-    (C.FunTy xTy _)  = C.tyView funTy
-    -- Safe to use `mkUnsafeSystemName` here, because we're building the
-    -- identity \x.x, so any shadowing of 'x' would be the desired behavior.
-    xName            = C.mkUnsafeSystemName "x" 0
-    xId              = C.mkLocalId xTy xName
+nameModTerm sa (C.ForAllTy nmTV (C.ForAllTy aTV funTy))
+  | (C.FunTy xTy _) <- C.tyView funTy
+  = let
+      -- Safe to use `mkUnsafeSystemName` here, because we're building the
+      -- identity \x.x, so any shadowing of 'x' would be the desired behavior.
+      xName            = C.mkUnsafeSystemName "x" 0
+      xId              = C.mkLocalId xTy xName
+    in
+      C.TyLam nmTV (
+      C.TyLam aTV (
+      C.Lam   xId (
+      (C.Tick (C.NameMod sa (C.VarTy nmTV)) (C.Var xId)))))
 
 nameModTerm _ ty = error $ $(curLoc) ++ show ty
 
@@ -1431,20 +1466,21 @@ nameModTerm _ ty = error $ $(curLoc) ++ show ty
 xToErrorCtxTerm
   :: C.Type
   -> C.Term
-xToErrorCtxTerm (C.ForAllTy aTV funTy) =
-  C.TyLam aTV (
-  C.Lam ctxId (
-  C.Lam xId (
-  C.Var xId)))
-  where
-    (C.FunTy ctxTy rTy) = C.tyView funTy
-    (C.FunTy xTy _)     = C.tyView rTy
-    -- Safe to use `mkUnsafeSystemName` here, because we're building the
-    -- identity \_ x.x, so any shadowing of 'x' would be the desired behavior.
-    ctxName = C.mkUnsafeSystemName "ctx" 0
-    ctxId   = C.mkLocalId ctxTy ctxName
-    xName   = C.mkUnsafeSystemName "x" 1
-    xId     = C.mkLocalId xTy xName
+xToErrorCtxTerm (C.ForAllTy aTV funTy)
+  | (C.FunTy ctxTy rTy) <- C.tyView funTy
+  , (C.FunTy xTy _)     <- C.tyView rTy
+  = let
+      -- Safe to use `mkUnsafeSystemName` here, because we're building the
+      -- identity \_ x.x, so any shadowing of 'x' would be the desired behavior.
+      ctxName = C.mkUnsafeSystemName "ctx" 0
+      ctxId   = C.mkLocalId ctxTy ctxName
+      xName   = C.mkUnsafeSystemName "x" 1
+      xId     = C.mkLocalId xTy xName
+    in
+      C.TyLam aTV (
+      C.Lam ctxId (
+      C.Lam xId (
+      C.Var xId)))
 
 xToErrorCtxTerm ty = error $ $(curLoc) ++ show ty
 

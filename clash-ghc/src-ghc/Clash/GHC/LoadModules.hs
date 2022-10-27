@@ -77,6 +77,19 @@ import           System.Process                  (runInteractiveCommand,
 
 -- GHC API
 #if MIN_VERSION_ghc(9,0,0)
+#if MIN_VERSION_ghc(9,2,0)
+import qualified GHC.Driver.Env as HscTypes
+import qualified GHC.Unit.Module.ModGuts as HscTypes
+import qualified GHC.Types.SourceError as HscTypes
+import qualified GHC.Unit.Module.Deps as HscTypes
+import qualified GHC.Driver.Backend as Backend
+import qualified GHC.Unit.Module.Graph as Graph
+import qualified GHC.Platform.Ways as Ways
+import qualified GHC.Types.Error as Error
+#else
+import qualified GHC.Driver.Types as HscTypes
+import qualified GHC.Driver.Ways as Ways
+#endif
 import qualified GHC.Types.Annotations as Annotations
 import qualified GHC.Core.FVs as CoreFVs
 import qualified GHC.Core as CoreSyn
@@ -88,7 +101,6 @@ import qualified GHC.Driver.Session as DynFlags
 import qualified GHC.Data.FastString as FastString
 import qualified GHC
 import qualified GHC.Driver.Main as HscMain
-import qualified GHC.Driver.Types as HscTypes
 import qualified GHC.Utils.Monad as MonadUtils
 import qualified GHC.Utils.Panic as Panic
 import qualified GHC.Serialized as Serialized (deserializeWithData)
@@ -109,7 +121,6 @@ import qualified GHC.Utils.Outputable as Outputable
 import qualified GHC.Types.Unique.Set as UniqSet
 import           GHC.Utils.Misc (OverridingBool)
 import qualified GHC.Types.Var as Var
-import qualified GHC.Driver.Ways as Ways
 import qualified GHC.Unit.Module.Env as ModuleEnv
 import qualified GHC.Types.Name.Env as NameEnv
 #else
@@ -235,7 +246,12 @@ setupGhc useColor dflagsM idirs = do
         df <- do
           df <- GHC.getSessionDynFlags
 #if MIN_VERSION_ghc(9,0,0)
+#if MIN_VERSION_ghc(9,2,0)
+          logger <- GHC.getLogger
+          df1 <- liftIO (GHC.interpretPackageEnv logger df)
+#else
           df1 <- liftIO (GHC.interpretPackageEnv df)
+#endif
           _ <- GHC.setSessionDynFlags df1
 
 #else
@@ -259,6 +275,12 @@ setupGhc useColor dflagsM idirs = do
                   { DynFlags.optLevel = 2
                   , DynFlags.ghcMode  = GHC.CompManager
                   , DynFlags.ghcLink  = GHC.LinkInMemory
+#if MIN_VERSION_ghc(9,2,0)
+                  , DynFlags.backend  =
+                      if Ways.hostIsProfiled
+                         then Backend.NoBackend
+                         else Backend.platformDefaultBackend (DynFlags.targetPlatform dflags)
+#else
                   , DynFlags.hscTarget
 #if MIN_VERSION_ghc(9,0,0)
                       = if Ways.hostIsProfiled
@@ -271,6 +293,7 @@ setupGhc useColor dflagsM idirs = do
                                   DynFlags.targetPlatform
 #endif
                                     dflags
+#endif
                   , DynFlags.reductionDepth = 1000
                   }
   let dflags2 = unwantedOptimizationFlags dflags1
@@ -290,7 +313,12 @@ setupGhc useColor dflagsM idirs = do
                ])
       (return ())
 
-#if MIN_VERSION_ghc(9,0,0)
+#if MIN_VERSION_ghc(9,2,0)
+  _ <- GHC.setSessionDynFlags dflags3
+  hscenv <- GHC.getSession
+  hscenv1 <- MonadUtils.liftIO (DynamicLoading.initializePlugins hscenv)
+  GHC.setSession hscenv1
+#elif MIN_VERSION_ghc(9,0,0)
   _ <- GHC.setSessionDynFlags dflags3
   hscenv <- GHC.getSession
   dflags4 <- MonadUtils.liftIO (DynamicLoading.initializePlugins hscenv dflags3)
@@ -324,7 +352,12 @@ loadLocalModule hdl modName = do
   let modGraph' = GHC.mapMG disableOptimizationsFlags modGraph
       -- 'topSortModuleGraph' ensures that modGraph2, and hence tidiedMods
       -- are in topological order, i.e. the root module is last.
-      modGraph2 = Digraph.flattenSCCs (GHC.topSortModuleGraph True modGraph' Nothing)
+      modGraph2 = Digraph.flattenSCCs $
+#if MIN_VERSION_ghc(9,2,0)
+                  -- TODO: this might break backpack
+                  Graph.filterToposortToModules $
+#endif
+                  GHC.topSortModuleGraph True modGraph' Nothing
 
   liftIO $ mapM_ checkMonoLocalBindsMod modGraph2
 
@@ -446,7 +479,13 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
     famInstEnvs <- do
       (msgs, m) <- TcRnMonad.liftIO $ TcRnMonad.initTcInteractive hscEnv FamInst.tcGetFamInstEnvs
       case m of
-        Nothing -> TcRnMonad.liftIO $ throwIO (HscTypes.mkSrcErr (snd msgs))
+        Nothing -> TcRnMonad.liftIO $ throwIO
+                                    $ HscTypes.mkSrcErr
+#if MIN_VERSION_ghc(9,2,0)
+                                    $ Error.getErrorMessages msgs
+#else
+                                    $ snd msgs
+#endif
         Just x  -> return x
 
     allSyn     <- Map.fromList <$> findSynthesizeAnnotations allBinderIds
@@ -811,11 +850,19 @@ findPrimitiveAnnotations hdl bndrs = do
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule
 parseModule modSum = do
+#if MIN_VERSION_ghc(9,2,0)
+  (GHC.ParsedModule pmModSum pmParsedSource extraSrc) <-
+    GHC.parseModule modSum
+  return (GHC.ParsedModule
+            (disableOptimizationsFlags pmModSum)
+            pmParsedSource extraSrc)
+#else
   (GHC.ParsedModule pmModSum pmParsedSource extraSrc anns) <-
     GHC.parseModule modSum
   return (GHC.ParsedModule
             (disableOptimizationsFlags pmModSum)
             pmParsedSource extraSrc anns)
+#endif
 
 disableOptimizationsFlags :: GHC.ModSummary -> GHC.ModSummary
 disableOptimizationsFlags ms@(GHC.ModSummary {..})
@@ -944,20 +991,36 @@ removeStrictnessAnnotations pm =
     rmTyClD tyClD = tyClD
 
     -- rmDataDefn :: GHC.DataId name => GHC.HsDataDefn name -> GHC.HsDataDefn name
+#if MIN_VERSION_ghc(9,2,0)
+    rmDataDefn :: GHC.HsDataDefn GHC.GhcPs -> GHC.HsDataDefn GHC.GhcPs
+#endif
     rmDataDefn hdf = hdf {GHC.dd_cons = (fmap . fmap) rmCD (GHC.dd_cons hdf)}
 
     -- rmCD :: GHC.DataId name => GHC.ConDecl name -> GHC.ConDecl name
     rmCD gadt@(GHC.ConDeclGADT {}) = gadt {GHC.con_res_ty = rmHsType (GHC.con_res_ty gadt)
+#if MIN_VERSION_ghc(9,2,0)
+                                          ,GHC.con_g_args = rmGConDetails (GHC.con_g_args gadt)
+#else
                                           ,GHC.con_args   = rmConDetails (GHC.con_args gadt)
+#endif
                                           }
     rmCD h98@(GHC.ConDeclH98 {})   = h98  {GHC.con_args = rmConDetails (GHC.con_args h98)}
 #if !MIN_VERSION_ghc(9,0,0)
     rmCD xcon                      = xcon
 #endif
 
+#if MIN_VERSION_ghc(9,2,0)
+    rmGConDetails :: GHC.HsConDeclGADTDetails GHC.GhcPs -> GHC.HsConDeclGADTDetails GHC.GhcPs
+    rmGConDetails (GHC.PrefixConGADT args) = GHC.PrefixConGADT (fmap rmHsScaledType args)
+    rmGConDetails (GHC.RecConGADT rec)     = GHC.RecConGADT ((fmap . fmap . fmap) rmConDeclF rec)
+#endif
+
     -- type HsConDeclDetails name = HsConDetails (LBangType name) (Located [LConDeclField name])
     -- rmConDetails :: _ => GHC.HsConDeclDetails name -> GHC.HsConDeclDetails name
-#if MIN_VERSION_ghc(9,0,0)
+#if MIN_VERSION_ghc(9,2,0)
+    rmConDetails (GHC.PrefixCon tys args) = GHC.PrefixCon tys (fmap rmHsScaledType args)
+    rmConDetails (GHC.InfixCon l r)   = GHC.InfixCon (rmHsScaledType l) (rmHsScaledType r)
+#elif MIN_VERSION_ghc(9,0,0)
     rmConDetails (GHC.PrefixCon args) = GHC.PrefixCon (fmap rmHsScaledType args)
     rmConDetails (GHC.InfixCon l r)   = GHC.InfixCon (rmHsScaledType l) (rmHsScaledType r)
 #else
@@ -970,12 +1033,22 @@ removeStrictnessAnnotations pm =
     -- rmHsType :: GHC.DataId name => GHC.Located (GHC.HsType name) -> GHC.Located (GHC.HsType name)
     rmHsType = transform go
       where
+#if MIN_VERSION_ghc(9,2,0)
+        go ::
+          GHC.LBangType GHC.GhcPs ->
+          GHC.LBangType GHC.GhcPs
+#endif
         go (GHC.unLoc -> GHC.HsBangTy _ _ ty) = ty
         go ty                               = ty
 
 #if MIN_VERSION_ghc(9,0,0)
     rmHsScaledType = transform go
       where
+#if MIN_VERSION_ghc(9,2,0)
+        go ::
+          GHC.HsScaled GHC.GhcPs (GHC.LBangType GHC.GhcPs) ->
+          GHC.HsScaled GHC.GhcPs (GHC.LBangType GHC.GhcPs)
+#endif
         go (GHC.HsScaled m (GHC.unLoc -> GHC.HsBangTy _ _ ty)) = GHC.HsScaled m ty
         go ty = ty
 #endif

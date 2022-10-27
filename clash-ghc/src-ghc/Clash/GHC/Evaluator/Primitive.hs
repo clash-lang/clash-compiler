@@ -16,6 +16,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnboxedTuples #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module Clash.GHC.Evaluator.Primitive
   ( ghcPrimStep
   , ghcPrimUnwind
@@ -46,7 +48,9 @@ import           GHC.Int
 import           GHC.Integer
   (decodeDoubleInteger,encodeDoubleInteger,compareInteger,orInteger,andInteger,
    xorInteger,complementInteger,absInteger,signumInteger)
-#if MIN_VERSION_base(4,15,0)
+#if MIN_VERSION_base(4,16,0)
+import           GHC.Num.Integer (Integer (..), integerEncodeFloat#)
+#elif MIN_VERSION_base(4,15,0)
 import           GHC.Num.Integer
   (Integer (..), integerEncodeFloat#, integerToFloat#, integerToDouble#)
 #else
@@ -1033,6 +1037,16 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , Just i <- integerLiteral v
     -> reduce . Literal . DoubleLiteral . doubleToWord $ D# (integerToDouble# i)
 
+  "GHC.Float.integerToFloat#"
+    | [v] <- args
+    , Just i <- integerLiteral v
+    -> reduce . Literal . FloatLiteral . floatToWord $ F# (integerToFloat# i)
+
+  "GHC.Float.integerToDouble#"
+    | [v] <- args
+    , Just i <- integerLiteral v
+    -> reduce . Literal . DoubleLiteral . doubleToWord $ D# (integerToDouble# i)
+
   "GHC.Num.Natural.naturalLogBase#"
     | Just (a,b) <- naturalLiterals args
     , Just c <- flogBase a b
@@ -1620,25 +1634,49 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   "GHC.Int.I8#"
     | isSubj
+#if MIN_VERSION_base(4,16,0)
+    , [Lit (Int8Literal i)] <- args
+#else
     , [Lit (IntLiteral i)] <- args
+#endif
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
             (Just intTc) = UniqMap.lookup intTcNm tcm
             [intDc] = tyConDataCons intTc
+#if MIN_VERSION_base(4,16,0)
+        in  reduce (mkApps (Data intDc) [Left (Literal (Int8Literal i))])
+#else
         in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
+#endif
   "GHC.Int.I16#"
     | isSubj
+#if MIN_VERSION_base(4,16,0)
+    , [Lit (Int16Literal i)] <- args
+#else
     , [Lit (IntLiteral i)] <- args
+#endif
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
             (Just intTc) = UniqMap.lookup intTcNm tcm
             [intDc] = tyConDataCons intTc
+#if MIN_VERSION_base(4,16,0)
+        in  reduce (mkApps (Data intDc) [Left (Literal (Int16Literal i))])
+#else
         in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
+#endif
   "GHC.Int.I32#"
     | isSubj
+#if MIN_VERSION_base(4,16,0)
+    , [Lit (Int32Literal i)] <- args
+#else
     , [Lit (IntLiteral i)] <- args
+#endif
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
             (Just intTc) = UniqMap.lookup intTcNm tcm
             [intDc] = tyConDataCons intTc
+#if MIN_VERSION_base(4,16,0)
+        in  reduce (mkApps (Data intDc) [Left (Literal (Int32Literal i))])
+#else
         in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
+#endif
   "GHC.Int.I64#"
     | isSubj
     , [Lit (IntLiteral i)] <- args
@@ -1649,25 +1687,49 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   "GHC.Word.W8#"
     | isSubj
+#if MIN_VERSION_base(4,16,0)
+    , [Lit (Word8Literal c)] <- args
+#else
     , [Lit (WordLiteral c)] <- args
+#endif
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
             (Just wordTc) = UniqMap.lookup wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
+#if MIN_VERSION_base(4,16,0)
+        in  reduce (mkApps (Data wordDc) [Left (Literal (Word8Literal c))])
+#else
         in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
+#endif
   "GHC.Word.W16#"
     | isSubj
+#if MIN_VERSION_base(4,16,0)
+    , [Lit (Word16Literal c)] <- args
+#else
     , [Lit (WordLiteral c)] <- args
+#endif
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
             (Just wordTc) = UniqMap.lookup wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
+#if MIN_VERSION_base(4,16,0)
+        in  reduce (mkApps (Data wordDc) [Left (Literal (Word16Literal c))])
+#else
         in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
+#endif
   "GHC.Word.W32#"
     | isSubj
+#if MIN_VERSION_base(4,16,0)
+    , [Lit (Word32Literal c)] <- args
+#else
     , [Lit (WordLiteral c)] <- args
+#endif
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
             (Just wordTc) = UniqMap.lookup wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
+#if MIN_VERSION_base(4,16,0)
+        in  reduce (mkApps (Data wordDc) [Left (Literal (Word32Literal c))])
+#else
         in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
+#endif
   "GHC.Word.W64#"
     | isSubj
     , [Lit (WordLiteral c)] <- args

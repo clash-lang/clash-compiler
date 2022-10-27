@@ -16,23 +16,27 @@ module Clash.GHC.GenerateBindings
   (generateBindings)
 where
 
-import           Control.Arrow           ((***), first)
+import           Control.Arrow           ((***))
 import           Control.DeepSeq         (deepseq)
 import           Control.Lens            ((%~),(&),(.~))
 import           Control.Monad           (unless)
 import qualified Control.Monad.State     as State
 import qualified Control.Monad.RWS.Strict as RWS
 import           Data.Coerce             (coerce)
-import           Data.Either             (partitionEithers, lefts, rights)
+import           Data.Either             (partitionEithers, lefts ,rights)
 import           Data.IntMap.Strict      (IntMap)
 import qualified Data.IntMap.Strict      as IMS
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.List               (isPrefixOf)
+import           Data.Maybe              (listToMaybe)
 import qualified Data.Text               as Text
 import qualified Data.Time.Clock         as Clock
 
 import qualified GHC                     as GHC (Ghc)
 #if MIN_VERSION_ghc(9,0,0)
+#if MIN_VERSION_ghc(9,2,0)
+import qualified GHC.Utils.Panic         as GHC
+#endif
 import qualified GHC.Types.Basic         as GHC
 import qualified GHC.Core                as GHC
 import qualified GHC.Types.Demand        as GHC
@@ -297,7 +301,11 @@ checkPrimitive primMap v = do
         inline = GHC.inlinePragmaSpec $ GHC.inlinePragInfo info
         strictness = GHC.strictnessInfo info
         ty = GHC.varType v
+#if MIN_VERSION_ghc(9,2,0)
+        (argTys,_resTy) = GHC.splitFunTys (snd (GHC.splitForAllTyCoVars ty))
+#else
         (argTys,_resTy) = GHC.splitFunTys . snd . GHC.splitForAllTys $ ty
+#endif
         (dmdArgs,_dmdRes) = GHC.splitStrictSig strictness
         nrOfArgs = length argTys
         loc = case GHC.getSrcLoc v of
@@ -329,7 +337,9 @@ checkPrimitive primMap v = do
         warnIf (inline /= GHC.NoInline)
           (primStr ++ "isn't marked NOINLINE."
           ++ "\nThis might make Clash ignore this primitive.")
-#if MIN_VERSION_ghc(9,0,0)
+#if MIN_VERSION_ghc(9,2,0)
+        warnIf (GHC.isDeadEndAppSig strictness nrOfArgs)
+#elif MIN_VERSION_ghc(9,0,0)
         warnIf (GHC.appIsDeadEnd strictness nrOfArgs)
 #else
         warnIf (GHC.appIsBottom strictness nrOfArgs)
@@ -352,25 +362,26 @@ mkClassSelector
   -> Term
 mkClassSelector inScope0 tcm ty sel = newExpr
   where
-    ((tvs,dictTy:_),_) = first (lefts *** rights)
-                       $ first (span (\l -> case l of Left _ -> True
-                                                      _      -> False))
-                       $ splitFunForallTy ty
-    newExpr = case tyView dictTy of
-      (TyConApp tcNm _)
+    -- TODO: why can't we just use partitionEithers here?
+    (tvs,dicts) = (lefts *** rights)
+                . span (\l -> case l of {Left _ -> True; _ -> False})
+                $ fst (splitFunForallTy ty)
+    newExpr = case listToMaybe dicts of
+      Just dictTy@(tyView -> TyConApp tcNm _)
         | Just tc <- UniqMap.lookup tcNm tcm
         , not (isNewTypeTc tc)
         -> flip State.evalState (0 :: Int) $ do
-                          dcId <- mkInternalVar inScope0 "dict" dictTy
-                          let inScope1 = extendInScopeSet inScope0 dcId
-                          selE <- mkSelectorCase "mkClassSelector" inScope1 tcm (Var dcId) 1 sel
-                          return (mkTyLams (mkLams selE [dcId]) tvs)
-      (FunTy arg res) -> flip State.evalState (0 :: Int) $ do
-                           dcId <- mkInternalVar inScope0 "dict" (mkFunTy arg res)
-                           return (mkTyLams (mkLams (Var dcId) [dcId]) tvs)
-      _ -> flip State.evalState (0 :: Int) $ do
-                           dcId <- mkInternalVar inScope0 "dict" dictTy
-                           return (mkTyLams (mkLams (Var dcId) [dcId]) tvs)
+              dcId <- mkInternalVar inScope0 "dict" dictTy
+              let inScope1 = extendInScopeSet inScope0 dcId
+              selE <- mkSelectorCase "mkClassSelector" inScope1 tcm (Var dcId) 1 sel
+              return (mkTyLams (mkLams selE [dcId]) tvs)
+      Just (tyView -> FunTy arg res) -> flip State.evalState (0 :: Int) $ do
+              dcId <- mkInternalVar inScope0 "dict" (mkFunTy arg res)
+              return (mkTyLams (mkLams (Var dcId) [dcId]) tvs)
+      Just dictTy -> flip State.evalState (0 :: Int) $ do
+              dcId <- mkInternalVar inScope0 "dict" dictTy
+              return (mkTyLams (mkLams (Var dcId) [dcId]) tvs)
+      Nothing -> error "mkClassSelector: expected at least one dictionary argument"
 
 mkTupTyCons :: GHC2CoreState -> (GHC2CoreState,IntMap TyConName)
 mkTupTyCons tcMap = (tcMap'',tupTcCache)
