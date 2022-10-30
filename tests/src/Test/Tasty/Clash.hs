@@ -300,6 +300,7 @@ instance IsTest ClashBinaryTest where
       [ "-package", "clash-testsuite"
       , "-main-is", cbModName <> ".main" <> show cbBuildTarget
       , "-o", oDir </> "out"
+      , "-i" <> cbSourceDirectory
       , "-outputdir", oDir
       ] <> cbExtraBuildArgs <>
       [ cbSourceDirectory </> cbModName <.> "hs"

@@ -35,7 +35,7 @@ import           Control.Monad.State              (evalState, get)
 import           Control.Monad.State.Strict       (State)
 import qualified Control.Monad.State.Strict       as State
 import qualified Crypto.Hash.SHA256               as Sha256
-import           Data.Bifunctor                   (first)
+import           Data.Bifunctor                   (first, second)
 import           Data.ByteString                  (ByteString)
 import qualified Data.ByteString                  as ByteString
 import qualified Data.ByteString.Lazy             as ByteStringLazy
@@ -48,6 +48,7 @@ import qualified Data.HashMap.Strict              as HashMap
 import qualified Data.HashSet                     as HashSet
 import           Data.Proxy                       (Proxy(..))
 import           Data.List                        (intercalate)
+import qualified Data.List                        as List
 import           Data.Maybe                       (fromMaybe, maybeToList, mapMaybe)
 import qualified Data.Map.Ordered                 as OMap
 import           Data.Map.Ordered.Extra           ()
@@ -1082,28 +1083,37 @@ normalizeEntity env bindingsMap typeTrans peEval eval topEntities supply tm = tr
                             typeTrans peEval eval emptyVarEnv
                             topEntities doNorm
 
--- | topologically sort the top entities
-sortTop
-  :: BindingMap
-  -> [TopEntityT]
-  -> ([TopEntityT], HashMap Unique [Unique])
+-- | Reverse topologically sort given top entities. Also returns a mapping that
+-- maps a top entity to its reverse topologically sorted transitive dependencies.
+sortTop ::
+  BindingMap ->
+  [TopEntityT] ->
+  ( [TopEntityT]
+  , HashMap Unique [Unique]
+  )
 sortTop bindingsMap topEntities =
-  let (nodes,edges) = unzip (map go topEntities)
-      edges' = concat edges
-  in  case reverseTopSort nodes edges' of
-        Left msg   -> error msg
-        Right tops -> (tops, mapFrom edges')
+  case reverseTopSort nodes edges of
+    Left msg   -> error msg
+    Right tops -> (tops, mapFrom tops)
  where
-  go t@(TopEntityT topE _ _) =
-    let topRefs = goRefs topE topE
-    in  ((varUniq topE,t)
-         ,map ((\top -> (varUniq topE, varUniq (topId top)))) topRefs)
+  nodes = [(varUniq topE, t) | t@(TopEntityT topE _ _) <- topEntities]
+  edges = concatMap getEdges topEntities
 
-  goRefs top i_ =
-    let cg = callGraph bindingsMap i_
+  getEdges (TopEntityT topE _ _) =
+    map
+      (\top -> (varUniq topE, topToUnique top))
+      (getTransitiveRefs topE)
+
+  getTransitiveRefs top =
+    let allDeps = callGraph bindingsMap top
+    in  filter (\t -> topId t /= top && topId t `elemVarEnv` allDeps) topEntities
+
+  topToUnique = varUniq . topId
+
+  mapFrom tops =
+    let
+      topIndices = HashMap.fromList (zip (map topToUnique tops) [(0 :: Int)..])
+      nonOrdered = HashMap.fromListWith (<>) (map (second pure) edges)
+      orderFunc k = fromMaybe (-1) (HashMap.lookup k topIndices)
     in
-      filter
-        (\t -> topId t /= top && topId t /= i_ && topId t `elemVarEnv` cg)
-        topEntities
-
-  mapFrom = HashMap.fromListWith mappend . fmap (fmap pure)
+      HashMap.map (List.sortOn orderFunc) nonOrdered
