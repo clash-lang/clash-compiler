@@ -57,15 +57,6 @@ import Paths_clash_lib (getDataFileName)
   file by invoking
 
   > cabal run clash-lib:static-files -- --tcl-connector clashConnector.tcl
-
-  The Tcl Connector is currently affected by
-  bugs [#2325](https://github.com/clash-lang/clash-compiler/issues/2325)
-  and [#2334](https://github.com/clash-lang/clash-compiler/issues/2334). The
-  result is that HDL files might be read in the wrong order. This doesn't seem
-  to affect the example script above, but simulation /is/ affected. Until these
-  bugs are fixed, an invocation of @update_compile_order@ after @clash::readHdl@
-  might be needed even in Non-project Mode, even though @update_compile_order@
-  is a Project Mode command.
 -}
 tclConnector :: IO FilePath
 tclConnector = getDataFileName $ "data-files" </> "tcl" </> "clashConnector.tcl"

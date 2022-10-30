@@ -86,8 +86,6 @@ genSimTcl dir top = do
     clash::readMetadata {#{topEntityDir}}
     clash::createAndReadIp -dir ip
     clash::readHdl
-    \# Compiler doesn't topologically sort source files (bug)
-    update_compile_order -fileset [current_fileset]
     set_property TOP $clash::topEntity [current_fileset -sim]
     save_project_as sim project -force
     set_property RUNTIME all [current_fileset -sim]

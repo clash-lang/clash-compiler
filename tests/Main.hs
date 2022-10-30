@@ -367,7 +367,7 @@ runClashTest = defaultMain $ clashTestRoot
           --
           -- tracked: https://github.com/clash-lang/clash-compiler/issues/2266
           let _opts = def { hdlTargets=[VHDL]
-                          , hdlSim=hdlSim def \\ [Vivado]
+                          , hdlSim=hdlSim def
                           }
           in runTest "Parameters" _opts
         , runTest "PopCount" def
