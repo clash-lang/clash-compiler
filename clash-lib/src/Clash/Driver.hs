@@ -479,9 +479,11 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
       let
         components = map (snd . snd) (OMap.assocs netlist)
         filesAndDigests0 =
-             zip (map fst hdlDocs) hdlDocDigests
+          -- FIXME: We should track dependencies of `mfiles` and `dfiles` and
+          -- maintain the proper topological sort of all these.
+             zip (map fst mfiles) memoryFilesDigests
           <> zip (map fst dfiles) dataFilesDigests
-          <> zip (map fst mfiles) memoryFilesDigests
+          <> zip (map fst hdlDocs) hdlDocDigests
 
       filesAndDigests1 <- modifyMVar edamFilesV $ \edamFiles ->
         if opt_edalize opts
@@ -764,19 +766,19 @@ createHDL
   -- + The data files that need to be copied
 createHDL backend modName seen components domainConfs top topName = flip evalState backend $ getAp $ do
   let componentsL = map snd (OMap.assocs components)
-  (hdlNmDocs,incs) <-
+  (hdlNmDocs0,incs) <-
     fmap unzip $
       forM componentsL $ \(ComponentMeta{cmLoc, cmScope,cmUsage}, comp) ->
          genHDL modName cmLoc (Id.union seen cmScope) cmUsage comp
 
   hwtys <- HashSet.toList <$> extractTypes <$> Ap get
-  typesPkg <- mkTyPackage modName hwtys
+  typesPkg0 <- mkTyPackage modName hwtys
   dataFiles <- Ap getDataFiles
   memFiles  <- Ap getMemoryDataFiles
   let
-    hdl = map (first (<.> Clash.Backend.extension backend)) (typesPkg ++ hdlNmDocs)
-    qincs = concat incs
-    topFiles = hdl ++ qincs
+    typesPkg1 = map (first (<.> Clash.Backend.extension backend)) typesPkg0
+    hdlNmDocs1 = map (first (<.> Clash.Backend.extension backend)) hdlNmDocs0
+    topFiles = concat incs ++ typesPkg1 ++ hdlNmDocs1
 
     topClks = findClocks top
     sdcInfo = fmap findDomainConfig <$> topClks
