@@ -1,0 +1,1 @@
+FIXED: Files in `clash-manifest.json` are now (correctly) listed in reverse topological order [#2334](https://github.com/clash-lang/clash-compiler/issues/2334)

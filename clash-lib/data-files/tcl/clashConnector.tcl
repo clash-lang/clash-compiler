@@ -38,7 +38,7 @@ namespace eval clash {
         variable topEntity
 
         CheckMetadataExists
-        set libs [lreverse [dict get $metadata $topEntity dependencies]]
+        set libs [dict get $metadata $topEntity dependencies]
         lappend libs $topEntity
         foreach lib $libs {
             foreach hdlFile [dict get $metadata $lib hdlFiles] {
