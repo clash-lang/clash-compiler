@@ -361,15 +361,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "NestedPrimitives" def{hdlSim=[]}
         , runTest "NestedPrimitives2" def{hdlSim=[]}
         , runTest "NORX" def
-        ,
-          -- TODO: Vivado infrastructure tries to simulate topEntity.testBench
-          -- instead of testBench.testBench
-          --
-          -- tracked: https://github.com/clash-lang/clash-compiler/issues/2266
-          let _opts = def { hdlTargets=[VHDL]
-                          , hdlSim=hdlSim def
-                          }
-          in runTest "Parameters" _opts
+        , runTest "Parameters" def{hdlTargets=[VHDL]}
         , runTest "PopCount" def
         , runTest "RecordSumOfProducts" def{hdlSim=[]}
         , runTest "Replace" def
