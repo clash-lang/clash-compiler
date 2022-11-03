@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -21,8 +22,8 @@ clockPeriod
   => SNat period
 clockPeriod =
   case knownDomain @dom of
-    SDomainConfiguration _dom period _edge _sync _init _polarity ->
-      period
+    SDomainConfiguration{sPeriod} ->
+      sPeriod
 {-# NOINLINE clockPeriod #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
 
@@ -41,8 +42,8 @@ activeEdge
   => SActiveEdge edge
 activeEdge =
   case knownDomain @dom of
-    SDomainConfiguration _dom _period edge _sync _init _polarity ->
-      edge
+    SDomainConfiguration{sActiveEdge} ->
+      sActiveEdge
 {-# NOINLINE activeEdge #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
 
@@ -61,8 +62,8 @@ resetKind
   => SResetKind sync
 resetKind =
   case knownDomain @dom of
-    SDomainConfiguration _dom _period _edge sync _init _polarity ->
-      sync
+    SDomainConfiguration{sResetKind} ->
+      sResetKind
 {-# NOINLINE resetKind #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
 
@@ -81,8 +82,8 @@ initBehavior
   => SInitBehavior init
 initBehavior =
   case knownDomain @dom of
-    SDomainConfiguration _dom _period _edge _sync init_ _polarity ->
-      init_
+    SDomainConfiguration{sInitBehavior} ->
+      sInitBehavior
 {-# NOINLINE initBehavior #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
 
@@ -101,8 +102,8 @@ resetPolarity
   => SResetPolarity polarity
 resetPolarity =
   case knownDomain @dom of
-    SDomainConfiguration _dom _period _edge _sync _init polarity ->
-      polarity
+    SDomainConfiguration{sResetPolarity} ->
+      sResetPolarity
 {-# NOINLINE resetPolarity #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
 

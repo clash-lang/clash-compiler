@@ -45,8 +45,9 @@ acknowledge, valid, or programmable full\/empty flags)
 Vivado 2022.1.)
 -}
 
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module Clash.Cores.Xilinx.DcFifo
@@ -262,13 +263,16 @@ dcFifo DcConfig{..} wClk wRst rClk rRst writeData rEnable =
   wrClkSignal = case wClk of
     Clock _ (Just wrPeriods) -> wrPeriods
     Clock _ Nothing ->
-      let SDomainConfiguration _ (snatToNum -> period) _ _ _ _ = knownDomain @write in
-        pure period
+      case knownDomain @write of
+        SDomainConfiguration{sPeriod} ->
+          pure (snatToNum sPeriod)
+
   rdClkSignal = case rClk of
     Clock _ (Just rdPeriods) -> rdPeriods
     Clock _ Nothing ->
-      let SDomainConfiguration _ (snatToNum -> period) _ _ _ _ = knownDomain @read in
-        pure period
+      case knownDomain @read of
+        SDomainConfiguration{sPeriod} ->
+          pure (snatToNum sPeriod)
 {-# NOINLINE dcFifo #-}
 {-# ANN dcFifo (
    let primName = 'dcFifo

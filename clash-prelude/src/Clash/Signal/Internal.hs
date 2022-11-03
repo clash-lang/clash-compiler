@@ -366,22 +366,21 @@ type DomainResetPolarity (dom :: Domain) =
 
 -- | Singleton version of 'DomainConfiguration'
 data SDomainConfiguration (dom :: Domain) (conf :: DomainConfiguration) where
-  SDomainConfiguration
-    :: SSymbol dom
-    -- Domain name ^
-    -> SNat period
-    -- Period of clock in /ps/ ^
-    -> SActiveEdge edge
-    -- Active edge of the clock (not yet
-    -- implemented) ^
-    -> SResetKind reset
-    -- Whether resets are synchronous (edge-sensitive) or asynchronous (level-sensitive) ^
-    -> SInitBehavior init
-    -- Whether the initial (or "power up") value of memory elements is
-    -- unknown/undefined, or configurable to a specific value ^
-    -> SResetPolarity polarity
-    -- Whether resets are active high or active low ^
-    -> SDomainConfiguration dom ('DomainConfiguration dom period edge reset init polarity)
+  SDomainConfiguration ::
+    { sName :: SSymbol dom
+      -- ^ Domain name
+    , sPeriod :: SNat period
+    -- ^ Period of clock in /ps/
+    , sActiveEdge :: SActiveEdge edge
+    -- ^ Active edge of the clock (not yet implemented)
+    , sResetKind :: SResetKind reset
+    -- ^ Whether resets are synchronous (edge-sensitive) or asynchronous (level-sensitive)
+    , sInitBehavior :: SInitBehavior init
+    -- ^ Whether the initial (or "power up") value of memory elements is
+    -- unknown/undefined, or configurable to a specific value
+    , sResetPolarity :: SResetPolarity polarity
+    -- ^ Whether resets are active high or active low
+    } -> SDomainConfiguration dom ('DomainConfiguration dom period edge reset init polarity)
 
 deriving instance Show (SDomainConfiguration dom conf)
 
@@ -396,13 +395,13 @@ class KnownSymbol dom => KnownDomain (dom :: Domain) where
   -- Example usage:
   --
   -- >>> knownDomain @System
-  -- SDomainConfiguration (SSymbol @"System") (SNat @10000) SRising SAsynchronous SDefined SActiveHigh
+  -- SDomainConfiguration {sName = SSymbol @"System", sPeriod = SNat @10000, sActiveEdge = SRising, sResetKind = SAsynchronous, sInitBehavior = SDefined, sResetPolarity = SActiveHigh}
   knownDomain :: SDomainConfiguration dom (KnownConf dom)
 
 -- | Version of 'knownDomain' that takes a 'SSymbol'. For example:
 --
 -- >>> knownDomainByName (SSymbol @"System")
--- SDomainConfiguration (SSymbol @"System") (SNat @10000) SRising SAsynchronous SDefined SActiveHigh
+-- SDomainConfiguration {sName = SSymbol @"System", sPeriod = SNat @10000, sActiveEdge = SRising, sResetKind = SAsynchronous, sInitBehavior = SDefined, sResetPolarity = SActiveHigh}
 knownDomainByName
   :: forall dom
    . KnownDomain dom

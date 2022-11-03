@@ -1,0 +1,1 @@
+CHANGED: `SDomainConfiguration` is now a record, easing field access.
