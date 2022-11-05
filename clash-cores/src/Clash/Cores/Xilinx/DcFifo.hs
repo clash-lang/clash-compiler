@@ -70,12 +70,12 @@ module Clash.Cores.Xilinx.DcFifo
   ) where
 
 import Clash.Explicit.Prelude
-import Clash.Signal.Internal (Clock (..), Signal (..))
+import Clash.Signal.Internal (Signal (..), ClockAB (..), clockTicks)
 import Data.Maybe (isJust)
 import qualified Data.Sequence as Seq
+import Data.Sequence (Seq)
 import Data.String.Interpolate (__i)
 import GHC.Stack (HasCallStack)
-import Numeric.Natural (Natural)
 
 import Clash.Annotations.Primitive (Primitive (InlineYamlPrimitive))
 
@@ -160,7 +160,7 @@ dcFifo DcConfig{..} wClk wRst rClk rRst writeData rEnable =
     (SSynchronous, SSynchronous) ->
       let
         (wFull, wOver, wCnt, rEmpty, rUnder, rCnt, rData) =
-          go initState rdClkSignal wrClkSignal rstSignalR rEnable rstSignalW writeData
+          go (clockTicks wClk rClk) mempty rstSignalR rEnable rstSignalW writeData
       in FifoOut
           wFull
           (if dcOverflow
@@ -183,9 +183,8 @@ dcFifo DcConfig{..} wClk wRst rClk rRst writeData rEnable =
   maxDepth = natToNum @(2 ^ depth - 1) @Int
 
   go ::
-    FifoState a ->
-    Signal read Natural -> -- clock
-    Signal write Natural -> -- clock
+    [ClockAB] ->
+    Seq a ->
     Signal read Bool -> -- reset
     Signal read Bool -> -- read enabled
     Signal write Bool -> -- reset
@@ -199,23 +198,23 @@ dcFifo DcConfig{..} wClk wRst rClk rRst writeData rEnable =
     , Signal read (DataCount depth)
     , Signal read a
     )
-  go st@(FifoState _ rt) rdClk wrClk =
-    if rt <= 0
-      then goRead st rdClk wrClk
-      else goWrite st rdClk wrClk
+  go (ClockA:ticks)  = goWrite ticks
+  go (ClockB:ticks)  = goRead ticks
+  go (ClockAB:ticks) = go (ClockB:ClockA:ticks)
+  go [] = error "dcFifo.go: `ticks` should have been an infinite list"
 
-  goWrite (FifoState _ rt) rdClk (tWr :- wrClk) rstR rEna (True :- rstWNext) (_ :- wData) =
+  goWrite ticks _q rstR rEna (True :- rstWNext) (_ :- wData) =
       -- The register will discard the @wOver@ sample
       (False :- preFull, undefined :- preOver, 0 :- preWCnt, fifoEmpty, under, rCnt, rData)
     where
       (preFull, preOver, preWCnt, fifoEmpty, under, rCnt, rData) =
-        go (FifoState mempty (rt-fromIntegral tWr)) rdClk wrClk rstR rEna rstWNext wData
+        go ticks mempty rstR rEna rstWNext wData
 
-  goWrite (FifoState q rt) rdClk (tWr :- wrClk) rstR rEna (_ :- rstW) (wDat :- wDats1) =
+  goWrite ticks q rstR rEna (_ :- rstW) (wDat :- wDats1) =
     (full, over, wCnt, fifoEmpty, under, rCnt, rData)
     where
       (preFull, preOver, preWCnt, fifoEmpty, under, rCnt, rData) =
-        go (FifoState q' (rt-fromIntegral tWr)) rdClk wrClk rstR rEna rstW wDats1
+        go ticks q' rstR rEna rstW wDats1
 
       wCnt = sDepth q :- preWCnt
       full = (Seq.length q == maxDepth) :- preFull
@@ -226,7 +225,7 @@ dcFifo DcConfig{..} wClk wRst rClk rRst writeData rEnable =
 
   sDepth = fromIntegral . Seq.length
 
-  goRead (FifoState _ rt) (tR :- rdClk) wrClk (True :- rstRNext) (_ :- rEnas1) rstW wData =
+  goRead ticks _q (True :- rstRNext) (_ :- rEnas1) rstW wData =
     (full, over, wCnt, fifoEmpty, under, rCnt, rData)
     where
       -- The register will discard the sample
@@ -237,9 +236,9 @@ dcFifo DcConfig{..} wClk wRst rClk rRst writeData rEnable =
       under = undefined :- preUnder
 
       (full, over, wCnt, preEmpty, preUnder, preRCnt, preRData) =
-        go (FifoState mempty (rt+fromIntegral tR)) rdClk wrClk rstRNext rEnas1 rstW wData
+        go ticks mempty rstRNext rEnas1 rstW wData
 
-  goRead (FifoState q rt) (tR :- rdClk) wrClk (_ :- rstRNext) (rEna :- rEnas1) rstW wData =
+  goRead ticks q (_ :- rstRNext) (rEna :- rEnas1) rstW wData =
     (full, over, wCnt, fifoEmpty, under, rCnt, rData)
     where
       rCnt = sDepth q :- preRCnt
@@ -247,7 +246,7 @@ dcFifo DcConfig{..} wClk wRst rClk rRst writeData rEnable =
       rData = nextData :- preRData
 
       (full, over, wCnt, preEmpty, preUnder, preRCnt, preRData) =
-        go (FifoState q' (rt+fromIntegral tR)) rdClk wrClk rstRNext rEnas1 rstW wData
+        go ticks q' rstRNext rEnas1 rstW wData
 
       (q', nextData, under) =
         if rEna
@@ -256,23 +255,6 @@ dcFifo DcConfig{..} wClk wRst rClk rRst writeData rEnable =
               Seq.EmptyR -> (q, deepErrorX "FIFO empty", True :- preUnder)
               qData Seq.:> qDatum -> (qData, qDatum, False :- preUnder)
           else (q, deepErrorX "Enable off", False :- preUnder)
-
-  initState :: FifoState a
-  initState = FifoState Seq.empty 0
-
-  wrClkSignal = case wClk of
-    Clock _ (Just wrPeriods) -> wrPeriods
-    Clock _ Nothing ->
-      case knownDomain @write of
-        SDomainConfiguration{sPeriod} ->
-          pure (snatToNum sPeriod)
-
-  rdClkSignal = case rClk of
-    Clock _ (Just rdPeriods) -> rdPeriods
-    Clock _ Nothing ->
-      case knownDomain @read of
-        SDomainConfiguration{sPeriod} ->
-          pure (snatToNum sPeriod)
 {-# NOINLINE dcFifo #-}
 {-# ANN dcFifo (
    let primName = 'dcFifo

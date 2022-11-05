@@ -8,8 +8,6 @@ module Clash.Cores.Xilinx.DcFifo.Internal.Types where
 
 import Clash.Prelude
 
-import qualified Data.Sequence as Seq
-
 type Full = Bool
 type Empty = Bool
 type DataCount n = Unsigned n
@@ -45,13 +43,6 @@ data DcConfig depth = DcConfig
   , dcUnderflow :: !Bool
   }
   deriving (Show, Generic)
-
-data FifoState a = FifoState
-  { hsQueue      :: Seq.Seq a
-  , relativeTime :: Int -- ^ In order to model a FIFO in two clock domains,
-                        -- we track the offset between edges in order to know
-                        -- which signals to peel off.
-  } deriving Show
 
 -- | Output of 'Clash.Cores.Xilinx.DcFifo.dcFifo'
 data FifoOut read write depth a =
