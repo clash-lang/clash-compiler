@@ -179,8 +179,8 @@ dcFifo DcConfig{..} wClk wRst rClk rRst writeData rEnable =
   rstSignalR = unsafeToHighPolarity rRst
   rstSignalW = unsafeToHighPolarity wRst
 
-  -- reified depth
-  maxDepth = natToNum @(2 ^ depth - 1) @Int
+  fifoSize = natToNum @(2 ^ depth - 1) @Int
+  dataCount = fromIntegral . Seq.length
 
   go ::
     [ClockAB] ->
@@ -216,14 +216,13 @@ dcFifo DcConfig{..} wClk wRst rClk rRst writeData rEnable =
       (preFull, preOver, preWCnt, fifoEmpty, under, rCnt, rData) =
         go ticks q' rstR rEna rstW wDats1
 
-      wCnt = sDepth q :- preWCnt
-      full = (Seq.length q == maxDepth) :- preFull
+      wCnt = dataCount q :- preWCnt
+      full = (Seq.length q == fifoSize) :- preFull
       (q', over) =
-        if Seq.length q < maxDepth
+        if Seq.length q < fifoSize
           then (case wDat of { Just x -> x Seq.<| q ; _ -> q }, False :- preOver)
           else (q, isJust wDat :- preOver)
 
-  sDepth = fromIntegral . Seq.length
 
   goRead ticks _q (True :- rstRNext) (_ :- rEnas1) rstW wData =
     (full, over, wCnt, fifoEmpty, under, rCnt, rData)
@@ -241,7 +240,7 @@ dcFifo DcConfig{..} wClk wRst rClk rRst writeData rEnable =
   goRead ticks q (_ :- rstRNext) (rEna :- rEnas1) rstW wData =
     (full, over, wCnt, fifoEmpty, under, rCnt, rData)
     where
-      rCnt = sDepth q :- preRCnt
+      rCnt = dataCount q :- preRCnt
       fifoEmpty = (Seq.length q == 0) :- preEmpty
       rData = nextData :- preRData
 
