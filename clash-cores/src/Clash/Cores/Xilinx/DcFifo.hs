@@ -204,56 +204,55 @@ dcFifo DcConfig{..} wClk wRst rClk rRst writeData rEnable =
   go [] = error "dcFifo.go: `ticks` should have been an infinite list"
 
   goWrite ticks _q rstR rEna (True :- rstWNext) (_ :- wData) =
-      -- The register will discard the @wOver@ sample
-      (False :- preFull, undefined :- preOver, 0 :- preWCnt, fifoEmpty, under, rCnt, rData)
-    where
-      (preFull, preOver, preWCnt, fifoEmpty, under, rCnt, rData) =
-        go ticks mempty rstR rEna rstWNext wData
+    -- The register will discard the @wOver@ sample
+    (False :- preFull, undefined :- preOver, 0 :- preWCnt, fifoEmpty, under, rCnt, rData)
+   where
+    (preFull, preOver, preWCnt, fifoEmpty, under, rCnt, rData) =
+      go ticks mempty rstR rEna rstWNext wData
 
   goWrite ticks q rstR rEna (_ :- rstW) (wDat :- wDats1) =
     (full, over, wCnt, fifoEmpty, under, rCnt, rData)
-    where
-      (preFull, preOver, preWCnt, fifoEmpty, under, rCnt, rData) =
-        go ticks q' rstR rEna rstW wDats1
+   where
+    (preFull, preOver, preWCnt, fifoEmpty, under, rCnt, rData) =
+      go ticks q' rstR rEna rstW wDats1
 
-      wCnt = dataCount q :- preWCnt
-      full = (Seq.length q == fifoSize) :- preFull
-      (q', over) =
-        if Seq.length q < fifoSize
-          then (case wDat of { Just x -> x Seq.<| q ; _ -> q }, False :- preOver)
-          else (q, isJust wDat :- preOver)
-
+    wCnt = dataCount q :- preWCnt
+    full = (Seq.length q == fifoSize) :- preFull
+    (q', over) =
+      if Seq.length q < fifoSize
+        then (case wDat of { Just x -> x Seq.<| q ; _ -> q }, False :- preOver)
+        else (q, isJust wDat :- preOver)
 
   goRead ticks _q (True :- rstRNext) (_ :- rEnas1) rstW wData =
     (full, over, wCnt, fifoEmpty, under, rCnt, rData)
-    where
-      -- The register will discard the sample
-      rData = undefined :- preRData
-      fifoEmpty = True :- preEmpty
-      rCnt = 0 :- preRCnt
-      -- The register will discard the sample
-      under = undefined :- preUnder
+   where
+    -- The register will discard the sample
+    rData = undefined :- preRData
+    fifoEmpty = True :- preEmpty
+    rCnt = 0 :- preRCnt
+    -- The register will discard the sample
+    under = undefined :- preUnder
 
-      (full, over, wCnt, preEmpty, preUnder, preRCnt, preRData) =
-        go ticks mempty rstRNext rEnas1 rstW wData
+    (full, over, wCnt, preEmpty, preUnder, preRCnt, preRData) =
+      go ticks mempty rstRNext rEnas1 rstW wData
 
   goRead ticks q (_ :- rstRNext) (rEna :- rEnas1) rstW wData =
     (full, over, wCnt, fifoEmpty, under, rCnt, rData)
-    where
-      rCnt = dataCount q :- preRCnt
-      fifoEmpty = (Seq.length q == 0) :- preEmpty
-      rData = nextData :- preRData
+   where
+    rCnt = dataCount q :- preRCnt
+    fifoEmpty = (Seq.length q == 0) :- preEmpty
+    rData = nextData :- preRData
 
-      (full, over, wCnt, preEmpty, preUnder, preRCnt, preRData) =
-        go ticks q' rstRNext rEnas1 rstW wData
+    (full, over, wCnt, preEmpty, preUnder, preRCnt, preRData) =
+      go ticks q' rstRNext rEnas1 rstW wData
 
-      (q', nextData, under) =
-        if rEna
-          then
-            case Seq.viewr q of
-              Seq.EmptyR -> (q, deepErrorX "FIFO empty", True :- preUnder)
-              qData Seq.:> qDatum -> (qData, qDatum, False :- preUnder)
-          else (q, deepErrorX "Enable off", False :- preUnder)
+    (q', nextData, under) =
+      if rEna
+        then
+          case Seq.viewr q of
+            Seq.EmptyR -> (q, deepErrorX "FIFO empty", True :- preUnder)
+            qData Seq.:> qDatum -> (qData, qDatum, False :- preUnder)
+        else (q, deepErrorX "Enable off", False :- preUnder)
 {-# NOINLINE dcFifo #-}
 {-# ANN dcFifo (
    let primName = 'dcFifo
