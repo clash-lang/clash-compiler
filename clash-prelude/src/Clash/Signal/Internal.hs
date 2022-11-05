@@ -13,6 +13,8 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -79,6 +81,9 @@ module Clash.Signal.Internal
   , Clock (..)
   , hzToPeriod
   , periodToHz
+  , ClockAB (..)
+  , clockTicks
+  , clockTicksEither
     -- ** Enabling
   , Enable(..)
   , toEnable
@@ -155,6 +160,7 @@ import Data.Char                  (isAsciiUpper, isAlphaNum, isAscii)
 import Data.Data                  (Data)
 import Data.Default.Class         (Default (..))
 import Data.Hashable              (Hashable)
+import Data.Int                   (Int64)
 import Data.Maybe                 (isJust)
 import Data.Proxy                 (Proxy(..))
 import Data.Ratio                 (Ratio)
@@ -1589,3 +1595,79 @@ infiniteRefList val = go
     rest <- unsafeInterleaveIO go
     ref  <- newIORef val
     return (ref :- rest)
+
+data ClockAB
+  -- | Clock edge A produced
+  = ClockA
+  -- | Clock edge B produced
+  | ClockB
+  -- | Clock edges coincided
+  | ClockAB
+  deriving (Generic, Eq, Show, NFData, NFDataX)
+
+-- | Given two clocks, produce a list of clock ticks indicating which clock
+-- (or both) ticked. Can be used in components handling multiple clocks, such
+-- as @unsafeSynchronizer@ or dual clock FIFOs.
+--
+-- If your primitive does not care about coincided clock edges, it should - by
+-- convention - replace it by @ClockB:ClockA:@.
+clockTicks ::
+  (KnownDomain domA, KnownDomain domB) =>
+  Clock domA ->
+  Clock domB ->
+  [ClockAB]
+clockTicks clkA clkB = clockTicksEither (toEither clkA) (toEither clkB)
+ where
+  toEither ::
+    forall dom.
+    KnownDomain dom =>
+    Clock dom ->
+    Either Int64 (Signal dom Int64)
+  toEither (Clock _ maybePeriods)
+    | Just periods <- maybePeriods =
+        Right (fromIntegral <$> periods)
+    | SDomainConfiguration{sPeriod} <- knownDomain @dom =
+        Left (snatToNum sPeriod)
+
+-- | Given two clock periods, produce a list of clock ticks indicating which clock
+-- (or both) ticked. Can be used in components handling multiple clocks, such
+-- as @unsafeSynchronizer@ or dual clock FIFOs.
+--
+-- If your primitive does not care about coincided clock edges, it should - by
+-- convention - replace it by @ClockB:ClockA:@.
+clockTicksEither ::
+  Either Int64 (Signal domA Int64) ->
+  Either Int64 (Signal domB Int64) ->
+  [ClockAB]
+clockTicksEither clkA clkB =
+  case (clkA, clkB) of
+    (Left  tA, Left  tB) | tA == tB -> repeat ClockAB
+    (Left  tA, Left  tB) -> goStatic 0 tA tB
+    (Right tA, Right tB) -> goDynamic 0 tA tB
+    (Left  tA, Right tB) -> clockTicksEither (Right (pure tA)) (Right tB)
+    (Right tA, Left  tB) -> clockTicksEither (Right tA) (Right (pure tB))
+ where
+  -- Given
+  --   tAbsA = absolute time of next active edge of clock A
+  --   tAbsB = absolute time of next active edge of clock B
+  -- relativeTime is defined as relativeTime = tAbsB - tAbsA
+  --
+  -- Put differently, relative time 0 points at the next active edge of
+  -- clock A, and relativeTime points at the next active edge of clock B.
+
+  goStatic :: Int64 -> Int64 -> Int64 -> [ClockAB]
+  goStatic relativeTime tA tB =
+    case compare relativeTime 0 of
+      LT -> ClockB  : goStatic (relativeTime + tB)      tA tB
+      EQ -> ClockAB : goStatic (relativeTime - tA + tB) tA tB
+      GT -> ClockA  : goStatic (relativeTime - tA)      tA tB
+
+  goDynamic :: Int64 -> Signal domA Int64 -> Signal domB Int64 -> [ClockAB]
+  goDynamic relativeTime tsA@(~(tA :- tsA0)) tsB@(~(tB :- tsB0)) =
+    -- Even though we lazily match on the signal's constructor, this shouldn't
+    -- build up a significant chain of chunks as 'relativeTime' gets evaluated
+    -- every iteration.
+    case compare relativeTime 0 of
+      LT -> ClockB  : goDynamic (relativeTime + tB)      tsA  tsB0
+      EQ -> ClockAB : goDynamic (relativeTime - tA + tB) tsA0 tsB0
+      GT -> ClockA  : goDynamic (relativeTime - tA)      tsA0 tsB
