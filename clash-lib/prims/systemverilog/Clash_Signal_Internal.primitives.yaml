@@ -174,12 +174,12 @@
           end
           ~ELSE~FI
           // 1 = 0.1ps
-          ~SYM[0] = ((~VAR[periods][1] * 10) / 2);
+          ~SYM[0] = (~VAR[periods][1] / 2);
 
           ~RESULT = ~ ~RESULT;
-          #~SYM[0];
+          #(~SYM[0] * 0.01);
           ~RESULT = ~ ~RESULT;
-          #~SYM[0];
+          #(~SYM[0] * 0.01);
         end
       end
       // pragma translate_on
