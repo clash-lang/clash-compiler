@@ -38,7 +38,8 @@ import qualified Data.Sequence as Seq
 import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Explicit.Signal (unbundle, KnownDomain, andEnable)
 import Clash.Promoted.Nat    (SNat (..), snatToNum, pow2SNat)
-import Clash.Signal.Internal (Clock (..), Signal (..), Enable, fromEnable)
+import Clash.Signal.Internal
+  (Clock (..), ClockAB (..), Signal (..), Enable, fromEnable, clockTicks)
 import Clash.Signal.Internal.Ambiguous (clockPeriod)
 import Clash.Sized.Unsigned  (Unsigned)
 import Clash.XException
@@ -142,7 +143,7 @@ asyncRam#
   -- ^ Value to write (at address @w@)
   -> Signal rdom a
   -- ^ Value of the RAM at address @r@
-asyncRam# !_ !_ en sz rd we wr din = dout
+asyncRam# wClk rClk en sz rd we wr din = dout
   where
     ramI = Seq.replicate
               szI
@@ -150,7 +151,7 @@ asyncRam# !_ !_ en sz rd we wr din = dout
     en0 = fromEnable (andEnable en we)
     dout = if rPeriod == wPeriod
            then goSingle ramI rd en0 wr din
-           else go 0 ramI rd en0 wr din
+           else go (clockTicks wClk rClk) ramI rd en0 wr din
     rPeriod = snatToNum (clockPeriod @rdom) :: Int
     wPeriod = snatToNum (clockPeriod @wdom) :: Int
     szI = snatToNum sz :: Int
@@ -162,23 +163,19 @@ asyncRam# !_ !_ en sz rd we wr din = dout
           o    = ram `safeAt` r
       in  o :- (o `defaultSeqX` wt `seq` dt `seq` goSingle ram0 rs es ws ds)
 
-    -- Given
-    --   tR = absolute time of next active edge of read clock
-    --   tW = absolute time of next active edge of write clock
-    -- relTime is defined as relTime = tW - tR
-    --
-    -- Put differently, relative time 0 points at the next active edge of the
-    -- read clock, and relTime points at the next active edge of the write
-    -- clock.
-    go :: Int -> Seq.Seq a -> Signal rdom Int -> Signal wdom Bool
+    go :: [ClockAB] -> Seq.Seq a -> Signal rdom Int -> Signal wdom Bool
        -> Signal wdom Int -> Signal wdom a -> Signal rdom a
-    go   relTime !ram rt@(~(r :- rs)) et@(~(e :- es)) wt@(~(w :- ws))
-         dt@(~(d :- ds))
-      | relTime < 0 = let ram0 = upd ram e w d
-                      in wt `seq` dt `seq`
-                         go (relTime + wPeriod) ram0 rt es ws ds
-      | otherwise   = let o = ram `safeAt` r
-                      in o :- (o `defaultSeqX` go (relTime - rPeriod) ram rs et wt dt)
+    go [] _ _ _ _ _ = error "asyncRam#.go: `ticks` should have been an infinite list"
+    go (tick:ticks) !ram rt@(~(r :- rs)) et@(~(e :- es)) wt@(~(w :- ws)) dt@(~(d :- ds)) =
+      case tick of
+        ClockA  ->
+          let ram0 = upd ram e w d
+          in  wt `seq` dt `seq` go ticks ram0 rt es ws ds
+        ClockB  ->
+          let o = ram `safeAt` r
+          in  o :- (o `defaultSeqX` go ticks ram rs et wt dt)
+        ClockAB ->
+          go (ClockB:ClockA:ticks) ram rt et wt dt
 
     upd ram we0 waddr d = case maybeIsX we0 of
       Nothing -> case maybeIsX waddr of

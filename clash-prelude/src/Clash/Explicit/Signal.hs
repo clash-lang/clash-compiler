@@ -268,6 +268,8 @@ module Clash.Explicit.Signal
   )
 where
 
+import           Data.Bifunctor                 (bimap)
+import           Data.Int                       (Int64)
 import           Data.Maybe                     (isJust)
 import           GHC.TypeLits                   (type (<=))
 
@@ -447,15 +449,15 @@ unsafeSynchronizer
   -> Signal dom1 a
   -> Signal dom2 a
 unsafeSynchronizer clk1 clk2 =
-  veryUnsafeSynchronizer (toEither clk1) (toEither clk2)
+  go (clockTicks clk1 clk2)
  where
-  toEither :: forall dom. KnownDomain dom => Clock dom -> Either Int (Signal dom Int)
-  toEither (Clock _ maybePeriods)
-    | Just periods <- maybePeriods = Right (fromIntegral <$> periods)
-    | otherwise = Left (snatToNum (clockPeriod @dom))
--- XXX: 'unsafeSynchronizer' shouldn't need a blackbox, but Clash doesn't currently
---      clean up the 'toEither' logic correctly, leading to translation errors. We
---      should improve dead code elimination and run it more often to fix this.
+  go :: [ClockAB] -> Signal dom1 a -> Signal dom2 a
+  go [] _ = error "unsafeSynchronizer.go: `ticks` should have been an infinite list"
+  go (tick:ticks) ass@(~(a :- as)) =
+    case tick of
+      ClockA  -> go ticks as
+      ClockB  -> a :- go ticks ass
+      ClockAB -> go (ClockB:ClockA:ticks) ass
 {-# NOINLINE unsafeSynchronizer #-}
 {-# ANN unsafeSynchronizer hasBlackBox #-}
 
@@ -488,27 +490,24 @@ veryUnsafeSynchronizer
   -> Signal dom1 a
   -> Signal dom2 a
 veryUnsafeSynchronizer t1e t2e =
-  case (t1e, t2e) of
-    (Left  t1, Left  t2) | t1 == t2 -> same
-    (Left  t1, Left  t2) -> goStatic t1 t2 0
-    (Right t1, Right t2) -> goDynamic 0 t1 t2
-    (Left  t1, Right t2) -> veryUnsafeSynchronizer (Right (pure t1)) (Right t2)
-    (Right t1, Left  t2) -> veryUnsafeSynchronizer (Right t1) (Right (pure t2))
-
+  go (clockTicksEither (toInt64 t1e) (toInt64 t2e))
  where
-  -- If clock frequencies line up, we can return the signal unchanged
-  same :: Signal dom1 a -> Signal dom2 a
-  same (s :- ss) = s :- same ss
+  -- TODO: deprecate 'veryUnsafeSynchronizer' or change its type signature to use
+  --       'Int64' to prevent issues down the road if/when we switch to represent
+  --       clock periods using femtoseconds.
+  toInt64 ::
+    forall dom .
+    Either Int (Signal dom Int) ->
+    Either Int64 (Signal dom Int64)
+  toInt64 = bimap fromIntegral (fmap fromIntegral)
 
-  goDynamic :: Int -> Signal dom1 Int -> Signal dom2 Int -> Signal dom1 a -> Signal dom2 a
-  goDynamic relativeTime (t1 :- ts1) (t2 :- ts2) (a :- as)
-    | relativeTime <= 0 = a :- goDynamic (relativeTime + t2) (t1 :- ts1) ts2 (a :- as)
-    | otherwise = goDynamic (relativeTime - t1) ts1 (t2 :- ts2) as
-
-  goStatic :: Int -> Int -> Int -> Signal dom1 a -> Signal dom2 a
-  goStatic t1 t2 relativeTime (a :- s)
-    | relativeTime <= 0 = a :- goStatic t1 t2 (relativeTime + t2) (a :- s)
-    | otherwise = goStatic t1 t2 (relativeTime - t1) s
+  go :: [ClockAB] -> Signal dom1 a -> Signal dom2 a
+  go [] _ = error "veryUnsafeSynchronizer.go: `ticks` should have been an infinite list"
+  go (tick:ticks) ass@(~(a :- as)) =
+    case tick of
+      ClockA  -> go ticks as
+      ClockB  -> a :- go ticks ass
+      ClockAB -> go (ClockB:ClockA:ticks) ass
 {-# NOINLINE veryUnsafeSynchronizer #-}
 {-# ANN veryUnsafeSynchronizer hasBlackBox #-}
 

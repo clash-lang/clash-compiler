@@ -47,6 +47,7 @@ main = do
 -}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -230,9 +231,9 @@ traceSignal
   -> Signal dom a
 traceSignal traceName signal =
   case knownDomain @dom of
-    SDomainConfiguration _dom period _edge _reset _init _polarity ->
+    SDomainConfiguration{sPeriod} ->
       unsafePerformIO $
-        traceSignal# traceMap# (snatToNum period) traceName signal
+        traceSignal# traceMap# (snatToNum sPeriod) traceName signal
 {-# NOINLINE traceSignal #-}
 {-# ANN traceSignal hasBlackBox #-}
 
@@ -278,9 +279,9 @@ traceVecSignal
   -> Signal dom (Vec (n+1) a)
 traceVecSignal traceName signal =
   case knownDomain @dom of
-    SDomainConfiguration _dom period _edge _reset _init _polarity ->
+    SDomainConfiguration{sPeriod} ->
       unsafePerformIO $
-        traceVecSignal# traceMap# (snatToNum period) traceName signal
+        traceVecSignal# traceMap# (snatToNum sPeriod) traceName signal
 {-# NOINLINE traceVecSignal #-}
 {-# ANN traceVecSignal hasBlackBox #-}
 

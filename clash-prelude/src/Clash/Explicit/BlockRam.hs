@@ -2,7 +2,8 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2017, Myrtle Software Ltd,
                   2017     , Google Inc.,
-                  2021-2022, QBayLogic B.V.
+                  2021-2022, QBayLogic B.V.,
+                  2022     , Google Inc.,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -446,7 +447,8 @@ import           Clash.Annotations.Primitive
 import           Clash.Class.Num        (SaturationMode(SatBound), satSucc)
 import           Clash.Explicit.Signal  (KnownDomain, Enable, register, fromEnable)
 import           Clash.Signal.Internal
-  (Clock(..), Reset, Signal (..), invertReset, (.&&.), mux)
+  (Clock(..), Reset, Signal (..), ClockAB (..), invertReset, (.&&.), mux,
+   clockTicks)
 import           Clash.Promoted.Nat     (SNat(..), snatToNum, natToNum)
 import           Clash.Signal.Bundle    (unbundle, bundle)
 import           Clash.Signal.Internal.Ambiguous (clockPeriod)
@@ -1288,8 +1290,8 @@ trueDualPortBlockRam# clkA enA weA addrA datA clkB enB weB addrB datB
 
 -- | Haskell model for the primitive 'trueDualPortBlockRam#'.
 --
--- Warning: this model only works if @domFast@'s clock is faster (or equal to)
--- @domSlow@'s clock.
+-- Warning: this model only works if @domFast@'s clock is faster than (or equal
+-- to) @domSlow@'s clock.
 trueDualPortBlockRamModel ::
   forall nAddrs domFast domSlow a .
   ( HasCallStack
@@ -1314,22 +1316,21 @@ trueDualPortBlockRamModel ::
   Signal domFast a ->
 
   (Signal domSlow a, Signal domFast a)
-trueDualPortBlockRamModel labelA !_clkA enA weA addrA datA labelB !_clkB enB weB addrB datB =
+trueDualPortBlockRamModel labelA clkA enA weA addrA datA labelB clkB enB weB addrB datB =
   ( startA :- outA
   , startB :- outB )
  where
   (outA, outB) =
     go
       (Seq.fromFunction (natToNum @nAddrs) initElement)
-      tB -- ensure 'go' hits fast clock first for 1 cycle, then execute slow
-         -- clock for 1 cycle, followed by the regular cadence of 'ceil(tA / tB)'
-         -- cycles for the fast clock followed by 1 cycle of the slow clock
+      -- ensure 'go' hits 'goFast' first for 1 cycle, then execute 'goBoth'
+      -- once, followed by the regular cadence of either 'ceil(tA / tB)' or
+      -- 'floor(tA / tB)' cycles for the fast clock followed by 1 cycle of the
+      -- slow clock
+      (ClockB : clockTicks clkA clkB)
       (bundle (enA, weA, fromIntegral <$> addrA, datA))
       (bundle (enB, weB, fromIntegral <$> addrB, datB))
       startA startB
-
-  tA = snatToNum @Int (clockPeriod @domSlow)
-  tB = snatToNum @Int (clockPeriod @domFast)
 
   startA = deepErrorX $ "trueDualPortBlockRam: " <> labelA <> ": First value undefined"
   startB = deepErrorX $ "trueDualPortBlockRam: " <> labelB <> ": First value undefined"
@@ -1340,7 +1341,7 @@ trueDualPortBlockRamModel labelA !_clkA enA weA addrA datA labelB !_clkB enB weB
 
   unknownEnableAndAddr :: String -> String -> Int -> a
   unknownEnableAndAddr enaMsg addrMsg n =
-    deepErrorX ("Write enable and data unknown; position " <> show n <>
+    deepErrorX ("Write enable and address unknown; position " <> show n <>
                 "\nWrite enable error message: " <> enaMsg <>
                 "\nAddress error message: " <> addrMsg)
 
@@ -1402,16 +1403,18 @@ trueDualPortBlockRamModel labelA !_clkA enA weA addrA datA labelB !_clkB enB weB
 
   go ::
     Seq a ->
-    Int ->
+    [ClockAB] ->
     Signal domSlow (Bool, Bool, Int, a) ->
     Signal domFast (Bool, Bool, Int, a) ->
     a -> a ->
     (Signal domSlow a, Signal domFast a)
-  go ram0 relativeTime as0 bs0 =
-    case compare relativeTime 0 of
-      LT -> goSlow
-      EQ -> goBoth
-      GT -> goFast
+  go _ [] _ _ =
+    error "trueDualPortBlockRamModel.go: `ticks` should have been an infinite list"
+  go ram0 (tick:ticks) as0 bs0 =
+    case tick of
+      ClockA -> goSlow
+      ClockB -> goFast
+      ClockAB -> goBoth
    where
     (enA_, weA_, addrA_, datA_) :- as1 = as0
     (enB_, weB_, addrB_, datB_) :- bs1 = bs0
@@ -1448,18 +1451,18 @@ trueDualPortBlockRamModel labelA !_clkA enA weA addrA datA labelB !_clkB enB weB
 
       outA2 = if enA_ then outA1 else prevA
       outB2 = if enB_ then outB1 else prevB
-      (as2,bs2) = go ram2 (relativeTime - tB + tA) as1 bs1 outA2 outB2
+      (as2,bs2) = go ram2 ticks as1 bs1 outA2 outB2
 
     -- 1 iteration here, as this is the slow clock.
     goSlow _ prevB | enA_ = out0 `seqX` (out0 :- as2, bs2)
      where
       (wrote, !ram1) = writeRam weA_ addrA_ datA_ ram0
       out0 = fromMaybe (ram1 `Seq.index` addrA_) wrote
-      (as2, bs2) = go ram1 (relativeTime + tA) as1 bs0 out0 prevB
+      (as2, bs2) = go ram1 ticks as1 bs0 out0 prevB
 
     goSlow prevA prevB = (prevA :- as2, bs2)
       where
-        (as2,bs2) = go ram0 (relativeTime + tA) as1 bs0 prevA prevB
+        (as2,bs2) = go ram0 ticks as1 bs0 prevA prevB
 
     -- 1 or more iterations here, as this is the fast clock. First iteration
     -- happens here.
@@ -1467,8 +1470,8 @@ trueDualPortBlockRamModel labelA !_clkA enA weA addrA datA labelB !_clkB enB weB
      where
       (wrote, !ram1) = writeRam weB_ addrB_ datB_ ram0
       out0 = fromMaybe (ram1 `Seq.index` addrB_) wrote
-      (as2, bs2) = go ram1 (relativeTime - tB) as0 bs1 prevA out0
+      (as2, bs2) = go ram1 ticks as0 bs1 prevA out0
 
     goFast prevA prevB = (as2, prevB :- bs2)
      where
-       (as2,bs2) = go ram0 (relativeTime - tB) as0 bs1 prevA prevB
+       (as2,bs2) = go ram0 ticks as0 bs1 prevA prevB
