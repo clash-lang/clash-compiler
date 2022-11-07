@@ -3,4 +3,7 @@
 with nixpkgs.pkgs;
 with gitignore;
 
-haskellPackages.callCabal2nix "clash-lib" (gitignoreSource ./.) {}
+# We disable tests as doctest-parallel doesn't play nice with nix
+haskell.lib.dontCheck
+
+  (haskellPackages.callCabal2nix "clash-lib" (gitignoreSource ./.) {})

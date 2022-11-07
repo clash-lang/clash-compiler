@@ -73,6 +73,11 @@ prelude:unittests:
   script:
     - cabal v2-run clash-prelude:unittests
 
+lib:doctests:
+  extends: .test-common
+  script:
+    - cabal v2-run clash-lib:doctests
+
 lib:unittests:
   extends: .test-common
   script:

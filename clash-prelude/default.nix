@@ -3,8 +3,7 @@
 with nixpkgs.pkgs;
 with gitignore;
 
-# We disable tests as doctests don't play nice with nix
-# (issue with ghc plugins)
+# We disable tests as doctest-parallel doesn't play nice with nix
 haskell.lib.dontCheck
 # We disable haddock as it doesn't play nice with nix
 # (issue with ghc plugins)

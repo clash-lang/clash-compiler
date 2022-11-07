@@ -297,7 +297,7 @@ isBV _ _ = False
 
 -- | Generate unique (partial) names for product fields. Example:
 --
--- >>> productFieldNames [Unsigned 6, Unsigned 6, Bit, Bool]
+-- > productFieldNames Nothing [Unsigned 6, Unsigned 6, Bit, Bool]
 -- ["unsigned6_0", "unsigned6_1", "bit", "boolean"]
 productFieldNames
   :: HasCallStack

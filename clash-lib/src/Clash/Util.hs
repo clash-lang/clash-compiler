@@ -68,6 +68,11 @@ import Clash.Unique
 import qualified Paths_clash_lib      (version)
 #endif
 
+{- $setup
+>>> :m -Prelude
+>>> import Clash.Prelude
+-}
+
 data ClashException = ClashException SrcSpan String (Maybe String)
 
 instance Show ClashException where
@@ -259,8 +264,10 @@ clogBase x y | x > 1 && y > 0 =
 clogBase _ _ = Nothing
 
 -- | Get the package id of the type of a value
--- >>> pkgIdFromTypeable (undefined :: TopEntity)
--- "clash-prelude-0.99.3-64904d90747cb49e17166bbc86fec8678918e4ead3847193a395b258e680373c"
+--
+-- >>> pkgIdFromTypeable (0 :: Unsigned 32)
+-- "clash-prelude-...
+--
 pkgIdFromTypeable :: Typeable a => a -> String
 pkgIdFromTypeable = tyConPackage . typeRepTyCon . typeOf
 
