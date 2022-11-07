@@ -469,7 +469,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
 
       -- 4. Generate topEntity wrapper
       (hdlDocs, dfiles, mfiles) <- withMVar seenV $ \seen ->
-        pure $! createHDL hdlState' modNameT seen netlist domainConfs topComponent topNmT
+        pure $! createHDL hdlState' opts modNameT seen netlist domainConfs topComponent topNmT
 
       -- TODO: Data files should go into their own directory
       -- FIXME: Files can silently overwrite each other
@@ -750,6 +750,8 @@ createHDL
   :: Backend backend
   => backend
   -- ^ Backend
+  -> ClashOpts
+  -- ^ Global Clash options
   -> IdentifierText
   -- ^ Module hierarchy root
   -> Id.IdentifierSet
@@ -765,12 +767,12 @@ createHDL
   -> ([(String,Doc)],[(String,FilePath)],[(String,String)])
   -- ^ The pretty-printed HDL documents
   -- + The data files that need to be copied
-createHDL backend modName seen components domainConfs top topName = flip evalState backend $ getAp $ do
+createHDL backend opts modName seen components domainConfs top topName = flip evalState backend $ getAp $ do
   let componentsL = map snd (OMap.assocs components)
   (hdlNmDocs0,incs) <-
     fmap unzip $
       forM componentsL $ \(ComponentMeta{cmLoc, cmScope,cmUsage}, comp) ->
-         genHDL modName cmLoc (Id.union seen cmScope) cmUsage comp
+         genHDL opts modName cmLoc (Id.union seen cmScope) cmUsage comp
 
   hwtys <- HashSet.toList <$> extractTypes <$> Ap get
   typesPkg0 <- mkTyPackage modName hwtys

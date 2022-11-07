@@ -191,6 +191,7 @@ Library
                       Clash.Backend
                       Clash.Backend.SystemVerilog
                       Clash.Backend.Verilog
+                      Clash.Backend.Verilog.Time
                       Clash.Backend.VHDL
 
                       Clash.Core.DataCon

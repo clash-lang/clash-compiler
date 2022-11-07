@@ -275,3 +275,10 @@ Clash Compiler Flags
   When using one of ``--vhdl``, ``--verilog``, or ``--systemverilog``, this
   flag refers to synthesis target. For example, running Clash with
   ``clash My.Module -main-is top --vhdl`` would synthesize ``My.Module.top``.
+
+-fclash-timescale-precision
+  Sets the second part of Verilog's ``timescale 100fs/100fs``. E.g., setting this
+  flag to ``1fs`` would make Clash generate Verilog files with ``timescale 100fs/1fs``
+  as their header.
+
+  **Default:** ``100fs``

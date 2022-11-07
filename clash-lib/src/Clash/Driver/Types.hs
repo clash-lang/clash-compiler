@@ -1,8 +1,9 @@
 {-|
   Copyright  :  (C) 2013-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
-                    2017     , QBayLogic, Google Inc.
-                    2020-2022, QBayLogic
+                    2017     , QBayLogic, Google Inc.,
+                    2020-2022, QBayLogic,
+                    2022     , Google Inc.,
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -54,6 +55,7 @@ import           Util                           (OverridingBool(..))
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import           Clash.Signal.Internal
 
+import           Clash.Backend.Verilog.Time     (Period(..), Unit(Fs))
 import           Clash.Core.Term                (Term)
 import           Clash.Core.TyCon               (TyConMap, TyConName)
 import           Clash.Core.Var                 (Id)
@@ -392,6 +394,9 @@ data ClashOpts = ClashOpts
   , opt_renderEnums :: Bool
   -- ^ Render sum types with all zero-width fields as enums where supported, as
   -- opposed to rendering them as bitvectors.
+  , opt_timescalePrecision :: Period
+  -- ^ Timescale precision set in Verilog files. E.g., setting this would sets
+  -- the second part of @`timescale 100fs/100fs@.
   }
   deriving (Show)
 
@@ -424,6 +429,7 @@ instance NFData ClashOpts where
     opt_inlineWFCacheLimit o `deepseq`
     opt_edalize o `deepseq`
     opt_renderEnums o `deepseq`
+    opt_timescalePrecision o `deepseq`
     ()
 
 instance Eq ClashOpts where
@@ -454,7 +460,8 @@ instance Eq ClashOpts where
     opt_aggressiveXOptBB s0 == opt_aggressiveXOptBB s1 &&
     opt_inlineWFCacheLimit s0 == opt_inlineWFCacheLimit s1 &&
     opt_edalize s0 == opt_edalize s1 &&
-    opt_renderEnums s0 == opt_renderEnums s1
+    opt_renderEnums s0 == opt_renderEnums s1 &&
+    opt_timescalePrecision s0 == opt_timescalePrecision s1
 
    where
     eqOverridingBool :: OverridingBool -> OverridingBool -> Bool
@@ -492,7 +499,8 @@ instance Hashable ClashOpts where
     opt_aggressiveXOptBB `hashWithSalt`
     opt_inlineWFCacheLimit `hashWithSalt`
     opt_edalize `hashWithSalt`
-    opt_renderEnums
+    opt_renderEnums `hashWithSalt`
+    opt_timescalePrecision
    where
     hashOverridingBool :: Int -> OverridingBool -> Int
     hashOverridingBool s1 Auto = hashWithSalt s1 (0 :: Int)
@@ -531,6 +539,7 @@ defClashOpts
   , opt_inlineWFCacheLimit  = 10 -- TODO: find "optimal" value
   , opt_edalize             = False
   , opt_renderEnums         = True
+  , opt_timescalePrecision  = Period 100 Fs
   }
 
 -- | Synopsys Design Constraint (SDC) information for a component.

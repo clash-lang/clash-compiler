@@ -388,13 +388,14 @@ enumVariantName _ _ =
 
 -- | Generate VHDL for a Netlist component
 genVHDL
-  :: ModName
+  :: ClashOpts
+  -> ModName
   -> SrcSpan
   -> IdentifierSet
   -> UsageMap
   -> Component
   -> VHDLM ((String, Doc), [(String, Doc)])
-genVHDL nm sp seen us c = do
+genVHDL _ nm sp seen us c = do
     -- Don't have type names conflict with module names or with previously
     -- generated type names.
     --

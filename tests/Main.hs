@@ -797,6 +797,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "DynamicClocks" def
             { hdlLoad = hdlLoad def \\ [Verilator]
             , hdlSim = hdlSim def \\ [Verilator]
+            , clashFlags = ["-fclash-timescale-precision", "1fs"]
             }
         , runTest "Oversample" def
         , runTest "RegisterAR" def

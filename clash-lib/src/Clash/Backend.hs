@@ -112,7 +112,7 @@ class (HasUsageMap state, HasIdentifierSet state) => Backend state where
   extractTypes     :: state -> HashSet HWType
 
   -- | Generate HDL for a Netlist component
-  genHDL           :: ModName -> SrcSpan -> IdentifierSet -> UsageMap -> Component -> Ap (State state) ((String, Doc),[(String,Doc)])
+  genHDL           :: ClashOpts -> ModName -> SrcSpan -> IdentifierSet -> UsageMap -> Component -> Ap (State state) ((String, Doc),[(String,Doc)])
   -- | Generate a HDL package containing type definitions for the given HWTypes
   mkTyPackage      :: ModName -> [HWType] -> Ap (State state) [(String, Doc)]
   -- | Convert a Netlist HWType to a target HDL type
