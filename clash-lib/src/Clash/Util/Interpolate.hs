@@ -208,19 +208,19 @@ nodesToLines =
 variable is on its own line and expands to a multi-line string, the interpolated
 text will be indented the same as the interpolation variable was:
 
->>> :set -XQuasiQuotes
->>> :{
->>> a = "Multi\nLine\nString"
->>> b = [i|
->>>     This line will be reflowed
->>>     and the interpolated
->>>     multi-line string here:
->>>         #{a}
->>>     will be indented. This
->>>     text is outdented again.
->>>   |]
->>> :}
->>> putStrLn b
+> :set -XQuasiQuotes
+> :{
+> a = "Multi\nLine\nString"
+> b = [i|
+>     This line will be reflowed
+>     and the interpolated
+>     multi-line string here:
+>         #{a}
+>     will be indented. This
+>     text is outdented again.
+>   |]
+> :}
+> putStrLn b
 This line will be reflowed and the interpolated multi-line string here:
     Multi
     Line

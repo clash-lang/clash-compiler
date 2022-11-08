@@ -108,6 +108,11 @@ module Clash.Signal.Internal
     -- * Simulation and testbench functions
   , clockGen
   , tbClockGen
+  , Femtoseconds(..)  -- experimental, do not expose in public API
+  , fsToHz            -- experimental, do not expose in public API
+  , hzToFs            -- experimental, do not expose in public API
+  , unFemtoseconds    -- experimental, do not expose in public API
+  , mapFemtoseconds   -- experimental, do not expose in public API
   , tbDynamicClockGen -- experimental, do not expose in public API
   , dynamicClockGen   -- experimental, do not expose in public API
   , resetGen
@@ -157,6 +162,7 @@ import Control.DeepSeq            (NFData)
 import Clash.Annotations.Primitive (hasBlackBox, dontTranslate)
 import Data.Binary                (Binary)
 import Data.Char                  (isAsciiUpper, isAlphaNum, isAscii)
+import Data.Coerce                (coerce)
 import Data.Data                  (Data)
 import Data.Default.Class         (Default (..))
 import Data.Hashable              (Hashable)
@@ -852,7 +858,7 @@ data Clock (dom :: Domain) = Clock
     -- | Periods of the clock. This is an experimental feature used to simulate
     -- clock frequency correction mechanisms. Currently, all ways to contruct
     -- such a clock are hidden from the public API.
-  , clockPeriods :: Maybe (Signal dom Natural)
+  , clockPeriods :: Maybe (Signal dom Femtoseconds)
   }
 
 instance Show (Clock dom) where
@@ -929,6 +935,21 @@ tbClockGen done = Clock (done `seq` SSymbol) Nothing
 {-# NOINLINE tbClockGen #-}
 {-# ANN tbClockGen hasBlackBox #-}
 
+-- | Femtoseconds expressed as an 'Int64'. Is a newtype to prevent accidental
+-- mixups with picoseconds - the unit used in 'DomainConfiguration'.
+--
+newtype Femtoseconds = Femtoseconds Int64
+  -- No 'Integral' instance to prevent accidental picoseconds / femtoseconds mixup
+  deriving (Show, Eq, Generic, NFDataX, NFData, Lift)
+
+-- | Strip newtype wrapper 'Femtoseconds'
+unFemtoseconds :: Femtoseconds -> Int64
+unFemtoseconds (Femtoseconds fs) = fs
+
+-- | Map 'Int64' fields in 'Femtoseconds'
+mapFemtoseconds :: (Int64 -> Int64) -> Femtoseconds -> Femtoseconds
+mapFemtoseconds f (Femtoseconds fs) = Femtoseconds (f fs)
+
 -- | Clock generator with dynamic clock periods for simulations. This is an
 -- experimental feature and hence not part of the public API.
 --
@@ -939,7 +960,24 @@ tbClockGen done = Clock (done `seq` SSymbol) Nothing
 -- @
 --
 -- See 'DomainConfiguration' for more information on how to use synthesis domains.
-dynamicClockGen :: KnownDomain dom => Signal dom Natural -> Clock dom
+dynamicClockGen ::
+  KnownDomain dom =>
+  -- | Clock period in /femto/seconds.
+  --
+  -- __N.B.__: Beware that the periods are given in femtoseconds; this differs
+  --           from the usual unit Clash uses to represent period length,
+  --           picoseconds.
+  --
+  -- __N.B.__: Beware that not all simulators support femtoseconds. For example,
+  --           Vivado's XSIM will round down to nearest picoseconds.
+  --
+  -- __N.B.__: Beware that, by default, Clash will define @`timescale 100fs/100fs@
+  --           in its generated Verilog. The latter will make simulators round
+  --           time to 100fs. If you rely on more precision you should pass
+  --           @-fclash-timescale-precision 1fs@ to Clash.
+  --
+  Signal dom Femtoseconds ->
+  Clock dom
 dynamicClockGen periods = tbDynamicClockGen periods (pure True)
 
 -- | Clock generator with dynamic clock periods for simulations. This is an
@@ -955,7 +993,21 @@ dynamicClockGen periods = tbDynamicClockGen periods (pure True)
 -- See 'DomainConfiguration' for more information on how to use synthesis domains.
 tbDynamicClockGen ::
   KnownDomain dom =>
-  Signal dom Natural ->
+  -- | Clock period in /femto/seconds.
+  --
+  -- __N.B.__: Beware that the periods are given in femtoseconds; this differs
+  --           from the usual unit Clash uses to represent period length,
+  --           picoseconds.
+  --
+  -- __N.B.__: Beware that not all simulators support femtoseconds. For example,
+  --           Vivado's XSIM will round down to nearest picoseconds.
+  --
+  -- __N.B.__: Beware that, by default, Clash will define @`timescale 100fs/100fs@
+  --           in its generated Verilog. The latter will make simulators round
+  --           time to 100fs. If you rely on more precision you should pass
+  --           @-fclash-timescale-precision 1fs@ to Clash.
+  --
+  Signal dom Femtoseconds ->
   Signal dom Bool ->
   Clock dom
 tbDynamicClockGen periods ena =
@@ -1547,6 +1599,19 @@ simulate_lazy f = sample_lazy . f . fromList_lazy
 hzToPeriod :: HasCallStack => Ratio Natural -> Natural
 hzToPeriod freq = floor ((1.0 / freq) / 1.0e-12)
 
+-- | Calculate the period, in __fs__, given a frequency in __Hz__
+--
+-- i.e. to calculate the clock period for a circuit to run at 240 MHz we get
+--
+-- >>> hzToFs 240e6
+-- Femtoseconds 4166666
+--
+-- __NB__: This function is /not/ synthesizable
+--
+-- __NB__: This function is lossy. I.e.,  fsToHz . hzToFs /= id.
+hzToFs :: HasCallStack => Ratio Natural -> Femtoseconds
+hzToFs freq = Femtoseconds (floor ((1.0 / freq) / 1.0e-15))
+
 -- | Calculate the frequence in __Hz__, given the period in __ps__
 --
 -- i.e. to calculate the clock frequency of a clock with a period of 5000 ps:
@@ -1557,6 +1622,17 @@ hzToPeriod freq = floor ((1.0 / freq) / 1.0e-12)
 -- __NB__: This function is /not/ synthesizable
 periodToHz :: Natural -> Ratio Natural
 periodToHz period = 1.0 / (1.0e-12 * fromIntegral period)
+
+-- | Calculate the frequence in __Hz__, given the period in __fs__
+--
+-- i.e. to calculate the clock frequency of a clock with a period of 5000 fs:
+--
+-- >>> fsToHz (Femtoseconds 5000)
+-- 200000000000 % 1
+--
+-- __NB__: This function is /not/ synthesizable
+fsToHz :: Femtoseconds -> Ratio Natural
+fsToHz (Femtoseconds period) = 1.0 / (1.0e-15 * fromIntegral period)
 
 -- | Build an 'Automaton' from a function over 'Signal's.
 --
@@ -1625,9 +1701,15 @@ clockTicks clkA clkB = clockTicksEither (toEither clkA) (toEither clkB)
     Either Int64 (Signal dom Int64)
   toEither (Clock _ maybePeriods)
     | Just periods <- maybePeriods =
-        Right (fromIntegral <$> periods)
+        Right (unFemtosecondsSignal periods)
     | SDomainConfiguration{sPeriod} <- knownDomain @dom =
-        Left (snatToNum sPeriod)
+        -- Convert to femtoseconds - dynamic clocks use them
+        Left (1000 * snatToNum sPeriod)
+
+  -- Coerce whole signal instead of `fmap coerce` to prevent useless constructor
+  -- packing and unpacking.
+  unFemtosecondsSignal :: forall dom . Signal dom Femtoseconds -> Signal dom Int64
+  unFemtosecondsSignal = coerce
 
 -- | Given two clock periods, produce a list of clock ticks indicating which clock
 -- (or both) ticked. Can be used in components handling multiple clocks, such

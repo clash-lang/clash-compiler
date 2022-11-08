@@ -171,7 +171,7 @@
     type: |-
       tbDynamicClockGen
         :: KnownDomain dom     -- ARG[0]
-        => Signal dom Natural  -- ARG[1]
+        => Signal dom Int64    -- ARG[1]
         -> Signal dom Bool     -- ARG[2]
         -> Clock dom
     template: |-
@@ -186,7 +186,7 @@
         wait for ~LONGESTPERIOD ps;
 
         ~IF~ISACTIVEENABLE[2]~THENwhile ~ARG[2] ~ELSE~FIloop
-          ~SYM[1] := to_integer(~VAR[periods][1]) * 1000 * 1 fs;
+          ~SYM[1] := to_integer(~VAR[periods][1]) * 1 fs;
           ~SYM[2] := ~SYM[1] / 2;
           ~SYM[3] := ~SYM[1] - ~SYM[2];
 

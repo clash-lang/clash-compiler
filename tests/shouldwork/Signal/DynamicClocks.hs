@@ -8,7 +8,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 module DynamicClocks where
 
 import Clash.Explicit.Prelude
-import Clash.Signal.Internal (tbDynamicClockGen)
+import Clash.Signal.Internal (Femtoseconds (..), tbDynamicClockGen, mapFemtoseconds)
 import Clash.Explicit.Testbench
 
 createDomain vSystem{vName="Static", vPeriod=1000}
@@ -74,7 +74,9 @@ testBench = bundle (boolToBit <$> doneStatic, actual)
 
   doneStatic = outputVerifier' clkStatic rstStatic expected actual
 
-  periods = stimuliGenerator clkDynamic rstDynamic ($(lift (iterate d500 (+100) (1000 :: Int))))
+  periods =
+    stimuliGenerator clkDynamic rstDynamic $
+      $(lift (iterate d500 (mapFemtoseconds (+100_000)) (Femtoseconds 1_000_000)))
 
   notDoneStatic  = not <$> doneStatic
   notDoneDynamic = unsafeSynchronizer clkStatic clkDynamic notDoneStatic

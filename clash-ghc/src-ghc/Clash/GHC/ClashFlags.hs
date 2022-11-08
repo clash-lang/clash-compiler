@@ -1,7 +1,8 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
-                     2021,      QBayLogic B.V.
+                     2021,      QBayLogic B.V.,
+                     2022,      Google Inc.,
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -33,6 +34,7 @@ import qualified Data.Set                       as Set
 import qualified Data.Text                      as Text
 import           Text.Read                      (readMaybe)
 
+import           Clash.Backend.Verilog.Time     (parsePeriod)
 import           Clash.Driver.Types
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
 import           Clash.Netlist.Types            (PreserveCase (ToLower))
@@ -89,6 +91,7 @@ flagsClash r = [
   , defFlag "fclash-inline-workfree-limit"       $ IntSuffix (liftEwM . setInlineWFLimit r)
   , defFlag "fclash-edalize"                     $ NoArg (liftEwM (setEdalize r))
   , defFlag "fclash-no-render-enums"             $ NoArg (liftEwM (setNoRenderEnums r))
+  , defFlag "fclash-timescale-precision"         $ SepArg (setTimescalePrecision r)
   ]
 
 -- | Print deprecated flag warning
@@ -281,6 +284,18 @@ setComponentPrefix
   -> IO ()
 setComponentPrefix r s =
   modifyIORef r (\c -> c {opt_componentPrefix = Just (Text.pack s)})
+
+setTimescalePrecision
+  :: IORef ClashOpts
+  -> String
+  -> EwM IO ()
+setTimescalePrecision r s =
+  case parsePeriod s of
+    Just period ->
+      liftEwM $ modifyIORef r $ \c ->
+        c{opt_timescalePrecision = period}
+    Nothing ->
+      addWarn $ "Could not parse " <> s <> " as a period."
 
 setOldInlineStrategy :: IORef ClashOpts -> IO ()
 setOldInlineStrategy r = modifyIORef r (\c -> c {opt_newInlineStrat = False})

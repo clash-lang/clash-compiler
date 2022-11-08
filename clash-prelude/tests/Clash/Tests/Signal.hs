@@ -23,7 +23,8 @@ import           Prelude hiding (undefined)
 import qualified Clash.Explicit.Prelude         as E
 import           Clash.Prelude                  hiding (sample)
 
-import           Clash.Signal.Internal          (dynamicClockGen, sample)
+import           Clash.Signal.Internal
+  (Femtoseconds(..), dynamicClockGen, sample)
 
 import           Control.Exception              (evaluate)
 import           Data.List                      (isInfixOf)
@@ -216,8 +217,15 @@ case_dynamicStaticEq = do
 
     clk11 = clockGen @H11
     clk77 = clockGen @H77
-    dclk11 = dynamicClockGen @H11 (pure (hzToPeriod 11))
-    dclk77 = dynamicClockGen @H77 (pure (hzToPeriod 77))
+
+    -- We construct periods in a roundabout way (i.e., using 'hzToPeriod' instead
+    -- of using 'hzToFs'), to prevent rounding errors between periods of the
+    -- static clocks and the periods of the dynamic clocks.
+    fs11 = Femtoseconds (fromIntegral (1000 * hzToPeriod 11))
+    fs77 = Femtoseconds (fromIntegral (1000 * hzToPeriod 77))
+
+    dclk11 = dynamicClockGen @H11 (pure fs11)
+    dclk77 = dynamicClockGen @H77 (pure fs77)
 
     counter :: forall dom. Signal dom Int
     counter = fromList [0..]
@@ -238,10 +246,16 @@ case_dynamicHasEffect = do
   let
     sampleMagicN = P.take 500 . sample
 
+    -- We construct periods in a roundabout way (i.e., using 'hzToPeriod' instead
+    -- of using 'hzToFs'), to prevent rounding errors between periods of the
+    -- static clocks and the periods of the dynamic clocks.
+    fs11 = Femtoseconds (fromIntegral (1000 * hzToPeriod 11))
+    fs77lying = Femtoseconds (fromIntegral (1000 * hzToPeriod 78))
+
     clk11 = clockGen @H11
     clk77 = clockGen @H77
-    dclk11 = dynamicClockGen @H11 (pure (hzToPeriod 11))
-    dclk77lying = dynamicClockGen @H77 (pure (hzToPeriod 78))
+    dclk11 = dynamicClockGen @H11 (pure fs11)
+    dclk77lying = dynamicClockGen @H77 (pure fs77lying)
 
     counter :: forall dom. Signal dom Int
     counter = fromList [0..]
@@ -254,8 +268,10 @@ case_dynamicHasEffect = do
 case_changingDynamicClocks :: Assertion
 case_changingDynamicClocks = do
   let
-    dclk11 = dynamicClockGen @H11 (fromList (cycle [10, 20, 30, 40, 50, 60, 70, 80, 90]))
-    dclk77 = dynamicClockGen @H77 (fromList (cycle [90, 80, 70, 60, 50, 40, 30, 20, 10]))
+    dclk11 = dynamicClockGen @H11 $ fromList $ cycle $ fmap Femtoseconds
+      [10, 20, 30, 40, 50, 60, 70, 80, 90]
+    dclk77 = dynamicClockGen @H77 $ fromList $ cycle $ fmap Femtoseconds
+      [90, 80, 70, 60, 50, 40, 30, 20, 10]
 
     counter = fromList [(0 :: Int)..]
     actual = P.take 70 (sample (E.unsafeSynchronizer dclk11 dclk77 counter))

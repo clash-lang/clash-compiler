@@ -297,7 +297,7 @@ isBV _ _ = False
 
 -- | Generate unique (partial) names for product fields. Example:
 --
--- >>> productFieldNames [Unsigned 6, Unsigned 6, Bit, Bool]
+-- > productFieldNames Nothing [Unsigned 6, Unsigned 6, Bit, Bool]
 -- ["unsigned6_0", "unsigned6_1", "bit", "boolean"]
 productFieldNames
   :: HasCallStack
@@ -388,13 +388,14 @@ enumVariantName _ _ =
 
 -- | Generate VHDL for a Netlist component
 genVHDL
-  :: ModName
+  :: ClashOpts
+  -> ModName
   -> SrcSpan
   -> IdentifierSet
   -> UsageMap
   -> Component
   -> VHDLM ((String, Doc), [(String, Doc)])
-genVHDL nm sp seen us c = do
+genVHDL _ nm sp seen us c = do
     -- Don't have type names conflict with module names or with previously
     -- generated type names.
     --

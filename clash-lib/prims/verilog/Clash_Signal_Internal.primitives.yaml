@@ -159,7 +159,7 @@
     type: |-
       clockGen
         :: KnownDomain dom     -- ARG[0]
-        -> Signal dom Natural  -- ARG[1]
+        -> Signal dom Int64    -- ARG[1]
         -> Signal dom Bool     -- ARG[2]
         => Clock dom
     template: |-
@@ -177,12 +177,12 @@
           end
           ~ELSE~FI
           // 1 = 0.1ps
-          ~SYM[1] = ((~VAR[periods][1] * 10) / 2);
+          ~SYM[1] = (~VAR[periods][1] / 2);
 
           ~SYM[0] = ~ ~SYM[0];
-          #~SYM[1];
+          #(~SYM[1] * 0.01);
           ~SYM[0] = ~ ~SYM[0];
-          #~SYM[1];
+          #(~SYM[1] * 0.01);
         end
       end
 

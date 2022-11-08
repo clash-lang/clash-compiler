@@ -85,6 +85,12 @@ flag unittests
   default: True
   manual: True
 
+flag doctests
+  description:
+    You can disable testing with doctests using `-f-doctests`.
+  default: True
+  manual: True
+
 common common-options
   default-language:   Haskell2010
   default-extensions: BangPatterns
@@ -185,6 +191,7 @@ Library
                       Clash.Backend
                       Clash.Backend.SystemVerilog
                       Clash.Backend.Verilog
+                      Clash.Backend.Verilog.Time
                       Clash.Backend.VHDL
 
                       Clash.Core.DataCon
@@ -335,6 +342,23 @@ executable static-files
   Other-Modules:      Paths_clash_lib
   GHC-Options:        -Wall -Wcompat
   default-language:   Haskell2010
+
+
+test-suite doctests
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  main-is:          doctests.hs
+  ghc-options:      -Wall -Wcompat -threaded
+  hs-source-dirs:   tests
+
+  if !flag(doctests)
+    buildable: False
+  else
+    build-depends:
+      base,
+      clash-lib,
+      doctest-parallel >= 0.2 && < 0.3,
+      filepath
 
 test-suite unittests
   import:           common-options
