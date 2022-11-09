@@ -940,7 +940,7 @@ tbClockGen done = Clock (done `seq` SSymbol) Nothing
 --
 newtype Femtoseconds = Femtoseconds Int64
   -- No 'Integral' instance to prevent accidental picoseconds / femtoseconds mixup
-  deriving (Show, Eq, Generic, NFDataX, NFData, Lift)
+  deriving (Show, Eq, Generic, NFDataX, NFData, Lift, Ord)
 
 -- | Strip newtype wrapper 'Femtoseconds'
 unFemtoseconds :: Femtoseconds -> Int64
