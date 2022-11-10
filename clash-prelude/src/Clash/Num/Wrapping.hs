@@ -19,6 +19,7 @@ import Data.Coerce (coerce)
 import Data.Functor.Compose (Compose(..))
 import Data.Hashable (Hashable)
 import GHC.TypeLits (KnownNat, type (+))
+import Test.QuickCheck (Arbitrary)
 
 import Clash.Class.BitPack (BitPack)
 import Clash.Class.Num (SaturationMode(SatWrap), SaturatingNum(..))
@@ -35,7 +36,8 @@ import Clash.XException (NFDataX, ShowX)
 newtype Wrapping a =
   Wrapping { fromWrapping :: a }
   deriving newtype
-    ( Binary
+    ( Arbitrary
+    , Binary
     , Bits
     , BitPack
     , Bounded
