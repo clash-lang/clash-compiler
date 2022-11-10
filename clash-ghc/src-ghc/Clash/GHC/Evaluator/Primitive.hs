@@ -47,7 +47,8 @@ import           GHC.Integer
   (decodeDoubleInteger,encodeDoubleInteger,compareInteger,orInteger,andInteger,
    xorInteger,complementInteger,absInteger,signumInteger)
 #if MIN_VERSION_base(4,15,0)
-import           GHC.Num.Integer (Integer (..), integerEncodeFloat#)
+import           GHC.Num.Integer
+  (Integer (..), integerEncodeFloat#, integerToFloat#, integerToDouble#)
 #else
 import           GHC.Integer.GMP.Internals
   (Integer (..), BigNat (..))
@@ -1021,6 +1022,16 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | Just (a,b) <- integerLiterals args
     , Just c <- flogBase a b
     -> (reduce . Literal . WordLiteral . toInteger) c
+
+  "GHC.Num.Integer.integerToFloat#"
+    | [v] <- args
+    , Just i <- integerLiteral v
+    -> reduce . Literal . FloatLiteral . floatToWord $ F# (integerToFloat# i)
+
+  "GHC.Num.Integer.integerToDouble#"
+    | [v] <- args
+    , Just i <- integerLiteral v
+    -> reduce . Literal . DoubleLiteral . doubleToWord $ D# (integerToDouble# i)
 
   "GHC.Num.Natural.naturalLogBase#"
     | Just (a,b) <- naturalLiterals args
