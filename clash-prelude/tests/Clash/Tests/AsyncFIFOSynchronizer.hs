@@ -202,19 +202,21 @@ printR
   :: Foldable f
   => f (Bool, (Int, Bool))
   -> IO ()
-printR r = do
-  let (first:rest) = P.map show $ sampleR 60 r
-  putStrLn $ (P.foldl (\b a -> b <> "  , " <> a <> "\n")
-                ("  [ " <> first <> "\n") rest) <> "  ]"
+printR r = case P.map show $ sampleR 60 r of
+  (first:rest) ->
+    putStrLn $ (P.foldl (\b a -> b <> "  , " <> a <> "\n")
+                  ("  [ " <> first <> "\n") rest) <> "  ]"
+  _ -> error "impossible"
 
 printW
   :: (Foldable f, NFDataX a, Show a)
   => f a
   -> IO ()
-printW w = do
-  let (first:rest) = P.map show $ sampleN 60 w
-  putStrLn $ (P.foldl (\b a -> b <> "  , " <> a <> "\n")
-                ("  [ " <> first <> "\n") rest) <> "  ]"
+printW w = case P.map show $ sampleN 60 w of
+  (first:rest) ->
+    putStrLn $ (P.foldl (\b a -> b <> "  , " <> a <> "\n")
+                  ("  [ " <> first <> "\n") rest) <> "  ]"
+  _ -> error "impossible"
 
 testR
   :: Foldable f

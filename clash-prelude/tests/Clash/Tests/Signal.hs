@@ -177,7 +177,7 @@ tests =
             let
               f (_, b) = (b, b)
               s = f <$> liftA2 (,) (fst <$> s) (pure 'a')
-              ((a,_):_) = sample @(Signal System) s
+              a = fst (Prelude.head (sample @(Signal System) s))
             in
               evaluate a >> pure ()
         ]

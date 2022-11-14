@@ -284,10 +284,15 @@ deriveAutoRegProduct tyInfo conInfo = go (constructorName conInfo) fieldInfos
 
   go :: Name -> [(Maybe Name,Type)] -> Q [Dec]
   go dcNm fields = do
-    args <- mapM newName ["clk", "rst", "en", "initVal", "input"]
+    clkN     <- newName "clk"
+    rstN     <- newName "rst"
+    enN      <- newName "en"
+    initValN <- newName "initVal"
+    inputN   <- newName "input"
     let
-      [clkE, rstE, enE, initValE, inputE] = map varE args
-      argsP = map varP args
+      initValE = varE initValN
+      inputE = varE inputN
+      argsP = map varP [clkN, rstN, enN, initValN, inputN]
       fieldNames = map fst fields
 
       field :: Name -> Int -> DecQ
@@ -308,6 +313,9 @@ deriveAutoRegProduct tyInfo conInfo = go (constructorName conInfo) fieldInfos
     initDecl <- valD initPat (normalB initValE) []
 
     let
+      clkE = varE clkN
+      rstE = varE rstN
+      enE  = varE enN
       genAutoRegDecl :: PatQ -> ExpQ -> ExpQ -> Maybe Name -> DecsQ
       genAutoRegDecl s v i nameM =
         [d| $s = $nameMe autoReg $clkE $rstE $enE $i $v |]

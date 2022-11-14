@@ -315,7 +315,7 @@ createMemBlob name care es =
   runs = litE . stringPrimL $ L.unpack runsB
   endsLen = litE . integerL . toInteger $ L.length endsB
   ends = litE . stringPrimL $ L.unpack endsB
-  Right (len, runsB, endsB) = packed
+  (len, runsB, endsB) = either error id packed
   packed = packBVs care es
 
 -- | Create a 'MemBlob' from a list of values
@@ -382,5 +382,5 @@ memBlobTH care es =
   runs = litE . stringPrimL $ L.unpack runsB
   endsLen = litE . integerL . toInteger $ L.length endsB
   ends = litE . stringPrimL $ L.unpack endsB
-  Right (len, runsB, endsB) = packed
+  (len, runsB, endsB) = either error id packed
   packed = packBVs care es

@@ -403,6 +403,10 @@ deriveDataRepr
   -- ^ Field derivator
   -> Derivator
 deriveDataRepr constrDerivator fieldsDerivator typ = do
+  let (fun, typeArgs) = collectTypeArgs typ
+      tyConstrName = case fun of
+        ConT t -> t
+        _ -> error ("deriveDataRep: expecting type constructor, but got: " <> show fun)
   info <- reify tyConstrName
   case info of
     (TyConI (DataD [] _constrName vars _kind dConstructors _clauses)) ->
@@ -459,9 +463,6 @@ deriveDataRepr constrDerivator fieldsDerivator typ = do
           $(listE constrReprs) |]
     _ ->
       fail $ "Could not derive dataRepr for: " ++ show info
-
-    where
-      (ConT tyConstrName, typeArgs) = collectTypeArgs typ
 
 -- | Simple derivators change the (default) way Clash stores data types. It
 -- assumes no overlap between constructors and fields.
@@ -580,9 +581,10 @@ possibleValues
   -> Size
   -> Q [[Bit']]
 possibleValues typeMap typ size =
-  let (ConT typeName, _typeArgs) = collectTypeArgs typ in
-
-  case Map.lookup typ typeMap of
+  let typeName = case fst (collectTypeArgs typ) of
+        ConT t -> t
+        fun -> error ("possibleValues: expected a type constructor, but got" <> show fun)
+  in case Map.lookup typ typeMap of
     -- No custom data representation found.
     Nothing -> do
       info <- reify typeName

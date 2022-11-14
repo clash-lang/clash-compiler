@@ -155,10 +155,17 @@ unpackNats len width runBs endBs
          else
            unpackEnds endL len $ unpackW64s endBs
 
-  go val 0    runBs0 ~(end0:ends0) = val : go end0 runL runBs0 ends0
+  go :: Natural -> Int -> B.ByteString -> [Natural] -> [Natural]
+  go val 0    runBs0 ends0
+    = let (end0,end0rest) = case ends0 of
+            [] -> error "unpackNats: unexpected end of bytestring"
+            (x:xs) -> (x,xs)
+       in val : go end0 runL runBs0 end0rest
   go _   _    runBs0 _             | B.null runBs0 = []
   go val runC runBs0 ends0
-    = let Just (runB, runBs1) = B.uncons runBs0
+    = let (runB, runBs1) = case B.uncons runBs0 of
+             Nothing -> error "unpackNats: unexpected end of bytestring"
+             Just xs -> xs
           val0 = val * 256 + fromIntegral runB
       in go val0 (runC - 1) runBs1 ends0
 
@@ -170,7 +177,9 @@ unpackW64s = go 8 0
   go :: Int -> Word64 -> B.ByteString -> [Word64]
   go 8 _   endBs | B.null endBs = []
   go 0 val endBs = val : go 8 0 endBs
-  go n val endBs = let Just (endB, endBs0) = B.uncons endBs
+  go n val endBs = let (endB, endBs0) = case B.uncons endBs of
+                          Nothing -> error "unpackW64s: unexpeded end of bytestring"
+                          Just xs -> xs
                        val0 = val * 256 + fromIntegral endB
                    in go (n - 1) val0 endBs0
 

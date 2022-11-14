@@ -40,7 +40,9 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
 
   pure $ flip map [3..maxTupleSize] $ \tupleNum ->
     let names  = take tupleNum allNames
-        (v:vs) = fmap VarT names
+        (v,vs) = case map VarT names of
+                    (z:zs) -> (z,zs)
+                    _ -> error "maxTupleSize <= 3"
         tuple xs = foldl' AppT (TupleT $ length xs) xs
 
         -- Instance declaration
@@ -68,7 +70,9 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
                     retupName
                     [ Clause
                         [ TupP $ map VarP names ]
-                        ( let (e:es) = map VarE names
+                        ( let (e,es) = case map VarE names of
+                                          (z:zs) -> (z,zs)
+                                          _ -> error "maxTupleSize <= 3"
                           in NormalB (mkTupE [e,mkTupE es])
                         )
                         []
@@ -82,7 +86,9 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
             [ Clause
                 [ VarP x ]
                 ( NormalB $
-                    let (p:ps) = map VarP names
+                    let (p,ps) = case map VarP names of
+                                   (z:zs) -> (z,zs)
+                                   _ -> error "maxTupleSize <= 3"
                     in
                     LetE
                       [ ValD

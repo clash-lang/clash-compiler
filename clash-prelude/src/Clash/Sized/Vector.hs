@@ -217,8 +217,8 @@ instance (KnownNat n, Typeable a, Data a) => Data (Vec n a) where
   gfoldl f z xs = case compareSNat (SNat @n) (SNat @0) of
     SNatLE -> case leZero @n of
                   Sub Dict -> z Nil
-    SNatGT -> let (y :> ys) = xs
-              in (z @(a -> Vec (n-1) a -> Vec n a) (:>) `f` y `f` ys)
+    SNatGT -> case xs of
+                  (y :> ys) -> (z @(a -> Vec (n-1) a -> Vec n a) (:>) `f` y `f` ys)
 
 tVec :: DataType
 tVec = mkDataType "Vec" [cNil, cCons]
