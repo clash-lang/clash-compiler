@@ -8,6 +8,7 @@ Random generation of Signed numbers.
 
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 
 module Clash.Hedgehog.Sized.Signed
@@ -16,7 +17,9 @@ module Clash.Hedgehog.Sized.Signed
   , genSomeSigned
   ) where
 
+#if !MIN_VERSION_base(4,16,0)
 import GHC.Natural (Natural)
+#endif
 import GHC.TypeNats
 import Hedgehog (MonadGen, Range)
 import qualified Hedgehog.Gen as Gen

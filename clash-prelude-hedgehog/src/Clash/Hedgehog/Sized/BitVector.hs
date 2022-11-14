@@ -8,6 +8,7 @@ Random generation of BitVector.
 
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RankNTypes #-}
@@ -21,7 +22,9 @@ module Clash.Hedgehog.Sized.BitVector
   , genSomeBitVector
   ) where
 
+#if !MIN_VERSION_base(4,16,0)
 import GHC.Natural (Natural)
+#endif
 import GHC.TypeNats
 import Hedgehog (MonadGen, Range)
 import Hedgehog.Internal.Range (constantBounded, constant)

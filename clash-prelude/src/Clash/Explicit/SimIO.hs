@@ -95,7 +95,9 @@ apSimIO# (SimIO f) (SimIO m) = SimIO (f <*> m)
 {-# ANN apSimIO# hasBlackBox #-}
 
 instance Monad SimIO where
+#if !MIN_VERSION_base(4,16,0)
   return = pureSimIO#
+#endif
   (>>=)  = bindSimIO#
 
 bindSimIO# :: SimIO a -> (a -> SimIO b) -> SimIO b

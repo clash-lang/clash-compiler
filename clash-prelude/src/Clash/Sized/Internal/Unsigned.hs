@@ -92,7 +92,11 @@ import Data.Default.Class             (Default (..))
 import Data.Proxy                     (Proxy (..))
 import Text.Read                      (Read (..), ReadPrec)
 import Text.Printf                    (PrintfArg (..), printf)
+#if MIN_VERSION_base(4,16,0)
+import GHC.Exts                       (wordToWord8#, wordToWord16#, wordToWord32#)
+#else
 import GHC.Exts                       (narrow8Word#, narrow16Word#, narrow32Word#)
+#endif
 import GHC.Generics                   (Generic)
 #if MIN_VERSION_base(4,15,0)
 import GHC.Num.BigNat                 (bigNatToWord, bigNatToWord#)
@@ -759,7 +763,10 @@ unsignedToWord (U (NatJ# u#)) = W# (bigNatToWord u#)
 {-# ANN unsignedToWord hasBlackBox #-}
 
 unsigned8toWord8 :: Unsigned 8 -> Word8
-#if MIN_VERSION_base(4,15,0)
+#if MIN_VERSION_base(4,16,0)
+unsigned8toWord8 (U (NS u#)) = W8# (wordToWord8# u#)
+unsigned8toWord8 (U (NB u#)) = W8# (wordToWord8# (bigNatToWord# u#))
+#elif MIN_VERSION_base(4,15,0)
 unsigned8toWord8 (U (NS u#)) = W8# (narrow8Word# u#)
 unsigned8toWord8 (U (NB u#)) = W8# (narrow8Word# (bigNatToWord# u#))
 #else
@@ -770,7 +777,10 @@ unsigned8toWord8 (U (NatJ# u#)) = W8# (narrow8Word# (bigNatToWord u#))
 {-# ANN unsigned8toWord8 hasBlackBox #-}
 
 unsigned16toWord16 :: Unsigned 16 -> Word16
-#if MIN_VERSION_base(4,15,0)
+#if MIN_VERSION_base(4,16,0)
+unsigned16toWord16 (U (NS u#)) = W16# (wordToWord16# u#)
+unsigned16toWord16 (U (NB u#)) = W16# (wordToWord16# (bigNatToWord# u#))
+#elif MIN_VERSION_base(4,15,0)
 unsigned16toWord16 (U (NS u#)) = W16# (narrow16Word# u#)
 unsigned16toWord16 (U (NB u#)) = W16# (narrow16Word# (bigNatToWord# u#))
 #else
@@ -781,7 +791,10 @@ unsigned16toWord16 (U (NatJ# u#)) = W16# (narrow16Word# (bigNatToWord u#))
 {-# ANN unsigned16toWord16 hasBlackBox #-}
 
 unsigned32toWord32 :: Unsigned 32 -> Word32
-#if MIN_VERSION_base(4,15,0)
+#if MIN_VERSION_base(4,16,0)
+unsigned32toWord32 (U (NS u#)) = W32# (wordToWord32# u#)
+unsigned32toWord32 (U (NB u#)) = W32# (wordToWord32# (bigNatToWord# u#))
+#elif MIN_VERSION_base(4,15,0)
 unsigned32toWord32 (U (NS u#)) = W32# (narrow32Word# u#)
 unsigned32toWord32 (U (NB u#)) = W32# (narrow32Word# (bigNatToWord# u#))
 #else

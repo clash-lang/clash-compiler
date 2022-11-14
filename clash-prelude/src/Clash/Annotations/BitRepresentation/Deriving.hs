@@ -897,7 +897,11 @@ buildPackMatch dataRepr cRepr@(ConstrRepr name _ _ fieldanns) = do
               (\v1 v2 -> [| $v1 ++# $v2 |])
               (map (select $ map VarE fieldPackedNames) origins)
 
+#if MIN_VERSION_template_haskell(2,18,0)
+  return $ Match (ConP name [] (VarP <$> fieldNames)) (NormalB vec) fieldPackedDecls
+#else
   return $ Match (ConP name (VarP <$> fieldNames)) (NormalB vec) fieldPackedDecls
+#endif
 
 -- | Build a /pack/ function corresponding to given DataRepr
 buildPack
