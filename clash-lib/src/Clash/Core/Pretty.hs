@@ -223,11 +223,24 @@ pprTopLevelBndr (bndr,expr) = do
 dcolon, rarrow, lam, tylam, at, cast, coerce, let_, letrec, in_, case_, of_, forall_,
   data_,newtype_,type_,family_,instance_
   :: ClashDoc
-[dcolon, rarrow, lam, tylam, at, cast, coerce, let_, letrec, in_, case_, of_, forall_,
-  data_,newtype_,type_,family_,instance_]
-  = annotate (AnnSyntax Keyword) <$>
-    ["::", "->", "λ", "Λ", "@", "▷", "~", "let", "letrec", "in", "case", "of", "forall",
-     "data","newtype","type","family","instance"]
+dcolon = annotate (AnnSyntax Keyword) "::"
+rarrow = annotate (AnnSyntax Keyword) "->"
+lam = annotate (AnnSyntax Keyword)  "λ"
+tylam = annotate (AnnSyntax Keyword) "Λ"
+at = annotate (AnnSyntax Keyword)  "@"
+cast = annotate (AnnSyntax Keyword) "▷"
+coerce = annotate (AnnSyntax Keyword) "~"
+let_ = annotate (AnnSyntax Keyword) "let"
+letrec = annotate (AnnSyntax Keyword) "letrec"
+in_ = annotate (AnnSyntax Keyword) "in"
+case_ = annotate (AnnSyntax Keyword) "case"
+of_ = annotate (AnnSyntax Keyword) "of"
+forall_ = annotate (AnnSyntax Keyword) "forall"
+data_ = annotate (AnnSyntax Keyword) "data"
+newtype_ = annotate (AnnSyntax Keyword) "newtype"
+type_ = annotate (AnnSyntax Keyword) "type"
+family_ = annotate (AnnSyntax Keyword) "family"
+instance_ = annotate (AnnSyntax Keyword) "instance"
 
 instance PrettyPrec Text where
   pprPrec _ = pure . pretty

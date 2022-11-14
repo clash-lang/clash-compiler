@@ -25,6 +25,9 @@ import qualified Control.Exception    as Exception
 import Control.Lens
 import Control.Monad.State            (MonadState,StateT)
 import qualified Control.Monad.State  as State
+#if !MIN_VERSION_transformers(0,6,0)
+import Control.Monad.Trans.Maybe      (MaybeT (..))
+#endif
 import Data.Hashable                  (Hashable)
 import Data.HashMap.Lazy              (HashMap)
 import qualified Data.HashMap.Lazy    as HashMapL
@@ -331,3 +334,8 @@ unwantedLanguageExtensions =
   , LangExt.Strict
   , LangExt.StrictData
   ]
+
+#if !MIN_VERSION_transformers(0,6,0)
+hoistMaybe :: (Applicative m) => Maybe b -> MaybeT m b
+hoistMaybe = MaybeT . pure
+#endif

@@ -33,6 +33,7 @@ import qualified Data.HashMap.Lazy as HashMap
 import Data.List ((\\))
 import qualified Data.List as List
 import qualified Data.List.Extra as List
+import Data.Maybe (fromMaybe)
 import qualified Data.Monoid as Monoid (Any(..))
 import qualified Data.Text as Text
 import qualified Data.Text.Extra as Text
@@ -160,10 +161,11 @@ removeUnusedExpr _ e@(collectArgsTicks -> (Data dc, [_,Right aTy,Right nTy,_,Lef
         | (con, _) <- collectArgs nil
         , not (isCon con)
         -> let eTy = inferCoreTypeOf tcm e
-               (TyConApp vecTcNm _) = tyView eTy
-               (Just vecTc) = UniqMap.lookup vecTcNm tcm
-               [nilCon,consCon] = tyConDataCons vecTc
-               v = mkTicks (mkVec nilCon consCon aTy 1 [a]) ticks
+               v = fromMaybe (error "removeUnusedExpr: failed to create Vec DCs") $ do
+                  (TyConApp vecTcNm _) <- pure (tyView eTy)
+                  vecTc <- UniqMap.lookup vecTcNm tcm
+                  [nilCon,consCon] <- pure (tyConDataCons vecTc)
+                  return (mkTicks (mkVec nilCon consCon aTy 1 [a]) ticks)
            in  changed v
       _ -> return e
 
@@ -181,10 +183,11 @@ flattenLet :: HasCallStack => NormRewrite
 flattenLet ctx@(TransformContext is0 _) (Letrec binds0 body0@Letrec{}) = do
   -- deshadow binds1, so binds0 and binds1 don't conflict when merged
   let is1 = extendInScopeSetList is0 (fmap fst binds0)
-      Letrec binds1 body1 = deShadowTerm is1 body0
-
-  setChanged
-  flattenLet ctx{tfInScope=is1} (Letrec (binds0 <> binds1) body1)
+  case deShadowTerm is1 body0 of
+    Letrec binds1 body1 -> do
+      setChanged
+      flattenLet ctx{tfInScope=is1} (Letrec (binds0 <> binds1) body1)
+    _ -> error "internal error"
 
 flattenLet (TransformContext is0 _) (Letrec binds body) = do
   let is1 = extendInScopeSetList is0 (map fst binds)
@@ -222,8 +225,10 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
             -- This is much better than blindly calling freshenTm, and saves
             -- almost 30% run-time of the normalization phase on some examples.
             if any (`elemInScopeSet` isN) bs1 then
-              let Letrec bindsN bodyN = deShadowTerm isN (Letrec binds1 body1)
-              in  (bindsN,bodyN,extendInScopeSetList isN (map fst bindsN))
+              case deShadowTerm isN (Letrec binds1 body1) of
+                Letrec bindsN bodyN ->
+                  (bindsN,bodyN,extendInScopeSetList isN (map fst bindsN))
+                _ -> error "internal error"
             else
               (binds1,body1,extendInScopeSetList isN bs1)
       let bodyOccs = Lens.foldMapByOf
@@ -398,8 +403,8 @@ isClassConstraint _ = False
 -- On the two examples that were tested, Reducer and PipelinesViaFolds, this new
 -- version of CSE removed the same amount of let-binders.
 simpleCSE :: HasCallStack => NormRewrite
-simpleCSE (TransformContext is0 _) term@Letrec{} = do
-  let Letrec bndrs body = inverseTopSortLetBindings term
+simpleCSE (TransformContext is0 _) term@(Letrec bndrsX body) = do
+  let bndrs = inverseTopSortLetBindings bndrsX
   let is1 = extendInScopeSetList is0 (map fst bndrs)
   ((subst,bndrs1), change) <- listen $ reduceBinders (mkSubst is1) [] bndrs
   -- TODO: check whether a substitution over the body is enough, the reason I'm

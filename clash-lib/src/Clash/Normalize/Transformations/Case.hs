@@ -579,18 +579,21 @@ collectFlat _ _ = Nothing
 {-# SCC collectFlat #-}
 
 collectEqArgs :: Term -> Maybe (Term,Term)
-collectEqArgs (collectArgsTicks -> (Prim p, args, ticks))
+collectEqArgs f@(collectArgsTicks -> (Prim p, args, ticks))
   | nm == Text.showt 'BV.eq#
-    = let [_,_,Left scrut,Left val] = args
-      in Just (mkTicks scrut ticks,val)
+    = case args of
+        [_,_,Left scrut,Left val] -> Just (mkTicks scrut ticks,val)
+        _ -> error ("collectEqArgs: BV.eq expects 4 arguments, but got: " <> showPpr f)
   | nm == Text.showt 'I.eq#  ||
     nm == Text.showt 'S.eq# ||
     nm == Text.showt 'U.eq#
-    = let [_,Left scrut,Left val] = args
-      in Just (mkTicks scrut ticks,val)
+    = case args of
+        [_,Left scrut,Left val] -> Just (mkTicks scrut ticks,val)
+        _ -> error (show nm <> " expects 3 arguments, but got: " <> showPpr f)
   | nm == "GHC.Classes.eqInt"
-    = let [Left scrut,Left val] = args
-      in  Just (mkTicks scrut ticks,val)
+    = case args of
+        [Left scrut,Left val] -> Just (mkTicks scrut ticks,val)
+        _ -> error ("eqInt expects 2 arguments, but got: " <> showPpr f)
  where
   nm = primName p
 

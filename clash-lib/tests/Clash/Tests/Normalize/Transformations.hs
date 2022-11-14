@@ -7,6 +7,8 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 module Clash.Tests.Normalize.Transformations where
 
+import Data.Maybe (fromMaybe)
+
 import Clash.Normalize.Transformations (inlineBndrsCleanup)
 import Clash.Core.VarEnv
   (mkInScopeSet, mkVarSet, mkVarEnv, emptyVarEnv)
@@ -19,14 +21,8 @@ import Test.Tasty.HUnit
 import Test.Clash.Rewrite (parseToTermQQ, parseToTerm)
 
 t1337a :: Term
-t1337a = Letrec keep1 result
- where
-  (keep0:inlines)= map (\(v,e) -> (v,((v,e),countFreeOccurances e))) binds
-  is = mkInScopeSet (mkVarSet (map fst binds))
-
-  keep1 = inlineBndrsCleanup is (mkVarEnv inlines) emptyVarEnv [snd keep0]
-
-  Letrec binds result =
+t1337a = fromMaybe (error "failed to build term") $ do
+  Letrec binds result <- pure $
     [parseToTermQQ|
       let
         -- Types don't mean anything for this example
@@ -41,6 +37,13 @@ t1337a = Letrec keep1 result
         result_1
     |]
 
+  (keep0:inlines) <- pure (map (\(v,e) -> (v,((v,e),countFreeOccurances e))) binds)
+  let is = mkInScopeSet (mkVarSet (map fst binds))
+
+  let keep1 = inlineBndrsCleanup is (mkVarEnv inlines) emptyVarEnv [snd keep0]
+
+  return (Letrec keep1 result)
+
 t1337a_result :: Term
 t1337a_result = [parseToTermQQ|
   let
@@ -52,14 +55,9 @@ t1337a_result = [parseToTermQQ|
 |]
 
 t1337b :: Term
-t1337b = Letrec keep1 result
- where
-  (keep0:inlines)= map (\(v,e) -> (v,((v,e),countFreeOccurances e))) binds
-  is = mkInScopeSet (mkVarSet (map fst binds))
+t1337b = fromMaybe (error "failed to build term") $ do
 
-  keep1 = inlineBndrsCleanup is (mkVarEnv inlines) emptyVarEnv [snd keep0]
-
-  Letrec binds result =
+  Letrec binds result <- pure $
     [parseToTermQQ|
       let
         -- Types don't mean anything for this example
@@ -75,6 +73,13 @@ t1337b = Letrec keep1 result
         result_1
     |]
 
+  (keep0:inlines) <- pure (map (\(v,e) -> (v,((v,e),countFreeOccurances e))) binds)
+  let is = mkInScopeSet (mkVarSet (map fst binds))
+
+  let keep1 = inlineBndrsCleanup is (mkVarEnv inlines) emptyVarEnv [snd keep0]
+
+  return (Letrec keep1 result)
+
 t1337b_result :: Term
 t1337b_result = [parseToTermQQ|
   let
@@ -86,15 +91,8 @@ t1337b_result = [parseToTermQQ|
 |]
 
 t1337c :: Term
-t1337c = Letrec keep1 result
- where
-  (keep0:inlines)= map (\(v,e) -> (v,((v,e),countFreeOccurances e))) binds
-  Var fv = parseToTerm "freevar_5 :: Int"
-  is = mkInScopeSet (mkVarSet (fv : map fst binds))
-
-  keep1 = inlineBndrsCleanup is (mkVarEnv inlines) emptyVarEnv [snd keep0]
-
-  Letrec binds result =
+t1337c = fromMaybe (error "failed to build term") $ do
+  Letrec binds result <- pure $
     [parseToTermQQ|
       let
         result_1, a_2, b_3, c_4 :: Int
@@ -107,6 +105,14 @@ t1337c = Letrec keep1 result
       in
         result_1
     |]
+
+  (keep0:inlines) <- pure (map (\(v,e) -> (v,((v,e),countFreeOccurances e))) binds)
+  Var fv <- pure (parseToTerm "freevar_5 :: Int")
+  let is = mkInScopeSet (mkVarSet (fv : map fst binds))
+
+  let keep1 = inlineBndrsCleanup is (mkVarEnv inlines) emptyVarEnv [snd keep0]
+
+  return (Letrec keep1 result)
 
 t1337c_result :: Term
 t1337c_result = [parseToTermQQ|

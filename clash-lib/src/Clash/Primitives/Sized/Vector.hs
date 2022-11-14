@@ -113,16 +113,18 @@ foldFunctionPlurality n
 foldBBF :: HasCallStack => BlackBoxFunction
 foldBBF _isD _primName args _resTy = do
   tcm <- Lens.view tcCache
-  pure (Right (meta tcm, bb))
- where
-  bb = BBFunction "Clash.Primitives.Sized.Vector.foldTF" 0 foldTF
-  [vecLengthMinusOne, _] = rights args
-  vecLength tcm =
-    case coreView tcm vecLengthMinusOne of
-      (LitTy (NumTy n)) -> n + 1
-      vl -> error $ "Unexpected vector length: " ++ show vl
-  funcPlural tcm = foldFunctionPlurality (fromInteger (vecLength tcm))
-  meta tcm = emptyBlackBoxMeta {bbKind=TDecl, bbFunctionPlurality=[(0, funcPlural tcm)]}
+  let
+    bb = BBFunction "Clash.Primitives.Sized.Vector.foldTF" 0 foldTF
+    vecLengthMinusOne = case rights args of
+      (l:_) -> l
+      _ -> error ("foldBBF: bad Vec: " <> show args)
+    vecLength =
+      case coreView tcm vecLengthMinusOne of
+        (LitTy (NumTy n)) -> n + 1
+        vl -> error $ "Unexpected vector length: " ++ show vl
+    funcPlural = foldFunctionPlurality (fromInteger vecLength)
+    meta = emptyBlackBoxMeta {bbKind=TDecl, bbFunctionPlurality=[(0, funcPlural)]}
+  pure (Right (meta, bb))
 
 -- | Type signature of function we're generating netlist for:
 --
@@ -282,28 +284,26 @@ indexIntVerilogTemplate
   :: Backend s
   => BlackBoxContext
   -> State s Doc
-indexIntVerilogTemplate bbCtx = getAp $ case typeSize vTy of
+indexIntVerilogTemplate bbCtx
+  | [  _kn, (vec, vTy, _), (ix, _, _)] <- bbInputs bbCtx
+  , [(_,rTy)] <- bbResults bbCtx
+  = getAp $ case typeSize vTy of
   0 -> hdlTypeErrValue rTy
   _ -> case vec of
-    Identifier i mM -> case mM of
-      Just m ->
-           expr False (Identifier i (Just (Nested m (Indexed (vTy,10,ixI ix)))))
-      _ -> expr False (Identifier i (Just (Indexed (vTy,10,ixI ix))))
+    Identifier i mM -> do
+      let
+        ixI :: Expr ->  Int
+        ixI ix0 = case ix0 of
+          Literal _ (NumLit j) ->
+            fromInteger j
+          DataCon (Signed _) (DC (Void{},_)) [Literal (Just (Signed _,_)) (NumLit j)] ->
+            fromInteger j
+          _ ->
+            error ($(curLoc) ++ "Unexpected literal: " ++ show ix)
+      case mM of
+        Just m ->
+            expr False (Identifier i (Just (Nested m (Indexed (vTy,10,ixI ix)))))
+        _ -> expr False (Identifier i (Just (Indexed (vTy,10,ixI ix))))
     _ -> error ($(curLoc) ++ "Expected Identifier: " ++ show vec)
- where
-  [  _kn
-   , (vec, vTy, _)
-   , (ix, _, _)
-   ] = bbInputs bbCtx
-
-  [(_,rTy)] = bbResults bbCtx
-
-  ixI :: Expr ->  Int
-  ixI ix0 = case ix0 of
-    Literal _ (NumLit i) ->
-      fromInteger i
-    DataCon (Signed _) (DC (Void{},_)) [Literal (Just (Signed _,_)) (NumLit i)] ->
-      fromInteger i
-    _ ->
-      error ($(curLoc) ++ "Unexpected literal: " ++ show ix)
-
+  | otherwise
+  = error ("indexIntVerilogTemplate: bad bbContext: " <> show bbCtx)

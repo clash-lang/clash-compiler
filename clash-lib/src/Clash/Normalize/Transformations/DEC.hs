@@ -618,11 +618,12 @@ genCase tcm tupTcm ty argTys = go
 
 -- | Lookup the TyConName and DataCon for a tuple of size n
 findTup :: TyConMap -> IntMap TyConName -> Int -> (TyConName,DataCon)
-findTup tcm tupTcm n = (tupTcNm,tupDc)
-  where
-    tupTcNm      = Maybe.fromMaybe (error $ $curLoc ++ "Can't find " ++ show n ++ "-tuple") $ IntMap.lookup n tupTcm
-    Just tupTc   = UniqMap.lookup tupTcNm tcm
-    [tupDc]      = tyConDataCons tupTc
+findTup tcm tupTcm n =
+  Maybe.fromMaybe (error ("Cannot build " <> show n <> "-tuble")) $ do
+    tupTcNm <- IntMap.lookup n tupTcm
+    tupTc <- UniqMap.lookup tupTcNm tcm
+    tupDc <- Maybe.listToMaybe (tyConDataCons tupTc)
+    return (tupTcNm,tupDc)
 
 mkBigTupTm :: TyConMap -> IntMap TyConName -> [(Type,Term)] -> Term
 mkBigTupTm tcm tupTcm args = snd $ mkBigTup tcm tupTcm args

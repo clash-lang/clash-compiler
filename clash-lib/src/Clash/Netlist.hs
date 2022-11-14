@@ -292,12 +292,12 @@ genComponentT compName0 componentExpr = do
 
       let (compOutps',resUnwrappers') = case compOutps of
             [oport] -> ([(useOf oport,oport,rIM)],resUnwrappers)
-            _       -> let NetDecl n res resTy = case resUnwrappers of
-                             decl:_ -> decl
-                             _ -> error "internal error: insufficient resUnwrappers"
-                       in  (map (\op -> (useOf op,op,Nothing)) compOutps
-                           ,NetDecl' n res resTy Nothing:tail resUnwrappers
-                           )
+            _ -> case resUnwrappers of
+              NetDecl n res resTy:_ ->
+                (map (\op -> (useOf op,op,Nothing)) compOutps
+                ,NetDecl' n res resTy Nothing:tail resUnwrappers
+                )
+              _ -> error "internal error: insufficient resUnwrappers"
           component      = Component compName1 compInps compOutps'
                              (netDecls ++ argWrappers ++ decls ++ resUnwrappers')
       ids <- Lens.use seenIds

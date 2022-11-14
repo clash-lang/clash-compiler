@@ -40,6 +40,8 @@ module Clash.Normalize.PrimitiveReductions where
 
 import qualified Control.Lens                     as Lens
 import           Control.Lens                     ((.=))
+import           Control.Monad.Trans.Class        (lift)
+import           Control.Monad.Trans.Maybe        (MaybeT (..))
 import           Data.Bifunctor                   (second)
 import           Data.List                        (mapAccumR)
 import           Data.List.Extra                  (zipEqual)
@@ -183,18 +185,21 @@ extractHeadTail
   -> (Term, Term)
   -- ^ (head of vector, tail of vector)
 extractHeadTail consCon elTy n vec =
-  ( Case vec elTy [(pat, Var el)]
-  , Case vec restTy [(pat, Var rest)] )
+  case dataConInstArgTys consCon tys of
+    Just [coTy, _elTy, restTy] ->
+      let
+        mTV = mkTyVar typeNatKind (mkUnsafeSystemName "m" 0)
+        co = mkLocalId coTy (mkUnsafeSystemName "_co_" 1)
+        el = mkLocalId elTy (mkUnsafeSystemName "el" 2)
+        rest = mkLocalId restTy (mkUnsafeSystemName "res" 3)
+
+        pat = DataPat consCon [mTV] [co, el, rest]
+      in
+        ( Case vec elTy [(pat, Var el)]
+        , Case vec restTy [(pat, Var rest)] )
+    _ -> error "extractHeadTail: failed to instantiate Cons DC"
  where
   tys = [(LitTy (NumTy n)), elTy, (LitTy (NumTy (n-1)))]
-  Just [coTy, _elTy, restTy] = dataConInstArgTys consCon tys
-
-  mTV = mkTyVar typeNatKind (mkUnsafeSystemName "m" 0)
-  co = mkLocalId coTy (mkUnsafeSystemName "_co_" 1)
-  el = mkLocalId elTy (mkUnsafeSystemName "el" 2)
-  rest = mkLocalId restTy (mkUnsafeSystemName "res" 3)
-
-  pat = DataPat consCon [mTV] [co, el, rest]
 
 -- | Create a vector of supplied elements
 mkVecCons
@@ -212,17 +217,16 @@ mkVecCons
   -> Term
 mkVecCons consCon resTy n h t
   | n <= 0 = error "mkVecCons: n <= 0"
-  | otherwise =
-    mkApps (Data consCon) [ Right (LitTy (NumTy n))
-                          , Right resTy
-                          , Right (LitTy (NumTy (n-1)))
-                          , Left (primCo consCoTy)
-                          , Left h
-                          , Left t ]
-
- where
-  args = dataConInstArgTys consCon [LitTy (NumTy n), resTy, LitTy (NumTy (n-1))]
-  Just (consCoTy : _) = args
+  | otherwise
+  = case dataConInstArgTys consCon [LitTy (NumTy n), resTy, LitTy (NumTy (n-1))] of
+    Just (consCoTy : _) ->
+      mkApps (Data consCon) [ Right (LitTy (NumTy n))
+                            , Right resTy
+                            , Right (LitTy (NumTy (n-1)))
+                            , Left (primCo consCoTy)
+                            , Left h
+                            , Left t ]
+    _ -> error "mkVecCons: failed to instantiate Cons DC"
 
 -- | Create an empty vector
 mkVecNil
@@ -231,13 +235,12 @@ mkVecNil
   -> Type
   -- ^ The element type
   -> Term
-mkVecNil nilCon resTy =
-  mkApps (Data nilCon) [ Right (LitTy (NumTy 0))
-                       , Right resTy
-                       , Left  (primCo nilCoTy) ]
- where
-  args = dataConInstArgTys nilCon [LitTy (NumTy 0), resTy]
-  Just (nilCoTy : _ ) = args
+mkVecNil nilCon resTy = case dataConInstArgTys nilCon [LitTy (NumTy 0), resTy] of
+  Just (nilCoTy : _) ->
+    mkApps (Data nilCon) [ Right (LitTy (NumTy 0))
+                        , Right resTy
+                        , Left  (primCo nilCoTy) ]
+  _ -> error "mkVecNil: failed to instantiate Nil DC"
 
 -- | Replace an application of the @Clash.Sized.Vector.reverse@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
@@ -388,8 +391,10 @@ reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
             (uniqs1,nTv) = mkUniqSystemTyVar (uniqs0,is1) ("n",typeNatKind)
             (uniqs2,(vars,elems)) = second (second concat . unzip)
                                   $ uncurry extractElems uniqs1 consCon argElTy 'I' n arg
-            (Right idxTy:_,_) = splitFunForallTy (inferCoreTypeOf tcm fun)
-            (TyConApp idxTcNm _) = tyView idxTy
+            idxTcNm = Maybe.fromMaybe (error "reduceImap: failed to create Index TC") $ do
+              (Right idxTy:_,_) <- pure (splitFunForallTy (inferCoreTypeOf tcm fun))
+              TyConApp nm _ <- pure (tyView idxTy)
+              return nm
             -- fromInteger# :: KnownNat n => Integer -> Index n
             idxFromIntegerTy = ForAllTy nTv
                                         (foldr mkFunTy
@@ -440,11 +445,12 @@ reduceIterateI (TransformContext is0 ctx) n aTy vTy f0 a = do
   uniqSupply .= uniqs1
 
   let
-    TyConApp vecTcNm _ = tyView vTy
-    Just vecTc = UniqMap.lookup vecTcNm tcm
-    [nilCon, consCon] = tyConDataCons vecTc
     elems = map (App f1) (a:map Var elementIds)
-    vec = mkVec nilCon consCon aTy n (take (fromInteger n) (a:map Var elementIds))
+    vec = Maybe.fromMaybe (error "reduceIterateI: failed to create Vec DCs") $ do
+      TyConApp vecTcNm _ <- pure (tyView vTy)
+      vecTc <- UniqMap.lookup vecTcNm tcm
+      [nilCon, consCon] <- pure (tyConDataCons vecTc)
+      return (mkVec nilCon consCon aTy n (take (fromInteger n) (a:map Var elementIds)))
 
   -- Result:
   --   let
@@ -472,73 +478,75 @@ reduceTraverse
   -> NormalizeSession Term
 reduceTraverse (TransformContext is0 ctx) n aTy fTy bTy dict fun arg = do
     tcm <- Lens.view tcCache
-    let (TyConApp apDictTcNm _) = tyView (inferCoreTypeOf tcm dict)
-        ty = inferCoreTypeOf tcm arg
-    go tcm apDictTcNm ty
+    case tyView (inferCoreTypeOf tcm dict) of
+      TyConApp apDictTcNm _ ->
+        let ty = inferCoreTypeOf tcm arg
+         in go tcm apDictTcNm ty
+      t -> error ("reduceTraverse: expected a TC, but got: " <> show t)
   where
     go tcm apDictTcNm (coreView1 tcm -> Just ty') = go tcm apDictTcNm ty'
     go tcm apDictTcNm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- UniqMap.lookup vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [nilCon,consCon] <- tyConDataCons vecTc
-      = do
-        uniqs0 <- Lens.use uniqSupply
-        fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
-        let is1 = extendInScopeSetList is0 (collectTermIds fun1)
-            (Just apDictTc)    = UniqMap.lookup apDictTcNm tcm
-            [apDictCon]        = tyConDataCons apDictTc
-            (Just apDictIdTys) = dataConInstArgTys apDictCon [fTy]
-            (uniqs1,apDictIds@[functorDictId,pureId,apId,_,_,_]) =
-              mapAccumR mkUniqInternalId (uniqs0,is1)
-                (zipEqual ["functorDict","pure","ap","liftA2","apConstL","apConstR"]
-                     apDictIdTys)
+      = fmap (Maybe.fromMaybe (error "reduceTraverse: failed to build")) $ runMaybeT $ do
+          uniqs0 <- Lens.use uniqSupply
+          fun1 <- lift (constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun)
+          let is1 = extendInScopeSetList is0 (collectTermIds fun1)
+          apDictTc <- hoistMaybe (UniqMap.lookup apDictTcNm tcm)
+          apDictCon <- hoistMaybe (Maybe.listToMaybe (tyConDataCons apDictTc))
+          apDictIdTys <- hoistMaybe (dataConInstArgTys apDictCon [fTy])
+          (uniqs1,apDictIds@[functorDictId,pureId,apId,_,_,_]) <- pure $
+                mapAccumR mkUniqInternalId (uniqs0,is1)
+                  (zipEqual ["functorDict","pure","ap","liftA2","apConstL","apConstR"]
+                      apDictIdTys)
 
-            (TyConApp funcDictTcNm _) = tyView (head apDictIdTys)
-            (Just funcDictTc) = UniqMap.lookup funcDictTcNm tcm
-            [funcDictCon] = tyConDataCons funcDictTc
-            (Just funcDictIdTys) = dataConInstArgTys funcDictCon [fTy]
-            (uniqs2,funcDicIds@[fmapId,_]) =
-              mapAccumR mkUniqInternalId uniqs1
-                (zipEqual ["fmap","fmapConst"] funcDictIdTys)
+          TyConApp funcDictTcNm _ <- pure (tyView (head apDictIdTys))
+          funcDictTc <- hoistMaybe (UniqMap.lookup funcDictTcNm tcm)
+          funcDictCon <- hoistMaybe (Maybe.listToMaybe (tyConDataCons funcDictTc))
+          funcDictIdTys <- hoistMaybe (dataConInstArgTys funcDictCon [fTy])
+          (uniqs2,funcDicIds@[fmapId,_]) <- pure $
+                mapAccumR mkUniqInternalId uniqs1
+                  (zipEqual ["fmap","fmapConst"] funcDictIdTys)
 
-            apPat    = DataPat apDictCon   [] apDictIds
-            fnPat    = DataPat funcDictCon [] funcDicIds
+          let apPat    = DataPat apDictCon   [] apDictIds
+              fnPat    = DataPat funcDictCon [] funcDicIds
 
-            -- Extract the 'pure' function from the Applicative dictionary
-            pureTy = coreTypeOf pureId
-            pureTm = Case dict pureTy [(apPat,Var pureId)]
+              -- Extract the 'pure' function from the Applicative dictionary
+              pureTy = coreTypeOf pureId
+              pureTm = Case dict pureTy [(apPat,Var pureId)]
 
-            -- Extract the '<*>' function from the Applicative dictionary
-            apTy   = coreTypeOf apId
-            apTm   = Case dict apTy [(apPat, Var apId)]
+              -- Extract the '<*>' function from the Applicative dictionary
+              apTy   = coreTypeOf apId
+              apTm   = Case dict apTy [(apPat, Var apId)]
 
-            -- Extract the Functor dictionary from the Applicative dictionary
-            funcTy = coreTypeOf functorDictId
-            funcTm = Case dict funcTy
-                               [(apPat,Var functorDictId)]
+              -- Extract the Functor dictionary from the Applicative dictionary
+              funcTy = coreTypeOf functorDictId
+              funcTm = Case dict funcTy
+                                [(apPat,Var functorDictId)]
 
-            -- Extract the 'fmap' function from the Functor dictionary
-            fmapTy = coreTypeOf fmapId
-            fmapTm = Case (Var functorDictId) fmapTy
-                          [(fnPat, Var fmapId)]
+              -- Extract the 'fmap' function from the Functor dictionary
+              fmapTy = coreTypeOf fmapId
+              fmapTm = Case (Var functorDictId) fmapTy
+                            [(fnPat, Var fmapId)]
 
-            (uniqs3,(vars,elems)) = second (second concat . unzip)
-                                  $ uncurry extractElems uniqs2 consCon aTy 'T' n arg
+              (uniqs3,(vars,elems)) = second (second concat . unzip)
+                                    $ uncurry extractElems uniqs2 consCon aTy 'T' n arg
 
-            funApps = map (fun1 `App`) vars
+              funApps = map (fun1 `App`) vars
 
-            lbody   = mkTravVec vecTcNm nilCon consCon (Var (apDictIds!!1))
-                                                       (Var (apDictIds!!2))
-                                                       (Var (funcDicIds!!0))
-                                                       bTy n funApps
+              lbody   = mkTravVec vecTcNm nilCon consCon (Var (apDictIds!!1))
+                                                        (Var (apDictIds!!2))
+                                                        (Var (funcDicIds!!0))
+                                                        bTy n funApps
 
-            lb      = Letrec ([((apDictIds!!0), funcTm)
-                              ,((apDictIds!!1), pureTm)
-                              ,((apDictIds!!2), apTm)
-                              ,((funcDicIds!!0), fmapTm)
-                              ] ++ init elems) lbody
-        uniqSupply Lens..= uniqs3
-        changed lb
+              lb      = Letrec ([((apDictIds!!0), funcTm)
+                                ,((apDictIds!!1), pureTm)
+                                ,((apDictIds!!2), apTm)
+                                ,((funcDicIds!!0), fmapTm)
+                                ] ++ init elems) lbody
+          uniqSupply Lens..= uniqs3
+          lift (changed lb)
     go _ _ ty = error $ $(curLoc) ++ "reduceTraverse: argument does not have a vector type: " ++ showPpr ty
 
 -- | Create the traversable vector
@@ -711,10 +719,11 @@ reduceDFold is0 n aTy fun start arg = do
             -- TOOD: be used for every other function in this module.
             (uniqs1,(vars,elems)) = second (second concat . unzip)
                                   $ extractElems uniqs0 is1 consCon aTy 'D' n arg
-            (_ltv:Right snTy:_,_) = splitFunForallTy (inferCoreTypeOf tcm fun)
-            (TyConApp snatTcNm _) = tyView snTy
-            (Just snatTc)         = UniqMap.lookup snatTcNm tcm
-            [snatDc]              = tyConDataCons snatTc
+            snatDc = Maybe.fromMaybe (error "reduceDFold: faild to build SNat") $ do
+              (_ltv:Right snTy:_,_) <- pure (splitFunForallTy (inferCoreTypeOf tcm fun))
+              (TyConApp snatTcNm _) <- pure (tyView snTy)
+              snatTc <- UniqMap.lookup snatTcNm tcm
+              Maybe.listToMaybe (tyConDataCons snatTc)
             lbody = doFold (buildSNat snatDc) (n-1) vars
             lb    = Letrec (init elems) lbody
         uniqSupply Lens..= uniqs1
@@ -1040,17 +1049,18 @@ reduceReplace_int is0 n aTy vTy v i newA = do
     -> Term
   replace_intElement tcm iDc iTy oldA elIndex = case0
    where
-    (Just boolTc) = UniqMap.lookup (getKey boolTyConKey) tcm
-    [_,trueDc]    = tyConDataCons boolTc
-    eqInt         = eqIntPrim iTy (mkTyConApp (tyConName boolTc) [])
-    case0         = Case (mkApps eqInt [Left i
-                                       ,Left (mkApps (Data iDc)
-                                             [Left (Literal (IntLiteral elIndex))])
-                                       ])
-                         aTy
-                         [(DefaultPat, oldA)
-                         ,(DataPat trueDc [] [], newA)
-                         ]
+    case0 = Maybe.fromMaybe (error "replace_intElement: faild to build Truce DC") $ do
+      boolTc <- UniqMap.lookup (getKey boolTyConKey) tcm
+      [_,trueDc] <- pure (tyConDataCons boolTc)
+      let eqInt = eqIntPrim iTy (mkTyConApp (tyConName boolTc) [])
+      return (Case (mkApps eqInt [ Left i
+                                 , Left (mkApps (Data iDc)
+                                                [Left (Literal (IntLiteral elIndex))])
+                                 ])
+                   aTy
+                   [ (DefaultPat, oldA)
+                   , (DataPat trueDc [] [], newA)
+                   ])
 
   -- Equality on lifted Int that returns a Bool
   eqIntPrim
@@ -1074,9 +1084,10 @@ reduceReplace_int is0 n aTy vTy v i newA = do
       -- Get data constructors of 'Int'
       uniqs0                   <- Lens.use uniqSupply
       let iTy                   = inferCoreTypeOf tcm i
-          (TyConApp iTcNm _)    = tyView iTy
-          (Just iTc)            = UniqMap.lookup iTcNm tcm
-          [iDc]                 = tyConDataCons iTc
+          iDc = Maybe.fromMaybe (error "replace_intElement: faild to build Int DC") $ do
+            (TyConApp iTcNm _) <- pure (tyView iTy)
+            iTc <- UniqMap.lookup iTcNm tcm
+            Maybe.listToMaybe (tyConDataCons iTc)
 
       -- Get elements from vector
           (uniqs1,(vars,elems)) = second (second concat . unzip)
@@ -1145,17 +1156,18 @@ reduceIndex_int is0 n aTy v i = do
     -> Term
   index_intElement tcm iDc iTy (cur,elIndex) next = case0
    where
-    (Just boolTc) = UniqMap.lookup (getKey boolTyConKey) tcm
-    [_,trueDc]    = tyConDataCons boolTc
-    eqInt         = eqIntPrim iTy (mkTyConApp (tyConName boolTc) [])
-    case0         = Case (mkApps eqInt [Left i
-                                       ,Left (mkApps (Data iDc)
-                                             [Left (Literal (IntLiteral elIndex))])
-                                       ])
-                         aTy
-                         [(DefaultPat, next)
-                         ,(DataPat trueDc [] [], cur)
-                         ]
+    case0 = Maybe.fromMaybe (error "reduceIndex_int: faild to build True DC") $ do
+      boolTc <- UniqMap.lookup (getKey boolTyConKey) tcm
+      [_,trueDc] <- pure (tyConDataCons boolTc)
+      let eqInt = eqIntPrim iTy (mkTyConApp (tyConName boolTc) [])
+      return (Case (mkApps eqInt [ Left i
+                                 , Left (mkApps (Data iDc)
+                                        [Left (Literal (IntLiteral elIndex))])
+                                 ])
+                   aTy
+                   [ (DefaultPat, next)
+                   , (DataPat trueDc [] [], cur)
+                   ])
 
   -- Equality on lifted Int that returns a Bool
   eqIntPrim
@@ -1179,9 +1191,10 @@ reduceIndex_int is0 n aTy v i = do
       -- Get data constructors of 'Int'
       uniqs0                   <- Lens.use uniqSupply
       let iTy                   = inferCoreTypeOf tcm i
-          (TyConApp iTcNm _)    = tyView iTy
-          (Just iTc)            = UniqMap.lookup iTcNm tcm
-          [iDc]                 = tyConDataCons iTc
+          iDc = Maybe.fromMaybe (error "reduceIndex_int: faild to build Int DC") $ do
+              (TyConApp iTcNm _) <- pure (tyView iTy)
+              iTc <- UniqMap.lookup iTcNm tcm
+              Maybe.listToMaybe (tyConDataCons iTc)
 
       -- Get elements from vector
           (uniqs1,(vars,elems)) = second (second concat . unzip)
@@ -1229,12 +1242,13 @@ reduceDTFold inScope n aTy lrFun brFun arg = do
            let (uniqs1,(vars,elems)) = second (second concat . unzip)
                                      $ extractElems uniqs0 inScope consCon aTy
                                          'T' (2^n) arg
-               (_ltv:Right snTy:_,_) = splitFunForallTy (inferCoreTypeOf tcm brFun)
-               (TyConApp snatTcNm _) = tyView snTy
-               (Just snatTc)         = UniqMap.lookup snatTcNm tcm
-               [snatDc]              = tyConDataCons snatTc
+               snatDc = Maybe.fromMaybe (error "reduceDTFold: faild to build SNat") $ do
+                  (_ltv:Right snTy:_,_) <- pure (splitFunForallTy (inferCoreTypeOf tcm brFun))
+                  (TyConApp snatTcNm _) <- pure (tyView snTy)
+                  snatTc <- UniqMap.lookup snatTcNm tcm
+                  Maybe.listToMaybe (tyConDataCons snatTc)
                lbody = doFold (buildSNat snatDc) (n-1) vars
-               lb    = Letrec (init elems) lbody
+               lb = Letrec (init elems) lbody
            uniqSupply Lens..= uniqs1
            changed lb
     go _ ty = error $ $(curLoc) ++ "reduceDTFold: argument does not have a vector type: " ++ showPpr ty
@@ -1275,12 +1289,13 @@ reduceTFold inScope n aTy lrFun brFun arg = do
       , [lrCon,brCon] <- tyConDataCons treeTc
       = do uniqs0 <- Lens.use uniqSupply
            let (uniqs1,(vars,elems)) = extractTElems uniqs0 inScope lrCon brCon aTy 'T' n arg
-               (_ltv:Right snTy:_,_) = splitFunForallTy (inferCoreTypeOf tcm brFun)
-               (TyConApp snatTcNm _) = tyView snTy
-               (Just snatTc)         = UniqMap.lookup snatTcNm tcm
-               [snatDc]              = tyConDataCons snatTc
+               snatDc = Maybe.fromMaybe (error "reduceTFold: faild to build SNat") $ do
+                  (_ltv:Right snTy:_,_) <- pure (splitFunForallTy (inferCoreTypeOf tcm brFun))
+                  (TyConApp snatTcNm _) <- pure (tyView snTy)
+                  snatTc <- UniqMap.lookup snatTcNm tcm
+                  Maybe.listToMaybe (tyConDataCons snatTc)
                lbody = doFold (buildSNat snatDc) (n-1) vars
-               lb    = Letrec elems lbody
+               lb = (Letrec elems lbody)
            uniqSupply Lens..= uniqs1
            changed lb
     go _ ty = error $ $(curLoc) ++ "reduceTFold: argument does not have a tree type: " ++ showPpr ty
