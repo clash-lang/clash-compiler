@@ -473,6 +473,7 @@ undefinedPrims =
   , "GHC.Err.error"
   , "GHC.Err.errorWithoutStackTrace"
   , "GHC.Err.undefined"
+  , "GHC.Prim.Panic.absentError"
   , "GHC.Real.divZeroError"
   , "GHC.Real.overflowError"
   , "GHC.Real.ratioZeroDenominatorError"

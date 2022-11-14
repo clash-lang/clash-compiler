@@ -552,6 +552,14 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
       LitPat  (CharLiteral c) -> return (Just (NumLit . toInteger $ ord c), altExpr)
       LitPat  (Int64Literal i) -> return (Just (NumLit i), altExpr)
       LitPat  (Word64Literal w) -> return (Just (NumLit w), altExpr)
+#if MIN_VERSION_base(4,16,0)
+      LitPat  (Int8Literal i) -> return (Just (NumLit i), altExpr)
+      LitPat  (Int16Literal i) -> return (Just (NumLit i), altExpr)
+      LitPat  (Int32Literal i) -> return (Just (NumLit i), altExpr)
+      LitPat  (Word8Literal w) -> return (Just (NumLit w), altExpr)
+      LitPat  (Word16Literal w) -> return (Just (NumLit w), altExpr)
+      LitPat  (Word32Literal w) -> return (Just (NumLit w), altExpr)
+#endif
       LitPat  (NaturalLiteral n) -> return (Just (NumLit n), altExpr)
       _  -> do
         (_,sp) <- Lens.use curCompNm
@@ -818,6 +826,14 @@ mkExpr _ _ _ (stripTicks -> Core.Literal l) = do
     WordLiteral w    -> return (HW.Literal (Just (Unsigned iw,iw)) $ NumLit w, [])
     Int64Literal i   -> return (HW.Literal (Just (Signed 64,64)) $ NumLit i, [])
     Word64Literal w  -> return (HW.Literal (Just (Unsigned 64,64)) $ NumLit w, [])
+#if MIN_VERSION_ghc(8,8,0)
+    Int8Literal i    -> return (HW.Literal (Just (Signed 8,8)) $ NumLit i, [])
+    Int16Literal i   -> return (HW.Literal (Just (Signed 16,16)) $ NumLit i, [])
+    Int32Literal i   -> return (HW.Literal (Just (Signed 32,32)) $ NumLit i, [])
+    Word8Literal w   -> return (HW.Literal (Just (Unsigned 8,8)) $ NumLit w, [])
+    Word16Literal w  -> return (HW.Literal (Just (Unsigned 16,16)) $ NumLit w, [])
+    Word32Literal w  -> return (HW.Literal (Just (Unsigned 32,32)) $ NumLit w, [])
+#endif
     CharLiteral c    -> return (HW.Literal (Just (Unsigned 21,21)) . NumLit . toInteger $ ord c, [])
     FloatLiteral w   -> return (HW.Literal (Just (BitVector 32,32)) (NumLit $ toInteger w), [])
     DoubleLiteral w  -> return (HW.Literal (Just (BitVector 64,64)) (NumLit $ toInteger w), [])

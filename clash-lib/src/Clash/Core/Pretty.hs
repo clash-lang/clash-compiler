@@ -303,6 +303,7 @@ instance PrettyPrec TyCon where
 instance Pretty LitTy where
   pretty (NumTy i) = pretty i
   pretty (SymTy s) = dquotes $ pretty s
+  pretty (CharTy c) = squotes $ pretty c
 
 instance PrettyPrec LitTy where
   pprPrec _ = return . annotate (AnnSyntax LitS) . pretty
@@ -364,17 +365,19 @@ instance PrettyPrec DataCon where
 
 instance PrettyPrec Literal where
   pprPrec _ l = return $ annotate (AnnSyntax LitS) $ case l of
-    IntegerLiteral i
-      | i < 0          -> parens (pretty i)
-      | otherwise      -> pretty i
-    IntLiteral i
-      | i < 0          -> parens (pretty i <> "#")
-      | otherwise      -> pretty i <> "#"
-    Int64Literal i
-      | i < 0          -> parens (pretty i <> "#")
-      | otherwise      -> pretty i <> "#"
+    IntegerLiteral i   -> parensIf (i < 0) (pretty i)
+    IntLiteral i       -> parensIf (i < 0) (pretty i)
+    Int64Literal i     -> parensIf (i < 0) (pretty i <> "#64")
     WordLiteral w      -> pretty w <> "##"
-    Word64Literal w    -> pretty w <> "##"
+    Word64Literal w    -> pretty w <> "##64"
+#if MIN_VERSION_ghc(8,8,0)
+    Int8Literal i      -> parensIf (i < 0) (pretty i <> "#8")
+    Int16Literal i     -> parensIf (i < 0) (pretty i <> "#16")
+    Int32Literal i     -> parensIf (i < 0) (pretty i <> "#32")
+    Word8Literal w     -> pretty w <> "##8"
+    Word16Literal w    -> pretty w <> "##16"
+    Word32Literal w    -> pretty w <> "##32"
+#endif
     FloatLiteral w     -> pretty (wordToFloat w) <> "#"
     DoubleLiteral w    -> pretty (wordToDouble w) <> "##"
     CharLiteral c      -> pretty c <> "#"

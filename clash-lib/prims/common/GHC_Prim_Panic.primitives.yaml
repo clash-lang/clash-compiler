@@ -1,0 +1,7 @@
+- BlackBox:
+    name: GHC.Prim.Panic.absentError
+    kind: Expression
+    type: 'absentError ::
+      Addr# -> a'
+    template: ~ERRORO
+    workInfo: Constant

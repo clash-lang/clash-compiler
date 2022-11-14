@@ -610,7 +610,11 @@ liftBinding (var@Id {varName = idName} ,e) = do
                                     -- function at this moment for a reason!
                                     -- (termination, CSE and DEC oppertunities,
                                     -- ,etc.)
+#if MIN_VERSION_ghc(9,2,0)
+                                    (Binding newBodyId sp NoUserInlinePrag IsFun newBody r)
+#else
                                     (Binding newBodyId sp NoUserInline IsFun newBody r)
+#endif
              -- Return the new binder
              return (var, newExpr)
     -- If it does, use the existing binder

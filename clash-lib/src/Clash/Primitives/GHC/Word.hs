@@ -5,11 +5,13 @@
 
   Blackbox generation for GHC.Word.WordX# data constructors. (System)Verilog only!
 -}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Primitives.GHC.Word (wordTF) where
 
-import           Clash.Core.Literal           (Literal(WordLiteral))
+import           Clash.Core.Literal           (Literal(..))
 import           Clash.Core.Term              (Term(Literal))
 import           Clash.Core.Type              (Type)
 import           Clash.Primitives.GHC.Literal
@@ -24,6 +26,20 @@ import           Clash.Netlist.BlackBox.Types
 wordTF :: BlackBoxFunction
 wordTF = literalTF "GHC.Word.W" wordTF'
 
+getWordLit
+  :: Literal
+  -> Maybe Integer
+getWordLit =
+  \case
+    WordLiteral i   -> Just i
+#if MIN_VERSION_ghc(8,8,0)
+    Word8Literal i  -> Just i
+    Word16Literal i -> Just i
+    Word32Literal i -> Just i
+#endif
+    Word64Literal i -> Just i
+    _               -> Nothing
+
 wordTF'
   :: Bool
   -- ^ Is declaration
@@ -32,12 +48,12 @@ wordTF'
   -> Int
   -- ^ Word size
   -> (BlackBoxMeta, BlackBox)
-wordTF' False [Left (Literal (WordLiteral n))] wordSize =
+wordTF' False [Left (Literal (getWordLit -> Just n))] wordSize =
   -- Literal as expression:
   ( emptyBlackBoxMeta
   , BBTemplate [unsignedLiteral wordSize n])
 
-wordTF' True [Left (Literal (WordLiteral n))] wordSize =
+wordTF' True [Left (Literal (getWordLit -> Just n))] wordSize =
   -- Literal as declaration:
   ( emptyBlackBoxMeta
   , BBTemplate (assign Result [unsignedLiteral wordSize n]))

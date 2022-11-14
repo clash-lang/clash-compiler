@@ -27,7 +27,13 @@ import Data.Text.Lazy (pack)
 import System.IO (hPutStrLn, stderr)
 import Text.Trifecta.Result (Result(Success))
 
-#if MIN_VERSION_ghc(9,0,0)
+#if MIN_VERSION_ghc(9,2,0)
+import GHC.Utils.Error (mkPlainWarnMsg, pprLocMsgEnvelope)
+import GHC.Utils.Outputable
+  (blankLine, empty, int, integer, showSDocUnsafe, text, ($$), ($+$), (<+>))
+import qualified GHC.Utils.Outputable as Outputable
+import GHC.Types.SrcLoc (isGoodSrcSpan)
+#elif MIN_VERSION_ghc(9,0,0)
 import GHC.Driver.Session (unsafeGlobalDynFlags)
 import GHC.Utils.Error (mkPlainWarnMsg, pprLocErrMsg)
 import GHC.Utils.Outputable
@@ -77,9 +83,15 @@ toIntegerBB hdl hty _isD _primName args _ty = do
         let srcInfo1 | isGoodSrcSpan sp = srcInfo
                      | otherwise        = empty
 
+#if MIN_VERSION_ghc(9,2,0)
+            warnMsg1 = mkPlainWarnMsg sp (warnMsg i1 iw $+$ blankLine $+$ srcInfo1)
+            warnMsg2 = pprLocMsgEnvelope warnMsg1
+#else
             warnMsg1 = mkPlainWarnMsg unsafeGlobalDynFlags sp (warnMsg i1 iw $+$ blankLine $+$ srcInfo1)
+            warnMsg2 = pprLocErrMsg warnMsg1
+#endif
 
-        liftIO (hPutStrLn stderr (showSDocUnsafe (pprLocErrMsg warnMsg1)))
+        liftIO (hPutStrLn stderr (showSDocUnsafe warnMsg2))
     _ -> return ()
   return ((meta,) <$> bb)
  where

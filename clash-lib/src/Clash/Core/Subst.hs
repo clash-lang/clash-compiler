@@ -968,10 +968,6 @@ acmpTerm' inScope = go (mkRnEnv inScope)
     Case {}    -> 11
     Tick {}    -> 12
 
-thenCompare :: Ordering -> Ordering -> Ordering
-thenCompare EQ rel = rel
-thenCompare rel _  = rel
-
 -- | Structural equality on 'Term'
 eqTerm :: Term -> Term -> Bool
 eqTerm = go
@@ -1040,5 +1036,3 @@ instance TypeError (
 
 instance Ord Term where
   compare = acmpTerm
-
-deriving instance Ord TickInfo

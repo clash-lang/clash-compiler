@@ -273,7 +273,8 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- WHNF of subject is _|_, in the form of `absentError`: that means that
       -- the entire case-expression is evaluates to _|_
       (Prim pInfo,_:msgOrCallStack:_,ticks)
-        | primName pInfo == "Control.Exception.Base.absentError" ->
+        | primName pInfo `elem` ["Control.Exception.Base.absentError"
+                                ,"GHC.Prim.Panic.absentError"] ->
         let e1 = mkApps (mkTicks (Prim pInfo) ticks)
                         [Right ty,msgOrCallStack]
         in  changed e1

@@ -302,6 +302,20 @@ mkArgument bbName bndr nArg e = do
           return ((N.Literal (Just (Signed 64,64)) (N.NumLit i),hwTy,True),[])
         (C.Literal (Word64Literal i), [],_) ->
           return ((N.Literal (Just (Unsigned 64,64)) (N.NumLit i),hwTy,True),[])
+#if MIN_VERSION_base(4,16,0)
+        (C.Literal (Int8Literal i), [],_) ->
+          return ((N.Literal (Just (Signed 8,8)) (N.NumLit i),hwTy,True),[])
+        (C.Literal (Int16Literal i), [],_) ->
+          return ((N.Literal (Just (Signed 16,16)) (N.NumLit i),hwTy,True),[])
+        (C.Literal (Int32Literal i), [],_) ->
+          return ((N.Literal (Just (Signed 16,16)) (N.NumLit i),hwTy,True),[])
+        (C.Literal (Word8Literal i), [],_) ->
+          return ((N.Literal (Just (Unsigned 8,8)) (N.NumLit i),hwTy,True),[])
+        (C.Literal (Word16Literal i), [],_) ->
+          return ((N.Literal (Just (Unsigned 16,16)) (N.NumLit i),hwTy,True),[])
+        (C.Literal (Word32Literal i), [],_) ->
+          return ((N.Literal (Just (Unsigned 32,32)) (N.NumLit i),hwTy,True),[])
+#endif
         (C.Literal (NaturalLiteral n), [],_) ->
           return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit n),hwTy,True),[])
         (Prim pinfo,args,ticks) -> withTicks ticks $ \tickDecls -> do

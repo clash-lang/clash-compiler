@@ -9,6 +9,7 @@
   Term Literal
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -50,6 +51,14 @@ data Literal
   | WordLiteral     !Integer
   | Int64Literal    !Integer
   | Word64Literal   !Integer
+#if MIN_VERSION_ghc(8,8,0)
+  | Int8Literal     !Integer
+  | Int16Literal    !Integer
+  | Int32Literal    !Integer
+  | Word8Literal    !Integer
+  | Word16Literal   !Integer
+  | Word32Literal   !Integer
+#endif
   | StringLiteral   !String
   | FloatLiteral    !Word32
   | DoubleLiteral   !Word64

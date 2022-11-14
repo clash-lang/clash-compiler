@@ -335,6 +335,10 @@ unwantedLanguageExtensions =
   , LangExt.StrictData
   ]
 
+thenCompare :: Ordering -> Ordering -> Ordering
+thenCompare EQ rel = rel
+thenCompare rel _  = rel
+
 #if !MIN_VERSION_transformers(0,6,0)
 hoistMaybe :: (Applicative m) => Maybe b -> MaybeT m b
 hoistMaybe = MaybeT . pure
