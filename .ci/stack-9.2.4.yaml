@@ -1,0 +1,17 @@
+resolver: nightly-2022-11-12
+
+ghc-options:
+  "$locals": -Wall -Wcompat
+
+packages:
+- clash-prelude
+- clash-prelude-hedgehog
+- clash-lib
+- clash-lib-hedgehog
+- clash-ghc
+- clash-cores
+- tests
+
+extra-deps:
+- concurrent-supply-0.1.8@sha256:9373f4868ad28936a7b93781b214ef4afdeacf377ef4ac729583073491c9f9fb,1627
+- hashable-1.3.5.0@sha256:3a2beeafb220f9de706568a7e4a5b3c762cc4c9f25c94d7ef795b8c2d6a691d7,4240
