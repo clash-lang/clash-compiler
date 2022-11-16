@@ -132,14 +132,14 @@ parseOctStr size oct = do
 
   let go acc (i, x) =
         case x of
-          '0' -> pure (replaceSlice [0, 0, 0] i acc)
-          '1' -> pure (replaceSlice [0, 0, 1] i acc)
-          '2' -> pure (replaceSlice [0, 1, 0] i acc)
-          '3' -> pure (replaceSlice [0, 1, 1] i acc)
-          '4' -> pure (replaceSlice [1, 0, 0] i acc)
-          '5' -> pure (replaceSlice [1, 0, 1] i acc)
-          '6' -> pure (replaceSlice [1, 1, 0] i acc)
-          '7' -> pure (replaceSlice [1, 1, 1] i acc)
+          '0' -> pure (replaceSlice (0, 0, 0) i acc)
+          '1' -> pure (replaceSlice (0, 0, 1) i acc)
+          '2' -> pure (replaceSlice (0, 1, 0) i acc)
+          '3' -> pure (replaceSlice (0, 1, 1) i acc)
+          '4' -> pure (replaceSlice (1, 0, 0) i acc)
+          '5' -> pure (replaceSlice (1, 0, 1) i acc)
+          '6' -> pure (replaceSlice (1, 1, 0) i acc)
+          '7' -> pure (replaceSlice (1, 1, 1) i acc)
           'x' -> pure acc
           'X' -> Sim.throw (ImpreciseBitString OctStrFmt str parse callStack)
           'z' -> pure acc
@@ -151,7 +151,7 @@ parseOctStr size oct = do
 
   parse str
  where
-   replaceSlice ~[x, y, z] i
+   replaceSlice ~(x, y, z) i
      | i == size - 1
      = replaceBit i z
 
@@ -195,22 +195,22 @@ parseHexStr size hex = do
 
   let go acc (i, x) =
         case toLower x of
-          '0' -> pure (replaceSlice [0, 0, 0, 0] i acc)
-          '1' -> pure (replaceSlice [0, 0, 0, 1] i acc)
-          '2' -> pure (replaceSlice [0, 0, 1, 0] i acc)
-          '3' -> pure (replaceSlice [0, 0, 1, 1] i acc)
-          '4' -> pure (replaceSlice [0, 1, 0, 0] i acc)
-          '5' -> pure (replaceSlice [0, 1, 0, 1] i acc)
-          '6' -> pure (replaceSlice [0, 1, 1, 0] i acc)
-          '7' -> pure (replaceSlice [0, 1, 1, 1] i acc)
-          '8' -> pure (replaceSlice [1, 0, 0, 0] i acc)
-          '9' -> pure (replaceSlice [1, 0, 0, 1] i acc)
-          'a' -> pure (replaceSlice [1, 0, 1, 0] i acc)
-          'b' -> pure (replaceSlice [1, 0, 1, 1] i acc)
-          'c' -> pure (replaceSlice [1, 1, 0, 0] i acc)
-          'd' -> pure (replaceSlice [1, 1, 0, 1] i acc)
-          'e' -> pure (replaceSlice [1, 1, 1, 0] i acc)
-          'f' -> pure (replaceSlice [1, 1, 1, 1] i acc)
+          '0' -> pure (replaceSlice (0, 0, 0, 0) i acc)
+          '1' -> pure (replaceSlice (0, 0, 0, 1) i acc)
+          '2' -> pure (replaceSlice (0, 0, 1, 0) i acc)
+          '3' -> pure (replaceSlice (0, 0, 1, 1) i acc)
+          '4' -> pure (replaceSlice (0, 1, 0, 0) i acc)
+          '5' -> pure (replaceSlice (0, 1, 0, 1) i acc)
+          '6' -> pure (replaceSlice (0, 1, 1, 0) i acc)
+          '7' -> pure (replaceSlice (0, 1, 1, 1) i acc)
+          '8' -> pure (replaceSlice (1, 0, 0, 0) i acc)
+          '9' -> pure (replaceSlice (1, 0, 0, 1) i acc)
+          'a' -> pure (replaceSlice (1, 0, 1, 0) i acc)
+          'b' -> pure (replaceSlice (1, 0, 1, 1) i acc)
+          'c' -> pure (replaceSlice (1, 1, 0, 0) i acc)
+          'd' -> pure (replaceSlice (1, 1, 0, 1) i acc)
+          'e' -> pure (replaceSlice (1, 1, 1, 0) i acc)
+          'f' -> pure (replaceSlice (1, 1, 1, 1) i acc)
 
           'x' | x == 'X'  -> Sim.throw (ImpreciseBitString HexStrFmt str parse callStack)
               | otherwise -> pure acc
@@ -225,7 +225,7 @@ parseHexStr size hex = do
 
   parse str
  where
-  replaceSlice ~[w, x, y, z] i
+  replaceSlice ~(w, x, y, z) i
     | i == size - 1
     = replaceBit i z
 
