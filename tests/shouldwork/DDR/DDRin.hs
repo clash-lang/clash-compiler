@@ -1,10 +1,10 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 module DDRin where
 
 import Clash.Explicit.Prelude
 import Clash.Explicit.DDR
 import Clash.Explicit.Testbench
-import Clash.Intel.DDR
-import Clash.Xilinx.DDR
 
 --createDomain vSystem{vName="AsyncReal", vPeriod=2000, vResetKind=Asynchronous}  -- real clock domain (same as TB)
 createDomain vSystem{vName="AsyncDDR", vPeriod=1000, vResetKind=Asynchronous}  -- fake ddr domain
@@ -40,6 +40,8 @@ topEntityUA
   -> Signal AsyncDDR (BitVector 8)
   -> Signal AsyncReal (BitVector 8, BitVector 8)
 topEntityUA clk rst = topEntityGeneric clk rst enableGen
+{-# NOINLINE topEntityUA #-}
+{-# ANN topEntityUA (defSyn "topEntityUA") #-}
 
 topEntityUS
   :: Clock SyncReal
@@ -47,6 +49,9 @@ topEntityUS
   -> Signal SyncDDR (BitVector 8)
   -> Signal SyncReal (BitVector 8, BitVector 8)
 topEntityUS clk rst = topEntityGeneric clk rst enableGen
+{-# NOINLINE topEntityUS #-}
+{-# ANN topEntityUS (defSyn "topEntityUS") #-}
+
 
 topEntityGA
   :: Clock AsyncReal
@@ -54,6 +59,9 @@ topEntityGA
   -> Signal AsyncDDR (BitVector 8)
   -> Signal AsyncReal (BitVector 8, BitVector 8)
 topEntityGA clk rst = topEntityGeneric clk rst tbEnableGen
+{-# NOINLINE topEntityGA #-}
+{-# ANN topEntityGA (defSyn "topEntityGA") #-}
+
 
 topEntityGS
   :: Clock SyncReal
@@ -61,12 +69,17 @@ topEntityGS
   -> Signal SyncDDR (BitVector 8)
   -> Signal SyncReal (BitVector 8, BitVector 8)
 topEntityGS clk rst = topEntityGeneric clk rst tbEnableGen
+{-# NOINLINE topEntityGS #-}
+{-# ANN topEntityGS (defSyn "topEntityGS") #-}
 
 
-testinput = $(listToVecTH [1..17::BitVector 8])
+testinput :: Vec 17 (BitVector 8)
+testinput = $(listToVecTH [1..17 :: BitVector 8])
 
+dummy :: BitVector 8
 dummy = 0
 
+testoutput :: Vec 9 (BitVector 8, BitVector 8)
 testoutput = (dummy,dummy):>(dummy,2):>(3,4):>(5,6):>(7,8):>(9,10):>(11,12):>(13,14):>((15,16)::(BitVector 8,BitVector 8)) :> Nil
 
 
@@ -87,6 +100,8 @@ testBenchUS = done
     rstTest        = resetGen @TB
     rstDDR         = resetGen @SyncDDR
     rstReal        = resetGen @SyncReal
+{-# NOINLINE testBenchUS #-}
+{-# ANN testBenchUS (TestBench 'topEntityUS) #-}
 
 testBenchUA :: Signal TB Bool
 testBenchUA = done
@@ -101,6 +116,8 @@ testBenchUA = done
     clkReal        = tbClockGen @AsyncReal notDone
     rstDDR         = resetGen @AsyncDDR
     rstReal        = resetGen @AsyncReal
+{-# NOINLINE testBenchUA #-}
+{-# ANN testBenchUA (TestBench 'topEntityUA) #-}
 
 testBenchGS :: Signal TB Bool
 testBenchGS = done
@@ -118,6 +135,8 @@ testBenchGS = done
     rstTest        = resetGen @TB
     rstDDR         = resetGen @SyncDDR
     rstReal        = resetGen @SyncReal
+{-# NOINLINE testBenchGS #-}
+{-# ANN testBenchGS (TestBench 'topEntityGS) #-}
 
 testBenchGA :: Signal TB Bool
 testBenchGA = done
@@ -132,3 +151,5 @@ testBenchGA = done
     clkReal        = tbClockGen @AsyncReal notDone
     rstDDR         = resetGen @AsyncDDR
     rstReal        = resetGen @AsyncReal
+{-# NOINLINE testBenchGA #-}
+{-# ANN testBenchGA (TestBench 'topEntityGA) #-}

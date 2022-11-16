@@ -466,29 +466,22 @@ runClashTest = defaultMain $ clashTestRoot
                                                         ]
                            }
             in runTest "Floating" _opts
-          ]
-        ]
-      , clashTestGroup "Cores"
-        [ clashTestGroup "Xilinx"
-          [ runTest "DcFifo0" def{
-              hdlTargets=[VHDL, Verilog]
-            , hdlLoad=[]
-            , hdlSim=[Vivado]}
-          , runTest "DcFifo1" def{
-              hdlTargets=[VHDL, Verilog]
-            , hdlLoad=[]
-            , hdlSim=[Vivado]}
-          , runTest "DcFifo2" def{
-              hdlTargets=[VHDL, Verilog]
-            , hdlLoad=[]
-            , hdlSim=[Vivado]}
-          , clashTestGroup "DcFifo" [
-              let _opts =
+          , clashTestGroup "DcFifo"
+            [ let _opts =
                     def{ hdlTargets=[VHDL, Verilog]
                        , hdlLoad=[]
                        , hdlSim=[Vivado]
                        }
               in runTest "Basic" _opts
+            , let _opts = def{ hdlTargets=[VHDL, Verilog]
+                             , hdlLoad=[]
+                             , hdlSim=[Vivado]
+                             , buildTargets=BuildSpecific [ "testBench_17_2"
+                                                          , "testBench_2_17"
+                                                          , "testBench_2_2"
+                                                          ]
+                             }
+              in runTest "Lfsr" _opts
             ]
           ]
         ]
@@ -533,14 +526,18 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T694" def{hdlSim=[],hdlTargets=[VHDL]}
         ]
       , clashTestGroup "DDR"
-        [ runTest "DDRinGA" def
-        , runTest "DDRinGS" def
-        , runTest "DDRinUA" def
-        , runTest "DDRinUS" def
-        , runTest "DDRoutUA" def
-        , runTest "DDRoutUS" def
-        , runTest "DDRoutGA" def
-        , runTest "DDRoutGS" def
+        [ let _opts = def{ buildTargets = BuildSpecific [ "testBenchGA"
+                                                        , "testBenchGS"
+                                                        , "testBenchUA"
+                                                        , "testBenchUS"
+                                                        ]}
+          in runTest "DDRin" _opts
+        , let _opts = def{ buildTargets = BuildSpecific [ "testBenchUA"
+                                                        , "testBenchUS"
+                                                        , "testBenchGA"
+                                                        , "testBenchGS"
+                                                        ]}
+          in runTest "DDRout" _opts
         ]
       , clashTestGroup "DSignal"
         [ runTest "DelayedFold" def
@@ -770,8 +767,9 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Ram" def
         , clashTestGroup "Ram"
           [ runTest "RMultiTop" def
-          , runTest "RWMulti35" def
-          , runTest "RWMulti53" def
+          , let _opts = def{ buildTargets=BuildSpecific [ "testBench35"
+                                                        , "testBench53"]}
+            in runTest "RWMultiTop" _opts
           ]
         , runTest "ResetGen" def
         ,
@@ -784,16 +782,13 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "BlockRamTest" def{hdlSim=[]}
         , runTest "Compression" def
         , runTest "DelayedReset" def
-        , let _opts = def { -- vivado segfaults
-                            hdlLoad = hdlLoad def \\ [Verilator, Vivado]
-                          , hdlSim = hdlSim def \\ [Verilator, Vivado]
-                          }
-          in runTest "DualBlockRam0" _opts
-        , let _opts = def { -- vivado segfaults
-                            hdlLoad = hdlLoad def \\ [Verilator, Vivado]
-                          , hdlSim = hdlSim def \\ [Verilator, Vivado]
-                          }
-          in runTest "DualBlockRam1" _opts
+        , let _opts = def{ -- Vivado segfaults
+                           hdlLoad=hdlLoad def \\ [Verilator, Vivado]
+                         , hdlSim=hdlSim def \\ [Verilator, Vivado]
+                         , buildTargets=BuildSpecific [ "testBenchAB"
+                                                      , "testBenchBC"]
+                         }
+          in runTest "DualBlockRam" _opts
         , let _opts = def { buildTargets=BuildSpecific ["example"]
                           , hdlSim=[]
                           }
@@ -808,8 +803,9 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "RegisterSR" def
         , runTest "RegisterAE" def
         , runTest "RegisterSE" def
-        , runTest "ResetSynchronizer" def
-        , runTest "ResetSynchronizerSync" def
+        , let _opts = def{ buildTargets=BuildSpecific [ "testBenchAsync"
+                                                      , "testBenchSync"]}
+          in runTest "ResetSynchronizer" _opts
         , runTest "ResetLow" def
         , runTest "Rom" def
         , runTest "RomNegative" def
