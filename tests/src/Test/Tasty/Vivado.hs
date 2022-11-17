@@ -78,8 +78,8 @@ genSimTcl ::
 genSimTcl dir top = do
   connector <- tclConnector
   manifests <- getManifests (dir </> "*" </> manifestFilename)
-  let [(dropFileName -> topEntityDir, _)] =
-        filter ((== top) . topComponent . snd) manifests
+  let (dropFileName -> topEntityDir, _) =
+        head (filter ((== top) . topComponent . snd) manifests)
   pure [__i|
     set_msg_config -severity {CRITICAL WARNING} -new_severity ERROR
     source -notrace {#{connector}}
