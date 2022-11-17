@@ -407,22 +407,22 @@ vhdlComparePrim primName tclTFName funcName = InlineYamlPrimitive [VHDL] [__i|
         templateFunction: #{tclTFName}
   |]
  where
-  (  _knownDomain
-   : _knownNat
-   : _hasCallStack
-   : clock
-   : enable
-   : x
-   : y
-   : _
-   ) = [(0 :: Int)..]
+  clock, enable, x, y :: Int
+  (  _knownDomain :: Int
+   , _knownNat :: Int
+   , _hasCallStack :: Int
+   , clock
+   , enable
+   , x
+   , y
+   ) = (0,1,2,3,4,5,6)
 
+  blockSym, compSym, clkEnStdSym, ipResultSym :: Int
   (  blockSym
-   : compSym
-   : clkEnStdSym
-   : ipResultSym
-   : _
-   ) = [(0 :: Int)..]
+   , compSym
+   , clkEnStdSym
+   , ipResultSym
+   ) = (0,1,2,3)
 
 -- | The InlinePrimitive annotation for Xilinx's compare floating point
 -- primitive, in Verilog.
@@ -456,16 +456,14 @@ veriComparePrim primName tclTFName funcName =
         templateFunction: #{tclTFName}
     |]
  where
-  (  _knownDomain
-   : _knownNat
-   : _hasCallStack
-   : clock
-   : enable
-   : x
-   : y
-   : _
-   ) = [(0 :: Int)..]
+  clock, enable, x, y :: Int
+  (  _knownDomain :: Int
+   , _knownNat :: Int
+   , _hasCallStack :: Int
+   , clock
+   , enable
+   , x
+   , y
+   ) = (0,1,2,3,4,5,6)
 
-  (  compSym
-   : _
-   ) = [(0 :: Int)..]
+  compSym = 0 :: Int

@@ -77,7 +77,7 @@ testMasterMultiSlave divHalf wait mVal sVal mode latch duration =
 
   masterIn = masterLawfulSignal clk rst [mVal] masterAck bp
 
-  (ss2 :> ss1 :> ss0 :> Nil) = slaveAddressRotate @3 clk rst (ss,bp)
+  (ss2 `Cons` ss1 `Cons` ss0 `Cons` _) = slaveAddressRotate @3 clk rst (ss,bp)
 
   (sclk, mosi, ss, bp, masterAck, masterOut) =
     withClockResetEnable clk rst enableGen

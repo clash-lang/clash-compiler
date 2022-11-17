@@ -51,7 +51,19 @@ sbioTemplate
   :: Backend s
   => BlackBoxContext
   -> State s Doc
-sbioTemplate bbCtx = do
+sbioTemplate bbCtx
+  | [ _HasCallStack
+    , (clk, clkTy, _)
+    , (en, _enTy, _)
+    , (pinConfig, _pinTy, pinConfigLiteral -> ())
+    , (packagePin, packagePinTy, _)
+    , (latchInput, Bit, _)
+    , (dOut0, Bit, _)
+    , (dOut1, Bit, _)
+    , (outputEnable, Bool, _)
+    ] <- bbInputs bbCtx
+  , [(Identifier result Nothing,resTy)] <- bbResults bbCtx
+  = do
   let compName = Id.unsafeMake "SB_IO"  -- Hardcoded for now
 
   sbio <- Id.makeBasic "sbio"
@@ -93,16 +105,5 @@ sbioTemplate bbCtx = do
       ])
     , Assignment result Cont resultTuple
     ]
- where
-  [ _HasCallStack
-   , (clk, clkTy, _)
-   , (en, _enTy, _)
-   , (pinConfig, _pinTy, pinConfigLiteral -> ())
-   , (packagePin, packagePinTy, _)
-   , (latchInput, Bit, _)
-   , (dOut0, Bit, _)
-   , (dOut1, Bit, _)
-   , (outputEnable, Bool, _)
-   ] = bbInputs bbCtx
 
-  [(Identifier result Nothing,resTy)] = bbResults bbCtx
+sbioTemplate bbCtx = error ("iCE40.sbio, bad bbCtx: " <> show bbCtx)

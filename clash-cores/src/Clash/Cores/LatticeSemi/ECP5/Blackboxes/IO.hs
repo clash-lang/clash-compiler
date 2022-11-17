@@ -34,7 +34,18 @@ bbTemplate
   :: Backend s
   => BlackBoxContext
   -> State s Doc
-bbTemplate bbCtx = do
+bbTemplate bbCtx
+  | [  _HasCallStack
+    , _HasBiSignalDefault
+    , _KnownDomain
+    , (intrinsicName, String, _)
+    , (packagePin, packagePinTy, _)
+    , (dOut, Bit, _)
+    , (outputEnable, Bool, _)
+    ] <- bbInputs bbCtx
+  , Just compName' <- exprToString intrinsicName
+  , [(Identifier result Nothing,_)] <- bbResults bbCtx
+  = do
   bb      <- Id.makeBasic "bb"
   bb_inst <- Id.makeBasic "bb_inst"
   dIn     <- Id.makeBasic "dIn"
@@ -57,16 +68,6 @@ bbTemplate bbCtx = do
     , Assignment result Cont (Identifier dIn Nothing)
     ]
  where
-  [  _HasCallStack
-   , _HasBiSignalDefault
-   , _KnownDomain
-   , (intrinsicName, String, _)
-   , (packagePin, packagePinTy, _)
-   , (dOut, Bit, _)
-   , (outputEnable, Bool, _)
-   ] = bbInputs bbCtx
-
-  Just compName' = exprToString intrinsicName
   instPort pn = Identifier (Id.unsafeMake pn) Nothing
 
-  [(Identifier result Nothing,_)] = bbResults bbCtx
+bbTemplate bbCtx = error ("ECP5.bidirectionalBuffer, bad bbCtx: " <> show bbCtx)

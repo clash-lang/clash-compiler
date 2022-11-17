@@ -93,17 +93,19 @@ tclTemplate
   -> String
   -> BlackBoxContext
   -> State s Doc
-tclTemplate (HasCustom {..}) operType bbCtx = pure bbText
- where
+tclTemplate (HasCustom {..}) operType bbCtx
+  | (Literal _ (NumLit latency), _, _) <- bbInputs bbCtx !! 1
+  , (DataCon _ _ cfgExprs, _, _) <- bbInputs bbCtx !! 3
+  , let cfgArchOptExpr = cfgExprs !! 0
+  , DataCon _ (DC (Sum _ cfgArchOptConstrs, cfgArchOptTag)) _ <- cfgArchOptExpr
+  , let cfgDspUsageExpr = cfgExprs !! 1
+  , DataCon _ (DC (Sum _ cfgDspUsageConstrs, cfgDspUsageTag)) _ <- cfgDspUsageExpr
+  , let cfgBMemUsageExpr = cfgExprs !! 2
+  , DataCon _ (DC (Sum _ cfgBMemUsageConstrs, cfgBMemUsageTag)) _ <- cfgBMemUsageExpr
+  =
+ let
   compName = bbQsysIncName bbCtx !! 0
 
-  (Literal _ (NumLit latency), _, _) = bbInputs bbCtx !! 1
-  (DataCon _ _ cfgExprs, _, _) = bbInputs bbCtx !! 3
-  cfgArchOptExpr = cfgExprs !! 0
-  cfgDspUsageExpr = cfgExprs !! 1
-  cfgBMemUsageExpr = cfgExprs !! 2
-
-  DataCon _ (DC (Sum _ cfgArchOptConstrs, cfgArchOptTag)) _ = cfgArchOptExpr
   cfgArchOpt = cfgArchOptConstrs !! cfgArchOptTag
   tclArchOpt :: String
   tclArchOpt
@@ -111,7 +113,6 @@ tclTemplate (HasCustom {..}) operType bbCtx = pure bbText
     | cfgArchOpt == show0 'LatencyArch = "Low_Latency"
     | otherwise = error "Unknown ArchOpt constructor"
 
-  DataCon _ (DC (Sum _ cfgDspUsageConstrs, cfgDspUsageTag)) _ = cfgDspUsageExpr
   cfgDspUsage = cfgDspUsageConstrs !! cfgDspUsageTag
   tclDspUsage :: String
   tclDspUsage
@@ -121,7 +122,6 @@ tclTemplate (HasCustom {..}) operType bbCtx = pure bbText
     | cfgDspUsage == show0 'MaxDspUsage = "Max_Usage"
     | otherwise = error "Unknown FloatingDspUsage constructor"
 
-  DataCon _ (DC (Sum _ cfgBMemUsageConstrs, cfgBMemUsageTag)) _ = cfgBMemUsageExpr
   cfgBMemUsage = cfgBMemUsageConstrs !! cfgBMemUsageTag
   tclBMemUsage :: String
   tclBMemUsage
@@ -166,6 +166,10 @@ tclTemplate (HasCustom {..}) operType bbCtx = pure bbText
     return
   }
 }|]
+ in
+  pure bbText
+
+tclTemplate _ _ bbCtx = error ("Xilinx.Floating.tclTemplate, bad bbCtx: " <> show bbCtx)
 
 fromUTclTF :: TemplateFunction
 fromUTclTF = TemplateFunction used valid fromUTclTemplate
@@ -177,16 +181,17 @@ fromUTclTemplate
   :: Backend s
   => BlackBoxContext
   -> State s Doc
-fromUTclTemplate bbCtx = pure bbText
- where
-  [compName] = bbQsysIncName bbCtx
-  (Literal _ (NumLit latency), _, _) = bbInputs bbCtx !! 1
+fromUTclTemplate bbCtx
+  | [compName] <- bbQsysIncName bbCtx
+  , (Literal _ (NumLit latency), _, _) <- bbInputs bbCtx !! 1
+  , (_, Unsigned inpLen, _) <- bbInputs bbCtx !! 5
+  =
+ let
   tclClkEn :: String
   tclClkEn =
     case bbInputs bbCtx !! 4 of
       (DataCon _ _ [Literal Nothing (BoolLit True)], _, _) -> "false"
       _                                                    -> "true"
-  (_, Unsigned inpLen, _) = bbInputs bbCtx !! 5
 
   bbText = [__i|
     namespace eval $tclIface {
@@ -213,6 +218,10 @@ fromUTclTemplate bbCtx = pure bbText
         return
       }
     }|]
+ in
+  pure bbText
+
+fromUTclTemplate bbCtx = error ("Xilinx.Floating.fromUTclTemplate, bad bbCtx: " <> show bbCtx)
 
 fromSTclTF :: TemplateFunction
 fromSTclTF = TemplateFunction used valid fromSTclTemplate
@@ -224,16 +233,17 @@ fromSTclTemplate
   :: Backend s
   => BlackBoxContext
   -> State s Doc
-fromSTclTemplate bbCtx = pure bbText
- where
-  [compName] = bbQsysIncName bbCtx
-  (Literal _ (NumLit latency), _, _) = bbInputs bbCtx !! 1
+fromSTclTemplate bbCtx
+  | [compName] <- bbQsysIncName bbCtx
+  , (Literal _ (NumLit latency), _, _) <- bbInputs bbCtx !! 1
+  , (_, Signed inpLen, _) <- bbInputs bbCtx !! 5
+  =
+ let
   tclClkEn :: String
   tclClkEn =
     case bbInputs bbCtx !! 4 of
       (DataCon _ _ [Literal Nothing (BoolLit True)], _, _) -> "false"
       _                                                    -> "true"
-  (_, Signed inpLen, _) = bbInputs bbCtx !! 5
 
   bbText = [__i|
     namespace eval $tclIface {
@@ -260,6 +270,10 @@ fromSTclTemplate bbCtx = pure bbText
         return
       }
     }|]
+ in
+  pure bbText
+
+fromSTclTemplate bbCtx = error ("Xilinx.Floating.fromSTclTemplate, bad bbCtx: " <> show bbCtx)
 
 compareTclTF :: TemplateFunction
 compareTclTF = TemplateFunction used valid compareTclTemplate
@@ -271,10 +285,11 @@ compareTclTemplate
   :: Backend s
   => BlackBoxContext
   -> State s Doc
-compareTclTemplate bbCtx = pure bbText
- where
-  [compName] = bbQsysIncName bbCtx
-  (Literal _ (NumLit latency), _, _) = bbInputs bbCtx !! 1
+compareTclTemplate bbCtx
+  | [compName] <- bbQsysIncName bbCtx
+  , (Literal _ (NumLit latency), _, _) <- bbInputs bbCtx !! 1
+  =
+ let
   tclClkEn :: String
   tclClkEn =
     case bbInputs bbCtx !! 4 of
@@ -311,7 +326,10 @@ compareTclTemplate bbCtx = pure bbText
         return
       }
     }|]
+ in
+  pure bbText
 
+compareTclTemplate bbCtx = error ("Xilinx.Floating.compareTclTemplate, bad bbCtx: " <> show bbCtx)
 
 show0 :: (Show a, IsString s) => a -> s
 show0 = fromString . show
