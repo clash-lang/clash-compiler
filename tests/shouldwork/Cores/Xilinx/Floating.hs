@@ -23,7 +23,8 @@ import Floating.Annotations
 import Floating.TH
 
 newtype FloatVerifier = FloatVerifier Float
-  deriving (Generic, BitPack)
+  deriving (Generic)
+  deriving anyclass BitPack
 
 instance Eq FloatVerifier where
   (FloatVerifier x) == (FloatVerifier y) = pack x == pack y
