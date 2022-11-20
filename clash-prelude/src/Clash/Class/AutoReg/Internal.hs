@@ -48,9 +48,6 @@ import           Language.Haskell.TH.Lib
 import           Language.Haskell.TH.Ppr
 
 import           Control.Lens.Internal.TH     (conAppsT)
-#if !(MIN_VERSION_th_abstraction(0,4,0))
-import           Control.Lens.Internal.TH     (bndrName)
-#endif
 
 -- $setup
 -- >>> import Data.Maybe
@@ -258,21 +255,12 @@ deriveAutoRegProduct :: DatatypeInfo -> ConstructorInfo -> DecsQ
 deriveAutoRegProduct tyInfo conInfo = go (constructorName conInfo) fieldInfos
  where
   tyNm = datatypeName tyInfo
-  tyVarBndrs = datatypeVars tyInfo
-
-#if MIN_VERSION_th_abstraction(0,4,0)
-  toTyVar = VarT . tvName
-#elif MIN_VERSION_th_abstraction(0,3,0)
-  toTyVar = VarT . bndrName
+#if MIN_VERSION_th_abstraction(0,3,0)
+  tyArgs = datatypeInstTypes tyInfo
 #else
-  toTyVar t = case t of
-    VarT _ -> t
-    SigT t' _ -> toTyVar t'
-    _ -> error "deriveAutoRegProduct.toTv"
+  tyArgs = datatypeVars tyInfo
 #endif
-
-  tyVars = map toTyVar tyVarBndrs
-  ty = conAppsT tyNm tyVars
+  ty = conAppsT tyNm tyArgs
 
   fieldInfos =
     zip fieldNames (constructorFields conInfo)
