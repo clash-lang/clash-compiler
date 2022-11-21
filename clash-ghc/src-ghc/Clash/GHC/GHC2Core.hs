@@ -75,7 +75,7 @@ import GHC.Core.FamInstEnv
 import GHC.Data.FastString (unpackFS, bytesFS)
 import GHC.Types.Id (isDataConId_maybe)
 import GHC.Types.Id.Info (IdDetails (..), unfoldingInfo)
-import GHC.Types.Literal (Literal (..), LitNumType (..))
+import GHC.Types.Literal (Literal (..), LitNumType (..), literalType)
 import GHC.Unit.Module (moduleName, moduleNameString)
 import GHC.Types.Name
   (Name, nameModule_maybe, nameOccName, nameUnique, getSrcSpan)
@@ -125,6 +125,9 @@ import FastString (unpackFS, fastStringToByteString)
 import Id         (isDataConId_maybe)
 import IdInfo     (IdDetails (..), unfoldingInfo)
 import Literal    (Literal (..), LitNumType (..))
+#if MIN_VERSION_ghc(8,8,0)
+import Literal    (literalType)
+#endif
 import Module     (moduleName, moduleNameString)
 import Name       (Name, nameModule_maybe,
                    nameOccName, nameUnique, getSrcSpan)
@@ -437,6 +440,15 @@ coreToTerm primMap unlocs = term
       Text.readMaybe (Text.unpack nm2)
 
     term' (Var x)                 = var x
+#if MIN_VERSION_ghc(8,8,0)
+    term' (Lit l@LitRubbish{}) = do
+      ty <- coreToType (literalType l)
+      return (C.Prim (C.PrimInfo (pack "_RUBBISH_")
+                                 ty
+                                 C.WorkNever
+                                 C.SingleResult
+                                 C.NoUnfolding))
+#endif
     term' (Lit l)                 = return $ C.Literal (coreToLiteral l)
     term' (App eFun (Type tyArg)) = C.TyApp <$> term eFun <*> coreToType tyArg
     term' (App eFun eArg)         = C.App   <$> term eFun <*> term eArg
