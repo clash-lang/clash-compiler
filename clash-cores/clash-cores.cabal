@@ -94,6 +94,7 @@ library
     Clash.Cores.Xilinx.Floating.BlackBoxes
     Clash.Cores.Xilinx.Floating.Explicit
     Clash.Cores.Xilinx.Floating.Internal
+    Clash.Cores.Xilinx.Synchronizer
     Clash.Cores.SPI
     Clash.Cores.UART
     Clash.Cores.LatticeSemi.ICE40.IO

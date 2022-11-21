@@ -465,6 +465,9 @@ runClashTest = defaultMain $ clashTestRoot
                                                         ]
                            }
             in runTest "Floating" _opts
+          , runTest "Synchronizer" def{
+              hdlTargets=[Verilog, SystemVerilog]
+            }
           ]
         ]
       , clashTestGroup "Cores"
