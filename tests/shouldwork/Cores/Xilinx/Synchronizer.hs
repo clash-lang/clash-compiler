@@ -10,6 +10,7 @@ topEntity ::
   Signal XilinxSystem Bit ->
   Signal XilinxSystem Bit
 topEntity = X.dualFlipFlopSynchronizer
+{-# NOINLINE topEntity #-}
 
 testBench :: Signal XilinxSystem Bool
 testBench = done
@@ -20,3 +21,4 @@ testBench = done
   clk       = tbClockGen (not <$> done)
   rst       = resetGen
   ena       = enableGen
+{-# NOINLINE testBench #-}
