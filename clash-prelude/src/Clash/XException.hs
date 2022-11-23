@@ -420,6 +420,8 @@ instance ShowX Integer where
 instance ShowX Natural where
   showsPrecX = showsPrecXWith showsPrec
 
+instance ShowX Ordering
+
 instance ShowX a => ShowX (Seq a) where
   showsPrecX _ = showListX . toList
 
