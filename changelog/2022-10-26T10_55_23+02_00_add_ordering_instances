@@ -1,1 +1,1 @@
-ADDED: Add `BitPack` and `NFDataX` instances for `Ordering`
+ADDED: Add `BitPack`, `NFDataX` and `ShowX` instances for `Ordering`

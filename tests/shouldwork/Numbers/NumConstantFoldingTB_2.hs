@@ -3,8 +3,6 @@ import Clash.Prelude
 import Clash.Explicit.Testbench
 import qualified NumConstantFolding_2
 
-instance ShowX Ordering
-
 expected = $(lift NumConstantFolding_2.topEntity) :> Nil
 
 topEntity = NumConstantFolding_2.topEntity

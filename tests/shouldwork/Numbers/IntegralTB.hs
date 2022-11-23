@@ -3,8 +3,6 @@ import Clash.Prelude
 import Clash.Explicit.Testbench
 import qualified Integral
 
-instance ShowX Ordering
-
 expected = $(lift $ map Integral.topEntity $ Integral.inputs)
 
 topEntity = Integral.topEntity
