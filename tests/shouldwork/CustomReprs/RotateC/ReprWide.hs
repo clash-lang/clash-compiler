@@ -1,16 +1,13 @@
-{-# LANGUAGE BinaryLiterals #-}
-{-# LANGUAGE TemplateHaskell #-}
-
 module ReprWide
   ( topEntity
   , testBench
   ) where
 
-import Prelude
-import Data.Maybe
-import RotateC (Color(..), MaybeColor(..))
-import qualified RotateC
+import Clash.Prelude
 import Clash.Annotations.BitRepresentation
+
+import RotateC (Color(..), Top, tb)
+import qualified RotateC
 
 {-# ANN module (
   DataReprAnn
@@ -33,5 +30,10 @@ import Clash.Annotations.BitRepresentation
         []
     ]) #-}
 
-topEntity a = RotateC.topEntity a
-testBench = RotateC.testBench
+topEntity :: Top
+topEntity = RotateC.topEntity
+{-# NOINLINE topEntity #-}
+
+testBench :: Signal System Bool
+testBench = tb topEntity
+{-# NOINLINE testBench #-}

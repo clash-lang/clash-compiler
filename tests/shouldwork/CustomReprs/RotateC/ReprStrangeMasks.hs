@@ -1,16 +1,13 @@
-{-# LANGUAGE BinaryLiterals #-}
-{-# LANGUAGE TemplateHaskell #-}
-
 module ReprStrangeMasks
   ( topEntity
   , testBench
   ) where
 
-import Prelude
-import Data.Maybe
-import RotateC (Color(..), MaybeColor(..))
-import qualified RotateC
+import Clash.Prelude
 import Clash.Annotations.BitRepresentation
+
+import RotateC (Color(..), MaybeColor(..), Top, tb)
+import qualified RotateC
 
 {-# ANN module (
   DataReprAnn
@@ -49,5 +46,10 @@ import Clash.Annotations.BitRepresentation
         [0b01010] -- Masks
     ]) #-}
 
-topEntity a = RotateC.topEntity a
-testBench = RotateC.testBench
+topEntity :: Top
+topEntity = RotateC.topEntity
+{-# NOINLINE topEntity #-}
+
+testBench :: Signal System Bool
+testBench = tb topEntity
+{-# NOINLINE testBench #-}
