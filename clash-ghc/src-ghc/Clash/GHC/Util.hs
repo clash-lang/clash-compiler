@@ -1,16 +1,31 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE QuasiQuotes #-}
 
-module Clash.GHC.Util where
+module Clash.GHC.Util
+  ( module Clash.GHC.Util
+#if MIN_VERSION_ghc(9,2,0)
+  , module X
+#endif
+  )
+where
 
-#if MIN_VERSION_ghc(9,0,0)
-import GHC.Utils.Outputable (SDoc)
+#if MIN_VERSION_ghc(9,2,0)
+import GHC.Utils.Outputable as X (showPprUnsafe, showSDocUnsafe)
+import GHC.Utils.Outputable (SDoc, neverQualify)
+import GHC.Utils.Error (mkMsgEnvelope)
+import GHC.Plugins
+  (DynFlags, SourceError, ($$), blankLine, empty, isGoodSrcSpan, liftIO,
+   noSrcSpan, text, throwOneError)
+#elif MIN_VERSION_ghc(9,0,0)
+import GHC.Driver.Session (unsafeGlobalDynFlags)
+import GHC.Utils.Outputable (Outputable, SDoc, showPpr, showSDoc)
 import GHC.Utils.Error (mkPlainErrMsg)
 import GHC.Plugins
   (DynFlags, SourceError, ($$), blankLine, empty, isGoodSrcSpan, liftIO,
    noSrcSpan, text, throwOneError)
 #else
-import Outputable         (SDoc)
+import DynFlags           (unsafeGlobalDynFlags)
+import Outputable         (Outputable, SDoc, showPpr, showSDoc)
 import ErrUtils           (mkPlainErrMsg)
 import GhcPlugins         (DynFlags, SourceError, ($$), blankLine, empty, isGoodSrcSpan, liftIO, noSrcSpan, text, throwOneError)
 #endif
@@ -37,19 +52,41 @@ handleClashException
   -> ClashOpts
   -> SomeException
   -> m a
+#if MIN_VERSION_ghc(9,2,0)
+handleClashException _df opts e = case fromException e of
+#else
 handleClashException df opts e = case fromException e of
+#endif
   Just (ClashException sp s eM) -> do
     let srcInfo' | isGoodSrcSpan sp = srcInfo
                  | otherwise = empty
-    throwOneError (mkPlainErrMsg df sp (blankLine $$ textLines s $$ blankLine $$ srcInfo' $$ showExtra (opt_errorExtra opts) eM))
+    throwOneError
+#if MIN_VERSION_ghc(9,2,0)
+      (mkMsgEnvelope sp neverQualify
+#else
+      (mkPlainErrMsg df sp
+#endif
+        (blankLine $$ textLines s $$ blankLine $$ srcInfo' $$ showExtra (opt_errorExtra opts) eM))
   _ -> case fromException e of
     Just (ErrorCallWithLocation _ _) ->
-      throwOneError (mkPlainErrMsg df noSrcSpan (text "Clash error call:" $$ textLines (show e)))
+      throwOneError
+#if MIN_VERSION_ghc(9,2,0)
+        (mkMsgEnvelope noSrcSpan neverQualify
+#else
+        (mkPlainErrMsg df noSrcSpan
+#endif
+        (text "Clash error call:" $$ textLines (show e)))
     _ -> case fromException e of
       Just (e' :: SourceError) -> do
         GHC.printException e'
         liftIO $ exitWith (ExitFailure 1)
-      _ -> throwOneError (mkPlainErrMsg df noSrcSpan (text "Other error:" $$ textLines (displayException e)))
+      _ -> throwOneError
+#if MIN_VERSION_ghc(9,2,0)
+              (mkMsgEnvelope noSrcSpan neverQualify
+#else
+              (mkPlainErrMsg df noSrcSpan
+#endif
+              (text "Other error:" $$ textLines (displayException e)))
   where
     srcInfo = textLines [i|
       The source location of the error is not exact, only indicative, as it
@@ -66,3 +103,11 @@ handleClashException df opts e = case fromException e of
       text "Additional information:" $$ blankLine $$
       textLines msg
     showExtra _ _ = empty
+
+#if !MIN_VERSION_ghc(9,2,0)
+showPprUnsafe :: Outputable a => a -> String
+showPprUnsafe = showPpr unsafeGlobalDynFlags
+
+showSDocUnsafe :: SDoc -> String
+showSDocUnsafe = showSDoc unsafeGlobalDynFlags
+#endif

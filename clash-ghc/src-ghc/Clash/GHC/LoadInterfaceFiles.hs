@@ -52,7 +52,6 @@ import qualified GHC.Core.Class as Class
 import qualified GHC.Core.FVs as CoreFVs
 import qualified GHC.Core as CoreSyn
 import qualified GHC.Types.Demand as Demand
-import           GHC.Driver.Session as DynFlags (unsafeGlobalDynFlags)
 import qualified GHC
 import qualified GHC.Types.Id as Id
 import qualified GHC.Types.Id.Info as IdInfo
@@ -65,7 +64,7 @@ import qualified GHC.Unit.Module.Env as ModuleEnv
 import qualified GHC.Utils.Monad as MonadUtils
 import qualified GHC.Types.Name as Name
 import qualified GHC.Types.Name.Env as NameEnv
-import           GHC.Utils.Outputable as Outputable (showPpr, showSDoc, text)
+import           GHC.Utils.Outputable as Outputable (text)
 import qualified GHC.Plugins as GhcPlugins (deserializeWithData, fromSerialized)
 import qualified GHC.IfaceToCore as TcIface
 import qualified GHC.Tc.Utils.Monad as TcRnMonad
@@ -80,7 +79,6 @@ import qualified Class
 import qualified CoreFVs
 import qualified CoreSyn
 import qualified Demand
-import           DynFlags                    (unsafeGlobalDynFlags)
 import qualified GHC
 import qualified Id
 import qualified IdInfo
@@ -91,7 +89,7 @@ import qualified MkCore
 import qualified Module
 import qualified MonadUtils
 import qualified Name
-import           Outputable                  (showPpr, showSDoc, text)
+import           Outputable                  (text)
 import qualified GhcPlugins                  (deserializeWithData, fromSerialized)
 import qualified TcIface
 import qualified TcRnMonad
@@ -111,6 +109,7 @@ import           Clash.Primitives.Util               (decodeOrErrJson, decodeOrE
 import           Clash.GHC.GHC2Core                  (qualifiedNameString')
 import           Clash.Util                          (curLoc)
 import qualified Clash.Util.Interpolate              as I
+import           Clash.GHC.Util
 
 -- | Data structure tracking loaded binders (and their related data)
 data LoadedBinders = LoadedBinders
@@ -154,11 +153,11 @@ bndrsInExpr e = partitionEithers (map go freeVars)
       Nothing -> error [I.i|
         Internal error: couldn't find class method
 
-          #{showPpr DynFlags.unsafeGlobalDynFlags v}
+          #{showPprUnsafe v}
 
         in class
 
-          #{showPpr DynFlags.unsafeGlobalDynFlags c}
+          #{showPprUnsafe c}
       |]
       Just n -> n
 
@@ -252,9 +251,9 @@ loadIface foundMod = do
     Maybes.Succeeded (modInfo,_) -> return (Just modInfo)
     Maybes.Failed msg -> let msg' = concat [ $(curLoc)
                                            , "Failed to load interface for module: "
-                                           , showPpr unsafeGlobalDynFlags foundMod
+                                           , showPprUnsafe foundMod
                                            , "\nReason: "
-                                           , showSDoc unsafeGlobalDynFlags msg
+                                           , showSDocUnsafe msg
                                            ]
                          in traceIf True msg' (return Nothing)
 
@@ -380,7 +379,7 @@ loadCustomReprAnnotations anns =
     error [I.i|
       Multiple DataReprAnn annotations for same type:
 
-        #{Outputable.showPpr DynFlags.unsafeGlobalDynFlags name}
+        #{showPprUnsafe name}
 
       Reprs:
 
@@ -477,7 +476,7 @@ loadExprFromTyThing bndr tyThing = case tyThing of
         | Demand.isBottomingSig $ IdInfo.strictnessInfo _idInfo
 #endif
         -> do
-          let noUnfoldingErr = "no_unfolding " ++ showPpr unsafeGlobalDynFlags bndr
+          let noUnfoldingErr = "no_unfolding " ++ showPprUnsafe bndr
           Just (MkCore.mkAbsentErrorApp (Var.varType _id) noUnfoldingErr)
       _ -> Nothing
   _ -> Nothing

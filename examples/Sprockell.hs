@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, RecordWildCards, TypeOperators #-}
 module Sprockell where
 
-import Clash.Prelude hiding (Word)
+import Clash.Prelude hiding (Word, And)
 
 {-------------------------------------------------------------
 | SPROCKELL: Simple PROCessor in hasKELL :-)

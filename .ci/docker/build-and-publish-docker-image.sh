@@ -7,8 +7,8 @@ NAME="clash-ci-"
 DIR=$(dirname "$0")
 now=$(date +%F)
 
-GHC_VERSIONS=(  "9.0.2"   "8.10.7"  "8.8.4"   "8.6.5")
-CABAL_VERSIONS=("3.4.0.0" "3.2.0.0" "3.2.0.0" "3.0.0.0")
+GHC_VERSIONS=(  "9.2.5"   "9.0.2"   "8.10.7"  "8.8.4"   "8.6.5")
+CABAL_VERSIONS=("3.6.2.0" "3.4.0.0" "3.2.0.0" "3.2.0.0" "3.0.0.0")
 
 # We want to use docker buildkit so that our layers are built in parallel. This
 # is ignored completely on versions of docker which don't support buildkit.

@@ -273,7 +273,8 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- WHNF of subject is _|_, in the form of `absentError`: that means that
       -- the entire case-expression is evaluates to _|_
       (Prim pInfo,_:msgOrCallStack:_,ticks)
-        | primName pInfo == "Control.Exception.Base.absentError" ->
+        | primName pInfo `elem` ["Control.Exception.Base.absentError"
+                                ,"GHC.Prim.Panic.absentError"] ->
         let e1 = mkApps (mkTicks (Prim pInfo) ticks)
                         [Right ty,msgOrCallStack]
         in  changed e1
@@ -579,18 +580,21 @@ collectFlat _ _ = Nothing
 {-# SCC collectFlat #-}
 
 collectEqArgs :: Term -> Maybe (Term,Term)
-collectEqArgs (collectArgsTicks -> (Prim p, args, ticks))
+collectEqArgs f@(collectArgsTicks -> (Prim p, args, ticks))
   | nm == Text.showt 'BV.eq#
-    = let [_,_,Left scrut,Left val] = args
-      in Just (mkTicks scrut ticks,val)
+    = case args of
+        [_,_,Left scrut,Left val] -> Just (mkTicks scrut ticks,val)
+        _ -> error ("collectEqArgs: BV.eq expects 4 arguments, but got: " <> showPpr f)
   | nm == Text.showt 'I.eq#  ||
     nm == Text.showt 'S.eq# ||
     nm == Text.showt 'U.eq#
-    = let [_,Left scrut,Left val] = args
-      in Just (mkTicks scrut ticks,val)
+    = case args of
+        [_,Left scrut,Left val] -> Just (mkTicks scrut ticks,val)
+        _ -> error (show nm <> " expects 3 arguments, but got: " <> showPpr f)
   | nm == "GHC.Classes.eqInt"
-    = let [Left scrut,Left val] = args
-      in  Just (mkTicks scrut ticks,val)
+    = case args of
+        [Left scrut,Left val] -> Just (mkTicks scrut ticks,val)
+        _ -> error ("eqInt expects 2 arguments, but got: " <> showPpr f)
  where
   nm = primName p
 

@@ -70,12 +70,25 @@ import           GHC.Generics           (Generic(..))
 import           GHC.Integer            (smallInteger)
 import           GHC.Integer.Logarithms (integerLogBase#)
 import           GHC.TypeLits           (type TypeError, ErrorMessage(Text, (:<>:)))
+#if MIN_VERSION_base(4,16,0)
+import           GHC.Base               (ord)
+import           Data.Char              (chr)
+import           Data.Maybe             (fromMaybe)
+import           Data.Text.Extra        (showt)
+#endif
 
 -- GHC API
 #if MIN_VERSION_ghc(9,0,0)
+#if MIN_VERSION_ghc(9,2,0)
+import           GHC.Builtin.Names
+  (typeCharCmpTyFamNameKey, typeConsSymbolTyFamNameKey, typeUnconsSymbolTyFamNameKey,
+   typeCharToNatTyFamNameKey, typeNatToCharTyFamNameKey)
+#else
+import           GHC.Builtin.Names      (typeNatLeqTyFamNameKey)
+#endif
 import           GHC.Builtin.Names
   (integerTyConKey, typeNatAddTyFamNameKey, typeNatExpTyFamNameKey,
-   typeNatLeqTyFamNameKey, typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
+   typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
    typeNatCmpTyFamNameKey, ordLTDataConKey, ordEQDataConKey, ordGTDataConKey,
    typeSymbolAppendFamNameKey, typeSymbolCmpTyFamNameKey)
 import           GHC.Types.SrcLoc       (wiredInSrcSpan)
@@ -158,6 +171,7 @@ data ConstTy
 data LitTy
   = NumTy !Integer
   | SymTy !String
+  | CharTy !Char
   deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
 
 -- | The level above types
@@ -522,6 +536,7 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
         -> Just (LitTy (NumTy z))
       _ -> Nothing
 
+#if !MIN_VERSION_ghc(9,2,0)
   | nameUniq tc == getKey typeNatLeqTyFamNameKey
   = case mapMaybe (litView tcm) tys of
       [i1, i2]
@@ -532,6 +547,7 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
             in  if i1 <= i2 then Just (mkTyConApp trueTc [])
                             else Just (mkTyConApp falseTc [])
       _ -> Nothing
+#endif
 
   | nameUniq tc == getKey typeNatCmpTyFamNameKey -- "GHC.TypeNats.CmpNat"
   = case mapMaybe (litView tcm) tys of
@@ -552,6 +568,50 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
             EQ -> Name User "GHC.Types.EQ" (getKey ordEQDataConKey) wiredInSrcSpan
             GT -> Name User "GHC.Types.GT" (getKey ordGTDataConKey) wiredInSrcSpan
       _ -> Nothing
+
+#if MIN_VERSION_base(4,16,0)
+  | nameUniq tc == getKey typeCharCmpTyFamNameKey -- "GHC.TypeNats.CmpSymbol"
+  = case mapMaybe (charLitView tcm) tys of
+      [s1, s2] ->
+        Just $ ConstTy $ TyCon $
+          case compare s1 s2 of
+            LT -> Name User (showt 'LT) (getKey ordLTDataConKey) wiredInSrcSpan
+            EQ -> Name User (showt 'EQ) (getKey ordEQDataConKey) wiredInSrcSpan
+            GT -> Name User (showt 'GT) (getKey ordGTDataConKey) wiredInSrcSpan
+      _ -> Nothing
+
+  | nameUniq tc == getKey typeConsSymbolTyFamNameKey -- ConsSymbol
+  , [c0, s0] <- tys
+  , Just c1 <- charLitView tcm c0
+  , Just s1 <- symLitView tcm s0
+  = Just (LitTy (SymTy (c1:s1)))
+
+  | nameUniq tc == getKey typeUnconsSymbolTyFamNameKey -- UnconsSymbol
+  , [s1] <- mapMaybe (symLitView tcm) tys
+  = fromMaybe (error "reduceTypeFamily: cannot construct UnconsSymbol result") $ do
+      FunTyCon {tyConKind = tck} <- UniqMap.lookup tc tcm
+      TyConApp maybeTcNm [tupTcApp] <- pure (tyView (snd (splitFunTys tcm tck)))
+      maybeTc <- UniqMap.lookup maybeTcNm tcm
+      [nothingTc,justTc] <- pure (map (coerce . dcName) (tyConDataCons maybeTc))
+      TyConApp tupTcNm [charTy,symbolTy] <- pure (tyView tupTcApp)
+      tupTc <- UniqMap.lookup tupTcNm tcm
+      [tupDc] <- pure (map (coerce . dcName) (tyConDataCons tupTc))
+      case s1 of
+        [] ->
+          pure (Just (mkTyConApp nothingTc [tupTcApp]))
+        (c:cs) ->
+          let tup = mkTyConApp tupDc
+                      [charTy,symbolTy,LitTy (CharTy c),LitTy (SymTy cs)]
+           in pure (Just (mkTyConApp justTc [tupTcApp,tup]))
+
+  | nameUniq tc == getKey typeCharToNatTyFamNameKey -- CharToNat
+  , [c1] <- mapMaybe (charLitView tcm) tys
+  = Just (LitTy (NumTy (fromIntegral (ord c1))))
+
+  | nameUniq tc == getKey typeNatToCharTyFamNameKey -- NatToChar
+  , [n1] <- mapMaybe (litView tcm) tys
+  = Just (LitTy (CharTy (chr (fromInteger n1))))
+#endif
 
   | nameUniq tc == getKey typeSymbolAppendFamNameKey  -- GHC.TypeLits.AppendSymbol"
   = case mapMaybe (symLitView tcm) tys of
@@ -641,6 +701,13 @@ symLitView :: TyConMap -> Type -> Maybe String
 symLitView _ (LitTy (SymTy s))                = Just s
 symLitView m (reduceTypeFamily m -> Just ty') = symLitView m ty'
 symLitView _ _ = Nothing
+
+#if MIN_VERSION_base(4,16,0)
+charLitView :: TyConMap -> Type -> Maybe Char
+charLitView _ (LitTy (CharTy c)) = Just c
+charLitView m (reduceTypeFamily m -> Just t) = charLitView m t
+charLitView _ _ = Nothing
+#endif
 
 isIntegerTy :: Type -> Bool
 isIntegerTy (ConstTy (TyCon nm)) = nameUniq nm == getKey integerTyConKey

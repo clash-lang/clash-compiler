@@ -70,19 +70,19 @@ import Data.List                               (nub, partition)
 import Data.Text                               (Text)
 import GHC.Generics
 #if MIN_VERSION_ghc(9,0,0)
-import GHC.Types.SrcLoc                        (SrcSpan)
+import GHC.Types.SrcLoc                        (SrcSpan, leftmost_smallest)
 #else
-import SrcLoc                                  (SrcSpan)
+import SrcLoc                                  (SrcSpan, leftmost_smallest)
 #endif
 
 -- Internal Modules
 import Clash.Core.DataCon                      (DataCon)
 import Clash.Core.Literal                      (Literal)
 import Clash.Core.Name                         (Name (..))
-import {-# SOURCE #-} Clash.Core.Subst         () -- instance Eq Type
+import {-# SOURCE #-} Clash.Core.Subst         () -- instance Eq/Ord Type
 import {-# SOURCE #-} Clash.Core.Type          (Type)
 import Clash.Core.Var                          (Var, Id, TyVar)
-import Clash.Util                              (curLoc)
+import Clash.Util                              (curLoc, thenCompare)
 
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 data Term
@@ -123,6 +123,18 @@ data TickInfo
   -- ^ Do not deduplicate, i.e. /keep/, an expression inside a case-alternative;
   -- do not try to share expressions between multiple branches.
   deriving (Eq, Show, Generic, NFData, Binary)
+
+instance Ord TickInfo where
+  compare (SrcSpan s1) (SrcSpan s2) = leftmost_smallest s1 s2
+  compare (NameMod m1 t1) (NameMod m2 t2) =
+    compare m1 m2 `thenCompare` compare t1 t2
+  compare t1 t2 = compare (getRank t1) (getRank t2)
+    where
+      getRank :: TickInfo -> Word
+      getRank SrcSpan{} = 0
+      getRank NameMod{} = 1
+      getRank DeDup     = 2
+      getRank NoDeDup   = 3
 
 -- | Tag to indicate which instance/register name modifier was used
 data NameMod

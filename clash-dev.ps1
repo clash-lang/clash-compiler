@@ -16,5 +16,5 @@ ghci `
   -XDeriveLift -XDeriveTraversable -XDerivingStrategies -XInstanceSigs `
   -XKindSignatures $XNoStarIsType -XScopedTypeVariables -XStandaloneDeriving `
   -XTupleSections -XTypeApplications -XTypeOperators -XViewPatterns `
-  -DDEBUG `
+  -XNoPolyKinds -DDEBUG `
   Clash.hs

@@ -123,8 +123,9 @@ genRecordDataCons tcm tcn univTvs =
     let argGen = genMonoTypeFrom tcm bound liftedTypeKind -- TODO Make polymorphic
     ty <- genWithCodomain resTy argGen
 
-    -- If there are type variables, getMonoTypeFrom is wrong.
-    let ([], argTys) = partitionEithers $ fst (splitFunForallTy ty)
+    let argTys = case partitionEithers $ fst (splitFunForallTy ty) of
+          ([],_) -> error "getMonoTypeFrom is wrong, there are type variables"
+          (_,vs) -> vs
     bangs <- traverse (genStrictness tcm) argTys
     fields <- replicateM (length argTys) genFieldLabel
 

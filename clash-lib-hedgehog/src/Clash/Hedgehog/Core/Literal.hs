@@ -6,6 +6,8 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 Random type-directed generation of literals.
 -}
 
+{-# LANGUAGE CPP #-}
+
 module Clash.Hedgehog.Core.Literal
   ( genLiteralFrom
   ) where
@@ -38,6 +40,14 @@ genLiteralFrom ty
   | aeqType ty wordPrimTy = genWordLiteral
   | aeqType ty int64PrimTy = genInt64Literal
   | aeqType ty word64PrimTy = genWord64Literal
+#if MIN_VERSION_base(4,16,0)
+  | aeqType ty int8PrimTy = genInt8Literal
+  | aeqType ty int16PrimTy = genInt16Literal
+  | aeqType ty int32PrimTy = genInt32Literal
+  | aeqType ty word8PrimTy = genWord8Literal
+  | aeqType ty word16PrimTy = genWord16Literal
+  | aeqType ty word32PrimTy = genWord32Literal
+#endif
   | aeqType ty stringPrimTy = genStringLiteral
   | aeqType ty floatPrimTy = genFloatLiteral
   | aeqType ty doublePrimTy = genDoubleLiteral
@@ -79,6 +89,32 @@ genInt64Literal =
 genWord64Literal :: forall m. MonadGen m => m Literal
 genWord64Literal =
   Word64Literal <$> (toInteger <$> Gen.word64 Range.linearBounded)
+
+#if MIN_VERSION_base(4,16,0)
+genInt8Literal :: forall m. MonadGen m => m Literal
+genInt8Literal =
+  Int8Literal <$> (toInteger <$> Gen.int8 Range.linearBounded)
+
+genInt16Literal :: forall m. MonadGen m => m Literal
+genInt16Literal =
+  Int16Literal <$> (toInteger <$> Gen.int16 Range.linearBounded)
+
+genInt32Literal :: forall m. MonadGen m => m Literal
+genInt32Literal =
+  Int32Literal <$> (toInteger <$> Gen.int32 Range.linearBounded)
+
+genWord8Literal :: forall m. MonadGen m => m Literal
+genWord8Literal =
+  Word8Literal <$> (toInteger <$> Gen.word8 Range.linearBounded)
+
+genWord16Literal :: forall m. MonadGen m => m Literal
+genWord16Literal =
+  Word16Literal <$> (toInteger <$> Gen.word16 Range.linearBounded)
+
+genWord32Literal :: forall m. MonadGen m => m Literal
+genWord32Literal =
+  Word32Literal <$> (toInteger <$> Gen.word32 Range.linearBounded)
+#endif
 
 genStringLiteral :: forall m. MonadGen m => m Literal
 genStringLiteral =

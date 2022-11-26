@@ -5,13 +5,14 @@
 
   Blackbox generation for GHC.Int.IntX# data constructors. (System)Verilog only!
 -}
+
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Primitives.GHC.Int (intTF) where
 
-import           Clash.Core.Literal
-  (Literal(IntegerLiteral, IntLiteral, Int64Literal))
+import           Clash.Core.Literal           (Literal(..))
 import           Clash.Core.Term              (Term(Literal))
 import           Clash.Core.Type              (Type)
 import           Clash.Primitives.GHC.Literal
@@ -28,6 +29,11 @@ getIntLit =
   \case
     IntegerLiteral i -> Just i
     IntLiteral i     -> Just i
+#if MIN_VERSION_ghc(8,8,0)
+    Int8Literal i    -> Just i
+    Int16Literal i   -> Just i
+    Int32Literal i   -> Just i
+#endif
     Int64Literal i   -> Just i
     _                -> Nothing
 

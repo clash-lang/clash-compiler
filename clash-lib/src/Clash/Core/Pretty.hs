@@ -223,11 +223,24 @@ pprTopLevelBndr (bndr,expr) = do
 dcolon, rarrow, lam, tylam, at, cast, coerce, let_, letrec, in_, case_, of_, forall_,
   data_,newtype_,type_,family_,instance_
   :: ClashDoc
-[dcolon, rarrow, lam, tylam, at, cast, coerce, let_, letrec, in_, case_, of_, forall_,
-  data_,newtype_,type_,family_,instance_]
-  = annotate (AnnSyntax Keyword) <$>
-    ["::", "->", "λ", "Λ", "@", "▷", "~", "let", "letrec", "in", "case", "of", "forall",
-     "data","newtype","type","family","instance"]
+dcolon = annotate (AnnSyntax Keyword) "::"
+rarrow = annotate (AnnSyntax Keyword) "->"
+lam = annotate (AnnSyntax Keyword)  "λ"
+tylam = annotate (AnnSyntax Keyword) "Λ"
+at = annotate (AnnSyntax Keyword)  "@"
+cast = annotate (AnnSyntax Keyword) "▷"
+coerce = annotate (AnnSyntax Keyword) "~"
+let_ = annotate (AnnSyntax Keyword) "let"
+letrec = annotate (AnnSyntax Keyword) "letrec"
+in_ = annotate (AnnSyntax Keyword) "in"
+case_ = annotate (AnnSyntax Keyword) "case"
+of_ = annotate (AnnSyntax Keyword) "of"
+forall_ = annotate (AnnSyntax Keyword) "forall"
+data_ = annotate (AnnSyntax Keyword) "data"
+newtype_ = annotate (AnnSyntax Keyword) "newtype"
+type_ = annotate (AnnSyntax Keyword) "type"
+family_ = annotate (AnnSyntax Keyword) "family"
+instance_ = annotate (AnnSyntax Keyword) "instance"
 
 instance PrettyPrec Text where
   pprPrec _ = pure . pretty
@@ -290,6 +303,7 @@ instance PrettyPrec TyCon where
 instance Pretty LitTy where
   pretty (NumTy i) = pretty i
   pretty (SymTy s) = dquotes $ pretty s
+  pretty (CharTy c) = squotes $ pretty c
 
 instance PrettyPrec LitTy where
   pprPrec _ = return . annotate (AnnSyntax LitS) . pretty
@@ -351,17 +365,19 @@ instance PrettyPrec DataCon where
 
 instance PrettyPrec Literal where
   pprPrec _ l = return $ annotate (AnnSyntax LitS) $ case l of
-    IntegerLiteral i
-      | i < 0          -> parens (pretty i)
-      | otherwise      -> pretty i
-    IntLiteral i
-      | i < 0          -> parens (pretty i <> "#")
-      | otherwise      -> pretty i <> "#"
-    Int64Literal i
-      | i < 0          -> parens (pretty i <> "#")
-      | otherwise      -> pretty i <> "#"
+    IntegerLiteral i   -> parensIf (i < 0) (pretty i)
+    IntLiteral i       -> parensIf (i < 0) (pretty i)
+    Int64Literal i     -> parensIf (i < 0) (pretty i <> "#64")
     WordLiteral w      -> pretty w <> "##"
-    Word64Literal w    -> pretty w <> "##"
+    Word64Literal w    -> pretty w <> "##64"
+#if MIN_VERSION_ghc(8,8,0)
+    Int8Literal i      -> parensIf (i < 0) (pretty i <> "#8")
+    Int16Literal i     -> parensIf (i < 0) (pretty i <> "#16")
+    Int32Literal i     -> parensIf (i < 0) (pretty i <> "#32")
+    Word8Literal w     -> pretty w <> "##8"
+    Word16Literal w    -> pretty w <> "##16"
+    Word32Literal w    -> pretty w <> "##32"
+#endif
     FloatLiteral w     -> pretty (wordToFloat w) <> "#"
     DoubleLiteral w    -> pretty (wordToDouble w) <> "##"
     CharLiteral c      -> pretty c <> "#"

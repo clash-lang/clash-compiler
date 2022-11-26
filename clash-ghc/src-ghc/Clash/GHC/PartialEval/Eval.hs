@@ -24,6 +24,7 @@ import           Control.Monad (foldM)
 import           Data.Bifunctor
 import           Data.Bitraversable
 import           Data.Either
+import           Data.Maybe
 import           Data.Primitive.ByteArray (ByteArray(..))
 #if MIN_VERSION_base(4,15,0)
 import           GHC.Num.Integer (Integer (..))
@@ -460,11 +461,14 @@ matchLiteral lit alt@(pat, _) =
   matchBigNat i (BN# ba) = do
 #endif
     tcm <- getTyConMap
-    let Just integerTcName = fmap fst (splitTyConAppM integerPrimTy)
-        [_, jpDc, _] = tyConDataCons (UniqMap.find integerTcName tcm)
-        ([bnTy], _) = splitFunTys tcm (dcType jpDc)
-        Just bnTcName = fmap fst (splitTyConAppM bnTy)
-        [bnDc] = tyConDataCons (UniqMap.find bnTcName tcm)
+    let bnDcM = do
+          integerTcName <- fmap fst (splitTyConAppM integerPrimTy)
+          [_, jpDc, _]  <- pure (tyConDataCons (UniqMap.find integerTcName tcm))
+          ([bnTy], _)   <- pure (splitFunTys tcm (dcType jpDc))
+          bnTcName      <- fmap fst (splitTyConAppM bnTy)
+          listToMaybe (tyConDataCons (UniqMap.find bnTcName tcm))
+
+        bnDc = fromMaybe (error "Cannot find BigNat constructor") bnDcM
 
     let arr = ByteArrayLiteral (ByteArray ba)
     val <- VData bnDc [Left (VLiteral arr)] <$> getLocalEnv

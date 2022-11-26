@@ -479,7 +479,11 @@ specialize' _ctx _ (appE,args,ticks) (Left specArg) = do
   -- Create a new function if an alpha-equivalent binder doesn't exist
   newf <- case UniqMap.elems existing of
     [] -> do (cf,sp) <- Lens.use curFun
+#if MIN_VERSION_ghc(9,2,0)
+             mkFunction (appendToName (varName cf) "_specF") sp NoUserInlinePrag newBody
+#else
              mkFunction (appendToName (varName cf) "_specF") sp NoUserInline newBody
+#endif
     (b:_) -> return (bindingId b)
   -- Create specialized argument
   let newArg  = Left $ mkApps (Var newf) specVars

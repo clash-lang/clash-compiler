@@ -311,7 +311,9 @@ productFieldNames labels0 fields = do
   hFields <- zipWithM hName labels1 fields
 
   let grouped = group $ sort $ hFields
-      counted = HashMapS.fromList (map (\(g:gs) -> (g, succ (length gs))) grouped)
+      countGroup [] = error "productFIeldNames.countGroup: group of zero elements"
+      countGroup (g:gs) = (g, succ (length gs))
+      counted = HashMapS.fromList (map countGroup grouped)
       names   = snd $ mapAccumL (name' counted) HashMapS.empty hFields
 
   return names
@@ -1732,16 +1734,16 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ m, Literal _ i] <- extractLiterals bbCtx
-  = let NumLit m' = m
-        NumLit i' = i
-    in exprLit (Just (BitVector (fromInteger n),fromInteger n)) (BitVecLit m' i')
+  , NumLit m' <- m
+  , NumLit i' <- i
+  = exprLit (Just (BitVector (fromInteger n),fromInteger n)) (BitVecLit m' i')
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger##"
   , [Literal _ m, Literal _ i] <- extractLiterals bbCtx
-  = let NumLit m' = m
-        NumLit i' = i
-    in exprLit (Just (Bit,1)) (BitLit $ toBit m' i')
+  , NumLit m' <- m
+  , NumLit i' <- i
+  = exprLit (Just (Bit,1)) (BitLit $ toBit m' i')
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Index.fromInteger#"
@@ -1916,9 +1918,9 @@ bits :: [Bit] -> VHDLM Doc
 bits = dquotes . hcat . mapM bit_char
 
 toHex :: Int -> Integer -> String
-toHex sz i =
-  let Just d = clogBase 16 (2^sz)
-  in  printf ("%0" ++ show d ++ "X") (abs i)
+toHex sz i = case clogBase 16 (2^sz) of
+  Just d -> printf ("%0" ++ show d ++ "X") (abs i)
+  _ -> error "toHex: impossible"
 
 hex :: String -> VHDLM Doc
 hex s = char 'x' <> dquotes (pretty (T.pack s))

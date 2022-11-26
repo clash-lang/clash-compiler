@@ -464,12 +464,16 @@ inlineNonRep ctx0 e0@(Case {}) = do
   case r of
     (e1, Monoid.getAny -> True) ->
       return e1
-    (~(Case subj0 typ alts), _) -> do
+    (e1, _) -> do
       -- If a term _in_ the subject triggers 'inlineNonRepWorker', inline and
       -- propagate might eliminate this case. We therefore don't explore the
       -- alternatives. Note that this makes it substantially different from a
       -- 'topdownSucR' transformation.
       let
+        (subj0,typ,alts) = case e1 of
+          Case s t a -> (s,t,a)
+          _ -> error ("internal error, inlineNonRep triggered on a non-Case:" <>
+                      showPpr e1)
         TransformContext inScope ctx1 = ctx0
         ctx2 = TransformContext inScope (CaseScrut:ctx1)
 

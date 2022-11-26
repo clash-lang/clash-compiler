@@ -48,9 +48,6 @@ import           Language.Haskell.TH.Lib
 import           Language.Haskell.TH.Ppr
 
 import           Control.Lens.Internal.TH     (conAppsT)
-#if !(MIN_VERSION_th_abstraction(0,4,0))
-import           Control.Lens.Internal.TH     (bndrName)
-#endif
 
 -- $setup
 -- >>> import Data.Maybe
@@ -258,21 +255,12 @@ deriveAutoRegProduct :: DatatypeInfo -> ConstructorInfo -> DecsQ
 deriveAutoRegProduct tyInfo conInfo = go (constructorName conInfo) fieldInfos
  where
   tyNm = datatypeName tyInfo
-  tyVarBndrs = datatypeVars tyInfo
-
-#if MIN_VERSION_th_abstraction(0,4,0)
-  toTyVar = VarT . tvName
-#elif MIN_VERSION_th_abstraction(0,3,0)
-  toTyVar = VarT . bndrName
+#if MIN_VERSION_th_abstraction(0,3,0)
+  tyArgs = datatypeInstTypes tyInfo
 #else
-  toTyVar t = case t of
-    VarT _ -> t
-    SigT t' _ -> toTyVar t'
-    _ -> error "deriveAutoRegProduct.toTv"
+  tyArgs = datatypeVars tyInfo
 #endif
-
-  tyVars = map toTyVar tyVarBndrs
-  ty = conAppsT tyNm tyVars
+  ty = conAppsT tyNm tyArgs
 
   fieldInfos =
     zip fieldNames (constructorFields conInfo)
@@ -284,10 +272,15 @@ deriveAutoRegProduct tyInfo conInfo = go (constructorName conInfo) fieldInfos
 
   go :: Name -> [(Maybe Name,Type)] -> Q [Dec]
   go dcNm fields = do
-    args <- mapM newName ["clk", "rst", "en", "initVal", "input"]
+    clkN     <- newName "clk"
+    rstN     <- newName "rst"
+    enN      <- newName "en"
+    initValN <- newName "initVal"
+    inputN   <- newName "input"
     let
-      [clkE, rstE, enE, initValE, inputE] = map varE args
-      argsP = map varP args
+      initValE = varE initValN
+      inputE = varE inputN
+      argsP = map varP [clkN, rstN, enN, initValN, inputN]
       fieldNames = map fst fields
 
       field :: Name -> Int -> DecQ
@@ -308,6 +301,9 @@ deriveAutoRegProduct tyInfo conInfo = go (constructorName conInfo) fieldInfos
     initDecl <- valD initPat (normalB initValE) []
 
     let
+      clkE = varE clkN
+      rstE = varE rstN
+      enE  = varE enN
       genAutoRegDecl :: PatQ -> ExpQ -> ExpQ -> Maybe Name -> DecsQ
       genAutoRegDecl s v i nameM =
         [d| $s = $nameMe autoReg $clkE $rstE $enE $i $v |]

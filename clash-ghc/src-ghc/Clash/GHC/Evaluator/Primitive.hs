@@ -16,6 +16,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnboxedTuples #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module Clash.GHC.Evaluator.Primitive
   ( ghcPrimStep
   , ghcPrimUnwind
@@ -46,7 +48,9 @@ import           GHC.Int
 import           GHC.Integer
   (decodeDoubleInteger,encodeDoubleInteger,compareInteger,orInteger,andInteger,
    xorInteger,complementInteger,absInteger,signumInteger)
-#if MIN_VERSION_base(4,15,0)
+#if MIN_VERSION_base(4,16,0)
+import           GHC.Num.Integer (Integer (..), integerEncodeFloat#)
+#elif MIN_VERSION_base(4,15,0)
 import           GHC.Num.Integer
   (Integer (..), integerEncodeFloat#, integerToFloat#, integerToDouble#)
 #else
@@ -550,6 +554,356 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            b = narrow32Word# a
        in  reduce . Literal . WordLiteral . toInteger $ W# b
 
+#if MIN_VERSION_base(4,16,0)
+--------
+-- Int8#
+--------
+  "GHC.Prim.intToInt8#" | [i] <- intLiterals' args
+    -> let !(I# a)  = fromInteger i
+           b = narrow8Int# a
+       in  reduce . Literal . Int8Literal . toInteger $ I# b
+  "GHC.Prim.int8ToInt#" | [i] <- int8Literals' args
+    -> reduce . Literal $ IntLiteral i
+  "GHC.Prim.negateInt8" | [i] <- int8Literals' args
+    -> let !(I8# a) = fromInteger i
+        in reduce (Literal (Int8Literal (toInteger (I8# (negateInt8# a)))))
+  "GHC.Prim.plusInt8#" | Just r <- liftI8 plusInt8# args
+    -> reduce r
+  "GHC.Prim.subInt8#" | Just r <- liftI8 subInt8# args
+    -> reduce r
+  "GHC.Prim.timesInt8#" | Just r <- liftI8 timesInt8# args
+    -> reduce r
+  "GHC.Prim.quotInt8#" | Just r <- liftI8 quotInt8# args
+    -> reduce r
+  "GHC.Prim.remInt8#" | Just r <- liftI8 remInt8# args
+    -> reduce r
+  "GHC.Prim.quotRemInt8#"
+    | [i, j] <- int8Literals' args
+    , (_,tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+    , (Just tupTc) <- UniqMap.lookup tupTcNm tcm
+    , [tupDc] <- tyConDataCons tupTc
+    -> let !(I8# a)    = fromInteger i
+           !(I8# b)    = fromInteger j
+           !(# q, r #) = quotRemInt8# a b
+        in reduce $
+           mkApps (Data tupDc) (map Right tyArgs ++
+                  [ Left (Literal (Int8Literal (toInteger (I8# q))))
+                  , Left (Literal (Int8Literal (toInteger (I8# r))))])
+  "GHC.Prim.uncheckedShiftLInt8#" | Just r <- liftI8I uncheckedShiftLInt8# args
+    -> reduce r
+  "GHC.Prim.uncheckedShiftRAInt8#" | Just r <- liftI8I uncheckedShiftRAInt8# args
+    -> reduce r
+  "GHC.Prim.uncheckedShiftRLInt8#" | Just r <- liftI8I uncheckedShiftRLInt8# args
+    -> reduce r
+  "GHC.Prim.int8ToWord8#" | [i] <- int8Literals' args
+    -> let !(I8# a) = fromInteger i
+        in reduce (Literal (Word8Literal (toInteger (W8# (int8ToWord8# a)))))
+  "GHC.Prim.eqInt8#" | Just r <- liftI8RI eqInt8# args
+    -> reduce r
+  "GHC.Prim.geInt8#" | Just r <- liftI8RI geInt8# args
+    -> reduce r
+  "GHC.Prim.gtInt8#" | Just r <- liftI8RI gtInt8# args
+    -> reduce r
+  "GHC.Prim.leInt8#" | Just r <- liftI8RI leInt8# args
+    -> reduce r
+  "GHC.Prim.ltInt8#" | Just r <- liftI8RI ltInt8# args
+    -> reduce r
+  "GHC.Prim.neInt8#" | Just r <- liftI8RI neInt8# args
+    -> reduce r
+
+---------
+-- Int16#
+---------
+  "GHC.Prim.intToInt16#" | [i] <- intLiterals' args
+    -> let !(I# a)  = fromInteger i
+           b = narrow16Int# a
+       in  reduce . Literal . Int16Literal . toInteger $ I# b
+  "GHC.Prim.int16ToInt#" | [i] <- int16Literals' args
+    -> reduce . Literal $ IntLiteral i
+  "GHC.Prim.negateInt16" | [i] <- int16Literals' args
+    -> let !(I16# a) = fromInteger i
+        in reduce (Literal (Int16Literal (toInteger (I16# (negateInt16# a)))))
+  "GHC.Prim.plusInt16#" | Just r <- liftI16 plusInt16# args
+    -> reduce r
+  "GHC.Prim.subInt16#" | Just r <- liftI16 subInt16# args
+    -> reduce r
+  "GHC.Prim.timesInt16#" | Just r <- liftI16 timesInt16# args
+    -> reduce r
+  "GHC.Prim.quotInt16#" | Just r <- liftI16 quotInt16# args
+    -> reduce r
+  "GHC.Prim.remInt16#" | Just r <- liftI16 remInt16# args
+    -> reduce r
+  "GHC.Prim.quotRemInt16#"
+    | [i, j] <- int16Literals' args
+    , (_,tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+    , (Just tupTc) <- UniqMap.lookup tupTcNm tcm
+    , [tupDc] <- tyConDataCons tupTc
+    -> let !(I16# a)   = fromInteger i
+           !(I16# b)   = fromInteger j
+           !(# q, r #) = quotRemInt16# a b
+        in reduce $
+           mkApps (Data tupDc) (map Right tyArgs ++
+                  [ Left (Literal (Int16Literal (toInteger (I16# q))))
+                  , Left (Literal (Int16Literal (toInteger (I16# r))))])
+  "GHC.Prim.uncheckedShiftLInt16#" | Just r <- liftI16I uncheckedShiftLInt16# args
+    -> reduce r
+  "GHC.Prim.uncheckedShiftRAInt16#" | Just r <- liftI16I uncheckedShiftRAInt16# args
+    -> reduce r
+  "GHC.Prim.uncheckedShiftRLInt16#" | Just r <- liftI16I uncheckedShiftRLInt16# args
+    -> reduce r
+  "GHC.Prim.int16ToWord16#" | [i] <- int16Literals' args
+    -> let !(I16# a) = fromInteger i
+        in reduce (Literal (Word16Literal (toInteger (W16# (int16ToWord16# a)))))
+  "GHC.Prim.eqInt16#" | Just r <- liftI16RI eqInt16# args
+    -> reduce r
+  "GHC.Prim.geInt16#" | Just r <- liftI16RI geInt16# args
+    -> reduce r
+  "GHC.Prim.gtInt16#" | Just r <- liftI16RI gtInt16# args
+    -> reduce r
+  "GHC.Prim.leInt16#" | Just r <- liftI16RI leInt16# args
+    -> reduce r
+  "GHC.Prim.ltInt16#" | Just r <- liftI16RI ltInt16# args
+    -> reduce r
+  "GHC.Prim.neInt16#" | Just r <- liftI16RI neInt16# args
+    -> reduce r
+
+---------
+-- Int32#
+---------
+  "GHC.Prim.intToInt32#" | [i] <- intLiterals' args
+    -> let !(I# a)  = fromInteger i
+           b = narrow32Int# a
+       in  reduce . Literal . Int32Literal . toInteger $ I# b
+  "GHC.Prim.int32ToInt#" | [i] <- int32Literals' args
+    -> reduce . Literal $ IntLiteral i
+  "GHC.Prim.negateInt32" | [i] <- int32Literals' args
+    -> let !(I32# a) = fromInteger i
+        in reduce (Literal (Int32Literal (toInteger (I32# (negateInt32# a)))))
+  "GHC.Prim.plusInt32#" | Just r <- liftI32 plusInt32# args
+    -> reduce r
+  "GHC.Prim.subInt32#" | Just r <- liftI32 subInt32# args
+    -> reduce r
+  "GHC.Prim.timesInt32#" | Just r <- liftI32 timesInt32# args
+    -> reduce r
+  "GHC.Prim.quotInt32#" | Just r <- liftI32 quotInt32# args
+    -> reduce r
+  "GHC.Prim.remInt32#" | Just r <- liftI32 remInt32# args
+    -> reduce r
+  "GHC.Prim.quotRemInt32#"
+    | [i, j] <- int32Literals' args
+    , (_,tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+    , (Just tupTc) <- UniqMap.lookup tupTcNm tcm
+    , [tupDc] <- tyConDataCons tupTc
+    -> let !(I32# a)   = fromInteger i
+           !(I32# b)   = fromInteger j
+           !(# q, r #) = quotRemInt32# a b
+        in reduce $
+           mkApps (Data tupDc) (map Right tyArgs ++
+                  [ Left (Literal (Int32Literal (toInteger (I32# q))))
+                  , Left (Literal (Int32Literal (toInteger (I32# r))))])
+  "GHC.Prim.uncheckedShiftLInt32#" | Just r <- liftI32I uncheckedShiftLInt32# args
+    -> reduce r
+  "GHC.Prim.uncheckedShiftRAInt32#" | Just r <- liftI32I uncheckedShiftRAInt32# args
+    -> reduce r
+  "GHC.Prim.uncheckedShiftRLInt32#" | Just r <- liftI32I uncheckedShiftRLInt32# args
+    -> reduce r
+  "GHC.Prim.int32ToWord32#" | [i] <- int32Literals' args
+    -> let !(I32# a) = fromInteger i
+        in reduce (Literal (Word32Literal (toInteger (W32# (int32ToWord32# a)))))
+  "GHC.Prim.eqInt32#" | Just r <- liftI32RI eqInt32# args
+    -> reduce r
+  "GHC.Prim.geInt32#" | Just r <- liftI32RI geInt32# args
+    -> reduce r
+  "GHC.Prim.gtInt32#" | Just r <- liftI32RI gtInt32# args
+    -> reduce r
+  "GHC.Prim.leInt32#" | Just r <- liftI32RI leInt32# args
+    -> reduce r
+  "GHC.Prim.ltInt32#" | Just r <- liftI32RI ltInt32# args
+    -> reduce r
+  "GHC.Prim.neInt32#" | Just r <- liftI32RI neInt32# args
+    -> reduce r
+
+---------
+-- Word8#
+---------
+  "GHC.Prim.wordToWord8#" | [i] <- wordLiterals' args
+    -> let !(W# a)  = fromInteger i
+           b = narrow8Word# a
+       in  reduce . Literal . Word8Literal . toInteger $ W# b
+  "GHC.Prim.word8ToWord#" | [i] <- word8Literals' args
+    -> reduce . Literal $ WordLiteral i
+  "GHC.Prim.plusWord8#" | Just r <- liftW8 plusWord8# args
+    -> reduce r
+  "GHC.Prim.subWord8#" | Just r <- liftW8 subWord8# args
+    -> reduce r
+  "GHC.Prim.timesWord8#" | Just r <- liftW8 timesWord8# args
+    -> reduce r
+  "GHC.Prim.quotWord8#" | Just r <- liftW8 quotWord8# args
+    -> reduce r
+  "GHC.Prim.remWord8#" | Just r <- liftW8 remWord8# args
+    -> reduce r
+  "GHC.Prim.quotRemWord8#"
+    | [i, j] <- word8Literals' args
+    , (_,tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+    , (Just tupTc) <- UniqMap.lookup tupTcNm tcm
+    , [tupDc] <- tyConDataCons tupTc
+    -> let !(W8# a)    = fromInteger i
+           !(W8# b)    = fromInteger j
+           !(# q, r #) = quotRemWord8# a b
+        in reduce $
+           mkApps (Data tupDc) (map Right tyArgs ++
+                  [ Left (Literal (Word8Literal (toInteger (W8# q))))
+                  , Left (Literal (Word8Literal (toInteger (W8# r))))])
+  "GHC.Prim.andWord8#" | Just r <- liftW8 andWord8# args
+    -> reduce r
+  "GHC.Prim.orWord8#" | Just r <- liftW8 orWord8# args
+    -> reduce r
+  "GHC.Prim.xorWord8#" | Just r <- liftW8 xorWord8# args
+    -> reduce r
+  "GHC.Prim.notWord8" | [i] <- word8Literals' args
+    -> let !(W8# a) = fromInteger i
+        in reduce (Literal (Word8Literal (toInteger (W8# (notWord8# a)))))
+  "GHC.Prim.uncheckedShiftLWord8#" | Just r <- liftW8I uncheckedShiftLWord8# args
+    -> reduce r
+  "GHC.Prim.uncheckedShiftRLWord8#" | Just r <- liftW8I uncheckedShiftRLWord8# args
+    -> reduce r
+  "GHC.Prim.word8ToInt8#" | [i] <- word8Literals' args
+    -> let !(W8# a) = fromInteger i
+        in reduce (Literal (Int8Literal (toInteger (I8# (word8ToInt8# a)))))
+  "GHC.Prim.eqWord8#" | Just r <- liftW8RI eqWord8# args
+    -> reduce r
+  "GHC.Prim.geWord8#" | Just r <- liftW8RI geWord8# args
+    -> reduce r
+  "GHC.Prim.gtWord8#" | Just r <- liftW8RI gtWord8# args
+    -> reduce r
+  "GHC.Prim.leWord8#" | Just r <- liftW8RI leWord8# args
+    -> reduce r
+  "GHC.Prim.ltWord8#" | Just r <- liftW8RI ltWord8# args
+    -> reduce r
+  "GHC.Prim.neWord8#" | Just r <- liftW8RI neWord8# args
+    -> reduce r
+
+----------
+-- Word16#
+----------
+  "GHC.Prim.wordToWord16#" | [i] <- wordLiterals' args
+    -> let !(W# a)  = fromInteger i
+           b = narrow16Word# a
+       in  reduce . Literal . Word16Literal . toInteger $ W# b
+  "GHC.Prim.word16ToWord#" | [i] <- word16Literals' args
+    -> reduce . Literal $ WordLiteral i
+  "GHC.Prim.plusWord16#" | Just r <- liftW16 plusWord16# args
+    -> reduce r
+  "GHC.Prim.subWord16#" | Just r <- liftW16 subWord16# args
+    -> reduce r
+  "GHC.Prim.timesWord16#" | Just r <- liftW16 timesWord16# args
+    -> reduce r
+  "GHC.Prim.quotWord16#" | Just r <- liftW16 quotWord16# args
+    -> reduce r
+  "GHC.Prim.remWord16#" | Just r <- liftW16 remWord16# args
+    -> reduce r
+  "GHC.Prim.quotRemWord16#"
+    | [i, j] <- word16Literals' args
+    , (_,tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+    , (Just tupTc) <- UniqMap.lookup tupTcNm tcm
+    , [tupDc] <- tyConDataCons tupTc
+    -> let !(W16# a)    = fromInteger i
+           !(W16# b)    = fromInteger j
+           !(# q, r #) = quotRemWord16# a b
+        in reduce $
+           mkApps (Data tupDc) (map Right tyArgs ++
+                  [ Left (Literal (Word16Literal (toInteger (W16# q))))
+                  , Left (Literal (Word16Literal (toInteger (W16# r))))])
+  "GHC.Prim.andWord16#" | Just r <- liftW16 andWord16# args
+    -> reduce r
+  "GHC.Prim.orWord16#" | Just r <- liftW16 orWord16# args
+    -> reduce r
+  "GHC.Prim.xorWord16#" | Just r <- liftW16 xorWord16# args
+    -> reduce r
+  "GHC.Prim.notWord16" | [i] <- word16Literals' args
+    -> let !(W16# a) = fromInteger i
+        in reduce (Literal (Word16Literal (toInteger (W16# (notWord16# a)))))
+  "GHC.Prim.uncheckedShiftLWord16#" | Just r <- liftW16I uncheckedShiftLWord16# args
+    -> reduce r
+  "GHC.Prim.uncheckedShiftRLWord16#" | Just r <- liftW16I uncheckedShiftRLWord16# args
+    -> reduce r
+  "GHC.Prim.word16ToInt16#" | [i] <- word16Literals' args
+    -> let !(W16# a) = fromInteger i
+        in reduce (Literal (Int16Literal (toInteger (I16# (word16ToInt16# a)))))
+  "GHC.Prim.eqWord16#" | Just r <- liftW16RI eqWord16# args
+    -> reduce r
+  "GHC.Prim.geWord16#" | Just r <- liftW16RI geWord16# args
+    -> reduce r
+  "GHC.Prim.gtWord16#" | Just r <- liftW16RI gtWord16# args
+    -> reduce r
+  "GHC.Prim.leWord16#" | Just r <- liftW16RI leWord16# args
+    -> reduce r
+  "GHC.Prim.ltWord16#" | Just r <- liftW16RI ltWord16# args
+    -> reduce r
+  "GHC.Prim.neWord16#" | Just r <- liftW16RI neWord16# args
+    -> reduce r
+
+----------
+-- Word32#
+----------
+  "GHC.Prim.wordToWord32#" | [i] <- wordLiterals' args
+    -> let !(W# a)  = fromInteger i
+           b = narrow32Word# a
+       in  reduce . Literal . Word32Literal . toInteger $ W# b
+  "GHC.Prim.word32ToWord#" | [i] <- word32Literals' args
+    -> reduce . Literal $ WordLiteral i
+  "GHC.Prim.plusWord32#" | Just r <- liftW32 plusWord32# args
+    -> reduce r
+  "GHC.Prim.subWord32#" | Just r <- liftW32 subWord32# args
+    -> reduce r
+  "GHC.Prim.timesWord32#" | Just r <- liftW32 timesWord32# args
+    -> reduce r
+  "GHC.Prim.quotWord32#" | Just r <- liftW32 quotWord32# args
+    -> reduce r
+  "GHC.Prim.remWord32#" | Just r <- liftW32 remWord32# args
+    -> reduce r
+  "GHC.Prim.quotRemWord32#"
+    | [i, j] <- word32Literals' args
+    , (_,tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+    , (Just tupTc) <- UniqMap.lookup tupTcNm tcm
+    , [tupDc] <- tyConDataCons tupTc
+    -> let !(W32# a)    = fromInteger i
+           !(W32# b)    = fromInteger j
+           !(# q, r #) = quotRemWord32# a b
+        in reduce $
+           mkApps (Data tupDc) (map Right tyArgs ++
+                  [ Left (Literal (Word32Literal (toInteger (W32# q))))
+                  , Left (Literal (Word32Literal (toInteger (W32# r))))])
+  "GHC.Prim.andWord32#" | Just r <- liftW32 andWord32# args
+    -> reduce r
+  "GHC.Prim.orWord32#" | Just r <- liftW32 orWord32# args
+    -> reduce r
+  "GHC.Prim.xorWord32#" | Just r <- liftW32 xorWord32# args
+    -> reduce r
+  "GHC.Prim.notWord32" | [i] <- word32Literals' args
+    -> let !(W32# a) = fromInteger i
+        in reduce (Literal (Word32Literal (toInteger (W32# (notWord32# a)))))
+  "GHC.Prim.uncheckedShiftLWord32#" | Just r <- liftW32I uncheckedShiftLWord32# args
+    -> reduce r
+  "GHC.Prim.uncheckedShiftRLWord32#" | Just r <- liftW32I uncheckedShiftRLWord32# args
+    -> reduce r
+  "GHC.Prim.word32ToInt32#" | [i] <- word32Literals' args
+    -> let !(W32# a) = fromInteger i
+        in reduce (Literal (Int32Literal (toInteger (I32# (word32ToInt32# a)))))
+  "GHC.Prim.eqWord32#" | Just r <- liftW32RI eqWord32# args
+    -> reduce r
+  "GHC.Prim.geWord32#" | Just r <- liftW32RI geWord32# args
+    -> reduce r
+  "GHC.Prim.gtWord32#" | Just r <- liftW32RI gtWord32# args
+    -> reduce r
+  "GHC.Prim.leWord32#" | Just r <- liftW32RI leWord32# args
+    -> reduce r
+  "GHC.Prim.ltWord32#" | Just r <- liftW32RI ltWord32# args
+    -> reduce r
+  "GHC.Prim.neWord32#" | Just r <- liftW32RI neWord32# args
+    -> reduce r
+#endif
+
 ----------
 -- Double#
 ----------
@@ -1029,6 +1383,16 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce . Literal . FloatLiteral . floatToWord $ F# (integerToFloat# i)
 
   "GHC.Num.Integer.integerToDouble#"
+    | [v] <- args
+    , Just i <- integerLiteral v
+    -> reduce . Literal . DoubleLiteral . doubleToWord $ D# (integerToDouble# i)
+
+  "GHC.Float.integerToFloat#"
+    | [v] <- args
+    , Just i <- integerLiteral v
+    -> reduce . Literal . FloatLiteral . floatToWord $ F# (integerToFloat# i)
+
+  "GHC.Float.integerToDouble#"
     | [v] <- args
     , Just i <- integerLiteral v
     -> reduce . Literal . DoubleLiteral . doubleToWord $ D# (integerToDouble# i)
@@ -1620,25 +1984,49 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   "GHC.Int.I8#"
     | isSubj
+#if MIN_VERSION_base(4,16,0)
+    , [Lit (Int8Literal i)] <- args
+#else
     , [Lit (IntLiteral i)] <- args
+#endif
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
             (Just intTc) = UniqMap.lookup intTcNm tcm
             [intDc] = tyConDataCons intTc
+#if MIN_VERSION_base(4,16,0)
+        in  reduce (mkApps (Data intDc) [Left (Literal (Int8Literal i))])
+#else
         in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
+#endif
   "GHC.Int.I16#"
     | isSubj
+#if MIN_VERSION_base(4,16,0)
+    , [Lit (Int16Literal i)] <- args
+#else
     , [Lit (IntLiteral i)] <- args
+#endif
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
             (Just intTc) = UniqMap.lookup intTcNm tcm
             [intDc] = tyConDataCons intTc
+#if MIN_VERSION_base(4,16,0)
+        in  reduce (mkApps (Data intDc) [Left (Literal (Int16Literal i))])
+#else
         in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
+#endif
   "GHC.Int.I32#"
     | isSubj
+#if MIN_VERSION_base(4,16,0)
+    , [Lit (Int32Literal i)] <- args
+#else
     , [Lit (IntLiteral i)] <- args
+#endif
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
             (Just intTc) = UniqMap.lookup intTcNm tcm
             [intDc] = tyConDataCons intTc
+#if MIN_VERSION_base(4,16,0)
+        in  reduce (mkApps (Data intDc) [Left (Literal (Int32Literal i))])
+#else
         in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
+#endif
   "GHC.Int.I64#"
     | isSubj
     , [Lit (IntLiteral i)] <- args
@@ -1649,25 +2037,49 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   "GHC.Word.W8#"
     | isSubj
+#if MIN_VERSION_base(4,16,0)
+    , [Lit (Word8Literal c)] <- args
+#else
     , [Lit (WordLiteral c)] <- args
+#endif
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
             (Just wordTc) = UniqMap.lookup wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
+#if MIN_VERSION_base(4,16,0)
+        in  reduce (mkApps (Data wordDc) [Left (Literal (Word8Literal c))])
+#else
         in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
+#endif
   "GHC.Word.W16#"
     | isSubj
+#if MIN_VERSION_base(4,16,0)
+    , [Lit (Word16Literal c)] <- args
+#else
     , [Lit (WordLiteral c)] <- args
+#endif
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
             (Just wordTc) = UniqMap.lookup wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
+#if MIN_VERSION_base(4,16,0)
+        in  reduce (mkApps (Data wordDc) [Left (Literal (Word16Literal c))])
+#else
         in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
+#endif
   "GHC.Word.W32#"
     | isSubj
+#if MIN_VERSION_base(4,16,0)
+    , [Lit (Word32Literal c)] <- args
+#else
     , [Lit (WordLiteral c)] <- args
+#endif
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
             (Just wordTc) = UniqMap.lookup wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
+#if MIN_VERSION_base(4,16,0)
+        in  reduce (mkApps (Data wordDc) [Left (Literal (Word32Literal c))])
+#else
         in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
+#endif
   "GHC.Word.W64#"
     | isSubj
     , [Lit (WordLiteral c)] <- args
@@ -4115,6 +4527,32 @@ intLiteral x = case x of
   Lit (IntLiteral i) -> Just i
   _ -> Nothing
 
+#if MIN_VERSION_base(4,16,0)
+int8Literals' :: [Value] -> [Integer]
+int8Literals' = listOf int8Literal
+
+int8Literal :: Value -> Maybe Integer
+int8Literal x = case x of
+  Lit (Int8Literal i) -> Just i
+  _ -> Nothing
+
+int16Literals' :: [Value] -> [Integer]
+int16Literals' = listOf int16Literal
+
+int16Literal :: Value -> Maybe Integer
+int16Literal x = case x of
+  Lit (Int16Literal i) -> Just i
+  _ -> Nothing
+
+int32Literals' :: [Value] -> [Integer]
+int32Literals' = listOf int32Literal
+
+int32Literal :: Value -> Maybe Integer
+int32Literal x = case x of
+  Lit (Int32Literal i) -> Just i
+  _ -> Nothing
+#endif
+
 intCLiteral :: Value -> Maybe Integer
 intCLiteral v = case v of
   (DC _ [Left (Literal (IntLiteral i))]) -> Just i
@@ -4133,6 +4571,32 @@ wordLiteral :: Value -> Maybe Integer
 wordLiteral x = case x of
   Lit (WordLiteral i) -> Just i
   _ -> Nothing
+
+#if MIN_VERSION_base(4,16,0)
+word8Literals' :: [Value] -> [Integer]
+word8Literals' = listOf word8Literal
+
+word8Literal :: Value -> Maybe Integer
+word8Literal x = case x of
+  Lit (Word8Literal i) -> Just i
+  _ -> Nothing
+
+word16Literals' :: [Value] -> [Integer]
+word16Literals' = listOf word16Literal
+
+word16Literal :: Value -> Maybe Integer
+word16Literal x = case x of
+  Lit (Word16Literal i) -> Just i
+  _ -> Nothing
+
+word32Literals' :: [Value] -> [Integer]
+word32Literals' = listOf word32Literal
+
+word32Literal :: Value -> Maybe Integer
+word32Literal x = case x of
+  Lit (Word32Literal i) -> Just i
+  _ -> Nothing
+#endif
 
 charLiterals :: [Value] -> Maybe (Char,Char)
 charLiterals = pairOf charLiteral
@@ -4695,6 +5159,150 @@ runFF f i
   = let !(F# a) = wordToFloat i
         r = f a
     in  Literal . FloatLiteral . floatToWord $ F# r
+
+#if MIN_VERSION_base(4,16,0)
+liftI8 :: (Int8# -> Int8# -> Int8#) -> [Value] -> Maybe Term
+liftI8 f args = case int8Literals' args of
+  [i,j] ->
+    let !(I8# a) = fromInteger i
+        !(I8# b) = fromInteger j
+     in Just (Literal (Int8Literal (toInteger (I8# (f a b)))))
+  _ -> Nothing
+
+liftI8I :: (Int8# -> Int# -> Int8#) -> [Value] -> Maybe Term
+liftI8I f args = case args of
+  [Lit (Int8Literal i),Lit (IntLiteral j)] ->
+    let !(I8# a) = fromInteger i
+        !(I# b) = fromInteger j
+     in Just (Literal (Int8Literal (toInteger (I8# (f a b)))))
+  _ -> Nothing
+
+liftI8RI :: (Int8# -> Int8# -> Int#) -> [Value] -> Maybe Term
+liftI8RI f args = case int8Literals' args of
+  [i,j] ->
+    let !(I8# a) = fromInteger i
+        !(I8# b) = fromInteger j
+     in Just (Literal (IntLiteral (toInteger (I# (f a b)))))
+  _ -> Nothing
+
+liftI16 :: (Int16# -> Int16# -> Int16#) -> [Value] -> Maybe Term
+liftI16 f args = case int16Literals' args of
+  [i,j] ->
+    let !(I16# a) = fromInteger i
+        !(I16# b) = fromInteger j
+     in Just (Literal (Int16Literal (toInteger (I16# (f a b)))))
+  _ -> Nothing
+
+liftI16I :: (Int16# -> Int# -> Int16#) -> [Value] -> Maybe Term
+liftI16I f args = case args of
+  [Lit (Int16Literal i),Lit (IntLiteral j)] ->
+    let !(I16# a) = fromInteger i
+        !(I# b) = fromInteger j
+     in Just (Literal (Int16Literal (toInteger (I16# (f a b)))))
+  _ -> Nothing
+
+liftI16RI :: (Int16# -> Int16# -> Int#) -> [Value] -> Maybe Term
+liftI16RI f args = case int16Literals' args of
+  [i,j] ->
+    let !(I16# a) = fromInteger i
+        !(I16# b) = fromInteger j
+     in Just (Literal (IntLiteral (toInteger (I# (f a b)))))
+  _ -> Nothing
+
+liftI32 :: (Int32# -> Int32# -> Int32#) -> [Value] -> Maybe Term
+liftI32 f args = case int32Literals' args of
+  [i,j] ->
+    let !(I32# a) = fromInteger i
+        !(I32# b) = fromInteger j
+     in Just (Literal (Int32Literal (toInteger (I32# (f a b)))))
+  _ -> Nothing
+
+liftI32I :: (Int32# -> Int# -> Int32#) -> [Value] -> Maybe Term
+liftI32I f args = case args of
+  [Lit (Int32Literal i),Lit (IntLiteral j)] ->
+    let !(I32# a) = fromInteger i
+        !(I# b) = fromInteger j
+     in Just (Literal (Int32Literal (toInteger (I32# (f a b)))))
+  _ -> Nothing
+
+liftI32RI :: (Int32# -> Int32# -> Int#) -> [Value] -> Maybe Term
+liftI32RI f args = case int32Literals' args of
+  [i,j] ->
+    let !(I32# a) = fromInteger i
+        !(I32# b) = fromInteger j
+     in Just (Literal (IntLiteral (toInteger (I# (f a b)))))
+  _ -> Nothing
+
+liftW8 :: (Word8# -> Word8# -> Word8#) -> [Value] -> Maybe Term
+liftW8 f args = case word8Literals' args of
+  [i,j] ->
+    let !(W8# a) = fromInteger i
+        !(W8# b) = fromInteger j
+     in Just (Literal (Word8Literal (toInteger (W8# (f a b)))))
+  _ -> Nothing
+
+liftW8I :: (Word8# -> Int# -> Word8#) -> [Value] -> Maybe Term
+liftW8I f args = case args of
+  [Lit (Word8Literal i),Lit (IntLiteral j)] ->
+    let !(W8# a) = fromInteger i
+        !(I# b) = fromInteger j
+     in Just (Literal (Word8Literal (toInteger (W8# (f a b)))))
+  _ -> Nothing
+
+liftW8RI :: (Word8# -> Word8# -> Int#) -> [Value] -> Maybe Term
+liftW8RI f args = case word8Literals' args of
+  [i,j] ->
+    let !(W8# a) = fromInteger i
+        !(W8# b) = fromInteger j
+     in Just (Literal (IntLiteral (toInteger (I# (f a b)))))
+  _ -> Nothing
+
+liftW16 :: (Word16# -> Word16# -> Word16#) -> [Value] -> Maybe Term
+liftW16 f args = case word16Literals' args of
+  [i,j] -> let !(W16# a) = fromInteger i
+               !(W16# b) = fromInteger j
+            in Just (Literal (Word16Literal (toInteger (W16# (f a b)))))
+  _ -> Nothing
+
+liftW16I :: (Word16# -> Int# -> Word16#) -> [Value] -> Maybe Term
+liftW16I f args = case args of
+  [Lit (Word16Literal i),Lit (IntLiteral j)] ->
+    let !(W16# a) = fromInteger i
+        !(I# b) = fromInteger j
+     in Just (Literal (Word16Literal (toInteger (W16# (f a b)))))
+  _ -> Nothing
+
+liftW16RI :: (Word16# -> Word16# -> Int#) -> [Value] -> Maybe Term
+liftW16RI f args = case word16Literals' args of
+  [i,j] ->
+    let !(W16# a) = fromInteger i
+        !(W16# b) = fromInteger j
+     in Just (Literal (IntLiteral (toInteger (I# (f a b)))))
+  _ -> Nothing
+
+liftW32 :: (Word32# -> Word32# -> Word32#) -> [Value] -> Maybe Term
+liftW32 f args = case word32Literals' args of
+  [i,j] -> let !(W32# a) = fromInteger i
+               !(W32# b) = fromInteger j
+            in Just (Literal (Word32Literal (toInteger (W32# (f a b)))))
+  _ -> Nothing
+
+liftW32I :: (Word32# -> Int# -> Word32#) -> [Value] -> Maybe Term
+liftW32I f args = case args of
+  [Lit (Word32Literal i),Lit (IntLiteral j)] ->
+    let !(W32# a) = fromInteger i
+        !(I# b) = fromInteger j
+     in Just (Literal (Word32Literal (toInteger (W32# (f a b)))))
+  _ -> Nothing
+
+liftW32RI :: (Word32# -> Word32# -> Int#) -> [Value] -> Maybe Term
+liftW32RI f args = case word32Literals' args of
+  [i,j] ->
+    let !(W32# a) = fromInteger i
+        !(W32# b) = fromInteger j
+     in Just (Literal (IntLiteral (toInteger (I# (f a b)))))
+  _ -> Nothing
+#endif
 
 splitAtPrim
   :: TyConName

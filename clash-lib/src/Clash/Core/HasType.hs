@@ -70,6 +70,14 @@ instance HasType Literal where
     CharLiteral _ -> charPrimTy
     Int64Literal _ -> int64PrimTy
     Word64Literal _ -> word64PrimTy
+#if MIN_VERSION_ghc(8,8,0)
+    Int8Literal _ -> int8PrimTy
+    Int16Literal _ -> int16PrimTy
+    Int32Literal _ -> int32PrimTy
+    Word8Literal _ -> word8PrimTy
+    Word16Literal _ -> word16PrimTy
+    Word32Literal _ -> word32PrimTy
+#endif
     NaturalLiteral _ -> naturalPrimTy
     ByteArrayLiteral _ -> byteArrayPrimTy
 
@@ -120,6 +128,7 @@ instance InferType Type where
           ForAllTy _ a -> inferCoreTypeOf tcm a
           LitTy NumTy{} -> typeNatKind
           LitTy SymTy{} -> typeSymbolKind
+          LitTy CharTy{} -> charPrimTy
           AnnType _ a -> inferCoreTypeOf tcm a
           AppTy a b -> go a [b]
            where

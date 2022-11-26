@@ -54,12 +54,18 @@ genId ty genName = do
 -- | Generate a fresh local identifier of the specified kind.
 genLocalId :: forall m. MonadGen m => Type -> m TmName -> m Id
 genLocalId ty =
-  fmap (\i -> i { idScope = LocalId }) . genId ty
+  fmap setToLocal . genId ty
+ where
+  setToLocal i@Id{} = i {idScope = LocalId}
+  setToLocal i = i
 
 -- | Generate a fresh global identifier of the specified kind.
 genGlobalId :: forall m. MonadGen m => Type -> m TmName -> m Id
 genGlobalId ty =
-  fmap (\i -> i { idScope = GlobalId }) . genId ty
+  fmap setToGlobal . genId ty
+ where
+  setToGlobal i@Id{} = i {idScope = LocalId}
+  setToGlobal i = i
 
 mapAccumLM
   :: forall m acc x y

@@ -26,7 +26,7 @@ import qualified Data.Graph                    as Graph
 import Data.List                               (mapAccumR)
 import Data.List.Extra                         (zipEqual)
 import Data.Maybe
-  (fromJust, isJust, mapMaybe, catMaybes)
+  (fromJust, fromMaybe, isJust, mapMaybe, catMaybes)
 import qualified Data.Set                      as Set
 import qualified Data.Set.Lens                 as Lens
 import qualified Data.Text                     as T
@@ -159,15 +159,13 @@ extractElems supply inScope consCon resTy s maxN vec =
   go :: Integer -> (Supply,InScopeSet) -> Term
      -> ((Supply,InScopeSet),[(Term,[(Id, Term)])])
   go 0 uniqs _ = (uniqs,[])
-  go n uniqs0 e =
-    (uniqs3,(elNVar,[(elNId, lhs),(restNId, rhs)]):restVs)
-   where
-    tys = [(LitTy (NumTy n)),resTy,(LitTy (NumTy (n-1)))]
-    (Just idTys) = dataConInstArgTys consCon tys
-    restTy       = last idTys
+  go n uniqs0 e = fromMaybe (error "extractElems: failed to project elements") $ do
+    let tys = [(LitTy (NumTy n)),resTy,(LitTy (NumTy (n-1)))]
+    idTys <- dataConInstArgTys consCon tys
+    let restTy = last idTys
 
-    (uniqs1,mTV) = mkUniqSystemTyVar uniqs0 ("m",typeNatKind)
-    (uniqs2,[elNId,restNId,co,el,rest]) =
+    let (uniqs1,mTV) = mkUniqSystemTyVar uniqs0 ("m",typeNatKind)
+    (uniqs2,[elNId,restNId,co,el,rest]) <- pure $
       mapAccumR mkUniqSystemId uniqs1 $ zipEqual
         ["el" `T.append` (s `T.cons` T.pack (show (maxN-n)))
         ,"rest" `T.append` (s `T.cons` T.pack (show (maxN-n)))
@@ -177,12 +175,14 @@ extractElems supply inScope consCon resTy s maxN vec =
         ]
         (resTy:restTy:idTys)
 
-    elNVar    = Var elNId
-    pat       = DataPat consCon [mTV] [co,el,rest]
-    lhs       = Case e resTy  [(pat,Var el)]
-    rhs       = Case e restTy [(pat,Var rest)]
+    let elNVar    = Var elNId
+        pat       = DataPat consCon [mTV] [co,el,rest]
+        lhs       = Case e resTy  [(pat,Var el)]
+        rhs       = Case e restTy [(pat,Var rest)]
 
-    (uniqs3,restVs) = go (n-1) uniqs2 (Var restNId)
+    let (uniqs3,restVs) = go (n-1) uniqs2 (Var restNId)
+
+    return (uniqs3,(elNVar,[(elNId, lhs),(restNId, rhs)]):restVs)
 
 -- | Create let-bindings with case-statements that select elements out of a
 -- tree. Returns both the variables to which element-selections are bound
@@ -214,35 +214,30 @@ extractTElems supply inScope lrCon brCon resTy s maxN tree =
      -> (Supply,InScopeSet)
      -> Term
      -> ((Supply,InScopeSet),([Term],[(Id, Term)]))
-  go 0 _ ks uniqs0 e = (uniqs1,([elNVar],[(elNId, rhs)]))
-   where
-    tys          = [LitTy (NumTy 0),resTy]
-    (Just idTys) = dataConInstArgTys lrCon tys
+  go 0 _ ks uniqs0 e = fromMaybe (error "extractTElems: failed to project elements") $ do
+    let tys = [LitTy (NumTy 0),resTy]
+    idTys <- dataConInstArgTys lrCon tys
 
-    (uniqs1,[elNId,co,el]) =
+    (uniqs1,[elNId,co,el]) <- pure $
       mapAccumR mkUniqSystemId uniqs0 $ zipEqual
         [ "el" `T.append` (s `T.cons` T.pack (show (head ks)))
         , "_co_"
         , "el"
         ]
         (resTy:idTys)
-    elNVar = Var elNId
-    pat    = DataPat lrCon [] [co,el]
-    rhs    = Case e resTy [(pat,Var el)]
+    let elNVar = Var elNId
+        pat    = DataPat lrCon [] [co,el]
+        rhs    = Case e resTy [(pat,Var el)]
+    return (uniqs1,([elNVar],[(elNId, rhs)]))
 
-  go n bs ks uniqs0 e =
-    (uniqs4
-    ,(lVars ++ rVars,(ltNId, ltRhs):
-                     (rtNId, rtRhs):
-                     (lBinds ++ rBinds)))
-   where
-    tys = [LitTy (NumTy n),resTy,LitTy (NumTy (n-1))]
-    (Just idTys) = dataConInstArgTys brCon tys
+  go n bs ks uniqs0 e = fromMaybe (error "extractTElems: failed to project elements") $ do
+    let tys = [LitTy (NumTy n),resTy,LitTy (NumTy (n-1))]
+    idTys <- dataConInstArgTys brCon tys
 
-    (uniqs1,mTV) = mkUniqSystemTyVar uniqs0 ("m",typeNatKind)
-    (b0:bL,b1:bR) = splitAt (length bs `div` 2) bs
-    brTy = last idTys
-    (uniqs2,[ltNId,rtNId,co,lt,rt]) =
+    let (uniqs1,mTV) = mkUniqSystemTyVar uniqs0 ("m",typeNatKind)
+    (b0:bL,b1:bR) <- pure (splitAt (length bs `div` 2) bs)
+    let brTy = last idTys
+    (uniqs2,[ltNId,rtNId,co,lt,rt]) <- pure $
       mapAccumR mkUniqSystemId uniqs1 $ zipEqual
         ["lt" `T.append` (s `T.cons` T.pack (show b0))
         ,"rt" `T.append` (s `T.cons` T.pack (show b1))
@@ -251,15 +246,21 @@ extractTElems supply inScope lrCon brCon resTy s maxN tree =
         ,"rt"
         ]
         (brTy:brTy:idTys)
-    ltVar = Var ltNId
-    rtVar = Var rtNId
-    pat   = DataPat brCon [mTV] [co,lt,rt]
-    ltRhs = Case e brTy [(pat,Var lt)]
-    rtRhs = Case e brTy [(pat,Var rt)]
+    let ltVar = Var ltNId
+        rtVar = Var rtNId
+        pat   = DataPat brCon [mTV] [co,lt,rt]
+        ltRhs = Case e brTy [(pat,Var lt)]
+        rtRhs = Case e brTy [(pat,Var rt)]
 
-    (kL,kR) = splitAt (length ks `div` 2) ks
-    (uniqs3,(lVars,lBinds)) = go (n-1) bL kL uniqs2 ltVar
-    (uniqs4,(rVars,rBinds)) = go (n-1) bR kR uniqs3 rtVar
+        (kL,kR) = splitAt (length ks `div` 2) ks
+        (uniqs3,(lVars,lBinds)) = go (n-1) bL kL uniqs2 ltVar
+        (uniqs4,(rVars,rBinds)) = go (n-1) bR kR uniqs3 rtVar
+
+    return ( uniqs4
+           , ( lVars ++ rVars
+             , (ltNId, ltRhs):(rtNId, rtRhs): (lBinds ++ rBinds)
+             )
+           )
 
 -- | Create a vector of supplied elements
 mkRTree :: DataCon -- ^ The LR constructor
@@ -472,6 +473,7 @@ undefinedPrims =
   , "GHC.Err.error"
   , "GHC.Err.errorWithoutStackTrace"
   , "GHC.Err.undefined"
+  , "GHC.Prim.Panic.absentError"
   , "GHC.Real.divZeroError"
   , "GHC.Real.overflowError"
   , "GHC.Real.ratioZeroDenominatorError"
@@ -663,9 +665,9 @@ stripIP t = t
 -- | Do an inverse topological sorting of the let-bindings in a let-expression
 inverseTopSortLetBindings
   :: HasCallStack
-  => Term
-  -> Term
-inverseTopSortLetBindings (Letrec bndrs0 res) =
+  => [(Id, Term)]
+  -> [(Id, Term)]
+inverseTopSortLetBindings bndrs0 =
   let (graph,nodeMap,_) =
         Graph.graphFromEdges
           (map (\(i,e) -> let fvs = fmap varUniq
@@ -673,7 +675,7 @@ inverseTopSortLetBindings (Letrec bndrs0 res) =
                           in  ((i,e),varUniq i,fvs)) bndrs0)
       nodes  = postOrd graph
       bndrs1 = map ((\(x,_,_) -> x) . nodeMap) nodes
-  in  Letrec bndrs1 res
+   in bndrs1
  where
   postOrd :: Graph.Graph -> [Graph.Vertex]
   postOrd g = postorderF (Graph.dff g) []
@@ -683,8 +685,6 @@ inverseTopSortLetBindings (Letrec bndrs0 res) =
 
   postorder :: Graph.Tree a -> [a] -> [a]
   postorder (Graph.Node a ts) = postorderF ts . (a :)
-
-inverseTopSortLetBindings e = e
 {-# SCC inverseTopSortLetBindings #-}
 
 -- | Group let-bindings into cyclic groups and acyclic individual bindings
@@ -719,7 +719,9 @@ mkSelectorCase caller inScope tcm scrut dcI fieldI = go (inferCoreTypeOf tcm scr
         dcs | dcI > length dcs -> cantCreate $(curLoc) "DC index exceeds max" scrutTy
             | otherwise -> do
           let dc = indexNote ($(curLoc) ++ "No DC with tag: " ++ show (dcI-1)) dcs (dcI-1)
-          let (Just fieldTys) = dataConInstArgTysE inScope tcm dc args
+          let fieldTys =
+                fromMaybe (cantCreate $(curLoc) "Cannot instantiate dataCon" scrutTy)
+                          (dataConInstArgTysE inScope tcm dc args)
           if fieldI >= length fieldTys
             then cantCreate $(curLoc) "Field index exceed max" scrutTy
             else do
@@ -732,6 +734,7 @@ mkSelectorCase caller inScope tcm scrut dcI fieldI = go (inferCoreTypeOf tcm scr
               return retVal
     go scrutTy = cantCreate $(curLoc) ("Type of subject is not a datatype: " ++ showPpr scrutTy) scrutTy
 
+    cantCreate :: String -> String -> Type -> a
     cantCreate loc info scrutTy = error $ loc ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: (" ++ showPpr scrut ++ " :: " ++ showPpr scrutTy ++ ")\nAdditional info: " ++ info
 
 -- | Make a binder that should not be referenced

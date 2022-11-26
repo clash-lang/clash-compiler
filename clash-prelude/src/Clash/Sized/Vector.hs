@@ -217,8 +217,8 @@ instance (KnownNat n, Typeable a, Data a) => Data (Vec n a) where
   gfoldl f z xs = case compareSNat (SNat @n) (SNat @0) of
     SNatLE -> case leZero @n of
                   Sub Dict -> z Nil
-    SNatGT -> let (y :> ys) = xs
-              in (z @(a -> Vec (n-1) a -> Vec n a) (:>) `f` y `f` ys)
+    SNatGT -> case xs of
+                  (y :> ys) -> (z @(a -> Vec (n-1) a -> Vec n a) (:>) `f` y `f` ys)
 
 tVec :: DataType
 tVec = mkDataType "Vec" [cNil, cCons]
@@ -1713,20 +1713,29 @@ stencil1d :: KnownNat n
 stencil1d stX f xs = map f (windows1d stX xs)
 {-# INLINE stencil1d #-}
 
--- | 2-dimensional stencil computations
---
--- \"'stencil2d' @stY stX f xss@\", where /xss/ is a matrix of /stY + m/ rows
--- of /stX + n/ elements, applies the stencil computation /f/ on:
--- /(m + 1) * (n + 1)/ overlapping (2D) windows of /stY/ rows of /stX/ elements,
--- drawn from /xss/. The result matrix has /m + 1/ rows of /n + 1/ elements.
---
--- >>> let xss = ((1:>2:>3:>4:>Nil):>(5:>6:>7:>8:>Nil):>(9:>10:>11:>12:>Nil):>(13:>14:>15:>16:>Nil):>Nil)
--- >>> :t xss
--- xss :: Num a => Vec 4 (Vec 4 a)
--- >>> :t stencil2d d2 d2 (sum . map sum) xss
--- stencil2d d2 d2 (sum . map sum) xss :: Num b => Vec 3 (Vec 3 b)
--- >>> stencil2d d2 d2 (sum . map sum) xss
--- (14 :> 18 :> 22 :> Nil) :> (30 :> 34 :> 38 :> Nil) :> (46 :> 50 :> 54 :> Nil) :> Nil
+{- | 2-dimensional stencil computations
+
+\"'stencil2d' @stY stX f xss@\", where /xss/ is a matrix of /stY + m/ rows
+of /stX + n/ elements, applies the stencil computation /f/ on:
+/(m + 1) * (n + 1)/ overlapping (2D) windows of /stY/ rows of /stX/ elements,
+drawn from /xss/. The result matrix has /m + 1/ rows of /n + 1/ elements.
+
+>>> let xss = ((1:>2:>3:>4:>Nil):>(5:>6:>7:>8:>Nil):>(9:>10:>11:>12:>Nil):>(13:>14:>15:>16:>Nil):>Nil)
+>>> :t xss
+xss :: Num a => Vec 4 (Vec 4 a)
+
+#if __GLASGOW_HASKELL__ >= 902
+>>> :t stencil2d d2 d2 (sum . map sum) xss
+stencil2d d2 d2 (sum . map sum) xss :: Num a => Vec 3 (Vec 3 a)
+
+#else
+>>> :t stencil2d d2 d2 (sum . map sum) xss
+stencil2d d2 d2 (sum . map sum) xss :: Num b => Vec 3 (Vec 3 b)
+
+#endif
+>>> stencil2d d2 d2 (sum . map sum) xss
+(14 :> 18 :> 22 :> Nil) :> (30 :> 34 :> 38 :> Nil) :> (46 :> 50 :> 54 :> Nil) :> Nil
+-}
 stencil2d :: (KnownNat n, KnownNat m)
           => SNat (stY + 1) -- ^ Window hight /stY/, at least size 1
           -> SNat (stX + 1) -- ^ Window width /stX/, at least size 1

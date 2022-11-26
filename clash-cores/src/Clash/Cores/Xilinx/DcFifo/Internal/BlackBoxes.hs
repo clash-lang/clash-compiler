@@ -15,14 +15,17 @@ module Clash.Cores.Xilinx.DcFifo.Internal.BlackBoxes where
 
 import Prelude
 
+import Control.Monad.State (State)
 import Data.Either (lefts)
 import Data.Maybe (catMaybes)
 import Data.Text (Text)
+import Data.Text.Prettyprint.Doc.Extra (Doc)
 import GHC.Stack (HasCallStack)
 
+import Clash.Backend (Backend)
 import Clash.Core.TermLiteral (termToDataError)
 import Clash.Netlist.BlackBox.Types (BlackBoxFunction, emptyBlackBoxMeta)
-import Clash.Netlist.Types (TemplateFunction(..), BlackBox(BBFunction))
+import Clash.Netlist.Types (TemplateFunction(..), BlackBox(BBFunction), BlackBoxContext)
 import Clash.Netlist.Util (orNothing, stripVoid)
 import Clash.Signal.Internal (ResetKind(..))
 import Clash.Promoted.Nat (snatToNum)
@@ -45,9 +48,8 @@ import Clash.Cores.Xilinx.Internal
 --   creating the Xilinx IP with @create_ip@
 --   * 'dcFifoTF': instantiates IP generated in @dcFifoTclTF@
 dcFifoBBF :: HasCallStack => BlackBoxFunction
-dcFifoBBF _isD _primName args _resTys = do
-  let
-    [  _knownDomainWrite, _knownDomainRead
+dcFifoBBF _isD _primName args _resTys
+  |  [  _knownDomainWrite, _knownDomainRead
      , _nfDataX, _knownNatDepth
      , _constraint1, _constraint2, _hasCallStack
      , either error id . termToDataError -> dcConfig
@@ -57,12 +59,10 @@ dcFifoBBF _isD _primName args _resTys = do
     -- TODO: Make this blackbox return multiple results, instead of a tuple. See:
     --       https://github.com/clash-lang/clash-compiler/pull/1560
     --  , _, _, _, _, _, _, _
-     ] = lefts args
-
-  pure $ Right (bbMeta dcConfig, bb dcConfig)
-
- where
-  bbMeta dcConfig = emptyBlackBoxMeta
+     ] <- lefts args
+  =
+ let
+  bbMeta = emptyBlackBoxMeta
     { N.bbKind = N.TDecl
     , N.bbIncludes =
       [ ( ("dcfifo", "tcl")
@@ -80,12 +80,16 @@ dcFifoBBF _isD _primName args _resTys = do
     --   ]
     }
 
-  bb :: DcConfig n -> BlackBox
-  bb dcConfig = BBFunction (show 'dcFifoTF) 0 (dcFifoTF dcConfig)
+  bb :: BlackBox
+  bb = BBFunction (show 'dcFifoTF) 0 (dcFifoTF dcConfig)
+ in
+  pure $ Right (bbMeta, bb)
+
+dcFifoBBF _ _ args _ = error ("dcFifoBBF, bad args: " <> show args)
 
 -- | Instantiate IP generated with 'dcFifoTclTF'
 dcFifoTF :: HasCallStack => DcConfig n -> TemplateFunction
-dcFifoTF DcConfig{..} =
+dcFifoTF config =
   TemplateFunction
     -- ( KnownDomain write        -- 0
     -- , KnownDomain read         -- 1
@@ -104,20 +108,27 @@ dcFifoTF DcConfig{..} =
     -- Signal read Bool ->        -- 13
     [0, 1, 7, 8, 9, 10, 11, 12, 13]
     (const True)
-    $ \bbCtx -> do
+    (dcFifoBBTF config)
+ where
+
+dcFifoBBTF ::
+  Backend s =>
+  DcConfig n ->
+  BlackBoxContext ->
+  State s Doc
+dcFifoBBTF DcConfig{..} bbCtx
+  | [  knownDomainWrite, knownDomainRead
+    , _nfDataX, _knownNatDepth
+    , _constraint1, _constraint2, _hasCallStack
+    , _dcConfig
+    , wClk, wRst, rClk, rRst, wDataM
+    , rEnable
+    ] <- map fst (DSL.tInputs bbCtx)
+  , [tResult] <- map DSL.ety (DSL.tResults bbCtx)
+  , [dcFifoName] <- N.bbQsysIncName bbCtx
+  = do
   let
     depth = snatToNum dcDepth
-
-    [  knownDomainWrite, knownDomainRead
-     , _nfDataX, _knownNatDepth
-     , _constraint1, _constraint2, _hasCallStack
-     , _dcConfig
-     , wClk, wRst, rClk, rRst, wDataM
-     , rEnable
-     ] = map fst (DSL.tInputs bbCtx)
-
-    [tResult] = map DSL.ety (DSL.tResults bbCtx)
-    [dcFifoName] = N.bbQsysIncName bbCtx
 
   dcFifoInstName <- Id.makeBasic "dcfifo_inst"
 
@@ -254,10 +265,12 @@ dcFifoTF DcConfig{..} =
       , rdEmptyBool, rdUnderBool, rdDataCountUnsigned, rdDout
       ]]
 
+dcFifoBBTF _ bbCtx = error ("dcFifoBBTF, bad bbCtx: " <> show bbCtx)
+
 -- | Renders Tcl file conforming to the /Clash\<->Tcl API/, creating the Xilinx
 -- IP with @create_ip@
 dcFifoTclTF :: HasCallStack => DcConfig n -> TemplateFunction
-dcFifoTclTF DcConfig{..} =
+dcFifoTclTF conf =
   TemplateFunction
     -- ( KnownDomain write        -- 0
     -- , KnownDomain read         -- 1
@@ -276,17 +289,24 @@ dcFifoTclTF DcConfig{..} =
     -- Signal read Bool ->        -- 13
     [7, 12]
     (const True)
-    $ \bbCtx ->
-      let [dcFifoName] = N.bbQsysIncName bbCtx
-          [  _knownDomainWrite, _knownDomainRead, _nfDataX
-           , _knownNatDepth, _constraint1, _constraint2, _hasCallStack
-           , _dcConfig, _wClk, _wRst, _rClk, _rRst, wDataM, _rEnable
-           ] = map fst (DSL.tInputs bbCtx)
-          width = DSL.tySize (DSL.ety wDataM) - 1 :: Int -- (-1) cause it's Maybe
-      in  pure (renderTcl [IpConfigPurpose $ ipConfig dcFifoName width])
- where
-  ipConfig nm width = (defIpConfig "fifo_generator" "13.2" nm){properties = props width}
+    (dcFifoTclBBTF conf)
+
+dcFifoTclBBTF ::
+  Backend s =>
+  DcConfig n ->
+  BlackBoxContext ->
+  State s Doc
+dcFifoTclBBTF DcConfig{..} bbCtx
+  | [dcFifoName] <- N.bbQsysIncName bbCtx
+  , [  _knownDomainWrite, _knownDomainRead, _nfDataX
+    , _knownNatDepth, _constraint1, _constraint2, _hasCallStack
+    , _dcConfig, _wClk, _wRst, _rClk, _rRst, wDataM, _rEnable
+    ] <- map fst (DSL.tInputs bbCtx)
+  , let width = DSL.tySize (DSL.ety wDataM) - 1 :: Int -- (-1) cause it's Maybe
+  = pure (renderTcl [IpConfigPurpose $ ipConfig dcFifoName width])
+  where
   depth = snatToNum @Int dcDepth
+  ipConfig nm width = (defIpConfig "fifo_generator" "13.2" nm){properties = props width}
 
   -- NOTE: The product guide listed the wrong default value for
   -- "use_dout_register" (which in reality defaults to "true" for UltraScale
@@ -330,3 +350,5 @@ dcFifoTclTF DcConfig{..} =
     , property       "Read_Data_Count_Width"        depth
     , property       "Disable_Timing_Violations"    False
     ]
+
+dcFifoTclBBTF _ bbCtx = error ("dcFifoTclBBTF, bad bbCtx: " <> show bbCtx)

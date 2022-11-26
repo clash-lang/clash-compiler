@@ -80,7 +80,9 @@ mkUnique# is id0 = (is{is_freshCache=freshCache, is_store=isStore}, id2)
  where
   freshCache = updateFreshCache# (is_freshCache is) id2
   isStore = HashSet.insert id2 (is_store is)
-  id2 = id1{i_provenance=if debugIsOn then callStack else emptyCallStack}
+  id2 = case id1 of
+          x@RawIdentifier{} -> x
+          y -> y{i_provenance=if debugIsOn then callStack else emptyCallStack}
   id1 = case lookupFreshCache# (is_freshCache is) id0 of
     Just currentMax ->
       id0{i_extensionsRev=currentMax+1 : tail (i_extensionsRev id0)}

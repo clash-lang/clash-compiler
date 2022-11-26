@@ -133,7 +133,7 @@ Library
                       RecordWildCards
                       TemplateHaskell
 
-  Build-depends:      aeson                   >= 0.6.2.0  && < 2.1,
+  Build-depends:      aeson                   >= 0.6.2.0  && < 2.2,
                       aeson-pretty            >= 0.8      && < 0.9,
                       ansi-terminal           >= 0.8.0.0  && < 0.12,
                       array,
@@ -155,7 +155,7 @@ Library
                       exceptions              >= 0.8.3    && < 0.11.0,
                       extra                   >= 1.6.17   && < 1.8,
                       filepath                >= 1.3.0.1  && < 1.5,
-                      ghc                     >= 8.6.0    && < 9.1,
+                      ghc                     >= 8.6.0    && < 9.3,
                       ghc-boot-th,
                       hashable                >= 1.2.1.0  && < 1.5,
                       haskell-src-meta        >= 0.8      && < 0.9,
@@ -167,7 +167,7 @@ Library
                       prettyprinter           >= 1.2.0.1  && < 1.8,
                       pretty-show             >= 1.9      && < 2.0,
                       primitive               >= 0.5.0.1  && < 1.0,
-                      template-haskell        >= 2.8.0.0  && < 2.18,
+                      template-haskell        >= 2.8.0.0  && < 2.19,
                       temporary               >= 1.2.1    && < 1.4,
                       terminal-size           >= 0.3      && < 0.4,
                       text                    >= 1.2.2    && < 2.1,
@@ -342,6 +342,8 @@ executable static-files
   Other-Modules:      Paths_clash_lib
   GHC-Options:        -Wall -Wcompat
   default-language:   Haskell2010
+  if impl(ghc >= 9.2.0)
+    buildable: False
 
 
 test-suite doctests

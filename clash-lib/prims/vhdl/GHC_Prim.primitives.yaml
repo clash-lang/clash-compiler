@@ -1257,3 +1257,753 @@
           when (~ARG[1] /= 0) else (others => 'X')
           -- pragma translate_on
           ;
+- BlackBox:
+    name: GHC.Prim.int8ToInt#
+    kind: Expression
+    template: resize(~ARG[0],~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.intToInt8#
+    kind: Expression
+    template: ~VAR[i][0](7 downto 0)
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.negateInt8#
+    kind: Expression
+    template: -~ARG[0]
+- BlackBox:
+    name: GHC.Prim.timesInt8#
+    kind: Expression
+    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+- BlackBox:
+    name: GHC.Prim.quotInt8#
+    kind: Declaration
+    template: |-
+      ~RESULT <= ~ARG[0] / ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.remInt8#
+    kind: Declaration
+    template: |-
+      ~RESULT <= ~ARG[0] rem ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.quotRemInt8#
+    kind: Declaration
+    template: |-
+      ~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else ((others => 'X'), (others => 'X'))
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftLInt8#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= shift_left(~ARG[0],~SYM[1])
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftRAInt8#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftR][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= shift_right(~ARG[0],~SYM[1])
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftRLInt8#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftRL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= ~ARG[0] srl ~SYM[1]
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.int8ToWord8#
+    kind: Expression
+    template: unsigned(std_logic_vector(~ARG[0]))
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.eqInt8#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.geInt8#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.gtInt8#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.leInt8#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.ltInt8#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.neInt8#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.word8ToWord#
+    kind: Expression
+    template: resize(~ARG[0],~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.wordToWord8#
+    kind: Expression
+    template: resize(~ARG[0],~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.timesWord8#
+    kind: Expression
+    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+- BlackBox:
+    name: GHC.Prim.quotWord8#
+    kind: Declaration
+    template: |-
+      ~RESULT <= ~ARG[0] / ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.remWord8#
+    kind: Declaration
+    template: |-
+      ~RESULT <= ~ARG[0] rem ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.quotRemWord8#
+    kind: Declaration
+    template: |-
+      ~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else ((others => 'X'), (others => 'X'))
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.andWord8#
+    kind: Expression
+    template: ~ARG[0] and ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.orWord8#
+    kind: Expression
+    template: ~ARG[0] or ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.xorWord8#
+    kind: Expression
+    template: ~ARG[0] xor ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.notWord8#
+    kind: Expression
+    template: not ~ARG[0]
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftLWord8#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= shift_left(~ARG[0],~SYM[1])
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftRLWord8#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftRL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= ~ARG[0] srl ~SYM[1]
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.word8ToInt8#
+    kind: Expression
+    template: signed(std_logic_vector(~ARG[0]))
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.eqWord8#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.geWord8#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.gtWord8#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.leWord8#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.ltWord8#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.neWord8#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.int16ToInt#
+    kind: Expression
+    template: resize(~ARG[0],~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.intToInt16#
+    kind: Expression
+    template: ~VAR[i][0](15 downto 0)
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.negateInt16#
+    kind: Expression
+    template: -~ARG[0]
+- BlackBox:
+    name: GHC.Prim.timesInt16#
+    kind: Expression
+    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+- BlackBox:
+    name: GHC.Prim.quotInt16#
+    kind: Declaration
+    template: |-
+      ~RESULT <= ~ARG[0] / ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.remInt16#
+    kind: Declaration
+    template: |-
+      ~RESULT <= ~ARG[0] rem ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.quotRemInt16#
+    kind: Declaration
+    template: |-
+      ~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else ((others => 'X'), (others => 'X'))
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftLInt16#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= shift_left(~ARG[0],~SYM[1])
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftRAInt16#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftR][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= shift_right(~ARG[0],~SYM[1])
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftRLInt16#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftRL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= ~ARG[0] srl ~SYM[1]
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.int16ToWord16#
+    kind: Expression
+    template: unsigned(std_logic_vector(~ARG[0]))
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.eqInt16#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.geInt16#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.gtInt16#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.leInt16#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.ltInt16#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.neInt16#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.word16ToWord#
+    kind: Expression
+    template: resize(~ARG[0],~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.wordToWord16#
+    kind: Expression
+    template: resize(~ARG[0],~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.timesWord16#
+    kind: Expression
+    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+- BlackBox:
+    name: GHC.Prim.quotWord16#
+    kind: Declaration
+    template: |-
+      ~RESULT <= ~ARG[0] / ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.remWord16#
+    kind: Declaration
+    template: |-
+      ~RESULT <= ~ARG[0] rem ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.quotRemWord16#
+    kind: Declaration
+    template: |-
+      ~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else ((others => 'X'), (others => 'X'))
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.andWord16#
+    kind: Expression
+    template: ~ARG[0] and ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.orWord16#
+    kind: Expression
+    template: ~ARG[0] or ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.xorWord16#
+    kind: Expression
+    template: ~ARG[0] xor ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.notWord16#
+    kind: Expression
+    template: not ~ARG[0]
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftLWord16#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= shift_left(~ARG[0],~SYM[1])
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftRLWord16#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftRL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= ~ARG[0] srl ~SYM[1]
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.word16ToInt16#
+    kind: Expression
+    template: signed(std_logic_vector(~ARG[0]))
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.eqWord16#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.geWord16#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.gtWord16#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.leWord16#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.ltWord16#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.neWord16#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.int32ToInt#
+    kind: Expression
+    template: resize(~ARG[0],~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.intToInt32#
+    kind: Expression
+    template: ~VAR[i][0](31 downto 0)
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.negateInt32#
+    kind: Expression
+    template: -~ARG[0]
+- BlackBox:
+    name: GHC.Prim.timesInt32#
+    kind: Expression
+    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+- BlackBox:
+    name: GHC.Prim.quotInt32#
+    kind: Declaration
+    template: |-
+      ~RESULT <= ~ARG[0] / ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.remInt32#
+    kind: Declaration
+    template: |-
+      ~RESULT <= ~ARG[0] rem ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.quotRemInt32#
+    kind: Declaration
+    template: |-
+      ~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else ((others => 'X'), (others => 'X'))
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftLInt32#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= shift_left(~ARG[0],~SYM[1])
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftRAInt32#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftR][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= shift_right(~ARG[0],~SYM[1])
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftRLInt32#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftRL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= ~ARG[0] srl ~SYM[1]
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.int32ToWord32#
+    kind: Expression
+    template: unsigned(std_logic_vector(~ARG[0]))
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.eqInt32#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.geInt32#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.gtInt32#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.leInt32#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.ltInt32#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.neInt32#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.word32ToWord#
+    kind: Expression
+    template: resize(~ARG[0],~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.wordToWord32#
+    kind: Expression
+    template: resize(~ARG[0],~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.timesWord32#
+    kind: Expression
+    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+- BlackBox:
+    name: GHC.Prim.quotWord32#
+    kind: Declaration
+    template: |-
+      ~RESULT <= ~ARG[0] / ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.remWord32#
+    kind: Declaration
+    template: |-
+      ~RESULT <= ~ARG[0] rem ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.quotRemWord32#
+    kind: Declaration
+    template: |-
+      ~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else ((others => 'X'), (others => 'X'))
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.andWord32#
+    kind: Expression
+    template: ~ARG[0] and ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.orWord32#
+    kind: Expression
+    template: ~ARG[0] or ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.xorWord32#
+    kind: Expression
+    template: ~ARG[0] xor ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.notWord32#
+    kind: Expression
+    template: not ~ARG[0]
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftLWord32#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= shift_left(~ARG[0],~SYM[1])
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftRLWord32#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftRL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= ~ARG[0] srl ~SYM[1]
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.word32ToInt32#
+    kind: Expression
+    template: signed(std_logic_vector(~ARG[0]))
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.eqWord32#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.geWord32#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.gtWord32#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.leWord32#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.ltWord32#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.neWord32#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);

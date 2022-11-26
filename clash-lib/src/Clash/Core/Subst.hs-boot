@@ -19,3 +19,4 @@ aeqType
   -> Bool
 
 instance Eq Type
+instance Ord Type

@@ -7,6 +7,7 @@ import qualified Data.Aeson.Encode.Pretty as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Base16 as Base16
 import Data.Coerce (coerce)
+import Data.Either (fromRight)
 import Data.Text (Text)
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text as Text
@@ -89,7 +90,8 @@ tests =
         manifest@Manifest{fileNames} <- genManifest
         let
           encoded = Aeson.encodePretty manifest
-          Right (FilesManifest fileNamesDecoded) = Aeson.eitherDecode encoded
+          FilesManifest fileNamesDecoded =
+            fromRight (error "Failed to decode manifest") (Aeson.eitherDecode encoded)
 
         pure (fileNamesDecoded Q.=== fileNames)
     ]

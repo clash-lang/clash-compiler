@@ -393,50 +393,56 @@ renderElem
 renderElem b (Component (Decl n subN (l:ls))) = do
   (o,oTy,_) <- idToExpr <$> bitraverse (lineToIdentifier b) (return . lineToType b) l
   is <- mapM (fmap idToExpr . bitraverse (lineToIdentifier b) (return . lineToType b)) ls
+  sp <- getSrcSpan
   let func0 = IntMap.lookup n (bbFunctions b)
       errr = concat [ "renderElem: not enough functions rendered? Needed "
                     , show (subN +1 ), " got only ", show (length (fromJust func0)) ]
-      func1 = indexNote' errr subN <$> func0
-      Just (templ0,_,libs,imps,inc,pCtx) = func1
-      b' = pCtx { bbResults = [(o,oTy)], bbInputs = bbInputs pCtx ++ is }
-      layoutOptions = LayoutOptions (AvailablePerLine 120 0.4)
-      render = N.BBTemplate . parseFail . renderLazy . layoutPretty layoutOptions
+  case indexNote' errr subN <$> func0 of
+    Just (templ0,_,libs,imps,inc,pCtx) -> do
+      let b' = pCtx { bbResults = [(o,oTy)], bbInputs = bbInputs pCtx ++ is }
+          layoutOptions = LayoutOptions (AvailablePerLine 120 0.4)
+          render = N.BBTemplate . parseFail . renderLazy . layoutPretty layoutOptions
 
-  templ1 <-
-    case templ0 of
-      Left t ->
-        return t
-      Right (nm0,ds) -> do
-        nm1 <- Id.next nm0
-        block <- getAp (blockDecl nm1 ds)
-        return (render block)
-
-  templ4 <-
-    case templ1 of
-      N.BBFunction {} ->
-        return templ1
-      N.BBTemplate templ2 -> do
-        (templ3, templDecls) <- setSym b' templ2
-        case templDecls of
-          [] ->
-            return (N.BBTemplate templ3)
-          _ -> do
-            nm1 <- Id.toText <$> Id.makeBasic "bb"
-            nm2 <- Id.makeBasic "bb"
-            let bbD = BlackBoxD nm1 libs imps inc (N.BBTemplate templ3) b'
-            block <- getAp (blockDecl nm2 (templDecls ++ [bbD]))
+      templ1 <-
+        case templ0 of
+          Left t ->
+            return t
+          Right (nm0,ds) -> do
+            nm1 <- Id.next nm0
+            block <- getAp (blockDecl nm1 ds)
             return (render block)
 
-  case verifyBlackBoxContext b' templ4 of
-    Nothing -> do
-      bb <- renderBlackBox libs imps inc templ4 b'
-      return (renderLazy . layoutPretty layoutOptions . bb)
-    Just err0 -> do
-      sp <- getSrcSpan
-      let err1 = concat [ "Couldn't instantiate blackbox for "
-                        , Data.Text.unpack (bbName b), ". Verification procedure "
-                        , "reported:\n\n" ++ err0 ]
-      throw (ClashException sp ($(curLoc) ++ err1) Nothing)
+      templ4 <-
+        case templ1 of
+          N.BBFunction {} ->
+            return templ1
+          N.BBTemplate templ2 -> do
+            (templ3, templDecls) <- setSym b' templ2
+            case templDecls of
+              [] ->
+                return (N.BBTemplate templ3)
+              _ -> do
+                nm1 <- Id.toText <$> Id.makeBasic "bb"
+                nm2 <- Id.makeBasic "bb"
+                let bbD = BlackBoxD nm1 libs imps inc (N.BBTemplate templ3) b'
+                block <- getAp (blockDecl nm2 (templDecls ++ [bbD]))
+                return (render block)
+
+      case verifyBlackBoxContext b' templ4 of
+        Nothing -> do
+          bb <- renderBlackBox libs imps inc templ4 b'
+          return (renderLazy . layoutPretty layoutOptions . bb)
+        Just err0 -> do
+          let err1 = concat [ "Couldn't instantiate blackbox for "
+                            , Data.Text.unpack (bbName b), ". Verification procedure "
+                            , "reported:\n\n" ++ err0 ]
+          throw (ClashException sp ($(curLoc) ++ err1) Nothing)
+    Nothing ->
+      let err1 = concat [show n
+                        , "'th argument isn't a function, only "
+                        , show (IntMap.keys (bbFunctions b))
+                        , "are."]
+       in throw (ClashException sp ($(curLoc) ++ err1) Nothing)
 
 renderElem b (SigD e m) = do
   e' <- Text.concat <$> mapM (fmap ($ 0) . renderElem b) e

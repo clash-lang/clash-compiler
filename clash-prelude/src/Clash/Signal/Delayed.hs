@@ -88,29 +88,39 @@ delayed
   -> DSignal dom (n + d) a
 delayed = hideClockResetEnable E.delayed
 
--- | Delay a 'DSignal' for @d@ periods, where @d@ is derived from the context.
---
--- @
--- delay2
---   :: HiddenClockResetEnable dom
---   => Int
---   -> 'DSignal' dom n Int
---   -> 'DSignal' dom (n + 2) Int
--- delay2 = 'delayedI'
--- @
---
--- >>> sampleN @System 7 (toSignal (delay2 (-1) (dfromList [0..])))
--- [-1,-1,-1,1,2,3,4]
---
--- Or @d@ can be specified using type application:
---
--- >>> :t delayedI @3
--- delayedI @3
---   :: (...
---       ...
---       ...
---       ...) =>
---      a -> DSignal dom n a -> DSignal dom (n + 3) a
+{- | Delay a 'DSignal' for @d@ periods, where @d@ is derived from the context.
+
+@
+delay2
+  :: HiddenClockResetEnable dom
+  => Int
+  -> 'DSignal' dom n Int
+  -> 'DSignal' dom (n + 2) Int
+delay2 = 'delayedI'
+@
+
+>>> sampleN @System 7 (toSignal (delay2 (-1) (dfromList [0..])))
+[-1,-1,-1,1,2,3,4]
+
+Or @d@ can be specified using type application:
+
+#if __GLASGOW_HASKELL__ >= 902
+>>> :t delayedI @3
+delayedI @3
+  :: ... =>
+     a -> DSignal dom n a -> DSignal dom (n + 3) a
+
+#else
+>>> :t delayedI @3
+delayedI @3
+  :: (...
+      ...
+      ...
+      ...) =>
+     a -> DSignal dom n a -> DSignal dom (n + 3) a
+
+#endif
+-}
 delayedI
   :: ( KnownNat d
      , NFDataX a

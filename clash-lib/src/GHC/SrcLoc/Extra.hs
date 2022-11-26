@@ -32,11 +32,6 @@ import FastString                           (FastString (..), bytesFS, mkFastStr
 #endif
 
 
-#if MIN_VERSION_ghc(9,0,0)
-deriving instance Ord SrcSpan
-deriving instance Ord UnhelpfulSpanReason
-#endif
-
 deriving instance Generic SrcSpan
 instance Hashable SrcSpan
 

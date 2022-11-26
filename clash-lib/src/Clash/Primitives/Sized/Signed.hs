@@ -32,9 +32,9 @@ fromIntegerTFTemplateVhdl
   :: Backend s
   => BlackBoxContext
   -> State s Doc
-fromIntegerTFTemplateVhdl bbCtx = getAp $ do
-  let [(Literal _ (NumLit sz),_,_), (i, Signed szI, _)] = bbInputs bbCtx
-  case compare sz (toInteger szI) of
+fromIntegerTFTemplateVhdl bbCtx
+  | [(Literal _ (NumLit sz),_,_), (i, Signed szI, _)] <- bbInputs bbCtx
+  = getAp $ case compare sz (toInteger szI) of
     LT -> case i of
            Identifier iV m ->
             let sl = Sliced (Signed szI,fromInteger sz-1,0)
@@ -44,3 +44,5 @@ fromIntegerTFTemplateVhdl bbCtx = getAp $ do
     EQ -> expr False i
     GT -> "resize" <> tupled (sequenceA [expr False i
                                         ,expr False (Literal Nothing (NumLit sz))])
+  | otherwise
+  = error ("fromIntegerTFTemplateVhdl: bad bInputs: " <> show (bbInputs bbCtx))

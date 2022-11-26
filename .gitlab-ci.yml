@@ -56,6 +56,11 @@ tests-9.0:
   variables:
     GHC_VERSION: 9.0.2
 
+tests-9.2:
+  extends: .common-trigger
+  variables:
+    GHC_VERSION: 9.2.5
+
 stack-build:
   extends: .common
   needs: []

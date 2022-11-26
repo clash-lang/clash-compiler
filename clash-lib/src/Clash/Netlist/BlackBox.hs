@@ -302,6 +302,20 @@ mkArgument bbName bndr nArg e = do
           return ((N.Literal (Just (Signed 64,64)) (N.NumLit i),hwTy,True),[])
         (C.Literal (Word64Literal i), [],_) ->
           return ((N.Literal (Just (Unsigned 64,64)) (N.NumLit i),hwTy,True),[])
+#if MIN_VERSION_base(4,16,0)
+        (C.Literal (Int8Literal i), [],_) ->
+          return ((N.Literal (Just (Signed 8,8)) (N.NumLit i),hwTy,True),[])
+        (C.Literal (Int16Literal i), [],_) ->
+          return ((N.Literal (Just (Signed 16,16)) (N.NumLit i),hwTy,True),[])
+        (C.Literal (Int32Literal i), [],_) ->
+          return ((N.Literal (Just (Signed 16,16)) (N.NumLit i),hwTy,True),[])
+        (C.Literal (Word8Literal i), [],_) ->
+          return ((N.Literal (Just (Unsigned 8,8)) (N.NumLit i),hwTy,True),[])
+        (C.Literal (Word16Literal i), [],_) ->
+          return ((N.Literal (Just (Unsigned 16,16)) (N.NumLit i),hwTy,True),[])
+        (C.Literal (Word32Literal i), [],_) ->
+          return ((N.Literal (Just (Unsigned 32,32)) (N.NumLit i),hwTy,True),[])
+#endif
         (C.Literal (NaturalLiteral n), [],_) ->
           return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit n),hwTy,True),[])
         (Prim pinfo,args,ticks) -> withTicks ticks $ \tickDecls -> do
@@ -605,26 +619,31 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
           | pNm == "Clash.Explicit.SimIO.fmapSimIO#" -> do
               resM <- resBndr1 True dst
               case resM of
-                Just (_,dstNm,dstDecl) -> do
-                  tcm <- Lens.view tcCache
-                  let (fun0:arg0:_) = lefts args
-                      arg1 = unSimIO tcm arg0
-                      fun1 = case fun0 of
-                        Lam b bE ->
-                          let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet fun0)
-                              subst = extendIdSubst (mkSubst is0) b arg1
-                          in  substTm "mkPrimitive.fmapSimIO" subst bE
-                        _ -> mkApps fun0 [Left arg1]
-                  (expr,bindDecls) <- mkExpr False Sequential dst fun1
-                  assn <- case expr of
-                            Noop -> pure []
-                            _ -> do declareUse (Proc Blocking) dstNm
-                                    pure [Assignment dstNm (Proc Blocking) expr]
-                  return (Identifier dstNm Nothing, dstDecl ++ bindDecls ++ assn)
-                Nothing -> do
-                  let (_:arg0:_) = lefts args
-                  (_,bindDecls) <- mkExpr True Sequential dst arg0
-                  return (Noop, bindDecls)
+                Just (_,dstNm,dstDecl) -> case lefts args of
+                  (fun0:arg0:_) -> do
+                    tcm <- Lens.view tcCache
+                    let arg1 = unSimIO tcm arg0
+                        fun1 = case fun0 of
+                          Lam b bE ->
+                            let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet fun0)
+                                subst = extendIdSubst (mkSubst is0) b arg1
+                            in  substTm "mkPrimitive.fmapSimIO" subst bE
+                          _ -> mkApps fun0 [Left arg1]
+                    (expr,bindDecls) <- mkExpr False Sequential dst fun1
+                    assn <- case expr of
+                              Noop -> pure []
+                              _ -> do declareUse (Proc Blocking) dstNm
+                                      pure [Assignment dstNm (Proc Blocking) expr]
+                    return (Identifier dstNm Nothing, dstDecl ++ bindDecls ++ assn)
+                  args1 -> error ("internal error: fmapSimIO# has insufficient arguments"
+                                  <> showPpr args1)
+                Nothing -> case lefts args of
+                  (_:arg0:_) -> do
+                    (_,bindDecls) <- mkExpr True Sequential dst arg0
+                    return (Noop, bindDecls)
+                  args1 -> error ("internal error: fmapSimIO# has insufficient arguments"
+                                  <> showPpr args1)
+
 
           | pNm == "Clash.Explicit.SimIO.unSimIO#" ->
               case lefts args of
@@ -789,15 +808,16 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
                           Lens.foldMapOf freeIds unitVarSet mealyIn)
       -- Given that we're creating a sequential list of statements from the
       -- let-bindings, make sure that everything is inverse topologically sorted
-      (bs,res) = case inverseTopSortLetBindings res0 of
-        Letrec bsN (C.Var resN) -> (bsN,resN)
-        Letrec bsN e ->
-          let u = case dst of
-                    CoreId u0 -> u0
-                    _ -> uniqAway is0
-                           (mkLocalId (inferCoreTypeOf tcm e)
-                                      (mkUnsafeSystemName "mealyres" 0))
-          in  (bsN ++ [(u,e)], u)
+      (bs,res) = case res0 of
+        Letrec bsU e | let bsN = inverseTopSortLetBindings bsU -> case e of
+          C.Var resN -> (bsN,resN)
+          _ ->
+            let u = case dst of
+                      CoreId u0 -> u0
+                      _ -> uniqAway is0
+                            (mkLocalId (inferCoreTypeOf tcm e)
+                                        (mkUnsafeSystemName "mealyres" 0))
+            in  (bsN ++ [(u,e)], u)
         e ->
           let u = case dst of
                     CoreId u0 -> u0
@@ -945,7 +965,7 @@ collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
   let qS = substTm "collectBindIO1" subst q
   case splitNormalized tcm qS of
     Right (args,bs0,res) -> do
-      let Letrec bs _ = inverseTopSortLetBindings (Letrec bs0 (C.Var res))
+      let bs = inverseTopSortLetBindings bs0
       let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet qS)
       normE <- mkUniqueNormalized is0 Nothing (args,bs,res)
       case normE of
@@ -966,7 +986,7 @@ collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
  where
   collectAction tcm = case splitNormalized tcm m of
     Right (args,bs0,res) -> do
-      let Letrec bs _ = inverseTopSortLetBindings (Letrec bs0 (C.Var res))
+      let bs = inverseTopSortLetBindings bs0
       let is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet m)
       normE <- mkUniqueNormalized is0 Nothing (args,(x,m):bs,res)
       case normE of

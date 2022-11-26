@@ -216,9 +216,11 @@ declarationReturn
 declarationReturn bbCtx blockName blockBuilder =
   declaration blockName $ do
     res <- blockBuilder
-    forM_ (zip (bbResults bbCtx) res) $ \(rNm, r) -> do
-      let (Identifier resultNm Nothing, _) = rNm
-      addDeclaration (Assignment resultNm Cont (eex r))
+    forM_ (zip (bbResults bbCtx) res) $ \(rNm, r) -> case rNm of
+      (Identifier resultNm Nothing, _) ->
+        addDeclaration (Assignment resultNm Cont (eex r))
+      (t,_) -> error ("declarationReturn expected an Identifier, but got: " <> show t)
+
 
 emptyBlockState :: backend -> BlockState backend
 emptyBlockState bck = BlockState
@@ -286,7 +288,11 @@ assign
   -> State (BlockState backend) TExpr
   -- ^ the identifier of the expression that actually got assigned
 assign aName (TExpr ty aExpr) = do
-  texp@(~(TExpr _ (Identifier uniqueName Nothing))) <- declare aName ty
+  texp <- declare aName ty
+  let uniqueName = case texp of
+        TExpr _ (Identifier x Nothing) -> x
+        t' -> error ("assign expected an Identifier, but got: " <> show t')
+
   addDeclaration (Assignment uniqueName Cont aExpr)
   pure texp
 
@@ -302,7 +308,11 @@ unvec
   -> State (BlockState backend) [TExpr]
   -- ^ Vector elements
 unvec vName v@(ety -> Vector vSize eType) = do
-  ~(TExpr _ (Identifier vUniqueName Nothing)) <- toIdentifier vName v
+  texp <- toIdentifier vName v
+  let vUniqueName = case texp of
+        TExpr _ (Identifier x Nothing) -> x
+        t' -> error ("unvec expected an Identifier, but got: " <> show t')
+
   let vIndex i = Identifier vUniqueName (Just (Indexed (ety v, 10, i)))
   pure (map (TExpr eType . vIndex) [0..vSize-1])
 unvec _ e = error $ "unvec: cannot be called on non-vector: " <> show (ety e)
@@ -413,7 +423,10 @@ boolToBit bitName = \case
   T -> pure High
   F -> pure Low
   TExpr Bool boolExpr -> do
-    texp@(~(TExpr _ (Identifier uniqueBitName Nothing))) <- declare bitName Bit
+    texp <- declare bitName Bit
+    let uniqueBitName = case texp of
+          TExpr _ (Identifier x Nothing) -> x
+          t' -> error ("boolFromBit expected an Identifier, but got: " <> show t')
     addDeclaration $
       CondAssignment uniqueBitName Bit boolExpr Bool
         [ (Just (BoolLit True), Literal Nothing (BitLit H))
@@ -432,7 +445,10 @@ enableToBit
   -> State (BlockState backend) TExpr
 enableToBit bitName = \case
   TExpr ena@(Enable _) enableExpr -> do
-    texp@(~(TExpr _ (Identifier uniqueBitName Nothing))) <- declare bitName Bit
+    texp <- declare bitName Bit
+    let uniqueBitName = case texp of
+          TExpr _ (Identifier x Nothing) -> x
+          t' -> error ("boolFromBit expected an Identifier, but got: " <> show t')
     addDeclaration $
       CondAssignment uniqueBitName Bit enableExpr ena
         -- Enable normalizes to Bool for all current backends
@@ -457,7 +473,10 @@ boolFromBit boolName = \case
   High -> pure T
   Low -> pure F
   TExpr Bit bitExpr -> do
-    texp@(~(TExpr _ (Identifier uniqueBoolName Nothing))) <- declare boolName Bool
+    texp <- declare boolName Bool
+    let uniqueBoolName = case texp of
+          TExpr _ (Identifier x Nothing) -> x
+          t' -> error ("boolFromBit expected an Identifier, but got: " <> show t')
     addDeclaration $
       CondAssignment uniqueBoolName Bool bitExpr Bit
         [ (Just (BitLit H), Literal Nothing (BoolLit True))
@@ -854,7 +873,10 @@ toIdentifier'
   -- ^ identifier to expression
 toIdentifier' _ (TExpr _ (Identifier aExpr Nothing)) = pure aExpr
 toIdentifier' nm texp = do
-  ~(TExpr _ (Identifier nm' Nothing)) <- assign nm texp
+  t <- assign nm texp
+  let nm' = case t of
+              TExpr _ (Identifier x Nothing) -> x
+              t' -> error ("toIdentifier' expected an Identifier, but got: " <> show t')
   pure nm'
 
 -- | Get an identifier to an expression, creating a new assignment if
