@@ -225,7 +225,7 @@ powUNat x (USucc y) = mulUNat x (powUNat x y)
 -- __NB__: Not synthesizable
 predUNat :: UNat (n+1) -> UNat n
 predUNat (USucc x) = x
-#if __GLASGOW_HASKELL__ < 902
+#if __GLASGOW_HASKELL__ != 902
 predUNat UZero     =
   error "predUNat: impossible: 0 minus 1, -1 is not a natural number"
 #endif
@@ -484,7 +484,7 @@ div2Sub1BNat _      = error "div2Sub1BNat: impossible: 2*n+1 ~ 2*n"
 --
 -- __NB__: Not synthesizable
 log2BNat :: BNat (2^n) -> BNat n
-#if __GLASGOW_HASKELL__ < 902
+#if __GLASGOW_HASKELL__ != 902
 log2BNat BT = error "log2BNat: log2(0) not defined"
 #endif
 log2BNat (B1 x) = case stripZeros x of
