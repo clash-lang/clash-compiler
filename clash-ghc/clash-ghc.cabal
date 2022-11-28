@@ -173,31 +173,31 @@ library
                       ghc-typelits-natnormalise >= 0.6      && < 0.8,
                       deepseq                   >= 1.3.0.2  && < 1.5,
                       time                      >= 1.4.0.1  && < 1.14,
-                      ghc-boot                  >= 8.6.0    && < 9.3,
-                      ghc-prim                  >= 0.3.1.0  && < 0.9,
-                      ghci                      >= 8.6.0    && < 9.3,
+                      ghc-boot                  >= 8.6.0    && < 9.5,
+                      ghc-prim                  >= 0.3.1.0  && < 0.10,
+                      ghci                      >= 8.6.0    && < 9.5,
                       uniplate                  >= 1.6.12   && < 1.8,
                       reflection                >= 2.1.2    && < 3.0,
                       primitive                 >= 0.5.0.1  && < 1.0,
-                      template-haskell          >= 2.8.0.0  && < 2.19,
+                      template-haskell          >= 2.8.0.0  && < 2.20,
                       utf8-string               >= 1.0.0.0  && < 1.1.0.0,
                       vector                    >= 0.11     && < 1.0
 
   if os(windows)
     -- 8.8 is broken on Windows - it randomly segfaults
-    Build-Depends: ghc >= 8.6.0 && < 8.8.0 || >= 8.10.0 && < 9.3
+    Build-Depends: ghc >= 8.6.0 && < 8.8.0 || >= 8.10.0 && < 9.5
   elif os(darwin)
     -- 8.10 is broken on macOS - it exits tests with status code -11
-    Build-Depends: ghc >= 8.6.0 && < 8.10.0 || >= 9.0.0 && < 9.3
+    Build-Depends: ghc >= 8.6.0 && < 8.10.0 || >= 9.0.0 && < 9.5
   else
     -- Unix
-    Build-Depends: ghc >= 8.6.0 && < 9.3
+    Build-Depends: ghc >= 8.6.0 && < 9.5
 
   if impl(ghc >= 8.10.0)
     Build-Depends:    exceptions                >= 0.10.4   && < 0.11,
 
   if impl(ghc >= 9.0.0)
-    Build-Depends:    ghc-bignum                >= 1.0      && < 1.3
+    Build-Depends:    ghc-bignum                >= 1.0      && < 1.4
   else
     Build-Depends:    integer-gmp               >= 1.0.1.0  && < 2.0
 
