@@ -42,7 +42,11 @@ import           Data.Text.Prettyprint.Doc
 
 import           GHC.Generics                   (Generic)
 
-#if MIN_VERSION_ghc(9,0,0)
+#if MIN_VERSION_ghc(9,4,0)
+import           GHC.Types.Basic                (InlineSpec)
+import           GHC.Types.SrcLoc               (SrcSpan)
+import           GHC.Data.Bool                  (OverridingBool(..))
+#elif MIN_VERSION_ghc(9,0,0)
 import           GHC.Types.Basic                (InlineSpec)
 import           GHC.Types.SrcLoc               (SrcSpan)
 import           GHC.Utils.Misc                 (OverridingBool(..))

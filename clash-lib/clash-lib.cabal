@@ -308,6 +308,9 @@ Library
                       -- Used in clash-cores
                       Data.Text.Prettyprint.Doc.Extra
 
+                      -- Used in clash-ghc
+                      GHC.BasicTypes.Extra
+
   Other-Modules:      Clash.Annotations.TopEntity.Extra
                       Data.IntMap.Extra
                       Data.List.Extra
@@ -316,7 +319,6 @@ Library
                       Data.Primitive.ByteArray.Extra
                       Data.Set.Ordered.Extra
                       Data.Text.Extra
-                      GHC.BasicTypes.Extra
                       GHC.SrcLoc.Extra
                       Paths_clash_lib
 

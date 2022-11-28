@@ -52,7 +52,9 @@ import           System.Console.ANSI
   , ConsoleIntensity(BoldIntensity), ConsoleLayer(Foreground), ColorIntensity(Vivid))
 import           System.IO
   (hPutStrLn, stderr, hFlush, hIsTerminalDevice)
-#if MIN_VERSION_ghc(9,0,0)
+#if MIN_VERSION_ghc(9,4,0)
+import           GHC.Data.Bool                 (OverridingBool(..))
+#elif MIN_VERSION_ghc(9,0,0)
 import           GHC.Utils.Misc                (OverridingBool(..))
 #else
 import           Util                          (OverridingBool(..))

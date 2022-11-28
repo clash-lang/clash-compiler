@@ -66,7 +66,9 @@ import           Clash.Primitives.Util (hashCompiledPrimMap)
 import           Clash.Signal (VDomainConfiguration(..))
 import           Clash.Util.Graph (callGraphBindings)
 
-#if MIN_VERSION_ghc(9,0,0)
+#if MIN_VERSION_ghc(9,4,0)
+import GHC.Data.Bool (OverridingBool(..))
+#elif MIN_VERSION_ghc(9,0,0)
 import GHC.Utils.Misc (OverridingBool(..))
 #else
 import Util (OverridingBool(..))
