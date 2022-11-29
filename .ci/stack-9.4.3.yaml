@@ -1,0 +1,24 @@
+resolver: nightly-2022-11-29
+
+ghc-options:
+  "$locals": -Wall -Wcompat
+
+packages:
+- clash-prelude
+- clash-prelude-hedgehog
+- clash-lib
+- clash-lib-hedgehog
+- clash-ghc
+- clash-cores
+- tests
+
+allow-newer: true
+
+extra-deps:
+ - concurrent-supply-0.1.8@sha256:9373f4868ad28936a7b93781b214ef4afdeacf377ef4ac729583073491c9f9fb,1627
+ - string-interpolate-0.3.1.2@sha256:4d0987f453c66040aa8e482fe28a7d3cdc9d8df01b698bc92f42a592cfb337db,4268
+ - prettyprinter-interp-0.2.0.0@sha256:45299b61bd6c27d594c1a72b5a8dd5734e791a59828725e4f4e420f3cc37232b,2016
+ - infinite-list-0.1@sha256:4de250517ce75e128c766fbc1f23b5a778ea964e695e47f8e83e0f3b293091bf,2383
+ - hashable-1.4.1.0
+ - git: https://github.com/haskell-hint/hint.git
+   commit: b2bc76a748819713df534e6e3c376dbe27cc60ce
