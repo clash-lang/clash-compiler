@@ -97,7 +97,7 @@ tests =
  where
   threeSlaveLatch spi =
     testCase (show spi <> ", Divider 8, Slave Latch") $
-      testMasterMultiSlave d4 d1 0b0110011101 0b0110010101 spi True (3 * 84)
+      testMasterMultiSlave d4 d1 0b0110011101 0b0110010101 spi True (3 * 85)
         @?= (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3))
 
   threeSlaveNoLatch spi =
