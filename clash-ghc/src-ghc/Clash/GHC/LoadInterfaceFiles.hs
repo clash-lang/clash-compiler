@@ -44,7 +44,10 @@ import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
 import           Data.Word                   (Word8)
 
--- GHC API
+-- GHC
+#if MIN_VERSION_ghc(9,4,0)
+import           GHC.Driver.Env.KnotVars (emptyKnotVars)
+#endif
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Types.Annotations (Annotation(..))
 import qualified GHC.Types.Annotations as Annotations
@@ -229,7 +232,11 @@ runIfl modName action = do
 
     globalEnv = TcRnTypes.IfGblEnv
       { TcRnTypes.if_doc = text "Clash.runIfl"
+#if MIN_VERSION_ghc(9,4,0)
+      , TcRnTypes.if_rec_types = emptyKnotVars
+#else
       , TcRnTypes.if_rec_types = Nothing
+#endif
       }
 
   hscEnv <- GHC.getSession
@@ -239,12 +246,21 @@ runIfl modName action = do
 loadDecl :: IfaceSyn.IfaceDecl -> TcRnTypes.IfL GHC.TyThing
 loadDecl = TcIface.tcIfaceDecl False
 
+#if MIN_VERSION_ghc(9,4,0)
+loadIface :: GHC.HscEnv -> GHC.Module -> IO (Maybe GHC.ModIface)
+loadIface env foundMod = do
+#else
 loadIface :: GHC.Module -> TcRnTypes.IfL (Maybe GHC.ModIface)
 loadIface foundMod = do
+#endif
+#if MIN_VERSION_ghc(9,4,0)
+  ifaceFailM <- LoadIface.findAndReadIface env (Outputable.text "loadIface")
+                  (fst (Module.getModuleInstantiation foundMod)) foundMod UnitTypes.NotBoot
+#elif MIN_VERSION_ghc(9,0,0)
   ifaceFailM <- LoadIface.findAndReadIface (Outputable.text "loadIface")
-#if MIN_VERSION_ghc(9,0,0)
                   (fst (Module.getModuleInstantiation foundMod)) foundMod UnitTypes.NotBoot
 #else
+  ifaceFailM <- LoadIface.findAndReadIface (Outputable.text "loadIface")
                   (fst (Module.splitModuleInsts foundMod)) foundMod False
 #endif
   case ifaceFailM of
@@ -299,7 +315,12 @@ getIfaceDeclM hdl bndr = do
     case Map.lookup nameMod lbCache of
       Nothing -> do
         -- Not loaded before
+#if MIN_VERSION_ghc(9,4,0)
+        env <- lift GHC.getSession
+        ifaceM <- lift (liftIO (loadIface env nameMod))
+#else
         ifaceM <- lift (runIfl nameMod (loadIface nameMod))
+#endif
         case ifaceM of
           Just iface -> do
             -- Add binder : decl map to cache
@@ -361,7 +382,10 @@ loadCustomReprAnnotations anns =
   env = Annotations.mkAnnEnv anns
   deserialize = GhcPlugins.deserializeWithData :: [Word8] -> DataReprAnn
 
-#if MIN_VERSION_ghc(9,0,0)
+#if MIN_VERSION_ghc(9,4,0)
+  (mEnv, nEnv) = Annotations.deserializeAnns deserialize env
+  reprs = ModuleEnv.moduleEnvElts mEnv <> NameEnv.nonDetNameEnvElts nEnv
+#elif MIN_VERSION_ghc(9,0,0)
   (mEnv, nEnv) = Annotations.deserializeAnns deserialize env
   reprs = ModuleEnv.moduleEnvElts mEnv <> NameEnv.nameEnvElts nEnv
 #else
@@ -470,7 +494,9 @@ loadExprFromTyThing bndr tyThing = case tyThing of
       CoreSyn.DFunUnfolding dfbndrs dc es ->
         Just (MkCore.mkCoreLams dfbndrs (MkCore.mkCoreConApps dc es))
       CoreSyn.NoUnfolding
-#if MIN_VERSION_ghc(9,0,0)
+#if MIN_VERSION_ghc(9,4,0)
+        | Demand.isDeadEndSig $ IdInfo.dmdSigInfo _idInfo
+#elif MIN_VERSION_ghc(9,0,0)
         | Demand.isDeadEndSig $ IdInfo.strictnessInfo _idInfo
 #else
         | Demand.isBottomingSig $ IdInfo.strictnessInfo _idInfo

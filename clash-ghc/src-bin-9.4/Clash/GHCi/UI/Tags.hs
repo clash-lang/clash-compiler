@@ -7,7 +7,7 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
-module GHCi.UI.Tags (
+module Clash.GHCi.UI.Tags (
   createCTagsWithLineNumbersCmd,
   createCTagsWithRegExesCmd,
   createETagsFileCmd
@@ -15,7 +15,7 @@ module GHCi.UI.Tags (
 
 import GHC.Utils.Exception
 import GHC
-import GHCi.UI.Monad
+import Clash.GHCi.UI.Monad
 import GHC.Utils.Outputable
 
 -- ToDo: figure out whether we need these, and put something appropriate

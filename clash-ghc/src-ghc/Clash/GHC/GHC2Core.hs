@@ -9,6 +9,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -48,8 +49,16 @@ import qualified Data.Text                   as Text
 import           Data.Text.Encoding          (decodeUtf8)
 import qualified Data.Traversable            as T
 import qualified Text.Read                   as Text
+#if MIN_VERSION_ghc(9,4,0)
+import           Data.Primitive.ByteArray    (ByteArray(ByteArray))
+import qualified GHC.Data.Strict             as GHC
+import           GHC.Num.Integer             (integerToBigNatClamp#)
+#endif
 
 -- GHC API
+#if MIN_VERSION_ghc(9,4,0)
+import GHC.Core.Reduction (Reduction(Reduction))
+#endif
 #if MIN_VERSION_ghc(9,0,0)
 import GHC.Builtin.Types (falseDataCon)
 import GHC.Core.Coercion.Axiom
@@ -330,7 +339,7 @@ makeTyCon tc = tycon
 makeAlgTyConRhs :: AlgTyConRhs
                 -> C2C (Maybe C.AlgTyConRhs)
 makeAlgTyConRhs algTcRhs = case algTcRhs of
-  DataTyCon dcs _ _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
+  DataTyCon {data_cons = dcs} -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
   SumTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
 
 #if MIN_VERSION_ghc(8,10,0)
@@ -531,7 +540,10 @@ coreToTerm primMap unlocs = term
           -> C.Cast <$> term e <*> coreToType ty1 <*> coreToType ty2
         _ -> term e
     term' (Tick (SourceNote rsp _) e) =
-#if MIN_VERSION_ghc(9,0,0)
+#if MIN_VERSION_ghc(9,4,0)
+      C.Tick (C.SrcSpan (RealSrcSpan rsp GHC.Nothing)) <$>
+             addUsefull (RealSrcSpan rsp GHC.Nothing) (term e)
+#elif MIN_VERSION_ghc(9,0,0)
       C.Tick (C.SrcSpan (RealSrcSpan rsp Nothing)) <$>
              addUsefull (RealSrcSpan rsp Nothing) (term e)
 #else
@@ -664,8 +676,12 @@ coreToTerm primMap unlocs = term
 #else
       LitNumber lt i _ -> case lt of
 #endif
+#if MIN_VERSION_ghc(9,4,0)
+        LitNumBigNat  -> C.ByteArrayLiteral (ByteArray (integerToBigNatClamp# i))
+#else
         LitNumInteger -> C.IntegerLiteral i
         LitNumNatural -> C.NaturalLiteral i
+#endif
         LitNumInt     -> C.IntLiteral i
         LitNumInt64   -> C.IntLiteral i
         LitNumWord    -> C.WordLiteral i
@@ -871,8 +887,13 @@ coreToAttr t@(TyConApp ty args) = do
   let value = args !! 1
   name' <- typeConstructorToString ty
   envs <- view famInstEnvs
+#if MIN_VERSION_ghc(9,4,0)
+  let Reduction _ key1 = normaliseType envs Nominal key
+      Reduction _ value1 = normaliseType envs Nominal value
+#else
   let (_,key1) = normaliseType envs Nominal key
       (_,value1) = normaliseType envs Nominal value
+#endif
   case name' of
     "Clash.Annotations.SynthesisAttributes.StringAttr" ->
         return $ C.StringAttr' (tyLitToString key1) (tyLitToString value1)

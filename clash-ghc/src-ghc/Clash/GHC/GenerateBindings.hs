@@ -34,6 +34,9 @@ import qualified Data.Time.Clock         as Clock
 
 import qualified GHC                     as GHC (Ghc)
 #if MIN_VERSION_ghc(9,0,0)
+#if MIN_VERSION_ghc(9,4,0)
+import qualified GHC.Types.SourceText    as GHC
+#endif
 #if MIN_VERSION_ghc(9,2,0)
 import qualified GHC.Utils.Panic         as GHC
 #endif
@@ -67,6 +70,7 @@ import qualified TysWiredIn              as GHC
 import qualified Var                     as GHC
 import qualified SrcLoc                  as GHC
 #endif
+import           GHC.BasicTypes.Extra (isNoInline)
 
 import           Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 import           Clash.Annotations.Primitive (HDL, extractPrim)
@@ -149,7 +153,15 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
                       (fmap (coerce . bindingId) clsMap))
                                     -- Recursion info is always False for class
                                     -- selectors, no need to check free vars.
-      clsMap                        = fmap (\(v,i) -> (Binding v GHC.noSrcSpan GHC.Inline IsFun (mkClassSelector inScope0 allTcCache (varType v) i) False)) clsVMap
+      clsMap =
+        fmap (\(v,i) ->
+#if MIN_VERSION_ghc(9,4,0)
+               (Binding v GHC.noSrcSpan (GHC.Inline GHC.NoSourceText) IsFun
+#else
+               (Binding v GHC.noSrcSpan GHC.Inline IsFun
+#endif
+                  (mkClassSelector inScope0 allTcCache (varType v) i) False))
+             clsVMap
       allBindings                   = bindingsMap `unionVarEnv` clsMap
       topEntities'                  =
         (\m -> fst (RWS.evalRWS m (GHC2CoreEnv GHC.noSrcSpan fiEnvs) tcMap')) $
@@ -197,7 +209,12 @@ setNoInlineTopEntities bm tes =
   ids = mkVarSet (fmap topId tes)
 
   go b@Binding{bindingId}
-    | bindingId `elemVarSet` ids = b { bindingSpec = GHC.NoInline }
+    | bindingId `elemVarSet` ids
+#if MIN_VERSION_ghc(9,4,0)
+    = b { bindingSpec = GHC.NoInline GHC.NoSourceText }
+#else
+    = b { bindingSpec = GHC.NoInline }
+#endif
     | otherwise = b
 
 -- TODO This function should be changed to provide the information that
@@ -299,14 +316,22 @@ checkPrimitive primMap v = do
       let
         info = GHC.idInfo v
         inline = GHC.inlinePragmaSpec $ GHC.inlinePragInfo info
+#if MIN_VERSION_ghc(9,4,0)
+        strictness = GHC.dmdSigInfo info
+#else
         strictness = GHC.strictnessInfo info
+#endif
         ty = GHC.varType v
 #if MIN_VERSION_ghc(9,2,0)
         (argTys,_resTy) = GHC.splitFunTys (snd (GHC.splitForAllTyCoVars ty))
 #else
         (argTys,_resTy) = GHC.splitFunTys . snd . GHC.splitForAllTys $ ty
 #endif
+#if MIN_VERSION_ghc(9,4,0)
+        (dmdArgs,_dmdRes) = GHC.splitDmdSig strictness
+#else
         (dmdArgs,_dmdRes) = GHC.splitStrictSig strictness
+#endif
         nrOfArgs = length argTys
         loc = case GHC.getSrcLoc v of
                 GHC.UnhelpfulLoc _ -> ""
@@ -334,7 +359,7 @@ checkPrimitive primMap v = do
             warnArgs xs
 
       unless (qName == "Clash.XException.errorX" || "GHC." `isPrefixOf` qName) $ do
-        warnIf (inline /= GHC.NoInline)
+        warnIf (not (isNoInline inline))
           (primStr ++ "isn't marked NOINLINE."
           ++ "\nThis might make Clash ignore this primitive.")
 #if MIN_VERSION_ghc(9,2,0)

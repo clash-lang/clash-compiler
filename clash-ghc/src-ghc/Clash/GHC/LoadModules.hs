@@ -77,6 +77,16 @@ import           System.Process                  (runInteractiveCommand,
 
 -- GHC API
 #if MIN_VERSION_ghc(9,0,0)
+#if MIN_VERSION_ghc(9,4,0)
+import           GHC.Data.Bool (OverridingBool)
+import           GHC.Driver.Config.Tidy (initTidyOpts)
+import           GHC.Driver.Errors.Types (GhcMessage(GhcTcRnMessage))
+import           GHC.Driver.Monad (modifySession)
+import           GHC.Driver.Pipeline (compileOne')
+import           GHC.Unit.Env (addHomeModInfoToHug)
+#else
+import           GHC.Utils.Misc (OverridingBool)
+#endif
 #if MIN_VERSION_ghc(9,2,0)
 import qualified GHC.Driver.Env as HscTypes
 import qualified GHC.Unit.Module.ModGuts as HscTypes
@@ -85,7 +95,9 @@ import qualified GHC.Unit.Module.Deps as HscTypes
 import qualified GHC.Driver.Backend as Backend
 import qualified GHC.Unit.Module.Graph as Graph
 import qualified GHC.Platform.Ways as Ways
+#if !MIN_VERSION_ghc(9,4,0)
 import qualified GHC.Types.Error as Error
+#endif
 #else
 import qualified GHC.Driver.Types as HscTypes
 import qualified GHC.Driver.Ways as Ways
@@ -119,7 +131,6 @@ import qualified GHC.Types.Name.Occurrence as OccName
 import           GHC.Utils.Outputable (ppr)
 import qualified GHC.Utils.Outputable as Outputable
 import qualified GHC.Types.Unique.Set as UniqSet
-import           GHC.Utils.Misc (OverridingBool)
 import qualified GHC.Types.Var as Var
 import qualified GHC.Unit.Module.Env as ModuleEnv
 import qualified GHC.Types.Name.Env as NameEnv
@@ -272,9 +283,11 @@ setupGhc useColor dflagsM idirs = do
         return dfPlug
 
   let dflags1 = dflags
-                  { DynFlags.optLevel = 2
-                  , DynFlags.ghcMode  = GHC.CompManager
+                  { DynFlags.ghcMode  = GHC.CompManager
                   , DynFlags.ghcLink  = GHC.LinkInMemory
+#if !MIN_VERSION_ghc(9,4,0)
+                  , DynFlags.optLevel = 2
+#endif
 #if MIN_VERSION_ghc(9,2,0)
                   , DynFlags.backend  =
                       if Ways.hostIsProfiled
@@ -346,7 +359,11 @@ loadLocalModule
        , [CoreSyn.CoreBind]                     -- All bindings
        )
 loadLocalModule hdl modName = do
+#if MIN_VERSION_ghc(9,4,0)
+  target <- GHC.guessTarget modName Nothing Nothing
+#else
   target <- GHC.guessTarget modName Nothing
+#endif
   GHC.setTargets [target]
   modGraph <- GHC.depanal [] False
   let modGraph' = GHC.mapMG disableOptimizationsFlags modGraph
@@ -383,12 +400,24 @@ loadLocalModule hdl modName = do
     --
     -- Given that TH splices can do non-trivial computation and I/O,
     -- running TH twice must be avoid.
+#if MIN_VERSION_ghc(9,4,0)
+    hsc_env_tc <- GHC.getSession
+    mod_info <- liftIO $ compileOne' Nothing hsc_env_tc m 1 1 Nothing Nothing
+    modifySession $ HscTypes.hscUpdateHUG (addHomeModInfoToHug mod_info)
+    let tcMod' = tcMod
+#else
     tcMod' <- GHC.loadModule tcMod
+#endif
     dsMod <- fmap GHC.coreModule $ GHC.desugarModule tcMod'
     hsc_env <- GHC.getSession
     simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env [] dsMod
     checkForInvalidPrelude simpl_guts
+#if MIN_VERSION_ghc(9,4,0)
+    opts <- liftIO (initTidyOpts hsc_env)
+    (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram opts simpl_guts
+#else
     (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env simpl_guts
+#endif
     let pgm        = HscTypes.cg_binds tidy_guts
     let modFamInstEnv = TcRnTypes.tcg_fam_inst_env $ fst $ GHC.tm_internals_ tcMod
     _ <- GHC.setSessionDynFlags oldDFlags
@@ -481,7 +510,9 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
       case m of
         Nothing -> TcRnMonad.liftIO $ throwIO
                                     $ HscTypes.mkSrcErr
-#if MIN_VERSION_ghc(9,2,0)
+#if MIN_VERSION_ghc(9,4,0)
+                                    $ fmap GhcTcRnMessage msgs
+#elif MIN_VERSION_ghc(9,2,0)
                                     $ Error.getErrorMessages msgs
 #else
                                     $ snd msgs
@@ -713,7 +744,9 @@ findAllModuleAnnotations = do
   hsc_env <- GHC.getSession
   ann_env <- liftIO $ HscTypes.prepareAnnotations hsc_env Nothing
   return $ concat
-#if MIN_VERSION_ghc(9,0,0)
+#if MIN_VERSION_ghc(9,4,0)
+        $ (\(mEnv,nEnv) -> ModuleEnv.moduleEnvElts mEnv <> NameEnv.nonDetNameEnvElts nEnv)
+#elif MIN_VERSION_ghc(9,0,0)
          $ (\(mEnv,nEnv) -> ModuleEnv.moduleEnvElts mEnv <> NameEnv.nameEnvElts nEnv)
 #else
          $ UniqFM.nonDetEltsUFM
@@ -869,8 +902,10 @@ disableOptimizationsFlags ms@(GHC.ModSummary {..})
   = ms {GHC.ms_hspp_opts = dflags}
   where
     dflags = unwantedOptimizationFlags (ms_hspp_opts
-              { DynFlags.optLevel = 2
-              , DynFlags.reductionDepth = 1000
+              { DynFlags.reductionDepth = 1000
+#if !MIN_VERSION_ghc(9,4,0)
+              , DynFlags.optLevel = 2
+#endif
               })
 
 unwantedOptimizationFlags :: GHC.DynFlags -> GHC.DynFlags
@@ -1009,7 +1044,11 @@ removeStrictnessAnnotations pm =
     rmCD xcon                      = xcon
 #endif
 
-#if MIN_VERSION_ghc(9,2,0)
+#if MIN_VERSION_ghc(9,4,0)
+    rmGConDetails :: GHC.HsConDeclGADTDetails GHC.GhcPs -> GHC.HsConDeclGADTDetails GHC.GhcPs
+    rmGConDetails (GHC.PrefixConGADT args) = GHC.PrefixConGADT (fmap rmHsScaledType args)
+    rmGConDetails (GHC.RecConGADT rec tkn) = GHC.RecConGADT ((fmap . fmap . fmap) rmConDeclF rec) tkn
+#elif MIN_VERSION_ghc(9,2,0)
     rmGConDetails :: GHC.HsConDeclGADTDetails GHC.GhcPs -> GHC.HsConDeclGADTDetails GHC.GhcPs
     rmGConDetails (GHC.PrefixConGADT args) = GHC.PrefixConGADT (fmap rmHsScaledType args)
     rmGConDetails (GHC.RecConGADT rec)     = GHC.RecConGADT ((fmap . fmap . fmap) rmConDeclF rec)
@@ -1069,8 +1108,14 @@ checkForInvalidPrelude guts =
     []    -> return ()
     (x:_) -> throw (ClashException noSrcSpan (msgWrongPrelude x) Nothing)
   where
+#if MIN_VERSION_ghc(9,4,0)
+    pkgs = HscTypes.dep_direct_pkgs . HscTypes.mg_deps $ guts
+#else
     pkgs = HscTypes.dep_pkgs . HscTypes.mg_deps $ guts
-#if MIN_VERSION_ghc(9,0,0)
+#endif
+#if MIN_VERSION_ghc(9,4,0)
+    pkgIds = map (UnitTypes.unitIdString) (toList pkgs)
+#elif MIN_VERSION_ghc(9,0,0)
     pkgIds = map (UnitTypes.unitIdString . fst) pkgs
 #else
     pkgIds = map (GhcPlugins.installedUnitIdString . fst) pkgs

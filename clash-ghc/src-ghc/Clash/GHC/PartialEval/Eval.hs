@@ -32,11 +32,7 @@ import           GHC.Num.Integer (Integer (..))
 import           GHC.Integer.GMP.Internals (BigNat(..), Integer(..))
 #endif
 
-#if MIN_VERSION_ghc(9,0,0)
-import           GHC.Types.Basic (InlineSpec(..))
-#else
-import           BasicTypes (InlineSpec(..))
-#endif
+import           GHC.BasicTypes.Extra (isNoInline)
 
 import           Clash.Core.DataCon (DataCon(..))
 import           Clash.Core.HasType
@@ -131,7 +127,7 @@ lookupGlobal i = do
     Just x
       -- The binding cannot be inlined. Note that this is limited to bindings
       -- which are not primitives in Clash, as these must be marked NOINLINE.
-      |  bindingSpec x == NoInline
+      |  isNoInline (bindingSpec x)
       ,  bindingIsPrim x == IsFun
       -> pure (VNeutral (NeVar i))
 
