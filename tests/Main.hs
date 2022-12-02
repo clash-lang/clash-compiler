@@ -29,7 +29,11 @@ ghcVersion3 =
 #ifdef __GLASGOW_HASKELL_PATCHLEVEL2__
   let ghc_p1 = __GLASGOW_HASKELL_PATCHLEVEL1__
       ghc_p2 = __GLASGOW_HASKELL_PATCHLEVEL2__ in
-  intercalate "." (map show (versionBranch compilerVersion <> [ghc_p1,ghc_p2]))
+  case ghc_p2 of
+    0 ->
+      intercalate "." (map show (versionBranch compilerVersion <> [ghc_p1]))
+    _ ->
+      intercalate "." (map show (versionBranch compilerVersion <> [ghc_p1,ghc_p2]))
 #else
   let ghc_p1 = __GLASGOW_HASKELL_PATCHLEVEL1__ in
   intercalate "." (map show (versionBranch compilerVersion <> [ghc_p1]))
