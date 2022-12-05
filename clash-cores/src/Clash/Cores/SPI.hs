@@ -1,5 +1,6 @@
 {-|
   Copyright   :  (C) 2019, Foamspace corp
+                     2022, Google LLC
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -154,12 +155,10 @@ spiCommon mode ssI msI sckI dinI =
       | otherwise = dataInQ
 
     dataOutD
-      | ss        = unpack din
-      | shiftSck  = if cntOldQ
-                       then unpack din
-                       else if sampleOnTrailing mode && cntQ == 0
-                               then dataOutQ
-                               else tail @(n-1) dataOutQ :< unpack undefined#
+      | ss || (sampleOnTrailing mode && sampleSck && cntQ == maxBound) = unpack din
+      | shiftSck  = if sampleOnTrailing mode && cntQ == 0
+                    then dataOutQ
+                    else tail @(n-1) dataOutQ :< unpack undefined#
       | otherwise = dataOutQ
 
     -- The counter is updated during the capture moment
@@ -314,7 +313,6 @@ spiGen mode SNat SNat =
       _ -> 0
 
     sckD = case stQ of
-      Wait 0 | sampleOnTrailing mode -> not sckQ
       Transfer n | n == maxBound -> not sckQ
       _ -> sckQ
 
