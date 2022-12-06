@@ -80,12 +80,14 @@ namespace eval clash {
                 error "Error: readXdc: Invalid order $order"
             }
         }
+        unset order
 
         set early {}
         set normal {}
         set late {}
-        foreach tclIface [GetAllTclIfaces {} {} readXdc] {
-            lappend [subst $${tclIface}::order] $tclIface
+        foreach tclIface [GetAllTclIfaces {purposes readXdc}] {
+            namespace upvar ${tclIface} order order
+            lappend $order $tclIface
         }
 
         if {{early} in $orders} {
@@ -126,8 +128,8 @@ namespace eval clash {
         # Identical names means identical IP, only one run needed even if it
         # occurs in multiple HDL directories.
         set seen {}
-        foreach tclIface [GetAllTclIfaces {} {} createIp] {
-            set ipName [subst $${tclIface}::ipName]
+        foreach tclIface [GetAllTclIfaces {purposes createIp}] {
+            namespace upvar ${tclIface} ipName ipName
             if {$ipName in $seen} {
                 continue
             }
@@ -147,7 +149,7 @@ namespace eval clash {
     # probably be the very first thing you call in setting up the design.
     proc createAndReadIp args {
         CheckMetadataExists
-        if {[GetAllTclIfaces {} {} createIp] eq {}} {
+        if {![llength [GetAllTclIfaces {purposes createIp}]]} {
             return
         }
         PerformAction {
@@ -194,7 +196,7 @@ namespace eval clash {
     }
 
     proc GetCommonIndent msg {
-        set indent {}
+        set indent -1
         foreach line [split $msg \n] {
             regexp -indices {^ *} $line blanks
             if {[lindex $blanks 1] == [string length $line] - 1} {
@@ -202,11 +204,11 @@ namespace eval clash {
                 continue
             }
             set leader [expr {[lindex $blanks 1] - [lindex $blanks 0] + 1}]
-            if {$indent eq {} || $leader < $indent} {
+            if {$indent < 0 || $leader < $indent} {
                 set indent $leader
             }
         }
-        if {$indent eq {}} {
+        if {$indent < 0} {
             return 0
         }
         return $indent
@@ -300,14 +302,14 @@ namespace eval clash {
 
     proc CheckMetadataExists {} {
         variable metadata
-        if {$metadata eq {}} {
+        if {![dict size $metadata]} {
             error "Error: Please invoke clash::readMetadata first."
         }
         return
     }
 
     proc GetNsVar {ns varName} {
-        if {[uplevel 1 [list info vars ${ns}::$varName]] eq {}} {
+        if {![llength [uplevel 1 [list info vars ${ns}::$varName]]]} {
             error "Error: $ns doesn't provide \"$varName\"\
                     variable."
         }
@@ -413,12 +415,12 @@ namespace eval clash {
                 error "Error: ${tclIface}::multipleScripts does not exist."
             }
             set children [namespace children ${tclIface}::multipleScripts]
-            if {$children eq {}} {
+            if {![llength $children]} {
                 error "Error: ${tclIface}::multipleScripts doesn't provide any\
                         scripts."
             }
             foreach child $children {
-                if {[info vars ${child}::api] ne {}} {
+                if {[llength [info vars ${child}::api]]} {
                     error "Error: $child cannot specify api: it is specified by\
                             parent script."
                 }
@@ -432,7 +434,7 @@ namespace eval clash {
             # invocation of "createIp" could call "createIpAlt" if
             # "createIp" did not exist. Let's be strict here to prevent
             # confusion: only accept the exact name "createIp".
-            if {[info procs ${tclIface}::createIp] eq {}} {
+            if {![llength [info procs ${tclIface}::createIp]]} {
                 error "Error: $tclIface doesn't provide \"createIp\"\
                         procedure."
             }
@@ -461,8 +463,9 @@ namespace eval clash {
             set ${tclIface}::xdcFile $resolvedFile
             Log 3 "    Constraint file: $resolvedFile"
             Log 4 "    Order: $order"
-            if {[info vars ${tclIface}::scopeRef] ne {}} {
-                Log 4 "    Scoped to ref: [subst $${tclIface}::scopeRef]"
+            if {[llength [info vars ${tclIface}::scopeRef]]} {
+                namespace upvar ${tclIface} scopeRef scopeRef
+                Log 4 "    Scoped to ref: $scopeRef"
             }
             Log 4 "    Used in: $usedIn"
 
@@ -477,13 +480,10 @@ namespace eval clash {
     proc RemoveManagedFiles lib {
         variable metadata
 
-        foreach tclIface [GetAllTclIfaces $lib] {
-            if {[subst $${tclIface}::scriptPurpose] ne {readXdc}} {
-                continue
-            }
-            set xdcFile [subst $${tclIface}::xdcFile]
+        foreach tclIface [GetAllTclIfaces {libs $lib purposes readXdc}] {
+            namespace upvar ${tclIface} xdcFile xdcFile
             set constraintFiles [dict get $metadata $lib constraintFiles]
-            if {[lsearch -all -inline -exact $constraintFiles $xdcFile] ne {}} {
+            if {[lsearch -exact $constraintFiles $xdcFile] >= 0} {
                 Log 3 "Marking as managed by the Clash<->Tcl API: $xdcFile"
                 set filtered [lsearch -all -inline -exact -not \
                         $constraintFiles $xdcFile]
@@ -497,39 +497,49 @@ namespace eval clash {
     #
     # They can optionally be filtered by specifying a list of libraries to
     # consider, a list of interface names to consider, or a list of script
-    # purposes to consider. Specifying the empty string for any of these filters
-    # means to return all matches. For example, if these two interfaces exist:
+    # purposes to consider. The sole argument of the function is a dictionary of
+    # options, with the possible keys "libs", "ifaces" and "purposes".
+    #
+    # For example, if these two interfaces exist:
     #   - ::clash::tclIface::libA::ifaceX
     #   - ::clash::tclIface::libB::ifaceX
     #
-    # Then "GetAllTclIfaces libA" would only return the first, but
-    # "GetAllTclIfaces {} ifaceX" would return both since the libraries are not
-    # filtered (empty list) but the interface names are (and they both match).
-    proc GetAllTclIfaces {{libs {}} {ifaces {}} {purposes {}}} {
+    # Then "GetAllTclIfaces {libs libA}" would only return the first, but
+    # "GetAllTclIfaces {ifaces ifaceX}" would return both since the interface
+    # names both match.
+    proc GetAllTclIfaces {{opts {}}} {
         if {![namespace exists tclIface]} {
             # There are no scripts
             return
         }
 
-        if {$libs eq {}} {
-            set walkLibs [namespace children tclIface]
-        } else {
+        if {[dict exists $opts libs]} {
             set walkLibs {}
-            foreach lib $libs {
+            foreach lib [dict get $opts libs] {
                 if {[namespace exists tclIface::$lib]} {
                     lappend walkLibs tclIface::$lib
                 }
             }
+        } else {
+            set walkLibs [namespace children tclIface]
         }
         set tclIfaces {}
+        set hasIfaces [dict exists $opts ifaces]
+        if {$hasIfaces} {
+            set ifaces [dict get $opts ifaces]
+        }
+        set hasPurposes [dict exists $opts purposes]
+        if {$hasPurposes} {
+            set purposes [dict get $opts purposes]
+        }
         foreach libNs $walkLibs {
             foreach tclIface [namespace children $libNs] {
-                if {$ifaces ne {} && [namespace tail $tclIface] ni $ifaces} {
+                if {$hasIfaces && [namespace tail $tclIface] ni $ifaces} {
                     continue
                 }
-                set purpose [subst $${tclIface}::scriptPurpose]
-                if {[subst $${tclIface}::scriptPurpose] ne {multipleScripts}} {
-                    if {$purposes eq {} || $purpose in $purposes} {
+                namespace upvar ${tclIface} scriptPurpose purpose
+                if {$purpose ne {multipleScripts}} {
+                    if {(!$hasPurposes) || $purpose in $purposes} {
                         lappend tclIfaces $tclIface
                     }
                     continue
@@ -537,8 +547,8 @@ namespace eval clash {
                 set childIfaces \
                         [namespace children ${tclIface}::multipleScripts]
                 foreach childIface $childIfaces {
-                    set purpose [subst $${childIface}::scriptPurpose]
-                    if {$purposes eq {} || $purpose in $purposes} {
+                    namespace upvar ${childIface} scriptPurpose purpose
+                    if {(!$hasPurposes) || $purpose in $purposes} {
                         lappend tclIfaces $childIface
                     }
                 }
@@ -548,15 +558,15 @@ namespace eval clash {
     }
 
     proc ReadManagedXdc tclIface {
-        set xdcFile [subst $${tclIface}::xdcFile]
-        set usedIn [subst $${tclIface}::usedIn]
-        if {[info vars ${tclIface}::scopeRef] ne {}} {
-            set scopeRef [list -ref [subst $${tclIface}::scopeRef]]
+        namespace upvar $tclIface xdcFile xdcFile usedIn usedIn
+        if {[llength [info vars ${tclIface}::scopeRef]]} {
+            namespace upvar ${tclIface} scopeRef scopeRef
+            set scopeRefArg [list -ref $scopeRef]
         } else {
-            set scopeRef {}
+            set scopeRefArg {}
         }
         PerformAction {
-            read_xdc } -varexpand scopeRef { } -var xdcFile {
+            read_xdc } -varexpand scopeRefArg { } -var xdcFile {
             set_property USED_IN } -var usedIn { [get_files } -var xdcFile {]
         }
         return
