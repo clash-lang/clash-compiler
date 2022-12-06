@@ -96,11 +96,7 @@ namespace eval clash {
             }
         }
         if {{normal} in $orders} {
-            set constraintFiles [dict get $metadata $topEntity constraintFiles]
-            foreach constraintFile $constraintFiles {
-                PerformAction {
-                    read_xdc } -var constraintFile
-            }
+            ReadUnmanagedXdc
             foreach tclIface $normal {
                 ReadManagedXdc $tclIface
             }
@@ -326,6 +322,7 @@ namespace eval clash {
         Log 1 "New top component: $lib"
         # Clash sometimes lists files multiple times, process them only once
         set seen {}
+        set topConstraintName [file join $entityDir "${lib}.sdc"]
         dict set metadata $lib hdlFiles {}
         dict set metadata $lib constraintFiles {}
         foreach fileEntry [dict get $manifest files] {
@@ -334,7 +331,9 @@ namespace eval clash {
                 continue
             }
             lappend seen $name
-            if {
+            if {$name eq $topConstraintName} {
+                dict set metadata $lib topConstraintFile $name
+            } elseif {
                    [string match {*.vhdl} $name]
                 || [string match {*.v} $name]
                 || [string match {*.sv} $name]
@@ -557,6 +556,34 @@ namespace eval clash {
             }
         }
         return $tclIfaces
+    }
+
+    # If Clash generates constraint files without an accompanying tclIface, they
+    # fall into two categories. Given $lib as the name of the top component in a
+    # library, ${lib}.sdc contains the "create_clock" statements. We only read
+    # that for the top entity. All other constraint files are passed to Vivado
+    # as-is and should match on unique identifiers in the HDL, such that they
+    # can be read for all libraries without worrying about `current_instance` or
+    # similar scoping mechanisms.
+    proc ReadUnmanagedXdc {} {
+        variable metadata
+        variable topEntity
+
+        if {[dict exists $metadata $topEntity topConstraintFile]} {
+            set topConstraintFile \
+                    [dict get $metadata $topEntity topConstraintFile]
+            PerformAction {
+                read_xdc } -var topConstraintFile
+        }
+        set libs [dict get $metadata $topEntity dependencies]
+        lappend libs $topEntity
+        foreach lib $libs {
+            set constraintFiles [dict get $metadata $lib constraintFiles]
+            foreach constraintFile $constraintFiles {
+                PerformAction {
+                    read_xdc } -var constraintFile
+            }
+        }
     }
 
     proc ReadManagedXdc tclIface {
