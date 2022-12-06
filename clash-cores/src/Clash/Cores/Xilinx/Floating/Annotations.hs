@@ -87,7 +87,7 @@ vhdlBinaryPrim primName tclTFName funcName = InlineYamlPrimitive [VHDL] [__i|
       end block;
       -- #{funcName} end
     includes:
-      - extension: tcl
+      - extension: clash.tcl
         name: floating_point
         format: Haskell
         templateFunction: #{tclTFName}
@@ -131,7 +131,7 @@ veriBinaryPrim primName tclTFName funcName =
           .m_axis_result_tdata(~RESULT)
         );
       includes:
-        - extension: tcl
+        - extension: clash.tcl
           name: floating_point
           format: Haskell
           templateFunction: #{tclTFName}
@@ -197,7 +197,7 @@ vhdlFromUPrim primName funcName =
         end block;
         -- #{funcName} end
       includes:
-        - extension: tcl
+        - extension: clash.tcl
           name: floating_point
           format: Haskell
           templateFunction: #{tfName}
@@ -240,7 +240,7 @@ veriFromUPrim primName funcName =
         );
         // #{funcName} end
       includes:
-        - extension: tcl
+        - extension: clash.tcl
           name: floating_point
           format: Haskell
           templateFunction: #{tfName}
@@ -306,7 +306,7 @@ vhdlFromSPrim primName funcName =
         end block;
         -- #{funcName} end
       includes:
-        - extension: tcl
+        - extension: clash.tcl
           name: floating_point
           format: Haskell
           templateFunction: #{tfName}
@@ -349,7 +349,7 @@ veriFromSPrim primName funcName =
         );
         // #{funcName} end
       includes:
-        - extension: tcl
+        - extension: clash.tcl
           name: floating_point
           format: Haskell
           templateFunction: #{tfName}
@@ -401,7 +401,7 @@ vhdlComparePrim primName tclTFName funcName = InlineYamlPrimitive [VHDL] [__i|
       end block;
       -- #{funcName} end
     includes:
-      - extension: tcl
+      - extension: clash.tcl
         name: floating_point
         format: Haskell
         templateFunction: #{tclTFName}
@@ -450,7 +450,7 @@ veriComparePrim primName tclTFName funcName =
       );
       // #{funcName} end
     includes:
-      - extension: tcl
+      - extension: clash.tcl
         name: floating_point
         format: Haskell
         templateFunction: #{tclTFName}

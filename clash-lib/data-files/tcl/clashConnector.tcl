@@ -351,7 +351,7 @@ namespace eval clash {
                 dict with metadata $lib {
                     lappend constraintFiles $name
                 }
-            } elseif {[string match {*.tcl} $name]} {
+            } elseif {[string match {*.clash.tcl} $name]} {
                 Log 3 "Adding Clash<->Tcl API file: $name"
                 LoadTclIface $lib $name
             }
@@ -374,7 +374,9 @@ namespace eval clash {
     # Populate a namespace with a Clash-generated Tcl interface.
     # Namespace is clash::tclIface::${lib}::$baseName
     proc LoadTclIface {lib tclIfaceFile} {
-        set baseName [file rootname [file tail $tclIfaceFile]]
+        set fileName [file tail $tclIfaceFile]
+        # Strip all extensions
+        set baseName [string range $fileName 0 [string first . $fileName]-1]
         set tclIface [namespace current]::tclIface::${lib}::$baseName
         # Evaluate script code inside temporary throwaway namespace to
         # separate its code from ours and reduce the chance of accidentally

@@ -65,7 +65,7 @@ dcFifoBBF _isD _primName args _resTys
   bbMeta = emptyBlackBoxMeta
     { N.bbKind = N.TDecl
     , N.bbIncludes =
-      [ ( ("dcfifo", "tcl")
+      [ ( ("dcfifo", "clash.tcl")
         , BBFunction (show 'dcFifoTclTF) 0 (dcFifoTclTF dcConfig))
       ]
     -- TODO: Make this blackbox return multiple results, instead of a tuple. See:
