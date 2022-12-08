@@ -8,7 +8,7 @@ Support for the [Xilinx Floating-Point LogiCORE IP v7.1](https://www.xilinx.com/
 
 The functions in this module make it possible to use the Xilinx IP in Clash.
 Compilation will instantiate the Xilinx IP. Clash will output a TCL script
-named @floating_point@/.../@.tcl@ which needs to be executed in the Vivado
+named @floating_point@/.../@.clash.tcl@ which needs to be executed in the Vivado
 project to create the proper entity. Simulation in Clash produces bit-identical
 results to synthesis.
 
