@@ -94,7 +94,7 @@ FROM builder AS build-verilator
 ARG DEPS_VERILATOR="perl python3 make autoconf g++ flex bison ccache libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlibc zlib1g zlib1g-dev"
 RUN apt-get install -y --no-install-recommends $DEPS_VERILATOR
 
-ARG verilator_version="v4.214"
+ARG verilator_version="v5.002"
 RUN git clone https://github.com/verilator/verilator verilator \
   && cd verilator \
   && git checkout $verilator_version \

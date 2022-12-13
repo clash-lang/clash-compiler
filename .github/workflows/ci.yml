@@ -114,7 +114,7 @@ jobs:
 
     # Run steps inside the clash CI docker image
     container:
-      image: ghcr.io/clash-lang/clash-ci-${{ matrix.ghc }}:2022-11-14
+      image: ghcr.io/clash-lang/clash-ci-${{ matrix.ghc }}:2022-12-13
 
       env:
         THREADS: 2
