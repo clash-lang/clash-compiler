@@ -122,7 +122,7 @@ ARG UBUNTU_VERSION=focal-20210416
 FROM ubuntu:$UBUNTU_VERSION AS run
 
 LABEL vendor="QBayLogic B.V." maintainer="devops@qbaylogic.com"
-ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH="$PATH:/opt/bin:/root/.ghcup/bin"
+ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH="$PATH:/opt/bin:/root/.ghcup/bin" PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:/opt/share/pkgconfig/"
 
 ARG DEPS_RUNTIME="ca-certificates ccache curl g++ gcc git jq libc6-dev libgmp10-dev libgnat-9 libllvm11 libreadline8 libtinfo-dev libtcl8.6 make perl python3 ssh zlib1g-dev zlibc zstd locales libtinfo5 libx11-6"
 RUN apt-get update \
