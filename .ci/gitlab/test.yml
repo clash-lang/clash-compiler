@@ -61,22 +61,22 @@ build-clash-dev:
 cores:unittests:
   extends: .test-common
   script:
-    - cabal v2-run clash-cores:unittests
+    - cabal v2-run -- clash-cores:unittests --hide-successes
 
 cosim:unittests:
   extends: .test-common
   script:
-    - cabal v2-run clash-cosim:tests
+    - cabal v2-run -- clash-cosim:tests
 
 prelude:unittests:
   extends: .test-common
   script:
-    - cabal v2-run clash-prelude:unittests
+    - cabal v2-run -- clash-prelude:unittests --hide-successes
 
 lib:unittests:
   extends: .test-common
   script:
-    - cabal v2-run clash-lib:unittests
+    - cabal v2-run -- clash-lib:unittests --hide-successes
 
 prelude:doctests:
   extends: .test-common
