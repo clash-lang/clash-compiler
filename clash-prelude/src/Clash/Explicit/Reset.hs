@@ -1,5 +1,6 @@
 {-|
 Copyright  :  (C) 2020-2021, QBayLogic B.V.
+                  2022     , Google LLC
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -34,22 +35,17 @@ module Clash.Explicit.Reset
   , unsafeFromLowPolarity
   ) where
 
-import           Data.Bits (testBit, shiftL, (.|.))
 import           Data.Type.Equality ((:~:)(Refl))
-import           GHC.Generics (Generic)
 
-import           Clash.Class.BitPack (pack)
-import           Clash.Class.Resize (resize)
 import           Clash.Class.Num (satSucc, SaturationMode(SatBound))
-import           Clash.Explicit.Mealy
+import           Clash.Explicit.Moore
 import           Clash.Explicit.Signal
 import           Clash.Promoted.Nat
 import           Clash.Signal.Internal
-import           Clash.Sized.BitVector (BitVector)
 import           Clash.Sized.Index (Index)
-import           Clash.XException (NFDataX, ShowX)
 
-import           GHC.TypeLits (type (+), KnownNat)
+import           GHC.Stack (HasCallStack)
+import           GHC.TypeLits (type (+))
 
 {- $setup
 >>> import Clash.Explicit.Prelude
@@ -176,27 +172,26 @@ resetSynchronizer clk rst = rstOut
                          $ unsafeFromReset rst
 {-# NOINLINE resetSynchronizer #-} -- Give reset synchronizer its own HDL file
 
-data GlitchFilterState = Idle | InReset
-  deriving (Generic, NFDataX, Show, ShowX)
-
 -- | Filter glitches from reset signals by only triggering a reset after it has
--- been asserted for /glitchlessPeriod/ cycles. It will then stay asserted for
--- as long as the given reset was asserted consecutively.
+-- been asserted for /glitchlessPeriod/ cycles. Similarly, it will stay
+-- asserted until a /glitchlessPeriod/ number of deasserted cycles have been
+-- observed.
 --
--- If synthesized on a domain with initial values, 'resetGlitchFilter' will
--- output an asserted reset for /glitchlessPeriod/ cycles (plus any cycles added
--- by the given reset). If initial values can't be used, it will only output
--- defined reset values after /glitchlessPeriod/ cycles.
+-- This circuit can only be used on platforms supporting initial values. Platforms
+-- not supporting this should consider using a power-on-reset and a circuit
+-- designed with this environment in mind.
 --
 -- === __Example 1__
 -- >>> let sampleResetN n = sampleN n . unsafeToHighPolarity
 -- >>> let resetFromList = unsafeFromHighPolarity . fromList
--- >>> let rst = resetFromList [True, True, False, False, True, False, False, True, True, False, True]
+-- >>> let rst = resetFromList [True, True, False, False, True, False, False, True, True, False, True, True]
 -- >>> sampleResetN 12 (resetGlitchFilter d2 systemClockGen rst)
--- [True,True,True,True,False,False,False,False,False,True,True,False]
+-- [True,True,True,True,False,False,False,False,False,True,True,True]
+--
 resetGlitchFilter
   :: forall dom glitchlessPeriod n
-   . ( KnownDomain dom
+   . ( HasCallStack
+     , KnownDomain dom
      , glitchlessPeriod ~ (n + 1) )
   => SNat glitchlessPeriod
   -- ^ Consider a reset signal to be properly asserted after having seen the
@@ -205,20 +200,18 @@ resetGlitchFilter
   -> Reset dom
   -> Reset dom
 resetGlitchFilter SNat clk rst =
-  unsafeToReset (mealy clk noReset enableGen go Idle shiftReg)
+  case initBehavior @dom of
+    SDefined ->
+      unsafeToReset $
+        moore clk noReset enableGen go fst (asserted, 0) (unsafeFromReset rst)
+    SUnknown ->
+      error "'resetGlitchFilter' only supports domains with defined initial values."
  where
-  shiftReg =
-    delay clk enableGen noGlitch (shiftInLsb <$> shiftReg <*> unsafeFromReset rst)
-
-  go gfs sreg
-    | sreg == noGlitch = (InReset, asserted)
-    | Idle <- gfs = (Idle, not asserted)
-    | otherwise = (if msb == asserted then InReset else Idle, msb)
-   where
-    msb = testBit sreg (natToNum @n)
-
-  noGlitch :: BitVector glitchlessPeriod
-  noGlitch = if asserted then maxBound else minBound
+  go :: state ~ (Bool, Index glitchlessPeriod) => state -> Bool -> state
+  go (state, count) reset
+    | reset == state    = (state,     0)
+    | count == maxBound = (not state, 0)
+    | otherwise         = (state,     count + 1)
 
   noReset :: Reset dom
   noReset = unsafeToReset (pure (not asserted))
@@ -228,9 +221,6 @@ resetGlitchFilter SNat clk rst =
     case resetPolarity @dom of
       SActiveHigh -> True
       SActiveLow -> False
-
-  shiftInLsb :: forall m. KnownNat m => BitVector (m + 1) -> Bool -> BitVector (m + 1)
-  shiftInLsb bv s = shiftL bv 1 .|. resize (pack s)
 {-# NOINLINE resetGlitchFilter #-} -- Give reset glitch filter its own HDL file
 
 -- | Hold reset for a number of cycles relative to an incoming reset signal.
