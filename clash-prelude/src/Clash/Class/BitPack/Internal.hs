@@ -41,6 +41,7 @@ import Data.Ord                       (Down)
 import Data.Word
 import Foreign.C.Types                (CUShort)
 import GHC.Generics
+import GHC.Stack                      (HasCallStack)
 import GHC.TypeLits                   (KnownNat, Nat, type (+), type (-))
 import GHC.TypeLits.Extra             (CLog, Max)
 import Numeric.Half                   (Half (..))
@@ -127,9 +128,10 @@ class KnownNat (BitSize a) => BitPack a where
   -- 59
   -- >>> pack (59 :: Unsigned 6)
   -- 0b11_1011
-  unpack :: BitVector (BitSize a) -> a
+  unpack :: HasCallStack => BitVector (BitSize a) -> a
   default unpack
-    :: ( Generic a
+    :: ( HasCallStack
+       , Generic a
        , GBitPack (Rep a)
        , KnownNat constrSize
        , KnownNat fieldSize

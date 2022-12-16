@@ -158,7 +158,7 @@ import GHC.Natural
 #endif
 import GHC.Natural                (naturalToInteger)
 import GHC.Prim                   (dataToTag#)
-import GHC.Stack                  (withFrozenCallStack)
+import GHC.Stack                  (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-))
 #if MIN_VERSION_base(4,15,0)
 import GHC.TypeNats               (natVal)
@@ -1329,7 +1329,7 @@ undefErrorU op bv1 = withFrozenCallStack $
   ++ " called with (partially) undefined argument: "
   ++ show bv1
 
-undefError :: KnownNat n => String -> [BitVector n] -> a
+undefError :: (HasCallStack, KnownNat n) => String -> [BitVector n] -> a
 undefError op bvs = withFrozenCallStack $
   errorX $ op
   ++ " called with (partially) undefined arguments: "
@@ -1337,7 +1337,7 @@ undefError op bvs = withFrozenCallStack $
 
 
 -- | Implement BitVector undefinedness checking for unpack functions
-checkUnpackUndef :: (KnownNat n, Typeable a)
+checkUnpackUndef :: (HasCallStack, KnownNat n, Typeable a)
                  => (BitVector n -> a) -- ^ unpack function
                  -> BitVector n -> a
 checkUnpackUndef f bv@(BV 0 _) = f bv

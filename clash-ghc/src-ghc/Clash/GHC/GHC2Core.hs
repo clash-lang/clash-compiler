@@ -391,7 +391,7 @@ coreToTerm primMap unlocs = term
           | length args == 3
           = term (App (args!!2) (args!!1))
         go "Clash.Sized.BitVector.Internal.checkUnpackUndef" args
-          | [_nTy,_aTy,_kn,_typ,f] <- args
+          | [_nTy,_aTy,_callStk,_kn,_typ,f] <- args
           = term f
         go "Clash.Magic.prefixName" args
           | [Type nmTy,_aTy,f] <- args
@@ -1421,23 +1421,27 @@ checkUnpackUndefTerm
   :: C.Type
   -> C.Term
 checkUnpackUndefTerm (C.ForAllTy nTV (C.ForAllTy aTV funTy))
-  | C.FunTy knTy r0Ty <- C.tyView funTy
-  , C.FunTy tpTy r1Ty <- C.tyView r0Ty
-  , C.FunTy fTy _     <- C.tyView r1Ty
+  | C.FunTy callStkTy r0Ty <- C.tyView funTy
+  , C.FunTy knTy r1Ty <- C.tyView r0Ty
+  , C.FunTy tpTy r2Ty <- C.tyView r1Ty
+  , C.FunTy fTy _     <- C.tyView r2Ty
   = let
+      callStkName       = C.mkUnsafeSystemName "callStk" 0
       knName            = C.mkUnsafeSystemName "kn" 0
       tpName            = C.mkUnsafeSystemName "tp" 1
       fName             = C.mkUnsafeSystemName "f" 2
+      callStkId         = C.mkLocalId callStkTy callStkName
       knId              = C.mkLocalId knTy knName
       tpId              = C.mkLocalId tpTy tpName
       fId               = C.mkLocalId fTy fName
     in
       C.TyLam nTV (
       C.TyLam aTV (
+      C.Lam callStkId (
       C.Lam knId (
       C.Lam tpId (
       C.Lam fId (
-      C.Var fId)))))
+      C.Var fId))))))
 
 checkUnpackUndefTerm ty = error $ $(curLoc) ++ show ty
 
