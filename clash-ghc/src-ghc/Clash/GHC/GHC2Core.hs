@@ -51,6 +51,7 @@ import qualified Text.Read                   as Text
 
 -- GHC API
 #if MIN_VERSION_ghc(9,0,0)
+import GHC.Builtin.Types (falseDataCon)
 import GHC.Core.Coercion.Axiom
   (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs), fromBranches)
 import GHC.Core.Coercion (Role (Nominal), coercionType, coercionKind)
@@ -103,6 +104,7 @@ import CoreFVs    (exprSomeFreeVars)
 import CoreSyn
   (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..), Tickish (..),
    collectArgs, rhssOfAlts, unfoldingTemplate)
+import TysWiredIn (falseDataCon)
 import DataCon    (DataCon, HsImplBang(..),
 #if MIN_VERSION_ghc(8,8,0)
                    dataConExTyCoVars,
@@ -417,6 +419,8 @@ coreToTerm primMap unlocs = term
         go "Clash.Magic.noDeDup" args
           | [_aTy,f] <- args
           = C.Tick C.NoDeDup <$> term f
+        go "Clash.Magic.simulation" _
+          = C.Data <$> coreToDataCon falseDataCon
         go "Clash.XException.xToErrorCtx" args
           -- xToErrorCtx :: forall a. String -> a -> a
           | [_ty, _msg, x] <- args

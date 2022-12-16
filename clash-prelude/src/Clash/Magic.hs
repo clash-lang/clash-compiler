@@ -30,6 +30,9 @@ module Clash.Magic
   -- ** Functions to control Clash's (de)duplication mechanisms
   , deDup
   , noDeDup
+
+  -- ** Utilities to differentiate between simulation and generating HDL
+  , simulation
   ) where
 
 import Clash.NamedTypes            ((:::))
@@ -234,3 +237,8 @@ noDeDup
   :: forall a . a -> a
 noDeDup = id
 {-# NOINLINE noDeDup #-}
+
+-- | 'True' in Haskell simulation. Replaced by 'False' when generating HDL.
+simulation :: Bool
+simulation = True
+{-# NOINLINE simulation #-}
