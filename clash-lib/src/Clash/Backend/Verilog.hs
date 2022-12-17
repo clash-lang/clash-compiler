@@ -1264,9 +1264,8 @@ bit_char k b = do
   udf <- Ap (use k)
   case (udf,b) of
     (Just Nothing,U)  -> char '0'
-    (Just (Just i),U) -> "'" <> int i <> "'"
+    (Just (Just i),U) -> int i
     _                 -> char (bit_char' b)
-
 
 dcToExpr :: HWType -> Int -> Expr
 dcToExpr ty i = Literal (Just (ty,conSize ty)) (NumLit (toInteger i))
