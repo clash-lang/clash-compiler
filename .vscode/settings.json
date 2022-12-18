@@ -1,12 +1,16 @@
 {
   "cSpell.words": [
-    "NOINLINE",
-    "WHNF",
+    "dflipflop",
     "fmap",
     "frontends",
     "inlines",
+    "NOINLINE",
     "scrutinee",
-    "subterms"
+    "subterms",
+    "Twente",
+    "Verilog",
+    "VHDL",
+    "WHNF"
   ],
   "files.exclude": {
     "**/*.dyn_hi": true,
