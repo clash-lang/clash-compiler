@@ -194,6 +194,7 @@ import Clash.XException
 >>> import Clash.Prelude (SSymbol(..))
 >>> import Clash.Signal.Internal
 >>> import Clash.Promoted.Nat
+>>> import Clash.Promoted.Nat.Literals
 >>> import Clash.XException
 >>> import Data.Ratio (Ratio)
 >>> import Numeric.Natural (Natural)
@@ -1016,7 +1017,8 @@ tbDynamicClockGen periods ena =
 {-# ANN tbDynamicClockGen hasBlackBox #-}
 
 
--- | Reset generator
+-- | Reset generator for simulation purposes. Asserts the reset for a single
+-- cycle.
 --
 -- To be used like:
 --
@@ -1026,6 +1028,8 @@ tbDynamicClockGen periods ena =
 --
 -- See 'Clash.Explicit.Testbench.tbClockGen' for example usage.
 --
+-- __NB__: While this can be used in the @testBench@ function, it cannot be
+-- synthesized to hardware.
 resetGen
   :: forall dom
    . KnownDomain dom
@@ -1033,19 +1037,22 @@ resetGen
 resetGen = resetGenN (SNat @1)
 {-# INLINE resetGen #-}
 
--- | Generate reset that's asserted for the first /n/ cycles.
+-- | Reset generator for simulation purposes. Asserts the reset for the first /n/
+-- cycles.
 --
 -- To be used like:
 --
 -- @
--- rstSystem5 = resetGen @System (SNat @5)
+-- rstSystem5 = resetGen @System d5
 -- @
 --
 -- Example usage:
 --
--- >>> sampleN 7 (unsafeToHighPolarity (resetGenN @System (SNat @3)))
+-- >>> sampleN 7 (unsafeToHighPolarity (resetGenN @System d3))
 -- [True,True,True,False,False,False,False]
 --
+-- __NB__: While this can be used in the @testBench@ function, it cannot be
+-- synthesized to hardware.
 resetGenN
   :: forall dom n
    . (KnownDomain dom, 1 <= n)
