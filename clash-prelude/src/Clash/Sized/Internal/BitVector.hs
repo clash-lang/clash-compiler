@@ -249,7 +249,7 @@ data Bit =
 {-# ANN Bit hasBlackBox #-}
 
 -- * Constructions
--- ** Initialisation
+-- ** Initialization
 {-# NOINLINE high #-}
 {-# ANN high hasBlackBox #-}
 -- | logic '1'

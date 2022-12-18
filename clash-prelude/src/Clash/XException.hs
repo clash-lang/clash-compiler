@@ -6,14 +6,58 @@ Copyright  :  (C) 2016,      University of Twente,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-'XException': An exception for uninitialized values
+This module houses utilities to deal with /undefined/ values in Clash. An undefined
+value is translated to @x@ in VHDL and Verilog. At its core, this is handled by
+a special 'Exception' called 'XException'.
 
->>> show (errorX "undefined" :: Integer, 4 :: Int)
-"(*** Exception: X: undefined
-CallStack (from HasCallStack):
+Like any 'Exception' in Haskell, any term can take on this value:
+
+>>> error "help" :: Int
+*** Exception: help
 ...
->>> showX (errorX "undefined" :: Integer, 4 :: Int)
-"(undefined,4)"
+>>> errorX "help" :: Int
+*** Exception: X: help
+...
+
+Within the Haskell ecosystem, and throughout this module, you will find these
+exception values being referred to as /bottom/. This is sometimes written as a
+symbol: @_|_@.
+
+All 'Exception's, including 'XException', are \"infectious\". Any value depending
+on an 'Exception' will itself be replaced by it:
+
+>>> let x = error "help" :: Int
+>>> x + 1
+*** Exception: help
+
+In typical non-IO Haskell, exceptions are generally used to halt execution in case
+of /the impossible/. E.g., situations where GHC can't proof a branch won't be
+evaluated, but it nevertheless won't:
+
+@
+if | a < 0     = "less than"
+   | a == 0    = "equal"
+   | a > 0     = "greater than"
+   | otherwise = error "Can't happen"
+@
+
+In Clash they are used far more pervasively, as hardware architectures often
+deal with /undefinedness/. For example, the initial value of a 'dflipflop' is
+/undefined/:
+
+>>> showX (sampleN @System 3 (dflipflop (pure 5)))
+"[undefined,5,5]"
+
+Note that we had to use a special version of 'show' called 'showX' here, as the
+former treats any bottom as an immediate cause to end program execution:
+
+>>> show (sampleN @System 10 (dflipflop (pure 5)))
+"[*** Exception: X: First value of dflipflop undefined
+
+In this we find the heart of "Clash.XException": a way to continue simulating
+when facing /undefinedness/. The two most important classes are 'NFDataX' and
+'ShowX'. You are encouraged to read their documentation first before diving into
+other definitions.
 -}
 
 {-# LANGUAGE CPP #-}
@@ -476,7 +520,10 @@ rwhnfX = (`seqX` ())
 {-# INLINE rwhnfX #-}
 
 -- | Class that houses functions dealing with /undefined/ values in Clash. See
--- 'deepErrorX' and 'rnfX'.
+-- this module's documentation for a general introduction.
+--
+-- TODO
+--
 class NFDataX a where
   -- | Create a value where all the elements have an 'errorX',
   -- but the spine is defined.
