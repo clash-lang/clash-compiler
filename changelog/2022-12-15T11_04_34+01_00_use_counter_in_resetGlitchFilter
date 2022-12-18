@@ -1,0 +1,3 @@
+CHANGED: `resetGlitchFilter` now uses a counter instead of shift register, allowing glitch filtering over much larger periods.
+CHANGED: `resetGlitchFilter` now filters glitches symmetrically, only deasserting the reset after the incoming reset has stabilized. For more information, read [#2374](https://github.com/clash-lang/clash-compiler/pull/2374).
+CHANGED: `resetGlitchFilter` does not support domains with unknown initial values anymore. Its previous behavior could lead to unstable circuits. Domains not supporting initial values should consider using power-on-resets and glitch filters specifically designed for this environment.
