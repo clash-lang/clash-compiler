@@ -1933,7 +1933,7 @@ bit_char U = do
   case udf of
     Nothing -> char '-'
     Just Nothing -> char '0'
-    Just (Just i) -> "'" <> int i <> "'"
+    Just (Just i) -> int i
 bit_char Z = char 'Z'
 
 toSLV :: HasCallStack => HWType -> Expr -> VHDLM Doc
