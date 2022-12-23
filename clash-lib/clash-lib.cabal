@@ -359,7 +359,7 @@ test-suite doctests
     build-depends:
       base,
       clash-lib,
-      doctest-parallel >= 0.2 && < 0.3,
+      doctest-parallel >= 0.2 && < 0.4,
       filepath
 
 test-suite unittests

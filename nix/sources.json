@@ -5,10 +5,10 @@
         "homepage": null,
         "owner": "martijnbastiaan",
         "repo": "doctest-parallel",
-        "rev": "36c82ff2c7b18b265a680ffd22e38786184cee62",
-        "sha256": "1fc7ir9gniqcbcpi3wwkmz9qvcgcxbikrsxngs45gy7xp3bqxj2w",
+        "rev": "112b85b55c63dae1cc52b5216efe03873f1acc06",
+        "sha256": "1v18an5np0wflg6phycmmhqmcpmn30p0vxaq2wx8ha5af8ckmymb",
         "type": "tarball",
-        "url": "https://github.com/martijnbastiaan/doctest-parallel/archive/36c82ff2c7b18b265a680ffd22e38786184cee62.tar.gz",
+        "url": "https://github.com/martijnbastiaan/doctest-parallel/archive/112b85b55c63dae1cc52b5216efe03873f1acc06.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "ghc-tcplugins-extra": {
