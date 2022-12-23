@@ -5,10 +5,10 @@
         "homepage": null,
         "owner": "martijnbastiaan",
         "repo": "doctest-parallel",
-        "rev": "f75c2973f889ef99f0458317430641148ad8b1ea",
-        "sha256": "0rp0gag4vy4pxx2hlyxp73kdy99ikvpb17zq8nr9b5zc2k50a5sf",
+        "rev": "112b85b55c63dae1cc52b5216efe03873f1acc06",
+        "sha256": "1v18an5np0wflg6phycmmhqmcpmn30p0vxaq2wx8ha5af8ckmymb",
         "type": "tarball",
-        "url": "https://github.com/martijnbastiaan/doctest-parallel/archive/f75c2973f889ef99f0458317430641148ad8b1ea.tar.gz",
+        "url": "https://github.com/martijnbastiaan/doctest-parallel/archive/112b85b55c63dae1cc52b5216efe03873f1acc06.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "ghc-tcplugins-extra": {
@@ -71,6 +71,18 @@
         "url": "https://github.com/hercules-ci/gitignore/archive/c4662e662462e7bf3c2a968483478a665d00e717.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
+    "haskell-hedgehog": {
+        "branch": "master",
+        "description": "Release with confidence, state-of-the-art property testing for Haskell.",
+        "homepage": "",
+        "owner": "hedgehogqa",
+        "repo": "haskell-hedgehog",
+        "rev": "a5b482493733dbdd50482c6e65f0ee8f2e156293",
+        "sha256": "1ar2nsbsk7490lpc66zaxsqrh0pkgczh26dkkyby78a2svvmx3gx",
+        "type": "tarball",
+        "url": "https://github.com/hedgehogqa/haskell-hedgehog/archive/a5b482493733dbdd50482c6e65f0ee8f2e156293.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
     "niv": {
         "branch": "master",
         "description": "Easy dependency management for Nix projects",
@@ -84,15 +96,27 @@
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs": {
-        "branch": "nixos-20.09",
+        "branch": "nixos-21.11",
         "description": "Nixpkgs/NixOS branches that track the Nixpkgs/NixOS channels",
         "homepage": null,
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "edb26126d98bc696f4f3e206583faa65d3d6e818",
-        "sha256": "1cl4ka4kk7kh3bl78g06dhiidazf65q8miyzaxi9930d6gwyzkci",
+        "rev": "eabc38219184cc3e04a974fe31857d8e0eac098d",
+        "sha256": "04ffwp2gzq0hhz7siskw6qh9ys8ragp7285vi1zh8xjksxn1msc5",
         "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/edb26126d98bc696f4f3e206583faa65d3d6e818.tar.gz",
+        "url": "https://github.com/NixOS/nixpkgs/archive/eabc38219184cc3e04a974fe31857d8e0eac098d.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "tasty-hedgehog": {
+        "branch": "master",
+        "description": "Tasty integration for the Hedgehog property testing library",
+        "homepage": "",
+        "owner": "qfpl",
+        "repo": "tasty-hedgehog",
+        "rev": "1ade0d8e78c32a724f80d4bc39bdb2a55c5de1c6",
+        "sha256": "00p60dhj2b8jqnv7hkk6ghshmabkhjalxvncz6dfs0wkr19rqr3l",
+        "type": "tarball",
+        "url": "https://github.com/qfpl/tasty-hedgehog/archive/1ade0d8e78c32a724f80d4bc39bdb2a55c5de1c6.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }

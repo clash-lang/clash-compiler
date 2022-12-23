@@ -11,6 +11,11 @@ let
     haskellPackages = nixpkgs.haskellPackages.override {
       overrides = self: super: {
         # External overrides
+        hedgehog =
+         self.callCabal2nix "hedgehog" (sources.haskell-hedgehog + "/hedgehog") {};
+
+        tasty-hedgehog =
+         self.callCabal2nix "tasty-hedgehog" sources.tasty-hedgehog {};
 
         ghc-typelits-knownnat =
          self.callCabal2nix "ghc-typelits-knownnat" sources.ghc-typelits-knownnat {};
