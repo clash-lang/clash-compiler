@@ -120,7 +120,7 @@ import Clash.XException
 
 type role Index nominal
 
--- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
+-- | Arbitrarily-bounded unsigned integer represented by @ceil(log_2(n))@ bits
 --
 -- Given an upper bound @n@, an 'Index' @n@ number has a range of: [0 .. @n@-1]
 --
@@ -144,14 +144,19 @@ type role Index nominal
 -- *** Exception: X: Clash.Sized.Index: result 8 is out of bounds: [0..7]
 -- ...
 --
+-- __NB__: The usual Haskell method of converting an integral numeric type to
+-- another, 'fromIntegral', is not well suited for Clash as it will go through
+-- 'Integer' which is arbitrarily bounded in HDL. Instead use
+-- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
+--
 -- Index has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html type role>
 --
 -- >>> :i Index
 -- type role Index nominal
 -- ...
 --
--- as it is not safe to coerce between different range Index. To change the
--- size, use the functions in the 'Clash.Class.Resize.Resize' class.
+-- as it is not safe to coerce between 'Index'es with different ranges. To
+-- change the size, use the functions in the 'Resize' class.
 #if MIN_VERSION_base(4,15,0)
 data Index (n :: Nat) =
     -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
@@ -282,6 +287,10 @@ maxBound# =
 {-# ANN maxBound# hasBlackBox #-}
 
 -- | Operators report an error on overflow and underflow
+--
+-- __NB__: 'fromInteger'/'fromIntegral' can cause unexpected truncation, as
+-- 'Integer' is arbitrarily bounded during synthesis.  Prefer
+-- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
 instance KnownNat n => Num (Index n) where
   (+)         = (+#)
   (-)         = (-#)
@@ -437,6 +446,9 @@ instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
 instance KnownNat n => Real (Index n) where
   toRational = toRational . toInteger#
 
+-- | __NB__: 'toInteger'/'fromIntegral' can cause unexpected truncation, as
+-- 'Integer' is arbitrarily bounded during synthesis.  Prefer
+-- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
 instance KnownNat n => Integral (Index n) where
   quot        = quot#
   rem         = rem#

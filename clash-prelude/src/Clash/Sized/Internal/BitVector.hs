@@ -212,10 +212,15 @@ type role BitVector nominal
 
 -- * Type definitions
 
--- | A vector of bits.
+-- | A vector of bits
 --
 -- * Bit indices are descending
 -- * 'Num' instance performs /unsigned/ arithmetic.
+--
+-- __NB__: The usual Haskell method of converting an integral numeric type to
+-- another, 'fromIntegral', is not well suited for Clash as it will go through
+-- 'Integer' which is arbitrarily bounded in HDL. Instead use
+-- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
 --
 -- BitVector has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html type role>
 --
@@ -223,8 +228,8 @@ type role BitVector nominal
 -- type role BitVector nominal
 -- ...
 --
--- as it is not safe to coerce between different size BitVector. To change the
--- size, use the functions in the 'Clash.Class.Resize.Resize' class.
+-- as it is not safe to coerce between different sizes of BitVector. To change
+-- the size, use the functions in the 'Resize' class.
 data BitVector (n :: Nat) =
     -- | The constructor, 'BV', and  the field, 'unsafeToNatural', are not
     -- synthesizable.
@@ -237,7 +242,12 @@ data BitVector (n :: Nat) =
 
 -- * Bit
 
--- | Bit
+-- | A single bit
+--
+-- __NB__: The usual Haskell method of converting an integral numeric type to
+-- another, 'fromIntegral', is not well suited for Clash as it will go through
+-- 'Integer' which is arbitrarily bounded in HDL. Instead use
+-- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
 data Bit =
   -- | The constructor, 'Bit', and  the field, 'unsafeToInteger#', are not
   -- synthesizable.
@@ -665,6 +675,9 @@ maxBound# = let m = 1 `shiftL` natToNum @n in BV 0 (m-1)
 {-# NOINLINE maxBound# #-}
 {-# ANN maxBound# hasBlackBox #-}
 
+-- | __NB__: 'fromInteger'/'fromIntegral' can cause unexpected truncation, as
+-- 'Integer' is arbitrarily bounded during synthesis.  Prefer
+-- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
 instance KnownNat n => Num (BitVector n) where
   (+)         = (+#)
   (-)         = (-#)
@@ -780,6 +793,9 @@ times# bv1 bv2 = undefErrorP "mul" bv1 bv2
 instance KnownNat n => Real (BitVector n) where
   toRational = toRational . toInteger#
 
+-- | __NB__: 'toInteger'/'fromIntegral' can cause unexpected truncation, as
+-- 'Integer' is arbitrarily bounded during synthesis.  Prefer
+-- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
 instance KnownNat n => Integral (BitVector n) where
   quot        = quot#
   rem         = rem#
