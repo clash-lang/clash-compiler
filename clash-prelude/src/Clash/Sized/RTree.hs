@@ -267,7 +267,7 @@ tree-structure of adders:
 @
 populationCount :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
                 => BitVector (2^d) -> Index (2^d+1)
-populationCount = tfold fromIntegral (+) . v2t . bv2v
+populationCount = tfold (resize . bv2i . pack) (+) . v2t . bv2v
 @
 
 The \"problem\" with this description is that all adders have the same
@@ -289,12 +289,12 @@ type:
 We have such an adder in the form of the 'Clash.Class.Num.add' function, as
 defined in the instance 'Clash.Class.Num.ExtendingNum' instance of 'Index'.
 However, we cannot simply use 'Clash.Sized.Vector.fold' to create a tree-structure of
-'Clash.Class.Num.add'es:
+'Clash.Class.Num.add's:
 #if __GLASGOW_HASKELL__ >= 900
 >>> :{
 let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
                      => BitVector (2^d) -> Index (2^d+1)
-    populationCount' = tfold fromIntegral add . v2t . bv2v
+    populationCount' = tfold (resize . bv2i . pack) add . v2t . bv2v
 :}
 <BLANKLINE>
 <interactive>:...
@@ -306,8 +306,9 @@ let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
                 -> Index ((2 ^ d) + 1)
                 -> AResult (Index ((2 ^ d) + 1)) (Index ((2 ^ d) + 1))
     • In the second argument of ‘tfold’, namely ‘add’
-      In the first argument of ‘(.)’, namely ‘tfold fromIntegral add’
-      In the expression: tfold fromIntegral add . v2t . bv2v
+      In the first argument of ‘(.)’, namely
+        ‘tfold (resize . bv2i . pack) add’
+      In the expression: tfold (resize . bv2i . pack) add . v2t . bv2v
     • Relevant bindings include
         populationCount' :: BitVector (2 ^ d) -> Index ((2 ^ d) + 1)
           (bound at ...)
@@ -316,7 +317,7 @@ let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
 >>> :{
 let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
                      => BitVector (2^d) -> Index (2^d+1)
-    populationCount' = tfold fromIntegral add . v2t . bv2v
+    populationCount' = tfold (resize . bv2i . pack) add . v2t . bv2v
 :}
 <BLANKLINE>
 <interactive>:...
@@ -328,8 +329,9 @@ let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
                      -> Index ((2 ^ d) + 1)
                      -> AResult (Index ((2 ^ d) + 1)) (Index ((2 ^ d) + 1))
     • In the second argument of ‘tfold’, namely ‘add’
-      In the first argument of ‘(.)’, namely ‘tfold fromIntegral add’
-      In the expression: tfold fromIntegral add . v2t . bv2v
+      In the first argument of ‘(.)’, namely
+        ‘tfold (resize . bv2i . pack) add’
+      In the expression: tfold (resize . bv2i . pack) add . v2t . bv2v
     • Relevant bindings include
         populationCount' :: BitVector (2 ^ d) -> Index ((2 ^ d) + 1)
           (bound at ...)
@@ -346,7 +348,6 @@ the form of 'dtfold':
 @
 {\-\# LANGUAGE UndecidableInstances \#-\}
 import Data.Singletons
-import Data.Proxy
 
 data IIndex (f :: 'TyFun' Nat Type) :: Type
 type instance 'Apply' IIndex l = 'Index' ((2^l)+1)
@@ -354,7 +355,7 @@ type instance 'Apply' IIndex l = 'Index' ((2^l)+1)
 populationCount' :: (KnownNat k, KnownNat (2^k))
                  => BitVector (2^k) -> Index ((2^k)+1)
 populationCount' bv = 'tdfold' (Proxy @IIndex)
-                             fromIntegral
+                             (resize . bv2i . pack)
                              (\\_ x y -> 'Clash.Class.Num.add' x y)
                              ('v2t' ('Clash.Sized.Vector.bv2v' bv))
 @
