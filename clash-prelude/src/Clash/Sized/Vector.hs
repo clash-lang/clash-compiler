@@ -153,6 +153,9 @@ import Clash.XException           (ShowX (..), NFDataX (..), seqX, isX)
 >>> :set -XTypeOperators
 >>> :set -XTemplateHaskell
 >>> :set -XFlexibleContexts
+>>> :set -fplugin GHC.TypeLits.Normalise
+>>> :set -fplugin GHC.TypeLits.KnownNat.Solver
+>>> :set -fplugin GHC.TypeLits.Extra.Solver
 >>> :m -Prelude
 >>> import Clash.Prelude
 >>> import qualified Clash.Sized.Vector as Vec
@@ -750,7 +753,7 @@ map f (x `Cons` xs) = f x `Cons` map f xs
 -- >>> imap (+) (2 :> 2 :> 2 :> 2 :> Nil)
 -- 2 :> 3 :> *** Exception: X: Clash.Sized.Index: result 4 is out of bounds: [0..3]
 -- ...
--- >>> imap (\i a -> fromIntegral i + a) (2 :> 2 :> 2 :> 2 :> Nil) :: Vec 4 (Unsigned 8)
+-- >>> imap (\i a -> extend (bitCoerce i) + a) (2 :> 2 :> 2 :> 2 :> Nil) :: Vec 4 (Unsigned 8)
 -- 2 :> 3 :> 4 :> 5 :> Nil
 --
 -- \"'imap' @f xs@\" corresponds to the following circuit layout:
@@ -777,7 +780,7 @@ imap f = go 0
 *** Exception: X: Clash.Sized.Index: result 3 is out of bounds: [0..1]
 ...
 #endif
->>> izipWith (\i a b -> fromIntegral i + a + b) (2 :> 2 :> Nil) (3 :> 3 :> Nil) :: Vec 2 (Unsigned 8)
+>>> izipWith (\i a b -> extend (bitCoerce i) + a + b) (2 :> 2 :> Nil) (3 :> 3 :> Nil) :: Vec 2 (Unsigned 8)
 5 :> 6 :> Nil
 
 \"'imap' @f xs@\" corresponds to the following circuit layout:

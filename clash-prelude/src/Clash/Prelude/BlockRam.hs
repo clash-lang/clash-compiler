@@ -86,7 +86,7 @@ cpu
      , (MemAddr, Maybe (MemAddr,Value), InstrAddr)
      )
 cpu regbank (memOut, instr) =
-  (regbank', (rdAddr, (,aluOut) 'Prelude.<$>' wrAddrM, fromIntegral ipntr))
+  (regbank', (rdAddr, (,aluOut) 'Prelude.<$>' wrAddrM, bitCoerce ipntr))
  where
   -- Current instruction pointer
   ipntr = regbank 'Clash.Sized.Vector.!!' PC
@@ -272,7 +272,7 @@ cpu2
      , (MemAddr, Maybe (MemAddr,Value), InstrAddr)
      )
 cpu2 (regbank,ldRegD) (memOut,instr) =
-  ((regbank', ldRegD'), (rdAddr, (,aluOut) 'Prelude.<$>' wrAddrM, fromIntegral ipntr))
+  ((regbank', ldRegD'), (rdAddr, (,aluOut) 'Prelude.<$>' wrAddrM, bitCoerce ipntr))
  where
   -- Current instruction pointer
   ipntr = regbank 'Clash.Sized.Vector.!!' PC
@@ -496,7 +496,7 @@ let cpu :: Vec 7 Value          -- ^ Register bank
         -> ( Vec 7 Value
            , (MemAddr,Maybe (MemAddr,Value),InstrAddr)
            )
-    cpu regbank (memOut,instr) = (regbank',(rdAddr,(,aluOut) <$> wrAddrM,fromIntegral ipntr))
+    cpu regbank (memOut,instr) = (regbank',(rdAddr,(,aluOut) <$> wrAddrM,bitCoerce ipntr))
       where
         -- Current instruction pointer
         ipntr = regbank C.!! PC
@@ -607,7 +607,7 @@ let cpu2
          , (MemAddr, Maybe (MemAddr, Value), InstrAddr)
          )
     cpu2 (regbank,ldRegD) (memOut,instr) =
-      ((regbank', ldRegD'), (rdAddr, (,aluOut) <$> wrAddrM, fromIntegral ipntr))
+      ((regbank', ldRegD'), (rdAddr, (,aluOut) <$> wrAddrM, bitCoerce ipntr))
      where
       -- Current instruction pointer
       ipntr = regbank C.!! PC
