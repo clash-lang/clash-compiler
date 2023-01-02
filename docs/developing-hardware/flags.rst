@@ -180,8 +180,9 @@ Clash Compiler Flags
   **Default:** 20
 
 -fclash-intwidth
-  Set the bit width for the ``Int/Word/Integer`` types. The only allowed values
-  are 32 or 64.
+  Set the bit width for the ``Int/Word/Integer`` types in the generated HDL.
+  Clash simulation is not affected, and neither are `BitPack` instances. The
+  only allowed values are 32 or 64.
 
   **Default:** Machine word size (``WORD_SIZE_IN_BITS``)
 
