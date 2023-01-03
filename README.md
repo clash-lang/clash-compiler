@@ -29,7 +29,7 @@ Features of Clash:
 # Community
 **Mailing list**: for updates and questions join the mailing list clash-language+subscribe@googlegroups.com or read the [forum](https://groups.google.com/d/forum/clash-language)
 
-**Slack**: [functionalprogramming.slack.com#clash](https://functionalprogramming.slack.com/archives/CPGMJFF50) (Invite yourself at [fpchat-invite.herokuapp.com](http://fpchat-invite.herokuapp.com)).
+**Slack**: [functionalprogramming.slack.com#clash](https://functionalprogramming.slack.com/archives/CPGMJFF50) (Invite yourself at [fpslack.com/](https://fpslack.com/)).
 
 **IRC**: [libera.chat#clash (webchat access)](https://web.libera.chat/#clash) (or ircs://irc.libera.chat:6697/clash if you want to use a regular IRC client)
 
