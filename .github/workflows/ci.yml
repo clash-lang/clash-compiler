@@ -1,5 +1,12 @@
 name: CI
-on: pull_request
+
+on:
+  push:
+    branches:
+      # PRs can only use caches from their target branch. We therefore need to
+      # make sure we run on 'master' too.
+      - master
+  pull_request:
 
 concurrency:
   group: ${{ github.head_ref }}
@@ -31,8 +38,8 @@ jobs:
             ghc: 9.0.2
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: haskell/actions/setup@v1
+      - uses: actions/checkout@v3
+      - uses: haskell/actions/setup@v2
         id: setup-haskell
         with:
           ghc-version: ${{ matrix.ghc }}
@@ -51,6 +58,9 @@ jobs:
           cp .ci/stack-${{ matrix.ghc }}.yaml stack.yaml
 
       - name: Cache
+        # Note: we're stuck on v1 because of:
+        #
+        #   https://github.com/actions/cache/issues/666
         uses: actions/cache@v1
         with:
           path: |
@@ -124,7 +134,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: true
           ref: ${{ github.event.pull_request.head.ref }}
@@ -140,7 +150,7 @@ jobs:
           mv cabal.project.freeze frozen
 
       - name: Restore Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             dist-newstyle
@@ -168,3 +178,44 @@ jobs:
 
       - name: Testsuite (SystemVerilog)
         run: cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .SystemVerilog --no-modelsim --no-vivado
+
+
+  all:
+    name: All jobs finished
+    if: always()
+    needs: [
+        build_mac_windows,
+        build_and_test,
+      ]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Check dependencies for failures
+        run: |
+          # Test all dependencies for success/failure
+          set -x
+          success="${{ contains(needs.*.result, 'success') }}"
+          fail="${{ contains(needs.*.result, 'failure') }}"
+          set +x
+
+          # Test whether success/fail variables contain sane values
+          if [[ "${success}" != "true" && "${success}" != "false" ]]; then exit 1; fi
+          if [[ "${fail}"    != "true" && "${fail}"    != "false" ]]; then exit 1; fi
+
+          # We want to fail if one or more dependencies fail. For safety, we introduce
+          # a second check: if no dependencies succeeded something weird is going on.
+          if [[ "${fail}" == "true" || "${success}" == "false" ]]; then
+            echo "One or more dependency failed, or no dependency succeeded."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install python3-yaml
+
+      - name: Check that the 'all' job depends on all other jobs
+        run: |
+          .ci/all_check.py
