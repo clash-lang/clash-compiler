@@ -6,6 +6,7 @@ on:
       # PRs can only use caches from their target branch. We therefore need to
       # make sure we run on 'master' too.
       - master
+      - 1.6
   pull_request:
 
 concurrency:
