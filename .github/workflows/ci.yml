@@ -1,5 +1,12 @@
 name: CI
-on: pull_request
+
+on:
+  push:
+    branches:
+      # PRs can only use caches from their target branch. We therefore need to
+      # make sure we run on 'master' too.
+      - master
+  pull_request:
 
 concurrency:
   group: ${{ github.head_ref }}
