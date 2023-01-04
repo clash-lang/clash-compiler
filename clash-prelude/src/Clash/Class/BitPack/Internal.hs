@@ -1,8 +1,9 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2017, Myrtle Software Ltd,
-                  2021-2025, QBayLogic B.V.,
+                  2021-2026, QBayLogic B.V.,
                   2022,      Google Inc.
+                  2023,      LumiGuide Fietsdetectie B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -253,53 +254,143 @@ instance BitPack Bit where
 
 instance BitPack Int where
   type BitSize Int = WORD_SIZE_IN_BITS
-  pack   = packXWith fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  pack   = packXWith toEnum
+  unpack = checkUnpackUndef fromEnum
 
 instance BitPack Int8 where
   type BitSize Int8 = 8
-  pack   = packXWith fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  pack   = packXWith packInt8#
+  unpack = checkUnpackUndef unpackInt8#
+
+packInt8# :: Int8 -> BitVector 8
+packInt8# = fromIntegral
+{-# NOINLINE packInt8# #-}
+{-# ANN packInt8# hasBlackBox #-}
+
+unpackInt8# :: BitVector 8 -> Int8
+unpackInt8# = fromIntegral
+{-# NOINLINE unpackInt8# #-}
+{-# ANN unpackInt8# hasBlackBox #-}
 
 instance BitPack Int16 where
   type BitSize Int16 = 16
-  pack   = packXWith fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  pack   = packXWith packInt16#
+  unpack = checkUnpackUndef unpackInt16#
+
+packInt16# :: Int16 -> BitVector 16
+packInt16# = fromIntegral
+{-# NOINLINE packInt16# #-}
+{-# ANN packInt16# hasBlackBox #-}
+
+unpackInt16# :: BitVector 16 -> Int16
+unpackInt16# = fromIntegral
+{-# NOINLINE unpackInt16# #-}
+{-# ANN unpackInt16# hasBlackBox #-}
 
 instance BitPack Int32 where
   type BitSize Int32 = 32
-  pack   = packXWith fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  pack   = packXWith packInt32#
+  unpack = checkUnpackUndef unpackInt32#
+
+packInt32# :: Int32 -> BitVector 32
+packInt32# = fromIntegral
+{-# NOINLINE packInt32# #-}
+{-# ANN packInt32# hasBlackBox #-}
+
+unpackInt32# :: BitVector 32 -> Int32
+unpackInt32# = fromIntegral
+{-# NOINLINE unpackInt32# #-}
+{-# ANN unpackInt32# hasBlackBox #-}
 
 instance BitPack Int64 where
   type BitSize Int64 = 64
-  pack   = packXWith fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  pack   = packXWith packInt64#
+  unpack = checkUnpackUndef unpackInt64#
+
+packInt64# :: Int64 -> BitVector 64
+packInt64# = fromIntegral
+{-# NOINLINE packInt64# #-}
+{-# ANN packInt64# hasBlackBox #-}
+
+unpackInt64# :: BitVector 64 -> Int64
+unpackInt64# = fromIntegral
+{-# NOINLINE unpackInt64# #-}
+{-# ANN unpackInt64# hasBlackBox #-}
 
 instance BitPack Word where
   type BitSize Word = WORD_SIZE_IN_BITS
-  pack   = packXWith fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  pack   = packXWith packWord#
+  unpack = checkUnpackUndef unpackWord#
+
+packWord# :: Word -> BitVector WORD_SIZE_IN_BITS
+packWord# = fromIntegral
+{-# NOINLINE packWord# #-}
+{-# ANN packWord# hasBlackBox #-}
+
+unpackWord# :: BitVector WORD_SIZE_IN_BITS -> Word
+unpackWord# = fromIntegral
+{-# NOINLINE unpackWord# #-}
+{-# ANN unpackWord# hasBlackBox #-}
 
 instance BitPack Word8 where
   type BitSize Word8 = 8
-  pack   = packXWith fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  pack   = packXWith packWord8#
+  unpack = checkUnpackUndef unpackWord8#
+
+packWord8# :: Word8 -> BitVector 8
+packWord8# = fromIntegral
+{-# NOINLINE packWord8# #-}
+{-# ANN packWord8# hasBlackBox #-}
+
+unpackWord8# :: BitVector 8 -> Word8
+unpackWord8# = fromIntegral
+{-# NOINLINE unpackWord8# #-}
+{-# ANN unpackWord8# hasBlackBox #-}
 
 instance BitPack Word16 where
   type BitSize Word16 = 16
-  pack   = packXWith fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  pack   = packXWith packWord16#
+  unpack = checkUnpackUndef unpackWord16#
+
+packWord16# :: Word16 -> BitVector 16
+packWord16# = fromIntegral
+{-# NOINLINE packWord16# #-}
+{-# ANN packWord16# hasBlackBox #-}
+
+unpackWord16# :: BitVector 16 -> Word16
+unpackWord16# = fromIntegral
+{-# NOINLINE unpackWord16# #-}
+{-# ANN unpackWord16# hasBlackBox #-}
 
 instance BitPack Word32 where
   type BitSize Word32 = 32
-  pack   = packXWith fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  pack   = packXWith packWord32#
+  unpack = checkUnpackUndef unpackWord32#
+
+packWord32# :: Word32 -> BitVector 32
+packWord32# = fromIntegral
+{-# NOINLINE packWord32# #-}
+{-# ANN packWord32# hasBlackBox #-}
+
+unpackWord32# :: BitVector 32 -> Word32
+unpackWord32# = fromIntegral
+{-# NOINLINE unpackWord32# #-}
+{-# ANN unpackWord32# hasBlackBox #-}
 
 instance BitPack Word64 where
   type BitSize Word64 = 64
-  pack   = packXWith fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  pack   = packXWith packWord64#
+  unpack = checkUnpackUndef unpackWord64#
+
+packWord64# :: Word64 -> BitVector 64
+packWord64# = fromIntegral
+{-# NOINLINE packWord64# #-}
+{-# ANN packWord64# hasBlackBox #-}
+
+unpackWord64# :: BitVector 64 -> Word64
+unpackWord64# = fromIntegral
+{-# NOINLINE unpackWord64# #-}
+{-# ANN unpackWord64# hasBlackBox #-}
 
 instance BitPack Float where
   type BitSize Float = 32
@@ -333,8 +424,18 @@ unpackDouble# (unsafeToNatural -> w) = wordToDouble (fromIntegral w)
 
 instance BitPack CUShort where
   type BitSize CUShort = 16
-  pack   = packXWith fromIntegral
-  unpack = checkUnpackUndef fromIntegral
+  pack   = packXWith packCUShort#
+  unpack = checkUnpackUndef unpackCUShort#
+
+packCUShort# :: CUShort -> BitVector 16
+packCUShort# = fromIntegral
+{-# NOINLINE packCUShort# #-}
+{-# ANN packCUShort# hasBlackBox #-}
+
+unpackCUShort# :: BitVector 16 -> CUShort
+unpackCUShort# = fromIntegral
+{-# NOINLINE unpackCUShort# #-}
+{-# ANN unpackCUShort# hasBlackBox #-}
 
 instance BitPack Half where
   type BitSize Half = 16

@@ -3,6 +3,7 @@
                      2016-2017, Myrtle Software Ltd,
                      2017-2022, Google Inc.,
                      2017-2026, QBayLogic B.V.
+
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -2122,6 +2123,144 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       , DC _     [Left (Literal (IntLiteral j))]
       ] <- args
     -> reduce (App (Data intDc) (Literal (IntLiteral (i `quot` j))))
+  "Clash.Class.BitPack.Internal.packInt8#" -- :: Int8 -> BitVector 8
+    | [DC _ [Left arg]] <- args
+      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+#if MIN_VERSION_base(4,16,0)
+      , mach2@Machine{mStack=[],mTerm=Literal (Int8Literal i)} <-
+          whnf eval tcm True (setTerm arg $ stackClear mach)
+#else
+      , mach2@Machine{mStack=[],mTerm=Literal (IntLiteral i)} <-
+          whnf eval tcm True (setTerm arg $ stackClear mach)
+#endif
+      -> let resTyInfo = extractTySizeInfo tcm ty tys
+          in Just $ mach2
+              { mStack = mStack mach
+              , mTerm = mkBitVectorLit' resTyInfo 0 i
+              }
+
+  "Clash.Class.BitPack.Internal.packInt16#" -- :: Int16 -> BitVector 16
+    | [DC _ [Left arg]] <- args
+      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+#if MIN_VERSION_base(4,16,0)
+      , mach2@Machine{mStack=[],mTerm=Literal (Int16Literal i)} <-
+          whnf eval tcm True (setTerm arg $ stackClear mach)
+#else
+      , mach2@Machine{mStack=[],mTerm=Literal (IntLiteral i)} <-
+          whnf eval tcm True (setTerm arg $ stackClear mach)
+#endif
+      -> let resTyInfo = extractTySizeInfo tcm ty tys
+          in Just $ mach2
+              { mStack = mStack mach
+              , mTerm = mkBitVectorLit' resTyInfo 0 i
+              }
+
+  "Clash.Class.BitPack.Internal.packInt32#" -- :: Int32 -> BitVector 32
+    | [DC _ [Left arg]] <- args
+      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+#if MIN_VERSION_base(4,16,0)
+      , mach2@Machine{mStack=[],mTerm=Literal (Int32Literal i)} <-
+          whnf eval tcm True (setTerm arg $ stackClear mach)
+#else
+      , mach2@Machine{mStack=[],mTerm=Literal (IntLiteral i)} <-
+          whnf eval tcm True (setTerm arg $ stackClear mach)
+#endif
+      -> let resTyInfo = extractTySizeInfo tcm ty tys
+          in Just $ mach2
+              { mStack = mStack mach
+              , mTerm = mkBitVectorLit' resTyInfo 0 i
+              }
+
+  "Clash.Class.BitPack.Internal.packInt64#" -- :: Int64 -> BitVector 64
+    | [DC _ [Left arg]] <- args
+      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+#if MIN_VERSION_base(4,16,0)
+      , mach2@Machine{mStack=[],mTerm=Literal (Int64Literal i)} <-
+          whnf eval tcm True (setTerm arg $ stackClear mach)
+#else
+      , mach2@Machine{mStack=[],mTerm=Literal (IntLiteral i)} <-
+          whnf eval tcm True (setTerm arg $ stackClear mach)
+#endif
+      -> let resTyInfo = extractTySizeInfo tcm ty tys
+          in Just $ mach2
+              { mStack = mStack mach
+              , mTerm = mkBitVectorLit' resTyInfo 0 i
+              }
+
+  "Clash.Class.BitPack.Internal.packWord#" -- :: Word -> BitVector WORD_SIZE_IN_BITS
+    | [DC _ [Left arg]] <- args
+      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+      , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)} <-
+          whnf eval tcm True (setTerm arg $ stackClear mach)
+      -> let resTyInfo = extractTySizeInfo tcm ty tys
+          in Just $ mach2
+              { mStack = mStack mach
+              , mTerm = mkBitVectorLit' resTyInfo 0 i
+              }
+
+  "Clash.Class.BitPack.Internal.packWord8#" -- :: Word8 -> BitVector 8
+    | [DC _ [Left arg]] <- args
+      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+#if MIN_VERSION_base(4,16,0)
+      , mach2@Machine{mStack=[],mTerm=Literal (Word8Literal i)} <-
+          whnf eval tcm True (setTerm arg $ stackClear mach)
+#else
+      , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)} <-
+          whnf eval tcm True (setTerm arg $ stackClear mach)
+#endif
+      -> let resTyInfo = extractTySizeInfo tcm ty tys
+          in Just $ mach2
+              { mStack = mStack mach
+              , mTerm = mkBitVectorLit' resTyInfo 0 i
+              }
+
+  "Clash.Class.BitPack.Internal.packWord16#" -- :: Word16 -> BitVector 16
+    | [DC _ [Left arg]] <- args
+      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+#if MIN_VERSION_base(4,16,0)
+      , mach2@Machine{mStack=[],mTerm=Literal (Word16Literal i)} <-
+          whnf eval tcm True (setTerm arg $ stackClear mach)
+#else
+      , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)} <-
+          whnf eval tcm True (setTerm arg $ stackClear mach)
+#endif
+      -> let resTyInfo = extractTySizeInfo tcm ty tys
+          in Just $ mach2
+              { mStack = mStack mach
+              , mTerm = mkBitVectorLit' resTyInfo 0 i
+              }
+
+  "Clash.Class.BitPack.Internal.packWord32#" -- :: Word32 -> BitVector 32
+    | [DC _ [Left arg]] <- args
+      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+#if MIN_VERSION_base(4,16,0)
+      , mach2@Machine{mStack=[],mTerm=Literal (Word32Literal i)} <-
+          whnf eval tcm True (setTerm arg $ stackClear mach)
+#else
+      , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)} <-
+          whnf eval tcm True (setTerm arg $ stackClear mach)
+#endif
+      -> let resTyInfo = extractTySizeInfo tcm ty tys
+          in Just $ mach2
+              { mStack = mStack mach
+              , mTerm = mkBitVectorLit' resTyInfo 0 i
+              }
+
+  "Clash.Class.BitPack.Internal.packWord64#" -- :: Word64 -> BitVector 64
+    | [DC _ [Left arg]] <- args
+      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+#if MIN_VERSION_base(4,16,0)
+      , mach2@Machine{mStack=[],mTerm=Literal (Word64Literal i)} <-
+          whnf eval tcm True (setTerm arg $ stackClear mach)
+#else
+      , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)} <-
+          whnf eval tcm True (setTerm arg $ stackClear mach)
+#endif
+      -> let resTyInfo = extractTySizeInfo tcm ty tys
+          in Just $ mach2
+              { mStack = mStack mach
+              , mTerm = mkBitVectorLit' resTyInfo 0 i
+              }
 
   $(namePat 'GHC.Base.remInt)
     | [ DC intDc [Left (Literal (IntLiteral i))]
@@ -2145,7 +2284,8 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   $(namePat 'Clash.Class.BitPack.Internal.packDouble#) -- :: Double -> BitVector 64
     | [DC _ [Left arg]] <- args
     , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-    , mach2@Machine{mStack=[],mTerm=Literal (DoubleLiteral i)} <- whnf eval tcm True (setTerm arg $ stackClear mach)
+    , mach2@Machine{mStack=[],mTerm=Literal (DoubleLiteral i)}
+        <- whnf eval tcm True (setTerm arg $ stackClear mach)
     -> let resTyInfo = extractTySizeInfo tcm ty tys
         in Just $ mach2
              { mStack = mStack mach
@@ -2155,12 +2295,123 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   $(namePat 'Clash.Class.BitPack.Internal.packFloat#) -- :: Float -> BitVector 32
     | [DC _ [Left arg]] <- args
     , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-    , mach2@Machine{mStack=[],mTerm=Literal (FloatLiteral i)} <- whnf eval tcm True (setTerm arg $ stackClear mach)
+    , mach2@Machine{mStack=[],mTerm=Literal (FloatLiteral i)}
+        <- whnf eval tcm True (setTerm arg $ stackClear mach)
     -> let resTyInfo = extractTySizeInfo tcm ty tys
         in Just $ mach2
              { mStack = mStack mach
              , mTerm = mkBitVectorLit' resTyInfo 0 (toInteger $ (pack :: Word32 -> BitVector 32) i)
              }
+
+  $(namePat 'Clash.Class.BitPack.Internal.packCUShort#) -- :: CUShort -> BitVector 16
+    | [DC _ [Left arg]] <- args
+      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+#if MIN_VERSION_base(4,16,0)
+      , mach2@Machine{mStack=[],mTerm=Literal (Word16Literal i)}
+          <- whnf eval tcm True (setTerm arg $ stackClear mach)
+#else
+      , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)}
+          <- whnf eval tcm True (setTerm arg $ stackClear mach)
+#endif
+      -> let resTyInfo = extractTySizeInfo tcm ty tys
+          in Just $ mach2
+              { mStack = mStack mach
+              , mTerm = mkBitVectorLit' resTyInfo 0 i
+              }
+
+  $(namePat 'Clash.Class.BitPack.Internal.unpackInt8#) -- BitVector 8 -> Int8
+    | [i] <- bitVectorLiterals' args
+    -> let resTy = getResultTy tcm ty tys
+           val = toInteger (unpack (toBV i) :: Signed 8)
+#if MIN_VERSION_base(4,16,0)
+           proj = Int8Literal
+#else
+           proj = IntLiteral
+#endif
+        in reduce (mkIntCLit tcm proj val resTy)
+
+  $(namePat 'Clash.Class.BitPack.Internal.unpackInt16#) -- BitVector 16 -> Int16
+    | [i] <- bitVectorLiterals' args
+    -> let resTy = getResultTy tcm ty tys
+           val = toInteger (unpack (toBV i) :: Signed 16)
+#if MIN_VERSION_base(4,16,0)
+           proj = Int16Literal
+#else
+           proj = IntLiteral
+#endif
+        in reduce (mkIntCLit tcm proj val resTy)
+
+  $(namePat 'Clash.Class.BitPack.Internal.unpackInt32#) -- BitVector 32 -> Int32
+    | [i] <- bitVectorLiterals' args
+    -> let resTy = getResultTy tcm ty tys
+           val = toInteger (unpack (toBV i) :: Signed 32)
+#if MIN_VERSION_base(4,16,0)
+           proj = Int32Literal
+#else
+           proj = IntLiteral
+#endif
+        in reduce (mkIntCLit tcm proj val resTy)
+
+  $(namePat 'Clash.Class.BitPack.Internal.unpackInt64#) -- BitVector 64 -> Int64
+    | [i] <- bitVectorLiterals' args
+    -> let resTy = getResultTy tcm ty tys
+           val = toInteger (unpack (toBV i) :: Signed 64)
+#if MIN_VERSION_base(4,16,0)
+           proj = Int64Literal
+#else
+           proj = IntLiteral
+#endif
+        in reduce (mkIntCLit tcm proj val resTy)
+
+  $(namePat 'Clash.Class.BitPack.Internal.unpackWord#) -- BitVector WORD_SIZE_IN_BITS -> Word
+    | [i] <- bitVectorLiterals' args
+    -> let resTy = getResultTy tcm ty tys
+           val = toInteger (unpack (toBV i) :: Unsigned 64)
+        in reduce (mkIntCLit tcm WordLiteral val resTy)
+
+  $(namePat 'Clash.Class.BitPack.Internal.unpackWord8#) -- BitVector 8 -> Word8
+    | [i] <- bitVectorLiterals' args
+    -> let resTy = getResultTy tcm ty tys
+           val = toInteger (unpack (toBV i) :: Unsigned 8)
+#if MIN_VERSION_base(4,16,0)
+           proj = Word8Literal
+#else
+           proj = WordLiteral
+#endif
+        in reduce (mkIntCLit tcm proj val resTy)
+
+  $(namePat 'Clash.Class.BitPack.Internal.unpackWord16#) -- BitVector 16 -> Word16
+    | [i] <- bitVectorLiterals' args
+    -> let resTy = getResultTy tcm ty tys
+           val = toInteger (unpack (toBV i) :: Unsigned 16)
+#if MIN_VERSION_base(4,16,0)
+           proj = Word16Literal
+#else
+           proj = WordLiteral
+#endif
+        in reduce (mkIntCLit tcm proj val resTy)
+
+  $(namePat 'Clash.Class.BitPack.Internal.unpackWord32#) -- BitVector 32 -> Word32
+    | [i] <- bitVectorLiterals' args
+    -> let resTy = getResultTy tcm ty tys
+           val = toInteger (unpack (toBV i) :: Unsigned 32)
+#if MIN_VERSION_base(4,16,0)
+           proj = Word32Literal
+#else
+           proj = WordLiteral
+#endif
+        in reduce (mkIntCLit tcm proj val resTy)
+
+  $(namePat 'Clash.Class.BitPack.Internal.unpackWord64#) -- BitVector 64 -> Word64
+    | [i] <- bitVectorLiterals' args
+    -> let resTy = getResultTy tcm ty tys
+           val = toInteger (unpack (toBV i) :: Unsigned 64)
+#if MIN_VERSION_base(4,16,0)
+           proj = Word64Literal
+#else
+           proj = WordLiteral
+#endif
+        in reduce (mkIntCLit tcm proj val resTy)
 
   $(namePat 'Clash.Class.BitPack.Internal.unpackFloat#)
     | [i] <- bitVectorLiterals' args
@@ -2173,6 +2424,17 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let resTy = getResultTy tcm ty tys
            val = unpack (toBV i :: BitVector 64)
         in reduce (mkDoubleCLit tcm val resTy)
+
+  $(namePat 'Clash.Class.BitPack.Internal.unpackCUShort#)
+    | [i] <- bitVectorLiterals' args
+    -> let resTy = getResultTy tcm ty tys
+           val = toInteger (unpack (toBV i) :: Unsigned 16)
+#if MIN_VERSION_base(4,16,0)
+           proj = Word16Literal
+#else
+           proj = WordLiteral
+#endif
+        in reduce (mkIntCLit tcm proj val resTy)
 
   $(namePat 'Clash.Sized.Internal.BitVector.xToBV)
     | isSubj
@@ -2732,7 +2994,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   $(namePat 'Clash.Sized.Internal.Index.fromEnum#)
     | [i] <- indexLiterals' args
     -> let resTy = getResultTy tcm ty tys
-        in reduce (mkIntCLit tcm i resTy)
+        in reduce (mkIntCLit tcm IntLiteral i resTy)
 
 -- Bounded
   $(namePat 'Clash.Sized.Internal.Index.maxBound#)
@@ -2849,7 +3111,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   $(namePat 'Clash.Sized.Internal.Signed.fromEnum#)
     | [i] <- signedLiterals' args
     -> let resTy = getResultTy tcm ty tys
-        in reduce (mkIntCLit tcm i resTy)
+        in reduce (mkIntCLit tcm IntLiteral i resTy)
 
 -- Bounded
   $(namePat 'Clash.Sized.Internal.Signed.minBound#)
@@ -3067,7 +3329,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   $(namePat 'Clash.Sized.Internal.Unsigned.fromEnum#)
     | [i] <- unsignedLiterals' args
     -> let resTy = getResultTy tcm ty tys
-        in reduce (mkIntCLit tcm i resTy)
+        in reduce (mkIntCLit tcm IntLiteral i resTy)
 
 -- Bounded
   $(namePat 'Clash.Sized.Internal.Unsigned.minBound#)
@@ -4742,9 +5004,9 @@ bitVectorLitIntLit tcm tys args
   | otherwise
   = Nothing
 
-mkIntCLit :: TyConMap -> Integer -> Type -> Term
-mkIntCLit tcm lit resTy =
-  App (Data intDc) (Literal (IntLiteral lit))
+mkIntCLit :: TyConMap -> (Integer -> Literal) -> Integer -> Type -> Term
+mkIntCLit tcm proj lit resTy =
+  App (Data intDc) (Literal (proj lit))
  where
   (_, tyView -> TyConApp intTcNm []) = splitFunForallTy resTy
   Just intTc = UniqMap.lookup intTcNm tcm
@@ -5084,7 +5346,7 @@ liftBitVector2CInt
 liftBitVector2CInt tcm resTy f args _p
   | [i] <- bitVectorLiterals' args
   = let val = f (toBV i)
-     in Just $ mkIntCLit tcm val resTy
+     in Just $ mkIntCLit tcm IntLiteral val resTy
   | otherwise
   = Nothing
 

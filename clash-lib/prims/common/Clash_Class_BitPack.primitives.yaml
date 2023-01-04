@@ -1,15 +1,71 @@
 - BlackBox:
+    name: Clash.Class.BitPack.Internal.packInt8#
+    kind: Expression
+    type: 'packInt8# :: Int8
+      -> Bitvector 8'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.packInt16#
+    kind: Expression
+    type: 'packInt16# :: Int16
+      -> Bitvector 16'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.packInt32#
+    kind: Expression
+    type: 'packInt32# :: Int32
+      -> Bitvector 32'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.packInt64#
+    kind: Expression
+    type: 'packInt64# :: Int64
+      -> Bitvector 64'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.packWord#
+    kind: Expression
+    type: 'packWord# :: Word
+      -> Bitvector WORD_SIZE_IN_BITS'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.packWord8#
+    kind: Expression
+    type: 'packWord8# :: Word8
+      -> Bitvector 8'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.packWord16#
+    kind: Expression
+    type: 'packWord16# :: Word16
+      -> Bitvector 16'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.packWord32#
+    kind: Expression
+    type: 'packWord32# :: Word32
+      -> Bitvector 32'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.packWord64#
+    kind: Expression
+    type: 'packWord64# :: Word64
+      -> Bitvector 64'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
     name: Clash.Class.BitPack.Internal.packFloat#
     kind: Expression
     type: 'packFloat# :: Float
       -> BitVector 32'
-    template: ~ARG[0]
-    workInfo: Never
-- BlackBox:
-    name: Clash.Class.BitPack.Internal.unpackFloat#
-    kind: Expression
-    type: 'packFloat# :: BitVector
-      32 -> Float'
     template: ~ARG[0]
     workInfo: Never
 - BlackBox:
@@ -20,10 +76,94 @@
     template: ~ARG[0]
     workInfo: Never
 - BlackBox:
+    name: Clash.Class.BitPack.Internal.packCUShort#
+    kind: Expression
+    type: 'packCUShort# :: CUShort
+      -> Bitvector 16'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.unpackInt8#
+    kind: Expression
+    type: 'unpackInt8# :: Bitvector
+      8 -> Int8'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.unpackInt16#
+    kind: Expression
+    type: 'unpackInt16# :: Bitvector
+      16 -> Int16'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.unpackInt32#
+    kind: Expression
+    type: 'unpackInt32# :: Bitvector
+      32 -> Int32'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.unpackInt64#
+    kind: Expression
+    type: 'unpackInt64# :: Bitvector
+      64 -> Int64'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.unpackWord#
+    kind: Expression
+    type: 'unpackWord# :: Bitvector
+      WORD_SIZE_IN_BITS -> Word'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.unpackWord8#
+    kind: Expression
+    type: 'unpackWord8# :: Bitvector
+      8 -> Word8'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.unpackWord16#
+    kind: Expression
+    type: 'unpackWord16# :: Bitvector
+      16 -> Word16'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.unpackWord32#
+    kind: Expression
+    type: 'unpackWord32# :: Bitvector
+      32 -> Word32'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.unpackWord64#
+    kind: Expression
+    type: 'unpackWord64# :: Bitvector
+      64 -> Word64'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.unpackFloat#
+    kind: Expression
+    type: 'unpackFloat# :: BitVector
+      32 -> Float'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
     name: Clash.Class.BitPack.Internal.unpackDouble#
     kind: Expression
-    type: 'packFloat# :: BitVector
+    type: 'unpackDouble# :: BitVector
       64 -> Double'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.unpackCUShort#
+    kind: Expression
+    type: 'unpackCUShort# :: Bitvector 16
+      -> CUShort'
     template: ~ARG[0]
     workInfo: Never
 - BlackBox:
