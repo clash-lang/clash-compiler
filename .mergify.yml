@@ -9,6 +9,7 @@ pull_request_rules:
       - merged
     actions:
       copy:
+        bot_account: clash-lang-builder
         ignore_conflicts: True
         branches:
           - "1.2"
@@ -20,6 +21,7 @@ pull_request_rules:
       - merged
     actions:
       copy:
+        bot_account: clash-lang-builder
         ignore_conflicts: True
         branches:
           - "1.4"
@@ -31,8 +33,11 @@ pull_request_rules:
       - merged
     actions:
       copy:
+        bot_account: clash-lang-builder
         ignore_conflicts: True
         branches:
           - "1.6"
       queue:
+        update_bot_account: clash-lang-builder
+        merge_bot_account: clash-lang-builder
         update_method: rebase
