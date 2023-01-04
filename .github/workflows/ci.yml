@@ -100,6 +100,7 @@ jobs:
     name: Build and Test
 
     strategy:
+      fail-fast: false
       matrix:
         include:
           - name: GHC 8.6.5, Single Hidden
@@ -110,16 +111,16 @@ jobs:
             ghc: 8.8.4
             multiple_hidden: yes
 
-          - name: GHC 8.10.2, Multiple Hidden
-            ghc: 8.10.2
+          - name: GHC 8.10.7, Multiple Hidden
+            ghc: 8.10.7
             multiple_hidden: yes
 
           - name: GHC 9.0.2, Multiple Hidden
             ghc: 9.0.2
             multiple_hidden: yes
 
-          - name: GHC 9.2.4, Multiple Hidden
-            ghc: 9.2.4
+          - name: GHC 9.2.5, Multiple Hidden
+            ghc: 9.2.5
             multiple_hidden: yes
 
     # Run steps inside the clash CI docker image
