@@ -1,6 +1,6 @@
 module UnpackGHCNums where
 
-import BitPackGHCNumsConstants
+import BitPackGHCNumConstants
 
 import Clash.Prelude
 import Clash.Explicit.Testbench

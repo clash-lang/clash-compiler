@@ -264,12 +264,12 @@ instance BitPack Int8 where
 
 packInt8# :: Int8 -> BitVector 8
 packInt8# = fromIntegral
-{-# NOINLINE packInt8# #-}
+{-# OPAQUE packInt8# #-}
 {-# ANN packInt8# hasBlackBox #-}
 
 unpackInt8# :: BitVector 8 -> Int8
 unpackInt8# = fromIntegral
-{-# NOINLINE unpackInt8# #-}
+{-# OPAQUE unpackInt8# #-}
 {-# ANN unpackInt8# hasBlackBox #-}
 
 instance BitPack Int16 where
@@ -279,12 +279,12 @@ instance BitPack Int16 where
 
 packInt16# :: Int16 -> BitVector 16
 packInt16# = fromIntegral
-{-# NOINLINE packInt16# #-}
+{-# OPAQUE packInt16# #-}
 {-# ANN packInt16# hasBlackBox #-}
 
 unpackInt16# :: BitVector 16 -> Int16
 unpackInt16# = fromIntegral
-{-# NOINLINE unpackInt16# #-}
+{-# OPAQUE unpackInt16# #-}
 {-# ANN unpackInt16# hasBlackBox #-}
 
 instance BitPack Int32 where
@@ -294,12 +294,12 @@ instance BitPack Int32 where
 
 packInt32# :: Int32 -> BitVector 32
 packInt32# = fromIntegral
-{-# NOINLINE packInt32# #-}
+{-# OPAQUE packInt32# #-}
 {-# ANN packInt32# hasBlackBox #-}
 
 unpackInt32# :: BitVector 32 -> Int32
 unpackInt32# = fromIntegral
-{-# NOINLINE unpackInt32# #-}
+{-# OPAQUE unpackInt32# #-}
 {-# ANN unpackInt32# hasBlackBox #-}
 
 instance BitPack Int64 where
@@ -309,12 +309,12 @@ instance BitPack Int64 where
 
 packInt64# :: Int64 -> BitVector 64
 packInt64# = fromIntegral
-{-# NOINLINE packInt64# #-}
+{-# OPAQUE packInt64# #-}
 {-# ANN packInt64# hasBlackBox #-}
 
 unpackInt64# :: BitVector 64 -> Int64
 unpackInt64# = fromIntegral
-{-# NOINLINE unpackInt64# #-}
+{-# OPAQUE unpackInt64# #-}
 {-# ANN unpackInt64# hasBlackBox #-}
 
 instance BitPack Word where
@@ -324,12 +324,12 @@ instance BitPack Word where
 
 packWord# :: Word -> BitVector WORD_SIZE_IN_BITS
 packWord# = fromIntegral
-{-# NOINLINE packWord# #-}
+{-# OPAQUE packWord# #-}
 {-# ANN packWord# hasBlackBox #-}
 
 unpackWord# :: BitVector WORD_SIZE_IN_BITS -> Word
 unpackWord# = fromIntegral
-{-# NOINLINE unpackWord# #-}
+{-# OPAQUE unpackWord# #-}
 {-# ANN unpackWord# hasBlackBox #-}
 
 instance BitPack Word8 where
@@ -339,12 +339,12 @@ instance BitPack Word8 where
 
 packWord8# :: Word8 -> BitVector 8
 packWord8# = fromIntegral
-{-# NOINLINE packWord8# #-}
+{-# OPAQUE packWord8# #-}
 {-# ANN packWord8# hasBlackBox #-}
 
 unpackWord8# :: BitVector 8 -> Word8
 unpackWord8# = fromIntegral
-{-# NOINLINE unpackWord8# #-}
+{-# OPAQUE unpackWord8# #-}
 {-# ANN unpackWord8# hasBlackBox #-}
 
 instance BitPack Word16 where
@@ -354,12 +354,12 @@ instance BitPack Word16 where
 
 packWord16# :: Word16 -> BitVector 16
 packWord16# = fromIntegral
-{-# NOINLINE packWord16# #-}
+{-# OPAQUE packWord16# #-}
 {-# ANN packWord16# hasBlackBox #-}
 
 unpackWord16# :: BitVector 16 -> Word16
 unpackWord16# = fromIntegral
-{-# NOINLINE unpackWord16# #-}
+{-# OPAQUE unpackWord16# #-}
 {-# ANN unpackWord16# hasBlackBox #-}
 
 instance BitPack Word32 where
@@ -369,12 +369,12 @@ instance BitPack Word32 where
 
 packWord32# :: Word32 -> BitVector 32
 packWord32# = fromIntegral
-{-# NOINLINE packWord32# #-}
+{-# OPAQUE packWord32# #-}
 {-# ANN packWord32# hasBlackBox #-}
 
 unpackWord32# :: BitVector 32 -> Word32
 unpackWord32# = fromIntegral
-{-# NOINLINE unpackWord32# #-}
+{-# OPAQUE unpackWord32# #-}
 {-# ANN unpackWord32# hasBlackBox #-}
 
 instance BitPack Word64 where
@@ -384,12 +384,12 @@ instance BitPack Word64 where
 
 packWord64# :: Word64 -> BitVector 64
 packWord64# = fromIntegral
-{-# NOINLINE packWord64# #-}
+{-# OPAQUE packWord64# #-}
 {-# ANN packWord64# hasBlackBox #-}
 
 unpackWord64# :: BitVector 64 -> Word64
 unpackWord64# = fromIntegral
-{-# NOINLINE unpackWord64# #-}
+{-# OPAQUE unpackWord64# #-}
 {-# ANN unpackWord64# hasBlackBox #-}
 
 instance BitPack Float where
@@ -429,12 +429,12 @@ instance BitPack CUShort where
 
 packCUShort# :: CUShort -> BitVector 16
 packCUShort# = fromIntegral
-{-# NOINLINE packCUShort# #-}
+{-# OPAQUE packCUShort# #-}
 {-# ANN packCUShort# hasBlackBox #-}
 
 unpackCUShort# :: BitVector 16 -> CUShort
 unpackCUShort# = fromIntegral
-{-# NOINLINE unpackCUShort# #-}
+{-# OPAQUE unpackCUShort# #-}
 {-# ANN unpackCUShort# hasBlackBox #-}
 
 instance BitPack Half where

@@ -1,4 +1,4 @@
-module BitPackGHCNums where
+module BitPackGHCNumConstants where
 
 import Clash.Prelude
 import Clash.Explicit.Testbench

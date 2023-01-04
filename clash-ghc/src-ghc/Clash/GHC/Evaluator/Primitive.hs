@@ -3,7 +3,6 @@
                      2016-2017, Myrtle Software Ltd,
                      2017-2022, Google Inc.,
                      2017-2026, QBayLogic B.V.
-
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -2123,7 +2122,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       , DC _     [Left (Literal (IntLiteral j))]
       ] <- args
     -> reduce (App (Data intDc) (Literal (IntLiteral (i `quot` j))))
-  "Clash.Class.BitPack.Internal.packInt8#" -- :: Int8 -> BitVector 8
+  $(namePat 'Clash.Class.BitPack.Internal.packInt8#) -- :: Int8 -> BitVector 8
     | [DC _ [Left arg]] <- args
       , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
 #if MIN_VERSION_base(4,16,0)
@@ -2139,7 +2138,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
               , mTerm = mkBitVectorLit' resTyInfo 0 i
               }
 
-  "Clash.Class.BitPack.Internal.packInt16#" -- :: Int16 -> BitVector 16
+  $(namePat 'Clash.Class.BitPack.Internal.packInt16#) -- :: Int16 -> BitVector 16
     | [DC _ [Left arg]] <- args
       , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
 #if MIN_VERSION_base(4,16,0)
@@ -2155,7 +2154,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
               , mTerm = mkBitVectorLit' resTyInfo 0 i
               }
 
-  "Clash.Class.BitPack.Internal.packInt32#" -- :: Int32 -> BitVector 32
+  $(namePat 'Clash.Class.BitPack.Internal.packInt32#) -- :: Int32 -> BitVector 32
     | [DC _ [Left arg]] <- args
       , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
 #if MIN_VERSION_base(4,16,0)
@@ -2171,7 +2170,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
               , mTerm = mkBitVectorLit' resTyInfo 0 i
               }
 
-  "Clash.Class.BitPack.Internal.packInt64#" -- :: Int64 -> BitVector 64
+  $(namePat 'Clash.Class.BitPack.Internal.packInt64#) -- :: Int64 -> BitVector 64
     | [DC _ [Left arg]] <- args
       , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
 #if MIN_VERSION_base(4,16,0)
@@ -2187,7 +2186,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
               , mTerm = mkBitVectorLit' resTyInfo 0 i
               }
 
-  "Clash.Class.BitPack.Internal.packWord#" -- :: Word -> BitVector WORD_SIZE_IN_BITS
+  $(namePat 'Clash.Class.BitPack.Internal.packWord#) -- :: Word -> BitVector WORD_SIZE_IN_BITS
     | [DC _ [Left arg]] <- args
       , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
       , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)} <-
@@ -2198,7 +2197,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
               , mTerm = mkBitVectorLit' resTyInfo 0 i
               }
 
-  "Clash.Class.BitPack.Internal.packWord8#" -- :: Word8 -> BitVector 8
+  $(namePat 'Clash.Class.BitPack.Internal.packWord8#) -- :: Word8 -> BitVector 8
     | [DC _ [Left arg]] <- args
       , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
 #if MIN_VERSION_base(4,16,0)
@@ -2214,7 +2213,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
               , mTerm = mkBitVectorLit' resTyInfo 0 i
               }
 
-  "Clash.Class.BitPack.Internal.packWord16#" -- :: Word16 -> BitVector 16
+  $(namePat 'Clash.Class.BitPack.Internal.packWord16#) -- :: Word16 -> BitVector 16
     | [DC _ [Left arg]] <- args
       , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
 #if MIN_VERSION_base(4,16,0)
@@ -2230,7 +2229,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
               , mTerm = mkBitVectorLit' resTyInfo 0 i
               }
 
-  "Clash.Class.BitPack.Internal.packWord32#" -- :: Word32 -> BitVector 32
+  $(namePat 'Clash.Class.BitPack.Internal.packWord32#) -- :: Word32 -> BitVector 32
     | [DC _ [Left arg]] <- args
       , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
 #if MIN_VERSION_base(4,16,0)
@@ -2246,7 +2245,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
               , mTerm = mkBitVectorLit' resTyInfo 0 i
               }
 
-  "Clash.Class.BitPack.Internal.packWord64#" -- :: Word64 -> BitVector 64
+  $(namePat 'Clash.Class.BitPack.Internal.packWord64#) -- :: Word64 -> BitVector 64
     | [DC _ [Left arg]] <- args
       , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
 #if MIN_VERSION_base(4,16,0)
@@ -2284,8 +2283,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   $(namePat 'Clash.Class.BitPack.Internal.packDouble#) -- :: Double -> BitVector 64
     | [DC _ [Left arg]] <- args
     , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-    , mach2@Machine{mStack=[],mTerm=Literal (DoubleLiteral i)}
-        <- whnf eval tcm True (setTerm arg $ stackClear mach)
+    , mach2@Machine{mStack=[],mTerm=Literal (DoubleLiteral i)} <- whnf eval tcm True (setTerm arg $ stackClear mach)
     -> let resTyInfo = extractTySizeInfo tcm ty tys
         in Just $ mach2
              { mStack = mStack mach
@@ -2295,8 +2293,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   $(namePat 'Clash.Class.BitPack.Internal.packFloat#) -- :: Float -> BitVector 32
     | [DC _ [Left arg]] <- args
     , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-    , mach2@Machine{mStack=[],mTerm=Literal (FloatLiteral i)}
-        <- whnf eval tcm True (setTerm arg $ stackClear mach)
+    , mach2@Machine{mStack=[],mTerm=Literal (FloatLiteral i)} <- whnf eval tcm True (setTerm arg $ stackClear mach)
     -> let resTyInfo = extractTySizeInfo tcm ty tys
         in Just $ mach2
              { mStack = mStack mach
