@@ -100,6 +100,7 @@ jobs:
     name: Build and Test
 
     strategy:
+      fail-fast: false
       matrix:
         include:
           - name: GHC 8.6.5, Single Hidden
