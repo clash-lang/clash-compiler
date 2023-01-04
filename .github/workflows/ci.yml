@@ -90,6 +90,7 @@ jobs:
         run: stack build --pedantic
 
       - name: Run Vector testsuite
+        if: github.ref != 'refs/heads/master'
         run: stack run -- clash-testsuite --hide-successes -p .Vector. --no-ghdl --no-verilator --no-modelsim --no-vivado
 
   build_and_test:
@@ -165,6 +166,7 @@ jobs:
         run: ./.ci/build.sh
 
       - name: Unit Tests
+        if: github.ref != 'refs/heads/master'
         run: |
           cabal v2-test clash-prelude
           cabal v2-test clash-lib
@@ -172,12 +174,15 @@ jobs:
           cabal v2-test clash-cosim
 
       - name: Testsuite (VHDL)
+        if: github.ref != 'refs/heads/master'
         run: cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .VHDL --no-vivado
 
       - name: Testsuite (Verilog)
+        if: github.ref != 'refs/heads/master'
         run: cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .Verilog --no-vivado
 
       - name: Testsuite (SystemVerilog)
+        if: github.ref != 'refs/heads/master'
         run: cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .SystemVerilog --no-modelsim --no-vivado
 
 
