@@ -2,7 +2,7 @@
   Copyright   :  (C) 2013-2016, University of Twente,
                      2017-2019, Myrtle Software Ltd
                      2017     , Google Inc.,
-                     2021-2022, QBayLogic B.V.
+                     2021-2023, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -102,6 +102,8 @@ module Clash.Prelude
   , isFalling
   , riseEvery
   , oscillate
+    -- * Static assertions
+  , clashCompileError
     -- * Tracing
     -- ** Simple
   , traceSignal1
@@ -188,6 +190,7 @@ import           Clash.Class.Num
 import           Clash.Class.Parity
 import           Clash.Class.Resize
 import qualified Clash.Explicit.Prelude      as E
+import           Clash.Explicit.Prelude (clashCompileError)
 import           Clash.Hidden
 import           Clash.Magic
 import           Clash.NamedTypes

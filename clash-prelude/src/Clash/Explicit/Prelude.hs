@@ -2,7 +2,8 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.
                   2019     , Myrtle Software Ltd,
-                  2021-2022, QBayLogic B.V.
+                  2021-2023, QBayLogic B.V.,
+                  2022     , Myrtle.ai,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -11,6 +12,8 @@ defined in "Clash.Prelude".
 -}
 
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 {-# LANGUAGE Unsafe #-}
 
@@ -74,6 +77,8 @@ module Clash.Explicit.Prelude
   , isFalling
   , riseEvery
   , oscillate
+    -- * Static assertions
+  , clashCompileError
     -- * Testbench functions
   , assert
   , stimuliGenerator
@@ -146,11 +151,14 @@ where
 import Control.Applicative
 import Data.Bits
 import Data.Default.Class
+import Data.String.Interpolate (__i)
+import GHC.Stack (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits
 import GHC.TypeLits.Extra
 import Language.Haskell.TH.Syntax  (Lift(..))
 import Clash.HaskellPrelude
 
+import Clash.Annotations.Primitive (Primitive(..))
 import Clash.Annotations.TopEntity
 import Clash.Class.AutoReg
 import Clash.Class.BitPack
@@ -276,3 +284,22 @@ windowD clk rst en x =
       next = x +>> prev
   in  prev
 {-# INLINABLE windowD #-}
+
+-- | Same as 'error' but will make HDL generation fail if included in the
+-- final circuit.
+--
+-- This is useful for the error case of static assertions.
+--
+-- Note that the error message needs to be a literal, and during HDL generation
+-- the error message does not include a stack trace, so it had better be
+-- descriptive.
+clashCompileError :: forall a . HasCallStack => String -> a
+clashCompileError msg = withFrozenCallStack $ error msg
+{-# NOINLINE clashCompileError #-}
+{-# ANN clashCompileError (
+  let primName = 'clashCompileError
+  in InlineYamlPrimitive [minBound..] [__i|
+    BlackBoxHaskell:
+      name: #{primName}
+      templateFunction: Clash.Primitives.Prelude.clashCompileErrorBBF
+    |]) #-}

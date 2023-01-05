@@ -51,7 +51,7 @@ Author:               The Clash Authors
 Maintainer:           QBayLogic B.V. <devops@qbaylogic.com>
 Copyright:            Copyright © 2012-2016, University of Twente,
                                   2016-2019, Myrtle Software Ltd,
-                                  2017-2022, QBayLogic B.V., Google Inc.
+                                  2017-2023, QBayLogic B.V., Google Inc.
 Category:             Hardware
 Build-type:           Simple
 
@@ -273,6 +273,7 @@ Library
                       Clash.Primitives.GHC.Literal
                       Clash.Primitives.GHC.Word
                       Clash.Primitives.Intel.ClockGen
+                      Clash.Primitives.Prelude
                       Clash.Primitives.Sized.ToInteger
                       Clash.Primitives.Sized.Signed
                       Clash.Primitives.Sized.Vector
