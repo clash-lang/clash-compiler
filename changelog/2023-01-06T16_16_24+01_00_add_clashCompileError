@@ -1,0 +1,4 @@
+NEW: `clashCompileError`: make HDL generation error out with a custom error
+message. Simulation in Clash will also error when the function is evaluated,
+including a call stack. HDL generation unfortunately does not include a call
+stack.

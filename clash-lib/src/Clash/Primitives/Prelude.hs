@@ -1,0 +1,30 @@
+{-|
+  Copyright   :  (C) 2022     , Myrtle.ai,
+                     2023     , QBayLogic B.V.,
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Blackbox functions for primitives in one of the @Prelude@ modules.
+-}
+
+{-# LANGUAGE TemplateHaskellQuotes #-}
+
+module Clash.Primitives.Prelude
+  ( clashCompileErrorBBF
+  ) where
+
+import Data.Either (lefts)
+import GHC.Stack (HasCallStack)
+
+import Clash.Core.TermLiteral (termToDataError)
+import Clash.Netlist.BlackBox.Types (BlackBoxFunction)
+import Clash.Netlist.Types ()
+
+clashCompileErrorBBF :: HasCallStack => BlackBoxFunction
+clashCompileErrorBBF _isD _primName args _ty
+  | [ _hasCallstack
+    , either error id . termToDataError -> msg
+    ] <- lefts args
+  = pure $ Left $ "clashCompileError: " <> msg
+  | otherwise
+  = pure $ Left $ show 'clashCompileErrorBBF <> ": bad args: " <> show args

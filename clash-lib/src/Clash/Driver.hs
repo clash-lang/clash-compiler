@@ -2,7 +2,7 @@
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017     , QBayLogic, Google Inc.
-                     2020-2022, QBayLogic,
+                     2020-2023, QBayLogic,
                      2022     , Google Inc.
 
   License     :  BSD2 (see the file LICENSE)
@@ -139,6 +139,7 @@ import qualified Clash.Primitives.Sized.Vector    as P
 import qualified Clash.Primitives.GHC.Int         as P
 import qualified Clash.Primitives.GHC.Word        as P
 import qualified Clash.Primitives.Intel.ClockGen  as P
+import qualified Clash.Primitives.Prelude         as P
 import qualified Clash.Primitives.Verification    as P
 import           Clash.Primitives.Types
 import           Clash.Signal.Internal
@@ -577,6 +578,7 @@ knownBlackBoxFunctions =
     [ ('P.checkBBF, P.checkBBF)
     , ('P.bvToIntegerVHDL, P.bvToIntegerVHDL)
     , ('P.bvToIntegerVerilog, P.bvToIntegerVerilog)
+    , ('P.clashCompileErrorBBF, P.clashCompileErrorBBF)
     , ('P.foldBBF, P.foldBBF)
     , ('P.indexIntVerilog, P.indexIntVerilog)
     , ('P.indexToIntegerVerilog, P.indexToIntegerVerilog)
