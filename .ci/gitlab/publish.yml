@@ -29,9 +29,6 @@ hackage-sdist:
     - .ci/publish_sdist.sh clash-ghc
   retry:
     max: 2
-  # XXX: Temporarily on local runners
-  tags:
-   - local
 
 # Run every night, when explicitly triggered, or when tagged (release)
 .run-on-nightly-and-changes:
@@ -107,6 +104,3 @@ debian-bindist-test:
     - .ci/snap.sh publish
   retry:
     max: 2
-  # XXX: Temporarily on local runners
-  tags:
-   - local
