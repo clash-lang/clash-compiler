@@ -20,15 +20,13 @@ stages:
   - publish
   - post
 
-# Triggers child pipelines that runs tests for various GHC and Cabal versions.
-# Should be replaced by matrix builds in the future, but currently blocking on:
-# https://gitlab.com/gitlab-org/gitlab/-/issues/270957
-.common-trigger:
+tests:
   stage: test
   needs: []
   trigger:
     include: .ci/gitlab/test.yml
     strategy: depend
+<<<<<<< HEAD
 
 tests-8.6:
   extends: .common-trigger
@@ -50,6 +48,13 @@ tests-9.0:
   extends: .common-trigger
   variables:
     GHC_VERSION: 9.0.2
+=======
+  parallel:
+    matrix:
+      - GHC_VERSION: [8.8.4, 8.10.7, 9.0.2, 9.2.5]
+      - GHC_VERSION: 8.6.5
+        MULTIPLE_HIDDEN: "no"
+>>>>>>> 8969ecb41 (GitLab CI: avoid recompilation, use matrix)
 
 stack-build:
   extends: .common-local
