@@ -5,7 +5,29 @@ stages:
   - build
   - test
 
-.test-common:
+.test-nocache:
+  extends: .common
+  needs: ["build"]
+  stage: test
+  cache:
+    paths: []
+  before_script:
+    - unset SNAPCRAFT_LOGIN_FILE
+    - unset HACKAGE_PASSWORD
+    - export THREADS=$(./.ci/effective_cpus.sh)
+    - export CABAL_JOBS=$(./.ci/effective_cpus.sh)
+    - export clash_lib_datadir=$(pwd)/clash-lib/
+    - export clash_cosim_datadir=$(pwd)/clash-cosim/
+    - export
+    - tar -xf dist.tar.zst -C /
+
+    # Not all package in cache get packed into dist.tar.zst, so we need to
+    # regenerate the package database
+    - ghc-pkg recache --package-db=$HOME/.cabal/store/ghc-$GHC_VERSION/package.db
+  after_script:
+
+.test-cache-local:
+  extends: .common-local
   needs: ["build"]
   stage: test
   before_script:
@@ -13,6 +35,8 @@ stages:
     - unset HACKAGE_PASSWORD
     - export THREADS=$(./.ci/effective_cpus.sh)
     - export CABAL_JOBS=$(./.ci/effective_cpus.sh)
+    - export clash_lib_datadir=$(pwd)/clash-lib/
+    - export clash_cosim_datadir=$(pwd)/clash-cosim/
     - export
     - tar -xf cache.tar.zst -C / || true
     - tar -xf dist.tar.zst -C /
@@ -23,16 +47,6 @@ stages:
     - ghc-pkg recache --package-db=$HOME/.cabal/store/ghc-$GHC_VERSION/package.db
   after_script:
     - tar -cf - /root/.cabal/packages | zstd -T${THREADS} -3 > cache.tar.zst
-
-.test-common-shared:
-  extends:
-    - .common
-    - .test-common
-
-.test-common-local:
-  extends:
-    - .common-local
-    - .test-common
 
 # 'build' publishes its build files as an artifact. These build files are reused
 # by the tests below.
@@ -53,34 +67,34 @@ build:
 # Tests run on shared runners:
 
 cores:unittests:
-  extends: .test-common-shared
+  extends: .test-nocache
   script:
-    - cabal v2-run -- clash-cores:unittests --hide-successes
+    - ./dist-newstyle/build/*/*/clash-cores-*/t/unittests/build/unittests/unittests --hide-successes
 
 cosim:unittests:
-  extends: .test-common-shared
+  extends: .test-nocache
   script:
-    - cabal v2-run -- clash-cosim:tests
+    - ./dist-newstyle/build/*/*/clash-cosim-*/build/test/test
 
 prelude:unittests:
-  extends: .test-common-shared
+  extends: .test-nocache
   script:
-    - cabal v2-run -- clash-prelude:unittests --hide-successes
+    - ./dist-newstyle/build/*/*/clash-prelude-*/t/unittests/build/unittests/unittests --hide-successes
 
 lib:doctests:
-  extends: .test-common-shared
+  extends: .test-nocache
   script:
-    - cabal v2-run -- clash-lib:doctests -j${THREADS}
+    - ./dist-newstyle/build/*/*/clash-lib-*/t/doctests/build/doctests/doctests -j${THREADS}
 
 lib:unittests:
-  extends: .test-common-shared
+  extends: .test-nocache
   script:
-    - cabal v2-run -- clash-lib:unittests --hide-successes
+    - ./dist-newstyle/build/*/*/clash-lib-*/t/unittests/build/unittests/unittests --hide-successes
 
 prelude:doctests:
-  extends: .test-common-shared
+  extends: .test-nocache
   script:
-    - cabal v2-run -- clash-prelude:doctests -j${THREADS}
+    - ./dist-newstyle/build/*/*/clash-prelude-*/t/doctests/build/doctests/doctests -j${THREADS}
 
 # Tests run on local fast machines:
 
@@ -89,32 +103,32 @@ prelude:doctests:
 # picked up from the 'build' issue and then it is a larger job, so we keep it on
 # local runners for now.
 build-clash-dev:
-  extends: .test-common-local
+  extends: .test-cache-local
   script:
     - .ci/build_clash_dev.sh
 
 suite:vhdl:
-  extends: .test-common-local
+  extends: .test-cache-local
   script:
-    - cabal v2-run -- clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-vivado
+    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-vivado
 
 suite:verilog:
-  extends: .test-common-local
+  extends: .test-cache-local
   script:
-    - cabal v2-run -- clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-vivado
+    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-vivado
 
 suite:systemverilog:
-  extends: .test-common-local
+  extends: .test-cache-local
   script:
-    - cabal v2-run -- clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim --no-vivado
+    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim --no-vivado
 
 # Vivado is quite slow, so we only run a subset of the tests on development branches
 # with it. The full testsuite gets run with Vivado every night on 'master'.
 suite:cores:
-  extends: .test-common-local
+  extends: .test-cache-local
   script:
     - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-    - cabal v2-run -- clash-testsuite -j$THREADS -p Cores --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p Cores --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
   tags:
     - local
     - vivado-2022.1-standard
@@ -122,27 +136,27 @@ suite:cores:
 
 # Tests run on local fast machines with Vivado installed. We only run these at night
 # to save resources - as Vivado is quite slow to execute.
-.test-common-local-nightly:
-  extends: .test-common-local
+.test-cache-local-nightly:
+  extends: .test-cache-local
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"  # When schedueled (at night)
     - if: $CI_PIPELINE_SOURCE == "trigger"   # When triggered (manual triggers)
     - if: '$CI_COMMIT_TAG != null'           # When tags are set (releases)
 
 suite:vivado:vhdl:
-  extends: .test-common-local-nightly
+  extends: .test-cache-local-nightly
   script:
     - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-    - cabal v2-run -- clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
   tags:
     - local
     - vivado-2022.1-standard
 
 suite:vivado:verilog:
-  extends: .test-common-local-nightly
+  extends: .test-cache-local-nightly
   script:
     - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-    - cabal v2-run -- clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
   tags:
     - local
     - vivado-2022.1-standard
