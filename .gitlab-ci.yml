@@ -52,7 +52,7 @@ tests-9.0:
     GHC_VERSION: 9.0.2
 
 stack-build:
-  extends: .common
+  extends: .common-local
   needs: []
   stage: test
   variables:
@@ -76,7 +76,7 @@ nix-build:
     - local
 
 haddock:
-  extends: .common
+  extends: .common-local
   needs: []
   stage: test
   variables:
@@ -87,8 +87,6 @@ haddock:
     expire_in: 1 month
   script:
     - .ci/build_docs.sh
-  tags:
-    - local
 
 # # Run benchmarks for isclashfastyet.com
 # benchmark-8.10.2:
