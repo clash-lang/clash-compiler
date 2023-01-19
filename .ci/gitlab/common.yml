@@ -1,6 +1,6 @@
 .common:
   image: ghcr.io/clash-lang/clash-ci-$GHC_VERSION:2022-11-14
-  timeout: 2 hours
+  timeout: 10 minutes
   stage: build
   variables:
     # Note that we copy+paste the image name into CACHE_FALLBACK_KEY. If we don't,
@@ -26,5 +26,15 @@
     - .ci/setup.sh
   after_script:
     - tar -cf - $(ls -d /root/.cabal /root/.stack $(pwd)/.ci/bindist/linux/debian/*/build || true) | zstd -T${THREADS} -3 > cache.tar.zst
+
+# We run tests on local machines if:
+#
+#   * A job may take more than 3 minutes to complete on public runners.
+#   * A job needs specific capabilities public runners cannot provide, e.g.
+#     more than 4GB memory of memory, proprietary synthesis tooling.
+#
+.common-local:
+  extends: .common
+  timeout: 2 hours
   tags:
     - local

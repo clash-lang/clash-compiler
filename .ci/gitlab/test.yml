@@ -5,8 +5,7 @@ stages:
   - build
   - test
 
-.test-common-local:
-  extends: .common
+.test-common:
   needs: ["build"]
   stage: test
   before_script:
@@ -24,16 +23,21 @@ stages:
     - ghc-pkg recache --package-db=$HOME/.cabal/store/ghc-$GHC_VERSION/package.db
   after_script:
     - tar -cf - /root/.cabal/packages | zstd -T${THREADS} -3 > cache.tar.zst
-  tags:
-    - local
 
-.test-common:
-  extends: .test-common-local
+.test-common-shared:
+  extends:
+    - .common
+    - .test-common
+
+.test-common-local:
+  extends:
+    - .common-local
+    - .test-common
 
 # 'build' publishes its build files as an artifact. These build files are reused
 # by the tests below.
 build:
-  extends: .common
+  extends: .common-local
   artifacts:
     when: always
     name: "$CI_JOB_NAME-$CI_COMMIT_SHA-$GHC_VERSION"
@@ -45,38 +49,36 @@ build:
 
     # Archive all build files (from .cabal and dist-newstyle)
     - tar -cf - $(.ci/get_build_dist.sh) | zstd -T${THREADS} -15 > dist.tar.zst
-  tags:
-   - local
 
 # Tests run on shared runners:
 
 cores:unittests:
-  extends: .test-common
+  extends: .test-common-shared
   script:
     - cabal v2-run -- clash-cores:unittests --hide-successes
 
 cosim:unittests:
-  extends: .test-common
+  extends: .test-common-shared
   script:
     - cabal v2-run -- clash-cosim:tests
 
 prelude:unittests:
-  extends: .test-common
+  extends: .test-common-shared
   script:
     - cabal v2-run -- clash-prelude:unittests --hide-successes
 
 lib:doctests:
-  extends: .test-common
+  extends: .test-common-shared
   script:
     - cabal v2-run -- clash-lib:doctests -j${THREADS}
 
 lib:unittests:
-  extends: .test-common
+  extends: .test-common-shared
   script:
     - cabal v2-run -- clash-lib:unittests --hide-successes
 
 prelude:doctests:
-  extends: .test-common
+  extends: .test-common-shared
   script:
     - cabal v2-run -- clash-prelude:doctests -j${THREADS}
 
