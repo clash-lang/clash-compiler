@@ -228,6 +228,7 @@ still need the @NOINLINE@ annotation.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
 {-# LANGUAGE Safe #-}

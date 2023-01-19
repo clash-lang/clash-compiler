@@ -32,6 +32,7 @@
 
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
 
 {-# LANGUAGE Safe #-}
 

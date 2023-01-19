@@ -12,6 +12,8 @@ Haskell Prelude does. In addition, for the 'Clash.Class.Parity.odd' and
 'Clash.Class.Parity.Parity' is available at "Clash.Class.Parity".
 -}
 
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+
 {-# LANGUAGE Safe #-}
 
 {-# OPTIONS_HADDOCK show-extensions, not-home #-}

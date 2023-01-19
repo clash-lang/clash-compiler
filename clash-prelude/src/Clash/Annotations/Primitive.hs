@@ -12,6 +12,7 @@ primitives.
 
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
 {-# LANGUAGE Safe #-}
