@@ -11,6 +11,7 @@ Self-synchronizing circuits based on data-flow principles.
 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-# LANGUAGE Safe #-}
