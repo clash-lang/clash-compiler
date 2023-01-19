@@ -13,6 +13,7 @@
 -}
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
 
 {-# LANGUAGE Safe #-}
 
