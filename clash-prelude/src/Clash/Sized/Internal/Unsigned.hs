@@ -156,7 +156,11 @@ type role Unsigned nominal
 --
 -- Given @n@ bits, an 'Unsigned' @n@ number has a range of: [0 .. 2^@n@-1]
 --
--- __NB__: The 'Num' operators perform @wrap-around@ on overflow. If you want
+-- * __NB__: The usual Haskell method of converting an integral numeric type to
+-- another, 'fromIntegral', is not well suited for Clash as it will go through
+-- 'Integer' which is arbitrarily bounded in HDL. Instead use
+-- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
+-- * __NB__: The 'Num' operators perform @wrap-around@ on overflow. If you want
 -- saturation on overflow, check out the 'SaturatingNum' class.
 --
 -- >>> maxBound :: Unsigned 3
@@ -376,6 +380,9 @@ maxBound# = let m = 1 `shiftL` (natToNum @n) in  U (m - 1)
 {-# NOINLINE maxBound# #-}
 {-# ANN maxBound# hasBlackBox #-}
 
+-- | __NB__: 'fromInteger'/'fromIntegral' can cause unexpected truncation, as
+-- 'Integer' is arbitrarily bounded during synthesis.  Prefer
+-- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
 instance KnownNat n => Num (Unsigned n) where
   (+)         = (+#)
   (-)         = (-#)
@@ -470,6 +477,9 @@ times# (U a) (U b) = U (a * b)
 instance KnownNat n => Real (Unsigned n) where
   toRational = toRational . toInteger#
 
+-- | __NB__: 'toInteger'/'fromIntegral' can cause unexpected truncation, as
+-- 'Integer' is arbitrarily bounded during synthesis.  Prefer
+-- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
 instance KnownNat n => Integral (Unsigned n) where
   quot        = quot#
   rem         = rem#

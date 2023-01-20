@@ -136,13 +136,17 @@ import Clash.XException
 type role Signed nominal
 
 -- | Arbitrary-width signed integer represented by @n@ bits, including the sign
--- bit.
+-- bit
 --
 -- Uses standard 2-complements representation. Meaning that, given @n@ bits,
 -- a 'Signed' @n@ number has a range of: [-(2^(@n@-1)) .. 2^(@n@-1)-1] for
 -- @n > 0@. When @n = 0@, both the min and max bound are 0.
 --
--- __NB__: The 'Num' operators perform @wrap-around@ on overflow. If you want
+-- * __NB__: The usual Haskell method of converting an integral numeric type to
+-- another, 'fromIntegral', is not well suited for Clash as it will go through
+-- 'Integer' which is arbitrarily bounded in HDL. Instead use
+-- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
+-- * __NB__: The 'Num' operators perform @wrap-around@ on overflow. If you want
 -- saturation on overflow, check out the 'SaturatingNum' class.
 --
 -- >>>  maxBound :: Signed 3
@@ -365,6 +369,10 @@ maxBound# =
 {-# ANN maxBound# hasBlackBox #-}
 
 -- | Operators do @wrap-around@ on overflow
+--
+-- __NB__: 'fromInteger'/'fromIntegral' can cause unexpected truncation, as
+-- 'Integer' is arbitrarily bounded during synthesis.  Prefer
+-- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
 instance KnownNat n => Num (Signed n) where
   (+)         = (+#)
   (-)         = (-#)
@@ -471,6 +479,9 @@ times# (S a) (S b) = S (a * b)
 instance KnownNat n => Real (Signed n) where
   toRational = toRational . toInteger#
 
+-- | __NB__: 'toInteger'/'fromIntegral' can cause unexpected truncation, as
+-- 'Integer' is arbitrarily bounded during synthesis.  Prefer
+-- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
 instance KnownNat n => Integral (Signed n) where
   quot        = quot#
   rem         = rem#

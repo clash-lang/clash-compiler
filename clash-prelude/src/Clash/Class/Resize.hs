@@ -69,8 +69,11 @@ checkIntegral Proxy v =
 -- you "know" /a/ can't be out of bounds, but would like to have your assumptions
 -- checked.
 --
--- __N.B.__: Check only affects simulation. I.e., no checks will be inserted
+-- * __NB__: Check only affects simulation. I.e., no checks will be inserted
 -- into the generated HDL
+-- * __NB__: 'fromIntegral' is not well suited for Clash as it will go through
+-- 'Integer' which is arbitrarily bounded in HDL. Instead use
+-- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
 checkedFromIntegral ::
   forall a b.
   HasCallStack =>
