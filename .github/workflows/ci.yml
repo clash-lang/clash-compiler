@@ -50,18 +50,25 @@ jobs:
         run: brew install icarus-verilog
 
       - name: Install IVerilog (Windows)
-        if: matrix.os == 'windows'
+        if: matrix.os == 'Windows'
         run: choco install --no-progress iverilog
 
       - name: General Setup
         run: |
           cp .ci/stack-${{ matrix.ghc }}.yaml stack.yaml
 
-      - name: Cache
-        # Note: we're stuck on v1 because of:
-        #
-        #   https://github.com/actions/cache/issues/666
-        uses: actions/cache@v1
+      - name: Cache (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        uses: actions/cache@v3
+        with:
+          # On windows we have to use "\" as a path seperator, otherwise caching fails
+          path: |
+            ${{ steps.setup-haskell.outputs.stack-root }}\snapshots
+          key: ${{ matrix.os }}-${{ matrix.ghc }}-${{ hashFiles('stack.yaml', '**/*.cabal', '.github/workflows/ci.yml') }}
+          restore-keys: ${{ matrix.os }}-${{ matrix.ghc }}-
+      - name: Cache (non-Windows)
+        if: ${{ runner.os != 'Windows' }}
+        uses: actions/cache@v3
         with:
           path: |
             ${{ steps.setup-haskell.outputs.stack-root }}/snapshots
