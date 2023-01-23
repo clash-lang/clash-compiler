@@ -1,5 +1,5 @@
 hackage-sdist:
-  extends: .common
+  extends: .common-local
   needs: []
   stage: pack
   script:
@@ -12,8 +12,6 @@ hackage-sdist:
     paths:
       - clash-*.tar.gz  # clash-{prelude,lib,ghc}-$version{-docs,}.tar.gz
     expire_in: 1 week
-  tags:
-    - local
 
 .hackage:
   extends: .common
@@ -45,7 +43,7 @@ hackage-sdist:
 
 # Create Debian packages.
 debian-bindist:
-  extends: .common
+  extends: .common-local
   needs: []
   image: ghcr.io/clash-lang/bindist-debian-focal:2022-01-25
   stage: pack
@@ -64,8 +62,6 @@ debian-bindist:
   script:
     - rm -rf .ci/bindist/linux/debian/focal/build/clash* || true
     - .ci/bindist/linux/debian/scripts/build.sh focal
-  tags:
-    - local
 
 # Test debian distribution. Ideally, this would be in the same stage as
 # 'debian-bindist', but we can't yet do that with GitLab CI.
@@ -84,6 +80,7 @@ debian-bindist-test:
 
 # Use binary distribution built in `snap-bindist` to build a snap package.
 .snap:
+  timeout: 10 minutes
   image: ghcr.io/clash-lang/snapcraft:2022-01-23
   stage: publish
   interruptible: false
