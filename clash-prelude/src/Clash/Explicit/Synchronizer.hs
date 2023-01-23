@@ -10,6 +10,7 @@ Synchronizer circuits for safe clock domain crossings
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-# LANGUAGE Safe #-}

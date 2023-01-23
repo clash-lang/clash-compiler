@@ -33,6 +33,7 @@ fifo @System
 
 -}
 
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PolyKinds #-}
 
 {-# LANGUAGE Safe #-}

@@ -12,6 +12,8 @@
   requirements.
 -}
 
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+
 {-# LANGUAGE Safe #-}
 
 module Clash.Explicit.Mealy

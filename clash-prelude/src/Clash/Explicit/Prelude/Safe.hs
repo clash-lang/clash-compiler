@@ -13,6 +13,7 @@ defined in "Clash.Prelude".
 -}
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 {-# LANGUAGE Safe #-}

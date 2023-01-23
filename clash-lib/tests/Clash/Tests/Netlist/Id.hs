@@ -24,8 +24,6 @@ import qualified Data.Text as Text
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8)
 import Test.QuickCheck.Utf8
-import Text.Show.Pretty (ppShow)
-import Debug.Trace
 
 newtype NonEmptyText = NonEmptyText Text deriving (Show)
 newtype ArbitraryText = ArbitraryText Text deriving (Show)
@@ -123,7 +121,6 @@ tests =
         id0 <- Id.addRaw "LED"
         put old
         Id.add id0
-        traceM . ppShow =<< get
         id1 <- Id.toText <$> Id.make "led"
         pure [ testCase "id1 == led_0" $ id1 @?= "led_0" ]
 

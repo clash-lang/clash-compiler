@@ -11,6 +11,7 @@ RAM primitives with a combinational read port
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-# LANGUAGE Safe #-}

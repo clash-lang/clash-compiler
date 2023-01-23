@@ -12,6 +12,11 @@ variables:
   # Hackage.
   GHC_VERSION: 8.10.7
 
+  # https://docs.gitlab.com/runner/executors/custom.html#system-failure
+  GET_SOURCES_ATTEMPTS: 5
+  RESTORE_CACHE_ATTEMPTS: 5
+  ARTIFACT_DOWNLOAD_ATTEMPTS: 5
+
 stages:
   - pre
   - test
@@ -20,49 +25,26 @@ stages:
   - publish
   - post
 
-# Triggers child pipelines that runs tests for various GHC and Cabal versions.
-# Should be replaced by matrix builds in the future, but currently blocking on:
-# https://gitlab.com/gitlab-org/gitlab/-/issues/270957
-.common-trigger:
+tests:
   stage: test
   needs: []
   trigger:
     include: .ci/gitlab/test.yml
     strategy: depend
-
-tests-8.6:
-  extends: .common-trigger
-  variables:
-    GHC_VERSION: 8.6.5
-    MULTIPLE_HIDDEN: "no"
-
-tests-8.8:
-  extends: .common-trigger
-  variables:
-    GHC_VERSION: 8.8.4
-
-tests-8.10:
-  extends: .common-trigger
-  variables:
-    GHC_VERSION: 8.10.7
-
-tests-9.0:
-  extends: .common-trigger
-  variables:
-    GHC_VERSION: 9.0.2
+  parallel:
+    matrix:
+      - GHC_VERSION: [8.8.4, 8.10.7, 9.0.2]
+      - GHC_VERSION: 8.6.5
+        MULTIPLE_HIDDEN: "no"
 
 stack-build:
-  extends: .common
+  extends: .common-local
   needs: []
   stage: test
   variables:
     GHC_VERSION: 8.10.7
   script:
     - .ci/stack_build.sh
-  # Run on shared runners
-  # XXX: Temporarily on local runners
-  tags:
-   - local
 
 nix-build:
   image: nixos/nix:2.9.2
@@ -76,7 +58,7 @@ nix-build:
     - local
 
 haddock:
-  extends: .common
+  extends: .common-local
   needs: []
   stage: test
   variables:
@@ -87,8 +69,6 @@ haddock:
     expire_in: 1 month
   script:
     - .ci/build_docs.sh
-  tags:
-    - local
 
 # # Run benchmarks for isclashfastyet.com
 # benchmark-8.10.2:
@@ -140,9 +120,6 @@ snap-stable:
   image: curlimages/curl
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
-  # XXX: Temporarily on local runners
-  tags:
-   - local
 
 set_pending:
   extends: .github_status
