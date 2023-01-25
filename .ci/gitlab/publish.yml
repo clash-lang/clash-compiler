@@ -101,3 +101,5 @@ debian-bindist-test:
     - .ci/snap.sh publish
   retry:
     max: 2
+  tags:
+    - local
