@@ -1,6 +1,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
-module DcFifo.Abstract where
+module Lfsr where
 
 import Clash.Explicit.Prelude
 import Clash.Cores.Xilinx.DcFifo
@@ -164,3 +164,33 @@ fifoVerifier clk rst ena actual = done0
     assert clk rst "Doesn't time out" stuck (pure False) $
       assert clk rst "fifoVerifier" actual expected0 done
 {-# NOINLINE fifoVerifier #-}
+
+topEntity_17_2 :: ConfiguredFifo (BitVector 16) Dom17 Dom2
+topEntity_17_2 = dcFifo defConfig
+{-# NOINLINE topEntity_17_2 #-}
+{-# ANN topEntity_17_2 (defSyn "topEntity_17_2") #-}
+
+testBench_17_2 :: Signal Dom17 Bool
+testBench_17_2 = mkTestBench topEntity_17_2
+{-# NOINLINE testBench_17_2 #-}
+{-# ANN testBench_17_2 (TestBench 'topEntity_17_2) #-}
+
+topEntity_2_17 :: ConfiguredFifo (BitVector 16) Dom2 Dom17
+topEntity_2_17 = dcFifo defConfig
+{-# NOINLINE topEntity_2_17 #-}
+{-# ANN topEntity_2_17 (defSyn "topEntity_2_17") #-}
+
+testBench_2_17 :: Signal Dom2 Bool
+testBench_2_17 = mkTestBench topEntity_2_17
+{-# NOINLINE testBench_2_17 #-}
+{-# ANN testBench_2_17 (TestBench 'topEntity_2_17) #-}
+
+topEntity_2_2 :: ConfiguredFifo (Unsigned 16) Dom2 Dom2
+topEntity_2_2 = dcFifo defConfig
+{-# NOINLINE topEntity_2_2 #-}
+{-# ANN topEntity_2_2 (defSyn "topEntity_2_2") #-}
+
+testBench_2_2 :: Signal Dom2 Bool
+testBench_2_2 = mkTestBench topEntity_2_2
+{-# NOINLINE testBench_2_2 #-}
+{-# ANN testBench_2_2 (TestBench 'topEntity_2_2) #-}

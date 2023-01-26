@@ -1,12 +1,11 @@
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
+
 module RotateC where
 
 import Clash.Prelude.Testbench
 import Clash.Prelude
-import GHC.Generics
-import Clash.Annotations.BitRepresentation
-import Data.Maybe
 
 -- Test data structures:
 data Color
@@ -30,10 +29,13 @@ rotateColor c =
     Green -> Blue
     Blue  -> Red
 
-topEntity
-  :: SystemClockResetEnable
+
+type Top =
+     SystemClockResetEnable
   => Signal System MaybeColor
   -> Signal System Color
+
+topEntity :: Top
 topEntity = fmap f
   where
     f cM =
@@ -43,8 +45,8 @@ topEntity = fmap f
 {-# NOINLINE topEntity #-}
 
 -- Testbench:
-testBench :: Signal System Bool
-testBench = done'
+tb :: Top -> Signal System Bool
+tb top = done'
   where
     testInput :: _ => _
     testInput = stimuliGenerator $ NothingC
@@ -60,10 +62,15 @@ testBench = done'
                                    :> Nil) a
 
     done :: _ => _
-    done = expectedOutput (topEntity testInput)
+    done = expectedOutput (top testInput)
     done' =
       withClockResetEnable
         (tbSystemClockGen (not <$> done'))
         systemResetGen
         enableGen
         done
+{-# INLINE tb #-}
+
+testBench :: Signal System Bool
+testBench = tb topEntity
+{-# NOINLINE testBench #-}
