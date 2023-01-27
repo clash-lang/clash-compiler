@@ -229,7 +229,16 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
            _ -> changed (TyApp (Prim NP.undefined) ty)
     where
       -- Check whether the pattern matches the data constructor
-      equalCon (DataPat dcPat _ _) = dcUniq dc == dcUniq dcPat
+      --
+      -- Ideally we'd just compare the actual DataCons:
+      --    equalCon (DataPat dcPat _ _) = dc == dcPat
+      -- But that fails when unsafeCoerce is used on the case subject,
+      -- and we end up trying to match DataCons from different types.
+      -- So instead we do a sort of structural matching: first on the tag,
+      -- and second we check the number of fields the DataCons have,
+      -- to prevent things like #2375
+      equalCon (DataPat dcPat _ fieldsPat)
+        = dcTag dc == dcTag dcPat && List.equalLength fieldsPat (Either.lefts args)
       equalCon _ = False
 
       -- Decide whether the applied arguments of the data constructor should
