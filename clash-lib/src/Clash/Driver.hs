@@ -145,7 +145,6 @@ import qualified Clash.Primitives.Xilinx.ClockGen as P
 import           Clash.Primitives.Types
 import           Clash.Signal.Internal
 import           Clash.Unique                     (Unique, getUnique)
-import           Clash.Util.Interpolate           (i)
 import           Clash.Util
   (ClashException(..), reportTimeDiff,
    wantedLanguageExtensions, unwantedLanguageExtensions, curLoc)
@@ -190,7 +189,7 @@ splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
             in
               go newLam (take n portNames1 ++ ps)
           PortName nm ->
-            throw (flip (ClashException sp) Nothing $ [i|
+            throw (flip (ClashException sp) Nothing $ [I.i|
               Couldn't separate clock, reset, or enable from a product type due
               to a malformed Synthesize annotation. All clocks, resets, and
               enables should be given a unique port name. Type to be split:
@@ -820,7 +819,7 @@ pprVerilatorShim (Id.toText -> topNm) =
   -- Extra newlines are aggressively inserted so the quasiquoter doesn't wrap
   -- the outlines lines in the file. It doesn't matter for code inside main,
   -- but is fatal for the #include directives.
-  pretty $ Data.Text.pack [i|
+  pretty $ Data.Text.pack [I.i|
     \#include <cstdlib>
 
     \#include <verilated.h>
