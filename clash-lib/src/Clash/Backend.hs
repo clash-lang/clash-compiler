@@ -28,7 +28,8 @@ import SrcLoc (SrcSpan)
 #endif
 
 import Clash.Driver.Types (ClashOpts)
-import {-# SOURCE #-} Clash.Netlist.Types hiding (Usage)
+import {-# SOURCE #-} Clash.Netlist.Types
+  (Component, Declaration, Expr, HWType, Identifier, IdentifierSet, HasIdentifierSet, UsageMap)
 import Clash.Netlist.BlackBox.Types
 
 import Clash.Signal.Internal                (VDomainConfiguration)

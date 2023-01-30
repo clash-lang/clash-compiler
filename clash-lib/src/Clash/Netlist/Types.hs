@@ -88,7 +88,7 @@ import Clash.Unique                         (Unique)
 import Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, DataRepr', ConstrRepr')
 
-import {-# SOURCE #-} qualified Clash.Netlist.Id as Id
+import {-# SOURCE #-} qualified Clash.Netlist.Id as Id (toText)
 
 -- | Structure describing a top entity: it's id and its port annotations.
 data TopEntityT = TopEntityT

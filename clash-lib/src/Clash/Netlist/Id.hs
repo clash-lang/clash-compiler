@@ -58,7 +58,7 @@ import           Clash.Annotations.Primitive (HDL (..))
 import           Clash.Core.Name (nameOcc)
 import           Clash.Core.Var (Id, varName)
 import           Clash.Debug (debugIsOn)
-import {-# SOURCE #-} Clash.Netlist.Types
+import           Clash.Netlist.Types
   (PreserveCase(..), HasIdentifierSet(..), IdentifierSet(..), Identifier(..),
    IdentifierType(..), IdentifierSetMonad(identifierSetM))
 import qualified Data.HashSet as HashSet
