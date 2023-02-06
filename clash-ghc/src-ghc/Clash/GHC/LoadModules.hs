@@ -35,7 +35,7 @@ import           Clash.Primitives.Types          (UnresolvedPrimitive)
 import           Clash.Util                      (ClashException(..), pkgIdFromTypeable)
 import qualified Clash.Util.Interpolate          as I
 import           Control.Arrow                   (first)
-import           Control.Exception               (SomeException, throw)
+import           Control.Exception               (throw)
 import           Control.Monad                   (forM, when)
 import           Data.List.Extra                 (nubSort)
 import           Control.Exception               (throwIO)
@@ -209,7 +209,7 @@ loadExternalModule
   -- ^ Module name. Can either be a filepath pointing to a .hs file, or a
   -- qualified module name (example: "Data.List").
   -> m (Either
-          SomeException
+          GHC.GhcException
           ( [CoreSyn.CoreBndr]                     -- Root binders
           , FamInstEnv.FamInstEnv                  -- Local type family instances
           , GHC.ModuleName                         -- Module name
@@ -223,8 +223,8 @@ loadExternalModule hdl modName0 = Exception.gtry $ do
 #endif
   let modName1 = GHC.mkModuleName modName0
   foundMod <- GHC.findModule modName1 Nothing
-  let errMsg = "Internal error: found  module, but could not load it"
-  modInfo <- fromMaybe (error errMsg) <$> (GHC.getModuleInfo foundMod)
+  let err = GHC.ProgramError "Internal error: found  module, but could not load it"
+  modInfo <- fromMaybe (throw err) <$> (GHC.getModuleInfo foundMod)
   tyThings <- catMaybes <$> mapM GHC.lookupGlobalName (GHC.modInfoExports modInfo)
   let rootIds = [id_ | GHC.AnId id_ <- tyThings]
   loaded <- loadExternalBinders hdl rootIds
