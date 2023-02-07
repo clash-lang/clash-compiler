@@ -80,7 +80,7 @@ debian-bindist-test:
 
 # Use binary distribution built in `snap-bindist` to build a snap package.
 .snap:
-  timeout: 10 minutes
+  timeout: 2 hours
   image: ghcr.io/clash-lang/snapcraft:2022-01-23
   stage: publish
   interruptible: false
