@@ -186,6 +186,28 @@ runClashTest = defaultMain $ clashTestRoot
           , expectClashFail=Just (def, "Template function for returned False")
           }
         ]
+      , clashTestGroup "Cores"
+        [ clashTestGroup "Xilinx"
+          [ clashTestGroup "VIO"
+            [ runTest "OutputBusWidthExceeded" def{
+                hdlTargets=[VHDL, Verilog, SystemVerilog]
+              , expectClashFail=Just (def, "Probe signals must be been between 1 and 256 bits wide.")
+              }
+            , runTest "OutputProbesExceeded" def{
+                hdlTargets=[VHDL, Verilog, SystemVerilog]
+              , expectClashFail=Just (def, "At most 256 input/output probes are supported.")
+              }
+            , runTest "InputBusWidthExceeded" def{
+                hdlTargets=[VHDL, Verilog, SystemVerilog]
+              , expectClashFail=Just (def, "Probe signals must be been between 1 and 256 bits wide.")
+              }
+            , runTest "InputProbesExceeded" def{
+                hdlTargets=[VHDL, Verilog, SystemVerilog]
+              , expectClashFail=Just (def, "At most 256 input/output probes are supported.")
+              }
+            ]
+          ]
+        ]
       , clashTestGroup "InvalidPrimitive"
         [ runTest "InvalidPrimitive" def{
             hdlTargets=[VHDL]
@@ -483,6 +505,13 @@ runClashTest = defaultMain $ clashTestRoot
                              }
               in runTest "Lfsr" _opts
             ]
+          , let _opts =
+                  def{ hdlTargets=[VHDL, Verilog, SystemVerilog]
+                     , hdlLoad=[]
+                     , hdlSim=[]
+                     , buildTargets = BuildSpecific []
+                     }
+            in runTest "VIO" _opts
           ]
         ]
       , clashTestGroup "CSignal"
