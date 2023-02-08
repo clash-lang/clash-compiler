@@ -12,6 +12,7 @@ PLL and other clock-related components for Xilinx FPGAs
 module Clash.Xilinx.ClockGen where
 
 import Clash.Annotations.Primitive    (hasBlackBox)
+import Clash.Explicit.Signal          (unsafeSynchronizer)
 import Clash.Promoted.Symbol
 import Clash.Signal.Internal
 import Unsafe.Coerce
@@ -36,9 +37,9 @@ import Unsafe.Coerce
 -- clockWizard @@Dom100MHz (SSymbol @@"clkWizard50to100") clk50 rst
 -- @
 clockWizard
-  :: forall domIn domOut periodIn periodOut edge init polarity name
-   . ( KnownConfiguration domIn  ('DomainConfiguration domIn periodIn edge 'Asynchronous init polarity)
-     , KnownConfiguration domOut ('DomainConfiguration domOut periodOut edge 'Asynchronous init polarity) )
+  :: forall domIn domOut name
+   . ( KnownDomain domIn
+     , KnownDomain domOut)
   => SSymbol name
   -- ^ Name of the component, must correspond to the name entered in the
   -- \"Clock Wizard\" dialog.
@@ -50,10 +51,11 @@ clockWizard
   -- ^ Free running clock (i.e. a clock pin connected to a crystal)
   -> Reset domIn
   -- ^ Reset for the PLL
-  -> (Clock domOut, Enable domOut)
+  -> (Clock domOut, Signal domOut Bool)
   -- ^ (Stable PLL clock, PLL lock)
 clockWizard !_ clk@(Clock _ Nothing) rst =
-  (unsafeCoerce clk, unsafeCoerce (toEnable (unsafeToHighPolarity rst)))
+  let clkO = Clock SSymbol Nothing
+   in (clkO, unsafeSynchronizer clk clkO $ unsafeToLowPolarity rst)
 clockWizard _ _ _ =
   error "clockWizard: no support for dynamic clocks"
 {-# NOINLINE clockWizard #-}
