@@ -51,7 +51,7 @@ Maintainer:           QBayLogic B.V. <devops@qbaylogic.com>
 Copyright:            Copyright © 2013-2016, University of Twente,
                                   2016-2017, Myrtle Software Ltd,
                                   2017-2019, QBayLogic B.V., Google Inc.,
-                                  2021-2022, QBayLogic B.V.
+                                  2021-2023, QBayLogic B.V.
 Category:             Hardware
 Build-type:           Simple
 
@@ -410,6 +410,7 @@ test-suite unittests
                  Clash.Tests.BitVector
                  Clash.Tests.BlockRam
                  Clash.Tests.BlockRam.Blob
+                 Clash.Tests.Clocks
                  Clash.Tests.Counter
                  Clash.Tests.DerivingDataRepr
                  Clash.Tests.DerivingDataReprTypes

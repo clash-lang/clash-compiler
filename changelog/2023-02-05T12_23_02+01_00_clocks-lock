@@ -1,0 +1,5 @@
+FIXED: The Haskell simulation of the PLL lock signal in `Clash.Clocks` (used by
+`Clash.Intel.ClockGen`) is fixed: the signal is now unasserted for the time the
+reset input is asserted and vice versa, and no longer crashes the simulation.
+HDL generation is unchanged. The PLL functions now have an additional
+constraint: `KnownDomain pllLock`.
