@@ -1,8 +1,9 @@
 {-|
 Copyright  :  (C) 2018, Google Inc
                   2019, Myrtle Software Ltd
+                  2023,      QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
@@ -12,6 +13,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 module Clash.Clocks.Deriving (deriveClocksInstances) where
 
 import Control.Monad               (foldM)
+import Clash.Explicit.Signal       (unsafeSynchronizer)
 import Clash.Signal.Internal
 import Language.Haskell.TH.Compat
 import Language.Haskell.TH.Syntax
@@ -26,12 +28,14 @@ derive' n = do
   instType1 <- AppT instType0 <$> lockType
   let instHead = AppT (ConT $ mkName "Clocks") instType1
 
-  cxtRHS <- foldM (\a n' -> AppT a <$> knownDomainCxt n') (TupleT n) [1..n]
+  cxtRHS0 <-
+    foldM (\a n' -> AppT a <$> knownDomainCxt n') (TupleT $ n + 1) [1..n]
+  cxtRHS1 <- AppT cxtRHS0 <$> lockKnownDomainCxt
 #if MIN_VERSION_template_haskell(2,15,0)
   let cxtLHS = AppT (ConT $ mkName "ClocksCxt") instType1
-  let cxtTy  = TySynInstD (TySynEqn Nothing cxtLHS cxtRHS)
+  let cxtTy  = TySynInstD (TySynEqn Nothing cxtLHS cxtRHS1)
 #else
-  let cxtTy  = TySynInstD (mkName "ClocksCxt") (TySynEqn [instType1] cxtRHS)
+  let cxtTy  = TySynInstD (mkName "ClocksCxt") (TySynEqn [instType1] cxtRHS1)
 #endif
 
   -- Function definition of 'clocks'
@@ -39,9 +43,11 @@ derive' n = do
   let rst = mkName "rst"
 
   -- Implementation of 'clocks'
+  lockImpl <- [| unsafeSynchronizer clockGen clockGen
+                   (unsafeToLowPolarity $(varE rst)) |]
   let noInline  = PragmaD $ InlineP (mkName "clocks") NoInline FunLike AllPhases
   let clkImpls  = replicate n (clkImpl clk)
-  let instTuple = mkTupE $ clkImpls ++ [AppE (VarE 'unsafeCoerce) (VarE rst)]
+  let instTuple = mkTupE $ clkImpls ++ [lockImpl]
   let funcBody  = NormalB instTuple
   let instFunc  = FunD (mkName "clocks") [Clause [VarP clk, VarP rst] funcBody []]
 
@@ -61,6 +67,11 @@ derive' n = do
     lockType =
       let c = varT $ mkName "pllLock" in
       [t| Signal $c Bool |]
+
+    lockKnownDomainCxt =
+      let p = varT $ mkName "pllLock" in
+      [t| KnownDomain $p |]
+
 
     clkImpl clk = AppE (VarE 'unsafeCoerce) (VarE clk)
 
