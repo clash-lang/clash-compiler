@@ -11,9 +11,9 @@
         -> (Clock domOut, Signal domOut Bool)
     template: |-
       // clockWizard begin
-      ~NAME[2] ~GENSYM[clockWizard_inst][2]
-      (.clk_in1  (~ARG[3])
-      ,.reset    (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI ~ARG[4])
+      ~NAME[3] ~GENSYM[clockWizard_inst][2]
+      (.clk_in1  (~ARG[4])
+      ,.reset    (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI ~ARG[5])
       ,.clk_out1 (~RESULT[1])
       ,.locked   (~RESULT[0]));
       // clockWizard end

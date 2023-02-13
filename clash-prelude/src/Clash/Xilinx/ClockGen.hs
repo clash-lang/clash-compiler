@@ -33,9 +33,10 @@ import Clash.Signal.Internal
 --
 -- See also the [Clocking Wizard LogiCORE IP Product Guide](https://docs.xilinx.com/r/en-US/pg065-clk-wiz)
 clockWizard
-  :: forall domIn domOut name
+  :: forall domIn domOut pllLock name
    . ( KnownDomain domIn
-     , KnownDomain domOut )
+     , KnownDomain domOut
+     , KnownDomain pllLock)
   => SSymbol name
   -- ^ Name of the component instance
   --
@@ -44,7 +45,7 @@ clockWizard
   -- ^ Free running clock (i.e. a clock pin connected to a crystal)
   -> Reset domIn
   -- ^ Reset for the PLL
-  -> (Clock domOut, Signal domOut Bool)
+  -> (Clock domOut, Signal pllLock Bool)
   -- ^ (Stable PLL clock, PLL lock)
 clockWizard !_ = clocks
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
@@ -66,9 +67,10 @@ clockWizard !_ = clocks
 --
 -- See also the [Clocking Wizard LogiCORE IP Product Guide](https://docs.xilinx.com/r/en-US/pg065-clk-wiz)
 clockWizardDifferential
-  :: forall domIn domOut name
+  :: forall domIn domOut pllLock name
    . ( KnownDomain domIn
-     , KnownDomain domOut )
+     , KnownDomain domOut
+     , KnownDomain pllLock)
   => SSymbol name
   -- ^ Name of the component instance
   --
@@ -77,7 +79,7 @@ clockWizardDifferential
   -- ^ Free running clock
   -> Reset domIn
   -- ^ Reset for the PLL
-  -> (Clock domOut, Signal domOut Bool)
+  -> (Clock domOut, Signal pllLock Bool)
   -- ^ (Stable PLL clock, PLL lock)
 clockWizardDifferential !_ (DiffClock clk _) = clocks clk
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511

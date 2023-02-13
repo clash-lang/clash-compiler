@@ -16,14 +16,14 @@
         signal ~GENSYM[locked][2]  : std_logic;
         signal ~GENSYM[pllLock][3] : boolean;
 
-        component ~NAME[2]
+        component ~NAME[3]
           port (clk_in1  : in std_logic;
                 reset    : in std_logic;
                 clk_out1 : out std_logic;
                 locked   : out std_logic);
         end component;
       begin
-        ~GENSYM[clockWizard_inst][4] : component ~NAME[2] port map (~ARG[3],~IF ~ISACTIVEHIGH[0] ~THEN ~ARG[4] ~ELSE NOT(~ARG[4]) ~FI,~SYM[1],~SYM[2]);
+        ~GENSYM[clockWizard_inst][4] : component ~NAME[3] port map (~ARG[4],~IF ~ISACTIVEHIGH[0] ~THEN ~ARG[5] ~ELSE NOT(~ARG[5]) ~FI,~SYM[1],~SYM[2]);
         ~SYM[3] <= true when ~SYM[2] = '1' else false;
         ~RESULT <= (~SYM[1],~SYM[3]);
       end block;
