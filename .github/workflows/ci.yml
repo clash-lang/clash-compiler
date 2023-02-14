@@ -105,8 +105,8 @@ jobs:
             ghc: 8.8.4
             multiple_hidden: yes
 
-          - name: GHC 8.10.2, Multiple Hidden
-            ghc: 8.10.2
+          - name: GHC 8.10.7, Multiple Hidden
+            ghc: 8.10.7
             multiple_hidden: yes
 
           - name: GHC 9.0.2, Multiple Hidden
