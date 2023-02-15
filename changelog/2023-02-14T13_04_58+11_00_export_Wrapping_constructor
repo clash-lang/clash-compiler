@@ -1,0 +1,1 @@
+CHANGED: Export the constructor for the `Wrapping` type in the `Clash.Num.Wrapping` module. See [#2292](https://github.com/clash-lang/clash-compiler/issues/2292)
