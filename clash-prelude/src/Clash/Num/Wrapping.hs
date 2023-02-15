@@ -8,7 +8,7 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Clash.Num.Wrapping
-  ( Wrapping(fromWrapping)
+  ( Wrapping(..)
   , toWrapping
   ) where
 
