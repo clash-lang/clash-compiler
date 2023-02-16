@@ -374,6 +374,16 @@ Library
   if flag(large-tuples)
     Build-Depends:    ghc
 
+executable dump-splice
+  Main-Is: DumpSplice.hs
+  Build-Depends:
+    base,
+    clash-prelude,
+    pretty-show,
+    template-haskell,
+  GHC-Options: -Wall -Wcompat
+  default-language: Haskell2010
+
 test-suite doctests
   type:             exitcode-stdio-1.0
   default-language: Haskell2010
