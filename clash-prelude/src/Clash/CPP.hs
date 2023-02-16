@@ -1,7 +1,8 @@
 {-|
-Copyright  :  (C) 2019, Myrtle Software Ltd
+Copyright  :  (C) 2019     , Myrtle Software Ltd,
+                  2023     , QBayLogic B.V.,
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
@@ -10,6 +11,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 module Clash.CPP
  ( maxTupleSize
+ , haddockOnly
 
  -- ** Cabal flags
  , fSuperStrict
@@ -37,6 +39,13 @@ import Constants (mAX_TUPLE_SIZE)
 
 maxTupleSize :: Num a => a
 maxTupleSize = MAX_TUPLE_SIZE
+
+haddockOnly :: Bool
+#ifdef HADDOCK_ONLY
+haddockOnly = True
+#else
+haddockOnly = False
+#endif
 
 -- | Whether clash-prelude was compiled with -fsuper-strict
 fSuperStrict :: Bool
