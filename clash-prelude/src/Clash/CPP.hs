@@ -10,6 +10,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 module Clash.CPP
  ( maxTupleSize
+ , haddockOnly
 
  -- ** Cabal flags
  , fSuperStrict
@@ -37,6 +38,13 @@ import Constants (mAX_TUPLE_SIZE)
 
 maxTupleSize :: Num a => a
 maxTupleSize = MAX_TUPLE_SIZE
+
+haddockOnly :: Bool
+#ifdef HADDOCK_ONLY
+haddockOnly = True
+#else
+haddockOnly = False
+#endif
 
 -- | Whether clash-prelude was compiled with -fsuper-strict
 fSuperStrict :: Bool
