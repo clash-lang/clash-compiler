@@ -6,90 +6,60 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
+{-# LANGUAGE ConstrainedClassMethods #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE TypeFamilies #-}
 
-module Clash.Clocks.Deriving (deriveClocksInstances) where
+module Clash.Clocks.Deriving (Clocks(..), deriveClocksInstances) where
 
-import Control.Monad               (foldM)
-import Clash.Promoted.Symbol       (SSymbol(..))
-import Clash.Explicit.Signal       (unsafeSynchronizer)
+import Control.Monad.Extra (concatMapM)
+import Data.Kind (Constraint)
+import Language.Haskell.TH
+
+import Clash.Explicit.Signal (unsafeSynchronizer)
+import Clash.Promoted.Symbol (SSymbol(..))
 import Clash.Signal.Internal
-import Language.Haskell.TH.Compat
-import Language.Haskell.TH.Syntax
-import Language.Haskell.TH.Lib
+  (clockGen, Clock(..), KnownDomain, Reset, Signal, unsafeToActiveLow)
 
-conPatternNoTypes :: Name -> [Pat] -> Pat
-#if MIN_VERSION_template_haskell(2,18,0)
-conPatternNoTypes nm pats = ConP nm [] pats
-#else
-conPatternNoTypes nm pats = ConP nm pats
-#endif
+class Clocks t where
+  type ClocksCxt t :: Constraint
+
+  clocks ::
+    (KnownDomain domIn, ClocksCxt t) =>
+    Clock domIn ->
+    Reset domIn ->
+    t
 
 -- Derive instance for /n/ clocks
-derive' :: Int -> Q Dec
-derive' n = do
-  -- (Clock d0, Clock d1, )
-  instType0 <- foldM (\a n' -> AppT a <$> clkType n') (TupleT $ n + 1) [1..n]
-  instType1 <- AppT instType0 <$> lockType
-  let instHead = AppT (ConT $ mkName "Clocks") instType1
+deriveClocksInstance :: Int -> DecsQ
+deriveClocksInstance n =
+  [d| instance Clocks $instType where
+        type ClocksCxt $instType = $cxtType
 
-  cxtRHS0 <-
-    foldM (\a n' -> AppT a <$> knownDomainCxt n') (TupleT $ n + 1) [1..n]
-  cxtRHS1 <- AppT cxtRHS0 <$> lockKnownDomainCxt
-#if MIN_VERSION_template_haskell(2,15,0)
-  let cxtLHS = AppT (ConT $ mkName "ClocksCxt") instType1
-  let cxtTy  = TySynInstD (TySynEqn Nothing cxtLHS cxtRHS1)
-#else
-  let cxtTy  = TySynInstD (mkName "ClocksCxt") (TySynEqn [instType1] cxtRHS1)
-#endif
+        clocks (Clock _ Nothing) $(varP rst) = $funcImpl
+        clocks _ _ = error "clocks: dynamic clocks unsupported"
+        {-# CLASH_OPAQUE clocks #-}
+    |]
+ where
+  clkTyVar m = varT $ mkName $ "c" <> show m
+  clkTypes = map (\m -> [t| Clock $(clkTyVar m) |]) [1..n]
+  lockTyVar = varT $ mkName "pllLock"
+  -- (Clock c1, Clock c2, ..., Signal pllLock Bool)
+  instType = foldl appT (tupleT $ n + 1) $
+               clkTypes <> [ [t| Signal $lockTyVar Bool |] ]
+  clkKnownDoms = map (\m -> [t| KnownDomain $(clkTyVar m) |]) [1..n]
+  -- (KnownDomain c1, KnownDomain c2, ..., KnownDomain pllLock)
+  cxtType = foldl appT (tupleT $ n + 1) $
+              clkKnownDoms <> [ [t| KnownDomain $lockTyVar |] ]
 
-  -- Function definition of 'clocks'
-  let rst = mkName "rst"
-
-  -- Implementation of 'clocks'
-  clkImpl <- [| Clock SSymbol Nothing |]
-  lockImpl <- [| unsafeSynchronizer clockGen clockGen
-                   (unsafeToActiveLow $(varE rst)) |]
-  let
-    noInline  = PragmaD $ InlineP (mkName "clocks") NoInline FunLike AllPhases
-    clkImpls  = replicate n clkImpl
-    instTuple = mkTupE $ clkImpls ++ [lockImpl]
-    funcBody  = NormalB instTuple
-    errMsg    = "clocks: dynamic clocks unsupported"
-    errBody   = NormalB ((VarE 'error) `AppE` (LitE (StringL errMsg)))
-    instFunc  = FunD (mkName "clocks")
-      [ Clause
-          [ (conPatternNoTypes 'Clock [WildP, conPatternNoTypes 'Nothing []])
-          , VarP rst]
-          funcBody
-          []
-      , Clause [WildP, WildP] errBody []
-      ]
-
-  return $ InstanceD Nothing [] instHead [cxtTy, instFunc, noInline]
-
-  where
-    -- | Generate type @Clock dom@ with fresh @dom@ variable
-    clkType n' =
-      let c = varT $ mkName ("c" ++ show n') in
-      [t| Clock $c |]
-
-    knownDomainCxt n' =
-      let c = varT $ mkName ("c" ++ show n') in
-      [t| KnownDomain $c |]
-
-    -- | Generate type @Signal dom 'Bool@ with fresh @dom@ variable
-    lockType =
-      let c = varT $ mkName "pllLock" in
-      [t| Signal $c Bool |]
-
-    lockKnownDomainCxt =
-      let p = varT $ mkName "pllLock" in
-      [t| KnownDomain $p |]
-
+  -- 'clocks' function
+  rst = mkName "rst"
+  lockImpl = [| unsafeSynchronizer clockGen clockGen
+                  (unsafeToActiveLow $(varE rst)) |]
+  clkImpls = replicate n [| Clock SSymbol Nothing |]
+  funcImpl = tupE $ clkImpls <> [lockImpl]
 
 -- Derive instances for up to and including to /n/ clocks
-deriveClocksInstances :: Int -> Q [Dec]
-deriveClocksInstances n = mapM derive' [1..n]
+deriveClocksInstances :: Int -> DecsQ
+deriveClocksInstances n = concatMapM deriveClocksInstance [1..n]
