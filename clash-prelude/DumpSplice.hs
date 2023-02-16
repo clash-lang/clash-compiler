@@ -28,4 +28,4 @@ import Clash.Clocks.Deriving
 main :: IO ()
 main = do
   fName <- fmap head getArgs
-  writeFile fName $(stringE . ppShow =<< deriveClocksInstances 16)
+  writeFile fName $(stringE . ppShow =<< deriveClocksInstances)
