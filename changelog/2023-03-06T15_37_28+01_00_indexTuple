@@ -1,0 +1,2 @@
+NEW: `indexTuple`. This function can be used to bind variables to numbers
+indexing successive elements in a list-like structure.

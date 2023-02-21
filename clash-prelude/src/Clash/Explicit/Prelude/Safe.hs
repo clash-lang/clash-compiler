@@ -2,7 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.
                   2019     , Myrtle Software Ltd,
-                  2021-2022, QBayLogic B.V.
+                  2021-2023, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -64,6 +64,7 @@ module Clash.Explicit.Prelude.Safe
   , isFalling
   , riseEvery
   , oscillate
+  , indexTuple
     -- * Exported modules
     -- ** Synchronous signals
   , module Clash.Explicit.Signal
@@ -122,6 +123,7 @@ import qualified Prelude
 
 import Clash.Annotations.TopEntity
 import Clash.Class.BitPack
+import Clash.Class.IndexTuple
 import Clash.Class.Num
 import Clash.Class.Resize
 import Clash.NamedTypes

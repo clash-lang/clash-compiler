@@ -298,6 +298,8 @@ Library
 
   other-modules:
                       Clash.Class.AutoReg.Instances
+                      Clash.Class.IndexTuple
+                      Clash.Class.IndexTuple.Deriving
                       Clash.CPP
                       Clash.Signal.Bundle.Internal
                       Language.Haskell.TH.Compat
@@ -327,6 +329,7 @@ Library
                       data-default-class        >= 0.1.2   && < 0.2,
                       deepseq                   >= 1.4.1.0 && < 1.5,
                       extra                     >= 1.6.17  && < 1.8,
+                      ghc,
                       ghc-prim                  >= 0.5.1.0 && < 0.9,
                       ghc-typelits-extra        >= 0.4     && < 0.5,
                       ghc-typelits-knownnat     >= 0.7.2   && < 0.8,
@@ -354,8 +357,6 @@ Library
     Build-Depends:    ghc-bignum                >= 1.0      && < 1.3
   else
     Build-Depends:    integer-gmp               >= 1.0.1.0  && < 2.0
-  if flag(large-tuples)
-    Build-Depends:    ghc
 
 test-suite doctests
   type:             exitcode-stdio-1.0

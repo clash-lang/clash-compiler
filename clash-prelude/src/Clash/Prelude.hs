@@ -102,6 +102,7 @@ module Clash.Prelude
   , isFalling
   , riseEvery
   , oscillate
+  , indexTuple
     -- * Static assertions
   , clashCompileError
     -- * Tracing

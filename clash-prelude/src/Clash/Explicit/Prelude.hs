@@ -77,6 +77,7 @@ module Clash.Explicit.Prelude
   , isFalling
   , riseEvery
   , oscillate
+  , indexTuple
     -- * Static assertions
   , clashCompileError
     -- * Testbench functions
