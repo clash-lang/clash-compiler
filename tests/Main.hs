@@ -1019,6 +1019,13 @@ runClashTest = defaultMain $ clashTestRoot
           , verificationTool=Just SymbiYosys
           }
         ]
+      , clashTestGroup "Xilinx"
+        [ let _opts = def{ hdlTargets=[VHDL, Verilog]
+                         , hdlLoad=[Vivado]
+                         , hdlSim=[Vivado]
+                         }
+          in runTest "ClockWizard" _opts
+        ]
       , clashTestGroup "XOptimization"
         [ outputTest "Conjunction" def
         , outputTest "Disjunction" def

@@ -279,6 +279,7 @@ Library
                       Clash.Primitives.Sized.Signed
                       Clash.Primitives.Sized.Vector
                       Clash.Primitives.Verification
+                      Clash.Primitives.Xilinx.ClockGen
 
                       Clash.Rewrite.Combinators
                       Clash.Rewrite.Types
