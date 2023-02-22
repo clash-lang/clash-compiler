@@ -13,12 +13,12 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 module Clash.Clocks.Deriving (deriveClocksInstances) where
 
 import Control.Monad               (foldM)
+import Clash.Promoted.Symbol       (SSymbol(..))
 import Clash.Explicit.Signal       (unsafeSynchronizer)
 import Clash.Signal.Internal
 import Language.Haskell.TH.Compat
 import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Lib
-import Unsafe.Coerce               (unsafeCoerce)
 
 conPatternNoTypes :: Name -> [Pat] -> Pat
 #if MIN_VERSION_template_haskell(2,18,0)
@@ -46,24 +46,22 @@ derive' n = do
 #endif
 
   -- Function definition of 'clocks'
-  let clk = mkName "clk"
   let rst = mkName "rst"
 
   -- Implementation of 'clocks'
+  clkImpl <- [| Clock SSymbol Nothing |]
   lockImpl <- [| unsafeSynchronizer clockGen clockGen
                    (unsafeToLowPolarity $(varE rst)) |]
   let
     noInline  = PragmaD $ InlineP (mkName "clocks") NoInline FunLike AllPhases
-    clkImpls  = replicate n (clkImpl clk)
+    clkImpls  = replicate n clkImpl
     instTuple = mkTupE $ clkImpls ++ [lockImpl]
     funcBody  = NormalB instTuple
     errMsg    = "clocks: dynamic clocks unsupported"
     errBody   = NormalB ((VarE 'error) `AppE` (LitE (StringL errMsg)))
     instFunc  = FunD (mkName "clocks")
       [ Clause
-          [ AsP
-              clk
-              (conPatternNoTypes 'Clock [WildP, conPatternNoTypes 'Nothing []])
+          [ (conPatternNoTypes 'Clock [WildP, conPatternNoTypes 'Nothing []])
           , VarP rst]
           funcBody
           []
@@ -91,8 +89,6 @@ derive' n = do
       let p = varT $ mkName "pllLock" in
       [t| KnownDomain $p |]
 
-
-    clkImpl clk = AppE (VarE 'unsafeCoerce) (VarE clk)
 
 -- Derive instances for up to and including to /n/ clocks
 deriveClocksInstances :: Int -> Q [Dec]

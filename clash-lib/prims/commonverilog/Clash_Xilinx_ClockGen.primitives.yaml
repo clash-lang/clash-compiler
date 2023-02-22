@@ -3,40 +3,50 @@
     kind: Declaration
     type: |-
       clockWizard
-        :: ( KnownDomain domIn confIn       -- ARG[0]
-           , KnownDomain domOut confOut )   -- ARG[1]
-        => SSymbol name                    -- ARG[2]
-        -> Clock  pllIn                    -- ARG[3]
-        -> Reset pllIn                     -- ARG[4]
-        -> (Clock pllOut, Enable pllOut)
+        :: ( KnownDomain domIn            -- ARG[0]
+           , KnownDomain domOut )         -- ARG[1]
+        => SSymbol name                   -- ARG[2]
+        -> Clock domIn                    -- ARG[3]
+        -> Reset domIn                    -- ARG[4]
+        -> (Clock domOut, Signal domOut Bool)
     template: |-
       // clockWizard begin
       ~NAME[2] ~GENSYM[clockWizard_inst][2]
-      (.CLK_IN1  (~ARG[3])
-      ,.RESET    (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI ~ARG[4])
-      ,.CLK_OUT1 (~RESULT[1])
-      ,.LOCKED   (~RESULT[0]));
+      (.clk_in1  (~ARG[3])
+      ,.reset    (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI ~ARG[4])
+      ,.clk_out1 (~RESULT[1])
+      ,.locked   (~RESULT[0]));
       // clockWizard end
+    includes:
+      - name: clk_wiz
+        extension: clash.tcl
+        format: Haskell
+        templateFunction: Clash.Primitives.Xilinx.ClockGen.clockWizardTclTF
     workInfo: Always
 - BlackBox:
     name: Clash.Xilinx.ClockGen.clockWizardDifferential
     kind: Declaration
     type: |-
       clockWizardDifferential
-        :: ( KnownDomain domIn confIn       -- ARG[0]
-           , KnownDomain domOut confOut )   -- ARG[1]
-        :: SSymbol name                    -- ARG[2]
-        -> Clock  pllIn                    -- ARG[3]
-        -> Clock  pllIn                    -- ARG[4]
-        -> Reset pllIn                     -- ARG[5]
-        -> (Clock pllOut, Enable pllOut)
+        :: ( KnownDomain domIn            -- ARG[0]
+           , KnownDomain domOut )         -- ARG[1]
+        :: SSymbol name                   -- ARG[2]
+        -> Clock domIn                    -- ARG[3]
+        -> Clock domIn                    -- ARG[4]
+        -> Reset domIn                    -- ARG[5]
+        -> (Clock domOut, Signal domOut Bool)
     template: |-
       // clockWizardDifferential begin
       ~NAME[2] ~GENSYM[clockWizardDifferential_inst][2]
-      (.CLK_IN1_D_clk_n (~ARG[3])
-      ,.CLK_IN1_D_clk_n (~ARG[4])
-      ,.RESET           (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI ~ARG[5])
-      ,.CLK_OUT1        (~RESULT[1])
-      ,.LOCKED          (~RESULT[0]));
+      (.clk_in1_n       (~ARG[3])
+      ,.clk_in1_p       (~ARG[4])
+      ,.reset           (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI ~ARG[5])
+      ,.clk_out1        (~RESULT[1])
+      ,.locked          (~RESULT[0]));
       // clockWizardDifferential end
+    includes:
+      - name: clk_wiz
+        extension: clash.tcl
+        format: Haskell
+        templateFunction: Clash.Primitives.Xilinx.ClockGen.clockWizardDifferentialTclTF
     workInfo: Always
