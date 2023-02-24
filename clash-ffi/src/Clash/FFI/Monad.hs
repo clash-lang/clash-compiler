@@ -69,7 +69,7 @@ same way, e.g.
 -- 'runSimAction'.
 --
 newtype SimCont o i = SimCont (ContT o IO i)
-  deriving newtype (Applicative, Functor, Monad, MonadCont, MonadIO)
+  deriving newtype (Applicative, Functor, Monad, MonadCont, MonadIO, MonadFail)
 
 -- | The type of an VPI "main" action run in @clash-ffi@. For the more general
 -- type of FFI computations, use 'SimCont'.
