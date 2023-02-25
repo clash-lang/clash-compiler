@@ -5,10 +5,10 @@
         "homepage": null,
         "owner": "martijnbastiaan",
         "repo": "doctest-parallel",
-        "rev": "112b85b55c63dae1cc52b5216efe03873f1acc06",
-        "sha256": "1v18an5np0wflg6phycmmhqmcpmn30p0vxaq2wx8ha5af8ckmymb",
+        "rev": "cfadbd95748ee00bab15b7ab00ccae3d86b7add9",
+        "sha256": "1bwj42fnlz0wx0gfpj1cmrrjb9qxfnl6ivg834jziqz4av8w262h",
         "type": "tarball",
-        "url": "https://github.com/martijnbastiaan/doctest-parallel/archive/112b85b55c63dae1cc52b5216efe03873f1acc06.tar.gz",
+        "url": "https://github.com/martijnbastiaan/doctest-parallel/archive/cfadbd95748ee00bab15b7ab00ccae3d86b7add9.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "ghc-tcplugins-extra": {
@@ -17,10 +17,10 @@
         "homepage": null,
         "owner": "clash-lang",
         "repo": "ghc-tcplugins-extra",
-        "rev": "631facf6160f87e481c25ea76094c8a01d85f990",
-        "sha256": "0mhf86japnxrqahlj68w4s12lss637pi3xyysvaz0xrf4yr1wa1m",
+        "rev": "c2007b347c9cff4637709907010d309f68401f2a",
+        "sha256": "0q7c8kk58sg1xazcrmjch1h655jx2canrnfj7npinmm853rnnm8c",
         "type": "tarball",
-        "url": "https://github.com/clash-lang/ghc-tcplugins-extra/archive/631facf6160f87e481c25ea76094c8a01d85f990.tar.gz",
+        "url": "https://github.com/clash-lang/ghc-tcplugins-extra/archive/c2007b347c9cff4637709907010d309f68401f2a.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "ghc-typelits-extra": {
@@ -29,10 +29,10 @@
         "homepage": null,
         "owner": "clash-lang",
         "repo": "ghc-typelits-extra",
-        "rev": "fe80881503c8ba80c86f17fbdaf481dcd1304d44",
-        "sha256": "1vg9kj34iyjdbmvs71nr3jh11r963an1c8vcx4j1zr3w8h3sbjkj",
+        "rev": "d4a66e64944b7ab84d18450f2c9130a36e2c5917",
+        "sha256": "091kvzlpzhy6l0qcsk6gwksnlg53272xnzag1r1xxl825my6hcav",
         "type": "tarball",
-        "url": "https://github.com/clash-lang/ghc-typelits-extra/archive/fe80881503c8ba80c86f17fbdaf481dcd1304d44.tar.gz",
+        "url": "https://github.com/clash-lang/ghc-typelits-extra/archive/d4a66e64944b7ab84d18450f2c9130a36e2c5917.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "ghc-typelits-knownnat": {
@@ -41,10 +41,10 @@
         "homepage": null,
         "owner": "clash-lang",
         "repo": "ghc-typelits-knownnat",
-        "rev": "fb94131ac8beaf6167fc2cc5f94602cc881950df",
-        "sha256": "1mknsldr99qp4494vxqdjw0v97mzjhsmi3mfcp0h5qbdv11z1qhc",
+        "rev": "0cf1cc089db84431ecb54b5bfc6171375f1f6ec4",
+        "sha256": "0q13vh6d5l2nnhack47kfgkykb3x8lbsanpcd6158g5fbhjqvrlf",
         "type": "tarball",
-        "url": "https://github.com/clash-lang/ghc-typelits-knownnat/archive/fb94131ac8beaf6167fc2cc5f94602cc881950df.tar.gz",
+        "url": "https://github.com/clash-lang/ghc-typelits-knownnat/archive/0cf1cc089db84431ecb54b5bfc6171375f1f6ec4.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "ghc-typelits-natnormalise": {
@@ -53,10 +53,10 @@
         "homepage": null,
         "owner": "clash-lang",
         "repo": "ghc-typelits-natnormalise",
-        "rev": "48c69dfe3e7c523b1e5268008571fd17d89d2d58",
-        "sha256": "0r0ky6fcwpabj2kdb8yb8h4731vc06qz3gf89c44mjc042pnmd5q",
+        "rev": "f089f6bd91af2038cdc5b60f28d10bc8d1079a23",
+        "sha256": "18kc71gasmpqic0lxwhsian1j3a0i2zlbm09hhfi258ih9bi7dq8",
         "type": "tarball",
-        "url": "https://github.com/clash-lang/ghc-typelits-natnormalise/archive/48c69dfe3e7c523b1e5268008571fd17d89d2d58.tar.gz",
+        "url": "https://github.com/clash-lang/ghc-typelits-natnormalise/archive/f089f6bd91af2038cdc5b60f28d10bc8d1079a23.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "gitignore": {
@@ -77,10 +77,10 @@
         "homepage": "https://github.com/nmattia/niv",
         "owner": "nmattia",
         "repo": "niv",
-        "rev": "82e5cd1ad3c387863f0545d7591512e76ab0fc41",
-        "sha256": "090l219mzc0gi33i3psgph6s2pwsc8qy4lyrqjdj4qzkvmaj65a7",
+        "rev": "689d0e5539eddd0b0f566aee7bb18629eee7df74",
+        "sha256": "1rld3lk42l6b01f2gcrhq8qm9vry1awmfl29zmpiqda9dy89vbx0",
         "type": "tarball",
-        "url": "https://github.com/nmattia/niv/archive/82e5cd1ad3c387863f0545d7591512e76ab0fc41.tar.gz",
+        "url": "https://github.com/nmattia/niv/archive/689d0e5539eddd0b0f566aee7bb18629eee7df74.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs": {
@@ -89,10 +89,22 @@
         "homepage": null,
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "3321eea12a97a31a04b419108564ca1b8cca193c",
-        "sha256": "12pil3zaq7ap9q9782zqxgbr1b8mwlnc0mwlbh0paacbgkgc3sbf",
+        "rev": "0874168639713f547c05947c76124f78441ea46c",
+        "sha256": "0gw5l5bj3zcgxhp7ki1jafy6sl5nk4vr43hal94lhi15kg2vfmfy",
         "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/3321eea12a97a31a04b419108564ca1b8cca193c.tar.gz",
+        "url": "https://github.com/NixOS/nixpkgs/archive/0874168639713f547c05947c76124f78441ea46c.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "prettyprinter-interp": {
+        "branch": "main",
+        "description": "Efficient interpolation for Prettyprinter",
+        "homepage": null,
+        "owner": "DigitalBrains1",
+        "repo": "prettyprinter-interp",
+        "rev": "0a4056f3f22ca5c3baa28fa1ec3d1d0d9b6802dd",
+        "sha256": "0krn2bjdj01rxz1613w9qnhfdgr05r14hdf1rfg93qgfrnac9y2k",
+        "type": "tarball",
+        "url": "https://github.com/DigitalBrains1/prettyprinter-interp/archive/0a4056f3f22ca5c3baa28fa1ec3d1d0d9b6802dd.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "tasty-hedgehog": {

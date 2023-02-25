@@ -16,7 +16,6 @@ module Clash.Cores.Xilinx.Internal where
 
 import Prelude
 import Data.Maybe (catMaybes)
-import Data.String.Interpolate (i, __i)
 import Data.Text (Text)
 import qualified Data.Text as Text
 #if MIN_VERSION_prettyprinter(1,7,0)
@@ -29,6 +28,8 @@ import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Extra (Doc)
 import GHC.Natural (Natural)
 import GHC.Stack (HasCallStack)
+import Prettyprinter.Interpolate (di, __di)
+
 import Clash.Netlist.Types (IdentifierText)
 
 type PropName = Text
@@ -166,7 +167,7 @@ renderTcl = \case
        indent 2 "variable scriptPurpose multipleScripts" <> line <> rbrace <>
        line <> vsep ms
  where
-  rootSnippet = [__i|
+  rootSnippet = [__di|
     namespace eval $tclIface {
       variable api 1
     |]
@@ -176,7 +177,7 @@ renderTcl = \case
     indent 2 "return" <> line <> rbrace
    where
     -- \& is needed to prevent CPP from joining lines :-(
-    ipSnippet = [__i|
+    ipSnippet = [__di|
       variable scriptPurpose createIp
       variable ipName {#{moduleName}}
       proc createIp {ipName0 args} {
@@ -208,5 +209,5 @@ renderTcl = \case
            ]
 
   renderMulti n p =
-    line <> [i|namespace eval ${tclIface}::multipleScripts::script#{n} {|] <>
+    line <> [di|namespace eval ${tclIface}::multipleScripts::script#{n} {|] <>
     line <> indent 2 (renderOne p) <> line <> rbrace

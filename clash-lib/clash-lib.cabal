@@ -165,6 +165,7 @@ Library
                       mtl                     >= 2.1.2    && < 2.3,
                       ordered-containers      >= 0.2      && < 0.3,
                       prettyprinter           >= 1.2.0.1  && < 1.8,
+                      prettyprinter-interp    ^>= 0.2,
                       pretty-show             >= 1.9      && < 2.0,
                       primitive               >= 0.5.0.1  && < 1.0,
                       template-haskell        >= 2.8.0.0  && < 2.19,

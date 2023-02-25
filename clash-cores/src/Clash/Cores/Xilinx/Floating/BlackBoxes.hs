@@ -24,7 +24,7 @@ import Prelude
 import Control.Monad.State (State)
 import Data.Maybe (isJust, fromJust)
 import Data.String (fromString, IsString)
-import Data.String.Interpolate (i, __i)
+import Prettyprinter.Interpolate (di, __di)
 
 import Clash.Backend (Backend)
 import Clash.Netlist.Types
@@ -152,7 +152,7 @@ tclTemplate (HasCustom {..}) operType bbCtx
   prop (True, name, value) s =
     replicate 29 ' ' ++ name ++ ' ': value ++ " \\\n" ++ s
 
-  bbText = [i|namespace eval $tclIface {
+  bbText = [di|namespace eval $tclIface {
   variable api 1
   variable scriptPurpose createIp
   variable ipName {#{compName}}
@@ -193,7 +193,7 @@ fromUTclTemplate bbCtx
       (DataCon _ _ [Literal Nothing (BoolLit True)], _, _) -> "false"
       _                                                    -> "true"
 
-  bbText = [__i|
+  bbText = [__di|
     namespace eval $tclIface {
       variable api 1
       variable scriptPurpose createIp
@@ -245,7 +245,7 @@ fromSTclTemplate bbCtx
       (DataCon _ _ [Literal Nothing (BoolLit True)], _, _) -> "false"
       _                                                    -> "true"
 
-  bbText = [__i|
+  bbText = [__di|
     namespace eval $tclIface {
       variable api 1
       variable scriptPurpose createIp
@@ -296,7 +296,7 @@ compareTclTemplate bbCtx
       (DataCon _ _ [Literal Nothing (BoolLit True)], _, _) -> "false"
       _                                                    -> "true"
 
-  bbText = [__i|
+  bbText = [__di|
     namespace eval $tclIface {
       variable api 1
       variable scriptPurpose createIp
