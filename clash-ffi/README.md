@@ -44,11 +44,12 @@ All interaction with a simulator follows the same general process:
       setup-depends: base, Cabal, directory, filepath
     ```
 
-    that uses the `Setup.hs` of this project (copied to your project's
-    root). This custom setup places the created foreign library into a
-    `lib` folder created under your project's root and renames the
-    file accordingly. It is important that the library has a `.vpl`
-    ending to be used by a VPI simulator in the end.
+    using the `Setup.hs` of the example project in the `example`
+    folder (copied to your project's root). This custom setup places
+    the created foreign library into a `lib` folder created under your
+    project's root and renames the file accordingly. It is important
+    that the library has a `.vpl` ending to be used by a VPI simulator
+    in the end.
 
   * From this point on, development of your `foreign-library` works
     like for a normal Haskell library. For interfacing with the
@@ -74,6 +75,13 @@ All interaction with a simulator follows the same general process:
     ```bash
     vvp -L lib -l libclashffi-iverilog-vpi MODULE.vvp
     ```
+
+  * The `example` folder contains a minimalistic project utilizing
+    `clash-ffi`. Check the `run-iverilog.sh` script in the folder for
+    a quick overview of how to use `clash-ffi`. The script may be
+    executed within the `examples` folder. If it does not work for you
+    out-of-the-box, feel free to adapted it according to your local
+    setup.
 
 ## Supported API Functions
 
