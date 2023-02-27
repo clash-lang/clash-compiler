@@ -9,16 +9,51 @@ a standard interface (e.g. VPI / VHPI / FLI). Currently only VPI is supported.
 
 All interaction with a simulator follows the same general process:
 
-  * the Haskell code performing the FFI is compiled as a shared library. Any
-    libraries specified as `foreign-library` in `clash-ffi.cabal` are copied
-    into a `lib/` directory in the project on successful build. Haskell FFI
-    code *must* export the entry point
+  * The Haskell code performing the FFI is compiled as a foreign
+    shared library. To this end, your project's cabal must be extended
+    by a `foreign-library` section, e.g.,
 
-    ```c
-    void clash_ffi_main(void);
+    ```cabal
+    foreign-library <my-clash-ffi-lib-name>
+      default-language: Haskell2010
+      includes:         vpi_user.h
+      include-dirs:     </path/to/vpi_user.h>
+      build-depends:    clash-ffi,
+                        ...
+      type:             native-shared
+      lib-version-info: 0:1:0
+      cpp-options:      -DVERILOG=1 -DIVERILOG=1 -DVERILOG_2001=1 -DVERILOG_2005=1 -DVPI_VECVAL=1
+      ...
     ```
 
-    This requires a foreign export in user code, i.e.
+    See `vpi_user.h` for more details on the possible
+    `cpp-options`. You can either use the `vpi_user.h`, which is
+    shipped with this project, (see the `include` directory) or the
+    one that's usually provided by the simulator. Note that
+    `clash-ffi` gets included just like any other standard Haskell
+    library to your project at this point.
+
+  * Cabal creates libraries in some hard to access nested
+    sub-directory with a file ending that depends on your operating
+    systems, which is not well suited for the usage in the context of
+    VPI. To get around this, we recommend adding a custom setup to
+    your cabal file:
+
+    ```cabal
+    custom-setup
+      setup-depends: base, Cabal, directory, filepath
+    ```
+
+    that uses the `Setup.hs` of this project (copied to your project's
+    root). This custom setup places the created foreign library into a
+    `lib` folder created under your project's root and renames the
+    file accordingly. It is important that the library has a `.vpl`
+    ending to be used by a VPI simulator in the end.
+
+  * From this point on, development of your `foreign-library` works
+    like for a normal Haskell library. For interfacing with the
+    simulator, you just need to have one exposed module within your
+    setup that exports the Clash FFI entry point:
 
     ```haskell
     foreign export ccall "clash_ffi_main"
@@ -28,9 +63,10 @@ All interaction with a simulator follows the same general process:
     ffiMain = -- Some FFI code
     ```
 
-    This main action is run during the start-of-simulation callback from VPI.
-    This means while it can register new callbacks, it should not run forever
-    as doing so would mean control is never returned to the simulator.
+    This main action is run during the start-of-simulation callback of
+    the simulator. This means while it can register new callbacks, it
+    should not run forever as doing so would mean control is never
+    returned to the simulator.
 
   * The simulator is started with flags which load the library. For instance,
     with `iverilog` the simulator is invoked with a command similar to
