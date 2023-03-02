@@ -155,3 +155,7 @@
       Enable dom'
     template: ~RESULT <= true;
     workInfo: Always
+- BlackBox:
+    name: Clash.Explicit.Testbench.seClockToDiffClock
+    kind: Expression
+    template: (~ARG[0], not ~ARG[0])
