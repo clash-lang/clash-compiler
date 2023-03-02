@@ -395,7 +395,13 @@ This concludes the short introduction to using 'blockRam'.
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fconstraint-solver-iterations=20 #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
+
+-- In the blackbox definitions of 'trueDualPortBlockRam#' we bind a 'Vec', which
+-- GHC doesn't recognize as being complete (though it will throw a type error if
+-- the left and right side of the pattern match disagree on their types).
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- See [Note: eta port names for trueDualPortBlockRam]
 {-# OPTIONS_GHC -fno-do-lambda-eta-expansion #-}
@@ -459,6 +465,7 @@ import           Clash.Sized.Unsigned   (Unsigned)
 import           Clash.Sized.Index      (Index)
 import           Clash.Sized.Vector     (Vec, replicate, iterateI)
 import qualified Clash.Sized.Vector     as CV
+import           Clash.Sized.Vector     (Vec((:>), Nil))
 import           Clash.XException
   (maybeIsX, NFDataX(deepErrorX), defaultSeqX, fromJustX, undefined,
    XException (..), seqX, isX, errorX)
@@ -1292,197 +1299,206 @@ trueDualPortBlockRam# clkA enA weA addrA datA clkB enB weB addrB datB
 {-# ANN trueDualPortBlockRam# (
   let
     bbName = show 'trueDualPortBlockRam#
-  in
-    InlineYamlPrimitive [VHDL] [__i|
+    (   _hasCallStack
+     :> knownNatAddrs
+     :> _knownDomainA
+     :> _knownDomainB
+     :> _nfdataX
+
+     :> clockA
+     :> enaA
+     :> wenaA
+     :> addrA
+     :> datA
+
+     :> clockB
+     :> enaB
+     :> wenaB
+     :> addrB
+     :> datB
+
+     :> Nil
+     ) = CV.indicesI @15
+
+    (   symBlockName
+     :> symDoutA
+     :> symDoutB
+     :> Nil
+     ) = CV.indicesI @3
+  in InlineYamlPrimitive [VHDL] [__i|
     BlackBox:
       name: "#{bbName}"
       kind: Declaration
-      type: |-
-        trueDualPortBlockRam ::
-          forall nAddrs domA domB a .
-          ( HasCallStack           ~ARG[0]
-          , KnownNat nAddrs        ~ARG[1]
-          , KnownDomain domA       ~ARG[2]
-          , KnownDomain domB       ~ARG[3]
-          , NFDataX a              ~ARG[4]
-          ) =>
-
-          Clock domA ->                   ~ARG[5]
-          Signal domA Bool ->             ~ARG[6]
-          Signal domA Bool ->             ~ARG[7]
-          Signal domA (Index nAddrs) ->   ~ARG[8]
-          Signal domA a ->                ~ARG[9]
-
-          Clock domB ->                   ~ARG[10]
-          Signal domB Bool ->             ~ARG[11]
-          Signal domB Bool ->             ~ARG[12]
-          Signal domB (Index nAddrs) ->   ~ARG[13]
-          Signal domB a ->                ~ARG[14]
-          (Signal domA a, Signal domB a)
       template: |-
         -- trueDualPortBlockRam begin
-        ~GENSYM[~RESULT_trueDualPortBlockRam][1] : block
+        ~GENSYM[~RESULT_trueDualPortBlockRam][#{symBlockName}] : block
           -- Shared memory
-          type mem_type is array ( ~LIT[1]-1 downto 0 ) of ~TYP[9];
+          type mem_type is array ( ~LIT[#{knownNatAddrs}]-1 downto 0 ) of ~TYP[#{datA}];
           shared variable mem : mem_type;
-          signal ~GENSYM[a_dout][2] : ~TYP[9];
-          signal ~GENSYM[b_dout][3] : ~TYP[14];
+          signal ~GENSYM[a_dout][#{symDoutA}] : ~TYP[#{datA}];
+          signal ~GENSYM[b_dout][#{symDoutB}] : ~TYP[#{datB}];
         begin
 
           -- Port A
-          process(~ARG[5])
+          process(~ARG[#{clockA}])
           begin
-              if(rising_edge(~ARG[5])) then
-                    if(~ARG[6]) then
-                      if(~ARG[7]) then
-                          mem(~IF~SIZE[~TYP[8]]~THENto_integer(~ARG[8])~ELSE0~FI) := ~ARG[9];
+              if(rising_edge(~ARG[#{clockA}])) then
+                    if(~ARG[#{enaA}]) then
+                      if(~ARG[#{wenaA}]) then
+                          mem(~IF~SIZE[~TYP[#{addrA}]]~THENto_integer(~ARG[#{addrA}])~ELSE0~FI) := ~ARG[#{datA}];
                       end if;
-                      ~SYM[2] <= mem(~IF~SIZE[~TYP[8]]~THENto_integer(~ARG[8])~ELSE0~FI);
+                      ~SYM[#{symDoutA}] <= mem(~IF~SIZE[~TYP[#{addrA}]]~THENto_integer(~ARG[#{addrA}])~ELSE0~FI);
                   end if;
               end if;
           end process;
 
           -- Port B
-          process(~ARG[10])
+          process(~ARG[#{clockB}])
           begin
-              if(rising_edge(~ARG[10])) then
-                  if(~ARG[11]) then
-                      if(~ARG[12]) then
-                          mem(~IF~SIZE[~TYP[13]]~THENto_integer(~ARG[13])~ELSE0~FI) := ~ARG[14];
+              if(rising_edge(~ARG[#{clockB}])) then
+                  if(~ARG[#{enaB}]) then
+                      if(~ARG[#{wenaB}]) then
+                          mem(~IF~SIZE[~TYP[#{addrB}]]~THENto_integer(~ARG[#{addrB}])~ELSE0~FI) := ~ARG[#{datB}];
                       end if;
-                      ~SYM[3] <= mem(~IF~SIZE[~TYP[13]]~THENto_integer(~ARG[13])~ELSE0~FI);
+                      ~SYM[#{symDoutB}] <= mem(~IF~SIZE[~TYP[#{addrB}]]~THENto_integer(~ARG[#{addrB}])~ELSE0~FI);
                   end if;
               end if;
           end process;
 
-          ~RESULT <= (~SYM[2], ~SYM[3]);
+          ~RESULT <= (~SYM[#{symDoutA}], ~SYM[#{symDoutB}]);
         end block;
         -- end trueDualPortBlockRam
 |]) #-}
 {-# ANN trueDualPortBlockRam# (
   let
     bbName = show 'trueDualPortBlockRam#
-  in
-    InlineYamlPrimitive [SystemVerilog] [__i|
+    (   _hasCallStack
+     :> knownNatAddrs
+     :> knownDomainA
+     :> knownDomainB
+     :> _nfdataX
+
+     :> clockA
+     :> enaA
+     :> wenaA
+     :> addrA
+     :> datA
+
+     :> clockB
+     :> enaB
+     :> wenaB
+     :> addrB
+     :> datB
+
+     :> Nil
+     ) = CV.indicesI @15
+
+    (   symMem
+     :> symDoutA
+     :> symDoutB
+     :> Nil
+     ) = CV.indicesI @3
+  in InlineYamlPrimitive [SystemVerilog] [__i|
     BlackBox:
       name: "#{bbName}"
       kind: Declaration
-      type: |-
-        trueDualPortBlockRam ::
-          forall nAddrs domA domB a .
-          ( HasCallStack           ~ARG[0]
-          , KnownNat nAddrs        ~ARG[1]
-          , KnownDomain domA       ~ARG[2]
-          , KnownDomain domB       ~ARG[3]
-          , NFDataX a              ~ARG[4]
-          ) =>
-
-          Clock domA ->                   ~ARG[5]
-          Signal domA Bool ->             ~ARG[6]
-          Signal domA Bool ->             ~ARG[7]
-          Signal domA (Index nAddrs) ->   ~ARG[8]
-          Signal domA a ->                ~ARG[9]
-
-          Clock domB ->                   ~ARG[10]
-          Signal domB Bool ->             ~ARG[11]
-          Signal domB Bool ->             ~ARG[12]
-          Signal domB (Index nAddrs) ->   ~ARG[13]
-          Signal domB a ->                ~ARG[14]
-          (Signal domA a, Signal domB a)
       template: |-
         // trueDualPortBlockRam begin
         // Shared memory
-        logic [~SIZE[~TYP[9]]-1:0] ~GENSYM[mem][0] [~LIT[1]-1:0];
+        logic [~SIZE[~TYP[#{datA}]]-1:0] ~GENSYM[mem][#{symMem}] [~LIT[#{knownNatAddrs}]-1:0];
 
-        ~SIGD[~GENSYM[data_slow][1]][9];
-        ~SIGD[~GENSYM[data_fast][2]][14];
+        ~SIGD[~GENSYM[data_slow][#{symDoutA}]][#{datA}];
+        ~SIGD[~GENSYM[data_fast][#{symDoutB}]][#{datB}];
 
         // Port A
-        always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[5]) begin
-            if(~ARG[6]) begin
-                ~SYM[1] <= ~SYM[0][~IF~SIZE[~TYP[8]]~THEN~ARG[8]~ELSE0~FI];
-                if(~ARG[7]) begin
-                    ~SYM[1] <= ~ARG[9];
-                    ~SYM[0][~IF~SIZE[~TYP[8]]~THEN~ARG[8]~ELSE0~FI] <= ~ARG[9];
+        always @(~IF~ACTIVEEDGE[Rising][#{knownDomainA}]~THENposedge~ELSEnegedge~FI ~ARG[#{clockA}]) begin
+            if(~ARG[#{enaA}]) begin
+                ~SYM[#{symDoutA}] <= ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrA}]]~THEN~ARG[#{addrA}]~ELSE0~FI];
+                if(~ARG[#{wenaA}]) begin
+                    ~SYM[#{symDoutA}] <= ~ARG[#{datA}];
+                    ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrA}]]~THEN~ARG[#{addrA}]~ELSE0~FI] <= ~ARG[#{datA}];
                 end
             end
         end
 
         // Port B
-        always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[10]) begin
-            if(~ARG[11]) begin
-                ~SYM[2] <= ~SYM[0][~IF~SIZE[~TYP[13]]~THEN~ARG[13]~ELSE0~FI];
-                if(~ARG[12]) begin
-                    ~SYM[2] <= ~ARG[14];
-                    ~SYM[0][~IF~SIZE[~TYP[13]]~THEN~ARG[13]~ELSE0~FI] <= ~ARG[14];
+        always @(~IF~ACTIVEEDGE[Rising][#{knownDomainB}]~THENposedge~ELSEnegedge~FI ~ARG[#{clockB}]) begin
+            if(~ARG[#{enaB}]) begin
+                ~SYM[#{symDoutB}] <= ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrB}]]~THEN~ARG[#{addrB}]~ELSE0~FI];
+                if(~ARG[#{wenaB}]) begin
+                    ~SYM[#{symDoutB}] <= ~ARG[#{datB}];
+                    ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrB}]]~THEN~ARG[#{addrB}]~ELSE0~FI] <= ~ARG[#{datB}];
                 end
             end
         end
 
-        assign ~RESULT = {~SYM[1], ~SYM[2]};
+        assign ~RESULT = {~SYM[#{symDoutA}], ~SYM[#{symDoutB}]};
         // end trueDualPortBlockRam
 |]) #-}
 {-# ANN trueDualPortBlockRam# (
   let
     bbName = show 'trueDualPortBlockRam#
-  in
-    InlineYamlPrimitive [Verilog] [__i|
+    (   _hasCallStack
+     :> knownNatAddrs
+     :> knownDomainA
+     :> knownDomainB
+     :> _nfdataX
+
+     :> clockA
+     :> enaA
+     :> wenaA
+     :> addrA
+     :> datA
+
+     :> clockB
+     :> enaB
+     :> wenaB
+     :> addrB
+     :> datB
+
+     :> Nil
+     ) = CV.indicesI @15
+
+    (   symMem
+     :> symDoutA
+     :> symDoutB
+     :> Nil
+     ) = CV.indicesI @3
+  in InlineYamlPrimitive [Verilog] [__i|
     BlackBox:
       name: "#{bbName}"
       kind: Declaration
-      type: |-
-        trueDualPortBlockRam ::
-          forall nAddrs domA domB a .
-          ( HasCallStack           ~ARG[0]
-          , KnownNat nAddrs        ~ARG[1]
-          , KnownDomain domA       ~ARG[2]
-          , KnownDomain domB       ~ARG[3]
-          , NFDataX a              ~ARG[4]
-          ) =>
-
-          Clock domA ->                   ~ARG[5]
-          Signal domA Bool ->             ~ARG[6]
-          Signal domA Bool ->             ~ARG[7]
-          Signal domA (Index nAddrs) ->   ~ARG[8]
-          Signal domA a ->                ~ARG[9]
-
-          Clock domB ->                   ~ARG[10]
-          Signal domB Bool ->             ~ARG[11]
-          Signal domB Bool ->             ~ARG[12]
-          Signal domB (Index nAddrs) ->   ~ARG[13]
-          Signal domB a ->                ~ARG[14]
-          (Signal domA a, Signal domB a)
       template: |-
         // trueDualPortBlockRam begin
         // Shared memory
-        reg [~SIZE[~TYP[9]]-1:0] ~GENSYM[mem][0] [~LIT[1]-1:0];
+        reg [~SIZE[~TYP[#{datA}]]-1:0] ~GENSYM[mem][#{symMem}] [~LIT[#{knownNatAddrs}]-1:0];
 
-        reg ~SIGD[~GENSYM[data_slow][1]][9];
-        reg ~SIGD[~GENSYM[data_fast][2]][14];
+        reg ~SIGD[~GENSYM[data_slow][#{symDoutA}]][#{datA}];
+        reg ~SIGD[~GENSYM[data_fast][#{symDoutB}]][#{datB}];
 
         // Port A
-        always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[5]) begin
-            if(~ARG[6]) begin
-                ~SYM[1] <= ~SYM[0][~IF~SIZE[~TYP[8]]~THEN~ARG[8]~ELSE0~FI];
-                if(~ARG[7]) begin
-                    ~SYM[1] <= ~ARG[9];
-                    ~SYM[0][~IF~SIZE[~TYP[8]]~THEN~ARG[8]~ELSE0~FI] <= ~ARG[9];
+        always @(~IF~ACTIVEEDGE[Rising][#{knownDomainA}]~THENposedge~ELSEnegedge~FI ~ARG[#{clockA}]) begin
+            if(~ARG[#{enaA}]) begin
+                ~SYM[#{symDoutA}] <= ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrA}]]~THEN~ARG[#{addrA}]~ELSE0~FI];
+                if(~ARG[#{wenaA}]) begin
+                    ~SYM[#{symDoutA}] <= ~ARG[#{datA}];
+                    ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrA}]]~THEN~ARG[#{addrA}]~ELSE0~FI] <= ~ARG[#{datA}];
                 end
             end
         end
 
         // Port B
-        always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[10]) begin
-            if(~ARG[11]) begin
-                ~SYM[2] <= ~SYM[0][~IF~SIZE[~TYP[13]]~THEN~ARG[13]~ELSE0~FI];
-                if(~ARG[12]) begin
-                    ~SYM[2] <= ~ARG[14];
-                    ~SYM[0][~IF~SIZE[~TYP[13]]~THEN~ARG[13]~ELSE0~FI] <= ~ARG[14];
+        always @(~IF~ACTIVEEDGE[Rising][#{knownDomainB}]~THENposedge~ELSEnegedge~FI ~ARG[#{clockB}]) begin
+            if(~ARG[#{enaB}]) begin
+                ~SYM[#{symDoutB}] <= ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrB}]]~THEN~ARG[#{addrB}]~ELSE0~FI];
+                if(~ARG[#{wenaB}]) begin
+                    ~SYM[#{symDoutB}] <= ~ARG[#{datB}];
+                    ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrB}]]~THEN~ARG[#{addrB}]~ELSE0~FI] <= ~ARG[#{datB}];
                 end
             end
         end
 
-        assign ~RESULT = {~SYM[1], ~SYM[2]};
+        assign ~RESULT = {~SYM[#{symDoutA}], ~SYM[#{symDoutB}]};
 
         // end trueDualPortBlockRam
 |]) #-}
