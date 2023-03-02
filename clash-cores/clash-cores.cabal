@@ -89,6 +89,8 @@ library
     Clash.Cores.Xilinx.DcFifo.Internal.BlackBoxes
     Clash.Cores.Xilinx.DcFifo.Internal.Instances
     Clash.Cores.Xilinx.DcFifo.Internal.Types
+    Clash.Cores.Xilinx.VIO
+    Clash.Cores.Xilinx.VIO.Internal.BlackBoxes
     Clash.Cores.Xilinx.Floating
     Clash.Cores.Xilinx.Floating.Annotations
     Clash.Cores.Xilinx.Floating.BlackBoxes

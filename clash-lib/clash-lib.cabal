@@ -236,6 +236,7 @@ Library
                       Clash.Netlist.BlackBox.Parser
                       Clash.Netlist.BlackBox.Types
                       Clash.Netlist.BlackBox.Util
+                      Clash.Netlist.Expr
                       Clash.Netlist.Id
                       Clash.Netlist.Id.Common
                       Clash.Netlist.Id.Internal
