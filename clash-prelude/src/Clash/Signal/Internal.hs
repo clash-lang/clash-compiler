@@ -2,7 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017-2019, Myrtle Software Ltd
                   2017-2022, Google Inc.,
-                  2021-2022, QBayLogic B.V.
+                  2021-2023, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -172,7 +172,7 @@ import Data.Proxy                 (Proxy(..))
 import Data.Ratio                 (Ratio)
 import Data.Type.Equality         ((:~:))
 import GHC.Generics               (Generic)
-import GHC.Stack                  (HasCallStack)
+import GHC.Stack                  (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits               (KnownSymbol, Nat, Symbol, type (<=), sameSymbol)
 import Language.Haskell.TH.Syntax -- (Lift (..), Q, Dec)
 import Language.Haskell.TH.Compat
@@ -195,6 +195,8 @@ import Clash.XException
 >>> import Clash.Signal.Internal
 >>> import Clash.Promoted.Nat
 >>> import Clash.XException
+>>> import Data.Ratio (Ratio)
+>>> import Numeric.Natural (Natural)
 >>> type System = "System"
 >>> let systemClockGen = clockGen @System
 >>> let systemResetGen = resetGen @System
@@ -964,18 +966,17 @@ dynamicClockGen ::
   KnownDomain dom =>
   -- | Clock period in /femto/seconds.
   --
-  -- __N.B.__: Beware that the periods are given in femtoseconds; this differs
+  -- * __NB__: Beware that the periods are given in femtoseconds; this differs
   --           from the usual unit Clash uses to represent period length,
   --           picoseconds.
   --
-  -- __N.B.__: Beware that not all simulators support femtoseconds. For example,
+  -- * __NB__: Beware that not all simulators support femtoseconds. For example,
   --           Vivado's XSIM will round down to nearest picoseconds.
   --
-  -- __N.B.__: Beware that, by default, Clash will define @`timescale 100fs/100fs@
+  -- * __NB__: Beware that, by default, Clash will define @`timescale 100fs/100fs@
   --           in its generated Verilog. The latter will make simulators round
   --           time to 100fs. If you rely on more precision you should pass
   --           @-fclash-timescale-precision 1fs@ to Clash.
-  --
   Signal dom Femtoseconds ->
   Clock dom
 dynamicClockGen periods = tbDynamicClockGen periods (pure True)
@@ -995,18 +996,17 @@ tbDynamicClockGen ::
   KnownDomain dom =>
   -- | Clock period in /femto/seconds.
   --
-  -- __N.B.__: Beware that the periods are given in femtoseconds; this differs
+  -- * __NB__: Beware that the periods are given in femtoseconds; this differs
   --           from the usual unit Clash uses to represent period length,
   --           picoseconds.
   --
-  -- __N.B.__: Beware that not all simulators support femtoseconds. For example,
+  -- * __NB__: Beware that not all simulators support femtoseconds. For example,
   --           Vivado's XSIM will round down to nearest picoseconds.
   --
-  -- __N.B.__: Beware that, by default, Clash will define @`timescale 100fs/100fs@
+  -- * __NB__: Beware that, by default, Clash will define @`timescale 100fs/100fs@
   --           in its generated Verilog. The latter will make simulators round
   --           time to 100fs. If you rely on more precision you should pass
   --           @-fclash-timescale-precision 1fs@ to Clash.
-  --
   Signal dom Femtoseconds ->
   Signal dom Bool ->
   Clock dom
@@ -1586,53 +1586,88 @@ fromList_lazy = Prelude.foldr (:-) (error "finite list")
 simulate_lazy :: (Signal dom1 a -> Signal dom2 b) -> [a] -> [b]
 simulate_lazy f = sample_lazy . f . fromList_lazy
 
--- | Calculate the period, in __ps__, given a frequency in __Hz__
+-- | Calculate the period in __ps__, given a frequency in __Hz__
 --
--- i.e. to calculate the clock period for a circuit to run at 240 MHz we get
+-- I.e., to calculate the clock period for a circuit to run at 240 MHz we get
 --
 -- >>> hzToPeriod 240e6
 -- 4166
 --
--- __NB__: This function is /not/ synthesizable
+-- If the value @hzToPeriod@ is applied to is not of the type 'Ratio'
+-- 'Natural', you can use @hzToPeriod ('realToFrac' f)@. Note that if @f@ is
+-- negative, @realToFrac@ will give an @'Control.Exception.Underflow' ::
+-- t'Control.Exception.ArithException'@ without a call stack, making debugging
+-- cumbersome.
 --
--- __NB__: This function is lossy. I.e.,  periodToHz . hzToPeriod /= id.
-hzToPeriod :: HasCallStack => Ratio Natural -> Natural
-hzToPeriod freq = floor ((1.0 / freq) / 1.0e-12)
+-- Before Clash 1.8, this function always returned a 'Natural'. To get the old
+-- behavior of this function, use a type application:
+--
+-- >>> hzToPeriod @Natural 240e6
+-- 4166
+--
+-- * __NB__: This function is not synthesizable
+-- * __NB__: This function is lossy. I.e., @periodToHz . hzToPeriod /= id@.
+hzToPeriod :: (HasCallStack, Integral a) => Ratio Natural -> a
+hzToPeriod freq
+  | freq > 0  = floor ((1.0 / freq) / 1e-12)
+  | otherwise = withFrozenCallStack $ error "Zero frequency"
 
--- | Calculate the period, in __fs__, given a frequency in __Hz__
+-- | Calculate the period in __fs__, given a frequency in __Hz__
 --
--- i.e. to calculate the clock period for a circuit to run at 240 MHz we get
+-- I.e., to calculate the clock period for a circuit to run at 240 MHz we get
 --
 -- >>> hzToFs 240e6
 -- Femtoseconds 4166666
 --
--- __NB__: This function is /not/ synthesizable
+-- If the value @hzToFs@ is applied to is not of the type 'Ratio' 'Natural', you
+-- can use @hzToFs ('realToFrac' f)@. Note that if @f@ is negative, @realToFrac@
+-- will give an @'Control.Exception.Underflow' ::
+-- t'Control.Exception.ArithException'@ without a call stack, making debugging
+-- cumbersome.
 --
--- __NB__: This function is lossy. I.e.,  fsToHz . hzToFs /= id.
+-- * __NB__: This function is not synthesizable
+-- * __NB__: This function is lossy. I.e.,  @fsToHz . hzToFs /= id@.
 hzToFs :: HasCallStack => Ratio Natural -> Femtoseconds
-hzToFs freq = Femtoseconds (floor ((1.0 / freq) / 1.0e-15))
+hzToFs freq
+  | freq > 0  = Femtoseconds (floor ((1.0 / freq) / 1e-15))
+  | otherwise = withFrozenCallStack $ error "Zero frequency"
 
--- | Calculate the frequence in __Hz__, given the period in __ps__
+-- | Calculate the frequency in __Hz__, given the period in __ps__
 --
--- i.e. to calculate the clock frequency of a clock with a period of 5000 ps:
+-- I.e., to calculate the clock frequency of a clock with a period of 5000 ps:
 --
 -- >>> periodToHz 5000
+-- 2.0e8
+--
+-- Note that if @p@ in @periodToHz ('fromIntegral' p)@ is negative,
+-- @fromIntegral@ will give an @'Control.Exception.Underflow' ::
+-- t'Control.Exception.ArithException'@ without a call stack, making debugging
+-- cumbersome.
+--
+-- Before Clash 1.8, this function always returned a 'Ratio'
+-- 'Natural'. To get the old behavior of this function, use a type application:
+--
+-- >>> periodToHz @(Ratio Natural) 5000
 -- 200000000 % 1
 --
--- __NB__: This function is /not/ synthesizable
-periodToHz :: Natural -> Ratio Natural
-periodToHz period = 1.0 / (1.0e-12 * fromIntegral period)
+-- __NB__: This function is not synthesizable
+periodToHz :: (HasCallStack, Fractional a) => Natural -> a
+periodToHz period
+  | period > 0 = fromRational $ 1.0 / (fromIntegral period * 1e-12)
+  | otherwise  = withFrozenCallStack $ error "Zero period"
 
--- | Calculate the frequence in __Hz__, given the period in __fs__
+-- | Calculate the frequency in __Hz__, given the period in __fs__
 --
--- i.e. to calculate the clock frequency of a clock with a period of 5000 fs:
+-- I.e., to calculate the clock frequency of a clock with a period of 5000 fs:
 --
 -- >>> fsToHz (Femtoseconds 5000)
--- 200000000000 % 1
+-- 2.0e11
 --
--- __NB__: This function is /not/ synthesizable
-fsToHz :: Femtoseconds -> Ratio Natural
-fsToHz (Femtoseconds period) = 1.0 / (1.0e-15 * fromIntegral period)
+-- __NB__: This function is not synthesizable
+fsToHz :: (HasCallStack, Fractional a) => Femtoseconds -> a
+fsToHz (Femtoseconds period)
+  | period > 0 = fromRational $ 1.0 / (fromIntegral period * 1e-15)
+  | otherwise  = withFrozenCallStack $ error "Zero period"
 
 -- | Build an 'Automaton' from a function over 'Signal's.
 --
