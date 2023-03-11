@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2018     , Google Inc.,
-                     2021-2022, QBayLogic B.V.
+                     2021-2023, QBayLogic B.V.,
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -19,6 +19,7 @@ import Clash.Netlist.BlackBox.Util
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
 import Clash.Netlist.Util
+import Clash.Signal (periodToHz)
 
 import Control.Monad.State
 import Data.Monoid (Ap(getAp))
@@ -166,7 +167,7 @@ altpllQsysTemplate bbCtx = case bbInputs bbCtx of
     , KnownDomain _ clkOutPeriod _ _ _ _ <- kdOut ->
     let
       clkOutFreq :: Double
-      clkOutFreq = (1.0 / (fromInteger clkOutPeriod * 1.0e-12)) / 1e6
+      clkOutFreq = periodToHz (fromIntegral clkOutPeriod) / 1e6
       clklcm = lcm clkInPeriod clkOutPeriod
       clkmult = clklcm `quot` clkOutPeriod
       clkdiv = clklcm `quot` clkInPeriod
@@ -267,7 +268,7 @@ alteraPllQsysTemplate bbCtx = case bbInputs bbCtx of
         _ -> error "internal error: not a Product or KnownDomain"
 
       cklFreq (KnownDomain _ p _ _ _ _)
-        = (1.0 / (fromInteger p * 1.0e-12 :: Double)) / 1e6
+        = periodToHz (fromIntegral p) / 1e6 :: Double
       cklFreq _ = error "internal error: not a KnownDomain"
 
       clkOuts = TextS.intercalate "\n"

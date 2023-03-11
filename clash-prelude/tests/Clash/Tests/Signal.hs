@@ -1,8 +1,9 @@
 {-|
 Copyright  :  (C) 2019, Myrtle Software Ltd
                   2022, Google Inc.
+                  2023, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
@@ -221,8 +222,8 @@ case_dynamicStaticEq = do
     -- We construct periods in a roundabout way (i.e., using 'hzToPeriod' instead
     -- of using 'hzToFs'), to prevent rounding errors between periods of the
     -- static clocks and the periods of the dynamic clocks.
-    fs11 = Femtoseconds (fromIntegral (1000 * hzToPeriod 11))
-    fs77 = Femtoseconds (fromIntegral (1000 * hzToPeriod 77))
+    fs11 = Femtoseconds (1000 * hzToPeriod 11)
+    fs77 = Femtoseconds (1000 * hzToPeriod 77)
 
     dclk11 = dynamicClockGen @H11 (pure fs11)
     dclk77 = dynamicClockGen @H77 (pure fs77)
@@ -249,8 +250,8 @@ case_dynamicHasEffect = do
     -- We construct periods in a roundabout way (i.e., using 'hzToPeriod' instead
     -- of using 'hzToFs'), to prevent rounding errors between periods of the
     -- static clocks and the periods of the dynamic clocks.
-    fs11 = Femtoseconds (fromIntegral (1000 * hzToPeriod 11))
-    fs77lying = Femtoseconds (fromIntegral (1000 * hzToPeriod 78))
+    fs11 = Femtoseconds (1000 * hzToPeriod 11)
+    fs77lying = Femtoseconds (1000 * hzToPeriod 78)
 
     clk11 = clockGen @H11
     clk77 = clockGen @H77
