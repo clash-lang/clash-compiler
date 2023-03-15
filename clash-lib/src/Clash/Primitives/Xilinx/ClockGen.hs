@@ -12,6 +12,7 @@
 module Clash.Primitives.Xilinx.ClockGen where
 
 import Control.Monad.State (State)
+import Data.List.Infinite (Infinite(..), (...))
 import qualified Data.String.Interpolate as I
 
 import Clash.Signal (periodToHz)
@@ -27,11 +28,12 @@ clockWizardTclTF :: TemplateFunction
 clockWizardTclTF =
   TemplateFunction used valid (clockWizardTclTemplate False)
  where
-  knownDomIn = 0
-  knownDomOut = 1
-  name = 2
-  -- clk = 3
-  -- rst = 4
+  knownDomIn
+    :< knownDomOut
+    :< name
+    :< _clk
+    :< _rst
+    :< _ = (0...)
   used = [knownDomIn, knownDomOut, name]
   valid = const True
 
@@ -39,12 +41,13 @@ clockWizardDifferentialTclTF :: TemplateFunction
 clockWizardDifferentialTclTF =
   TemplateFunction used valid (clockWizardTclTemplate True)
  where
-  knownDomIn = 0
-  knownDomOut = 1
-  name = 2
-  -- clkN = 3
-  -- clkP = 4
-  -- rst = 5
+  knownDomIn
+    :< knownDomOut
+    :< name
+    :< _clkN
+    :< _clkP
+    :< _rst
+    :< _ = (0...)
   used = [knownDomIn, knownDomOut, name]
   valid = const True
 
@@ -55,9 +58,10 @@ clockWizardTclTemplate
   -> BlackBoxContext
   -> State s Doc
 clockWizardTclTemplate isDifferential bbCtx
-  | (_,stripVoid -> (KnownDomain _ clkInPeriod _ _ _ _),_) <- bbInputs bbCtx !! 0
-  , (_,stripVoid -> (KnownDomain _ clkOutPeriod _ _ _ _),_) <- bbInputs bbCtx !! 1
-  , (nm,_,_) <- bbInputs bbCtx !! 2
+  |   (_,stripVoid -> (KnownDomain _ clkInPeriod _ _ _ _),_)
+    : (_,stripVoid -> (KnownDomain _ clkOutPeriod _ _ _ _),_)
+    : (nm,_,_)
+    : _ <- bbInputs bbCtx
   , [(Identifier _ Nothing,Product {})] <- bbResults bbCtx
   , Just compName <- exprToString nm
   =

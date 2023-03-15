@@ -9,8 +9,8 @@ license:             BSD-2-Clause
 license-file:        LICENSE
 author:              QBayLogic B.V.
 maintainer:          devops@qbaylogic.com
-copyright:           Copyright © 2019, Foamspace Corp.
-                                 2022, QBayLogic B.V.
+copyright:           Copyright © 2019     , Foamspace Corp.,
+                                 2022-2023, QBayLogic B.V.
 category:            Hardware
 build-type:          Simple
 extra-source-files:  CHANGELOG.md
@@ -46,6 +46,7 @@ common basic-config
     FlexibleContexts
     MagicHash
     NoImplicitPrelude
+    PostfixOperators
     ScopedTypeVariables
     TemplateHaskell
     TypeApplications
@@ -109,6 +110,7 @@ library
 
   build-depends:
     clash-lib,
+    infinite-list           ^>= 0.1,
     mtl                     >= 2.1.1 && < 2.3,
     prettyprinter           >= 1.2.0.1  && < 1.8,
     prettyprinter-interp    ^>= 0.2,

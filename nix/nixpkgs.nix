@@ -33,6 +33,9 @@ let
         tasty-hedgehog =
          self.callCabal2nix "tasty-hedgehog" sources.tasty-hedgehog {};
 
+        infinite-list =
+         self.callCabal2nix "infinite-list" sources.infinite-list {};
+
         # Internal overrides
         clash-lib = import ../clash-lib { inherit nixpkgs; };
         clash-ghc = import ../clash-ghc { inherit nixpkgs; };

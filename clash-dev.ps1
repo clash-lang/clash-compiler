@@ -14,7 +14,7 @@ ghci `
   -XBangPatterns -XBinaryLiterals -XDataKinds -XDefaultSignatures `
   -XDeriveDataTypeable -XDeriveFoldable -XDeriveFunctor -XDeriveGeneric `
   -XDeriveLift -XDeriveTraversable -XDerivingStrategies -XInstanceSigs `
-  -XKindSignatures $XNoStarIsType -XScopedTypeVariables -XStandaloneDeriving `
-  -XTupleSections -XTypeApplications -XTypeOperators -XViewPatterns `
-  -XNoPolyKinds -DDEBUG `
+  -XKindSignatures -XPostfixOperators $XNoStarIsType -XScopedTypeVariables `
+  -XStandaloneDeriving -XTupleSections -XTypeApplications -XTypeOperators `
+  -XViewPatterns -XNoPolyKinds -DDEBUG `
   Clash.hs

@@ -22,6 +22,7 @@ import Clash.Netlist.Util
 import Clash.Signal (periodToHz)
 
 import Control.Monad.State
+import Data.List.Infinite (Infinite(..), (...))
 import Data.Monoid (Ap(getAp))
 import qualified Data.String.Interpolate as I
 import Data.Text.Prettyprint.Doc.Extra
@@ -33,10 +34,16 @@ import Data.Text.Extra (showt)
 altpllTF :: TemplateFunction
 altpllTF = TemplateFunction used valid altpllTemplate
  where
-  used         = [0..4]
+  _knownDomIn
+    :< _knownDomOut
+    :< nm
+    :< clk
+    :< rst
+    :< _ = (0...)
+  used = [ nm, clk, rst ]
   valid bbCtx
-    | [_,_,(nm,_,_),_,_] <- bbInputs bbCtx
-    , Just _ <- exprToString nm
+    | (nm0,_,_) <- bbInputs bbCtx !! nm
+    , Just _ <- exprToString nm0
     , [(Identifier _ Nothing,Product {})] <- bbResults bbCtx
     = True
   valid _ = False
@@ -44,33 +51,44 @@ altpllTF = TemplateFunction used valid altpllTemplate
 altpllQsysTF :: TemplateFunction
 altpllQsysTF = TemplateFunction used valid altpllQsysTemplate
  where
-  used = [0..4]
-  valid bbCtx
-    | [_,_,(nm,_,_),_,_] <- bbInputs bbCtx
-    , Just _ <- exprToString nm
-    , [(Identifier _ Nothing,Product {})] <- bbResults bbCtx
-    = True
-  valid _ = False
+  knownDomIn
+    :< knownDomOut
+    :< _name
+    :< _clk
+    :< _rst
+    :< _ = (0...)
+  used = [ knownDomIn, knownDomOut ]
+  valid = const True
 
 alteraPllTF :: TemplateFunction
 alteraPllTF = TemplateFunction used valid alteraPllTemplate
  where
-  used         = [1..20]
+  _clocksClass
+    :< _knownDomIn
+    :< _clocksCxt
+    :< nm
+    :< clk
+    :< rst
+    :< _ = (0...)
+  used = [ nm, clk, rst ]
   valid bbCtx
-    | ((nm,_,_):_) <- drop 3 (bbInputs bbCtx)
-    , Just _ <- exprToString nm
+    | (nm0,_,_) <- bbInputs bbCtx !! nm
+    , Just _ <- exprToString nm0
     = True
   valid _ = False
 
 alteraPllQsysTF :: TemplateFunction
 alteraPllQsysTF = TemplateFunction used valid alteraPllQsysTemplate
  where
-  used  = [1..20]
-  valid bbCtx
-    | ((nm,_,_):_) <- drop 3 (bbInputs bbCtx)
-    , Just _ <- exprToString nm
-    = True
-  valid _ = False
+  _clocksClass
+    :< knownDomIn
+    :< clocksCxt
+    :< _name
+    :< _clk
+    :< _rst
+    :< _ = (0...)
+  used = [ knownDomIn, clocksCxt ]
+  valid = const True
 
 alteraPllTemplate
   :: forall s
@@ -79,7 +97,12 @@ alteraPllTemplate
   -> State s Doc
 alteraPllTemplate bbCtx
   | [(Identifier result Nothing,resTy@(Product _ _ (init -> tys)))] <- bbResults bbCtx
-  , [(nm,_,_),(clk,clkTy,_),(rst,rstTy,_)] <- drop 3 (bbInputs bbCtx)
+  , [ _clocksClass
+    , _knownDomIn
+    , _clocksCxt
+    , (nm,_,_)
+    , (clk,clkTy,_)
+    , (rst,rstTy,_)] <- bbInputs bbCtx
   , Just nm' <- exprToString nm
   , let instname0 = TextS.pack nm'
   = do
@@ -122,7 +145,11 @@ altpllTemplate
   => BlackBoxContext
   -> State s Doc
 altpllTemplate bbCtx
-  | [_,_,(nm,_,_),(clk,clkTy,_),(rst,rstTy,_)] <- bbInputs bbCtx
+  | [ _knownDomIn
+    , _knownDomOut
+    , (nm,_,_)
+    , (clk,clkTy,_)
+    , (rst,rstTy,_)] <- bbInputs bbCtx
   , [(Identifier result Nothing,resTy@(Product _ _ [clkOutTy,_]))] <- bbResults bbCtx
   , Just nm' <- exprToString nm
   , let instname0 = TextS.pack nm'
@@ -162,11 +189,13 @@ altpllQsysTemplate
   :: Backend s
   => BlackBoxContext
   -> State s Doc
-altpllQsysTemplate bbCtx = case bbInputs bbCtx of
-  ((_,stripVoid -> kdIn,_):(_,stripVoid -> kdOut,_):_)
-    | KnownDomain _ clkInPeriod _ _ _ _ <- kdIn
-    , KnownDomain _ clkOutPeriod _ _ _ _ <- kdOut ->
-    let
+altpllQsysTemplate bbCtx
+  |   (_,stripVoid -> kdIn,_)
+    : (_,stripVoid -> kdOut,_)
+    : _ <- bbInputs bbCtx
+  , KnownDomain _ clkInPeriod _ _ _ _ <- kdIn
+  , KnownDomain _ clkOutPeriod _ _ _ _ <- kdOut
+  = let
       clkOutFreq :: Double
       clkOutFreq = periodToHz (fromIntegral clkOutPeriod) / 1e6
       clklcm = lcm clkInPeriod clkOutPeriod
@@ -254,15 +283,19 @@ altpllQsysTemplate bbCtx = case bbInputs bbCtx of
         |]
       in
         pure bbText
-  inps -> error ("altpllQsysTemplate: bad bInputs: " <> show inps)
+  | otherwise
+  = error ("altpllQsysTemplate: bad bbContext: " <> show bbCtx)
 
 alteraPllQsysTemplate
   :: Backend s
   => BlackBoxContext
   -> State s Doc
-alteraPllQsysTemplate bbCtx = case bbInputs bbCtx of
-  (_:(_,stripVoid -> kdIn,_):(_,stripVoid -> kdOutsProd,_):_) ->
-    let
+alteraPllQsysTemplate bbCtx
+  |   _clocksClass
+    : (_,stripVoid -> kdIn,_)
+    : (_,stripVoid -> kdOutsProd,_)
+    : _ <- bbInputs bbCtx
+  = let
       kdOuts = case kdOutsProd of
         Product _ _ ps -> ps
         KnownDomain {} -> [kdOutsProd]
@@ -298,4 +331,5 @@ alteraPllQsysTemplate bbCtx = case bbInputs bbCtx of
         |]
     in
       pure bbText
-  inps -> error ("alteraPllQsysTemplate: bad bInputs: " <> show inps)
+  | otherwise
+  = error ("alteraPllQsysTemplate: bad bbContext: " <> show bbCtx)
