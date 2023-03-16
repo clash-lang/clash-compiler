@@ -28,6 +28,8 @@ package clash-prelude
   ghc-options: +RTS -qn4 -A128M -RTS -j4
   -- workaround for plugins not loading in Haddock with GHC-8.6
   haddock-options: --optghc=-fdefer-type-errors
+  -- Workaround for Haddock/CPP #if issues https://github.com/haskell/haddock/issues/1382
+  haddock-options: --optghc="-optP -P"
   -- Don't pollute docs with 1024 SNat literals
   haddock-options: --optghc=-DHADDOCK_ONLY
 
