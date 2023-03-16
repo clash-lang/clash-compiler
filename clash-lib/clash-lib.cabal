@@ -126,7 +126,7 @@ Library
                       RecordWildCards
                       TemplateHaskell
 
-  Build-depends:      aeson                   >= 0.6.2.0  && < 2.1,
+  Build-depends:      aeson                   >= 0.6.2.0  && < 2.2,
                       aeson-pretty            >= 0.8      && < 0.9,
                       ansi-terminal           >= 0.8.0.0  && < 0.12,
                       array,
