@@ -21,7 +21,6 @@ stages:
   - pre
   - test
   - pack
-  - pack-test
   - publish
   - post
 
@@ -92,23 +91,6 @@ hackage-release:
   variables:
     HACKAGE_RELEASE: "yes"
 
-  rules:
-    - if: '$CI_COMMIT_TAG != null' # tags
-
-# Publish a release candidate (beta/edge) to snapcraft.io/clash
-snap-beta-or-edge:
-  extends: .snap
-  variables:
-    RELEASE_CHANNEL: beta_or_edge
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-    - if: $CI_PIPELINE_SOURCE == "trigger"
-
-# Publish a new version to stable channel on snapcraft.io/clash
-snap-stable:
-  extends: .snap
-  variables:
-    RELEASE_CHANNEL: stable
   rules:
     - if: '$CI_COMMIT_TAG != null' # tags
 

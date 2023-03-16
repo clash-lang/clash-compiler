@@ -9,12 +9,12 @@ fi
 
 set -e
 
-# Check whether version numbers in snap / clash-{prelude,lib,ghc} are the same
+# Check whether version numbers in
+# clash-{prelude{,-hedgehog},lib{,-hedgehog},ghc,cores} are the same
 cabal_files="clash-prelude/clash-prelude.cabal clash-prelude-hedgehog/clash-prelude-hedgehog.cabal clash-lib/clash-lib.cabal clash-lib-hedgehog/clash-lib-hedgehog.cabal clash-ghc/clash-ghc.cabal clash-cores/clash-cores.cabal"
-snapcraft_file=".ci/bindist/linux/snap/snap/snapcraft.yaml"
-versions=$(grep "^[vV]ersion" $cabal_files $snapcraft_file | grep -Eo '[0-9]+(\.[0-9]+)+')
+versions=$(grep "^[vV]ersion" $cabal_files | grep -Eo '[0-9]+(\.[0-9]+)+')
 
-if [[ $(echo $versions | tr ' ' '\n' | wc -l) == 7 ]]; then
+if [[ $(echo $versions | tr ' ' '\n' | wc -l) == 6 ]]; then
     if [[ $(echo $versions | tr ' ' '\n' | uniq | wc -l) != 1 ]]; then
         echo "Expected all distributions to have the same version number. Found: $versions"
         exit 1;
@@ -31,7 +31,7 @@ version=$(echo $versions | tr ' ' '\n' | head -n 1)
 tag_version=${CI_COMMIT_TAG:1:${#CI_COMMIT_TAG}-1}  # Strip first character (v0.99 -> 0.99)
 
 # `tag_version` is set when a tag has been created on GitHub. We use this to
-# trigger a release pipeline (release to Snap / Hackage).
+# trigger a release pipeline (release to Hackage).
 if [[ ${tag_version} != "" ]]; then
 
     if [[ ${version} != ${tag_version} ]]; then

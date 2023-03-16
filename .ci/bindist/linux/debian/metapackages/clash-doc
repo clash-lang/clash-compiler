@@ -1,9 +1,0 @@
-Section: Haskell
-Priority: optional
-Homepage: https://clash-lang.org
-Standards-Version: 3.9.2
-
-Package: clash-doc
-Maintainer: QBayLogic B.V. <devops@qbaylogic.com>
-Depends: libghc-clash-prelude-doc, libghc-clash-lib-doc, libghc-clash-ghc-doc
-Description: Clash documentation metapackage
