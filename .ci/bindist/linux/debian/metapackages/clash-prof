@@ -1,9 +1,0 @@
-Section: Haskell
-Priority: optional
-Homepage: https://clash-lang.org
-Standards-Version: 3.9.2
-
-Package: clash-prof
-Maintainer: QBayLogic B.V. <devops@qbaylogic.com>
-Depends: libghc-clash-prelude-prof, libghc-clash-lib-prof, libghc-clash-ghc-prof
-Description: Clash profiling metapackage

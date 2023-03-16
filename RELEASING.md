@@ -1,21 +1,15 @@
 # Clash's release process
 
-Clash actively deploys to two platforms:
-
- * [Hackage](http://hackage.haskell.org/package/clash-prelude), a source
-   distribution platform for Haskell applications.
- * [The Snap Store](https://snapcraft.io/clash), a binary distribution platform
-   for most Linux distributions.
+Clash actively deploys to one platform: [Hackage](http://hackage.haskell.org/package/clash-prelude),
+a source distribution platform for Haskell applications.
 
 Development happens on the `master` branch. Released versions live in `1.0`,
 `1.2`, etc. Changes made to these branches automatically get published every
 night. This is achieved through [GitLab Pipeline Schedules](https://gitlab.com/clash-lang/clash-compiler/pipeline_schedules).
 (You need admin access to see that page.) At the time of writing it gets
-triggered on `master` and `1.2`. For Hackage, a release candidate gets pushed out
+triggered on `master` and `1.6`. A release candidate gets pushed out
 with the version numbers in the various cabal files. Candidates can be previewed
 on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/candidates/).
-For the Snap Store, an _edge_ release gets made when triggered on `master`. When
-triggered on any other branch a _beta_ release gets made.
 
 ## Branches overview
 * `master`: development branch
@@ -33,7 +27,6 @@ triggered on any other branch a _beta_ release gets made.
   * `clash-lib-hedgehog/clash-lib-hedgehog.cabal`
   * `clash-ghc/clash-ghc.cabal`
   * `clash-cores/clash-cores.cabal`
-  * `.ci/bindist/linux/snap/snap/snapcraft.yaml`
   * `docs/conf.py`
 2. Update the CHANGELOG (see changelog/README.md).
 3. Create a release branch named after the major version of Clash you're trying to
@@ -46,13 +39,13 @@ triggered on any other branch a _beta_ release gets made.
 6. Ask someone with admin permissions on GitLab to create a new nightly schedule
    and trigger a test release build on [GitLab CI](https://gitlab.com/clash-lang/clash-compiler/pipeline_schedules).
    The new schedule should be the same as the old one, but targeting the new
-   release branch. Verify that both Snap and Hackage release fine, and preview
-   their releases.
-     * [Preview on Hackage](http://hackage.haskell.org/package/clash-prelude/candidates/)
-     * [Preview on Snap](https://snapcraft.io/clash)
+   release branch. Verify that the Hackage release deploys well, and preview
+   the release. [Preview on Hackage](http://hackage.haskell.org/package/clash-prelude/candidates/)
 7. Write release notes for: Twitter, LinkedIn, and clash-lang.org.
 8. Create a release on [GitHub's new release page](https://github.com/clash-lang/clash-compiler/releases/new)
-9. After the release is on Hackage: run `changelog/comment-gh.py` and execute the commands it lists. This will inform users subscribed to specific issues that a fix for their issue is now in a released version.
+9. After the release is on Hackage: run `changelog/comment-gh.py` and execute
+   the commands it lists. This will inform users subscribed to specific issues
+   that a fix for their issue is now in a released version.
 10. Update the [starter projects](https://github.com/clash-lang/stack-templates/)
 11. Update these docs if anything is missing :-)
 12. Enjoy!
@@ -65,18 +58,16 @@ triggered on any other branch a _beta_ release gets made.
   * `clash-lib-hedgehog/clash-lib-hedgehog.cabal`
   * `clash-ghc/clash-ghc.cabal`
   * `clash-cores/clash-cores.cabal`
-  * `.ci/bindist/linux/snap/snap/snapcraft.yaml`
   * `docs/conf.py`
 2. Update the CHANGELOG (see changelog/README.md).
 3. Ask someone with admin permissions on GitLab to trigger a nightly schedule,
-   or simply wait a day. Verify that both Snap and Hackage release fine, and
-   preview heir releases.
-     * [Preview on Hackage](http://hackage.haskell.org/package/clash-prelude/candidates/)
-     * [Preview on Snap](https://snapcraft.io/clash)
-
+   or simply wait a day. Verify that the Hackage release deploys well, and
+   preview the release. [Preview on Hackage](http://hackage.haskell.org/package/clash-prelude/candidates/)
 4. Create a release on [GitHub's new release page](https://github.com/clash-lang/clash-compiler/releases/new)
 5. Update the [starter projects](https://github.com/clash-lang/stack-templates/)
 6. Cherry-pick commit made in (2) to `master`
-7. After the release is on Hackage: run `changelog/comment-gh.py` and execute the commands it lists. This will inform users subscribed to specific issues that a fix for their issue is now in a released version.
+7. After the release is on Hackage: run `changelog/comment-gh.py` and execute
+   the commands it lists. This will inform users subscribed to specific issues
+   that a fix for their issue is now in a released version.
 8. Update these docs if anything is missing :-)
 9. Enjoy!
