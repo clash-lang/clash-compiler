@@ -218,7 +218,7 @@ instance UnsafeSend CallbackReason where
     AfterDelay mObject time -> do
       let object = maybe nullObject coerce mObject
       ctime <- pokeSend time
-      pure (7, object, ctime, FFI.nullPtr)
+      pure (9, object, ctime, FFI.nullPtr)
 
     EndOfCompile ->
       pure (10, nullObject, FFI.nullPtr, FFI.nullPtr)
@@ -303,7 +303,7 @@ instance UnsafeSend CallbackReason where
     NbaSynch mObject time -> do
       let object = maybe nullObject coerce mObject
       ctime <- pokeSend time
-      pure (31, object, ctime, FFI.nullPtr)
+      pure (30, object, ctime, FFI.nullPtr)
 
     AtEndOfSimTime mObject time -> do
       let object = maybe nullObject coerce mObject

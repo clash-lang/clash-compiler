@@ -207,7 +207,7 @@ instance UnsafeSend Value where
 #endif
 
     StringVal size str -> do
-      cvalue <- CStringVal <$> unsafeSend str
+      cvalue <- CStringVal <$> unsafeSend (ensureNullTerminated str)
       pure (CValueSized cvalue (snatToNum size))
 
     TimeVal time -> do
@@ -241,7 +241,7 @@ instance Send Value where
 #endif
 
     StringVal size str -> do
-      cvalue <- CStringVal <$> send str
+      cvalue <- CStringVal <$> send (ensureNullTerminated str)
       pure (CValueSized cvalue (snatToNum size))
 
     TimeVal time -> do

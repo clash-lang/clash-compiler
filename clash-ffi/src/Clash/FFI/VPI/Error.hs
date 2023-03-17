@@ -87,7 +87,7 @@ instance UnsafeReceive ErrorInfo where
 instance Receive ErrorInfo where
   receive cerror = do
     state <- receive (cerrorState cerror)
-    level <- receive (cerrorState cerror)
+    level <- receive (cerrorLevel cerror)
     msg <- receive (cerrorMessage cerror)
     prod <- receive (cerrorProduct cerror)
     code <- receive (cerrorCode cerror)

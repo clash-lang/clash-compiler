@@ -19,6 +19,7 @@ import Data.ByteString (ByteString)
 import Foreign.Storable (Storable)
 import GHC.Stack (HasCallStack)
 
+import Clash.FFI.View (ensureNullTerminated)
 import Clash.FFI.Monad (SimCont)
 import Clash.FFI.VPI.Iterator
 import Clash.FFI.VPI.Object
@@ -49,7 +50,8 @@ topModules = iterateAll @_ @Object ObjModule Nothing
 -- exception if no top-level module with the given name is found in the design.
 --
 findTopModule :: HasCallStack => ByteString -> SimCont o Module
-findTopModule name = unsafeSendChildRef @_ @Object name Nothing
+findTopModule name =
+  unsafeSendChildRef @_ @Object (ensureNullTerminated name) Nothing
 
 -- | Iterate all the nets in a module. This will iterate all nets at once, for
 -- large designs it may be more efficient to use

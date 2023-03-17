@@ -12,14 +12,9 @@ maintainer:         devops@qbaylogic.com
 copyright:          Copyright © 2022, QBayLogic B.V.
 category:           Hardware
 
-library
+common common-options
   default-language: Haskell2010
   default-extensions:
-    BangPatterns
-    DeriveAnyClass
-    DeriveGeneric
-    DerivingStrategies
-    GeneralizedNewtypeDeriving
     ScopedTypeVariables
     TypeApplications
   ghc-options:
@@ -29,12 +24,28 @@ library
     bytestring              >= 0.10 && < 0.12,
     clash-prelude           >= 1.2  && < 1.8,
     deepseq                 >= 1.4  && < 1.5,
+  include-dirs: include
+  includes: vpi_user.h
+  cpp-options:
+    -DVERILOG=1
+    -DIVERILOG=1
+    -DVERILOG_2001=1
+    -DVERILOG_2005=1
+    -DVPI_VECVAL=1
+
+library
+  import: common-options
+  default-extensions:
+    BangPatterns
+    DeriveAnyClass
+    DeriveGeneric
+    DerivingStrategies
+    GeneralizedNewtypeDeriving
+  build-depends:
     derive-storable         >= 0.3  && < 0.4,
     derive-storable-plugin  >= 0.2  && < 0.3,
     mtl                     >= 2.2  && < 2.3,
   hs-source-dirs: src
-  include-dirs: include
-  includes: vpi_user.h
   c-sources: cbits/entry_vpi.c
   exposed-modules:
     Clash.FFI.Monad
@@ -64,9 +75,34 @@ library
     Clash.FFI.VPI.Port
     Clash.FFI.VPI.Port.Direction
     Clash.FFI.VPI.Reg
-  cpp-options:
-    -DVERILOG=1
-    -DIVERILOG=1
-    -DVERILOG_2001=1
-    -DVERILOG_2005=1
-    -DVPI_VECVAL=1
+
+executable ffi-interface-tests
+  import: common-options
+  default-extensions:
+    DataKinds
+    RankNTypes
+    LambdaCase
+    ViewPatterns
+    TupleSections
+    ImplicitParams
+    FlexibleContexts
+    FlexibleInstances
+    MultiParamTypeClasses
+    ExistentialQuantification
+  hs-source-dirs: tests
+  main-is: Main.hs
+  other-modules:
+    Clash.FFI.Test
+    Clash.FFI.Test.Instances
+  include-dirs: tests/cbits
+  c-sources:
+    tests/cbits/VPI.c
+    tests/cbits/Test.c
+    tests/cbits/Pipe.c
+    tests/cbits/Print.c
+  build-depends:
+    , clash-ffi
+    , smallcheck
+    , tasty
+    , tasty-hunit
+    , tasty-smallcheck

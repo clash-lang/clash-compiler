@@ -8,6 +8,7 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 
 #if defined(VERILOG_2005) && defined(VPI_VECVAL)
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeApplications #-}
@@ -23,11 +24,12 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 
 module Clash.FFI.VPI.Object.Value.Vector
   ( CVector(..)
+  , bitVectorToVector
+  , vectorToBitVector
   ) where
 
 import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.Bits (clearBit, setBit, testBit)
-import qualified Data.List as List (replicate)
 import           Data.Proxy
 import           Foreign.C.Types (CInt)
 import qualified Foreign.Marshal.Array as FFI (peekArray)
@@ -75,43 +77,36 @@ vectorToCVectorList
   => KnownNat n
   => Vec n Scalar
   -> [CVector]
-vectorToCVectorList vec =
-  let
-      size = fromIntegral (natVal (Proxy @n))
-      len  = div (size - 1) 32 + 1
-   in
-      -- Default to all bits being undefined.
-      go (List.replicate len (CVector (-1) (-1))) (size - 1) vec
+vectorToCVectorList vec = go [] 0
  where
-  go :: forall m. [CVector] -> Int -> Vec m Scalar -> [CVector]
-  go acc n = \case
-    Nil ->
-      acc
+  size :: Int
+  size = fromIntegral $ natVal (Proxy @n)
 
-    Cons x xs ->
-      go (replaceScalar n x acc) (n - 1) xs
+  replaceScalar :: Int -> Scalar -> CVector -> CVector
+  replaceScalar ix s (CVector as bs) =
+    let
+      (aMod, bMod) =
+        case s of
+          S0 -> (clearBit, clearBit)
+          SL -> (clearBit, clearBit)
+          S1 -> (  setBit, clearBit)
+          SH -> (  setBit, clearBit)
+          SZ -> (clearBit,   setBit)
+          SX -> (  setBit,   setBit)
+          S_ -> (  setBit,   setBit)
+    in
+      CVector (aMod as ix) (bMod bs ix)
 
-  replaceScalar :: HasCallStack => Int -> Scalar -> [CVector] -> [CVector]
-  replaceScalar ix s [CVector as bs]
-    | ix < 32
-    = let (f, g) = case s of
-                     S0 -> (clearBit, clearBit)
-                     S1 -> (setBit,   clearBit)
-                     SZ -> (clearBit, setBit)
-                     SX -> (setBit,   setBit)
-                     SH -> (setBit,   clearBit)
-                     SL -> (clearBit, clearBit)
-                     S_ -> (setBit,   setBit)
-       in [CVector (f as ix) (g bs ix)]
-
-    | otherwise
-    = error "replaceScalar: Index out of range"
-
-  replaceScalar ix s (x:xs) =
-    x : replaceScalar (ix - 32) s xs
-
-  replaceScalar _ _ _ =
-    error "replaceScalar: Index and list not consistent"
+  go :: [CVector] -> Int -> [CVector]
+  go a i =
+    let
+      new = CVector (-1) (-1)
+      upd = replaceScalar (i `mod` 32) (vec Vec.!! (size - i - 1))
+    in if
+      | i >= size       -> reverse a
+      | i `mod` 32 == 0 -> go (upd new : a ) $ i + 1
+      | x:xr <- a       -> go (upd   x : xr) $ i + 1
+      | otherwise       -> error "vectorToCVectorList"
 
 type instance CRepr (Vec _ Scalar) = CRepr [CVector]
 
@@ -127,24 +122,18 @@ cvectorListToVector
   => KnownNat n
   => [CVector]
   -> Vec n Scalar
-cvectorListToVector =
-  let size = fromIntegral (natVal (Proxy @n))
-   in go (Vec.repeat SX) size 0
+cvectorListToVector = go (Vec.repeat SX) 0
  where
-  go :: Vec n Scalar -> Int -> Int -> [CVector] -> Vec n Scalar
-  go acc size ix arr
-    | size == ix
-    = acc
+  size :: Int
+  size = fromIntegral $ natVal (Proxy @n)
 
-    | ix < 32
-    , [x] <- arr
-    = go (Vec.replace ix (getScalar ix x) acc) size (ix + 1) arr
-
-    | (_:xs) <- arr
-    = go acc (size - 32) 0 xs
-
-    | otherwise
-    = error "cvectorListToVector: Array is not the specified size"
+  go :: Vec n Scalar -> Int -> [CVector] -> Vec n Scalar
+  go acc ix arr
+    | ix >= size && length arr <= 1 = acc
+    | x:xr <- arr =
+        go (Vec.replace ix (getScalar (ix `mod` 32) x) acc) (ix + 1)
+          $ if (ix + 1) `mod` 32 == 0 then xr else x:xr
+    | otherwise = error "cvectorListToVector: Array is not the specified size"
 
   getScalar :: Int -> CVector -> Scalar
   getScalar ix (CVector as bs) =

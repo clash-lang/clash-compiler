@@ -3,13 +3,13 @@
 # This is just a minimalistic script for demonstrating the process of
 # running the clash-ffi example using the Icarus Verilog VVP runtime
 # engine. The script is not designed to work in any possible system
-# environment and may not work immediatly for you. It is intended to
-# serve as an easy starter instead. Adapt it too you needs if it's not
+# environment and may not work immediately for you. It is intended to
+# serve as an easy starter instead. Adapt it to your needs if it's not
 # working out-of-the-box for you.
 
 ###############################
 
-# adapt these variables, if the tools are not in your PATH already
+# Adjust these variables if the tools are not in your PATH already
 
 # Cabal
 # https://www.haskell.org/cabal

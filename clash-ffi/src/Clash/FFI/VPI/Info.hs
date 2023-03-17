@@ -5,6 +5,7 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- Used to improve the performance of derived instances.
 {-# OPTIONS_GHC -fplugin=Foreign.Storable.Generic.Plugin #-}
@@ -51,7 +52,7 @@ data CInfo = CInfo
 
 -- | Information about the simulator connected to over VPI. This includes the
 -- command line used to start the simulation tool. Depending on the simulator
--- this may include / remove arguments recognised by the simulator (i.e. it
+-- this may include / remove arguments recognized by the simulator (i.e. it
 -- will only contain other flags like RTS flags).
 --
 data Info = Info
@@ -64,20 +65,20 @@ data Info = Info
 type instance CRepr Info = CInfo
 
 instance UnsafeReceive Info where
-  unsafeReceive cinfo = do
+  unsafeReceive CInfo{..} = do
     -- When passing +RTS to some simulators, they may replace the whole
-    -- argument with NULL, so we check for that instead of using argc.
-    args <- unsafeReceiveArray0 FFI.nullPtr (cinfoArgv cinfo)
-    prod <- unsafeReceive (cinfoProduct cinfo)
-    ver  <- unsafeReceive (cinfoVersion cinfo)
+    -- argument with NULL, so we check in addition to argc.
+    args <- unsafeReceiveArray0 (fromEnum cinfoArgc) FFI.nullPtr cinfoArgv
+    prod <- unsafeReceive cinfoProduct
+    ver  <- unsafeReceive cinfoVersion
 
     pure (Info args prod ver)
 
 instance Receive Info where
-  receive cinfo = do
-    args <- receiveArray0 FFI.nullPtr (cinfoArgv cinfo)
-    prod <- receive (cinfoProduct cinfo)
-    ver  <- receive (cinfoVersion cinfo)
+  receive CInfo{..} = do
+    args <- receiveArray0 (fromEnum cinfoArgc) FFI.nullPtr cinfoArgv
+    prod <- receive cinfoProduct
+    ver  <- receive cinfoVersion
 
     pure (Info args prod ver)
 
