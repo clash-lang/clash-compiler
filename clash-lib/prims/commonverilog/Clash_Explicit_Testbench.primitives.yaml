@@ -5,3 +5,7 @@
       Enable dom'
     template: assign ~RESULT = 1'b1;
     workInfo: Always
+- BlackBox:
+    name: Clash.Explicit.Testbench.seClockToDiffClock
+    kind: Expression
+    template: '{~ARG[0], ~ ~ARG[0]}'

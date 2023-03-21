@@ -26,6 +26,7 @@ module Clash.Explicit.Testbench
   , tbClockGen
   , tbEnableGen
   , tbSystemClockGen
+  , seClockToDiffClock
 
   , outputVerifier
   , outputVerifier'
@@ -450,6 +451,29 @@ tbSystemClockGen
   :: Signal System Bool
   -> Clock System
 tbSystemClockGen = tbClockGen
+
+-- | Convert a single-ended clock to a differential clock
+--
+-- The 'tbClockGen' function generates a single-ended clock. This function will
+-- output the two phases of a differential clock corresponding to that
+-- single-ended clock.
+--
+-- This function is only meant to be used in the /testBench/ function, not to
+-- create a differential output in hardware.
+--
+-- Example:
+--
+-- @
+-- (clkP, clkN) = seClockToDiffClock $ tbClockGen (not \<\$\> done)
+-- @
+seClockToDiffClock ::
+  -- | Single-ended input
+  Clock dom ->
+  -- | (Positive phase, negative phase)
+  (Clock dom, Clock dom)
+seClockToDiffClock clk = (clk, clk)
+{-# NOINLINE seClockToDiffClock #-}
+{-# ANN seClockToDiffClock hasBlackBox #-}
 
 -- | Cross clock domains in a way that is unsuitable for hardware but good
 -- enough for simulation.
