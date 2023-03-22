@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2019, Myrtle Software Ltd.
-                     2020-2022, QBayLogic B.V.
+                     2020-2023, QBayLogic B.V.
                      2021, Myrtle.ai
                      2022, Google Inc
   License     :  BSD2 (see the file LICENSE)
@@ -656,9 +656,10 @@ fromBV
   TExpr ->
   -- | Converted BitVector expression
   State (BlockState backend) TExpr
-fromBV resultName resultType TExpr{eex, ety = BitVector _} =
-  assign resultName (TExpr resultType (FromBv Nothing resultType eex))
-
+fromBV resultName resultType e@TExpr{eex, ety = BitVector _} =
+  case resultType of
+    BitVector{} -> pure e
+    _ -> assign resultName (TExpr resultType (FromBv Nothing resultType eex))
 fromBV _ _ TExpr{ety} = error $ "fromBV: expected BitVector, got: " <> show ety
 
 clog2 :: Num i => Integer -> i
