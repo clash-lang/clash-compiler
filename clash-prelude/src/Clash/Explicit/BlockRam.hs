@@ -425,42 +425,44 @@ module Clash.Explicit.BlockRam
   )
 where
 
-import           Clash.HaskellPrelude
+import Clash.HaskellPrelude
 
-import           Control.Exception      (catch, throw)
-import           Control.Monad          (forM_)
-import           Control.Monad.ST       (ST, runST)
-import           Control.Monad.ST.Unsafe (unsafeInterleaveST, unsafeIOToST, unsafeSTToIO)
-import           Data.Array.MArray      (newListArray)
-import qualified Data.List              as L
-import           Data.List.Infinite     (Infinite(..), (...))
-import           Data.Maybe             (isJust, fromMaybe)
-import           GHC.Arr
-  (STArray, unsafeReadSTArray, unsafeWriteSTArray)
-import qualified Data.Sequence          as Seq
-import           Data.Sequence          (Seq)
-import           Data.String.Interpolate(__i)
-import           GHC.Generics           (Generic)
-import           GHC.Stack              (HasCallStack, withFrozenCallStack)
-import           GHC.TypeLits           (KnownNat, type (^), type (<=))
-import           Unsafe.Coerce          (unsafeCoerce)
+import Control.Exception (catch, throw)
+import Control.Monad (forM_)
+import Control.Monad.ST (ST, runST)
+import Control.Monad.ST.Unsafe (unsafeInterleaveST, unsafeIOToST, unsafeSTToIO)
+import Data.Array.MArray (newListArray)
+import Data.List.Infinite (Infinite(..), (...))
+import Data.Maybe (isJust)
+import Data.Sequence (Seq)
+import Data.String.Interpolate (__i)
+import GHC.Arr (STArray, unsafeReadSTArray, unsafeWriteSTArray)
+import GHC.Generics (Generic)
+import GHC.Stack (HasCallStack, withFrozenCallStack)
+import GHC.TypeLits (KnownNat, type (^), type (<=))
+import Unsafe.Coerce (unsafeCoerce)
 
-import           Clash.Annotations.Primitive
+import Clash.Annotations.Primitive
   (Primitive(InlineYamlPrimitive), HDL(..), hasBlackBox)
-import           Clash.Class.Num        (SaturationMode(SatBound), satSucc)
-import           Clash.Explicit.Signal  (KnownDomain, Enable, register, fromEnable)
-import           Clash.Signal.Internal
-  (Clock(..), Reset, Signal (..), ClockAB (..), invertReset, (.&&.), mux,
-   clockTicks)
-import           Clash.Promoted.Nat     (SNat(..), natToNum)
-import           Clash.Signal.Bundle    (unbundle, bundle)
-import           Clash.Sized.Unsigned   (Unsigned)
-import           Clash.Sized.Index      (Index)
-import           Clash.Sized.Vector     (Vec, replicate, iterateI)
-import qualified Clash.Sized.Vector     as CV
-import           Clash.XException
-  (maybeIsX, NFDataX(deepErrorX), defaultSeqX, fromJustX, undefined,
-   XException (..), seqX, isX, errorX)
+import Clash.Class.Num (SaturationMode(SatBound), satSucc)
+import Clash.Explicit.BlockRam.Model (TdpbramModelConfig(..), tdpbramModel)
+import Clash.Explicit.Signal (KnownDomain, Enable, register, fromEnable)
+import Clash.Promoted.Nat (SNat(..))
+import Clash.Signal.Bundle (unbundle)
+import Clash.Signal.Internal
+  (Clock(..), Reset, Signal (..), invertReset, (.&&.), mux)
+import Clash.Sized.Index (Index)
+import Clash.Sized.Unsigned (Unsigned)
+import Clash.Sized.Vector (Vec, replicate, iterateI)
+import Clash.XException
+ (maybeIsX, NFDataX(deepErrorX), defaultSeqX, fromJustX, undefined,
+ XException (..), seqX, errorX)
+import Clash.XException.MaybeX (MaybeX(..), andX)
+
+import qualified Data.Sequence as Seq
+import qualified Data.List as L
+
+import qualified Clash.Sized.Vector as CV
 
 {- $tdpbram
 A true dual-port block RAM has two fully independent, fully functional access
@@ -1212,20 +1214,6 @@ trueDualPortBlockRam = \clkA clkB opA opB ->
     clkA (isOp <$> opA) (isRamWrite <$> opA) (ramOpAddr <$> opA) (fromJustX . ramOpWriteVal <$> opA)
     clkB (isOp <$> opB) (isRamWrite <$> opB) (ramOpAddr <$> opB) (fromJustX . ramOpWriteVal <$> opB)
 
-toMaybeX :: a -> MaybeX a
-toMaybeX a =
-  case isX a of
-    Left _ -> IsX
-    Right _ -> IsDefined a
-
-data MaybeX a = IsX | IsDefined !a
-
-data Conflict = Conflict
-  { cfRWA     :: !(MaybeX Bool) -- ^ Read/Write conflict for output A
-  , cfRWB     :: !(MaybeX Bool) -- ^ Read/Write conflict for output B
-  , cfWW      :: !(MaybeX Bool) -- ^ Write/Write conflict
-  , cfAddress :: !(MaybeX Int) }
-
 -- [Note: eta port names for trueDualPortBlockRam]
 --
 -- By naming all the arguments and setting the -fno-do-lambda-eta-expansion GHC
@@ -1445,10 +1433,10 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
         // end trueDualPortBlockRam
 |]) #-}
 
--- | Haskell model/primitive for 'trueDualPortBlockRam'.
+-- | Primitive for 'trueDualPortBlockRam'
 --
 trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
-  forall nAddrs domB domA a .
+  forall nAddrs domA domB a .
   ( HasCallStack
   , KnownNat nAddrs
   , KnownDomain domA
@@ -1478,154 +1466,19 @@ trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
 
   (Signal domA a, Signal domB a)
 trueDualPortBlockRam# clkA enA weA addrA datA clkB enB weB addrB datB =
-  ( startA :- outA
-  , startB :- outB )
+  tdpbramModel
+    TdpbramModelConfig
+      { tdpIsActiveWriteEnable = id
+      , tdpMergeWriteEnable = andX
+      , tdpUpdateRam = updateRam }
+    clkA enA addrA weA datA
+    clkB enB addrB weB datB
  where
-  (outA, outB) =
-    go
-      (Seq.fromFunction (natToNum @nAddrs) initElement)
-      (clockTicks clkA clkB)
-      (bundle (enA, weA, fromIntegral <$> addrA, datA))
-      (bundle (enB, weB, fromIntegral <$> addrB, datB))
-      startA startB
-
-  startA = deepErrorX $ "trueDualPortBlockRam: Port A: First value undefined"
-  startB = deepErrorX $ "trueDualPortBlockRam: Port B: First value undefined"
-
-  initElement :: Int -> a
-  initElement n =
-    deepErrorX ("Unknown initial element; position " <> show n)
-
-  unknownEnableAndAddr :: String -> String -> Int -> a
-  unknownEnableAndAddr enaMsg addrMsg n =
-    deepErrorX ("Write enable and address unknown; position " <> show n <>
-                "\nWrite enable error message: " <> enaMsg <>
-                "\nAddress error message: " <> addrMsg)
-
-  unknownAddr :: String -> Int -> a
-  unknownAddr msg n =
-    deepErrorX ("Write enabled, but address unknown; position " <> show n <>
-                "\nAddress error message: " <> msg)
-
-  getConflict :: Bool -> Bool -> Bool -> Int -> Bool -> Int -> Maybe Conflict
-  getConflict enA_ enB_ wenA addrA_ wenB addrB_ =
-    -- If port A or port B is writing on (potentially!) the same address,
-    -- there's a conflict
-    if sameAddr then Just conflict else Nothing
-   where
-    wenAX = toMaybeX wenA
-    wenBX = toMaybeX wenB
-
-    mergeX IsX b = b
-    mergeX a IsX = a
-    mergeX (IsDefined a) (IsDefined b) = IsDefined (a && b)
-
-    conflict = Conflict
-      { cfRWA     = if enB_ then wenBX else IsDefined False
-      , cfRWB     = if enA_ then wenAX else IsDefined False
-      , cfWW      = if enA_ && enB_ then mergeX wenAX wenBX else IsDefined False
-      , cfAddress = toMaybeX addrA_ }
-
-    sameAddr =
-      case (isX addrA_, isX addrB_) of
-        (Left _, _) -> True
-        (_, Left _) -> True
-        _           -> addrA_ == addrB_
-
-  writeRam :: Bool -> Int -> a -> Seq a -> (Maybe a, Seq a)
-  writeRam enable addr dat mem
-    | Left enaMsg <- enableUndefined
-    , Left addrMsg <- addrUndefined
-    = let msg = "Unknown enable and address" <>
-                "\nWrite enable error message: " <> enaMsg <>
-                "\nAddress error message: " <> addrMsg
-       in ( Just (deepErrorX msg)
-          , Seq.fromFunction (natToNum @nAddrs)
-                             (unknownEnableAndAddr enaMsg addrMsg) )
-    | Left enaMsg <- enableUndefined
-    = let msg = "Write enable unknown; position" <> show addr <>
-                "\nWrite enable error message: " <> enaMsg
-       in writeRam True addr (deepErrorX msg) mem
-    | enable
-    , Left addrMsg <- addrUndefined
-    = ( Just (deepErrorX "Unknown address")
-      , Seq.fromFunction (natToNum @nAddrs) (unknownAddr addrMsg) )
-    | enable
-    = (Just dat, Seq.update addr dat mem)
-    | otherwise
-    = (Nothing, mem)
-   where
-    enableUndefined = isX enable
-    addrUndefined = isX addr
-
-  go ::
-    Seq a ->
-    [ClockAB] ->
-    Signal domA (Bool, Bool, Int, a) ->
-    Signal domB (Bool, Bool, Int, a) ->
-    a -> a ->
-    (Signal domA a, Signal domB a)
-  go _ [] _ _ =
-    error "trueDualPortBlockRamModel#.go: `ticks` should have been an infinite list"
-  go ram0 (tick:ticks) as0 bs0 =
-    case tick of
-      ClockA -> goA
-      ClockB -> goB
-      ClockAB -> goBoth
-   where
-    (enA_, weA_, addrA_, datA_) :- as1 = as0
-    (enB_, weB_, addrB_, datB_) :- bs1 = bs0
-
-    goBoth prevA prevB = outA2 `seqX` outB2 `seqX` (outA2 :- as2, outB2 :- bs2)
-     where
-      conflict = getConflict enA_ enB_ weA_ addrA_ weB_ addrB_
-
-      (datA1_,datB1_) = case conflict of
-        Just Conflict{cfWW=IsDefined True} ->
-          ( deepErrorX "trueDualPortBlockRam: conflicting write/write queries"
-          , deepErrorX "trueDualPortBlockRam: conflicting write/write queries" )
-        Just Conflict{cfWW=IsX} ->
-          ( deepErrorX "trueDualPortBlockRam: conflicting write/write queries"
-          , deepErrorX "trueDualPortBlockRam: conflicting write/write queries" )
-        _ -> (datA_,datB_)
-
-      (wroteA,ram1) = writeRam weA_ addrA_ datA1_ ram0
-      (wroteB,ram2) = writeRam weB_ addrB_ datB1_ ram1
-
-      outA1 = case conflict of
-        Just Conflict{cfRWA=IsDefined True} ->
-          deepErrorX "trueDualPortBlockRam: conflicting read/write queries"
-        Just Conflict{cfRWA=IsX} ->
-          deepErrorX "trueDualPortBlockRam: conflicting read/write queries"
-        _ -> fromMaybe (ram0 `Seq.index` addrA_) wroteA
-
-      outB1 = case conflict of
-        Just Conflict{cfRWB=IsDefined True} ->
-          deepErrorX "trueDualPortBlockRam: conflicting read/write queries"
-        Just Conflict{cfRWB=IsX} ->
-          deepErrorX "trueDualPortBlockRam: conflicting read/write queries"
-        _ -> fromMaybe (ram0 `Seq.index` addrB_) wroteB
-
-      outA2 = if enA_ then outA1 else prevA
-      outB2 = if enB_ then outB1 else prevB
-      (as2,bs2) = go ram2 ticks as1 bs1 outA2 outB2
-
-    goA _ prevB | enA_ = out0 `seqX` (out0 :- as2, bs2)
-     where
-      (wrote, !ram1) = writeRam weA_ addrA_ datA_ ram0
-      out0 = fromMaybe (ram1 `Seq.index` addrA_) wrote
-      (as2, bs2) = go ram1 ticks as1 bs0 out0 prevB
-
-    goA prevA prevB = (prevA :- as2, bs2)
-      where
-        (as2,bs2) = go ram0 ticks as1 bs0 prevA prevB
-
-    goB prevA _ | enB_ = out0 `seqX` (as2, out0 :- bs2)
-     where
-      (wrote, !ram1) = writeRam weB_ addrB_ datB_ ram0
-      out0 = fromMaybe (ram1 `Seq.index` addrB_) wrote
-      (as2, bs2) = go ram1 ticks as0 bs1 prevA out0
-
-    goB prevA prevB = (as2, prevB :- bs2)
-     where
-       (as2,bs2) = go ram0 ticks as0 bs1 prevA prevB
+  updateRam :: Int -> MaybeX Bool -> a -> Seq a -> Seq a
+  updateRam addr writeEnable dat mem =
+    case writeEnable of
+      IsDefined False -> mem
+      IsDefined True -> Seq.update addr dat mem
+      IsX msg -> Seq.update addr dat $ deepErrorX $
+          "Write enable unknown; position" <> show addr <>
+        "\nWrite enable error message: " <> msg

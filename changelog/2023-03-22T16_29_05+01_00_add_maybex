@@ -1,0 +1,1 @@
+ADDED: Added `Clash.XException.MaybeX`, a data structure with smart constructors that can help programmers deal with `XException` values in their blackbox model implementations

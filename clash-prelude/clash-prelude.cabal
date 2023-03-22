@@ -208,6 +208,7 @@ Library
                       Clash.Explicit.BlockRam.Blob
                       Clash.Explicit.BlockRam.File
                       Clash.Explicit.BlockRam.Internal
+                      Clash.Explicit.BlockRam.Model
                       Clash.Explicit.DDR
                       Clash.Explicit.Mealy
                       Clash.Explicit.Moore
@@ -294,6 +295,7 @@ Library
 
                       Clash.XException
                       Clash.XException.Internal
+                      Clash.XException.MaybeX
                       Clash.XException.TH
 
                       Clash.Xilinx.ClockGen
@@ -428,6 +430,7 @@ test-suite unittests
                  Clash.Tests.DerivingDataReprTypes
                  Clash.Tests.Fixed
                  Clash.Tests.FixedExhaustive
+                 Clash.Tests.MaybeX
                  Clash.Tests.NFDataX
                  Clash.Tests.NumNewtypes
                  Clash.Tests.Ram
