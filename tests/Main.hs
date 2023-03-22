@@ -469,7 +469,16 @@ runClashTest = defaultMain $ clashTestRoot
         ]
       , clashTestGroup "Cores"
         [ clashTestGroup "Xilinx"
-          [ let _opts = def{ hdlTargets=[VHDL, Verilog]
+          [ runTest "TdpBlockRam" def
+            { -- Compiling with VHDL gives:
+              --   https://github.com/clash-lang/clash-compiler/issues/2446
+              hdlTargets = [Verilog]
+            , hdlLoad = [Vivado]
+            , hdlSim = [Vivado]
+            , clashFlags=["-fclash-hdlsyn", "Vivado"]
+            , buildTargets=BuildSpecific [ "normalWritesTB", "writeEnableWritesTB" ]
+            }
+          , let _opts = def{ hdlTargets=[VHDL, Verilog]
                            , hdlLoad=[Vivado]
                            , hdlSim=[Vivado]
                              -- addShortPLTB now segfaults :-(

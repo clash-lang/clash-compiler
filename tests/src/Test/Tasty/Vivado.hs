@@ -61,7 +61,7 @@ instance IsTest VivadoTest where
         -- ~/.Xilinx. https://support.xilinx.com/s/article/63253
         [("XILINX_LOCAL_USER_DATA", "no")]
       where re = either error id
-              (compile defaultCompOpt (ExecOption False) "^\\s*(@|(Error))")
+              (compile defaultCompOpt (ExecOption False) "^\\s*(@|(Error)|(FATAL_ERROR)|(The simulator has terminated in an unexpected manner))")
     runVivado workDir args =
       run optionSet (vivado workDir args) progressCallback
 

@@ -10,13 +10,20 @@ module Main where
 import Prelude
 import Test.Tasty
 
-import qualified Test.Cores.SPI as SPI
-import qualified Test.Cores.SPI.MultiSlave as Mul
-import qualified Test.Cores.UART as UART
-import qualified Test.Cores.Xilinx.DcFifo as Fifo
+import qualified Test.Cores.SPI
+import qualified Test.Cores.SPI.MultiSlave
+import qualified Test.Cores.UART
+import qualified Test.Cores.Xilinx.BlockRam
+import qualified Test.Cores.Xilinx.DcFifo
 
 tests :: TestTree
-tests = testGroup "Unittests" [SPI.tests, Mul.tests, UART.tests, Fifo.tests]
+tests = testGroup "Unittests"
+  [ Test.Cores.SPI.tests
+  , Test.Cores.SPI.MultiSlave.tests
+  , Test.Cores.UART.tests
+  , Test.Cores.Xilinx.DcFifo.tests
+  , Test.Cores.Xilinx.BlockRam.tests
+  ]
 
 main :: IO ()
 main = defaultMain tests
