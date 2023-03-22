@@ -27,6 +27,9 @@ let
         doctest-parallel =
          self.callCabal2nix "doctest-parallel" sources.doctest-parallel {};
 
+        prettyprinter-interp =
+         self.callCabal2nix "prettyprinter-interp" sources.prettyprinter-interp {};
+
         tasty-hedgehog =
          self.callCabal2nix "tasty-hedgehog" sources.tasty-hedgehog {};
 

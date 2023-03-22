@@ -25,6 +25,7 @@ import Control.Monad.State
 import Data.Monoid (Ap(getAp))
 import qualified Data.String.Interpolate as I
 import Data.Text.Prettyprint.Doc.Extra
+import qualified Prettyprinter.Interpolate as I
 
 import qualified Data.Text as TextS
 import Data.Text.Extra (showt)
@@ -176,7 +177,7 @@ altpllQsysTemplate bbCtx = case bbInputs bbCtx of
       -- "altpll" IP. Module parameters were then stripped on a trial-and-error
       -- basis to get a template that has the minimal number of parameters, but
       -- still has the desired, working, configuration.
-      bbText = [I.__i|
+      bbText = [I.__di|
         <?xml version="1.0" encoding="UTF-8"?>
         <system name="$${FILENAME}">
           <module
@@ -277,7 +278,7 @@ alteraPllQsysTemplate bbCtx = case bbInputs bbCtx of
         ]
 
       -- See Note [QSys file templates] on how this qsys template was derived.
-      bbText = [I.__i|
+      bbText = [I.__di|
         <?xml version="1.0" encoding="UTF-8"?>
         <system name="$${FILENAME}">
         <module

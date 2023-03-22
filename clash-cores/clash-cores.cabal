@@ -111,6 +111,7 @@ library
     clash-lib,
     mtl                     >= 2.1.1 && < 2.3,
     prettyprinter           >= 1.2.0.1  && < 1.8,
+    prettyprinter-interp    ^>= 0.2,
     reducers                >= 3.12.2 && < 4.0,
     text                    >= 1.2.2 && < 1.3
 
