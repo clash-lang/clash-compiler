@@ -20,7 +20,7 @@ module Clash.FFI.VPI.Object.Time
   ) where
 
 import           Control.Exception (Exception)
-import           Data.Bits ((.|.), unsafeShiftL, unsafeShiftR)
+import           Data.Bits ((.|.), (.&.), unsafeShiftL, unsafeShiftR)
 import           Data.Int (Int64)
 import           Foreign.C.Types (CDouble(..), CInt(..), CUInt(..))
 import           Foreign.Storable.Generic (GStorable)
@@ -111,8 +111,8 @@ type instance CRepr Time = CTime
 instance Send Time where
   send = \case
     SimTime int ->
-     let high = fromIntegral ((int `unsafeShiftR` 32) .|. 0xffffffff)
-         low  = fromIntegral (int .|. 0xffffffff)
+     let high = fromIntegral ((int `unsafeShiftR` 32) .&. 0xffffffff)
+         low  = fromIntegral (int .&. 0xffffffff)
        in CTime <$> send Sim <*> pure high <*> pure low <*> pure 0.0
 
     RealTime real ->

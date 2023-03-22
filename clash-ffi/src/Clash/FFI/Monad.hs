@@ -4,6 +4,8 @@ License:      BSD2 (see the file LICENSE)
 Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
+{-# LANGUAGE CPP #-}
+
 module Clash.FFI.Monad
   ( SimCont
   , SimAction
@@ -32,6 +34,15 @@ import qualified Foreign.Ptr as FFI (nullPtr)
 import           Foreign.Storable (Storable)
 import qualified Foreign.Storable as FFI (peek)
 import           GHC.Stack (HasCallStack)
+
+#if MIN_VERSION_base(4,9,0)
+#ifdef MIN_VERSION_GLASGOW_HASKELL
+#if MIN_VERSION_GLASGOW_HASKELL(8,8,4,0)
+#else
+import Control.Monad.Fail (MonadFail)
+#endif
+#endif
+#endif
 
 {-
 NOTE [continuation-based API]
@@ -69,17 +80,22 @@ same way, e.g.
 -- 'runSimAction'.
 --
 newtype SimCont o i = SimCont (ContT o IO i)
-  deriving newtype (Applicative, Functor, Monad, MonadCont, MonadIO)
+  deriving newtype
+    ( Applicative, Functor, Monad, MonadCont, MonadIO
+#if MIN_VERSION_base(4,9,0)
+    , MonadFail
+#endif
+    )
 
 -- | The type of an VPI "main" action run in @clash-ffi@. For the more general
 -- type of FFI computations, use 'SimCont'.
 --
-type SimAction = SimCont () ()
+type SimAction a = SimCont a a
 
 -- | Run a VPI "main" action. See 'SimAction' and 'SimCont' for more
 -- information.
 --
-runSimAction :: SimAction -> IO ()
+runSimAction :: SimAction a -> IO a
 runSimAction (SimCont cont) = Cont.runContT cont pure
 
 -- | Lift a continuation into a simulation FFI action.

@@ -19,10 +19,11 @@ module Clash.FFI.VPI.Object.Value.Parse
 import           Control.Exception (Exception)
 import qualified Control.Monad as Monad (foldM)
 import qualified Control.Monad.IO.Class as IO (liftIO)
+import           Data.Bits (shiftL)
 import           Data.Char (toLower)
+import           Data.Function (fix)
 import           Data.Typeable (Typeable)
 import           Foreign.C.String (CString)
-import qualified Foreign.C.String as FFI (peekCString)
 import           Foreign.C.Types (CInt)
 import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
 import           GHC.TypeNats (KnownNat)
@@ -32,6 +33,7 @@ import           Clash.Class.BitPack
 import           Clash.Sized.BitVector (BitVector)
 import           Clash.XException (deepErrorX)
 
+import           Clash.FFI.View (peekCStringBound)
 import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim
 import           Clash.FFI.VPI.Object.Value.Format (ValueFormat(..))
@@ -64,9 +66,9 @@ parseBinStr
   => CInt
   -> CString
   -> SimCont o (BitVector n)
-parseBinStr size bin = do
-  str <- IO.liftIO (FFI.peekCString bin)
-  let is = [size - 1, size - 2 .. 0]
+parseBinStr bitSize bin = do
+  let is = [bitSize - 1, bitSize - 2 .. 0]
+  str <- IO.liftIO $ peekCStringBound (fromEnum bitSize) bin
 
   let go acc (i, x) =
         case x of
@@ -126,9 +128,10 @@ parseOctStr
   => CInt
   -> CString
   -> SimCont o (BitVector n)
-parseOctStr size oct = do
-  str <- IO.liftIO (FFI.peekCString oct)
-  let is = [0, 3 .. size - 1]
+parseOctStr bitSize oct = do
+  let bound = bitSize `div` 3 + if bitSize `mod` 3 == 0 then 0 else 1
+      is = [0, 3 .. bitSize - 1]
+  str <- IO.liftIO $ peekCStringBound (fromEnum bound) oct
 
   let go acc (i, x) =
         case x of
@@ -152,10 +155,10 @@ parseOctStr size oct = do
   parse str
  where
    replaceSlice ~(x, y, z) i
-     | i == size - 1
+     | i == bitSize - 1
      = replaceBit i z
 
-     | i == size - 2
+     | i == bitSize - 2
      = replaceBit (i + 1) y . replaceBit i z
 
      | otherwise
@@ -168,12 +171,17 @@ parseDecStr
   => CInt
   -> CString
   -> SimCont o (BitVector n)
-parseDecStr _ dec = do
-  str <- IO.liftIO (FFI.peekCString dec)
+parseDecStr bitSize dec = do
+  let bound = fromInteger
+        $ fix (\f a x -> if x < 10 then a else f (a + 1) $ div x 10) 1
+        $ shiftL (1 :: Integer)
+        $ fromEnum bitSize
+  str <- IO.liftIO $ peekCStringBound bound dec
 
   -- I don't think you can have X or Z in the decimal strings, although the
   -- standard doesn't mention you can have x or z here either...
   case str of
+    ""  -> pure (fromInteger 0)
     "x" -> pure (deepErrorX "parseDecStr: x")
     "z" -> pure (deepErrorX "parseDecStr: z")
     _   -> maybe
@@ -189,9 +197,10 @@ parseHexStr
   => CInt
   -> CString
   -> SimCont o (BitVector n)
-parseHexStr size hex = do
-  str <- IO.liftIO (FFI.peekCString hex)
-  let is = [0, 4 .. size - 1]
+parseHexStr bitSize hex = do
+  let bound = bitSize `div` 4 + if bitSize `mod` 4 == 0 then 0 else 1
+      is = [0, 4 .. bitSize - 1]
+  str <- IO.liftIO $ peekCStringBound (fromEnum bound) hex
 
   let go acc (i, x) =
         case toLower x of
@@ -226,13 +235,13 @@ parseHexStr size hex = do
   parse str
  where
   replaceSlice ~(w, x, y, z) i
-    | i == size - 1
+    | i == bitSize - 1
     = replaceBit i z
 
-    | i == size - 2
+    | i == bitSize - 2
     = replaceBit (i + 1) y . replaceBit i z
 
-    | i == size - 3
+    | i == bitSize - 3
     = replaceBit (i + 2) x . replaceBit (i + 1) y . replaceBit i z
 
     | otherwise

@@ -27,22 +27,25 @@ module Clash.FFI.View
   , unsafeSendString
   , sendString
   , receiveString
+  , peekCStringBound
+  , ensureNullTerminated
   ) where
 
 import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.ByteString (ByteString)
-import qualified Data.ByteString as BS (length, packCString)
+import qualified Data.ByteString as BS (length, packCString, null, last, snoc)
 import qualified Data.ByteString.Unsafe as BS
 import           Data.Typeable (Typeable)
 import           Foreign.C.String (CString)
 import qualified Foreign.C.String as FFI
+import           Foreign.C.Types (CChar)
 import qualified Foreign.Marshal.Alloc as FFI (mallocBytes)
 import qualified Foreign.Marshal.Array as FFI
 import qualified Foreign.Marshal.Utils as FFI (copyBytes)
 import           Foreign.Ptr (Ptr)
 import qualified Foreign.Ptr as FFI (nullPtr)
-import           Foreign.Storable (Storable)
-import qualified Foreign.Storable as FFI (peek, poke)
+import           Foreign.Storable (Storable, sizeOf)
+import qualified Foreign.Storable as FFI (peek, poke, peekElemOff)
 import           GHC.Stack (HasCallStack)
 
 import           Clash.FFI.Monad (SimCont)
@@ -212,32 +215,74 @@ peekReceive
 peekReceive ptr =
   IO.liftIO (FFI.peek ptr) >>= receive
 
--- | Unsafely receive an array of values, with the end of the array marked by
--- the given final element. Each element of the array is unsafely received.
---
+-- | Unsafely receive an array of values, with the end of the array
+-- marked by the given final element. The search for the marker is
+-- bounded by 'bound'. Each element of the array is unsafely received.
 unsafeReceiveArray0
   :: (UnsafeReceive a, Eq (CRepr a), Storable (CRepr a), Typeable b)
-  => CRepr a
+  => Int
+  -> CRepr a
   -> Ptr (CRepr a)
   -> SimCont b [a]
-unsafeReceiveArray0 end ptr =
-  IO.liftIO (FFI.peekArray0 end ptr) >>= traverse unsafeReceive
+unsafeReceiveArray0 bound end ptr =
+  IO.liftIO (boundedPeekArray0 bound end ptr) >>= traverse unsafeReceive
 
--- | Safely receive an array of values, with the end of the array marked by
--- the given final element. The caller is responsible for deallocating the
+-- | Safely receive an array of values, with the end of the array
+-- marked by the given final element. The search for the marker is
+-- bounded by 'bound'. The caller is responsible for deallocating the
 -- elements of the array if necessary.
---
 receiveArray0
   :: (Receive a, Eq (CRepr a), Storable (CRepr a), Typeable b)
-  => CRepr a
+  => Int
+  -> CRepr a
   -> Ptr (CRepr a)
   -> SimCont b [a]
-receiveArray0 end ptr =
-  IO.liftIO (FFI.peekArray0 end ptr) >>= traverse receive
+receiveArray0 bound end ptr =
+  IO.liftIO (boundedPeekArray0 bound end ptr) >>= traverse receive
 
--- | Safely receive a string. Users are recommended to use 'ByteString' instead
--- which supports safe and unsafe sending / receiving.
---
+-- | Variant of 'Foreign.Marshal.Array.lengthArray0' using an upper
+-- bound on the elements when searching for the terminator.
+boundedLengthArray0
+  :: (Storable a, Eq a)
+  => Int
+  -> a
+  -> Ptr a -> IO Int
+boundedLengthArray0 bound marker ptr = loop 0
+  where
+    loop i
+      | i >= bound = return bound
+      | otherwise = do
+          val <- FFI.peekElemOff ptr i
+          if val == marker then return i else loop (i+1)
+
+-- | Variant of 'Foreign.Marshal.Array.peekArray0' using an upper
+-- bound on the elements when searching for the terminator.
+boundedPeekArray0
+  :: (Storable a, Eq a)
+  => Int
+  -> a
+  -> Ptr a
+  -> IO [a]
+boundedPeekArray0 bound marker ptr = do
+  size <- boundedLengthArray0 bound marker ptr
+  FFI.peekArray size ptr
+
+-- | Variant of 'Foreign.C.String.peekCString' using an upper bound on the
+-- elements when searching for the NUL terminator.
+peekCStringBound :: Int -> CString -> IO String
+peekCStringBound bound cp = do
+  let nNL = (0 :: CChar)
+  sz <- boundedLengthArray0 bound nNL cp
+  FFI.peekCStringLen (cp, sz * sizeOf nNL)
+
+-- | Safely receive a string. Users are recommended to use
+-- 'ByteString' instead which supports safe and unsafe sending /
+-- receiving.
 receiveString :: CString -> SimCont b String
 receiveString =
   IO.liftIO . FFI.peekCString
+
+-- | Ensure that the given 'ByteString' is a null-terminated 'ByteString'
+ensureNullTerminated :: ByteString -> ByteString
+ensureNullTerminated bs =
+  if not (BS.null bs) && BS.last bs == 0 then bs else BS.snoc bs 0

@@ -133,6 +133,17 @@ suite:cores:
     - local
     - vivado-2022.1-standard
 
+ffi:interface-tests:
+  extends: .test-cache-local
+  script:
+    - ./dist-newstyle/build/*/*/clash-ffi-*/x/ffi-interface-tests/build/ffi-interface-tests/ffi-interface-tests --smallcheck-max-count 2000
+
+ffi:example:
+  extends: .test-cache-local
+  script:
+    - cabal build clash # ensure clash has been built (avoids some legacy cabal issue)
+    - cd clash-ffi/example && ./run-iverilog.sh
+
 
 # Tests run on local fast machines with Vivado installed. We only run these at night
 # to save resources - as Vivado is quite slow to execute.

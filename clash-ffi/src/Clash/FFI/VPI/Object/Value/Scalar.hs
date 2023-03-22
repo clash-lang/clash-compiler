@@ -44,7 +44,7 @@ data Scalar
   | SH -- Weak 1
   | SL -- Weak 0
   | S_ -- Don't care
-  deriving stock (Show)
+  deriving stock (Show, Eq)
 
 type instance CRepr Scalar = CInt
 

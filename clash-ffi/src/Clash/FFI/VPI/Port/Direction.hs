@@ -31,6 +31,11 @@ data Direction
   -- ^ An output port.
   | InOut
   -- ^ A bidirectional port.
+  | MixedIO
+  -- ^ A mixed IO port.
+  | NoDirection
+  -- ^ No direction.
+  deriving stock (Show)
 
 -- | An exception thrown when decoding a port direction if an invalid value is
 -- given for the C enum that specifies the constructor of 'Direction'.
@@ -55,4 +60,6 @@ instance Receive Direction where
     1 -> pure Input
     2 -> pure Output
     3 -> pure InOut
+    4 -> pure MixedIO
+    5 -> pure NoDirection
     n -> Sim.throw (UnknownDirection n callStack)

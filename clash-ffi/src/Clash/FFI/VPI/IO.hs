@@ -22,7 +22,7 @@ import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
 
 import           Clash.FFI.Monad (SimCont)
 import qualified Clash.FFI.Monad as Sim (throw)
-import           Clash.FFI.View (unsafeSend)
+import           Clash.FFI.View (unsafeSend, ensureNullTerminated)
 
 foreign import ccall "vpi_user.h vpi_printf"
   c_vpi_printf :: CString -> IO CInt
@@ -37,7 +37,7 @@ simPutStr
   => ByteString
   -> SimCont o ()
 simPutStr =
-  unsafeSend >=> IO.liftIO . Monad.void . c_vpi_printf
+  (unsafeSend >=> IO.liftIO . Monad.void . c_vpi_printf) . ensureNullTerminated
 
 -- | A version of 'putStrLn' which outputs to the handle used by the simulator.
 -- When running a VPI callback, the normal functions provided in @base@ may
