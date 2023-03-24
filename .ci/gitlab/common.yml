@@ -24,6 +24,7 @@
     - export
     - tar -xf cache.tar.zst -C / || true
     - .ci/setup.sh
+    - PATH="$(readlink -f .ci/retry-ghc-heisenbug/bin):$PATH"
   after_script:
     - tar -cf - $(ls -d /root/.cabal /root/.stack || true) | zstd -T${THREADS} -3 > cache.tar.zst
 

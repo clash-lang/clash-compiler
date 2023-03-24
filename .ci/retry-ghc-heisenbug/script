@@ -1,0 +1,75 @@
+#!/bin/bash
+
+# Every now and then, GHC will exit with the error
+#
+# out: mmap 131072 bytes at (nil): Cannot allocate memory
+# out: Try specifying an address with +RTS -xm<addr> -RTS
+# out: internal error: m32_allocator_init: Failed to map
+#     (GHC version 9.0.2 for x86_64_unknown_linux)
+#     Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug
+#
+# (when the binary is named `out`).
+#
+# Since we invoke GHC/Clash an awful amount of times in some of our CI tests,
+# the chances of hitting it in one of those invocations are really high.
+# Additionally, it seems some binaries have really high odds of exhibiting the
+# issue.
+#
+# This script wraps the relevant binaries and will retry for a total of
+# twenty(!) times when this error message is observed. The number of retries
+# can be configured with the "-t" option argument.
+#
+# The mmap error message itself will not be observed on stdout and stderr of
+# this script, but anything printed before that by the wrapped binary will
+# occur multiple times as the binary is run again. Given that we usually test
+# either that stdout or stderr is empty or that it contains or does not
+# contain a certain string, duplication does not affect the outcome of the
+# test.
+#
+# We think this problem occurs on every combination of GHC version and
+# Linux kernel version, but we are seeing it (almost?) exclusively on GHC
+# 9.0.2.
+
+unset VERBOSE MAXTRIES PROG TRIES STATUS
+
+MAXTRIES=20
+while true; do
+  case "$1" in
+    -v)
+      VERBOSE=1
+      ;;
+    -t)
+      MAXTRIES="$2"
+      shift
+      ;;
+    *)
+      break
+      ;;
+  esac
+  shift
+done
+
+PROG="$1"
+shift
+
+exec 3>&1
+
+TRIES=1
+[[ -n $VERBOSE ]] && echo "retry-ghc-heisenbug: Run $PROG" >&2
+while true; do
+  "$PROG" "$@" 2>&1 >&3 | \
+    awk '
+      /mmap 131072 bytes at \(nil\): Cannot allocate memory/ \
+        { exit 1 }
+      { print }' >&2
+  STATUS=("${PIPESTATUS[@]}")
+  [[ ${STATUS[1]} -eq 0 ]] && exit ${STATUS[0]}
+  ((TRIES++))
+  [[ $TRIES -gt $MAXTRIES ]] && break
+  [[ -n $VERBOSE ]] && echo "retry-ghc-heisenbug: RETRYING due to heisenbug (try: $TRIES)" >&2
+done
+
+exec 3>&-
+
+echo "retry-ghc-heisenbug: Heisenbug limit EXCEEDED" >&2
+exit -6

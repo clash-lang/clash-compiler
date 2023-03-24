@@ -307,7 +307,7 @@ instance IsTest ClashBinaryTest where
       ]
 
     execProgram oDir =
-      TestProgram (oDir </> "out") (oDir:cbExtraExecArgs) NoGlob PrintStdErr False Nothing []
+      TestHeisenbugProgram (oDir </> "out") (oDir:cbExtraExecArgs) NoGlob PrintStdErr False Nothing []
 
   testOptions = coerce (testOptions @TestProgram)
 

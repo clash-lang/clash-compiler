@@ -71,12 +71,15 @@ module Test.Tasty.Program (
  , ExpectOutput(..)
  , TestProgram(..)
  , TestFailingProgram(..)
+ , TestHeisenbugProgram(..)
+ , TestFailingHeisenbugProgram(..)
  ) where
 
 import qualified Clash.Util.Interpolate  as I
 import qualified Data.List as List
 
 import Control.Applicative     ( Alternative (..) )
+import Control.Monad.Extra     ( firstJustM, unless                       )
 import Data.Typeable           ( Typeable                                 )
 import Data.Maybe              ( fromMaybe, isNothing, listToMaybe        )
 import System.FilePath.Glob    ( globDir1, compile                        )
@@ -95,6 +98,8 @@ import Data.String.Interpolate ( __i )
 import Text.Regex.TDFA.Text ( Regex, execute )
 
 import qualified Data.Text    as T
+
+import Debug.Trace (traceIO)
 
 data ExpectOutput a
   = ExpectStdOut a
@@ -138,8 +143,50 @@ data TestProgram =
     -- ^ Additional environment variables
       deriving (Typeable)
 
+data TestHeisenbugProgram =
+  TestHeisenbugProgram
+    String
+    -- ^ Executable
+    [String]
+    -- ^ Executable args
+    GlobArgs
+    -- ^ Whether to interpret glob patterns in arguments
+    PrintOutput
+    -- ^ What output to print on test success
+    Bool
+    -- ^ Whether a non-empty stdout means failure
+    (Maybe FilePath)
+    -- ^ Work directory
+    [(String, String)]
+    -- ^ Additional environment variables
+      deriving (Typeable)
+
 data TestFailingProgram =
   TestFailingProgram
+    Bool
+    -- ^ Test exit code
+    String
+    -- ^ Executable
+    [String]
+    -- ^ Executable args
+    GlobArgs
+    -- ^ Whether to interpret glob patterns in arguments
+    PrintOutput
+    -- ^ What output to print on test success
+    Bool
+    -- ^ Whether an empty stderr means test failure
+    (Maybe Int)
+    -- ^ Expected return code
+    (ExpectOutput T.Text)
+    -- ^ Expected string in stderr
+    (Maybe FilePath)
+    -- ^ Work directory
+    [(String, String)]
+    -- ^ Additional environment variables
+      deriving (Typeable)
+
+data TestFailingHeisenbugProgram =
+  TestFailingHeisenbugProgram
     Bool
     -- ^ Test exit code
     String
@@ -275,7 +322,20 @@ instance IsTest TestProgram where
     -- Execute program
     case execFound of
       Nothing       -> return $ execNotFoundFailure program
-      Just progPath -> runProgram progPath args' stdO stdF workDir addEnv
+      Just progPath -> runProgram False progPath args' stdO stdF workDir addEnv
+
+  testOptions = return []
+
+instance IsTest TestHeisenbugProgram where
+  run opts (TestHeisenbugProgram program args glob stdO stdF workDir addEnv) _ = do
+    execFound <- findExecutableAlt program
+
+    args' <- globArgs glob workDir args
+
+    -- Execute program
+    case execFound of
+      Nothing       -> return $ execNotFoundFailure program
+      Just progPath -> runProgram True progPath args' stdO stdF workDir addEnv
 
   testOptions = return []
 
@@ -288,14 +348,29 @@ instance IsTest TestFailingProgram where
     -- Execute program
     case execFound of
       Nothing       -> return $ execNotFoundFailure program
-      Just progPath -> runFailingProgram testExitCode progPath args stdO stdF errCode expectedOutput workDir addEnv
+      Just progPath -> runFailingProgram False testExitCode progPath args stdO stdF errCode expectedOutput workDir addEnv
+
+  testOptions = return []
+
+instance IsTest TestFailingHeisenbugProgram where
+  run _opts (TestFailingHeisenbugProgram testExitCode program args glob stdO stdF errCode expectedOutput workDir addEnv) _ = do
+    execFound <- findExecutableAlt program
+
+    args' <- globArgs glob workDir args
+
+    -- Execute program
+    case execFound of
+      Nothing       -> return $ execNotFoundFailure program
+      Just progPath -> runFailingProgram True testExitCode progPath args stdO stdF errCode expectedOutput workDir addEnv
 
   testOptions = return []
 
 -- | Run a program with given options and optional working directory.
 -- Return success if program exits with success code.
 runProgram
-  :: String
+  :: Bool
+  -- ^ Should we retry when we see the heisenbug error msg?
+  -> String
   -- ^ Program name
   -> [String]
   -- ^ Program options
@@ -308,10 +383,11 @@ runProgram
   -> [(String, String)]
   -- ^ Additional environment variables
   -> IO Result
-runProgram program args stdO stdF workDir addEnv = do
+runProgram heisen program args stdO stdF workDir addEnv = do
   e <- getEnvironment
   let cp = (proc program args) { cwd = workDir, env = Just (addEnv ++ e) }
-  (exitCode, stdout, stderr) <- readCreateProcessWithExitCode cp ""
+  (exitCode, stdout, stderr) <-
+    filterHeisenbugProcess heisen $ readCreateProcessWithExitCode cp ""
 
   -- For debugging: Uncomment this to print executable and and its arguments
   --putStrLn $ show program ++ " " ++ concatMap (++ " ") args
@@ -333,6 +409,8 @@ runProgram program args stdO stdF workDir addEnv = do
 -- all.
 runFailingProgram
   :: Bool
+  -- ^ Should we retry when we see the heisenbug error msg?
+  -> Bool
   -- ^ Test exit code?
   -> String
   -- ^ Program name
@@ -352,10 +430,11 @@ runFailingProgram
   -> [(String, String)]
   -- ^ Additional environment variables
   -> IO Result
-runFailingProgram testExitCode program args stdO errOnEmptyStderr expectedCode expectedStderr workDir addEnv = do
+runFailingProgram heisen testExitCode program args stdO errOnEmptyStderr expectedCode expectedStderr workDir addEnv = do
   e <- getEnvironment
   let cp = (proc program args) { cwd = workDir, env = Just (addEnv ++ e) }
-  (exitCode0, stdout, stderr) <- readCreateProcessWithExitCode cp ""
+  (exitCode0, stdout, stderr) <-
+    filterHeisenbugProcess heisen $ readCreateProcessWithExitCode cp ""
 
   -- For debugging: Uncomment this to print executable and and its arguments
   --putStrLn $ show program ++ " " ++ concatMap (++ " ") args
@@ -406,6 +485,28 @@ runFailingProgram testExitCode program args stdO errOnEmptyStderr expectedCode e
                 else
                   passed
 
+filterHeisenbugProcess
+  :: Bool
+  -- ^ Should we retry when we see the heisenbug error msg?
+  -> IO (ExitCode, String, String)
+  -> IO (ExitCode, String, String)
+filterHeisenbugProcess heisen process =
+  if heisen then do
+    res <- firstJustM skipHeisenbug [(1 :: Int) .. 20]
+    case res of
+      Just res0 -> pure res0
+      Nothing -> pure (ExitFailure (-6), "", "Heisenbug limit exceeded")
+  else do
+    process
+ where
+  skipHeisenbug cnt = do
+    unless (cnt == 1) $
+      traceIO ("Retrying due to heisenbug (try: " <> show cnt <> ")")
+    res@(_exitCode, _stdout, stderr) <- process
+    if heisenMsg `T.isInfixOf` (T.pack stderr)
+      then pure Nothing
+      else pure $ Just res
+  heisenMsg = T.pack "mmap 131072 bytes at (nil): Cannot allocate memory"
 
 -- | Indicates that program does not exist in the path
 execNotFoundFailure :: String -> Result

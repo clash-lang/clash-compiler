@@ -20,6 +20,7 @@ stages:
     - export clash_cosim_datadir=$(pwd)/clash-cosim/
     - export
     - tar -xf dist.tar.zst -C /
+    - PATH="$(readlink -f .ci/retry-ghc-heisenbug/bin):$PATH"
 
     # Not all package in cache get packed into dist.tar.zst, so we need to
     # regenerate the package database
@@ -41,6 +42,7 @@ stages:
     - tar -xf cache.tar.zst -C / || true
     - tar -xf dist.tar.zst -C /
     - .ci/setup.sh
+    - PATH="$(readlink -f .ci/retry-ghc-heisenbug/bin):$PATH"
 
     # Not all package in cache get packed into dist.tar.zst, so we need to
     # regenerate the package database
@@ -94,7 +96,7 @@ lib:unittests:
 prelude:doctests:
   extends: .test-nocache
   script:
-    - ./dist-newstyle/build/*/*/clash-prelude-*/t/doctests/build/doctests/doctests -j${THREADS}
+    - .ci/retry-ghc-heisenbug/script -v ./dist-newstyle/build/*/*/clash-prelude-*/t/doctests/build/doctests/doctests -j${THREADS}
 
 # Tests run on local fast machines:
 
