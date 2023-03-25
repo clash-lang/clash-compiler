@@ -6,7 +6,7 @@
 #
 # To use buildkit, you need to set DOCKER_BUILDKIT=1 in your shell
 
-ARG UBUNTU_VERSION=focal-20210416
+ARG UBUNTU_VERSION=jammy-20230308
 FROM ubuntu:$UBUNTU_VERSION AS builder
 
 LABEL vendor="QBayLogic B.V." maintainer="devops@qbaylogic.com"
@@ -18,14 +18,14 @@ RUN apt-get update \
 
 FROM builder AS build-ghdl
 
-ARG DEPS_GHDL="gnat llvm-11-dev"
+ARG DEPS_GHDL="gnat-10 llvm-13-dev"
 RUN apt-get install -y --no-install-recommends $DEPS_GHDL
 
-ARG ghdl_version="1.0.0"
+ARG ghdl_version="2.0.0"
 RUN curl -L "https://github.com/ghdl/ghdl/archive/v$ghdl_version.tar.gz" \
         | tar -xz \
  && cd ghdl-$ghdl_version \
- && ./configure --with-llvm-config=llvm-config-11 --prefix=$PREFIX \
+ && ./configure --with-llvm-config=llvm-config-13 --prefix=$PREFIX \
  && make -j$(nproc) \
  && make install
 
@@ -34,10 +34,13 @@ FROM builder AS build-iverilog
 ARG DEPS_IVERILOG="gperf"
 RUN apt-get install -y --no-install-recommends $DEPS_IVERILOG
 
-ARG iverilog_version="10_3"
-RUN curl -L "https://github.com/steveicarus/iverilog/archive/v$iverilog_version.tar.gz" \
+# At the time of writing (2023-04-14), the latest commit in 'v10-branch'. This
+# commit is needed to work around compilation issues with newer 'bison's shipped
+# with 22.04.
+ARG iverilog_version="b988543096183650979e2aae9702de3750fee798"
+RUN curl -L "https://github.com/steveicarus/iverilog/archive/${iverilog_version}.tar.gz" \
         | tar -xz \
- && cd iverilog-$iverilog_version \
+ && cd iverilog-* \
  && sh autoconf.sh \
  && ./configure --prefix=$PREFIX \
  && make -j$(nproc) \
@@ -91,7 +94,7 @@ RUN git clone https://github.com/cliffordwolf/SymbiYosys.git SymbiYosys \
 
 FROM builder AS build-verilator
 
-ARG DEPS_VERILATOR="perl python3 make autoconf g++ flex bison ccache libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlibc zlib1g zlib1g-dev"
+ARG DEPS_VERILATOR="perl python3 make autoconf g++ flex bison ccache libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlib1g zlib1g-dev"
 RUN apt-get install -y --no-install-recommends $DEPS_VERILATOR
 
 ARG verilator_version="v4.214"
@@ -124,7 +127,7 @@ FROM ubuntu:$UBUNTU_VERSION AS run
 LABEL vendor="QBayLogic B.V." maintainer="devops@qbaylogic.com"
 ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH="$PATH:/opt/bin:/root/.ghcup/bin"
 
-ARG DEPS_RUNTIME="ca-certificates ccache curl g++ gcc git jq libc6-dev libgmp10-dev libgnat-9 libllvm11 libreadline8 libtinfo-dev libtcl8.6 make perl python3 ssh zlib1g-dev zlibc zstd locales libtinfo5 libx11-6"
+ARG DEPS_RUNTIME="ca-certificates ccache curl g++ gcc git jq libc6-dev libgmp10-dev libgnat-10 libllvm13 libreadline8 libtinfo-dev libtcl8.6 make perl python3 ssh zlib1g-dev zstd locales libtinfo5 libx11-6"
 RUN apt-get update \
  && apt-get install -y --no-install-recommends $DEPS_RUNTIME \
  && apt-get clean \
