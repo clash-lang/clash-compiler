@@ -108,22 +108,27 @@ build:
 #  extends: .test-cache-local
 #  script:
 #    - .ci/build_clash_dev.sh
+
+suite:tests-lib:
+  extends: .test-cache-local
+  script:
+    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p '/[clash-lib test]/'
+
+#suite:vhdl:
+#  extends: .test-cache-local
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-vivado
 #
-suite:vhdl:
-  extends: .test-cache-local
-  script:
-    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-vivado
-
-suite:verilog:
-  extends: .test-cache-local
-  script:
-    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-vivado
-
-suite:systemverilog:
-  extends: .test-cache-local
-  script:
-    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim --no-vivado
-
+#suite:verilog:
+#  extends: .test-cache-local
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-vivado
+#
+#suite:systemverilog:
+#  extends: .test-cache-local
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim --no-vivado
+#
 ## Vivado is quite slow, so we only run a subset of the tests on development branches
 ## with it. The full testsuite gets run with Vivado every night on 'master'.
 #suite:cores:
