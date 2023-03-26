@@ -298,7 +298,7 @@ instance IsTest ClashBinaryTest where
 
     buildArgs oDir =
       [ "-package", "clash-testsuite"
---       , "-with-rtsopts=-xm20000000"
+      , "-with-rtsopts=-xm20000000"
       , "-main-is", cbModName <> ".main" <> show cbBuildTarget
       , "-o", oDir </> "out"
       , "-i" <> cbSourceDirectory
