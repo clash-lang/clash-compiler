@@ -298,6 +298,7 @@ instance IsTest ClashBinaryTest where
 
     buildArgs oDir =
       [ "-package", "clash-testsuite"
+      , "-rtsopts"
       , "-main-is", cbModName <> ".main" <> show cbBuildTarget
       , "-o", oDir </> "out"
       , "-i" <> cbSourceDirectory
@@ -307,7 +308,10 @@ instance IsTest ClashBinaryTest where
       ]
 
     execProgram oDir =
-      TestHeisenbugProgram (oDir </> "out") (oDir:cbExtraExecArgs) NoGlob PrintStdErr False Nothing []
+      TestHeisenbugProgram (oDir </> "out")
+        (   [ "+RTS", "-xm20000000", "-RTS" ]
+         <> (oDir:cbExtraExecArgs))
+        NoGlob PrintStdErr False Nothing []
 
   testOptions = coerce (testOptions @TestProgram)
 

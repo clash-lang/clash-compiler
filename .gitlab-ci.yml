@@ -4,7 +4,7 @@ default:
 
 include:
   - '/.ci/gitlab/common.yml'
-  - '/.ci/gitlab/publish.yml'
+#   - '/.ci/gitlab/publish.yml'
 #   - '/.ci/gitlab/benchmark.yml'
 
 variables:
@@ -32,67 +32,68 @@ tests:
     strategy: depend
   parallel:
     matrix:
-      - GHC_VERSION: [8.8.4, 8.10.7, 9.0.2, 9.2.5]
-      - GHC_VERSION: 8.6.5
-        MULTIPLE_HIDDEN: "no"
+      - GHC_VERSION: 9.0.2
+      #- GHC_VERSION: [8.8.4, 8.10.7, 9.0.2, 9.2.5]
+      #- GHC_VERSION: 8.6.5
+      #  MULTIPLE_HIDDEN: "no"
 
-stack-build:
-  extends: .common-local
-  needs: []
-  stage: test
-  variables:
-    GHC_VERSION: 8.10.7
-  script:
-    - .ci/stack_build.sh
-
-nix-build:
-  image: nixos/nix:2.10.1
-  needs: []
-  stage: test
-  before_script:
-   - nix-env -i gawk
-  script:
-    - nix-build -j$(./.ci/effective_cpus.sh)
-  tags:
-    - local
-
-haddock:
-  extends: .common-local
-  needs: []
-  stage: test
-  variables:
-    GHC_VERSION: 9.0.2
-  artifacts:
-    paths:
-      - hadocs/*/*
-    expire_in: 1 month
-  script:
-    - .ci/build_docs.sh
-
-# # Run benchmarks for isclashfastyet.com
-# benchmark-8.10.2:
-#   extends: .benchmark
-
-# "Publish" a release candidate
-hackage-release-candidate:
-  extends: .hackage
-
-  variables:
-    HACKAGE_RELEASE: "no"
-
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-    - if: $CI_PIPELINE_SOURCE == "trigger"
-
-# Release new version of Clash to Hackage
-hackage-release:
-  extends: .hackage
-
-  variables:
-    HACKAGE_RELEASE: "yes"
-
-  rules:
-    - if: '$CI_COMMIT_TAG != null' # tags
+#stack-build:
+#  extends: .common-local
+#  needs: []
+#  stage: test
+#  variables:
+#    GHC_VERSION: 8.10.7
+#  script:
+#    - .ci/stack_build.sh
+#
+#nix-build:
+#  image: nixos/nix:2.10.1
+#  needs: []
+#  stage: test
+#  before_script:
+#   - nix-env -i gawk
+#  script:
+#    - nix-build -j$(./.ci/effective_cpus.sh)
+#  tags:
+#    - local
+#
+#haddock:
+#  extends: .common-local
+#  needs: []
+#  stage: test
+#  variables:
+#    GHC_VERSION: 9.0.2
+#  artifacts:
+#    paths:
+#      - hadocs/*/*
+#    expire_in: 1 month
+#  script:
+#    - .ci/build_docs.sh
+#
+## # Run benchmarks for isclashfastyet.com
+## benchmark-8.10.2:
+##   extends: .benchmark
+#
+## "Publish" a release candidate
+#hackage-release-candidate:
+#  extends: .hackage
+#
+#  variables:
+#    HACKAGE_RELEASE: "no"
+#
+#  rules:
+#    - if: $CI_PIPELINE_SOURCE == "schedule"
+#    - if: $CI_PIPELINE_SOURCE == "trigger"
+#
+## Release new version of Clash to Hackage
+#hackage-release:
+#  extends: .hackage
+#
+#  variables:
+#    HACKAGE_RELEASE: "yes"
+#
+#  rules:
+#    - if: '$CI_COMMIT_TAG != null' # tags
 
 # Work around https://gitlab.com/gitlab-org/gitlab/-/issues/216629
 #
