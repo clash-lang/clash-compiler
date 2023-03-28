@@ -96,7 +96,7 @@ build:
 prelude:doctests:
   extends: .test-nocache
   script:
-    - .ci/retry-ghc-heisenbug/script -v ./dist-newstyle/build/*/*/clash-prelude-*/t/doctests/build/doctests/doctests --verbose -j${THREADS}
+    - .ci/retry-ghc-heisenbug/script -v ./dist-newstyle/build/*/*/clash-prelude-*/t/doctests/build/doctests/doctests -j${THREADS}
 
 ## Tests run on local fast machines:
 #
