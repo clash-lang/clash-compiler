@@ -92,12 +92,12 @@ build:
 #  extends: .test-nocache
 #  script:
 #    - ./dist-newstyle/build/*/*/clash-lib-*/t/unittests/build/unittests/unittests --hide-successes
-#
-#prelude:doctests:
-#  extends: .test-nocache
-#  script:
-#    - .ci/retry-ghc-heisenbug/script -v ./dist-newstyle/build/*/*/clash-prelude-*/t/doctests/build/doctests/doctests -j${THREADS}
-#
+
+prelude:doctests:
+  extends: .test-nocache
+  script:
+    - .ci/retry-ghc-heisenbug/script -v ./dist-newstyle/build/*/*/clash-prelude-*/t/doctests/build/doctests/doctests --verbose -j${THREADS}
+
 ## Tests run on local fast machines:
 #
 ## Normally, this job is small. But it is flaky on GHC 9.2; it sometimes fails
