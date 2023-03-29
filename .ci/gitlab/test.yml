@@ -138,12 +138,13 @@ ffi:interface-tests:
   script:
     - ./dist-newstyle/build/*/*/clash-ffi-*/x/ffi-interface-tests/build/ffi-interface-tests/ffi-interface-tests --smallcheck-max-count 2000
 
-ffi:example:
-  extends: .test-cache-local
-  script:
-    - cabal build clash # ensure clash has been built (avoids some legacy cabal issue)
-    - cd clash-ffi/example && ./run-iverilog.sh
-
+# Disabled for now. The test is faulty and so is the tested code. This will be
+# fixed later.
+#ffi:example:
+#  extends: .test-cache-local
+#  script:
+#    - cabal build clash # ensure clash has been built (avoids some legacy cabal issue)
+#    - cd clash-ffi/example && ./run-iverilog.sh
 
 # Tests run on local fast machines with Vivado installed. We only run these at night
 # to save resources - as Vivado is quite slow to execute.

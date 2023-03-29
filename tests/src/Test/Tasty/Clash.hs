@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
@@ -629,7 +630,11 @@ clashLibTest' modName target extraGhcArgs path =
   clashBuild workDir = ("clash (exec)", singleTest "clash (exec)" (ClashBinaryTest {
       cbBuildTarget=target
     , cbSourceDirectory=sourceDir
-    , cbExtraBuildArgs="-DCLASHLIBTEST" : extraGhcArgs
+    , cbExtraBuildArgs="-DCLASHLIBTEST" :
+#ifdef CLASH_WORKAROUND_GHC_MMAP_CRASH
+        "-with-rtsopts=-xm20000000" :
+#endif
+        extraGhcArgs
     , cbExtraExecArgs=[]
     , cbModName=modName
     , cbOutputDirectory=workDir

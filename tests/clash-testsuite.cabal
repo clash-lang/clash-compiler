@@ -31,6 +31,12 @@ flag multiple-hidden
   default: True
   manual: True
 
+flag workaround-ghc-mmap-crash
+  description:
+    Only use this flag when hit by GHC bug #19421. See clash-compiler PR #2444.
+  default: False
+  manual: True
+
 common basic-config
   default-language: Haskell2010
   ghc-options: -Wall -Wcompat
@@ -79,6 +85,9 @@ common basic-config
 
   if flag(multiple-hidden)
     cpp-options:       -DCLASH_MULTIPLE_HIDDEN
+
+  if flag(workaround-ghc-mmap-crash)
+    cpp-options:       -DCLASH_WORKAROUND_GHC_MMAP_CRASH
 
 library
   import: basic-config
