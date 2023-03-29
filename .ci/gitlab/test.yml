@@ -144,9 +144,20 @@ suite:tests-lib:
 #    - ./dist-newstyle/build/*/*/clash-ffi-*/x/ffi-interface-tests/build/ffi-interface-tests/ffi-interface-tests --smallcheck-max-count 2000
 
 ffi:example:
-  extends: .test-cache-local
+  extends: .common-local
+  stage: test
+  needs: []
+  before_script:
+    - unset SNAPCRAFT_LOGIN_FILE
+    - unset HACKAGE_PASSWORD
+    - export THREADS=$(./.ci/effective_cpus.sh)
+    - export CABAL_JOBS=$(./.ci/effective_cpus.sh)
+    - export clash_lib_datadir=$(pwd)/clash-lib/
+    - export clash_cosim_datadir=$(pwd)/clash-cosim/
+    - export
+    - tar -xf cache.tar.zst -C / || true
+    - .ci/setup.sh
   script:
-    - cabal build clash # ensure clash has been built (avoids some legacy cabal issue)
     - cd clash-ffi/example && ./run-iverilog.sh
     - cd clash-ffi/example && ./run-iverilog.sh
     - cd clash-ffi/example && ./run-iverilog.sh
@@ -157,6 +168,8 @@ ffi:example:
     - cd clash-ffi/example && ./run-iverilog.sh
     - cd clash-ffi/example && ./run-iverilog.sh
     - cd clash-ffi/example && ./run-iverilog.sh
+  after_script:
+    - tar -cf - /root/.cabal | zstd -T${THREADS} -3 > cache.tar.zst
 
 ## Tests run on local fast machines with Vivado installed. We only run these at night
 ## to save resources - as Vivado is quite slow to execute.

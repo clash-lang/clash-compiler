@@ -27,9 +27,9 @@ EXAMPLES=../../examples
 
 ###############################
 
-${CABAL} build clash-ffi-example
-${CLASH} --verilog -i${EXAMPLES} ${EXAMPLES}/Calculator.hs
-${IVERILOG} verilog/Calculator.topEntity/topEntity.v -o Calculator.vvp
+${CABAL} build clash-ffi-example || exit 1
+${CLASH} --verilog -i${EXAMPLES} ${EXAMPLES}/Calculator.hs || exit 1
+${IVERILOG} verilog/Calculator.topEntity/topEntity.v -o Calculator.vvp || exit 1
 echo ""
 echo "Running Icarus Verilog VVP runtime engine:"
 echo ""
