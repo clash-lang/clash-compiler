@@ -32,10 +32,11 @@ tests:
     strategy: depend
   parallel:
     matrix:
+      # - GHC_VERSION: [8.8.4, 8.10.7, 9.2.5]
       - GHC_VERSION: 9.0.2
-      #- GHC_VERSION: [8.8.4, 8.10.7, 9.0.2, 9.2.5]
-      #- GHC_VERSION: 8.6.5
-      #  MULTIPLE_HIDDEN: "no"
+        WORKAROUND_HEISENBUG: "yes"
+      # - GHC_VERSION: 8.6.5
+      #   MULTIPLE_HIDDEN: "no"
 
 #stack-build:
 #  extends: .common-local

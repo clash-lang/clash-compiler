@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
@@ -298,7 +299,6 @@ instance IsTest ClashBinaryTest where
 
     buildArgs oDir =
       [ "-package", "clash-testsuite"
-      , "-with-rtsopts=-xm20000000"
       , "-main-is", cbModName <> ".main" <> show cbBuildTarget
       , "-o", oDir </> "out"
       , "-i" <> cbSourceDirectory
@@ -308,7 +308,7 @@ instance IsTest ClashBinaryTest where
       ]
 
     execProgram oDir =
-      TestHeisenbugProgram (oDir </> "out") (oDir:cbExtraExecArgs) NoGlob PrintStdErr False Nothing []
+      TestProgram (oDir </> "out") (oDir:cbExtraExecArgs) NoGlob PrintStdErr False Nothing []
 
   testOptions = coerce (testOptions @TestProgram)
 
@@ -630,7 +630,11 @@ clashLibTest' modName target extraGhcArgs path =
   clashBuild workDir = ("clash (exec)", singleTest "clash (exec)" (ClashBinaryTest {
       cbBuildTarget=target
     , cbSourceDirectory=sourceDir
-    , cbExtraBuildArgs="-DCLASHLIBTEST" : extraGhcArgs
+    , cbExtraBuildArgs="-DCLASHLIBTEST" :
+#ifdef CLASH_HEISENBUG
+        "-with-rtsopts=-xm20000000" :
+#endif
+        extraGhcArgs
     , cbExtraExecArgs=[]
     , cbModName=modName
     , cbOutputDirectory=workDir

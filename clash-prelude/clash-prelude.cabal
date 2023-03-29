@@ -117,6 +117,12 @@ flag benchmarks
   default: True
   manual: True
 
+flag workaround-heisenbug
+  description:
+    Only use this flag when hit by GHC bug #19421. See clash-compiler PR #XXXX.
+  default: False
+  manual: True
+
 common common-options
   default-language:   Haskell2010
   default-extensions: BangPatterns
@@ -372,6 +378,10 @@ test-suite doctests
       clash-prelude,
       doctest-parallel >= 0.2 && < 0.4,
       filepath
+
+  if flag(workaround-heisenbug)
+    ghc-options:    -with-rtsopts=-xm20000000
+
 
 test-suite unittests
   import:           common-options

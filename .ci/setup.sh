@@ -77,6 +77,10 @@ if [ ! -f cabal.project.local ]; then
     sed -i 's/+multiple-hidden/-multiple-hidden/g' cabal.project.local
   fi
 
+  if [[ "$WORKAROUND_HEISENBUG" == "yes" ]]; then
+    sed -i 's/-workaround-heisenbug/+workaround-heisenbug/g' cabal.project.local
+  fi
+
   set +u
   if [[ "$GHC_HEAD" == "yes" ]]; then
     cat .ci/cabal.project.local.append-HEAD >> cabal.project.local

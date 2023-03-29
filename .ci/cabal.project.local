@@ -10,7 +10,7 @@ package *
 
 package clash-prelude
   ghc-options: -Werror
-  flags: +doctests +multiple-hidden
+  flags: +doctests +multiple-hidden -workaround-heisenbug
   tests: True
   benchmarks: True
 
@@ -27,6 +27,7 @@ package clash-ghc
 
 package clash-cosim
   ghc-options: -Werror
+  flags: -workaround-heisenbug
   tests: True
 
   -- clash-cosim unittests fail with dynamic executables
@@ -47,7 +48,7 @@ package clash-lib-hedgehog
 package clash-testsuite
   ghc-options: -Werror
   -- enable cosim
-  flags: +cosim +multiple-hidden
+  flags: +cosim +multiple-hidden -workaround-heisenbug
 
 package clash-benchmark
   ghc-options: -Werror
