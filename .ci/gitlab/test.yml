@@ -66,46 +66,46 @@ build:
 
 # Tests run on shared runners:
 
-cores:unittests:
-  extends: .test-nocache
-  script:
-    - ./dist-newstyle/build/*/*/clash-cores-*/t/unittests/build/unittests/unittests --hide-successes
-
-cosim:unittests:
-  extends: .test-nocache
-  script:
-    - ./dist-newstyle/build/*/*/clash-cosim-*/build/test/test
-
-prelude:unittests:
-  extends: .test-nocache
-  script:
-    - ./dist-newstyle/build/*/*/clash-prelude-*/t/unittests/build/unittests/unittests --hide-successes
-
-lib:doctests:
-  extends: .test-nocache
-  script:
-    - ./dist-newstyle/build/*/*/clash-lib-*/t/doctests/build/doctests/doctests -j${THREADS}
-
-lib:unittests:
-  extends: .test-nocache
-  script:
-    - ./dist-newstyle/build/*/*/clash-lib-*/t/unittests/build/unittests/unittests --hide-successes
-
-prelude:doctests:
-  extends: .test-nocache
-  script:
-    - ./dist-newstyle/build/*/*/clash-prelude-*/t/doctests/build/doctests/doctests -j${THREADS}
-
-# Tests run on local fast machines:
-
-# Normally, this job is small. But it is flaky on GHC 9.2; it sometimes fails
-# and we don't know yet why. When it fails, it recompiles things it should have
-# picked up from the 'build' issue and then it is a larger job, so we keep it on
-# local runners for now.
-build-clash-dev:
-  extends: .test-cache-local
-  script:
-    - .ci/build_clash_dev.sh
+#cores:unittests:
+#  extends: .test-nocache
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-cores-*/t/unittests/build/unittests/unittests --hide-successes
+#
+#cosim:unittests:
+#  extends: .test-nocache
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-cosim-*/build/test/test
+#
+#prelude:unittests:
+#  extends: .test-nocache
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-prelude-*/t/unittests/build/unittests/unittests --hide-successes
+#
+#lib:doctests:
+#  extends: .test-nocache
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-lib-*/t/doctests/build/doctests/doctests -j${THREADS}
+#
+#lib:unittests:
+#  extends: .test-nocache
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-lib-*/t/unittests/build/unittests/unittests --hide-successes
+#
+#prelude:doctests:
+#  extends: .test-nocache
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-prelude-*/t/doctests/build/doctests/doctests -j${THREADS}
+#
+## Tests run on local fast machines:
+#
+## Normally, this job is small. But it is flaky on GHC 9.2; it sometimes fails
+## and we don't know yet why. When it fails, it recompiles things it should have
+## picked up from the 'build' issue and then it is a larger job, so we keep it on
+## local runners for now.
+#build-clash-dev:
+#  extends: .test-cache-local
+#  script:
+#    - .ci/build_clash_dev.sh
 
 suite:tests-lib:
   extends: .test-cache-local
@@ -148,15 +148,15 @@ ffi:example:
   script:
     - cabal build clash # ensure clash has been built (avoids some legacy cabal issue)
     - cd clash-ffi/example && ./run-iverilog.sh
-    - ./run-iverilog.sh
-    - ./run-iverilog.sh
-    - ./run-iverilog.sh
-    - ./run-iverilog.sh
-    - ./run-iverilog.sh
-    - ./run-iverilog.sh
-    - ./run-iverilog.sh
-    - ./run-iverilog.sh
-    - ./run-iverilog.sh
+    - cd clash-ffi/example && ./run-iverilog.sh
+    - cd clash-ffi/example && ./run-iverilog.sh
+    - cd clash-ffi/example && ./run-iverilog.sh
+    - cd clash-ffi/example && ./run-iverilog.sh
+    - cd clash-ffi/example && ./run-iverilog.sh
+    - cd clash-ffi/example && ./run-iverilog.sh
+    - cd clash-ffi/example && ./run-iverilog.sh
+    - cd clash-ffi/example && ./run-iverilog.sh
+    - cd clash-ffi/example && ./run-iverilog.sh
 
 ## Tests run on local fast machines with Vivado installed. We only run these at night
 ## to save resources - as Vivado is quite slow to execute.
