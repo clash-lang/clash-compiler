@@ -130,7 +130,7 @@ ffiMain = runSimAction $ do
     4 -> "<=>" -- mixed input-output
     _ -> "x"   -- no direction
 
-assignInputs :: (?state :: State) => SimAction
+assignInputs :: (?state :: State) => SimAction ()
 assignInputs = do
   SimTime time <- receiveTime Sim $ Just top
 
@@ -171,7 +171,7 @@ assignInputs = do
     sendValue port (BitVectorVal SNat $ pack v) $ InertialDelay $ SimTime 0
     return $ Just v
 
-readOutputs :: (?state :: State) => SimAction
+readOutputs :: (?state :: State) => SimAction ()
 readOutputs = do
   SimTime time <- receiveTime Sim $ Just top
   receiveValue VectorFmt dataOut >>= \case
@@ -228,8 +228,8 @@ updates = Updates 0 Nothing Nothing Nothing Nothing Nothing
 nextCB ::
   (Maybe Object -> Time -> CallbackReason) ->
   Int64 ->
-  SimAction ->
-  SimAction
+  SimAction () ->
+  SimAction ()
 nextCB reason time action =
   void $ registerCallback
     CallbackInfo
@@ -248,11 +248,11 @@ getByName m name = do
   liftIO $ free ref
   return obj
 
-putStr :: String -> SimAction
+putStr :: String -> SimAction ()
 putStr = simPutStr . B.pack
 
-putStrLn :: String -> SimAction
+putStrLn :: String -> SimAction ()
 putStrLn = simPutStrLn . B.pack
 
-print :: Show a => a -> SimAction
+print :: Show a => a -> SimAction ()
 print = simPutStrLn . B.pack . show
