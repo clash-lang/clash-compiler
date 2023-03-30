@@ -7,7 +7,8 @@ import Data.Coerce (Coercible)
 import Data.Typeable (Typeable)
 import Data.Bits (complement)
 import Data.List (intercalate, zip5)
-import Control.Monad (when, void)
+import Control.Exception (SomeException, try)
+import Control.Monad (void)
 import Control.Monad.IO.Class (liftIO)
 import Foreign.C.String (newCString)
 import Foreign.Marshal.Alloc (free)
@@ -23,6 +24,7 @@ import Clash.FFI.Monad
 import Clash.FFI.VPI.Info
 import Clash.FFI.VPI.IO
 import Clash.FFI.VPI.Callback
+import Clash.FFI.VPI.Control
 import Clash.FFI.VPI.Module
 import Clash.FFI.VPI.Object
 import Clash.FFI.VPI.Port
@@ -106,16 +108,6 @@ ffiMain = runSimAction $ do
   putStrLn " STEP ; CLK  ; RST  ; ENB  ;         OPC          ;        RESULT"
   putStrLn "------;------;------;------;----------------------;----------------------"
 
-  void $ registerCallback
-    CallbackInfo
-      { cbReason  = EndOfSimulation
-      , cbRoutine = const $ do
-          runSimAction (putStrLn "" >> putStrLn "[ Simulation done ]")
-          return 0
-      , cbIndex   = 0
-      , cbData    = B.empty
-      }
-
   nextCB ReadWriteSynch 0 assignInputs
 
  where
@@ -182,9 +174,15 @@ readOutputs = do
         }
     _ -> return ()
 
-  when (steps > 0) $ do
+  if (steps > 0) then do
     let ?state = ?state { steps = steps - 1 }
     nextCB ReadWriteSynch 1 assignInputs
+  else do
+    putStrLn ""
+    putStrLn "[ Simulation done ]"
+
+    liftIO $ void $ try @SomeException $ runSimAction
+      $ controlSimulator $ Finish NoDiagnostics
 
  where
   State{..} = ?state
