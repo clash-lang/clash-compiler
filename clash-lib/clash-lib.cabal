@@ -107,6 +107,7 @@ common common-options
                       InstanceSigs
                       KindSignatures
                       NoStarIsType
+                      PostfixOperators
                       ScopedTypeVariables
                       StandaloneDeriving
                       TupleSections
@@ -160,7 +161,7 @@ Library
                       hashable                >= 1.2.1.0  && < 1.5,
                       haskell-src-meta        >= 0.8      && < 0.9,
                       hint                    >= 0.7      && < 0.10,
-                      string-interpolate      ^>= 0.3,
+                      infinite-list           ^>= 0.1,
                       lens                    >= 4.10     && < 5.3,
                       mtl                     >= 2.1.2    && < 2.3,
                       ordered-containers      >= 0.2      && < 0.3,
@@ -168,6 +169,7 @@ Library
                       prettyprinter-interp    ^>= 0.2,
                       pretty-show             >= 1.9      && < 2.0,
                       primitive               >= 0.5.0.1  && < 1.0,
+                      string-interpolate      ^>= 0.3,
                       template-haskell        >= 2.8.0.0  && < 2.19,
                       temporary               >= 1.2.1    && < 1.4,
                       terminal-size           >= 0.3      && < 0.4,

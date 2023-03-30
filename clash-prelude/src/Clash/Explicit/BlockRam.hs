@@ -395,13 +395,7 @@ This concludes the short introduction to using 'blockRam'.
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
-{-# OPTIONS_GHC -fconstraint-solver-iterations=20 #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
-
--- In the blackbox definitions of 'trueDualPortBlockRam#' we bind a 'Vec', which
--- GHC doesn't recognize as being complete (though it will throw a type error if
--- the left and right side of the pattern match disagree on their types).
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- See [Note: eta port names for trueDualPortBlockRam]
 {-# OPTIONS_GHC -fno-do-lambda-eta-expansion #-}
@@ -439,6 +433,7 @@ import           Control.Monad.ST       (ST, runST)
 import           Control.Monad.ST.Unsafe (unsafeInterleaveST, unsafeIOToST, unsafeSTToIO)
 import           Data.Array.MArray      (newListArray)
 import qualified Data.List              as L
+import           Data.List.Infinite     (Infinite(..), (...))
 import           Data.Maybe             (isJust, fromMaybe)
 import           GHC.Arr
   (STArray, unsafeReadSTArray, unsafeWriteSTArray)
@@ -463,7 +458,6 @@ import           Clash.Sized.Unsigned   (Unsigned)
 import           Clash.Sized.Index      (Index)
 import           Clash.Sized.Vector     (Vec, replicate, iterateI)
 import qualified Clash.Sized.Vector     as CV
-import           Clash.Sized.Vector     (Vec((:>), Nil))
 import           Clash.XException
   (maybeIsX, NFDataX(deepErrorX), defaultSeqX, fromJustX, undefined,
    XException (..), seqX, isX, errorX)
@@ -1254,32 +1248,30 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
 {-# ANN trueDualPortBlockRam# (
   let
     bbName = show 'trueDualPortBlockRam#
-    (   _hasCallStack
-     :> knownNatAddrs
-     :> _knownDomainA
-     :> _knownDomainB
-     :> _nfdataX
+    _hasCallStack
+     :< knownNatAddrs
+     :< _knownDomainA
+     :< _knownDomainB
+     :< _nfdataX
 
-     :> clockA
-     :> enaA
-     :> wenaA
-     :> addrA
-     :> datA
+     :< clockA
+     :< enaA
+     :< wenaA
+     :< addrA
+     :< datA
 
-     :> clockB
-     :> enaB
-     :> wenaB
-     :> addrB
-     :> datB
+     :< clockB
+     :< enaB
+     :< wenaB
+     :< addrB
+     :< datB
 
-     :> Nil
-     ) = CV.indicesI @15
+     :< _ = ((0 :: Int)...)
 
-    (   symBlockName
-     :> symDoutA
-     :> symDoutB
-     :> Nil
-     ) = CV.indicesI @3
+    symBlockName
+     :< symDoutA
+     :< symDoutB
+     :< _ = ((0 :: Int)...)
   in InlineYamlPrimitive [VHDL] [__i|
     BlackBox:
       name: "#{bbName}"
@@ -1327,32 +1319,29 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
 {-# ANN trueDualPortBlockRam# (
   let
     bbName = show 'trueDualPortBlockRam#
-    (   _hasCallStack
-     :> knownNatAddrs
-     :> knownDomainA
-     :> knownDomainB
-     :> _nfdataX
+    _hasCallStack
+     :< knownNatAddrs
+     :< knownDomainA
+     :< knownDomainB
+     :< _nfdataX
 
-     :> clockA
-     :> enaA
-     :> wenaA
-     :> addrA
-     :> datA
+     :< clockA
+     :< enaA
+     :< wenaA
+     :< addrA
+     :< datA
 
-     :> clockB
-     :> enaB
-     :> wenaB
-     :> addrB
-     :> datB
+     :< clockB
+     :< enaB
+     :< wenaB
+     :< addrB
+     :< datB
 
-     :> Nil
-     ) = CV.indicesI @15
-
-    (   symMem
-     :> symDoutA
-     :> symDoutB
-     :> Nil
-     ) = CV.indicesI @3
+     :< _ = ((0 :: Int)...)
+    symMem
+     :< symDoutA
+     :< symDoutB
+     :< _ = ((0 :: Int)...)
   in InlineYamlPrimitive [SystemVerilog] [__i|
     BlackBox:
       name: "#{bbName}"
@@ -1393,32 +1382,30 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
 {-# ANN trueDualPortBlockRam# (
   let
     bbName = show 'trueDualPortBlockRam#
-    (   _hasCallStack
-     :> knownNatAddrs
-     :> knownDomainA
-     :> knownDomainB
-     :> _nfdataX
+    _hasCallStack
+     :< knownNatAddrs
+     :< knownDomainA
+     :< knownDomainB
+     :< _nfdataX
 
-     :> clockA
-     :> enaA
-     :> wenaA
-     :> addrA
-     :> datA
+     :< clockA
+     :< enaA
+     :< wenaA
+     :< addrA
+     :< datA
 
-     :> clockB
-     :> enaB
-     :> wenaB
-     :> addrB
-     :> datB
+     :< clockB
+     :< enaB
+     :< wenaB
+     :< addrB
+     :< datB
 
-     :> Nil
-     ) = CV.indicesI @15
+     :< _ = ((0 :: Int)...)
 
-    (   symMem
-     :> symDoutA
-     :> symDoutB
-     :> Nil
-     ) = CV.indicesI @3
+    symMem
+     :< symDoutA
+     :< symDoutB
+     :< _ = ((0 :: Int)...)
   in InlineYamlPrimitive [Verilog] [__i|
     BlackBox:
       name: "#{bbName}"

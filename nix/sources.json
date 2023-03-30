@@ -5,10 +5,10 @@
         "homepage": null,
         "owner": "martijnbastiaan",
         "repo": "doctest-parallel",
-        "rev": "cfadbd95748ee00bab15b7ab00ccae3d86b7add9",
-        "sha256": "1bwj42fnlz0wx0gfpj1cmrrjb9qxfnl6ivg834jziqz4av8w262h",
+        "rev": "76a4e3c326cc44ef36e878b122a1ed0f876e58ca",
+        "sha256": "17dnlrykynqd2q1ffsmh3s1bkw30ncmqcxhk1ac61ckbhxkv7rk7",
         "type": "tarball",
-        "url": "https://github.com/martijnbastiaan/doctest-parallel/archive/cfadbd95748ee00bab15b7ab00ccae3d86b7add9.tar.gz",
+        "url": "https://github.com/martijnbastiaan/doctest-parallel/archive/76a4e3c326cc44ef36e878b122a1ed0f876e58ca.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "ghc-tcplugins-extra": {
@@ -71,16 +71,24 @@
         "url": "https://github.com/hercules-ci/gitignore/archive/a20de23b925fd8264fd7fad6454652e142fd7f73.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
+    "infinite-list": {
+        "homepage": null,
+        "rev": "0.1",
+        "sha256": "0q6iprhjkb2hs5d2a98b9lcxxgr2kk8ydi4fbiqxqz32j7926hqx",
+        "type": "tarball",
+        "url": "https://hackage.haskell.org/package/infinite-list-0.1/infinite-list-0.1.tar.gz",
+        "url_template": "https://hackage.haskell.org/package/infinite-list-<rev>/infinite-list-<rev>.tar.gz"
+    },
     "niv": {
         "branch": "master",
         "description": "Easy dependency management for Nix projects",
         "homepage": "https://github.com/nmattia/niv",
         "owner": "nmattia",
         "repo": "niv",
-        "rev": "689d0e5539eddd0b0f566aee7bb18629eee7df74",
-        "sha256": "1rld3lk42l6b01f2gcrhq8qm9vry1awmfl29zmpiqda9dy89vbx0",
+        "rev": "ecabfde837ccfb392ccca235f96bfcf4bb8ab186",
+        "sha256": "1aij19grvzbxj0dal49bsnhq1lc23nrglv6p0f00gwznl6109snj",
         "type": "tarball",
-        "url": "https://github.com/nmattia/niv/archive/689d0e5539eddd0b0f566aee7bb18629eee7df74.tar.gz",
+        "url": "https://github.com/nmattia/niv/archive/ecabfde837ccfb392ccca235f96bfcf4bb8ab186.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs": {

@@ -7,6 +7,7 @@ import Data.Either
 
 import qualified Control.Lens                    as Lens
 import           Control.Monad.State             (State)
+import           Data.List.Infinite              (Infinite(..), (...))
 import           Data.Monoid                     (Ap(getAp))
 import           Data.Text.Prettyprint.Doc.Extra (Doc)
 import qualified Data.Text                       as Text
@@ -46,15 +47,20 @@ checkBBF _isD _primName args _ty =
  where
   -- TODO: Improve error handling; currently errors don't indicate what
   -- TODO: blackbox generated them.
-  clk = indexNote "clk" (lefts args) 1
+  _knownDomainArg
+    :< clkArg
+    :< _rstArg
+    :< propNameArg
+    :< renderAsArg
+    :< propArg
+    :< _ = ((0 :: Int)...)
+  (Id.unsafeFromCoreId -> clkId) = varToId (indexNote "clk" (lefts args) clkArg)
   clkExpr = Identifier clkId Nothing
-  (Id.unsafeFromCoreId -> clkId) = varToId clk
-  (Id.unsafeFromCoreId -> _clkId) = varToId (indexNote "rst" (lefts args) 2)
 
   litArgs = do
-    propName <- termToDataError (indexNote "propName" (lefts args) 3)
-    renderAs <- termToDataError (indexNote "renderAs" (lefts args) 4)
-    cvProperty <- termToDataError (indexNote "propArg" (lefts args) 5)
+    propName <- termToDataError (indexNote "propName" (lefts args) propNameArg)
+    renderAs <- termToDataError (indexNote "renderAs" (lefts args) renderAsArg)
+    cvProperty <- termToDataError (indexNote "propArg" (lefts args) propArg)
     Right (propName, renderAs, cvProperty)
 
   bb = BBFunction "Clash.Primitives.Verification.checkTF" 0
