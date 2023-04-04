@@ -294,7 +294,7 @@ instance IsTest TestFailingProgram where
 
 -- | Run a program with given options and optional working directory.
 -- Return success if program exits with success code.
-runProgram
+runProgram,runProgram'
   :: String
   -- ^ Program name
   -> [String]
@@ -308,7 +308,8 @@ runProgram
   -> [(String, String)]
   -- ^ Additional environment variables
   -> IO Result
-runProgram program args stdO stdF workDir addEnv = do
+runProgram program args stdO stdF workDir addEnv = runProgram' "gdb" ("-x":".ci/coredump-on-barf.gdb":"--args":program:args) stdO stdF workDir addEnv
+runProgram' program args stdO stdF workDir addEnv = do
   e <- getEnvironment
   let cp = (proc program args) { cwd = workDir, env = Just (addEnv ++ e) }
   (exitCode, stdout, stderr) <- readCreateProcessWithExitCode cp ""
