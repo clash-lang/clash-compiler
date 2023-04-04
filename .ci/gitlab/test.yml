@@ -104,7 +104,8 @@ suite:tests-lib:
     - apt install gdb -y
     - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p '/[clash-lib test]/'
   after_script:
-    - tar -cf - core.* | zstd -T${THREADS} -3 > cores.tar.zst
+    - tar -cf - core.* | zstd -T${THREADS} -3 | head --bytes=900M > cores.tar.zst
+    - ls -lh cores.*
   artifacts:
     when: always
     name: "$CI_JOB_NAME-$CI_COMMIT_SHA-$GHC_VERSION"
