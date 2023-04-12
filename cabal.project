@@ -16,7 +16,7 @@ write-ghc-environment-files: always
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2023-02-25T00:27:36Z
+index-state: 2023-04-12T11:22:22Z
 
 -- For some reason the `clash-testsuite` executable fails to run without
 -- this, as it cannot find the related library...
