@@ -11,7 +11,17 @@ import GHC.Exts (IsList(..))
 import Control.DeepSeq (NFData(..))
 #endif
 
-#if !MIN_VERSION_hashable(1,4,2)
+#if !MIN_VERSION_hashable(1,4,1)
+-- Hashable <1.4.1 doesn't define hashable instances at all
+#define DEFINE_HASHABLE_BYTEARRAY
+#elif !MIN_VERSION_hashable(1,4,2)
+-- Hashable 1.4.1 defines hashable for _some_ base versions
+#if !MIN_VERSION_base(4,17,0)
+#define DEFINE_HASHABLE_BYTEARRAY
+#endif
+#endif
+
+#ifdef DEFINE_HASHABLE_BYTEARRAY
 import Data.Hashable (Hashable(..))
 #endif
 
@@ -24,7 +34,7 @@ instance Binary ByteArray where
   get = fmap fromList get
   put = put . toList
 
-#if !MIN_VERSION_hashable(1,4,2)
+#ifdef DEFINE_HASHABLE_BYTEARRAY
 instance Hashable ByteArray where
   hashWithSalt salt = hashWithSalt salt . toList
 #endif
