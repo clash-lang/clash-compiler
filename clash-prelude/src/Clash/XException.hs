@@ -2,7 +2,7 @@
 Copyright  :  (C) 2016,      University of Twente,
                   2017,      QBayLogic, Google Inc.
                   2017-2019, Myrtle Software Ltd,
-                  2021-2022, QBayLogic B.V.
+                  2021-2023, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -258,13 +258,16 @@ hwSeqX = seqX
 infixr 0 `hwSeqX`
 
 -- | Evaluate a value with given function, returning 'Nothing' if it throws
--- 'XException'.
+-- 'XException'. Note that non-'XException' errors take precedence over 'XException'
+-- ones
 --
--- > maybeX hasX 42                  = Just 42
--- > maybeX hasX (XException msg)    = Nothing
--- > maybeX hasX (3, XException msg) = Nothing
--- > maybeX hasX (3, _|_)            = _|_
--- > maybeX hasX _|_                 = _|_
+-- > maybeX hasX 42                    = Just 42
+-- > maybeX hasX (XException msg)      = Nothing
+-- > maybeX hasX (3, XException msg)   = Nothing
+-- > maybeX hasX (XException msg, _|_) = _|_
+-- > maybeX hasX (_|_, XException msg) = _|_
+-- > maybeX hasX (3, _|_)              = _|_
+-- > maybeX hasX _|_                   = _|_
 -- >
 -- > maybeX isX 42                  = Just 42
 -- > maybeX isX (XException msg)    = Nothing
@@ -275,15 +278,18 @@ infixr 0 `hwSeqX`
 maybeX :: (a -> Either String a) -> a -> Maybe a
 maybeX f a = either (const Nothing) Just (f a)
 
--- | Fully evaluate a value, returning 'Nothing' if it throws 'XException'.
+-- | Fully evaluate a value, returning 'Nothing' if it throws 'XException'. Note
+-- that non-'XException' errors take precedence over 'XException' ones.
 --
--- > maybeHasX 42                  = Just 42
--- > maybeHasX (XException msg)    = Nothing
--- > maybeHasX (3, XException msg) = Nothing
--- > maybeHasX (3, _|_)            = _|_
--- > maybeHasX _|_                 = _|_
+-- > maybeHasX 42                    = Just 42
+-- > maybeHasX (XException msg)      = Nothing
+-- > maybeHasX (3, XException msg)   = Nothing
+-- > maybeHasX (XException msg, _|_) = _|_
+-- > maybeHasX (_|_, XException msg) = _|_
+-- > maybeHasX (3, _|_)              = _|_
+-- > maybeHasX _|_                   = _|_
 --
-maybeHasX :: NFData a => a -> Maybe a
+maybeHasX :: (NFData a, NFDataX a) => a -> Maybe a
 maybeHasX = maybeX hasX
 
 -- | Evaluate a value to WHNF, returning 'Nothing' if it throws 'XException'.
@@ -300,20 +306,26 @@ maybeIsX = maybeX isX
 -- If you want to determine if a value contains undefined parts, use
 -- 'hasUndefined' instead.
 --
--- > hasX 42                  = Right 42
--- > hasX (XException msg)    = Left msg
--- > hasX (3, XException msg) = Left msg
--- > hasX (3, _|_)            = _|_
--- > hasX _|_                 = _|_
+-- > hasX 42                    = Right 42
+-- > hasX (XException msg)      = Left msg
+-- > hasX (3, XException msg)   = Left msg
+-- > hasX (XException msg, _|_) = _|_
+-- > hasX (_|_, XException msg) = _|_
+-- > hasX (3, _|_)              = _|_
+-- > hasX _|_                   = _|_
 --
 -- If a data structure contains multiple 'XException's, the "first" message is
--- picked according to the implementation of 'rnf'.
-hasX :: NFData a => a -> Either String a
+-- picked according to the implementation of 'rnfX'.
+hasX :: (NFData a, NFDataX a) => a -> Either String a
 hasX a =
+  -- TODO: Whenever 'a' contains an 'XException', we need to reevaluate the
+  --       structure using 'rnfX' to make sure it didn't also contain another
+  --       error call. We could prevent the two traversals by making 'hasX' a
+  --       type class method. Also see: https://github.com/clash-lang/clash-compiler/issues/2450.
   unsafeDupablePerformIO
     (catch
       (evaluate (rnf a) >> return (Right a))
-      (\(XException msg) -> return (Left msg)))
+      (\(XException msg) -> evaluate (rnfX a) >> return (Left msg)))
 {-# NOINLINE hasX #-}
 
 -- | Evaluate a value to WHNF, returning @'Left' msg@ if is a 'XException'.
