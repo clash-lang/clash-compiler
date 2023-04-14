@@ -6,7 +6,6 @@ module Test.Tasty.HUnit.Extra
   , expectExceptionNoX
   ) where
 
-import Control.DeepSeq (NFData)
 import Control.Exception (SomeException, try, evaluate)
 import Test.Tasty.HUnit
 
@@ -20,14 +19,14 @@ expectXException a0 =
     Right a -> assertFailure ("Expected Exception, got: " <> show a)
 
 -- | Succeed if evaluating leads to an Exception
-expectException :: (Show a, NFData a) => a -> Assertion
+expectException :: Show a => a -> Assertion
 expectException a0 =
   try @SomeException (evaluate a0) >>= \case
     Left _ -> pure ()
     Right a -> assertFailure ("Expected Exception, got: " <> show a)
 
 -- | Succeed if evaluating leads to a non-XException Exception
-expectExceptionNoX :: (Show a, NFData a) => a -> Assertion
+expectExceptionNoX :: Show a => a -> Assertion
 expectExceptionNoX a0 =
   try @SomeException (try @XException (evaluate a0)) >>= \case
     Left _ -> pure ()
