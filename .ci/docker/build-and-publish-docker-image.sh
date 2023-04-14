@@ -7,6 +7,13 @@ NAME="clash-ci-"
 DIR=$(dirname "$0")
 now=$(date +%F)
 
+if [[ "$1" == "-y" ]]; then
+  push=y
+elif [[ "$1" != "" ]]; then
+  echo "Unrecognized argument: $1" >&2
+  exit 1
+fi
+
 GHC_VERSIONS=(  "9.2.5"   "9.0.2"   "8.10.7"  "8.8.4"   "8.6.5")
 CABAL_VERSIONS=("3.6.2.0" "3.4.0.0" "3.2.0.0" "3.2.0.0" "3.0.0.0")
 
@@ -27,7 +34,9 @@ do
     "$DIR"
 done
 
-read -p "Push to GitHub? (y/N) " push
+if [[ "${push}" == "" ]]; then
+  read -p "Push to GitHub? (y/N) " push
+fi
 
 if [[ $push =~ ^[Yy]$ ]]; then
   for i in "${!GHC_VERSIONS[@]}"
