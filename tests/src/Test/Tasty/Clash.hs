@@ -12,7 +12,6 @@ import           Clash.Annotations.Primitive (HDL(..))
 import           Data.Coerce               (coerce)
 import           Data.Default              (Default, def)
 import qualified Data.List                 as List
-import           Data.List                 (intercalate)
 import           Data.Maybe                (isJust)
 import qualified Data.Text                 as T
 import qualified System.Directory          as Directory
@@ -168,30 +167,6 @@ sourceDirectory =
   unsafePerformIO Directory.getCurrentDirectory
 {-# NOINLINE sourceDirectory #-}
 
--- | Given a number of test trees, make sure each one of them is executed
--- one after the other. To prevent naming collisions, parent group names can
--- be included. Parent group names should be ordered outer -> inner.
-sequenceTests
-  :: [TestName]
-  -- ^ Parent group names
-  -> [(TestName, TestTree)]
-  -- ^ Tests to sequence
-  -> [TestTree]
-sequenceTests path (unzip -> (testNames, testTrees)) =
-  zipWith applyAfter testPatterns testTrees
-    where
-      -- Make pattern for a single test
-      pat :: TestName -> String
-      pat nm = "$0 ~ /" ++ intercalate "." (reverse (nm:path)) ++ "/"
-
-      -- Test patterns for all given tests such that each executes sequentially
-      testPatterns = init (map (fmap pat) (Nothing : map Just testNames))
-
-      -- | Generate patterns given parent patterns and item patterns
-      applyAfter :: Maybe String -> TestTree -> TestTree
-      applyAfter Nothing  tt = tt
-      applyAfter (Just p) tt = after AllSucceed p tt
-
 targetTempPath
   :: IO FilePath
   -- ^ Parent temporary directory
@@ -219,8 +194,8 @@ stepName tool step target = tool <> " (" <> step <> " " <> target <> ")"
 -- and one for running them. It depends on 'hdlLoad' and 'hdlSim' what will be
 -- executed.
 data TestTarget = TestTarget
-  { buildTests :: [(TestName, TestTree)]
-  , simTests :: [(TestName, TestTree)]
+  { buildTests :: [TestTree]
+  , simTests :: [TestTree]
   }
 
 data ClashGenTest = ClashGenTest
@@ -329,13 +304,11 @@ ghdlTests opts@TestOptions{..} parentTmp =
   makeName = toolName "make"
   simName = toolName "sim"
   build t =
-    [ ( importName t
-      , singleTest (importName t) $ GhdlImportTest parentTmp (dir t))
-    , ( makeName t
-      , singleTest (makeName t) $ GhdlMakeTest (dir t) t)
+    [ singleTest (importName t) $ GhdlImportTest parentTmp (dir t)
+    , singleTest (makeName t) $ GhdlMakeTest (dir t) t
     ]
   sim t =
-    [ (simName t, singleTest (simName t) $ GhdlSimTest expectSimFail (dir t) t)
+    [ singleTest (simName t) $ GhdlSimTest expectSimFail (dir t) t
     ]
 
 -- | Generate test trees for running Icarus Verilog
@@ -354,13 +327,11 @@ iverilogTests opts@TestOptions{..} parentTmp =
   makeName = toolName "make"
   simName = toolName "sim"
   build t =
-    [ ( makeName t
-      , singleTest (makeName t) $ IVerilogMakeTest parentTmp (dir t) t)
+    [ singleTest (makeName t) $ IVerilogMakeTest parentTmp (dir t) t
     ]
   sim t =
-    [ ( simName t
-      , singleTest (simName t) $
-          IVerilogSimTest expectSimFail vvpStdoutNonEmptyFail (dir t) t)
+    [ singleTest (simName t) $
+          IVerilogSimTest expectSimFail vvpStdoutNonEmptyFail (dir t) t
     ]
 
 -- | Generate test trees for running ModelSim
@@ -380,14 +351,11 @@ modelsimTests opts@TestOptions{..} parentTmp =
   vlogName = toolName "vlog"
   simName = toolName "sim"
   build t =
-    [ ( vlibName t
-      , singleTest (vlibName t) $ ModelsimVlibTest parentTmp (dir t))
-    , ( vlogName t
-      , singleTest (vlogName t) $ ModelsimVlogTest (dir t))
+    [ singleTest (vlibName t) $ ModelsimVlibTest parentTmp (dir t)
+    , singleTest (vlogName t) $ ModelsimVlogTest (dir t)
     ]
   sim t =
-    [ ( simName t
-      , singleTest (simName t) $ ModelsimSimTest expectSimFail (dir t) t)
+    [ singleTest (simName t) $ ModelsimSimTest expectSimFail (dir t) t
     ]
 
 -- | Generate test trees for running Verilator
@@ -406,13 +374,11 @@ verilatorTests opts@TestOptions{..} parentTmp =
   makeName = toolName "make"
   simName = toolName "sim"
   build t =
-    [ ( makeName t
-      , singleTest (makeName t) $ VerilatorMakeTest parentTmp (dir t) t)
+    [ singleTest (makeName t) $ VerilatorMakeTest parentTmp (dir t) t
     ]
   sim t =
-    [ ( simName t
-      , singleTest (simName t) $
-          VerilatorSimTest expectSimFail vvpStdoutNonEmptyFail (dir t) t)
+    [ singleTest (simName t) $
+          VerilatorSimTest expectSimFail vvpStdoutNonEmptyFail (dir t) t
     ]
 
 -- | Generate a test tree for running Vivado. Depending on 'hdlSim' it will be
@@ -430,25 +396,20 @@ vivadoTests opts parentTmp =
   dir = targetTempPath parentTmp "vivado"
   simName = stepName "vivado" "sim"
   sim t =
-    [ ( simName t
-      , singleTest (simName t) $ VivadoTest parentTmp (dir t) (T.pack t))
+    [ singleTest (simName t) $ VivadoTest parentTmp (dir t) (T.pack t)
     ]
 
 -- | Generate a test tree for running SymbiYosys
 sbyTests
   :: TestOptions
   -> IO FilePath
-  -> [(TestName, TestTree)]
+  -> TestTree
 sbyTests opts@TestOptions {..} parentTmp =
-  [ ( sbyName t
-    , singleTest (sbyName t) $
-        SbyVerificationTest expectVerificationFail parentTmp (dir t) t
-    )
-  | t <- getBuildTargets opts
-  ]
+  testGroup "SymbiYosys" (map sbyTest (getBuildTargets opts))
  where
+  sbyTest t =
+    singleTest t (SbyVerificationTest expectVerificationFail parentTmp (dir t) t)
   dir = targetTempPath parentTmp "symbiyosys"
-  sbyName t = "symbiyosys (" <> t <> ")"
 
 runTest1
   :: String
@@ -458,18 +419,16 @@ runTest1
   -> TestTree
 runTest1 modName opts@TestOptions{..} path target =
   withResource mkTmpDir Directory.removeDirectoryRecursive $ \tmpDir ->
-    testGroup (show target) $
-      sequenceIndependent (clashTest tmpDir) $
-           (case verificationTool of
-             Nothing -> []
-             Just SymbiYosys -> sbyTests opts tmpDir)
-         : hdlTests tmpDir
+    sequentialTestGroup (show target) AllSucceed
+      ( clashTest tmpDir
+      : verifTests tmpDir
+      : hdlTests tmpDir )
  where
   mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
   sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))
 
   clashTest tmpDir =
-    ("clash (gen)", singleTest "clash (gen)" (ClashGenTest {
+    singleTest "clash (gen)" (ClashGenTest {
       cgExpectFailure=expectClashFail
     , cgBuildTarget=target
     , cgSourceDirectory=sourceDir
@@ -477,63 +436,39 @@ runTest1 modName opts@TestOptions{..} path target =
     , cgModName=modName
     , cgOutputDirectory=tmpDir
     , cgHdlDirectory=fmap (</> "hdl") tmpDir
-    }))
+    })
 
-  buildAndSimTests :: Sim -> [TestTarget] -> [[(TestName, TestTree)]]
+  emptyGroup = testGroup "empty" []
+
+  buildAndSimTests :: Sim -> [TestTarget] -> TestTree
   buildAndSimTests sim tests
-    | isJust expectClashFail = []
-    | otherwise              = flip map tests $ \TestTarget{..} ->
-      (if sim `elem` hdlLoad then buildTests else []) <>
-      (if sim `elem` hdlSim then simTests else [])
-
-  -- HACK: We want to run simulators independently if multiple are going to be
-  -- run, otherwise failures from whichever comes first will mean the second is
-  -- skipped. In lieu of a better way to sequence tests we can sequence tests
-  -- for multiple simulators, then drop the first test tree for all but the
-  -- first simulator (as it will be copies of clash gen).
-  --
-  -- TODO: Since tasty doesn't provide one, we should really provide a better
-  -- set of combinators for describing test dependencies. That way we can have
-  -- some more principled way of having a test structure like
-  --
-  --   Group A
-  --     - Task A1
-  --     - Group B
-  --         - Task B1
-  --         - Task B2
-  --     - Group C
-  --         - Task C1
-  --
-  -- where groups B and C are independent of each other, but both dependent on
-  -- the success of Task A1.
-  sequenceIndependent
-    :: (TestName, TestTree)
-    -- ^ The tree everything else depends on ("clash (gen)")
-    -> [[(TestName, TestTree)]]
-    -- ^ All the independent trees to run after "clash (gen)"
-    -> [TestTree]
-  sequenceIndependent gen = go
-   where
-    go [] = sequenceOne []
-    go (l:ls) = sequenceOne l <> concatMap (tail . sequenceOne) ls
-    sequenceOne ts = sequenceTests (show target : path) (gen : ts)
+    | isJust expectClashFail = testGroup "" []
+    | otherwise = sequentialTestGroup (show sim) AllSucceed $
+      flip concatMap tests $ \TestTarget{..} ->
+        (if sim `elem` hdlLoad then buildTests else []) <>
+        (if sim `elem` hdlSim then simTests else [])
 
   -- | The tests that are switched by `hdlLoad` and `hdlSim`
   hdlTests tmpDir = case target of
-    VHDL -> concat
+    VHDL ->
       [ buildAndSimTests GHDL (ghdlTests opts tmpDir)
       , buildAndSimTests Vivado (vivadoTests opts tmpDir)
       ]
-    Verilog -> concat
+    Verilog ->
       [ buildAndSimTests IVerilog (iverilogTests opts tmpDir)
       , buildAndSimTests Verilator (verilatorTests opts tmpDir)
       , buildAndSimTests Vivado (vivadoTests opts tmpDir)
       ]
-    SystemVerilog -> concat
+    SystemVerilog ->
       [ -- TODO: ModelSim can do VHDL and Verilog too. Add that?
         buildAndSimTests ModelSim (modelsimTests opts tmpDir)
       , buildAndSimTests Verilator (verilatorTests opts tmpDir)
       ]
+
+  verifTests tmpDir =
+    case verificationTool of
+      Nothing -> emptyGroup
+      Just SymbiYosys -> sbyTests opts tmpDir
 
 runTest
   :: String
@@ -563,7 +498,7 @@ outputTest'
   -> TestTree
 outputTest' modName target extraClashArgs extraGhcArgs path =
   withResource mkTmpDir Directory.removeDirectoryRecursive $ \tmpDir ->
-    testGroup (show target) $ sequenceTests (show target : path) $
+    sequentialTestGroup (show target) AllSucceed
       [ clashGenHdl tmpDir
       , clashBuild tmpDir
       ]
@@ -571,7 +506,7 @@ outputTest' modName target extraClashArgs extraGhcArgs path =
   mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
   sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))
 
-  clashGenHdl workDir = ("clash (gen)", singleTest "clash (gen)" (ClashGenTest {
+  clashGenHdl workDir = singleTest "clash (gen)" (ClashGenTest {
       cgExpectFailure=Nothing
     , cgBuildTarget=target
     , cgSourceDirectory=sourceDir
@@ -579,16 +514,16 @@ outputTest' modName target extraClashArgs extraGhcArgs path =
     , cgModName=modName
     , cgOutputDirectory=workDir
     , cgHdlDirectory=workDir
-    }))
+    })
 
-  clashBuild workDir = ("clash (exec)", singleTest "clash (exec)" (ClashBinaryTest {
+  clashBuild workDir = singleTest "clash (exec)" (ClashBinaryTest {
       cbBuildTarget=target
     , cbSourceDirectory=sourceDir
     , cbExtraBuildArgs="-DOUTPUTTEST" : extraGhcArgs
     , cbExtraExecArgs=[]
     , cbModName=modName
     , cbOutputDirectory=workDir
-    }))
+    })
 
 outputTest
   :: String
@@ -620,14 +555,14 @@ clashLibTest'
   -> TestTree
 clashLibTest' modName target extraGhcArgs path =
   withResource mkTmpDir Directory.removeDirectoryRecursive $ \tmpDir ->
-    testGroup (show target) $ sequenceTests (show target : path) $
+    sequentialTestGroup (show target) AllSucceed
       [ clashBuild tmpDir
       ]
  where
   mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
   sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))
 
-  clashBuild workDir = ("clash (exec)", singleTest "clash (exec)" (ClashBinaryTest {
+  clashBuild workDir = singleTest "clash (exec)" (ClashBinaryTest {
       cbBuildTarget=target
     , cbSourceDirectory=sourceDir
     , cbExtraBuildArgs="-DCLASHLIBTEST" :
@@ -638,7 +573,7 @@ clashLibTest' modName target extraGhcArgs path =
     , cbExtraExecArgs=[]
     , cbModName=modName
     , cbOutputDirectory=workDir
-    }))
+    })
 
 clashLibTest
   :: String
@@ -653,7 +588,7 @@ clashLibTest modName opts path =
   -- HACK: clashLibTests are run sequentially to prevent race issues. See:
   -- HACK: https://github.com/clash-lang/clash-compiler/pull/1416
   let testName = modName ++ " [clash-lib test]"
-   in testGroup testName $ sequenceTests (testName:path)
-        [ (show target, clashLibTest' modName target (ghcFlags opts) (testName:path))
+   in sequentialTestGroup testName AllFinish
+        [ clashLibTest' modName target (ghcFlags opts) (testName:path)
         | target <- hdlTargets opts
         ]
