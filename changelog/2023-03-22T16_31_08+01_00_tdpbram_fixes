@@ -1,0 +1,2 @@
+FIXED: `trueDualPortBlockRam` now handles undefined values in its input correctly  [#2350](https://github.com/clash-lang/clash-compiler/issues/2350)
+FIXED: `trueDualPortBlockRam` now correctly handles port enables when clock edges coincide [#2351](https://github.com/clash-lang/clash-compiler/issues/2351)

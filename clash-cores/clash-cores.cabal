@@ -72,6 +72,7 @@ common basic-config
   build-depends:
     base                      >= 4.10  && < 5,
     clash-prelude,
+    constraints,
     ghc-typelits-natnormalise >= 0.6,
     ghc-typelits-extra        >= 0.3.2,
     ghc-typelits-knownnat     >= 0.6,
@@ -86,6 +87,9 @@ library
 
   exposed-modules:
     Clash.Cores.Xilinx.Internal
+    Clash.Cores.Xilinx.BlockRam
+    Clash.Cores.Xilinx.BlockRam.BlackBoxes
+    Clash.Cores.Xilinx.BlockRam.Internal
     Clash.Cores.Xilinx.DcFifo
     Clash.Cores.Xilinx.DcFifo.Internal.BlackBoxes
     Clash.Cores.Xilinx.DcFifo.Internal.Instances
@@ -130,13 +134,15 @@ test-suite unittests
     Test.Cores.Internal.SampleSPI
     Test.Cores.Internal.Signals
     Test.Cores.SPI
-    Test.Cores.UART
     Test.Cores.SPI.MultiSlave
+    Test.Cores.UART
+    Test.Cores.Xilinx.BlockRam
     Test.Cores.Xilinx.DcFifo
 
   build-depends:
     clash-cores,
     clash-lib,
+    clash-prelude-hedgehog,
     deepseq,
     tasty        >= 1.2 && < 1.5,
     tasty-hunit,
@@ -156,6 +162,6 @@ test-suite doctests
   else
     build-depends:
       base,
-      clash-prelude,
+      clash-cores,
       doctest-parallel >= 0.2 && < 0.4,
       filepath

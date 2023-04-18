@@ -38,8 +38,10 @@ let
 
         # Internal overrides
         clash-lib = import ../clash-lib { inherit nixpkgs; };
+        clash-lib-hedgehog = import ../clash-lib-hedgehog { inherit nixpkgs; };
         clash-ghc = import ../clash-ghc { inherit nixpkgs; };
         clash-prelude = import ../clash-prelude { inherit nixpkgs; };
+        clash-prelude-hedgehog = import ../clash-prelude-hedgehog { inherit nixpkgs; };
         clash-cores = import ../clash-cores { inherit nixpkgs; };
       };
     };
