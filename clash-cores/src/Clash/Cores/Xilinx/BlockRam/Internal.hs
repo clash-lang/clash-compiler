@@ -20,6 +20,7 @@ import Clash.Explicit.Prelude hiding (enable)
 import Clash.Annotations.Primitive (Primitive(InlineYamlPrimitive), hasBlackBox)
 import Clash.Explicit.BlockRam.Model (TdpbramModelConfig(..), tdpbramModel)
 import Clash.Sized.Internal.BitVector (BitVector(BV), undefined#)
+import Clash.Sized.Internal.Mod (complementMod)
 import Clash.XException.MaybeX (MaybeX(..))
 
 import Data.String.Interpolate (__i)
@@ -78,6 +79,7 @@ isActiveWriteEnable = fmap (/= 0)
 
 -- | Update a true dual-port block RAM with byte enables
 updateRam ::
+  forall nBytes a .
   ( KnownNat nBytes
   , BitSize a ~ (8 * nBytes)
   , BitPack a
@@ -98,18 +100,55 @@ updateRam addr (IsDefined byteEna) dat mem
   = let
     goAdjust oldDat =
       let
-        datBv0 = pack dat
-        oldDatBv0 = pack oldDat
-        bitEnable = byteMaskToBitMask byteEna
-        -- Skip any bits that are the same in old and new: by handling this
-        -- explicitly, we avoid these bits becoming undefined unnecessarily.
-        -- .&. and .|. will take care of any undefined bits in 'byteEna'.
-        bitEnableMasked = bitEnable .&. (oldDatBv0 `xor` datBv0)
-        datBv1 = datBv0 .&. bitEnableMasked
-        oldDatBv1 = oldDatBv0 .&. complement bitEnableMasked
-        newDatBv = datBv1 .|. oldDatBv1
+        -- Adjust memory data accounting for byte enables. Each bit in a memory
+        -- word is treated separately; the byte-enable is expanded to enable
+        -- lines for individual bits. Two cases are self-evident:
+        --   - Bit-enable deasserted: bit in memory unchanged
+        --   - Bit-enable asserted: bit in memory receives new value
+        --
+        -- When the bit-enable is undefined however, the following holds:
+        -- Given @oldDat@ the original contents, @dat@ the data input and
+        -- @newDat@ the new memory contents, the truth table is as follows:
+        --
+        --   oldDat   dat   newDat
+        --     0       0      0
+        --     0       1      X
+        --     0       X      X
+        --     1       0      X
+        --     1       1      1
+        --     1       X      X
+        --     X       0      X
+        --     X       1      X
+        --     X       X      X
+        --
+        -- In words, if the new data is the same as the old data, the bit in
+        -- memory is retained; if this is not certain, it becomes X.
+        BV datMask datVal = pack dat
+        BV oldMask oldVal = pack oldDat
+        BV enaMask enaVal = byteMaskToBitMask byteEna
+        complementN = complementMod (natToNum @(BitSize a))
+        enaValInv = complementN enaVal
+        sameValInv =
+          -- Bit is 0 when @old@ and @dat@ are the same defined value, 1
+          -- otherwise
+          (oldVal `xor` datVal) .|. oldMask .|. datMask
+        newMask =
+              -- Not enabled, old value undefined
+              (oldMask .&. enaValInv)
+          .|. -- Enabled, new value undefined
+              (datMask .&. enaVal)
+          .|. -- Enable undefined, @old@ and @dat@ not the same defined value
+              (sameValInv .&. enaMask)
+        newVal =     (    -- Not enabled: old value
+                          (oldVal .&. enaValInv)
+                      .|. -- Enabled: new value
+                          (datVal .&. enaVal)
+                     )
+                 .&. -- Filter out undefined
+                     complementN newMask
+
       in
-        unpack newDatBv
+        unpack $ BV newMask newVal
   in
     Seq.adjust goAdjust addr mem
  where

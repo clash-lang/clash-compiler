@@ -6,6 +6,7 @@
 module Test.Cores.Xilinx.BlockRam where
 
 import Clash.Explicit.Prelude
+import Clash.Sized.Internal.BitVector (BitVector(..))
 import Clash.XException.MaybeX (MaybeX)
 
 import Control.DeepSeq (force)
@@ -274,11 +275,13 @@ testsAccessRam = testGroup "accessRam"
   , testCase "test20" $ access u u    u      @?= "(undefined,[undefined,undefined])"
 
   -- Byte enables on BitVector
-  , testCase "test21" $ accessBv $(bLit "11") 0b1010_1010_1010_1010 @?= "[0b1010_1010_1010_1010]"
-  , testCase "test22" $ accessBv $(bLit "1.") 0b1010_1010_1010_1010 @?= "[0b1010_1010_.0.0_1010]"
-  , testCase "test23" $ accessBv $(bLit ".1") 0b1010_1010_1010_1010 @?= "[0b.0.0_...._1010_1010]"
-  , testCase "test24" $ accessBv $(bLit "..") 0b1010_1010_1010_1010 @?= "[0b.0.0_...._.0.0_1010]"
-  , testCase "test25" $ accessBv (errorX "X") 0b1010_1010_1010_1010 @?= "[0b.0.0_...._.0.0_1010]"
+  , testCase "test21" $ accessBv $(bLit "11") bvDat @?= "[0b...._1010_...._1010]"
+  , testCase "test22" $ accessBv $(bLit "1.") bvDat @?= "[0b...._1010_...._..10]"
+  , testCase "test23" $ accessBv $(bLit ".1") bvDat @?= "[0b...._...._...._1010]"
+  , testCase "test24" $ accessBv $(bLit "..") bvDat @?= "[0b...._...._...._..10]"
+  , testCase "test25" $ accessBv (errorX "X") bvDat @?= "[0b...._...._...._..10]"
+  , testCase "test26" $ accessBv $(bLit "01") bvDat @?= "[0b...._...._...._1010]"
+  , testCase "test27" $ accessBv $(bLit "10") bvDat @?= "[0b...._1010_0110_0110]"
 
   , testProperty "prop_definedOutputAccessRamWord16"
       (prop_definedOutputAccessRam (Gen.enumBounded @_ @Word16))
@@ -291,7 +294,22 @@ testsAccessRam = testGroup "accessRam"
       accessRam d2 (pure addr) (pure byteEna) dat [0x1111, 0x2222 :: Word16]
 
   accessBv byteEna dat = showX $ F.toList $ snd $
-    accessRam d1 (pure 0) (pure byteEna) dat [0b0101_0000_1010 :: BitVector 16]
+    accessRam d1 (pure 0) (pure byteEna) dat [bvInit]
+
+  -- bvInit and bvDat chosen to exercise all possible bit combinations of mask
+  -- and value of old and new data. For the byte enables, this would be
+  -- superfluous, as the @BV 1 1@ type pattern will not propagate past
+  -- @byteMaskToBitMask@.
+  bvInit :: BitVector 16
+  bvInit =
+    BV
+      0b1111_1111_0000_0000
+      0b0110_0110_0110_0110
+
+  bvDat =
+    BV
+      0b1111_0000_1111_0000
+      0b1010_1010_1010_1010
 
   u = errorX "X"
 
