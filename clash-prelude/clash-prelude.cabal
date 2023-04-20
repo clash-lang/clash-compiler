@@ -442,6 +442,7 @@ test-suite unittests
                  Clash.Tests.TopEntityGeneration
                  Clash.Tests.Unsigned
                  Clash.Tests.Vector
+                 Clash.Tests.XException
 
                  Clash.Tests.Laws.Enum
                  Clash.Tests.Laws.SaturatingNum

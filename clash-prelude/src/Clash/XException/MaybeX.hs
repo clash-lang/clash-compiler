@@ -35,7 +35,7 @@ import Control.Applicative
 import Control.DeepSeq (NFData)
 import Control.Exception (throw)
 
-import Clash.XException (XException(..), isX, hasX)
+import Clash.XException (XException(..), NFDataX, isX, hasX)
 
 -- | Structure helping programmers to deal with 'Clash.XException.XException'
 -- values. For safety reasons it can't be constructed directly, but should be
@@ -83,7 +83,7 @@ toMaybeX = pure
 
 -- | Construct a 'MaybeX' value. If 'hasX' evaluates to 'Left', this function
 -- will return 'IsX'. Otherwise, it will return 'IsDefined'.
-hasXToMaybeX :: NFData a => a -> MaybeX a
+hasXToMaybeX :: (NFDataX a, NFData a) => a -> MaybeX a
 hasXToMaybeX = either IsX_ IsDefined_ . hasX
 
 -- | Deconstruct 'MaybeX' into an @a@ - the opposite of 'toMaybeX'. Be careful

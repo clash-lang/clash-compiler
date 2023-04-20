@@ -37,9 +37,7 @@ case_showVectorInList =
   "[1 :> 2 :> Nil,3 :> 4 :> Nil]" @=? show [1 :> 2 :> Nil, 3 :> i 4 :> Nil]
 
 tests :: TestTree
-tests = testGroup "All"
-  [ $(testGroupGenerator)
-  ]
+tests = $(testGroupGenerator)
 
 -- Run with:
 --

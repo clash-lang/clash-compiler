@@ -1,0 +1,1 @@
+CHANGED: `hasX` now needs an `NFDataX` constraint, in addition to an `NFData` one. This API change was made to fix an issue where `hasX` would hide error calls in certain situations, see [#2450](https://github.com/clash-lang/clash-compiler/issues/2450).
