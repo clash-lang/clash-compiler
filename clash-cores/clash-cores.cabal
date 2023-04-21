@@ -101,6 +101,10 @@ library
     Clash.Cores.Xilinx.Floating.BlackBoxes
     Clash.Cores.Xilinx.Floating.Explicit
     Clash.Cores.Xilinx.Floating.Internal
+    Clash.Cores.Xilinx.Xpm
+    Clash.Cores.Xilinx.Xpm.Cdc
+    Clash.Cores.Xilinx.Xpm.Cdc.Gray
+    Clash.Cores.Xilinx.Xpm.Cdc.Gray.Internal
     Clash.Cores.SPI
     Clash.Cores.UART
     Clash.Cores.LatticeSemi.ICE40.IO
@@ -116,6 +120,7 @@ library
     clash-lib,
     infinite-list           ^>= 0.1,
     mtl                     >= 2.1.1 && < 2.3,
+    pretty-show,
     prettyprinter           >= 1.2.0.1  && < 1.8,
     prettyprinter-interp    ^>= 0.2,
     reducers                >= 3.12.2 && < 4.0,
@@ -147,6 +152,7 @@ test-suite unittests
     tasty        >= 1.2 && < 1.5,
     tasty-hunit,
     tasty-quickcheck,
+    tasty-th,
     hedgehog,
     tasty-hedgehog >= 1.2.0
 

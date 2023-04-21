@@ -87,6 +87,7 @@ genSimTcl dir top = do
     clash::createAndReadIp -dir ip
     clash::readHdl
     set_property TOP $clash::topEntity [current_fileset -sim]
+    set_property -name xsim.elaborate.xelab.more_options -value {-L xpm} -objects [current_fileset -sim]
     save_project_as sim project -force
     set_property RUNTIME all [current_fileset -sim]
     launch_simulation
