@@ -231,4 +231,5 @@
       `endif
       // pragma translate_on
       // resetGen end
+    warning: Clash.Signal.Internal.resetGenN can not be synthesized to hardware!
     workInfo: Always

@@ -3,7 +3,7 @@ Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software,
                   2017-2022, Google Inc.
                   2020     , Ben Gamari,
-                  2021     , QBayLogic B.V.
+                  2021-2023, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -338,9 +338,11 @@ systemClockGen
   :: Clock System
 systemClockGen = clockGen
 
--- | Reset generator for the 'System' clock domain.
+-- | Reset generator for use in simulation, for the 'System' clock domain.
+-- Asserts the reset for a single cycle.
 --
--- __NB__: should only be used for simulation or the \testBench\ function.
+-- __NB__: While this can be used in the @testBench@ function, it cannot be
+-- synthesized to hardware.
 --
 -- === __Example__
 --
@@ -353,7 +355,7 @@ systemClockGen = clockGen
 --   where
 --     testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
 --     expectedOutput = outputVerifier' ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
---     done           = exposeClockResetEnable (expectedOutput (topEntity <$> testInput)) clk rst
+--     done           = exposeClockResetEnable (expectedOutput (topEntity \<$\> testInput)) clk rst
 --     clk            = tbSystemClockGen (not <\$\> done)
 --     rst            = 'systemResetGen'
 -- @
