@@ -1,0 +1,3 @@
+packages: . .. ../../clash-ghc ../../clash-lib ../../clash-prelude ../../clash-ffi
+
+write-ghc-environment-files: always
