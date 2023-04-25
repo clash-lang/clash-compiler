@@ -503,6 +503,12 @@ runClashTest = defaultMain $ clashTestRoot
               , hdlSim=[Vivado]
               , buildTargets=BuildSpecific ["tb" <> show n | n <- [(1::Int)..7]]
               }
+          , runTest "XpmCdcSingle" $ def
+              { hdlTargets=[VHDL, Verilog]
+              , hdlLoad=[]
+              , hdlSim=[Vivado]
+              , buildTargets=BuildSpecific ["tb" <> show n | n <- [(1::Int)..7]]
+              }
           , clashTestGroup "DcFifo"
             [ let _opts =
                     def{ hdlTargets=[VHDL, Verilog]

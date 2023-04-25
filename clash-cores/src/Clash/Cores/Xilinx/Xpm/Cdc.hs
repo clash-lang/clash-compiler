@@ -5,7 +5,9 @@
 -}
 
 module Clash.Cores.Xilinx.Xpm.Cdc
-  ( module Clash.Cores.Xilinx.Xpm.Cdc.Gray
+  ( xpmCdcGray
+  , xpmCdcSingle
   ) where
 
 import Clash.Cores.Xilinx.Xpm.Cdc.Gray
+import Clash.Cores.Xilinx.Xpm.Cdc.Single
