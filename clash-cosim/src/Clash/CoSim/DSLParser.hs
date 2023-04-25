@@ -3,6 +3,10 @@ module Clash.CoSim.DSLParser
   , vars
   , clks
   , parse
+
+    -- * Internal
+  , CoSimDSL
+  , CoSimDSLToken
   ) where
 
 import Prelude

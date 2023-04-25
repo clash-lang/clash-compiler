@@ -44,7 +44,7 @@ genDefinedBit :: (MonadGen m) => m Bit
 genDefinedBit = Gen.element [low, high]
 
 -- | Generate a bit which is not guaranteed to be defined.
--- This will either have the value 'low' or 'high', or throw an 'XException'.
+-- This will either have the value 'low' or 'high', or throw an @XException@.
 --
 genBit :: (MonadGen m) => m Bit
 genBit = Gen.element [low, high, errorX "X"]

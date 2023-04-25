@@ -22,6 +22,14 @@ module Clash.Cores.UART
   , uartRx
   , uartNoBaudGen
   , uart
+
+  -- * Internal
+  , UartBaudGenTick
+  , UartBaudGenTick2
+  , PeriodToHz
+  , DivRound
+  , BaudGenCounterWidth
+  , Second
   ) where
 
 import Clash.Prelude
