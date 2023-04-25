@@ -41,7 +41,7 @@ import Clash.Hedgehog.Unique
 
 -- | Classify a type or kind according to some criteria. The classification
 -- of a type or kind is used to determine the pre-defined types / kinds which
--- can be used in hole fills. See 'classify' and 'useTyCon'.
+-- can be used in hole fills. See @classify@ and @useTyCon@.
 --
 data Class = Class
   { cData :: !Any -- ^ Uses -XDataKinds
@@ -131,7 +131,7 @@ classify isKind tcm = go
           ConstTy _ -> error ("classify: Naked ConstTy: " <> showPpr ty)
 
 -- | Decide whether to use a type constructor based on the configuration and
--- the result of 'classifyKind'. A type constructor is not usable if it uses
+-- the result of @classifyKind@. A type constructor is not usable if it uses
 -- any features which are not included in the current configuration.
 --
 useTyCon :: Bool -> CoreGenConfig -> TyConMap -> TyCon -> Bool

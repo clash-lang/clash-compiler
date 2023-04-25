@@ -25,7 +25,7 @@ import Clash.Core.Type (Type)
 import Clash.Core.TysPrim
 
 -- | Generate a 'Literal' with the specified core type. If the type does not
--- correspond to a known 'PrimTyCon' (as defined in "Clash.Core.TysPrim") then
+-- correspond to a known @PrimTyCon@ (as defined in @Clash.Core.TysPrim@) then
 -- an error is returned.
 --
 genLiteralFrom

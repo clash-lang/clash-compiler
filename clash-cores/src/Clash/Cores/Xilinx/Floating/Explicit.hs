@@ -318,8 +318,8 @@ type FromS32DefDelay = 6
 
 -- | Customizable floating point comparison
 --
--- Produces 'NaN' if any of the inputs is NaN. Otherwise, it behaves like
--- Haskell's 'P.compare'.
+-- Produces 'Clash.Cores.Xilinx.Floating.NaN' if any of the inputs is NaN. Otherwise,
+-- it behaves like Haskell's 'P.compare'.
 --
 -- Only the delay is configurable, so this function does not take a @Config@
 -- argument.
@@ -343,8 +343,8 @@ compareWith clk ena a b = delayI und ena clk (xilinxCompare <$> a <*> b)
 
 -- | Floating point comparison, with default delay
 --
--- Produces 'NaN' if any of the inputs is NaN. Otherwise, it behaves like
--- Haskell's 'P.compare'.
+-- Produces 'Clash.Cores.Xilinx.Floating.NaN' if any of the inputs is NaN. Otherwise,
+-- it behaves like Haskell's 'P.compare'.
 compare
   :: forall dom n
    . ( KnownDomain dom
