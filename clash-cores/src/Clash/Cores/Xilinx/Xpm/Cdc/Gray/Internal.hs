@@ -9,6 +9,8 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_HADDOCK hide #-}
+
 module Clash.Cores.Xilinx.Xpm.Cdc.Gray.Internal where
 
 import Prelude
