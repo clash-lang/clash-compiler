@@ -179,7 +179,8 @@ data Element
   -- ^ Period of a domain. Errors if not applied to a @KnownDomain@ or
   -- @KnownConfiguration@.
   | LongestPeriod
-  -- ^ Longest period of all known domains
+  -- ^ Longest period of all known domains. The minimum duration returned is
+  -- 100 ns, see https://github.com/clash-lang/clash-compiler/issues/2455.
   | ActiveEdge !Signal.ActiveEdge !Int
   -- ^ Test active edge of memory elements in a certain domain. Errors if not
   -- applied to a @KnownDomain@ or @KnownConfiguration@.

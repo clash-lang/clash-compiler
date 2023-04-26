@@ -1,0 +1,1 @@
+CHANGED: Clock generators now wait at least 100 ns before producing their first tick. This change has been implemented to account for Xilinx's GSR in clock synchronization primitives. This change does not affect Clash simulation. See [#2455](https://github.com/clash-lang/clash-compiler/issues/2455).

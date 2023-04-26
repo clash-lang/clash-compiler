@@ -14,6 +14,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
@@ -463,7 +464,9 @@ renderElem b (Period n) = do
 
 renderElem _ LongestPeriod = do
   doms <- domainConfigurations
-  let longestPeriod = maximum [vPeriod v | v <- HashMap.elems doms]
+  -- Longest period with a minimum of 100 ns, see:
+  -- https://github.com/clash-lang/clash-compiler/issues/2455
+  let longestPeriod = maximum (100_000 : [vPeriod v | v <- HashMap.elems doms])
   return (const (Text.pack (show longestPeriod)))
 
 renderElem b (Tag n) = do
