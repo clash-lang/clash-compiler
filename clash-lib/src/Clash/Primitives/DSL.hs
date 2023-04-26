@@ -62,6 +62,7 @@ module Clash.Primitives.DSL
   , deconstructMaybe
 
   -- ** Conversion
+  , bitCoerce
   , toBV
   , fromBV
   , enableToBit
@@ -635,6 +636,24 @@ exprToInteger :: Expr -> Maybe Integer
 exprToInteger (DataCon _ _ [n]) = exprToInteger n
 exprToInteger (Literal _ (NumLit n)) = Just n
 exprToInteger _ = Nothing
+
+-- | Convert an expression from one type to another. Errors if result type and
+-- given expression are sized differently.
+bitCoerce ::
+  (HasCallStack, Backend backend) =>
+  -- | Name hints for intermediate variables
+  Text ->
+  -- | Type to convert to
+  HWType ->
+  -- | Expression to convert
+  TExpr ->
+  -- | Converted expression
+  State (BlockState backend) TExpr
+bitCoerce nameHint destType e@(TExpr ety _)
+  | tySize ety /= tySize @Int destType = error "Size mismatch"
+  | ety == destType = pure e
+  | BitVector _ <- ety = fromBV nameHint destType e
+  | otherwise = bitCoerce nameHint destType =<< toBV nameHint e
 
 -- | Convert an expression to a BitVector
 toBV ::
