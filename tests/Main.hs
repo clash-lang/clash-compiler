@@ -498,6 +498,12 @@ runClashTest = defaultMain $ clashTestRoot
                                                         ]
                            }
             in runTest "Floating" _opts
+          , runTest "XpmCdcArraySingle" $ def
+              { hdlTargets=[VHDL, Verilog]
+              , hdlLoad=[]
+              , hdlSim=[Vivado]
+              , buildTargets=BuildSpecific ["tb" <> show n | n <- [(0::Int)..7]]
+              }
           , runTest "XpmCdcGray" $ def
               { hdlTargets=[VHDL, Verilog]
               , hdlLoad=[]
