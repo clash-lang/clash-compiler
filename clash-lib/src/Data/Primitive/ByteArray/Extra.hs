@@ -11,11 +11,18 @@ import GHC.Exts (IsList(..))
 import Control.DeepSeq (NFData(..))
 #endif
 
-#if !MIN_VERSION_hashable(1,4,1)
--- Hashable <1.4.1 doesn't define hashable instances at all
+-- hashable 1.4.2 defines Hashable for Data.Array.Byte.ByteArray, either from
+-- base or from the data-array-byte compat package for GHC < 9.4.
+-- primitive 0.8.0.0 re-exports this ByteArray.
+#if !MIN_VERSION_primitive(0,8,0)
+-- In primitive < 0.8.0.0, its ByteArray is a distinct type from
+-- Data.Array.Byte.ByteArray (insofar as the latter even exists).
+#define DEFINE_HASHABLE_BYTEARRAY
+#elif !MIN_VERSION_hashable(1,4,1)
+-- hashable < 1.4.1 doesn't define a Hashable ByteArray instance at all.
 #define DEFINE_HASHABLE_BYTEARRAY
 #elif !MIN_VERSION_hashable(1,4,2)
--- Hashable 1.4.1 defines hashable for _some_ base versions
+-- hashable 1.4.1 defines hashable for the ByteArray added to base 4.17.
 #if !MIN_VERSION_base(4,17,0)
 #define DEFINE_HASHABLE_BYTEARRAY
 #endif
