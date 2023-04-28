@@ -8,6 +8,8 @@ import Clash.Prelude
   , ssymbolToString
   )
 
+import Hedgehog (Gen)
+
 import Clash.FFI.VPI.Module (Module)
 import Clash.FFI.VPI.Port (Port, Direction)
 
@@ -46,6 +48,12 @@ data TBSignal (s :: Stage) (dom :: Domain) a =
       , signalCurVal :: IO a
       , signalPrint  :: Maybe (a -> String)
       }
+  | Generator
+      { signalId     :: ID s SIGNAL
+      , signalCurVal :: IO a
+      , signalPrint  :: Maybe (a -> String)
+      , generator    :: Gen a
+      }
 
 instance (KnownDomain dom, AnyStage s) => Show (TBSignal s dom a) where
   show = case knownDomain @dom of
@@ -58,6 +66,8 @@ instance (KnownDomain dom, AnyStage s) => Show (TBSignal s dom a) where
           <> show signalDeps
       IOInput{..} ->
         "Input " <> show signalId
+      Generator{..} ->
+        "Gen " <> show signalId
 
 instance AnyStage s => Eq (TBSignal s dom a) where
   (==) = (==) `on` signalId
@@ -79,7 +89,7 @@ instance Functor (TBSignal 'USER dom) where
         , signalUpdate = Nothing
           -- we lose printing abilities at this point. This is fine,
           -- since printing capabilities are recovered automatically
-          -- once the new signal gets watched.
+          -- once the new signal requires printing capabilities again.
         , signalPrint  = Nothing
         , ..
         }
@@ -87,11 +97,15 @@ instance Functor (TBSignal 'USER dom) where
       IOInput
         { signalId     = NoID
         , signalCurVal = f <$> signalCurVal
-          -- we lose printing abilities at this point. This is fine,
-          -- since printing capabilities are recovered automatically
-          -- once the new signal gets watched.
         , signalPrint  = Nothing
         , ..
+        }
+    Generator{..} ->
+      Generator
+        { signalId = NoID
+        , signalCurVal = f <$> signalCurVal
+        , signalPrint  = Nothing
+        , generator    = f <$> generator
         }
 
 instance Applicative (TBSignal 'USER dom) where

@@ -67,8 +67,9 @@ simulate steps testbench = do
       when (i > 0) $ case signalPrint s of
         Nothing    -> return ()
         Just toStr -> Prelude.putStrLn . (<> toStr v) $ case s of
-          IOInput{}  -> "I "
-          TBSignal{} -> "O "
+          IOInput{}   -> "I "
+          Generator{} -> "I "
+          TBSignal{}  -> "O "
     modifyIORef tbSimStepRef (+ 1)
   return r
 
@@ -167,8 +168,9 @@ assignInputs = do
 --  putStrLn $ "assignInputs " <> show (time, vpiClock, vpiInit)
 
   forM_ vpiSignals $ onAllSignalTypes $ \case
-    IOInput{}    -> return ()
     TBSignal{..} -> mapM_ (assignModuleInputs vpiInstance) signalDeps
+    _            -> return ()
+
 
   let ?state = ?state { vpiClock = complement vpiClock
                       , vpiInit = False
@@ -207,7 +209,6 @@ readOutputs = do
 --  putStrLn $ "readOutputs " <> show time
 
   forM_ vpiSignals $ onAllSignalTypes $ \case
-    IOInput{}    -> return ()
     TBSignal{..} -> case vpiInstance of
       Nothing -> error "Cannot read from module"
       Just VPIInstance{..} ->
@@ -216,6 +217,7 @@ readOutputs = do
             Just upd -> liftIO $ upd $ unpack $ resize v
             Nothing  -> error "No signal update"
           _ -> error "Unexpected return format"
+    _ -> return ()
 
   -- print the watched signals
   i <- liftIO $ readIORef vpiStepRef
@@ -224,8 +226,9 @@ readOutputs = do
     case signalPrint s of
       Nothing    -> return ()
       Just toStr -> putStrLn . (<> toStr v) $ case s of
-        IOInput{}  -> "I "
-        TBSignal{} -> "O "
+        IOInput{}   -> "I "
+        Generator{} -> "I "
+        TBSignal{}  -> "O "
 
   -- proceed time for all instances not running trough Clash-FFI
   liftIO $ modifyIORef vpiStepRef (+ 1)
@@ -260,7 +263,6 @@ vpiInst ::
   (?signalFromID :: ID 'FINAL () -> SomeSignal 'FINAL, KnownDomain dom, BitPack a, Typeable b) =>
   Module -> TBSignal 'FINAL dom a -> SimCont b (TBSignal 'FINAL dom a)
 vpiInst vpiModule = \case
-  IOInput{}  -> error "Unfiltered IOInput"
   tbs@TBSignal{..} -> do
     ports <- modulePorts vpiModule
     dirs  <- mapM direction ports
@@ -292,6 +294,7 @@ vpiInst vpiModule = \case
       _   -> error "TODO: later / "
 
     return tbs { vpiInstance = Just VPIInstance{..} }
+  _ -> error "Unfiltered TBS"
 
  where
   isInput = \case

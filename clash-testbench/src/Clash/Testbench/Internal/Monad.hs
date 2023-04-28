@@ -247,6 +247,15 @@ runTB mode testbench = do
                 , ..
                 } :: Internal.TBSignal 'FINAL dom a
             )
+        (Generator{..} :: TBSignal dom a) ->
+          return $ SomeSignal
+            ( Generator
+                { signalId = case signalId of
+                    NoID       -> NoID
+                    SignalID x -> SignalID x
+                , ..
+                } :: Internal.TBSignal 'FINAL dom a
+            )
         Internal.TBSignal{..} -> do
           deps <- mapM fixAutoDomIds signalDeps
           return $ SomeSignal $ Internal.TBSignal
@@ -256,6 +265,8 @@ runTB mode testbench = do
             , signalDeps = deps
             , ..
             }
+
+
 
     FreeID n <- gets idCount
     let a :: A.Array Int (SomeSignal 'FINAL)

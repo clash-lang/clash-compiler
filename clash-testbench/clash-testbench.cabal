@@ -39,6 +39,7 @@ library
     Clash.Testbench.Input
     Clash.Testbench.Output
     Clash.Testbench.Simulate
+    Clash.Testbench.Generate
   other-modules:
     Clash.Testbench.Internal.ID
     Clash.Testbench.Internal.Signal
@@ -48,6 +49,7 @@ library
     base,
     mtl,
     array,
+    hedgehog,
     containers,
     bytestring,
     clash-ffi,
