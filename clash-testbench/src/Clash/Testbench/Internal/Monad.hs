@@ -2,7 +2,6 @@ module Clash.Testbench.Internal.Monad where
 
 import Control.Arrow (second)
 import Control.Monad.State.Lazy (StateT, liftIO, get, gets, modify, forM, evalStateT)
-import Data.Set (Set, toList, member, insert)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef, modifyIORef)
 
 import qualified Data.Map as M
@@ -47,13 +46,15 @@ instance Ord DomainSpecificIDSource where
   compare DSEnable{} _          = LT
   compare _          DSEnable{} = GT
 
+type KnownSignals (s :: Stage) = S.Set (SomeSignal s)
+
 data ST =
   ST
     { idCount    :: ID 'USER Int
-    , signals    :: Set (SomeSignal 'USER)
+    , signals    :: KnownSignals 'USER
     , simStepRef :: IORef Int
     , simMode    :: IORef Simulator
-    , domIds     :: M.Map String (Set DomainSpecificIDSource)
+    , domIds     :: M.Map String (S.Set DomainSpecificIDSource)
     }
 
 data Testbench =
@@ -68,7 +69,7 @@ instance Show ST where
   show ST{..} =
     "ST {"
     <> show idCount <> ", "
-    <> show (toList signals)
+    <> show (S.toAscList signals)
     <> "}"
 
 -- | The 'TB' monad defines the context in which the test bench gets
@@ -89,15 +90,24 @@ nextFreeID = do
   modify $ \st -> st { idCount = i + 1 }
   return i
 
-registerTBS ::
+mindSignal ::
   (NFDataX a, BitPack a, KnownDomain dom) =>
   TBSignal dom a ->
   TB (TBSignal dom a)
-registerTBS s = do
-  let s' = SomeSignal s
-  modify $ \st@ST{..} ->
-    st { signals = if s' `member` signals then signals else insert s' signals }
-  return s
+mindSignal s = case signalId s of
+  NoID -> do
+    FreeID i <- nextFreeID
+    let s' = s { signalId = SignalID i }
+    modify $ \st@ST{..} -> st { signals = S.insert (SomeSignal s') signals }
+    return s'
+  _ -> do
+    let s' = SomeSignal s
+    modify $ \st@ST{..} ->
+      st { signals = S.insert s' $ case S.lookupIndex s' signals of
+             Nothing -> signals
+             Just i  -> S.deleteAt i signals
+         }
+    return s
 
 type family ArgOf a where
   ArgOf (a -> b) = a
@@ -128,8 +138,7 @@ instance
  where
   (@@) = defTBLift
 
-  liftTB name deps exec s = do
-    FreeID i <- nextFreeID
+  liftTB signalName (reverse -> signalDeps) exec signal = do
     mode <- simMode <$> get
     extVal <- liftIO $ newIORef Nothing
 
@@ -137,11 +146,8 @@ instance
     (signalRef, run) <- liftIO exec
     simStepCache <- liftIO (readIORef simStepRef >>= newIORef)
 
-    registerTBS $ Internal.TBSignal
-      { signal       = s
-      , signalId     = SignalID i
-      , signalDeps   = reverse deps
-      , signalName   = name
+    mindSignal $ Internal.TBSignal
+      { signalId     = NoID
       , signalCurVal = do
           readIORef mode >>= \case
             Internal -> do
@@ -160,9 +166,10 @@ instance
             External -> readIORef extVal >>= \case
               Nothing -> error "No Value"
               Just x  -> return x
-      , signalUpdate = writeIORef extVal . Just
+      , signalUpdate = Just (writeIORef extVal . Just)
       , signalPrint  = Nothing
       , vpiInstance  = Nothing
+      , ..
       }
 
 instance
@@ -231,13 +238,21 @@ runTB mode testbench = do
     ST { signals, simStepRef, simMode } <- get
     tbSignals <- forM (S.toAscList signals) $ \case
       SomeSignal s -> case s of
-        (IOInput {signalId = SignalID x, ..} :: TBSignal dom a) ->
+        (IOInput{..} :: TBSignal dom a) ->
           return $ SomeSignal
-            (IOInput { signalId = SignalID x, .. } :: Internal.TBSignal 'FINAL dom a)
-        Internal.TBSignal {signalId = SignalID x, ..} -> do
+            ( IOInput
+                { signalId = case signalId of
+                    NoID       -> NoID
+                    SignalID x -> SignalID x
+                , ..
+                } :: Internal.TBSignal 'FINAL dom a
+            )
+        Internal.TBSignal{..} -> do
           deps <- mapM fixAutoDomIds signalDeps
           return $ SomeSignal $ Internal.TBSignal
-            { signalId   = SignalID x
+            { signalId   = case signalId of
+                NoID       -> NoID
+                SignalID x -> SignalID x
             , signalDeps = deps
             , ..
             }
@@ -260,6 +275,7 @@ runTB mode testbench = do
 
   fixAutoDomIds :: ID 'USER () -> TB (ID 'FINAL ())
   fixAutoDomIds (SomeID s) = case s of
+    NoID       -> return $ SomeID $ NoID
     SignalID x -> return $ SomeID $ SignalID x
     ClockID x  -> updAutoDom DSClock  (SomeID . ClockID)  x
     ResetID x  -> updAutoDom DSReset  (SomeID . ResetID)  x

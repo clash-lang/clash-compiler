@@ -37,7 +37,7 @@ data TBSignal (s :: Stage) (dom :: Domain) a =
       , signalName   :: String
       , signal       :: Signal dom a
       , signalCurVal :: IO a
-      , signalUpdate :: a -> IO ()
+      , signalUpdate :: Maybe (a -> IO ())
       , signalPrint  :: Maybe (a -> String)
       , vpiInstance  :: Maybe VPIInstance
       }
@@ -65,7 +65,49 @@ instance AnyStage s => Eq (TBSignal s dom a) where
 instance AnyStage s => Ord (TBSignal s dom a) where
   compare = compare `on` signalId
 
------------
+instance Functor (TBSignal 'USER dom) where
+  fmap f = \case
+    TBSignal{..} ->
+      TBSignal
+        { signalId     = NoID
+        , signal       = fmap f signal
+        , signalCurVal = f <$> signalCurVal
+          -- We cannot update the values of a mapped signal, which
+          -- makes sense, since a mapped signal cannot be simulated
+          -- externally. It is always defined as the result of
+          -- applying 'f' to the given source signal.
+        , signalUpdate = Nothing
+          -- we lose printing abilities at this point. This is fine,
+          -- since printing capabilities are recovered automatically
+          -- once the new signal gets watched.
+        , signalPrint  = Nothing
+        , ..
+        }
+    IOInput{..} ->
+      IOInput
+        { signalId     = NoID
+        , signalCurVal = f <$> signalCurVal
+          -- we lose printing abilities at this point. This is fine,
+          -- since printing capabilities are recovered automatically
+          -- once the new signal gets watched.
+        , signalPrint  = Nothing
+        , ..
+        }
+
+instance Applicative (TBSignal 'USER dom) where
+  pure x =
+    IOInput
+      { signalId     = NoID
+      , signalCurVal = pure x
+      , signalPrint  = Nothing
+      }
+
+  f <*> s =
+    IOInput
+      { signalId     = NoID
+      , signalCurVal = signalCurVal f <*> signalCurVal s
+      , signalPrint  = Nothing
+      }
 
 data TBClock (s :: Stage) (dom :: Domain) =
   TBClock

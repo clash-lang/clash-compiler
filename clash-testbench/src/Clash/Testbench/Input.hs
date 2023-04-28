@@ -6,7 +6,7 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 Input sources for simulating 'TB' defined testbenches.
 -}
 module Clash.Testbench.Input
-  ( inputFromList
+  ( fromList
   ) where
 
 import Control.Monad.State.Lazy
@@ -25,17 +25,16 @@ import Clash.Testbench.Internal.ID
 -- the list is finite and the number of simulation steps exceeds the
 -- length of the list, then the value of the first argument is
 -- used instead.
-inputFromList
+fromList
   :: (KnownDomain dom, BitPack a, NFDataX a) => a -> [a] -> TB (TBSignal dom a)
-inputFromList x xs = do
-  FreeID i <- nextFreeID
+fromList x xs = do
   ST{..} <- get
 
   listRef <- liftIO $ newIORef $ x : xs
   simStepCache <- liftIO (readIORef simStepRef >>= newIORef)
 
-  registerTBS $ IOInput
-    { signalId     = SignalID i
+  mindSignal $ IOInput
+    { signalId     = NoID
     , signalPrint  = Nothing
     , signalCurVal = do
         (r, rs) <- fromMaybe (x, []) . uncons <$> readIORef listRef

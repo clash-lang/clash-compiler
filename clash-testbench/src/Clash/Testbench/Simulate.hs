@@ -190,7 +190,7 @@ assignInputs = do
          ClockID  _TODO -> sendV port vpiClock
          ResetID  _TODO -> sendV port $ boolToBit vpiInit
          EnableID _TODO -> sendV port high
-         SignalID _TODO
+         _
            | vpiClock == high -> return ()
            | otherwise        ->
                (`onAllSignalTypes` vpiSignal sid) $ \s ->
@@ -212,8 +212,9 @@ readOutputs = do
       Nothing -> error "Cannot read from module"
       Just VPIInstance{..} ->
         receiveValue VectorFmt (port vpiOutputPort) >>= \case
-          BitVectorVal SNat v ->
-            liftIO $ signalUpdate $ unpack $ resize v
+          BitVectorVal SNat v -> case signalUpdate of
+            Just upd -> liftIO $ upd $ unpack $ resize v
+            Nothing  -> error "No signal update"
           _ -> error "Unexpected return format"
 
   -- print the watched signals

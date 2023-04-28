@@ -9,7 +9,7 @@ import qualified Calculator (topEntity)
 myTestbench
   :: TB ()
 myTestbench = mdo
-  input <- inputFromList Pop [Imm 1, Push, Imm 2, Push, Pop, Pop, Pop, ADD]
+  input <- fromList Pop [Imm 1, Push, Imm 2, Push, Pop, Pop, Pop, ADD]
   output <- ("topEntity" @@ Calculator.topEntity) auto auto auto input
   watch input
   watch output

@@ -14,6 +14,7 @@ module Clash.Testbench.Internal.ID
   , isClockID
   , isResetID
   , isEnableID
+  , isNoID
   ) where
 
 import Clash.Prelude (Type)
@@ -83,6 +84,9 @@ data ID (stage :: Stage) a where
   ClockID  ::                IDSource stage CLOCK  -> ID stage CLOCK
   ResetID  ::                IDSource stage RESET  -> ID stage RESET
   EnableID ::                IDSource stage ENABLE -> ID stage ENABLE
+  -- signals that result from higher order applications may not be
+  -- explicitly available
+  NoID     ::                                         ID stage SIGNAL
   -- wrapper type for passing different ID types around. Note that IDs
   -- of the free id pool cannot be passed around this way.
   SomeID   :: (a ~ IDT a) => ID stage a            -> ID stage ()
@@ -100,6 +104,7 @@ instance AnyStage 'USER where
     ClockID  x -> f $ Right x
     ResetID x  -> f $ Right x
     EnableID x -> f $ Right x
+    NoID       -> f $ Left (-1)
     SomeID s   -> mapID f s
 
 instance AnyStage 'FINAL where
@@ -108,6 +113,7 @@ instance AnyStage 'FINAL where
     ClockID  x -> f $ Left x
     ResetID x  -> f $ Left x
     EnableID x -> f $ Left x
+    NoID       -> f $ Left (-1)
     SomeID s   -> mapID f s
 
 instance Num (ID 'USER Int) where
@@ -128,7 +134,9 @@ instance Show (ID s Int) where
   show (FreeID x) = show x
 
 instance Show (ID s SIGNAL) where
-  show (SignalID x) = 's' : show x
+  show = \case
+    SignalID x -> 's' : show x
+    NoID       -> "-"
 
 instance AnyStage s => Show (ID s CLOCK) where
   show x = 'c' : mapID showEither x
@@ -145,6 +153,7 @@ instance AnyStage s => Show (ID s ()) where
     ClockID{}  -> show x
     ResetID{}  -> show x
     EnableID{} -> show x
+    NoID{}     -> show x
 
 showEither :: (Show a, Show b) => Either a b -> String
 showEither = \case
@@ -158,16 +167,27 @@ idToInt = \case
   ClockID x  -> x
   ResetID x  -> x
   EnableID x -> x
+  NoID       -> -1
   SomeID s   -> idToInt s
 
 -- | Checks whether the given ID is a signal identifier.
 isSignalID :: ID s a -> Bool
 isSignalID = \case
   SignalID{} -> True
+  NoID{}     -> True
   SomeID s   -> case s of
     SignalID{} -> True
+    NoID{}     -> True
     _          -> False
   _          -> False
+
+isNoID :: ID s a -> Bool
+isNoID = \case
+  NoID{} -> True
+  SomeID s  -> case s of
+    NoID{} -> True
+    _      -> False
+  _         -> False
 
 -- | Checks whether the given ID is a clock identifier.
 isClockID :: ID s a -> Bool

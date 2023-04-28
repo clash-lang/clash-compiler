@@ -11,8 +11,7 @@ module Clash.Testbench.Output
   , watchWith
   ) where
 
-import Control.Monad.State.Lazy (modify)
-import Data.Set (lookupIndex, insert, deleteAt)
+import Control.Monad (void)
 
 import Clash.Prelude (KnownDomain(..), BitPack(..), NFDataX)
 
@@ -33,10 +32,4 @@ watchWith ::
   (KnownDomain dom, BitPack a, NFDataX a) =>
   (a -> String) -> TBSignal dom a -> TB ()
 watchWith toStr tbs =
-  modify $ \st@ST{..} ->
-    st { signals = case lookupIndex tbs' signals of
-           Nothing -> insert tbs' signals
-           Just i  -> insert tbs' $ deleteAt i signals
-       }
- where
-   tbs' = SomeSignal $ tbs { signalPrint = Just toStr }
+  void $ mindSignal tbs { signalPrint = Just toStr }
