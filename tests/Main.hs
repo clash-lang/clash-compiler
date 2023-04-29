@@ -514,6 +514,12 @@ runClashTest = defaultMain $ clashTestRoot
               , hdlSim=[Vivado]
               , buildTargets=BuildSpecific ["tb" <> show n | n <- [(1::Int)..7]]
               }
+          , runTest "XpmCdcHandshake" $ def
+              { hdlTargets=[VHDL, Verilog]
+              , hdlLoad=[]
+              , hdlSim=[Vivado]
+              , buildTargets=BuildSpecific ["tb" <> show n | n <- [(0::Int)..6]]
+              }
           , runTest "XpmCdcSingle" $ def
               { hdlTargets=[VHDL, Verilog]
               , hdlLoad=[Vivado]
