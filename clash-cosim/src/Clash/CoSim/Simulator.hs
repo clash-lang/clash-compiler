@@ -18,6 +18,15 @@ see: <https://essay.utwente.nl/70777/>.
 module Clash.CoSim.Simulator
     ( coSimN
     , defaultSettings
+
+      -- * Internal
+    , CoSim
+    , coSim
+    , CoSimType
+    , CoSimRun
+    , SignalStream
+    , toSignalStream
+    , fromSignalStream
     ) where
 
 ---------------------------

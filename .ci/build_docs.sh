@@ -34,9 +34,10 @@ for pkg in ${haddock_pkgs}; do
   #   exit 1
   # fi
 
-  if [[ $pkg == "clash-prelude" ]]; then
-    # TODO: Currently just checking clash-prelude; other libraries still fail
-    # these checks.
+  if [[ "${pkg}" != "clash-lib" && "${pkg}" != "clash-lib-hedgehog" ]]; then
+    # TODO: Currently not checking `clash-lib` as it still fails these checks.
+    #       `clash-lib-hedgehog` is blocked on
+    #       https://github.com/clash-lang/clash-compiler/issues/2462
 
     out_of_scope_warn="If you qualify the identifier, haddock can try to link it anyway"
     if grep -q "${out_of_scope_warn}" haddock_log; then

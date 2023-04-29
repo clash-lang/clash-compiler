@@ -37,6 +37,7 @@ JTAG clock speed:
 
 module Clash.Cores.Xilinx.VIO
   ( vioProbe
+  , VIO(..)
   ) where
 
 import Clash.Explicit.Prelude

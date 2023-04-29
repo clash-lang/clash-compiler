@@ -24,8 +24,6 @@ import           Clash.Cores.UART
 -- | Create a 100 MHz domain instead of relying on the default period of System.
 createDomain vSystem{vName="System100", vPeriod=10000}
 
-type Second = 1_000_000_000_000
-
 toMaybe :: Bool -> a -> Maybe a
 toMaybe True a = Just a
 toMaybe False _ = Nothing

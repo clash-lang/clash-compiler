@@ -74,7 +74,7 @@ arityOf = length . fst . splitFunForallTy
 
 -- | A TyConMap contains all the algebraic data types and type families that
 -- are used in a program. This is typically the first thing that should be
--- generated, as calls to other generators like 'genKind' or 'genTypeFrom' will
+-- generated, as calls to other generators like @genKind@ or @genTypeFrom@ will
 -- likely want to use the type constructors added to the TyConMap.
 --
 -- TODO It would be nice if this also included types from @clash-prelude@ like
