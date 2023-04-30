@@ -146,6 +146,7 @@ library
     Clash.Cores.Xilinx.Xpm.Cdc.Gray
     Clash.Cores.Xilinx.Xpm.Cdc.Handshake
     Clash.Cores.Xilinx.Xpm.Cdc.Internal
+    Clash.Cores.Xilinx.Xpm.Cdc.Pulse
     Clash.Cores.Xilinx.Xpm.Cdc.Single
     Clash.Cores.SPI
     Clash.Cores.UART
