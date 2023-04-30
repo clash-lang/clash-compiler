@@ -8,10 +8,12 @@ module Clash.Cores.Xilinx.Xpm.Cdc
   ( xpmCdcArraySingle
   , xpmCdcGray
   , xpmCdcHandshake
+  , xpmCdcPulse
   , xpmCdcSingle
   ) where
 
 import Clash.Cores.Xilinx.Xpm.Cdc.ArraySingle
 import Clash.Cores.Xilinx.Xpm.Cdc.Gray
 import Clash.Cores.Xilinx.Xpm.Cdc.Handshake
+import Clash.Cores.Xilinx.Xpm.Cdc.Pulse
 import Clash.Cores.Xilinx.Xpm.Cdc.Single
