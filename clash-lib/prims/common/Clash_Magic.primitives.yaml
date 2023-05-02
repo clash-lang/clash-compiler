@@ -16,3 +16,9 @@
 - Primitive:
     name: Clash.Magic.setName
     primType: Function
+- BlackBox:
+    name: Clash.Magic.SimOnly
+    kind: Expression
+    type: 'SimOnly :: a -> SimOnly a'
+    template: ~ERRORO
+    workInfo: Constant

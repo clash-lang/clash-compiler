@@ -391,6 +391,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "TestIndex" def{hdlSim=[]}
         , runTest "Time" def
         , runTest "Shift" def{hdlSim=[]}
+        , runTest "SimOnly" def{hdlTargets=[VHDL],hdlSim=[]}
         , runTest "SimpleConstructor" def{hdlSim=[]}
         , runTest "SomeNatVal" def{hdlTargets=[VHDL],hdlSim=[]}
         , runTest "TyEqConstraints" def{
