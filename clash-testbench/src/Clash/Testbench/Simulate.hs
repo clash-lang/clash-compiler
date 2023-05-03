@@ -68,9 +68,17 @@ simulate steps testbench = do
         Nothing    -> return ()
         Just toStr -> Prelude.putStrLn . (<> toStr v) $ case s of
           IOInput{}   -> "I "
-          Generator{} -> "I "
+          SimSignal{} -> "O "
           TBSignal{}  -> "O "
+
     modifyIORef tbSimStepRef (+ 1)
+
+    forM_ tbSignals $ onAllSignalTypes $ \case
+      SimSignal{..} -> signalVerify >>= \case
+        Nothing  -> Prelude.putStrLn "✓"
+        Just msg -> Prelude.putStrLn $ "✗ " <> msg
+      _ -> return ()
+
   return r
 
 data VPIState =
@@ -121,13 +129,13 @@ simulateFFI steps testbench = do
 
     -- match top modules with the signals --
     vpiSignals <-
-        fmap ((<>) (filter (not . isTBSignal) tbSignals) . catMaybes)
+        fmap ((<>) (filter (not . isSimSignal) tbSignals) . catMaybes)
       $ mapM matchModule
       $ M.toAscList
       $ M.unionWith (\(x,_) (_,y) -> (x,y))
           ( M.fromList
           $ map (\s -> (signalName `onAllSignalTypes` s, (Just s, Nothing)))
-          $ filter isTBSignal tbSignals
+          $ filter isSimSignal tbSignals
           )
           ( M.fromList
           $ zip (map B.unpack topNames)
@@ -158,8 +166,8 @@ simulateFFI steps testbench = do
       Just x -> x
       Nothing -> error $ show b
 
-  isTBSignal = \case
-    SomeSignal TBSignal{}            -> True
+  isSimSignal = \case
+    SomeSignal SimSignal{}            -> True
     _                                -> False
 
 assignInputs :: (?state :: VPIState) => SimAction ()
@@ -168,7 +176,7 @@ assignInputs = do
 --  putStrLn $ "assignInputs " <> show (time, vpiClock, vpiInit)
 
   forM_ vpiSignals $ onAllSignalTypes $ \case
-    TBSignal{..} -> mapM_ (assignModuleInputs vpiInstance) signalDeps
+    SimSignal{..} -> mapM_ (assignModuleInputs vpiInstance) dependencies
     _            -> return ()
 
 
@@ -189,10 +197,11 @@ assignInputs = do
     Just VPIInstance{..} -> \sid@(SomeID x) ->
       let VPIPort{..} = vpiInputPort sid
       in case x of
+         NoID           -> return ()
          ClockID  _TODO -> sendV port vpiClock
          ResetID  _TODO -> sendV port $ boolToBit vpiInit
          EnableID _TODO -> sendV port high
-         _
+         SignalID _TODO
            | vpiClock == high -> return ()
            | otherwise        ->
                (`onAllSignalTypes` vpiSignal sid) $ \s ->
@@ -209,7 +218,7 @@ readOutputs = do
 --  putStrLn $ "readOutputs " <> show time
 
   forM_ vpiSignals $ onAllSignalTypes $ \case
-    TBSignal{..} -> case vpiInstance of
+    SimSignal{..} -> case vpiInstance of
       Nothing -> error "Cannot read from module"
       Just VPIInstance{..} ->
         receiveValue VectorFmt (port vpiOutputPort) >>= \case
@@ -227,8 +236,8 @@ readOutputs = do
       Nothing    -> return ()
       Just toStr -> putStrLn . (<> toStr v) $ case s of
         IOInput{}   -> "I "
-        Generator{} -> "I "
-        TBSignal{}  -> "O "
+        SimSignal{} -> "O "
+        TBSignal{}  -> "S "
 
   -- proceed time for all instances not running trough Clash-FFI
   liftIO $ modifyIORef vpiStepRef (+ 1)
@@ -252,7 +261,8 @@ matchModule ::
   SimCont b (Maybe (SomeSignal 'FINAL))
 matchModule = \case
   (_, (Just s, Just m)) -> case s of
-    SomeSignal s' -> Just . SomeSignal <$> vpiInst m s'
+    SomeSignal s'  -> Just . SomeSignal  <$> vpiInst m s'
+    SomeMonitor s' -> Just . SomeMonitor <$> vpiInst m s'
   (name, (_, Nothing)) ->
     error $ "No module matches \"" <> name <> "\""
   (name, (Nothing, _)) -> do
@@ -263,7 +273,7 @@ vpiInst ::
   (?signalFromID :: ID 'FINAL () -> SomeSignal 'FINAL, KnownDomain dom, BitPack a, Typeable b) =>
   Module -> TBSignal 'FINAL dom a -> SimCont b (TBSignal 'FINAL dom a)
 vpiInst vpiModule = \case
-  tbs@TBSignal{..} -> do
+  tbs@SimSignal{..} -> do
     ports <- modulePorts vpiModule
     dirs  <- mapM direction ports
 
@@ -274,7 +284,7 @@ vpiInst vpiModule = \case
     vpiInputPort <-
       (M.!) . M.fromList
         <$> ( mapM (matchPort vpiModule)
-            $ zip signalDeps
+            $ zip dependencies
             $ map Just inputPorts <> repeat Nothing
             )
 

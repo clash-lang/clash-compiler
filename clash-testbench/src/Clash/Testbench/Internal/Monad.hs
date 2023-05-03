@@ -1,8 +1,12 @@
 module Clash.Testbench.Internal.Monad where
 
+import Algebra.PartialOrd
 import Control.Arrow (second)
 import Control.Monad.State.Lazy (StateT, liftIO, get, gets, modify, forM, evalStateT)
+import Data.Function ((&))
 import Data.IORef (IORef, newIORef, readIORef, writeIORef, modifyIORef)
+import Data.List (uncons, partition)
+import Data.Maybe (catMaybes)
 
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -52,6 +56,7 @@ data ST =
   ST
     { idCount    :: ID 'USER Int
     , signals    :: KnownSignals 'USER
+    , monitors   :: KnownSignals 'USER
     , simStepRef :: IORef Int
     , simMode    :: IORef Simulator
     , domIds     :: M.Map String (S.Set DomainSpecificIDSource)
@@ -90,24 +95,36 @@ nextFreeID = do
   modify $ \st -> st { idCount = i + 1 }
   return i
 
-mindSignal ::
-  (NFDataX a, BitPack a, KnownDomain dom) =>
+mind ::
+  (KnownDomain dom, NFDataX a, BitPack a) =>
+  (TBSignal dom a -> SomeSignal 'USER) ->
   TBSignal dom a ->
   TB (TBSignal dom a)
-mindSignal s = case signalId s of
+mind t s = case signalId s of
   NoID -> do
     FreeID i <- nextFreeID
     let s' = s { signalId = SignalID i }
-    modify $ \st@ST{..} -> st { signals = S.insert (SomeSignal s') signals }
+    modify $ \st@ST{..} -> st { signals = S.insert (t s') signals }
     return s'
   _ -> do
-    let s' = SomeSignal s
     modify $ \st@ST{..} ->
-      st { signals = S.insert s' $ case S.lookupIndex s' signals of
+      st { signals = S.insert (t s) $ case S.lookupIndex (t s) signals of
              Nothing -> signals
              Just i  -> S.deleteAt i signals
          }
     return s
+
+mindSignal ::
+  (KnownDomain dom, NFDataX a, BitPack a) =>
+  TBSignal dom a ->
+  TB (TBSignal dom a)
+mindSignal = mind SomeSignal
+
+monitor ::
+  KnownDomain dom =>
+  TBSignal dom Bool ->
+  TB (TBSignal dom Bool)
+monitor = mind SomeMonitor
 
 type family ArgOf a where
   ArgOf (a -> b) = a
@@ -138,35 +155,53 @@ instance
  where
   (@@) = defTBLift
 
-  liftTB signalName (reverse -> signalDeps) exec signal = do
+  liftTB signalName (reverse -> dependencies) exec origin = do
     mode <- simMode <$> get
     extVal <- liftIO $ newIORef Nothing
+    expectations <- liftIO $ newIORef []
 
     ST{..} <- get
     (signalRef, run) <- liftIO exec
     simStepCache <- liftIO (readIORef simStepRef >>= newIORef)
 
-    mindSignal $ Internal.TBSignal
+    let
+      signalCurVal = do
+        readIORef mode >>= \case
+          Internal -> do
+            (head# -> x, step) <- run
+            local <- readIORef simStepRef
+            world <- readIORef simStepCache
+            -- THOUGHT: one could also use an individual simulation
+            -- counter per domain allowing for multiple steps to be
+            -- simulated at once, if necessary.
+            if local == world
+            then return x
+            else do
+              modifyIORef signalRef $ step tail#
+              writeIORef simStepCache world
+              return x
+          External -> readIORef extVal >>= \case
+            Nothing -> error "No Value"
+            Just x  -> return x
+
+    mind SomeSignal $ Internal.SimSignal
       { signalId     = NoID
-      , signalCurVal = do
-          readIORef mode >>= \case
-            Internal -> do
-              (head# -> x, step) <- run
-              local <- readIORef simStepRef
-              world <- readIORef simStepCache
-              -- THOUGHT: one could also use an individual simulation
-              -- counter per domain allowing for multiple steps to be
-              -- simulated at once, if necessary.
-              if local == world
-              then return x
-              else do
-                modifyIORef signalRef $ step tail#
-                writeIORef simStepCache world
-                return x
-            External -> readIORef extVal >>= \case
-              Nothing -> error "No Value"
-              Just x  -> return x
       , signalUpdate = Just (writeIORef extVal . Just)
+      , signalExpect = modifyIORef expectations . (:)
+      , signalVerify = do
+          step <- readIORef simStepRef
+          value <- signalCurVal
+          expct <- readIORef expectations
+
+          let
+            (cur, later) =
+              partition (flip leq $ Expectation (step + 1, undefined)) expct
+
+          writeIORef expectations later
+
+          return$ fmap fst $ uncons $ catMaybes
+            $ map ((value &) . snd . expectation) cur
+
       , signalPrint  = Nothing
       , vpiInstance  = Nothing
       , ..
@@ -180,7 +215,7 @@ instance
   (@@) = defTBLift
 
   liftTB name deps exec sf s =
-    flip (liftTB name (SomeID (signalId s) : deps)) (sf $ signal s)
+    flip (liftTB name (SomeID (signalId s) : deps)) (sf $ origin s)
       $ (<$> exec) $ second $ (=<<) $ \(sf', cont) -> do
         v <- signalCurVal s
         return (sf' $ pure v, cont . (\f sf'' -> f . sf'' . (v :-)))
@@ -228,45 +263,18 @@ runTB mode testbench = do
   simStepRef <- newIORef 0
   simMode <- newIORef mode
   evalStateT (testbench >>= finalize) ST
-    { idCount = 0
-    , signals = S.empty
-    , domIds  = M.empty
+    { idCount  = 0
+    , signals  = S.empty
+    , monitors = S.empty
+    , domIds   = M.empty
     , ..
     }
  where
   finalize r = do
     ST { signals, simStepRef, simMode } <- get
     tbSignals <- forM (S.toAscList signals) $ \case
-      SomeSignal s -> case s of
-        (IOInput{..} :: TBSignal dom a) ->
-          return $ SomeSignal
-            ( IOInput
-                { signalId = case signalId of
-                    NoID       -> NoID
-                    SignalID x -> SignalID x
-                , ..
-                } :: Internal.TBSignal 'FINAL dom a
-            )
-        (Generator{..} :: TBSignal dom a) ->
-          return $ SomeSignal
-            ( Generator
-                { signalId = case signalId of
-                    NoID       -> NoID
-                    SignalID x -> SignalID x
-                , ..
-                } :: Internal.TBSignal 'FINAL dom a
-            )
-        Internal.TBSignal{..} -> do
-          deps <- mapM fixAutoDomIds signalDeps
-          return $ SomeSignal $ Internal.TBSignal
-            { signalId   = case signalId of
-                NoID       -> NoID
-                SignalID x -> SignalID x
-            , signalDeps = deps
-            , ..
-            }
-
-
+      SomeSignal s  -> SomeSignal <$> finalizeSignal s
+      SomeMonitor s -> SomeMonitor <$> finalizeSignal s
 
     FreeID n <- gets idCount
     let a :: A.Array Int (SomeSignal 'FINAL)
@@ -283,6 +291,35 @@ runTB mode testbench = do
           , ..
           }
       )
+
+  finalizeSignal ::
+    Internal.TBSignal 'USER dom a ->
+    TB (Internal.TBSignal 'FINAL dom a)
+
+  finalizeSignal = \case
+    SimSignal{..} -> do
+      deps <- mapM fixAutoDomIds dependencies
+      return $ SimSignal
+        { signalId   = case signalId of
+            NoID       -> NoID
+            SignalID x -> SignalID x
+        , dependencies = deps
+        , ..
+        }
+    IOInput{..} ->
+      return $ IOInput
+        { signalId = case signalId of
+            NoID       -> NoID
+            SignalID x -> SignalID x
+        , ..
+        }
+    Internal.TBSignal{..} ->
+      return $ Internal.TBSignal
+        { signalId = case signalId of
+            NoID       -> NoID
+            SignalID x -> SignalID x
+        , ..
+        }
 
   fixAutoDomIds :: ID 'USER () -> TB (ID 'FINAL ())
   fixAutoDomIds (SomeID s) = case s of

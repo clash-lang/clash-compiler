@@ -49,6 +49,7 @@ library
     base,
     mtl,
     array,
+    lattices,
     hedgehog,
     containers,
     bytestring,

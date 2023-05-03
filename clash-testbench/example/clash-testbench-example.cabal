@@ -20,7 +20,9 @@ common basic-config
     -fplugin GHC.TypeLits.KnownNat.Solver
   build-depends:
     base,
+    hedgehog,
     clash-prelude,
+    clash-prelude-hedgehog,
     clash-testbench,
     ghc-typelits-extra,
     ghc-typelits-knownnat,

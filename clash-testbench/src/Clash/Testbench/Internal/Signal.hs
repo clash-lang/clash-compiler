@@ -1,5 +1,6 @@
 module Clash.Testbench.Internal.Signal where
 
+import Algebra.PartialOrd
 import Data.Function (on)
 
 import Clash.Prelude
@@ -8,11 +9,8 @@ import Clash.Prelude
   , ssymbolToString
   )
 
-import Hedgehog (Gen)
-
 import Clash.FFI.VPI.Module (Module)
 import Clash.FFI.VPI.Port (Port, Direction)
-
 import Clash.Testbench.Internal.ID
 
 data VPIPort =
@@ -32,42 +30,57 @@ data VPIInstance =
     , vpiOutputPort :: VPIPort
     }
 
+newtype Expectation a = Expectation { expectation :: (Int, a -> Maybe String) }
+
+-- | Expectations cannot be compared, hence they are always unequal
+instance Eq (Expectation a) where
+  _ == _ = False
+
+-- | Expectations enjoy some partial order via the simulation step at
+-- which they are verified.
+instance PartialOrd (Expectation a) where
+  leq        (Expectation (x, _)) (Expectation (y, _)) = x <= y
+  comparable (Expectation (x, _)) (Expectation (y, _)) = x /= y
+
 data TBSignal (s :: Stage) (dom :: Domain) a =
-    TBSignal
+    -- | Signal that can be simulated
+    SimSignal
       { signalId     :: ID s SIGNAL
-      , signalDeps   :: [ID s ()]
-      , signalName   :: String
-      , signal       :: Signal dom a
       , signalCurVal :: IO a
-      , signalUpdate :: Maybe (a -> IO ())
       , signalPrint  :: Maybe (a -> String)
+      , origin       :: Signal dom a
+      , dependencies :: [ID s ()]
+      , signalName   :: String
+      , signalUpdate :: Maybe (a -> IO ())
+      , signalExpect :: Expectation a -> IO ()
+      , signalVerify :: IO (Maybe String)
       , vpiInstance  :: Maybe VPIInstance
       }
+    -- | Signal
   | IOInput
       { signalId     :: ID s SIGNAL
       , signalCurVal :: IO a
       , signalPrint  :: Maybe (a -> String)
       }
-  | Generator
+  | TBSignal
       { signalId     :: ID s SIGNAL
       , signalCurVal :: IO a
       , signalPrint  :: Maybe (a -> String)
-      , generator    :: Gen a
       }
 
 instance (KnownDomain dom, AnyStage s) => Show (TBSignal s dom a) where
   show = case knownDomain @dom of
     SDomainConfiguration domainName _ _ _ _ _ -> \case
-      TBSignal{..} ->
+      SimSignal{..} ->
         "Signal \""
           <> signalName <> "\" @"
           <> ssymbolToString domainName <> " "
           <> show signalId <> " "
-          <> show signalDeps
+          <> show dependencies
       IOInput{..} ->
         "Input " <> show signalId
-      Generator{..} ->
-        "Gen " <> show signalId
+      TBSignal{} ->
+        "TS"
 
 instance AnyStage s => Eq (TBSignal s dom a) where
   (==) = (==) `on` signalId
@@ -76,48 +89,26 @@ instance AnyStage s => Ord (TBSignal s dom a) where
   compare = compare `on` signalId
 
 instance Functor (TBSignal 'USER dom) where
-  fmap f = \case
-    TBSignal{..} ->
-      TBSignal
-        { signalId     = NoID
-        , signal       = fmap f signal
-        , signalCurVal = f <$> signalCurVal
-          -- We cannot update the values of a mapped signal, which
-          -- makes sense, since a mapped signal cannot be simulated
-          -- externally. It is always defined as the result of
-          -- applying 'f' to the given source signal.
-        , signalUpdate = Nothing
-          -- we lose printing abilities at this point. This is fine,
-          -- since printing capabilities are recovered automatically
-          -- once the new signal requires printing capabilities again.
-        , signalPrint  = Nothing
-        , ..
-        }
-    IOInput{..} ->
-      IOInput
-        { signalId     = NoID
-        , signalCurVal = f <$> signalCurVal
-        , signalPrint  = Nothing
-        , ..
-        }
-    Generator{..} ->
-      Generator
-        { signalId = NoID
-        , signalCurVal = f <$> signalCurVal
-        , signalPrint  = Nothing
-        , generator    = f <$> generator
-        }
+  fmap f s =
+    TBSignal
+      { signalId     = NoID
+      , signalCurVal = f <$> signalCurVal s
+        -- we lose printing abilities at this point. This is fine,
+        -- since printing capabilities are recovered automatically
+        -- once the new signal requires printing capabilities again.
+      , signalPrint  = Nothing
+      }
 
 instance Applicative (TBSignal 'USER dom) where
   pure x =
-    IOInput
+    TBSignal
       { signalId     = NoID
       , signalCurVal = pure x
       , signalPrint  = Nothing
       }
 
   f <*> s =
-    IOInput
+    TBSignal
       { signalId     = NoID
       , signalCurVal = signalCurVal f <*> signalCurVal s
       , signalPrint  = Nothing
@@ -189,6 +180,11 @@ data SomeSignal (s :: Stage) where
       (KnownDomain dom, NFDataX a, BitPack a) =>
       TBSignal s dom a ->
       SomeSignal s
+  SomeMonitor ::
+    forall s dom.
+      KnownDomain dom =>
+      TBSignal s dom Bool ->
+      SomeSignal s
 
 instance AnyStage s => Eq (SomeSignal s) where
   (==) = (==) `on` (signalId `onAllSignalTypes`)
@@ -209,3 +205,4 @@ onAllSignalTypes ::
   b
 onAllSignalTypes f = \case
   SomeSignal s -> f s
+  SomeMonitor s -> f s
