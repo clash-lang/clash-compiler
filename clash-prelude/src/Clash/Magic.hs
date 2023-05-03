@@ -1,5 +1,5 @@
 {-|
-  Copyright   :  (C) 2019, Myrtle Software Ltd
+  Copyright   :  (C) 2019-2023, Myrtle Software Ltd
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -33,6 +33,7 @@ module Clash.Magic
 
   -- ** Utilities to differentiate between simulation and generating HDL
   , simulation
+  , SimOnly (..)
   ) where
 
 import Clash.NamedTypes            ((:::))
@@ -242,3 +243,29 @@ noDeDup = id
 simulation :: Bool
 simulation = True
 {-# NOINLINE simulation #-}
+
+-- | A container for data you only want to have around during simulation and
+-- is ignored during synthesis. Useful for carrying around things such as:
+--
+--   * A map of simulation/vcd traces
+--   * Co-simulation state or meta-data
+--   * etc.
+data SimOnly a = SimOnly a
+  deriving (Eq, Ord, Foldable, Traversable)
+{-# ANN SimOnly hasBlackBox #-}
+
+instance Functor SimOnly where
+  fmap f (SimOnly a) = SimOnly (f a)
+
+instance Applicative SimOnly where
+  pure = SimOnly
+  (SimOnly f) <*> (SimOnly a) = SimOnly (f a)
+
+instance Monad SimOnly where
+  (SimOnly a) >>= f = f a
+
+instance Semigroup a => Semigroup (SimOnly a) where
+  (SimOnly a) <> (SimOnly b) = SimOnly (a <> b)
+
+instance Monoid a => Monoid (SimOnly a) where
+  mempty = SimOnly mempty

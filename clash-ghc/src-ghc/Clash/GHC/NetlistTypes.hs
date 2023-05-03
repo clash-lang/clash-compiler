@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
-                     2016-2017, Myrtle Software Ltd,
+                     2016-2023, Myrtle Software Ltd,
                      2021-2022, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -293,6 +293,9 @@ ghcTypeToHWType iw = go
         "GHC.STRef.STRef" -> case args of
           [_,aTy] -> ExceptT (MaybeT (Just <$> coreTypeToHWType go reprs m aTy))
           _ -> throwE $ $(curLoc) ++ "STRef TC has unexpected amount of arguments"
+
+        -- Anything that's wrapped in SimOnly should be elided when we generate HDL
+        "Clash.Magic.SimOnly" -> returnN (Void Nothing)
 
         _ -> ExceptT (MaybeT (pure Nothing))
 
