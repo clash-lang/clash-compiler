@@ -995,7 +995,7 @@ notExpr nm aExpr = do
     VHDL          -> "not " <> aIdent
     Verilog       -> "! " <> aIdent
     SystemVerilog -> "! " <> aIdent
-  assign nm $ TExpr Bit (Identifier (Id.unsafeMake notTxt) Nothing)
+  assign nm $ TExpr (ety aExpr) (Identifier (Id.unsafeMake notTxt) Nothing)
 
 -- | Creates a BV that produces the following vhdl:
 --

@@ -6,6 +6,7 @@
 
 module Clash.Cores.Xilinx.Xpm.Cdc
   ( xpmCdcArraySingle
+  , xpmCdcAsyncRst
   , xpmCdcGray
   , xpmCdcHandshake
   , xpmCdcPulse
@@ -13,6 +14,7 @@ module Clash.Cores.Xilinx.Xpm.Cdc
   ) where
 
 import Clash.Cores.Xilinx.Xpm.Cdc.ArraySingle
+import Clash.Cores.Xilinx.Xpm.Cdc.AsyncRst
 import Clash.Cores.Xilinx.Xpm.Cdc.Gray
 import Clash.Cores.Xilinx.Xpm.Cdc.Handshake
 import Clash.Cores.Xilinx.Xpm.Cdc.Pulse
