@@ -1,5 +1,5 @@
 {-|
-  Copyright   :  (C) 2022 Google Inc
+  Copyright   :  (C) 2022-2023, Google Inc
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -25,6 +25,7 @@ import Data.Foldable (fold)
 import Data.String.Interpolate (__i)
 import Data.Text.Prettyprint.Doc.Extra (Doc)
 import qualified Data.Text as T (pack, append, concat)
+import Text.Show.Pretty (ppShow)
 
 import Control.Arrow (first)
 import Control.Monad (when, forM, zipWithM)
@@ -223,11 +224,11 @@ constantProbeValues ty expr = case bits (DSL.tySize ty) expr of
     Clash failed to determine a constant value for one of the expressions
     given as the inital output probe values. The failing expression is:
 
-      #{show failedExpr}
+      #{ppShow failedExpr}
 
     The complete expression is:
 
-      #{show expr}
+      #{ppShow expr}
 
     As a quick fix: it may help to leverage the template haskell function
     $(lift ...) to get rid of this error message.
