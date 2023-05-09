@@ -93,10 +93,10 @@ genSimTcl dir top = do
     launch_simulation
 
     \# Uncomment if you want to dump all signals to /tmp/log.vcd
-    \# restart
-    \# open_vcd /tmp/log.vcd
-    \# log_vcd /*
-    \# run -all
-    \# flush_vcd
-    \# close_vcd
+    restart
+    open_vcd /tmp/log.vcd
+    log_vcd /*
+    run -all
+    flush_vcd
+    close_vcd
     |]
