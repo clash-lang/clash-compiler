@@ -11,8 +11,11 @@ import Clash.Core.Name
 import Clash.Core.Var
 import Clash.Core.VarEnv
 import Clash.Driver.Types
+import GHC.BasicTypes.Extra
 
-#if __GLASGOW_HASKELL__ >= 900
+#if __GLASGOW_HASKELL__ >= 904
+import GHC.BasicTypes.Extra
+#elif __GLASGOW_HASKELL__ >= 900
 import GHC.Types.Basic
 #else
 import BasicTypes
@@ -52,7 +55,7 @@ mainCommon hdl = do
 
   checkTE n bm =
     case findBinding n bm of
-      Just b | bindingSpec b == NoInline -> pure ()
+      Just b | isNoInline (bindingSpec b) -> pure ()
              | otherwise -> error ("Binding is not marked NOINLINE: " <> show (bindingSpec b))
 
       Nothing -> error ("Could not find top entity: " <> show n)
