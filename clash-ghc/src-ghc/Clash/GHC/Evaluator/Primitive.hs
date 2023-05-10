@@ -1750,6 +1750,8 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [Lit (IntLiteral i)] <- args
     -> reduce (Literal (IntegerLiteral i))
   "GHC.Num.Integer.IP"
+    | [Lit (ByteArrayLiteral (BA.ByteArray ba))] <- args
+    -> reduce (Literal (IntegerLiteral (IP ba)))
     | [Lit l] <- args
     -> error ("IP: " <> show l)
   "GHC.Num.Integer.IN"
