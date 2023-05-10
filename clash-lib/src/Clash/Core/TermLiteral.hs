@@ -7,6 +7,8 @@ Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Tools to convert a 'Term' into its "real" representation
 -}
+
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -27,6 +29,11 @@ import           Data.Either                     (lefts)
 import           Data.Proxy                      (Proxy(..))
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
+#if MIN_VERSION_ghc(9,4,0)
+import qualified Data.Text.Internal              as Text
+import qualified Data.Text.Array                 as Text
+import qualified Data.Primitive.ByteArray        as BA
+#endif
 import           Data.Typeable                   (Typeable, typeRep)
 import           GHC.Natural
 import           GHC.Stack
@@ -82,7 +89,15 @@ instance TermLiteral String where
   termToData t = Left t
 
 instance TermLiteral Text where
-  termToData t = Text.pack <$> termToData t
+  termToData (collectArgs -> (_, [Left (Literal (StringLiteral s))])) =
+    Right (Text.pack s)
+#if MIN_VERSION_ghc(9,4,0)
+  termToData (collectArgs -> (_, [ Left (Literal (ByteArrayLiteral (BA.ByteArray ba)))
+                                 , Left (Literal (IntLiteral off))
+                                 , Left (Literal (IntLiteral len))])) =
+    Right (Text.Text (Text.ByteArray ba) (fromInteger off) (fromInteger len))
+#endif
+  termToData t = Left t
 
 instance TermLiteral Int where
   termToData (collectArgs -> (_, [Left (Literal (IntLiteral n))])) =

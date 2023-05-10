@@ -33,6 +33,7 @@ import qualified Control.Monad.State.Strict as State
 import           Control.Monad.Trans.Except (runExcept)
 import           Data.Binary.IEEE754        (doubleToWord, floatToWord, wordToDouble, wordToFloat)
 import           Data.Bits
+import qualified Data.ByteString.Internal as BS
 import           Data.Char           (chr,ord)
 import qualified Data.Either         as Either
 import           Data.Maybe (fromMaybe, mapMaybe)
@@ -61,6 +62,7 @@ import           GHC.Integer.GMP.Internals
 import           GHC.Num.Natural     (naturalSubUnsafe)
 #endif
 import           GHC.Natural
+import           GHC.ForeignPtr
 import           GHC.Prim
 import           GHC.Real            (Ratio (..))
 import           GHC.TypeLits        (KnownNat)
@@ -1266,6 +1268,25 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                     ,Left (Literal (WordLiteral (toInteger w)))
                     ])
        in reduce newE
+
+  "GHC.Prim.copyAddrToByteArray#"
+    | [ Lit (StringLiteral addr)
+      , PrimVal _mbaTy _ [dst_mbaV]
+      , offV, lenV
+      , PrimVal rwTy _ _
+      ] <- args
+    , [off,len,dst_mba] <- intLiterals' [offV, lenV, dst_mbaV]
+    -> let Just (Literal (ByteArrayLiteral dst_ba)) =
+              primLookup (fromInteger dst_mba) mach
+           !(I# off') = fromInteger off
+           !(I# len') = fromInteger len
+           !(BS.PS (ForeignPtr addr' _) _ _) = BS.packChars addr
+           ba2 = unsafeDupablePerformIO $ do
+                    BA.MutableByteArray dst_mba1 <- BA.unsafeThawByteArray dst_ba
+                    svoid (copyAddrToByteArray# addr' dst_mba1 off' len')
+                    BA.unsafeFreezeByteArray (BA.MutableByteArray dst_mba1)
+           ba3 = Literal (ByteArrayLiteral ba2)
+        in Just . setTerm (Prim rwTy) $ primUpdate (fromInteger dst_mba) ba3 mach
 
 -- decodeFloat_Int# :: Float# -> (#Int#, Int##)
   "GHC.Prim.decodeFloat_Int#" | [i] <- floatLiterals' args
