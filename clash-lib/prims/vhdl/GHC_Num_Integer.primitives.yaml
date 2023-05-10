@@ -341,17 +341,17 @@
     warning: 'GHC.Num.Integer.integerAnd: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerSigmum
+    name: GHC.Num.Integer.integerSignum
     kind: Declaration
-    type: 'integerSigmum ::
+    type: 'integerSignum ::
       Integer -> Integer'
     template: |2
 
-      -- begin integerSigmum
+      -- begin integerSignum
       ~RESULT <= to_signed(-1, ~SIZE[~TYPO]) when ~ARG[0] < 0
         else to_signed(0, ~SIZE[~TYPO])  when ~ARG[0] = 0
         else to_signed(1, ~SIZE[~TYPO]);
-      -- end integerSigmum
+      -- end integerSignum
     warning: 'GHC.Num.Integer.integerSignum: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
