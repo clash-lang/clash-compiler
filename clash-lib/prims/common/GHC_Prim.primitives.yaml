@@ -30,6 +30,10 @@
     kind: Expression
     template: ~ARG[0] + ~ARG[1]
 - BlackBox:
+    name: GHC.Prim.plusInt64#
+    kind: Expression
+    template: ~ARG[0] + ~ARG[1]
+- BlackBox:
     name: GHC.Prim.-#
     kind: Expression
     type: '(-#) :: Int# ->
@@ -45,6 +49,10 @@
     template: ~ARG[0] - ~ARG[1]
 - BlackBox:
     name: GHC.Prim.subInt32#
+    kind: Expression
+    template: ~ARG[0] - ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.subInt64#
     kind: Expression
     template: ~ARG[0] - ~ARG[1]
 - BlackBox:
@@ -66,6 +74,10 @@
     kind: Expression
     template: ~ARG[0] + ~ARG[1]
 - BlackBox:
+    name: GHC.Prim.plusWord64#
+    kind: Expression
+    template: ~ARG[0] + ~ARG[1]
+- BlackBox:
     name: GHC.Prim.minusWord#
     kind: Expression
     type: 'minusWord# :: Word#
@@ -81,5 +93,9 @@
     template: ~ARG[0] - ~ARG[1]
 - BlackBox:
     name: GHC.Prim.subWord32#
+    kind: Expression
+    template: ~ARG[0] - ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.subWord64#
     kind: Expression
     template: ~ARG[0] - ~ARG[1]
