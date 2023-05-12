@@ -1891,6 +1891,20 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        reduce (checkNaturalRange1 nTy i id)
 #endif
 
+  "GHC.Num.Integer.integerToInt64#"
+    | [i] <- integerLiterals' args
+    -> reduce (integerToInt64Literal i)
+
+  "GHC.Num.Integer.integerToWord64#"
+    | [i] <- integerLiterals' args
+    -> reduce (integerToWord64Literal i)
+
+#if MIN_VERSION_base(4,17,0)
+  "GHC.Num.Integer.integerFromWord64#"
+    | [w] <- word64Literals' args
+    -> reduce (Literal (IntegerLiteral w))
+#endif
+
 #if !MIN_VERSION_base(4,15,0)
   -- GHC.shiftLNatural --- XXX: Fragile worker of GHC.shiflLNatural
   "GHC.Natural.$wshiftLNatural"
@@ -5082,6 +5096,12 @@ integerToIntLiteral = Literal . IntLiteral . toInteger . (fromInteger :: Integer
 
 integerToWordLiteral :: Integer -> Term
 integerToWordLiteral = Literal . WordLiteral . toInteger . (fromInteger :: Integer -> Word) -- for overflow behavior
+
+integerToInt64Literal :: Integer -> Term
+integerToInt64Literal = Literal . Int64Literal . toInteger . (fromInteger :: Integer -> Int64) -- for overflow behavior
+
+integerToWord64Literal :: Integer -> Term
+integerToWord64Literal = Literal . Word64Literal . toInteger . (fromInteger :: Integer -> Word64) -- for overflow behavior
 
 integerToIntegerLiteral :: Integer -> Term
 integerToIntegerLiteral = Literal . IntegerLiteral

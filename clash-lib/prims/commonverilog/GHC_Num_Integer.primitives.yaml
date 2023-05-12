@@ -173,6 +173,14 @@
       but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
+    name: GHC.Num.Integer.integerToInt64#
+    kind: Expression
+    type: 'integerToInt64#:: Integer -> Int64#'
+    template: ~ARG[0]
+    warning: 'GHC.Num.Integer.integerToInt64#: Integers are dynamically sized in
+      simulation, but fixed-length after synthesis. Use carefully.'
+    workInfo: Never
+- BlackBox:
     name: GHC.Num.Integer.integerToWord64#
     comment: only used by 32 bit GHC
     kind: Declaration
@@ -180,6 +188,14 @@
       :: Integer -> Word64#'
     template: assign ~RESULT = $unsigned(~ARG[0]);
     warning: 'GHC.Num.Integer.integerToWord64#: Integers are dynamically sized in
+      simulation, but fixed-length after synthesis. Use carefully.'
+    workInfo: Never
+- BlackBox:
+    name: GHC.Num.Integer.integerFromWord64#
+    kind: Declaration
+    type: 'integerFromWord64# :: Word64# -> Integer'
+    template: assign ~RESULT = $signed(~ARG[0]);
+    warning: 'GHC.Num.Integer.integerFromWord64#: Integers are dynamically sized in
       simulation, but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
