@@ -403,3 +403,9 @@
           ;
     warning: 'GHC.Num.Integer.integerQuot: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Integer.$wintegerFromInt64#
+    kind: Expression
+    type: '$wintegerFromInt64# :: Int64# -> Int#'
+    template: resize(~ARG[0],~SIZE[~TYPO])
+    workInfo: Never

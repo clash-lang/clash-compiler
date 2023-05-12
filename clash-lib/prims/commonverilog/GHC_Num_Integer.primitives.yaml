@@ -279,3 +279,12 @@
     template: ~ARG[0] / ~ARG[1]
     warning: 'GHC.Num.Integer.integerQuot: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
+- BlackBox:
+    name: GHC.Num.Integer.$wintegerFromInt64#
+    kind: Declaration
+    type: '$wintegerFromInt64# :: Int64# -> Int#'
+    template: |-
+      // wintegerFromInt64 begin
+      assign ~RESULT = ~ARG[0];
+      // wintegerFromInt64 end
+    workInfo: Never
