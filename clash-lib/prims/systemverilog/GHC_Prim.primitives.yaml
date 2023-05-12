@@ -1424,3 +1424,87 @@
       ~FI
       assign ~RESULT = $unsigned(~SYM[7]);
       // ctz end
+- BlackBox:
+    name: GHC.Prim.quotRemInt8#
+    kind: Declaration
+    type: 'quotRemInt8# ::
+      Int8# -> Int8# -> (#Int8#, Int8##)'
+    template: |-
+      // quotRemInt8 begin
+      ~SIGD[~GENSYM[quot_res][0]][0];
+      ~SIGD[~GENSYM[rem_res][1]][0];
+      assign ~SYM[0] = ~ARG[0] / ~ARG[1];
+      assign ~SYM[1] = ~ARG[0] % ~ARG[1];
+
+      assign ~RESULT = {~SYM[0],~SYM[1]};
+      // quotRemInt8 end
+- BlackBox:
+    name: GHC.Prim.quotRemWord8#
+    kind: Declaration
+    type: 'quotRemWord8# ::
+      Word8# -> Word8# -> (#Word8#, Word8##)'
+    template: |-
+      // quotRemWord8 begin
+      ~SIGD[~GENSYM[quot_res][0]][0];
+      ~SIGD[~GENSYM[rem_res][1]][0];
+      assign ~SYM[0] = ~ARG[0] / ~ARG[1];
+      assign ~SYM[1] = ~ARG[0] % ~ARG[1];
+
+      assign ~RESULT = {~SYM[0],~SYM[1]};
+      // quotRemWord8 end
+- BlackBox:
+    name: GHC.Prim.quotRemInt16#
+    kind: Declaration
+    type: 'quotRemInt16# ::
+      Int16# -> Int16# -> (#Int16#, Int16##)'
+    template: |-
+      // quotRemInt16 begin
+      ~SIGD[~GENSYM[quot_res][0]][0];
+      ~SIGD[~GENSYM[rem_res][1]][0];
+      assign ~SYM[0] = ~ARG[0] / ~ARG[1];
+      assign ~SYM[1] = ~ARG[0] % ~ARG[1];
+
+      assign ~RESULT = {~SYM[0],~SYM[1]};
+      // quotRemInt16 end
+- BlackBox:
+    name: GHC.Prim.quotRemWord16#
+    kind: Declaration
+    type: 'quotRemWord16# ::
+      Word16# -> Word16# -> (#Word16#, Word16##)'
+    template: |-
+      // quotRemWord16 begin
+      ~SIGD[~GENSYM[quot_res][0]][0];
+      ~SIGD[~GENSYM[rem_res][1]][0];
+      assign ~SYM[0] = ~ARG[0] / ~ARG[1];
+      assign ~SYM[1] = ~ARG[0] % ~ARG[1];
+
+      assign ~RESULT = {~SYM[0],~SYM[1]};
+      // quotRemWord16 end
+- BlackBox:
+    name: GHC.Prim.quotRemInt32#
+    kind: Declaration
+    type: 'quotRemInt32# ::
+      Int32# -> Int32# -> (#Int32#, Int32##)'
+    template: |-
+      // quotRemInt32 begin
+      ~SIGD[~GENSYM[quot_res][0]][0];
+      ~SIGD[~GENSYM[rem_res][1]][0];
+      assign ~SYM[0] = ~ARG[0] / ~ARG[1];
+      assign ~SYM[1] = ~ARG[0] % ~ARG[1];
+
+      assign ~RESULT = {~SYM[0],~SYM[1]};
+      // quotRemInt32 end
+- BlackBox:
+    name: GHC.Prim.quotRemWord32#
+    kind: Declaration
+    type: 'quotRemWord32# ::
+      Word32# -> Word32# -> (#Word32#, Word32##)'
+    template: |-
+      // quotRemWord32 begin
+      ~SIGD[~GENSYM[quot_res][0]][0];
+      ~SIGD[~GENSYM[rem_res][1]][0];
+      assign ~SYM[0] = ~ARG[0] / ~ARG[1];
+      assign ~SYM[1] = ~ARG[0] % ~ARG[1];
+
+      assign ~RESULT = {~SYM[0],~SYM[1]};
+      // quotRemWord32 end
