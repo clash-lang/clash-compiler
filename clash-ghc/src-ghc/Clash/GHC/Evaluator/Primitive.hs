@@ -806,7 +806,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce r
   "GHC.Prim.xorWord8#" | Just r <- liftW8 xorWord8# args
     -> reduce r
-  "GHC.Prim.notWord8" | [i] <- word8Literals' args
+  "GHC.Prim.notWord8#" | [i] <- word8Literals' args
     -> let !(W8# a) = fromInteger i
         in reduce (Literal (Word8Literal (toInteger (W8# (notWord8# a)))))
   "GHC.Prim.uncheckedShiftLWord8#" | Just r <- liftW8I uncheckedShiftLWord8# args
@@ -866,7 +866,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce r
   "GHC.Prim.xorWord16#" | Just r <- liftW16 xorWord16# args
     -> reduce r
-  "GHC.Prim.notWord16" | [i] <- word16Literals' args
+  "GHC.Prim.notWord16#" | [i] <- word16Literals' args
     -> let !(W16# a) = fromInteger i
         in reduce (Literal (Word16Literal (toInteger (W16# (notWord16# a)))))
   "GHC.Prim.uncheckedShiftLWord16#" | Just r <- liftW16I uncheckedShiftLWord16# args
@@ -926,7 +926,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce r
   "GHC.Prim.xorWord32#" | Just r <- liftW32 xorWord32# args
     -> reduce r
-  "GHC.Prim.notWord32" | [i] <- word32Literals' args
+  "GHC.Prim.notWord32#" | [i] <- word32Literals' args
     -> let !(W32# a) = fromInteger i
         in reduce (Literal (Word32Literal (toInteger (W32# (notWord32# a)))))
   "GHC.Prim.uncheckedShiftLWord32#" | Just r <- liftW32I uncheckedShiftLWord32# args
