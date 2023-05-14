@@ -12,6 +12,8 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_HADDOCK hide #-}
+
 module Clash.Cores.Xilinx.BlockRam.Internal where
 
 import Clash.Explicit.Prelude hiding (enable)
