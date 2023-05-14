@@ -8,6 +8,8 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+{-# OPTIONS_HADDOCK hide #-}
+
 module Clash.Cores.Xilinx.Floating.Annotations
   ( veriBinaryPrim
   , vhdlBinaryPrim

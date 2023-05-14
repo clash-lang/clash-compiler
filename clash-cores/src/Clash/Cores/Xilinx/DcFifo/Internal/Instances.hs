@@ -9,6 +9,8 @@
 
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_HADDOCK hide #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Clash.Cores.Xilinx.DcFifo.Internal.Instances where

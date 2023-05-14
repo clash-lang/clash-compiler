@@ -8,6 +8,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_HADDOCK hide #-}
+
 module Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO (sbioTF) where
 
 import           Prelude

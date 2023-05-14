@@ -13,6 +13,8 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-# OPTIONS_HADDOCK hide #-}
+
 module Clash.Cores.Xilinx.VIO.Internal.BlackBoxes (vioProbeBBF) where
 
 import Prelude

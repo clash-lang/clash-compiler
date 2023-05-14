@@ -7,6 +7,8 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE DeriveLift #-}
 {-# LANGUAGE LambdaCase #-}
 
+{-# OPTIONS_HADDOCK hide #-}
+
 module Clash.Cores.Xilinx.Floating.Internal
   ( Config(..)
   , ArchOpt(..)

@@ -4,6 +4,8 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
+{-# OPTIONS_HADDOCK hide #-}
+
 module Clash.Cores.Xilinx.DcFifo.Internal.Types where
 
 import Clash.Prelude

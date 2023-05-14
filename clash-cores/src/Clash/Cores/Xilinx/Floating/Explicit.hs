@@ -45,6 +45,8 @@ type variable for delay annotation in circuits.
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_HADDOCK hide #-}
+
 module Clash.Cores.Xilinx.Floating.Explicit
   ( -- * Instantiating IP
     addWith

@@ -11,6 +11,8 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_HADDOCK hide #-}
+
 module Clash.Cores.Xilinx.DcFifo.Internal.BlackBoxes where
 
 import Prelude
