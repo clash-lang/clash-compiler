@@ -472,6 +472,13 @@ data HWType
   -- ^ File type for simulation-level I/O
   deriving (Eq, Ord, Show, Generic, NFData, Hashable)
 
+-- | Smart constructor for 'Annotated'. Wraps the given type in an 'Annotated'
+-- if the attribute list is non-empty. If it is empty, it will return the given
+-- 'HWType' unchanged.
+annotated :: [Attr'] -> HWType -> HWType
+annotated [] t = t
+annotated attrs t = Annotated attrs t
+
 hwTypeDomain :: HWType -> Maybe DomainName
 hwTypeDomain = \case
   Clock dom -> Just dom
