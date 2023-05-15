@@ -2117,6 +2117,14 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let resTy = getResultTy tcm ty tys
         in reduce (mkSomeNat tcm n resTy)
 
+  "GHC.Types.I#"
+    | isSubj
+    , [Lit (IntLiteral i)] <- args
+    ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+            (Just intTc) = UniqMap.lookup intTcNm tcm
+            [intDc] = tyConDataCons intTc
+        in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
+
   "GHC.Int.I8#"
     | isSubj
 #if MIN_VERSION_base(4,16,0)
@@ -2238,6 +2246,14 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 #else
         in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
 #endif
+
+  "GHC.Types.W#"
+    | isSubj
+    , [Lit (WordLiteral i)] <- args
+    ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+            (Just intTc) = UniqMap.lookup intTcNm tcm
+            [intDc] = tyConDataCons intTc
+        in  reduce (mkApps (Data intDc) [Left (Literal (WordLiteral i))])
 
   "GHC.Float.$w$sfromRat''" -- XXX: Very fragile
     | [Lit (IntLiteral _minEx)

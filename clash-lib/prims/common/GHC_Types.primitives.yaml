@@ -2,3 +2,17 @@
     name: GHC.Types.MkCoercible
     primType: Constructor
     workInfo: Never
+- BlackBox:
+    name: GHC.Types.I#
+    kind: Expression
+    comment: Needed to make the evaluator handle this constructor strictly
+    type: 'I# :: Int# -> Int'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: GHC.Types.W#
+    kind: Expression
+    comment: Needed to make the evaluator handle this constructor strictly
+    type: 'W# :: Word# -> Word'
+    template: ~ARG[0]
+    workInfo: Never
