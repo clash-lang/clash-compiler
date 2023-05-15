@@ -314,9 +314,19 @@ collectValueTicks = go []
 forcePrims :: Machine -> Bool
 forcePrims = go . mStack
  where
+  -- When do we need to force the compile-time evaluation of a primitive?
+  --
+  -- 1. When they are the subject of a case-expression
   go (Scrutinise{}:_) = True
+  -- 2. When they are in the argument position of another primitive:
+  --    primitives are assumed to be strict in their arguments
   go (PrimApply{}:_)  = True
+  -- We look through ticks
   go (Tickish{}:xs)   = go xs
+  -- We are in a context where we dereferenced a heap-binding, hence the
+  -- update fram on the stack. So now we need to check whether that variable
+  -- reference was in a position where the result must be evaluated to WHNF
+  go (Update{}:xs)    = go xs
   go _                = False
 
 primCount :: Machine -> Int
