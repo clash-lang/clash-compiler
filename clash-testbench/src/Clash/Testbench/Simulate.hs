@@ -9,7 +9,6 @@ from Clash circuitry.
 module Clash.Testbench.Simulate
   ( TB
   , LiftTB((@@))
-  , AutoTB(..)
   , simulate
   , simulateFFI
   ) where
@@ -21,10 +20,10 @@ import Control.Monad.IO.Class
 import Control.Monad.State.Lazy hiding (lift)
 import Data.Proxy
 
+import Data.Array ((!))
 import Data.Coerce (Coercible)
 import Data.IORef
 import Data.Bits (complement)
-import Data.Maybe (catMaybes)
 import Data.Typeable (Typeable)
 import Foreign.C.String (newCString)
 import Foreign.Marshal.Alloc (free)
@@ -32,6 +31,7 @@ import Control.Exception (SomeException, try)
 import Data.Int (Int64)
 import qualified Data.Map as M
 import qualified Data.ByteString.Char8 as B
+import qualified Data.Array as A
 
 import Clash.Prelude
   ( KnownDomain(..), BitSize, BitPack(..), SNat(..), Bit
@@ -50,10 +50,9 @@ import Clash.FFI.VPI.Port
 import Clash.Testbench.Internal.ID
 import Clash.Testbench.Internal.Signal
 import Clash.Testbench.Internal.Monad
-import Clash.Testbench.Internal.Auto
 
 -- | @simulate n testbench@ simulates the @testbench@, created in the
--- 'TB' context, for @n@ simulation steps.
+-- 'Clash.Testbench.Simulate.TB' context, for @n@ simulation steps.
 --
 -- The simulation is run on the native Clash implementation, as given
 -- by the Clash signals and signal functions lifted into 'TB'.
@@ -61,31 +60,33 @@ simulate :: Int -> TB a -> IO a
 simulate steps testbench = do
   (r, Testbench{..}) <- runTB Internal testbench
   replicateM_ (steps + 1) $ do
-    forM_ tbSignals $ onAllSignalTypes $ \s -> do
-      v <- signalCurVal s
-      i <- readIORef tbSimStepRef
-      when (i > 0) $ case signalPrint s of
-        Nothing    -> return ()
-        Just toStr -> Prelude.putStrLn . (<> toStr v) $ case s of
-          IOInput{}   -> "I "
-          SimSignal{} -> "O "
-          TBSignal{}  -> "O "
-
-    modifyIORef tbSimStepRef (+ 1)
+    forM_ tbDomains $ \(d, map (tbSignalLookup !) -> xs) ->
+      (`onAllDomainTypes` d) $ \(TBDomain{..} :: TBDomain 'FINAL dom) -> do
+        i <- readIORef simStepRef
+        when (i > 0) $ forM_ xs $ onAllSignalTypes $ \s -> do
+          v <- signalCurVal s
+          case signalPrint s of
+            Nothing    -> return ()
+            Just toStr -> Prelude.putStrLn . (<> toStr v) $ case s of
+              IOInput{}   -> "I "
+              SimSignal{} -> "O "
+              TBSignal{}  -> "S "
+        modifyIORef simStepRef (+ 1)
 
     forM_ tbSignals $ onAllSignalTypes $ \case
-      SimSignal{..} -> signalVerify >>= \case
-        Nothing  -> Prelude.putStrLn "✓"
-        Just msg -> Prelude.putStrLn $ "✗ " <> msg
+      SimSignal{..} -> do
+        signalVerify >>= \case
+          Nothing  -> Prelude.putStrLn "✓"
+          Just msg -> Prelude.putStrLn $ "✗ " <> msg
       _ -> return ()
 
   return r
 
 data VPIState =
   VPIState
-    { vpiSignal   :: ID 'FINAL () -> SomeSignal 'FINAL
-    , vpiSignals  :: [SomeSignal 'FINAL]
-    , vpiStepRef  :: IORef Int
+    { testbench   :: Testbench
+      -- multiple clocks are not supported yet, currently all clocks
+      -- are synchronously executed.
     , vpiClock    :: Bit
     , vpiSimSteps :: Int
     , vpiInit     :: Bool
@@ -98,12 +99,12 @@ data VPIState =
 -- Note that this function is not executable in a standard Haskell
 -- environment, but must to be bound to some @ffiMain@ foreign call
 -- that is shipped via a shared library and executed by an external
--- simulator. See Clash-FFI for more details.
+-- simulator. See Clash-FFI for more details on this.
 simulateFFI :: Int -> TB a -> IO a
-simulateFFI steps testbench = do
-  (r, Testbench{..}) <- runTB External testbench
+simulateFFI steps tb = do
+  (r, testbench@Testbench{..}) <- runTB External tb
 
-  let ?signalFromID = tbLookupID
+  let ?testbench = testbench
 
   runSimAction $ do
     -- print simulator info
@@ -125,31 +126,28 @@ simulateFFI steps testbench = do
     -- analyzing the architecture upfront. For long-term references to
     -- be reusable during simulation, the objects should be queried via
     -- their architectural name reference instead.
-    tops <- mapM findTopModule topNames
+    topM <- M.fromList
+      <$> mapM (\x -> (B.unpack x, ) <$> findTopModule x) topNames
 
-    -- match top modules with the signals --
+    -- add the VPI module references to the signals
     vpiSignals <-
-        fmap ((<>) (filter (not . isSimSignal) tbSignals) . catMaybes)
-      $ mapM matchModule
-      $ M.toAscList
-      $ M.unionWith (\(x,_) (_,y) -> (x,y))
-          ( M.fromList
-          $ map (\s -> (signalName `onAllSignalTypes` s, (Just s, Nothing)))
-          $ filter isSimSignal tbSignals
-          )
-          ( M.fromList
-          $ zip (map B.unpack topNames)
-          $ map (\t -> (Nothing, Just t)) tops
-          )
+      forM tbSignals $ onAllSignalTypes $ \case
+        s@SimSignal{..} ->
+          case M.lookup signalName topM of
+            Just m  -> (signalId, ) . SomeSignal <$> matchModule m s
+            Nothing -> error $ "No module matches \"" <> signalName <> "\""
+        x -> return (signalId x, SomeSignal x)
 
     let
       ?state =
         VPIState
-          { vpiStepRef  = tbSimStepRef
-          , vpiClock    = low
+          { vpiClock    = low
           , vpiSimSteps = steps
-          , vpiSignal   = createIDMap vpiSignals
           , vpiInit     = True
+          , testbench   = testbench
+              { tbSignals      = map snd vpiSignals
+              , tbSignalLookup = A.array (A.bounds tbSignalLookup) vpiSignals
+              }
           , ..
           }
 
@@ -160,24 +158,16 @@ simulateFFI steps testbench = do
 
   return r
 
- where
-  createIDMap a b =
-    let f = flip M.lookup $ M.fromAscList $ map (\x -> (SomeID (signalId `onAllSignalTypes` x), x)) a in case f b of
-      Just x -> x
-      Nothing -> error $ show b
-
-  isSimSignal = \case
-    SomeSignal SimSignal{}            -> True
-    _                                -> False
-
 assignInputs :: (?state :: VPIState) => SimAction ()
 assignInputs = do
 --  SimTime time <- receiveTime Sim (Nothing @Object)
 --  putStrLn $ "assignInputs " <> show (time, vpiClock, vpiInit)
 
-  forM_ vpiSignals $ onAllSignalTypes $ \case
-    SimSignal{..} -> mapM_ (assignModuleInputs vpiInstance) dependencies
-    _            -> return ()
+  forM_ tbDomains $ \(d, map (tbSignalLookup !) -> xs) ->
+    (`onAllDomainTypes` d) $ const $ do
+      forM_ xs $ onAllSignalTypes $ \case
+        SimSignal{..} -> mapM_ (assignModuleInputs vpiInstance) dependencies
+        _             -> return ()
 
 
   let ?state = ?state { vpiClock = complement vpiClock
@@ -190,21 +180,22 @@ assignInputs = do
 
  where
   VPIState{..} = ?state
+  Testbench{..} = testbench
 
-  assignModuleInputs :: Typeable b => Maybe VPIInstance -> ID 'FINAL () -> SimCont b ()
+  assignModuleInputs :: Typeable b => Maybe VPIInstance -> ID () -> SimCont b ()
   assignModuleInputs = \case
     Nothing              -> const $ return ()
     Just VPIInstance{..} -> \sid@(SomeID x) ->
       let VPIPort{..} = vpiInputPort sid
       in case x of
-         NoID           -> return ()
-         ClockID  _TODO -> sendV port vpiClock
-         ResetID  _TODO -> sendV port $ boolToBit vpiInit
-         EnableID _TODO -> sendV port high
-         SignalID _TODO
+         NoID                 -> return ()
+         ClockID  _TODO       -> sendV port vpiClock
+         ResetID  _TODO       -> sendV port $ boolToBit vpiInit
+         EnableID _TODO       -> sendV port high
+         i@(SignalID _TODO)
            | vpiClock == high -> return ()
            | otherwise        ->
-               (`onAllSignalTypes` vpiSignal sid) $ \s ->
+               (`onAllSignalTypes` (tbSignalLookup ! i)) $ \s ->
                  liftIO (signalCurVal s) >>= \v -> do
                    sendV port v
 
@@ -217,30 +208,31 @@ readOutputs = do
 --  SimTime time <- receiveTime Sim (Nothing @Object)
 --  putStrLn $ "readOutputs " <> show time
 
-  forM_ vpiSignals $ onAllSignalTypes $ \case
-    SimSignal{..} -> case vpiInstance of
-      Nothing -> error "Cannot read from module"
-      Just VPIInstance{..} ->
-        receiveValue VectorFmt (port vpiOutputPort) >>= \case
-          BitVectorVal SNat v -> case signalUpdate of
-            Just upd -> liftIO $ upd $ unpack $ resize v
-            Nothing  -> error "No signal update"
-          _ -> error "Unexpected return format"
-    _ -> return ()
-
-  -- print the watched signals
-  i <- liftIO $ readIORef vpiStepRef
-  when (i > 0) $ forM_ vpiSignals $ onAllSignalTypes $ \s -> do
-    v <- liftIO $ signalCurVal s
-    case signalPrint s of
-      Nothing    -> return ()
-      Just toStr -> putStrLn . (<> toStr v) $ case s of
-        IOInput{}   -> "I "
-        SimSignal{} -> "O "
-        TBSignal{}  -> "S "
-
-  -- proceed time for all instances not running trough Clash-FFI
-  liftIO $ modifyIORef vpiStepRef (+ 1)
+  forM_ tbDomains $ \(d, map (tbSignalLookup !) -> xs) ->
+    (`onAllDomainTypes` d) $ \(TBDomain{..} :: TBDomain 'FINAL dom) -> do
+      -- receive the outputs
+      forM_ xs $ onAllSignalTypes $ \case
+        SimSignal{..} -> case vpiInstance of
+          Nothing -> error "Cannot read from module"
+          Just VPIInstance{..} ->
+            receiveValue VectorFmt (port vpiOutputPort) >>= \case
+              BitVectorVal SNat v -> case signalUpdate of
+                Just upd -> liftIO $ upd $ unpack $ resize v
+                Nothing  -> error "No signal update"
+              _ -> error "Unexpected return format"
+        _ -> return ()
+      -- print the watched signals
+      i <- liftIO $ readIORef simStepRef
+      when (i > 0) $ forM_ xs $ onAllSignalTypes $ \s -> do
+        v <- liftIO $ signalCurVal s
+        case signalPrint s of
+          Nothing    -> return ()
+          Just toStr -> putStrLn . (<> toStr v) $ case s of
+            IOInput{}   -> "I "
+            SimSignal{} -> "O "
+            TBSignal{}  -> "S "
+      -- proceed time for all instances not running trough Clash-FFI
+      liftIO $ modifyIORef simStepRef (+ 1)
 
   if vpiSimSteps > 0 then do
     let ?state = ?state { vpiSimSteps = vpiSimSteps - 1 }
@@ -254,25 +246,12 @@ readOutputs = do
 
  where
   VPIState{..} = ?state
+  Testbench{..} = testbench
 
 matchModule ::
-  (?signalFromID :: ID 'FINAL () -> SomeSignal 'FINAL, Typeable b) =>
-  (String, (Maybe (SomeSignal 'FINAL), Maybe Module)) ->
-  SimCont b (Maybe (SomeSignal 'FINAL))
-matchModule = \case
-  (_, (Just s, Just m)) -> case s of
-    SomeSignal s'  -> Just . SomeSignal  <$> vpiInst m s'
-    SomeMonitor s' -> Just . SomeMonitor <$> vpiInst m s'
-  (name, (_, Nothing)) ->
-    error $ "No module matches \"" <> name <> "\""
-  (name, (Nothing, _)) -> do
-    putStrLn $ "Module not required: \"" <> name <> "\" (ignoring)"
-    return Nothing
-
-vpiInst ::
-  (?signalFromID :: ID 'FINAL () -> SomeSignal 'FINAL, KnownDomain dom, BitPack a, Typeable b) =>
+  (?testbench :: Testbench, KnownDomain dom, BitPack a, Typeable b) =>
   Module -> TBSignal 'FINAL dom a -> SimCont b (TBSignal 'FINAL dom a)
-vpiInst vpiModule = \case
+matchModule vpiModule = \case
   tbs@SimSignal{..} -> do
     ports <- modulePorts vpiModule
     dirs  <- mapM direction ports
@@ -316,8 +295,8 @@ vpiInst vpiModule = \case
     _      -> False
 
 matchPort ::
-  (?signalFromID :: ID 'FINAL () -> SomeSignal 'FINAL, Typeable b) =>
-  Module -> (ID 'FINAL (), Maybe Port) -> SimCont b (ID 'FINAL (), VPIPort)
+  (?testbench :: Testbench, Typeable b) =>
+  Module -> (ID (), Maybe Port) -> SimCont b (ID (), VPIPort)
 matchPort m = \case
   (_, Nothing)     -> error "Not enough ports"
   (sid, Just p) -> do
@@ -327,20 +306,28 @@ matchPort m = \case
     portDirection <- direction p
 
     let portName = B.unpack portNameBS
-
-    if
-      | isSignalID sid -> (`onAllSignalTypes` ?signalFromID sid) $ \s ->
-                            checkPort (toInteger portSize) s portDirection
-      | isClockID sid  && portSize /= 1 -> error $ "Not a clock port: "  <> portName
-      | isResetID sid  && portSize /= 1 -> error $ "Not a reset port: "  <> portName
-      | isEnableID sid && portSize /= 1 -> error $ "Not a enable port: " <> portName
-      | otherwise -> return ()
+    checkID portName portSize portDirection sid
 
     -- Get a long-term reference via direct name access. Iterator
-    -- references may not be persitent.
+    -- references may not be persistent.
     port <- getByName (Just m) portNameBS
 
     return (sid, VPIPort{..})
+ where
+  Testbench{..} = ?testbench
+
+  match :: forall b. Int -> Int -> String -> String -> SimCont b ()
+  match n k tName pName =
+    when (n /= k) $ error $ "Not a " <> tName <> " port: " <> pName
+
+  checkID :: forall b. String -> Int -> Direction -> ID () -> SimCont b ()
+  checkID name size dir (SomeID x) = case x of
+    ClockID{}    -> match size 1 "clock" name
+    ResetID{}    -> match size 1 "reset" name
+    EnableID{}   -> match size 1 "enable" name
+    NoID         -> error "NoID, TODO check"
+    i@SignalID{} -> (`onAllSignalTypes` (tbSignalLookup ! i)) $ \s ->
+                       checkPort (toInteger size) s dir
 
 checkPort ::
   forall dom a b.

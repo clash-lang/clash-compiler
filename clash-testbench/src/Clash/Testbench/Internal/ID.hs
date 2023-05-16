@@ -1,217 +1,210 @@
+{-|
+Copyright:    (C) 2023 Google Inc.
+License:      BSD2 (see the file LICENSE)
+Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
+
+'Clash.Testbench.Simulate.TB' lifted signals.
+-}
+
 module Clash.Testbench.Internal.ID
-  ( Source(..)
-  , Stage(..)
-  , AnyStage
-  , SIGNAL
-  , CLOCK
-  , RESET
-  , ENABLE
+  ( SIGNAL
+  , DOMAIN
   , IDT
-  , IDSource
   , ID(..)
+  , MID(..)
   , idToInt
-  , isSignalID
-  , isClockID
-  , isResetID
-  , isEnableID
-  , isNoID
   ) where
 
-import Clash.Prelude (Type)
+import GHC.Arr (Ix(..))
 
--- | Source of identification
-data Source =
-    AutoDom String
-    -- ^ Implicit source determined through the domain
-    -- (given in reified form here)
-  | UserDef Int
-    -- ^ User defined source that has some modeled given by the user
-  deriving (Eq, Ord)
-
-instance Show Source where
-  show = \case
-    AutoDom str -> '@' : str
-    UserDef i   -> show i
-
-data Stage :: Type where
-  -- | The test bench is created in the USER stage. The elements of
-  -- the test bench are setup by the user inside the TB monad during
-  -- this stage.
-  USER  :: Stage
-  -- | The FINAL stage is reached once the test bench has been created
-  -- and all elements of the setup are known. Furthermore,
-  -- post-processing of the setup has passed
-  -- successfully. Post-processing also introduces the switch from
-  -- USER to FINAL on the type level.
-  FINAL :: Stage
-
--- | ID reference for the standard Clash 'Signal' type.
+-- | ID reference for the standard Clash 'Clash.Signal.Signal' type.
 data SIGNAL
--- | ID reference for the special Clash 'Clock' type.
-data CLOCK
--- | ID reference for the special Clash 'Reset' type.
-data RESET
--- | ID reference for the special Clash 'Enable' type.
-data ENABLE
+-- | ID reference for domain specific special Clash types like
+-- 'Clash.Internal.Signal.Clock', 'Clash.Internal.Signal.Reset', or
+-- 'Clash.Internal.Signal.Enable'.
+data DOMAIN
 
 -- | Some closed type family used for capturing the available ID types.
 type family IDT a where
-  IDT CLOCK  = CLOCK
-  IDT RESET  = RESET
-  IDT ENABLE = ENABLE
+  IDT DOMAIN = DOMAIN
   IDT a      = SIGNAL
 
--- | Closed type family, which determines the underlying ID type for
--- each of the different stages.
-type family IDSource (s :: Stage) a where
-  -- at the final stage all ids must be of type Int
-  IDSource 'FINAL a      = Int
-  -- clocks, resets and enable signals may have been introduced on the
-  -- fly and still need to get some unique id during post-processing.
-  IDSource 'USER  CLOCK  = Source
-  IDSource 'USER  RESET  = Source
-  IDSource 'USER  ENABLE = Source
-  -- everything has a known id already
-  IDSource s      a      = Int
-
 -- | The ID data constructors for holding the different ID types.
-data ID (stage :: Stage) a where
-  -- the pool of free IDs is only available a the USER stage and gets
-  -- closed at later stages
-  FreeID   ::                IDSource 'USER Int    -> ID 'USER Int
+data ID a where
+  -- the pool of free IDs
+  FreeID   :: Int -> ID Int
   -- the different ID types
-  SignalID ::                IDSource stage SIGNAL -> ID stage SIGNAL
-  ClockID  ::                IDSource stage CLOCK  -> ID stage CLOCK
-  ResetID  ::                IDSource stage RESET  -> ID stage RESET
-  EnableID ::                IDSource stage ENABLE -> ID stage ENABLE
-  -- signals that result from higher order applications may not be
-  -- explicitly available
-  NoID     ::                                         ID stage SIGNAL
+  SignalID :: Int -> ID SIGNAL
+  ClockID  :: Int -> ID DOMAIN
+  ResetID  :: Int -> ID DOMAIN
+  EnableID :: Int -> ID DOMAIN
+  -- signals that result from higher order transformations may not be
+  -- tracked explicitly
+  NoID     :: ID SIGNAL
   -- wrapper type for passing different ID types around. Note that IDs
-  -- of the free id pool cannot be passed around this way.
-  SomeID   :: (a ~ IDT a) => ID stage a            -> ID stage ()
+  -- of the free id pool are excluded here.
+  SomeID   :: (a ~ IDT a) => ID a -> ID ()
 
--- | This class collects some operations that are available during all
--- stages. It is mostly used to defined the remaining type class
--- instances of 'ID'.
-class AnyStage (s :: Stage) where
-  mapID :: (Either Int Source -> b) -> ID s a -> b
+-- | Accesses the encapsulated 'Int' of an 'ID'. Note that 'NoID' is
+-- mapped to zero. Hence, 'SignalID' should only be used on positive
+-- values to ensure proper behavior.
+idToInt :: ID a -> Int
+idToInt = \case
+  FreeID x   -> x
+  SignalID x -> x
+  ClockID x  -> x
+  ResetID x  -> x
+  EnableID x -> x
+  NoID       -> 0
+  SomeID x   -> idToInt x
 
-instance AnyStage 'USER where
-  mapID f = \case
-    FreeID x   -> f $ Left x
-    SignalID x -> f $ Left x
-    ClockID  x -> f $ Right x
-    ResetID x  -> f $ Right x
-    EnableID x -> f $ Right x
-    NoID       -> f $ Left (-1)
-    SomeID s   -> mapID f s
+-- | ID context switch, guarded via 'Maybe'.
+class MID a where
+  mID :: ID b -> Maybe (ID a)
 
-instance AnyStage 'FINAL where
-  mapID f = \case
-    SignalID x -> f $ Left x
-    ClockID  x -> f $ Left x
-    ResetID x  -> f $ Left x
-    EnableID x -> f $ Left x
-    NoID       -> f $ Left (-1)
-    SomeID s   -> mapID f s
+instance MID () where
+  mID = \case
+    x@SomeID{} -> Just x
+    _          -> Nothing
 
-instance Num (ID 'USER Int) where
+instance MID Int where
+  mID = \case
+    x@FreeID{} -> Just x
+    _          -> Nothing
+
+instance MID SIGNAL where
+  mID = \case
+    x@NoID{}     -> Just x
+    x@SignalID{} -> Just x
+    SomeID x     -> mID x
+    _            -> Nothing
+
+instance MID DOMAIN where
+  mID = \case
+    x@ClockID{}  -> Just x
+    x@ResetID{}  -> Just x
+    x@EnableID{} -> Just x
+    SomeID x     -> mID x
+    _            -> Nothing
+
+instance Num (ID Int) where
   FreeID x + FreeID y   = FreeID $ x + y
   FreeID x - FreeID y   = FreeID $ x - y
   FreeID x * FreeID y   = FreeID $ x * y
   abs (FreeID x)    = FreeID $ abs x
   signum (FreeID x) = FreeID $ signum x
-  fromInteger   = FreeID . fromInteger
+  fromInteger       = FreeID . fromInteger
 
-instance AnyStage s => Eq (ID s a) where
-  x == y = mapID (mapID (==) x) y
+instance Eq (ID a) where
+  (==) = \case
+    FreeID x   -> \case
+      FreeID y -> x == y
+    SignalID x -> \case
+      SignalID y -> x == y
+      _          -> False
+    NoID       -> \case
+      NoID -> True
+      _    -> False
+    ClockID x  -> \case
+      ClockID y -> x == y
+      _         -> False
+    ResetID x  -> \case
+      ResetID y -> x == y
+      _         -> False
+    EnableID x -> \case
+      EnableID y -> x == y
+      _         -> False
+    SomeID x   -> \case
+      SomeID y -> case x of
+        z@SignalID{} -> (==) (Just z) $ mID y
+        z@NoID{}     -> (==) (Just z) $ mID y
+        z@ClockID{}  -> (==) (Just z) $ mID y
+        z@ResetID{}  -> (==) (Just z) $ mID y
+        z@EnableID{} -> (==) (Just z) $ mID y
 
-instance AnyStage s => Ord (ID s a) where
-  compare x = mapID (mapID compare x)
+instance Ord (ID a) where
+  compare = \case
+    FreeID x     -> \case
+      FreeID y -> compare x y
+    SignalID x -> \case
+      SignalID y -> compare x y
+      NoID       -> GT
+    NoID       -> \case
+      NoID       -> EQ
+      SignalID{} -> LT
+    ClockID x  -> \y -> case compare x $ idToInt y of
+      EQ -> case y of
+        ClockID{} -> EQ
+        _         -> LT
+      v -> v
+    ResetID x  -> \y -> case compare x $ idToInt y of
+      EQ -> case y of
+        ClockID{}  -> GT
+        ResetID{}  -> EQ
+        EnableID{} -> LT
+      v -> v
+    EnableID x -> \y -> case compare x $ idToInt y of
+      EQ -> case y of
+        EnableID{} -> EQ
+        _          -> GT
+      v -> v
+    SomeID x   -> \case
+      SomeID y -> case x of
+        z@SignalID{} -> maybe LT (compare z) $ mID y
+        z@NoID{}     -> maybe LT (compare z) $ mID y
+        z@ClockID{}  -> maybe GT (compare z) $ mID y
+        z@ResetID{}  -> maybe GT (compare z) $ mID y
+        z@EnableID{} -> maybe GT (compare z) $ mID y
 
-instance Show (ID s Int) where
-  show (FreeID x) = show x
-
-instance Show (ID s SIGNAL) where
+instance Show (ID a) where
   show = \case
+    FreeID x   -> show x
     SignalID x -> 's' : show x
     NoID       -> "-"
+    ClockID x  -> 'c' : show x
+    ResetID x  -> 'r' : show x
+    EnableID x -> 'e' : show x
+    SomeID x   -> show x
 
-instance AnyStage s => Show (ID s CLOCK) where
-  show x = 'c' : mapID showEither x
+instance Ix (ID SIGNAL) where
+  {-# INLINE range #-}
+  range (NoID,       NoID      ) = [NoID]
+  range (NoID,       SignalID x) = NoID : map SignalID (range (1,x))
+  range (SignalID x, SignalID y) = map SignalID (range (x,y))
+  range (SignalID _, NoID      ) = []
 
-instance AnyStage s => Show (ID s RESET) where
-  show x = 'r' : mapID showEither x
+  {-# INLINE unsafeIndex #-}
+  unsafeIndex _ = \case
+    NoID       -> 0
+    SignalID x -> x
 
-instance AnyStage s => Show (ID s ENABLE) where
-  show x = 'e' : mapID showEither x
+  {-# INLINE index #-}
+  index b i
+    | inRange b i = unsafeIndex b i
+    | otherwise   = error $ "Index " <> show i <> " out of range: " <> show b
 
-instance AnyStage s => Show (ID s ()) where
-  show (SomeID x) = case x of
-    SignalID{} -> show x
-    ClockID{}  -> show x
-    ResetID{}  -> show x
-    EnableID{} -> show x
-    NoID{}     -> show x
 
-showEither :: (Show a, Show b) => Either a b -> String
-showEither = \case
-  Left x  -> show x
-  Right x -> show x
+  {-# INLINE inRange #-}
+  inRange (NoID,       NoID)       = (NoID ==)
+  inRange (NoID, SignalID x)       = \case
+    NoID       -> True
+    SignalID i -> inRange (1, x) i
+  inRange (SignalID x, SignalID y) = \case
+    NoID       -> False
+    SignalID i -> inRange (x, y) i
+  inRange (SignalID _, NoID)       = const False
 
--- | At the final stage all IDs are of type Int.
-idToInt :: ID 'FINAL a -> Int
-idToInt = \case
-  SignalID x -> x
-  ClockID x  -> x
-  ResetID x  -> x
-  EnableID x -> x
-  NoID       -> -1
-  SomeID s   -> idToInt s
+instance Ix (ID DOMAIN) where
+  {-# INLINE range #-}
+  range (x, y) = map ClockID $ range (idToInt x, idToInt y)
 
--- | Checks whether the given ID is a signal identifier.
-isSignalID :: ID s a -> Bool
-isSignalID = \case
-  SignalID{} -> True
-  NoID{}     -> True
-  SomeID s   -> case s of
-    SignalID{} -> True
-    NoID{}     -> True
-    _          -> False
-  _          -> False
+  {-# INLINE unsafeIndex #-}
+  unsafeIndex = const idToInt
 
-isNoID :: ID s a -> Bool
-isNoID = \case
-  NoID{} -> True
-  SomeID s  -> case s of
-    NoID{} -> True
-    _      -> False
-  _         -> False
+  {-# INLINE index #-}
+  index b i
+    | inRange b i = unsafeIndex b i
+    | otherwise   = error $ "Index " <> show i <> " out of range: " <> show b
 
--- | Checks whether the given ID is a clock identifier.
-isClockID :: ID s a -> Bool
-isClockID = \case
-  ClockID{} -> True
-  SomeID s  -> case s of
-    ClockID{} -> True
-    _         -> False
-  _         -> False
-
--- | Checks whether the given ID is a reset identifier.
-isResetID :: ID s a -> Bool
-isResetID = \case
-  ResetID{} -> True
-  SomeID s  -> case s of
-    ResetID{} -> True
-    _         -> False
-  _         -> False
-
--- | Checks whether the given ID is an enable identifier.
-isEnableID :: ID s a -> Bool
-isEnableID = \case
-  ResetID{} -> True
-  SomeID s  -> case s of
-    ResetID{} -> True
-    _         -> False
-  _         -> False
+  {-# INLINE inRange #-}
+  inRange (x, y) = inRange (idToInt x, idToInt y) . idToInt

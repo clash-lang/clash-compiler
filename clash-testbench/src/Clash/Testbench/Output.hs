@@ -4,7 +4,7 @@ License:      BSD2 (see the file LICENSE)
 Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 
 Output processors for post-processing output that results from
-simulating 'TB' defined testbenches.
+simulating 'Clash.Testbench.Simulate.TB' defined test benches.
 -}
 module Clash.Testbench.Output
   ( watch
@@ -27,9 +27,9 @@ watch ::
 watch = watchWith show
 
 -- | Output the values of the given signal to @stdout@ during
--- simulation using the provided 'String'-converter for @a@.
+-- simulation using the provided 'String' transformer for @a@.
 watchWith ::
   (KnownDomain dom, BitPack a, NFDataX a) =>
   (a -> String) -> TBSignal dom a -> TB ()
 watchWith toStr tbs =
-  void $ mindSignal tbs { signalPrint = Just toStr }
+  void $ mind SomeSignal tbs { signalPrint = Just toStr }

@@ -40,11 +40,9 @@ library
     Clash.Testbench.Output
     Clash.Testbench.Simulate
     Clash.Testbench.Generate
-  other-modules:
     Clash.Testbench.Internal.ID
     Clash.Testbench.Internal.Signal
     Clash.Testbench.Internal.Monad
-    Clash.Testbench.Internal.Auto
   build-depends:
     base,
     mtl,
