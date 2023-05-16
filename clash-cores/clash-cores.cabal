@@ -121,7 +121,7 @@ library
   build-depends:
     clash-lib,
     infinite-list           ^>= 0.1,
-    mtl                     >= 2.1.1 && < 2.3,
+    mtl                     >= 2.1.1 && < 2.4,
     pretty-show,
     prettyprinter           >= 1.2.0.1  && < 1.8,
     prettyprinter-interp    ^>= 0.2,
