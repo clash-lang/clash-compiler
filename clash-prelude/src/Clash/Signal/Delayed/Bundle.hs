@@ -18,7 +18,9 @@ module Clash.Signal.Delayed.Bundle (
   , TaggedEmptyTuple(..)
   ) where
 
+#if !MIN_VERSION_base(4,18,0)
 import           Control.Applicative           (liftA2)
+#endif
 import           GHC.TypeLits                  (KnownNat)
 import           Prelude                       hiding (head, map, tail)
 

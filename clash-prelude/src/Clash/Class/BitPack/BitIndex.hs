@@ -5,6 +5,7 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -44,22 +45,37 @@ import Clash.Sized.Internal.BitVector
 (!) v i = index# (pack v) (fromEnum i)
 
 {-# INLINE slice #-}
--- | Get a slice between bit index @m@ and and bit index @n@.
---
--- __NB:__ Bit indices are __DESCENDING__.
---
--- >>> pack (7 :: Unsigned 6)
--- 0b00_0111
--- >>> slice d4 d2 (7 :: Unsigned 6)
--- 0b001
--- >>> slice d6 d4 (7 :: Unsigned 6)
--- <BLANKLINE>
--- <interactive>:...
---     • Couldn't match type ‘7 + i0’ with ‘6’
---         arising from a use of ‘slice’
---       The type variable ‘i0’ is ambiguous
---     • In the expression: slice d6 d4 (7 :: Unsigned 6)
---       In an equation for ‘it’: it = slice d6 d4 (7 :: Unsigned 6)
+{- | Get a slice between bit index @m@ and and bit index @n@.
+
+__NB:__ Bit indices are __DESCENDING__.
+
+>>> pack (7 :: Unsigned 6)
+0b00_0111
+>>> slice d4 d2 (7 :: Unsigned 6)
+0b001
+
+#if __GLASGOW_HASKELL__ >= 906
+>>> slice d6 d4 (7 :: Unsigned 6)
+<BLANKLINE>
+<interactive>:...
+    • Couldn't match type ‘7 + i0’ with ‘6’
+        arising from a use of ‘slice’
+        The type variable ‘i0’ is ambiguous
+    • In the expression: slice d6 d4 (7 :: Unsigned 6)
+      In an equation for ‘it’: it = slice d6 d4 (7 :: Unsigned 6)
+
+#else
+>>> slice d6 d4 (7 :: Unsigned 6)
+<BLANKLINE>
+<interactive>:...
+    • Couldn't match type ‘7 + i0’ with ‘6’
+        arising from a use of ‘slice’
+      The type variable ‘i0’ is ambiguous
+    • In the expression: slice d6 d4 (7 :: Unsigned 6)
+      In an equation for ‘it’: it = slice d6 d4 (7 :: Unsigned 6)
+
+#endif
+-}
 slice
   :: (BitPack a, BitSize a ~ ((m + 1) + i))
   => SNat m
@@ -104,24 +120,39 @@ replaceBit :: (BitPack a, Enum i) => i -> Bit -> a -> a
 replaceBit i b v = unpack (replaceBit# (pack v) (fromEnum i) b)
 
 {-# INLINE setSlice #-}
--- | Set the bits between bit index @m@ and bit index @n@.
---
--- __NB:__ Bit indices are __DESCENDING__.
---
--- >>> pack (-5 :: Signed 6)
--- 0b11_1011
--- >>> setSlice d4 d3 0 (-5 :: Signed 6)
--- -29
--- >>> pack (-29 :: Signed 6)
--- 0b10_0011
--- >>> setSlice d6 d5 0 (-5 :: Signed 6)
--- <BLANKLINE>
--- <interactive>:...
---     • Couldn't match type ‘7 + i0’ with ‘6’
---         arising from a use of ‘setSlice’
---       The type variable ‘i0’ is ambiguous
---     • In the expression: setSlice d6 d5 0 (- 5 :: Signed 6)
---       In an equation for ‘it’: it = setSlice d6 d5 0 (- 5 :: Signed 6)
+{- | Set the bits between bit index @m@ and bit index @n@.
+
+__NB:__ Bit indices are __DESCENDING__.
+
+>>> pack (-5 :: Signed 6)
+0b11_1011
+>>> setSlice d4 d3 0 (-5 :: Signed 6)
+-29
+>>> pack (-29 :: Signed 6)
+0b10_0011
+
+#if __GLASGOW_HASKELL__ >= 906
+>>> setSlice d6 d5 0 (-5 :: Signed 6)
+<BLANKLINE>
+<interactive>:...
+    • Couldn't match type ‘7 + i0’ with ‘6’
+        arising from a use of ‘setSlice’
+        The type variable ‘i0’ is ambiguous
+    • In the expression: setSlice d6 d5 0 (- 5 :: Signed 6)
+      In an equation for ‘it’: it = setSlice d6 d5 0 (- 5 :: Signed 6)
+
+#else
+>>> setSlice d6 d5 0 (-5 :: Signed 6)
+<BLANKLINE>
+<interactive>:...
+    • Couldn't match type ‘7 + i0’ with ‘6’
+        arising from a use of ‘setSlice’
+      The type variable ‘i0’ is ambiguous
+    • In the expression: setSlice d6 d5 0 (- 5 :: Signed 6)
+      In an equation for ‘it’: it = setSlice d6 d5 0 (- 5 :: Signed 6)
+
+#endif
+-}
 setSlice
   :: (BitPack a, BitSize a ~ ((m + 1) + i))
   => SNat m

@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -22,8 +23,11 @@ import Test.Tasty.HUnit
 import qualified Test.Tasty.Hedgehog.Extra as H
 import qualified Test.Tasty.QuickCheck as Q
 
+#if !MIN_VERSION_base(4,18,0)
+import Control.Applicative (liftA2)
+#endif
 import Clash.Prelude
-  (Bit, high, low, bitPattern, type (<=), type (-), natToInteger, liftA2, msb, bLit)
+  (Bit, high, low, bitPattern, type (<=), type (-), natToInteger, msb, bLit)
 import Clash.Sized.Internal.BitVector (BitVector (..))
 
 import Clash.Tests.SizedNum

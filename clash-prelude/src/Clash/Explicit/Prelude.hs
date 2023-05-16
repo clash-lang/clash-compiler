@@ -11,6 +11,7 @@ This module defines the explicitly clocked counterparts of the functions
 defined in "Clash.Prelude".
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
@@ -154,6 +155,9 @@ import Data.Default.Class
 import Data.String.Interpolate (__i)
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits
+#if MIN_VERSION_base(4,18,0)
+  hiding (SNat, SSymbol, fromSNat)
+#endif
 import GHC.TypeLits.Extra
 import Language.Haskell.TH.Syntax  (Lift(..))
 import Clash.HaskellPrelude

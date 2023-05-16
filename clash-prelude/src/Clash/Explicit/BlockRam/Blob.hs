@@ -277,7 +277,7 @@ blockRamBlob# !_ gen content@MemBlob{} = \rd wen waS wd -> runST $ do
 -- x = 1
 -- :}
 -- <BLANKLINE>
--- <interactive>:...: error:
+-- <interactive>:...: error:...
 --     packBVs: cannot convert don't care values. Please specify a mapping to a definite value.
 --
 -- Note how we hinted to @clashi@ that our multi-line command was a list of
@@ -352,7 +352,7 @@ createMemBlob name care es =
 -- 0b1_0000_1000
 -- >>> $(memBlobTH Nothing es)
 -- <BLANKLINE>
--- <interactive>:...: error:
+-- <interactive>:...: error:...
 --     • packBVs: cannot convert don't care values. Please specify a mapping to a definite value.
 --     • In the untyped splice: $(memBlobTH Nothing es)
 memBlobTH
