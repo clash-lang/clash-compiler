@@ -33,8 +33,9 @@ module Clash.Normalize.Transformations.Inline
 
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
+import Control.Monad ((>=>))
 import Control.Monad.Trans.Maybe (MaybeT(..))
-import Control.Monad.Writer ((>=>),lift,listen)
+import Control.Monad.Writer (lift,listen)
 import Data.Default (Default(..))
 import Data.Either  (lefts)
 import qualified Data.HashMap.Lazy as HashMap

@@ -13,8 +13,8 @@
 
 module Clash.Primitives.Sized.Vector where
 
-import           Control.Monad                      (replicateM)
-import           Control.Monad.State                (State, zipWithM)
+import           Control.Monad                      (replicateM, zipWithM)
+import           Control.Monad.State                (State)
 import qualified Control.Lens                       as Lens
 import           Data.Either                        (rights)
 import           Data.List.Extra                    (iterateNM)

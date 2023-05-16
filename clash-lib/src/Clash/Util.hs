@@ -18,6 +18,9 @@ module Clash.Util
   ( module Clash.Util
   , SrcSpan
   , noSrcSpan
+#if MIN_VERSION_transformers(0,6,0)
+  , hoistMaybe
+#endif
   )
 where
 
@@ -25,7 +28,9 @@ import qualified Control.Exception    as Exception
 import Control.Lens
 import Control.Monad.State            (MonadState,StateT)
 import qualified Control.Monad.State  as State
-#if !MIN_VERSION_transformers(0,6,0)
+#if MIN_VERSION_transformers(0,6,0)
+import Control.Monad.Trans.Maybe      (hoistMaybe)
+#else
 import Control.Monad.Trans.Maybe      (MaybeT (..))
 #endif
 import Data.Hashable                  (Hashable)
