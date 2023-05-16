@@ -54,6 +54,9 @@ import           Data.Primitive.ByteArray    (ByteArray(ByteArray))
 import qualified GHC.Data.Strict             as GHC
 import           GHC.Num.Integer             (integerToBigNatClamp#)
 #endif
+#if MIN_VERSION_ghc(9,6,0)
+import           Language.Haskell.Syntax.Basic (FieldLabelString (..))
+#endif
 
 -- GHC API
 #if MIN_VERSION_ghc(9,4,0)
@@ -95,9 +98,15 @@ import GHC.Data.Pair (Pair (..))
 import GHC.Types.SrcLoc (SrcSpan (..), isGoodSrcSpan)
 import GHC.Core.TyCon
   (AlgTyConRhs (..), TyCon, tyConName, algTyConRhs, isAlgTyCon, isFamilyTyCon,
-   isFunTyCon, isNewTyCon, isPrimTyCon, isTupleTyCon,
+   isNewTyCon, isPrimTyCon, isTupleTyCon,
    isClosedSynFamilyTyConWithAxiom_maybe, expandSynTyCon_maybe, tyConArity,
    tyConDataCons, tyConKind, tyConName, tyConUnique, isClassTyCon, isPromotedDataCon_maybe)
+#if MIN_VERSION_ghc(9,6,0)
+import GHC.Core.TyCon (ExpandSynResult (..))
+import GHC.Core.Type (tyConAppFunTy_maybe)
+#else
+import GHC.Core.TyCon (isFunTyCon)
+#endif
 import GHC.Core.Type (mkTvSubstPrs, substTy, coreView)
 import GHC.Core.TyCo.Rep (Coercion (..), TyLit (..), Type (..), scaledThing)
 import GHC.Types.Unique (Uniquable (..), Unique, getKey, hasKey)
@@ -595,7 +604,6 @@ coreToTerm primMap unlocs = term
               | Just n <- parseBundle "bundle" f        -> return (bundleUnbundleTerm (n+1) xType)
               | Just n <- parseBundle "unbundle" f      -> return (bundleUnbundleTerm (n+1) xType)
               | f == "Clash.Signal.Internal.mapSignal#" -> return (mapSignalTerm xType)
-              | f == "Clash.Signal.Internal.mapSignal#" -> return (mapSignalTerm xType)
               | f == "Clash.Signal.Internal.signal#"    -> return (signalTerm xType)
               | f == "Clash.Signal.Internal.appSignal#" -> return (appSignalTerm xType)
               | f == "Clash.Signal.Internal.traverse#"  -> return (traverseTerm xType)
@@ -785,7 +793,11 @@ hasPrimCo (AxiomRuleCo _ coers) = do
   tcs <- catMaybes <$> mapM hasPrimCo coers
   return (listToMaybe tcs)
 
+#if MIN_VERSION_ghc(9,6,0)
+hasPrimCo (SelCo _ co) = hasPrimCo co
+#else
 hasPrimCo (NthCo _ _ co)  = hasPrimCo co
+#endif
 hasPrimCo (LRCo _ co)   = hasPrimCo co
 hasPrimCo (InstCo co _) = hasPrimCo co
 hasPrimCo (SubCo co)    = hasPrimCo co
@@ -804,7 +816,9 @@ coreToDataCon dc = do
     mkDc dcTy repTys
   where
     mkDc dcTy repTys = do
-#if MIN_VERSION_ghc(8,10,0)
+#if MIN_VERSION_ghc(9,6,0)
+      let decLabel = decodeUtf8 . bytesFS . field_label . flLabel
+#elif MIN_VERSION_ghc(8,10,0)
       let decLabel = decodeUtf8 . bytesFS . flLabel
 #else
       let decLabel = decodeUtf8 . fastStringToByteString . flLabel
@@ -833,7 +847,7 @@ coreToDataCon dc = do
 
 hsImplBangToBool :: HsImplBang -> C.DcStrictness
 hsImplBangToBool HsLazy = C.Lazy
-hsImplBangToBool HsStrict = C.Strict
+hsImplBangToBool HsStrict{} = C.Strict
 hsImplBangToBool HsUnpack{} = C.Strict
 
 typeConstructorToString
@@ -1014,9 +1028,17 @@ coreToType'
   -> C2C C.Type
 coreToType' (TyVarTy tv) = C.VarTy <$> coreToTyVar tv
 coreToType' (TyConApp tc args)
+#if MIN_VERSION_ghc(9,6,0)
+  | Just (FunTy _ _ ty1 ty2) <- tyConAppFunTy_maybe tc args = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
+#else
   | isFunTyCon tc = foldl C.AppTy (C.ConstTy C.Arrow) <$> mapM coreToType args
+#endif
   | otherwise     = case expandSynTyCon_maybe tc args of
+#if MIN_VERSION_ghc(9,6,0)
+                      ExpandsSyn substs synTy remArgs -> do
+#else
                       Just (substs,synTy,remArgs) -> do
+#endif
                         let substs' = mkTvSubstPrs substs
                             synTy'  = substTy substs' synTy
                         foldl C.AppTy <$> coreToType synTy' <*> mapM coreToType remArgs

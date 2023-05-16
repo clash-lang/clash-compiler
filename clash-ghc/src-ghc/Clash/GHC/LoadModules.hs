@@ -77,6 +77,9 @@ import           System.Process                  (runInteractiveCommand,
 
 -- GHC API
 #if MIN_VERSION_ghc(9,0,0)
+#if MIN_VERSION_ghc(9,6,0)
+import           GHC.Unit.Home.ModInfo (emptyHomeModInfoLinkable)
+#endif
 #if MIN_VERSION_ghc(9,4,0)
 import           GHC.Data.Bool (OverridingBool)
 import           GHC.Driver.Config.Tidy (initTidyOpts)
@@ -291,7 +294,11 @@ setupGhc useColor dflagsM idirs = do
 #if MIN_VERSION_ghc(9,2,0)
                   , DynFlags.backend  =
                       if Ways.hostIsProfiled
+#if MIN_VERSION_ghc(9,6,0)
+                         then Backend.noBackend
+#else
                          then Backend.NoBackend
+#endif
                          else Backend.platformDefaultBackend (DynFlags.targetPlatform dflags)
 #else
                   , DynFlags.hscTarget
@@ -400,7 +407,12 @@ loadLocalModule hdl modName = do
     --
     -- Given that TH splices can do non-trivial computation and I/O,
     -- running TH twice must be avoid.
-#if MIN_VERSION_ghc(9,4,0)
+#if MIN_VERSION_ghc(9,6,0)
+    hsc_env_tc <- GHC.getSession
+    mod_info <- liftIO $ compileOne' Nothing hsc_env_tc m 1 1 Nothing emptyHomeModInfoLinkable
+    modifySession $ HscTypes.hscUpdateHUG (addHomeModInfoToHug mod_info)
+    let tcMod' = tcMod
+#elif MIN_VERSION_ghc(9,4,0)
     hsc_env_tc <- GHC.getSession
     mod_info <- liftIO $ compileOne' Nothing hsc_env_tc m 1 1 Nothing Nothing
     modifySession $ HscTypes.hscUpdateHUG (addHomeModInfoToHug mod_info)
