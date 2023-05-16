@@ -1,3 +1,11 @@
 packages: . .. ../../clash-ghc ../../clash-lib ../../clash-prelude
 
 write-ghc-environment-files: always
+
+allow-newer:
+  hashable
+
+source-repository-package
+    type: git
+    location: https://github.com/haskell-hint/hint.git
+    tag: 710745eafa6bb8d531f2dfdbc07c50c9b776f0b2
