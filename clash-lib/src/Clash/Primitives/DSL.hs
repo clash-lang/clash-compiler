@@ -1,8 +1,8 @@
 {-|
-  Copyright   :  (C) 2019, Myrtle Software Ltd.
+  Copyright   :  (C) 2019,      Myrtle Software Ltd.
                      2020-2023, QBayLogic B.V.
-                     2021, Myrtle.ai
-                     2022, Google Inc
+                     2021,      Myrtle.ai
+                     2022-2023, Google Inc
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -361,10 +361,15 @@ deconstructProduct
   -> [Text]
   -- ^ Name hints for element assignments
   -> State (BlockState backend) [TExpr]
-deconstructProduct (TExpr ty@(Product _ _ tys) (Identifier resName _)) vals = do
-  newNames <- zipWithM declare vals tys
-  addDeclaration $ Assignment resName Cont $ DataCon ty (DC (ty, 0)) (fmap eex newNames)
-  pure newNames
+deconstructProduct (TExpr ty@(Product _ _ fieldTys) (Identifier resName Nothing)) nameHints =
+  forM (zip3 [0..] nameHints fieldTys) $ \(fieldIndex, nameHint, fieldTy) ->
+    assign nameHint $
+      TExpr fieldTy (Identifier resName (Just (Indexed (ty, 0, fieldIndex))))
+
+deconstructProduct t0@(TExpr (Product {}) _) nameHints = do
+  t1 <- toIdentifier "product" t0
+  deconstructProduct t1 nameHints
+
 deconstructProduct e i =
   error $ "deconstructProduct: " <> show e <> " " <> show i
 

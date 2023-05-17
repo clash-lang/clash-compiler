@@ -1,0 +1,1 @@
+FIXED: `Clash.Primitives.DSL.deconstructProduct` now projects fields out of a product [#2469](https://github.com/clash-lang/clash-compiler/issues/2469)
