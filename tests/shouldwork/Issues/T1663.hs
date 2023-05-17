@@ -4,6 +4,7 @@ module T1663 (topEntity) where
 
 import Clash.Prelude
 import Data.Maybe
+import Data.Monoid
 import Control.Monad
 import Control.Monad.RWS
 
