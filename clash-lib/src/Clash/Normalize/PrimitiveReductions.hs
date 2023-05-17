@@ -84,8 +84,7 @@ import           Clash.Core.Util
   (appendToVec, extractElems, extractTElems, mkRTree,
    mkUniqInternalId, mkUniqSystemTyVar, mkVec, dataConInstArgTys, primCo)
 import           Clash.Core.Var                   (mkTyVar, mkLocalId)
-import           Clash.Core.VarEnv
-  (InScopeSet, extendInScopeSetList)
+import           Clash.Core.VarEnv                (extendInScopeSetList)
 import qualified Clash.Data.UniqMap as UniqMap
 import qualified Clash.Normalize.Primitives as NP (undefined)
 import {-# SOURCE #-} Clash.Normalize.Strategy
@@ -246,15 +245,15 @@ mkVecNil nilCon resTy = case dataConInstArgTys nilCon [LitTy (NumTy 0), resTy] o
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.reverse@
 reduceReverse
-  :: InScopeSet
-  -> Integer
+  :: Integer
   -- ^ Length of the vector
   -> Type
   -- ^ Element of type of the vector
   -> Term
   -- ^ The vector to reverse
+  -> TransformContext
   -> NormalizeSession Term
-reduceReverse inScope0 n elTy vArg = do
+reduceReverse n elTy vArg (TransformContext inScope0 _ctx) = do
   tcm <- Lens.view tcCache
   let ty = inferCoreTypeOf tcm vArg
   go tcm ty
@@ -278,8 +277,7 @@ reduceReverse inScope0 n elTy vArg = do
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.zipWith@
 reduceZipWith
-  :: TransformContext
-  -> PrimInfo -- ^ zipWith primitive info
+  :: PrimInfo -- ^ zipWith primitive info
   -> Integer  -- ^ Length of the vector(s)
   -> Type -- ^ Element type of the lhs of the function
   -> Type -- ^ Element type of the rhs of the function
@@ -287,8 +285,9 @@ reduceZipWith
   -> Term -- ^ The zipWith'd functions
   -> Term -- ^ The 1st vector argument
   -> Term -- ^ The 2nd vector argument
+  -> TransformContext
   -> NormalizeSession Term
-reduceZipWith _ctx zipWithPrimInfo n lhsElTy rhsElTy resElTy fun lhsArg rhsArg = do
+reduceZipWith zipWithPrimInfo n lhsElTy rhsElTy resElTy fun lhsArg rhsArg _ctx = do
   tcm <- Lens.view tcCache
   changed (go tcm (inferCoreTypeOf tcm lhsArg))
  where
@@ -324,15 +323,15 @@ reduceZipWith _ctx zipWithPrimInfo n lhsElTy rhsElTy resElTy fun lhsArg rhsArg =
 -- of a known length @n@, by the fully unrolled recursive "definition" of
 -- @Clash.Sized.Vector.map@
 reduceMap
-  :: TransformContext
-  -> PrimInfo -- ^ map primitive info
+  :: PrimInfo -- ^ map primitive info
   -> Integer  -- ^ Length of the vector
   -> Type -- ^ Argument type of the function
   -> Type -- ^ Result type of the function
   -> Term -- ^ The map'd function
   -> Term -- ^ The map'd over vector
+  -> TransformContext
   -> NormalizeSession Term
-reduceMap _ctx mapPrimInfo n argElTy resElTy fun arg = do
+reduceMap mapPrimInfo n argElTy resElTy fun arg _ctx = do
     tcm <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm arg
     changed (go tcm ty)
@@ -367,14 +366,15 @@ reduceMap _ctx mapPrimInfo n argElTy resElTy fun arg = do
 -- of a known length @n@, by the fully unrolled recursive "definition" of
 -- @Clash.Sized.Vector.imap@
 reduceImap
-  :: TransformContext
-  -> Integer  -- ^ Length of the vector
+  :: Integer  -- ^ Length of the vector
   -> Type -- ^ Argument type of the function
   -> Type -- ^ Result type of the function
+  -> Term -- ^ Lenght of the vector (as a KnownNat)
   -> Term -- ^ The imap'd function
   -> Term -- ^ The imap'd over vector
+  -> TransformContext
   -> NormalizeSession Term
-reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
+reduceImap n argElTy resElTy _kn fun arg (TransformContext is0 ctx) = do
     tcm <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm arg
     go tcm ty
@@ -416,20 +416,22 @@ reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.iterateI@
 reduceIterateI
-  :: TransformContext
-  -> Integer
+  :: Integer
   -- ^ Length of vector
   -> Type
   -- ^ Vector's element type
   -> Type
   -- ^ Vector's type
   -> Term
+  -- ^ Length of the vector (as a KnownNat)
+  -> Term
   -- ^ iterateI's HO-function argument
   -> Term
   -- ^ iterateI's start value
+  -> TransformContext
   -> RewriteMonad NormalizeState Term
   -- ^ Fully unrolled definition
-reduceIterateI (TransformContext is0 ctx) n aTy vTy f0 a = do
+reduceIterateI n aTy vTy _kn f0 a (TransformContext is0 ctx) = do
   tcm <- Lens.view tcCache
   f1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) f0
 
@@ -467,16 +469,16 @@ reduceIterateI (TransformContext is0 ctx) n aTy vTy f0 a = do
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.traverse#@
 reduceTraverse
-  :: TransformContext
-  -> Integer  -- ^ Length of the vector
+  :: Integer  -- ^ Length of the vector
   -> Type -- ^ Element type of the argument vector
   -> Type -- ^ The type of the applicative
   -> Type -- ^ Element type of the result vector
   -> Term -- ^ The @Applicative@ dictionary
   -> Term -- ^ The function to traverse with
   -> Term -- ^ The argument vector
+  -> TransformContext
   -> NormalizeSession Term
-reduceTraverse (TransformContext is0 ctx) n aTy fTy bTy dict fun arg = do
+reduceTraverse n aTy fTy bTy dict fun arg (TransformContext is0 ctx) = do
     tcm <- Lens.view tcCache
     case tyView (inferCoreTypeOf tcm dict) of
       TyConApp apDictTcNm _ ->
@@ -600,8 +602,7 @@ mkTravVec vecTc nilCon consCon pureTm apTm fmapTm bTy = go
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.foldr@
 reduceFoldr
-  :: TransformContext
-  -> PrimInfo
+  :: PrimInfo
   -- ^ Primitive info for foldr blackbox
   -> Integer
   -- ^ Length of the vector
@@ -613,9 +614,10 @@ reduceFoldr
   -- ^ The starting value
   -> Term
   -- ^ The argument vector
+  -> TransformContext
   -> NormalizeSession Term
-reduceFoldr _ _ 0 _ _ start _ = changed start
-reduceFoldr _ctx foldrPrimInfo n aTy fun start arg = do
+reduceFoldr _ 0 _ _ start _ _ = changed start
+reduceFoldr foldrPrimInfo n aTy fun start arg _ctx = do
     tcm <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm arg
     changed (go tcm ty)
@@ -647,8 +649,7 @@ reduceFoldr _ctx foldrPrimInfo n aTy fun start arg = do
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.fold@
 reduceFold
-  :: TransformContext
-  -> Integer
+  :: Integer
   -- ^ Length of the vector
   -> Type
   -- ^ Element type of the argument vector
@@ -656,8 +657,9 @@ reduceFold
   -- ^ The function to fold with
   -> Term
   -- ^ The argument vector
+  -> TransformContext
   -> NormalizeSession Term
-reduceFold (TransformContext is0 ctx) n aTy fun arg = do
+reduceFold n aTy fun arg (TransformContext is0 ctx) = do
     tcm <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm arg
     go tcm ty
@@ -689,20 +691,24 @@ reduceFold (TransformContext is0 ctx) n aTy fun arg = do
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.dfold@
 reduceDFold
-  :: InScopeSet
-  -> Integer
+  :: Integer
   -- ^ Length of the vector
   -> Type
   -- ^ Element type of the argument vector
+  -> Term
+  -- ^ Length of the vector (as a KnownNat)
+  -> Term
+  -- ^ The motive
   -> Term
   -- ^ Function to fold with
   -> Term
   -- ^ Starting value
   -> Term
   -- ^ The vector to fold
+  -> TransformContext
   -> NormalizeSession Term
-reduceDFold _ 0 _ _ start _ = changed start
-reduceDFold is0 n aTy fun start arg = do
+reduceDFold 0 _   _   _       _   start _   _ = changed start
+reduceDFold n aTy _kn _motive fun start arg (TransformContext is0 _ctx) = do
     tcm <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm arg
     go tcm ty
@@ -742,12 +748,12 @@ reduceDFold is0 n aTy fun start arg = do
 -- vectors of a known length @n@, by a projection of the first element of a
 -- vector.
 reduceHead
-  :: InScopeSet
-  -> Integer  -- ^ Length of the vector
+  :: Integer  -- ^ Length of the vector
   -> Type -- ^ Element type of the vector
   -> Term -- ^ The argument vector
+  -> TransformContext
   -> NormalizeSession Term
-reduceHead inScope n aTy vArg = do
+reduceHead n aTy vArg (TransformContext inScope _ctx) = do
     tcm <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm vArg
     go tcm ty
@@ -770,12 +776,12 @@ reduceHead inScope n aTy vArg = do
 -- vectors of a known length @n@, by a projection of the tail of a
 -- vector.
 reduceTail
-  :: InScopeSet
-  -> Integer  -- ^ Length of the vector
+  :: Integer  -- ^ Length of the vector
   -> Type -- ^ Element type of the vector
   -> Term -- ^ The argument vector
+  -> TransformContext
   -> NormalizeSession Term
-reduceTail inScope n aTy vArg = do
+reduceTail n aTy vArg (TransformContext inScope _ctx) = do
     tcm <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm vArg
     go tcm ty
@@ -799,12 +805,12 @@ reduceTail inScope n aTy vArg = do
 -- vectors of a known length @n@, by a projection of the last element of a
 -- vector.
 reduceLast
-  :: InScopeSet
-  -> Integer  -- ^ Length of the vector
+  :: Integer  -- ^ Length of the vector
   -> Type -- ^ Element type of the vector
   -> Term -- ^ The argument vector
+  -> TransformContext
   -> NormalizeSession Term
-reduceLast inScope n aTy vArg = do
+reduceLast n aTy vArg (TransformContext inScope _ctx) = do
     tcm <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm vArg
     go tcm ty
@@ -829,13 +835,13 @@ reduceLast inScope n aTy vArg = do
 -- vectors of a known length @n@, by a projection of the init of a
 -- vector.
 reduceInit
-  :: InScopeSet
-  -> PrimInfo -- ^ Primitive info for 'init'
+  :: PrimInfo -- ^ Primitive info for 'init'
   -> Integer  -- ^ Length of the vector
   -> Type -- ^ Element type of the vector
   -> Term -- ^ The argument vector
+  -> TransformContext
   -> NormalizeSession Term
-reduceInit _inScope initPrimInfo n aTy vArg = do
+reduceInit initPrimInfo n aTy vArg _ctx = do
   tcm <- Lens.view tcCache
   let ty = inferCoreTypeOf tcm vArg
   changed (go tcm ty)
@@ -866,14 +872,16 @@ reduceInit _inScope initPrimInfo n aTy vArg = do
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.(++)@
 reduceAppend
-  :: InScopeSet
-  -> Integer  -- ^ Length of the LHS arg
+  :: Integer  -- ^ Length of the LHS arg
   -> Integer  -- ^ Lenght of the RHS arg
   -> Type -- ^ Element type of the vectors
   -> Term -- ^ The LHS argument
   -> Term -- ^ The RHS argument
+  -> TransformContext
   -> NormalizeSession Term
-reduceAppend inScope n m aTy lArg rArg = do
+reduceAppend 0 _ _   _    rArg _ = changed rArg
+reduceAppend _ 0 _   lArg _    _ = changed lArg
+reduceAppend n m aTy lArg rArg (TransformContext inScope _ctx) = do
     tcm <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm lArg
     go tcm ty
@@ -896,15 +904,16 @@ reduceAppend inScope n m aTy lArg rArg = do
 -- | Replace an application of the @Clash.Sized.Vector.unconcat@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.unconcat@
-reduceUnconcat :: InScopeSet
-               -> PrimInfo -- ^ Unconcat primitive info
+reduceUnconcat :: PrimInfo -- ^ Unconcat primitive info
                -> Integer  -- ^ Length of the result vector
                -> Integer  -- ^ Length of the elements of the result vector
                -> Type -- ^ Element type
+               -> Term -- ^ Length of the result vector (as a KnownNat)
                -> Term -- ^ SNat "Length of the elements of the result vector"
                -> Term -- ^ Argument vector
+               -> TransformContext
                -> NormalizeSession Term
-reduceUnconcat inScope unconcatPrimInfo n m aTy sm arg = do
+reduceUnconcat unconcatPrimInfo n m aTy _kn sm arg (TransformContext inScope _ctx) = do
     tcm <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm arg
     go tcm ty
@@ -961,9 +970,11 @@ reduceUnconcat inScope unconcatPrimInfo n m aTy sm arg = do
 reduceTranspose :: Integer  -- ^ Length of the result vector
                 -> Integer  -- ^ Length of the elements of the result vector
                 -> Type -- ^ Element type
+                -> Term -- ^ Lenght of the result vector (as a KnownNat)
                 -> Term -- ^ Argument vector
+                -> TransformContext
                 -> NormalizeSession Term
-reduceTranspose n 0 aTy arg = do
+reduceTranspose n 0 aTy _kn arg _ctx = do
     tcm <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm arg
     go tcm ty
@@ -979,14 +990,16 @@ reduceTranspose n 0 aTy arg = do
         in  changed retVec
     go _ ty = error $ $(curLoc) ++ "reduceTranspose: argument does not have a vector type: " ++ showPpr ty
 
-reduceTranspose _ _ _ _ = error $ $(curLoc) ++ "reduceTranspose: unimplemented"
+reduceTranspose _ _ _ _ _ _ = error $ $(curLoc) ++ "reduceTranspose: unimplemented"
 
 reduceReplicate :: Integer
                 -> Type
                 -> Type
                 -> Term
+                -> Term
+                -> TransformContext
                 -> NormalizeSession Term
-reduceReplicate n aTy eTy arg = do
+reduceReplicate n aTy eTy _sn arg _ctx = do
     tcm <- Lens.view tcCache
     go tcm eTy
   where
@@ -1004,21 +1017,23 @@ reduceReplicate n aTy eTy arg = do
 -- TODO: Clash will eliminate one-by-one if the index turned out to be literal.
 -- TODO: It would of course be best to not create the cases in the first place!
 reduceReplace_int
-  :: InScopeSet
-  -> Integer
+  :: Integer
   -- ^ Size of vector
   -> Type
   -- ^ Type of vector element
   -> Type
   -- ^ Type of vector
   -> Term
+  -- ^ Size of vector (as a KnownNat)
+  -> Term
   -- ^ Vector
   -> Term
   -- ^ Index
   -> Term
   -- ^ Element
+  -> TransformContext
   -> NormalizeSession Term
-reduceReplace_int is0 n aTy vTy v i newA = do
+reduceReplace_int n aTy vTy _kn v i newA (TransformContext is0 _ctx) = do
   tcm <- Lens.view tcCache
   go tcm vTy
  where
@@ -1114,17 +1129,19 @@ reduceReplace_int is0 n aTy vTy v i newA = do
 -- TODO: Clash will eliminate one-by-one if the index turned out to be literal.
 -- TODO: It would of course be best to not create the cases in the first place!
 reduceIndex_int
-  :: InScopeSet
-  -> Integer
+  :: Integer
   -- ^ Size of vector
   -> Type
   -- ^ Type of vector element
   -> Term
+  -- ^ Size of vector (as a KnownNat)
+  -> Term
   -- ^ Vector
   -> Term
   -- ^ Index
+  -> TransformContext
   -> NormalizeSession Term
-reduceIndex_int is0 n aTy v i = do
+reduceIndex_int n aTy _kn v i (TransformContext is0 _ctx) = do
   tcm <- Lens.view tcCache
   let vTy = inferCoreTypeOf tcm v
   go tcm vTy
@@ -1221,14 +1238,16 @@ reduceIndex_int is0 n aTy v i = do
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.Vector.dtfold@
 reduceDTFold
-  :: InScopeSet
-  -> Integer  -- ^ Length of the vector
+  :: Integer  -- ^ Length of the vector
   -> Type     -- ^ Element type of the argument vector
+  -> Term     -- ^ Length of the vector (as a KnownNat)
+  -> Term     -- ^ The motive
   -> Term     -- ^ Function to convert elements with
   -> Term     -- ^ Function to combine branches with
   -> Term     -- ^ The vector to fold
+  -> TransformContext
   -> NormalizeSession Term
-reduceDTFold inScope n aTy lrFun brFun arg = do
+reduceDTFold n aTy _kn _motive lrFun brFun arg (TransformContext inScope _ctx) = do
     tcm <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm arg
     go tcm ty
@@ -1270,14 +1289,16 @@ reduceDTFold inScope n aTy lrFun brFun arg = do
 -- trees of a known depth @n@, by the fully unrolled recursive "definition"
 -- of @Clash.Sized.RTree.tdfold@
 reduceTFold
-  :: InScopeSet
-  -> Integer -- ^ Depth of the tree
+  :: Integer -- ^ Depth of the tree
   -> Type    -- ^ Element type of the argument tree
+  -> Term    -- ^ Depth of the tree (as a KnownNat)
+  -> Term    -- ^ The motive
   -> Term    -- ^ Function to convert elements with
   -> Term    -- ^ Function to combine branches with
   -> Term    -- ^ The tree to fold
+  -> TransformContext
   -> NormalizeSession Term
-reduceTFold inScope n aTy lrFun brFun arg = do
+reduceTFold n aTy _kn _motive lrFun brFun arg (TransformContext inScope _ctx) = do
     tcm <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm arg
     go tcm ty
@@ -1315,9 +1336,11 @@ reduceTFold inScope n aTy lrFun brFun arg = do
 reduceTReplicate :: Integer -- ^ Depth of the tree
                  -> Type    -- ^ Element type
                  -> Type    -- ^ Result type
+                 -> Term    -- ^ Depth of the tree (as an SNat)
                  -> Term    -- ^ Element
+                 -> TransformContext
                  -> NormalizeSession Term
-reduceTReplicate n aTy eTy arg = do
+reduceTReplicate n aTy eTy _sn arg _ctx = do
     tcm <- Lens.view tcCache
     go tcm eTy
   where
