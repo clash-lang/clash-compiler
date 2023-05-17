@@ -16,6 +16,7 @@ stages:
     - unset HACKAGE_PASSWORD
     - export THREADS=$(./.ci/effective_cpus.sh)
     - export CABAL_JOBS=$(./.ci/effective_cpus.sh)
+    - export CABAL_DIR=$HOME/.cabal
     - export clash_lib_datadir=$(pwd)/clash-lib/
     - export clash_cosim_datadir=$(pwd)/clash-cosim/
     - export
@@ -35,6 +36,7 @@ stages:
     - unset HACKAGE_PASSWORD
     - export THREADS=$(./.ci/effective_cpus.sh)
     - export CABAL_JOBS=$(./.ci/effective_cpus.sh)
+    - export CABAL_DIR=$HOME/.cabal
     - export clash_lib_datadir=$(pwd)/clash-lib/
     - export clash_cosim_datadir=$(pwd)/clash-cosim/
     - export
@@ -147,6 +149,7 @@ ffi:example:
     - unset HACKAGE_PASSWORD
     - export THREADS=$(./.ci/effective_cpus.sh)
     - export CABAL_JOBS=$(./.ci/effective_cpus.sh)
+    - export CABAL_DIR=$HOME/.cabal
     - export clash_lib_datadir=$(pwd)/clash-lib/
     - export clash_cosim_datadir=$(pwd)/clash-cosim/
     - export MASKBINS="$(mktemp -d)"

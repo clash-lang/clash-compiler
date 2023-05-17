@@ -1,5 +1,5 @@
 .benchmark:
-  image: ghcr.io/clash-lang/clash-ci-$GHC_VERSION:2023-05-11
+  image: ghcr.io/clash-lang/clash-ci-$GHC_VERSION:2023-05-16
   stage: test
   timeout: 2 hours
   variables:
@@ -32,6 +32,7 @@
     - export GHC_VERSION="${GHC_VERSION:-$(echo $CI_JOB_NAME | egrep -o '[0-9]+.[0-9]+.[0-9]+')}"
     - export THREADS=2
     - export CABAL_JOBS=1
+    - export CABAL_DIR=$HOME/.cabal
     - export
     - .ci/setup.sh
     - cabal v2-run --write-ghc-environment-files=always benchmark -- --csv benchmark.csv
