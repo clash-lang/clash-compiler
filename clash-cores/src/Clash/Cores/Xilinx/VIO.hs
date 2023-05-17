@@ -90,6 +90,11 @@ instance VIO dom a o => VIO dom (Signal dom i -> a) o where
 -- Creates VIO IP with three input probes of bit widths 4, 2, and 1,
 -- and three output probes, all a single bit wide. The output probes
 -- are all initialized to 1.
+--
+-- Note that under certain conditions Clash may optimize 'vioProbe' instances
+-- away, especially if the VIO is only used to monitor some inputs and
+-- produces no output. Utilizing 'Clash.XException.hwSeqX' may be helpful
+-- in this case to enforce the VIO to be rendered in HDL.
 vioProbe :: forall dom a o. (KnownDomain dom, VIO dom a o) => o -> Clock dom -> a
 vioProbe !_initialOutputProbeValues !_clk = vioX @dom @a @o
 {-# NOINLINE vioProbe #-}
