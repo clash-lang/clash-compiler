@@ -308,10 +308,9 @@ instance KnownNat n => Enum (Unsigned n) where
 
   pred n
     | n == minBound =
-        error $ "'pred' was called on (" <> show @(Unsigned n) maxBound <> " :: "
-             <> "Unsigned " <> show (natToNatural @n) <> ") and caused an "
-             <> "underflow. Use 'satPred' and specify a SaturationMode if you "
-             <> "need other behavior."
+        error $ "'pred' was called on (0 :: Unsigned " <> show (natToNatural @n)
+             <> ") and caused an overflow. Use 'satPred' and specify a "
+             <> "SaturationMode if you need other behavior."
     | otherwise = n -# fromInteger# 1
 
   toEnum         = toEnum#
@@ -701,7 +700,7 @@ instance KnownNat n => SaturatingNum (Unsigned n) where
     let r = minus# a b
     in  case msb r of
           0 -> resize# r
-          _ -> errorX "Unsigned.satSub: underflow"
+          _ -> errorX "Unsigned.satSub: overflow"
   satSub _ a b =
     let r = minus# a b
     in  case msb r of
@@ -737,7 +736,7 @@ instance KnownNat n => SaturatingNum (Unsigned n) where
   {-# INLINE satSucc #-}
 
   satPred SatError a
-    | a == minBound = errorX "Unsigned.satPred: underflow"
+    | a == minBound = errorX "Unsigned.satPred: overflow"
   satPred satMode a = satSub satMode a 1
   {-# INLINE satPred #-}
 
