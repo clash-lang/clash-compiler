@@ -126,6 +126,7 @@ jobs:
           - name: GHC 9.0.2, Multiple Hidden
             ghc: 9.0.2
             multiple_hidden: yes
+            workaround_ghc_mmap_crash: yes
 
           - name: GHC 9.2.5, Multiple Hidden
             ghc: 9.2.5
@@ -138,6 +139,7 @@ jobs:
       env:
         THREADS: 2
         CABAL_JOBS: 2
+        WORKAROUND_GHC_MMAP_CRASH: ${{ matrix.workaround_ghc_mmap_crash }}
         MULTIPLE_HIDDEN: ${{ matrix.multiple_hidden }}
         CI_COMMIT_BRANCH: ${{ github.base_ref }}
 
