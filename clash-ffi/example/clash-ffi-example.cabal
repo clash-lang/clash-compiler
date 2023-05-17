@@ -14,7 +14,7 @@ category:           Hardware
 custom-setup
   setup-depends:
     base        >= 4.11  && < 5,
-    Cabal       >= 2.4   && < 3.9,
+    Cabal       >= 2.4   && < 3.11,
     directory   >= 1.3.6 && < 1.4,
     filepath    >= 1.4.2 && < 1.5,
 
