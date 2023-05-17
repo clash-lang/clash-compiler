@@ -944,11 +944,11 @@ coreToAttrs' [annotationType, realType, attributes] = allAttrs
         name'  <- typeConstructorToString ty
         name'' <- typeConstructorToString ty'
 
-        let result | name' == "GHC.Types.[]" && name'' == _ATTR_NAME =
+        let result | name' `elem` ["GHC.Types.[]", "GHC.Types.List"] && name'' == _ATTR_NAME =
                       -- List of attributes
                       traverse coreToAttr (listTypeToListOfTypes attributes)
 
-                   | name' == "GHC.Types.[]" =
+                   | name' `elem` ["GHC.Types.[]", "GHC.Types.List"] =
                       -- List, but unknown types
                       error $ $(curLoc) ++ unwords [ "Annotate expects an"
                                                    , "Attr or a list of"
