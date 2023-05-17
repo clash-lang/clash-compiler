@@ -4562,6 +4562,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                     , Left (Literal (IntLiteral 0))
                     , Left (Literal (IntLiteral (toInteger len)))])
         in reduce ret
+  "GHC.Magic.noinlineConstraint"
+    | [arg] <- args
+    -> reduce (valToTerm arg)
 #endif
   _ -> Nothing
   where
