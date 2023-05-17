@@ -4565,6 +4565,19 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "GHC.Magic.noinlineConstraint"
     | [arg] <- args
     -> reduce (valToTerm arg)
+  "GHC.TypeNats.withSomeSNat"
+    | Lit (NaturalLiteral n) : fun : _ <- args
+    , _ : funTy : _ <- Either.rights (fst (splitFunForallTy ty))
+    , (tyView -> TyConApp snatTcNm _) : _ <- Either.rights (fst (splitFunForallTy funTy))
+    , Just snatTc <- UniqMap.lookup snatTcNm tcm
+    , [snatDc] <- tyConDataCons snatTc
+    -> let nTy = LitTy (NumTy n)
+           snat = mkApps (Data snatDc) [Right nTy, Left (Literal (NaturalLiteral n))]
+           ret = mkApps (valToTerm fun) [Right nTy, Left snat]
+        in reduce ret
+  "GHC.Magic.nospec"
+    | [arg] <- args
+    -> reduce (valToTerm arg)
 #endif
   _ -> Nothing
   where
