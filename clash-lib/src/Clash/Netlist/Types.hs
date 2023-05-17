@@ -3,7 +3,7 @@
                     2017     , Myrtle Software Ltd,
                     2017-2018, Google Inc.
                     2020-2022, QBayLogic B.V.
-                    2022     , Google Inc.
+                    2022-2023, Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -720,11 +720,18 @@ instance NFData Declaration where
 
 -- | Expression Modifier
 data Modifier
-  = Indexed (HWType,Int,Int) -- ^ Index the expression: (Type of expression,DataCon tag,Field Tag)
-  | DC (HWType,Int)          -- ^ See expression in a DataCon context: (Type of the expression, DataCon tag)
-  | VecAppend                -- ^ See the expression in the context of a Vector append operation
-  | RTreeAppend              -- ^ See the expression in the context of a Tree append operation
-  | Sliced (HWType,Int,Int)  -- ^ Slice the identifier of the given type from start to end
+  = Indexed (HWType, Int, Int)
+  -- ^ Index the expression: (Type of expression, DataCon tag, Field Tag). Note
+  -- that the type of the expression is the type we are slicing from, not the type
+  -- returned by the index operation.
+  | DC (HWType, Int)
+  -- ^ See expression in a DataCon context: (Type of the expression, DataCon tag)
+  | VecAppend
+  -- ^ See the expression in the context of a Vector append operation
+  | RTreeAppend
+  -- ^ See the expression in the context of a Tree append operation
+  | Sliced (HWType, Int, Int)
+  -- ^ Slice the identifier of the given type from start to end
   | Nested Modifier Modifier
   deriving Show
 
