@@ -70,6 +70,7 @@ import           GHC.Types           (IO (..))
 import           GHC.Word
 import           System.IO.Unsafe    (unsafeDupablePerformIO)
 #if MIN_VERSION_ghc(9,6,0)
+import           Data.Bifunctor      (first)
 import qualified Data.Text.Array     as Text
 import qualified Data.Text.Internal  as Text
 #endif
@@ -4578,6 +4579,22 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "GHC.Magic.nospec"
     | [arg] <- args
     -> reduce (valToTerm arg)
+  "GHC.Float.$wproperFractionDouble"
+    | _ : Lit (DoubleLiteral d) : _ <- args
+    , [sty@(tyView -> TyConApp signedTcNm [nTy@(LitTy (NumTy kn))])] <- tys
+    , nameOcc signedTcNm == "Clash.Sized.Internal.Signed.Signed"
+    , (_, tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+    , Just tupTc <- UniqMap.lookup tupTcNm tcm
+    , [tupDc] <- tyConDataCons tupTc
+    -> let (sn, d1) = reifyNat kn (\p -> first toInteger (op p (wordToDouble d)))
+           ret = mkApps (Data tupDc) (map Right tyArgs ++
+                  [ Left (mkSignedLit sty nTy kn sn)
+                  , Left (mkDoubleCLit tcm (doubleToWord d1) (last tyArgs))
+                  ])
+        in reduce ret
+    where
+      op :: KnownNat n => Proxy n -> Double -> (Signed n, Double)
+      op _ = properFraction
 #endif
   _ -> Nothing
   where
