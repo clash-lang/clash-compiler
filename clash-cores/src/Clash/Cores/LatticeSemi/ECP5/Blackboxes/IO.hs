@@ -9,6 +9,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_HADDOCK hide #-}
+
 module Clash.Cores.LatticeSemi.ECP5.Blackboxes.IO (bbTF) where
 
 import           Clash.Backend

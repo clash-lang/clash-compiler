@@ -39,7 +39,8 @@ import Clash.Cores.Xilinx.Xpm.Cdc.Gray.Internal (xpmCdcGray#)
 -- __N.B.__: In order to simulate initial values, both the source and destination
 --           domain need to support them. If the source and destination domain
 --           disagree on this property, use of this function will fail to
---           simulate and translate to HDL.
+--           simulate and translate to HDL. You can explicitly set initial value
+--           usage by using 'xpmCdcGrayWith'.
 --
 xpmCdcGray ::
   forall n src dst.

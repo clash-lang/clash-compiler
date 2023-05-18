@@ -3,26 +3,15 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_HADDOCK hide #-}
 
-module Clash.Cores.Xilinx.Xpm.Cdc.Gray.Internal where
+module Clash.Cores.Xilinx.Xpm.Cdc.Single.Internal where
 
 import Prelude
-import Clash.Explicit.Prelude
-  ( type (<=), KnownNat, SNat, Unsigned, Clock, KnownDomain, errorX
-  , unsafeSynchronizer )
-
-import Clash.Annotations.Primitive (Primitive(..), HDL(..), hasBlackBox)
-import Clash.Backend (Backend)
-import Clash.Netlist.Types (TemplateFunction(..), BlackBoxContext)
-import Clash.Promoted.Nat (snatToNum)
-import Clash.Signal.Internal (Signal((:-)))
 
 import Control.Monad.State (State)
 import Data.List.Infinite (Infinite(..), (...))
@@ -32,25 +21,35 @@ import Data.Text.Prettyprint.Doc.Extra (Doc)
 import GHC.Stack (HasCallStack)
 import Text.Show.Pretty (ppShow)
 
+import Clash.Annotations.Primitive (Primitive(..), HDL(..), hasBlackBox)
+import Clash.Backend (Backend)
+import Clash.Explicit.Prelude
+  ( type (<=), SNat, Clock, KnownDomain, BitPack(BitSize), NFDataX, deepErrorX
+  , unsafeSynchronizer, unpack )
+import Clash.Netlist.Types (TemplateFunction(..), BlackBoxContext)
+import Clash.Promoted.Nat (snatToNum)
+import Clash.Signal.Internal (Signal((:-)))
+
 import qualified Clash.Netlist.Id as Id
 import qualified Clash.Netlist.Types as N
 import qualified Clash.Primitives.DSL as DSL
 
-xpmCdcGrayTF :: TemplateFunction
-xpmCdcGrayTF =
+xpmCdcSingleTF :: TemplateFunction
+xpmCdcSingleTF =
   TemplateFunction
-    [initBehavior, stages, clkSrc, clkDst, input]
+    [registerInput, initBehavior, stages, clkSrc, clkDst, input]
     (const True)
-    xpmCdcGrayTF#
+    xpmCdcSingleTF#
  where
   _2LteN
-    :< _nLte32
-    :< _2LteStages
     :< _stagesLte10
-    :< _knownNatN
     :< _knownDomainSrc
     :< _knownDomainDst
     :< _hasCallStack
+    :< _nfdatax
+    :< _bitpack
+    :< _bitsize
+    :< registerInput
     :< initBehavior
     :< stages
     :< clkSrc
@@ -58,16 +57,17 @@ xpmCdcGrayTF =
     :< input
     :< _ = (0...)
 
-xpmCdcGrayTF# :: Backend backend => BlackBoxContext -> State backend Doc
-xpmCdcGrayTF# bbCtx
-  | [ _2LteN
-    , _nLte32
-    , _2LteStages
+xpmCdcSingleTF# :: Backend backend => BlackBoxContext -> State backend Doc
+xpmCdcSingleTF# bbCtx
+  | [ _2LteStages
     , _stagesLte10
-    , _knownNatN
     , _knownDomainSrc
     , _knownDomainDst
     , _hasCallStack
+    , _nfdatax
+    , _bitpack
+    , _bitsize
+    , DSL.getBool -> Just registerInput
     , DSL.getBool -> Just initValues
     , DSL.tExprToInteger -> Just stages
     , clkSrc
@@ -79,38 +79,32 @@ xpmCdcGrayTF# bbCtx
 
     let
       compName :: Text
-      compName = "xpm_cdc_gray"
-
-      width :: Integral a => a
-      width = DSL.tySize resultTy
+      compName = "xpm_cdc_single"
 
     instName <- Id.make (compName <> "_inst")
     DSL.declarationReturn bbCtx (compName <> "_block") $ do
-      inputBv <- DSL.toBV "src_in_bin_bv" input
-      resultBv <- DSL.declare "dest_out_bin_bv" (N.BitVector width)
-      result <- DSL.fromBV "dest_out_bin" resultTy resultBv
+      resultBit <- DSL.declare "result_bit" N.Bit
+      inputBit <- DSL.bitCoerce "src_in" N.Bit input
 
       let
         generics :: [(Text, DSL.LitHDL)]
         generics =
           [ ("DEST_SYNC_FF", DSL.I stages)
           , ("INIT_SYNC_FF", if initValues then 1 else 0)
-          , ("REG_OUTPUT", 0)
           , ("SIM_ASSERT_CHK", 0)
-          , ("SIM_LOSSLESS_GRAY_CHK", 0)
-          , ("WIDTH", DSL.I width)
+          , ("SRC_INPUT_REG", if registerInput then 1 else 0)
           ]
 
         inps :: [(Text, DSL.TExpr)]
         inps =
           [ ("src_clk", clkSrc)
           , ("dest_clk", clkDst)
-          , ("src_in_bin", inputBv)
+          , ("src_in", inputBit)
           ]
 
         outs :: [(Text, DSL.TExpr)]
         outs =
-          [ ("dest_out_bin", resultBv)
+          [ ("dest_out", resultBit)
           ]
 
       DSL.instDecl
@@ -121,16 +115,16 @@ xpmCdcGrayTF# bbCtx
         inps
         outs
 
-      pure [result]
+      pure <$> DSL.bitCoerce "result" resultTy resultBit
 
-xpmCdcGrayTF# bbCtx = error (ppShow bbCtx)
+xpmCdcSingleTF# bbCtx = error (ppShow bbCtx)
 
-{-# NOINLINE xpmCdcGray# #-}
-{-# ANN xpmCdcGray# hasBlackBox #-}
-{-# ANN xpmCdcGray#
+{-# NOINLINE xpmCdcSingle# #-}
+{-# ANN xpmCdcSingle# hasBlackBox #-}
+{-# ANN xpmCdcSingle#
   let
-    primName = show 'xpmCdcGray#
-    tfName = show 'xpmCdcGrayTF
+    primName = show 'xpmCdcSingle#
+    tfName = show 'xpmCdcSingleTF
   in InlineYamlPrimitive [VHDL] [__i|
     BlackBox:
       name: #{primName}
@@ -140,10 +134,10 @@ xpmCdcGrayTF# bbCtx = error (ppShow bbCtx)
       imports: ["xpm.vcomponents.all"]
       templateFunction: #{tfName}
   |] #-}
-{-# ANN xpmCdcGray#
+{-# ANN xpmCdcSingle#
   let
-    primName = show 'xpmCdcGray#
-    tfName = show 'xpmCdcGrayTF
+    primName = show 'xpmCdcSingle#
+    tfName = show 'xpmCdcSingleTF
   in InlineYamlPrimitive [Verilog, SystemVerilog] [__i|
     BlackBox:
       name: #{primName}
@@ -151,30 +145,34 @@ xpmCdcGrayTF# bbCtx = error (ppShow bbCtx)
       format: Haskell
       templateFunction: #{tfName}
   |] #-}
--- | Primitive used in 'Clash.Cores.Xilinx.Xpm.Cdc.Gray.xpmCdcGray'
-xpmCdcGray# ::
-  forall stages n src dst.
-  ( 2 <= n, n <= 32
-  , 2 <= stages, stages <= 10
-  , KnownNat n
+-- | Primitive used in 'Clash.Cores.Xilinx.Xpm.Cdc.Single.xpmCdcSingle'
+xpmCdcSingle# ::
+  forall stages a src dst.
+  ( 2 <= stages, stages <= 10
   , KnownDomain src
   , KnownDomain dst
   , HasCallStack
+  , NFDataX a
+  , BitPack a
+  , BitSize a ~ 1
   ) =>
-  -- | Initial values supported
+  -- | Register input
+  Bool ->
+  -- | Initial value usage
   Bool ->
   SNat stages ->
   Clock src ->
   Clock dst ->
-  Signal src (Unsigned n) ->
-  Signal dst (Unsigned n)
-xpmCdcGray# initValuesSupported stages clkSrc clkDst input =
-  go (snatToNum stages) (initVal :- input)
+  Signal src a ->
+  Signal dst a
+xpmCdcSingle# registerInput initValuesUsed stages clkSrc clkDst input
+  | registerInput = go (snatToNum stages) (initVal :- input)
+  | otherwise     = go (snatToNum stages) input
  where
   initVal
-    | initValuesSupported = 0
-    | otherwise = errorX "xpmCdcGray: initial values undefined"
+    | initValuesUsed = unpack 0
+    | otherwise = deepErrorX "xpmCdcSingle: initial values undefined"
 
-  go :: Word -> Signal src (Unsigned n) -> Signal dst (Unsigned n)
+  go :: Word -> Signal src a -> Signal dst a
   go 0 src = unsafeSynchronizer clkSrc clkDst src
   go n src = initVal :- go (n - 1) src
