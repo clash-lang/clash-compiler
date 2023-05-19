@@ -5,12 +5,24 @@
       Int -> Int'
     template: |-
       // divInt begin
-      // divide (rounds towards zero)
-      wire ~SIGD[~GENSYM[quot_res][0]][0];
-      assign ~SYM[0] = ~VAR[dividend][0] / ~VAR[divider][1];
+      wire ~GENSYM[resultPos][1];
+      wire ~GENSYM[dividerNeg][2];
+      wire signed [~SIZE[~TYPO]:0] ~GENSYM[dividend2][3];
+      wire signed [~SIZE[~TYPO]:0] ~GENSYM[dividendE][4];
+      wire signed [~SIZE[~TYPO]:0] ~GENSYM[dividerE][5];
+      wire signed [~SIZE[~TYPO]:0] ~GENSYM[quot_res][6];
 
-      // round toward minus infinity
-      assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~TYPO]-1]) ? ~SYM[0] : ~SYM[0] - ~SIZE[~TYPO]'sd1;
+      assign ~SYM[1] = ~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~TYPO]-1];
+      assign ~SYM[2] = ~VAR[divider][1][~SIZE[~TYPO]-1] == 1'b1;
+      assign ~SYM[4] = $signed({{~VAR[dividend][0][~SIZE[~TYPO]-1]},~VAR[dividend][0]});  // sign extension
+      assign ~SYM[5] = $signed({{~VAR[divider][1][~SIZE[~TYPO]-1]} ,~VAR[divider][1]} );  // sign extension
+
+      assign ~SYM[3] = ~SYM[1] ? ~SYM[4]
+                               : (~SYM[2] ? (~SYM[4] - ~SYM[5] - ~SIZE[~TYPO]'sd1)
+                                          : (~SYM[4] - ~SYM[5] + ~SIZE[~TYPO]'sd1));
+
+      assign ~SYM[6] = ~SYM[3] / ~SYM[5];
+      assign ~RESULT = $signed(~SYM[6][~SIZE[~TYPO]-1:0]);
       // divInt end
 - BlackBox:
     name: GHC.Base.modInt

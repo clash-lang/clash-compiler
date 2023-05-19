@@ -37,11 +37,7 @@ import           Prettyprinter                    (vcat)
 import           Data.Text.Prettyprint.Doc        (vcat)
 #endif
 
-#if MIN_VERSION_ghc(9,0,0)
-import           GHC.Types.Basic                  (InlineSpec (..))
-#else
-import           BasicTypes                       (InlineSpec (..))
-#endif
+import           GHC.BasicTypes.Extra             (isNoInline)
 
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
@@ -298,7 +294,7 @@ stripArgs _ _ _ = Nothing
 flattenNode
   :: CallTree
   -> NormalizeSession (Either CallTree ((Id,Term),[CallTree]))
-flattenNode c@(CLeaf (_,(Binding _ _ NoInline _ _ _))) = return (Left c)
+flattenNode c@(CLeaf (_,(Binding _ _ spec _ _ _))) | isNoInline spec = return (Left c)
 flattenNode c@(CLeaf (nm,(Binding _ _ _ _ e _))) = do
   isTopEntity <- elemVarSet nm <$> Lens.view topEntities
   if isTopEntity then return (Left c) else do
@@ -312,7 +308,7 @@ flattenNode c@(CLeaf (nm,(Binding _ _ _ _ e _))) = do
                return (Right ((nm,mkApps (mkTicks fun ticks) (reverse remainder)),[]))
           _ -> return (Right ((nm,e),[]))
       _ -> return (Right ((nm,e),[]))
-flattenNode b@(CBranch (_,(Binding _ _ NoInline _ _ _)) _) =
+flattenNode b@(CBranch (_,(Binding _ _ spec _ _ _)) _) | isNoInline spec =
   return (Left b)
 flattenNode b@(CBranch (nm,(Binding _ _ _ _ e _)) us) = do
   isTopEntity <- elemVarSet nm <$> Lens.view topEntities
@@ -366,7 +362,7 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
   -- inline all components when the resulting expression after flattening
   -- is still considered "cheap". This happens often at the topEntity which
   -- wraps another functions and has some selectors and data-constructors.
-  if inl /= NoInline && isCheapFunction newExpr
+  if not (isNoInline inl) && isCheapFunction newExpr
      then do
         let (toInline',allUsed') = unzip (map goCheap allUsed)
             subst' = extendGblSubstList (mkSubst emptyInScopeSet)
@@ -387,10 +383,10 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
       topdownSucR (apply "topLet" topLet)
 
     goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e _)))
-      | inl2 == NoInline = (Nothing     ,[c])
+      | isNoInline inl2  = (Nothing     ,[c])
       | otherwise        = (Just (nm2,e),[])
     goCheap c@(CBranch (nm2,(Binding _ _ inl2 _ e _)) us)
-      | inl2 == NoInline = (Nothing, [c])
+      | isNoInline inl2  = (Nothing, [c])
       | otherwise        = (Just (nm2,e),us)
 
 callTreeToList :: [Id] -> CallTree -> ([Id], [(Id, Binding Term)])

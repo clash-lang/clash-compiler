@@ -30,7 +30,15 @@ import SrcLoc
    srcSpanFile, srcSpanStartLine, srcSpanEndLine, srcSpanStartCol, srcSpanEndCol)
 import FastString                           (FastString (..), bytesFS, mkFastStringByteList)
 #endif
+#if MIN_VERSION_ghc(9,4,0)
+import qualified GHC.Data.Strict
+#endif
 
+#if MIN_VERSION_ghc(9,4,0)
+deriving instance Generic (GHC.Data.Strict.Maybe a)
+instance Hashable a => Hashable (GHC.Data.Strict.Maybe a)
+instance Binary a => Binary (GHC.Data.Strict.Maybe a)
+#endif
 
 deriving instance Generic SrcSpan
 instance Hashable SrcSpan

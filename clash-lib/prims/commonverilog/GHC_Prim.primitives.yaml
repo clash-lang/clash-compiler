@@ -894,3 +894,157 @@
     name: GHC.Prim.neWord32#
     kind: Expression
     template: "(~ARG[0] != ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+- BlackBox:
+    name: GHC.Prim.int64ToInt#
+    kind: Declaration
+    template: |-
+      // int64ToInt begin
+      assign ~RESULT = ~ARG[0];
+      // int64ToInt end
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.intToInt64#
+    kind: Declaration
+    template: |-
+      // intToInt64 begin
+      assign ~RESULT = ~ARG[0];
+      // intToInt64 end
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.negateInt64#
+    kind: Expression
+    template: -(~ARG[0])
+- BlackBox:
+    name: GHC.Prim.timesInt64#
+    kind: Expression
+    template: ~ARG[0] * ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.quotInt64#
+    kind: Expression
+    template: ~ARG[0] / ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.remInt64#
+    kind: Expression
+    template: ~ARG[0] % ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.uncheckedIShiftL64#
+    kind: Expression
+    template: ~ARG[0] <<< ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.uncheckedIShiftRA64#
+    kind: Expression
+    template: ~ARG[0] >>> ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.uncheckedIShiftRL64#
+    kind: Expression
+    template: ~ARG[0] >> ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.int64ToWord64#
+    kind: Expression
+    template: $unsigned(~ARG[0])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.eqInt64#
+    kind: Expression
+    template: "(~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+- BlackBox:
+    name: GHC.Prim.geInt64#
+    kind: Expression
+    template: "(~ARG[0] >= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+- BlackBox:
+    name: GHC.Prim.gtInt64#
+    kind: Expression
+    template: "(~ARG[0] > ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+- BlackBox:
+    name: GHC.Prim.leInt64#
+    kind: Expression
+    template: "(~ARG[0] <= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+- BlackBox:
+    name: GHC.Prim.ltInt64#
+    kind: Expression
+    template: "(~ARG[0] < ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+- BlackBox:
+    name: GHC.Prim.neInt64#
+    kind: Expression
+    template: "(~ARG[0] != ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+- BlackBox:
+    name: GHC.Prim.word64ToWord#
+    kind: Declaration
+    template: |-
+      // word64ToWord begin
+      assign ~RESULT = ~ARG[0];
+      // word64ToWord end
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.wordToWord64#
+    kind: Declaration
+    template: |-
+      // wordToWord64 begin
+      assign ~RESULT = ~ARG[0];
+      // wordToWord64 end
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.timesWord64#
+    kind: Expression
+    template: ~ARG[0] * ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.quotWord64#
+    kind: Expression
+    template: ~ARG[0] / ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.remWord64#
+    kind: Expression
+    template: ~ARG[0] % ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.and64#
+    kind: Expression
+    template: ~ARG[0] & ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.or64#
+    kind: Expression
+    template: ~ARG[0] | ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.xor64#
+    kind: Expression
+    template: ~ARG[0] ^ ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.not64#
+    kind: Expression
+    template: ~ ~ARG[0]
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftL64#
+    kind: Expression
+    template: ~ARG[0] << ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftRL64#
+    kind: Expression
+    template: ~ARG[0] >> ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.word64ToInt64#
+    kind: Expression
+    template: $signed(~ARG[0])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.eqWord64#
+    kind: Expression
+    template: "(~ARG[0] == ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+- BlackBox:
+    name: GHC.Prim.geWord64#
+    kind: Expression
+    template: "(~ARG[0] >= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+- BlackBox:
+    name: GHC.Prim.gtWord64#
+    kind: Expression
+    template: "(~ARG[0] > ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+- BlackBox:
+    name: GHC.Prim.leWord64#
+    kind: Expression
+    template: "(~ARG[0] <= ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+- BlackBox:
+    name: GHC.Prim.ltWord64#
+    kind: Expression
+    template: "(~ARG[0] < ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"
+- BlackBox:
+    name: GHC.Prim.neWord64#
+    kind: Expression
+    template: "(~ARG[0] != ~ARG[1]) ? ~SIZE[~TYPO]'sd1 : ~SIZE[~TYPO]'sd0"

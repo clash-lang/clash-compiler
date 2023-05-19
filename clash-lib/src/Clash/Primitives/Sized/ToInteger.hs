@@ -27,7 +27,16 @@ import Data.Text.Lazy (pack)
 import System.IO (hPutStrLn, stderr)
 import Text.Trifecta.Result (Result(Success))
 
-#if MIN_VERSION_ghc(9,2,0)
+#if MIN_VERSION_ghc(9,4,0)
+import GHC.Utils.Error
+  (DiagOpts(..), mkPlainDiagnostic, mkPlainMsgEnvelope, pprLocMsgEnvelope)
+import GHC.Utils.Outputable
+  (blankLine, empty, int, integer, showSDocUnsafe, text, ($$), ($+$), (<+>),
+   defaultSDocContext )
+import qualified GHC.Utils.Outputable as Outputable
+import GHC.Types.Error (DiagnosticReason (WarningWithoutFlag))
+import GHC.Types.SrcLoc (isGoodSrcSpan)
+#elif MIN_VERSION_ghc(9,2,0)
 import GHC.Utils.Error (mkPlainWarnMsg, pprLocMsgEnvelope)
 import GHC.Utils.Outputable
   (blankLine, empty, int, integer, showSDocUnsafe, text, ($$), ($+$), (<+>))
@@ -83,7 +92,12 @@ toIntegerBB hdl hty _isD _primName args _ty = do
         let srcInfo1 | isGoodSrcSpan sp = srcInfo
                      | otherwise        = empty
 
-#if MIN_VERSION_ghc(9,2,0)
+#if MIN_VERSION_ghc(9,4,0)
+            opts     = DiagOpts mempty mempty False False Nothing defaultSDocContext
+            diag     = mkPlainDiagnostic WarningWithoutFlag [] (warnMsg i1 iw $+$ blankLine $+$ srcInfo1)
+            warnMsg1 = mkPlainMsgEnvelope opts sp diag
+            warnMsg2 = pprLocMsgEnvelope warnMsg1
+#elif MIN_VERSION_ghc(9,2,0)
             warnMsg1 = mkPlainWarnMsg sp (warnMsg i1 iw $+$ blankLine $+$ srcInfo1)
             warnMsg2 = pprLocMsgEnvelope warnMsg1
 #else

@@ -128,7 +128,7 @@ fsm (Pop i) =
                    , fExpectedEmpty=pack (i >= actualDepth - 1)
                    , fExpectedUnderflow=pack underflow
                    , fExpectedData=if underflow then undefined#
-                                   else pack (resize i)
+                                   else pack i
                    }
   in (s', o)
 fsm Done = (Done, defFsmOut{fDone=True, fExpectedEmpty=pack True})

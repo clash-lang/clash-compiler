@@ -507,17 +507,29 @@ renderElem b (IF c t f) = do
         (l,_,_)
           | Literal _ l' <- l ->
             case l' of
+              -- Integer, Int#, KnownNat, Natural, Word#
               NumLit i -> fromInteger i
+              -- Bit
               BitLit bl -> case bl of
                 N.H -> 1
                 N.L -> 0
                 _   -> error $ $(curLoc) ++ "IF: LIT bit literal must be high or low"
+              -- Bool
               BoolLit bl -> bool 0 1 bl
               _ -> error $ $(curLoc) ++ "IF: LIT must be a numeric lit"
+          -- Int
           | DataCon (Signed _) _ [Literal _ (NumLit i)] <- l
             -> fromInteger i
+          -- Word, SNat
           | DataCon (Unsigned _) _ [Literal _ (NumLit i)] <- l
             -> fromInteger i
+          | BlackBoxE pNm _lib _use _incl _templ bbCtx _paren <- l
+          , pNm `elem` ["GHC.Int.I8#", "GHC.Int.I16#", "GHC.Int.I32#", "GHC.Int.I64#"
+                       ,"GHC.Word.W8#","GHC.Word.W16#","GHC.Word.W32#","GHC.Word.W64#"
+                       ,"GHC.Types.I#","GHC.Types.W#"
+                       ]
+          , [Literal _ (NumLit j)] <- extractLiterals bbCtx
+          -> fromInteger j
         k -> error $ $(curLoc) ++ ("IF: LIT must be a numeric lit:" ++ show k)
       (Depth e)  -> case lineToType b [e] of
                       (RTree n _) -> n
@@ -700,6 +712,7 @@ renderTag b (Lit n) =
 
   mkLit (BlackBoxE pNm _ _ _ _ bbCtx _) | pNm `elem` ["GHC.Int.I8#", "GHC.Int.I16#", "GHC.Int.I32#", "GHC.Int.I64#"
                                                      ,"GHC.Word.W8#","GHC.Word.W16#","GHC.Word.W32#","GHC.Word.W64#"
+                                                     ,"GHC.Types.I#","GHC.Types.W#"
                                                      ]
                                         , [Literal _ i] <- extractLiterals bbCtx
                                         = Literal Nothing i

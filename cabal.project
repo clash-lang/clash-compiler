@@ -64,7 +64,10 @@ allow-newer:
   brick:base,
   vector-binary-instances:base,
   cryptohash-sha256:base,
-  hashable
+  hashable,
+  string-interpolate:template-haskell,
+  string-interpolate:text,
+  haskell-src-meta:template-haskell
 
 -- Works around: https://github.com/recursion-schemes/recursion-schemes/issues/128. This
 -- shouldn't harm (runtime) performance of Clash, as we only use recursion-schemes with
@@ -74,3 +77,8 @@ package recursion-schemes
 
 package regex-tdfa
     optimization: 2
+
+source-repository-package
+    type: git
+    location: https://github.com/haskell-hint/hint.git
+    tag: 710745eafa6bb8d531f2dfdbc07c50c9b776f0b2

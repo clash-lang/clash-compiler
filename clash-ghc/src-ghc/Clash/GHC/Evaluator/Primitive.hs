@@ -33,6 +33,7 @@ import qualified Control.Monad.State.Strict as State
 import           Control.Monad.Trans.Except (runExcept)
 import           Data.Binary.IEEE754        (doubleToWord, floatToWord, wordToDouble, wordToFloat)
 import           Data.Bits
+import qualified Data.ByteString.Internal as BS
 import           Data.Char           (chr,ord)
 import qualified Data.Either         as Either
 import           Data.Maybe (fromMaybe, mapMaybe)
@@ -61,6 +62,7 @@ import           GHC.Integer.GMP.Internals
 import           GHC.Num.Natural     (naturalSubUnsafe)
 #endif
 import           GHC.Natural
+import           GHC.ForeignPtr
 import           GHC.Prim
 import           GHC.Real            (Ratio (..))
 import           GHC.TypeLits        (KnownNat)
@@ -724,6 +726,50 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce r
 
 ---------
+-- Int64#
+---------
+#if MIN_VERSION_base(4,17,0)
+  "GHC.Prim.intToInt64#" | [i] <- intLiterals' args
+    -> reduce (Literal (Int64Literal i))
+  "GHC.Prim.int64ToInt#" | [i] <- int64Literals' args
+    -> reduce . Literal $ IntLiteral i
+  "GHC.Prim.negateInt64" | [i] <- int64Literals' args
+    -> let !(I64# a) = fromInteger i
+        in reduce (Literal (Int64Literal (toInteger (I64# (negateInt64# a)))))
+  "GHC.Prim.plusInt64#" | Just r <- liftI64 plusInt64# args
+    -> reduce r
+  "GHC.Prim.subInt64#" | Just r <- liftI64 subInt64# args
+    -> reduce r
+  "GHC.Prim.timesInt64#" | Just r <- liftI64 timesInt64# args
+    -> reduce r
+  "GHC.Prim.quotInt64#" | Just r <- liftI64 quotInt64# args
+    -> reduce r
+  "GHC.Prim.remInt64#" | Just r <- liftI64 remInt64# args
+    -> reduce r
+  "GHC.Prim.uncheckedIShiftL64#" | Just r <- liftI64I uncheckedIShiftL64# args
+    -> reduce r
+  "GHC.Prim.uncheckedIShiftRA64#" | Just r <- liftI64I uncheckedIShiftRA64# args
+    -> reduce r
+  "GHC.Prim.uncheckedIShiftRL64#" | Just r <- liftI64I uncheckedIShiftRL64# args
+    -> reduce r
+  "GHC.Prim.int64ToWord64#" | [i] <- int64Literals' args
+    -> let !(I64# a) = fromInteger i
+        in reduce (Literal (Word64Literal (toInteger (W64# (int64ToWord64# a)))))
+  "GHC.Prim.eqInt64#" | Just r <- liftI64RI eqInt64# args
+    -> reduce r
+  "GHC.Prim.geInt64#" | Just r <- liftI64RI geInt64# args
+    -> reduce r
+  "GHC.Prim.gtInt64#" | Just r <- liftI64RI gtInt64# args
+    -> reduce r
+  "GHC.Prim.leInt64#" | Just r <- liftI64RI leInt64# args
+    -> reduce r
+  "GHC.Prim.ltInt64#" | Just r <- liftI64RI ltInt64# args
+    -> reduce r
+  "GHC.Prim.neInt64#" | Just r <- liftI64RI neInt64# args
+    -> reduce r
+#endif
+
+---------
 -- Word8#
 ---------
   "GHC.Prim.wordToWord8#" | [i] <- wordLiterals' args
@@ -760,7 +806,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce r
   "GHC.Prim.xorWord8#" | Just r <- liftW8 xorWord8# args
     -> reduce r
-  "GHC.Prim.notWord8" | [i] <- word8Literals' args
+  "GHC.Prim.notWord8#" | [i] <- word8Literals' args
     -> let !(W8# a) = fromInteger i
         in reduce (Literal (Word8Literal (toInteger (W8# (notWord8# a)))))
   "GHC.Prim.uncheckedShiftLWord8#" | Just r <- liftW8I uncheckedShiftLWord8# args
@@ -820,7 +866,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce r
   "GHC.Prim.xorWord16#" | Just r <- liftW16 xorWord16# args
     -> reduce r
-  "GHC.Prim.notWord16" | [i] <- word16Literals' args
+  "GHC.Prim.notWord16#" | [i] <- word16Literals' args
     -> let !(W16# a) = fromInteger i
         in reduce (Literal (Word16Literal (toInteger (W16# (notWord16# a)))))
   "GHC.Prim.uncheckedShiftLWord16#" | Just r <- liftW16I uncheckedShiftLWord16# args
@@ -880,7 +926,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce r
   "GHC.Prim.xorWord32#" | Just r <- liftW32 xorWord32# args
     -> reduce r
-  "GHC.Prim.notWord32" | [i] <- word32Literals' args
+  "GHC.Prim.notWord32#" | [i] <- word32Literals' args
     -> let !(W32# a) = fromInteger i
         in reduce (Literal (Word32Literal (toInteger (W32# (notWord32# a)))))
   "GHC.Prim.uncheckedShiftLWord32#" | Just r <- liftW32I uncheckedShiftLWord32# args
@@ -902,6 +948,54 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce r
   "GHC.Prim.neWord32#" | Just r <- liftW32RI neWord32# args
     -> reduce r
+
+#if MIN_VERSION_base(4,17,0)
+----------
+-- Word64#
+----------
+  "GHC.Prim.wordToWord64#" | [i] <- wordLiterals' args
+    -> reduce (Literal (Word64Literal i))
+  "GHC.Prim.word64ToWord#" | [i] <- word64Literals' args
+    -> reduce . Literal $ WordLiteral i
+  "GHC.Prim.plusWord64#" | Just r <- liftW64 plusWord64# args
+    -> reduce r
+  "GHC.Prim.subWord64#" | Just r <- liftW64 subWord64# args
+    -> reduce r
+  "GHC.Prim.timesWord64#" | Just r <- liftW64 timesWord64# args
+    -> reduce r
+  "GHC.Prim.quotWord64#" | Just r <- liftW64 quotWord64# args
+    -> reduce r
+  "GHC.Prim.remWord64#" | Just r <- liftW64 remWord64# args
+    -> reduce r
+  "GHC.Prim.and64#" | Just r <- liftW64 and64# args
+    -> reduce r
+  "GHC.Prim.or64#" | Just r <- liftW64 or64# args
+    -> reduce r
+  "GHC.Prim.xor64#" | Just r <- liftW64 xor64# args
+    -> reduce r
+  "GHC.Prim.not64#" | [i] <- word64Literals' args
+    -> let !(W64# a) = fromInteger i
+        in reduce (Literal (Word64Literal (toInteger (W64# (not64# a)))))
+  "GHC.Prim.uncheckedShiftL64#" | Just r <- liftW64I uncheckedShiftL64# args
+    -> reduce r
+  "GHC.Prim.uncheckedShiftRL64#" | Just r <- liftW64I uncheckedShiftRL64# args
+    -> reduce r
+  "GHC.Prim.word64ToInt64#" | [i] <- word64Literals' args
+    -> let !(W64# a) = fromInteger i
+        in reduce (Literal (Int64Literal (toInteger (I64# (word64ToInt64# a)))))
+  "GHC.Prim.eqWord64#" | Just r <- liftW64RI eqWord64# args
+    -> reduce r
+  "GHC.Prim.geWord64#" | Just r <- liftW64RI geWord64# args
+    -> reduce r
+  "GHC.Prim.gtWord64#" | Just r <- liftW64RI gtWord64# args
+    -> reduce r
+  "GHC.Prim.leWord64#" | Just r <- liftW64RI leWord64# args
+    -> reduce r
+  "GHC.Prim.ltWord64#" | Just r <- liftW64RI ltWord64# args
+    -> reduce r
+  "GHC.Prim.neWord64#" | Just r <- liftW64RI neWord64# args
+    -> reduce r
+#endif
 #endif
 
 ----------
@@ -1001,7 +1095,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            !(# p, q #) = decodeDouble_Int64# a
        in reduce $
           mkApps (Data tupDc) (map Right tyArgs ++
+#if MIN_VERSION_ghc_prim(0,9,0)
+                   [ Left (Literal . Int64Literal  . toInteger $ I64# p)
+#else
                    [ Left (Literal . IntLiteral  . toInteger $ I64# p)
+#endif
                    , Left (Literal . IntLiteral  . toInteger $ I# q)])
 
 --------
@@ -1267,6 +1365,25 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                     ])
        in reduce newE
 
+  "GHC.Prim.copyAddrToByteArray#"
+    | [ Lit (StringLiteral addr)
+      , PrimVal _mbaTy _ [dst_mbaV]
+      , offV, lenV
+      , PrimVal rwTy _ _
+      ] <- args
+    , [off,len,dst_mba] <- intLiterals' [offV, lenV, dst_mbaV]
+    -> let Just (Literal (ByteArrayLiteral dst_ba)) =
+              primLookup (fromInteger dst_mba) mach
+           !(I# off') = fromInteger off
+           !(I# len') = fromInteger len
+           !(BS.PS (ForeignPtr addr' _) _ _) = BS.packChars addr
+           ba2 = unsafeDupablePerformIO $ do
+                    BA.MutableByteArray dst_mba1 <- BA.unsafeThawByteArray dst_ba
+                    svoid (copyAddrToByteArray# addr' dst_mba1 off' len')
+                    BA.unsafeFreezeByteArray (BA.MutableByteArray dst_mba1)
+           ba3 = Literal (ByteArrayLiteral ba2)
+        in Just . setTerm (Prim rwTy) $ primUpdate (fromInteger dst_mba) ba3 mach
+
 -- decodeFloat_Int# :: Float# -> (#Int#, Int##)
   "GHC.Prim.decodeFloat_Int#" | [i] <- floatLiterals' args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
@@ -1287,6 +1404,10 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                    ; List.find ((== (i+1)) . toInteger . dcTag) dcs
                    }
        in (\e -> setTerm (Data e) mach) <$> dc
+
+  "GHC.Prim.dataToTag#"
+    | [DC dc _] <- args
+    -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
 
   "GHC.Classes.eqInt" | Just (i,j) <- intCLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i == j))
@@ -1721,12 +1842,16 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [Lit (WordLiteral w)] <- args
     -> reduce (Literal (NaturalLiteral w))
   "GHC.Num.Natural.NB"
+    | [Lit (ByteArrayLiteral (BA.ByteArray ba))] <- args
+    -> reduce (Literal (NaturalLiteral (IP ba)))
     | [Lit l] <- args
     -> error ("NB: " <> show l)
   "GHC.Num.Integer.IS"
     | [Lit (IntLiteral i)] <- args
     -> reduce (Literal (IntegerLiteral i))
   "GHC.Num.Integer.IP"
+    | [Lit (ByteArrayLiteral (BA.ByteArray ba))] <- args
+    -> reduce (Literal (IntegerLiteral (IP ba)))
     | [Lit l] <- args
     -> error ("IP: " <> show l)
   "GHC.Num.Integer.IN"
@@ -1768,6 +1893,20 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [i] <- integerLiterals' args
     -> let nTy = snd (splitFunForallTy ty) in
        reduce (checkNaturalRange1 nTy i id)
+#endif
+
+  "GHC.Num.Integer.integerToInt64#"
+    | [i] <- integerLiterals' args
+    -> reduce (integerToInt64Literal i)
+
+  "GHC.Num.Integer.integerToWord64#"
+    | [i] <- integerLiterals' args
+    -> reduce (integerToWord64Literal i)
+
+#if MIN_VERSION_base(4,17,0)
+  "GHC.Num.Integer.integerFromWord64#"
+    | [w] <- word64Literals' args
+    -> reduce (Literal (IntegerLiteral w))
 #endif
 
 #if !MIN_VERSION_base(4,15,0)
@@ -1982,6 +2121,14 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let resTy = getResultTy tcm ty tys
         in reduce (mkSomeNat tcm n resTy)
 
+  "GHC.Types.I#"
+    | isSubj
+    , [Lit (IntLiteral i)] <- args
+    ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+            (Just intTc) = UniqMap.lookup intTcNm tcm
+            [intDc] = tyConDataCons intTc
+        in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
+
   "GHC.Int.I8#"
     | isSubj
 #if MIN_VERSION_base(4,16,0)
@@ -2029,11 +2176,19 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 #endif
   "GHC.Int.I64#"
     | isSubj
+#if MIN_VERSION_base(4,16,0)
+    , [Lit (Int64Literal i)] <- args
+#else
     , [Lit (IntLiteral i)] <- args
+#endif
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
             (Just intTc) = UniqMap.lookup intTcNm tcm
             [intDc] = tyConDataCons intTc
+#if MIN_VERSION_base(4,16,0)
+        in  reduce (mkApps (Data intDc) [Left (Literal (Int64Literal i))])
+#else
         in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
+#endif
 
   "GHC.Word.W8#"
     | isSubj
@@ -2082,11 +2237,27 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 #endif
   "GHC.Word.W64#"
     | isSubj
+#if MIN_VERSION_base(4,16,0)
+    , [Lit (Word64Literal c)] <- args
+#else
     , [Lit (WordLiteral c)] <- args
+#endif
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
             (Just wordTc) = UniqMap.lookup wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
+#if MIN_VERSION_base(4,16,0)
+        in  reduce (mkApps (Data wordDc) [Left (Literal (Word64Literal c))])
+#else
         in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
+#endif
+
+  "GHC.Types.W#"
+    | isSubj
+    , [Lit (WordLiteral i)] <- args
+    ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+            (Just intTc) = UniqMap.lookup intTcNm tcm
+            [intDc] = tyConDataCons intTc
+        in  reduce (mkApps (Data intDc) [Left (Literal (WordLiteral i))])
 
   "GHC.Float.$w$sfromRat''" -- XXX: Very fragile
     | [Lit (IntLiteral _minEx)
@@ -2194,6 +2365,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 #endif
     | [i] <- integerLiterals' args
     -> reduce (Literal (DoubleLiteral (doubleToWord (fromInteger i))))
+
+#if MIN_VERSION_base(4,17,0)
+  "GHC.Num.Integer.$wintegerFromInt64#"
+    | [i] <- int64Literals' args
+    -> reduce . Literal $ IntLiteral i
+#endif
 
   "GHC.Base.eqString"
     | [PrimVal _ _ [Lit (StringLiteral s1)]
@@ -4551,6 +4728,16 @@ int32Literal :: Value -> Maybe Integer
 int32Literal x = case x of
   Lit (Int32Literal i) -> Just i
   _ -> Nothing
+
+#if MIN_VERSION_base(4,17,0)
+int64Literals' :: [Value] -> [Integer]
+int64Literals' = listOf int64Literal
+
+int64Literal :: Value -> Maybe Integer
+int64Literal x = case x of
+  Lit (Int64Literal i) -> Just i
+  _ -> Nothing
+#endif
 #endif
 
 intCLiteral :: Value -> Maybe Integer
@@ -4596,6 +4783,16 @@ word32Literal :: Value -> Maybe Integer
 word32Literal x = case x of
   Lit (Word32Literal i) -> Just i
   _ -> Nothing
+
+#if MIN_VERSION_base(4,17,0)
+word64Literals' :: [Value] -> [Integer]
+word64Literals' = listOf word64Literal
+
+word64Literal :: Value -> Maybe Integer
+word64Literal x = case x of
+  Lit (Word64Literal i) -> Just i
+  _ -> Nothing
+#endif
 #endif
 
 charLiterals :: [Value] -> Maybe (Char,Char)
@@ -4920,6 +5117,12 @@ integerToIntLiteral = Literal . IntLiteral . toInteger . (fromInteger :: Integer
 integerToWordLiteral :: Integer -> Term
 integerToWordLiteral = Literal . WordLiteral . toInteger . (fromInteger :: Integer -> Word) -- for overflow behavior
 
+integerToInt64Literal :: Integer -> Term
+integerToInt64Literal = Literal . Int64Literal . toInteger . (fromInteger :: Integer -> Int64) -- for overflow behavior
+
+integerToWord64Literal :: Integer -> Term
+integerToWord64Literal = Literal . Word64Literal . toInteger . (fromInteger :: Integer -> Word64) -- for overflow behavior
+
 integerToIntegerLiteral :: Integer -> Term
 integerToIntegerLiteral = Literal . IntegerLiteral
 
@@ -5233,6 +5436,32 @@ liftI32RI f args = case int32Literals' args of
      in Just (Literal (IntLiteral (toInteger (I# (f a b)))))
   _ -> Nothing
 
+#if MIN_VERSION_base(4,17,0)
+liftI64 :: (Int64# -> Int64# -> Int64#) -> [Value] -> Maybe Term
+liftI64 f args = case int64Literals' args of
+  [i,j] ->
+    let !(I64# a) = fromInteger i
+        !(I64# b) = fromInteger j
+     in Just (Literal (Int64Literal (toInteger (I64# (f a b)))))
+  _ -> Nothing
+
+liftI64I :: (Int64# -> Int# -> Int64#) -> [Value] -> Maybe Term
+liftI64I f args = case args of
+  [Lit (Int64Literal i),Lit (IntLiteral j)] ->
+    let !(I64# a) = fromInteger i
+        !(I# b) = fromInteger j
+     in Just (Literal (Int64Literal (toInteger (I64# (f a b)))))
+  _ -> Nothing
+
+liftI64RI :: (Int64# -> Int64# -> Int#) -> [Value] -> Maybe Term
+liftI64RI f args = case int64Literals' args of
+  [i,j] ->
+    let !(I64# a) = fromInteger i
+        !(I64# b) = fromInteger j
+     in Just (Literal (IntLiteral (toInteger (I# (f a b)))))
+  _ -> Nothing
+#endif
+
 liftW8 :: (Word8# -> Word8# -> Word8#) -> [Value] -> Maybe Term
 liftW8 f args = case word8Literals' args of
   [i,j] ->
@@ -5302,6 +5531,31 @@ liftW32RI f args = case word32Literals' args of
         !(W32# b) = fromInteger j
      in Just (Literal (IntLiteral (toInteger (I# (f a b)))))
   _ -> Nothing
+
+#if MIN_VERSION_base(4,17,0)
+liftW64 :: (Word64# -> Word64# -> Word64#) -> [Value] -> Maybe Term
+liftW64 f args = case word64Literals' args of
+  [i,j] -> let !(W64# a) = fromInteger i
+               !(W64# b) = fromInteger j
+            in Just (Literal (Word64Literal (toInteger (W64# (f a b)))))
+  _ -> Nothing
+
+liftW64I :: (Word64# -> Int# -> Word64#) -> [Value] -> Maybe Term
+liftW64I f args = case args of
+  [Lit (Word64Literal i),Lit (IntLiteral j)] ->
+    let !(W64# a) = fromInteger i
+        !(I# b) = fromInteger j
+     in Just (Literal (Word64Literal (toInteger (W64# (f a b)))))
+  _ -> Nothing
+
+liftW64RI :: (Word64# -> Word64# -> Int#) -> [Value] -> Maybe Term
+liftW64RI f args = case word64Literals' args of
+  [i,j] ->
+    let !(W64# a) = fromInteger i
+        !(W64# b) = fromInteger j
+     in Just (Literal (IntLiteral (toInteger (I# (f a b)))))
+  _ -> Nothing
+#endif
 #endif
 
 splitAtPrim

@@ -58,6 +58,12 @@ import           GHC.Base hiding (Type, TyCon)
 import           Data.Text.Extra (showt)
 #endif
 
+#if MIN_VERSION_base(4,17,0)
+import           Clash.Core.DataCon (DataCon(..), DcStrictness(..))
+import           GHC.Num.Integer (Integer(..))
+import           GHC.Num.Natural (Natural(..))
+#endif
+
 import           Clash.Core.Name
 import           Clash.Core.TyCon
 import           Clash.Core.Type
@@ -148,7 +154,94 @@ intPrimTc, integerPrimTc, charPrimTc, stringPrimTc, wordPrimTc,
   int64PrimTc, word64PrimTc, floatPrimTc, doublePrimTc, naturalPrimTc,
   byteArrayPrimTc :: TyCon
 intPrimTc     = liftedPrimTC intPrimTyConName
+#if MIN_VERSION_base(4,17,0)
+-- While GHC might have dropped Integer and Natural literals, in Clash it is
+-- still nice to have them around. However, Integer and Natural are also no
+-- longer primitive types in GHC, but we still want to give the Integer and
+-- Natural type to our Integer and Natural literals.
+--
+-- So instead of recording the primitive types, we record the algebraic types,
+-- i.e. the complete data type for Integer and Natural, data constructors and all.
+
+integerPrimTc =
+  let
+    name = integerPrimTyConName
+    uniq = nameUniq name
+    isDcNm = mkUnsafeSystemName (showt 'IS) (getKey integerISDataConKey)
+    isDc = MkData
+      { dcName = isDcNm
+      , dcUniq = nameUniq isDcNm
+      , dcTag  = 1
+      , dcType = mkPolyFunTy integerPrimTy [Right intPrimTy]
+      , dcUnivTyVars = []
+      , dcExtTyVars = []
+      , dcArgTys = [intPrimTy]
+      , dcArgStrict = [Strict]
+      , dcFieldLabels = []
+      }
+    ipDcNm = mkUnsafeSystemName (showt 'IP) (getKey integerIPDataConKey)
+    ipDc = MkData
+      { dcName = ipDcNm
+      , dcUniq = nameUniq ipDcNm
+      , dcTag  = 2
+      , dcType = mkPolyFunTy integerPrimTy [Right byteArrayPrimTy]
+      , dcUnivTyVars = []
+      , dcExtTyVars = []
+      , dcArgTys = [byteArrayPrimTy]
+      , dcArgStrict = [Strict]
+      , dcFieldLabels = []
+      }
+    inDcNm = mkUnsafeSystemName (showt 'IN) (getKey integerINDataConKey)
+    inDc = MkData
+      { dcName = inDcNm
+      , dcUniq = nameUniq inDcNm
+      , dcTag  = 3
+      , dcType = mkPolyFunTy integerPrimTy [Right byteArrayPrimTy]
+      , dcUnivTyVars = []
+      , dcExtTyVars = []
+      , dcArgTys = [byteArrayPrimTy]
+      , dcArgStrict = [Strict]
+      , dcFieldLabels = []
+      }
+    rhs = DataTyCon [isDc,ipDc,inDc]
+  in
+    AlgTyCon uniq name liftedTypeKind 0 rhs False
+
+naturalPrimTc =
+  let
+    name = naturalPrimTyConName
+    uniq = nameUniq name
+    nsDcNm = mkUnsafeSystemName (showt 'NS) (getKey naturalNSDataConKey)
+    nsDc = MkData
+      { dcName = nsDcNm
+      , dcUniq = nameUniq nsDcNm
+      , dcTag  = 1
+      , dcType = mkPolyFunTy naturalPrimTy [Right wordPrimTy]
+      , dcUnivTyVars = []
+      , dcExtTyVars = []
+      , dcArgTys = [wordPrimTy]
+      , dcArgStrict = [Strict]
+      , dcFieldLabels = []
+      }
+    nbDcNm = mkUnsafeSystemName (showt 'NB) (getKey naturalNBDataConKey)
+    nbDc = MkData
+      { dcName = nbDcNm
+      , dcUniq = nameUniq nbDcNm
+      , dcTag  = 2
+      , dcType = mkPolyFunTy naturalPrimTy [Right byteArrayPrimTy]
+      , dcUnivTyVars = []
+      , dcExtTyVars = []
+      , dcArgTys = [byteArrayPrimTy]
+      , dcArgStrict = [Strict]
+      , dcFieldLabels = []
+      }
+    rhs = DataTyCon [nsDc,nbDc]
+   in
+    AlgTyCon uniq name liftedTypeKind 0 rhs False
+#else
 integerPrimTc = liftedPrimTC integerPrimTyConName
+naturalPrimTc = liftedPrimTC naturalPrimTyConName
+#endif
 charPrimTc    = liftedPrimTC charPrimTyConName
 stringPrimTc  = liftedPrimTC stringPrimTyConName
 wordPrimTc    = liftedPrimTC wordPrimTyConName
@@ -156,7 +249,6 @@ int64PrimTc   = liftedPrimTC int64PrimTyConName
 word64PrimTc  = liftedPrimTC word64PrimTyConName
 floatPrimTc   = liftedPrimTC floatPrimTyConName
 doublePrimTc  = liftedPrimTC doublePrimTyConName
-naturalPrimTc = liftedPrimTC naturalPrimTyConName
 byteArrayPrimTc = liftedPrimTC  byteArrayPrimTyConName
 
 #if !MIN_VERSION_ghc(9,2,0)

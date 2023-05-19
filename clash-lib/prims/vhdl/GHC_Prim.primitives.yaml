@@ -2007,3 +2007,253 @@
     name: GHC.Prim.neWord32#
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.int64ToInt#
+    kind: Expression
+    template: resize(~ARG[0],~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.intToInt64#
+    kind: Expression
+    template: resize(~ARG[0],~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.negateInt64#
+    kind: Expression
+    template: -~ARG[0]
+- BlackBox:
+    name: GHC.Prim.timesInt64#
+    kind: Expression
+    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+- BlackBox:
+    name: GHC.Prim.quotInt64#
+    kind: Declaration
+    template: |-
+      ~RESULT <= ~ARG[0] / ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.remInt64#
+    kind: Declaration
+    template: |-
+      ~RESULT <= ~ARG[0] rem ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.quotRemInt64#
+    kind: Declaration
+    template: |-
+      ~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else ((others => 'X'), (others => 'X'))
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.uncheckedIShiftL64#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= shift_left(~ARG[0],~SYM[1])
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.uncheckedIShiftRA64#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftR][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= shift_right(~ARG[0],~SYM[1])
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.uncheckedIShiftRL64#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftRL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= ~ARG[0] srl ~SYM[1]
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.int64ToWord64#
+    kind: Expression
+    template: unsigned(std_logic_vector(~ARG[0]))
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.eqInt64#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.geInt64#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.gtInt64#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.leInt64#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.ltInt64#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.neInt64#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.word64ToWord#
+    kind: Expression
+    template: resize(~ARG[0],~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.wordToWord64#
+    kind: Expression
+    template: resize(~ARG[0],~SIZE[~TYPO])
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.timesWord64#
+    kind: Expression
+    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+- BlackBox:
+    name: GHC.Prim.quotWord64#
+    kind: Declaration
+    template: |-
+      ~RESULT <= ~ARG[0] / ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.remWord64#
+    kind: Declaration
+    template: |-
+      ~RESULT <= ~ARG[0] rem ~ARG[1]
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else (others => 'X')
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.quotRemWord64#
+    kind: Declaration
+    template: |-
+      ~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
+          -- pragma translate_off
+          when (~ARG[1] /= 0) else ((others => 'X'), (others => 'X'))
+          -- pragma translate_on
+          ;
+- BlackBox:
+    name: GHC.Prim.and64#
+    kind: Expression
+    template: ~ARG[0] and ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.or64#
+    kind: Expression
+    template: ~ARG[0] or ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.xor64#
+    kind: Expression
+    template: ~ARG[0] xor ~ARG[1]
+- BlackBox:
+    name: GHC.Prim.not64#
+    kind: Expression
+    template: not ~ARG[0]
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftL64#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= shift_left(~ARG[0],~SYM[1])
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.uncheckedShiftRL64#
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_shiftRL][0] : block
+        signal ~GENSYM[sh][1] : natural;
+      begin
+        ~SYM[1] <=
+            -- pragma translate_off
+            natural'high when (~VAR[shI][1](~SIZE[~TYP[1]]-1 downto 31) /= 0) else
+            -- pragma translate_on
+            to_integer(~VAR[shI][1]);
+        ~RESULT <= ~ARG[0] srl ~SYM[1]
+            -- pragma translate_off
+            when (~ARG[1] >= 0) else (others => 'X')
+            -- pragma translate_on
+            ;
+      end block;
+- BlackBox:
+    name: GHC.Prim.word64ToInt64#
+    kind: Expression
+    template: signed(std_logic_vector(~ARG[0]))
+    workInfo: Never
+- BlackBox:
+    name: GHC.Prim.eqWord64#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.geWord64#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.gtWord64#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.leWord64#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.ltWord64#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
+- BlackBox:
+    name: GHC.Prim.neWord64#
+    kind: Declaration
+    template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);

@@ -44,12 +44,7 @@ import qualified Data.Monoid as Monoid (Any(..))
 import qualified Data.Text as Text
 import qualified Data.Text.Extra as Text
 import GHC.Stack (HasCallStack)
-
-#if MIN_VERSION_ghc(9,0,0)
-import GHC.Types.Basic             (InlineSpec (..))
-#else
-import BasicTypes                  (InlineSpec (..))
-#endif
+import GHC.BasicTypes.Extra (isNoInline)
 
 import qualified Clash.Explicit.SimIO as SimIO
 import qualified Clash.Sized.Internal.BitVector as BV (Bit(Bit), BitVector(BV))
@@ -606,7 +601,7 @@ inlineSmall _ e@(collectArgsTicks -> (Var f,args,ticks)) = do
         -- Don't inline recursive expressions
         Just b -> do
           isRecBndr <- isRecursiveBndr f
-          if not isRecBndr && bindingSpec b /= NoInline && termSize (bindingTerm b) < sizeLimit
+          if not isRecBndr && not (isNoInline (bindingSpec b)) && termSize (bindingTerm b) < sizeLimit
              then do
                let tm = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
                changed $ mkApps tm args

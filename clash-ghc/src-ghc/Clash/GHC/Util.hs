@@ -9,7 +9,15 @@ module Clash.GHC.Util
   )
 where
 
-#if MIN_VERSION_ghc(9,2,0)
+#if MIN_VERSION_ghc(9,4,0)
+import GHC.Driver.Errors.Types (GhcMessage(GhcUnknownMessage))
+import GHC.Utils.Outputable as X (showPprUnsafe, showSDocUnsafe)
+import GHC.Utils.Outputable (SDoc, neverQualify)
+import GHC.Utils.Error (mkErrorMsgEnvelope, mkPlainError)
+import GHC.Plugins
+  (DynFlags, SourceError, ($$), blankLine, empty, isGoodSrcSpan, liftIO,
+   noSrcSpan, text, throwOneError)
+#elif MIN_VERSION_ghc(9,2,0)
 import GHC.Utils.Outputable as X (showPprUnsafe, showSDocUnsafe)
 import GHC.Utils.Outputable (SDoc, neverQualify)
 import GHC.Utils.Error (mkMsgEnvelope)
@@ -61,7 +69,9 @@ handleClashException df opts e = case fromException e of
     let srcInfo' | isGoodSrcSpan sp = srcInfo
                  | otherwise = empty
     throwOneError
-#if MIN_VERSION_ghc(9,2,0)
+#if MIN_VERSION_ghc(9,4,0)
+      (mkErrorMsgEnvelope sp neverQualify $ GhcUnknownMessage $ mkPlainError []
+#elif MIN_VERSION_ghc(9,2,0)
       (mkMsgEnvelope sp neverQualify
 #else
       (mkPlainErrMsg df sp
@@ -70,7 +80,9 @@ handleClashException df opts e = case fromException e of
   _ -> case fromException e of
     Just (ErrorCallWithLocation _ _) ->
       throwOneError
-#if MIN_VERSION_ghc(9,2,0)
+#if MIN_VERSION_ghc(9,4,0)
+        (mkErrorMsgEnvelope noSrcSpan neverQualify $ GhcUnknownMessage $ mkPlainError []
+#elif MIN_VERSION_ghc(9,2,0)
         (mkMsgEnvelope noSrcSpan neverQualify
 #else
         (mkPlainErrMsg df noSrcSpan
@@ -81,7 +93,9 @@ handleClashException df opts e = case fromException e of
         GHC.printException e'
         liftIO $ exitWith (ExitFailure 1)
       _ -> throwOneError
-#if MIN_VERSION_ghc(9,2,0)
+#if MIN_VERSION_ghc(9,4,0)
+              (mkErrorMsgEnvelope noSrcSpan neverQualify $ GhcUnknownMessage  $ mkPlainError []
+#elif MIN_VERSION_ghc(9,2,0)
               (mkMsgEnvelope noSrcSpan neverQualify
 #else
               (mkPlainErrMsg df noSrcSpan

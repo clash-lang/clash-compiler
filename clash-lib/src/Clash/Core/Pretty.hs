@@ -366,7 +366,7 @@ instance PrettyPrec DataCon where
 instance PrettyPrec Literal where
   pprPrec _ l = return $ annotate (AnnSyntax LitS) $ case l of
     IntegerLiteral i   -> parensIf (i < 0) (pretty i)
-    IntLiteral i       -> parensIf (i < 0) (pretty i)
+    IntLiteral i       -> parensIf (i < 0) (pretty i <> "#")
     Int64Literal i     -> parensIf (i < 0) (pretty i <> "#64")
     WordLiteral w      -> pretty w <> "##"
     Word64Literal w    -> pretty w <> "##64"
