@@ -25,7 +25,9 @@ module Data.List.Extra
 import "extra" Data.List.Extra as NeilsExtra
 import "extra" Control.Monad.Extra (anyM, allM, orM, partitionM)
 
+#if !MIN_VERSION_base(4,18,0)
 import Control.Applicative (liftA2)
+#endif
 
 #if defined(DEBUG)
 import GHC.Stack (HasCallStack)

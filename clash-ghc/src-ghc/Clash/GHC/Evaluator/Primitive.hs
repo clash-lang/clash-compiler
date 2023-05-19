@@ -69,6 +69,11 @@ import           GHC.TypeLits        (KnownNat)
 import           GHC.Types           (IO (..))
 import           GHC.Word
 import           System.IO.Unsafe    (unsafeDupablePerformIO)
+#if MIN_VERSION_ghc(9,6,0)
+import           Data.Bifunctor      (first)
+import qualified Data.Text.Array     as Text
+import qualified Data.Text.Internal  as Text
+#endif
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Types.Basic     (Boxity (..))
@@ -4546,6 +4551,51 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                         , Left (Case splitCall n1BVTy [bvAlt])
                         ])
          _ -> Nothing
+#if MIN_VERSION_ghc(9,6,0)
+  "Data.Text.Show.$wunpackCStringAscii#"
+    | [Lit (StringLiteral addr)] <- args
+    , Text.Text (Text.ByteArray ba) _off len <- Text.pack addr
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = UniqMap.lookup tupTcNm tcm
+           [tupDc] = tyConDataCons tupTc
+           ret     = mkApps (Data tupDc) (map Right tyArgs ++
+                    [ Left (Literal (ByteArrayLiteral (BA.ByteArray ba)))
+                    , Left (Literal (IntLiteral 0))
+                    , Left (Literal (IntLiteral (toInteger len)))])
+        in reduce ret
+  "GHC.Magic.noinlineConstraint"
+    | [arg] <- args
+    -> reduce (valToTerm arg)
+  "GHC.TypeNats.withSomeSNat"
+    | Lit (NaturalLiteral n) : fun : _ <- args
+    , _ : funTy : _ <- Either.rights (fst (splitFunForallTy ty))
+    , (tyView -> TyConApp snatTcNm _) : _ <- Either.rights (fst (splitFunForallTy funTy))
+    , Just snatTc <- UniqMap.lookup snatTcNm tcm
+    , [snatDc] <- tyConDataCons snatTc
+    -> let nTy = LitTy (NumTy n)
+           snat = mkApps (Data snatDc) [Right nTy, Left (Literal (NaturalLiteral n))]
+           ret = mkApps (valToTerm fun) [Right nTy, Left snat]
+        in reduce ret
+  "GHC.Magic.nospec"
+    | [arg] <- args
+    -> reduce (valToTerm arg)
+  "GHC.Float.$wproperFractionDouble"
+    | _ : Lit (DoubleLiteral d) : _ <- args
+    , [sty@(tyView -> TyConApp signedTcNm [nTy@(LitTy (NumTy kn))])] <- tys
+    , nameOcc signedTcNm == "Clash.Sized.Internal.Signed.Signed"
+    , (_, tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+    , Just tupTc <- UniqMap.lookup tupTcNm tcm
+    , [tupDc] <- tyConDataCons tupTc
+    -> let (sn, d1) = reifyNat kn (\p -> first toInteger (op p (wordToDouble d)))
+           ret = mkApps (Data tupDc) (map Right tyArgs ++
+                  [ Left (mkSignedLit sty nTy kn sn)
+                  , Left (mkDoubleCLit tcm (doubleToWord d1) (last tyArgs))
+                  ])
+        in reduce ret
+    where
+      op :: KnownNat n => Proxy n -> Double -> (Signed n, Double)
+      op _ = properFraction
+#endif
   _ -> Nothing
   where
     ty = primType pInfo

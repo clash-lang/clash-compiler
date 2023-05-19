@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -6,7 +7,9 @@ module Clash.Tests.MaybeX where
 import Clash.XException (errorX)
 import Clash.XException.MaybeX (MaybeX(IsX, IsDefined), toMaybeX)
 
+#if !MIN_VERSION_base(4,18,0)
 import Control.Applicative (liftA2)
+#endif
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.TH

@@ -16,6 +16,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Rewrite.Types where
@@ -174,6 +175,13 @@ newtype RewriteMonad extra a = R
     , Monad
     , MonadFix
     )
+#if MIN_VERSION_transformers(0,5,6) && MIN_VERSION_mtl(2,3,0)
+  deriving newtype
+    ( MonadState (RewriteState extra)
+    , MonadWriter Any
+    , MonadReader RewriteEnv
+    )
+#endif
 
 -- | Run the computation in the RewriteMonad
 runR

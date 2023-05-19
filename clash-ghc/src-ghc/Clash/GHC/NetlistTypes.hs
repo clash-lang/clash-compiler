@@ -276,6 +276,9 @@ ghcTypeToHWType iw = go
         "GHC.Types.[]" -> case tyView (head args) of
           (TyConApp (nameOcc -> "GHC.Types.Char") []) -> returnN String
           _ -> throwE $ "Can't translate type: " ++ showPpr ty
+        "GHC.Types.List" -> case tyView (head args) of
+          (TyConApp (nameOcc -> "GHC.Types.Char") []) -> returnN String
+          _ -> throwE $ "Can't translate type: " ++ showPpr ty
 
         -- To ensure that Clash doesn't get stuck working away callstacks that
         -- never end up being used in the generated HDL.

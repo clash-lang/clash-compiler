@@ -12,6 +12,7 @@ This module defines the explicitly clocked counterparts of the functions
 defined in "Clash.Prelude".
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
@@ -116,6 +117,9 @@ import Control.Applicative
 import Data.Bits
 import GHC.Generics (Generic, Generic1)
 import GHC.TypeLits
+#if MIN_VERSION_base(4,18,0)
+  hiding (SNat, SSymbol, fromSNat)
+#endif
 import GHC.TypeLits.Extra
 import Clash.HaskellPrelude
 import qualified Prelude

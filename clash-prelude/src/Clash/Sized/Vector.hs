@@ -1446,7 +1446,19 @@ replace i y xs = replace_int xs (fromEnum i) y
 >>> take d0               (1:>2:>Nil)
 Nil
 
-#if __GLASGOW_HASKELL__ >= 900
+#if __GLASGOW_HASKELL__ >= 906
+>>> take d4               (1:>2:>Nil)
+<BLANKLINE>
+<interactive>:...
+    • Couldn't match type ‘4 + n0’ with ‘2’
+      Expected: Vec (4 + n0) a
+        Actual: Vec (1 + 1) a
+        The type variable ‘n0’ is ambiguous
+    • In the second argument of ‘take’, namely ‘(1 :> 2 :> Nil)’
+      In the expression: take d4 (1 :> 2 :> Nil)
+      In an equation for ‘it’: it = take d4 (1 :> 2 :> Nil)
+
+#elif __GLASGOW_HASKELL__ >= 900
 >>> take d4               (1:>2:>Nil)
 <BLANKLINE>
 <interactive>:...
@@ -1484,21 +1496,35 @@ takeI :: KnownNat m => Vec (m + n) a -> Vec m a
 takeI = withSNat take
 {-# INLINE takeI #-}
 
--- | \"'drop' @n xs@\" returns the suffix of /xs/ after the first /n/ elements.
---
--- >>> drop (SNat :: SNat 3) (1:>2:>3:>4:>5:>Nil)
--- 4 :> 5 :> Nil
--- >>> drop d3               (1:>2:>3:>4:>5:>Nil)
--- 4 :> 5 :> Nil
--- >>> drop d0               (1:>2:>Nil)
--- 1 :> 2 :> Nil
--- >>> drop d4               (1:>2:>Nil)
--- <BLANKLINE>
--- <interactive>:...: error:
---     • Couldn't match...type ‘4 + n0...
---       The type variable ‘n0’ is ambiguous
---     • In the first argument of ‘print’, namely ‘it’
---       In a stmt of an interactive GHCi command: print it
+{- | \"'drop' @n xs@\" returns the suffix of /xs/ after the first /n/ elements.
+
+>>> drop (SNat :: SNat 3) (1:>2:>3:>4:>5:>Nil)
+4 :> 5 :> Nil
+>>> drop d3               (1:>2:>3:>4:>5:>Nil)
+4 :> 5 :> Nil
+>>> drop d0               (1:>2:>Nil)
+1 :> 2 :> Nil
+
+#if __GLASGOW_HASKELL__ >= 906
+>>> drop d4               (1:>2:>Nil)
+<BLANKLINE>
+<interactive>:...: error:...
+    • Couldn't match...type ‘4 + n0...
+        The type variable ‘n0’ is ambiguous
+    • In the first argument of ‘print’, namely ‘it’
+      In a stmt of an interactive GHCi command: print it
+
+#else
+>>> drop d4               (1:>2:>Nil)
+<BLANKLINE>
+<interactive>:...: error:...
+    • Couldn't match...type ‘4 + n0...
+      The type variable ‘n0’ is ambiguous
+    • In the first argument of ‘print’, namely ‘it’
+      In a stmt of an interactive GHCi command: print it
+
+#endif
+-}
 drop :: SNat m -> Vec (m + n) a -> Vec n a
 drop n = snd . splitAt n
 {-# INLINE drop #-}

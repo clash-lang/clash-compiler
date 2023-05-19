@@ -7,6 +7,11 @@
     workInfo: Never
 - Primitive:
     name: GHC.TypeNats.someNatVal
-    primType: Functions
+    primType: Function
     type: 'someNatVal :: Natural -> SomeNat'
+    workInfo: Never
+- Primitive:
+    name: GHC.TypeNates.withSomeSNat
+    primType: Function
+    type: 'withSomeSNat :: forall rep (r :: TYPE rep). Natural -> (forall n. SNat n -> r) -> r'
     workInfo: Never

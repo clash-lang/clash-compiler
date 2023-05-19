@@ -50,6 +50,9 @@ import Data.Coerce
 #endif
 import Data.IORef
 import GHC.TypeLits
+#if MIN_VERSION_base(4,18,0)
+  hiding (SNat)
+#endif
 import Prelude hiding (getChar, putChar, getLine)
 import qualified System.IO as IO
 import System.IO.Unsafe

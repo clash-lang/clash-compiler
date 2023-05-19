@@ -21,7 +21,9 @@
 module Clash.Backend.VHDL (VHDLState) where
 
 import           Control.Arrow                        (second)
+#if !MIN_VERSION_base(4,18,0)
 import           Control.Applicative                  (liftA2)
+#endif
 import           Control.Lens                         hiding (Indexed, Empty)
 import           Control.Monad                        (forM,join,zipWithM)
 import           Control.Monad.State                  (State, StateT)

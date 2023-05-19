@@ -9,6 +9,7 @@
   Transformations for compile-time reduction of expressions / primitives.
 -}
 
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Normalize.Transformations.Reduce
@@ -32,11 +33,12 @@ import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Subst (Subst, extendIdSubst, substTm)
 import Clash.Core.Term
-  ( LetBinding, PrimInfo(..), Term(..), TickInfo(..), collectArgs
-  , collectArgsTicks, mkApps, mkTicks)
+  ( CoreContext(..), LetBinding, PrimInfo(..), Term(..), TickInfo(..), collectArgs
+  , collectArgsTicks, mkApps, mkTicks, mkTmApps)
 import Clash.Core.TyCon (tyConDataCons)
-import Clash.Core.Type (TypeView(..), mkTyConApp, tyView)
-import Clash.Core.Util (mkVec, shouldSplit, tyNatSize)
+import Clash.Core.Type (Type, TypeView(..), mkTyConApp, splitFunForallTy, tyView)
+import Clash.Core.Util (mkVec, shouldSplit, tyNatSize, mkInternalVar)
+import Clash.Core.VarEnv (extendInScopeSet)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Normalize.PrimitiveReductions
 import Clash.Normalize.Primitives (removedArg)
@@ -148,11 +150,12 @@ reduceConst _ e = return e
 --
 -- See https://github.com/clash-lang/clash-compiler/issues/1606
 reduceNonRepPrim :: HasCallStack => NormRewrite
-reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks) <- collectArgsTicks e = do
+reduceNonRepPrim c@(TransformContext _ ctx) e@(App _ _) | (Prim p, args, ticks) <- collectArgsTicks e = do
   tcm <- Lens.view tcCache
   ultra <- Lens.view normalizeUltra
   let eTy = inferCoreTypeOf tcm e
-  case tyView eTy of
+  let resTy = snd (splitFunForallTy eTy)
+  case tyView resTy of
     (TyConApp vecTcNm@(nameOcc -> "Clash.Sized.Vector.Vec")
               [runExcept . tyNatSize tcm -> Right 0, aTy]) -> do
       let nilE = fromMaybe (error "reduceNonRepPrim: unable to create Vec DCs") $ do
@@ -162,8 +165,7 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
       changed (mkTicks nilE ticks)
     tv -> let argLen = length args in case primName p of
       "Clash.Sized.Vector.zipWith"
-        | argLen == 7
-        , ([fun,lhsArg,rhsArg],[lhsElTy,rhsElty,resElTy,nTy]) <- Either.partitionEithers args
+        | (tmArgs,[lhsElTy,rhsElty,resElTy,nTy]) <- Either.partitionEithers args
         , TyConApp vecTcNm _ <- tv
         , let lhsTy = mkTyConApp vecTcNm [nTy,lhsElTy]
         , let rhsTy = mkTyConApp vecTcNm [nTy,rhsElty]
@@ -175,18 +177,17 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                         [lhsElTy,rhsElty,resElTy]
                                  -- Note [Unroll shouldSplit types]
                                  , pure (any (Maybe.isJust . shouldSplit tcm)
-                                             [lhsTy,rhsTy,eTy]) ]
+                                             [lhsTy,rhsTy,resTy]) ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$>
-                    reduceZipWith c p n lhsElTy rhsElty resElTy fun lhsArg rhsArg
+               then abstractOverMissingArgs ticks tmArgs eTy c
+                      (reduceZipWith p n lhsElTy rhsElty resElTy)
                else return e
           _ -> return e
-        | argLen == 7
+        | argLen >= 4
         -> error ("reduceNonRepPrim: zipWith bad args" <> showPpr e)
 
       "Clash.Sized.Vector.map"
-        | argLen == 5
-        , ([fun,arg],[argElTy,resElTy,nTy]) <- Either.partitionEithers args
+        | (tmArgs,[argElTy,resElTy,nTy]) <- Either.partitionEithers args
         , TyConApp vecTcNm _ <- tv
         , let argTy = mkTyConApp vecTcNm [nTy,argElTy]
         -> case runExcept (tyNatSize tcm nTy) of
@@ -197,27 +198,26 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                         [argElTy,resElTy]
                                  -- Note [Unroll shouldSplit types]
                                  , pure (any (Maybe.isJust . shouldSplit tcm)
-                                             [argTy,eTy]) ]
+                                             [argTy,resTy]) ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceMap c p n argElTy resElTy fun arg
+               then abstractOverMissingArgs ticks tmArgs eTy c
+                      (reduceMap p n argElTy resElTy)
                else return e
           _ -> return e
-        | argLen == 5
+        | argLen >= 3
         -> error ("reduceNonRepPrim: map bad args" <> showPpr e)
 
       "Clash.Sized.Vector.traverse#"
-        | argLen == 7
-        , ([dict,fun,arg],[aTy,fTy,bTy,nTy]) <- Either.partitionEithers args
+        | (tmArgs,[aTy,fTy,bTy,nTy]) <- Either.partitionEithers args
         -> case runExcept (tyNatSize tcm nTy) of
-          Right n -> (`mkTicks` ticks) <$> reduceTraverse c n aTy fTy bTy dict fun arg
+          Right n -> abstractOverMissingArgs ticks tmArgs eTy c (reduceTraverse n aTy fTy bTy)
           _ -> return e
-        | argLen == 7
+        | argLen >= 4
         -> error ("reduceNonRepPrim: traverse# bad args" <> showPpr e)
 
       "Clash.Sized.Vector.fold"
-        | argLen == 4
-        , ([fun,arg],[nTy,aTy]) <- Either.partitionEithers args
-        , let argTy = inferCoreTypeOf tcm arg
+        | (tmArgs,[nTy,aTy]) <- Either.partitionEithers args
+        , (_:Right argTy:_) <- fst (splitFunForallTy (piResultTys tcm (primType p) [nTy,aTy]))
         -> case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ pure (ultra || n == 0)
@@ -226,16 +226,15 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                  -- Note [Unroll shouldSplit types]
                                  , pure (Maybe.isJust (shouldSplit tcm argTy))]
             if shouldReduce1 then
-              (`mkTicks` ticks) <$> reduceFold c (n + 1) aTy fun arg
+              abstractOverMissingArgs ticks tmArgs eTy c (reduceFold (n + 1) aTy)
             else return e
           _ -> return e
-        | argLen == 4
+        | argLen >= 2
         -> error ("reduceNonRepPrim: fold bad args" <> showPpr e)
 
       "Clash.Sized.Vector.foldr"
-        | argLen == 6
-        , ([fun,start,arg],[aTy,bTy,nTy]) <- Either.partitionEithers args
-        , let argTy = inferCoreTypeOf tcm arg
+        | (tmArgs,[aTy,bTy,nTy]) <- Either.partitionEithers args
+        , (_:_:Right argTy:_) <- fst (splitFunForallTy (piResultTys tcm (primType p) [aTy,bTy,nTy]))
         -> case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ pure ultra
@@ -244,44 +243,40 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                  -- Note [Unroll shouldSplit types]
                                  , pure (Maybe.isJust (shouldSplit tcm argTy)) ]
             if shouldReduce1
-              then (`mkTicks` ticks) <$> reduceFoldr c p n aTy fun start arg
+              then abstractOverMissingArgs ticks tmArgs eTy c (reduceFoldr p n aTy)
               else return e
           _ -> return e
-        | argLen == 6
+        | argLen >= 3
         -> error ("reduceNonRepPrim: foldr bad args" <> showPpr e)
 
       "Clash.Sized.Vector.dfold"
-        | argLen == 8
-        , ([_kn,_motive,fun,start,arg],[_mTy,nTy,aTy]) <- Either.partitionEithers args
+        | (tmArgs,[_mTy,nTy,aTy]) <- Either.partitionEithers args
         -> case runExcept (tyNatSize tcm nTy) of
-          Right n -> (`mkTicks` ticks) <$> reduceDFold is0 n aTy fun start arg
+          Right n -> abstractOverMissingArgs ticks tmArgs eTy c (reduceDFold n aTy)
           _ -> return e
-        | argLen == 8
+        | argLen >= 3
         -> error ("reduceNonRepPrim: dfold bad args" <> showPpr e)
 
       "Clash.Sized.Vector.++"
-        | argLen == 5
-        , ([lArg,rArg],[nTy,aTy,mTy]) <- Either.partitionEithers args
+        | (tmArgs,[nTy,aTy,mTy]) <- Either.partitionEithers args
         -> case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy)) of
-              (Right n, Right m)
-                | n == 0 -> changed rArg
-                | m == 0 -> changed lArg
-                | otherwise -> do
-                    shouldReduce1 <- List.orM [ shouldReduce ctx
+              (Right n, Right m) -> do
+                    shouldReduce1 <- List.orM [ pure (n==0)
+                                         , pure (m==0)
+                                         , shouldReduce ctx
                                          , isUntranslatableType_not_poly aTy
                                          -- Note [Unroll shouldSplit types]
-                                         , pure (Maybe.isJust (shouldSplit tcm eTy)) ]
+                                         , pure (Maybe.isJust (shouldSplit tcm resTy)) ]
                     if shouldReduce1
-                       then (`mkTicks` ticks) <$> reduceAppend is0 n m aTy lArg rArg
+                       then abstractOverMissingArgs ticks tmArgs eTy c (reduceAppend n m aTy)
                        else return e
               _ -> return e
-        | argLen == 5
+        | argLen >= 3
         -> error ("reduceNonRepPrim: ++ bad args" <> showPpr e)
 
       "Clash.Sized.Vector.head"
-        | argLen == 3
-        , ([vArg],[nTy,aTy]) <- Either.partitionEithers args
-        , let argTy = inferCoreTypeOf tcm vArg
+        | (tmArgs,[nTy,aTy]) <- Either.partitionEithers args
+        , (Right argTy:_) <- fst (splitFunForallTy (piResultTys tcm (primType p) [nTy,aTy]))
         -> case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ shouldReduce ctx
@@ -289,16 +284,15 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                  -- Note [Unroll shouldSplit types]
                                  , pure (Maybe.isJust (shouldSplit tcm argTy)) ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceHead is0 (n+1) aTy vArg
+               then abstractOverMissingArgs ticks tmArgs eTy c (reduceHead (n+1) aTy)
                else return e
           _ -> return e
-        | argLen == 3
+        | argLen >= 2
         -> error ("reduceNonRepPrim: head bad args" <> showPpr e)
 
       "Clash.Sized.Vector.tail"
-        | argLen == 3
-        , ([vArg],[nTy,aTy]) <- Either.partitionEithers args
-        , let argTy = inferCoreTypeOf tcm vArg
+        | (tmArgs,[nTy,aTy]) <- Either.partitionEithers args
+        , (Right argTy:_) <- fst (splitFunForallTy (piResultTys tcm (primType p) [nTy,aTy]))
         -> case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ shouldReduce ctx
@@ -306,16 +300,15 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                  -- Note [Unroll shouldSplit types]
                                  , pure (Maybe.isJust (shouldSplit tcm argTy)) ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceTail is0 (n+1) aTy vArg
+               then abstractOverMissingArgs ticks tmArgs eTy c (reduceTail (n+1) aTy)
                else return e
           _ -> return e
-        | argLen == 3
+        | argLen >= 2
         -> error ("reduceNonRepPrim: tail bad args" <> showPpr e)
 
       "Clash.Sized.Vector.last"
-        | argLen == 3
-        , ([vArg],[nTy,aTy]) <- Either.partitionEithers args
-        , let argTy = inferCoreTypeOf tcm vArg
+        | (tmArgs,[nTy,aTy]) <- Either.partitionEithers args
+        , (Right argTy:_) <- fst (splitFunForallTy (piResultTys tcm (primType p) [nTy,aTy]))
         -> case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ shouldReduce ctx
@@ -324,16 +317,15 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                  , pure (Maybe.isJust (shouldSplit tcm argTy))
                                  ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceLast is0 (n+1) aTy vArg
+               then abstractOverMissingArgs ticks tmArgs eTy c (reduceLast (n+1) aTy)
                else return e
           _ -> return e
-        | argLen == 3
+        | argLen >= 2
         -> error ("reduceNonRepPrim: last bad args" <> showPpr e)
 
       "Clash.Sized.Vector.init"
-        | argLen == 3
-        , ([vArg],[nTy,aTy]) <- Either.partitionEithers args
-        , let argTy = inferCoreTypeOf tcm vArg
+        | (tmArgs,[nTy,aTy]) <- Either.partitionEithers args
+        , (Right argTy:_) <- fst (splitFunForallTy (piResultTys tcm (primType p) [nTy,aTy]))
         -> case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ shouldReduce ctx
@@ -341,16 +333,15 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                  -- Note [Unroll shouldSplit types]
                                  , pure (Maybe.isJust (shouldSplit tcm argTy)) ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceInit is0 p n aTy vArg
+               then abstractOverMissingArgs ticks tmArgs eTy c (reduceInit p n aTy)
                else return e
           _ -> return e
-        | argLen == 3
+        | argLen >= 2
         -> error ("reduceNonRepPrim: init bad args" <> showPpr e)
 
       "Clash.Sized.Vector.unconcat"
-        | argLen == 6
-        , ([_knN,sm,arg],[nTy,mTy,aTy]) <- Either.partitionEithers args
-        , let argTy = inferCoreTypeOf tcm arg
+        | (tmArgs,[nTy,mTy,aTy]) <- Either.partitionEithers args
+        , (_:_:Right argTy:_) <- fst (splitFunForallTy (piResultTys tcm (primType p) [nTy,mTy,aTy]))
         -> case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy)) of
           (Right n, Right m) -> do
             shouldReduce1 <- List.orM [ pure (m==0)
@@ -360,62 +351,58 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                       , pure (Maybe.isJust (shouldSplit tcm argTy))
                                       ]
             if shouldReduce1 then
-              (`mkTicks` ticks) <$> reduceUnconcat is0 p n m aTy sm arg
+              abstractOverMissingArgs ticks tmArgs eTy c (reduceUnconcat p n m aTy)
             else
               return e
           _ -> return e
-        | argLen == 6
+        | argLen >= 3
         -> error ("reduceNonRepPrim: unconcat bad args" <> showPpr e)
 
       "Clash.Sized.Vector.transpose"
-        | argLen == 5
-        , ([_knN,arg],[mTy,nTy,aTy]) <- Either.partitionEithers args
+        | (tmArgs,[mTy,nTy,aTy]) <- Either.partitionEithers args
         -> case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy)) of
-          (Right n, Right 0) -> (`mkTicks` ticks) <$> reduceTranspose n 0 aTy arg
+          (Right n, Right 0) -> abstractOverMissingArgs ticks tmArgs eTy c (reduceTranspose n 0 aTy)
           _ -> return e
-        | argLen == 5
+        | argLen >= 3
         -> error ("reduceNonRepPrim: transpose bad args" <> showPpr e)
 
       "Clash.Sized.Vector.replicate"
-        | argLen == 4
-        , ([_sArg,vArg],[nTy,aTy]) <- Either.partitionEithers args
+        | (tmArgs,[nTy,aTy]) <- Either.partitionEithers args
         -> case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy
                                  -- Note [Unroll shouldSplit types]
-                                 , pure (Maybe.isJust (shouldSplit tcm eTy))
+                                 , pure (Maybe.isJust (shouldSplit tcm resTy))
                                  ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceReplicate n aTy eTy vArg
+               then abstractOverMissingArgs ticks tmArgs eTy c (reduceReplicate n aTy resTy)
                else return e
           _ -> return e
-        | argLen == 4
+        | argLen >= 2
         -> error ("reduceNonRepPrim: replicate bad args" <> showPpr e)
 
        -- replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a
       "Clash.Sized.Vector.replace_int"
-        | argLen == 6
-        , ([_knArg,vArg,iArg,aArg],[nTy,aTy]) <- Either.partitionEithers args
+        | (tmArgs,[nTy,aTy]) <- Either.partitionEithers args
         -> case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ pure ultra
                                  , shouldReduce ctx
                                  , isUntranslatableType_not_poly aTy
                                  -- Note [Unroll shouldSplit types]
-                                 , pure (Maybe.isJust (shouldSplit tcm eTy))
+                                 , pure (Maybe.isJust (shouldSplit tcm resTy))
                                  ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceReplace_int is0 n aTy eTy vArg iArg aArg
+               then abstractOverMissingArgs ticks tmArgs eTy c (reduceReplace_int n aTy resTy)
                else return e
           _ -> return e
-        | argLen == 6
+        | argLen >= 2
         -> error ("reduceNonRepPrim: replace_int bad args" <> showPpr e)
 
       "Clash.Sized.Vector.index_int"
-        | argLen == 5
-        , ([_knArg,vArg,iArg],[nTy,aTy]) <- Either.partitionEithers args
-        , let argTy = inferCoreTypeOf tcm vArg
+        | (tmArgs,[nTy,aTy]) <- Either.partitionEithers args
+        , (_:Right argTy:_) <- fst (splitFunForallTy (piResultTys tcm (primType p) [nTy,aTy]))
         -> case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ pure ultra
@@ -424,15 +411,14 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                  -- Note [Unroll shouldSplit types]
                                  , pure (Maybe.isJust (shouldSplit tcm argTy)) ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceIndex_int is0 n aTy vArg iArg
+               then abstractOverMissingArgs ticks tmArgs eTy c (reduceIndex_int n aTy)
                else return e
           _ -> return e
-        | argLen == 5
+        | argLen >= 2
         -> error ("reduceNonRepPrim: index_int bad args" <> showPpr e)
 
       "Clash.Sized.Vector.imap"
-        | argLen == 6
-        , ([_,fun,arg],[nTy,argElTy,resElTy]) <- Either.partitionEithers args
+        | (tmArgs,[nTy,argElTy,resElTy]) <- Either.partitionEithers args
         , TyConApp vecTcNm _ <- tv
         , let argTy = mkTyConApp vecTcNm [nTy,argElTy]
         -> case runExcept (tyNatSize tcm nTy) of
@@ -442,17 +428,16 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                                  , List.anyM isUntranslatableType_not_poly [argElTy,resElTy]
                                  -- Note [Unroll shouldSplit types]
                                  , pure (any (Maybe.isJust . shouldSplit tcm)
-                                             [argTy,eTy]) ]
+                                             [argTy,resTy]) ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceImap c n argElTy resElTy fun arg
+               then abstractOverMissingArgs ticks tmArgs eTy c (reduceImap n argElTy resElTy)
                else return e
           _ -> return e
-        | argLen == 6
+        | argLen >= 3
         -> error ("reduceNonRepPrim: imap bad args" <> showPpr e)
 
       "Clash.Sized.Vector.iterateI"
-        | argLen == 5
-        , ([_kn,f,a],[nTy,aTy]) <- Either.partitionEithers args
+        | (tmArgs,[nTy,aTy]) <- Either.partitionEithers args
         -> case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM
@@ -460,58 +445,54 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
               , shouldReduce ctx
               , isUntranslatableType_not_poly aTy
               -- Note [Unroll shouldSplit types]
-              , pure (Maybe.isJust (shouldSplit tcm eTy)) ]
+              , pure (Maybe.isJust (shouldSplit tcm resTy)) ]
 
             if shouldReduce1 then
-              (`mkTicks` ticks) <$> reduceIterateI c n aTy eTy f a
+              abstractOverMissingArgs ticks tmArgs eTy c (reduceIterateI n aTy resTy)
             else
               return e
           _ -> return e
-        | argLen == 5
+        | argLen >= 2
         -> error ("reduceNonRepPrim: iterateI bad args" <> showPpr e)
 
       "Clash.Sized.Vector.dtfold"
-        | argLen == 8
-        , ([_kn,_motive,lrFun,brFun,arg],[_mTy,nTy,aTy]) <- Either.partitionEithers args
+        | (tmArgs,[_mTy,nTy,aTy]) <- Either.partitionEithers args
         -> case runExcept (tyNatSize tcm nTy) of
-          Right n -> (`mkTicks` ticks) <$> reduceDTFold is0 n aTy lrFun brFun arg
+          Right n -> abstractOverMissingArgs ticks tmArgs eTy c (reduceDTFold n aTy)
           _ -> return e
-        | argLen == 8
+        | argLen >= 3
         -> error ("reduceNonRepPrim: dtfold bad args" <> showPpr e)
 
       "Clash.Sized.Vector.reverse"
         | ultra
-        , ([vArg],[nTy,aTy]) <- Either.partitionEithers args
+        , (tmArgs,[nTy,aTy]) <- Either.partitionEithers args
         , Right n <- runExcept (tyNatSize tcm nTy)
-        -> (`mkTicks` ticks) <$> reduceReverse is0 n aTy vArg
+        -> abstractOverMissingArgs ticks tmArgs eTy c (reduceReverse n aTy)
 
       "Clash.Sized.RTree.tdfold"
-        | argLen == 8
-        , ([_kn,_motive,lrFun,brFun,arg],[_mTy,nTy,aTy]) <- Either.partitionEithers args
+        | (tmArgs,[_mTy,nTy,aTy]) <- Either.partitionEithers args
         -> case runExcept (tyNatSize tcm nTy) of
-          Right n -> (`mkTicks` ticks) <$> reduceTFold is0 n aTy lrFun brFun arg
+          Right n -> abstractOverMissingArgs ticks tmArgs eTy c (reduceTFold n aTy)
           _ -> return e
-        | argLen == 8
+        | argLen >= 3
         -> error ("reduceNonRepPrim: tdfold bad args" <> showPpr e)
       "Clash.Sized.RTree.treplicate"
-        | argLen == 4
-        , ([_sArg,vArg],[nTy,aTy]) <- Either.partitionEithers args ->
+        | (tmArgs,[nTy,aTy]) <- Either.partitionEithers args ->
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
             shouldReduce1 <- List.orM [ shouldReduce ctx
                                  , isUntranslatableType False aTy ]
             if shouldReduce1
-               then (`mkTicks` ticks) <$> reduceTReplicate n aTy eTy vArg
+               then abstractOverMissingArgs ticks tmArgs eTy c (reduceTReplicate n aTy resTy)
                else return e
           _ -> return e
-        | argLen == 4
+        | argLen >= 2
         -> error ("reduceNonRepPrim: treplicate bad args" <> showPpr e)
       "Clash.Sized.Internal.BitVector.split#"
-        | argLen == 4
-        , ([_knArg,bvArg],[nTy,mTy]) <- Either.partitionEithers args ->
+        | (tmArgs,[nTy,mTy]) <- Either.partitionEithers args ->
         case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy), tv) of
           (Right n, Right m, TyConApp tupTcNm [lTy,rTy])
-            | n == 0 -> do
+            | n == 0 -> abstractOverMissingArgs ticks tmArgs eTy c $ \(_kn :: Term) bvArg (_ctx :: TransformContext) -> do
               let tup = mkApps (Data tupDc)
                            [Right lTy
                            ,Right rTy
@@ -519,8 +500,8 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                            ,Left  (TyApp (Prim removedArg) rTy)
                            ]
 
-              changed (mkTicks tup ticks)
-            | m == 0 -> do
+              (changed (mkTicks tup ticks) :: NormalizeSession Term)
+            | m == 0 -> abstractOverMissingArgs ticks tmArgs eTy c $ \(_kn :: Term) bvArg (_ctx :: TransformContext) -> do
               let tup = mkApps (Data tupDc)
                            [Right lTy
                            ,Right rTy
@@ -528,23 +509,24 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
                            ,Left  bvArg
                            ]
 
-              changed (mkTicks tup ticks)
+              (changed (mkTicks tup ticks) :: NormalizeSession Term)
            where
             tupDc = fromMaybe (error "reduceNonRepPrim: faield to create tup DC") $ do
                     tupTc <- UniqMap.lookup tupTcNm tcm
                     listToMaybe (tyConDataCons tupTc)
           _ -> return e
-        | argLen == 4
+        | argLen >= 3
         -> error ("reduceNonRepPrim: split# bad args" <> showPpr e)
       "Clash.Sized.Internal.BitVector.eq#"
-        | ([_,_],[nTy]) <- Either.partitionEithers args
+        | (tmArgs,[nTy]) <- Either.partitionEithers args
         , Right 0 <- runExcept (tyNatSize tcm nTy)
         , TyConApp boolTcNm [] <- tv
-        -> let trueDc = fromMaybe (error "reduceNonRepPrim: failed to create True DC") $ do
+        -> abstractOverMissingArgs ticks tmArgs eTy c $ \(_kn :: Term) (_l :: Term) (_r :: Term) (_ctx :: TransformContext) -> do
+           let trueDc = fromMaybe (error "reduceNonRepPrim: failed to create True DC") $ do
                   boolTc <- UniqMap.lookup boolTcNm tcm
                   [_falseDc,dc] <- pure (tyConDataCons boolTc)
                   return dc
-           in  changed (mkTicks (Data trueDc) ticks)
+            in (changed (Data trueDc) :: NormalizeSession Term)
       _ -> return e
   where
     isUntranslatableType_not_poly t = do
@@ -555,3 +537,29 @@ reduceNonRepPrim c@(TransformContext is0 ctx) e@(App _ _) | (Prim p, args, ticks
 
 reduceNonRepPrim _ e = return e
 {-# SCC reduceNonRepPrim #-}
+
+class AbstractOverMissingArgs a where
+  -- | Abstract over a primitive until it is saturated
+  abstractOverMissingArgs ::
+    HasCallStack =>
+    -- | Ticks originally tagged to the applied primitive
+    [TickInfo] ->
+    -- | Available arguments
+    [Term] ->
+    -- | The type of the expression containing the applied primitive
+    Type ->
+    -- | The context in which reduceNonRepPrim was called
+    TransformContext ->
+    a ->
+    NormalizeSession Term
+
+instance AbstractOverMissingArgs (TransformContext -> NormalizeSession Term) where
+  abstractOverMissingArgs ticks args _ is f = (`mkTmApps` args) <$> (`mkTicks` ticks) <$> f is
+
+instance AbstractOverMissingArgs a => AbstractOverMissingArgs (Term -> a) where
+  abstractOverMissingArgs ticks (t:ts) ty ctx f = abstractOverMissingArgs ticks ts ty ctx (f t)
+  abstractOverMissingArgs ticks []     (tyView -> FunTy argTy resTy) (TransformContext is0 ctx) f = do
+     newId <- mkInternalVar is0 "arg" argTy
+     let ctx1 = TransformContext (extendInScopeSet is0 newId) (LamBody newId : ctx)
+     Lam newId <$> abstractOverMissingArgs ticks [] resTy ctx1 (f (Var newId))
+  abstractOverMissingArgs _ _ ty _ _ = error ("not a funty: " <> showPpr ty)

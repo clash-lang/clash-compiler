@@ -178,6 +178,9 @@ import           Data.Default.Class
 import           Data.Kind (Type, Constraint)
 import           GHC.Stack                   (HasCallStack)
 import           GHC.TypeLits
+#if MIN_VERSION_base(4,18,0)
+  hiding (SNat, SSymbol, fromSNat)
+#endif
 import           GHC.TypeLits.Extra
 import           Language.Haskell.TH.Syntax  (Lift(..))
 import           Clash.HaskellPrelude

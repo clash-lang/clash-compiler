@@ -4,6 +4,7 @@ module I2C.ByteMaster.ShiftRegister where
 import Clash.Prelude
 
 import Control.Lens hiding (Index)
+import Control.Monad
 import Control.Monad.State
 
 data ShiftRegister

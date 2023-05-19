@@ -10,6 +10,7 @@ This module contains a mini dsl for creating haskell blackbox
 instantiations.
 -}
 
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE NoImplicitPrelude #-}
@@ -89,6 +90,9 @@ module Clash.Primitives.DSL
   ) where
 
 import           Control.Lens                    hiding (Indexed, assign)
+#if MIN_VERSION_mtl(2,3,0)
+import           Control.Monad                   (forM, forM_, zipWithM)
+#endif
 import           Control.Monad.State
 import           Data.Default                    (Default(def))
 import           Data.IntMap                     (IntMap)

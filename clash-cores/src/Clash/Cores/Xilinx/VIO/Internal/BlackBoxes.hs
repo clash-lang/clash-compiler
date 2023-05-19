@@ -27,7 +27,8 @@ import Data.Text.Prettyprint.Doc.Extra (Doc)
 import qualified Data.Text as T (pack, append, concat)
 
 import Control.Arrow (first)
-import Control.Monad.State (State, when, forM, zipWithM)
+import Control.Monad (when, forM, zipWithM)
+import Control.Monad.State (State)
 import Control.Exception (assert)
 
 import qualified Clash.Netlist.Id as Id

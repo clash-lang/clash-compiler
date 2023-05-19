@@ -3,6 +3,7 @@ module I2C.BitMaster.BusCtrl where
 
 import Clash.Prelude
 import Control.Lens
+import Control.Monad
 import Control.Monad.State
 
 import I2C.BitMaster.StateMachine

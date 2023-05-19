@@ -119,12 +119,12 @@ mkKindTyCon name kind
 
 -- | Does the TyCon look like a tuple TyCon
 isTupleTyConLike :: TyConName -> Bool
-isTupleTyConLike nm = tupleName (nameOcc nm)
+isTupleTyConLike nm = tupleName (T.takeWhileEnd (/= '.') (nameOcc nm))
   where
-    tupleName nm'
-      | '(' <- T.head nm'
-      , ')' <- T.last nm'
-      = T.all (== ',') (T.init $ T.tail nm')
+    tupleName nm0
+      | Just ('(', nm1) <- T.uncons nm0
+      , Just (nm2, ')') <- T.unsnoc nm1
+      = T.all (== ',') nm2
     tupleName _ = False
 
 -- | Get the DataCons belonging to a TyCon

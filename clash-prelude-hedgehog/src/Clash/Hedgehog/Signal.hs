@@ -6,6 +6,8 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 Random generation of types from "Clash.Signal.Internal".
 -}
 
+{-# LANGUAGE CPP #-}
+
 module Clash.Hedgehog.Signal
   ( genSignal
   , genActiveEdge
@@ -14,7 +16,9 @@ module Clash.Hedgehog.Signal
   , genResetPolarity
   ) where
 
+#if !MIN_VERSION_base(4,18,0)
 import Control.Applicative (liftA2)
+#endif
 import Hedgehog (MonadGen)
 import qualified Hedgehog.Gen as Gen
 

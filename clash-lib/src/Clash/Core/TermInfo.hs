@@ -6,13 +6,11 @@
 module Clash.Core.TermInfo where
 
 import Data.Maybe (fromMaybe)
-import Data.Text (isInfixOf)
 import GHC.Stack (HasCallStack)
 
 import Clash.Core.HasType
-import Clash.Core.Name
 import Clash.Core.Term
-import Clash.Core.TyCon (tyConDataCons, TyConMap)
+import Clash.Core.TyCon (tyConDataCons, isTupleTyConLike, TyConMap)
 import Clash.Core.Type
 import Clash.Core.Var
 import qualified Clash.Data.UniqMap as UniqMap
@@ -70,7 +68,7 @@ multiPrimInfo tcm primInfo
   | (_primArgs, primResTy) <- splitFunForallTy (primType primInfo)
   , TyConApp tupTcNm tupEls <- tyView primResTy
     -- XXX: Hardcoded for tuples
-  , "GHC.Tuple.(," `isInfixOf` nameOcc tupTcNm
+  , isTupleTyConLike tupTcNm
   , Just tupTc <- UniqMap.lookup tupTcNm tcm
   , [tupDc] <- tyConDataCons tupTc
   = Just $ MultiPrimInfo

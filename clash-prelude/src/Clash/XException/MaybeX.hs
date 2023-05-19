@@ -10,6 +10,7 @@ translated to HDL.
 
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PatternSynonyms #-}
 
@@ -31,7 +32,9 @@ module Clash.XException.MaybeX
 
 import Prelude
 
+#if !MIN_VERSION_base(4,18,0)
 import Control.Applicative
+#endif
 import Control.DeepSeq (NFData)
 import Control.Exception (throw)
 
