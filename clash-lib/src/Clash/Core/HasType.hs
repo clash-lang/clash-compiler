@@ -22,8 +22,6 @@ module Clash.Core.HasType
   , piResultTys
   ) where
 
-import qualified Data.Text as Text (isInfixOf)
-
 #if MIN_VERSION_prettyprinter(1,7,0)
 import Prettyprinter (line)
 #else
@@ -35,11 +33,10 @@ import GHC.Stack (HasCallStack)
 import Clash.Core.DataCon (DataCon(dcType))
 import Clash.Core.HasFreeVars
 import Clash.Core.Literal (Literal(..))
-import Clash.Core.Name (Name(nameOcc))
 import Clash.Core.Pretty
 import Clash.Core.Subst
 import Clash.Core.Term (Term(..), IsMultiPrim(..), PrimInfo(..), collectArgs)
-import Clash.Core.TyCon (TyCon(tyConKind), TyConMap)
+import Clash.Core.TyCon (TyCon(tyConKind), TyConMap, isTupleTyConLike)
 import Clash.Core.Type
 import Clash.Core.TysPrim
 import Clash.Core.Var (Var(varType))
@@ -90,7 +87,7 @@ instance HasType PrimInfo where
       MultiResult
         | let (primArgs, primResTy) = splitFunForallTy (primType pr)
         , TyConApp tupTcNm tupArgs <- tyView primResTy
-        , Text.isInfixOf "GHC.Tuple.(" (nameOcc tupTcNm)
+        , isTupleTyConLike tupTcNm
         -> mkPolyFunTy primResTy (primArgs <> fmap Right tupArgs)
 
         | otherwise
