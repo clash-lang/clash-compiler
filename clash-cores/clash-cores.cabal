@@ -33,6 +33,12 @@ flag haddock
   default: False
   manual: True
 
+flag nix
+  description:
+    Are we building this package from nix
+  default: False
+  manual: True
+
 common basic-config
   default-language: Haskell2010
 
@@ -63,6 +69,22 @@ common basic-config
   if flag(haddock)
     ghc-options:
       -fdefer-type-errors
+  elif flag(nix)
+    -- It's absolutely grimy, but if we don't specify the `-package` flags here
+    -- then when nix eventually calls `./Setup register` on the package it will
+    -- still pass the `-fplugin` options to GHC and fail to create the package
+    -- registation file needed to finish the `installPhase`.
+    --
+    -- These flags are something we NEVER want to manually specify in a normal
+    -- build, since correctly configuring this kind of thing should be solely
+    -- left to cabal as a build tool.
+    ghc-options:
+      -package ghc-typelits-extra
+      -fplugin GHC.TypeLits.Extra.Solver
+      -package ghc-typelits-knownnat
+      -fplugin GHC.TypeLits.Normalise
+      -package ghc-typelits-natnormalise
+      -fplugin GHC.TypeLits.KnownNat.Solver
   else
     ghc-options:
       -fplugin GHC.TypeLits.Extra.Solver
