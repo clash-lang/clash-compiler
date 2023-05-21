@@ -437,7 +437,7 @@ coreToTerm primMap unlocs = term
         go "Clash.Magic.noDeDup" args
           | [_aTy,f] <- args
           = C.Tick C.NoDeDup <$> term f
-        go "Clash.Magic.simulation" _
+        go "Clash.Magic.clashSimulation" _
           = C.Data <$> coreToDataCon falseDataCon
         go "Clash.XException.xToErrorCtx" args
           -- xToErrorCtx :: forall a. String -> a -> a
