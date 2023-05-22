@@ -24,7 +24,7 @@ import GHC.Stack (HasCallStack)
 import Data.Foldable (fold)
 import Data.String.Interpolate (__i)
 import Data.Text.Prettyprint.Doc.Extra (Doc)
-import qualified Data.Text as T (pack, append, concat)
+import qualified Data.Text as T (pack, concat)
 import Text.Show.Pretty (ppShow)
 
 import Control.Arrow (first)
@@ -79,16 +79,27 @@ vioProbeBBF _isD _primName _args _resTys = pure $ Right (bbMeta, bb)
    bb :: BlackBox
    bb = BBFunction (show 'vioProbeTF) 0 vioProbeTF
 
+usedArguments :: [Int]
+usedArguments = (inputNames : outputNames : initOutValues : clock : inputProbes)
+ where
+  (   _knownDomain
+    : _vioConstraint
+    : inputNames
+    : outputNames
+    : initOutValues
+    : clock
+    : inputProbes
+    ) = [0..8096] -- This function is polyvariadic so in theory it supports an
+                  -- unlimited number of arguments. To prevent evaluation loops
+                  -- when forcing this argument to NF we limit it to a modest
+                  -- 8096+1 input ports.
+
+
+
 vioProbeTF :: HasCallStack => TemplateFunction
 vioProbeTF =
   TemplateFunction
-    (
---      0 :       -- KnownDomain dom
---      1 :       -- VIO dom a o
-      2 :       -- initialOutputProbeValues
-      3 :       -- Clock dom
-      [4,5..]   -- input probes
-    )
+    usedArguments
     -- 'validateVioProbeBCC' already produces string describing
     -- failing checks, but 'TemplateFunction' cannot handle this
     -- yet. This is prepared to get updated easily as soon as the
@@ -100,22 +111,40 @@ vioProbeBBTF :: Backend s => BlackBoxContext -> State s Doc
 vioProbeBBTF bbCtx
   | (   _knownDomainDom
       : _vioConstraint
+      : (DSL.getVec -> Just inputNameExprs)
+      : (DSL.getVec -> Just outputNameExprs)
       : _initialOutputProbeValues
       : clk
       : inputProbes
       ) <- map fst $ DSL.tInputs bbCtx
+  , Just inputNames <- mapM (fmap T.pack . DSL.getStr) inputNameExprs
+  , Just outputNames <- mapM (fmap T.pack . DSL.getStr) outputNameExprs
   , [vioProbeName] <- bbQsysIncName bbCtx
   , Right (inTys, outTys) <- probesFromTypes bbCtx
   , [tResult] <- map DSL.ety (DSL.tResults bbCtx)
   = do
+      when (length inTys /= length inputNames) $
+        error [__i|
+          Number of input names did not match number of input probes. Expected
+          #{length inTys} input name(s), got #{length inputNames}. Got input name(s):
+
+            #{ppShow inputNames}
+        |]
+
+      when (length outTys /= length outputNames) $
+        error [__i|
+          Number of output names did not match number of output probes. Expected
+          #{length outTys} output name(s), got #{length outputNames}. Got output name(s):
+
+            #{ppShow outputNames}
+        |]
+
       vioProbeInstName <- Id.makeBasic "vio_inst"
 
       let
         inPs = filter ((> (0 :: Int)) . DSL.tySize . DSL.ety) inputProbes
         inNames = map (T.pack . ("probe_in" <>) . show) [0 :: Int, 1..]
         outNames = map (T.pack . ("probe_out" <>) . show) [0 :: Int, 1..]
-        inBVNames = map (`T.append` "_bv") inNames
-        outBVNames = map (`T.append` "_bv") outNames
         -- The HDL attribute 'KEEP' is added to the signals connected to the
         -- probe ports so they are not optimized away by the synthesis tool.
         attrs = [StringAttr' "KEEP" "true"]
@@ -141,10 +170,10 @@ vioProbeBBTF bbCtx
         outProbes <-
           forM (zip outNames outTys) $ uncurry DSL.declare
         outProbesBV <-
-          forM (zip outBVNames outProbes) $ uncurry (DSL.toBvWithAttrs attrs)
+          forM (zip outputNames outProbes) $ uncurry (DSL.toBvWithAttrs attrs)
 
         inProbesBV <-
-          forM (zip inBVNames inProbes) $ uncurry (DSL.toBvWithAttrs attrs)
+          forM (zip inputNames inProbes) $ uncurry (DSL.toBvWithAttrs attrs)
 
         DSL.instDecl Empty (Id.unsafeMake vioProbeName) vioProbeInstName []
           (("clk", clk) : zip inNames inProbesBV)
@@ -160,13 +189,7 @@ vioProbeBBTF bbCtx
 vioProbeTclTF :: HasCallStack => TemplateFunction
 vioProbeTclTF =
   TemplateFunction
-    (
---      0 :       -- KnownDomain dom
---      1 :       -- VIO dom a o
-      2 :       -- initialOutputProbeValues
-      3 :       -- Clock dom
-      [4,5..]   -- input probes
-    )
+    usedArguments
     -- 'validateVioProbeBCC' already produces string describing
     -- failing checks, but 'TemplateFunction' cannot handle this
     -- yet. This is prepared to get updated easily as soon as the
@@ -182,6 +205,8 @@ vioProbeTclBBTF ::
 vioProbeTclBBTF bbCtx
   | ( _knownDomainDom
     : _vioConstraint
+    : _inputNames
+    : _outputNames
     : initialOutputProbeValues
     : _clk
     : _inputProbes
@@ -276,6 +301,8 @@ probesFromTypes Context{..} = do
   is <- case map (\(_,x,_) -> x) bbInputs of
     (   _knownDomainDom
       : _VIOConstraint
+      : _inputNames
+      : _outputNames
       : _clk
       : _initialOutputProbeValues
       : xs
