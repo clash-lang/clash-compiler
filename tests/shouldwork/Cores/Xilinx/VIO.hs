@@ -6,6 +6,8 @@ import Clash.Annotations.TH
 import Clash.Annotations.BitRepresentation
 import Clash.Explicit.Testbench
 
+import qualified Data.List as L
+
 type Dom = XilinxSystem
 
 top :: "result" ::: Unsigned 8
@@ -17,7 +19,10 @@ makeTopEntity 'top
 noInputTrue ::
   "clk" ::: Clock Dom ->
   "result" ::: Signal Dom Bool
-noInputTrue = vioProbe @Dom True
+noInputTrue = vioProbe @Dom inNames outNames True
+ where
+  inNames = Nil
+  outNames = singleton "probe_out"
 {-# ANN noInputTrue (TestBench 'top) #-}
 
 makeTopEntity 'noInputTrue
@@ -26,7 +31,10 @@ makeTopEntity 'noInputTrue
 noInputFalse ::
   "clk" ::: Clock Dom ->
   "result" ::: Signal Dom Bool
-noInputFalse = vioProbe @Dom False
+noInputFalse = vioProbe @Dom inNames outNames False
+ where
+  inNames = Nil
+  outNames = singleton "probe_out"
 {-# ANN noInputFalse (TestBench 'top) #-}
 
 makeTopEntity 'noInputFalse
@@ -35,7 +43,10 @@ makeTopEntity 'noInputFalse
 noInputLow ::
   "clk" ::: Clock Dom ->
   "result" ::: Signal Dom Bit
-noInputLow = vioProbe @Dom low
+noInputLow = vioProbe @Dom inNames outNames low
+ where
+  inNames = Nil
+  outNames = singleton "probe_out"
 {-# ANN noInputLow (TestBench 'top) #-}
 
 makeTopEntity 'noInputLow
@@ -44,7 +55,10 @@ makeTopEntity 'noInputLow
 noInputHigh ::
   "clk" ::: Clock Dom ->
   "result" ::: Signal Dom Bit
-noInputHigh = vioProbe @Dom high
+noInputHigh = vioProbe @Dom inNames outNames high
+ where
+  inNames = Nil
+  outNames = singleton "probe_out"
 {-# ANN noInputHigh (TestBench 'top) #-}
 
 makeTopEntity 'noInputHigh
@@ -53,7 +67,10 @@ makeTopEntity 'noInputHigh
 noInputSigned ::
   "clk" ::: Clock Dom ->
   "result" ::: Signal Dom (Signed 2)
-noInputSigned = vioProbe @Dom (-1)
+noInputSigned = vioProbe @Dom inNames outNames (-1)
+ where
+  inNames = Nil
+  outNames = singleton "probe_out"
 {-# ANN noInputSigned (TestBench 'top) #-}
 
 makeTopEntity 'noInputSigned
@@ -62,7 +79,10 @@ makeTopEntity 'noInputSigned
 noInputUnsigned ::
   "clk" ::: Clock Dom ->
   "result" ::: Signal Dom (Unsigned 2)
-noInputUnsigned = vioProbe @Dom 3
+noInputUnsigned = vioProbe @Dom inNames outNames 3
+ where
+  inNames = Nil
+  outNames = singleton "probe_out"
 {-# ANN noInputUnsigned (TestBench 'top) #-}
 
 makeTopEntity 'noInputUnsigned
@@ -71,7 +91,10 @@ makeTopEntity 'noInputUnsigned
 noInputBitVector ::
   "clk" ::: Clock Dom ->
   "result" ::: Signal Dom (BitVector 7)
-noInputBitVector = vioProbe @Dom 111
+noInputBitVector = vioProbe @Dom inNames outNames 111
+ where
+  inNames = Nil
+  outNames = singleton "probe_out"
 {-# ANN noInputBitVector (TestBench 'top) #-}
 
 makeTopEntity 'noInputBitVector
@@ -80,7 +103,10 @@ makeTopEntity 'noInputBitVector
 noInputPair ::
   "clk" ::: Clock Dom ->
   "result" ::: Signal Dom (Bit, Bool)
-noInputPair = vioProbe @Dom (high, False)
+noInputPair = vioProbe @Dom inNames outNames (high, False)
+ where
+  inNames = Nil
+  outNames = $(listToVecTH (L.map (("probe_out_" <>) . show) [0,1]))
 {-# ANN noInputPair (TestBench 'top) #-}
 
 makeTopEntity 'noInputPair
@@ -89,7 +115,10 @@ makeTopEntity 'noInputPair
 noInputVec ::
   "clk" ::: Clock Dom ->
   "result" ::: Signal Dom (Vec 4 (Unsigned 2))
-noInputVec = vioProbe @Dom (0 :> 1 :> 2 :> 3 :> Nil)
+noInputVec = vioProbe @Dom inNames outNames (0 :> 1 :> 2 :> 3 :> Nil)
+ where
+  inNames = Nil
+  outNames = $(listToVecTH (L.map (("probe_out_" <>) . show) [0..3]))
 {-# ANN noInputVec (TestBench 'top) #-}
 
 makeTopEntity 'noInputVec
@@ -100,7 +129,10 @@ data D1 = D1 Bool Bit (Unsigned 2)
 noInputCustom ::
   "clk" ::: Clock Dom ->
   "result" ::: Signal Dom D1
-noInputCustom = vioProbe @Dom (D1 True high 1)
+noInputCustom = vioProbe @Dom inNames outNames (D1 True high 1)
+ where
+  inNames = Nil
+  outNames = $(listToVecTH (L.map (("probe_out_" <>) . show) [0..2]))
 {-# ANN noInputCustom (TestBench 'top) #-}
 
 makeTopEntity 'noInputCustom
@@ -111,7 +143,10 @@ data D2 = D2 Bool (Vec 2 D1)
 noInputNested ::
   "clk" ::: Clock Dom ->
   "result" ::: Signal Dom D2
-noInputNested = vioProbe @Dom (D2 True (D1 True high 1 :> D1 False low 0 :> Nil))
+noInputNested = vioProbe @Dom inNames outNames (D2 True (D1 True high 1 :> D1 False low 0 :> Nil))
+ where
+  inNames = Nil
+  outNames = $(listToVecTH (L.map (("probe_out_" <>) . show) [0..1]))
 {-# ANN noInputNested (TestBench 'top) #-}
 
 makeTopEntity 'noInputNested
@@ -138,7 +173,10 @@ singleInputBool ::
   "clk" ::: Clock Dom ->
   "inp" ::: Signal Dom Bool ->
   "result" ::: Signal Dom ()
-singleInputBool = vioProbe @Dom ()
+singleInputBool = vioProbe @Dom inNames outNames ()
+ where
+  inNames = singleton "probe_in"
+  outNames = Nil
 {-# ANN singleInputBool (TestBench 'top) #-}
 
 makeTopEntity 'singleInputBool
@@ -148,7 +186,10 @@ singleInputBit ::
   "clk" ::: Clock Dom ->
   "inp" ::: Signal Dom Bit ->
   "result" ::: Signal Dom ()
-singleInputBit = vioProbe @Dom ()
+singleInputBit = vioProbe @Dom inNames outNames ()
+ where
+  inNames = singleton "probe_in"
+  outNames = Nil
 {-# ANN singleInputBit (TestBench 'top) #-}
 
 makeTopEntity 'singleInputBit
@@ -158,7 +199,10 @@ singleInputSigned ::
   "clk" ::: Clock Dom ->
   "inp" ::: Signal Dom (Signed 2) ->
   "result" ::: Signal Dom ()
-singleInputSigned = vioProbe @Dom ()
+singleInputSigned = vioProbe @Dom inNames outNames ()
+ where
+  inNames = singleton "probe_in"
+  outNames = Nil
 {-# ANN singleInputSigned (TestBench 'top) #-}
 
 makeTopEntity 'singleInputSigned
@@ -168,7 +212,10 @@ singleInputUnsigned ::
   "clk" ::: Clock Dom ->
   "inp" ::: Signal Dom (Unsigned 2) ->
   "result" ::: Signal Dom ()
-singleInputUnsigned = vioProbe @Dom ()
+singleInputUnsigned = vioProbe @Dom inNames outNames ()
+ where
+  inNames = singleton "probe_in"
+  outNames = Nil
 {-# ANN singleInputUnsigned (TestBench 'top) #-}
 
 makeTopEntity 'singleInputUnsigned
@@ -178,7 +225,10 @@ singleInputBitVector ::
   "clk" ::: Clock Dom ->
   "inp" ::: Signal Dom (BitVector 7) ->
   "result" ::: Signal Dom ()
-singleInputBitVector = vioProbe @Dom ()
+singleInputBitVector = vioProbe @Dom inNames outNames ()
+ where
+  inNames = singleton "probe_in"
+  outNames = Nil
 {-# ANN singleInputBitVector (TestBench 'top) #-}
 
 makeTopEntity 'singleInputBitVector
@@ -188,7 +238,10 @@ singleInputPair ::
   "clk" ::: Clock Dom ->
   "inp" ::: Signal Dom (Bit, Bool) ->
   "result" ::: Signal Dom ()
-singleInputPair = vioProbe @Dom ()
+singleInputPair = vioProbe @Dom inNames outNames ()
+ where
+  inNames = $(listToVecTH (L.map (("probe_in_" <>) . show) [0..1]))
+  outNames = Nil
 {-# ANN singleInputPair (TestBench 'top) #-}
 
 makeTopEntity 'singleInputPair
@@ -198,7 +251,10 @@ singleInputVec ::
   "clk" ::: Clock Dom ->
   "result" ::: Signal Dom (Vec 4 (Unsigned 2)) ->
   "result" ::: Signal Dom ()
-singleInputVec = vioProbe @Dom ()
+singleInputVec = vioProbe @Dom inNames outNames ()
+ where
+  inNames = $(listToVecTH (L.map (("probe_in_" <>) . show) [0..3]))
+  outNames = Nil
 {-# ANN singleInputVec (TestBench 'top) #-}
 
 makeTopEntity 'singleInputVec
@@ -208,7 +264,10 @@ singleInputCustom ::
   "clk" ::: Clock Dom ->
   "inp" ::: Signal Dom D1 ->
   "result" ::: Signal Dom ()
-singleInputCustom = vioProbe @Dom ()
+singleInputCustom = vioProbe @Dom inNames outNames ()
+ where
+  inNames = $(listToVecTH (L.map (("probe_in_" <>) . show) [0..2]))
+  outNames = Nil
 {-# ANN singleInputCustom (TestBench 'top) #-}
 
 makeTopEntity 'singleInputCustom
@@ -218,7 +277,10 @@ singleInputNested ::
   "clk" ::: Clock Dom ->
   "inp" ::: Signal Dom D2 ->
   "result" ::: Signal Dom ()
-singleInputNested = vioProbe @Dom ()
+singleInputNested = vioProbe @Dom inNames outNames ()
+ where
+  inNames = $(listToVecTH (L.map (("probe_in_" <>) . show) [0..1]))
+  outNames = Nil
 {-# ANN singleInputNested (TestBench 'top) #-}
 
 makeTopEntity 'singleInputNested
@@ -235,7 +297,10 @@ multipleInputs ::
   "in7" ::: Signal Dom D1 ->
   "in8" ::: Signal Dom (BitVector 7) ->
   "result" ::: Signal Dom (Vec 0 Bool)
-multipleInputs = vioProbe @Dom Nil
+multipleInputs = vioProbe @Dom inNames outNames Nil
+ where
+  inNames = $(listToVecTH (L.map (("probe_in_" <>) . show) [0..7]))
+  outNames = Nil
 {-# ANN multipleInputs (TestBench 'top) #-}
 
 makeTopEntity 'multipleInputs
@@ -260,16 +325,20 @@ inputsAndOutputs ::
                        , D1
                        , BitVector 6
                        )
-inputsAndOutputs = vioProbe @Dom
-  ( low
-  , True
-  , 1
-  , -1
-  , (True, low, False)
-  , 5 :> 3 :> Nil
-  , D1 False high 0
-  , 0b111000
-  )
+inputsAndOutputs = vioProbe @Dom inNames outNames initVals
+ where
+  inNames = $(listToVecTH (L.map (("probe_in_" <>) . show) [0..7]))
+  outNames = $(listToVecTH (L.map (("probe_out_" <>) . show) [0..7]))
+  initVals =
+    ( low
+    , True
+    , 1
+    , -1
+    , (True, low, False)
+    , 5 :> 3 :> Nil
+    , D1 False high 0
+    , 0b111000
+    )
 {-# ANN inputsAndOutputs (TestBench 'top) #-}
 
 makeTopEntity 'inputsAndOutputs

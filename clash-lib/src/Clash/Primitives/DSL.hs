@@ -56,6 +56,7 @@ module Clash.Primitives.DSL
   , tResults
   , getStr
   , getBool
+  , getVec
   , exprToInteger
   , tExprToInteger
   , deconstructProduct
@@ -634,6 +635,17 @@ getStr (TExpr _ e) = exprToString e
 getBool :: TExpr -> Maybe Bool
 getBool (TExpr _ (Literal _ (BoolLit b))) = Just b
 getBool _ = Nothing
+
+-- | Try to get a Vector of expressions.
+getVec :: TExpr -> Maybe [TExpr]
+getVec (TExpr (Void (Just (Vector 0 _) )) _) =
+  pure []
+getVec (TExpr (Vector 1 elementTy) (DataCon _ VecAppend [e])) =
+  pure [TExpr elementTy e]
+getVec (TExpr (Vector n elementTy) (DataCon _ VecAppend [e, es0])) = do
+  es1 <- getVec (TExpr (Vector (n-1) elementTy) es0)
+  pure (TExpr elementTy e:es1)
+getVec _ = Nothing
 
 -- | Try to get the literal nat value of an expression.
 tExprToInteger :: TExpr -> Maybe Integer
