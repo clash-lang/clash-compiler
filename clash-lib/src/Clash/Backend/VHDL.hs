@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021-2022, QBayLogic B.V.
+                     2021-2023, QBayLogic B.V.
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -1298,8 +1298,8 @@ filterTransparent hwty = case hwty of
       (map (second filterTransparent) constrs)
 
   -- Transparent types:
-  Annotated _ elTy -> elTy
-  BiDirectional _ elTy -> elTy
+  Annotated _ elTy -> filterTransparent elTy
+  BiDirectional _ elTy -> filterTransparent elTy
 
   Void {} -> hwty
   KnownDomain {} -> hwty

@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd
                     2017-2018, Google Inc.
-                    2021-2022, QBayLogic B.V.
+                    2021-2023, QBayLogic B.V.
                     2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -729,10 +729,12 @@ termHWTypeM e = do
 
 isBiSignalIn :: HWType -> Bool
 isBiSignalIn (BiDirectional In _) = True
+isBiSignalIn (Annotated _ ty)     = isBiSignalIn ty
 isBiSignalIn _                    = False
 
 isBiSignalOut :: HWType -> Bool
 isBiSignalOut (BiDirectional Out _) = True
+isBiSignalOut (Annotated _ ty)      = isBiSignalOut ty
 isBiSignalOut _                     = False
 
 containsBiSignalIn
@@ -743,6 +745,7 @@ containsBiSignalIn (Product _ _ tys) = any containsBiSignalIn tys
 containsBiSignalIn (SP _ tyss)       = any (any containsBiSignalIn . snd) tyss
 containsBiSignalIn (Vector _ ty)     = containsBiSignalIn ty
 containsBiSignalIn (RTree _ ty)      = containsBiSignalIn ty
+containsBiSignalIn (Annotated _ ty)  = containsBiSignalIn ty
 containsBiSignalIn _                 = False
 
 -- | Uniquely rename all the variables and their references in a normalized

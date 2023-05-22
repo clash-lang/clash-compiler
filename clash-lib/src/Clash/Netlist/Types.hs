@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd,
                     2017-2018, Google Inc.
-                    2020-2022, QBayLogic B.V.
+                    2020-2023, QBayLogic B.V.
                     2022-2023, Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -382,8 +382,11 @@ data Component
 -- | Check if an input port is really an inout port.
 --
 isBiDirectional :: (Identifier, HWType) -> Bool
-isBiDirectional (_, BiDirectional _ _) = True
-isBiDirectional _ = False
+isBiDirectional = go . snd
+  where
+    go BiDirectional{} = True
+    go (Annotated _ hwty) = go hwty
+    go _ = False
 
 -- | Find the name and domain name of each clock argument of a component.
 --
