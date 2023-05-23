@@ -812,24 +812,24 @@ instDecl
   => EntityOrComponent
   -- ^ Type of instantiation
   -> Identifier
-  -- ^ component/entity name
+  -- ^ Component/entity name
   -> Identifier
-  -- ^ instantiation label
+  -- ^ Instantiation label
   -> [(Text, LitHDL)]
-  -- ^ attributes
+  -- ^ Generics / parameters
   -> [(Text, TExpr)]
-  -- ^ in ports
+  -- ^ In ports
   -> [(Text, TExpr)]
-  -- ^ out ports
+  -- ^ Out ports
   -> State (BlockState backend) ()
-instDecl entOrComp compName instLbl attrs inPorts outPorts = do
+instDecl entOrComp compName instLbl params inPorts outPorts = do
 
   inPorts' <- mapM (mkPort In) inPorts
   outPorts' <- mapM (mkPort Out) outPorts
 
   addDeclaration $
     InstDecl
-      entOrComp Nothing [] compName instLbl (mkAttrs attrs)
+      entOrComp Nothing [] compName instLbl (mkParams params)
       (NamedPortMap (inPorts' ++ outPorts'))
     where
     mkPort
@@ -840,10 +840,10 @@ instDecl entOrComp compName instLbl attrs inPorts outPorts = do
       TExpr ty pExpr' <- toIdentifier (nmText <> "_port")  pExpr
       pure (Identifier (Id.unsafeMake nmText) Nothing, inOrOut, ty, pExpr')
 
-    -- Convert a list of name attributes to the form clash wants
-    mkAttrs :: [(Text.Text, LitHDL)] -> [(Expr, HWType, Expr)]
-    mkAttrs = map (\(s, ty) -> ( Identifier (Id.unsafeMake s) Nothing
-                               , hdlTy ty, litExpr ty) )
+    -- Convert a list of name generics / parameters to the form clash wants
+    mkParams :: [(Text.Text, LitHDL)] -> [(Expr, HWType, Expr)]
+    mkParams = map (\(s, ty) -> ( Identifier (Id.unsafeMake s) Nothing
+                                , hdlTy ty, litExpr ty) )
 
     litExpr :: LitHDL -> Expr
     litExpr (B b) = Literal Nothing (BoolLit b)
