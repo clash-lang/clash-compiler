@@ -32,7 +32,7 @@ module Clash.Magic
   , noDeDup
 
   -- ** Utilities to differentiate between simulation and generating HDL
-  , simulation
+  , clashSimulation
   , SimOnly (..)
   ) where
 
@@ -239,10 +239,10 @@ noDeDup
 noDeDup = id
 {-# NOINLINE noDeDup #-}
 
--- | 'True' in Haskell simulation. Replaced by 'False' when generating HDL.
-simulation :: Bool
-simulation = True
-{-# NOINLINE simulation #-}
+-- | 'True' in Haskell/Clash simulation. Replaced by 'False' when generating HDL.
+clashSimulation :: Bool
+clashSimulation = True
+{-# NOINLINE clashSimulation #-}
 
 -- | A container for data you only want to have around during simulation and
 -- is ignored during synthesis. Useful for carrying around things such as:

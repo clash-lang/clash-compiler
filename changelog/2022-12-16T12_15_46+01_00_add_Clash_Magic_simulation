@@ -1,1 +1,1 @@
-ADDED: `Clash.Magic.simulation`, a way to differentiate between simulation and generating HDL.
+ADDED: `Clash.Magic.clashSimulation`, a way to differentiate between Clash simulation and generating HDL.

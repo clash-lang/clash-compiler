@@ -6,11 +6,11 @@ import System.Environment (getArgs)
 import System.FilePath ((</>))
 
 import Clash.Prelude
-import Clash.Magic (simulation)
+import Clash.Magic (clashSimulation)
 
 f :: Int
-f | simulation = 123
-  | otherwise  = 456
+f | clashSimulation = 123
+  | otherwise       = 456
 {-# ANN f (defSyn "f") #-}
 
 assertNotIn :: String -> String -> IO ()
