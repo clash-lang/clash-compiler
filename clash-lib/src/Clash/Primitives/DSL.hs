@@ -84,9 +84,10 @@ module Clash.Primitives.DSL
   , open
 
   -- ** Utilities
+  , clog2
+  , litTExpr
   , toIdentifier
   , tySize
-  , clog2
   ) where
 
 import           Control.Lens                    hiding (Indexed, assign)
@@ -805,33 +806,44 @@ compInBlock compName inPorts0 outPorts0 =
   inPorts1 = mkPort In <$> inPorts0
   outPorts1 = mkPort Out <$> outPorts0
 
--- | Instantiate a component/entity in a block state.
+-- | Convert a 'LitHDL' to a 'TExpr'
+--
+-- __N.B.__: Clash 1.6 changed 'instDecl'\'s type signature. Where it would
+--           previously accept 'LitHDL' in its generics/parameters argument, it
+--           now accepts a 'TExpr'. This function is mostly there to ease this
+--           transition.
+litTExpr :: LitHDL -> TExpr
+litTExpr (B b) = TExpr Bool    (Literal Nothing (BoolLit b))
+litTExpr (S s) = TExpr String  (Literal Nothing (StringLit s))
+litTExpr (I i) = TExpr Integer (Literal Nothing (NumLit i))
+
+-- | Instantiate a component/entity in a block state
 instDecl
   :: forall backend
    . Backend backend
   => EntityOrComponent
   -- ^ Type of instantiation
   -> Identifier
-  -- ^ component/entity name
+  -- ^ Component/entity name
   -> Identifier
-  -- ^ instantiation label
-  -> [(Text, LitHDL)]
-  -- ^ attributes
+  -- ^ Instantiation label
   -> [(Text, TExpr)]
-  -- ^ in ports
+  -- ^ Generics / parameters
   -> [(Text, TExpr)]
-  -- ^ out ports
+  -- ^ In ports
+  -> [(Text, TExpr)]
+  -- ^ Out ports
   -> State (BlockState backend) ()
-instDecl entOrComp compName instLbl attrs inPorts outPorts = do
+instDecl entOrComp compName instLbl params inPorts outPorts = do
 
   inPorts' <- mapM (mkPort In) inPorts
   outPorts' <- mapM (mkPort Out) outPorts
 
   addDeclaration $
     InstDecl
-      entOrComp Nothing [] compName instLbl (mkAttrs attrs)
+      entOrComp Nothing [] compName instLbl (mkParams params)
       (NamedPortMap (inPorts' ++ outPorts'))
-    where
+   where
     mkPort
       :: PortDirection
       -> (Text, TExpr)
@@ -840,21 +852,12 @@ instDecl entOrComp compName instLbl attrs inPorts outPorts = do
       TExpr ty pExpr' <- toIdentifier (nmText <> "_port")  pExpr
       pure (Identifier (Id.unsafeMake nmText) Nothing, inOrOut, ty, pExpr')
 
-    -- Convert a list of name attributes to the form clash wants
-    mkAttrs :: [(Text.Text, LitHDL)] -> [(Expr, HWType, Expr)]
-    mkAttrs = map (\(s, ty) -> ( Identifier (Id.unsafeMake s) Nothing
-                               , hdlTy ty, litExpr ty) )
-
-    litExpr :: LitHDL -> Expr
-    litExpr (B b) = Literal Nothing (BoolLit b)
-    litExpr (S s) = Literal Nothing (StringLit s)
-    litExpr (I i) = Literal Nothing (NumLit i)
-
-    hdlTy :: LitHDL -> HWType
-    hdlTy = \case
-      B{} -> Bool
-      S{} -> String
-      I{} -> Integer
+    -- Convert a list of name generics / parameters to the form clash wants
+    mkParams :: [(Text.Text, TExpr)] -> [(Expr, HWType, Expr)]
+    mkParams = map $ \(paramName, texpr) ->
+      ( Identifier (Id.unsafeMake paramName) Nothing
+      , ety texpr
+      , eex texpr )
 
 -- | Wires the two given `TExpr`s together using a newly declared
 -- signal with (exactly) the given name `sigNm`. The new signal has an

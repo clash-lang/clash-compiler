@@ -25,6 +25,7 @@ import Clash.Promoted.Nat (snatToNum)
 import Clash.Signal.Internal (Signal((:-)))
 
 import Control.Monad.State (State)
+import Data.Bifunctor (second)
 import Data.List.Infinite (Infinite(..), (...))
 import Data.String.Interpolate (__i)
 import Data.Text (Text)
@@ -117,7 +118,7 @@ xpmCdcGrayTF# bbCtx
         N.Empty
         (Id.unsafeMake compName)
         instName
-        generics
+        (map (second DSL.litTExpr) generics)
         inps
         outs
 

@@ -14,6 +14,7 @@ module Clash.Cores.Xilinx.Xpm.Cdc.Single.Internal where
 import Prelude
 
 import Control.Monad.State (State)
+import Data.Bifunctor (second)
 import Data.List.Infinite (Infinite(..), (...))
 import Data.String.Interpolate (__i)
 import Data.Text (Text)
@@ -111,7 +112,7 @@ xpmCdcSingleTF# bbCtx
         N.Empty
         (Id.unsafeMake compName)
         instName
-        generics
+        (map (second DSL.litTExpr) generics)
         inps
         outs
 
