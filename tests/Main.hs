@@ -886,6 +886,7 @@ runClashTest = defaultMain $ clashTestRoot
           [ runTest "Counter" def
           , runTest "CounterHalfTuple" def
           , runTest "CounterHalfTupleRev" def
+          , outputTest "T2472" def{hdlTargets=[VHDL]}
           ]
         , runTest "T1007" def{hdlSim=[]}
         ]

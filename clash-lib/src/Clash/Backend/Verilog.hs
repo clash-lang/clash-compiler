@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021-2022, QBayLogic B.V.
+                     2021-2023, QBayLogic B.V.
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -372,6 +372,7 @@ verilogType t = case t of
   Bool     -> emptyDoc
   FileType -> emptyDoc
   Annotated _ ty -> verilogType ty
+  BiDirectional _ ty -> verilogType ty
   _        -> brackets (int (typeSize t -1) <> colon <> int 0)
 
 sigDecl :: VerilogM Doc -> HWType -> VerilogM Doc
