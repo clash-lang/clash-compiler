@@ -1,0 +1,1 @@
+CHANGED: `Clash.Primitives.DSL.instDecl` now accepts `TExpr`s instead of `LitHDL`s as generics/parameters. This allows for VHDL black boxes to use all possible generic types. To ease transition, `litTExpr` has been added to `Clash.Primitives.DSL`. [#2471](https://github.com/clash-lang/clash-compiler/issues/2471)
