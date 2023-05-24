@@ -20,5 +20,5 @@ extra-deps:
  - prettyprinter-interp-0.2.0.0@sha256:45299b61bd6c27d594c1a72b5a8dd5734e791a59828725e4f4e420f3cc37232b,2016
  - infinite-list-0.1@sha256:4de250517ce75e128c766fbc1f23b5a778ea964e695e47f8e83e0f3b293091bf,2383
  - hashable-1.4.1.0
- - git: https://github.com/haskell-hint/hint.git
-   commit: b2bc76a748819713df534e6e3c376dbe27cc60ce
+ - git: https://github.com/christiaanb/hint.git
+   commit: 7803c34c8ae1d83c0f7c13fe6b30fcb3abd0ac51
