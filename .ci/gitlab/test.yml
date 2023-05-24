@@ -5,8 +5,17 @@ stages:
   - build
   - test
 
+.nightly-rules:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"  # When schedueled (at night)
+    - if: $CI_PIPELINE_SOURCE == "trigger"   # When triggered (manual triggers)
+    - if: '$CI_COMMIT_TAG != null'           # When tags are set (releases)
+    - if: '$RUN_TESTS == "always"'           # When test matrix indicates it should always run
+
 .test-nocache:
-  extends: .common
+  extends:
+    - .common
+    - .nightly-rules
   needs: ["build"]
   stage: test
   cache:
@@ -28,7 +37,9 @@ stages:
   after_script:
 
 .test-cache-local:
-  extends: .common-local
+  extends:
+    - .common-local
+    - .nightly-rules
   needs: ["build"]
   stage: test
   before_script:
@@ -141,7 +152,9 @@ suite:cores:
     - vivado-2022.1-standard
 
 ffi:example:
-  extends: .common-local
+  extends:
+    - .common-local
+    - .nightly-rules
   stage: test
   needs: []
   before_script:

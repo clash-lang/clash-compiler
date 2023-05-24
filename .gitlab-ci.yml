@@ -32,11 +32,22 @@ tests:
     strategy: depend
   parallel:
     matrix:
-      - GHC_VERSION: [8.8.4, 8.10.7, 9.2.5, 9.4.3, 9.6.1]
+      - GHC_VERSION: 9.6.1
+        RUN_TESTS: "always"
+
+      - GHC_VERSION: [9.4.3, 9.2.5, 8.10.7]
+        RUN_TESTS: "nightly"
+
       - GHC_VERSION: 9.0.2
         WORKAROUND_GHC_MMAP_CRASH: "yes"
+        RUN_TESTS: "always"
+
+      - GHC_VERSION: 8.8.4
+        RUN_TESTS: "nightly"
+
       - GHC_VERSION: 8.6.5
         MULTIPLE_HIDDEN: "no"
+        RUN_TESTS: "always"
 
 stack-build:
   extends: .common-local
