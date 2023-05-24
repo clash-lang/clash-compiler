@@ -21,9 +21,9 @@
       ~GENSYM[~COMPNAME_IDDR][0] : block
         signal ~GENSYM[dataout_l][1] : ~TYP[7];
         signal ~GENSYM[dataout_h][2] : ~TYP[7];
-        signal ~GENSYM[d][3]         : ~TYP[7];~IF ~ISACTIVEENABLE[4] ~THEN
+        signal ~GENSYM[d][3]         : ~TYP[7];~IF ~ISACTIVEENABLE[6] ~THEN
         signal ~GENSYM[ce_logic][4]: std_logic;~ELSE ~FI
-      begin~IF ~ISACTIVEENABLE[4] ~THEN
+      begin~IF ~ISACTIVEENABLE[6] ~THEN
         ~SYM[4] <= '1' when (~ARG[6]) else '0';~ELSE ~FI
         ~SYM[3] <= ~ARG[7];
 
