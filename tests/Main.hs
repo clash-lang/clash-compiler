@@ -510,13 +510,13 @@ runClashTest = defaultMain $ clashTestRoot
               }
           , runTest "XpmCdcGray" $ def
               { hdlTargets=[VHDL, Verilog]
-              , hdlLoad=[]
+              , hdlLoad=[Vivado]
               , hdlSim=[Vivado]
-              , buildTargets=BuildSpecific ["tb" <> show n | n <- [(1::Int)..7]]
+              , buildTargets=BuildSpecific ["tb" <> show n | n <- [(0::Int)..7]]
               }
           , runTest "XpmCdcHandshake" $ def
               { hdlTargets=[VHDL, Verilog]
-              , hdlLoad=[]
+              , hdlLoad=[Vivado]
               , hdlSim=[Vivado]
               , buildTargets=BuildSpecific ["tb" <> show n | n <- [(0::Int)..6]]
               }
@@ -529,12 +529,12 @@ runClashTest = defaultMain $ clashTestRoot
           , clashTestGroup "DcFifo"
             [ let _opts =
                     def{ hdlTargets=[VHDL, Verilog]
-                       , hdlLoad=[]
+                       , hdlLoad=[Vivado]
                        , hdlSim=[Vivado]
                        }
               in runTest "Basic" _opts
             , let _opts = def{ hdlTargets=[VHDL, Verilog]
-                             , hdlLoad=[]
+                             , hdlLoad=[Vivado]
                              , hdlSim=[Vivado]
                              , buildTargets=BuildSpecific [ "testBench_17_2"
                                                           , "testBench_2_17"
