@@ -163,16 +163,31 @@
         # These packages need no extra configuration other than that already
         # provided by cabal2nix.
         inherit
-          clash-benchmark
           clash-cores
           clash-ffi
-          clash-ghc
           clash-lib
           clash-lib-hedgehog
           clash-prelude
           clash-prelude-hedgehog
           clash-profiling
           clash-term;
+
+        clash-benchmark =
+          clash-benchmark.overrideAttrs(old: {
+            buildInputs = (old.buildInputs or []) ++ [
+              pkgs.makeWrapper
+            ];
+
+            postInstall = (old.postInstall or "") + ''
+              wrapProgram $out/bin/clash-benchmark-concurrency \
+                --prefix PATH : ${dirOf "${old.passthru.env.NIX_GHC}"} \
+                --set GHC_PACKAGE_PATH "${old.passthru.env.NIX_GHC_LIBDIR}/package.conf.d:"
+
+              wrapProgram $out/bin/clash-benchmark-normalization \
+                --prefix PATH : ${dirOf "${old.passthru.env.NIX_GHC}"} \
+                --set GHC_PACKAGE_PATH "${old.passthru.env.NIX_GHC_LIBDIR}/package.conf.d:"
+            '';
+          });
 
         # We need to include iverilog in the build environment for clash-cosim,
         # since it checks the executable is in scope in its Setup.hs.
@@ -182,6 +197,13 @@
               pkgs.verilog
             ];
           });
+
+        # The performance of clash-ghc when linked statically is abysmally
+        # worse than dynamically. On my machine, building `examples/ALU.hs` in
+        # `clash-testsuite` is around 60s when static and under a second when
+        # dynamic..
+        clash-ghc =
+          pkgs.haskell.lib.enableSharedExecutables clash-ghc;
 
         # We need to override the environment of clash-profiling-prepare to
         # include the GHC and packages from the build environment, otherwise
@@ -226,8 +248,9 @@
                   pkgs.verilog
                   pkgs.yosys
                 ]} \
-                --prefix LD_LIBRARY_PATH ${pkgs.lib.makeLibraryPath [
-                  pkgs.zlib
+                --set LIBRARY_PATH ${pkgs.lib.makeLibraryPath [
+                  pkgs.ghdl-llvm
+                  pkgs.zlib.static
                 ]}
             '';
           });
@@ -322,6 +345,9 @@
                 clash-testsuite.env
               ];
 
+            # As well as the dependencies needed to build all packages, we
+            # provide common tooling that might be wanted while developing
+            # the clash compiler.
             buildInputs = [
               ghcPkgs.cabal-install
               ghcPkgs.haskell-language-server

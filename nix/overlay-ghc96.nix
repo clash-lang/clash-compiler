@@ -51,8 +51,8 @@ in {
         pkgs.fetchFromGitHub {
           owner = "haskell-hint";
           repo = "hint";
-          rev = "710745eafa6bb8d531f2dfdbc07c50c9b776f0b2";
-          hash = "sha256-XPaVzI1+vRDWEZ3mzQhvhC5mObI5f1uWzlfoRkkTAjE=";
+          rev = "7803c34c8ae1d83c0f7c13fe6b30fcb3abd0ac51";
+          hash = "sha256-ZFusrioxjDmWnDktD1evu7EjPG6brYpmmcaE2NWQKGA=";
         };
     });
 
