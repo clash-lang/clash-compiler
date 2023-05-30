@@ -1,5 +1,5 @@
 {-|
-Copyright  :  (C) 2022, Google Inc,
+Copyright  :  (C) 2022-2023, Google Inc,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -75,7 +75,7 @@ instance VIO dom a o => VIO dom (Signal dom i -> a) o where
 --
 -- @
 -- someProbe :: 'KnownDomain' dom => 'Clock' dom -> 'Signal' dom 'Bit' -> 'Signal' dom ('Unsigned' 8) -> 'Signal' dom ('Bool', 'Maybe' ('Signed' 8))
--- someProbe = 'vioProbe' ('False', 'Nothing')
+-- someProbe = 'vioProbe' ("in_b" :> "in_u8" :> Nil) ("out_b" :> "out_mu8" :> Nil) ('False', 'Nothing')
 -- @
 --
 -- Creates VIO IP with two input probes of bit widths 1 and 8,
@@ -84,7 +84,7 @@ instance VIO dom a o => VIO dom (Signal dom i -> a) o where
 --
 -- @
 -- otherProbe :: 'KnownDomain' dom => 'Clock' dom -> 'Signal' dom ('Unsigned' 4, 'Unsigned' 2, 'Bit') -> 'Signal' dom ('Vec' 3 'Bit')
--- otherProbe = 'vioProbe' ('repeat' 'high')
+-- otherProbe = 'vioProbe' ("in_u4" :> "in_u2" :> "in_b" :> Nil) ("out_b1" :> "out_b2" :> "out_b3" :> Nil) ('repeat' 'high')
 -- @
 --
 -- Creates VIO IP with three input probes of bit widths 4, 2, and 1,
@@ -95,8 +95,15 @@ instance VIO dom a o => VIO dom (Signal dom i -> a) o where
 -- away, especially if the VIO is only used to monitor some inputs and
 -- produces no output. Utilizing 'Clash.XException.hwSeqX' may be helpful
 -- in this case to enforce the VIO to be rendered in HDL.
-vioProbe :: forall dom a o. (KnownDomain dom, VIO dom a o) => o -> Clock dom -> a
-vioProbe !_initialOutputProbeValues !_clk = vioX @dom @a @o
+vioProbe ::
+  forall dom a o n m.
+  (KnownDomain dom, VIO dom a o) =>
+  Vec n String ->
+  Vec m String ->
+  o ->
+  Clock dom ->
+  a
+vioProbe !_inputNames !_outputNames !_initialOutputProbeValues !_clk = vioX @dom @a @o
 {-# NOINLINE vioProbe #-}
 {-# ANN vioProbe (
     let primName = 'vioProbe
