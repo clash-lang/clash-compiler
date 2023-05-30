@@ -358,7 +358,8 @@ Library
                       transformers              >= 0.5.2.0 && < 0.7,
                       type-errors               >= 0.2.0.0 && < 0.3,
                       uniplate                  >= 1.6.12  && < 1.7,
-                      vector                    >= 0.11    && < 1.0
+                      vector                    >= 0.11    && < 1.0,
+                      mtl                       >= 2.0     && < 3.0
 
   if impl(ghc >= 9.0.0)
     Build-Depends:    ghc-bignum                >= 1.0      && < 1.4
