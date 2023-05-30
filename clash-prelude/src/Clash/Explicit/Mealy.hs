@@ -19,6 +19,7 @@
 module Clash.Explicit.Mealy
   ( -- * Mealy machines with explicit clock and reset ports
     mealy
+  , mealyS
   , mealyB
   )
 where
@@ -27,10 +28,15 @@ import           Clash.Explicit.Signal
   (KnownDomain, Bundle (..), Clock, Reset, Signal, Enable, register)
 import           Clash.XException      (NFDataX)
 
+import           Control.Monad.State.Strict
+  (State, runState)
+
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
->>> import Clash.Explicit.Prelude
+>>> import Clash.Explicit.Prelude as C
 >>> import qualified Data.List as L
+>>> import Control.Lens (Lens', (%=), (-=), uses, use)
+>>> import Control.Monad.State.Strict (State)
 >>> :{
 let macT s (x,y) = (s',s)
       where
@@ -38,6 +44,40 @@ let macT s (x,y) = (s',s)
 :}
 
 >>> let mac clk rst en = mealy clk rst en macT 0
+>>> data DelayState = DelayState { _delayed :: Vec 4 Int , _untilValid :: Index 4 }
+>>> :{
+let delayed :: Lens' DelayState (Vec 4 Int)
+    delayed f = \(DelayState d u) -> (`DelayState` u) <$> f d
+    untilValid :: Lens' DelayState (Index 4)
+    untilValid f = \(DelayState d u) -> (DelayState d) <$> f u
+    initialDelayState = DelayState (C.repeat 0) maxBound
+:}
+>>> :{
+  let delayTop :: Clock System -> Reset System -> Enable System -> (Signal System Int -> Signal System (Maybe Int))
+      topDelay = P.undefined
+:}
+>>> let hello = "hello"
+>>> :{
+let delayS :: Int -> State DelayState (Maybe Int)
+    delayS n = do
+      _remaining <- use untilValid
+      return Nothing
+:}
+-}
+{-
+      -- if remaining > 0
+      -- then do
+      --   untilValid -= 1
+      --   delayed   %= (n +>>)
+      --   return Nothing
+      -- else do
+      --   out     <- uses delayed C.last
+      --   delayed %= (n +>>)
+      --   return (Just out)
+>>> :{
+  let delayTop :: Clock System -> Reset System -> Enable System -> (Signal System Int -> Signal System (Maybe Int))
+      delayTop clk rst en = mealyS clk rst en delayS initialDelayState
+:}
 -}
 
 -- | Create a synchronous function from a combinational function describing
@@ -105,6 +145,65 @@ mealy clk rst en f iS =
             s      = register clk rst en iS s'
         in  o
 {-# INLINABLE mealy #-}
+
+-- | Create a synchronous function from a combinational function describing
+-- a mealy machine using the state monad. This can be particularly useful
+-- when combined with lenses or optics to replicate imperative algorithms.
+--
+-- @
+-- data DelayState = DelayState
+--   { _delayed    :: Vec 4 Int
+--   , _untilValid :: Index 4
+--   }
+-- makeLenses 'DelayedState
+--
+-- initialDelayState = DelayState (repeat 0) maxBound
+--
+-- delayS :: Int -> State DelayState (Maybe Int)
+-- delayS n = do
+--   remaining <- get untilValid
+--   if remaining > 0
+--   then do
+--      remaining -= 1
+--      delayed   %= (n +>>)
+--      return Nothing
+--    else do
+--      out     <- uses delayed last
+--      delayed %= (n +>>)
+--      return (Just out)
+--
+-- delayTop ::'KnownDomain' dom
+--   => 'Clock' dom
+--   -> 'Reset' dom
+--   -> 'Enable' dom
+--   -> ('Signal' dom Int -> 'Signal' dom (Maybe Int))
+-- delayTop clk rst en = 'mealyS' clk rst en delayS initialDelayState
+-- @
+--
+-- >>> simulate (delayTop systemClockGen systemResetGen enableGen) [1,2,3,4,5,6,7,8]
+-- [Nothing, Nothing, Nothing, Nothing, Just 1, Just 2,...
+-- ...
+--
+mealyS
+  :: ( KnownDomain dom
+     , NFDataX s )
+  => Clock dom
+  -- ^ 'Clock' to synchronize to
+  -> Reset dom
+  -> Enable dom
+  -- ^ Global enable
+  -> (i -> State s o)
+  -- ^ Transfer function in mealy machine handling inputs using @Control.Monad.Strict.State s@.
+  -> s
+  -- ^ Initial state
+  -> (Signal dom i -> Signal dom o)
+  -- ^ Synchronous sequential function with input and output matching that
+  -- of the mealy machine
+mealyS clk rst en f iS =
+  \i -> let (o,s') = unbundle $ (runState . f) <$> i <*> s
+            s      = register clk rst en iS s'
+        in o
+{-# INLINABLE mealyS #-}
 
 -- | A version of 'mealy' that does automatic 'Bundle'ing
 --
