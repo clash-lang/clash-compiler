@@ -539,9 +539,31 @@ runClashTest = defaultMain $ clashTestRoot
             ]
           , let _opts =
                   def{ hdlTargets=[VHDL, Verilog, SystemVerilog]
-                     , hdlLoad=[]
-                     , hdlSim=[]
-                     , buildTargets = BuildSpecific []
+                     , hdlLoad=[Vivado]
+                     , hdlSim=[Vivado]
+                     , buildTargets=BuildSpecific [ "noInputTrue"
+                                                  , "noInputFalse"
+                                                  , "noInputLow"
+                                                  , "noInputHigh"
+                                                  , "noInputSigned"
+                                                  , "noInputUnsigned"
+                                                  , "noInputBitVector"
+                                                  , "noInputPair"
+                                                  , "noInputVec"
+                                                  , "noInputCustom"
+                                                  , "noInputNested"
+                                                  , "singleInputBool"
+                                                  , "singleInputBit"
+                                                  , "singleInputSigned"
+                                                  , "singleInputUnsigned"
+                                                  , "singleInputBitVector"
+                                                  , "singleInputPair"
+                                                  , "singleInputVec"
+                                                  , "singleInputCustom"
+                                                  , "singleInputNested"
+                                                  , "multipleInputs"
+                                                  , "inputsAndOutputs"
+                                                  ]
                      }
             in runTest "VIO" _opts
           ]

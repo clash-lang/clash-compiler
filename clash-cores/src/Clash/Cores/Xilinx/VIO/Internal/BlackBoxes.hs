@@ -1,5 +1,5 @@
 {-|
-  Copyright   :  (C) 2022 Google Inc
+  Copyright   :  (C) 2022-2023, Google Inc
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -25,6 +25,7 @@ import Data.Foldable (fold)
 import Data.String.Interpolate (__i)
 import Data.Text.Prettyprint.Doc.Extra (Doc)
 import qualified Data.Text as T (pack, append, concat)
+import Text.Show.Pretty (ppShow)
 
 import Control.Arrow (first)
 import Control.Monad (when, forM, zipWithM)
@@ -34,6 +35,7 @@ import Control.Exception (assert)
 import qualified Clash.Netlist.Id as Id
 import qualified Clash.Primitives.DSL as DSL
 import Clash.Backend (Backend)
+import Clash.Core.Var (Attr' (StringAttr'))
 import Clash.Netlist.Expr (bits, fromBits)
 import Clash.Netlist.Types
   ( Size
@@ -114,26 +116,35 @@ vioProbeBBTF bbCtx
         outNames = map (T.pack . ("probe_out" <>) . show) [0 :: Int, 1..]
         inBVNames = map (`T.append` "_bv") inNames
         outBVNames = map (`T.append` "_bv") outNames
+        -- The HDL attribute 'KEEP' is added to the signals connected to the
+        -- probe ports so they are not optimized away by the synthesis tool.
+        attrs = [StringAttr' "KEEP" "true"]
+
+        inBVs = map (BitVector . (fromInteger . DSL.tySize)) inTys
+        outBVs = map (BitVector . (fromInteger . DSL.tySize)) outTys
 
       DSL.declarationReturn bbCtx "vio_inst_block" $ do
-        DSL.compInBlock vioProbeName (("clk", Bit) : zip inNames inTys)
+        DSL.compInBlock vioProbeName (("clk", Bit) : zip inNames inBVs)
           $ case tResult of
               Void{} -> []
-              _      -> [("out_probes", tResult)]
+              _      -> zip outNames outBVs
 
-        inProbesBV <- case inPs of
-          [ singleInput ] -> case DSL.ety singleInput of
-            Vector{}  -> DSL.unvec "vec" singleInput
-            Product{} -> DSL.deconstructProduct singleInput inBVNames
-            _         -> pure <$> DSL.toBV (head inBVNames) singleInput
-          _ -> zipWithM DSL.toBV inBVNames inPs
+        inProbes <-
+          case inPs of
+            [ singleInput ] ->
+              case DSL.ety singleInput of
+                Vector{}  -> DSL.unvec "vec" singleInput
+                Product{} -> DSL.deconstructProduct singleInput inNames
+                _         -> pure <$> DSL.assign (head inNames) singleInput
+            _ -> zipWithM DSL.assign inNames inPs
 
-        outProbesBV <-
-          forM (zip outBVNames outTys) $ \(name, ty) ->
-            DSL.declare name $ BitVector $ fromInteger $ DSL.tySize ty
         outProbes <-
-          forM (zip (zip outNames outTys) outProbesBV)
-            $ uncurry $ uncurry DSL.fromBV
+          forM (zip outNames outTys) $ uncurry DSL.declare
+        outProbesBV <-
+          forM (zip outBVNames outProbes) $ uncurry (DSL.toBvWithAttrs attrs)
+
+        inProbesBV <-
+          forM (zip inBVNames inProbes) $ uncurry (DSL.toBvWithAttrs attrs)
 
         DSL.instDecl Empty (Id.unsafeMake vioProbeName) vioProbeInstName []
           (("clk", clk) : zip inNames inProbesBV)
@@ -223,11 +234,11 @@ constantProbeValues ty expr = case bits (DSL.tySize ty) expr of
     Clash failed to determine a constant value for one of the expressions
     given as the inital output probe values. The failing expression is:
 
-      #{show failedExpr}
+      #{ppShow failedExpr}
 
     The complete expression is:
 
-      #{show expr}
+      #{ppShow expr}
 
     As a quick fix: it may help to leverage the template haskell function
     $(lift ...) to get rid of this error message.

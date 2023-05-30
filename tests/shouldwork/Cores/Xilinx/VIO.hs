@@ -4,99 +4,117 @@ import Clash.Prelude
 import Clash.Cores.Xilinx.VIO
 import Clash.Annotations.TH
 import Clash.Annotations.BitRepresentation
+import Clash.Explicit.Testbench
 
 type Dom = XilinxSystem
 
+top :: "result" ::: Unsigned 8
+top = 0
+{-# NOINLINE top #-}
+
+makeTopEntity 'top
+
 noInputTrue ::
   "clk" ::: Clock Dom ->
-  "out" ::: Signal Dom Bool
+  "result" ::: Signal Dom Bool
 noInputTrue = vioProbe @Dom True
+{-# ANN noInputTrue (TestBench 'top) #-}
 
-makeTopEntityWithName 'noInputTrue ""
+makeTopEntity 'noInputTrue
 
 
 noInputFalse ::
   "clk" ::: Clock Dom ->
-  "out" ::: Signal Dom Bool
+  "result" ::: Signal Dom Bool
 noInputFalse = vioProbe @Dom False
+{-# ANN noInputFalse (TestBench 'top) #-}
 
-makeTopEntityWithName 'noInputFalse ""
+makeTopEntity 'noInputFalse
 
 
 noInputLow ::
   "clk" ::: Clock Dom ->
-  "out" ::: Signal Dom Bit
+  "result" ::: Signal Dom Bit
 noInputLow = vioProbe @Dom low
+{-# ANN noInputLow (TestBench 'top) #-}
 
-makeTopEntityWithName 'noInputLow ""
+makeTopEntity 'noInputLow
 
 
 noInputHigh ::
   "clk" ::: Clock Dom ->
-  "out" ::: Signal Dom Bit
+  "result" ::: Signal Dom Bit
 noInputHigh = vioProbe @Dom high
+{-# ANN noInputHigh (TestBench 'top) #-}
 
-makeTopEntityWithName 'noInputHigh ""
+makeTopEntity 'noInputHigh
 
 
 noInputSigned ::
   "clk" ::: Clock Dom ->
-  "out" ::: Signal Dom (Signed 2)
+  "result" ::: Signal Dom (Signed 2)
 noInputSigned = vioProbe @Dom (-1)
+{-# ANN noInputSigned (TestBench 'top) #-}
 
-makeTopEntityWithName 'noInputSigned ""
+makeTopEntity 'noInputSigned
 
 
 noInputUnsigned ::
   "clk" ::: Clock Dom ->
-  "out" ::: Signal Dom (Unsigned 2)
+  "result" ::: Signal Dom (Unsigned 2)
 noInputUnsigned = vioProbe @Dom 3
+{-# ANN noInputUnsigned (TestBench 'top) #-}
 
-makeTopEntityWithName 'noInputUnsigned ""
+makeTopEntity 'noInputUnsigned
 
 
 noInputBitVector ::
   "clk" ::: Clock Dom ->
-  "out" ::: Signal Dom (BitVector 7)
+  "result" ::: Signal Dom (BitVector 7)
 noInputBitVector = vioProbe @Dom 111
+{-# ANN noInputBitVector (TestBench 'top) #-}
 
-makeTopEntityWithName 'noInputBitVector ""
+makeTopEntity 'noInputBitVector
 
 
 noInputPair ::
   "clk" ::: Clock Dom ->
-  "out" ::: Signal Dom (Bit, Bool)
+  "result" ::: Signal Dom (Bit, Bool)
 noInputPair = vioProbe @Dom (high, False)
+{-# ANN noInputPair (TestBench 'top) #-}
 
-makeTopEntityWithName 'noInputPair ""
+makeTopEntity 'noInputPair
 
 
 noInputVec ::
   "clk" ::: Clock Dom ->
-  "out" ::: Signal Dom (Vec 4 (Unsigned 2))
+  "result" ::: Signal Dom (Vec 4 (Unsigned 2))
 noInputVec = vioProbe @Dom (0 :> 1 :> 2 :> 3 :> Nil)
+{-# ANN noInputVec (TestBench 'top) #-}
 
-makeTopEntityWithName 'noInputVec ""
+makeTopEntity 'noInputVec
 
 
 data D1 = D1 Bool Bit (Unsigned 2)
 
 noInputCustom ::
   "clk" ::: Clock Dom ->
-  "out" ::: Signal Dom D1
+  "result" ::: Signal Dom D1
 noInputCustom = vioProbe @Dom (D1 True high 1)
+{-# ANN noInputCustom (TestBench 'top) #-}
 
-makeTopEntityWithName 'noInputCustom ""
+makeTopEntity 'noInputCustom
 
 
 data D2 = D2 Bool (Vec 2 D1)
 
 noInputNested ::
   "clk" ::: Clock Dom ->
-  "out" ::: Signal Dom D2
+  "result" ::: Signal Dom D2
 noInputNested = vioProbe @Dom (D2 True (D1 True high 1 :> D1 False low 0 :> Nil))
+{-# ANN noInputNested (TestBench 'top) #-}
 
-makeTopEntityWithName 'noInputNested ""
+makeTopEntity 'noInputNested
 
 
 data T = R Bool Bool
@@ -109,7 +127,7 @@ data T = R Bool Bool
    yet. See Clash.Cores.Xilinx.VIO.Internal.BlackBoxes for details.
 noInputCustomRep ::
   "clk" ::: Clock Dom ->
-  "out" ::: Signal Dom T
+  "result" ::: Signal Dom T
 noInputCustomRep = vioProbe @Dom (R True False)
 
 makeTopEntityWithName 'noInputCustomRep ""
@@ -118,83 +136,92 @@ makeTopEntityWithName 'noInputCustomRep ""
 
 singleInputBool ::
   "clk" ::: Clock Dom ->
-  "in" ::: Signal Dom Bool ->
-  "out" ::: Signal Dom ()
+  "inp" ::: Signal Dom Bool ->
+  "result" ::: Signal Dom ()
 singleInputBool = vioProbe @Dom ()
+{-# ANN singleInputBool (TestBench 'top) #-}
 
-makeTopEntityWithName 'singleInputBool ""
+makeTopEntity 'singleInputBool
 
 
 singleInputBit ::
   "clk" ::: Clock Dom ->
-  "in" ::: Signal Dom Bit ->
-  "out" ::: Signal Dom ()
+  "inp" ::: Signal Dom Bit ->
+  "result" ::: Signal Dom ()
 singleInputBit = vioProbe @Dom ()
+{-# ANN singleInputBit (TestBench 'top) #-}
 
-makeTopEntityWithName 'singleInputBit ""
+makeTopEntity 'singleInputBit
 
 
 singleInputSigned ::
   "clk" ::: Clock Dom ->
-  "in" ::: Signal Dom (Signed 2) ->
-  "out" ::: Signal Dom ()
+  "inp" ::: Signal Dom (Signed 2) ->
+  "result" ::: Signal Dom ()
 singleInputSigned = vioProbe @Dom ()
+{-# ANN singleInputSigned (TestBench 'top) #-}
 
-makeTopEntityWithName 'singleInputSigned ""
+makeTopEntity 'singleInputSigned
 
 
 singleInputUnsigned ::
   "clk" ::: Clock Dom ->
-  "in" ::: Signal Dom (Unsigned 2) ->
-  "out" ::: Signal Dom ()
+  "inp" ::: Signal Dom (Unsigned 2) ->
+  "result" ::: Signal Dom ()
 singleInputUnsigned = vioProbe @Dom ()
+{-# ANN singleInputUnsigned (TestBench 'top) #-}
 
-makeTopEntityWithName 'singleInputUnsigned ""
+makeTopEntity 'singleInputUnsigned
 
 
 singleInputBitVector ::
   "clk" ::: Clock Dom ->
-  "in" ::: Signal Dom (BitVector 7) ->
-  "out" ::: Signal Dom ()
+  "inp" ::: Signal Dom (BitVector 7) ->
+  "result" ::: Signal Dom ()
 singleInputBitVector = vioProbe @Dom ()
+{-# ANN singleInputBitVector (TestBench 'top) #-}
 
-makeTopEntityWithName 'singleInputBitVector ""
+makeTopEntity 'singleInputBitVector
 
 
 singleInputPair ::
   "clk" ::: Clock Dom ->
-  "in" ::: Signal Dom (Bit, Bool) ->
-  "out" ::: Signal Dom ()
+  "inp" ::: Signal Dom (Bit, Bool) ->
+  "result" ::: Signal Dom ()
 singleInputPair = vioProbe @Dom ()
+{-# ANN singleInputPair (TestBench 'top) #-}
 
-makeTopEntityWithName 'singleInputPair ""
+makeTopEntity 'singleInputPair
 
 
 singleInputVec ::
   "clk" ::: Clock Dom ->
-  "out" ::: Signal Dom (Vec 4 (Unsigned 2)) ->
-  "out" ::: Signal Dom ()
+  "result" ::: Signal Dom (Vec 4 (Unsigned 2)) ->
+  "result" ::: Signal Dom ()
 singleInputVec = vioProbe @Dom ()
+{-# ANN singleInputVec (TestBench 'top) #-}
 
-makeTopEntityWithName 'singleInputVec ""
+makeTopEntity 'singleInputVec
 
 
 singleInputCustom ::
   "clk" ::: Clock Dom ->
-  "in" ::: Signal Dom D1 ->
-  "out" ::: Signal Dom ()
+  "inp" ::: Signal Dom D1 ->
+  "result" ::: Signal Dom ()
 singleInputCustom = vioProbe @Dom ()
+{-# ANN singleInputCustom (TestBench 'top) #-}
 
-makeTopEntityWithName 'singleInputCustom ""
+makeTopEntity 'singleInputCustom
 
 
 singleInputNested ::
   "clk" ::: Clock Dom ->
-  "in" ::: Signal Dom D2 ->
-  "out" ::: Signal Dom ()
+  "inp" ::: Signal Dom D2 ->
+  "result" ::: Signal Dom ()
 singleInputNested = vioProbe @Dom ()
+{-# ANN singleInputNested (TestBench 'top) #-}
 
-makeTopEntityWithName 'singleInputNested ""
+makeTopEntity 'singleInputNested
 
 
 multipleInputs ::
@@ -207,10 +234,11 @@ multipleInputs ::
   "in6" ::: Signal Dom (Vec 3 (Unsigned 2)) ->
   "in7" ::: Signal Dom D1 ->
   "in8" ::: Signal Dom (BitVector 7) ->
-  "out" ::: Signal Dom (Vec 0 Bool)
+  "result" ::: Signal Dom (Vec 0 Bool)
 multipleInputs = vioProbe @Dom Nil
+{-# ANN multipleInputs (TestBench 'top) #-}
 
-makeTopEntityWithName 'multipleInputs ""
+makeTopEntity 'multipleInputs
 
 
 inputsAndOutputs ::
@@ -223,7 +251,7 @@ inputsAndOutputs ::
   "in6" ::: Signal Dom ( Vec 3 (Unsigned 2) ) ->
   "in7" ::: Signal Dom   D1 ->
   "in8" ::: Signal Dom ( BitVector 7 ) ->
-  "out" ::: Signal Dom ( Bit
+  "result" ::: Signal Dom ( Bit
                        , Bool
                        , Unsigned 5
                        , Signed 2
@@ -242,5 +270,6 @@ inputsAndOutputs = vioProbe @Dom
   , D1 False high 0
   , 0b111000
   )
+{-# ANN inputsAndOutputs (TestBench 'top) #-}
 
-makeTopEntityWithName 'inputsAndOutputs ""
+makeTopEntity 'inputsAndOutputs

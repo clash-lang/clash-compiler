@@ -33,6 +33,7 @@ module Clash.Primitives.DSL
   , BlockState (..)
   , TExpr(..)
   , addDeclaration
+  , assign
   , compInBlock
   , declaration
   , declarationReturn
@@ -65,6 +66,7 @@ module Clash.Primitives.DSL
   -- ** Conversion
   , bitCoerce
   , toBV
+  , toBvWithAttrs
   , fromBV
   , enableToBit
   , boolToBit
@@ -669,26 +671,44 @@ toBV ::
   TExpr ->
   -- | BitVector expression
   State (BlockState backend) TExpr
-toBV bvName a = case a of
-  TExpr BitVector{} _ -> pure a
-  TExpr aTy aExpr     -> assign bvName $
-    TExpr (BitVector (typeSize aTy)) (ToBv Nothing aTy aExpr)
+toBV = toBvWithAttrs []
 
--- | Convert an expression from a BitVector into some type
+-- | Convert an expression to a BitVector and add the given HDL attributes
+toBvWithAttrs ::
+  Backend backend =>
+  [Attr'] ->
+  -- | BitVector name hint
+  Text ->
+  -- | Expression to convert to BitVector
+  TExpr ->
+  -- | BitVector expression
+  State (BlockState backend) TExpr
+toBvWithAttrs attrs bvName (TExpr aTy aExpr) =
+  assign bvName $
+    TExpr
+      (annotated attrs (BitVector (tySize aTy)))
+      (ToBv Nothing aTy aExpr)
+
+-- | Convert an expression from a 'BitVector' into some type. If the expression
+-- is 'Annotated', only convert the expression within.
 fromBV
   :: (HasCallStack, Backend backend) =>
   -- | Result name hint
   Text ->
   -- | Type to convert to
   HWType ->
-  -- | BitVector expression
+  -- | 'BitVector' expression
   TExpr ->
-  -- | Converted BitVector expression
+  -- | Converted 'BitVector' expression
   State (BlockState backend) TExpr
 fromBV resultName resultType e@TExpr{eex, ety = BitVector _} =
   case resultType of
     BitVector{} -> pure e
     _ -> assign resultName (TExpr resultType (FromBv Nothing resultType eex))
+fromBV resultName resultType e@TExpr{ety = Annotated _ bv@(BitVector _)} =
+  case resultType of
+    BitVector{} -> pure (TExpr bv (eex e))
+    _ -> assign resultName (TExpr resultType (FromBv Nothing resultType (eex e)))
 fromBV _ _ TExpr{ety} = error $ "fromBV: expected BitVector, got: " <> show ety
 
 clog2 :: Num i => Integer -> i
