@@ -11,6 +11,8 @@ module Clash.Testbench.Internal.Signal where
 import Algebra.PartialOrd
 import Data.Function (on)
 
+import Hedgehog (PropertyT)
+
 import Data.IORef (IORef)
 import Clash.Prelude
   ( KnownDomain(..), BitPack(..), SDomainConfiguration(..), NFDataX, Type
@@ -70,7 +72,7 @@ data VPIInstance =
     }
 
 -- | Expectations on certain outputs at the given simulation step.
-newtype Expectation a = Expectation { expectation :: (Int, a -> Maybe String) }
+newtype Expectation a = Expectation { expectation :: (Int, a -> PropertyT IO ()) }
 
 -- | Expectations cannot be compared: they are always unequal.
 instance Eq (Expectation a) where
@@ -90,13 +92,13 @@ data TBSignal (s :: Stage) (dom :: Domain) a =
       { signalId     :: ID SIGNAL
       , signalCurVal :: SimModeDependent s (IO a)
       , signalPrint  :: Maybe (a -> String)
-      , origin       :: Signal dom a
-      , dependencies :: [ID ()]
+      , signalOrigin :: Signal dom a
+      , signalDeps   :: [ID ()]
       , signalName   :: String
       , signalUpdate :: Maybe (a -> IO ())
       , signalExpect :: Expectation a -> IO ()
-      , signalVerify :: SimModeDependent s (IO (Maybe String))
-      , vpiInstance  :: Maybe VPIInstance
+      , signalVerify :: SimModeDependent s (PropertyT IO ())
+      , signalVPI    :: Maybe VPIInstance
       }
     -- | A signal that receives its content from IO.
   | IOInput
@@ -119,7 +121,7 @@ instance KnownDomain dom => Show (TBSignal s dom a) where
           <> signalName <> "\" @"
           <> ssymbolToString domainName <> " "
           <> show signalId <> " "
-          <> show dependencies
+          <> show signalDeps
       IOInput{..} ->
         "Input " <> show signalId
       TBSignal{} ->
@@ -326,10 +328,10 @@ onAllSignalTypes f = \case
 -- inside 'Clash.Testbench.Internal.TB'.
 data TBDomain (s :: Stage) (dom :: Domain) =
   TBDomain
-    { domainClock   :: Maybe (TBClock s dom)
-    , domainReset   :: Maybe (TBReset s dom)
-    , domainEnable  :: Maybe (TBEnable s dom)
-    , simStepRef :: IORef Int
+    { domainClock  :: Maybe (TBClock s dom)
+    , domainReset  :: Maybe (TBReset s dom)
+    , domainEnable :: Maybe (TBEnable s dom)
+    , simStepRef   :: IORef Int
     }
 
 -- | Existential data type wrapper for 'TBDomain'.

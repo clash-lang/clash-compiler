@@ -14,25 +14,26 @@ module Clash.Testbench.Internal.Monad
  , KnownDomains
  , Testbench(..)
  , TB
- , ST
+ , ST(..)
  , LiftAcc(..)
  , ArgOf
  , LiftTB(..)
  , runTB
  , tbDomain
  , mind
+ , progressCheck
  ) where
 
 import Data.Bifunctor (bimap)
 import Data.Function (on)
 import Data.Type.Equality
 import Algebra.PartialOrd
-import Control.Monad.State.Lazy (StateT, liftIO, get, gets, modify, evalStateT, forM_, void)
+import Control.Monad.State.Lazy
+  (StateT, liftIO, get, gets, modify, evalStateT, forM_, void, when)
 import Data.Function ((&))
 import Data.IORef (IORef, newIORef, readIORef, writeIORef, modifyIORef)
-import Data.List (uncons, partition, sort, sortBy, groupBy)
-import Data.Maybe (catMaybes, mapMaybe)
-
+import Data.List (partition, sort, sortBy, groupBy)
+import Data.Maybe (catMaybes)
 
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -71,12 +72,14 @@ data ST =
     { idSigCount :: ID Int
     -- ^ Counter for generating free IDs to be assigned to signal
     -- (functions)
-    , signals    :: KnownSignals 'USER
+    , signals :: KnownSignals 'USER
     -- ^ Captured signal (functions)
     , idDomCount :: ID Int
     -- ^ Counter for generating free IDs to be assigned to domains
-    , domains    :: KnownDomains 'USER
+    , domains :: KnownDomains 'USER
     -- ^ Captured domains
+    , simSteps :: Int
+    -- ^ Simulation step preset
     }
 
 instance Show ST where
@@ -101,6 +104,8 @@ data Testbench =
     -- that are driven by this domain
     , tbDomainLookup :: A.Array (ID DOMAIN) (SomeDomain 'FINAL)
     -- ^ Domain lookup via ID (partial array)
+    , tbSimSteps :: Int
+    -- ^ Simulation step preset
     }
 instance Show Testbench where
   show Testbench{..} =
@@ -148,7 +153,7 @@ data LiftAcc a b =
       -- ^ the name of the lifted signal (function)
     , deps :: [ID ()]
       -- ^ the dependencies of the lifted signal (function)
-    , signalRef :: IORef b
+    , sfRef :: IORef b
       -- ^ some IO reference to the lifted signal (function)
     , cont :: IO (a, (a -> a) -> b -> b)
       -- ^ the continuation transformation of the lifted signal
@@ -177,55 +182,58 @@ instance
  where
   (@@) = initializeLiftTB
 
-  liftTB exec origin = do
+  liftTB exec signalOrigin = do
     extVal <- liftIO $ newIORef Nothing
     expectations <- liftIO $ newIORef []
 
     LiftAcc{..} <- exec
     TBDomain{..} <- tbDomain @domA
-    simStepCache <- liftIO (readIORef simStepRef >>= newIORef)
+    -- Initial progress ensures that the value reference and the
+    -- signal function reference are updated immediately after the
+    -- first call to `signalCurVal`, which is required for the first
+    -- continuation transformation to be applied on the initial
+    -- values.
+    checkForProgress <- progressCheck simStepRef True
+    vRef <- liftIO $ newIORef undefined
 
     let
       signalCurVal = \case
         Internal -> do
-          (head# -> x, step) <- cont
-          global <- readIORef simStepRef
-          local <- readIORef simStepCache
+          progress <- checkForProgress
 
-          if local == global
-          then return x
-          else do
-            modifyIORef signalRef $ step tail#
-            writeIORef simStepCache global
+          if progress
+          then do
+            (head# -> x, step) <- cont
+            writeIORef vRef x
+            modifyIORef sfRef $ step tail#
             return x
+          else
+            readIORef vRef
+
         External -> readIORef extVal >>= \case
           Nothing -> error "No Value @Signal"
           Just x  -> return x
 
     mind SomeSignal $ Internal.SimSignal
-      { signalId     = NoID
-      , dependencies = reverse deps
-      , signalName   = name
+      { signalId = NoID
+      , signalDeps = reverse deps
+      , signalName = name
       , signalUpdate = Just (writeIORef extVal . Just)
       , signalExpect = modifyIORef expectations . (:)
-      , signalVerify = \m -> do
-          step <- readIORef simStepRef
-          value <- signalCurVal m
-          expct <- readIORef expectations
+      , signalVerify = \mode -> do
+          curStep <- liftIO $ readIORef simStepRef
+          value <- liftIO $ signalCurVal mode
+          expct <- liftIO $ readIORef expectations
 
           let
-            (cur, later) =
-              partition (flip leq $ Expectation (step + 1, undefined)) expct
+            (current, later) =
+              partition (`leq` Expectation (curStep + 1, undefined)) expct
 
-          writeIORef expectations later
+          liftIO $ writeIORef expectations later
+          mapM_ ((value &) . snd . expectation) current
 
-          return
-            $ fmap fst
-            $ uncons
-            $ mapMaybe ((value &) . snd . expectation) cur
-
-      , signalPrint  = Nothing
-      , vpiInstance  = Nothing
+      , signalPrint = Nothing
+      , signalVPI = Nothing
       , ..
       }
 
@@ -236,7 +244,7 @@ instance
  where
   (@@) = initializeLiftTB
 
-  liftTB a sf s = liftTB (upd <$> a) $ sf $ origin s
+  liftTB a sf s = liftTB (upd <$> a) $ sf $ signalOrigin s
    where
     upd acc@LiftAcc{..} =
       acc { deps = SomeID (signalId s) : deps
@@ -299,21 +307,21 @@ instance
             resetId <- nextFreeID ResetID
             extVal <- liftIO $ newIORef Nothing
             signalRef <- liftIO $ newIORef $ unsafeFromReset reset
-            simStepCache <- liftIO (readIORef simStepRef >>= newIORef)
+            checkForProgress <- progressCheck simStepRef False
 
             let
               resetCurVal = \case
                 Internal -> do
-                  s@(_ :- s') <- readIORef signalRef
-                  global <- readIORef simStepRef
-                  local <- readIORef simStepCache
+                  x :- xr <- readIORef signalRef
+                  progress <- checkForProgress
 
-                  if local == global
-                  then return $ head# s
-                  else do
-                    writeIORef signalRef s'
-                    writeIORef simStepCache global
-                    return $ head# s'
+                  if progress
+                  then do
+                    writeIORef signalRef xr
+                    return $ head# xr
+                  else
+                    return x
+
                 External -> readIORef extVal >>= \case
                   Nothing -> error "No Value @Reset"
                   Just x  -> return x
@@ -355,21 +363,21 @@ instance
             enableId <- nextFreeID EnableID
             extVal <- liftIO $ newIORef Nothing
             signalRef <- liftIO $ newIORef (fromEnable enable)
-            simStepCache <- liftIO (readIORef simStepRef >>= newIORef)
+            checkForProgress <- progressCheck simStepRef False
 
             let
               enableCurVal = \case
                 Internal -> do
-                  s@(_ :- s') <- readIORef signalRef
-                  global <- readIORef simStepRef
-                  local <- readIORef simStepCache
+                  x :- xr <- readIORef signalRef
+                  progress <- checkForProgress
 
-                  if local == global
-                  then return $ head# s
-                  else do
-                    writeIORef signalRef s'
-                    writeIORef simStepCache global
-                    return $ head# s'
+                  if progress
+                  then do
+                    writeIORef signalRef xr
+                    return $ head# xr
+                  else
+                    return x
+
                 External -> readIORef extVal >>= \case
                   Nothing -> error "No Value @Enable"
                   Just x  -> return x
@@ -401,12 +409,38 @@ initializeLiftTB :: (LiftTB a, a ~ (ArgOf a -> b)) => String -> ArgOf a -> b
 initializeLiftTB name x = liftTB accInit x
  where
   accInit = do
-   signalRef <- liftIO $ newIORef x
+   sfRef <- liftIO $ newIORef x
    return LiftAcc
      { deps = []
-     , cont = (,($)) <$> readIORef signalRef
+     , cont = (,($)) <$> readIORef sfRef
      , ..
      }
+
+-- | Creates a new simulation step reference, against which the global
+-- reference is compared on execution of the returned progress
+-- check. The local reference gets automatically updated to the global
+-- one when checking for progress and progress is detected. The
+-- boolean argument determines whether progress gets immediately
+-- triggered at startup (@True@) or with the first clock change
+-- (@False@).
+progressCheck :: IORef Int -> Bool -> TB (IO Bool)
+progressCheck simStepRef initialProgress = do
+  simStepCache <- liftIO ((offset <$> readIORef simStepRef) >>= newIORef)
+
+  return $ do
+    globalRef <- readIORef simStepRef
+    localRef  <- readIORef simStepCache
+
+    when (globalRef > localRef) $
+      writeIORef simStepCache globalRef
+
+    return $ globalRef > localRef
+
+ where
+  offset
+    | initialProgress = (+ (-1))
+    | otherwise       = id
+
 
 -- | Some generalized extender for the accumulated continuation.
 extendVia ::
@@ -426,7 +460,6 @@ extendVia contAcc valueM f g = do
   v <- valueM
   (sf, step) <- contAcc
   return (sf $ f v, step . g v)
-
 
 -- | Query the next free 'ID' based on the 'ID' context.
 class NextFreeID a where
@@ -518,6 +551,7 @@ runTB mode testbench =
     , signals     = S.empty
     , idDomCount  = 0
     , domains     = M.empty
+    , simSteps    = 0
     }
  where
   finalize r = do
@@ -540,7 +574,11 @@ runTB mode testbench =
         void $ tbDomain @dom
 
     -- all of the internal state is final at this point
-    ST { idSigCount = FreeID n, idDomCount = FreeID m, .. } <- get
+    ST { idSigCount = FreeID n
+       , idDomCount = FreeID m
+       , simSteps = tbSimSteps
+       , ..
+       } <- get
 
     let
       -- finalize the domains

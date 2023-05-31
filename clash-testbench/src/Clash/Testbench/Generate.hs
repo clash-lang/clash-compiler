@@ -10,7 +10,7 @@ module Clash.Testbench.Generate where
 
 import Hedgehog
 import Hedgehog.Gen
-import Control.Monad.State.Lazy (liftIO)
+import Control.Monad.State.Lazy (liftIO, when, modify)
 import Data.IORef (newIORef, readIORef, writeIORef)
 
 import Clash.Prelude (KnownDomain(..), BitPack(..), NFDataX)
@@ -101,34 +101,39 @@ matchIOGen expectedOutput gen = do
   TBDomain{..} <- tbDomain @dom
 
   vRef <- liftIO $ newIORef undefined
-  simStepCache <- liftIO (readIORef simStepRef >>= newIORef)
+  checkForProgress <- progressCheck simStepRef False
 
   mind SomeSignal $ IOInput
     { signalId     = NoID
     , signalCurVal = const $ do
-        global <- readIORef simStepRef
-        local <- readIORef simStepCache
+        progress <- checkForProgress
 
-        if local == global
-        then readIORef vRef
-        else do
+        if progress
+        then do
           (i, o) <- sample gen
-          signalExpect expectedOutput $ Expectation (global + 1, verify o)
-
+          curStep <- readIORef simStepRef
+          signalExpect expectedOutput $ Expectation (curStep, verify o)
           writeIORef vRef i
-          writeIORef simStepCache global
+
           return i
+        else
+          readIORef vRef
     , signalPrint  = Nothing
     }
+
  where
-  verify x y
-    | x == y    = Nothing
-    | otherwise = Just $ "Expected " <> show x <> " but the output is " <> show y
+  verify x y = do
+    when (x /= y)
+      $ footnote
+      $ "Expected '" <> show x <> "' but the output is '" <> show y <> "'"
+    x === x
 
 -- | Extended version of 'matchIOGen', which allows to specify valid
--- IO behavior over a finite amount of simulation steps. The generator
--- is repeatedly called after all steps of a generation have been
--- verified.
+-- IO behavior over a finite amount of simulation steps. During native
+-- simulation (no property check), the generator is repeatedly called
+-- after all the generated simulation steps have been consumed. The
+-- generator is only called once if the test bench is converted to a
+-- property instead.
 matchIOGenN ::
   forall dom i o.
   (NFDataX i, BitPack i, KnownDomain dom, Eq o, Show o, Show i) =>
@@ -136,39 +141,45 @@ matchIOGenN ::
 matchIOGenN expectedOutput gen = do
   TBDomain{..} <- tbDomain @dom
 
-  vRef <- liftIO $ newIORef []
-  simStepCache <- liftIO (readIORef simStepRef >>= newIORef)
+  xs <- liftIO $ sample gen
+  modify $ \st@ST{..} -> st { simSteps = max simSteps $ length xs }
+
+  vRef <- liftIO $ newIORef xs
+  checkForProgress <- progressCheck simStepRef False
 
   mind SomeSignal $ IOInput
-    { signalId     = NoID
+    { signalId = NoID
     , signalCurVal = const $ do
-        global <- readIORef simStepRef
-        local <- readIORef simStepCache
+        progress <- checkForProgress
 
-        if local == global
-        then readIORef vRef >>= \case
-          (i, _) : _ -> return i
-          [] -> do
-            (i, o) : xr <- sample gen
-            writeIORef vRef ((i, o) : xr)
-            Prelude.print $ (i, o) : xr
-            return i
-        else do
-          writeIORef simStepCache global
-          readIORef vRef >>= \case
+        readIORef vRef >>=
+          if progress
+          then \case
             _ : (i, o) : xr -> do
               writeIORef vRef ((i, o) : xr)
-              signalExpect expectedOutput $ Expectation (global + 1, verify o)
+              curStep <- readIORef simStepRef
+              signalExpect expectedOutput $ Expectation (curStep, verify o)
               return i
             _ -> do
               (i, o) : xr <- sample gen
-              Prelude.print $ (i, o) : xr
+
               writeIORef vRef ((i, o) : xr)
-              signalExpect expectedOutput $ Expectation (global + 1, verify o)
+              curStep <- readIORef simStepRef
+              signalExpect expectedOutput $ Expectation (curStep, verify o)
               return i
-    , signalPrint  = Nothing
+          else \case
+            (i, _) : _ -> return i
+            [] -> do
+              (i, o) : xr <- sample gen
+              writeIORef vRef ((i, o) : xr)
+              Prelude.print $ (i, o) : xr
+              return i
+    , signalPrint = Nothing
     }
+
  where
-  verify x y
-    | x == y    = Nothing
-    | otherwise = Just $ "Expected '" <> show x <> "' but the output is '" <> show y <> "'"
+  verify x y = do
+    when (x /= y)
+      $ footnote
+      $ "Expected '" <> show x <> "' but the output is '" <> show y <> "'"
+    x === x

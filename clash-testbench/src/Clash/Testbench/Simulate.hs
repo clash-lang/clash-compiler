@@ -11,6 +11,7 @@ module Clash.Testbench.Simulate
   , LiftTB((@@))
   , simulate
   , simulateFFI
+  , tbProperty
   ) where
 
 import Prelude hiding (putStrLn)
@@ -19,6 +20,8 @@ import qualified Prelude (putStrLn)
 import Control.Monad.IO.Class
 import Control.Monad.State.Lazy hiding (lift)
 import Data.Proxy
+
+import qualified Hedgehog (Property, property)
 
 import Data.Array ((!))
 import Data.Coerce (Coercible)
@@ -62,8 +65,8 @@ simulate steps testbench = do
   replicateM_ (steps + 1) $ do
     forM_ tbDomains $ \(d, map (tbSignalLookup !) -> xs) ->
       (`onAllDomainTypes` d) $ \(TBDomain{..} :: TBDomain 'FINAL dom) -> do
-        i <- readIORef simStepRef
-        when (i > 0) $ forM_ xs $ onAllSignalTypes $ \s -> do
+--        i <- readIORef simStepRef
+        forM_ xs $ onAllSignalTypes $ \s -> do
           v <- signalCurVal s
           case signalPrint s of
             Nothing    -> return ()
@@ -73,14 +76,28 @@ simulate steps testbench = do
               TBSignal{}  -> "S "
         modifyIORef simStepRef (+ 1)
 
-    forM_ tbSignals $ onAllSignalTypes $ \case
-      SimSignal{..} -> do
-        signalVerify >>= \case
-          Nothing  -> Prelude.putStrLn "✓"
-          Just msg -> Prelude.putStrLn $ "✗ " <> msg
-      _ -> return ()
+--    forM_ tbSignals $ onAllSignalTypes $ \case
+--      SimSignal{..} -> do
+--        signalVerify >>= \case
+--          Nothing  -> Prelude.putStrLn "✓"
+--          Just msg -> error $ "✗ " <> msg
+--      _ -> return ()
 
   return r
+
+tbProperty :: TB () -> Hedgehog.Property
+tbProperty testbench = Hedgehog.property $ do
+  (_, Testbench{..}) <- liftIO $ runTB Internal testbench
+  replicateM_ tbSimSteps $ do
+    forM_ tbDomains $ \(d, map (tbSignalLookup !) -> xs) ->
+      (`onAllDomainTypes` d) $ \(TBDomain{..} :: TBDomain 'FINAL dom) -> do
+        forM_ xs $ onAllSignalTypes $ \s -> do
+--          void $ liftIO $ signalCurVal s
+          case s of
+            SimSignal{..} -> signalVerify
+            _             -> return ()
+
+        liftIO $ modifyIORef simStepRef (+ 1)
 
 data VPIState =
   VPIState
@@ -166,7 +183,7 @@ assignInputs = do
   forM_ tbDomains $ \(d, map (tbSignalLookup !) -> xs) ->
     (`onAllDomainTypes` d) $ const $ do
       forM_ xs $ onAllSignalTypes $ \case
-        SimSignal{..} -> mapM_ (assignModuleInputs vpiInstance) dependencies
+        SimSignal{..} -> mapM_ (assignModuleInputs signalVPI) signalDeps
         _             -> return ()
 
 
@@ -212,7 +229,7 @@ readOutputs = do
     (`onAllDomainTypes` d) $ \(TBDomain{..} :: TBDomain 'FINAL dom) -> do
       -- receive the outputs
       forM_ xs $ onAllSignalTypes $ \case
-        SimSignal{..} -> case vpiInstance of
+        SimSignal{..} -> case signalVPI of
           Nothing -> error "Cannot read from module"
           Just VPIInstance{..} ->
             receiveValue VectorFmt (port vpiOutputPort) >>= \case
@@ -263,7 +280,7 @@ matchModule vpiModule = \case
     vpiInputPort <-
       (M.!) . M.fromList
         <$> ( mapM (matchPort vpiModule)
-            $ zip dependencies
+            $ zip signalDeps
             $ map Just inputPorts <> repeat Nothing
             )
 
@@ -282,7 +299,7 @@ matchModule vpiModule = \case
         return $ VPIPort{..}
       _   -> error "TODO: later / "
 
-    return tbs { vpiInstance = Just VPIInstance{..} }
+    return tbs { signalVPI = Just VPIInstance{..} }
   _ -> error "Unfiltered TBS"
 
  where
