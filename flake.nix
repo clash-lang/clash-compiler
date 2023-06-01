@@ -203,7 +203,22 @@
         # `clash-testsuite` is around 60s when static and under a second when
         # dynamic..
         clash-ghc =
-          pkgs.haskell.lib.enableSharedExecutables clash-ghc;
+          pkgs.haskell.lib.enableSharedExecutables
+            (clash-ghc.overrideAttrs(old: {
+              buildInputs = (old.buildInputs or []) ++ [
+                pkgs.makeWrapper
+              ];
+
+              postInstall = (old.postInstall or "") + ''
+                wrapProgram $out/bin/clash \
+                  --prefix PATH : ${dirOf "${old.passthru.env.NIX_GHC}"} \
+                  --set GHC_PACKAGE_PATH "${old.passthru.env.NIX_GHC_LIBDIR}/package.conf.d:"
+
+                wrapProgram $out/bin/clashi \
+                  --prefix PATH : ${dirOf "${old.passthru.env.NIX_GHC}"} \
+                  --set GHC_PACKAGE_PATH "${old.passthru.env.NIX_GHC_LIBDIR}/package.conf.d:"
+              '';
+            }));
 
         # We need to override the environment of clash-profiling-prepare to
         # include the GHC and packages from the build environment, otherwise
