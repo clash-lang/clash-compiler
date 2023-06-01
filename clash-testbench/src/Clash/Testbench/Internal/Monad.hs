@@ -9,6 +9,7 @@ bench creation (internal module).
 
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE ConstraintKinds #-}
 module Clash.Testbench.Internal.Monad
  ( KnownSignals
  , KnownDomains
@@ -17,20 +18,26 @@ module Clash.Testbench.Internal.Monad
  , ST(..)
  , LiftAcc(..)
  , ArgOf
+ , LiftTBSignalConstraints
  , LiftTB(..)
  , runTB
  , tbDomain
  , mind
  , progressCheck
+ , newHistory
+ , memorize
+ , history
  ) where
 
 import Data.Bifunctor (bimap)
 import Data.Function (on)
 import Data.Type.Equality
 import Algebra.PartialOrd
+import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.State.Lazy
   (StateT, liftIO, get, gets, modify, evalStateT, forM_, void, when)
 import Data.Function ((&))
+import Data.Array.IO (newArray, writeArray, getElems)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef, modifyIORef)
 import Data.List (partition, sort, sortBy, groupBy)
 import Data.Maybe (catMaybes)
@@ -80,6 +87,9 @@ data ST =
     -- ^ Captured domains
     , simSteps :: Int
     -- ^ Simulation step preset
+    , defaultHistorySize :: Int
+    -- ^ Default size of the history for all simulated signals, as
+    -- long as not explicitly overwritten per signal.
     }
 
 instance Show ST where
@@ -150,13 +160,13 @@ type family ArgOf a where
 data LiftAcc a b =
   LiftAcc
     { name :: String
-      -- ^ the name of the lifted signal (function)
+      -- ^ The name of the lifted signal (function)
     , deps :: [ID ()]
-      -- ^ the dependencies of the lifted signal (function)
+      -- ^ The dependencies of the lifted signal (function)
     , sfRef :: IORef b
-      -- ^ some IO reference to the lifted signal (function)
+      -- ^ Some IO reference to the lifted signal (function)
     , cont :: IO (a, (a -> a) -> b -> b)
-      -- ^ the continuation transformation of the lifted signal
+      -- ^ The continuation transformation of the lifted signal
       -- (function)
     }
 
@@ -174,11 +184,18 @@ class LiftTB a where
   -- the given signal function.
   liftTB :: TB (LiftAcc (ArgOf a) b) -> a
 
-instance
+-- | 'LiftTB' instance constraints for lifting a Clash
+-- 'Clash.Signal.Signal' into a test bench
+-- 'Clash.Testbench.Signal.TBSignal'.
+type LiftTBSignalConstraints domA domB a a' =
   ( KnownDomain domA, KnownDomain domB
   , domA ~ domB, a ~ a'
   , NFDataX a, BitPack a
-  ) => LiftTB (Signal domA a -> TB (TBSignal domB a'))
+  )
+
+instance
+  LiftTBSignalConstraints domA domB a a' =>
+  LiftTB (Signal domA a -> TB (TBSignal domB a'))
  where
   (@@) = initializeLiftTB
 
@@ -195,6 +212,7 @@ instance
     -- values.
     checkForProgress <- progressCheck simStepRef True
     vRef <- liftIO $ newIORef undefined
+    signalHistory <- newHistory
 
     let
       signalCurVal = \case
@@ -203,9 +221,14 @@ instance
 
           if progress
           then do
+            -- progress on the signal
             (head# -> x, step) <- cont
             writeIORef vRef x
             modifyIORef sfRef $ step tail#
+
+            -- update the history
+            memorize signalHistory x
+
             return x
           else
             readIORef vRef
@@ -233,7 +256,7 @@ instance
           mapM_ ((value &) . snd . expectation) current
 
       , signalPrint = Nothing
-      , signalVPI = Nothing
+      , signalPlug = Nothing
       , ..
       }
 
@@ -442,6 +465,45 @@ progressCheck simStepRef initialProgress = do
     | otherwise       = id
 
 
+newHistory ::
+  TB (History a)
+newHistory = do
+  size <- gets defaultHistorySize
+  historySize <- liftIO $ newIORef size
+  historyBufferPos <- liftIO $ newIORef 0
+  historyBuffer <- liftIO $ newIORef Nothing
+  return History{..}
+
+memorize :: MonadIO m => History a -> a -> m ()
+memorize History{..} value =
+  liftIO $ readIORef historySize >>= \case
+    0 -> return ()
+    n -> do
+      pos <- readIORef historyBufferPos
+      buf <- readIORef historyBuffer >>= \case
+        Just a  -> return a
+        Nothing -> do
+          a <- newArray (0, n-1) Nothing
+          writeIORef historyBuffer $ Just a
+          return a
+
+      writeArray buf pos $ Just value
+      writeIORef historyBufferPos $ pos + 1
+
+history ::
+  (KnownDomain dom, MonadIO m) =>
+  TBSignal dom a ->
+  m [a]
+history s = liftIO $ readIORef historyBuffer >>= \case
+  Nothing  -> return []
+  Just buf -> do
+    pos <- readIORef historyBufferPos
+    catMaybes . uncurry (flip (<>)) . splitAt pos <$> getElems buf
+
+ where
+  History{..} = signalHistory s
+
+
 -- | Some generalized extender for the accumulated continuation.
 extendVia ::
   Monad m =>
@@ -547,11 +609,12 @@ updDomain domain = case knownDomain @dom of
 runTB :: SimMode -> TB a -> IO (a, Testbench)
 runTB mode testbench =
   evalStateT (testbench >>= finalize) ST
-    { idSigCount  = 1
-    , signals     = S.empty
-    , idDomCount  = 0
-    , domains     = M.empty
-    , simSteps    = 0
+    { idSigCount         = 1
+    , signals            = S.empty
+    , idDomCount         = 0
+    , domains            = M.empty
+    , simSteps           = 0
+    , defaultHistorySize = 100
     }
  where
   finalize r = do

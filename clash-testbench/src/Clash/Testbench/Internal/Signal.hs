@@ -13,6 +13,7 @@ import Data.Function (on)
 
 import Hedgehog (PropertyT)
 
+import Data.Array.IO (IOArray)
 import Data.IORef (IORef)
 import Clash.Prelude
   ( KnownDomain(..), BitPack(..), SDomainConfiguration(..), NFDataX, Type
@@ -53,8 +54,8 @@ type family SimModeDependent (s :: Stage) a where
   SimModeDependent 'FINAL a = a
 
 -- | Clash-FFI Port connector.
-data VPIPort =
-  VPIPort
+data PortInterface =
+  PortInterface
     { port          :: Port
     , portName      :: String
     , portSize      :: Int
@@ -63,12 +64,19 @@ data VPIPort =
     }
 
 -- | Clash-FFI Module connector.
-data VPIInstance =
-  VPIInstance
-    { vpiModule     :: Module
-    , vpiInputPort  :: ID () -> VPIPort
+data ModuleInterface =
+  ModuleInterface
+    { module_       :: Module
+    , inputPort  :: ID () -> PortInterface
       -- TODO: multiple port support vie Bundle/Unbundle
-    , vpiOutputPort :: VPIPort
+    , outputPort :: PortInterface
+    }
+
+data History a =
+  History
+    { historySize :: IORef Int
+    , historyBufferPos :: IORef Int
+    , historyBuffer :: IORef (Maybe (IOArray Int (Maybe a)))
     }
 
 -- | Expectations on certain outputs at the given simulation step.
@@ -87,32 +95,71 @@ instance PartialOrd (Expectation a) where
 -- | The lifted 'Clash.Signal.Signal' type to be used in
 -- 'Clash.Testbench.Internal.Monad.TB'.
 data TBSignal (s :: Stage) (dom :: Domain) a =
-    -- | A signal that can be simulated.
+    -- | A signal that is simulated
     SimSignal
-      { signalId     :: ID SIGNAL
+      { signalId :: ID SIGNAL
+      -- ^ Some unique signal ID
       , signalCurVal :: SimModeDependent s (IO a)
-      , signalPrint  :: Maybe (a -> String)
+      -- ^ The data value that is captured by the signal at the
+      -- current simulation step
+      , signalName :: String
+      -- ^ Some name identifier for the signal (this name is used for
+      -- module port matching in case of simulation with an external
+      -- simulator)
       , signalOrigin :: Signal dom a
-      , signalDeps   :: [ID ()]
-      , signalName   :: String
-      , signalUpdate :: Maybe (a -> IO ())
+      -- ^ The Clash signal, out of which the test bench signal has
+      -- been created (for internal use only)
+      , signalDeps :: [ID ()]
+      -- ^ The dependencies of the signal (i.e., all other input
+      -- signals whose content is required for computing the values of
+      -- this signal)
       , signalExpect :: Expectation a -> IO ()
+      -- ^ Registers an expectation on the content of this signal to
+      -- be verified during simulation
       , signalVerify :: SimModeDependent s (PropertyT IO ())
-      , signalVPI    :: Maybe VPIInstance
+      -- ^ The expectation verifier
+      , signalHistory :: History a
+      -- ^ Bounded history of signal values
+      , signalUpdate :: Maybe (a -> IO ())
+      -- ^ Overwrites the value of the signal at the current
+      -- simulation step (only available in external simulation mode)
+
+      -- TODO: Use proper type families instead of the 'Maybe' wrapper
+      -- here.
+      , signalPlug :: Maybe ModuleInterface
+      -- ^ Some external module interface whose ports match with this
+      -- signal's type (only available in external simulation mode)
+      , signalPrint :: Maybe (a -> String)
+      -- ^ Some optional value printer for inspection of the signal content
       }
-    -- | A signal that receives its content from IO.
+    -- | A signal that receives its content via some IO
   | IOInput
-      { signalId     :: ID SIGNAL
+      { signalId :: ID SIGNAL
+      -- ^ Some unique signal ID
       , signalCurVal :: SimModeDependent s (IO a)
-      , signalPrint  :: Maybe (a -> String)
+      -- ^ The data value hold by the signal at the current simulation step
+      , signalHistory :: History a
+      -- ^ Bounded history of signal values
+      , signalPrint :: Maybe (a -> String)
+      -- ^ Some optional value printer for inspection of the signal content
       }
-    -- | A signal that results from composition.
+    -- | A signal that results from composition
   | TBSignal
-      { signalId     :: ID SIGNAL
+      { signalId :: ID SIGNAL
+      -- ^ This is always 'Clash.Testbench.Internal.ID.NoID', because
+      -- it is impossible to keep track of signals that are created
+      -- via some functor or applicative composition (note that
+      -- tracking those is also not necessary: the corresponding
+      -- transformation cannot be run through an external execution
+      -- engine anyway)
       , signalCurVal :: SimModeDependent s (IO a)
-      , signalPrint  :: Maybe (a -> String)
+      -- ^ The data value hold by the signal at the current simulation step
+      , signalPrint :: Maybe (a -> String)
+      -- ^ Some optional value printer for inspection of the signal content
       }
 
+-- | For internal use only (this is __not__ connected to the data that
+-- is hold by the signal)
 instance KnownDomain dom => Show (TBSignal s dom a) where
   show = case knownDomain @dom of
     SDomainConfiguration domainName _ _ _ _ _ -> \case
@@ -127,9 +174,13 @@ instance KnownDomain dom => Show (TBSignal s dom a) where
       TBSignal{} ->
         "TS"
 
+-- | For internal use only (this is __not__ connected to the data that
+-- is hold by the signal)
 instance Eq (TBSignal s dom a) where
   (==) = (==) `on` signalId
 
+-- | For internal use only (this is __not__ connected to the data that
+-- is hold by the signal)
 instance Ord (TBSignal s dom a) where
   compare = compare `on` signalId
 

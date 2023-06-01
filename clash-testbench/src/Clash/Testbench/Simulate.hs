@@ -76,26 +76,19 @@ simulate steps testbench = do
               TBSignal{}  -> "S "
         modifyIORef simStepRef (+ 1)
 
---    forM_ tbSignals $ onAllSignalTypes $ \case
---      SimSignal{..} -> do
---        signalVerify >>= \case
---          Nothing  -> Prelude.putStrLn "✓"
---          Just msg -> error $ "✗ " <> msg
---      _ -> return ()
-
   return r
 
+-- | Turns a test bench design into a 'Hedghog.Property' using
+-- internal simulation.
 tbProperty :: TB () -> Hedgehog.Property
 tbProperty testbench = Hedgehog.property $ do
   (_, Testbench{..}) <- liftIO $ runTB Internal testbench
   replicateM_ tbSimSteps $ do
     forM_ tbDomains $ \(d, map (tbSignalLookup !) -> xs) ->
       (`onAllDomainTypes` d) $ \(TBDomain{..} :: TBDomain 'FINAL dom) -> do
-        forM_ xs $ onAllSignalTypes $ \s -> do
---          void $ liftIO $ signalCurVal s
-          case s of
-            SimSignal{..} -> signalVerify
-            _             -> return ()
+        forM_ xs $ onAllSignalTypes $ \case
+          SimSignal{..} -> signalVerify
+          _             -> return ()
 
         liftIO $ modifyIORef simStepRef (+ 1)
 
@@ -183,7 +176,7 @@ assignInputs = do
   forM_ tbDomains $ \(d, map (tbSignalLookup !) -> xs) ->
     (`onAllDomainTypes` d) $ const $ do
       forM_ xs $ onAllSignalTypes $ \case
-        SimSignal{..} -> mapM_ (assignModuleInputs signalVPI) signalDeps
+        SimSignal{..} -> mapM_ (assignModuleInputs signalPlug) signalDeps
         _             -> return ()
 
 
@@ -191,7 +184,7 @@ assignInputs = do
                       , vpiInit = False
                       }
 
-  if vpiClock == low || vpiInit
+  if vpiClock == high || vpiInit
   then nextCB ReadWriteSynch 1 assignInputs
   else nextCB ReadOnlySynch  1 readOutputs
 
@@ -199,11 +192,15 @@ assignInputs = do
   VPIState{..} = ?state
   Testbench{..} = testbench
 
-  assignModuleInputs :: Typeable b => Maybe VPIInstance -> ID () -> SimCont b ()
+  assignModuleInputs ::
+    Typeable b =>
+    Maybe ModuleInterface ->
+    ID () ->
+    SimCont b ()
   assignModuleInputs = \case
-    Nothing              -> const $ return ()
-    Just VPIInstance{..} -> \sid@(SomeID x) ->
-      let VPIPort{..} = vpiInputPort sid
+    Nothing                  -> const $ return ()
+    Just ModuleInterface{..} -> \sid@(SomeID x) ->
+      let PortInterface{..} = inputPort sid
       in case x of
          NoID                 -> return ()
          ClockID  _TODO       -> sendV port vpiClock
@@ -229,10 +226,10 @@ readOutputs = do
     (`onAllDomainTypes` d) $ \(TBDomain{..} :: TBDomain 'FINAL dom) -> do
       -- receive the outputs
       forM_ xs $ onAllSignalTypes $ \case
-        SimSignal{..} -> case signalVPI of
+        SimSignal{..} -> case signalPlug of
           Nothing -> error "Cannot read from module"
-          Just VPIInstance{..} ->
-            receiveValue VectorFmt (port vpiOutputPort) >>= \case
+          Just ModuleInterface{..} ->
+            receiveValue VectorFmt (port outputPort) >>= \case
               BitVectorVal SNat v -> case signalUpdate of
                 Just upd -> liftIO $ upd $ unpack $ resize v
                 Nothing  -> error "No signal update"
@@ -268,23 +265,23 @@ readOutputs = do
 matchModule ::
   (?testbench :: Testbench, KnownDomain dom, BitPack a, Typeable b) =>
   Module -> TBSignal 'FINAL dom a -> SimCont b (TBSignal 'FINAL dom a)
-matchModule vpiModule = \case
+matchModule module_ = \case
   tbs@SimSignal{..} -> do
-    ports <- modulePorts vpiModule
+    ports <- modulePorts module_
     dirs  <- mapM direction ports
 
     let
       inputPorts  = map fst $ filter (isInput  . snd) $ zip ports dirs
       outputPorts = map fst $ filter (isOutput . snd) $ zip ports dirs
 
-    vpiInputPort <-
+    inputPort <-
       (M.!) . M.fromList
-        <$> ( mapM (matchPort vpiModule)
+        <$> ( mapM (matchPort module_)
             $ zip signalDeps
             $ map Just inputPorts <> repeat Nothing
             )
 
-    vpiOutputPort <- case outputPorts of
+    outputPort <- case outputPorts of
       [p] -> do
         portNameBS    <- receiveProperty Name p
         portSize      <- fromEnum <$> getProperty Size p
@@ -292,14 +289,14 @@ matchModule vpiModule = \case
         portDirection <- direction p
 
         let portName = B.unpack portNameBS
-        port <- getByName (Just vpiModule) portNameBS
+        port <- getByName (Just module_) portNameBS
 
         checkPort (toInteger portSize) tbs portDirection
 
-        return $ VPIPort{..}
+        return $ PortInterface{..}
       _   -> error "TODO: later / "
 
-    return tbs { signalVPI = Just VPIInstance{..} }
+    return tbs { signalPlug = Just ModuleInterface{..} }
   _ -> error "Unfiltered TBS"
 
  where
@@ -313,7 +310,7 @@ matchModule vpiModule = \case
 
 matchPort ::
   (?testbench :: Testbench, Typeable b) =>
-  Module -> (ID (), Maybe Port) -> SimCont b (ID (), VPIPort)
+  Module -> (ID (), Maybe Port) -> SimCont b (ID (), PortInterface)
 matchPort m = \case
   (_, Nothing)     -> error "Not enough ports"
   (sid, Just p) -> do
@@ -329,7 +326,7 @@ matchPort m = \case
     -- references may not be persistent.
     port <- getByName (Just m) portNameBS
 
-    return (sid, VPIPort{..})
+    return (sid, PortInterface{..})
  where
   Testbench{..} = ?testbench
 

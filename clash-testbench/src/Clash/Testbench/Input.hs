@@ -51,27 +51,30 @@ fromList mode xs = do
 
   vRef <- liftIO $ newIORef xs
   checkForProgress <- progressCheck simStepRef False
+  signalHistory <- newHistory
+
+  let
+    signalCurVal m = do
+      x : xr <- readIORef vRef >>= return . \case
+        [] -> case mode of
+          Repeat     -> xs
+          Default v  -> [v]
+          IsInfinite -> error $ "Clash.Testbench.Input.fromList: "
+                             <> "end of list reached"
+        yr -> yr
+
+      progress <- checkForProgress
+
+      if progress
+      then do
+        memorize signalHistory x
+        writeIORef vRef xr
+        signalCurVal m
+      else
+        return x
 
   mind SomeSignal $ IOInput
     { signalId     = NoID
     , signalPrint  = Nothing
-    , signalCurVal = const $ do
-        readIORef vRef >>= \case
-          [] -> case mode of
-            Repeat -> do
-              let (x : xr) = xs
-              writeIORef vRef xr
-              return x
-            Default v ->
-              return v
-            IsInfinite ->
-              error $ "Clash.Testbench.Input.fromList: "
-                   <> "End of list reached."
-          x : xr -> do
-            progress <- checkForProgress
-
-            when progress $
-              writeIORef vRef xr
-
-            return x
+    , ..
     }
