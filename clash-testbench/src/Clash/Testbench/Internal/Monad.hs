@@ -42,7 +42,7 @@ import Data.IORef (IORef, newIORef, readIORef, writeIORef, modifyIORef)
 import Data.List (partition, sort, sortBy, groupBy)
 import Data.Maybe (catMaybes)
 
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Array as A
 
@@ -243,9 +243,9 @@ instance
       , signalName = name
       , signalUpdate = Just (writeIORef extVal . Just)
       , signalExpect = modifyIORef expectations . (:)
-      , signalVerify = \mode -> do
+      , signalVerify = \sMode -> Verifier $ \vMode -> do
           curStep <- liftIO $ readIORef simStepRef
-          value <- liftIO $ signalCurVal mode
+          value <- liftIO $ signalCurVal sMode
           expct <- liftIO $ readIORef expectations
 
           let
@@ -253,8 +253,7 @@ instance
               partition (`leq` Expectation (curStep + 1, undefined)) expct
 
           liftIO $ writeIORef expectations later
-          mapM_ ((value &) . snd . expectation) current
-
+          mapM_ ((`verifier` vMode) . (value &) . snd . expectation) current
       , signalPrint = Nothing
       , signalPlug = Nothing
       , ..
@@ -449,7 +448,6 @@ initializeLiftTB name x = liftTB accInit x
 progressCheck :: IORef Int -> Bool -> TB (IO Bool)
 progressCheck simStepRef initialProgress = do
   simStepCache <- liftIO ((offset <$> readIORef simStepRef) >>= newIORef)
-
   return $ do
     globalRef <- readIORef simStepRef
     localRef  <- readIORef simStepCache
@@ -458,13 +456,12 @@ progressCheck simStepRef initialProgress = do
       writeIORef simStepCache globalRef
 
     return $ globalRef > localRef
-
  where
   offset
     | initialProgress = (+ (-1))
     | otherwise       = id
 
-
+-- | Creates a new 'History' container.
 newHistory ::
   TB (History a)
 newHistory = do
@@ -474,6 +471,7 @@ newHistory = do
   historyBuffer <- liftIO $ newIORef Nothing
   return History{..}
 
+-- | Memorizes a value inside the given 'History' container.
 memorize :: MonadIO m => History a -> a -> m ()
 memorize History{..} value =
   liftIO $ readIORef historySize >>= \case
@@ -490,6 +488,8 @@ memorize History{..} value =
       writeArray buf pos $ Just value
       writeIORef historyBufferPos $ pos + 1
 
+-- | Reveals the history of a test bench signal. The returned list is
+-- given in temporal order.
 history ::
   (KnownDomain dom, MonadIO m) =>
   TBSignal dom a ->
@@ -499,10 +499,8 @@ history s = liftIO $ readIORef historyBuffer >>= \case
   Just buf -> do
     pos <- readIORef historyBufferPos
     catMaybes . uncurry (flip (<>)) . splitAt pos <$> getElems buf
-
  where
   History{..} = signalHistory s
-
 
 -- | Some generalized extender for the accumulated continuation.
 extendVia ::

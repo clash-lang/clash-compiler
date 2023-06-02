@@ -12,6 +12,7 @@ module Clash.Testbench.Generate where
 
 import Hedgehog
 import Hedgehog.Gen
+import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.State.Lazy (liftIO, when, modify)
 import Data.IORef (newIORef, readIORef, writeIORef)
 
@@ -102,7 +103,7 @@ matchIOGen ::
   forall dom i o.
   (NFDataX i, BitPack i, KnownDomain dom, Eq o, Show o) =>
   TBSignal dom o -> Gen (i, o) -> TB (TBSignal dom i)
-matchIOGen expectedOutput gen = do
+matchIOGen checkedOutput gen = do
   TBDomain{..} <- tbDomain @dom
 
   vRef <- liftIO $ newIORef undefined
@@ -116,12 +117,11 @@ matchIOGen expectedOutput gen = do
 
         if progress
         then do
-          (i, o) <- sample gen
+          (input, expectedOutput) <- sample gen
           curStep <- readIORef simStepRef
-          signalExpect expectedOutput $ Expectation (curStep, verify o)
-          writeIORef vRef i
-
-          return i
+          signalExpect checkedOutput $ Expectation (curStep, verifier expectedOutput)
+          writeIORef vRef input
+          return input
         else
           readIORef vRef
     , signalPrint  = Nothing
@@ -129,11 +129,18 @@ matchIOGen expectedOutput gen = do
     }
 
  where
-  verify x y = do
-    when (x /= y)
-      $ footnote
-      $ "Expected '" <> show x <> "' but the output is '" <> show y <> "'"
-    x === x
+  verifier :: o -> o -> Verifier
+  verifier expectedOutput observedOutput = Verifier $ \case
+    Simple   -> checkDifferenceWith error undefined
+    Hedgehog -> checkDifferenceWith footnote (expectedOutput === observedOutput)
+   where
+    checkDifferenceWith :: MonadIO m => (String -> m ()) -> m () -> m ()
+    checkDifferenceWith report abort =
+      when (expectedOutput /= observedOutput) $ do
+        report
+           $ "Expected to see the output '" <> show expectedOutput <> "',"
+          <> "but the observed output is '" <> show observedOutput <> "'."
+        abort
 
 -- | Extended version of 'matchIOGen', which allows to specify valid
 -- IO behavior over a finite amount of simulation steps. During native
@@ -168,7 +175,7 @@ matchIOGenN checkedOutput gen = mdo
               memorize signalHistory h
               writeIORef vRef ((i, o) : xr)
               curStep <- readIORef simStepRef
-              signalExpect checkedOutput $ Expectation (curStep, verify s i o)
+              signalExpect checkedOutput $ Expectation (curStep, verifier s i o)
               return i
             [(h, _)] -> do
               memorize signalHistory h
@@ -176,7 +183,7 @@ matchIOGenN checkedOutput gen = mdo
 
               writeIORef vRef ((i, o) : xr)
               curStep <- readIORef simStepRef
-              signalExpect checkedOutput $ Expectation (curStep, verify s i o)
+              signalExpect checkedOutput $ Expectation (curStep, verifier s i o)
               return i
             _ -> error "unreachable"
           else \case
@@ -193,8 +200,14 @@ matchIOGenN checkedOutput gen = mdo
   return s
 
  where
-  verify generatedInput currentInput expectedOutput observedOutput = do
-    when (expectedOutput /= observedOutput) $ do
+  verifier :: TBSignal dom i -> i -> o -> o -> Verifier
+  verifier generatedInput currentInput expectedOutput observedOutput =
+    Verifier $ \case
+      Simple   -> checkDifferenceWith error undefined
+      Hedgehog -> checkDifferenceWith footnote failure
+   where
+    checkDifferenceWith :: MonadIO m => (String -> m ()) -> m () -> m ()
+    checkDifferenceWith report abort = do
       xs <-
         (<> [(currentInput, observedOutput)])
           <$> (zip <$> history generatedInput <*> history checkedOutput)
@@ -207,21 +220,21 @@ matchIOGenN checkedOutput gen = mdo
         iLen = maximum $ (length iHeading :) $ fmap (length . show . fst) xs
         oLen = maximum $ (length oHeading :) $ fmap (length . show . snd) xs
 
-      footnote $ unlines $
-        [ "Expected to see the output '" <> show expectedOutput <> "',"
-        , "but the observed output is '" <> show observedOutput <> "'."
-        , ""
-        , "I/O History:"
-        , ""
-        , cHeading <>
-          replicate (iLen - length iHeading + 2) ' ' <> iHeading <>
-          replicate (oLen - length oHeading + 2) ' ' <> oHeading
-        , replicate (cLen + iLen + oLen + 4) '-'
-        ] <>
-        [ replicate (cLen - length (show c))     ' ' <> show c <>
-          replicate (iLen - length (show i) + 2) ' ' <> show i <>
-          replicate (oLen - length (show o) + 2) ' ' <> show o
-        | (c, (i, o)) <- zip [0 :: Int,1..] xs
-        ]
-
-      failure
+      when (expectedOutput /= observedOutput) $ do
+        report $ unlines $
+          [ "Expected to see the output '" <> show expectedOutput <> "',"
+          , "but the observed output is '" <> show observedOutput <> "'."
+          , ""
+          , "I/O History:"
+          , ""
+          , cHeading <>
+            replicate (iLen - length iHeading + 2) ' ' <> iHeading <>
+            replicate (oLen - length oHeading + 2) ' ' <> oHeading
+          , replicate (cLen + iLen + oLen + 4) '-'
+          ] <>
+          [ replicate (cLen - length (show c))     ' ' <> show c <>
+            replicate (iLen - length (show i) + 2) ' ' <> show i <>
+            replicate (oLen - length (show o) + 2) ' ' <> show o
+          | (c, (i, o)) <- zip [0 :: Int,1..] xs
+          ]
+        abort

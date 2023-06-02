@@ -6,6 +6,7 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 All it needs for building and running test benches that are created
 from Clash circuitry.
 -}
+{-# LANGUAGE OverloadedStrings #-}
 module Clash.Testbench.Simulate
   ( TB
   , LiftTB((@@))
@@ -54,34 +55,52 @@ import Clash.Testbench.Internal.ID
 import Clash.Testbench.Internal.Signal
 import Clash.Testbench.Internal.Monad
 
+-- | Simulation Settings
+data SimSettings =
+  SimSettings
+    { quietRun :: Bool
+    , validate :: Bool
+    }
+  deriving (Eq, Ord, Show)
+
+
 -- | @simulate n testbench@ simulates the @testbench@, created in the
 -- 'Clash.Testbench.Simulate.TB' context, for @n@ simulation steps.
 --
 -- The simulation is run on the native Clash implementation, as given
 -- by the Clash signals and signal functions lifted into 'TB'.
-simulate :: Int -> TB a -> IO a
-simulate steps testbench = do
-  (r, Testbench{..}) <- runTB Internal testbench
-  replicateM_ (steps + 1) $ do
+simulate :: (MonadIO m, Verify m) => SimSettings -> TB a -> m a
+simulate SimSettings{..} testbench = do
+  (r, Testbench{..}) <- liftIO $ runTB Internal testbench
+  replicateM_ (tbSimSteps + 1) $ do
     forM_ tbDomains $ \(d, map (tbSignalLookup !) -> xs) ->
       (`onAllDomainTypes` d) $ \(TBDomain{..} :: TBDomain 'FINAL dom) -> do
 --        i <- readIORef simStepRef
         forM_ xs $ onAllSignalTypes $ \s -> do
-          v <- signalCurVal s
-          case signalPrint s of
+          when validate $ case s of
+            SimSignal{..} -> verify signalVerify
+            _ -> return ()
+          v <- liftIO $ signalCurVal s
+          when (not quietRun) $ case signalPrint s of
             Nothing    -> return ()
-            Just toStr -> Prelude.putStrLn . (<> toStr v) $ case s of
+            Just toStr -> liftIO $ Prelude.putStrLn . (<> toStr v) $ case s of
               IOInput{}   -> "I "
               SimSignal{} -> "O "
               TBSignal{}  -> "S "
-        modifyIORef simStepRef (+ 1)
-
+        liftIO $ modifyIORef simStepRef (+ 1)
   return r
 
--- | Turns a test bench design into a 'Hedghog.Property' using
--- internal simulation.
+-- | Turns a test bench design into a 'Hedgehog.Property' according to
+-- the given simulation mode.
 tbProperty :: TB () -> Hedgehog.Property
-tbProperty testbench = Hedgehog.property $ do
+tbProperty = Hedgehog.property . simulate
+  SimSettings
+    { quietRun = True
+    , validate = True
+    }
+
+{-
+
   (_, Testbench{..}) <- liftIO $ runTB Internal testbench
   replicateM_ tbSimSteps $ do
     forM_ tbDomains $ \(d, map (tbSignalLookup !) -> xs) ->
@@ -91,7 +110,7 @@ tbProperty testbench = Hedgehog.property $ do
           _             -> return ()
 
         liftIO $ modifyIORef simStepRef (+ 1)
-
+-}
 data VPIState =
   VPIState
     { testbench   :: Testbench
@@ -100,6 +119,7 @@ data VPIState =
     , vpiClock    :: Bit
     , vpiSimSteps :: Int
     , vpiInit     :: Bool
+    , simSettings :: SimSettings
     }
 
 -- | @simulate n testbench@ simulates the @testbench@, created in the
@@ -110,65 +130,66 @@ data VPIState =
 -- environment, but must to be bound to some @ffiMain@ foreign call
 -- that is shipped via a shared library and executed by an external
 -- simulator. See Clash-FFI for more details on this.
-simulateFFI :: Int -> TB a -> IO a
-simulateFFI steps tb = do
-  (r, testbench@Testbench{..}) <- runTB External tb
+simulateFFI :: MonadIO m => SimSettings -> TB a -> m a
+simulateFFI simSettings tb = do
+  (r, testbench@Testbench{..}) <- liftIO $ runTB External tb
 
-  let ?testbench = testbench
+  let
+    vpiClock    = low
+    vpiSimSteps = tbSimSteps
+    vpiInit     = True
 
-  runSimAction $ do
-    -- print simulator info
-    putStrLn "[ Simulator Info ]"
-    Info{..} <- receiveSimulatorInfo
-    simPutStrLn infoProduct
-    simPutStrLn infoVersion
-    putStrLn ""
+  let
+    ?state = VPIState{..}
 
-    -- print top modules
-    putStrLn "[ Top Modules ]"
-    tops' <- topModules
-    topNames <- mapM (receiveProperty Name) tops'
-    mapM_ simPutStrLn topNames
-    putStrLn ""
+  -- print simulator info
+  putStrLn "[ Simulator Info ]"
+  Info{..} <- liftIO $ runSimAction $ receiveSimulatorInfo
+  putStrLn infoProduct
+  putStrLn infoVersion
+  putStrLn ""
 
-    -- iverilog runs into problems if iterated objects are used as a
-    -- long-term reference. Hence, they only should be used for
-    -- analyzing the architecture upfront. For long-term references to
-    -- be reusable during simulation, the objects should be queried via
-    -- their architectural name reference instead.
-    topM <- M.fromList
-      <$> mapM (\x -> (B.unpack x, ) <$> findTopModule x) topNames
+  -- print top modules
+  putStrLn "[ Top Modules ]"
+  tops' <- liftIO $ runSimAction $ topModules
+  topNames <- liftIO $ runSimAction $ mapM (receiveProperty Name) tops'
+  mapM_ putStrLn topNames
+  putStrLn ""
 
-    -- add the VPI module references to the signals
-    vpiSignals <-
-      forM tbSignals $ onAllSignalTypes $ \case
-        s@SimSignal{..} ->
-          case M.lookup signalName topM of
-            Just m  -> (signalId, ) . SomeSignal <$> matchModule m s
-            Nothing -> error $ "No module matches \"" <> signalName <> "\""
-        x -> return (signalId x, SomeSignal x)
+  -- iverilog runs into problems if iterated objects are used as a
+  -- long-term reference. Hence, they only should be used for
+  -- analyzing the architecture upfront. For long-term references to
+  -- be reusable during simulation, the objects should be queried via
+  -- their architectural name reference instead.
+  topM <- liftIO $ runSimAction $ M.fromList
+    <$> mapM (\x -> (B.unpack x, ) <$> findTopModule x) topNames
 
-    let
-      ?state =
-        VPIState
-          { vpiClock    = low
-          , vpiSimSteps = steps
-          , vpiInit     = True
-          , testbench   = testbench
-              { tbSignals      = map snd vpiSignals
-              , tbSignalLookup = A.array (A.bounds tbSignalLookup) vpiSignals
-              }
-          , ..
-          }
+  -- add the VPI module references to the signals
+  vpiSignals <-
+    forM tbSignals $ onAllSignalTypes $ \case
+      s@SimSignal{..} ->
+        case M.lookup signalName topM of
+          Just m  -> (signalId, ) . SomeSignal <$> matchModule m s
+          Nothing -> error $ "No module matches \"" <> signalName <> "\""
+      x -> return (signalId x, SomeSignal x)
 
-    putStrLn "[ Simulation start ]"
-    putStrLn ""
+  let
+    ?state =
+      ?state
+        { testbench   = testbench
+            { tbSignals      = map snd vpiSignals
+            , tbSignalLookup = A.array (A.bounds tbSignalLookup) vpiSignals
+            }
+        }
 
-    nextCB ReadWriteSynch 0 assignInputs
+  putStrLn "[ Simulation start ]"
+  putStrLn ""
+
+  nextCB ReadWriteSynch 0 assignInputs
 
   return r
 
-assignInputs :: (?state :: VPIState) => SimAction ()
+assignInputs :: MonadIO m => (?state :: VPIState) => m ()
 assignInputs = do
 --  SimTime time <- receiveTime Sim (Nothing @Object)
 --  putStrLn $ "assignInputs " <> show (time, vpiClock, vpiInit)
@@ -193,10 +214,10 @@ assignInputs = do
   Testbench{..} = testbench
 
   assignModuleInputs ::
-    Typeable b =>
+    MonadIO m =>
     Maybe ModuleInterface ->
     ID () ->
-    SimCont b ()
+    m ()
   assignModuleInputs = \case
     Nothing                  -> const $ return ()
     Just ModuleInterface{..} -> \sid@(SomeID x) ->
@@ -213,11 +234,13 @@ assignInputs = do
                  liftIO (signalCurVal s) >>= \v -> do
                    sendV port v
 
-  sendV :: (BitPack a, Typeable b) => Port -> a -> SimCont b ()
-  sendV port v = do
-    sendValue port (BitVectorVal SNat $ pack v) $ InertialDelay $ SimTime 0
+  sendV :: (BitPack a, MonadIO m) => Port -> a -> m ()
+  sendV port v =
+    liftIO $ runSimAction $
+      sendValue port (BitVectorVal SNat $ pack v)
+        $ InertialDelay $ SimTime 0
 
-readOutputs :: (?state :: VPIState) => SimAction ()
+readOutputs :: (?state :: VPIState, MonadIO m, Verify m) => m ()
 readOutputs = do
 --  SimTime time <- receiveTime Sim (Nothing @Object)
 --  putStrLn $ "readOutputs " <> show time
@@ -229,19 +252,23 @@ readOutputs = do
         SimSignal{..} -> case signalPlug of
           Nothing -> error "Cannot read from module"
           Just ModuleInterface{..} ->
-            receiveValue VectorFmt (port outputPort) >>= \case
-              BitVectorVal SNat v -> case signalUpdate of
-                Just upd -> liftIO $ upd $ unpack $ resize v
-                Nothing  -> error "No signal update"
-              _ -> error "Unexpected return format"
+            liftIO $ runSimAction $
+              receiveValue VectorFmt (port outputPort) >>= \case
+                BitVectorVal SNat v -> case signalUpdate of
+                  Just upd -> liftIO $ upd $ unpack $ resize v
+                  Nothing  -> error "No signal update"
+                _ -> error "Unexpected return format"
         _ -> return ()
       -- print the watched signals
       i <- liftIO $ readIORef simStepRef
       when (i > 0) $ forM_ xs $ onAllSignalTypes $ \s -> do
+        when validate $ case s of
+          SimSignal{..} -> verify signalVerify
+          _ -> return ()
         v <- liftIO $ signalCurVal s
-        case signalPrint s of
+        when (not quietRun) $ case signalPrint s of
           Nothing    -> return ()
-          Just toStr -> putStrLn . (<> toStr v) $ case s of
+          Just toStr -> putStrLn . B.pack . (<> toStr v) $ case s of
             IOInput{}   -> "I "
             SimSignal{} -> "O "
             TBSignal{}  -> "S "
@@ -260,15 +287,16 @@ readOutputs = do
 
  where
   VPIState{..} = ?state
+  SimSettings{..} = simSettings
   Testbench{..} = testbench
 
 matchModule ::
-  (?testbench :: Testbench, KnownDomain dom, BitPack a, Typeable b) =>
-  Module -> TBSignal 'FINAL dom a -> SimCont b (TBSignal 'FINAL dom a)
+  (?state :: VPIState, KnownDomain dom, BitPack a, MonadIO m) =>
+  Module -> TBSignal 'FINAL dom a -> m (TBSignal 'FINAL dom a)
 matchModule module_ = \case
   tbs@SimSignal{..} -> do
-    ports <- modulePorts module_
-    dirs  <- mapM direction ports
+    ports <- liftIO $ runSimAction $ modulePorts module_
+    dirs  <- liftIO $ runSimAction $ mapM direction ports
 
     let
       inputPorts  = map fst $ filter (isInput  . snd) $ zip ports dirs
@@ -282,7 +310,7 @@ matchModule module_ = \case
             )
 
     outputPort <- case outputPorts of
-      [p] -> do
+      [p] -> liftIO $ runSimAction $ do
         portNameBS    <- receiveProperty Name p
         portSize      <- fromEnum <$> getProperty Size p
         portIndex     <- fromEnum <$> getProperty PortIndex p
@@ -309,11 +337,11 @@ matchModule module_ = \case
     _      -> False
 
 matchPort ::
-  (?testbench :: Testbench, Typeable b) =>
-  Module -> (ID (), Maybe Port) -> SimCont b (ID (), PortInterface)
+  (?state :: VPIState, MonadIO m) =>
+  Module -> (ID (), Maybe Port) -> m (ID (), PortInterface)
 matchPort m = \case
-  (_, Nothing)     -> error "Not enough ports"
-  (sid, Just p) -> do
+  (_, Nothing)   -> error "Not enough ports"
+  (sid, Just p) -> liftIO $ runSimAction $ do
     portNameBS    <- receiveProperty Name p
     portSize      <- fromEnum <$> getProperty Size p
     portIndex     <- fromEnum <$> getProperty PortIndex p
@@ -328,7 +356,8 @@ matchPort m = \case
 
     return (sid, PortInterface{..})
  where
-  Testbench{..} = ?testbench
+  VPIState{..} = ?state
+  Testbench{..} = testbench
 
   match :: forall b. Int -> Int -> String -> String -> SimCont b ()
   match n k tName pName =
@@ -367,22 +396,33 @@ getByName m name = do
 --putStr :: String -> SimCont a ()
 --putStr = simPutStr . B.pack
 
-putStrLn :: String -> SimCont a ()
-putStrLn = simPutStrLn . B.pack
+putStrLn :: (?state :: VPIState, MonadIO m) => B.ByteString -> m ()
+putStrLn = liftIO . when (not quietRun) . runSimAction . simPutStrLn
+ where
+  VPIState{..} = ?state
+  SimSettings{..} = simSettings
 
 --print :: Show a => a -> SimCont b ()
 --print = simPutStrLn . B.pack . show
 
 nextCB ::
+  MonadIO m =>
   (Maybe Object -> Time -> CallbackReason) ->
   Int64 ->
-  SimAction () ->
-  SimAction ()
+  IO () ->
+  m ()
 nextCB reason time action =
-  void $ registerCallback
+  void $ liftIO $ runSimAction $ registerCallback
     CallbackInfo
       { cbReason  = reason Nothing (SimTime time)
-      , cbRoutine = const (runSimAction action >> return 0)
+      , cbRoutine = const (action >> return 0)
       , cbIndex   = 0
       , cbData    = B.empty
       }
+
+tbPropertyFFI :: TB () -> Hedgehog.Property
+tbPropertyFFI = Hedgehog.property . simulate
+  SimSettings
+    { quietRun = True
+    , validate = True
+    }

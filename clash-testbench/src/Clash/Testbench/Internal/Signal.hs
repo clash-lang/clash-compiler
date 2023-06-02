@@ -9,12 +9,12 @@ Lifted signal types and internal data structures for
 module Clash.Testbench.Internal.Signal where
 
 import Algebra.PartialOrd
+import Control.Monad.IO.Class (MonadIO)
+import Data.Array.IO (IOArray)
 import Data.Function (on)
-
+import Data.IORef (IORef)
 import Hedgehog (PropertyT)
 
-import Data.Array.IO (IOArray)
-import Data.IORef (IORef)
 import Clash.Prelude
   ( KnownDomain(..), BitPack(..), SDomainConfiguration(..), NFDataX, Type
   , Domain, Signal, Clock, Reset, Enable
@@ -23,6 +23,7 @@ import Clash.Prelude
 
 import Clash.FFI.VPI.Module (Module)
 import Clash.FFI.VPI.Port (Port, Direction)
+
 import Clash.Testbench.Internal.ID
 
 -- | Test bench design stages
@@ -38,12 +39,12 @@ data Stage :: Type where
   -- successfully. Post-processing also introduces the switch from
   -- 'USER' to 'FINAL' on the type level.
 
--- | The supported simulation modes sources.
-data SimMode where
-  Internal :: SimMode
-  -- ^ Internal pure Haskell based simulation
-  External :: SimMode
-  -- ^ Co-Simulation via Clash-FFI
+-- | Supported simulation modes sources
+data SimMode =
+    Internal
+    -- ^ Internal pure Haskell based simulation
+  | External
+    -- ^ Co-Simulation via Clash-FFI
 
 -- | Type family for handling simulation mode dependent types.
 -- 'SimMode' does not have to be fixed during test bench creation, but
@@ -53,7 +54,7 @@ type family SimModeDependent (s :: Stage) a where
   SimModeDependent 'USER  a = SimMode -> a
   SimModeDependent 'FINAL a = a
 
--- | Clash-FFI Port connector.
+-- | Clash-FFI port connector
 data PortInterface =
   PortInterface
     { port          :: Port
@@ -63,24 +64,25 @@ data PortInterface =
     , portDirection :: Direction
     }
 
--- | Clash-FFI Module connector.
+-- | Clash-FFI module connector
 data ModuleInterface =
   ModuleInterface
-    { module_       :: Module
+    { module_    :: Module
     , inputPort  :: ID () -> PortInterface
       -- TODO: multiple port support vie Bundle/Unbundle
     , outputPort :: PortInterface
     }
 
+-- | Size bounded signal history
 data History a =
   History
-    { historySize :: IORef Int
+    { historySize      :: IORef Int
     , historyBufferPos :: IORef Int
-    , historyBuffer :: IORef (Maybe (IOArray Int (Maybe a)))
+    , historyBuffer    :: IORef (Maybe (IOArray Int (Maybe a)))
     }
 
--- | Expectations on certain outputs at the given simulation step.
-newtype Expectation a = Expectation { expectation :: (Int, a -> PropertyT IO ()) }
+-- | Expectations on certain outputs at the given simulation step
+newtype Expectation a = Expectation { expectation :: (Int, a -> Verifier) }
 
 -- | Expectations cannot be compared: they are always unequal.
 instance Eq (Expectation a) where
@@ -91,6 +93,31 @@ instance Eq (Expectation a) where
 instance PartialOrd (Expectation a) where
   leq        (Expectation (x, _)) (Expectation (y, _)) = x <= y
   comparable (Expectation (x, _)) (Expectation (y, _)) = x /= y
+
+-- | The verification mode determines the environment in which a
+-- verifier is executed.
+data VerificationMode m where
+  Simple   :: VerificationMode IO
+  Hedgehog :: VerificationMode (PropertyT IO)
+
+-- | Existential quantified container for passing different
+-- verification environments around.
+data Verifier =
+  Verifier
+    { verifier :: (forall m. MonadIO m => VerificationMode m -> m ())
+    }
+
+-- | Runs a verifier in a supported verification environment.
+class Verify m where
+  verify :: Verifier -> m ()
+
+instance Verify IO where
+  verify = \case
+    Verifier v -> v Simple
+
+instance Verify (PropertyT IO) where
+  verify = \case
+    Verifier v -> v Hedgehog
 
 -- | The lifted 'Clash.Signal.Signal' type to be used in
 -- 'Clash.Testbench.Internal.Monad.TB'.
@@ -116,7 +143,7 @@ data TBSignal (s :: Stage) (dom :: Domain) a =
       , signalExpect :: Expectation a -> IO ()
       -- ^ Registers an expectation on the content of this signal to
       -- be verified during simulation
-      , signalVerify :: SimModeDependent s (PropertyT IO ())
+      , signalVerify :: SimModeDependent s Verifier
       -- ^ The expectation verifier
       , signalHistory :: History a
       -- ^ Bounded history of signal values
