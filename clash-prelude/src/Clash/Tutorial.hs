@@ -2,7 +2,7 @@
 Copyright : © 2014-2016, Christiaan Baaij,
               2017-2019, Myrtle Software Ltd
               2017     , QBayLogic, Google Inc.,
-              2021     , QBayLogic B.V.
+              2021-2023, QBayLogic B.V.
               2022     , LUMI GUIDE FIETSDETECTIE B.V.
 
 Licence   : Creative Commons 4.0 (CC BY 4.0) (https://creativecommons.org/licenses/by/4.0/)
@@ -232,15 +232,22 @@ at the same time. If you followed the installation instructions based on
 start the Clash compiler in interpretive mode by:
 
 @
-stack exec --package clash-ghc -- clashi
+stack exec --resolver lts-19 --package clash-ghc -- clashi
 @
 
-If you followed the installation instruction based on
-<https://snapcraft.io/clash snap> (Linux only), you can start the Clash compiler
-in interpretive mode by:
+If instead you followed the [instructions](https://clash-lang.org/install/linux/)
+to setup a starter project with Stack, you can also run @clashi@ inside such a
+project. Change to the directory of the project, and invoke
 
 @
-clash.clashi
+stack run -- clashi
+@
+
+If you instead set up the starter project with GHC and Cabal, change to the
+directory of the project and invoke
+
+@
+cabal run -- clashi
 @
 
 For those familiar with Haskell/GHC, this is indeed just @GHCi@, with three
@@ -263,7 +270,7 @@ choice in editor, the following @edit-load-run@ cycle probably work best for you
       * Once a file has been edited and saved, type @:r@ to reload the files in
         the interpreter
 
-You are of course free to deviate from these suggestions as you see fit :-) It
+You are of course free to deviate from these suggestions as you see fit :-). It
 is just recommended that you have the Clash interpreter open during this
 tutorial.
 -}
