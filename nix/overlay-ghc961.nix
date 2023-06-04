@@ -1,9 +1,4 @@
-{ pkgs
-, ghc-tcplugins-extra
-, ghc-typelits-extra
-, ghc-typelits-knownnat
-, ghc-typelits-natnormalise
-}:
+{ pkgs }:
 next: prev:
 let
   inherit (pkgs.haskell.lib) doJailbreak dontCheck markUnbroken;
@@ -18,31 +13,6 @@ in {
 
   # Use a newer version than the default in nixpkgs.
   doctest-parallel = next.doctest-parallel_0_3_0_1;
-
-  # Use a special version we fetch from flake inputs.
-  ghc-typelits-extra =
-    prev.callCabal2nix "ghc-typelits-extra" "${ghc-typelits-extra}" {};
-
-  # Use a special version we fetch from flake inputs.
-  ghc-tcplugins-extra =
-    prev.callCabal2nix
-      "ghc-tcplugins-extra"
-      "${ghc-tcplugins-extra}"
-      {};
-
-  # Use a special version we fetch from flake inputs.
-  ghc-typelits-knownnat =
-    prev.callCabal2nix
-      "ghc-typelits-knownnat"
-      "${ghc-typelits-knownnat}"
-      {};
-
-  # Use a special version we fetch from flake inputs.
-  ghc-typelits-natnormalise =
-    prev.callCabal2nix
-      "ghc-typelits-natnormalise"
-      "${ghc-typelits-natnormalise}"
-      {};
 
   # Use a branch with changes to support GHC 9.6.1.
   hint =
