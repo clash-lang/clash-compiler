@@ -63,16 +63,15 @@ untilValid f = \(DelayState d u) -> DelayState d <$> f u
 >>> :{
 delayS :: Int -> State DelayState (Maybe Int)
 delayS n = do
+  history   %= (n +>>)
   remaining <- use untilValid
   if remaining > 0
   then do
-    history %= (n +>>)
-    untilValid -= 1
-    return Nothing
-  else do
-    history %= (n +>>)
-    out     <- uses history C.last
-    return (Just out)
+     untilValid -= 1
+     return Nothing
+   else do
+     out <- uses history C.last
+     return (Just out)
 :}
 
 >>> let initialDelayState = DelayState (C.repeat 0) maxBound
@@ -179,7 +178,7 @@ mealyB = hideClockResetEnable E.mealyB
 --
 -- @
 -- data DelayState = DelayState
---   { _delayed    :: Vec 4 Int
+--   { _history    :: Vec 4 Int
 --   , _untilValid :: Index 4
 --   }
 -- makeLenses 'DelayedState
@@ -188,15 +187,14 @@ mealyB = hideClockResetEnable E.mealyB
 --
 -- delayS :: Int -> State DelayState (Maybe Int)
 -- delayS n = do
+--   history   %= (n +>>)
 --   remaining <- use untilValid
 --   if remaining > 0
 --   then do
 --      remaining -= 1
---      delayed   %= (n +>>)
 --      return Nothing
 --    else do
---      out     <- uses delayed last
---      delayed %= (n +>>)
+--      out <- uses history last
 --      return (Just out)
 --
 -- delayTop :: HiddenClockResetEnable dom  => 'Signal' dom Int -> 'Signal' dom (Maybe Int)
@@ -204,7 +202,7 @@ mealyB = hideClockResetEnable E.mealyB
 -- @
 --
 -- >>> L.take 7 $ simulate @System delayTop [1,2,3,4,5,6,7,8]
--- [Nothing,Nothing,Nothing,Nothing,Just 1,Just 2,Just 3]
+-- [Nothing,Nothing,Nothing,Just 1,Just 2,Just 3,Just 4]
 -- ...
 --
 mealyS

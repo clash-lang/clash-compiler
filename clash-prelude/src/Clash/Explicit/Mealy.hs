@@ -63,16 +63,15 @@ untilValid f = \(DelayState d u) -> DelayState d <$> f u
 >>> :{
 delayS :: Int -> State DelayState (Maybe Int)
 delayS n = do
+  history   %= (n +>>)
   remaining <- use untilValid
   if remaining > 0
   then do
-    history %= (n +>>)
-    untilValid -= 1
-    return Nothing
-  else do
-    history %= (n +>>)
-    out     <- uses history C.last
-    return (Just out)
+     untilValid -= 1
+     return Nothing
+   else do
+     out <- uses history C.last
+     return (Just out)
 :}
 
 >>> let initialDelayState = DelayState (C.repeat 0) maxBound
@@ -183,8 +182,8 @@ mealy clk rst en f iS =
 -- delayTop clk rst en = 'mealyS' clk rst en delayS initialDelayState
 -- @
 --
--- >>> L.take 7 $ simulate (delayTop systemClockGen systemResetGen enableGen) [1,2,3,4,5,6,7,8]
--- [Nothing,Nothing,Nothing,Nothing,Just 1,Just 2, Just 3]
+-- >>> L.take 7 $ simulate (delayTop systemClockGen systemResetGen enableGen) [-100,1,2,3,4,5,6,7,8]
+-- [Nothing,Nothing,Nothing,Nothing,Just 1,Just 2,Just 3]
 --
 mealyS
   :: ( KnownDomain dom
