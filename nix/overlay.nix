@@ -1,6 +1,10 @@
 # This overlay contains everything which is non-specific to the version of GHC
 # used. Since it is applied to nixpkgs, we also import and apply the more
 # specific overlay for the version of GHC in `compilerVersion`.
+#
+# We should only need to edit this file directly if we want to add additional
+# packages to the environment, or need to change the configuration of the
+# different packages maintained by QBayLogic.
 
 { ghc-tcplugins-extra
 , ghc-typelits-extra
@@ -8,7 +12,7 @@
 , ghc-typelits-natnormalise
 }:
 compilerVersion:
-next: prev:
+final: prev:
 let
   # An overlay with the things we need to change for the specified GHC version.
   ghcOverlay = import (./. + "/overlay-${compilerVersion}.nix") {
@@ -20,44 +24,43 @@ let
   # This is mostly intended for packages developed by QBayLogic which are
   # standalone repositories, e.g. the typechecker plugins needed for Clash.
   haskellExternalPackages =
-    hnext: hprev: {
+    hfinal: hprev: {
       ghc-tcplugins-extra =
         hprev.callCabal2nix
           "ghc-tcplugins-extra"
           "${ghc-tcplugins-extra}"
-          {};
+          { };
 
       ghc-typelits-extra =
         hprev.callCabal2nix
           "ghc-typelits-extra"
           "${ghc-typelits-extra}"
-          {};
+          { };
 
       ghc-typelits-knownnat =
         hprev.callCabal2nix
           "ghc-typelits-knownnat"
           "${ghc-typelits-knownnat}"
-          {};
+          { };
 
       ghc-typelits-natnormalise =
         hprev.callCabal2nix
           "ghc-typelits-natnormalise"
           "${ghc-typelits-natnormalise}"
-          {};
+          { };
     };
 
   # An overlay with the packages in this repository.
   haskellInternalPackages =
-    # Might be able to replace rec with use of hfinal?
-    hnext: hprev: rec {
+    hfinal: hprev: {
       clash-benchmark =
         let
           unmodified = hprev.callCabal2nix "clash-benchmark" ../benchmark {
-            inherit clash-ghc clash-lib clash-prelude;
+            inherit (hfinal) clash-ghc clash-lib clash-prelude;
           };
         in
         unmodified.overrideAttrs (old: {
-          buildInputs = (old.buildInputs or []) ++ [
+          buildInputs = (old.buildInputs or [ ]) ++ [
             prev.makeWrapper
           ];
 
@@ -74,37 +77,37 @@ let
 
       clash-cores =
         hprev.callCabal2nixWithOptions "clash-cores" ../clash-cores "--flag nix" {
-          inherit clash-prelude;
+          inherit (hfinal) clash-prelude;
         };
 
       clash-cosim =
         let
           unmodified =
             hprev.callCabal2nix "clash-cosim" ../clash-cosim {
-              inherit clash-prelude;
+              inherit (hfinal) clash-prelude;
             };
         in
         unmodified.overrideAttrs (old: {
-          nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+          nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
             prev.verilog
           ];
         });
 
       clash-ffi =
         hprev.callCabal2nix "clash-ffi" ../clash-ffi {
-          inherit clash-prelude;
+          inherit (hfinal) clash-prelude;
         };
 
       clash-ghc =
         let
           unmodified =
             hprev.callCabal2nix "clash-ghc" ../clash-ghc {
-              inherit clash-lib clash-prelude;
+              inherit (hfinal) clash-lib clash-prelude;
             };
         in
         prev.haskell.lib.enableSharedExecutables
           (unmodified.overrideAttrs (old: {
-            buildInputs = (old.buildInputs or []) ++ [
+            buildInputs = (old.buildInputs or [ ]) ++ [
               prev.makeWrapper
             ];
 
@@ -121,12 +124,12 @@ let
 
       clash-lib =
         hprev.callCabal2nix "clash-lib" ../clash-lib {
-          inherit clash-prelude;
+          inherit (hfinal) clash-prelude;
         };
 
       clash-lib-hedgehog =
         hprev.callCabal2nix "clash-lib-hedgehog" ../clash-lib-hedgehog {
-          inherit clash-lib;
+          inherit (hfinal) clash-lib;
         };
 
       clash-prelude =
@@ -134,16 +137,16 @@ let
           "clash-prelude"
           ../clash-prelude
           "--flag workaround-ghc-mmap-crash"
-          {};
+          { };
 
       clash-prelude-hedgehog =
         hprev.callCabal2nix "clash-prelude-hedgehog" ../clash-prelude-hedgehog {
-          inherit clash-prelude;
+          inherit (hfinal) clash-prelude;
         };
 
       clash-profiling =
         hprev.callCabal2nix "clash-profiling" ../benchmark/profiling/run {
-          inherit
+          inherit (hfinal)
             clash-benchmark
             clash-ghc
             clash-lib
@@ -155,11 +158,11 @@ let
         let
           unmodified =
             hprev.callCabal2nix "clash-profiling-prepare" ../benchmark/profiling/prepare {
-              inherit clash-benchmark clash-lib clash-prelude;
+              inherit (hfinal) clash-benchmark clash-lib clash-prelude;
             };
         in
         unmodified.overrideAttrs (old: {
-          buildInputs = (old.buildInputs or []) ++ [
+          buildInputs = (old.buildInputs or [ ]) ++ [
             prev.makeWrapper
           ];
 
@@ -176,18 +179,18 @@ let
 
       clash-term =
         hprev.callCabal2nix "clash-term" ../clash-term {
-          inherit clash-lib;
+          inherit (hfinal) clash-lib;
         };
 
       clash-testsuite =
         let
           unmodified =
             hprev.callCabal2nix "clash-testsuite" ../tests {
-              inherit clash-cores clash-ghc clash-lib clash-prelude;
+              inherit (hfinal) clash-cores clash-ghc clash-lib clash-prelude;
             };
         in
         unmodified.overrideAttrs (old: {
-          buildInputs = (old.buildInputs or []) ++ [
+          buildInputs = (old.buildInputs or [ ]) ++ [
             prev.makeWrapper
           ];
 

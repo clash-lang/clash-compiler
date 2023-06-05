@@ -1,8 +1,9 @@
 { pkgs }:
-next: prev:
+final: prev:
 let
   inherit (pkgs.haskell.lib) doJailbreak dontCheck markUnbroken;
-in {
+in
+{
   # Use an older version than the default in nixpkgs. Since rewrite-inspector
   # is basically abandonware it catches fire with brick 1.0+.
   brick = doJailbreak prev.brick_0_70_1;
@@ -12,11 +13,11 @@ in {
   concurrent-supply = doJailbreak (markUnbroken prev.concurrent-supply);
 
   # Use a newer version than the default in nixpkgs.
-  doctest-parallel = next.doctest-parallel_0_3_0_1;
+  doctest-parallel = prev.doctest-parallel_0_3_0_1;
 
   # Use a branch with changes to support GHC 9.6.1.
   hint =
-    prev.hint.overrideAttrs(_: {
+    prev.hint.overrideAttrs (_: {
       src =
         pkgs.fetchFromGitHub {
           owner = "haskell-hint";
@@ -34,24 +35,24 @@ in {
   rewrite-inspector = doJailbreak (markUnbroken prev.rewrite-inspector);
 
   # Use a newer version than the default in nixpkgs.
-  singletons = next.singletons_3_0_2;
+  singletons = prev.singletons_3_0_2;
 
   # We want a version that matches with singletons-th, but the tests in here
   # are also a bit flaky since GHC 9.6 isn't officially supported.
   singletons-base = dontCheck prev.singletons-base_3_2;
 
   # Use a newer version than the default in nixpkgs.
-  singletons-th = next.singletons-th_3_2;
+  singletons-th = prev.singletons-th_3_2;
 
   # Needs a newer text than the .cabal file currently uploaded to hackage.
   string-qq = doJailbreak prev.string-qq;
 
   # Needs a newer version than the default in nixpkgs.
-  th-desugar = next.th-desugar_1_15;
+  th-desugar = prev.th-desugar_1_15;
 
   # Needs a newer base than the .cabal file currently uploaded to hackage.
   vector-binary-instances = doJailbreak prev.vector-binary-instances;
 
   # Use a newer version than the default in nixpkgs.
-  vty = next.vty_5_38;
+  vty = prev.vty_5_38;
 }
