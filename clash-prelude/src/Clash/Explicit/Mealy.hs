@@ -32,8 +32,9 @@ import           Control.Monad.State.Strict
   (State, runState)
 
 {- $setup
->>> :set -XDataKinds -XTypeApplications
+>>> :set -XDataKinds -XTypeApplications -XDeriveGeneric -XDeriveAnyClass
 >>> import Clash.Explicit.Prelude as C
+>>> import Clash.Explicit.Mealy (mealyS)
 >>> import qualified Data.List as L
 >>> import Control.Lens (Lens', (%=), (-=), uses, use)
 >>> import Control.Monad.State.Strict (State)
@@ -43,41 +44,44 @@ let macT s (x,y) = (s',s)
         s' = x * y + s
 :}
 
->>> let mac clk rst en = mealy clk rst en macT 0
->>> data DelayState = DelayState { _delayed :: Vec 4 Int , _untilValid :: Index 4 }
+>>> mac clk rst en = mealy clk rst en macT 0
+
 >>> :{
-let delayed :: Lens' DelayState (Vec 4 Int)
-    delayed f = \(DelayState d u) -> (`DelayState` u) <$> f d
-    untilValid :: Lens' DelayState (Index 4)
-    untilValid f = \(DelayState d u) -> (DelayState d) <$> f u
-    initialDelayState = DelayState (C.repeat 0) maxBound
+data DelayState = DelayState { _history :: Vec 4 Int , _untilValid :: Index 4 } deriving (Generic,NFDataX)
 :}
+
 >>> :{
-  let delayTop :: Clock System -> Reset System -> Enable System -> (Signal System Int -> Signal System (Maybe Int))
-      topDelay = P.undefined
+history :: Lens' DelayState (Vec 4 Int)
+history f = \(DelayState d u) -> (`DelayState` u) <$> f d
 :}
->>> let hello = "hello"
+
 >>> :{
-let delayS :: Int -> State DelayState (Maybe Int)
-    delayS n = do
-      _remaining <- use untilValid
-      return Nothing
+untilValid :: Lens' DelayState (Index 4)
+untilValid f = \(DelayState d u) -> DelayState d <$> f u
 :}
--}
-{-
-      -- if remaining > 0
-      -- then do
-      --   untilValid -= 1
-      --   delayed   %= (n +>>)
-      --   return Nothing
-      -- else do
-      --   out     <- uses delayed C.last
-      --   delayed %= (n +>>)
-      --   return (Just out)
+
 >>> :{
-  let delayTop :: Clock System -> Reset System -> Enable System -> (Signal System Int -> Signal System (Maybe Int))
-      delayTop clk rst en = mealyS clk rst en delayS initialDelayState
+delayS :: Int -> State DelayState (Maybe Int)
+delayS n = do
+  remaining <- use untilValid
+  if remaining > 0
+  then do
+    history %= (n +>>)
+    untilValid -= 1
+    return Nothing
+  else do
+    history %= (n +>>)
+    out     <- uses history C.last
+    return (Just out)
 :}
+
+>>> let initialDelayState = DelayState (C.repeat 0) maxBound
+
+>>> :{
+delayTop :: Clock System -> Reset System -> Enable System -> Signal System Int -> Signal System (Maybe Int)
+delayTop clk rst en = mealyS clk rst en delayS initialDelayState
+:}
+
 -}
 
 -- | Create a synchronous function from a combinational function describing
@@ -152,7 +156,7 @@ mealy clk rst en f iS =
 --
 -- @
 -- data DelayState = DelayState
---   { _delayed    :: Vec 4 Int
+--   { _history    :: Vec 4 Int
 --   , _untilValid :: Index 4
 --   }
 -- makeLenses 'DelayedState
@@ -161,15 +165,14 @@ mealy clk rst en f iS =
 --
 -- delayS :: Int -> State DelayState (Maybe Int)
 -- delayS n = do
+--   history   %= (n +>>)
 --   remaining <- get untilValid
 --   if remaining > 0
 --   then do
 --      remaining -= 1
---      delayed   %= (n +>>)
 --      return Nothing
 --    else do
---      out     <- uses delayed last
---      delayed %= (n +>>)
+--      out <- uses history last
 --      return (Just out)
 --
 -- delayTop ::'KnownDomain' dom
@@ -180,9 +183,8 @@ mealy clk rst en f iS =
 -- delayTop clk rst en = 'mealyS' clk rst en delayS initialDelayState
 -- @
 --
--- >>> simulate (delayTop systemClockGen systemResetGen enableGen) [1,2,3,4,5,6,7,8]
--- [Nothing, Nothing, Nothing, Nothing, Just 1, Just 2,...
--- ...
+-- >>> L.take 7 $ simulate (delayTop systemClockGen systemResetGen enableGen) [1,2,3,4,5,6,7,8]
+-- [Nothing,Nothing,Nothing,Nothing,Just 1,Just 2, Just 3]
 --
 mealyS
   :: ( KnownDomain dom
