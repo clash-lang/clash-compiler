@@ -188,7 +188,7 @@ mealyB = hideClockResetEnable E.mealyB
 --
 -- delayS :: Int -> State DelayState (Maybe Int)
 -- delayS n = do
---   remaining <- get untilValid
+--   remaining <- use untilValid
 --   if remaining > 0
 --   then do
 --      remaining -= 1
