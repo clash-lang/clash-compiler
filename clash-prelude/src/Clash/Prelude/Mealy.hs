@@ -33,8 +33,9 @@ import           Clash.XException           (NFDataX)
 import           Control.Monad.State.Strict (State)
 
 {- $setup
->>> :set -XDataKinds -XTypeApplications
+>>> :set -XDataKinds -XTypeApplications -XDeriveGeneric -XDeriveAnyClass
 >>> import Clash.Prelude as C
+>>> import Clash.Prelude.Mealy (mealyS)
 >>> import qualified Data.List as L
 >>> import Control.Lens (Lens', (%=), (-=), uses, use)
 >>> import Control.Monad.State.Strict (State)
@@ -45,30 +46,42 @@ let macT s (x,y) = (s',s)
     mac = mealy macT 0
 :}
 
->>> data DelayState = DelayState { _delayed :: Vec 4 Int , _untilValid :: Index 4 }
 >>> :{
-let delayed :: Lens' DelayState (Vec 4 Int)
-    delayed f = \(DelayState d u) -> (`DelayState` u) <$> f d
-    untilValid :: Lens' DelayState (Index 4)
-    untilValid f = \(DelayState d u) -> (DelayState d) <$> f u
-    initialDelayState = DelayState (C.repeat 0) maxBound
+data DelayState = DelayState { _history :: Vec 4 Int , _untilValid :: Index 4 } deriving (Generic,NFDataX)
 :}
 
 >>> :{
-let delayS :: Int -> State DelayState (Maybe Int)
-    delayS n = do
-      remaining <- use untilValid
-      if remaining > 0
-      then do
-        untilValid -= 1
-        delayed   %= (n +>>)
-        return Nothing
-      else do
-        out     <- uses delayed C.last
-        delayed %= (n +>>)
-        return (Just out)
-
+history :: Lens' DelayState (Vec 4 Int)
+history f = \(DelayState d u) -> (`DelayState` u) <$> f d
 :}
+
+>>> :{
+untilValid :: Lens' DelayState (Index 4)
+untilValid f = \(DelayState d u) -> DelayState d <$> f u
+:}
+
+>>> :{
+delayS :: Int -> State DelayState (Maybe Int)
+delayS n = do
+  remaining <- use untilValid
+  if remaining > 0
+  then do
+    history %= (n +>>)
+    untilValid -= 1
+    return Nothing
+  else do
+    history %= (n +>>)
+    out     <- uses history C.last
+    return (Just out)
+:}
+
+>>> let initialDelayState = DelayState (C.repeat 0) maxBound
+
+>>> :{
+delayTop :: HiddenClockResetEnable dom => Signal dom Int -> Signal dom (Maybe Int)
+delayTop = mealyS delayS initialDelayState
+:}
+
 -}
 
 -- | Create a synchronous function from a combinational function describing
@@ -190,8 +203,8 @@ mealyB = hideClockResetEnable E.mealyB
 -- delayTop = 'mealyS' delayS initialDelayState
 -- @
 --
--- >>> simulate @System delayTop [1,2,3,4,5,6,7,8]
--- [Nothing, Nothing, Nothing, Nothing, Just 1, Just 2,...
+-- >>> L.take 7 $ simulate @System delayTop [1,2,3,4,5,6,7,8]
+-- [Nothing,Nothing,Nothing,Nothing,Just 1,Just 2,Just 3]
 -- ...
 --
 mealyS
