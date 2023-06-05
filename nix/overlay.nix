@@ -101,7 +101,10 @@ let
       clash-ghc =
         let
           unmodified =
-            hprev.callCabal2nix "clash-ghc" ../clash-ghc {
+            hprev.callCabal2nixWithOptions
+              "clash-ghc"
+              ../clash-ghc
+              "--flag workaround-ghc-mmap-crash" {
               inherit (hfinal) clash-lib clash-prelude;
             };
         in
@@ -185,7 +188,10 @@ let
       clash-testsuite =
         let
           unmodified =
-            hprev.callCabal2nix "clash-testsuite" ../tests {
+            hprev.callCabal2nixWithOptions
+              "clash-testsuite"
+              ../tests
+              "--flag workaround-ghc-mmap-crash" {
               inherit (hfinal) clash-cores clash-ghc clash-lib clash-prelude;
             };
         in
