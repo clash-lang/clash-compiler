@@ -1,12 +1,6 @@
 {
   description = "A functional hardware description language";
 
-  nixConfig = {
-    # extra-substituters = "https://clash-lang.cachix.org";
-    # extra-trusted-public-keys = "https://clash-lang.cachix.org-1:/2N1uka38B/heaOAC+Ztd/EWLmF0RLfizWgC5tamCBg=";
-    extra-experimental-features = "nix-command flakes";
-  };
-
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
