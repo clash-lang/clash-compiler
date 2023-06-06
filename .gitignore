@@ -62,3 +62,6 @@ docs/env
 
 # build_clash_dev.sh output
 clash-dev.result
+
+# direnv
+.envrc

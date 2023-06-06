@@ -103,7 +103,43 @@ stack run -- clash
 Or [use Nix](https://nixos.org/nix/download.html) to get a shell with the `clash` and `clashi` binaries on your PATH:
 
 ```bash
-nix-shell
+# Start the default dev shell
+nix develop .
+
+# Start a dev shell with a specific GHC version
+nix develop .#ghc961
+```
+
+You will need a modern version of nix with support for the new-style `nix`
+command and flakes (2.4 or newer). Support for these must still be manually
+enabled, this can be done by setting
+
+```
+experimental-features = nix-command flakes
+```
+
+in your `nix.conf`.
+
+To automatically enter and exit the `nix` environment on directory change, you
+can install [`direnv`](https://direnv.net/) and
+[`nix-direnv`](https://github.com/nix-community/nix-direnv) and write the
+following to a `.envrc` file in the root of this repository:
+
+```
+use flake
+
+watch_file nix/*
+```
+
+Upon adding or changing this file you must `direnv allow` in order for the file
+to be automatically loaded / reloaded on project changes.
+
+Individual packages / applications can also be built or run using the `nix
+build` and `nix run` commands, i.e.
+
+```
+nix build .#clash-ghc
+nix run .#clashi
 ```
 
 # Related libraries and initiatives
