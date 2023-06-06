@@ -114,8 +114,8 @@ clashTestRoot testTrees =
   clashTestGroup "." testTrees []
 
 -- | `clashTestGroup` and `clashTestRoot` make sure that each test knows its
--- fully qualified test name at construction time. This is used to create
--- dependency patterns.
+-- fully qualified test name at construction time. This is used to pass -i flags
+-- to Clash as the test layout matches the layout in @shouldwork/@.
 clashTestGroup
   :: TestName
   -> [[TestName] -> TestTree]

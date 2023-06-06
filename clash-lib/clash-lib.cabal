@@ -404,7 +404,7 @@ test-suite unittests
       lens,
       pretty-show,
       quickcheck-text,
-      tasty         >= 1.2      && < 1.5,
+      tasty         >= 1.2      && < 1.6,
       tasty-hunit,
       tasty-quickcheck,
       tasty-th,
