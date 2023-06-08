@@ -840,7 +840,7 @@ compInBlock compName inPorts0 outPorts0 =
 
 -- | Convert a 'LitHDL' to a 'TExpr'
 --
--- __N.B.__: Clash 1.6 changed 'instDecl'\'s type signature. Where it would
+-- __N.B.__: Clash 1.8 changed 'instDecl'\'s type signature. Where it would
 --           previously accept 'LitHDL' in its generics/parameters argument, it
 --           now accepts a 'TExpr'. This function is mostly there to ease this
 --           transition.
