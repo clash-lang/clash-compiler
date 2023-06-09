@@ -683,31 +683,18 @@ structure.
 
     @
     macTS (x,y) = do
-      acc <- 'Control.Monad.State.Lazy.get'
-      'Control.Monad.State.Lazy.put' (acc + x * y)
+      acc <- 'Control.Monad.State.Strict.get'
+      'Control.Monad.State.Strict.put' (acc + x * y)
       return acc
     @
 
-    We can use the 'mealy' function again, although we will have to change
-    position of the arguments and result:
-
-    @
-    asStateM
-      :: ( 'HiddenClockResetEnable' dom
-         , 'NFDataX' s )
-      => (i -> 'Control.Monad.State.Lazy.State' s o)
-      -> s
-      -> ('Signal' dom i -> 'Signal' dom o)
-    asStateM f i = 'mealy' g i
-      where
-        g s x = let (o,s') = 'Control.Monad.State.Lazy.runState' (f x) s
-                in  (s',o)
-    @
+    We can use the 'mealyS' function to run out stateful implementation, this
+    can simplify translating algorithms which are described imperatively.
 
     We can then create the complete @mac@ circuit as:
 
     @
-    macS = asStateM macTS 0
+    macS = 'mealyS' macTS 0
     @
 -}
 
