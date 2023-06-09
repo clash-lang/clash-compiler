@@ -1,0 +1,1 @@
+ADDED: `Clash.Prelude.Mealy.mealyS` and `Clash.Explicit.Mealy.mealyS` which make writing state machines using the strict State monad easier. The tutorial has also been simplified by using this change.
