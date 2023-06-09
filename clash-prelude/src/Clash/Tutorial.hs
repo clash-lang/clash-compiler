@@ -676,7 +676,7 @@ structure.
     after the import of "Clash.Prelude":
 
     @
-    import Control.Monad.State
+    import Control.Monad.State.Strict
     @
 
     We can then implement macT as follows:
@@ -688,8 +688,17 @@ structure.
       return acc
     @
 
-    We can use the 'mealyS' function to run out stateful implementation, this
+    We can use the 'mealyS' function to run our stateful implementation, this
     can simplify translating algorithms which are described imperatively.
+
+    @
+    mealyS
+      :: ( HiddenClockResetEnable dom, NFDataX s )
+      => (i -> State s o)
+      -> s
+      -> (Signal dom i -> Signal dom o)
+    mealyS f initS = ...
+    @
 
     We can then create the complete @mac@ circuit as:
 
