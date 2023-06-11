@@ -95,7 +95,7 @@ flagsClash r = [
   , defFlag "fclash-edalize"                     $ NoArg (liftEwM (setEdalize r))
   , defFlag "fclash-no-render-enums"             $ NoArg (liftEwM (setNoRenderEnums r))
   , defFlag "fclash-timescale-precision"         $ SepArg (setTimescalePrecision r)
-  , defFlag "fclash-sanitise-netlist-ids"        $ NoArg (liftEwM (setSanitizeNames r))
+  , defFlag "fclash-sanitize-netlist-ids"        $ NoArg (liftEwM (setSanitizeNames r))
   ]
 
 -- | Print deprecated flag warning
