@@ -243,7 +243,7 @@ fromCoreId = withIdentifierSetM fromCoreId#
 -- Identifier might be generated at a later point as it is NOT added to an
 -- IdentifierSet.
 unsafeFromCoreId :: HasCallStack => SanitizeNames -> Id -> Identifier
-unsafeFromCoreId san = unsafeMake . ckId . nameOcc . varName where
-  ckId s = case san of
+unsafeFromCoreId san = unsafeMake . maybeSanitize . nameOcc . varName where
+  maybeSanitize s = case san of
     Sanitize -> Data.Text.map (\c -> if c == '$' then '_' else c) s
     NoSanitize -> s
