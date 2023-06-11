@@ -32,7 +32,7 @@ import           Control.Lens            ((.=), (%=))
 import qualified Control.Lens            as Lens
 import           Control.Monad           (when, zipWithM)
 import           Control.Monad.Extra     (concatMapM)
-import           Control.Monad.Reader    (ask, asks, local)
+import           Control.Monad.Reader    (ask, local)
 import qualified Control.Monad.State as State
 import           Control.Monad.State.Strict
   (State, evalState, get, modify, runState)
@@ -1005,7 +1005,7 @@ idToOutPort var = do
 idToPort :: Id -> NetlistMonad (Maybe (Identifier, HWType))
 idToPort var = do
   hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (coreTypeOf var)
-  san <- asks _sanitizeNames
+  san <- Lens.view sanitizeNames
   if isVoid hwTy
     then return Nothing
     else return (Just (Id.unsafeFromCoreId san var, hwTy))
@@ -1926,7 +1926,7 @@ expandTopEntityOrErrM
   -- IdentifierSet.
 expandTopEntityOrErrM ihwtys ohwty topM = do
   is <- identifierSetM id
-  san <- asks _sanitizeNames
+  san <- Lens.view sanitizeNames
   case expandTopEntity san ihwtys ohwty topM of
     Left (AttrError attrs) ->
       (error [I.i|

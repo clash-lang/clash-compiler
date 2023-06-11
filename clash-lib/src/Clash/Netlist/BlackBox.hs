@@ -26,7 +26,6 @@ import           Control.Exception             (throw)
 import           Control.Lens                  ((%=))
 import qualified Control.Lens                  as Lens
 import           Control.Monad                 (when, replicateM, zipWithM)
-import           Control.Monad.Reader          (asks)
 import           Control.Monad.Extra           (concatMapM)
 import           Control.Monad.IO.Class        (liftIO)
 import           Data.Bifunctor                (first, second)
@@ -144,7 +143,7 @@ mkBlackBoxContext
   -> NetlistMonad (BlackBoxContext,[Declaration])
 mkBlackBoxContext bbName resIds args@(lefts -> termArgs) = do
     -- Make context inputs
-    san <- asks _sanitizeNames
+    san <- Lens.view sanitizeNames
     let
       resNms = fmap (Id.unsafeFromCoreId san) resIds
       resNm = fromMaybe (error "mkBlackBoxContext: head") (listToMaybe resNms)
@@ -291,7 +290,7 @@ mkArgument bbName bndr nArg e = do
         -> return ((error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg), Void Nothing, False), [])
       Just hwTy -> case collectArgsTicks e of
         (C.Var v,[],_) -> do
-          san <- asks _sanitizeNames
+          san <- Lens.view sanitizeNames
           return ((Identifier (Id.unsafeFromCoreId san v) Nothing,hwTy,False),[])
         (C.Literal (IntegerLiteral i),[],_) ->
           return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
@@ -749,7 +748,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
       resHwTy <- case tys of
         (ty1:_) -> unsafeCoreTypeToHWTypeM' $(curLoc) ty1
         _ -> error "internal error: insufficient types"
-      san <- asks _sanitizeNames
+      san <- Lens.view sanitizeNames
       if isVoid resHwTy then
         pure Nothing
       else
@@ -908,7 +907,7 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
         Identifier _ Nothing -> pure []
         Noop -> pure []
         _ -> case sBinders of
-          ((b,_):_) -> do san <- asks _sanitizeNames
+          ((b,_):_) -> do san <- Lens.view sanitizeNames
                           assn <- procAssign Blocking (Id.unsafeFromCoreId san b) exprInit
                           pure [assn]
           _ -> error "internal error: insufficient sBinders"
@@ -922,7 +921,7 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
       (exprArg,inpDeclsMisc) <- mkExpr False Concurrent iDst mealyIn
 
       argAssign <- case iBinders of
-        ((i,_):_) -> do san <- asks _sanitizeNames
+        ((i,_):_) -> do san <- Lens.view sanitizeNames
                         assn <- contAssign (Id.unsafeFromCoreId san i) exprArg
                         pure [assn]
         _ -> error "internal error: insufficient iBinders"
@@ -980,7 +979,7 @@ collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
         (_,_,[],_,[],binders,Just result) -> do
           ds1 <- concatMapM (uncurry (mkDeclarations' Sequential)) binders
           netDecls <- concatMapM mkNetDecl binders
-          san <- asks _sanitizeNames
+          san <- Lens.view sanitizeNames
           return (Identifier (Id.unsafeFromCoreId san result) Nothing, netDecls ++ ds0 ++ ds1)
         _ -> error "internal error"
     _ -> case substTm "collectBindIO2" subst e of
@@ -1296,7 +1295,7 @@ mkFunInput resId e =
       go is1 (n+(1::Int)) e''
 
     go _ _ (C.Var v) = do
-      san <- asks _sanitizeNames
+      san <- Lens.view sanitizeNames
       let assn = Assignment (Id.unsafeMake "~RESULT") Cont (Identifier (Id.unsafeFromCoreId san v) Nothing)
       return (Right ((Id.unsafeMake "",[assn]), Cont))
 
@@ -1334,7 +1333,7 @@ mkFunInput resId e =
           netDecls <- concatMapM mkNetDecl $ binders
           decls    <- concatMapM (uncurry mkDeclarations) binders
           nm <- Id.makeBasic "fun"
-          san <- asks _sanitizeNames
+          san <- Lens.view sanitizeNames
           let resultId = Id.unsafeFromCoreId san result
           -- TODO: Due to reasons lost in the mists of time, #1265 creates an
           -- assignement here, whereas it previously wouldn't. With the PR in

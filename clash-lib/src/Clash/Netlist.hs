@@ -27,7 +27,7 @@ import           Control.Lens                     ((.=), (<~))
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    (zipWithM)
 import           Control.Monad.Extra              (concatMapM, mapMaybeM)
-import           Control.Monad.Reader             (runReaderT, asks)
+import           Control.Monad.Reader             (runReaderT)
 import           Control.Monad.State.Strict       (State, runStateT, runState)
 import           Data.Bifunctor                   (first, second)
 import           Data.Char                        (ord)
@@ -323,7 +323,7 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
 
   where
     multiDecls pInfo args0 = do
-      san <- asks _sanitizeNames
+      san <- Lens.view sanitizeNames
       tcm <- Lens.view tcCache
       resInits0 <- getResInits (id_, tm)
       let
@@ -338,7 +338,7 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
       pure (zipWith3 netdecl res hwTys resInits1)
 
     singleDecl hwTy = do
-      san <- asks _sanitizeNames
+      san <- Lens.view sanitizeNames
       rIM <- listToMaybe <$> getResInits (id_, tm)
       return (NetDecl' srcNote (Id.unsafeFromCoreId san id_) hwTy rIM)
 
@@ -421,7 +421,7 @@ mkDeclarations'
   -- ^ RHS of the let-binder
   -> NetlistMonad [Declaration]
 mkDeclarations' _declType bndr (collectTicks -> (Var v,ticks)) = do
-  san <- asks _sanitizeNames
+  san <- Lens.view sanitizeNames
   withTicks ticks (mkFunApp (Id.unsafeFromCoreId san bndr) v [])
 
 mkDeclarations' _declType _bndr e@(collectTicks -> (Case _ _ [],_)) = do
@@ -444,14 +444,14 @@ mkDeclarations' declType bndr app = do
   case appF of
     Var f
       | null tyArgs -> do
-        san <- asks _sanitizeNames
+        san <- Lens.view sanitizeNames
         withTicks ticks (mkFunApp (Id.unsafeFromCoreId san bndr) f args)
       | otherwise   -> do
         (_,sp) <- Lens.use curCompNm
         throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
     _ -> do
       (exprApp,declsApp0) <- mkExpr False declType (CoreId bndr) app
-      san <- asks _sanitizeNames
+      san <- Lens.view sanitizeNames
       let dstId = Id.unsafeFromCoreId san bndr
       assn  <- case exprApp of
                  Identifier _ Nothing ->
@@ -489,7 +489,7 @@ mkSelection
   -> [Declaration]
   -> NetlistMonad [Declaration]
 mkSelection declType bndr scrut altTy alts0 tickDecls = do
-  san <- asks _sanitizeNames
+  san <- Lens.view sanitizeNames
   let dstId = netlistId1 id (Id.unsafeFromCoreId san) bndr
   tcm <- Lens.view tcCache
   let scrutTy = inferCoreTypeOf tcm scrut
@@ -548,7 +548,7 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
  where
   mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe HW.Literal,Expr),[Declaration])
   mkCondExpr scrutHTy (pat,alt) = do
-    san <- asks _sanitizeNames
+    san <- Lens.view sanitizeNames
     altId <- Id.suffix (netlistId1 id (Id.unsafeFromCoreId san) bndr) "sel_alt"
     (altExpr,altDecls) <- mkExpr False declType (NetlistId altId altTy) alt
     (,altDecls) <$> case pat of
@@ -783,7 +783,7 @@ mkFunApp dstId fun args tickDecls = do
       case args of
         [] -> do
           -- TODO: Figure out what to do with zero-width constructs
-          san <- asks _sanitizeNames
+          san <- Lens.view sanitizeNames
           assn <- contAssign dstId (Identifier (Id.unsafeFromCoreId san fun) Nothing)
           pure [assn]
         _ -> error [I.i|
@@ -871,13 +871,13 @@ mkExpr bbEasD declType bndr app =
           if isVoid hwTyA then
             return (Noop, [])
           else do
-            san <- asks _sanitizeNames
+            san <- Lens.view sanitizeNames
             return (Identifier (Id.unsafeFromCoreId san f) Nothing, [])
       | not (null tyArgs) ->
           throw (ClashException sp ($(curLoc) ++ "Not in normal form: "
             ++ "Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
       | otherwise -> do
-          san <- asks _sanitizeNames
+          san <- Lens.view sanitizeNames
           argNm <- Id.suffix (netlistId1 id (Id.unsafeFromCoreId san) bndr) "fun_arg"
           decls  <- mkFunApp argNm f tmArgs tickDecls
           if isVoid hwTyA then
@@ -888,7 +888,7 @@ mkExpr bbEasD declType bndr app =
                    , NetDecl Nothing argNm hwTyA : decls)
     Case scrut ty' [alt] -> mkProjection bbEasD bndr scrut ty' alt
     Case scrut tyA alts -> do
-      san <- asks _sanitizeNames
+      san <- Lens.view sanitizeNames
       argNm <- Id.suffix (netlistId1 id (Id.unsafeFromCoreId san) bndr) "sel_arg"
       decls  <- mkSelection declType (NetlistId argNm (netlistTypes1 bndr))
                             scrut tyA alts tickDecls
@@ -933,7 +933,7 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
   sHwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
   vHwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) altTy
   scrutRendered <- do
-    san <- asks _sanitizeNames
+    san <- Lens.view sanitizeNames
     scrutNm <-
       netlistId1
         Id.next
@@ -956,7 +956,7 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
   case scrutRendered of
     Left newDecls -> pure (Noop, newDecls)
     Right (selId, modM, decls) -> do
-      san <- asks _sanitizeNames
+      san <- Lens.view sanitizeNames
       let altVarId = Id.unsafeFromCoreId san varTm
       modifier <- case pat of
         DataPat dc exts tms -> do
@@ -1016,7 +1016,7 @@ mkDcApplication declType [dstHType] bndr dc args = do
   let dcNm = nameOcc (dcName dc)
   tcm <- Lens.view tcCache
   let argTys = map (inferCoreTypeOf tcm) args
-  san <- asks _sanitizeNames
+  san <- Lens.view sanitizeNames
   argNm <- netlistId1 return (\b -> Id.suffix (Id.unsafeFromCoreId san b) "_dc_arg") bndr
   argHWTys <- mapM coreTypeToHWTypeM' argTys
 
@@ -1160,7 +1160,7 @@ mkDcApplication declType dstHTypes (MultiId argNms) _ args = do
   (argExprs,argDecls) <- fmap (second concat . unzip) $!
                          mapM (uncurry (mkExpr False declType)) argsFiltered
   if length dstHTypes == length argExprs then do
-    san <- asks _sanitizeNames
+    san <- Lens.view sanitizeNames
     assns <- mapMaybeM
                   (\case (_,Noop) -> pure Nothing
                          (dstId,e) -> let nm = netlistId1 id (Id.unsafeFromCoreId san) dstId
