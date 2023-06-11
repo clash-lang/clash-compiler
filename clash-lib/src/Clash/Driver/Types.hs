@@ -401,6 +401,9 @@ data ClashOpts = ClashOpts
   , opt_timescalePrecision :: Period
   -- ^ Timescale precision set in Verilog files. E.g., setting this would sets
   -- the second part of @`timescale 100fs/100fs@.
+  , opt_sanitizeNames :: Bool
+  -- ^ Sanitize ID's for particular tools that may reject
+  -- otherwise valid names.
   }
   deriving (Show)
 
@@ -433,6 +436,7 @@ instance NFData ClashOpts where
     opt_inlineWFCacheLimit o `deepseq`
     opt_edalize o `deepseq`
     opt_renderEnums o `deepseq`
+    opt_sanitizeNames o `deepseq`
     opt_timescalePrecision o `deepseq`
     ()
 
@@ -465,6 +469,7 @@ instance Eq ClashOpts where
     opt_inlineWFCacheLimit s0 == opt_inlineWFCacheLimit s1 &&
     opt_edalize s0 == opt_edalize s1 &&
     opt_renderEnums s0 == opt_renderEnums s1 &&
+    opt_sanitizeNames s0 == opt_sanitizeNames s1 &&
     opt_timescalePrecision s0 == opt_timescalePrecision s1
 
    where
@@ -504,6 +509,7 @@ instance Hashable ClashOpts where
     opt_inlineWFCacheLimit `hashWithSalt`
     opt_edalize `hashWithSalt`
     opt_renderEnums `hashWithSalt`
+    opt_sanitizeNames `hashWithSalt`
     opt_timescalePrecision
    where
     hashOverridingBool :: Int -> OverridingBool -> Int
@@ -543,6 +549,7 @@ defClashOpts
   , opt_inlineWFCacheLimit  = 10 -- TODO: find "optimal" value
   , opt_edalize             = False
   , opt_renderEnums         = True
+  , opt_sanitizeNames       = False
   , opt_timescalePrecision  = Period 100 Fs
   }
 

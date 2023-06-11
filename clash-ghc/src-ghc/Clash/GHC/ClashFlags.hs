@@ -95,6 +95,7 @@ flagsClash r = [
   , defFlag "fclash-edalize"                     $ NoArg (liftEwM (setEdalize r))
   , defFlag "fclash-no-render-enums"             $ NoArg (liftEwM (setNoRenderEnums r))
   , defFlag "fclash-timescale-precision"         $ SepArg (setTimescalePrecision r)
+  , defFlag "fclash-sanitise-netlist-ids"        $ NoArg (liftEwM (setSanitizeNames r))
   ]
 
 -- | Print deprecated flag warning
@@ -343,3 +344,6 @@ setRewriteHistoryFile r arg = do
 
 setNoRenderEnums :: IORef ClashOpts -> IO ()
 setNoRenderEnums r = modifyIORef r (\c -> c { opt_renderEnums = False })
+
+setSanitizeNames :: IORef ClashOpts -> IO ()
+setSanitizeNames r = modifyIORef r (\c -> c { opt_sanitizeNames = True })

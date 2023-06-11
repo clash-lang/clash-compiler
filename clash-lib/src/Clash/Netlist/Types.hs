@@ -192,6 +192,10 @@ data IdentifierSet
       -- ^ Identifier store
     } deriving (Generic, NFData, Show)
 
+-- This is an option flag to clean up names that may be valid identifiers
+-- but that particular tools e.g. Vivado may reject (tcl with '$' in ids).
+data SanitizeNames = Sanitize | NoSanitize deriving (Eq, Bounded, Read, Show)
+
 -- | HDL identifier. Consists of a base name and a number of extensions. An
 -- identifier with a base name of "foo" and a list of extensions [1, 2] will be
 -- rendered as "foo_1_2".
@@ -281,6 +285,8 @@ data NetlistEnv
   -- ^ Postfix for instance/register names
   , _setName :: Maybe Text
   -- ^ (Maybe) user given instance/register name
+  , _sanitizeNames :: SanitizeNames
+  -- ^ whether to sanitize names in unsafeFromCoreId
   }
 
 data ComponentMeta = ComponentMeta

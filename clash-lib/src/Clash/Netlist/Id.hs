@@ -60,12 +60,12 @@ import           Clash.Core.Var (Id, varName)
 import           Clash.Debug (debugIsOn)
 import {-# SOURCE #-} Clash.Netlist.Types
   (PreserveCase(..), HasIdentifierSet(..), IdentifierSet(..), Identifier(..),
-   IdentifierType(..), IdentifierSetMonad(identifierSetM))
+   IdentifierType(..), IdentifierSetMonad(identifierSetM), SanitizeNames(..))
 import qualified Data.HashSet as HashSet
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as List
-import           Data.Text (Text)
+import           Data.Text (Text, map)
 import qualified Data.Text.Lazy as LT
 import           GHC.Stack
 
@@ -242,5 +242,8 @@ fromCoreId = withIdentifierSetM fromCoreId#
 -- spliced at verbatim in the HDL. As opposed to 'fromCoreId', the resulting
 -- Identifier might be generated at a later point as it is NOT added to an
 -- IdentifierSet.
-unsafeFromCoreId :: HasCallStack => Id -> Identifier
-unsafeFromCoreId = unsafeMake . nameOcc . varName
+unsafeFromCoreId :: HasCallStack => SanitizeNames -> Id -> Identifier
+unsafeFromCoreId san = unsafeMake . ckId . nameOcc . varName where
+  ckId s = case san of
+    Sanitize -> Data.Text.map (\c -> if c == '$' then '_' else c) s
+    NoSanitize -> s

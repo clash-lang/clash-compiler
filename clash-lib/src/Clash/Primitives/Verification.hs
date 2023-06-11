@@ -6,6 +6,7 @@ import Data.Either
 
 
 import qualified Control.Lens                    as Lens
+import           Control.Monad.Reader            (asks)
 import           Control.Monad.State             (State)
 import           Data.List.Infinite              (Infinite(..), (...))
 import           Data.Monoid                     (Ap(getAp))
@@ -27,7 +28,8 @@ import           Clash.Netlist.Types
   (BlackBox(BBFunction), TemplateFunction(..), BlackBoxContext, Identifier,
    NetlistMonad, Declaration(Assignment, NetDecl), Usage(Cont),
    HWType(Bool, KnownDomain), NetlistId(..),
-   DeclarationType(Concurrent), tcCache, bbInputs, Expr(Identifier))
+   DeclarationType(Concurrent), tcCache, bbInputs, Expr(Identifier),
+   NetlistEnv(..), SanitizeNames(..))
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TDecl), RenderVoid(..),
    emptyBlackBoxMeta)
@@ -47,6 +49,8 @@ checkBBF _isD _primName args _ty =
  where
   -- TODO: Improve error handling; currently errors don't indicate what
   -- TODO: blackbox generated them.
+  -- This definition is unused, so Sanitize as a constant won't
+  -- hurt to pass to it.
   _knownDomainArg
     :< clkArg
     :< _rstArg
@@ -54,7 +58,7 @@ checkBBF _isD _primName args _ty =
     :< renderAsArg
     :< propArg
     :< _ = ((0 :: Int)...)
-  (Id.unsafeFromCoreId -> clkId) = varToId (indexNote "clk" (lefts args) clkArg)
+  (Id.unsafeFromCoreId Sanitize -> clkId) = varToId (indexNote "clk" (lefts args) clkArg)
   clkExpr = Identifier clkId Nothing
 
   litArgs = do
@@ -73,7 +77,9 @@ checkBBF _isD _primName args _ty =
     -- ^ Term to bind. Does not bind if it's already a reference to a signal
     -> NetlistMonad (Identifier, [Declaration])
     -- ^ ([new] reference to signal, [declarations need to get it in scope])
-  bindMaybe _ (Var vId) = pure (Id.unsafeFromCoreId vId, [])
+  bindMaybe _ (Var vId) = do
+    san <- asks _sanitizeNames
+    pure (Id.unsafeFromCoreId san vId, [])
   bindMaybe Nothing t = bindMaybe (Just "s") t
   bindMaybe (Just nm) t = do
     tcm <- Lens.view tcCache

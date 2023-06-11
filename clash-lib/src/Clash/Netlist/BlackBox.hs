@@ -26,6 +26,7 @@ import           Control.Exception             (throw)
 import           Control.Lens                  ((%=))
 import qualified Control.Lens                  as Lens
 import           Control.Monad                 (when, replicateM, zipWithM)
+import           Control.Monad.Reader          (asks)
 import           Control.Monad.Extra           (concatMapM)
 import           Control.Monad.IO.Class        (liftIO)
 import           Data.Bifunctor                (first, second)
@@ -143,8 +144,9 @@ mkBlackBoxContext
   -> NetlistMonad (BlackBoxContext,[Declaration])
 mkBlackBoxContext bbName resIds args@(lefts -> termArgs) = do
     -- Make context inputs
+    san <- asks _sanitizeNames
     let
-      resNms = fmap Id.unsafeFromCoreId resIds
+      resNms = fmap (Id.unsafeFromCoreId san) resIds
       resNm = fromMaybe (error "mkBlackBoxContext: head") (listToMaybe resNms)
     resTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc) . coreTypeOf) resIds
     (imps,impDecls) <- unzip <$> zipWithM (mkArgument bbName resNm) [0..] termArgs
@@ -289,7 +291,8 @@ mkArgument bbName bndr nArg e = do
         -> return ((error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg), Void Nothing, False), [])
       Just hwTy -> case collectArgsTicks e of
         (C.Var v,[],_) -> do
-          return ((Identifier (Id.unsafeFromCoreId v) Nothing,hwTy,False),[])
+          san <- asks _sanitizeNames
+          return ((Identifier (Id.unsafeFromCoreId san v) Nothing,hwTy,False),[])
         (C.Literal (IntegerLiteral i),[],_) ->
           return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
         (C.Literal (IntLiteral i), [],_) ->
@@ -746,6 +749,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
       resHwTy <- case tys of
         (ty1:_) -> unsafeCoreTypeToHWTypeM' $(curLoc) ty1
         _ -> error "internal error: insufficient types"
+      san <- asks _sanitizeNames
       if isVoid resHwTy then
         pure Nothing
       else
@@ -776,9 +780,9 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                 |]
 
           CoreId dstR ->
-            return (Just ([dstR], [Id.unsafeFromCoreId dstR], []))
+            return (Just ([dstR], [Id.unsafeFromCoreId san dstR], []))
           MultiId ids ->
-            return (Just (ids, map Id.unsafeFromCoreId ids, []))
+            return (Just (ids, map (Id.unsafeFromCoreId san) ids, []))
 
     -- Like resBndr, but fails on MultiId
     resBndr1
@@ -904,7 +908,8 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
         Identifier _ Nothing -> pure []
         Noop -> pure []
         _ -> case sBinders of
-          ((b,_):_) -> do assn <- procAssign Blocking (Id.unsafeFromCoreId b) exprInit
+          ((b,_):_) -> do san <- asks _sanitizeNames
+                          assn <- procAssign Blocking (Id.unsafeFromCoreId san b) exprInit
                           pure [assn]
           _ -> error "internal error: insufficient sBinders"
 
@@ -917,7 +922,8 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
       (exprArg,inpDeclsMisc) <- mkExpr False Concurrent iDst mealyIn
 
       argAssign <- case iBinders of
-        ((i,_):_) -> do assn <- contAssign (Id.unsafeFromCoreId i) exprArg
+        ((i,_):_) -> do san <- asks _sanitizeNames
+                        assn <- contAssign (Id.unsafeFromCoreId san i) exprArg
                         pure [assn]
         _ -> error "internal error: insufficient iBinders"
 
@@ -974,7 +980,8 @@ collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
         (_,_,[],_,[],binders,Just result) -> do
           ds1 <- concatMapM (uncurry (mkDeclarations' Sequential)) binders
           netDecls <- concatMapM mkNetDecl binders
-          return (Identifier (Id.unsafeFromCoreId result) Nothing, netDecls ++ ds0 ++ ds1)
+          san <- asks _sanitizeNames
+          return (Identifier (Id.unsafeFromCoreId san result) Nothing, netDecls ++ ds0 ++ ds1)
         _ -> error "internal error"
     _ -> case substTm "collectBindIO2" subst e of
       Letrec {} -> error "internal error"
@@ -1289,7 +1296,8 @@ mkFunInput resId e =
       go is1 (n+(1::Int)) e''
 
     go _ _ (C.Var v) = do
-      let assn = Assignment (Id.unsafeMake "~RESULT") Cont (Identifier (Id.unsafeFromCoreId v) Nothing)
+      san <- asks _sanitizeNames
+      let assn = Assignment (Id.unsafeMake "~RESULT") Cont (Identifier (Id.unsafeFromCoreId san v) Nothing)
       return (Right ((Id.unsafeMake "",[assn]), Cont))
 
     go _ _ (Case scrut ty [alt]) = do
@@ -1326,7 +1334,8 @@ mkFunInput resId e =
           netDecls <- concatMapM mkNetDecl $ binders
           decls    <- concatMapM (uncurry mkDeclarations) binders
           nm <- Id.makeBasic "fun"
-          let resultId = Id.unsafeFromCoreId result
+          san <- asks _sanitizeNames
+          let resultId = Id.unsafeFromCoreId san result
           -- TODO: Due to reasons lost in the mists of time, #1265 creates an
           -- assignement here, whereas it previously wouldn't. With the PR in
           -- tests break when reverting to the old behavior. In some cases this
