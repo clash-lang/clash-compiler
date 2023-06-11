@@ -717,7 +717,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T2342A" def{hdlSim=[]}
         , runTest "T2342B" def{hdlSim=[]}
         , runTest "T2360" def{hdlSim=[],clashFlags=["-fclash-force-undefined=0"]}
-        , outputTest "T2242" def{hdlTargets=[Verilog], clashFlags=["-fclash-sanitize-netlist-ids"]}
+        , outputTest "T2242" def{clashFlags=["-fclash-sanitize-netlist-ids"]}
         ] <>
         if compiledWith == Cabal then
           -- This tests fails without environment files present, which are only
