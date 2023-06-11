@@ -192,9 +192,10 @@ data IdentifierSet
       -- ^ Identifier store
     } deriving (Generic, NFData, Show)
 
--- This is an option flag to clean up names that may be valid identifiers
+-- | This is an option flag to clean up names that may be valid identifiers
 -- but that particular tools e.g. Vivado may reject (tcl with '$' in ids).
-data SanitizeNames = Sanitize | NoSanitize deriving (Eq, Bounded, Read, Show)
+-- These are issues because of usafe ID processing APAI's.
+data SanitizeNames = Sanitize | NoSanitize
 
 -- | HDL identifier. Consists of a base name and a number of extensions. An
 -- identifier with a base name of "foo" and a list of extensions [1, 2] will be
