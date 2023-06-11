@@ -403,7 +403,8 @@ data ClashOpts = ClashOpts
   -- the second part of @`timescale 100fs/100fs@.
   , opt_sanitizeNames :: Bool
   -- ^ Sanitize ID's for particular tools that may reject
-  -- otherwise valid names.
+  -- otherwise valid names in functions that would normally
+  -- pass dollar signs through esp. unsafeFromCoreId.
   }
   deriving (Show)
 
