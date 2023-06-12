@@ -97,6 +97,7 @@ import Data.Default.Class
 >>> :set -XTemplateHaskell -XDataKinds -XConstraintKinds -XTypeApplications
 >>> :m -Prelude
 >>> import Clash.Prelude
+>>> import Clash.Prelude.Mealy
 >>> import Clash.Explicit.Testbench
 >>> :{
 let ma :: Num a => a -> (a, a) -> a
