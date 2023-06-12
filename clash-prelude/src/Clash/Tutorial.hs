@@ -81,6 +81,7 @@ module Clash.Tutorial (
 where
 
 import Clash.Prelude
+import Clash.Prelude.Mealy
 import Clash.Explicit.Testbench
 import Clash.XException (NFDataX)
 import Control.Monad.ST
@@ -670,10 +671,10 @@ structure.
         acc' = ma '<$>' acc '<*>' 'bundle' (x,y)
     @
 
-* __'Control.Monad.State.Lazy.State' Monad__
+* __'Control.Monad.State.Strict.State' Monad__
 
     We can also implement the original @macT@ function as a
-    @'Control.Monad.State.Lazy.State'@
+    @'Control.Monad.State.Strict.State'@
     monadic computation. First we must add an extra import statement, right
     after the import of "Clash.Prelude":
 
