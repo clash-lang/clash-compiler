@@ -282,3 +282,12 @@ Clash Compiler Flags
   as their header.
 
   **Default:** ``100fs``
+
+-fclash-sanitize-netlist-ids
+  This extends a modest amount of sanitization to the unsafe API
+  ``unsafeFromCoreId``. Specifically, Vivado objected to the dollar
+  signs being passed through there, though there may be other tools
+  that have similar trouble even though these are valid basic
+  identifiers. So this flag substitutes underscores for those dollar
+  signs even in this unsafe case. It could mangle user-specified
+  names, so use with caution!
