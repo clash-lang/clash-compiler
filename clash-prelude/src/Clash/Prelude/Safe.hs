@@ -42,6 +42,7 @@
 module Clash.Prelude.Safe
   ( -- * Creating synchronous sequential circuits
     mealy
+  , mealyS
   , mealyB
   , (<^>)
   , moore
@@ -151,7 +152,7 @@ import           Clash.NamedTypes
 import           Clash.Prelude.BlockRam
 import           Clash.Prelude.BlockRam.Blob
 import qualified Clash.Explicit.Prelude.Safe as E
-import           Clash.Prelude.Mealy         (mealy, mealyB, (<^>))
+import           Clash.Prelude.Mealy         (mealy, mealyB, mealyS, (<^>))
 import           Clash.Prelude.Moore         (moore, mooreB)
 import           Clash.Prelude.RAM           (asyncRam,asyncRamPow2)
 import           Clash.Prelude.ROM           (asyncRom,asyncRomPow2,rom,romPow2)
