@@ -45,6 +45,7 @@
 module Clash.Prelude
   ( -- * Creating synchronous sequential circuits
     mealy
+  , mealyS
   , mealyB
   , (<^>)
   , moore
