@@ -210,7 +210,7 @@ mealyS
   :: ( HiddenClockResetEnable dom
      , NFDataX s )
   => (i -> State s o)
-  -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+  --  ^ Transfer function in mealy machine handling inputs using @Control.Monad.Strict.State s@.
   -> s
   -- ^ Initial state
   -> (Signal dom i -> Signal dom o)
