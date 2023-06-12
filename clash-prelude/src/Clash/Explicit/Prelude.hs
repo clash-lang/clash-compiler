@@ -24,6 +24,7 @@ defined in "Clash.Prelude".
 module Clash.Explicit.Prelude
   ( -- * Creating synchronous sequential circuits
     mealy
+  , mealyS
   , mealyB
   , moore
   , mooreB
