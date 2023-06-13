@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ["macOS", "windows"]
-        ghc: ["8.6.5", "8.8.4", "8.10.7", "9.0.2", "9.2.4", "9.4.3"]
+        ghc: ["8.6.5", "8.8.4", "8.10.7", "9.0.2", "9.2.8", "9.4.5"]
         exclude:
           # Some tests fail with a mysterious -11 error code.
           - os: macOS
@@ -117,7 +117,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: [ "8.6.5", "8.8.4", "8.10.7", "9.0.2", "9.2.5" ]
+        ghc: [ "8.6.5", "9.0.2" ]
         include:
           - multiple_hidden: yes
 

@@ -1,4 +1,4 @@
-resolver: nightly-2022-11-29
+resolver: nightly-2023-06-13
 
 ghc-options:
   "$locals": -Wall -Wcompat
