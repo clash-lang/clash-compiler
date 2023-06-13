@@ -54,8 +54,13 @@ jobs:
         run: choco install --no-progress iverilog
 
       - name: General Setup
+        shell: bash
         run: |
-          cp .ci/stack-${{ matrix.ghc }}.yaml stack.yaml
+          declare GHC_VERSION=${{ matrix.ghc }}
+          # Rewrite an argument of the form X.Y.Z to X.Y
+          cp .ci/stack-${GHC_VERSION%.*}.yaml stack.yaml
+          # Print out stack.yaml for debugging purposes
+          cat stack.yaml
 
       - name: Cache (Windows)
         if: ${{ runner.os == 'Windows' }}
@@ -83,10 +88,12 @@ jobs:
       # Retry Stack initialization, see:
       # https://github.com/commercialhaskell/stack/issues/5770
       - name: Initialize Stack
+        shell: bash
         run: ./.ci/retry.sh stack build base
 
       # Building 'happy' sometimes fails on Windows for some obscure reason
       - name: Build happy with Stack
+        shell: bash
         run: ./.ci/retry.sh stack build happy
 
       # Note: the --pedantic switch adds -Wall -Werror to the options passed to
@@ -110,27 +117,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        ghc: [ "8.6.5", "8.8.4", "8.10.7", "9.0.2", "9.2.5" ]
         include:
-          - name: GHC 8.6.5, Single Hidden
-            ghc: 8.6.5
+          - multiple_hidden: yes
+
+          - ghc: 8.6.5
             multiple_hidden: no
 
-          - name: GHC 8.8.4, Multiple Hidden
-            ghc: 8.8.4
-            multiple_hidden: yes
-
-          - name: GHC 8.10.7, Multiple Hidden
-            ghc: 8.10.7
-            multiple_hidden: yes
-
-          - name: GHC 9.0.2, Multiple Hidden
-            ghc: 9.0.2
-            multiple_hidden: yes
+          - ghc: 9.0.2
             workaround_ghc_mmap_crash: yes
 
-          - name: GHC 9.2.5, Multiple Hidden
-            ghc: 9.2.5
-            multiple_hidden: yes
 
     # Run steps inside the clash CI docker image
     container:
