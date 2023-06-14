@@ -112,32 +112,34 @@ vioProbeBBTF :: Backend s => BlackBoxContext -> State s Doc
 vioProbeBBTF bbCtx
   | (   _knownDomainDom
       : _vioConstraint
-      : (DSL.getVec -> Just inputNameExprs)
-      : (DSL.getVec -> Just outputNameExprs)
+      : (DSL.getVec -> Just userInputNameExprs)
+      : (DSL.getVec -> Just userOutputNameExprs)
       : _initialOutputProbeValues
       : clk
       : inputProbes
       ) <- map fst $ DSL.tInputs bbCtx
-  , Just inputNames <- mapM (fmap T.pack . DSL.getStr) inputNameExprs
-  , Just outputNames <- mapM (fmap T.pack . DSL.getStr) outputNameExprs
+  , Just userInputNames <- mapM (fmap T.pack . DSL.getStr) userInputNameExprs
+  , Just userOutputNames <- mapM (fmap T.pack . DSL.getStr) userOutputNameExprs
   , [vioProbeName] <- bbQsysIncName bbCtx
   , Right (inTys, outTys) <- probesFromTypes bbCtx
   , [tResult] <- map DSL.ety (DSL.tResults bbCtx)
   = do
-      when (length inTys /= length inputNames) $
+      when (length inTys /= length userInputNames) $
         error [__i|
           Number of input names did not match number of input probes. Expected
-          #{length inTys} input name(s), got #{length inputNames}. Got input name(s):
+          #{length inTys} input name(s), got #{length userInputNames}. Got input
+          name(s):
 
-            #{ppShow inputNames}
+            #{ppShow userInputNames}
         |]
 
-      when (length outTys /= length outputNames) $
+      when (length outTys /= length userOutputNames) $
         error [__i|
           Number of output names did not match number of output probes. Expected
-          #{length outTys} output name(s), got #{length outputNames}. Got output name(s):
+          #{length outTys} output name(s), got #{length userOutputNames}. Got output
+          name(s):
 
-            #{ppShow outputNames}
+            #{ppShow userOutputNames}
         |]
 
       vioProbeInstName <- Id.makeBasic "vio_inst"
@@ -171,10 +173,10 @@ vioProbeBBTF bbCtx
         outProbes <-
           forM (zip outNames outTys) $ uncurry DSL.declare
         outProbesBV <-
-          forM (zip outputNames outProbes) $ uncurry (DSL.toBvWithAttrs attrs)
+          forM (zip userOutputNames outProbes) $ uncurry (DSL.toBvWithAttrs attrs)
 
         inProbesBV <-
-          forM (zip inputNames inProbes) $ uncurry (DSL.toBvWithAttrs attrs)
+          forM (zip userInputNames inProbes) $ uncurry (DSL.toBvWithAttrs attrs)
 
         DSL.instDecl Empty (Id.unsafeMake vioProbeName) vioProbeInstName []
           (("clk", clk) : zip inNames inProbesBV)
