@@ -112,6 +112,7 @@ jobs:
           - name: GHC 9.0.2, Multiple Hidden
             ghc: 9.0.2
             multiple_hidden: yes
+            workaround_ghc_mmap_crash: yes
 
     # Run steps inside the clash CI docker image
     container:
@@ -122,6 +123,7 @@ jobs:
         CABAL_JOBS: 2
         MULTIPLE_HIDDEN: ${{ matrix.multiple_hidden }}
         CI_COMMIT_BRANCH: ${{ github.base_ref }}
+        WORKAROUND_GHC_MMAP_CRASH: ${{ matrix.workaround_ghc_mmap_crash }}
 
     steps:
       - name: Checkout
