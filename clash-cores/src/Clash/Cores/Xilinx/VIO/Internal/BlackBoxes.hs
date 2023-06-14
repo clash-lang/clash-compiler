@@ -31,7 +31,7 @@ import qualified Data.List.Infinite as Infinite
 import qualified Data.Text as T (pack, concat)
 
 import Control.Arrow (first)
-import Control.Monad (when, forM, zipWithM)
+import Control.Monad (when, zipWithM)
 import Control.Monad.State (State)
 import Control.Exception (assert)
 
@@ -170,13 +170,9 @@ vioProbeBBTF bbCtx
                 _         -> pure <$> DSL.assign (head inNames) singleInput
             _ -> zipWithM DSL.assign inNames inPs
 
-        outProbes <-
-          forM (zip outNames outTys) $ uncurry DSL.declare
-        outProbesBV <-
-          forM (zip userOutputNames outProbes) $ uncurry (DSL.toBvWithAttrs attrs)
-
-        inProbesBV <-
-          forM (zip userInputNames inProbes) $ uncurry (DSL.toBvWithAttrs attrs)
+        outProbes <- zipWithM DSL.declare outNames outTys
+        outProbesBV <- zipWithM (DSL.toBvWithAttrs attrs) userOutputNames outProbes
+        inProbesBV <- zipWithM (DSL.toBvWithAttrs attrs) userInputNames inProbes
 
         DSL.instDecl Empty (Id.unsafeMake vioProbeName) vioProbeInstName []
           (("clk", clk) : zip inNames inProbesBV)
