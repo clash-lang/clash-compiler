@@ -57,6 +57,8 @@ module Clash.Sized.Internal.BitVector
   , maxIndex#
     -- ** Construction
   , bLit
+  , hLit
+  , oLit
   , undefined#
     -- ** Concatenation
   , (++#)
@@ -141,6 +143,7 @@ import Data.Proxy                 (Proxy (..))
 import Data.Typeable              (Typeable, typeOf)
 import GHC.Generics               (Generic)
 import Data.Maybe                 (fromMaybe)
+import Numeric                    (readOct, readHex)
 import GHC.Exts
   (Word#, Word (W#), eqWord#, int2Word#, isTrue#, uncheckedShiftRL#)
 #if MIN_VERSION_base(4,15,0)
@@ -552,6 +555,66 @@ read# cs0 = (fromIntegral (length cs1), BV m v)
       _   -> error $
            "Clash.Sized.Internal.bLit: unknown character: "
         ++ show c ++ " in input: " ++ cs0
+
+-- | Create a hexadecimal literal.
+-- >>> $(hLit "dead")
+-- 0b1101111010101101
+--
+-- Don't care digits are interpreted as f as a hexadecimal digit.
+hLit :: String -> ExpQ
+hLit s = pure (SigE body typ)
+  where
+    typ = ConT ''BitVector `AppT` LitT (NumTyLit (toInteger n))
+    body = VarE 'fromInteger# `AppE` iLit mask `AppE` iLit value
+
+    iLit = LitE . IntegerL . toInteger
+    (n, BV mask value) = read16# s :: (Natural, BitVector n)
+
+read16# :: String -> (Natural, BitVector n)
+read16# cs0 = (fromIntegral $ 4 * length cs1, BV m v)
+  where
+    cs1 = filter (/= '_') cs0
+    (vs, ms) = unzip $ map readHexDigit cs1
+    combineHexDigits = foldl (\b a -> 16*b+a) 0
+    v = combineHexDigits vs
+    m = combineHexDigits ms
+    -- The dot is a don't care, which applies to a whole digit.
+    readHexDigit c = case readHex [c] of
+      [(n,  "")] -> (n, 0)
+      [(_, ".")] -> (0, 0xf)
+      _ -> error $
+             "Clash.Sized.Internal.hLit: unknown character: "
+             ++ show c ++ " in input: " ++ cs0
+
+-- | Create an octal literal.
+-- >>> $(hLit "5234")
+-- 0b101011010100
+--
+-- Don't care digits are interpreted as 7 as an octal digit.
+oLit :: String -> ExpQ
+oLit s = pure (SigE body typ)
+  where
+    typ = ConT ''BitVector `AppT` LitT (NumTyLit (toInteger n))
+    body = VarE 'fromInteger# `AppE` iLit mask `AppE` iLit value
+
+    iLit = LitE . IntegerL . toInteger
+    (n, BV mask value) = read8# s :: (Natural, BitVector n)
+
+read8# :: String -> (Natural, BitVector n)
+read8# cs0 = (fromIntegral $ 3 * length cs1, BV m v)
+  where
+    cs1 = filter (/= '_') cs0
+    (vs, ms) = unzip $ map readOctDigit cs1
+    combineOctDigits = foldl (\b a -> 8*b+a) 0
+    v = combineOctDigits vs
+    m = combineOctDigits ms
+    -- The dot is a don't care, which applies to a whole digit.
+    readOctDigit c = case readOct [c] of
+      [(n,  "")] -> (n, 0)
+      [(_, ".")] -> (0, 0o7)
+      _ -> error $
+             "Clash.Sized.Internal.oLit: unknown character: "
+             ++ show c ++ " in input: " ++ cs0
 
 
 instance KnownNat n => Eq (BitVector n) where

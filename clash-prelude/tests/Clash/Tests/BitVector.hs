@@ -27,8 +27,8 @@ import qualified Test.Tasty.QuickCheck as Q
 import Control.Applicative (liftA2)
 #endif
 import Clash.Prelude
-  (Bit, high, low, bitPattern, type (<=), type (-), natToInteger, msb, bLit)
-import Clash.Sized.Internal.BitVector (BitVector (..))
+  (Bit, high, low, bitPattern, type (<=), type (-), natToInteger, msb)
+import Clash.Sized.Internal.BitVector (BitVector (..), bLit, hLit, oLit)
 
 import Clash.Tests.SizedNum
 
@@ -124,6 +124,11 @@ tests = localOption (Q.QuickCheckMaxRatio 2) $ testGroup "All"
     , testCase "show11" $ show @(BitVector 5) $(bLit "1010.") @?= "0b1_010."
     , testCase "show12" $ show @(BitVector 8) $(bLit "0001010.") @?= "0b0001_010."
     , testCase "show13" $ show @(BitVector 9) $(bLit "10001010.") @?= "0b1_0001_010."
+
+    , testCase "show14" $ show @(BitVector 16) $(hLit "dead") @?= "0b1101_1110_1010_1101"
+    , testCase "show15" $ show @(BitVector 16) $(hLit "beef") @?= "0b1011_1110_1110_1111"
+    , testCase "show16" $ show @(BitVector 12) $(oLit "7734") @?= "0b1111_1101_1100"
+    , testCase "show17" $ show @(BitVector 12) $(oLit "5324") @?= "0b1010_1101_0100"
     ]
   ]
 
