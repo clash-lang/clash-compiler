@@ -30,6 +30,8 @@ tests:
   trigger:
     include: .ci/gitlab/test.yml
     strategy: depend
+  variables:
+    CI_PARENT_PIPELINE_SOURCE: $CI_PIPELINE_SOURCE
   parallel:
     matrix:
       - GHC_VERSION: 9.6.1

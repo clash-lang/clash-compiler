@@ -7,10 +7,10 @@ stages:
 
 .nightly-rules:
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"  # When schedueled (at night)
-    - if: $CI_PIPELINE_SOURCE == "trigger"   # When triggered (manual triggers)
-    - if: '$CI_COMMIT_TAG != null'           # When tags are set (releases)
-    - if: '$RUN_TESTS == "always"'           # When test matrix indicates it should always run
+    - if: $CI_PARENT_PIPELINE_SOURCE == "schedule"  # When schedueled (at night)
+    - if: $CI_PARENT_PIPELINE_SOURCE == "trigger"   # When triggered (manual triggers)
+    - if: '$CI_COMMIT_TAG != null'                  # When tags are set (releases)
+    - if: '$RUN_TESTS == "always"'                  # When test matrix indicates it should always run
 
 .test-nocache:
   extends:
@@ -184,9 +184,9 @@ ffi:example:
 .test-cache-local-nightly:
   extends: .test-cache-local
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"  # When schedueled (at night)
-    - if: $CI_PIPELINE_SOURCE == "trigger"   # When triggered (manual triggers)
-    - if: '$CI_COMMIT_TAG != null'           # When tags are set (releases)
+    - if: $CI_PARENT_PIPELINE_SOURCE == "schedule"  # When schedueled (at night)
+    - if: $CI_PARENT_PIPELINE_SOURCE == "trigger"   # When triggered (manual triggers)
+    - if: '$CI_COMMIT_TAG != null'                  # When tags are set (releases)
 
 suite:vivado:vhdl:
   extends: .test-cache-local-nightly
