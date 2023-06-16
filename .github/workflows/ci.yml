@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ["macOS", "windows"]
-        ghc: ["8.6.5", "8.8.4", "8.10.7", "9.0.2", "9.2.4", "9.4.3"]
+        ghc: ["8.6.5", "8.8.4", "8.10.7", "9.0.2", "9.2.8", "9.4.5"]
         exclude:
           # Some tests fail with a mysterious -11 error code.
           - os: macOS
@@ -54,8 +54,13 @@ jobs:
         run: choco install --no-progress iverilog
 
       - name: General Setup
+        shell: bash
         run: |
-          cp .ci/stack-${{ matrix.ghc }}.yaml stack.yaml
+          declare GHC_VERSION=${{ matrix.ghc }}
+          # Rewrite an argument of the form X.Y.Z to X.Y
+          cp .ci/stack-${GHC_VERSION%.*}.yaml stack.yaml
+          # Print out stack.yaml for debugging purposes
+          cat stack.yaml
 
       - name: Cache (Windows)
         if: ${{ runner.os == 'Windows' }}
@@ -83,10 +88,12 @@ jobs:
       # Retry Stack initialization, see:
       # https://github.com/commercialhaskell/stack/issues/5770
       - name: Initialize Stack
+        shell: bash
         run: ./.ci/retry.sh stack build base
 
       # Building 'happy' sometimes fails on Windows for some obscure reason
       - name: Build happy with Stack
+        shell: bash
         run: ./.ci/retry.sh stack build happy
 
       # Note: the --pedantic switch adds -Wall -Werror to the options passed to
@@ -110,27 +117,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        ghc: [ "8.6.5", "9.0.2" ]
         include:
-          - name: GHC 8.6.5, Single Hidden
-            ghc: 8.6.5
+          - multiple_hidden: yes
+
+          - ghc: 8.6.5
             multiple_hidden: no
 
-          - name: GHC 8.8.4, Multiple Hidden
-            ghc: 8.8.4
-            multiple_hidden: yes
-
-          - name: GHC 8.10.7, Multiple Hidden
-            ghc: 8.10.7
-            multiple_hidden: yes
-
-          - name: GHC 9.0.2, Multiple Hidden
-            ghc: 9.0.2
-            multiple_hidden: yes
+          - ghc: 9.0.2
             workaround_ghc_mmap_crash: yes
 
-          - name: GHC 9.2.5, Multiple Hidden
-            ghc: 9.2.5
-            multiple_hidden: yes
 
     # Run steps inside the clash CI docker image
     container:
@@ -153,6 +149,7 @@ jobs:
 
       - name: Setup CI
         run: |
+          export CABAL_DIR=$HOME/.cabal
           ./.ci/setup.sh
           cabal v2-freeze
 
@@ -172,11 +169,14 @@ jobs:
           restore-keys: ${{ matrix.ghc }}-
 
       - name: Build Clash
-        run: ./.ci/build.sh
+        run: |
+          export CABAL_DIR=$HOME/.cabal
+          ./.ci/build.sh
 
       - name: Unit Tests
         if: github.ref != 'refs/heads/master'
         run: |
+          export CABAL_DIR=$HOME/.cabal
           cabal v2-test clash-prelude
           cabal v2-test clash-lib
           cabal v2-test clash-cores
@@ -184,15 +184,21 @@ jobs:
 
       - name: Testsuite (VHDL)
         if: github.ref != 'refs/heads/master'
-        run: cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .VHDL --no-vivado
+        run: |
+          export CABAL_DIR=$HOME/.cabal
+          cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .VHDL --no-vivado
 
       - name: Testsuite (Verilog)
         if: github.ref != 'refs/heads/master'
-        run: cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .Verilog --no-vivado
+        run: |
+          export CABAL_DIR=$HOME/.cabal
+          cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .Verilog --no-vivado
 
       - name: Testsuite (SystemVerilog)
         if: github.ref != 'refs/heads/master'
-        run: cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .SystemVerilog --no-modelsim --no-vivado
+        run: |
+          export CABAL_DIR=$HOME/.cabal
+          cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .SystemVerilog --no-modelsim --no-vivado
 
 
   all:

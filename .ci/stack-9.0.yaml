@@ -1,4 +1,4 @@
-resolver: lts-19.25
+resolver: lts-19.33
 
 ghc-options:
   "$locals": -Wall -Wcompat
