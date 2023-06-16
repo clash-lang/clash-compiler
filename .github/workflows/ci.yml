@@ -139,6 +139,7 @@ jobs:
       env:
         THREADS: 2
         CABAL_JOBS: 2
+        WORKAROUND_GHC_MMAP_CRASH: ${{ matrix.workaround_ghc_mmap_crash }}
         MULTIPLE_HIDDEN: ${{ matrix.multiple_hidden }}
         CI_COMMIT_BRANCH: ${{ github.base_ref }}
         WORKAROUND_GHC_MMAP_CRASH: ${{ matrix.workaround_ghc_mmap_crash }}
