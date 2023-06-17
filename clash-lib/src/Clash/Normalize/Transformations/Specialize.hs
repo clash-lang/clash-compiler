@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021-2022, QBayLogic B.V.
+                    2021-2023, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -339,6 +339,27 @@ We may also not want to look at ticks, as then the specialization cache will
 miss on virtually every lookup which could add to normalization time.
 -}
 
+-- | Given two 'InlineSpec's, return the \"strongest\" one. I.e., the one that's
+-- closest to @NoInline@ (or @Opaque@ for newer GHCs).
+preferNoInline :: InlineSpec -> InlineSpec -> InlineSpec
+preferNoInline is0 is1
+  | enumInlineSpec is0 >= enumInlineSpec is1 = is0
+  | otherwise                                = is1
+ where
+  enumInlineSpec :: InlineSpec -> Int
+  enumInlineSpec = \case
+#if MIN_VERSION_ghc(9,2,0)
+    NoUserInlinePrag {} -> -1
+#else
+    NoUserInline {} -> -1
+#endif
+    Inline {} -> 0
+    Inlinable {} -> 1
+    NoInline {} -> 2
+#if MIN_VERSION_ghc(9,4,0)
+    Opaque {} -> 3
+#endif
+
 -- | Specialize an application on its argument
 specialize'
   :: TransformContext
@@ -440,7 +461,11 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
                       -- are inlined, meaning the state-transition-function
                       -- and the memory element will be in a single function.
                       gTmM <- fmap (UniqMap.lookup g) $ Lens.use bindings
-                      return (g,maybe inl bindingSpec gTmM, maybe specArg (Left . (`mkApps` gArgs) . bindingTerm) gTmM)
+                      return
+                        ( g
+                        , preferNoInline inl (maybe noUserInline bindingSpec gTmM)
+                        , maybe specArg (Left . (`mkApps` gArgs) . bindingTerm) gTmM
+                        )
                     else return (f,inl,specArg)
                 _ -> return (f,inl,specArg)
               -- Create specialized functions
@@ -454,6 +479,13 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
               newf `deepseq` changed newExpr
         Nothing -> return e
   where
+    noUserInline :: InlineSpec
+#if MIN_VERSION_ghc(9,2,0)
+    noUserInline = NoUserInlinePrag
+#else
+    noUserInline = NoUserInline
+#endif
+
     collectBndrsMinusApps :: Term -> [Name a]
     collectBndrsMinusApps = reverse . go []
       where
