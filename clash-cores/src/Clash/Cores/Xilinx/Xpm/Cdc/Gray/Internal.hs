@@ -162,7 +162,7 @@ xpmCdcGray# ::
   , KnownDomain dst
   , HasCallStack
   ) =>
-  -- | Initial values supported
+  -- | Initial value usage
   Bool ->
   SNat stages ->
   Clock src ->

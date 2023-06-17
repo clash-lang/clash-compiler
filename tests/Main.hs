@@ -510,10 +510,19 @@ runClashTest = defaultMain $ clashTestRoot
               }
           , runTest "XpmCdcGray" $ def
               { hdlTargets=[VHDL, Verilog]
-              , hdlLoad=[]
+              , hdlLoad=[Vivado]
               , hdlSim=[Vivado]
-              , buildTargets=BuildSpecific ["tb" <> show n | n <- [(1::Int)..7]]
+              , buildTargets=BuildSpecific ["tb" <> show n | n <- [(0::Int)..7]]
               }
+#if !MIN_VERSION_ghc(9,6,0)
+          -- XXX: Broken on GHC 9.6. See https://github.com/clash-lang/clash-compiler/issues/2512.
+          , runTest "XpmCdcHandshake" $ def
+              { hdlTargets=[VHDL, Verilog]
+              , hdlLoad=[Vivado]
+              , hdlSim=[Vivado]
+              , buildTargets=BuildSpecific ["tb" <> show n | n <- [(0::Int)..6]]
+              }
+#endif
           , runTest "XpmCdcSingle" $ def
               { hdlTargets=[VHDL, Verilog]
               , hdlLoad=[Vivado]
@@ -523,12 +532,12 @@ runClashTest = defaultMain $ clashTestRoot
           , clashTestGroup "DcFifo"
             [ let _opts =
                     def{ hdlTargets=[VHDL, Verilog]
-                       , hdlLoad=[]
+                       , hdlLoad=[Vivado]
                        , hdlSim=[Vivado]
                        }
               in runTest "Basic" _opts
             , let _opts = def{ hdlTargets=[VHDL, Verilog]
-                             , hdlLoad=[]
+                             , hdlLoad=[Vivado]
                              , hdlSim=[Vivado]
                              , buildTargets=BuildSpecific [ "testBench_17_2"
                                                           , "testBench_2_17"
