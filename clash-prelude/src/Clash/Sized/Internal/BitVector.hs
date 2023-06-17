@@ -3,6 +3,7 @@ Copyright  :  (C) 2013-2016, University of Twente,
                   2019     , Gergő Érdi
                   2016-2019, Myrtle Software Ltd,
                   2021-2022, QBayLogic B.V.
+                  2023     , Nadia Chambers
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -560,7 +561,7 @@ read# cs0 = (fromIntegral (length cs1), BV m v)
 -- >>> $(hLit "dead")
 -- 0b1101111010101101
 --
--- Don't care digits are interpreted as f as a hexadecimal digit.
+-- Don't care digits set 4 bits in the undefined mask.
 hLit :: String -> ExpQ
 hLit s = pure (SigE body typ)
   where
@@ -587,10 +588,10 @@ read16# cs0 = (fromIntegral $ 4 * length cs1, BV m v)
              ++ show c ++ " in input: " ++ cs0
 
 -- | Create an octal literal.
--- >>> $(hLit "5234")
+-- >>> $(oLit "5234")
 -- 0b101011010100
 --
--- Don't care digits are interpreted as 7 as an octal digit.
+-- Don't care digits set 3 bits in the undefined mask.
 oLit :: String -> ExpQ
 oLit s = pure (SigE body typ)
   where

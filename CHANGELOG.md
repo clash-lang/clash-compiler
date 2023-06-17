@@ -13,6 +13,7 @@ Changed:
 ## 1.6.4 *Aug 30th 2022*
 Fixed:
 
+ * Add hex and octal BitVector parsing. [#1772] (https://github.com/clash-lang/clash-compiler/pull/2505)
  * Input validation of the used arguments in blackboxes is now complete. [#2184](https://github.com/clash-lang/clash-compiler/pull/2184)
  * `Clash.Annotations.BitRepresentation.Deriving.deriveAnnotation` no longer has quadratic complexity in the size of the constructors and fields. [#2209](https://github.com/clash-lang/clash-compiler/pull/2209)
  * Fully resolve type synonyms when deriving bit representations. [#2209](https://github.com/clash-lang/clash-compiler/pull/2209)
