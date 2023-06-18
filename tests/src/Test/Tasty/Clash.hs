@@ -241,6 +241,13 @@ instance IsTest ClashGenTest where
       , "-odir", oDir
       , "-hidir", oDir
       , "-fclash-debug", "DebugSilent"
+
+      -- See https://github.com/clash-lang/clash-compiler/pull/2511
+#if __GLASGOW_HASKELL__ >= 904
+      , "-DCLASH_OPAQUE=OPAQUE"
+#else
+      , "-DCLASH_OPAQUE=NOINLINE"
+#endif
       ] <> cgExtraArgs
 
     target =

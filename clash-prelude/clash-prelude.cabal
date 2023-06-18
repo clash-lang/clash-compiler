@@ -155,6 +155,12 @@ Library
   ghc-options:        -Wall -Wcompat -fexpose-all-unfoldings -fno-worker-wrapper
   CPP-Options:        -DCABAL
 
+  -- See https://github.com/clash-lang/clash-compiler/pull/2511
+  if impl(ghc >= 9.4)
+    CPP-Options: -DCLASH_OPAQUE=OPAQUE
+  else
+    CPP-Options: -DCLASH_OPAQUE=NOINLINE
+
   if flag(large-tuples)
     CPP-Options: -DLARGE_TUPLES
 
