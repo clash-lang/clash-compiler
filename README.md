@@ -63,20 +63,21 @@ git checkout 1.2
 Note that release branches might contain non-released patches.
 
 ## GHC compatibility
-|      | Linux | Windows | macOS |
-|------|-------|---------|-------|
-| 8.6  | ✔️     | ✔️      | ✔️     |
-| 8.8  | ✔️     | ❌      | ✔️     |
-| 8.10 | ✔️     | ✔️      | ❌     |
-| 9.0  | ✔️     | ✔️²     | ✔️     |
-| 9.2¹ | ❌     | ❌      | ❌     |
-| 9.4³ | ❌     | ❌      | ❌     |
+|      | Linux | Windows | macOS | Clash (released) | Clash (development version)
+|------|-------|---------|-------|------------------|--------------------------
+| 8.6  | ✔️     | ✔️       | ✔️     | 1.0 - 1.6        | ✔️
+| 8.8  | ✔️     | ❌      | ✔️     | 1.0 - 1.6        | ✔️
+| 8.10 | ✔️     | ✔️       | ❌    | 1.2 - 1.6        | ✔️
+| 9.0  | ✔️     | ✔️²      | ✔️     | 1.4 - 1.6        | ✔️
+| 9.2  | ⚠️¹    | ⚠️¹      | ⚠️¹    |                  | ⚠️¹️
+| 9.4  | ✔️     | ✔️       | ✔️     |                  | ✔️
+| 9.6  | ✔️     | ❔³     | ❔³   |                  | ✔️
 
-¹ GHC 9.2 contains a regression, rendering Clash error messages indecipherable. This change will be reverted in 9.4.
+¹ GHC 9.2 contains a regression, rendering Clash error messages indecipherable. This change was reverted in 9.4.
 
 ² GHC 9.0.2 on Windows fails to compile `clash-cores`. We therefore don't run the Clash testsuite on CI for this combination.
 
-³ A critical dependency of Clash, `hint`, has not yet been ported to GHC 9.4.
+³ We use Stack to test on Windows/macOS. There is no resolver yet that uses GHC 9.6, so this remains untested.
 
 ## Cabal
 To use Cabal you need both Cabal and GHC installed on your system. We recommend using [ghcup](https://www.haskell.org/ghcup/). For more information, see [https://www.haskell.org/downloads/](https://www.haskell.org/downloads/).
