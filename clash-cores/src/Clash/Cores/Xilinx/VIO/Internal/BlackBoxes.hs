@@ -28,10 +28,10 @@ import Data.Text.Prettyprint.Doc.Extra (Doc)
 import Text.Show.Pretty (ppShow)
 
 import qualified Data.List.Infinite as Infinite
-import qualified Data.Text as T (pack, concat)
+import qualified Data.Text as T (Text, pack, concat)
 
 import Control.Arrow (first)
-import Control.Monad (when, forM, zipWithM)
+import Control.Monad (when, zipWithM)
 import Control.Monad.State (State)
 import Control.Exception (assert)
 
@@ -108,36 +108,55 @@ vioProbeTF =
     (maybe True error . validateVioProbeBBC)
     vioProbeBBTF
 
-vioProbeBBTF :: Backend s => BlackBoxContext -> State s Doc
+checkNameCollision :: HasCallStack => T.Text -> DSL.TExpr -> DSL.TExpr
+checkNameCollision userName tExpr@(DSL.TExpr _ (Identifier (Id.toText -> name) Nothing))
+  | userName == name = tExpr
+  | otherwise = error [__i|
+      Tried create a signal called '#{userName}', but identifier generation returned
+      '#{name}'. Refusing to instantiate VIO with unreliable probe names.
+  |]
+checkNameCollision _ tExpr = error [__i|
+  Internal error: Expected 'TExpr' with the following form:
+
+    TExpr _ (Identifier _ Nothing)
+
+  got:
+
+    #{ppShow tExpr}
+|]
+
+vioProbeBBTF :: (Backend s, HasCallStack) => BlackBoxContext -> State s Doc
 vioProbeBBTF bbCtx
   | (   _knownDomainDom
       : _vioConstraint
-      : (DSL.getVec -> Just inputNameExprs)
-      : (DSL.getVec -> Just outputNameExprs)
+      : (DSL.getVec -> Just userInputNameExprs)
+      : (DSL.getVec -> Just userOutputNameExprs)
       : _initialOutputProbeValues
       : clk
       : inputProbes
       ) <- map fst $ DSL.tInputs bbCtx
-  , Just inputNames <- mapM (fmap T.pack . DSL.getStr) inputNameExprs
-  , Just outputNames <- mapM (fmap T.pack . DSL.getStr) outputNameExprs
+  , Just userInputNames <- mapM (fmap T.pack . DSL.getStr) userInputNameExprs
+  , Just userOutputNames <- mapM (fmap T.pack . DSL.getStr) userOutputNameExprs
   , [vioProbeName] <- bbQsysIncName bbCtx
   , Right (inTys, outTys) <- probesFromTypes bbCtx
   , [tResult] <- map DSL.ety (DSL.tResults bbCtx)
   = do
-      when (length inTys /= length inputNames) $
+      when (length inTys /= length userInputNames) $
         error [__i|
           Number of input names did not match number of input probes. Expected
-          #{length inTys} input name(s), got #{length inputNames}. Got input name(s):
+          #{length inTys} input name(s), got #{length userInputNames}. Got input
+          name(s):
 
-            #{ppShow inputNames}
+            #{ppShow userInputNames}
         |]
 
-      when (length outTys /= length outputNames) $
+      when (length outTys /= length userOutputNames) $
         error [__i|
           Number of output names did not match number of output probes. Expected
-          #{length outTys} output name(s), got #{length outputNames}. Got output name(s):
+          #{length outTys} output name(s), got #{length userOutputNames}. Got output
+          name(s):
 
-            #{ppShow outputNames}
+            #{ppShow userOutputNames}
         |]
 
       vioProbeInstName <- Id.makeBasic "vio_inst"
@@ -146,10 +165,6 @@ vioProbeBBTF bbCtx
         inPs = filter ((> (0 :: Int)) . DSL.tySize . DSL.ety) inputProbes
         inNames = map (T.pack . ("probe_in" <>) . show) [0 :: Int, 1..]
         outNames = map (T.pack . ("probe_out" <>) . show) [0 :: Int, 1..]
-        -- The HDL attribute 'KEEP' is added to the signals connected to the
-        -- probe ports so they are not optimized away by the synthesis tool.
-        attrs = [StringAttr' "KEEP" "true"]
-
         inBVs = map (BitVector . (fromInteger . DSL.tySize)) inTys
         outBVs = map (BitVector . (fromInteger . DSL.tySize)) outTys
 
@@ -168,13 +183,9 @@ vioProbeBBTF bbCtx
                 _         -> pure <$> DSL.assign (head inNames) singleInput
             _ -> zipWithM DSL.assign inNames inPs
 
-        outProbes <-
-          forM (zip outNames outTys) $ uncurry DSL.declare
-        outProbesBV <-
-          forM (zip outputNames outProbes) $ uncurry (DSL.toBvWithAttrs attrs)
-
-        inProbesBV <-
-          forM (zip inputNames inProbes) $ uncurry (DSL.toBvWithAttrs attrs)
+        outProbes <- zipWithM DSL.declare outNames outTys
+        outProbesBV <- zipWithM toNameCheckedBv userOutputNames outProbes
+        inProbesBV <- zipWithM toNameCheckedBv userInputNames inProbes
 
         DSL.instDecl Empty (Id.unsafeMake vioProbeName) vioProbeInstName []
           (("clk", clk) : zip inNames inProbesBV)
@@ -186,6 +197,11 @@ vioProbeBBTF bbCtx
           _         -> pure outProbes
 
   | otherwise = error $ "vioProbeBBTF, bad bbCtx: " <> show bbCtx
+ where
+  toNameCheckedBv x =
+    -- The HDL attribute 'KEEP' is added to the signals connected to the
+    -- probe ports so they are not optimized away by the synthesis tool.
+    fmap (checkNameCollision x) . DSL.toBvWithAttrs [StringAttr' "KEEP" "true"] x
 
 vioProbeTclTF :: HasCallStack => TemplateFunction
 vioProbeTclTF =

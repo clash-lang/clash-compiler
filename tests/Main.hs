@@ -193,7 +193,19 @@ runClashTest = defaultMain $ clashTestRoot
       , clashTestGroup "Cores"
         [ clashTestGroup "Xilinx"
           [ clashTestGroup "VIO"
-            [ runTest "OutputBusWidthExceeded" def{
+            [ runTest "DuplicateOutputNames" def{
+                hdlTargets=[VHDL]
+              , expectClashFail=Just (def, "Tried create a signal called 'a', but identifier generation returned")
+              }
+            , runTest "DuplicateInputNames" def{
+                hdlTargets=[VHDL]
+              , expectClashFail=Just (def, "Tried create a signal called 'a', but identifier generation returned")
+              }
+            , runTest "DuplicateInputOutputNames" def{
+                hdlTargets=[VHDL]
+              , expectClashFail=Just (def, "Tried create a signal called 'a', but identifier generation returned")
+              }
+            , runTest "OutputBusWidthExceeded" def{
                 hdlTargets=[VHDL, Verilog, SystemVerilog]
               , expectClashFail=Just (def, "Probe signals must be been between 1 and 256 bits wide.")
               }
