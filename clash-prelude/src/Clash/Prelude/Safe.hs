@@ -44,6 +44,7 @@ module Clash.Prelude.Safe
     mealy
   , mealyS
   , mealyB
+  , mealySB
   , (<^>)
   , moore
   , mooreB
@@ -152,7 +153,7 @@ import           Clash.NamedTypes
 import           Clash.Prelude.BlockRam
 import           Clash.Prelude.BlockRam.Blob
 import qualified Clash.Explicit.Prelude.Safe as E
-import           Clash.Prelude.Mealy         (mealy, mealyB, mealyS, (<^>))
+import           Clash.Prelude.Mealy         (mealy, mealyB, mealyS, mealySB, (<^>))
 import           Clash.Prelude.Moore         (moore, mooreB)
 import           Clash.Prelude.RAM           (asyncRam,asyncRamPow2)
 import           Clash.Prelude.ROM           (asyncRom,asyncRomPow2,rom,romPow2)

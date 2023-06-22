@@ -23,6 +23,7 @@ module Clash.Prelude.Mealy
     mealy
   , mealyS
   , mealyB
+  , mealySB
   , (<^>)
   )
 where
@@ -220,6 +221,21 @@ mealyS
 mealyS = hideClockResetEnable E.mealyS
 {-# INLINE mealyS #-}
 
+-- | A version of 'mealyS' that does automatic 'Bundle'ing, see 'mealyB' for details.
+mealySB
+  :: ( HiddenClockResetEnable dom
+     , NFDataX s
+     , Bundle i
+     , Bundle o  )
+  => (i -> State s o)
+  --  ^ Transfer function in mealy machine handling inputs using @Control.Monad.Strict.State s@.
+  -> s
+  -- ^ Initial state
+  -> (Unbundled dom i -> Unbundled dom o)
+  -- ^ Synchronous sequential function with input and output matching that
+  -- of the mealy machine
+mealySB = hideClockResetEnable E.mealySB
+{-# INLINE mealySB #-}
 
 -- | Infix version of 'mealyB'
 (<^>)

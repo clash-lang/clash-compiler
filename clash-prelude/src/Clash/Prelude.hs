@@ -47,6 +47,7 @@ module Clash.Prelude
     mealy
   , mealyS
   , mealyB
+  , mealySB
   , (<^>)
   , moore
   , mooreB
