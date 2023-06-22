@@ -898,11 +898,26 @@ runClashTest = defaultMain $ clashTestRoot
                           }
            in runTest "NoCPR" _opts
         , runTest "DynamicClocks" def
-            { hdlLoad = hdlLoad def \\ [Verilator]
+            { hdlTargets = [VHDL]
+              -- Vivado often fails with "Iteration limit reached"
+            , hdlLoad = hdlLoad def \\ [Verilator, Vivado]
+            , hdlSim = hdlSim def \\ [Verilator, Vivado]
+            , clashFlags = ["-fclash-timescale-precision", "1fs"]
+            }
+        , runTest "DynamicClocks" def
+            { hdlTargets = [Verilog, SystemVerilog]
+            , hdlLoad = hdlLoad def \\ [Verilator]
             , hdlSim = hdlSim def \\ [Verilator]
             , clashFlags = ["-fclash-timescale-precision", "1fs"]
             }
         , runTest "Oversample" def
+            { hdlTargets = [VHDL]
+              -- Vivado fails "exceptional condition"
+            , hdlLoad = hdlLoad def \\ [Vivado]
+            , hdlSim = hdlSim def \\ [Vivado]
+            }
+        , runTest "Oversample" def
+            { hdlTargets = [Verilog, SystemVerilog] }
         , runTest "RegisterAR" def
         , runTest "RegisterSR" def
         , runTest "RegisterAE" def
