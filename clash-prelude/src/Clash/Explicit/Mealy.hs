@@ -16,12 +16,15 @@
 {-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
 
 {-# LANGUAGE Safe #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Redundant lambda" #-}
 
 module Clash.Explicit.Mealy
   ( -- * Mealy machines with explicit clock and reset ports
     mealy
   , mealyS
   , mealyB
+  , mealySB
   )
 where
 
@@ -251,3 +254,23 @@ mealyB
  -- of the mealy machine
 mealyB clk rst en f iS i = unbundle (mealy clk rst en f iS (bundle i))
 {-# INLINE mealyB #-}
+
+
+-- | A version of 'mealyS' that does automatic 'Bundle'ing, see 'mealyB' for details.
+mealySB
+  :: ( KnownDomain dom
+     , NFDataX s
+     , Bundle i
+     , Bundle o )
+  => Clock dom
+  -> Reset dom
+  -> Enable dom
+  -> (i -> State s o)
+  -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+  -> s
+  -- ^ Initial state
+  -> (Unbundled dom i -> Unbundled dom o)
+ -- ^ Synchronous sequential function with input and output matching that
+ -- of the mealy machine
+mealySB clk rst en f iS i = unbundle (mealyS clk rst en f iS (bundle i))
+{-# INLINE mealySB #-}

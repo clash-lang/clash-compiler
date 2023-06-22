@@ -26,6 +26,7 @@ module Clash.Explicit.Prelude
     mealy
   , mealyS
   , mealyB
+  , mealySB
   , moore
   , mooreB
   , registerB
