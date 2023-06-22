@@ -182,7 +182,8 @@ mealyB = hideClockResetEnable E.mealyB
 --   { _history    :: Vec 4 Int
 --   , _untilValid :: Index 4
 --   }
--- makeLenses 'DelayedState
+--   deriving (Generic, NFDataX)
+-- makeLenses ''DelayState
 --
 -- initialDelayState = DelayState (repeat 0) maxBound
 --
@@ -192,7 +193,7 @@ mealyB = hideClockResetEnable E.mealyB
 --   remaining <- use untilValid
 --   if remaining > 0
 --   then do
---      remaining -= 1
+--      untilValid -= 1
 --      return Nothing
 --    else do
 --      out <- uses history last

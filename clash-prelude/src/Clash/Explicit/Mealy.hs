@@ -159,7 +159,8 @@ mealy clk rst en f iS =
 --   { _history    :: Vec 4 Int
 --   , _untilValid :: Index 4
 --   }
--- makeLenses 'DelayedState
+--   deriving (Generic, NFDataX)
+-- makeLenses ''DelayState
 --
 -- initialDelayState = DelayState (repeat 0) maxBound
 --
@@ -169,7 +170,7 @@ mealy clk rst en f iS =
 --   remaining <- use untilValid
 --   if remaining > 0
 --   then do
---      remaining -= 1
+--      untilValid -= 1
 --      return Nothing
 --    else do
 --      out <- uses history last
