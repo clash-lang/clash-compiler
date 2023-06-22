@@ -118,9 +118,6 @@ common common-options
                       TypeOperators
                       ViewPatterns
 
-  if impl(ghc >= 8.6)
-      default-extensions: NoStarIsType
-
 library
   import:             common-options
   HS-Source-Dirs:     src-ghc, src-bin-common

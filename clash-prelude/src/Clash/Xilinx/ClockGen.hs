@@ -30,6 +30,8 @@ import Clash.Signal.Internal
 -- -- Outputs a clock running at 100 MHz
 -- clockWizard \@_ \@Dom100MHz (SSymbol \@\"clkWizard50to100\") clk50 rst
 -- @
+--
+-- See also the [Clocking Wizard LogiCORE IP Product Guide](https://docs.xilinx.com/r/en-US/pg065-clk-wiz)
 clockWizard
   :: forall domIn domOut name
    . ( KnownDomain domIn
@@ -60,6 +62,8 @@ clockWizard !_ = clocks
 -- -- Outputs a clock running at 100 MHz
 -- clockWizardDifferential \@_ \@Dom100MHz (SSymbol \@\"clkWizard50to100\") clk50N clk50P rst
 -- @
+--
+-- See also the [Clocking Wizard LogiCORE IP Product Guide](https://docs.xilinx.com/r/en-US/pg065-clk-wiz)
 clockWizardDifferential
   :: forall domIn domOut name
    . ( KnownDomain domIn

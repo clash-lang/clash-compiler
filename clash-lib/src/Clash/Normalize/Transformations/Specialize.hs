@@ -6,7 +6,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Transformations for specialisation.
+  Transformations for specialization
 -}
 
 {-# LANGUAGE CPP #-}
@@ -125,10 +125,10 @@ import Clash.Util (ClashException(..))
 --       D a b -> h a b
 -- @
 --
--- is very bad because 'b' in 'h a b' is now bound by the pattern instead of the
+-- is very bad because @b@ in @h a b@ is now bound by the pattern instead of the
 -- newly introduced let-binding
 --
--- instead me must deshadow w.r.t. the new variable and rewrite to:
+-- instead we must deshadow w.r.t. the new variable and rewrite to:
 --
 -- @
 -- let b = f x y
@@ -156,8 +156,10 @@ import Clash.Util (ClashException(..))
 -- whether @x@ is in the current InScopeSet, and deshadow if that's the case,
 -- i.e. we then rewrite to:
 --
+-- @
 -- let x1 = u
 -- in  e [x:=x1]
+-- @
 --
 -- Case 3.
 --
@@ -280,7 +282,7 @@ appProp ctx@(TransformContext is _) = \case
   goCaseArg _ ty ls [] = return (ty,ls,[])
 {-# SCC appProp #-}
 
--- | Specialise functions on arguments which are constant, except when they
+-- | Specialize functions on arguments which are constant, except when they
 -- are clock, reset generators.
 constantSpec :: HasCallStack => NormRewrite
 constantSpec ctx@(TransformContext is0 tfCtx) e@(App e1 e2)
@@ -428,7 +430,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
               (fId,inl',specArg') <- case specArg of
                 Left a@(collectArgsTicks -> (Var g,gArgs,_gTicks)) -> if isPolyFun tcm a
                     then do
-                      -- In case we are specialising on an argument that is a
+                      -- In case we are specializing on an argument that is a
                       -- global function then we use that function's name as the
                       -- name of the specialized higher-order function.
                       -- Additionally, we will return the body of the global
@@ -467,7 +469,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
           bs' -> init bs' ++ bs
         go bs _ = bs
 
--- Specialising non Var's is used by nonRepANF
+-- Specializing non Var's is used by nonRepANF
 specialize' _ctx _ (appE,args,ticks) (Left specArg) = do
   -- Create binders and variable references for free variables in 'specArg'
   let (specBndrs,specVars) = specArgBndrsAndVars (Left specArg)
@@ -499,10 +501,10 @@ specialize' _ e _ _ = return e
 -- yield (alpha equivalent) results for the same specialization. While collecting
 -- free variables in a given term or type it should therefore keep a stable
 -- ordering based on the order in which it finds free vars. To see why,
--- consider the following two pseudo-code calls to 'specialise':
+-- consider the following two pseudo-code calls to 'specialize':
 --
---     specialise {f ('a', x[123], y[456])}
---     specialise {f ('b', x[456], y[123])}
+--     specialize {f ('a', x[123], y[456])}
+--     specialize {f ('b', x[456], y[123])}
 --
 -- Collecting the binders in a VarSet would yield the following (unique ordered)
 -- sets:
@@ -562,12 +564,12 @@ nonRepSpec ctx e@(App e1 e2)
            specialize ctx (App e1 e2')
          else return e
   where
-    -- | If the argument on which we're specialising ia an internal function,
+    -- | If the argument on which we're specializing is an internal function,
     -- one created by the compiler, then inline that function before we
-    -- specialise.
+    -- specialize.
     --
-    -- We need to do this because otherwise the specialisation history won't
-    -- recognize the new specialisation argument as something the function has
+    -- We need to do this because otherwise the specialization history won't
+    -- recognize the new specialization argument as something the function has
     -- already been specialized on
     inlineInternalSpecialisationArgument
       :: Term
@@ -600,8 +602,8 @@ typeSpec _ e = return e
 {-# SCC typeSpec #-}
 
 -- | Specialize functions on arguments which are zero-width. These arguments
--- can have only one possible value, and specialising on this value may create
--- additional oppourtunities for transformations to fire.
+-- can have only one possible value, and specializing on this value may create
+-- additional opportunities for transformations to fire.
 --
 -- As we can't remove zero-width arguements (as transformations cannot change
 -- the type of a term), we instead substitute all occurances of a lambda-bound

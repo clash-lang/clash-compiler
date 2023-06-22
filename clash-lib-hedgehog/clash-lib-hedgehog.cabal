@@ -23,10 +23,7 @@ common basic-config
     TypeApplications
     TypeFamilies
     TypeOperators
-
-  if impl(ghc >= 8.6)
-    default-extensions:
-      NoStarIsType
+    NoStarIsType
 
   ghc-options:
     -Wall -Wcompat

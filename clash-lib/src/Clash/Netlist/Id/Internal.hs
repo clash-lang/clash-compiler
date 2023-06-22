@@ -11,7 +11,7 @@ import           Clash.Annotations.Primitive (HDL (..))
 import           Clash.Core.Name (Name(nameOcc))
 import           Clash.Core.Var (Id, varName)
 import           Clash.Debug (debugIsOn)
-import {-# SOURCE #-} Clash.Netlist.Types
+import           Clash.Netlist.Types
   (PreserveCase(..), IdentifierSet(..), Identifier(..), FreshCache,
    IdentifierType(..))
 import           Control.Arrow (second)
