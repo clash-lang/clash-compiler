@@ -266,7 +266,7 @@ mealySB
   -> Reset dom
   -> Enable dom
   -> (i -> State s o)
-  -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+  -- ^ Transfer function in mealy machine handling inputs using @Control.Monad.Strict.State s@.
   -> s
   -- ^ Initial state
   -> (Unbundled dom i -> Unbundled dom o)
