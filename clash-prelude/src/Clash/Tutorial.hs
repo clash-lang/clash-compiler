@@ -4,6 +4,7 @@ Copyright : © 2014-2016, Christiaan Baaij,
               2017     , QBayLogic, Google Inc.,
               2021-2023, QBayLogic B.V.
               2022     , LUMI GUIDE FIETSDETECTIE B.V.
+              2023     , Alex Mason
 
 Licence   : Creative Commons 4.0 (CC BY 4.0) (https://creativecommons.org/licenses/by/4.0/)
 Maintainer:  QBayLogic B.V. <devops@qbaylogic.com>
@@ -80,6 +81,7 @@ module Clash.Tutorial (
 where
 
 import Clash.Prelude
+import Clash.Prelude.Mealy
 import Clash.Explicit.Testbench
 import Clash.XException (NFDataX)
 import Control.Monad.ST
@@ -96,6 +98,7 @@ import Data.Default.Class
 >>> :set -XTemplateHaskell -XDataKinds -XConstraintKinds -XTypeApplications
 >>> :m -Prelude
 >>> import Clash.Prelude
+>>> import Clash.Prelude.Mealy
 >>> import Clash.Explicit.Testbench
 >>> :{
 let ma :: Num a => a -> (a, a) -> a
@@ -668,46 +671,42 @@ structure.
         acc' = ma '<$>' acc '<*>' 'bundle' (x,y)
     @
 
-* __'Control.Monad.State.Lazy.State' Monad__
+* __'Control.Monad.State.Strict.State' Monad__
 
     We can also implement the original @macT@ function as a
-    @'Control.Monad.State.Lazy.State'@
+    @'Control.Monad.State.Strict.State'@
     monadic computation. First we must add an extra import statement, right
     after the import of "Clash.Prelude":
 
     @
-    import Control.Monad.State
+    import Control.Monad.State.Strict
     @
 
     We can then implement macT as follows:
 
     @
     macTS (x,y) = do
-      acc <- 'Control.Monad.State.Lazy.get'
-      'Control.Monad.State.Lazy.put' (acc + x * y)
+      acc <- 'Control.Monad.State.Strict.get'
+      'Control.Monad.State.Strict.put' (acc + x * y)
       return acc
     @
 
-    We can use the 'mealy' function again, although we will have to change
-    position of the arguments and result:
+    We can use the 'mealyS' function to run our stateful implementation, this
+    can simplify translating algorithms which are described imperatively.
 
     @
-    asStateM
-      :: ( 'HiddenClockResetEnable' dom
-         , 'NFDataX' s )
-      => (i -> 'Control.Monad.State.Lazy.State' s o)
+    mealyS
+      :: ( HiddenClockResetEnable dom, NFDataX s )
+      => (i -> State s o)
       -> s
-      -> ('Signal' dom i -> 'Signal' dom o)
-    asStateM f i = 'mealy' g i
-      where
-        g s x = let (o,s') = 'Control.Monad.State.Lazy.runState' (f x) s
-                in  (s',o)
+      -> (Signal dom i -> Signal dom o)
+    mealyS f initS = ...
     @
 
     We can then create the complete @mac@ circuit as:
 
     @
-    macS = asStateM macTS 0
+    macS = 'mealyS' macTS 0
     @
 -}
 
