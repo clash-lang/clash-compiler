@@ -16,8 +16,6 @@
 {-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
 
 {-# LANGUAGE Safe #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Redundant lambda" #-}
 
 module Clash.Explicit.Mealy
   ( -- * Mealy machines with explicit clock and reset ports
