@@ -56,7 +56,7 @@ where
 import           Clash.Annotations.Primitive (HDL (..))
 import           Clash.Core.Var (Id)
 import           Clash.Debug (debugIsOn)
-import {-# SOURCE #-} Clash.Netlist.Types
+import           Clash.Netlist.Types
   (PreserveCase(..), HasIdentifierSet(..), IdentifierSet(..), Identifier(..),
    IdentifierType(..), IdentifierSetMonad(identifierSetM))
 import qualified Data.HashSet as HashSet

@@ -1601,7 +1601,7 @@ iterateI f a = xs
       , "templateFunction": "Clash.Primitives.Sized.Vector.iterateBBF"
     }}] |]) #-}
 
--- | \"'unfoldr @n f s@\" builds a vector of length @n@ from a seed value @s@,
+-- | \"'unfoldr' @n f s@\" builds a vector of length @n@ from a seed value @s@,
 -- where every element @a@ is created by successive calls of @f@ on @s@. Unlike
 -- 'Data.List.unfoldr' from "Data.List" the generating function @f@ cannot
 -- dictate the length of the resulting vector, it must be statically known.
@@ -1614,7 +1614,7 @@ unfoldr :: SNat n -> (s -> (a,s)) -> s -> Vec n a
 unfoldr SNat = unfoldrI
 {-# INLINE unfoldr #-}
 
--- | \"'unfoldr @f s@\" builds a vector from a seed value @s@, where every
+-- | \"'unfoldrI' @f s@\" builds a vector from a seed value @s@, where every
 -- element @a@ is created by successive calls of @f@ on @s@; the length of the
 -- vector is inferred from the context. Unlike 'Data.List.unfoldr' from
 -- "Data.List" the generating function @f@ cannot  dictate the length of the

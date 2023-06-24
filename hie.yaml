@@ -15,7 +15,7 @@ cradle:
     # The src-bin directories are GHC version dependant, so don't load them
     - path: "./clash-ghc/src-bin-8.10"
       config: { cradle: {none: }}
-    - path: "./clash-ghc/src-bin-841"
+    - path: "./clash-ghc/src-bin-9.0"
       config: { cradle: {none: }}
     - path: "./clash-ghc/src-bin-861"
       config: { cradle: {none: }}
@@ -26,11 +26,11 @@ cradle:
     - path: "./clash-lib"
       config: { cradle: {cabal: [{path: "./clash-lib/src", component: "lib:clash-lib"}
                                 ,{path: "./clash-lib/test", component: "clash-lib:unittests"} ] } }
+    - path: "./clash-prelude-hedgehog"
+      config: { cradle: {cabal: [{path: "./clash-prelude-hedgehog/src", component: "lib:clash-prelude-hedgehog"}]}}
     # Clash prelude is broken for now because ghcide won't use -fobject-code
     # when loading ./clash-prelude/src/Clash/Sized/Internal/Mod.hs transitively
     # as a dependency of another module
-    - path: "./clash-prelude-hedgehog"
-      config: { cradle: {cabal: [{path: "./clash-prelude-hedgehog/src", component: "lib:clash-prelude-hedgehog"}]}}
     - path: "./clash-prelude"
       config: { cradle: {none: }}
     - path: "./clash-term"

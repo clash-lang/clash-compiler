@@ -1099,7 +1099,7 @@ expr_ _ (Identifier id_ (Just (Indexed ((Unsigned w),_,_))))  = do
 expr_ _ (Identifier _ (Just (Indexed ((BitVector _),_,0)))) = do
   iw <- Ap $ use intWidth
   traceIf True ($(curLoc) ++ "WARNING: synthesizing bitvector mask to dontcare") $
-    verilogTypeErrValue (Signed iw)
+    verilogTypeErrValue (Unsigned iw)
 
 -- See [Note] bitvector projection
 expr_ _ (Identifier id_ (Just (Indexed ((BitVector w),_,1)))) = do

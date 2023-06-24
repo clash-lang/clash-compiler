@@ -32,7 +32,7 @@ module Clash.Primitives.Types
   , CompiledPrimMap
   ) where
 
-import {-# SOURCE #-} Clash.Netlist.Types
+import {-# SOURCE #-} Clash.Netlist.Types (BlackBox)
 import           Clash.Annotations.Primitive  (PrimitiveGuard)
 import           Clash.Core.Term (WorkInfo (..))
 import           Clash.Netlist.BlackBox.Types
