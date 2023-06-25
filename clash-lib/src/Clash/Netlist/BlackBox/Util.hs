@@ -127,7 +127,7 @@ inputHole = \case
   SigD _ nM        -> nM
   CtxName          -> Nothing
 
--- | Determine if the number of normal/literal/function inputs of a blackbox
+-- | Determine if the number of normal\/literal\/function inputs of a blackbox
 -- context at least matches the number of argument that is expected by the
 -- template.
 verifyBlackBoxContext

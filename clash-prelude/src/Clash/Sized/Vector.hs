@@ -825,7 +825,7 @@ imap f = go 0
 
 <<doc/izipWith.svg>>
 
-__NB:__ 'izipWith' is /strict/ in its second argument, and /lazy/ in its
+__NB__: 'izipWith' is /strict/ in its second argument, and /lazy/ in its
 third. This matters when 'izipWith' is used in a recursive setting. See
 'lazyV' for more information.
 -}
@@ -919,7 +919,7 @@ elemIndex x = findIndex (x ==)
 --
 -- <<doc/zipWith.svg>>
 --
--- __NB:__ 'zipWith' is /strict/ in its second argument, and /lazy/ in its
+-- __NB__: 'zipWith' is /strict/ in its second argument, and /lazy/ in its
 -- third. This matters when 'zipWith' is used in a recursive setting. See
 -- 'lazyV' for more information.
 zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
@@ -938,7 +938,7 @@ zipWith f (x `Cons` xs) ys = f x (head ys) `Cons` zipWith f xs (tail ys)
 --
 -- <<doc/zipWith3.svg>>
 --
--- __NB:__ 'zipWith3' is /strict/ in its second argument, and /lazy/ in its
+-- __NB__: 'zipWith3' is /strict/ in its second argument, and /lazy/ in its
 -- third and fourth. This matters when 'zipWith3' is used in a recursive setting.
 -- See 'lazyV' for more information.
 zipWith3 :: (a -> b -> c -> d) -> Vec n a -> Vec n b -> Vec n c -> Vec n d
@@ -947,7 +947,7 @@ zipWith3 f us vs ws = zipWith (\a (b,c) -> f a b c) us (zip vs ws)
 
 -- 'zipWith4' is analogous to 'zipWith3', but with four vectors.
 --
--- __NB:__ 'zipWith4' is /strict/ in its second argument, and /lazy/ its following
+-- __NB__: 'zipWith4' is /strict/ in its second argument, and /lazy/ its following
 -- arguments. This matters when 'zipWith4' is used in a recursive setting. See
 -- 'lazyV' for more information.
 zipWith4
@@ -963,7 +963,7 @@ zipWith4 f us vs ws xs =
 
 -- 'zipWith5' is analogous to 'zipWith3', but with five vectors.
 --
--- __NB:__ 'zipWith5' is /strict/ in its second argument, and /lazy/ its following
+-- __NB__: 'zipWith5' is /strict/ in its second argument, and /lazy/ its following
 -- arguments. This matters when 'zipWith5' is used in a recursive setting. See
 -- 'lazyV' for more information.
 zipWith5
@@ -980,7 +980,7 @@ zipWith5 f us vs ws xs ys =
 
 -- 'zipWith6' is analogous to 'zipWith3', but with six vectors.
 --
--- __NB:__ 'zipWith6' is /strict/ in its second argument, and /lazy/ its following
+-- __NB__: 'zipWith6' is /strict/ in its second argument, and /lazy/ its following
 -- arguments. This matters when 'zipWith6' is used in a recursive setting. See
 -- 'lazyV' for more information.
 zipWith6
@@ -998,7 +998,7 @@ zipWith6 f us vs ws xs ys zs =
 
 -- 'zipWith7' is analogous to 'zipWith3', but with seven vectors.
 --
--- __NB:__ 'zipWith7' is /strict/ in its second argument, and /lazy/ its following
+-- __NB__: 'zipWith7' is /strict/ in its second argument, and /lazy/ its following
 -- arguments. This matters when 'zipWith7' is used in a recursive setting. See
 -- 'lazyV' for more information.
 zipWith7
@@ -1420,7 +1420,7 @@ index_int xs i@(I# n0)
 
 -- | \"@xs@ '!!' @n@\" returns the /n/'th element of /xs/.
 --
--- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
+-- __NB__: Vector elements have an __ASCENDING__ subscript starting from 0 and
 -- ending at @'length' - 1@.
 --
 -- >>> (1:>2:>3:>4:>5:>Nil) !! 4
@@ -1467,7 +1467,7 @@ replace_int xs i@(I# n0) a
 -- | \"'replace' @n a xs@\" returns the vector /xs/ where the /n/'th element is
 -- replaced by /a/.
 --
--- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
+-- __NB__: Vector elements have an __ASCENDING__ subscript starting from 0 and
 -- ending at @'length' - 1@.
 --
 -- >>> replace 3 7 (1:>2:>3:>4:>5:>Nil)
@@ -1583,7 +1583,7 @@ dropI = withSNat drop
 
 -- | \"'at' @n xs@\" returns /n/'th element of /xs/
 --
--- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
+-- __NB__: Vector elements have an __ASCENDING__ subscript starting from 0 and
 -- ending at @'length' - 1@.
 --
 -- >>> at (SNat :: SNat 1) (1:>2:>3:>4:>5:>Nil)
@@ -1967,7 +1967,7 @@ interleave d = concat . transpose . unconcat d
 -- >>> rotateLeft xs (-1)
 -- 4 :> 1 :> 2 :> 3 :> Nil
 --
--- __NB:__ use `rotateLeftS` if you want to rotate left by a /static/ amount.
+-- __NB__: Use `rotateLeftS` if you want to rotate left by a /static/ amount.
 rotateLeft :: (Enum i, KnownNat n)
            => Vec n a
            -> i
@@ -1988,7 +1988,7 @@ rotateLeft xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
 -- >>> rotateRight xs (-1)
 -- 2 :> 3 :> 4 :> 1 :> Nil
 --
--- __NB:__ use `rotateRightS` if you want to rotate right by a /static/ amount.
+-- __NB__: Use `rotateRightS` if you want to rotate right by a /static/ amount.
 rotateRight :: (Enum i, KnownNat n)
             => Vec n a
             -> i
@@ -2005,7 +2005,7 @@ rotateRight xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
 -- >>> rotateLeftS xs d1
 -- 2 :> 3 :> 4 :> 1 :> Nil
 --
--- __NB:__ use `rotateLeft` if you want to rotate left by a /dynamic/ amount.
+-- __NB__: Use `rotateLeft` if you want to rotate left by a /dynamic/ amount.
 rotateLeftS :: KnownNat n
             => Vec n a
             -> SNat d
@@ -2026,7 +2026,7 @@ rotateLeftS xs d = go (snatToInteger d `mod` natVal (asNatProxy xs)) xs
 -- >>> rotateRightS xs d1
 -- 4 :> 1 :> 2 :> 3 :> Nil
 --
--- __NB:__ use `rotateRight` if you want to rotate right by a /dynamic/ amount.
+-- __NB__: Use `rotateRight` if you want to rotate right by a /dynamic/ amount.
 rotateRightS :: KnownNat n
              => Vec n a
              -> SNat d
@@ -2045,7 +2045,7 @@ rotateRightS xs d = go (snatToInteger d `mod` natVal (asNatProxy xs)) xs
 -- >>> toList (1:>2:>3:>Nil)
 -- [1,2,3]
 --
--- __NB:__ this function is not synthesizable
+-- __NB__: This function is not synthesizable
 toList :: Vec n a -> [a]
 toList = foldr (:) []
 {-# INLINE toList #-}
@@ -2062,8 +2062,8 @@ toList = foldr (:) []
 -- >>> Vec.fromList [1,2,3,4,5] :: Maybe (Vec 10 Int)
 -- Nothing
 --
--- * __NB:__ use `listToVecTH` if you want to make a /statically known/ vector
--- * __NB:__ this function is not synthesizable
+-- * __NB__: Use `listToVecTH` if you want to make a /statically known/ vector
+-- * __NB__: This function is not synthesizable
 --
 fromList :: forall n a. (KnownNat n) => [a] -> Maybe (Vec n a)
 fromList xs
@@ -2091,8 +2091,8 @@ fromList xs
 -- 1 :> 2 :> 3 :> 4 :> 5 :> *** Exception: Clash.Sized.Vector.unsafeFromList: vector larger than list
 -- ...
 --
--- * __NB:__ use `listToVecTH` if you want to make a /statically known/ vector
--- * __NB:__ this function is not synthesizable
+-- * __NB__: Use `listToVecTH` if you want to make a /statically known/ vector
+-- * __NB__: This function is not synthesizable
 --
 unsafeFromList :: forall n a. (KnownNat n) => [a] -> Vec n a
 unsafeFromList = unfoldr SNat go

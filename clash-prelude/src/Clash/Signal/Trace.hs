@@ -218,7 +218,7 @@ traceVecSignal# traceMap period vecTraceName (unbundle -> vecSignal) =
 -- | Trace a single signal. Will emit an error if a signal with the same name
 -- was previously registered.
 --
--- __NB__ Works correctly when creating VCD files from traced signal in
+-- __NB__: Works correctly when creating VCD files from traced signal in
 -- multi-clock circuits. However 'traceSignal1' might be more convenient to
 -- use when the domain of your circuit is polymorphic.
 traceSignal
@@ -244,7 +244,7 @@ traceSignal traceName signal =
 -- | Trace a single signal. Will emit an error if a signal with the same name
 -- was previously registered.
 --
--- __NB__ associates the traced signal with a clock period of /1/, which
+-- __NB__: Associates the traced signal with a clock period of /1/, which
 -- results in incorrect VCD files when working with circuits that have
 -- multiple clocks. Use 'traceSignal' when working with circuits that have
 -- multiple clocks.
@@ -267,7 +267,7 @@ traceSignal1 traceName signal =
 -- a different trace. If the trace name already exists, this function will emit
 -- an error.
 --
--- __NB__ Works correctly when creating VCD files from traced signal in
+-- __NB__: Works correctly when creating VCD files from traced signal in
 -- multi-clock circuits. However 'traceSignal1' might be more convenient to
 -- use when the domain of your circuit is polymorphic.
 traceVecSignal
@@ -295,7 +295,7 @@ traceVecSignal traceName signal =
 -- a different trace. If the trace name already exists, this function will emit
 -- an error.
 --
--- __NB__ associates the traced signal with a clock period of /1/, which
+-- __NB__: Associates the traced signal with a clock period of /1/, which
 -- results in incorrect VCD files when working with circuits that have
 -- multiple clocks. Use 'traceSignal' when working with circuits that have
 -- multiple clocks.

@@ -23,7 +23,7 @@ import GHC.TypeLits (KnownNat, type (<=))
 -- >>> import Clash.Sized.Signed (Signed)
 -- >>> import Clash.Sized.Unsigned (Unsigned)
 
--- | 'Clash.Class.Counter.Counter' is a class that composes multiple counters
+-- | t'Clash.Class.Counter.Counter' is a class that composes multiple counters
 -- into a single one. It is similar to odometers found in olds cars,
 -- once all counters reach their maximum they reset to zero - i.e. odometer
 -- rollover. See 'Clash.Class.Counter.countSucc' and 'Clash.Class.Counter.countPred'
@@ -43,7 +43,7 @@ import GHC.TypeLits (KnownNat, type (<=))
 --
 -- and have 'Clash.Class.Counter.countSucc' work as described.
 --
--- __N.B.__: This class exposes four functions 'countMin', 'countMax',
+-- __NB__: This class exposes four functions 'countMin', 'countMax',
 -- 'countSuccOverflow', and 'countPredOverflow'. These functions are considered
 -- an internal API. Users are encouraged to use 'Clash.Class.Counter.countSucc'
 -- and 'Clash.Class.Counter.countPred'.
@@ -117,7 +117,7 @@ instance (Counter a, Counter b) => Counter (Either a b) where
 -- >>> countSucc @T (0, 1, 1)
 -- (1,0,0)
 --
--- __N.B.__: The documentation only shows the instances up to /3/-tuples. By
+-- __NB__: The documentation only shows the instances up to /3/-tuples. By
 -- default, instances up to and including /12/-tuples will exist. If the flag
 -- @large-tuples@ is set instances up to the GHC imposed limit will exist. The
 -- GHC imposed limit is either 62 or 64 depending on the GHC version.
