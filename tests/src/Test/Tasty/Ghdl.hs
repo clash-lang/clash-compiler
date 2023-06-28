@@ -72,7 +72,7 @@ instance IsTest GhdlImportTest where
     runGhdlI workDir args =
       run optionSet (ghdlI workDir args) progressCallback
     ghdlI workDir args =
-      TestProgram "ghdl" (stdArgs <> args) NoGlob PrintNeither False (Just workDir) []
+      TestProgram "ghdl" (stdArgs <> args) PrintNeither False (Just workDir) []
 
     -- Read a manifest file, error if its malformed / inaccessible. Run @ghdl -i@
     -- on files associated with the component.
@@ -121,7 +121,7 @@ instance IsTest GhdlMakeTest where
     | otherwise =
         pure (testPassed "Ignoring test due to --no-ghdl")
    where
-    ghdl workDir args = TestProgram "ghdl" args NoGlob PrintNeither False (Just workDir) []
+    ghdl workDir args = TestProgram "ghdl" args PrintNeither False (Just workDir) []
     runGhdl workDir args = run optionSet (ghdl workDir args) progressCallback
 
   testOptions =
@@ -163,11 +163,11 @@ instance IsTest GhdlSimTest where
         pure (testPassed "Ignoring test due to --no-ghdl")
    where
     program workDir top =
-      TestProgram "ghdl" (args top) NoGlob PrintNeither False (Just workDir) []
+      TestProgram "ghdl" (args top) PrintNeither False (Just workDir) []
 
     failingProgram workDir top (testExit, expectedErr) =
       TestFailingProgram
-        (testExitCode testExit) "ghdl" (args top) NoGlob PrintNeither False
+        (testExitCode testExit) "ghdl" (args top) PrintNeither False
         (specificExitCode testExit) (ExpectEither expectedErr) (Just workDir) []
 
     args work =

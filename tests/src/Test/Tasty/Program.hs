@@ -60,14 +60,11 @@
 
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE QuasiQuotes #-}
-{-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
-{-# OPTIONS_GHC -fno-warn-unused-matches #-}
 
 module Test.Tasty.Program (
    testProgram
  , testFailingProgram
  , PrintOutput(..)
- , GlobArgs(..)
  , ExpectOutput(..)
  , TestProgram(..)
  , TestFailingProgram(..)
@@ -78,12 +75,10 @@ import qualified Data.List as List
 
 import Control.Applicative     ( Alternative (..) )
 import Data.Typeable           ( Typeable                                 )
-import Data.Maybe              ( fromMaybe, isNothing, listToMaybe        )
-import System.FilePath.Glob    ( globDir1, compile                        )
+import Data.Maybe              ( isNothing, listToMaybe                   )
 import System.FilePath.Posix   ( getSearchPath )
 import System.Directory        ( findExecutable,
-                                 findExecutablesInDirectories,
-                                 getCurrentDirectory )
+                                 findExecutablesInDirectories )
 import System.Environment      ( getEnvironment,                          )
 import System.Exit             ( ExitCode(..)                             )
 import System.Process          ( cwd, env, readCreateProcessWithExitCode,
@@ -105,14 +100,6 @@ data ExpectOutput a
   | ExpectNothing
   deriving Functor
 
-
-data GlobArgs
-  = GlobStar
-  -- ^ Glob all argument with a star (*) in them
-  | NoGlob
-  -- ^ No globbing here, mister
-
-
 data PrintOutput
   = PrintBoth
   | PrintStdErr
@@ -126,8 +113,6 @@ data TestProgram =
     -- ^ Executable
     [String]
     -- ^ Executable args
-    GlobArgs
-    -- ^ Whether to interpret glob patterns in arguments
     PrintOutput
     -- ^ What output to print on test success
     Bool
@@ -146,8 +131,6 @@ data TestFailingProgram =
     -- ^ Executable
     [String]
     -- ^ Executable args
-    GlobArgs
-    -- ^ Whether to interpret glob patterns in arguments
     PrintOutput
     -- ^ What output to print on test success
     Bool
@@ -181,20 +164,6 @@ testOutput PrintBoth     stderr  stdout = [__i|
   #{stdout}
   |]
 
-globArgs
-  :: GlobArgs
-  -> Maybe FilePath
-  -> [String]
-  -> IO [String]
-globArgs NoGlob _dir args = return args
-globArgs GlobStar dir args = do
-  cwd0 <- getCurrentDirectory
-  concat <$> mapM (globArg' cwd0) args
-  where
-    globArg' cwd1 arg
-      | '*' `elem` arg = globDir1 (compile arg) (fromMaybe cwd1 dir)
-      | otherwise      = return [arg]
-
 -- | Create test that runs a program with given options. Test succeeds
 -- if program terminates successfully.
 testProgram
@@ -204,8 +173,6 @@ testProgram
   -- ^ Program name
   -> [String]
   -- ^ Program arguments
-  -> GlobArgs
-  -- ^ Whether to interpret glob patterns in arguments
   -> PrintOutput
   -- ^ What output to print on test success
   -> Bool
@@ -213,8 +180,8 @@ testProgram
   -> Maybe FilePath
   -- ^ Optional working directory
   -> TestTree
-testProgram testName program opts glob stdO stdF workDir =
-  singleTest testName (TestProgram program opts glob stdO stdF workDir [])
+testProgram testName program opts stdO stdF workDir =
+  singleTest testName (TestProgram program opts stdO stdF workDir [])
 
 cleanNewlines :: T.Text -> T.Text
 cleanNewlines = T.replace "  " " " . T.replace "\n" " "
@@ -230,8 +197,6 @@ testFailingProgram
   -- ^ Program name
   -> [String]
   -- ^ Program options
-  -> GlobArgs
-  -- ^ Whether to interpret glob patterns in arguments
   -> PrintOutput
   -- ^ Whether to print stdout or stderr on success
   -> Bool
@@ -244,8 +209,8 @@ testFailingProgram
   -> Maybe FilePath
   -- ^ Optional working directory
   -> TestTree
-testFailingProgram testExitCode testName program opts glob stdO stdF errCode expectedOutput workDir =
-  singleTest testName (TestFailingProgram testExitCode program opts glob stdO stdF errCode expectedOutput workDir [])
+testFailingProgram testExitCode testName program opts stdO stdF errCode expectedOutput workDir =
+  singleTest testName (TestFailingProgram testExitCode program opts stdO stdF errCode expectedOutput workDir [])
 
 -- | Find the location of a program.
 --
@@ -267,23 +232,19 @@ findExecutableAlt program = do
   return (execFoundSystem <|> execFoundPath)
 
 instance IsTest TestProgram where
-  run opts (TestProgram program args glob stdO stdF workDir addEnv) _ = do
+  run _opts (TestProgram program args stdO stdF workDir addEnv) _ = do
     execFound <- findExecutableAlt program
-
-    args' <- globArgs glob workDir args
 
     -- Execute program
     case execFound of
       Nothing       -> return $ execNotFoundFailure program
-      Just progPath -> runProgram progPath args' stdO stdF workDir addEnv
+      Just progPath -> runProgram progPath args stdO stdF workDir addEnv
 
   testOptions = return []
 
 instance IsTest TestFailingProgram where
-  run _opts (TestFailingProgram testExitCode program args glob stdO stdF errCode expectedOutput workDir addEnv) _ = do
+  run _opts (TestFailingProgram testExitCode program args stdO stdF errCode expectedOutput workDir addEnv) _ = do
     execFound <- findExecutableAlt program
-
-    args' <- globArgs glob workDir args
 
     -- Execute program
     case execFound of

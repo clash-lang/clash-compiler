@@ -221,7 +221,7 @@ instance IsTest ClashGenTest where
    where
     program oDir hdlDir =
       TestProgram
-        "clash" (args oDir hdlDir) NoGlob PrintNeither False Nothing []
+        "clash" (args oDir hdlDir) PrintNeither False Nothing []
 
     failingProgram oDir hdlDir (testExit, expectedErr) = let
         -- TODO: there's no easy way to test for the absence of something in stderr
@@ -230,7 +230,7 @@ instance IsTest ClashGenTest where
                      _ -> ExpectStdErr expectedErr
       in
       TestFailingProgram
-        (testExitCode testExit) "clash" (args oDir hdlDir) NoGlob PrintNeither
+        (testExitCode testExit) "clash" (args oDir hdlDir) PrintNeither
         False (specificExitCode testExit) expected Nothing []
 
     args oDir hdlDir =
@@ -270,7 +270,7 @@ instance IsTest ClashBinaryTest where
       else pure buildRes
    where
     buildProgram oDir =
-      TestProgram "clash" (buildArgs oDir) NoGlob PrintStdErr False Nothing []
+      TestProgram "clash" (buildArgs oDir) PrintStdErr False Nothing []
 
     buildArgs oDir =
       [ "-package", "clash-testsuite"
@@ -283,7 +283,7 @@ instance IsTest ClashBinaryTest where
       ]
 
     execProgram oDir =
-      TestProgram (oDir </> "out") (oDir:cbExtraExecArgs) NoGlob PrintStdErr False Nothing []
+      TestProgram (oDir </> "out") (oDir:cbExtraExecArgs) PrintStdErr False Nothing []
 
   testOptions = coerce (testOptions @TestProgram)
 

@@ -47,7 +47,7 @@ instance IsTest ModelsimVlibTest where
     | otherwise =
         pure (testPassed "Ignoring test due to --no-modelsim")
    where
-    vlib workDir args = TestProgram "vlib" args NoGlob PrintNeither False (Just workDir) []
+    vlib workDir args = TestProgram "vlib" args PrintNeither False (Just workDir) []
     runVlib workDir args = run optionSet (vlib workDir args) progressCallback
 
   testOptions =
@@ -69,7 +69,7 @@ instance IsTest ModelsimVlogTest where
     | otherwise =
         pure (testPassed "Ignoring test due to --no-modelsim")
    where
-    vlog workDir args = TestProgram "vlog" args NoGlob PrintNeither False (Just workDir) []
+    vlog workDir args = TestProgram "vlog" args PrintNeither False (Just workDir) []
     runVlog workDir args = run optionSet (vlog workDir args) progressCallback
 
   testOptions =
@@ -104,11 +104,11 @@ instance IsTest ModelsimSimTest where
         pure (testPassed "Ignoring test due to --no-modelsim")
    where
     vsim workDir args =
-      TestProgram "vsim" args NoGlob PrintNeither False (Just workDir) []
+      TestProgram "vsim" args PrintNeither False (Just workDir) []
 
     failingVsim workDir args (testExit, expectedErr) =
       TestFailingProgram
-        (testExitCode testExit) "vsim" args NoGlob PrintNeither False
+        (testExitCode testExit) "vsim" args PrintNeither False
         (specificExitCode testExit) (ExpectEither expectedErr) (Just workDir) []
 
     doScript = List.intercalate ";"

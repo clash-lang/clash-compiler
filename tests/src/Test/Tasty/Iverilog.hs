@@ -66,7 +66,7 @@ instance IsTest IVerilogMakeTest where
       <> ["-g2", "-s", top, "-o", top <> ".exe"]
       <> files
 
-    icarus workDir args = TestProgram "iverilog" args NoGlob PrintNeither False (Just workDir) []
+    icarus workDir args = TestProgram "iverilog" args PrintNeither False (Just workDir) []
     runIcarus workDir args = run optionSet (icarus workDir args) progressCallback
 
   testOptions =
@@ -110,11 +110,11 @@ instance IsTest IVerilogSimTest where
         pure (testPassed "Ignoring test due to --no-iverilog")
    where
     vvp workDir args =
-      TestProgram "vvp" args NoGlob PrintNeither ivsStdoutNonEmptyFail (Just workDir) []
+      TestProgram "vvp" args PrintNeither ivsStdoutNonEmptyFail (Just workDir) []
 
     failingVvp workDir args (testExit, expectedErr) =
       TestFailingProgram
-        (testExitCode testExit) "vvp" args NoGlob PrintNeither False
+        (testExitCode testExit) "vvp" args PrintNeither False
         (specificExitCode testExit) (ExpectEither expectedErr) (Just workDir) []
 
   testOptions =
