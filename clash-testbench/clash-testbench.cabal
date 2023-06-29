@@ -43,6 +43,7 @@ library
     Clash.Testbench.Internal.ID
     Clash.Testbench.Internal.Signal
     Clash.Testbench.Internal.Monad
+    Control.Monad.Extra
   build-depends:
     base,
     mtl,

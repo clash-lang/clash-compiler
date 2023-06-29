@@ -1,3 +1,6 @@
 packages: . .. ../../clash-ghc ../../clash-lib ../../clash-prelude ../../clash-ffi ../../clash-prelude-hedgehog
 
 write-ghc-environment-files: always
+
+--package *
+--  ghc-options: -fPIC -shared

@@ -1,21 +1,28 @@
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 import Data.Bool (bool)
 
-import Clash.Prelude (Signed)
+import Clash.Prelude (Signal, Clock, Reset, Enable, Signed, System, exposeClockResetEnable, register, bundle, unsafeFromReset, hasReset, fromEnable, hasEnable)
 
 import Clash.Testbench
 
 import Calculator (OPC(..))
-import qualified Calculator (topEntity)
+--import qualified Calculator (topEntity)
+import qualified Register (topEntity)
+import qualified RegisterFail (topEntity)
 
+import Control.Monad (void)
+import Control.Monad.IO.Class
 import Clash.Hedgehog.Sized.Signed
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
+{-
 genIO :: Gen [(OPC (Signed 4), Maybe (Signed 4))]
 genIO = do
   -- generate 7 constants
@@ -43,17 +50,62 @@ genIO = do
 myTestbench
   :: TB ()
 myTestbench = mdo
---  input <- fromList Pop [Imm 1, Push, Imm 2, Push, Pop, Pop, Pop, ADD]
-  input <- matchIOGenN output genIO
+  input <- fromList Pop [Imm 1, Push, Imm 2, Push, Pop, Pop, Pop, ADD]
+--  input <- matchIOGenN output genIO
   output <- ("topEntity" @@ Calculator.topEntity) auto auto auto input
   watch input
   watch output
+-}
+
+rstenb
+  :: Clock  System
+  -> Reset  System
+  -> Enable System
+  -> Signal System (Bool, Bool)
+rstenb = exposeClockResetEnable
+  $ bundle (unsafeFromReset hasReset, fromEnable hasEnable)
+
+myTestbench
+  :: TB ()
+myTestbench = mdo
+  input <- matchIOGenN output $ do
+    cs  <- Gen.list (Range.singleton 7) (genSigned Range.constantBounded)
+    return $ ((0,0) :) $ zip cs $ 0 : cs
+  output <- ("topEntity" @@ Register.topEntity) auto auto auto input
+--  x <- ("rstenb" @@ rstenb) auto auto auto
+--  watch x
+  watch input
+  watch output
+
+myTestbenchFail
+  :: TB ()
+myTestbenchFail = mdo
+  input <- matchIOGenN output $ do
+    cs  <- Gen.list (Range.singleton 7) (genSigned Range.constantBounded)
+    return $ ((0,0) :) $ zip cs $ 0 : cs
+  output <- ("topEntity" @@ RegisterFail.topEntity) auto auto auto input
+--  x <- ("rstenb" @@ rstenb) auto auto auto
+--  watch x
+  watch input
+  watch output
+
 
 main :: IO ()
-main = simulate 38 myTestbench
+main =
+--  simulate 10 myTestbench
+  void $ checkParallel $ Group "Default"
+    [ ("'successful test'", withTests 1 $ tbProperty myTestbench)
+    , ("'failing test'", withTests 1 $ tbProperty myTestbenchFail)
+    ]
 
 foreign export ccall "clash_ffi_main"
   ffiMain :: IO ()
 
 ffiMain :: IO ()
-ffiMain = simulateFFI 38 myTestbench
+ffiMain = do
+--  simulateFFI (SimSettings False False) myTestbench
+  sync <- ffiHedgehog
+  ffiCheckGroup sync $ Group "Default"
+    [ ("'successful test'", withTests 1 $ (tbPropertyFFI sync) myTestbench)
+--    [ ("'failing test'", withTests 1 $ (tbPropertyFFI sync) myTestbenchFail)
+    ]

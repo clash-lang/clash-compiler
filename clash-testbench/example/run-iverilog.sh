@@ -26,9 +26,11 @@ VVP=vvp
 
 ${CABAL} build clash-testbench-example || exit $?
 ${CLASH} --verilog Calculator.hs || exit $?
-${IVERILOG} verilog/Calculator.topEntity/topEntity.v -o Calculator.vvp \
+${CLASH} --verilog Register.hs || exit $?
+${CLASH} --verilog RegisterFail.hs || exit $?
+${IVERILOG} verilog/Register.topEntity/topEntity.v -o Register.vvp \
   || exit $?
 echo ""
 echo "Running Icarus Verilog VVP runtime engine:"
 echo ""
-${VVP} -Mlib -mlibsimulate-ffi Calculator.vvp
+${VVP} -Mlib -mlibsimulate-ffi Register.vvp

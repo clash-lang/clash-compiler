@@ -12,6 +12,7 @@ module Clash.Testbench.Generate where
 
 import Hedgehog
 import Hedgehog.Gen
+import Control.Monad.Extra ((<?>), (<:>))
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.State.Lazy (liftIO, when, modify)
 import Data.IORef (newIORef, readIORef, writeIORef)
@@ -33,24 +34,21 @@ generate gen = do
   TBDomain{..} <- tbDomain @dom
 
   vRef <- liftIO $ newIORef undefined
-  checkForProgress <- progressCheck simStepRef True
+  ifProgress <- progressCheck simStepRef True
   signalHistory <- newHistory
 
   mind SomeSignal IOInput
     { signalId     = NoID
-    , signalCurVal = const $ do
-        progress <- checkForProgress
-
-        if progress
-        then do
+    , signalCurVal = const $ ifProgress
+        <?> do
           x <- sample gen
           writeIORef vRef x
           memorize signalHistory x
           return x
-        else
+        <:>
           readIORef vRef
     , signalPrint  = Nothing
-    ,..
+    , ..
     }
 
 -- | Extended version of 'generate', which allows to generate a finite
@@ -65,28 +63,24 @@ generateN def gen = do
   TBDomain{..} <- tbDomain @dom
 
   vRef <- liftIO $ newIORef [def]
-  checkForProgress <- progressCheck simStepRef False
+  ifProgress <- progressCheck simStepRef False
   signalHistory <- newHistory
 
   mind SomeSignal IOInput
     { signalId     = NoID
-    , signalCurVal = const $ do
-        progress <- checkForProgress
-
-        if progress
-        then
-          readIORef vRef >>= \case
-            h : x : xr -> do
-              memorize signalHistory h
-              writeIORef vRef (x : xr)
-              return x
-            [h] -> do
-              memorize signalHistory h
-              x : xr <- sample gen
-              writeIORef vRef (x : xr)
-              return x
-            _ -> error "unreachable"
-        else readIORef vRef >>= \case
+    , signalCurVal = const $ ifProgress
+        <?> readIORef vRef >>= \case
+          h : x : xr -> do
+            memorize signalHistory h
+            writeIORef vRef (x : xr)
+            return x
+          [h] -> do
+            memorize signalHistory h
+            x : xr <- sample gen
+            writeIORef vRef (x : xr)
+            return x
+          _ -> error "unreachable"
+        <:> readIORef vRef >>= \case
           x : _ -> return x
           [] -> do
             x : xr <- sample gen
@@ -107,22 +101,19 @@ matchIOGen checkedOutput gen = do
   TBDomain{..} <- tbDomain @dom
 
   vRef <- liftIO $ newIORef undefined
-  checkForProgress <- progressCheck simStepRef False
+  ifProgress <- progressCheck simStepRef False
   signalHistory <- newHistory
 
   mind SomeSignal $ IOInput
     { signalId     = NoID
-    , signalCurVal = const $ do
-        progress <- checkForProgress
-
-        if progress
-        then do
+    , signalCurVal = const $ ifProgress
+        <?> do
           (input, expectedOutput) <- sample gen
           curStep <- readIORef simStepRef
           signalExpect checkedOutput $ Expectation (curStep, verifier expectedOutput)
           writeIORef vRef input
           return input
-        else
+        <:>
           readIORef vRef
     , signalPrint  = Nothing
     , ..
@@ -157,42 +148,37 @@ matchIOGenN checkedOutput gen = mdo
 
   xs <- liftIO $ sample gen
   modify $ \st@ST{..} -> st { simSteps = max simSteps $ length xs }
-  liftIO $ Prelude.print xs
 
   vRef <- liftIO $ newIORef xs
-  checkForProgress <- progressCheck simStepRef False
+  ifProgress <- progressCheck simStepRef False
   signalHistory <- newHistory
 
   s <- mind SomeSignal $ IOInput
     { signalId = NoID
-    , signalCurVal = const $ do
-        progress <- checkForProgress
+    , signalCurVal = const $ ifProgress
+        <?> readIORef vRef >>= \case
+          (h, _) : (i, o) : xr -> do
+            memorize signalHistory h
+            writeIORef vRef ((i, o) : xr)
+            curStep <- readIORef simStepRef
+            signalExpect checkedOutput $ Expectation (curStep, verifier s i o)
+            return i
+          [(h, _)] -> do
+            memorize signalHistory h
+            (i, o) : xr <- sample gen
 
-        readIORef vRef >>=
-          if progress
-          then \case
-            (h, _) : (i, o) : xr -> do
-              memorize signalHistory h
-              writeIORef vRef ((i, o) : xr)
-              curStep <- readIORef simStepRef
-              signalExpect checkedOutput $ Expectation (curStep, verifier s i o)
-              return i
-            [(h, _)] -> do
-              memorize signalHistory h
-              (i, o) : xr <- sample gen
-
-              writeIORef vRef ((i, o) : xr)
-              curStep <- readIORef simStepRef
-              signalExpect checkedOutput $ Expectation (curStep, verifier s i o)
-              return i
-            _ -> error "unreachable"
-          else \case
-            (i, _) : _ -> return i
-            [] -> do
-              (i, o) : xr <- sample gen
-              writeIORef vRef ((i, o) : xr)
-              Prelude.print $ (i, o) : xr
-              return i
+            writeIORef vRef ((i, o) : xr)
+            curStep <- readIORef simStepRef
+            signalExpect checkedOutput $ Expectation (curStep, verifier s i o)
+            return i
+          _ -> error "unreachable"
+        <:> readIORef vRef >>= \case
+          (i, _) : _ -> return i
+          [] -> do
+            (i, o) : xr <- sample gen
+            writeIORef vRef ((i, o) : xr)
+            Prelude.print $ (i, o) : xr
+            return i
     , signalPrint = Nothing
     , ..
     }

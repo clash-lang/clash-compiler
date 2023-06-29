@@ -33,6 +33,7 @@ import Data.Bifunctor (bimap)
 import Data.Function (on)
 import Data.Type.Equality
 import Algebra.PartialOrd
+import Control.Monad.Extra ((<?>), (<:>))
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.State.Lazy
   (StateT, liftIO, get, gets, modify, evalStateT, forM_, void, when)
@@ -191,6 +192,7 @@ type LiftTBSignalConstraints domA domB a a' =
   ( KnownDomain domA, KnownDomain domB
   , domA ~ domB, a ~ a'
   , NFDataX a, BitPack a
+  , Show a
   )
 
 instance
@@ -210,18 +212,14 @@ instance
     -- first call to `signalCurVal`, which is required for the first
     -- continuation transformation to be applied on the initial
     -- values.
-    checkForProgress <- progressCheck simStepRef True
+    ifProgress <- progressCheck simStepRef True
     vRef <- liftIO $ newIORef undefined
     signalHistory <- newHistory
 
     let
       signalCurVal = \case
-        Internal -> do
-          progress <- checkForProgress
-
-          if progress
-          then do
-            -- progress on the signal
+        Internal -> ifProgress
+          <?> do
             (head# -> x, step) <- cont
             writeIORef vRef x
             modifyIORef sfRef $ step tail#
@@ -230,12 +228,14 @@ instance
             memorize signalHistory x
 
             return x
-          else
+          <:>
             readIORef vRef
 
         External -> readIORef extVal >>= \case
           Nothing -> error "No Value @Signal"
-          Just x  -> return x
+          Just x  -> ifProgress
+            <?> memorize signalHistory x >> return x
+            <:> return x
 
     mind SomeSignal $ Internal.SimSignal
       { signalId = NoID
@@ -246,13 +246,13 @@ instance
       , signalVerify = \sMode -> Verifier $ \vMode -> do
           curStep <- liftIO $ readIORef simStepRef
           value <- liftIO $ signalCurVal sMode
-          expct <- liftIO $ readIORef expectations
+          expcts <- liftIO $ readIORef expectations
 
-          let
-            (current, later) =
-              partition (`leq` Expectation (curStep + 1, undefined)) expct
+          let sepAt n = partition (`leq` Expectation (n, undefined))
+              (xs, later) = sepAt curStep expcts
+              (_, current) = sepAt (curStep - 1) xs
 
-          liftIO $ writeIORef expectations later
+          liftIO $ writeIORef expectations (current <> later)
           mapM_ ((`verifier` vMode) . (value &) . snd . expectation) current
       , signalPrint = Nothing
       , signalPlug = Nothing
@@ -329,20 +329,18 @@ instance
             resetId <- nextFreeID ResetID
             extVal <- liftIO $ newIORef Nothing
             signalRef <- liftIO $ newIORef $ unsafeFromReset reset
-            checkForProgress <- progressCheck simStepRef False
+            ifProgress <- progressCheck simStepRef False
 
             let
               resetCurVal = \case
                 Internal -> do
                   x :- xr <- readIORef signalRef
-                  progress <- checkForProgress
-
-                  if progress
-                  then do
-                    writeIORef signalRef xr
-                    return $ head# xr
-                  else
-                    return x
+                  ifProgress
+                    <?> do
+                      writeIORef signalRef xr
+                      return $ head# xr
+                    <:>
+                      return x
 
                 External -> readIORef extVal >>= \case
                   Nothing -> error "No Value @Reset"
@@ -385,20 +383,18 @@ instance
             enableId <- nextFreeID EnableID
             extVal <- liftIO $ newIORef Nothing
             signalRef <- liftIO $ newIORef (fromEnable enable)
-            checkForProgress <- progressCheck simStepRef False
+            ifProgress <- progressCheck simStepRef False
 
             let
               enableCurVal = \case
                 Internal -> do
                   x :- xr <- readIORef signalRef
-                  progress <- checkForProgress
-
-                  if progress
-                  then do
-                    writeIORef signalRef xr
-                    return $ head# xr
-                  else
-                    return x
+                  ifProgress
+                    <?> do
+                      writeIORef signalRef xr
+                      return $ head# xr
+                    <:>
+                      return x
 
                 External -> readIORef extVal >>= \case
                   Nothing -> error "No Value @Enable"
