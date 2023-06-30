@@ -1,4 +1,15 @@
 # Changelog for the Clash project
+## 1.6.5 *Jun 27th 2023*
+
+Fixed:
+
+ * Support building with all combinations of specific versions of our dependencies `hashable` and `primitive`. [#2485](https://github.com/clash-lang/clash-compiler/pull/2485)
+ * The Haskell simulation of the PLL lock signal in `Clash.Clocks` (used by `Clash.Intel.ClockGen`) is fixed: the signal is now unasserted for the time the reset input is asserted and vice versa, and no longer crashes the simulation. HDL generation is unchanged. The PLL functions now have an additional constraint: `KnownDomain pllLock`. [#2420](https://github.com/clash-lang/clash-compiler/pull/2420)
+
+Changed:
+
+ * Export the constructor for the `Wrapping` type in the `Clash.Num.Wrapping` module. See [#2292](https://github.com/clash-lang/clash-compiler/issues/2292)
+
 ## 1.6.4 *Aug 30th 2022*
 Fixed:
 
