@@ -48,12 +48,15 @@
   >  ) where
   >
   > import Test.Tasty
+  > import Test.Tasty.Providers
   > import Test.Tasty.Program
   >
   > main :: IO ()
-  > main = defaultMain $ testGroup "Compilation with GHC" $ [
-  >     testProgram "Foo" "ghc" ["-fforce-recomp", "foo.hs"] Nothing
-  >   ]
+  > main =
+  >   defaultMain $ testGroup "Compilation with GHC" [
+  >       singleTest "Foo" $ TestProgram "ghc" ["-fforce-recomp", "Foo.hs"]
+  >                            PrintNeither False Nothing []
+  >     ]
 
   Program's output and error streams are ignored.
 -}
@@ -62,12 +65,10 @@
 {-# LANGUAGE QuasiQuotes #-}
 
 module Test.Tasty.Program (
-   testProgram
- , testFailingProgram
+   TestProgram(..)
+ , TestFailingProgram(..)
  , PrintOutput(..)
  , ExpectOutput(..)
- , TestProgram(..)
- , TestFailingProgram(..)
  ) where
 
 import qualified Clash.Util.Interpolate  as I
@@ -96,6 +97,7 @@ data ExpectOutput a
   | ExpectStdErr a
   | ExpectEither a
   | ExpectNotStdErr a
+  | ExpectMatchStdOut !Regex
   | ExpectNotMatchStdOut !Regex
   | ExpectNothing
   deriving Functor
@@ -126,7 +128,7 @@ data TestProgram =
 data TestFailingProgram =
   TestFailingProgram
     Bool
-    -- ^ Test exit code
+    -- ^ Test exit code?
     String
     -- ^ Executable
     [String]
@@ -136,11 +138,17 @@ data TestFailingProgram =
     Bool
     -- ^ Whether an empty stderr means test failure
     (Maybe Int)
-    -- ^ Expected return code
+    -- ^ Expected error code. Test will *only* succeed if program fails and the
+    -- returned error code is equal to the given one.
     (ExpectOutput T.Text)
-    -- ^ Expected string in stderr
+    -- ^ Expected output
+    (ExpectOutput T.Text)
+    -- ^ SILENCE the test (which doesn't count as a failure) if the output
+    -- matches this. Vivado sometimes fails to run the test, but at other times
+    -- it works. By distinguishing specific failures, we still get the test when
+    -- it does work.
     (Maybe FilePath)
-    -- ^ Work directory
+    -- ^ Optional working directory
     [(String, String)]
     -- ^ Additional environment variables
       deriving (Typeable)
@@ -164,53 +172,8 @@ testOutput PrintBoth     stderr  stdout = [__i|
   #{stdout}
   |]
 
--- | Create test that runs a program with given options. Test succeeds
--- if program terminates successfully.
-testProgram
-  :: TestName
-  -- ^ Test name
-  -> String
-  -- ^ Program name
-  -> [String]
-  -- ^ Program arguments
-  -> PrintOutput
-  -- ^ What output to print on test success
-  -> Bool
-  -- ^ Whether a non-empty stdout means failure
-  -> Maybe FilePath
-  -- ^ Optional working directory
-  -> TestTree
-testProgram testName program opts stdO stdF workDir =
-  singleTest testName (TestProgram program opts stdO stdF workDir [])
-
 cleanNewlines :: T.Text -> T.Text
 cleanNewlines = T.replace "  " " " . T.replace "\n" " "
-
--- | Create test that runs a program with given options. Test succeeds
--- if program terminates with error
-testFailingProgram
-  :: Bool
-  -- ^ Test exit code?
-  -> TestName
-  -- ^ Test name
-  -> String
-  -- ^ Program name
-  -> [String]
-  -- ^ Program options
-  -> PrintOutput
-  -- ^ Whether to print stdout or stderr on success
-  -> Bool
-  -- ^ Whether an empty stderr means failure
-  -> Maybe Int
-  -- ^ Expected error code. Test will *only* succeed if program fails and the
-  -- returned error code is equal to the given one.
-  -> ExpectOutput T.Text
-  -- ^ Expected string in stderr
-  -> Maybe FilePath
-  -- ^ Optional working directory
-  -> TestTree
-testFailingProgram testExitCode testName program opts stdO stdF errCode expectedOutput workDir =
-  singleTest testName (TestFailingProgram testExitCode program opts stdO stdF errCode expectedOutput workDir [])
 
 -- | Find the location of a program.
 --
@@ -243,13 +206,13 @@ instance IsTest TestProgram where
   testOptions = return []
 
 instance IsTest TestFailingProgram where
-  run _opts (TestFailingProgram testExitCode program args stdO stdF errCode expectedOutput workDir addEnv) _ = do
+  run _opts (TestFailingProgram testExitCode program args stdO stdF errCode expectedOutput silencedOutput workDir addEnv) _ = do
     execFound <- findExecutableAlt program
 
     -- Execute program
     case execFound of
       Nothing       -> return $ execNotFoundFailure program
-      Just progPath -> runFailingProgram testExitCode progPath args stdO stdF errCode expectedOutput workDir addEnv
+      Just progPath -> runFailingProgram testExitCode progPath args stdO stdF errCode expectedOutput silencedOutput workDir addEnv
 
   testOptions = return []
 
@@ -296,24 +259,28 @@ runFailingProgram
   :: Bool
   -- ^ Test exit code?
   -> String
-  -- ^ Program name
+  -- ^ Executable
   -> [String]
-  -- ^ Program options
+  -- ^ Executable args
   -> PrintOutput
-  -- ^ Whether to print stdout or stderr on test success
+  -- ^ What output to print on test success
   -> Bool
   -- ^ Whether an empty stderr means test failure
   -> Maybe Int
   -- ^ Expected error code. Test will *only* succeed if program fails and the
   -- returned error code is equal to the given one.
   -> ExpectOutput T.Text
-  -- ^ Expected string in stderr
+  -- ^ Expected output
+  -> ExpectOutput T.Text
+  -- ^ SILENCE the test (which doesn't count as a failure) if the output matches
+  -- this. Vivado sometimes causes spurious failures. By distinguishing specific
+  -- failures, we still get to run the test when it does work.
   -> Maybe FilePath
   -- ^ Optional working directory
   -> [(String, String)]
   -- ^ Additional environment variables
   -> IO Result
-runFailingProgram testExitCode program args stdO errOnEmptyStderr expectedCode expectedStderr workDir addEnv = do
+runFailingProgram testExitCode program args stdO errOnEmptyStderr expectedCode expectedOutput silencedOutput workDir addEnv = do
   e <- getEnvironment
   let cp = (proc program args) { cwd = workDir, env = Just (addEnv ++ e) }
   (exitCode0, stdout, stderr) <- readCreateProcessWithExitCode cp ""
@@ -326,47 +293,81 @@ runFailingProgram testExitCode program args stdO errOnEmptyStderr expectedCode e
 
       passed = testPassed (T.unpack $ testOutput stdO stderrT stdoutT)
 
-  return (go (stdoutT, stderrT, stdout, stderr, passed) exitCode0)
+  return (go (stdoutT, stderrT, passed) exitCode0)
 
  where
-  -- TODO: Clean up this code..
-  go e@(stdoutT, stderrT, _stdout, stderr, passed) exitCode1 =
+  go e@(stdoutT, stderrT, passed) exitCode1 =
     case exitCode1 of
       ExitSuccess ->
         if (testExitCode && isNothing expectedCode) then
           unexpectedSuccess program stderrT stdoutT
         else
           go e (ExitFailure 0)
-      ExitFailure code ->
-        if errOnEmptyStderr && null stderr
-          then
-            unexpectedEmptyStderr program code stdoutT
-          else
-            case expectedStderr of
-              ExpectStdErr r | not (cleanNewlines r `T.isInfixOf` cleanNewlines stderrT) ->
-                unexpectedStd "stderr" program args code stderrT stdoutT r
-              ExpectStdOut r | not (cleanNewlines r `T.isInfixOf` cleanNewlines stdoutT) ->
-                unexpectedStd "stdout" program args code stderrT stdoutT r
-              ExpectEither r
-                |  not (cleanNewlines r `T.isInfixOf` cleanNewlines stdoutT)
-                && not (cleanNewlines r `T.isInfixOf` cleanNewlines stderrT)
-                ->
-                unexpectedStd "stdout or stderr" program args code stderrT stdoutT r
-              ExpectNotStdErr r | cleanNewlines r `T.isInfixOf` cleanNewlines stderrT ->
-                unexpectedNonEmptyStderr program args code stderrT stdoutT
-              ExpectNotMatchStdOut re | Right (Just{}) <- execute re stdoutT ->
-                unexpectedNonEmptyStdout program args code stderrT stdoutT
-              ExpectNotMatchStdOut re | Left err <- execute re stdoutT ->
-                testFailed err
-              _ ->
-                if testExitCode then
-                  case expectedCode of
-                    Nothing -> passed
-                    Just n | n == code -> passed
-                           | otherwise -> unexpectedCode program code n stderrT stdoutT
-                else
-                  passed
-
+      ExitFailure code
+        | errOnEmptyStderr && T.null stderr
+        -> unexpectedEmptyStderr program code stdoutT
+        | Just result <- checkSilenced
+        -> result
+        | otherwise
+        -> case expectedOutput of
+             ExpectStdErr r | not (cleanNewlines r `T.isInfixOf` cleanNewlines stderrT) ->
+               unexpectedStd "stderr" program args code stderrT stdoutT r
+             ExpectStdOut r | not (cleanNewlines r `T.isInfixOf` cleanNewlines stdoutT) ->
+               unexpectedStd "stdout" program args code stderrT stdoutT r
+             ExpectEither r
+               |  not (cleanNewlines r `T.isInfixOf` cleanNewlines stdoutT)
+               && not (cleanNewlines r `T.isInfixOf` cleanNewlines stderrT)
+               ->
+               unexpectedStd "stdout or stderr" program args code stderrT stdoutT r
+             ExpectNotStdErr r | cleanNewlines r `T.isInfixOf` cleanNewlines stderrT ->
+               unexpectedNonEmptyStderr program args code stderrT stdoutT
+             ExpectMatchStdOut re | Right Nothing <- execute re stdoutT ->
+               unmatchedStd "stdout" program args code stderrT stdoutT
+             ExpectMatchStdOut re | Left err <- execute re stdoutT ->
+               testFailed err
+             ExpectNotMatchStdOut re | Right (Just{}) <- execute re stdoutT ->
+               unexpectedNonEmptyStdout program args code stderrT stdoutT
+             ExpectNotMatchStdOut re | Left err <- execute re stdoutT ->
+               testFailed err
+             _ ->
+               if testExitCode then
+                 case expectedCode of
+                   Nothing -> passed
+                   Just n | n == code -> passed
+                          | otherwise -> unexpectedCode program code n stderrT stdoutT
+               else
+                 passed
+   where
+    testOutput
+    checkSilenced = case silencedOutput of
+      -- TODO
+      ExpectStdErr r | not (cleanNewlines r `T.isInfixOf` cleanNewlines stderrT) ->
+        unexpectedStd "stderr" program args code stderrT stdoutT r
+      ExpectStdOut r | not (cleanNewlines r `T.isInfixOf` cleanNewlines stdoutT) ->
+        unexpectedStd "stdout" program args code stderrT stdoutT r
+      ExpectEither r
+        |  not (cleanNewlines r `T.isInfixOf` cleanNewlines stdoutT)
+        && not (cleanNewlines r `T.isInfixOf` cleanNewlines stderrT)
+        ->
+        unexpectedStd "stdout or stderr" program args code stderrT stdoutT r
+      ExpectNotStdErr r | cleanNewlines r `T.isInfixOf` cleanNewlines stderrT ->
+        unexpectedNonEmptyStd "stderr" program args code stderrT stdoutT
+      ExpectMatchStdOut re | Right Nothing <- execute re stdoutT ->
+        unmatchedStd "stdout" program args code stderrT stdoutT
+      ExpectMatchStdOut re | Left err <- execute re stdoutT ->
+        testFailed err
+      ExpectNotMatchStdOut re | Right (Just{}) <- execute re stdoutT ->
+        unexpectedNonEmptyStd "stdout" program args code stderrT stdoutT
+      ExpectNotMatchStdOut re | Left err <- execute re stdoutT ->
+        testFailed err
+      _ ->
+        if testExitCode then
+          case expectedCode of
+            Nothing -> passed
+            Just n | n == code -> passed
+                   | otherwise -> unexpectedCode program code n stderrT stdoutT
+        else
+          passed
 
 -- | Indicates that program does not exist in the path
 execNotFoundFailure :: String -> Result
@@ -392,8 +393,10 @@ exitFailure cmd args code stderr stdout =
       #{stdout}
   |]
 
-unexpectedNonEmptyStdout
-  :: String
+unexpectedNonEmptyStd
+  :: T.Text
+  -- ^ Expected output name
+  -> String
   -- ^ Program name
   -> [String]
   -- ^ Program arguments
@@ -404,38 +407,9 @@ unexpectedNonEmptyStdout
   -> T.Text
   -- ^ stdout
   -> Result
-unexpectedNonEmptyStdout cmd args code stderr stdout =
+unexpectedNonEmptyStdout expectedOut cmd args code stderr stdout =
   testFailed [I.i|
-    Program #{cmd} (return code: #{code}) printed to stdout unexpectedly.
-
-    Full invocation:
-
-      #{cmd} #{List.intercalate " " args}
-
-    Stderr was:
-
-      #{stderr}
-
-    Stdout was:
-
-      #{stdout}
-  |]
-
-unexpectedNonEmptyStderr
-  :: String
-  -- ^ Program name
-  -> [String]
-  -- ^ Program arguments
-  -> Int
-  -- ^ Code returned by program
-  -> T.Text
-  -- ^ stderr
-  -> T.Text
-  -- ^ stdout
-  -> Result
-unexpectedNonEmptyStderr cmd args code stderr stdout =
-  testFailed [I.i|
-    Program #{cmd} (return code: #{code}) printed to stderr unexpectedly.
+    Program #{cmd} (return code: #{code}) printed to #{expectedOut} unexpectedly.
 
     Full invocation:
 
@@ -471,6 +445,37 @@ unexpectedStd expectedOut cmd args code stderr stdout expected =
     Program #{cmd} (return code #{code}) did not print expected output to #{expectedOut}. We expected:
 
        #{expected}
+
+    Full invocation:
+
+      #{cmd} #{List.intercalate " " args}
+
+    Stderr was:
+
+      #{stderr}
+
+    Stdout was:
+
+      #{stdout}
+  |]
+
+unmatchedStd
+  :: T.Text
+  -- ^ Expected output name
+  -> String
+  -- ^ Program name
+  -> [String]
+  -- ^ Program arguments
+  -> Int
+  -- ^ Code returned by program
+  -> T.Text
+  -- ^ stderr
+  -> T.Text
+  -- ^ stdout
+  -> Result
+unexpectedStd expectedOut cmd args code stderr stdout =
+  testFailed [I.i|
+    The #{expectedOut} of program #{cmd} (return code #{code}) did not match the expected regular expression.
 
     Full invocation:
 
