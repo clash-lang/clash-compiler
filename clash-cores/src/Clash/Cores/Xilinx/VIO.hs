@@ -1,5 +1,6 @@
 {-|
 Copyright  :  (C) 2022-2023, Google Inc,
+                  2023,      QBayLogic B.V.,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -35,6 +36,9 @@ JTAG clock speed:
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE UndecidableInstances #-}
+
+-- See [Note: eta port names for trueDualPortBlockRam]
+{-# OPTIONS_GHC -fno-do-lambda-eta-expansion #-}
 
 module Clash.Cores.Xilinx.VIO
   ( vioProbe
@@ -104,11 +108,26 @@ vioProbe ::
   o ->
   Clock dom ->
   a
-vioProbe !_inputNames !_outputNames !_initialOutputProbeValues !_clk = vioX @dom @a @o
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
+vioProbe inputNames outputNames initialOutputProbeValues clk =
+  vioProbe# @dom @a @o inputNames outputNames initialOutputProbeValues clk
 {-# CLASH_OPAQUE vioProbe #-}
-{-# ANN vioProbe (
-    let primName = 'vioProbe
+
+-- | Primitive for 'vioProbe'. Defining a wrapper like this makes the VIO probe
+-- instantiation be rendered in its own module to reduce naming collision
+-- probabilities.
+vioProbe# ::
+  forall dom a o n m.
+  (KnownDomain dom, VIO dom a o) =>
+  Vec n String ->
+  Vec m String ->
+  o ->
+  Clock dom ->
+  a
+vioProbe# !_inputNames !_outputNames !_initialOutputProbeValues !_clk = vioX @dom @a @o
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE vioProbe# #-}
+{-# ANN vioProbe# (
+    let primName = 'vioProbe#
         tfName = 'vioProbeBBF
     in InlineYamlPrimitive [minBound..] [__i|
          BlackBoxHaskell:
