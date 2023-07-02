@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module VIO where
 
 import Clash.Prelude
@@ -6,6 +8,14 @@ import Clash.Annotations.TH
 import Clash.Annotations.BitRepresentation
 import Clash.Explicit.Testbench
 
+import Control.Monad (unless)
+import Control.Monad.Extra (anyM)
+import GHC.Stack (HasCallStack)
+import System.Environment (getArgs)
+import System.FilePath ((</>))
+import System.FilePath.Glob (globDir1)
+
+import qualified Language.Haskell.TH as TH
 import qualified Data.List as L
 
 type Dom = XilinxSystem
@@ -342,3 +352,45 @@ inputsAndOutputs = vioProbe @Dom inNames outNames initVals
 {-# ANN inputsAndOutputs (TestBench 'top) #-}
 
 makeTopEntity 'inputsAndOutputs
+
+withSetName ::
+  "clk" ::: Clock Dom ->
+  "arg" ::: Signal Dom Bit ->
+  "result" ::: Signal Dom Bit
+withSetName =
+  setName @"my_vio" $
+    vioProbe @Dom ("a" :> Nil) ("b" :> Nil) low
+{-# ANN withSetName (TestBench 'top) #-}
+
+makeTopEntity 'withSetName
+
+withSetNameNoResult ::
+  "clk" ::: Clock Dom ->
+  "arg" ::: Signal Dom Bit ->
+  "result" ::: Signal Dom ()
+withSetNameNoResult =
+  setName @"my_vio" $
+    vioProbe @Dom ("a" :> Nil) (Nil) ()
+{-# ANN withSetNameNoResult (TestBench 'top) #-}
+
+makeTopEntity 'withSetNameNoResult
+
+mainVHDL :: IO ()
+mainVHDL = do
+  [topDir] <- getArgs
+
+  test topDir 'withSetName
+  test topDir 'withSetNameNoResult
+
+ where
+  test :: HasCallStack => FilePath -> TH.Name -> IO ()
+  test topDir nm = do
+    let hdlDir = topDir </> show nm
+    paths <- L.sort <$> globDir1 "*.vhdl" hdlDir
+    result <- anyM containsMyVio paths
+    unless result $ error $ "'my_vio' not found in any of: " <> show paths
+
+  containsMyVio :: FilePath -> IO Bool
+  containsMyVio path = do
+    contents <- readFile path
+    pure $ "my_vio" `L.isInfixOf` contents
