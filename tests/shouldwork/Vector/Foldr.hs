@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Foldr where
 
 import Clash.Prelude
@@ -5,7 +7,8 @@ import Clash.Explicit.Testbench
 
 topEntity :: Vec 4 (Unsigned 8) -> (Unsigned 8)
 topEntity = foldr div 1
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

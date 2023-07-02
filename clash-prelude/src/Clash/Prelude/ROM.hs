@@ -9,6 +9,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 ROMs
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -121,7 +122,8 @@ asyncRom# content = safeAt
         withFrozenCallStack
           (deepErrorX ("asyncRom: address " ++ show i ++
                        " not in range [0.." ++ show szI ++ ")"))
-{-# NOINLINE asyncRom# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE asyncRom# #-}
 {-# ANN asyncRom# hasBlackBox #-}
 
 -- | A ROM with a synchronous read port, with space for @n@ elements

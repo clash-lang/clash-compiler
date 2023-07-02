@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module MatrixVect where
 
 import Clash.Prelude
@@ -16,7 +18,8 @@ matrixVector m v = map (`dotProduct` v) m
 
 topEntity :: Vec 3 (Signed 16) -> Vec 3 (Signed 16)
 topEntity = matrixVector matrix
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module T2040 where
 
 import Clash.Explicit.Prelude
@@ -7,7 +9,8 @@ topEntity
   :: Signal System (Unsigned 8)
   -> Signal System (Unsigned 8)
 topEntity = id
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 
 module ZeroWidth where
 
@@ -22,7 +23,8 @@ answer = "A nervous wreck."
 -- | Inserts given comment in HDL. Returns "nothing".
 comment :: String -> ()
 comment !_s = ()
-{-# NOINLINE comment #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE comment #-}
 {-# ANN comment (InlinePrimitive [VHDL] [__i|
   [ { "BlackBox" :
       { "name"      : "ZeroWidth.comment"
@@ -40,7 +42,8 @@ implicitComment n =
     5 -> ()
     _ ->
       comment question
-{-# NOINLINE implicitComment #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE implicitComment #-}
 
 topEntity :: Int -> (Int, (), ())
 topEntity a = (succ a, comment luckyNumber, implicitComment a)

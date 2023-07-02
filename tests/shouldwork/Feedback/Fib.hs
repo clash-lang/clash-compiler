@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Fib where
 
 import Clash.Prelude
@@ -12,7 +14,8 @@ topEntity
   -> Enable System
   -> Signal System (Unsigned 64)
 topEntity = exposeClockResetEnable fib
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

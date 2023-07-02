@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module SignedZero where
 
 import Clash.Prelude
@@ -23,7 +25,8 @@ topEntity clk rst =
     , mul (n :: Signed 16) (0 :: Signed 0)
     , mul (0 :: Signed 0)  (n :: Signed 16)
     ))
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
@@ -34,4 +37,5 @@ testBench = done
     done           = expectedOutput (topEntity clk rst (pure n1))
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen
-{-# NOINLINE testBench #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBench #-}

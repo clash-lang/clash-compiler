@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module I2Ctest.I2CConfig where
 
 import Clash.Prelude
@@ -161,4 +163,5 @@ config
   -> Signal System ConfI
   -> Signal System ConfO
 config clk = mealyIO clk configT (reg confInit)
-{-# NOINLINE config #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE config #-}

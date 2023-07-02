@@ -301,7 +301,8 @@ windowD clk rst en x =
 -- descriptive.
 clashCompileError :: forall a . HasCallStack => String -> a
 clashCompileError msg = withFrozenCallStack $ error msg
-{-# NOINLINE clashCompileError #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE clashCompileError #-}
 {-# ANN clashCompileError (
   let primName = 'clashCompileError
   in InlineYamlPrimitive [minBound..] [__i|

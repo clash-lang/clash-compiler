@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE KindSignatures #-}
 module DFold where
 
@@ -14,7 +15,8 @@ append' xs ys = dfold (Proxy :: Proxy (Append m a)) (const (:>)) ys xs
 
 topEntity :: (Vec 3 Int,Vec 7 Int) -> Vec 10 Int
 topEntity = uncurry append'
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

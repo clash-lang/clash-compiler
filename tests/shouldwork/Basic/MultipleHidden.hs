@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module MultipleHidden where
 
 import Clash.Prelude
@@ -30,7 +32,8 @@ topEntityI
   -> Signal domB (Unsigned 16)
   -> Signal domA (Unsigned 16)
 topEntityI a b = multiClockAdd a b
-{-# NOINLINE topEntityI #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntityI #-}
 
 
 topEntity
@@ -47,7 +50,8 @@ topEntity
   -> Signal DomA (Unsigned 16)
 topEntity clkA rstA enA clkB rstB enB a b =
   withSpecificClockResetEnable clkA rstA enA $ withSpecificClockResetEnable clkB rstB enB (topEntityI a) b
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal DomA Bool
 testBench = done

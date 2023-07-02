@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Bounds where
 import Clash.Prelude
 import Clash.Explicit.Testbench
@@ -24,7 +26,8 @@ topEntity
   -> Enable System
   -> Signal System () -> Signal System Integer
 topEntity = exposeClockResetEnable (mealy loop actual)
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 loop :: Vec (n+2) a -> () -> (Vec (n+2) a, a)
 --loop (x:>xs) _ = (xs :< last xs, x)

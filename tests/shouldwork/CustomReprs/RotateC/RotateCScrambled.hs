@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
@@ -85,7 +86,8 @@ topEntity = fmap f
       case cM of
         NothingC -> Blue
         JustC c  -> rotateColor c
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 -- Testbench:
 testBench :: Signal System Bool

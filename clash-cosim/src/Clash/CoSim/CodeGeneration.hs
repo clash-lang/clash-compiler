@@ -79,8 +79,13 @@ coSimGen' clks args = do
     -- Function declaration and body
     let coSim = FunD coSimName [Clause [] (NormalB $ VarE $ mkName "coSimN") []]
 
+#if __GLASGOW_HASKELL__ >= 904
+    -- OPAQUE pragma
+    let inline = PragmaD $ OpaqueP coSimName
+#else
     -- NOINLINE pragma
     let inline = PragmaD $ InlineP coSimName NoInline FunLike AllPhases
+#endif
 
     -- Clash blackbox pragma
     primDir        <- runIO $ getDataFileName "src/prims/verilog"

@@ -215,7 +215,8 @@ newtype Unsigned (n :: Nat) =
 
 {-# ANN U hasBlackBox #-}
 
-{-# NOINLINE size# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE size# #-}
 {-# ANN size# hasBlackBox #-}
 size# :: KnownNat n => Unsigned n -> Int
 #if MIN_VERSION_base(4,15,0)
@@ -250,12 +251,14 @@ instance KnownNat n => BitPack (Unsigned n) where
   pack   = packXWith pack#
   unpack = unpack#
 
-{-# NOINLINE pack# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE pack# #-}
 {-# ANN pack# hasBlackBox #-}
 pack# :: Unsigned n -> BitVector n
 pack# (U i) = BV 0 i
 
-{-# NOINLINE unpack# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE unpack# #-}
 {-# ANN unpack# hasBlackBox #-}
 unpack# :: KnownNat n => BitVector n -> Unsigned n
 unpack# (BV 0 i) = U i
@@ -265,12 +268,14 @@ instance Eq (Unsigned n) where
   (==) = eq#
   (/=) = neq#
 
-{-# NOINLINE eq# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE eq# #-}
 {-# ANN eq# hasBlackBox #-}
 eq# :: Unsigned n -> Unsigned n -> Bool
 eq# (U v1) (U v2) = v1 == v2
 
-{-# NOINLINE neq# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE neq# #-}
 {-# ANN neq# hasBlackBox #-}
 neq# :: Unsigned n -> Unsigned n -> Bool
 neq# (U v1) (U v2) = v1 /= v2
@@ -282,16 +287,20 @@ instance Ord (Unsigned n) where
   (<=) = le#
 
 lt#,ge#,gt#,le# :: Unsigned n -> Unsigned n -> Bool
-{-# NOINLINE lt# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE lt# #-}
 {-# ANN lt# hasBlackBox #-}
 lt# (U n) (U m) = n < m
-{-# NOINLINE ge# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE ge# #-}
 {-# ANN ge# hasBlackBox #-}
 ge# (U n) (U m) = n >= m
-{-# NOINLINE gt# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE gt# #-}
 {-# ANN gt# hasBlackBox #-}
 gt# (U n) (U m) = n > m
-{-# NOINLINE le# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE le# #-}
 {-# ANN le# hasBlackBox #-}
 le# (U n) (U m) = n <= m
 
@@ -322,12 +331,14 @@ instance KnownNat n => Enum (Unsigned n) where
 
 toEnum# :: forall n. KnownNat n => Int -> Unsigned n
 toEnum# = fromInteger# . toInteger
-{-# NOINLINE toEnum# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE toEnum# #-}
 {-# ANN toEnum# hasBlackBox #-}
 
 fromEnum# :: forall n. KnownNat n => Unsigned n -> Int
 fromEnum# = fromEnum . toInteger#
-{-# NOINLINE fromEnum# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE fromEnum# #-}
 {-# ANN fromEnum# hasBlackBox #-}
 
 enumFrom# :: forall n. KnownNat n => Unsigned n -> [Unsigned n]
@@ -337,7 +348,8 @@ enumFrom# = \x -> map (U . (`mod` m)) [unsafeToNatural x .. unsafeToNatural (max
 #else
   where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 #endif
-{-# NOINLINE enumFrom# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE enumFrom# #-}
 
 enumFromThen# :: forall n. KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
 enumFromThen# = \x y -> toUnsigneds [unsafeToNatural x, unsafeToNatural y .. bound x y]
@@ -349,7 +361,8 @@ enumFromThen# = \x y -> toUnsigneds [unsafeToNatural x, unsafeToNatural y .. bou
 #else
   m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 #endif
-{-# NOINLINE enumFromThen# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE enumFromThen# #-}
 
 enumFromTo# :: forall n. KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
 enumFromTo# = \x y -> map (U . (`mod` m)) [unsafeToNatural x .. unsafeToNatural y]
@@ -358,7 +371,8 @@ enumFromTo# = \x y -> map (U . (`mod` m)) [unsafeToNatural x .. unsafeToNatural 
 #else
   where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 #endif
-{-# NOINLINE enumFromTo# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE enumFromTo# #-}
 
 enumFromThenTo# :: forall n. KnownNat n => Unsigned n -> Unsigned n -> Unsigned n -> [Unsigned n]
 enumFromThenTo# = \x1 x2 y -> map (U . (`mod` m)) [unsafeToNatural x1, unsafeToNatural x2 .. unsafeToNatural y]
@@ -367,7 +381,8 @@ enumFromThenTo# = \x1 x2 y -> map (U . (`mod` m)) [unsafeToNatural x1, unsafeToN
 #else
   where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 #endif
-{-# NOINLINE enumFromThenTo# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE enumFromThenTo# #-}
 
 instance KnownNat n => Bounded (Unsigned n) where
   minBound = minBound#
@@ -375,12 +390,14 @@ instance KnownNat n => Bounded (Unsigned n) where
 
 minBound# :: Unsigned n
 minBound# = U 0
-{-# NOINLINE minBound# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE minBound# #-}
 {-# ANN minBound# hasBlackBox #-}
 
 maxBound# :: forall n. KnownNat n => Unsigned n
 maxBound# = let m = 1 `shiftL` (natToNum @n) in  U (m - 1)
-{-# NOINLINE maxBound# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE maxBound# #-}
 {-# ANN maxBound# hasBlackBox #-}
 
 -- | __NB__: 'fromInteger'/'fromIntegral' can cause unexpected truncation, as
@@ -396,7 +413,8 @@ instance KnownNat n => Num (Unsigned n) where
   fromInteger = fromInteger#
 
 (+#),(-#),(*#) :: forall n . KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
-{-# NOINLINE (+#) #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE (+#) #-}
 {-# ANN (+#) hasBlackBox #-}
 (+#) = \(U i) (U j) -> U (addMod m i j)
 #if MIN_VERSION_base(4,15,0)
@@ -405,7 +423,8 @@ instance KnownNat n => Num (Unsigned n) where
   where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 #endif
 
-{-# NOINLINE (-#) #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE (-#) #-}
 {-# ANN (-#) hasBlackBox #-}
 (-#) = \(U i) (U j) -> U (subMod m i j)
 #if MIN_VERSION_base(4,15,0)
@@ -414,7 +433,8 @@ instance KnownNat n => Num (Unsigned n) where
   where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 #endif
 
-{-# NOINLINE (*#) #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE (*#) #-}
 {-# ANN (*#) hasBlackBox #-}
 (*#) = \(U i) (U j) -> U (mulMod2 m i j)
 #if MIN_VERSION_base(4,15,0)
@@ -423,7 +443,8 @@ instance KnownNat n => Num (Unsigned n) where
   where m = (1 `shiftL` fromInteger (natVal (Proxy @n))) - 1
 #endif
 
-{-# NOINLINE negate# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE negate# #-}
 {-# ANN negate# hasBlackBox #-}
 negate# :: forall n . KnownNat n => Unsigned n -> Unsigned n
 negate# = \(U i) -> U (negateMod m i)
@@ -433,7 +454,8 @@ negate# = \(U i) -> U (negateMod m i)
   where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
 #endif
 
-{-# NOINLINE fromInteger# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE fromInteger# #-}
 {-# ANN fromInteger# hasBlackBox #-}
 fromInteger# :: forall n . KnownNat n => Integer -> Unsigned n
 #if MIN_VERSION_base(4,15,0)
@@ -453,12 +475,14 @@ instance (KnownNat m, KnownNat n) => ExtendingNum (Unsigned m) (Unsigned n) wher
   type MResult (Unsigned m) (Unsigned n) = Unsigned (m + n)
   mul = times#
 
-{-# NOINLINE plus# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE plus# #-}
 {-# ANN plus# hasBlackBox #-}
 plus# :: Unsigned m -> Unsigned n -> Unsigned (Max m n + 1)
 plus# (U a) (U b) = U (a + b)
 
-{-# NOINLINE minus# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE minus# #-}
 {-# ANN minus# hasBlackBox #-}
 minus# :: forall m n . (KnownNat m, KnownNat n) => Unsigned m -> Unsigned n
                                                 -> Unsigned (Max m n + 1)
@@ -472,7 +496,8 @@ minus# = \(U a) (U b) -> U (subMod mask a b)
   mask = 1 `shiftL` sz
 #endif
 
-{-# NOINLINE times# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE times# #-}
 {-# ANN times# hasBlackBox #-}
 times# :: Unsigned m -> Unsigned n -> Unsigned (m + n)
 times# (U a) (U b) = U (a * b)
@@ -493,14 +518,17 @@ instance KnownNat n => Integral (Unsigned n) where
   toInteger   = toInteger#
 
 quot#,rem# :: Unsigned n -> Unsigned n -> Unsigned n
-{-# NOINLINE quot# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE quot# #-}
 {-# ANN quot# hasBlackBox #-}
 quot# (U i) (U j) = U (i `quot` j)
-{-# NOINLINE rem# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE rem# #-}
 {-# ANN rem# hasBlackBox #-}
 rem# (U i) (U j) = U (i `rem` j)
 
-{-# NOINLINE toInteger# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE toInteger# #-}
 {-# ANN toInteger# hasBlackBox #-}
 toInteger# :: Unsigned n -> Integer
 toInteger# (U i) = naturalToInteger i
@@ -532,29 +560,34 @@ instance KnownNat n => Bits (Unsigned n) where
   rotateR v i       = rotateR# v i
   popCount u        = popCount (pack# u)
 
-{-# NOINLINE and# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE and# #-}
 {-# ANN and# hasBlackBox #-}
 and# :: Unsigned n -> Unsigned n -> Unsigned n
 and# (U v1) (U v2) = U (v1 .&. v2)
 
-{-# NOINLINE or# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE or# #-}
 {-# ANN or# hasBlackBox #-}
 or# :: Unsigned n -> Unsigned n -> Unsigned n
 or# (U v1) (U v2) = U (v1 .|. v2)
 
-{-# NOINLINE xor# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE xor# #-}
 {-# ANN xor# hasBlackBox #-}
 xor# :: Unsigned n -> Unsigned n -> Unsigned n
 xor# (U v1) (U v2) = U (v1 `xor` v2)
 
-{-# NOINLINE complement# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE complement# #-}
 {-# ANN complement# hasBlackBox #-}
 complement# :: forall n . KnownNat n => Unsigned n -> Unsigned n
 complement# = \(U i) -> U (complementN i)
   where complementN = complementMod (natVal (Proxy @n))
 
 shiftL#, shiftR#, rotateL#, rotateR# :: forall n .KnownNat n => Unsigned n -> Int -> Unsigned n
-{-# NOINLINE shiftL# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE shiftL# #-}
 {-# ANN shiftL# hasBlackBox #-}
 shiftL# = \(U v) i ->
 #if MIN_VERSION_base(4,15,0)
@@ -574,7 +607,8 @@ shiftL# = \(U v) i ->
   m  = 1 `shiftL` sz
 #endif
 
-{-# NOINLINE shiftR# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE shiftR# #-}
 {-# ANN shiftR# hasBlackBox #-}
 -- shiftR# doesn't need the KnownNat constraint
 -- But having the same type signature for all shift and rotate functions
@@ -584,7 +618,8 @@ shiftR# (U v) i
               $ "'shiftR' undefined for negative number: " ++ show i
   | otherwise = U (shiftR v i)
 
-{-# NOINLINE rotateL# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE rotateL# #-}
 {-# ANN rotateL# hasBlackBox #-}
 rotateL# =
   \(U n) b ->
@@ -611,7 +646,8 @@ rotateL# =
     m  = 1 `shiftL` sz
 #endif
 
-{-# NOINLINE rotateR# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE rotateR# #-}
 {-# ANN rotateR# hasBlackBox #-}
 rotateR# =
   \(U n) b ->
@@ -649,7 +685,8 @@ instance Resize Unsigned where
   zeroExtend = extend
   truncateB  = resize#
 
-{-# NOINLINE resize# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE resize# #-}
 {-# ANN resize# hasBlackBox #-}
 resize# :: forall n m . KnownNat m => Unsigned n -> Unsigned m
 resize# = \(U i) -> if i >= m then U (i `mod` m) else U i
@@ -768,7 +805,8 @@ unsignedToWord (U (NB u#)) = bigNatToWord u#
 unsignedToWord (U (NatS# u#)) = W# u#
 unsignedToWord (U (NatJ# u#)) = W# (bigNatToWord u#)
 #endif
-{-# NOINLINE unsignedToWord #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE unsignedToWord #-}
 {-# ANN unsignedToWord hasBlackBox #-}
 
 unsigned8toWord8 :: Unsigned 8 -> Word8
@@ -782,7 +820,8 @@ unsigned8toWord8 (U (NB u#)) = W8# (narrow8Word# (bigNatToWord# u#))
 unsigned8toWord8 (U (NatS# u#)) = W8# (narrow8Word# u#)
 unsigned8toWord8 (U (NatJ# u#)) = W8# (narrow8Word# (bigNatToWord u#))
 #endif
-{-# NOINLINE unsigned8toWord8 #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE unsigned8toWord8 #-}
 {-# ANN unsigned8toWord8 hasBlackBox #-}
 
 unsigned16toWord16 :: Unsigned 16 -> Word16
@@ -796,7 +835,8 @@ unsigned16toWord16 (U (NB u#)) = W16# (narrow16Word# (bigNatToWord# u#))
 unsigned16toWord16 (U (NatS# u#)) = W16# (narrow16Word# u#)
 unsigned16toWord16 (U (NatJ# u#)) = W16# (narrow16Word# (bigNatToWord u#))
 #endif
-{-# NOINLINE unsigned16toWord16 #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE unsigned16toWord16 #-}
 {-# ANN unsigned16toWord16 hasBlackBox #-}
 
 unsigned32toWord32 :: Unsigned 32 -> Word32
@@ -810,7 +850,8 @@ unsigned32toWord32 (U (NB u#)) = W32# (narrow32Word# (bigNatToWord# u#))
 unsigned32toWord32 (U (NatS# u#)) = W32# (narrow32Word# u#)
 unsigned32toWord32 (U (NatJ# u#)) = W32# (narrow32Word# (bigNatToWord u#))
 #endif
-{-# NOINLINE unsigned32toWord32 #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE unsigned32toWord32 #-}
 {-# ANN unsigned32toWord32 hasBlackBox #-}
 
 {-# RULES

@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Head where
 
 import Clash.Prelude
@@ -5,11 +7,13 @@ import Clash.Explicit.Testbench
 
 head' :: Vec (n+1) (Signed 16) -> Signed 16
 head' (Cons x xs) = x
-{-# NOINLINE head' #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE head' #-}
 
 topEntity :: Vec 3 (Signed 16) -> Signed 16
 topEntity = head'
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

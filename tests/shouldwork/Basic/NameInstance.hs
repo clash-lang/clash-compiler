@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module NameInstance where
 
 import qualified Prelude as P
@@ -12,7 +14,8 @@ topEntity = suffixName @"after" $ setName @"foo" $ prefixName @"before" f
 
 f :: Bool -> Bool -> (Bool,Bool)
 f x y = (y,x)
-{-# NOINLINE f #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE f #-}
 
 -- File content test
 assertIn :: String -> String -> IO ()

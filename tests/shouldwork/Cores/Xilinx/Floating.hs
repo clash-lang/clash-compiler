@@ -5,6 +5,8 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
+{-# LANGUAGE CPP #-}
+
 {-# OPTIONS_GHC -fconstraint-solver-iterations=10 -Wall -Werror #-}
 
 module Floating where
@@ -136,7 +138,8 @@ addBasic
   -> DSignal XilinxSystem 0 Float
   -> DSignal XilinxSystem F.AddDefDelay Float
 addBasic clk x y = withClock clk $ withEnable enableGen $ F.add x y
-{-# NOINLINE addBasic #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE addBasic #-}
 {-# ANN addBasic (binaryTopAnn "addBasic") #-}
 
 addBasicTB :: Signal XilinxSystem Bool
@@ -154,7 +157,8 @@ addEnable
   -> DSignal XilinxSystem 0 Float
   -> DSignal XilinxSystem 11 Float
 addEnable clk en x y = withClock clk $ withEnable en $ F.add x y
-{-# NOINLINE addEnable #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE addEnable #-}
 {-# ANN addEnable (binaryEnTopAnn "addEnable") #-}
 
 addEnableTB :: Signal XilinxSystem Bool
@@ -194,7 +198,8 @@ addShortPL
   -> DSignal XilinxSystem 6 Float
 addShortPL clk x y =
   withClock clk $ withEnable enableGen $ F.addWith F.defConfig x y
-{-# NOINLINE addShortPL #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE addShortPL #-}
 {-# ANN addShortPL (binaryTopAnn "addShortPL") #-}
 
 addShortPLTB :: Signal XilinxSystem Bool
@@ -212,7 +217,8 @@ subBasic
   -> DSignal XilinxSystem 0 Float
   -> DSignal XilinxSystem F.SubDefDelay Float
 subBasic clk x y = withClock clk $ withEnable enableGen $ F.sub x y
-{-# NOINLINE subBasic #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE subBasic #-}
 {-# ANN subBasic (binaryTopAnn "subBasic") #-}
 
 subBasicTB :: Signal XilinxSystem Bool
@@ -229,7 +235,8 @@ mulBasic
   -> DSignal XilinxSystem 0 Float
   -> DSignal XilinxSystem F.MulDefDelay Float
 mulBasic clk x y = withClock clk $ withEnable enableGen $ F.mul x y
-{-# NOINLINE mulBasic #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE mulBasic #-}
 {-# ANN mulBasic (binaryTopAnn "mulBasic") #-}
 
 mulBasicTB :: Signal XilinxSystem Bool
@@ -246,7 +253,8 @@ divBasic
   -> DSignal XilinxSystem 0 Float
   -> DSignal XilinxSystem F.DivDefDelay Float
 divBasic clk x y = withClock clk $ withEnable enableGen $ F.div x y
-{-# NOINLINE divBasic #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE divBasic #-}
 {-# ANN divBasic (binaryTopAnn "divBasic") #-}
 
 divBasicTB :: Signal XilinxSystem Bool
@@ -264,7 +272,8 @@ compareBasic
   -> DSignal XilinxSystem F.CompareDefDelay F.Ordering
 compareBasic clk x y =
   withClock clk $ withEnable enableGen $ F.compare x y
-{-# NOINLINE compareBasic #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE compareBasic #-}
 {-# ANN compareBasic (binaryTopAnn "compareBasic") #-}
 
 compareBasicTB :: Signal XilinxSystem Bool
@@ -279,7 +288,8 @@ compareEnable
   -> DSignal XilinxSystem 0 Float
   -> DSignal XilinxSystem F.CompareDefDelay F.Ordering
 compareEnable clk en x y = withClock clk $ withEnable en $ F.compare x y
-{-# NOINLINE compareEnable #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE compareEnable #-}
 {-# ANN compareEnable (binaryEnTopAnn "compareEnable") #-}
 
 compareEnableTB :: Signal XilinxSystem Bool
@@ -303,7 +313,8 @@ fromUBasic
   -> DSignal XilinxSystem 0 (Unsigned 32)
   -> DSignal XilinxSystem F.FromU32DefDelay Float
 fromUBasic clk x = withClock clk $ withEnable enableGen $ F.fromU32 x
-{-# NOINLINE fromUBasic #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE fromUBasic #-}
 {-# ANN fromUBasic (unaryTopAnn "fromUBasic") #-}
 
 fromUBasicTB :: Signal XilinxSystem Bool
@@ -328,7 +339,8 @@ fromUEnable
   -> DSignal XilinxSystem 0 (Unsigned 32)
   -> DSignal XilinxSystem 5 Float
 fromUEnable clk en x = withClock clk $ withEnable en $ F.fromU32 x
-{-# NOINLINE fromUEnable #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE fromUEnable #-}
 {-# ANN fromUEnable (unaryEnTopAnn "fromUEnable") #-}
 
 fromUEnableTB :: Signal XilinxSystem Bool
@@ -361,7 +373,8 @@ fromSBasic
   -> DSignal XilinxSystem 0 (Signed 32)
   -> DSignal XilinxSystem F.FromS32DefDelay Float
 fromSBasic clk x = withClock clk $ withEnable enableGen $ F.fromS32 x
-{-# NOINLINE fromSBasic #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE fromSBasic #-}
 {-# ANN fromSBasic (unaryTopAnn "fromSBasic") #-}
 
 fromSBasicTB :: Signal XilinxSystem Bool
@@ -386,7 +399,8 @@ fromSEnable
   -> DSignal XilinxSystem 0 (Signed 32)
   -> DSignal XilinxSystem 6 Float
 fromSEnable clk en x = withClock clk $ withEnable en $ F.fromS32 x
-{-# NOINLINE fromSEnable #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE fromSEnable #-}
 {-# ANN fromSEnable (unaryEnTopAnn "fromSEnable") #-}
 
 fromSEnableTB :: Signal XilinxSystem Bool

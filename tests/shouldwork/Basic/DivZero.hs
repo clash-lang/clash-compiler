@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-# OPTIONS_GHC -fconstraint-solver-iterations=5 #-}
 module DivZero where
 
@@ -17,7 +19,8 @@ topEntity (b,u,s,x,i,w,nX) =
   , 4 `quot` i
   , 4 `quot` w
   , 4 `quot` nX)
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 t8ToEnum :: T8 -> (BitVector 8, Unsigned 8, Signed 8, Index 8, Int, Word, Int)
 t8ToEnum (b,u,s,x,i,w,nX) = (b,u,s,x,i,w, fromEnum nX)

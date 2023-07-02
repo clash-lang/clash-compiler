@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module RegisterSE where
 
 -- Register: Synchronous, Enabled
@@ -51,7 +53,8 @@ topEntitySE clk rst = topEntity clk arst en
   where
     arst = unsafeFromHighPolarity (resetInput clk rst enableGen)
     en = toEnable (enableInput clk rst enableGen)
-{-# NOINLINE topEntitySE #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntitySE #-}
 
 testBench :: Signal System Bool
 testBench = done

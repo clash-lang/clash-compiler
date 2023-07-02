@@ -2,6 +2,7 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module TdpBlockRam where
@@ -26,7 +27,8 @@ topEntity
   tdpbram
     clkA (toEnable enA) addrA byteEnaA datA
     clkB (toEnable enB) addrB byteEnaB datB
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 noRstA :: Reset A
 noRstA = unsafeFromHighPolarity (pure False)
@@ -76,7 +78,8 @@ tb inputA expectedA inputB expectedB =
   clkB :: Clock B
   clkB = tbClockGen (not <$> doneB)
 
-{-# NOINLINE normalWritesTB #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE normalWritesTB #-}
 {-# ANN normalWritesTB (TestBench 'topEntity) #-}
 -- | Test bench doing some (non-overlapping) writes and reads on two ports, either
 -- with the byte enable fully set, or fully unset.
@@ -127,7 +130,8 @@ normalWritesTB = tb inputA expectedA inputB expectedB
     :> Nil
     ) ++ repeat @10 noOp
 
-{-# NOINLINE writeEnableWritesTB #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE writeEnableWritesTB #-}
 {-# ANN writeEnableWritesTB (TestBench 'topEntity) #-}
 -- | Test bench doing some (non-overlapping) writes and reads on two ports, with
 -- varying byte enables.

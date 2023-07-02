@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module ZipWithTupleWithUnitLeft where
 
 import Clash.Prelude
@@ -7,7 +9,8 @@ topEntity
   :: Vec 2 (Int,Int)
   -> Vec 2 ((Int,Int),((), Int))
 topEntity xs = zipWith (,) xs (repeat ((), fst (head xs)))
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

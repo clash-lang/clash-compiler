@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 module ShiftRotateBase where
@@ -21,7 +22,8 @@ testall v i
     , testAs @(Int8)        v i
     , testAs @(Unsigned 70) v i
     )
-{-# NOINLINE testall #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testall #-}
 
 testAs
   :: (Num b, Bits b) => Integer -> Int -> Vec Ops b

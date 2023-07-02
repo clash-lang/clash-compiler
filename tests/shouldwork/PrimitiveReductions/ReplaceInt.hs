@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module ReplaceInt where
 
 import Clash.Prelude
@@ -11,7 +13,8 @@ replace_int
   -> a
   -> Vec n a
 replace_int v i a = replace i a v
-{-# NOINLINE replace_int #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE replace_int #-}
 
 
 topEntity
@@ -24,7 +27,8 @@ topEntity i = a
       register
         (replace_int (repeat 'a') 3 'c')
         (replace_int <$> a <*> i <*> pure 'x')
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
@@ -38,4 +42,5 @@ testBench = done
     done           = expectedOutput (exposeClockResetEnable topEntity clk rst enableGen testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen
-{-# NOINLINE testBench #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBench #-}

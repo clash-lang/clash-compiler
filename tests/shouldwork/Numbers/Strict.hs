@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 module Strict where
 import Clash.Prelude
 import Clash.Explicit.Testbench
@@ -29,12 +30,14 @@ topEntity a b = f a b
 f :: Nr -> Nr -> Vec 1 Nr
 f x y = let res = x + y
         in res `seq` res :> Nil
-{-# NOINLINE f #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE f #-}
 
 
 g :: Nr -> Nr -> Vec 1 Nr
 g x !y = x `seq` x + y :> Nil
-{-# NOINLINE g #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE g #-}
 
 
 testBench :: Signal System Bool

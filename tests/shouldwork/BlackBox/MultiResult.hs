@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module MultiResult where
@@ -21,7 +22,8 @@ import System.FilePath ((</>))
 -- | Ties off sh_ddr on AWS.
 tieOffShDdr :: Clock dom -> Reset dom -> Signal dom Int -> (Signal dom Int, Signal dom Int)
 tieOffShDdr !_clk !_rst !_ = (undefined, undefined)
-{-# NOINLINE tieOffShDdr #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE tieOffShDdr #-}
 {-# ANN tieOffShDdr (blackBoxHaskell 'tieOffShDdr 'tieOffShDdrBBF def{bo_multiResult=True}) #-}
 
 tieOffShDdrBBF :: BlackBoxFunction
@@ -47,7 +49,8 @@ topEntity ::
 topEntity clk rst x = bundle (a, b, pure 5)
  where
   (a, b) = tieOffShDdr @System clk rst x
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

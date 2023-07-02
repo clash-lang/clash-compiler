@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module RomNegative where
 
 import Clash.Prelude
@@ -13,7 +15,8 @@ topEntity
 topEntity = exposeClockResetEnable go
  where
   go rd = mux ((< 0) <$> rd) 0 (unpack <$> romFile d256 "memory.list" rd)
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

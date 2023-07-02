@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module SFixedTest where
 
 import Clash.Prelude
@@ -7,7 +9,8 @@ type SF = SFixed 4 18
 
 topEntity :: SF -> SF
 topEntity x = x * 2.56
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

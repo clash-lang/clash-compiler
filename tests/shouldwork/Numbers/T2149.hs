@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module T2149 where
 
 import Clash.Prelude
@@ -5,7 +7,8 @@ import Clash.Explicit.Testbench
 
 topEntity :: Word -> Signed 8
 topEntity = fromIntegral
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

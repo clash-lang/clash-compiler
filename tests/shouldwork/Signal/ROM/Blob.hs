@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Blob where
 
 import Clash.Explicit.Prelude
@@ -13,7 +15,8 @@ topEntity
 topEntity clk en rd =
   let rom0 en0 = unpack <$> romBlob clk en0 content rd
   in bundle (rom0 enableGen, rom0 en)
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
@@ -26,4 +29,5 @@ testBench = done
     clk = tbSystemClockGen (not <$> done)
     rst = systemResetGen
     en = enableGen
-{-# NOINLINE testBench #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBench #-}

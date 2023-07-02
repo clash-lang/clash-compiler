@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module T2046B where
 
 import Clash.Prelude
@@ -13,7 +15,8 @@ topEntity ((a, b), (c, d), (e, f), (g, h), i) =
   , (toEnum (fromEnum g), toEnum (fromEnum h))
   , toEnum (fromEnum i)
   )
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

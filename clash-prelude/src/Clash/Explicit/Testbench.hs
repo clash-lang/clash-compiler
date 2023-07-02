@@ -7,6 +7,7 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-# LANGUAGE Unsafe #-}
@@ -112,7 +113,8 @@ assert clk (Reset _) msg checked expected returned =
   where
     eqX a b = unsafeDupablePerformIO (catch (evaluate (a == b))
                                             (\(_ :: XException) -> return False))
-{-# NOINLINE assert #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE assert #-}
 {-# ANN assert hasBlackBox #-}
 
 -- | The same as 'assert', but can handle don't care bits in its expected value.
@@ -146,7 +148,8 @@ assertBitVector clk (Reset _) msg checked expected returned =
   where
     eqX a b = unsafeDupablePerformIO (catch (evaluate (a `isLike#` b))
                                             (\(_ :: XException) -> return False))
-{-# NOINLINE assertBitVector #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE assertBitVector #-}
 {-# ANN assertBitVector hasBlackBox #-}
 
 
@@ -425,7 +428,8 @@ biTbClockGen done = (testClk, circuitClk)
 -- be optimized away.
 tbEnableGen :: Enable tag
 tbEnableGen = toEnable (pure True)
-{-# NOINLINE tbEnableGen #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE tbEnableGen #-}
 {-# ANN tbEnableGen hasBlackBox #-}
 
 -- | Clock generator for the 'System' clock domain.
@@ -472,7 +476,8 @@ seClockToDiffClock ::
   -- | (Positive phase, negative phase)
   (Clock dom, Clock dom)
 seClockToDiffClock clk = (clk, clk)
-{-# NOINLINE seClockToDiffClock #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE seClockToDiffClock #-}
 {-# ANN seClockToDiffClock hasBlackBox #-}
 
 -- | Cross clock domains in a way that is unsuitable for hardware but good
@@ -493,5 +498,6 @@ unsafeSimSynchronizer
   -> Signal dom1 a
   -> Signal dom2 a
 unsafeSimSynchronizer = unsafeSynchronizer
-{-# NOINLINE unsafeSimSynchronizer #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE unsafeSimSynchronizer #-}
 {-# ANN unsafeSimSynchronizer hasBlackBox #-}

@@ -338,7 +338,8 @@ instance Functor (Vec n) where
 instance (KnownNat n, 1 <= n) => Traversable (Vec n) where
   traverse = traverse#
 
-{-# NOINLINE traverse# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE traverse# #-}
 {-# ANN traverse# hasBlackBox #-}
 traverse# :: forall a f b n . Applicative f => (a -> f b) -> Vec n a -> f (Vec n b)
 traverse# _ Nil           = pure Nil
@@ -373,7 +374,8 @@ instance (NFDataX a, KnownNat n) => NFDataX (Vec n a) where
 singleton :: a -> Vec 1 a
 singleton = (`Cons` Nil)
 
-{-# NOINLINE head #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE head #-}
 {-# ANN head hasBlackBox #-}
 {- | Extract the first element of a vector
 
@@ -407,7 +409,8 @@ singleton = (`Cons` Nil)
 head :: Vec (n + 1) a -> a
 head (x `Cons` _) = x
 
-{-# NOINLINE tail #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE tail #-}
 {-# ANN tail hasBlackBox #-}
 {- | Extract the elements after the head of a vector
 
@@ -441,7 +444,8 @@ head (x `Cons` _) = x
 tail :: Vec (n + 1) a -> Vec n a
 tail (_ `Cons` xs) = xs
 
-{-# NOINLINE last #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE last #-}
 {-# ANN last hasBlackBox #-}
 {- | Extract the last element of a vector
 
@@ -476,7 +480,8 @@ last :: Vec (n + 1) a -> a
 last (x `Cons` Nil)         = x
 last (_ `Cons` y `Cons` ys) = last (y `Cons` ys)
 
-{-# NOINLINE init #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE init #-}
 {-# ANN init hasBlackBox #-}
 {- | Extract all the elements of a vector except the last element
 
@@ -644,7 +649,8 @@ infixr 5 ++
 (++) :: Vec n a -> Vec m a -> Vec (n + m) a
 Nil           ++ ys = ys
 (x `Cons` xs) ++ ys = x `Cons` xs ++ ys
-{-# NOINLINE (++) #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE (++) #-}
 {-# ANN (++) hasBlackBox #-}
 
 -- | Split a vector into two vectors at the given point.
@@ -655,7 +661,8 @@ Nil           ++ ys = ys
 -- (1 :> 2 :> 3 :> Nil,7 :> 8 :> Nil)
 splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
 splitAt n xs = splitAtU (toUNat n) xs
-{-# NOINLINE splitAt #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE splitAt #-}
 {-# ANN splitAt hasBlackBox #-}
 
 splitAtU :: UNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
@@ -679,7 +686,8 @@ splitAtI = withSNat splitAt
 concat :: Vec n (Vec m a) -> Vec (n * m) a
 concat Nil           = Nil
 concat (x `Cons` xs) = x ++ concat xs
-{-# NOINLINE concat #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE concat #-}
 {-# ANN concat hasBlackBox #-}
 
 -- | Map a function over all the elements of a vector and concatentate the resulting vectors.
@@ -697,7 +705,8 @@ concatMap f xs = concat (map f xs)
 -- (1 :> 2 :> 3 :> 4 :> Nil) :> (5 :> 6 :> 7 :> 8 :> Nil) :> (9 :> 10 :> 11 :> 12 :> Nil) :> Nil
 unconcat :: KnownNat n => SNat m -> Vec (n * m) a -> Vec n (Vec m a)
 unconcat n xs = unconcatU (withSNat toUNat) (toUNat n) xs
-{-# NOINLINE unconcat #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE unconcat #-}
 {-# ANN unconcat hasBlackBox #-}
 
 unconcatU :: UNat n -> UNat m -> Vec (n * m) a -> Vec n (Vec m a)
@@ -729,7 +738,8 @@ merge x y = concat (transpose (x :> singleton y))
 reverse :: Vec n a -> Vec n a
 reverse Nil           = Nil
 reverse (x `Cons` xs) = reverse xs :< x
-{-# NOINLINE reverse #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE reverse #-}
 {-# ANN reverse hasBlackBox #-}
 
 -- | \"'map' @f xs@\" is the vector obtained by applying /f/ to each element
@@ -743,7 +753,8 @@ reverse (x `Cons` xs) = reverse xs :< x
 map :: (a -> b) -> Vec n a -> Vec n b
 map _ Nil           = Nil
 map f (x `Cons` xs) = f x `Cons` map f xs
-{-# NOINLINE map #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE map #-}
 {-# ANN map hasBlackBox #-}
 
 -- | Apply a function of every element of a vector and its index.
@@ -766,7 +777,8 @@ imap f = go 0
     go :: Index n -> Vec m a -> Vec m b
     go _ Nil           = Nil
     go n (x `Cons` xs) = f n x `Cons` go (n+1) xs
-{-# NOINLINE imap #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE imap #-}
 {-# ANN imap hasBlackBox #-}
 
 {- | Zip two vectors with a functions that also takes the elements' indices.
@@ -887,7 +899,8 @@ elemIndex x = findIndex (x ==)
 zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
 zipWith _ Nil           _  = Nil
 zipWith f (x `Cons` xs) ys = f x (head ys) `Cons` zipWith f xs (tail ys)
-{-# NOINLINE zipWith #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE zipWith #-}
 {-# ANN zipWith hasBlackBox #-}
 
 -- | 'zipWith3' generalizes 'zip3' by zipping with the function given
@@ -997,7 +1010,8 @@ zipWith7 f ts us vs ws xs ys zs =
 foldr :: (a -> b -> b) -> b -> Vec n a -> b
 foldr _ z Nil           = z
 foldr f z (x `Cons` xs) = f x (foldr f z xs)
-{-# NOINLINE foldr #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE foldr #-}
 {-# ANN foldr hasBlackBox #-}
 
 -- | 'foldl', applied to a binary operator, a starting value (typically
@@ -1091,7 +1105,8 @@ fold f vs = fold' (toList vs)
     fold' xs  = fold' ys `f` fold' zs
       where
         (ys,zs) = P.splitAt (P.length xs `div` 2) xs
-{-# NOINLINE fold #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE fold #-}
 {-# ANN fold (InlineYamlPrimitive [VHDL,Verilog,SystemVerilog] [I.__i|
   BlackBoxHaskell:
     name: Clash.Sized.Vector.fold
@@ -1373,7 +1388,8 @@ index_int xs i@(I# n0)
     sub (y `Cons` (!ys)) n = if isTrue# (n ==# 0#)
                                 then y
                                 else sub ys (n -# 1#)
-{-# NOINLINE index_int #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE index_int #-}
 {-# ANN index_int hasBlackBox #-}
 
 -- | \"@xs@ '!!' @n@\" returns the /n/'th element of /xs/.
@@ -1400,7 +1416,8 @@ xs !! i = index_int xs (fromEnum i)
 -- 3
 length :: KnownNat n => Vec n a -> Int
 length = fromInteger . natVal . asNatProxy
-{-# NOINLINE length #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE length #-}
 {-# ANN length hasBlackBox #-}
 
 replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a
@@ -1417,7 +1434,8 @@ replace_int xs i@(I# n0) a
     sub (y `Cons` (!ys)) n b = if isTrue# (n ==# 0#)
                                  then b `Cons` ys
                                  else y `Cons` sub ys (n -# 1#) b
-{-# NOINLINE replace_int #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE replace_int #-}
 {-# ANN replace_int hasBlackBox #-}
 
 -- | \"'replace' @n a xs@\" returns the vector /xs/ where the /n/'th element is
@@ -1569,7 +1587,8 @@ select f s n xs = select' (toUNat n) $ drop f xs
     select' UZero      _               = Nil
     select' (USucc n') vs@(x `Cons` _) = x `Cons`
                                          select' n' (drop s (unsafeCoerce vs))
-{-# NOINLINE select #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE select #-}
 {-# ANN select hasBlackBox #-}
 
 -- | \"'selectI' @f s xs@\" selects as many elements as demanded by the context
@@ -1593,7 +1612,8 @@ selectI f s xs = withSNat (\n -> select f s n xs)
 -- 6 :> 6 :> 6 :> Nil
 replicate :: SNat n -> a -> Vec n a
 replicate n a = replicateU (toUNat n) a
-{-# NOINLINE replicate #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE replicate #-}
 {-# ANN replicate hasBlackBox #-}
 
 replicateU :: UNat n -> a -> Vec n a
@@ -1641,7 +1661,8 @@ iterateI f a = xs
   where
     xs = init (a `Cons` ws)
     ws = map f (lazyV xs)
-{-# NOINLINE iterateI #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE iterateI #-}
 {-# ANN iterateI (InlineYamlPrimitive [VHDL,Verilog,SystemVerilog] [I.__i|
   BlackBoxHaskell:
     name: Clash.Sized.Vector.iterateI
@@ -1718,7 +1739,8 @@ generateI f a = iterateI f (f a)
 -- (1 :> 3 :> 5 :> Nil) :> (2 :> 4 :> 6 :> Nil) :> Nil
 transpose :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)
 transpose = traverse# id
-{-# NOINLINE transpose #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE transpose #-}
 {-# ANN transpose hasBlackBox #-}
 
 -- | 1-dimensional stencil computations
@@ -1968,7 +1990,8 @@ rotateLeftS xs d = go (snatToInteger d `mod` natVal (asNatProxy xs)) xs
     go _ Nil           = Nil
     go 0 ys            = ys
     go n (y `Cons` ys) = go (n-1) (ys :< y)
-{-# NOINLINE rotateLeftS #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE rotateLeftS #-}
 {-# ANN rotateLeftS hasBlackBox #-}
 
 -- | /Statically/ rotate a 'Vec'tor to the right:
@@ -1987,7 +2010,8 @@ rotateRightS xs d = go (snatToInteger d `mod` natVal (asNatProxy xs)) xs
     go _ Nil            = Nil
     go 0 ys             = ys
     go n ys@(Cons _ _)  = go (n-1) (last ys :> init ys)
-{-# NOINLINE rotateRightS #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE rotateRightS #-}
 {-# ANN rotateRightS hasBlackBox #-}
 
 -- | Convert a vector to a list.
@@ -2023,7 +2047,8 @@ fromList xs
   exactLength 0 acc = null acc
   exactLength _ []  = False
   exactLength i (_:ys) = exactLength (i - 1) ys
-{-# NOINLINE fromList #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE fromList #-}
 {-# ANN fromList dontTranslate #-}
 
 -- | Convert a list to a vector. This function always returns a vector of the
@@ -2051,7 +2076,8 @@ unsafeFromList = unfoldr SNat go
   go [] =
     let item = error "Clash.Sized.Vector.unsafeFromList: vector larger than list"
      in (item, [])
-{-# NOINLINE unsafeFromList #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE unsafeFromList #-}
 {-# ANN unsafeFromList dontTranslate #-}
 
 -- | Create a vector literal from a list literal.
@@ -2152,7 +2178,8 @@ lazyV = lazyV' (repeat ())
     lazyV' :: Vec n () -> Vec n a -> Vec n a
     lazyV' Nil           _  = Nil
     lazyV' (_ `Cons` xs) ys = head ys `Cons` lazyV' xs (tail ys)
-{-# NOINLINE lazyV #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE lazyV #-}
 {-# ANN lazyV hasBlackBox #-}
 
 -- | A /dependently/ typed fold.
@@ -2256,7 +2283,8 @@ dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
     go s (y `Cons` ys) =
       let s' = s `subSNat` d1
       in  f s' y (go s' ys)
-{-# NOINLINE dfold #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE dfold #-}
 {-# ANN dfold hasBlackBox #-}
 
 {- | A combination of 'dfold' and 'fold': a /dependently/ typed fold that
@@ -2419,7 +2447,8 @@ dtfold _ f g = go (SNat :: SNat k)
           sn'       = sn `subSNat` d1
           (xsL,xsR) = splitAt (pow2SNat sn') xs
       in  g sn' (go sn' xsL) (go sn' xsR)
-{-# NOINLINE dtfold #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE dtfold #-}
 {-# ANN dtfold hasBlackBox #-}
 
 -- | To be used as the motive /p/ for 'dfold', when the /f/ in \"'dfold' @p f@\"
@@ -2496,7 +2525,8 @@ concatBitVector# = go 0
   go (BV accMsk accVal) ((BV xMsk xVal) `Cons` xs) =
     let sh = fromInteger (natVal (Proxy @m)) :: Int in
     go (BV (shiftL accMsk sh .|. xMsk) (shiftL accVal sh .|. xVal)) xs
-{-# NOINLINE concatBitVector# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE concatBitVector# #-}
 {-# ANN concatBitVector# hasBlackBox #-}
 
 unconcatBitVector#
@@ -2512,7 +2542,8 @@ unconcatBitVector# orig = snd (go (toUNat (SNat @n)))
       let (bv,xs) = go n
           (l,x) = (GHC.Magic.noinline split#) bv
       in  (l,x :> xs)
-{-# NOINLINE unconcatBitVector# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE unconcatBitVector# #-}
 {-# ANN unconcatBitVector# hasBlackBox #-}
 
 -- | Convert a 'BitVector' to a 'Vec' of 'Bit's.
@@ -2544,7 +2575,8 @@ seqV
 seqV v b =
   let s () e = seq e () in
   foldl s () v `seq` b
-{-# NOINLINE seqV #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE seqV #-}
 {-# ANN seqV hasBlackBox #-}
 infixr 0 `seqV`
 
@@ -2567,7 +2599,8 @@ seqVX
 seqVX v b =
   let s () e = seqX e () in
   foldl s () v `seqX` b
-{-# NOINLINE seqVX #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE seqVX #-}
 {-# ANN seqVX hasBlackBox #-}
 infixr 0 `seqVX`
 

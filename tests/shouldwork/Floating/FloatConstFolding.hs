@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module FloatConstFolding where
 
 import Clash.Prelude
@@ -60,7 +62,8 @@ twiddle = (+ 1e-5) -- prevent any optimiser from doing: asin . sin <=> id
 
 pi_noinline :: Floating a => a
 pi_noinline = pi
-{-# NOINLINE pi_noinline #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE pi_noinline #-}
 
 a,b,c,d,e,f :: Floating a => a
 a = 1.0

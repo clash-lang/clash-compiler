@@ -1,10 +1,13 @@
+{-# LANGUAGE CPP #-}
+
 module VecFun where
 
 import Clash.Prelude
 import Clash.Explicit.Testbench
 
 topEntity = work
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 work :: Vec 3 Int -> Vec 3 Int
 work xs = zipWith sel xs funs where

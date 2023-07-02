@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module ResetGen where
 
 import Clash.Explicit.Prelude
@@ -10,7 +12,8 @@ topEntity clk = bundle (unsafeToHighPolarity r, unsafeToHighPolarity r')
   where
     r  = resetGenN (SNat @3)
     r' = holdReset clk enableGen (SNat @2) r
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

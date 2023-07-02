@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- Case alternatives should be selected by the partial evalautor when they
@@ -37,7 +38,8 @@ import Test.Tasty.Clash.CoreTest
 matchedAlt :: [Integer]
 matchedAlt = [1, 1, 2, 5, 14, 42, 132, 429, 1430, 4862]
 
-{-# NOINLINE caseOfData #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE caseOfData #-}
 {-# ANN caseOfData (Synthesize
           { t_name   = "caseOfData"
           , t_inputs = []
@@ -47,7 +49,8 @@ matchedAlt = [1, 1, 2, 5, 14, 42, 132, 429, 1430, 4862]
 caseOfData :: [Integer]
 caseOfData = maybe [] (const matchedAlt) (Just 0)
 
-{-# NOINLINE caseOfLit #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE caseOfLit #-}
 {-# ANN caseOfLit (Synthesize
           { t_name   = "caseOfLit"
           , t_inputs = []
@@ -61,7 +64,8 @@ caseOfLit =
     3 -> matchedAlt
     _ -> []
 
-{-# NOINLINE caseOfDefault #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE caseOfDefault #-}
 {-# ANN caseOfDefault (Synthesize
           { t_name   = "caseOfDefault"
           , t_inputs = []
@@ -105,4 +109,3 @@ mainVerilog = mainCommon SVerilog
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = mainCommon SSystemVerilog
-

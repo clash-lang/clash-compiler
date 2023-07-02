@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module T2334 where
 
 import qualified Prelude as P
@@ -19,7 +21,8 @@ topEntity ::
   Signal System Int ->
   Signal System Int
 topEntity clk rst = assert clk rst "FileOrder"
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 assertBool :: HasCallStack => Bool -> IO ()
 assertBool b = Exception.assert b pure ()

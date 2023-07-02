@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module ExpWithGhcCF where
 import Clash.Prelude
 import Clash.Explicit.Testbench
@@ -8,7 +10,8 @@ expected = $(lift (map pack Exp.expectedOutputs))
 
 -- Constant folded (?) topEntity (Clash)
 topEntity = Exp.topEntity
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

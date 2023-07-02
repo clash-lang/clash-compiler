@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -11,7 +12,8 @@ topEntity
   :: Signal System Bool
   -> Signal System Bool
 topEntity = id
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 tb
   :: Signal System Bool
@@ -26,4 +28,5 @@ tb = done
 
 testBench :: Signal System Bool
 testBench = tb
-{-# NOINLINE testBench #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBench #-}

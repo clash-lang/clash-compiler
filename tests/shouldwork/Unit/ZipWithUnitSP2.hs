@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module ZipWithUnitSP2 where
 
 import Clash.Prelude
@@ -9,7 +11,8 @@ topEntity
   :: Vec 2 YZA
   -> Vec 2 (Index 2, YZA)
 topEntity xs = zipWith (,) indicesI xs
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

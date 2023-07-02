@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 module BitPackDerivation where
@@ -28,7 +29,8 @@ topEntity
   => Signal System Train
   -> Signal System (BitVector 8)
 topEntity trains = pack <$> trains
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench
   :: Signal System Bool

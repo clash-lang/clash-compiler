@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module TyEqConstraints where
 import GHC.Stack
 import Clash.Prelude
@@ -11,7 +13,8 @@ topEntity
 topEntity = exposeClock board
   where
     board = id
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 {-# ANN topEntity (defSyn "top1") #-}
 
 -- type equality is symmetrical so this should also work:

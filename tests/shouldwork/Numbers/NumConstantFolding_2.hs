@@ -111,5 +111,6 @@ topEntity
    , tInt16
    , tWord16
    )
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 #endif

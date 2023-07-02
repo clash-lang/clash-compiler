@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module T1072 where
 
 import Clash.Explicit.Prelude
@@ -11,7 +13,8 @@ topEntity2
   -> (Enable System, Signal System Int)
   -> Signal System Int
 topEntity2 (clk, rst) (en, a) = register clk rst en 0 a
-{-# NOINLINE topEntity2 #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity2 #-}
 
 {-# ANN topEntity
   (Synthesize

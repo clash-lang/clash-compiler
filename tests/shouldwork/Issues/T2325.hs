@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module T2325 where
@@ -18,22 +19,26 @@ type T = Unsigned 8 -> Unsigned 8
 
 f :: T
 f = g . h
-{-# NOINLINE f #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE f #-}
 {-# ANN f (defSyn "f") #-}
 
 g :: T
 g = h . j
-{-# NOINLINE g #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE g #-}
 {-# ANN g (defSyn "g") #-}
 
 h :: T
 h = (+ 5)
-{-# NOINLINE h #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE h #-}
 {-# ANN h (defSyn "h") #-}
 
 j :: T
 j = (+ 10)
-{-# NOINLINE j #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE j #-}
 {-# ANN j (defSyn "j") #-}
 
 assertBool :: HasCallStack => Bool -> IO ()

@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -24,7 +25,8 @@ clockPeriod =
   case knownDomain @dom of
     SDomainConfiguration{sPeriod} ->
       sPeriod
-{-# NOINLINE clockPeriod #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE clockPeriod #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
 
 -- | Get 'ActiveEdge' from a KnownDomain context. Example usage:
@@ -44,7 +46,8 @@ activeEdge =
   case knownDomain @dom of
     SDomainConfiguration{sActiveEdge} ->
       sActiveEdge
-{-# NOINLINE activeEdge #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE activeEdge #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
 
 -- | Get 'ResetKind' from a KnownDomain context. Example usage:
@@ -64,7 +67,8 @@ resetKind =
   case knownDomain @dom of
     SDomainConfiguration{sResetKind} ->
       sResetKind
-{-# NOINLINE resetKind #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE resetKind #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
 
 -- | Get 'InitBehavior' from a KnownDomain context. Example usage:
@@ -84,7 +88,8 @@ initBehavior =
   case knownDomain @dom of
     SDomainConfiguration{sInitBehavior} ->
       sInitBehavior
-{-# NOINLINE initBehavior #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE initBehavior #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
 
 -- | Get 'ResetPolarity' from a KnownDomain context. Example usage:
@@ -104,7 +109,8 @@ resetPolarity =
   case knownDomain @dom of
     SDomainConfiguration{sResetPolarity} ->
       sResetPolarity
-{-# NOINLINE resetPolarity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE resetPolarity #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
 
 -- | Like 'knownDomain but yields a 'VDomainConfiguration'. Should only be used

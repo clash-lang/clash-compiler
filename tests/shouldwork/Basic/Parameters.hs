@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -135,7 +136,8 @@ myAdd
   -> Unsigned n
   -> Unsigned n
 myAdd a b = a + b
-{-# NOINLINE myAdd #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE myAdd #-}
 
 topEntity
   :: Unsigned 32

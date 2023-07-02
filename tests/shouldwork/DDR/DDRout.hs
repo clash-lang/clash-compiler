@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module DDRout where
@@ -40,7 +42,8 @@ topEntityUA
   -> Signal AsyncReal (BitVector 8, BitVector 8)
   -> Signal AsyncDDR (BitVector 8)
 topEntityUA clk rst = topEntityGeneric clk rst enableGen
-{-# NOINLINE topEntityUA #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntityUA #-}
 {-# ANN topEntityUA (defSyn "topEntityUA") #-}
 
 topEntityUS
@@ -49,7 +52,8 @@ topEntityUS
   -> Signal SyncReal (BitVector 8, BitVector 8)
   -> Signal SyncDDR (BitVector 8)
 topEntityUS clk rst = topEntityGeneric clk rst enableGen
-{-# NOINLINE topEntityUS #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntityUS #-}
 {-# ANN topEntityUS (defSyn "topEntityUS") #-}
 
 topEntityGA
@@ -58,7 +62,8 @@ topEntityGA
   -> Signal AsyncReal (BitVector 8, BitVector 8)
   -> Signal AsyncDDR (BitVector 8)
 topEntityGA clk rst = topEntityGeneric clk rst tbEnableGen
-{-# NOINLINE topEntityGA #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntityGA #-}
 {-# ANN topEntityGA (defSyn "topEntityGA") #-}
 
 topEntityGS
@@ -67,7 +72,8 @@ topEntityGS
   -> Signal SyncReal (BitVector 8, BitVector 8)
   -> Signal SyncDDR (BitVector 8)
 topEntityGS clk rst = topEntityGeneric clk rst tbEnableGen
-{-# NOINLINE topEntityGS #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntityGS #-}
 {-# ANN topEntityGS (defSyn "topEntityGS") #-}
 
 input :: Vec 5 (BitVector 8, BitVector 8)
@@ -95,7 +101,8 @@ testBenchUS = done
     rstTest        = resetGen @TB
     rstDDR         = resetGen @SyncDDR
     rstReal        = resetGen @SyncReal
-{-# NOINLINE testBenchUS #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBenchUS #-}
 {-# ANN testBenchUS (TestBench 'topEntityUS) #-}
 
 testBenchUA :: Signal TB Bool
@@ -110,7 +117,8 @@ testBenchUA = done
     clkReal        = tbClockGen @AsyncReal (unsafeSynchronizer clkDDR clkReal notDone)
     rstDDR         = resetGen @AsyncDDR
     rstReal        = resetGen @AsyncReal
-{-# NOINLINE testBenchUA #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBenchUA #-}
 {-# ANN testBenchUA (TestBench 'topEntityUA) #-}
 
 testBenchGA :: Signal TB Bool
@@ -125,7 +133,8 @@ testBenchGA = done
     clkReal        = tbClockGen @AsyncReal (unsafeSynchronizer clkDDR clkReal notDone)
     rstDDR         = resetGen @AsyncDDR
     rstReal        = resetGen @AsyncReal
-{-# NOINLINE testBenchGA #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBenchGA #-}
 {-# ANN testBenchGA (TestBench 'topEntityGA) #-}
 
 testBenchGS :: Signal TB Bool
@@ -144,5 +153,6 @@ testBenchGS = done
     rstTest        = resetGen @TB
     rstDDR         = resetGen @SyncDDR
     rstReal        = resetGen @SyncReal
-{-# NOINLINE testBenchGS #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBenchGS #-}
 {-# ANN testBenchGS (TestBench 'topEntityGS) #-}

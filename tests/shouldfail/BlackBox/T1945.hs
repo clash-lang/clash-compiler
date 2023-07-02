@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 module T1945 where
 
@@ -9,7 +10,8 @@ import           Data.String.Interpolate      (__i)
 
 bb :: a -> a
 bb x = x
-{-# NOINLINE bb #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE bb #-}
 {-# ANN bb hasBlackBox #-}
 {-# ANN bb (InlinePrimitive [VHDL,Verilog,SystemVerilog] [__i|
    [ { "BlackBox" :

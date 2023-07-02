@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveLift #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -45,7 +46,8 @@ topEntity (x,y) =
     , test @(Index 128) (abs x) (abs y)
     )
   )
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 inputs :: Vec _ (Integer,Integer)
 inputs =
@@ -63,4 +65,3 @@ deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g, Lift 
       => Lift (a,b,c,d,e,f,g,h,i,j,k)
 deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g, Lift h, Lift i, Lift j, Lift k, Lift l)
       => Lift (a,b,c,d,e,f,g,h,i,j,k,l)
-

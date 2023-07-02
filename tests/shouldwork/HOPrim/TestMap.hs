@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module TestMap where
 
 import Clash.Explicit.Prelude
@@ -48,7 +50,8 @@ topEntity
   -> (Signal System50 Word1, Signal System50 Bool)
   -> Signal System50 Word1
 topEntity clk rst en = mf clk rst en ((romF1 :> romF2 :> Nil), d2, d8)
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System50 Bool
 testBench = done

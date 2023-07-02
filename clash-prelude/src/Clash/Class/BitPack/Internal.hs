@@ -155,7 +155,8 @@ xToBV :: KnownNat n => BitVector n -> BitVector n
 xToBV x =
   unsafeDupablePerformIO (catch (evaluate x)
                                 (\(XException _) -> return undefined#))
-{-# NOINLINE xToBV #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE xToBV #-}
 {-# ANN xToBV hasBlackBox #-}
 
 -- | Pack both arguments to a 'BitVector' and use
@@ -298,12 +299,14 @@ instance BitPack Float where
 
 packFloat# :: Float -> BitVector 32
 packFloat# = fromIntegral . floatToWord
-{-# NOINLINE packFloat# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE packFloat# #-}
 {-# ANN packFloat# hasBlackBox #-}
 
 unpackFloat# :: BitVector 32 -> Float
 unpackFloat# (unsafeToNatural -> w) = wordToFloat (fromIntegral w)
-{-# NOINLINE unpackFloat# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE unpackFloat# #-}
 {-# ANN unpackFloat# hasBlackBox #-}
 
 instance BitPack Double where
@@ -313,12 +316,14 @@ instance BitPack Double where
 
 packDouble# :: Double -> BitVector 64
 packDouble# = fromIntegral . doubleToWord
-{-# NOINLINE packDouble# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE packDouble# #-}
 {-# ANN packDouble# hasBlackBox #-}
 
 unpackDouble# :: BitVector 64 -> Double
 unpackDouble# (unsafeToNatural -> w) = wordToDouble (fromIntegral w)
-{-# NOINLINE unpackDouble# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE unpackDouble# #-}
 {-# ANN unpackDouble# hasBlackBox #-}
 
 instance BitPack CUShort where

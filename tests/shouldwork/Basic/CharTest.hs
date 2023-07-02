@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module CharTest where
 
 import Clash.Prelude
@@ -6,7 +8,8 @@ import Data.Char
 
 topEntity :: (Int,Char) -> (Int,Char,Char)
 topEntity (i,c) = (ord c,chr i,'λ')
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

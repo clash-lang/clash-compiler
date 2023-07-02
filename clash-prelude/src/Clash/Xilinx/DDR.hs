@@ -50,7 +50,8 @@ iddr
   -> Signal slow ((BitVector m),(BitVector m))
   -- ^ normal speed output pairs
 iddr clk rst en = withFrozenCallStack ddrIn# clk rst en 0 0 0
-{-# NOINLINE iddr #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE iddr #-}
 {-# ANN iddr hasBlackBox #-}
 
 -- | Xilinx specific variant of 'ddrOut' implemented using the Xilinx ODDR
@@ -84,5 +85,6 @@ oddr#
   -> Signal slow (BitVector m)
   -> Signal fast (BitVector m)
 oddr# clk rst en = ddrOut# clk rst en 0
-{-# NOINLINE oddr# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE oddr# #-}
 {-# ANN oddr# hasBlackBox #-}

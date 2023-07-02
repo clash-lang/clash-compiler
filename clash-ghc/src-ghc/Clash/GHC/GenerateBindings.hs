@@ -211,7 +211,7 @@ setNoInlineTopEntities bm tes =
   go b@Binding{bindingId}
     | bindingId `elemVarSet` ids
 #if MIN_VERSION_ghc(9,4,0)
-    = b { bindingSpec = GHC.NoInline GHC.NoSourceText }
+    = b { bindingSpec = GHC.Opaque GHC.NoSourceText }
 #else
     = b { bindingSpec = GHC.NoInline }
 #endif

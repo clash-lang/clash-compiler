@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -26,7 +27,8 @@ myMultiply
   -> Signal System Int
 myMultiply a b =
   a * b
-{-# NOINLINE myMultiply #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE myMultiply #-}
 
 topEntity
   :: SystemClockResetEnable

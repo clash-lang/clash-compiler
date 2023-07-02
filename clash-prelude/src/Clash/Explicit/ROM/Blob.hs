@@ -19,6 +19,7 @@ tools consuming the generated HDL.
 -}
 
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
@@ -149,5 +150,6 @@ romBlob# !_ en content@MemBlob{} =
         (deepErrorX ("romBlob: address " ++ show i ++
                      " not in range [0.." ++ show szI ++ ")"))
   {-# INLINE safeAt #-}
-{-# NOINLINE romBlob# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE romBlob# #-}
 {-# ANN romBlob# hasBlackBox #-}

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
 module Naturals where
 
@@ -9,23 +10,28 @@ import GHC.Natural
 -- Mark NOINLINE to prevent GHC constant folding
 plusNatural' :: Natural -> Natural -> Natural
 plusNatural' = (+)
-{-# NOINLINE plusNatural' #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE plusNatural' #-}
 
 timesNatural' :: Natural -> Natural -> Natural
 timesNatural' = (*)
-{-# NOINLINE timesNatural' #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE timesNatural' #-}
 
 minusNatural' :: Natural -> Natural -> Natural
 minusNatural' = (-)
-{-# NOINLINE minusNatural' #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE minusNatural' #-}
 
 wordToNatural' :: Word -> Natural
 wordToNatural' = wordToNatural
-{-# NOINLINE wordToNatural' #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE wordToNatural' #-}
 
 naturalFromInteger' :: Integer -> Natural
 naturalFromInteger' = naturalFromInteger
-{-# NOINLINE naturalFromInteger' #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE naturalFromInteger' #-}
 
 calc :: Integer -> Natural
 calc (naturalFromInteger -> n) = c + h
@@ -49,7 +55,8 @@ calc (naturalFromInteger -> n) = c + h
     -- TODO: the result of the code below is outside the range of an unsigned.
     -- lt_zero_d = minusNatural' 5 7            -- (-2)
     -- lt_zero_e = plusNatural' lt_zero_d 1000  -- 998, should NOT show after transformations
-{-# NOINLINE calc #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE calc #-}
 
 topEntity :: Integer -> Natural
 topEntity = calc

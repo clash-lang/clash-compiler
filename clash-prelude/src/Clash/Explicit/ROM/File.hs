@@ -77,6 +77,7 @@ __>>> L.tail $ sampleN 4 $ g systemClockGen (fromList [3..5])__
 @
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 {-# LANGUAGE Unsafe #-}
@@ -225,5 +226,6 @@ romFile# clk en sz file rd =
       deepErrorX ("romFile: address " ++ show i ++
                   " not in range [0.." ++ show szI ++ ")")
   {-# INLINE safeAt #-}
-{-# NOINLINE romFile# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE romFile# #-}
 {-# ANN romFile# hasBlackBox #-}

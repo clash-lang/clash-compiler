@@ -3,6 +3,8 @@ Copyright  :  (C) 2022, Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
+{-# LANGUAGE CPP #-}
+
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module DynamicClocks where
@@ -16,7 +18,8 @@ createDomain vSystem{vName="Dynamic", vPeriod=1000}
 
 counter :: KnownDomain dom => Clock dom -> Reset dom -> Enable dom -> Signal dom Int
 counter clk rst ena = let counter0 = register clk rst ena 0 (counter0 + 1) in counter0
-{-# NOINLINE counter #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE counter #-}
 
 topEntity ::
   Clock Static ->
@@ -24,7 +27,8 @@ topEntity ::
   Signal Static Int
 topEntity clkStatic clkDyn rstDyn enaDyn =
   unsafeSynchronizer clkDyn clkStatic (counter clkDyn rstDyn enaDyn)
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal Static (Bit, Int)
 testBench = bundle (boolToBit <$> doneStatic, actual)
@@ -87,4 +91,5 @@ testBench = bundle (boolToBit <$> doneStatic, actual)
   rstDynamic = resetGen @"Dynamic"
 
   enaDynamic = enableGen @"Dynamic"
-{-# NOINLINE testBench #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBench #-}

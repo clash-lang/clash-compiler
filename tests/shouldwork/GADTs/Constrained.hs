@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 
 module Constrained where
@@ -26,11 +27,13 @@ complementBus
   => Bus n
   -> Bus n
 complementBus (Bus bv) = Bus (complement bv)
-{-# NOINLINE complementBus #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE complementBus #-}
 
 topEntity :: Bus 5 -> Bus 5
 topEntity = complementBus
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module DontTranslate where
 
 import Clash.Prelude
@@ -9,7 +11,8 @@ primitive
 primitive i =
   (i+5)
 
-{-# NOINLINE primitive #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE primitive #-}
 {-# ANN primitive dontTranslate #-}
 
 topEntity = primitive

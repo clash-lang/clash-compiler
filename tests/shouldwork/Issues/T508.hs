@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module T508 where
@@ -16,10 +17,12 @@ data AB = A | B
 ab :: KnownNat n => Index n -> AB -> AB
 ab n A = if n >  0 then A else B
 ab n B = if n == 0 then B else A
-{-# NOINLINE ab #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE ab #-}
 
 topEntity = ab @1
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testPath :: FilePath
 testPath = "tests/shouldwork/Issues/T508.hs"

@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module VRotate where
 
 import Clash.Prelude
@@ -5,7 +7,8 @@ import Clash.Explicit.Testbench
 
 topEntity :: Vec 5 Int -> (Vec 5 Int,Vec 5 Int)
 topEntity v = (rotateLeftS v d2,rotateRightS v d2)
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

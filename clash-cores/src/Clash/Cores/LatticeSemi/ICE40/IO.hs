@@ -8,11 +8,12 @@
   <http://www.latticesemi.com/~/media/LatticeSemi/Documents/TechnicalBriefs/SBTICETechnologyLibrary201504.pdf LATTICE ICE Technology Library>,
   referred to as LITL.
 -}
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Clash.Cores.LatticeSemi.ICE40.IO
   ( sbio
@@ -230,7 +231,8 @@ sbio pinConf pkgPinIn latchInput dOut_0 _dOut_1 outputEnable0 =
     writeToBiSignal
       pkgPinIn
       (toMaybe <$> outputEnable1 <*> pkgPinWriteInput)
-{-# NOINLINE sbio #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE sbio #-}
 {-# ANN sbio hasBlackBox #-}
 {-# ANN sbio (InlineYamlPrimitive [VHDL,Verilog,SystemVerilog] [__i|
    BlackBox:

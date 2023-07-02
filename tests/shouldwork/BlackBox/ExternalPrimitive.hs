@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 
 module ExternalPrimitive where
@@ -12,12 +13,14 @@ import Clash.Annotations.Primitive (hasBlackBox)
 
 jsonPrim :: Int
 jsonPrim = 0
-{-# NOINLINE jsonPrim #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE jsonPrim #-}
 {-# ANN jsonPrim hasBlackBox #-}
 
 yamlPrim :: Int
 yamlPrim = 1
-{-# NOINLINE yamlPrim #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE yamlPrim #-}
 {-# ANN yamlPrim hasBlackBox #-}
 
 topEntity :: Vec _ Int

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
 module Register where
 
@@ -27,7 +28,8 @@ verilog_register clk (unsafeToHighPolarity -> arst) x = [verilog|
       end
     end
   |]
-{-# NOINLINE verilog_register #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE verilog_register #-}
 
 topEntity
   :: Clock System

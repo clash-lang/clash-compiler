@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module T1102A where
 
 import Clash.Prelude
@@ -11,7 +13,8 @@ topEntity
   :: (Signal System Int, Signal System Int)
   -> Signal System (Int, Int)
 topEntity = bundle
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 assertIn :: String -> String -> IO ()
 assertIn needle haystack

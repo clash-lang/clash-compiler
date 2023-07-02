@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module T1556 where
 
 import Clash.Prelude
@@ -14,7 +16,8 @@ topEntity clk rst en = o2
         o1 = withClockResetEnable clk rst enMerged $ register 1 $ succ <$> o1
         o2 = CEP.register clk rst enMerged 0 o1
         enMerged = CEP.andEnable en (pure True)
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

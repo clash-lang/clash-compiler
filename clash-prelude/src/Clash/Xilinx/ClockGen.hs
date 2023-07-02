@@ -7,6 +7,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 PLL and other clock-related components for Xilinx FPGAs
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 
@@ -47,7 +48,8 @@ clockWizard
   -> (Clock domOut, Signal domOut Bool)
   -- ^ (Stable PLL clock, PLL lock)
 clockWizard !_ = clocks
-{-# NOINLINE clockWizard #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE clockWizard #-}
 {-# ANN clockWizard hasBlackBox #-}
 
 -- | A clock source that corresponds to the Xilinx MMCM component created
@@ -84,5 +86,6 @@ clockWizardDifferential !_ clk@(Clock _ Nothing) (Clock _ Nothing) =
   clocks clk
 clockWizardDifferential !_ _ _ =
   error "clockWizardDifferential: dynamic clocks not supported"
-{-# NOINLINE clockWizardDifferential #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE clockWizardDifferential #-}
 {-# ANN clockWizardDifferential hasBlackBox #-}

@@ -18,6 +18,7 @@ generates practically the same HDL as "Clash.Explicit.BlockRam" and is
 compatible with all tools consuming the generated HDL.
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeApplications #-}
@@ -232,7 +233,8 @@ blockRamBlob# !_ gen content@MemBlob{} = \rd wen waS wd -> runST $ do
        in forM_ [0..(szI-1)] (\j -> unsafeWriteSTArray s j d)
   {-# INLINE safeUpdate #-}
 {-# ANN blockRamBlob# hasBlackBox #-}
-{-# NOINLINE blockRamBlob# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE blockRamBlob# #-}
 
 -- | Create a 'MemBlob' binding from a list of values
 --

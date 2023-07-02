@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 
 module RegisterAE where
@@ -53,7 +54,8 @@ topEntityAE clk rst = topEntity clk arst en
   where
     arst = unsafeFromHighPolarity (resetInput clk rst enableGen)
     en = toEnable (enableInput clk rst enableGen)
-{-# NOINLINE topEntityAE #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntityAE #-}
 
 -- | Doing this case inline trips GHC 8.4 due to dead code. We sometimes
 -- want to run our whole testsuite with a different System domain though, so

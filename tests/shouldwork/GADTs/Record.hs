@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -31,13 +32,15 @@ instance ShowX (Foo Int) where
 succIntChar :: Foo a -> Foo a
 succIntChar (Foo chr dt int) =
   Foo (succ chr) dt (succ int)
-{-# NOINLINE succIntChar #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE succIntChar #-}
 
 topEntity :: Foo Int -> Foo Int
 topEntity foo = Foo chr (succ <$> dt) int
   where
     Foo chr dt int = succIntChar foo
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
@@ -48,4 +51,5 @@ testBench = done
     done           = expectedOutput (topEntity <$> testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen
-{-# NOINLINE testBench #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBench #-}

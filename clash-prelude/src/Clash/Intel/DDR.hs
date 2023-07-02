@@ -54,7 +54,8 @@ altddioIn
   -> Signal slow (BitVector m,BitVector m)
   -- ^ normal speed output pairs
 altddioIn _devFam clk rst en = withFrozenCallStack ddrIn# clk rst en 0 0 0
-{-# NOINLINE altddioIn #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE altddioIn #-}
 {-# ANN altddioIn hasBlackBox #-}
 
 -- | Intel specific variant of 'ddrOut' implemented using the ALTDDIO_OUT IP core.
@@ -97,5 +98,6 @@ altddioOut#
   -> Signal slow (BitVector m)
   -> Signal fast (BitVector m)
 altddioOut# _ clk rst en = ddrOut# clk rst en 0
-{-# NOINLINE altddioOut# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE altddioOut# #-}
 {-# ANN altddioOut# hasBlackBox #-}

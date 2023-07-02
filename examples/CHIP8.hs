@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving, DerivingStrategies #-}
 {-# LANGUAGE RecordWildCards #-}
 module CHIP8 where
@@ -11,7 +12,8 @@ import Data.Word
 import Control.Monad.RWS
 import Data.Monoid
 
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 topEntity
     :: Clock System
     -> Reset System

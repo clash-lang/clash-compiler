@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 module I2C.BitMaster.BusCtrl where
 
@@ -40,7 +41,8 @@ busStartState
   , _cmdStop        = False              -- STOP command
   }
 
-{-# NOINLINE busStatusCtrl #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE busStatusCtrl #-}
 busStatusCtrl :: Bool
               -> Bool
               -> Unsigned 16

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 module DFold2 where
 
@@ -7,7 +8,8 @@ import Data.Proxy
 
 topEntity :: Vec 4 (Vec 4 (Unsigned 8)) -> Vec 4 (Vec 4 (Unsigned 8))
 topEntity = smap (flip rotateRightS)
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

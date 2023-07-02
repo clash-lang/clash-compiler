@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 
 module MonomorphicTopEntity where
@@ -12,11 +13,13 @@ data STy ty where
 sty :: STy ty -> ty
 sty (SBool b) = not b
 sty (SInt16 i) = i + 1
-{-# NOINLINE sty #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE sty #-}
 
 topEntity :: STy (Signed 16) -> Signed 16
 topEntity = sty
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

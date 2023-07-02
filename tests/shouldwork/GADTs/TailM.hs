@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module TailM where
 
 import Clash.Prelude
@@ -5,11 +7,13 @@ import Clash.Explicit.Testbench
 
 tail' :: Vec 3 (Signed 16) -> Vec 2 (Signed 16)
 tail' (Cons x xs) = xs
-{-# NOINLINE tail' #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE tail' #-}
 
 topEntity :: Vec 3 (Signed 16) -> Vec 2 (Signed 16)
 topEntity = tail'
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
