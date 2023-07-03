@@ -127,7 +127,8 @@ textract (RLeaf x)   = x
 #if __GLASGOW_HASKELL__ != 902
 textract (RBranch _ _) = error $ "textract: nodes hold no values"
 #endif
-{-# NOINLINE textract #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE textract #-}
 {-# ANN textract hasBlackBox #-}
 
 tsplit :: RTree (d+1) a -> (RTree d a,RTree d a)
@@ -135,7 +136,8 @@ tsplit (RBranch l r) = (l,r)
 #if __GLASGOW_HASKELL__ != 902
 tsplit (RLeaf _)   = error $ "tsplit: leaf is atomic"
 #endif
-{-# NOINLINE tsplit #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE tsplit #-}
 {-# ANN tsplit hasBlackBox #-}
 
 -- | RLeaf of a perfect depth tree
@@ -388,7 +390,8 @@ tdfold _ f g = go SNat
     go _  (RLeaf a)   = f a
     go sn (RBranch l r) = let sn' = sn `subSNat` d1
                       in  g sn' (go sn' l) (go sn' r)
-{-# NOINLINE tdfold #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE tdfold #-}
 {-# ANN tdfold hasBlackBox #-}
 
 data TfoldTree (a :: Type) (f :: TyFun Nat Type) :: Type
@@ -417,7 +420,8 @@ treplicate sn a = go (toUNat sn)
     go :: UNat n -> RTree n a
     go UZero      = LR a
     go (USucc un) = BR (go un) (go un)
-{-# NOINLINE treplicate #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE treplicate #-}
 {-# ANN treplicate hasBlackBox #-}
 
 -- | \"'trepeat' @a@\" creates a tree with as many copies of /a/ as demanded by

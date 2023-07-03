@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 module I2C.BitMaster (bitMaster) where
 
@@ -60,7 +61,8 @@ bitMaster
   -> Unbundled System BitMasterI
   -> Unbundled System BitMasterO
 bitMaster = exposeClockResetEnable (mealyB bitMasterT bitMasterInit)
-{-# NOINLINE bitMaster #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE bitMaster #-}
 
 bitMasterInit = BitS { _stateMachine   = stateMachineStart
                             , _busState       = busStartState

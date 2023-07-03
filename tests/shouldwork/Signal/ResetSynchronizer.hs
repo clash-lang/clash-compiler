@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 
 module ResetSynchronizer where
@@ -58,12 +59,14 @@ polyTopEntity clk asyncRst = counter
 
 topEntityAsync :: Clock System -> Reset System -> Signal System ResetCount
 topEntityAsync = polyTopEntity @System
-{-# NOINLINE topEntityAsync #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntityAsync #-}
 {-# ANN topEntityAsync (defSyn "topEntityAsync") #-}
 
 topEntitySync :: Clock XilinxSystem -> Reset XilinxSystem -> Signal XilinxSystem ResetCount
 topEntitySync = polyTopEntity @XilinxSystem
-{-# NOINLINE topEntitySync #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntitySync #-}
 {-# ANN topEntitySync (defSyn "topEntitySync") #-}
 
 -- | Doing this case inline trips GHC 8.4 due to dead code. We sometimes
@@ -91,10 +94,12 @@ polyTestBench top = (done, sampleN 20 (top cClk cRst))
 
 testBenchAsync :: Signal System Bool
 testBenchAsync = fst (polyTestBench topEntityAsync)
-{-# NOINLINE testBenchAsync #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBenchAsync #-}
 {-# ANN testBenchAsync (TestBench 'topEntityAsync) #-}
 
 testBenchSync :: Signal System Bool
 testBenchSync = fst (polyTestBench topEntitySync)
-{-# NOINLINE testBenchSync #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBenchSync #-}
 {-# ANN testBenchSync (TestBench 'topEntitySync) #-}

@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Lambda where
 
 -- Test if Clash will try to reduce "myConstant" to a constant even though it
@@ -13,18 +15,21 @@ type VecSize = 32
 
 g :: Bool -> Vec (n + 1) Int -> Vec (n + 1) Int
 g b xs = (+ 1) (head xs) :> tail xs
-{-# NOINLINE g #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE g #-}
 
 myConstant :: Bool -> Vec VecSize Int
 myConstant b = g b (map (+1) (repeat 3))
-{-# NOINLINE myConstant #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE myConstant #-}
 
 topEntity
   :: SystemClockResetEnable
   => Signal System (Vec VecSize Int)
   -> Signal System (Vec VecSize Int)
 topEntity = register (myConstant True)
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
@@ -34,4 +39,5 @@ testBench = done
     done           = expectedOutput (exposeClockResetEnable topEntity clk rst enableGen testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen
-{-# NOINLINE testBench #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBench #-}

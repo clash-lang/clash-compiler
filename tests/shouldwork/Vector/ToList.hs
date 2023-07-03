@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module ToList where
 
 import Clash.Prelude
@@ -6,7 +8,8 @@ import qualified Data.List as L
 
 topEntity :: Vec 3 Int -> Int
 topEntity xs = L.foldr (+) 0 (toList xs)
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

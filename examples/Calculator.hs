@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Calculator where
 
 import Clash.Prelude hiding (Word)
@@ -44,7 +46,8 @@ topEntity = exposeClockResetEnable go where
     (addr,val) = (pu alu <^> (0,0,0 :: Unsigned 3)) (mem,i)
     mem        = (datamem <^> initMem) (addr,val)
     initMem    = replicate d8 0
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Async where
 
 import Clash.Explicit.Prelude
@@ -8,7 +10,8 @@ topEntity
   -> Signal System (Unsigned 8)
 topEntity = fmap (asyncRomPow2 content)
  where content = $(listToVecTH [1 :: Unsigned 8 .. 16])
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
@@ -20,4 +23,5 @@ testBench = done
     clk = tbSystemClockGen (not <$> done)
     rst = systemResetGen
     en = enableGen
-{-# NOINLINE testBench #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBench #-}

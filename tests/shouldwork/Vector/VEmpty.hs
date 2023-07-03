@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module VEmpty where
 
 import Clash.Prelude
@@ -9,11 +11,13 @@ topEntity
   -> Signal System Int
 topEntity x =
   delayBy (SNat @2) x
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 delayBy n signal =
   foldr (\_ s -> s + 10) signal (replicate n ())
-{-# NOINLINE delayBy #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE delayBy #-}
 
 testBench :: Signal System Bool
 testBench = done

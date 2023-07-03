@@ -45,6 +45,7 @@ acknowledge, valid, or programmable full\/empty flags)
 Vivado 2022.1.)
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -253,7 +254,8 @@ dcFifo DcConfig{..} wClk wRst rClk rRst writeData rEnable =
             Seq.EmptyR -> (q, deepErrorX "FIFO empty", True :- preUnder)
             qData Seq.:> qDatum -> (qData, qDatum, False :- preUnder)
         else (q, deepErrorX "Enable off", False :- preUnder)
-{-# NOINLINE dcFifo #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE dcFifo #-}
 {-# ANN dcFifo (
    let primName = 'dcFifo
        tfName = 'dcFifoBBF

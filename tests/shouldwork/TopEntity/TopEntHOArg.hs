@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module TopEntHOArg where
 
 import Clash.Prelude
@@ -8,7 +10,8 @@ f :: Bit
   -> (Bit,Bool,Maybe Bit,(Bit, Bool),Bool)
 f z (a,b,c) d = (z,a,c,b,d)
 {-# ANN f Synthesize {t_name = "f", t_inputs = [PortName "z",PortProduct "" []], t_output = PortProduct "" []} #-}
-{-# NOINLINE f #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE f #-}
 
 g
   :: Bit

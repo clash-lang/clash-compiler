@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Unconcat where
 
 import Clash.Prelude
@@ -5,7 +7,8 @@ import Clash.Explicit.Testbench
 
 topEntity :: Vec 6 (Unsigned 8) -> Vec 2 (Vec 3 (Unsigned 8))
 topEntity = unconcatI
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

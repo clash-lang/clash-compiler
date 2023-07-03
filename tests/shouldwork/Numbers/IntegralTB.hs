@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module IntegralTB where
 import Clash.Prelude
 import Clash.Explicit.Testbench
@@ -6,7 +8,8 @@ import qualified Integral
 expected = $(lift $ map Integral.topEntity $ Integral.inputs)
 
 topEntity = Integral.topEntity
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

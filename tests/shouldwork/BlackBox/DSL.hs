@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -35,7 +36,8 @@ funcTF = N.TemplateFunction [] (const True) $ \bbCtx -> do
 func :: Maybe a -> (Bit, a)
 func Nothing = (0, errorX "no data")
 func (Just a) = (0, a)
-{-# NOINLINE func #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE func #-}
 {-# ANN func (InlineYamlPrimitive [minBound..maxBound] [i|
 BlackBoxHaskell:
     name: DSL.func

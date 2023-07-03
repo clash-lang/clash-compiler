@@ -4,6 +4,8 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP #-}
+
 module Signum where
 
 import Clash.Prelude
@@ -13,7 +15,8 @@ topEntity
   :: (Integer, Int, Index 5, Signed 5)
   -> (Integer, Int, Index 5, Signed 5)
 topEntity (a, b, c, d) = (signum a, signum b, signum c, signum d)
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

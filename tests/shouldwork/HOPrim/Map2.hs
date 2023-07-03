@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Map2 where
 
 import Clash.Prelude
@@ -13,7 +15,8 @@ topEntity
   -> Signal System (Vec 4 Bool)
 topEntity =
   bundle . fmap go . unbundle
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 
 testBench :: SystemClockResetEnable => Signal System Bool

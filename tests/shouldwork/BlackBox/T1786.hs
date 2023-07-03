@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 module T1786 where
 
 import           Clash.Prelude
@@ -10,14 +11,16 @@ import           Data.String.Interpolate (__i)
 
 testEnable :: Signal System Bool
 testEnable = testAlwaysEnabled enableGen
-{-# NOINLINE testEnable #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testEnable #-}
 
 -- Only call with always-enabled Enable if you want the model to match the HDL.
 testAlwaysEnabled
   :: Enable System
   -> Signal System Bool
 testAlwaysEnabled !_ = pure True
-{-# NOINLINE testAlwaysEnabled #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testAlwaysEnabled #-}
 {-# ANN testAlwaysEnabled (InlinePrimitive [VHDL] [__i|
   [ { "BlackBox" :
       { "name"      : "T1786.testAlwaysEnabled"
@@ -34,19 +37,22 @@ testEnableTB = done
   done = outputVerifier' clk rst (True :> Nil) testEnable
   clk  = tbSystemClockGen (not <$> done)
   rst  = systemResetGen
-{-# NOINLINE testEnableTB #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testEnableTB #-}
 {-# ANN testEnableTB (TestBench 'testEnable) #-}
 
 testBool :: Signal System Bool
 testBool = testAlwaysEnabledBool (pure True)
-{-# NOINLINE testBool #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBool #-}
 
 -- Only call with always-true input if you want the model to match the HDL.
 testAlwaysEnabledBool
   :: Signal System Bool
   -> Signal System Bool
 testAlwaysEnabledBool !_ = pure True
-{-# NOINLINE testAlwaysEnabledBool #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testAlwaysEnabledBool #-}
 {-# ANN testAlwaysEnabledBool (InlinePrimitive [VHDL] [__i|
   [ { "BlackBox" :
       { "name"      : "T1786.testAlwaysEnabledBool"
@@ -64,5 +70,6 @@ testBoolTB = done
   done = outputVerifier' clk rst (True :> Nil) testBool
   clk  = tbSystemClockGen (not <$> done)
   rst  = systemResetGen
-{-# NOINLINE testBoolTB #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBoolTB #-}
 {-# ANN testBoolTB (TestBench 'testBool) #-}

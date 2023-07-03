@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-# OPTIONS_GHC -fno-strictness #-}
 module Disjunction where
 
@@ -16,7 +18,8 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
 f x y = x || y
-{-# NOINLINE f #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE f #-}
 
 topEntity (x :: Bool) = f (let y :: Bool = y in y) False
 

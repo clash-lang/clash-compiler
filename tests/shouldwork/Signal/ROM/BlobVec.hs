@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module BlobVec where
 
 import Clash.Explicit.Prelude
@@ -14,7 +16,8 @@ topEntity clk addr = bundle $ romBlob clk enableGen <$> blobs <*> pure addr
           :> $(memBlobTH Nothing [17 :: BitVector 8 .. 31])
           :> $(memBlobTH Nothing [33 :: BitVector 8 .. 47])
           :> Nil
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
@@ -33,4 +36,5 @@ testBench = done
     clk = tbSystemClockGen (not <$> done)
     rst = systemResetGen
     en = enableGen
-{-# NOINLINE testBench #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBench #-}

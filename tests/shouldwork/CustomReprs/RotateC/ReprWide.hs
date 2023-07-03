@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module ReprWide
   ( topEntity
   , testBench
@@ -32,8 +34,10 @@ import qualified RotateC
 
 topEntity :: Top
 topEntity = RotateC.topEntity
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = tb topEntity
-{-# NOINLINE testBench #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBench #-}

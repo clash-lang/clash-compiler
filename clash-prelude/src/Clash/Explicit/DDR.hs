@@ -135,7 +135,8 @@ ddrIn# (Clock _ Nothing) (unsafeToHighPolarity -> hRst) (fromEnable -> ena) i0 i
 
 ddrIn# _ _ _ _ _ _ =
   error "ddrIn#: dynamic clocks not supported"
-{-# NOINLINE ddrIn# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE ddrIn# #-}
 {-# ANN ddrIn# hasBlackBox #-}
 
 -- | DDR output primitive
@@ -185,5 +186,6 @@ ddrOut# clk rst en i0 xs ys =
     xs' = register# clk rst en (errorX "ddrOut: unreachable error") i0 xs
     ys' = register# clk rst en (deepErrorX "ddrOut: initial value undefined") i0 ys
     zipSig (a :- as) (b :- bs) = a :- b :- zipSig as bs
-{-# NOINLINE ddrOut# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE ddrOut# #-}
 {-# ANN ddrOut# hasBlackBox #-}

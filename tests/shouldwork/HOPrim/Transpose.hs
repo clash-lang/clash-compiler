@@ -1,10 +1,13 @@
+{-# LANGUAGE CPP #-}
+
 module Transpose where
 
 import Clash.Prelude
 import Clash.Explicit.Testbench
 
 topEntity = transposeV
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 transposeV :: Vec 3 (Vec 4 Int) -> Vec 4 (Vec 3 Int)
 transposeV = sequenceA

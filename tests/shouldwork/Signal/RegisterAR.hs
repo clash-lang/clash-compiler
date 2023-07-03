@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 
 module RegisterAR where
@@ -35,7 +36,8 @@ topEntity clk rst = head <$> r
 topEntityAR clk rst = topEntity clk arst
   where
     arst = unsafeFromHighPolarity (resetInput clk rst enableGen)
-{-# NOINLINE topEntityAR #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntityAR #-}
 
 -- | Doing this case inline trips GHC 8.4 due to dead code. We sometimes
 -- want to run our whole testsuite with a different System domain though, so

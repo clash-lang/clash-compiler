@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 
 module MutuallyRecursive where
@@ -34,7 +35,8 @@ hdlSimTest n topEntity testInput expectedOutput = done
         withSpecificClockResetEnable tbClk tbRst tbEn expectedOutput
 
     done = expectedOutput' (topEntity' testInput')
-{-# NOINLINE hdlSimTest #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE hdlSimTest #-}
 
 testBench :: Signal System Bool
 testBench = done

@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module T2046 where
 
 import Clash.Prelude
@@ -19,7 +21,8 @@ topBit
   -> Int
   -> Int
 topBit = topGeneric (Proxy @Bit)
-{-# NOINLINE topBit #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topBit #-}
 {-# ANN topBit (defSyn "top_bit") #-}
 
 topBitVector
@@ -27,7 +30,8 @@ topBitVector
   -> Int
   -> Int
 topBitVector = topGeneric (Proxy @(BitVector 3))
-{-# NOINLINE topBitVector #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topBitVector #-}
 {-# ANN topBitVector (defSyn "top_bitvector") #-}
 
 topIndex
@@ -35,7 +39,8 @@ topIndex
   -> Int
   -> Int
 topIndex = topGeneric (Proxy @(Index 5))
-{-# NOINLINE topIndex #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topIndex #-}
 {-# ANN topIndex (defSyn "top_index") #-}
 
 topSigned
@@ -43,7 +48,8 @@ topSigned
   -> Int
   -> Int
 topSigned = topGeneric (Proxy @(Signed 4))
-{-# NOINLINE topSigned #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topSigned #-}
 {-# ANN topSigned (defSyn "top_signed") #-}
 
 topUnsigned
@@ -51,5 +57,6 @@ topUnsigned
   -> Int
   -> Int
 topUnsigned = topGeneric (Proxy @(Unsigned 3))
-{-# NOINLINE topUnsigned #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topUnsigned #-}
 {-# ANN topUnsigned (defSyn "top_unsigned") #-}

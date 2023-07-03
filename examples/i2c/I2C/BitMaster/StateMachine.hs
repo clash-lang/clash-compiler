@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 module I2C.BitMaster.StateMachine where
 
@@ -37,7 +38,8 @@ stateMachineStart
   , _bitStateM = Idle
   }
 
-{-# NOINLINE bitStateMachine #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE bitStateMachine #-}
 bitStateMachine :: Bool
                 -> Bool
                 -> Bool

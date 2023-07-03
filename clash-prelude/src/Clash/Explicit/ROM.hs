@@ -10,6 +10,7 @@ ROMs
 -}
 
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -139,5 +140,6 @@ rom# !_ en content =
         (deepErrorX ("rom: address " ++ show i ++
                      " not in range [0.." ++ show szI ++ ")"))
   {-# INLINE safeAt #-}
-{-# NOINLINE rom# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE rom# #-}
 {-# ANN rom# hasBlackBox #-}

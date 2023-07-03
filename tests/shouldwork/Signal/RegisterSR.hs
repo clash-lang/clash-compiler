@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module RegisterSR where
 
 -- Register: Synchronous, Regular
@@ -33,7 +35,8 @@ topEntity clk rst = head <$> r
 topEntitySR clk rst = topEntity clk srst
   where
     srst = unsafeFromHighPolarity (resetInput clk rst enableGen)
-{-# NOINLINE topEntitySR #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntitySR #-}
 
 testBench :: Signal System Bool
 testBench = done

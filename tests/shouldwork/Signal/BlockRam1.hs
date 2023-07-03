@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module BlockRam1 where
 
 import Clash.Prelude
@@ -32,7 +34,8 @@ topEntity = exposeClockResetEnable go where
         (3 :: Unsigned 8)
         rd
         wr
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

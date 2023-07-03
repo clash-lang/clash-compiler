@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module VIO where
@@ -22,7 +23,8 @@ type Dom = XilinxSystem
 
 top :: "result" ::: Unsigned 8
 top = 0
-{-# NOINLINE top #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE top #-}
 
 makeTopEntity 'top
 

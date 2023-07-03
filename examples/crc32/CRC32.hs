@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module CRC32 where
 
 import Clash.Prelude
@@ -26,7 +28,8 @@ topEntity
   -> Enable System
   -> Signal System (BitVector 8) -> Signal System (Unsigned 32)
 topEntity = exposeClockResetEnable (fmap unpack . crc32)
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 -- test bench
 testBench :: Signal System Bool
@@ -38,4 +41,3 @@ testBench = done
     done           = expectedOutput (topEntity clk rst enableGen testInput)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen
-

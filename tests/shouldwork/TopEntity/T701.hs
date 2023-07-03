@@ -1,7 +1,10 @@
+{-# LANGUAGE CPP #-}
+
 module T701 where
 
 import Clash.Prelude
-{-# NOINLINE myNot #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE myNot #-}
 {-# ANN myNot (defSyn "mynot") #-}
 myNot = not
 

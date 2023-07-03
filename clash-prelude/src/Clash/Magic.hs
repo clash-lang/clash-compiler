@@ -16,6 +16,8 @@ Refer to "Clash.Annotations.TopEntity" for controlling naming of entities
 (VHDL) / modules ((System)Verilog) and their ports.
 -}
 
+{-# LANGUAGE CPP #-}
+
 module Clash.Magic
   (
   -- ** Functions to control names of identifiers in HDL
@@ -45,19 +47,22 @@ import Clash.Annotations.Primitive (hasBlackBox)
 prefixName
   :: forall (name :: Symbol) a . a -> name ::: a
 prefixName = id
-{-# NOINLINE prefixName #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE prefixName #-}
 
 -- | Suffix instance and register names with the given 'Symbol'
 suffixName
   :: forall (name :: Symbol) a . a -> name ::: a
 suffixName = id
-{-# NOINLINE suffixName #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE suffixName #-}
 
 -- | Suffix instance and register names with the given 'Nat'
 suffixNameFromNat
   :: forall (name :: Nat) a . a -> name ::: a
 suffixNameFromNat = id
-{-# NOINLINE suffixNameFromNat #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE suffixNameFromNat #-}
 
 -- | Suffix instance and register names with the given 'Symbol', but add it
 -- in front of other suffixes.
@@ -80,7 +85,8 @@ suffixNameFromNat = id
 suffixNameP
   :: forall (name :: Symbol) a . a -> name ::: a
 suffixNameP = id
-{-# NOINLINE suffixNameP #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE suffixNameP #-}
 
 -- | Suffix instance and register names with the given 'Nat', but add it in
 -- front of other suffixes.
@@ -103,7 +109,8 @@ suffixNameP = id
 suffixNameFromNatP
   :: forall (name :: Nat) a . a -> name ::: a
 suffixNameFromNatP = id
-{-# NOINLINE suffixNameFromNatP #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE suffixNameFromNatP #-}
 
 -- | Name the instance or register with the given 'Symbol', instead of using
 -- an auto-generated name. Pre- and suffixes annotated with 'prefixName' and
@@ -112,7 +119,8 @@ suffixNameFromNatP = id
 setName
   :: forall (name :: Symbol) a . a -> name ::: a
 setName = id
-{-# NOINLINE setName #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE setName #-}
 
 -- | Name a given term, such as one of type 'Clash.Signal.Signal', using the
 -- given 'SSymbol'. Results in a declaration with the name used as the
@@ -131,7 +139,8 @@ nameHint
   -- ^ A hint for a name
   -> a -> a
 nameHint = seq
-{-# NOINLINE nameHint #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE nameHint #-}
 {-# ANN nameHint hasBlackBox #-}
 
 -- | Force deduplication, i.e. share a function or operator between multiple
@@ -178,7 +187,8 @@ nameHint = seq
 deDup
   :: forall a . a -> a
 deDup = id
-{-# NOINLINE deDup #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE deDup #-}
 
 -- | Do not deduplicate, i.e. /keep/, an applied function inside a
 -- case-alternative; do not try to share the function between multiple
@@ -237,12 +247,14 @@ deDup = id
 noDeDup
   :: forall a . a -> a
 noDeDup = id
-{-# NOINLINE noDeDup #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE noDeDup #-}
 
 -- | 'True' in Haskell/Clash simulation. Replaced by 'False' when generating HDL.
 clashSimulation :: Bool
 clashSimulation = True
-{-# NOINLINE clashSimulation #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE clashSimulation #-}
 
 -- | A container for data you only want to have around during simulation and
 -- is ignored during synthesis. Useful for carrying around things such as:

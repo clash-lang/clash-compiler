@@ -7,6 +7,7 @@
 -}
 
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -157,7 +158,8 @@ updateRam addr (IsDefined byteEna) dat mem
   isDefinedMaxBound _        = False
 
 {-# ANN tdpbram# hasBlackBox #-}
-{-# NOINLINE tdpbram# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE tdpbram# #-}
 {-# ANN tdpbram# (
    let
      primName = 'tdpbram#

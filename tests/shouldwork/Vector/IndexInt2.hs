@@ -1,5 +1,7 @@
 -- This tests the special, verlog only, code-path for index_int,
 -- which generates special verilog when the index is constant.
+{-# LANGUAGE CPP #-}
+
 module IndexInt2 where
 
 import qualified Prelude as P
@@ -22,7 +24,8 @@ topEntity xs ix0 =
   where
     ix1 :: Signed 8
     ix1 = fold (+) (1 :> (-1) :> 1 :> Nil)
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

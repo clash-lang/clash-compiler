@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -17,7 +18,8 @@ data ABCD = A | B | C | D
 
 twice :: Int -> Int
 twice a = 2 * a
-{-# NOINLINE twice #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE twice #-}
 
 -- | 'f' should have one call to twice in the netlist
 f :: Int -> ABCD -> Int
@@ -27,7 +29,8 @@ f n abcd =
     B -> 5 + n
     C -> n - 3
     D -> twice (3 + n)
-{-# NOINLINE f #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE f #-}
 
 -- | 'g' should have two calls to twice in the netlist
 g :: Int -> ABCD -> Int
@@ -37,7 +40,8 @@ g n abcd =
     B -> 5 + n
     C -> n - 3
     D -> noDeDup (twice (3 + n))
-{-# NOINLINE g #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE g #-}
 
 topEntity :: Int -> ABCD -> Int
 topEntity n abcd = (f n abcd) - (g n abcd)

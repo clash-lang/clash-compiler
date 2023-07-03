@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 
 module ResetLow where
@@ -36,7 +37,8 @@ topEntity clk rst en = head <$> r
 topEntity1 clk rst = topEntity clk arst enableGen
   where
     arst = unsafeToReset (resetInput clk rst enableGen)
-{-# NOINLINE topEntity1 #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity1 #-}
 
 -- | Doing this case inline trips GHC 8.4 due to dead code. We sometimes
 -- want to run our whole testsuite with a different System domain though, so

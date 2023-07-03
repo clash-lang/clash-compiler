@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module T2325f where
@@ -18,7 +19,8 @@ import qualified Data.List as L
 
 f :: Unsigned 8 -> Unsigned 8
 f = g . h
-{-# NOINLINE f #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE f #-}
 {-# ANN f (defSyn "f") #-}
 
 assertBool :: HasCallStack => Bool -> IO ()

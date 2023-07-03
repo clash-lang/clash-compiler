@@ -77,6 +77,12 @@ common basic-config
     clash-lib,
     clash-prelude
 
+  -- See https://github.com/clash-lang/clash-compiler/pull/2511
+  if impl(ghc >= 9.4)
+    CPP-Options: -DCLASH_OPAQUE=OPAQUE
+  else
+    CPP-Options: -DCLASH_OPAQUE=NOINLINE
+
   if flag(cosim)
     build-depends:     clash-cosim
 

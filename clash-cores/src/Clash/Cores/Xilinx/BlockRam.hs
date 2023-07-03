@@ -6,6 +6,8 @@
   Xilinx block RAM primitives
 -}
 
+{-# LANGUAGE CPP #-}
+
 -- See [Note: eta port names for tdpbram]
 {-# OPTIONS_GHC -fno-do-lambda-eta-expansion #-}
 
@@ -76,4 +78,5 @@ tdpbram clkA enA addrA byteEnaA datA clkB enB addrB byteEnaB datB =
       clashCompileError "tdpbram: domain A needs a rising active edge"
     (_, SFalling) ->
       clashCompileError "tdpbram: domain B needs a rising active edge"
-{-# NOINLINE tdpbram #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE tdpbram #-}

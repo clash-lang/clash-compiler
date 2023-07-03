@@ -4,6 +4,8 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP #-}
+
 module BitInteger where
 
 import Clash.Prelude
@@ -13,7 +15,8 @@ import Data.Bits
 
 topEntity :: Int -> Integer
 topEntity = bit
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

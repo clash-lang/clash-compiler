@@ -1,4 +1,5 @@
 {-# LANGUAGE Arrows #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 
 module T990 (topEntity, testBench) where
@@ -42,7 +43,8 @@ topEntity
     -> Signal System Bool
     -> Signal System Bool
 topEntity = exposeClock $ runSA risingEdgeA
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module TB where
 
 import Clash.Prelude
@@ -12,7 +14,8 @@ topEntity
   -> Enable System
   -> Signal System Inp -> Signal System Outp
 topEntity = exposeClockResetEnable (transfer `mealy` initS)
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 transfer s i = (i,o)
   where

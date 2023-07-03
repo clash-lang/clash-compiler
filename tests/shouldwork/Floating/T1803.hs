@@ -1,5 +1,6 @@
-{-# LANGUAGE NumericUnderscores #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE NegativeLiterals #-}
+{-# LANGUAGE NumericUnderscores #-}
 
 module T1803 where
 
@@ -21,7 +22,8 @@ topEntity clk rst =
       d :: Signal System Double
       d = stimuliGenerator clk rst (map unpack doubleData)
   in bundle (pack <$> f, pack <$> d)
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench
   :: Signal System Bool
@@ -31,7 +33,8 @@ testBench = done
     done = expectOutput $ topEntity clk rst
     clk = tbSystemClockGen (not <$> done)
     rst = systemResetGen
-{-# NOINLINE testBench #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBench #-}
 
 {-
  - floatData should end up in the top entity as:

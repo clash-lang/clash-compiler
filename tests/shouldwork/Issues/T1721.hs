@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module T1721 where
 
 import Clash.Prelude
@@ -16,7 +18,8 @@ f :: F (T (G ()))
   -> F (T (G ()))
 f = id
 
-{-# NOINLINE f #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE f #-}
 
 topEntity :: F (T (G ()))
           -> F (T (G ()))

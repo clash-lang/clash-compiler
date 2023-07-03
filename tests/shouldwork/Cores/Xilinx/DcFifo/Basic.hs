@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Basic where
 
 import Clash.Explicit.Prelude
@@ -48,7 +50,8 @@ topEntity clk rst writeData rEnable =
     , dcOverflow=True
     , dcUnderflow=True
     }
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench ::
   Signal XilinxSystem Bool
@@ -80,7 +83,8 @@ testBench = done
   clk = tbClockGen (not <$> done)
   noRst = unsafeFromHighPolarity $ pure False
   en = enableGen
-{-# NOINLINE testBench #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBench #-}
 
 data FsmOut = FsmOut
   { fDone :: Bool

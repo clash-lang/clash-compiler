@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 module T2117 where
 
 import Clash.Prelude
@@ -9,17 +10,20 @@ import Data.String.Interpolate (__i)
 undefBV
   :: Signal System Bool
 undefBV = testUndefined @(BitVector 8) (deepErrorX "undefined value")
-{-# NOINLINE undefBV #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE undefBV #-}
 
 undefTup
   :: Signal System Bool
 undefTup = testUndefined @(Bit, Bit) (deepErrorX "undefined value")
-{-# NOINLINE undefTup #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE undefTup #-}
 
 partialDefTup
   :: Signal System Bool
 partialDefTup = testDefined @(Bit, Bit) (errorX "undefined value", 0)
-{-# NOINLINE partialDefTup #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE partialDefTup #-}
 
 testBenchG
   :: Signal System Bool
@@ -33,17 +37,20 @@ testBenchG f = done
 
 testBenchUndefBV :: Signal System Bool
 testBenchUndefBV = testBenchG undefBV
-{-# NOINLINE testBenchUndefBV #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBenchUndefBV #-}
 {-# ANN testBenchUndefBV (TestBench 'undefBV) #-}
 
 testBenchUndefTup :: Signal System Bool
 testBenchUndefTup = testBenchG undefTup
-{-# NOINLINE testBenchUndefTup #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBenchUndefTup #-}
 {-# ANN testBenchUndefTup (TestBench 'undefTup) #-}
 
 testBenchPartialDefTup :: Signal System Bool
 testBenchPartialDefTup = testBenchG partialDefTup
-{-# NOINLINE testBenchPartialDefTup #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBenchPartialDefTup #-}
 {-# ANN testBenchPartialDefTup (TestBench 'partialDefTup) #-}
 
 -- Only call with XException-argument if you want the model to match the HDL.
@@ -52,7 +59,8 @@ testUndefined
   => a
   -> Signal System Bool
 testUndefined !_ = pure True
-{-# NOINLINE testUndefined #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testUndefined #-}
 {-# ANN testUndefined (InlinePrimitive [VHDL] [__i|
   [ { "BlackBox" :
       { "name"      : "T2117.testUndefined"
@@ -70,7 +78,8 @@ testDefined
   => a
   -> Signal System Bool
 testDefined !_ = pure True
-{-# NOINLINE testDefined #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testDefined #-}
 {-# ANN testDefined (InlinePrimitive [VHDL] [__i|
   [ { "BlackBox" :
       { "name"      : "T2117.testDefined"

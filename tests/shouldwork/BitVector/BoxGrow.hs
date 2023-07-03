@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module BoxGrow where
 
 import Clash.Prelude
@@ -13,7 +15,8 @@ box0 grid =     (zeroesM :> ((zeroesN >:> grid) <:< zeroesN)) :< zeroesM
           zeroesM = replicate d8 0
 
 topEntity = box0
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

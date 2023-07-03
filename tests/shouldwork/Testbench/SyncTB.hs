@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module SyncTB where
 
 import Clash.Explicit.Testbench
@@ -43,7 +45,8 @@ topEntity clk2 clk7 clk9 i =
           clk7
           clk2
           (delay clk7 enableGen 0 i))))
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench
   :: Signal Dom9 Bool

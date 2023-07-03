@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module IndexInt where
 
 import Clash.Prelude
@@ -11,10 +13,12 @@ index_ints
   -> (Int, Int)
 index_ints (mv, mi) (nv, ni) =
   (mv !! mi, nv !! ni)
-{-# NOINLINE index_ints #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE index_ints #-}
 
 fst' ab = fst ab
-{-# NOINLINE fst' #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE fst' #-}
 
 topEntity
   :: (Vec 3 Int, Int)
@@ -22,7 +26,8 @@ topEntity
   -> Int
 topEntity (mv, mi) (nv, ni) =
   fst' (index_ints (mv, mi) (nv, ni))
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

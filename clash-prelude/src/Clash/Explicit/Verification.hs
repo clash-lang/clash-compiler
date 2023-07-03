@@ -12,6 +12,7 @@ of PSL and an introduction to the concepts of property checking, read
 The verification API is currently experimental and subject to change.
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE QuasiQuotes #-}
 
@@ -259,7 +260,8 @@ check !_clk !_rst !_propName !_renderAs !_prop =
   pure (errorX (concat [
       "Simulation for Clash.Verification not yet implemented. If you need this,"
     , " create an issue at https://github.com/clash-compiler/clash-lang/issues." ]))
-{-# NOINLINE check #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE check #-}
 {-# ANN check (InlineYamlPrimitive [Verilog, SystemVerilog, VHDL] [__i|
   BlackBoxHaskell:
     name: Clash.Explicit.Verification.check

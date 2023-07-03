@@ -131,6 +131,7 @@ can potentially introduce situations prone to meta-stability:
 
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
@@ -460,7 +461,8 @@ unsafeSynchronizer clk1 clk2 =
       ClockA  -> go ticks as
       ClockB  -> a :- go ticks ass
       ClockAB -> go (ClockB:ClockA:ticks) ass
-{-# NOINLINE unsafeSynchronizer #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE unsafeSynchronizer #-}
 {-# ANN unsafeSynchronizer hasBlackBox #-}
 
 -- | Same as 'unsafeSynchronizer', but with manually supplied clock periods.
@@ -510,7 +512,8 @@ veryUnsafeSynchronizer t1e t2e =
       ClockA  -> go ticks as
       ClockB  -> a :- go ticks ass
       ClockAB -> go (ClockB:ClockA:ticks) ass
-{-# NOINLINE veryUnsafeSynchronizer #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE veryUnsafeSynchronizer #-}
 {-# ANN veryUnsafeSynchronizer hasBlackBox #-}
 
 -- * Basic circuit functions
@@ -744,7 +747,8 @@ simulateWithReset m resetVal f as =
   clk = clockGen
   en  = enableGen
   out = simulate (f clk rst en) inp
-{-# NOINLINE simulateWithReset #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE simulateWithReset #-}
 
 -- | Same as 'simulateWithReset', but only sample the first /Int/ output values.
 simulateWithResetN
@@ -850,7 +854,8 @@ sampleWithReset
 sampleWithReset nReset f0 =
   let f1 = f0 clockGen (resetGenN @dom nReset) enableGen in
   drop (snatToNum nReset) (sample f1)
-{-# NOINLINE sampleWithReset #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE sampleWithReset #-}
 
 -- | Get a fine list of /m/ samples from a 'Signal', while asserting the reset line
 -- for /n/ clock cycles. 'sampleWithReset' does not return the first /n/ cycles,

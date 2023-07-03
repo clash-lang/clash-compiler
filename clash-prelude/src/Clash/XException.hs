@@ -150,7 +150,8 @@ xToErrorCtx ctx a = unsafeDupablePerformIO
   (catch (evaluate a >> return a)
          (\(XException msg) ->
            throw (ErrorCall (unlines [ctx,msg]))))
-{-# NOINLINE xToErrorCtx #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE xToErrorCtx #-}
 
 -- | Convert 'XException' to 'ErrorCall'
 --
@@ -220,7 +221,8 @@ xToError = xToErrorCtx (prettyCallStack callStack)
 seqX :: a -> b -> b
 seqX a b = unsafeDupablePerformIO
   (catch (evaluate a >> return b) (\(XException _) -> return b))
-{-# NOINLINE seqX #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE seqX #-}
 {-# ANN seqX hasBlackBox #-}
 infixr 0 `seqX`
 
@@ -236,7 +238,8 @@ seqErrorX a b = unsafeDupablePerformIO
      [ Handler (\(XException _) -> return b)
      , Handler (\(ErrorCall _) -> return b)
      ])
-{-# NOINLINE seqErrorX #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE seqErrorX #-}
 {-# ANN seqErrorX hasBlackBox #-}
 infixr 0 `seqErrorX`
 
@@ -255,7 +258,8 @@ infixr 0 `seqErrorX`
 -- uses 'Clash.Netlist.BlackBox.Types.RenderVoid'
 hwSeqX :: a -> b -> b
 hwSeqX = seqX
-{-# NOINLINE hwSeqX #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE hwSeqX #-}
 {-# ANN hwSeqX hasBlackBox #-}
 infixr 0 `hwSeqX`
 
@@ -328,7 +332,8 @@ hasX a =
     (catch
       (evaluate (rnf a) >> return (Right a))
       (\(XException msg) -> evaluate (rnfX a) >> return (Left msg)))
-{-# NOINLINE hasX #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE hasX #-}
 
 -- | Evaluate a value to WHNF, returning @'Left' msg@ if is a 'XException'.
 --
@@ -343,7 +348,8 @@ isX a =
     (catch
       (evaluate a >> return (Right a))
       (\(XException msg) -> return (Left msg)))
-{-# NOINLINE isX #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE isX #-}
 
 -- | Like the 'Show' class, but values that normally throw an 'XException' are
 -- converted to @undefined@, instead of error'ing out with an exception.
@@ -476,7 +482,8 @@ forceX x = x `deepseqX` x
 -- second. Does not propagate 'XException's.
 deepseqX :: NFDataX a => a -> b -> b
 deepseqX a b = rnfX a `seq` b
-{-# NOINLINE deepseqX #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE deepseqX #-}
 {-# ANN deepseqX hasBlackBox #-}
 infixr 0 `deepseqX`
 

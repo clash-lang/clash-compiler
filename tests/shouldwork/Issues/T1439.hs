@@ -2,6 +2,7 @@
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module T1439 where
@@ -27,7 +28,8 @@ rotate_right
     -- ^ Result.
 rotate_right bv =
   leToPlus @1 @n (rotate_right' bv)
-{-# NOINLINE rotate_right #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE rotate_right #-}
 
 rotate_right'
     :: forall n . (KnownNat n)
@@ -41,7 +43,8 @@ rotate_right' bool bv
     | bool      = pack b ++# (fst $ split# bv)
     | otherwise = bv
     where b = lsb bv
-{-# NOINLINE rotate_right' #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE rotate_right' #-}
 
 testPath :: FilePath
 testPath = "tests/shouldwork/Issues/T1439.hs"

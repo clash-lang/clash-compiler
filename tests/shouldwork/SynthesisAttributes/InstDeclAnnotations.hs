@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module InstDeclAnnotations where
@@ -48,7 +49,8 @@ myBlackBox
   :: Signal System Int
   -> Signal System Int
 myBlackBox _ = pure (errorX "not implemented")
-{-# NOINLINE myBlackBox #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE myBlackBox #-}
 {-# ANN myBlackBox (InlinePrimitive [VHDL,Verilog,SystemVerilog] [__i|
    [ { "BlackBox" :
         { "name" : "InstDeclAnnotations.myBlackBox",

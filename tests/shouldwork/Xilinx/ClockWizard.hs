@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -31,7 +32,8 @@ topEntity clkInN clkInP rstIn =
       o1 = f clkA rstA o1
       o2 = f clkB rstB o2
   in bundle (o1, o2)
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench ::
   Signal DomIn Bool
@@ -45,7 +47,8 @@ testBench = done
   strictAnd !a !b = a && b
   (clkP, clkN) = seClockToDiffClock $ tbClockGen (not <$> done)
   rst = resetGen
-{-# NOINLINE testBench #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE testBench #-}
 
 -- Normally we end VHDL sim by stopping the clocks; usually simulation will
 -- notice nothing can ever change anymore and end. The @clockWizard@ simulation
@@ -61,7 +64,8 @@ endVhdlSim ::
   Bool ->
   Bool
 endVhdlSim = id
-{-# NOINLINE endVhdlSim #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE endVhdlSim #-}
 {-# ANN endVhdlSim (
   let primName = 'endVhdlSim
   in InlineYamlPrimitive [VHDL] [__i|

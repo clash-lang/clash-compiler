@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 module DelayedReset where
 
@@ -28,7 +29,8 @@ topEntity clk reset en = (cycleCount, countFromReset, newResetSig)
     cycleCount :: Signal System (Unsigned 4)
     cycleCount' = cycleCount + 1
     cycleCount = register clk reset en 0 cycleCount'
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

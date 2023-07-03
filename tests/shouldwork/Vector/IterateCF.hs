@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module IterateCF where
 
 import qualified Prelude as P
@@ -21,7 +23,8 @@ topEntity = (a1, a2)
   a2 = case test of
     (_ :> _ :> s :> _) -> s == 257
     _ -> False
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 assertNotIn :: String -> String -> IO ()
 assertNotIn needle haystack

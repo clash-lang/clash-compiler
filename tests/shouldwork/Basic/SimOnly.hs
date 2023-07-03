@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module SimOnly where
 
 import Clash.Explicit.Prelude
@@ -10,7 +12,8 @@ unionIgnore (SimOnly m1) (SimOnly m2) = SimOnly (Map.unionWith (<>) m1 m2)
 
 foo :: Int -> Int -> (Int, Ignore)
 foo a b = (a+b,SimOnly (Map.fromList [("foo",[a + b])]))
-{-# NOINLINE foo #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE foo #-}
 
 bar :: Int -> Int -> (Int, Ignore)
 bar a b = (a*b,SimOnly (Map.fromList [("bar",[a * b])]))

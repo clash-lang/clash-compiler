@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 
 module ManyEntitiesEqual where
@@ -34,42 +35,50 @@ type Top n =
     => Signal System (Unsigned n)
     -> Signal System (Unsigned n)
 
-{-# NOINLINE top0 #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE top0 #-}
 {-# ANN top0 (defSyn "top_0") #-}
 top0 :: Top 64
 top0 = entity (SNat @64)
 
-{-# NOINLINE top1 #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE top1 #-}
 {-# ANN top1 (defSyn "top_1") #-}
 top1 :: Top 64
 top1 = entity (SNat @64)
 
-{-# NOINLINE top2 #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE top2 #-}
 {-# ANN top2 (defSyn "top_2") #-}
 top2 :: Top 64
 top2 = entity (SNat @64)
 
-{-# NOINLINE top3 #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE top3 #-}
 {-# ANN top3 (defSyn "top_3") #-}
 top3 :: Top 64
 top3 = entity (SNat @64)
 
-{-# NOINLINE top4 #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE top4 #-}
 {-# ANN top4 (defSyn "top_4") #-}
 top4 :: Top 64
 top4 = entity (SNat @64)
 
-{-# NOINLINE top5 #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE top5 #-}
 {-# ANN top5 (defSyn "top_5") #-}
 top5 :: Top 64
 top5 = entity (SNat @64)
 
-{-# NOINLINE top6 #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE top6 #-}
 {-# ANN top6 (defSyn "top_6") #-}
 top6 :: Top 64
 top6 = entity (SNat @64)
 
-{-# NOINLINE top7 #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE top7 #-}
 {-# ANN top7 (defSyn "top_7") #-}
 top7 :: Top 64
 top7 = entity (SNat @64)

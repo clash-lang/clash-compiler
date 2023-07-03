@@ -3,6 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -120,7 +121,8 @@ xpmCdcSingleTF# bbCtx
 
 xpmCdcSingleTF# bbCtx = error (ppShow bbCtx)
 
-{-# NOINLINE xpmCdcSingle# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE xpmCdcSingle# #-}
 {-# ANN xpmCdcSingle# hasBlackBox #-}
 {-# ANN xpmCdcSingle#
   let

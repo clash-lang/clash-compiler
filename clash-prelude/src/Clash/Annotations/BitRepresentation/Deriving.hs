@@ -924,7 +924,8 @@ buildPack dataRepr@(DataReprAnn _name _size constrs) = do
 -- This is used in the generated pack/unpack to not do anything in HDL.
 dontApplyInHDL :: (a -> b) -> a -> b
 dontApplyInHDL f a = f a
-{-# NOINLINE dontApplyInHDL #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE dontApplyInHDL #-}
 {-# ANN dontApplyInHDL hasBlackBox #-}
 
 buildUnpackField

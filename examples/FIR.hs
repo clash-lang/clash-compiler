@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module FIR where
 
 import Clash.Prelude
@@ -28,7 +30,8 @@ topEntity
   -> Signal System (Signed 16)
   -> Signal System (Signed 16)
 topEntity = exposeClockResetEnable (fir (2:>3:>(-2):>8:>Nil))
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

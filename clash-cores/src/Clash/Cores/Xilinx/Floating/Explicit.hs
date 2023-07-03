@@ -43,6 +43,7 @@ type variable for delay annotation in circuits.
 -}
 
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_HADDOCK hide #-}
@@ -107,7 +108,8 @@ addWith !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
   delayI und en clk . conditionFloatF $ x + y
  where
   und = withFrozenCallStack $ deepErrorX "Initial values of add undefined"
-{-# NOINLINE addWith #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE addWith #-}
 {-# ANN addWith (vhdlBinaryPrim 'addWith 'addTclTF "add") #-}
 {-# ANN addWith (veriBinaryPrim 'addWith 'addTclTF "add") #-}
 
@@ -145,7 +147,8 @@ subWith !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
   delayI und en clk . conditionFloatF $ x - y
  where
   und = withFrozenCallStack $ deepErrorX "Initial values of sub undefined"
-{-# NOINLINE subWith #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE subWith #-}
 {-# ANN subWith (vhdlBinaryPrim 'subWith 'subTclTF "sub") #-}
 {-# ANN subWith (veriBinaryPrim 'subWith 'subTclTF "sub") #-}
 
@@ -184,7 +187,8 @@ mulWith !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
   delayI und en clk . conditionFloatF $ x * y
  where
   und = withFrozenCallStack $ deepErrorX "Initial values of mul undefined"
-{-# NOINLINE mulWith #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE mulWith #-}
 {-# ANN mulWith (vhdlBinaryPrim 'mulWith 'mulTclTF "mul") #-}
 {-# ANN mulWith (veriBinaryPrim 'mulWith 'mulTclTF "mul") #-}
 
@@ -223,7 +227,8 @@ divWith !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
   delayI und en clk . conditionFloatF $ x / y
  where
   und = withFrozenCallStack $ deepErrorX "Initial values of div undefined"
-{-# NOINLINE divWith #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE divWith #-}
 {-# ANN divWith (vhdlBinaryPrim 'divWith 'divTclTF "div") #-}
 {-# ANN divWith (veriBinaryPrim 'divWith 'divTclTF "div") #-}
 
@@ -261,7 +266,8 @@ fromU32With
 fromU32With clk en = delayI und en clk . fmap fromIntegral
  where
   und = withFrozenCallStack $ errorX "Initial values of fromU32 undefined"
-{-# NOINLINE fromU32With #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE fromU32With #-}
 {-# ANN fromU32With (vhdlFromUPrim 'fromU32With "fromU32") #-}
 {-# ANN fromU32With (veriFromUPrim 'fromU32With "fromU32") #-}
 
@@ -298,7 +304,8 @@ fromS32With
 fromS32With clk en = delayI und en clk . fmap fromIntegral
  where
   und = withFrozenCallStack $ errorX "Initial values of fromS32 undefined"
-{-# NOINLINE fromS32With #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE fromS32With #-}
 {-# ANN fromS32With (vhdlFromSPrim 'fromS32With "fromS32") #-}
 {-# ANN fromS32With (veriFromSPrim 'fromS32With "fromS32") #-}
 
@@ -339,7 +346,8 @@ compareWith
 compareWith clk ena a b = delayI und ena clk (xilinxCompare <$> a <*> b)
  where
   und = withFrozenCallStack $ errorX "Initial values of compare undefined"
-{-# NOINLINE compareWith #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE compareWith #-}
 {-# ANN compareWith (vhdlComparePrim 'compareWith 'compareTclTF "compare") #-}
 {-# ANN compareWith (veriComparePrim 'compareWith 'compareTclTF "compare") #-}
 

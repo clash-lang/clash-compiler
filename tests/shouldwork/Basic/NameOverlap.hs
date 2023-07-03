@@ -1,8 +1,11 @@
+{-# LANGUAGE CPP #-}
+
 module NameOverlap where
 
 import Clash.Prelude
 
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 {-# ANN topEntity
   (Synthesize
     { t_name   = "nameoverlap"

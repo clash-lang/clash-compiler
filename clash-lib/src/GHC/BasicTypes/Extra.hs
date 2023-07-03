@@ -1,7 +1,8 @@
 {-|
   Copyright   :  (C) 2017, Google Inc.
+                     2023, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
@@ -32,9 +33,21 @@ instance NFData SourceText
 instance Binary SourceText
 #endif
 
+-- | Determine whether given 'InlineSpec' is NOINLINE or more strict (OPAQUE)
 isNoInline :: InlineSpec -> Bool
 isNoInline NoInline{} = True
 #if MIN_VERSION_ghc(9,4,0)
 isNoInline Opaque{} = True
 #endif
 isNoInline _ = False
+
+-- | Determine whether given 'InlineSpec' is OPAQUE. If this function is used on
+-- a GHC that does not support OPAQUE yet (<9.4), it will return 'True' if given
+-- 'InlineSpec' is NOINLINE instead.
+isOpaque :: InlineSpec -> Bool
+#if MIN_VERSION_ghc(9,4,0)
+isOpaque Opaque{} = True
+#else
+isOpaque NoInline{} = True
+#endif
+isOpaque _ = False

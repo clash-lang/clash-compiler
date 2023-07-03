@@ -2,6 +2,7 @@
 
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 module LITrendering where
 import Clash.Prelude
 import Control.Monad (when)
@@ -40,7 +41,8 @@ foo !x1
     !x17 !x18
     = False
 
-{-# NOINLINE foo #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE foo #-}
 {-# ANN foo (InlinePrimitive [Verilog] $ [I.i|
   [ { "BlackBox" :
       { "name"      : "LITrendering.foo"

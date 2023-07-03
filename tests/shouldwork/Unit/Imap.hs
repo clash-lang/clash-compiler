@@ -1,5 +1,7 @@
 -- See: https://github.com/clash-lang/clash-compiler/issues/507
 
+{-# LANGUAGE CPP #-}
+
 module Imap where
 
 import Clash.Prelude
@@ -10,11 +12,13 @@ data AB = A | B deriving (Eq, Generic, ShowX)
 ab :: KnownNat n => Index n -> AB -> AB
 ab n A = if n >  0 then A else B
 ab n B = if n == 0 then B else A
-{-# NOINLINE ab #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE ab #-}
 
 topEntity :: Vec 1 AB -> Vec 1 AB
 topEntity = imap ab
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

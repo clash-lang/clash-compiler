@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module DivMod where
 
 import Clash.Prelude
@@ -21,5 +23,5 @@ topEntity1 height depthInput filterHeight stride cycles = snatToNum cycles `divM
 
     rows :: Integer
     rows = ((snatToNum height - snatToNum filterHeight) `div` snatToNum stride) + 1
-{-# NOINLINE topEntity1 #-}
-
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity1 #-}

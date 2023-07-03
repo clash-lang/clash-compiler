@@ -7,6 +7,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 Utilities to deal with resets.
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -170,7 +171,8 @@ resetSynchronizer clk rst = rstOut
                          $ delay clk enableGen isActiveHigh
                          $ delay clk enableGen isActiveHigh
                          $ unsafeFromReset rst
-{-# NOINLINE resetSynchronizer #-} -- Give reset synchronizer its own HDL file
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE resetSynchronizer #-} -- Give reset synchronizer its own HDL file
 
 -- | Filter glitches from reset signals by only triggering a reset after it has
 -- been asserted for /glitchlessPeriod/ cycles. Similarly, it will stay
@@ -221,7 +223,8 @@ resetGlitchFilter SNat clk rst =
     case resetPolarity @dom of
       SActiveHigh -> True
       SActiveLow -> False
-{-# NOINLINE resetGlitchFilter #-} -- Give reset glitch filter its own HDL file
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE resetGlitchFilter #-} -- Give reset glitch filter its own HDL file
 
 -- | Hold reset for a number of cycles relative to an incoming reset signal.
 --

@@ -212,5 +212,6 @@ asyncRam# wClk rClk en sz rd we wr din = dout
                            " not in range [0.." ++ show szI ++ ")"))
         in d <$ s
     {-# INLINE safeUpdate #-}
-{-# NOINLINE asyncRam# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE asyncRam# #-}
 {-# ANN asyncRam# hasBlackBox #-}

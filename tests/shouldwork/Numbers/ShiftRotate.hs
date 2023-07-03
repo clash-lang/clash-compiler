@@ -5,6 +5,7 @@ by checking their results against compile-time evaluated calls to the same funct
 So it checks that the HDL implementations have the same behavior as the Haskell implementations.
 (And it assumes that the Haskell implementations are correct.)
 -}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 module ShiftRotate where
@@ -15,7 +16,8 @@ import Data.Word
 import ShiftRotateBase
 
 topEntity = testall
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 expected :: Vec _ ( Vec Ops (Unsigned 8)
                   , Vec Ops (Signed 8)

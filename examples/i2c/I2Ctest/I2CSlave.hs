@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module I2Ctest.I2CSlave where
 
 import Clash.Prelude
@@ -109,4 +111,5 @@ i2cSlave
   -> Signal System ACConfTestI
   -> Signal System ACConfTestO
 i2cSlave clk = mealyIO clk i2cSlaveT (reg i2cSlaveInit)
-{-# NOINLINE i2cSlave #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE i2cSlave #-}

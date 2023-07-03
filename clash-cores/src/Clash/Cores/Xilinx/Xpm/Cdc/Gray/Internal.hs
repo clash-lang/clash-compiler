@@ -3,6 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -126,7 +127,8 @@ xpmCdcGrayTF# bbCtx
 
 xpmCdcGrayTF# bbCtx = error (ppShow bbCtx)
 
-{-# NOINLINE xpmCdcGray# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE xpmCdcGray# #-}
 {-# ANN xpmCdcGray# hasBlackBox #-}
 {-# ANN xpmCdcGray#
   let

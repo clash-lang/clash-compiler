@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module T1388 where
 
 import Clash.Prelude hiding (Word)
@@ -25,13 +27,15 @@ newtype TypeA = TypeA (Bytes 4)
 newtype TypeB = TypeB (Words 4)
   deriving (Generic, NFDataX, Show, Eq)
 
-{-# NOINLINE bytesToWords #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE bytesToWords #-}
 bytesToWords :: Bytes 4 -> TypeB
 bytesToWords = TypeB . fmap (\(Byte a) -> Word $ ((unpack . resize .  pack) a))
 
 data TypeAs = Nop | TypeAS TypeA
 
-{-# NOINLINE convertTwoTypeAs #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE convertTwoTypeAs #-}
 convertTwoTypeAs :: TypeAs -> Maybe TypeB
 convertTwoTypeAs op = case op of
   TypeAS (TypeA a) -> Just $ (bytesToWords a)

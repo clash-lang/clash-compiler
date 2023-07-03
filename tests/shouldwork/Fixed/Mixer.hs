@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Mixer where
 
 import Clash.Prelude
@@ -16,7 +18,8 @@ cordic angle
 
 topEntity :: SFixed 3 8 -> SFixed 3 8
 topEntity = cordic
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

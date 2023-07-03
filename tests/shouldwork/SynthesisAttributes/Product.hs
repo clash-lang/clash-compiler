@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 module Product where
@@ -40,7 +41,8 @@ topEntity
 topEntity xy = bundle (s, s)
   where
     s = mac xy
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 
 --------------- Actual tests for generated HDL -------------------

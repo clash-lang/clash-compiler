@@ -25,6 +25,7 @@ We suggest you always use a PLL even if your oscillator runs at the frequency
 you want to run your circuit at.
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 module Clash.Intel.ClockGen
@@ -113,7 +114,8 @@ altpll
   -> (Clock domOut, Signal domOut Bool)
   -- ^ (Stable PLL clock, PLL lock)
 altpll !_ = knownDomain @domIn `seq` knownDomain @domOut `seq` clocks
-{-# NOINLINE altpll #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE altpll #-}
 {-# ANN altpll hasBlackBox #-}
 
 -- | A clock source that corresponds to the Intel/Quartus \"Altera PLL\"
@@ -200,5 +202,6 @@ alteraPll
   -- ^ Reset for the PLL
   -> t
 alteraPll !_ = clocks
-{-# NOINLINE alteraPll #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE alteraPll #-}
 {-# ANN alteraPll hasBlackBox #-}

@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module T1292 where
 
 import Clash.Prelude
@@ -5,7 +7,8 @@ import Clash.Explicit.Testbench
 
 topEntity :: Maybe (Index 16, Unsigned 4) -> Index 16
 topEntity (Just (a,_)) = a
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

@@ -81,6 +81,7 @@ __>>> L.tail $ sampleN 4 $ g systemClockGen enableGen (fromList [3..5])__
 -}
 
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 
 {-# LANGUAGE Unsafe #-}
@@ -426,7 +427,8 @@ blockRamFile# (Clock _ Nothing) ena sz file = \rd wen waS wd -> runST $ do
   parseBV' = fmap fst . listToMaybe . readInt 2 (`elem` "01") digitToInt
 blockRamFile# _ _ _ _ = error "blockRamFile#: dynamic clocks not supported"
 
-{-# NOINLINE blockRamFile# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE blockRamFile# #-}
 {-# ANN blockRamFile# hasBlackBox #-}
 
 -- | __NB:__ Not synthesizable
@@ -437,4 +439,5 @@ initMem = fmap (map parseBV . lines) . readFile
                   Just i  -> fromInteger i
                   Nothing -> error ("Failed to parse: " ++ s)
     parseBV' = fmap fst . listToMaybe . readInt 2 (`elem` "01") digitToInt
-{-# NOINLINE initMem #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE initMem #-}

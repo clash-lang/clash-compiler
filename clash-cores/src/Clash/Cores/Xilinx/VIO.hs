@@ -28,11 +28,12 @@ JTAG clock speed:
 
 -}
 
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Clash.Cores.Xilinx.VIO
@@ -104,7 +105,8 @@ vioProbe ::
   Clock dom ->
   a
 vioProbe !_inputNames !_outputNames !_initialOutputProbeValues !_clk = vioX @dom @a @o
-{-# NOINLINE vioProbe #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE vioProbe #-}
 {-# ANN vioProbe (
     let primName = 'vioProbe
         tfName = 'vioProbeBBF

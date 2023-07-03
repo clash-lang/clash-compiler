@@ -1,4 +1,6 @@
 -- Test that the compiler doesn't crash on any DivideByZero exceptions
+{-# LANGUAGE CPP #-}
+
 module DivideByZero where
 
 import Clash.Prelude
@@ -16,7 +18,8 @@ topEntity = pure @(Signal System)
   ,test @Word16
   ,test @Int32
   )
-{-# NOINLINE topEntity #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE topEntity #-}
 
 test :: Integral a => (a,a,a,a)
 test = (div0,quot0,mod0,rem0)

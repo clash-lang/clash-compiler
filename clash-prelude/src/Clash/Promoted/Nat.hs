@@ -269,7 +269,8 @@ infixl 7 `mulSNat`
 -- | Power of two singleton natural numbers
 powSNat :: SNat a -> SNat b -> SNat (a^b)
 powSNat SNat SNat = SNat
-{-# NOINLINE powSNat #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE powSNat #-}
 {-# ANN powSNat hasBlackBox #-}
 infixr 8 `powSNat`
 
@@ -297,7 +298,8 @@ flogBaseSNat :: (2 <= base, 1 <= x)
              -> SNat x
              -> SNat (FLog base x)
 flogBaseSNat SNat SNat = SNat
-{-# NOINLINE flogBaseSNat #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE flogBaseSNat #-}
 {-# ANN flogBaseSNat hasBlackBox #-}
 
 -- | Ceiling of the logarithm of a natural number
@@ -306,7 +308,8 @@ clogBaseSNat :: (2 <= base, 1 <= x)
              -> SNat x
              -> SNat (CLog base x)
 clogBaseSNat SNat SNat = SNat
-{-# NOINLINE clogBaseSNat #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE clogBaseSNat #-}
 {-# ANN clogBaseSNat hasBlackBox #-}
 
 -- | Exact integer logarithm of a natural number
@@ -317,7 +320,8 @@ logBaseSNat :: (FLog base x ~ CLog base x)
             -> SNat x
             -> SNat (Log base x)
 logBaseSNat SNat SNat = SNat
-{-# NOINLINE logBaseSNat #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE logBaseSNat #-}
 {-# ANN logBaseSNat hasBlackBox #-}
 
 -- | Power of two of a singleton natural number

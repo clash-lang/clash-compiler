@@ -18,6 +18,7 @@ the same HDL as "Clash.Prelude.ROM" and is compatible with all tools consuming
 the generated HDL.
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
@@ -118,7 +119,8 @@ asyncRomBlob# content@MemBlob{} = safeAt
           (deepErrorX ("asyncRom: address " ++ show i ++
                        " not in range [0.." ++ show szI ++ ")"))
 {-# ANN asyncRomBlob# hasBlackBox #-}
-{-# NOINLINE asyncRomBlob# #-}
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE asyncRomBlob# #-}
 
 -- | A ROM with a synchronous read port, with space for @n@ elements
 --

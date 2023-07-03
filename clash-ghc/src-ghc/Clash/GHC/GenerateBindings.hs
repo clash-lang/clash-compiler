@@ -70,7 +70,7 @@ import qualified TysWiredIn              as GHC
 import qualified Var                     as GHC
 import qualified SrcLoc                  as GHC
 #endif
-import           GHC.BasicTypes.Extra (isNoInline)
+import           GHC.BasicTypes.Extra (isOpaque)
 
 import           Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 import           Clash.Annotations.Primitive (HDL, extractPrim)
@@ -211,7 +211,7 @@ setNoInlineTopEntities bm tes =
   go b@Binding{bindingId}
     | bindingId `elemVarSet` ids
 #if MIN_VERSION_ghc(9,4,0)
-    = b { bindingSpec = GHC.NoInline GHC.NoSourceText }
+    = b { bindingSpec = GHC.Opaque GHC.NoSourceText }
 #else
     = b { bindingSpec = GHC.NoInline }
 #endif
@@ -359,8 +359,12 @@ checkPrimitive primMap v = do
             warnArgs xs
 
       unless (qName == "Clash.XException.errorX" || "GHC." `isPrefixOf` qName) $ do
-        warnIf (not (isNoInline inline))
+        warnIf (not (isOpaque inline))
+#if MIN_VERSION_ghc(9,4,0)
+          (primStr ++ "isn't marked OPAQUE."
+#else
           (primStr ++ "isn't marked NOINLINE."
+#endif
           ++ "\nThis might make Clash ignore this primitive.")
 #if MIN_VERSION_ghc(9,2,0)
         warnIf (GHC.isDeadEndAppSig strictness nrOfArgs)
