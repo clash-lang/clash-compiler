@@ -1,5 +1,6 @@
 {-|
   Copyright   :  (C) 2022-2023, Google Inc
+                     2022,      QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -159,7 +160,7 @@ vioProbeBBTF bbCtx
             #{ppShow userOutputNames}
         |]
 
-      vioProbeInstName <- Id.makeBasic "vio_inst"
+      vioProbeInstName <- Id.makeBasic (vioName (bbCtxName bbCtx))
 
       let
         inPs = filter ((> (0 :: Int)) . DSL.tySize . DSL.ety) inputProbes
@@ -202,6 +203,18 @@ vioProbeBBTF bbCtx
     -- The HDL attribute 'KEEP' is added to the signals connected to the
     -- probe ports so they are not optimized away by the synthesis tool.
     fmap (checkNameCollision x) . DSL.toBvWithAttrs [StringAttr' "KEEP" "true"] x
+
+  -- Return user-friendly name given a context name hint. Note that we ignore
+  -- @__VOID_TDECL_NOOP__@. It is created by 'mkPrimitive' whenever a user hint
+  -- is _not_ given and the primitive returns a zero-width type.
+  --
+  -- XXX: Is the input every 'Nothing' for non-recursive calls? It looks like
+  --      Clash always picks a context hint.
+  vioName :: Maybe T.Text -> T.Text
+  vioName Nothing = "vio_inst"
+  vioName (Just "result") = vioName Nothing
+  vioName (Just "__VOID_TDECL_NOOP__") = vioName Nothing
+  vioName (Just s) = s
 
 vioProbeTclTF :: HasCallStack => TemplateFunction
 vioProbeTclTF =

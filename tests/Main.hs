@@ -584,9 +584,15 @@ runClashTest = defaultMain $ clashTestRoot
                                                   , "singleInputNested"
                                                   , "multipleInputs"
                                                   , "inputsAndOutputs"
+                                                  , "withSetName"
+                                                  , "withSetNameNoResult"
                                                   ]
                      }
             in runTest "VIO" _opts
+          , outputTest "VIO" def{
+              hdlTargets=[VHDL]
+            , buildTargets=BuildSpecific ["withSetName", "withSetNameNoResult"]
+            }
           ]
         ]
       , clashTestGroup "CSignal"
