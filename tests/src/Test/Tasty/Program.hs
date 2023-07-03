@@ -338,7 +338,22 @@ runFailingProgram testExitCode program args stdO errOnEmptyStderr expectedCode e
                else
                  passed
    where
-    testOutput
+    testOutput test stdoutT stderrT = case test of
+      ExpectStdErr r = Right $
+        not $ cleanNewlines r `T.isInfixOf` cleanNewlines stderrT
+      ExpectStdOut r = Right $
+        not $ cleanNewlines r `T.isInfixOf` cleanNewlines stdoutT
+      ExpectEither r = Right $
+           not (cleanNewlines r `T.isInfixOf` cleanNewlines stdoutT)
+        && not (cleanNewlines r `T.isInfixOf` cleanNewlines stderrT)
+      ExpectNotStdErr r = Right $
+        cleanNewlines r `T.isInfixOf` cleanNewlines stderrT
+      ExpectMatchStdOut re = either id isNothing $ execute re stdoutT
+      ExpectNotMatchStdOut re = either id isJust $ execute re stdoutT
+      _ -> Right False
+
+    failExpected expected stdoutT stderrT = case expected of
+
     checkSilenced = case silencedOutput of
       -- TODO
       ExpectStdErr r | not (cleanNewlines r `T.isInfixOf` cleanNewlines stderrT) ->
@@ -374,6 +389,17 @@ execNotFoundFailure :: String -> Result
 execNotFoundFailure file =
   testFailed $ "Cannot locate program " ++ file ++ " in the PATH"
 
+testFailureVerbose
+  :: T.Text
+  -- ^ Error message
+  -> String
+  -- ^ Executable
+  -> [String]
+  -- ^ Executable arguments
+  -> Maybe T.Text
+  -- ^ stderr (@Nothing@ means the error message already says it is empty)
+  -> Maybe T.Text
+  -- ^ stdo (@Nothing@ means the error message already says it is empty)
 -- | Indicates that program failed with an error code
 exitFailure :: String -> [String] -> Int -> T.Text -> T.Text -> Result
 exitFailure cmd args code stderr stdout =
