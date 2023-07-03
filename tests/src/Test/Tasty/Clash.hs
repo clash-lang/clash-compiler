@@ -566,6 +566,16 @@ clashLibTest' modName target extraGhcArgs path =
       cbBuildTarget=target
     , cbSourceDirectory=sourceDir
     , cbExtraBuildArgs="-DCLASHLIBTEST" :
+#if __GLASGOW_HASKELL__ >= 906
+        "-dynamic" :
+        -- All libraries in the GHC environment file are passed to the GHC
+        -- linking stage, even when they are not used by the particular target.
+        -- The clash-ffi so-lib contains undefined references, but said library
+        -- isn't actually used in any of the clash-lib tests. So we just tell
+        -- the linker to shut up and continue producing an executable, as the
+        -- undefined references will not be an issue at run-time.
+        "-optl" : "-Wl,--allow-shlib-undefined" :
+#endif
 #ifdef CLASH_WORKAROUND_GHC_MMAP_CRASH
         "-with-rtsopts=-xm20000000" :
 #endif
