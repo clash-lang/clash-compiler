@@ -69,7 +69,7 @@ import           GHC.TypeLits        (KnownNat)
 import           GHC.Types           (IO (..))
 import           GHC.Word
 import           System.IO.Unsafe    (unsafeDupablePerformIO)
-#if MIN_VERSION_ghc(9,6,0)
+#if MIN_VERSION_ghc(9,4,0)
 import           Data.Bifunctor      (first)
 import qualified Data.Text.Array     as Text
 import qualified Data.Text.Internal  as Text
@@ -4575,7 +4575,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                         , Left (Case splitCall n1BVTy [bvAlt])
                         ])
          _ -> Nothing
-#if MIN_VERSION_ghc(9,6,0)
+#if MIN_VERSION_ghc(9,4,0)
   "Data.Text.Show.$wunpackCStringAscii#"
     | [Lit (StringLiteral addr)] <- args
     , Text.Text (Text.ByteArray ba) _off len <- Text.pack addr
