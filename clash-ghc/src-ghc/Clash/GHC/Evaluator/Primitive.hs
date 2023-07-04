@@ -2384,6 +2384,30 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce (boolToBoolLiteral tcm ty (s1 == s2))
     | otherwise -> error (show args)
 
+  "GHC.Base.quotInt"
+    | [ DC intDc [Left (Literal (IntLiteral i))]
+      , DC _     [Left (Literal (IntLiteral j))]
+      ] <- args
+    -> reduce (App (Data intDc) (Literal (IntLiteral (i `quot` j))))
+
+  "GHC.Base.remInt"
+    | [ DC intDc [Left (Literal (IntLiteral i))]
+      , DC _     [Left (Literal (IntLiteral j))]
+      ] <- args
+    -> reduce (App (Data intDc) (Literal (IntLiteral (i `rem` j))))
+
+  "GHC.Base.divInt"
+    | [ DC intDc [Left (Literal (IntLiteral i))]
+      , DC _     [Left (Literal (IntLiteral j))]
+      ] <- args
+    -> reduce (App (Data intDc) (Literal (IntLiteral (i `div` j))))
+
+
+  "GHC.Base.modInt"
+    | [ DC intDc [Left (Literal (IntLiteral i))]
+      , DC _     [Left (Literal (IntLiteral j))]
+      ] <- args
+    -> reduce (App (Data intDc) (Literal (IntLiteral (i `mod` j))))
 
   "Clash.Class.BitPack.Internal.packDouble#" -- :: Double -> BitVector 64
     | [DC _ [Left arg]] <- args
