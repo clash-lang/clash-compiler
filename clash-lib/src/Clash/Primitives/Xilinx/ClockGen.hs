@@ -7,22 +7,94 @@
   Clash.Xilinx.ClockGen.{clockWizard,clockWizardDifferential}
 -}
 
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 
 module Clash.Primitives.Xilinx.ClockGen where
 
 import Control.Monad.State (State)
 import Data.List.Infinite (Infinite(..), (...))
-import qualified Data.String.Interpolate as I
+import qualified Data.Text as T
+import Prettyprinter.Interpolate (__di)
+import Text.Show.Pretty (ppShow)
 
 import Clash.Signal (periodToHz)
 
 import Clash.Backend (Backend)
 import Clash.Netlist.BlackBox.Util (exprToString)
+import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
 import Clash.Netlist.Util (stripVoid)
+import qualified Clash.Primitives.DSL as DSL
 import Data.Text.Prettyprint.Doc.Extra (Doc)
 
+
+clockWizardDifferentialTF :: TemplateFunction
+clockWizardDifferentialTF =
+  TemplateFunction used valid clockWizardDifferentialTemplate
+ where
+  knownDomIn
+    :< knownDomOut
+    :< name
+    :< clk
+    :< rst
+    :< _ = (0...)
+  used = [knownDomIn, knownDomOut, name, clk, rst]
+  valid = const True
+
+
+clockWizardDifferentialTemplate
+  :: Backend s
+  => BlackBoxContext
+  -> State s Doc
+clockWizardDifferentialTemplate bbCtx
+  |   knownDomIn
+    : _knownDomOut
+    : name0
+    : clk
+    : rst
+    : _ <- map fst (DSL.tInputs bbCtx)
+  , Just name1 <- DSL.getStr name0
+  , DataCon (Product "Clash.Signal.Internal.DiffClock" _ clkTys) _ clkEs
+    <- DSL.eex clk
+  , [clkP@(Identifier _ Nothing), clkN@(Identifier _ Nothing)] <- clkEs
+  , [clkPTy, clkNTy] <- clkTys
+  , [tResult] <- map DSL.ety (DSL.tResults bbCtx)
+  = do
+      clkWizInstName <- Id.makeBasic "clockWizardDifferential_inst"
+      DSL.declarationReturn bbCtx "clockWizardDifferential" $ do
+
+        rstHigh <- DSL.unsafeToHighPolarity "reset" (DSL.ety knownDomIn) rst
+        pllOut <- DSL.declare "pllOut" Bit
+        locked <- DSL.declare "locked" Bit
+        pllLock <- DSL.boolFromBit "pllLock" locked
+
+        let compName = T.pack name1
+            compInps =
+              [ ("clk_in1_p", Bit)
+              , ("clk_in1_n", Bit)
+              , ("reset", Bit)
+              ]
+            compOuts =
+              [ ("clk_out1", Bit)
+              , ("locked", Bit)
+              ]
+            inps =
+              [ ("clk_in1_p", DSL.TExpr clkPTy clkP)
+              , ("clk_in1_n", DSL.TExpr clkNTy clkN)
+              , ("reset", rstHigh)
+              ]
+            outs =
+              [ ("clk_out1", pllOut)
+              , ("locked", locked)
+              ]
+
+        DSL.compInBlock compName compInps compOuts
+        DSL.instDecl Empty (Id.unsafeMake compName) clkWizInstName [] inps outs
+
+        pure [DSL.constructProduct tResult [pllOut, pllLock]]
+  | otherwise
+  = error $ ppShow bbCtx
 
 clockWizardTclTF :: TemplateFunction
 clockWizardTclTF =
@@ -71,11 +143,12 @@ clockWizardTclTemplate isDifferential bbCtx
     clkOutFreq :: Double
     clkOutFreq = periodToHz (fromInteger clkOutPeriod) / 1e6
 
+    differentialPinString :: T.Text
     differentialPinString = if isDifferential
       then "Differential_clock_capable_pin"
       else "Single_ended_clock_capable_pin"
 
-    bbText = [I.__i|
+    bbText = [__di|
       namespace eval $tclIface {
         variable api 1
         variable scriptPurpose createIp

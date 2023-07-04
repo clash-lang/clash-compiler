@@ -8,4 +8,4 @@
 - BlackBox:
     name: Clash.Explicit.Testbench.seClockToDiffClock
     kind: Expression
-    template: '{~ARG[0], ~ ~ARG[0]}'
+    template: '{~ARG[1], ~ ~ARG[1]}'

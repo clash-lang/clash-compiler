@@ -1,5 +1,5 @@
 {-|
-Copyright  : (C) 2021-2022, QBayLogic B.V.
+Copyright  : (C) 2021-2023, QBayLogic B.V.
 License    : BSD2 (see the file LICENSE)
 Maintainer : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -58,7 +58,7 @@ import           Clash.Driver.Types
 import           Clash.Primitives.Types
 import           Clash.Core.Var (Id, varName)
 import           Clash.Netlist.Types
-  (TopEntityT, Component(..), HWType (Clock), hwTypeDomain)
+  (TopEntityT, Component(..), HWType (Clock, ClockN), hwTypeDomain)
 import qualified Clash.Netlist.Types as Netlist
 import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.Util (typeSize)
@@ -291,7 +291,7 @@ mkManifestPort backend portId portType portDir = ManifestPort{..}
   mpName = Id.toText portId
   mpWidth = typeSize portType
   mpDirection = portDir
-  mpIsClock = case portType of {Clock _ -> True; _ -> False}
+  mpIsClock = case portType of {Clock _ -> True; ClockN _ -> True; _ -> False}
   mpDomain = hwTypeDomain portType
   mpTypeName = flip evalState backend $ getAp $ do
      LText.toStrict . renderOneLine <$> hdlType (External mpName) portType

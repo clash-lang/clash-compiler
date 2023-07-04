@@ -18,7 +18,6 @@ import Clash.Clocks (clocks)
 import Clash.Promoted.Symbol (SSymbol)
 import Clash.Signal.Internal
 
-
 -- | A clock source that corresponds to the Xilinx MMCM component created
 -- with the \"Clock Wizard\" with settings to provide a stable 'Clock' from
 -- a single free-running clock input.
@@ -62,7 +61,7 @@ clockWizard !_ = clocks
 -- createDomain vXilinxSystem{vName=\"Dom100MHz\", vPeriod=10000}
 --
 -- -- Outputs a clock running at 100 MHz
--- clockWizardDifferential \@_ \@Dom100MHz (SSymbol \@\"clkWizard50to100\") clk50N clk50P rst
+-- clockWizardDifferential \@_ \@Dom100MHz (SSymbol \@\"clkWizard50to100\") clk50 rst
 -- @
 --
 -- See also the [Clocking Wizard LogiCORE IP Product Guide](https://docs.xilinx.com/r/en-US/pg065-clk-wiz)
@@ -74,18 +73,13 @@ clockWizardDifferential
   -- ^ Name of the component instance
   --
   -- Instantiate as follows: @(SSymbol \@\"clockWizardD50\")@
-  -> Clock domIn
-  -- ^ Free running clock, negative phase
-  -> Clock domIn
-  -- ^ Free running clock, positive phase
+  -> DiffClock domIn
+  -- ^ Free running clock
   -> Reset domIn
   -- ^ Reset for the PLL
   -> (Clock domOut, Signal domOut Bool)
   -- ^ (Stable PLL clock, PLL lock)
-clockWizardDifferential !_ clk@(Clock _ Nothing) (Clock _ Nothing) =
-  clocks clk
-clockWizardDifferential !_ _ _ =
-  error "clockWizardDifferential: dynamic clocks not supported"
+clockWizardDifferential !_ (DiffClock clk _) = clocks clk
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE clockWizardDifferential #-}
 {-# ANN clockWizardDifferential hasBlackBox #-}

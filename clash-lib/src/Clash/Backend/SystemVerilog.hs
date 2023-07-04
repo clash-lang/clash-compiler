@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021-2022, QBayLogic B.V.
+                     2021-2023, QBayLogic B.V.,
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -330,6 +330,7 @@ normaliseType ty@(Index _) = return (Unsigned (typeSize ty))
 normaliseType ty@(Sum _ _) = return (BitVector (typeSize ty))
 normaliseType ty@(CustomSum _ _ _ _) = return (BitVector (typeSize ty))
 normaliseType (Clock _) = return Bit
+normaliseType (ClockN _) = return Bit
 normaliseType (Reset _) = return Bit
 normaliseType (Enable _) = return Bool
 normaliseType (BiDirectional dir ty) = BiDirectional dir <$> normaliseType ty
@@ -394,6 +395,7 @@ splitVecTy = fmap splitElemTy . go
       Product {} -> (ns, verilogType t)
       Vector {}  -> error $ $(curLoc) ++ "impossible"
       Clock {}   -> (ns, verilogType t)
+      ClockN {}  -> (ns, verilogType t)
       Reset {}   -> (ns, "logic")
       Enable {}  -> (ns, "logic")
       Bool       -> (ns, "logic")
@@ -596,6 +598,7 @@ verilogType t_ = do
     RTree {}      -> pvrType
     Signed n      -> logicOrWire <+> "signed" <+> brackets (int (n-1) <> colon <> int 0)
     Clock _       -> "logic"
+    ClockN _      -> "logic"
     Reset _       -> "logic"
     Enable _      -> "logic"
     Bit           -> "logic"
@@ -645,6 +648,7 @@ tyName t@(Product nm _ _)      = do
 
 tyName t@(SP _ _) = "logic_vector_" <> int (typeSize t)
 tyName (Clock _)  = "logic"
+tyName (ClockN _) = "logic"
 tyName (Reset _)  = "logic"
 tyName (Enable _) = "logic"
 tyName t =  error $ $(curLoc) ++ "tyName: " ++ show t

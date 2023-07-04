@@ -19,15 +19,15 @@ createDomain vXilinxSystem{vName="DomOut", vPeriod=hzToPeriod 300_000_000}
 
 topEntity ::
   Clock DomIn ->
-  Clock DomIn ->
+  DiffClock DomIn ->
   Reset DomIn ->
   Signal DomOut (Index 10, Index 10)
-topEntity clkInN clkInP rstIn =
+topEntity clkInSE clkInDiff rstIn =
   let f clk rst = register clk rst enableGen 0 . fmap (satSucc SatBound)
-      (clkA, stableA) = clockWizard (SSymbol @"clk_wiz_se") clkInP rstIn
+      (clkA, stableA) = clockWizard (SSymbol @"clk_wiz_se") clkInSE rstIn
       rstA = unsafeFromLowPolarity stableA
-      (clkB, stableB) = clockWizardDifferential (SSymbol @"clk_wiz_diff") clkInN
-                          clkInP rstIn
+      (clkB, stableB) = clockWizardDifferential (SSymbol @"clk_wiz_diff")
+                          clkInDiff rstIn
       rstB = unsafeFromLowPolarity stableB
       o1 = f clkA rstA o1
       o2 = f clkB rstB o2
@@ -39,13 +39,14 @@ testBench ::
   Signal DomIn Bool
 testBench = done
  where
-  (o1, o2) = unbundle $ topEntity clkP clkN rst
+  (o1, o2) = unbundle $ topEntity clkSE clkDiff rst
   done1 = o1 .==. pure maxBound
   done2 = o2 .==. pure maxBound
-  done  = unsafeSynchronizer clockGen clkP $ fmap endVhdlSim $
+  done  = unsafeSynchronizer clockGen clkSE $ fmap endVhdlSim $
             strictAnd <$> done1 <*> done2
   strictAnd !a !b = a && b
-  (clkP, clkN) = seClockToDiffClock $ tbClockGen (not <$> done)
+  clkSE = tbClockGen (not <$> done)
+  clkDiff = seClockToDiffClock clkSE
   rst = resetGen
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE testBench #-}

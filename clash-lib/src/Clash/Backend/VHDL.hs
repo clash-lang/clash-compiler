@@ -177,6 +177,7 @@ instance Backend VHDLState where
       if enums then pure UserType else pure SynonymType
 
     Clock {} -> pure SynonymType
+    ClockN {} -> pure SynonymType
     Reset {} -> pure SynonymType
     Enable {} -> pure SynonymType
     Index {} -> pure SynonymType
@@ -602,6 +603,7 @@ tyDec hwty = do
 
     -- Type aliases:
     Clock _           -> typAliasDec hwty
+    ClockN _          -> typAliasDec hwty
     Reset _           -> typAliasDec hwty
     Enable _          -> typAliasDec hwty
     Index _           -> typAliasDec hwty
@@ -1196,6 +1198,9 @@ tyName' rec0 (filterTransparent -> t) = do
     Clock nm0 ->
       let nm1 = "clk_" `TextS.append` nm0 in
       Ap $ makeCached (t, False) nameCache (userTyName "clk" nm1 t)
+    ClockN nm0 ->
+      let nm1 = "clk_n_" `TextS.append` nm0 in
+      Ap $ makeCached (t, False) nameCache (userTyName "clk" nm1 t)
     Reset nm0 ->
       let nm1 = "rst_" `TextS.append` nm0 in
       Ap $ makeCached (t, False) nameCache (userTyName "rst" nm1 t)
@@ -1248,6 +1253,7 @@ normaliseType enums@(RenderEnums e) hwty = case hwty of
 
   -- Simple types, for which a subtype (without qualifiers) will be made in VHDL:
   Clock _           -> Bit
+  ClockN _          -> Bit
   Reset _           -> Bit
   Enable _          -> Bool
   Index _           -> Unsigned (typeSize hwty)
@@ -1271,6 +1277,7 @@ filterTransparent hwty = case hwty of
   Integer           -> hwty
   Bit               -> hwty
   Clock _           -> hwty
+  ClockN _          -> hwty
   Reset _           -> hwty
   Enable _          -> hwty
   Index _           -> hwty
@@ -1349,6 +1356,7 @@ sizedQualTyNameErrValue t@(Sum _ _)  = do
   else
     qualTyName t <> "'" <> parens (int 0 <+> "to" <+> int (typeSize t - 1) <+> rarrow <+> singularErrValue)
 sizedQualTyNameErrValue (Clock _)  = singularErrValue
+sizedQualTyNameErrValue (ClockN _) = singularErrValue
 sizedQualTyNameErrValue (Reset _)  = singularErrValue
 sizedQualTyNameErrValue (Enable _) = singularErrValue
 sizedQualTyNameErrValue (Void {})  =
@@ -1948,6 +1956,9 @@ toSLV Bit          e = do
 toSLV (Clock {})    e = do
   nm <- Ap $ use modNm
   pretty nm <> "_types.toSLV" <> parens (expr_ False e)
+toSLV (ClockN {})   e = do
+  nm <- Ap $ use modNm
+  pretty nm <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (Reset {})    e = do
   nm <- Ap $ use modNm
   pretty (TextS.toLower nm) <> "_types.toSLV" <> parens (expr_ False e)
@@ -2034,6 +2045,7 @@ punctuate' s d = vcat (punctuate s d) <> s
 
 encodingNote :: HWType -> VHDLM Doc
 encodingNote (Clock _)  = "-- clock" <> line
+encodingNote (ClockN _) = "-- clock (neg phase)" <> line
 encodingNote (Reset _)  = "-- reset" <> line
 encodingNote (Enable _) = "-- enable" <> line
 encodingNote (Annotated _ t) = encodingNote t
