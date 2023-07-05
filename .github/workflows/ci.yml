@@ -117,7 +117,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: [ "8.6.5", "9.0.2" ]
+        ghc: [ "8.6.5", "9.0.2", "9.6.1" ]
         include:
           - multiple_hidden: yes
 
