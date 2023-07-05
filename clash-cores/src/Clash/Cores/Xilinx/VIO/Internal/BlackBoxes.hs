@@ -184,8 +184,9 @@ vioProbeBBTF bbCtx
                 _         -> pure <$> DSL.assign (head inNames) singleInput
             _ -> zipWithM DSL.assign inNames inPs
 
-        outProbes <- zipWithM DSL.declare outNames outTys
-        outProbesBV <- zipWithM toNameCheckedBv userOutputNames outProbes
+        (outProbes, outProbesBV) <- fmap unzip $ sequence $
+          zipWith3 fromNameCheckedBv userOutputNames outNames outTys
+
         inProbesBV <- zipWithM toNameCheckedBv userInputNames inProbes
 
         DSL.instDecl Empty (Id.unsafeMake vioProbeName) vioProbeInstName []
@@ -197,12 +198,21 @@ vioProbeBBTF bbCtx
           Product{} -> pure $ pure $ DSL.constructProduct tResult outProbes
           _         -> pure outProbes
 
-  | otherwise = error $ "vioProbeBBTF, bad bbCtx: " <> show bbCtx
+  | otherwise = error $ "vioProbeBBTF, bad bbCtx: " <> ppShow bbCtx
  where
-  toNameCheckedBv x =
-    -- The HDL attribute 'KEEP' is added to the signals connected to the
-    -- probe ports so they are not optimized away by the synthesis tool.
-    fmap (checkNameCollision x) . DSL.toBvWithAttrs [StringAttr' "KEEP" "true"] x
+  -- The HDL attribute 'KEEP' is added to the signals connected to the
+  -- probe ports so they are not optimized away by the synthesis tool.
+  keepAttrs = [StringAttr' "KEEP" "true"]
+
+  toNameCheckedBv nameHint inProbe =
+    fmap (checkNameCollision nameHint) $
+      DSL.toBvWithAttrs keepAttrs nameHint inProbe
+
+  fromNameCheckedBv nameHintBv nameHintOut outTy = do
+    let bvTy = Annotated keepAttrs (BitVector (DSL.tySize outTy))
+    outProbeBv <- checkNameCollision nameHintBv <$> DSL.declare nameHintBv bvTy
+    outProbe <- DSL.fromBV nameHintOut outTy outProbeBv
+    pure (outProbe, outProbeBv)
 
   -- Return user-friendly name given a context name hint. Note that we ignore
   -- @__VOID_TDECL_NOOP__@. It is created by 'mkPrimitive' whenever a user hint
