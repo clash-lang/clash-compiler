@@ -50,7 +50,7 @@ import Clash.Core.Name
 import Clash.Core.Pretty                 (showPpr)
 import Clash.Core.Subst
 import Clash.Core.Term
-import Clash.Core.TyCon                  (TyConMap, tyConDataCons)
+import Clash.Core.TyCon                  (TyConName, TyConMap, tyConDataCons)
 import Clash.Core.Type
 import Clash.Core.TysPrim                (liftedTypeKind, typeNatKind)
 import Clash.Core.Var                    (Id, Var(..), mkLocalId, mkTyVar)
@@ -560,7 +560,7 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
   , let dcArgsLen = length dcArgs
   , dcArgsLen > 1
   , let dcArgVs = map (tyView . coreView tcm) dcArgs
-  = if any shouldSplitTy dcArgVs && not (isHidden tcNm tyArgs) then
+  = if any shouldSplitOutTy dcArgVs && not (isHidden tcNm tyArgs) then
       Just ( mkApps (Data dc) . (map Right tyArgs ++) . map Left
            , Projections
              (\is0 subj -> mapM (mkSelectorCase ($(curLoc) ++ "splitArg") is0 tcm subj 1)
@@ -575,7 +575,7 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
   , n > 1
   , Just tc <- UniqMap.lookup tcNm tcm
   , [nil,cons] <- tyConDataCons tc
-  = if shouldSplitTy (tyView (coreView tcm argTy)) then
+  = if shouldSplitOutTy (tyView (coreView tcm argTy)) then
       Just ( mkVec nil cons argTy n
            , Projections (\is0 subj -> mapM (mkVecSelector is0 subj) [0..n-1])
            , replicate (fromInteger n) argTy)
@@ -597,29 +597,36 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
     subj1 <- mkSelectorCase ($(curLoc) ++ "mkVecSelector") is0 tcm subj 2 2
     mkVecSelector is0 subj1 (n-1)
 
-  shouldSplitTy :: TypeView -> Bool
-  shouldSplitTy ty = isJust (shouldSplit0 tcm ty) || splitTy ty
+  --
+  shouldSplitOutTy :: TypeView -> Bool
+  shouldSplitOutTy (TyConApp nm args)
+    | isHidden nm args = True
+  shouldSplitOutTy ty = isJust (shouldSplit0 tcm ty) || splitOutTy ty
 
-  -- Hidden constructs (HiddenClock, HiddenReset, ..) don't need to be split
-  -- because KnownDomain will be filtered anyway during netlist generation due
-  -- to it being a zero-width type
+  -- Hidden singular constructs (HiddenClock, HiddenReset, HiddenEnable)
+  -- don't need to be split up, because the KnownDomain in there will be
+  -- filtered out during netlist generation due to it being a zero-width type.
+  -- And splitting them up can lead to PortName confusion, like in https://github.com/clash-lang/clash-compiler/issues/1033
+  --
+  -- However this doesn't hold for HiddenClockResetEnable, it should be split up
+  -- and 'isHidden' will return False for it.
   --
   -- TODO: This currently only handles (IP $x, KnownDomain) given that $x is any
-  -- TODO: of the constructs handled in 'splitTy'. In practise this means only
+  -- TODO: of the constructs handled in 'splitOutTy'. In practise this means only
   -- TODO: HiddenClock, HiddenReset, and HiddenEnable are handled. If a user were
   -- TODO: to define their own versions with -for example- the elements of the
   -- TODO: tuple swapped, 'isHidden' wouldn't recognize it. We could generalize
   -- TODO: this in the future.
   --
-  isHidden :: Name a -> [Type] -> Bool
+  isHidden :: TyConName -> [Type] -> Bool
   isHidden nm [a1, a2] | TyConApp a2Nm _ <- tyView a2 =
        nameOcc nm == "GHC.Classes.(%,%)"
-    && splitTy (tyView (stripIP a1))
+    && splitOutTy (tyView (stripIP a1))
     && nameOcc a2Nm == "Clash.Signal.Internal.KnownDomain"
   isHidden _ _ = False
 
   -- Currently we're only interested in splitting of Clock, Reset, and Enable
-  splitTy (TyConApp tcNm0 _)
+  splitOutTy (TyConApp tcNm0 _)
     = nameOcc tcNm0 `elem` [ "Clash.Signal.Internal.Clock"
                            , "Clash.Signal.Internal.Reset"
                            , "Clash.Signal.Internal.Enable"
@@ -629,7 +636,7 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
                            , "Clash.Explicit.SimIO.File"
                            , "GHC.IO.Handle.Types.Handle"
                            ]
-  splitTy _ = False
+  splitOutTy _ = False
 
 shouldSplit0 _ _ = Nothing
 
