@@ -599,8 +599,8 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
 
   --
   shouldSplitOutTy :: TypeView -> Bool
-  shouldSplitOutTy (TyConApp nm args)
-    | isHidden nm args = True
+  -- shouldSplitOutTy (TyConApp nm args)
+  --   | isHidden nm args = True
   shouldSplitOutTy ty = isJust (shouldSplit0 tcm ty) || splitOutTy ty
 
   -- Hidden singular constructs (HiddenClock, HiddenReset, HiddenEnable)
