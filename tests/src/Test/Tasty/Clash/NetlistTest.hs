@@ -26,6 +26,7 @@ import           Clash.Backend.SystemVerilog
 import           Clash.Backend.VHDL
 import           Clash.Backend.Verilog
 import           Clash.Core.Name
+import           Clash.Core.Term (Term)
 import           Clash.Core.Var
 import           Clash.Core.VarEnv
 import           Clash.Driver as Driver
@@ -74,27 +75,31 @@ runToNetlistStage target f src = do
 
   let (compNames, initIs) = genTopNames opts hdl (designEntities design)
       teNames = fmap topId (designEntities design)
-      te      = topId (P.head (designEntities design))
       tes2    = mkVarEnv (P.zip (P.map topId (designEntities design)) (designEntities design))
 
   supplyN <- Supply.newSupply
 
-  transformedBindings <-
-    normalizeEntity env (designBindings design)
-      (ghcTypeToHWType (opt_intWidth opts))
-      ghcEvaluator
-      evaluator
-      teNames supplyN te
-
-  fmap (\(_,x,_) -> force (P.map snd (OMap.assocs x))) $
-    netlistFrom
-      (env, transformedBindings, tes2, compNames, te, initIs, designDomains design)
+  let transformAndGenNetlist te = do
+        transformedBindings <-
+          normalizeEntity env (designBindings design)
+            (ghcTypeToHWType (opt_intWidth opts))
+            ghcEvaluator
+            evaluator
+            teNames supplyN te
+        netlistFrom (env, transformedBindings, tes2, compNames, initIs, designDomains design) te
+  netlists <- mapM (fmap (\(_,x,_) -> force (P.map snd (OMap.assocs x))) . transformAndGenNetlist) teNames
+  return $ P.concat netlists
  where
   opts = f mkClashOpts
   backend = initBackend @(TargetToState target) opts
   hdl = buildTargetToHdl target
 
-  netlistFrom (env, bm, tes, compNames, te, seen, domainConfs) =
+  netlistFrom :: (ClashEnv, BindingMap, VarEnv TopEntityT,
+                       VarEnv Identifier, IdentifierSet,
+                       Backend.DomainMap)
+                      -> Var Term
+                      -> IO (Component, ComponentMap, IdentifierSet)
+  netlistFrom (env, bm, tes, compNames, seen, domainConfs) te =
     genNetlist env False bm tes compNames (ghcTypeToHWType (opt_intWidth opts))
       ite (SomeBackend hdlSt) seen hdlDir Nothing te
    where
