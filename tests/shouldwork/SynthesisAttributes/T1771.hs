@@ -17,7 +17,7 @@ type AttrSingle x = 'StringAttr "foo" x
 -- being rendered, or throw an error during compilation.
 type AttrMulti = '[ AttrSingle "BB", 'BoolAttr "bar" 'True ]
 
--- Hiding the Annotate synyonm in another type synonym should not prevent it
+-- Hiding the Annotate synonym in another type synonym should not prevent it
 -- from being rendered, or throw an error during compilation.
 type PinC = Annotate (BitVector 1) '[ AttrSingle "CC" ]
 

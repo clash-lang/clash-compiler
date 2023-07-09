@@ -10,7 +10,9 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -48,6 +50,7 @@ import           Data.Text                   (Text, pack)
 import qualified Data.Text                   as Text
 import           Data.Text.Encoding          (decodeUtf8)
 import qualified Data.Traversable            as T
+import           Data.String.Interpolate     (__i)
 import qualified Text.Read                   as Text
 #if MIN_VERSION_ghc(9,4,0)
 import           Data.Primitive.ByteArray    (ByteArray(ByteArray))
@@ -180,6 +183,7 @@ import VarSet     (isEmptyVarSet)
 
 -- Local imports
 import           Clash.Annotations.Primitive (extractPrim)
+import           Clash.Annotations.SynthesisAttributes (Annotate, Attr(..))
 import qualified Clash.Core.DataCon          as C
 import qualified Clash.Core.Literal          as C
 import qualified Clash.Core.Name             as C
@@ -190,9 +194,11 @@ import qualified Clash.Core.Util             as C (undefinedTy, undefinedXPrims)
 import qualified Clash.Core.Var              as C
 import qualified Clash.Data.UniqMap          as C
 import           Clash.Normalize.Primitives  as C
-import           Clash.Primitives.Types
+import           Clash.Primitives.Types      hiding (name)
 import           Clash.Util
 import           Clash.GHC.Util
+import Control.Monad.Extra (ifM, andM)
+import Control.Applicative ((<|>))
 
 instance Hashable Name where
   hashWithSalt s = hashWithSalt s . getKey . nameUnique
@@ -856,9 +862,6 @@ typeConstructorToString
 typeConstructorToString constructor =
    Text.unpack . C.nameOcc <$> coreToName tyConName tyConUnique qualifiedNameString constructor
 
-_ATTR_NAME :: String
-_ATTR_NAME = "Clash.Annotations.SynthesisAttributes.Attr"
-
 -- | Flatten a list type structure to a list of types.
 listTypeToListOfTypes :: Type -> [Type]
 -- TyConApp ': [kind, head, tail]
@@ -893,14 +896,15 @@ tyLitToInteger s = error $ unwords [ "Could not unpack given type to integer:"
                                    , showPprUnsafe s ]
 
 -- | Try to interpret a Type as an Attr
-coreToAttr
-  :: Type
-  -> C2C C.Attr'
-coreToAttr t@(TyConApp ty args) = do
-  let key   = args !! 0
-  let value = args !! 1
-  name' <- typeConstructorToString ty
+coreToAttr :: Type -> C2C C.Attr'
+coreToAttr t0@(TyConApp ty args) = do
+  name <- typeConstructorToString ty
   envs <- view famInstEnvs
+  let
+    -- XXX: This relies on 'value' not being evaluated if the constructor
+    --      doesn't have a second field.
+    key = args !! 0
+    value = args !! 1
 #if MIN_VERSION_ghc(9,4,0)
   let Reduction _ key1 = normaliseType envs Nominal key
       Reduction _ value1 = normaliseType envs Nominal value
@@ -908,93 +912,77 @@ coreToAttr t@(TyConApp ty args) = do
   let (_,key1) = normaliseType envs Nominal key
       (_,value1) = normaliseType envs Nominal value
 #endif
-  case name' of
-    "Clash.Annotations.SynthesisAttributes.StringAttr" ->
-        return $ C.StringAttr' (tyLitToString key1) (tyLitToString value1)
-    "Clash.Annotations.SynthesisAttributes.IntegerAttr" ->
-        return $ C.IntegerAttr' (tyLitToString key1) (tyLitToInteger value1)
-    "Clash.Annotations.SynthesisAttributes.BoolAttr" -> do
-        bool <- boolTypeToBool value1
-        return $ C.BoolAttr' (tyLitToString key1) bool
-    "Clash.Annotations.SynthesisAttributes.Attr" ->
-        return $ C.Attr' (tyLitToString key1)
-    _ ->
-        case coreView t of
-          Just t' -> coreToAttr t'
-          Nothing -> error $ unwords [ "Expected StringAttr, IntegerAttr, BoolAttr or Attr"
-                       , "constructor, got:" ++ name' ]
+  if
+    | name == show 'StringAttr ->
+      return $ C.StringAttr' (tyLitToString key1) (tyLitToString value1)
+    | name == show 'IntegerAttr ->
+      return $ C.IntegerAttr' (tyLitToString key1) (tyLitToInteger value1)
+    | name == show 'BoolAttr -> do
+      bool <- boolTypeToBool value1
+      return $ C.BoolAttr' (tyLitToString key1) bool
+    | name == show 'Attr ->
+      return $ C.Attr' (tyLitToString key1)
+    | otherwise ->
+      case coreView t0 of
+        Just t1 -> coreToAttr t1
+        Nothing -> error $ [__i|Expected constructor of Attr, got #{name}|]
+coreToAttr t0 =
+  case coreView t0 of
+    Just t1 -> coreToAttr t1
+    Nothing -> error $ [__i|Expected constructor of Attr, got #{showPprUnsafe t0}|]
 
-coreToAttr t =
-  error $ unwords [ "Expected type constructor (TyConApp), but got:"
-                  , showPprUnsafe t ]
+coreToAttrs' :: [Type] -> C2C [C.Attr']
+coreToAttrs' [k, a, attrs] = do
+  -- We expect three type arguments:
+  --
+  --  k: either @Attr@ or @[Attr]@
+  --  a: type being annotated
+  --  attrs: attribute or list of attributes
+  --
+  attrs1 <- tryList
+  attrs2 <- tryAttr
+  case attrs1 <|> attrs2 of
+    Just theseAttrs -> do
+      subAttrs <- coreToAttrs a
+      pure (theseAttrs <> subAttrs)
+    Nothing ->
+      error [__i|
+        Expected either an attribute or a list of attributes, got:
 
-coreToAttrs'
-    :: [Type]
-    -> C2C [C.Attr']
-coreToAttrs' [annotationType, realType, attributes] = allAttrs
+          #{showPprUnsafe k}
+      |]
  where
-  allAttrs = (++) <$> attrs <*> subAttrs
 
-  subAttrs =
-    coreToAttrs realType
+  isListTy = fmap (== show ''[]) . typeConstructorToString
+  isAttrTy = fmap (== show ''Attr) . typeConstructorToString
 
-  attrs =
-    case annotationType of
-      TyConApp ty [TyConApp ty' _args'] -> do
-        name'  <- typeConstructorToString ty
-        name'' <- typeConstructorToString ty'
+  tryList = case k of
+    TyConApp ty0 [TyConApp ty1 _] -> do
+      ifM
+        (andM [isListTy ty0, isAttrTy ty1])
+        (Just <$> traverse coreToAttr (listTypeToListOfTypes attrs))
+        (pure Nothing)
+    _ -> pure Nothing
 
-        let result | name' `elem` ["GHC.Types.[]", "GHC.Types.List"] && name'' == _ATTR_NAME =
-                      -- List of attributes
-                      traverse coreToAttr (listTypeToListOfTypes attributes)
-
-                   | name' `elem` ["GHC.Types.[]", "GHC.Types.List"] =
-                      -- List, but unknown types
-                      error $ $(curLoc) ++ unwords [ "Annotate expects an"
-                                                   , "Attr or a list of"
-                                                   , "Attr's, but got a list"
-                                                   , "of:", name'']
-                   | otherwise =
-                        -- Some unknown nested type
-                      error $ $(curLoc) ++ unwords [ "Annotate expects an"
-                                                   , "Attr or a list of"
-                                                   , "Attr's, but got:"
-                                                   , name' ]
-
-        result
-
-      TyConApp ty _args -> do
-        name' <- typeConstructorToString ty
-        if name' == _ATTR_NAME
-          then
-            -- Single annotation
-            sequence [coreToAttr attributes]
-          else do
-            -- Annotation to something we don't recognize (not a list,
-            -- nor an Attr)
-            tystr <- typeConstructorToString ty
-            error $ unwords [ "Annotate expects an Attr or a list of Attr's,"
-                            , "but got:", tystr ]
-      _ ->
-        error $ $(curLoc) ++ unwords [ "Expected TyConApp, not:"
-                                     , showPprUnsafe annotationType]
+  tryAttr = case k of
+    TyConApp ty _ -> do
+      ifM
+        (isAttrTy ty)
+        (Just <$> sequence [coreToAttr attrs])
+        (pure Nothing)
+    _ -> pure Nothing
 
 coreToAttrs' illegal =
-  error $ "Expected list with three items (as Annotate has three arguments), but got: "
-      ++ show (map (showPprUnsafe) illegal)
+  error $ "Unexpected type args to Annotate: " ++ show (map (showPprUnsafe) illegal)
 
 -- | If this type has an annotate type synonym, return list of attributes.
-coreToAttrs
-  :: Type
-  -> C2C [C.Attr']
+coreToAttrs :: Type -> C2C [C.Attr']
 coreToAttrs (TyConApp tycon kindsOrTypes) = do
   name' <- typeConstructorToString tycon
 
-  if name' == "Clash.Annotations.SynthesisAttributes.Annotate"
-    then
-      coreToAttrs' kindsOrTypes
-    else
-      return []
+  if name' == show ''Annotate
+  then coreToAttrs' kindsOrTypes
+  else return []
 
 coreToAttrs _ =
     return []
