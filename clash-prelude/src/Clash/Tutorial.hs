@@ -1109,7 +1109,7 @@ blockRam#
   :: ( KnownDomain dom
      , HasCallStack
      , NFDataX a )
-  => 'Clock' dom           -- ^ 'Clock' to synchronize to
+  => 'Clock' dom           -- ^ Clock to synchronize to
   -> 'Enable' dom          -- ^ Global enable
   -> 'Vec' n a             -- ^ Initial content of the BRAM, also
                            -- determines the size, @n@, of the BRAM.
@@ -1262,7 +1262,7 @@ a general listing of the available template holes:
   @-fclash-vivado@ flag. To be used with in an @~IF .. ~THEN .. ~ELSE .. ~FI@
   statement.
 * @~CMPLE[\<HOLE1\>][\<HOLE2\>]@: /1/ when @\<HOLE1\> \<= \<HOLE2\>@, otherwise /0/
-* @~IW64@: /1/ when Int/Word/Integer types are represented with 64 bits in HDL.
+* @~IW64@: /1/ when Int\/Word\/Integer types are represented with 64 bits in HDL.
   /0/ when they're represented by 32 bits.
 * @~TOBV[\<HOLE\>][\<TYPE\>]@: create conversion code that so that the
   expression in @\<HOLE\>@ is converted to a bit vector (@std_logic_vector@).
@@ -1565,8 +1565,8 @@ __asyncRam__
      , 'KnownDomain' rdom
      , 'NFDataX' a
      )
-  => 'Clock' wdom                     -- ^ 'Clock' to which to synchronize the write port of the RAM
-  -> 'Clock' rdom                     -- ^ 'Clock' to which the read address signal, @r@, is synchronized to
+  => 'Clock' wdom                     -- ^ Clock to which to synchronize the write port of the RAM
+  -> 'Clock' rdom                     -- ^ Clock to which the read address signal, @r@, is synchronized to
   -> 'Enable' wdom                    -- ^ Global enable
   -> 'SNat' n                         -- ^ Size @n@ of the RAM
   -> 'Signal' rdom addr               -- ^ Read address @r@
@@ -1681,9 +1681,9 @@ asyncFIFOSynchronizer
   -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
   -- elements.
   -> 'Clock' wdom
-  -- ^ 'Clock' to which the write port is synchronized
+  -- ^ Clock to which the write port is synchronized
   -> 'Clock' rdom
-  -- ^ 'Clock' to which the read port is synchronized
+  -- ^ Clock to which the read port is synchronized
   -> 'Reset' wdom
   -> 'Reset' rdom
   -> 'Enable' wdom

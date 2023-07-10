@@ -259,7 +259,7 @@ data HDL
 --       ~GENSYM[example][0] : block
 --       ~RESULT <= 1 + ~ARG[0];
 --       end block;
---       end InlinePrimitive example
+--       -- end InlinePrimitive example
 --   |]) \#-\}
 -- {\-\# NOINLINE example \#-\}
 -- example :: Signal System (BitVector 2) -> Signal System (BitVector 2)

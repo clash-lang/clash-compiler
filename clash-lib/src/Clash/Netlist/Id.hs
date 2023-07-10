@@ -118,13 +118,11 @@ clearSet (IdentifierSet escL lwL hdlL _ _) =
 toList :: IdentifierSet -> [Identifier]
 toList (IdentifierSet _ _ _ _ idStore) = HashSet.toList idStore
 
--- | Convert an identifier to string. Use 'unmake' if you need the
--- "IdentifierType" too.
+-- | Convert an identifier to string
 toText :: Identifier -> Text
 toText = toText#
 
--- | Convert an identifier to string. Use 'unmake' if you need the
--- "IdentifierType" too.
+-- | Convert an identifier to string
 toLazyText :: Identifier -> LT.Text
 toLazyText = LT.fromStrict . toText
 

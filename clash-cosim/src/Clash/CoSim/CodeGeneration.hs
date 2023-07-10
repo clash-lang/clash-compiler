@@ -116,7 +116,7 @@ coSimTypeGen clks args = do
     let domName = mkName "dom"
     let dom     = return $ VarT domName
 
-    -- Generate contraints:
+    -- Generate constraints:
     argConstraints <- sequence $ map (\name -> [t| ClashType $name |]) argTypeNames
     resConstraint  <- [t| ClashType $result |]
     kdConstraint   <- [t| KnownDomain $dom |]

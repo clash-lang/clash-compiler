@@ -59,16 +59,16 @@ class Counter a where
   default countMax :: Bounded a => a
   countMax = maxBound
 
-  -- | Gets the successor of @a@. If it overflows, the left part of the tuple
-  -- will be set to True.
+  -- | Gets the successor of @a@. If it overflows, the first part of the tuple
+  -- will be set to True and the second part wraps around to `countMin`.
   countSuccOverflow :: a -> (Bool, a)
   default countSuccOverflow :: (Eq a, Enum a, Bounded a) => a -> (Bool, a)
   countSuccOverflow a
     | a == maxBound = (True, countMin)
     | otherwise = (False, succ a)
 
-  -- | Gets the predecessor of @a@. If it overflows, the left part of the tuple
-  -- will be set to True.
+  -- | Gets the predecessor of @a@. If it underflows, the first part of the tuple
+  -- will be set to True and the second part wraps around to `countMax`.
   countPredOverflow :: a -> (Bool, a)
   default countPredOverflow :: (Eq a, Enum a, Bounded a) => a -> (Bool, a)
   countPredOverflow a
