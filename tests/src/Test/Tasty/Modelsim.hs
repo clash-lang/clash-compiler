@@ -109,7 +109,8 @@ instance IsTest ModelsimSimTest where
     failingVsim workDir args (testExit, expectedErr) =
       TestFailingProgram
         (testExitCode testExit) "vsim" args PrintNeither False
-        (specificExitCode testExit) (ExpectEither expectedErr) (Just workDir) []
+        (specificExitCode testExit) (ExpectEither expectedErr) ExpectNothing
+        (Just workDir) []
 
     doScript = List.intercalate ";"
       [ "run -all"

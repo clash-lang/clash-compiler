@@ -22,6 +22,11 @@ import           Text.Printf               (printf)
 import           Test.Tasty
 import           Test.Tasty.Common
 import           Test.Tasty.Clash
+import           Test.Tasty.Program
+import           Test.Tasty.Providers
+
+import Text.Regex.TDFA (ExecOption (..), defaultCompOpt)
+import Text.Regex.TDFA.Text (compile)
 
 -- | GHC version as major.minor.patch1. For example: 8.10.2.
 ghcVersion3 :: String
@@ -1141,4 +1146,128 @@ main :: IO ()
 main = do
   setEnv "TASTY_NUM_THREADS" (show numCapabilities)
   setClashEnvs compiledWith
-  runClashTest
+--   runClashTest
+  defaultMain $ testGroup "testtest"
+    [ singleTest "ExpectStdOut" $
+        TestFailingProgram
+          False
+          "failMyriadWays"
+          [ "He's dead, Jim"
+          , "\\c"
+          , "0"
+          ]
+          PrintBoth
+          False
+          Nothing
+          (ExpectStdOut "still alive")
+          ExpectNothing
+          Nothing
+          []
+    , singleTest "ExpectStdErr" $
+        TestFailingProgram
+          False
+          "failMyriadWays"
+          [ "\\c"
+          , "He's dead, Jim"
+          , "0"
+          ]
+          PrintBoth
+          False
+          Nothing
+          (ExpectStdErr "still alive")
+          ExpectNothing
+          Nothing
+          []
+    , singleTest "ExpectEither" $
+        TestFailingProgram
+          False
+          "failMyriadWays"
+          [ "\\c"
+          , "He's dead, Jim"
+          , "0"
+          ]
+          PrintBoth
+          False
+          Nothing
+          (ExpectEither "still alive")
+          ExpectNothing
+          Nothing
+          []
+    , singleTest "ExpectNotStdErr" $
+        TestFailingProgram
+          False
+          "failMyriadWays"
+          [ "\\c"
+          , "He's dead, Jim"
+          , "0"
+          ]
+          PrintBoth
+          False
+          Nothing
+          (ExpectNotStdErr "dead")
+          ExpectNothing
+          Nothing
+          []
+    , singleTest "ExpectMatchStdOut" $
+        TestFailingProgram
+          False
+          "failMyriadWays"
+          [ "He's still alive, Jim, but barely"
+          , "\\c"
+          , "0"
+          ]
+          PrintBoth
+          False
+          Nothing
+          (ExpectMatchStdOut re)
+          ExpectNothing
+          Nothing
+          []
+    , singleTest "ExpectNotMatchStdOut" $
+        TestFailingProgram
+          False
+          "failMyriadWays"
+          [ "He's dead, Jim"
+          , "\\c"
+          , "0"
+          ]
+          PrintBoth
+          False
+          Nothing
+          (ExpectNotMatchStdOut re)
+          ExpectNothing
+          Nothing
+          []
+    , singleTest "errOnEmptyStderr" $
+        TestFailingProgram
+          False
+          "failMyriadWays"
+          [ "He's dead, Jim"
+          , "\\c"
+          , "0"
+          ]
+          PrintBoth
+          True
+          Nothing
+          ExpectNothing
+          ExpectNothing
+          Nothing
+          []
+    , singleTest "unexpectedCode" $
+        TestFailingProgram
+          True
+          "failMyriadWays"
+          [ "He's dead, Jim"
+          , "\\c"
+          , "1"
+          ]
+          PrintBoth
+          False
+          (Just 0)
+          ExpectNothing
+          ExpectNothing
+          Nothing
+          []
+    ]
+ where
+  re = either error id (compile defaultCompOpt (ExecOption False) "dead")

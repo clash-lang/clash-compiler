@@ -115,7 +115,8 @@ instance IsTest IVerilogSimTest where
     failingVvp workDir args (testExit, expectedErr) =
       TestFailingProgram
         (testExitCode testExit) "vvp" args PrintNeither False
-        (specificExitCode testExit) (ExpectEither expectedErr) (Just workDir) []
+        (specificExitCode testExit) (ExpectEither expectedErr) ExpectNothing
+        (Just workDir) []
 
   testOptions =
     coerce (coerce (testOptions @TestProgram) <> [Option (Proxy @Iverilog)])

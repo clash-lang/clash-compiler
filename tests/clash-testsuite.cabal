@@ -145,6 +145,7 @@ executable clash-testsuite
 
   build-depends:
     containers,
+    regex-tdfa >=1.3.1.0,
     clash-testsuite
 
   if impl(ghc >= 9.0.0)

@@ -168,7 +168,8 @@ instance IsTest GhdlSimTest where
     failingProgram workDir top (testExit, expectedErr) =
       TestFailingProgram
         (testExitCode testExit) "ghdl" (args top) PrintNeither False
-        (specificExitCode testExit) (ExpectEither expectedErr) (Just workDir) []
+        (specificExitCode testExit) (ExpectEither expectedErr) ExpectNothing
+        (Just workDir) []
 
     args work =
       [ "-r"

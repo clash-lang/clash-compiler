@@ -231,7 +231,7 @@ instance IsTest ClashGenTest where
       in
       TestFailingProgram
         (testExitCode testExit) "clash" (args oDir hdlDir) PrintNeither
-        False (specificExitCode testExit) expected Nothing []
+        False (specificExitCode testExit) expected ExpectNothing Nothing []
 
     args oDir hdlDir =
       [ target

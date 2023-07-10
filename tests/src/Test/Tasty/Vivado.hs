@@ -55,7 +55,7 @@ instance IsTest VivadoTest where
    where
     vivado workDir args =
       TestFailingProgram True "vivado" args PrintNeither False (Just 0)
-        (ExpectNotMatchStdOut re) (Just workDir)
+        (ExpectNotMatchStdOut re) ExpectNothing (Just workDir)
         -- Without XILINX_LOCAL_USER_DATA=no, concurrently running instances of
         -- Vivado might error out while accessing the Xilinx Tcl App Store at
         -- ~/.Xilinx. https://support.xilinx.com/s/article/63253

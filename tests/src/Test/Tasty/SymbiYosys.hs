@@ -69,7 +69,8 @@ instance IsTest SbyVerificationTest where
     failingSby workDir args (testExit, expectedErr) =
       TestFailingProgram
         (testExitCode testExit) "sby" args PrintNeither False
-        (specificExitCode testExit) (ExpectEither expectedErr) (Just workDir) []
+        (specificExitCode testExit) (ExpectEither expectedErr) ExpectNothing
+        (Just workDir) []
 
   testOptions =
     coerce (coerce (testOptions @TestProgram) <> [Option (Proxy @Symbiyosys)])

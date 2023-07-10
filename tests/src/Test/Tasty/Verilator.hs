@@ -120,7 +120,8 @@ instance IsTest VerilatorSimTest where
 
     failingVerilated workDir exe (exit, expectedErr) =
       TestFailingProgram (testExitCode exit) exe [] PrintNeither False
-        (specificExitCode exit) (ExpectEither expectedErr) (Just workDir) []
+        (specificExitCode exit) (ExpectEither expectedErr) ExpectNothing
+        (Just workDir) []
 
   testOptions =
     coerce (coerce (testOptions @TestProgram) <> [Option (Proxy @Verilator)])
