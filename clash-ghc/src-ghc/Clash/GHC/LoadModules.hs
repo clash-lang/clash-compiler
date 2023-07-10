@@ -2,7 +2,7 @@
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017     , Google Inc.
-                     2021     , QBayLogic B.V.
+                     2021-2023, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -63,6 +63,9 @@ import           Debug.Trace
 import           Language.Haskell.TH.Syntax      (lift)
 import           GHC.Natural                     (naturalFromInteger)
 import           GHC.Stack                       (HasCallStack)
+#if MIN_VERSION_ghc(9,4,0)
+import           System.FilePath.Posix           (dropExtension, takeDirectory)
+#endif
 import           Text.Read                       (readMaybe)
 
 #ifdef USE_GHC_PATHS
@@ -77,16 +80,25 @@ import           System.Process                  (runInteractiveCommand,
 
 -- GHC API
 #if MIN_VERSION_ghc(9,0,0)
-#if MIN_VERSION_ghc(9,6,0)
-import           GHC.Unit.Home.ModInfo (emptyHomeModInfoLinkable)
-#endif
 #if MIN_VERSION_ghc(9,4,0)
+import           GHC.Driver.Phases (StopPhase(NoStop))
+import           GHC.Driver.Pipeline (mkPipeEnv, runPipeline, hscBackendPipeline)
+#if MIN_VERSION_ghc(9,6,0)
+import           GHC.SysTools.Cpp (offsetIncludePaths)
+import           GHC.Unit.Home.ModInfo (homeMod_bytecode)
+#else
+import           GHC.Driver.Pipeline.Execute (offsetIncludePaths)
+import           GHC.Driver.Pipeline.Monad (PipelineOutput(NoOutputFile, Persistent))
+#endif
+import           GHC.Driver.Pipeline.Monad ( MonadUse(use) )
+import           GHC.Driver.Pipeline.Phases (TPhase(T_HscPostTc))
 import           GHC.Data.Bool (OverridingBool)
 import           GHC.Driver.Config.Tidy (initTidyOpts)
 import           GHC.Driver.Errors.Types (GhcMessage(GhcTcRnMessage))
 import           GHC.Driver.Monad (modifySession)
-import           GHC.Driver.Pipeline (compileOne')
 import           GHC.Unit.Env (addHomeModInfoToHug)
+import           GHC.Unit.Home.ModInfo (HomeModInfo(HomeModInfo))
+import           GHC.Unit.Module.ModSummary (findTarget)
 #else
 import           GHC.Utils.Misc (OverridingBool)
 #endif
@@ -407,15 +419,8 @@ loadLocalModule hdl modName = do
     --
     -- Given that TH splices can do non-trivial computation and I/O,
     -- running TH twice must be avoid.
-#if MIN_VERSION_ghc(9,6,0)
-    hsc_env_tc <- GHC.getSession
-    mod_info <- liftIO $ compileOne' Nothing hsc_env_tc m 1 1 Nothing emptyHomeModInfoLinkable
-    modifySession $ HscTypes.hscUpdateHUG (addHomeModInfoToHug mod_info)
-    let tcMod' = tcMod
-#elif MIN_VERSION_ghc(9,4,0)
-    hsc_env_tc <- GHC.getSession
-    mod_info <- liftIO $ compileOne' Nothing hsc_env_tc m 1 1 Nothing Nothing
-    modifySession $ HscTypes.hscUpdateHUG (addHomeModInfoToHug mod_info)
+#if MIN_VERSION_ghc(9,4,0)
+    let (tc_result,_) = GHC.tm_internals_ tcMod
     let tcMod' = tcMod
 #else
     tcMod' <- GHC.loadModule tcMod
@@ -429,6 +434,67 @@ loadLocalModule hdl modName = do
     (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram opts simpl_guts
 #else
     (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env simpl_guts
+#endif
+#if MIN_VERSION_ghc(9,4,0)
+    let
+      loadAsByteCode
+        | Just GHC.Target { targetAllowObjCode = obj }
+            <- findTarget m (HscTypes.hsc_targets hsc_env)
+        , not obj
+        = True
+        | otherwise = False
+      lcl_dflags = GHC.ms_hspp_opts m
+      old_paths  = GHC.includePaths lcl_dflags
+      location = GHC.ms_location m
+      input_fn = fromMaybe (error "loadLocalModule") (GHC.ml_hs_file location)
+      basename = dropExtension input_fn
+      current_dir = takeDirectory basename
+#if MIN_VERSION_ghc(9,6,0)
+      interpreterBackend = Backend.interpreterBackend
+#else
+      interpreterBackend = Backend.Interpreter
+#endif
+      (bcknd, dflags3)
+        | loadAsByteCode
+        = ( interpreterBackend
+          , DynFlags.gopt_set
+              (lcl_dflags { GHC.backend = interpreterBackend })
+              Opt_ForceRecomp
+          )
+        | otherwise
+        = (GHC.backend dflags, lcl_dflags)
+      dflags = dflags3
+              { GHC.includePaths = offsetIncludePaths dflags3 $
+                                    DynFlags.addImplicitQuoteInclude
+                                      old_paths
+                                      [current_dir] }
+#if MIN_VERSION_ghc(9,6,0)
+      pipelineOutput = Backend.backendPipelineOutput bcknd
+#else
+      pipelineOutput = case bcknd of
+        GHC.Interpreter -> NoOutputFile
+        GHC.NoBackend -> NoOutputFile
+        _ -> Persistent
+#endif
+      upd_summary = m { GHC.ms_hspp_opts = dflags }
+      hsc_env1 = HscTypes.hscSetFlags dflags hsc_env
+      pipe_env = mkPipeEnv NoStop input_fn Nothing pipelineOutput
+      pipeline = do
+        ac <- use (T_HscPostTc hsc_env1 upd_summary
+                      (TcRnTypes.FrontendTypecheck tc_result) mempty Nothing )
+        hscBackendPipeline pipe_env hsc_env1 upd_summary ac
+    (iface, linkable) <- liftIO (runPipeline (HscTypes.hsc_hooks hsc_env1) pipeline)
+#if MIN_VERSION_ghc(9,6,0)
+    details <- liftIO (HscMain.initModDetails hsc_env1 iface)
+    linkable1 <- liftIO (traverse (HscMain.initWholeCoreBindings hsc_env1 iface details)
+                                  (homeMod_bytecode linkable))
+    let linkable2 = linkable {homeMod_bytecode = linkable1}
+#else
+    details <- liftIO (HscMain.initModDetails hsc_env1 upd_summary iface)
+    let linkable2 = linkable
+#endif
+    let mod_info = HomeModInfo iface details linkable2
+    modifySession $ HscTypes.hscUpdateHUG (addHomeModInfoToHug mod_info)
 #endif
     let pgm        = HscTypes.cg_binds tidy_guts
     let modFamInstEnv = TcRnTypes.tcg_fam_inst_env $ fst $ GHC.tm_internals_ tcMod
