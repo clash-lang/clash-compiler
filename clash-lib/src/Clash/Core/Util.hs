@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
-                     2021     , QBayLogic B.V.,
+                     2021-2023, QBayLogic B.V.,
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -345,6 +345,7 @@ isClockOrReset
 isClockOrReset m (coreView1 m -> Just ty)    = isClockOrReset m ty
 isClockOrReset _ (tyView -> TyConApp tcNm _) = case nameOcc tcNm of
   "Clash.Signal.Internal.Clock" -> True
+  "Clash.Signal.Internal.ClockN" -> True
   "Clash.Signal.Internal.Reset" -> True
   _ -> False
 isClockOrReset _ _ = False
@@ -618,9 +619,9 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
     && nameOcc a2Nm == "Clash.Signal.Internal.KnownDomain"
   isHidden _ _ = False
 
-  -- Currently we're only interested in splitting of Clock, Reset, and Enable
   splitTy (TyConApp tcNm0 _)
     = nameOcc tcNm0 `elem` [ "Clash.Signal.Internal.Clock"
+                           , "Clash.Signal.Internal.ClockN"
                            , "Clash.Signal.Internal.Reset"
                            , "Clash.Signal.Internal.Enable"
                            -- iverilog doesn't like it when we put file handles

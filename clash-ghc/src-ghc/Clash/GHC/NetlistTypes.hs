@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2023, Myrtle Software Ltd,
-                     2021-2022, QBayLogic B.V.
+                     2021-2023, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -184,6 +184,12 @@ ghcTypeToHWType iw = go
           -> do
             tag1 <- domTag m tag0
             returnN (Clock (pack tag1))
+
+        "Clash.Signal.Internal.ClockN"
+          | [tag0] <- args
+          -> do
+            tag1 <- domTag m tag0
+            returnN (ClockN (pack tag1))
 
         "Clash.Signal.Internal.Reset"
           | [tag0] <- args

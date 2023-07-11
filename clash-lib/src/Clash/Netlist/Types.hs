@@ -390,6 +390,8 @@ isBiDirectional = go . snd
 
 -- | Find the name and domain name of each clock argument of a component.
 --
+-- This will not consider @ClockN@ to be a clock argument, which means only the
+-- positive phase of a differential pair will be added to @sdcClock@.
 findClocks :: Component -> [(Text, Text)]
 findClocks (Component _ is _ _) =
   mapMaybe isClock is
@@ -449,6 +451,8 @@ data HWType
   -- ^ Sum-of-Product type: Name and Constructor names + field types
   | Clock !DomainName
   -- ^ Clock type corresponding to domain /DomainName/
+  | ClockN !DomainName
+  -- ^ ClockN type corresponding to domain /DomainName/
   | Reset !DomainName
   -- ^ Reset type corresponding to domain /DomainName/
   | Enable !DomainName
@@ -482,6 +486,7 @@ annotated attrs t = Annotated attrs t
 hwTypeDomain :: HWType -> Maybe DomainName
 hwTypeDomain = \case
   Clock dom -> Just dom
+  ClockN dom -> Just dom
   Reset dom -> Just dom
   Enable dom -> Just dom
   KnownDomain dom _ _ _ _ _ -> Just dom

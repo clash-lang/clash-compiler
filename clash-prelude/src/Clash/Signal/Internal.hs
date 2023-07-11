@@ -79,6 +79,8 @@ module Clash.Signal.Internal
   , createDomain
     -- * Clocks
   , Clock (..)
+  , ClockN (..)
+  , DiffClock (..)
   , hzToPeriod
   , periodToHz
   , ClockAB (..)
@@ -185,6 +187,7 @@ import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
                                    property)
 
 import Clash.CPP                  (fStrictMapSignal)
+import Clash.NamedTypes
 import Clash.Promoted.Nat         (SNat (..), snatToNum, snatToNatural)
 import Clash.Promoted.Symbol      (SSymbol (..), ssymbolToString)
 import Clash.XException
@@ -876,6 +879,28 @@ data Clock (dom :: Domain) = Clock
 instance Show (Clock dom) where
   show (Clock dom Nothing) = "<Clock: " ++ ssymbolToString dom ++ ">"
   show (Clock dom _) = "<Dynamic clock: " ++ ssymbolToString dom ++ ">"
+
+-- | The negative or inverted phase of a differential clock signal. HDL
+-- generation will treat it the same as 'Clock', except that no @create_clock@
+-- command is issued in the SDC file for 'ClockN'. Used in 'DiffClock'.
+newtype ClockN (dom :: Domain) = ClockN { clockNTag :: SSymbol dom }
+
+instance Show (ClockN dom) where
+  show (ClockN dom) = "<ClockN: " ++ ssymbolToString dom ++ ">"
+
+-- | A differential clock signal belonging to a domain named /dom/. The clock
+-- input of a design with such an input has two ports which are in antiphase.
+-- The first input is the positive phase, the second the negative phase. When
+-- using 'Clash.Annotations.TH.makeTopEntity', the names of the inputs will end
+-- in @_p@ and @_n@ respectively.
+data DiffClock (dom :: Domain) =
+  DiffClock ("p" ::: Clock dom) ("n" ::: ClockN dom)
+
+instance Show (DiffClock dom) where
+  show (DiffClock (Clock dom Nothing) _) =
+    "<DiffClock: " ++ ssymbolToString dom ++ ">"
+  show (DiffClock (Clock dom _) _) =
+    "<Dynamic DiffClock: " ++ ssymbolToString dom ++ ">"
 
 -- | Clock generator for simulations. Do __not__ use this clock generator for
 -- the /testBench/ function, use 'tbClockGen' instead.

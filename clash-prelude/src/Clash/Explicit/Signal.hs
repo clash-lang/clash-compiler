@@ -196,6 +196,7 @@ module Clash.Explicit.Signal
   , enableGen
     -- * Clock
   , Clock
+  , DiffClock
   , periodToHz
   , hzToPeriod
     -- ** Synchronization primitive

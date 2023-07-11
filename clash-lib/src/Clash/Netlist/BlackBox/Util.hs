@@ -1,7 +1,7 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
-                    2021-2022, QBayLogic B.V.
+                    2021-2023, QBayLogic B.V.
                     2022     , LUMI GUIDE FIETSDETECTIE B.V.
                     2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
@@ -475,6 +475,8 @@ renderElem b (Tag n) = do
     KnownDomain dom _ _ _ _ _ ->
       return (const (Text.pack (Data.Text.unpack dom)))
     Clock dom ->
+      return (const (Text.pack (Data.Text.unpack dom)))
+    ClockN dom ->
       return (const (Text.pack (Data.Text.unpack dom)))
     Reset dom ->
       return (const (Text.pack (Data.Text.unpack dom)))

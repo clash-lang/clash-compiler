@@ -2,7 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017-2022, Google Inc.
                   2019     , Myrtle Software Ltd,
-                  2021     , QBayLogic B.V.
+                  2021-2023, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -48,10 +48,12 @@ import System.IO.Unsafe      (unsafeDupablePerformIO)
 import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Class.Num       (satSucc, SaturationMode(SatBound))
 import Clash.Promoted.Nat    (SNat(..))
+import Clash.Promoted.Symbol (SSymbol(..))
 import Clash.Explicit.Signal
   (Clock, Reset, System, Signal, toEnable, fromList, register,
   unbundle, unsafeSynchronizer)
-import Clash.Signal.Internal (Reset (..), tbClockGen)
+import Clash.Signal.Internal
+  (ClockN (..), DiffClock (..), Reset (..), tbClockGen)
 import Clash.Signal          (mux, KnownDomain, Enable)
 import Clash.Sized.Index     (Index)
 import Clash.Sized.Internal.BitVector
@@ -468,14 +470,15 @@ tbSystemClockGen = tbClockGen
 -- Example:
 --
 -- @
--- (clkP, clkN) = seClockToDiffClock $ tbClockGen (not \<\$\> done)
+-- clk = seClockToDiffClock $ tbClockGen (not \<\$\> done)
 -- @
 seClockToDiffClock ::
+  KnownDomain dom =>
   -- | Single-ended input
   Clock dom ->
-  -- | (Positive phase, negative phase)
-  (Clock dom, Clock dom)
-seClockToDiffClock clk = (clk, clk)
+  -- | Differential output
+  DiffClock dom
+seClockToDiffClock clk = DiffClock clk (ClockN SSymbol)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE seClockToDiffClock #-}
 {-# ANN seClockToDiffClock hasBlackBox #-}

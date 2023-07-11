@@ -678,6 +678,7 @@ typeSize (KnownDomain {}) = 0
 typeSize Bool = 1
 typeSize Bit = 1
 typeSize (Clock _) = 1
+typeSize (ClockN _) = 1
 typeSize (Reset _) = 1
 typeSize (Enable _) = 1
 typeSize (BitVector i) = i
