@@ -515,7 +515,7 @@ macT acc (x,y) = (acc',o)
     acc' = ma acc (x,y)
     o    = acc
 
-mac inp = 'mealy' macT 0 inp
+mac xy = 'mealy' macT 0 xy
 
 topEntity
   :: 'Clock' 'System'
@@ -652,8 +652,9 @@ structure.
     function directly:
 
     @
-    macN (x,y) = acc
+    macN xy = acc
       where
+        (x,y) = 'unbundle' xy
         acc = 'register' 0 (acc + x * y)
     @
 
@@ -665,10 +666,10 @@ structure.
     class:
 
     @
-    macA (x,y) = acc
+    macA xy = acc
       where
         acc  = 'register' 0 acc'
-        acc' = ma '<$>' acc '<*>' 'bundle' (x,y)
+        acc' = ma '<$>' acc '<*>' xy
     @
 
 * __'Control.Monad.State.Strict.State' Monad__
@@ -706,7 +707,7 @@ structure.
     We can then create the complete @mac@ circuit as:
 
     @
-    macS = 'mealyS' macTS 0
+    macS xy = 'mealyS' macTS 0 xy
     @
 -}
 
