@@ -15,6 +15,7 @@ module Clash.Primitives.Prelude
 
 import Data.Either (lefts)
 import GHC.Stack (HasCallStack)
+import Text.Show.Pretty
 
 import Clash.Core.TermLiteral (termToDataError)
 import Clash.Netlist.BlackBox.Types (BlackBoxFunction)
@@ -22,9 +23,9 @@ import Clash.Netlist.Types ()
 
 clashCompileErrorBBF :: HasCallStack => BlackBoxFunction
 clashCompileErrorBBF _isD _primName args _ty
-  | [ _hasCallstack
-    , either error id . termToDataError -> msg
-    ] <- lefts args
+  |   _hasCallstack
+    : (either error id . termToDataError -> msg)
+    : _ <- lefts args
   = pure $ Left $ "clashCompileError: " <> msg
   | otherwise
-  = pure $ Left $ show 'clashCompileErrorBBF <> ": bad args: " <> show args
+  = pure $ Left $ show 'clashCompileErrorBBF <> ": bad args:\n" <> ppShow args
