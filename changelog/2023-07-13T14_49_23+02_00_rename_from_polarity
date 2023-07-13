@@ -1,1 +1,1 @@
-DEPRECATED: `unsafeFromLowPolarity` and `unsafeFromHighPolarity` have been replaced by `unsafeFromActiveLow` and `unsafeFromActiveHigh`. While former ones will continue to exist, a deprecation warning has been added pointing to the latter ones.
+DEPRECATED: `unsafeFromLowPolarity`, `unsafeFromHighPolarity`, `unsafeToLowPolarity`, `unsafeToHighPolarity` have been replaced by `unsafeFromActiveLow`, `unsafeFromActiveHigh`, `unsafeToActiveLow`, `unsafeToActiveHigh`. While former ones will continue to exist, a deprecation warning has been added pointing to the latter ones.
