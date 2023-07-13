@@ -120,8 +120,8 @@ mkTestBench cFifo = done
  where
   (rClk, wClk) = biTbClockGen (not <$> done)
 
-  noRRst = unsafeFromHighPolarity $ pure False
-  noWRst = unsafeFromHighPolarity $ pure False
+  noRRst = unsafeFromActiveHigh $ pure False
+  noWRst = unsafeFromActiveHigh $ pure False
 
   rEna = enableGen
   wEna = enableGen

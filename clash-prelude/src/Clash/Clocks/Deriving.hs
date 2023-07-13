@@ -51,7 +51,7 @@ derive' n = do
   -- Implementation of 'clocks'
   clkImpl <- [| Clock SSymbol Nothing |]
   lockImpl <- [| unsafeSynchronizer clockGen clockGen
-                   (unsafeToLowPolarity $(varE rst)) |]
+                   (unsafeToActiveLow $(varE rst)) |]
   let
     noInline  = PragmaD $ InlineP (mkName "clocks") NoInline FunLike AllPhases
     clkImpls  = replicate n clkImpl

@@ -113,7 +113,7 @@ tests =
         "Implicit"
         [ -- See: https://github.com/clash-lang/clash-compiler/pull/655
           let rst0 = fromList [True, True, False, False, True, True]
-              rst1 = unsafeFromHighPolarity rst0
+              rst1 = unsafeFromActiveHigh rst0
               reg  = register 'a' (pure 'b')
 #ifdef CLASH_MULTIPLE_HIDDEN
               sig = withReset rst1 reg

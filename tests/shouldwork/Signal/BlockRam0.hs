@@ -99,6 +99,6 @@ testBench = done
 
           :> Nil)
 
-    done           = expectedOutput (topEntity clk (unsafeFromHighPolarity rst0) enableGen rd wr)
+    done           = expectedOutput (topEntity clk (unsafeFromActiveHigh rst0) enableGen rd wr)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen

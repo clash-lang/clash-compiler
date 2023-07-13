@@ -92,7 +92,7 @@ ddrIn#
   -> a
   -> Signal fast a
   -> Signal slow (a,a)
-ddrIn# (Clock _ Nothing) (unsafeToHighPolarity -> hRst) (fromEnable -> ena) i0 i1 i2 =
+ddrIn# (Clock _ Nothing) (unsafeToActiveHigh -> hRst) (fromEnable -> ena) i0 i1 i2 =
   case resetKind @fast of
     SAsynchronous ->
       goAsync

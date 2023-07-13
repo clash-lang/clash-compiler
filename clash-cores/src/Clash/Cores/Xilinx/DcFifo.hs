@@ -177,8 +177,8 @@ dcFifo DcConfig{..} wClk wRst rClk rRst writeData rEnable =
     _ -> error $ show 'dcFifo <> " only supports synchronous resets"
 
  where
-  rstSignalR = unsafeToHighPolarity rRst
-  rstSignalW = unsafeToHighPolarity wRst
+  rstSignalR = unsafeToActiveHigh rRst
+  rstSignalW = unsafeToActiveHigh wRst
 
   fifoSize = natToNum @(2 ^ depth - 1) @Int
   dataCount = fromIntegral . Seq.length

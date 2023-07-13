@@ -14,7 +14,7 @@ createDomain vXilinxSystem{vName="D10", vPeriod=hzToPeriod 100e6}
 createDomain vXilinxSystem{vName="D11", vPeriod=hzToPeriod 110e6}
 
 noRst :: KnownDomain dom => Reset dom
-noRst = unsafeFromHighPolarity (pure False)
+noRst = unsafeFromActiveHigh (pure False)
 
 tb ::
   forall a b stages width n .

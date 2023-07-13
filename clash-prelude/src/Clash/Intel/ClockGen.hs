@@ -77,13 +77,13 @@ import Clash.Signal.Internal
 --  where
 --   (clk, pllStable) =
 --     'altpll' \@'Clash.Signal.System' ('SSymbol' \@\"altpll50to100\") clkInp
---            ('Clash.Signal.unsafeFromLowPolarity' rstInp)
---   rst = 'Clash.Signal.resetSynchronizer' clk ('Clash.Signal.unsafeFromLowPolarity' pllStable)
+--            ('Clash.Signal.unsafeFromActiveLow' rstInp)
+--   rst = 'Clash.Signal.resetSynchronizer' clk ('Clash.Signal.unsafeFromActiveLow' pllStable)
 -- @
 --
 -- 'Clash.Signal.resetSynchronizer' will keep the reset asserted when
 -- @pllStable@ is 'False', hence the use of
--- @'Clash.Signal.unsafeFromLowPolarity' pllStable@. Your circuit will have
+-- @'Clash.Signal.unsafeFromActiveLow' pllStable@. Your circuit will have
 -- signals of type @'Signal' 'Clash.Signal.System'@ and all the clocks and
 -- resets of your components will be the @clk@ and @rst@ signals generated here
 -- (modulo local resets, which will be based on @rst@ or never asserted at all
@@ -179,13 +179,13 @@ altpll !_ = knownDomain @domIn `seq` knownDomain @domOut `seq` clocks
 --  where
 --   (clk :: 'Clock' 'Clash.Signal.System', pllStable :: 'Signal' 'Clash.Signal.System' 'Bool')
 --     'alteraPll' ('SSymbol' \@\"alterapll50to100\") clkInp
---               ('Clash.Signal.unsafeFromLowPolarity' rstInp)
---   rst = 'Clash.Signal.resetSynchronizer' clk ('Clash.Signal.unsafeFromLowPolarity' pllStable)
+--               ('Clash.Signal.unsafeFromActiveLow' rstInp)
+--   rst = 'Clash.Signal.resetSynchronizer' clk ('Clash.Signal.unsafeFromActiveLow' pllStable)
 -- @
 --
 -- 'Clash.Signal.resetSynchronizer' will keep the reset asserted when
 -- @pllStable@ is 'False', hence the use of
--- @'Clash.Signal.unsafeFromLowPolarity' pllStable@. Your circuit will have
+-- @'Clash.Signal.unsafeFromActiveLow' pllStable@. Your circuit will have
 -- signals of type @'Signal' 'Clash.Signal.System'@ and all the clocks and
 -- resets of your components will be the @clk@ and @rst@ signals generated here
 -- (modulo local resets, which will be based on @rst@ or never asserted at all

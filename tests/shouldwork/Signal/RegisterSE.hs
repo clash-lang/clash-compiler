@@ -51,7 +51,7 @@ topEntity clk rst en = head <$> r
 
 topEntitySE clk rst = topEntity clk arst en
   where
-    arst = unsafeFromHighPolarity (resetInput clk rst enableGen)
+    arst = unsafeFromActiveHigh (resetInput clk rst enableGen)
     en = toEnable (enableInput clk rst enableGen)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE topEntitySE #-}

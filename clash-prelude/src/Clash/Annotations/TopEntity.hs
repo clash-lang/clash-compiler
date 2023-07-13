@@ -84,8 +84,8 @@ topEntity clk20 rstBtn enaBtn modeBtn =
 
   -- Signal coming from the reset button is low when pressed, and high when
   -- not pressed. We convert this signal to the polarity of our domain with
-  -- /unsafeFromLowPolarity/.
-  rst = 'Clash.Signal.unsafeFromLowPolarity' ('Clash.Signal.unsafeFromReset' rstBtn)
+  -- /unsafeFromActiveLow/.
+  rst = 'Clash.Signal.unsafeFromActiveLow' ('Clash.Signal.unsafeFromReset' rstBtn)
 
   -- Instantiate a PLL: this stabilizes the incoming clock signal and indicates
   -- when the signal is stable. We're also using it to transform an incoming
@@ -99,11 +99,11 @@ topEntity clk20 rstBtn enaBtn modeBtn =
 
   -- Synchronize reset to clock signal coming from PLL. We want the reset to
   -- remain active while the PLL is NOT stable, hence the conversion with
-  -- /unsafeFromLowPolarity/
+  -- /unsafeFromActiveLow/
   rstSync =
     'Clash.Prelude.resetSynchronizer'
       clk50
-      ('Clash.Signal.unsafeFromLowPolarity' pllStable)
+      ('Clash.Signal.unsafeFromActiveLow' pllStable)
 
 blinkerT
   :: (BitVector 8, Bool, Index 16650001)

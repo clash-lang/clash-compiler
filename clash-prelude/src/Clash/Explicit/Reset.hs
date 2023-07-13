@@ -30,10 +30,16 @@ module Clash.Explicit.Reset
   , systemResetGen
   , unsafeToReset
   , unsafeFromReset
-  , unsafeToHighPolarity
-  , unsafeToLowPolarity
+  , unsafeToActiveHigh
+  , unsafeToActiveLow
+  , unsafeFromActiveHigh
+  , unsafeFromActiveLow
+
+  -- * Deprecated
   , unsafeFromHighPolarity
   , unsafeFromLowPolarity
+  , unsafeToHighPolarity
+  , unsafeToLowPolarity
   ) where
 
 import           Data.Type.Equality ((:~:)(Refl))
@@ -111,7 +117,7 @@ import           GHC.TypeLits (type (+))
 --   -> Signal System (BitVector 8)
 -- topEntity clk rst key1 =
 --     let  (pllOut,pllStable) = altpll (SSymbol @"altpll50") clk rst
---          rstSync            = 'resetSynchronizer' pllOut (unsafeToHighPolarity pllStable)
+--          rstSync            = 'resetSynchronizer' pllOut (unsafeToActiveHigh pllStable)
 --     in   exposeClockResetEnable leds pllOut rstSync enableGen
 --   where
 --     key1R  = isRising 1 key1
@@ -184,8 +190,8 @@ resetSynchronizer clk rst = rstOut
 -- designed with this environment in mind.
 --
 -- === __Example 1__
--- >>> let sampleResetN n = sampleN n . unsafeToHighPolarity
--- >>> let resetFromList = unsafeFromHighPolarity . fromList
+-- >>> let sampleResetN n = sampleN n . unsafeToActiveHigh
+-- >>> let resetFromList = unsafeFromActiveHigh . fromList
 -- >>> let rst = resetFromList [True, True, False, False, True, False, False, True, True, False, True, True]
 -- >>> sampleResetN 12 (resetGlitchFilter d2 systemClockGen rst)
 -- [True,True,True,True,False,False,False,False,False,True,True,True]
@@ -230,7 +236,7 @@ resetGlitchFilter SNat clk rst =
 --
 -- Example:
 --
--- >>> let sampleWithReset = sampleN 8 . unsafeToHighPolarity
+-- >>> let sampleWithReset = sampleN 8 . unsafeToActiveHigh
 -- >>> sampleWithReset (holdReset @System clockGen enableGen (SNat @2) (resetGenN (SNat @3)))
 -- [True,True,True,True,True,False,False,False]
 --
@@ -239,7 +245,7 @@ resetGlitchFilter SNat clk rst =
 -- intermediate assertions of the reset signal:
 --
 -- >>> let rst = fromList [True, False, False, False, True, False, False, False]
--- >>> sampleWithReset (holdReset @System clockGen enableGen (SNat @2) (unsafeFromHighPolarity rst))
+-- >>> sampleWithReset (holdReset @System clockGen enableGen (SNat @2) (unsafeFromActiveHigh rst))
 -- [True,True,True,False,True,True,True,False]
 --
 holdReset
@@ -255,7 +261,7 @@ holdReset
   -- ^ Reset to extend
   -> Reset dom
 holdReset clk en SNat rst =
-  unsafeFromHighPolarity ((/=maxBound) <$> counter)
+  unsafeFromActiveHigh ((/=maxBound) <$> counter)
  where
   counter :: Signal dom (Index (n+1))
   counter = register clk rst en 0 (satSucc SatBound <$> counter)

@@ -35,8 +35,8 @@ tbOutput top wClk rClk = output
           Just (0, 1) :> Just (1,2) :> Nothing :> Nil
   rd = delay rClk enableGen 0 $ rd + 1
   output = ignoreFor rClk rNoReset enableGen d2 0 $ top wClk rClk rd wrM
-  wNoReset = unsafeFromHighPolarity @P20 (pure False)
-  rNoReset = unsafeFromHighPolarity @P10 (pure False)
+  wNoReset = unsafeFromActiveHigh @P20 (pure False)
+  rNoReset = unsafeFromActiveHigh @P10 (pure False)
 {-# INLINE tbOutput #-}
 
 tb
@@ -51,5 +51,5 @@ tb top expectedSamples = done
   expectedOutput = outputVerifier' rClk noReset expectedSamples
   done = expectedOutput output
   (rClk, wClk) = biTbClockGen (not <$> done) :: (Clock P10, Clock P20)
-  noReset = unsafeFromHighPolarity @P10 (pure False)
+  noReset = unsafeFromActiveHigh @P10 (pure False)
 {-# INLINE tb #-}

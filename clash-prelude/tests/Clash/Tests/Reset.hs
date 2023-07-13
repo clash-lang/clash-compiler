@@ -20,10 +20,10 @@ createDomain vSystem{vName="Low", vResetPolarity=ActiveLow}
 createDomain vSystem{vName="NoInit", vInitBehavior=Unknown}
 
 sampleResetN :: KnownDomain dom => Int -> Reset dom -> [Bool]
-sampleResetN n = sampleN n . unsafeToHighPolarity
+sampleResetN n = sampleN n . unsafeToActiveHigh
 
 resetFromList :: KnownDomain dom => [Bool] -> Reset dom
-resetFromList = unsafeFromHighPolarity . fromList
+resetFromList = unsafeFromActiveHigh . fromList
 
 onePeriodGlitchReset :: KnownDomain dom => Reset dom
 onePeriodGlitchReset =

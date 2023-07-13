@@ -44,7 +44,7 @@ knightrider clk rst ena = pack <$> leds
 topEntity :: Clock System -> Signal System Bool -> Signal System (BitVector 8)
 topEntity clk rstBool = knightrider clk rst enableGen
  where
-  rst = unsafeFromLowPolarity rstBool
+  rst = unsafeFromActiveLow rstBool
 
 testPath :: FilePath
 testPath = "tests/shouldwork/Netlist/T1766.hs"

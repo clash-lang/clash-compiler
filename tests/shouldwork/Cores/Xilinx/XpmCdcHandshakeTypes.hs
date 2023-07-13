@@ -18,7 +18,7 @@ createDomain vXilinxSystem{vName="D11", vPeriod=hzToPeriod 110e6}
 data State = WaitForDeassert | WaitForAssert deriving (Generic, NFDataX)
 
 noRst :: KnownDomain dom => Reset dom
-noRst = unsafeFromHighPolarity (pure False)
+noRst = unsafeFromActiveHigh (pure False)
 
 -- | Transfer 1, 2, 3, ... to destination domain
 srcFsm ::

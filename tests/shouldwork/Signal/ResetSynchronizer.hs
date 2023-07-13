@@ -21,7 +21,7 @@ testReset ::
   Clock circuitDom ->
   Reset circuitDom
 testReset tbClk tbRst cClk =
-    unsafeFromHighPolarity
+    unsafeFromActiveHigh
   $ unsafeSynchronizer tbClk cClk
   $ stimuliGenerator tbClk tbRst
     ( True

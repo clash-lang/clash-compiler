@@ -21,7 +21,7 @@ topEntity
   -> "LED"         ::: Signal Bank2C (BitVector 4)
 topEntity clk rstnButton = exposeClockResetEnable top clk rst en where
   en = enableGen
-  rst = unsafeFromLowPolarity rstnButton
+  rst = unsafeFromActiveLow rstnButton
   rstSync = resetSynchronizer clk rst
 
 makeTopEntityWithName 'topEntity "shell"

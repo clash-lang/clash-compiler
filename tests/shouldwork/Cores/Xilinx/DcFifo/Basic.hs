@@ -81,7 +81,7 @@ testBench = done
         (pack <$> fifoData maxOut) (fExpectedData <$> fsmOut)
         (fDone <$> fsmOut)
   clk = tbClockGen (not <$> done)
-  noRst = unsafeFromHighPolarity $ pure False
+  noRst = unsafeFromActiveHigh $ pure False
   en = enableGen
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE testBench #-}
