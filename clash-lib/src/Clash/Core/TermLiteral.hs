@@ -51,6 +51,7 @@ import           Clash.Core.Pretty               (showPpr)
 import           Clash.Core.Term                 (Term(Literal, Data), collectArgs)
 import           Clash.Promoted.Nat
 import           Clash.Promoted.Nat.Unsafe
+import           Clash.Sized.Index               (Index)
 import           Clash.Sized.Vector              (Vec (Nil, Cons), fromList)
 import qualified Clash.Util.Interpolate          as I
 import qualified Clash.Verification.Internal     as Cv

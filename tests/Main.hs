@@ -589,6 +589,28 @@ runClashTest = defaultMain $ clashTestRoot
                                                   ]
                      }
             in runTest "VIO" _opts
+          , let _opts =
+                  def{ hdlTargets=[VHDL, Verilog, SystemVerilog]
+                     , hdlLoad=[Vivado]
+                     , hdlSim=[Vivado]
+                     , buildTargets=BuildSpecific [ "testWithDefaultsOne"
+                                                  , "testWithDefaultsThree"
+                                                  , "testWithLefts"
+                                                  , "testWithRights"
+                                                  , "testWithRightsSameCu"
+                                                  ]
+                     }
+            in runTest "Ila" _opts
+          , let _opts =
+                  def{ hdlTargets=[VHDL, Verilog, SystemVerilog]
+                     , buildTargets=BuildSpecific [ "testWithDefaultsOne"
+                                                  , "testWithDefaultsThree"
+                                                  , "testWithLefts"
+                                                  , "testWithRights"
+                                                  , "testWithRightsSameCu"
+                                                  ]
+                     }
+            in outputTest "Ila" _opts
           , outputTest "VIO" def{
               hdlTargets=[VHDL]
             , buildTargets=BuildSpecific ["withSetName", "withSetNameNoResult"]
