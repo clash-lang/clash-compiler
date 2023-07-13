@@ -1,0 +1,2 @@
+CHANGED: `resetGlitchFilter` does not support domains with unknown initial values anymore. Its previous behavior could lead to unstable circuits. Domains not supporting initial values should consider using `resetGlitchFilterWithReset` or `holdReset`. The previous behavior can still be attained through the new `unsafeResetGlitchFilter`.
+NEW: `resetGlitchFilterWithReset`, which accomplishes the same task as `resetGlitchFilter` in domains with unknown initial values by adding a power-on reset input to reset the glitch filter itself.

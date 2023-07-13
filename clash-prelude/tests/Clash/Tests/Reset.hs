@@ -30,16 +30,20 @@ onePeriodGlitchReset =
   resetFromList [True,True,False,False,True,False,False,True,True,False,False,False]
 
 -- | Introduce a glitch of one period, and see if it's filtered out
+--
+-- Note that since 'System' is a domain with asynchronous resets,
+-- 'resetGlitchFilter' first synchronizes the incoming reset. This leads to an
+-- additional delay of two cycles with respect to the output.
 case_onePeriodGlitch :: Assertion
 case_onePeriodGlitch =
-      [True,True,True,True,False,False,False,False,False,True,True,False]
-  @=? sampleResetN 12 (resetGlitchFilter d2 systemClockGen onePeriodGlitchReset)
+      [True,True,True,True,True,True,False,False,False,False,False,True,True,False]
+  @=? sampleResetN 14 (resetGlitchFilter d2 systemClockGen onePeriodGlitchReset)
 
 -- | Same as 'case_onePeriodGlitch' but on a domain with active low resets
 case_onePeriodGlitch_LowPolarity :: Assertion
 case_onePeriodGlitch_LowPolarity =
-      [True,True,True,True,False,False,False,False,False,True,True,False]
-  @=? sampleResetN 12 (resetGlitchFilter d2 (clockGen @Low) onePeriodGlitchReset)
+      [True,True,True,True,True,True,False,False,False,False,False,True,True,False]
+  @=? sampleResetN 14 (resetGlitchFilter d2 (clockGen @Low) onePeriodGlitchReset)
 
 -- Check that the meaning of @Reset@ is maintained when converting from
 -- active-low to active-high.
