@@ -80,7 +80,7 @@ deriveTermLiteral :: Name -> Q [Dec]
 deriveTermLiteral typName = do
   TyConI (DataD _ _ typeVars _ _ _) <- reify typName
   typeVarNames <- mapM typeVarName typeVars
-  showsTypePrec <- deriveShowsTypePrec typName typeVarNames
+  showsTypePrec <- deriveShowsTypePrec typName
   termToDataBody <- deriveTermToData typName
   let
     termToData = FunD termToDataName [Clause [] (NormalB termToDataBody) []]
@@ -101,9 +101,11 @@ deriveTermLiteral typName = do
 -- >     in
 -- >       showParen (n > 10) showType
 --
-deriveShowsTypePrec :: Name -> [(Name, Maybe Type)] -> Q Dec
-deriveShowsTypePrec typName typeVars = do
-  showTypeBody <- mkShowTypeBody
+deriveShowsTypePrec :: Name -> Q Dec
+deriveShowsTypePrec typName = do
+  TyConI (DataD _ _ typeVars _ _ _) <- reify typName
+  typeVarNames <- mapM typeVarName typeVars
+  showTypeBody <- mkShowTypeBody typeVarNames
   pure (FunD showsTypePrecName [Clause [VarP nName, WildP] (NormalB showTypeBody) []])
  where
   showTypeName = [| showString $(litE (StringL (nameBase typName))) |]
@@ -131,9 +133,9 @@ deriveShowsTypePrec typName typeVars = do
   -- This is wrapped in an if-statement wrapping the result in parentheses if the
   -- incoming prec is more than 10 (function application).
   --
-  mkShowTypeBody :: Q Exp
-  mkShowTypeBody =
-    case typeVars of
+  mkShowTypeBody :: [(Name, Maybe Type)] -> Q Exp
+  mkShowTypeBody typeVarNames =
+    case typeVarNames of
       [] ->
         -- We seq on `n` here to prevent _unused variable_ warnings. This is a
         -- bit of a hack (the real solution would be to selectively pattern
@@ -142,7 +144,7 @@ deriveShowsTypePrec typName typeVars = do
       _  -> [|
         let
           showSpace = showChar ' '
-          precCalls = $(listE (map mkTypePrecCall typeVars))
+          precCalls = $(listE (map mkTypePrecCall typeVarNames))
           interspersedPrecCalls = intersperse showSpace precCalls
           showType = foldl (.) $(showTypeName) (showSpace : interspersedPrecCalls)
         in
