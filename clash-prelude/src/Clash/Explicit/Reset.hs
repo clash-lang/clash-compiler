@@ -1,6 +1,6 @@
 {-|
 Copyright  :  (C) 2020-2023, QBayLogic B.V.,
-                  2022     , Google LLC
+                  2022-2023, Google LLC
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -21,6 +21,9 @@ module Clash.Explicit.Reset
   , resetGlitchFilter
   , holdReset
   , convertReset
+  , noReset
+  , andReset, unsafeAndReset
+  , orReset, unsafeOrReset
 
     -- Reexports
   , Reset
@@ -57,6 +60,51 @@ import           GHC.TypeLits (type (+))
 {- $setup
 >>> import Clash.Explicit.Prelude
 -}
+
+-- | A reset that is never asserted
+noReset :: KnownDomain dom => Reset dom
+noReset = unsafeFromActiveHigh (pure False)
+
+-- | Output reset will be asserted when either one of the input resets is
+-- asserted
+orReset ::
+  forall dom .
+  SynchronousReset dom =>
+  Reset dom ->
+  Reset dom ->
+  Reset dom
+orReset = unsafeOrReset
+
+-- | Output reset will be asserted when either one of the input resets is
+-- asserted. This function is considered unsafe because it can be used on
+-- domains with components with asynchronous resets, where use of this function
+-- can introduce glitches triggering a reset.
+unsafeOrReset :: forall dom. KnownDomain dom => Reset dom -> Reset dom -> Reset dom
+unsafeOrReset (unsafeFromReset -> rst0) (unsafeFromReset -> rst1) =
+  unsafeToReset $
+    case resetPolarity @dom of
+      SActiveHigh -> rst0 .||. rst1
+      SActiveLow  -> rst0 .&&. rst1
+
+-- | Output reset will be asserted when both input resets are asserted
+andReset ::
+  forall dom .
+  SynchronousReset dom =>
+  Reset dom ->
+  Reset dom ->
+  Reset dom
+andReset = unsafeAndReset
+
+-- | Output reset will be asserted when both input resets are asserted. This
+-- function is considered unsafe because it can be used on domains with
+-- components with asynchronous resets, where use of this function can introduce
+-- glitches triggering a reset.
+unsafeAndReset :: forall dom. KnownDomain dom => Reset dom -> Reset dom -> Reset dom
+unsafeAndReset (unsafeFromReset -> rst0) (unsafeFromReset -> rst1) =
+  unsafeToReset $
+    case resetPolarity @dom of
+      SActiveHigh -> rst0 .&&. rst1
+      SActiveLow  -> rst0 .||. rst1
 
 -- | The resetSynchronizer will synchronize an incoming reset according to
 -- whether the domain is synchronous or asynchronous.
@@ -220,9 +268,6 @@ resetGlitchFilter SNat clk rst =
     | reset == state    = (state,     0)
     | count == maxBound = (not state, 0)
     | otherwise         = (state,     count + 1)
-
-  noReset :: Reset dom
-  noReset = unsafeToReset (pure (not asserted))
 
   asserted :: Bool
   asserted =

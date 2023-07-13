@@ -66,6 +66,11 @@ module Clash.Signal.Internal
   , DomainConfigurationResetKind
   , DomainConfigurationInitBehavior
   , DomainConfigurationResetPolarity
+
+  -- *** Convenience types
+  , SynchronousReset
+  , DefinedInitialValues
+
     -- ** Default domains
   , System
   , XilinxSystem
@@ -373,6 +378,21 @@ type DomainActiveEdge (dom :: Domain) =
 type DomainResetKind (dom :: Domain) =
   DomainConfigurationResetKind (KnownConf dom)
 
+-- | Convenience type to constrain a domain to have synchronous resets. Example
+-- usage:
+--
+-- @
+-- myFunc :: SynchronousReset dom => ...
+-- @
+--
+-- Using this type implies 'KnownDomain'.
+--
+-- __N.B.__: There is no @AsynchronousReset dom@ as synchronous resets have
+--           stricter requirements than asynchronous ones, making the existence
+--           of the constraint superfluous.
+type SynchronousReset (dom :: Domain) =
+  (KnownDomain dom, DomainResetKind dom ~ 'Synchronous)
+
 -- | Convenience type to help to extract the initial value behavior from a
 -- domain. Example usage:
 --
@@ -381,6 +401,20 @@ type DomainResetKind (dom :: Domain) =
 -- @
 type DomainInitBehavior (dom :: Domain) =
   DomainConfigurationInitBehavior (KnownConf dom)
+
+-- | Convenience type to constrain a domain to have initial values. Example
+-- usage:
+--
+-- @
+-- myFunc :: DefinedInitialValues dom => ...
+-- @
+--
+-- Using this type implies 'KnownDomain'.
+--
+-- __N.B.__: There is no @UnknownInitialValues dom@ as a component that works
+--           without initial values will also work fine if it does have them.
+type DefinedInitialValues (dom :: Domain) =
+  (KnownDomain dom, DomainInitBehavior dom ~ 'Defined)
 
 -- | Convenience type to help to extract the reset polarity from a domain.
 -- Example usage:

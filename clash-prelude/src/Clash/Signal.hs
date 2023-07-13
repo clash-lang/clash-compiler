@@ -106,6 +106,9 @@ module Clash.Signal
   , DomainResetKind
   , DomainInitBehavior
   , DomainResetPolarity
+    -- *** Convenience types
+  , SynchronousReset
+  , DefinedInitialValues
     -- ** Default domains
   , System
   , XilinxSystem

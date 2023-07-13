@@ -1,0 +1,1 @@
+ADDED: Convenience functions: `noReset`, `andReset`, `orReset` plus their unsafe counterparts
