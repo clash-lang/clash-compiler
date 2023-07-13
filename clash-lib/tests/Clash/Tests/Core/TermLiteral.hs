@@ -18,7 +18,6 @@ import Test.Tasty.HUnit
 import Test.Tasty.TH
 
 import Clash.Core.TermLiteral
-import Clash.Core.TermLiteral.TH
 import Clash.Promoted.Nat
 
 import Clash.Tests.Core.TermLiteral.Types

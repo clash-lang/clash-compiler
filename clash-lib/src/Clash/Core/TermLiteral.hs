@@ -13,6 +13,7 @@ Tools to convert a 'Term' into its "real" representation
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 --{-# OPTIONS_GHC -ddump-splices #-}
 
@@ -22,6 +23,7 @@ module Clash.Core.TermLiteral
   , showType
   , termToData
   , termToDataError
+  , deriveTermLiteral
   ) where
 
 import           Data.Bifunctor                  (bimap)
@@ -29,6 +31,7 @@ import           Data.Either                     (lefts)
 import           Data.Proxy                      (Proxy(..))
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
+import           Data.Text.Extra                 (showt)
 #if MIN_VERSION_ghc(9,4,0)
 import qualified Data.Text.Internal              as Text
 import qualified Data.Text.Array                 as Text
@@ -37,12 +40,16 @@ import qualified Data.Primitive.ByteArray        as BA
 import           Data.Typeable                   (Typeable, typeRep)
 import           GHC.Natural
 import           GHC.Stack
+import           GHC.TypeNats (KnownNat)
 
-import           Clash.Core.Term                 (Term(Literal), collectArgs)
+import           Clash.Core.DataCon              (DataCon(..))
 import           Clash.Core.Literal
+import           Clash.Core.Name                 (Name(..))
 import           Clash.Core.Pretty               (showPpr)
+import           Clash.Core.Term                 (Term(Literal, Data), collectArgs)
 import           Clash.Promoted.Nat
 import           Clash.Promoted.Nat.Unsafe
+import           Clash.Sized.Vector              (Vec (Nil, Cons), fromList)
 import qualified Clash.Util.Interpolate          as I
 import qualified Clash.Verification.Internal     as Cv
 
@@ -157,6 +164,37 @@ instance (TermLiteral a, TermLiteral b) => TermLiteral (a, b) where
     . showString ","
     . showsTypePrec 11 (Proxy @b)
     . showChar ')'
+
+instance (TermLiteral a, KnownNat n) => TermLiteral (Vec n a) where
+  termToData term = do
+    res <- fromList <$> go term
+    -- Check whether length of list constructed in 'go' corresponds to the
+    -- @KnownNat n@ we've been given
+    case res of
+      Nothing -> Left term
+      Just v -> Right v
+   where
+    -- Construct a list from given term
+    go t@(collectArgs -> (constr, args)) =
+      case constr of
+        Data (MkData{dcName=Name{nameOcc}})
+          | nameOcc == showt 'Nil -> Right []
+          | nameOcc == showt 'Cons ->
+            case lefts args of
+              [_gadtProof, c0, cs0] -> do
+                c1 <- termToData @a c0
+                cs1 <- go cs0
+                Right (c1:cs1)
+              _ -> Left t
+        _ -> Left t
+
+  showsTypePrec n _ =
+    showParen (n > 10) $
+        showString "Vec"
+      . showChar ' '
+      . showString (show (natToInteger @n))
+      . showChar ' '
+      . showsTypePrec 11 (Proxy @a)
 
 deriveTermLiteral ''Bool
 deriveTermLiteral ''Maybe
