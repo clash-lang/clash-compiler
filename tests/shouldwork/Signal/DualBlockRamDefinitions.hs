@@ -102,26 +102,19 @@ opsA = opsA0 ++ opsA1 ++ opsA2 ++ opsA3 ++ opsA4 ++ opsA5 ++ opsA6
 opsB = opsB0 ++ opsB1 ++ opsB2 ++ opsB3 ++ opsB4 ++ opsB5 ++ opsB6
  ++ opsB7 ++ opsB8 ++ opsB9 ++ opsB10 ++ opsB11 ++ opsB12
 
-topOut top clkA rstA clkB rstB = out
+topOut top clkA clkB = out
   where
-    out = top clkA clkB (inputWritesA clkA rstA )  (inputWritesB clkB rstB)
+    out = top clkA clkB (inputWritesA clkA)  (inputWritesB clkB)
 
-simEntityAB = topOut tdpRam clk20TH noRst20 clk10TH noRst10
-simEntityBC = topOut tdpRam clk10TH noRst10 clk7TH noRst7
+simEntityAB = topOut tdpRam clk20TH clk10TH
+simEntityBC = topOut tdpRam clk10TH clk7TH
 
-inputWritesA clk rst = stimuliGenerator clk rst opsA
-inputWritesB clk rst = stimuliGenerator clk rst opsB
+inputWritesA clk = stimuliGenerator clk noReset opsA
+inputWritesB clk = stimuliGenerator clk noReset opsB
 
 clk20TH = clockGen @A
 clk10TH = clockGen @B
 clk7TH = clockGen @C
-
-noRst20 :: Reset A
-noRst20 = unsafeFromActiveHigh (pure False)
-noRst10 :: Reset B
-noRst10 = unsafeFromActiveHigh (pure False)
-noRst7 :: Reset C
-noRst7 = unsafeFromActiveHigh (pure False)
 
 twice = concatMap (replicate d2)
 strictAnd !a !b = (&&) a b

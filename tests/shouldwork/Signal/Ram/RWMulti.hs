@@ -55,7 +55,6 @@ tbOutput top wClk rClk = output
  where
   wrD = delay wClk enableGen 0 $ wrD + 1
   output = ignoreFor rClk noReset enableGen d1 0 $ top wClk rClk wrD
-  noReset = unsafeFromActiveHigh @rdom (pure False)
 {-# INLINE tbOutput #-}
 
 tb
@@ -76,5 +75,4 @@ tb top expectedSamples = done
   expectedOutput = outputVerifier' rClk noReset expectedSamples
   done = expectedOutput output
   (rClk, wClk) = biTbClockGen (not <$> done) :: (Clock rdom, Clock wdom)
-  noReset = unsafeFromActiveHigh @rdom (pure False)
 {-# INLINE tb #-}

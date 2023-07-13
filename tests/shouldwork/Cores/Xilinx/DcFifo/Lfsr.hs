@@ -120,26 +120,23 @@ mkTestBench cFifo = done
  where
   (rClk, wClk) = biTbClockGen (not <$> done)
 
-  noRRst = unsafeFromActiveHigh $ pure False
-  noWRst = unsafeFromActiveHigh $ pure False
-
   rEna = enableGen
   wEna = enableGen
 
   -- Driver
-  wLfsr = bitToBool <$> lfsrF wClk noWRst wEna 0xDEAD
-  writeData = fifoDriver wClk noWRst wEna wLfsr (bundle (isFull, writeCount))
+  wLfsr = bitToBool <$> lfsrF wClk noReset wEna 0xDEAD
+  writeData = fifoDriver wClk noReset wEna wLfsr (bundle (isFull, writeCount))
 
   -- Sampler
-  rLfsr = bitToBool <$> lfsrF rClk noRRst rEna 0xBEEF
+  rLfsr = bitToBool <$> lfsrF rClk noReset rEna 0xBEEF
   (readEnable, maybeReadData) =
     unbundle $
-      fifoSampler rClk noRRst rEna rLfsr (bundle (isEmpty, readCount, fifoData))
+      fifoSampler rClk noReset rEna rLfsr (bundle (isEmpty, readCount, fifoData))
 
   FifoOut{isFull, writeCount, isEmpty, readCount, fifoData} =
-    cFifo wClk noWRst rClk noRRst writeData readEnable
+    cFifo wClk noReset rClk noReset writeData readEnable
 
-  done = fifoVerifier rClk noRRst rEna maybeReadData
+  done = fifoVerifier rClk noReset rEna maybeReadData
 {-# INLINE mkTestBench #-}
 
 fifoVerifier ::

@@ -13,9 +13,6 @@ createDomain vXilinxSystem{vName="D5",  vPeriod=hzToPeriod 50e6}
 createDomain vXilinxSystem{vName="D10", vPeriod=hzToPeriod 100e6}
 createDomain vXilinxSystem{vName="D11", vPeriod=hzToPeriod 110e6}
 
-noRst :: KnownDomain dom => Reset dom
-noRst = unsafeFromActiveHigh (pure False)
-
 tb ::
   forall a b stages width n .
   ( KnownNat n, 1 <= n
@@ -48,7 +45,7 @@ tb Proxy Proxy initVals regInput SNat expectedDat = done
   done =
     outputVerifierWith
       (\clk rst -> assertBitVector clk rst "outputVerifier Port A")
-      clkB clkB (noRst @b)
+      clkB clkB noReset
       expectedDat
       (pack <$> actual)
 

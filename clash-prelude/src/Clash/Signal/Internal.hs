@@ -66,6 +66,15 @@ module Clash.Signal.Internal
   , DomainConfigurationResetKind
   , DomainConfigurationInitBehavior
   , DomainConfigurationResetPolarity
+
+    -- *** Convenience types #conveniencetypes#
+    -- **** Simplifying
+    -- $conveniencetypes
+
+  , HasSynchronousReset
+  , HasAsynchronousReset
+  , HasDefinedInitialValues
+
     -- ** Default domains
   , System
   , XilinxSystem
@@ -218,6 +227,33 @@ import Clash.XException
 >>> let registerA = register
 -}
 
+{- $conveniencetypes
+
+If you want to write part of your Clash design as domain-polymorphic functions,
+it can be practical to define a design-wide constraint synonym that captures the
+characteristics of the clock domains of the design. Such a constraint synonym
+can be used as a constraint on all domain-polymorphic functions in the design,
+regardless of whether they actually need the constraints from this section.
+
+@
+type DesignDomain dom =
+  ( 'HasSynchronousReset' dom
+  , 'HasDefinedInitialValues' dom
+  )
+
+type DesignDomainHidden dom =
+  ( DesignDomain dom
+  , t'Clash.Signal.HiddenClockResetEnable' dom
+  )
+
+myFunc ::
+  DesignDomainHidden dom =>
+  'Signal' dom [...]
+@
+
+This way, you don't have to think about which constraints the function you're
+writing has exactly, and the constraint is succinct.
+-}
 
 -- * Signal
 
@@ -373,6 +409,32 @@ type DomainActiveEdge (dom :: Domain) =
 type DomainResetKind (dom :: Domain) =
   DomainConfigurationResetKind (KnownConf dom)
 
+-- | Convenience type to constrain a domain to have synchronous resets. Example
+-- usage:
+--
+-- @
+-- myFunc :: HasSynchronousReset dom => ...
+-- @
+--
+-- Using this type implies 'KnownDomain'.
+--
+-- [See above](#g:conveniencetypes)
+type HasSynchronousReset (dom :: Domain) =
+  (KnownDomain dom, DomainResetKind dom ~ 'Synchronous)
+
+-- | Convenience type to constrain a domain to have asynchronous resets. Example
+-- usage:
+--
+-- @
+-- myFunc :: HasAsynchronousReset dom => ...
+-- @
+--
+-- Using this type implies 'KnownDomain'.
+--
+-- [See above](#g:conveniencetypes)
+type HasAsynchronousReset (dom :: Domain) =
+  (KnownDomain dom, DomainResetKind dom ~ 'Asynchronous)
+
 -- | Convenience type to help to extract the initial value behavior from a
 -- domain. Example usage:
 --
@@ -381,6 +443,22 @@ type DomainResetKind (dom :: Domain) =
 -- @
 type DomainInitBehavior (dom :: Domain) =
   DomainConfigurationInitBehavior (KnownConf dom)
+
+-- | Convenience type to constrain a domain to have initial values. Example
+-- usage:
+--
+-- @
+-- myFunc :: HasDefinedInitialValues dom => ...
+-- @
+--
+-- Using this type implies 'KnownDomain'.
+--
+-- Note that there is no @UnknownInitialValues dom@ as a component that works
+-- without initial values will also work if it does have them.
+--
+-- [See above](#g:conveniencetypes)
+type HasDefinedInitialValues (dom :: Domain) =
+  (KnownDomain dom, DomainInitBehavior dom ~ 'Defined)
 
 -- | Convenience type to help to extract the reset polarity from a domain.
 -- Example usage:
