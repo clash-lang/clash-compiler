@@ -2,7 +2,7 @@
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017-2022, Google Inc.,
-                     2017-2022, QBayLogic B.V.
+                     2017-2023, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -203,6 +203,7 @@ ghcPrimUnwind tcm p tys vs v [e] m0
                        , "GHC.Classes.&&"
                        , "GHC.Classes.||"
                        , "Clash.Class.BitPack.Internal.xToBV"
+                       , "Clash.Sized.Vector.imap_go"
                        ]
   = if isUndefinedPrimVal v then
       let tyArgs = map Right tys
@@ -4103,39 +4104,45 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
               ,Right nTy
               ,Right aTy
               ,Right bTy
-              ,Left iLit
               ,Left (valToTerm (args !! 1))
               ,Left (valToTerm (args !! 2))
+              ,Left iLit
               ]
 
   "Clash.Sized.Vector.imap_go"
     | isSubj
     , nTy : mTy : aTy : bTy : _ <- tys
-    , n : f : xs : _ <- args
+    , f : xs : (Suspend nArg) : _ <- args
     , DC dc vArgs <- xs
     , Right n' <- runExcept (tyNatSize tcm nTy)
     , Right m <- runExcept (tyNatSize tcm mTy)
     -> case m of
          0  -> reduce (mkVecNil dc bTy)
-         m' -> let (tyArgs,_) = splitFunForallTy ty
-                   TyConApp indexTcNm _ = tyView (Either.rights tyArgs !! 0)
-                   iLit = mkIndexLit (Either.rights tyArgs !! 0) nTy n' 1
-               in reduce $ mkVecCons dc bTy m'
-                 (mkApps (valToTerm f) [Left (valToTerm n),Left (Either.lefts vArgs !! 1)])
+         m'
+          | eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+          , mach1@Machine{mStack=[],mTerm=n} <-
+              whnf eval tcm True (setTerm nArg (stackClear mach))
+          ->  let (tyArgs,_) = splitFunForallTy ty
+                  TyConApp indexTcNm _ = tyView (Either.rights tyArgs !! 2)
+                  iLit = mkIndexLit (Either.rights tyArgs !! 2) nTy n' 1
+               in Just $ flip setTerm (mach1 {mStack = mStack mach}) $ mkVecCons dc bTy m'
+                 (mkApps (valToTerm f) [Left n,Left (Either.lefts vArgs !! 1)])
                  (mkApps (Prim pInfo)
                          [Right nTy
                          ,Right (LitTy (NumTy (m'-1)))
                          ,Right aTy
                          ,Right bTy
+                         ,Left (valToTerm f)
+                         ,Left (Either.lefts vArgs !! 2)
                          ,Left (mkApps (Prim (PrimInfo "Clash.Sized.Internal.Index.+#" (indexAddTy indexTcNm) WorkVariable SingleResult NoUnfolding))
                                        [Right nTy
                                        ,Left (Literal (NaturalLiteral n'))
-                                       ,Left (valToTerm n)
+                                       ,Left n
                                        ,Left iLit
                                        ])
-                         ,Left (valToTerm f)
-                         ,Left (Either.lefts vArgs !! 2)
                          ])
+          | otherwise
+          -> Nothing
 
   -- :: forall n a. KnownNat n => (a -> a) -> a -> Vec n a
   "Clash.Sized.Vector.iterateI"
@@ -5778,9 +5785,8 @@ vecImapGoTy vecTcNm indexTcNm =
   ForAllTy mTV (
   ForAllTy aTV (
   ForAllTy bTV (
-  mkFunTy indexTy
-    (mkFunTy fTy
-       (mkFunTy vecATy vecBTy))))))
+  mkFunTy fTy
+       (mkFunTy vecATy (mkFunTy indexTy vecBTy))))))
   where
     nTV = mkTyVar typeNatKind (mkUnsafeSystemName "n" 0)
     mTV = mkTyVar typeNatKind (mkUnsafeSystemName "m" 1)
