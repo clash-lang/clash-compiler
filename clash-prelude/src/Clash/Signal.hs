@@ -209,7 +209,7 @@ module Clash.Signal
   , systemClockGen
   , systemResetGen
     -- * Boolean connectives
-  , (.&&.), (.||.)
+  ,(.&&.), (&&.), (.&&), (.||.), (||.), (.||)
     -- * Product/Signal isomorphism
   , Bundle(..)
   , EmptyTuple(..)
@@ -241,9 +241,9 @@ module Clash.Signal
   , testFor
     -- * Type classes
     -- ** 'Eq'-like
-  , (.==.), (./=.)
+  , (.==.), (.==), (==.), (./=.), (./=), (/=.)
     -- ** 'Ord'-like
-  , (.<.), (.<=.), (.>=.), (.>.)
+  , (.<.), (.<), (<.), (.<=.), (.<=), (<=.), (.>=.), (.>=), (>=.), (.>.), (.>), (>.)
     -- * Bisignal functions
   , veryUnsafeToBiSignalIn
   , readFromBiSignal
