@@ -241,9 +241,9 @@ module Clash.Signal
   , testFor
     -- * Type classes
     -- ** 'Eq'-like
-  , (.==.), (./=.)
+  , (.==.), (.==), (==.), (./=.), (./=), (/=.)
     -- ** 'Ord'-like
-  , (.<.), (.<=.), (.>=.), (.>.)
+  , (.<.), (.<), (<.), (.<=.), (.<=), (<=.), (.>=.), (.>=), (>=.), (.>.), (.>), (>.)
     -- * Bisignal functions
   , veryUnsafeToBiSignalIn
   , readFromBiSignal
