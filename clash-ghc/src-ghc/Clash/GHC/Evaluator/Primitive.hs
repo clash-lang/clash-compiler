@@ -2,7 +2,13 @@
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017-2022, Google Inc.,
+<<<<<<< HEAD
                      2017-2024, QBayLogic B.V.
+||||||| parent of a1dacb46 (Make `imap_go` eval rule lazy in index argument (#2543))
+                     2017-2022, QBayLogic B.V.
+=======
+                     2017-2023, QBayLogic B.V.
+>>>>>>> a1dacb46 (Make `imap_go` eval rule lazy in index argument (#2543))
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -202,8 +208,15 @@ ghcPrimUnwind tcm p tys vs v [e] m0
                        , "Clash.Sized.Vector.replace_int"
                        , "GHC.Classes.&&"
                        , "GHC.Classes.||"
+<<<<<<< HEAD
                        , showt 'BitVector.xToBV
                        , "Clash.Sized.Vector.imap_go"
+||||||| parent of a1dacb46 (Make `imap_go` eval rule lazy in index argument (#2543))
+                       , "Clash.Class.BitPack.Internal.xToBV"
+=======
+                       , "Clash.Class.BitPack.Internal.xToBV"
+                       , "Clash.Sized.Vector.imap_go"
+>>>>>>> a1dacb46 (Make `imap_go` eval rule lazy in index argument (#2543))
                        ]
   = if isUndefinedPrimVal v then
       let tyArgs = map Right tys

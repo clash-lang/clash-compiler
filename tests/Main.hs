@@ -816,6 +816,7 @@ runClashTest = defaultMain
           }
         , outputTest "T2510" def{hdlTargets=[VHDL], clashFlags=["-DNOINLINE=OPAQUE"]}
 #endif
+<<<<<<< HEAD
         , outputTest "T2542" def{hdlTargets=[VHDL]}
         , runTest "T2593" def{hdlSim=[]}
         , runTest "T2623CaseConFVs" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
@@ -824,6 +825,10 @@ runClashTest = defaultMain
         , runTest "T2839" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
         , runTest "T2845" def{hdlSim=[],hdlTargets=[Verilog]}
         , runTest "T2831" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
+||||||| parent of a1dacb46 (Make `imap_go` eval rule lazy in index argument (#2543))
+=======
+        , outputTest "T2542" def{hdlTargets=[VHDL]}
+>>>>>>> a1dacb46 (Make `imap_go` eval rule lazy in index argument (#2543))
         ] <>
         if compiledWith == Cabal then
           -- This tests fails without environment files present, which are only
