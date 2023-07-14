@@ -180,13 +180,11 @@ targetTempPath parent tool target =
 
 stepName
   :: String
-  -- ^ Tool name
-  -> String
   -- ^ Step name
   -> String
   -- ^ Build target
   -> String
-stepName tool step target = tool <> " (" <> step <> " " <> target <> ")"
+stepName step target = step <> " " <> target
 
 -- | Simulation test for a specific build target
 --
@@ -306,10 +304,9 @@ ghdlTests opts@TestOptions{..} parentTmp =
                })
  where
   dir = targetTempPath parentTmp "ghdl"
-  toolName = stepName "ghdl"
-  importName = toolName "import"
-  makeName = toolName "make"
-  simName = toolName "sim"
+  importName = stepName "import"
+  makeName = stepName "make"
+  simName = stepName "sim"
   build t =
     [ singleTest (importName t) $ GhdlImportTest parentTmp (dir t)
     , singleTest (makeName t) $ GhdlMakeTest (dir t) t
@@ -330,9 +327,8 @@ iverilogTests opts@TestOptions{..} parentTmp =
                })
  where
   dir = targetTempPath parentTmp "iverilog"
-  toolName = stepName "iverilog"
-  makeName = toolName "make"
-  simName = toolName "sim"
+  makeName = stepName "make"
+  simName = stepName "sim"
   build t =
     [ singleTest (makeName t) $ IVerilogMakeTest parentTmp (dir t) t
     ]
@@ -353,10 +349,9 @@ modelsimTests opts@TestOptions{..} parentTmp =
                })
  where
   dir = targetTempPath parentTmp "modelsim"
-  toolName = stepName "modelsim"
-  vlibName = toolName "vlib"
-  vlogName = toolName "vlog"
-  simName = toolName "sim"
+  vlibName = stepName "vlib"
+  vlogName = stepName "vlog"
+  simName = stepName "sim"
   build t =
     [ singleTest (vlibName t) $ ModelsimVlibTest parentTmp (dir t)
     , singleTest (vlogName t) $ ModelsimVlogTest (dir t)
@@ -377,9 +372,8 @@ verilatorTests opts@TestOptions{..} parentTmp =
                })
  where
   dir = targetTempPath parentTmp "verilator"
-  toolName = stepName "verilator"
-  makeName = toolName "make"
-  simName = toolName "sim"
+  makeName = stepName "make"
+  simName = stepName "sim"
   build t =
     [ singleTest (makeName t) $ VerilatorMakeTest parentTmp (dir t) t
     ]
@@ -401,7 +395,7 @@ vivadoTests opts parentTmp =
                })
  where
   dir = targetTempPath parentTmp "vivado"
-  simName = stepName "vivado" "sim"
+  simName = stepName "sim"
   sim t =
     [ singleTest (simName t) $ VivadoTest parentTmp (dir t) (T.pack t)
     ]
@@ -427,9 +421,9 @@ runTest1
 runTest1 modName opts@TestOptions{..} path target =
   withResource mkTmpDir Directory.removeDirectoryRecursive $ \tmpDir ->
     sequentialTestGroup (show target) AllSucceed
-      ( clashTest tmpDir
-      : verifTests tmpDir
-      : hdlTests tmpDir )
+      [ clashTest tmpDir
+      , testGroup "tools" (verifTests tmpDir : hdlTests tmpDir)
+      ]
  where
   mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
   sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))
@@ -447,26 +441,27 @@ runTest1 modName opts@TestOptions{..} path target =
 
   emptyGroup = testGroup "empty" []
 
-  buildAndSimTests :: Sim -> [TestTarget] -> TestTree
+  buildAndSimTests :: Sim -> [TestTarget] -> [TestTree]
   buildAndSimTests sim tests
-    | isJust expectClashFail = testGroup "" []
-    | otherwise = sequentialTestGroup (show sim) AllSucceed $
-      flip concatMap tests $ \TestTarget{..} ->
-        (if sim `elem` hdlLoad then buildTests else []) <>
-        (if sim `elem` hdlSim then simTests else [])
+    | isJust expectClashFail = []
+    | otherwise =
+        flip map tests $ \TestTarget{..} ->
+          sequentialTestGroup (show sim) AllSucceed $
+            (if sim `elem` hdlLoad then buildTests else []) <>
+            (if sim `elem` hdlSim then simTests else [])
 
   -- | The tests that are switched by `hdlLoad` and `hdlSim`
   hdlTests tmpDir = case target of
-    VHDL ->
+    VHDL -> concat
       [ buildAndSimTests GHDL (ghdlTests opts tmpDir)
       , buildAndSimTests Vivado (vivadoTests opts tmpDir)
       ]
-    Verilog ->
+    Verilog -> concat
       [ buildAndSimTests IVerilog (iverilogTests opts tmpDir)
       , buildAndSimTests Verilator (verilatorTests opts tmpDir)
       , buildAndSimTests Vivado (vivadoTests opts tmpDir)
       ]
-    SystemVerilog ->
+    SystemVerilog -> concat
       [ -- TODO: ModelSim can do VHDL and Verilog too. Add that?
         buildAndSimTests ModelSim (modelsimTests opts tmpDir)
       , buildAndSimTests Verilator (verilatorTests opts tmpDir)
