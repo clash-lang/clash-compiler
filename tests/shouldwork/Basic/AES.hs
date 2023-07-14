@@ -89,7 +89,7 @@ aes
     -> Signal dom (BitVector 128)
     -> Signal dom (BitVector 128)
     -> Signal dom (Unsigned 4, Vec 4 (BitVector 32), BitVector 128, Bool)
-aes start key block = bundle (cnt, roundKey, pack <$> roundState, cnt .==. 11)
+aes start key block = bundle (cnt, roundKey, pack <$> roundState, cnt .== 11)
     where
 
     roundKey :: Signal dom (Vec 4 (BitVector 32))

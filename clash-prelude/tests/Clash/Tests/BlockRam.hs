@@ -14,7 +14,7 @@ readRam
   :: (HiddenClockResetEnable dom)
   => Signal dom (Unsigned 4)
   -> Signal dom (Unsigned 8)
-readRam addr = mux (register False $ addr .<. 8) ram (pure 0xff)
+readRam addr = mux (register False $ addr .< 8) ram (pure 0xff)
   where
     ram = blockRam1 NoClearOnReset (SNat @8) 0 addr (pure Nothing)
 

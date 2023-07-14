@@ -25,7 +25,7 @@ assertCvResult
 assertCvResult clk rst gen max results = done
  where
   counter = register clk rst gen (minBound :: n) (succ <$> counter)
-  done = hideAssertion results (counter .==. pure maxBound)
+  done = hideAssertion results (counter .== maxBound)
 {-# INLINE assertCvResult #-}
 
 binaryTest

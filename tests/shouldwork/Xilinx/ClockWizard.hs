@@ -37,8 +37,8 @@ testBench ::
 testBench = done
  where
   (o1, o2) = unbundle $ topEntity clkSE clkDiff rst
-  done1 = o1 .==. pure maxBound
-  done2 = o2 .==. pure maxBound
+  done1 = o1 .== maxBound
+  done2 = o2 .== maxBound
   done  = unsafeSynchronizer clockGen clkSE $ fmap endVhdlSim $
             strictAnd <$> done1 <*> done2
   strictAnd !a !b = a && b
