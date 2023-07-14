@@ -184,7 +184,7 @@ import Data.Ratio                 (Ratio)
 import Data.Type.Equality         ((:~:))
 import GHC.Generics               (Generic)
 import GHC.Stack                  (HasCallStack, withFrozenCallStack)
-import GHC.TypeLits               (KnownSymbol, Nat, Symbol, type (<=), sameSymbol)
+import GHC.TypeLits               (KnownSymbol, KnownNat, Nat, Symbol, type (<=), sameSymbol)
 import Language.Haskell.TH.Syntax -- (Lift (..), Q, Dec)
 import Language.Haskell.TH.Compat
 import Numeric.Natural            (Natural)
@@ -415,7 +415,7 @@ type KnownConfiguration dom conf = (KnownDomain dom, KnownConf dom ~ conf)
 
 -- | A 'KnownDomain' constraint indicates that a circuit's behavior depends on
 -- some properties of a domain. See 'DomainConfiguration' for more information.
-class KnownSymbol dom => KnownDomain (dom :: Domain) where
+class (KnownSymbol dom, KnownNat (DomainPeriod dom)) => KnownDomain (dom :: Domain) where
   type KnownConf dom :: DomainConfiguration
   -- | Returns 'SDomainConfiguration' corresponding to an instance's 'DomainConfiguration'.
   --
