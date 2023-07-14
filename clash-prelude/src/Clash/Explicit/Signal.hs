@@ -206,10 +206,10 @@ module Clash.Explicit.Signal
   , Reset
   , unsafeToReset
   , unsafeFromReset
-  , unsafeToHighPolarity
-  , unsafeToLowPolarity
-  , unsafeFromHighPolarity
-  , unsafeFromLowPolarity
+  , unsafeToActiveHigh
+  , unsafeToActiveLow
+  , unsafeFromActiveHigh
+  , unsafeFromActiveLow
     -- * Basic circuit functions
   , andEnable
   , enable -- DEPRECATED
@@ -267,6 +267,12 @@ module Clash.Explicit.Signal
   , readFromBiSignal
   , writeToBiSignal
   , mergeBiSignalOuts
+
+  -- * Deprecated
+  , unsafeFromHighPolarity
+  , unsafeFromLowPolarity
+  , unsafeToHighPolarity
+  , unsafeToLowPolarity
   )
 where
 
@@ -813,7 +819,7 @@ simulateB_lazy f = simulate_lazy (bundle . f . unbundle)
 
 -- | Like 'fromList', but resets on reset and has a defined reset value.
 --
--- >>> let rst = unsafeFromHighPolarity (fromList [True, True, False, False, True, False])
+-- >>> let rst = unsafeFromActiveHigh (fromList [True, True, False, False, True, False])
 -- >>> let res = fromListWithReset @System rst Nothing [Just 'a', Just 'b', Just 'c']
 -- >>> sampleN 6 res
 -- [Nothing,Nothing,Just 'a',Just 'b',Nothing,Just 'a']
@@ -827,7 +833,7 @@ fromListWithReset
   -> [a]
   -> Signal dom a
 fromListWithReset rst resetValue vals =
-  go (unsafeToHighPolarity rst) vals
+  go (unsafeToActiveHigh rst) vals
  where
   go (r :- rs) _ | r = resetValue :- go rs vals
   go (_ :- rs) [] = deepErrorX "fromListWithReset: input ran out" :- go rs []

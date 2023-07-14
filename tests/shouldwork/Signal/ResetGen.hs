@@ -8,7 +8,7 @@ import Clash.Explicit.Testbench
 topEntity
   :: Clock System
   -> Signal System (Bool, Bool)
-topEntity clk = bundle (unsafeToHighPolarity r, unsafeToHighPolarity r')
+topEntity clk = bundle (unsafeToActiveHigh r, unsafeToActiveHigh r')
   where
     r  = resetGenN (SNat @3)
     r' = holdReset clk enableGen (SNat @2) r

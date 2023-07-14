@@ -76,8 +76,8 @@ module Clash.Primitives.DSL
   , unsignedFromBitVector
   , boolFromBits
 
-  , unsafeToHighPolarity
-  , unsafeToLowPolarity
+  , unsafeToActiveHigh
+  , unsafeToActiveLow
 
   -- ** Operations
   , andExpr
@@ -988,7 +988,7 @@ andExpr nm a b = do
   assign nm $ TExpr Bool (Identifier (Id.unsafeMake andTxt) Nothing)
 
 -- | Massage a reset to work as active-high reset.
-unsafeToHighPolarity
+unsafeToActiveHigh
   :: Backend backend
   => Text
   -- ^ Name hint
@@ -997,7 +997,7 @@ unsafeToHighPolarity
   -> TExpr
   -- ^ Reset signal
   -> State (BlockState backend) TExpr
-unsafeToHighPolarity nm dom rExpr =
+unsafeToActiveHigh nm dom rExpr =
   case extrResetPolarity dom of
     ActiveHigh -> pure rExpr
     ActiveLow -> notExpr nm rExpr
@@ -1007,7 +1007,7 @@ extrResetPolarity (Void (Just (KnownDomain _ _ _ _ _ p))) = p
 extrResetPolarity p = error ("Internal error: expected KnownDomain, got: " <> show p)
 
 -- | Massage a reset to work as active-low reset.
-unsafeToLowPolarity
+unsafeToActiveLow
   :: Backend backend
   => Text
   -- ^ Name hint
@@ -1016,7 +1016,7 @@ unsafeToLowPolarity
   -> TExpr
   -- ^ Reset signal
   -> State (BlockState backend) TExpr
-unsafeToLowPolarity nm dom rExpr =
+unsafeToActiveLow nm dom rExpr =
   case extrResetPolarity dom of
     ActiveLow -> pure rExpr
     ActiveHigh -> notExpr nm rExpr

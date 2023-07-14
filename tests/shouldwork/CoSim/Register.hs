@@ -12,7 +12,7 @@ verilog_register
   -> Reset d
   -> Signal d (Signed 64)
   -> Signal d (Signed 64)
-verilog_register clk (unsafeToHighPolarity -> arst) x = [verilog|
+verilog_register clk (unsafeToActiveHigh -> arst) x = [verilog|
   parameter data_width = 64;
 
   input  #{clk};

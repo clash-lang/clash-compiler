@@ -260,7 +260,7 @@ testOverflow = testCase "Overflows appropriately" $ do
 
   fifo = dcFifo @4 defConfig{dcOverflow = True} clk noRst clk noRst
   clk = clockGen @D3
-  noRst = unsafeFromHighPolarity $ pure False
+  noRst = unsafeFromActiveHigh $ pure False
   drive15 = mealy clk noRst enableGen go 15 (pure ())
   go 0 _ = (0 :: Int, Nothing)
   go n _ = (n-1, Just (1 :: Int))
@@ -361,11 +361,11 @@ throughFifo d _ _ feed drain wrDataList rdStalls = rdDataList
   where
 
     wrClk = clockGen @write
-    noWrRst = unsafeFromHighPolarity $ pure False
+    noWrRst = unsafeFromActiveHigh $ pure False
     wrEna = enableGen @write
 
     rdClk = clockGen @read
-    noRdRst = unsafeFromHighPolarity $ pure False
+    noRdRst = unsafeFromActiveHigh $ pure False
     rdEna = enableGen @read
 
     wrData =

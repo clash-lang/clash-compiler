@@ -1053,8 +1053,8 @@ fifoOperations racts wacts = (bundle (rAllDone, rel), bundle (wAllDone, wel))
   wclk = clockGen @wdom
   -- Not resetting makes the test easier to interpret and actual proper testing
   -- of reset behaviour is a lot more involved.
-  noRRst = unsafeFromHighPolarity @rdom (pure False)
-  noWRst = unsafeFromHighPolarity @wdom (pure False)
+  noRRst = unsafeFromActiveHigh @rdom (pure False)
+  noWRst = unsafeFromActiveHigh @wdom (pure False)
   (wdone, wact) =
     unbundle $ fromList $ P.zip (P.repeat False) wacts <> P.repeat (True, WNoOp)
   (rdone, ract) =

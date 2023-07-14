@@ -924,8 +924,8 @@ topEntity
 topEntity clk rst =
     'exposeClockResetEnable' ('mealy' blinkerT (1,False,0) . Clash.Prelude.isRising 1) pllOut rstSync 'enableGen'
   where
-    (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' \@Dom100 (SSymbol \@\"altpll100\") clk ('Clash.Signal.unsafeFromLowPolarity' rst)
-    rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeFromLowPolarity' pllStable)
+    (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' \@Dom100 (SSymbol \@\"altpll100\") clk ('Clash.Signal.unsafeFromActiveLow' rst)
+    rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeFromActiveLow' pllStable)
 
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where
@@ -2505,8 +2505,8 @@ topEntity
 topEntity clk rst =
     'exposeClockResetEnable' ('mealy' blinkerT (1,False,0) . Clash.Prelude.isRising 1) pllOut rstSync 'enableGen'
   where
-    (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' \@Dom100 (SSymbol \@\"altpll100\") clk ('Clash.Signal.unsafeFromLowPolarity' rst)
-    rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeFromLowPolarity' pllStable)
+    (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' \@Dom100 (SSymbol \@\"altpll100\") clk ('Clash.Signal.unsafeFromActiveLow' rst)
+    rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeFromActiveLow' pllStable)
 
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where

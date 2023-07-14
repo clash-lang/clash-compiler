@@ -15,7 +15,7 @@ topEntity clk reset en = (cycleCount, countFromReset, newResetSig)
   where
     newReset ::Reset System
     newReset
-      = unsafeFromHighPolarity newResetSig
+      = unsafeFromActiveHigh newResetSig
 
     newResetSig
       = register clk reset en True

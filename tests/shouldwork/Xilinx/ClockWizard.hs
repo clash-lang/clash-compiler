@@ -25,10 +25,10 @@ topEntity ::
 topEntity clkInSE clkInDiff rstIn =
   let f clk rst = register clk rst enableGen 0 . fmap (satSucc SatBound)
       (clkA, stableA) = clockWizard (SSymbol @"clk_wiz_se") clkInSE rstIn
-      rstA = unsafeFromLowPolarity stableA
+      rstA = unsafeFromActiveLow stableA
       (clkB, stableB) = clockWizardDifferential (SSymbol @"clk_wiz_diff")
                           clkInDiff rstIn
-      rstB = unsafeFromLowPolarity stableB
+      rstB = unsafeFromActiveLow stableB
       o1 = f clkA rstA o1
       o2 = f clkB rstB o2
   in bundle (o1, o2)

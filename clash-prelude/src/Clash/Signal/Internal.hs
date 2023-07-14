@@ -95,10 +95,10 @@ module Clash.Signal.Internal
   , Reset(..)
   , unsafeToReset
   , unsafeFromReset
-  , unsafeToHighPolarity
-  , unsafeToLowPolarity
-  , unsafeFromHighPolarity
-  , unsafeFromLowPolarity
+  , unsafeToActiveHigh
+  , unsafeToActiveLow
+  , unsafeFromActiveHigh
+  , unsafeFromActiveLow
   , invertReset
     -- * Basic circuits
   , delay#
@@ -153,6 +153,12 @@ module Clash.Signal.Internal
   , traverse#
   -- * EXTREMELY EXPERIMENTAL
   , joinSignal#
+
+  -- * Deprecated
+  , unsafeFromHighPolarity
+  , unsafeFromLowPolarity
+  , unsafeToHighPolarity
+  , unsafeToLowPolarity
   )
 where
 
@@ -1084,7 +1090,7 @@ resetGen = resetGenN (SNat @1)
 --
 -- Example usage:
 --
--- >>> sampleN 7 (unsafeToHighPolarity (resetGenN @System d3))
+-- >>> sampleN 7 (unsafeToActiveHigh (resetGenN @System d3))
 -- [True,True,True,False,False,False,False]
 --
 -- __NB__: While this can be used in the @testBench@ function, it cannot be
@@ -1097,7 +1103,7 @@ resetGenN
   -> Reset dom
 resetGenN n =
   let asserted = replicate (snatToNum n) True in
-  unsafeFromHighPolarity (fromList (asserted ++ repeat False))
+  unsafeFromActiveHigh (fromList (asserted ++ repeat False))
 {-# ANN resetGenN hasBlackBox #-}
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE resetGenN #-}
@@ -1128,16 +1134,54 @@ resetPolarityProxy _proxy =
 -- loops. In case of synchronous resets it can lead to
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
+unsafeToActiveHigh
+  :: forall dom
+   . KnownDomain dom
+  => Reset dom
+  -> Signal dom Bool
+unsafeToActiveHigh (unsafeFromReset -> r) =
+  case resetPolarityProxy (Proxy @dom) of
+    SActiveHigh -> r
+    SActiveLow -> not <$> r
+{-# INLINE unsafeToActiveHigh #-}
+
+-- | Convert a reset to an active high reset. Has no effect if reset is already
+-- an active high reset. Is unsafe because it can introduce:
+--
+-- * <Clash-Explicit-Signal.html#metastability meta-stability>
+--
+-- For asynchronous resets it is unsafe because it can cause combinatorial
+-- loops. In case of synchronous resets it can lead to
+-- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
+-- asynchronous resets.
 unsafeToHighPolarity
   :: forall dom
    . KnownDomain dom
   => Reset dom
   -> Signal dom Bool
-unsafeToHighPolarity (unsafeFromReset -> r) =
-  case resetPolarityProxy (Proxy @dom) of
-    SActiveHigh -> r
-    SActiveLow -> not <$> r
+unsafeToHighPolarity = unsafeToActiveHigh
+{-# DEPRECATED unsafeToHighPolarity "Use 'unsafeToActiveHigh' instead. This function will be removed in Clash 1.12." #-}
 {-# INLINE unsafeToHighPolarity #-}
+
+-- | Convert a reset to an active low reset. Has no effect if reset is already
+-- an active low reset. It is unsafe because it can introduce:
+--
+-- * <Clash-Explicit-Signal.html#metastability meta-stability>
+--
+-- For asynchronous resets it is unsafe because it can cause combinatorial
+-- loops. In case of synchronous resets it can lead to
+-- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
+-- asynchronous resets.
+unsafeToActiveLow
+  :: forall dom
+   . KnownDomain dom
+  => Reset dom
+  -> Signal dom Bool
+unsafeToActiveLow (unsafeFromReset -> r) =
+  case resetPolarityProxy (Proxy @dom) of
+    SActiveHigh -> not <$> r
+    SActiveLow -> r
+{-# INLINE unsafeToActiveLow #-}
 
 -- | Convert a reset to an active low reset. Has no effect if reset is already
 -- an active low reset. It is unsafe because it can introduce:
@@ -1153,10 +1197,8 @@ unsafeToLowPolarity
    . KnownDomain dom
   => Reset dom
   -> Signal dom Bool
-unsafeToLowPolarity (unsafeFromReset -> r) =
-  case resetPolarityProxy (Proxy @dom) of
-    SActiveHigh -> not <$> r
-    SActiveLow -> r
+unsafeToLowPolarity = unsafeToActiveLow
+{-# DEPRECATED unsafeToLowPolarity "Use 'unsafeToActiveLow' instead. This function will be removed in Clash 1.12." #-}
 {-# INLINE unsafeToLowPolarity #-}
 
 -- | 'unsafeFromReset' is unsafe because it can introduce:
@@ -1168,8 +1210,8 @@ unsafeToLowPolarity (unsafeFromReset -> r) =
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
 --
--- __NB__: You probably want to use 'unsafeToLowPolarity' or
--- 'unsafeToHighPolarity'.
+-- __NB__: You probably want to use 'unsafeToActiveLow' or
+-- 'unsafeToActiveHigh'.
 unsafeFromReset
   :: Reset dom
   -> Signal dom Bool
@@ -1183,8 +1225,8 @@ unsafeFromReset (Reset r) = r
 -- it can lead to <Clash-Explicit-Signal.html#metastability meta-stability>
 -- issues in the presence of asynchronous resets.
 --
--- __NB__: You probably want to use 'unsafeFromLowPolarity' or
--- 'unsafeFromHighPolarity'.
+-- __NB__: You probably want to use 'unsafeFromActiveLow' or
+-- 'unsafeFromActiveHigh'.
 unsafeToReset
   :: Signal dom Bool
   -> Reset dom
@@ -1206,7 +1248,24 @@ unsafeFromHighPolarity
   => Signal dom Bool
   -- ^ Reset signal that's 'True' when active, and 'False' when inactive.
   -> Reset dom
-unsafeFromHighPolarity r =
+unsafeFromHighPolarity = unsafeFromActiveHigh
+{-# DEPRECATED unsafeFromHighPolarity "Use 'unsafeFromActiveHigh' instead. This function will be removed in Clash 1.12." #-}
+{-# INLINE unsafeFromHighPolarity #-}
+
+-- | Interpret a signal of bools as an active high reset and convert it to
+-- a reset signal corresponding to the domain's setting.
+--
+-- For asynchronous resets it is unsafe because it can cause combinatorial
+-- loops. In case of synchronous resets it can lead to
+-- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
+-- asynchronous resets.
+unsafeFromActiveHigh
+  :: forall dom
+   . KnownDomain dom
+  => Signal dom Bool
+  -- ^ Reset signal that's 'True' when active, and 'False' when inactive.
+  -> Reset dom
+unsafeFromActiveHigh r =
   unsafeToReset $
     case resetPolarityProxy (Proxy @dom) of
       SActiveHigh -> r
@@ -1225,7 +1284,24 @@ unsafeFromLowPolarity
   => Signal dom Bool
   -- ^ Reset signal that's 'False' when active, and 'True' when inactive.
   -> Reset dom
-unsafeFromLowPolarity r =
+unsafeFromLowPolarity = unsafeFromActiveLow
+{-# DEPRECATED unsafeFromLowPolarity "Use 'unsafeFromActiveLow' instead. This function will be removed in Clash 1.12." #-}
+{-# INLINE unsafeFromLowPolarity #-}
+
+-- | Interpret a signal of bools as an active low reset and convert it to
+-- a reset signal corresponding to the domain's setting.
+--
+-- For asynchronous resets it is unsafe because it can cause combinatorial
+-- loops. In case of synchronous resets it can lead to
+-- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
+-- asynchronous resets.
+unsafeFromActiveLow
+  :: forall dom
+   . KnownDomain dom
+  => Signal dom Bool
+  -- ^ Reset signal that's 'False' when active, and 'True' when inactive.
+  -> Reset dom
+unsafeFromActiveLow r =
   unsafeToReset $
     case resetPolarityProxy (Proxy @dom) of
       SActiveHigh -> not <$> r
@@ -1371,7 +1447,7 @@ asyncRegister#
   -- ^ Reset value
   -> Signal dom a
   -> Signal dom a
-asyncRegister# clk (unsafeToHighPolarity -> rst) (fromEnable -> ena) initVal resetVal =
+asyncRegister# clk (unsafeToActiveHigh -> rst) (fromEnable -> ena) initVal resetVal =
   go (registerPowerup# clk initVal) rst ena
  where
   go o (r :- rs) enas@(~(e :- es)) as@(~(x :- xs)) =
@@ -1401,7 +1477,7 @@ syncRegister#
   -- ^ Reset value
   -> Signal dom a
   -> Signal dom a
-syncRegister# clk (unsafeToHighPolarity -> rst) (fromEnable -> ena) initVal resetVal =
+syncRegister# clk (unsafeToActiveHigh -> rst) (fromEnable -> ena) initVal resetVal =
   go (registerPowerup# clk initVal) rst ena
  where
   go o rt@(~(r :- rs)) enas@(~(e :- es)) as@(~(x :- xs)) =

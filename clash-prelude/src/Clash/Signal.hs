@@ -136,10 +136,10 @@ module Clash.Signal
   , Reset
   , unsafeToReset
   , unsafeFromReset
-  , unsafeToHighPolarity
-  , unsafeToLowPolarity
-  , unsafeFromHighPolarity
-  , unsafeFromLowPolarity
+  , unsafeToActiveHigh
+  , unsafeToActiveLow
+  , unsafeFromActiveHigh
+  , unsafeFromActiveLow
 #ifdef CLASH_MULTIPLE_HIDDEN
   , convertReset
 #endif
@@ -262,6 +262,12 @@ module Clash.Signal
   , HiddenClockName
   , HiddenResetName
   , HiddenEnableName
+
+    -- * Deprecated
+  , unsafeFromHighPolarity
+  , unsafeFromLowPolarity
+  , unsafeToHighPolarity
+  , unsafeToLowPolarity
   )
 where
 
@@ -417,7 +423,7 @@ topEntity
   -> Signal System (BitVector 8)
 topEntity clk rst key1 =
     let  (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' (SSymbol \@\"altpll50\") clk rst
-         rstSync            = 'resetSynchronizer' pllOut (unsafeToHighPolarity pllStable)
+         rstSync            = 'resetSynchronizer' pllOut (unsafeToActiveHigh pllStable)
     in   'exposeClockResetEnable' leds pllOut rstSync enableGen
   where
     key1R  = isRising 1 key1
@@ -434,7 +440,7 @@ topEntity
   -> Signal System (BitVector 8)
 topEntity clk rst key1 =
     let  (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' (SSymbol \@\"altpll50\") clk rst
-         rstSync            = 'resetSynchronizer' pllOut (unsafeToHighPolarity pllStable)
+         rstSync            = 'resetSynchronizer' pllOut (unsafeToActiveHigh pllStable)
     in   'withClockResetEnable' pllOut rstSync enableGen leds
   where
     key1R  = isRising 1 key1
@@ -2234,7 +2240,7 @@ unsafeSynchronizer =
 --
 -- Example:
 --
--- >>> sampleN @System 8 (unsafeToHighPolarity (holdReset (SNat @2)))
+-- >>> sampleN @System 8 (unsafeToActiveHigh (holdReset (SNat @2)))
 -- [True,True,True,False,False,False,False,False]
 --
 -- 'holdReset' holds the reset for an additional 2 clock cycles for a total
@@ -2252,7 +2258,7 @@ holdReset m =
 
 -- | Like 'fromList', but resets on reset and has a defined reset value.
 --
--- >>> let rst = unsafeFromHighPolarity (fromList [True, True, False, False, True, False])
+-- >>> let rst = unsafeFromActiveHigh (fromList [True, True, False, False, True, False])
 -- >>> let res = withReset rst (fromListWithReset Nothing [Just 'a', Just 'b', Just 'c'])
 -- >>> sampleN @System 6 res
 -- [Nothing,Nothing,Just 'a',Just 'b',Nothing,Just 'a']

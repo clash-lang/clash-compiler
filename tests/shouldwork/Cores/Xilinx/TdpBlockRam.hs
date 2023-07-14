@@ -31,10 +31,10 @@ topEntity
 {-# CLASH_OPAQUE topEntity #-}
 
 noRstA :: Reset A
-noRstA = unsafeFromHighPolarity (pure False)
+noRstA = unsafeFromActiveHigh (pure False)
 
 noRstB :: Reset B
-noRstB = unsafeFromHighPolarity (pure False)
+noRstB = unsafeFromActiveHigh (pure False)
 
 tb ::
   ( KnownNat n0, KnownNat n1, KnownNat n2, KnownNat n3

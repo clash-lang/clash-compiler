@@ -117,11 +117,11 @@ clk10TH = clockGen @B
 clk7TH = clockGen @C
 
 noRst20 :: Reset A
-noRst20 = unsafeFromHighPolarity (pure False)
+noRst20 = unsafeFromActiveHigh (pure False)
 noRst10 :: Reset B
-noRst10 = unsafeFromHighPolarity (pure False)
+noRst10 = unsafeFromActiveHigh (pure False)
 noRst7 :: Reset C
-noRst7 = unsafeFromHighPolarity (pure False)
+noRst7 = unsafeFromActiveHigh (pure False)
 
 twice = concatMap (replicate d2)
 strictAnd !a !b = (&&) a b
