@@ -165,7 +165,8 @@ ghcTypeToHWType iw = go
         "Clash.Signal.Internal.KnownDomain"
           -> case tyConDataCons (UniqMap.find tc m) of
                [dc] -> case substArgTys dc args of
-                 [_,tyView -> TyConApp _ [_,dom]] -> case tyView (coreView m dom) of
+                 [_knownSymbol, _knownNat, tyView -> TyConApp _ [_,dom]] ->
+                  case tyView (coreView m dom) of
                    TyConApp _ [tag0, period0, edge0, rstKind0, init0, polarity0] -> do
                      tag1      <- domTag m tag0
                      period1   <- domPeriod m period0

@@ -1,0 +1,1 @@
+ADDED: `KnownNat (DomainPeriod dom)` as an implied constraint to `KnownDomain dom`. This reduces the amount of code needed to write - for example - clock speed dependent code.
