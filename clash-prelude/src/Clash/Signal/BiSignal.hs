@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2017, Google Inc.
                   2019, Myrtle Software Ltd
-                  2022, QBayLogic B.V.
+                  2022-2023, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -203,7 +203,7 @@ type role BiSignalOut nominal nominal nominal
 --
 -- as it is not safe to coerce the default behaviour, synthesis domain or width
 -- of the data in the signal.
-#if MIN_VERSION_base(4,15,0)
+#if MIN_VERSION_base(4,15,0) && !MIN_VERSION_base(4,17,0)
 data BiSignalOut (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
   = BiSignalOut ![Signal dom (Maybe (BitVector n))]
 #else
