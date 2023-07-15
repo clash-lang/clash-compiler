@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software Ltd,
-                  2021-2022, QBayLogic B.V.
+                  2021-2023, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -157,7 +157,7 @@ type role Index nominal
 --
 -- as it is not safe to coerce between 'Index'es with different ranges. To
 -- change the size, use the functions in the 'Resize' class.
-#if MIN_VERSION_base(4,15,0)
+#if MIN_VERSION_base(4,15,0) && !MIN_VERSION_base(4,17,0)
 data Index (n :: Nat) =
     -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
     -- synthesizable.

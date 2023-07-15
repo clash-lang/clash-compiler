@@ -783,7 +783,7 @@ imap f = go 0
 
 {- | Zip two vectors with a functions that also takes the elements' indices.
 
-#if __GLASGOW_HASKELL__ >= 900
+#if __GLASGOW_HASKELL__ >= 900 && __GLASGOW_HASKELL__ < 904
 >>> izipWith (\i a b -> i + a + b) (2 :> 2 :> Nil)  (3 :> 3:> Nil)
 *** Exception: X: Clash.Sized.Index: result 2 is out of bounds: [0..1]
 ...

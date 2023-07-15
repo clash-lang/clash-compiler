@@ -1,0 +1,1 @@
+CHANGED: From GHC 9.4.1 onwards the following types: `BiSignalOut`, `Index`, `Signed`, `Unsigned`, `File`, `Ref`, and `SimIO` are all encoded as `newtype` instead of `data` now that [#2511](https://github.com/clash-lang/clash-compiler/pull/2511) is merged. This means you can once again use `Data.Coerce.coerce` to coerce between these types and their underlying representation.
