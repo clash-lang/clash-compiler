@@ -65,7 +65,7 @@ import           Clash.Annotations.BitRepresentation.Internal
   (ConstrRepr'(..), DataRepr'(..), ConstrRepr'(..))
 import           Clash.Annotations.BitRepresentation.Util
   (BitOrigin(Lit, Field), bitOrigins, bitRanges)
-import           Clash.Core.Var                       (Attr'(..))
+import           Clash.Annotations.SynthesisAttributes (Attr(..))
 import           Clash.Backend
 import           Clash.Backend.Verilog.Time           (periodToString)
 import           Clash.Debug                          (traceIf)
@@ -410,22 +410,22 @@ decls ds = do
 
 -- | Add attribute notation to given declaration
 addAttrs
-  :: [Attr']
+  :: [Attr TextS.Text]
   -> VerilogM Doc
   -> VerilogM Doc
 addAttrs []     t = t
 addAttrs attrs' t =
   "(*" <+> attrs'' <+> "*)" <+> t
  where
-  attrs'' = string $ Text.intercalate ", " (map renderAttr attrs')
+  attrs'' = stringS $ TextS.intercalate ", " (map renderAttr attrs')
 
 -- | Convert single attribute to verilog syntax
-renderAttr :: Attr' -> Text.Text
-renderAttr (StringAttr'  key value) = pack $ concat [key, " = ", show value]
-renderAttr (IntegerAttr' key value) = pack $ concat [key, " = ", show value]
-renderAttr (BoolAttr'    key True ) = pack $ concat [key, " = ", "1"]
-renderAttr (BoolAttr'    key False) = pack $ concat [key, " = ", "0"]
-renderAttr (Attr'        key      ) = pack $ key
+renderAttr :: Attr TextS.Text -> TextS.Text
+renderAttr (StringAttr  key value) = TextS.concat [key, " = ", TextS.pack (show value)]
+renderAttr (IntegerAttr key value) = TextS.concat [key, " = ", TextS.pack (show value)]
+renderAttr (BoolAttr    key True ) = TextS.concat [key, " = ", "1"]
+renderAttr (BoolAttr    key False) = TextS.concat [key, " = ", "0"]
+renderAttr (Attr        key      ) = key
 
 decl :: Declaration -> VerilogM (Maybe Doc)
 decl (NetDecl' noteM id_ tyE iEM) = do

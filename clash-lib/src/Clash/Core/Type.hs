@@ -65,6 +65,7 @@ import           Data.Hashable          (Hashable (hashWithSalt))
 import           Data.List              (foldl')
 import           Data.List.Extra        (splitAtList)
 import           Data.Maybe             (isJust, mapMaybe)
+import           Data.Text              (Text)
 import           GHC.Base               (isTrue#,(==#))
 import           GHC.Generics           (Generic(..))
 import           GHC.Integer            (smallInteger)
@@ -112,6 +113,7 @@ import           Unique                 (getKey)
 #endif
 
 -- Local imports
+import           Clash.Annotations.SynthesisAttributes
 import           Clash.Core.DataCon
 import           Clash.Core.Name
 import {-# SOURCE #-} Clash.Core.Subst
@@ -127,7 +129,7 @@ ordEQDataConKey = eqDataConKey
 ordGTDataConKey = gtDataConKey
 #endif
 
-varAttrs :: Var a -> [Attr']
+varAttrs :: Var a -> [Attr Text]
 varAttrs t@(TyVar {}) =
   error $ $(curLoc) ++ "Unexpected argument: " ++ show t
 
@@ -144,7 +146,7 @@ data Type
   | ForAllTy !TyVar !Type       -- ^ Polymorphic Type
   | AppTy    !Type !Type        -- ^ Type Application
   | LitTy    !LitTy             -- ^ Type literal
-  | AnnType  [Attr'] !Type      -- ^ Annotated type, see Clash.Annotations.SynthesisAttributes
+  | AnnType  [Attr Text] !Type  -- ^ Annotated type, see Clash.Annotations.SynthesisAttributes
   deriving (Show, Generic, NFData, Binary)
 
 instance TypeError (
@@ -387,9 +389,7 @@ isPolyFunCoreTy _ ty = case tyView ty of
 
 -- | Extract attributes from type. Will return an empty list if this is an
 -- AnnType with an empty list AND if this is not an AnnType at all.
-typeAttrs
-  :: Type
-  -> [Attr']
+typeAttrs :: Type -> [Attr Text]
 typeAttrs (AnnType attrs _typ) = attrs
 typeAttrs _                    = []
 

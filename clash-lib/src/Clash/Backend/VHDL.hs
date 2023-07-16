@@ -65,8 +65,8 @@ import           Clash.Annotations.BitRepresentation.ClashLib
   (bitsToBits)
 import           Clash.Annotations.BitRepresentation.Util
   (BitOrigin(Lit, Field), bitOrigins, bitRanges)
+import           Clash.Annotations.SynthesisAttributes (Attr(..))
 import           Clash.Backend
-import           Clash.Core.Var                       (Attr'(..),attrName)
 import           Clash.Debug                          (traceIf)
 import           Clash.Driver.Types                   (ClashOpts(..))
 import           Clash.Explicit.BlockRam.Internal     (unpackNats)
@@ -993,38 +993,44 @@ architecture c = do {
    isNetDecl NetDecl'{} = True
    isNetDecl _          = False
 
-attrType
-  :: t ~ HashMap T.Text T.Text
-  => t
-  -> Attr'
-  -> t
+attrType ::
+  HashMap TextS.Text TextS.Text ->
+  Attr TextS.Text ->
+  HashMap TextS.Text TextS.Text
 attrType types attr =
   case HashMap.lookup name' types of
     Nothing    -> HashMap.insert name' type' types
     Just type'' | type'' == type' -> types
                 | otherwise -> error $
-                      $(curLoc) ++ unwords [ T.unpack name', "already assigned"
-                                           , T.unpack type'', "while we tried to"
-                                           , "add", T.unpack type' ]
+                      $(curLoc) ++ unwords [ TextS.unpack name', "already assigned"
+                                           , TextS.unpack type'', "while we tried to"
+                                           , "add", TextS.unpack type' ]
  where
-  name' = T.pack $ attrName attr
-  type' = T.pack $ case attr of
+  name' = attrName attr
+  type' = case attr of
             BoolAttr _ _    -> "boolean"
             IntegerAttr _ _ -> "integer"
             StringAttr _ _  -> "string"
             Attr _          -> "boolean"
 
+attrName :: Attr a -> a
+attrName = \case
+  BoolAttr a _ -> a
+  IntegerAttr a _ -> a
+  StringAttr a _ -> a
+  Attr a -> a
+
 -- | Create 'attrname -> type' mapping for given attributes. Will err if multiple
 -- types are assigned to the same name.
-attrTypes :: [Attr'] -> HashMap T.Text T.Text
+attrTypes :: [Attr TextS.Text] -> HashMap TextS.Text TextS.Text
 attrTypes = foldl attrType HashMap.empty
 
 -- | Create a 'attrname -> (type, [(signalname, value)]). Will err if multiple
 -- types are assigned to the same name.
 attrMap
   :: forall t
-   . t ~ HashMap T.Text (T.Text, [(TextS.Text, T.Text)])
-  => [(Identifier, Attr')]
+   . t ~ HashMap TextS.Text (TextS.Text, [(TextS.Text, TextS.Text)])
+  => [(Identifier, Attr TextS.Text)]
   -> t
 attrMap attrs0 = foldl go empty' attrs1
  where
@@ -1034,55 +1040,56 @@ attrMap attrs0 = foldl go empty' attrs1
            [(k, (types HashMap.! k, [])) | k <- HashMap.keys types]
   types = attrTypes (map snd attrs1)
 
-  go :: t -> (TextS.Text, Attr') -> t
-  go map' attr = HashMap.adjust
-                   (go' attr)
-                   (T.pack $ attrName $ snd attr)
-                   map'
+  go :: t -> (TextS.Text, Attr TextS.Text) -> t
+  go map' attr = HashMap.adjust (go' attr) (attrName $ snd attr) map'
 
   go'
-    :: (TextS.Text, Attr')
-    -> (T.Text, [(TextS.Text, T.Text)])
-    -> (T.Text, [(TextS.Text, T.Text)])
+    :: (TextS.Text, Attr TextS.Text)
+    -> (TextS.Text, [(TextS.Text, TextS.Text)])
+    -> (TextS.Text, [(TextS.Text, TextS.Text)])
   go' (signalName, attr) (typ, elems) =
     (typ, (signalName, renderAttr attr) : elems)
 
 renderAttrs
   :: TextS.Text
-  -> [(Identifier, Attr')]
+  -> [(Identifier, Attr TextS.Text)]
   -> VHDLM Doc
 renderAttrs what (attrMap -> attrs) =
   vcat $ sequence $ intersperse " " $ map renderAttrGroup (HashMap.toList attrs)
  where
   renderAttrGroup
-    :: (T.Text, (T.Text, [(TextS.Text, T.Text)]))
+    :: (TextS.Text, (TextS.Text, [(TextS.Text, TextS.Text)]))
     -> VHDLM Doc
   renderAttrGroup (attrname, (typ, elems)) =
-    ("attribute" <+> string attrname <+> colon <+> string typ <> semi)
+    ("attribute" <+> stringS attrname <+> colon <+> stringS typ <> semi)
     <> line <>
     (vcat $ sequence $ map (renderAttrDecl attrname) elems)
 
   renderAttrDecl
-    :: T.Text
-    -> (TextS.Text, T.Text)
+    :: TextS.Text
+    -> (TextS.Text, TextS.Text)
     -> VHDLM Doc
   renderAttrDecl attrname (signalName, value) =
         "attribute"
-    <+> string attrname
+    <+> stringS attrname
     <+> "of"
     <+> stringS signalName -- or component name
     <+> colon
     <+> stringS what <+> "is" -- "signal is" or "component is"
-    <+> string value
+    <+> stringS value
     <> semi
 
 -- | Convert single attribute to VHDL syntax
-renderAttr :: Attr' -> T.Text
-renderAttr (StringAttr'  _key value) = T.replace "\\\"" "\"\"" $ T.pack $ show value
-renderAttr (IntegerAttr' _key value) = T.pack $ show value
-renderAttr (BoolAttr'    _key True ) = T.pack $ "true"
-renderAttr (BoolAttr'    _key False) = T.pack $ "false"
-renderAttr (Attr'        _key      ) = T.pack $ "true"
+renderAttr :: Attr TextS.Text -> TextS.Text
+renderAttr (StringAttr  _key value) = wrap '"' $ TextS.replace "\"" "\"\"" value
+renderAttr (IntegerAttr _key value) = TextS.pack (show value)
+renderAttr (BoolAttr    _key True ) = "true"
+renderAttr (BoolAttr    _key False) = "false"
+renderAttr (Attr        _key      ) = "true"
+
+-- | Prepend and append a character to a string
+wrap :: Char -> TextS.Text -> TextS.Text
+wrap c = cons c . (`snoc` c)
 
 sigDecl :: VHDLM Doc -> HWType -> VHDLM Doc
 sigDecl d t = d <+> colon <+> sizedQualTyName t
@@ -1414,7 +1421,9 @@ decl _ (InstDecl Comp _ attrs nm _ gens (NamedPortMap pms)) = fmap (Just . (,0))
     portDir In  = "in"
     portDir Out = "out"
 
-    attrs' = if null attrs then emptyDoc else renderAttrs (TextS.pack "component") [(nm, a) | a <- attrs]
+    attrs'
+      | null attrs = emptyDoc
+      | otherwise = renderAttrs (TextS.pack "component") [(nm, a) | a <- attrs]
 
 decl _ _ = return Nothing
 

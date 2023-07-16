@@ -3,9 +3,9 @@
 
 module InstDeclAnnotations where
 
+import           Clash.Annotations.SynthesisAttributes (Attr(..))
 import           Clash.Annotations.Primitive     (HDL (..), Primitive (..))
 import           Clash.Backend
-import           Clash.Core.Var                  (Attr' (..))
 import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types
 import           Clash.Prelude
@@ -38,8 +38,8 @@ myTemplate bbCtx = do
   compName <- Id.makeBasic "TEST"
   let
     attrs =
-      [ IntegerAttr' "my_int_attr"    7
-      , StringAttr'  "my_string_attr" "Hello World!"
+      [ IntegerAttr "my_int_attr"    7
+      , StringAttr  "my_string_attr" "Hello World!"
       ]
   getAp
     $ blockDecl blkName [InstDecl Comp Nothing attrs compName compInst [] (NamedPortMap []) ]

@@ -38,8 +38,8 @@ import Control.Exception (assert)
 
 import qualified Clash.Netlist.Id as Id
 import qualified Clash.Primitives.DSL as DSL
+import Clash.Annotations.SynthesisAttributes (Attr(StringAttr))
 import Clash.Backend (Backend)
-import Clash.Core.Var (Attr' (StringAttr'))
 import Clash.Netlist.Expr (bits, fromBits)
 import Clash.Netlist.Types
   ( Size
@@ -202,7 +202,7 @@ vioProbeBBTF bbCtx
  where
   -- The HDL attribute 'KEEP' is added to the signals connected to the
   -- probe ports so they are not optimized away by the synthesis tool.
-  keepAttrs = [StringAttr' "KEEP" "true"]
+  keepAttrs = [StringAttr "KEEP" "true"]
 
   toNameCheckedBv nameHint inProbe =
     fmap (checkNameCollision nameHint) $

@@ -114,9 +114,9 @@ import           Data.Text.Prettyprint.Doc.Extra
 import           GHC.Stack                       (HasCallStack)
 
 import           Clash.Annotations.Primitive     (HDL (..), Primitive (..))
+import           Clash.Annotations.SynthesisAttributes (Attr)
 import           Clash.Backend                   hiding (Usage, fromBV, toBV)
 import           Clash.Backend.VHDL              (VHDLState)
-import           Clash.Core.Var                  (Attr')
 import           Clash.Explicit.Signal           (ResetPolarity(..))
 import           Clash.Netlist.BlackBox.Util     (exprToString, renderElem)
 import           Clash.Netlist.BlackBox.Types
@@ -688,7 +688,7 @@ toBV = toBvWithAttrs []
 -- | Convert an expression to a BitVector and add the given HDL attributes
 toBvWithAttrs ::
   Backend backend =>
-  [Attr'] ->
+  [Attr Text] ->
   -- | BitVector name hint
   Text ->
   -- | Expression to convert to BitVector
@@ -902,7 +902,7 @@ viaAnnotatedSignal
   -- ^ expression the signal is assigned to
   -> TExpr
   -- ^ expression (must be identifier) to which the signal is assigned
-  -> [Attr']
+  -> [Attr Text]
   -- ^ the attributes to annotate the signal with
   -> State (BlockState backend) ()
 viaAnnotatedSignal sigNm (TExpr fromTy fromExpr) (TExpr toTy (Identifier outNm Nothing)) attrs

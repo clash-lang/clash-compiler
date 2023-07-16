@@ -36,6 +36,8 @@ where
 
 -- External Modules
 import           Control.Lens                ((^.), (%~), (&), (%=), (.~), view, makeLenses)
+import           Control.Applicative         ((<|>))
+import           Control.Monad.Extra         (ifM, andM)
 import           Control.Monad.RWS.Strict    (RWS)
 import qualified Control.Monad.RWS.Strict    as RWS
 import           Data.Bifunctor              (second)
@@ -197,8 +199,6 @@ import           Clash.Normalize.Primitives  as C
 import           Clash.Primitives.Types      hiding (name)
 import           Clash.Util
 import           Clash.GHC.Util
-import Control.Monad.Extra (ifM, andM)
-import Control.Applicative ((<|>))
 
 instance Hashable Name where
   hashWithSalt s = hashWithSalt s . getKey . nameUnique
@@ -889,6 +889,10 @@ tyLitToString (LitTy (StrTyLit s)) = unpackFS s
 tyLitToString s = error $ unwords [ "Could not unpack given type to string:"
                                   , showPprUnsafe s ]
 
+-- | Returns string in Text form of (LitTy (StrTyLit s)) construction.
+tyLitToText :: Type -> Text
+tyLitToText = Text.pack . tyLitToString
+
 -- | Returns integer of (LitTy (NumTyLit n)) construction.
 tyLitToInteger :: Type -> Integer
 tyLitToInteger (LitTy (NumTyLit n)) = n
@@ -896,7 +900,7 @@ tyLitToInteger s = error $ unwords [ "Could not unpack given type to integer:"
                                    , showPprUnsafe s ]
 
 -- | Try to interpret a Type as an Attr
-coreToAttr :: Type -> C2C C.Attr'
+coreToAttr :: Type -> C2C (Attr Text)
 coreToAttr t0@(TyConApp ty args) = do
   name <- typeConstructorToString ty
   envs <- view famInstEnvs
@@ -914,14 +918,14 @@ coreToAttr t0@(TyConApp ty args) = do
 #endif
   if
     | name == show 'StringAttr ->
-      return $ C.StringAttr' (tyLitToString key1) (tyLitToString value1)
+      return $ StringAttr (tyLitToText key1) (tyLitToText value1)
     | name == show 'IntegerAttr ->
-      return $ C.IntegerAttr' (tyLitToString key1) (tyLitToInteger value1)
+      return $ IntegerAttr (tyLitToText key1) (tyLitToInteger value1)
     | name == show 'BoolAttr -> do
       bool <- boolTypeToBool value1
-      return $ C.BoolAttr' (tyLitToString key1) bool
+      return $ BoolAttr (tyLitToText key1) bool
     | name == show 'Attr ->
-      return $ C.Attr' (tyLitToString key1)
+      return $ Attr (tyLitToText key1)
     | otherwise ->
       case coreView t0 of
         Just t1 -> coreToAttr t1
@@ -931,7 +935,7 @@ coreToAttr t0 =
     Just t1 -> coreToAttr t1
     Nothing -> error $ [__i|Expected constructor of Attr, got #{showPprUnsafe t0}|]
 
-coreToAttrs' :: [Type] -> C2C [C.Attr']
+coreToAttrs' :: [Type] -> C2C [Attr Text]
 coreToAttrs' [k, a, attrs] = do
   -- We expect three type arguments:
   --
@@ -976,7 +980,7 @@ coreToAttrs' illegal =
   error $ "Unexpected type args to Annotate: " ++ show (map (showPprUnsafe) illegal)
 
 -- | If this type has an annotate type synonym, return list of attributes.
-coreToAttrs :: Type -> C2C [C.Attr']
+coreToAttrs :: Type -> C2C [Attr Text]
 coreToAttrs (TyConApp tycon kindsOrTypes) = do
   name' <- typeConstructorToString tycon
 

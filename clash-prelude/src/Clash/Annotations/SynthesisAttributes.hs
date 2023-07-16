@@ -10,6 +10,7 @@
   (<https://github.com/clash-lang/clash-compiler/issues>).
 -}
 
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PolyKinds #-}
 
@@ -20,7 +21,12 @@ module Clash.Annotations.SynthesisAttributes
   , Annotate
   ) where
 
+import Control.DeepSeq (NFData)
+import Data.Binary (Binary)
 import Data.Kind (Type)
+import Data.Hashable (Hashable)
+import GHC.Generics (Generic)
+import Language.Haskell.TH.Syntax (Lift)
 
 type Annotate (a :: Type) (attrs :: k) = a
 
@@ -109,3 +115,4 @@ data Attr a
   | Attr a
   -- ^ Attribute rendered as constant. Example:
   -- <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir_keep.htm>
+  deriving (Show, Generic, NFData, Binary, Lift, Eq, Ord, Hashable, Functor)
