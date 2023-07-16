@@ -903,8 +903,8 @@ coreToAttr t0@(TyConApp ty args) = do
   let
     -- XXX: This relies on 'value' not being evaluated if the constructor
     --      doesn't have a second field.
-    key = args !! 0
-    value = args !! 1
+    key = args !! 1
+    value = args !! 2
 #if MIN_VERSION_ghc(9,4,0)
   let Reduction _ key1 = normaliseType envs Nominal key
       Reduction _ value1 = normaliseType envs Nominal value

@@ -1,10 +1,10 @@
 {-|
-  Copyright   :  (C) 2018, Google Inc.,
-                     2021, QBayLogic B.V.
+  Copyright   :  (C) 2018,      Google Inc.,
+                     2021-2023, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  API for synthesis attributes (sometimes refered to as "synthesis directives",
+  API for synthesis attributes (sometimes referred to as "synthesis directives",
   "pragmas", or "logic synthesis directives"). This is an experimental feature,
   please report any unexpected or broken behavior to Clash's GitHub page
   (<https://github.com/clash-lang/clash-compiler/issues>).
@@ -20,12 +20,11 @@ module Clash.Annotations.SynthesisAttributes
   , Annotate
   ) where
 
-import GHC.TypeLits (Symbol)
 import Data.Kind (Type)
 
 type Annotate (a :: Type) (attrs :: k) = a
 
--- | Synthesis attributes are directives passed to sythesis tools, such as
+-- | Synthesis attributes are directives passed to synthesis tools, such as
 -- Quartus. An example of such an attribute in VHDL:
 --
 -- @
@@ -94,16 +93,19 @@ type Annotate (a :: Type) (attrs :: k) = a
 --
 -- This is an experimental feature, please report any unexpected or broken
 -- behavior to Clash's GitHub page (<https://github.com/clash-lang/clash-compiler/issues>).
-data Attr
-  = BoolAttr Symbol Bool
+--
+-- Use 'annotate' if you wish to annotate an intermediate signal. Its use is
+-- preferred over type level annotations.
+data Attr a
+  = BoolAttr a Bool
   -- ^ Attribute which argument is rendered as a bool. Example:
   -- <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir_direct_enable.htm>
-  | IntegerAttr Symbol Integer
+  | IntegerAttr a Integer
   -- ^ Attribute which argument is rendered as a integer. Example:
   -- <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir_max_depth.htm>
-  | StringAttr Symbol Symbol
+  | StringAttr a a
   -- ^ Attribute which argument is rendered as a string. Example:
   -- <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir_chip.htm>
-  | Attr Symbol
+  | Attr a
   -- ^ Attribute rendered as constant. Example:
   -- <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir_keep.htm>
