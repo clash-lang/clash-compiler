@@ -263,10 +263,9 @@ instance Backend VHDLState where
                 else line <> line <> renderAttrs (TextS.pack "signal") attrs) <>
                if null cds
                 then emptyDoc
-                else line <> line <> insts cds) <>
-            nest 2
-              ("begin" <> line <>
-                insts ids) <> line <>
+                else line <> line <> insts cds) <> line <> "begin" <>
+            nest 2 (line <> insts ids)
+            <> line <>
             "end block" <> semi
    where
      (cds, ids) = partition isCompDecl ds
