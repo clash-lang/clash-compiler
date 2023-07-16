@@ -1009,10 +1009,10 @@ attrType types attr =
  where
   name' = T.pack $ attrName attr
   type' = T.pack $ case attr of
-            BoolAttr' _ _    -> "boolean"
-            IntegerAttr' _ _ -> "integer"
-            StringAttr' _ _  -> "string"
-            Attr' _          -> "bool"
+            BoolAttr _ _    -> "boolean"
+            IntegerAttr _ _ -> "integer"
+            StringAttr _ _  -> "string"
+            Attr _          -> "boolean"
 
 -- | Create 'attrname -> type' mapping for given attributes. Will err if multiple
 -- types are assigned to the same name.
