@@ -21,6 +21,7 @@ module Clash.Annotations.SynthesisAttributes
   ( Attr(..)
   , Annotate
   , annotate
+  , markDebug
   ) where
 
 import Control.DeepSeq (NFData)
@@ -139,3 +140,20 @@ annotate !_attrs !a = a
         templateFunction: "Clash.Primitives.Annotations.SynthesisAttributes.annotateBBF"
         workInfo: Always
   |] #-}
+
+-- | Insert attributes such that signals are preserved in major synthesis tools.
+-- Also inserts "mark_debug", a way of signalling Vivado a signal should show up
+-- in a list of signals desired for ILA/VIO insertion.
+--
+-- Attributes inserted: @keep@, @mark_debug@, @noprune@, and @preserve@.
+markDebug :: Signal dom a -> Signal dom a
+markDebug = annotate $
+     BoolAttr "keep" True
+
+  -- Vivado:
+  :> BoolAttr "mark_debug" True
+
+  -- Quartus:
+  :> Attr "noprune"
+  :> Attr "preserve"
+  :> Nil
