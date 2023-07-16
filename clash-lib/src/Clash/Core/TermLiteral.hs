@@ -42,6 +42,7 @@ import           GHC.Natural
 import           GHC.Stack
 import           GHC.TypeNats (KnownNat)
 
+import           Clash.Annotations.SynthesisAttributes (Attr)
 import           Clash.Core.DataCon              (DataCon(..))
 import           Clash.Core.Literal
 import           Clash.Core.Name                 (Name(..))
@@ -117,6 +118,7 @@ instance TermLiteral Word where
   termToData t = Left t
 
 instance TermLiteral Integer where
+  termToData (Literal (IntegerLiteral n)) = Right n
   termToData (collectArgs -> (_, [Left (Literal (IntegerLiteral n))])) = Right n
   termToData t = Left t
 
@@ -125,6 +127,9 @@ instance TermLiteral Char where
   termToData t = Left t
 
 instance TermLiteral Natural where
+  termToData t@(Literal (NaturalLiteral n))
+    | n < 0 = Left t
+    | otherwise = Right (fromIntegral n)
   termToData (collectArgs -> (_, [Left (Literal (NaturalLiteral n))])) =
     Right (fromInteger n)
   termToData t = Left t
@@ -202,6 +207,7 @@ deriveTermLiteral ''Either
 deriveTermLiteral ''Cv.RenderAs
 deriveTermLiteral ''Cv.Assertion'
 deriveTermLiteral ''Cv.Property'
+deriveTermLiteral ''Attr
 
 -- | Same as 'termToData', but returns printable error message if it couldn't
 -- translate a term.

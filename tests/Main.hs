@@ -981,12 +981,13 @@ runClashTest = defaultMain $ clashTestRoot
            in runTest "Test00" _opts
         ]
       , clashTestGroup "SynthesisAttributes"
-        [ outputTest "InstDeclAnnotations" def
+        [ outputTest "Annotate" def{hdlTargets=[VHDL]}
+        , outputTest "InstDeclAnnotations" def
         , outputTest "MultipleAnnotations" def
         , outputTest "Product" def
         , outputTest "Simple" def
-        , runTest "Product" def
         , outputTest "T1771" def
+        , runTest "Product" def
         ]
       , clashTestGroup "Testbench"
         [ runTest "TB" def{clashFlags=["-fclash-inline-limit=0"]}

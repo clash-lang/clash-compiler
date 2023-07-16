@@ -11,22 +11,29 @@
 -}
 
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PolyKinds #-}
-
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Annotations.SynthesisAttributes
   ( Attr(..)
   , Annotate
+  , annotate
   ) where
 
 import Control.DeepSeq (NFData)
 import Data.Binary (Binary)
-import Data.Kind (Type)
 import Data.Hashable (Hashable)
+import Data.Kind (Type)
+import Data.String.Interpolate (__i)
 import GHC.Generics (Generic)
 import Language.Haskell.TH.Syntax (Lift)
+
+import Clash.Annotations.Primitive (Primitive(InlineYamlPrimitive), hasBlackBox)
+import Clash.Signal.Internal (Signal)
+import Clash.Sized.Vector (Vec(..))
 
 type Annotate (a :: Type) (attrs :: k) = a
 
@@ -116,3 +123,19 @@ data Attr a
   -- ^ Attribute rendered as constant. Example:
   -- <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir_keep.htm>
   deriving (Show, Generic, NFData, Binary, Lift, Eq, Ord, Hashable, Functor)
+
+-- | Create a new identifier in HDL and inserts given synthesis attributes. The
+-- name of the intermediate signal can be influenced using naming functions in
+-- "Clash.Magic".
+annotate :: forall n dom a . Vec n (Attr String) -> Signal dom a -> Signal dom a
+annotate !_attrs !a = a
+{-# CLASH_OPAQUE annotate #-}
+{-# ANN annotate hasBlackBox #-}
+{-# ANN annotate
+  let primName = show 'annotate
+  in InlineYamlPrimitive [minBound..] [__i|
+    BlackBoxHaskell:
+        name: #{primName}
+        templateFunction: "Clash.Primitives.Annotations.SynthesisAttributes.annotateBBF"
+        workInfo: Always
+  |] #-}

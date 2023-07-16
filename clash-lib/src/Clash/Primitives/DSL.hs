@@ -293,7 +293,7 @@ assign
   => Text
   -- ^ Name hint for assignment
   -> TExpr
-  -- ^ expression to be assigned to
+  -- ^ expression to be assigned to freshly generated identifier
   -> State (BlockState backend) TExpr
   -- ^ the identifier of the expression that actually got assigned
 assign aName (TExpr ty aExpr) = do
