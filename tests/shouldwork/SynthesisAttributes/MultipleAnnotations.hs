@@ -1,4 +1,4 @@
-module Product where
+module MultipleAnnotations where
 
 import qualified Prelude as P
 import Prelude ((++))
@@ -32,7 +32,6 @@ topEntity x y = mac $ bundle (x, y)
 
 --------------- Actual tests for generated HDL -------------------
 assertIn :: String -> String -> IO ()
-assertIn :: String -> String -> IO ()
 assertIn needle haystack
   | needle `isInfixOf` haystack = return ()
   | otherwise                   = P.error $ P.concat [ "Expected:\n\n  ", needle
@@ -41,8 +40,8 @@ assertIn needle haystack
 -- VHDL test
 mainVHDL :: IO ()
 mainVHDL = do
-  [topFile] <- getArgs
-  content <- readFile topFile
+  [topDir] <- getArgs
+  content <- readFile (topDir </> show 'topEntity </> "topEntity.vhdl")
 
   assertIn "attribute top : string;" content
   assertIn " : signal is \"input1\"" content
@@ -51,12 +50,14 @@ mainVHDL = do
 -- Verilog test
 mainVerilog :: IO ()
 mainVerilog = do
-  topFile <- getArgs
-  content <- readFile topFile
+  [topDir] <- getArgs
+  content <- readFile (topDir </> show 'topEntity </> "topEntity.v")
 
-  assertIn "(* top = \"input1\" *) input" content
-  assertIn "(* top = \"input2\" *) input" content
+  assertIn "(* top = \"input2\", top = \"input1\" *)" content
 
--- Verilog and SystemVerilog should share annotation syntax
-mainSystemVerilog = mainVerilog
+-- SystemVerilog test
+mainSystemVerilog = do
+  [topDir] <- getArgs
+  content <- readFile (topDir </> show 'topEntity </> "topEntity.sv")
 
+  assertIn "(* top = \"input2\", top = \"input1\" *)" content
