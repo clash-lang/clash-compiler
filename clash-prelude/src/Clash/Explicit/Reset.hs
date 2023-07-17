@@ -1,5 +1,5 @@
 {-|
-Copyright  :  (C) 2020-2021, QBayLogic B.V.
+Copyright  :  (C) 2020-2023, QBayLogic B.V.,
                   2022     , Google LLC
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -278,10 +278,16 @@ convertReset
   -> Clock domB
   -> Reset domA
   -> Reset domB
-convertReset clkA clkB rstA0 = rstA2
+convertReset clkA clkB rstA0 = rstB1
  where
-  rstA1 = unsafeToReset (unsafeSynchronizer clkA clkB (unsafeFromReset rstA0))
+  rstA1 = unsafeFromReset rstA0
   rstA2 =
+    case (resetPolarity @domA, resetPolarity @domB) of
+      (SActiveLow, SActiveLow)   -> rstA1
+      (SActiveHigh, SActiveHigh) -> rstA1
+      _                          -> not <$> rstA1
+  rstB0 = unsafeToReset $ unsafeSynchronizer clkA clkB rstA2
+  rstB1 =
     case (sameDomain @domA @domB) of
       Just Refl -> rstA0
-      Nothing   -> resetSynchronizer clkB rstA1
+      Nothing   -> resetSynchronizer clkB rstB0
