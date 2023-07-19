@@ -35,6 +35,7 @@ clockWizardDifferentialTF =
  where
   knownDomIn
     :< knownDomOut
+    :< _knownDomLock
     :< name
     :< clk
     :< rst
@@ -50,6 +51,7 @@ clockWizardDifferentialTemplate
 clockWizardDifferentialTemplate bbCtx
   |   knownDomIn
     : _knownDomOut
+    : _knownDomLock
     : name0
     : clk
     : rst
@@ -102,6 +104,7 @@ clockWizardTclTF =
  where
   knownDomIn
     :< knownDomOut
+    :< _knownDomLock
     :< name
     :< _clk
     :< _rst
@@ -115,6 +118,7 @@ clockWizardDifferentialTclTF =
  where
   knownDomIn
     :< knownDomOut
+    :< _knownDomLock
     :< name
     :< _clkN
     :< _clkP
@@ -132,6 +136,7 @@ clockWizardTclTemplate
 clockWizardTclTemplate isDifferential bbCtx
   |   (_,stripVoid -> (KnownDomain _ clkInPeriod _ _ _ _),_)
     : (_,stripVoid -> (KnownDomain _ clkOutPeriod _ _ _ _),_)
+    : _knownDomLock
     : (nm,_,_)
     : _ <- bbInputs bbCtx
   , [(Identifier _ Nothing,Product {})] <- bbResults bbCtx
