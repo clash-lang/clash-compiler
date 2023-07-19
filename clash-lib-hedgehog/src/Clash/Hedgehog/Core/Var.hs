@@ -7,36 +7,23 @@ Random generation of core variables.
 -}
 
 module Clash.Hedgehog.Core.Var
-  ( genAttr'
-  , genTyVar
+  ( genTyVar
   , genId
   , genLocalId
   , genGlobalId
   , genVars
   ) where
 
-import Hedgehog (MonadGen, Range)
+import Hedgehog (MonadGen)
 import qualified Hedgehog.Gen as Gen
 
 import Clash.Core.Name (Name(nameUniq))
 import Clash.Core.Term (TmName)
 import Clash.Core.Type (Kind, KindOrType, TyName, Type)
-import Clash.Core.Var (Attr'(..), Id, IdScope(..), TyVar, Var(..))
+import Clash.Core.Var (Id, IdScope(..), TyVar, Var(..))
 import qualified Clash.Data.UniqMap as UniqMap
 
 import Clash.Hedgehog.Core.Name (genFreshName)
-
-genAttr' :: forall m. MonadGen m => Range Int -> m Attr'
-genAttr' range =
-  Gen.choice
-    [ BoolAttr' <$> genAlphaNum <*> Gen.bool
-    , IntegerAttr' <$> genAlphaNum <*> genInteger
-    , StringAttr' <$> genAlphaNum <*> genAlphaNum
-    , Attr' <$> genAlphaNum
-    ]
- where
-  genAlphaNum = Gen.string range Gen.alphaNum
-  genInteger  = toInteger <$> Gen.integral range
 
 -- | Generate a fresh type variable of the specified kind.
 genTyVar :: forall m. MonadGen m => Kind -> m TyName -> m TyVar

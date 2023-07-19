@@ -69,13 +69,14 @@ import GHC.Types.SrcLoc                     (SrcSpan)
 import SrcLoc                               (SrcSpan)
 #endif
 
+import Clash.Annotations.SynthesisAttributes(Attr)
 import Clash.Annotations.BitRepresentation  (FieldAnn)
 import Clash.Annotations.Primitive          (HDL(..))
 import Clash.Annotations.TopEntity          (TopEntity)
 import Clash.Backend                        (Backend, HasUsageMap (..))
 import Clash.Core.HasType
 import Clash.Core.Type                      (Type)
-import Clash.Core.Var                       (Attr', Id)
+import Clash.Core.Var                       (Id)
 import Clash.Core.TyCon                     (TyConMap)
 import Clash.Core.VarEnv                    (VarEnv)
 import Clash.Driver.Types                   (BindingMap, ClashEnv(..), ClashOpts(..))
@@ -468,7 +469,7 @@ data HWType
   | CustomProduct !Text !DataRepr' !Size (Maybe [Text]) [(FieldAnn, HWType)]
   -- ^ Same as Product, but with a user specified bit representation. For more
   -- info, see: Clash.Annotations.BitRepresentations.
-  | Annotated [Attr'] !HWType
+  | Annotated [Attr Text] !HWType
   -- ^ Annotated with HDL attributes
   | KnownDomain !DomainName !Integer !ActiveEdge !ResetKind !InitBehavior !ResetPolarity
   -- ^ Domain name, period, active edge, reset kind, initial value behavior
@@ -479,7 +480,7 @@ data HWType
 -- | Smart constructor for 'Annotated'. Wraps the given type in an 'Annotated'
 -- if the attribute list is non-empty. If it is empty, it will return the given
 -- 'HWType' unchanged.
-annotated :: [Attr'] -> HWType -> HWType
+annotated :: [Attr Text] -> HWType -> HWType
 annotated [] t = t
 annotated attrs t = Annotated attrs t
 
@@ -494,7 +495,7 @@ hwTypeDomain = \case
 
 -- | Extract hardware attributes from Annotated. Returns an empty list if
 -- non-Annotated given or if Annotated has an empty list of attributes.
-hwTypeAttrs :: HWType -> [Attr']
+hwTypeAttrs :: HWType -> [Attr Text]
 hwTypeAttrs (Annotated attrs _type) = attrs
 hwTypeAttrs _                       = []
 
@@ -542,7 +543,7 @@ data Declaration
   | InstDecl
       EntityOrComponent                  -- ^ Whether it's an entity or a component
       (Maybe Text)                       -- ^ Library instance is defined in
-      [Attr']                            -- ^ Attributes to add to the generated code
+      [Attr Text]                        -- ^ Attributes to add to the generated code
       !Identifier                        -- ^ The component's (or entity's) name
       !Identifier                        -- ^ Instance label
       [(Expr,HWType,Expr)]               -- ^ List of parameters for this component (param name, param type, param value)
@@ -699,7 +700,7 @@ lookupUsage i = Map.lookup (Id.toText i)
 NOTE [`Text` key for `UsageMap`]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We would like to use netlist identifiers as the key for the usage map, since
-concepturally it is a map from an identifier to how it is used in assignments.
+conceptually it is a map from an identifier to how it is used in assignments.
 However, in practice we commonly end up with the same textual identifier
 appearing in different ways in the netlist.
 

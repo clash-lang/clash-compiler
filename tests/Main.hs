@@ -693,7 +693,8 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "VecFun" def
       ]
       , clashTestGroup "Issues" $
-        [ clashLibTest "T508" def
+        [ runTest "T359" def{hdlSim=[]}
+        , clashLibTest "T508" def
         , let _opts = def { hdlSim = [], hdlTargets = [Verilog] }
            in runTest "T1187" _opts
         , clashLibTest "T1388" def{hdlTargets=[VHDL]}
@@ -980,11 +981,13 @@ runClashTest = defaultMain $ clashTestRoot
            in runTest "Test00" _opts
         ]
       , clashTestGroup "SynthesisAttributes"
-        [ outputTest "Simple" def
-        , outputTest "Product" def
+        [ outputTest "Annotate" def{hdlTargets=[VHDL]}
         , outputTest "InstDeclAnnotations" def
-        , runTest "Product" def
+        , outputTest "MultipleAnnotations" def
+        , outputTest "Product" def
+        , outputTest "Simple" def
         , outputTest "T1771" def
+        , runTest "Product" def
         ]
       , clashTestGroup "Testbench"
         [ runTest "TB" def{clashFlags=["-fclash-inline-limit=0"]}

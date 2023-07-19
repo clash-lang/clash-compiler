@@ -276,6 +276,7 @@ Library
                       Clash.Primitives.Types
                       Clash.Primitives.Util
 
+                      Clash.Primitives.Annotations.SynthesisAttributes
                       Clash.Primitives.GHC.Int
                       Clash.Primitives.GHC.Literal
                       Clash.Primitives.GHC.Word

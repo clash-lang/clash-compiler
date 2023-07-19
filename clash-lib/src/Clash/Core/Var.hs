@@ -14,8 +14,7 @@
 {-# LANGUAGE RankNTypes #-}
 
 module Clash.Core.Var
-  ( Attr' (..)
-  , Var (..)
+  ( Var (..)
   , IdScope (..)
   , Id
   , TyVar
@@ -27,7 +26,6 @@ module Clash.Core.Var
   , modifyVarName
   , isGlobalId
   , isLocalId
-  , attrName
   )
 where
 
@@ -41,24 +39,6 @@ import Clash.Core.Name                  (Name (..))
 import {-# SOURCE #-} Clash.Core.Term   (Term, TmName)
 import {-# SOURCE #-} Clash.Core.Type   (Kind, Type, TyName)
 import Clash.Unique
-
-
--- | Interal version of Clash.Annotations.SynthesisAttributes.Attr.
---
--- Needed because Clash.Annotations.SynthesisAttributes.Attr uses the Symbol
--- kind for names, which do not have a term-level representation
-data Attr'
-  = BoolAttr' String Bool
-  | IntegerAttr' String Integer
-  | StringAttr' String String
-  | Attr' String
-  deriving (Eq, Show, NFData, Generic, Hashable, Ord, Binary)
-
-attrName :: Attr' -> String
-attrName (BoolAttr' n _)    = n
-attrName (IntegerAttr' n _) = n
-attrName (StringAttr' n _)  = n
-attrName (Attr' n)          = n
 
 -- | Variables in CoreHW
 data Var a

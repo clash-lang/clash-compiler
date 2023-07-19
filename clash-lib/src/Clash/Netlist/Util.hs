@@ -76,6 +76,7 @@ import           Clash.Annotations.BitRepresentation.ClashLib
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, ConstrRepr'(..), DataRepr'(..), getDataRepr,
    uncheckedGetConstrRepr)
+import           Clash.Annotations.SynthesisAttributes (Attr)
 import           Clash.Annotations.Primitive (HDL(VHDL))
 import           Clash.Backend           (HasUsageMap (..), HWKind(..), hdlHWTypeKind, hdlKind)
 import           Clash.Core.DataCon      (DataCon (..))
@@ -101,7 +102,7 @@ import           Clash.Core.Type
 import           Clash.Core.Util
   (substArgTys, tyLitShow)
 import           Clash.Core.Var
-  (Id, Var (..), mkLocalId, modifyVarName, Attr')
+  (Id, Var (..), mkLocalId, modifyVarName)
 import           Clash.Core.VarEnv
   (InScopeSet, extendInScopeSetList, uniqAway, lookupVarEnv)
 import qualified Clash.Data.UniqMap as UniqMap
@@ -1461,7 +1462,7 @@ genTopName prefixM ann =
 -- non-Annotated. Accumulates all attributes of nested annotations.
 stripAttributes
   :: HWType
-  -> ([Attr'], HWType)
+  -> ([Attr Text], HWType)
 -- Recursively strip type, accumulate attrs:
 stripAttributes (Annotated attrs typ) =
   let (attrs', typ') = stripAttributes typ
@@ -1537,7 +1538,7 @@ mkTopOutput epp@(ExpandedPortProduct p hwty ps) = do
 mkTopCompDecl
   :: Maybe Text
   -- ^ Library entity is defined in
-  -> [Attr']
+  -> [Attr Text]
   -- ^ Attributes to add to generate code
   -> Identifier
   -- ^ The component's (or entity's) name
@@ -1905,7 +1906,7 @@ affixName nm0 = do
 -- | Errors 'expandTopEntity' might yield
 data ExpandError
   -- | Synthesis attributes are not supported on PortProducts
-  = AttrError [Attr']
+  = AttrError [Attr Text]
   -- | Something was annotated as being a PortProduct, but wasn't one
   | PortProductError PortName HWType
 

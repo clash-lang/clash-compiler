@@ -49,7 +49,7 @@ import           Clash.Annotations.BitRepresentation.ClashLib
   (bitsToBits)
 import           Clash.Annotations.BitRepresentation.Util
   (BitOrigin(Lit, Field), bitOrigins, bitRanges)
-import           Clash.Core.Var                       (Attr'(..))
+import           Clash.Annotations.SynthesisAttributes (Attr(..))
 import           Clash.Debug                          (traceIf)
 import           Clash.Backend
 import           Clash.Backend.Verilog
@@ -702,23 +702,23 @@ decl (NetDecl' noteM id_ tyE iEM) =
 decl _ = return Nothing
 
 -- | Convert single attribute to systemverilog syntax
-renderAttr :: Attr' -> Text.Text
-renderAttr (StringAttr'  key value) = Text.pack $ concat [key, " = ", show value]
-renderAttr (IntegerAttr' key value) = Text.pack $ concat [key, " = ", show value]
-renderAttr (BoolAttr'    key True ) = Text.pack $ concat [key, " = ", "1"]
-renderAttr (BoolAttr'    key False) = Text.pack $ concat [key, " = ", "0"]
-renderAttr (Attr'        key      ) = Text.pack $ key
+renderAttr :: Attr TextS.Text -> TextS.Text
+renderAttr (StringAttr  key value) = TextS.concat [key, " = ", TextS.pack (show value)]
+renderAttr (IntegerAttr key value) = TextS.concat [key, " = ", TextS.pack (show value)]
+renderAttr (BoolAttr    key True ) = TextS.concat [key, " = ", "1"]
+renderAttr (BoolAttr    key False) = TextS.concat [key, " = ", "0"]
+renderAttr (Attr        key      ) = key
 
 -- | Add attribute notation to given declaration
 addAttrs
-  :: [Attr']
+  :: [Attr TextS.Text]
   -> SystemVerilogM Doc
   -> SystemVerilogM Doc
 addAttrs []     t = t
 addAttrs attrs' t =
   "(*" <+> attrs'' <+> "*)" <+> t
     where
-      attrs'' = string $ Text.intercalate ", " (map renderAttr attrs')
+      attrs'' = stringS $ TextS.intercalate ", " (map renderAttr attrs')
 
 insts :: [Declaration] -> SystemVerilogM Doc
 insts [] = emptyDoc

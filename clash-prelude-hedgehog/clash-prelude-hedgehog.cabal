@@ -37,12 +37,13 @@ library
   hs-source-dirs: src
 
   exposed-modules:
+    Clash.Hedgehog.Annotations.SynthesisAttributes
     Clash.Hedgehog.Signal
     Clash.Hedgehog.Sized.BitVector
     Clash.Hedgehog.Sized.Index
+    Clash.Hedgehog.Sized.RTree
     Clash.Hedgehog.Sized.Signed
     Clash.Hedgehog.Sized.Unsigned
-    Clash.Hedgehog.Sized.RTree
     Clash.Hedgehog.Sized.Vector
 
   build-depends:

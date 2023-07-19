@@ -180,6 +180,7 @@ library
                       uniplate                  >= 1.6.12   && < 1.8,
                       reflection                >= 2.1.2    && < 3.0,
                       primitive                 >= 0.5.0.1  && < 1.0,
+                      string-interpolate        ^>= 0.3,
                       template-haskell          >= 2.8.0.0  && < 2.21,
                       utf8-string               >= 1.0.0.0  && < 1.1.0.0,
                       vector                    >= 0.11     && < 1.0
