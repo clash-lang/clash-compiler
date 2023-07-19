@@ -3,7 +3,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017     , Google Inc.,
-                    2021-2022, QBayLogic B.V.
+                    2021-2023, QBayLogic B.V.
                     2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -83,7 +83,7 @@ import           Clash.Core.TyCon              as C (TyConMap, tyConDataCons)
 import           Clash.Core.Util
   (inverseTopSortLetBindings, splitShouldSplit)
 import           Clash.Core.Var                as V
-  (Id, mkLocalId, modifyVarName)
+  (Id, mkLocalId, modifyVarName, varType)
 import           Clash.Core.VarEnv
   (extendInScopeSet, mkInScopeSet, lookupVarEnv, uniqAway, unitVarSet)
 import {-# SOURCE #-} Clash.Netlist
@@ -186,7 +186,7 @@ mkBlackBoxContext bbName resIds args@(lefts -> termArgs) = do
 
         curBBlvl Lens.+= 1
         (fs,ds) <- case resIds of
-          (resId:_) -> unzip <$> replicateM funcPlurality (mkFunInput resId arg)
+          (resId:_) -> unzip <$> replicateM funcPlurality (mkFunInput bbName resId arg)
           _ -> error "internal error: insufficient resIds"
         curBBlvl Lens.-= 1
 
@@ -1049,7 +1049,10 @@ unSimIO tcm arg =
 -- a function
 mkFunInput
   :: HasCallStack
-  => Id
+  => TextS.Text
+  -- ^ Name of the primitive of which the function in question is an argument.
+  -- Used for error reporting.
+  -> Id
   -- ^ Identifier binding the encompassing primitive/blackbox application. Used
   -- as a name hint if 'mkFunInput' needs intermediate signals.
   -> Term
@@ -1062,7 +1065,7 @@ mkFunInput
        ,[((TextS.Text,TextS.Text),BlackBox)]
        ,BlackBoxContext)
       ,[Declaration])
-mkFunInput resId e =
+mkFunInput parentName resId e =
  let (appE,args,ticks) = collectArgsTicks e
  in  withTicks ticks $ \tickDecls -> do
   tcm <- Lens.view tcCache
@@ -1190,7 +1193,7 @@ mkFunInput resId e =
                   normalized <- Lens.use bindings
                   case lookupVarEnv fun normalized of
                     Just _ -> do
-                      (meta,N.Component compName compInps [(_,compOutp,_)] _) <-
+                      (meta,N.Component compName compInps compOutps _) <-
                         preserveVarEnv $ genComponent fun
 
                       let
@@ -1199,14 +1202,30 @@ mkFunInput resId e =
                         inpVar i = Id.unsafeMake ("~VAR[arg" <> showt i <> "][" <> showt i <> "]")
                         inpVars = [Identifier (inpVar i)  Nothing | i <- originalIndices cmWereVoids]
                         inpAssigns = zipWith inpAssign compInps inpVars
-                        outpAssign =
-                          ( Identifier (fst compOutp) Nothing
-                          , Out
-                          , snd compOutp
-                          , Identifier (Id.unsafeMake "~RESULT") Nothing )
+                        outpAssigns = case compOutps of
+                          [] -> [] -- See issue #2549
+                          [(_,compOutp,_)] ->
+                            [ ( Identifier (fst compOutp) Nothing
+                              , Out
+                              , snd compOutp
+                              , Identifier (Id.unsafeMake "~RESULT") Nothing )
+                            ]
+                          outps ->
+                            error [I.i|
+                              Cannot handle multi-result function as an argument to
+                              a primitive.
+
+                              Primitive: #{parentName}
+
+                              Argument: #{showPpr fun} :: #{showPpr (varType fun)}
+
+                              Outputs: #{show (map (\(_,x,_) -> x) outps)}
+
+                              Please report this as an issue.
+                            |]
                       instLabel <- Id.next compName
                       let
-                        portMap = NamedPortMap (outpAssign:inpAssigns)
+                        portMap = NamedPortMap (outpAssigns ++ inpAssigns)
                         instDecl = InstDecl Entity Nothing [] compName instLabel [] portMap
                       return (Right ((Id.unsafeMake "",tickDecls ++ [instDecl]), Cont))
                     Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
