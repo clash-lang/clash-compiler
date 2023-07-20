@@ -593,6 +593,7 @@ runClashTest = defaultMain $ clashTestRoot
               hdlTargets=[VHDL]
             , buildTargets=BuildSpecific ["withSetName", "withSetNameNoResult"]
             }
+          , runTest "T2549" def{hdlTargets=[Verilog],hdlSim=[]}
           ]
         ]
       , clashTestGroup "CSignal"
