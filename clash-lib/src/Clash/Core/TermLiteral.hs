@@ -41,6 +41,7 @@ import           Data.Typeable                   (Typeable, typeRep)
 import           GHC.Natural
 import           GHC.Stack
 import           GHC.TypeNats (KnownNat)
+import           Text.Show.Pretty                (ppShow)
 
 import           Clash.Annotations.SynthesisAttributes (Attr)
 import           Clash.Core.DataCon              (DataCon(..))
@@ -227,7 +228,7 @@ termToDataError term = bimap err id (termToData term)
 
     In its non-pretty-printed form:
 
-      #{show failedTerm}
+      #{ppShow failedTerm}
 
     In the full term:
 
