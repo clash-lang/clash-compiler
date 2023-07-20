@@ -108,6 +108,13 @@ instance TermLiteral Text where
 #endif
   termToData t = Left t
 
+instance KnownNat n => TermLiteral (Index n) where
+  termToData t@(collectArgs -> (_, [_, _, Left (Literal (IntegerLiteral n))]))
+    | n < 0 = Left t
+    | n >= natToNum @n = Left t
+    | otherwise = Right (fromInteger n)
+  termToData t = Left t
+
 instance TermLiteral Int where
   termToData (collectArgs -> (_, [Left (Literal (IntLiteral n))])) =
     Right (fromInteger n)
