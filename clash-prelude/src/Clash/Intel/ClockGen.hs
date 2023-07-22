@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2017-2018, Google Inc
                   2019     , Myrtle Software
-                  2022     , QBayLogic B.V.
+                  2022-2023, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -27,18 +27,39 @@ you want to run your circuit at.
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Clash.Intel.ClockGen
-  ( altpll
+  ( altpllSync
+  , alteraPllSync
+  , unsafeAltpll
+  , unsafeAlteraPll
+    -- ** Deprecated
+  , altpll
   , alteraPll
   ) where
 
 import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Clocks           (Clocks (..))
-import Clash.Promoted.Symbol  (SSymbol)
-import Clash.Signal.Internal
-  (Signal, Clock, Reset, KnownDomain (..))
+import Clash.Clocks
+import Clash.Promoted.Symbol (SSymbol)
+import Clash.Signal.Internal (Signal, Clock, Reset, KnownDomain (..))
 
+altpllSync ::
+  forall domOut domIn name .
+  ( KnownDomain domIn
+  , KnownDomain domOut
+  ) =>
+  -- | Name of the component instance
+  --
+  -- Instantiate as follows: @(SSymbol \@\"altpll50\")@
+  SSymbol name ->
+  -- | Free running clock (e.g. a clock pin connected to a crystal oscillator)
+  Clock domIn ->
+  -- | Reset for the PLL
+  Reset domIn ->
+  -- | (Stable PLL clock, PLL lock reset)
+  (Clock domOut, Reset domOut)
+altpllSync name = clocksResetSynchronizer (unsafeAltpll name)
 
 -- | A clock source that corresponds to the Intel/Quartus \"ALTPLL\" component
 -- (Arria GX, Arria II, Stratix IV, Stratix III, Stratix II, Stratix,
@@ -100,23 +121,64 @@ import Clash.Signal.Internal
 -- -- outputs a clock running at 100 MHz
 -- (clk100, pllLocked) = 'altpll' \@Dom100MHz ('SSymbol' \@\"altpll50to100\") clk50 rst50
 -- @
-altpll
-  :: forall domOut domIn name
-   . (KnownDomain domIn, KnownDomain domOut)
-  => SSymbol name
-  -- ^ Name of the component instance
+altpll ::
+  forall domOut domIn name .
+  ( KnownDomain domIn
+  , KnownDomain domOut
+  ) =>
+  -- | Name of the component instance
   --
   -- Instantiate as follows: @(SSymbol \@\"altpll50\")@
-  -> Clock domIn
-  -- ^ Free running clock (e.g. a clock pin connected to a crystal oscillator)
-  -> Reset domIn
-  -- ^ Reset for the PLL
-  -> (Clock domOut, Signal domOut Bool)
-  -- ^ (Stable PLL clock, PLL lock)
-altpll !_ = knownDomain @domIn `seq` knownDomain @domOut `seq` clocks
+  SSymbol name ->
+  -- | Free running clock (e.g. a clock pin connected to a crystal oscillator)
+  Clock domIn ->
+  -- | Reset for the PLL
+  Reset domIn ->
+  -- | (Stable PLL clock, PLL lock)
+  (Clock domOut, Signal domOut Bool)
+altpll = unsafeAltpll
+
+unsafeAltpll ::
+  forall domOut domIn name pllLock .
+  ( KnownDomain domIn
+  , KnownDomain domOut
+  , KnownDomain pllLock
+  ) =>
+  -- | Name of the component instance
+  --
+  -- Instantiate as follows: @(SSymbol \@\"altpll50\")@
+  SSymbol name ->
+  -- | Free running clock (e.g. a clock pin connected to a crystal oscillator)
+  Clock domIn ->
+  -- | Reset for the PLL
+  Reset domIn ->
+  -- | (Stable PLL clock, PLL lock)
+  (Clock domOut, Signal pllLock Bool)
+unsafeAltpll !_ = knownDomain @domIn `seq` knownDomain @domOut `seq` clocks
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE altpll #-}
-{-# ANN altpll hasBlackBox #-}
+{-# CLASH_OPAQUE unsafeAltpll #-}
+{-# ANN unsafeAltpll hasBlackBox #-}
+
+alteraPllSync ::
+  forall t name .
+  ClocksSyncCxt t =>
+  -- | Name of the component instance
+  --
+  -- Instantiate as follows: @(SSymbol \@\"alterapll50\")@
+  SSymbol name ->
+  t
+alteraPllSync name =
+  clocksResetSynchronizer (unsafeAlteraPll name)
+
+
+{-
+  :: forall {t1} {t2} {domIn :: Domain}.
+     (ClocksSynchronizedResetCxt t1, ClocksCxt t2,
+      ClocksSynchronizedReset t1, Clocks t2, KnownDomain domIn,
+      ClocksSynchronizedResetInput t1
+      ~ (Clock domIn -> Reset domIn -> t2)) =>
+-}
+
 
 -- | A clock source that corresponds to the Intel/Quartus \"Altera PLL\"
 -- component (Arria V, Stratix V, Cyclone V) with settings to provide a stable
@@ -190,18 +252,39 @@ altpll !_ = knownDomain @domIn `seq` knownDomain @domOut `seq` clocks
 -- resets of your components will be the @clk@ and @rst@ signals generated here
 -- (modulo local resets, which will be based on @rst@ or never asserted at all
 -- if the component doesn't need a reset).
-alteraPll
-  :: (Clocks t, KnownDomain domIn, ClocksCxt t)
-  => SSymbol name
-  -- ^ Name of the component instance
+alteraPll ::
+  forall t domIn name .
+  ( Clocks t
+  , KnownDomain domIn
+  , ClocksCxt t
+  ) =>
+  -- | Name of the component instance
   --
   -- Instantiate as follows: @(SSymbol \@\"alterapll50\")@
-  -> Clock domIn
-  -- ^ Free running clock (e.g. a clock pin connected to a crystal oscillator)
-  -> Reset domIn
-  -- ^ Reset for the PLL
-  -> t
-alteraPll !_ = clocks
+  SSymbol name ->
+  -- | Free running clock (e.g. a clock pin connected to a crystal oscillator)
+  Clock domIn ->
+  -- | Reset for the PLL
+  Reset domIn ->
+  t
+alteraPll = unsafeAlteraPll
+
+unsafeAlteraPll ::
+  forall t domIn name .
+  ( Clocks t
+  , KnownDomain domIn
+  , ClocksCxt t
+  ) =>
+  -- | Name of the component instance
+  --
+  -- Instantiate as follows: @(SSymbol \@\"alterapll50\")@
+  SSymbol name ->
+  -- | Free running clock (e.g. a clock pin connected to a crystal oscillator)
+  Clock domIn ->
+  -- | Reset for the PLL
+  Reset domIn ->
+  t
+unsafeAlteraPll !_ = clocks
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE alteraPll #-}
-{-# ANN alteraPll hasBlackBox #-}
+{-# CLASH_OPAQUE unsafeAlteraPll #-}
+{-# ANN unsafeAlteraPll hasBlackBox #-}

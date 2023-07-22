@@ -36,6 +36,7 @@ altpllTF = TemplateFunction used valid altpllTemplate
  where
   _knownDomIn
     :< _knownDomOut
+    :< _knownDomPll
     :< nm
     :< clk
     :< rst
@@ -53,6 +54,7 @@ altpllQsysTF = TemplateFunction used valid altpllQsysTemplate
  where
   knownDomIn
     :< knownDomOut
+    :< _knownDomPll
     :< _name
     :< _clk
     :< _rst
@@ -147,6 +149,7 @@ altpllTemplate
 altpllTemplate bbCtx
   | [ _knownDomIn
     , _knownDomOut
+    , _knownDomPll
     , (nm,_,_)
     , (clk,clkTy,_)
     , (rst,rstTy,_)] <- bbInputs bbCtx
