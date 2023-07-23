@@ -59,7 +59,7 @@ altpllSync ::
   Reset domIn ->
   -- | (Stable PLL clock, PLL lock reset)
   (Clock domOut, Reset domOut)
-altpllSync name = clocksResetSynchronizer (unsafeAltpll name)
+altpllSync name clkIn rstIn = clocksResetSynchronizer (unsafeAltpll name clkIn rstIn) clkIn
 
 -- | A clock source that corresponds to the Intel/Quartus \"ALTPLL\" component
 -- (Arria GX, Arria II, Stratix IV, Stratix III, Stratix II, Stratix,
@@ -160,25 +160,17 @@ unsafeAltpll !_ = knownDomain @domIn `seq` knownDomain @domOut `seq` clocks
 {-# ANN unsafeAltpll hasBlackBox #-}
 
 alteraPllSync ::
-  forall t name .
-  ClocksSyncCxt t =>
+  forall t domIn name .
+  ClocksSyncCxt t domIn =>
   -- | Name of the component instance
   --
   -- Instantiate as follows: @(SSymbol \@\"alterapll50\")@
   SSymbol name ->
+  Clock domIn ->
+  Reset domIn ->
   t
-alteraPllSync name =
-  clocksResetSynchronizer (unsafeAlteraPll name)
-
-
-{-
-  :: forall {t1} {t2} {domIn :: Domain}.
-     (ClocksSynchronizedResetCxt t1, ClocksCxt t2,
-      ClocksSynchronizedReset t1, Clocks t2, KnownDomain domIn,
-      ClocksSynchronizedResetInput t1
-      ~ (Clock domIn -> Reset domIn -> t2)) =>
--}
-
+alteraPllSync name clkIn rstIn =
+  clocksResetSynchronizer (unsafeAlteraPll name clkIn rstIn) clkIn
 
 -- | A clock source that corresponds to the Intel/Quartus \"Altera PLL\"
 -- component (Arria V, Stratix V, Cyclone V) with settings to provide a stable

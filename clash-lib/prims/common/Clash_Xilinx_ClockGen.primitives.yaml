@@ -1,5 +1,5 @@
 - BlackBox:
-    name: Clash.Xilinx.ClockGen.clockWizardDifferential
+    name: Clash.Xilinx.ClockGen.unsafeClockWizardDifferential
     kind: Declaration
     format: Haskell
     templateFunction: Clash.Primitives.Xilinx.ClockGen.clockWizardDifferentialTF

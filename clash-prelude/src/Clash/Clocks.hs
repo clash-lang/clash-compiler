@@ -53,65 +53,52 @@ instance Clocks (Clock c1, Clock c2, Clock c3, Signal pllLock Bool) where
     )
   clocks _ _ = error "clocks: dynamic clocks unsupported"
 
-type ClocksSyncCxt t =
-  ( KnownDomain (ClocksSyncDomIn t)
+type ClocksSyncCxt t (domIn :: Domain) =
+  ( KnownDomain domIn
   , ClocksSync t
   , ClocksResetSynchronizerCxt t
-  , Clocks (ClocksSyncClocksInst t)
-  , ClocksCxt (ClocksSyncClocksInst t)
-  ,   ClocksResetSynchronizerInput t
-    ~ (Clock (ClocksSyncDomIn t)-> Reset (ClocksSyncDomIn t)-> ClocksSyncClocksInst t)
+  , Clocks (ClocksSyncClocksInst t domIn)
+  , ClocksCxt (ClocksSyncClocksInst t domIn)
   )
 
 class ClocksSync t where
-  type ClocksSyncClocksInst t :: Type
-
-  type ClocksSyncDomIn t :: Domain
+  type ClocksSyncClocksInst t (domIn :: Domain) :: Type
 
   type ClocksResetSynchronizerCxt t :: Constraint
 
-  type ClocksResetSynchronizerInput t :: Type
+  clocksResetSynchronizer ::
+    ( KnownDomain domIn
+    , ClocksResetSynchronizerCxt t
+    ) =>
+    ClocksSyncClocksInst t domIn ->
+    Clock domIn ->
+    t
 
-  clocksResetSynchronizer
-    :: ClocksResetSynchronizerCxt t
-    => ClocksResetSynchronizerInput t
-    -> t
+instance ClocksSync (Clock c1, Reset c1) where
 
-instance ClocksSync (Clock domIn -> Reset domIn -> (Clock c1, Reset c1)) where
-
-  type ClocksSyncClocksInst (Clock domIn -> Reset domIn -> (Clock c1, Reset c1)) =
+  type ClocksSyncClocksInst (Clock c1, Reset c1) domIn =
     (Clock c1, Signal domIn Bool)
 
-  type ClocksSyncDomIn (Clock domIn -> Reset domIn -> (Clock c1, Reset c1)) = domIn
+  type ClocksResetSynchronizerCxt (Clock c1, Reset c1) =
+    KnownDomain c1
 
-  type ClocksResetSynchronizerCxt (Clock domIn -> Reset domIn -> (Clock c1, Reset c1)) =
-    (KnownDomain c1, KnownDomain domIn)
-
-  type ClocksResetSynchronizerInput (Clock domIn -> Reset domIn -> (Clock c1, Reset c1)) =
-    (Clock domIn -> Reset domIn -> (Clock c1, Signal domIn Bool))
-
-  clocksResetSynchronizer pll clkIn rstIn =
-    let (c1, pllLock) = pll clkIn rstIn
+  clocksResetSynchronizer pllOut clkIn =
+    let (c1, pllLock) = pllOut
     in ( c1
        , resetSynchronizer c1 $
            unsafeFromActiveLow $ unsafeSynchronizer clkIn c1 pllLock
        )
 
-instance ClocksSync (Clock domIn -> Reset domIn -> (Clock c1, Reset c1, Clock c2, Reset c2, Clock c3, Reset c3)) where
+instance ClocksSync (Clock c1, Reset c1, Clock c2, Reset c2, Clock c3, Reset c3) where
 
-  type ClocksSyncClocksInst (Clock domIn -> Reset domIn -> (Clock c1, Reset c1, Clock c2, Reset c2, Clock c3, Reset c3)) =
+  type ClocksSyncClocksInst (Clock c1, Reset c1, Clock c2, Reset c2, Clock c3, Reset c3) domIn =
     (Clock c1, Clock c2, Clock c3, Signal domIn Bool)
 
-  type ClocksSyncDomIn (Clock domIn -> Reset domIn -> (Clock c1, Reset c1, Clock c2, Reset c2, Clock c3, Reset c3)) = domIn
+  type ClocksResetSynchronizerCxt (Clock c1, Reset c1, Clock c2, Reset c2, Clock c3, Reset c3) =
+    (KnownDomain c1, KnownDomain c2, KnownDomain c3)
 
-  type ClocksResetSynchronizerCxt (Clock domIn -> Reset domIn -> (Clock c1, Reset c1, Clock c2, Reset c2, Clock c3, Reset c3)) =
-    (KnownDomain c1, KnownDomain c2, KnownDomain c3, KnownDomain domIn)
-
-  type ClocksResetSynchronizerInput (Clock domIn -> Reset domIn -> (Clock c1, Reset c1, Clock c2, Reset c2, Clock c3, Reset c3)) =
-    (Clock domIn -> Reset domIn -> (Clock c1, Clock c2, Clock c3, Signal domIn Bool))
-
-  clocksResetSynchronizer pll clkIn rstIn =
-    let (c1, c2, c3, pllLock) = pll clkIn rstIn
+  clocksResetSynchronizer pllOut clkIn =
+    let (c1, c2, c3, pllLock) = pllOut
     in ( c1
        , resetSynchronizer c1 $
            unsafeFromActiveLow $ unsafeSynchronizer clkIn c1 pllLock

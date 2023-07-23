@@ -1,5 +1,5 @@
 - BlackBox:
-    name: Clash.Xilinx.ClockGen.clockWizard
+    name: Clash.Xilinx.ClockGen.unsafeClockWizard
     kind: Declaration
     type: |-
       clockWizard
