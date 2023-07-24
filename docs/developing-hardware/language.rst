@@ -11,7 +11,7 @@ with Haskell, there are many resources to learn the language, such as
 - `Real World Haskell <http://book.realworldhaskell.org/read/>`_
 - `The Haskell Wikibook <https://en.wikibooks.org/wiki/Haskell>`_
 
-Clash does make some use of more advances features of GHC Haskell, which are
+Clash does make some use of more advanced features of GHC Haskell, which are
 exposed by GHC as language extensions. The extensions used by Clash are
 
 - `BinaryLiterals <https://downloads.haskell.org/~ghc/9.0.1/docs/html/users_guide/exts/binary_literals.html>`_
