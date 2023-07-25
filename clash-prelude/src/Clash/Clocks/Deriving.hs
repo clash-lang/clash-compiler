@@ -27,7 +27,7 @@ import Clash.Explicit.Reset (resetSynchronizer)
 import Clash.Explicit.Signal (unsafeSynchronizer)
 import Clash.Promoted.Symbol (SSymbol(..))
 import Clash.Signal.Internal
-  (clockGen, Clock(..), KnownDomain, Reset, Signal, unsafeToActiveLow)
+  (clockGen, Clock(..), Domain, KnownDomain, Reset, Signal, unsafeToActiveLow)
 
 class Clocks t where
   type ClocksCxt t :: Constraint
@@ -97,34 +97,31 @@ deriveClocksSyncInstance n =
   |]
  where
   clkVarName m = mkName $ "c" <> show m
+  clkTyVar :: Int -> TypeQ
   clkTyVar m = varT $ clkVarName m
   clkAndRstTy m = [ [t| Clock $(clkTyVar m) |]
                   , [t| Reset $(clkTyVar m) |]
                   ]
   -- (Clock c1, Reset c1, Clock c2, Reset c2, ...)
-  instType =
-    foldl appT (tupleT $ n * 2) $
-      concatMap clkAndRstTy [1..n]
-  domInTyVar =
-    varT $ mkName "domIn"
-  clkTypes =
-    map (\m -> [t| Clock $(clkTyVar m) |]) [1..n]
+  instType = foldl appT (tupleT $ n * 2) $
+               concatMap clkAndRstTy [1..n]
+  domInTyVar = varT $ mkName "domIn"
+  clkTypes = map (\m -> [t| Clock $(clkTyVar m) |]) [1..n]
   -- (Clock c1, Clock c2, ..., Signal domIn Bool)
-  clocksInstType =
-    foldl appT (tupleT $ n + 1) $
-      clkTypes <> [ [t| Signal $domInTyVar Bool |] ]
+  clocksInstType = foldl appT (tupleT $ n + 1) $
+                     clkTypes <> [ [t| Signal $domInTyVar Bool |] ]
   -- (KnownDomain c1, KnownDomain c2, ...)
-  cxtT =
-    foldl appT (tupleT n) $
-      map (\m -> [t| KnownDomain $(clkTyVar m) |]) [1..n]
+  cxtT
+    | n == 1
+    = [t| KnownDomain $(clkTyVar 1) |]
+    | otherwise
+    = foldl appT (tupleT n) $
+        map (\m -> [t| KnownDomain $(clkTyVar m) |]) [1..n]
 
   -- 'clocksResetSynchronizer' function
-  clkIn =
-    mkName "clkIn"
-  pllLock =
-    mkName "pllLock"
-  pllPat =
-    tupP $ map (varP . clkVarName) [1..n] <> [varP pllLock]
+  clkIn = mkName "clkIn"
+  pllLock = mkName "pllLock"
+  pllPat = tupP $ map (varP . clkVarName) [1..n] <> [varP pllLock]
   syncImpl m =
     [|
       resetSynchronizer $(varE $ clkVarName m)
@@ -136,8 +133,6 @@ deriveClocksSyncInstance n =
                  , syncImpl m
                  ]
   instTuple = tupE $ concatMap clkAndRstE [1..n]
-
-
 
 clocksSyncAST :: DecsQ
 clocksSyncAST = [d|

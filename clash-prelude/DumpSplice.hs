@@ -17,8 +17,8 @@ import Clash.Clocks.Deriving
 
 out :: String
 -- out = $(stringE . ppShow =<< deriveClocksInstances 16)
--- out = $(stringE . pprint =<< deriveClocksSyncInstance 3)
-out = $(stringE . ppShow =<< deriveClocksSyncInstance 3)
+out = $(stringE . pprint =<< deriveClocksSyncInstance 1)
+-- out = $(stringE . ppShow =<< deriveClocksSyncInstance 3)
 
 main :: IO ()
 main = do
