@@ -11,15 +11,14 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE TypeFamilies #-}
 
--- module Clash.Clocks.Deriving
---   ( Clocks(..)
---   , deriveClocksInstances
---   , ClocksSync(..)
---   ) where
-module Clash.Clocks.Deriving where
+module Clash.Clocks.Deriving
+  ( Clocks(..)
+  , deriveClocksInstances
+  , ClocksSync(..)
+  , deriveClocksSyncInstances
+  ) where
 
 import Control.Monad.Extra (concatMapM)
--- import Data.Kind (Constraint)
 import Data.Kind (Constraint, Type)
 import Language.Haskell.TH hiding (Type)
 
@@ -27,7 +26,8 @@ import Clash.Explicit.Reset (resetSynchronizer)
 import Clash.Explicit.Signal (unsafeSynchronizer)
 import Clash.Promoted.Symbol (SSymbol(..))
 import Clash.Signal.Internal
-  (clockGen, Clock(..), Domain, KnownDomain, Reset, Signal, unsafeToActiveLow)
+  (clockGen, Clock(..), Domain, KnownDomain, Reset, Signal, unsafeFromActiveLow,
+   unsafeToActiveLow)
 
 class Clocks t where
   type ClocksCxt t :: Constraint
@@ -73,7 +73,6 @@ deriveClocksInstances n = concatMapM deriveClocksInstance [1..n]
 
 class ClocksSync t where
   type ClocksSyncClocksInst t (domIn :: Domain) :: Type
-
   type ClocksResetSynchronizerCxt t :: Constraint
 
   clocksResetSynchronizer ::
@@ -84,12 +83,13 @@ class ClocksSync t where
     Clock domIn ->
     t
 
+-- Derive instance for /n/ clocks
 deriveClocksSyncInstance :: Int -> DecsQ
 deriveClocksSyncInstance n =
   [d|
     instance ClocksSync $instType where
       type ClocksSyncClocksInst $instType $domInTyVar = $clocksInstType
-      type ClocksResetSynchronizerCxt $instType = $cxtT
+      type ClocksResetSynchronizerCxt $instType = $cxtType
 
       clocksResetSynchronizer pllOut $(varP clkIn) =
         let $pllPat = pllOut
@@ -111,7 +111,7 @@ deriveClocksSyncInstance n =
   clocksInstType = foldl appT (tupleT $ n + 1) $
                      clkTypes <> [ [t| Signal $domInTyVar Bool |] ]
   -- (KnownDomain c1, KnownDomain c2, ...)
-  cxtT
+  cxtType
     | n == 1
     = [t| KnownDomain $(clkTyVar 1) |]
     | otherwise
@@ -121,6 +121,7 @@ deriveClocksSyncInstance n =
   -- 'clocksResetSynchronizer' function
   clkIn = mkName "clkIn"
   pllLock = mkName "pllLock"
+  -- (c1, c2, ..., pllLock)
   pllPat = tupP $ map (varP . clkVarName) [1..n] <> [varP pllLock]
   syncImpl m =
     [|
@@ -129,47 +130,12 @@ deriveClocksSyncInstance n =
           (unsafeSynchronizer $(varE clkIn) $(varE $ clkVarName m)
                               $(varE pllLock)))
     |]
-  clkAndRstE m = [ varE $ clkVarName m
-                 , syncImpl m
-                 ]
-  instTuple = tupE $ concatMap clkAndRstE [1..n]
+  clkAndRstExp m = [ varE $ clkVarName m
+                   , syncImpl m
+                   ]
+  -- (c1, r1, c2, r2, ...) where rN is the synchronized reset for clock N
+  instTuple = tupE $ concatMap clkAndRstExp [1..n]
 
-clocksSyncAST :: DecsQ
-clocksSyncAST = [d|
-  instance ClocksSync (Clock c1, Reset c1, Clock c2, Reset c2, Clock c3, Reset c3) where
-
-    type ClocksSyncClocksInst (Clock c1, Reset c1, Clock c2, Reset c2, Clock c3, Reset c3) domIn =
-      (Clock c1, Clock c2, Clock c3, Signal domIn Bool)
-
-    type ClocksResetSynchronizerCxt (Clock c1, Reset c1, Clock c2, Reset c2, Clock c3, Reset c3) =
-      (KnownDomain c1, KnownDomain c2, KnownDomain c3)
-
-    clocksResetSynchronizer pllOut clkIn =
-      let (c1, c2, c3, pllLock) = pllOut
-      in ( c1
-         , resetSynchronizer c1 $
-             unsafeFromActiveLow $ unsafeSynchronizer clkIn c1 pllLock
-         , c2
-         , resetSynchronizer c2 $
-             unsafeFromActiveLow $ unsafeSynchronizer clkIn c2 pllLock
-         , c3
-         , resetSynchronizer c3 $
-             unsafeFromActiveLow $ unsafeSynchronizer clkIn c3 pllLock
-         )
-
-  instance ClocksSync (Clock c1, Reset c1) where
-
-    type ClocksSyncClocksInst (Clock c1, Reset c1) domIn =
-      (Clock c1, Signal domIn Bool)
-
-    type ClocksResetSynchronizerCxt (Clock c1, Reset c1) =
-      KnownDomain c1
-
-    clocksResetSynchronizer pllOut clkIn =
-      let (c1, pllLock) = pllOut
-      in ( c1
-         , resetSynchronizer c1 $
-             unsafeFromActiveLow $ unsafeSynchronizer clkIn c1 pllLock
-         )
-
-  |]
+-- Derive instances for up to and including to /n/ clocks
+deriveClocksSyncInstances :: Int -> DecsQ
+deriveClocksSyncInstances n = concatMapM deriveClocksSyncInstance [1..n]
