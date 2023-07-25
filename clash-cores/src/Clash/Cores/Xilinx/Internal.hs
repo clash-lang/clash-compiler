@@ -82,6 +82,7 @@ instance TclShow Text where
   tclShow = id
 
 instance TclShow Int
+instance TclShow Word
 instance TclShow Integer
 instance TclShow Natural
 

@@ -98,13 +98,14 @@ common basic-config
     base                      >= 4.10  && < 5,
     clash-prelude,
     constraints,
-    ghc-typelits-natnormalise >= 0.6,
+    containers                >=0.5    && <0.7,
     ghc-typelits-extra        >= 0.3.2,
     ghc-typelits-knownnat     >= 0.6,
-    string-interpolate        ^>= 0.3,
+    ghc-typelits-natnormalise >= 0.6,
+    lens,
     QuickCheck,
+    string-interpolate        ^>= 0.3,
     template-haskell,
-    containers                >=0.5    && <0.7
 
 library
   import: basic-config
@@ -119,6 +120,8 @@ library
     Clash.Cores.Xilinx.DcFifo.Internal.BlackBoxes
     Clash.Cores.Xilinx.DcFifo.Internal.Instances
     Clash.Cores.Xilinx.DcFifo.Internal.Types
+    Clash.Cores.Xilinx.Ila
+    Clash.Cores.Xilinx.Ila.Internal
     Clash.Cores.Xilinx.VIO
     Clash.Cores.Xilinx.VIO.Internal.BlackBoxes
     Clash.Cores.Xilinx.Floating

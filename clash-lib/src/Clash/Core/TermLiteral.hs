@@ -41,6 +41,7 @@ import           Data.Typeable                   (Typeable, typeRep)
 import           GHC.Natural
 import           GHC.Stack
 import           GHC.TypeNats (KnownNat)
+import           Text.Show.Pretty                (ppShow)
 
 import           Clash.Annotations.SynthesisAttributes (Attr)
 import           Clash.Core.DataCon              (DataCon(..))
@@ -50,6 +51,7 @@ import           Clash.Core.Pretty               (showPpr)
 import           Clash.Core.Term                 (Term(Literal, Data), collectArgs)
 import           Clash.Promoted.Nat
 import           Clash.Promoted.Nat.Unsafe
+import           Clash.Sized.Index               (Index)
 import           Clash.Sized.Vector              (Vec (Nil, Cons), fromList)
 import qualified Clash.Util.Interpolate          as I
 import qualified Clash.Verification.Internal     as Cv
@@ -105,6 +107,13 @@ instance TermLiteral Text where
                                  , Left (Literal (IntLiteral len))])) =
     Right (Text.Text (Text.ByteArray ba) (fromInteger off) (fromInteger len))
 #endif
+  termToData t = Left t
+
+instance KnownNat n => TermLiteral (Index n) where
+  termToData t@(collectArgs -> (_, [_, _, Left (Literal (IntegerLiteral n))]))
+    | n < 0 = Left t
+    | n >= natToNum @n = Left t
+    | otherwise = Right (fromInteger n)
   termToData t = Left t
 
 instance TermLiteral Int where
@@ -227,7 +236,7 @@ termToDataError term = bimap err id (termToData term)
 
     In its non-pretty-printed form:
 
-      #{show failedTerm}
+      #{ppShow failedTerm}
 
     In the full term:
 
