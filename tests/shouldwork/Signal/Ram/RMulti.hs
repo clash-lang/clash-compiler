@@ -31,12 +31,10 @@ tbOutput
   -> Signal P10 (Unsigned 2)
 tbOutput top wClk rClk = output
  where
-  wrM = stimuliGenerator wClk wNoReset $
+  wrM = stimuliGenerator wClk noReset $
           Just (0, 1) :> Just (1,2) :> Nothing :> Nil
   rd = delay rClk enableGen 0 $ rd + 1
-  output = ignoreFor rClk rNoReset enableGen d2 0 $ top wClk rClk rd wrM
-  wNoReset = unsafeFromActiveHigh @P20 (pure False)
-  rNoReset = unsafeFromActiveHigh @P10 (pure False)
+  output = ignoreFor rClk noReset enableGen d2 0 $ top wClk rClk rd wrM
 {-# INLINE tbOutput #-}
 
 tb
@@ -51,5 +49,4 @@ tb top expectedSamples = done
   expectedOutput = outputVerifier' rClk noReset expectedSamples
   done = expectedOutput output
   (rClk, wClk) = biTbClockGen (not <$> done) :: (Clock P10, Clock P20)
-  noReset = unsafeFromActiveHigh @P10 (pure False)
 {-# INLINE tb #-}

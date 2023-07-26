@@ -24,9 +24,6 @@ top = 0
 {-# CLASH_OPAQUE top #-}
 makeTopEntity 'top
 
-noReset :: KnownDomain dom => Reset dom
-noReset = unsafeFromActiveHigh (pure False)
-
 oneCounter :: IlaConfig 1 -> Clock Dom -> Signal Dom ()
 oneCounter config clk = setName @"one_counter_ila" $ ila @Dom config clk counter
  where

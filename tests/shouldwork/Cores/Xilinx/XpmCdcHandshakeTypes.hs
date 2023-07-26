@@ -17,9 +17,6 @@ createDomain vXilinxSystem{vName="D11", vPeriod=hzToPeriod 110e6}
 
 data State = WaitForDeassert | WaitForAssert deriving (Generic, NFDataX)
 
-noRst :: KnownDomain dom => Reset dom
-noRst = unsafeFromActiveHigh (pure False)
-
 -- | Transfer 1, 2, 3, ... to destination domain
 srcFsm ::
   forall a src .
@@ -30,7 +27,7 @@ srcFsm ::
   Clock src ->
   Signal src Bool ->
   Signal src (a, Bool)
-srcFsm clk = mealy clk noRst enableGen go (0, WaitForDeassert)
+srcFsm clk = mealy clk noReset enableGen go (0, WaitForDeassert)
  where
   go (n, WaitForDeassert) True  = ((n,     WaitForDeassert), (n,     False))
   go (n, WaitForDeassert) False = ((n + 1, WaitForAssert),   (n + 1, True))
@@ -45,7 +42,7 @@ dstFsm ::
   Clock dst ->
   Signal dst (Bool, a) ->
   Signal dst (Bool, Maybe a)
-dstFsm clk = mealy clk noRst enableGen go WaitForAssert
+dstFsm clk = mealy clk noReset enableGen go WaitForAssert
  where
   go WaitForAssert   (False, _) = (WaitForAssert,   (False, Nothing))
   go WaitForAssert   (True,  n) = (WaitForDeassert, (True,  Just n))
@@ -97,7 +94,7 @@ tb Proxy Proxy opts expectedDat = done
  where
   actual = top @(Unsigned 8) opts clkA clkB
 
-  done = outputVerifier' clkB (noRst @b) expectedDat actual
+  done = outputVerifier' clkB noReset expectedDat actual
 
   -- Testbench clocks
   clkA :: Clock a

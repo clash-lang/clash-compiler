@@ -30,12 +30,6 @@ topEntity
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE topEntity #-}
 
-noRstA :: Reset A
-noRstA = unsafeFromActiveHigh (pure False)
-
-noRstB :: Reset B
-noRstB = unsafeFromActiveHigh (pure False)
-
 tb ::
   ( KnownNat n0, KnownNat n1, KnownNat n2, KnownNat n3
   , 1 <= n0, 1 <= n1, 1 <= n2, 1 <= n3 ) =>
@@ -57,11 +51,11 @@ tb inputA expectedA inputB expectedB =
   (actualA0, actualB0) =
     topEntity
       clkA clkB
-      (stimuliGenerator clkA noRstA inputA)
-      (stimuliGenerator clkB noRstB inputB)
+      (stimuliGenerator clkA noReset inputA)
+      (stimuliGenerator clkB noReset inputB)
 
-  actualA1 = ignoreFor clkA noRstA enableGen d1 0 actualA0
-  actualB1 = ignoreFor clkB noRstB enableGen d1 0 actualB0
+  actualA1 = ignoreFor clkA noReset enableGen d1 0 actualA0
+  actualB1 = ignoreFor clkB noReset enableGen d1 0 actualB0
 
   -- Verification
   outputVerifierA = outputVerifierWith
@@ -69,8 +63,8 @@ tb inputA expectedA inputB expectedB =
   outputVerifierB = outputVerifierWith
    (\clk rst -> assert clk rst "outputVerifier Port B")
 
-  doneA  = outputVerifierA clkA clkA noRstA expectedA actualA1
-  doneB  = outputVerifierB clkB clkB noRstB expectedB actualB1
+  doneA  = outputVerifierA clkA clkA noReset expectedA actualA1
+  doneB  = outputVerifierB clkB clkB noReset expectedB actualB1
 
   -- Testbench clocks
   clkA :: Clock A
