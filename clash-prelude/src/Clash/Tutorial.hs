@@ -924,8 +924,7 @@ topEntity
 topEntity clk rst =
     'exposeClockResetEnable' ('mealy' blinkerT (1,False,0) . Clash.Prelude.isRising 1) pllOut rstSync 'enableGen'
   where
-    (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' \@Dom100 (SSymbol \@\"altpll100\") clk ('Clash.Signal.unsafeFromActiveLow' rst)
-    rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeFromActiveLow' pllStable)
+    (pllOut,rstSync) = 'Clash.Intel.ClockGen.altpllSync' \@Dom100 (SSymbol \@\"altpll100\") clk ('Clash.Signal.unsafeFromActiveLow' rst)
 
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where

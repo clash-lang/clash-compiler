@@ -413,7 +413,7 @@ Similarly, there are 'exposeClock', 'exposeReset' and 'exposeEnable' to just
 expose the hidden clock, the hidden reset or the hidden enable argument.
 
 You will need to explicitly apply clocks and resets when you want to use
-components such as PLLs and 'resetSynchronizer':
+components such as PLLs:
 
 @
 topEntity
@@ -422,8 +422,7 @@ topEntity
   -> Signal System Bit
   -> Signal System (BitVector 8)
 topEntity clk rst key1 =
-    let  (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' (SSymbol \@\"altpll50\") clk rst
-         rstSync            = 'resetSynchronizer' pllOut (unsafeToActiveHigh pllStable)
+    let  (pllOut,rstSync) = 'Clash.Intel.ClockGen.altpllSync' (SSymbol \@\"altpll100\") clk rst
     in   'exposeClockResetEnable' leds pllOut rstSync enableGen
   where
     key1R  = isRising 1 key1
@@ -439,8 +438,7 @@ topEntity
   -> Signal System Bit
   -> Signal System (BitVector 8)
 topEntity clk rst key1 =
-    let  (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' (SSymbol \@\"altpll50\") clk rst
-         rstSync            = 'resetSynchronizer' pllOut (unsafeToActiveHigh pllStable)
+    let  (pllOut,rstSync) = 'Clash.Intel.ClockGen.altpllSync' (SSymbol \@\"altpll100\") clk rst
     in   'withClockResetEnable' pllOut rstSync enableGen leds
   where
     key1R  = isRising 1 key1

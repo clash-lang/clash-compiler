@@ -68,23 +68,16 @@ topEntity clk20 rstBtn modeBtn =
   -- 'unsafeFromActiveLow'.
   rst = unsafeFromActiveLow rstBtn
 
-  -- Instantiate a PLL: this stabilizes the incoming clock signal and indicates
-  -- when the signal is stable. We're also using it to transform an incoming
-  -- clock signal running at 20 MHz to a clock signal running at 50 MHz.
-  (clk50, pllStable) =
-    altpll
+  -- Instantiate a PLL: this stabilizes the incoming clock signal and releases
+  -- the reset output when the signal is stable. We're also using it to
+  -- transform an incoming clock signal running at 20 MHz to a clock signal
+  -- running at 50 MHz.
+  (clk50, rstSync) =
+    altpllSync
       @Dom50
       (SSymbol @"altpll50")
       clk20
       rst
-
-  -- Synchronize reset to clock signal coming from PLL. We want the reset to
-  -- remain active while the PLL is NOT stable, hence the conversion with
-  -- 'unsafeFromActiveLow'
-  rstSync =
-    resetSynchronizer
-      clk50
-      (unsafeFromActiveLow pllStable)
 
 flipMode :: LedMode -> LedMode
 flipMode Rotate = Complement
