@@ -82,5 +82,5 @@ package regex-tdfa
 source-repository-package
     type: git
     location: https://github.com/UnkindPartition/tasty.git
-    tag: e0e71bc40fcc1fa410f98a5963b9ed8eefa1e92d
+    tag: 249bee98b588ef6936925e268ea7707f5e450c30
     subdir: core
