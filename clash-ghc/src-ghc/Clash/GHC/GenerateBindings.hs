@@ -192,6 +192,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
         , envPrimitives = primMapC
         , envCustomReprs = buildCustomReprs customBitRepresentations
         , envDomains = domainConfs
+        , envHdl = hdl
         }
     , ClashDesign
         { designEntities = topEntities''

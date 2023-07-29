@@ -79,7 +79,8 @@ import Clash.Core.Type                      (Type)
 import Clash.Core.Var                       (Id)
 import Clash.Core.TyCon                     (TyConMap)
 import Clash.Core.VarEnv                    (VarEnv)
-import Clash.Driver.Types                   (BindingMap, ClashEnv(..), ClashOpts(..))
+import Clash.Driver.Types
+  (BindingMap, ClashEnv(..), ClashOpts(..))
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Primitives.Types               (CompiledPrimMap)
 import Clash.Signal.Internal

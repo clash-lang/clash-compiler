@@ -56,6 +56,7 @@ import           SrcLoc                         (SrcSpan)
 import           Util                           (OverridingBool(..))
 #endif
 
+import           Clash.Annotations.Primitive    (HDL)
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import           Clash.Signal.Internal
 
@@ -75,6 +76,7 @@ data ClashEnv = ClashEnv
   , envPrimitives  :: CompiledPrimMap
   , envCustomReprs :: CustomReprs
   , envDomains     :: DomainMap
+  , envHdl         :: HDL
   } deriving (Generic, NFData)
 
 data ClashDesign = ClashDesign
