@@ -148,8 +148,8 @@ library
     Clash.Cores.Xilinx.Xpm.Cdc.Gray.Internal
     Clash.Cores.Xilinx.Xpm.Cdc.Handshake
     Clash.Cores.Xilinx.Xpm.Cdc.Handshake.Internal
+    Clash.Cores.Xilinx.Xpm.Cdc.Internal
     Clash.Cores.Xilinx.Xpm.Cdc.Single
-    Clash.Cores.Xilinx.Xpm.Cdc.Single.Internal
     Clash.Cores.SPI
     Clash.Cores.UART
     Clash.Cores.LatticeSemi.ICE40.IO
