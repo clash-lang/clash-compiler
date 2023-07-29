@@ -27,8 +27,8 @@ import qualified Test.Tasty.QuickCheck as Q
 import Control.Applicative (liftA2)
 #endif
 import Clash.Prelude
-  (Bit, high, low, bitPattern, type (<=), type (-), natToInteger, msb)
-import Clash.Sized.Internal.BitVector (BitVector (..), bLit, hLit, oLit)
+  (Bit, high, low, bitPattern, type (<=), type (-), natToInteger, msb, bLit, hLit, oLit)
+import Clash.Sized.Internal.BitVector (BitVector (..))
 
 import Clash.Tests.SizedNum
 
