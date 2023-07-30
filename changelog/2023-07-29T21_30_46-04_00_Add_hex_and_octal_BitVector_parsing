@@ -1,0 +1,1 @@
+ * Add hex and octal BitVector parsing. [#1772] (https://github.com/clash-lang/clash-compiler/pull/2505)
