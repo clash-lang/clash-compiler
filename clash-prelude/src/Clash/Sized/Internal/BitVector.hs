@@ -558,8 +558,9 @@ read# cs0 = (fromIntegral (length cs1), BV m v)
         ++ show c ++ " in input: " ++ cs0
 
 -- | Create a hexadecimal literal.
--- >>> $(hLit "dead")
--- 0b1101111010101101
+-- ghci> $(hLit "dead")
+-- 0b1101_1110_1010_1101
+-- it :: BitVector 16
 --
 -- Don't care digits set 4 bits in the undefined mask.
 hLit :: String -> ExpQ
@@ -580,16 +581,17 @@ read16# cs0 = (fromIntegral $ 4 * length cs1, BV m v)
     v = combineHexDigits vs
     m = combineHexDigits ms
     -- The dot is a don't care, which applies to a whole digit.
+    readHexDigit '.' = (0, 0xf)
     readHexDigit c = case readHex [c] of
       [(n,  "")] -> (n, 0)
-      [(_, ".")] -> (0, 0xf)
       _ -> error $
              "Clash.Sized.Internal.hLit: unknown character: "
              ++ show c ++ " in input: " ++ cs0
 
 -- | Create an octal literal.
--- >>> $(oLit "5234")
--- 0b101011010100
+-- ghci> $(oLit "5234")
+-- 0b1010_1001_1100
+-- it :: BitVector 12
 --
 -- Don't care digits set 3 bits in the undefined mask.
 oLit :: String -> ExpQ
@@ -610,9 +612,9 @@ read8# cs0 = (fromIntegral $ 3 * length cs1, BV m v)
     v = combineOctDigits vs
     m = combineOctDigits ms
     -- The dot is a don't care, which applies to a whole digit.
+    readOctDigit '.' = (0, 0o7)
     readOctDigit c = case readOct [c] of
       [(n,  "")] -> (n, 0)
-      [(_, ".")] -> (0, 0o7)
       _ -> error $
              "Clash.Sized.Internal.oLit: unknown character: "
              ++ show c ++ " in input: " ++ cs0

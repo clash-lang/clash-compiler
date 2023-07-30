@@ -126,9 +126,13 @@ tests = localOption (Q.QuickCheckMaxRatio 2) $ testGroup "All"
     , testCase "show13" $ show @(BitVector 9) $(bLit "10001010.") @?= "0b1_0001_010."
 
     , testCase "show14" $ show @(BitVector 16) $(hLit "dead") @?= "0b1101_1110_1010_1101"
+    , testCase "show14" $ show @(BitVector 16) $(hLit "de.d") @?= "0b1101_1110_...._1101"
     , testCase "show15" $ show @(BitVector 16) $(hLit "beef") @?= "0b1011_1110_1110_1111"
+    , testCase "show15" $ show @(BitVector 16) $(hLit ".eef") @?= "0b...._1110_1110_1111"
     , testCase "show16" $ show @(BitVector 12) $(oLit "7734") @?= "0b1111_1101_1100"
+    , testCase "show16" $ show @(BitVector 12) $(oLit "77.4") @?= "0b1111_11.._.100"
     , testCase "show17" $ show @(BitVector 12) $(oLit "5324") @?= "0b1010_1101_0100"
+    , testCase "show17" $ show @(BitVector 12) $(oLit ".324") @?= "0b...0_1101_0100"
     ]
   ]
 
