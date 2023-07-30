@@ -1,0 +1,3 @@
+FIXED: If `convertReset` is used to convert a synchronous reset into an
+asynchronous reset, a flip-flop in the source domain is inserted to filter
+glitches from the source reset.
