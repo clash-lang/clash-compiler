@@ -212,7 +212,6 @@ module Clash.Explicit.Signal
   , unsafeFromActiveLow
     -- * Basic circuit functions
   , andEnable
-  , enable -- DEPRECATED
   , dflipflop
   , delay
   , delayMaybe
@@ -533,17 +532,7 @@ andEnable
   -> Enable dom
 andEnable e0 e1 =
   toEnable (fromEnable e0 .&&. e1)
-{-# INLINE enable #-}
-
--- | Merge enable signal with signal of bools by applying the boolean AND
--- operation.
-enable
-  :: Enable dom
-  -> Signal dom Bool
-  -> Enable dom
-enable = andEnable
-{-# DEPRECATED enable
-  "Use 'andEnable' instead. This function will be removed in Clash 1.8." #-}
+{-# INLINE andEnable #-}
 
 -- | Special version of 'delay' that doesn't take enable signals of any kind.
 -- Initial value will be undefined.
@@ -598,7 +587,7 @@ delayMaybe
   -> Signal dom (Maybe a)
   -> Signal dom a
 delayMaybe = \clk gen dflt i ->
-  delay# clk (enable gen (isJust <$> i)) dflt (fromJustX <$> i)
+  delay# clk (andEnable gen (isJust <$> i)) dflt (fromJustX <$> i)
 {-# INLINE delayMaybe #-}
 
 -- | Version of 'delay' that only updates when its third argument is asserted.
@@ -621,7 +610,7 @@ delayEn
   -> Signal dom a
   -> Signal dom a
 delayEn = \clk gen dflt en i ->
-  delay# clk (enable gen en) dflt i
+  delay# clk (andEnable gen en) dflt i
 {-# INLINE delayEn #-}
 
 -- | \"@'register' clk rst en i s@\" delays the values in 'Signal' /s/ for one
@@ -683,7 +672,7 @@ regMaybe
   -> Signal dom (Maybe a)
   -> Signal dom a
 regMaybe = \clk rst en initial iM ->
-  register# clk rst (enable en (fmap isJust iM)) initial initial (fmap fromJustX iM)
+  register# clk rst (andEnable en (fmap isJust iM)) initial initial (fmap fromJustX iM)
 {-# INLINE regMaybe #-}
 
 -- | Version of 'register' that only updates its content when its fourth
@@ -718,7 +707,7 @@ regEn
   -> Signal dom a
   -> Signal dom a
 regEn = \clk rst gen initial en i ->
-  register# clk rst (enable gen en) initial initial i
+  register# clk rst (andEnable gen en) initial initial i
 {-# INLINE regEn #-}
 
 -- * Simulation functions
