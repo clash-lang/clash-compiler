@@ -20,7 +20,7 @@ Self-synchronizing circuits based on data-flow principles.
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
-module Clash.Prelude.DataFlow {-# DEPRECATED "Module will be removed in future versions of clash-prelude in favor of clash-protocols. See: https://github.com/clash-lang/clash-protocols/." #-}
+module Clash.Prelude.DataFlow {-# DEPRECATED "Module will be removed in Clash 1.10 in favor of clash-protocols. See: https://github.com/clash-lang/clash-protocols/." #-}
   ( -- * Data types
     DataFlow (..)
     -- * Creating DataFlow circuits
