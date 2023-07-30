@@ -269,6 +269,10 @@ holdReset clk en SNat rst =
 -- | Convert between different types of reset, adding a synchronizer when
 -- the domains are not the same. See 'resetSynchronizer' for further details
 -- about reset synchronization.
+--
+-- If @domA@ has 'Synchronous' resets and @domB@ has 'Asynchronous' resets, a
+-- flip-flop is inserted in @domA@ to filter glitches. This adds one @domA@
+-- clock cycle delay.
 convertReset
   :: forall domA domB
    . ( KnownDomain domA
@@ -286,8 +290,17 @@ convertReset clkA clkB rstA0 = rstB1
       (SActiveLow, SActiveLow)   -> rstA1
       (SActiveHigh, SActiveHigh) -> rstA1
       _                          -> not <$> rstA1
-  rstB0 = unsafeToReset $ unsafeSynchronizer clkA clkB rstA2
+  rstA3 =
+    case (resetKind @domA, resetKind @domB) of
+      (SSynchronous, SAsynchronous) -> delay clkA enableGen assertedA rstA2
+      _                             -> rstA2
+  rstB0 = unsafeToReset $ unsafeSynchronizer clkA clkB rstA3
   rstB1 =
     case (sameDomain @domA @domB) of
       Just Refl -> rstA0
       Nothing   -> resetSynchronizer clkB rstB0
+  assertedA :: Bool
+  assertedA =
+    case resetPolarity @domA of
+      SActiveHigh -> True
+      SActiveLow  -> False
