@@ -17,7 +17,7 @@
 
 module Clash.Cores.Xilinx.BlockRam.Internal where
 
-import Clash.Explicit.Prelude hiding (enable)
+import Clash.Explicit.Prelude
 import Clash.Annotations.Primitive (Primitive(InlineYamlPrimitive), hasBlackBox)
 import Clash.Explicit.BlockRam.Model (TdpbramModelConfig(..), tdpbramModel)
 import Clash.Sized.Internal.BitVector (BitVector(BV), undefined#)

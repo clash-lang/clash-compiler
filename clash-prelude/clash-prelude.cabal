@@ -250,8 +250,6 @@ Library
                       Clash.NamedTypes
 
                       Clash.Prelude
-                      Clash.Prelude.BitIndex
-                      Clash.Prelude.BitReduction
                       Clash.Prelude.BlockRam
                       Clash.Prelude.BlockRam.Blob
                       Clash.Prelude.BlockRam.File
