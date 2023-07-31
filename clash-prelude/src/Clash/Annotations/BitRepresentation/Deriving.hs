@@ -76,7 +76,7 @@ import           Data.Bits
 import           Data.Data                    (Data)
 import           Data.Containers.ListUtils    (nubOrd)
 import           Data.List
-  (mapAccumL, zipWith4, sortOn, partition)
+  (mapAccumL, zipWith4, sortOn, partition, uncons)
 import           Data.Typeable                (Typeable)
 import qualified Data.Map                     as Map
 import           Data.Maybe                   (fromMaybe)
@@ -560,19 +560,19 @@ complementValues 1 xs
   | H `elem` xs'                 = [[L]]
   | otherwise                    = [[H]]
   where
-    xs' = map head xs
+    xs' = map (maybe (error "complementValues: expected at least 1 bit") fst . uncons) xs
 complementValues size [] = [replicate size U]
 complementValues size values =
-  if | all (==U) (map head values') -> map (U:) (recc (map tail values'))
-     | any (==X) (map head values') -> map (X:) (recc (map tail values'))
+  if | all (maybe False ((==U) . fst) . uncons) values' -> map (U:) (recc (map (drop 1) values'))
+     | any (maybe False ((==X) . fst) . uncons) values' -> map (X:) (recc (map (drop 1) values'))
      | otherwise ->
-        (map (L:) (recc (map tail lows))) ++
-        (map (H:) (recc (map tail highs')))
+        (map (L:) (recc (map (drop 1) lows))) ++
+        (map (H:) (recc (map (drop 1) highs')))
   where
     values'       = filter (any (/= U)) values
     recc          = complementValues (size - 1)
-    (highs, lows) = partition ((== H) . head) values'
-    highs'        = highs ++ filter ((`elem` [X, U]) . head) values'
+    (highs, lows) = partition (maybe False ((== H) . fst) . uncons) values'
+    highs'        = highs ++ filter (maybe False ((`elem` [X, U]) . fst) . uncons) values'
 
 -- | Generate all bitvalues the given type can assume.
 possibleValues
@@ -642,7 +642,8 @@ packedMaybeDerivator (DataReprAnn _ size _) typ =
         let err = unwords [ "Could not derive packed maybe for:", show typ
                           , ";", "Does its subtype have any space left to store"
                           , "the constructor in?" ]
-        packedM <- packedMaybe (size - 1) maybeTyp
+        packedM <- packedMaybe (size - 1)
+                    (maybe (error "Maybe type without argument") fst (uncons maybeTyps))
         (fromMaybe (fail err) . fmap lift) packedM
       else
         fail $ unwords [ "You can only pass Maybe types to packedMaybeDerivator,"
@@ -650,7 +651,7 @@ packedMaybeDerivator (DataReprAnn _ size _) typ =
     unexpected ->
       fail $ "packedMaybeDerivator: unexpected constructor: " ++ show unexpected
   where
-    (maybeCon, head -> maybeTyp) = collectTypeArgs typ
+    (maybeCon, maybeTyps) = collectTypeArgs typ
 
 -- | Derive a compactly represented version of @Maybe a@.
 derivePackedMaybeAnnotation :: DataReprAnn -> Q [Dec]
@@ -717,17 +718,17 @@ storeInFields _dataWidth _additionalMask [] = []
 storeInFields _dataWidth _additionalMask [_] =
   -- Last constructor is implict
   [Embedded 0 0]
-storeInFields dataWidth additionalMask constrs =
+storeInFields dataWidth additionalMask constrs@(constr:constrRest) =
   if commonMask == fullMask then
     -- We can't store the constructor anywhere special, so we need a special
     -- constructor bit stored besides fields
-    External : storeInFields dataWidth additionalMask (tail constrs)
+    External : storeInFields dataWidth additionalMask constrRest
   else
     -- Hooray, we can store it somewhere.
     maskOrigins ++ (storeInFields dataWidth additionalMask' (drop storeSize constrs))
 
   where
-    headMask   = head constrs
+    headMask   = constr
     commonMask = (.|.) headMask additionalMask
 
     -- Variables for the case that we can store something:
@@ -802,10 +803,10 @@ collectDataReprs = do
 
 group :: [Bit] -> [(Int, Bit)]
 group [] = []
-group bs = (length head', head bs) : rest
+group bs@(b:_) = (length head', b) : rest
   where
-    tail' = dropWhile (==head bs) bs
-    head' = takeWhile (==head bs) bs
+    tail' = dropWhile (==b) bs
+    head' = takeWhile (==b) bs
     rest  = group tail'
 
 bitToExpr' :: (Int, Bit) -> Q Exp -- BitVector n

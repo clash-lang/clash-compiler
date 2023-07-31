@@ -97,7 +97,7 @@ import           Clash.Sized.Vector    (Vec, iterateI)
 import qualified Clash.Sized.Vector    as Vector
 import           Clash.Class.BitPack   (BitPack, BitSize, pack, unpack)
 import           Clash.Promoted.Nat    (snatToNum, SNat(..))
-import           Clash.Signal.Internal (sample)
+import           Clash.Signal.Internal (Signal ((:-)), sample)
 import           Clash.XException      (deepseqX, NFDataX)
 import           Clash.Sized.Internal.BitVector
   (BitVector(BV))
@@ -111,7 +111,7 @@ import qualified Data.ByteString.Lazy  as ByteStringLazy
 import           Data.Char             (ord, chr)
 import           Data.IORef
   (IORef, atomicModifyIORef', atomicWriteIORef, newIORef, readIORef)
-import           Data.List             (foldl1', foldl', unzip4, transpose)
+import           Data.List             (foldl1', foldl', unzip4, transpose, uncons)
 import qualified Data.Map.Strict       as Map
 import           Data.Maybe            (fromMaybe, catMaybes)
 import qualified Data.Text             as Text
@@ -348,8 +348,8 @@ dumpVCD## (offset, cycles) traceMap now
       error $ "dumpVCD: no traces found. Extend the given trace names."
   | Map.size traceMap > 126 - 33 =
       Left $ "Tracemap contains more than 93 traces, which is not supported by VCD."
-  | not $ null $ offensiveNames =
-      Left $ unwords [ "Trace '" ++ head offensiveNames ++ "' contains"
+  | (nm:_) <- offensiveNames =
+      Left $ unwords [ "Trace '" ++ nm ++ "' contains"
                      , "non-printable ASCII characters, which is not"
                      , "supported by VCD." ]
   | otherwise =
@@ -414,7 +414,7 @@ dumpVCD## (offset, cycles) traceMap now
   initValues       = map Text.pack $ zipWith ($) formatters inits
 
   formatters = zipWith format widths labels
-  inits = map head valuess'
+  inits = map (maybe (error "dumpVCD##: empty value") fst . uncons) valuess'
   tails = map changed valuess'
 
   -- | Format single value according to VCD spec
@@ -566,14 +566,14 @@ waitForTraces#
   -> IO ()
 waitForTraces# traceMap signal traceNames = do
   atomicWriteIORef traceMap Map.empty
-  rest <- foldM go (sample signal) traceNames
-  return $ deepseqX (head rest) ()
+  rest <- foldM go signal traceNames
+  seq rest (return ())
  where
-  go s nm = do
+  go (s0 :- ss) nm = do
     m <- readIORef traceMap
     if Map.member nm m then
-      return s
+      deepseqX s0 (return ss)
     else
       deepseqX
-        (head s)
-        (go (tail s) nm)
+        s0
+        (go ss nm)

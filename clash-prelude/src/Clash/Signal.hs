@@ -280,6 +280,7 @@ where
 
 import           Control.Arrow.Transformer.Automaton (Automaton)
 import           GHC.TypeLits          (type (<=))
+import           Data.List             (uncons)
 import           Data.Proxy            (Proxy(..))
 import           Prelude
 import           Test.QuickCheck       (Property, property)
@@ -1998,7 +1999,9 @@ simulate
   -- and/or enable.
   -> [a]
   -> [b]
-simulate f as = simulateWithReset (SNat @1) (head as) f as
+simulate f as = simulateWithReset (SNat @1) rval f as
+  where
+    rval = maybe (error "simulate: no stimuli") fst (uncons as)
 {-# INLINE simulate #-}
 
 -- | Same as 'simulate', but only sample the first /Int/ output values.
@@ -2016,7 +2019,9 @@ simulateN
   -- (and reset)
   -> [a]
   -> [b]
-simulateN n f as = simulateWithResetN (SNat @1) (head as) n f as
+simulateN n f as = simulateWithResetN (SNat @1) rval n f as
+  where
+    rval = maybe (error "simulate: no stimuli") fst (uncons as)
 {-# INLINE simulateN #-}
 
 -- | Same as 'simulate', but with the reset line asserted for /n/ cycles. Similar
@@ -2084,7 +2089,7 @@ simulate_lazy
   -> [b]
 simulate_lazy f0 =
   let f1 = exposeClockResetEnable @dom f0 clockGen resetGen enableGen in
-  tail . E.simulate_lazy f1 . dup1
+  drop 1 . E.simulate_lazy f1 . dup1
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE simulate_lazy #-}
 
@@ -2111,7 +2116,7 @@ simulateB
   -> [a]
   -> [b]
 simulateB f0 =
-  tail . E.simulateB f1 . dup1
+  drop 1 . E.simulateB f1 . dup1
  where
   f1 =
     withSpecificClockResetEnable
@@ -2144,7 +2149,7 @@ simulateB_lazy
   -> [a]
   -> [b]
 simulateB_lazy f0 =
-  tail . E.simulateB_lazy f1 . dup1
+  drop 1 . E.simulateB_lazy f1 . dup1
  where
   f1 =
     withSpecificClockResetEnable

@@ -8,6 +8,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -25,7 +26,7 @@ import qualified Clash.Explicit.Prelude         as E
 import           Clash.Prelude                  hiding (sample)
 
 import           Clash.Signal.Internal
-  (Femtoseconds(..), dynamicClockGen, sample)
+  (Femtoseconds(..), dynamicClockGen, sample, head#)
 
 import           Control.Exception              (evaluate)
 import           Data.List                      (isInfixOf)
@@ -178,7 +179,7 @@ tests =
             let
               f (_, b) = (b, b)
               s = f <$> liftA2 (,) (fst <$> s) (pure 'a')
-              a = fst (Prelude.head (sample @(Signal System) s))
+              a = fst (head# s)
             in
               evaluate a >> pure ()
         ]

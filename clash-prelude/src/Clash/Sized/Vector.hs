@@ -1464,7 +1464,7 @@ replace i y xs = replace_int xs (fromEnum i) y
 >>> take d0               (1:>2:>Nil)
 Nil
 
-#if __GLASGOW_HASKELL__ >= 906
+#if __GLASGOW_HASKELL__ == 906
 >>> take d4               (1:>2:>Nil)
 <BLANKLINE>
 <interactive>:...
@@ -1523,7 +1523,7 @@ takeI = withSNat take
 >>> drop d0               (1:>2:>Nil)
 1 :> 2 :> Nil
 
-#if __GLASGOW_HASKELL__ >= 906
+#if __GLASGOW_HASKELL__ == 906
 >>> drop d4               (1:>2:>Nil)
 <BLANKLINE>
 <interactive>:...: error:...

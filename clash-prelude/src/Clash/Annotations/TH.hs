@@ -372,7 +372,7 @@ typeTreeToPorts f@(AppTF (a,a') (b,b')) = do
   applyFamilyBindings _ _ _ = error "familyTyMap called with non family argument!"
 
 #if MIN_VERSION_template_haskell(2,15,0)
-  tySynArgs (TySynEqn _ args _) = tail (unapp args)
+  tySynArgs (TySynEqn _ args _) = drop 1 (unapp args)
 #else
   tySynArgs (TySynEqn args _) = args
 #endif

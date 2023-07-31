@@ -24,7 +24,7 @@ readRam addr = mux (register False $ addr .<. 8) ram (pure 0xff)
 addrNotTooStrict :: Assertion
 addrNotTooStrict =
   let addr = fromList [0..15]
-   in List.tail (sampleN @System 15 (readRam addr)) @?=
+   in List.drop 1 (sampleN @System 15 (readRam addr)) @?=
         [255,0,0,0,0,0,0,0,255,255,255,255,255,255]
 
 primRam

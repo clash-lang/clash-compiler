@@ -55,25 +55,25 @@ packPredTest2 _ _ = packTest2 (satPred SatWrap) (countPred @(Unsigned a, Unsigne
 -- | Counting /down/ from 'countMin' should yield 'countMin' at some point
 predShouldWrapAround :: forall a. (Eq a, Counter a, Show a) => Proxy a -> Assertion
 predShouldWrapAround Proxy =
-  let counter = P.take 100_0000 (P.tail (P.iterate countPred countMin)) in
+  let counter = P.take 100_0000 (P.drop 1 (P.iterate countPred countMin)) in
   assertBool "Pred should wrap-around" (countMin @a `P.elem` counter)
 
 -- | Counting /up/ from 'countMin' should yield 'countMin' at some point
 succShouldWrapAround :: forall a. (Eq a, Counter a, Show a) => Proxy a -> Assertion
 succShouldWrapAround Proxy =
-  let counter = P.take 100_000 (P.tail (P.iterate countSucc countMin)) in
+  let counter = P.take 100_000 (P.drop 1 (P.iterate countSucc countMin)) in
   assertBool "Succ should wrap-around" (countMin @a `P.elem` counter)
 
 -- | Counting /down/ from 'countMax' should yield 'countMin' at some point
 predShouldSeeCountMin :: forall a. (Eq a, Counter a, Show a) => Proxy a -> Assertion
 predShouldSeeCountMin Proxy =
-  let counter = P.take 100_0000 (P.tail (P.iterate countPred countMax)) in
+  let counter = P.take 100_0000 (P.drop 1 (P.iterate countPred countMax)) in
   assertBool "Pred should see countMin" (countMin @a `P.elem` counter)
 
 -- | Counting /up/ from 'countMin' should yield 'countMax' at some point
 succShouldSeeCountMax :: forall a. (Eq a, Counter a, Show a) => Proxy a -> Assertion
 succShouldSeeCountMax Proxy =
-  let counter = P.take 100_000 (P.tail (P.iterate countSucc countMin)) in
+  let counter = P.take 100_000 (P.drop 1 (P.iterate countSucc countMin)) in
   assertBool "Succ should see countMax" (countMax @a `P.elem` counter)
 
 quadTest :: forall a. (Eq a, Counter a, Typeable a, Show a) => Proxy a -> TestTree

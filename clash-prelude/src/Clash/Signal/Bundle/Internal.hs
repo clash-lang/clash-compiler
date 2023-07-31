@@ -9,7 +9,7 @@ import           Clash.Annotations.Primitive (Primitive(InlineYamlPrimitive))
 import           Clash.CPP                   (maxTupleSize)
 import           Clash.Signal.Internal       (Signal((:-)))
 import           Clash.XException            (seqX)
-import           Data.List                   (foldl')
+import           Data.List                   (foldl', uncons)
 import           Data.String.Interpolate     (__i)
 import qualified Language.Haskell.TH.Syntax  as TH
 import           Language.Haskell.TH
@@ -135,13 +135,13 @@ deriveBundleTuples bundleTyName unbundledTyName bundleName unbundleName = do
           UInfixE
             (LamE (map VarP aPrimeNames) (mkTupE (map VarE aPrimeNames)))
             (VarE '(<$>))
-            (VarE (head aNames))
+            (VarE (maybe (error "impossible") fst (uncons aNames)))
 
         bundleFBody =
           foldl'
             (\e n -> UInfixE e (VarE '(<*>)) (VarE n))
             bundleFmap
-            (tail aNames)
+            (drop 1 aNames)
 
         bundleF =
           FunD

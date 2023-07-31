@@ -284,6 +284,7 @@ where
 
 import           Data.Bifunctor                 (bimap)
 import           Data.Int                       (Int64)
+import           Data.List                      (uncons)
 import           Data.Maybe                     (isJust)
 import           GHC.TypeLits                   (type (<=))
 
@@ -994,6 +995,6 @@ runUntil check s =
         . (" cycles until value " ++) $ showX value
   (before, after) = break check $ sample s
   nSamples = length before
-  value = head after
+  value = maybe (error "impossible") fst (uncons after)
 
 {-# RULES "sequenceAVecSignal" Clash.Sized.Vector.traverse# (\x -> x) = vecBundle# #-}

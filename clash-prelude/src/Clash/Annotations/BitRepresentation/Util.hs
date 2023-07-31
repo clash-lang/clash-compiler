@@ -17,7 +17,7 @@ module Clash.Annotations.BitRepresentation.Util
 import Clash.Annotations.BitRepresentation.Internal
   (DataRepr'(..), ConstrRepr'(..))
 import Data.Bits  (Bits, testBit, testBit, shiftR, (.|.))
-import Data.List  (findIndex, group, mapAccumL)
+import Data.List  (findIndex, group, mapAccumL, uncons)
 import Data.Tuple (swap)
 
 data Bit
@@ -142,7 +142,7 @@ bitRanges :: Integer -> [(Int, Int)]
 bitRanges word = reverse $ map swap ranges
   where
     ranges  = map (\(ofs, grp) -> (ofs, ofs+length grp-1)) groups'
-    groups' = filter (head . snd) groups
+    groups' = filter (maybe False fst . uncons . snd) groups
     groups  = snd $ mapAccumL offsets 0 (group bits)
     bits    = bitsToBools word
 
