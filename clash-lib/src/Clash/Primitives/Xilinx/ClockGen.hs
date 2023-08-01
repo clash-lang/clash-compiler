@@ -9,11 +9,18 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE ViewPatterns #-}
 
-module Clash.Primitives.Xilinx.ClockGen where
+module Clash.Primitives.Xilinx.ClockGen
+  ( clockWizardTF
+  , clockWizardTclTF
+  , clockWizardDifferentialTF
+  , clockWizardDifferentialTclTF
+  ) where
 
 import Control.Monad.State (State)
 import Data.List.Infinite (Infinite(..), (...))
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Prettyprinter.Interpolate (__di)
 import Text.Show.Pretty (ppShow)
@@ -21,69 +28,63 @@ import Text.Show.Pretty (ppShow)
 import Clash.Signal (periodToHz)
 
 import Clash.Backend (Backend)
-import Clash.Netlist.BlackBox.Util (exprToString)
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
 import Clash.Netlist.Util (stripVoid)
 import qualified Clash.Primitives.DSL as DSL
 import Data.Text.Prettyprint.Doc.Extra (Doc)
 
-
-clockWizardDifferentialTF :: TemplateFunction
-clockWizardDifferentialTF =
-  TemplateFunction used valid clockWizardDifferentialTemplate
+usedArguments :: [Int]
+usedArguments = [knownDomIn, knownDomOut, clk, rst]
  where
   knownDomIn
     :< knownDomOut
-    :< name
+    :< _knownDomLock
     :< clk
     :< rst
     :< _ = (0...)
-  used = [knownDomIn, knownDomOut, name, clk, rst]
+
+clockWizardTF :: TemplateFunction
+clockWizardTF =
+  TemplateFunction usedArguments valid (clockWizardTemplate False)
+ where
   valid = const True
 
+clockWizardDifferentialTF :: TemplateFunction
+clockWizardDifferentialTF =
+  TemplateFunction usedArguments valid (clockWizardTemplate True)
+ where
+  valid = const True
 
-clockWizardDifferentialTemplate
+clockWizardTemplate
   :: Backend s
-  => BlackBoxContext
+  => Bool
+  -> BlackBoxContext
   -> State s Doc
-clockWizardDifferentialTemplate bbCtx
+clockWizardTemplate isDifferential bbCtx
   |   knownDomIn
     : _knownDomOut
-    : name0
+    : _knownDomLock
     : clk
     : rst
     : _ <- map fst (DSL.tInputs bbCtx)
-  , Just name1 <- DSL.getStr name0
-  , DataCon (Product "Clash.Signal.Internal.DiffClock" _ clkTys) _ clkEs
-    <- DSL.eex clk
-  , [clkP@(Identifier _ Nothing), clkN@(Identifier _ Nothing)] <- clkEs
-  , [clkPTy, clkNTy] <- clkTys
-  , [tResult] <- map DSL.ety (DSL.tResults bbCtx)
+  , [DSL.ety -> resultTy] <- DSL.tResults bbCtx
+  , [compName] <- bbQsysIncName bbCtx
   = do
-      clkWizInstName <- Id.makeBasic "clockWizardDifferential_inst"
-      DSL.declarationReturn bbCtx "clockWizardDifferential" $ do
+      clkWizInstName <- Id.makeBasic $ fromMaybe "clk_wiz" $ bbCtxName bbCtx
+      DSL.declarationReturn bbCtx blockName $ do
 
         rstHigh <- DSL.unsafeToActiveHigh "reset" (DSL.ety knownDomIn) rst
         pllOut <- DSL.declare "pllOut" Bit
         locked <- DSL.declare "locked" Bit
         pllLock <- DSL.boolFromBit "pllLock" locked
 
-        let compName = T.pack name1
-            compInps =
-              [ ("clk_in1_p", Bit)
-              , ("clk_in1_n", Bit)
-              , ("reset", Bit)
-              ]
+        let compInps = compClkInps <> [ ("reset", Bit) ]
             compOuts =
               [ ("clk_out1", Bit)
               , ("locked", Bit)
               ]
-            inps =
-              [ ("clk_in1_p", DSL.TExpr clkPTy clkP)
-              , ("clk_in1_n", DSL.TExpr clkNTy clkN)
-              , ("reset", rstHigh)
-              ]
+            inps = clkInps clk <> [ ("reset", rstHigh) ]
             outs =
               [ ("clk_out1", pllOut)
               , ("locked", locked)
@@ -92,37 +93,41 @@ clockWizardDifferentialTemplate bbCtx
         DSL.compInBlock compName compInps compOuts
         DSL.instDecl Empty (Id.unsafeMake compName) clkWizInstName [] inps outs
 
-        pure [DSL.constructProduct tResult [pllOut, pllLock]]
+        pure [DSL.constructProduct resultTy [pllOut, pllLock]]
   | otherwise
   = error $ ppShow bbCtx
+ where
+  blockName | isDifferential = "clockWizardDifferential"
+            | otherwise      = "clockWizard"
+  compClkInps | isDifferential = [ ("clk_in1_p", Bit)
+                                 , ("clk_in1_n", Bit)
+                                 ]
+              | otherwise      = [ ("clk_in1", Bit) ]
+  clkInps clk
+    | isDifferential
+    , DataCon (Product "Clash.Signal.Internal.DiffClock" _ clkTys) _ clkEs
+      <- DSL.eex clk
+    , [clkP@(Identifier _ Nothing), clkN@(Identifier _ Nothing)] <- clkEs
+    , [clkPTy, clkNTy] <- clkTys
+    = [ ("clk_in1_p", DSL.TExpr clkPTy clkP)
+      , ("clk_in1_n", DSL.TExpr clkNTy clkN)
+      ]
+    | not isDifferential
+    = [ ("clk_in1", clk) ]
+    | otherwise
+    = error $ ppShow bbCtx
 
 clockWizardTclTF :: TemplateFunction
 clockWizardTclTF =
-  TemplateFunction used valid (clockWizardTclTemplate False)
+  TemplateFunction usedArguments valid (clockWizardTclTemplate False)
  where
-  knownDomIn
-    :< knownDomOut
-    :< name
-    :< _clk
-    :< _rst
-    :< _ = (0...)
-  used = [knownDomIn, knownDomOut, name]
   valid = const True
 
 clockWizardDifferentialTclTF :: TemplateFunction
 clockWizardDifferentialTclTF =
-  TemplateFunction used valid (clockWizardTclTemplate True)
+  TemplateFunction usedArguments valid (clockWizardTclTemplate True)
  where
-  knownDomIn
-    :< knownDomOut
-    :< name
-    :< _clkN
-    :< _clkP
-    :< _rst
-    :< _ = (0...)
-  used = [knownDomIn, knownDomOut, name]
   valid = const True
-
 
 clockWizardTclTemplate
   :: Backend s
@@ -132,10 +137,10 @@ clockWizardTclTemplate
 clockWizardTclTemplate isDifferential bbCtx
   |   (_,stripVoid -> (KnownDomain _ clkInPeriod _ _ _ _),_)
     : (_,stripVoid -> (KnownDomain _ clkOutPeriod _ _ _ _),_)
-    : (nm,_,_)
+    : _knownDomLock
     : _ <- bbInputs bbCtx
   , [(Identifier _ Nothing,Product {})] <- bbResults bbCtx
-  , Just compName <- exprToString nm
+  , [compName] <- bbQsysIncName bbCtx
   =
   let
     clkInFreq :: Double

@@ -109,6 +109,7 @@ myPll10 ::
 myPll10 = clockWizardDifferentialSyncWithName (SSymbol @"foo")
 {-# ANN myPll10 (defSyn "myPll10") #-}
 {-# NOINLINE myPll10 #-}
+-}
 
 myPll11 ::
   Clock System ->
@@ -140,7 +141,6 @@ myPll13 ::
 myPll13 = clockWizard (SSymbol @"foo")
 {-# ANN myPll13 (defSyn "myPll13") #-}
 {-# NOINLINE myPll13 #-}
--}
 
 myPll14 ::
   Clock System ->
