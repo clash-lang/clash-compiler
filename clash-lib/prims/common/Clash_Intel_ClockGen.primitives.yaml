@@ -1,5 +1,5 @@
 - BlackBox:
-    name: Clash.Intel.ClockGen.altpll
+    name: Clash.Intel.ClockGen.unsafeAltpll
     format: Haskell
     includes:
     - name: altpll
@@ -10,7 +10,7 @@
     templateFunction: Clash.Primitives.Intel.ClockGen.altpllTF
     workInfo: Always
 - BlackBox:
-    name: Clash.Intel.ClockGen.alteraPll
+    name: Clash.Intel.ClockGen.unsafeAlteraPll
     format: Haskell
     includes:
     - name: altera_pll
