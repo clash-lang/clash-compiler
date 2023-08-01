@@ -15,7 +15,6 @@ module Clash.Xilinx.ClockGen where
 
 import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Clocks (clocks)
-import Clash.Promoted.Symbol (SSymbol)
 import Clash.Signal.Internal
 
 -- | A clock source that corresponds to the Xilinx MMCM component created
@@ -32,24 +31,22 @@ import Clash.Signal.Internal
 -- @
 --
 -- See also the [Clocking Wizard LogiCORE IP Product Guide](https://docs.xilinx.com/r/en-US/pg065-clk-wiz)
-clockWizard
-  :: forall domIn domOut name
-   . ( KnownDomain domIn
-     , KnownDomain domOut )
-  => SSymbol name
-  -- ^ Name of the component instance
-  --
-  -- Instantiate as follows: @(SSymbol \@\"clockWizard50\")@
-  -> Clock domIn
-  -- ^ Free running clock (i.e. a clock pin connected to a crystal)
-  -> Reset domIn
-  -- ^ Reset for the PLL
-  -> (Clock domOut, Signal domOut Bool)
-  -- ^ (Stable PLL clock, PLL lock)
-clockWizard !_ = clocks
+unsafeClockWizard ::
+  forall domIn domOut pllLock .
+  ( KnownDomain domIn
+  , KnownDomain domOut
+  , KnownDomain pllLock
+  ) =>
+  -- | Free running clock (i.e. a clock pin connected to a crystal)
+  Clock domIn ->
+  -- | Reset for the PLL
+  Reset domIn ->
+  -- | (Stable PLL clock, PLL lock)
+  (Clock domOut, Signal pllLock Bool)
+unsafeClockWizard = clocks
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE clockWizard #-}
-{-# ANN clockWizard hasBlackBox #-}
+{-# CLASH_OPAQUE unsafeClockWizard #-}
+{-# ANN unsafeClockWizard hasBlackBox #-}
 
 -- | A clock source that corresponds to the Xilinx MMCM component created
 -- with the \"Clock Wizard\", with settings to provide a stable 'Clock'
@@ -65,21 +62,19 @@ clockWizard !_ = clocks
 -- @
 --
 -- See also the [Clocking Wizard LogiCORE IP Product Guide](https://docs.xilinx.com/r/en-US/pg065-clk-wiz)
-clockWizardDifferential
-  :: forall domIn domOut name
-   . ( KnownDomain domIn
-     , KnownDomain domOut )
-  => SSymbol name
-  -- ^ Name of the component instance
-  --
-  -- Instantiate as follows: @(SSymbol \@\"clockWizardD50\")@
-  -> DiffClock domIn
-  -- ^ Free running clock
-  -> Reset domIn
-  -- ^ Reset for the PLL
-  -> (Clock domOut, Signal domOut Bool)
-  -- ^ (Stable PLL clock, PLL lock)
-clockWizardDifferential !_ (DiffClock clk _) = clocks clk
+unsafeClockWizardDifferential ::
+  forall domIn domOut pllLock .
+  ( KnownDomain domIn
+  , KnownDomain domOut
+  , KnownDomain pllLock
+  ) =>
+  -- | Free running clock
+  DiffClock domIn ->
+  -- | Reset for the PLL
+  Reset domIn ->
+  -- | (Stable PLL clock, PLL lock)
+  (Clock domOut, Signal pllLock Bool)
+unsafeClockWizardDifferential (DiffClock clk _) = clocks clk
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE clockWizardDifferential #-}
-{-# ANN clockWizardDifferential hasBlackBox #-}
+{-# CLASH_OPAQUE unsafeClockWizardDifferential #-}
+{-# ANN unsafeClockWizardDifferential hasBlackBox #-}

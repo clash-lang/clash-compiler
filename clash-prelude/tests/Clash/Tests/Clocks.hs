@@ -11,7 +11,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Explicit.Prelude
-import Clash.Intel.ClockGen (altpll)
+import Clash.Intel.ClockGen (unsafeAltpll)
 
 -- Ratio of clock periods in 'createDomain' and 'resetLen' are chosen, rest is
 -- derived from that
@@ -29,7 +29,7 @@ lockResampled =
     Clock ClocksSlow ->
     Reset ClocksSlow ->
     (Clock System, Signal System Bool)
-  pll = altpll (SSymbol @"pll")
+  pll = unsafeAltpll
 
   unlockedLenSeen =
     P.length . P.takeWhile not .
