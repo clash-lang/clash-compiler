@@ -57,31 +57,30 @@ testBench ::
   Signal XilinxSystem Bool
 testBench = done
  where
-  fsmOut = let (s', o) = unbundle $ fsm <$> register clk noRst en (Push 0) s'
+  fsmOut = let (s', o) = unbundle $ fsm <$> delay clk en (Push 0) s'
            in o
   (minOut, maxOut) =
-    topEntity clk noRst (fWriteData <$> fsmOut) (fREnable <$> fsmOut)
+    topEntity clk noReset (fWriteData <$> fsmOut) (fREnable <$> fsmOut)
   done =
-      register clk noRst en False
-    $ assertBitVector clk noRst "FIFO min full"
+      register clk noReset en False
+    $ assertBitVector clk noReset "FIFO min full"
         (pack <$> isFull minOut) (fExpectedFull <$> fsmOut)
-    $ assertBitVector clk noRst "FIFO max full"
+    $ assertBitVector clk noReset "FIFO max full"
         (pack <$> isFull maxOut) (fExpectedFull <$> fsmOut)
-    $ assertBitVector clk noRst "FIFO max overflow"
+    $ assertBitVector clk noReset "FIFO max overflow"
         (pack <$> isOverflow maxOut) (fExpectedOverflow <$> fsmOut)
-    $ assertBitVector clk noRst "FIFO min empty"
+    $ assertBitVector clk noReset "FIFO min empty"
         (pack <$> isEmpty minOut) (fExpectedEmpty <$> fsmOut)
-    $ assertBitVector clk noRst "FIFO max empty"
+    $ assertBitVector clk noReset "FIFO max empty"
         (pack <$> isEmpty maxOut) (fExpectedEmpty <$> fsmOut)
-    $ assertBitVector clk noRst "FIFO max underflow"
+    $ assertBitVector clk noReset "FIFO max underflow"
         (pack <$> isUnderflow maxOut) (fExpectedUnderflow <$> fsmOut)
-    $ assertBitVector clk noRst "FIFO min data out"
+    $ assertBitVector clk noReset "FIFO min data out"
         (pack <$> fifoData minOut) (fExpectedData <$> fsmOut)
-    $ assertBitVector clk noRst "FIFO max data out"
+    $ assertBitVector clk noReset "FIFO max data out"
         (pack <$> fifoData maxOut) (fExpectedData <$> fsmOut)
         (fDone <$> fsmOut)
   clk = tbClockGen (not <$> done)
-  noRst = unsafeFromActiveHigh $ pure False
   en = enableGen
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE testBench #-}

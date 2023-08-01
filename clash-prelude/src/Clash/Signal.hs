@@ -106,6 +106,13 @@ module Clash.Signal
   , DomainResetKind
   , DomainInitBehavior
   , DomainResetPolarity
+    -- *** Convenience types #conveniencetypes#
+    -- **** Simplifying
+    -- $conveniencetypes
+
+  , HasSynchronousReset
+  , HasAsynchronousReset
+  , HasDefinedInitialValues
     -- ** Default domains
   , System
   , XilinxSystem
@@ -322,6 +329,34 @@ let countSometimes = s where
       plusM = liftA2 (liftA2 (+))
 :}
 
+-}
+
+{- $conveniencetypes
+
+If you want to write part of your Clash design as domain-polymorphic functions,
+it can be practical to define a design-wide constraint synonym that captures the
+characteristics of the clock domains of the design. Such a constraint synonym
+can be used as a constraint on all domain-polymorphic functions in the design,
+regardless of whether they actually need the constraints from this section.
+
+@
+type DesignDomain dom =
+  ( 'HasSynchronousReset' dom
+  , 'HasDefinedInitialValues' dom
+  )
+
+type DesignDomainHidden dom =
+  ( DesignDomain dom
+  , 'HiddenClockResetEnable' dom
+  )
+
+myFunc ::
+  DesignDomainHidden dom =>
+  'Signal' dom [...]
+@
+
+This way, you don't have to think about which constraints the function you're
+writing has exactly, and the constraint is succinct.
 -}
 
 {- $hiddenclockandreset #hiddenclockandreset#

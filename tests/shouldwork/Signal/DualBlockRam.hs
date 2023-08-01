@@ -26,7 +26,7 @@ testBenchAB = strictAnd <$> doneA <*> (unsafeSynchronizer clk10 clk20 doneB)
     simOutB = $(collectSimResults (length opsB) $ pack <$> (snd simEntityAB))
 
     --topEntity output
-    (portA, portB) = topOut topEntityAB clk20 noRst20 clk10 noRst10
+    (portA, portB) = topOut topEntityAB clk20 clk10
 
     --Verification
     outputVerifierA = outputVerifierWith
@@ -34,8 +34,8 @@ testBenchAB = strictAnd <$> doneA <*> (unsafeSynchronizer clk10 clk20 doneB)
     outoutVerifierB = outputVerifierWith
      (\clk rst -> assertBitVector clk rst "outputVerifierBitVector Port B")
 
-    doneA  = outputVerifierA clk20 clk20 noRst20 simOutA $ pack <$> portA
-    doneB  = outoutVerifierB clk10 clk10 noRst10 simOutB $ pack <$> portB
+    doneA  = outputVerifierA clk20 clk20 noReset simOutA $ pack <$> portA
+    doneB  = outoutVerifierB clk10 clk10 noReset simOutB $ pack <$> portB
 
     -- Testbench clocks
     clk20 :: Clock A
@@ -61,7 +61,7 @@ testBenchBC = strictAnd <$> doneA <*> (unsafeSynchronizer clk7 clk10 doneB)
           pack <$> (snd simEntityBC))
 
     -- topEntity output
-    (portA, portB) = topOut topEntityBC clk10 noRst10 clk7 noRst7
+    (portA, portB) = topOut topEntityBC clk10 clk7
 
     -- Verification
     outputVerifierA = outputVerifierWith
@@ -69,8 +69,8 @@ testBenchBC = strictAnd <$> doneA <*> (unsafeSynchronizer clk7 clk10 doneB)
     outoutVerifierB = outputVerifierWith
      (\clk rst -> assertBitVector clk rst "outputVerifierBitVector Port B")
 
-    doneA  = outputVerifierA clk10 clk10 noRst10 simOutA $ pack <$> portA
-    doneB  = outoutVerifierB clk7 clk7 noRst7 simOutB $ pack <$> portB
+    doneA  = outputVerifierA clk10 clk10 noReset simOutA $ pack <$> portA
+    doneB  = outoutVerifierB clk7 clk7 noReset simOutB $ pack <$> portB
 
     -- Testbench clocks
     clk10 :: Clock B

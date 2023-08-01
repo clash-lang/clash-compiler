@@ -65,3 +65,8 @@ clash-dev.result
 
 # direnv
 .envrc
+
+# Vivado tmp files
+vivado.jou
+vivado_*.backup.jou
+work-obj93.cf
