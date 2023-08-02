@@ -67,9 +67,7 @@ module Clash.Signal.Internal
   , DomainConfigurationInitBehavior
   , DomainConfigurationResetPolarity
 
-    -- *** Convenience types #conveniencetypes#
-    -- **** Simplifying
-    -- $conveniencetypes
+    -- *** Convenience types
 
   , HasSynchronousReset
   , HasAsynchronousReset
@@ -225,34 +223,6 @@ import Clash.XException
 >>> import Clash.Explicit.Signal (register)
 >>> let registerS = register
 >>> let registerA = register
--}
-
-{- $conveniencetypes
-
-If you want to write part of your Clash design as domain-polymorphic functions,
-it can be practical to define a design-wide constraint synonym that captures the
-characteristics of the clock domains of the design. Such a constraint synonym
-can be used as a constraint on all domain-polymorphic functions in the design,
-regardless of whether they actually need the constraints from this section.
-
-@
-type DesignDomain dom =
-  ( 'HasSynchronousReset' dom
-  , 'HasDefinedInitialValues' dom
-  )
-
-type DesignDomainHidden dom =
-  ( DesignDomain dom
-  , t'Clash.Signal.HiddenClockResetEnable' dom
-  )
-
-myFunc ::
-  DesignDomainHidden dom =>
-  'Signal' dom [...]
-@
-
-This way, you don't have to think about which constraints the function you're
-writing has exactly, and the constraint is succinct.
 -}
 
 -- * Signal
@@ -418,7 +388,7 @@ type DomainResetKind (dom :: Domain) =
 --
 -- Using this type implies 'KnownDomain'.
 --
--- [See above](#g:conveniencetypes)
+-- [Click here for usage hints]("Clash.Explicit.Signal#g:conveniencetypes")
 type HasSynchronousReset (dom :: Domain) =
   (KnownDomain dom, DomainResetKind dom ~ 'Synchronous)
 
@@ -431,7 +401,7 @@ type HasSynchronousReset (dom :: Domain) =
 --
 -- Using this type implies 'KnownDomain'.
 --
--- [See above](#g:conveniencetypes)
+-- [Click here for usage hints]("Clash.Explicit.Signal#g:conveniencetypes")
 type HasAsynchronousReset (dom :: Domain) =
   (KnownDomain dom, DomainResetKind dom ~ 'Asynchronous)
 
@@ -456,7 +426,7 @@ type DomainInitBehavior (dom :: Domain) =
 -- Note that there is no @UnknownInitialValues dom@ as a component that works
 -- without initial values will also work if it does have them.
 --
--- [See above](#g:conveniencetypes)
+-- [Click here for usage hints]("Clash.Explicit.Signal#g:conveniencetypes")
 type HasDefinedInitialValues (dom :: Domain) =
   (KnownDomain dom, DomainInitBehavior dom ~ 'Defined)
 

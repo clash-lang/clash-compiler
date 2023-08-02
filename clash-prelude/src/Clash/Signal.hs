@@ -106,7 +106,7 @@ module Clash.Signal
   , DomainResetKind
   , DomainInitBehavior
   , DomainResetPolarity
-    -- *** Convenience types #conveniencetypes#
+    -- *** Convenience types
     -- **** Simplifying
     -- $conveniencetypes
 
