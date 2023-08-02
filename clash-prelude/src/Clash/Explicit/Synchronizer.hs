@@ -41,10 +41,10 @@ import Clash.Class.BitPack.BitIndex (slice)
 import Clash.Explicit.Mealy        (mealyB)
 import Clash.Explicit.BlockRam     (RamOp (..), trueDualPortBlockRam)
 import Clash.Explicit.Signal
-  (Clock, Reset, Signal, Enable, register, unsafeSynchronizer, fromEnable, (.&&.))
+  (Clock, Reset, Signal, Enable, register, unsafeSynchronizer, fromEnable,
+  (.&&.), mux, KnownDomain)
 import Clash.Promoted.Nat          (SNat (..))
 import Clash.Promoted.Nat.Literals (d0)
-import Clash.Signal                (mux, KnownDomain)
 import Clash.Sized.BitVector       (BitVector, (++#))
 import Clash.XException            (NFDataX, fromJustX)
 

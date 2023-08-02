@@ -10,6 +10,8 @@ Utilities to deal with resets.
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
@@ -19,6 +21,8 @@ module Clash.Explicit.Reset
   ( -- Defined in this module
     resetSynchronizer
   , resetGlitchFilter
+  , resetGlitchFilterWithReset
+  , unsafeResetGlitchFilter
   , holdReset
   , convertReset
   , noReset
@@ -48,14 +52,14 @@ module Clash.Explicit.Reset
 import           Data.Type.Equality ((:~:)(Refl))
 
 import           Clash.Class.Num (satSucc, SaturationMode(SatBound))
-import           Clash.Explicit.Moore
 import           Clash.Explicit.Signal
+import           Clash.Explicit.Synchronizer (dualFlipFlopSynchronizer)
 import           Clash.Promoted.Nat
 import           Clash.Signal.Internal
 import           Clash.Sized.Index (Index)
 
 import           GHC.Stack (HasCallStack)
-import           GHC.TypeLits (type (+))
+import           GHC.TypeLits (type (+), type (<=))
 
 {- $setup
 >>> import Clash.Explicit.Prelude
@@ -225,45 +229,164 @@ resetSynchronizer clk rst = rstOut
                          $ delay clk enableGen isActiveHigh
                          $ delay clk enableGen isActiveHigh
                          $ unsafeFromReset rst
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE resetSynchronizer #-} -- Give reset synchronizer its own HDL file
 
 -- | Filter glitches from reset signals by only triggering a reset after it has
 -- been asserted for /glitchlessPeriod/ cycles. Similarly, it will stay
 -- asserted until a /glitchlessPeriod/ number of deasserted cycles have been
 -- observed.
 --
--- This circuit can only be used on platforms supporting initial values. Platforms
--- not supporting this should consider using a power-on-reset and a circuit
--- designed with this environment in mind.
+-- This circuit can only be used on platforms supporting initial values. This
+-- restriction can be worked around by using 'unsafeResetGlitchFilter' but this
+-- is not recommended.
+--
+-- On platforms without initial values, you should instead use
+-- 'resetGlitchFilterWithReset' with an additional power-on reset, or
+-- 'holdReset' if filtering is only needed on deassertion.
+--
+-- At power-on, the reset will be asserted. If the filtered reset input remains
+-- unasserted, the output reset will deassert after /glitchlessPeriod/ clock
+-- cycles.
+--
+-- If @resetGlitchFilter@ is used in a domain with asynchronous resets
+-- ('Asynchronous'), @resetGlitchFilter@ will first synchronize the reset input
+-- with 'dualFlipFlopSynchronizer'.
 --
 -- === __Example 1__
 -- >>> let sampleResetN n = sampleN n . unsafeToActiveHigh
 -- >>> let resetFromList = unsafeFromActiveHigh . fromList
 -- >>> let rst = resetFromList [True, True, False, False, True, False, False, True, True, False, True, True]
--- >>> sampleResetN 12 (resetGlitchFilter d2 systemClockGen rst)
+-- >>> sampleResetN 12 (resetGlitchFilter d2 (clockGen @XilinxSystem) rst)
 -- [True,True,True,True,False,False,False,False,False,True,True,True]
---
 resetGlitchFilter
-  :: forall dom glitchlessPeriod n
+  :: forall dom glitchlessPeriod
    . ( HasCallStack
-     , KnownDomain dom
-     , glitchlessPeriod ~ (n + 1) )
+     , HasDefinedInitialValues dom
+     , 1 <= glitchlessPeriod
+     )
   => SNat glitchlessPeriod
   -- ^ Consider a reset signal to be properly asserted after having seen the
   -- reset asserted for /glitchlessPeriod/ cycles straight.
   -> Clock dom
   -> Reset dom
   -> Reset dom
-resetGlitchFilter SNat clk rst =
-  case initBehavior @dom of
-    SDefined ->
-      unsafeToReset $
-        moore clk noReset enableGen go fst (asserted, 0) (unsafeFromReset rst)
-    SUnknown ->
-      error "'resetGlitchFilter' only supports domains with defined initial values."
+resetGlitchFilter = unsafeResetGlitchFilter
+{-# INLINE resetGlitchFilter #-}
+
+-- | Filter glitches from reset signals by only triggering a reset after it has
+-- been asserted for /glitchlessPeriod/ cycles. Similarly, it will stay
+-- asserted until a /glitchlessPeriod/ number of deasserted cycles have been
+-- observed.
+--
+-- On platforms without initial values ('Unknown'), 'resetGlitchFilter' cannot
+-- be used and you should use 'resetGlitchFilterWithReset' with an additional
+-- power-on reset, or 'holdReset' if filtering is only needed on deassertion.
+--
+-- @unsafeResetGlitchFilter@ allows breaking the requirement of initial values,
+-- but by doing so it is possible that the design starts up with a period of up
+-- to /2 * glitchlessPeriod/ clock cycles where the reset output is unasserted
+-- (or longer in the case of glitches on the filtered reset input). This can
+-- cause a number of problems. The outputs\/tri-states of the design might
+-- output random things, including coherent but incorrect streams of data. This
+-- might have grave repercussions in the design's environment (sending network
+-- packets, overwriting non-volatile memory, in extreme cases destroying
+-- controlled equipment or causing harm to living beings, ...).
+--
+-- Without initial values, the synthesized result of @unsafeResetGlitchFilter@
+-- eventually correctly outputs a filtered version of the reset input. However,
+-- in simulation, it will indefinitely output an undefined value. This happens
+-- both in Clash simulation and in HDL simulation. Therefore, simulation should
+-- not include the @unsafeResetGlitchFilter@.
+--
+-- If @unsafeResetGlitchFilter@ is used in a domain with asynchronous resets
+-- ('Asynchronous'), @unsafeResetGlitchFilter@ will first synchronize the reset
+-- input with 'dualFlipFlopSynchronizer'.
+unsafeResetGlitchFilter
+  :: forall dom glitchlessPeriod
+   . ( HasCallStack
+     , KnownDomain dom
+     , 1 <= glitchlessPeriod
+     )
+  => SNat glitchlessPeriod
+  -- ^ Consider a reset signal to be properly asserted after having seen the
+  -- reset asserted for /glitchlessPeriod/ cycles straight.
+  -> Clock dom
+  -> Reset dom
+  -> Reset dom
+unsafeResetGlitchFilter glitchlessPeriod clk =
+  resetGlitchFilter# glitchlessPeriod reg dffSync
  where
-  go :: state ~ (Bool, Index glitchlessPeriod) => state -> Bool -> state
+  reg = delay clk enableGen
+  dffSync = dualFlipFlopSynchronizer clk clk noReset enableGen
+{-# INLINE unsafeResetGlitchFilter #-}
+
+-- | Filter glitches from reset signals by only triggering a reset after it has
+-- been asserted for /glitchlessPeriod/ cycles. Similarly, it will stay
+-- asserted until a /glitchlessPeriod/ number of deasserted cycles have been
+-- observed.
+--
+-- Compared to 'resetGlitchFilter', this function adds an additional power-on
+-- reset input. As soon as the power-on reset asserts, the reset output will
+-- assert, and after the power-on reset deasserts, the reset output will stay
+-- asserted for another /glitchlessPeriod/ clock cycles. This is identical
+-- behavior to 'holdReset' where it concerns the power-on reset, and differs
+-- from the filtered reset, which will only cause an assertion after
+-- /glitchlessPeriod/ cycles.
+--
+-- If @resetGlitchFilterWithReset@ is used in a domain with asynchronous resets
+-- ('Asynchronous'), @resetGlitchFilterWithReset@ will first synchronize the
+-- reset input with 'dualFlipFlopSynchronizer'.
+resetGlitchFilterWithReset
+  :: forall dom glitchlessPeriod
+   . ( HasCallStack
+     , KnownDomain dom
+     , 1 <= glitchlessPeriod
+     )
+  => SNat glitchlessPeriod
+  -- ^ Consider a reset signal to be properly asserted after having seen the
+  -- reset asserted for /glitchlessPeriod/ cycles straight.
+  -> Clock dom
+  -> Reset dom
+  -- ^ The power-on reset for the glitch filter itself
+  -> Reset dom
+  -- ^ The reset that will be filtered
+  -> Reset dom
+resetGlitchFilterWithReset glitchlessPeriod clk ownRst =
+  resetGlitchFilter# glitchlessPeriod reg dffSync
+ where
+  reg = register clk ownRst enableGen
+  dffSync = dualFlipFlopSynchronizer clk clk ownRst enableGen
+{-# INLINE resetGlitchFilterWithReset #-}
+
+resetGlitchFilter#
+  :: forall dom glitchlessPeriod state
+   . ( HasCallStack
+     , KnownDomain dom
+     , 1 <= glitchlessPeriod
+     , state ~ (Bool, Index glitchlessPeriod)
+     )
+  => SNat glitchlessPeriod
+  -> (   state
+      -> Signal dom state
+      -> Signal dom state
+     )
+  -> (   Bool
+      -> Signal dom Bool
+      -> Signal dom Bool
+     )
+  -> Reset dom
+  -> Reset dom
+resetGlitchFilter# SNat reg dffSync rstIn0 =
+  let s' = go <$> s <*> rstIn2
+      s  = reg (asserted, 0) s'
+  in unsafeToReset $ fst <$> s
+ where
+  rstIn1 = unsafeFromReset rstIn0
+  rstIn2 =
+    case resetKind @dom of
+      SAsynchronous -> dffSync asserted rstIn1
+      SSynchronous -> rstIn1
+
+  go :: state -> Bool -> state
   go (state, count) reset
     | reset == state    = (state,     0)
     | count == maxBound = (not state, 0)
@@ -274,8 +397,6 @@ resetGlitchFilter SNat clk rst =
     case resetPolarity @dom of
       SActiveHigh -> True
       SActiveLow -> False
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE resetGlitchFilter #-} -- Give reset glitch filter its own HDL file
 
 -- | Hold reset for a number of cycles relative to an incoming reset signal.
 --
