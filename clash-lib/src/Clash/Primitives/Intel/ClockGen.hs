@@ -19,32 +19,33 @@ import Clash.Netlist.BlackBox.Util
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
 import Clash.Netlist.Util
+import qualified Clash.Primitives.DSL as DSL
 import Clash.Signal (periodToHz)
+import Data.Text.Extra (showt)
 
 import Control.Monad.State
 import Data.List.Infinite (Infinite(..), (...))
-import Data.Monoid (Ap(getAp))
-import qualified Data.String.Interpolate as I
 import Data.Text.Prettyprint.Doc.Extra
-import qualified Prettyprinter.Interpolate as I
+import Text.Show.Pretty (ppShow)
 
+import qualified Data.String.Interpolate as I
 import qualified Data.Text as TextS
-import Data.Text.Extra (showt)
+import qualified Prettyprinter.Interpolate as I
 
 altpllTF :: TemplateFunction
 altpllTF = TemplateFunction used valid altpllTemplate
  where
-  _knownDomIn
+  knownDomIn
     :< _knownDomOut
     :< nm
     :< clk
     :< rst
     :< _ = (0...)
-  used = [ nm, clk, rst ]
+  used = [ knownDomIn, nm, clk, rst ]
   valid bbCtx
     | (nm0,_,_) <- bbInputs bbCtx !! nm
     , Just _ <- exprToString nm0
-    , [(Identifier _ Nothing,Product {})] <- bbResults bbCtx
+    , [(_,Product {})] <- bbResults bbCtx
     = True
   valid _ = False
 
@@ -64,16 +65,17 @@ alteraPllTF :: TemplateFunction
 alteraPllTF = TemplateFunction used valid alteraPllTemplate
  where
   _clocksClass
-    :< _knownDomIn
+    :< knownDomIn
     :< _clocksCxt
     :< nm
     :< clk
     :< rst
     :< _ = (0...)
-  used = [ nm, clk, rst ]
+  used = [ knownDomIn, nm, clk, rst ]
   valid bbCtx
     | (nm0,_,_) <- bbInputs bbCtx !! nm
     , Just _ <- exprToString nm0
+    , [(_,Product {})] <- bbResults bbCtx
     = True
   valid _ = False
 
@@ -96,98 +98,105 @@ alteraPllTemplate
   => BlackBoxContext
   -> State s Doc
 alteraPllTemplate bbCtx
-  | [(Identifier result Nothing,resTy@(Product _ _ (init -> tys)))] <- bbResults bbCtx
-  , [ _clocksClass
-    , _knownDomIn
+  | [ _clocksClass
+    , knownDomIn
     , _clocksCxt
-    , (nm,_,_)
-    , (clk,clkTy,_)
-    , (rst,rstTy,_)] <- bbInputs bbCtx
-  , Just nm' <- exprToString nm
-  , let instname0 = TextS.pack nm'
+    , name0
+    , clk
+    , rst
+    ] <- map fst (DSL.tInputs bbCtx)
+  , Just name1 <- DSL.getStr name0
+  , [DSL.ety -> resultTy] <- DSL.tResults bbCtx
+  , Product _ _ (init -> pllOutTys) <- resultTy
+  , [compName] <- bbQsysIncName bbCtx
   = do
-    locked <- Id.makeBasic "locked"
-    pllLock <- Id.makeBasic "pllLock"
-    alteraPll <- Id.makeBasic "altera_pll_block"
-    alteraPll_inst <- Id.makeBasic instname0
-
-    clocks <- Id.nextN (length tys) =<< Id.make "pllOut"
+      instName <- Id.makeBasic $ TextS.pack name1
 
       -- TODO: unsafeMake is dubious here: I don't think we take names in
       -- TODO: bbQsysIncName into account when generating fresh ids
-    let compName = case bbQsysIncName bbCtx of
-                      x:_ -> Id.unsafeMake x
-                      _ -> error "alteraPll primitive has no 'includes' entry"
+      let compNameId = Id.unsafeMake compName
 
-    let outclkPorts = map (\n -> instPort ("outclk_" <> showt n)) [(0 :: Int)..length clocks-1]
+      DSL.declarationReturn bbCtx "altera_pll_block" $ do
 
-    getAp $ blockDecl alteraPll $ concat
-      [[ NetDecl Nothing locked Bit
-      , NetDecl Nothing pllLock Bool]
-      ,[ NetDecl Nothing clkNm ty | (clkNm,ty) <- zip clocks tys]
-      ,[ InstDecl Comp Nothing [] compName alteraPll_inst [] $ NamedPortMap $ concat
-          [ [ (instPort "refclk", In, clkTy, clk)
-            , (instPort "rst", In, rstTy, rst)]
-          , [ (p, Out, ty, Identifier k Nothing) | (k, ty, p) <- zip3 clocks tys outclkPorts ]
-          , [(instPort "locked", Out, Bit, Identifier locked Nothing)]]
-      , CondAssignment pllLock Bool (Identifier locked Nothing) Bit
-          [(Just (BitLit H),Literal Nothing (BoolLit True))
-          ,(Nothing        ,Literal Nothing (BoolLit False))]
-      , Assignment result Cont (DataCon resTy (DC (resTy,0)) $ concat
-                              [[Identifier k Nothing | k <- clocks]
-                              ,[Identifier pllLock Nothing]])
+        rstHigh <- DSL.unsafeToActiveHigh "reset" (DSL.ety knownDomIn) rst
+        pllOuts <- DSL.declareN "pllOut" pllOutTys
+        locked <- DSL.declare "locked" Bit
+        pllLock <- DSL.boolFromBit "pllLock" locked
 
-       ]
-      ]
+        let
+          pllOutNames =
+            map (\n -> "outclk_" <> showt n) [(0::Int) .. length pllOutTys - 1]
+          compInps =
+            [ ("refclk", DSL.ety clk)
+            , ("rst", DSL.ety rstHigh)
+            ]
+          compOuts = zip pllOutNames pllOutTys  <> [("locked", Bit)]
+          inps =
+            [ ("refclk", clk)
+            , ("rst", rstHigh)
+            ]
+          outs = zip pllOutNames pllOuts <> [("locked", locked)]
+
+        DSL.compInBlock compName compInps compOuts
+        DSL.instDecl Empty compNameId instName [] inps outs
+
+        pure [DSL.constructProduct resultTy (pllOuts <> [pllLock])]
   | otherwise
-  = error ("alteraPllTemplate: bad bbContext: " <> show bbCtx)
+  = error $ ppShow bbCtx
 
 altpllTemplate
   :: Backend s
   => BlackBoxContext
   -> State s Doc
 altpllTemplate bbCtx
-  | [ _knownDomIn
+  | [ knownDomIn
     , _knownDomOut
-    , (nm,_,_)
-    , (clk,clkTy,_)
-    , (rst,rstTy,_)] <- bbInputs bbCtx
-  , [(Identifier result Nothing,resTy@(Product _ _ [clkOutTy,_]))] <- bbResults bbCtx
-  , Just nm' <- exprToString nm
-  , let instname0 = TextS.pack nm'
+    , name0
+    , clk
+    , rst
+    ] <- map fst (DSL.tInputs bbCtx)
+  , Just name1 <- DSL.getStr name0
+  , [DSL.ety -> resultTy] <- DSL.tResults bbCtx
+  , Product _ _ (pllOutTy:_) <- resultTy
+  , [compName] <- bbQsysIncName bbCtx
   = do
-      pllOut <- Id.make "pllOut"
-      locked <- Id.make "locked"
-      pllLock <- Id.make "pllLock"
-      alteraPll <- Id.make "altpll_block"
-      alteraPll_inst <- Id.make instname0
+      instName <- Id.makeBasic $ TextS.pack name1
 
       -- TODO: unsafeMake is dubious here: I don't think we take names in
       -- TODO: bbQsysIncName into account when generating fresh ids
-      let compName = case bbQsysIncName bbCtx of
-                      x:_ -> Id.unsafeMake x
-                      _ -> error "altpll primitive has no 'includes' entry"
+      let compNameId = Id.unsafeMake compName
 
-      getAp $ blockDecl alteraPll
-        [ NetDecl Nothing locked  Bit
-        , NetDecl Nothing pllLock Bool
-        , NetDecl Nothing pllOut clkOutTy
-        , InstDecl Comp Nothing [] compName alteraPll_inst [] $ NamedPortMap $
-            [ (instPort "clk", In, clkTy, clk)
-            , (instPort "areset", In, rstTy, rst)
-            , (instPort "c0", Out, clkOutTy, Identifier pllOut Nothing)
-            , (instPort "locked", Out, Bit, Identifier locked Nothing)]
-        , CondAssignment pllLock Bool (Identifier locked Nothing) Bit
-            [(Just (BitLit H),Literal Nothing (BoolLit True))
-            ,(Nothing        ,Literal Nothing (BoolLit False))]
-        , Assignment result Cont (DataCon resTy (DC (resTy,0))
-                              [Identifier pllOut Nothing
-                              ,Identifier pllLock Nothing])
+      DSL.declarationReturn bbCtx "altpll_block" $ do
 
-        ]
+        rstHigh <- DSL.unsafeToActiveHigh "reset" (DSL.ety knownDomIn) rst
+        pllOut <- DSL.declare "pllOut" pllOutTy
+        locked <- DSL.declare "locked" Bit
+        pllLock <- DSL.boolFromBit "pllLock" locked
+
+        let
+          compInps =
+            [ ("clk", DSL.ety clk)
+            , ("areset", DSL.ety rstHigh)
+            ]
+          compOuts =
+            [ ("c0", pllOutTy)
+            , ("locked", Bit)
+            ]
+          inps =
+            [ ("clk", clk)
+            , ("areset", rstHigh)
+            ]
+          outs =
+            [ ("c0", pllOut)
+            , ("locked", locked)
+            ]
+
+        DSL.compInBlock compName compInps compOuts
+        DSL.instDecl Empty compNameId instName [] inps outs
+
+        pure [DSL.constructProduct resultTy [pllOut, pllLock]]
   | otherwise
-  = error ("altpllTemplate: bad bbContext: " <> show bbCtx)
-
+  = error $ ppShow bbCtx
 
 altpllQsysTemplate
   :: Backend s
