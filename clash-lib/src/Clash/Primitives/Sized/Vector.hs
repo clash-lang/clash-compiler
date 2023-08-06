@@ -18,7 +18,7 @@ import           Control.Monad.State                (State)
 import qualified Control.Lens                       as Lens
 import           Data.Either                        (rights)
 import           Data.List.Extra                    (iterateNM)
-import           Data.Maybe                         (fromMaybe)
+import           Data.Maybe                         (fromMaybe, listToMaybe)
 import           Data.Monoid                        (Ap(getAp))
 import           Data.Text.Extra                    (showt)
 import           Data.Text.Prettyprint.Doc.Extra
@@ -61,10 +61,10 @@ iterateBBF _isD _primName args _resTy = do
  where
   bb = BBFunction "Clash.Primitives.Sized.Vector.iterateBBF" 0 iterateTF
   vecLength tcm =
-    case coreView tcm (head (rights args)) of
-      (LitTy (NumTy 0)) -> error "Unexpected empty vector in 'iterateBBF'"
-      (LitTy (NumTy n)) -> fromInteger (n - 1)
-      vl -> error $ "Unexpected vector length: " ++ show vl
+    case coreView tcm <$> rights args of
+      (LitTy (NumTy 0)):_ -> error "Unexpected empty vector in 'iterateBBF'"
+      (LitTy (NumTy n)):_ -> fromInteger (n - 1)
+      vl -> error $ "Unexpected vector length: " ++ show (listToMaybe vl)
   meta tcm = emptyBlackBoxMeta {
       bbKind=TDecl
     , bbFunctionPlurality=[(1, vecLength tcm)]

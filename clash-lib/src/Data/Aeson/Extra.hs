@@ -22,7 +22,8 @@ import qualified Data.Text.Lazy       as LT
 import qualified Data.Text.Lazy.Encoding as LT
 import           Data.Text.Encoding.Error (UnicodeException(..))
 import           Data.List            (intercalate)
-import           Data.List.Extra      (groupOn)
+import           Data.List.NonEmpty   (NonEmpty (..))
+import qualified Data.List.NonEmpty   as NE
 import           Data.Tuple.Extra     (second, first)
 import           Data.Aeson           (FromJSON, Result (..), fromJSON, json)
 import           Data.Attoparsec.Lazy (Result (..), parse)
@@ -99,12 +100,13 @@ toSpecNewlines bs = do
   go2 n inString (_:rest) = go2 n inString rest
 
   toLineMap :: [Int] -> LineMap
-  toLineMap virtuals =
+  toLineMap [] = IntMap.empty
+  toLineMap (v:virtuals) =
       IntMap.fromList
     $ map (second (\reals -> (minimum reals, maximum reals)))
-    $ map (first head . unzip)
-    $ groupOn fst
-    $ zip virtuals [(0::Int)..]
+    $ map (first NE.head . NE.unzip)
+    $ NE.groupBy (\(a,_) (b,_) -> a == b)
+    $ NE.zip (v :| virtuals) (NE.iterate (+1) (0 :: Int))
 
 genLineErr' :: [Text] -> (Int, Int) -> [Int] -> Text
 genLineErr' allLines range errorLines =

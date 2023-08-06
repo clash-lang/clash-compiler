@@ -85,7 +85,7 @@ mkUnique# is id0 = (is{is_freshCache=freshCache, is_store=isStore}, id2)
           y -> y{i_provenance=if debugIsOn then callStack else emptyCallStack}
   id1 = case lookupFreshCache# (is_freshCache is) id0 of
     Just currentMax ->
-      id0{i_extensionsRev=currentMax+1 : tail (i_extensionsRev id0)}
+      id0{i_extensionsRev=currentMax+1 : drop 1 (i_extensionsRev id0)}
     Nothing ->
       -- Identifier doesn't exist in set yet, so just return it.
       id0

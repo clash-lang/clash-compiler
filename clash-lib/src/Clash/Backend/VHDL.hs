@@ -745,8 +745,9 @@ funDec _ _ t@(Product _ labels elTys) = Just
                             parens ("p." <> tyName t <> selectProductField labels elTys i))
 
     argLengths = map typeSize elTys
-    starts     = 0 : snd (mapAccumL ((join (,) .) . (+)) 0 argLengths)
-    ends       = map (subtract 1) (tail starts)
+    starts1    = snd (mapAccumL ((join (,) .) . (+)) 0 argLengths)
+    starts     = 0 : starts1
+    ends       = map (subtract 1) starts1
 
     elTyFromSLV = forM (zip starts ends)
                        (\(s,e) -> "fromSLV" <>

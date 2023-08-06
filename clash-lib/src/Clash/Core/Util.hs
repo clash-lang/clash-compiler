@@ -20,13 +20,14 @@ module Clash.Core.Util where
 
 import           Control.Concurrent.Supply     (Supply, freshId)
 import Control.Monad.Trans.Except              (Except, throwE, runExcept)
-import Data.Bifunctor                          (first)
+import Data.Bifunctor                          (first, second)
 import qualified Data.HashSet                  as HashSet
 import qualified Data.Graph                    as Graph
-import Data.List                               (mapAccumR)
+import Data.List                               (mapAccumR, uncons)
 import Data.List.Extra                         (zipEqual)
+import Data.List.NonEmpty                      (NonEmpty (..), toList)
 import Data.Maybe
-  (fromJust, fromMaybe, isJust, mapMaybe, catMaybes)
+  (fromMaybe, isJust, mapMaybe, catMaybes)
 import qualified Data.Set                      as Set
 import qualified Data.Set.Lens                 as Lens
 import qualified Data.Text                     as T
@@ -105,12 +106,15 @@ mkVec nilCon consCon resTy = go
                                         ,Left x
                                         ,Left (go (n-1) xs)]
 
-    nilCoTy    = head (fromJust $! dataConInstArgTys nilCon  [(LitTy (NumTy 0))
-                                                             ,resTy])
-    consCoTy n = head (fromJust $! dataConInstArgTys consCon
-                                                     [(LitTy (NumTy n))
-                                                     ,resTy
-                                                     ,(LitTy (NumTy (n-1)))])
+    nilCoTy    = case dataConInstArgTys nilCon [(LitTy (NumTy 0)) ,resTy] of
+                   Just (x:_) -> x
+                   _ -> error "impossible"
+    consCoTy n = case dataConInstArgTys consCon
+                                        [(LitTy (NumTy n))
+                                        ,resTy
+                                        ,(LitTy (NumTy (n-1)))] of
+                   Just (x:_) -> x
+                   _ -> error "impossible"
 
 -- | Append elements to the supplied vector
 appendToVec :: DataCon -- ^ The Cons (:>) constructor
@@ -129,16 +133,19 @@ appendToVec consCon resTy vec = go
                                         ,Left x
                                         ,Left (go (n-1) xs)]
 
-    consCoTy n = head (fromJust $! dataConInstArgTys consCon
-                                                   [(LitTy (NumTy n))
-                                                   ,resTy
-                                                   ,(LitTy (NumTy (n-1)))])
+    consCoTy n = case dataConInstArgTys consCon
+                                        [(LitTy (NumTy n))
+                                        ,resTy
+                                        ,(LitTy (NumTy (n-1)))] of
+                   Just (x:_) -> x
+                   _ -> error "impossible"
 
 -- | Create let-bindings with case-statements that select elements out of a
 -- vector. Returns both the variables to which element-selections are bound
 -- and the let-bindings
 extractElems
-  :: Supply
+  :: HasCallStack
+  => Supply
   -- ^ Unique supply
   -> InScopeSet
   -- ^ (Superset of) in scope variables
@@ -152,13 +159,15 @@ extractElems
   -- ^ Length of the vector
   -> Term
   -- ^ The vector
-  -> (Supply, [(Term,[(Id, Term)])])
+  -> (Supply, NonEmpty (Term,NonEmpty (Id, Term)))
 extractElems supply inScope consCon resTy s maxN vec =
-  first fst (go maxN (supply,inScope) vec)
+  if maxN >= 1 then
+    first fst (go maxN (supply,inScope) vec)
+  else
+    error "extractElems must be called with positive number"
  where
   go :: Integer -> (Supply,InScopeSet) -> Term
-     -> ((Supply,InScopeSet),[(Term,[(Id, Term)])])
-  go 0 uniqs _ = (uniqs,[])
+     -> ((Supply,InScopeSet),NonEmpty (Term, NonEmpty (Id, Term)))
   go n uniqs0 e = fromMaybe (error "extractElems: failed to project elements") $ do
     let tys = [(LitTy (NumTy n)),resTy,(LitTy (NumTy (n-1)))]
     idTys <- dataConInstArgTys consCon tys
@@ -180,9 +189,9 @@ extractElems supply inScope consCon resTy s maxN vec =
         lhs       = Case e resTy  [(pat,Var el)]
         rhs       = Case e restTy [(pat,Var rest)]
 
-    let (uniqs3,restVs) = go (n-1) uniqs2 (Var restNId)
+    let (uniqs3,restVs) = if n < 2 then (uniqs2,[]) else second toList (go (n-1) uniqs2 (Var restNId))
 
-    return (uniqs3,(elNVar,[(elNId, lhs),(restNId, rhs)]):restVs)
+    return (uniqs3,(elNVar,(elNId, lhs) :| [(restNId, rhs)]) :| restVs)
 
 -- | Create let-bindings with case-statements that select elements out of a
 -- tree. Returns both the variables to which element-selections are bound
@@ -217,10 +226,11 @@ extractTElems supply inScope lrCon brCon resTy s maxN tree =
   go 0 _ ks uniqs0 e = fromMaybe (error "extractTElems: failed to project elements") $ do
     let tys = [LitTy (NumTy 0),resTy]
     idTys <- dataConInstArgTys lrCon tys
+    (k,_) <- uncons ks
 
     (uniqs1,[elNId,co,el]) <- pure $
       mapAccumR mkUniqSystemId uniqs0 $ zipEqual
-        [ "el" `T.append` (s `T.cons` T.pack (show (head ks)))
+        [ "el" `T.append` (s `T.cons` T.pack (show k))
         , "_co_"
         , "el"
         ]
@@ -286,12 +296,15 @@ mkRTree lrCon brCon resTy = go
                               ,Left (go (n-1) xsL)
                               ,Left (go (n-1) xsR)]
 
-    lrCoTy   = head (fromJust $! dataConInstArgTys lrCon  [(LitTy (NumTy 0))
-                                                         ,resTy])
-    brCoTy n = head (fromJust $! dataConInstArgTys brCon
-                                                   [(LitTy (NumTy n))
-                                                   ,resTy
-                                                   ,(LitTy (NumTy (n-1)))])
+    lrCoTy   = case dataConInstArgTys lrCon [(LitTy (NumTy 0)) ,resTy] of
+                 Just (x:_) -> x
+                 _ -> error "impossible"
+    brCoTy n = case dataConInstArgTys brCon
+                                      [(LitTy (NumTy n))
+                                      ,resTy
+                                      ,(LitTy (NumTy (n-1)))] of
+                 Just (x:_) -> x
+                 _ -> error "impossible"
 
 -- | Determine whether a type is isomorphic to "Clash.Signal.Internal.Signal"
 --

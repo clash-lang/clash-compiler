@@ -480,7 +480,8 @@ mkDisjointGroup inScope (fun,(seen,cs)) = do
     let argss    = Foldable.toList cs
         argssT   = zip [0..] (List.transpose argss)
         (sharedT,distinctT) = List.partition (areShared tcm inScope . fmap (first stripTicks) . snd) argssT
-        shared   = map (second head) sharedT
+        -- TODO: find a better solution than "maybe undefined fst . uncons"
+        shared   = map (second (maybe (error "impossible") fst . List.uncons)) sharedT
         distinct = map (Either.lefts) (List.transpose (map snd distinctT))
         cs'      = fmap (zip [0..]) cs
         cs''     = removeEmpty
@@ -766,7 +767,7 @@ interestingToLift inScope eval e@(Prim pInfo) args ticks
     allNonPow2  = all (not . termIsPow2) lArgs
     tailNonPow2 = case lArgs of
                     [] -> True
-                    _  -> all (not . termIsPow2) (tail lArgs)
+                    _  -> all (not . termIsPow2) (drop 1 lArgs)
     lastNotPow2 = case lArgs of
                     [] -> True
                     _  -> not (termIsPow2 (last lArgs))

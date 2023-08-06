@@ -8,6 +8,7 @@ import Data.Either
 import qualified Control.Lens                    as Lens
 import           Control.Monad.State             (State)
 import           Data.List.Infinite              (Infinite(..), (...))
+import           Data.Maybe                      (listToMaybe)
 import           Data.Monoid                     (Ap(getAp))
 import           Data.Text.Prettyprint.Doc.Extra (Doc)
 import qualified Data.Text                       as Text
@@ -118,9 +119,9 @@ checkTF' decls (clk, clkId) propName renderAs prop bbCtx = do
   hdl = hdlKind (undefined :: s)
 
   edge =
-    case head (bbInputs bbCtx) of
-      (_, stripVoid -> KnownDomain _nm _period e _rst _init _polarity, _) -> e
-      _ -> error $ "Unexpected first argument: " ++ show (head (bbInputs bbCtx))
+    case bbInputs bbCtx of
+      (_, stripVoid -> KnownDomain _nm _period e _rst _init _polarity, _):_ -> e
+      _ -> error $ "Unexpected first argument: " ++ show (listToMaybe (bbInputs bbCtx))
 
   renderedPslProperty = case renderAs of
     PSL          -> psl

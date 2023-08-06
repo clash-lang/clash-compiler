@@ -18,6 +18,8 @@ module Clash.Netlist
   ,mkFunApp
   ) where
 
+import Data.List.NonEmpty (NonEmpty)
+
 import Clash.Core.DataCon   (DataCon)
 import Clash.Core.Term      (Alt,LetBinding,Term)
 import Clash.Core.Type      (Type)
@@ -60,7 +62,7 @@ mkSelection
   -> NetlistId
   -> Term
   -> Type
-  -> [Alt]
+  -> NonEmpty Alt
   -> [Declaration]
   -> NetlistMonad [Declaration]
 

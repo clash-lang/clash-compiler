@@ -34,6 +34,7 @@ import           Data.Either                   (lefts, partitionEithers)
 import           Data.Foldable                 (for_)
 import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
+import           Data.List.NonEmpty            (NonEmpty (..))
 import           Data.List                     (elemIndex, partition)
 import           Data.List.Extra               (countEq, mapAccumLM)
 import           Data.Maybe                    (listToMaybe, fromJust, fromMaybe)
@@ -993,7 +994,7 @@ collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
       normE <- mkUniqueNormalized is0 Nothing (args,(x,m):bs,res)
       case normE of
         (_,_,[],_,[],binders@(b:_),Just result) -> do
-          let binders1 = tail binders ++ [(fst b, C.Var result)]
+          let binders1 = drop 1 binders ++ [(fst b, C.Var result)]
           ds1 <- concatMapM (uncurry (mkDeclarations' Sequential)) binders1
           netDecls <- concatMapM mkNetDecl binders
           return (netDecls ++ ds1,extendIdSubst (mkSubst eInScopeSet) x (Var (fst b)))
@@ -1321,13 +1322,13 @@ mkFunInput parentName resId e =
                else Id.makeBasic "projection"
       return (Right ((nm,decls ++ [assn]), Cont))
 
-    go _ _ (Case scrut ty alts@(_:_:_)) = do
+    go _ _ (Case scrut ty (alt:alts@(_:_))) = do
       resNm <- Id.make "result"
       resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
       -- It's safe to use 'mkUnsafeSystemName' here: only the name, not the
       -- unique, will be used
       let resId'  = NetlistId resNm ty
-      selectionDecls <- mkSelection Concurrent resId' scrut ty alts []
+      selectionDecls <- mkSelection Concurrent resId' scrut ty (alt :| alts) []
       let assn = [ NetDecl' Nothing resNm resTy Nothing
                  , Assignment (Id.unsafeMake "~RESULT") Cont (Identifier resNm Nothing) ]
       nm <- Id.makeBasic "selection"

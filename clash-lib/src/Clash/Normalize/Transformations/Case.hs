@@ -648,8 +648,8 @@ caseOneAlt e@(Case _ _ [(pat,altE)]) =
       | otherwise
       -> return e
 
-caseOneAlt (Case _ _ alts@((pat,alt):_:_))
-  | all ((== alt) . snd) (tail alts)
+caseOneAlt (Case _ _ ((pat,alt):alts@(_:_)))
+  | all ((== alt) . snd) alts
   , (tvs,xs) <- patIds pat
   , (coerce tvs ++ coerce xs) `localVarsDoNotOccurIn` alt
   = changed alt
