@@ -206,26 +206,26 @@ ghcTypeToHWType iw = go
 
         "Clash.Sized.Internal.BitVector.Bit" -> returnN Bit
 
-        "Clash.Sized.Internal.BitVector.BitVector" -> do
-          n <- liftE (tyNatSize m (head args))
+        "Clash.Sized.Internal.BitVector.BitVector" | n0:_ <- args -> do
+          n <- liftE (tyNatSize m n0)
           case n of
             0 -> returnN (Void (Just (BitVector (fromInteger n))))
             _ -> returnN (BitVector (fromInteger n))
 
-        "Clash.Sized.Internal.Index.Index" -> do
-          n <- liftE (tyNatSize m (head args))
+        "Clash.Sized.Internal.Index.Index" | n0:_ <- args -> do
+          n <- liftE (tyNatSize m n0)
           if n < 2
              then returnN (Void (Just (Index (fromInteger n))))
              else returnN (Index (fromInteger n))
 
-        "Clash.Sized.Internal.Signed.Signed" -> do
-          n <- liftE (tyNatSize m (head args))
+        "Clash.Sized.Internal.Signed.Signed" | n0:_ <- args -> do
+          n <- liftE (tyNatSize m n0)
           if n == 0
              then returnN (Void (Just (Signed (fromInteger n))))
              else returnN (Signed (fromInteger n))
 
-        "Clash.Sized.Internal.Unsigned.Unsigned" -> do
-          n <- liftE (tyNatSize m (head args))
+        "Clash.Sized.Internal.Unsigned.Unsigned" | n0:_ <- args -> do
+          n <- liftE (tyNatSize m n0)
           if n == 0
              then returnN (Void (Just (Unsigned (fromInteger n))))
              else returnN (Unsigned (fromInteger n))
@@ -280,10 +280,10 @@ ghcTypeToHWType iw = go
 
         "String" -> returnN String
         "GHC.Prim.Addr#" -> returnN String
-        "GHC.Types.[]" -> case tyView (head args) of
+        "GHC.Types.[]" | a0:_ <- args -> case tyView a0 of
           (TyConApp (nameOcc -> "GHC.Types.Char") []) -> returnN String
           _ -> throwE $ "Can't translate type: " ++ showPpr ty
-        "GHC.Types.List" -> case tyView (head args) of
+        "GHC.Types.List" | a0:_ <- args -> case tyView a0 of
           (TyConApp (nameOcc -> "GHC.Types.Char") []) -> returnN String
           _ -> throwE $ "Can't translate type: " ++ showPpr ty
 
@@ -291,8 +291,8 @@ ghcTypeToHWType iw = go
         -- never end up being used in the generated HDL.
         "GHC.Stack.Types.CallStack" -> returnN (Void Nothing)
 
-        "Clash.Explicit.SimIO.SimIO" ->
-          ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m (head args)
+        "Clash.Explicit.SimIO.SimIO" | a0:_ <- args ->
+          ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m a0
 
         "Clash.Explicit.SimIO.File" -> returnN FileType
 

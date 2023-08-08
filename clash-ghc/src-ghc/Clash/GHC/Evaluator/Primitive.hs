@@ -3751,16 +3751,16 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 -- - Splitting
   "Clash.Sized.Vector.splitAt" -- :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
     | isSubj
-    , DC snatDc (Right mTy:_) <- head args
+    , (DC snatDc (Right mTy:_)):_ <- args
     , Right m <- runExcept (tyNatSize tcm mTy)
     -> let _:nTy:aTy:_ = tys
            -- Get the tuple data-constructor
            ty1 = piResultTys tcm ty tys
-           (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty1
+           (_,tyView -> TyConApp tupTcNm tyArgs@(tyArg:_)) = splitFunForallTy ty1
            (Just tupTc)       = UniqMap.lookup tupTcNm tcm
            [tupDc]            = tyConDataCons tupTc
            -- Get the vector data-constructors
-           TyConApp vecTcNm _ = tyView (head tyArgs)
+           TyConApp vecTcNm _ = tyView tyArg
            Just vecTc         = UniqMap.lookup vecTcNm tcm
            [nilCon,consCon]   = tyConDataCons vecTc
            -- Recursive call to @splitAt@
@@ -3870,7 +3870,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 -- - Concatenation
   "Clash.Sized.Vector.++" -- :: Vec n a -> Vec m a -> Vec (n + m) a
     | isSubj
-    , DC dc vArgs <- head args
+    , (DC dc vArgs):_ <- args
     , Right nTy : Right aTy : _ <- vArgs
     , Right n <- runExcept (tyNatSize tcm nTy)
     -> case n of
@@ -4283,11 +4283,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , Right m <- runExcept (tyNatSize tcm mTy)
     -> let -- Get the tuple data-constructor
            ty1 = piResultTys tcm ty tys
-           (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty1
+           (_,tyView -> TyConApp tupTcNm tyArgs@(tyArg:_)) = splitFunForallTy ty1
            (Just tupTc)       = UniqMap.lookup tupTcNm tcm
            [tupDc]            = tyConDataCons tupTc
            -- Get the vector data-constructors
-           TyConApp vecTcNm _ = tyView (head tyArgs)
+           TyConApp vecTcNm _ = tyView tyArg
            Just vecTc         = UniqMap.lookup vecTcNm tcm
            [nilCon,consCon]   = tyConDataCons vecTc
            -- Recursive call to @splitAt@

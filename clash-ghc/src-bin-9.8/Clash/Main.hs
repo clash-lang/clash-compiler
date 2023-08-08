@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Main (main) where
+module Clash.Main (defaultMain, defaultMainWithAction) where
 
 -- The official GHC API
 import qualified GHC
@@ -39,7 +39,7 @@ import GHC.Platform.Ways
 import GHC.Platform.Host
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
-import GHCi.UI              ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
+import Clash.GHCi.UI        ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
 
 import GHC.Runtime.Loader   ( loadFrontendPlugin, initializeSessionPlugins )
@@ -91,7 +91,7 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except (throwE, runExceptT)
 import Data.Char
-import Data.List ( isPrefixOf, partition, intercalate, (\\) )
+import Data.List ( partition, intercalate, (\\) )
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Data.Maybe
@@ -100,6 +100,28 @@ import GHC.ResponseFile (expandResponse)
 import Data.Bifunctor
 import GHC.Data.Graph.Directed
 import qualified Data.List.NonEmpty as NE
+
+-- clash additions
+import           Paths_clash_ghc
+import           Clash.GHCi.UI (makeHDL)
+import           Control.Monad.Catch (catch)
+import           Data.List (nub)
+import           Data.Proxy
+import           Data.IORef (IORef, newIORef, readIORef, modifyIORef')
+import qualified Data.Version (showVersion)
+import           GHC.Data.EnumSet as EnumSet
+import           GHC.Driver.Session as Session
+
+import           Clash.Backend (Backend)
+import           Clash.Backend.SystemVerilog (SystemVerilogState)
+import           Clash.Backend.VHDL    (VHDLState)
+import           Clash.Backend.Verilog (VerilogState)
+import           Clash.Driver.Types
+  (ClashOpts (..), defClashOpts)
+import           Clash.GHC.ClashFlags
+import           Clash.Util (clashLibVersion)
+import           Clash.GHC.LoadModules (ghcLibDir, setWantedLanguageExtensions)
+import           Clash.GHC.Util (handleClashException)
 
 -----------------------------------------------------------------------------
 -- ToDo:
@@ -113,8 +135,11 @@ import qualified Data.List.NonEmpty as NE
 -----------------------------------------------------------------------------
 -- GHC's command-line interface
 
-main :: IO ()
-main = do
+defaultMain :: [String] -> IO ()
+defaultMain = defaultMainWithAction (return ())
+
+defaultMainWithAction :: Ghc () -> [String] -> IO ()
+defaultMainWithAction startAction = flip withArgs $ do
    hSetBuffering stdout LineBuffering
    hSetBuffering stderr LineBuffering
 
@@ -123,14 +148,15 @@ main = do
     -- 1. extract the -B flag from the args
     argv0 <- getArgs
 
-    let (minusB_args, argv1) = partition ("-B" `isPrefixOf`) argv0
-        mbMinusB | null minusB_args = Nothing
-                 | otherwise = Just (drop 2 (last minusB_args))
+    let argv1 = map (mkGeneralLocated "on the commandline") argv0
+    libDir <- ghcLibDir
 
-    let argv2 = map (mkGeneralLocated "on the commandline") argv1
+    r <- newIORef defClashOpts
+    (argv2, clashFlagWarnings) <- parseClashFlags r argv1
 
     -- 2. Parse the "mode" flags (--make, --interactive etc.)
-    (mode, units, argv3, flagWarnings) <- parseModeFlags argv2
+    (mode, units, argv3, modeFlagWarnings) <- parseModeFlags argv2
+    let flagWarnings = modeFlagWarnings ++ clashFlagWarnings
 
     -- If all we want to do is something like showing the version number
     -- then do it now, before we start a GHC session etc. This makes
@@ -143,30 +169,42 @@ main = do
     case mode of
         Left preStartupMode ->
             do case preStartupMode of
-                   ShowSupportedExtensions   -> showSupportedExtensions mbMinusB
+                   ShowSupportedExtensions   -> showSupportedExtensions (Just libDir)
                    ShowVersion               -> showVersion
                    ShowNumVersion            -> putStrLn cProjectVersion
-                   ShowOptions isInteractive -> showOptions isInteractive
+                   ShowOptions isInteractive -> showOptions isInteractive r
         Right postStartupMode ->
             -- start our GHC session
-            GHC.runGhc mbMinusB $ do
+            GHC.runGhc (Just libDir) $ do
 
             dflags <- GHC.getSessionDynFlags
+            let dflagsExtra = setWantedLanguageExtensions dflags
+
+                ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
+                ghcTyLitExtrPlugin = GHC.mkModuleName "GHC.TypeLits.Extra.Solver"
+                ghcTyLitKNPlugin   = GHC.mkModuleName "GHC.TypeLits.KnownNat.Solver"
+                dflagsExtra1 = dflagsExtra
+                                  { Session.pluginModNames = nub $
+                                      ghcTyLitNormPlugin : ghcTyLitExtrPlugin :
+                                      ghcTyLitKNPlugin :
+                                      Session.pluginModNames dflagsExtra
+                                  }
 
             case postStartupMode of
                 Left preLoadMode ->
                     liftIO $ do
                         case preLoadMode of
-                            ShowInfo               -> showInfo dflags
-                            ShowGhcUsage           -> showGhcUsage  dflags
-                            ShowGhciUsage          -> showGhciUsage dflags
-                            PrintWithDynFlags f    -> putStrLn (f dflags)
+                            ShowInfo               -> showInfo dflagsExtra1
+                            ShowGhcUsage           -> showGhcUsage  dflagsExtra1
+                            ShowGhciUsage          -> showGhciUsage dflagsExtra1
+                            PrintWithDynFlags f    -> putStrLn (f dflagsExtra1)
                 Right postLoadMode ->
-                    main' postLoadMode units dflags argv3 flagWarnings
+                    main' postLoadMode units dflagsExtra1 argv3 flagWarnings startAction r
 
 main' :: PostLoadMode -> [String] -> DynFlags -> [Located String] -> [Warn]
+      -> Ghc () -> IORef ClashOpts
       -> Ghc ()
-main' postLoadMode units dflags0 args flagWarnings = do
+main' postLoadMode units dflags0 args flagWarnings startAction clashOpts = do
   let args' = case postLoadMode of
                 DoRun -> takeWhile (\arg -> unLoc arg /= "--") args
                 _     -> args
@@ -185,6 +223,9 @@ main' postLoadMode units dflags0 args flagWarnings = do
                DoBackpack      -> (CompManager, dflt_backend, LinkBinary)
                DoMkDependHS    -> (MkDepend,    dflt_backend, LinkBinary)
                DoAbiHash       -> (OneShot,     dflt_backend, LinkBinary)
+               DoVHDL          -> (CompManager, noBackend,     NoLink)
+               DoVerilog       -> (CompManager, noBackend,     NoLink)
+               DoSystemVerilog -> (CompManager, noBackend,     NoLink)
                _               -> (OneShot,     dflt_backend, LinkBinary)
 
   let dflags1 = dflags0{ ghcMode   = mode,
@@ -224,6 +265,10 @@ main' postLoadMode units dflags0 args flagWarnings = do
         -- Leftover ones are presumably files
   (dflags3, fileish_args, dynamicFlagWarnings) <-
       GHC.parseDynamicFlags logger2 dflags2 args'
+
+  -- Propagate -Werror to Clash
+  liftIO . modifyIORef' clashOpts $ \opts ->
+    opts { opt_werror = EnumSet.member Opt_WarnIsError (generalFlags dflags3) }
 
   let dflags4 = if backendNeedsFullWays bcknd &&
                    not (gopt Opt_ExternalInterpreter dflags3)
@@ -283,6 +328,8 @@ main' postLoadMode units dflags0 args flagWarnings = do
   handleSourceError (\e -> do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
+    clashOpts' <- liftIO (readIORef clashOpts)
+    let clash fun = catch (fun startAction clashOpts srcs) (handleClashException dflags6 clashOpts')
     case postLoadMode of
        ShowInterface f        -> liftIO $ showIface logger
                                                     (hsc_dflags hsc_env)
@@ -292,30 +339,33 @@ main' postLoadMode units dflags0 args flagWarnings = do
        DoMake                 -> doMake units srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)
        StopBefore p           -> liftIO (oneShot hsc_env p srcs)
-       DoInteractive          -> ghciUI units srcs Nothing
-       DoEval exprs           -> ghciUI units srcs $ Just $ reverse exprs
-       DoRun                  -> doRun units srcs args
+       DoInteractive          -> ghciUI clashOpts units srcs Nothing
+       DoEval exprs           -> ghciUI clashOpts units srcs $ Just $ reverse exprs
+       DoRun                  -> doRun clashOpts units srcs args
        DoAbiHash              -> abiHash (map fst srcs)
        ShowPackages           -> liftIO $ showUnits hsc_env
        DoFrontend f           -> doFrontend f srcs
        DoBackpack             -> doBackpack (map fst srcs)
+       DoVHDL                 -> clash makeVHDL
+       DoVerilog              -> clash makeVerilog
+       DoSystemVerilog        -> clash makeSystemVerilog
 
   liftIO $ dumpFinalStats logger
 
-doRun :: [String] -> [(FilePath, Maybe Phase)] -> [Located String] -> Ghc ()
-doRun units srcs args = do
+doRun ::IORef ClashOpts -> [String] -> [(FilePath, Maybe Phase)] -> [Located String] -> Ghc ()
+doRun clashOpts units srcs args = do
     dflags <- getDynFlags
     let mainFun = fromMaybe "main" (mainFunIs dflags)
-    ghciUI units srcs (Just ["System.Environment.withArgs " ++ show args' ++ " (Control.Monad.void " ++ mainFun ++ ")"])
+    ghciUI clashOpts units srcs (Just ["System.Environment.withArgs " ++ show args' ++ " (Control.Monad.void " ++ mainFun ++ ")"])
   where
     args' = drop 1 $ dropWhile (/= "--") $ map unLoc args
 
-ghciUI :: [String] -> [(FilePath, Maybe Phase)] -> Maybe [String] -> Ghc ()
+ghciUI :: IORef ClashOpts -> [String] -> [(FilePath, Maybe Phase)] -> Maybe [String] -> Ghc ()
 #if !defined(HAVE_INTERNAL_INTERPRETER)
-ghciUI _ _ _ =
+ghciUI _ _ _ _ =
   throwGhcException (CmdLineError "not built for interactive use")
 #else
-ghciUI units srcs maybe_expr = do
+ghciUI clashOpts units srcs maybe_expr = do
   hs_srcs <- case NE.nonEmpty units of
     Just ne_units -> do
       initMulti ne_units
@@ -325,7 +375,7 @@ ghciUI units srcs maybe_expr = do
         _  -> do
           s <- initMake srcs
           return $ map (uncurry (,Nothing,)) s
-  interactiveUI defaultGhciSettings hs_srcs maybe_expr
+  interactiveUI (defaultGhciSettings clashOpts) hs_srcs maybe_expr
 #endif
 
 
@@ -490,15 +540,22 @@ data PostLoadMode
   | DoAbiHash               -- ghc --abi-hash
   | ShowPackages            -- ghc --show-packages
   | DoFrontend ModuleName   -- ghc --frontend Plugin.Module
+  | DoVHDL                  -- ghc --vhdl
+  | DoVerilog               -- ghc --verilog
+  | DoSystemVerilog         -- ghc --systemverilog
 
 doMkDependHSMode, doMakeMode, doInteractiveMode, doRunMode,
-  doAbiHashMode, showUnitsMode :: Mode
+  doAbiHashMode, showUnitsMode, doVHDLMode, doVerilogMode,
+  doSystemVerilogMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
 doInteractiveMode = mkPostLoadMode DoInteractive
 doRunMode = mkPostLoadMode DoRun
 doAbiHashMode = mkPostLoadMode DoAbiHash
 showUnitsMode = mkPostLoadMode ShowPackages
+doVHDLMode = mkPostLoadMode DoVHDL
+doVerilogMode = mkPostLoadMode DoVerilog
+doSystemVerilogMode = mkPostLoadMode DoSystemVerilog
 
 showInterfaceMode :: FilePath -> Mode
 showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
@@ -550,6 +607,9 @@ needsInputsMode :: PostLoadMode -> Bool
 needsInputsMode DoMkDependHS    = True
 needsInputsMode (StopBefore _)  = True
 needsInputsMode DoMake          = True
+needsInputsMode DoVHDL          = True
+needsInputsMode DoVerilog       = True
+needsInputsMode DoSystemVerilog = True
 needsInputsMode _               = False
 
 -- True if we are going to attempt to link in this mode.
@@ -567,6 +627,9 @@ isCompManagerMode DoRun         = True
 isCompManagerMode DoMake        = True
 isCompManagerMode DoInteractive = True
 isCompManagerMode (DoEval _)    = True
+isCompManagerMode DoVHDL        = True
+isCompManagerMode DoVerilog     = True
+isCompManagerMode DoSystemVerilog = True
 isCompManagerMode _             = False
 
 -- -----------------------------------------------------------------------------
@@ -652,6 +715,9 @@ mode_flags =
   , defFlag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
   , defFlag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
   , defFlag "-frontend"    (SepArg   (\s -> setMode (doFrontendMode s) "-frontend"))
+  , defFlag "-vhdl"        (PassFlag (setMode doVHDLMode))
+  , defFlag "-verilog"     (PassFlag (setMode doVerilogMode))
+  , defFlag "-systemverilog" (PassFlag (setMode doSystemVerilogMode))
   ]
 
 addUnit :: String -> String -> EwM ModeM ()
@@ -994,14 +1060,20 @@ showSupportedExtensions m_top_dir = do
   mapM_ putStrLn $ supportedLanguagesAndExtensions arch_os
 
 showVersion :: IO ()
-showVersion = putStrLn (cProjectName ++ ", version " ++ cProjectVersion)
+showVersion = putStrLn $ concat [ "Clash, version "
+                                , Data.Version.showVersion Paths_clash_ghc.version
+                                , " (using clash-lib, version: "
+                                , Data.Version.showVersion clashLibVersion
+                                , ")"
+                                ]
 
-showOptions :: Bool -> IO ()
-showOptions isInteractive = putStr (unlines availableOptions)
+showOptions :: Bool -> IORef ClashOpts -> IO ()
+showOptions isInteractive = putStr . unlines . availableOptions
     where
-      availableOptions = concat [
+      availableOptions opts = concat [
         flagsForCompletion isInteractive,
-        map ('-':) (getFlagNames mode_flags)
+        map ('-':) (getFlagNames mode_flags),
+        map ('-':) (getFlagNames (flagsClash opts))
         ]
       getFlagNames opts         = map flagName opts
 
@@ -1129,6 +1201,29 @@ abiHash strs = do
   f <- fingerprintBinMem bh
 
   putStrLn (showPpr dflags f)
+
+-----------------------------------------------------------------------------
+-- HDL Generation
+
+makeHDL'
+  :: forall backend
+   . Clash.Backend.Backend backend
+  => Proxy backend
+  -> Ghc ()
+  -> IORef ClashOpts
+  -> [(String,Maybe Phase)]
+  -> Ghc ()
+makeHDL' _     _           _ []   = throwGhcException (CmdLineError "No input files")
+makeHDL' proxy startAction r srcs = makeHDL proxy startAction r $ fmap fst srcs
+
+makeVHDL :: Ghc () -> IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
+makeVHDL = makeHDL' (Proxy @VHDLState)
+
+makeVerilog :: Ghc () -> IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
+makeVerilog = makeHDL' (Proxy @VerilogState)
+
+makeSystemVerilog :: Ghc () -> IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
+makeSystemVerilog = makeHDL' (Proxy @SystemVerilogState)
 
 -- -----------------------------------------------------------------------------
 -- Util

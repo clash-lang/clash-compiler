@@ -121,7 +121,9 @@ common common-options
 library
   import:             common-options
   HS-Source-Dirs:     src-ghc, src-bin-common
-  if impl(ghc >= 9.6.0)
+  if impl(ghc >= 9.8.0)
+    HS-Source-Dirs: src-bin-9.8
+  elif impl(ghc >= 9.6.0)
     HS-Source-Dirs: src-bin-9.6
   elif impl(ghc >= 9.4.0)
     HS-Source-Dirs: src-bin-9.4
@@ -237,7 +239,6 @@ library
                       Clash.GHCi.UI
                       Clash.GHCi.UI.Info
                       Clash.GHCi.UI.Monad
-                      Clash.GHCi.UI.Tags
 
                       Clash.GHC.ClashFlags
                       Clash.GHC.GHC2Core
@@ -246,3 +247,8 @@ library
                       Paths_clash_ghc
   if impl(ghc >= 8.8.0)
     Other-Modules:    Clash.GHCi.Util
+
+  if impl(ghc >= 9.8.0)
+    Other-Modules:    Clash.GHCi.UI.Exception
+  else
+    Other-Modules:    Clash.GHCi.UI.Tags

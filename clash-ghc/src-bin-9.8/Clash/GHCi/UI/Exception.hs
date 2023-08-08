@@ -1,7 +1,8 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-module GHCi.UI.Exception(printGhciException, GHCiMessage(..)) where
+{-# LANGUAGE NoImplicitPrelude #-}
+module Clash.GHCi.UI.Exception(printGhciException, GHCiMessage(..)) where
 
 import GHC.Prelude
 

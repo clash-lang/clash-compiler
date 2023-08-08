@@ -36,7 +36,7 @@ import           Clash.Util                      (ClashException(..), pkgIdFromT
 import qualified Clash.Util.Interpolate          as I
 import           Control.Arrow                   (first)
 import           Control.Exception               (SomeException, throw)
-import           Control.Monad                   (forM, when)
+import           Control.Monad                   (forM, join, when)
 import           Data.List.Extra                 (nubSort)
 import           Control.Exception               (throwIO)
 #if MIN_VERSION_ghc(9,0,0)
@@ -53,7 +53,8 @@ import qualified Data.HashMap.Strict             as HashMap
 import           Data.Typeable                   (Typeable)
 import           Data.List                       (foldl', nub, find)
 import qualified Data.Map                        as Map
-import           Data.Maybe                      (catMaybes, fromMaybe, mapMaybe)
+import           Data.Maybe
+  (catMaybes, fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
 import qualified Data.Time.Clock                 as Clock
@@ -678,7 +679,8 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
 #endif
 
         famToDomain  = fromMaybe (error "KnownConf: Expected Symbol at LHS of type family")
-                         . fmap fsToText . Type.isStrLitTy . head . FamInstEnv.fi_tys
+                         . join . fmap (fmap fsToText) . fmap Type.isStrLitTy
+                         . listToMaybe . FamInstEnv.fi_tys
         famToConf    = unpackKnownConf . FamInstEnv.fi_rhs
 
         knownConfNms = fmap famToDomain knownConfs
