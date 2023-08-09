@@ -9,7 +9,6 @@ import Data.Bits (complement)
 import Data.List (intercalate, zip5)
 import Control.Exception (SomeException, try)
 import Control.Monad (void)
-import Control.Monad.IO.Class (liftIO)
 import Foreign.C.String (newCString)
 import Foreign.Marshal.Alloc (free)
 
@@ -20,7 +19,6 @@ import Clash.Prelude
   , low, high, pack, unpack, resize
   )
 
-import Clash.FFI.Monad
 import Clash.FFI.VPI.Info
 import Clash.FFI.VPI.IO
 import Clash.FFI.VPI.Callback
@@ -49,7 +47,7 @@ foreign export ccall "clash_ffi_main"
   ffiMain :: IO ()
 
 ffiMain :: IO ()
-ffiMain = runSimAction $ do
+ffiMain = do
   --------------------------
   -- print simulator info --
   --------------------------
@@ -122,7 +120,7 @@ ffiMain = runSimAction $ do
     4 -> "<=>" -- mixed input-output
     _ -> "x"   -- no direction
 
-assignInputs :: (?state :: State) => SimAction ()
+assignInputs :: (?state :: State) => IO ()
 assignInputs = do
   SimTime time <- receiveTime Sim $ Just top
 
@@ -163,7 +161,7 @@ assignInputs = do
     sendValue port (BitVectorVal SNat $ pack v) $ InertialDelay $ SimTime 0
     return $ Just v
 
-readOutputs :: (?state :: State) => SimAction ()
+readOutputs :: (?state :: State) => IO ()
 readOutputs = do
   SimTime time <- receiveTime Sim $ Just top
   receiveValue VectorFmt dataOut >>= \case
@@ -174,14 +172,14 @@ readOutputs = do
         }
     _ -> return ()
 
-  if (steps > 0) then do
+  if steps > 0 then do
     let ?state = ?state { steps = steps - 1 }
     nextCB ReadWriteSynch 1 assignInputs
   else do
     putStrLn ""
     putStrLn "[ Simulation done ]"
 
-    liftIO $ void $ try @SomeException $ runSimAction
+    void $ try @SomeException
       $ controlSimulator $ Finish NoDiagnostics
 
  where
@@ -226,31 +224,31 @@ updates = Updates 0 Nothing Nothing Nothing Nothing Nothing
 nextCB ::
   (Maybe Object -> Time -> CallbackReason) ->
   Int64 ->
-  SimAction () ->
-  SimAction ()
+  IO () ->
+  IO ()
 nextCB reason time action =
   void $ registerCallback
     CallbackInfo
       { cbReason  = reason Nothing (SimTime time)
-      , cbRoutine = const (runSimAction action >> return 0)
+      , cbRoutine = const (action >> return 0)
       , cbIndex   = 0
       , cbData    = B.empty
       }
 
 getByName ::
   (Coercible a Object, Show a, Typeable a, Coercible Object b) =>
-  Maybe a -> B.ByteString -> SimCont o b
+  Maybe a -> B.ByteString -> IO b
 getByName m name = do
-  ref <- liftIO $ newCString $ B.unpack name
+  ref <- newCString $ B.unpack name
   obj <- getChild ref m
-  liftIO $ free ref
+  free ref
   return obj
 
-putStr :: String -> SimAction ()
+putStr :: String -> IO ()
 putStr = simPutStr . B.pack
 
-putStrLn :: String -> SimAction ()
+putStrLn :: String -> IO ()
 putStrLn = simPutStrLn . B.pack
 
-print :: Show a => a -> SimAction ()
+print :: Show a => a -> IO ()
 print = simPutStrLn . B.pack . show

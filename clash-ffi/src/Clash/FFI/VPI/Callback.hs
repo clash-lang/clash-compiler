@@ -6,7 +6,6 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
@@ -22,15 +21,20 @@ module Clash.FFI.VPI.Callback
   , removeCallback
 #ifndef IVERILOG
   , getCallbackInfo
+  , withCallbackInfo
+  , unsafeReceiveCallbackInfo
+  , receiveCallbackInfo
 #endif
   , module Clash.FFI.VPI.Callback.Reason
   ) where
 
-import           Control.Exception (Exception)
+import           Control.Exception (Exception, throwIO)
 import qualified Control.Monad as Monad (unless)
-import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CInt(..))
+#ifndef IVERILOG
+import qualified Foreign.Marshal.Alloc as FFI (alloca, malloc)
+#endif
 import           Foreign.Ptr (FunPtr, Ptr)
 import qualified Foreign.Ptr as FFI (castPtr)
 import           Foreign.Storable (Storable)
@@ -38,8 +42,6 @@ import           Foreign.Storable.Generic (GStorable)
 import           GHC.Generics (Generic)
 import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
 
-import           Clash.FFI.Monad (SimCont)
-import qualified Clash.FFI.Monad as Sim
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Callback.Reason
 import           Clash.FFI.VPI.Object
@@ -82,22 +84,21 @@ foreign import ccall "wrapper"
 type instance CRepr (CallbackInfo _) = CCallbackInfo
 
 instance (UnsafeSend extra, CRepr extra ~ Ptr a) => UnsafeSend (CallbackInfo extra) where
-  unsafeSend CallbackInfo{..} = do
-    (creason, cobject, ctime, cvalue) <- unsafeSend cbReason
-    croutine <- IO.liftIO (sendRoutine cbRoutine)
-    let cindex = fromIntegral cbIndex
-    bytes <- FFI.castPtr <$> unsafeSend cbData
-
-    pure (CCallbackInfo creason croutine cobject ctime cvalue cindex bytes)
+  unsafeSend CallbackInfo{..} f =
+    unsafeSend cbReason $ \(ccbReason, ccbObject, ccbTime, ccbValue) -> do
+      ccbRoutine <- sendRoutine cbRoutine
+      let ccbIndex = fromIntegral cbIndex
+      unsafeSend cbData $ \ptr -> do
+        let ccbData = FFI.castPtr ptr
+        f CCallbackInfo{..}
 
 instance (Send extra, CRepr extra ~ Ptr a) => Send (CallbackInfo extra) where
   send CallbackInfo{..} = do
-    (creason, cobject, ctime, cvalue) <- send cbReason
-    croutine <- IO.liftIO (sendRoutine cbRoutine)
-    let cindex = fromIntegral cbIndex
-    bytes <- FFI.castPtr <$> send cbData
-
-    pure (CCallbackInfo creason croutine cobject ctime cvalue cindex bytes)
+    (ccbReason, ccbObject, ccbTime, ccbValue) <- send cbReason
+    ccbRoutine <- sendRoutine cbRoutine
+    let ccbIndex = fromIntegral cbIndex
+    ccbData <- FFI.castPtr <$> send cbData
+    pure CCallbackInfo{..}
 
 foreign import ccall "dynamic"
   receiveRoutine
@@ -106,21 +107,19 @@ foreign import ccall "dynamic"
 
 instance (UnsafeReceive extra, CRepr extra ~ Ptr a) => UnsafeReceive (CallbackInfo extra) where
   unsafeReceive CCallbackInfo{..} = do
-    reason <- unsafeReceive (ccbReason, ccbObject, ccbTime, ccbValue)
-    let routine = receiveRoutine ccbRoutine
-    let index = fromIntegral ccbIndex
-    extra <- unsafeReceive (FFI.castPtr ccbData)
-
-    pure (CallbackInfo reason routine index extra)
+    cbReason <- unsafeReceive (ccbReason, ccbObject, ccbTime, ccbValue)
+    let cbRoutine = receiveRoutine ccbRoutine
+    let cbIndex = fromIntegral ccbIndex
+    cbData <- unsafeReceive $ FFI.castPtr ccbData
+    pure CallbackInfo{..}
 
 instance (Receive extra, CRepr extra ~ Ptr a) => Receive (CallbackInfo extra) where
   receive CCallbackInfo{..} = do
-    reason <- receive (ccbReason, ccbObject, ccbTime, ccbValue)
-    let routine = receiveRoutine ccbRoutine
-    let index = fromIntegral ccbIndex
-    extra <- receive (FFI.castPtr ccbData)
-
-    pure (CallbackInfo reason routine index extra)
+    cbReason <- receive (ccbReason, ccbObject, ccbTime, ccbValue)
+    let cbRoutine = receiveRoutine ccbRoutine
+    let cbIndex = fromIntegral ccbIndex
+    cbData <- receive $ FFI.castPtr ccbData
+    pure CallbackInfo{..}
 
 foreign import ccall "vpi_user.h vpi_register_cb"
   c_vpi_register_cb :: Ptr CCallbackInfo -> IO Callback
@@ -143,14 +142,13 @@ newtype Callback
 -- the callback is triggered, and what data it has available.
 --
 registerCallback
-  :: forall extra o
+  :: forall extra
    . UnsafeSend extra
   => CRepr extra ~ CString
   => CallbackInfo extra
-  -> SimCont o Callback
-registerCallback cb = do
-  ptr <- unsafePokeSend cb
-  IO.liftIO (c_vpi_register_cb ptr)
+  -> IO Callback
+registerCallback =
+  (`unsafePokeSend` c_vpi_register_cb)
 
 -- | An exception thrown when VPI could not remove a callback from the running
 -- simulator. If this is thrown the callback may still be active in simulation.
@@ -174,14 +172,11 @@ foreign import ccall "vpi_user.h vpi_remove_cb"
 -- | Remove a callback from the simulator. Removing a callback also frees the
 -- callback object, so 'freeObject' does not need to be called.
 --
-removeCallback :: forall o. HasCallStack => Callback -> SimCont o ()
+removeCallback :: HasCallStack => Callback -> IO ()
 removeCallback cb = do
-  status <- IO.liftIO (c_vpi_remove_cb cb)
-
+  status <- c_vpi_remove_cb cb
   Monad.unless status $
-    Sim.throw (CouldNotUnregisterCallback cb callStack)
-
-  pure ()
+    throwIO $ CouldNotUnregisterCallback cb callStack
 
 -- iverilog just decided not to implement this VPI call...
 #ifndef IVERILOG
@@ -189,17 +184,22 @@ foreign import ccall "vpi_user.h vpi_get_cb_info"
   c_vpi_get_cb_info :: Callback -> Ptr CCallbackInfo -> IO ()
 
 -- | Get the low-level representation of the information for the given callback
--- object. This can be converted to the high-level representation using
--- 'Receive'. If only the high-level representation is needed then consider
--- using 'receiveCallbackInfo' or 'unsafeReceiveCallbackInfo' instead.
+-- object, which is allocated on the heap. This can be converted to the high-level
+-- representation using 'Receive'. If only the high-level representation is needed
+-- then consider using 'receiveCallbackInfo' or 'unsafeReceiveCallbackInfo' instead.
 --
-getCallbackInfo
-  :: forall o
-   . SimCont o (Ptr CCallbackInfo)
-  -> Callback
-  -> SimCont o (Ptr CCallbackInfo)
-getCallbackInfo alloc callback =
-  Sim.withNewPtr alloc (c_vpi_get_cb_info callback)
+getCallbackInfo :: Callback -> IO (Ptr CCallbackInfo)
+getCallbackInfo callback =
+  FFI.malloc >>= \ptr -> c_vpi_get_cb_info callback ptr >> return ptr
+
+-- | Get the low-level representation of the information for the given callback
+-- object, which is allocated on the stack. This can be converted to the high-level
+-- representation using 'Receive'. If only the high-level representation is needed
+-- then consider using 'receiveCallbackInfo' or 'unsafeReceiveCallbackInfo' instead.
+--
+withCallbackInfo :: Callback -> (Ptr CCallbackInfo -> IO a) -> IO a
+withCallbackInfo callback f =
+  FFI.alloca $ \ptr -> c_vpi_get_cb_info callback ptr >> f ptr
 
 -- | Get the high-level representation of the information for the given
 -- callback object. The value is unsafely read, meaning it may be corrupted if
@@ -211,13 +211,13 @@ getCallbackInfo alloc callback =
 -- For more information about safety, see 'Receive' and 'UnsafeReceive'.
 --
 unsafeReceiveCallbackInfo
-  :: forall extra a o
+  :: forall extra a
    . UnsafeReceive extra
   => CRepr extra ~ Ptr a
   => Callback
-  -> SimCont o (CallbackInfo extra)
+  -> IO (CallbackInfo extra)
 unsafeReceiveCallbackInfo callback =
-  getCallbackInfo Sim.stackPtr callback >>= unsafeReceive
+  withCallbackInfo callback unsafePeekReceive
 
 -- | Get the high-level representation of the information for the given
 -- callback object. The value is safely read meaning it will not become
@@ -226,11 +226,11 @@ unsafeReceiveCallbackInfo callback =
 -- For more information about safety, see 'Receive' and 'UnsafeReceive'.
 --
 receiveCallbackInfo
-  :: forall extra a o
+  :: forall extra a
    . Receive extra
   => CRepr extra ~ Ptr a
   => Callback
-  -> SimCont o (CallbackInfo extra)
+  -> IO (CallbackInfo extra)
 receiveCallbackInfo callback =
-  getCallbackInfo Sim.stackPtr callback >>= receive
+  getCallbackInfo callback >>= peekReceive
 #endif

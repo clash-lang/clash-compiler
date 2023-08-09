@@ -7,7 +7,6 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -- Used to improve the performance of derived instances.
@@ -32,6 +31,7 @@ import           Data.ByteString (ByteString)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CDouble, CInt(..))
 import           Foreign.Ptr (Ptr)
+import qualified Foreign.Marshal.Alloc as FFI (alloca, malloc)
 import           Foreign.Storable as FFI (Storable(..))
 import           Foreign.Storable.Generic (GStorable)
 import           GHC.Generics (Generic)
@@ -42,7 +42,6 @@ import           Clash.Promoted.Nat (SNat(..), snatProxy, snatToNum)
 import           Clash.Sized.BitVector (Bit, BitVector)
 import           Clash.Sized.Signed (Signed)
 
-import qualified Clash.FFI.Monad as Sim (heapPtr, stackPtr, withNewPtr)
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Object.Time
 import           Clash.FFI.VPI.Object.Value.Delay
@@ -146,6 +145,7 @@ instance Storable CValue where
     CTimeVal time ->
       FFI.pokeByteOff ptr 0 TimeFmt *> FFI.pokeByteOff ptr 8 time
 
+-- | A 'CValue' packed together with it's size.
 data CValueSized = CValueSized
   { cvsValue :: CValue
   , cvsSize :: CInt
@@ -171,84 +171,85 @@ data Value where
 
 instance Show Value where
   show = \case
-    BitVal bit -> show bit
+    BitVal bit           -> show bit
     BitVectorVal SNat bv -> show bv
-    IntVal int -> show int
-    RealVal real -> show real
-    StringVal _ str -> show str
-    TimeVal time -> show time
+    IntVal int           -> show int
+    RealVal real         -> show real
+    StringVal _ str      -> show str
+    TimeVal time         -> show time
 
 -- | A value is always sent with it's size, this is needed to properly decode
 -- some formats.
 type instance CRepr Value = CValueSized
 
 instance UnsafeSend Value where
-  unsafeSend = \case
+  unsafeSend v f = case v of
     BitVal bit -> do
       cvalue <- CScalarVal <$> send (bitToScalar bit)
-      pure (CValueSized cvalue 1)
+      f $ CValueSized cvalue 1
 
-    BitVectorVal n@SNat bv -> do
+    BitVectorVal n@SNat bv ->
 #if defined(VERILOG_2005) && defined(VPI_VECVAL)
-      cvalue <- CVectorVal <$> unsafeSend bv
-      pure (CValueSized cvalue (snatToNum n))
+      unsafeSend bv $ \x ->
+        f $ CValueSized (CVectorVal x) $ snatToNum n
 #else
       error "UnsafeSend.Value: BitVector without VPI_VECVAL"
 #endif
 
     IntVal int ->
-      pure (CValueSized (CIntVal (fromIntegral int)) 32)
+      f $ CValueSized (CIntVal (fromIntegral int)) 32
 
     RealVal real ->
 #if defined(IVERILOG)
-      pure (CValueSized (CRealVal (realToFrac real)) 1)
+      f $ CValueSized (CRealVal (realToFrac real)) 1
 #else
-      pure (CValueSized (CRealVal (realToFrac real)) 64)
+      f $ CValueSized (CRealVal (realToFrac real)) 64
 #endif
 
-    StringVal size str -> do
-      cvalue <- CStringVal <$> unsafeSend (ensureNullTerminated str)
-      pure (CValueSized cvalue (snatToNum size))
+    StringVal size str ->
+      unsafeSend (ensureNullTerminated str) $ \x ->
+        f $ CValueSized (CStringVal x) $ snatToNum size
 
     TimeVal time -> do
       ctime <- send @Time time
-      ptr <- fst <$> Sim.withNewPtr Sim.stackPtr (`FFI.poke` ctime)
-
-      pure (CValueSized (CTimeVal ptr) 64)
+      FFI.alloca $ \ptr -> do
+        FFI.poke ptr ctime
+        f $ CValueSized (CTimeVal ptr) 64
 
 instance Send Value where
   send = \case
     BitVal bit -> do
       cvalue <- CScalarVal <$> send (bitToScalar bit)
-      pure (CValueSized cvalue 1)
+      pure $ CValueSized cvalue 1
 
     BitVectorVal n@SNat bv -> do
 #if defined(VERILOG_2005) && defined(VPI_VECVAL)
       cvalue <- CVectorVal <$> send bv
-      pure (CValueSized cvalue (snatToNum n))
+      pure $ CValueSized cvalue $ snatToNum n
 #else
       error "Send.Value: BitVector without VPI_VECVAL"
 #endif
 
     IntVal int ->
-      pure (CValueSized (CIntVal (fromIntegral int)) 32)
+      pure $ CValueSized (CIntVal (fromIntegral int)) 32
 
     RealVal real ->
 #if defined(IVERILOG)
-      pure (CValueSized (CRealVal (realToFrac real)) 1)
+      pure $ CValueSized (CRealVal (realToFrac real)) 1
 #else
-      pure (CValueSized (CRealVal (realToFrac real)) 64)
+      pure $ CValueSized (CRealVal (realToFrac real)) 64
 #endif
 
     StringVal size str -> do
       cvalue <- CStringVal <$> send (ensureNullTerminated str)
-      pure (CValueSized cvalue (snatToNum size))
+      pure $ CValueSized cvalue $ snatToNum size
 
     TimeVal time -> do
       ctime <- send time
-      ptr <- fst <$> Sim.withNewPtr Sim.heapPtr (`FFI.poke` ctime)
+      ptr <- FFI.malloc
+      FFI.poke ptr ctime
 
-      pure (CValueSized (CTimeVal ptr) 64)
+      pure $ CValueSized (CTimeVal ptr) 64
 
 instance UnsafeReceive Value where
   unsafeReceive (CValueSized cvalue size) =
@@ -277,10 +278,10 @@ instance UnsafeReceive Value where
         BitVal . scalarToBit <$> receive scalar
 
       CIntVal int ->
-        pure (IntVal (fromIntegral int))
+        pure $ IntVal $ fromIntegral int
 
       CRealVal real ->
-        pure (RealVal (realToFrac real))
+        pure $ RealVal $ realToFrac real
 
       CStringVal str -> do
         case someNatVal (fromIntegral size) of
@@ -322,10 +323,10 @@ instance Receive Value where
         BitVal . scalarToBit <$> receive scalar
 
       CIntVal int ->
-        pure (IntVal (fromIntegral int))
+        pure $ IntVal $ fromIntegral int
 
       CRealVal real ->
-        pure (RealVal (realToFrac real))
+        pure $ RealVal $ realToFrac real
 
       CStringVal str -> do
         case someNatVal (fromIntegral size) of

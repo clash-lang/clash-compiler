@@ -16,13 +16,11 @@ module Clash.FFI.VPI.Object.Value.Parse
   , ImpreciseBitString(..)
   ) where
 
-import           Control.Exception (Exception)
+import           Control.Exception (Exception, throwIO)
 import qualified Control.Monad as Monad (foldM)
-import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.Bits (shiftL)
 import           Data.Char (toLower)
 import           Data.Function (fix)
-import           Data.Typeable (Typeable)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CInt)
 import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
@@ -34,8 +32,6 @@ import           Clash.Sized.BitVector (BitVector)
 import           Clash.XException (deepErrorX)
 
 import           Clash.FFI.View (peekCStringBound)
-import           Clash.FFI.Monad (SimCont)
-import qualified Clash.FFI.Monad as Sim
 import           Clash.FFI.VPI.Object.Value.Format (ValueFormat(..))
 
 -- | An exception thrown when the bit string to parse contains characters
@@ -46,8 +42,8 @@ data InvalidBitString
   deriving anyclass (Exception)
 
 instance Show InvalidBitString where
-  show (InvalidBitString f s c) =
-    mconcat
+  show = \case
+    InvalidBitString f s c -> mconcat
       [ "Invalid bit-string for format "
       , show f
       , ": "
@@ -59,24 +55,26 @@ instance Show InvalidBitString where
 -- TODO: These parsers are all defined in terms of replaceBit, however that
 -- may be a bottleneck in applications reading a lot of values / large values.
 
+-- | Parses a binary string (consisting only of the characters @0@, @1@, @x@,
+-- and @z@) and turns it into a 'BitVector'.
 parseBinStr
-  :: forall n o
+  :: forall n
    . HasCallStack
   => KnownNat n
   => CInt
   -> CString
-  -> SimCont o (BitVector n)
+  -> IO (BitVector n)
 parseBinStr bitSize bin = do
   let is = [bitSize - 1, bitSize - 2 .. 0]
-  str <- IO.liftIO $ peekCStringBound (fromEnum bitSize) bin
+  str <- peekCStringBound (fromEnum bitSize) bin
 
   let go acc (i, x) =
         case x of
-          '0' -> pure (replaceBit i 0 acc)
-          '1' -> pure (replaceBit i 1 acc)
+          '0' -> pure $ replaceBit i 0 acc
+          '1' -> pure $ replaceBit i 1 acc
           'x' -> pure acc
           'z' -> pure acc
-          _   -> Sim.throw (InvalidBitString BinStrFmt str callStack)
+          _   -> throwIO $ InvalidBitString BinStrFmt str callStack
 
   Monad.foldM go (deepErrorX "parseBinStr: undefined") (zip is str)
 
@@ -99,15 +97,15 @@ parseBinStr bitSize bin = do
 -- provide a way to recover. If this exception is caught, the catcher can
 -- amend the string, and call the supplied continuation to retry the parse.
 --
-data ImpreciseBitString n o = ImpreciseBitString
+data ImpreciseBitString n = ImpreciseBitString
   { sourceFormat :: ValueFormat
   , sourceString :: String
-  , retryParse :: String -> SimCont o (BitVector n)
+  , retryParse :: String -> IO (BitVector n)
   , parseStack :: CallStack
   }
   deriving anyclass (Exception)
 
-instance Show (ImpreciseBitString n o) where
+instance Show (ImpreciseBitString n) where
   show (ImpreciseBitString f s _ c) =
     mconcat
       [ "Loss of precision in bit string for format: "
@@ -120,34 +118,35 @@ instance Show (ImpreciseBitString n o) where
       , prettyCallStack c
       ]
 
+-- | Parses an octal string (consisting only of the characters @0@-@7@, @x@,
+-- and @z@) and turns it into a 'BitVector'.
 parseOctStr
-  :: forall n o
+  :: forall n
    . HasCallStack
   => KnownNat n
-  => Typeable o
   => CInt
   -> CString
-  -> SimCont o (BitVector n)
+  -> IO (BitVector n)
 parseOctStr bitSize oct = do
   let bound = bitSize `div` 3 + if bitSize `mod` 3 == 0 then 0 else 1
       is = [0, 3 .. bitSize - 1]
-  str <- IO.liftIO $ peekCStringBound (fromEnum bound) oct
+  str <- peekCStringBound (fromEnum bound) oct
 
   let go acc (i, x) =
         case x of
-          '0' -> pure (replaceSlice (0, 0, 0) i acc)
-          '1' -> pure (replaceSlice (0, 0, 1) i acc)
-          '2' -> pure (replaceSlice (0, 1, 0) i acc)
-          '3' -> pure (replaceSlice (0, 1, 1) i acc)
-          '4' -> pure (replaceSlice (1, 0, 0) i acc)
-          '5' -> pure (replaceSlice (1, 0, 1) i acc)
-          '6' -> pure (replaceSlice (1, 1, 0) i acc)
-          '7' -> pure (replaceSlice (1, 1, 1) i acc)
+          '0' -> pure $ replaceSlice (0, 0, 0) i acc
+          '1' -> pure $ replaceSlice (0, 0, 1) i acc
+          '2' -> pure $ replaceSlice (0, 1, 0) i acc
+          '3' -> pure $ replaceSlice (0, 1, 1) i acc
+          '4' -> pure $ replaceSlice (1, 0, 0) i acc
+          '5' -> pure $ replaceSlice (1, 0, 1) i acc
+          '6' -> pure $ replaceSlice (1, 1, 0) i acc
+          '7' -> pure $ replaceSlice (1, 1, 1) i acc
           'x' -> pure acc
-          'X' -> Sim.throw (ImpreciseBitString OctStrFmt str parse callStack)
+          'X' -> throwIO $ ImpreciseBitString OctStrFmt str parse callStack
           'z' -> pure acc
-          'Z' -> Sim.throw (ImpreciseBitString OctStrFmt str parse callStack)
-          _ -> Sim.throw (InvalidBitString OctStrFmt str callStack)
+          'Z' -> throwIO $ ImpreciseBitString OctStrFmt str parse callStack
+          _   -> throwIO $ InvalidBitString OctStrFmt str callStack
 
       parse =
         Monad.foldM go (deepErrorX "parseOctStr: undefined") . zip is . reverse
@@ -164,70 +163,73 @@ parseOctStr bitSize oct = do
      | otherwise
      = replaceBit (i + 2) x . replaceBit (i + 1) y . replaceBit i z
 
+-- | Parses a decimal string (consisting only of the characters @0@-@9@) and
+-- turns it into a 'BitVector'.
 parseDecStr
-  :: forall n o
+  :: forall n
    . HasCallStack
   => KnownNat n
   => CInt
   -> CString
-  -> SimCont o (BitVector n)
+  -> IO (BitVector n)
 parseDecStr bitSize dec = do
   let bound = fromInteger
         $ fix (\f a x -> if x < 10 then a else f (a + 1) $ div x 10) 1
         $ shiftL (1 :: Integer)
         $ fromEnum bitSize
-  str <- IO.liftIO $ peekCStringBound bound dec
+  str <- peekCStringBound bound dec
 
   -- I don't think you can have X or Z in the decimal strings, although the
   -- standard doesn't mention you can have x or z here either...
   case str of
-    ""  -> pure (fromInteger 0)
-    "x" -> pure (deepErrorX "parseDecStr: x")
-    "z" -> pure (deepErrorX "parseDecStr: z")
+    ""  -> pure 0
+    "x" -> pure $ deepErrorX "parseDecStr: x"
+    "z" -> pure $ deepErrorX "parseDecStr: z"
     _   -> maybe
-             (Sim.throw (InvalidBitString DecStrFmt str callStack))
+             (throwIO $ InvalidBitString DecStrFmt str callStack)
              (pure . fromInteger)
              (readMaybe str)
 
+-- | Parses a hexadecimal string (consisting only of the characters @0@-@9@,
+-- @a@-@f@, and @A@-@F@) and turns it into a 'BitVector'.
 parseHexStr
-  :: forall n o
+  :: forall n
    . HasCallStack
   => KnownNat n
-  => Typeable o
   => CInt
   -> CString
-  -> SimCont o (BitVector n)
+  -> IO (BitVector n)
 parseHexStr bitSize hex = do
   let bound = bitSize `div` 4 + if bitSize `mod` 4 == 0 then 0 else 1
       is = [0, 4 .. bitSize - 1]
-  str <- IO.liftIO $ peekCStringBound (fromEnum bound) hex
+  str <- peekCStringBound (fromEnum bound) hex
 
   let go acc (i, x) =
         case toLower x of
-          '0' -> pure (replaceSlice (0, 0, 0, 0) i acc)
-          '1' -> pure (replaceSlice (0, 0, 0, 1) i acc)
-          '2' -> pure (replaceSlice (0, 0, 1, 0) i acc)
-          '3' -> pure (replaceSlice (0, 0, 1, 1) i acc)
-          '4' -> pure (replaceSlice (0, 1, 0, 0) i acc)
-          '5' -> pure (replaceSlice (0, 1, 0, 1) i acc)
-          '6' -> pure (replaceSlice (0, 1, 1, 0) i acc)
-          '7' -> pure (replaceSlice (0, 1, 1, 1) i acc)
-          '8' -> pure (replaceSlice (1, 0, 0, 0) i acc)
-          '9' -> pure (replaceSlice (1, 0, 0, 1) i acc)
-          'a' -> pure (replaceSlice (1, 0, 1, 0) i acc)
-          'b' -> pure (replaceSlice (1, 0, 1, 1) i acc)
-          'c' -> pure (replaceSlice (1, 1, 0, 0) i acc)
-          'd' -> pure (replaceSlice (1, 1, 0, 1) i acc)
-          'e' -> pure (replaceSlice (1, 1, 1, 0) i acc)
-          'f' -> pure (replaceSlice (1, 1, 1, 1) i acc)
+          '0' -> pure $ replaceSlice (0, 0, 0, 0) i acc
+          '1' -> pure $ replaceSlice (0, 0, 0, 1) i acc
+          '2' -> pure $ replaceSlice (0, 0, 1, 0) i acc
+          '3' -> pure $ replaceSlice (0, 0, 1, 1) i acc
+          '4' -> pure $ replaceSlice (0, 1, 0, 0) i acc
+          '5' -> pure $ replaceSlice (0, 1, 0, 1) i acc
+          '6' -> pure $ replaceSlice (0, 1, 1, 0) i acc
+          '7' -> pure $ replaceSlice (0, 1, 1, 1) i acc
+          '8' -> pure $ replaceSlice (1, 0, 0, 0) i acc
+          '9' -> pure $ replaceSlice (1, 0, 0, 1) i acc
+          'a' -> pure $ replaceSlice (1, 0, 1, 0) i acc
+          'b' -> pure $ replaceSlice (1, 0, 1, 1) i acc
+          'c' -> pure $ replaceSlice (1, 1, 0, 0) i acc
+          'd' -> pure $ replaceSlice (1, 1, 0, 1) i acc
+          'e' -> pure $ replaceSlice (1, 1, 1, 0) i acc
+          'f' -> pure $ replaceSlice (1, 1, 1, 1) i acc
 
-          'x' | x == 'X'  -> Sim.throw (ImpreciseBitString HexStrFmt str parse callStack)
+          'x' | x == 'X'  -> throwIO $ ImpreciseBitString HexStrFmt str parse callStack
               | otherwise -> pure acc
 
-          'z' | x == 'Z'  -> Sim.throw (ImpreciseBitString HexStrFmt str parse callStack)
+          'z' | x == 'Z'  -> throwIO $ ImpreciseBitString HexStrFmt str parse callStack
               | otherwise -> pure acc
 
-          _ -> Sim.throw (InvalidBitString HexStrFmt str callStack)
+          _ -> throwIO $ InvalidBitString HexStrFmt str callStack
 
       parse =
         Monad.foldM go (deepErrorX "parseHexStr: undefined") . zip is . reverse
