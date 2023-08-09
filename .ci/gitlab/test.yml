@@ -188,14 +188,6 @@ ffi:example:
     - if: $CI_PARENT_PIPELINE_SOURCE == "trigger"   # When triggered (manual triggers)
     - if: '$CI_COMMIT_TAG != null'                  # When tags are set (releases)
 
-suite:vivado:vhdl:
-  extends: .test-cache-local-nightly
-  script:
-    - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
-  tags:
-    - local
-    - vivado-2022.1-standard
 
 suite:vivado:verilog:
   extends: .test-cache-local-nightly
@@ -205,3 +197,23 @@ suite:vivado:verilog:
   tags:
     - local
     - vivado-2022.1-standard
+
+# XXX: Vivado randomly fails with the following error message:
+#
+#          FATAL_ERROR: Vivado Simulator kernel has discovered an exceptional
+#          condition from which it cannot recover. Process will terminate. For
+#          technical support on this issue, please open a WebCase with this
+#          project attached at http://www.xilinx.com/support.
+#
+#      Until we have a way of retrying these test cases or marking them as
+#      skipped, these nightlies have been disabled to prevent a "boy who cried
+#      wolf" situtation.
+#
+# suite:vivado:vhdl:
+#   extends: .test-cache-local-nightly
+#   script:
+#     - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
+#     - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+#   tags:
+#     - local
+#     - vivado-2022.1-standard
