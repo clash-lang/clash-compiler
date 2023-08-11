@@ -41,7 +41,7 @@ arrow t1 t2 = AppT (AppT ArrowT t1) t2
 -- evaluating `arrowsR [a, b] c` ~ `a -> (b -> c)`.
 arrowsR :: [Type] -> Type -> Type
 arrowsR [] t = t
-arrowsR ts t = arrow (head ts) (arrowsR (tail ts) t)
+arrowsR (t0:ts) t = arrow t0 (arrowsR ts t)
 
 -- | Convenience function to apply a list of arguments to a function
 applyE :: Foldable t => ExpQ -> t Name -> ExpQ

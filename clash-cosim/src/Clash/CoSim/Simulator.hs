@@ -118,8 +118,7 @@ transposeList ::(Eq a, Num b, Eq b) => b -> [[a]] -> [[a]]
 transposeList 0 _   = []
 transposeList n xss = ys : transposeList (n-1) yss
     where
-        ys  = map head xss
-        yss = map tail xss
+        (ys,yss) = unzip [(hd,tl) | hd : tl <- xss]
 
 mapAccumLM :: (acc -> x -> IO (acc, y)) -> acc -> [x] -> IO (acc, [y])
 mapAccumLM f s xs = return $ mapAccumL (\a xs' -> unsafePerformIO $ f a xs') s xs
