@@ -30,6 +30,9 @@
   simulator is setup correctly. These tests only ensure that data does
   not get corrupted when exchanged via the VPI.
 -}
+
+{-# LANGUAGE MonoLocalBinds #-}
+
 module Main where
 
 import Prelude hiding (iterate)
