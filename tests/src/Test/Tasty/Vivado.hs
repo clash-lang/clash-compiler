@@ -78,8 +78,9 @@ genSimTcl ::
 genSimTcl dir top = do
   connector <- tclConnector
   manifests <- getManifests (dir </> "*" </> manifestFilename)
-  let (dropFileName -> topEntityDir, _) =
-        head (filter ((== top) . topComponent . snd) manifests)
+  let topEntityDir = case filter ((== top) . topComponent . snd) manifests of
+                       (x,_):_ -> dropFileName x
+                       _ -> error "topEntity not found in manifest"
   pure [__i|
     set_msg_config -severity {CRITICAL WARNING} -new_severity ERROR
     source -notrace {#{connector}}
