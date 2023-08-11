@@ -59,6 +59,9 @@ import           Data.Functor.Identity (Identity)
 import           Data.Functor.Product (Product)
 import           Data.Functor.Sum    (Sum)
 import           Data.Int            (Int8, Int16, Int32, Int64)
+import qualified Data.List.Infinite  as Inf
+import           Data.List.Infinite  (Infinite (..))
+import           Data.List.NonEmpty  (NonEmpty)
 import           Data.Ord            (Down (Down))
 import           Data.Ratio          (Ratio, numerator, denominator)
 import qualified Data.Semigroup      as SG
@@ -561,9 +564,25 @@ instance NFDataX a => NFDataX (Down a) where
   hasUndefined d@(~(Down x))= if isLeft (isX d) then True else hasUndefined x
   ensureSpine ~(Down x) = Down (ensureSpine x)
 
+instance NFDataX a => NFDataX (Infinite a) where
+  deepErrorX msg = Inf.repeat (deepErrorX msg)
+  rnfX d@(~(x :< xs)) =
+    if isLeft (isX d) then
+      ()
+    else
+      rnfX x `seq` rnfX xs
+  hasUndefined d@(~(x :< xs)) =
+    if isLeft (isX d) then
+      True
+    else
+      hasUndefined x || hasUndefined xs
+
+  ensureSpine ~(x :< xs) = ensureSpine x :< ensureSpine xs
+
 instance NFDataX Bool
 instance NFDataX Ordering
 instance NFDataX a => NFDataX [a]
+instance NFDataX a => NFDataX (NonEmpty a)
 instance (NFDataX a, NFDataX b) => NFDataX (Either a b)
 instance NFDataX a => NFDataX (Maybe a)
 instance NFDataX a => NFDataX (Identity a)

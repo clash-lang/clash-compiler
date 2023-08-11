@@ -75,7 +75,7 @@ testMasterMultiSlave divHalf wait mVal sVal mode latch duration =
   miso = veryUnsafeToBiSignalIn
          (mergeBiSignalOuts (misoZ2 :> misoZ1 :> misoZ0 :> Nil))
 
-  masterIn = masterLawfulSignal clk rst [mVal] masterAck bp
+  masterIn = masterLawfulSignal clk rst (pure mVal) masterAck bp
 
   (ss2 `Cons` ss1 `Cons` ss0 `Cons` _) = slaveAddressRotate @3 clk rst (ss,bp)
 

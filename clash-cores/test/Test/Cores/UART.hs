@@ -52,7 +52,7 @@ baudGeneratorErr baud@SNat = errPercent <= 0.625
       | n <= 0    = 0
       | f x       = 1 + (cntNMatches (n - 1) f xs)
       | otherwise = 1 + (cntNMatches n f xs)
-    samples = List.tail $ List.dropWhile not $ sample uartEn
+    samples = List.drop 1 $ List.dropWhile not $ sample uartEn
     fndFullPeriod = clock100Period * (cntNMatches (160 :: Int) id samples)
     expFullPeriod = 10 * uartPeriod
     err :: Double
@@ -73,7 +73,7 @@ baudGeneratorDeltaPeriod0or1 baud@SNat = ok
                $ exposeClockResetEnable
                    (baudGenerator baud)
                    clk rst en
-    periodLengths bs = go (1 :: Int) (List.tail $ List.dropWhile not bs)
+    periodLengths bs = go (1 :: Int) (List.drop 1 $ List.dropWhile not bs)
       where go _ [] = []
             go n (True:xs) = n:(go 1 xs)
             go n (False:xs) = go (n + 1) xs
