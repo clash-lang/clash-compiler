@@ -95,7 +95,7 @@ prettyName t = maybe t (uncurry (<>)) (maybeTuple t)
 maybeTuple :: Text -> Maybe (Text, Text)
 maybeTuple "(# #)" = Just ("Unit", "")
 maybeTuple "()" = Just ("Unit", "")
-maybeTuple t = first (\n -> "Tup" <> showt n) <$> parseTuple t
+maybeTuple t = first (\n -> "Tuple" <> showt n) <$> parseTuple t
 
 parseTuple :: Text -> Maybe (Int, Text)
 parseTuple t0 = do
