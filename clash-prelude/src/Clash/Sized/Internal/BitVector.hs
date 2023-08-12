@@ -557,12 +557,15 @@ read# cs0 = (fromIntegral (length cs1), BV m v)
            "Clash.Sized.Internal.bLit: unknown character: "
         ++ show c ++ " in input: " ++ cs0
 
--- | Create a hexadecimal literal.
--- ghci> $(hLit "dead")
--- 0b1101_1110_1010_1101
--- it :: BitVector 16
+-- | Create a hexadecimal literal
 --
--- Don't care digits set 4 bits in the undefined mask.
+-- >>> $(hLit "dead")
+-- 0b1101_1110_1010_1101
+--
+-- Don't care digits set 4 bits:
+--
+-- >>> $(hLit "de..")
+-- 0b1101_1110_...._....
 hLit :: String -> ExpQ
 hLit s = pure (SigE body typ)
   where
@@ -588,12 +591,15 @@ read16# cs0 = (fromIntegral $ 4 * length cs1, BV m v)
              "Clash.Sized.Internal.hLit: unknown character: "
              ++ show c ++ " in input: " ++ cs0
 
--- | Create an octal literal.
--- ghci> $(oLit "5234")
--- 0b1010_1001_1100
--- it :: BitVector 12
+-- | Create an octal literal
 --
--- Don't care digits set 3 bits in the undefined mask.
+-- >>> $(oLit "5234")
+-- 0b1010_1001_1100
+--
+-- Don't care digits set 3 bits:
+--
+-- >>> $(oLit "52..")
+-- 0b1010_10.._....
 oLit :: String -> ExpQ
 oLit s = pure (SigE body typ)
   where
