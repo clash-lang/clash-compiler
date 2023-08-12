@@ -19,7 +19,7 @@ import qualified Data.HashMap.Strict                          as HM
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import           Clash.Core.Var (Id)
 import           Clash.Core.TyCon (TyConMap,TyConName)
-import           Clash.Driver.Types (BindingMap)
+import           Clash.Driver.Types (BindingMap, DomainMap)
 import           Data.IntMap.Strict (IntMap)
 
 
@@ -45,7 +45,24 @@ instance (Binary k, Binary v, Eq k, Hashable k) => Binary (HM.HashMap k v) where
   get = HM.fromList <$> get
 
 -- data that's serialised to file between profile-normalization-prepare  and profile-normalization-run
-type NormalizationInputs = (BindingMap,TyConMap,IntMap TyConName,CompiledPrimMap',CustomReprs,[Id],Id)
+type NormalizationInputs =
+  ( BindingMap
+  , TyConMap
+  , IntMap TyConName
+  , CompiledPrimMap'
+  , CustomReprs
+  , [Id]
+  , Id
+  , DomainMap
+  )
 
 -- data that's serialised to file between profile-netlist-prepare  and profile-netlist-run
-type NetlistInputs = (BindingMap,[CL.TopEntityT],CompiledPrimMap',TyConMap,CustomReprs,Id)
+type NetlistInputs =
+  ( BindingMap
+  , [CL.TopEntityT]
+  , CompiledPrimMap'
+  , TyConMap
+  , CustomReprs
+  , Id
+  , DomainMap
+  )

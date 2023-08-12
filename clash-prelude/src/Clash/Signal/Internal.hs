@@ -255,7 +255,7 @@ data ResetKind
   -- ^ Elements respond /synchronously/ to changes in their reset input. This
   -- means that changes in their reset input won't take effect until the next
   -- active clock edge. Common on Xilinx FPGA platforms.
-  deriving (Show, Read, Eq, Ord, Generic, NFData, Data, Hashable)
+  deriving (Show, Read, Eq, Ord, Generic, NFData, Data, Hashable, Binary)
 
 -- | Singleton version of 'ResetKind'
 data SResetKind (resetKind :: ResetKind) where
@@ -275,7 +275,7 @@ data ResetPolarity
   -- ^ Reset is considered active if underlying signal is 'True'.
   | ActiveLow
   -- ^ Reset is considered active if underlying signal is 'False'.
-  deriving (Eq, Ord, Show, Read, Generic, NFData, Data, Hashable)
+  deriving (Eq, Ord, Show, Read, Generic, NFData, Data, Hashable, Binary)
 
 -- | Singleton version of 'ResetPolarity'
 data SResetPolarity (polarity :: ResetPolarity) where
@@ -296,7 +296,7 @@ data InitBehavior
   -- ^ If applicable, power up value of a memory element is defined. Applies to
   -- 'Clash.Signal.register's for example, but not to
   -- 'Clash.Prelude.BlockRam.blockRam'.
-  deriving (Show, Read, Eq, Ord, Generic, NFData, Data, Hashable)
+  deriving (Show, Read, Eq, Ord, Generic, NFData, Data, Hashable, Binary)
 
 data SInitBehavior (init :: InitBehavior) where
   SUnknown :: SInitBehavior 'Unknown
@@ -579,7 +579,7 @@ data VDomainConfiguration
   , vResetPolarity :: ResetPolarity
   -- ^ Corresponds to '_resetPolarity' on 'DomainConfiguration'
   }
-  deriving (Eq, Generic, NFData, Show, Read)
+  deriving (Eq, Generic, NFData, Show, Read, Binary)
 
 -- | Convert 'SDomainConfiguration' to 'VDomainConfiguration'. Should be used in combination with
 -- 'createDomain' only.

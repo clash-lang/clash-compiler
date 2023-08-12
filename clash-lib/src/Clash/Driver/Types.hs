@@ -74,18 +74,17 @@ data ClashEnv = ClashEnv
   , envTupleTyCons :: IntMap TyConName
   , envPrimitives  :: CompiledPrimMap
   , envCustomReprs :: CustomReprs
+  , envDomains     :: DomainMap
   } deriving (Generic, NFData)
 
 data ClashDesign = ClashDesign
   { designEntities :: [TopEntityT]
-  , designDomains  :: DomainMap
   , designBindings :: BindingMap
   }
 
 instance NFData ClashDesign where
   rnf design =
     designEntities design `seq`
-    designDomains design `deepseq`
     designBindings design `deepseq`
     ()
 
