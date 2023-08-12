@@ -24,6 +24,8 @@ module Clash.Sized.BitVector
   , maxIndex#
     -- ** Construction
   , bLit
+  , hLit
+  , oLit
     -- ** Concatenation
   , (++#)
     -- * Modification
