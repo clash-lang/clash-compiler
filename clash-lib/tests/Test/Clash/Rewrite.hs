@@ -65,6 +65,7 @@ instance Default RewriteEnv where
         , envTupleTyCons = IntMap.empty
         , envPrimitives = HashMap.empty
         , envCustomReprs = buildCustomReprs []
+        , envDomains = HashMap.empty
         }
     , _typeTranslator=error "_typeTranslator: NYI"
     , _peEvaluator=error "_peEvaluator: NYI"

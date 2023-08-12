@@ -39,7 +39,7 @@ main = do
 
 benchFile :: [FilePath] -> FilePath -> IO ()
 benchFile idirs src = do
-  (transformedBindings,topEntities,primMap,tcm,reprs,topEntity) <- setupEnv src
+  (transformedBindings, topEntities, primMap, tcm, reprs, topEntity, domains) <- setupEnv src
   putStrLn $ "Doing netlist generation of " ++ src
 
   let env = ClashEnv
@@ -48,6 +48,7 @@ benchFile idirs src = do
                    , envTupleTyCons = mempty
                    , envPrimitives = fmap (fmap unremoveBBfunc) primMap
                    , envCustomReprs = reprs
+                   , envDomains = domains
                    }
 
       topEntityS = Text.unpack (nameOcc (varName topEntity))

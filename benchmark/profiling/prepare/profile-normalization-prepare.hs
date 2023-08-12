@@ -37,8 +37,9 @@ prepareFile idirs fIn = do
                , envCustomReprs clashEnv
                , topNames
                , head topNames
+               , envDomains clashEnv
                )
 
   putStrLn $ "Serialising to : " ++ fOut
-  B.writeFile fOut $ encode inputs
+  B.writeFile fOut $ encode (inputs :: NormalizationInputs)
   putStrLn "Done"

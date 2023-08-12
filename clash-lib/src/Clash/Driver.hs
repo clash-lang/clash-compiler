@@ -364,7 +364,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
     -> TopEntityT
     -> IO ()
   go compNames seenV edamFilesV ioLockV deps topEntityMap (TopEntityT topEntity annM isTb) = do
-  let domainConfs = designDomains design
+  let domainConfs = envDomains env
   let bindingsMap = designBindings design
   let primMap = envPrimitives env
   let topEntities0 = designEntities design

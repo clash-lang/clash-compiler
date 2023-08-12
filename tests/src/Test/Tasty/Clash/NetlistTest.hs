@@ -88,19 +88,19 @@ runToNetlistStage target f src = do
 
   fmap (\(_,x,_) -> force (P.map snd (OMap.assocs x))) $
     netlistFrom
-      (env, transformedBindings, tes2, compNames, te, initIs, designDomains design)
+      (env, transformedBindings, tes2, compNames, te, initIs)
  where
   opts = f mkClashOpts
   backend = initBackend @(TargetToState target) opts
   hdl = buildTargetToHdl target
 
-  netlistFrom (env, bm, tes, compNames, te, seen, domainConfs) =
+  netlistFrom (env, bm, tes, compNames, te, seen) =
     genNetlist env False bm tes compNames (ghcTypeToHWType (opt_intWidth opts))
       ite (SomeBackend hdlSt) seen hdlDir Nothing te
    where
     teS     = Text.unpack . nameOcc $ varName te
     modN    = takeWhile (/= '.') teS
-    hdlSt   = setDomainConfigurations domainConfs
+    hdlSt   = setDomainConfigurations (envDomains env)
             $ setModName (Text.pack modN) backend
     ite     = ifThenElseExpr hdlSt
     hdlDir  = fromMaybe "." (opt_hdlDir opts)
