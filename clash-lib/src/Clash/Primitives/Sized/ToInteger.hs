@@ -27,7 +27,17 @@ import Data.Text.Lazy (pack)
 import System.IO (hPutStrLn, stderr)
 import Text.Trifecta.Result (Result(Success))
 
-#if MIN_VERSION_ghc(9,6,0)
+#if MIN_VERSION_ghc(9,8,0)
+import GHC.Unit.Module.Warnings (emptyWarningCategorySet)
+import GHC.Utils.Error
+  (DiagOpts(..), mkPlainDiagnostic, mkPlainMsgEnvelope, pprLocMsgEnvelopeDefault)
+import GHC.Utils.Outputable
+  (blankLine, empty, int, integer, showSDocUnsafe, text, ($$), ($+$), (<+>),
+   defaultSDocContext )
+import qualified GHC.Utils.Outputable as Outputable
+import GHC.Types.Error (DiagnosticReason (WarningWithoutFlag))
+import GHC.Types.SrcLoc (isGoodSrcSpan)
+#elif MIN_VERSION_ghc(9,6,0)
 import GHC.Utils.Error
   (DiagOpts(..), mkPlainDiagnostic, mkPlainMsgEnvelope, pprLocMsgEnvelopeDefault)
 import GHC.Utils.Outputable
@@ -100,7 +110,12 @@ toIntegerBB hdl hty _isD _primName args _ty = do
         (_,sp) <- Lens.use curCompNm
         let srcInfo1 | isGoodSrcSpan sp = srcInfo
                      | otherwise        = empty
-#if MIN_VERSION_ghc(9,6,0)
+#if MIN_VERSION_ghc(9,8,0)
+            opts     = DiagOpts mempty mempty emptyWarningCategorySet emptyWarningCategorySet False False Nothing defaultSDocContext
+            diag     = mkPlainDiagnostic WarningWithoutFlag [] (warnMsg i1 iw $+$ blankLine $+$ srcInfo1)
+            warnMsg1 = mkPlainMsgEnvelope opts sp diag
+            warnMsg2 = pprLocMsgEnvelopeDefault warnMsg1
+#elif MIN_VERSION_ghc(9,6,0)
             opts     = DiagOpts mempty mempty False False Nothing defaultSDocContext
             diag     = mkPlainDiagnostic WarningWithoutFlag [] (warnMsg i1 iw $+$ blankLine $+$ srcInfo1)
             warnMsg1 = mkPlainMsgEnvelope opts sp diag

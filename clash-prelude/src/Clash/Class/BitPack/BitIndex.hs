@@ -54,7 +54,7 @@ __NB:__ Bit indices are __DESCENDING__.
 >>> slice d4 d2 (7 :: Unsigned 6)
 0b001
 
-#if __GLASGOW_HASKELL__ >= 906
+#if __GLASGOW_HASKELL__ == 906
 >>> slice d6 d4 (7 :: Unsigned 6)
 <BLANKLINE>
 <interactive>:...
@@ -131,7 +131,7 @@ __NB:__ Bit indices are __DESCENDING__.
 >>> pack (-29 :: Signed 6)
 0b10_0011
 
-#if __GLASGOW_HASKELL__ >= 906
+#if __GLASGOW_HASKELL__ == 906
 >>> setSlice d6 d5 0 (-5 :: Signed 6)
 <BLANKLINE>
 <interactive>:...

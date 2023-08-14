@@ -23,6 +23,7 @@ module Clash.Core.TermLiteral.TH
 import           Data.Either
 import qualified Data.Text                       as Text
 import           Data.List                       (intersperse)
+import qualified Data.List.NonEmpty              as NE
 import           Data.Proxy
 import           Data.Maybe                      (isNothing)
 import           Language.Haskell.TH.Syntax
@@ -79,7 +80,11 @@ typeVarName = \case
 deriveTermLiteral :: Name -> Q [Dec]
 deriveTermLiteral typName = do
   TyConI (DataD _ _ typeVars _ _ _) <- reify typName
+#if MIN_VERSION_template_haskell(2,21,0)
+  typeVarNames <- mapM (typeVarName . fmap (const ())) typeVars
+#else
   typeVarNames <- mapM typeVarName typeVars
+#endif
   showsTypePrec <- deriveShowsTypePrec typName
   termToDataBody <- deriveTermToData typName
   let
@@ -104,7 +109,11 @@ deriveTermLiteral typName = do
 deriveShowsTypePrec :: Name -> Q Dec
 deriveShowsTypePrec typName = do
   TyConI (DataD _ _ typeVars _ _ _) <- reify typName
+#if MIN_VERSION_template_haskell(2,21,0)
+  typeVarNames <- mapM (typeVarName . fmap (const ())) typeVars
+#else
   typeVarNames <- mapM typeVarName typeVars
+#endif
   showTypeBody <- mkShowTypeBody typeVarNames
   pure (FunD showsTypePrecName [Clause [VarP nName, WildP] (NormalB showTypeBody) []])
  where
@@ -173,7 +182,7 @@ deriveTermToData1 constrs =
   nArgs = maximum (map snd constrs)
 
   args :: [Dec]
-  args = zipWith (\n nm -> ValD (VarP nm) (NormalB (arg n)) []) [0..] argNames
+  args = zipWith (\n nm -> ValD (VarP nm) (NormalB (arg (toInteger n))) []) [0..nArgs-1] (NE.toList argNames)
   arg n = UInfixE (VarE argsName) (VarE '(!!)) (LitE (IntegerL n))
 
   -- case nm of {"ConstrOne" -> ConstOne <$> termToData arg0; "ConstrTwo" -> ...}
@@ -195,7 +204,7 @@ deriveTermToData1 constrs =
     UInfixE
       (ConE cName)
       (VarE '(<$>))
-      (VarE termToDataName `AppE` VarE (head argNames))
+      (VarE termToDataName `AppE` VarE (NE.head argNames))
   mkCall cName nFields =
     foldl
       (\e aName ->
@@ -204,7 +213,7 @@ deriveTermToData1 constrs =
           (VarE '(<*>))
           (VarE termToDataName `AppE` VarE aName))
       (mkCall cName 1)
-      (take (nFields-1) (tail argNames))
+      (take (nFields-1) (NE.tail argNames))
 
   -- term@(collectArgs -> (Data (dcName' -> nm), args))
   pat :: Pat
@@ -224,5 +233,5 @@ deriveTermToData1 constrs =
 
   termName = mkName "term"
   argsName = mkName "args"
-  argNames = [mkName ("arg" ++ show n) | n <- [0..nArgs-1]]
+  argNames = fmap (mkName . ("arg" <>) . show) (NE.iterate (+1) (0 :: Word))
   nameName = mkName "nm"

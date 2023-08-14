@@ -188,7 +188,8 @@ test-suite unittests
     tasty-quickcheck,
     tasty-th,
     hedgehog,
-    tasty-hedgehog >= 1.2.0
+    tasty-hedgehog >= 1.2.0,
+    infinite-list
 
 test-suite doctests
   type:             exitcode-stdio-1.0

@@ -74,7 +74,9 @@ runToNetlistStage target f src = do
 
   let (compNames, initIs) = genTopNames opts hdl (designEntities design)
       teNames = fmap topId (designEntities design)
-      te      = topId (P.head (designEntities design))
+      te      = case designEntities design of
+                  x:_ -> topId x
+                  _ -> error "no design entities"
       tes2    = mkVarEnv (P.zip (P.map topId (designEntities design)) (designEntities design))
 
   supplyN <- Supply.newSupply

@@ -11,6 +11,7 @@ module Test.Cores.Internal.SampleSPI
   ) where
 
 import qualified Data.List as List (unzip4)
+import           Data.List.NonEmpty (NonEmpty)
 import           Test.QuickCheck (Arbitrary(..), suchThat)
 
 import           Clash.Prelude
@@ -45,9 +46,9 @@ type CyclingTest halfPeriod waitTime master slave a =
   -> SNat waitTime
   -- ^ Core clock cycles between de-assertion of slave-select
   -- and the start of the SPI clock
-  -> [BitVector master]
+  -> NonEmpty (BitVector master)
   -- ^ Values master sends to slave
-  -> [BitVector slave]
+  -> NonEmpty (BitVector slave)
   -- ^ Values slave sends to master
   -> SPIMode
   -- ^ SPI Mode
@@ -112,5 +113,4 @@ sampleSimple
   -> GenSlave slave
   -> SimpleTest halfPeriod waitTime master slave (SPISamples master slave)
 sampleSimple genM genS divHalf wait mVal sVal =
-  sampleCycling genM genS divHalf wait [mVal] [sVal]
-
+  sampleCycling genM genS divHalf wait (pure mVal) (pure sVal)

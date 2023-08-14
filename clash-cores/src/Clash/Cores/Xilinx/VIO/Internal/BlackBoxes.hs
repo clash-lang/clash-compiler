@@ -24,6 +24,7 @@ import GHC.Stack (HasCallStack)
 
 import Data.Foldable (fold)
 import Data.List.Infinite((...), Infinite((:<)))
+import qualified Data.List.NonEmpty as NE
 import Data.String.Interpolate (__i)
 import Data.Text.Prettyprint.Doc.Extra (Doc)
 import Text.Show.Pretty (ppShow)
@@ -164,13 +165,13 @@ vioProbeBBTF bbCtx
 
       let
         inPs = filter ((> (0 :: Int)) . DSL.tySize . DSL.ety) inputProbes
-        inNames = map (T.pack . ("probe_in" <>) . show) [0 :: Int, 1..]
+        inNames = fmap (T.pack . ("probe_in" <>) . show) (NE.iterate (+1) (0 :: Int))
         outNames = map (T.pack . ("probe_out" <>) . show) [0 :: Int, 1..]
         inBVs = map (BitVector . (fromInteger . DSL.tySize)) inTys
         outBVs = map (BitVector . (fromInteger . DSL.tySize)) outTys
 
       DSL.declarationReturn bbCtx "vio_inst_block" $ do
-        DSL.compInBlock vioProbeName (("clk", Bit) : zip inNames inBVs)
+        DSL.compInBlock vioProbeName (("clk", Bit) : zip (NE.toList inNames) inBVs)
           $ case tResult of
               Void{} -> []
               _      -> zip outNames outBVs
@@ -180,9 +181,9 @@ vioProbeBBTF bbCtx
             [ singleInput ] ->
               case DSL.ety singleInput of
                 Vector{}  -> DSL.unvec "vec" singleInput
-                Product{} -> DSL.deconstructProduct singleInput inNames
-                _         -> pure <$> DSL.assign (head inNames) singleInput
-            _ -> zipWithM DSL.assign inNames inPs
+                Product{} -> DSL.deconstructProduct singleInput (NE.toList inNames)
+                _         -> pure <$> DSL.assign (NE.head inNames) singleInput
+            _ -> zipWithM DSL.assign (NE.toList inNames) inPs
 
         (outProbes, outProbesBV) <- fmap unzip $ sequence $
           zipWith3 fromNameCheckedBv userOutputNames outNames outTys
@@ -190,7 +191,7 @@ vioProbeBBTF bbCtx
         inProbesBV <- zipWithM toNameCheckedBv userInputNames inProbes
 
         DSL.instDecl Empty (Id.unsafeMake vioProbeName) vioProbeInstName []
-          (("clk", clk) : zip inNames inProbesBV)
+          (("clk", clk) : zip (NE.toList inNames) inProbesBV)
           (zip outNames outProbesBV)
 
         case tResult of

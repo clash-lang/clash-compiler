@@ -115,7 +115,9 @@ alteraPllTemplate bbCtx
 
       -- TODO: unsafeMake is dubious here: I don't think we take names in
       -- TODO: bbQsysIncName into account when generating fresh ids
-    let compName = Id.unsafeMake (head (bbQsysIncName bbCtx))
+    let compName = case bbQsysIncName bbCtx of
+                      x:_ -> Id.unsafeMake x
+                      _ -> error "alteraPll primitive has no 'includes' entry"
 
     let outclkPorts = map (\n -> instPort ("outclk_" <> showt n)) [(0 :: Int)..length clocks-1]
 
@@ -162,7 +164,9 @@ altpllTemplate bbCtx
 
       -- TODO: unsafeMake is dubious here: I don't think we take names in
       -- TODO: bbQsysIncName into account when generating fresh ids
-      let compName = Id.unsafeMake (head (bbQsysIncName bbCtx))
+      let compName = case bbQsysIncName bbCtx of
+                      x:_ -> Id.unsafeMake x
+                      _ -> error "altpll primitive has no 'includes' entry"
 
       getAp $ blockDecl alteraPll
         [ NetDecl Nothing locked  Bit

@@ -1,6 +1,8 @@
 module Test.Cores.SPI where
 
 import qualified Data.List as List
+import           Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.List.NonEmpty as NE
 import           Data.Maybe
 import           Test.Tasty
 import           Test.Tasty.QuickCheck as QC
@@ -49,7 +51,7 @@ cyclingRepeats divHalf wait mVals sVals mode latch duration dev =
 
   checkWith outs vals =
     let spis = sampleSPI divHalf wait mVals sVals mode latch duration
-     in List.isPrefixOf (catMaybes $ outs spis) (List.cycle vals)
+     in NE.isPrefixOf (catMaybes $ outs spis) (NE.cycle vals)
 
 -- | Test that acknowledgement signals and done signals are interleaved.
 -- As acknowledgement signals a transfer has started and done signals a
@@ -92,8 +94,7 @@ tests = testGroup "SPI"
   ]
  where
   mSimple  = 0b10101010
-  mCycling = [0b10101010, 0b11110000, 0b10010110]
+  mCycling = 0b10101010 :| [0b11110000, 0b10010110]
 
   sSimple  = 0b00010011
-  sCycling = [0b11111111, 0b00100010]
-
+  sCycling = 0b11111111 :| [0b00100010]

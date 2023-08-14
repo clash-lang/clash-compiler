@@ -426,7 +426,7 @@ runTest1 modName opts@TestOptions{..} path target =
       ]
  where
   mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
-  sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))
+  sourceDir = List.foldl' (</>) sourceDirectory (reverse (drop 1 path))
 
   clashTest tmpDir =
     singleTest "clash (gen)" (ClashGenTest {
@@ -506,7 +506,7 @@ outputTest' modName target extraClashArgs extraGhcArgs path =
       ]
  where
   mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
-  sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))
+  sourceDir = List.foldl' (</>) sourceDirectory (reverse (drop 1 path))
 
   clashGenHdl workDir = singleTest "clash (gen)" (ClashGenTest {
       cgExpectFailure=Nothing
@@ -562,7 +562,7 @@ clashLibTest' modName target extraGhcArgs path =
       ]
  where
   mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
-  sourceDir = List.foldl' (</>) sourceDirectory (reverse (tail path))
+  sourceDir = List.foldl' (</>) sourceDirectory (reverse (drop 1 path))
 
   clashBuild workDir = singleTest "clash (exec)" (ClashBinaryTest {
       cbBuildTarget=target

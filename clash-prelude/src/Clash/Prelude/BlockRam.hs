@@ -836,16 +836,28 @@ blockRamPow2 = \cnt rd wrM -> withFrozenCallStack
   (hideEnable (hideClock E.blockRamPow2) cnt rd wrM)
 {-# INLINE blockRamPow2 #-}
 
--- | Create a read-after-write block RAM from a read-before-write one
---
--- >>> :t readNew (blockRam (0 :> 1 :> Nil))
--- readNew (blockRam (0 :> 1 :> Nil))
---   :: ...
---      ...
---      ...
---      ...
---      ... =>
---      Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a
+{- | Create a read-after-write block RAM from a read-before-write one
+
+#if __GLASGOW_HASKELL__ >= 908 && !defined(CLASH_MULTIPLE_HIDDEN)
+>>> :t readNew (blockRam (0 :> 1 :> Nil))
+readNew (blockRam (0 :> 1 :> Nil))
+  :: ...
+     ...
+     ... =>
+     Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a
+
+#else
+>>> :t readNew (blockRam (0 :> 1 :> Nil))
+readNew (blockRam (0 :> 1 :> Nil))
+  :: ...
+     ...
+     ...
+     ...
+     ... =>
+     Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a
+
+#endif
+-}
 readNew
   :: ( HiddenClockResetEnable dom
      , NFDataX a

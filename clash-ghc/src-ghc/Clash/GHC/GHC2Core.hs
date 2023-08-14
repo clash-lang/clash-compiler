@@ -189,6 +189,7 @@ import           Clash.Annotations.SynthesisAttributes (Annotate, Attr(..))
 import qualified Clash.Core.DataCon          as C
 import qualified Clash.Core.Literal          as C
 import qualified Clash.Core.Name             as C
+import qualified Clash.Core.Pretty           as C
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.TyCon            as C
 import qualified Clash.Core.Type             as C
@@ -304,16 +305,19 @@ makeTyCon tc = tycon
         mkTupleTyCon = do
           tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
           tcKind <- coreToType (tyConKind tc)
-          tcDc   <- fmap (C.DataTyCon . (:[])) . coreToDataCon . head . tyConDataCons $ tc
-          return
-            C.AlgTyCon
-            { C.tyConUniq   = C.nameUniq tcName
-            , C.tyConName   = tcName
-            , C.tyConKind   = tcKind
-            , C.tyConArity  = tcArity
-            , C.algTcRhs    = tcDc
-            , C.isClassTc   = isClassTyCon tc
-            }
+          case tyConDataCons tc of
+            dc:_ -> do
+              tcDc   <- fmap (C.DataTyCon . (:[])) (coreToDataCon dc)
+              return
+                C.AlgTyCon
+                { C.tyConUniq   = C.nameUniq tcName
+                , C.tyConName   = tcName
+                , C.tyConKind   = tcKind
+                , C.tyConArity  = tcArity
+                , C.algTcRhs    = tcDc
+                , C.isClassTc   = isClassTyCon tc
+                }
+            _ -> error "impossible"
 
         mkPrimTyCon = do
           tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
@@ -1346,6 +1350,24 @@ traverseTerm ty = error $ $(curLoc) ++ show ty
 -- @/\(r:Rep)/\(a:TYPE Lifted)./\(b:TYPE r).\(f : (a -> b)).\(x : a).f x@
 dollarTerm :: C.Type
            -> C.Term
+#if MIN_VERSION_ghc(9,8,0)
+dollarTerm (C.ForAllTy raTV (C.ForAllTy rbTV (C.ForAllTy aTV (C.ForAllTy bTV funTy))))
+  | (C.FunTy fTy funTy'') <- C.tyView funTy
+  , (C.FunTy aTy _)       <- C.tyView funTy''
+  = let
+      fName = C.mkUnsafeSystemName "f" 0
+      xName = C.mkUnsafeSystemName "x" 1
+      fId   = C.mkLocalId fTy fName
+      xId   = C.mkLocalId aTy xName
+    in
+      C.TyLam raTV (
+      C.TyLam rbTV (
+      C.TyLam aTV (
+      C.TyLam bTV (
+      C.Lam   fId (
+      C.Lam   xId (
+      C.App (C.Var fId) (C.Var xId)))))))
+#else
 dollarTerm (C.ForAllTy rTV (C.ForAllTy aTV (C.ForAllTy bTV funTy)))
   | (C.FunTy fTy funTy'') <- C.tyView funTy
   , (C.FunTy aTy _)       <- C.tyView funTy''
@@ -1361,8 +1383,9 @@ dollarTerm (C.ForAllTy rTV (C.ForAllTy aTV (C.ForAllTy bTV funTy)))
       C.Lam   fId (
       C.Lam   xId (
       C.App (C.Var fId) (C.Var xId))))))
+#endif
 
-dollarTerm ty = error $ $(curLoc) ++ show ty
+dollarTerm ty = error $ $(curLoc) ++ C.showPpr ty
 
 -- | Given the type:
 --

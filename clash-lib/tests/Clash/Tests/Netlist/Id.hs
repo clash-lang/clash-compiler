@@ -170,15 +170,15 @@ tests =
     , testGroup "pretty names"
       [ testCase "(# #) => Unit" $ "Unit" @=? roundTrip' "(# #)"
       , testCase "() => Unit" $ "Unit" @=? roundTrip' "()"
-      , testCase "(,,) => Tup3" $ "Tup3" @=? roundTrip' "(,,)"
-      , testCase "(#,,,,#) => Tup5" $ "Tup5" @=? roundTrip' "(,,,,)"
+      , testCase "(,,) => Tuple3" $ "Tuple3" @=? roundTrip' "(,,)"
+      , testCase "(#,,,,#) => Tuple5" $ "Tuple5" @=? roundTrip' "(,,,,)"
       ]
 
     , testGroup "pretty names (force basic)"
       [ testCase "(# #) => Unit" $ "Unit" @=? roundTrip False VHDL "(# #)"
       , testCase "() => Unit" $ "Unit" @=? roundTrip False VHDL "()"
-      , testCase "(,,) => Tup3" $ "Tup3" @=? roundTrip False VHDL "(,,)"
-      , testCase "(#,,,,#) => Tup5" $ "Tup5" @=? roundTrip False VHDL "(,,,,)"
+      , testCase "(,,) => Tuple3" $ "Tuple3" @=? roundTrip False VHDL "(,,)"
+      , testCase "(#,,,,#) => Tuple5" $ "Tuple5" @=? roundTrip False VHDL "(,,,,)"
       ]
 
     , testGroup "disallow escaped identifiers"

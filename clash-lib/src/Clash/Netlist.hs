@@ -33,8 +33,10 @@ import           Data.Bifunctor                   (first, second)
 import           Data.Char                        (ord)
 import           Data.Either                      (partitionEithers, rights)
 import           Data.Foldable                    (foldlM)
-import           Data.List                        (elemIndex, partition, sortOn)
+import           Data.List                        (elemIndex, partition)
 import           Data.List.Extra                  (zipEqual)
+import           Data.List.NonEmpty               (NonEmpty (..))
+import qualified Data.List.NonEmpty.Extra         as NE
 import           Data.Maybe
   (listToMaybe, fromMaybe)
 import qualified Data.Map.Ordered                 as OMap
@@ -295,7 +297,7 @@ genComponentT compName0 componentExpr = do
             _ -> case resUnwrappers of
               NetDecl n res resTy:_ ->
                 (map (\op -> (useOf op,op,Nothing)) compOutps
-                ,NetDecl' n res resTy Nothing:tail resUnwrappers
+                ,NetDecl' n res resTy Nothing:drop 1 resUnwrappers
                 )
               _ -> error "internal error: insufficient resUnwrappers"
           component      = Component compName1 compInps compOutps'
@@ -431,8 +433,8 @@ mkDeclarations' _declType _bndr e@(collectTicks -> (Case _ _ [],_)) = do
                     ])
           Nothing
 
-mkDeclarations' declType bndr (collectTicks -> (Case scrut altTy alts@(_:_:_),ticks)) =
-  withTicks ticks (mkSelection declType (CoreId bndr) scrut altTy alts)
+mkDeclarations' declType bndr (collectTicks -> (Case scrut altTy (alt:alts@(_:_)),ticks)) =
+  withTicks ticks (mkSelection declType (CoreId bndr) scrut altTy (alt :| alts))
 
 mkDeclarations' declType bndr app = do
   let (appF,args0,ticks) = collectArgsTicks app
@@ -479,7 +481,7 @@ mkSelection
   -> NetlistId
   -> Term
   -> Type
-  -> [Alt]
+  -> NonEmpty Alt
   -> [Declaration]
   -> NetlistMonad [Declaration]
 mkSelection declType bndr scrut altTy alts0 tickDecls = do
@@ -491,13 +493,13 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
   (_,sp) <- Lens.use curCompNm
   ite <- Lens.use backEndITE
   altHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) altTy
-  case iteAlts scrutHTy alts0 of
+  case iteAlts scrutHTy (NE.toList alts0) of
     Just (altT,altF)
       | ite
       , Concurrent <- declType
       -> do
       (scrutExpr,scrutDecls) <- case scrutHTy of
-        SP {} -> first (mkScrutExpr sp scrutHTy (fst (last alts0))) <$>
+        SP {} -> first (mkScrutExpr sp scrutHTy (fst (NE.last alts0))) <$>
                    mkExpr True declType (NetlistId scrutId scrutTy) scrut
         _ -> mkExpr False declType (NetlistId scrutId scrutTy) scrut
       altTId <- Id.suffix dstId "sel_alt_t"
@@ -521,9 +523,9 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
     _ -> do
       reprs <- Lens.view customReprs
       let alts1 = (reorderDefault . reorderCustom tcm reprs scrutTy) alts0
-      (scrutExpr,scrutDecls) <- first (mkScrutExpr sp scrutHTy (fst (head alts1))) <$>
+      (scrutExpr,scrutDecls) <- first (mkScrutExpr sp scrutHTy (fst (NE.head alts1))) <$>
                                   mkExpr True declType (NetlistId scrutId scrutTy) scrut
-      (exprs,altsDecls)      <- unzip <$> mapM (mkCondExpr scrutHTy) alts1
+      (exprs,altsDecls)      <- unzip <$> mapM (mkCondExpr scrutHTy) (NE.toList alts1)
       case declType of
         Sequential -> do
           -- Assign to the result in every branch
@@ -592,23 +594,26 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
 -- GHC puts default patterns in the first position, we want them in the
 -- last position.
 reorderDefault
-  :: [(Pat, Term)]
-  -> [(Pat, Term)]
-reorderDefault ((DefaultPat,e):alts') = alts' ++ [(DefaultPat,e)]
-reorderDefault alts'                  = alts'
+  :: NonEmpty (Pat, Term)
+  -> NonEmpty (Pat, Term)
+reorderDefault ((DefaultPat,e) :| alts') =
+  case alts' of
+    [] -> (DefaultPat,e) :| []
+    x:xs -> x :| (xs <> [(DefaultPat,e)])
+reorderDefault alts' = alts'
 
 reorderCustom
   :: TyConMap
   -> CustomReprs
   -> Type
-  -> [(Pat, Term)]
-  -> [(Pat, Term)]
+  -> NonEmpty (Pat, Term)
+  -> NonEmpty (Pat, Term)
 reorderCustom tcm reprs (coreView1 tcm -> Just ty) alts =
   reorderCustom tcm reprs ty alts
 reorderCustom _tcm reprs (coreToType' -> Right typeName) alts =
   case getDataRepr typeName reprs of
     Just (DataRepr' _name _size _constrReprs) ->
-      sortOn (patPos reprs . fst) alts
+      NE.sortOn (patPos reprs . fst) alts
     Nothing ->
       alts
 reorderCustom _tcm _reprs _type alts =
@@ -876,10 +881,10 @@ mkExpr bbEasD declType bndr app =
             return ( Identifier argNm Nothing
                    , NetDecl Nothing argNm hwTyA : decls)
     Case scrut ty' [alt] -> mkProjection bbEasD bndr scrut ty' alt
-    Case scrut tyA alts -> do
+    Case scrut tyA (alt:alts) -> do
       argNm <- Id.suffix (netlistId1 id Id.unsafeFromCoreId bndr) "sel_arg"
       decls  <- mkSelection declType (NetlistId argNm (netlistTypes1 bndr))
-                            scrut tyA alts tickDecls
+                            scrut tyA (alt :| alts) tickDecls
       if isVoid hwTyA then
         return (Noop, decls)
       else

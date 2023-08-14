@@ -125,7 +125,7 @@ isTupleTyConLike nm = tupleName (T.takeWhileEnd (/= '.') (nameOcc nm))
       | Just ('(', nm1) <- T.uncons nm0
       , Just (nm2, ')') <- T.unsnoc nm1
       = T.all (== ',') nm2
-    tupleName _ = False
+    tupleName _ = T.pack "GHC.Tuple.Prim.Tuple" `T.isPrefixOf` (nameOcc nm)
 
 -- | Get the DataCons belonging to a TyCon
 tyConDataCons :: TyCon -> [DataCon]

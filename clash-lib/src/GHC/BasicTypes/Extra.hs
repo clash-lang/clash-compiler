@@ -23,13 +23,29 @@ import GHC.Generics
 import GHC.Types.SourceText
 #endif
 
+#if MIN_VERSION_ghc(9,8,0)
+import Data.ByteString
+import GHC.Data.FastString
+import Unsafe.Coerce
+#endif
+
 deriving instance Generic InlineSpec
 instance NFData InlineSpec
 instance Binary InlineSpec
 
+#if MIN_VERSION_ghc(9,8,0)
+deriving instance Generic FastString
+instance Binary FastString
+instance Binary FastZString where
+  put = put . fastZStringToByteString
+  get = unsafeCoerce (get :: Get ByteString)
+#endif
+
 #if MIN_VERSION_ghc(9,4,0)
 deriving instance Generic SourceText
+#if !MIN_VERSION_ghc(9,8,0)
 instance NFData SourceText
+#endif
 instance Binary SourceText
 #endif
 

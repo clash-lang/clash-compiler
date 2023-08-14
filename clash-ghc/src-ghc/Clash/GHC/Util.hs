@@ -9,7 +9,16 @@ module Clash.GHC.Util
   )
 where
 
-#if MIN_VERSION_ghc(9,6,0)
+#if MIN_VERSION_ghc(9,8,0)
+import GHC.Driver.Errors.Types (GhcMessage(GhcUnknownMessage))
+import GHC.Utils.Outputable as X (showPprUnsafe, showSDocUnsafe)
+import GHC.Utils.Outputable (SDoc, neverQualify)
+import GHC.Utils.Error (mkErrorMsgEnvelope, mkPlainError)
+import GHC.Plugins
+  (DynFlags, SourceError, ($$), blankLine, empty, isGoodSrcSpan, liftIO,
+   noSrcSpan, text, throwOneError)
+import GHC.Types.Error (mkSimpleUnknownDiagnostic)
+#elif MIN_VERSION_ghc(9,6,0)
 import GHC.Driver.Errors.Types (GhcMessage(GhcUnknownMessage))
 import GHC.Utils.Outputable as X (showPprUnsafe, showSDocUnsafe)
 import GHC.Utils.Outputable (SDoc, neverQualify)
@@ -78,7 +87,9 @@ handleClashException df opts e = case fromException e of
     let srcInfo' | isGoodSrcSpan sp = srcInfo
                  | otherwise = empty
     throwOneError
-#if MIN_VERSION_ghc(9,6,0)
+#if MIN_VERSION_ghc(9,8,0)
+      (mkErrorMsgEnvelope sp neverQualify $ GhcUnknownMessage $ mkSimpleUnknownDiagnostic $ mkPlainError []
+#elif MIN_VERSION_ghc(9,6,0)
       (mkErrorMsgEnvelope sp neverQualify $ GhcUnknownMessage $ UnknownDiagnostic $ mkPlainError []
 #elif MIN_VERSION_ghc(9,4,0)
       (mkErrorMsgEnvelope sp neverQualify $ GhcUnknownMessage $ mkPlainError []
@@ -91,7 +102,9 @@ handleClashException df opts e = case fromException e of
   _ -> case fromException e of
     Just (ErrorCallWithLocation _ _) ->
       throwOneError
-#if MIN_VERSION_ghc(9,6,0)
+#if MIN_VERSION_ghc(9,8,0)
+        (mkErrorMsgEnvelope noSrcSpan neverQualify $ GhcUnknownMessage $ mkSimpleUnknownDiagnostic $ mkPlainError []
+#elif MIN_VERSION_ghc(9,6,0)
         (mkErrorMsgEnvelope noSrcSpan neverQualify $ GhcUnknownMessage $ UnknownDiagnostic $ mkPlainError []
 #elif MIN_VERSION_ghc(9,4,0)
         (mkErrorMsgEnvelope noSrcSpan neverQualify $ GhcUnknownMessage $ mkPlainError []
@@ -106,7 +119,9 @@ handleClashException df opts e = case fromException e of
         GHC.printException e'
         liftIO $ exitWith (ExitFailure 1)
       _ -> throwOneError
-#if MIN_VERSION_ghc(9,6,0)
+#if MIN_VERSION_ghc(9,8,0)
+              (mkErrorMsgEnvelope noSrcSpan neverQualify $ GhcUnknownMessage $ mkSimpleUnknownDiagnostic $ mkPlainError []
+#elif MIN_VERSION_ghc(9,6,0)
               (mkErrorMsgEnvelope noSrcSpan neverQualify $ GhcUnknownMessage $ UnknownDiagnostic $ mkPlainError []
 #elif MIN_VERSION_ghc(9,4,0)
               (mkErrorMsgEnvelope noSrcSpan neverQualify $ GhcUnknownMessage  $ mkPlainError []

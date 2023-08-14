@@ -43,17 +43,21 @@ benchFile :: [FilePath] -> FilePath -> Benchmark
 benchFile idirs src =
   env (setupEnv idirs src) $
     \ ~(clashEnv, clashDesign, supplyN) -> do
-      bench ("normalization of " ++ src)
-            (nfIO
-              (normalizeEntity
-                 clashEnv
-                 (designBindings clashDesign)
-                 (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
-                 ghcEvaluator
-                 evaluator
-                 (fmap topId (designEntities clashDesign))
-                 supplyN
-                 (topId (head (designEntities clashDesign)))))
+      let topEntities = fmap topId (designEntities clashDesign)
+      case topEntities of
+        topEntity:_ ->
+          bench ("normalization of " ++ src)
+                (nfIO
+                  (normalizeEntity
+                    clashEnv
+                    (designBindings clashDesign)
+                    (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
+                    ghcEvaluator
+                    evaluator
+                    topEntities
+                    supplyN
+                    topEntity))
+        _ -> error "no top entities"
 
 setupEnv
   :: [FilePath]

@@ -111,10 +111,11 @@ parseBBFN bbfn =
       let errs = lefts $ checkFunc func : map checkMod mods in
       case errs of
         [] -> Right $ BlackBoxFunctionName mods func
-        _  -> Left $ "Error while parsing " ++ show bbfn ++ ": " ++ head errs
+        e:_ -> Left $ "Error while parsing " ++ show bbfn ++ ": " ++ e
   where
     checkMod mod'
-      | isLower (head mod') =
+      | m':_ <- mod'
+      , isLower m' =
           Left $ "Module name cannot start with lowercase: " ++ mod'
       | any (not . isAlphaNum) mod' =
           Left $ "Module name must be alphanumerical: " ++ mod'
@@ -122,7 +123,8 @@ parseBBFN bbfn =
           Right mod'
 
     checkFunc func
-      | isUpper (head func) =
+      | f:_ <- func
+      , isUpper f =
           Left $ "Function name must start with lowercase: " ++ func
       | otherwise =
           Right func

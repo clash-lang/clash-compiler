@@ -45,6 +45,10 @@ import qualified Data.Set                    as Set
 import           Data.Word                   (Word8)
 
 -- GHC
+#if MIN_VERSION_ghc(9,8,0)
+import GHC.Types.Error (defaultOpts)
+import GHC.Iface.Errors.Ppr (missingInterfaceErrorDiagnostic)
+#endif
 #if MIN_VERSION_ghc(9,4,0)
 import           GHC.Driver.Env.KnotVars (emptyKnotVars)
 #endif
@@ -269,7 +273,11 @@ loadIface foundMod = do
                                            , "Failed to load interface for module: "
                                            , showPprUnsafe foundMod
                                            , "\nReason: "
+#if MIN_VERSION_ghc(9,8,0)
+                                           , showSDocUnsafe (missingInterfaceErrorDiagnostic defaultOpts msg)
+#else
                                            , showSDocUnsafe msg
+#endif
                                            ]
                          in traceIf True msg' (return Nothing)
 

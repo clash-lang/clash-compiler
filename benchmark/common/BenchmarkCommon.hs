@@ -59,11 +59,13 @@ runNormalisationStage idirs src = do
   supplyN <- Supply.newSupply
   (env, design) <- runInputStage idirs src
   let topEntityNames = fmap topId (designEntities design)
-  let topEntity = head topEntityNames
-  transformedBindings <-
-        normalizeEntity env (designBindings design)
-          (ghcTypeToHWType (opt_intWidth (opts idirs)))
-          ghcEvaluator
-          evaluator
-          topEntityNames supplyN topEntity
-  return (env, design{designBindings=transformedBindings},topEntity)
+  case topEntityNames of
+    topEntity:_ -> do
+      transformedBindings <-
+            normalizeEntity env (designBindings design)
+              (ghcTypeToHWType (opt_intWidth (opts idirs)))
+              ghcEvaluator
+              evaluator
+              topEntityNames supplyN topEntity
+      return (env, design{designBindings=transformedBindings},topEntity)
+    _ -> error "no top entities"

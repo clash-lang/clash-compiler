@@ -147,7 +147,9 @@ unpackNats
 unpackNats 0 _ _ _ = []
 unpackNats len width runBs endBs
   | width < 8 = ends
-  | otherwise = go (head ends) runL runBs (tail ends)
+  | otherwise = case ends of
+                  (e0:es) -> go e0 runL runBs es
+                  _ -> error ("unpackNats failed for:" <> show (len,width,runBs,endBs))
  where
   (runL, endL) = width `divMod` 8
   ends = if endL == 0 then

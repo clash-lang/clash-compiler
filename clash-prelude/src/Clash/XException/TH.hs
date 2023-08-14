@@ -117,10 +117,12 @@ mkNFDataXTupleInstance n =
         CondE
           (VarE 'isLeft `AppE` (VarE isXName `AppE` VarE t))
           (TupE [])
-          (foldl
-            (\e1 e2 -> UInfixE e1 (VarE 'seq) (VarE rnfXName `AppE` e2))
-            (VarE rnfXName `AppE` VarE (head names))
-            (map VarE (tail names)))
+          (case names of
+            (nm:nms) -> foldl
+              (\e1 e2 -> UInfixE e1 (VarE 'seq) (VarE rnfXName `AppE` e2))
+              (VarE rnfXName `AppE` VarE nm)
+              (map VarE nms)
+            [] -> error ("mkNFDataXTupleInstance, n must be atleast 1: " <> show n))
       ))
       []
     ]

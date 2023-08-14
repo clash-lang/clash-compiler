@@ -12,6 +12,7 @@ module Clash.CoSim.DSLParser
 import Prelude
 
 import Data.List (nub)
+import qualified Data.List.Infinite as Inf
 import Text.Printf (printf)
 
 import qualified Text.Parsec
@@ -205,8 +206,8 @@ anonymousNames
     -- ^ Unique anonymous argument names
 anonymousNames nVarNums' varNames' =
   let aaName n m = (replicate m '_') ++ "aa" ++ show n in
-  map (head . dropWhile (`elem` varNames')) $
-  [[aaName n m | m <- [0..]] | n <- [0..nVarNums'-1]]
+  map (Inf.head . Inf.dropWhile (`elem` varNames')) $
+  [fmap (aaName n) (Inf.iterate (+1) (0 :: Int)) | n <- [0..nVarNums'-1]]
 
 tokensToString :: CoSimDSL -> String
 tokensToString tokens = concatMap tokenToString tokens
