@@ -30,16 +30,19 @@ prepareFile idirs fIn = do
 
   let topNames = fmap topId (designEntities clashDesign)
 
-  let inputs = ( designBindings clashDesign
-               , envTyConMap clashEnv
-               , envTupleTyCons clashEnv
-               , fmap (fmap removeBBfunc) (envPrimitives clashEnv)
-               , envCustomReprs clashEnv
-               , topNames
-               , head topNames
-               , envDomains clashEnv
-               )
+  case topNames of
+    topName:_ -> do
+      let inputs = ( designBindings clashDesign
+                   , envTyConMap clashEnv
+                   , envTupleTyCons clashEnv
+                   , fmap (fmap removeBBfunc) (envPrimitives clashEnv)
+                   , envCustomReprs clashEnv
+                   , topNames
+                   , topName
+                   , envDomains clashEnv
+                   )
 
-  putStrLn $ "Serialising to : " ++ fOut
-  B.writeFile fOut $ encode (inputs :: NormalizationInputs)
-  putStrLn "Done"
+      putStrLn $ "Serialising to : " ++ fOut
+      B.writeFile fOut $ encode inputs
+      putStrLn "Done"
+    _ -> error "no top entities"
