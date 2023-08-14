@@ -34,9 +34,9 @@ bin
     -> a
     -> a
     -> a
-bin f x y = L.head $ sample $ f
-    (stimuliGenerator (x:>Nil))
-    (stimuliGenerator (y:>Nil))
+bin f x y = case sample $ f (stimuliGenerator (x:>Nil)) (stimuliGenerator (y:>Nil)) of
+              z:_ -> z
+              _ -> error "impossible"
 
 
 -- | Test equalness of fibonacci sequences generated in verilog and haskell
