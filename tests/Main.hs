@@ -872,6 +872,10 @@ runClashTest = defaultMain $ clashTestRoot
             hdlTargets=[VHDL]
           , expectClashFail=Just (NoTestExitCode, "You shouldn't use 'primitive'!")
           }
+        , runTest "MultipleGuards" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (NoTestExitCode, "You should know that ...")
+          }
         ]
       , clashTestGroup "PrimitiveReductions"
         [ runTest "Lambda" def
