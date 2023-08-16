@@ -4,12 +4,12 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Blackbox functions for primitives in one of the @Prelude@ modules.
+  Blackbox functions for primitives in the @Clash.Magic@ module.
 -}
 
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
-module Clash.Primitives.Prelude
+module Clash.Primitives.Magic
   ( clashCompileErrorBBF
   ) where
 

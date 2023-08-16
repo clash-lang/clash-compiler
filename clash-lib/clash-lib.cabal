@@ -281,7 +281,7 @@ Library
                       Clash.Primitives.GHC.Literal
                       Clash.Primitives.GHC.Word
                       Clash.Primitives.Intel.ClockGen
-                      Clash.Primitives.Prelude
+                      Clash.Primitives.Magic
                       Clash.Primitives.Sized.ToInteger
                       Clash.Primitives.Sized.Signed
                       Clash.Primitives.Sized.Vector

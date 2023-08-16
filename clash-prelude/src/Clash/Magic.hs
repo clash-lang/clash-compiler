@@ -17,6 +17,8 @@ Refer to "Clash.Annotations.TopEntity" for controlling naming of entities
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Magic
   (
@@ -36,12 +38,17 @@ module Clash.Magic
   -- ** Utilities to differentiate between simulation and generating HDL
   , clashSimulation
   , SimOnly (..)
+
+  -- * Static assertions
+  , clashCompileError
   ) where
 
+import Data.String.Interpolate     (__i)
+import GHC.Stack                   (HasCallStack, withFrozenCallStack)
 import Clash.NamedTypes            ((:::))
 import GHC.TypeLits                (Nat,Symbol)
 import Clash.Promoted.Symbol       (SSymbol)
-import Clash.Annotations.Primitive (hasBlackBox)
+import Clash.Annotations.Primitive (Primitive(..), hasBlackBox)
 
 -- | Prefix instance and register names with the given 'Symbol'
 prefixName
@@ -281,3 +288,23 @@ instance Semigroup a => Semigroup (SimOnly a) where
 
 instance Monoid a => Monoid (SimOnly a) where
   mempty = SimOnly mempty
+
+-- | Same as 'error' but will make HDL generation fail if included in the
+-- final circuit.
+--
+-- This is useful for the error case of static assertions.
+--
+-- Note that the error message needs to be a literal, and during HDL generation
+-- the error message does not include a stack trace, so it had better be
+-- descriptive.
+clashCompileError :: forall a . HasCallStack => String -> a
+clashCompileError msg = withFrozenCallStack $ error msg
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE clashCompileError #-}
+{-# ANN clashCompileError (
+  let primName = 'clashCompileError
+  in InlineYamlPrimitive [minBound..] [__i|
+    BlackBoxHaskell:
+      name: #{primName}
+      templateFunction: Clash.Primitives.Magic.clashCompileErrorBBF
+    |]) #-}

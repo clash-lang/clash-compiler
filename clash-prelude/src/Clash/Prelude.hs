@@ -104,8 +104,6 @@ module Clash.Prelude
   , isFalling
   , riseEvery
   , oscillate
-    -- * Static assertions
-  , clashCompileError
     -- * Tracing
     -- ** Simple
   , traceSignal1
@@ -195,7 +193,6 @@ import           Clash.Class.Num
 import           Clash.Class.Parity
 import           Clash.Class.Resize
 import qualified Clash.Explicit.Prelude      as E
-import           Clash.Explicit.Prelude (clashCompileError)
 import           Clash.Hidden
 import           Clash.Magic
 import           Clash.NamedTypes
