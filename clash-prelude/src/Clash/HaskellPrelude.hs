@@ -26,7 +26,7 @@ import Prelude hiding
   ((++), (!!), concat, concatMap, drop, even, foldl, foldl1, foldr, foldr1, head, init,
    iterate, last, length, map, odd, repeat, replicate, reverse, scanl, scanl1,
    scanr, scanr1, splitAt, tail, take, unzip, unzip3, zip, zip3, zipWith, zipWith3, undefined,
-   (^), getChar, putChar, getLine, (&&), (||), not)
+   (^), getChar, putChar, getLine, (&&), (||), not, maximum, minimum)
 
 import qualified Prelude
 import GHC.Magic (noinline)

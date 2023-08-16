@@ -13,13 +13,13 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 module Clash.Sized.Vector where
 
 import Data.Kind (Type)
-import GHC.TypeLits  (KnownNat, Nat, type (<=))
+import GHC.TypeLits  (KnownNat, Nat)
 import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector, Bit)
 
 type role Vec nominal representational
 data Vec :: Nat -> Type -> Type
 
-instance (KnownNat n, 1 <= n) => Foldable (Vec n)
+instance KnownNat n => Foldable (Vec n)
 
 bv2v  :: KnownNat n => BitVector n -> Vec n Bit
 map   :: (a -> b) -> Vec n a -> Vec n b

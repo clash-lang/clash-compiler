@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Myrtle Software Ltd
-                  2022     , QBayLogic B.V.
+                  2022-2023, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -75,7 +75,7 @@ module Clash.Sized.Vector
   , foldr, foldl, foldr1, foldl1, fold
   , ifoldr, ifoldl
     -- ** Specialized folds
-  , dfold, dtfold, vfold
+  , dfold, dtfold, vfold, maximum, minimum
     -- * Prefix sums (scans)
   , scanl, scanl1, scanr, scanr1, postscanl, postscanr
   , mapAccumL, mapAccumR
@@ -107,6 +107,9 @@ import Data.Constraint.Nat        (leZero)
 import Data.Data
   (Data (..), Constr, DataType, Fixity (..), Typeable, mkConstr, mkDataType)
 import Data.Either                (isLeft)
+#if MIN_VERSION_base(4,18,0)
+import qualified Data.Foldable1   as F1
+#endif
 import Data.Default.Class         (Default (..))
 import qualified Data.Foldable    as F
 import Data.Kind                  (Type)
@@ -129,7 +132,7 @@ import Prelude                    hiding ((++), (!!), concat, concatMap, drop,
                                           repeat, replicate, reverse, scanl,
                                           scanl1, scanr, scanr1, splitAt, tail,
                                           take, unzip, unzip3, zip, zip3, zipWith,
-                                          zipWith3)
+                                          zipWith3, maximum, minimum)
 import qualified Data.String.Interpolate as I
 import qualified Prelude          as P
 import Test.QuickCheck
@@ -138,9 +141,13 @@ import Unsafe.Coerce              (unsafeCoerce)
 
 import Clash.Annotations.Primitive
   (Primitive(InlineYamlPrimitive), HDL(..), dontTranslate, hasBlackBox)
+import Clash.Magic (clashCompileError)
 import Clash.Promoted.Nat
-  (SNat (..), SNatLE (..), UNat (..), compareSNat, leToPlus, pow2SNat,
+  (SNat (..), SNatLE (..), UNat (..), compareSNat, pow2SNat,
    snatProxy, snatToInteger, subSNat, withSNat, toUNat, natToInteger)
+#if MIN_VERSION_base(4,18,0)
+import Clash.Promoted.Nat (leToPlus)
+#endif
 import Clash.Promoted.Nat.Literals (d1)
 import Clash.Sized.Internal.BitVector (Bit, BitVector (..), split#)
 import Clash.Sized.Index          (Index)
@@ -317,25 +324,44 @@ instance KnownNat n => Applicative (Vec n) where
 "zipWith$map" forall f xs ys. zipWith (\g a -> g a) (map f xs) ys = zipWith f xs ys
   #-}
 
-instance (KnownNat n, 1 <= n) => F.Foldable (Vec n) where
-  fold      = leToPlus @1 @n $ fold mappend
-  foldMap f = leToPlus @1 @n $ fold mappend . map f
+instance KnownNat n => F.Foldable (Vec n) where
+  fold Nil      = mempty
+  fold z@Cons{} = fold mappend z
+  foldMap _ Nil      = mempty
+  foldMap f z@Cons{} = fold mappend (map f z)
   foldr     = foldr
   foldl     = foldl
-  foldr1 f  = leToPlus @1 @n $ foldr1 f
-  foldl1 f  = leToPlus @1 @n $ foldl1 f
+  foldr1 _ Nil      = clashCompileError "foldr1: empty Vec"
+  foldr1 f z@Cons{} = foldr1 f z
+  foldl1 _ Nil      = clashCompileError "foldl1: empty Vec"
+  foldl1 f z@Cons{} = foldl1 f z
   toList    = toList
+  null Nil  = True
   null _    = False
   length    = length
-  maximum   = leToPlus @1 @n $ fold (\x y -> if x >= y then x else y)
-  minimum   = leToPlus @1 @n $ fold (\x y -> if x <= y then x else y)
-  sum       = leToPlus @1 @n $ fold (+)
-  product   = leToPlus @1 @n $ fold (*)
+  maximum Nil      = clashCompileError "maximum: empty Vec"
+  maximum z@Cons{} = fold (\x y -> if x >= y then x else y) z
+  minimum Nil      = clashCompileError "minimum: empty Vec"
+  minimum z@Cons{} = fold (\x y -> if x <= y then x else y) z
+  sum Nil      = 0
+  sum z@Cons{} = fold (+) z
+  product Nil      = 1
+  product z@Cons{} = fold (*) z
+
+#if MIN_VERSION_base(4,18,0)
+instance (KnownNat n, 1 <= n) => F1.Foldable1 (Vec n) where
+  fold1         = leToPlus @1 @n $ fold (<>)
+  foldMap1 f    = leToPlus @1 @n $ fold (<>) . map f
+  maximum       = leToPlus @1 @n maximum
+  minimum       = leToPlus @1 @n minimum
+  head          = leToPlus @1 @n head
+  last          = leToPlus @1 @n last
+#endif
 
 instance Functor (Vec n) where
   fmap = map
 
-instance (KnownNat n, 1 <= n) => Traversable (Vec n) where
+instance KnownNat n => Traversable (Vec n) where
   traverse = traverse#
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
@@ -2491,6 +2517,20 @@ vfold :: forall k a b . KnownNat k
       -> Vec k b
 vfold f xs = dfold (Proxy @(VCons b)) f Nil xs
 {-# INLINE vfold #-}
+
+-- | The largest element of a non-empty vector
+maximum ::
+  Ord a =>
+  Vec (n + 1) a ->
+  a
+maximum = fold (\x y -> if x >= y then x else y)
+
+-- | The least element of a non-empty vector
+minimum ::
+  Ord a =>
+  Vec (n + 1) a ->
+  a
+minimum = fold (\x y -> if x <= y then x else y)
 
 -- | Apply a function to every element of a vector and the element's position
 -- (as an 'SNat' value) in the vector.
