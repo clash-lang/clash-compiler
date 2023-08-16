@@ -802,9 +802,7 @@ errOnDuplicateAnnotations nm bndrs anns =
 
 -- | Find annotations by given targets
 findAnnotationsByTargets
-  :: GHC.GhcMonad m
-  => Typeable a
-  => Data a
+  :: (GHC.GhcMonad m, Data a, Typeable a)
   => [Annotations.AnnTarget Name.Name]
   -> m [[a]]
 findAnnotationsByTargets targets =
@@ -816,9 +814,7 @@ findAnnotationsByTargets targets =
 
 -- | Find all annotations of a certain type in all modules seen so far.
 findAllModuleAnnotations
-  :: GHC.GhcMonad m
-  => Data a
-  => Typeable a
+  :: (GHC.GhcMonad m, Data a, Typeable a)
   => m [a]
 findAllModuleAnnotations = do
   hsc_env <- GHC.getSession
@@ -841,9 +837,7 @@ findAllModuleAnnotations = do
 
 -- | Find all annotations belonging to all binders seen so far.
 findNamedAnnotations
-  :: GHC.GhcMonad m
-  => Data a
-  => Typeable a
+  :: (GHC.GhcMonad m, Data a, Typeable a)
   => [CoreSyn.CoreBndr]
   -> m [[a]]
 findNamedAnnotations bndrs =
