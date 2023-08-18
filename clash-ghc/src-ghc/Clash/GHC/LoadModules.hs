@@ -518,7 +518,7 @@ loadLocalModule hdl modName = do
   localPrims <- findPrimitiveAnnotations hdl binderIds
   let loaded1 = loaded0{lbPrims=lbPrims loaded0 <> Seq.fromList localPrims}
 
-  let allBinders = concat binders ++ makeRecursiveGroups (Map.assocs (lbBinders loaded0))
+  let allBinders = makeRecursiveGroups (Map.assocs (lbBinders loaded0))
   pure (rootIds, modFamInstEnvs', rootModule, loaded1, allBinders)
 
 nameString :: Name.Name -> String
