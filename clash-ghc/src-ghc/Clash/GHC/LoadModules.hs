@@ -29,7 +29,7 @@ where
 #endif
 
 -- External Modules
-import           Clash.Annotations.Primitive     (HDL, PrimitiveGuard)
+import           Clash.Annotations.Primitive     (HDL, PrimitiveGuard(..))
 import           Clash.Annotations.TopEntity     (TopEntity (..))
 import           Clash.Primitives.Types          (UnresolvedPrimitive)
 import           Clash.Util                      (ClashException(..), pkgIdFromTypeable)
@@ -39,6 +39,7 @@ import           Control.Exception               (SomeException, throw)
 import           Control.Monad                   (forM, join, when)
 import           Data.List.Extra                 (nubSort)
 import           Control.Exception               (throwIO)
+import           Control.Monad                   (foldM)
 #if MIN_VERSION_ghc(9,0,0)
 import           Control.Monad.Catch             as MC (try)
 #endif
@@ -786,25 +787,42 @@ errOnDuplicateAnnotations
   -> [[a]]
   -- ^ Parsed annotations
   -> [(CoreSyn.CoreBndr, a)]
-errOnDuplicateAnnotations nm bndrs anns =
+errOnDuplicateAnnotations nm =
+  combineAnnotationsWith err nm
+ where
+  err _ _ = Left $ "A binder can't have more than one '" ++ nm ++ "' annotation."
+
+combineAnnotationsWith
+  :: forall a. (a -> a -> Either String a)
+  -- ^ function to (attempts to) combine different annotations
+  -> String
+  -- ^ Name of annotation
+  -> [CoreSyn.CoreBndr]
+  -- ^ Binders searched for
+  -> [[a]]
+  -- ^ Parsed annotations
+  -> [(CoreSyn.CoreBndr, a)]
+combineAnnotationsWith f nm bndrs anns =
   go (zip bndrs anns)
  where
-  go
-    :: [(CoreSyn.CoreBndr, [a])]
-    -> [(CoreSyn.CoreBndr, a)]
+  go :: [(CoreSyn.CoreBndr, [a])] -> [(CoreSyn.CoreBndr, a)]
   go []             = []
   go ((_, []):ps)   = go ps
-  go ((b, [p]):ps)  = (b, p) : (go ps)
-  go ((b, _):_)  =
-    Panic.pgmError $ "The following value has multiple "
-                  ++ "'" ++ nm ++ "' annotations: "
-                  ++ Outputable.showSDocUnsafe (ppr b)
+  go ((b, (a:as)):ps) = case foldM f a as of
+    Left err ->
+      Panic.pgmError $ "Error processing '" ++ nm ++ "' annotations on "
+                       ++ Outputable.showSDocUnsafe (pprQualified $ Var.varName b)
+                       ++ ":\n" ++ err
+    Right x -> (b, x) : go ps
+  pprQualified :: Name.Name -> Outputable.SDoc
+  pprQualified x = case Name.nameModule_maybe x of
+    Just m  -> Outputable.hcat [ppr m, Outputable.dot, ppr x]
+    Nothing -> ppr x
+
 
 -- | Find annotations by given targets
 findAnnotationsByTargets
-  :: GHC.GhcMonad m
-  => Typeable a
-  => Data a
+  :: (GHC.GhcMonad m, Data a, Typeable a)
   => [Annotations.AnnTarget Name.Name]
   -> m [[a]]
 findAnnotationsByTargets targets =
@@ -816,9 +834,7 @@ findAnnotationsByTargets targets =
 
 -- | Find all annotations of a certain type in all modules seen so far.
 findAllModuleAnnotations
-  :: GHC.GhcMonad m
-  => Data a
-  => Typeable a
+  :: (GHC.GhcMonad m, Data a, Typeable a)
   => m [a]
 findAllModuleAnnotations = do
   hsc_env <- GHC.getSession
@@ -841,9 +857,7 @@ findAllModuleAnnotations = do
 
 -- | Find all annotations belonging to all binders seen so far.
 findNamedAnnotations
-  :: GHC.GhcMonad m
-  => Data a
-  => Typeable a
+  :: (GHC.GhcMonad m, Data a, Typeable a)
   => [CoreSyn.CoreBndr]
   -> m [[a]]
 findNamedAnnotations bndrs =
@@ -855,8 +869,14 @@ findPrimitiveGuardAnnotations
   -> m [(Text.Text, (PrimitiveGuard ()))]
 findPrimitiveGuardAnnotations bndrs = do
   anns0 <- findNamedAnnotations bndrs
-  let anns1 = errOnDuplicateAnnotations "PrimitiveGuard" bndrs anns0
+  let anns1 = combineAnnotationsWith combinePrimGuards "PrimitiveGuard" bndrs anns0
   pure (map (first (qualifiedNameString' . Var.varName)) anns1)
+ where
+  combinePrimGuards a b = case (a,b) of
+    (HasBlackBox x _, HasBlackBox y _) -> Right (HasBlackBox (x++y) ())
+    (DontTranslate  , DontTranslate)   -> Right DontTranslate
+    (_,_) -> Left "One binder can't have both HasBlackBox and DontTranslate annotations."
+
 
 -- | Find annotations of type @DataReprAnn@ and convert them to @DataRepr'@
 findCustomReprAnnotations
