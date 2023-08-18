@@ -49,6 +49,7 @@ import Clash.Explicit.Prelude
 import Clash.Annotations.Primitive (Primitive (InlineYamlPrimitive))
 
 import Data.String.Interpolate (__i)
+import GHC.Magic (lazy)
 
 import Clash.Cores.Xilinx.VIO.Internal.BlackBoxes
 
@@ -123,7 +124,12 @@ vioProbe# ::
   o ->
   Clock dom ->
   a
-vioProbe# !_inputNames !_outputNames !_initialOutputProbeValues !_clk = vioX @dom @a @o
+vioProbe# !_inputNames !_outputNames !_initialOutputProbeValues clk =
+  lazy clk `seq` -- Ensure clk is considered used, but not marked "used once".
+                 -- This makes makes GHC not inline the clock argument.
+                 --
+                 -- Fixes #2532
+  vioX @dom @a @o
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE vioProbe# #-}
 {-# ANN vioProbe# (
