@@ -246,6 +246,7 @@ instance IsTest ClashGenTest where
 #else
       , "-DCLASH_OPAQUE=NOINLINE"
 #endif
+      , "-XCPP"
       ] <> cgExtraArgs
 
     target =
