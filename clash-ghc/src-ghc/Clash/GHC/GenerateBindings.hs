@@ -11,6 +11,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.GHC.GenerateBindings
   (generateBindings)
@@ -24,10 +25,11 @@ import qualified Control.Monad.State     as State
 import qualified Control.Monad.RWS.Strict as RWS
 import           Data.Coerce             (coerce)
 import           Data.Either             (partitionEithers, lefts ,rights)
+import qualified Data.HashMap.Strict     as HashMap
 import           Data.IntMap.Strict      (IntMap)
 import qualified Data.IntMap.Strict      as IMS
-import qualified Data.HashMap.Strict     as HashMap
-import           Data.List               (isPrefixOf)
+import qualified Data.IntSet             as IntSet
+import           Data.List               (isPrefixOf, (\\))
 import           Data.Maybe              (listToMaybe)
 import qualified Data.Text               as Text
 import qualified Data.Time.Clock         as Clock
@@ -96,10 +98,13 @@ import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
 import           Clash.Netlist.BlackBox.Util (getUsedArguments)
 import           Clash.Netlist.Types     (TopEntityT(..))
 import           Clash.Primitives.Types
-  (Primitive (..), CompiledPrimMap)
+  (Primitive (..), CompiledPrimitive, CompiledPrimMap, UsedArguments(..))
 import           Clash.Primitives.Util   (generatePrimMap)
 import           Clash.Util              (reportTimeDiff)
 import qualified Clash.Util.Interpolate as I
+
+import Clash.Explicit.Prelude (clashCompileError)
+import Clash.XException (errorX)
 
 -- | Safe indexing, returns a 'Nothing' if the index does not exist
 indexMaybe :: [a] -> Int -> Maybe a
@@ -311,8 +316,30 @@ global bindings when they appear in a term.
 checkPrimitive :: CompiledPrimMap -> GHC.CoreBndr -> C2C ()
 checkPrimitive primMap v = do
   nm <- qualifiedNameString (GHC.varName v)
-  case HashMap.lookup nm primMap >>= extractPrim of
-    Just (BlackBox{resultNames, resultInits, template, includes}) -> do
+  let ty = GHC.varType v
+#if MIN_VERSION_ghc(9,2,0)
+      (argTys,_resTy) = GHC.splitFunTys (snd (GHC.splitForAllTyCoVars ty))
+#else
+      (argTys,_resTy) = GHC.splitFunTys (snd (GHC.splitForAllTys ty))
+#endif
+      nrOfArgs = length argTys
+
+  let primUsedArgs :: CompiledPrimitive -> [Int]
+      primUsedArgs (BlackBox{resultNames, resultInits, template, includes}) =
+        IntSet.toAscList $
+          IntSet.unions $ map IntSet.fromList
+                 [ concatMap getUsedArguments resultNames
+                 , concatMap getUsedArguments resultInits
+                 , getUsedArguments template
+                 , concatMap (getUsedArguments . snd) includes
+                 ]
+      primUsedArgs (BlackBoxHaskell {usedArguments}) = extractUsedArgs usedArguments
+      primUsedArgs (Primitive {}) = [0..nrOfArgs-1] -- assume all arguments are used
+      extractUsedArgs (UsedArguments xs) = xs
+      extractUsedArgs (IgnoredArguments xs) = [0..nrOfArgs-1] \\ xs
+
+  case fmap primUsedArgs (extractPrim =<< HashMap.lookup nm primMap) of
+    Just usedArgs -> do
       let
         info = GHC.idInfo v
         inline = GHC.inlinePragmaSpec $ GHC.inlinePragInfo info
@@ -321,18 +348,11 @@ checkPrimitive primMap v = do
 #else
         strictness = GHC.strictnessInfo info
 #endif
-        ty = GHC.varType v
-#if MIN_VERSION_ghc(9,2,0)
-        (argTys,_resTy) = GHC.splitFunTys (snd (GHC.splitForAllTyCoVars ty))
-#else
-        (argTys,_resTy) = GHC.splitFunTys . snd . GHC.splitForAllTys $ ty
-#endif
 #if MIN_VERSION_ghc(9,4,0)
         (dmdArgs,_dmdRes) = GHC.splitDmdSig strictness
 #else
         (dmdArgs,_dmdRes) = GHC.splitStrictSig strictness
 #endif
-        nrOfArgs = length argTys
         loc = case GHC.getSrcLoc v of
                 GHC.UnhelpfulLoc _ -> ""
 #if MIN_VERSION_ghc(9,0,0)
@@ -343,11 +363,6 @@ checkPrimitive primMap v = do
         warnIf cond msg = traceIf cond ("\n"++loc++"Warning: "++msg) return ()
       qName <- Text.unpack <$> qualifiedNameString (GHC.varName v)
       let primStr = "primitive " ++ qName ++ " "
-      let usedArgs = concat [ concatMap getUsedArguments resultNames
-                            , concatMap getUsedArguments resultInits
-                            , getUsedArguments template
-                            , concatMap (getUsedArguments . snd) includes
-                            ]
 
       let warnArgs [] = return ()
           warnArgs (x:xs) = do
@@ -358,7 +373,7 @@ checkPrimitive primMap v = do
                "arguments by an undefined value.")
             warnArgs xs
 
-      unless (qName == "Clash.XException.errorX" || "GHC." `isPrefixOf` qName) $ do
+      unless (qName == show 'errorX || qName == show 'clashCompileError || "GHC." `isPrefixOf` qName) $ do
         warnIf (not (isOpaque inline))
 #if MIN_VERSION_ghc(9,4,0)
           (primStr ++ "isn't marked OPAQUE."
