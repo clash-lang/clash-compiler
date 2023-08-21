@@ -384,7 +384,8 @@ flush (File fp) = SimIO (IO.hFlush fp)
 --     regIn  = 'mealyIO' clk tbMachine tbInit regOut
 -- @
 mealyIO
-  :: KnownDomain dom
+  :: forall dom s i o
+   . KnownDomain dom
   => Clock dom
   -- ^ Clock at which rate the I\/O environment progresses
   -> (s -> i -> SimIO o)
@@ -393,7 +394,8 @@ mealyIO
   -- ^ I/O action to create the initial state
   -> Signal dom i
   -> Signal dom o
-mealyIO !_ f (SimIO i) inp = unsafePerformIO (i >>= go inp)
+mealyIO !_ f (SimIO i) inp = knownDomain @dom `seq` -- artificially create demand for `KnownDomain dom`, it is needed in Clash.Netlist.BlackBox.collectMealy
+  unsafePerformIO (i >>= go inp)
  where
   go q@(~(k :- ks)) s =
     (:-) <$> unSimIO (f s k) <*> unsafeInterleaveIO ((q `seq` go ks s))

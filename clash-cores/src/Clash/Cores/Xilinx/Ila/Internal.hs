@@ -151,7 +151,7 @@ ilaBBF :: HasCallStack => BlackBoxFunction
 ilaBBF _isD _primName args _resTys = Lens.view tcCache >>= go
  where
   go tcm
-    | _:_:_:config:_ <- lefts args
+    | _:_:config:_ <- lefts args
     , _:_:(coreView tcm -> LitTy (NumTy n)):_ <- rights args
     , Just (SomeNat (Proxy :: Proxy n)) <- someNatVal n
     = case termToDataError @(IlaConfig n) config of
@@ -176,8 +176,7 @@ ilaBBF _isD _primName args _resTys = Lens.view tcCache >>= go
 usedArguments :: [Int]
 usedArguments = ilaConfig : clock : inputProbes
  where
-  (    _knownDomain
-    :< _ilaConstraint
+  (    _ilaConstraint
     :< _1nConstraint
     :< ilaConfig
     :< clock
@@ -215,8 +214,7 @@ ilaBBTF ::
   BlackBoxContext ->
   State s Doc
 ilaBBTF config bbCtx
-  | (   _knownDomainDom
-      : _ilaConstraint
+  | (   _ilaConstraint
       : _1nConstraint
       : _ilaConfig
       : clk
@@ -289,8 +287,7 @@ ilaTclBBTF ::
   State s Doc
 ilaTclBBTF config@IlaConfig{..} bbCtx
   | [ilaName] <- bbQsysIncName bbCtx
-  , (   _knownDomainDom
-    : _IlaConstraint
+  , ( _IlaConstraint
     : _1nConstraint
     : _ilaConfig
     : _clk

@@ -56,7 +56,7 @@ module Clash.Explicit.Verification
  where
 
 import           Prelude
-  (Bool, Word, (.), pure, max, concat)
+  (Bool, Word, (.), pure, max, concat, seq)
 
 import           Data.Text  (Text)
 import           Data.Maybe (Maybe(Just))
@@ -64,7 +64,7 @@ import           Data.String.Interpolate (__i)
 
 import           Clash.Annotations.Primitive
   (Primitive(InlineYamlPrimitive), HDL(..))
-import           Clash.Signal.Internal (KnownDomain, Signal, Clock, Reset)
+import           Clash.Signal.Internal (KnownDomain, Signal, Clock, Reset, knownDomain)
 import           Clash.XException      (errorX, hwSeqX)
 
 import           Clash.Verification.Internal
@@ -247,7 +247,8 @@ assume = Property . CvAssume . assertion . toAssertionValue
 -- | Print property as PSL/SVA in HDL. Clash simulation support not yet
 -- implemented.
 check
-  :: KnownDomain dom
+  :: forall dom
+   . KnownDomain dom
   => Clock dom
   -> Reset dom
   -> Text
@@ -256,7 +257,7 @@ check
   -- ^ Assertion language to use in HDL
   -> Property dom
   -> Signal dom AssertionResult
-check !_clk !_rst !_propName !_renderAs !_prop =
+check !_clk !_rst !_propName !_renderAs !_prop = knownDomain @dom `seq` -- artificially create demand for `KnownDomain dom`, it is used in Clash.Primitives.Verification.checkTF'
   pure (errorX (concat [
       "Simulation for Clash.Verification not yet implemented. If you need this,"
     , " create an issue at https://github.com/clash-compiler/clash-lang/issues." ]))

@@ -6,7 +6,7 @@ import Data.String.Interpolate (__i)
 
 test :: Bool
 test = True
-{-# NOINLINE test #-}
+{-# CLASH_OPAQUE test #-}
 {-# ANN test hasBlackBox #-}
 {-# ANN test (warnAlways "WARN1") #-}
 {-# ANN test (warnAlways "WARN2: You should know that ...") #-}

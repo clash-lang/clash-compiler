@@ -15,8 +15,10 @@ import Data.Word
 import qualified Data.List as L
 import qualified Data.String.Interpolate as I
 
+import Data.Proxy
 import GHC.Natural
 import GHC.Prim
+import GHC.Types
 
 topEntity = foo @0 (SNat @1)
                 2 3
@@ -25,7 +27,8 @@ topEntity = foo @0 (SNat @1)
                 14 15 16
                 17# 18##
 
-foo :: KnownNat x0
+foo :: forall x0 x1
+     . KnownNat x0
     => SNat x1
     -> Integer -> Natural
     -> Int -> Int8 -> Int16 -> Int32 -> Int64
@@ -38,8 +41,8 @@ foo !x1
     !x4 !x5 !x6 !x7 !x8
     !x9 !x10 !x11 !x12 !x13
     !x14 !x15 !x16
-    !x17 !x18
-    = False
+    x17 x18  -- NOTE: because x17 and x18 are unboxed we can't simply force them with !
+    = natVal (Proxy @x0) `seq` (I# x17 > 17) || (W# x18 > 18)
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE foo #-}

@@ -88,7 +88,7 @@ deriveBundleTuples bundleTyName unbundledTyName bundleName unbundleName = do
         -- unbundle3# ~s@((a, b, c) :- abcs) =
         --   let (as, bs, cs) = s `seq` unbundle3# abcs in
         --   (a :- as, b :- bs, c :- cs)
-        unbundleNoInlineAnn = PragmaD (InlineP unbundlePrimName NoInline FunLike AllPhases)
+        unbundleNoInlineAnn = clashOpaque unbundlePrimName
 
         unbundleSig = SigD unbundlePrimName (
           mkFunTys
@@ -123,7 +123,7 @@ deriveBundleTuples bundleTyName unbundledTyName bundleName unbundleName = do
               [] ]
 
         -- bundle2# (a1, a2) = (\ a1' a2' -> (a1', a2')) <$> a1 <*> a2
-        bundleNoInlineAnn = PragmaD (InlineP bundlePrimName NoInline FunLike AllPhases)
+        bundleNoInlineAnn = clashOpaque bundlePrimName
 
         bundleSig = SigD bundlePrimName (
           mkFunTys
@@ -167,3 +167,12 @@ mkFunTys :: Foldable t => t TH.Type -> TH.Type -> TH.Type
 mkFunTys args res= foldl' go res args
  where
   go l r = AppT (AppT ArrowT l) r
+
+-- Creates OPAQUE or NOINLINE annotation
+clashOpaque :: TH.Name -> Dec
+clashOpaque nm = PragmaD $
+#if __GLASGOW_HASKELL__ >= 904
+  OpaqueP nm
+#else
+  InlineP nm NoInline FunLike AllPhases
+#endif

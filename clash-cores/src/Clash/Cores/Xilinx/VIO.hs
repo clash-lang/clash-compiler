@@ -118,7 +118,7 @@ vioProbe inputNames outputNames initialOutputProbeValues clk =
 -- probabilities.
 vioProbe# ::
   forall dom a o n m.
-  (KnownDomain dom, VIO dom a o) =>
+  VIO dom a o =>
   Vec n String ->
   Vec m String ->
   o ->
