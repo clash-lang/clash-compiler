@@ -123,6 +123,7 @@ jobs:
 
           - ghc: 8.6.5
             multiple_hidden: no
+            workaround_ghc_mmap_crash: yes
 
           - ghc: 9.0.2
             workaround_ghc_mmap_crash: yes
