@@ -100,14 +100,17 @@ jobs:
           - name: GHC 8.6.5, Single Hidden
             ghc: 8.6.5
             multiple_hidden: no
+            workaround_ghc_mmap_crash: yes
 
           - name: GHC 8.8.4, Multiple Hidden
             ghc: 8.8.4
             multiple_hidden: yes
+            workaround_ghc_mmap_crash: yes
 
           - name: GHC 8.10.7, Multiple Hidden
             ghc: 8.10.7
             multiple_hidden: yes
+            workaround_ghc_mmap_crash: yes
 
           - name: GHC 9.0.2, Multiple Hidden
             ghc: 9.0.2

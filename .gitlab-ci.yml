@@ -33,10 +33,10 @@ tests:
     strategy: depend
   parallel:
     matrix:
-      - GHC_VERSION: [8.8.4, 8.10.7]
-      - GHC_VERSION: 9.0.2
+      - GHC_VERSION: [8.8.4, 8.10.7, 9.0.2]
         WORKAROUND_GHC_MMAP_CRASH: "yes"
       - GHC_VERSION: 8.6.5
+        WORKAROUND_GHC_MMAP_CRASH: "yes"
         MULTIPLE_HIDDEN: "no"
 
 stack-build:
