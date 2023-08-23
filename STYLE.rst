@@ -45,9 +45,9 @@ space. Some examples:
      where
       greeting name = "Hello, " ++ name ++ "!"
 
-    filter 
-      :: (a -> Bool) 
-      -> [a] 
+    filter
+      :: (a -> Bool)
+      -> [a]
       -> [a]
     filter _ [] = []
     filter p (x:xs)
@@ -86,11 +86,11 @@ instead. An example of a multiline tuple declaration is:
       ( a
       , b
       , c )
-      
-    goodMulti2 = 
+
+    goodMulti2 =
       ( a
       , b
-      , c 
+      , c
       )
 
 Use nested tuples as such:
@@ -114,7 +114,7 @@ multiple constructors, each constructor will get its own line. Example:
 
 .. code:: haskell
 
-    data Tree a 
+    data Tree a
       = Branch !a !(Tree a) !(Tree a)
       | Leaf
       deriving (Eq, Show)
@@ -123,7 +123,7 @@ Data types deriving lots of instances may be written like:
 
 .. code:: haskell
 
-    data Tree a 
+    data Tree a
       = Branch !a !(Tree a) !(Tree a)
       | Leaf
       deriving
@@ -141,11 +141,11 @@ Format records as follows:
 .. code:: haskell
 
     data Person = Person
-      { firstName :: !String  
+      { firstName :: !String
       -- ^ First name
-      , lastName :: !String  
+      , lastName :: !String
       -- ^ Last name
-      , age :: !Int     
+      , age :: !Int
       -- ^ Age
       } deriving (Eq, Show)
 
@@ -168,7 +168,7 @@ You may put the closing bracket on a new line. Use your judgement.
     exceptions =
       [ InvalidStatusCode
       , MissingContentHeader
-      , InternalServerError 
+      , InternalServerError
       ]
 
 You may not skip the first newline.
@@ -179,7 +179,7 @@ You may not skip the first newline.
     directions = [ North
                  , East
                  , South
-                 , West 
+                 , West
                  ]
 
 *unless* it fits on a single line:
@@ -212,8 +212,8 @@ Or:
 
 .. code:: haskell
 
-    exceptions = 
-         North :> East :> South 
+    exceptions =
+         North :> East :> South
       :> West :> Middle :> Nil
 
 Language pragmas
@@ -257,13 +257,13 @@ your judgement. Some examples:
 .. code:: haskell
 
     bar :: IO ()
-    bar = 
+    bar =
       forM_ [1, 2, 3] $ \n -> do
         putStrLn "Here comes a number!"
         print n
 
     foo :: IO ()
-    foo = 
+    foo =
       alloca 10 $ \a ->
       alloca 20 $ \b ->
       cFunction a b
@@ -299,17 +299,17 @@ like you would normal expressions:
 
 .. code:: haskell
 
-    foo = 
-      if cond0 then 
+    foo =
+      if cond0 then
         ...
-      else 
+      else
         ...
 
 When used in monadic contexts, use:
 
 .. code:: haskell
 
-    foo = 
+    foo =
       if cond0 then do
         ...
       else do
@@ -337,7 +337,7 @@ the two following styles:
 
 .. code:: haskell
 
-    foobar = 
+    foobar =
       case something of
         Just j  -> foo
         Nothing -> bar
@@ -346,18 +346,18 @@ or as
 
 .. code:: haskell
 
-    foobar = 
+    foobar =
       case something of
-        Just j -> 
+        Just j ->
           foo
-        Nothing -> 
+        Nothing ->
           bar
 
 In monadic contexts, use:
 
 .. code:: haskell
 
-    foobar = 
+    foobar =
       case something of
         Just j -> do
           foo
@@ -383,7 +383,7 @@ Longer ones should be put on multiple lines:
 
 .. code:: haskell
 
-    toInt 
+    toInt
       :: Int
       -- ^ Shift char by /n/
       -> Char
@@ -394,7 +394,7 @@ Multiple constraints can be added with a "tuple":
 
 .. code:: haskell
 
-    toInt 
+    toInt
       :: (Num a, Show a)
       => a
       -- ^ Shift char by /n/
@@ -406,7 +406,7 @@ Many constraints need to be split accross multiple lines too:
 
 .. code:: haskell
 
-    toInt 
+    toInt
       :: ( Num a
          , Show a
          , Foo a
@@ -423,7 +423,7 @@ Many constraints need to be split accross multiple lines too:
 
 .. code:: haskell
 
-    toInt 
+    toInt
       :: forall a
        . (Num a , Show a)
       => a
@@ -449,7 +449,7 @@ your function would end up looking like:
          , Functor f )
       => f a
       -> f b
-      -> f c  
+      -> f c
 
 Imports
 -------
@@ -499,12 +499,12 @@ every exported data type. Function example:
     -- | Send a message on a socket. The socket must be in a connected
     -- state. Returns the number of bytes sent. Applications are
     -- responsible for ensuring that all data has been sent.
-    send 
+    send
       :: Socket
       -- ^ Connected socket
-      -> ByteString  
+      -> ByteString
       -- ^ Data to send
-      -> IO Int      
+      -> IO Int
       -- ^ Bytes sent
 
 For functions the documentation should give enough information apply the
@@ -516,9 +516,9 @@ Record example:
 
     -- | Bla bla bla.
     data Person = Person
-      { age  :: !Int     
+      { age  :: !Int
       -- ^ Age
-      , name :: !String  
+      , name :: !String
       -- ^ First name
       }
 
@@ -544,7 +544,7 @@ comments for data type definitions. Some examples:
 
 .. code:: haskell
 
-    data Parser = 
+    data Parser =
       Parser
         !Int         -- Current position
         !ByteString  -- Remaining input
@@ -603,8 +603,8 @@ spend thinking about evaluation order.
 
     -- Good
     data Point = Point
-      { pointX :: !Double  
-      , pointY :: !Double 
+      { pointX :: !Double
+      , pointY :: !Double
       }
 
 .. code:: haskell
