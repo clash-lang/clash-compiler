@@ -4,7 +4,7 @@
     type: |-
       rom# :: ( KnownDomain dom        ARG[0]
                , KnownNat n    --       ARG[1]
-               , Undefined a ) --       ARG[2]
+               , NFDataX a )   --       ARG[2]
             => Clock dom       -- clk,  ARG[3]
             => Enable dom      -- en,   ARG[4]
             -> Vec n a         -- init, ARG[5]

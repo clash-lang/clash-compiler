@@ -5,7 +5,7 @@
       blockRam#
         :: ( KnownDomain dom        ARG[0]
            , HasCallStack  --       ARG[1]
-           , Undefined a ) --       ARG[2]
+           , NFDataX a )   --       ARG[2]
         => Clock dom       -- clk,  ARG[3]
         -> Enable dom      -- en,   ARG[4]
         -> Vec n a         -- init, ARG[5]
@@ -50,7 +50,7 @@
       blockRamU#
         :: ( KnownDomain dom        ARG[0]
            , HasCallStack  --       ARG[1]
-           , Undefined a ) --       ARG[2]
+           , NFDataX a )   --       ARG[2]
         => Clock dom       -- clk,  ARG[3]
         -> Enable dom      -- en,   ARG[4]
         -> SNat n          -- len,  ARG[5]
@@ -92,7 +92,7 @@
       blockRam1#
         :: ( KnownDomain dom        ARG[0]
            , HasCallStack  --       ARG[1]
-           , Undefined a ) --       ARG[2]
+           , NFDataX a )   --       ARG[2]
         => Clock dom       -- clk,  ARG[3]
         -> Enable dom      -- en,   ARG[4]
         -> SNat n          -- len,  ARG[5]

@@ -128,7 +128,7 @@ Data types deriving lots of instances may be written like:
       | Leaf
       deriving
         ( Eq, Show, Ord, Read, Functor, Generic, NFData
-        , Undefined, BitPack, ShowX)
+        , NFDataX, BitPack, ShowX)
 
 Data types with a single constructor may be written on a single line:
 
@@ -443,7 +443,7 @@ your function would end up looking like:
            resetDomain
            resetKind
            domainGatedness
-       . ( Undefined a
+       . ( NFDataX a
          , Ord b
          , NFData c
          , Functor f )
