@@ -117,12 +117,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: [ "8.6.5", "9.0.2", "9.6.1" ]
+        ghc: [ "8.6.5", "9.0.2", "9.6.2" ]
         include:
           - multiple_hidden: yes
 
           - ghc: 8.6.5
             multiple_hidden: no
+            workaround_ghc_mmap_crash: yes
 
           - ghc: 9.0.2
             workaround_ghc_mmap_crash: yes
@@ -130,7 +131,7 @@ jobs:
 
     # Run steps inside the clash CI docker image
     container:
-      image: ghcr.io/clash-lang/clash-ci-${{ matrix.ghc }}:2023-05-16
+      image: ghcr.io/clash-lang/clash-ci-${{ matrix.ghc }}:2023-08-22
 
       env:
         THREADS: 2
