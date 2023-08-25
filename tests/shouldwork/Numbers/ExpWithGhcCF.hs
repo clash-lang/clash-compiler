@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-specialise #-} -- TODO: remove when https://gitlab.haskell.org/ghc/ghc/-/issues/23109#note_499130 is fixed
 
 module ExpWithGhcCF where
 import Clash.Prelude
