@@ -1,0 +1,3 @@
+CHANGED: The `Foldable (Vec n)` instance and `Traversable (Vec n)` instance no longer have the `1 <= n` constraint. `Foldable.{foldr1,foldl1,maximum,minimum}` functions now throw an error at run-/simulation-time, and also at HDL-generation time, for vectors of length zero.
+CHANGED: The `maximum` and `minimum` functions exported by `Clash.Prelude` work on non-empty vectors, instead of the more generic version from `Data.Foldable`.
+ADDED: `1 <= n => Foldable1 (Vec n)` instance (`base-4.18+` only)

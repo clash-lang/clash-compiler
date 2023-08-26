@@ -13,8 +13,6 @@ defined in "Clash.Prelude".
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TemplateHaskellQuotes #-}
 
 {-# LANGUAGE Unsafe #-}
 
@@ -80,8 +78,6 @@ module Clash.Explicit.Prelude
   , isFalling
   , riseEvery
   , oscillate
-    -- * Static assertions
-  , clashCompileError
     -- * Testbench functions
   , assert
   , stimuliGenerator
@@ -154,8 +150,6 @@ where
 import Control.Applicative
 import Data.Bits
 import Data.Default.Class
-import Data.String.Interpolate (__i)
-import GHC.Stack (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits
 #if MIN_VERSION_base(4,18,0)
   hiding (SNat, SSymbol, fromSNat)
@@ -164,7 +158,6 @@ import GHC.TypeLits.Extra
 import Language.Haskell.TH.Syntax  (Lift(..))
 import Clash.HaskellPrelude
 
-import Clash.Annotations.Primitive (Primitive(..))
 import Clash.Annotations.TopEntity
 import Clash.Class.AutoReg
 import Clash.Class.BitPack
@@ -290,23 +283,3 @@ windowD clk rst en x =
       next = x +>> prev
   in  prev
 {-# INLINABLE windowD #-}
-
--- | Same as 'error' but will make HDL generation fail if included in the
--- final circuit.
---
--- This is useful for the error case of static assertions.
---
--- Note that the error message needs to be a literal, and during HDL generation
--- the error message does not include a stack trace, so it had better be
--- descriptive.
-clashCompileError :: forall a . HasCallStack => String -> a
-clashCompileError msg = withFrozenCallStack $ error msg
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE clashCompileError #-}
-{-# ANN clashCompileError (
-  let primName = 'clashCompileError
-  in InlineYamlPrimitive [minBound..] [__i|
-    BlackBoxHaskell:
-      name: #{primName}
-      templateFunction: Clash.Primitives.Prelude.clashCompileErrorBBF
-    |]) #-}

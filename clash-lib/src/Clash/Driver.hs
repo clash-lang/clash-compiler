@@ -139,7 +139,7 @@ import qualified Clash.Primitives.Sized.Vector    as P
 import qualified Clash.Primitives.GHC.Int         as P
 import qualified Clash.Primitives.GHC.Word        as P
 import qualified Clash.Primitives.Intel.ClockGen  as P
-import qualified Clash.Primitives.Prelude         as P
+import qualified Clash.Primitives.Magic           as P
 import qualified Clash.Primitives.Verification    as P
 import qualified Clash.Primitives.Xilinx.ClockGen as P
 import           Clash.Primitives.Types
