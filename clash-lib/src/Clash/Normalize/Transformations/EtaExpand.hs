@@ -71,7 +71,7 @@ etaExpansionTL (TransformContext is0 ctx) (Lam bndr e) = do
   return $ Lam bndr e'
 
 etaExpansionTL (TransformContext is0 ctx) (Let (NonRec i x) e) = do
-  let ctx' = TransformContext (extendInScopeSet is0 i) (LetBody [i] : ctx)
+  let ctx' = TransformContext (extendInScopeSet is0 i) (LetBody [(i,x)] : ctx)
   e' <- etaExpansionTL ctx' e
   case stripLambda e' of
     (bs@(_:_),e2) -> do
@@ -81,7 +81,7 @@ etaExpansionTL (TransformContext is0 ctx) (Let (NonRec i x) e) = do
 
 etaExpansionTL (TransformContext is0 ctx) (Let (Rec xes) e) = do
   let bndrs = map fst xes
-      ctx' = TransformContext (extendInScopeSetList is0 bndrs) (LetBody bndrs : ctx)
+      ctx' = TransformContext (extendInScopeSetList is0 bndrs) (LetBody xes : ctx)
   e' <- etaExpansionTL ctx' e
   case stripLambda e' of
     (bs@(_:_),e2) -> do

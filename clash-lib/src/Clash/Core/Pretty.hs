@@ -455,7 +455,7 @@ pprPrecCast prec e ty1 ty2 = do
 pprPrecLetrec :: Monad m => Rational -> Bool -> [(Id, Term)] -> Term -> m ClashDoc
 pprPrecLetrec prec isRec xes body = do
   let bndrs = fst <$> xes
-  body' <- annotate (AnnContext $ LetBody bndrs) <$> pprPrec noPrec body
+  body' <- annotate (AnnContext $ LetBody xes) <$> pprPrec noPrec body
   xes'  <- mapM (\(x,e) -> do
                   x' <- pprBndr LetBind x
                   e' <- pprPrec noPrec e

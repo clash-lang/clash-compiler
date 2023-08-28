@@ -266,7 +266,7 @@ data CoreContext
   -- ^ Function position of a type application
   | LetBinding Id [Id]
   -- ^ RHS of a Let-binder with the sibling LHS'
-  | LetBody [Id]
+  | LetBody [LetBinding]
   -- ^ Body of a Let-binding with the bound LHS'
   | LamBody Id
   -- ^ Body of a lambda-term with the abstracted variable
@@ -303,7 +303,7 @@ instance Eq CoreContext where
     -- NB: we do not see inside the argument here
     (TyAppC,          TyAppC)            -> True
     (LetBinding i is, LetBinding i' is') -> i == i' && is == is'
-    (LetBody is,      LetBody is')       -> is == is'
+    (LetBody is,      LetBody is')       -> map fst is == map fst is'
     (LamBody i,       LamBody i')        -> i == i'
     (TyLamBody tv,    TyLamBody tv')     -> tv == tv'
     (CaseAlt p,       CaseAlt p')        -> p == p'
