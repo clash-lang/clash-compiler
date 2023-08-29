@@ -4,7 +4,6 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
-{-# OPTIONS_GHC -fno-specialise #-} -- TODO: remove when https://gitlab.haskell.org/ghc/ghc/-/issues/23109#note_499130 is fixed
 
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Extra.Solver #-}
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
