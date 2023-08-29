@@ -283,6 +283,7 @@ instance IsTest ClashBinaryTest where
       , "-o", oDir </> "out"
       , "-i" <> cbSourceDirectory
       , "-outputdir", oDir
+      , "-rtsopts"
       ] <> cbExtraBuildArgs <>
       [ cbSourceDirectory </> cbModName <.> "hs"
       ]
@@ -577,9 +578,6 @@ clashLibTest' modName target extraGhcArgs path =
         -- the linker to shut up and continue producing an executable, as the
         -- undefined references will not be an issue at run-time.
         "-optl" : "-Wl,--allow-shlib-undefined" :
-#endif
-#ifdef CLASH_WORKAROUND_GHC_MMAP_CRASH
-        "-with-rtsopts=-xm20000000" :
 #endif
         extraGhcArgs
     , cbExtraExecArgs=[]
