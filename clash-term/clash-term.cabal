@@ -30,7 +30,7 @@ executable clash-term
                       bytestring        >= 0.10.0.2 && < 0.11,
                       rewrite-inspector == 0.1.0.11
 
-  GHC-Options:        -Wall -Wcompat -threaded
+  GHC-Options:        -Wall -Wcompat -threaded -rtsopts
   extra-libraries:    pthread
   default-language:   Haskell2010
   if os(windows)

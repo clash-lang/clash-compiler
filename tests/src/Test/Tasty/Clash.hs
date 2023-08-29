@@ -285,6 +285,7 @@ instance IsTest ClashBinaryTest where
       , "-main-is", cbModName <> ".main" <> show cbBuildTarget
       , "-o", oDir </> "out"
       , "-outputdir", oDir
+      , "-rtsopts"
       ] <> cbExtraBuildArgs <>
       [ cbSourceDirectory </> cbModName <.> "hs"
       ]

@@ -37,6 +37,7 @@ stages:
     - export CABAL_JOBS=$(./.ci/effective_cpus.sh)
     - export clash_lib_datadir=$(pwd)/clash-lib/
     - export clash_cosim_datadir=$(pwd)/clash-cosim/
+    - if [[ "$WORKAROUND_GHC_MMAP_CRASH" == "yes" ]]; then export GHCRTS="-xm20000000"; fi
     - export
     - tar -xf cache.tar.zst -C / || true
     - tar -xf dist.tar.zst -C /

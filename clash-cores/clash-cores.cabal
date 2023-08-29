@@ -99,7 +99,7 @@ test-suite unittests
   hs-source-dirs: test
   type: exitcode-stdio-1.0
   main-is: unittests.hs
-
+  ghc-options: -rtsopts
   if !flag(unittests)
     buildable: False
 
