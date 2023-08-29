@@ -53,6 +53,9 @@ package clash-cores
   -- so we're able to import its css file from the custom theme.
   haddock-options: --theme=doc/linuwial-wrap-types.css --theme=Linuwial
 
+package clash-benchmark
+  executable-dynamic: True
+
 optional-packages:
   ./benchmark
   ./benchmark/profiling/prepare
