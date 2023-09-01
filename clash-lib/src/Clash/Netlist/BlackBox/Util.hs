@@ -185,10 +185,11 @@ verifyBlackBoxContext bbCtx (N.BBTemplate t) =
             Just n ->
               case indexMaybe (bbInputs bbCtx) n of
                 Just _ -> Nothing
-                Nothing ->
-                  Just ( "Blackbox required at least " ++ show (n+1)
-                      ++ " arguments, but only " ++ show (length (bbInputs bbCtx))
-                      ++ " were passed." )
+                Nothing -> do
+                  let str = fromJust (fmap Text.unpack (getAp $ prettyElem e))
+                  Just ( "Blackbox used \"" ++ str ++ "\""
+                      ++ ", but only " ++ show (length (bbInputs bbCtx))
+                      ++ " arguments were passed." )
 
 extractLiterals :: BlackBoxContext
                 -> [Expr]
