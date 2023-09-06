@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2017, Myrtle Software Ltd,
-                  2021-2022  QBayLogic B.V.,
+                  2021-2023  QBayLogic B.V.,
                   2022,      Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -78,6 +78,19 @@ import Clash.XException
 -- represent values. This means that types such as @[a]@ cannot have @BitPack@
 -- instances, as even if @a@ has a statically known size, the length of the
 -- list cannot be known in advance.
+--
+-- It is not possible to give data a custom bit representation by providing a
+-- @BitPack@ instance. A @BitPack@ instance allows no creativity and should
+-- always accurately reflect the bit representation of the data in HDL. You
+-- should always @derive ('Generic', BitPack)@ unless you use a custom data
+-- representation, in which case you should use
+-- 'Clash.Annotations.BitRepresentation.Deriving.deriveBitPack'. Custom
+-- encodings can be created with "Clash.Annotations.BitRepresentation" and
+-- "Clash.Annotations.BitRepresentation.Deriving".
+--
+-- If the @BitPack@ instance does not accurately match the bit representation of
+-- the data in HDL, Clash designs will exhibit incorrect behavior in various
+-- places.
 --
 -- Clash provides some generic functions on packable types in the prelude, such
 -- as indexing into packable stuctures (see "Clash.Class.BitPack.BitIndex") and
