@@ -22,6 +22,7 @@
     - export THREADS=$(./.ci/effective_cpus.sh)
     - export CABAL_JOBS=$(./.ci/effective_cpus.sh)
     - export CABAL_DIR=$HOME/.cabal
+    - if [[ "$WORKAROUND_GHC_MMAP_CRASH" == "yes" ]]; then export GHCRTS="-xm20000000"; fi
     - export
     - tar -xf cache.tar.zst -C / || true
     - .ci/setup.sh

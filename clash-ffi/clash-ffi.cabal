@@ -91,6 +91,7 @@ executable ffi-interface-tests
     ExistentialQuantification
   hs-source-dirs: tests
   main-is: Main.hs
+  ghc-options: -rtsopts
   other-modules:
     Clash.FFI.Test
     Clash.FFI.Test.Instances

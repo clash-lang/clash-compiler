@@ -41,7 +41,7 @@
       # We pick a single version of GHC to use by default within nix. This is
       # probably cleaner than always having N copies of each package / app and
       # being forced to refer to them by their GHC version.
-      defaultGhcVersion = "ghc902";
+      defaultGhcVersion = "ghc961";
 
       # Overlays are not per-system, so let's only compute them once.
       # For each version of GHC we produce a `pkgs.clashPackages-ghcVER`, e.g.

@@ -166,7 +166,7 @@ test-suite unittests
   hs-source-dirs: test
   type: exitcode-stdio-1.0
   main-is: unittests.hs
-
+  ghc-options: -rtsopts
   if !flag(unittests)
     buildable: False
 
@@ -196,7 +196,7 @@ test-suite doctests
   type:             exitcode-stdio-1.0
   default-language: Haskell2010
   main-is:          doctests.hs
-  ghc-options:      -Wall -Wcompat -threaded
+  ghc-options:      -Wall -Wcompat -threaded -rtsopts
   hs-source-dirs:   test
 
   if !flag(doctests)

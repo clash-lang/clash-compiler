@@ -65,24 +65,12 @@ flag use-ghc-paths
   default: False
   manual: True
 
-flag workaround-ghc-mmap-crash
-  description:
-    Only use this flag when hit by GHC bug #19421. See clash-compiler PR #2444.
-  default: False
-  manual: True
-
 executable clash
   Main-Is:            src-ghc/Batch.hs
   Build-Depends:      base, clash-ghc
-  GHC-Options:        -Wall -Wcompat -threaded -rtsopts
+  GHC-Options:        -Wall -Wcompat -threaded -rtsopts -with-rtsopts=-A128m
   if flag(dynamic)
     GHC-Options: -dynamic
-  -- Note that multiple -with-rtsopts are not cumulative, so we can't add the
-  -- common RTS options in the unconditional GHC-Options
-  if flag(workaround-ghc-mmap-crash)
-    GHC-Options: "-with-rtsopts=-A128m -xm20000000"
-  else
-    GHC-Options: -with-rtsopts=-A128m
   extra-libraries:    pthread
   default-language:   Haskell2010
 

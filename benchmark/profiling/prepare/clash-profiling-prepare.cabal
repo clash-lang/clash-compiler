@@ -26,7 +26,7 @@ library
 executable clash-profile-normalization-prepare
   main-is:             profile-normalization-prepare.hs
   default-language:    Haskell2010
-  ghc-options:         -Wall -Wcompat
+  ghc-options:         -Wall -Wcompat -rtsopts
   build-depends:       base,
                        binary,
                        bytestring,
@@ -38,7 +38,7 @@ executable clash-profile-normalization-prepare
 executable clash-profile-netlist-prepare
   main-is:             profile-netlist-prepare.hs
   default-language:    Haskell2010
-  ghc-options:         -Wall -Wcompat
+  ghc-options:         -Wall -Wcompat -rtsopts
   build-depends:       base,
                        binary,
                        bytestring,
