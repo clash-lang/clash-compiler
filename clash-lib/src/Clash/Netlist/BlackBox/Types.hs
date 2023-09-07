@@ -211,7 +211,7 @@ data Element arg
   | CtxName
   -- ^ The "context name", name set by `Clash.Magic.setName`, defaults to the
   -- name of the closest binder
-  deriving (Show, Generic, NFData, Binary, Eq, Hashable)
+  deriving (Show, Generic, NFData, Binary, Eq, Hashable, Functor, Foldable, Traversable)
 
 -- | Component instantiation hole. First argument indicates which function argument
 -- to instantiate. Third argument corresponds to output and input assignments,
@@ -235,7 +235,7 @@ data Decl arg
       -- to zero. Haskell blackboxes can use this data type.
       [([Element arg],[Element arg])]
       -- ^ (name of signal, type of signal)
-  deriving (Show, Generic, NFData, Binary, Eq, Hashable)
+  deriving (Show, Generic, NFData, Binary, Eq, Hashable, Functor, Foldable, Traversable)
 
 data HdlSyn = Vivado | Quartus | Other
   deriving (Eq, Show, Read, Generic, NFData, Binary, Hashable)
