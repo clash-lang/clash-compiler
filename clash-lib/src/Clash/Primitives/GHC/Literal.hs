@@ -29,16 +29,16 @@ import           Clash.Netlist.Types          (BlackBox)
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, Element(Text), BlackBoxMeta)
 
-unsigned :: Element -> [Element]
+unsigned :: Element arg -> [Element arg]
 unsigned el = [Text "$unsigned(", el, Text ")"]
 
-signed :: Element -> [Element]
+signed :: Element arg -> [Element arg]
 signed el = [Text "$signed(", el, Text ")"]
 
-assign :: Element -> [Element] -> [Element]
+assign :: Element arg -> [Element arg] -> [Element arg]
 assign lhs rhs = Text "assign " : lhs : Text " = " : rhs ++ [Text ";"]
 
-signedLiteral :: Int -> Integer -> Element
+signedLiteral :: Int -> Integer -> Element arg
 signedLiteral wordSize wordVal =
   Text (LT.concat [ if wordVal < 0 then "-" else ""
                   , showtl wordSize
@@ -46,7 +46,7 @@ signedLiteral wordSize wordVal =
                   , showtl (abs wordVal)
                   ])
 
-unsignedLiteral :: Int -> Integer -> Element
+unsignedLiteral :: Int -> Integer -> Element arg
 unsignedLiteral wordSize wordVal =
   Text (LT.concat [ if wordVal < 0 then "-" else ""
                   , showtl wordSize

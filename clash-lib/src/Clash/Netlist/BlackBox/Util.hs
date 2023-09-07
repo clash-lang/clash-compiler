@@ -73,7 +73,7 @@ import qualified Clash.Util.Interpolate          as I
 
 import           Clash.Annotations.Primitive     (HDL(VHDL))
 
-inputHole :: Element -> Maybe Int
+inputHole :: Element arg -> Maybe arg
 inputHole = \case
   Text _           -> Nothing
   Component _      -> Nothing
@@ -212,11 +212,11 @@ setSym bbCtx l = do
     bbnm = Data.Text.unpack (bbName bbCtx)
 
     setSym'
-      :: Element
+      :: Element Int
       -> StateT ( IntMap.IntMap N.IdentifierText
                 , IntMap.IntMap (N.IdentifierText, [N.Declaration]))
                 m
-                Element
+                (Element Int)
     setSym' e = case e of
       ToVar nm i | i < length (bbInputs bbCtx) -> case bbInputs bbCtx !! i of
         (Identifier nm0 Nothing,_,_) ->
@@ -262,7 +262,7 @@ setSym bbCtx l = do
       BV t e' m     -> BV <$> pure t <*> mapM setSym' e' <*> pure m
       _             -> pure e
 
-    concatT :: [Element] -> Text
+    concatT :: [Element Int] -> Text
     concatT = Text.concat . map (
       \case
         Text t -> t
@@ -390,7 +390,7 @@ renderElem
   :: HasCallStack
   => Backend backend
   => BlackBoxContext
-  -> Element
+  -> Element Int
   -> State backend (Int -> Text)
 renderElem b (Component (Decl n subN (l:ls))) = do
   (o,oTy,_) <- idToExpr <$> bitraverse (lineToIdentifier b) (return . lineToType b) l
@@ -496,7 +496,7 @@ renderElem b (IF c t f) = do
   let c' = check (coerce xOpt) iw hdl syn enums c
   if c' > 0 then renderTemplate b t else renderTemplate b f
   where
-    check :: Bool -> Int -> HDL -> HdlSyn -> RenderEnums -> Element -> Int
+    check :: Bool -> Int -> HDL -> HdlSyn -> RenderEnums -> Element Int -> Int
     check xOpt iw hdl syn enums c' = case c' of
       (Size e)   -> typeSize (lineToType b [e])
       (Length e) -> case lineToType b [e] of
@@ -682,7 +682,7 @@ lineToType _ _ = error $ $(curLoc) ++ "Unexpected type manipulation"
 -- context that matches the tag of the hole.
 renderTag :: Backend backend
           => BlackBoxContext
-          -> Element
+          -> Element Int
           -> State backend Text
 renderTag _ (Text t)        = return t
 renderTag b (Result)    = do
@@ -883,7 +883,7 @@ renderTag _ e = do e' <- getAp (prettyElem e)
 -- on template level (constants).
 elementsToText
     :: BlackBoxContext
-    -> [Element]
+    -> [Element Int]
     -> Either String Text
 elementsToText bbCtx elements =
     foldl (\txt el -> case txt of
@@ -894,11 +894,11 @@ elementsToText bbCtx elements =
 
 elementToText
     :: BlackBoxContext
-    -> Element
+    -> Element Int
     -> Either String Text
 elementToText bbCtx  (Name n) = elementToText bbCtx (Lit n)
 elementToText _bbCtx (Text t) = return $ t
-elementToText bbCtx  (Lit n) =
+elementToText bbCtx  lit@(Lit n) =
     case bbInputs bbCtx ^? element n of
         Just (e,_,_) ->
             case exprToString e of
@@ -907,9 +907,9 @@ elementToText bbCtx  (Lit n) =
                 Nothing ->
                     Left $ $(curLoc) ++ unwords [ "Could not extract string from"
                                                 , show e, "referred to by"
-                                                , show (Lit n) ]
+                                                , show lit ]
         Nothing ->
-            Left $ $(curLoc) ++ unwords [ "Invalid literal", show (Lit n)
+            Left $ $(curLoc) ++ unwords [ "Invalid literal", show lit
                                         , "used in blackbox with context:"
                                         , show bbCtx, "." ]
 
@@ -931,14 +931,14 @@ exprToString (BlackBoxE "GHC.CString.unpackCString#" _ _ _ _ ctx _) =
     _ -> error "internal error: insufficient bbInputs"
 exprToString _ = Nothing
 
-prettyBlackBox :: Monad m
-               => BlackBoxTemplate
+prettyBlackBox :: (Monad m, PP.Pretty arg, Show arg)
+               => [Element arg]
                -> Ap m Text
 prettyBlackBox bbT = Text.concat <$> mapM prettyElem bbT
 
 prettyElem
-  :: (HasCallStack, Monad m)
-  => Element
+  :: (HasCallStack, Monad m, PP.Pretty arg, Show arg)
+  => Element arg
   -> Ap m Text
 prettyElem (Text t) = return t
 prettyElem (Component (Decl i 0 args)) = do
@@ -946,7 +946,7 @@ prettyElem (Component (Decl i 0 args)) = do
   case args' of
     (arg:rest) ->
       renderOneLine <$>
-        (nest 2 (string "~INST" <+> int i <> line <>
+        (nest 2 (string "~INST" <+> argPpr i <> line <>
             string "~OUTPUT" <+> string "=>" <+> string (fst arg) <+> string (snd arg) <+> string "~" <> line <>
             vcat (mapM (\(a,b) -> string "~INPUT" <+> string "=>" <+> string a <+> string b <+> string "~") rest))
           <> line <> string "~INST")
@@ -954,20 +954,20 @@ prettyElem (Component (Decl i 0 args)) = do
 prettyElem (Component (Decl {})) =
   error $ $(curLoc) ++ "prettyElem can't (yet) render ~INST when subfuncion /= 0!"
 prettyElem Result = return "~RESULT"
-prettyElem (Arg i) = renderOneLine <$> ("~ARG" <> brackets (int i))
-prettyElem (Lit i) = renderOneLine <$> (string "~LIT" <> brackets (int i))
-prettyElem (Const i) = renderOneLine <$> (string "~CONST" <> brackets (int i))
-prettyElem (Name i) = renderOneLine <$> (string "~NAME" <> brackets (int i))
+prettyElem (Arg i) = renderOneLine <$> ("~ARG" <> brackets (argPpr i))
+prettyElem (Lit i) = renderOneLine <$> (string "~LIT" <> brackets (argPpr i))
+prettyElem (Const i) = renderOneLine <$> (string "~CONST" <> brackets (argPpr i))
+prettyElem (Name i) = renderOneLine <$> (string "~NAME" <> brackets (argPpr i))
 prettyElem (ToVar es i) = do
   es' <- prettySigD es
-  renderOneLine <$> (string "~VAR" <> brackets (string es') <> brackets (int i))
+  renderOneLine <$> (string "~VAR" <> brackets (string es') <> brackets (argPpr i))
 prettyElem (Sym _ i) = renderOneLine <$> (string "~SYM" <> brackets (int i))
 prettyElem (Typ Nothing) = return "~TYPO"
-prettyElem (Typ (Just i)) = renderOneLine <$> (string "~TYP" <> brackets (int i))
+prettyElem (Typ (Just i)) = renderOneLine <$> (string "~TYP" <> brackets (argPpr i))
 prettyElem (TypM Nothing) = return "~TYPMO"
-prettyElem (TypM (Just i)) = renderOneLine <$> (string "~TYPM" <> brackets (int i))
+prettyElem (TypM (Just i)) = renderOneLine <$> (string "~TYPM" <> brackets (argPpr i))
 prettyElem (Err Nothing) = return "~ERRORO"
-prettyElem (Err (Just i)) = renderOneLine <$> (string "~ERROR" <> brackets (int i))
+prettyElem (Err (Just i)) = renderOneLine <$> (string "~ERROR" <> brackets (argPpr i))
 prettyElem (TypElem e) = do
   e' <- prettyElem e
   renderOneLine <$> (string "~TYPEL" <> brackets (string e'))
@@ -1024,24 +1024,24 @@ prettyElem (BV b es e) = do
 prettyElem (Sel e i) = do
   e' <- prettyElem e
   renderOneLine <$> (string "~SEL" <> brackets (string e') <> brackets (int i))
-prettyElem (IsLit i) = renderOneLine <$> (string "~ISLIT" <> brackets (int i))
-prettyElem (IsVar i) = renderOneLine <$> (string "~ISVAR" <> brackets (int i))
-prettyElem (IsScalar i) = renderOneLine <$> (string "~ISSCALAR" <> brackets (int i))
-prettyElem (IsActiveHigh i) = renderOneLine <$> (string "~ISACTIVEHIGH" <> brackets (int i))
-prettyElem (IsActiveEnable i) = renderOneLine <$> (string "~ISACTIVEENABLE" <> brackets (int i))
-prettyElem (IsUndefined i) = renderOneLine <$> (string "~ISUNDEFINED" <> brackets (int i))
+prettyElem (IsLit i) = renderOneLine <$> (string "~ISLIT" <> brackets (argPpr i))
+prettyElem (IsVar i) = renderOneLine <$> (string "~ISVAR" <> brackets (argPpr i))
+prettyElem (IsScalar i) = renderOneLine <$> (string "~ISSCALAR" <> brackets (argPpr i))
+prettyElem (IsActiveHigh i) = renderOneLine <$> (string "~ISACTIVEHIGH" <> brackets (argPpr i))
+prettyElem (IsActiveEnable i) = renderOneLine <$> (string "~ISACTIVEENABLE" <> brackets (argPpr i))
+prettyElem (IsUndefined i) = renderOneLine <$> (string "~ISUNDEFINED" <> brackets (argPpr i))
 
 -- Domain attributes:
-prettyElem (Tag i) = renderOneLine <$> (string "~TAG" <> brackets (int i))
-prettyElem (Period i) = renderOneLine <$> (string "~PERIOD" <> brackets (int i))
+prettyElem (Tag i) = renderOneLine <$> (string "~TAG" <> brackets (argPpr i))
+prettyElem (Period i) = renderOneLine <$> (string "~PERIOD" <> brackets (argPpr i))
 prettyElem LongestPeriod = return "~LONGESTPERIOD"
-prettyElem (ActiveEdge e i) = renderOneLine <$> (string "~ACTIVEEDGE" <> brackets (string (Text.pack (show e))) <> brackets (int i))
-prettyElem (IsSync i) = renderOneLine <$> (string "~ISSYNC" <> brackets (int i))
-prettyElem (IsInitDefined i) = renderOneLine <$> (string "~ISINITDEFINED" <> brackets (int i))
+prettyElem (ActiveEdge e i) = renderOneLine <$> (string "~ACTIVEEDGE" <> brackets (string (Text.pack (show e))) <> brackets (argPpr i))
+prettyElem (IsSync i) = renderOneLine <$> (string "~ISSYNC" <> brackets (argPpr i))
+prettyElem (IsInitDefined i) = renderOneLine <$> (string "~ISINITDEFINED" <> brackets (argPpr i))
 
 prettyElem (StrCmp es i) = do
   es' <- prettySigD es
-  renderOneLine <$> (string "~STRCMP" <> brackets (string es') <> brackets (int i))
+  renderOneLine <$> (string "~STRCMP" <> brackets (string es') <> brackets (argPpr i))
 prettyElem (GenSym es i) = do
   es' <- prettySigD es
   renderOneLine <$> (string "~GENSYM" <> brackets (string es') <> brackets (int i))
@@ -1066,12 +1066,12 @@ prettyElem (SigD es mI) = do
   es' <- prettySigD es
   renderOneLine <$>
     (maybe (string "~SIGDO" <> brackets (string es'))
-           (((string "~SIGD" <> brackets (string es')) <>) . brackets . int)
+           (((string "~SIGD" <> brackets (string es')) <>) . brackets . argPpr)
            mI)
-prettyElem (Vars i) = renderOneLine <$> (string "~VARS" <> brackets (int i))
-prettyElem (OutputUsage n) = renderOneLine <$> (string "~OUTPUTUSAGE" <> brackets (int n))
+prettyElem (Vars i) = renderOneLine <$> (string "~VARS" <> brackets (argPpr i))
+prettyElem (OutputUsage n) = renderOneLine <$> (string "~OUTPUTUSAGE" <> brackets (argPpr n))
 prettyElem (ArgGen n x) =
-  renderOneLine <$> (string "~ARGN" <> brackets (int n) <> brackets (int x))
+  renderOneLine <$> (string "~ARGN" <> brackets (int n) <> brackets (argPpr x))
 prettyElem (Template bbname source) = do
   bbname' <- prettySigD bbname
   source' <- prettySigD source
@@ -1083,8 +1083,8 @@ prettyElem CtxName = return "~CTXNAME"
 
 -- This reverses what Clash.Netlist.Blackbox.Parser.pSigD does
 -- ie turn a "[" back into "[\" and "]" back into "\]"
-prettySigD :: Monad m
-               => [Element]
+prettySigD :: (Monad m, PP.Pretty arg, Show arg)
+               => [Element arg]
                -> Ap m Text
 prettySigD bbT = Text.concat <$> mapM prettySigDElem bbT
  where
@@ -1097,8 +1097,8 @@ prettySigD bbT = Text.concat <$> mapM prettySigDElem bbT
 
 -- | Recursively walk @Element@, applying @f@ to each element in the tree.
 walkElement
-  :: (Element -> Maybe a)
-  -> Element
+  :: (Element arg -> Maybe a)
+  -> Element arg
   -> [a]
 walkElement f el = maybeToList (f el) ++ walked
   where
