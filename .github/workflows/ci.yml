@@ -163,7 +163,6 @@ jobs:
         with:
           path: |
             dist-newstyle
-            ~/.cabal/packages
             ~/.cabal/store
 
           key: ${{ matrix.ghc }}-${{ hashFiles('frozen') }}
