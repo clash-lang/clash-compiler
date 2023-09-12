@@ -165,7 +165,7 @@ jobs:
             dist-newstyle
             ~/.cabal/store
 
-          key: ${{ matrix.ghc }}-${{ hashFiles('frozen') }}
+          key: ${{ matrix.ghc }}-${{ hashFiles('frozen', 'cabal.project') }}
           restore-keys: ${{ matrix.ghc }}-
 
       - name: Build Clash
