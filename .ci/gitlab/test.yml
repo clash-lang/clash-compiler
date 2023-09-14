@@ -177,7 +177,6 @@ ffi:example:
       # Make sure we get custom cabals setting in the clash-example project too
     - cp cabal.project.local clash-ffi/example
   script:
-     - if [[ "$WORKAROUND_GHC_MMAP_CRASH" == "yes" ]]; then ./.ci/clash-ffi-example-build.sh; fi
      - cd clash-ffi/example && ./run-iverilog.sh
   after_script:
     - tar -cf - /root/.cabal | zstd -T${THREADS} -3 > cache.tar.zst
