@@ -8,18 +8,8 @@ in
   # is basically abandonware it catches fire with brick 1.0+.
   brick = doJailbreak prev.brick_0_70_1;
 
-  # Marked as broken in nixpkgs since it needs a newer hashable than the one
-  # in the .cabal file uplodaed to hackage.
-  concurrent-supply = doJailbreak (markUnbroken prev.concurrent-supply);
-
   # Marked as broken in nixpkgs for this version of GHC.
   docopt = markUnbroken prev.docopt;
-
-  # The doctests crash for this package, but the main testsuite passes.
-  generic-lens = dontCheck prev.generic-lens;
-
-  # For some reason, lens 5.1.1 didn't build properly.
-  lens = prev.lens_5_2_2;
 
   # Marked as broken in nixpkgs, since it specifies much older dependencies
   # than the defaults in nixpkgs.

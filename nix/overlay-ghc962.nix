@@ -12,9 +12,6 @@ in
   # .cabal file currently uploaded to hackage.
   concurrent-supply = doJailbreak (markUnbroken prev.concurrent-supply);
 
-  # Use a newer version than the default in nixpkgs.
-  doctest-parallel = prev.doctest-parallel_0_3_0_1;
-
   # Use a branch with changes to support GHC 9.6.1.
   hint =
     prev.hint.overrideAttrs (_: {
@@ -27,15 +24,9 @@ in
         };
     });
 
-  # Latest hackage revision is not yet in nixpkgs.
-  prettyprinter-interp = doJailbreak prev.prettyprinter-interp;
-
   # Marked as broken in nixpkgs, since it specifies much older dependencies
   # than the defaults in nixpkgs.
   rewrite-inspector = doJailbreak (markUnbroken prev.rewrite-inspector);
-
-  # Use a newer version than the default in nixpkgs.
-  singletons = prev.singletons_3_0_2;
 
   # We want a version that matches with singletons-th, but the tests in here
   # are also a bit flaky since GHC 9.6 isn't officially supported.
@@ -54,5 +45,10 @@ in
   vector-binary-instances = doJailbreak prev.vector-binary-instances;
 
   # Use a newer version than the default in nixpkgs.
-  vty = prev.vty_5_38;
+  th-abstraction = prev.th-abstraction_0_5_0_0;
+
+  # We can't use newer than 1.12 here: we need singletons 3.x (due to the cabal
+  # file of `clash-testsuite`) but the changed `DConP` constructor in 1.13
+  # stops `singletons-th` from building.
+  doctest = prev.callHackage "doctest" "0.21.1" { };
 }

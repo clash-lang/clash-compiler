@@ -25,7 +25,8 @@ import           Data.List            (intercalate)
 import           Data.List.NonEmpty   (NonEmpty (..))
 import qualified Data.List.NonEmpty   as NE
 import           Data.Tuple.Extra     (second, first)
-import           Data.Aeson           (FromJSON, Result (..), fromJSON, json)
+import           Data.Aeson           (FromJSON, Result (..), fromJSON)
+import           Data.Aeson.Parser    (json)
 import           Data.Attoparsec.Lazy (Result (..), parse)
 import           Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BS
