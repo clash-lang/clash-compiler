@@ -78,6 +78,10 @@ if [ ! -f cabal.project.local ]; then
   fi
 
   set +u
+  if [[ "$WORKAROUND_GHC_MMAP_CRASH" == "yes" ]]; then
+    sed -i 's/-workaround-ghc-mmap-crash/+workaround-ghc-mmap-crash/g' cabal.project.local
+  fi
+
   if [[ "$GHC_HEAD" == "yes" ]]; then
     cat .ci/cabal.project.local.append-HEAD >> cabal.project.local
   fi

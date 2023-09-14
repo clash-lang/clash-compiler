@@ -67,7 +67,6 @@ nix-build:
   needs: []
   stage: test
   before_script:
-   - if [[ "$WORKAROUND_GHC_MMAP_CRASH" == "yes" ]]; then export GHCRTS="-xm20000000"; fi
    - nix-env -i gawk
   script:
     - nix-build -j$(./.ci/effective_cpus.sh)
