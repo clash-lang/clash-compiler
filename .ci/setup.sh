@@ -96,6 +96,11 @@ cat cabal.project.local
 rm -f ${HOME}/.cabal/config
 cabal user-config init
 sed -i "s/-- ghc-options:/ghc-options: -j$THREADS/g" ${HOME}/.cabal/config
+set +u
+if [[ "$WORKAROUND_GHC_MMAP_CRASH" == "yes" ]]; then
+  sed -i "s/ghc-options:/ghc-options: +RTS -xm20000000 -RTS -with-rtsopts=-xm20000000/g" ${HOME}/.cabal/config
+fi
+set -u
 sed -i "s/^[- ]*jobs:.*/jobs: $CABAL_JOBS/g" ${HOME}/.cabal/config
 sed -i "/remote-repo-cache:.*/d" ${HOME}/.cabal/config
 cat ${HOME}/.cabal/config

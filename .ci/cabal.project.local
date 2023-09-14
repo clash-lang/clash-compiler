@@ -20,7 +20,7 @@ package clash-prelude
 package clash-lib
   ghc-options: -Werror
   tests: True
-  flags: +debug
+  flags: +debug -workaround-ghc-mmap-crash
 
 package clash-ghc
   ghc-options: -Werror

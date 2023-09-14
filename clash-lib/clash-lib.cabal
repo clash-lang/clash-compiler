@@ -91,6 +91,12 @@ flag doctests
   default: True
   manual: True
 
+flag workaround-ghc-mmap-crash
+  description:
+    Only use this flag when hit by GHC bug #19421. See clash-compiler PR #2444.
+  default: False
+  manual: True
+
 common common-options
   default-language:   Haskell2010
   default-extensions: BangPatterns
@@ -379,7 +385,13 @@ test-suite unittests
   type:             exitcode-stdio-1.0
   default-language: Haskell2010
   main-is:          unittests.hs
-  ghc-options:      -Wall -Wcompat -threaded -with-rtsopts=-N
+  ghc-options:      -Wall -Wcompat -threaded
+  -- Note that multiple -with-rtsopts are not cumulative, so we can't add the
+  -- common RTS options in the unconditional GHC-Options
+  if flag(workaround-ghc-mmap-crash)
+    GHC-Options: "-with-rtsopts=-N -xm20000000"
+  else
+    GHC-Options: -with-rtsopts=-N
   hs-source-dirs:   tests
 
   if !flag(unittests)
