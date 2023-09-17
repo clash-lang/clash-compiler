@@ -30,7 +30,4 @@ extra-deps:
 - string-interpolate-0.3.1.2@sha256:4d0987f453c66040aa8e482fe28a7d3cdc9d8df01b698bc92f42a592cfb337db,4268
 - prettyprinter-interp-0.2.0.0@sha256:45299b61bd6c27d594c1a72b5a8dd5734e791a59828725e4f4e420f3cc37232b,2016
 - infinite-list-0.1@sha256:4de250517ce75e128c766fbc1f23b5a778ea964e695e47f8e83e0f3b293091bf,2383
-- git: https://github.com/UnkindPartition/tasty.git
-  commit: e0e71bc40fcc1fa410f98a5963b9ed8eefa1e92d
-  subdirs:
-    - core
+- tasty-1.5@sha256:c62c96da1e9d65bf61ce583e9f7085eed1daeb62a45f3106ca252bf9ef87025b,2763

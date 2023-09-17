@@ -28,7 +28,6 @@ stages:
     - export CABAL_DIR=$HOME/.cabal
     - export clash_lib_datadir=$(pwd)/clash-lib/
     - export clash_cosim_datadir=$(pwd)/clash-cosim/
-    - if [[ "$WORKAROUND_GHC_MMAP_CRASH" == "yes" ]]; then export GHCRTS="-xm20000000"; fi
     - export
     - tar -xf dist.tar.zst -C /
 
@@ -51,7 +50,6 @@ stages:
     - export CABAL_DIR=$HOME/.cabal
     - export clash_lib_datadir=$(pwd)/clash-lib/
     - export clash_cosim_datadir=$(pwd)/clash-cosim/
-    - if [[ "$WORKAROUND_GHC_MMAP_CRASH" == "yes" ]]; then export GHCRTS="-xm20000000"; fi
     - export
     - tar -xf cache.tar.zst -C / || true
     - tar -xf dist.tar.zst -C /
@@ -169,7 +167,6 @@ ffi:example:
     - export clash_cosim_datadir=$(pwd)/clash-cosim/
     - export MASKBINS="$(mktemp -d)"
     - PATH="$MASKBINS:$PATH"
-    - if [[ "$WORKAROUND_GHC_MMAP_CRASH" == "yes" ]]; then export GHCRTS="-xm20000000"; fi
     - export
     - tar -xf cache.tar.zst -C / || true
       # The iverilog on CI cannot run the example, we only test it builds
@@ -180,7 +177,6 @@ ffi:example:
       # Make sure we get custom cabals setting in the clash-example project too
     - cp cabal.project.local clash-ffi/example
   script:
-     - if [[ "$WORKAROUND_GHC_MMAP_CRASH" == "yes" ]]; then ./.ci/clash-ffi-example-build.sh; fi
      - cd clash-ffi/example && ./run-iverilog.sh
   after_script:
     - tar -cf - /root/.cabal | zstd -T${THREADS} -3 > cache.tar.zst

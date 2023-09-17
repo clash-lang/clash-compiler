@@ -101,9 +101,10 @@ let
       clash-ghc =
         let
           unmodified =
-            hprev.callCabal2nix
+            hprev.callCabal2nixWithOptions
               "clash-ghc"
-              ../clash-ghc {
+              ../clash-ghc
+              "--flag workaround-ghc-mmap-crash" {
               inherit (hfinal) clash-lib clash-prelude;
             };
         in
@@ -135,9 +136,10 @@ let
         };
 
       clash-prelude =
-        hprev.callCabal2nix
+        hprev.callCabal2nixWithOptions
           "clash-prelude"
           ../clash-prelude
+          "--flag workaround-ghc-mmap-crash"
           { };
 
       clash-prelude-hedgehog =
@@ -186,9 +188,10 @@ let
       clash-testsuite =
         let
           unmodified =
-            hprev.callCabal2nix
+            hprev.callCabal2nixWithOptions
               "clash-testsuite"
-              ../tests {
+              ../tests
+              "--flag workaround-ghc-mmap-crash" {
               inherit (hfinal) clash-cores clash-ghc clash-lib clash-prelude;
             };
         in

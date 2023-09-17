@@ -117,6 +117,12 @@ flag benchmarks
   default: True
   manual: True
 
+flag workaround-ghc-mmap-crash
+  description:
+    Only use this flag when hit by GHC bug #19421. See clash-compiler PR #2444.
+  default: False
+  manual: True
+
 common common-options
   default-language:   Haskell2010
   default-extensions: BangPatterns
@@ -370,7 +376,7 @@ test-suite doctests
   type:             exitcode-stdio-1.0
   default-language: Haskell2010
   main-is:          doctests.hs
-  ghc-options:      -Wall -Wcompat -threaded -rtsopts
+  ghc-options:      -Wall -Wcompat -threaded
   hs-source-dirs:   tests
 
   if !flag(doctests)
@@ -382,11 +388,21 @@ test-suite doctests
       doctest-parallel >= 0.2 && < 0.4,
       filepath
 
+  if flag(workaround-ghc-mmap-crash)
+    ghc-options:    -with-rtsopts=-xm20000000
+
+
 test-suite unittests
   import:           common-options
   type:             exitcode-stdio-1.0
   main-is:          unittests.hs
-  ghc-options:      -Wall -Wcompat -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:      -Wall -Wcompat -threaded
+  -- Note that multiple -with-rtsopts are not cumulative
+  if flag(workaround-ghc-mmap-crash)
+    ghc-options:    "-with-rtsopts=-N -xm20000000"
+  else
+    ghc-options:    -with-rtsopts=-N
+
   hs-source-dirs:   tests
 
   if !flag(unittests)
@@ -452,7 +468,7 @@ benchmark benchmark-clash-prelude
   type:             exitcode-stdio-1.0
   default-language: Haskell2010
   main-is:          benchmark-main.hs
-  ghc-options:      -O2 -Wall -rtsopts
+  ghc-options:      -O2 -Wall
   hs-source-dirs:   benchmarks
 
   ghc-options:      -with-rtsopts=-T
