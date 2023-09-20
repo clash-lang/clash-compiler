@@ -46,7 +46,7 @@ testBench = done
             strictAnd <$> done1 <*> done2
   strictAnd !a !b = a && b
   clkSE = tbClockGen (not <$> done)
-  clkDiff = seClockToDiffClock clkSE
+  clkDiff = clockToDiffClock clkSE
   rst = resetGen
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE testBench #-}
