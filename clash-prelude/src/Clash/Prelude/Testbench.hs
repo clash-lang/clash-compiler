@@ -26,7 +26,7 @@ module Clash.Prelude.Testbench
   , E.tbClockGen
   , E.tbEnableGen
   , E.tbSystemClockGen
-  , E.seClockToDiffClock
+  , E.clockToDiffClock
   )
 where
 

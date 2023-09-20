@@ -1,2 +1,1 @@
-NEW: `seClockToDiffClock`, to create a differential clock signal in a test
-bench. It is not suitable for synthesising a differential output in hardware.
+NEW: `clockToDiffClock`, to create a differential clock signal in a test bench. It is not suitable for synthezising a differential output in hardware.
