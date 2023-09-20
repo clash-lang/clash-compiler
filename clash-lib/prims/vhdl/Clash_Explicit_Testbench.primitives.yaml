@@ -156,6 +156,6 @@
     template: ~RESULT <= true;
     workInfo: Always
 - BlackBox:
-    name: Clash.Explicit.Testbench.seClockToDiffClock
+    name: Clash.Explicit.Testbench.clockToDiffClock
     kind: Expression
     template: (~ARG[1], not ~ARG[1])

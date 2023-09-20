@@ -27,7 +27,7 @@ module Clash.Explicit.Testbench
   , tbClockGen
   , tbEnableGen
   , tbSystemClockGen
-  , seClockToDiffClock
+  , clockToDiffClock
 
   , outputVerifier
   , outputVerifier'
@@ -470,18 +470,18 @@ tbSystemClockGen = tbClockGen
 -- Example:
 --
 -- @
--- clk = seClockToDiffClock $ tbClockGen (not \<\$\> done)
+-- clk = clockToDiffClock $ tbClockGen (not \<\$\> done)
 -- @
-seClockToDiffClock ::
+clockToDiffClock ::
   KnownDomain dom =>
   -- | Single-ended input
   Clock dom ->
   -- | Differential output
   DiffClock dom
-seClockToDiffClock clk = DiffClock clk (ClockN SSymbol)
+clockToDiffClock clk = DiffClock clk (ClockN SSymbol)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE seClockToDiffClock #-}
-{-# ANN seClockToDiffClock hasBlackBox #-}
+{-# CLASH_OPAQUE clockToDiffClock #-}
+{-# ANN clockToDiffClock hasBlackBox #-}
 
 -- | Cross clock domains in a way that is unsuitable for hardware but good
 -- enough for simulation.
