@@ -55,6 +55,10 @@
       "src": {"type": "hackage", "version": "0.1.8"}
     },
     {
+      "name": "attoparsec-aeson",
+      "src": {"type": "hackage", "version": "2.1.0.0"}
+    },
+    {
       "name": "clash-prelude",
       "cabal_debian_options": [
         "--disable-haddock", "--disable-tests",

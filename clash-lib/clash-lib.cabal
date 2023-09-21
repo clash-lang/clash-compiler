@@ -126,7 +126,8 @@ Library
                       RecordWildCards
                       TemplateHaskell
 
-  Build-depends:      aeson                   >= 0.6.2.0  && < 2.2,
+  Build-depends:      aeson                   >= 0.6.2.0  && < 2.3,
+                      attoparsec-aeson        >= 2.1      && < 2.3,
                       aeson-pretty            >= 0.8      && < 0.9,
                       ansi-terminal           >= 0.8.0.0  && < 0.12,
                       array,
@@ -307,6 +308,7 @@ executable v16-upgrade-primitives
   Build-Depends:
     base,
     aeson,
+    attoparsec-aeson,
     deepseq,
     yaml,
     bytestring,
@@ -336,6 +338,7 @@ test-suite unittests
       ghc-typelits-knownnat,
 
       aeson,
+      attoparsec-aeson,
       aeson-pretty,
       base,
       base16-bytestring,

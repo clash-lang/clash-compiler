@@ -32,6 +32,9 @@ let
         doctest-parallel =
          self.callCabal2nix "doctest-parallel" sources.doctest-parallel {};
 
+        attoparsec-aeson =
+         self.callCabal2nix "attoparsec-aeson" sources.attoparsec-aeson {};
+
         # Internal overrides
         clash-lib = import ../clash-lib { inherit nixpkgs; };
         clash-ghc = import ../clash-ghc { inherit nixpkgs; };
