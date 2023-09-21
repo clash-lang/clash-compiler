@@ -22,24 +22,29 @@ jobs:
       fail-fast: false
       matrix:
         os: ["macOS", "windows"]
-        ghc: ["8.6.5", "8.8.4", "8.10.7", "9.0.2"]
+        ghc: ["8.6", "8.8", "8.10", "9.0"]
         exclude:
           # Some tests fail with a mysterious -11 error code.
           - os: macOS
-            ghc: 8.10.7
+            ghc: 8.10
 
           # Windows gets non-deterministically gets stuck in infinite loops
           # or segfaults while running the testcase.
           - os: windows
-            ghc: 8.8.4
+            ghc: 8.8
+
+          # GHC 9.0 fails to compile clash-cores due to a template haskell
+          # failure
+          - os: windows
+            ghc: 9.0
 
     steps:
       - uses: actions/checkout@v3
       - uses: haskell/actions/setup@v2
         id: setup-haskell
         with:
-          ghc-version: ${{ matrix.ghc }}
           enable-stack: true
+          stack-no-global: true
 
       - name: Install IVerilog (macOS)
         if: matrix.os == 'macOS'
@@ -50,8 +55,11 @@ jobs:
         run: choco install --no-progress iverilog
 
       - name: General Setup
+        shell: bash
         run: |
           cp .ci/stack-${{ matrix.ghc }}.yaml stack.yaml
+          # Print out stack.yaml for debugging purposes
+          cat stack.yaml
 
       - name: Cache (Windows)
         if: ${{ runner.os == 'Windows' }}
@@ -79,6 +87,7 @@ jobs:
       # Retry Stack initialization, see:
       # https://github.com/commercialhaskell/stack/issues/5770
       - name: Initialize Stack
+        shell: bash
         run: ./.ci/initialize_stack.sh
 
       - name: Build with Stack
