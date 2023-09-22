@@ -1,4 +1,4 @@
-resolver: nightly-2022-02-19
+resolver: lts-18.28
 
 packages:
 - clash-prelude
@@ -10,5 +10,6 @@ packages:
 - tests
 
 extra-deps:
+- doctest-parallel-0.2.1@sha256:c6c0d095dd6e0b8ce1bd9f6f5fc4e0cf5cf50b6895b557356ac41b8aa2947399,5631
+- fakedata-1.0.2@sha256:37c93be9a81acbc9109e2c0b300a793d9c1f5ead1d34330d869d76568191f428,24593
 - tasty-1.2.3@sha256:bba67074e5326d57e8f53fc1dabcb6841daa4dc51b053506eb7f40a6f49a0497,2517
-
