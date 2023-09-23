@@ -44,11 +44,9 @@ in
   # Needs a newer base than the .cabal file currently uploaded to hackage.
   vector-binary-instances = doJailbreak prev.vector-binary-instances;
 
-  # Use a newer version than the default in nixpkgs.
+  # Use an older version than the default in nixpkgs.
   th-abstraction = prev.th-abstraction_0_5_0_0;
 
-  # We can't use newer than 1.12 here: we need singletons 3.x (due to the cabal
-  # file of `clash-testsuite`) but the changed `DConP` constructor in 1.13
-  # stops `singletons-th` from building.
+  # type-errors 0.2.0.2 is bounded on doctest >=0.16.0.1 && <0.22
   doctest = prev.callHackage "doctest" "0.21.1" { };
 }
