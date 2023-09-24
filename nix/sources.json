@@ -1,4 +1,11 @@
 {
+    "attoparsec-aeson": {
+        "sha256": "068d77pb3kbnqp2x7qgqmlcw5d93hna5px8vsdg8np9ngwq1bp72",
+        "type": "tarball",
+        "url": "https://hackage.haskell.org/package/attoparsec-aeson-2.1.0.0/attoparsec-aeson-2.1.0.0.tar.gz",
+        "url_template": "https://hackage.haskell.org/package/attoparsec-aeson-<version>/attoparsec-aeson-<version>.tar.gz",
+        "version": "2.1.0.0"
+    },
     "doctest-parallel": {
         "branch": "main",
         "description": "Test interactive Haskell examples",
