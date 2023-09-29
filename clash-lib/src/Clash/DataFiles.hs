@@ -46,9 +46,10 @@ import Paths_clash_lib (getDataFileName)
   > route_design
   > write_bitstream ${clash::topEntity}.bit
 
-  @clash-cores:Clash.Cores.Xilinx@ modules make use of the IP instantiating
-  functionality; XDC metadata functionality is not currently used as the IP is
-  already packaged with correct constraints by Vivado.
+  "Clash.Xilinx.ClockGen" and @clash-cores:Clash.Cores.Xilinx@
+  modules make use of the IP instantiating functionality; XDC metadata
+  functionality is not currently used as the IP is already packaged with correct
+  constraints by Vivado.
 
   More documentation about the Tcl Connector and the Clash\<->Tcl API will be
   made available later.
