@@ -13,19 +13,15 @@ import Text.Show.Pretty
 -- import Clash.Clocks
 import Clash.Clocks.Deriving
 
--- clk = 10 :: Int
-
--- play
-
 -- deriveClocksInstances 16
 
--- playAST :: IO ()
--- playAST = putStrLn $(stringE . ppShow =<< play)
-
--- playRender :: IO ()
--- playRender = putStrLn $(stringE . pprint =<< play)
+out :: String
+-- out = $(stringE . ppShow =<< deriveClocksInstances)
+-- out = $(stringE . pprint =<< deriveClocksInstances)
+out = $(stringE . pprint =<< deriveClocksSyncInstances)
+-- out = $(stringE . ppShow =<< deriveClocksSyncInstance 3)
 
 main :: IO ()
 main = do
   fName <- fmap head getArgs
-  writeFile fName $(stringE . ppShow =<< deriveClocksInstances)
+  writeFile fName out

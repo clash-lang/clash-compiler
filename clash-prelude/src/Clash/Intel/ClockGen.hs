@@ -30,7 +30,9 @@ you want to run your circuit at.
 {-# LANGUAGE TypeFamilies #-}
 
 module Clash.Intel.ClockGen
-  ( unsafeAltpll
+  ( altpllSync
+  , alteraPllSync
+  , unsafeAltpll
   , unsafeAlteraPll
     -- ** Deprecated
   , altpll
@@ -40,10 +42,24 @@ module Clash.Intel.ClockGen
 import GHC.TypeLits (type (<=))
 
 import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Clocks (Clocks(..))
+import Clash.Clocks
+  (Clocks(..), ClocksSync(..), ClocksSyncCxt, NumOutClocksSync)
 import Clash.Magic (setName)
 import Clash.Promoted.Symbol (SSymbol)
-import Clash.Signal.Internal (Signal, Clock, Reset, KnownDomain)
+import Clash.Signal.Internal
+  (Signal, Clock, Reset, KnownDomain, HasAsynchronousReset)
+
+altpllSync ::
+  forall t domIn .
+  ( HasAsynchronousReset domIn
+  , ClocksSyncCxt t domIn
+  , NumOutClocksSync t domIn <= 5
+  ) =>
+  Clock domIn ->
+  Reset domIn ->
+  t
+altpllSync clkIn rstIn =
+  clocksResetSynchronizer (unsafeAltpll clkIn rstIn) clkIn
 
 -- | A clock source that corresponds to the Intel/Quartus \"ALTPLL\" component
 -- (Arria GX, Arria II, Stratix IV, Stratix III, Stratix II, Stratix,
@@ -107,7 +123,7 @@ import Clash.Signal.Internal (Signal, Clock, Reset, KnownDomain)
 -- @
 altpll ::
   forall domOut domIn name .
-  ( KnownDomain domIn
+  ( HasAsynchronousReset domIn
   , KnownDomain domOut
   ) =>
   -- | Name of the component instance
@@ -138,6 +154,18 @@ unsafeAltpll = clocks
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE unsafeAltpll #-}
 {-# ANN unsafeAltpll hasBlackBox #-}
+
+alteraPllSync ::
+  forall t domIn .
+  ( HasAsynchronousReset domIn
+  , ClocksSyncCxt t domIn
+  , NumOutClocksSync t domIn <= 18
+  ) =>
+  Clock domIn ->
+  Reset domIn ->
+  t
+alteraPllSync clkIn rstIn =
+  clocksResetSynchronizer (unsafeAlteraPll clkIn rstIn) clkIn
 
 -- | A clock source that corresponds to the Intel/Quartus \"Altera PLL\"
 -- component (Arria V, Stratix V, Cyclone V) with settings to provide a stable
@@ -213,8 +241,8 @@ unsafeAltpll = clocks
 -- if the component doesn't need a reset).
 alteraPll ::
   forall t domIn name .
-  ( Clocks t
-  , KnownDomain domIn
+  ( HasAsynchronousReset domIn
+  , Clocks t
   , ClocksCxt t
   , NumOutClocks t <= 18
   ) =>

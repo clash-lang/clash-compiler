@@ -24,10 +24,8 @@ topEntity ::
   Signal DomOut (Index 10, Index 10)
 topEntity clkInSE clkInDiff rstIn =
   let f clk rst = register clk rst enableGen 0 . fmap (satSucc SatBound)
-      (clkA, stableA) = unsafeClockWizard clkInSE rstIn
-      rstA = unsafeFromActiveLow stableA
-      (clkB, stableB) = unsafeClockWizardDifferential clkInDiff rstIn
-      rstB = unsafeFromActiveLow stableB
+      (clkA, rstA) = clockWizard clkInSE rstIn
+      (clkB, rstB) = clockWizardDifferential clkInDiff rstIn
       o1 = f clkA rstA o1
       o2 = f clkB rstB o2
   in bundle (o1, o2)

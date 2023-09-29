@@ -29,6 +29,7 @@ myPll2 clkIn rstIn =
   clocksResetSynchronizer (clockWizard (SSymbol @"foo") clkIn rstIn) clkIn
 {-# ANN myPll2 (defSyn "myPll2") #-}
 {-# NOINLINE myPll2 #-}
+-}
 
 myPll3 ::
   Clock System ->
@@ -48,7 +49,7 @@ myPll4 ::
   Clock System ->
   Reset System ->
   (Clock Dom1, Reset Dom1)
-myPll4 = altpllSync (SSymbol @"foo")
+myPll4 = setName @"foo" altpllSync
 {-# ANN myPll4 (defSyn "myPll4") #-}
 {-# NOINLINE myPll4 #-}
 
@@ -57,7 +58,7 @@ myPll5 ::
   Reset System ->
   ( Clock Dom1
   , Reset Dom1)
-myPll5 = alteraPllSync (SSymbol @"foo")
+myPll5 = setName @"foo" alteraPllSync
 {-# ANN myPll5 (defSyn "myPll5") #-}
 {-# NOINLINE myPll5 #-}
 
@@ -70,7 +71,7 @@ myPll6 ::
   , Reset Dom2
   , Clock Dom3
   , Reset Dom3)
-myPll6 = alteraPllSync (SSymbol @"foo")
+myPll6 = setName @"foo" alteraPllSync
 {-# ANN myPll6 (defSyn "myPll6") #-}
 {-# NOINLINE myPll6 #-}
 
@@ -97,7 +98,7 @@ myPll9 ::
   Reset System ->
   ( Clock Dom1
   , Reset Dom1)
-myPll9 = clockWizardSyncWithName (SSymbol @"foo")
+myPll9 = setName @"foo" clockWizardSync
 {-# ANN myPll9 (defSyn "myPll9") #-}
 {-# NOINLINE myPll9 #-}
 
@@ -106,10 +107,9 @@ myPll10 ::
   Reset System ->
   ( Clock Dom1
   , Reset Dom1)
-myPll10 = clockWizardDifferentialSyncWithName (SSymbol @"foo")
+myPll10 = setName @"foo" clockWizardDifferentialSync
 {-# ANN myPll10 (defSyn "myPll10") #-}
 {-# NOINLINE myPll10 #-}
--}
 
 myPll11 ::
   Clock System ->
