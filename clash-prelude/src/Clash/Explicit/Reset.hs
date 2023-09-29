@@ -158,8 +158,13 @@ unsafeAndReset (unsafeFromReset -> rst0) (unsafeFromReset -> rst1) =
 -- === __Example 2__
 -- Similar to /Example 1/ this circuit detects a rising bit (i.e., a transition
 -- from 0 to 1) in a given argument. It takes a clock that is not stable yet and
--- a reset singal that is not synchronized to any other signals. It stabalizes
+-- a reset signal that is not synchronized to any other signals. It stabilizes
 -- the clock and then synchronizes the reset signal.
+--
+--
+-- Note that the function 'Clash.Intel.ClockGen.altpllSync' provides this
+-- functionality in a convenient form, obviating the need for
+-- @resetSynchronizer@ for this use case.
 --
 -- @
 -- topEntity
@@ -168,8 +173,8 @@ unsafeAndReset (unsafeFromReset -> rst0) (unsafeFromReset -> rst1) =
 --   -> Signal System Bit
 --   -> Signal System (BitVector 8)
 -- topEntity clk rst key1 =
---     let  (pllOut,pllStable) = altpll (SSymbol @"altpll50") clk rst
---          rstSync            = 'resetSynchronizer' pllOut (unsafeToActiveHigh pllStable)
+--     let  (pllOut,pllStable) = unsafeAltpll clk rst
+--          rstSync            = 'resetSynchronizer' pllOut (unsafeFromActiveLow pllStable)
 --     in   exposeClockResetEnable leds pllOut rstSync enableGen
 --   where
 --     key1R  = isRising 1 key1
