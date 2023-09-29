@@ -11,13 +11,32 @@ PLL and other clock-related components for Xilinx FPGAs
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 
-module Clash.Xilinx.ClockGen where
+module Clash.Xilinx.ClockGen
+  ( clockWizard
+  , clockWizardDifferential
+  , unsafeClockWizard
+  , unsafeClockWizardDifferential
+  ) where
 
 import GHC.TypeLits (type (<=))
 
 import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Clocks (Clocks(..))
+import Clash.Clocks
+  (Clocks(..), ClocksSync(..), ClocksSyncCxt, NumOutClocksSync)
 import Clash.Signal.Internal
+  (Clock, DiffClock(..), Reset, KnownDomain, HasAsynchronousReset)
+
+clockWizard ::
+  forall t domIn .
+  ( HasAsynchronousReset domIn
+  , ClocksSyncCxt t domIn
+  , NumOutClocksSync t domIn <= 7
+  ) =>
+  Clock domIn ->
+  Reset domIn ->
+  t
+clockWizard clkIn rstIn =
+  clocksResetSynchronizer (unsafeClockWizard clkIn rstIn) clkIn
 
 -- | A clock source that corresponds to the Xilinx MMCM component created
 -- with the \"Clock Wizard\" with settings to provide a stable 'Clock' from
@@ -49,6 +68,18 @@ unsafeClockWizard = clocks
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE unsafeClockWizard #-}
 {-# ANN unsafeClockWizard hasBlackBox #-}
+
+clockWizardDifferential ::
+  forall t domIn .
+  ( HasAsynchronousReset domIn
+  , ClocksSyncCxt t domIn
+  , NumOutClocksSync t domIn <= 7
+  ) =>
+  DiffClock domIn ->
+  Reset domIn ->
+  t
+clockWizardDifferential clkIn@(DiffClock clkInP _) rstIn =
+  clocksResetSynchronizer (unsafeClockWizardDifferential clkIn rstIn) clkInP
 
 -- | A clock source that corresponds to the Xilinx MMCM component created
 -- with the \"Clock Wizard\", with settings to provide a stable 'Clock'
