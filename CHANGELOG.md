@@ -1,8 +1,8 @@
 # Changelog for the Clash project
 ## 1.6.6 *Oct 2nd 2023*
 
-* Support Aeson 2.2
-* Dropped the snap package
+* Support Aeson 2.2 [#2578](https://github.com/clash-lang/clash-compiler/pull/2578)
+* Drop the snap package [#2439](https://github.com/clash-lang/clash-compiler/pull/2439)
 
     The Clash snap package has not been a recommended way to use Clash for quite some time, and it is a hassle to support.
 
