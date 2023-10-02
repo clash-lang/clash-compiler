@@ -1289,16 +1289,16 @@ a general listing of the available template holes:
 * @~TAG[N]@: Name of given domain. Errors when called on an argument which is not
   a 'KnownDomain', 'Reset', or 'Clock'.
 * @~PERIOD[N]@: Clock period of given domain. Errors when called on an argument
-  which is not a 'KnownDomain' or 'KnownConf'.
+  which is not a 'Clock', 'Reset', 'KnownDomain' or 'KnownConf'.
 * @~ISACTIVEENABLE[N]@: Is the @(N+1)@'th argument a an Enable line NOT set to a
   constant True. Can be used instead of deprecated (and removed) template tag
 * @~ISSYNC[N]@: Does synthesis domain at the @(N+1)@'th argument have synchronous resets. Errors
-  when called on an argument which is not a 'KnownDomain' or 'KnownConf'.
+  when called on an argument which is not a 'Reset', 'Clock', 'Enable', 'KnownDomain' or 'KnownConf'.
 * @~ISINITDEFINED[N]@: Does synthesis domain at the @(N+1)@'th argument have defined initial
-  values. Errors when called on an argument which is not a 'KnownDomain' or 'KnownConf'.
+  values. Errors when called on an argument which is not a 'Clock', 'Reset', 'Enable', 'KnownDomain' or 'KnownConf'.
 * @~ACTIVEEDGE[edge][N]@: Does synthesis domain at the @(N+1)@'th argument respond to
   /edge/. /edge/ must be one of 'Falling' or 'Rising'. Errors when called on an
-  argument which is not a 'KnownDomain' or 'KnownConf'.
+  argument which is not a 'Clock', 'Reset', 'Enable', 'KnownDomain' or 'KnownConf'.
 * @~AND[\<HOLE1\>,\<HOLE2\>,..]@: Logically /and/ the conditions in the @\<HOLE\>@'s
 * @~VAR[\<NAME\>][N]@: Like @~ARG[N]@ but binds the argument to a variable named NAME.
   The @\<NAME\>@ can be left blank, then clash will come up with a (unique) name.

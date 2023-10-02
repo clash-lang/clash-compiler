@@ -57,7 +57,7 @@ import           Text.Read                       (readEither)
 import           Text.Trifecta.Result            hiding (Err)
 
 import           Clash.Backend
-  (Backend (..), Usage (..), AggressiveXOptBB(..), RenderEnums(..))
+  (Backend (..), DomainMap, Usage (..), AggressiveXOptBB(..), RenderEnums(..))
 import           Clash.Netlist.BlackBox.Parser
 import           Clash.Netlist.BlackBox.Types
 import           Clash.Netlist.Types
@@ -65,7 +65,7 @@ import           Clash.Netlist.Types
    Declaration(BlackBoxD))
 import qualified Clash.Netlist.Id                as Id
 import qualified Clash.Netlist.Types             as N
-import           Clash.Netlist.Util              (typeSize, isVoid, stripVoid)
+import           Clash.Netlist.Util              (typeSize, isVoid, stripAttributes, stripVoid)
 import           Clash.Signal.Internal
   (ResetKind(..), ResetPolarity(..), InitBehavior(..), VDomainConfiguration (..))
 import           Clash.Util
@@ -493,20 +493,20 @@ renderElem b (IF c t f) = do
   syn <- hdlSyn
   enums <- renderEnums
   xOpt <- aggressiveXOptBB
-  let c' = check (coerce xOpt) iw hdl syn enums c
+  c' <- check (coerce xOpt) iw hdl syn enums c
   if c' > 0 then renderTemplate b t else renderTemplate b f
   where
-    check :: Bool -> Int -> HDL -> HdlSyn -> RenderEnums -> Element Int -> Int
+    check :: Backend backend => Bool -> Int -> HDL -> HdlSyn -> RenderEnums -> Element Int -> State backend Int
     check xOpt iw hdl syn enums c' = case c' of
-      (Size e)   -> typeSize (lineToType b [e])
-      (Length e) -> case lineToType b [e] of
+      (Size e)   -> pure $ typeSize (lineToType b [e])
+      (Length e) -> pure $ case lineToType b [e] of
                        (Vector n _)              -> n
                        Void (Just (Vector n _))  -> n
                        (MemBlob n _)             -> n
                        Void (Just (MemBlob n _)) -> n
                        _                         -> 0 -- HACK: So we can test in splitAt if one of the
                               -- vectors in the tuple had a zero length
-      (Lit n) -> case bbInputs b !! n of
+      (Lit n) -> pure $ case bbInputs b !! n of
         (l,_,_)
           | Literal _ l' <- l ->
             case l' of
@@ -534,16 +534,16 @@ renderElem b (IF c t f) = do
           , [Literal _ (NumLit j)] <- extractLiterals bbCtx
           -> fromInteger j
         k -> error $ $(curLoc) ++ ("IF: LIT must be a numeric lit:" ++ show k)
-      (Depth e)  -> case lineToType b [e] of
+      (Depth e)  -> pure $ case lineToType b [e] of
                       (RTree n _) -> n
                       _ -> error $ $(curLoc) ++ "IF: treedepth of non-tree type"
-      IW64       -> if iw == 64 then 1 else 0
-      (HdlSyn s) -> if s == syn then 1 else 0
-      (IsVar n)  -> let (e,_,_) = bbInputs b !! n
+      IW64       -> pure $ if iw == 64 then 1 else 0
+      (HdlSyn s) -> pure $ if s == syn then 1 else 0
+      (IsVar n)  -> pure $ let (e,_,_) = bbInputs b !! n
                     in case e of
                       Identifier _ Nothing -> 1
                       _                    -> 0
-      (IsLit n)  -> let (e,_,_) = bbInputs b !! n
+      (IsLit n)  -> pure $ let (e,_,_) = bbInputs b !! n
                     in case e of
                       DataCon {}   -> 1
                       Literal {}   -> 1
@@ -557,13 +557,13 @@ renderElem b (IF c t f) = do
                                                        RenderEnums True  -> 1
                                                        RenderEnums False -> 0
                           isScalar _ _            = 0
-                      in isScalar hdl ty
+                        in pure $ isScalar hdl ty
 
-      (IsUndefined n) ->
+      (IsUndefined n) -> pure $
         let (e, _, _) = bbInputs b !! n
         in if xOpt && checkUndefined e then 1 else 0
 
-      (IsActiveEnable n) ->
+      (IsActiveEnable n) -> pure $
         let (e, ty, _) = bbInputs b !! n in
         case ty of
           Enable _ ->
@@ -585,51 +585,79 @@ renderElem b (IF c t f) = do
           _ ->
             error $ $(curLoc) ++ "IsActiveEnable: Expected Bool or Enable, not: " ++ show ty
 
-      (ActiveEdge edgeRequested n) ->
-        let (_, ty, _) = bbInputs b !! n in
-        case stripVoid ty of
-          KnownDomain _ _ edgeActual _ _ _ ->
+      (ActiveEdge edgeRequested n) -> do
+        let (_, ty, _) = bbInputs b !! n
+        domConf <- getDomainConf ty
+        case domConf of
+          VDomainConfiguration _ _ edgeActual _ _ _ -> pure $
             if edgeRequested == edgeActual then 1 else 0
-          _ ->
-            error $ $(curLoc) ++ "ActiveEdge: Expected `KnownDomain` or `KnownConfiguration`, not: " ++ show ty
 
-      (IsSync n) ->
-        let (_, ty, _) = bbInputs b !! n in
-        case stripVoid ty of
-          KnownDomain _ _ _ Synchronous _ _ -> 1
-          KnownDomain _ _ _ Asynchronous _ _ -> 0
-          _ -> error $ $(curLoc) ++ "IsSync: Expected `KnownDomain` or `KnownConfiguration`, not: " ++ show ty
+      (IsSync n) -> do
+        let (_, ty, _) = bbInputs b !! n
+        domConf <- getDomainConf ty
+        case domConf of
+          VDomainConfiguration _ _ _ Synchronous _ _ -> pure 1
+          VDomainConfiguration _ _ _ Asynchronous _ _ -> pure 0
 
-      (IsInitDefined n) ->
-        let (_, ty, _) = bbInputs b !! n in
-        case stripVoid ty of
-          KnownDomain _ _ _ _ Defined _ -> 1
-          KnownDomain _ _ _ _ Unknown _ -> 0
-          _ -> error $ $(curLoc) ++ "IsInitDefined: Expected `KnownDomain` or `KnownConfiguration`, not: " ++ show ty
+      (IsInitDefined n) -> do
+        let (_, ty, _) = bbInputs b !! n
+        domConf <- getDomainConf ty
+        case domConf of
+          VDomainConfiguration _ _ _ _ Defined _ -> pure 1
+          VDomainConfiguration _ _ _ _ Unknown _ -> pure 0
 
-      (IsActiveHigh n) ->
-        let (_, ty, _) = bbInputs b !! n in
-        case stripVoid ty of
-          KnownDomain _ _ _ _ _ ActiveHigh -> 1
-          KnownDomain _ _ _ _ _ ActiveLow -> 0
-          _ -> error $ $(curLoc) ++ "IsActiveHigh: Expected `KnownDomain` or `KnownConfiguration`, not: " ++ show ty
+      (IsActiveHigh n) -> do
+        let (_, ty, _) = bbInputs b !! n
+        domConf <- getDomainConf ty
+        case domConf of
+          VDomainConfiguration _ _ _ _ _ ActiveHigh -> pure 1
+          VDomainConfiguration _ _ _ _ _ ActiveLow  -> pure 0
 
-      (StrCmp [Text t1] n) ->
+      (StrCmp [Text t1] n) -> pure $
         let (e,_,_) = bbInputs b !! n
         in  case exprToString e of
               Just t2
                 | t1 == Text.pack t2 -> 1
                 | otherwise -> 0
               Nothing -> error $ $(curLoc) ++ "Expected a string literal: " ++ show e
-      (And es)   -> if all (/=0) (map (check xOpt iw hdl syn enums) es)
+      (And es)   -> do
+        es' <- mapM (check xOpt iw hdl syn enums) es
+        pure $ if all (/=0) es'
                        then 1
                        else 0
-      CmpLE e1 e2 -> if check xOpt iw hdl syn enums e1 <= check xOpt iw hdl syn enums e2
-                        then 1
-                        else 0
+      CmpLE e1 e2 -> do
+        v1 <- check xOpt iw hdl syn enums e1
+        v2 <- check xOpt iw hdl syn enums e2
+        if v1 <= v2
+          then pure 1
+          else pure 0
       _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGTH, LIT, DEPTH, IW64, VIVADO, OTHERSYN, ISVAR, ISLIT, ISUNDEFINED, ISACTIVEENABLE, ACTIVEEDGE, ISSYNC, ISINITDEFINED, ISACTIVEHIGH, STRCMP, AND, ISSCALAR or CMPLE."
                              ++ "\nGot: " ++ show c'
 renderElem b e = fmap const (renderTag b e)
+
+getDomainConf :: (Backend backend, HasCallStack) => HWType -> State backend VDomainConfiguration
+getDomainConf = generalGetDomainConf domainConfigurations
+
+generalGetDomainConf
+  :: (Monad m, HasCallStack)
+  => (m DomainMap) -- ^ a way to get the `DomainMap`
+  -> HWType -> m VDomainConfiguration
+generalGetDomainConf getDomainMap ty = case (snd . stripAttributes . stripVoid) ty of
+  KnownDomain dom period activeEdge resetKind initBehavior resetPolarity ->
+    pure $ VDomainConfiguration (Data.Text.unpack dom) (fromIntegral period) activeEdge resetKind initBehavior resetPolarity
+
+  Clock dom -> go dom
+  ClockN dom -> go dom
+  Reset dom  -> go dom
+  Enable dom -> go dom
+  Product _DiffClock _ [Clock dom,_clkN] -> go dom
+  t -> error $ $(curLoc) ++ "Don't know how to get a Domain out of HWType: " <> show t
+ where
+  go dom = do
+    doms <- getDomainMap
+    case HashMap.lookup dom doms of
+      Nothing -> error $ "Can't find domain " <> show dom
+      Just conf -> pure conf
 
 parseFail :: Text -> BlackBoxTemplate
 parseFail t = case runParse t of
