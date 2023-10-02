@@ -43,6 +43,7 @@ module Clash.Signal.Internal
   , Domain
   , sameDomain
   , KnownDomain(..)
+  , ZKnownDomain
   , KnownConfiguration
   , knownDomainByName
   , ActiveEdge(..)
@@ -172,6 +173,7 @@ module Clash.Signal.Internal
 where
 
 import Data.IORef                 (IORef, atomicModifyIORef, newIORef, readIORef)
+import Data.Kind                  (Constraint)
 import Type.Reflection            (Typeable)
 import Control.Arrow.Transformer.Automaton
 #if !MIN_VERSION_base(4,18,0)
@@ -462,6 +464,11 @@ data SDomainConfiguration (dom :: Domain) (conf :: DomainConfiguration) where
 deriving instance Show (SDomainConfiguration dom conf)
 
 type KnownConfiguration dom conf = (KnownDomain dom, KnownConf dom ~ conf)
+
+-- temp constraint placeholder so we don't have to renumber the prim args just yet
+{-  # DEPRECATED ZKnownDomain ["ZKnownDomain is a transitional dummy constraint."] #-}
+type ZKnownDomain (dom :: Domain) = () :: Constraint
+
 
 -- | A 'KnownDomain' constraint indicates that a circuit's behavior depends on
 -- some properties of a domain. See 'DomainConfiguration' for more information.

@@ -155,6 +155,7 @@ module Clash.Explicit.Signal
     -- * Domain
   , Domain
   , KnownDomain(..)
+  , ZKnownDomain
   , KnownConfiguration
   , ActiveEdge(..)
   , SActiveEdge(..)
