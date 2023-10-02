@@ -9,6 +9,6 @@
     name: Clash.Signal.Internal.unsafeToReset
     kind: Expression
     type: 'unsafeToReset ::
-      Signal dom Bool -> Reset dom'
-    template: ~ARG[0]
+      KnownDomain dom => Signal dom Bool -> Reset dom'
+    template: ~ARG[1]
     workInfo: Never

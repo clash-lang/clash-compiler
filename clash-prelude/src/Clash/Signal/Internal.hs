@@ -920,7 +920,7 @@ enableGen :: Enable dom
 enableGen = toEnable (pure True)
 
 -- | A clock signal belonging to a domain named /dom/.
-data Clock (dom :: Domain) = Clock
+data Clock (dom :: Domain) = KnownDomain dom => Clock
   { -- | Domain associated with the clock
     clockTag :: SSymbol dom
 
@@ -1160,7 +1160,8 @@ resetGenN n =
 -- | A reset signal belonging to a domain called /dom/.
 --
 -- The underlying representation of resets is 'Bool'.
-data Reset (dom :: Domain) = Reset (Signal dom Bool)
+data Reset (dom :: Domain) where
+  Reset :: KnownDomain dom => Signal dom Bool -> Reset dom
 
 -- | Non-ambiguous version of 'Clash.Signal.Internal.Ambiguous.resetPolarity'
 resetPolarityProxy
@@ -1184,13 +1185,14 @@ resetPolarityProxy _proxy =
 -- asynchronous resets.
 unsafeToActiveHigh
   :: forall dom
-   . KnownDomain dom
-  => Reset dom
+   . Reset dom
   -> Signal dom Bool
-unsafeToActiveHigh (unsafeFromReset -> r) =
+unsafeToActiveHigh r0@(Reset{}) =
   case resetPolarityProxy (Proxy @dom) of
     SActiveHigh -> r
     SActiveLow -> not <$> r
+ where
+  r = unsafeFromReset r0
 {-# INLINE unsafeToActiveHigh #-}
 
 -- | Convert a reset to an active high reset. Has no effect if reset is already
@@ -1204,8 +1206,7 @@ unsafeToActiveHigh (unsafeFromReset -> r) =
 -- asynchronous resets.
 unsafeToHighPolarity
   :: forall dom
-   . KnownDomain dom
-  => Reset dom
+   . Reset dom
   -> Signal dom Bool
 unsafeToHighPolarity = unsafeToActiveHigh
 {-# DEPRECATED unsafeToHighPolarity "Use 'unsafeToActiveHigh' instead. This function will be removed in Clash 1.12." #-}
@@ -1222,13 +1223,14 @@ unsafeToHighPolarity = unsafeToActiveHigh
 -- asynchronous resets.
 unsafeToActiveLow
   :: forall dom
-   . KnownDomain dom
-  => Reset dom
+   . Reset dom
   -> Signal dom Bool
-unsafeToActiveLow (unsafeFromReset -> r) =
+unsafeToActiveLow r0@(Reset{}) =
   case resetPolarityProxy (Proxy @dom) of
     SActiveHigh -> not <$> r
     SActiveLow -> r
+ where
+  r = unsafeFromReset r0
 {-# INLINE unsafeToActiveLow #-}
 
 -- | Convert a reset to an active low reset. Has no effect if reset is already
@@ -1242,8 +1244,7 @@ unsafeToActiveLow (unsafeFromReset -> r) =
 -- asynchronous resets.
 unsafeToLowPolarity
   :: forall dom
-   . KnownDomain dom
-  => Reset dom
+   . Reset dom
   -> Signal dom Bool
 unsafeToLowPolarity = unsafeToActiveLow
 {-# DEPRECATED unsafeToLowPolarity "Use 'unsafeToActiveLow' instead. This function will be removed in Clash 1.12." #-}
@@ -1276,7 +1277,8 @@ unsafeFromReset (Reset r) = r
 -- __NB__: You probably want to use 'unsafeFromActiveLow' or
 -- 'unsafeFromActiveHigh'.
 unsafeToReset
-  :: Signal dom Bool
+  :: KnownDomain dom
+  => Signal dom Bool
   -> Reset dom
 unsafeToReset r = Reset r
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
@@ -1357,7 +1359,7 @@ unsafeFromActiveLow r =
 
 -- | Invert reset signal
 invertReset :: Reset dom -> Reset dom
-invertReset = unsafeToReset . fmap not . unsafeFromReset
+invertReset r@(Reset{}) = unsafeToReset . fmap not . unsafeFromReset $ r
 
 infixr 2 .||.
 -- | The above type is a generalization for:
