@@ -1,4 +1,15 @@
 # Changelog for the Clash project
+## 1.6.6 *Oct 2nd 2023*
+
+* Support Aeson 2.2 [#2578](https://github.com/clash-lang/clash-compiler/pull/2578)
+* Drop the snap package [#2439](https://github.com/clash-lang/clash-compiler/pull/2439)
+
+    The Clash snap package has not been a recommended way to use Clash for quite some time, and it is a hassle to support.
+
+    In order to build a snap package, we build .deb packages for Clash with Ubuntu 20.04 LTS. But the interaction between the Debian build system and GHC is problematic, requiring significant effort to support and to upgrade to a more recent Ubuntu release.
+
+    Additionally, snap packages have their own issues on distributions other than Ubuntu. Given that we no longer recommend people use our snap package and given the effort required to keep supporting them, we have decided to drop the snap package.
+
 ## 1.6.5 *Jun 27th 2023*
 
 Fixed:
