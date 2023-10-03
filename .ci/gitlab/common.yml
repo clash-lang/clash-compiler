@@ -25,7 +25,7 @@
     - tar -xf cache.tar.zst -C / || true
     - .ci/setup.sh
   after_script:
-    - tar -cf - $(ls -d /root/.cabal /root/.stack $(pwd)/.ci/bindist/linux/debian/*/build || true) | zstd -T${THREADS} -3 > cache.tar.zst
+    - tar -cf - $(ls -d /root/.cabal /root/.stack || true) | zstd -T${THREADS} -3 > cache.tar.zst
 
 # We run tests on local machines if:
 #
