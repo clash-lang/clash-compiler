@@ -12,26 +12,26 @@ data ConfStateMachine = CONFena  |
                          CONFstop
   deriving Show
 
-data ConfS = ConfS { confStateM :: ConfStateMachine
-                   , start      :: Bool
-                   , stop       :: Bool
-                   , write      :: Bool
-                   , din        :: Vec 8 Bit
-                   , lutIndex   :: Index 16
-                   , fault      :: Bool
+data ConfS = ConfS { i2cConfStateM :: ConfStateMachine
+                   , i2cStart      :: Bool
+                   , i2cStop       :: Bool
+                   , i2cWrite      :: Bool
+                   , i2cDin        :: Vec 8 Bit
+                   , i2cLutIndex   :: Index 16
+                   , i2cFault      :: Bool
                    }
 
 type ConfI = (Bool,Bool,Bool,Bool,Bool)
 type ConfO = (Bool,Bool,Bool,BitVector 8,Bool,Bool)
 
 confInit :: ConfS
-confInit = ConfS { confStateM = CONFena
-                 , start      = False
-                 , stop       = False
-                 , write      = False
-                 , din        = repeat low
-                 , lutIndex   = 0
-                 , fault      = False
+confInit = ConfS { i2cConfStateM = CONFena
+                 , i2cStart      = False
+                 , i2cStop       = False
+                 , i2cWrite      = False
+                 , i2cDin        = repeat low
+                 , i2cLutIndex   = 0
+                 , i2cFault      = False
                  }
 
 configT
@@ -53,84 +53,84 @@ configT s0 (rst,ena,cmdAck,rxAck,al) = do
   sNext <- if rst then pure confInit else case confStateM of
     CONFena
       | ena && not done
-      -> pure s { confStateM = CONFaddr }
+      -> pure s { i2cConfStateM = CONFaddr }
       | done
       -> do display "done"
             finish 0
 
     CONFaddr
-      -> pure s { confStateM = CONFaddrAck
-                , start = True
-                , write = True
-                , din   = unpack i2cSlvAddr
+      -> pure s { i2cConfStateM = CONFaddrAck
+                , i2cStart = True
+                , i2cWrite = True
+                , i2cDin   = unpack i2cSlvAddr
                 }
 
     CONFaddrAck
       | success
       -> do display "CONFaddrAck"
-            pure s { confStateM = CONFreg
-                   , start = False
-                   , write = False
+            pure s { i2cConfStateM = CONFreg
+                   , i2cStart = False
+                   , i2cWrite = False
                    }
 
     CONFreg
       -> if rxAck == False then do
            display "Success CONFreg"
-           pure s { confStateM = CONFregAck
-                  , write = True
-                  , din   = unpack (fst lutData)
-                  , fault = False
+           pure s { i2cConfStateM = CONFregAck
+                  , i2cWrite = True
+                  , i2cDin   = unpack (fst lutData)
+                  , i2cFault = False
                   }
          else do
            display "Failure CONFreg"
-           finish 1
-           pure s { confStateM = CONFena
-                  , fault = True
+           _ <- finish 1
+           pure s { i2cConfStateM = CONFena
+                  , i2cFault = True
                   }
 
     CONFregAck
       | success
       -> do display "CONFregAck"
-            pure s { confStateM = CONFdata
-                   , write = False
+            pure s { i2cConfStateM = CONFdata
+                   , i2cWrite = False
                    }
 
     CONFdata
-      -> if rxAck == False then do
+      -> if not rxAck then do
            display "Success CONFdata"
-           pure s { confStateM = CONFdataAck
-                  , write = True
-                  , stop = True
-                  , din = unpack (snd lutData)
-                  , fault = False
+           pure s { i2cConfStateM = CONFdataAck
+                  , i2cWrite = True
+                  , i2cStop = True
+                  , i2cDin = unpack (snd lutData)
+                  , i2cFault = False
                   }
          else do
            display "Failure CONFdata"
-           finish 1
-           pure s { confStateM = CONFena
-                  , fault = True
+           _ <- finish 1
+           pure s { i2cConfStateM = CONFena
+                  , i2cFault = True
                   }
 
     CONFdataAck
       | success
       -> do display "CONFdataAck"
-            pure s { confStateM = CONFstop
-                   , stop = False
-                   , write = False
+            pure s { i2cConfStateM = CONFstop
+                   , i2cStop = False
+                   , i2cWrite = False
                    }
 
     CONFstop
-      -> if rxAck == False then do
+      -> if not rxAck then do
            display "Success CONFstop"
-           pure s { confStateM = CONFena
-                  , lutIndex = lutIndex + 1
-                  , fault = False
+           pure s { i2cConfStateM = CONFena
+                  , i2cLutIndex = lutIndex + 1
+                  , i2cFault = False
                   }
          else do
            display "Failure CONFdata"
-           finish 1
-           pure s { confStateM = CONFena
-                  , fault = True
+           _ <- finish 1
+           pure s { i2cConfStateM = CONFena
+                  , i2cFault = True
                   }
 
     _ -> pure s

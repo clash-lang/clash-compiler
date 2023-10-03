@@ -2,11 +2,10 @@
 
 module Clash.Cores.I2C where
 
-import Clash.Prelude
+import Clash.Prelude hiding (read)
 
 import Clash.Cores.I2C.BitMaster
 import Clash.Cores.I2C.ByteMaster
-import Clash.Cores.I2C.Types
 
 {-# ANN i2c
   (Synthesize
@@ -32,10 +31,29 @@ import Clash.Cores.I2C.Types
                      , PortProduct "" [PortName "i2cO_clk"]
                      ]
     }) #-}
+i2c ::
+  Clock System ->
+  Reset System ->
+  Signal System Bool ->
+  Signal System Bool ->
+  Signal System (Unsigned 16) ->
+  Signal System Bool ->
+  Signal System Bool ->
+  Signal System Bool ->
+  Signal System Bool ->
+  Signal System Bool ->
+  Signal System (BitVector 8) ->
+  Signal System (Bit, Bit) ->
+  ( Signal System (BitVector 8)
+  , Signal System Bool
+  , Signal System Bool
+  , Signal System Bool
+  , Signal System Bool
+  , Signal System (Bit, Bool, Bit, Bool))
 i2c clk arst rst ena clkCnt start stop read write ackIn din i2cI = (dout,hostAck,busy,al,ackOut,i2cO)
   where
     (hostAck,ackOut,dout,bitCtrl) = byteMaster clk arst enableGen (rst,start,stop,read,write,ackIn,din,bitResp)
     (bitResp,busy,i2cO)           = bitMaster  clk arst enableGen (rst,ena,clkCnt,bitCtrl,i2cI)
-    (cmdAck,al,dbout)             = unbundle bitResp
+    (_cmdAck,al,_dbout)           = unbundle bitResp
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE i2c #-}

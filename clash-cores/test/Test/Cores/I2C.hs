@@ -11,9 +11,9 @@ import Test.Cores.I2C.Slave
 import Test.Cores.I2C.Config
 
 system0 :: Clock System -> Reset System -> Signal System (Vec 16 (Unsigned 8), Bool, Bool)
-system0 clk arst = bundle (regFile,done,fault)
+system0 clk arst = bundle (registerFile,done,fault)
  where
-  (dout,hostAck,busy,al,ackOut,i2cO) =
+  (_dout,hostAck,_busy,al,ackOut,i2cO) =
     i2c clk arst rst (pure True) (pure 19) start stop (pure False) write (pure True) din i2cI
 
   (start,stop,write,din,done,fault) = unbundle $
@@ -23,7 +23,7 @@ system0 clk arst = bundle (regFile,done,fault)
   scl  = fmap bitCoerce sclOen
   i2cI = bundle (scl,sdaS)
 
-  (sdaS,regFile) = unbundle
+  (sdaS,registerFile) = unbundle
     (i2cSlave clk (bundle (scl, bitCoerce <$> sdaOen)))
 
   rst = liftA2 (<) rstCounter 500
@@ -32,6 +32,8 @@ system0 clk arst = bundle (regFile,done,fault)
 {-# CLASH_OPAQUE system0 #-}
 
 {-# ANN system Synthesize { t_name = "system", t_inputs = [], t_output = PortName "" } #-}
+system :: Signal System (Vec 16 (Unsigned 8), Bool, Bool)
 system = system0 systemClockGen resetGen
 
+systemResult :: (Vec 16 (Unsigned 8), Bool, Bool)
 systemResult = L.last (sampleN 200050 system)

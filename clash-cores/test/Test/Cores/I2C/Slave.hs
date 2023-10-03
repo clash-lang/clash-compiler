@@ -5,14 +5,14 @@ module Test.Cores.I2C.Slave where
 import Clash.Prelude
 import Clash.Explicit.SimIO
 
-data ACConfTestS = ACCTS { regFile  :: Vec 16 (Unsigned 8)
-                         , addr     :: Vec 8 Bit
-                         , cntr     :: Int
-                         , atStateM :: AudioTestSM
-                         , prevSCL  :: Bit
-                         , prevSDA  :: Bit
-                         , sdaOut   :: Bit
-                         , regAddr  :: Unsigned 8
+data ACConfTestS = ACCTS { i2cSlaveRegFile  :: Vec 16 (Unsigned 8)
+                         , i2cSlaveAddr     :: Vec 8 Bit
+                         , i2cSlaveCntr     :: Int
+                         , i2cSlaveAtStateM :: AudioTestSM
+                         , i2cSlavePrevSCL  :: Bit
+                         , i2cSlavePrevSDA  :: Bit
+                         , i2cSlaveSdaOut   :: Bit
+                         , i2cSlaveRegAddr  :: Unsigned 8
                          }
 
 data AudioTestSM = ATidle | ATaddr | ATaddrAck | ATreg | ATregAck | ATval | ATvalAck | ATstop
@@ -40,69 +40,70 @@ i2cSlaveT s0 (scl,sda) = do
   stateMachine <- case atStateM of
     ATidle
       | startCondition -> do display "start"
-                             pure s {atStateM = ATaddr}
+                             pure s {i2cSlaveAtStateM = ATaddr}
     ATaddr
       | cntr == 8 -> if validAddr then do
                        display "valid addr"
-                       pure s { atStateM = ATaddrAck
-                              , addr = repeat low
-                              , cntr = 0 }
+                       pure s { i2cSlaveAtStateM = ATaddrAck
+                              , i2cSlaveAddr = repeat low
+                              , i2cSlaveCntr = 0 }
                      else do
                        display "invalid addr"
-                       pure s { atStateM = ATidle
-                              , addr = repeat low
-                              , cntr = 0}
-      | sclRising ->   pure s { cntr = cntr + 1
-                              , addr = addr <<+ sda
-                              , sdaOut = high }
+                       pure s { i2cSlaveAtStateM = ATidle
+                              , i2cSlaveAddr = repeat low
+                              , i2cSlaveCntr = 0}
+      | sclRising ->   pure s { i2cSlaveCntr = cntr + 1
+                              , i2cSlaveAddr = addr <<+ sda
+                              , i2cSlaveSdaOut = high }
     ATaddrAck
       | sclRising -> do display "addrAck"
-                        pure s { atStateM = ATreg, sdaOut = low }
+                        pure s { i2cSlaveAtStateM = ATreg, i2cSlaveSdaOut = low }
     ATreg
       | cntr == 8 -> if validRegAddr then do
                        display "valid reg addr"
-                       pure s { atStateM = ATregAck
-                              , addr     = repeat low
-                              , cntr     = 0
-                              , regAddr  = shiftR (bitCoerce addr) 1
+                       pure s { i2cSlaveAtStateM = ATregAck
+                              , i2cSlaveAddr     = repeat low
+                              , i2cSlaveCntr     = 0
+                              , i2cSlaveRegAddr  = shiftR (bitCoerce addr) 1
                               }
                      else do
                        display "invalid reg addr"
-                       pure s { atStateM = ATidle
-                              , addr = repeat low
-                              , cntr = 0
+                       pure s { i2cSlaveAtStateM = ATidle
+                              , i2cSlaveAddr = repeat low
+                              , i2cSlaveCntr = 0
                               }
-      | sclRising -> pure s { cntr = cntr + 1
-                            , addr = addr <<+ sda
-                            , sdaOut = high }
+      | sclRising -> pure s { i2cSlaveCntr = cntr + 1
+                            , i2cSlaveAddr = addr <<+ sda
+                            , i2cSlaveSdaOut = high }
     ATregAck
       | sclRising -> do display "regAck"
-                        pure s { sdaOut = low
-                               , atStateM = ATval
+                        pure s { i2cSlaveSdaOut = low
+                               , i2cSlaveAtStateM = ATval
                                }
     ATval
       | cntr == 8 -> do display "val"
-                        pure s { atStateM = ATvalAck
-                               , addr = repeat low
-                               , cntr = 0
-                               , regFile = replace regAddr (bitCoerce addr) regFile
-                               }
-      | sclRising -> pure s { cntr = cntr + 1
-                            , addr = addr <<+ sda
-                            , sdaOut = high }
+                        pure s { i2cSlaveAtStateM = ATvalAck
+                                , i2cSlaveAddr = repeat low
+                                , i2cSlaveCntr = 0
+                                , i2cSlaveRegFile =
+                                  replace regAddr (bitCoerce addr) regFile
+                                }
+      | sclRising -> pure s { i2cSlaveCntr = cntr + 1
+                            , i2cSlaveAddr = addr <<+ sda
+                            , i2cSlaveSdaOut = high }
     ATvalAck
       | sclRising -> do display "valAck"
-                        pure s { sdaOut = low
-                               , atStateM = ATstop
+                        pure s { i2cSlaveSdaOut = low
+                               , i2cSlaveAtStateM = ATstop
                                }
     ATstop
       | stopCondition -> do display "stop"
-                            pure s { atStateM = ATidle
-                                   , sdaOut = high
+                            pure s { i2cSlaveAtStateM = ATidle
+                                   , i2cSlaveSdaOut = high
                                    }
     _ -> pure s
 
-  writeReg s0 (stateMachine {prevSDA = sda, prevSCL = scl})
+  writeReg s0 (stateMachine {i2cSlavePrevSDA = sda, i2cSlavePrevSCL = scl})
   pure (sdaOut, regFile)
 
 {-# ANN i2cSlave Synthesize { t_name = "slave", t_inputs = [], t_output = PortName "" } #-}

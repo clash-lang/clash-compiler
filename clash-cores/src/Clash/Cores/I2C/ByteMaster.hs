@@ -2,7 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Clash.Cores.I2C.ByteMaster (byteMaster) where
 
-import Clash.Prelude
+import Clash.Prelude hiding (read)
 
 import Control.Lens hiding (Index)
 import Control.Monad

@@ -64,6 +64,7 @@ bitMaster = exposeClockResetEnable (mealyB bitMasterT bitMasterInit)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE bitMaster #-}
 
+bitMasterInit :: BitMasterS
 bitMasterInit = BitS { _stateMachine   = stateMachineStart
                             , _busState       = busStartState
                             , _dout           = high       -- dout register
@@ -79,7 +80,8 @@ bitMasterT s@(BitS { _stateMachine = StateMachine  {..}
                    , _busState     = BusStatusCtrl {..}
                    , ..
                    })
-                  (rst,ena,clkCnt,(cmd,din),i2cI@(sclI,sdaI)) = swap $ flip runState s $ do
+                  (rst,ena,clkCnt,(cmd,din),i2cI@(_sclI,_sdaI)) =
+                     swap $ flip runState s $ do
   -- Whenever the slave is not ready it can delay the cycle by pulling SCL low
   -- delay scloEn
   dsclOen .= _sclOen
