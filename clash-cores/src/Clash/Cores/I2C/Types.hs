@@ -1,4 +1,4 @@
-module I2C.Types where
+module Clash.Cores.I2C.Types where
 
 import Clash.Prelude
 

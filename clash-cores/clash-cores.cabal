@@ -106,13 +106,26 @@ common basic-config
     QuickCheck,
     string-interpolate        ^>= 0.3,
     template-haskell,
+    transformers,
 
 library
   import: basic-config
   hs-source-dirs: src
 
   exposed-modules:
-    Clash.Cores.Xilinx.Internal
+    Clash.Cores.I2C
+    Clash.Cores.I2C.BitMaster
+    Clash.Cores.I2C.BitMaster.BusCtrl
+    Clash.Cores.I2C.BitMaster.StateMachine
+    Clash.Cores.I2C.ByteMaster
+    Clash.Cores.I2C.ByteMaster.ShiftRegister
+    Clash.Cores.I2C.Types
+    Clash.Cores.LatticeSemi.ECP5.Blackboxes.IO
+    Clash.Cores.LatticeSemi.ECP5.IO
+    Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO
+    Clash.Cores.LatticeSemi.ICE40.IO
+    Clash.Cores.SPI
+    Clash.Cores.UART
     Clash.Cores.Xilinx.BlockRam
     Clash.Cores.Xilinx.BlockRam.BlackBoxes
     Clash.Cores.Xilinx.BlockRam.Internal
@@ -120,15 +133,16 @@ library
     Clash.Cores.Xilinx.DcFifo.Internal.BlackBoxes
     Clash.Cores.Xilinx.DcFifo.Internal.Instances
     Clash.Cores.Xilinx.DcFifo.Internal.Types
-    Clash.Cores.Xilinx.Ila
-    Clash.Cores.Xilinx.Ila.Internal
-    Clash.Cores.Xilinx.VIO
-    Clash.Cores.Xilinx.VIO.Internal.BlackBoxes
     Clash.Cores.Xilinx.Floating
     Clash.Cores.Xilinx.Floating.Annotations
     Clash.Cores.Xilinx.Floating.BlackBoxes
     Clash.Cores.Xilinx.Floating.Explicit
     Clash.Cores.Xilinx.Floating.Internal
+    Clash.Cores.Xilinx.Ila
+    Clash.Cores.Xilinx.Ila.Internal
+    Clash.Cores.Xilinx.Internal
+    Clash.Cores.Xilinx.VIO
+    Clash.Cores.Xilinx.VIO.Internal.BlackBoxes
     Clash.Cores.Xilinx.Xpm
     Clash.Cores.Xilinx.Xpm.Cdc
     Clash.Cores.Xilinx.Xpm.Cdc.ArraySingle
@@ -139,12 +153,6 @@ library
     Clash.Cores.Xilinx.Xpm.Cdc.Handshake.Internal
     Clash.Cores.Xilinx.Xpm.Cdc.Single
     Clash.Cores.Xilinx.Xpm.Cdc.Single.Internal
-    Clash.Cores.SPI
-    Clash.Cores.UART
-    Clash.Cores.LatticeSemi.ICE40.IO
-    Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO
-    Clash.Cores.LatticeSemi.ECP5.IO
-    Clash.Cores.LatticeSemi.ECP5.Blackboxes.IO
 
   ghc-options:
     -fexpose-all-unfoldings
@@ -171,6 +179,9 @@ test-suite unittests
     buildable: False
 
   other-Modules:
+    Test.Cores.I2C
+    Test.Cores.I2C.Config
+    Test.Cores.I2C.Slave
     Test.Cores.Internal.SampleSPI
     Test.Cores.Internal.Signals
     Test.Cores.SPI

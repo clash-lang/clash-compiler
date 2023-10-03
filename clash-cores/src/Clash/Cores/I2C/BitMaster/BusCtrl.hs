@@ -1,14 +1,14 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
-module I2C.BitMaster.BusCtrl where
+module Clash.Cores.I2C.BitMaster.BusCtrl where
 
 import Clash.Prelude
 import Control.Lens
 import Control.Monad
 import Control.Monad.State
 
-import I2C.BitMaster.StateMachine
-import I2C.Types
+import Clash.Cores.I2C.BitMaster.StateMachine
+import Clash.Cores.I2C.Types
 
 data BusStatusCtrl
   = BusStatusCtrl

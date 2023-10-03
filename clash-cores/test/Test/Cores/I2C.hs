@@ -1,14 +1,14 @@
 {-# LANGUAGE CPP #-}
 
-module I2Ctest where
+module Test.Cores.I2C where
 
 import qualified Data.List as L
 
 import Clash.Explicit.Prelude
-import I2C
+import Clash.Cores.I2C
 
-import I2Ctest.I2CSlave
-import I2Ctest.I2CConfig
+import Test.Cores.I2C.Slave
+import Test.Cores.I2C.Config
 
 system0 :: Clock System -> Reset System -> Signal System (Vec 16 (Unsigned 8), Bool, Bool)
 system0 clk arst = bundle (regFile,done,fault)
