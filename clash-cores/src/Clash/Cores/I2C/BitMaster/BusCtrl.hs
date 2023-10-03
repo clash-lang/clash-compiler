@@ -27,6 +27,7 @@ data BusStatusCtrl
 makeLenses ''BusStatusCtrl
 
 {-# INLINE busStartState #-}
+busStartState :: BusStatusCtrl
 busStartState
   = BusStatusCtrl
   { _sI2C           = (high,high)        -- synchronized SCL and SDA input
@@ -53,7 +54,7 @@ busStatusCtrl :: Bool
               -> Bool
               -> Bool
               -> State BusStatusCtrl ()
-busStatusCtrl rst ena clkCnt cmd clkEn i2cI bitStateM sdaChk sdaOen = do
+busStatusCtrl rst ena clkCnt cmd clkEn i2cI bitStateM0 sdaChk0 sdaOen0 = do
   BusStatusCtrl {..} <- get
 
   -- capture SCL and SDA
@@ -103,18 +104,18 @@ busStatusCtrl rst ena clkCnt cmd clkEn i2cI bitStateM sdaChk sdaOen = do
   -- arbitration lost when:
   -- 1) master drives SDA high, but the i2c bus is low
   -- 2) stop detected while not requested (detect during 'idle' state)
-  let masterHighBusLow = sdaChk && sSDA == low && sdaOen
+  let masterHighBusLow = sdaChk0 && sSDA == low && sdaOen0
   if rst then do
     cmdStop .= False
     al      .= False
   else do
     when clkEn $
       cmdStop .= (cmd == I2Cstop)
-    if bitStateM == Idle then
+    if bitStateM0 == Idle then
       al .= (masterHighBusLow || (_stopCondition && (not _cmdStop)))
     else
       al .= masterHighBusLow
   where
-    filterT f = (f!!2 .&. f!!1) .|.
-                (f!!2 .&. f!!0) .|.
-                (f!!1 .&. f!!0)
+    filterT f = (f !! (2 :: Integer) .&. f !! (1 :: Integer)) .|.
+                (f !! (2 :: Integer) .&. f !! (0 :: Integer)) .|.
+                (f !! (1 :: Integer) .&. f !! (0 :: Integer))

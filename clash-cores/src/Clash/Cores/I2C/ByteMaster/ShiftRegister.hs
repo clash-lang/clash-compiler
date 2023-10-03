@@ -16,18 +16,20 @@ data ShiftRegister
 makeLenses ''ShiftRegister
 
 {-# INLINE shiftStartState #-}
+shiftStartState :: ShiftRegister
 shiftStartState
   = ShiftRegister
   { _sr   = repeat low
   , _dcnt = 0
   }
 
-shiftRegister :: Bool
-              -> Bool
-              -> Bool
-              -> Vec 8 Bit
-              -> Bit
-              -> State ShiftRegister Bool
+shiftRegister ::
+  Bool ->
+  Bool ->
+  Bool ->
+  Vec 8 Bit ->
+  Bit ->
+  State ShiftRegister Bool
 shiftRegister rst ld shiftsr din coreRxd = do
   (ShiftRegister {..}) <- get
 

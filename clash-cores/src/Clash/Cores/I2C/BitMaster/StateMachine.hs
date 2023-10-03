@@ -29,6 +29,7 @@ data StateMachine
 makeLenses ''StateMachine
 
 {-# INLINE stateMachineStart #-}
+stateMachineStart :: StateMachine
 stateMachineStart
   = StateMachine
   { _sclOen    = True
@@ -175,5 +176,5 @@ bitStateMachine rst al clkEn cmd din = do
                        I2Cstop   -> Stop 0
                        I2Cwrite  -> Write 0
                        I2Cread   -> Read 0
-                       otherwise -> Idle
+                       _         -> Idle
         sdaChk    .= False
