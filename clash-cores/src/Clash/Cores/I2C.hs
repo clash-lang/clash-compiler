@@ -1,12 +1,12 @@
 {-# LANGUAGE CPP #-}
 
-module I2C where
+module Clash.Cores.I2C where
 
 import Clash.Prelude
 
-import I2C.BitMaster
-import I2C.ByteMaster
-import I2C.Types
+import Clash.Cores.I2C.BitMaster
+import Clash.Cores.I2C.ByteMaster
+import Clash.Cores.I2C.Types
 
 {-# ANN i2c
   (Synthesize

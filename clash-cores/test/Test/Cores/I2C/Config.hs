@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 
-module I2Ctest.I2CConfig where
+module Test.Cores.I2C.Config where
 
 import Clash.Prelude
 import Clash.Explicit.SimIO

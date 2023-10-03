@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
-module I2C.ByteMaster (byteMaster) where
+module Clash.Cores.I2C.ByteMaster (byteMaster) where
 
 import Clash.Prelude
 
@@ -9,8 +9,8 @@ import Control.Monad
 import Control.Monad.Trans.State
 import Data.Tuple
 
-import I2C.ByteMaster.ShiftRegister
-import I2C.Types
+import Clash.Cores.I2C.ByteMaster.ShiftRegister
+import Clash.Cores.I2C.Types
 
 data ByteStateMachine = Idle | Start | Read | Write | Ack | Stop
   deriving (Show, Generic, NFDataX)

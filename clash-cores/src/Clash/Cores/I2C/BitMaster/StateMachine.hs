@@ -1,13 +1,13 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
-module I2C.BitMaster.StateMachine where
+module Clash.Cores.I2C.BitMaster.StateMachine where
 
 import Clash.Prelude
 import Control.Lens hiding (Index)
 import Control.Monad
 import Control.Monad.State
 
-import I2C.Types
+import Clash.Cores.I2C.Types
 
 data BitStateMachine
   = Idle

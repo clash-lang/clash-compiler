@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
-module I2C.BitMaster (bitMaster) where
+module Clash.Cores.I2C.BitMaster (bitMaster) where
 
 import Clash.Prelude
 
@@ -9,9 +9,9 @@ import Control.Monad
 import Control.Monad.Trans.State
 import Data.Tuple
 
-import I2C.BitMaster.BusCtrl
-import I2C.BitMaster.StateMachine
-import I2C.Types
+import Clash.Cores.I2C.BitMaster.BusCtrl
+import Clash.Cores.I2C.BitMaster.StateMachine
+import Clash.Cores.I2C.Types
 
 data BitMasterS
   = BitS
