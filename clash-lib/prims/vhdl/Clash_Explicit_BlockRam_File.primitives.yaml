@@ -4,7 +4,7 @@
     outputUsage: NonBlocking
     type: |-
       blockRamFile#
-        :: ( KnownDomain dom        -- ARG[0]
+        :: ( ZKnownDomain dom        -- ARG[0]
            , KnownNat m             -- ARG[1]
            , HasCallStack )         -- ARG[2]
         => Clock dom                -- clk,  ARG[3]
@@ -51,7 +51,7 @@
         ~IF ~VIVADO ~THEN ~IF ~ISACTIVEENABLE[4] ~THEN
         ~GENSYM[blockRamFile_sync][10] : process(~ARG[3])
         begin
-          if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
+          if ~IF~ACTIVEEDGE[Rising][3]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
             if ~ARG[4] then
               if ~ARG[8] then
                 ~SYM[3](~SYM[6]) <= to_bitvector(~ARG[10]);
@@ -62,7 +62,7 @@
         end process;~ELSE
         ~SYM[10] : process(~ARG[3])
         begin
-          if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
+          if ~IF~ACTIVEEDGE[Rising][3]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
             if ~ARG[8] then
               ~SYM[3](~SYM[6]) <= to_bitvector(~ARG[10]);
             end if;
@@ -71,7 +71,7 @@
         end process;~FI ~ELSE ~IF ~ISACTIVEENABLE[4] ~THEN
         ~SYM[10] : process(~ARG[3])
         begin
-          if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
+          if ~IF~ACTIVEEDGE[Rising][3]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
             if ~ARG[8] and ~ARG[4] then
               ~SYM[3](~SYM[6]) <= to_bitvector(~ARG[10]);
             end if;
@@ -82,7 +82,7 @@
         end process;~ELSE
         ~SYM[10] : process(~ARG[3])
         begin
-          if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
+          if ~IF~ACTIVEEDGE[Rising][3]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
             if ~ARG[8] then
               ~SYM[3](~SYM[6]) <= to_bitvector(~ARG[10]);
             end if;

@@ -486,9 +486,7 @@ systemResetGen = resetGen
 -- [0,0,1,2,3,4,5,6,7,8,9,10]
 unsafeSynchronizer
   :: forall dom1 dom2 a
-   . ( KnownDomain dom1
-     , KnownDomain dom2 )
-  => Clock dom1
+   . Clock dom1
   -- ^ 'Clock' of the incoming signal
   -> Clock dom2
   -- ^ 'Clock' of the outgoing signal

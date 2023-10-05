@@ -56,7 +56,7 @@ import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Class.BitPack.Internal (BitPack, BitSize)
 import Clash.Explicit.BlockRam.Internal
   (MemBlob(..), packBVs, unpackMemBlob, unpackMemBlob0)
-import Clash.Explicit.Signal (KnownDomain, Enable, fromEnable)
+import Clash.Explicit.Signal (ZKnownDomain, Enable, fromEnable)
 import Clash.Promoted.Nat (natToInteger, natToNum)
 import Clash.Signal.Bundle (unbundle)
 import Clash.Signal.Internal (Clock, Signal(..), (.&&.))
@@ -88,8 +88,7 @@ import Clash.XException
 -- clk rst en ('blockRamBlob' clk en content) rd wrM@.
 blockRamBlob
   :: forall dom addr m n
-   . ( KnownDomain dom
-     , Enum addr
+   . ( Enum addr
      , NFDataX addr
      )
   => Clock dom
@@ -127,8 +126,7 @@ blockRamBlob = \clk gen content@MemBlob{} rd wrM ->
 -- clk rst en ('blockRamBlobPow2' clk en content) rd wrM@.
 blockRamBlobPow2
   :: forall dom m n
-   . ( KnownDomain dom
-     , KnownNat n
+   . ( KnownNat n
      )
   => Clock dom
   -- ^ 'Clock' to synchronize to
@@ -150,7 +148,7 @@ blockRamBlobPow2 = blockRamBlob
 -- | blockRAMBlob primitive
 blockRamBlob#
   :: forall dom m n
-   . KnownDomain dom
+   . ZKnownDomain dom
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom

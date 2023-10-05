@@ -4,7 +4,7 @@
     outputUsage: NonBlocking
     type: |-
       blockRamBlob#
-        :: KnownDomain dom           --       ARG[0]
+        :: ZKnownDomain dom           --       ARG[0]
         => Clock dom                 -- clk,  ARG[1]
         -> Enable dom                -- en,   ARG[2]
         -> MemBlob n m               -- init, ARG[3]
@@ -33,7 +33,7 @@
                       ;
         ~SYM[6] : process(~ARG[1])
         begin
-          if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[1]) then
+          if ~IF~ACTIVEEDGE[Rising][1]~THENrising_edge~ELSEfalling_edge~FI(~ARG[1]) then
             if ~ARG[5]~IF~ISACTIVEENABLE[2]~THEN and ~ARG[2]~ELSE~FI then
               ~SYM[2](~SYM[5]) <= ~ARG[7];
             end if;

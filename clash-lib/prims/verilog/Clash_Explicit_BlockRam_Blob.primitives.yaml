@@ -4,7 +4,7 @@
     outputUsage: NonBlocking
     type: |-
       blockRamBlob#
-        :: KnownDomain dom           --       ARG[0]
+        :: ZKnownDomain dom           --       ARG[0]
         => Clock dom                 -- clk,  ARG[1]
         -> Enable dom                -- en,   ARG[2]
         -> MemBlob n m               -- init, ARG[3]
@@ -26,7 +26,7 @@
         end
       end
       ~IF ~ISACTIVEENABLE[2] ~THEN
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[1]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
+      always @(~IF~ACTIVEEDGE[Rising][1]~THENposedge~ELSEnegedge~FI ~ARG[1]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
         if (~ARG[2]) begin
           if (~ARG[5]) begin
             ~SYM[1][~ARG[6]] <= ~ARG[7];
@@ -40,7 +40,7 @@
           ~RESULT <= ~SYM[1][~ARG[4]];
         end~FI
       end~ELSE
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[1]) begin : ~SYM[5]
+      always @(~IF~ACTIVEEDGE[Rising][1]~THENposedge~ELSEnegedge~FI ~ARG[1]) begin : ~SYM[5]
         if (~ARG[5]) begin
           ~SYM[1][~ARG[6]] <= ~ARG[7];
         end

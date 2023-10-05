@@ -4,7 +4,7 @@
     outputUsage: NonBlocking
     type: |-
       delay#
-        :: ( KnownDomain dom        -- ARG[0]
+        :: ( ZKnownDomain dom        -- ARG[0]
            , Undefined a )          -- ARG[1]
         => Clock dom                -- ARG[2]
         -> Enable dom               -- ARG[3]
@@ -12,17 +12,17 @@
         -> Signal clk a             -- ARG[5]
         -> Signal clk a
     resultInit:
-      template: ~IF~ISINITDEFINED[0]~THEN~CONST[4]~ELSE~FI
+      template: ~IF~ISINITDEFINED[2]~THEN~CONST[4]~ELSE~FI
     resultName:
       template: ~CTXNAME
     template: |-
       // delay begin~IF ~ISACTIVEENABLE[3] ~THEN
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~GENSYM[~RESULT_delay][1]
+      always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~GENSYM[~RESULT_delay][1]
         if (~ARG[3]) begin
           ~RESULT <= ~ARG[5];
         end
       end~ELSE
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~SYM[1]
+      always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~SYM[1]
         ~RESULT <= ~ARG[5];
       end~FI
       // delay end
@@ -32,7 +32,7 @@
     outputUsage: NonBlocking
     type: |-
       asyncRegister#
-        :: ( KnownDomain dom        -- ARG[0]
+        :: ( ZKnownDomain dom        -- ARG[0]
            , NFDataX a )            -- ARG[1]
         => Clock dom                -- ARG[2]
         -> Reset dom                -- ARG[3]
@@ -42,13 +42,13 @@
         -> Signal clk a             -- ARG[7]
         -> Signal clk a
     resultInit:
-      template: ~IF~ISINITDEFINED[0]~THEN~CONST[5]~ELSE~FI
+      template: ~IF~ISINITDEFINED[2]~THEN~CONST[5]~ELSE~FI
     resultName:
       template: ~CTXNAME
     template: |-
       // async register begin
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]~IF ~ISUNDEFINED[6] ~THEN ~ELSE or ~IF ~ISACTIVEHIGH[0] ~THEN posedge ~ELSE negedge ~FI ~VAR[rst][3]~FI) begin : ~GENSYM[~RESULT_register][1]
-        ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI~VAR[rst][3]) begin
+      always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[2]~IF ~ISUNDEFINED[6] ~THEN ~ELSE or ~IF ~ISACTIVEHIGH[3] ~THEN posedge ~ELSE negedge ~FI ~VAR[rst][3]~FI) begin : ~GENSYM[~RESULT_register][1]
+        ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif (~IF ~ISACTIVEHIGH[3] ~THEN ~ELSE ! ~FI~VAR[rst][3]) begin
           ~RESULT <= ~CONST[6];
         end else ~FI~IF ~ISACTIVEENABLE[4] ~THENif (~ARG[4]) ~ELSE~FIbegin
           ~RESULT <= ~ARG[7];
@@ -61,7 +61,7 @@
     outputUsage: NonBlocking
     type: |-
       register#
-        :: ( KnownDomain dom        -- ARG[0]
+        :: ( ZKnownDomain dom        -- ARG[0]
            , Undefined a )          -- ARG[1]
         => Clock dom                -- ARG[2]
         -> Reset dom                -- ARG[3]
@@ -71,13 +71,13 @@
         -> Signal clk a             -- ARG[7]
         -> Signal clk a
     resultInit:
-      template: ~IF~ISINITDEFINED[0]~THEN~CONST[5]~ELSE~FI
+      template: ~IF~ISINITDEFINED[2]~THEN~CONST[5]~ELSE~FI
     resultName:
       template: ~CTXNAME
     template: |-
       // register begin
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]~IF ~ISSYNC[0] ~THEN ~ELSE~IF ~ISUNDEFINED[6] ~THEN ~ELSE or ~IF ~ISACTIVEHIGH[0] ~THEN posedge ~ELSE negedge ~FI ~VAR[rst][3]~FI~FI) begin : ~GENSYM[~RESULT_register][1]
-        ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI~VAR[rst][3]) begin
+      always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[2]~IF ~ISSYNC[3] ~THEN ~ELSE~IF ~ISUNDEFINED[6] ~THEN ~ELSE or ~IF ~ISACTIVEHIGH[3] ~THEN posedge ~ELSE negedge ~FI ~VAR[rst][3]~FI~FI) begin : ~GENSYM[~RESULT_register][1]
+        ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif (~IF ~ISACTIVEHIGH[3] ~THEN ~ELSE ! ~FI~VAR[rst][3]) begin
           ~RESULT <= ~CONST[6];
         end else ~FI~IF ~ISACTIVEENABLE[4] ~THENif (~ARG[4]) ~ELSE~FIbegin
           ~RESULT <= ~ARG[7];

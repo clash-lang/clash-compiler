@@ -3,7 +3,7 @@
     kind: Declaration
     type: |-
       blockRam#
-        :: ( KnownDomain dom        ARG[0]
+        :: ( ZKnownDomain dom        ARG[0]
            , HasCallStack  --       ARG[1]
            , Undefined a ) --       ARG[2]
         => Clock dom       -- clk,  ARG[3]
@@ -21,7 +21,7 @@
       initial begin
         ~SYM[1] = ~CONST[5];
       end~IF ~ISACTIVEENABLE[4] ~THEN
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
         if (~ARG[4]) begin
           if (~ARG[7]) begin
             ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
@@ -35,7 +35,7 @@
           ~SYM[2] <= ~SYM[1][~ARG[6]];
         end~FI
       end~ELSE
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[3]
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[3]
         if (~ARG[7]) begin
           ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
         end
@@ -48,7 +48,7 @@
     kind: Declaration
     type: |-
       blockRamU#
-        :: ( KnownDomain dom        ARG[0]
+        :: ( ZKnownDomain dom        ARG[0]
            , HasCallStack  --       ARG[1]
            , Undefined a ) --       ARG[2]
         => Clock dom       -- clk,  ARG[3]
@@ -63,7 +63,7 @@
       // blockRamU begin,
       ~TYPO ~GENSYM[~RESULT_RAM][1] [0:~LIT[5]-1];
       logic [~SIZE[~TYP[9]]-1:0] ~GENSYM[~RESULT_q][2];~IF ~ISACTIVEENABLE[4] ~THEN
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
         if (~ARG[4]) begin
           if (~ARG[7]) begin
             ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
@@ -77,7 +77,7 @@
           ~SYM[2] <= ~SYM[1][~ARG[6]];
         end~FI
       end~ELSE
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[3]
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[3]
         if (~ARG[7]) begin
           ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
         end
@@ -90,7 +90,7 @@
     kind: Declaration
     type: |-
       blockRam1#
-        :: ( KnownDomain dom        ARG[0]
+        :: ( ZKnownDomain dom        ARG[0]
            , HasCallStack  --       ARG[1]
            , Undefined a ) --       ARG[2]
         => Clock dom       -- clk,  ARG[3]
@@ -109,7 +109,7 @@
       initial begin
         ~SYM[1] = '{default: ~CONST[6]};
       end~IF ~ISACTIVEENABLE[4] ~THEN
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
         if (~ARG[4]) begin
           if (~ARG[8]) begin
             ~SYM[1][~ARG[9]] <= ~TOBV[~ARG[10]][~TYP[10]];
@@ -123,7 +123,7 @@
           ~SYM[2] <= ~SYM[1][~ARG[7]];
         end~FI
       end~ELSE
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[3]
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[3]
         if (~ARG[8]) begin
           ~SYM[1][~ARG[9]] <= ~TOBV[~ARG[10]][~TYP[10]];
         end

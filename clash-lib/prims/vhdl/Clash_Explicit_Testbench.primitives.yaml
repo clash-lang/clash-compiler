@@ -32,7 +32,7 @@
     kind: Declaration
     type: |-
       assert
-        :: (KnownDomain dom, Eq a, ShowX a)      -- (ARG[0],ARG[1],ARG[2])
+        :: (ZKnownDomain dom, Eq a, ShowX a)      -- (ARG[0],ARG[1],ARG[2])
         => Clock dom                             -- ARG[3]
         -> Reset dom                             -- ARG[4]
         -> String                                -- ARG[5]
@@ -53,7 +53,7 @@
         ~SYM[3] <= ~ARG[7];
         process(~ARG[3]) is
         begin
-          if (~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3])) then
+          if (~IF~ACTIVEEDGE[Rising][3]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3])) then
             assert (toSLV(~SYM[2]) = toSLV(~SYM[3])) report (~LIT[5] & ", expected: " & ~INCLUDENAME[0].slv2string(toSLV(~SYM[3])) & ", actual: " & ~INCLUDENAME[0].slv2string(toSLV(~SYM[2]))) severity error;
           end if;
         end process;
@@ -118,7 +118,7 @@
     kind: Declaration
     type: |-
       assertBitVector
-        :: ( KnownDomain dom        --                 ARG[0]
+        :: ( ZKnownDomain dom        --                 ARG[0]
            , KnownNat n )           --                 ARG[1]
         => Clock dom                --                 ARG[2]
         -> Reset dom                --                 ARG[3]
@@ -140,7 +140,7 @@
         ~SYM[3] <= ~ARG[6];
         process(~ARG[2]) is
         begin
-          if (~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2])) then
+          if (~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2])) then
             assert (~INCLUDENAME[0].non_std_match(toSLV(~SYM[2]),toSLV(~SYM[3]))) report (~LIT[4] & ", expected: " & ~INCLUDENAME[0].slv2string(toSLV(~SYM[3])) & ", actual: " & ~INCLUDENAME[0].slv2string(toSLV(~SYM[2]))) severity error;
           end if;
         end process;
@@ -158,4 +158,5 @@
 - BlackBox:
     name: Clash.Explicit.Testbench.seClockToDiffClock
     kind: Expression
-    template: (~ARG[1], not ~ARG[1])
+    type: 'seClockToDiffClock :: Clock dom -> DiffClock dom'
+    template: (~ARG[0], not ~ARG[0])

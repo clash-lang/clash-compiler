@@ -4,8 +4,8 @@
     type: |-
       asyncRam#
         :: ( HasCallStack      --         ARG[0]
-           , KnownDomain wdom  --         ARG[1]
-           , KnownDomain rdom  --         ARG[2]
+           , ZKnownDomain wdom  --         ARG[1]
+           , ZKnownDomain rdom  --         ARG[2]
            , NFDataX a )       --         ARG[3]
         => Clock wdom          -- ^ wclk, ARG[4]
         -> Clock rdom          -- ^ rclk, ARG[5]
@@ -19,7 +19,7 @@
     template: |-
       // asyncRam begin
       logic [~SIZE[~TYP[11]]-1:0] ~GENSYM[RAM][0] [0:~LIT[7]-1];
-      always @(~IF~ACTIVEEDGE[Rising][1]~THENposedge~ELSEnegedge~FI ~ARG[4]) begin : ~GENSYM[~COMPNAME_Ram][1]
+      always @(~IF~ACTIVEEDGE[Rising][4]~THENposedge~ELSEnegedge~FI ~ARG[4]) begin : ~GENSYM[~COMPNAME_Ram][1]
         if (~IF ~ISACTIVEENABLE[6] ~THEN ~ARG[6] & ~ELSE ~FI ~ARG[9]) begin
           ~SYM[0][~ARG[10]] <= ~TOBV[~ARG[11]][~TYP[11]];
         end

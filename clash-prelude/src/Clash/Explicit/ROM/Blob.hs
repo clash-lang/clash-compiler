@@ -47,7 +47,7 @@ import Clash.Explicit.BlockRam.Blob (createMemBlob, memBlobTH)
 import Clash.Explicit.BlockRam.Internal (MemBlob(..), unpackMemBlob)
 import Clash.Promoted.Nat (natToNum)
 import Clash.Signal.Internal
-  (Clock (..), KnownDomain, Signal (..), Enable, fromEnable)
+  (Clock (..), ZKnownDomain, Signal (..), Enable, fromEnable)
 import Clash.Sized.Internal.BitVector (BitVector)
 import Clash.Sized.Internal.Unsigned (Unsigned)
 import Clash.XException (deepErrorX, seqX)
@@ -64,8 +64,7 @@ import Clash.XException (deepErrorX, seqX)
 -- "Clash.Explicit.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.
 romBlob
   :: forall dom addr m n
-   . ( KnownDomain dom
-     , Enum addr
+   . ( Enum addr
      )
   => Clock dom
   -- ^ 'Clock' to synchronize to
@@ -94,8 +93,7 @@ romBlob = \clk en content rd -> romBlob# clk en content (fromEnum <$> rd)
 -- "Clash.Explicit.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.
 romBlobPow2
   :: forall dom m n
-   . ( KnownDomain dom
-     , KnownNat n
+   . ( KnownNat n
      )
   => Clock dom
   -- ^ 'Clock' to synchronize to
@@ -115,7 +113,7 @@ romBlobPow2 = romBlob
 -- | ROM primitive
 romBlob#
   :: forall dom m n
-   . KnownDomain dom
+   . ZKnownDomain dom
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom

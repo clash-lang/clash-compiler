@@ -14,11 +14,9 @@
     kind: Expression
     type: |-
       unsafeSynchronizer
-        :: ( KnownDomain dom1    -- ARG[0]
-           , KnownDomain dom2 )  -- ARG[1]
-        => Clock dom1            -- ARG[2]
-        -> Clock dom2            -- ARG[3]
-        -> Signal dom1 a         -- ARG[4]
+        :: Clock dom1            -- ARG[0]
+        -> Clock dom2            -- ARG[1]
+        -> Signal dom1 a         -- ARG[2]
         -> Signal dom2 a
-    template: ~ARG[4]
+    template: ~ARG[2]
     workInfo: Never

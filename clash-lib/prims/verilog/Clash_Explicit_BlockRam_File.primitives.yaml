@@ -4,7 +4,7 @@
     outputUsage: NonBlocking
     type: |-
       blockRamFile#
-        :: ( KnownDomain dom         --       ARG[0]
+        :: ( ZKnownDomain dom         --       ARG[0]
            , KnownNat m              --       ARG[1]
            , HasCallStack )          --       ARG[2]
         => Clock dom                 -- clk,  ARG[3]
@@ -24,7 +24,7 @@
         $readmemb(~FILE[~LIT[6]],~SYM[1]);
       end
       ~IF ~ISACTIVEENABLE[4] ~THEN
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRamFile][3]~IF ~VIVADO ~THEN
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRamFile][3]~IF ~VIVADO ~THEN
         if (~ARG[4]) begin
           if (~ARG[8]) begin
             ~SYM[1][~ARG[9]] <= ~ARG[10];
@@ -38,7 +38,7 @@
           ~RESULT <= ~SYM[1][~ARG[7]];
         end~FI
       end~ELSE
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[3]
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[3]
         if (~ARG[8]) begin
           ~SYM[1][~ARG[9]] <= ~ARG[10];
         end

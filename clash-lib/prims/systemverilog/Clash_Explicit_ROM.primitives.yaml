@@ -2,7 +2,7 @@
     name: Clash.Explicit.ROM.rom#
     kind: Declaration
     type: |-
-      rom# :: ( KnownDomain dom        ARG[0]
+      rom# :: ( ZKnownDomain dom        ARG[0]
                , KnownNat n    --       ARG[1]
                , Undefined a ) --       ARG[2]
             => Clock dom       -- clk,  ARG[3]
@@ -16,12 +16,12 @@
       assign ~SYM[1] = ~LIT[5];
 
       logic [~SIZE[~TYPO]-1:0] ~GENSYM[~RESULT_q][2];~IF ~ISACTIVEENABLE[4] ~THEN
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_rom][3]
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_rom][3]
         if (~ARG[4]) begin
           ~SYM[2] <= ~SYM[1][~ARG[6]];
         end
       end~ELSE
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[3]
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[3]
         ~SYM[2] <= ~SYM[1][~ARG[6]];
       end~FI
 

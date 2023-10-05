@@ -3,7 +3,7 @@
     kind: Declaration
     outputUsage: NonBlocking
     type: |-
-      rom# :: ( KnownDomain dom        ARG[0]
+      rom# :: ( ZKnownDomain dom        ARG[0]
                , KnownNat n    --       ARG[1]
                , Undefined a ) --       ARG[2]
             => Clock dom       -- clk,  ARG[3]
@@ -26,7 +26,7 @@
                       ;
         ~GENSYM[romSync][6] : process (~ARG[3])
         begin
-          if (~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3])~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI) then~IF ~VIVADO ~THEN
+          if (~IF~ACTIVEEDGE[Rising][3]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3])~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI) then~IF ~VIVADO ~THEN
             ~RESULT <= ~FROMBV[~SYM[2](~SYM[3])][~TYPO];~ELSE
             ~RESULT <= ~SYM[2](~SYM[3]);~FI
           end if;

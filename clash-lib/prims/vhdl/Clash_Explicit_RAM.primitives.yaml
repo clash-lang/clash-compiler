@@ -4,8 +4,8 @@
     type: |-
       asyncRam#
         :: ( HasCallStack      --         ARG[0]
-           , KnownDomain wdom  --         ARG[1]
-           , KnownDomain rdom  --         ARG[2]
+           , ZKnownDomain wdom  --         ARG[1]
+           , ZKnownDomain rdom  --         ARG[2]
            , NFDataX a )       --         ARG[3]
         => Clock wdom          -- ^ wclk, ARG[4]
         -> Clock rdom          -- ^ rclk, ARG[5]
@@ -38,7 +38,7 @@
                       ;
         ~GENSYM[asyncRam_sync][7] : process(~ARG[4])
         begin
-          if ~IF~ACTIVEEDGE[Rising][1]~THENrising_edge~ELSEfalling_edge~FI(~ARG[4]) then
+          if ~IF~ACTIVEEDGE[Rising][4]~THENrising_edge~ELSEfalling_edge~FI(~ARG[4]) then
             if (~ARG[9] ~IF ~ISACTIVEENABLE[6] ~THEN and ~ARG[6] ~ELSE ~FI) then~IF ~VIVADO ~THEN
               ~SYM[1](~SYM[3]) <= ~TOBV[~ARG[11]][~TYP[11]];~ELSE
               ~SYM[1](~SYM[3]) <= ~ARG[11];~FI

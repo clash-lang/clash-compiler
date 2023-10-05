@@ -4,7 +4,7 @@
     outputUsage: NonBlocking
     type: |-
       romFile# :: ( KnownNat m           --       ARG[0]
-                   , KnownDomain dom      --       ARG[1]
+                   , ZKnownDomain dom      --       ARG[1]
                 => Clock dom              -- clk,  ARG[2]
                 -> Enable dom             -- en,   ARG[3]
                 -> SNat n                 -- sz,   ARG[4]
@@ -39,7 +39,7 @@
         ~IF ~ISACTIVEENABLE[3] ~THEN
         ~GENSYM[romFileSync][7] : process (~ARG[2])
         begin
-          if (~IF~ACTIVEEDGE[Rising][1]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2])) then
+          if (~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2])) then
             if ~ARG[3] then
               ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]));
             end if;
@@ -47,7 +47,7 @@
         end process;~ELSE
         ~SYM[7] : process (~ARG[2])
         begin
-          if (~IF~ACTIVEEDGE[Rising][1]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2])) then
+          if (~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2])) then
             ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]));
           end if;
         end process;~FI

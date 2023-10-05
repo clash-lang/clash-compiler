@@ -3,7 +3,7 @@
     kind: Declaration
     type: |-
       romFile# :: ( KnownNat m             --       ARG[0]
-                   , KnownDomain dom )      --       ARG[1]
+                   , ZKnownDomain dom )      --       ARG[1]
                 => Clock dom                -- clk,  ARG[2]
                 -> Enable dom               -- en,   ARG[3]
                 -> SNat n                   -- sz,   ARG[4]
@@ -19,12 +19,12 @@
       end
 
       ~SIGDO[~GENSYM[~RESULT_q][1]];~IF ~ISACTIVEENABLE[3] ~THEN
-      always @(~IF~ACTIVEEDGE[Rising][1]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~GENSYM[~COMPNAME_romFile][2]
+      always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~GENSYM[~COMPNAME_romFile][2]
         if (~ARG[3]) begin
           ~SYM[1] <= ~SYM[0][~ARG[6]];
         end
       end~ELSE
-      always @(~IF~ACTIVEEDGE[Rising][1]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~SYM[2]
+      always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~SYM[2]
         ~SYM[1] <= ~SYM[0][~ARG[6]];
       end~FI
 

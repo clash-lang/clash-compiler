@@ -4,7 +4,7 @@
     outputUsage: NonBlocking
     type: |-
       delay#
-        :: ( KnownDomain dom        -- ARG[0]
+        :: ( ZKnownDomain dom        -- ARG[0]
            , Undefined a )          -- ARG[1]
         => Clock dom                -- ARG[2]
         -> Enable dom               -- ARG[3]
@@ -12,14 +12,14 @@
         -> Signal clk a             -- ARG[5]
         -> Signal clk a
     resultInit:
-      template: ~IF~ISINITDEFINED[0]~THEN~CONST[4]~ELSE~FI
+      template: ~IF~ISINITDEFINED[2]~THEN~CONST[4]~ELSE~FI
     resultName:
       template: ~CTXNAME
     template: |-
       -- delay begin~IF ~ISACTIVEENABLE[3] ~THEN
       ~GENSYM[~RESULT_delay][4] : process(~ARG[2])
       begin
-        if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
+        if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
           if ~ARG[3] then
             ~RESULT <= ~ARG[5];
           end if;
@@ -27,7 +27,7 @@
       end process;~ELSE
       ~SYM[4] : process(~ARG[2])
       begin
-        if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
+        if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
           ~RESULT <= ~ARG[5];
         end if;
       end process;~FI
@@ -38,7 +38,7 @@
     outputUsage: NonBlocking
     type: |-
       asyncRegister#
-        :: ( KnownDomain dom        -- ARG[0]
+        :: ( ZKnownDomain dom        -- ARG[0]
            , NFDataX a )            -- ARG[1]
         => Clock dom                -- ARG[2]
         -> Reset dom                -- ARG[3]
@@ -48,16 +48,16 @@
         -> Signal clk a             -- ARG[7]
         -> Signal clk a
     resultInit:
-      template: ~IF~ISINITDEFINED[0]~THEN~CONST[5]~ELSE~FI
+      template: ~IF~ISINITDEFINED[2]~THEN~CONST[5]~ELSE~FI
     resultName:
       template: ~CTXNAME
     template: |-
       -- async register begin
       ~SYM[2] : process(~ARG[2]~IF ~ISUNDEFINED[6] ~THEN ~ELSE,~ARG[3]~FI)
       begin
-        ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
+        ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif ~ARG[3] = ~IF ~ISACTIVEHIGH[3] ~THEN '1' ~ELSE '0' ~FI then
           ~RESULT <= ~CONST[6];
-        els~FIif ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
+        els~FIif ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
           ~IF ~ISACTIVEENABLE[4] ~THEN
           if ~ARG[4] then
             ~RESULT <= ~ARG[7];
@@ -74,7 +74,7 @@
     outputUsage: NonBlocking
     type: |-
       register#
-        :: ( KnownDomain dom        -- ARG[0]
+        :: ( ZKnownDomain dom        -- ARG[0]
            , NFDataX a )            -- ARG[1]
         => Clock dom                -- ARG[2]
         -> Reset dom                -- ARG[3]
@@ -84,15 +84,15 @@
         -> Signal clk a             -- ARG[7]
         -> Signal clk a
     resultInit:
-      template: ~IF~ISINITDEFINED[0]~THEN~CONST[5]~ELSE~FI
+      template: ~IF~ISINITDEFINED[2]~THEN~CONST[5]~ELSE~FI
     resultName:
       template: ~CTXNAME
     template: |-
-      -- register begin~IF ~ISACTIVEENABLE[4] ~THEN ~IF ~ISSYNC[0] ~THEN
+      -- register begin~IF ~ISACTIVEENABLE[4] ~THEN ~IF ~ISSYNC[3] ~THEN
       ~GENSYM[~RESULT_register][2] : process(~ARG[2])
       begin
-        if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
-          ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
+        if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
+          ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif ~ARG[3] = ~IF ~ISACTIVEHIGH[3] ~THEN '1' ~ELSE '0' ~FI then
             ~RESULT <= ~CONST[6];
           els~FIif ~ARG[4] then
             ~RESULT <= ~ARG[7];
@@ -101,18 +101,18 @@
       end process;~ELSE
       ~SYM[2] : process(~ARG[2]~IF ~ISUNDEFINED[6] ~THEN ~ELSE,~ARG[3]~FI)
       begin
-        ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
+        ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif ~ARG[3] = ~IF ~ISACTIVEHIGH[3] ~THEN '1' ~ELSE '0' ~FI then
           ~RESULT <= ~CONST[6];
-        els~FIif ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
+        els~FIif ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
           if ~ARG[4] then
             ~RESULT <= ~ARG[7];
           end if;
         end if;
-      end process;~FI~ELSE ~IF ~ISSYNC[0] ~THEN
+      end process;~FI~ELSE ~IF ~ISSYNC[3] ~THEN
       ~SYM[2] : process(~ARG[2])
       begin
-        if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
-          ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
+        if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
+          ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif ~ARG[3] = ~IF ~ISACTIVEHIGH[3] ~THEN '1' ~ELSE '0' ~FI then
             ~RESULT <= ~CONST[6];
           else
             ~FI~RESULT <= ~ARG[7];
@@ -121,9 +121,9 @@
       end process;~ELSE
       ~SYM[2] : process(~ARG[2]~IF ~ISUNDEFINED[6] ~THEN ~ELSE,~ARG[3]~FI)
       begin
-        ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
+        ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif ~ARG[3] = ~IF ~ISACTIVEHIGH[3] ~THEN '1' ~ELSE '0' ~FI then
           ~RESULT <= ~CONST[6];
-        els~FIif ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
+        els~FIif ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
           ~RESULT <= ~ARG[7];
         end if;
       end process;~FI~FI

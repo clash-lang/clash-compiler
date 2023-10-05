@@ -130,8 +130,7 @@ We initially create a memory out of simple registers:
 
 @
 dataMem
-  :: KnownDomain dom
-  => Clock dom
+  :: Clock dom
   -> Reset dom
   -> Enable dom
   -> Signal dom MemAddr
@@ -156,8 +155,7 @@ And then connect everything:
 
 @
 system
-  :: ( KnownDomain dom
-     , KnownNat n )
+  :: ( KnownNat n )
   => Vec n Instruction
   -> Clock dom
   -> Reset dom
@@ -226,8 +224,7 @@ has the potential to be translated to a more efficient structure:
 
 @
 system2
-  :: ( KnownDomain dom
-     , KnownNat n )
+  :: ( KnownNat n )
   => Vec n Instruction
   -> Clock dom
   -> Reset dom
@@ -318,8 +315,7 @@ We can now finally instantiate our system with a 'blockRam':
 
 @
 system3
-  :: ( KnownDomain dom
-     , KnownNat n )
+  :: ( KnownNat n )
   => Vec n Instruction
   -> Clock dom
   -> Reset dom
@@ -447,7 +443,7 @@ import Clash.Annotations.Primitive
   (Primitive(InlineYamlPrimitive), HDL(..), hasBlackBox)
 import Clash.Class.Num (SaturationMode(SatBound), satSucc)
 import Clash.Explicit.BlockRam.Model (TdpbramModelConfig(..), tdpbramModel)
-import Clash.Explicit.Signal (KnownDomain, Enable, register, fromEnable)
+import Clash.Explicit.Signal (ZKnownDomain, Enable, register, fromEnable)
 import Clash.Promoted.Nat (SNat(..))
 import Clash.Signal.Bundle (unbundle)
 import Clash.Signal.Internal
@@ -580,8 +576,7 @@ let cpu :: Vec 7 Value          -- ^ Register bank
 
 >>> :{
 let dataMem
-      :: KnownDomain dom
-      => Clock  dom
+      :: Clock  dom
       -> Reset  dom
       -> Enable dom
       -> Signal dom MemAddr
@@ -599,8 +594,7 @@ let dataMem
 
 >>> :{
 let system
-      :: ( KnownDomain dom
-         , KnownNat n )
+      :: ( KnownNat n )
       => Vec n Instruction
       -> Clock dom
       -> Reset dom
@@ -647,8 +641,7 @@ prog = -- 0 := 4
 
 >>> :{
 let system2
-      :: ( KnownDomain dom
-         , KnownNat n )
+      :: ( KnownNat n )
       => Vec n Instruction
       -> Clock dom
       -> Reset dom
@@ -698,8 +691,7 @@ let cpu2 :: (Vec 7 Value,Reg)    -- ^ (Register bank, Load reg addr)
 
 >>> :{
 let system3
-      :: ( KnownDomain dom
-         , KnownNat n )
+      :: ( KnownNat n )
       => Vec n Instruction
       -> Clock dom
       -> Reset dom
@@ -774,8 +766,7 @@ prog2 = -- 0 := 4
 -- bram40 clk en = 'blockRam' clk en ('Clash.Sized.Vector.replicate' d40 1)
 -- @
 blockRam
-  :: ( KnownDomain dom
-     , HasCallStack
+  :: ( HasCallStack
      , NFDataX a
      , Enum addr
      , NFDataX addr )
@@ -828,8 +819,7 @@ blockRam = \clk gen content rd wrM ->
 -- bram32 clk en = 'blockRamPow2' clk en ('Clash.Sized.Vector.replicate' d32 1)
 -- @
 blockRamPow2
-  :: ( KnownDomain dom
-     , HasCallStack
+  :: ( HasCallStack
      , NFDataX a
      , KnownNat n )
   => Clock dom
@@ -858,8 +848,7 @@ data ResetStrategy (r :: Bool) where
 -- an arbitrary state using a reset function.
 blockRamU
    :: forall n dom a r addr
-   . ( KnownDomain dom
-     , HasCallStack
+   . ( HasCallStack
      , NFDataX a
      , Enum addr
      , NFDataX addr
@@ -916,7 +905,7 @@ blockRamU clk rst0 en rstStrategy n@SNat initF rd0 mw0 =
 -- | blockRAMU primitive
 blockRamU#
   :: forall n dom a
-   . ( KnownDomain dom
+   . ( ZKnownDomain dom
      , HasCallStack
      , NFDataX a )
   => Clock dom
@@ -951,8 +940,7 @@ blockRamU# clk en SNat =
 -- memory positions
 blockRam1
    :: forall n dom a r addr
-   . ( KnownDomain dom
-     , HasCallStack
+   . ( HasCallStack
      , NFDataX a
      , Enum addr
      , NFDataX addr
@@ -1009,7 +997,7 @@ blockRam1 clk rst0 en rstStrategy n@SNat a rd0 mw0 =
 -- | blockRAM1 primitive
 blockRam1#
   :: forall n dom a
-   . ( KnownDomain dom
+   . ( ZKnownDomain dom
      , HasCallStack
      , NFDataX a )
   => Clock dom
@@ -1040,7 +1028,7 @@ blockRam1# clk en n a =
 -- | blockRAM primitive
 blockRam#
   :: forall dom a n
-   . ( KnownDomain dom
+   . ( ZKnownDomain dom
      , HasCallStack
      , NFDataX a )
   => Clock dom
@@ -1136,8 +1124,7 @@ blockRam# _ _ _ = error "blockRam#: dynamic clocks not supported"
 
 -- | Create a read-after-write block RAM from a read-before-write one
 readNew
-  :: ( KnownDomain dom
-     , NFDataX a
+  :: ( NFDataX a
      , Eq addr )
   => Clock dom
   -> Reset dom
@@ -1196,8 +1183,6 @@ trueDualPortBlockRam ::
   forall nAddrs domA domB a .
   ( HasCallStack
   , KnownNat nAddrs
-  , KnownDomain domA
-  , KnownDomain domB
   , NFDataX a
   )
   => Clock domA
@@ -1244,8 +1229,6 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
     bbName = show 'trueDualPortBlockRam#
     _hasCallStack
      :< knownNatAddrs
-     :< _knownDomainA
-     :< _knownDomainB
      :< _nfdataX
 
      :< clockA
@@ -1315,8 +1298,6 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
     bbName = show 'trueDualPortBlockRam#
     _hasCallStack
      :< knownNatAddrs
-     :< knownDomainA
-     :< knownDomainB
      :< _nfdataX
 
      :< clockA
@@ -1349,7 +1330,7 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
         ~SIGD[~GENSYM[b_dout][#{symDoutB}]][#{datB}];
 
         // Port A
-        always @(~IF~ACTIVEEDGE[Rising][#{knownDomainA}]~THENposedge~ELSEnegedge~FI ~ARG[#{clockA}]) begin
+        always @(~IF~ACTIVEEDGE[Rising][#{clockA}]~THENposedge~ELSEnegedge~FI ~ARG[#{clockA}]) begin
             if(~ARG[#{enaA}]) begin
                 ~SYM[#{symDoutA}] <= ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrA}]]~THEN~ARG[#{addrA}]~ELSE0~FI];
                 if(~ARG[#{wenaA}]) begin
@@ -1360,7 +1341,7 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
         end
 
         // Port B
-        always @(~IF~ACTIVEEDGE[Rising][#{knownDomainB}]~THENposedge~ELSEnegedge~FI ~ARG[#{clockB}]) begin
+        always @(~IF~ACTIVEEDGE[Rising][#{clockB}]~THENposedge~ELSEnegedge~FI ~ARG[#{clockB}]) begin
             if(~ARG[#{enaB}]) begin
                 ~SYM[#{symDoutB}] <= ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrB}]]~THEN~ARG[#{addrB}]~ELSE0~FI];
                 if(~ARG[#{wenaB}]) begin
@@ -1378,8 +1359,6 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
     bbName = show 'trueDualPortBlockRam#
     _hasCallStack
      :< knownNatAddrs
-     :< knownDomainA
-     :< knownDomainB
      :< _nfdataX
 
      :< clockA
@@ -1413,7 +1392,7 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
         reg ~SIGD[~GENSYM[b_dout][#{symDoutB}]][#{datB}];
 
         // Port A
-        always @(~IF~ACTIVEEDGE[Rising][#{knownDomainA}]~THENposedge~ELSEnegedge~FI ~ARG[#{clockA}]) begin
+        always @(~IF~ACTIVEEDGE[Rising][#{clockA}]~THENposedge~ELSEnegedge~FI ~ARG[#{clockA}]) begin
             if(~ARG[#{enaA}]) begin
                 ~SYM[#{symDoutA}] <= ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrA}]]~THEN~ARG[#{addrA}]~ELSE0~FI];
                 if(~ARG[#{wenaA}]) begin
@@ -1424,7 +1403,7 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
         end
 
         // Port B
-        always @(~IF~ACTIVEEDGE[Rising][#{knownDomainB}]~THENposedge~ELSEnegedge~FI ~ARG[#{clockB}]) begin
+        always @(~IF~ACTIVEEDGE[Rising][#{clockB}]~THENposedge~ELSEnegedge~FI ~ARG[#{clockB}]) begin
             if(~ARG[#{enaB}]) begin
                 ~SYM[#{symDoutB}] <= ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrB}]]~THEN~ARG[#{addrB}]~ELSE0~FI];
                 if(~ARG[#{wenaB}]) begin
@@ -1445,8 +1424,6 @@ trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
   forall nAddrs domA domB a .
   ( HasCallStack
   , KnownNat nAddrs
-  , KnownDomain domA
-  , KnownDomain domB
   , NFDataX a
   ) =>
 

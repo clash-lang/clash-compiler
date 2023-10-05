@@ -36,7 +36,7 @@ import GHC.TypeLits          (KnownNat)
 import qualified Data.Sequence as Seq
 
 import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Explicit.Signal (unbundle, KnownDomain, andEnable)
+import Clash.Explicit.Signal (unbundle, ZKnownDomain, andEnable)
 import Clash.Promoted.Nat    (SNat (..), snatToNum, pow2SNat)
 import Clash.Signal.Internal
   (Clock (..), ClockAB (..), Signal (..), Enable, fromEnable, clockTicks)
@@ -58,8 +58,6 @@ asyncRamPow2
   :: forall wdom rdom n a
    . ( KnownNat n
      , HasCallStack
-     , KnownDomain wdom
-     , KnownDomain rdom
      , NFDataX a
      )
   => Clock wdom
@@ -92,8 +90,6 @@ asyncRam
   :: ( Enum addr
      , NFDataX addr
      , HasCallStack
-     , KnownDomain wdom
-     , KnownDomain rdom
      , NFDataX a
      )
   => Clock wdom
@@ -121,8 +117,8 @@ asyncRam = \wclk rclk gen sz rd wrM ->
 asyncRam#
   :: forall wdom rdom n a
    . ( HasCallStack
-     , KnownDomain wdom
-     , KnownDomain rdom
+     , ZKnownDomain wdom
+     , ZKnownDomain rdom
      , NFDataX a
      )
   => Clock wdom
@@ -143,7 +139,7 @@ asyncRam#
   -- ^ Value to write (at address @w@)
   -> Signal rdom a
   -- ^ Value of the RAM at address @r@
-asyncRam# wClk rClk en sz rd we wr din = dout
+asyncRam# wClk@(Clock{}) rClk@(Clock{}) en sz rd we wr din = dout
   where
     ramI = Seq.replicate
               szI

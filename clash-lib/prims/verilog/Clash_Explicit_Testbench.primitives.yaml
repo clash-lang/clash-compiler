@@ -3,7 +3,7 @@
     kind: Declaration
     type: |-
       assert
-        :: (KnownDomain dom, Eq a, ShowX a)      -- (ARG[0], ARG[1], ARG[2])
+        :: (ZKnownDomain dom, Eq a, ShowX a)      -- (ARG[0], ARG[1], ARG[2])
         => Clock dom                             -- ARG[3]
         -> Reset dom                             -- ARG[4]
         -> String                                -- ARG[5]
@@ -14,7 +14,7 @@
     template: |-
       // assert begin
       // pragma translate_off
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin
         if (~ARG[6] !== ~ARG[7]) begin
           $display("@%0tns: %s, expected: %b, actual: %b", $time, ~LIT[5], ~ARG[7], ~ARG[6]);
           $finish;
@@ -28,7 +28,7 @@
     kind: Declaration
     type: |-
       assertBitVector
-        :: ( KnownDomain dom        --                 ARG[0]
+        :: ( ZKnownDomain dom        --                 ARG[0]
            , KnownNat n             --                 ARG[1]
         => Clock dom                --                 ARG[2]
         -> Reset dom                --                 ARG[3]
@@ -44,7 +44,7 @@
       wire ~TYP[5] ~GENSYM[checked][1]  = ~ARG[5] ^ ~SYM[0];
       wire ~TYP[5] ~GENSYM[expected][2] = ~ARG[6] ^ ~SYM[0];
 
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin
+      always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin
         if (~SYM[1] !== ~SYM[2]) begin
           $display("@%0tns: %s, expected: %b, actual: %b", $time, ~LIT[4], ~ARG[6], ~ARG[5]);
           $finish;

@@ -4,7 +4,7 @@
     outputUsage: NonBlocking
     type: |-
       blockRam#
-        :: ( KnownDomain dom        ARG[0]
+        :: ( ZKnownDomain dom        ARG[0]
            , HasCallStack  --       ARG[1]
            , Undefined a ) --       ARG[2]
         => Clock dom       -- clk,  ARG[3]
@@ -28,7 +28,7 @@
         end
       end
       ~IF ~ISACTIVEENABLE[4] ~THEN
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
         if (~ARG[4]) begin
           if (~ARG[7]) begin
             ~SYM[1][~ARG[8]] <= ~ARG[9];
@@ -42,7 +42,7 @@
           ~RESULT <= ~SYM[1][~ARG[6]];
         end~FI
       end~ELSE
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
         if (~ARG[7]) begin
           ~SYM[1][~ARG[8]] <= ~ARG[9];
         end
@@ -55,7 +55,7 @@
     outputUsage: NonBlocking
     type: |-
       blockRamU#
-        :: ( KnownDomain dom        ARG[0]
+        :: ( ZKnownDomain dom        ARG[0]
            , HasCallStack  --       ARG[1]
            , Undefined a ) --       ARG[2]
         => Clock dom       -- clk,  ARG[3]
@@ -71,7 +71,7 @@
       reg ~TYPO ~GENSYM[~RESULT_RAM][0] [0:~LIT[5]-1];
 
       ~IF ~ISACTIVEENABLE[4] ~THEN
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
         if (~ARG[4]) begin
           if (~ARG[7]) begin
             ~SYM[0][~ARG[8]] <= ~ARG[9];
@@ -85,7 +85,7 @@
           ~RESULT <= ~SYM[0][~ARG[6]];
         end~FI
       end~ELSE
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
         if (~ARG[7]) begin
           ~SYM[0][~ARG[8]] <= ~ARG[9];
         end
@@ -98,7 +98,7 @@
     outputUsage: NonBlocking
     type: |-
       blockRam1#
-        :: ( KnownDomain dom        ARG[0]
+        :: ( ZKnownDomain dom        ARG[0]
            , HasCallStack  --       ARG[1]
            , Undefined a ) --       ARG[2]
         => Clock dom       -- clk,  ARG[3]
@@ -121,7 +121,7 @@
       end
 
       ~IF ~ISACTIVEENABLE[4] ~THEN
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
         if (~ARG[4]) begin
           if (~ARG[8]) begin
             ~SYM[0][~ARG[9]] <= ~ARG[10];
@@ -135,7 +135,7 @@
           ~RESULT <= ~SYM[0][~ARG[7]];
         end~FI
       end~ELSE
-      always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
+      always @(~IF~ACTIVEEDGE[Rising][3]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
         if (~ARG[8]) begin
           ~SYM[0][~ARG[9]] <= ~ARG[10];
         end

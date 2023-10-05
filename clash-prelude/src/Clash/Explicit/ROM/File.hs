@@ -41,8 +41,7 @@ We can instantiate a synchronous ROM using the contents of the file above like
 so:
 
 @
-f :: KnownDomain dom
-  => Clock  dom
+f :: Clock  dom
   -> Enable dom
   -> Signal dom (Unsigned 3)
   -> Signal dom (Unsigned 9)
@@ -61,8 +60,7 @@ However, we can also interpret the same data as a tuple of a 6-bit unsigned
 number, and a 3-bit signed number:
 
 @
-g :: KnownDomain dom
-  => Clock  dom
+g :: Clock  dom
   -> Signal dom (Unsigned 3)
   -> Signal dom (Unsigned 6,Signed 3)
 g clk en rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' clk en d7 \"memory.bin\" rd
@@ -104,7 +102,7 @@ import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Explicit.BlockRam.File (initMem, memFile)
 import Clash.Promoted.Nat           (SNat (..), pow2SNat, snatToNum)
 import Clash.Sized.BitVector        (BitVector)
-import Clash.Explicit.Signal        (Clock, Enable, Signal, KnownDomain, delay)
+import Clash.Explicit.Signal        (Clock, Enable, Signal, ZKnownDomain, delay)
 import Clash.Sized.Unsigned         (Unsigned)
 import Clash.XException             (NFDataX(deepErrorX))
 
@@ -137,7 +135,7 @@ import Clash.XException             (NFDataX(deepErrorX))
 -- your own data files.
 romFilePow2
   :: forall dom  n m
-   . (KnownNat m, KnownNat n, KnownDomain dom)
+   . (KnownNat m, KnownNat n)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -178,7 +176,7 @@ romFilePow2 = \clk en -> romFile clk en (pow2SNat (SNat @n))
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 romFile
-  :: (KnownNat m, Enum addr, KnownDomain dom)
+  :: (KnownNat m, Enum addr)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -197,7 +195,7 @@ romFile = \clk en sz file rd -> romFile# clk en sz file (fromEnum <$> rd)
 -- | romFile primitive
 romFile#
   :: forall m dom n
-   . (KnownNat m, KnownDomain dom)
+   . (KnownNat m, ZKnownDomain dom)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom

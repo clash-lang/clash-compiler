@@ -1425,7 +1425,7 @@ infixr 3 .&&.
 
 delay#
   :: forall dom a
-   . ( KnownDomain dom
+   . ( ZKnownDomain dom
      , NFDataX a )
   => Clock dom
   -> Enable dom
@@ -1464,7 +1464,7 @@ delay# (Clock dom _) (fromEnable -> en) powerUpVal0 =
 -- instead. Source: https://www.intel.com/content/www/us/en/programmable/support/support-resources/knowledge-base/solutions/rd01072011_91.html
 register#
   :: forall dom  a
-   . ( KnownDomain dom
+   . ( ZKnownDomain dom
      , NFDataX a )
   => Clock dom
   -> Reset dom
@@ -1489,8 +1489,7 @@ register# clk@(Clock dom _) rst ena powerUpVal resetVal =
 -- value constructed with 'deepErrorX' otherwise.
 registerPowerup#
   :: forall dom a
-   . ( KnownDomain dom
-     , NFDataX a
+   . ( NFDataX a
      , HasCallStack )
   => Clock dom
   -> a
@@ -1505,7 +1504,7 @@ registerPowerup# (Clock dom _) a =
 -- domain. Is synthesizable.
 asyncRegister#
   :: forall dom  a
-   . ( KnownDomain dom
+   . ( ZKnownDomain dom
      , NFDataX a )
   => Clock dom
   -- ^ Clock signal
@@ -1519,7 +1518,7 @@ asyncRegister#
   -- ^ Reset value
   -> Signal dom a
   -> Signal dom a
-asyncRegister# clk (unsafeToActiveHigh -> rst) (fromEnable -> ena) initVal resetVal =
+asyncRegister# clk@(Clock{}) (unsafeToActiveHigh -> rst) (fromEnable -> ena) initVal resetVal =
   go (registerPowerup# clk initVal) rst ena
  where
   go o (r :- rs) enas@(~(e :- es)) as@(~(x :- xs)) =
@@ -1535,8 +1534,7 @@ asyncRegister# clk (unsafeToActiveHigh -> rst) (fromEnable -> ena) initVal reset
 -- domain. Not synthesizable.
 syncRegister#
   :: forall dom  a
-   . ( KnownDomain dom
-     , NFDataX a )
+   . ( NFDataX a )
   => Clock dom
   -- ^ Clock signal
   -> Reset dom
@@ -1922,7 +1920,6 @@ data ClockAB
 -- If your primitive does not care about coincided clock edges, it should - by
 -- convention - replace it by @ClockB:ClockA:@.
 clockTicks ::
-  (KnownDomain domA, KnownDomain domB) =>
   Clock domA ->
   Clock domB ->
   [ClockAB]
@@ -1930,7 +1927,6 @@ clockTicks clkA clkB = clockTicksEither (toEither clkA) (toEither clkB)
  where
   toEither ::
     forall dom.
-    KnownDomain dom =>
     Clock dom ->
     Either Int64 (Signal dom Int64)
   toEither (Clock _ maybePeriods)

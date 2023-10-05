@@ -36,7 +36,7 @@ import Prelude hiding         (length)
 
 import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Signal.Internal
-  (Clock (..), KnownDomain, Signal (..), Enable, fromEnable)
+  (Clock (..), ZKnownDomain, Signal (..), Enable, fromEnable)
 import Clash.Sized.Unsigned   (Unsigned)
 import Clash.Sized.Vector     (Vec, length, toList)
 import Clash.XException       (deepErrorX, seqX, NFDataX)
@@ -56,7 +56,7 @@ import Clash.XException       (deepErrorX, seqX, NFDataX)
 -- 'Clash.Explicit.ROM.Blob.romBlobPow2' for different approaches that scale
 -- well.
 romPow2
-  :: (KnownDomain dom, KnownNat n, NFDataX a)
+  :: (KnownNat n, NFDataX a)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -86,7 +86,7 @@ romPow2 = rom
 -- is constructed. See 'Clash.Explicit.ROM.File.romFile' and
 -- 'Clash.Explicit.ROM.Blob.romBlob' for different approaches that scale well.
 rom
-  :: (KnownDomain dom, KnownNat n, NFDataX a, Enum addr)
+  :: (KnownNat n, NFDataX a, Enum addr)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -105,7 +105,7 @@ rom = \clk en content rd -> rom# clk en content (fromEnum <$> rd)
 -- | ROM primitive
 rom#
   :: forall dom n a
-   . (KnownDomain dom, KnownNat n, NFDataX a)
+   . (ZKnownDomain dom, KnownNat n, NFDataX a)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom

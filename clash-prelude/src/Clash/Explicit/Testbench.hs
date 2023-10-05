@@ -50,11 +50,12 @@ import Clash.Class.Num       (satSucc, SaturationMode(SatBound))
 import Clash.Promoted.Nat    (SNat(..))
 import Clash.Promoted.Symbol (SSymbol(..))
 import Clash.Explicit.Signal
-  (Clock, Reset, System, Signal, toEnable, fromList, register,
+  (System, Signal, toEnable, fromList, register,
   unbundle, unsafeSynchronizer)
 import Clash.Signal.Internal
-  (ClockN (..), DiffClock (..), Reset (..), tbClockGen)
+  (Clock (..), ClockN (..), DiffClock (..), Reset (..), tbClockGen)
 import Clash.Signal          (mux, KnownDomain, Enable)
+import Clash.Signal.Internal (ZKnownDomain)
 import Clash.Sized.Index     (Index)
 import Clash.Sized.Internal.BitVector
   (BitVector, isLike#)
@@ -86,7 +87,7 @@ import Clash.XException      (ShowX (..), XException)
 --
 -- __NB__: This function /can/ be used in synthesizable designs.
 assert
-  :: (KnownDomain dom, Eq a, ShowX a)
+  :: (ZKnownDomain dom, Eq a, ShowX a)
   => Clock dom
   -> Reset dom
   -> String
@@ -121,7 +122,7 @@ assert clk (Reset _) msg checked expected returned =
 
 -- | The same as 'assert', but can handle don't care bits in its expected value.
 assertBitVector
-  :: (KnownDomain dom, KnownNat n)
+  :: (ZKnownDomain dom, KnownNat n)
   => Clock dom
   -> Reset dom
   -> String
@@ -162,8 +163,7 @@ assertBitVector clk (Reset _) msg checked expected returned =
 --
 -- @
 -- testInput
---   :: KnownDomain dom
---   => Clock dom
+--   :: Clock dom
 --   -> Reset dom
 --   -> 'Signal' dom Int
 -- testInput clk rst = 'stimuliGenerator' clk rst $('Clash.Sized.Vector.listToVecTH' [(1::Int),3..21])
@@ -174,7 +174,7 @@ assertBitVector clk (Reset _) msg checked expected returned =
 stimuliGenerator
   :: forall l dom   a
    . ( KnownNat l
-     , KnownDomain dom )
+     )
   => Clock dom
   -- ^ Clock to which to synchronize the output signal
   -> Reset dom
@@ -201,7 +201,6 @@ stimuliGenerator clk rst samples =
 outputVerifier'
   :: forall l a dom
    . ( KnownNat l
-     , KnownDomain dom
      , Eq a
      , ShowX a
      , 1 <= l
@@ -269,8 +268,6 @@ outputVerifier' clk =
 outputVerifier
   :: forall l a testDom circuitDom
    . ( KnownNat l
-     , KnownDomain testDom
-     , KnownDomain circuitDom
      , Eq a
      , ShowX a
      , 1 <= l
@@ -298,7 +295,6 @@ outputVerifierBitVector'
   :: forall l n dom
    . ( KnownNat l
      , KnownNat n
-     , KnownDomain dom
      , 1 <= l
      )
   => Clock dom
@@ -320,8 +316,6 @@ outputVerifierBitVector
   :: forall l n testDom circuitDom
    . ( KnownNat l
      , KnownNat n
-     , KnownDomain testDom
-     , KnownDomain circuitDom
      , 1 <= l
      )
   => Clock testDom
@@ -345,8 +339,6 @@ outputVerifierBitVector =
 outputVerifierWith
   :: forall l a testDom circuitDom
    . ( KnownNat l
-     , KnownDomain testDom
-     , KnownDomain circuitDom
      , Eq a
      , ShowX a
      , 1 <= l
@@ -391,8 +383,7 @@ outputVerifierWith assertF clkTest clkCircuit rst samples i0 =
 -- | Ignore signal for a number of cycles, while outputting a static value.
 ignoreFor
   :: forall dom  n a
-   . KnownDomain dom
-  => Clock dom
+   . Clock dom
   -> Reset dom
   -> Enable dom
   -> SNat n
@@ -473,12 +464,11 @@ tbSystemClockGen = tbClockGen
 -- clk = seClockToDiffClock $ tbClockGen (not \<\$\> done)
 -- @
 seClockToDiffClock ::
-  KnownDomain dom =>
   -- | Single-ended input
   Clock dom ->
   -- | Differential output
   DiffClock dom
-seClockToDiffClock clk = DiffClock clk (ClockN SSymbol)
+seClockToDiffClock clk@(Clock{}) = DiffClock clk (ClockN SSymbol)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE seClockToDiffClock #-}
 {-# ANN seClockToDiffClock hasBlackBox #-}
@@ -492,9 +482,7 @@ seClockToDiffClock clk = DiffClock clk (ClockN SSymbol)
 -- for simulating the generated HDL.
 unsafeSimSynchronizer
   :: forall dom1 dom2 a
-   . ( KnownDomain dom1
-     , KnownDomain dom2 )
-  => Clock dom1
+   . Clock dom1
   -- ^ 'Clock' of the incoming signal
   -> Clock dom2
   -- ^ 'Clock' of the outgoing signal

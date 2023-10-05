@@ -41,8 +41,7 @@ writeFile "memory.bin" (memFile Nothing [7 :: Unsigned 9 .. 13])
 We can instantiate a block RAM using the contents of the file above like so:
 
 @
-f :: KnownDomain dom
-  => Clock  dom
+f :: Clock  dom
   -> Enable dom
   -> Signal dom (Unsigned 3)
   -> Signal dom (Unsigned 9)
@@ -62,8 +61,7 @@ However, we can also interpret the same data as a tuple of a 6-bit unsigned
 number, and a 3-bit signed number:
 
 @
-g :: KnownDomain dom
-  => Clock  dom
+g :: Clock  dom
   -> Enable dom
   -> Signal dom (Unsigned 3)
   -> Signal dom (Unsigned 6,Signed 3)
@@ -124,7 +122,7 @@ import Clash.Class.BitPack   (BitPack, BitSize, pack)
 import Clash.Promoted.Nat    (SNat (..), pow2SNat, natToNum, snatToNum)
 import Clash.Sized.Internal.BitVector (Bit(..), BitVector(..), undefined#)
 import Clash.Signal.Internal
-  (Clock(..), Signal (..), Enable, KnownDomain, fromEnable, (.&&.))
+  (Clock(..), Signal (..), Enable, ZKnownDomain, fromEnable, (.&&.))
 import Clash.Signal.Bundle   (unbundle)
 import Clash.Sized.Unsigned  (Unsigned)
 import Clash.XException      (maybeIsX, seqX, fromJustX, NFDataX(..), XException (..))
@@ -172,7 +170,7 @@ import Clash.XException      (maybeIsX, seqX, fromJustX, NFDataX(..), XException
 -- create your own data files.
 blockRamFilePow2
   :: forall dom n m
-   . (KnownDomain dom, KnownNat m, KnownNat n, HasCallStack)
+   . (KnownNat m, KnownNat n, HasCallStack)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -219,7 +217,7 @@ blockRamFilePow2 = \clk en file rd wrM -> withFrozenCallStack
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for more ideas on how to create
 -- your own data files.
 blockRamFile
-  :: (KnownDomain dom, KnownNat m, Enum addr, NFDataX addr, HasCallStack)
+  :: (KnownNat m, Enum addr, NFDataX addr, HasCallStack)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -318,7 +316,7 @@ memFile care = foldr (\e -> showsBV $ pack e) ""
 -- | blockRamFile primitive
 blockRamFile#
   :: forall m dom n
-   . (KnownDomain dom, KnownNat m, HasCallStack)
+   . (ZKnownDomain dom, KnownNat m, HasCallStack)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
