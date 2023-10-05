@@ -297,14 +297,9 @@ alteraPllQsysTemplate
 alteraPllQsysTemplate bbCtx
   |   _clocksClass
     : (_,stripVoid -> kdIn,_)
-    : (_,stripVoid -> kdOutsProd,_)
+    : (_,stripVoid -> Product _ _ (init -> kdOuts),_)
     : _ <- bbInputs bbCtx
   = let
-      kdOuts = case kdOutsProd of
-        Product _ _ ps -> ps
-        KnownDomain {} -> [kdOutsProd]
-        _ -> error "internal error: not a Product or KnownDomain"
-
       cklFreq (KnownDomain _ p _ _ _ _)
         = periodToHz (fromIntegral p) / 1e6 :: Double
       cklFreq _ = error "internal error: not a KnownDomain"
