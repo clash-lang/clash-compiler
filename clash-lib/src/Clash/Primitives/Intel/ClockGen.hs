@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2018     , Google Inc.,
-                     2021-2022, QBayLogic B.V.
+                     2021-2023, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -249,11 +249,10 @@ alteraPllQsysTemplate
   -> State s Doc
 alteraPllQsysTemplate bbCtx = pure bbText
  where
-  (_:(_,stripVoid -> kdIn,_):(_,stripVoid -> kdOutsProd,_):_) = bbInputs bbCtx
-  kdOuts = case kdOutsProd of
-    Product _ _ ps -> ps
-    KnownDomain {} -> [kdOutsProd]
-    _ -> error "internal error: not a Product or KnownDomain"
+  _clocksClass
+    : (_,stripVoid -> kdIn,_)
+    : (_,stripVoid -> Product _ _ (init -> kdOuts),_)
+    : _ = bbInputs bbCtx
 
   cklFreq (KnownDomain _ p _ _ _ _)
     = (1.0 / (fromInteger p * 1.0e-12 :: Double)) / 1e6
