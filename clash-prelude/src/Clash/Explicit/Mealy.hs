@@ -27,7 +27,7 @@ module Clash.Explicit.Mealy
 where
 
 import           Clash.Explicit.Signal
-  (KnownDomain, Bundle (..), Clock, Reset, Signal, Enable, register)
+  (Bundle (..), Clock, Reset, Signal, Enable, register)
 import           Clash.XException      (NFDataX)
 
 import           Control.Monad.State.Strict
@@ -100,8 +100,7 @@ delayTop clk rst en = mealyS clk rst en delayS initialDelayState
 --     s' = x * y + s
 --
 -- mac
---   :: 'KnownDomain' dom
---   => 'Clock' dom
+--   :: 'Clock' dom
 --   -> 'Reset' dom
 --   -> 'Enable' dom
 --   -> 'Signal' dom (Int, Int)
@@ -118,8 +117,7 @@ delayTop clk rst en = mealyS clk rst en delayS initialDelayState
 --
 -- @
 -- dualMac
---   :: 'KnownDomain' dom
---   => 'Clock' dom
+--   :: 'Clock' dom
 --   -> 'Reset' dom
 --   -> 'Enable' dom
 --   -> ('Signal' dom Int, 'Signal' dom Int)
@@ -131,8 +129,8 @@ delayTop clk rst en = mealyS clk rst en delayS initialDelayState
 --     s2 = 'mealy' clk rst en macT 0 ('bundle' (b,y))
 -- @
 mealy
-  :: ( KnownDomain dom
-     , NFDataX s )
+  :: forall dom s i o
+   . NFDataX s
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Reset dom
@@ -177,8 +175,8 @@ mealy clk rst en f iS =
 --      out <- uses history last
 --      return (Just out)
 --
--- delayTop ::'KnownDomain' dom
---   => 'Clock' dom
+-- delayTop ::
+--      'Clock' dom
 --   -> 'Reset' dom
 --   -> 'Enable' dom
 --   -> ('Signal' dom Int -> 'Signal' dom (Maybe Int))
@@ -189,8 +187,8 @@ mealy clk rst en f iS =
 -- [Nothing,Nothing,Nothing,Nothing,Just 1,Just 2,Just 3]
 --
 mealyS
-  :: ( KnownDomain dom
-     , NFDataX s )
+  :: forall dom s i o
+   . NFDataX s
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Reset dom
@@ -236,8 +234,8 @@ mealyS clk rst en f iS =
 --     (i2,b2) = 'mealyB' clk rst en f 3 (c,i1)
 -- @
 mealyB
-  :: ( KnownDomain dom
-     , NFDataX s
+  :: forall dom s i o
+   . ( NFDataX s
      , Bundle i
      , Bundle o )
   => Clock dom
@@ -256,8 +254,8 @@ mealyB clk rst en f iS i = unbundle (mealy clk rst en f iS (bundle i))
 
 -- | A version of 'mealyS' that does automatic 'Bundle'ing, see 'mealyB' for details.
 mealySB
-  :: ( KnownDomain dom
-     , NFDataX s
+  :: forall dom s i o
+   . ( NFDataX s
      , Bundle i
      , Bundle o )
   => Clock dom

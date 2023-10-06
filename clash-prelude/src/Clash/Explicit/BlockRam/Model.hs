@@ -25,7 +25,7 @@ import GHC.TypeNats (KnownNat)
 import Clash.Promoted.Nat (SNat(..), natToNum)
 import Clash.Signal.Bundle (Bundle(bundle))
 import Clash.Signal.Internal
-  (KnownDomain(..), Clock (..), Signal (..), ClockAB (..), clockTicks)
+  (Clock (..), Signal (..), ClockAB (..), clockTicks)
 import Clash.Sized.Index (Index)
 import Clash.XException (XException(..), NFDataX(..), seqX)
 import Clash.XException.MaybeX (MaybeX(..), toMaybeX, andX)
@@ -218,8 +218,6 @@ tdpbramModel ::
   forall nAddrs domA domB a writeEnable .
   ( HasCallStack
   , KnownNat nAddrs
-  , KnownDomain domA
-  , KnownDomain domB
   , NFDataX a
   ) =>
   TdpbramModelConfig writeEnable a ->

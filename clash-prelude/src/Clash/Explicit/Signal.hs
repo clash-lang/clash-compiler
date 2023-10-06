@@ -572,8 +572,7 @@ andEnable e0 e1 =
 -- | Special version of 'delay' that doesn't take enable signals of any kind.
 -- Initial value will be undefined.
 dflipflop
-  :: ( KnownDomain dom
-     , NFDataX a )
+  :: NFDataX a
   => Clock dom
   -> Signal dom a
   -> Signal dom a
@@ -591,8 +590,7 @@ dflipflop = \clk i ->
 -- >>> sampleN 3 (delay systemClockGen enableGen 0 (fromList [1,2,3,4]))
 -- [0,1,2]
 delay
-  :: ( KnownDomain dom
-     , NFDataX a )
+  :: NFDataX a
   => Clock dom
   -- ^ Clock
   -> Enable dom
@@ -611,8 +609,7 @@ delay = delay#
 -- >>> sampleN 7 (delayMaybe systemClockGen enableGen 0 input)
 -- [0,1,2,2,2,5,6]
 delayMaybe
-  :: ( KnownDomain dom
-     , NFDataX a )
+  :: NFDataX a
   => Clock dom
   -- ^ Clock
   -> Enable dom
@@ -632,8 +629,7 @@ delayMaybe = \clk gen dflt i ->
 -- >>> sampleN 7 (delayEn systemClockGen enableGen 0 enable input)
 -- [0,1,2,2,2,5,6]
 delayEn
-  :: ( KnownDomain dom
-     , NFDataX a )
+  :: NFDataX a
   => Clock dom
   -- ^ Clock
   -> Enable dom
@@ -654,8 +650,7 @@ delayEn = \clk gen dflt en i ->
 -- >>> sampleN 5 (register systemClockGen resetGen enableGen 8 (fromList [1,1,2,3,4]))
 -- [8,8,1,2,3]
 register
-  :: ( KnownDomain dom
-     , NFDataX a )
+  :: NFDataX a
   => Clock dom
   -- ^ clock
   -> Reset dom
@@ -693,8 +688,7 @@ register = \clk rst gen initial i ->
 -- >>> sampleN 9 (count systemClockGen resetGen enableGen)
 -- [0,0,0,1,1,2,2,3,3]
 regMaybe
-  :: ( KnownDomain dom
-     , NFDataX a )
+  :: NFDataX a
   => Clock dom
   -- ^ Clock
   -> Reset dom
@@ -725,9 +719,7 @@ regMaybe = \clk rst en initial iM ->
 -- >>> sampleN 9 (count systemClockGen resetGen enableGen)
 -- [0,0,0,1,1,2,2,3,3]
 regEn
-  :: ( KnownDomain dom
-     , NFDataX a
-     )
+  :: NFDataX a
   => Clock dom
   -- ^ Clock
   -> Reset dom
@@ -761,8 +753,7 @@ simulateWithReset
   -- ^ Number of cycles to assert the reset
   -> a
   -- ^ Reset value
-  -> ( KnownDomain dom
-    => Clock dom
+  -> ( Clock dom
     -> Reset dom
     -> Enable dom
     -> Signal dom a
@@ -793,8 +784,7 @@ simulateWithResetN
   -- ^ Reset value
   -> Int
   -- ^ Number of cycles to simulate (excluding cycle spent in reset)
-  -> ( KnownDomain dom
-    => Clock dom
+  -> ( Clock dom
     -> Reset dom
     -> Enable dom
     -> Signal dom a
@@ -851,7 +841,7 @@ simulateB_lazy f = simulate_lazy (bundle . f . unbundle)
 -- __NB__: This function is not synthesizable
 fromListWithReset
   :: forall dom a
-   . (KnownDomain dom, NFDataX a)
+   . NFDataX a
   => Reset dom
   -> a
   -> [a]
@@ -875,8 +865,7 @@ sampleWithReset
      , 1 <= m )
   => SNat m
   -- ^ Number of cycles to assert the reset
-  -> (KnownDomain dom
-      => Clock dom
+  -> ( Clock dom
       -> Reset dom
       -> Enable dom
       -> Signal dom a)
@@ -902,8 +891,7 @@ sampleWithResetN
   -- ^ Number of cycles to assert the reset
   -> Int
   -- ^ Number of samples to produce
-  -> (KnownDomain dom
-      => Clock dom
+  -> ( Clock dom
       -> Reset dom
       -> Enable dom
       -> Signal dom a)
@@ -979,7 +967,7 @@ sampleWithResetN nReset nSamples f =
 -- @
 runUntil
   :: forall dom a
-   . (KnownDomain dom, NFDataX a, ShowX a)
+   . (NFDataX a, ShowX a)
   => (a -> Bool)
   -- ^ Condition checking function, should return @True@ to finish run
   -> Signal dom a

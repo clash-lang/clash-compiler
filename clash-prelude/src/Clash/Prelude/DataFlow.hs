@@ -53,7 +53,7 @@ import Clash.Class.Resize     (truncateB)
 import Clash.Class.BitPack.BitIndex (msb)
 import Clash.Explicit.Mealy   (mealyB)
 import Clash.Promoted.Nat     (SNat)
-import Clash.Signal           (KnownDomain, (.&&.))
+import Clash.Signal           ((.&&.))
 import Clash.Signal.Bundle    (Bundle (..))
 import Clash.Explicit.Signal  (Clock, Reset, Signal, Enable, andEnable, register)
 import Clash.Sized.BitVector  (BitVector)
@@ -152,8 +152,8 @@ pureDF f = DF (\i iV oR -> (fmap f i,iV,oR))
 -- | Create a 'DataFlow' circuit from a Mealy machine description as those of
 -- "Clash.Prelude.Mealy"
 mealyDF
-  :: ( KnownDomain dom
-     , NFDataX s )
+  :: forall dom s i o
+   . NFDataX s
   => Clock dom
   -> Reset dom
   -> Enable dom
@@ -169,8 +169,8 @@ mealyDF clk rst gen f iS =
 -- | Create a 'DataFlow' circuit from a Moore machine description as those of
 -- "Clash.Prelude.Moore"
 mooreDF
-  :: ( KnownDomain dom
-     , NFDataX s )
+  :: forall dom s i o
+   . NFDataX s
   => Clock dom
   -> Reset dom
   -> Enable dom
@@ -217,8 +217,7 @@ fifoDF_mealy (mem,rptr,wptr) (wdata,winc,rinc) =
 -- @
 fifoDF
   :: forall addrSize m n a dom
-   . ( KnownDomain dom
-     , NFDataX a
+   . ( NFDataX a
      , KnownNat addrSize
      , KnownNat n
      , KnownNat m
@@ -356,8 +355,8 @@ parNDF fs =
 --
 -- <<doc/loopDF_sync.svg>>
 loopDF
-  :: ( KnownDomain dom
-     , NFDataX d
+  :: forall dom d m n addrSize a b
+   . ( NFDataX d
      , KnownNat m
      , KnownNat n
      , KnownNat addrSize
