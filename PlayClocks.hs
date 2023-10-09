@@ -130,15 +130,15 @@ myPll12 ::
   DiffClock System ->
   Reset System ->
   (Clock Dom1, Signal Dom1 Bool)
-myPll12 = clockWizardDifferential (SSymbol @"foo")
+myPll12 = unsafeClockWizardDifferential
 {-# ANN myPll12 (defSyn "myPll12") #-}
 {-# NOINLINE myPll12 #-}
 
 myPll13 ::
   Clock System ->
   Reset System ->
-  (Clock Dom1, Signal Dom1 Bool)
-myPll13 = clockWizard (SSymbol @"foo")
+  (Clock Dom1, Clock Dom2, Clock Dom3, Signal System Bool)
+myPll13 = unsafeClockWizard
 {-# ANN myPll13 (defSyn "myPll13") #-}
 {-# NOINLINE myPll13 #-}
 

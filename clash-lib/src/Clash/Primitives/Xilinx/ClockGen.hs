@@ -21,6 +21,7 @@ module Clash.Primitives.Xilinx.ClockGen
 import Control.Monad.State (State)
 import Data.List.Infinite (Infinite(..), (...))
 import Data.Maybe (fromMaybe)
+import Data.String.Interpolate (i)
 import qualified Data.Text as T
 import Prettyprinter.Interpolate (__di)
 import Text.Show.Pretty (ppShow)
@@ -32,14 +33,16 @@ import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
 import Clash.Netlist.Util (stripVoid)
 import qualified Clash.Primitives.DSL as DSL
+import Data.Text.Extra (showt)
 import Data.Text.Prettyprint.Doc.Extra (Doc)
 
 usedArguments :: [Int]
-usedArguments = [knownDomIn, knownDomOut, clk, rst]
+usedArguments = [knownDomIn, clocksCxt, clk, rst]
  where
   knownDomIn
-    :< knownDomOut
-    :< _knownDomLock
+    :< _clocksClass
+    :< clocksCxt
+    :< _numOutClocks
     :< clk
     :< rst
     :< _ = (0...)
@@ -62,38 +65,36 @@ clockWizardTemplate
   -> BlackBoxContext
   -> State s Doc
 clockWizardTemplate isDifferential bbCtx
-  |   knownDomIn
-    : _knownDomOut
-    : _knownDomLock
-    : clk
-    : rst
-    : _ <- map fst (DSL.tInputs bbCtx)
+  | [ knownDomIn
+    , _clocksClass
+    , _clocksCxt
+    , _numOutClocks
+    , clk
+    , rst
+    ] <- map fst (DSL.tInputs bbCtx)
   , [DSL.ety -> resultTy] <- DSL.tResults bbCtx
+  , Product _ _ (init -> pllOutTys) <- resultTy
   , [compName] <- bbQsysIncName bbCtx
   = do
       clkWizInstName <- Id.makeBasic $ fromMaybe "clk_wiz" $ bbCtxName bbCtx
       DSL.declarationReturn bbCtx blockName $ do
 
         rstHigh <- DSL.unsafeToActiveHigh "reset" (DSL.ety knownDomIn) rst
-        pllOut <- DSL.declare "pllOut" Bit
+        pllOuts <- DSL.declareN "pllOut" pllOutTys
         locked <- DSL.declare "locked" Bit
         pllLock <- DSL.boolFromBit "pllLock" locked
 
-        let compInps = compClkInps <> [ ("reset", Bit) ]
-            compOuts =
-              [ ("clk_out1", Bit)
-              , ("locked", Bit)
-              ]
+        let pllOutNames =
+              map (\n -> "clk_out" <> showt n) [1 .. length pllOutTys]
+            compInps = compClkInps <> [ ("reset", Bit) ]
+            compOuts = zip pllOutNames pllOutTys <> [("locked", Bit)]
             inps = clkInps clk <> [ ("reset", rstHigh) ]
-            outs =
-              [ ("clk_out1", pllOut)
-              , ("locked", locked)
-              ]
+            outs = zip pllOutNames pllOuts <> [("locked", locked)]
 
         DSL.compInBlock compName compInps compOuts
         DSL.instDecl Empty (Id.unsafeMake compName) clkWizInstName [] inps outs
 
-        pure [DSL.constructProduct resultTy [pllOut, pllLock]]
+        pure [DSL.constructProduct resultTy (pllOuts <> [pllLock])]
   | otherwise
   = error $ ppShow bbCtx
  where
@@ -135,23 +136,37 @@ clockWizardTclTemplate
   -> BlackBoxContext
   -> State s Doc
 clockWizardTclTemplate isDifferential bbCtx
-  |   (_,stripVoid -> (KnownDomain _ clkInPeriod _ _ _ _),_)
-    : (_,stripVoid -> (KnownDomain _ clkOutPeriod _ _ _ _),_)
-    : _knownDomLock
+  |   (_,stripVoid -> kdIn,_)
+    : _clocksClass
+    : (_,stripVoid -> Product _ _ (init -> kdOuts),_)
     : _ <- bbInputs bbCtx
-  , [(Identifier _ Nothing,Product {})] <- bbResults bbCtx
   , [compName] <- bbQsysIncName bbCtx
-  =
-  let
-    clkInFreq :: Double
-    clkInFreq  = periodToHz (fromInteger clkInPeriod) / 1e6
-    clkOutFreq :: Double
-    clkOutFreq = periodToHz (fromInteger clkOutPeriod) / 1e6
+  = let
+    clkFreq (KnownDomain _ p _ _ _ _) =
+      periodToHz (fromInteger p) / 1e6 :: Double
+    clkFreq _ =
+      error $ "Internal error: not a KnownDomain\n" <> ppShow bbCtx
+
+    clkInFreq = clkFreq kdIn
+    clkOutFreqs = map clkFreq kdOuts
+
+    clkOutProps = concat
+      [ [ [i|CONFIG.CLKOUT#{n}_USED true \\|]
+        , [i|CONFIG.CLKOUT#{n}_REQUESTED_OUT_FREQ #{clkOutFreq} \\|]
+        ]
+      | (clkOutFreq, n) <- zip clkOutFreqs [(1::Word)..]
+      ]
 
     differentialPinString :: T.Text
     differentialPinString = if isDifferential
       then "Differential_clock_capable_pin"
       else "Single_ended_clock_capable_pin"
+
+    propIndent = T.replicate 18 " "
+    props = T.intercalate "\n"  . map (propIndent <>) $
+      [ [i|CONFIG.PRIM_SOURCE #{differentialPinString} \\|]
+      , [i|CONFIG.PRIM_IN_FREQ #{clkInFreq} \\|]
+      ] <> clkOutProps
 
     bbText = [__di|
       namespace eval $tclIface {
@@ -170,13 +185,11 @@ clockWizardTclTemplate isDifferential bbCtx
 
           set_property \\
             -dict [list \\
-                        CONFIG.PRIM_SOURCE #{differentialPinString} \\
-                        CONFIG.PRIM_IN_FREQ #{clkInFreq} \\
-                        CONFIG.CLKOUT1_REQUESTED_OUT_FREQ #{clkOutFreq} \\
+      #{props}
                   ] [get_ips $ipName0]
           return
         }
       }|]
-   in pure bbText
+    in pure bbText
   | otherwise
   = error ("clockWizardTclTemplate: bad bbContext: " <> show bbCtx)

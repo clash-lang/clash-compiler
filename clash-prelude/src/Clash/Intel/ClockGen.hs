@@ -27,6 +27,7 @@ you want to run your circuit at.
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Clash.Intel.ClockGen
   ( unsafeAltpll
@@ -35,6 +36,8 @@ module Clash.Intel.ClockGen
   , altpll
   , alteraPll
   ) where
+
+import GHC.TypeLits (type (<=))
 
 import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Clocks (Clocks(..))
@@ -122,14 +125,15 @@ altpll _ = setName @name unsafeAltpll
 {-# DEPRECATED altpll "This function is unsafe. Please see documentation of the function for alternatives." #-}
 
 unsafeAltpll ::
-  forall domOut domIn pllLock .
+  forall t domIn .
   ( KnownDomain domIn
-  , KnownDomain domOut
-  , KnownDomain pllLock
+  , Clocks t
+  , ClocksCxt t
+  , NumOutClocks t <= 5
   ) =>
   Clock domIn ->
   Reset domIn ->
-  (Clock domOut, Signal pllLock Bool)
+  t
 unsafeAltpll = clocks
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE unsafeAltpll #-}
@@ -212,6 +216,7 @@ alteraPll ::
   ( Clocks t
   , KnownDomain domIn
   , ClocksCxt t
+  , NumOutClocks t <= 18
   ) =>
   -- | Name of the component instance
   --
@@ -231,6 +236,7 @@ unsafeAlteraPll ::
   ( KnownDomain domIn
   , Clocks t
   , ClocksCxt t
+  , NumOutClocks t <= 18
   ) =>
   Clock domIn ->
   Reset domIn ->
