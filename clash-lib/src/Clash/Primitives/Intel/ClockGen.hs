@@ -19,7 +19,7 @@ import Clash.Netlist.BlackBox.Util
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
 import Clash.Netlist.Util
-import Clash.Signal (periodToHz)
+import Clash.Signal (periodToHz, vPeriod)
 
 import Control.Monad.State
 import Data.List.Infinite (Infinite(..), (...))
@@ -30,12 +30,12 @@ import qualified Prettyprinter.Interpolate as I
 
 import qualified Data.Text as TextS
 import Data.Text.Extra (showt)
+import Numeric.Natural
 
 altpllTF :: TemplateFunction
 altpllTF = TemplateFunction used valid altpllTemplate
  where
-  _knownDomIn
-    :< _knownDomOut
+  _knownDomOut
     :< nm
     :< clk
     :< rst
@@ -51,20 +51,18 @@ altpllTF = TemplateFunction used valid altpllTemplate
 altpllQsysTF :: TemplateFunction
 altpllQsysTF = TemplateFunction used valid altpllQsysTemplate
  where
-  knownDomIn
-    :< knownDomOut
+  knownDomOut
     :< _name
-    :< _clk
+    :< clk
     :< _rst
     :< _ = (0...)
-  used = [ knownDomIn, knownDomOut ]
+  used = [ knownDomOut, clk ]
   valid = const True
 
 alteraPllTF :: TemplateFunction
 alteraPllTF = TemplateFunction used valid alteraPllTemplate
  where
   _clocksClass
-    :< _knownDomIn
     :< _clocksCxt
     :< nm
     :< clk
@@ -81,13 +79,12 @@ alteraPllQsysTF :: TemplateFunction
 alteraPllQsysTF = TemplateFunction used valid alteraPllQsysTemplate
  where
   _clocksClass
-    :< knownDomIn
     :< clocksCxt
     :< _name
-    :< _clk
+    :< clk
     :< _rst
     :< _ = (0...)
-  used = [ knownDomIn, clocksCxt ]
+  used = [ clocksCxt, clk ]
   valid = const True
 
 alteraPllTemplate
@@ -98,7 +95,6 @@ alteraPllTemplate
 alteraPllTemplate bbCtx
   | [(Identifier result Nothing,resTy@(Product _ _ (init -> tys)))] <- bbResults bbCtx
   , [ _clocksClass
-    , _knownDomIn
     , _clocksCxt
     , (nm,_,_)
     , (clk,clkTy,_)
@@ -147,8 +143,7 @@ altpllTemplate
   => BlackBoxContext
   -> State s Doc
 altpllTemplate bbCtx
-  | [ _knownDomIn
-    , _knownDomOut
+  | [ _knownDomOut
     , (nm,_,_)
     , (clk,clkTy,_)
     , (rst,rstTy,_)] <- bbInputs bbCtx
@@ -194,12 +189,15 @@ altpllQsysTemplate
   => BlackBoxContext
   -> State s Doc
 altpllQsysTemplate bbCtx
-  |   (_,stripVoid -> kdIn,_)
-    : (_,stripVoid -> kdOut,_)
+  | (_,stripVoid -> kdOut,_)
+    : _ssymbolName
+    : _clkIn@(_,clkInTy,_)
+    : _rstIn
     : _ <- bbInputs bbCtx
-  , KnownDomain _ clkInPeriod _ _ _ _ <- kdIn
-  , KnownDomain _ clkOutPeriod _ _ _ _ <- kdOut
-  = let
+  , KnownDomain _ (fromInteger @Natural -> clkOutPeriod) _ _ _ _ <- kdOut
+  = do
+    clkInPeriod <- vPeriod <$> getDomainConf clkInTy
+    let
       clkOutFreq :: Double
       clkOutFreq = periodToHz (fromIntegral clkOutPeriod) / 1e6
       clklcm = lcm clkInPeriod clkOutPeriod
@@ -296,10 +294,16 @@ alteraPllQsysTemplate
   -> State s Doc
 alteraPllQsysTemplate bbCtx
   |   _clocksClass
-    : (_,stripVoid -> kdIn,_)
     : (_,stripVoid -> Product _ _ (init -> kdOuts),_)
+    : _ssymbolName
+    : (_,clkInTy,_)
+    : _rstIn
     : _ <- bbInputs bbCtx
-  = let
+  = do
+    clkInPeriod <- vPeriod <$> getDomainConf clkInTy
+    let
+      clkInFreq = periodToHz (fromIntegral clkInPeriod) / 1e6 :: Double
+
       cklFreq (KnownDomain _ p _ _ _ _)
         = periodToHz (fromIntegral p) / 1e6 :: Double
       cklFreq _ = error "internal error: not a KnownDomain"
@@ -323,12 +327,11 @@ alteraPllQsysTemplate bbCtx
           <parameter name="gui_operation_mode" value="direct" />
         #{clkOuts}
           <parameter name="gui_pll_mode" value="Integer-N PLL" />
-          <parameter name="gui_reference_clock_frequency" value="#{cklFreq kdIn}" />
+          <parameter name="gui_reference_clock_frequency" value="#{clkInFreq}" />
           <parameter name="gui_use_locked" value="true" />
         </module>
         </system>
         |]
-    in
-      pure bbText
+    pure bbText
   | otherwise
   = error ("alteraPllQsysTemplate: bad bbContext: " <> show bbCtx)

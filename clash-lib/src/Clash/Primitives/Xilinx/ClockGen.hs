@@ -18,10 +18,10 @@ import qualified Data.Text as T
 import Prettyprinter.Interpolate (__di)
 import Text.Show.Pretty (ppShow)
 
-import Clash.Signal (periodToHz)
+import Clash.Signal (periodToHz, vPeriod)
 
 import Clash.Backend (Backend)
-import Clash.Netlist.BlackBox.Util (exprToString)
+import Clash.Netlist.BlackBox.Util (exprToString, getDomainConf)
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
 import Clash.Netlist.Util (stripVoid)
@@ -33,13 +33,12 @@ clockWizardDifferentialTF :: TemplateFunction
 clockWizardDifferentialTF =
   TemplateFunction used valid clockWizardDifferentialTemplate
  where
-  knownDomIn
-    :< knownDomOut
+  knownDomOut
     :< name
     :< clk
     :< rst
     :< _ = (0...)
-  used = [knownDomIn, knownDomOut, name, clk, rst]
+  used = [knownDomOut, name, clk, rst]
   valid = const True
 
 
@@ -48,8 +47,7 @@ clockWizardDifferentialTemplate
   => BlackBoxContext
   -> State s Doc
 clockWizardDifferentialTemplate bbCtx
-  |   knownDomIn
-    : _knownDomOut
+  |   _knownDomOut
     : name0
     : clk
     : rst
@@ -100,27 +98,25 @@ clockWizardTclTF :: TemplateFunction
 clockWizardTclTF =
   TemplateFunction used valid (clockWizardTclTemplate False)
  where
-  knownDomIn
-    :< knownDomOut
+  knownDomOut
     :< name
-    :< _clk
+    :< clk
     :< _rst
     :< _ = (0...)
-  used = [knownDomIn, knownDomOut, name]
+  used = [knownDomOut, name, clk]
   valid = const True
 
 clockWizardDifferentialTclTF :: TemplateFunction
 clockWizardDifferentialTclTF =
   TemplateFunction used valid (clockWizardTclTemplate True)
  where
-  knownDomIn
-    :< knownDomOut
+  knownDomOut
     :< name
-    :< _clkN
+    :< clkN
     :< _clkP
     :< _rst
     :< _ = (0...)
-  used = [knownDomIn, knownDomOut, name]
+  used = [knownDomOut, name, clkN]
   valid = const True
 
 
@@ -130,16 +126,18 @@ clockWizardTclTemplate
   -> BlackBoxContext
   -> State s Doc
 clockWizardTclTemplate isDifferential bbCtx
-  |   (_,stripVoid -> (KnownDomain _ clkInPeriod _ _ _ _),_)
-    : (_,stripVoid -> (KnownDomain _ clkOutPeriod _ _ _ _),_)
+  |   (_,stripVoid -> (KnownDomain _ clkOutPeriod _ _ _ _),_)
     : (nm,_,_)
+    : (_,clkInTy,_)
     : _ <- bbInputs bbCtx
   , [(Identifier _ Nothing,Product {})] <- bbResults bbCtx
   , Just compName <- exprToString nm
-  =
+  = do
+  clkInPeriod <- vPeriod <$> getDomainConf clkInTy
+
   let
     clkInFreq :: Double
-    clkInFreq  = periodToHz (fromInteger clkInPeriod) / 1e6
+    clkInFreq  = periodToHz (fromIntegral clkInPeriod) / 1e6
     clkOutFreq :: Double
     clkOutFreq = periodToHz (fromInteger clkOutPeriod) / 1e6
 

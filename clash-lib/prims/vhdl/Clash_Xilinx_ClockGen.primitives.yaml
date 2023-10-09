@@ -3,11 +3,10 @@
     kind: Declaration
     type: |-
       clockWizard
-        :: ( KnownDomain domIn            -- ARG[0]
-           , KnownDomain domOut )         -- ARG[1]
-        => SSymbol name                   -- ARG[2]
-        -> Clock domIn                    -- ARG[3]
-        -> Reset domIn                    -- ARG[4]
+        :: KnownDomain domOut             -- ARG[0]
+        => SSymbol name                   -- ARG[1]
+        -> Clock domIn                    -- ARG[2]
+        -> Reset domIn                    -- ARG[3]
         -> (Clock domIn, Signal domOut Bool)
     template: |-
       -- clockWizard begin
@@ -16,14 +15,14 @@
         signal ~GENSYM[locked][2]  : std_logic;
         signal ~GENSYM[pllLock][3] : boolean;
 
-        component ~NAME[2]
+        component ~NAME[1]
           port (clk_in1  : in std_logic;
                 reset    : in std_logic;
                 clk_out1 : out std_logic;
                 locked   : out std_logic);
         end component;
       begin
-        ~GENSYM[clockWizard_inst][4] : component ~NAME[2] port map (~ARG[3],~IF ~ISACTIVEHIGH[0] ~THEN ~ARG[4] ~ELSE NOT(~ARG[4]) ~FI,~SYM[1],~SYM[2]);
+        ~GENSYM[clockWizard_inst][4] : component ~NAME[1] port map (~ARG[2],~IF ~ISACTIVEHIGH[3] ~THEN ~ARG[3] ~ELSE NOT(~ARG[3]) ~FI,~SYM[1],~SYM[2]);
         ~SYM[3] <= true when ~SYM[2] = '1' else false;
         ~RESULT <= (~SYM[1],~SYM[3]);
       end block;

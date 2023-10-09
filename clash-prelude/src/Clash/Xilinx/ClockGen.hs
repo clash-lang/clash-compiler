@@ -34,8 +34,7 @@ import Clash.Signal.Internal
 -- See also the [Clocking Wizard LogiCORE IP Product Guide](https://docs.xilinx.com/r/en-US/pg065-clk-wiz)
 clockWizard
   :: forall domIn domOut name
-   . ( KnownDomain domIn
-     , KnownDomain domOut )
+   . KnownDomain domOut
   => SSymbol name
   -- ^ Name of the component instance
   --
@@ -67,8 +66,7 @@ clockWizard !_ = clocks
 -- See also the [Clocking Wizard LogiCORE IP Product Guide](https://docs.xilinx.com/r/en-US/pg065-clk-wiz)
 clockWizardDifferential
   :: forall domIn domOut name
-   . ( KnownDomain domIn
-     , KnownDomain domOut )
+   . KnownDomain domOut
   => SSymbol name
   -- ^ Name of the component instance
   --
