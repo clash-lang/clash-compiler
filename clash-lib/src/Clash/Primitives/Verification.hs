@@ -8,7 +8,6 @@ import Data.Either
 import qualified Control.Lens                    as Lens
 import           Control.Monad.State             (State)
 import           Data.List.Infinite              (Infinite(..), (...))
-import           Data.Maybe                      (listToMaybe)
 import           Data.Monoid                     (Ap(getAp))
 import           Data.Text.Prettyprint.Doc.Extra (Doc)
 import qualified Data.Text                       as Text
@@ -22,17 +21,18 @@ import           Clash.Core.Term                 (Term(Var), varToId)
 import           Clash.Core.TermLiteral          (termToDataError)
 import           Clash.Util                      (indexNote)
 import           Clash.Netlist                   (mkExpr)
-import           Clash.Netlist.Util              (stripVoid)
 import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types
   (BlackBox(BBFunction), TemplateFunction(..), BlackBoxContext, Identifier,
    NetlistMonad, Declaration(Assignment, NetDecl), Usage(Cont),
-   HWType(Bool, KnownDomain), NetlistId(..),
+   HWType(Bool), NetlistId(..),
    DeclarationType(Concurrent), tcCache, bbInputs, Expr(Identifier))
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TDecl), RenderVoid(..),
    emptyBlackBoxMeta)
+import           Clash.Netlist.BlackBox.Util (getDomainConf)
 
+import           Clash.Signal (vActiveEdge)
 import           Clash.Verification.Internal
 import           Clash.Verification.Pretty
 
@@ -48,8 +48,7 @@ checkBBF _isD _primName args _ty =
  where
   -- TODO: Improve error handling; currently errors don't indicate what
   -- TODO: blackbox generated them.
-  _knownDomainArg
-    :< clkArg
+  clkArg
     :< _rstArg
     :< propNameArg
     :< renderAsArg
@@ -112,18 +111,15 @@ checkTF'
   -> BlackBoxContext
   -> State s Doc
 checkTF' decls (clk, clkId) propName renderAs prop bbCtx = do
+  let (_,clkTy,_) = head $ bbInputs bbCtx
+  edge <- vActiveEdge <$> getDomainConf clkTy
   blockName <- Id.makeBasic (propName <> "_block")
-  getAp (blockDecl blockName (renderedPslProperty : decls))
+  getAp (blockDecl blockName (renderedPslProperty edge : decls))
 
  where
   hdl = hdlKind (undefined :: s)
 
-  edge =
-    case bbInputs bbCtx of
-      (_, stripVoid -> KnownDomain _nm _period e _rst _init _polarity, _):_ -> e
-      _ -> error $ "Unexpected first argument: " ++ show (listToMaybe (bbInputs bbCtx))
-
-  renderedPslProperty = case renderAs of
+  renderedPslProperty edge = case renderAs of
     PSL          -> psl
     SVA          -> sva
     AutoRenderAs -> case hdl of

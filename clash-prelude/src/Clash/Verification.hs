@@ -48,13 +48,12 @@ module Clash.Verification
 
 import qualified Clash.Explicit.Verification     as EV
 import           Clash.Signal
-  (KnownDomain, HiddenClock, HiddenReset, Signal, hasClock, hasReset)
+  (HiddenClock, HiddenReset, Signal, hasClock, hasReset)
 import           Clash.Verification.Internal
 import           Data.Text                       (Text)
 
 check
-  :: ( KnownDomain dom
-     , HiddenClock dom
+  :: ( HiddenClock dom
      , HiddenReset dom
      )
   => Text
@@ -66,8 +65,7 @@ check
 check = EV.check hasClock hasReset
 
 checkI
-  :: ( KnownDomain dom
-     , HiddenClock dom
+  :: ( HiddenClock dom
      , HiddenReset dom
      )
   => Text
