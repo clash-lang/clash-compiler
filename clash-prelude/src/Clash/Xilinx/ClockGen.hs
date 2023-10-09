@@ -13,8 +13,10 @@ PLL and other clock-related components for Xilinx FPGAs
 
 module Clash.Xilinx.ClockGen where
 
+import GHC.TypeLits (type (<=))
+
 import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Clocks (clocks)
+import Clash.Clocks (Clocks(..))
 import Clash.Signal.Internal
 
 -- | A clock source that corresponds to the Xilinx MMCM component created
@@ -32,17 +34,17 @@ import Clash.Signal.Internal
 --
 -- See also the [Clocking Wizard LogiCORE IP Product Guide](https://docs.xilinx.com/r/en-US/pg065-clk-wiz)
 unsafeClockWizard ::
-  forall domIn domOut pllLock .
+  forall t domIn .
   ( KnownDomain domIn
-  , KnownDomain domOut
-  , KnownDomain pllLock
+  , Clocks t
+  , ClocksCxt t
+  , NumOutClocks t <= 7
   ) =>
   -- | Free running clock (i.e. a clock pin connected to a crystal)
   Clock domIn ->
   -- | Reset for the PLL
   Reset domIn ->
-  -- | (Stable PLL clock, PLL lock)
-  (Clock domOut, Signal pllLock Bool)
+  t
 unsafeClockWizard = clocks
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE unsafeClockWizard #-}
@@ -63,17 +65,17 @@ unsafeClockWizard = clocks
 --
 -- See also the [Clocking Wizard LogiCORE IP Product Guide](https://docs.xilinx.com/r/en-US/pg065-clk-wiz)
 unsafeClockWizardDifferential ::
-  forall domIn domOut pllLock .
+  forall t domIn .
   ( KnownDomain domIn
-  , KnownDomain domOut
-  , KnownDomain pllLock
+  , Clocks t
+  , ClocksCxt t
+  , NumOutClocks t <= 7
   ) =>
   -- | Free running clock
   DiffClock domIn ->
   -- | Reset for the PLL
   Reset domIn ->
-  -- | (Stable PLL clock, PLL lock)
-  (Clock domOut, Signal pllLock Bool)
+  t
 unsafeClockWizardDifferential (DiffClock clk _) = clocks clk
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE unsafeClockWizardDifferential #-}

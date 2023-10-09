@@ -15,6 +15,7 @@ module Clash.Clocks.Internal (Clocks(..), deriveClocksInstances) where
 
 import Control.Monad.Extra (concatMapM)
 import Data.Kind (Constraint)
+import GHC.TypeLits (Nat)
 import Language.Haskell.TH
 
 import Clash.CPP (haddockOnly)
@@ -24,9 +25,10 @@ import Clash.Signal.Internal
   (clockGen, Clock(..), KnownDomain, Reset, Signal, unsafeToActiveLow)
 
 -- | __NB__: The documentation only shows instances up to /3/ output clocks. By
--- default, instances up to and including /16/ clocks will exist.
+-- default, instances up to and including /18/ clocks will exist.
 class Clocks t where
   type ClocksCxt t :: Constraint
+  type NumOutClocks t :: Nat
 
   clocks ::
     (KnownDomain domIn, ClocksCxt t) =>
@@ -39,6 +41,7 @@ deriveClocksInstance :: Int -> DecsQ
 deriveClocksInstance n =
   [d| instance Clocks $instType where
         type ClocksCxt $instType = $cxtType
+        type NumOutClocks $instType = $numOutClocks
 
         clocks (Clock _ Nothing) $(varP rst) = $funcImpl
         clocks _ _ = error "clocks: dynamic clocks unsupported"
@@ -55,6 +58,7 @@ deriveClocksInstance n =
   -- (KnownDomain c1, KnownDomain c2, ..., KnownDomain pllLock)
   cxtType = foldl appT (tupleT $ n + 1) $
               clkKnownDoms <> [ [t| KnownDomain $lockTyVar |] ]
+  numOutClocks = litT . numTyLit $ toInteger n
 
   -- 'clocks' function
   rst = mkName "rst"
@@ -64,10 +68,10 @@ deriveClocksInstance n =
   clkImpls = replicate n [| Clock SSymbol Nothing |]
   funcImpl = tupE $ clkImpls <> [lockImpl]
 
--- Derive instances for up to and including 16 clocks, except when we are
+-- Derive instances for up to and including 18 clocks, except when we are
 -- generating Haddock
 deriveClocksInstances :: DecsQ
 deriveClocksInstances = concatMapM deriveClocksInstance [1..n]
  where
   n | haddockOnly = 3
-    | otherwise   = 16
+    | otherwise   = 18
