@@ -117,8 +117,8 @@ import           Clash.Annotations.Primitive     (HDL (..), Primitive (..))
 import           Clash.Annotations.SynthesisAttributes (Attr)
 import           Clash.Backend                   hiding (Usage, fromBV, toBV)
 import           Clash.Backend.VHDL              (VHDLState)
-import           Clash.Explicit.Signal           (ResetPolarity(..))
-import           Clash.Netlist.BlackBox.Util     (exprToString, renderElem)
+import           Clash.Explicit.Signal           (ResetPolarity(..), vResetPolarity)
+import           Clash.Netlist.BlackBox.Util     (exprToString, getDomainConf, renderElem)
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxTemplate, Element(Component, Text), Decl(..))
 import qualified Clash.Netlist.Id                as Id
@@ -202,6 +202,17 @@ instance Backend backend => HasIdentifierSet (BlockState backend) where
 
 instance HasUsageMap backend => HasUsageMap (BlockState backend) where
   usageMap = bsBackend.usageMap
+
+liftToBlockState
+  :: forall backend a. Backend backend
+   => State backend a -> State (BlockState backend) a
+liftToBlockState (StateT f) = StateT g
+ where
+  g :: BlockState backend -> Identity (a, BlockState backend)
+  g sbsIn = do
+    let sIn = _bsBackend sbsIn
+    (res,sOut) <- f sIn
+    pure (res, sbsIn{_bsBackend = sOut})
 
 -- | A typed expression.
 data TExpr = TExpr
@@ -992,32 +1003,26 @@ unsafeToActiveHigh
   :: Backend backend
   => Text
   -- ^ Name hint
-  -> HWType
-  -- ^ 'KnownDomain'
   -> TExpr
   -- ^ Reset signal
   -> State (BlockState backend) TExpr
-unsafeToActiveHigh nm dom rExpr =
-  case extrResetPolarity dom of
+unsafeToActiveHigh nm rExpr = do
+  resetLevel <- vResetPolarity <$> liftToBlockState (getDomainConf (ety rExpr))
+  case resetLevel of
     ActiveHigh -> pure rExpr
     ActiveLow -> notExpr nm rExpr
-
-extrResetPolarity :: HWType -> ResetPolarity
-extrResetPolarity (Void (Just (KnownDomain _ _ _ _ _ p))) = p
-extrResetPolarity p = error ("Internal error: expected KnownDomain, got: " <> show p)
 
 -- | Massage a reset to work as active-low reset.
 unsafeToActiveLow
   :: Backend backend
   => Text
   -- ^ Name hint
-  -> HWType
-  -- ^ 'KnownDomain'
   -> TExpr
   -- ^ Reset signal
   -> State (BlockState backend) TExpr
-unsafeToActiveLow nm dom rExpr =
-  case extrResetPolarity dom of
+unsafeToActiveLow nm rExpr = do
+  resetLevel <- vResetPolarity <$> liftToBlockState (getDomainConf (ety rExpr))
+  case resetLevel of
     ActiveLow -> pure rExpr
     ActiveHigh -> notExpr nm rExpr
 

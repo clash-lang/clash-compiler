@@ -62,7 +62,7 @@ clockWizardDifferentialTemplate bbCtx
       clkWizInstName <- Id.makeBasic "clockWizardDifferential_inst"
       DSL.declarationReturn bbCtx "clockWizardDifferential" $ do
 
-        rstHigh <- DSL.unsafeToActiveHigh "reset" (DSL.ety knownDomIn) rst
+        rstHigh <- DSL.unsafeToActiveHigh "reset" rst
         pllOut <- DSL.declare "pllOut" Bit
         locked <- DSL.declare "locked" Bit
         pllLock <- DSL.boolFromBit "pllLock" locked
