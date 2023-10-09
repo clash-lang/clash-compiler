@@ -65,7 +65,7 @@ clockWizardTemplate
   -> BlackBoxContext
   -> State s Doc
 clockWizardTemplate isDifferential bbCtx
-  | [ knownDomIn
+  | [ _knownDomIn
     , _clocksClass
     , _clocksCxt
     , _numOutClocks
@@ -79,7 +79,7 @@ clockWizardTemplate isDifferential bbCtx
       clkWizInstName <- Id.makeBasic $ fromMaybe "clk_wiz" $ bbCtxName bbCtx
       DSL.declarationReturn bbCtx blockName $ do
 
-        rstHigh <- DSL.unsafeToActiveHigh "reset" (DSL.ety knownDomIn) rst
+        rstHigh <- DSL.unsafeToActiveHigh "reset" rst
         pllOuts <- DSL.declareN "pllOut" pllOutTys
         locked <- DSL.declare "locked" Bit
         pllLock <- DSL.boolFromBit "pllLock" locked

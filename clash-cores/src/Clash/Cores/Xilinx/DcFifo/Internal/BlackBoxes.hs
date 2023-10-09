@@ -178,7 +178,7 @@ dcFifoBBTF DcConfig{..} bbCtx
       let domty = DSL.ety knownDomainWrite
       in case stripVoid domty of
            N.KnownDomain _ _ _ Synchronous _ _ ->
-             DSL.unsafeToActiveHigh "wr_rst_high" domty wRst
+             DSL.unsafeToActiveHigh "wr_rst_high" wRst
            N.KnownDomain _ _ _ Asynchronous _ _ ->
              error $
                show 'dcFifoTF <> ": dcFifo only supports synchronous resets"
@@ -190,7 +190,7 @@ dcFifoBBTF DcConfig{..} bbCtx
       let domty = DSL.ety knownDomainRead
       in case stripVoid domty of
            N.KnownDomain _ _ _ Synchronous _ _ ->
-             DSL.unsafeToActiveHigh "rd_rst_high" domty rRst
+             DSL.unsafeToActiveHigh "rd_rst_high" rRst
            N.KnownDomain _ _ _ Asynchronous _ _ ->
              error $
                show 'dcFifoTF <> ": dcFifo only supports synchronous resets"
