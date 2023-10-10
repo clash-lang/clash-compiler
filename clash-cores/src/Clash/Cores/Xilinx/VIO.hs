@@ -80,7 +80,7 @@ instance VIO dom a o => VIO dom (Signal dom i -> a) o where
 -- Example incarnations are:
 --
 -- @
--- someProbe :: 'KnownDomain' dom => 'Clock' dom -> 'Signal' dom 'Bit' -> 'Signal' dom ('Unsigned' 8) -> 'Signal' dom ('Bool', 'Maybe' ('Signed' 8))
+-- someProbe :: 'Clock' dom -> 'Signal' dom 'Bit' -> 'Signal' dom ('Unsigned' 8) -> 'Signal' dom ('Bool', 'Maybe' ('Signed' 8))
 -- someProbe = 'vioProbe' ("in_b" :> "in_u8" :> Nil) ("out_b" :> "out_mu8" :> Nil) ('False', 'Nothing')
 -- @
 --
@@ -89,7 +89,7 @@ instance VIO dom a o => VIO dom (Signal dom i -> a) o where
 -- output probes are both initialized to 0.
 --
 -- @
--- otherProbe :: 'KnownDomain' dom => 'Clock' dom -> 'Signal' dom ('Unsigned' 4, 'Unsigned' 2, 'Bit') -> 'Signal' dom ('Vec' 3 'Bit')
+-- otherProbe :: 'Clock' dom -> 'Signal' dom ('Unsigned' 4, 'Unsigned' 2, 'Bit') -> 'Signal' dom ('Vec' 3 'Bit')
 -- otherProbe = 'vioProbe' ("in_u4" :> "in_u2" :> "in_b" :> Nil) ("out_b1" :> "out_b2" :> "out_b3" :> Nil) ('repeat' 'high')
 -- @
 --
@@ -103,7 +103,7 @@ instance VIO dom a o => VIO dom (Signal dom i -> a) o where
 -- in this case to enforce the VIO to be rendered in HDL.
 vioProbe ::
   forall dom a o n m.
-  (KnownDomain dom, VIO dom a o) =>
+  VIO dom a o =>
   Vec n String ->
   Vec m String ->
   o ->
@@ -118,7 +118,7 @@ vioProbe inputNames outputNames initialOutputProbeValues clk =
 -- probabilities.
 vioProbe# ::
   forall dom a o n m.
-  (KnownDomain dom, VIO dom a o) =>
+  VIO dom a o =>
   Vec n String ->
   Vec m String ->
   o ->

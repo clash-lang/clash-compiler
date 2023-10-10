@@ -94,8 +94,7 @@ import Clash.Cores.Xilinx.Floating.Internal
 -- | Customizable floating point addition.
 addWith
   :: forall d dom n
-   . ( KnownDomain dom
-     , KnownNat d
+   . ( KnownNat d
      , HasCallStack
      )
   => Config
@@ -116,8 +115,7 @@ addWith !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
 -- | Floating point addition with default settings.
 add
   :: forall dom n
-   . ( KnownDomain dom
-     , HasCallStack
+   . ( HasCallStack
      )
   => Clock dom
   -> Enable dom
@@ -133,8 +131,7 @@ type AddDefDelay = 11
 -- | Customizable floating point subtraction.
 subWith
   :: forall d dom n
-   . ( KnownDomain dom
-     , KnownNat d
+   . ( KnownNat d
      , HasCallStack
      )
   => Config
@@ -155,8 +152,7 @@ subWith !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
 -- | Floating point subtraction with default settings.
 sub
   :: forall dom n
-   . ( KnownDomain dom
-     , HasCallStack
+   . ( HasCallStack
      )
   => Clock dom
   -> Enable dom
@@ -173,8 +169,7 @@ type SubDefDelay = 11
 -- | Customizable floating point multiplication.
 mulWith
   :: forall d dom n
-   . ( KnownDomain dom
-     , KnownNat d
+   . ( KnownNat d
      , HasCallStack
      )
   => Config
@@ -195,8 +190,7 @@ mulWith !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
 -- | Floating point multiplication with default settings.
 mul
   :: forall dom n
-   . ( KnownDomain dom
-     , HasCallStack
+   . ( HasCallStack
      )
   => Clock dom
   -> Enable dom
@@ -213,8 +207,7 @@ type MulDefDelay = 8
 -- | Customizable floating point division.
 divWith
   :: forall d dom n
-   . ( KnownDomain dom
-     , KnownNat d
+   . ( KnownNat d
      , HasCallStack
      )
   => Config
@@ -235,8 +228,7 @@ divWith !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
 -- | Floating point division with default settings.
 div
   :: forall dom n
-   . ( KnownDomain dom
-     , HasCallStack
+   . ( HasCallStack
      )
   => Clock dom
   -> Enable dom
@@ -255,8 +247,7 @@ type DivDefDelay = 28
 -- argument.
 fromU32With
   :: forall d dom n
-   . ( KnownDomain dom
-     , KnownNat d
+   . ( KnownNat d
      , HasCallStack
      )
   => Clock dom
@@ -274,8 +265,7 @@ fromU32With clk en = delayI und en clk . fmap fromIntegral
 -- | Conversion of @Unsigned 32@ to @Float@, with default delay
 fromU32
   :: forall dom n
-   . ( KnownDomain dom
-     , HasCallStack
+   . ( HasCallStack
      )
   => Clock dom
   -> Enable dom
@@ -293,8 +283,7 @@ type FromU32DefDelay = 5
 -- argument.
 fromS32With
   :: forall d dom n
-   . ( KnownDomain dom
-     , KnownNat d
+   . ( KnownNat d
      , HasCallStack
      )
   => Clock dom
@@ -312,8 +301,7 @@ fromS32With clk en = delayI und en clk . fmap fromIntegral
 -- | Conversion of @Signed 32@ to @Float@, with default delay
 fromS32
   :: forall dom n
-   . ( KnownDomain dom
-     , HasCallStack
+   . ( HasCallStack
      )
   => Clock dom
   -> Enable dom
@@ -334,8 +322,7 @@ type FromS32DefDelay = 6
 -- argument.
 compareWith
   :: forall d dom n
-   . ( KnownDomain dom
-     , KnownNat d
+   . ( KnownNat d
      , HasCallStack
      )
   => Clock dom
@@ -357,8 +344,7 @@ compareWith clk ena a b = delayI und ena clk (xilinxCompare <$> a <*> b)
 -- NaN. Otherwise, it behaves like Haskell's 'P.compare'.
 compare
   :: forall dom n
-   . ( KnownDomain dom
-     , HasCallStack
+   . ( HasCallStack
      )
   => Clock dom
   -> Enable dom

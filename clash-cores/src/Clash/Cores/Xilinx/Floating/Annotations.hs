@@ -43,8 +43,7 @@ vhdlBinaryPrim
   -> Primitive
 vhdlBinaryPrim primName tclTFName funcName =
   let
-    _knownDomain
-      :< _knownNat
+    _knownNat
       :< _hasCallStack
       :< config
       :< clk
@@ -110,8 +109,7 @@ veriBinaryPrim
   -> Primitive
 veriBinaryPrim primName tclTFName funcName =
   let
-    _knownDomain
-      :< _knownNat
+    _knownNat
       :< _hasCallStack
       :< config
       :< clk
@@ -148,8 +146,7 @@ vhdlFromUPrim
   -> Primitive
 vhdlFromUPrim primName funcName =
   let tfName = 'fromUTclTF
-      _knownDomain
-        :< _knownNat
+      _knownNat
         :< _hasCallStack
         :< clk
         :< en
@@ -186,7 +183,7 @@ vhdlFromUPrim primName funcName =
           ~GENSYM[#{funcName}][#{compSym}] : ~INCLUDENAME[0]
             port map (
               aclk => ~ARG[#{clk}],
-        ~IF~ISACTIVEENABLE[#{en}]~THEN      aclken => ~SYM[#{clk}],
+        ~IF~ISACTIVEENABLE[#{en}]~THEN      aclken => ~SYM[#{clkEnStdSym}],
         ~ELSE~FI      s_axis_a_tvalid => '1',
               s_axis_a_tdata => ~SYM[#{inpSlvSym}],
               m_axis_result_tvalid => open,
@@ -208,8 +205,7 @@ veriFromUPrim
 veriFromUPrim primName funcName =
   let
     tfName = 'fromUTclTF
-    _knownDomain
-      :< _knownNat
+    _knownNat
       :< _hasCallStack
       :< clk
       :< en
@@ -245,8 +241,7 @@ vhdlFromSPrim
 vhdlFromSPrim primName funcName =
   let
     tfName = 'fromSTclTF
-    _knownDomain
-      :< _knownNat
+    _knownNat
       :< _hasCallStack
       :< clk
       :< en
@@ -283,7 +278,7 @@ vhdlFromSPrim primName funcName =
           ~GENSYM[#{funcName}][#{compSym}] : ~INCLUDENAME[0]
             port map (
               aclk => ~ARG[#{clk}],
-        ~IF~ISACTIVEENABLE[#{en}]~THEN      aclken => ~SYM[#{clk}],
+        ~IF~ISACTIVEENABLE[#{en}]~THEN      aclken => ~SYM[#{clkEnStdSym}],
         ~ELSE~FI      s_axis_a_tvalid => '1',
               s_axis_a_tdata => ~SYM[#{inpSlvSym}],
               m_axis_result_tvalid => open,
@@ -305,8 +300,7 @@ veriFromSPrim
 veriFromSPrim primName funcName =
   let
     tfName = 'fromSTclTF
-    _knownDomain
-      :< _knownNat
+    _knownNat
       :< _hasCallStack
       :< clk
       :< en
@@ -344,8 +338,7 @@ vhdlComparePrim
   -> Primitive
 vhdlComparePrim primName tclTFName funcName =
   let
-    _knownDomain
-      :< _knownNat
+    _knownNat
       :< _hasCallStack
       :< clock
       :< enable
@@ -410,8 +403,7 @@ veriComparePrim
   -> Primitive
 veriComparePrim primName tclTFName funcName =
   let
-    _knownDomain
-      :< _knownNat
+    _knownNat
       :< _hasCallStack
       :< clock
       :< enable

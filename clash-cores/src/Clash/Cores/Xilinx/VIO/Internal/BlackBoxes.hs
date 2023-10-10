@@ -87,8 +87,7 @@ vioProbeBBF _isD _primName _args _resTys = pure $ Right (bbMeta, bb)
 usedArguments :: [Int]
 usedArguments = (inputNames : outputNames : initOutValues : clock : inputProbes)
  where
-  (    _knownDomain
-    :< _vioConstraint
+  (    _vioConstraint
     :< inputNames
     :< outputNames
     :< initOutValues
@@ -129,8 +128,7 @@ checkNameCollision _ tExpr = error [__i|
 
 vioProbeBBTF :: (Backend s, HasCallStack) => BlackBoxContext -> State s Doc
 vioProbeBBTF bbCtx
-  | (   _knownDomainDom
-      : _vioConstraint
+  | (   _vioConstraint
       : (DSL.getVec -> Just userInputNameExprs)
       : (DSL.getVec -> Just userOutputNameExprs)
       : _initialOutputProbeValues
@@ -244,8 +242,7 @@ vioProbeTclBBTF ::
   BlackBoxContext ->
   State s Doc
 vioProbeTclBBTF bbCtx
-  | ( _knownDomainDom
-    : _vioConstraint
+  | ( _vioConstraint
     : _inputNames
     : _outputNames
     : initialOutputProbeValues
@@ -340,8 +337,7 @@ validateVioProbeBBC bbCtx = case probesFromTypes bbCtx of
 probesFromTypes :: BlackBoxContext -> Either String ([HWType], [HWType])
 probesFromTypes Context{..} = do
   is <- case map (\(_,x,_) -> x) bbInputs of
-    (   _knownDomainDom
-      : _VIOConstraint
+    (   _VIOConstraint
       : _inputNames
       : _outputNames
       : _clk

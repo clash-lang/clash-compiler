@@ -24,7 +24,7 @@ import GHC.Stack (HasCallStack)
 import Text.Show.Pretty (ppShow)
 
 import Clash.Explicit.Prelude
-  ( type (<=), SNat, Clock, KnownDomain, BitPack(BitSize), NFDataX, deepErrorX
+  ( type (<=), SNat, Clock, BitPack(BitSize), NFDataX, deepErrorX
   , unsafeSynchronizer, unpack )
 import Clash.Annotations.Primitive (Primitive(..), HDL(..), hasBlackBox)
 import Clash.Backend (Backend)
@@ -47,8 +47,6 @@ xpmCdcArraySingleTF =
     :< _stagesLte10
     :< _1LteBitsize
     :< _bitsizeLte1024
-    :< _knownDomainSrc
-    :< _knownDomainDst
     :< _hasCallStack
     :< _nfdatax
     :< _bitpack
@@ -66,8 +64,6 @@ xpmCdcArraySingleTF# bbCtx
     , _stagesLte10
     , _1LteBitSize
     , _bitsizeLte1024
-    , _knownDomainSrc
-    , _knownDomainDst
     , _hasCallStack
     , _nfdatax
     , _bitpack
@@ -160,8 +156,6 @@ xpmCdcArraySingle# ::
   forall stages a src dst.
   ( 2 <= stages, stages <= 10
   , 1 <= BitSize a, BitSize a <= 1024
-  , KnownDomain src
-  , KnownDomain dst
   , HasCallStack
   , NFDataX a
   , BitPack a

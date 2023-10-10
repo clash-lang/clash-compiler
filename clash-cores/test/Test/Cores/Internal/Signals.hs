@@ -24,8 +24,7 @@ import           Clash.Prelude
 
 type GenMaster n =
      forall dom
-   . ( KnownDomain dom
-     , KnownNat n )
+   . KnownNat n
   => Clock dom
   -> Reset dom
   -> NonEmpty (BitVector n)
@@ -35,8 +34,7 @@ type GenMaster n =
 
 type GenSlave n =
      forall dom
-   . ( KnownDomain dom
-     , KnownNat n )
+   . KnownNat n
   => Clock dom
   -> Reset dom
   -> NonEmpty (BitVector n)

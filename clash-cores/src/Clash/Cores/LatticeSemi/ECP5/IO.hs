@@ -30,7 +30,6 @@ bidirectionalBuffer
   :: forall ds dom
    . ( HasCallStack
      , HasBiSignalDefault ds
-     , KnownDomain dom
      )
   => Enable dom
   -- ^ output enable
@@ -56,7 +55,6 @@ bbECP5
   :: forall ds dom
    . ( HasCallStack
      , HasBiSignalDefault ds
-     , KnownDomain dom
      )
   => String
   -> BiSignalIn ds dom 1

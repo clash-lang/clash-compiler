@@ -15,6 +15,7 @@ module Clash.Cores.Xilinx.Xpm.Cdc.Gray
 import GHC.Stack (HasCallStack)
 
 import Clash.Explicit.Prelude
+import Clash.Signal.Internal (Clock(Clock))
 
 import Clash.Cores.Xilinx.Xpm.Cdc.Gray.Internal (xpmCdcGray#)
 
@@ -46,15 +47,13 @@ xpmCdcGray ::
   forall n src dst.
   ( 2 <= n, n <= 32
   , KnownNat n
-  , KnownDomain src
-  , KnownDomain dst
   , HasCallStack
   ) =>
   Clock src ->
   Clock dst ->
   Signal src (Unsigned n) ->
   Signal dst (Unsigned n)
-xpmCdcGray = xpmCdcGrayWith XpmCdcGrayConfig{..}
+xpmCdcGray clkSrc@(Clock{}) clkDst@(Clock{}) = xpmCdcGrayWith XpmCdcGrayConfig{..}  clkSrc clkDst
  where
   stages = d4
   initialValues =
@@ -87,8 +86,6 @@ xpmCdcGrayWith ::
   ( 2 <= n, n <= 32
   , 2 <= stages, stages <= 10
   , KnownNat n
-  , KnownDomain src
-  , KnownDomain dst
   , HasCallStack
   ) =>
   XpmCdcGrayConfig stages ->

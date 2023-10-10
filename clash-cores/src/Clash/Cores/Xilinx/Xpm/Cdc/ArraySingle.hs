@@ -12,6 +12,7 @@ module Clash.Cores.Xilinx.Xpm.Cdc.ArraySingle
   ) where
 
 import Clash.Explicit.Prelude
+import Clash.Signal.Internal (Clock(Clock))
 
 import GHC.Stack (HasCallStack)
 
@@ -32,8 +33,6 @@ import Clash.Cores.Xilinx.Xpm.Cdc.ArraySingle.Internal (xpmCdcArraySingle#)
 xpmCdcArraySingle ::
   forall a src dst.
   ( 1 <= BitSize a, BitSize a <= 1024
-  , KnownDomain src
-  , KnownDomain dst
   , HasCallStack
   , NFDataX a
   , BitPack a
@@ -42,7 +41,7 @@ xpmCdcArraySingle ::
   Clock dst ->
   Signal src a ->
   Signal dst a
-xpmCdcArraySingle = xpmCdcArraySingleWith XpmCdcArraySingleConfig{..}
+xpmCdcArraySingle clkSrc@(Clock{}) clkDst@(Clock{}) = xpmCdcArraySingleWith XpmCdcArraySingleConfig{..} clkSrc clkDst
  where
   registerInput = True
   stages = d4
@@ -78,8 +77,6 @@ xpmCdcArraySingleWith ::
   forall stages a src dst.
   ( 2 <= stages, stages <= 10
   , 1 <= BitSize a, BitSize a <= 1024
-  , KnownDomain src
-  , KnownDomain dst
   , HasCallStack
   , NFDataX a
   , BitPack a

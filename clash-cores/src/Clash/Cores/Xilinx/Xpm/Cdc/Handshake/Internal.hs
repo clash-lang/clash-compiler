@@ -25,7 +25,7 @@ import Text.Show.Pretty (ppShow)
 import Clash.Annotations.Primitive (Primitive(..), HDL(..), hasBlackBox)
 import Clash.Backend (Backend)
 import Clash.Explicit.Prelude
-  ( type (<=), type (:::), SNat, Clock, KnownDomain, Signal, BitPack(BitSize)
+  ( type (<=), type (:::), SNat, Clock, Signal, BitPack(BitSize)
   , NFDataX, deepErrorX, unsafeSynchronizer, enableGen, delay, toEnable,
   (.&&.), unpack )
 import Clash.Netlist.Types (TemplateFunction(..), BlackBoxContext)
@@ -49,8 +49,6 @@ xpmCdcHandshakeTF =
     :< _dstStagesLte10
     :< _1LteBitsize
     :< _bitsizeLte1024
-    :< _knownDomainSrc
-    :< _knownDomainDst
     :< _bitpackA
     :< _nfdataxA
     :< _hasCallStack
@@ -69,8 +67,6 @@ xpmCdcHandshakeTF# bbCtx
   | [ _2LteSrcStages, _srcStagesLte10
     , _2LteDstStages, _dstStagesLte10
     , _1LteBitsize, _bitsizeLte1024
-    , _knownDomainSrc
-    , _knownDomainDst
     , _bitpackA
     , _nfdataxA
     , _hasCallStack
@@ -179,8 +175,6 @@ xpmCdcHandshake# ::
   ( 2 <= srcStages, srcStages <= 10
   , 2 <= dstStages, dstStages <= 10
   , 1 <= BitSize a, BitSize a <= 1024
-  , KnownDomain src
-  , KnownDomain dst
   , BitPack a
   , NFDataX a
   , HasCallStack

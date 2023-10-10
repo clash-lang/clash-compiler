@@ -86,7 +86,7 @@ binaryTclTF
 binaryTclTF hasCustom operType =
   TemplateFunction used valid (tclTemplate hasCustom operType)
  where
-  used = [0..4]
+  used = [0,2,4]
   valid = const True
 
 tclTemplate
@@ -96,8 +96,8 @@ tclTemplate
   -> BlackBoxContext
   -> State s Doc
 tclTemplate (HasCustom {..}) operType bbCtx
-  | (Literal _ (NumLit latency), _, _) <- bbInputs bbCtx !! 1
-  , (DataCon _ _ cfgExprs, _, _) <- bbInputs bbCtx !! 3
+  | (Literal _ (NumLit latency), _, _) <- bbInputs bbCtx !! 0
+  , (DataCon _ _ cfgExprs, _, _) <- bbInputs bbCtx !! 2
   , let cfgArchOptExpr = cfgExprs !! 0
   , DataCon _ (DC (Sum _ cfgArchOptConstrs, cfgArchOptTag)) _ <- cfgArchOptExpr
   , let cfgDspUsageExpr = cfgExprs !! 1
@@ -133,7 +133,7 @@ tclTemplate (HasCustom {..}) operType bbCtx
 
   tclClkEn :: String
   tclClkEn =
-    case bbInputs bbCtx !! 5 of
+    case bbInputs bbCtx !! 4 of
       (DataCon _ _ [Literal Nothing (BoolLit True)], _, _) -> "false"
       _                                                    -> "true"
 
@@ -176,7 +176,7 @@ tclTemplate _ _ bbCtx = error ("Xilinx.Floating.tclTemplate, bad bbCtx: " <> sho
 fromUTclTF :: TemplateFunction
 fromUTclTF = TemplateFunction used valid fromUTclTemplate
  where
-  used = [1,4,5]
+  used = [0,3,4]
   valid = const True
 
 fromUTclTemplate
@@ -185,13 +185,13 @@ fromUTclTemplate
   -> State s Doc
 fromUTclTemplate bbCtx
   | [compName] <- bbQsysIncName bbCtx
-  , (Literal _ (NumLit latency), _, _) <- bbInputs bbCtx !! 1
-  , (_, Unsigned inpLen, _) <- bbInputs bbCtx !! 5
+  , (Literal _ (NumLit latency), _, _) <- bbInputs bbCtx !! 0
+  , (_, Unsigned inpLen, _) <- bbInputs bbCtx !! 4
   =
  let
   tclClkEn :: String
   tclClkEn =
-    case bbInputs bbCtx !! 4 of
+    case bbInputs bbCtx !! 3 of
       (DataCon _ _ [Literal Nothing (BoolLit True)], _, _) -> "false"
       _                                                    -> "true"
 
@@ -228,7 +228,7 @@ fromUTclTemplate bbCtx = error ("Xilinx.Floating.fromUTclTemplate, bad bbCtx: " 
 fromSTclTF :: TemplateFunction
 fromSTclTF = TemplateFunction used valid fromSTclTemplate
  where
-  used = [1,4,5]
+  used = [0,3,4]
   valid = const True
 
 fromSTclTemplate
@@ -237,13 +237,13 @@ fromSTclTemplate
   -> State s Doc
 fromSTclTemplate bbCtx
   | [compName] <- bbQsysIncName bbCtx
-  , (Literal _ (NumLit latency), _, _) <- bbInputs bbCtx !! 1
-  , (_, Signed inpLen, _) <- bbInputs bbCtx !! 5
+  , (Literal _ (NumLit latency), _, _) <- bbInputs bbCtx !! 0
+  , (_, Signed inpLen, _) <- bbInputs bbCtx !! 4
   =
  let
   tclClkEn :: String
   tclClkEn =
-    case bbInputs bbCtx !! 4 of
+    case bbInputs bbCtx !! 3 of
       (DataCon _ _ [Literal Nothing (BoolLit True)], _, _) -> "false"
       _                                                    -> "true"
 
@@ -280,7 +280,7 @@ fromSTclTemplate bbCtx = error ("Xilinx.Floating.fromSTclTemplate, bad bbCtx: " 
 compareTclTF :: TemplateFunction
 compareTclTF = TemplateFunction used valid compareTclTemplate
  where
-  used = [1,3,4,5,6]
+  used = [0,2,3,4,5]
   valid = const True
 
 compareTclTemplate
@@ -289,12 +289,12 @@ compareTclTemplate
   -> State s Doc
 compareTclTemplate bbCtx
   | [compName] <- bbQsysIncName bbCtx
-  , (Literal _ (NumLit latency), _, _) <- bbInputs bbCtx !! 1
+  , (Literal _ (NumLit latency), _, _) <- bbInputs bbCtx !! 0
   =
  let
   tclClkEn :: String
   tclClkEn =
-    case bbInputs bbCtx !! 4 of
+    case bbInputs bbCtx !! 3 of
       (DataCon _ _ [Literal Nothing (BoolLit True)], _, _) -> "false"
       _                                                    -> "true"
 

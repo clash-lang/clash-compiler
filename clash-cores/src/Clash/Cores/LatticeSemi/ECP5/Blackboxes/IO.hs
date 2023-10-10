@@ -29,7 +29,7 @@ import           Prelude
 bbTF :: TemplateFunction
 bbTF = TemplateFunction used valid bbTemplate
  where
-  used = [3..6]
+  used = [2..5]
   valid = const True
 
 bbTemplate
@@ -39,7 +39,6 @@ bbTemplate
 bbTemplate bbCtx
   | [  _HasCallStack
     , _HasBiSignalDefault
-    , _KnownDomain
     , (intrinsicName, String, _)
     , (packagePin, packagePinTy, _)
     , (dOut, Bit, _)

@@ -91,6 +91,7 @@ module Clash.Primitives.DSL
   , litTExpr
   , toIdentifier
   , tySize
+  , liftToBlockState
   ) where
 
 import           Control.Lens                    hiding (Indexed, assign)
