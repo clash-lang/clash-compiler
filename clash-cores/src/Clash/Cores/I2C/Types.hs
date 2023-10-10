@@ -2,11 +2,18 @@ module Clash.Cores.I2C.Types where
 
 import Clash.Prelude
 
+-- | I2C commands: start, stop, read, write, and no-op.
 data I2CCommand = I2Cstart | I2Cstop | I2Cwrite | I2Cread | I2Cnop
   deriving (Eq, Ord, Generic, NFDataX)
 
-type BitCtrlSig = (I2CCommand,Bit)
-type BitRespSig = (Bool,Bool,Bit)
+-- | Bit-level I2C control signals (Command, Bit).
+type BitCtrlSig = (I2CCommand, Bit)
 
-type I2CIn      = (Bit,Bit)
-type I2COut     = (Bit,Bool,Bit,Bool)
+-- | Bit-level I2C response signals (Ack, Busy, Bit).
+type BitRespSig = (Bool, Bool, Bit)
+
+-- | I2C input signals (SCL, SDA).
+type I2CIn = (Bit, Bit)
+
+-- | I2C output signals (SCL, SCL enable, SDA, SDA enable).
+type I2COut = (Bit, Bool, Bit, Bool)

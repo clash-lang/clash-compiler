@@ -21,35 +21,67 @@ import Clash.Cores.I2C.ByteMaster
                    , PortName "write"
                    , PortName "ackIn"
                    , PortName "din"
-                   , PortName "i2cI"]
+                     , PortProduct "i2c"
+                        [ PortName "sda"
+                        , PortName "sdaEn"]
+                        ]
     , t_output   = PortProduct ""
                      [ PortName "dout"
                      , PortName "hostAck"
                      , PortName "busy"
                      , PortName "al"
                      , PortName "ackOut"
-                     , PortProduct "" [PortName "i2cO_clk"]
-                     ]
+                     , PortProduct "i2cO"
+                        [ PortName "scl"
+                        , PortName "sclOEn"
+                        , PortName "sda"
+                        , PortName "sdaOEn"
+                     ]]
     }) #-}
+-- | Core for I2C communication
 i2c ::
-  Clock System ->
-  Reset System ->
-  Signal System Bool ->
-  Signal System Bool ->
-  Signal System (Unsigned 16) ->
-  Signal System Bool ->
-  Signal System Bool ->
-  Signal System Bool ->
-  Signal System Bool ->
-  Signal System Bool ->
-  Signal System (BitVector 8) ->
-  Signal System (Bit, Bit) ->
-  ( Signal System (BitVector 8)
-  , Signal System Bool
-  , Signal System Bool
-  , Signal System Bool
-  , Signal System Bool
-  , Signal System (Bit, Bool, Bit, Bool))
+  -- | Input Clock
+  "clk" ::: Clock System ->
+  -- | Low level reset
+  "arst" ::: Reset System ->
+  -- | Statemachine reset
+  "rst" ::: Signal System Bool ->
+  -- | BitMaster enable
+  "ena" ::: Signal System Bool ->
+  -- | Clock divider
+  "clkCnt" ::: Signal System (Unsigned 16) ->
+  -- | Start signal
+  "start" ::: Signal System Bool ->
+  -- | Stop signal
+  "stop" ::: Signal System Bool ->
+  -- | Read signal
+  "read" ::: Signal System Bool ->
+  -- | Write signal
+  "write" ::: Signal System Bool ->
+  -- | Ack signal
+  "ackIn" ::: Signal System Bool ->
+  -- | Input data
+  "din" ::: Signal System (BitVector 8) ->
+  -- | I2C input signals (SCL, SDA)
+  "i2c" ::: Signal System ("scl" ::: Bit, "sda" ::: Bit) ->
+  -- |
+  -- 1. Received data
+  -- 2. Command acknowledgement
+  -- 3. I2C bus busy
+  -- 4. Arbitration lost
+  -- 5. I2C slave acknowledgement
+  -- 6. Outgoing I2C signals
+  --    6.1 SCL
+  --    6.2 SCL Output enable`
+  --    6.3 SDA
+  --    6.4 SDA Output enable
+  "" :::
+    ( "i2cO" ::: Signal System (BitVector 8)
+    , "scl" ::: Signal System Bool
+    , "sclOEn" ::: Signal System Bool
+    , "sda" ::: Signal System Bool
+    , "sdaOEn" ::: Signal System Bool
+    , "i2cO" ::: Signal System ("scl" ::: Bit, "sclOEn" ::: Bool, "sda" ::: Bit, "sdaOEn" ::: Bool))
 i2c clk arst rst ena clkCnt start stop read write ackIn din i2cI = (dout,hostAck,busy,al,ackOut,i2cO)
   where
     (hostAck,ackOut,dout,bitCtrl) = byteMaster clk arst enableGen (rst,start,stop,read,write,ackIn,din,bitResp)

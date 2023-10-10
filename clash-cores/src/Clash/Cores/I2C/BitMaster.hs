@@ -13,6 +13,16 @@ import Clash.Cores.I2C.BitMaster.BusCtrl
 import Clash.Cores.I2C.BitMaster.StateMachine
 import Clash.Cores.I2C.Types
 
+-- | Internal state of the I2C BitMaster.
+--
+-- It includes the bus status controller, bit-level state machine, and various control signals and counters.
+-- The '_busState' manages the overall status of the I2C bus.
+-- The '_stateMachine' handles the bit-level I2C operations.
+-- The '_dout' holds the data to be sent out on the I2C bus.
+-- The '_dsclOen' is a delayed version of the SCL output enable signal.
+-- The '_clkEn' enables the clock for the state machine.
+-- The '_slaveWait' indicates if the slave is pulling the SCL line low, causing the master to wait.
+-- The '_cnt' is a counter used for clock division.
 data BitMasterS
   = BitS
   { _busState       :: BusStatusCtrl
@@ -27,7 +37,19 @@ data BitMasterS
 
 makeLenses ''BitMasterS
 
+
+-- | 5-tuple containing the input interface for the BitMaster.
+--  1. Resets the internal state when asserted
+--  2. Enables or disables the BitMaster
+--  3. Used for clock division
+--  4. Carries command and data in signals
+--  5. Contains the SCL and SDA input signals
 type BitMasterI = (Bool,Bool,Unsigned 16,BitCtrlSig,I2CIn)
+
+-- | 3-tuple containing the output interface for the BitMaster.
+-- 1. Carries command acknowledgment and other flags
+-- 2. Indicates if the BitMaster is currently busy
+-- 3. Contains the SCL and SDA output signals
 type BitMasterO = (BitRespSig,Bool,I2COut)
 
 {-# ANN bitMaster
@@ -51,7 +73,11 @@ type BitMasterO = (BitRespSig,Bool,I2COut)
                         , PortName "al"
                         , PortName "dout" ]
                      , PortName "busy"
-                     , PortName "i2cO"
+                     , PortProduct "i2c"
+                        [ PortName "sda"
+                        , PortName "sdaEn"
+                        , PortName "scl"
+                        , PortName "sclEn" ]
                      ]
     }) #-}
 bitMaster
