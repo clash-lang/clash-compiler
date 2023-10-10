@@ -10,6 +10,7 @@ import Control.Monad.State
 import Clash.Cores.I2C.BitMaster.StateMachine
 import Clash.Cores.I2C.Types
 
+-- | Bus status control state.
 data BusStatusCtrl
   = BusStatusCtrl
   { _sI2C           :: I2CIn       -- synchronized SCL and SDA
@@ -44,6 +45,8 @@ busStartState
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE busStatusCtrl #-}
+-- | Low level bus status controller that monitors the state of the bus and performs
+-- glitch filtering. It detects start conditions, stop conditions and arbitration loss.
 busStatusCtrl :: Bool
               -> Bool
               -> Unsigned 16

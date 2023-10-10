@@ -30,7 +30,22 @@ data ByteMasterS
 
 makeLenses ''ByteMasterS
 
+-- |
+-- 1. Statemachine reset
+-- 2. Start
+-- 3. Stop
+-- 4. Read
+-- 5. Write
+-- 6. Acknowledge
+-- 7. Data in
+-- 8. Bitmaster response
 type ByteMasterI = (Bool,Bool,Bool,Bool,Bool,Bool,BitVector 8,BitRespSig)
+
+-- |
+-- 1. Acknowledge for I2C controller
+-- 2. I2C acknowledgement
+-- 3. Data output
+-- 4  Bitmaster control signals
 type ByteMasterO = (Bool,Bool,BitVector 8,BitCtrlSig)
 
 {-# ANN byteMaster
@@ -56,6 +71,10 @@ type ByteMasterO = (Bool,Bool,BitVector 8,BitCtrlSig)
                      , PortName "bitCtrl"
                      ]
     }) #-}
+-- | Byte level controller, takes care of correctly executing i2c communication
+-- based on the supplied control signals. It should be instantiated alongside 'bitMaster'.
+-- The outgoing bitCtrl' controls the 'bitMaster' whose 'bitResp' should be supplied
+-- as last input.
 byteMaster
   :: Clock System
   -> Reset System
