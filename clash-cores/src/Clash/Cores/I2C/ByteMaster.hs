@@ -76,11 +76,12 @@ type ByteMasterO = (Bool,Bool,BitVector 8,BitCtrlSig)
 -- The outgoing bitCtrl' controls the 'bitMaster' whose 'bitResp' should be supplied
 -- as last input.
 byteMaster
-  :: Clock System
-  -> Reset System
-  -> Enable System
-  -> Unbundled System ByteMasterI
-  -> Unbundled System ByteMasterO
+  :: KnownDomain dom
+  => Clock dom
+  -> Reset dom
+  -> Enable dom
+  -> Unbundled dom ByteMasterI
+  -> Unbundled dom ByteMasterO
 byteMaster = exposeClockResetEnable (mealyB byteMasterT byteMasterInit)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE byteMaster #-}
