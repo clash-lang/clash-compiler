@@ -412,6 +412,9 @@ sbyTests opts@TestOptions {..} parentTmp =
     singleTest t (SbyVerificationTest expectVerificationFail parentTmp (dir t) t)
   dir = targetTempPath parentTmp "symbiyosys"
 
+rmTmpDir :: FilePath -> IO ()
+rmTmpDir = Directory.removeDirectoryRecursive
+
 runTest1
   :: String
   -> TestOptions
@@ -419,13 +422,13 @@ runTest1
   -> HDL
   -> TestTree
 runTest1 modName opts@TestOptions{..} path target =
-  withResource mkTmpDir Directory.removeDirectoryRecursive $ \tmpDir ->
+  withResource mkTmpDir rmTmpDir $ \tmpDir ->
     sequentialTestGroup (show target) AllSucceed
       [ clashTest tmpDir
       , testGroup "tools" (verifTests tmpDir : hdlTests tmpDir)
       ]
  where
-  mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
+  mkTmpDir = flip createTempDirectory ("clash-test_" <> modName) =<< getCanonicalTemporaryDirectory
   sourceDir = List.foldl' (</>) sourceDirectory (reverse (drop 1 path))
 
   clashTest tmpDir =
@@ -499,13 +502,13 @@ outputTest'
   -- one closest to the test.
   -> TestTree
 outputTest' modName target extraClashArgs extraGhcArgs path =
-  withResource mkTmpDir Directory.removeDirectoryRecursive $ \tmpDir ->
+  withResource mkTmpDir rmTmpDir $ \tmpDir ->
     sequentialTestGroup (show target) AllSucceed
       [ clashGenHdl tmpDir
       , clashBuild tmpDir
       ]
  where
-  mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
+  mkTmpDir = flip createTempDirectory ("clash-test_" <> modName) =<< getCanonicalTemporaryDirectory
   sourceDir = List.foldl' (</>) sourceDirectory (reverse (drop 1 path))
 
   clashGenHdl workDir = singleTest "clash (gen)" (ClashGenTest {
@@ -556,12 +559,12 @@ clashLibTest'
   -- one closest to the test.
   -> TestTree
 clashLibTest' modName target extraGhcArgs path =
-  withResource mkTmpDir Directory.removeDirectoryRecursive $ \tmpDir ->
+  withResource mkTmpDir rmTmpDir $ \tmpDir ->
     sequentialTestGroup (show target) AllSucceed
       [ clashBuild tmpDir
       ]
  where
-  mkTmpDir = flip createTempDirectory "clash-test" =<< getCanonicalTemporaryDirectory
+  mkTmpDir = flip createTempDirectory ("clash-test_" <> modName) =<< getCanonicalTemporaryDirectory
   sourceDir = List.foldl' (</>) sourceDirectory (reverse (drop 1 path))
 
   clashBuild workDir = singleTest "clash (exec)" (ClashBinaryTest {
