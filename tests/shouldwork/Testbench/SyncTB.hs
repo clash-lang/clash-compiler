@@ -14,7 +14,7 @@ createDomain vSystem{vName="Dom9", vPeriod=9}
 
 zeroAt0
   :: forall dom a
-   . (KnownDomain dom, Num a)
+   . Num a
   => Clock dom
   -> Reset dom
   -> Signal dom a

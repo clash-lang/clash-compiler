@@ -11,8 +11,7 @@ testInput :: Vec 7 (Signed 8)
 testInput = 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> Nil
 
 resetInput
-  :: KnownDomain dom
-  => Clock dom
+  :: Clock dom
   -> Reset dom
   -> Enable dom
   -> Signal dom Bool

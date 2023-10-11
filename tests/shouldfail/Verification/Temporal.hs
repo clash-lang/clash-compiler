@@ -17,7 +17,7 @@ import           Clash.XException                (hwSeqX)
 
 assertCvResult
   :: forall n dom
-   . (Bounded n, Enum n, Eq n, NFDataX n, KnownDomain dom)
+   . (Bounded n, Enum n, Eq n, NFDataX n)
   => Clock dom -> Reset dom -> Enable dom
   -> n
   -> Signal dom AssertionResult

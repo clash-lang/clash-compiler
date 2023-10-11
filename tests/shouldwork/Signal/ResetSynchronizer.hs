@@ -14,14 +14,13 @@ succResetCount RRRRRRR = Count 0
 succResetCount (Count n) = Count (succ n)
 
 testReset ::
-  ( KnownDomain circuitDom
-  , KnownDomain testDom ) =>
   Clock testDom ->
   Reset testDom ->
   Clock circuitDom ->
   Reset circuitDom
 testReset tbClk tbRst cClk =
-    unsafeFromActiveHigh
+    provideKnownDomainFrom cClk
+  $ unsafeFromActiveHigh
   $ unsafeSynchronizer tbClk cClk
   $ stimuliGenerator tbClk tbRst
     ( True
@@ -48,8 +47,7 @@ testReset tbClk tbRst cClk =
    :> replicate d20 False )
 
 polyTopEntity
-  :: KnownDomain dom
-  => Clock dom
+  :: Clock dom
   -> Reset dom
   -> Signal dom ResetCount
 polyTopEntity clk asyncRst = counter
