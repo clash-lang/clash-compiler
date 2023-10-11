@@ -16,6 +16,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -84,6 +85,7 @@ module Clash.Signal.Internal
   , VDomainConfiguration(..)
   , vDomain
   , createDomain
+  , HasKnownDomain(..)
     -- * Clocks
   , Clock (..)
   , ClockN (..)
@@ -1284,6 +1286,19 @@ unsafeToReset r = Reset r
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE unsafeToReset #-}
 {-# ANN unsafeToReset hasBlackBox #-}
+
+class HasKnownDomain a where
+  provideKnownDomainFrom :: a dom -> (KnownDomain dom => r) -> r
+
+instance HasKnownDomain Clock where
+  provideKnownDomainFrom (Clock{}) f = f
+
+instance HasKnownDomain DiffClock where
+  provideKnownDomainFrom (DiffClock clkP _) = provideKnownDomainFrom clkP
+
+instance HasKnownDomain Reset where
+  provideKnownDomainFrom (Reset{}) f = f
+
 
 -- | Interpret a signal of bools as an active high reset and convert it to
 -- a reset signal corresponding to the domain's setting.

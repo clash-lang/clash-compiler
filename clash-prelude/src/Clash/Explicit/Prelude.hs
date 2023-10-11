@@ -78,6 +78,7 @@ module Clash.Explicit.Prelude
   , isFalling
   , riseEvery
   , oscillate
+  , HasKnownDomain(..)
     -- * Testbench functions
   , assert
   , stimuliGenerator
@@ -185,6 +186,7 @@ import Clash.Promoted.Nat
 import Clash.Promoted.Nat.TH
 import Clash.Promoted.Nat.Literals
 import Clash.Promoted.Symbol
+import Clash.Signal.Internal (HasKnownDomain(..))
 import Clash.Signal.Trace
 import Clash.Sized.BitVector
 import Clash.Sized.Fixed
