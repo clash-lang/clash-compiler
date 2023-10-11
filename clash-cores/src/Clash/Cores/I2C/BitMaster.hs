@@ -81,11 +81,12 @@ type BitMasterO = (BitRespSig,Bool,I2COut)
                      ]
     }) #-}
 bitMaster
-  :: Clock System
-  -> Reset System
-  -> Enable System
-  -> Unbundled System BitMasterI
-  -> Unbundled System BitMasterO
+  :: KnownDomain dom
+  => Clock dom
+  -> Reset dom
+  -> Enable dom
+  -> Unbundled dom BitMasterI
+  -> Unbundled dom BitMasterO
 bitMaster = exposeClockResetEnable (mealyB bitMasterT bitMasterInit)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE bitMaster #-}

@@ -40,30 +40,32 @@ import Clash.Cores.I2C.ByteMaster
     }) #-}
 -- | Core for I2C communication
 i2c ::
+  forall dom .
+  KnownDomain dom =>
   -- | Input Clock
-  "clk" ::: Clock System ->
+  "clk" ::: Clock dom ->
   -- | Low level reset
-  "arst" ::: Reset System ->
+  "arst" ::: Reset dom ->
   -- | Statemachine reset
-  "rst" ::: Signal System Bool ->
+  "rst" ::: Signal dom Bool ->
   -- | BitMaster enable
-  "ena" ::: Signal System Bool ->
+  "ena" ::: Signal dom Bool ->
   -- | Clock divider
-  "clkCnt" ::: Signal System (Unsigned 16) ->
+  "clkCnt" ::: Signal dom (Unsigned 16) ->
   -- | Start signal
-  "start" ::: Signal System Bool ->
+  "start" ::: Signal dom Bool ->
   -- | Stop signal
-  "stop" ::: Signal System Bool ->
+  "stop" ::: Signal dom Bool ->
   -- | Read signal
-  "read" ::: Signal System Bool ->
+  "read" ::: Signal dom Bool ->
   -- | Write signal
-  "write" ::: Signal System Bool ->
+  "write" ::: Signal dom Bool ->
   -- | Ack signal
-  "ackIn" ::: Signal System Bool ->
+  "ackIn" ::: Signal dom Bool ->
   -- | Input data
-  "din" ::: Signal System (BitVector 8) ->
+  "din" ::: Signal dom (BitVector 8) ->
   -- | I2C input signals (SCL, SDA)
-  "i2c" ::: Signal System ("scl" ::: Bit, "sda" ::: Bit) ->
+  "i2c" ::: Signal dom ("scl" ::: Bit, "sda" ::: Bit) ->
   -- |
   -- 1. Received data
   -- 2. Command acknowledgement
@@ -76,12 +78,12 @@ i2c ::
   --    6.3 SDA
   --    6.4 SDA Output enable
   "" :::
-    ( "i2cO" ::: Signal System (BitVector 8)
-    , "scl" ::: Signal System Bool
-    , "sclOEn" ::: Signal System Bool
-    , "sda" ::: Signal System Bool
-    , "sdaOEn" ::: Signal System Bool
-    , "i2cO" ::: Signal System ("scl" ::: Bit, "sclOEn" ::: Bool, "sda" ::: Bit, "sdaOEn" ::: Bool))
+    ( "i2cO" ::: Signal dom (BitVector 8)
+    , "scl" ::: Signal dom Bool
+    , "sclOEn" ::: Signal dom Bool
+    , "sda" ::: Signal dom Bool
+    , "sdaOEn" ::: Signal dom Bool
+    , "i2cO" ::: Signal dom ("scl" ::: Bit, "sclOEn" ::: Bool, "sda" ::: Bit, "sdaOEn" ::: Bool))
 i2c clk arst rst ena clkCnt start stop read write ackIn din i2cI = (dout,hostAck,busy,al,ackOut,i2cO)
   where
     (hostAck,ackOut,dout,bitCtrl) = byteMaster clk arst enableGen (rst,start,stop,read,write,ackIn,din,bitResp)
