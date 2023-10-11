@@ -73,7 +73,7 @@ import Clash.Annotations.SynthesisAttributes(Attr)
 import Clash.Annotations.BitRepresentation  (FieldAnn)
 import Clash.Annotations.Primitive          (HDL(..))
 import Clash.Annotations.TopEntity          (TopEntity)
-import Clash.Backend                        (Backend, HasUsageMap (..))
+import Clash.Backend                        (Backend, DomainMap, HasUsageMap (..))
 import Clash.Core.HasType
 import Clash.Core.Type                      (Type)
 import Clash.Core.Var                       (Id)
@@ -986,6 +986,10 @@ primitives = clashEnv . Lens.to envPrimitives
 
 clashOpts :: Lens.Getter NetlistEnv ClashOpts
 clashOpts = clashEnv . Lens.to envOpts
+
+domainMap :: Lens.Getter NetlistEnv DomainMap
+domainMap = clashEnv . Lens.to envDomains
+
 
 -- | Structures that hold an 'IdentifierSet'
 class HasIdentifierSet s where

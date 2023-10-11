@@ -384,8 +384,7 @@ flush (File fp) = SimIO (IO.hFlush fp)
 --     regIn  = 'mealyIO' clk tbMachine tbInit regOut
 -- @
 mealyIO
-  :: KnownDomain dom
-  => Clock dom
+  :: Clock dom
   -- ^ Clock at which rate the I\/O environment progresses
   -> (s -> i -> SimIO o)
   -- ^ Transition function inside an I\/O environment

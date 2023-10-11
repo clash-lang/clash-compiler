@@ -102,7 +102,7 @@ import           Clash.Netlist.Util            as N
 import           Clash.Normalize.Primitives    (removedArg)
 import           Clash.Primitives.Types        as P
 import qualified Clash.Primitives.Util         as P
-import           Clash.Signal.Internal         (ActiveEdge (..))
+import           Clash.Signal.Internal         (ActiveEdge (..), VDomainConfiguration(..))
 import           Clash.Util
 import qualified Clash.Util.Interpolate        as I
 
@@ -804,7 +804,7 @@ collectMealy
   -> [Term]
   -- ^ The arguments to 'mealyIO'
   -> NetlistMonad [Declaration]
-collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
+collectMealy dstNm dst tcm (clk:mealyFun:mealyInit:mealyIn:_) = do
   let (lefts -> args0,res0) = collectBndrs mealyFun
       is0 = mkInScopeSet (Lens.foldMapOf freeIds unitVarSet res0 <>
                           Lens.foldMapOf freeIds unitVarSet mealyInit <>
@@ -929,15 +929,14 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
       -- be of type 'reg' in Verilog nomenclature
       let netDeclsSeq1 = netDeclsSeq ++ netDeclsSeqMisc ++ netDeclsInit
 
+
+      clkTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (inferCoreTypeOf tcm clk)
+      domConf <- getDomainConfNetlistM clkTy
       -- We run mealy block in the opposite clock edge of the the ambient system
       -- because we're basically clocked logic; so we need to have our outputs
       -- ready before the ambient system starts sampling them. The clockGen code
       -- ensures that the "opposite" edge always comes first.
-      kdTy <- unsafeCoreTypeToHWTypeM $(curLoc) (inferCoreTypeOf tcm kd)
-      let edge = case stripVoid (stripFiltered kdTy) of
-                   KnownDomain _ _ Rising _ _ _  -> Falling
-                   KnownDomain _ _ Falling _ _ _ -> Rising
-                   _ -> error "internal error"
+      let edge = invertEdge $ vActiveEdge domConf
       (clkExpr,clkDecls) <-
         mkExpr False Concurrent (NetlistId (Id.unsafeMake "__MEALY_CLK__") (inferCoreTypeOf tcm clk)) clk
 
@@ -953,8 +952,13 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
  where
   isNet NetDecl' {} = True
   isNet _ = False
+  invertEdge Rising = Falling
+  invertEdge Falling = Rising
 
 collectMealy _ _ _ _ = error "internal error"
+
+getDomainConfNetlistM :: HasCallStack => HWType -> NetlistMonad VDomainConfiguration
+getDomainConfNetlistM = generalGetDomainConf (Lens.view domainMap)
 
 -- | Collect the sequential declarations for 'bindIO'
 collectBindIO :: NetlistId -> [Term] -> NetlistMonad (Expr,[Declaration])
