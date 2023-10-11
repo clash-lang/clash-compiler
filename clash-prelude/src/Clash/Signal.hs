@@ -617,7 +617,7 @@ type HiddenReset dom =
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 type HiddenEnable dom =
   ( Hidden (HiddenEnableName dom) (Enable dom)
-  , KnownDomain dom )
+  )
 
 -- | A /constraint/ that indicates the component needs a 'Clock', a 'Reset',
 -- and an 'Enable' belonging to the same @dom@.
@@ -687,7 +687,7 @@ exposeClock
 #endif
      (HiddenClock dom => r)
   -- ^ The component with a hidden clock
-  -> (KnownDomain dom => Clock dom -> r)
+  -> (Clock dom -> r)
   -- ^ The component with its clock argument exposed
 exposeClock = \f clk -> exposeSpecificClock (const f) clk (Proxy @dom)
 -- See Note [Going from WithSingleDomain to WithSpecificDomain]
@@ -713,7 +713,7 @@ exposeClock = \f clk -> exposeSpecificClock (const f) clk (Proxy @dom)
 --       :: forall dom r
 --        . WithSingleDomain dom r
 --       => (HiddenClock dom => r)
---       -> (KnownDomain dom => Clock dom -> r)
+--       -> (Clock dom -> r)
 --     exposeClock = \f clk -> exposeSpecificClock (const f) clk (Proxy @dom)
 --
 -- The type of 'exposeSpecificClock' as called from 'exposeClock' could be
@@ -724,7 +724,7 @@ exposeClock = \f clk -> exposeSpecificClock (const f) clk (Proxy @dom)
 --          , s ~ (Proxy dom -> r)
 --          )
 --       => (HiddenClock dom => Proxy dom -> r)
---       -> (KnownDomain dom => Clock dom -> Proxy dom -> r)
+--       -> (Clock dom -> Proxy dom -> r)
 --
 -- The type-checker can now find 'dom' in the 'Proxy', so it type-checks.
 --
@@ -736,7 +736,7 @@ exposeClock = \f clk -> exposeSpecificClock (const f) clk (Proxy @dom)
 --
 -- In the resulting
 --
---     (KnownDomain dom => Clock dom -> Proxy dom -> r)
+--     (Clock dom -> Proxy dom -> r)
 --
 -- the filled in values are 'clk' and 'Proxy @dom', leaving 'r'.
 
@@ -770,9 +770,9 @@ exposeSpecificClock
    . WithSpecificDomain dom r
   => (HiddenClock dom => r)
   -- ^ The component with a hidden clock
-  -> (KnownDomain dom => Clock dom -> r)
+  -> (Clock dom -> r)
   -- ^ The component with its clock argument exposed
-exposeSpecificClock = \f clk -> expose @(HiddenClockName dom) f clk
+exposeSpecificClock = \f clk@(Clock{}) -> expose @(HiddenClockName dom) f clk
 {-# INLINE exposeSpecificClock #-}
 
 -- | Hide the 'Clock' argument of a component, so it can be routed implicitly.
@@ -831,8 +831,7 @@ withClock
 #ifdef CLASH_MULTIPLE_HIDDEN
      WithSingleDomain dom r =>
 #endif
-     KnownDomain dom
-  => Clock dom
+     Clock dom
   -- ^ The 'Clock' we want to connect
   -> (HiddenClock dom => r)
   -- ^ The function with a hidden 'Clock' argument
@@ -868,13 +867,13 @@ sig = 'withSpecificClock' @@dom 'clockGen' reg
 -}
 withSpecificClock
   :: forall dom r
-   . (KnownDomain dom, WithSpecificDomain dom r)
+   . WithSpecificDomain dom r
   => Clock dom
   -- ^ The 'Clock' we want to connect
   -> (HiddenClock dom => r)
   -- ^ The function with a hidden 'Clock' argument
   -> r
-withSpecificClock = \clk f -> expose @(HiddenClockName dom) f clk
+withSpecificClock = \clk@(Clock{}) f -> expose @(HiddenClockName dom) f clk
 {-# INLINE withSpecificClock #-}
 
 -- | Connect a hidden 'Clock' to an argument where a normal 'Clock' argument
@@ -935,7 +934,7 @@ exposeReset
 #endif
      (HiddenReset dom => r)
   -- ^ The component with a hidden reset
-  -> (KnownDomain dom => Reset dom -> r)
+  -> (Reset dom -> r)
   -- ^ The component with its reset argument exposed
 exposeReset = \f rst -> exposeSpecificReset (const f) rst (Proxy @dom)
 -- See Note [Going from WithSingleDomain to WithSpecificDomain]
@@ -971,9 +970,9 @@ exposeSpecificReset
    . WithSpecificDomain dom r
   => (HiddenReset dom => r)
   -- ^ The component with a hidden reset
-  -> (KnownDomain dom => Reset dom -> r)
+  -> (Reset dom -> r)
   -- ^ The component with its reset argument exposed
-exposeSpecificReset = \f rst -> expose @(HiddenResetName dom) f rst
+exposeSpecificReset = \f rst@(Reset{}) -> expose @(HiddenResetName dom) f rst
 {-# INLINE exposeSpecificReset #-}
 
 -- | Hide the 'Reset' argument of a component, so it can be routed implicitly.
@@ -1032,13 +1031,12 @@ withReset
 #ifdef CLASH_MULTIPLE_HIDDEN
      WithSingleDomain dom r =>
 #endif
-     KnownDomain dom
-  => Reset dom
+     Reset dom
   -- ^ The 'Reset' we want to connect
   -> (HiddenReset dom => r)
   -- ^ The function with a hidden 'Reset' argument
   -> r
-withReset = \rst f -> expose @(HiddenResetName dom) f rst
+withReset = \rst@(Reset{}) f -> expose @(HiddenResetName dom) f rst
 {-# INLINE withReset #-}
 
 {- | Connect an explicit 'Reset' to a function with a hidden 'Reset'. This
@@ -1068,13 +1066,13 @@ sig = 'withSpecificReset' @@dom 'resetGen' reg
 -}
 withSpecificReset
   :: forall dom r
-   . (KnownDomain dom, WithSpecificDomain dom r)
+   . WithSpecificDomain dom r
   => Reset dom
   -- ^ The 'Reset' we want to connect
   -> (HiddenReset dom => r)
   -- ^ The function with a hidden 'Reset' argument
   -> r
-withSpecificReset = \rst f -> expose @(HiddenResetName dom) f rst
+withSpecificReset = \rst@(Reset{}) f -> expose @(HiddenResetName dom) f rst
 {-# INLINE withSpecificReset #-}
 
 -- | Connect a hidden 'Reset' to an argument where a normal 'Reset' argument
@@ -1134,7 +1132,7 @@ exposeEnable
 #endif
      (HiddenEnable dom => r)
   -- ^ The component with a hidden enable
-  -> (KnownDomain dom => Enable dom -> r)
+  -> (Enable dom -> r)
   -- ^ The component with its enable argument exposed
 exposeEnable = \f gen -> exposeSpecificEnable (const f) gen (Proxy @dom)
 -- See Note [Going from WithSingleDomain to WithSpecificDomain]
@@ -1170,7 +1168,7 @@ exposeSpecificEnable
    . WithSpecificDomain dom r
   => (HiddenEnable dom => r)
   -- ^ The component with a hidden enable
-  -> (KnownDomain dom => Enable dom -> r)
+  -> (Enable dom -> r)
   -- ^ The component with its enable argument exposed
 exposeSpecificEnable = \f gen -> expose @(HiddenEnableName dom) f gen
 {-# INLINE exposeSpecificEnable #-}
@@ -1227,11 +1225,11 @@ domain later):
 -}
 withEnable
   :: forall dom r
-   . KnownDomain dom
+   .
 #ifdef CLASH_MULTIPLE_HIDDEN
-  => WithSingleDomain dom r
+     WithSingleDomain dom r =>
 #endif
-  => Enable dom
+     Enable dom
   -- ^ The 'Enable' we want to connect
   -> (HiddenEnable dom => r)
   -- ^ The function with a hidden 'Enable' argument
@@ -1266,7 +1264,7 @@ sig = 'withSpecificEnable' @@dom 'enableGen' reg
 -}
 withSpecificEnable
   :: forall dom r
-   . (KnownDomain dom, WithSpecificDomain dom r)
+   . WithSpecificDomain dom r
   => Enable dom
   -- ^ The 'Enable' we want to connect
   -> (HiddenEnable dom => r)
@@ -1465,7 +1463,7 @@ exposeClockResetEnable
 #endif
      (HiddenClockResetEnable dom => r)
   -- ^ The component with hidden clock, reset, and enable arguments
-  -> (KnownDomain dom => Clock dom -> Reset dom -> Enable dom -> r)
+  -> (Clock dom -> Reset dom -> Enable dom -> r)
   -- ^ The component with its clock, reset, and enable arguments exposed
 exposeClockResetEnable =
   \f clk rst en ->
@@ -1501,7 +1499,7 @@ exposeSpecificClockResetEnable
    . WithSpecificDomain dom r
   => (HiddenClockResetEnable dom => r)
   -- ^ The function with hidden 'Clock', 'Reset', and 'Enable' arguments
-  -> (KnownDomain dom => Clock dom -> Reset dom -> Enable dom -> r)
+  -> (Clock dom -> Reset dom -> Enable dom -> r)
   -- ^ The component with its 'Clock', 'Reset', and 'Enable' arguments exposed
 exposeSpecificClockResetEnable =
   \f clk rst en ->
@@ -1516,7 +1514,7 @@ exposeSpecificClockResetEnable =
 hideClockResetEnable
   :: forall dom r
    . HiddenClockResetEnable dom
-  => (KnownDomain dom => Clock dom -> Reset dom -> Enable dom -> r)
+  => (Clock dom -> Reset dom -> Enable dom -> r)
   -- ^ Component whose clock, reset, and enable argument you want to hide
   -> r
 hideClockResetEnable =
@@ -1569,11 +1567,11 @@ an explicit domain later):
 -}
 withClockResetEnable
   :: forall dom r
-   . KnownDomain dom
+   .
 #ifdef CLASH_MULTIPLE_HIDDEN
-  => WithSingleDomain dom r
+     WithSingleDomain dom r =>
 #endif
-  => Clock dom
+     Clock dom
   -- ^ The 'Clock' we want to connect
   -> Reset dom
   -- ^ The 'Reset' we want to connect
@@ -1616,7 +1614,7 @@ sig = 'withSpecificClockResetEnable' @@dom 'clockGen' 'resetGen' 'enableGen' reg
 -}
 withSpecificClockResetEnable
   :: forall dom r
-   . (KnownDomain dom, WithSpecificDomain dom r)
+   . WithSpecificDomain dom r
   => Clock dom
   -- ^ The 'Clock' we want to connect
   -> Reset dom

@@ -360,7 +360,7 @@ type family DomainConfigurationResetPolarity (config :: DomainConfiguration) :: 
 -- | Convenience type to help to extract a period from a domain. Example usage:
 --
 -- @
--- myFunc :: (KnownDomain dom, DomainPeriod dom ~ 6000) => ...
+-- myFunc :: (DomainPeriod dom ~ 6000) => ...
 -- @
 type DomainPeriod (dom :: Domain) =
   DomainConfigurationPeriod (KnownConf dom)
@@ -369,7 +369,7 @@ type DomainPeriod (dom :: Domain) =
 -- usage:
 --
 -- @
--- myFunc :: (KnownDomain dom, DomainActiveEdge dom ~ 'Rising) => ...
+-- myFunc :: (DomainActiveEdge dom ~ 'Rising) => ...
 -- @
 type DomainActiveEdge (dom :: Domain) =
   DomainConfigurationActiveEdge (KnownConf dom)
@@ -378,7 +378,7 @@ type DomainActiveEdge (dom :: Domain) =
 -- domain. Example usage:
 --
 -- @
--- myFunc :: (KnownDomain dom, DomainResetKind dom ~ 'Synchronous) => ...
+-- myFunc :: (DomainResetKind dom ~ 'Synchronous) => ...
 -- @
 type DomainResetKind (dom :: Domain) =
   DomainConfigurationResetKind (KnownConf dom)
@@ -390,11 +390,9 @@ type DomainResetKind (dom :: Domain) =
 -- myFunc :: HasSynchronousReset dom => ...
 -- @
 --
--- Using this type implies 'KnownDomain'.
---
 -- [Click here for usage hints]("Clash.Explicit.Signal#g:conveniencetypes")
 type HasSynchronousReset (dom :: Domain) =
-  (KnownDomain dom, DomainResetKind dom ~ 'Synchronous)
+  (DomainResetKind dom ~ 'Synchronous)
 
 -- | Convenience type to constrain a domain to have asynchronous resets. Example
 -- usage:
@@ -403,17 +401,15 @@ type HasSynchronousReset (dom :: Domain) =
 -- myFunc :: HasAsynchronousReset dom => ...
 -- @
 --
--- Using this type implies 'KnownDomain'.
---
 -- [Click here for usage hints]("Clash.Explicit.Signal#g:conveniencetypes")
 type HasAsynchronousReset (dom :: Domain) =
-  (KnownDomain dom, DomainResetKind dom ~ 'Asynchronous)
+  (DomainResetKind dom ~ 'Asynchronous)
 
 -- | Convenience type to help to extract the initial value behavior from a
 -- domain. Example usage:
 --
 -- @
--- myFunc :: (KnownDomain dom, DomainInitBehavior dom ~ 'Defined) => ...
+-- myFunc :: (DomainInitBehavior dom ~ 'Defined) => ...
 -- @
 type DomainInitBehavior (dom :: Domain) =
   DomainConfigurationInitBehavior (KnownConf dom)
@@ -425,20 +421,18 @@ type DomainInitBehavior (dom :: Domain) =
 -- myFunc :: HasDefinedInitialValues dom => ...
 -- @
 --
--- Using this type implies 'KnownDomain'.
---
 -- Note that there is no @UnknownInitialValues dom@ as a component that works
 -- without initial values will also work if it does have them.
 --
 -- [Click here for usage hints]("Clash.Explicit.Signal#g:conveniencetypes")
 type HasDefinedInitialValues (dom :: Domain) =
-  (KnownDomain dom, DomainInitBehavior dom ~ 'Defined)
+  (DomainInitBehavior dom ~ 'Defined)
 
 -- | Convenience type to help to extract the reset polarity from a domain.
 -- Example usage:
 --
 -- @
--- myFunc :: (KnownDomain dom, DomainResetPolarity dom ~ 'ActiveHigh) => ...
+-- myFunc :: (DomainResetPolarity dom ~ 'ActiveHigh) => ...
 -- @
 type DomainResetPolarity (dom :: Domain) =
   DomainConfigurationResetPolarity (KnownConf dom)
