@@ -14,7 +14,6 @@
 module Clash.Cores.Xilinx.BlockRam (tdpbram) where
 
 import Clash.Explicit.Prelude
-import Clash.Signal.Internal (Clock(Clock))
 
 import GHC.Stack (HasCallStack)
 
@@ -60,7 +59,7 @@ tdpbram ::
   ( Signal domA a
   , Signal domB a
   )
-tdpbram clkA@(Clock{}) enA addrA byteEnaA datA clkB@(Clock{}) enB addrB byteEnaB datB =
+tdpbram clkA@ExtractClockDom enA addrA byteEnaA datA clkB@ExtractClockDom enB addrB byteEnaB datB =
   -- [Note: eta port names for tdpbram]
   --
   -- By naming all the arguments and setting the -fno-do-lambda-eta-expansion GHC

@@ -203,7 +203,7 @@ module Clash.Explicit.Signal
   , fromEnable
   , enableGen
     -- * Clock
-  , Clock
+  , Clock(ExtractClockDom)
   , DiffClock
   , periodToHz
   , hzToPeriod
@@ -211,7 +211,7 @@ module Clash.Explicit.Signal
   , unsafeSynchronizer
   , veryUnsafeSynchronizer
     -- * Reset
-  , Reset
+  , Reset(ExtractResetDom)
   , unsafeToReset
   , unsafeFromReset
   , unsafeToActiveHigh

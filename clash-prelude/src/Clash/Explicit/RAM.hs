@@ -139,7 +139,7 @@ asyncRam#
   -- ^ Value to write (at address @w@)
   -> Signal rdom a
   -- ^ Value of the RAM at address @r@
-asyncRam# wClk@(Clock{}) rClk@(Clock{}) en sz rd we wr din = dout
+asyncRam# wClk@ExtractClockDom rClk@ExtractClockDom en sz rd we wr din = dout
   where
     ramI = Seq.replicate
               szI

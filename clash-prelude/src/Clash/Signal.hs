@@ -131,7 +131,7 @@ module Clash.Signal
   , initBehavior
   , resetPolarity
     -- * Clock
-  , Clock
+  , Clock(ExtractClockDom)
   , DiffClock
   , periodToHz
   , hzToPeriod
@@ -140,7 +140,7 @@ module Clash.Signal
   , unsafeSynchronizer
 #endif
     -- * Reset
-  , Reset
+  , Reset(ExtractResetDom)
   , unsafeToReset
   , unsafeFromReset
   , unsafeToActiveHigh

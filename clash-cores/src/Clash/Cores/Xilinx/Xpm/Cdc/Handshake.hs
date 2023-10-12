@@ -12,7 +12,6 @@ module Clash.Cores.Xilinx.Xpm.Cdc.Handshake
   ) where
 
 import Clash.Explicit.Prelude
-import Clash.Signal.Internal (Clock(Clock))
 
 import GHC.Stack (HasCallStack)
 
@@ -66,7 +65,7 @@ xpmCdcHandshake ::
   , "dest_req" ::: Signal dst Bool
   , "src_rcv"  ::: Signal src Bool
   )
-xpmCdcHandshake clkSrc@(Clock{}) clkDst@(Clock{}) = xpmCdcHandshakeWith XpmCdcHandshakeConfig{..} clkSrc clkDst
+xpmCdcHandshake clkSrc@ExtractClockDom clkDst@ExtractClockDom = xpmCdcHandshakeWith XpmCdcHandshakeConfig{..} clkSrc clkDst
  where
   srcStages = d4
   dstStages = d4

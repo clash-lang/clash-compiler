@@ -468,7 +468,7 @@ seClockToDiffClock ::
   Clock dom ->
   -- | Differential output
   DiffClock dom
-seClockToDiffClock clk@(Clock{}) = DiffClock clk (ClockN SSymbol)
+seClockToDiffClock clk@ExtractClockDom = DiffClock clk (ClockN SSymbol)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE seClockToDiffClock #-}
 {-# ANN seClockToDiffClock hasBlackBox #-}

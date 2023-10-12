@@ -71,7 +71,7 @@ module Clash.Cores.Xilinx.DcFifo
   ) where
 
 import Clash.Explicit.Prelude
-import Clash.Signal.Internal (Clock(..), Signal (..), ClockAB (..), clockTicks)
+import Clash.Signal.Internal (Signal (..), ClockAB (..), clockTicks)
 import Data.Maybe (isJust)
 import qualified Data.Sequence as Seq
 import Data.Sequence (Seq)
@@ -153,7 +153,7 @@ dcFifo ::
   -- | Read enable @rd_en@
   Signal read Bool ->
   FifoOut read write depth a
-dcFifo DcConfig{..} wClk@(Clock{}) wRst rClk@(Clock{}) rRst writeData rEnable =
+dcFifo DcConfig{..} wClk@ExtractClockDom wRst rClk@ExtractClockDom rRst writeData rEnable =
   case (resetKind @write, resetKind @read) of
     (SSynchronous, SSynchronous) ->
       let

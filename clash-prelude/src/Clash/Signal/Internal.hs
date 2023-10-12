@@ -88,7 +88,7 @@ module Clash.Signal.Internal
   , createDomain
   , HasKnownDomain(..)
     -- * Clocks
-  , Clock (..)
+  , Clock (..,ExtractClockDom)
   , ClockN (..)
   , DiffClock (..)
   , hzToPeriod
@@ -102,7 +102,7 @@ module Clash.Signal.Internal
   , fromEnable
   , enableGen
     -- * Resets
-  , Reset(..)
+  , Reset(..,ExtractResetDom)
   , unsafeToReset
   , unsafeFromReset
   , unsafeToActiveHigh
@@ -933,6 +933,13 @@ data Clock (dom :: Domain) = KnownDomain dom => Clock
   , clockPeriods :: Maybe (Signal dom Femtoseconds)
   }
 
+pattern ExtractClockDom
+  :: ()              -- constraint required to match the pattern
+  => KnownDomain dom -- constraint provided by matching the pattern
+  => Clock dom
+pattern ExtractClockDom <- Clock {}
+{-# COMPLETE ExtractClockDom #-}
+
 instance Show (Clock dom) where
   show (Clock dom Nothing) = "<Clock: " ++ ssymbolToString dom ++ ">"
   show (Clock dom _) = "<Dynamic clock: " ++ ssymbolToString dom ++ ">"
@@ -1166,6 +1173,13 @@ resetGenN n =
 data Reset (dom :: Domain) where
   Reset :: KnownDomain dom => Signal dom Bool -> Reset dom
 
+pattern ExtractResetDom
+  :: ()              -- constraint required to match the pattern
+  => KnownDomain dom -- constraint provided by matching the pattern
+  => Reset dom
+pattern ExtractResetDom <- Reset {}
+{-# COMPLETE ExtractResetDom #-}
+
 -- | Non-ambiguous version of 'Clash.Signal.Internal.Ambiguous.resetPolarity'
 resetPolarityProxy
   :: forall dom proxy polarity
@@ -1190,7 +1204,7 @@ unsafeToActiveHigh
   :: forall dom
    . Reset dom
   -> Signal dom Bool
-unsafeToActiveHigh r0@(Reset{}) =
+unsafeToActiveHigh r0@ExtractResetDom =
   case resetPolarityProxy (Proxy @dom) of
     SActiveHigh -> r
     SActiveLow -> not <$> r
@@ -1228,7 +1242,7 @@ unsafeToActiveLow
   :: forall dom
    . Reset dom
   -> Signal dom Bool
-unsafeToActiveLow r0@(Reset{}) =
+unsafeToActiveLow r0@ExtractResetDom =
   case resetPolarityProxy (Proxy @dom) of
     SActiveHigh -> not <$> r
     SActiveLow -> r
@@ -1292,13 +1306,13 @@ class HasKnownDomain a where
   provideKnownDomainFrom :: a dom -> (KnownDomain dom => r) -> r
 
 instance HasKnownDomain Clock where
-  provideKnownDomainFrom (Clock{}) f = f
+  provideKnownDomainFrom ExtractClockDom f = f
 
 instance HasKnownDomain DiffClock where
   provideKnownDomainFrom (DiffClock clkP _) = provideKnownDomainFrom clkP
 
 instance HasKnownDomain Reset where
-  provideKnownDomainFrom (Reset{}) f = f
+  provideKnownDomainFrom ExtractResetDom f = f
 
 
 -- | Interpret a signal of bools as an active high reset and convert it to
@@ -1375,7 +1389,7 @@ unsafeFromActiveLow r =
 
 -- | Invert reset signal
 invertReset :: Reset dom -> Reset dom
-invertReset r@(Reset{}) = unsafeToReset . fmap not . unsafeFromReset $ r
+invertReset r@ExtractResetDom = unsafeToReset . fmap not . unsafeFromReset $ r
 
 infixr 2 .||.
 -- | The above type is a generalization for:
@@ -1512,7 +1526,7 @@ asyncRegister#
   -- ^ Reset value
   -> Signal dom a
   -> Signal dom a
-asyncRegister# clk@(Clock{}) (unsafeToActiveHigh -> rst) (fromEnable -> ena) initVal resetVal =
+asyncRegister# clk@ExtractClockDom (unsafeToActiveHigh -> rst) (fromEnable -> ena) initVal resetVal =
   go (registerPowerup# clk initVal) rst ena
  where
   go o (r :- rs) enas@(~(e :- es)) as@(~(x :- xs)) =
