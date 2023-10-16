@@ -1279,7 +1279,8 @@ unsafeFromReset (Reset r) = r
 -- __NB__: You probably want to use 'unsafeFromActiveLow' or
 -- 'unsafeFromActiveHigh'.
 unsafeToReset
-  :: Signal dom Bool
+  :: KnownDomain dom
+  => Signal dom Bool
   -> Reset dom
 unsafeToReset r = Reset r
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
@@ -1359,7 +1360,7 @@ unsafeFromActiveLow r =
       SActiveLow -> r
 
 -- | Invert reset signal
-invertReset :: Reset dom -> Reset dom
+invertReset :: KnownDomain dom => Reset dom -> Reset dom
 invertReset = unsafeToReset . fmap not . unsafeFromReset
 
 infixr 2 .||.

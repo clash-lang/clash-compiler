@@ -230,6 +230,6 @@
     name: Clash.Signal.Internal.unsafeToReset
     kind: Declaration
     type: 'unsafeToReset ::
-      Signal dom Bool -> Reset dom'
-    template: ~RESULT <= '1' when ~ARG[0] = true else '0';
+      KnownDomain dom => Signal dom Bool -> Reset dom'
+    template: ~RESULT <= '1' when ~ARG[1] = true else '0';
     workInfo: Never

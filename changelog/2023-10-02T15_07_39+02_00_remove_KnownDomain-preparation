@@ -1,2 +1,5 @@
 ADDED: You can now use ~PERIOD, ~ISSYNC, ~ISINITDEFINED and ~ACTIVEEDGE
 on arguments of type Clock,Reset,Enable,ClockN and DiffClock.
+
+CHANGED: unsafeToReset and invertReset now have a KnownDomain constraint
+This was done in preparation for [Remove KnownDomain #2589](https://github.com/clash-lang/clash-compiler/pull/2589)
