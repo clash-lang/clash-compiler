@@ -57,7 +57,6 @@ import Clash.Explicit.Signal
 import Clash.Signal.Internal
   (Clock (..), ClockN (..), DiffClock (..), Reset (..), tbClockGen)
 import Clash.Signal          (mux, KnownDomain, Enable)
-import Clash.Signal.Internal (ZKnownDomain)
 import Clash.Sized.Index     (Index)
 import Clash.Sized.Internal.BitVector
   (BitVector, isLike#)
@@ -94,7 +93,7 @@ import Data.String.Interpolate (__i)
 --
 -- __NB__: This function /can/ be used in synthesizable designs.
 assert
-  :: (ZKnownDomain dom, Eq a, ShowX a)
+  :: (Eq a, ShowX a)
   => Clock dom
   -> Reset dom
   -> String
@@ -129,7 +128,7 @@ assert clk (Reset _) msg checked expected returned =
 {-# ANN assert (
   let
     bbName = show 'assert
-    _arg0 :< _arg1 :< _arg2 :< arg3 :< _arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< _ = ((0 :: Int)...)
+    _arg1 :< _arg2 :< arg3 :< _arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [SystemVerilog] [__i|
       BlackBox:
@@ -137,7 +136,7 @@ assert clk (Reset _) msg checked expected returned =
         kind: Declaration
         type: |-
           assert
-            :: (ZKnownDomain dom, Eq a, ShowX a)      -- (ARG[0], ARG[1], ARG[2])
+            :: (Eq a, ShowX a)      -- (ARG[1], ARG[2])
             => Clock dom                             -- ARG[3]
             -> Reset dom                             -- ARG[4]
             -> String                                -- ARG[5]
@@ -161,7 +160,7 @@ assert clk (Reset _) msg checked expected returned =
 {-# ANN assert (
   let
     bbName = show 'assert
-    _arg0 :< _arg1 :< _arg2 :< arg3 :< _arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< _ = ((0 :: Int)...)
+    _arg1 :< _arg2 :< arg3 :< _arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [Verilog] [__i|
       BlackBox:
@@ -169,7 +168,7 @@ assert clk (Reset _) msg checked expected returned =
         kind: Declaration
         type: |-
           assert
-            :: (ZKnownDomain dom, Eq a, ShowX a)      -- (ARG[0], ARG[1], ARG[2])
+            :: (Eq a, ShowX a)      -- (ARG[1], ARG[2])
             => Clock dom                             -- ARG[3]
             -> Reset dom                             -- ARG[4]
             -> String                                -- ARG[5]
@@ -193,7 +192,7 @@ assert clk (Reset _) msg checked expected returned =
 {-# ANN assert (
   let
     bbName = show 'assert
-    _arg0 :< _arg1 :< _arg2 :< arg3 :< _arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< _ = ((0 :: Int)...)
+    _arg1 :< _arg2 :< arg3 :< _arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [VHDL] [__i|
       BlackBox:
@@ -230,7 +229,7 @@ assert clk (Reset _) msg checked expected returned =
         kind: Declaration
         type: |-
           assert
-            :: (ZKnownDomain dom, Eq a, ShowX a)      -- (ARG[0],ARG[1],ARG[2])
+            :: (Eq a, ShowX a)      -- (ARG[1],ARG[2])
             => Clock dom                             -- ARG[3]
             -> Reset dom                             -- ARG[4]
             -> String                                -- ARG[5]
@@ -263,7 +262,7 @@ assert clk (Reset _) msg checked expected returned =
 
 -- | The same as 'assert', but can handle don't care bits in its expected value.
 assertBitVector
-  :: (ZKnownDomain dom, KnownNat n)
+  :: KnownNat n
   => Clock dom
   -> Reset dom
   -> String
@@ -298,7 +297,7 @@ assertBitVector clk (Reset _) msg checked expected returned =
 {-# ANN assertBitVector (
   let
     bbName = show 'assertBitVector
-    _arg0 :< _arg1 :< arg2 :< _arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+    _arg1 :< arg2 :< _arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [SystemVerilog] [__i|
       BlackBox:
@@ -306,8 +305,7 @@ assertBitVector clk (Reset _) msg checked expected returned =
         kind: Declaration
         type: |-
           assertBitVector
-            :: ( ZKnownDomain dom        --                 ARG[0]
-               , KnownNat n )           --                 ARG[1]
+            :: ( KnownNat n )           --                 ARG[1]
             => Clock dom                --                 ARG[2]
             -> Reset dom                --                 ARG[3]
             -> String                   --                 ARG[4]
@@ -335,7 +333,7 @@ assertBitVector clk (Reset _) msg checked expected returned =
 {-# ANN assertBitVector (
   let
     bbName = show 'assertBitVector
-    _arg0 :< _arg1 :< arg2 :< _arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+    _arg1 :< arg2 :< _arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [Verilog] [__i|
       BlackBox:
@@ -343,8 +341,7 @@ assertBitVector clk (Reset _) msg checked expected returned =
         kind: Declaration
         type: |-
           assertBitVector
-            :: ( ZKnownDomain dom        --                 ARG[0]
-               , KnownNat n             --                 ARG[1]
+            :: ( KnownNat n             --                 ARG[1]
             => Clock dom                --                 ARG[2]
             -> Reset dom                --                 ARG[3]
             -> String                   --                 ARG[4]
@@ -372,7 +369,7 @@ assertBitVector clk (Reset _) msg checked expected returned =
 {-# ANN assertBitVector (
   let
     bbName = show 'assertBitVector
-    _arg0 :< _arg1 :< arg2 :< _arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+    _arg1 :< arg2 :< _arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [VHDL] [__i|
       BlackBox:
@@ -432,8 +429,7 @@ assertBitVector clk (Reset _) msg checked expected returned =
         kind: Declaration
         type: |-
           assertBitVector
-            :: ( ZKnownDomain dom        --                 ARG[0]
-               , KnownNat n )           --                 ARG[1]
+            :: ( KnownNat n )           --                 ARG[1]
             => Clock dom                --                 ARG[2]
             -> Reset dom                --                 ARG[3]
             -> String                   --                 ARG[4]

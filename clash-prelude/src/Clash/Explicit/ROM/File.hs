@@ -104,7 +104,7 @@ import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Explicit.BlockRam.File (initMem, memFile)
 import Clash.Promoted.Nat           (SNat (..), pow2SNat, snatToNum)
 import Clash.Sized.BitVector        (BitVector)
-import Clash.Explicit.Signal        (Clock, Enable, Signal, ZKnownDomain, delay)
+import Clash.Explicit.Signal        (Clock, Enable, Signal, delay)
 import Clash.Sized.Unsigned         (Unsigned)
 import Clash.XException             (NFDataX(deepErrorX))
 
@@ -200,7 +200,7 @@ romFile = \clk en sz file rd -> romFile# clk en sz file (fromEnum <$> rd)
 -- | romFile primitive
 romFile#
   :: forall m dom n
-   . (KnownNat m, ZKnownDomain dom)
+   . KnownNat m
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -235,15 +235,15 @@ romFile# clk en sz file rd =
 {-# ANN romFile# (
   let
     bbName = show 'romFile#
-    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< _ = ((0 :: Int)...)
+    _arg0 :<  arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [SystemVerilog] [__i|
       BlackBox:
         name: '#{bbName}'
         kind: Declaration
         type: |-
-          romFile\# :: ( KnownNat m             --       ARG[0]
-                       , ZKnownDomain dom )      --       ARG[1]
+          romFile\# :: KnownNat m               --       ARG[0]
+
                     => Clock dom                -- clk,  ARG[2]
                     -> Enable dom               -- en,   ARG[3]
                     -> SNat n                   -- sz,   ARG[4]
@@ -274,7 +274,7 @@ romFile# clk en sz file rd =
 {-# ANN romFile# (
   let
     bbName = show 'romFile#
-    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< _ = ((0 :: Int)...)
+    _arg0 :<  arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [Verilog] [__i|
       BlackBox:
@@ -282,8 +282,8 @@ romFile# clk en sz file rd =
         kind: Declaration
         outputUsage: NonBlocking
         type: |-
-          romFile\# :: ( KnownNat m             --       ARG[0]
-                       , ZKnownDomain dom      ) --       ARG[1]
+          romFile\# :: KnownNat m               --       ARG[0]
+
                     => Clock dom                -- clk,  ARG[2]
                     -> Enable dom               -- en,   ARG[3]
                     -> SNat n                   -- sz,   ARG[4]
@@ -311,7 +311,7 @@ romFile# clk en sz file rd =
 {-# ANN romFile# (
   let
     bbName = show 'romFile#
-    arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< _ = ((0 :: Int)...)
+    arg0 :<  arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [VHDL] [__i|
       BlackBox:
@@ -319,8 +319,8 @@ romFile# clk en sz file rd =
         kind: Declaration
         outputUsage: NonBlocking
         type: |-
-          romFile\# :: ( KnownNat m           --       ARG[0]
-                       , ZKnownDomain dom      --       ARG[1]
+          romFile\# :: KnownNat m             --       ARG[0]
+
                     => Clock dom              -- clk,  ARG[2]
                     -> Enable dom             -- en,   ARG[3]
                     -> SNat n                 -- sz,   ARG[4]

@@ -38,7 +38,7 @@ import GHC.TypeLits          (KnownNat)
 import qualified Data.Sequence as Seq
 
 import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Explicit.Signal (unbundle, ZKnownDomain, andEnable)
+import Clash.Explicit.Signal (unbundle, andEnable)
 import Clash.Promoted.Nat    (SNat (..), snatToNum, pow2SNat)
 import Clash.Signal.Internal
   (Clock (..), ClockAB (..), Signal (..), Enable, fromEnable, clockTicks)
@@ -123,8 +123,6 @@ asyncRam = \wclk rclk gen sz rd wrM ->
 asyncRam#
   :: forall wdom rdom n a
    . ( HasCallStack
-     , ZKnownDomain wdom
-     , ZKnownDomain rdom
      , NFDataX a
      )
   => Clock wdom
@@ -220,7 +218,7 @@ asyncRam# wClk@ExtractClockDom rClk@ExtractClockDom en sz rd we wr din = dout
 {-# ANN asyncRam# (
   let
     bbName = show 'asyncRam#
-    _arg0 :< _arg1 :< _arg2 :< _arg3 :< arg4 :< _arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< arg11 :< _ = ((0 :: Int)...)
+    _arg0 :<   _arg3 :< arg4 :< _arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< arg11 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [SystemVerilog] [__i|
       BlackBox:
@@ -229,8 +227,7 @@ asyncRam# wClk@ExtractClockDom rClk@ExtractClockDom en sz rd we wr din = dout
         type: |-
           asyncRam\#
             :: ( HasCallStack      --         ARG[0]
-               , ZKnownDomain wdom  --         ARG[1]
-               , ZKnownDomain rdom  --         ARG[2]
+
                , NFDataX a )       --         ARG[3]
             => Clock wdom          -- ^ wclk, ARG[4]
             -> Clock rdom          -- ^ rclk, ARG[5]
@@ -256,7 +253,7 @@ asyncRam# wClk@ExtractClockDom rClk@ExtractClockDom en sz rd we wr din = dout
 {-# ANN asyncRam# (
   let
     bbName = show 'asyncRam#
-    _arg0 :< _arg1 :< _arg2 :< _arg3 :< arg4 :< _arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< arg11 :< _ = ((0 :: Int)...)
+    _arg0 :<   _arg3 :< arg4 :< _arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< arg11 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [Verilog] [__i|
       BlackBox:
@@ -265,8 +262,7 @@ asyncRam# wClk@ExtractClockDom rClk@ExtractClockDom en sz rd we wr din = dout
         type: |-
           asyncRam\#
             :: ( HasCallStack      --         ARG[0]
-               , ZKnownDomain wdom  --         ARG[1]
-               , ZKnownDomain rdom  --         ARG[2]
+
                , NFDataX a )       --         ARG[3]
             => Clock wdom          -- ^ wclk, ARG[4]
             -> Clock rdom          -- ^ rclk, ARG[5]
@@ -292,7 +288,7 @@ asyncRam# wClk@ExtractClockDom rClk@ExtractClockDom en sz rd we wr din = dout
 {-# ANN asyncRam# (
   let
     bbName = show 'asyncRam#
-    _arg0 :< _arg1 :< _arg2 :< _arg3 :< arg4 :< _arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< arg11 :< _ = ((0 :: Int)...)
+    _arg0 :<   _arg3 :< arg4 :< _arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< arg11 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [VHDL] [__i|
       BlackBox:
@@ -301,8 +297,7 @@ asyncRam# wClk@ExtractClockDom rClk@ExtractClockDom en sz rd we wr din = dout
         type: |-
           asyncRam\#
             :: ( HasCallStack      --         ARG[0]
-               , ZKnownDomain wdom  --         ARG[1]
-               , ZKnownDomain rdom  --         ARG[2]
+
                , NFDataX a )       --         ARG[3]
             => Clock wdom          -- ^ wclk, ARG[4]
             -> Clock rdom          -- ^ rclk, ARG[5]

@@ -57,7 +57,7 @@ import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Class.BitPack.Internal (BitPack, BitSize)
 import Clash.Explicit.BlockRam.Internal
   (MemBlob(..), packBVs, unpackMemBlob, unpackMemBlob0)
-import Clash.Explicit.Signal (ZKnownDomain, Enable, fromEnable)
+import Clash.Explicit.Signal (Enable, fromEnable)
 import Clash.Promoted.Nat (natToInteger, natToNum)
 import Clash.Signal.Bundle (unbundle)
 import Clash.Signal.Internal (Clock, Signal(..), (.&&.))
@@ -153,8 +153,7 @@ blockRamBlobPow2 = blockRamBlob
 -- | blockRAMBlob primitive
 blockRamBlob#
   :: forall dom m n
-   . ZKnownDomain dom
-  => Clock dom
+   . Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
   -- ^ 'Enable' line
@@ -241,7 +240,7 @@ blockRamBlob# !_ gen content@MemBlob{} = \rd wen waS wd -> runST $ do
 {-# ANN blockRamBlob# (
   let
     bbName = show 'blockRamBlob#
-    _arg0 :< arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+    arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [SystemVerilog] [__i|
       BlackBox:
@@ -249,8 +248,7 @@ blockRamBlob# !_ gen content@MemBlob{} = \rd wen waS wd -> runST $ do
         kind: Declaration
         type: |-
           blockRamBlob\#
-            :: ZKnownDomain dom           --       ARG[0]
-            => Clock dom                 -- clk,  ARG[1]
+            :: Clock dom                 -- clk,  ARG[1]
             -> Enable dom                -- en,   ARG[2]
             -> MemBlob n m               -- init, ARG[3]
             -> Signal dom Int            -- rd,   ARG[4]
@@ -291,7 +289,7 @@ blockRamBlob# !_ gen content@MemBlob{} = \rd wen waS wd -> runST $ do
 {-# ANN blockRamBlob# (
   let
     bbName = show 'blockRamBlob#
-    _arg0 :< arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+    arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [Verilog] [__i|
       BlackBox:
@@ -300,8 +298,7 @@ blockRamBlob# !_ gen content@MemBlob{} = \rd wen waS wd -> runST $ do
         outputUsage: NonBlocking
         type: |-
           blockRamBlob\#
-            :: ZKnownDomain dom           --       ARG[0]
-            => Clock dom                 -- clk,  ARG[1]
+            :: Clock dom                 -- clk,  ARG[1]
             -> Enable dom                -- en,   ARG[2]
             -> MemBlob n m               -- init, ARG[3]
             -> Signal dom Int            -- rd,   ARG[4]
@@ -347,7 +344,7 @@ blockRamBlob# !_ gen content@MemBlob{} = \rd wen waS wd -> runST $ do
 {-# ANN blockRamBlob# (
   let
     bbName = show 'blockRamBlob#
-    _arg0 :< arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+    arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [VHDL] [__i|
       BlackBox:
@@ -356,8 +353,7 @@ blockRamBlob# !_ gen content@MemBlob{} = \rd wen waS wd -> runST $ do
         outputUsage: NonBlocking
         type: |-
           blockRamBlob\#
-            :: ZKnownDomain dom           --       ARG[0]
-            => Clock dom                 -- clk,  ARG[1]
+            :: Clock dom                 -- clk,  ARG[1]
             -> Enable dom                -- en,   ARG[2]
             -> MemBlob n m               -- init, ARG[3]
             -> Signal dom Int            -- rd,   ARG[4]

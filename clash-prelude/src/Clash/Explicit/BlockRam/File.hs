@@ -124,7 +124,7 @@ import Clash.Class.BitPack   (BitPack, BitSize, pack)
 import Clash.Promoted.Nat    (SNat (..), pow2SNat, natToNum, snatToNum)
 import Clash.Sized.Internal.BitVector (Bit(..), BitVector(..), undefined#)
 import Clash.Signal.Internal
-  (Clock(..), Signal (..), Enable, ZKnownDomain, fromEnable, (.&&.))
+  (Clock(..), Signal (..), Enable, fromEnable, (.&&.))
 import Clash.Signal.Bundle   (unbundle)
 import Clash.Sized.Unsigned  (Unsigned)
 import Clash.XException      (maybeIsX, seqX, fromJustX, NFDataX(..), XException (..))
@@ -322,7 +322,7 @@ memFile care = foldr (\e -> showsBV $ pack e) ""
 -- | blockRamFile primitive
 blockRamFile#
   :: forall m dom n
-   . (ZKnownDomain dom, KnownNat m, HasCallStack)
+   . (KnownNat m, HasCallStack)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -437,7 +437,7 @@ blockRamFile# _ _ _ _ = error "blockRamFile#: dynamic clocks not supported"
 {-# ANN blockRamFile# (
   let
     bbName = show 'blockRamFile#
-    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< _ = ((0 :: Int)...)
+    _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [SystemVerilog] [__i|
       BlackBox:
@@ -445,8 +445,7 @@ blockRamFile# _ _ _ _ = error "blockRamFile#: dynamic clocks not supported"
         kind: Declaration
         type: |-
           blockRamFile\#
-            :: ( ZKnownDomain dom         --       ARG[0]
-               , KnownNat m              --       ARG[1]
+            :: ( KnownNat m              --       ARG[1]
                , HasCallStack )          --       ARG[2]
             => Clock dom                 -- clk,  ARG[3]
             => Enable dom                -- en,   ARG[4]
@@ -493,7 +492,7 @@ blockRamFile# _ _ _ _ = error "blockRamFile#: dynamic clocks not supported"
 {-# ANN blockRamFile# (
   let
     bbName = show 'blockRamFile#
-    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< _ = ((0 :: Int)...)
+    _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [Verilog] [__i|
       BlackBox:
@@ -502,8 +501,7 @@ blockRamFile# _ _ _ _ = error "blockRamFile#: dynamic clocks not supported"
         outputUsage: NonBlocking
         type: |-
           blockRamFile\#
-            :: ( ZKnownDomain dom         --       ARG[0]
-               , KnownNat m              --       ARG[1]
+            :: ( KnownNat m              --       ARG[1]
                , HasCallStack )          --       ARG[2]
             => Clock dom                 -- clk,  ARG[3]
             => Enable dom                -- en,   ARG[4]
@@ -547,7 +545,7 @@ blockRamFile# _ _ _ _ = error "blockRamFile#: dynamic clocks not supported"
 {-# ANN blockRamFile# (
   let
     bbName = show 'blockRamFile#
-    _arg0 :< arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< _ = ((0 :: Int)...)
+    arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [VHDL] [__i|
       BlackBox:
@@ -556,8 +554,7 @@ blockRamFile# _ _ _ _ = error "blockRamFile#: dynamic clocks not supported"
         outputUsage: NonBlocking
         type: |-
           blockRamFile\#
-            :: ( ZKnownDomain dom        -- ARG[0]
-               , KnownNat m             -- ARG[1]
+            :: ( KnownNat m             -- ARG[1]
                , HasCallStack )         -- ARG[2]
             => Clock dom                -- clk,  ARG[3]
             => Enable dom               -- en,   ARG[4]

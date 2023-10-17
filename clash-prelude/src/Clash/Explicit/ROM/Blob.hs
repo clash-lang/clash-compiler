@@ -49,7 +49,7 @@ import Clash.Explicit.BlockRam.Blob (createMemBlob, memBlobTH)
 import Clash.Explicit.BlockRam.Internal (MemBlob(..), unpackMemBlob)
 import Clash.Promoted.Nat (natToNum)
 import Clash.Signal.Internal
-  (Clock (..), ZKnownDomain, Signal (..), Enable, fromEnable)
+  (Clock (..), Signal (..), Enable, fromEnable)
 import Clash.Sized.Internal.BitVector (BitVector)
 import Clash.Sized.Internal.Unsigned (Unsigned)
 import Clash.XException (deepErrorX, seqX)
@@ -119,8 +119,7 @@ romBlobPow2 = romBlob
 -- | ROM primitive
 romBlob#
   :: forall dom m n
-   . ZKnownDomain dom
-  => Clock dom
+   . Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
   -- ^ 'Enable' line
@@ -160,7 +159,7 @@ romBlob# !_ en content@MemBlob{} =
 {-# ANN romBlob# (
   let
     bbName = show 'romBlob#
-    _arg0 :< arg1 :< arg2 :< arg3 :< arg4 :< _ = ((0 :: Int)...)
+    arg1 :< arg2 :< arg3 :< arg4 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [SystemVerilog] [__i|
       BlackBox:
@@ -168,8 +167,7 @@ romBlob# !_ en content@MemBlob{} =
         kind: Declaration
         type: |-
           romBlob\#
-            :: ZKnownDomain dom  --       ARG[0]
-            => Clock dom        -- clk,  ARG[1]
+            :: Clock dom        -- clk,  ARG[1]
             -> Enable dom       -- en,   ARG[2]
             -> MemBlob n m      -- init, ARG[3]
             -> Signal dom Int   -- rd,   ARG[4]
@@ -195,7 +193,7 @@ romBlob# !_ en content@MemBlob{} =
 {-# ANN romBlob# (
   let
     bbName = show 'romBlob#
-    _arg0 :< arg1 :< arg2 :< arg3 :< arg4 :< _ = ((0 :: Int)...)
+    arg1 :< arg2 :< arg3 :< arg4 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [Verilog] [__i|
       BlackBox:
@@ -204,8 +202,7 @@ romBlob# !_ en content@MemBlob{} =
         outputUsage: NonBlocking
         type: |-
           romBlob\#
-            :: ZKnownDomain dom  --       ARG[0]
-            => Clock dom        -- clk,  ARG[1]
+            :: Clock dom        -- clk,  ARG[1]
             -> Enable dom       -- en,   ARG[2]
             -> MemBlob n m      -- init, ARG[3]
             -> Signal dom Int   -- rd,   ARG[4]
@@ -236,7 +233,7 @@ romBlob# !_ en content@MemBlob{} =
 {-# ANN romBlob# (
   let
     bbName = show 'romBlob#
-    _arg0 :< arg1 :< arg2 :< arg3 :< arg4 :< _ = ((0 :: Int)...)
+    arg1 :< arg2 :< arg3 :< arg4 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [VHDL] [__i|
       BlackBox:
@@ -245,8 +242,7 @@ romBlob# !_ en content@MemBlob{} =
         outputUsage: NonBlocking
         type: |-
           romBlob\#
-            :: ZKnownDomain dom  --       ARG[0]
-            => Clock dom        -- clk,  ARG[1]
+            :: Clock dom        -- clk,  ARG[1]
             -> Enable dom       -- en,   ARG[2]
             -> MemBlob n m      -- init, ARG[3]
             -> Signal dom Int   -- rd,   ARG[4]

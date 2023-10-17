@@ -44,7 +44,6 @@ module Clash.Signal.Internal
   , Domain
   , sameDomain
   , KnownDomain(..)
-  , ZKnownDomain
   , KnownConfiguration
   , knownDomainByName
   , ActiveEdge(..)
@@ -174,7 +173,6 @@ module Clash.Signal.Internal
 where
 
 import Data.IORef                 (IORef, atomicModifyIORef, newIORef, readIORef)
-import Data.Kind                  (Constraint)
 import Type.Reflection            (Typeable)
 import Control.Arrow.Transformer.Automaton
 #if !MIN_VERSION_base(4,18,0)
@@ -463,11 +461,6 @@ data SDomainConfiguration (dom :: Domain) (conf :: DomainConfiguration) where
 deriving instance Show (SDomainConfiguration dom conf)
 
 type KnownConfiguration dom conf = (KnownDomain dom, KnownConf dom ~ conf)
-
--- temp constraint placeholder so we don't have to renumber the prim args just yet
-{-  # DEPRECATED ZKnownDomain ["ZKnownDomain is a transitional dummy constraint."] #-}
-type ZKnownDomain (dom :: Domain) = () :: Constraint
-
 
 -- | A 'KnownDomain' constraint indicates that a circuit's behavior depends on
 -- some properties of a domain. See 'DomainConfiguration' for more information.
@@ -1438,8 +1431,7 @@ infixr 3 .&&.
 
 delay#
   :: forall dom a
-   . ( ZKnownDomain dom
-     , NFDataX a )
+   . ( NFDataX a )
   => Clock dom
   -> Enable dom
   -> a
@@ -1466,7 +1458,7 @@ delay# (Clock dom _) (fromEnable -> en) powerUpVal0 =
 {-# ANN delay# (
   let
     bbName = show 'delay#
-    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< _ = ((0 :: Int)...)
+    _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [SystemVerilog] [__i|
       BlackBox:
@@ -1475,8 +1467,7 @@ delay# (Clock dom _) (fromEnable -> en) powerUpVal0 =
         outputUsage: NonBlocking
         type: |-
           delay\#
-            :: ( ZKnownDomain dom        -- ARG[0]
-               , Undefined a )          -- ARG[1]
+            :: ( Undefined a )          -- ARG[1]
             => Clock dom                -- ARG[2]
             -> Enable dom               -- ARG[3]
             -> a                        -- ARG[4]
@@ -1501,7 +1492,7 @@ delay# (Clock dom _) (fromEnable -> en) powerUpVal0 =
 {-# ANN delay# (
   let
     bbName = show 'delay#
-    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< _ = ((0 :: Int)...)
+    _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [Verilog] [__i|
       BlackBox:
@@ -1510,8 +1501,7 @@ delay# (Clock dom _) (fromEnable -> en) powerUpVal0 =
         outputUsage: NonBlocking
         type: |-
           delay\#
-            :: ( ZKnownDomain dom        -- ARG[0]
-               , Undefined a )          -- ARG[1]
+            :: ( Undefined a )          -- ARG[1]
             => Clock dom                -- ARG[2]
             -> Enable dom               -- ARG[3]
             -> a                        -- ARG[4]
@@ -1536,7 +1526,7 @@ delay# (Clock dom _) (fromEnable -> en) powerUpVal0 =
 {-# ANN delay# (
   let
     bbName = show 'delay#
-    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< _ = ((0 :: Int)...)
+    _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [VHDL] [__i|
       BlackBox:
@@ -1545,8 +1535,7 @@ delay# (Clock dom _) (fromEnable -> en) powerUpVal0 =
         outputUsage: NonBlocking
         type: |-
           delay\#
-            :: ( ZKnownDomain dom        -- ARG[0]
-               , Undefined a )          -- ARG[1]
+            :: ( Undefined a )          -- ARG[1]
             => Clock dom                -- ARG[2]
             -> Enable dom               -- ARG[3]
             -> a                        -- ARG[4]
@@ -1588,8 +1577,7 @@ delay# (Clock dom _) (fromEnable -> en) powerUpVal0 =
 -- instead. Source: https://www.intel.com/content/www/us/en/programmable/support/support-resources/knowledge-base/solutions/rd01072011_91.html
 register#
   :: forall dom  a
-   . ( ZKnownDomain dom
-     , NFDataX a )
+   . ( NFDataX a )
   => Clock dom
   -> Reset dom
   -> Enable dom
@@ -1611,7 +1599,7 @@ register# clk@(Clock dom _) rst ena powerUpVal resetVal =
 {-# ANN register# (
   let
     bbName = show 'register#
-    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+    _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [SystemVerilog] [__i|
       BlackBox:
@@ -1620,8 +1608,7 @@ register# clk@(Clock dom _) rst ena powerUpVal resetVal =
         outputUsage: NonBlocking
         type: |-
           register\#
-            :: ( ZKnownDomain dom        -- ARG[0]
-               , Undefined a )          -- ARG[1]
+            :: ( Undefined a )          -- ARG[1]
             => Clock dom                -- ARG[2]
             -> Reset dom                -- ARG[3]
             -> Enable dom               -- ARG[4]
@@ -1647,7 +1634,7 @@ register# clk@(Clock dom _) rst ena powerUpVal resetVal =
 {-# ANN register# (
   let
     bbName = show 'register#
-    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+    _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [Verilog] [__i|
       BlackBox:
@@ -1656,8 +1643,7 @@ register# clk@(Clock dom _) rst ena powerUpVal resetVal =
         outputUsage: NonBlocking
         type: |-
           register\#
-            :: ( ZKnownDomain dom        -- ARG[0]
-               , Undefined a )          -- ARG[1]
+            :: ( Undefined a )          -- ARG[1]
             => Clock dom                -- ARG[2]
             -> Reset dom                -- ARG[3]
             -> Enable dom               -- ARG[4]
@@ -1683,7 +1669,7 @@ register# clk@(Clock dom _) rst ena powerUpVal resetVal =
 {-# ANN register# (
   let
     bbName = show 'register#
-    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+    _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [VHDL] [__i|
       BlackBox:
@@ -1692,8 +1678,7 @@ register# clk@(Clock dom _) rst ena powerUpVal resetVal =
         outputUsage: NonBlocking
         type: |-
           register\#
-            :: ( ZKnownDomain dom        -- ARG[0]
-               , NFDataX a )            -- ARG[1]
+            :: ( NFDataX a )            -- ARG[1]
             => Clock dom                -- ARG[2]
             -> Reset dom                -- ARG[3]
             -> Enable dom               -- ARG[4]
@@ -1767,8 +1752,7 @@ registerPowerup# (Clock dom _) a =
 -- domain. Is synthesizable.
 asyncRegister#
   :: forall dom  a
-   . ( ZKnownDomain dom
-     , NFDataX a )
+   . NFDataX a
   => Clock dom
   -- ^ Clock signal
   -> Reset dom
@@ -1795,7 +1779,7 @@ asyncRegister# clk@ExtractClockDom (unsafeToActiveHigh -> rst) (fromEnable -> en
 {-# ANN asyncRegister# (
   let
     bbName = show 'asyncRegister#
-    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+    _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [SystemVerilog] [__i|
       BlackBox:
@@ -1804,8 +1788,7 @@ asyncRegister# clk@ExtractClockDom (unsafeToActiveHigh -> rst) (fromEnable -> en
         outputUsage: NonBlocking
         type: |-
           asyncRegister\#
-            :: ( ZKnownDomain dom        -- ARG[0]
-               , NFDataX a )            -- ARG[1]
+            :: ( NFDataX a )            -- ARG[1]
             => Clock dom                -- ARG[2]
             -> Reset dom                -- ARG[3]
             -> Enable dom               -- ARG[4]
@@ -1831,7 +1814,7 @@ asyncRegister# clk@ExtractClockDom (unsafeToActiveHigh -> rst) (fromEnable -> en
 {-# ANN asyncRegister# (
   let
     bbName = show 'asyncRegister#
-    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+    _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [Verilog] [__i|
       BlackBox:
@@ -1840,8 +1823,7 @@ asyncRegister# clk@ExtractClockDom (unsafeToActiveHigh -> rst) (fromEnable -> en
         outputUsage: NonBlocking
         type: |-
           asyncRegister\#
-            :: ( ZKnownDomain dom        -- ARG[0]
-               , NFDataX a )            -- ARG[1]
+            :: ( NFDataX a )            -- ARG[1]
             => Clock dom                -- ARG[2]
             -> Reset dom                -- ARG[3]
             -> Enable dom               -- ARG[4]
@@ -1867,7 +1849,7 @@ asyncRegister# clk@ExtractClockDom (unsafeToActiveHigh -> rst) (fromEnable -> en
 {-# ANN asyncRegister# (
   let
     bbName = show 'asyncRegister#
-    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+    _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [VHDL] [__i|
       BlackBox:
@@ -1876,8 +1858,7 @@ asyncRegister# clk@ExtractClockDom (unsafeToActiveHigh -> rst) (fromEnable -> en
         outputUsage: NonBlocking
         type: |-
           asyncRegister\#
-            :: ( ZKnownDomain dom        -- ARG[0]
-               , NFDataX a )            -- ARG[1]
+            :: ( NFDataX a )            -- ARG[1]
             => Clock dom                -- ARG[2]
             -> Reset dom                -- ARG[3]
             -> Enable dom               -- ARG[4]

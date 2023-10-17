@@ -443,7 +443,7 @@ import Clash.Annotations.Primitive
   (Primitive(InlineYamlPrimitive), HDL(..), hasBlackBox)
 import Clash.Class.Num (SaturationMode(SatBound), satSucc)
 import Clash.Explicit.BlockRam.Model (TdpbramModelConfig(..), tdpbramModel)
-import Clash.Explicit.Signal (ZKnownDomain, Enable, register, fromEnable)
+import Clash.Explicit.Signal (Enable, register, fromEnable)
 import Clash.Promoted.Nat (SNat(..))
 import Clash.Signal.Bundle (unbundle)
 import Clash.Signal.Internal
@@ -905,8 +905,7 @@ blockRamU clk rst0 en rstStrategy n@SNat initF rd0 mw0 =
 -- | blockRAMU primitive
 blockRamU#
   :: forall n dom a
-   . ( ZKnownDomain dom
-     , HasCallStack
+   . ( HasCallStack
      , NFDataX a )
   => Clock dom
   -- ^ 'Clock' to synchronize to
@@ -938,7 +937,7 @@ blockRamU# clk en SNat =
 {-# ANN blockRamU# (
   let
     bbName = show 'blockRamU#
-    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< _ = ((0 :: Int)...)
+    _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [SystemVerilog] [__i|
       BlackBox:
@@ -946,8 +945,7 @@ blockRamU# clk en SNat =
         kind: Declaration
         type: |-
           blockRamU\#
-            :: ( ZKnownDomain dom        ARG[0]
-               , HasCallStack  --       ARG[1]
+            :: ( HasCallStack  --       ARG[1]
                , Undefined a ) --       ARG[2]
             => Clock dom       -- clk,  ARG[3]
             -> Enable dom      -- en,   ARG[4]
@@ -987,7 +985,7 @@ blockRamU# clk en SNat =
 {-# ANN blockRamU# (
   let
     bbName = show 'blockRamU#
-    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< _ = ((0 :: Int)...)
+    _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [Verilog] [__i|
       BlackBox:
@@ -996,8 +994,7 @@ blockRamU# clk en SNat =
         outputUsage: NonBlocking
         type: |-
           blockRamU\#
-            :: ( ZKnownDomain dom        ARG[0]
-               , HasCallStack  --       ARG[1]
+            :: ( HasCallStack  --       ARG[1]
                , Undefined a ) --       ARG[2]
             => Clock dom       -- clk,  ARG[3]
             -> Enable dom      -- en,   ARG[4]
@@ -1037,7 +1034,7 @@ blockRamU# clk en SNat =
 {-# ANN blockRamU# (
   let
     bbName = show 'blockRamU#
-    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< _ = ((0 :: Int)...)
+    _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [VHDL] [__i|
       BlackBox:
@@ -1046,8 +1043,7 @@ blockRamU# clk en SNat =
         outputUsage: NonBlocking
         type: |-
           blockRamU\#
-            :: ( ZKnownDomain dom        ARG[0]
-               , HasCallStack  --       ARG[1]
+            :: ( HasCallStack  --       ARG[1]
                , Undefined a ) --       ARG[2]
             => Clock dom       -- clk,  ARG[3]
             -> Enable dom      -- en,   ARG[4]
@@ -1161,8 +1157,7 @@ blockRam1 clk rst0 en rstStrategy n@SNat a rd0 mw0 =
 -- | blockRAM1 primitive
 blockRam1#
   :: forall n dom a
-   . ( ZKnownDomain dom
-     , HasCallStack
+   . ( HasCallStack
      , NFDataX a )
   => Clock dom
   -- ^ 'Clock' to synchronize to
@@ -1191,7 +1186,7 @@ blockRam1# clk en n a =
 {-# ANN blockRam1# (
   let
     bbName = show 'blockRam1#
-    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< _ = ((0 :: Int)...)
+    _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [SystemVerilog] [__i|
       BlackBox:
@@ -1199,8 +1194,7 @@ blockRam1# clk en n a =
         kind: Declaration
         type: |-
           blockRam1\#
-            :: ( ZKnownDomain dom        ARG[0]
-               , HasCallStack  --       ARG[1]
+            :: ( HasCallStack  --       ARG[1]
                , Undefined a ) --       ARG[2]
             => Clock dom       -- clk,  ARG[3]
             -> Enable dom      -- en,   ARG[4]
@@ -1244,7 +1238,7 @@ blockRam1# clk en n a =
 {-# ANN blockRam1# (
   let
     bbName = show 'blockRam1#
-    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< _ = ((0 :: Int)...)
+    _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [Verilog] [__i|
       BlackBox:
@@ -1253,8 +1247,7 @@ blockRam1# clk en n a =
         outputUsage: NonBlocking
         type: |-
           blockRam1\#
-            :: ( ZKnownDomain dom        ARG[0]
-               , HasCallStack  --       ARG[1]
+            :: ( HasCallStack  --       ARG[1]
                , Undefined a ) --       ARG[2]
             => Clock dom       -- clk,  ARG[3]
             -> Enable dom      -- en,   ARG[4]
@@ -1301,7 +1294,7 @@ blockRam1# clk en n a =
 {-# ANN blockRam1# (
   let
     bbName = show 'blockRam1#
-    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< _ = ((0 :: Int)...)
+    _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [VHDL] [__i|
       BlackBox:
@@ -1310,8 +1303,7 @@ blockRam1# clk en n a =
         outputUsage: NonBlocking
         type: |-
           blockRam1\#
-            :: ( ZKnownDomain dom        ARG[0]
-               , HasCallStack  --       ARG[1]
+            :: ( HasCallStack  --       ARG[1]
                , Undefined a ) --       ARG[2]
             => Clock dom       -- clk,  ARG[3]
             -> Enable dom      -- en,   ARG[4]
@@ -1368,8 +1360,7 @@ blockRam1# clk en n a =
 -- | blockRAM primitive
 blockRam#
   :: forall dom a n
-   . ( ZKnownDomain dom
-     , HasCallStack
+   . ( HasCallStack
      , NFDataX a )
   => Clock dom
   -- ^ 'Clock' to synchronize to
@@ -1464,7 +1455,7 @@ blockRam# _ _ _ = error "blockRam#: dynamic clocks not supported"
 {-# ANN blockRam# (
   let
     bbName = show 'blockRam#
-    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< _ = ((0 :: Int)...)
+    _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [SystemVerilog] [__i|
       BlackBox:
@@ -1472,8 +1463,7 @@ blockRam# _ _ _ = error "blockRam#: dynamic clocks not supported"
         kind: Declaration
         type: |-
           blockRam\#
-            :: ( ZKnownDomain dom        ARG[0]
-               , HasCallStack  --       ARG[1]
+            :: ( HasCallStack  --       ARG[1]
                , Undefined a ) --       ARG[2]
             => Clock dom       -- clk,  ARG[3]
             -> Enable dom      -- en,   ARG[4]
@@ -1516,7 +1506,7 @@ blockRam# _ _ _ = error "blockRam#: dynamic clocks not supported"
 {-# ANN blockRam# (
   let
     bbName = show 'blockRam#
-    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< _ = ((0 :: Int)...)
+    _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [Verilog] [__i|
       BlackBox:
@@ -1525,8 +1515,7 @@ blockRam# _ _ _ = error "blockRam#: dynamic clocks not supported"
         outputUsage: NonBlocking
         type: |-
           blockRam\#
-            :: ( ZKnownDomain dom        ARG[0]
-               , HasCallStack  --       ARG[1]
+            :: ( HasCallStack  --       ARG[1]
                , Undefined a ) --       ARG[2]
             => Clock dom       -- clk,  ARG[3]
             => Enable dom      -- en,   ARG[4]
@@ -1574,7 +1563,7 @@ blockRam# _ _ _ = error "blockRam#: dynamic clocks not supported"
 {-# ANN blockRam# (
   let
     bbName = show 'blockRam#
-    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< _ = ((0 :: Int)...)
+    _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [VHDL] [__i|
       BlackBox:
@@ -1583,8 +1572,7 @@ blockRam# _ _ _ = error "blockRam#: dynamic clocks not supported"
         outputUsage: NonBlocking
         type: |-
           blockRam\#
-            :: ( ZKnownDomain dom        ARG[0]
-               , HasCallStack  --       ARG[1]
+            :: ( HasCallStack  --       ARG[1]
                , Undefined a ) --       ARG[2]
             => Clock dom       -- clk,  ARG[3]
             -> Enable dom      -- en,   ARG[4]

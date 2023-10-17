@@ -38,7 +38,7 @@ import Prelude hiding         (length)
 
 import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Signal.Internal
-  (Clock (..), ZKnownDomain, Signal (..), Enable, fromEnable)
+  (Clock (..), Signal (..), Enable, fromEnable)
 import Clash.Sized.Unsigned   (Unsigned)
 import Clash.Sized.Vector     (Vec, length, toList)
 import Clash.XException       (deepErrorX, seqX, NFDataX)
@@ -111,7 +111,7 @@ rom = \clk en content rd -> rom# clk en content (fromEnum <$> rd)
 -- | ROM primitive
 rom#
   :: forall dom n a
-   . (ZKnownDomain dom, KnownNat n, NFDataX a)
+   . (KnownNat n, NFDataX a)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -152,15 +152,14 @@ rom# !_ en content =
 {-# ANN rom# (
   let
     bbName = show 'rom#
-    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< _ = ((0 :: Int)...)
+    _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [SystemVerilog] [__i|
       BlackBox:
         name: '#{bbName}'
         kind: Declaration
         type: |-
-          rom\# :: ( ZKnownDomain dom        ARG[0]
-                   , KnownNat n    --       ARG[1]
+          rom\# :: ( KnownNat n    --       ARG[1]
                    , Undefined a ) --       ARG[2]
                 => Clock dom       -- clk,  ARG[3]
                 => Enable dom      -- en,   ARG[4]
@@ -188,7 +187,7 @@ rom# !_ en content =
 {-# ANN rom# (
   let
     bbName = show 'rom#
-    _arg0 :< arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< _ = ((0 :: Int)...)
+    arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [Verilog] [__i|
       BlackBox:
@@ -196,8 +195,7 @@ rom# !_ en content =
         kind: Declaration
         outputUsage: NonBlocking
         type: |-
-          rom\# :: ( ZKnownDomain dom        ARG[0]
-                   , KnownNat n    --       ARG[1]
+          rom\# :: ( KnownNat n    --       ARG[1]
                    , Undefined a ) --       ARG[2]
                 => Clock dom       -- clk,  ARG[3]
                 -> Enable dom      -- en,   ARG[4]
@@ -230,7 +228,7 @@ rom# !_ en content =
 {-# ANN rom# (
   let
     bbName = show 'rom#
-    _arg0 :< arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< _ = ((0 :: Int)...)
+    arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< _ = ((0 :: Int)...)
   in
     InlineYamlPrimitive [VHDL] [__i|
       BlackBox:
@@ -238,8 +236,7 @@ rom# !_ en content =
         kind: Declaration
         outputUsage: NonBlocking
         type: |-
-          rom\# :: ( ZKnownDomain dom        ARG[0]
-                   , KnownNat n    --       ARG[1]
+          rom\# :: ( KnownNat n    --       ARG[1]
                    , Undefined a ) --       ARG[2]
                 => Clock dom       -- clk,  ARG[3]
                 -> Enable dom      -- en,   ARG[4]
