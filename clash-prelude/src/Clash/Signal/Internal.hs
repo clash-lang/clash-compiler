@@ -16,6 +16,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -209,6 +210,10 @@ import Clash.Promoted.Nat         (SNat (..), snatToNum, snatToNatural)
 import Clash.Promoted.Symbol      (SSymbol (..), ssymbolToString)
 import Clash.XException
   (NFDataX(..), errorX, isX, deepseqX, defaultSeqX, seqX)
+
+import Clash.Annotations.Primitive(Primitive (InlineYamlPrimitive), HDL(..))
+import Data.List.Infinite (Infinite((:<)), (...))
+import Data.String.Interpolate (__i)
 
 {- $setup
 >>> :set -XDataKinds
@@ -1458,6 +1463,117 @@ delay# (Clock dom _) (fromEnable -> en) powerUpVal0 =
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE delay# #-}
 {-# ANN delay# hasBlackBox #-}
+{-# ANN delay# (
+  let
+    bbName = show 'delay#
+    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [SystemVerilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          delay\#
+            :: ( ZKnownDomain dom        -- ARG[0]
+               , Undefined a )          -- ARG[1]
+            => Clock dom                -- ARG[2]
+            -> Enable dom               -- ARG[3]
+            -> a                        -- ARG[4]
+            -> Signal clk a             -- ARG[5]
+            -> Signal clk a
+        resultInit:
+          template: ~IF ~ISINITDEFINED[#{arg2}] ~THEN~CONST[#{arg4}]~ELSE~FI
+        resultName:
+          template: ~CTXNAME
+        template: |-
+          // delay begin~IF ~ISACTIVEENABLE[#{arg3}] ~THEN
+          always_ff @(~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg2}]) begin : ~GENSYM[~RESULT_delay][1]
+            if (~ARG[#{arg3}]) begin
+              ~RESULT <= ~ARG[#{arg5}];
+            end
+          end~ELSE
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg2}]) begin : ~SYM[1]
+            ~RESULT <= ~ARG[#{arg5}];
+          end~FI
+          // delay end
+    |]) #-}
+{-# ANN delay# (
+  let
+    bbName = show 'delay#
+    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [Verilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          delay\#
+            :: ( ZKnownDomain dom        -- ARG[0]
+               , Undefined a )          -- ARG[1]
+            => Clock dom                -- ARG[2]
+            -> Enable dom               -- ARG[3]
+            -> a                        -- ARG[4]
+            -> Signal clk a             -- ARG[5]
+            -> Signal clk a
+        resultInit:
+          template: ~IF ~ISINITDEFINED[#{arg2}] ~THEN~CONST[#{arg4}]~ELSE~FI
+        resultName:
+          template: ~CTXNAME
+        template: |-
+          // delay begin~IF ~ISACTIVEENABLE[#{arg3}] ~THEN
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg2}]) begin : ~GENSYM[~RESULT_delay][1]
+            if (~ARG[#{arg3}]) begin
+              ~RESULT <= ~ARG[#{arg5}];
+            end
+          end~ELSE
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg2}]) begin : ~SYM[1]
+            ~RESULT <= ~ARG[#{arg5}];
+          end~FI
+          // delay end
+    |]) #-}
+{-# ANN delay# (
+  let
+    bbName = show 'delay#
+    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [VHDL] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          delay\#
+            :: ( ZKnownDomain dom        -- ARG[0]
+               , Undefined a )          -- ARG[1]
+            => Clock dom                -- ARG[2]
+            -> Enable dom               -- ARG[3]
+            -> a                        -- ARG[4]
+            -> Signal clk a             -- ARG[5]
+            -> Signal clk a
+        resultInit:
+          template: ~IF ~ISINITDEFINED[#{arg2}] ~THEN~CONST[#{arg4}]~ELSE~FI
+        resultName:
+          template: ~CTXNAME
+        template: |-
+          -- delay begin~IF ~ISACTIVEENABLE[#{arg3}] ~THEN
+          ~GENSYM[~RESULT_delay][4] : process(~ARG[#{arg2}])
+          begin
+            if ~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg2}]) then
+              if ~ARG[#{arg3}] then
+                ~RESULT <= ~ARG[#{arg5}];
+              end if;
+            end if;
+          end process;~ELSE
+          ~SYM[4] : process(~ARG[#{arg2}])
+          begin
+            if ~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg2}]) then
+              ~RESULT <= ~ARG[#{arg5}];
+            end if;
+          end process;~FI
+          -- delay end
+    |]) #-}
 
 -- | A register with a power up and reset value. Power up values are not
 -- supported on all platforms, please consult the manual of your target platform
@@ -1492,6 +1608,145 @@ register# clk@(Clock dom _) rst ena powerUpVal resetVal =
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE register# #-}
 {-# ANN register# hasBlackBox #-}
+{-# ANN register# (
+  let
+    bbName = show 'register#
+    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [SystemVerilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          register\#
+            :: ( ZKnownDomain dom        -- ARG[0]
+               , Undefined a )          -- ARG[1]
+            => Clock dom                -- ARG[2]
+            -> Reset dom                -- ARG[3]
+            -> Enable dom               -- ARG[4]
+            -> a                        -- ARG[5] (powerup value)
+            -> a                        -- ARG[6] (reset value)
+            -> Signal clk a             -- ARG[7]
+            -> Signal clk a
+        resultInit:
+          template: ~IF ~ISINITDEFINED[#{arg2}] ~THEN~CONST[#{arg5}]~ELSE~FI
+        resultName:
+          template: ~CTXNAME
+        template: |-
+          // register begin
+          always_ff @(~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg2}]~IF ~ISSYNC[#{arg3}] ~THEN ~ELSE~IF ~ISUNDEFINED[#{arg6}] ~THEN ~ELSE or ~IF ~ISACTIVEHIGH[#{arg3}] ~THEN posedge ~ELSE negedge ~FI ~VAR[rst][#{arg3}]~FI~FI) begin : ~GENSYM[~RESULT_register][1]
+            ~IF ~ISUNDEFINED[#{arg6}] ~THEN ~ELSEif (~IF ~ISACTIVEHIGH[#{arg3}] ~THEN ~ELSE ! ~FI~VAR[rst][#{arg3}]) begin
+              ~RESULT <= ~CONST[#{arg6}];
+            end else ~FI~IF ~ISACTIVEENABLE[#{arg4}] ~THEN if (~ARG[#{arg4}]) ~ELSE ~FI begin
+              ~RESULT <= ~ARG[#{arg7}];
+            end
+          end
+          // register end
+    |]) #-}
+{-# ANN register# (
+  let
+    bbName = show 'register#
+    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [Verilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          register\#
+            :: ( ZKnownDomain dom        -- ARG[0]
+               , Undefined a )          -- ARG[1]
+            => Clock dom                -- ARG[2]
+            -> Reset dom                -- ARG[3]
+            -> Enable dom               -- ARG[4]
+            -> a                        -- ARG[5] (powerup value)
+            -> a                        -- ARG[6] (reset value)
+            -> Signal clk a             -- ARG[7]
+            -> Signal clk a
+        resultInit:
+          template: ~IF ~ISINITDEFINED[#{arg2}] ~THEN~CONST[#{arg5}]~ELSE~FI
+        resultName:
+          template: ~CTXNAME
+        template: |-
+          // register begin
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg2}]~IF ~ISSYNC[#{arg3}] ~THEN ~ELSE~IF ~ISUNDEFINED[#{arg6}] ~THEN ~ELSE or ~IF ~ISACTIVEHIGH[#{arg3}] ~THEN posedge ~ELSE negedge ~FI ~VAR[rst][#{arg3}]~FI~FI) begin : ~GENSYM[~RESULT_register][1]
+            ~IF ~ISUNDEFINED[#{arg6}] ~THEN ~ELSEif (~IF ~ISACTIVEHIGH[#{arg3}] ~THEN ~ELSE ! ~FI~VAR[rst][#{arg3}]) begin
+              ~RESULT <= ~CONST[#{arg6}];
+            end else ~FI~IF ~ISACTIVEENABLE[#{arg4}] ~THENif (~ARG[#{arg4}]) ~ELSE~FIbegin
+              ~RESULT <= ~ARG[#{arg7}];
+            end
+          end
+          // register end
+    |]) #-}
+{-# ANN register# (
+  let
+    bbName = show 'register#
+    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [VHDL] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          register\#
+            :: ( ZKnownDomain dom        -- ARG[0]
+               , NFDataX a )            -- ARG[1]
+            => Clock dom                -- ARG[2]
+            -> Reset dom                -- ARG[3]
+            -> Enable dom               -- ARG[4]
+            -> a                        -- ARG[5] (powerup value)
+            -> a                        -- ARG[6] (reset value)
+            -> Signal clk a             -- ARG[7]
+            -> Signal clk a
+        resultInit:
+          template: ~IF ~ISINITDEFINED[#{arg2}] ~THEN~CONST[#{arg5}]~ELSE~FI
+        resultName:
+          template: ~CTXNAME
+        template: |-
+          -- register begin~IF ~ISACTIVEENABLE[#{arg4}] ~THEN ~IF ~ISSYNC[#{arg3}] ~THEN
+          ~GENSYM[~RESULT_register][2] : process(~ARG[#{arg2}])
+          begin
+            if ~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg2}]) then
+              ~IF ~ISUNDEFINED[#{arg6}] ~THEN ~ELSEif ~ARG[#{arg3}] = ~IF ~ISACTIVEHIGH[#{arg3}] ~THEN '1' ~ELSE '0' ~FI then
+                ~RESULT <= ~CONST[#{arg6}];
+              els~FIif ~ARG[#{arg4}] then
+                ~RESULT <= ~ARG[#{arg7}];
+              end if;
+            end if;
+          end process;~ELSE
+          ~SYM[2] : process(~ARG[#{arg2}]~IF ~ISUNDEFINED[#{arg6}] ~THEN ~ELSE,~ARG[#{arg3}]~FI)
+          begin
+            ~IF ~ISUNDEFINED[#{arg6}] ~THEN ~ELSEif ~ARG[#{arg3}] = ~IF ~ISACTIVEHIGH[#{arg3}] ~THEN '1' ~ELSE '0' ~FI then
+              ~RESULT <= ~CONST[#{arg6}];
+            els~FIif ~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg2}]) then
+              if ~ARG[#{arg4}] then
+                ~RESULT <= ~ARG[#{arg7}];
+              end if;
+            end if;
+          end process;~FI~ELSE ~IF ~ISSYNC[#{arg3}] ~THEN
+          ~SYM[2] : process(~ARG[#{arg2}])
+          begin
+            if ~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg2}]) then
+              ~IF ~ISUNDEFINED[#{arg6}] ~THEN ~ELSEif ~ARG[#{arg3}] = ~IF ~ISACTIVEHIGH[#{arg3}] ~THEN '1' ~ELSE '0' ~FI then
+                ~RESULT <= ~CONST[#{arg6}];
+              else
+                ~FI~RESULT <= ~ARG[#{arg7}];
+              ~IF ~ISUNDEFINED[#{arg6}] ~THEN ~ELSEend if;~FI
+            end if;
+          end process;~ELSE
+          ~SYM[2] : process(~ARG[#{arg2}]~IF ~ISUNDEFINED[#{arg6}] ~THEN ~ELSE,~ARG[#{arg3}]~FI)
+          begin
+            ~IF ~ISUNDEFINED[#{arg6}] ~THEN ~ELSEif ~ARG[#{arg3}] = ~IF ~ISACTIVEHIGH[#{arg3}] ~THEN '1' ~ELSE '0' ~FI then
+              ~RESULT <= ~CONST[#{arg6}];
+            els~FIif ~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg2}]) then
+              ~RESULT <= ~ARG[#{arg7}];
+            end if;
+          end process;~FI~FI
+          -- register end
+    |]) #-}
 
 -- | Acts like 'id' if given domain allows powerup values, but returns a
 -- value constructed with 'deepErrorX' otherwise.
@@ -1537,6 +1792,121 @@ asyncRegister# clk@ExtractClockDom (unsafeToActiveHigh -> rst) (fromEnable -> en
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE asyncRegister# #-}
 {-# ANN asyncRegister# hasBlackBox #-}
+{-# ANN asyncRegister# (
+  let
+    bbName = show 'asyncRegister#
+    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [SystemVerilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          asyncRegister\#
+            :: ( ZKnownDomain dom        -- ARG[0]
+               , NFDataX a )            -- ARG[1]
+            => Clock dom                -- ARG[2]
+            -> Reset dom                -- ARG[3]
+            -> Enable dom               -- ARG[4]
+            -> a                        -- ARG[5] (powerup value)
+            -> a                        -- ARG[6] (reset value)
+            -> Signal clk a             -- ARG[7]
+            -> Signal clk a
+        resultInit:
+          template: ~IF ~ISINITDEFINED[#{arg2}] ~THEN~CONST[#{arg5}]~ELSE~FI
+        resultName:
+          template: ~CTXNAME
+        template: |-
+          // async register begin
+          always_ff @(~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg2}]~IF ~ISUNDEFINED[#{arg6}] ~THEN ~ELSE or ~IF ~ISACTIVEHIGH[#{arg3}] ~THEN posedge ~ELSE negedge ~FI ~VAR[rst][#{arg3}]~FI) begin : ~GENSYM[~RESULT_register][1]
+            ~IF ~ISUNDEFINED[#{arg6}] ~THEN ~ELSEif (~IF ~ISACTIVEHIGH[#{arg3}] ~THEN ~ELSE ! ~FI~VAR[rst][#{arg3}]) begin
+              ~RESULT <= ~CONST[#{arg6}];
+            end else ~FI~IF ~ISACTIVEENABLE[#{arg4}] ~THEN if (~ARG[#{arg4}]) ~ELSE ~FI begin
+              ~RESULT <= ~ARG[#{arg7}];
+            end
+          end
+          // async register end
+    |]) #-}
+{-# ANN asyncRegister# (
+  let
+    bbName = show 'asyncRegister#
+    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [Verilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          asyncRegister\#
+            :: ( ZKnownDomain dom        -- ARG[0]
+               , NFDataX a )            -- ARG[1]
+            => Clock dom                -- ARG[2]
+            -> Reset dom                -- ARG[3]
+            -> Enable dom               -- ARG[4]
+            -> a                        -- ARG[5] (powerup value)
+            -> a                        -- ARG[6] (reset value)
+            -> Signal clk a             -- ARG[7]
+            -> Signal clk a
+        resultInit:
+          template: ~IF ~ISINITDEFINED[#{arg2}] ~THEN~CONST[#{arg5}]~ELSE~FI
+        resultName:
+          template: ~CTXNAME
+        template: |-
+          // async register begin
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg2}]~IF ~ISUNDEFINED[#{arg6}] ~THEN ~ELSE or ~IF ~ISACTIVEHIGH[#{arg3}] ~THEN posedge ~ELSE negedge ~FI ~VAR[rst][#{arg3}]~FI) begin : ~GENSYM[~RESULT_register][1]
+            ~IF ~ISUNDEFINED[#{arg6}] ~THEN ~ELSEif (~IF ~ISACTIVEHIGH[#{arg3}] ~THEN ~ELSE ! ~FI~VAR[rst][#{arg3}]) begin
+              ~RESULT <= ~CONST[#{arg6}];
+            end else ~FI~IF ~ISACTIVEENABLE[#{arg4}] ~THENif (~ARG[#{arg4}]) ~ELSE~FIbegin
+              ~RESULT <= ~ARG[#{arg7}];
+            end
+          end
+          // async register end
+    |]) #-}
+{-# ANN asyncRegister# (
+  let
+    bbName = show 'asyncRegister#
+    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [VHDL] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          asyncRegister\#
+            :: ( ZKnownDomain dom        -- ARG[0]
+               , NFDataX a )            -- ARG[1]
+            => Clock dom                -- ARG[2]
+            -> Reset dom                -- ARG[3]
+            -> Enable dom               -- ARG[4]
+            -> a                        -- ARG[5] (powerup value)
+            -> a                        -- ARG[6] (reset value)
+            -> Signal clk a             -- ARG[7]
+            -> Signal clk a
+        resultInit:
+          template: ~IF ~ISINITDEFINED[#{arg2}] ~THEN~CONST[#{arg5}]~ELSE~FI
+        resultName:
+          template: ~CTXNAME
+        template: |-
+          -- async register begin
+          ~SYM[2] : process(~ARG[#{arg2}]~IF ~ISUNDEFINED[#{arg6}] ~THEN ~ELSE,~ARG[#{arg3}]~FI)
+          begin
+            ~IF ~ISUNDEFINED[#{arg6}] ~THEN ~ELSEif ~ARG[#{arg3}] = ~IF ~ISACTIVEHIGH[#{arg3}] ~THEN '1' ~ELSE '0' ~FI then
+              ~RESULT <= ~CONST[#{arg6}];
+            els~FIif ~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg2}]) then
+              ~IF ~ISACTIVEENABLE[#{arg4}] ~THEN
+              if ~ARG[#{arg4}] then
+                ~RESULT <= ~ARG[#{arg7}];
+              end if;
+              ~ELSE
+              ~RESULT <= ~ARG[#{arg7}];
+              ~FI
+            end if;
+          end process;
+          -- async register end
+    |]) #-}
 
 -- | Version of 'register#' that simulates a register on a synchronous
 -- domain. Not synthesizable.

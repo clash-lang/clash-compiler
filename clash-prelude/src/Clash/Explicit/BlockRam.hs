@@ -935,6 +935,170 @@ blockRamU# clk en SNat =
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE blockRamU# #-}
 {-# ANN blockRamU# hasBlackBox #-}
+{-# ANN blockRamU# (
+  let
+    bbName = show 'blockRamU#
+    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [SystemVerilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        type: |-
+          blockRamU\#
+            :: ( ZKnownDomain dom        ARG[0]
+               , HasCallStack  --       ARG[1]
+               , Undefined a ) --       ARG[2]
+            => Clock dom       -- clk,  ARG[3]
+            -> Enable dom      -- en,   ARG[4]
+            -> SNat n          -- len,  ARG[5]
+            -> Signal dom Int  -- rd,   ARG[6]
+            -> Signal dom Bool -- wren, ARG[7]
+            -> Signal dom Int  -- wr,   ARG[8]
+            -> Signal dom a    -- din,  ARG[9]
+            -> Signal dom a
+        template: |-
+          // blockRamU begin,
+          ~TYPO ~GENSYM[~RESULT_RAM][1] [0:~LIT[#{arg5}]-1];
+          logic [~SIZE[~TYP[#{arg9}]]-1:0] ~GENSYM[~RESULT_q][2];~IF ~ISACTIVEENABLE[#{arg4}] ~THEN
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
+            if (~ARG[#{arg4}]) begin
+              if (~ARG[#{arg7}]) begin
+                ~SYM[1][~ARG[#{arg8}]] <= ~TOBV[~ARG[#{arg9}]][~TYP[#{arg9}]];
+              end
+              ~SYM[2] <= ~SYM[1][~ARG[#{arg6}]];
+            end~ELSE
+            if (~ARG[#{arg7}] & ~ARG[#{arg4}]) begin
+              ~SYM[1][~ARG[#{arg8}]] <= ~TOBV[~ARG[#{arg9}]][~TYP[#{arg9}]];
+            end
+            if (~ARG[#{arg4}]) begin
+              ~SYM[2] <= ~SYM[1][~ARG[#{arg6}]];
+            end~FI
+          end~ELSE
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~SYM[3]
+            if (~ARG[#{arg7}]) begin
+              ~SYM[1][~ARG[#{arg8}]] <= ~TOBV[~ARG[#{arg9}]][~TYP[#{arg9}]];
+            end
+            ~SYM[2] <= ~SYM[1][~ARG[#{arg6}]];
+          end~FI
+          assign ~RESULT = ~FROMBV[~SYM[2]][~TYP[#{arg9}]];
+          // blockRamU end
+    |]) #-}
+{-# ANN blockRamU# (
+  let
+    bbName = show 'blockRamU#
+    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [Verilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          blockRamU\#
+            :: ( ZKnownDomain dom        ARG[0]
+               , HasCallStack  --       ARG[1]
+               , Undefined a ) --       ARG[2]
+            => Clock dom       -- clk,  ARG[3]
+            -> Enable dom      -- en,   ARG[4]
+            -> SNat n          -- len,  ARG[5]
+            -> Signal dom Int  -- rd,   ARG[6]
+            -> Signal dom Bool -- wren, ARG[7]
+            -> Signal dom Int  -- wr,   ARG[8]
+            -> Signal dom a    -- din,  ARG[9]
+            -> Signal dom a
+        template: |-
+          // blockRamU begin
+          reg ~TYPO ~GENSYM[~RESULT_RAM][0] [0:~LIT[#{arg5}]-1];
+
+          ~IF ~ISACTIVEENABLE[#{arg4}] ~THEN
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
+            if (~ARG[#{arg4}]) begin
+              if (~ARG[#{arg7}]) begin
+                ~SYM[0][~ARG[#{arg8}]] <= ~ARG[#{arg9}];
+              end
+              ~RESULT <= ~SYM[0][~ARG[#{arg6}]];
+            end~ELSE
+            if (~ARG[#{arg7}] & ~ARG[#{arg4}]) begin
+              ~SYM[0][~ARG[#{arg8}]] <= ~ARG[#{arg9}];
+            end
+            if (~ARG[#{arg4}]) begin
+              ~RESULT <= ~SYM[0][~ARG[#{arg6}]];
+            end~FI
+          end~ELSE
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~SYM[5]
+            if (~ARG[#{arg7}]) begin
+              ~SYM[0][~ARG[#{arg8}]] <= ~ARG[#{arg9}];
+            end
+            ~RESULT <= ~SYM[0][~ARG[#{arg6}]];
+          end~FI
+          // blockRamU end
+    |]) #-}
+{-# ANN blockRamU# (
+  let
+    bbName = show 'blockRamU#
+    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [VHDL] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          blockRamU\#
+            :: ( ZKnownDomain dom        ARG[0]
+               , HasCallStack  --       ARG[1]
+               , Undefined a ) --       ARG[2]
+            => Clock dom       -- clk,  ARG[3]
+            -> Enable dom      -- en,   ARG[4]
+            -> SNat n          -- len,  ARG[5]
+            -> Signal dom Int  -- rd,   ARG[6]
+            -> Signal dom Bool -- wren, ARG[7]
+            -> Signal dom Int  -- wr,   ARG[8]
+            -> Signal dom a    -- din,  ARG[9]
+            -> Signal dom a
+        template: |-
+          -- blockRamU begin
+          ~GENSYM[~RESULT_blockRam][1] : block~IF ~VIVADO ~THEN
+            type ~GENSYM[ram_t][8] is array (0 to integer'(~LIT[#{arg5}])-1) of std_logic_vector(~SIZE[~TYP[#{arg9}]]-1 downto 0);~ELSE
+            type ~SYM[8] is array (0 to integer'(~LIT[#{arg5}])-1) of ~TYP[#{arg9}];~FI
+            signal ~GENSYM[~RESULT_RAM][2] : ~SYM[8];
+            signal ~GENSYM[rd][4]  : integer range 0 to ~LIT[#{arg5}] - 1;
+            signal ~GENSYM[wr][5]  : integer range 0 to ~LIT[#{arg5}] - 1;
+          begin
+            ~SYM[4] <= to_integer(~VAR[rdI][#{arg6}](31 downto 0))
+            -- pragma translate_off
+                          mod ~LIT[#{arg5}]
+            -- pragma translate_on
+                          ;
+
+            ~SYM[5] <= to_integer(~VAR[wrI][#{arg8}](31 downto 0))
+            -- pragma translate_off
+                          mod ~LIT[#{arg5}]
+            -- pragma translate_on
+                          ;
+          ~IF ~VIVADO ~THEN
+            ~SYM[6] : process(~ARG[#{arg3}])
+            begin
+              if ~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg3}]) then
+                if ~ARG[#{arg7}] ~IF ~ISACTIVEENABLE[#{arg4}] ~THEN and ~ARG[#{arg4}] ~ELSE ~FI then
+                  ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[#{arg9}]][~TYP[#{arg9}]];
+                end if;
+                ~RESULT <= fromSLV(~SYM[2](~SYM[4]));
+              end if;
+            end process; ~ELSE
+            ~SYM[6] : process(~ARG[#{arg3}])
+            begin
+              if ~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg3}]) then
+                if ~ARG[#{arg7}] ~IF ~ISACTIVEENABLE[#{arg4}] ~THEN and ~ARG[#{arg4}] ~ELSE ~FI then
+                  ~SYM[2](~SYM[5]) <= ~ARG[#{arg9}];
+                end if;
+                ~RESULT <= ~SYM[2](~SYM[4]);
+              end if;
+            end process; ~FI
+          end block;
+          --end blockRamU
+    |]) #-}
 
 -- | A version of 'blockRam' that is initialized with the same value on all
 -- memory positions
@@ -1024,6 +1188,182 @@ blockRam1# clk en n a =
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE blockRam1# #-}
 {-# ANN blockRam1# hasBlackBox #-}
+{-# ANN blockRam1# (
+  let
+    bbName = show 'blockRam1#
+    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [SystemVerilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        type: |-
+          blockRam1\#
+            :: ( ZKnownDomain dom        ARG[0]
+               , HasCallStack  --       ARG[1]
+               , Undefined a ) --       ARG[2]
+            => Clock dom       -- clk,  ARG[3]
+            -> Enable dom      -- en,   ARG[4]
+            -> SNat n          -- len,  ARG[5]
+            -> a               -- init, ARG[6]
+            -> Signal dom Int  -- rd,   ARG[7]
+            -> Signal dom Bool -- wren, ARG[8]
+            -> Signal dom Int  -- wr,   ARG[9]
+            -> Signal dom a    -- din,  ARG[10]
+            -> Signal dom a
+        template: |-
+          // blockRam1 begin,
+          ~TYPO ~GENSYM[~RESULT_RAM][1] [0:~LIT[#{arg5}]-1];
+          logic [~SIZE[~TYP[#{arg10}]]-1:0] ~GENSYM[~RESULT_q][2];
+          initial begin
+            ~SYM[1] = '{default: ~CONST[#{arg6}]};
+          end~IF ~ISACTIVEENABLE[#{arg4}] ~THEN
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
+            if (~ARG[#{arg4}]) begin
+              if (~ARG[#{arg8}]) begin
+                ~SYM[1][~ARG[#{arg9}]] <= ~TOBV[~ARG[#{arg10}]][~TYP[#{arg10}]];
+              end
+              ~SYM[2] <= ~SYM[1][~ARG[#{arg7}]];
+            end~ELSE
+            if (~ARG[#{arg8}] & ~ARG[#{arg4}]) begin
+              ~SYM[1][~ARG[#{arg9}]] <= ~TOBV[~ARG[#{arg10}]][~TYP[#{arg10}]];
+            end
+            if (~ARG[#{arg4}]) begin
+              ~SYM[2] <= ~SYM[1][~ARG[#{arg7}]];
+            end~FI
+          end~ELSE
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~SYM[3]
+            if (~ARG[#{arg8}]) begin
+              ~SYM[1][~ARG[#{arg9}]] <= ~TOBV[~ARG[#{arg10}]][~TYP[#{arg10}]];
+            end
+            ~SYM[2] <= ~SYM[1][~ARG[#{arg7}]];
+          end~FI
+          assign ~RESULT = ~FROMBV[~SYM[2]][~TYP[#{arg10}]];
+          // blockRam1 end
+    |]) #-}
+{-# ANN blockRam1# (
+  let
+    bbName = show 'blockRam1#
+    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [Verilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          blockRam1\#
+            :: ( ZKnownDomain dom        ARG[0]
+               , HasCallStack  --       ARG[1]
+               , Undefined a ) --       ARG[2]
+            => Clock dom       -- clk,  ARG[3]
+            -> Enable dom      -- en,   ARG[4]
+            -> SNat n          -- len,  ARG[5]
+            -> a               -- init, ARG[6]
+            -> Signal dom Int  -- rd,   ARG[7]
+            -> Signal dom Bool -- wren, ARG[8]
+            -> Signal dom Int  -- wr,   ARG[9]
+            -> Signal dom a    -- din,  ARG[10]
+            -> Signal dom a
+        template: |-
+          // blockRam1 begin
+          reg ~TYPO ~GENSYM[~RESULT_RAM][0] [0:~LIT[#{arg5}]-1];
+          integer ~GENSYM[i][1];
+          initial begin
+              for (~SYM[1]=0;~SYM[1]<~LIT[#{arg5}];~SYM[1]=~SYM[1]+1) begin
+                  ~SYM[0][~SYM[1]] = ~CONST[#{arg6}];
+              end
+          end
+
+          ~IF ~ISACTIVEENABLE[#{arg4}] ~THEN
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
+            if (~ARG[#{arg4}]) begin
+              if (~ARG[#{arg8}]) begin
+                ~SYM[0][~ARG[#{arg9}]] <= ~ARG[#{arg10}];
+              end
+              ~RESULT <= ~SYM[0][~ARG[#{arg7}]];
+            end~ELSE
+            if (~ARG[#{arg8}] & ~ARG[#{arg4}]) begin
+              ~SYM[0][~ARG[#{arg9}]] <= ~ARG[#{arg10}];
+            end
+            if (~ARG[#{arg4}]) begin
+              ~RESULT <= ~SYM[0][~ARG[#{arg7}]];
+            end~FI
+          end~ELSE
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~SYM[5]
+            if (~ARG[#{arg8}]) begin
+              ~SYM[0][~ARG[#{arg9}]] <= ~ARG[#{arg10}];
+            end
+            ~RESULT <= ~SYM[0][~ARG[#{arg7}]];
+          end~FI
+          // blockRam1 end
+    |]) #-}
+{-# ANN blockRam1# (
+  let
+    bbName = show 'blockRam1#
+    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [VHDL] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          blockRam1\#
+            :: ( ZKnownDomain dom        ARG[0]
+               , HasCallStack  --       ARG[1]
+               , Undefined a ) --       ARG[2]
+            => Clock dom       -- clk,  ARG[3]
+            -> Enable dom      -- en,   ARG[4]
+            -> SNat n          -- len,  ARG[5]
+            -> a               -- init, ARG[6]
+            -> Signal dom Int  -- rd,   ARG[7]
+            -> Signal dom Bool -- wren, ARG[8]
+            -> Signal dom Int  -- wr,   ARG[9]
+            -> Signal dom a    -- din,  ARG[10]
+            -> Signal dom a
+        template: |-
+          -- blockRam1 begin
+          ~GENSYM[~RESULT_blockRam][1] : block~IF ~VIVADO ~THEN
+            type ~GENSYM[ram_t][8] is array (0 to integer'(~LIT[#{arg5}])-1) of std_logic_vector(~SIZE[~TYP[#{arg6}]]-1 downto 0);~ELSE
+            type ~SYM[8] is array (0 to integer'(~LIT[#{arg5}])-1) of ~TYP[#{arg6}];~FI
+            signal ~GENSYM[~RESULT_RAM][2] : ~SYM[8] := (others => ~IF ~VIVADO ~THEN~TOBV[~CONST[#{arg6}]][~TYP[#{arg6}]]~ELSE~CONST[#{arg6}]~FI);
+            signal ~GENSYM[rd][4]  : integer range 0 to ~LIT[#{arg5}] - 1;
+            signal ~GENSYM[wr][5]  : integer range 0 to ~LIT[#{arg5}] - 1;
+          begin
+            ~SYM[4] <= to_integer(~VAR[rdI][#{arg7}](31 downto 0))
+            -- pragma translate_off
+                          mod ~LIT[#{arg5}]
+            -- pragma translate_on
+                          ;
+
+            ~SYM[5] <= to_integer(~VAR[wrI][#{arg9}](31 downto 0))
+            -- pragma translate_off
+                          mod ~LIT[#{arg5}]
+            -- pragma translate_on
+                          ;
+          ~IF ~VIVADO ~THEN
+            ~SYM[6] : process(~ARG[#{arg3}])
+            begin
+              if ~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg3}]) then
+                if ~ARG[#{arg8}] ~IF ~ISACTIVEENABLE[#{arg4}] ~THEN and ~ARG[#{arg4}] ~ELSE ~FI then
+                  ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[#{arg10}]][~TYP[#{arg10}]];
+                end if;
+                ~RESULT <= fromSLV(~SYM[2](~SYM[4]));
+              end if;
+            end process; ~ELSE
+            ~SYM[6] : process(~ARG[#{arg3}])
+            begin
+              if ~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg3}]) then
+                if ~ARG[#{arg8}] ~IF ~ISACTIVEENABLE[#{arg4}] ~THEN and ~ARG[#{arg4}] ~ELSE ~FI then
+                  ~SYM[2](~SYM[5]) <= ~ARG[#{arg10}];
+                end if;
+                ~RESULT <= ~SYM[2](~SYM[4]);
+              end if;
+            end process; ~FI
+          end block;
+          --end blockRam1
+    |]) #-}
 
 -- | blockRAM primitive
 blockRam#
@@ -1121,6 +1461,179 @@ blockRam# _ _ _ = error "blockRam#: dynamic clocks not supported"
 {-# ANN blockRam# hasBlackBox #-}
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE blockRam# #-}
+{-# ANN blockRam# (
+  let
+    bbName = show 'blockRam#
+    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [SystemVerilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        type: |-
+          blockRam\#
+            :: ( ZKnownDomain dom        ARG[0]
+               , HasCallStack  --       ARG[1]
+               , Undefined a ) --       ARG[2]
+            => Clock dom       -- clk,  ARG[3]
+            -> Enable dom      -- en,   ARG[4]
+            -> Vec n a         -- init, ARG[5]
+            -> Signal dom Int  -- rd,   ARG[6]
+            -> Signal dom Bool -- wren, ARG[7]
+            -> Signal dom Int  -- wr,   ARG[8]
+            -> Signal dom a    -- din,  ARG[9]
+            -> Signal dom a
+        template: |-
+          // blockRam begin
+          ~SIGD[~GENSYM[RAM][1]][#{arg5}];
+          logic [~SIZE[~TYP[#{arg9}]]-1:0] ~GENSYM[~RESULT_q][2];
+          initial begin
+            ~SYM[1] = ~CONST[#{arg5}];
+          end~IF ~ISACTIVEENABLE[#{arg4}] ~THEN
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
+            if (~ARG[#{arg4}]) begin
+              if (~ARG[#{arg7}]) begin
+                ~SYM[1][~ARG[#{arg8}]] <= ~TOBV[~ARG[#{arg9}]][~TYP[#{arg9}]];
+              end
+              ~SYM[2] <= ~SYM[1][~ARG[#{arg6}]];
+            end~ELSE
+            if (~ARG[#{arg7}] & ~ARG[#{arg4}]) begin
+              ~SYM[1][~ARG[#{arg8}]] <= ~TOBV[~ARG[#{arg9}]][~TYP[#{arg9}]];
+            end
+            if (~ARG[#{arg4}]) begin
+              ~SYM[2] <= ~SYM[1][~ARG[#{arg6}]];
+            end~FI
+          end~ELSE
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~SYM[3]
+            if (~ARG[#{arg7}]) begin
+              ~SYM[1][~ARG[#{arg8}]] <= ~TOBV[~ARG[#{arg9}]][~TYP[#{arg9}]];
+            end
+            ~SYM[2] <= ~SYM[1][~ARG[#{arg6}]];
+          end~FI
+          assign ~RESULT = ~FROMBV[~SYM[2]][~TYP[#{arg9}]];
+          // blockRam end
+    |]) #-}
+{-# ANN blockRam# (
+  let
+    bbName = show 'blockRam#
+    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [Verilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          blockRam\#
+            :: ( ZKnownDomain dom        ARG[0]
+               , HasCallStack  --       ARG[1]
+               , Undefined a ) --       ARG[2]
+            => Clock dom       -- clk,  ARG[3]
+            => Enable dom      -- en,   ARG[4]
+            -> Vec n a         -- init, ARG[5]
+            -> Signal dom Int  -- rd,   ARG[6]
+            -> Signal dom Bool -- wren, ARG[7]
+            -> Signal dom Int  -- wr,   ARG[8]
+            -> Signal dom a    -- din,  ARG[9]
+            -> Signal dom a
+        template: |-
+          // blockRam begin
+          reg ~TYPO ~GENSYM[~RESULT_RAM][1] [0:~LENGTH[~TYP[#{arg5}]]-1];
+
+          reg ~TYP[#{arg5}] ~GENSYM[ram_init][3];
+          integer ~GENSYM[i][4];
+          initial begin
+            ~SYM[3] = ~CONST[#{arg5}];
+            for (~SYM[4]=0; ~SYM[4] < ~LENGTH[~TYP[#{arg5}]]; ~SYM[4] = ~SYM[4] + 1) begin
+              ~SYM[1][~LENGTH[~TYP[#{arg5}]]-1-~SYM[4]] = ~SYM[3][~SYM[4]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+            end
+          end
+          ~IF ~ISACTIVEENABLE[#{arg4}] ~THEN
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
+            if (~ARG[#{arg4}]) begin
+              if (~ARG[#{arg7}]) begin
+                ~SYM[1][~ARG[#{arg8}]] <= ~ARG[#{arg9}];
+              end
+              ~RESULT <= ~SYM[1][~ARG[#{arg6}]];
+            end~ELSE
+            if (~ARG[#{arg7}] & ~ARG[#{arg4}]) begin
+              ~SYM[1][~ARG[#{arg8}]] <= ~ARG[#{arg9}];
+            end
+            if (~ARG[#{arg4}]) begin
+              ~RESULT <= ~SYM[1][~ARG[#{arg6}]];
+            end~FI
+          end~ELSE
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~SYM[5]
+            if (~ARG[#{arg7}]) begin
+              ~SYM[1][~ARG[#{arg8}]] <= ~ARG[#{arg9}];
+            end
+            ~RESULT <= ~SYM[1][~ARG[#{arg6}]];
+          end~FI
+          // blockRam end
+    |]) #-}
+{-# ANN blockRam# (
+  let
+    bbName = show 'blockRam#
+    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [VHDL] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          blockRam\#
+            :: ( ZKnownDomain dom        ARG[0]
+               , HasCallStack  --       ARG[1]
+               , Undefined a ) --       ARG[2]
+            => Clock dom       -- clk,  ARG[3]
+            -> Enable dom      -- en,   ARG[4]
+            -> Vec n a         -- init, ARG[5]
+            -> Signal dom Int  -- rd,   ARG[6]
+            -> Signal dom Bool -- wren, ARG[7]
+            -> Signal dom Int  -- wr,   ARG[8]
+            -> Signal dom a    -- din,  ARG[9]
+            -> Signal dom a
+        template: |-
+          -- blockRam begin
+          ~GENSYM[~RESULT_blockRam][1] : block
+            signal ~GENSYM[~RESULT_RAM][2] : ~TYP[#{arg5}] := ~CONST[#{arg5}];
+            signal ~GENSYM[rd][4]  : integer range 0 to ~LENGTH[~TYP[#{arg5}]] - 1;
+            signal ~GENSYM[wr][5]  : integer range 0 to ~LENGTH[~TYP[#{arg5}]] - 1;
+          begin
+            ~SYM[4] <= to_integer(~VAR[rdI][#{arg6}](31 downto 0))
+            -- pragma translate_off
+                          mod ~LENGTH[~TYP[#{arg5}]]
+            -- pragma translate_on
+                          ;
+
+            ~SYM[5] <= to_integer(~VAR[wrI][#{arg8}](31 downto 0))
+            -- pragma translate_off
+                          mod ~LENGTH[~TYP[#{arg5}]]
+            -- pragma translate_on
+                          ;
+          ~IF ~VIVADO ~THEN
+            ~SYM[6] : process(~ARG[#{arg3}])
+            begin
+              if ~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg3}]) then
+                if ~ARG[#{arg7}] ~IF ~ISACTIVEENABLE[#{arg4}] ~THEN and ~ARG[#{arg4}] ~ELSE ~FI then
+                  ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[#{arg9}]][~TYP[#{arg9}]];
+                end if;
+                ~RESULT <= fromSLV(~SYM[2](~SYM[4]));
+              end if;
+            end process; ~ELSE
+            ~SYM[6] : process(~ARG[#{arg3}])
+            begin
+              if ~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg3}]) then
+                if ~ARG[#{arg7}] ~IF ~ISACTIVEENABLE[#{arg4}] ~THEN and ~ARG[#{arg4}] ~ELSE ~FI then
+                  ~SYM[2](~SYM[5]) <= ~ARG[#{arg9}];
+                end if;
+                ~RESULT <= ~SYM[2](~SYM[4]);
+              end if;
+            end process; ~FI
+          end block;
+          --end blockRam
+    |]) #-}
 
 -- | Create a read-after-write block RAM from a read-before-write one
 readNew

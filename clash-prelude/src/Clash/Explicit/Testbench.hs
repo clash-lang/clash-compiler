@@ -8,6 +8,8 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-# LANGUAGE Unsafe #-}
@@ -61,6 +63,11 @@ import Clash.Sized.Internal.BitVector
   (BitVector, isLike#)
 import Clash.Sized.Vector    (Vec, (!!), length)
 import Clash.XException      (ShowX (..), XException)
+
+import Clash.Annotations.Primitive(Primitive (InlineYamlPrimitive), HDL(..))
+import Data.List.Infinite (Infinite((:<)), (...))
+import Data.String.Interpolate (__i)
+
 
 -- Note that outputVerifier' is used in $setup, while the examples mention
 -- outputVerifier. This is fine, as the examples have explicit type
@@ -119,6 +126,140 @@ assert clk (Reset _) msg checked expected returned =
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE assert #-}
 {-# ANN assert hasBlackBox #-}
+{-# ANN assert (
+  let
+    bbName = show 'assert
+    _arg0 :< _arg1 :< _arg2 :< arg3 :< _arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [SystemVerilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        type: |-
+          assert
+            :: (ZKnownDomain dom, Eq a, ShowX a)      -- (ARG[0], ARG[1], ARG[2])
+            => Clock dom                             -- ARG[3]
+            -> Reset dom                             -- ARG[4]
+            -> String                                -- ARG[5]
+            -> Signal dom a                          -- Checked value  (ARG[6])
+            -> Signal dom a                          -- Expected value (ARG[7])
+            -> Signal dom b                          -- Return valued  (ARG[8])
+            -> Signal dom b
+        template: |-
+          // assert begin
+          // pragma translate_off
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin
+            if (~ARG[#{arg6}] !== ~ARG[#{arg7}]) begin
+              $display("@%0tns: %s, expected: %b, actual: %b", $time, ~LIT[#{arg5}], ~TOBV[~ARG[#{arg7}]][~TYP[#{arg7}]], ~TOBV[~ARG[#{arg6}]][~TYP[#{arg6}]]);
+              $stop;
+            end
+          end
+          // pragma translate_on
+          assign ~RESULT = ~ARG[#{arg8}];
+          // assert end
+    |]) #-}
+{-# ANN assert (
+  let
+    bbName = show 'assert
+    _arg0 :< _arg1 :< _arg2 :< arg3 :< _arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [Verilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        type: |-
+          assert
+            :: (ZKnownDomain dom, Eq a, ShowX a)      -- (ARG[0], ARG[1], ARG[2])
+            => Clock dom                             -- ARG[3]
+            -> Reset dom                             -- ARG[4]
+            -> String                                -- ARG[5]
+            -> Signal dom a                          -- Checked value  (ARG[6])
+            -> Signal dom a                          -- Expected value (ARG[7])
+            -> Signal dom b                          -- Return valued  (ARG[8])
+            -> Signal dom b
+        template: |-
+          // assert begin
+          // pragma translate_off
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin
+            if (~ARG[#{arg6}] !== ~ARG[#{arg7}]) begin
+              $display("@%0tns: %s, expected: %b, actual: %b", $time, ~LIT[#{arg5}], ~ARG[#{arg7}], ~ARG[#{arg6}]);
+              $finish;
+            end
+          end
+          // pragma translate_on
+          assign ~RESULT = ~ARG[#{arg8}];
+          // assert end
+    |]) #-}
+{-# ANN assert (
+  let
+    bbName = show 'assert
+    _arg0 :< _arg1 :< _arg2 :< arg3 :< _arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [VHDL] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        imports:
+        - ~INCLUDENAME[0].all
+        includes:
+        - name: slv2string
+          extension: vhdl
+          template: |-
+            -- helper function of Clash.Explicit.Testbench.assert
+            library IEEE;
+            use IEEE.STD_LOGIC_1164.ALL;
+
+            package ~INCLUDENAME[0] is
+              function slv2string (slv : std_logic_vector) return STRING;
+            end;
+
+            package body ~INCLUDENAME[0] is
+              function slv2string (slv : std_logic_vector) return STRING is
+                 variable result : string (1 to slv'length);
+                 variable res_l : string (1 to 3);
+                 variable r : integer;
+               begin
+                 r := 1;
+                 for i in slv'range loop
+                    res_l := std_logic'image(slv(i));
+                    result(r) := res_l(2);
+                    r := r + 1;
+                 end loop;
+                 return result;
+              end slv2string;
+            end;
+        kind: Declaration
+        type: |-
+          assert
+            :: (ZKnownDomain dom, Eq a, ShowX a)      -- (ARG[0],ARG[1],ARG[2])
+            => Clock dom                             -- ARG[3]
+            -> Reset dom                             -- ARG[4]
+            -> String                                -- ARG[5]
+            -> Signal dom a                          -- Checked value  (ARG[6])
+            -> Signal dom a                          -- Expected value (ARG[7])
+            -> Signal dom b                          -- Return valued  (ARG[8])
+            -> Signal dom b
+        template: |-
+          -- assert begin
+          ~GENSYM[assert][0] : block
+            -- pragma translate_off
+            signal ~GENSYM[actual][2] : ~TYP[#{arg6}];
+            signal ~GENSYM[expected][3] : ~TYP[#{arg7}];
+            -- pragma translate_on
+          begin
+            -- pragma translate_off
+            ~SYM[2] <= ~ARG[#{arg6}];
+            ~SYM[3] <= ~ARG[#{arg7}];
+            process(~ARG[#{arg3}]) is
+            begin
+              if (~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg3}])) then
+                assert (toSLV(~SYM[2]) = toSLV(~SYM[3])) report (~LIT[#{arg5}] & ", expected: " & ~INCLUDENAME[0].slv2string(toSLV(~SYM[3])) & ", actual: " & ~INCLUDENAME[0].slv2string(toSLV(~SYM[2]))) severity error;
+              end if;
+            end process;
+            -- pragma translate_on
+            ~RESULT <= ~ARG[#{arg8}];
+          end block;
+          -- assert end
+    |]) #-}
 
 -- | The same as 'assert', but can handle don't care bits in its expected value.
 assertBitVector
@@ -154,6 +295,174 @@ assertBitVector clk (Reset _) msg checked expected returned =
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE assertBitVector #-}
 {-# ANN assertBitVector hasBlackBox #-}
+{-# ANN assertBitVector (
+  let
+    bbName = show 'assertBitVector
+    _arg0 :< _arg1 :< arg2 :< _arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [SystemVerilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        type: |-
+          assertBitVector
+            :: ( ZKnownDomain dom        --                 ARG[0]
+               , KnownNat n )           --                 ARG[1]
+            => Clock dom                --                 ARG[2]
+            -> Reset dom                --                 ARG[3]
+            -> String                   --                 ARG[4]
+            -> Signal dom (BitVector n) -- Checked value  (ARG[5])
+            -> Signal dom (BitVector n) -- Expected value (ARG[6])
+            -> Signal dom b             -- Return valued  (ARG[7])
+            -> Signal dom b
+        template: |-
+          // assertBitVector begin
+          // pragma translate_off
+          wire ~TYP[#{arg6}] ~GENSYM[maskXor][0]  = ~ARG[#{arg6}] ^ ~ARG[#{arg6}];
+          wire ~TYP[#{arg6}] ~GENSYM[checked][1]  = ~ARG[#{arg5}] ^ ~SYM[0];
+          wire ~TYP[#{arg6}] ~GENSYM[expected][2] = ~ARG[#{arg6}] ^ ~SYM[0];
+
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg2}]) begin
+            if (~SYM[1] !== ~SYM[2]) begin
+              $display("@%0tns: %s, expected: %b, actual: %b", $time, ~LIT[#{arg4}], ~TOBV[~ARG[#{arg6}]][~TYP[#{arg6}]], ~TOBV[~ARG[#{arg5}]][~TYP[#{arg5}]]);
+              $stop;
+            end
+          end
+          // pragma translate_on
+          assign ~RESULT = ~ARG[#{arg7}];
+          // assertBitVector end
+    |]) #-}
+{-# ANN assertBitVector (
+  let
+    bbName = show 'assertBitVector
+    _arg0 :< _arg1 :< arg2 :< _arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [Verilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        type: |-
+          assertBitVector
+            :: ( ZKnownDomain dom        --                 ARG[0]
+               , KnownNat n             --                 ARG[1]
+            => Clock dom                --                 ARG[2]
+            -> Reset dom                --                 ARG[3]
+            -> String                   --                 ARG[4]
+            -> Signal dom (BitVector n) -- Checked value  (ARG[5])
+            -> Signal dom (BitVector n) -- Expected value (ARG[6])
+            -> Signal dom b             -- Return valued  (ARG[7])
+            -> Signal dom b
+        template: |-
+          // assertBitVector begin
+          // pragma translate_off
+          wire ~TYP[#{arg5}] ~GENSYM[maskXor][0]  = ~ARG[#{arg6}] ^ ~ARG[#{arg6}];
+          wire ~TYP[#{arg5}] ~GENSYM[checked][1]  = ~ARG[#{arg5}] ^ ~SYM[0];
+          wire ~TYP[#{arg5}] ~GENSYM[expected][2] = ~ARG[#{arg6}] ^ ~SYM[0];
+
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg2}]) begin
+            if (~SYM[1] !== ~SYM[2]) begin
+              $display("@%0tns: %s, expected: %b, actual: %b", $time, ~LIT[#{arg4}], ~ARG[#{arg6}], ~ARG[#{arg5}]);
+              $finish;
+            end
+          end
+          // pragma translate_on
+          assign ~RESULT = ~ARG[#{arg7}];
+          // assertBitVector end
+    |]) #-}
+{-# ANN assertBitVector (
+  let
+    bbName = show 'assertBitVector
+    _arg0 :< _arg1 :< arg2 :< _arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [VHDL] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        imports:
+        - ~INCLUDENAME[0].all
+        includes:
+        - name: assertBitVector
+          extension: vhdl
+          template: |
+            -- helper functions of Clash.Explicit.Testbench.assertBitVector
+            library IEEE;
+            use IEEE.STD_LOGIC_1164.ALL;
+
+            package ~INCLUDENAME[0] is
+              function non_std_match (l, r : std_logic_vector) return boolean;
+              function slv2string (slv : std_logic_vector) return STRING;
+            end;
+
+            package body ~INCLUDENAME[0] is
+              type match_table_type is array (std_ulogic, std_ulogic) of boolean;
+              constant match_table: match_table_type :=
+                ('0' | 'L' => ('0' | 'L' | '-' => true, others => false),
+                 '1' | 'H' => ('1' | 'H' | '-' => true, others => false),
+                 '-' => ('-' => true, others => false),
+                 others    =>             ('-' => true, others => false)
+                );
+              -- non_std_match is like std_match
+              -- But only accepts '-' as don't care in its the second argument r.
+              function non_std_match (l, r : std_logic_vector) return boolean is
+                alias la : std_logic_vector (l'length downto 1) is l;
+                alias ra : std_logic_vector (r'length downto 1) is r;
+              begin
+                for i in l'range loop
+                   if not match_table (l (i), r (i)) then
+                     return false;
+                   end if;
+                end loop;
+                return true;
+              end non_std_match;
+
+              function slv2string (slv : std_logic_vector) return STRING is
+                 variable result : string (1 to slv'length);
+                 variable res_l : string (1 to 3);
+                 variable r : integer;
+               begin
+                 r := 1;
+                 for i in slv'range loop
+                    res_l := std_logic'image(slv(i));
+                    result(r) := res_l(2);
+                    r := r + 1;
+                 end loop;
+                 return result;
+              end slv2string;
+
+            end;
+        kind: Declaration
+        type: |-
+          assertBitVector
+            :: ( ZKnownDomain dom        --                 ARG[0]
+               , KnownNat n )           --                 ARG[1]
+            => Clock dom                --                 ARG[2]
+            -> Reset dom                --                 ARG[3]
+            -> String                   --                 ARG[4]
+            -> Signal dom (BitVector n) -- Checked value  (ARG[5])
+            -> Signal dom (BitVector n) -- Expected value (ARG[6])
+            -> Signal dom b             -- Return valued  (ARG[7])
+            -> Signal dom b
+        template: |-
+          -- assertBitVector begin
+          ~GENSYM[assert][0] : block
+            -- pragma translate_off
+            signal ~GENSYM[actual][2] : ~TYP[#{arg5}];
+            signal ~GENSYM[expected][3] : ~TYP[#{arg6}];
+            -- pragma translate_on
+          begin
+            -- pragma translate_off
+            ~SYM[2] <= ~ARG[#{arg5}];
+            ~SYM[3] <= ~ARG[#{arg6}];
+            process(~ARG[#{arg2}]) is
+            begin
+              if (~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg2}])) then
+                assert (~INCLUDENAME[0].non_std_match(toSLV(~SYM[2]),toSLV(~SYM[3]))) report (~LIT[#{arg4}] & ", expected: " & ~INCLUDENAME[0].slv2string(toSLV(~SYM[3])) & ", actual: " & ~INCLUDENAME[0].slv2string(toSLV(~SYM[2]))) severity error;
+              end if;
+            end process;
+            -- pragma translate_on
+            ~RESULT <= ~ARG[#{arg7}];
+          end block;
+          -- assertBitVector end
+    |]) #-}
 
 
 

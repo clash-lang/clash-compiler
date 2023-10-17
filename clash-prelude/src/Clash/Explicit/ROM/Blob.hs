@@ -20,6 +20,8 @@ tools consuming the generated HDL.
 
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
@@ -51,6 +53,10 @@ import Clash.Signal.Internal
 import Clash.Sized.Internal.BitVector (BitVector)
 import Clash.Sized.Internal.Unsigned (Unsigned)
 import Clash.XException (deepErrorX, seqX)
+
+import Clash.Annotations.Primitive(Primitive (InlineYamlPrimitive), HDL(..))
+import Data.List.Infinite (Infinite((:<)), (...))
+import Data.String.Interpolate (__i)
 
 -- | A ROM with a synchronous read port, with space for @n@ elements
 --
@@ -151,3 +157,119 @@ romBlob# !_ en content@MemBlob{} =
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE romBlob# #-}
 {-# ANN romBlob# hasBlackBox #-}
+{-# ANN romBlob# (
+  let
+    bbName = show 'romBlob#
+    _arg0 :< arg1 :< arg2 :< arg3 :< arg4 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [SystemVerilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        type: |-
+          romBlob\#
+            :: ZKnownDomain dom  --       ARG[0]
+            => Clock dom        -- clk,  ARG[1]
+            -> Enable dom       -- en,   ARG[2]
+            -> MemBlob n m      -- init, ARG[3]
+            -> Signal dom Int   -- rd,   ARG[4]
+            -> Signal dom (BitVector m)
+        template: |-
+          // romBlob begin
+          ~SIGD[~GENSYM[ROM][1]][#{arg3}];
+          assign ~SYM[1] = ~CONST[#{arg3}];
+
+          logic [~SIZE[~TYPO]-1:0] ~GENSYM[~RESULT_q][2];~IF ~ISACTIVEENABLE[#{arg2}] ~THEN
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg1}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg1}]) begin : ~GENSYM[~COMPNAME_rom][3]
+            if (~ARG[#{arg2}]) begin
+              ~SYM[2] <= ~SYM[1][~ARG[#{arg4}]];
+            end
+          end~ELSE
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg1}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg1}]) begin : ~SYM[3]
+            ~SYM[2] <= ~SYM[1][~ARG[#{arg4}]];
+          end~FI
+
+          assign ~RESULT = ~SYM[2];
+          // rom end
+    |]) #-}
+{-# ANN romBlob# (
+  let
+    bbName = show 'romBlob#
+    _arg0 :< arg1 :< arg2 :< arg3 :< arg4 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [Verilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          romBlob\#
+            :: ZKnownDomain dom  --       ARG[0]
+            => Clock dom        -- clk,  ARG[1]
+            -> Enable dom       -- en,   ARG[2]
+            -> MemBlob n m      -- init, ARG[3]
+            -> Signal dom Int   -- rd,   ARG[4]
+            -> Signal dom (BitVector m)
+        template: |-
+          // romBlob begin
+          reg ~TYPO ~GENSYM[ROM][1] [0:~LENGTH[~TYP[#{arg3}]]-1];
+
+          reg ~TYP[#{arg3}] ~GENSYM[rom_init][3];
+          integer ~GENSYM[i][4];
+          initial begin
+            ~SYM[3] = ~CONST[#{arg3}];
+            for (~SYM[4]=0; ~SYM[4] < ~LENGTH[~TYP[#{arg3}]]; ~SYM[4] = ~SYM[4] + 1) begin
+              ~SYM[1][~LENGTH[~TYP[#{arg3}]]-1-~SYM[4]] = ~SYM[3][~SYM[4]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+            end
+          end
+          ~IF ~ISACTIVEENABLE[#{arg2}] ~THEN
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg1}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg1}]) begin : ~GENSYM[~COMPNAME_rom][5]
+            if (~ARG[#{arg2}]) begin
+              ~RESULT <= ~SYM[1][~ARG[#{arg4}]];
+            end
+          end~ELSE
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg1}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg1}]) begin : ~SYM[5]
+            ~RESULT <= ~SYM[1][~ARG[#{arg4}]];
+          end~FI
+          // romBlob end
+    |]) #-}
+{-# ANN romBlob# (
+  let
+    bbName = show 'romBlob#
+    _arg0 :< arg1 :< arg2 :< arg3 :< arg4 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [VHDL] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          romBlob\#
+            :: ZKnownDomain dom  --       ARG[0]
+            => Clock dom        -- clk,  ARG[1]
+            -> Enable dom       -- en,   ARG[2]
+            -> MemBlob n m      -- init, ARG[3]
+            -> Signal dom Int   -- rd,   ARG[4]
+            -> Signal dom (BitVector m)
+        template: |-
+          -- romBlob begin
+          ~GENSYM[~COMPNAME_rom][1] : block
+            signal ~GENSYM[ROM][2] : ~TYP[#{arg3}];
+            signal ~GENSYM[rd][3]  : integer range 0 to ~LENGTH[~TYP[#{arg3}]]-1;
+          begin
+            ~SYM[2] <= ~CONST[#{arg3}];
+
+            ~SYM[3] <= to_integer(~VAR[rdI][#{arg4}](31 downto 0))
+            -- pragma translate_off
+                          mod ~LENGTH[~TYP[#{arg3}]]
+            -- pragma translate_on
+                          ;
+            ~GENSYM[romSync][6] : process (~ARG[#{arg1}])
+            begin
+              if (~IF ~ACTIVEEDGE[Rising][#{arg1}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg1}])~IF ~ISACTIVEENABLE[#{arg2}] ~THEN and ~ARG[#{arg2}]~ELSE~FI) then
+                ~RESULT <= ~SYM[2](~SYM[3]);
+              end if;
+            end process;
+          end block;
+          -- romBlob end
+    |]) #-}

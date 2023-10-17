@@ -19,6 +19,7 @@ compatible with all tools consuming the generated HDL.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeApplications #-}
@@ -64,6 +65,10 @@ import Clash.Sized.Internal.BitVector (Bit(..), BitVector(..))
 import Clash.Sized.Internal.Unsigned (Unsigned)
 import Clash.XException
   (maybeIsX, deepErrorX, defaultSeqX, fromJustX, NFDataX, XException (..), seqX)
+
+import Clash.Annotations.Primitive(Primitive (InlineYamlPrimitive), HDL(..))
+import Data.List.Infinite (Infinite((:<)), (...))
+import Data.String.Interpolate (__i)
 
 -- $setup
 -- >>> :set -XTemplateHaskell
@@ -233,6 +238,163 @@ blockRamBlob# !_ gen content@MemBlob{} = \rd wen waS wd -> runST $ do
 {-# ANN blockRamBlob# hasBlackBox #-}
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE blockRamBlob# #-}
+{-# ANN blockRamBlob# (
+  let
+    bbName = show 'blockRamBlob#
+    _arg0 :< arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [SystemVerilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        type: |-
+          blockRamBlob\#
+            :: ZKnownDomain dom           --       ARG[0]
+            => Clock dom                 -- clk,  ARG[1]
+            -> Enable dom                -- en,   ARG[2]
+            -> MemBlob n m               -- init, ARG[3]
+            -> Signal dom Int            -- rd,   ARG[4]
+            -> Signal dom Bool           -- wren, ARG[5]
+            -> Signal dom Int            -- wr,   ARG[6]
+            -> Signal dom (BitVector m)  -- din,  ARG[7]
+            -> Signal dom (BitVector m)
+        template: |-
+          // blockRamBlob begin
+          ~SIGD[~GENSYM[RAM][1]][#{arg3}];
+          logic [~SIZE[~TYP[#{arg7}]]-1:0] ~GENSYM[~RESULT_q][2];
+          initial begin
+            ~SYM[1] = ~CONST[#{arg3}];
+          end~IF ~ISACTIVEENABLE[#{arg2}] ~THEN
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg1}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg1}]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
+            if (~ARG[#{arg2}]) begin
+              if (~ARG[#{arg5}]) begin
+                ~SYM[1][~ARG[#{arg6}]] <= ~ARG[#{arg7}];
+              end
+              ~SYM[2] <= ~SYM[1][~ARG[#{arg4}]];
+            end~ELSE
+            if (~ARG[#{arg5}] & ~ARG[#{arg2}]) begin
+              ~SYM[1][~ARG[#{arg6}]] <= ~ARG[#{arg7}];
+            end
+            if (~ARG[#{arg2}]) begin
+              ~SYM[2] <= ~SYM[1][~ARG[#{arg4}]];
+            end~FI
+          end~ELSE
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg1}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg1}]) begin : ~SYM[3]
+            if (~ARG[#{arg5}]) begin
+              ~SYM[1][~ARG[#{arg6}]] <= ~ARG[#{arg7}];
+            end
+            ~SYM[2] <= ~SYM[1][~ARG[#{arg4}]];
+          end~FI
+          assign ~RESULT = ~SYM[2];
+          // blockRamBlob end
+    |]) #-}
+{-# ANN blockRamBlob# (
+  let
+    bbName = show 'blockRamBlob#
+    _arg0 :< arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [Verilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          blockRamBlob\#
+            :: ZKnownDomain dom           --       ARG[0]
+            => Clock dom                 -- clk,  ARG[1]
+            -> Enable dom                -- en,   ARG[2]
+            -> MemBlob n m               -- init, ARG[3]
+            -> Signal dom Int            -- rd,   ARG[4]
+            -> Signal dom Bool           -- wren, ARG[5]
+            -> Signal dom Int            -- wr,   ARG[6]
+            -> Signal dom (BitVector m)  -- din,  ARG[7]
+            -> Signal dom (BitVector m)
+        template: |-
+          // blockRamBlob begin
+          reg ~TYPO ~GENSYM[~RESULT_RAM][1] [0:~LENGTH[~TYP[#{arg3}]]-1];
+
+          reg ~TYP[#{arg3}] ~GENSYM[ram_init][3];
+          integer ~GENSYM[i][4];
+          initial begin
+            ~SYM[3] = ~CONST[#{arg3}];
+            for (~SYM[4]=0; ~SYM[4] < ~LENGTH[~TYP[#{arg3}]]; ~SYM[4] = ~SYM[4] + 1) begin
+              ~SYM[1][~LENGTH[~TYP[#{arg3}]]-1-~SYM[4]] = ~SYM[3][~SYM[4]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+            end
+          end
+          ~IF ~ISACTIVEENABLE[#{arg2}] ~THEN
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg1}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg1}]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
+            if (~ARG[#{arg2}]) begin
+              if (~ARG[#{arg5}]) begin
+                ~SYM[1][~ARG[#{arg6}]] <= ~ARG[#{arg7}];
+              end
+              ~RESULT <= ~SYM[1][~ARG[#{arg4}]];
+            end~ELSE
+            if (~ARG[#{arg5}] & ~ARG[#{arg2}]) begin
+              ~SYM[1][~ARG[#{arg6}]] <= ~ARG[#{arg7}];
+            end
+            if (~ARG[#{arg2}]) begin
+              ~RESULT <= ~SYM[1][~ARG[#{arg4}]];
+            end~FI
+          end~ELSE
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg1}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg1}]) begin : ~SYM[5]
+            if (~ARG[#{arg5}]) begin
+              ~SYM[1][~ARG[#{arg6}]] <= ~ARG[#{arg7}];
+            end
+            ~RESULT <= ~SYM[1][~ARG[#{arg4}]];
+          end~FI
+          // blockRamBlob end
+    |]) #-}
+{-# ANN blockRamBlob# (
+  let
+    bbName = show 'blockRamBlob#
+    _arg0 :< arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [VHDL] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          blockRamBlob\#
+            :: ZKnownDomain dom           --       ARG[0]
+            => Clock dom                 -- clk,  ARG[1]
+            -> Enable dom                -- en,   ARG[2]
+            -> MemBlob n m               -- init, ARG[3]
+            -> Signal dom Int            -- rd,   ARG[4]
+            -> Signal dom Bool           -- wren, ARG[5]
+            -> Signal dom Int            -- wr,   ARG[6]
+            -> Signal dom (BitVector m)  -- din,  ARG[7]
+            -> Signal dom (BitVector m)
+        template: |-
+          -- blockRamBlob begin
+          ~GENSYM[~RESULT_blockRam][1] : block
+            signal ~GENSYM[~RESULT_RAM][2] : ~TYP[#{arg3}] := ~CONST[#{arg3}];
+            signal ~GENSYM[rd][4]  : integer range 0 to ~LENGTH[~TYP[#{arg3}]] - 1;
+            signal ~GENSYM[wr][5]  : integer range 0 to ~LENGTH[~TYP[#{arg3}]] - 1;
+          begin
+            ~SYM[4] <= to_integer(~VAR[rdI][#{arg4}](31 downto 0))
+            -- pragma translate_off
+                          mod ~LENGTH[~TYP[#{arg3}]]
+            -- pragma translate_on
+                          ;
+
+            ~SYM[5] <= to_integer(~VAR[wrI][#{arg6}](31 downto 0))
+            -- pragma translate_off
+                          mod ~LENGTH[~TYP[#{arg3}]]
+            -- pragma translate_on
+                          ;
+            ~SYM[6] : process(~ARG[#{arg1}])
+            begin
+              if ~IF ~ACTIVEEDGE[Rising][#{arg1}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg1}]) then
+                if ~ARG[#{arg5}]~IF ~ISACTIVEENABLE[#{arg2}] ~THEN and ~ARG[#{arg2}]~ELSE~FI then
+                  ~SYM[2](~SYM[5]) <= ~ARG[#{arg7}];
+                end if;
+                ~RESULT <= ~SYM[2](~SYM[4]);
+              end if;
+            end process;
+          end block;
+          -- blockRamBlob end
+    |]) #-}
 
 -- | Create a 'MemBlob' binding from a list of values
 --

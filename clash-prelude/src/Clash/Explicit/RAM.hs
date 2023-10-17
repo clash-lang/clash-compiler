@@ -11,6 +11,8 @@ RAM primitives with a combinational read port.
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-# LANGUAGE Trustworthy #-}
@@ -44,6 +46,10 @@ import Clash.Signal.Internal.Ambiguous (clockPeriod)
 import Clash.Sized.Unsigned  (Unsigned)
 import Clash.XException
   (defaultSeqX, deepErrorX, fromJustX, maybeIsX, NFDataX)
+
+import Clash.Annotations.Primitive(Primitive (InlineYamlPrimitive), HDL(..))
+import Data.List.Infinite (Infinite((:<)), (...))
+import Data.String.Interpolate (__i)
 
 -- | Create a RAM with space for 2^@n@ elements
 --
@@ -211,3 +217,134 @@ asyncRam# wClk@ExtractClockDom rClk@ExtractClockDom en sz rd we wr din = dout
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE asyncRam# #-}
 {-# ANN asyncRam# hasBlackBox #-}
+{-# ANN asyncRam# (
+  let
+    bbName = show 'asyncRam#
+    _arg0 :< _arg1 :< _arg2 :< _arg3 :< arg4 :< _arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< arg11 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [SystemVerilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        type: |-
+          asyncRam\#
+            :: ( HasCallStack      --         ARG[0]
+               , ZKnownDomain wdom  --         ARG[1]
+               , ZKnownDomain rdom  --         ARG[2]
+               , NFDataX a )       --         ARG[3]
+            => Clock wdom          -- ^ wclk, ARG[4]
+            -> Clock rdom          -- ^ rclk, ARG[5]
+            -> Enable wdom         -- ^ wen,  ARG[6]
+            -> SNat n              -- ^ sz,   ARG[7]
+            -> Signal rdom Int     -- ^ rd,   ARG[8]
+            -> Signal wdom Bool    -- ^ en,   ARG[9]
+            -> Signal wdom Int     -- ^ wr,   ARG[10]
+            -> Signal wdom a       -- ^ din,  ARG[11]
+            -> Signal rdom a
+        template: |-
+          // asyncRam begin
+          logic [~SIZE[~TYP[#{arg11}]]-1:0] ~GENSYM[RAM][0] [0:~LIT[#{arg7}]-1];
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg4}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg4}]) begin : ~GENSYM[~COMPNAME_Ram][1]
+            if (~IF ~ISACTIVEENABLE[#{arg6}] ~THEN ~ARG[#{arg6}] & ~ELSE ~FI ~ARG[#{arg9}]) begin
+              ~SYM[0][~ARG[#{arg10}]] <= ~TOBV[~ARG[#{arg11}]][~TYP[#{arg11}]];
+            end
+          end
+
+          assign ~RESULT = ~FROMBV[~SYM[0][\\~ARG[#{arg8}]\\]][~TYPO];
+          // asyncRam end
+    |]) #-}
+{-# ANN asyncRam# (
+  let
+    bbName = show 'asyncRam#
+    _arg0 :< _arg1 :< _arg2 :< _arg3 :< arg4 :< _arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< arg11 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [Verilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        type: |-
+          asyncRam\#
+            :: ( HasCallStack      --         ARG[0]
+               , ZKnownDomain wdom  --         ARG[1]
+               , ZKnownDomain rdom  --         ARG[2]
+               , NFDataX a )       --         ARG[3]
+            => Clock wdom          -- ^ wclk, ARG[4]
+            -> Clock rdom          -- ^ rclk, ARG[5]
+            -> Enable wdom         -- ^ wen,  ARG[6]
+            -> SNat n              -- ^ sz,   ARG[7]
+            -> Signal rdom Int     -- ^ rd,   ARG[8]
+            -> Signal wdom Bool    -- ^ en,   ARG[9]
+            -> Signal wdom Int     -- ^ wr,   ARG[10]
+            -> Signal wdom a       -- ^ din,  ARG[11]
+            -> Signal rdom a
+        template: |-
+          // asyncRam begin
+          reg ~TYPO ~GENSYM[RAM][0] [0:~LIT[#{arg7}]-1];
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg4}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg4}]) begin : ~GENSYM[~COMPNAME_Ram][1]
+            if (~ARG[#{arg9}] ~IF ~ISACTIVEENABLE[#{arg6}] ~THEN & ~ARG[#{arg6}] ~ELSE ~FI) begin
+              ~SYM[0][~ARG[#{arg10}]] <= ~ARG[#{arg11}];
+            end
+          end
+
+          assign ~RESULT = ~SYM[0][~ARG[#{arg8}]];
+          // asyncRam end
+    |]) #-}
+{-# ANN asyncRam# (
+  let
+    bbName = show 'asyncRam#
+    _arg0 :< _arg1 :< _arg2 :< _arg3 :< arg4 :< _arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< arg11 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [VHDL] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        type: |-
+          asyncRam\#
+            :: ( HasCallStack      --         ARG[0]
+               , ZKnownDomain wdom  --         ARG[1]
+               , ZKnownDomain rdom  --         ARG[2]
+               , NFDataX a )       --         ARG[3]
+            => Clock wdom          -- ^ wclk, ARG[4]
+            -> Clock rdom          -- ^ rclk, ARG[5]
+            -> Enable wdom         -- ^ wen,  ARG[6]
+            -> SNat n              -- ^ sz,   ARG[7]
+            -> Signal rdom Int     -- ^ rd,   ARG[8]
+            -> Signal wdom Bool    -- ^ en,   ARG[9]
+            -> Signal wdom Int     -- ^ wr,   ARG[10]
+            -> Signal wdom a       -- ^ din,  ARG[11]
+            -> Signal rdom a
+        template: |-
+          -- asyncRam begin
+          ~GENSYM[~COMPNAME_asyncRam][0] : block~IF ~VIVADO ~THEN
+            type ~GENSYM[RamType][4] is array(natural range <>) of std_logic_vector(~SIZE[~TYP[#{arg11}]]-1 downto 0);~ELSE
+            type ~SYM[4] is array(natural range <>) of ~TYP[#{arg11}];~FI
+            signal ~GENSYM[RAM][1] : ~SYM[4](0 to ~LIT[#{arg7}]-1);
+            signal ~GENSYM[rd][2] : integer range 0 to ~LIT[#{arg7}] - 1;
+            signal ~GENSYM[wr][3] : integer range 0 to ~LIT[#{arg7}] - 1;
+          begin
+            ~SYM[2] <= to_integer(~VAR[rdI][#{arg8}](31 downto 0))
+            -- pragma translate_off
+                          mod ~LIT[#{arg7}]
+            -- pragma translate_on
+                          ;
+
+            ~SYM[3] <= to_integer(~VAR[wrI][#{arg10}](31 downto 0))
+            -- pragma translate_off
+                          mod ~LIT[#{arg7}]
+            -- pragma translate_on
+                          ;
+            ~GENSYM[asyncRam_sync][7] : process(~ARG[#{arg4}])
+            begin
+              if ~IF ~ACTIVEEDGE[Rising][#{arg4}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg4}]) then
+                if (~ARG[#{arg9}] ~IF ~ISACTIVEENABLE[#{arg6}] ~THEN and ~ARG[#{arg6}] ~ELSE ~FI) then~IF ~VIVADO ~THEN
+                  ~SYM[1](~SYM[3]) <= ~TOBV[~ARG[#{arg11}]][~TYP[#{arg11}]];~ELSE
+                  ~SYM[1](~SYM[3]) <= ~ARG[#{arg11}];~FI
+                end if;
+              end if;
+            end process;
+            ~IF ~VIVADO ~THEN
+            ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYP[#{arg11}]];~ELSE
+            ~RESULT <= ~SYM[1](~SYM[2]);~FI
+          end block;
+          -- asyncRam end
+    |]) #-}

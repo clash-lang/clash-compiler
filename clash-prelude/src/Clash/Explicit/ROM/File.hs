@@ -77,6 +77,8 @@ __>>> L.tail $ sampleN 4 $ g systemClockGen (fromList [3..5])__
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 {-# LANGUAGE Unsafe #-}
 
@@ -106,6 +108,9 @@ import Clash.Explicit.Signal        (Clock, Enable, Signal, ZKnownDomain, delay)
 import Clash.Sized.Unsigned         (Unsigned)
 import Clash.XException             (NFDataX(deepErrorX))
 
+import Clash.Annotations.Primitive(Primitive (InlineYamlPrimitive), HDL(..))
+import Data.List.Infinite (Infinite((:<)), (...))
+import Data.String.Interpolate (__i)
 
 -- | A ROM with a synchronous read port, with space for 2^@n@ elements
 --
@@ -227,3 +232,141 @@ romFile# clk en sz file rd =
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE romFile# #-}
 {-# ANN romFile# hasBlackBox #-}
+{-# ANN romFile# (
+  let
+    bbName = show 'romFile#
+    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [SystemVerilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        type: |-
+          romFile\# :: ( KnownNat m             --       ARG[0]
+                       , ZKnownDomain dom )      --       ARG[1]
+                    => Clock dom                -- clk,  ARG[2]
+                    -> Enable dom               -- en,   ARG[3]
+                    -> SNat n                   -- sz,   ARG[4]
+                    -> FilePath                 -- file, ARG[5]
+                    -> Signal dom Int           -- rd,   ARG[6]
+                    -> Signal dom (BitVector m)
+        template: |-
+          // romFile begin
+          ~SIGDO[~GENSYM[ROM][0]] [0:~LIT[#{arg4}]-1];
+
+          initial begin
+            $readmemb(~FILE[~LIT[#{arg5}]],~SYM[0]);
+          end
+
+          ~SIGDO[~GENSYM[~RESULT_q][1]];~IF ~ISACTIVEENABLE[#{arg3}] ~THEN
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg2}]) begin : ~GENSYM[~COMPNAME_romFile][2]
+            if (~ARG[#{arg3}]) begin
+              ~SYM[1] <= ~SYM[0][~ARG[#{arg6}]];
+            end
+          end~ELSE
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg2}]) begin : ~SYM[2]
+            ~SYM[1] <= ~SYM[0][~ARG[#{arg6}]];
+          end~FI
+
+          assign ~RESULT = ~SYM[1];
+          // romFile end
+    |]) #-}
+{-# ANN romFile# (
+  let
+    bbName = show 'romFile#
+    _arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [Verilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          romFile\# :: ( KnownNat m             --       ARG[0]
+                       , ZKnownDomain dom      ) --       ARG[1]
+                    => Clock dom                -- clk,  ARG[2]
+                    -> Enable dom               -- en,   ARG[3]
+                    -> SNat n                   -- sz,   ARG[4]
+                    -> FilePath                 -- file, ARG[5]
+                    -> Signal dom Int           -- rd,   ARG[6]
+                    -> Signal dom (BitVector m)
+        template: |-
+          // romFile begin
+          reg ~TYPO ~GENSYM[ROM][0] [0:~LIT[#{arg4}]-1];
+
+          initial begin
+            $readmemb(~FILE[~LIT[#{arg5}]],~SYM[0]);
+          end
+          ~IF ~ISACTIVEENABLE[#{arg3}] ~THEN
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg2}]) begin : ~GENSYM[~COMPNAME_romFile][2]
+            if (~ARG[#{arg3}]) begin
+              ~RESULT <= ~SYM[0][~ARG[#{arg6}]];
+            end
+          end~ELSE
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg2}]) begin : ~SYM[2]
+            ~RESULT <= ~SYM[0][~ARG[#{arg6}]];
+          end~FI
+          // romFile end
+    |]) #-}
+{-# ANN romFile# (
+  let
+    bbName = show 'romFile#
+    arg0 :< _arg1 :< arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [VHDL] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          romFile\# :: ( KnownNat m           --       ARG[0]
+                       , ZKnownDomain dom      --       ARG[1]
+                    => Clock dom              -- clk,  ARG[2]
+                    -> Enable dom             -- en,   ARG[3]
+                    -> SNat n                 -- sz,   ARG[4]
+                    -> FilePath               -- file, ARG[5]
+                    -> Signal dom Int         -- rd,   ARG[6]
+                    -> Signal dom (BitVector m)
+        template: |-
+          -- romFile begin
+          ~GENSYM[~COMPNAME_romFile][0] : block
+            type ~GENSYM[RomType][4] is array(natural range <>) of bit_vector(~LIT[#{arg0}]-1 downto 0);
+
+            impure function ~GENSYM[InitRomFromFile][1] (RomFileName : in string) return ~SYM[4] is
+              FILE RomFile : text open read_mode is RomFileName;
+              variable RomFileLine : line;
+              variable ROM : ~SYM[4](0 to ~LIT[#{arg4}]-1);
+            begin
+              for i in ROM'range loop
+                readline(RomFile,RomFileLine);
+                read(RomFileLine,ROM(i));
+              end loop;
+              return ROM;
+            end function;
+
+            signal ~GENSYM[ROM][2] : ~SYM[4](0 to ~LIT[#{arg4}]-1) := ~SYM[1](~FILE[~LIT[#{arg5}]]);
+            signal ~GENSYM[rd][3] : integer range 0 to ~LIT[#{arg4}]-1;
+          begin
+            ~SYM[3] <=to_integer(~VAR[rdI][#{arg6}](31 downto 0))
+            -- pragma translate_off
+                          mod ~LIT[#{arg4}]
+            -- pragma translate_on
+                          ;
+            ~IF ~ISACTIVEENABLE[#{arg3}] ~THEN
+            ~GENSYM[romFileSync][7] : process (~ARG[#{arg2}])
+            begin
+              if (~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg2}])) then
+                if ~ARG[#{arg3}] then
+                  ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]));
+                end if;
+              end if;
+            end process;~ELSE
+            ~SYM[7] : process (~ARG[#{arg2}])
+            begin
+              if (~IF ~ACTIVEEDGE[Rising][#{arg2}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg2}])) then
+                ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]));
+              end if;
+            end process;~FI
+          end block;
+          -- romFile end
+    |]) #-}

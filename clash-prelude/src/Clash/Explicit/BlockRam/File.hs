@@ -81,6 +81,8 @@ __>>> L.tail $ sampleN 4 $ g systemClockGen enableGen (fromList [3..5])__
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 {-# LANGUAGE Unsafe #-}
 
@@ -126,6 +128,10 @@ import Clash.Signal.Internal
 import Clash.Signal.Bundle   (unbundle)
 import Clash.Sized.Unsigned  (Unsigned)
 import Clash.XException      (maybeIsX, seqX, fromJustX, NFDataX(..), XException (..))
+
+import Clash.Annotations.Primitive(Primitive (InlineYamlPrimitive), HDL(..))
+import Data.List.Infinite (Infinite((:<)), (...))
+import Data.String.Interpolate (__i)
 
 -- start benchmark only
 -- import GHC.Arr (unsafeFreezeSTArray, unsafeThawSTArray)
@@ -428,6 +434,216 @@ blockRamFile# _ _ _ _ = error "blockRamFile#: dynamic clocks not supported"
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE blockRamFile# #-}
 {-# ANN blockRamFile# hasBlackBox #-}
+{-# ANN blockRamFile# (
+  let
+    bbName = show 'blockRamFile#
+    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [SystemVerilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        type: |-
+          blockRamFile\#
+            :: ( ZKnownDomain dom         --       ARG[0]
+               , KnownNat m              --       ARG[1]
+               , HasCallStack )          --       ARG[2]
+            => Clock dom                 -- clk,  ARG[3]
+            => Enable dom                -- en,   ARG[4]
+            -> SNat n                    -- sz,   ARG[5]
+            -> FilePath                  -- file, ARG[6]
+            -> Signal dom Int            -- rd,   ARG[7]
+            -> Signal dom Bool           -- wren, ARG[8]
+            -> Signal dom Int            -- wr,   ARG[9]
+            -> Signal dom (BitVector m)  -- din,  ARG[10]
+            -> Signal dom (BitVector m)
+        template: |-
+          // blockRamFile begin
+          ~SIGDO[~GENSYM[RAM][1]] [0:~LIT[#{arg5}]-1];
+          ~SIGD[~GENSYM[~RESULT_q][2]][#{arg10}];
+
+          initial begin
+            $readmemb(~FILE[~LIT[#{arg6}]],~SYM[1]);
+          end
+          ~IF ~ISACTIVEENABLE[#{arg4}] ~THEN
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~GENSYM[~COMPNAME_blockRamFile][3]~IF ~VIVADO ~THEN
+            if (~ARG[#{arg4}]) begin
+              if (~ARG[#{arg8}]) begin
+                ~SYM[1][~ARG[#{arg9}]] <= ~ARG[#{arg10}];
+              end
+              ~SYM[2] <= ~SYM[1][~ARG[#{arg7}]];
+            end~ELSE
+            if (~ARG[#{arg8}] & ~ARG[#{arg4}]) begin
+              ~SYM[1][~ARG[#{arg9}]] <= ~ARG[#{arg10}];
+            end
+            if (~ARG[#{arg4}]) begin
+              ~SYM[2] <= ~SYM[1][~ARG[#{arg7}]];
+            end~FI
+          end~ELSE
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~SYM[3]
+            if (~ARG[#{arg8}]) begin
+              ~SYM[1][~ARG[#{arg9}]] <= ~ARG[#{arg10}];
+            end
+            ~SYM[2] <= ~SYM[1][~ARG[#{arg7}]];
+          end~FI
+
+          assign ~RESULT = ~SYM[2];
+          // blockRamFile end
+    |]) #-}
+{-# ANN blockRamFile# (
+  let
+    bbName = show 'blockRamFile#
+    _arg0 :< _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [Verilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          blockRamFile\#
+            :: ( ZKnownDomain dom         --       ARG[0]
+               , KnownNat m              --       ARG[1]
+               , HasCallStack )          --       ARG[2]
+            => Clock dom                 -- clk,  ARG[3]
+            => Enable dom                -- en,   ARG[4]
+            -> SNat n                    -- sz,   ARG[5]
+            -> FilePath                  -- file, ARG[6]
+            -> Signal dom Int            -- rd,   ARG[7]
+            -> Signal dom Bool           -- wren, ARG[8]
+            -> Signal dom Int            -- wr,   ARG[9]
+            -> Signal dom (BitVector m)  -- din,  ARG[10]
+            -> Signal dom (BitVector m)
+        template: |-
+          // blockRamFile begin
+          reg ~TYPO ~GENSYM[RAM][1] [0:~LIT[#{arg5}]-1];
+
+          initial begin
+            $readmemb(~FILE[~LIT[#{arg6}]],~SYM[1]);
+          end
+          ~IF ~ISACTIVEENABLE[#{arg4}] ~THEN
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~GENSYM[~COMPNAME_blockRamFile][3]~IF ~VIVADO ~THEN
+            if (~ARG[#{arg4}]) begin
+              if (~ARG[#{arg8}]) begin
+                ~SYM[1][~ARG[#{arg9}]] <= ~ARG[#{arg10}];
+              end
+              ~RESULT <= ~SYM[1][~ARG[#{arg7}]];
+            end~ELSE
+            if (~ARG[#{arg8}] & ~ARG[#{arg4}]) begin
+              ~SYM[1][~ARG[#{arg9}]] <= ~ARG[#{arg10}];
+            end
+            if (~ARG[#{arg4}]) begin
+              ~RESULT <= ~SYM[1][~ARG[#{arg7}]];
+            end~FI
+          end~ELSE
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~SYM[3]
+            if (~ARG[#{arg8}]) begin
+              ~SYM[1][~ARG[#{arg9}]] <= ~ARG[#{arg10}];
+            end
+            ~RESULT <= ~SYM[1][~ARG[#{arg7}]];
+          end~FI
+          // blockRamFile end
+    |]) #-}
+{-# ANN blockRamFile# (
+  let
+    bbName = show 'blockRamFile#
+    _arg0 :< arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< arg7 :< arg8 :< arg9 :< arg10 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [VHDL] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          blockRamFile\#
+            :: ( ZKnownDomain dom        -- ARG[0]
+               , KnownNat m             -- ARG[1]
+               , HasCallStack )         -- ARG[2]
+            => Clock dom                -- clk,  ARG[3]
+            => Enable dom               -- en,   ARG[4]
+            -> SNat n                   -- sz,   ARG[5]
+            -> FilePath                 -- file, ARG[6]
+            -> Signal dom Int           -- rd,   ARG[7]
+            -> Signal dom Bool          -- wren, ARG[8]
+            -> Signal dom Int           -- wr,   ARG[9]
+            -> Signal dom (BitVector m) -- din,  ARG[10]
+            -> Signal dom (BitVector m)
+        template: |-
+          -- blockRamFile begin
+          ~GENSYM[~COMPNAME_blockRamFile][1] : block
+            type ~GENSYM[RamType][7] is array(natural range <>) of bit_vector(~LIT[#{arg1}]-1 downto 0);
+
+            impure function ~GENSYM[InitRamFromFile][2] (RamFileName : in string) return ~SYM[7] is
+              FILE RamFile : text open read_mode is RamFileName;
+              variable RamFileLine : line;
+              variable RAM : ~SYM[7](0 to ~LIT[#{arg5}]-1);
+            begin
+              for i in RAM'range loop
+                readline(RamFile,RamFileLine);
+                read(RamFileLine,RAM(i));
+              end loop;
+              return RAM;
+            end function;
+
+            signal ~GENSYM[RAM][3] : ~SYM[7](0 to ~LIT[#{arg5}]-1) := ~SYM[2](~FILE[~LIT[#{arg6}]]);
+            signal ~GENSYM[rd][5]  : integer range 0 to ~LIT[#{arg5}]-1;
+            signal ~GENSYM[wr][6]  : integer range 0 to ~LIT[#{arg5}]-1;
+          begin
+            ~SYM[5] <= to_integer(~VAR[rdI][#{arg7}](31 downto 0))
+            -- pragma translate_off
+                          mod ~LIT[#{arg5}]
+            -- pragma translate_on
+                          ;
+
+            ~SYM[6] <= to_integer(~VAR[wrI][#{arg9}](31 downto 0))
+            -- pragma translate_off
+                          mod ~LIT[#{arg5}]
+            -- pragma translate_on
+                          ;
+            ~IF ~VIVADO ~THEN ~IF ~ISACTIVEENABLE[#{arg4}] ~THEN
+            ~GENSYM[blockRamFile_sync][10] : process(~ARG[#{arg3}])
+            begin
+              if ~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg3}]) then
+                if ~ARG[#{arg4}] then
+                  if ~ARG[#{arg8}] then
+                    ~SYM[3](~SYM[6]) <= to_bitvector(~ARG[#{arg10}]);
+                  end if;
+                  ~RESULT <= to_stdlogicvector(~SYM[3](~SYM[5]));
+                end if;
+              end if;
+            end process;~ELSE
+            ~SYM[10] : process(~ARG[#{arg3}])
+            begin
+              if ~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg3}]) then
+                if ~ARG[#{arg8}] then
+                  ~SYM[3](~SYM[6]) <= to_bitvector(~ARG[#{arg10}]);
+                end if;
+                ~RESULT <= to_stdlogicvector(~SYM[3](~SYM[5]));
+              end if;
+            end process;~FI ~ELSE ~IF ~ISACTIVEENABLE[#{arg4}] ~THEN
+            ~SYM[10] : process(~ARG[#{arg3}])
+            begin
+              if ~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg3}]) then
+                if ~ARG[#{arg8}] and ~ARG[#{arg4}] then
+                  ~SYM[3](~SYM[6]) <= to_bitvector(~ARG[#{arg10}]);
+                end if;
+                if ~ARG[#{arg4}] then
+                  ~RESULT <= to_stdlogicvector(~SYM[3](~SYM[5]));
+                end if;
+              end if;
+            end process;~ELSE
+            ~SYM[10] : process(~ARG[#{arg3}])
+            begin
+              if ~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg3}]) then
+                if ~ARG[#{arg8}] then
+                  ~SYM[3](~SYM[6]) <= to_bitvector(~ARG[#{arg10}]);
+                end if;
+                ~RESULT <= to_stdlogicvector(~SYM[3](~SYM[5]));
+              end if;
+            end process;~FI ~FI
+          end block;
+          -- blockRamFile end
+    |]) #-}
 
 -- | __NB:__ Not synthesizable
 initMem :: KnownNat n => FilePath -> IO [BitVector n]
