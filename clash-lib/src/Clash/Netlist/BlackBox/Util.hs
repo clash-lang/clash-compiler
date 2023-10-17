@@ -959,7 +959,7 @@ prettyElem (Lit i) = renderOneLine <$> (string "~LIT" <> brackets (int i))
 prettyElem (Const i) = renderOneLine <$> (string "~CONST" <> brackets (int i))
 prettyElem (Name i) = renderOneLine <$> (string "~NAME" <> brackets (int i))
 prettyElem (ToVar es i) = do
-  es' <- prettyBlackBox es
+  es' <- prettySigD es
   renderOneLine <$> (string "~VAR" <> brackets (string es') <> brackets (int i))
 prettyElem (Sym _ i) = renderOneLine <$> (string "~SYM" <> brackets (int i))
 prettyElem (Typ Nothing) = return "~TYPO"
@@ -1015,7 +1015,7 @@ prettyElem (HdlSyn s) = case s of
   Vivado -> return "~VIVADO"
   _      -> return "~OTHERSYN"
 prettyElem (BV b es e) = do
-  es' <- prettyBlackBox es
+  es' <- prettySigD es
   e'  <- prettyBlackBox [e]
   renderOneLine <$>
     if b
@@ -1040,14 +1040,14 @@ prettyElem (IsSync i) = renderOneLine <$> (string "~ISSYNC" <> brackets (int i))
 prettyElem (IsInitDefined i) = renderOneLine <$> (string "~ISINITDEFINED" <> brackets (int i))
 
 prettyElem (StrCmp es i) = do
-  es' <- prettyBlackBox es
+  es' <- prettySigD es
   renderOneLine <$> (string "~STRCMP" <> brackets (string es') <> brackets (int i))
 prettyElem (GenSym es i) = do
-  es' <- prettyBlackBox es
+  es' <- prettySigD es
   renderOneLine <$> (string "~GENSYM" <> brackets (string es') <> brackets (int i))
 prettyElem (Repeat [es] [i]) = do
-  es' <- prettyElem es
-  i'  <- prettyElem i
+  es' <- prettySigD [es]
+  i'  <- prettySigD [i]
   renderOneLine
     <$> string "~REPEAT"
     <>  brackets (string es')
@@ -1059,26 +1059,41 @@ prettyElem (Repeat es i) = error $ $(curLoc)
                                 ++ show i
                                 ++ ". Both lists are expected to have a single element."
 prettyElem (DevNull es) = do
-  es' <- mapM prettyElem es
-  renderOneLine <$> (string "~DEVNULL" <> brackets (string $ Text.concat es'))
+  es' <- prettySigD es
+  renderOneLine <$> (string "~DEVNULL" <> brackets (string es'))
 
 prettyElem (SigD es mI) = do
-  es' <- prettyBlackBox es
+  es' <- prettySigD es
   renderOneLine <$>
     (maybe (string "~SIGDO" <> brackets (string es'))
-           (((string "~SIGD" <> brackets (string es')) <>) . int)
+           (((string "~SIGD" <> brackets (string es')) <>) . brackets . int)
            mI)
 prettyElem (Vars i) = renderOneLine <$> (string "~VARS" <> brackets (int i))
 prettyElem (OutputUsage n) = renderOneLine <$> (string "~OUTPUTUSAGE" <> brackets (int n))
 prettyElem (ArgGen n x) =
   renderOneLine <$> (string "~ARGN" <> brackets (int n) <> brackets (int x))
 prettyElem (Template bbname source) = do
-  bbname' <- mapM prettyElem bbname
-  source' <- mapM prettyElem source
+  bbname' <- prettySigD bbname
+  source' <- prettySigD source
   renderOneLine <$> (string "~TEMPLATE"
-                                  <> brackets (string $ Text.concat bbname')
-                                  <> brackets (string $ Text.concat source'))
+                                  <> brackets (string bbname')
+                                  <> brackets (string source'))
 prettyElem CtxName = return "~CTXNAME"
+
+
+-- This reverses what Clash.Netlist.Blackbox.Parser.pSigD does
+-- ie turn a "[" back into "[\" and "]" back into "\]"
+prettySigD :: Monad m
+               => [Element]
+               -> Ap m Text
+prettySigD bbT = Text.concat <$> mapM prettySigDElem bbT
+ where
+  prettySigDElem (Text t)
+    | t == "["  = return "[\\"
+    | t == "]"  = return "\\]"
+    | otherwise = return t
+  prettySigDElem e = prettyElem e
+
 
 -- | Recursively walk @Element@, applying @f@ to each element in the tree.
 walkElement
