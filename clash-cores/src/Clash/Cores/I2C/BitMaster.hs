@@ -52,34 +52,7 @@ type BitMasterI = (Bool,Bool,Unsigned 16,BitCtrlSig,I2CIn)
 -- 3. Contains the SCL and SDA output signals
 type BitMasterO = (BitRespSig,Bool,I2COut)
 
-{-# ANN bitMaster
-  (Synthesize
-    { t_name     = "bitmaster"
-    , t_inputs   = [ PortName "clk"
-                   , PortName "arst"
-                   , PortName "gen"
-                   , PortProduct ""
-                      [ PortName "rst"
-                      , PortName "ena"
-                      , PortName "clkCnt"
-                      , PortProduct ""
-                          [ PortName "cmd"
-                          , PortName "din" ]
-                      , PortName "i2cI" ]
-                   ]
-    , t_output   = PortProduct ""
-                     [ PortProduct ""
-                        [ PortName "cmdAck"
-                        , PortName "al"
-                        , PortName "dout" ]
-                     , PortName "busy"
-                     , PortProduct "i2c"
-                        [ PortName "sda"
-                        , PortName "sdaEn"
-                        , PortName "scl"
-                        , PortName "sclEn" ]
-                     ]
-    }) #-}
+
 bitMaster
   :: KnownDomain dom
   => Clock dom

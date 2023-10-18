@@ -48,29 +48,6 @@ type ByteMasterI = (Bool,Bool,Bool,Bool,Bool,Bool,BitVector 8,BitRespSig)
 -- 4  Bitmaster control signals
 type ByteMasterO = (Bool,Bool,BitVector 8,BitCtrlSig)
 
-{-# ANN byteMaster
-  (Synthesize
-    { t_name     = "bytemaster"
-    , t_inputs   = [ PortName "clk"
-                   , PortName "arst"
-                   , PortName "gen"
-                   , PortProduct ""
-                      [ PortName "rst"
-                      , PortName "start"
-                      , PortName "stop"
-                      , PortName "read"
-                      , PortName "write"
-                      , PortName "ackIn"
-                      , PortName "din"
-                      , PortName "bitResp" ]
-                   ]
-    , t_output   = PortProduct ""
-                     [ PortName "hostAck"
-                     , PortName "ackOut"
-                     , PortName "dout"
-                     , PortName "bitCtrl"
-                     ]
-    }) #-}
 -- | Byte level controller, takes care of correctly executing i2c communication
 -- based on the supplied control signals. It should be instantiated alongside 'bitMaster'.
 -- The outgoing bitCtrl' controls the 'bitMaster' whose 'bitResp' should be supplied

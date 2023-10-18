@@ -31,7 +31,7 @@ system0 clk arst = bundle (registerFile,done,fault)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE system0 #-}
 
-{-# ANN system Synthesize { t_name = "system", t_inputs = [], t_output = PortName "" } #-}
+{-# ANN system (defSyn "system") #-}
 system :: Signal System (Vec 16 (Unsigned 8), Bool, Bool)
 system = system0 systemClockGen resetGen
 
