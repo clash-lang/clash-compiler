@@ -603,14 +603,14 @@ type HiddenEnableName (dom :: Domain) = "enable"
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 type HiddenClock dom =
   ( Hidden (HiddenClockName dom) (Clock dom)
-  , KnownDomain dom )
+  )
 
 -- | A /constraint/ that indicates the component needs a 'Reset'
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 type HiddenReset dom =
   ( Hidden (HiddenResetName dom) (Reset dom)
-  , KnownDomain dom )
+  )
 
 -- | A /constraint/ that indicates the component needs an 'Enable'
 --
@@ -772,7 +772,7 @@ exposeSpecificClock
   -- ^ The component with a hidden clock
   -> (Clock dom -> r)
   -- ^ The component with its clock argument exposed
-exposeSpecificClock = \f clk@(Clock{}) -> expose @(HiddenClockName dom) f clk
+exposeSpecificClock = \f clk -> expose @(HiddenClockName dom) f clk
 {-# INLINE exposeSpecificClock #-}
 
 -- | Hide the 'Clock' argument of a component, so it can be routed implicitly.
@@ -873,7 +873,7 @@ withSpecificClock
   -> (HiddenClock dom => r)
   -- ^ The function with a hidden 'Clock' argument
   -> r
-withSpecificClock = \clk@(Clock{}) f -> expose @(HiddenClockName dom) f clk
+withSpecificClock = \clk f -> expose @(HiddenClockName dom) f clk
 {-# INLINE withSpecificClock #-}
 
 -- | Connect a hidden 'Clock' to an argument where a normal 'Clock' argument
@@ -972,7 +972,7 @@ exposeSpecificReset
   -- ^ The component with a hidden reset
   -> (Reset dom -> r)
   -- ^ The component with its reset argument exposed
-exposeSpecificReset = \f rst@(Reset{}) -> expose @(HiddenResetName dom) f rst
+exposeSpecificReset = \f rst -> expose @(HiddenResetName dom) f rst
 {-# INLINE exposeSpecificReset #-}
 
 -- | Hide the 'Reset' argument of a component, so it can be routed implicitly.
@@ -1036,7 +1036,7 @@ withReset
   -> (HiddenReset dom => r)
   -- ^ The function with a hidden 'Reset' argument
   -> r
-withReset = \rst@(Reset{}) f -> expose @(HiddenResetName dom) f rst
+withReset = \rst f -> expose @(HiddenResetName dom) f rst
 {-# INLINE withReset #-}
 
 {- | Connect an explicit 'Reset' to a function with a hidden 'Reset'. This
@@ -1072,7 +1072,7 @@ withSpecificReset
   -> (HiddenReset dom => r)
   -- ^ The function with a hidden 'Reset' argument
   -> r
-withSpecificReset = \rst@(Reset{}) f -> expose @(HiddenResetName dom) f rst
+withSpecificReset = \rst f -> expose @(HiddenResetName dom) f rst
 {-# INLINE withSpecificReset #-}
 
 -- | Connect a hidden 'Reset' to an argument where a normal 'Reset' argument
