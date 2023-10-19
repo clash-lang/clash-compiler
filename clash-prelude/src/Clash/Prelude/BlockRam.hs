@@ -838,11 +838,28 @@ blockRamPow2 = \cnt rd wrM -> withFrozenCallStack
 
 {- | Create a read-after-write block RAM from a read-before-write one
 
-#if __GLASGOW_HASKELL__ >= 908 && !defined(CLASH_MULTIPLE_HIDDEN)
+#if defined(CLASH_MULTIPLE_HIDDEN)
 >>> :t readNew (blockRam (0 :> 1 :> Nil))
 readNew (blockRam (0 :> 1 :> Nil))
   :: ...
      ...
+     ...
+     ... =>
+     Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a
+
+#else
+#if __GLASGOW_HASKELL__ >= 908
+>>> :t readNew (blockRam (0 :> 1 :> Nil))
+readNew (blockRam (0 :> 1 :> Nil))
+  :: ...
+     ...
+     ... =>
+     Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a
+
+#elif __GLASGOW_HASKELL__ >= 902
+>>> :t readNew (blockRam (0 :> 1 :> Nil))
+readNew (blockRam (0 :> 1 :> Nil))
+  :: ...
      ... =>
      Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a
 
@@ -856,6 +873,7 @@ readNew (blockRam (0 :> 1 :> Nil))
      ... =>
      Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a
 
+#endif
 #endif
 -}
 readNew

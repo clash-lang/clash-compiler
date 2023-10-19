@@ -106,7 +106,7 @@ instance Ila dom a => Ila dom (Signal dom i -> a) where
 --          optimized away by GHC.
 ila ::
   forall dom a n .
-  (KnownDomain dom, Ila dom a, 1 <= n) =>
+  (Ila dom a, 1 <= n) =>
   IlaConfig n ->
   -- | Clock to sample inputs on. Note that this is not necessarily the clock
   -- Xilinx's debug hub will run at, if multiple ILAs are instantiated.
@@ -124,7 +124,7 @@ ila conf clk =
 -- probabilities.
 ila# ::
   forall dom a n .
-  (KnownDomain dom, Ila dom a, 1 <= n) =>
+  (Ila dom a, 1 <= n) =>
   IlaConfig n ->
   Clock dom ->
   a

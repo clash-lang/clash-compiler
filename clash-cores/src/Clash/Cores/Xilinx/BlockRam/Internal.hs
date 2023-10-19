@@ -186,8 +186,6 @@ tdpbram# ::
   , DomainActiveEdge domA ~ 'Rising
   , DomainActiveEdge domB ~ 'Rising
   , KnownNat nAddrs
-  , KnownDomain domA
-  , KnownDomain domB
   , NFDataX a
   , BitPack a
   , KnownNat nBytes

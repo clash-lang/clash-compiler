@@ -34,7 +34,7 @@ pBlackBoxD :: Parser BlackBoxTemplate
 pBlackBoxD = some pElement
 
 -- | Parse a single Template Element
-pElement :: Parser Element
+pElement :: Parser (Element Int)
 pElement  =  pTagD
          <|> Text <$> pText
          <|> Text <$> (pack <$> string "~ ")
@@ -50,7 +50,7 @@ pEdge =
 
 
 -- | Parse a Declaration or Expression element
-pTagD :: Parser Element
+pTagD :: Parser (Element Int)
 pTagD =  IF <$> (symbol "~IF" *> pTagE)
             <*> (spaces *> (string "~THEN" *> pBlackBoxD))
             <*> (string "~ELSE" *> option ([Text ""]) pBlackBoxD <* string "~FI")
@@ -58,7 +58,7 @@ pTagD =  IF <$> (symbol "~IF" *> pTagE)
      <|> pTagE
 
 -- | Parse a Declaration
-pDecl :: Parser Decl
+pDecl :: Parser (Decl Int)
 pDecl = Decl <$> (symbol "~INST" *> natural') <*> pure 0 <*>
         ((:) <$> pOutput <*> many pInput) <* string "~INST"
 
@@ -71,7 +71,7 @@ pInput :: Parser (BlackBoxTemplate,BlackBoxTemplate)
 pInput = symbol "~INPUT" *> symbol "<=" *> ((,) <$> (pBlackBoxE <* symbol "~") <*> pBlackBoxE) <* symbol "~"
 
 -- | Parse an Expression element
-pTagE :: Parser Element
+pTagE :: Parser (Element Int)
 pTagE =  Result            <$  string "~RESULT"
      <|> ArgGen            <$> (string "~ARGN" *> brackets' natural') <*> brackets' natural'
      <|> Arg               <$> (string "~ARG" *> brackets' natural')
@@ -144,16 +144,16 @@ pBlackBoxE :: Parser BlackBoxTemplate
 pBlackBoxE = some pElemE
 
 -- | Parse an Expression or Text
-pElemE :: Parser Element
+pElemE :: Parser (Element Int)
 pElemE = pTagE
       <|> Text <$> pText
 
 -- | Parse SigD
-pSigD :: Parser [Element]
+pSigD :: Parser [Element Int]
 pSigD = some (pTagE <|> (Text (pack "[") <$ (pack <$> string "[\\"))
                     <|> (Text (pack "]") <$ (pack <$> string "\\]"))
                     <|> (Text <$> (pack <$> some (satisfyRange '\000' '\90')))
                     <|> (Text <$> (pack <$> some (satisfyRange '\94' '\125'))))
 
-pSigDorEmpty :: Parser [Element]
+pSigDorEmpty :: Parser [Element Int]
 pSigDorEmpty = pSigD <|> mempty

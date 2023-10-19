@@ -54,8 +54,7 @@ floatVerifierShowsPrec _ (FloatVerifier x)
 
 playSampleRom
   :: forall n a dom
-   . ( KnownDomain dom
-     , KnownNat n
+   . ( KnownNat n
      , BitPack a
      , 1 <= n
      )

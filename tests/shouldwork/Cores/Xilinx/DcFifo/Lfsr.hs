@@ -23,7 +23,6 @@ orNothing True a = Just a
 orNothing False _ = Nothing
 
 lfsrF ::
-  KnownDomain dom =>
   Clock dom -> Reset dom -> Enable dom ->
   BitVector 16 ->
   Signal dom Bit
@@ -41,7 +40,6 @@ lfsrF clk rst ena seed = msb <$> r
 {-# CLASH_OPAQUE lfsrF #-}
 
 fifoSampler ::
-  KnownDomain dom =>
   Clock dom -> Reset dom -> Enable dom ->
   -- | Stall circuit? For this test case, this signal comes from 'lfsrF'
   Signal dom Stall ->
@@ -67,8 +65,7 @@ fifoSampler clk rst ena stalls inps =
 -- intermittently based on stall input.
 fifoDriver ::
   forall a dom depth .
-  ( KnownDomain dom
-  , NFDataX a
+  ( NFDataX a
   , Enum a
   , Num a
   ) =>
@@ -141,8 +138,7 @@ mkTestBench cFifo = done
 
 fifoVerifier ::
   forall a dom .
-  ( KnownDomain dom
-  , Ord a
+  ( Ord a
   , Num a
   , NFDataX a
   , ShowX a

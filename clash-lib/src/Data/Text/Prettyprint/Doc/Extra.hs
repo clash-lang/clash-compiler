@@ -56,6 +56,10 @@ renderOneLine
   -> LT.Text
 renderOneLine = renderLazy . layoutPretty defaultLayoutOptions
 
+
+argPpr :: (Applicative f, PP.Pretty a) => a -> f Doc
+argPpr = pure . PP.pretty
+
 int :: Applicative f => Int -> f Doc
 int = pure . PP.pretty
 

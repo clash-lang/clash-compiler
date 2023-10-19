@@ -42,7 +42,7 @@ import Clash.Explicit.Mealy        (mealyB)
 import Clash.Explicit.BlockRam     (RamOp (..), trueDualPortBlockRam)
 import Clash.Explicit.Signal
   (Clock, Reset, Signal, Enable, register, unsafeSynchronizer, fromEnable,
-  (.&&.), mux, KnownDomain)
+  (.&&.), mux)
 import Clash.Promoted.Nat          (SNat (..))
 import Clash.Promoted.Nat.Literals (d0)
 import Clash.Sized.BitVector       (BitVector, (++#))
@@ -73,9 +73,7 @@ import Clash.XException            (NFDataX, fromJustX)
 --      If you want to have /safe/ __word__-synchronization use
 --      'asyncFIFOSynchronizer'.
 dualFlipFlopSynchronizer
-  :: ( NFDataX a
-     , KnownDomain dom1
-     , KnownDomain dom2 )
+  :: NFDataX a
   => Clock dom1
   -- ^ 'Clock' to which the incoming  data is synchronized
   -> Clock dom2
@@ -99,9 +97,7 @@ dualFlipFlopSynchronizer clk1 clk2 rst en i =
 
 fifoMem
   :: forall wdom rdom a addrSize
-   . ( KnownDomain wdom
-     , KnownDomain rdom
-     , NFDataX a
+   . ( NFDataX a
      , KnownNat addrSize
      , 1 <= addrSize )
   => Clock wdom
@@ -204,9 +200,8 @@ isFull addrSize@SNat ptr s_ptr =
 -- bus skew and maximum delay constraints inside your synthesis tool for the
 -- clock domain crossings of the gray pointers.
 asyncFIFOSynchronizer
-  :: ( KnownDomain wdom
-     , KnownDomain rdom
-     , 2 <= addrSize
+  :: forall wdom rdom addrSize a
+   . ( 2 <= addrSize
      , NFDataX a )
   => SNat addrSize
   -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@

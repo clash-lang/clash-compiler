@@ -83,12 +83,15 @@ orReset = unsafeOrReset
 -- asserted. This function is considered unsafe because it can be used on
 -- domains with components with asynchronous resets, where use of this function
 -- can introduce glitches triggering a reset.
-unsafeOrReset :: forall dom. KnownDomain dom => Reset dom -> Reset dom -> Reset dom
-unsafeOrReset (unsafeFromReset -> rst0) (unsafeFromReset -> rst1) =
+unsafeOrReset :: forall dom. Reset dom -> Reset dom -> Reset dom
+unsafeOrReset r0@ExtractResetDom r1 =
   unsafeToReset $
     case resetPolarity @dom of
       SActiveHigh -> rst0 .||. rst1
       SActiveLow  -> rst0 .&&. rst1
+ where
+  rst0 = unsafeFromReset r0
+  rst1 = unsafeFromReset r1
 
 -- | Output reset will be asserted when both input resets are asserted
 andReset ::
@@ -103,12 +106,15 @@ andReset = unsafeAndReset
 -- function is considered unsafe because it can be used on domains with
 -- components with asynchronous resets, where use of this function can introduce
 -- glitches triggering a reset.
-unsafeAndReset :: forall dom. KnownDomain dom => Reset dom -> Reset dom -> Reset dom
-unsafeAndReset (unsafeFromReset -> rst0) (unsafeFromReset -> rst1) =
+unsafeAndReset :: forall dom. Reset dom -> Reset dom -> Reset dom
+unsafeAndReset r0@ExtractResetDom r1 =
   unsafeToReset $
     case resetPolarity @dom of
       SActiveHigh -> rst0 .&&. rst1
       SActiveLow  -> rst0 .||. rst1
+ where
+  rst0 = unsafeFromReset r0
+  rst1 = unsafeFromReset r1
 
 -- | The resetSynchronizer will synchronize an incoming reset according to
 -- whether the domain is synchronous or asynchronous.
@@ -212,11 +218,10 @@ unsafeAndReset (unsafeFromReset -> rst0) (unsafeFromReset -> rst1) =
 --
 resetSynchronizer
   :: forall dom
-   . KnownDomain dom
-  => Clock dom
+   . Clock dom
   -> Reset dom
   -> Reset dom
-resetSynchronizer clk rst = rstOut
+resetSynchronizer clk@ExtractClockDom rst = rstOut
  where
   isActiveHigh = case resetPolarity @dom of { SActiveHigh -> True; _ -> False }
   rstOut =
@@ -303,7 +308,6 @@ resetGlitchFilter = unsafeResetGlitchFilter
 unsafeResetGlitchFilter
   :: forall dom glitchlessPeriod
    . ( HasCallStack
-     , KnownDomain dom
      , 1 <= glitchlessPeriod
      )
   => SNat glitchlessPeriod
@@ -312,7 +316,7 @@ unsafeResetGlitchFilter
   -> Clock dom
   -> Reset dom
   -> Reset dom
-unsafeResetGlitchFilter glitchlessPeriod clk =
+unsafeResetGlitchFilter glitchlessPeriod clk@ExtractClockDom =
   resetGlitchFilter# glitchlessPeriod reg dffSync
  where
   reg = delay clk enableGen
@@ -338,7 +342,6 @@ unsafeResetGlitchFilter glitchlessPeriod clk =
 resetGlitchFilterWithReset
   :: forall dom glitchlessPeriod
    . ( HasCallStack
-     , KnownDomain dom
      , 1 <= glitchlessPeriod
      )
   => SNat glitchlessPeriod
@@ -360,7 +363,6 @@ resetGlitchFilterWithReset glitchlessPeriod clk ownRst =
 resetGlitchFilter#
   :: forall dom glitchlessPeriod state
    . ( HasCallStack
-     , KnownDomain dom
      , 1 <= glitchlessPeriod
      , state ~ (Bool, Index glitchlessPeriod)
      )
@@ -375,7 +377,7 @@ resetGlitchFilter#
      )
   -> Reset dom
   -> Reset dom
-resetGlitchFilter# SNat reg dffSync rstIn0 =
+resetGlitchFilter# SNat reg dffSync rstIn0@ExtractResetDom =
   let s' = go <$> s <*> rstIn2
       s  = reg (asserted, 0) s'
   in unsafeToReset $ fst <$> s
@@ -416,8 +418,7 @@ resetGlitchFilter# SNat reg dffSync rstIn0 =
 --
 holdReset
   :: forall dom n
-   . KnownDomain dom
-  => Clock dom
+   . Clock dom
   -> Enable dom
   -- ^ Global enable
   -> SNat n
@@ -426,7 +427,7 @@ holdReset
   -> Reset dom
   -- ^ Reset to extend
   -> Reset dom
-holdReset clk en SNat rst =
+holdReset clk en SNat rst@ExtractResetDom =
   unsafeFromActiveHigh ((/=maxBound) <$> counter)
  where
   counter :: Signal dom (Index (n+1))
@@ -440,14 +441,11 @@ holdReset clk en SNat rst =
 -- filter glitches. This adds one @domA@ clock cycle delay.
 convertReset
   :: forall domA domB
-   . ( KnownDomain domA
-     , KnownDomain domB
-     )
-  => Clock domA
+   . Clock domA
   -> Clock domB
   -> Reset domA
   -> Reset domB
-convertReset clkA clkB rstA0 = rstB1
+convertReset clkA@ExtractClockDom clkB@ExtractClockDom rstA0 = rstB1
  where
   rstA1 = unsafeFromReset rstA0
   rstA2 =

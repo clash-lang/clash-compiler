@@ -129,10 +129,7 @@ defConfig = DcConfig
 -- disabled, the relevant signals will return 'XException'.
 dcFifo ::
   forall depth a write read .
-  ( KnownDomain write
-  , KnownDomain read
-
-  , NFDataX a
+  ( NFDataX a
 
   , KnownNat depth
   -- Number of elements should be between [2**4, 2**17] ~ [16, 131072].
@@ -156,7 +153,7 @@ dcFifo ::
   -- | Read enable @rd_en@
   Signal read Bool ->
   FifoOut read write depth a
-dcFifo DcConfig{..} wClk wRst rClk rRst writeData rEnable =
+dcFifo DcConfig{..} wClk@ExtractClockDom wRst rClk@ExtractClockDom rRst writeData rEnable =
   case (resetKind @write, resetKind @read) of
     (SSynchronous, SSynchronous) ->
       let

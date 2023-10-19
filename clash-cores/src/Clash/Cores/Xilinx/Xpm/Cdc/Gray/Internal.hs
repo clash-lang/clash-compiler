@@ -16,7 +16,7 @@ module Clash.Cores.Xilinx.Xpm.Cdc.Gray.Internal where
 
 import Prelude
 import Clash.Explicit.Prelude
-  ( type (<=), KnownNat, SNat, Unsigned, Clock, KnownDomain, errorX
+  ( type (<=), KnownNat, SNat, Unsigned, Clock, errorX
   , unsafeSynchronizer )
 
 import Clash.Annotations.Primitive (Primitive(..), HDL(..), hasBlackBox)
@@ -50,8 +50,6 @@ xpmCdcGrayTF =
     :< _2LteStages
     :< _stagesLte10
     :< _knownNatN
-    :< _knownDomainSrc
-    :< _knownDomainDst
     :< _hasCallStack
     :< initBehavior
     :< stages
@@ -67,8 +65,6 @@ xpmCdcGrayTF# bbCtx
     , _2LteStages
     , _stagesLte10
     , _knownNatN
-    , _knownDomainSrc
-    , _knownDomainDst
     , _hasCallStack
     , DSL.getBool -> Just initValues
     , DSL.tExprToInteger -> Just stages
@@ -160,8 +156,6 @@ xpmCdcGray# ::
   ( 2 <= n, n <= 32
   , 2 <= stages, stages <= 10
   , KnownNat n
-  , KnownDomain src
-  , KnownDomain dst
   , HasCallStack
   ) =>
   -- | Initial value usage

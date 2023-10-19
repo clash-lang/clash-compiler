@@ -44,8 +44,6 @@ used =
     :< _risingEdgeConstraintA
     :< _risingEdgeConstraintB
     :< knownNatNAddrs
-    :< _knownDomainA
-    :< _knownDomainB
     :< _nfDataX
     :< _bitpack
     :< nBytes
@@ -64,8 +62,6 @@ tdpbramBBTF bbCtx
     , _risingEdgeConstraintA
     , _risingEdgeConstraintB
     , _knownNatNAddrs
-    , _knownDomainA
-    , _knownDomainB
     , _nfDataX
     , _bitpack
     , (fmap fromIntegral . DSL.tExprToInteger -> Just nBytes)
@@ -155,8 +151,6 @@ tdpbramTclBBTF bbCtx
     , _risingEdgeConstraintA
     , _risingEdgeConstraintB
     , DSL.tExprToInteger -> Just depth
-    , _knownDomainA
-    , _knownDomainB
     , _nfDataX
     , _bitpack
     , DSL.tExprToInteger -> Just width

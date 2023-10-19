@@ -20,7 +20,7 @@ import           Test.Cores.Internal.Signals
 --
 slaveAddressRotate
   :: forall n dom
-   . (KnownDomain dom, KnownNat n, 1 <= n)
+   . (KnownNat n, 1 <= n)
   => Clock dom
   -> Reset dom
   -> (Signal dom Bool, Signal dom Bool)
@@ -114,4 +114,3 @@ tests =
     testCase (show spi <> ", Divider 2, No Slave Latch") $
       testMasterMultiSlave d1 d3 0b0110011101 0b0110010101 spi False (3 * 27)
         @?= (([0b0110011101],1),([0b0110011101],1),([0b0110011101],1),([0b0110010101],3))
-

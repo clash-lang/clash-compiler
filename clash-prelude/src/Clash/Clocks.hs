@@ -17,14 +17,14 @@ module Clash.Clocks (Clocks(..)) where
 
 import Data.Kind (Constraint)
 
-import Clash.Signal.Internal
+import Clash.Signal (Clock, Reset)
 import Clash.Clocks.Deriving (deriveClocksInstances)
 
 class Clocks t where
   type ClocksCxt t :: Constraint
 
   clocks
-    :: (KnownDomain domIn, ClocksCxt t)
+    :: ClocksCxt t
     => Clock domIn
     -> Reset domIn
     -> t

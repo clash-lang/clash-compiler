@@ -90,7 +90,7 @@ type BlackBoxFunction
 
 -- | A BlackBox Template is a List of Elements
 -- TODO: Add name of function for better error messages
-type BlackBoxTemplate = [Element]
+type BlackBoxTemplate = [Element Int]
 
 -- | Elements of a blackbox context. If you extend this list, make sure to
 -- update the following functions:
@@ -104,114 +104,114 @@ type BlackBoxTemplate = [Element]
 --  - Clash.Netlist.BlackBox.Types.usedVariables
 --  - Clash.Netlist.BlackBox.Types.verifyBlackBoxContext
 --  - Clash.Netlist.BlackBox.Types.walkElement
-data Element
+data Element arg
   = Text !Text
   -- ^ Dumps given text without processing in HDL
-  | Component !Decl
+  | Component !(Decl arg)
   -- ^ Component instantiation hole
   | Result
   -- ^ Output hole;
-  | Arg !Int
+  | Arg !arg
   -- ^ Input hole
-  | ArgGen !Int !Int
+  | ArgGen !Int !arg
   -- ^ Like Arg, but its first argument is the scoping level. For use in
   -- in generated code only.
-  | Const !Int
+  | Const !arg
   -- ^ Like Arg, but input hole must be a constant.
-  | Lit !Int
+  | Lit !arg
   -- ^ Like Arg, but input hole must be a literal
-  | Name !Int
+  | Name !arg
   -- ^ Name hole
-  | ToVar [Element] !Int
+  | ToVar [(Element arg)] !arg
   -- ^ Like Arg but only insert variable reference (creating an assignment
   -- elsewhere if necessary).
   | Sym !Text !Int
   -- ^ Symbol hole
-  | Typ !(Maybe Int)
+  | Typ !(Maybe arg)
   -- ^ Type declaration hole
-  | TypM !(Maybe Int)
+  | TypM !(Maybe arg)
   -- ^ Type root hole
-  | Err !(Maybe Int)
+  | Err !(Maybe arg)
   -- ^ Error value hole
-  | TypElem !Element
+  | TypElem !(Element arg)
   -- ^ Select element type from a vector-like type
   | CompName
   -- ^ Hole for the name of the component in which the blackbox is instantiated
   | IncludeName !Int
-  | IndexType !Element
+  | IndexType !(Element arg)
   -- ^ Index data type hole, the field is the (exclusive) maximum index
-  | Size !Element
+  | Size !(Element arg)
   -- ^ Size of a type hole
-  | Length !Element
+  | Length !(Element arg)
   -- ^ Length of a vector-like hole
-  | Depth !Element
+  | Depth !(Element arg)
   -- ^ Depth of a tree hole
-  | MaxIndex !Element
+  | MaxIndex !(Element arg)
   -- ^ Max index into a vector-like type
-  | FilePath !Element
+  | FilePath !(Element arg)
   -- ^ Hole containing a filepath for a data file
-  | Template [Element] [Element]
+  | Template [(Element arg)] [(Element arg)]
   -- ^ Create data file <HOLE0> with contents <HOLE1>
   | Gen !Bool
   -- ^ Hole marking beginning (True) or end (False) of a generative construct
-  | IF !Element [Element] [Element]
-  | And [Element]
+  | IF !(Element arg) [(Element arg)] [(Element arg)]
+  | And [(Element arg)]
   | IW64
   -- ^ Hole indicating whether Int/Word/Integer are 64-Bit
-  | CmpLE !Element !Element
+  | CmpLE !(Element arg) !(Element arg)
   -- ^ Compare less-or-equal
   | HdlSyn HdlSyn
   -- ^ Hole indicating which synthesis tool we're generating HDL for
-  | BV !Bool [Element] !Element
+  | BV !Bool [(Element arg)] !(Element arg)
   -- ^ Convert to (True)/from(False) a bit-vector
-  | Sel !Element !Int
+  | Sel !(Element arg) !Int
   -- ^ Record selector of a type
-  | IsLit !Int
-  | IsVar !Int
-  | IsScalar !Int
+  | IsLit !arg
+  | IsVar !arg
+  | IsScalar !arg
   -- ^ Whether element is scalar
-  | IsActiveHigh !Int
+  | IsActiveHigh !arg
   -- ^ Whether a domain's reset lines are active high. Errors if not applied to
   -- a @KnownDomain@ or @KnownConfiguration@.
-  | Tag !Int
+  | Tag !arg
   -- ^ Tag of a domain.
-  | Period !Int
+  | Period !arg
   -- ^ Period of a domain. Errors if not applied to a @KnownDomain@ or
   -- @KnownConfiguration@.
   | LongestPeriod
   -- ^ Longest period of all known domains. The minimum duration returned is
   -- 100 ns, see https://github.com/clash-lang/clash-compiler/issues/2455.
-  | ActiveEdge !Signal.ActiveEdge !Int
+  | ActiveEdge !Signal.ActiveEdge !arg
   -- ^ Test active edge of memory elements in a certain domain. Errors if not
   -- applied to a @KnownDomain@ or @KnownConfiguration@.
-  | IsSync !Int
+  | IsSync !arg
   -- ^ Whether a domain's reset lines are synchronous. Errors if not applied to
   -- a @KnownDomain@ or @KnownConfiguration@.
-  | IsInitDefined !Int
+  | IsInitDefined !arg
   -- ^ Whether the initial (or "power up") value of memory elements in a domain
   -- are configurable to a specific value rather than unknown\/undefined. Errors
   -- if not applied to a @KnownDomain@ or @KnownConfiguration@.
-  | IsActiveEnable !Int
+  | IsActiveEnable !arg
   -- ^ Whether given enable line is active. More specifically, whether the
   -- enable line is NOT set to a constant 'True'.
-  | IsUndefined !Int
+  | IsUndefined !arg
   -- ^ Whether argument is undefined. E.g., an XException, error call,
   -- removed argument, or primitive that is undefined. This template tag will
   -- always return 0 (False) if `-fclash-aggressive-x-optimization-blackboxes`
   -- is NOT set.
-  | StrCmp [Element] !Int
-  | OutputUsage !Int
-  | Vars !Int
-  | GenSym [Element] !Int
-  | Repeat [Element] [Element]
+  | StrCmp [(Element arg)] !arg
+  | OutputUsage !arg
+  | Vars !arg
+  | GenSym [(Element arg)] !Int
+  | Repeat [(Element arg)] [(Element arg)]
   -- ^ Repeat <hole> n times
-  | DevNull [Element]
+  | DevNull [(Element arg)]
   -- ^ Evaluate <hole> but swallow output
-  | SigD [Element] !(Maybe Int)
+  | SigD [(Element arg)] !(Maybe arg)
   | CtxName
   -- ^ The "context name", name set by `Clash.Magic.setName`, defaults to the
   -- name of the closest binder
-  deriving (Show, Generic, NFData, Binary, Eq, Hashable)
+  deriving (Show, Generic, NFData, Binary, Eq, Hashable, Functor, Foldable, Traversable)
 
 -- | Component instantiation hole. First argument indicates which function argument
 -- to instantiate. Third argument corresponds to output and input assignments,
@@ -220,9 +220,9 @@ data Element
 --
 -- The LHS of the tuple is the name of the signal, while the RHS of the tuple
 -- is the type of the signal
-data Decl
+data Decl arg
   = Decl
-      !Int
+      !arg
       -- ^ Argument position of the function to instantiate
       !Int
       -- ^ Subposition of function: blackboxes can request multiple instances
@@ -233,9 +233,9 @@ data Decl
       -- function until the very last moment. The blackbox language has no way
       -- to indicate the subposition, and every ~INST will default its subposition
       -- to zero. Haskell blackboxes can use this data type.
-      [(BlackBoxTemplate,BlackBoxTemplate)]
+      [([Element arg],[Element arg])]
       -- ^ (name of signal, type of signal)
-  deriving (Show, Generic, NFData, Binary, Eq, Hashable)
+  deriving (Show, Generic, NFData, Binary, Eq, Hashable, Functor, Foldable, Traversable)
 
 data HdlSyn = Vivado | Quartus | Other
   deriving (Eq, Show, Read, Generic, NFData, Binary, Hashable)

@@ -30,8 +30,6 @@ tdpbram ::
   forall nAddrs domA domB nBytes a .
   ( HasCallStack
   , KnownNat nAddrs
-  , KnownDomain domA
-  , KnownDomain domB
   , KnownNat nBytes
   , BitSize a ~ (8 * nBytes)
   , NFDataX a
@@ -61,7 +59,7 @@ tdpbram ::
   ( Signal domA a
   , Signal domB a
   )
-tdpbram clkA enA addrA byteEnaA datA clkB enB addrB byteEnaB datB =
+tdpbram clkA@ExtractClockDom enA addrA byteEnaA datA clkB@ExtractClockDom enB addrB byteEnaB datB =
   -- [Note: eta port names for tdpbram]
   --
   -- By naming all the arguments and setting the -fno-do-lambda-eta-expansion GHC

@@ -26,7 +26,7 @@ import Text.Show.Pretty (ppShow)
 import Clash.Annotations.Primitive (Primitive(..), HDL(..), hasBlackBox)
 import Clash.Backend (Backend)
 import Clash.Explicit.Prelude
-  ( type (<=), SNat, Clock, KnownDomain, BitPack(BitSize), NFDataX, deepErrorX
+  ( type (<=), SNat, Clock, BitPack(BitSize), NFDataX, deepErrorX
   , unsafeSynchronizer, unpack )
 import Clash.Netlist.Types (TemplateFunction(..), BlackBoxContext)
 import Clash.Promoted.Nat (snatToNum)
@@ -45,8 +45,6 @@ xpmCdcSingleTF =
  where
   _2LteN
     :< _stagesLte10
-    :< _knownDomainSrc
-    :< _knownDomainDst
     :< _hasCallStack
     :< _nfdatax
     :< _bitpack
@@ -63,8 +61,6 @@ xpmCdcSingleTF# :: Backend backend => BlackBoxContext -> State backend Doc
 xpmCdcSingleTF# bbCtx
   | [ _2LteStages
     , _stagesLte10
-    , _knownDomainSrc
-    , _knownDomainDst
     , _hasCallStack
     , _nfdatax
     , _bitpack
@@ -152,8 +148,6 @@ xpmCdcSingleTF# bbCtx = error (ppShow bbCtx)
 xpmCdcSingle# ::
   forall stages a src dst.
   ( 2 <= stages, stages <= 10
-  , KnownDomain src
-  , KnownDomain dst
   , HasCallStack
   , NFDataX a
   , BitPack a

@@ -12,7 +12,9 @@ ROMs
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -36,10 +38,14 @@ import Prelude hiding         (length)
 
 import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Signal.Internal
-  (Clock (..), KnownDomain, Signal (..), Enable, fromEnable)
+  (Clock (..), Signal (..), Enable, fromEnable)
 import Clash.Sized.Unsigned   (Unsigned)
 import Clash.Sized.Vector     (Vec, length, toList)
 import Clash.XException       (deepErrorX, seqX, NFDataX)
+
+import Clash.Annotations.Primitive(Primitive (InlineYamlPrimitive), HDL(..))
+import Data.List.Infinite (Infinite((:<)), (...))
+import Data.String.Interpolate (__i)
 
 -- | A ROM with a synchronous read port, with space for 2^@n@ elements
 --
@@ -56,7 +62,7 @@ import Clash.XException       (deepErrorX, seqX, NFDataX)
 -- 'Clash.Explicit.ROM.Blob.romBlobPow2' for different approaches that scale
 -- well.
 romPow2
-  :: (KnownDomain dom, KnownNat n, NFDataX a)
+  :: (KnownNat n, NFDataX a)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -86,7 +92,7 @@ romPow2 = rom
 -- is constructed. See 'Clash.Explicit.ROM.File.romFile' and
 -- 'Clash.Explicit.ROM.Blob.romBlob' for different approaches that scale well.
 rom
-  :: (KnownDomain dom, KnownNat n, NFDataX a, Enum addr)
+  :: (KnownNat n, NFDataX a, Enum addr)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -105,7 +111,7 @@ rom = \clk en content rd -> rom# clk en content (fromEnum <$> rd)
 -- | ROM primitive
 rom#
   :: forall dom n a
-   . (KnownDomain dom, KnownNat n, NFDataX a)
+   . (KnownNat n, NFDataX a)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -143,3 +149,120 @@ rom# !_ en content =
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE rom# #-}
 {-# ANN rom# hasBlackBox #-}
+{-# ANN rom# (
+  let
+    bbName = show 'rom#
+    _arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [SystemVerilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        type: |-
+          rom\# :: ( KnownNat n    --       ARG[1]
+                   , Undefined a ) --       ARG[2]
+                => Clock dom       -- clk,  ARG[3]
+                => Enable dom      -- en,   ARG[4]
+                -> Vec n a         -- init, ARG[5]
+                -> Signal dom Int  -- rd,   ARG[6]
+                -> Signal dom a
+        template: |-
+          // rom begin
+          ~SIGD[~GENSYM[ROM][1]][#{arg5}];
+          assign ~SYM[1] = ~LIT[#{arg5}];
+
+          logic [~SIZE[~TYPO]-1:0] ~GENSYM[~RESULT_q][2];~IF ~ISACTIVEENABLE[#{arg4}] ~THEN
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~GENSYM[~COMPNAME_rom][3]
+            if (~ARG[#{arg4}]) begin
+              ~SYM[2] <= ~SYM[1][~ARG[#{arg6}]];
+            end
+          end~ELSE
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~SYM[3]
+            ~SYM[2] <= ~SYM[1][~ARG[#{arg6}]];
+          end~FI
+
+          assign ~RESULT = ~FROMBV[~SYM[2]][~TYPO];
+          // rom end
+    |]) #-}
+{-# ANN rom# (
+  let
+    bbName = show 'rom#
+    arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [Verilog] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          rom\# :: ( KnownNat n    --       ARG[1]
+                   , Undefined a ) --       ARG[2]
+                => Clock dom       -- clk,  ARG[3]
+                -> Enable dom      -- en,   ARG[4]
+                -> Vec n a         -- init, ARG[5]
+                -> Signal dom Int  -- rd,   ARG[6]
+                -> Signal dom a
+        template: |-
+          // rom begin
+          reg ~TYPO ~GENSYM[ROM][1] [0:~LIT[#{arg1}]-1];
+
+          reg ~TYP[#{arg5}] ~GENSYM[rom_init][3];
+          integer ~GENSYM[i][4];
+          initial begin
+            ~SYM[3] = ~LIT[#{arg5}];
+            for (~SYM[4]=0; ~SYM[4] < ~LIT[#{arg1}]; ~SYM[4] = ~SYM[4] + 1) begin
+              ~SYM[1][~LIT[#{arg1}]-1-~SYM[4]] = ~SYM[3][~SYM[4]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+            end
+          end
+          ~IF ~ISACTIVEENABLE[#{arg4}] ~THEN
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~GENSYM[~COMPNAME_rom][5]
+            if (~ARG[#{arg4}]) begin
+              ~RESULT <= ~SYM[1][~ARG[#{arg6}]];
+            end
+          end~ELSE
+          always @(~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENposedge~ELSEnegedge~FI ~ARG[#{arg3}]) begin : ~SYM[5]
+            ~RESULT <= ~SYM[1][~ARG[#{arg6}]];
+          end~FI
+          // rom end
+    |]) #-}
+{-# ANN rom# (
+  let
+    bbName = show 'rom#
+    arg1 :< _arg2 :< arg3 :< arg4 :< arg5 :< arg6 :< _ = ((0 :: Int)...)
+  in
+    InlineYamlPrimitive [VHDL] [__i|
+      BlackBox:
+        name: '#{bbName}'
+        kind: Declaration
+        outputUsage: NonBlocking
+        type: |-
+          rom\# :: ( KnownNat n    --       ARG[1]
+                   , Undefined a ) --       ARG[2]
+                => Clock dom       -- clk,  ARG[3]
+                -> Enable dom      -- en,   ARG[4]
+                -> Vec n a         -- init, ARG[5]
+                -> Signal dom Int  -- rd,   ARG[6]
+                -> Signal dom a
+        template: |-
+          -- rom begin
+          ~GENSYM[~COMPNAME_rom][1] : block
+            signal ~GENSYM[ROM][2] : ~TYP[#{arg5}];
+            signal ~GENSYM[rd][3]  : integer range 0 to ~LIT[#{arg1}]-1;
+          begin
+            ~SYM[2] <= ~CONST[#{arg5}];
+
+            ~SYM[3] <= to_integer(~VAR[rdI][#{arg6}](31 downto 0))
+            -- pragma translate_off
+                          mod ~LIT[#{arg1}]
+            -- pragma translate_on
+                          ;
+            ~GENSYM[romSync][6] : process (~ARG[#{arg3}])
+            begin
+              if (~IF ~ACTIVEEDGE[Rising][#{arg3}] ~THENrising_edge~ELSEfalling_edge~FI(~ARG[#{arg3}])~IF ~ISACTIVEENABLE[#{arg4}] ~THEN and ~ARG[#{arg4}] ~ELSE ~FI) then~IF ~VIVADO ~THEN
+                ~RESULT <= ~FROMBV[~SYM[2](~SYM[3])][~TYPO];~ELSE
+                ~RESULT <= ~SYM[2](~SYM[3]);~FI
+              end if;
+            end process;
+          end block;
+          -- rom end
+    |]) #-}

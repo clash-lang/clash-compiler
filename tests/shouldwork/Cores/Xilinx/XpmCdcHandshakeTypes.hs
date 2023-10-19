@@ -20,42 +20,40 @@ data State = WaitForDeassert | WaitForAssert deriving (Generic, NFDataX)
 -- | Transfer 1, 2, 3, ... to destination domain
 srcFsm ::
   forall a src .
-  ( KnownDomain src
-  , Num a
+  ( Num a
   , NFDataX a
   ) =>
   Clock src ->
   Signal src Bool ->
   Signal src (a, Bool)
-srcFsm clk = mealy clk noReset enableGen go (0, WaitForDeassert)
+srcFsm clk = mealy clk rst enableGen go (0, WaitForDeassert)
  where
   go (n, WaitForDeassert) True  = ((n,     WaitForDeassert), (n,     False))
   go (n, WaitForDeassert) False = ((n + 1, WaitForAssert),   (n + 1, True))
   go (n, WaitForAssert)   False = ((n,     WaitForAssert),   (n,     True))
   go (n, WaitForAssert)   True  = ((n,     WaitForDeassert), (n,     False))
+  rst = provideKnownDomainFrom clk noReset
 {-# NOINLINE srcFsm #-}
 
 -- | Receives data from source domain
 dstFsm ::
   forall a dst .
-  KnownDomain dst =>
   Clock dst ->
   Signal dst (Bool, a) ->
   Signal dst (Bool, Maybe a)
-dstFsm clk = mealy clk noReset enableGen go WaitForAssert
+dstFsm clk = mealy clk rst enableGen go WaitForAssert
  where
   go WaitForAssert   (False, _) = (WaitForAssert,   (False, Nothing))
   go WaitForAssert   (True,  n) = (WaitForDeassert, (True,  Just n))
   go WaitForDeassert (True,  _) = (WaitForDeassert, (True,  Nothing))
   go WaitForDeassert (False, _) = (WaitForAssert,   (False, Nothing))
+  rst = provideKnownDomainFrom clk noReset
 {-# NOINLINE dstFsm #-}
 
 -- | Composition of 'srcFsm' and 'dstFsm'
 top ::
   forall a srcStages dstStages src dst .
-  ( KnownDomain src
-  , KnownDomain dst
-  , Num a
+  ( Num a
   , NFDataX a
   , BitPack a
   , 1 <= BitSize a, BitSize a <= 1024

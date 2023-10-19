@@ -3,17 +3,16 @@
     kind: Declaration
     type: |-
       clockWizard
-        :: ( KnownDomain domIn            -- ARG[0]
-           , KnownDomain domOut )         -- ARG[1]
-        => SSymbol name                   -- ARG[2]
-        -> Clock domIn                    -- ARG[3]
-        -> Reset domIn                    -- ARG[4]
+        :: KnownDomain domOut             -- ARG[0]
+        => SSymbol name                   -- ARG[1]
+        -> Clock domIn                    -- ARG[2]
+        -> Reset domIn                    -- ARG[3]
         -> (Clock domOut, Signal domOut Bool)
     template: |-
       // clockWizard begin
-      ~NAME[2] ~GENSYM[clockWizard_inst][2]
-      (.clk_in1  (~ARG[3])
-      ,.reset    (~IF ~ISACTIVEHIGH[0] ~THEN ~ELSE ! ~FI ~ARG[4])
+      ~NAME[1] ~GENSYM[clockWizard_inst][2]
+      (.clk_in1  (~ARG[2])
+      ,.reset    (~IF ~ISACTIVEHIGH[3] ~THEN ~ELSE ! ~FI ~ARG[3])
       ,.clk_out1 (~RESULT[1])
       ,.locked   (~RESULT[0]));
       // clockWizard end

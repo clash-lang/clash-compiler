@@ -29,9 +29,7 @@ createDomain vSystem{vName="P50", vPeriod=50000}
 
 ram
   :: forall wdom rdom
-   . ( KnownDomain rdom
-     , KnownDomain wdom)
-  => Clock wdom
+   . Clock wdom
   -> Clock rdom
   -> Signal wdom (Unsigned 4)
   -> Signal rdom (Unsigned 4)
@@ -42,9 +40,7 @@ ram wClk rClk wrD = asyncRamPow2 wClk rClk enableGen rd wrM
 
 tbOutput
   :: forall wdom rdom
-   . ( KnownDomain rdom
-     , KnownDomain wdom)
-  => (  Clock wdom
+   . (  Clock wdom
       -> Clock rdom
       -> Signal wdom (Unsigned 4)
       -> Signal rdom (Unsigned 4))
@@ -54,13 +50,14 @@ tbOutput
 tbOutput top wClk rClk = output
  where
   wrD = delay wClk enableGen 0 $ wrD + 1
-  output = ignoreFor rClk noReset enableGen d1 0 $ top wClk rClk wrD
+  output = ignoreFor rClk rst enableGen d1 0 $ top wClk rClk wrD
+  rst = provideKnownDomainFrom rClk noReset
 {-# INLINE tbOutput #-}
 
 tb
   :: forall wdom rdom n
-   . ( KnownDomain rdom
-     , KnownDomain wdom
+   . ( KnownDomain wdom
+     , KnownDomain rdom
      , KnownNat n
      , 1 <= n)
   => (  Clock wdom

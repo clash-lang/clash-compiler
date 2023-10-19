@@ -25,11 +25,11 @@ instance Arrow (SignalA dom) where
     (SA f) &&& (SA g) = SA $ f &&& g >>> bundle
 
 
-alwaysEnable :: (WithSingleDomain dom a, KnownDomain dom) => (HiddenEnable dom => a) -> a
+alwaysEnable :: (WithSingleDomain dom a) => (HiddenEnable dom => a) -> a
 alwaysEnable a = exposeEnable a enableGen
 
 alwaysDelayA ::
-    (KnownDomain dom, HiddenClock dom, NFDataX a) =>
+    (HiddenClock dom, NFDataX a) =>
     a -> SignalA dom a a
 alwaysDelayA a = SA $ alwaysEnable $ delay a
 

@@ -64,7 +64,7 @@ import           Data.String.Interpolate (__i)
 
 import           Clash.Annotations.Primitive
   (Primitive(InlineYamlPrimitive), HDL(..))
-import           Clash.Signal.Internal (KnownDomain, Signal, Clock, Reset)
+import           Clash.Signal.Internal (Signal, Clock, Reset)
 import           Clash.XException      (errorX, hwSeqX)
 
 import           Clash.Verification.Internal
@@ -247,8 +247,7 @@ assume = Property . CvAssume . assertion . toAssertionValue
 -- | Print property as PSL/SVA in HDL. Clash simulation support not yet
 -- implemented.
 check
-  :: KnownDomain dom
-  => Clock dom
+  :: Clock dom
   -> Reset dom
   -> Text
   -- ^ Property name (used in reports and error messages)
@@ -271,8 +270,7 @@ check !_clk !_rst !_propName !_renderAs !_prop =
 -- | Same as 'check', but doesn't require a design to explicitly carried to
 -- top-level.
 checkI
-  :: KnownDomain dom
-  => Clock dom
+  :: Clock dom
   -> Reset dom
   -> Text
   -- ^ Property name (used in reports and error messages)

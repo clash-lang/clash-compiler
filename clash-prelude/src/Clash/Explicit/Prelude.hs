@@ -78,6 +78,7 @@ module Clash.Explicit.Prelude
   , isFalling
   , riseEvery
   , oscillate
+  , HasKnownDomain(..)
     -- * Testbench functions
   , assert
   , stimuliGenerator
@@ -185,6 +186,7 @@ import Clash.Promoted.Nat
 import Clash.Promoted.Nat.TH
 import Clash.Promoted.Nat.Literals
 import Clash.Promoted.Symbol
+import Clash.Signal.Internal (HasKnownDomain(..))
 import Clash.Signal.Trace
 import Clash.Sized.BitVector
 import Clash.Sized.Fixed
@@ -227,8 +229,8 @@ functions a type class called 'Clash.Class.Parity.Parity' is available at
 -- [1 :> 0 :> 0 :> 0 :> Nil,2 :> 1 :> 0 :> 0 :> Nil,3 :> 2 :> 1 :> 0 :> Nil,4 :> 3 :> 2 :> 1 :> Nil,5 :> 4 :> 3 :> 2 :> Nil,...
 -- ...
 window
-  :: ( KnownNat n
-     , KnownDomain dom
+  :: forall n dom a
+   . ( KnownNat n
      , NFDataX a
      , Default a
      )
@@ -253,8 +255,7 @@ window clk rst en x = res
 --
 -- @
 -- windowD3
---   :: KnownDomain dom
---   -> Clock dom
+--   :: Clock dom
 --   -> Enable dom
 --   -> Reset dom
 --   -> 'Signal' dom Int
@@ -269,7 +270,7 @@ windowD
   :: ( KnownNat n
      , NFDataX a
      , Default a
-     , KnownDomain dom )
+     )
   => Clock dom
   -- ^ Clock to which the incoming signal is synchronized
   -> Reset dom

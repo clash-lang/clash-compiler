@@ -56,7 +56,7 @@ import Clash.Signal.Delayed.Internal
    unsafeFromSignal, antiDelay, feedback, forward)
 
 import Clash.Explicit.Signal
-  (KnownDomain, Clock, Domain, Reset, Signal, Enable, register, delay, bundle, unbundle)
+  (Clock, Domain, Reset, Signal, Enable, register, delay, bundle, unbundle)
 import Clash.Promoted.Nat         (SNat (..), snatToInteger)
 import Clash.XException           (NFDataX)
 
@@ -67,7 +67,7 @@ import Clash.XException           (NFDataX)
 >>> let delay3 clk rst en = delayed clk rst en (-1 :> -1 :> -1 :> Nil)
 >>> let delay2 clk rst en = (delayedI clk rst en :: Int -> DSignal System n Int -> DSignal System (n + 2) Int)
 >>> let delayN2 = delayN d2
->>> let delayI2 = delayI :: KnownDomain dom => Int -> Enable dom -> Clock dom -> DSignal dom n Int -> DSignal dom (n + 2) Int
+>>> let delayI2 = delayI :: Int -> Enable dom -> Clock dom -> DSignal dom n Int -> DSignal dom (n + 2) Int
 >>> let countingSignals = Clash.Prelude.repeat (dfromList [0..]) :: Vec 4 (DSignal dom 0 Int)
 >>> :{
 let mac :: Clock System
@@ -91,8 +91,7 @@ let mac :: Clock System
 --
 -- @
 -- delay3
---   :: KnownDomain dom
---   => Clock dom
+--   :: Clock dom
 --   -> Reset dom
 --   -> Enable dom
 --   -> 'DSignal' dom n Int
@@ -104,8 +103,7 @@ let mac :: Clock System
 -- [-1,-1,-1,-1,1,2,3]
 delayed
   :: forall dom  a n d
-   . ( KnownDomain dom
-     , KnownNat d
+   . ( KnownNat d
      , NFDataX a )
   => Clock dom
   -> Reset dom
@@ -128,8 +126,7 @@ delayed clk rst en m ds = coerce (delaySignal (coerce ds))
 --
 -- @
 -- delay2
---   :: KnownDomain dom
---   => Clock dom
+--   :: Clock dom
 --   -> Reset dom
 --   -> Enable dom
 --   -> Int
@@ -154,7 +151,6 @@ delayed clk rst en m ds = coerce (delaySignal (coerce ds))
 --      -> DSignal dom (n + 3) a
 delayedI
   :: ( KnownNat d
-     , KnownDomain dom
      , NFDataX a )
   => Clock dom
   -> Reset dom
@@ -169,8 +165,7 @@ delayedI clk rst en dflt = delayed clk rst en (repeat dflt)
 --
 -- @
 -- delayN2
---   :: 'KnownDomain' dom
---   => Int
+--   :: Int
 --   -> 'Enable' dom
 --   -> 'Clock' dom
 --   -> 'DSignal' dom n Int
@@ -182,8 +177,7 @@ delayedI clk rst en dflt = delayed clk rst en (repeat dflt)
 -- [-1,-1,1,2,3,4]
 delayN
   :: forall dom a d n
-   . ( KnownDomain dom
-     , NFDataX a )
+   . ( NFDataX a )
   => SNat d
   -> a
   -- ^ Initial value
@@ -201,8 +195,7 @@ delayN d dflt ena clk = coerce . go (snatToInteger d) . coerce @_ @(Signal dom a
 --
 -- @
 -- delayI2
---   :: 'KnownDomain' dom
---   => Int
+--   :: Int
 --   -> 'Enable' dom
 --   -> 'Clock' dom
 --   -> 'DSignal' dom n Int
@@ -220,7 +213,6 @@ delayN d dflt ena clk = coerce . go (snatToInteger d) . coerce @_ @(Signal dom a
 delayI
   :: forall d n a dom
    . ( NFDataX a
-     , KnownDomain dom
      , KnownNat d )
   => a
   -- ^ Initial value
@@ -250,7 +242,6 @@ type instance Apply (DelayedFold dom n delay a) k = DSignal dom (n + (delay*k)) 
 delayedFold
   :: forall dom  n delay k a
    . ( NFDataX a
-     , KnownDomain dom
      , KnownNat delay
      , KnownNat k )
   => SNat delay

@@ -19,7 +19,7 @@ import qualified Prelude as P
 type Low = ("Low" :: Domain)
 createDomain vSystem{vName="Low", vResetPolarity=ActiveLow}
 
-sampleResetN :: KnownDomain dom => Int -> Reset dom -> [Bool]
+sampleResetN :: Int -> Reset dom -> [Bool]
 sampleResetN n = sampleN n . unsafeToActiveHigh
 
 resetFromList :: KnownDomain dom => [Bool] -> Reset dom

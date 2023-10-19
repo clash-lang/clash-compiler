@@ -102,7 +102,7 @@ import Clash.Signal.Internal
 -- @
 altpll
   :: forall domOut domIn name
-   . (KnownDomain domIn, KnownDomain domOut)
+   . KnownDomain domOut
   => SSymbol name
   -- ^ Name of the component instance
   --
@@ -113,7 +113,7 @@ altpll
   -- ^ Reset for the PLL
   -> (Clock domOut, Signal domOut Bool)
   -- ^ (Stable PLL clock, PLL lock)
-altpll !_ = knownDomain @domIn `seq` knownDomain @domOut `seq` clocks
+altpll !_ = clocks
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE altpll #-}
 {-# ANN altpll hasBlackBox #-}
@@ -191,7 +191,8 @@ altpll !_ = knownDomain @domIn `seq` knownDomain @domOut `seq` clocks
 -- (modulo local resets, which will be based on @rst@ or never asserted at all
 -- if the component doesn't need a reset).
 alteraPll
-  :: (Clocks t, KnownDomain domIn, ClocksCxt t)
+  :: forall t domIn name
+   . (Clocks t, ClocksCxt t)
   => SSymbol name
   -- ^ Name of the component instance
   --

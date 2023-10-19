@@ -30,9 +30,7 @@ import Clash.Cores.Xilinx.Xpm.Cdc.Single.Internal (xpmCdcSingle#)
 --           'xpmCdcSingleWith'.
 xpmCdcSingle ::
   forall a src dst.
-  ( KnownDomain src
-  , KnownDomain dst
-  , HasCallStack
+  ( HasCallStack
   , NFDataX a
   , BitPack a
   , BitSize a ~ 1
@@ -41,7 +39,7 @@ xpmCdcSingle ::
   Clock dst ->
   Signal src a ->
   Signal dst a
-xpmCdcSingle = xpmCdcSingleWith XpmCdcSingleConfig{..}
+xpmCdcSingle  clkSrc@ExtractClockDom clkDst@ExtractClockDom = xpmCdcSingleWith XpmCdcSingleConfig{..}  clkSrc clkDst
  where
   registerInput = True
   stages = d4
@@ -76,8 +74,6 @@ data XpmCdcSingleConfig stages = XpmCdcSingleConfig
 xpmCdcSingleWith ::
   forall stages a src dst.
   ( 2 <= stages, stages <= 10
-  , KnownDomain src
-  , KnownDomain dst
   , NFDataX a
   , BitPack a
   , BitSize a ~ 1

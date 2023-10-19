@@ -26,7 +26,7 @@ module Clash.Explicit.Moore
 where
 
 import           Clash.Explicit.Signal
-  (KnownDomain, Bundle (..), Clock, Reset, Signal, Enable, register)
+  (Bundle (..), Clock, Reset, Signal, Enable, register)
 import           Clash.XException                 (NFDataX)
 
 {- $setup
@@ -47,8 +47,7 @@ import           Clash.XException                 (NFDataX)
 -- macT s (x,y) = x * y + s
 --
 -- mac
---   :: 'KnownDomain' dom
---   => 'Clock' dom
+--   :: 'Clock' dom
 --   -> 'Reset' dom
 --   -> 'Enable' dom
 --   -> 'Signal' dom (Int, Int)
@@ -65,8 +64,7 @@ import           Clash.XException                 (NFDataX)
 --
 -- @
 -- dualMac
---   :: 'KnownDomain' dom
---   => 'Clock' dom
+--   :: 'Clock' dom
 --   -> 'Reset' dom
 --   -> 'Enable' dom
 --   -> ('Signal' dom Int, 'Signal' dom Int)
@@ -78,8 +76,8 @@ import           Clash.XException                 (NFDataX)
 --     s2 = 'moore' clk rst en macT id 0 ('bundle' (b,y))
 -- @
 moore
-  :: ( KnownDomain dom
-     , NFDataX s )
+  :: forall dom s i o
+   . NFDataX s
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Reset dom
@@ -102,8 +100,8 @@ moore clk rst en ft fo iS =
 -- | Create a synchronous function from a combinational function describing
 -- a moore machine without any output logic
 medvedev
-  :: ( KnownDomain dom
-     , NFDataX s )
+  :: forall dom s i
+   . NFDataX s
   => Clock dom
   -> Reset dom
   -> Enable dom
@@ -141,8 +139,8 @@ medvedev clk rst en tr st = moore clk rst en tr id st
 --     (i2,b2) = 'mooreB' clk rst en t o 3 (c,i1)
 -- @
 mooreB
-  :: ( KnownDomain dom
-     , NFDataX s
+  :: forall dom s i o
+   . ( NFDataX s
      , Bundle i
      , Bundle o )
   => Clock dom
@@ -164,8 +162,8 @@ mooreB clk rst en ft fo iS i = unbundle (moore clk rst en ft fo iS (bundle i))
 
 -- | A version of 'medvedev' that does automatic 'Bundle'ing
 medvedevB
-  :: ( KnownDomain dom
-     , NFDataX s
+  :: forall dom s i
+   . ( NFDataX s
      , Bundle i
      , Bundle s )
   => Clock dom

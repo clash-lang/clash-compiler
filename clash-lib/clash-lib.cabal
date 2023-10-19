@@ -359,11 +359,37 @@ executable static-files
     docopt                  ^>= 0.7,
     extra,
     filepath
-  Other-Modules:      Paths_clash_lib
   GHC-Options:        -Wall -Wcompat
   default-language:   Haskell2010
   if impl(ghc >= 9.2.0)
     buildable: False
+
+executable prim-yaml-to-inlineyaml
+  Main-Is:            tools/prim-yaml-to-inlineyaml.hs
+  Build-Depends:
+    aeson,
+    base,
+    bytestring,
+    clash-lib,
+    clash-prelude,
+    containers,
+    directory,
+    extra,
+    filepath,
+    Glob,
+    lens,
+    lens-aeson,
+    prettyprinter,
+    stringsearch,
+    text,
+    trifecta,
+    vector,
+    yaml,
+  GHC-Options:        -Wall -Wcompat
+  default-language:   Haskell2010
+  if impl(ghc < 9.0.0) -- some of the lens magic doesn't typecheck on ghc-8.*
+    buildable: False
+
 
 
 test-suite doctests

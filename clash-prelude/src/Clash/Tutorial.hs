@@ -1106,8 +1106,7 @@ import qualified Data.Vector as V
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 
 blockRam#
-  :: ( KnownDomain dom
-     , HasCallStack
+  :: ( HasCallStack
      , NFDataX a )
   => 'Clock' dom           -- ^ 'Clock' to synchronize to
   -> 'Enable' dom          -- ^ Global enable
@@ -1154,40 +1153,39 @@ BlackBox:
   kind: Declaration
   type: |-
     blockRam#
-      :: ( KnownDomain dom        ARG[0]
-         , HasCallStack  --       ARG[1]
-         , NFDataX a )   --       ARG[2]
-      => Clock dom       -- clk,  ARG[3]
-      -> Enable dom      -- en,   ARG[4]
-      -> Vec n a         -- init, ARG[5]
-      -> Signal dom Int  -- rd,   ARG[6]
-      -> Signal dom Bool -- wren, ARG[7]
-      -> Signal dom Int  -- wr,   ARG[8]
-      -> Signal dom a    -- din,  ARG[9]
+      :: ( HasCallStack  --       ARG[0]
+         , NFDataX a )   --       ARG[1]
+      => Clock dom       -- clk,  ARG[2]
+      -> Enable dom      -- en,   ARG[3]
+      -> Vec n a         -- init, ARG[4]
+      -> Signal dom Int  -- rd,   ARG[5]
+      -> Signal dom Bool -- wren, ARG[6]
+      -> Signal dom Int  -- wr,   ARG[7]
+      -> Signal dom a    -- din,  ARG[8]
       -> Signal dom a
   template: |-
     -- blockRam begin
     ~GENSYM[~RESULT_blockRam][1] : block
-      signal ~GENSYM[~RESULT_RAM][2] : ~TYP[5] := ~CONST[5];
-      signal ~GENSYM[rd][4]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
-      signal ~GENSYM[wr][5]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
+      signal ~GENSYM[~RESULT_RAM][2] : ~TYP[4] := ~CONST[4];
+      signal ~GENSYM[rd][4]  : integer range 0 to ~LENGTH[~TYP[4]] - 1;
+      signal ~GENSYM[wr][5]  : integer range 0 to ~LENGTH[~TYP[4]] - 1;
     begin
-      ~SYM[4] <= to_integer(~ARG[6])
+      ~SYM[4] <= to_integer(~ARG[5])
       -- pragma translate_off
-                    mod ~LENGTH[~TYP[5]]
+                    mod ~LENGTH[~TYP[4]]
       -- pragma translate_on
                     ;
-      ~SYM[5] <= to_integer(~ARG[8])
+      ~SYM[5] <= to_integer(~ARG[7])
       -- pragma translate_off
-                    mod ~LENGTH[~TYP[5]]
+                    mod ~LENGTH[~TYP[4]]
       -- pragma translate_on
                     ;
     ~IF ~VIVADO ~THEN
-      ~SYM[6] : process(~ARG[3])
+      ~SYM[6] : process(~ARG[2])
       begin
-        if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-          if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
-            ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[9]][~TYP[9]];
+        if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
+          if ~ARG[6] ~IF ~ISACTIVEENABLE[3] ~THEN and ~ARG[3] ~ELSE ~FI then
+            ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[8]][~TYP[8]];
           end if;
           ~RESULT <= fromSLV(~SYM[2](~SYM[4]))
           -- pragma translate_off
@@ -1196,11 +1194,11 @@ BlackBox:
           ;
         end if;
       end process; ~ELSE
-      ~SYM[6] : process(~ARG[3])
+      ~SYM[6] : process(~ARG[2])
       begin
-        if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-          if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
-            ~SYM[2](~SYM[5]) <= ~ARG[9];
+        if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
+          if ~ARG[6] ~IF ~ISACTIVEENABLE[3] ~THEN and ~ARG[3] ~ELSE ~FI then
+            ~SYM[2](~SYM[5]) <= ~ARG[8];
           end if;
           ~RESULT <= ~SYM[2](~SYM[4])
           -- pragma translate_off
@@ -1289,16 +1287,16 @@ a general listing of the available template holes:
 * @~TAG[N]@: Name of given domain. Errors when called on an argument which is not
   a 'KnownDomain', 'Reset', or 'Clock'.
 * @~PERIOD[N]@: Clock period of given domain. Errors when called on an argument
-  which is not a 'KnownDomain' or 'KnownConf'.
+  which is not a 'Clock', 'Reset', 'KnownDomain' or 'KnownConf'.
 * @~ISACTIVEENABLE[N]@: Is the @(N+1)@'th argument a an Enable line NOT set to a
   constant True. Can be used instead of deprecated (and removed) template tag
 * @~ISSYNC[N]@: Does synthesis domain at the @(N+1)@'th argument have synchronous resets. Errors
-  when called on an argument which is not a 'KnownDomain' or 'KnownConf'.
+  when called on an argument which is not a 'Reset', 'Clock', 'Enable', 'KnownDomain' or 'KnownConf'.
 * @~ISINITDEFINED[N]@: Does synthesis domain at the @(N+1)@'th argument have defined initial
-  values. Errors when called on an argument which is not a 'KnownDomain' or 'KnownConf'.
+  values. Errors when called on an argument which is not a 'Clock', 'Reset', 'Enable', 'KnownDomain' or 'KnownConf'.
 * @~ACTIVEEDGE[edge][N]@: Does synthesis domain at the @(N+1)@'th argument respond to
   /edge/. /edge/ must be one of 'Falling' or 'Rising'. Errors when called on an
-  argument which is not a 'KnownDomain' or 'KnownConf'.
+  argument which is not a 'Clock', 'Reset', 'Enable', 'KnownDomain' or 'KnownConf'.
 * @~AND[\<HOLE1\>,\<HOLE2\>,..]@: Logically /and/ the conditions in the @\<HOLE\>@'s
 * @~VAR[\<NAME\>][N]@: Like @~ARG[N]@ but binds the argument to a variable named NAME.
   The @\<NAME\>@ can be left blank, then clash will come up with a (unique) name.
@@ -1345,49 +1343,48 @@ BlackBox:
   outputReg: true
   type: |-
     blockRam#
-      :: ( KnownDomain dom        ARG[0]
-         , HasCallStack  --       ARG[1]
-         , NFDataX a )   --       ARG[2]
-      => Clock dom       -- clk,  ARG[3]
-      => Enable dom      -- en,   ARG[4]
-      -> Vec n a         -- init, ARG[5]
-      -> Signal dom Int  -- rd,   ARG[6]
-      -> Signal dom Bool -- wren, ARG[7]
-      -> Signal dom Int  -- wr,   ARG[8]
-      -> Signal dom a    -- din,  ARG[9]
+      :: ( HasCallStack  --       ARG[0]
+         , NFDataX a )   --       ARG[1]
+      => Clock dom       -- clk,  ARG[2]
+      => Enable dom      -- en,   ARG[3]
+      -> Vec n a         -- init, ARG[4]
+      -> Signal dom Int  -- rd,   ARG[5]
+      -> Signal dom Bool -- wren, ARG[6]
+      -> Signal dom Int  -- wr,   ARG[7]
+      -> Signal dom a    -- din,  ARG[8]
       -> Signal dom a
   template: |-
     // blockRam begin
-    reg ~TYPO ~GENSYM[~RESULT_RAM][1] [0:~LENGTH[~TYP[5]]-1];
+    reg ~TYPO ~GENSYM[~RESULT_RAM][1] [0:~LENGTH[~TYP[4]]-1];
 
-    reg ~TYP[5] ~GENSYM[ram_init][3];
+    reg ~TYP[4] ~GENSYM[ram_init][3];
     integer ~GENSYM[i][4];
     initial begin
-      ~SYM[3] = ~CONST[5];
-      for (~SYM[4]=0; ~SYM[4] < ~LENGTH[~TYP[5]]; ~SYM[4] = ~SYM[4] + 1) begin
-        ~SYM[1][~LENGTH[~TYP[5]]-1-~SYM[4]] = ~SYM[3][~SYM[4]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+      ~SYM[3] = ~CONST[4];
+      for (~SYM[4]=0; ~SYM[4] < ~LENGTH[~TYP[4]]; ~SYM[4] = ~SYM[4] + 1) begin
+        ~SYM[1][~LENGTH[~TYP[4]]-1-~SYM[4]] = ~SYM[3][~SYM[4]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
       end
     end
-    ~IF ~ISACTIVEENABLE[4] ~THEN
-    always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
-      if (~ARG[4]) begin
-        if (~ARG[7]) begin
-          ~SYM[1][~ARG[8]] <= ~ARG[9];
+    ~IF ~ISACTIVEENABLE[3] ~THEN
+    always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
+      if (~ARG[3]) begin
+        if (~ARG[6]) begin
+          ~SYM[1][~ARG[7]] <= ~ARG[8];
         end
-        ~RESULT <= ~SYM[1][~ARG[6]];
+        ~RESULT <= ~SYM[1][~ARG[5]];
       end~ELSE
-      if (~ARG[7] & ~ARG[4]) begin
-        ~SYM[1][~ARG[8]] <= ~ARG[9];
+      if (~ARG[6] & ~ARG[3]) begin
+        ~SYM[1][~ARG[7]] <= ~ARG[8];
       end
-      if (~ARG[4]) begin
-        ~RESULT <= ~SYM[1][~ARG[6]];
+      if (~ARG[3]) begin
+        ~RESULT <= ~SYM[1][~ARG[5]];
       end~FI
     end~ELSE
-    always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
-      if (~ARG[7]) begin
-        ~SYM[1][~ARG[8]] <= ~ARG[9];
+    always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~SYM[5]
+      if (~ARG[6]) begin
+        ~SYM[1][~ARG[7]] <= ~ARG[8];
       end
-      ~RESULT <= ~SYM[1][~ARG[6]];
+      ~RESULT <= ~SYM[1][~ARG[5]];
     end~FI
     // blockRam end
 @
@@ -1413,45 +1410,44 @@ BlackBox:
   kind: Declaration
   type: |-
     blockRam#
-      :: ( KnownDomain dom        ARG[0]
-         , HasCallStack  --       ARG[1]
-         , NFDataX a )   --       ARG[2]
-      => Clock dom       -- clk,  ARG[3]
-      -> Enable dom      -- en,   ARG[4]
-      -> Vec n a         -- init, ARG[5]
-      -> Signal dom Int  -- rd,   ARG[6]
-      -> Signal dom Bool -- wren, ARG[7]
-      -> Signal dom Int  -- wr,   ARG[8]
-      -> Signal dom a    -- din,  ARG[9]
+      :: ( HasCallStack  --       ARG[0]
+         , NFDataX a )   --       ARG[1]
+      => Clock dom       -- clk,  ARG[2]
+      -> Enable dom      -- en,   ARG[3]
+      -> Vec n a         -- init, ARG[4]
+      -> Signal dom Int  -- rd,   ARG[5]
+      -> Signal dom Bool -- wren, ARG[6]
+      -> Signal dom Int  -- wr,   ARG[7]
+      -> Signal dom a    -- din,  ARG[8]
       -> Signal dom a
   template: |-
     // blockRam begin
-    ~SIGD[~GENSYM[RAM][1]][5];
-    logic [~SIZE[~TYP[9]]-1:0] ~GENSYM[~RESULT_q][2];
+    ~SIGD[~GENSYM[RAM][1]][4];
+    logic [~SIZE[~TYP[8]]-1:0] ~GENSYM[~RESULT_q][2];
     initial begin
-      ~SYM[1] = ~CONST[5];
-    end~IF ~ISACTIVEENABLE[4] ~THEN
-    always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
-      if (~ARG[4]) begin
-        if (~ARG[7]) begin
-          ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
+      ~SYM[1] = ~CONST[4];
+    end~IF ~ISACTIVEENABLE[3] ~THEN
+    always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
+      if (~ARG[3]) begin
+        if (~ARG[6]) begin
+          ~SYM[1][~ARG[7]] <= ~TOBV[~ARG[8]][~TYP[8]];
         end
-        ~SYM[2] <= ~SYM[1][~ARG[6]];
+        ~SYM[2] <= ~SYM[1][~ARG[5]];
       end~ELSE
-      if (~ARG[7] & ~ARG[4]) begin
-        ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
+      if (~ARG[6] & ~ARG[3]) begin
+        ~SYM[1][~ARG[7]] <= ~TOBV[~ARG[8]][~TYP[8]];
       end
-      if (~ARG[4]) begin
-        ~SYM[2] <= ~SYM[1][~ARG[6]];
+      if (~ARG[3]) begin
+        ~SYM[2] <= ~SYM[1][~ARG[5]];
       end~FI
     end~ELSE
-    always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[3]
-      if (~ARG[7]) begin
-        ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
+    always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin : ~SYM[3]
+      if (~ARG[6]) begin
+        ~SYM[1][~ARG[7]] <= ~TOBV[~ARG[8]][~TYP[8]];
       end
-      ~SYM[2] <= ~SYM[1][~ARG[6]];
+      ~SYM[2] <= ~SYM[1][~ARG[5]];
     end~FI
-    assign ~RESULT = ~FROMBV[~SYM[2]][~TYP[9]];
+    assign ~RESULT = ~FROMBV[~SYM[2]][~TYP[8]];
     // blockRam end
 @
 
@@ -1561,8 +1557,6 @@ synchronous logic. As a consequence, we see in the type signature of
 __asyncRam__
   :: ( 'Enum' addr
      , 'HasCallStack'
-     , 'KnownDomain' wdom
-     , 'KnownDomain' rdom
      )
   => 'Clock' wdom                     -- ^ 'Clock' to which to synchronize the write port of the RAM
   -> 'Clock' rdom                     -- ^ 'Clock' to which the read address signal, @r@, is synchronized to
@@ -1675,9 +1669,7 @@ Finally we combine all the components in:
 
 @
 asyncFIFOSynchronizer
-  :: ( 'KnownDomain' wdom
-     , 'KnownDomain' rdom
-     , 2 <= addrSize )
+  :: ( 2 <= addrSize )
   => SNat addrSize
   -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
   -- elements.
@@ -1796,9 +1788,7 @@ ptrSync clk1 clk2 rst2 en2 =
 
 -- Async FIFO synchronizer
 asyncFIFOSynchronizer
-  :: ( 'KnownDomain' wdom
-     , 'KnownDomain' rdom
-     , 2 <= addrSize )
+  :: ( 2 <= addrSize )
   => SNat addrSize
   -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
   -- elements.

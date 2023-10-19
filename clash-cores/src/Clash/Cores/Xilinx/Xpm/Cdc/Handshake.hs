@@ -35,8 +35,6 @@ import Clash.Cores.Xilinx.Xpm.Cdc.Handshake.Internal (xpmCdcHandshake#)
 xpmCdcHandshake ::
   forall a src dst.
   ( 1 <= BitSize a, BitSize a <= 1024
-  , KnownDomain src
-  , KnownDomain dst
   , BitPack a
   , NFDataX a
   , HasCallStack
@@ -67,7 +65,7 @@ xpmCdcHandshake ::
   , "dest_req" ::: Signal dst Bool
   , "src_rcv"  ::: Signal src Bool
   )
-xpmCdcHandshake = xpmCdcHandshakeWith XpmCdcHandshakeConfig{..}
+xpmCdcHandshake clkSrc@ExtractClockDom clkDst@ExtractClockDom = xpmCdcHandshakeWith XpmCdcHandshakeConfig{..} clkSrc clkDst
  where
   srcStages = d4
   dstStages = d4
@@ -105,8 +103,6 @@ xpmCdcHandshakeWith ::
   ( 2 <= srcStages, srcStages <= 10
   , 2 <= dstStages, dstStages <= 10
   , 1 <= BitSize a, BitSize a <= 1024
-  , KnownDomain src
-  , KnownDomain dst
   , BitPack a
   , NFDataX a
   , HasCallStack

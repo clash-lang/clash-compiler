@@ -12,7 +12,7 @@ createDomain vSystem{vName="A", vPeriod=hzToPeriod 20e6} -- fast
 createDomain vSystem{vName="B", vPeriod=hzToPeriod 10e6} -- slow
 createDomain vSystem{vName="C", vPeriod=hzToPeriod 7e6} -- slower
 
-tdpRam :: (KnownDomain domA, KnownDomain domB) => TdpRam domA domB
+tdpRam :: TdpRam domA domB
 tdpRam = trueDualPortBlockRam
 
 {- Testvectors

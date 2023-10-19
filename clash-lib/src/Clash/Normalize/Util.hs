@@ -101,7 +101,7 @@ isConstantArg
   -- ^ Yields @DontCare@ for if given primitive name is not found, if the
   -- argument does not exist, or if the argument was not mentioned by the
   -- blackbox.
-isConstantArg "Clash.Explicit.SimIO.mealyIO" i = pure (i == 2 || i == 3)
+isConstantArg "Clash.Explicit.SimIO.mealyIO" i = pure (i == 1 || i == 2)
 isConstantArg nm i = do
   argMap <- Lens.use (extra.primitiveArgs)
   case Map.lookup nm argMap of

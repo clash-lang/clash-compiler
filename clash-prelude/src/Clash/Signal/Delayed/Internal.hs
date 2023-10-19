@@ -52,8 +52,7 @@ import Clash.XException           (NFDataX)
 >>> :{
 let mac
       :: forall dom
-       . KnownDomain dom
-      => Clock dom
+       . Clock dom
       -> Reset dom
       -> Enable dom
       -> DSignal dom 0 Int
@@ -73,8 +72,7 @@ let mac
 >>> :{
 let numbers
       :: forall dom
-       . KnownDomain dom
-      => Clock dom
+       . Clock dom
       -> Reset dom
       -> Enable dom
       -> DSignal dom 5 (Int, Int)
@@ -136,8 +134,7 @@ dfromList_lazy = coerce . fromList_lazy
 -- @
 -- mac
 --   :: forall dom
---    . KnownDomain dom
---   => Clock dom
+--    . Clock dom
 --   -> Reset dom
 --   -> Enable dom
 --   -> 'DSignal' dom 0 Int
@@ -181,8 +178,7 @@ unsafeFromSignal = DSignal
 --
 -- @
 -- mac
---   :: KnownDomain dom
---   => Clock dom
+--   :: Clock dom
 --   -> Reset dom
 --   -> Enable dom
 --   -> 'DSignal' dom 0 Int
@@ -212,8 +208,7 @@ antiDelay _ = coerce
 -- @
 -- numbers
 --   :: forall dom
---    . KnownDomain dom
---   => Clock dom
+--    . Clock dom
 --   -> Reset dom
 --   -> Enable dom
 --   -> 'DSignal' dom 5 (Int, Int)

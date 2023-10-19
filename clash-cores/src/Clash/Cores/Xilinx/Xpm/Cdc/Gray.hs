@@ -46,15 +46,13 @@ xpmCdcGray ::
   forall n src dst.
   ( 2 <= n, n <= 32
   , KnownNat n
-  , KnownDomain src
-  , KnownDomain dst
   , HasCallStack
   ) =>
   Clock src ->
   Clock dst ->
   Signal src (Unsigned n) ->
   Signal dst (Unsigned n)
-xpmCdcGray = xpmCdcGrayWith XpmCdcGrayConfig{..}
+xpmCdcGray clkSrc@ExtractClockDom clkDst@ExtractClockDom = xpmCdcGrayWith XpmCdcGrayConfig{..}  clkSrc clkDst
  where
   stages = d4
   initialValues =
@@ -87,8 +85,6 @@ xpmCdcGrayWith ::
   ( 2 <= n, n <= 32
   , 2 <= stages, stages <= 10
   , KnownNat n
-  , KnownDomain src
-  , KnownDomain dst
   , HasCallStack
   ) =>
   XpmCdcGrayConfig stages ->
