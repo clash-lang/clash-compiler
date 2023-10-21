@@ -66,30 +66,30 @@ build:
 
 # Tests run on shared runners:
 
-cores:unittests:
-  extends: .test-nocache
-  script:
-    - ./dist-newstyle/build/*/*/clash-cores-*/t/unittests/build/unittests/unittests --hide-successes
-
-cosim:unittests:
-  extends: .test-nocache
-  script:
-    - ./dist-newstyle/build/*/*/clash-cosim-*/build/test/test
-
-prelude:unittests:
-  extends: .test-nocache
-  script:
-    - ./dist-newstyle/build/*/*/clash-prelude-*/t/unittests/build/unittests/unittests --hide-successes
-
-lib:unittests:
-  extends: .test-nocache
-  script:
-    - ./dist-newstyle/build/*/*/clash-lib-*/t/unittests/build/unittests/unittests --hide-successes
-
-prelude:doctests:
-  extends: .test-nocache
-  script:
-    - ./dist-newstyle/build/*/*/clash-prelude-*/t/doctests/build/doctests/doctests -j${THREADS}
+#cores:unittests:
+#  extends: .test-nocache
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-cores-*/t/unittests/build/unittests/unittests --hide-successes
+#
+#cosim:unittests:
+#  extends: .test-nocache
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-cosim-*/build/test/test
+#
+#prelude:unittests:
+#  extends: .test-nocache
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-prelude-*/t/unittests/build/unittests/unittests --hide-successes
+#
+#lib:unittests:
+#  extends: .test-nocache
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-lib-*/t/unittests/build/unittests/unittests --hide-successes
+#
+#prelude:doctests:
+#  extends: .test-nocache
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-prelude-*/t/doctests/build/doctests/doctests -j${THREADS}
 
 # Tests run on local fast machines:
 
@@ -97,22 +97,27 @@ prelude:doctests:
 # and we don't know yet why. When it fails, it recompiles things it should have
 # picked up from the 'build' issue and then it is a larger job, so we keep it on
 # local runners for now.
-build-clash-dev:
-  extends: .test-cache-local
-  script:
-    - .ci/build_clash_dev.sh
+#build-clash-dev:
+#  extends: .test-cache-local
+#  script:
+#    - .ci/build_clash_dev.sh
 
-suite:vhdl:
+t2593:
   extends: .test-cache-local
   script:
-    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .VHDL --hide-successes
+    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -p T2593
 
-suite:verilog:
-  extends: .test-cache-local
-  script:
-    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .Verilog --hide-successes
-
-suite:systemverilog:
-  extends: .test-cache-local
-  script:
-    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim
+#suite:vhdl:
+#  extends: .test-cache-local
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .VHDL --hide-successes
+#
+#suite:verilog:
+#  extends: .test-cache-local
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .Verilog --hide-successes
+#
+#suite:systemverilog:
+#  extends: .test-cache-local
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim

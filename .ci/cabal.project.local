@@ -10,7 +10,7 @@ package *
 
 package clash-prelude
   ghc-options: -Werror
-  flags: +doctests -workaround-ghc-mmap-crash
+  flags: +doctests +multiple-hidden -workaround-ghc-mmap-crash
   tests: True
   benchmarks: True
 
@@ -48,7 +48,7 @@ package clash-lib-hedgehog
 package clash-testsuite
   ghc-options: -Werror
   -- enable cosim
-  flags: +cosim -workaround-ghc-mmap-crash
+  flags: +cosim +multiple-hidden -workaround-ghc-mmap-crash
 
 package clash-benchmark
   ghc-options: -Werror

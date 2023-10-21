@@ -1,17 +1,17 @@
-hackage-sdist:
-  extends: .common-local
-  needs: []
-  stage: pack
-  script:
-    - .ci/build_sdist.sh clash-prelude
-    - .ci/build_sdist.sh clash-prelude-hedgehog
-    - .ci/build_sdist.sh clash-lib
-    - .ci/build_sdist.sh clash-lib-hedgehog
-    - .ci/build_sdist.sh clash-ghc
-  artifacts:
-    paths:
-      - clash-*.tar.gz  # clash-{prelude,lib,ghc}-$version{-docs,}.tar.gz
-    expire_in: 1 week
+#hackage-sdist:
+#  extends: .common-local
+#  needs: []
+#  stage: pack
+#  script:
+#    - .ci/build_sdist.sh clash-prelude
+#    - .ci/build_sdist.sh clash-prelude-hedgehog
+#    - .ci/build_sdist.sh clash-lib
+#    - .ci/build_sdist.sh clash-lib-hedgehog
+#    - .ci/build_sdist.sh clash-ghc
+#  artifacts:
+#    paths:
+#      - clash-*.tar.gz  # clash-{prelude,lib,ghc}-$version{-docs,}.tar.gz
+#    expire_in: 1 week
 
 .hackage:
   extends: .common
