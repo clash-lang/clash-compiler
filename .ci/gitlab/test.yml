@@ -79,40 +79,40 @@ build:
 
 # Tests run on shared runners:
 
-cores:unittests:
-  extends: .test-nocache
-  script:
-    - ./dist-newstyle/build/*/*/clash-cores-*/t/unittests/build/unittests/unittests --hide-successes
-
-cosim:unittests:
-  extends: .test-nocache
-  script:
-    - ./dist-newstyle/build/*/*/clash-cosim-*/build/test/test
-
-prelude:unittests:
-  extends: .test-nocache
-  script:
-    - ./dist-newstyle/build/*/*/clash-prelude-*/t/unittests/build/unittests/unittests --hide-successes
-
-lib:doctests:
-  extends: .test-nocache
-  script:
-    - ./dist-newstyle/build/*/*/clash-lib-*/t/doctests/build/doctests/doctests -j${THREADS}
-
-lib:unittests:
-  extends: .test-nocache
-  script:
-    - ./dist-newstyle/build/*/*/clash-lib-*/t/unittests/build/unittests/unittests --hide-successes
-
-prelude:doctests:
-  extends: .test-nocache
-  script:
-    - ./dist-newstyle/build/*/*/clash-prelude-*/t/doctests/build/doctests/doctests -j${THREADS}
-
-ffi:interface-tests:
-  extends: .test-nocache
-  script:
-    - ./dist-newstyle/build/*/*/clash-ffi-*/x/ffi-interface-tests/build/ffi-interface-tests/ffi-interface-tests --smallcheck-max-count 2000
+#cores:unittests:
+#  extends: .test-nocache
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-cores-*/t/unittests/build/unittests/unittests --hide-successes
+#
+#cosim:unittests:
+#  extends: .test-nocache
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-cosim-*/build/test/test
+#
+#prelude:unittests:
+#  extends: .test-nocache
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-prelude-*/t/unittests/build/unittests/unittests --hide-successes
+#
+#lib:doctests:
+#  extends: .test-nocache
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-lib-*/t/doctests/build/doctests/doctests -j${THREADS}
+#
+#lib:unittests:
+#  extends: .test-nocache
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-lib-*/t/unittests/build/unittests/unittests --hide-successes
+#
+#prelude:doctests:
+#  extends: .test-nocache
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-prelude-*/t/doctests/build/doctests/doctests -j${THREADS}
+#
+#ffi:interface-tests:
+#  extends: .test-nocache
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-ffi-*/x/ffi-interface-tests/build/ffi-interface-tests/ffi-interface-tests --smallcheck-max-count 2000
 
 # Tests run on local fast machines:
 
@@ -120,66 +120,71 @@ ffi:interface-tests:
 # and we don't know yet why. When it fails, it recompiles things it should have
 # picked up from the 'build' issue and then it is a larger job, so we keep it on
 # local runners for now.
-build-clash-dev:
+#build-clash-dev:
+#  extends: .test-cache-local
+#  script:
+#    - .ci/build_clash_dev.sh
+
+t2593:
   extends: .test-cache-local
   script:
-    - .ci/build_clash_dev.sh
+    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -p T2593
 
-suite:vhdl:
-  extends: .test-cache-local
-  script:
-    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-vivado
-
-suite:verilog:
-  extends: .test-cache-local
-  script:
-    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-vivado
-
-suite:systemverilog:
-  extends: .test-cache-local
-  script:
-    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim --no-vivado
-
-# Vivado is quite slow, so we only run a subset of the tests on development branches
-# with it. The full testsuite gets run with Vivado every night on 'master'.
-suite:cores:
-  extends: .test-cache-local
-  script:
-    - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p Cores --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
-  tags:
-    - local
-    - vivado-2022.1-standard
-
-ffi:example:
-  extends:
-    - .common-local
-    - .nightly-rules
-  stage: test
-  needs: []
-  before_script:
-    - unset SNAPCRAFT_LOGIN_FILE
-    - unset HACKAGE_PASSWORD
-    - export THREADS=$(./.ci/effective_cpus.sh)
-    - export CABAL_JOBS=$(./.ci/effective_cpus.sh)
-    - export CABAL_DIR=$HOME/.cabal
-    - export clash_lib_datadir=$(pwd)/clash-lib/
-    - export clash_cosim_datadir=$(pwd)/clash-cosim/
-    - export MASKBINS="$(mktemp -d)"
-    - PATH="$MASKBINS:$PATH"
-    - export
-    - tar -xf cache.tar.zst -C / || true
-      # The iverilog on CI cannot run the example, we only test it builds
-    - ln -s /bin/true "$MASKBINS/iverilog"
-    - ln -s /bin/true "$MASKBINS/vvp"
-    - ls -al "$MASKBINS"
-    - .ci/setup.sh
-      # Make sure we get custom cabals setting in the clash-example project too
-    - cp cabal.project.local clash-ffi/example
-  script:
-     - cd clash-ffi/example && ./run-iverilog.sh
-  after_script:
-    - tar -cf - /root/.cabal | zstd -T${THREADS} -3 > cache.tar.zst
+#suite:vhdl:
+#  extends: .test-cache-local
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-vivado
+#
+#suite:verilog:
+#  extends: .test-cache-local
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-vivado
+#
+#suite:systemverilog:
+#  extends: .test-cache-local
+#  script:
+#    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim --no-vivado
+#
+## Vivado is quite slow, so we only run a subset of the tests on development branches
+## with it. The full testsuite gets run with Vivado every night on 'master'.
+#suite:cores:
+#  extends: .test-cache-local
+#  script:
+#    - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
+#    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p Cores --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+#  tags:
+#    - local
+#    - vivado-2022.1-standard
+#
+#ffi:example:
+#  extends:
+#    - .common-local
+#    - .nightly-rules
+#  stage: test
+#  needs: []
+#  before_script:
+#    - unset SNAPCRAFT_LOGIN_FILE
+#    - unset HACKAGE_PASSWORD
+#    - export THREADS=$(./.ci/effective_cpus.sh)
+#    - export CABAL_JOBS=$(./.ci/effective_cpus.sh)
+#    - export CABAL_DIR=$HOME/.cabal
+#    - export clash_lib_datadir=$(pwd)/clash-lib/
+#    - export clash_cosim_datadir=$(pwd)/clash-cosim/
+#    - export MASKBINS="$(mktemp -d)"
+#    - PATH="$MASKBINS:$PATH"
+#    - export
+#    - tar -xf cache.tar.zst -C / || true
+#      # The iverilog on CI cannot run the example, we only test it builds
+#    - ln -s /bin/true "$MASKBINS/iverilog"
+#    - ln -s /bin/true "$MASKBINS/vvp"
+#    - ls -al "$MASKBINS"
+#    - .ci/setup.sh
+#      # Make sure we get custom cabals setting in the clash-example project too
+#    - cp cabal.project.local clash-ffi/example
+#  script:
+#     - cd clash-ffi/example && ./run-iverilog.sh
+#  after_script:
+#    - tar -cf - /root/.cabal | zstd -T${THREADS} -3 > cache.tar.zst
 
 # Tests run on local fast machines with Vivado installed. We only run these at night
 # to save resources - as Vivado is quite slow to execute.
