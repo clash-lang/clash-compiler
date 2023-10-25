@@ -1,9 +1,3 @@
 ADDED: A new clock type `DiffClock` is introduced to signify a differential
 clock signal that is passed to the design on two ports in antiphase. This is
-used by the Xilinx `clockWizardDifferential` IP generator.
-
-CHANGED: Xilinx `clockWizardDifferential` now gets its input clock as a
-`DiffClock` type; use `seClockToDiffClock` to generate this in your test bench
-if needed. Previously, the function received two clock inputs, but this
-generated `create_clock` statements in the top-level SDC file for both phases
-which is incorrect.
+used by the differential Xilinx clock wizards in `Clash.Xilinx.ClockGen`.

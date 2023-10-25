@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.,
-                  2021-2022, QBayLogic B.V.
+                  2021-2023, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -62,7 +62,11 @@ module Blinker where
 import Clash.Prelude
 import Clash.Intel.ClockGen
 
-'Clash.Explicit.Signal.createDomain' vSystem{vName=\"DomInput\", vPeriod=20000}
+-- Define a synthesis domain with a clock with a period of 20000 /ps/. Signal
+-- coming from the reset button is low when pressed, and high when not pressed.
+'Clash.Explicit.Signal.createDomain'
+  vSystem{vName=\"DomInput\", vPeriod=20000, vResetPolarity=ActiveLow}
+-- Define a synthesis domain with a clock with a period of 50000 /ps/.
 'Clash.Explicit.Signal.createDomain' vSystem{vName=\"Dom50\", vPeriod=50000}
 
 topEntity
@@ -75,35 +79,19 @@ topEntity clk20 rstBtn enaBtn modeBtn =
   'Clash.Signal.exposeClockResetEnable'
     ('Clash.Prelude.mealy' blinkerT initialStateBlinkerT . 'Clash.Prelude.isRising' 1)
     clk50
-    rstSync
+    rst50
     enaBtn
     modeBtn
  where
   -- Start with the first LED turned on, in rotate mode, with the counter on zero
   initialStateBlinkerT = (1, False, 0)
 
-  -- Signal coming from the reset button is low when pressed, and high when
-  -- not pressed. We convert this signal to the polarity of our domain with
-  -- /unsafeFromActiveLow/.
-  rst = 'Clash.Signal.unsafeFromActiveLow' ('Clash.Signal.unsafeFromReset' rstBtn)
-
-  -- Instantiate a PLL: this stabilizes the incoming clock signal and indicates
-  -- when the signal is stable. We're also using it to transform an incoming
-  -- clock signal running at 20 MHz to a clock signal running at 50 MHz.
-  (clk50, pllStable) =
-    'Clash.Intel.ClockGen.altpll'
-      \@Dom50
-      (SSymbol @"altpll50")
-      clk20
-      rst
-
-  -- Synchronize reset to clock signal coming from PLL. We want the reset to
-  -- remain active while the PLL is NOT stable, hence the conversion with
-  -- /unsafeFromActiveLow/
-  rstSync =
-    'Clash.Prelude.resetSynchronizer'
-      clk50
-      ('Clash.Signal.unsafeFromActiveLow' pllStable)
+  -- Instantiate a PLL: this stabilizes the incoming clock signal and releases
+  -- the reset output when the signal is stable. We're also using it to
+  -- transform an incoming clock signal running at 20 MHz to a clock signal
+  -- running at 50 MHz. Since the signature of topEntity already specifies the
+  -- Dom50 domain, we don't need any type signatures to specify the domain here.
+  (clk50, rst50) = 'Clash.Intel.ClockGen.altpllSync' clk20 rstBtn
 
 blinkerT
   :: (BitVector 8, Bool, Index 16650001)

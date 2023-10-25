@@ -1,32 +1,43 @@
 {-|
 Copyright  :  (C) 2018, Google Inc
                   2019, Myrtle Software Ltd
+                  2023,      QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Generic clock related utilities.
 -}
 
-{-# LANGUAGE ConstrainedClassMethods #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Clash.Clocks (Clocks(..)) where
+{-# OPTIONS_GHC "-Wno-orphans" #-}
 
-import Data.Kind (Constraint)
+module Clash.Clocks
+  ( Clocks(..)
+  , ClocksSync(..)
+  , ClocksSyncCxt
+  , NumOutClocksSync
+  ) where
 
-import Clash.Signal.Internal
-import Clash.Clocks.Deriving (deriveClocksInstances)
+import Clash.Clocks.Internal
+  (Clocks(..), ClocksSync(..), deriveClocksInstances, deriveClocksSyncInstances)
+import Clash.Signal.Internal (Domain, KnownDomain)
 
-class Clocks t where
-  type ClocksCxt t :: Constraint
+deriveClocksInstances
 
-  clocks
-    :: (KnownDomain domIn, ClocksCxt t)
-    => Clock domIn
-    -> Reset domIn
-    -> t
+type ClocksSyncCxt t (domIn :: Domain) =
+  ( KnownDomain domIn
+  , ClocksSync t
+  , ClocksResetSynchronizerCxt t
+  , Clocks (ClocksSyncClocksInst t domIn)
+  , ClocksCxt (ClocksSyncClocksInst t domIn)
+  )
 
-deriveClocksInstances 16
+type NumOutClocksSync t (domIn :: Domain) =
+  NumOutClocks (ClocksSyncClocksInst t domIn)
+
+deriveClocksSyncInstances

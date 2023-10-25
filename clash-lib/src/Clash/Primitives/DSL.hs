@@ -38,6 +38,7 @@ module Clash.Primitives.DSL
   , declaration
   , declarationReturn
   , declare
+  , declareN
   , instDecl
   , instHO
   , viaAnnotatedSignal
@@ -285,6 +286,25 @@ declare
 declare decName ty = do
   uniqueName <- declare' decName ty
   pure (TExpr ty (Identifier uniqueName Nothing))
+
+-- | Declare /n/ new signals with the given type and based on the given name
+declareN
+  :: Backend backend
+  => Text
+  -- ^ Name hint
+  -> [HWType]
+  -- ^ Types of the signals
+  -> State (BlockState backend) [TExpr]
+  -- ^ Expressions pointing the the new signals
+declareN decName tys = do
+  firstName <- Id.makeBasic decName
+  nextNames <- Id.nextN (length tys - 1) firstName
+  let uniqueNames = firstName : nextNames
+  zipWithM
+    (\uniqueName ty -> do
+      addDeclaration $ NetDecl' Nothing uniqueName ty Nothing
+      pure $ TExpr ty (Identifier uniqueName Nothing)
+    ) uniqueNames tys
 
 -- | Assign an expression to an identifier, returns the new typed
 --   identifier expression.

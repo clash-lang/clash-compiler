@@ -913,19 +913,18 @@ import "Clash.Signal"
 import "Clash.Prelude"
 import "Clash.Intel.ClockGen"
 
-'createDomain' vSystem{vName=\"DomInput\", vPeriod=20000}
+'createDomain' vSystem{vName=\"DomInput\", vPeriod=20000, vResetPolarity=ActiveLow}
 'createDomain' vSystem{vName=\"Dom100\", vPeriod=10000}
 
 topEntity
   :: Clock DomInput
-  -> Signal DomInput Bool
+  -> Reset DomInput
   -> Signal Dom100 Bit
   -> Signal Dom100 (BitVector 8)
 topEntity clk rst =
-    'exposeClockResetEnable' ('mealy' blinkerT (1,False,0) . Clash.Prelude.isRising 1) pllOut rstSync 'enableGen'
+    'exposeClockResetEnable' ('mealy' blinkerT (1,False,0) . 'Clash.Prelude.isRising' 1) pllOut pllRst 'enableGen'
   where
-    (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' \@Dom100 (SSymbol \@\"altpll100\") clk ('Clash.Signal.unsafeFromActiveLow' rst)
-    rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeFromActiveLow' pllStable)
+    (pllOut,pllRst) = 'Clash.Intel.ClockGen.altpllSync' clk rst
 
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where
@@ -959,8 +958,9 @@ use work.Blinker_topEntity_types.all;
 entity topEntity is
   port(-- clock
        clk    : in Blinker_topEntity_types.clk_DomInput;
-       rst    : in boolean;
-       x      : in std_logic;
+       -- reset
+       rst    : in Blinker_topEntity_types.rst_DomInput;
+       eta    : in std_logic;
        result : out std_logic_vector(7 downto 0));
 end;
 
@@ -994,8 +994,9 @@ use work.blinker_types.all;
 
 entity blinker is
   port(-- clock
-       CLOCK_50 : in blinker_types.clk_dominput;
-       KEY0     : in boolean;
+       CLOCK_50 : in blinker_types.clk_DomInput;
+       -- reset
+       KEY0     : in blinker_types.rst_DomInput;
        KEY1     : in std_logic;
        LED      : out std_logic_vector(7 downto 0));
 end;

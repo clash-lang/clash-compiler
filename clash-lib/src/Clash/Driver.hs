@@ -602,6 +602,7 @@ knownTemplateFunctions =
     , ('P.alteraPllTF, P.alteraPllTF)
     , ('P.altpllTF, P.altpllTF)
     , ('P.fromIntegerTFvhdl, P.fromIntegerTFvhdl)
+    , ('P.clockWizardTF, P.clockWizardTF)
     , ('P.clockWizardDifferentialTF, P.clockWizardDifferentialTF)
     , ('P.clockWizardTclTF, P.clockWizardTclTF)
     , ('P.clockWizardDifferentialTclTF, P.clockWizardDifferentialTclTF)

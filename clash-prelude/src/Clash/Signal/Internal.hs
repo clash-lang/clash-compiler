@@ -947,6 +947,9 @@ instance Show (ClockN dom) where
 -- The first input is the positive phase, the second the negative phase. When
 -- using 'Clash.Annotations.TH.makeTopEntity', the names of the inputs will end
 -- in @_p@ and @_n@ respectively.
+--
+-- To create a differential clock in a test bench, you can use
+-- 'Clash.Explicit.Testbench.clockToDiffClock'.
 data DiffClock (dom :: Domain) =
   DiffClock ("p" ::: Clock dom) ("n" ::: ClockN dom)
 

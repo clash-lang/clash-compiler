@@ -208,7 +208,6 @@ Library
                       Clash.Class.Resize
 
                       Clash.Clocks
-                      Clash.Clocks.Deriving
 
                       Clash.Explicit.BlockRam
                       Clash.Explicit.BlockRam.Blob
@@ -311,6 +310,7 @@ Library
 
   other-modules:
                       Clash.Class.AutoReg.Instances
+                      Clash.Clocks.Internal
                       Clash.CPP
                       Clash.Signal.Bundle.Internal
                       Language.Haskell.TH.Compat
