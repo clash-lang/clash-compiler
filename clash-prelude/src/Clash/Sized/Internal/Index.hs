@@ -112,7 +112,7 @@ import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV), high, low,
 import qualified Clash.Sized.Internal.BitVector as BV
 import Clash.Promoted.Nat         (SNat(..), snatToNum, natToInteger, leToPlusKN)
 import Clash.XException
-  (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX)
+  (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX, seqX)
 
 {- $setup
 >>> import Clash.Sized.Internal.Index
@@ -379,9 +379,9 @@ times# :: Index m -> Index n -> Index (((m - 1) * (n - 1)) + 1)
 times# (I a) (I b) = I (a * b)
 
 instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
-  satAdd SatWrap !a !b =
+  satAdd SatWrap a b =
     case natToInteger @n of
-      1 -> fromInteger# 0
+      1 -> a +# b
       _ -> leToPlusKN @1 @n $
         case plus# a b of
           z | let m = fromInteger# (natToInteger @n)
@@ -419,9 +419,9 @@ instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
        then fromInteger# 0
        else a -# b
 
-  satMul SatWrap !a !b =
+  satMul SatWrap a b =
     case natToInteger @n of
-      1 -> fromInteger# 0
+      1 -> a *# b
       2 -> case a of {0 -> 0; _ -> b}
       _ -> leToPlusKN @1 @n $
         case times# a b of
@@ -446,9 +446,9 @@ instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
           , z > m -> maxBound#
         z -> resize# z
 
-  satSucc SatError !a =
+  satSucc SatError a =
     case natToInteger @n of
-      1 -> errorX "Index.satSucc: overflow"
+      1 -> a `seqX` errorX "Index.satSucc: overflow"
       _ -> satAdd SatError a $ fromInteger# 1
   satSucc satMode !a =
     case natToInteger @n of
@@ -456,9 +456,9 @@ instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
       _ -> satAdd satMode a $ fromInteger# 1
   {-# INLINE satSucc #-}
 
-  satPred SatError !a =
+  satPred SatError a =
     case natToInteger @n of
-      1 -> errorX "Index.satPred: underflow"
+      1 -> a `seqX` errorX "Index.satPred: underflow"
       _ -> satSub SatError a $ fromInteger# 1
   satPred satMode !a =
     case natToInteger @n of
