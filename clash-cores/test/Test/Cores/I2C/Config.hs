@@ -13,8 +13,7 @@ data ConfStateMachine = CONFena  |
   deriving Show
 
 data ConfS = ConfS { i2cConfStateM :: ConfStateMachine
-                   , i2cStart      :: Bool
-                   , i2cStop       :: Bool
+                   , i2cClaim      :: Bool
                    , i2cWrite      :: Bool
                    , i2cDin        :: Vec 8 Bit
                    , i2cLutIndex   :: Index 16
@@ -22,12 +21,11 @@ data ConfS = ConfS { i2cConfStateM :: ConfStateMachine
                    }
 
 type ConfI = (Bool,Bool,Bool,Bool,Bool)
-type ConfO = (Bool,Bool,Bool,BitVector 8,Bool,Bool)
+type ConfO = (Bool,Bool,BitVector 8,Bool,Bool)
 
 confInit :: ConfS
 confInit = ConfS { i2cConfStateM = CONFena
-                 , i2cStart      = False
-                 , i2cStop       = False
+                 , i2cClaim      = False
                  , i2cWrite      = False
                  , i2cDin        = repeat low
                  , i2cLutIndex   = 0
@@ -40,7 +38,7 @@ configT
   -> SimIO ConfO
 configT s0 (rst,ena,cmdAck,rxAck,al) = do
   s <- readReg s0
-  let ConfS confStateM start stop write din lutIndex fault = s
+  let ConfS confStateM claim write din lutIndex fault = s
 
   let i2cSlvAddr = 0x34 :: BitVector 8
 
@@ -60,7 +58,7 @@ configT s0 (rst,ena,cmdAck,rxAck,al) = do
 
     CONFaddr
       -> pure s { i2cConfStateM = CONFaddrAck
-                , i2cStart = True
+                , i2cClaim = True
                 , i2cWrite = True
                 , i2cDin   = unpack i2cSlvAddr
                 }
@@ -69,12 +67,11 @@ configT s0 (rst,ena,cmdAck,rxAck,al) = do
       | success
       -> do display "CONFaddrAck"
             pure s { i2cConfStateM = CONFreg
-                   , i2cStart = False
                    , i2cWrite = False
                    }
 
     CONFreg
-      -> if rxAck == False then do
+      -> if not rxAck then do
            display "Success CONFreg"
            pure s { i2cConfStateM = CONFregAck
                   , i2cWrite = True
@@ -100,7 +97,7 @@ configT s0 (rst,ena,cmdAck,rxAck,al) = do
            display "Success CONFdata"
            pure s { i2cConfStateM = CONFdataAck
                   , i2cWrite = True
-                  , i2cStop = True
+                  , i2cClaim = False
                   , i2cDin = unpack (snd lutData)
                   , i2cFault = False
                   }
@@ -115,7 +112,6 @@ configT s0 (rst,ena,cmdAck,rxAck,al) = do
       | success
       -> do display "CONFdataAck"
             pure s { i2cConfStateM = CONFstop
-                   , i2cStop = False
                    , i2cWrite = False
                    }
 
@@ -127,7 +123,7 @@ configT s0 (rst,ena,cmdAck,rxAck,al) = do
                   , i2cFault = False
                   }
          else do
-           display "Failure CONFdata"
+           display "Failure CONFstop"
            _ <- finish 1
            pure s { i2cConfStateM = CONFena
                   , i2cFault = True
@@ -136,7 +132,7 @@ configT s0 (rst,ena,cmdAck,rxAck,al) = do
     _ -> pure s
 
   writeReg s0 sNext
-  pure (start,stop,write,pack din,done,fault)
+  pure (claim,write,pack din,done,fault)
 
 configLut :: Index 16 -> (BitVector  8, BitVector 8)
 configLut i

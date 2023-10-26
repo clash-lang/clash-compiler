@@ -15,5 +15,6 @@ type BitRespSig = (Bool, Bool, Bit)
 -- | I2C input signals (SCL, SDA).
 type I2CIn = (Bit, Bit)
 
--- | I2C output signals (SCL, SCL enable, SDA, SDA enable).
-type I2COut = (Bit, Bool, Bit, Bool)
+-- | I2C output Tri-state signals (SCL, SDA)
+-- Since I2C is a protocol with pull ups, Nothing means pulled high.
+type I2COut = (Maybe Bit, Maybe Bit)

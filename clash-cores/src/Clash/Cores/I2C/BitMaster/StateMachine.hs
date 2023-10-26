@@ -21,8 +21,8 @@ data BitStateMachine
 -- | Defines the state machine with control and status registers.
 data StateMachine
   = StateMachine
-  { _sclOen    :: Bool            -- ^ Enables SCL output
-  , _sdaOen    :: Bool            -- ^ Enables SDA output
+  { _sclOen    :: Bool            -- ^ Inverted SCL output enable, False pulls the scl low.
+  , _sdaOen    :: Bool            -- ^ Inverted SDA output enable, False pulls the sda low.
   , _sdaChk    :: Bool            -- ^ Checks SDA status
   , _cmdAck    :: Bool            -- ^ Acknowledges command completion
   , _bitStateM :: BitStateMachine -- ^ Current state of the bit-level state machine

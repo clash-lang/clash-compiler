@@ -7,24 +7,29 @@ import qualified Data.List as L
 import Clash.Explicit.Prelude
 import Clash.Cores.I2C
 
+import Data.Maybe
 import Test.Cores.I2C.Slave
 import Test.Cores.I2C.Config
+import Clash.Cores.I2C.ByteMaster (I2COperation(..))
 
 system0 :: Clock System -> Reset System -> Signal System (Vec 16 (Unsigned 8), Bool, Bool)
 system0 clk arst = bundle (registerFile,done,fault)
  where
   (_dout,hostAck,_busy,al,ackOut,i2cO) =
-    i2c clk arst rst (pure True) (pure 19) start stop (pure False) write (pure True) din i2cI
+    i2c clk arst rst (pure True) (pure 19) claim i2cOp (pure True) i2cI
 
-  (start,stop,write,din,done,fault) = unbundle $
+  i2cOp = mux claim (Just <$> mux write (WriteData <$> din) (pure ReadData)) (pure Nothing)
+
+  (claim,write,din,done,fault) = unbundle $
     config clk (bundle (rst, fmap not rst,hostAck,ackOut,al))
 
-  (_,sclOen,_,sdaOen) = unbundle i2cO
-  scl  = fmap bitCoerce sclOen
+  (sclOut,sdaOut) = unbundle i2cO
+  scl  = fmap (bitCoerce . isNothing) sclOut
+  sda  = fmap (bitCoerce . isNothing) sdaOut
   i2cI = bundle (scl,sdaS)
 
   (sdaS,registerFile) = unbundle
-    (i2cSlave clk (bundle (scl, bitCoerce <$> sdaOen)))
+    (i2cSlave clk (bundle (scl, sda)))
 
   rst = liftA2 (<) rstCounter 500
   rstCounter = register clk arst enableGen (0 :: Unsigned 18) (rstCounter + 1)

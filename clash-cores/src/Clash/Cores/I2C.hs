@@ -7,7 +7,19 @@ import Clash.Prelude hiding (read)
 import Clash.Cores.I2C.BitMaster
 import Clash.Cores.I2C.ByteMaster
 
--- | Core for I2C communication
+-- | Core for I2C communication. Returns the output enable signals for SCL en SDA
+-- These signals assume that when they are `True`, they pull down SCL and SDA respectively.
+-- For 2-wire I2C, you can use BiSignals (`Clash.Signal.Bidirectional.BiSignalIn` and `Clash.Signal.Bidirectional.BiSignalOut`)
+-- An example i2c design could look like this:
+-- i2cComp clk rst ena sclIn sdaIn = (sclOut, sdaOut)
+--  where
+--   sclOut = writeToBiSignal sclIn (mux sclOe (pure $ Just 0) (pure Nothing))
+--   sdaOut = writeToBiSignal sdaIn (mux sdaOe (pure $ Just 0) (pure Nothing))
+--   (sclOe, sdaOe) = unbundle i2cO
+--   i2cIn = bundle (readFromBiSignal sclIn, readFromBiSignal sdaIn)
+--   (dout,i2cOpAck,busy,al,ackWrite,i2cOut) = i2c clk arst rst ena clkCnt claimBus i2cOp ackRead i2cI
+--   ...
+
 i2c ::
   forall dom .
   KnownDomain dom =>
@@ -21,18 +33,13 @@ i2c ::
   "ena" ::: Signal dom Bool ->
   -- | Clock divider
   "clkCnt" ::: Signal dom (Unsigned 16) ->
-  -- | Start signal
-  "start" ::: Signal dom Bool ->
-  -- | Stop signal
-  "stop" ::: Signal dom Bool ->
-  -- | Read signal
-  "read" ::: Signal dom Bool ->
-  -- | Write signal
-  "write" ::: Signal dom Bool ->
-  -- | Ack signal
-  "ackIn" ::: Signal dom Bool ->
-  -- | Input data
-  "din" ::: Signal dom (BitVector 8) ->
+  -- | Claim bus signal
+  "claimBus" ::: Signal dom Bool ->
+  -- | I2C operation
+  "i2cOp" ::: Signal dom (Maybe I2COperation) ->
+  -- | Acknowledge signal to be transmitted from master to slave on read operations
+  --   True means SDA is low.
+  "ackRead" ::: Signal dom Bool ->
   -- | I2C input signals (SCL, SDA)
   "i2c" ::: Signal dom ("scl" ::: Bit, "sda" ::: Bit) ->
   -- |
@@ -40,23 +47,26 @@ i2c ::
   -- 2. Command acknowledgement
   -- 3. I2C bus busy
   -- 4. Arbitration lost
-  -- 5. I2C slave acknowledgement
+  -- 5. Received acknowledge signal from slave to master on write operations.
+  --    True means SDA is low.
   -- 6. Outgoing I2C signals
-  --    6.1 SCL
-  --    6.2 SCL Output enable`
-  --    6.3 SDA
-  --    6.4 SDA Output enable
+  --    6.1 SCL Tri-state signals, Nothing means pulled high.
+  --    6.2 SDA Tri-state signals, Nothing means pulled high.
   "" :::
     ( "i2cO" ::: Signal dom (BitVector 8)
-    , "scl" ::: Signal dom Bool
-    , "sclOEn" ::: Signal dom Bool
-    , "sda" ::: Signal dom Bool
-    , "sdaOEn" ::: Signal dom Bool
-    , "i2cO" ::: Signal dom ("scl" ::: Bit, "sclOEn" ::: Bool, "sda" ::: Bit, "sdaOEn" ::: Bool))
-i2c clk arst rst ena clkCnt start stop read write ackIn din i2cI = (dout,hostAck,busy,al,ackOut,i2cO)
+    , "i2cOpAck" ::: Signal dom Bool
+    , "busy" ::: Signal dom Bool
+    , "al" ::: Signal dom Bool
+    , "ackWrite" ::: Signal dom Bool
+    , "i2cO" ::: Signal dom ("sclOut" ::: Maybe Bit, "sclOut" ::: Maybe Bit))
+i2c clk arst rst ena clkCnt claimBus i2cOp ackRead i2cI =
+  (dout,i2cOpAck,busy,al,ackWrite,i2cO)
+
   where
-    (hostAck,ackOut,dout,bitCtrl) = byteMaster clk arst enableGen (rst,start,stop,read,write,ackIn,din,bitResp)
-    (bitResp,busy,i2cO)           = bitMaster  clk arst enableGen (rst,ena,clkCnt,bitCtrl,i2cI)
-    (_cmdAck,al,_dbout)           = unbundle bitResp
+    (i2cOpAck,ackWrite,dout,bitCtrl)
+      = byteMaster clk arst enableGen (rst,claimBus,i2cOp,ackRead,bitResp)
+    (bitResp,busy,i2cO)
+      = bitMaster clk arst enableGen (rst,ena,clkCnt,bitCtrl,i2cI)
+    (_cmdAck,al,_dout) = unbundle bitResp
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE i2c #-}
