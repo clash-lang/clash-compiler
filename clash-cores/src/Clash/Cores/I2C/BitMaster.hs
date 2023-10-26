@@ -52,7 +52,11 @@ type BitMasterI = (Bool,Bool,Unsigned 16,BitCtrlSig,I2CIn)
 -- 3. Contains the SCL and SDA output signals
 type BitMasterO = (BitRespSig,Bool,I2COut)
 
-
+-- | Bit level I2C controller that contains a statemachine to properly:
+-- * Monitor the bus for activity and arbitration.
+-- * Read singular bits from the bus.
+-- * Write singular bits to the bus.
+-- * Return bits read from the bus.
 bitMaster
   :: KnownDomain dom
   => Clock dom
@@ -118,9 +122,8 @@ bitMasterT s@(BitS { _stateMachine = StateMachine  {..}
   zoom stateMachine (bitStateMachine rst _al _clkEn cmd din)
 
   -- assign outputs
-  let sclO = low
-      sdaO = low
-      i2cO = (sclO,_sclOen,sdaO,_sdaOen)
-      outp = ((_cmdAck,_al,_dout),_busy,i2cO)
+  let
+    i2cO =  (if _sclOen then Nothing else Just 0, if _sdaOen then Nothing else Just 0)
+    outp = ((_cmdAck,_al,_dout),_busy,i2cO)
 
   return outp
