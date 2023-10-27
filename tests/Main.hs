@@ -669,7 +669,20 @@ runClashTest = defaultMain $ clashTestRoot
                                                         , "testBenchUS"
                                                         , "testBenchGA"
                                                         , "testBenchGS"
-                                                        ]}
+                                                        ]
+                         , hdlLoad = hdlLoad def \\ [Vivado]
+                         , hdlSim = hdlSim def \\ [Vivado]
+                         }
+          in runTest "DDRout" _opts
+        , let _opts = def{ buildTargets = BuildSpecific [ "testBenchUA"
+                                                        , "testBenchUS"
+                                                        , "testBenchGA"
+                                                        , "testBenchGS"
+                                                        ]
+                         , hdlLoad = [Vivado]
+                         , hdlSim = [Vivado]
+                         , clashFlags=["-fclash-hdlsyn", "Vivado"]
+                         }
           in runTest "DDRout" _opts
         ]
       , clashTestGroup "DSignal"
