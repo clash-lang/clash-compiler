@@ -10,6 +10,7 @@ module Main where
 import Prelude
 import Test.Tasty
 
+import qualified Test.Cores.I2C
 import qualified Test.Cores.SPI
 import qualified Test.Cores.SPI.MultiSlave
 import qualified Test.Cores.UART
@@ -23,6 +24,7 @@ tests = testGroup "Unittests"
   , Test.Cores.UART.tests
   , Test.Cores.Xilinx.DcFifo.tests
   , Test.Cores.Xilinx.BlockRam.tests
+  , Test.Cores.I2C.i2cTest
   ]
 
 main :: IO ()
