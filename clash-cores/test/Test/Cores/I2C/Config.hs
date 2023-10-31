@@ -54,7 +54,7 @@ configT s0 (rst,ena,cmdAck,rxAck,al) = do
       -> pure s { i2cConfStateM = CONFaddr }
       | done
       -> do display "done"
-            finish 0
+            pure s
 
     CONFaddr
       -> pure s { i2cConfStateM = CONFaddrAck

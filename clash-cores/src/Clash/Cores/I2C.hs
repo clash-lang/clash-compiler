@@ -1,6 +1,10 @@
 {-# LANGUAGE CPP #-}
 
-module Clash.Cores.I2C where
+module Clash.Cores.I2C
+  ( i2c
+  , i2cTop
+  , Clash.Cores.I2C.ByteMaster.I2COperation(..)
+  ) where
 
 import Clash.Prelude hiding (read)
 

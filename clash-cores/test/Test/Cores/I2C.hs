@@ -8,9 +8,11 @@ import Clash.Explicit.Prelude
 import Clash.Cores.I2C
 
 import Data.Maybe
-import Test.Cores.I2C.Slave
 import Test.Cores.I2C.Config
-import Clash.Cores.I2C.ByteMaster (I2COperation(..))
+import Test.Cores.I2C.Slave
+import Test.Tasty
+import Test.Tasty.HUnit
+
 
 system0 :: Clock System -> Reset System -> Signal System (Vec 16 (Unsigned 8), Bool, Bool)
 system0 clk arst = bundle (registerFile,done,fault)
@@ -42,3 +44,9 @@ system = system0 systemClockGen resetGen
 
 systemResult :: (Vec 16 (Unsigned 8), Bool, Bool)
 systemResult = L.last (sampleN 200050 system)
+
+i2cTest :: TestTree
+i2cTest = testCase "i2c core testcase passed."
+  $ assertBool "i2c core test procedure failed" (not f)
+ where
+  (_, _, f) = L.last $ takeWhile (\ (_, done, _) -> not done) $ sample system
