@@ -82,3 +82,6 @@ package recursion-schemes
 package regex-tdfa
     optimization: 2
 
+
+-- rewrite-inspector-0.1.0.11 uses brick-0.50 which doesn't compile with vty-6.0
+constraints: vty < 6.0
