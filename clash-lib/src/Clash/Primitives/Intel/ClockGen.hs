@@ -36,9 +36,9 @@ import qualified Prettyprinter.Interpolate as I
 data Variant = Altpll | AlteraPll
 
 hdlUsed :: [Int]
-hdlUsed = [ knownDomIn, clk, rst ]
+hdlUsed = [ clk, rst ]
  where
-  knownDomIn
+  _knownDomIn
     :< _clocksClass
     :< _clocksCxt
     :< _numOutClocks
@@ -81,7 +81,7 @@ hdlTemplate ::
   BlackBoxContext ->
   State s Doc
 hdlTemplate variant bbCtx
-  | [ knownDomIn
+  | [ _knownDomIn
     , _clocksClass
     , _clocksCxt
     , _numOutClocks
@@ -110,7 +110,7 @@ hdlTemplate variant bbCtx
 
     DSL.declarationReturn bbCtx (stdName variant <> "_block") $ do
 
-      rstHigh <- DSL.unsafeToActiveHigh "reset" (DSL.ety knownDomIn) rst
+      rstHigh <- DSL.unsafeToActiveHigh "reset" rst
       pllOuts <- DSL.declareN "pllOut" pllOutTys
       locked <- DSL.declare "locked" Bit
       pllLock <- DSL.boolFromBit "pllLock" locked

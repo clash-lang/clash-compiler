@@ -359,7 +359,6 @@ executable static-files
     docopt                  ^>= 0.7,
     extra,
     filepath
-  Other-Modules:      Paths_clash_lib
   GHC-Options:        -Wall -Wcompat
   default-language:   Haskell2010
   if impl(ghc >= 9.2.0)
