@@ -58,3 +58,6 @@ allow-newer:
   vector-binary-instances:base,
   cryptohash-sha256:base,
   hashable
+
+-- rewrite-inspector-0.1.0.11 uses brick-0.50 which doesn't compile with vty-6.0
+constraints: vty < 6.0
