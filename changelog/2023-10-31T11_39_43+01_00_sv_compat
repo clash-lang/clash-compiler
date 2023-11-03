@@ -1,0 +1,1 @@
+FIXED: SystemVerilog backend: Assignment patterns for unpacked arrays now have an index for every element; improves QuestaSim compatibility.

@@ -63,6 +63,7 @@
       // ddrOut begin
       reg ~SIGD[~GENSYM[data_Pos][1]][7];
       reg ~SIGD[~GENSYM[data_Neg][2]][7];
+      ~IF ~VIVADO ~THENreg ~SIGDO[~GENSYM[ddrOut][3]];~ELSE~FI
       always @(~IF~ACTIVEEDGE[Rising][2]~THENposedge~ELSEnegedge~FI ~ARG[4]~IF~ISSYNC[3]~THEN)~ELSE or ~IF~ISACTIVEHIGH[2]~THENposedge~ELSEnegedge~FI ~ARG[5])~FI begin : ~GENSYM[~COMPNAME_ddrOut_pos][5]
         if (~IF~ISACTIVEHIGH[2]~THEN~ARG[5]~ELSE! ~ARG[5]~FI) begin
           ~SYM[1] <= ~ARG[7];
@@ -78,6 +79,14 @@
         end
       end
 
-      assign ~RESULT = ~ARG[4] ? ~IF~ACTIVEEDGE[Rising][2]~THEN~SYM[1] : ~SYM[2]~ELSE~SYM[2] : ~SYM[1]~FI;
+      ~IF ~VIVADO ~THENalways @(*) begin
+        if (~ARG[4]) begin
+          ~SYM[3] = ~IF~ACTIVEEDGE[Rising][2]~THEN~SYM[1]~ELSE~SYM[2]~FI;
+        end else begin
+          ~SYM[3] = ~IF~ACTIVEEDGE[Rising][2]~THEN~SYM[2]~ELSE~SYM[1]~FI;
+        end
+      end
+      assign ~RESULT = ~SYM[3];~ELSE
+      assign ~RESULT = ~ARG[4] ? ~IF~ACTIVEEDGE[Rising][2]~THEN~SYM[1] : ~SYM[2]~ELSE~SYM[2] : ~SYM[1]~FI;~FI
 
       // ddrOut end

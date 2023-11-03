@@ -1147,10 +1147,10 @@ expr_ b (DataCon _ (DC (Void {}, -1)) [e]) =  expr_ b e
 
 expr_ _ (DataCon ty@(Vector 0 _) _ _) = verilogTypeErrValue ty
 
-expr_ _ (DataCon (Vector 1 elTy) _ [e]) = "'" <> braces (toSLV elTy e)
+expr_ _ (DataCon (Vector 1 elTy) _ [e]) = "'" <> braces (int 0 <> colon <+> toSLV elTy e)
 
 expr_ _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2]) = case vectorChain e of
-  Just es -> "'" <> listBraces (mapM (toSLV elTy) es)
+  Just es -> "'" <> listBraces (zipWithM (\i e3 -> int i <> colon <+> toSLV elTy e3) [0..] es)
   Nothing -> verilogTypeMark ty <> "_cons" <> parens (expr_ False e1 <> comma <+> expr_ False e2)
 
 expr_ _ (DataCon (MemBlob n m) _ [n0, m0, _, runs, _, ends])
