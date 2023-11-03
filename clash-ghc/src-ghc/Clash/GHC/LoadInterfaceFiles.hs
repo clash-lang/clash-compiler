@@ -495,7 +495,11 @@ loadExprFromTyThing :: CoreSyn.CoreBndr -> GHC.TyThing -> Maybe CoreSyn.CoreExpr
 loadExprFromTyThing bndr tyThing = case tyThing of
   GHC.AnId _id | Var.isId _id ->
     let _idInfo    = Var.idInfo _id
+#if MIN_VERSION_ghc(9,4,0)
+        unfolding  = IdInfo.realUnfoldingInfo _idInfo
+#else
         unfolding  = IdInfo.unfoldingInfo _idInfo
+#endif
     in case unfolding of
       CoreSyn.CoreUnfolding {} ->
         Just (CoreSyn.unfoldingTemplate unfolding)

@@ -105,7 +105,7 @@ instance Diff Term where
         (Letrec bnds body, LetBinding i' _) ->
           Letrec (mapBindings i' bnds) body
         (Letrec bnds t, LetBody is) ->
-          if (fst <$> bnds) == is
+          if (fst <$> bnds) == (fst <$> is)
             then Letrec bnds (go t)
             else error "Ctx.LetBody: different bindings"
         (Lam i t, LamBody i') ->

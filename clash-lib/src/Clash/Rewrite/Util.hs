@@ -79,7 +79,8 @@ import           Clash.Core.Var
 import           Clash.Core.VarEnv
   (InScopeSet, extendInScopeSet, extendInScopeSetList, mkInScopeSet,
    uniqAway, uniqAway', mapVarEnv, eltsVarEnv, unitVarSet, emptyVarEnv,
-   mkVarEnv, eltsVarSet, elemVarEnv, lookupVarEnv, extendVarEnv, elemVarSet)
+   mkVarEnv, eltsVarSet, elemVarEnv, lookupVarEnv, extendVarEnv, elemVarSet,
+   differenceVarEnv)
 import           Clash.Data.UniqMap (UniqMap)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug
@@ -730,7 +731,7 @@ whnfRW
   -> Term
   -> Rewrite extra
   -> RewriteMonad extra Term
-whnfRW isSubj ctx@(TransformContext is0 _) e rw = do
+whnfRW isSubj ctx@(TransformContext is0 hist) e rw = do
   tcm <- Lens.view tcCache
   bndrs <- Lens.use bindings
   eval <- Lens.view evaluator
@@ -738,11 +739,18 @@ whnfRW isSubj ctx@(TransformContext is0 _) e rw = do
   let (ids1,ids2) = splitSupply ids
   uniqSupply Lens..= ids2
   gh <- Lens.use globalHeap
+  let lh = localBinders mempty hist
 
-  case whnf' eval bndrs tcm gh ids1 is0 isSubj e of
+  case whnf' eval bndrs lh tcm gh ids1 is0 isSubj e of
     (!gh1,ph,v) -> do
       globalHeap Lens..= gh1
-      bindPureHeap tcm ph rw ctx v
+      bindPureHeap tcm (ph `differenceVarEnv` lh) rw ctx v
+ where
+  localBinders acc [] = acc
+  localBinders !acc (h:hs) = case h of
+    LetBody ls -> localBinders (acc <> mkVarEnv ls) hs
+    _ -> localBinders acc hs
+
 {-# SCC whnfRW #-}
 
 -- | Binds variables on the PureHeap over the result of the rewrite
@@ -791,7 +799,7 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
   where
     heapIds = map fst bndrs
     is1 = extendInScopeSetList is0 heapIds
-    ctx = TransformContext is1 (LetBody heapIds : hist)
+    ctx = TransformContext is1 (LetBody bndrs : hist)
 
     bndrs = map toLetBinding $ UniqMap.toList heap
 

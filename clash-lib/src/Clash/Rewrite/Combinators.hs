@@ -54,7 +54,7 @@ allR trans (TransformContext is c) (Cast e ty1 ty2) =
 
 allR trans (TransformContext is c) (Letrec xes e) = do
   xes' <- traverse rewriteBind xes
-  e'   <- trans (TransformContext is' (LetBody bndrs:c)) e
+  e'   <- trans (TransformContext is' (LetBody xes:c)) e
   return (Letrec xes' e')
  where
   bndrs              = map fst xes

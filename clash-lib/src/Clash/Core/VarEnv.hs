@@ -25,6 +25,7 @@ module Clash.Core.VarEnv
   , delVarEnvList
   , unionVarEnv
   , unionVarEnvWith
+  , differenceVarEnv
     -- ** Element-wise operations
     -- *** Mapping
   , mapVarEnv
@@ -226,6 +227,13 @@ unionVarEnvWith
   -> VarEnv a
   -> VarEnv a
 unionVarEnvWith = UniqMap.unionWith
+
+-- | Filter the first varenv to only contain keys which are not in the second varenv.
+differenceVarEnv
+  :: VarEnv a
+  -> VarEnv a
+  -> VarEnv a
+differenceVarEnv = UniqMap.difference
 
 -- | Create an environment given a list of var-value pairs
 mkVarEnv

@@ -303,7 +303,7 @@ collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), t
     let (ids1,ids2) = splitSupply ids
     uniqSupply Lens..= ids2
     gh <- Lens.use globalHeap
-    let eval = (Lens.view Lens._3) . whnf' evaluate bndrs tcm gh ids1 is0 False
+    let eval = (Lens.view Lens._3) . whnf' evaluate bndrs mempty tcm gh ids1 is0 False
     let eTy  = inferCoreTypeOf tcm e
     untran <- isUntranslatableType False eTy
     case untran of

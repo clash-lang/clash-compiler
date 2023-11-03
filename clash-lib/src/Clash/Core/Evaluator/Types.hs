@@ -38,6 +38,7 @@ import Clash.Pretty (ClashPretty(..), fromPretty, showDoc)
 whnf'
   :: Evaluator
   -> BindingMap
+  -> VarEnv Term
   -> TyConMap
   -> PrimHeap
   -> Supply
@@ -45,12 +46,12 @@ whnf'
   -> Bool
   -> Term
   -> (PrimHeap, PureHeap, Term)
-whnf' eval bm tcm ph ids is isSubj e =
+whnf' eval bm lh tcm ph ids is isSubj e =
   toResult $ whnf eval tcm isSubj m
  where
   toResult x = (mHeapPrim x, mHeapLocal x, mTerm x)
 
-  m  = Machine ph gh emptyVarEnv [] ids is e
+  m  = Machine ph gh lh [] ids is e
   gh = mapVarEnv bindingTerm bm
 
 -- | Evaluate to WHNF given an existing Heap and Stack
