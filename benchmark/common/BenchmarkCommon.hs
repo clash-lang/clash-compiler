@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeApplications #-}
 
 module BenchmarkCommon where
@@ -16,6 +17,22 @@ import Clash.GHC.GenerateBindings
 import Clash.GHC.NetlistTypes
 
 import qualified Control.Concurrent.Supply as Supply
+
+#if MIN_VERSION_ghc(9,2,0)
+import qualified GHC.Driver.Monad as GHC
+import qualified GHC.Driver.Session as GHC
+import qualified GHC.Driver.Env.Types as GHC
+import qualified GHC.LanguageExtensions as LangExt
+import qualified GHC.Settings as GHC
+import qualified GHC.Utils.Fingerprint as GHC
+#elif MIN_VERSION_ghc(9,0,0)
+import qualified GHC.Driver.Monad as GHC
+import qualified GHC.Driver.Session as GHC
+import qualified GHC.Driver.Types as GHC
+import qualified GHC.LanguageExtensions as LangExt
+import qualified GHC.Settings as GHC
+import qualified GHC.Utils.Fingerprint as GHC
+#endif
 
 defaultTests :: [FilePath]
 defaultTests =
@@ -49,7 +66,34 @@ runInputStage idirs src = do
   let o = opts idirs
   let backend = initBackend @VHDLState o
   pds <- primDirs backend
-  generateBindings o (return ()) pds (opt_importPaths o) [] (hdlKind backend) src Nothing
+  generateBindings o action pds (opt_importPaths o) [] (hdlKind backend) src Nothing
+ where
+#if MIN_VERSION_ghc(9,0,0)
+  action = do
+    env <- GHC.getSession
+    let df0 = GHC.hsc_dflags env
+#if MIN_VERSION_ghc(9,4,0)
+        df1 = addOptP "-DCLASH_OPAQUE=OPAQUE" df0
+#else
+        df1 = addOptP "-DCLASH_OPAQUE=NOINLINE" df0
+#endif
+        df2 = GHC.xopt_set df1 LangExt.Cpp
+    GHC.setSession (env {GHC.hsc_dflags = df2})
+
+  addOptP :: String -> GHC.DynFlags -> GHC.DynFlags
+  addOptP   f = alterToolSettings $ \s -> s
+            { GHC.toolSettings_opt_P   = f : GHC.toolSettings_opt_P s
+            , GHC.toolSettings_opt_P_fingerprint = fingerprintStrings (f : GHC.toolSettings_opt_P s)
+            }
+
+  alterToolSettings :: (GHC.ToolSettings -> GHC.ToolSettings) -> GHC.DynFlags -> GHC.DynFlags
+  alterToolSettings f dynFlags = dynFlags { GHC.toolSettings = f (GHC.toolSettings dynFlags) }
+
+  fingerprintStrings :: [String] -> GHC.Fingerprint
+  fingerprintStrings ss = GHC.fingerprintFingerprints $ map GHC.fingerprintString ss
+#else
+  action = return ()
+#endif
 
 runNormalisationStage
   :: [FilePath]
