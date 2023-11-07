@@ -26,6 +26,9 @@ library
                        clash-lib,
                        clash-prelude
 
+  if impl(ghc >= 9.0.0)
+    build-depends:     ghc-boot
+
 executable clash-benchmark-normalization
   main-is:             benchmark-normalization.hs
   default-language:    Haskell2010
