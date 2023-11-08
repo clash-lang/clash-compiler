@@ -1,2 +1,0 @@
-INTERNAL CHANGE: Add `CompDecl` to `Clash.Netlist.Types.Declaration` to
-accomodate VHDL's `component` declarations.

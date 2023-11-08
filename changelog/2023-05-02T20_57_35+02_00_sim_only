@@ -1,1 +1,0 @@
-ADDED: `Clash.Magic.SimOnly`, A container for data you only want to have around during simulation and is ignored during synthesis. Useful for carrying around things such as: a map of simulation/vcd traces, co-simulation state or meta-data, etc.

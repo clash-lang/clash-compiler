@@ -1,1 +1,0 @@
-FIXED: If the source reset of `convertReset` is synchronous, a flip-flop in the source domain is inserted to filter glitches from the source reset.

@@ -1,1 +1,0 @@
-FIXED: Name duplication in generated Verilog involving reset synchronizer [#2598](https://github.com/clash-lang/clash-compiler/issues/2598)

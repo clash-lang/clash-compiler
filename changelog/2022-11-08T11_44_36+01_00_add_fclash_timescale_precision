@@ -1,1 +1,0 @@
-ADDED: Verilog users can now influence the "precision" part of the generated `timescale` pragma using `-fclash-timescale-precision`.
