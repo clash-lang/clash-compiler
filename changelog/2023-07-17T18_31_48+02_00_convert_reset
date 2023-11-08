@@ -1,1 +1,0 @@
-FIXED: When `convertReset` was used with two domains that had a different reset polarity, the polarity of the signal was not changed.

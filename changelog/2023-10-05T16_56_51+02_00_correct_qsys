@@ -1,1 +1,0 @@
-FIXED: Fix `alteraPll` `qsys` generation. PR [#2417](https://github.com/clash-lang/clash-compiler/pull/2417) (included in Clash v1.6.5) caused a bug in the generation of the `qsys` file: it generated a spurious extra output clock which was completely unused otherwise.

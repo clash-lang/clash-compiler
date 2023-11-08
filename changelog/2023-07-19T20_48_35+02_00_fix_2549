@@ -1,1 +1,0 @@
-FIXED: Functional arguments of primitives cannot have 0-bit results [#2549](https://github.com/clash-lang/clash-compiler/issues/2549)

@@ -1,2 +1,0 @@
-FIXED: BiSignal test does not look through `Annotate` [#2472](https://github.com/clash-lang/clash-compiler/issues/2472)
-FIXED: Port size not rendered when type has more than one `Annotate`

@@ -1,1 +1,0 @@
-FIXED: `resetGen`'s documentation now mentions it is non-synthesizable ([#2375](https://github.com/clash-lang/clash-compiler/issues/2375))

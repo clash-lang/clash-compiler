@@ -1,1 +1,0 @@
-CHANGED: `fromJustX` now uses `deepErrorX` instead of `errorX`. This adds `NFDataX` constraints to `blockRam` like functions, `asyncRam` and `writeToBiSignal`. [#2113](https://github.com/clash-lang/clash-compiler/pull/2113)

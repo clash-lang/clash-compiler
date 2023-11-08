@@ -1,3 +1,0 @@
-ADDED: A new clock type `DiffClock` is introduced to signify a differential
-clock signal that is passed to the design on two ports in antiphase. This is
-used by the differential Xilinx clock wizards in `Clash.Xilinx.ClockGen`.

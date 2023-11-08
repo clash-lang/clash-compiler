@@ -1,2 +1,0 @@
-ADDED: Convenience functions: `noReset`, `andReset`, `orReset` plus their unsafe counterparts
-ADDED: Convenience constraint aliases: `HasSynchronousReset`, `HasAsynchronousReset`, and `HasDefinedInitialValues`

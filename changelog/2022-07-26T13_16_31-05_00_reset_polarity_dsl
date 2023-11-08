@@ -1,1 +1,0 @@
-INTERNAL NEW: Added `unsafeToActiveHigh` and `unsafeToActiveLow` to `Clash.Primitives.DSL`. [#2270](https://github.com/clash-lang/clash-compiler/pull/2270)

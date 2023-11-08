@@ -1,1 +1,0 @@
-ADDED: `Clash.Annotations.SynthesisAttributes.markDebug`: a way of marking a signals "debug", instructing synthesizers to leave the signal alone and offer debug features

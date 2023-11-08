@@ -1,1 +1,0 @@
-Fixed: Dependencies in `clash-manifest.json` are now listed in reverse topological ordering [#2325](https://github.com/clash-lang/clash-compiler/issues/2325)

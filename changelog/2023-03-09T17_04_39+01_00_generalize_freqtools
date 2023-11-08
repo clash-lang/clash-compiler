@@ -1,6 +1,0 @@
-CHANGED: Generalized the return types of `periodToHz` and `hzToPeriod`. Use a
-type application (`periodToHz @(Ratio Natural)`, `hzToPeriod @Natural`) to get
-the old behavior back, in case type errors arise.
-CHANGED: `periodToHz` and `hzToPeriod` now throw an `ErrorCall` with call stack
-when called with the argument 0 (zero), instead of a `RatioZeroDenominator ::
-ArithException`.

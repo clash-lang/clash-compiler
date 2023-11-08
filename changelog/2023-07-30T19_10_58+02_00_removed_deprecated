@@ -1,3 +1,0 @@
-REMOVED: Deprecated module `Clash.Prelude.BitIndex`: functions have been moved to `Clash.Class.BitPack`
-REMOVED: Deprecated module `Clash.Prelude.BitReduction`: functions have been moved to `Clash.Class.BitPack`
-REMOVED: Deprecated function `Clash.Explicit.Signal.enable`: function has been renamed to `andEnable`

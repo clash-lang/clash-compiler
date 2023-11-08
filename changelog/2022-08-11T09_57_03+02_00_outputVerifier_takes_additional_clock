@@ -1,2 +1,0 @@
-CHANGE: `Clash.Explicit.Testbench.outputVerifier` now takes an additional clock as an argument: the clock used by the circuit under test. If your tests use the same domain for the test circuit and design under test, consider using `Clash.Explicit.Testbench.outputVerifier'`.
-CHANGE: `Clash.Explicit.Signal.veryUnsafeSynchronizer` now accepts either a static clock period or a dynamic one. If you don't use dynamic clocks, convert your calls to use `Left`.
