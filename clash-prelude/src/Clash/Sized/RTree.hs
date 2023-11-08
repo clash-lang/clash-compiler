@@ -381,7 +381,7 @@ tdfold :: forall p k a . KnownNat k
        -> (forall l . SNat l -> (p @@ l) -> (p @@ l) -> (p @@ (l+1)))
        -- ^ Function to fold the branches with.
        --
-       -- __NB:__ @SNat l@ is the depth of the two sub-branches.
+       -- __NB__: @SNat l@ is the depth of the two sub-branches.
        -> RTree k a -- ^ Tree to fold over.
        -> (p @@ k)
 tdfold _ f g = go SNat

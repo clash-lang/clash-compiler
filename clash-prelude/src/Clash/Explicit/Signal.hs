@@ -375,7 +375,7 @@ writing has exactly, and the constraint is succinct.
 -- **Clock
 -- | Clock generator for the 'System' clock domain.
 --
--- __NB__: should only be used for simulation, and __not__ for the /testBench/
+-- __NB__: Should only be used for simulation, and __not__ for the /testBench/
 -- function. For the /testBench/ function, used 'Clash.Explicit.Testbench.tbSystemClockGen'
 systemClockGen
   :: Clock System

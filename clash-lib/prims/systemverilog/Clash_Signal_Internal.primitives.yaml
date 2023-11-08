@@ -5,7 +5,7 @@
     type: |-
       delay#
         :: ( KnownDomain dom        -- ARG[0]
-           , Undefined a )          -- ARG[1]
+           , NFDataX a )            -- ARG[1]
         => Clock dom                -- ARG[2]
         -> Enable dom               -- ARG[3]
         -> a                        -- ARG[4]
@@ -62,7 +62,7 @@
     type: |-
       register#
         :: ( KnownDomain dom        -- ARG[0]
-           , Undefined a )          -- ARG[1]
+           , NFDataX a )            -- ARG[1]
         => Clock dom                -- ARG[2]
         -> Reset dom                -- ARG[3]
         -> Enable dom               -- ARG[4]

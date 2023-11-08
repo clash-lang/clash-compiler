@@ -436,7 +436,7 @@ tbEnableGen = toEnable (pure True)
 
 -- | Clock generator for the 'System' clock domain.
 --
--- __NB__: can be used in the /testBench/ function
+-- __NB__: Can be used in the /testBench/ function
 --
 -- === __Example__
 --

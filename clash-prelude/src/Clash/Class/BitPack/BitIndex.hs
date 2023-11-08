@@ -30,7 +30,7 @@ import Clash.Sized.Internal.BitVector
 {-# INLINE (!) #-}
 -- | Get the bit at the specified bit index.
 --
--- __NB:__ Bit indices are __DESCENDING__.
+-- __NB__: Bit indices are __DESCENDING__.
 --
 -- >>> pack (7 :: Unsigned 6)
 -- 0b00_0111
@@ -47,7 +47,7 @@ import Clash.Sized.Internal.BitVector
 {-# INLINE slice #-}
 {- | Get a slice between bit index @m@ and and bit index @n@.
 
-__NB:__ Bit indices are __DESCENDING__.
+__NB__: Bit indices are __DESCENDING__.
 
 >>> pack (7 :: Unsigned 6)
 0b00_0111
@@ -101,7 +101,7 @@ split v = split# (pack v)
 {-# INLINE replaceBit #-}
 -- | Set the bit at the specified index
 --
--- __NB:__ Bit indices are __DESCENDING__.
+-- __NB__: Bit indices are __DESCENDING__.
 --
 -- >>> pack (-5 :: Signed 6)
 -- 0b11_1011
@@ -122,7 +122,7 @@ replaceBit i b v = unpack (replaceBit# (pack v) (fromEnum i) b)
 {-# INLINE setSlice #-}
 {- | Set the bits between bit index @m@ and bit index @n@.
 
-__NB:__ Bit indices are __DESCENDING__.
+__NB__: Bit indices are __DESCENDING__.
 
 >>> pack (-5 :: Signed 6)
 0b11_1011

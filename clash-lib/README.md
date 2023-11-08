@@ -10,9 +10,8 @@ low-level synthesizable VHDL, Verilog, or SystemVerilog.
 
 Features of Clash:
 
-  * Strongly typed (like VHDL), yet with a very high degree of type inference,
-    enabling both safe and fast prototying using consise descriptions (like
-    Verilog).
+  * Strongly typed, but with a very high degree of type inference, enabling both
+    safe and fast prototyping using concise descriptions.
 
   * Interactive REPL: load your designs in an interpreter and easily test all
     your component without needing to setup a test bench.

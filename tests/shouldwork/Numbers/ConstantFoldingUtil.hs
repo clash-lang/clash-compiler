@@ -6,19 +6,14 @@ import Clash.Prelude
 import Data.Char (toLower,toUpper)
 import qualified Data.List as L
 import Data.Maybe
-import Data.Semigroup ((<>))
 import System.Directory
 import System.Environment (getArgs)
 import System.FilePath ((</>))
-import System.FilePath.Glob (glob)
 import System.Exit
 import System.IO
 
 import Text.Parser.Combinators
 import Text.Trifecta
-import Text.Trifecta.Delta
-
-import Debug.Trace
 
 -- | Prevent GHC from constant folding operations. Clash should be able to
 -- do it though.

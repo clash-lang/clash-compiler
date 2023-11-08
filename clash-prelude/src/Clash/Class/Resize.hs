@@ -88,7 +88,7 @@ checkedFromIntegral v =
 -- you "know" /f a/ can't be out of bounds, but would like to have your
 -- assumptions checked.
 --
--- __N.B.__: Check only affects simulation. I.e., no checks will be inserted
+-- __NB__: Check only affects simulation. I.e., no checks will be inserted
 -- into the generated HDL
 checkedResize ::
   forall a b f.
@@ -104,7 +104,7 @@ checkedResize v =
 -- when you "know" /f (a + b)/ can't be out of bounds, but would like to have your
 -- assumptions checked.
 --
--- __N.B.__: Check only affects simulation. I.e., no checks will be inserted
+-- __NB__: Check only affects simulation. I.e., no checks will be inserted
 -- into the generated HDL
 checkedTruncateB ::
   forall a b f.

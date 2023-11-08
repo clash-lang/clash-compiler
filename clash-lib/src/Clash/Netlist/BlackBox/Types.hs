@@ -53,7 +53,7 @@ data TemplateKind
   | TExpr
   deriving (Show, Eq, Generic, NFData, Binary, Hashable)
 
--- | See @Clash.Primitives.Types.BlackBox@ for documentation on this record's
+-- | See 'Clash.Primitives.Types.BlackBox' for documentation on this record's
 -- fields. (They are intentionally renamed to prevent name clashes.)
 data BlackBoxMeta =
   BlackBoxMeta { bbOutputUsage :: Usage
@@ -68,7 +68,7 @@ data BlackBoxMeta =
                }
 
 -- | Use this value in your blackbox template function if you do want to
--- accept the defaults as documented in @Clash.Primitives.Types.BlackBox@.
+-- accept the defaults as documented in 'Clash.Primitives.Types.BlackBox'.
 emptyBlackBoxMeta :: BlackBoxMeta
 emptyBlackBoxMeta = BlackBoxMeta Cont TExpr [] [] [] [] NoRenderVoid [] []
 

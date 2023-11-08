@@ -111,11 +111,12 @@ vioProbe ::
   a
 vioProbe inputNames outputNames initialOutputProbeValues clk =
   vioProbe# @dom @a @o inputNames outputNames initialOutputProbeValues clk
-{-# CLASH_OPAQUE vioProbe #-}
-
--- | Primitive for 'vioProbe'. Defining a wrapper like this makes the VIO probe
+-- Defining a NOINLINEd wrapper like this makes the 'vioProbe#'
 -- instantiation be rendered in its own module to reduce naming collision
 -- probabilities.
+{-# CLASH_OPAQUE vioProbe #-}
+
+-- | Primitive for 'vioProbe'.
 vioProbe# ::
   forall dom a o n m.
   (KnownDomain dom, VIO dom a o) =>

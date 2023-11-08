@@ -29,7 +29,7 @@ module Clash.Explicit.Reset
   , andReset, unsafeAndReset
   , orReset, unsafeOrReset
 
-    -- Reexports
+    -- Re-exports
   , Reset
   , resetGen
   , resetGenN

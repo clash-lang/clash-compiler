@@ -40,9 +40,6 @@ assertAssignsInOut (Component _ [i] [o] ds) =
 
 assertAssignsInOut _ = error "Unexpected number of inputs and outputs"
 
-getComponent :: (a, b, c, d) -> d
-getComponent (_, _, _, x) = x
-
 mainVHDL :: IO ()
 mainVHDL = do
   netlist <- runToNetlistStage SVHDL id testPath

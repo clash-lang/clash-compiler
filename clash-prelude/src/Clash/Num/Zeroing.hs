@@ -8,7 +8,8 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Clash.Num.Zeroing
-  ( Zeroing(fromZeroing)
+  ( Zeroing
+  , fromZeroing  -- exported here because haddock https://github.com/haskell/haddock/issues/456
   , toZeroing
   ) where
 
@@ -128,6 +129,7 @@ instance (Real a, SaturatingNum a) => Real (Zeroing a) where
   toRational = coerce (toRational @a)
 
 instance (Integral a, SaturatingNum a) => Integral (Zeroing a) where
+  -- NOTE the seemingly duplicate "y < 0 && y == -1" guards against unsigned types
   quotRem x y
     | x == minBound && y < 0 && y == -1 = (0, 0)
     | otherwise = coerce (quotRem @a) x y

@@ -619,7 +619,7 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
   -- to it being a zero-width type
   --
   -- TODO: This currently only handles (IP $x, KnownDomain) given that $x is any
-  -- TODO: of the constructs handled in 'splitTy'. In practise this means only
+  -- TODO: of the constructs handled in 'splitTy'. In practice this means only
   -- TODO: HiddenClock, HiddenReset, and HiddenEnable are handled. If a user were
   -- TODO: to define their own versions with -for example- the elements of the
   -- TODO: tuple swapped, 'isHidden' wouldn't recognize it. We could generalize

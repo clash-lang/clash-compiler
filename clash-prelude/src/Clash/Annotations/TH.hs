@@ -1,6 +1,6 @@
 {-|
 
-This module can automatically generate TopEntity definitions from 'Clash.NamedTypes'
+This module can automatically generate TopEntity definitions from "Clash.NamedTypes"
 annotations. Annotations involving data\/type families must be inspected for correctness.
 Not all cases can be handled with automatic generation due to the difficulty of type manipulation
 in template Haskell. In particular annotations __inside__ the following is unlikely to work:

@@ -339,8 +339,8 @@ You should read this as follows:
 
  * __@ma ::@__, @ma@ is of type..
 
- * __@Num a@__, there is some type called @a@ that is a @'Num'@. Examples of
-   instances of @'Num'@ are @'Int'@, @'Signed' 16@, @'Index' 32@, and @'Float'@.
+ * __@Num a@__, there is some type called @a@ that is a 'Num'. Examples of
+   instances of 'Num' are 'Int', @'Signed' 16@, @'Index' 32@, and 'Float'.
 
  * __@a@__, @ma@'s first argument is of type @a@
 
@@ -349,8 +349,8 @@ You should read this as follows:
  * __@a@__, @ma@'s result is of type @a@
 
 Note that @ma@ therefore works on multiple types! The only condition we
-imposed is that @a@ should be a @'Num'@ber type. In Clash this means it should
-support the operations @'Prelude.+'@, @'Prelude.-'@, @'Prelude.*'@, and some
+imposed is that @a@ should be a 'Num'ber type. In Clash this means it should
+support the operations 'Prelude.+', 'Prelude.-', 'Prelude.*', and some
 others. Indeed, this is why Clash adds the constraint in the first place: the
 definition of @ma@ uses @+@ and @*@. Whenever a function works over multiple
 types, we call it /polymorphic/ ("poly" meaning "many", "morphic" meaning
@@ -362,12 +362,12 @@ Talking about /types/ also brings us to one of the most important parts of this
 tutorial: /types/ and /synchronous sequential logic/. Especially how we can
 always determine, through the types of a specification, if it describes
 combinational logic or (synchronous) sequential logic. We do this by examining
-the definition of one of the sequential primitives, the @'register'@ function:
+the definition of one of the sequential primitives, the 'register' function:
 
 @
 register
-     ( 'HiddenClockResetEnable' dom
-     , 'Clash.XException.NFDataX' a )
+  :: ( 'HiddenClockResetEnable' dom
+     , 'NFDataX' a )
   => a
   -> 'Signal' dom a
   -> 'Signal' dom a
@@ -401,10 +401,10 @@ examine the 'register' function by taking a look at the first 4 samples of the
 Where we see that the initial value of the signal is the specified 0 value,
 followed by 8's. You might be surprised to see /two/ zeros instead of just a
 single zero. What happens is that in Clash you get to see the output of the
-circuit /before/ the clock becomes actives. In other words, in Clash you get to
+circuit /before/ the clock becomes active. In other words, in Clash you get to
 describe the powerup values of registers too. Whether this is a defined or
 unknown value depends on your hardware target, and can be configured by using a
-different synthesis @'Domain'@. The default synthesis domain, @'System', assumes
+different synthesis 'Domain'. The default synthesis domain, @'System', assumes
 that registers do have a powerup value - as is true for most FPGA platforms in
 most contexts.
 -}
@@ -455,7 +455,7 @@ shape of @macT@:
 
 @
 mealy
-  :: ('HiddenClockResetEnable' dom, 'Clash.XException.NFDataX' s)
+  :: ('HiddenClockResetEnable' dom, 'NFDataX' s)
   => (s -> i -> (s,o))
   -> s
   -> ('Signal' dom i -> 'Signal' dom o)
@@ -468,7 +468,7 @@ The complete sequential MAC circuit can now be specified as:
 mac inp = 'mealy' macT 0 inp
 @
 
-Where the first argument of @'mealy'@ is our @macT@ function, and the second
+Where the first argument of 'mealy' is our @macT@ function, and the second
 argument is the initial state, in this case 0. We can see it is functioning
 correctly in our interpreter:
 
@@ -672,12 +672,11 @@ structure.
         acc' = ma '<$>' acc '<*>' xy
     @
 
-* __'Control.Monad.State.Strict.State' Monad__
+* __t'Control.Monad.State.Strict.State' Monad__
 
-    We can also implement the original @macT@ function as a
-    @'Control.Monad.State.Strict.State'@
-    monadic computation. First we must add an extra import statement, right
-    after the import of "Clash.Prelude":
+    We can also implement the original @macT@ function as
+    a t'Control.Monad.State.Strict.State' monadic computation. First we must add
+    an extra import statement, right after the import of "Clash.Prelude":
 
     @
     import Control.Monad.State.Strict
@@ -1051,7 +1050,7 @@ primitives, using 'Signed' multiplication (@*@) as an example. The
 "Clash.Sized.Internal.Signed" module specifies multiplication as follows:
 
 @
-(*#) :: 'GHC.TypeLits.KnownNat' n => 'Signed' n -> 'Signed' n -> 'Signed' n
+(*#) :: 'KnownNat' n => 'Signed' n -> 'Signed' n -> 'Signed' n
 (S a) *# (S b) = fromInteger_INLINE (a * b)
 {\-\# NOINLINE (*#) \#-\}
 @
@@ -1110,7 +1109,7 @@ blockRam#
   :: ( KnownDomain dom
      , HasCallStack
      , NFDataX a )
-  => 'Clock' dom           -- ^ 'Clock' to synchronize to
+  => 'Clock' dom           -- ^ Clock to synchronize to
   -> 'Enable' dom          -- ^ Global enable
   -> 'Vec' n a             -- ^ Initial content of the BRAM, also
                            -- determines the size, @n@, of the BRAM.
@@ -1263,7 +1262,7 @@ a general listing of the available template holes:
   @-fclash-vivado@ flag. To be used with in an @~IF .. ~THEN .. ~ELSE .. ~FI@
   statement.
 * @~CMPLE[\<HOLE1\>][\<HOLE2\>]@: /1/ when @\<HOLE1\> \<= \<HOLE2\>@, otherwise /0/
-* @~IW64@: /1/ when Int/Word/Integer types are represented with 64 bits in HDL.
+* @~IW64@: /1/ when Int\/Word\/Integer types are represented with 64 bits in HDL.
   /0/ when they're represented by 32 bits.
 * @~TOBV[\<HOLE\>][\<TYPE\>]@: create conversion code that so that the
   expression in @\<HOLE\>@ is converted to a bit vector (@std_logic_vector@).
@@ -1564,9 +1563,10 @@ __asyncRam__
      , 'HasCallStack'
      , 'KnownDomain' wdom
      , 'KnownDomain' rdom
+     , 'NFDataX' a
      )
-  => 'Clock' wdom                     -- ^ 'Clock' to which to synchronize the write port of the RAM
-  -> 'Clock' rdom                     -- ^ 'Clock' to which the read address signal, @r@, is synchronized to
+  => 'Clock' wdom                     -- ^ Clock to which to synchronize the write port of the RAM
+  -> 'Clock' rdom                     -- ^ Clock to which the read address signal, @r@, is synchronized to
   -> 'Enable' wdom                    -- ^ Global enable
   -> 'SNat' n                         -- ^ Size @n@ of the RAM
   -> 'Signal' rdom addr               -- ^ Read address @r@
@@ -1665,12 +1665,10 @@ ptrSync clk1 clk2 rst2 en2 =
   'Clash.Explicit.Signal.register' clk2 rst2 en2 0 . 'Clash.Explicit.Signal.register' clk2 rst2 en2 0 . 'Clash.Explicit.Signal.unsafeSynchronizer' clk1 clk2
 @
 
-It uses the 'Clash.Explicit.Signal.unsafeSynchronizer' primitive, which is needed to go from one clock
-domain to the other. All synchronizers are specified in terms of
-'Clash.Explicit.Signal.unsafeSynchronizer' (see for example the <src/Clash-Prelude-RAM.html#line-103 source of asyncRam>).
-The 'Clash.Explicit.Signal.unsafeSynchronizer' primitive is turned into a (bundle of) wire(s) by the
-Clash compiler, so developers must ensure that it is only used as part of a
-proper synchronizer.
+It uses the 'Clash.Explicit.Signal.unsafeSynchronizer' primitive, which is
+needed to go from one clock domain to the other. The 'Clash.Explicit.Signal.unsafeSynchronizer'
+primitive is turned into a (bundle of) wire(s) by the Clash compiler, so
+developers must ensure that it is only used as part of a proper synchronizer.
 
 Finally we combine all the components in:
 
@@ -1683,9 +1681,9 @@ asyncFIFOSynchronizer
   -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
   -- elements.
   -> 'Clock' wdom
-  -- ^ 'Clock' to which the write port is synchronized
+  -- ^ Clock to which the write port is synchronized
   -> 'Clock' rdom
-  -- ^ 'Clock' to which the read port is synchronized
+  -- ^ Clock to which the read port is synchronized
   -> 'Reset' wdom
   -> 'Reset' rdom
   -> 'Enable' wdom
@@ -2201,7 +2199,7 @@ Here is a list of Haskell features for which the Clash compiler has only
             __plusFloat#__ :: 'Float#' -> 'Float#' -> 'Float#'
             @
 
-            which underlie @'Float'@'s 'Num' instance, must be implemented as
+            which underlie 'Float'\'s 'Num' instance, must be implemented as
             purely combinational circuits according to their type. Remember,
             sequential circuits operate on values of type \"@'Signal' a@\".
 
@@ -2302,9 +2300,9 @@ function. This enables the following features not available to Lava:
 * Automatic synthesis for user-defined ADTs
 * Synthesis of all choice constructs (pattern matching, guards, etc.)
 * 'Applicative' instance for the 'Signal' type
-* Working with \"normal\" functions permits the use of e.g. the
-  'Control.Monad.State.Lazy.State' monad to describe the functionality of a
-  circuit.
+* Working with \"normal\" functions permits the use of e.g.
+  the t'Control.Monad.State.Strict.State' monad to describe the functionality of
+  a circuit.
 
 Although there are Lava alternatives to some of the above features (e.g.
 first-class patterns to replace pattern matching) they are not as \"beautiful\"
@@ -2506,8 +2504,8 @@ topEntity
 topEntity clk rst =
     'exposeClockResetEnable' ('mealy' blinkerT (1,False,0) . Clash.Prelude.isRising 1) pllOut rstSync 'enableGen'
   where
-    (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' \@Dom100 (SSymbol \@\"altpll100\") clk ('Clash.Signal.unsafeFromActiveLow' rst)
-    rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeFromActiveLow' pllStable)
+    (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' \@Dom100 (SSymbol \@\"altpll100\") clk ('unsafeFromActiveLow' rst)
+    rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('unsafeFromActiveLow' pllStable)
 
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where

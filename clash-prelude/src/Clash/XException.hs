@@ -127,7 +127,7 @@ errorX msg = throw (XException ("X: " ++ msg ++ "\n" ++ prettyCallStack callStac
 -- > {-# LANGUAGE ViewPatterns, BangPatterns #-}
 -- > f (xToErrorCtx "a is X" -> !a) (xToErrorCtx "b is X" -> !b) = ...
 --
--- __NB:__ Fully synthesizable, so doesn't have to be removed before synthesis
+-- __NB__: Fully synthesizable, so doesn't have to be removed before synthesis
 --
 -- === __Example__
 --
@@ -182,7 +182,7 @@ xToErrorCtx ctx a = unsafeDupablePerformIO
 -- > {-# LANGUAGE ViewPatterns, BangPatterns #-}
 -- > f (xToError -> !a) (xToError -> !b) = ...
 --
--- __NB:__ Fully synthesizable, so doesn't have to be removed before synthesis
+-- __NB__: Fully synthesizable, so doesn't have to be removed before synthesis
 --
 -- === __Example__
 --
@@ -253,7 +253,7 @@ infixr 0 `seqErrorX`
 -- output of such a component (typically a unit) can be passed as the first
 -- argument to 'hwSeqX' to ensure the ILA ends up in the generated HDL.
 --
--- __NB__: the result of 'hwSeqX' must (indirectly) be used at the very top of
+-- __NB__: The result of 'hwSeqX' must (indirectly) be used at the very top of
 -- a design. If it's not, Clash will remove it like it does for any other unused
 -- circuit parts.
 --
@@ -738,13 +738,13 @@ instance NFDataX a => NFDataX (M.Last a)
 instance NFDataX a => NFDataX (SG.Option a)
 #endif
 
--- | __N.B.__: The documentation only shows instances up to /3/-tuples. By
+-- | __NB__: The documentation only shows instances up to /3/-tuples. By
 -- default, instances up to and including /12/-tuples will exist. If the flag
 -- @large-tuples@ is set instances up to the GHC imposed limit will exist. The
 -- GHC imposed limit is either 62 or 64 depending on the GHC version.
 mkShowXTupleInstances [2..maxTupleSize]
 
--- | __N.B.__: The documentation only shows instances up to /3/-tuples. By
+-- | __NB__: The documentation only shows instances up to /3/-tuples. By
 -- default, instances up to and including /12/-tuples will exist. If the flag
 -- @large-tuples@ is set instances up to the GHC imposed limit will exist. The
 -- GHC imposed limit is either 62 or 64 depending on the GHC version.

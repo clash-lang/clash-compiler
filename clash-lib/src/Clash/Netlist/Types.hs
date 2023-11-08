@@ -207,7 +207,7 @@ data IdentifierSet
 -- identifiers internally. Any Identifier should be trivially printable to any
 -- HDL.
 --
--- __NB__: use the functions in Clash.Netlist.Id. Don't use these constructors
+-- __NB__: use the functions in "Clash.Netlist.Id". Don't use these constructors
 -- directly.
 data Identifier
   -- | Unparsed identifier. Used for things such as port names, which should

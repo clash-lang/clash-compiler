@@ -529,9 +529,9 @@ instance KnownNat n => NFDataX (BitVector n) where
 -- >>> $(bLit "1.0.")
 -- 0b1.0.
 --
--- __N.B.__: From Clash 1.6 an onwards 'bLit' will deduce the size of the
---           BitVector from the given string and annotate the splice it
---           produces accordingly.
+-- __NB__: From Clash 1.6 an onwards 'bLit' will deduce the size of the
+-- BitVector from the given string and annotate the splice it produces
+-- accordingly.
 bLit :: String -> ExpQ
 bLit s = pure (SigE body typ)
  where

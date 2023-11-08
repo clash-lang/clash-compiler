@@ -11,7 +11,7 @@ Fixed point numbers
 * 'Fixed' has an instance for 'Fractional' meaning you use fractional
   literals @(3.75 :: 'SFixed' 4 18)@.
 * Both integer literals and fractional literals are clipped to 'minBound' and
-  'maxBound'. __NB__ Needs the `-XNegativeLiterals` language extension to work
+  'maxBound'. __NB__: Needs the `-XNegativeLiterals` language extension to work
   for signed numbers.
 * There is no 'Floating' instance for 'Fixed', but you can use @$$('fLit' d)@
   to create 'Fixed' point literal from 'Double' constant at compile-time.
@@ -734,7 +734,7 @@ fLit a = [|| Fixed (fromInteger sat) ||]
 
 -- | Convert, at run-time, a 'Double' to a 'Fixed'-point.
 --
--- __NB__: this function is /not/ synthesizable
+-- __NB__: This function is /not/ synthesizable
 --
 -- = Creating data-files #creatingdatafiles#
 --

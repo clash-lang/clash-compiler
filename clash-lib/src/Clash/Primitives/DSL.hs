@@ -788,11 +788,11 @@ instHO
   -> Int
   -- ^ Position of HO-argument. For example:
   --
-  --   fold :: forall n a . (a -> a -> a) -> Vec (n + 1) a -> a
+  -- > fold :: forall n a . (a -> a -> a) -> Vec (n + 1) a -> a
   --
   -- would have its HO-argument at position 0, while
   --
-  --  iterateI :: forall n a. KnownNat n => (a -> a) -> a -> Vec n a
+  -- > iterateI :: forall n a. KnownNat n => (a -> a) -> a -> Vec n a
   --
   -- would have it at position 1.
   -> (HWType, BlackBoxTemplate)
@@ -1052,9 +1052,9 @@ notExpr
   => Text
   -- ^ name hint
   -> TExpr
-  -- ^ a
+  -- ^ @a@
   -> State (BlockState backend) TExpr
-  -- ^ not a
+  -- ^ @not a@
 notExpr _ T = pure F
 notExpr _ F = pure T
 notExpr nm aExpr = do
@@ -1079,9 +1079,9 @@ pureToBV
   -> Int
   -- ^ Size (n)
   -> TExpr
-  -- ^ ARG
+  -- ^ @ARG@
   -> State (BlockState VHDLState) TExpr
-  -- ^ (0 to n => ARG)
+  -- ^ @(0 to n => ARG)@
 pureToBV nm n arg = do
   arg' <- Id.toText <$> toIdentifier' nm arg
   -- This is very hard coded and hacky
@@ -1091,7 +1091,7 @@ pureToBV nm n arg = do
 -- | Creates a BV that produces the following vhdl:
 --
 -- @
---    std_logic_vector(resize(ARG, Size))
+--    std_logic_vector(resize(ARG, n))
 -- @
 --
 -- TODO: Implement for (System)Verilog
@@ -1103,7 +1103,7 @@ pureToBVResized
   -> TExpr
   -- ^ ARG
   -> State (BlockState VHDLState) TExpr
-  -- ^ std_logic_vector(resize(ARG, Size))
+  -- ^ @std_logic_vector(resize(ARG, n))@
 pureToBVResized nm n arg = do
   arg' <- Id.toText <$> toIdentifier' nm arg
   -- This is very hard coded and hacky

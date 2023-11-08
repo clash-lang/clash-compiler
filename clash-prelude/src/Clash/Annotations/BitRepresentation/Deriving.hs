@@ -22,9 +22,6 @@ This module contains:
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
--- See: https://ghc.haskell.org/trac/ghc/ticket/14959. TODO: Consider putting
--- the offending function (bitsToInteger') in a separate module.
-{-# OPTIONS_GHC -O0 #-}
 
 module Clash.Annotations.BitRepresentation.Deriving
   (

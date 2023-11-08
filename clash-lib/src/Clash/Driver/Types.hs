@@ -345,7 +345,7 @@ data ClashOpts = ClashOpts
   --
   -- Command line flag: -fdiagnostics-color
   , opt_intWidth :: Int
-  -- ^ Set the bit width for the Int/Word/Integer types. The only allowed values
+  -- ^ Set the bit width for the Int\/Word\/Integer types. The only allowed values
   -- are 32 or 64.
   , opt_hdlDir :: Maybe String
   -- ^ Directory to save HDL files to
@@ -363,8 +363,8 @@ data ClashOpts = ClashOpts
   , opt_escapedIds :: Bool
   -- ^ Use escaped identifiers in HDL. See:
   --
-  --  * http://vhdl.renerta.com/mobile/source/vhd00037.htm
-  --  * http://verilog.renerta.com/source/vrg00018.htm
+  --  * https://peterfab.com/ref/vhdl/vhdl_renerta/source/vhd00037.htm
+  --  * https://peterfab.com/ref/verilog/verilog_renerta/source/vrg00018.htm
   , opt_lowerCaseBasicIds :: PreserveCase
   -- ^ Force all generated basic identifiers to lowercase. Among others, this
   -- affects module and file names.

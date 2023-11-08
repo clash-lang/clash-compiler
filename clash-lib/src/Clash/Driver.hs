@@ -316,8 +316,8 @@ generateHDL
   -> WHNF.Evaluator
   -- ^ Hardcoded evaluator for WHNF (old evaluator)
   -> Maybe (TopEntityT, [TopEntityT])
-  -- ^ Main top entity to compile. If Nothing, all top entities in previous
-  -- argument will be compiled.
+  -- ^ Main top entity to compile. If Nothing, all top entities in the
+  -- 'ClashDesign' argument will be compiled.
   -> Clock.UTCTime
   -> IO ()
 generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = do

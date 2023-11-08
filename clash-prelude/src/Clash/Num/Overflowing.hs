@@ -159,6 +159,7 @@ instance (Real a, SaturatingNum a) => Real (Overflowing a) where
   toRational = toRational . fromOverflowing
 
 instance (Integral a, SaturatingNum a) => Integral (Overflowing a) where
+  -- NOTE the seemingly duplicate "y < 0 && y == -1" guards against unsigned types
   quotRem (Overflowing x a) (Overflowing y b)
     | x == minBound && y < 0 && y == -1 =
         withOverflow True

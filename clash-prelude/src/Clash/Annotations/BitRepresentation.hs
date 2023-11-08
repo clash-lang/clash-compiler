@@ -67,12 +67,12 @@ liftQ = (>>= TH.lift)
 --
 -- @
 -- data Color = R | G | B
--- {-# ANN module (DataReprAnn
---                   $(liftQ [t|Color|])
+-- {-# ANN module ('DataReprAnn'
+--                   $('liftQ' [t|Color|])
 --                   2
---                   [ ConstrRepr 'R 0b11 0b00 []
---                   , ConstrRepr 'G 0b11 0b01 []
---                   , ConstrRepr 'B 0b11 0b10 []
+--                   [ 'ConstrRepr' 'R 0b11 0b00 []
+--                   , 'ConstrRepr' 'G 0b11 0b01 []
+--                   , 'ConstrRepr' 'B 0b11 0b10 []
 --                   ]) #-}
 -- @
 --
@@ -84,11 +84,11 @@ liftQ = (>>= TH.lift)
 -- Or if we want to annotate @Maybe Color@:
 --
 -- @
--- {-# ANN module ( DataReprAnn
---                    $(liftQ [t|Maybe Color|])
+-- {-# ANN module ( 'DataReprAnn'
+--                    $('liftQ' [t|Maybe Color|])
 --                    2
---                    [ ConstrRepr 'Nothing 0b11 0b11 []
---                    , ConstrRepr 'Just 0b00 0b00 [0b11]
+--                    [ 'ConstrRepr' 'Nothing 0b11 0b11 []
+--                    , 'ConstrRepr' 'Just 0b00 0b00 [0b11]
 --                    ] ) #-}
 -- @
 --
