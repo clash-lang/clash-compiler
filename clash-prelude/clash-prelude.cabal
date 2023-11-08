@@ -1,6 +1,6 @@
 Cabal-version:        2.2
 Name:                 clash-prelude
-Version:              1.9.0
+Version:              1.8.0
 Synopsis:             Clash: a functional hardware description language - Prelude library
 Description:
   Clash is a functional hardware description language that borrows both its
@@ -96,7 +96,7 @@ flag multiple-hidden
     experimental feature, possibly triggering confusing error messages. By
     default, it is enabled on development versions of Clash and disabled on
     releases.
-  default: True
+  default: False
   manual: True
 
 flag doctests
