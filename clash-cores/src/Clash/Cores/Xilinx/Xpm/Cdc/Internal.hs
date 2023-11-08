@@ -37,8 +37,8 @@ import qualified Data.Text.Lazy as LazyText
 
 import Clash.Annotations.Primitive
 import Clash.Core.TermLiteral (TermLiteral(..), termToDataError, deriveTermLiteral)
-import Clash.Backend (Backend)
-import Clash.Driver.Types (DomainMap, envDomains, envHdl)
+import Clash.Backend (Backend, hdlKind)
+import Clash.Driver.Types (DomainMap, envDomains)
 import Clash.Netlist.BlackBox.Types
   ( BlackBoxFunction, BlackBoxMeta(bbKind), TemplateKind(TDecl), emptyBlackBoxMeta
   , bbLibrary, bbImports )
@@ -258,7 +258,8 @@ instBBF _isD _primName args [resTy]
   | _:config:userArgs <- lefts args
   = do
       doms <- Lens.view (clashEnv . Lens.to envDomains)
-      hdl <- Lens.view (clashEnv . Lens.to envHdl)
+      SomeBackend b <- Lens.use backend
+      let hdl = hdlKind b
       case go config userArgs of
         Left s -> error ("instBBF, bad context:\n\n" <> s)
         Right (c, a, r) -> pure $ Right (bbMeta hdl c, bb doms c a r)
