@@ -28,7 +28,7 @@ flag multiple-hidden
     experimental feature, possibly triggering confusing error messages. By
     default, it is enabled on development versions of Clash and disabled on
     releases.
-  default: True
+  default: False
   manual: True
 
 flag workaround-ghc-mmap-crash
