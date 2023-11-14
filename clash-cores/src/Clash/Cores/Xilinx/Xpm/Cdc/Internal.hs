@@ -258,8 +258,7 @@ instBBF _isD _primName args [resTy]
   | _:config:userArgs <- lefts args
   = do
       doms <- Lens.view (clashEnv . Lens.to envDomains)
-      SomeBackend b <- Lens.use backend
-      let hdl = hdlKind b
+      hdl <- Lens.use (backend . fromSomeBackend hdlKind)
       case go config userArgs of
         Left s -> error ("instBBF, bad context:\n\n" <> s)
         Right (c, a, r) -> pure $ Right (bbMeta hdl c, bb doms c a r)

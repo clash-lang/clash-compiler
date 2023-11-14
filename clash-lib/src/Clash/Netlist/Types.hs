@@ -363,6 +363,12 @@ data ComponentPrefix
 data SomeBackend where
   SomeBackend :: Backend backend => backend -> SomeBackend
 
+onSomeBackend :: (forall b. Backend b => b -> a) -> SomeBackend -> a
+onSomeBackend f (SomeBackend b) = f b
+
+fromSomeBackend :: (forall b. Backend b => b -> a) -> Lens.Getter SomeBackend a
+fromSomeBackend f = Lens.to (onSomeBackend f)
+
 type Comment = Text
 type Directive = Text
 
