@@ -551,7 +551,7 @@ instance NFDataX ()
 instance NFDataX b => NFDataX (a -> b) where
   deepErrorX = pure . deepErrorX
   rnfX = rwhnfX
-  hasUndefined = error "hasUndefined on Undefined (a -> b): Not Yet Implemented"
+  hasUndefined = error "hasUndefined on NFDataX (a -> b): Not Yet Implemented"
   ensureSpine = id
 
 instance NFDataX a => NFDataX (Down a) where
