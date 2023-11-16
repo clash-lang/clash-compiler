@@ -1,6 +1,8 @@
 # Make all tasks interruptible by default
 default:
   interruptible: true
+  artifacts:
+    expire_in: 1 week
 
 include:
   - '/.ci/gitlab/common.yml'
