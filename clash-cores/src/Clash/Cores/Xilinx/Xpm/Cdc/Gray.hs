@@ -15,8 +15,9 @@ module Clash.Cores.Xilinx.Xpm.Cdc.Gray
 import GHC.Stack (HasCallStack)
 
 import Clash.Explicit.Prelude
+import Clash.Signal.Internal (Signal((:-)))
 
-import Clash.Cores.Xilinx.Xpm.Cdc.Gray.Internal (xpmCdcGray#)
+import Clash.Cores.Xilinx.Xpm.Cdc.Internal
 
 -- | Synchronizes an 'Unsigned' from the source clock domain to the destination
 -- clock domain using Gray code. It instantiates Xilinx's @XPM_CDC_GRAY@, so no
@@ -96,5 +97,40 @@ xpmCdcGrayWith ::
   Clock dst ->
   Signal src (Unsigned n) ->
   Signal dst (Unsigned n)
-xpmCdcGrayWith XpmCdcGrayConfig{..} = xpmCdcGray# initialValues stages
+xpmCdcGrayWith XpmCdcGrayConfig{stages=stages@SNat, ..} clkSrc clkDst srcIn
+  -- = xpmCdcGray# initialValues stages
+  | clashSimulation = sim
+  | otherwise = synth
+ where
+  -- Definition used in for HDL generation
+  synth = unpack <$> unPort go
+   where
+    go :: Port "dest_out_bin" dst (BitVector n)
+    go =
+      inst
+        (instConfig "xpm_cdc_gray")
+          { library = Just "xpm"
+          , libraryImport = Just "xpm.vcomponents.all" }
+
+        (Param @"DEST_SYNC_FF"   @Integer (natToNum @stages))
+        (Param @"INIT_SYNC_FF"   @Integer (if initialValues then 1 else 0))
+        (Param @"REG_OUTPUT"     @Integer 0)
+        (Param @"SIM_ASSERT_CHK" @Integer 0)
+        (Param @"SIM_LOSSLESS_GRAY_CHK" @Integer 0)
+        (Param @"WIDTH"          @Integer (natToNum @n))
+
+        (ClockPort @"src_clk"    clkSrc)
+        (ClockPort @"dest_clk"   clkDst)
+        (Port      @"src_in_bin" (pack <$> srcIn))
+  -- Definition used in Clash simulation
+  sim
+    = go (snatToNum stages) (initVal :- srcIn)
+   where
+    initVal
+      | initialValues = 0
+      | otherwise = errorX "xpmCdcGray: initial values undefined"
+
+    go :: Word -> Signal src (Unsigned n) -> Signal dst (Unsigned n)
+    go 0 src = unsafeSynchronizer clkSrc clkDst src
+    go n src = initVal :- go (n - 1) src
 {-# INLINE xpmCdcGrayWith #-}
