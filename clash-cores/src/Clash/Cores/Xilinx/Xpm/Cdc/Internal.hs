@@ -47,6 +47,7 @@ import Clash.Core.Term ( Term(Data), collectArgs )
 import Clash.Core.Name ( Name(Name, nameOcc) )
 import Clash.Core.DataCon ( DataCon(MkData, dcName) )
 import Clash.Core.Type (Type(..), LitTy (SymTy), splitTyConAppM, isIntegerTy)
+import Clash.Core.TyCon(isTupleTyConLike)
 
 import qualified Clash.Netlist.BlackBox.Types as BlackBox
 import qualified Clash.Netlist.Id as Id
@@ -228,7 +229,7 @@ argsToPrimPortOrParams (t:ts) = do
   pure (arg:args)
 
 tyToPrimPort :: Type -> Either String [PrimPort ()]
-tyToPrimPort (splitTyConAppM -> Just (Name{nameOcc=Text.unpack -> tyConName}, args))
+tyToPrimPort (splitTyConAppM -> Just (tyConName'@(Name{nameOcc=Text.unpack -> tyConName}), args))
     | tyConName == show 'Param
     , LitTy (SymTy nm) : _ <- args
     = Left ("Can't translate Param " <> nm <> " to PrimPort. Did you define a Param in a result type?")
@@ -246,11 +247,14 @@ tyToPrimPort (splitTyConAppM -> Just (Name{nameOcc=Text.unpack -> tyConName}, ar
 
     | tyConName == show 'EnablePort
     = error (tyConName <> ppShow args) -- TODO
+    | isTupleTyConLike tyConName' = do
+      xs <- mapM tyToPrimPort args
+      pure $ P.concat xs
 tyToPrimPort ty = error (ppShow ty)
 
 hwtyToPortTypes :: HWType -> [HWType]
 hwtyToPortTypes (Annotated _ ty) = hwtyToPortTypes ty
-hwtyToPortTypes ty@(Product {}) = error (ppShow ty)
+hwtyToPortTypes (Product _ _ tys) = tys  -- TODO only do this for things split by tyToPrimPort
 hwtyToPortTypes hwty = [hwty]
 
 instBBF :: HasCallStack => BlackBoxFunction
