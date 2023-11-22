@@ -1,6 +1,11 @@
 # Changelog for the Clash project
 
-## 1.8.0
+## 1.8.1 *Nov 10th 2023*
+
+* Bump package dependencies to allow inclusion in stackage-nightly
+* Bump package dependencies to allow building on GHC 9.8.1
+
+## 1.8.0 *Nov 10th 2023*
 
 Release highlights:
 

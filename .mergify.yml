@@ -36,3 +36,16 @@ pull_request_rules:
           - "1.6"
       queue:
         update_method: rebase
+
+  - name: backport patches to 1.8
+    conditions:
+      - base=master
+      - label=backport 1.8
+      - merged
+    actions:
+      copy:
+        ignore_conflicts: True
+        branches:
+          - "1.8"
+      queue:
+        update_method: rebase
