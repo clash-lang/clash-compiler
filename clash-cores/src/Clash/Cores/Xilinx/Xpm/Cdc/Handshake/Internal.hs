@@ -1,5 +1,6 @@
 {-|
-  Copyright   :  (C) 2023, Google LLC
+  Copyright   :  (C) 2023, Google LLC,
+                     2023, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -111,11 +112,11 @@ xpmCdcHandshakeTF# bbCtx
       let
         generics :: [(Text, DSL.LitHDL)]
         generics =
-          [ ("DEST_EXT_HSK", DSL.I 0)
-          , ("DEST_SYNC_FF", DSL.I srcStages0)
+          [ ("DEST_EXT_HSK", DSL.I 1)
+          , ("DEST_SYNC_FF", DSL.I dstStages0)
           , ("INIT_SYNC_FF", if initValues0 then 1 else 0)
           , ("SIM_ASSERT_CHK", 0)
-          , ("SRC_SYNC_FF", DSL.I dstStages0)
+          , ("SRC_SYNC_FF", DSL.I srcStages0)
           , ("WIDTH", DSL.I width)
           ]
 
@@ -208,8 +209,8 @@ xpmCdcHandshake# initVals srcStages dstStages clkSrc clkDst srcIn srcSend dstAck
     , initialValues = initVals
     , registerInput = False }
 
-  srcSendFfSynced = xpmCdcSingleWith (defOpts srcStages) clkSrc clkDst srcSendFf
-  srcRcv = xpmCdcSingleWith (defOpts dstStages) clkDst clkSrc dstAck
+  srcSendFfSynced = xpmCdcSingleWith (defOpts dstStages) clkSrc clkDst srcSendFf
+  srcRcv = xpmCdcSingleWith (defOpts srcStages) clkDst clkSrc dstAck
 
   srcSendFf = delay clkSrc enableGen (initVal False) srcSend
   srcHsDataFf = delay clkSrc (toEnable (not <$> srcSendFf)) (initVal (unpack 0)) srcIn
