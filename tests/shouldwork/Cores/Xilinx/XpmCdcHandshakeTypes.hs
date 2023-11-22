@@ -15,7 +15,7 @@ createDomain vXilinxSystem{vName="D5",  vPeriod=hzToPeriod 50e6}
 createDomain vXilinxSystem{vName="D10", vPeriod=hzToPeriod 100e6}
 createDomain vXilinxSystem{vName="D11", vPeriod=hzToPeriod 110e6}
 
-data State = WaitForDeassert | WaitForAssert deriving (Generic, NFDataX)
+data State = WaitForDeassert | WaitForAssert (Index 2) deriving (Generic, NFDataX)
 
 -- | Transfer 1, 2, 3, ... to destination domain
 srcFsm ::
@@ -29,10 +29,11 @@ srcFsm ::
   Signal src (a, Bool)
 srcFsm clk = mealy clk noReset enableGen go (0, WaitForDeassert)
  where
-  go (n, WaitForDeassert) True  = ((n,     WaitForDeassert), (n,     False))
-  go (n, WaitForDeassert) False = ((n + 1, WaitForAssert),   (n + 1, True))
-  go (n, WaitForAssert)   False = ((n,     WaitForAssert),   (n,     True))
-  go (n, WaitForAssert)   True  = ((n,     WaitForDeassert), (n,     False))
+  go (n, WaitForDeassert) True  = ((n,     WaitForDeassert),         (0,     False))
+  go (n, WaitForDeassert) False = ((n + 1, WaitForAssert maxBound),  (n + 1, True))
+  go (n, WaitForAssert _) False = ((n,     WaitForAssert maxBound),  (n,     True))
+  go (n, WaitForAssert 0) True  = ((n,     WaitForDeassert),         (0,     False))
+  go (n, WaitForAssert w) True  = ((n,     WaitForAssert (w-1)),     (n,     True))  -- seen src_rcv, wait a little before dropping src_send
 {-# NOINLINE srcFsm #-}
 
 -- | Receives data from source domain
@@ -42,12 +43,13 @@ dstFsm ::
   Clock dst ->
   Signal dst (Bool, a) ->
   Signal dst (Bool, Maybe a)
-dstFsm clk = mealy clk noReset enableGen go WaitForAssert
+dstFsm clk = mealy clk noReset enableGen go (WaitForAssert maxBound)
  where
-  go WaitForAssert   (False, _) = (WaitForAssert,   (False, Nothing))
-  go WaitForAssert   (True,  n) = (WaitForDeassert, (True,  Just n))
-  go WaitForDeassert (True,  _) = (WaitForDeassert, (True,  Nothing))
-  go WaitForDeassert (False, _) = (WaitForAssert,   (False, Nothing))
+  go (WaitForAssert _)  (False, _) = (WaitForAssert maxBound,   (False, Nothing))
+  go (WaitForAssert 0)  (True,  n) = (WaitForDeassert,          (True,  Just n))
+  go (WaitForAssert w)  (True,  n) = (WaitForAssert (w-1),      (False, Nothing))  -- seen dest_req, wait a little before asserting dest_ack
+  go WaitForDeassert    (True,  _) = (WaitForDeassert,          (True,  Nothing))
+  go WaitForDeassert    (False, _) = (WaitForAssert maxBound,   (False, Nothing))
 {-# NOINLINE dstFsm #-}
 
 -- | Composition of 'srcFsm' and 'dstFsm'
