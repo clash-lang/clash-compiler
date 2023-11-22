@@ -28,27 +28,31 @@ on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/can
   * `clash-ghc/clash-ghc.cabal`
   * `clash-cores/clash-cores.cabal`
   * `docs/conf.py`
-2. Update the CHANGELOG (see changelog/README.md).
-3. Create a release branch named after the major version of Clash you're trying to
+2. Update the CHANGELOG (see `changelog/README.md`). Each entry should normally
+   end with a link to a PR or issue. The script `changelog/blame_pr.py` will
+   tell you for a single file which PR('s) introduced it.
+3. Add a new `pull_request_rule` for backports to `.mergify.yml` for the branch
+   you will create.
+4. Create a release branch named after the major version of Clash you're trying to
    release. For example, if you're planning on releasing Clash 1.6.0, create a
    branch called `1.6`.
-4. Repeat step (1) in the new release branch.
-5. Change the defaults of cabal flags in `clash-prelude/clash-prelude.cabal`
+5. Repeat step (1) in the new release branch.
+6. Change the defaults of cabal flags in `clash-prelude/clash-prelude.cabal`
    where necessary. At the time of writing this applies only to
    `-fmultiple-hidden`.
-6. Ask someone with admin permissions on GitLab to create a new nightly schedule
+7. Ask someone with admin permissions on GitLab to create a new nightly schedule
    and trigger a test release build on [GitLab CI](https://gitlab.com/clash-lang/clash-compiler/pipeline_schedules).
    The new schedule should be the same as the old one, but targeting the new
    release branch. Verify that the Hackage release deploys well, and preview
    the release. [Preview on Hackage](http://hackage.haskell.org/package/clash-prelude/candidates/)
-7. Write release notes for: Twitter, LinkedIn, and clash-lang.org.
-8. Create a release on [GitHub's new release page](https://github.com/clash-lang/clash-compiler/releases/new)
-9. After the release is on Hackage: run `changelog/comment-gh.py` and execute
+8. Write release notes for: Twitter, LinkedIn, and clash-lang.org.
+9. Create a release on [GitHub's new release page](https://github.com/clash-lang/clash-compiler/releases/new)
+10. After the release is on Hackage: run `changelog/comment-gh.py` and execute
    the commands it lists. This will inform users subscribed to specific issues
    that a fix for their issue is now in a released version.
-10. Update the [starter projects](https://github.com/clash-lang/stack-templates/)
-11. Update these docs if anything is missing :-)
-12. Enjoy!
+11. Update the [starter projects](https://github.com/clash-lang/stack-templates/)
+12. Update these docs if anything is missing :-)
+13. Enjoy!
 
 ## Releasing a new version minor version (1.x.x)
 1. Change version numbers in:
@@ -59,7 +63,9 @@ on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/can
   * `clash-ghc/clash-ghc.cabal`
   * `clash-cores/clash-cores.cabal`
   * `docs/conf.py`
-2. Update the CHANGELOG (see changelog/README.md).
+2. Update the CHANGELOG (see `changelog/README.md`). Each entry should normally
+   end with a link to a PR or issue. The script `changelog/blame_pr.py` will
+   tell you for a single file which PR('s) introduced it.
 3. Ask someone with admin permissions on GitLab to trigger a nightly schedule,
    or simply wait a day. Verify that the Hackage release deploys well, and
    preview the release. [Preview on Hackage](http://hackage.haskell.org/package/clash-prelude/candidates/)
