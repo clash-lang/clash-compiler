@@ -141,7 +141,7 @@
         => Signal dom Bool     -- ARG[1]
         -> Clock dom
     template: |-
-      -- tbClockGen begin
+      -- ~IF~ISACTIVEENABLE[1]~THENtbClockGen~ELSEclockGen~FI begin
       -- pragma translate_off
       ~GENSYM[clkGen][0] : process is
         constant ~GENSYM[half_periodH][1] : time := ~PERIOD[0]000 fs / 2;
