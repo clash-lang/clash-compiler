@@ -94,7 +94,7 @@
         => Signal dom Bool     -- ARG[1]
         -> Clock dom
     template: |-
-      // tbClockGen begin
+      // ~IF~ISACTIVEENABLE[1]~THENtbClockGen~ELSEclockGen~FI begin
       // pragma translate_off
       // 1 = 0.1ps
       localparam ~GENSYM[half_period][0] = (~PERIOD[0]0 / 2);
