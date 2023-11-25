@@ -4,7 +4,6 @@ License:      BSD2 (see the file LICENSE)
 Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -17,14 +16,13 @@ module Clash.FFI.VPI.Object.Value.Scalar
   , bitToScalar
   ) where
 
-import           Control.Exception (Exception)
+import           Control.Exception (Exception, throwIO)
 import           Foreign.C.Types (CInt)
 import           GHC.Stack (CallStack, callStack, prettyCallStack)
 
 import           Clash.Sized.Internal.BitVector
 import           Clash.XException (hasUndefined)
 
-import qualified Clash.FFI.Monad as Sim (throw)
 import           Clash.FFI.View
 
 -- | A VPI scalar value. This is similar to the 9-value logic type from VHDL,
@@ -67,8 +65,8 @@ data UnknownScalarValue
   deriving anyclass (Exception)
 
 instance Show UnknownScalarValue where
-  show (UnknownScalarValue x c) =
-    mconcat
+  show = \case
+    UnknownScalarValue x c -> mconcat
       [ "Unknown scalar value: "
       , show x
       , "\n"
@@ -84,20 +82,22 @@ instance Receive Scalar where
     4 -> pure SH
     5 -> pure SL
     6 -> pure S_
-    n -> Sim.throw (UnknownScalarValue n callStack)
+    n -> throwIO $ UnknownScalarValue n callStack
 
+-- | 'Bit' to 'Scalar' conversion.
 bitToScalar :: Bit -> Scalar
 bitToScalar b
-  | hasUndefined b  = SX
-  | b == low        = S0
-  | b == high       = S1
-  | otherwise       = SX
+  | hasUndefined b = SX
+  | b == low       = S0
+  | b == high      = S1
+  | otherwise      = SX
 
 type instance CRepr Bit = CRepr Scalar
 
 instance Send Bit where
   send = send . bitToScalar
 
+-- | 'Scalar' to 'Bit' conversion.
 scalarToBit :: Scalar -> Bit
 scalarToBit = \case
   S0 -> low

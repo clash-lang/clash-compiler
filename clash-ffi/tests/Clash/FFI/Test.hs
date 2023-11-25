@@ -23,7 +23,6 @@ import Test.SmallCheck.Series (Positive)
 
 import Clash.Prelude (BitSize, SNat(..), Bit, Signed, snatToNum)
 
-import Clash.FFI.Monad (SimAction, SimCont, runSimAction)
 import Clash.FFI.VPI.Module (Module(..), findTopModule)
 import Clash.FFI.VPI.Net (Net(..))
 import Clash.FFI.VPI.Object ( IsObject, Object(..), Value(..)
@@ -102,7 +101,7 @@ objectType = \case
   _            -> SomeObjectType (Proxy @Object)
 
 -- | Returns the top module named @top@.
-topModule :: SimCont o Module
+topModule :: IO Module
 topModule = findTopModule $ pack "top"
 
 -- | Returns the special top module named @special@. Calls of
@@ -113,7 +112,7 @@ topModule = findTopModule $ pack "top"
 --  their corresponding Haskell representation.
 specialTop :: (?pipe :: Handle) => IO Module
 specialTop =
-  runSimAction (findTopModule (pack "special") %% 3)
+  findTopModule (pack "special") %% 3
 
 -- | Runs tests over lists in the 'monadic' context.
 testM :: Testable m [b] => (a -> m b) -> [a] -> Property m
@@ -123,21 +122,21 @@ testM xs = monadic . mapM xs
 -- the output printed at the C side.
 receiveAndCompare ::
   (TShow a, ?pipe :: Handle) =>
-  SimAction a ->
+  IO a ->
   Positive Int ->
   IO TestResult
 receiveAndCompare action =
-  const $ runSimAction action >>= outputEQ
+  const $ action >>= outputEQ
 
 -- | Sends some value to the C side via a Clash FFI action and
 -- compares the output printed at the C side with the sent value.
 sendAndCompare ::
   (TShow a, ?pipe :: Handle) =>
-  (a -> SimAction ()) ->
+  (a -> IO ()) ->
   a ->
   IO TestResult
 sendAndCompare action input = do
-  runSimAction $ action input
+  action input
   inputEQ input
 
 -- | Sends some value to the C side via a Clash FFI action and
@@ -145,11 +144,11 @@ sendAndCompare action input = do
 -- same is done for the value returned by the action.
 sendReceiveAndCompare ::
   (TShow a, TShow b, ?pipe :: Handle) =>
-  (a -> SimAction b) ->
+  (a -> IO b) ->
   a ->
   IO [TestResult]
 sendReceiveAndCompare action input = do
-  output <- runSimAction $ action input
+  output <- action input
   sequence
     [ inputEQ input
     , outputEQ output
@@ -160,11 +159,11 @@ sendReceiveAndCompare action input = do
 -- same is done for the value returned by the action.
 sendReceiveAndCompare2 ::
   (TShow a, TShow b, TShow c, ?pipe :: Handle) =>
-  (a -> b -> SimAction c) ->
+  (a -> b -> IO c) ->
   (a, b) ->
   IO [TestResult]
 sendReceiveAndCompare2 action (i1, i2) = do
-  output <- runSimAction $ action i1 i2
+  output <- action i1 i2
   sequence
     [ inputEQ i1
     , inputEQ i2

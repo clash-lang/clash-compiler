@@ -9,7 +9,6 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 
 module Clash.FFI.VPI.Object
   ( Object(..)
@@ -27,10 +26,12 @@ module Clash.FFI.VPI.Object
     -- * Time
   , module Clash.FFI.VPI.Object.Time
   , getTime
+  , withTime
   , receiveTime
     -- * Value
   , module Clash.FFI.VPI.Object.Value
   , getValue
+  , withValue
   , receiveValue
   , unsafeReceiveValue
   , sendValue
@@ -38,9 +39,8 @@ module Clash.FFI.VPI.Object
   ) where
 
 import           Control.DeepSeq (NFData)
-import           Control.Exception (Exception)
+import           Control.Exception (Exception, throwIO)
 import qualified Control.Monad as Monad (unless, void, when)
-import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.Coerce
 
 #if defined(SYSTEMVERILOG)
@@ -51,6 +51,7 @@ import qualified Data.List as List (genericLength)
 import           Data.Typeable (Typeable)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CInt(..))
+import qualified Foreign.Marshal.Alloc as FFI (alloca, malloc)
 import qualified Foreign.Marshal.Utils as FFI (toBool)
 import           Foreign.Ptr (Ptr)
 import qualified Foreign.Ptr as FFI (castPtr, nullPtr)
@@ -58,8 +59,6 @@ import           Foreign.Storable (Storable)
 import qualified Foreign.Storable as FFI
 import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
 
-import           Clash.FFI.Monad (SimCont)
-import qualified Clash.FFI.Monad as Sim (heapPtr, stackPtr, throw, withNewPtr)
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Object.Property
 import           Clash.FFI.VPI.Object.Time
@@ -119,13 +118,13 @@ class IsObject a where
   -- | Deallocate the object. The object should not be used for any calls after
   -- this is called, as the object is no longer valid.
   --
-  freeObject :: a -> SimCont o ()
+  freeObject :: a -> IO ()
 
   -- | Equality on VPI objects. This function is not pure, as the current
   -- assignment of identifiers to objects in the simulator may change over time
   -- (so a deallocated object's identifier may be used for a new object).
   --
-  compareObjects :: a -> a -> SimCont o Bool
+  compareObjects :: a -> a -> IO Bool
 
 instance IsObject Object where
   nullObject = Object FFI.nullPtr
@@ -135,7 +134,6 @@ instance IsObject Object where
 
   freeObject obj =
     Monad.unless (isNullObject obj)
-      . IO.liftIO
       . Monad.void
 #if defined(VERILOG)
       $ c_vpi_free_object obj
@@ -145,8 +143,8 @@ instance IsObject Object where
 #error "Neither VERILOG or SYSTEMVERILOG is defined in VPI implementation"
 #endif
 
-  compareObjects x y =
-    IO.liftIO (c_vpi_compare_objects x y)
+  compareObjects =
+    c_vpi_compare_objects
 
 {-
 NOTE [use of Coercible in public API]
@@ -189,7 +187,7 @@ class IsChildRef i where
   -- an 'UnknownChild' exception is thrown.
   --
   getChild
-    :: forall a b o
+    :: forall a b
      . HasCallStack
     => Coercible a Object
     => Show a
@@ -197,7 +195,7 @@ class IsChildRef i where
     => Coercible Object b
     => i
     -> Maybe a
-    -> SimCont o b
+    -> IO b
 
 -- | An exception thrown when attempting to access a child object using a
 -- reference of type @i@ which does not exist under the parent object @a@.
@@ -207,8 +205,8 @@ data UnknownChild i a
   deriving anyclass (Exception)
 
 instance (Show i, Show a) => Show (UnknownChild i a) where
-  show (UnknownChild i a c) =
-    mconcat
+  show = \case
+    UnknownChild i a c -> mconcat
       [ "Unknown child "
       , show i
       , " for object "
@@ -224,12 +222,12 @@ instance IsChildRef ObjectType where
   getChild objTy mParent = do
     cobjTy <- send objTy
     let parent = maybe nullObject coerce mParent
-    child <- IO.liftIO (c_vpi_handle cobjTy parent)
+    child <- c_vpi_handle cobjTy parent
 
     Monad.when (isNullObject child) $
-      Sim.throw (UnknownChild objTy parent callStack)
+      throwIO $ UnknownChild objTy parent callStack
 
-    pure (coerce child)
+    pure $ coerce child
 
 foreign import ccall "vpi_user.h vpi_handle_by_name"
   c_vpi_handle_by_name :: CString -> Object -> IO Object
@@ -237,12 +235,12 @@ foreign import ccall "vpi_user.h vpi_handle_by_name"
 instance IsChildRef CString where
   getChild str mParent = do
     let parent = maybe nullObject coerce mParent
-    child <- IO.liftIO (c_vpi_handle_by_name str parent)
+    child <- c_vpi_handle_by_name str parent
 
     Monad.when (isNullObject child) $
-      Sim.throw (UnknownChild str parent callStack)
+      throwIO $ UnknownChild str parent callStack
 
-    pure (coerce child)
+    pure $ coerce child
 
 foreign import ccall "vpi_user.h vpi_handle_by_index"
   c_vpi_handle_by_index :: Object -> CInt -> IO Object
@@ -250,12 +248,12 @@ foreign import ccall "vpi_user.h vpi_handle_by_index"
 instance IsChildRef CInt where
   getChild ix mParent = do
     let parent = maybe nullObject coerce mParent
-    child <- IO.liftIO (c_vpi_handle_by_index parent ix)
+    child <- c_vpi_handle_by_index parent ix
 
     Monad.when (isNullObject child) $
-      Sim.throw (UnknownChild ix parent callStack)
+      throwIO $ UnknownChild ix parent callStack
 
-    pure (coerce child)
+    pure $ coerce child
 
 foreign import ccall "vpi_user.h vpi_handle_by_multi_index"
   c_vpi_handle_by_multi_index :: Object -> CInt -> Ptr CInt -> IO Object
@@ -263,14 +261,14 @@ foreign import ccall "vpi_user.h vpi_handle_by_multi_index"
 instance IsChildRef [CInt] where
   getChild ixs mParent = do
     let len = List.genericLength ixs
-    ptr <- unsafeSend ixs
-    let parent = maybe nullObject coerce mParent
-    child <- IO.liftIO (c_vpi_handle_by_multi_index parent len ptr)
+    unsafeSend ixs $ \ptr ->  do
+      let parent = maybe nullObject coerce mParent
+      child <- c_vpi_handle_by_multi_index parent len ptr
 
-    Monad.when (isNullObject child) $
-      Sim.throw (UnknownChild ixs parent callStack)
+      Monad.when (isNullObject child) $
+        throwIO $ UnknownChild ixs parent callStack
 
-    pure (coerce child)
+      pure $ coerce child
 
 -- | Get a child object by a reference of type @i@ from an optional parent
 -- object of type @a@. The reference given is a high-level representation which
@@ -284,7 +282,7 @@ instance IsChildRef [CInt] where
 -- For more information about safety, see 'Send' and 'UnsafeSend'.
 --
 unsafeSendChildRef
-  :: forall i a b o
+  :: forall i a b
    . HasCallStack
   => UnsafeSend i
   => IsChildRef (CRepr i)
@@ -294,9 +292,9 @@ unsafeSendChildRef
   => Coercible Object b
   => i
   -> Maybe a
-  -> SimCont o b
+  -> IO b
 unsafeSendChildRef ref parent =
-  unsafeSend ref >>= (`getChild` parent)
+  unsafeSend ref (`getChild` parent)
 
 -- | Get a child object by reference of type @i@ from an optional parent object
 -- of type @a@. The reference given is a high-level representation which is
@@ -309,7 +307,7 @@ unsafeSendChildRef ref parent =
 -- For more information about safety, see 'Send' and 'UnsafeSend'.
 --
 sendChildRef
-  :: forall i a b o
+  :: forall i a b
    . HasCallStack
   => Send i
   => IsChildRef (CRepr i)
@@ -319,7 +317,7 @@ sendChildRef
   => Coercible Object b
   => i
   -> Maybe a
-  -> SimCont o b
+  -> IO b
 sendChildRef ref parent =
   send ref >>= (`getChild` parent)
 
@@ -382,7 +380,7 @@ class IsProperty p where
     => Typeable a
     => Property p
     -> a
-    -> SimCont o p
+    -> IO p
 
 foreign import ccall "vpi_user.h vpi_get"
   c_vpi_get :: CInt -> Object -> IO CInt
@@ -390,22 +388,22 @@ foreign import ccall "vpi_user.h vpi_get"
 instance IsProperty CInt where
   getProperty prop object = do
     cprop <- send prop
-    value <- IO.liftIO (c_vpi_get cprop (coerce object))
+    value <- c_vpi_get cprop $ coerce object
 
     Monad.when (value == -1) $
-      Sim.throw (InvalidProperty prop object callStack)
+      throwIO $ InvalidProperty prop object callStack
 
     pure value
 
 instance IsProperty Bool where
   getProperty prop object = do
     cprop <- send prop
-    value <- IO.liftIO (c_vpi_get cprop (coerce object))
+    value <- c_vpi_get cprop $ coerce object
 
     Monad.when (value == -1) $
-      Sim.throw (InvalidProperty prop object callStack)
+      throwIO $ InvalidProperty prop object callStack
 
-    pure (FFI.toBool value)
+    pure $ FFI.toBool value
 
 #if defined(SYSTEMVERILOG)
 foreign import ccall "vpi_user.h vpi_get64"
@@ -414,10 +412,10 @@ foreign import ccall "vpi_user.h vpi_get64"
 instance IsProperty Int64 where
   getProperty prop object = do
     cprop <- send prop
-    value <- IO.liftIO (c_vpi_get64 cprop (coerce object))
+    value <- c_vpi_get64 cprop $ coerce object
 
     Monad.when (value == -1) $
-      Sim.throw (InvalidProperty prop object callStack)
+      throwIO $ InvalidProperty prop object callStack
 
     pure value
 #endif
@@ -428,10 +426,10 @@ foreign import ccall "vpi_user.h vpi_get_str"
 instance IsProperty CString where
   getProperty prop object = do
     cprop <- send prop
-    value <- IO.liftIO (c_vpi_get_str cprop (coerce object))
+    value <- c_vpi_get_str cprop $ coerce object
 
     Monad.when (value == FFI.nullPtr) $
-      Sim.throw (InvalidProperty prop object callStack)
+      throwIO $ InvalidProperty prop object callStack
 
     pure value
 
@@ -443,17 +441,16 @@ instance IsProperty CString where
 -- For more information about safety, see 'Receive' and 'UnsafeReceive'.
 --
 receiveProperty
-  :: forall p a o
+  :: forall p a
    . HasCallStack
   => Receive p
   => IsProperty (CRepr p)
   => Coercible a Object
   => Show a
   => Typeable a
-  => Typeable o
   => Property (CRepr p)
   -> a
-  -> SimCont o p
+  -> IO p
 receiveProperty prop object =
   getProperty prop object >>= receive
 
@@ -461,35 +458,66 @@ foreign import ccall "vpi_user.h vpi_get_time"
   c_vpi_get_time :: Object -> Ptr CTime -> IO ()
 
 -- | Get a pointer to the low-level representation of the current simulation
--- time. The pointer is allocated using the given allocation function. The time
--- returned is given in the specified format, and is either the global
--- simulation time or the time of a particular object in the simulation.
+-- time, where the pointer is allocated on the heap. The time returned is
+-- given in the specified format, and is either the global simulation time or
+-- the time of a particular object in the simulation.
 --
 -- The 'SuppressTime' format cannot be used for this function. Requesting this
 -- as the format will throw an 'InvalidTimeType' exception.
 --
 -- The retuned value can be converted to the high-level representation using
 -- 'Receive'. If only the high-level representation is needed then consider
--- using 'receiveTime' or 'unsafeReceiveTime' instead.
+-- using 'receiveTime' instead.
 --
 getTime
-  :: forall a o
+  :: forall a
    . HasCallStack
   => Coercible a Object
-  => SimCont o (Ptr CTime)
-  -> TimeType
+  => TimeType
   -> Maybe a
-  -> SimCont o (Ptr CTime)
-getTime alloc ty mObject = do
+  -> IO (Ptr CTime)
+getTime ty mObject = do
   Monad.when (ty == SuppressTime) $
-    Sim.throw (InvalidTimeType ty callStack)
+    throwIO $ InvalidTimeType ty callStack
 
   cty <- send ty
 
-  fmap fst . Sim.withNewPtr alloc $ \ptr -> do
+  FFI.malloc >>= \ptr -> do
     let object = maybe nullObject coerce mObject
-    FFI.poke ptr (CTime cty 0 0 0.0)
+    FFI.poke ptr $ CTime cty 0 0 0.0
     c_vpi_get_time object ptr
+    return ptr
+
+-- | Get a pointer to the low-level representation of the current simulation
+-- time, where the pointer is allocated on the stack. The time returned is
+-- given in the specified format, and is either the global simulation time or
+-- the time of a particular object in the simulation.
+--
+-- The 'SuppressTime' format cannot be used for this function. Requesting this
+-- as the format will throw an 'InvalidTimeType' exception.
+--
+-- The retuned value can be converted to the high-level representation using
+-- 'Receive'. If only the high-level representation is needed then consider
+-- using 'receiveTime' instead.
+--
+withTime
+  :: forall a b
+   . HasCallStack
+  => Coercible a Object
+  => TimeType
+  -> Maybe a
+  -> (Ptr CTime -> IO b) -> IO b
+withTime ty mObject f = do
+  Monad.when (ty == SuppressTime) $
+    throwIO $ InvalidTimeType ty callStack
+
+  cty <- send ty
+
+  FFI.alloca $ \ptr -> do
+    let object = maybe nullObject coerce mObject
+    FFI.poke ptr $ CTime cty 0 0 0.0
+    c_vpi_get_time object ptr
+    f ptr
 
 -- | Get the high-level representation of the current simulation time. The
 -- value is safely read, meaning it will not become corrupted if the low-level
@@ -501,22 +529,21 @@ getTime alloc ty mObject = do
 -- For more information about safety, see 'Receive' and 'UnsafeReceive'.
 --
 receiveTime
-  :: forall a o
+  :: forall a
    . HasCallStack
   => Coercible a Object
-  => Typeable o
   => TimeType
   -> Maybe a
-  -> SimCont o Time
+  -> IO Time
 receiveTime timeTy mObject =
-  getTime Sim.stackPtr timeTy mObject >>= peekReceive
+  withTime timeTy mObject peekReceive
 
 foreign import ccall "vpi_user.h vpi_get_value"
   c_vpi_get_value :: Object -> Ptr CValue -> IO ()
 
 -- | Get a pointer to the low-level representation of the current value
--- associated with the given object. The pointer is allocated using the given
--- allocation function. The value is returned in the requested format.
+-- associated with the given object, where the pointer is allocated on the
+-- heap. The value is returned in the requested format.
 --
 -- The 'SuppressValue' format cannot be used for this function. Requesting this
 -- as the format will throw an 'InvalidFormat' exception.
@@ -528,18 +555,39 @@ foreign import ccall "vpi_user.h vpi_get_value"
 getValue
   :: HasCallStack
   => Coercible a Object
-  => SimCont o (Ptr CValue)
-  -> ValueFormat
+  => ValueFormat
   -> a
-  -> SimCont o (Ptr CValue)
-getValue alloc fmt object = do
+  -> IO (Ptr CValue)
+getValue fmt object = do
   cfmt <- send fmt
-
-  fmap fst . Sim.withNewPtr alloc $ \ptr -> do
+  FFI.malloc >>= \ptr -> do
     FFI.pokeByteOff ptr 0 cfmt
     c_vpi_get_value (coerce object) ptr
+    return ptr
 
-    pure ()
+-- | Get a pointer to the low-level representation of the current value
+-- associated with the given object, where the pointer is allocated on the
+-- stack. The value is returned in the requested format.
+--
+-- The 'SuppressValue' format cannot be used for this function. Requesting this
+-- as the format will throw an 'InvalidFormat' exception.
+--
+-- The returned value can be converted to the high-level representation using
+-- 'Receive'. If only the high-level representation is needed then consider
+-- using 'receiveValue' or 'unsafeReceiveValue' instead.
+--
+withValue
+  :: HasCallStack
+  => Coercible a Object
+  => ValueFormat
+  -> a
+  -> (Ptr CValue -> IO b) -> IO b
+withValue fmt object f = do
+  cfmt <- send fmt
+  FFI.alloca $ \ptr -> do
+    FFI.pokeByteOff ptr 0 cfmt
+    c_vpi_get_value (coerce object) ptr
+    f ptr
 
 -- | Get the high-level representation of the current value associated with the
 -- given object. The value is converted from a low-level representation with
@@ -554,21 +602,19 @@ getValue alloc fmt object = do
 -- For more information about safety, see 'Receive' and 'UnsafeReceive'.
 --
 unsafeReceiveValue
-  :: forall a o
+  :: forall a
    . HasCallStack
   => Coercible a Object
   => Show a
   => Typeable a
-  => Typeable o
   => ValueFormat
   -> a
-  -> SimCont o Value
-unsafeReceiveValue fmt object = do
-  ptr <- getValue Sim.stackPtr fmt (coerce @a @Object object)
-  cvalue <- IO.liftIO (FFI.peek ptr)
-  size <- getProperty Size object
-
-  unsafeReceive (CValueSized cvalue size)
+  -> IO Value
+unsafeReceiveValue fmt object =
+  withValue fmt (coerce @a @Object object) $ \ptr -> do
+    cvalue <- FFI.peek ptr
+    size <- getProperty Size object
+    unsafeReceive $ CValueSized cvalue size
 
 -- | Get the high-level representation of the current value associated with the
 -- given object. The value is converted from a low-level representation with
@@ -580,21 +626,19 @@ unsafeReceiveValue fmt object = do
 -- For more information about safety, see 'Receive' and 'UnsafeReceive'.
 --
 receiveValue
-  :: forall a o
+  :: forall a
    . HasCallStack
   => Coercible a Object
   => Show a
   => Typeable a
-  => Typeable o
   => ValueFormat
   -> a
-  -> SimCont o Value
+  -> IO Value
 receiveValue fmt object = do
-  ptr <- getValue Sim.heapPtr fmt (coerce @a @Object object)
-  cvalue <- IO.liftIO (FFI.peek ptr)
+  ptr <- getValue fmt $ coerce @a @Object object
+  cvalue <- FFI.peek ptr
   size <- getProperty Size object
-
-  receive (CValueSized cvalue size)
+  receive $ CValueSized cvalue size
 
 foreign import ccall "vpi_user.h vpi_put_value"
   c_vpi_put_value :: Object -> Ptr CValue -> Ptr CTime -> CInt -> IO Object
@@ -629,15 +673,14 @@ unsafeSendValue
   => a
   -> Value
   -> DelayMode
-  -> SimCont o ()
+  -> IO ()
   -- No return object, see NOTE [vpi_put_value and events]
-unsafeSendValue object value delay = do
+unsafeSendValue object value delay =
   -- Safe use of castPtr to turn (CValue, CInt) into CValue
-  valuePtr <- FFI.castPtr <$> unsafePokeSend value
-  (timePtr, flags) <- send delay
-
-  Monad.void . IO.liftIO $
-    c_vpi_put_value (coerce object) valuePtr timePtr flags
+  unsafePokeSend value $ \ptr -> do
+    let valuePtr = FFI.castPtr ptr
+    (timePtr, flags) <- send delay
+    Monad.void $ c_vpi_put_value (coerce object) valuePtr timePtr flags
 
 -- | Update the value of the given object via the given 'DelayMode'. The value
 -- is safely sent, meaning the FFI call will succeed if the inputs to this
@@ -655,12 +698,10 @@ sendValue
   => a
   -> Value
   -> DelayMode
-  -> SimCont o ()
+  -> IO ()
   -- No return object, see NOTE [vpi_put_value and events]
 sendValue object value delay = do
   -- Safe use of castPtr to turn (CValue, CInt) into CValue
   valuePtr <- FFI.castPtr <$> pokeSend value
   (timePtr, flags) <- send delay
-
-  Monad.void . IO.liftIO $
-    c_vpi_put_value (coerce object) valuePtr timePtr flags
+  Monad.void $ c_vpi_put_value (coerce object) valuePtr timePtr flags

@@ -15,6 +15,7 @@ module Clash.FFI.VPI.Error
   ( CErrorInfo(..)
   , ErrorInfo(..)
   , getErrorInfo
+  , withErrorInfo
   , receiveErrorLevel
   , receiveErrorInfo
   , unsafeReceiveErrorInfo
@@ -22,18 +23,15 @@ module Clash.FFI.VPI.Error
   , module Clash.FFI.VPI.Error.State
   ) where
 
-import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.ByteString (ByteString)
-import           Data.Typeable (Typeable)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CInt(..))
+import qualified Foreign.Marshal.Alloc as FFI (alloca, malloc)
 import           Foreign.Ptr (Ptr)
 import qualified Foreign.Ptr as FFI (nullPtr)
 import           Foreign.Storable.Generic (GStorable)
 import           GHC.Generics (Generic)
 
-import           Clash.FFI.Monad (SimCont)
-import qualified Clash.FFI.Monad as Sim (stackPtr, withNewPtr)
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Error.Level
 import           Clash.FFI.VPI.Error.State
@@ -73,44 +71,51 @@ data ErrorInfo = ErrorInfo
 type instance CRepr ErrorInfo = CErrorInfo
 
 instance UnsafeReceive ErrorInfo where
-  unsafeReceive cerror = do
-    state <- receive (cerrorState cerror)
-    level <- receive (cerrorLevel cerror)
-    msg <- unsafeReceive (cerrorMessage cerror)
-    prod <- unsafeReceive (cerrorProduct cerror)
-    code <- unsafeReceive (cerrorCode cerror)
-    file <- receiveString (cerrorFile cerror)
-    let line = fromIntegral (cerrorLine cerror)
+  unsafeReceive CErrorInfo{..} = do
+    errorState <- receive cerrorState
+    errorLevel <- receive cerrorLevel
+    errorMessage <- unsafeReceive cerrorMessage
+    errorProduct <- unsafeReceive cerrorProduct
+    errorCode <- unsafeReceive cerrorCode
+    errorFile <- receiveString cerrorFile
+    let errorLine = fromIntegral cerrorLine
 
-    pure (ErrorInfo state level msg prod code file line)
+    pure ErrorInfo{..}
 
 instance Receive ErrorInfo where
-  receive cerror = do
-    state <- receive (cerrorState cerror)
-    level <- receive (cerrorLevel cerror)
-    msg <- receive (cerrorMessage cerror)
-    prod <- receive (cerrorProduct cerror)
-    code <- receive (cerrorCode cerror)
-    file <- receiveString (cerrorFile cerror)
-    let line = fromIntegral (cerrorLine cerror)
+  receive CErrorInfo{..} = do
+    errorState <- receive cerrorState
+    errorLevel <- receive cerrorLevel
+    errorMessage <- receive cerrorMessage
+    errorProduct <- receive cerrorProduct
+    errorCode <- receive cerrorCode
+    errorFile <- receiveString cerrorFile
+    let errorLine = fromIntegral cerrorLine
 
-    pure (ErrorInfo state level msg prod code file line)
+    pure ErrorInfo{..}
 
 foreign import ccall "vpi_user.h vpi_chk_error"
   c_vpi_chk_error :: Ptr CErrorInfo -> IO CInt
 
--- | Get the low-level representation of the current error information. This
--- can be converted to the high-level representation using 'Receive'. If only
--- the high-level representation is needed then consider using
--- 'receiveErrorInfo' or 'unsafeReceiveErrorInfo' instead.
+-- | Get the low-level representation of the current error information, which
+-- is allocated on the heap. This can be converted to the high-level
+-- representation using 'Receive'. If only the high-level representation is
+-- needed then consider using 'receiveErrorInfo' or 'unsafeReceiveErrorInfo'
+-- instead.
 --
-getErrorInfo
-  :: forall o
-   . Typeable o
-  => SimCont o (Ptr CErrorInfo)
-  -> SimCont o (Ptr CErrorInfo)
-getErrorInfo alloc =
-  fst <$> Sim.withNewPtr alloc c_vpi_chk_error
+getErrorInfo :: IO (Ptr CErrorInfo)
+getErrorInfo =
+  FFI.malloc >>= \ptr -> c_vpi_chk_error ptr >> return ptr
+
+-- | Get the low-level representation of the current error information, which
+-- is allocated on the stack. This can be converted to the high-level
+-- representation using 'Receive'. If only the high-level representation is
+-- needed then consider using 'receiveErrorInfo' or 'unsafeReceiveErrorInfo'
+-- instead.
+--
+withErrorInfo :: (Ptr CErrorInfo -> IO a) -> IO a
+withErrorInfo f =
+  FFI.alloca $ \ptr -> c_vpi_chk_error ptr >> f ptr
 
 -- | Get the high-level representation of the current error information. The
 -- value is unsafely read, meaning it may be corrupted if the low-level
@@ -121,12 +126,9 @@ getErrorInfo alloc =
 --
 -- For more information about safety, see 'Receive' and 'UnsafeReceive'.
 --
-unsafeReceiveErrorInfo
-  :: forall o
-   . Typeable o
-  => SimCont o ErrorInfo
+unsafeReceiveErrorInfo :: IO ErrorInfo
 unsafeReceiveErrorInfo =
-  getErrorInfo Sim.stackPtr >>= unsafePeekReceive
+  withErrorInfo unsafePeekReceive
 
 -- | Get the high-level representation of the current error information. The
 -- value is safely read, meaning it will not become corrupted if the low-level
@@ -134,21 +136,15 @@ unsafeReceiveErrorInfo =
 --
 -- For more information about safety, see 'Receive' and 'UnsafeReceive'.
 --
-receiveErrorInfo
-  :: forall o
-   . Typeable o
-  => SimCont o ErrorInfo
+receiveErrorInfo :: IO ErrorInfo
 receiveErrorInfo =
-  getErrorInfo Sim.stackPtr >>= peekReceive
+  getErrorInfo >>= peekReceive
 
 -- | Get the error level of the current error information. For more complete
 -- error information, use 'receiveErrorInfo' or 'unsafeReceiveErrorInfo' for
 -- the high-level representation, or 'getErrorInfo' for the low-level
 -- representation.
 --
-receiveErrorLevel
-  :: forall o
-   . Typeable o
-  => SimCont o ErrorLevel
+receiveErrorLevel :: IO ErrorLevel
 receiveErrorLevel =
-  IO.liftIO (c_vpi_chk_error FFI.nullPtr) >>= receive
+  c_vpi_chk_error FFI.nullPtr >>= receive

@@ -5,8 +5,6 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Clash.FFI.VPI.Control
@@ -18,15 +16,12 @@ module Clash.FFI.VPI.Control
   , controlSimulator
   ) where
 
-import           Control.Exception (Exception)
+import           Control.Exception (Exception, throwIO)
 import qualified Control.Monad as Monad (unless)
-import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.Maybe (fromMaybe)
 import           Foreign.C.Types (CInt(..))
 import           GHC.Stack (CallStack, callStack, prettyCallStack)
 
-import           Clash.FFI.Monad (SimCont)
-import qualified Clash.FFI.Monad as Sim (throw)
 import           Clash.FFI.View
 
 -- | A control command to send to the simulator. Depending on the simulator,
@@ -47,12 +42,11 @@ data Control
 type instance CRepr Control = (CInt, CInt, CInt, CInt)
 
 instance Send Control where
-  send =
-    \case
-      Stop d -> (66, 0, 0, ) <$> send d
-      Finish d -> (67, 0, 0, ) <$> send d
-      Reset s r d ->
-        (68,,,) <$> send s <*> pure (fromMaybe 0 r) <*> send d
+  send = \case
+    Stop d -> (66, 0, 0, ) <$> send d
+    Finish d -> (67, 0, 0, ) <$> send d
+    Reset s r d ->
+      (68,,,) <$> send s <*> pure (fromMaybe 0 r) <*> send d
 
 -- | When resetting the simulator, the stop value determines whether the
 -- simulator will enter interactive mode or immediately start processing again.
@@ -65,10 +59,9 @@ data StopValue
 type instance CRepr StopValue = CInt
 
 instance Send StopValue where
-  send =
-    pure . \case
-      Interactive -> 0
-      Processing -> 1
+  send = pure . \case
+    Interactive -> 0
+    Processing -> 1
 
 -- | When stopping
 data DiagnosticLevel
@@ -80,11 +73,10 @@ data DiagnosticLevel
 type instance CRepr DiagnosticLevel = CInt
 
 instance Send DiagnosticLevel where
-  send =
-    pure . \case
-      NoDiagnostics -> 0
-      TimeAndLocation -> 1
-      TimeLocationAndStats -> 2
+  send = pure . \case
+    NoDiagnostics -> 0
+    TimeAndLocation -> 1
+    TimeLocationAndStats -> 2
 
 -- | An exception thrown when the simulator could not perform a control action.
 --
@@ -111,19 +103,17 @@ foreign import ccall "vpi_user.h vpi_control"
 -- restarted or reset. If the simulator does not accept the control action, a
 -- 'CouldNotControl' exception is thrown.
 --
-controlSimulator :: forall o. Control -> SimCont o ()
+controlSimulator :: Control -> IO ()
 controlSimulator control = do
   (c, s, r, d) <- send control
 
-  success <-
-    case control of
-      Reset{} -> IO.liftIO (c_vpi_control_restart c s r d)
-      _ -> IO.liftIO (c_vpi_control_end c d)
+  success <- case control of
+    Reset{} -> c_vpi_control_restart c s r d
+    _       -> c_vpi_control_end c d
 
   Monad.unless success $
-    Sim.throw (CouldNotControl control callStack)
+    throwIO $ CouldNotControl control callStack
 
-  pure ()
 #else
   () where
 #endif

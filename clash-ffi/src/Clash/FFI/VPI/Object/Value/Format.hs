@@ -5,7 +5,6 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Clash.FFI.VPI.Object.Value.Format
@@ -14,9 +13,7 @@ module Clash.FFI.VPI.Object.Value.Format
   , InvalidFormat(..)
   ) where
 
-import           Control.Exception (Exception)
-import qualified Control.Exception as IO (throwIO)
-import qualified Control.Monad.IO.Class as IO (liftIO)
+import           Control.Exception (Exception, throwIO)
 import           Foreign.C.Types (CInt)
 import qualified Foreign.Ptr as FFI (castPtr)
 import           Foreign.Storable (Storable(..))
@@ -90,8 +87,8 @@ data UnknownFormat
   deriving anyclass (Exception)
 
 instance Show UnknownFormat where
-  show (UnknownFormat f c) =
-    mconcat
+  show = \case
+    UnknownFormat f c -> mconcat
       [ "Unknown format constant "
       , show f
       , "\n"
@@ -131,7 +128,7 @@ cintToFormat = \case
 #endif
   11 -> pure TimeFmt
   12 -> pure ObjTypeFmt
-  n -> IO.throwIO (UnknownFormat n callStack)
+  n -> throwIO $ UnknownFormat n callStack
 
 formatToCInt :: ValueFormat -> CInt
 formatToCInt = \case
@@ -167,4 +164,4 @@ instance Send ValueFormat where
   send = pure . formatToCInt
 
 instance Receive ValueFormat where
-  receive = IO.liftIO . cintToFormat
+  receive = cintToFormat

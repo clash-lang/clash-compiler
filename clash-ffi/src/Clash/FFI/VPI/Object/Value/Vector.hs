@@ -10,7 +10,6 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -28,7 +27,6 @@ module Clash.FFI.VPI.Object.Value.Vector
   , vectorToBitVector
   ) where
 
-import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.Bits (clearBit, setBit, testBit)
 import           Data.Proxy
 import           Foreign.C.Types (CInt)
@@ -83,7 +81,7 @@ vectorToCVectorList vec = go [] 0
   size = fromIntegral $ natVal (Proxy @n)
 
   replaceScalar :: Int -> Scalar -> CVector -> CVector
-  replaceScalar ix s (CVector as bs) =
+  replaceScalar ix s CVector{..} =
     let
       (aMod, bMod) =
         case s of
@@ -95,7 +93,7 @@ vectorToCVectorList vec = go [] 0
           SX -> (  setBit,   setBit)
           S_ -> (  setBit,   setBit)
     in
-      CVector (aMod as ix) (bMod bs ix)
+      CVector (aMod cvectorA ix) (bMod cvectorB ix)
 
   go :: [CVector] -> Int -> [CVector]
   go a i =
@@ -136,8 +134,8 @@ cvectorListToVector = go (Vec.repeat SX) 0
     | otherwise = error "cvectorListToVector: Array is not the specified size"
 
   getScalar :: Int -> CVector -> Scalar
-  getScalar ix (CVector as bs) =
-    case (testBit as ix, testBit bs ix) of
+  getScalar ix CVector{..} =
+    case (testBit cvectorA ix, testBit cvectorB ix) of
       (False, False) -> S0
       (True,  False) -> S1
       (False, True)  -> SZ
@@ -145,16 +143,18 @@ cvectorListToVector = go (Vec.repeat SX) 0
 
 instance (KnownNat n) => UnsafeReceive (Vec n Scalar) where
   unsafeReceive =
-    let size = fromIntegral (natVal (Proxy @n))
+    let size = fromIntegral $ natVal $ Proxy @n
         len  = div (size - 1) 32 + 1
-     in fmap cvectorListToVector . IO.liftIO . FFI.peekArray len
+     in fmap cvectorListToVector . FFI.peekArray len
 
 instance (KnownNat n) => Receive (Vec n Scalar) where
   receive =
-    let size = fromIntegral (natVal (Proxy @n))
+    let size = fromIntegral $ natVal $ Proxy @n
         len  = div (size - 1) 32 + 1
-     in fmap cvectorListToVector . IO.liftIO . FFI.peekArray len
+     in fmap cvectorListToVector . FFI.peekArray len
 
+
+-- | Turns a 'BitVector' into a vector of 'Scalar' values.
 bitVectorToVector
   :: forall n
    . KnownNat n
@@ -163,6 +163,7 @@ bitVectorToVector
 bitVectorToVector =
   fmap bitToScalar . unpack
 
+-- | Turns a vector of 'Scalar' values into a 'BitVector'.
 vectorToBitVector
   :: forall n
    . KnownNat n
@@ -172,7 +173,7 @@ vectorToBitVector vec =
   Vec.ifoldr go (deepErrorX "vectorToBitVector") vec
  where
   go :: Index n -> Scalar -> BitVector n -> BitVector n
-  go ix s = replaceBit ix (scalarToBit s)
+  go ix s = replaceBit ix $ scalarToBit s
 
 type instance CRepr (BitVector n) = CRepr (Vec n Scalar)
 

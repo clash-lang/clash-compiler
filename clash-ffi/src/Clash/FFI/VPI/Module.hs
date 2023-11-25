@@ -20,7 +20,6 @@ import Foreign.Storable (Storable)
 import GHC.Stack (HasCallStack)
 
 import Clash.FFI.View (ensureNullTerminated)
-import Clash.FFI.Monad (SimCont)
 import Clash.FFI.VPI.Iterator
 import Clash.FFI.VPI.Object
 import Clash.FFI.VPI.Net (Net(..))
@@ -43,13 +42,13 @@ newtype Module
 
 -- | Iterate the top-level of a design, finding all the modules.
 --
-topModules :: HasCallStack => SimCont o [Module]
+topModules :: HasCallStack => IO [Module]
 topModules = iterateAll @_ @Object ObjModule Nothing
 
 -- | Find a top-level module in a design by name. This throws an 'UnknownChild'
 -- exception if no top-level module with the given name is found in the design.
 --
-findTopModule :: HasCallStack => ByteString -> SimCont o Module
+findTopModule :: HasCallStack => ByteString -> IO Module
 findTopModule name =
   unsafeSendChildRef @_ @Object (ensureNullTerminated name) Nothing
 
@@ -57,26 +56,26 @@ findTopModule name =
 -- large designs it may be more efficient to use
 -- 'Clash.FFI.VPI.Iterator.iterate' and 'scan' manually.
 --
-moduleNets :: HasCallStack => Module -> SimCont o [Net]
+moduleNets :: HasCallStack => Module -> IO [Net]
 moduleNets = iterateAll ObjNet . Just
 
 -- | Iterate all the parameters in a module. This will iterate all nets at
 -- once, for large designs it may be more efficient to use
 -- 'Clash.FFI.VPI.Iterator.iterate' and 'scan' manually.
 --
-moduleParameters :: HasCallStack => Module -> SimCont o [Parameter]
+moduleParameters :: HasCallStack => Module -> IO [Parameter]
 moduleParameters = iterateAll ObjParameter . Just
 
 -- | Iterate all the ports in a module. This will iterate all nets at once, for
 -- large designs it may be more efficient to use
 -- 'Clash.FFI.VPI.Iterator.iterate' and 'scan' manually.
 --
-modulePorts :: HasCallStack => Module -> SimCont o [Port]
+modulePorts :: HasCallStack => Module -> IO [Port]
 modulePorts = iterateAll ObjPort . Just
 
 -- | Iterate all the registers in a module. This will iterate all nets at once,
 -- for large designs it may be more efficient to use
 -- 'Clash.FFI.VPI.Iterator.iterate' and 'scan' manually.
 --
-moduleRegs :: HasCallStack => Module -> SimCont o [Reg]
+moduleRegs :: HasCallStack => Module -> IO [Reg]
 moduleRegs = iterateAll ObjReg . Just
