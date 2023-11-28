@@ -4,7 +4,6 @@ License:      BSD2 (see the file LICENSE)
 Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Clash.FFI.VPI.Error.State
@@ -12,11 +11,10 @@ module Clash.FFI.VPI.Error.State
   , UnknownErrorState(..)
   ) where
 
-import           Control.Exception (Exception)
+import           Control.Exception (Exception, throwIO)
 import           Foreign.C.Types (CInt)
 import           GHC.Stack (CallStack, callStack, prettyCallStack)
 
-import qualified Clash.FFI.Monad as Sim (throw)
 import           Clash.FFI.View (CRepr, Receive(..))
 
 -- | The state of the simulator when an error occurred. This specifies whether
@@ -37,8 +35,8 @@ data UnknownErrorState
   deriving anyclass (Exception)
 
 instance Show UnknownErrorState where
-  show (UnknownErrorState x c) =
-    mconcat
+  show = \case
+    UnknownErrorState x c -> mconcat
       [ "Unknown error state: "
       , show x
       , "\n"
@@ -52,4 +50,4 @@ instance Receive ErrorState where
     1 -> pure CompileError
     2 -> pure PliError
     3 -> pure RunError
-    n -> Sim.throw (UnknownErrorState n callStack)
+    n -> throwIO $ UnknownErrorState n callStack

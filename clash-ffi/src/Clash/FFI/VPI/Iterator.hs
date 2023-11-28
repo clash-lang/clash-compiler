@@ -16,12 +16,10 @@ module Clash.FFI.VPI.Iterator
 import           Prelude hiding (iterate)
 
 import           Control.DeepSeq (NFData, deepseq)
-import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.Coerce
 import           Foreign.C.Types (CInt(..))
 import           Foreign.Storable (Storable)
 
-import           Clash.FFI.Monad (SimCont)
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Object
 
@@ -53,16 +51,15 @@ foreign import ccall "vpi_user.h vpi_iterate"
 -- manually freed with 'freeObject'.
 --
 iterate
-  :: forall p o
+  :: forall p
    . Coercible p Object
   => ObjectType
   -> Maybe p
-  -> SimCont o Iterator
+  -> IO Iterator
 iterate objTy parent = do
   cobjTy <- send objTy
   let object = maybe nullObject coerce parent
-
-  IO.liftIO (c_vpi_iterate cobjTy object)
+  c_vpi_iterate cobjTy object
 
 foreign import ccall "vpi_user.h vpi_scan"
   c_vpi_scan :: Iterator -> IO Object
@@ -72,18 +69,19 @@ foreign import ccall "vpi_user.h vpi_scan"
 -- (and does not need 'freeObject' to be called on it).
 --
 scan
-  :: forall c o
+  :: forall c
    . IsObject c
   => Coercible Object c
   => Iterator
-  -> SimCont o (Maybe c)
+  -> IO (Maybe c)
 scan iterator
-  | isNullObject (iteratorObject iterator)
-  = pure Nothing
-
-  | otherwise
-  = do next <- IO.liftIO (c_vpi_scan iterator)
-       pure (if isNullObject next then Nothing else Just (coerce next))
+  | isNullObject (iteratorObject iterator) = pure Nothing
+  | otherwise                              = do
+      next <- c_vpi_scan iterator
+      pure $
+        if isNullObject next
+        then Nothing
+        else Just $ coerce next
 
 -- | Create an iterator for objects of a given type under the specified parent
 -- object, and completely traverse the iterator using repeated calls to 'scan'.
@@ -91,14 +89,14 @@ scan iterator
 -- offers less control over iteration.
 --
 iterateAll
-  :: forall c p o
+  :: forall c p
    . IsObject c
   => NFData c
   => Coercible Object c
   => Coercible p Object
   => ObjectType
   -> Maybe p
-  -> SimCont o [c]
+  -> IO [c]
 iterateAll objTy parent = do
   iterator <- iterate objTy parent
   items <- takeWhileNonNull iterator
@@ -113,5 +111,5 @@ iterateAll objTy parent = do
     scanned <- scan iterator
 
     case scanned of
-      Just next -> fmap (next :) (takeWhileNonNull iterator)
+      Just next -> (next :) <$> takeWhileNonNull iterator
       Nothing   -> pure []

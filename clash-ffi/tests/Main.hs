@@ -50,7 +50,6 @@ import Test.Tasty.HUnit (testCase, assertFailure)
 import Test.Tasty.SmallCheck (testProperty)
 import Test.SmallCheck.Series (Positive)
 
-import Clash.FFI.Monad
 import Clash.FFI.VPI.Callback
 import Clash.FFI.VPI.Control
 import Clash.FFI.VPI.Error
@@ -79,7 +78,7 @@ main = withPipe $ do
         [ testProperty "registerCallback (vpi_register_cb)"
             $ testM $ sendReceiveAndCompare @(CallbackInfo BSNT) registerCallback
         , testProperty "removeCallback (vpi_remove_cb)"
-            $ testM $ \cbInfo -> runSimAction $ do
+            $ testM $ \cbInfo -> do
                 cb <- registerCallback (cbInfo :: CallbackInfo BSNT) %% 2
                 removeCallback cb
                 inputEQ cb
@@ -115,12 +114,12 @@ main = withPipe $ do
             $ testM $ sendReceiveAndCompare2 @_ @(Maybe Object) iterate
         , testProperty "scan (vpi_scan)"
             $ testM $ \x -> do
-                iterator <- runSimAction (iterate ObjModule (Nothing @Object) %% 3)
+                iterator <- iterate ObjModule (Nothing @Object) %% 3
                 receiveAndCompare @(Maybe Module) (scan iterator) x
         , testProperty "iterateAll (vpi_iterate, vpi_scan)"
             $ testM $ \(input, mObj) -> case objectType input of
                 SomeObjectType (Proxy :: Proxy t) -> do
-                  xs <- runSimAction $ iterateAll input mObj
+                  xs <- iterateAll input mObj
                   -- check vpi_iterate output
                   cInput <- sequence
                     [ inputEQ input
@@ -134,21 +133,21 @@ main = withPipe $ do
         ]
     , testGroup "Clash.FFI.VPI.Module"
         [ testCase "topModules (vpi_iterate, vpi_scan)" $ do
-            modules <- runSimAction topModules %% 3
+            modules <- topModules %% 3
             mapM_ (assert . outputEQ . Just) modules
             assert $ outputEQ (Nothing @Module)
         , testCase "findTopModule (vpi_handle_by_name)" $ do
             let known   = pack "top"
                 unknown = pack "unknown"
                 empty   = pack ""
-            top <- runSimAction $ findTopModule known
+            top <- findTopModule known
             mapM_ assert
               [ inputEQ (SerialBS known)
               , inputEQ (Nothing @Module)
               , outputEQ top
               ]
             catch
-              (  runSimAction (findTopModule unknown)
+              (  findTopModule unknown
               >> assertFailure "expected Exception"
               ) $ \(_ :: SomeException) -> return ()
             mapM_ assert
@@ -156,7 +155,7 @@ main = withPipe $ do
               , inputEQ (Nothing @Module)
               ]
             catch
-              (  runSimAction (findTopModule empty)
+              (  findTopModule empty
               >> assertFailure "expected Exception"
               ) $ \(_ :: SomeException) -> return ()
             mapM_ assert
@@ -164,19 +163,19 @@ main = withPipe $ do
               , inputEQ (Nothing @Module)
               ]
         , testCase "moduleNets (vpi_iterate, vpi_scan)" $
-            runSimAction ((topModule >>= moduleNets) %% 6)
+            ((topModule >>= moduleNets) %% 6)
               >>= mapM_ (assert . outputEQ . Just)
               >>  assert (outputEQ (Nothing @Net))
         , testCase "moduleParameters (vpi_iterate, vpi_scan)" $
-            runSimAction ((topModule >>= moduleParameters) %% 6)
+            ((topModule >>= moduleParameters) %% 6)
               >>= mapM_ (assert . outputEQ . Just)
               >> assert (outputEQ (Nothing @Parameter))
         , testCase "modulePorts (vpi_iterate, vpi_scan)" $
-            runSimAction ((topModule >>= modulePorts) %% 6)
+            ((topModule >>= modulePorts) %% 6)
               >>= mapM_ (assert . outputEQ . Just)
               >>  assert (outputEQ (Nothing @Port))
         , testCase "moduleRegs (vpi_iterate, vpi_scan)" $
-            runSimAction ((topModule >>= moduleRegs) %% 6)
+            ((topModule >>= moduleRegs) %% 6)
               >>= mapM_ (assert . outputEQ . Just)
               >>  assert (outputEQ (Nothing @Reg))
         ]
@@ -189,22 +188,21 @@ main = withPipe $ do
             let none = Nothing @Object
                 objTypeTop = ObjModule
                 objTypePort = ObjPort
-            runSimAction $ do
-              top <- getChild objTypeTop none
-              mapM_ assert
-                [ inputEQ objTypeTop
-                , inputEQ none
-                , outputEQ (top :: Module)
-                ]
-              let topRef = Just top
-              port <- getChild objTypePort topRef
-              mapM_ assert
-                [ inputEQ objTypePort
-                , inputEQ topRef
-                , outputEQ (port :: Port)
-                ]
+            top <- getChild objTypeTop none
+            mapM_ assert
+              [ inputEQ objTypeTop
+              , inputEQ none
+              , outputEQ (top :: Module)
+              ]
+            let topRef = Just top
+            port <- getChild objTypePort topRef
+            mapM_ assert
+              [ inputEQ objTypePort
+              , inputEQ topRef
+              , outputEQ (port :: Port)
+              ]
             catch
-              ( (runSimAction (getChild objTypePort none) :: IO Port)
+              ( (getChild objTypePort none :: IO Port)
                 >> assertFailure "expected Exception"
               ) $ \(_ :: SomeException) -> return ()
             mapM_ assert
@@ -215,22 +213,21 @@ main = withPipe $ do
             let none = Nothing @Object
                 topName = pack "top"
                 portName = pack "port"
-            runSimAction $ do
-              top <- sendChildRef topName none
-              mapM_ assert
-                [ inputEQ (SerialBS topName)
-                , inputEQ none
-                , outputEQ (top :: Module)
-                ]
-              let topRef = Just top
-              port <- sendChildRef portName topRef
-              mapM_ assert
-                [ inputEQ (SerialBS portName)
-                , inputEQ topRef
-                , outputEQ (port :: Port)
-                ]
+            top <- sendChildRef topName none
+            mapM_ assert
+              [ inputEQ (SerialBS topName)
+              , inputEQ none
+              , outputEQ (top :: Module)
+              ]
+            let topRef = Just top
+            port <- sendChildRef portName topRef
+            mapM_ assert
+              [ inputEQ (SerialBS portName)
+              , inputEQ topRef
+              , outputEQ (port :: Port)
+              ]
             catch
-              ( (runSimAction (sendChildRef portName none) :: IO Port)
+              ( (sendChildRef portName none :: IO Port)
                 >> assertFailure "expected Exception"
               ) $ \(_ :: SomeException) -> return ()
             mapM_ assert
@@ -241,22 +238,21 @@ main = withPipe $ do
             let none = Nothing @Object
                 topName = pack "top"
                 portName = pack "port"
-            runSimAction $ do
-              top <- unsafeSendChildRef topName none
-              mapM_ assert
-                [ inputEQ (SerialBS topName)
-                , inputEQ none
-                , outputEQ (top :: Module)
-                ]
-              let topRef = Just top
-              port <- unsafeSendChildRef portName topRef
-              mapM_ assert
-                [ inputEQ (SerialBS portName)
-                , inputEQ topRef
-                , outputEQ (port :: Port)
-                ]
+            top <- unsafeSendChildRef topName none
+            mapM_ assert
+              [ inputEQ (SerialBS topName)
+              , inputEQ none
+              , outputEQ (top :: Module)
+              ]
+            let topRef = Just top
+            port <- unsafeSendChildRef portName topRef
+            mapM_ assert
+              [ inputEQ (SerialBS portName)
+              , inputEQ topRef
+              , outputEQ (port :: Port)
+              ]
             catch
-              ( (runSimAction (unsafeSendChildRef portName none) :: IO Port)
+              ( (unsafeSendChildRef portName none :: IO Port)
                 >> assertFailure "expected Exception"
               ) $ \(_ :: SomeException) -> return ()
             mapM_ assert
@@ -268,15 +264,15 @@ main = withPipe $ do
                 netNameRef = pack "top.net"
                 existingNetBitIdx = (0 :: CInt)
                 missingNetBitIdx = (20 :: CInt)
-            net <- Just <$> runSimAction (sendChildRef netNameRef none %% 3)
-            obj <- runSimAction $ getChild existingNetBitIdx (net :: Maybe Net)
+            net <- Just <$> sendChildRef netNameRef none %% 3
+            obj <- getChild existingNetBitIdx (net :: Maybe Net)
             mapM_ assert
                 [ inputEQ existingNetBitIdx
                 , inputEQ net
                 , outputEQ (obj :: Object)
                 ]
             catch
-              ( (runSimAction (getChild missingNetBitIdx net) :: IO Port)
+              ( (getChild missingNetBitIdx net :: IO Port)
                 >> assertFailure "expected Exception"
               ) $ \(_ :: SomeException) -> return ()
             mapM_ assert
@@ -288,15 +284,15 @@ main = withPipe $ do
                 netNameRef = pack "top.reg"
                 existingRegBit = [0 :: CInt, 1 :: CInt]
                 missingRegBit = [1 :: CInt, 2 :: CInt]
-            reg <- Just <$> runSimAction (sendChildRef netNameRef none %% 3)
-            bit <- runSimAction $ getChild existingRegBit (reg :: Maybe Reg)
+            reg <- Just <$> sendChildRef netNameRef none %% 3
+            bit <- getChild existingRegBit (reg :: Maybe Reg)
             mapM_ assert
                 [ inputEQ existingRegBit
                 , inputEQ reg
                 , outputEQ (bit :: Object)
                 ]
             catch
-              ( (runSimAction (getChild missingRegBit reg) :: IO Port)
+              ( (getChild missingRegBit reg :: IO Port)
                 >> assertFailure "expected Exception"
               ) $ \(_ :: SomeException) -> return ()
             mapM_ assert
@@ -328,7 +324,7 @@ main = withPipe $ do
                 )
               . filter ((`notElem` [SuppressValue, ObjTypeFmt]) . fst)
         , testProperty "sendValue (vpi_put_value)"
-            $ testM $ \(value, delayMode) -> runSimAction $ do
+            $ testM $ \(value, delayMode) -> do
                 let none = Nothing @Object
                     portNameRef = pack "top.port"
                 port <- sendChildRef portNameRef none %% 3
@@ -340,7 +336,7 @@ main = withPipe $ do
                   , inputEQ delayMode
                   ]
         , testProperty "unsafeSendValue (vpi_put_value)"
-            $ testM $ \(value, delayMode) -> runSimAction $ do
+            $ testM $ \(value, delayMode) -> do
                 let none = Nothing @Object
                     portNameRef = pack "top.port"
                 port <- sendChildRef portNameRef none %% 3
@@ -352,7 +348,7 @@ main = withPipe $ do
                   , inputEQ delayMode
                   ]
         , testProperty "compare send & receive"
-            $ testM $ \(value, delayMode) -> runSimAction $ do
+            $ testM $ \(value, delayMode) -> do
                 let none = Nothing @Object
                     portNameRef = pack "top.port"
                 port <- sendChildRef portNameRef none %% 3
@@ -368,17 +364,16 @@ main = withPipe $ do
         ]
     , testGroup "Clash.FFI.VPI.Port"
         [ testProperty "direction (vpi_get)"
-            $ testM $ \(_ :: [Positive Int]) ->
-                runSimAction $ do
-                  let none = Nothing @Object
-                      portNameRef = pack "top.port"
-                  port <- sendChildRef portNameRef none %% 3
-                  value <- direction port
-                  sequence
-                    [ inputEQ Direction
-                    , inputEQ port
-                    , outputEQ value
-                    ]
+            $ testM $ \(_ :: [Positive Int]) -> do
+                let none = Nothing @Object
+                    portNameRef = pack "top.port"
+                port <- sendChildRef portNameRef none %% 3
+                value <- direction port
+                sequence
+                  [ inputEQ Direction
+                  , inputEQ port
+                  , outputEQ value
+                  ]
         ]
     ]
 

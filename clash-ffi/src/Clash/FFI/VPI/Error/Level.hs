@@ -4,7 +4,6 @@ License:      BSD2 (see the file LICENSE)
 Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Clash.FFI.VPI.Error.Level
@@ -12,11 +11,10 @@ module Clash.FFI.VPI.Error.Level
   , UnknownErrorLevel(..)
   ) where
 
-import           Control.Exception (Exception)
+import           Control.Exception (Exception, throwIO)
 import           Foreign.C.Types (CInt)
 import           GHC.Stack (CallStack, callStack, prettyCallStack)
 
-import qualified Clash.FFI.Monad as Sim (throw)
 import           Clash.FFI.View (CRepr, Receive(..))
 
 -- | The level, or severity of an error returned by a call to @vpi_chk_error@.
@@ -40,8 +38,8 @@ data UnknownErrorLevel
   deriving anyclass (Exception)
 
 instance Show UnknownErrorLevel where
-  show (UnknownErrorLevel x c) =
-    mconcat
+  show = \case
+    UnknownErrorLevel x c -> mconcat
       [ "Unknown error level: "
       , show x
       , "\n"
@@ -58,4 +56,4 @@ instance Receive ErrorLevel where
     3 -> pure Error
     4 -> pure System
     5 -> pure Internal
-    n -> Sim.throw (UnknownErrorLevel n callStack)
+    n -> throwIO $ UnknownErrorLevel n callStack

@@ -1,7 +1,7 @@
 cabal-version:      2.2
 
 name:               clash-ffi
-version:            1.5.0
+version:            1.7.0
 synopsis:           Interact with Simulators from Clash
 description:        Interact with Simulators from Clash
 bug-reports:        https://github.com/clash-lang/clash-compiler/issues
@@ -41,14 +41,15 @@ library
     DeriveGeneric
     DerivingStrategies
     GeneralizedNewtypeDeriving
+    LambdaCase
+    RecordWildCards
+    TupleSections
   build-depends:
     derive-storable         >= 0.3  && < 0.4,
     derive-storable-plugin  >= 0.2  && < 0.3,
-    mtl                     >= 2.2  && < 2.4,
   hs-source-dirs: src
   c-sources: cbits/entry_vpi.c
   exposed-modules:
-    Clash.FFI.Monad
     Clash.FFI.View
     Clash.FFI.VPI.Callback
     Clash.FFI.VPI.Callback.Reason

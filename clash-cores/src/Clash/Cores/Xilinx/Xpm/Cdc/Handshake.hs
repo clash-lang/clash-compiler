@@ -1,5 +1,6 @@
 {-|
-  Copyright   :  (C) 2023, Google LLC
+  Copyright   :  (C) 2023, Google LLC,
+                     2023, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -81,11 +82,28 @@ xpmCdcHandshake = xpmCdcHandshakeWith XpmCdcHandshakeConfig{..}
 {-# INLINE xpmCdcHandshake #-}
 
 -- | Configuration for 'xpmCdcHandshakeWith'
+--
+-- Other attributes that are hardcoded:
+--
+-- +------------------+-------+
+-- | Attribute        | Value |
+-- +==================+=======+
+-- | @DEST_EXT_HSK@   |     1 |
+-- +------------------+-------+
+-- | @SIM_ASSERT_CHK@ |     0 |
+-- +------------------+-------+
 data XpmCdcHandshakeConfig srcStages dstStages = XpmCdcHandshakeConfig
-  { -- | Number of synchronization stages in the source domain
+  { -- | Number of registers, clocked by the src clock, that are used to synchronize @dest_ack@ to @src_rcv@.
+    --
+    -- This is what [PG382](https://docs.xilinx.com/r/en-US/pg382-xpm-cdc-generator/XPM_CDC_HANDSHAKE)
+    -- calls @SRC_SYNC_FF@.
     srcStages :: SNat srcStages
 
-    -- | Number of synchronization stages in the destination domain
+    -- | Number of registers, clocked by the dst clock,
+    -- that are used to synchronize between the input register of @src_send@ and the output register of @dest_req@.
+    --
+    -- This is what [PG382](https://docs.xilinx.com/r/en-US/pg382-xpm-cdc-generator/XPM_CDC_HANDSHAKE)
+    -- calls @DEST_SYNC_FF@.
   , dstStages :: SNat dstStages
 
     -- | Initialize registers used within the primitive to /0/. Note that
@@ -95,6 +113,9 @@ data XpmCdcHandshakeConfig srcStages dstStages = XpmCdcHandshakeConfig
     --
     -- This value is ignored in Clash simulation on domains configured to not
     -- support initial values.
+    --
+    -- This is what [PG382](https://docs.xilinx.com/r/en-US/pg382-xpm-cdc-generator/XPM_CDC_HANDSHAKE)
+    -- calls @INIT_SYNC_FF@.
   , initialValues :: Bool
   }
 

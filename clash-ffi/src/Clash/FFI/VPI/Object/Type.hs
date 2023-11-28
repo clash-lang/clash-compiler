@@ -5,7 +5,6 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Clash.FFI.VPI.Object.Type
@@ -13,11 +12,10 @@ module Clash.FFI.VPI.Object.Type
   , UnknownObjectType(..)
   ) where
 
-import           Control.Exception (Exception)
+import           Control.Exception (Exception, throwIO)
 import           Foreign.C.Types (CInt)
 import           GHC.Stack (CallStack, callStack, prettyCallStack)
 
-import qualified Clash.FFI.Monad as Sim (throw)
 import           Clash.FFI.View
 
 -- | The type of the object according to the VPI specification. This can be
@@ -59,8 +57,8 @@ data UnknownObjectType
   deriving anyclass (Exception)
 
 instance Show UnknownObjectType where
-  show (UnknownObjectType x c) =
-    mconcat
+  show = \case
+    UnknownObjectType x c -> mconcat
       [ "Unknown object type: "
       , show x
       , "\n"
@@ -77,4 +75,4 @@ instance Receive ObjectType where
 #if defined(VERILOG_2001)
     107 -> pure ObjCallback
 #endif
-    ty -> Sim.throw (UnknownObjectType ty callStack)
+    ty -> throwIO $ UnknownObjectType ty callStack

@@ -5,7 +5,6 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE RecordWildCards #-}
 
 -- Used to improve the performance of derived instances.
 {-# OPTIONS_GHC -fplugin=Foreign.Storable.Generic.Plugin #-}
@@ -16,25 +15,23 @@ module Clash.FFI.VPI.Info
   , Info(..)
   , CouldNotGetInfo(..)
   , getInfo
+  , withInfo
   , receiveSimulatorInfo
   , unsafeReceiveSimulatorInfo
   ) where
 
-import           Control.Exception (Exception)
-import qualified Control.Exception as IO (throwIO)
+import           Control.Exception (Exception, throwIO)
 import qualified Control.Monad as Monad (unless)
 import           Data.ByteString (ByteString)
-import           Data.Typeable (Typeable)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CInt(..))
+import qualified Foreign.Marshal.Alloc as FFI (alloca, malloc)
 import           Foreign.Ptr (Ptr)
 import qualified Foreign.Ptr as FFI (nullPtr)
 import           Foreign.Storable.Generic (GStorable)
 import           GHC.Generics (Generic)
 import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
 
-import           Clash.FFI.Monad (SimCont)
-import qualified Clash.FFI.Monad as Sim (stackPtr, withNewPtr)
 import           Clash.FFI.View
 
 -- | The low-level representation of the VPI information structure, as returned
@@ -68,54 +65,69 @@ instance UnsafeReceive Info where
   unsafeReceive CInfo{..} = do
     -- When passing +RTS to some simulators, they may replace the whole
     -- argument with NULL, so we check in addition to argc.
-    args <- unsafeReceiveArray0 (fromEnum cinfoArgc) FFI.nullPtr cinfoArgv
-    prod <- unsafeReceive cinfoProduct
-    ver  <- unsafeReceive cinfoVersion
+    infoArgs <- unsafeReceiveArray0 (fromEnum cinfoArgc) FFI.nullPtr cinfoArgv
+    infoProduct <- unsafeReceive cinfoProduct
+    infoVersion <- unsafeReceive cinfoVersion
 
-    pure (Info args prod ver)
+    pure Info{..}
 
 instance Receive Info where
   receive CInfo{..} = do
-    args <- receiveArray0 (fromEnum cinfoArgc) FFI.nullPtr cinfoArgv
-    prod <- receive cinfoProduct
-    ver  <- receive cinfoVersion
+    infoArgs <- receiveArray0 (fromEnum cinfoArgc) FFI.nullPtr cinfoArgv
+    infoProduct <- receive cinfoProduct
+    infoVersion  <- receive cinfoVersion
 
-    pure (Info args prod ver)
+    pure Info{..}
 
 foreign import ccall "vpi_user.h vpi_get_vlog_info"
   c_vpi_get_vlog_info :: Ptr CInfo -> IO Bool
 
 -- | An exception thrown when the VPI call to get the simulator info fails.
 --
-data CouldNotGetInfo
+newtype CouldNotGetInfo
   = CouldNotGetInfo CallStack
   deriving anyclass (Exception)
 
 instance Show CouldNotGetInfo where
-  show (CouldNotGetInfo c) =
-    mconcat
+  show = \case
+    CouldNotGetInfo c -> mconcat
       [ "Could not identify the running simulator\n"
       , prettyCallStack c
       ]
 
--- | Get the low-level representation of the simulator information. This can be
--- converted to the high-level representation using 'Receive'. If only the
--- high-level representation is needed then consider using
--- 'receiveSimulatorInfo' or 'unsafeReceiveSimulatorInfo' instead.
+-- | Get the low-level representation of the simulator information, which is
+-- allocated on the heap. This can be converted to the high-level representation
+-- using 'Receive'. If only the high-level representation is needed then consider
+-- using 'receiveSimulatorInfo' or 'unsafeReceiveSimulatorInfo' instead.
 --
 getInfo
-  :: forall o
-   . HasCallStack
-  => SimCont o (Ptr CInfo)
-  -> SimCont o (Ptr CInfo)
-getInfo alloc =
-  fmap fst . Sim.withNewPtr alloc $ \ptr -> do
+  :: HasCallStack
+  => IO (Ptr CInfo)
+getInfo = do
+  ptr <- FFI.malloc
+  isSuccess <- c_vpi_get_vlog_info ptr
+
+  Monad.unless isSuccess $
+    throwIO $ CouldNotGetInfo callStack
+
+  return ptr
+
+-- | Get the low-level representation of the simulator information, which is
+-- allocated on the stack. This can be converted to the high-level representation
+-- using 'Receive'. If only the high-level representation is needed then consider
+-- using 'receiveSimulatorInfo' or 'unsafeReceiveSimulatorInfo' instead.
+--
+withInfo
+  :: HasCallStack
+  => (Ptr CInfo -> IO a) -> IO a
+withInfo f =
+  FFI.alloca $ \ptr -> do
     isSuccess <- c_vpi_get_vlog_info ptr
 
     Monad.unless isSuccess $
-      IO.throwIO (CouldNotGetInfo callStack)
+      throwIO $ CouldNotGetInfo callStack
 
-    pure isSuccess
+    f ptr
 
 -- | Get the high-level representation of the simulator information. The value
 -- is unsafely read, meaning it may be corrupted if the low-level
@@ -127,12 +139,10 @@ getInfo alloc =
 -- For more information about safety, see 'Receive' and 'UnsafeReceive'.
 --
 unsafeReceiveSimulatorInfo
-  :: forall o
-   . HasCallStack
-  => Typeable o
-  => SimCont o Info
+  :: HasCallStack
+  => IO Info
 unsafeReceiveSimulatorInfo =
-  getInfo Sim.stackPtr >>= unsafePeekReceive
+  withInfo unsafePeekReceive
 
 -- | Get the high-level representation of the simulator information. The value
 -- is safely read, meaning it will not become corrupted if the low-level
@@ -141,9 +151,7 @@ unsafeReceiveSimulatorInfo =
 -- For more information about safety, see 'Receive' and 'UnsafeReceive'.
 --
 receiveSimulatorInfo
-  :: forall o
-   . HasCallStack
-  => Typeable o
-  => SimCont o Info
+  :: HasCallStack
+  => IO Info
 receiveSimulatorInfo =
-  getInfo Sim.stackPtr >>= peekReceive
+  getInfo >>= peekReceive

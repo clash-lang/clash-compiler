@@ -4,7 +4,6 @@ License:      BSD2 (see the file LICENSE)
 Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Clash.FFI.VPI.Port.Direction
@@ -12,11 +11,10 @@ module Clash.FFI.VPI.Port.Direction
   , UnknownDirection(..)
   ) where
 
-import           Control.Exception (Exception)
+import           Control.Exception (Exception, throwIO)
 import           Foreign.C.Types (CInt)
 import           GHC.Stack (CallStack, callStack, prettyCallStack)
 
-import qualified Clash.FFI.Monad as Sim (throw)
 import           Clash.FFI.View
 
 -- | The direction of a port in a module. This does not include the mixed IO
@@ -45,8 +43,8 @@ data UnknownDirection
   deriving anyclass (Exception)
 
 instance Show UnknownDirection where
-  show (UnknownDirection d c) =
-    mconcat
+  show = \case
+    UnknownDirection d c -> mconcat
       [ "Unknown port direction: "
       , show d
       , "\n"
@@ -62,4 +60,4 @@ instance Receive Direction where
     3 -> pure InOut
     4 -> pure MixedIO
     5 -> pure NoDirection
-    n -> Sim.throw (UnknownDirection n callStack)
+    n -> throwIO $ UnknownDirection n callStack

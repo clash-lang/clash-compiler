@@ -7,7 +7,6 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Clash.FFI.VPI.Callback.Reason
@@ -15,16 +14,15 @@ module Clash.FFI.VPI.Callback.Reason
   , UnknownCallbackReason(..)
   ) where
 
-import           Control.Exception (Exception)
-import qualified Control.Monad.IO.Class as IO (liftIO)
+import           Control.Exception (Exception, throwIO)
 import           Data.Coerce
 import           Foreign.C.Types (CInt)
+import qualified Foreign.Marshal.Alloc as FFI (alloca, malloc)
 import           Foreign.Ptr (Ptr)
 import qualified Foreign.Ptr as FFI (nullPtr)
 import qualified Foreign.Storable as FFI (peekByteOff, pokeByteOff)
 import           GHC.Stack (CallStack, callStack, prettyCallStack)
 
-import qualified Clash.FFI.Monad as Sim
 import           Clash.FFI.View
 import           Clash.FFI.VPI.Object
 
@@ -154,177 +152,177 @@ data CallbackReason
 type instance CRepr CallbackReason = (CInt, Object, Ptr CTime, Ptr CValue)
 
 instance UnsafeSend CallbackReason where
-  unsafeSend = \case
+  unsafeSend cbr f = case cbr of
     AfterValueChange object timeTy valueFmt -> do
       ctimeTy <- send timeTy
-      ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
-
-      cfmt <- send valueFmt
-      cvalue <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
-
-      pure (1, coerce object, ctime, cvalue)
+      FFI.alloca $ \ctime -> do
+        FFI.pokeByteOff ctime 0 ctimeTy
+        cfmt <- send valueFmt
+        FFI.alloca $ \cvalue -> do
+          FFI.pokeByteOff cvalue 0 cfmt
+          f (1, coerce object, ctime, cvalue)
 
     BeforeStatement object timeTy -> do
       ctimeTy <- send timeTy
-      ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
-
-      pure (2, coerce object, ctime, FFI.nullPtr)
+      FFI.alloca $ \ctime -> do
+        FFI.pokeByteOff ctime 0 ctimeTy
+        f (2, coerce object, ctime, FFI.nullPtr)
 
     AfterForce mObject timeTy valueFmt -> do
       let object = maybe nullObject coerce mObject
-
       ctimeTy <- send timeTy
-      ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
-
-      cfmt <- send valueFmt
-      cvalue <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
-
-      pure (3, object, ctime, cvalue)
+      FFI.alloca $ \ctime -> do
+        FFI.pokeByteOff ctime 0 ctimeTy
+        cfmt <- send valueFmt
+        FFI.alloca $ \cvalue -> do
+          FFI.pokeByteOff cvalue 0 cfmt
+          f (3, object, ctime, cvalue)
 
     AfterRelease mObject timeTy valueFmt -> do
       let object = maybe nullObject coerce mObject
-
       ctimeTy <- send timeTy
-      ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
-
-      cfmt <- send valueFmt
-      cvalue <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
-
-      pure (4, object, ctime, cvalue)
+      FFI.alloca $ \ctime -> do
+        FFI.pokeByteOff ctime 0 ctimeTy
+        cfmt <- send valueFmt
+        FFI.alloca $ \cvalue -> do
+          FFI.pokeByteOff cvalue 0 cfmt
+          f (4, object, ctime, cvalue)
 
     AtStartOfSimTime mObject time -> do
       let object = maybe nullObject coerce mObject
       ctime <- pokeSend time
-      pure (5, object, ctime, FFI.nullPtr)
+      f (5, object, ctime, FFI.nullPtr)
 
     ReadWriteSynch mObject time -> do
       let object = maybe nullObject coerce mObject
       ctime <- pokeSend time
-      pure (6, object, ctime, FFI.nullPtr)
+      f (6, object, ctime, FFI.nullPtr)
 
     ReadOnlySynch mObject time -> do
       let object = maybe nullObject coerce mObject
       ctime <- pokeSend time
-      pure (7, object, ctime, FFI.nullPtr)
+      f (7, object, ctime, FFI.nullPtr)
 
     NextSimTime mObject timeTy -> do
       let object = maybe nullObject coerce mObject
-
       ctimeTy <- send timeTy
-      ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
-
-      pure (8, object, ctime, FFI.nullPtr)
+      FFI.alloca $ \ctime -> do
+        FFI.pokeByteOff ctime 0 ctimeTy
+        f (8, object, ctime, FFI.nullPtr)
 
     AfterDelay mObject time -> do
       let object = maybe nullObject coerce mObject
       ctime <- pokeSend time
-      pure (9, object, ctime, FFI.nullPtr)
+      f (9, object, ctime, FFI.nullPtr)
 
     EndOfCompile ->
-      pure (10, nullObject, FFI.nullPtr, FFI.nullPtr)
+      f (10, nullObject, FFI.nullPtr, FFI.nullPtr)
 
     StartOfSimulation ->
-      pure (11, nullObject, FFI.nullPtr, FFI.nullPtr)
+      f (11, nullObject, FFI.nullPtr, FFI.nullPtr)
 
     EndOfSimulation ->
-      pure (12, nullObject, FFI.nullPtr, FFI.nullPtr)
+      f (12, nullObject, FFI.nullPtr, FFI.nullPtr)
 
     RuntimeError ->
-      pure (13, nullObject, FFI.nullPtr, FFI.nullPtr)
+      f (13, nullObject, FFI.nullPtr, FFI.nullPtr)
 
     TchkViolation ->
-      pure (14, nullObject, FFI.nullPtr, FFI.nullPtr)
+      f (14, nullObject, FFI.nullPtr, FFI.nullPtr)
 
     StartOfSave ->
-      pure (15, nullObject, FFI.nullPtr, FFI.nullPtr)
+      f (15, nullObject, FFI.nullPtr, FFI.nullPtr)
 
     EndOfSave ->
-      pure (16, nullObject, FFI.nullPtr, FFI.nullPtr)
+      f (16, nullObject, FFI.nullPtr, FFI.nullPtr)
 
     StartOfRestart ->
-      pure (17, nullObject, FFI.nullPtr, FFI.nullPtr)
+      f (17, nullObject, FFI.nullPtr, FFI.nullPtr)
 
     EndOfRestart ->
-      pure (18, nullObject, FFI.nullPtr, FFI.nullPtr)
+      f (18, nullObject, FFI.nullPtr, FFI.nullPtr)
 
     StartOfReset ->
-      pure (19, nullObject, FFI.nullPtr, FFI.nullPtr)
+      f (19, nullObject, FFI.nullPtr, FFI.nullPtr)
 
     EndOfReset ->
-      pure (20, nullObject, FFI.nullPtr, FFI.nullPtr)
+      f (20, nullObject, FFI.nullPtr, FFI.nullPtr)
 
     EnterInteractive ->
-      pure (21, nullObject, FFI.nullPtr, FFI.nullPtr)
+      f (21, nullObject, FFI.nullPtr, FFI.nullPtr)
 
     ExitInteractive ->
-      pure (22, nullObject, FFI.nullPtr, FFI.nullPtr)
+      f (22, nullObject, FFI.nullPtr, FFI.nullPtr)
 
     InteractiveScopeChange ->
-      pure (23, nullObject, FFI.nullPtr, FFI.nullPtr)
+      f (23, nullObject, FFI.nullPtr, FFI.nullPtr)
 
     UnresolvedSysTf ->
-      pure (24, nullObject, FFI.nullPtr, FFI.nullPtr)
+      f (24, nullObject, FFI.nullPtr, FFI.nullPtr)
 
 #if defined(VERILOG_2001)
     AfterAssign object timeTy valueFmt -> do
       ctimeTy <- send timeTy
-      ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
-
-      cfmt <- send valueFmt
-      cvalue <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
-
-      pure (25, coerce object, ctime, cvalue)
+      FFI.alloca $ \ctime -> do
+        FFI.pokeByteOff ctime 0 ctimeTy
+        cfmt <- send valueFmt
+        FFI.alloca $ \cvalue -> do
+          FFI.pokeByteOff cvalue 0 cfmt
+          f (25, coerce object, ctime, cvalue)
 
     AfterDeassign object timeTy valueFmt -> do
       ctimeTy <- send timeTy
-      ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
-
-      cfmt <- send valueFmt
-      cvalue <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
-
-      pure (26, coerce object, ctime, cvalue)
+      FFI.alloca $ \ctime -> do
+        FFI.pokeByteOff ctime 0 ctimeTy
+        cfmt <- send valueFmt
+        FFI.alloca $ \cvalue -> do
+          FFI.pokeByteOff cvalue 0 cfmt
+          f (26, coerce object, ctime, cvalue)
 
     AfterDisable object timeTy valueFmt -> do
       ctimeTy <- send timeTy
-      ctime <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
-
-      cfmt <- send valueFmt
-      cvalue <- fst <$> Sim.withNewPtr Sim.stackPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
-
-      pure (27, coerce object, ctime, cvalue)
+      FFI.alloca $ \ctime -> do
+        FFI.pokeByteOff ctime 0 ctimeTy
+        cfmt <- send valueFmt
+        FFI.alloca $ \cvalue -> do
+          FFI.pokeByteOff cvalue 0 cfmt
+          f (27, coerce object, ctime, cvalue)
 
     PliError ->
-      pure (28, nullObject, FFI.nullPtr, FFI.nullPtr)
+      f (28, nullObject, FFI.nullPtr, FFI.nullPtr)
 
     Signal ->
-      pure (29, nullObject, FFI.nullPtr, FFI.nullPtr)
+      f (29, nullObject, FFI.nullPtr, FFI.nullPtr)
 #endif
 #if defined(VERILOG_2005)
     NbaSynch mObject time -> do
       let object = maybe nullObject coerce mObject
       ctime <- pokeSend time
-      pure (30, object, ctime, FFI.nullPtr)
+      f (30, object, ctime, FFI.nullPtr)
 
     AtEndOfSimTime mObject time -> do
       let object = maybe nullObject coerce mObject
       ctime <- pokeSend time
-      pure (31, object, ctime, FFI.nullPtr)
+      f (31, object, ctime, FFI.nullPtr)
 #endif
 
 instance Send CallbackReason where
   send = \case
     AfterValueChange object timeTy valueFmt -> do
       ctimeTy <- send timeTy
-      ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+      ctime <- FFI.malloc
+      FFI.pokeByteOff ctime 0 ctimeTy
 
       cfmt <- send valueFmt
-      cvalue <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
+      cvalue <- FFI.malloc
+      FFI.pokeByteOff cvalue 0 cfmt
 
       pure (1, coerce object, ctime, cvalue)
 
     BeforeStatement object timeTy -> do
       ctimeTy <- send timeTy
-      ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+      ctime <- FFI.malloc
+      FFI.pokeByteOff ctime 0 ctimeTy
 
       pure (2, coerce object, ctime, FFI.nullPtr)
 
@@ -332,10 +330,12 @@ instance Send CallbackReason where
       let object = maybe nullObject coerce mObject
 
       ctimeTy <- send timeTy
-      ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+      ctime <- FFI.malloc
+      FFI.pokeByteOff ctime 0 ctimeTy
 
       cfmt <- send valueFmt
-      cvalue <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
+      cvalue <- FFI.malloc
+      FFI.pokeByteOff cvalue 0 cfmt
 
       pure (3, object, ctime, cvalue)
 
@@ -343,10 +343,12 @@ instance Send CallbackReason where
       let object = maybe nullObject coerce mObject
 
       ctimeTy <- send timeTy
-      ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+      ctime <- FFI.malloc
+      FFI.pokeByteOff ctime 0 ctimeTy
 
       cfmt <- send valueFmt
-      cvalue <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
+      cvalue <- FFI.malloc
+      FFI.pokeByteOff cvalue 0 cfmt
 
       pure (4, object, ctime, cvalue)
 
@@ -369,7 +371,8 @@ instance Send CallbackReason where
       let object = maybe nullObject coerce mObject
 
       ctimeTy <- send timeTy
-      ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+      ctime <- FFI.malloc
+      FFI.pokeByteOff ctime 0 ctimeTy
 
       pure (8, object, ctime, FFI.nullPtr)
 
@@ -426,28 +429,34 @@ instance Send CallbackReason where
 #if defined(VERILOG_2001)
     AfterAssign object timeTy valueFmt -> do
       ctimeTy <- send timeTy
-      ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+      ctime <- FFI.malloc
+      FFI.pokeByteOff ctime 0 ctimeTy
 
       cfmt <- send valueFmt
-      cvalue <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
+      cvalue <- FFI.malloc
+      FFI.pokeByteOff cvalue 0 cfmt
 
       pure (25, coerce object, ctime, cvalue)
 
     AfterDeassign object timeTy valueFmt -> do
       ctimeTy <- send timeTy
-      ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+      ctime <- FFI.malloc
+      FFI.pokeByteOff ctime 0 ctimeTy
 
       cfmt <- send valueFmt
-      cvalue <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
+      cvalue <- FFI.malloc
+      FFI.pokeByteOff cvalue 0 cfmt
 
       pure (26, coerce object, ctime, cvalue)
 
     AfterDisable object timeTy valueFmt -> do
       ctimeTy <- send timeTy
-      ctime <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 ctimeTy)
+      ctime <- FFI.malloc
+      FFI.pokeByteOff ctime 0 ctimeTy
 
       cfmt <- send valueFmt
-      cvalue <- fst <$> Sim.withNewPtr Sim.heapPtr (\ptr -> FFI.pokeByteOff ptr 0 cfmt)
+      cvalue <- FFI.malloc
+      FFI.pokeByteOff cvalue 0 cfmt
 
       pure (27, coerce object, ctime, cvalue)
 
@@ -477,8 +486,8 @@ data UnknownCallbackReason
   deriving anyclass (Exception)
 
 instance Show UnknownCallbackReason where
-  show (UnknownCallbackReason x c) =
-    mconcat
+  show = \case
+    UnknownCallbackReason x c -> mconcat
       [ "Unknown callback reason: "
       , show x
       , "\n"
@@ -490,43 +499,43 @@ instance UnsafeReceive CallbackReason where
     let mObject = if isNullObject object then Nothing else Just object in
     case creason of
       1 -> do
-        timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
-        valueFmt <- IO.liftIO (FFI.peekByteOff cvalue 0) >>= receive
-        pure (AfterValueChange object timeTy valueFmt)
+        timeTy <- FFI.peekByteOff ctime 0 >>= receive
+        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
+        pure $ AfterValueChange object timeTy valueFmt
 
       2 -> do
-        timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
-        pure (BeforeStatement object timeTy)
+        timeTy <- FFI.peekByteOff ctime 0 >>= receive
+        pure $ BeforeStatement object timeTy
 
       3 -> do
-        timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
-        valueFmt <- IO.liftIO (FFI.peekByteOff cvalue 0) >>= receive
-        pure (AfterForce mObject timeTy valueFmt)
+        timeTy <- FFI.peekByteOff ctime 0 >>= receive
+        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
+        pure $ AfterForce mObject timeTy valueFmt
 
       4 -> do
-        timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
-        valueFmt <- IO.liftIO (FFI.peekByteOff cvalue 0) >>= receive
-        pure (AfterRelease mObject timeTy valueFmt)
+        timeTy <- FFI.peekByteOff ctime 0 >>= receive
+        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
+        pure $ AfterRelease mObject timeTy valueFmt
 
       5 -> do
         time <- peekReceive ctime
-        pure (AtStartOfSimTime mObject time)
+        pure $ AtStartOfSimTime mObject time
 
       6 -> do
         time <- peekReceive ctime
-        pure (ReadWriteSynch mObject time)
+        pure $ ReadWriteSynch mObject time
 
       7 -> do
         time <- peekReceive ctime
-        pure (ReadOnlySynch mObject time)
+        pure $ ReadOnlySynch mObject time
 
       8 -> do
-        timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
-        pure (NextSimTime mObject timeTy)
+        timeTy <- FFI.peekByteOff ctime 0 >>= receive
+        pure $ NextSimTime mObject timeTy
 
       9 -> do
         time <- peekReceive ctime
-        pure (AfterDelay mObject time)
+        pure $ AfterDelay mObject time
 
       10 ->
         pure EndOfCompile
@@ -575,19 +584,19 @@ instance UnsafeReceive CallbackReason where
 
 #if defined(VERILOG_2001)
       25 -> do
-        timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
-        valueFmt <- IO.liftIO (FFI.peekByteOff cvalue 0) >>= receive
-        pure (AfterAssign object timeTy valueFmt)
+        timeTy <- FFI.peekByteOff ctime 0 >>= receive
+        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
+        pure $ AfterAssign object timeTy valueFmt
 
       26 -> do
-        timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
-        valueFmt <- IO.liftIO (FFI.peekByteOff cvalue 0) >>= receive
-        pure (AfterDeassign object timeTy valueFmt)
+        timeTy <- FFI.peekByteOff ctime 0 >>= receive
+        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
+        pure $ AfterDeassign object timeTy valueFmt
 
       27 -> do
-        timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
-        valueFmt <- IO.liftIO (FFI.peekByteOff cvalue 0) >>= receive
-        pure (AfterDisable object timeTy valueFmt)
+        timeTy <- FFI.peekByteOff ctime 0 >>= receive
+        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
+        pure $ AfterDisable object timeTy valueFmt
 
       28 ->
         pure PliError
@@ -598,57 +607,57 @@ instance UnsafeReceive CallbackReason where
 #if defined(VERILOG_2005)
       30 -> do
         time <- peekReceive ctime
-        pure (NbaSynch mObject time)
+        pure $ NbaSynch mObject time
 
       31 -> do
         time <- peekReceive ctime
-        pure (AtEndOfSimTime mObject time)
+        pure $ AtEndOfSimTime mObject time
 #endif
 
-      n  -> Sim.throw (UnknownCallbackReason n callStack)
+      n  -> throwIO $ UnknownCallbackReason n callStack
 
 instance Receive CallbackReason where
   receive (creason, object, ctime, cvalue) =
     let mObject = if isNullObject object then Nothing else Just object in
     case creason of
       1 -> do
-        timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
-        valueFmt <- IO.liftIO (FFI.peekByteOff cvalue 0) >>= receive
-        pure (AfterValueChange object timeTy valueFmt)
+        timeTy <- FFI.peekByteOff ctime 0 >>= receive
+        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
+        pure $ AfterValueChange object timeTy valueFmt
 
       2 -> do
-        timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
-        pure (BeforeStatement object timeTy)
+        timeTy <- FFI.peekByteOff ctime 0 >>= receive
+        pure $ BeforeStatement object timeTy
 
       3 -> do
-        timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
-        valueFmt <- IO.liftIO (FFI.peekByteOff cvalue 0) >>= receive
-        pure (AfterForce mObject timeTy valueFmt)
+        timeTy <- FFI.peekByteOff ctime 0 >>= receive
+        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
+        pure $ AfterForce mObject timeTy valueFmt
 
       4 -> do
-        timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
-        valueFmt <- IO.liftIO (FFI.peekByteOff cvalue 0) >>= receive
-        pure (AfterRelease mObject timeTy valueFmt)
+        timeTy <- FFI.peekByteOff ctime 0 >>= receive
+        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
+        pure $ AfterRelease mObject timeTy valueFmt
 
       5 -> do
         time <- peekReceive ctime
-        pure (AtStartOfSimTime mObject time)
+        pure $ AtStartOfSimTime mObject time
 
       6 -> do
         time <- peekReceive ctime
-        pure (ReadWriteSynch mObject time)
+        pure $ ReadWriteSynch mObject time
 
       7 -> do
         time <- peekReceive ctime
-        pure (ReadOnlySynch mObject time)
+        pure $ ReadOnlySynch mObject time
 
       8 -> do
-        timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
-        pure (NextSimTime mObject timeTy)
+        timeTy <- FFI.peekByteOff ctime 0 >>= receive
+        pure $ NextSimTime mObject timeTy
 
       9 -> do
         time <- peekReceive ctime
-        pure (AfterDelay mObject time)
+        pure $ AfterDelay mObject time
 
       10 ->
         pure EndOfCompile
@@ -697,19 +706,19 @@ instance Receive CallbackReason where
 
 #if defined(VERILOG_2001)
       25 -> do
-        timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
-        valueFmt <- IO.liftIO (FFI.peekByteOff cvalue 0) >>= receive
-        pure (AfterAssign object timeTy valueFmt)
+        timeTy <- FFI.peekByteOff ctime 0 >>= receive
+        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
+        pure $ AfterAssign object timeTy valueFmt
 
       26 -> do
-        timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
-        valueFmt <- IO.liftIO (FFI.peekByteOff cvalue 0) >>= receive
-        pure (AfterDeassign object timeTy valueFmt)
+        timeTy <- FFI.peekByteOff ctime 0 >>= receive
+        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
+        pure $ AfterDeassign object timeTy valueFmt
 
       27 -> do
-        timeTy <- IO.liftIO (FFI.peekByteOff ctime 0) >>= receive
-        valueFmt <- IO.liftIO (FFI.peekByteOff cvalue 0) >>= receive
-        pure (AfterDisable object timeTy valueFmt)
+        timeTy <- FFI.peekByteOff ctime 0 >>= receive
+        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
+        pure $ AfterDisable object timeTy valueFmt
 
       28 ->
         pure PliError
@@ -720,11 +729,11 @@ instance Receive CallbackReason where
 #if defined(VERILOG_2005)
       30 -> do
         time <- peekReceive ctime
-        pure (NbaSynch mObject time)
+        pure $ NbaSynch mObject time
 
       31 -> do
         time <- peekReceive ctime
-        pure (AtEndOfSimTime mObject time)
+        pure $ AtEndOfSimTime mObject time
 #endif
 
-      n -> Sim.throw (UnknownCallbackReason n callStack)
+      n  -> throwIO $ UnknownCallbackReason n callStack

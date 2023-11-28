@@ -10,18 +10,14 @@ module Clash.FFI.VPI.IO
   , simFlushIO
   ) where
 
-import           Control.Exception (Exception)
-import           Control.Monad ((>=>))
+import           Control.Exception (Exception, throwIO)
 import qualified Control.Monad as Monad (void, when)
-import qualified Control.Monad.IO.Class as IO (liftIO)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS (snoc)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CInt(..))
 import           GHC.Stack (CallStack, HasCallStack, callStack, prettyCallStack)
 
-import           Clash.FFI.Monad (SimCont)
-import qualified Clash.FFI.Monad as Sim (throw)
 import           Clash.FFI.View (unsafeSend, ensureNullTerminated)
 
 foreign import ccall "vpi_user.h vpi_printf"
@@ -32,18 +28,18 @@ foreign import ccall "vpi_user.h vpi_printf"
 -- not output anything in some simulators, but this function will.
 --
 simPutStr
-  :: forall o
-   . HasCallStack
+  :: HasCallStack
   => ByteString
-  -> SimCont o ()
-simPutStr =
-  (unsafeSend >=> IO.liftIO . Monad.void . c_vpi_printf) . ensureNullTerminated
+  -> IO ()
+simPutStr bs =
+  unsafeSend (ensureNullTerminated bs)
+    $ Monad.void . c_vpi_printf
 
 -- | A version of 'putStrLn' which outputs to the handle used by the simulator.
 -- When running a VPI callback, the normal functions provided in @base@ may
 -- not output anything in some simulators, but this function will.
 --
-simPutStrLn :: HasCallStack => ByteString -> SimCont o ()
+simPutStrLn :: HasCallStack => ByteString -> IO ()
 simPutStrLn =
   simPutStr . (`BS.snoc` '\n')
 
@@ -63,11 +59,9 @@ foreign import ccall "vpi_user.h vpi_flush"
 
 -- | Flush the IO output buffer controlled by the simulator.
 --
-simFlushIO :: HasCallStack => SimCont o ()
+simFlushIO :: HasCallStack => IO ()
 simFlushIO = do
-  failed <- IO.liftIO c_vpi_flush
+  failed <- c_vpi_flush
 
   Monad.when failed $
-    Sim.throw (CouldNotFlushIO callStack)
-
-  pure ()
+    throwIO $ CouldNotFlushIO callStack

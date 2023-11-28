@@ -5,10 +5,18 @@
 
   HDL generation functionality for LATTICE ICE IO primitives.
 -}
+
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_HADDOCK hide #-}
+
+-- GHC < 9, sometimes(?) compains about the RHS of sbioTemplate being unreacheble,
+-- this explicitly turns that into an warning overriding -Werror.
+#if __GLASGOW_HASKELL__ < 900
+{-# OPTIONS_GHC -Wwarn=overlapping-patterns #-}
+#endif
 
 module Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO (sbioTF) where
 

@@ -11,10 +11,8 @@ module Clash.FFI.VPI.Port
   ) where
 
 import Control.DeepSeq (NFData)
-import Data.Typeable (Typeable)
 import Foreign.Storable (Storable)
 
-import Clash.FFI.Monad (SimCont)
 import Clash.FFI.VPI.Object
 import Clash.FFI.VPI.Port.Direction
 
@@ -36,5 +34,5 @@ newtype Port
 
 -- | The direction of the port, as specified in the design.
 --
-direction :: Typeable o => Port -> SimCont o Direction
+direction :: Port -> IO Direction
 direction = receiveProperty Direction
