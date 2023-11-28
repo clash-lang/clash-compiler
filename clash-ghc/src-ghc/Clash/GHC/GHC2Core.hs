@@ -701,9 +701,9 @@ coreToTerm primMap unlocs = term
         LitNumNatural -> C.NaturalLiteral i
 #endif
         LitNumInt     -> C.IntLiteral i
-        LitNumInt64   -> C.IntLiteral i
+        LitNumInt64   -> C.Int64Literal i
         LitNumWord    -> C.WordLiteral i
-        LitNumWord64  -> C.WordLiteral i
+        LitNumWord64  -> C.Word64Literal i
 #if MIN_VERSION_ghc(9,2,0)
         LitNumInt8    -> C.Int8Literal i
         LitNumInt16   -> C.Int16Literal i

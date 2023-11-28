@@ -486,7 +486,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce . integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word16) $ i
   "GHC.Prim.popCnt32#" | [i] <- wordLiterals' args
     -> reduce . integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word32) $ i
-  "GHC.Prim.popCnt64#" | [i] <- wordLiterals' args
+  "GHC.Prim.popCnt64#" | [i] <- word64Literals' args
     -> reduce . integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word64) $ i
   "GHC.Prim.popCnt#" | [i] <- wordLiterals' args
     -> reduce . integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word) $ i
@@ -497,7 +497,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce . integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word16) $ i
   "GHC.Prim.clz32#" | [i] <- wordLiterals' args
     -> reduce . integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word32) $ i
-  "GHC.Prim.clz64#" | [i] <- wordLiterals' args
+  "GHC.Prim.clz64#" | [i] <- word64Literals' args
     -> reduce . integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word64) $ i
   "GHC.Prim.clz#" | [i] <- wordLiterals' args
     -> reduce . integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word) $ i
@@ -508,7 +508,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce . integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word) $ i .&. (bit 16 - 1)
   "GHC.Prim.ctz32#" | [i] <- wordLiterals' args
     -> reduce . integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word) $ i .&. (bit 32 - 1)
-  "GHC.Prim.ctz64#" | [i] <- wordLiterals' args
+  "GHC.Prim.ctz64#" | [i] <- word64Literals' args
     -> reduce . integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word64) $ i .&. (bit 64 - 1)
   "GHC.Prim.ctz#" | [i] <- wordLiterals' args
     -> reduce . integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word) $ i
@@ -517,7 +517,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce . integerToWordLiteral . toInteger . byteSwap16 . (fromInteger :: Integer -> Word16) $ i
   "GHC.Prim.byteSwap32#" | [i] <- wordLiterals' args
     -> reduce . integerToWordLiteral . toInteger . byteSwap32 . (fromInteger :: Integer -> Word32) $ i
-  "GHC.Prim.byteSwap64#" | [i] <- wordLiterals' args
+  "GHC.Prim.byteSwap64#" | [i] <- word64Literals' args
     -> reduce . integerToWordLiteral . toInteger . byteSwap64 . (fromInteger :: Integer -> Word64) $ i
   "GHC.Prim.byteSwap#" | [i] <- wordLiterals' args -- assume 64bits
     -> reduce . integerToWordLiteral . toInteger . byteSwap64 . (fromInteger :: Integer -> Word64) $ i
@@ -531,7 +531,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce . integerToWordLiteral . toInteger . bitReverse16 . fromInteger $ i
   "GHC.Prim.bitReverse32#" | [i] <- wordLiterals' args
     -> reduce . integerToWordLiteral . toInteger . bitReverse32 . fromInteger $ i
-  "GHC.Prim.bitReverse64#" | [i] <- wordLiterals' args
+  "GHC.Prim.bitReverse64#" | [i] <- word64Literals' args
     -> reduce . integerToWordLiteral . toInteger . bitReverse64 . fromInteger $ i
 #endif
 ------------
@@ -4818,6 +4818,13 @@ int64Literal :: Value -> Maybe Integer
 int64Literal x = case x of
   Lit (Int64Literal i) -> Just i
   _ -> Nothing
+#else
+-- Prior to GHC 9.4 Int64# didn't exist, 64 bit primitives took Int# instead
+int64Literals' :: [Value] -> [Integer]
+int64Literals' = intLiterals'
+
+int64Literal :: Value -> Maybe Integer
+int64Literal = intLiteral
 #endif
 #endif
 
@@ -4873,6 +4880,13 @@ word64Literal :: Value -> Maybe Integer
 word64Literal x = case x of
   Lit (Word64Literal i) -> Just i
   _ -> Nothing
+#else
+-- Prior to GHC 9.4 Word64# didn't exist, 64 bit primitives took Word# instead
+word64Literals' :: [Value] -> [Integer]
+word64Literals' = wordLiterals'
+
+word64Literal :: Value -> Maybe Integer
+word64Literal= wordLiteral
 #endif
 #endif
 
