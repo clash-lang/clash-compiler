@@ -98,8 +98,15 @@ tUFixed
 -- Bit?
 
 tInt         = csGenericHaskell @Int
+tInt8        = csGenericHaskell @Int8
 tInt16       = csGenericHaskell @Int16
+tInt32       = csGenericHaskell @Int32
+tInt64       = csGenericHaskell @Int64
+tWord        = csGenericHaskell @Word
+tWord8       = csGenericHaskell @Word8
 tWord16      = csGenericHaskell @Word16
+tWord32      = csGenericHaskell @Word32
+tWord64      = csGenericHaskell @Word64
 
 topEntity
  = ( bvSpecific
@@ -107,9 +114,18 @@ topEntity
    , tInteger
    , tNatural
    , tUFixed
-   , tInt
-   , tInt16
-   , tWord16
+   , ( tInt
+     , tInt8
+     , tInt16
+     , tInt32
+     , tInt64
+     )
+   , ( tWord
+     , tWord8
+     , tWord16
+     , tWord32
+     , tWord64
+     )
    )
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE topEntity #-}
