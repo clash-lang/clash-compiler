@@ -1,132 +1,264 @@
-module Clash.Cores.SigmaDeltaADC where
+module SigmaDeltaADC (sigmaDeltaADC) where
 
 import Clash.Prelude hiding (filter, truncate)
+
+-- | Sigma Delta ADC configurable in the ADC width, OSR and filter depth
+
+-- The frequency for the ADC is equal to clk / 2^((AccumulatorWidth - BitsPerCycle - 1) + FilterDepth),
+-- where clk is the operating frequency of the ADC
+{-# NOINLINE sigmaDeltaADC #-}
+sigmaDeltaADC :: (HiddenClockResetEnable dom, KnownNat n0, KnownNat n1, 
+                  KnownNat n2, KnownNat n3, CLog 2 (n3 + 1) <= (n1 + n0)) 
+            => SNat n0                                  
+            -- ^ ADC width
+            -> SNat (n0 + n1)                           
+            -- ^ Accumulator width
+            -- Has to be larger or equal to the ADC width, the OSR is equal to 2^(AccumulatorWidth - ADCwidth)
+
+            -> SNat n2                                  
+            -- ^ Filter depth
+            -- The depth of the decimation filter, the downsampling rate is equal to 2^FilterDepth
+
+            -> Signal dom (BitVector n3)                        
+            -- ^ analog input from the comparator
+            -- For the design either lvds or an external comparator can be used
+            -- the input signal had to be connected to the positive input while 
+            -- the output from a low pass RC-network connects to the negative input.
+            -- The input is a bitvector such that ddr or a deserialiser can be utilised
+            -- to get more bits per clock cycle for an increased sampling frequency. 
+            -> Signal dom (BitVector n3, 
+                           BitVector n0, 
+                           Bool) 
+            -- ^ parts of the tuple
+            --
+            -- 1. feedback to the RC network:
+            -- The R and C of the low pass network need to be chosen such that:
+            -- RC inbetween 200 and 1000 x clk, where clk is the frequency of 
+            -- output
+            --
+            -- 2. the digital output of the ADC
+            --
+            -- 3. Trigger for when the output is ready
+
+sigmaDeltaADC adcw accumw filterw analog_cmp =  bundle(delta, digital_out, sample_rdy) 
+    where 
+        delta                       = register 0 analog_cmp
+        (accum, accum_rdy)          = unbundle(accumulator adcw accumw numOnes)
+        (digital_out, sample_rdy)   = unbundle(filter filterw accum accum_rdy)    
+        numOnes                     = pack <$> (countOnes <$> delta)
+
 
 -- Shared functions
 -- Function to remove the LSBs from a BitVector
 truncate :: (KnownNat n0, KnownNat n1) 
           => BitVector (n0 + n1) 
+          -- ^ entire bitvector
           -> BitVector n0 
+          -- ^ bitvector without number of LSBs
 truncate input = output
     where 
-        (output, lsb) = split input
+        (output, _) = split input
 
--- Remove the LSBs from sigma when the rollover is high
-updateAccum ::(KnownNat n0, KnownNat n1)
-            =>  BitVector n0                    -- The previous accum, the state
-            -> (BitVector (n0 + n1), Bool)      -- The input, sigma and the rollover boolean
-            -> (BitVector n0, BitVector n0)     -- The new accum and the output
-updateAccum accum (sigma, rollover)
+-- Remove the LSBs from the accumulator output when the accumulator is ready
+-- This is used for both the accumulator and the filter
+truncateAccum ::(KnownNat n0, KnownNat n1)
+            =>  BitVector n0                    
+            -- The previous accum
+            -> (BitVector (n0 + n1), Bool)      
+            -- ^ parts of the tuple
+            --
+            -- 1. Accumulator output
+            -- 2. Boolean for when the accumulator is ready
+
+            -> (BitVector n0, BitVector n0)     
+            
+            -- ^ parts of tuple
+            --  
+            -- 1. updated accum
+            -- 2. output accum
+
+truncateAccum accum (sigma, rollover)
     | rollover          = (sigma', accum)
-    | otherwise         = (accum, accum) 
+    | otherwise         = (accum,  accum) 
         where
             sigma'      = truncate sigma
 
+
+-- Function to do a popcount from the input bit vector
+countOnes :: (KnownNat n0)
+            => BitVector n0
+            -- The bitvector to do a popcount on
+            -> Index (n0 + 1)
+            -- The result as an index
+countOnes analog_cmp    =   fromInteger (toInteger(popCount analog_cmp))
+
+
 -- Accumulator
 
---The main function for the accumulator
+--The main function for the accumulator, all functions that start with accumulator are used for the accumulator
 {-# NOINLINE accumulator #-}
 accumulator :: (HiddenClockResetEnable dom,  KnownNat n0, KnownNat n1, KnownNat n2, n2 <= (n1 + n0))
-        => SNat n0                              -- The ADC width 
-        -> SNat (n1 + n0)                       -- The accumulator width
-        -> Signal dom (BitVector n2)            -- The input from the comparator    
-        -> Signal dom (BitVector n0, Bool)      -- The accumulator output and the accumulator ready 
-accumulator cw aw numOnes = bundle (accum, rollover)
+            => SNat n0
+            -- ^ The ADC width
+            -> SNat (n1 + n0)                       
+            -- ^ The accumulator width
+            -> Signal dom (BitVector n2)            
+            -- ^ The amount of ones from the input 
+            -> Signal dom (BitVector n0, Bool)      
+            -- ^ Parts of the Tuple
+            --
+            -- 1. The accumulator output 
+            -- 2. Accumulator ready going to the filter 
+            --
+accumulator _ aw numOnes = bundle (accum, rollover)
     where 
-        accum               = mealyB updateAccum 0 (sigma, rollover)
-        (sigma, rollover)   = unbundle (counterT aw numOnes)
+        accum               = mealyB truncateAccum 0 (sigma, rollover)
+        (sigma, rollover)   = unbundle (accumulatorCounterT aw numOnes)
 
 
-        counterT :: (HiddenClockResetEnable dom, KnownNat n0, KnownNat n1, n1 <= n0) => SNat n0 -> Signal dom (BitVector n1) -> Signal dom (BitVector n0, Bool) 
-        counterT aw numOnes = mealy counter (0, False, 0, 0) numOnes
+accumulatorCounterT :: (HiddenClockResetEnable dom, KnownNat n0, KnownNat n1, n1 <= n0) 
+                     => SNat n0 
+                     -- ^ the accumulator width
+                     -> Signal dom (BitVector n1)
+                     -- ^ The amount of ones from the input  
+                     -> Signal dom (BitVector n0, Bool) 
+                    -- ^ Parts of the Tuple
+                    --
+                    -- 1. The accumulator output 
+                    -- 2. Accumulator ready going to the filter  
+accumulatorCounterT _ numOnes = mealy accumulatorCounter (0, False, 0, 0) numOnes
 
-        -- The counter for sigma, which counts up when the input from the comparator is high and resets when count is equal to zero
-        counter :: (KnownNat n0, KnownNat n1, n1 <= n0) 
-                => (BitVector (n0 + 1), Bool, BitVector n1, BitVector (n0 - n1 + 1))                           --The current state of sigma  
-                -> BitVector n1                     --The input, and count
-                -> ((BitVector (n0 + 1), Bool, BitVector n1, BitVector (n0 - n1 + 1 )), (BitVector n0, Bool))  --The updated sigma and 
-        counter (sigma, rollover, num_ones, count) num_ones' = ((new_state, rollover', num_ones', count'), (resize sigma, rollover))
-            where
-                count' = count + 1 
-                rollover' = count == 0 
+-- The counter for sigma, which counts counts the number of ones from the input and resets when count is equal to zero
+accumulatorCounter :: (KnownNat n0, KnownNat n1, n1 <= n0) 
+                   => (BitVector (n0 + 1), 
+                       Bool, 
+                       BitVector n1, 
+                       BitVector (n0 - n1 + 1)) 
+                       -- ^ Parts of the Tuple
+                       -- 
+                       -- 1. The previous sigma
+                       -- 2. bool for when sigma is ready
+                       -- 3. previous number of ones from the input
+                       -- 4. previous value of the main counter                        
+                                                
+                   -> BitVector n1         
+                     -- number of ones from the input
+                            
+                   -> ((BitVector (n0 + 1), 
+                        Bool, 
+                        BitVector n1, 
+                        BitVector (n0 - n1 + 1 )), 
+                       (BitVector n0, 
+                        Bool))  
+                        -- ^ Parts of the Tuple
+                        --
+                        -- 1. The new sigma
+                        -- 2. bool for when sigma is ready
+                        -- 3. new number of ones from the input
+                        -- 4. new value of the main counter
+                        -- 5. The accumulator output 
+                        -- 6. Accumulator ready going to the filter  
+                        --
+accumulatorCounter (sigma, rollover, num_ones, count) num_ones' 
+                = ((new_state, rollover', num_ones', count'), (resize sigma, rollover))
+    where
+        count'      = count + 1 
+        rollover'   = (count == 0) 
 
-                new_state
-                    | rollover               = resize num_ones
-                    | sigma /= maxBound      = min (sigma + resize num_ones) (shiftR maxBound 1)
-                    | otherwise              = maxBound
-
-
-
+        new_state
+            | rollover               = resize num_ones
+            | sigma /= maxBound      = min (sigma + resize num_ones) (shiftR maxBound 1)
+            | otherwise              = maxBound
 
 
 -- Box avaraging filter
+-- All functions that start with filter are used for the box averaging filter
+
 {-# NOINLINE filter #-}
 filter ::  (HiddenClockResetEnable dom, KnownNat n0, KnownNat n1)  
-        =>  SNat n1                             -- The amount of filter bits                           
-        ->  Signal dom (BitVector n0)           -- The input of the filter, width is equal to the adc width
-        ->  Signal dom Bool                     -- Boolean to show when the accumulator is ready
-        ->  Signal dom (BitVector n0, Bool)     -- The filtered output and the sample_rdy
-filter fw data_in sample = bundle(data_out, result_valid)
+        =>  SNat n1                             
+        -- ^ Filter Depth                           
+        ->  Signal dom (BitVector n0)           
+        -- ^ The input of the filter, width is equal to the adc width
+
+        ->  Signal dom Bool                     
+        -- ^ Boolean to show when the accumulator is ready
+
+        ->  Signal dom (BitVector n0, Bool)     
+        -- ^ Parts of the tuple
+        -- 1. The filtered output 
+        -- 2. trigger when a new sample is ready
+
+filter fw data_in accumRdy = bundle(data_out, result_valid)
     where
-        (accumulate, latch_result, result_valid)    = mealyB pipeline (False, False, False) (sample, count)
-        count                                       = traceSignal1 "Filter.count" (count' fw sample)
-        accum                                       = traceSignal1 "Filter.Accum" (mealyB accumulatorf 0 (count, traceSignal1 "Filter.Data_in" data_in, traceSignal1 "Filter.Accumulate" accumulate))
-        data_out                                    = traceSignal1 "Filter.data_out" (mealyB updateAccum 0 (accum, latch_result))
+        (accumulate, latch_result, result_valid)    = mealyB filterPipeline (False, False, False) (accumRdy, count)
+        count                                       = filterCount fw accumRdy
+        accum                                       = mealyB filterAccumulator 0 (count, data_in, accumulate)
+        data_out                                    = mealyB truncateAccum 0 (accum, latch_result)
 
-        --  The accumulator for the filter, it adds the input to accum when teh sample is ready      
-        accumulatorf :: (KnownNat n0, KnownNat n1)
-                    =>   BitVector (n0 + n1)                        -- state of accum
-                    ->  (BitVector n1, BitVector n0, Bool)          -- The main counter input, the input data, boolean for when the sample is ready
-                    ->  (BitVector (n0 + n1), BitVector (n0 + n1))  -- new state, the output
-        accumulatorf accum (count, data_in, accumulate)
-            | count == 1 && accumulate      = (extend data_in, accum) 
-            | accumulate                    = (accum + extend data_in, accum)
-            | otherwise                     = (accum, accum)
-
-
-        -- Pipeline to sync all the signals 
-        pipeline :: (KnownNat n0)
-                    => (Bool, Bool, Bool)                       --                     
-                    -> (Bool, BitVector n0)
-                    -> ((Bool, Bool, Bool), (Bool, Bool, Bool))
-        pipeline (sample_d1, sample_d2, latch_result) (sample, count) = ((sample_d1', sample_d2', latch_result'), (accumulate, latch_result', latch_result))
-            where
-                sample_d1'      = sample
-                sample_d2'      = sample_d1
-                accumulate      = sample_d1 && not sample_d2
-                latch_result'   = accumulate && (count == 1) 
+--  The accumulator for the filter, it adds the input to accum when the sample from the accumulator is ready      
+filterAccumulator :: (KnownNat n0, KnownNat n1)
+                 =>   BitVector (n0 + n1)                        
+                 -- ^ previous count of the filter accumulator
+                 ->  (BitVector n1, BitVector n0, Bool)          
+                 -- ^ Parts of the Tuple:
+                 -- 1. The filter counter
+                 -- 2. Input data from a filter accumulator 
+                 -- 3. boolean for when the sample from the filter accumulator is ready
+                 --
+                 ->  (BitVector (n0 + n1), BitVector (n0 + n1))  
+                 -- ^ Parts of the Tuple
+                 -- 1. the new count of the accumulator
+                 -- 2. the downsampled output of the filter and adc 
+filterAccumulator accum (count, data_in, accumulate)
+    | count == 1 && accumulate      = (extend data_in, accum) 
+    | accumulate                    = (accum + extend data_in, accum)
+    | otherwise                     = (accum, accum)
 
 
-        -- Count when the input sample is ready 
-        count' :: (HiddenClockResetEnable dom, KnownNat n0) 
-                => SNat n0                      -- Filter width 
-                -> Signal dom Bool              -- Sample ready boolean
-                -> Signal dom (BitVector n0)    -- counter output 
-        count' fw sample = output
-            where
-                output = regEn 0 sample (output + 1)
+-- filterPipeline to sync all the signals 
+-- contains 3 registers to determine when the filter needs to accumulate.
+-- this happens when the accumulator is ready
+filterPipeline :: (KnownNat n0)
+            => (Bool, Bool, Bool) 
+            -- ^ parts of the tuple
+            --
+            -- 1. accum ready with 1 cycle of delay
+            -- 2. accum ready with 2 cycles of delay
+            -- 3. latch result with 1 cycle of delay                 
+            -> (Bool, BitVector n0)
+            -- ^ parts of tuple
+            -- input of the mealy machine
+            -- 1. accum ready 
+            -- 2. the main counter 
+            --
+            -> ((Bool, Bool, Bool), (Bool, Bool, Bool))
+            -- ^ parts of the tuple
+            --
+            -- 1,2,3. input for all the registers
+            -- 4, boolean for when the filter need to accumulate
+            -- 5. boolean for when the filter accumulator of ready
+            -- 6. boolean for when the output for the adc is ready 
+filterPipeline (accumRdy_d1, accumRdy_d2, latch_result) (accumRdy, count) 
+            = ((accumRdy_d1', accumRdy_d2', latch_result'), (accumulate, latch_result', latch_result))
+    where
+        accumRdy_d1'      = accumRdy
+        accumRdy_d2'      = accumRdy_d1
+        accumulate        = accumRdy_d1 && not accumRdy_d2
+        latch_result'     = accumulate && (count == 1) 
 
--- Function for the sigma delta ADC 
-{-# NOINLINE sigmaDeltaADC #-}
-sigmaDeltaADC :: (HiddenClockResetEnable dom, KnownNat n0, KnownNat n1, KnownNat n2, KnownNat n3, CLog 2 (n3 + 1) <= (n1 + n0)) 
-            => SNat n0                                  -- ADC width
-            -> SNat (n0 + n1)                           -- Accumnulator width
-            -> SNat n2                                  -- Filter width
-            -> Signal dom (BitVector n3)                        -- analog innput from the comparator
-            -> Signal dom (BitVector n3, BitVector n0, Bool)    -- analog output to the RC network, digital out, sample ready
-sigmaDeltaADC cw aw fw analog_cmp =  bundle(delta, digital_out, sample_rdy) 
-    where 
-        delta                       = register 0 analog_cmp
-        (accum, accum_rdy)          = unbundle(accumulator cw aw numOnes)
-        (digital_out, sample_rdy)   = unbundle(filter fw accum accum_rdy)
 
-        numOnes = traceSignal1 "adc.numOnes" (pack <$> (countOnes <$> delta))
-
-        countOnes :: (KnownNat n0)
-                    => BitVector n0
-                    -> Index (n0 + 1)
-        countOnes analog_cmp = fromInteger (toInteger(popCount analog_cmp))
-
+-- Count when the input sample is ready it counts till 2^(filterWidth)
+filterCount :: (HiddenClockResetEnable dom, KnownNat n0) 
+        => SNat n0                      
+        -- Filter width 
+        -> Signal dom Bool              
+        -- Sample ready boolean
+        -> Signal dom (BitVector n0)    
+        -- counter output 
+filterCount _ accumRdy = output
+    where
+        output = regEn 0 accumRdy (output + 1)
 
 
 
