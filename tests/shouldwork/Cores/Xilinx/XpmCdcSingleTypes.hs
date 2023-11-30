@@ -10,11 +10,6 @@ import Language.Haskell.TH.Lib
 
 import Clash.Cores.Xilinx.Xpm.Cdc.Single
 
-createDomain vXilinxSystem{vName="D3",  vPeriod=hzToPeriod 30e6}
-createDomain vXilinxSystem{vName="D5",  vPeriod=hzToPeriod 50e6}
-createDomain vXilinxSystem{vName="D10", vPeriod=hzToPeriod 100e6}
-createDomain vXilinxSystem{vName="D11", vPeriod=hzToPeriod 110e6}
-
 tb ::
   forall a b stages n .
   ( KnownNat n, 1 <= n
@@ -43,7 +38,7 @@ tb Proxy Proxy initVals regInput SNat expectedDat = done
 
   done =
     outputVerifierWith
-      (\clk rst -> assertBitVector clk rst "outputVerifier Port A")
+      (\clk rst -> assertBitVector clk rst "outputVerifier")
       clkB clkB noReset
       expectedDat
       (pack <$> actual)
