@@ -1367,7 +1367,7 @@ infixr 2 .||.
 -- | The above type is a generalization for:
 --
 -- @
--- __(.||.)__ :: 'Clash.Signal.Signal' 'Bool' -> 'Clash.Signal.Signal' 'Bool' -> 'Clash.Signal.Signal' 'Bool'
+-- __(.||.)__ :: 'Clash.Signal.Signal' dom 'Bool' -> 'Clash.Signal.Signal' dom 'Bool' -> 'Clash.Signal.Signal' dom 'Bool'
 -- @
 --
 -- It is a version of ('||') that returns a 'Clash.Signal.Signal' of 'Bool'
@@ -1378,7 +1378,7 @@ infixr 3 .&&.
 -- | The above type is a generalization for:
 --
 -- @
--- __(.&&.)__ :: 'Clash.Signal.Signal' 'Bool' -> 'Clash.Signal.Signal' 'Bool' -> 'Clash.Signal.Signal' 'Bool'
+-- __(.&&.)__ :: 'Clash.Signal.Signal' dom 'Bool' -> 'Clash.Signal.Signal' dom 'Bool' -> 'Clash.Signal.Signal' dom 'Bool'
 -- @
 --
 -- It is a version of ('&&') that returns a 'Clash.Signal.Signal' of 'Bool'
@@ -1544,7 +1544,7 @@ syncRegister# clk (unsafeToActiveHigh -> rst) (fromEnable -> ena) initVal resetV
 -- | The above type is a generalization for:
 --
 -- @
--- __mux__ :: 'Clash.Signal.Signal' 'Bool' -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a
+-- __mux__ :: 'Clash.Signal.Signal' dom 'Bool' -> 'Clash.Signal.Signal' dom a -> 'Clash.Signal.Signal' dom a -> 'Clash.Signal.Signal' dom a
 -- @
 --
 -- A multiplexer. Given "@'mux' b t f@", output @t@ when @b@ is 'True', and @f@
@@ -1557,7 +1557,7 @@ infix 4 .==.
 -- | The above type is a generalization for:
 --
 -- @
--- __(.==.)__ :: 'Eq' a => 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' 'Bool'
+-- __(.==.)__ :: 'Eq' a => 'Clash.Signal.Signal' dom a -> 'Clash.Signal.Signal' dom a -> 'Clash.Signal.Signal' dom 'Bool'
 -- @
 --
 -- It is a version of ('==') that returns a 'Clash.Signal.Signal' of 'Bool'
@@ -1568,7 +1568,7 @@ infix 4 ./=.
 -- | The above type is a generalization for:
 --
 -- @
--- __(./=.)__ :: 'Eq' a => 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' 'Bool'
+-- __(./=.)__ :: 'Eq' a => 'Clash.Signal.Signal' dom a -> 'Clash.Signal.Signal' dom a -> 'Clash.Signal.Signal' dom 'Bool'
 -- @
 --
 -- It is a version of ('/=') that returns a 'Clash.Signal.Signal' of 'Bool'
@@ -1579,7 +1579,7 @@ infix 4 .<.
 -- | The above type is a generalization for:
 --
 -- @
--- __(.<.)__ :: 'Ord' a => 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' 'Bool'
+-- __(.<.)__ :: 'Ord' a => 'Clash.Signal.Signal' dom a -> 'Clash.Signal.Signal' dom a -> 'Clash.Signal.Signal' dom 'Bool'
 -- @
 --
 -- It is a version of ('<') that returns a 'Clash.Signal.Signal' of 'Bool'
@@ -1590,7 +1590,7 @@ infix 4 .<=.
 -- | The above type is a generalization for:
 --
 -- @
--- __(.<=.)__ :: 'Ord' a => 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' 'Bool'
+-- __(.<=.)__ :: 'Ord' a => 'Clash.Signal.Signal' dom a -> 'Clash.Signal.Signal' dom a -> 'Clash.Signal.Signal' dom 'Bool'
 -- @
 --
 -- It is a version of ('GHC.TypeNats.<=') that returns a 'Clash.Signal.Signal' of 'Bool'
@@ -1601,7 +1601,7 @@ infix 4 .>.
 -- | The above type is a generalization for:
 --
 -- @
--- __(.>.)__ :: 'Ord' a => 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' 'Bool'
+-- __(.>.)__ :: 'Ord' a => 'Clash.Signal.Signal' dom a -> 'Clash.Signal.Signal' dom a -> 'Clash.Signal.Signal' dom 'Bool'
 -- @
 --
 -- It is a version of ('>') that returns a 'Clash.Signal.Signal' of 'Bool'
@@ -1612,7 +1612,7 @@ infix 4 .>=.
 -- | The above type is a generalization for:
 --
 -- @
--- __(.>=.)__ :: 'Ord' a => 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' 'Bool'
+-- __(.>=.)__ :: 'Ord' a => 'Clash.Signal.Signal' dom a -> 'Clash.Signal.Signal' dom a -> 'Clash.Signal.Signal' dom 'Bool'
 -- @
 --
 --  It is a version of ('>=') that returns a 'Clash.Signal.Signal' of 'Bool'
@@ -1635,7 +1635,7 @@ instance CoArbitrary a => CoArbitrary (Signal dom a) where
 -- | The above type is a generalization for:
 --
 -- @
--- __testFor__ :: 'Int' -> 'Clash.Signal.Signal' Bool -> 'Property'
+-- __testFor__ :: 'Int' -> 'Clash.Signal.Signal' dom Bool -> 'Property'
 -- @
 --
 -- @testFor n s@ tests the signal @s@ for @n@ cycles.
@@ -1649,7 +1649,7 @@ testFor n = property . and . take n . sample
 -- | The above type is a generalization for:
 --
 -- @
--- __sample__ :: 'Clash.Signal.Signal' a -> [a]
+-- __sample__ :: 'Clash.Signal.Signal' dom a -> [a]
 -- @
 --
 -- Get an infinite list of samples from a 'Clash.Signal.Signal'
@@ -1666,7 +1666,7 @@ sample = foldr (\a b -> deepseqX a (a : b)) []
 -- | The above type is a generalization for:
 --
 -- @
--- __sampleN__ :: Int -> 'Clash.Signal.Signal' a -> [a]
+-- __sampleN__ :: Int -> 'Clash.Signal.Signal' dom a -> [a]
 -- @
 --
 -- Get a list of @n@ samples from a 'Clash.Signal.Signal'
@@ -1694,7 +1694,7 @@ fromList = Prelude.foldr (\a b -> deepseqX a (a :- b)) (errorX "finite list")
 
 -- * Simulation functions (not synthesizable)
 
--- | Simulate a (@'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' b@) function
+-- | Simulate a (@'Clash.Signal.Signal' dom1 a -> 'Clash.Signal.Signal' dom2 b@) function
 -- given a list of samples of type @a@
 --
 -- >>> simulate (register systemClockGen resetGen enableGen 8) [1, 1, 2, 3]
@@ -1708,7 +1708,7 @@ simulate f = sample . f . fromList
 -- | The above type is a generalization for:
 --
 -- @
--- __sample__ :: 'Clash.Signal.Signal' a -> [a]
+-- __sample__ :: 'Clash.Signal.Signal' dom a -> [a]
 -- @
 --
 -- Get an infinite list of samples from a 'Clash.Signal.Signal'
@@ -1725,7 +1725,7 @@ sample_lazy = foldr (:) []
 -- | The above type is a generalization for:
 --
 -- @
--- __sampleN__ :: Int -> 'Clash.Signal.Signal' a -> [a]
+-- __sampleN__ :: Int -> 'Clash.Signal.Signal' dom a -> [a]
 -- @
 --
 -- Get a list of @n@ samples from a 'Clash.Signal.Signal'
@@ -1753,7 +1753,7 @@ fromList_lazy = Prelude.foldr (:-) (error "finite list")
 
 -- * Simulation functions (not synthesizable)
 
--- | Simulate a (@'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' b@) function
+-- | Simulate a (@'Clash.Signal.Signal' dom1 a -> 'Clash.Signal.Signal' dom2 b@) function
 -- given a list of samples of type @a@
 --
 -- >>> simulate (register systemClockGen resetGen enableGen 8) [1, 1, 2, 3]
