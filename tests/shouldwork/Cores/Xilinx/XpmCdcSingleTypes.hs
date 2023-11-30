@@ -9,6 +9,10 @@ import Data.Proxy
 import Language.Haskell.TH.Lib
 
 import Clash.Cores.Xilinx.Xpm.Cdc.Single
+import XpmTestCommon
+
+testData :: KnownDomain dom => Clock dom -> Signal dom (Unsigned 1)
+testData = genTestData randomSeed
 
 tb ::
   forall a b stages n .
@@ -28,17 +32,15 @@ tb ::
   Signal b Bool
 tb Proxy Proxy initVals regInput SNat expectedDat = done
  where
-  counter = delay clkA enableGen 0 (counter + 1)
-
   actual =
     xpmCdcSingleWith
       @stages @(Unsigned 1)
       (XpmCdcSingleConfig SNat initVals regInput)
-      clkA clkB counter
+      clkA clkB (testData clkA)
 
   done =
     outputVerifierWith
-      (\clk rst -> assertBitVector clk rst "outputVerifier")
+      (\clk rst -> assertBitVector clk rst $(lift $ "outputVerifier (seed:" <> show randomSeed <> ")"))
       clkB clkB noReset
       expectedDat
       (pack <$> actual)
@@ -72,6 +74,6 @@ expected Proxy Proxy initVals regInput SNat SNat = listToVecTH out1
       (XpmCdcSingleConfig SNat initVals regInput)
       (clockGen @a)
       (clockGen @b)
-      (fromList [0..])
+      (testData clockGen)
 
   out1 = pack <$> sampleN (natToNum @samples) out0

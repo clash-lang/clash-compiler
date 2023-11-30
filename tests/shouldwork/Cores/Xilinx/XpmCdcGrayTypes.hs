@@ -60,6 +60,6 @@ expected Proxy Proxy SNat SNat SNat = listToVecTH out1
       (XpmCdcGrayConfig SNat True)
       (clockGen @a)
       (clockGen @b)
-      (fromList [0..])
+      (fromList (cycle [0..]))
 
   out1 = pack <$> sampleN (natToNum @samples) out0

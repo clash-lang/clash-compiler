@@ -36,8 +36,8 @@ tb2 = done
 tb3 = done
  where
   --                          src dst stages  width samples              init reg
-  done =             Types.tb @D3 @D5 @2      @1024 @100     Proxy Proxy True True SNat expected
-  expected = $(Types.expected @D3 @D5 @2      @1024 @100     Proxy Proxy True True SNat SNat SNat)
+  done =             Types.tb @D3 @D5 @2      @64   @100     Proxy Proxy True True SNat expected
+  expected = $(Types.expected @D3 @D5 @2      @64   @100     Proxy Proxy True True SNat SNat SNat)
 {-# ANN tb3 (TestBench 'topEntity) #-}
 
 tb4 = done
