@@ -4,7 +4,7 @@ import Clash.Cores.Xilinx.Xpm.Cdc.Handshake
 import Clash.Explicit.Prelude
 import Data.Proxy
 
-import XpmCdcHandshakeTypes (D3, D5, D10, D11)
+import XpmTestCommon (D3, D5, D10, D11)
 
 import qualified XpmCdcHandshakeTypes as Types
 

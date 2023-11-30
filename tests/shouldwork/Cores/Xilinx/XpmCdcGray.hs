@@ -3,7 +3,7 @@ module XpmCdcGray where
 import Clash.Explicit.Prelude
 import Data.Proxy
 
-import XpmCdcGrayTypes (D3, D5, D10, D11)
+import XpmTestCommon (D3, D5, D10, D11)
 
 import qualified XpmCdcGrayTypes as Types
 
