@@ -4,7 +4,7 @@ import Clash.Explicit.Prelude
 
 import Data.Proxy
 
-import XpmCdcSingleTypes (D3, D5, D10, D11)
+import XpmTestCommon (D3, D5, D10, D11)
 
 import qualified XpmCdcSingleTypes as Types
 
