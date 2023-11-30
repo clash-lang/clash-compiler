@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  VHDL Blackbox implementations for "Clash.Sized.Internal.Signed.toInteger#".
+  VHDL Blackbox implementations for 'Clash.Sized.Internal.Signed.fromInteger#'.
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
