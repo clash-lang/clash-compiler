@@ -80,10 +80,10 @@ whnf eval tcm isSubj m
 -- define partial evaluation. In this implementation, it consists of two types
 -- of function:
 --
---   * steps, which applies the reduction realtion to the current term
+--   * steps, which applies the reduction relation to the current term
 --   * unwindings, which pop the stack and evaluate the stack frame
 --
--- Variants of these functions also exist for evalauting primitive operations.
+-- Variants of these functions also exist for evaluating primitive operations.
 -- This is because there may be multiple frontends to the compiler which can
 -- reuse a common step and unwind, but have different primitives.
 --

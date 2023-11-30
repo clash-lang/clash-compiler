@@ -522,7 +522,7 @@ dumpReplayable n oSignal traceName = do
 -- | Take a serialized signal (dumped with @dumpReplayable@) and convert it
 -- back into a signal. Will error if dumped type does not match requested
 -- type. The first value in the signal that fails to decode will stop the
--- decoding process and yield an error. Not that this always happens if you
+-- decoding process and yield an error. Note that this always happens if you
 -- evaluate more values than were originally dumped.
 replay
   :: forall a dom n
