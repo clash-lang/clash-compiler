@@ -88,7 +88,7 @@ solveEq tcm solveSet (coreView tcm -> left, coreView tcm -> right) =
             []
 
 -- | Solve equations supported by @normalizeAdd@. See documentation of
--- @TypeEqSolution@ to understand the return value.
+-- 'TypeEqSolution' to understand the return value.
 solveAdd
   :: VarSet
   -> (Type, Type)
@@ -130,7 +130,7 @@ normalizeAdd (a, b) = do
   lhsLit _                 _                 = Nothing
 
 -- | Tests for nonsencical patterns due to types being "absurd". See
--- @isAbsurdEq@ for more info.
+-- 'isAbsurdEq' for more info.
 isAbsurdPat
   :: TyConMap
   -> Pat
@@ -146,7 +146,7 @@ isAbsurdPat tcm pat =
     DataPat _dc extNms _ids -> mkVarSet extNms
     _ -> emptyVarSet
 
--- | Determines if an "equation" obtained through @patEqs@ or @typeEq@ is
+-- | Determines if an "equation" obtained through 'patEqs' or 'typeEq' is
 -- absurd. That is, it tests if two types that are definitely not equal are
 -- asserted to be equal OR if the computation of the types yield some absurd
 -- (intermediate) result such as -1.
