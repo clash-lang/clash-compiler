@@ -16,6 +16,7 @@ import GHC.Stack (HasCallStack)
 
 import Clash.Explicit.Prelude
 
+import Clash.Cores.Xilinx.Xpm.Cdc.Internal
 import Clash.Cores.Xilinx.Xpm.Cdc.Single (XpmCdcSingleConfig(..), xpmCdcSingleWith)
 
 -- | Synchronizes a pulse from the source clock domain to the destination
@@ -59,17 +60,25 @@ xpmCdcPulse = xpmCdcPulseWith XpmCdcPulseConfig{..}
 data XpmCdcPulseConfig stages = XpmCdcPulseConfig
   { -- | Number of synchronization stages. I.e., number of registers in the
     -- destination domain.
+    --
+    -- This is what [PG382](https://docs.xilinx.com/r/en-US/pg382-xpm-cdc-generator/XPM_CDC_HANDSHAKE)
+    -- calls @DEST_SYNC_FF@.
     stages :: SNat stages
 
     -- | Initialize registers used within the primitive to /0/. Note that
     -- 'xpmCdcPulse' will set this to 'True' if both domains support initial
     -- values, to 'False' if neither domain does, and will otherwise emit an
     -- error.
+    --
+    -- This is what [PG382](https://docs.xilinx.com/r/en-US/pg382-xpm-cdc-generator/XPM_CDC_HANDSHAKE)
+    -- calls @INIT_SYNC_FF@.
   , initialValues :: Bool
 
     -- | Register output. Makes sure the combinatorial logic in @XPM_CDC_PULSE@
     -- doesn't contribute to any user critical paths.
   , registerOutput :: Bool
+    -- This is what [PG382](https://docs.xilinx.com/r/en-US/pg382-xpm-cdc-generator/XPM_CDC_HANDSHAKE)
+    -- calls @REG_OUTPUT@.
   }
 
 -- | Like 'xpmCdcPulse', but with a configurable number of stages, initial values,
@@ -90,8 +99,33 @@ xpmCdcPulseWith ::
   Clock dst ->
   Signal src a ->
   Signal dst a
-xpmCdcPulseWith XpmCdcPulseConfig{..} clkSrc clkDst input =
-  xpmCdcPulse#
+xpmCdcPulseWith XpmCdcPulseConfig{stages=stages@SNat, ..} clkSrc clkDst input
+  | clashSimulation = sim
+  | otherwise = synth
+ where
+  synth = bitCoerce <$> unPort go
+   where
+    go :: Port "dest_pulse" dst Bit
+    go =
+      inst
+        (instConfig "xpm_cdc_pulse")
+          { library = Just "xpm"
+          , libraryImport = Just "xpm.vcomponents.all" }
+
+        (Param @"DEST_SYNC_FF"   @Integer (natToNum @stages))
+        (Param @"INIT_SYNC_FF"   @Integer (if initialValues then 1 else 0))
+        (Param @"REG_OUTPUT"     @Integer (if registerOutput then 1 else 0))
+        (Param @"RST_USED"       @Integer 0)
+        (Param @"SIM_ASSERT_CHK" @Integer 0)
+
+        (ClockPort @"dest_clk"  clkDst)
+        (ResetPort @"dest_rst"  (noReset @dst))
+
+        (ClockPort @"src_clk"   clkSrc)
+        (Port      @"src_pulse" (bitCoerce @_ @Bit <$> input))
+        (ResetPort @"src_rst"   (noReset @src))
+  sim =
+   xpmCdcPulse#
     registerOutput initialValues False stages
     clkSrc (error "xpmCdcPulseWith: src: no reset")
     clkDst (error "xpmCdcPulseWith: dst: no reset")
@@ -143,7 +177,7 @@ xpmCdcPulse# regOutput initVals resetUsed stages clkSrc rstSrc0 clkDst rstDst0 s
     | otherwise = noRst
 
   noRst :: forall dom . KnownDomain dom => Reset dom
-  noRst = unsafeFromHighPolarity (pure False)
+  noRst = unsafeFromActiveHigh (pure False)
 
   go :: Signal dst a
   go = dstPulse
