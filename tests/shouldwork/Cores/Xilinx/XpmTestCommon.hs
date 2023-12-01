@@ -15,10 +15,12 @@ createDomain vXilinxSystem{vName="D11", vPeriod=hzToPeriod 110e6}
 randomSeed :: Int
 randomSeed = $(runIO (randomIO @Int) >>= lift)
 
-genTestData :: forall dom a z. (KnownDomain dom, BitPack a, (BitSize a + z) ~ 64) => Int -> Clock dom -> Signal dom a
-genTestData seed clk = (unpack . truncateB @BitVector @(BitSize a) . pack) <$> out
+genTestData :: forall dom a z. (KnownDomain dom, BitPack a, BitSize a <= 64) => Int -> Clock dom -> Signal dom a
+genTestData seed clk = (unpack . truncateToSize . pack) <$> out
  where
   (out,gen) = unbundle $ genWord64 <$> delay clk enableGen (mkStdGen seed) gen
+  truncateToSize :: BitVector 64 -> BitVector (BitSize a)
+  truncateToSize = leToPlus @(BitSize a) @64 truncateB
 
 -- dummy implementation
 instance NFDataX StdGen where
