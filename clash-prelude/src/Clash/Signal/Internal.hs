@@ -1690,7 +1690,7 @@ sampleN n = take n . sample
 --
 -- __NB__: This function is not synthesizable
 fromList :: (HasCallStack,NFDataX a) => [a] -> Signal dom a
-fromList = Prelude.foldr (\a b -> deepseqX a (a :- b)) (error "finite list")
+fromList = Prelude.foldr (\a b -> deepseqX a (a :- b)) (pure $ error "finite list")
 
 -- * Simulation functions (not synthesizable)
 
@@ -1749,7 +1749,7 @@ sampleN_lazy n = take n . sample_lazy
 --
 -- __NB__: This function is not synthesizable
 fromList_lazy :: HasCallStack => [a] -> Signal dom a
-fromList_lazy = Prelude.foldr (:-) (error "finite list")
+fromList_lazy = Prelude.foldr (:-) (pure $ error "finite list")
 
 -- * Simulation functions (not synthesizable)
 
