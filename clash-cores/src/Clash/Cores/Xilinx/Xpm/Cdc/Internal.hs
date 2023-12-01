@@ -133,7 +133,8 @@ instance TermLiteral (PrimPortOrParam ()) where
     = pure (MkPrimPort (PrimClockPort{name=Text.pack nm, dom=Text.pack domNm, meta=()}))
 
     | constrName == show 'ResetPort
-    = error (constrName <> ppShow args) -- TODO
+    , (LitTy (SymTy nm) : LitTy (SymTy domNm) : _) <- rights args
+    = pure (MkPrimPort (PrimResetPort{name=Text.pack nm, dom=Text.pack domNm, meta=()}))
 
     | constrName == show 'EnablePort
     = error (constrName <> ppShow args) -- TODO
