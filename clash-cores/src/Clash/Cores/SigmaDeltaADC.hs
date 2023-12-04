@@ -1,4 +1,4 @@
-module SigmaDeltaADC (sigmaDeltaADC) where
+module Clash.Cores.SigmaDeltaADC (sigmaDeltaADC) where
 
 import Clash.Prelude hiding (filter, truncate)
 
