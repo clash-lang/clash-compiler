@@ -77,7 +77,7 @@ import           Clash.Core.Type             (Type (..), normalizeType)
 import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
-  (InScopeSet, extendInScopeSet, extendInScopeSetList, mkInScopeSet,
+  (InScopeSet, extendInScopeSet, extendInScopeSetList, mkInScopeSet, notElemInScopeSet,
    uniqAway, uniqAway', mapVarEnv, eltsVarEnv, unitVarSet, emptyVarEnv,
    mkVarEnv, eltsVarSet, elemVarEnv, lookupVarEnv, extendVarEnv, elemVarSet,
    differenceVarEnv)
@@ -173,12 +173,13 @@ apply = \s rewrite ctx expr0 -> do
     return ()
 
   if isDebugging opts
-    then applyDebug s expr0 hasChanged expr1
+    then applyDebug ctx s expr0 hasChanged expr1
     else return expr1
 {-# INLINE apply #-}
 
 applyDebug
-  :: String
+  :: TransformContext
+  -> String
   -- ^ Name of the transformation
   -> Term
   -- ^ Original expression
@@ -187,7 +188,7 @@ applyDebug
   -> Term
   -- ^ New expression
   -> RewriteMonad extra Term
-applyDebug name exprOld hasChanged exprNew = do
+applyDebug ctx name exprOld hasChanged exprNew = do
   nTrans <- Lens.use transformCounter
   opts <- Lens.view debugOpts
 
@@ -210,11 +211,12 @@ applyDebug name exprOld hasChanged exprNew = do
     Monad.when (dbg_invariants opts && hasChanged) $ do
       tcm                  <- Lens.view tcCache
       let beforeTy          = inferCoreTypeOf tcm exprOld
-          beforeFV          = Lens.setOf freeLocalVars exprOld
+          beforeFV          = Set.filter notInCtx (Lens.setOf freeLocalVars exprOld)
           afterTy           = inferCoreTypeOf tcm exprNew
-          afterFV           = Lens.setOf freeLocalVars exprNew
+          afterFV           = Set.filter notInCtx (Lens.setOf freeLocalVars exprNew)
           newFV             = not (afterFV `Set.isSubsetOf` beforeFV)
           accidentalShadows = findAccidentialShadows exprNew
+          notInCtx v = notElemInScopeSet v (tfInScope ctx)
 
       Monad.when newFV $
               error ( concat [ $(curLoc)
