@@ -4871,23 +4871,20 @@ word32Literal :: Value -> Maybe Integer
 word32Literal x = case x of
   Lit (Word32Literal i) -> Just i
   _ -> Nothing
+#endif
 
-#if MIN_VERSION_base(4,17,0)
 word64Literals' :: [Value] -> [Integer]
 word64Literals' = listOf word64Literal
 
+#if MIN_VERSION_base(4,17,0)
 word64Literal :: Value -> Maybe Integer
 word64Literal x = case x of
   Lit (Word64Literal i) -> Just i
   _ -> Nothing
 #else
 -- Prior to GHC 9.4 Word64# didn't exist, 64 bit primitives took Word# instead
-word64Literals' :: [Value] -> [Integer]
-word64Literals' = wordLiterals'
-
 word64Literal :: Value -> Maybe Integer
 word64Literal= wordLiteral
-#endif
 #endif
 
 charLiterals :: [Value] -> Maybe (Char,Char)
