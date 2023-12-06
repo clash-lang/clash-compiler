@@ -1,6 +1,7 @@
-module SigmaDeltaADC (sigmaDeltaADC) where
+module Clash.Cores.SigmaDeltaADC (sigmaDeltaADC) where
 
 import Clash.Prelude hiding (filter, truncate)
+import Clash.Sized.Internal.BitVector
 
 -- | Shared functions
 -- Function to remove the LSBs from a BitVector
@@ -16,7 +17,7 @@ truncate input = output
 
 -- | Remove the LSBs from the accumulator output when the accumulator is ready
 -- This is used for both the accumulator and the filter
-truncateAccum 
+truncateAccum
   :: (KnownNat n0, KnownNat n1)
   => BitVector n0
   -- ^ The previous accum
@@ -36,25 +37,16 @@ truncateAccum accum (sigma, rollover)
    where
      sigma' = truncate sigma
 
--- | Function to do a popcount from the input bit vector
-countOnes
-  :: (KnownNat n0)
-  => BitVector n0
-  -- ^ The bitvector to do a popcount on
-  -> Index (n0 + 1)
-  -- ^ The result as an index
-countOnes analogCmp = toEnum (popCount analogCmp)
-
 -- |Accumulator
 -- The main function for the accumulator,
 -- all functions that start with accumulator are used for the accumulator
-accumulator 
+accumulator
   :: ( HiddenClockResetEnable dom
      , KnownNat n0
      , KnownNat n1
      , KnownNat n2
-     , n2 <= (n1 + n0))
-  => SNat n0 
+     , (n2) <= (n1 + n0))
+  => SNat n0
   -- ^ The ADC width
   -> SNat (n1 + n0)
   -- ^ The accumulator width
@@ -88,7 +80,7 @@ accumulatorCounterT
   -- 2. Accumulator ready going to the filter
 accumulatorCounterT _ numOnes = mealyB accumulatorCounter (0, False, 0, 0) numOnes
 
--- | The counter for sigma, which counts counts the number of ones from 
+-- | The counter for sigma, which counts counts the number of ones from
 -- the input and resets when count is equal to zero
 accumulatorCounter
   :: (KnownNat n0, KnownNat n1, n1 <= n0)
@@ -101,7 +93,7 @@ accumulatorCounter
   -- 1. The previous sigma
   -- 2. bool for when sigma is ready
   -- 3. previous number of ones from the input
-  -- 4. previous value of the main counter-> BitVector n1 
+  -- 4. previous value of the main counter-> BitVector n1
   -> BitVector n1
   -- ^ number of ones from the input
   -> ( ( BitVector (n0 + 1)
@@ -131,7 +123,7 @@ accumulatorCounter (sigma, rollover, numOnes, count) numOnes' =
 
 -- | Box avaraging filter
 -- | All functions that start with filter are used for the box averaging filter
-filter 
+filter
   :: (HiddenClockResetEnable dom, KnownNat n0, KnownNat n1)
   => SNat n1
   -- ^ Filter Depth
@@ -146,13 +138,13 @@ filter
   -- 2. trigger when a new sample is ready
 filter fw dataIn accumRdy = (dataOut, resultValid)
  where
-   (accumulate, latchResult, resultValid) = 
+   (accumulate, latchResult, resultValid) =
      mealyB filterPipeline (False, False, False) (accumRdy, count)
    count = filterCount fw accumRdy
    accum = mealyB filterAccumulator 0 (count, dataIn, accumulate)
    dataOut = mealyB truncateAccum 0 (accum, latchResult)
 
--- | The accumulator for the filter, it adds the input to accum when 
+-- | The accumulator for the filter, it adds the input to accum when
 -- the sample from the accumulator is ready
 filterAccumulator
   :: (KnownNat n0, KnownNat n1)
@@ -229,26 +221,26 @@ sigmaDeltaADC
      , KnownNat n1
      , KnownNat n2
      , KnownNat n3
-     , CLog 2 (n3 + 1) <= (n1 + n0)
-     ) 
+     , CLog 2 (n3 + 2) <= (n1 + n0)
+     )
   => SNat n0
   -- ^ ADC width
   -> SNat (n0 + n1)
   -- ^ Accumulator width
-  -- Has to be larger or equal to the ADC width, 
+  -- Has to be larger or equal to the ADC width,
   -- the OSR is equal to 2^(AccumulatorWidth - ADCwidth)
   -> SNat n2
   -- ^ Filter depth
-  -- The depth of the decimation filter, 
+  -- The depth of the decimation filter,
   -- the downsampling rate is equal to 2^FilterDepth
-  -> Signal dom (BitVector n3)
+  -> Signal dom (BitVector (n3 + 1))
   -- ^ analog input from the comparator
   -- For the design either lvds or an external comparator can be used
   -- the input signal had to be connected to the positive input while
   -- the output from a low pass RC-network connects to the negative input.
   -- The input is a bitvector such that ddr or a deserialiser can be utilised
   -- to get more bits per clock cycle for an increased sampling frequency.
-  -> ( Signal dom (BitVector n3)
+  -> ( Signal dom (BitVector (n3 + 1))
      , Signal dom (BitVector n0)
      , Signal dom Bool
      )
@@ -267,4 +259,4 @@ sigmaDeltaADC adcw accumw filterw analogCmp = (delta, digitalOut, sampleRdy)
    delta = register 0 analogCmp
    (accum, accumRdy) = accumulator adcw accumw numOnes
    (digitalOut, sampleRdy) = filter filterw accum accumRdy
-   numOnes = pack <$> (countOnes <$> delta)
+   numOnes = pack <$> (popCountBV <$> delta)
