@@ -111,31 +111,35 @@ hackage-release:
   rules:
     - if: '$CI_COMMIT_TAG != null' # tags
 
-# Work around https://gitlab.com/gitlab-org/gitlab/-/issues/216629
+# We manually report status to GitHub to work around
+# <https://gitlab.com/gitlab-org/gitlab/-/issues/216629>.
+# The script will also send a Slack message when the nightly fails.
 #
-# If we ever remove this, we may have to rethink the use of the interruptible flag
-.github_status:
+# If we ever remove this manual GitHub reporting, we may have to rethink the
+# use of the interruptible flag: see <https://github.com/clash-lang/clash-compiler/pull/2616#discussion_r1409429185>
+.report_status:
   # interruptible: false
   image: curlimages/curl
+  dependencies: []
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
 
 set_pending:
-  extends: .github_status
+  extends: .report_status
   stage: pre
   script:
-    - .ci/set_github_status.sh pending
+    - .ci/report_status.sh pending
 
 set_success:
-  extends: .github_status
+  extends: .report_status
   stage: post
   when: on_success
   script:
-    - .ci/set_github_status.sh success
+    - .ci/report_status.sh success
 
 set_failure:
-  extends: .github_status
+  extends: .report_status
   stage: post
   when: on_failure
   script:
-    - .ci/set_github_status.sh failure
+    - .ci/report_status.sh failure
