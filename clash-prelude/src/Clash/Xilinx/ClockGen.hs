@@ -191,26 +191,22 @@ When type checking cannot infer the types of the tuple elements, or they have
 the wrong type, the GHC compiler will complain about satisfying @NumOutClocks@.
 The error message on GHC 9.4 and up is:
 
-@
-    • Cannot satisfy: clash-prelude-[...]:Clash.Clocks.Internal.NumOutClocks
-                        (clash-prelude-[...]:Clash.Clocks.Internal.ClocksSyncClocksInst
-                           ([...])
-                           DomInput) <= 7
-    • In the expression: clockWizard clkIn rstIn
-@
+>     • Cannot satisfy: clash-prelude-[...]:Clash.Clocks.Internal.NumOutClocks
+>                         (clash-prelude-[...]:Clash.Clocks.Internal.ClocksSyncClocksInst
+>                            ([...])
+>                            DomInput) <= 7
+>     • In the expression: clockWizard clkIn rstIn
 
 On older GHC versions, the error message is:
 
-@
-    • Couldn't match type ‘clash-prelude-[...]:Clash.Clocks.Internal.NumOutClocks
-                             (clash-prelude-[...]:Clash.Clocks.Internal.ClocksSyncClocksInst
-                                ([...])
-                                DomInput)
-                           <=? 7’
-                     with ‘'True’
-        arising from a use of ‘clockWizard’
-    • In the expression: clockWizard clkIn rstIn
-@
+>     • Couldn't match type ‘clash-prelude-[...]:Clash.Clocks.Internal.NumOutClocks
+>                              (clash-prelude-[...]:Clash.Clocks.Internal.ClocksSyncClocksInst
+>                                 ([...])
+>                                 DomInput)
+>                            <=? 7’
+>                      with ‘'True’
+>         arising from a use of ‘clockWizard’
+>     • In the expression: clockWizard clkIn rstIn
 
 The above error message is also emitted when trying to instantiate more than 18
 output clocks, as it will fail to find an instance. As the wizard supports no
@@ -218,18 +214,14 @@ more than 7 clocks, trying to instantiate between 8 and 18 output clocks will
 also cause a type checking error. On GHC 9.4 and up, the error for attempting to
 instantiate 8 clocks is:
 
-@
-    • Cannot satisfy: 8 <= 7
-    • In the expression: clockWizard clkIn rstIn
-@
+>     • Cannot satisfy: 8 <= 7
+>     • In the expression: clockWizard clkIn rstIn
 
 On older GHC versions, the error message is less clear:
 
-@
-    • Couldn't match type ‘'False’ with ‘'True’
-        arising from a use of ‘clockWizard’
-    • In the expression: clockWizard clkIn rstIn
-@
+>     • Couldn't match type ‘'False’ with ‘'True’
+>         arising from a use of ‘clockWizard’
+>     • In the expression: clockWizard clkIn rstIn
 -}
 
 {- $tcl

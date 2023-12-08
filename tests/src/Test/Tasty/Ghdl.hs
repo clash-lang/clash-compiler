@@ -38,11 +38,9 @@ instance IsOption Ghdl where
 --
 -- For example, for I2C it would execute:
 --
--- @
--- ghdl -i --work=bitMaster --workdir=bitMaster --std=93 <files>
--- ghdl -i --work=byteMaster --workdir=byteMaster --std=93 <files>
--- ghdl -i --work=i2c --workdir=i2c --std=93 <files>
--- @
+-- > ghdl -i --work=bitMaster --workdir=bitMaster --std=93 <files>
+-- > ghdl -i --work=byteMaster --workdir=byteMaster --std=93 <files>
+-- > ghdl -i --work=i2c --workdir=i2c --std=93 <files>
 --
 -- After executing this test, $tmpDir/work contains a directory for each
 -- top entity: @bitMaster@, @byteMaster@, @i2c@. A more typical test case might
@@ -96,9 +94,7 @@ instance IsTest GhdlImportTest where
 --
 -- For example, for I2C it would execute:
 --
--- @
--- ghdl -m -fpsl --work=i2c --workdir=i2c -PbitMaster -PbyteMaster -Pi2c -o i2c_exe i2c
--- @
+-- > ghdl -m -fpsl --work=i2c --workdir=i2c -PbitMaster -PbyteMaster -Pi2c -o i2c_exe i2c
 --
 data GhdlMakeTest = GhdlMakeTest
   { gmtSourceDirectory :: IO FilePath
@@ -131,9 +127,7 @@ instance IsTest GhdlMakeTest where
 --
 -- For examples, for I2C it would execute:
 --
--- @
--- ghdl -r --workdir=i2c --work=i2c i2c_exe --assert-level=error
--- @
+-- > ghdl -r --workdir=i2c --work=i2c i2c_exe --assert-level=error
 --
 data GhdlSimTest = GhdlSimTest
   { gstExpectFailure :: Maybe (TestExitCode, T.Text)
