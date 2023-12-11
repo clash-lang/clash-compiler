@@ -199,8 +199,9 @@ xpmCdcPulse# regOutput initVals resetUsed stages clkSrc rstSrc0 clkDst rstDst0 s
     -- Crossing
     opts = XpmCdcSingleConfig stages initVals False
     syncedPulse = xpmCdcSingleWith opts clkSrc clkDst srcLevelFf
+    syncedPulse' = liftA2 (.&.) syncedPulse (bitCoerce . complement <$> unsafeToActiveHigh rstDst1)
 
     -- Destination domain
-    syncedPulseFf = register clkDst rstDst1 enableGen initVal syncedPulse
-    dstPulse = liftA2 xor syncedPulse syncedPulseFf
+    syncedPulseFf = register clkDst rstDst1 enableGen initVal syncedPulse'
+    dstPulse = liftA2 xor syncedPulse' syncedPulseFf
 {-# NOINLINE xpmCdcPulse# #-}
