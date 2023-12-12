@@ -20,7 +20,6 @@ import Clash.Backend.VHDL
 import Clash.Core.PartialEval
 import Clash.Core.Name
 import Clash.Core.Term
-import Clash.Core.TyCon
 import Clash.Core.Var
 import Clash.Core.VarEnv
 import Clash.Driver.Types
@@ -68,9 +67,9 @@ runToCoreStage _target f src = do
 
 findBinding
   :: OccName
-  -> (BindingMap, TyConMap, Supply)
+  -> (ClashEnv, ClashDesign, Supply)
   -> IO Term
-findBinding nm (bm, tcm, ids) =
+findBinding nm (envTyConMap -> tcm, designBindings -> bm, ids) =
   case List.find byName (eltsVarEnv bm) of
     Just bd ->
       let env = mkGlobalEnv bm tcm emptyInScopeSet ids 20 mempty 0
