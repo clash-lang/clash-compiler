@@ -26,7 +26,7 @@ tb ::
   Proxy a -> Proxy b ->
   -- | Initial values
   Bool ->
-  -- | Registered input
+  -- | Registered output
   Bool ->
   SNat stages ->
   -- | Expected data
@@ -63,7 +63,7 @@ expected ::
   Proxy b ->
   -- | Initial values
   Bool ->
-  -- | Registered input
+  -- | Registered output
   Bool ->
   SNat stages ->
   SNat samples ->
