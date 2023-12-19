@@ -8,11 +8,6 @@
     CACHE_FALLBACK_KEY: $CI_JOB_NAME-master-ghcr.io/clash-lang/clash-ci-$GHC_VERSION:2023-08-22-2-3-non_protected
     GIT_SUBMODULE_STRATEGY: recursive
     TERM: xterm-color
-  retry:
-    max: 2
-    when:
-      - runner_system_failure
-      - stuck_or_timeout_failure
   cache:
     key: $CI_JOB_NAME-$CI_COMMIT_REF_SLUG-$CI_JOB_IMAGE-2
     when: always

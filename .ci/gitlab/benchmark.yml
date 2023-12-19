@@ -13,11 +13,6 @@
     RUN_CLASHDEV: "no"
     RUN_TESTSUITE: "no"
     RUN_BUILD_ALL: "no"
-  retry:
-    max: 2
-    when:
-      - runner_system_failure
-      - stuck_or_timeout_failure
   cache:
     key: cabal-store-$CI_JOB_NAME-$CI_JOB_IMAGE
     when: always
