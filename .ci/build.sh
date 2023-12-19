@@ -22,6 +22,11 @@ if [[ "$GHC_HEAD" != "yes" ]]; then
 fi
 set -u
 
+cabal v2-build clash-prelude --write-ghc-environment-files=always
+# Undo mmap crash workaround for clash-cosim, see PR #2572.
+# It uses a custom setup, which can't be linked with -rtsopts
+GHCRTS="" cabal v2-build clash-cosim --write-ghc-environment-files=always
+
 # Build with default constraints
 cabal v2-build all --write-ghc-environment-files=always
 

@@ -116,6 +116,6 @@ test-suite test
       tasty-hunit,
       tasty-quickcheck,
       template-haskell
-  ghc-options:   -Wall -Wcompat
+  ghc-options:   -Wall -Wcompat -rtsopts
   if flag(pedantic)
     ghc-options: -Werror
