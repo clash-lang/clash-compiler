@@ -54,7 +54,7 @@ nix-build:
   before_script:
    - nix-env -i gawk
   script:
-    - nix-build -j$(./.ci/effective_cpus.sh)
+    - nix-build -j$(./.ci/effective_cpus.sh) --log-format raw --max-silent-time 3600
   tags:
     - local
 
