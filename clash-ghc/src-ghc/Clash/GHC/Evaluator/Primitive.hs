@@ -1682,6 +1682,24 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                  ]
 
 #if MIN_VERSION_base(4,15,0)
+  "GHC.Num.Integer.integerGcd"
+#else
+  "GHC.Integer.Type.gcdInteger"
+#endif
+    | Just (i,j) <- integerLiterals args
+    ->
+     reduce $ integerToIntegerLiteral (gcd i j)
+
+#if MIN_VERSION_base(4,15,0)
+  "GHC.Num.Integer.integerLcm"
+#else
+  "GHC.Integer.Type.lcmInteger"
+#endif
+    | Just (i,j) <- integerLiterals args
+    ->
+     reduce $ integerToIntegerLiteral (lcm i j)
+
+#if MIN_VERSION_base(4,15,0)
   "GHC.Num.Integer.integerGt"
 #else
   "GHC.Integer.Type.gtInteger"
