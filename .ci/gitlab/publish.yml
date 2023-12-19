@@ -25,5 +25,3 @@ hackage-sdist:
     - .ci/publish_sdist.sh clash-lib
     - .ci/publish_sdist.sh clash-lib-hedgehog
     - .ci/publish_sdist.sh clash-ghc
-  retry:
-    max: 2
