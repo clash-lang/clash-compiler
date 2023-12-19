@@ -1,6 +1,11 @@
-# Make all tasks interruptible by default
 default:
+  # Make all tasks interruptible by default
   interruptible: true
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
 
 include:
   - '/.ci/gitlab/common.yml'
