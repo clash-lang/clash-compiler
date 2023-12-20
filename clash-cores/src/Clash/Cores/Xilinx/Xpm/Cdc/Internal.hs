@@ -141,7 +141,7 @@ instance TermLiteral (PrimPortOrParam ()) where
 
   termToData t = Left t
 
-getPolarity :: String -> Type -> ResetPolarity
+getPolarity :: HasCallStack => String -> Type -> ResetPolarity
 getPolarity _ (ConstTy (TyCon (Text.unpack . nameOcc -> nm)))
   | nm == show 'ActiveHigh = ActiveHigh
   | nm == show 'ActiveLow  = ActiveLow
@@ -250,7 +250,8 @@ tyToPrimPort (splitTyConAppM -> Just (tyConName'@(Name{nameOcc=Text.unpack -> ty
     = Right [PrimClockPort{name=Text.pack nm, dom=Text.pack domNm, meta=()}]
 
     | tyConName == show 'ResetPort
-    = error (tyConName <> ppShow args) -- TODO
+    , LitTy (SymTy nm) : pol : LitTy (SymTy domNm) : _ <- args
+    = Right [PrimResetPort{name=Text.pack nm, dom=Text.pack domNm, meta=(), polarity = getPolarity nm pol}]
 
     | tyConName == show 'EnablePort
     = error (tyConName <> ppShow args) -- TODO
