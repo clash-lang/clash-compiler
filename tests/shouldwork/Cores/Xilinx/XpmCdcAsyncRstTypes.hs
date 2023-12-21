@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 
-module XpmCdcPulseTypes where
+module XpmCdcAsyncRstTypes where
 
 import Clash.Explicit.Prelude
 import Clash.Explicit.Testbench
@@ -8,17 +8,11 @@ import Clash.Explicit.Testbench
 import Data.Proxy
 import Language.Haskell.TH.Lib
 
-import Clash.Cores.Xilinx.Xpm.Cdc.Pulse
+import Clash.Cores.Xilinx.Xpm.Cdc.AsyncRst
 import XpmTestCommon
 
-testData :: KnownDomain dom => Clock dom -> Signal dom (Unsigned 1)
-testData clk = genTestData (randomSeed+1) clk
-
 randomRstSrc :: KnownDomain dom => Clock dom -> Reset dom
-randomRstSrc clk = unsafeFromActiveHigh $ genTestData (randomSeed+2) clk
-
-randomRstDst :: KnownDomain dom => Clock dom -> Reset dom
-randomRstDst clk = unsafeFromActiveHigh $ genTestData (randomSeed+3) clk
+randomRstSrc clk = unsafeFromActiveHigh $ genTestData randomSeed clk
 
 tb ::
   forall a b stages n .
@@ -30,36 +24,32 @@ tb ::
   Proxy a -> Proxy b ->
   -- | Initial values
   Bool ->
-  -- | Registered output
-  Bool ->
-  -- | Resets used
-  Bool ->
   SNat stages ->
   -- | Expected data
   Vec n (BitVector 1) ->
   Signal b Bool
-tb Proxy Proxy initVals regOutput rstUsed SNat expectedDat = done
+tb Proxy Proxy initVals SNat expectedDat = done
  where
-  actual = actualClash
   -- actual = actualNative
-  actualNative =
-    xpmCdcPulseWith
-      @stages @(Unsigned 1)
-      (XpmCdcPulseConfig (SNat @stages) initVals rstUsed regOutput)
-      clkA rstA clkB rstB (testData clkA)
+  actual = actualClash
 
   actualClash =
-    xpmCdcPulse#
-      @stages @(Unsigned 1)
-      regOutput initVals rstUsed (SNat @stages)
-      clkA rstA clkB rstB (testData clkA)
+    asyncRstClash
+      (SNat @stages) initVals
+      clkA clkB (randomRstSrc clkA)
+
+  actualNative =
+    xpmCdcAsyncRstWith
+      @stages
+      (XpmCdcAsyncRstConfig (SNat @stages) initVals)
+      clkA clkB (randomRstSrc clkA)
 
   done =
     outputVerifierWith
       (\clk rst -> assertBitVector clk rst $(lift $ "outputVerifier (seed:" <> show randomSeed <> ")"))
       clkB clkB noReset
       expectedDat
-      (pack <$> actual)
+      (pack <$> unsafeToActiveHigh actual)
   rstA = randomRstSrc clkA
   rstB = unsafeFromActiveHigh $ unsafeSynchronizer clkA clkB $ unsafeToActiveHigh rstA
 
@@ -79,25 +69,19 @@ expected ::
   Proxy b ->
   -- | Initial values
   Bool ->
-  -- | Registered output
-  Bool ->
-  -- | Resets used
-  Bool ->
   SNat stages ->
   SNat samples ->
   ExpQ
-expected Proxy Proxy initVals regOutput rstUsed SNat SNat = listToVecTH out1
+expected Proxy Proxy initVals SNat SNat = listToVecTH out1
  where
-  out0 =
-    xpmCdcPulseWith
-      @stages @(Unsigned 1)
-      (XpmCdcPulseConfig (SNat @stages) initVals regOutput rstUsed)
-      clkA rstA
-      clkB rstB
-      (testData clockGen)
+  out0 = unsafeToActiveHigh $
+    xpmCdcAsyncRstWith
+      @stages
+      (XpmCdcAsyncRstConfig (SNat @stages) initVals)
+      clkA
+      clkB
+      (randomRstSrc clkA)
   clkA = clockGen @a
   clkB = clockGen @b
-  rstA = randomRstSrc clkA
-  rstB = unsafeFromActiveHigh $ unsafeSynchronizer clkA clkB $ unsafeToActiveHigh rstA
 
   out1 = pack <$> sampleN (natToNum @samples) out0

@@ -12,6 +12,12 @@ createDomain vXilinxSystem{vName="D5",  vPeriod=hzToPeriod 50e6}
 createDomain vXilinxSystem{vName="D10", vPeriod=hzToPeriod 100e6}
 createDomain vXilinxSystem{vName="D11", vPeriod=hzToPeriod 110e6}
 
+createDomain vXilinxSystem{vName="Da3",  vPeriod=hzToPeriod 30e6,  vResetKind = Asynchronous}
+createDomain vXilinxSystem{vName="Da5",  vPeriod=hzToPeriod 50e6,  vResetKind = Asynchronous}
+createDomain vXilinxSystem{vName="Da10", vPeriod=hzToPeriod 100e6, vResetKind = Asynchronous}
+createDomain vXilinxSystem{vName="Da11", vPeriod=hzToPeriod 110e6, vResetKind = Asynchronous}
+
+
 randomSeed :: Int
 randomSeed = $(runIO (randomIO @Int) >>= lift)
 

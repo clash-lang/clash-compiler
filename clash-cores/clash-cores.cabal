@@ -138,6 +138,7 @@ library
     Clash.Cores.Xilinx.Xpm.Cdc.Pulse
     Clash.Cores.Xilinx.Xpm.Cdc.Single
     Clash.Cores.Xilinx.Xpm.Cdc.SyncRst
+    Clash.Cores.Xilinx.Xpm.Cdc.AsyncRst
     Clash.Cores.SPI
     Clash.Cores.UART
     Clash.Cores.LatticeSemi.ICE40.IO
