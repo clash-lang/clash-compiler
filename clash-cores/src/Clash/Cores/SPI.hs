@@ -10,9 +10,11 @@ module Clash.Cores.SPI
   ( SPIMode(..)
     -- * SPI master
   , spiMaster
+  , spiMasterWide
     -- * SPI slave
   , SPISlaveConfig(..)
   , spiSlave
+  , spiSlaveWide
     -- ** Vendor configured SPI slaves
   , spiSlaveLatticeSBIO
   , spiSlaveLatticeBB
@@ -83,7 +85,7 @@ sampleOnLeading _        = False
 sampleOnTrailing :: SPIMode -> Bool
 sampleOnTrailing = not . sampleOnLeading
 
-data SPISlaveConfig ds dom
+data SPISlaveConfig ds dom inW outW
   = SPISlaveConfig
   { spiSlaveConfigMode :: SPIMode
   -- ^ SPI mode
@@ -97,10 +99,10 @@ data SPISlaveConfig ds dom
   --
   -- * Set to /False/ when core clock is twice as fast, or as fast, as the SCK
   , spiSlaveConfigBuffer
-      :: BiSignalIn ds dom 1
+      :: BiSignalIn ds dom inW
       -> Signal dom Bool
-      -> Signal dom Bit
-      -> BiSignalOut ds dom 1
+      -> Signal dom (BitVector outW)
+      -> BiSignalOut ds dom outW
   -- ^ Tri-state buffer: first argument is the inout pin, second
   -- argument is the output enable, third argument is the value to
   -- output when the enable is high
@@ -108,19 +110,23 @@ data SPISlaveConfig ds dom
 
 -- | SPI capture and shift logic that is shared between slave and master
 spiCommon
-  :: forall n dom
-   . (HiddenClockResetEnable dom, KnownNat n, 1 <= n)
+  :: forall n dom inW outW
+   . ( HiddenClockResetEnable dom
+     , KnownNat inW
+     , KnownNat outW
+     , KnownNat n
+     , 1 <= n )
   => SPIMode
   -> Signal dom Bool
   -- ^ Slave select
-  -> Signal dom Bit
+  -> Signal dom (BitVector inW)
   -- ^ Slave: MOSI; Master: MISO
   -> Signal dom Bool
   -- ^ SCK
-  -> Signal dom (BitVector n)
-  -> ( Signal dom Bit   -- Slave: MISO; Master: MOSI
-     , Signal dom Bool  -- Acknowledge start of transfer
-     , Signal dom (Maybe (BitVector n))
+  -> Signal dom (Vec outW (BitVector n))
+  -> ( Signal dom (BitVector outW) -- Slave: MISO; Master: MOSI
+     , Signal dom Bool             -- Acknowledge start of transfer
+     , Signal dom (Maybe (Vec inW (BitVector n)))
      )
 spiCommon mode ssI msI sckI dinI =
   mooreB go cvt ( 0 :: Index n      -- cntR
@@ -134,13 +140,16 @@ spiCommon mode ssI msI sckI dinI =
                 (ssI,msI,sckI,dinI)
  where
   cvt (_,_,_,dataInQ,dataOutQ,ackQ,doneQ) =
-    ( head dataOutQ
+    ( v2bv $ map head dataOutQ
     , ackQ
     , if doneQ
-         then Just (pack dataInQ)
+         then Just (map v2bv dataInQ)
          else Nothing
     )
 
+  go :: (Index n, Bool, Bool, Vec inW (Vec n Bit), Vec outW (Vec n Bit), Bool, Bool)
+     -> (Bool, BitVector inW, Bool, Vec outW (BitVector n))
+     -> (Index n, Bool, Bool, Vec inW (Vec n Bit), Vec outW (Vec n Bit), Bool, Bool)
   go (cntQ,cntOldQ,sckOldQ,dataInQ,dataOutQ,_,_) (ss,ms,sck,din) =
     (cntD,cntOldD,sck,dataInD,dataOutD,ackD,doneD)
    where
@@ -149,16 +158,18 @@ spiCommon mode ssI msI sckI dinI =
       | sampleSck = if cntQ == maxBound then 0 else cntQ + 1
       | otherwise = cntQ
 
+    dataInD :: Vec inW (Vec n Bit)
     dataInD
       | ss        = unpack undefined#
-      | sampleSck = tail @(n-1) dataInQ :< ms
+      | sampleSck = zipWith (\d m -> tail @(n-1) d :< m) dataInQ (bv2v ms)
       | otherwise = dataInQ
 
+    dataOutD :: Vec outW (Vec n Bit)
     dataOutD
-      | ss || (sampleOnTrailing mode && sampleSck && cntQ == maxBound) = unpack din
+      | ss || (sampleOnTrailing mode && sampleSck && cntQ == maxBound) = fmap bv2v din
       | shiftSck  = if sampleOnTrailing mode && cntQ == 0
                     then dataOutQ
-                    else tail @(n-1) dataOutQ :< unpack undefined#
+                    else map (\d -> tail @(n-1) d :< unpack undefined#) dataOutQ
       | otherwise = dataOutQ
 
     -- The counter is updated during the capture moment
@@ -181,8 +192,10 @@ spiCommon mode ssI msI sckI dinI =
 -- | SPI slave configurable SPI mode and tri-state buffer
 spiSlave
   :: forall n ds dom
-   . (HiddenClockResetEnable dom, KnownNat n, 1 <= n)
-  => SPISlaveConfig ds dom
+   . ( HiddenClockResetEnable dom
+     , KnownNat n
+     , 1 <= n )
+  => SPISlaveConfig ds dom 1 1
   -- ^ Configure SPI mode and tri-state buffer
   -> Signal dom Bool
   -- ^ Serial Clock (SCLK)
@@ -206,7 +219,44 @@ spiSlave
   -- 1. The "out" part of the inout port of the MISO; used only for simulation.
   --
   -- 2. (Maybe) the word send by the master
-spiSlave (SPISlaveConfig mode latch buf) sclk mosi bin ss din =
+spiSlave mode sclk mosi bin ss din =
+    unp $ spiSlaveWide mode sclk (fmap pack mosi) bin ss (fmap singleton din)
+  where
+    unp (a,b,c) = (a, b, fmap (fmap pack) c)
+
+-- | SPI slave configurable SPI mode, MOSI/MISO lane count, and tri-state buffer
+spiSlaveWide
+  :: forall n ds dom mosiW misoW
+   . ( HiddenClockResetEnable dom
+     , KnownNat mosiW
+     , KnownNat misoW
+     , KnownNat n
+     , 1 <= n )
+  => SPISlaveConfig ds dom misoW mosiW
+  -- ^ Configure SPI mode and tri-state buffer
+  -> Signal dom Bool
+  -- ^ Serial Clock (SCLK)
+  -> Signal dom (BitVector mosiW)
+  -- ^ Master Output Slave Input (MOSI)
+  -> BiSignalIn ds dom misoW
+  -- ^ Master Input Slave Output (MISO)
+  --
+  -- Inout port connected to the tri-state buffer for the MISO
+  -> Signal dom Bool
+  -- ^ Slave select (SS)
+  -> Signal dom (Vec mosiW (BitVector n))
+  -- ^ Data to send from master to slave
+  --
+  -- Input is latched the moment slave select goes low
+  -> ( BiSignalOut ds dom mosiW
+     , Signal dom Bool
+     , Signal dom (Maybe (Vec mosiW (BitVector n))))
+  -- ^ Parts of the tuple:
+  --
+  -- 1. The "out" part of the inout port of the MISO; used only for simulation.
+  --
+  -- 2. (Maybe) the word send by the master
+spiSlaveWide (SPISlaveConfig mode latch buf) sclk mosi bin ss din =
   let ssL   = if latch then delay undefined ss   else ss
       mosiL = if latch then delay undefined mosi else mosi
       sclkL = if latch then delay undefined sclk else sclk
@@ -255,8 +305,56 @@ spiMaster
   --    the data line will be ignored when /True/
   -- 5. (Maybe) the word send from the slave to the master
 spiMaster mode fN fW din miso =
+    unp $ spiMasterWide mode fN fW (fmap (fmap unpack) din) (fmap pack miso)
+  where
+    unp (a, b, c, d, e, f) =
+      (a, fmap unpack b, c, d, e, fmap (fmap pack) f )
+
+-- | SPI master configurable in the SPI mode, MISO/MOSI lane count, and clock divider
+--
+-- Adds latch to MISO line if the (half period) clock divider is
+-- set to 2 or higher.
+spiMasterWide
+  :: forall n halfPeriod waitTime dom misoW mosiW
+   . ( HiddenClockResetEnable dom
+     , KnownNat misoW
+     , KnownNat mosiW
+     , KnownNat n
+     , 1 <= n
+     , 1 <= halfPeriod
+     , 1 <= waitTime )
+  => SPIMode
+  -- ^ SPI Mode
+  -> SNat halfPeriod
+  -- ^ Clock divider (half period)
+  --
+  -- If set to two or higher, the MISO line will be latched
+  -> SNat waitTime
+  -- ^ (core clock) cycles between de-asserting slave-select and start of
+  -- the SPI clock
+  -> Signal dom (Maybe (Vec mosiW (BitVector n)))
+  -- ^ Data to send from master to slave, transmission starts when receiving
+  -- /Just/ a value
+  -> Signal dom (BitVector misoW)
+  -- ^ Master Input Slave Output (MISO)
+  -> ( Signal dom Bool              -- SCK
+     , Signal dom (BitVector mosiW) -- MOSI
+     , Signal dom Bool              -- SS
+     , Signal dom Bool              -- Busy
+     , Signal dom Bool              -- Acknowledge
+     , Signal dom (Maybe (Vec misoW (BitVector n))) -- Data: Slave -> Master
+     )
+  -- ^ Parts of the tuple:
+  --
+  -- 1. Serial Clock (SCLK)
+  -- 2. Master Output Slave Input (MOSI)
+  -- 3. Slave select (SS)
+  -- 4. Busy signal indicating that a transmission is in progress, new words on
+  --    the data line will be ignored when /True/
+  -- 5. (Maybe) the word send from the slave to the master
+spiMasterWide mode fN fW din miso =
   let (mosi, ack, dout)   = spiCommon mode ssL misoL sclkL
-                        (fromMaybe undefined# <$> din)
+                        (fromMaybe (repeat undefined#) <$> din)
       latch = snatToInteger fN /= 1
       ssL   = if latch then delay undefined ss   else ss
       misoL = if latch then delay undefined miso else miso
@@ -266,16 +364,17 @@ spiMaster mode fN fW din miso =
 
 -- | Generate slave select and SCK
 spiGen
-  :: forall n halfPeriod waitTime dom
+  :: forall n halfPeriod waitTime dom outW
    . ( HiddenClockResetEnable dom
      , KnownNat n
+     , KnownNat outW
      , 1 <= n
      , 1 <= halfPeriod
      , 1 <= waitTime )
   => SPIMode
   -> SNat halfPeriod
   -> SNat waitTime
-  -> Signal dom (Maybe (BitVector n))
+  -> Signal dom (Maybe (Vec outW (BitVector n)))
   -> ( Signal dom Bool
      , Signal dom Bool
      , Signal dom Bool
@@ -366,7 +465,7 @@ spiSlaveLatticeSBIO mode latchSPI =
  where
   sbioX bin en dout = bout
    where
-    (bout,_,_) = sbio 0b101001 bin (pure 0) dout (pure undefined) en
+    (bout,_,_) = sbio 0b101001 bin (pure 0) (fmap unpack dout) (pure undefined) en
 
 
 -- | SPI slave configurable SPI mode, using the BB tri-state buffer
@@ -412,4 +511,4 @@ spiSlaveLatticeBB mode latchSPI =
  where
     bbX bin en dout = bout
       where
-        (bout,_) = bidirectionalBuffer (toEnable en) bin dout
+        (bout,_) = bidirectionalBuffer (toEnable en) bin (fmap unpack dout)
