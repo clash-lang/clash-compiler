@@ -28,11 +28,9 @@ type Annotate (a :: Type) (attrs :: k) = a
 -- | Synthesis attributes are directives passed to sythesis tools, such as
 -- Quartus. An example of such an attribute in VHDL:
 --
--- @
---   attribute chip_pin : string;
---   attribute chip_pin of sel : signal is \"C4\";
---   attribute chip_pin of data : signal is "D1, D2, D3, D4";
--- @
+-- > attribute chip_pin : string;
+-- > attribute chip_pin of sel : signal is "C4";
+-- > attribute chip_pin of data : signal is "D1, D2, D3, D4";
 --
 -- This would instruct the synthesis tool to map the wire /sel/ to pin /C4/, and
 -- wire /data/ to pins /D1/, /D2/, /D3/, and /D4/. To achieve this in Clash, /Attr/s
@@ -79,7 +77,7 @@ type Annotate (a :: Type) (attrs :: k) = a
 -- @
 -- f :: Signal System Bool \`Annotate\` 'StringAttr \"chip_pin\" \"C4\"
 --   -> Signal System Bool
--- f x = id x -- Using a lambda, i.e. f = \x -> id x also works
+-- f x = id x -- Using a lambda, i.e. f = \\x -> id x also works
 -- @
 --
 -- will reliably show the annotation in the generated HDL, but

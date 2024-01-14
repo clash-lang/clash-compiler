@@ -674,7 +674,52 @@ instHO bbCtx fPos (resTy, bbResTy) argsWithTypes = do
 
   pure (TExpr resTy (Identifier resName Nothing))
 
+<<<<<<< HEAD
 -- | Instantiate a component/entity in a block state.
+=======
+-- | This creates a component declaration (for VHDL) given in and out port
+-- names, updating the 'BlockState backend' stored in the 'State' monad.
+--
+-- A typical result is that a
+--
+-- > component fifo port
+-- >    ( rst : in std_logic
+-- >    ...
+-- >    ; full : out std_logic
+-- >    ; empty : out std_logic );
+-- >  end component;
+--
+-- declaration would be added in the appropriate place.
+compInBlock
+  :: forall backend
+   . Backend backend
+  => Text
+  -- ^ Component name
+  -> [(Text, HWType)]
+  -- ^ in ports
+  -> [(Text, HWType)]
+  -- ^ out ports
+  -> State (BlockState backend) ()
+compInBlock compName inPorts0 outPorts0 =
+  addDeclaration (CompDecl compName (inPorts1 ++ outPorts1))
+ where
+  mkPort inOut (nm, ty) = (nm, inOut, ty)
+  inPorts1 = mkPort In <$> inPorts0
+  outPorts1 = mkPort Out <$> outPorts0
+
+-- | Convert a 'LitHDL' to a 'TExpr'
+--
+-- __N.B.__: Clash 1.8 changed 'instDecl'\'s type signature. Where it would
+--           previously accept 'LitHDL' in its generics/parameters argument, it
+--           now accepts a 'TExpr'. This function is mostly there to ease this
+--           transition.
+litTExpr :: LitHDL -> TExpr
+litTExpr (B b) = TExpr Bool    (Literal Nothing (BoolLit b))
+litTExpr (S s) = TExpr String  (Literal Nothing (StringLit s))
+litTExpr (I i) = TExpr Integer (Literal Nothing (NumLit i))
+
+-- | Instantiate a component/entity in a block state
+>>>>>>> cb401b8c5 (Haddock: Fix very confusing formatting errors (#2622))
 instDecl
   :: forall backend
    . Backend backend
@@ -840,9 +885,7 @@ notExpr nm aExpr = do
 
 -- | Creates a BV that produces the following vhdl:
 --
--- @
---    (0 to n => ARG)
--- @
+-- > (0 to n => ARG)
 --
 -- TODO: Implement for (System)Verilog
 pureToBV
@@ -862,9 +905,13 @@ pureToBV nm n arg = do
 
 -- | Creates a BV that produces the following vhdl:
 --
+<<<<<<< HEAD
 -- @
 --    std_logic_vector(resize(ARG, Size))
 -- @
+=======
+-- > std_logic_vector(resize(ARG, n))
+>>>>>>> cb401b8c5 (Haddock: Fix very confusing formatting errors (#2622))
 --
 -- TODO: Implement for (System)Verilog
 pureToBVResized

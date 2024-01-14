@@ -1070,8 +1070,216 @@ prefixParent parent (PortName p)        = PortName (parent <> "_" <> p)
 prefixParent parent (PortProduct "" ps) = PortProduct parent ps
 prefixParent parent (PortProduct p ps)  = PortProduct (parent <> "_" <> p) ps
 
+<<<<<<< HEAD
 mkAssign :: Identifier -> HWType -> Expr -> [Declaration]
 mkAssign id_ hwty expr = [NetDecl Nothing id_ hwty, Assignment id_ expr]
+=======
+-- | Make a new signal which is assigned with an initial value. This should be
+-- used in place of NetDecl directly, as it also updates the usage map to
+-- include the new identifier and usage.
+--
+mkInit
+  :: HasCallStack
+  => DeclarationType
+  -- ^ Are we in a concurrent or sequential context?
+  -> Usage
+  -- ^ How is the initial value assigned if the assignment is separate
+  -> Identifier
+  -- ^ The identifier of the declared net
+  -> HWType
+  -- ^ The typr of the declared net
+  -> Expr
+  -- ^ The value assigned to the net
+  -> NetlistMonad [Declaration]
+  -- ^ The declarations needed to declare and assign the net
+mkInit _ _ i ty e
+  -- When the initial value is a constant, we can set the value at the same
+  -- point the declaration happens. Initial assignments of this form do not
+  -- count as a usage as they are always allowed.
+  | isConstExpr e
+  = pure [NetDecl' Nothing i ty (Just e)]
+
+mkInit Concurrent Cont i ty e = do
+  usageMap %= Map.insert (Id.toText i) Cont
+  pure [NetDecl' Nothing i ty Nothing, Assignment i Cont e]
+
+mkInit Concurrent proc i ty e = do
+  usageMap %= Map.insert (Id.toText i) proc
+  pure
+    [ NetDecl' Nothing i ty Nothing
+    , Seq [Initial [SeqDecl (Assignment i proc e)]]
+    ]
+
+mkInit Sequential Cont _ _ _ =
+  error "mkInit: Cannot continuously assign in a sequential block"
+
+mkInit Sequential proc i ty e = do
+  usageMap %= Map.insert (Id.toText i) proc
+  pure
+    [ NetDecl' Nothing i ty Nothing
+    , Seq [SeqDecl (Assignment i proc e)]
+    ]
+
+-- | Determine if for the specified HDL, the type of assignment wanted can be
+-- performed on a signal which has been assigned another way. This identifies
+-- when a new intermediary signal needs to be created, e.g.
+--
+--   * when attempting to use blocking and non-blocking procedural assignment
+--     on the same signal in VHDL
+--
+--   * when attempting to use continuous and procedural assignment on the same
+--     signal in (System)Verilog
+--
+canUse :: HDL -> Usage -> Usage -> Bool
+canUse VHDL (Proc Blocking) = \case
+  Proc Blocking -> True
+  _ -> False
+
+canUse VHDL _ = \case
+  Proc Blocking -> False
+  _ -> True
+
+canUse _ Cont = \case
+  Cont -> True
+  _ -> False
+
+canUse _ _ = \case
+  Cont -> False
+  _ -> True
+
+declareUse :: Usage -> Identifier -> NetlistMonad ()
+declareUse u i = usageMap %= Map.insertWith (<>) (Id.toText i) u
+
+-- | Like 'declareUse', but will throw an exception if we run into a name
+-- collision.
+declareUseOnce :: HasUsageMap s => Usage -> Identifier -> State.State s ()
+declareUseOnce u i = usageMap %= Map.alter go (Id.toText i)
+ where
+  go Nothing = Just u
+  go Just{}  = error ("Internal error: unexpected re-declaration of usage for" ++ show i)
+
+-- | Declare uses which occur as a result of a component being instantiated,
+-- for example the following design (verilog)
+--
+-- > module f ( input p; output reg r ) ... endmodule
+-- >
+-- > module top ( ... )
+-- >   ...
+-- >   f f_inst ( .p(p), .r(foo));
+-- >   ...
+-- > endmodule
+--
+-- would declare a usage of foo, since it is assigned by @f_inst@.
+--
+declareInstUses
+  :: [(Expr, PortDirection, HWType, Expr)]
+  -- ^ The port mappings (named)
+  -> NetlistMonad ()
+declareInstUses =
+  mapM_ declare
+ where
+  -- Modifiers don't matter for these identifiers
+  declare (Identifier _ _, Out, _, Identifier n _) =
+    -- See NOTE [output ports are continuously assigned]
+    declareUse Cont n
+
+  declare (_, In, _, _) =
+    pure ()
+
+  declare portMapping =
+    error ("declareInstUses: Unexpected port mapping: " <> show portMapping)
+
+{-
+NOTE [output ports are continuously assigned]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a module is instantiated in Verilog, the output of the module is always
+continuously assigned. This means if I have the module
+
+  module f ( ..., output reg result)
+
+and an instantiation
+
+  f f_inst ( ..., .result(foo) );
+
+then the assignment of result to foo is a continuous assignment. This may seem
+strange, but consider
+
+  * instantiations can only occur in a concurrent context, and concurrent
+    contexts only admit continuous assignment
+
+  * the usage being tracked is not for the result port, but for foo. Whenever
+    the value of the port changes, the value of foo will change (i.e. there is
+    a wire between them, it cannot "hold" state).
+
+This means when we declare uses that occur as a result of an instantiation in
+netlist, the uses are always continuous assignment, and not the usage of the
+output port as given in the `outputs` field of the `Component` type.
+-}
+
+assignmentWith
+  :: HasCallStack
+  => (Identifier -> Declaration)
+  -> Usage
+  -> Identifier
+  -> NetlistMonad Declaration
+assignmentWith assign new i = do
+  u <- Lens.use usageMap
+  SomeBackend b <- Lens.use backend
+
+  case lookupUsage i u of
+    Just old | not $ canUse (hdlKind b) new old ->
+      error $ mconcat
+        [ "assignmentWith: Cannot assign as "
+        , show new
+        , " after "
+        , show old
+        , " for "
+        , show i
+        ]
+
+    _ ->
+      declareUse new i $> assign i
+
+-- | Attempt to continuously assign an expression to the given identifier. If
+-- the assignment is not allowed for the backend being used, a new signal is
+-- created which allows the assignment. The identifier which holds the result
+-- of the assignment is returned alongside the new declarations.
+--
+-- This function assumes the identifier being assigned is already declared. If
+-- the identifier is not in the usage map then an error is thrown.
+--
+contAssign
+  :: HasCallStack
+  => Identifier
+  -> Expr
+  -> NetlistMonad Declaration
+contAssign dst expr =
+  assignmentWith (\i -> Assignment i Cont expr) Cont dst
+
+procAssign
+  :: HasCallStack
+  => Blocking
+  -> Identifier
+  -> Expr
+  -> NetlistMonad Declaration
+procAssign block dst expr =
+  assignmentWith (\i -> Assignment i (Proc block) expr) (Proc block) dst
+
+condAssign
+  :: Identifier
+  -> HWType
+  -> Expr
+  -> HWType
+  -> [(Maybe Literal, Expr)]
+  -> NetlistMonad Declaration
+condAssign dst dstTy scrut scrutTy alts = do
+  -- Currently, all CondAssignment get rendered as `always @*` blocks in
+  -- (System)Verilog. This means when we target these HDL, this is _really_ a
+  -- blocking procedural assignment.
+  SomeBackend b <- Lens.use backend
+  let use = case hdlKind b of { VHDL -> Cont ; _ -> Proc Blocking }
+  assignmentWith (\i -> CondAssignment i dstTy scrut scrutTy alts) use dst
+>>>>>>> cb401b8c5 (Haddock: Fix very confusing formatting errors (#2622))
 
 -- | See 'toPrimitiveType' / 'fromPrimitiveType'
 convPrimitiveType :: HWType -> a -> NetlistMonad a -> NetlistMonad a

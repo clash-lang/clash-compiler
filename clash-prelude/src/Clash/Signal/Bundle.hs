@@ -82,10 +82,10 @@ import Clash.Sized.RTree            (RTree, lazyT)
 --   type Unbundled dom (Pair a b) = Pair (Signal dom a) (Signal dom b)
 --
 --   -- bundle :: Pair (Signal dom a) (Signal dom b) -> Signal dom (Pair a b)
---   bundle   (MkPair as bs) = MkPair <$> as <*> bs
+--   bundle   (MkPair as bs) = MkPair '<$>' as '<*>' bs
 --
 --   -- unbundle :: Signal dom (Pair a b) -> Pair (Signal dom a) (Signal dom b)
---   unbundle pairs = MkPair (getA <$> pairs) (getB <$> pairs)
+--   unbundle pairs = MkPair (getA '<$>' pairs) (getB '<$>' pairs)
 -- @
 
 class Bundle a where

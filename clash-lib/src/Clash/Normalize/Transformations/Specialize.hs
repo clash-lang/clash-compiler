@@ -143,7 +143,7 @@ import Clash.Util (ClashException(..))
 -- Imagine
 --
 -- @
--- (\x -> e) u
+-- (\\x -> e) u
 -- @
 --
 -- where @u@ has a free variable named @x@, rewriting this to:

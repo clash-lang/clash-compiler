@@ -743,10 +743,8 @@ fLit a = [|| Fixed (fromInteger sat) ||]
 -- synthesizable function like 'Clash.Prelude.ROM.File.asyncRomFile'. For
 -- example, consider a file @Data.txt@ containing:
 --
--- @
--- 1.2 2.0 3.0 4.0
--- -1.0 -2.0 -3.5 -4.0
--- @
+-- > 1.2 2.0 3.0 4.0
+-- > -1.0 -2.0 -3.5 -4.0
 --
 -- which we want to put in a ROM, interpreting them as @8.8@ signed fixed point
 -- numbers. What we do is that we first create a conversion utility,
@@ -786,30 +784,24 @@ fLit a = [|| Fixed (fromInteger sat) ||]
 --
 -- We then compile this to an executable:
 --
--- @
--- \$ clash --make createRomFile.hs
--- @
+-- > $ clash --make createRomFile.hs
 --
 -- We can then use this utility to convert our @Data.txt@ file which contains
 -- 'Double's to a @Data.bin@ file which will containing the desired ASCII-encoded
 -- binary data:
 --
--- @
--- \$ ./createRomFile \"Data.txt\" \"Data.bin\"
--- @
+-- > $ ./createRomFile Data.txt Data.bin
 --
 -- Which results in a @Data.bin@ file containing:
 --
--- @
--- 0000000100110011
--- 0000001000000000
--- 0000001100000000
--- 0000010000000000
--- 1111111100000000
--- 1111111000000000
--- 1111110010000000
--- 1111110000000000
--- @
+-- > 0000000100110011
+-- > 0000001000000000
+-- > 0000001100000000
+-- > 0000010000000000
+-- > 1111111100000000
+-- > 1111111000000000
+-- > 1111110010000000
+-- > 1111110000000000
 --
 -- We can then use this @Data.bin@ file in for our ROM:
 --

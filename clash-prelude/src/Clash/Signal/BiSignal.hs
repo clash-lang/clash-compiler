@@ -77,7 +77,7 @@ g :: Clock System
 g clk rst en s = writeToBiSignal s (mealy clk rst en counter (True, 0) (readFromBiSignal s))
 
 
--- | Connect the /f/ and /g/ circuits to the same bus
+-- | Connect the \/f\/ and \/g\/ circuits to the same bus
 topEntity
   :: Clock System
   -> Reset System

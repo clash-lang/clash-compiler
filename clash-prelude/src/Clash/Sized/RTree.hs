@@ -290,6 +290,7 @@ We have such an adder in the form of the 'Clash.Class.Num.add' function, as
 defined in the instance 'Clash.Class.Num.ExtendingNum' instance of 'Index'.
 However, we cannot simply use 'Clash.Sized.Vector.fold' to create a tree-structure of
 'Clash.Class.Num.add's:
+
 #if __GLASGOW_HASKELL__ >= 900
 >>> :{
 let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
