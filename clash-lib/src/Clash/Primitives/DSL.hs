@@ -842,14 +842,12 @@ instHO bbCtx fPos (resTy, bbResTy) argsWithTypes = do
 --
 -- A typical result is that a
 --
--- @
--- component fifo port
---    ( rst : in std_logic
---    ...
---    ; full : out std_logic
---    ; empty : out std_logic );
---  end component;
--- @
+-- > component fifo port
+-- >    ( rst : in std_logic
+-- >    ...
+-- >    ; full : out std_logic
+-- >    ; empty : out std_logic );
+-- >  end component;
 --
 -- declaration would be added in the appropriate place.
 compInBlock
@@ -1068,9 +1066,7 @@ notExpr nm aExpr = do
 
 -- | Creates a BV that produces the following vhdl:
 --
--- @
---    (0 to n => ARG)
--- @
+-- > (0 to n => ARG)
 --
 -- TODO: Implement for (System)Verilog
 pureToBV
@@ -1090,9 +1086,7 @@ pureToBV nm n arg = do
 
 -- | Creates a BV that produces the following vhdl:
 --
--- @
---    std_logic_vector(resize(ARG, n))
--- @
+-- > std_logic_vector(resize(ARG, n))
 --
 -- TODO: Implement for (System)Verilog
 pureToBVResized

@@ -42,7 +42,7 @@ import Clash.Util (ClashException(..), curLoc)
 -- transforms to:
 -- @
 --   y = f' a
---     where f' x' = (\x -> g x) (cast x')
+--     where f' x' = (\\x -> g x) (cast x')
 -- @
 --
 -- The reason d'etre for this transformation is that we hope to end up with

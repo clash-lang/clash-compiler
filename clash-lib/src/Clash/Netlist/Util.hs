@@ -1168,15 +1168,13 @@ declareUseOnce u i = usageMap %= Map.alter go (Id.toText i)
 -- | Declare uses which occur as a result of a component being instantiated,
 -- for example the following design (verilog)
 --
---    @
---    module f ( input p; output reg r ) ... endmodule
---
---    module top ( ... )
---      ...
---      f f_inst ( .p(p), .r(foo));
---      ...
---    endmodule
---    @
+-- > module f ( input p; output reg r ) ... endmodule
+-- >
+-- > module top ( ... )
+-- >   ...
+-- >   f f_inst ( .p(p), .r(foo));
+-- >   ...
+-- > endmodule
 --
 -- would declare a usage of foo, since it is assigned by @f_inst@.
 --

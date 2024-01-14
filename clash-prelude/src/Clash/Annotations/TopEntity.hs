@@ -62,11 +62,11 @@ module Blinker where
 import Clash.Prelude
 import Clash.Intel.ClockGen
 
--- Define a synthesis domain with a clock with a period of 20000 /ps/. Signal
+-- Define a synthesis domain with a clock with a period of 20000 \/ps\/. Signal
 -- coming from the reset button is low when pressed, and high when not pressed.
 'Clash.Explicit.Signal.createDomain'
   vSystem{vName=\"DomInput\", vPeriod=20000, vResetPolarity=ActiveLow}
--- Define a synthesis domain with a clock with a period of 50000 /ps/.
+-- Define a synthesis domain with a clock with a period of 50000 \/ps\/.
 'Clash.Explicit.Signal.createDomain' vSystem{vName=\"Dom50\", vPeriod=50000}
 
 topEntity
@@ -117,31 +117,29 @@ blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
 The Clash compiler would normally generate the following
 @topEntity.vhdl@ file:
 
-@
--- Automatically generated VHDL-93
-library IEEE;
-use IEEE.STD_LOGIC_1164.ALL;
-use IEEE.NUMERIC_STD.ALL;
-use IEEE.MATH_REAL.ALL;
-use std.textio.all;
-use work.all;
-use work.Blinker_topEntity_types.all;
-
-entity topEntity is
-  port(-- clock
-       clk20   : in Blinker_topEntity_types.clk_DomInput;
-       -- reset
-       rstBtn  : in Blinker_topEntity_types.rst_DomInput;
-       -- enable
-       enaBtn  : in Blinker_topEntity_types.en_Dom50;
-       modeBtn : in std_logic;
-       result  : out std_logic_vector(7 downto 0));
-end;
-
-architecture structural of topEntity is
-  ...
-end;
-@
+> -- Automatically generated VHDL-93
+> library IEEE;
+> use IEEE.STD_LOGIC_1164.ALL;
+> use IEEE.NUMERIC_STD.ALL;
+> use IEEE.MATH_REAL.ALL;
+> use std.textio.all;
+> use work.all;
+> use work.Blinker_topEntity_types.all;
+>
+> entity topEntity is
+>   port(-- clock
+>        clk20   : in Blinker_topEntity_types.clk_DomInput;
+>        -- reset
+>        rstBtn  : in Blinker_topEntity_types.rst_DomInput;
+>        -- enable
+>        enaBtn  : in Blinker_topEntity_types.en_Dom50;
+>        modeBtn : in std_logic;
+>        result  : out std_logic_vector(7 downto 0));
+> end;
+>
+> architecture structural of topEntity is
+>   ...
+> end;
 
 However, if we add the following 'Synthesize' annotation in the file:
 
@@ -159,31 +157,29 @@ However, if we add the following 'Synthesize' annotation in the file:
 
 The Clash compiler will generate the following @blinker.vhdl@ file instead:
 
-@
--- Automatically generated VHDL-93
-library IEEE;
-use IEEE.STD_LOGIC_1164.ALL;
-use IEEE.NUMERIC_STD.ALL;
-use IEEE.MATH_REAL.ALL;
-use std.textio.all;
-use work.all;
-use work.blinker_types.all;
-
-entity blinker is
-  port(-- clock
-       CLOCK_50 : in blinker_types.clk_DomInput;
-       -- reset
-       KEY0     : in blinker_types.rst_DomInput;
-       -- enable
-       KEY1     : in blinker_types.en_Dom50;
-       KEY2     : in std_logic;
-       LED      : out std_logic_vector(7 downto 0));
-end;
-
-architecture structural of blinker is
-  ...
-end;
-@
+> -- Automatically generated VHDL-93
+> library IEEE;
+> use IEEE.STD_LOGIC_1164.ALL;
+> use IEEE.NUMERIC_STD.ALL;
+> use IEEE.MATH_REAL.ALL;
+> use std.textio.all;
+> use work.all;
+> use work.blinker_types.all;
+>
+> entity blinker is
+>   port(-- clock
+>        CLOCK_50 : in blinker_types.clk_DomInput;
+>        -- reset
+>        KEY0     : in blinker_types.rst_DomInput;
+>        -- enable
+>        KEY1     : in blinker_types.en_Dom50;
+>        KEY2     : in std_logic;
+>        LED      : out std_logic_vector(7 downto 0));
+> end;
+>
+> architecture structural of blinker is
+>   ...
+> end;
 
 Where we now have:
 
@@ -293,14 +289,12 @@ instance Lift TopEntity where
 --
 -- Clash would normally generate the following VHDL entity:
 --
--- @
--- entity f is
---   port(a      : in signed(63 downto 0);
---        b_0    : in signed(63 downto 0);
---        b_1    : in boolean;
---        result : out std_logic_vector(65 downto 0));
--- end;
--- @
+-- > entity f is
+-- >   port(a      : in signed(63 downto 0);
+-- >        b_0    : in signed(63 downto 0);
+-- >        b_1    : in boolean;
+-- >        result : out std_logic_vector(65 downto 0));
+-- > end;
 --
 -- However, we can change this by using 'PortName's. So by:
 --
@@ -317,13 +311,11 @@ instance Lift TopEntity where
 --
 -- we get:
 --
--- @
--- entity f is
---   port(a   : in signed(63 downto 0);
---        b   : in std_logic_vector(64 downto 0);
---        res : out std_logic_vector(65 downto 0));
--- end;
--- @
+-- > entity f is
+-- >   port(a   : in signed(63 downto 0);
+-- >        b   : in std_logic_vector(64 downto 0);
+-- >        res : out std_logic_vector(65 downto 0));
+-- > end;
 --
 -- If we want to name fields for tuples/records we have to use 'PortProduct'
 --
@@ -340,15 +332,13 @@ instance Lift TopEntity where
 --
 -- So that we get:
 --
--- @
--- entity f is
---   port(a     : in signed(63 downto 0);
---        b     : in signed(63 downto 0);
---        c     : in boolean;
---        res_q : out std_logic_vector(64 downto 0);
---        res_1 : out boolean);
--- end;
--- @
+-- > entity f is
+-- >   port(a     : in signed(63 downto 0);
+-- >        b     : in signed(63 downto 0);
+-- >        c     : in boolean;
+-- >        res_q : out std_logic_vector(64 downto 0);
+-- >        res_1 : out boolean);
+-- > end;
 --
 -- Notice how we didn't name the second field of the result, and the second
 -- output port got 'PortProduct' name, \"res\", as a prefix for its name.

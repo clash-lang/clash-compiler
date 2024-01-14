@@ -58,7 +58,7 @@ import Clash.Rewrite.Util (changed)
 -- will be rewritten to:
 --
 -- @
---   \(x :: a) ->
+--   \\(x :: a) ->
 --         let
 --            r  = prim @a @b @c x r0 r1 -- With 'Clash.Core.Term.MultiPrim'
 --            r0 = c$multiPrimSelect r0 r

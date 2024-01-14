@@ -454,18 +454,20 @@ matchLiteralContructor c _ _ =
 
 -- | Remove non-reachable alternatives. For example, consider:
 --
---    data STy ty where
---      SInt :: Int -> STy Int
---      SBool :: Bool -> STy Bool
+-- @
+-- data STy ty where
+--   SInt :: Int -> STy Int
+--   SBool :: Bool -> STy Bool
 --
---    f :: STy ty -> ty
---    f (SInt b) = b + 1
---    f (SBool True) = False
---    f (SBool False) = True
---    {-# NOINLINE f #-}
+-- f :: STy ty -> ty
+-- f (SInt b) = b + 1
+-- f (SBool True) = False
+-- f (SBool False) = True
+-- {\-\# NOINLINE f \#-\}
 --
---    g :: STy Int -> Int
---    g = f
+-- g :: STy Int -> Int
+-- g = f
+-- @
 --
 -- @f@ is always specialized on @STy Int@. The SBool alternatives are therefore
 -- unreachable. Additional information can be found at:
@@ -498,7 +500,7 @@ caseElemNonReachable _ e = return e
 -- GHC generates Core that looks like:
 --
 -- @
--- f = \(x :: Unsigned 4) -> case x == fromInteger 3 of
+-- f = \\(x :: Unsigned 4) -> case x == fromInteger 3 of
 --                             False -> case x == fromInteger 2 of
 --                               False -> case x == fromInteger 1 of
 --                                 False -> case x == fromInteger 0 of
@@ -515,7 +517,7 @@ caseElemNonReachable _ e = return e
 -- This transformation transforms the above Core to the saner:
 --
 -- @
--- f = \(x :: Unsigned 4) -> case x of
+-- f = \\(x :: Unsigned 4) -> case x of
 --        _ -> error "incomplete case"
 --        0 -> fromInteger 3
 --        1 -> fromInteger 2

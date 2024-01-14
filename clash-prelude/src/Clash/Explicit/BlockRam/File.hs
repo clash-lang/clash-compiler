@@ -11,26 +11,22 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 Block RAM primitives that can be initialized with a data file. The BNF grammar
 for this data file is simple:
 
-@
-FILE = LINE+
-LINE = BIT+
-BIT  = '0'
-     | '1'
-@
+> FILE = LINE+
+> LINE = BIT+
+> BIT  = '0'
+>      | '1'
 
 Consecutive @LINE@s correspond to consecutive memory addresses starting at @0@.
 For example, a data file @memory.bin@ containing the 9-bit unsigned numbers
 @7@ to @13@ looks like:
 
-@
-000000111
-000001000
-000001001
-000001010
-000001011
-000001100
-000001101
-@
+> 000000111
+> 000001000
+> 000001001
+> 000001010
+> 000001011
+> 000001100
+> 000001101
 
 Such a file can be produced with 'memFile':
 

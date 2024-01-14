@@ -1943,9 +1943,7 @@ gather xs = map (xs!!)
 
 -- | \"'interleave' @d xs@\" creates a vector:
 --
--- @
--- \<x_0,x_d,x_(2d),...,x_1,x_(d+1),x_(2d+1),...,x_(d-1),x_(2d-1),x_(3d-1)\>
--- @
+-- > <x_0,x_d,x_(2d),...,x_1,x_(d+1),x_(2d+1),...,x_(d-1),x_(2d-1),x_(3d-1)>
 --
 -- >>> let xs = 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> 8 :> 9 :> Nil
 -- >>> interleave d3 xs
