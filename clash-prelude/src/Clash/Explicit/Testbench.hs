@@ -449,8 +449,8 @@ tbEnableGen = toEnable (pure True)
 --   where
 --     testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
 --     expectedOutput = outputVerifier' ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
---     done           = exposeClockResetEnable (expectedOutput (topEntity <$> testInput)) clk rst
---     clk            = 'tbSystemClockGen' (not <\$\> done)
+--     done           = exposeClockResetEnable (expectedOutput (topEntity \<\$> testInput)) clk rst
+--     clk            = 'tbSystemClockGen' (not \<\$> done)
 --     rst            = systemResetGen
 -- @
 tbSystemClockGen

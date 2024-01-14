@@ -27,7 +27,7 @@ domain looks like:
   { _name:: 'GHC.TypeLits.Symbol'
   -- ^ Domain name
   , _period :: 'GHC.TypeLits.Nat'
-  -- ^ Clock period in /ps/
+  -- ^ Clock period in \/ps\/
   , _edge :: 'ActiveEdge'
   -- ^ Active edge of the clock
   , _reset :: 'ResetKind'
@@ -46,8 +46,8 @@ made. Clash provides a standard implementation, called 'System', that is
 configured as follows:
 
 @
-instance KnownDomain "System" where
-  type KnownConf "System" = 'DomainConfiguration "System" 10000 'Rising 'Asynchronous 'Defined 'ActiveHigh
+instance KnownDomain 'System' where
+  type KnownConf 'System' = 'DomainConfiguration 'System' 10000 'Rising 'Asynchronous 'Defined 'ActiveHigh
   knownDomain = 'SDomainConfiguration' SSymbol SNat 'SRising' 'SAsynchronous' 'SDefined' 'SActiveHigh'
 @
 
@@ -514,7 +514,7 @@ unsafeSynchronizer clk1 clk2 =
 -- cannot be done precisely and can lead to odd behavior. For example,
 --
 -- @
--- sample $ unsafeSynchronizer @Dom2 @Dom7 . unsafeSynchronizer @Dom7 @Dom2 $ fromList [0..10]
+-- sample $ unsafeSynchronizer \@Dom2 \@Dom7 . unsafeSynchronizer \@Dom7 \@Dom2 $ fromList [0..10]
 -- > [0,4,4,4,7,7,7,7,11,11,11..
 -- @
 --
@@ -917,9 +917,7 @@ sampleWithResetN nReset nSamples f =
 --
 -- It prints a message of the form
 --
--- @
--- Signal sampled for N cycles until value X
--- @
+-- > Signal sampled for N cycles until value X
 --
 -- __NB__: This function is not synthesizable
 --
