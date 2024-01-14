@@ -498,9 +498,15 @@ tbEnableGen = toEnable (pure True)
 -- testBench = done
 --   where
 --     testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
+<<<<<<< HEAD
 --     expectedOutput = outputVerifier ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
 --     done           = exposeClockResetEnable (expectedOutput (topEntity <$> testInput)) clk rst
 --     clk            = 'tbSystemClockGen' (not <\$\> done)
+=======
+--     expectedOutput = outputVerifier' ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
+--     done           = exposeClockResetEnable (expectedOutput (topEntity \<\$> testInput)) clk rst
+--     clk            = 'tbSystemClockGen' (not \<\$> done)
+>>>>>>> cb401b8c5 (Haddock: Fix very confusing formatting errors (#2622))
 --     rst            = systemResetGen
 -- @
 tbSystemClockGen

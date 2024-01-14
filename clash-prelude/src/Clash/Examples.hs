@@ -321,7 +321,7 @@ uartRX r\@(RxReg {..}) rx_in uld_rx_data rx_enable = 'flip' 'execState' r $ do
       rx_busy       '.=' True
       rx_sample_cnt '.=' 1
       rx_cnt        '.=' 0
-    -- Star of frame detected, Proceed with rest of data
+    -- Start of frame detected, proceed with rest of data
     'when' _rx_busy $ do
       rx_sample_cnt '+=' 1
       -- Logic to sample at middle of data

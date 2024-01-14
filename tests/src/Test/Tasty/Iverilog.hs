@@ -33,12 +33,10 @@ instance IsOption Iverilog where
 --
 -- For example, for I2C it would execute:
 --
--- @
--- iverilog \
---   -I test_i2c -I test_bitmaster -I test_bytemaster \
---   -g2 -s test_i2c -o test_i2c.exe \
---   <verilog_files>
--- @
+-- > iverilog \
+-- >   -I test_i2c -I test_bitmaster -I test_bytemaster \
+-- >   -g2 -s test_i2c -o test_i2c.exe \
+-- >   <verilog_files>
 --
 data IVerilogMakeTest = IVerilogMakeTest
   { ivmSourceDirectory :: IO FilePath
@@ -73,9 +71,7 @@ instance IsTest IVerilogMakeTest where
 --
 -- For example, for I2C it would execute:
 --
--- @
--- vvp test_i2c.exe
--- @
+-- > vvp test_i2c.exe
 --
 data IVerilogSimTest = IVerilogSimTest
   { ivsExpectFailure :: Maybe (TestExitCode, T.Text)

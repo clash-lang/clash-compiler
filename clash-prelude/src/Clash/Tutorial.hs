@@ -231,24 +231,18 @@ at the same time. If you followed the installation instructions based on
 <https://docs.haskellstack.org/en/stable/README/#how-to-install Stack>, you can
 start the Clash compiler in interpretive mode by:
 
-@
-stack exec --resolver lts-19 --package clash-ghc -- clashi
-@
+> stack exec --resolver lts-19 --package clash-ghc -- clashi
 
 If instead you followed the [instructions](https://clash-lang.org/install/linux/)
 to setup a starter project with Stack, you can also run @clashi@ inside such a
 project. Change to the directory of the project, and invoke
 
-@
-stack run -- clashi
-@
+> stack run -- clashi
 
 If you instead set up the starter project with GHC and Cabal, change to the
 directory of the project and invoke
 
-@
-cabal run -- clashi
-@
+> cabal run -- clashi
 
 For those familiar with Haskell/GHC, this is indeed just @GHCi@, with three
 added commands (@:vhdl@, @:verilog@, and @:systemverilog@). You can load files
@@ -640,6 +634,7 @@ structure.
 -}
 
 {- $mac6 #mac6#
+
 * __'Num' instance for 'Signal'__:
 
     @'Signal' a@ is also also considered a 'Num'eric type as long as the value
@@ -946,6 +941,7 @@ blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
 
 The Clash compiler will normally generate the following @topentity.vhdl@ file:
 
+<<<<<<< HEAD
 @
 -- Automatically generated VHDL-93
 library IEEE;
@@ -968,6 +964,29 @@ architecture structural of topEntity is
  ...
 end;
 @
+=======
+> -- Automatically generated VHDL-93
+> library IEEE;
+> use IEEE.STD_LOGIC_1164.ALL;
+> use IEEE.NUMERIC_STD.ALL;
+> use IEEE.MATH_REAL.ALL;
+> use std.textio.all;
+> use work.all;
+> use work.Blinker_topEntity_types.all;
+>
+> entity topEntity is
+>   port(-- clock
+>        clk    : in Blinker_topEntity_types.clk_DomInput;
+>        -- reset
+>        rst    : in Blinker_topEntity_types.rst_DomInput;
+>        eta    : in std_logic;
+>        result : out std_logic_vector(7 downto 0));
+> end;
+>
+> architecture structural of topEntity is
+>  ...
+> end;
+>>>>>>> cb401b8c5 (Haddock: Fix very confusing formatting errors (#2622))
 
 However, if we add the following 'Synthesize' annotation in the file:
 
@@ -982,6 +1001,7 @@ However, if we add the following 'Synthesize' annotation in the file:
 
 The Clash compiler will generate the following @blinker.vhdl@ file instead:
 
+<<<<<<< HEAD
 @
 -- Automatically generated VHDL-93
 library IEEE;
@@ -1004,6 +1024,29 @@ architecture structural of blinker is
  ...
 end;
 @
+=======
+> -- Automatically generated VHDL-93
+> library IEEE;
+> use IEEE.STD_LOGIC_1164.ALL;
+> use IEEE.NUMERIC_STD.ALL;
+> use IEEE.MATH_REAL.ALL;
+> use std.textio.all;
+> use work.all;
+> use work.blinker_types.all;
+>
+> entity blinker is
+>   port(-- clock
+>        CLOCK_50 : in blinker_types.clk_DomInput;
+>        -- reset
+>        KEY0     : in blinker_types.rst_DomInput;
+>        KEY1     : in std_logic;
+>        LED      : out std_logic_vector(7 downto 0));
+> end;
+>
+> architecture structural of blinker is
+>  ...
+> end;
+>>>>>>> cb401b8c5 (Haddock: Fix very confusing formatting errors (#2622))
 
 Where we now have:
 
@@ -1057,13 +1100,11 @@ primitives, using 'Signed' multiplication (@*@) as an example. The
 
 For which the VHDL /expression/ primitive is:
 
-@
-BlackBox:
-  name: \'Clash.Sized.Internal.Signed.*#\'
-  kind: \'Expression\'
-  type: \'(*#) :: KnownNat n => Signed n -> Signed n -> Signed n\'
-  template: \'resize(~ARG[1] * ~ARG[2], ~LIT[0])\'
-@
+> BlackBox:
+>   name: Clash.Sized.Internal.Signed.*#
+>   kind: Expression
+>   type: '(*#) :: KnownNat n => Signed n -> Signed n -> Signed n'
+>   template: resize(~ARG[1] * ~ARG[2], ~LIT[0])
 
 The @name@ of the primitive is the /fully qualified/ name of the function you
 are creating the primitive for. Because we are creating an /expression/
@@ -1112,14 +1153,14 @@ blockRam#
   => 'Clock' dom           -- ^ 'Clock' to synchronize to
   -> 'Enable' dom          -- ^ Global enable
   -> 'Vec' n a             -- ^ Initial content of the BRAM, also
-                           -- determines the size, @n@, of the BRAM.
+                           -- determines the size, \@n\@, of the BRAM.
                            --
-                           -- __NB__: __MUST__ be a constant.
-  -> 'Signal' dom Int      -- ^ Read address @r@
+                           -- \_\_NB\_\_: \_\_MUST\_\_ be a constant.
+  -> 'Signal' dom Int      -- ^ Read address \@r\@
   -> 'Signal' dom Bool     -- ^ Write enable
-  -> 'Signal' dom Int      -- ^ Write address @w@
-  -> 'Signal' dom a        -- ^ Value to write (at address @w@)
-  -> 'Signal' dom a        -- ^ Value of the @blockRAM@ at address @r@ from
+  -> 'Signal' dom Int      -- ^ Write address \@w\@
+  -> 'Signal' dom a        -- ^ Value to write (at address \@w\@)
+  -> 'Signal' dom a        -- ^ Value of the BRAM at address \@r\@ from
                            -- the previous clock cycle
 blockRam# (Clock _) gen content rd wen =
   go
@@ -1148,70 +1189,68 @@ blockRam# (Clock _) gen content rd wen =
 
 And for which the /declaration/ primitive is:
 
-@
-BlackBox:
-  name: Clash.Explicit.BlockRam.blockRam#
-  kind: Declaration
-  type: |-
-    blockRam#
-      :: ( KnownDomain dom        ARG[0]
-         , HasCallStack  --       ARG[1]
-         , NFDataX a )   --       ARG[2]
-      => Clock dom       -- clk,  ARG[3]
-      -> Enable dom      -- en,   ARG[4]
-      -> Vec n a         -- init, ARG[5]
-      -> Signal dom Int  -- rd,   ARG[6]
-      -> Signal dom Bool -- wren, ARG[7]
-      -> Signal dom Int  -- wr,   ARG[8]
-      -> Signal dom a    -- din,  ARG[9]
-      -> Signal dom a
-  template: |-
-    -- blockRam begin
-    ~GENSYM[~RESULT_blockRam][1] : block
-      signal ~GENSYM[~RESULT_RAM][2] : ~TYP[5] := ~CONST[5];
-      signal ~GENSYM[rd][4]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
-      signal ~GENSYM[wr][5]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
-    begin
-      ~SYM[4] <= to_integer(~ARG[6])
-      -- pragma translate_off
-                    mod ~LENGTH[~TYP[5]]
-      -- pragma translate_on
-                    ;
-      ~SYM[5] <= to_integer(~ARG[8])
-      -- pragma translate_off
-                    mod ~LENGTH[~TYP[5]]
-      -- pragma translate_on
-                    ;
-    ~IF ~VIVADO ~THEN
-      ~SYM[6] : process(~ARG[3])
-      begin
-        if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-          if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
-            ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[9]][~TYP[9]];
-          end if;
-          ~RESULT <= fromSLV(~SYM[2](~SYM[4]))
-          -- pragma translate_off
-          after 1 ps
-          -- pragma translate_on
-          ;
-        end if;
-      end process; ~ELSE
-      ~SYM[6] : process(~ARG[3])
-      begin
-        if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-          if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
-            ~SYM[2](~SYM[5]) <= ~ARG[9];
-          end if;
-          ~RESULT <= ~SYM[2](~SYM[4])
-          -- pragma translate_off
-          after 1 ps
-          -- pragma translate_on
-          ;
-        end if;
-      end process; ~FI
-    end block;
-    --end blockRam
-@
+> BlackBox:
+>   name: Clash.Explicit.BlockRam.blockRam#
+>   kind: Declaration
+>   type: |-
+>     blockRam#
+>       :: ( KnownDomain dom        ARG[0]
+>          , HasCallStack  --       ARG[1]
+>          , NFDataX a )   --       ARG[2]
+>       => Clock dom       -- clk,  ARG[3]
+>       -> Enable dom      -- en,   ARG[4]
+>       -> Vec n a         -- init, ARG[5]
+>       -> Signal dom Int  -- rd,   ARG[6]
+>       -> Signal dom Bool -- wren, ARG[7]
+>       -> Signal dom Int  -- wr,   ARG[8]
+>       -> Signal dom a    -- din,  ARG[9]
+>       -> Signal dom a
+>   template: |-
+>     -- blockRam begin
+>     ~GENSYM[~RESULT_blockRam][1] : block
+>       signal ~GENSYM[~RESULT_RAM][2] : ~TYP[5] := ~CONST[5];
+>       signal ~GENSYM[rd][4]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
+>       signal ~GENSYM[wr][5]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
+>     begin
+>       ~SYM[4] <= to_integer(~ARG[6])
+>       -- pragma translate_off
+>                     mod ~LENGTH[~TYP[5]]
+>       -- pragma translate_on
+>                     ;
+>       ~SYM[5] <= to_integer(~ARG[8])
+>       -- pragma translate_off
+>                     mod ~LENGTH[~TYP[5]]
+>       -- pragma translate_on
+>                     ;
+>     ~IF ~VIVADO ~THEN
+>       ~SYM[6] : process(~ARG[3])
+>       begin
+>         if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
+>           if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
+>             ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[9]][~TYP[9]];
+>           end if;
+>           ~RESULT <= fromSLV(~SYM[2](~SYM[4]))
+>           -- pragma translate_off
+>           after 1 ps
+>           -- pragma translate_on
+>           ;
+>         end if;
+>       end process; ~ELSE
+>       ~SYM[6] : process(~ARG[3])
+>       begin
+>         if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
+>           if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
+>             ~SYM[2](~SYM[5]) <= ~ARG[9];
+>           end if;
+>           ~RESULT <= ~SYM[2](~SYM[4])
+>           -- pragma translate_off
+>           after 1 ps
+>           -- pragma translate_on
+>           ;
+>         end if;
+>       end process; ~FI
+>     end block;
+>     --end blockRam
 
 Again, the @name@ of the primitive is the fully qualified name of the function
 you are creating the primitive for. Because we are creating a /declaration/
@@ -1262,7 +1301,11 @@ a general listing of the available template holes:
   @-fclash-vivado@ flag. To be used with in an @~IF .. ~THEN .. ~ELSE .. ~FI@
   statement.
 * @~CMPLE[\<HOLE1\>][\<HOLE2\>]@: /1/ when @\<HOLE1\> \<= \<HOLE2\>@, otherwise /0/
+<<<<<<< HEAD
 * @~IW64@: /1/ when Int/Word/Integer types are represented with 64 bits in HDL.
+=======
+* @~IW64@: /1/ when @Int@\/@Word@\/@Integer@ types are represented with 64 bits in HDL.
+>>>>>>> cb401b8c5 (Haddock: Fix very confusing formatting errors (#2622))
   /0/ when they're represented by 32 bits.
 * @~TOBV[\<HOLE\>][\<TYPE\>]@: create conversion code that so that the
   expression in @\<HOLE\>@ is converted to a bit vector (@std_logic_vector@).
@@ -1289,8 +1332,13 @@ a general listing of the available template holes:
 * @~TAG[N]@: Name of given domain. Errors when called on an argument which is not
   a 'KnownDomain', 'Reset', or 'Clock'.
 * @~PERIOD[N]@: Clock period of given domain. Errors when called on an argument
+<<<<<<< HEAD
   which is not a 'KnownDomain' or 'KnownConf'.
 * @~ISACTIVEENABLE[N]@: Is the @(N+1)@'th argument a an Enable line NOT set to a
+=======
+  which is not a 'Clock', 'Reset', 'KnownDomain' or 'KnownConf'.
+* @~ISACTIVEENABLE[N]@: Is the @(N+1)@'th argument a an Enable line __not__ set to a
+>>>>>>> cb401b8c5 (Haddock: Fix very confusing formatting errors (#2622))
   constant True. Can be used instead of deprecated (and removed) template tag
 * @~ISSYNC[N]@: Does synthesis domain at the @(N+1)@'th argument have synchronous resets. Errors
   when called on an argument which is not a 'KnownDomain' or 'KnownConf'.
@@ -1301,7 +1349,7 @@ a general listing of the available template holes:
   argument which is not a 'KnownDomain' or 'KnownConf'.
 * @~AND[\<HOLE1\>,\<HOLE2\>,..]@: Logically /and/ the conditions in the @\<HOLE\>@'s
 * @~VAR[\<NAME\>][N]@: Like @~ARG[N]@ but binds the argument to a variable named NAME.
-  The @\<NAME\>@ can be left blank, then clash will come up with a (unique) name.
+  The @\<NAME\>@ can be left blank, then Clash will come up with a (unique) name.
 * @~VARS[N]@: VHDL: Return the variables at the @(N+1)@'th argument.
 * @~NAME[N]@: Render the @(N+1)@'th string literal argument as an identifier
   instead of a string literal. Fails when the @(N+1)@'th argument is not a
@@ -1328,132 +1376,124 @@ worlds, using e.g. VHDL's foreign function interface VHPI.
 {- $vprimitives
 For those who are interested, the equivalent Verilog primitives are:
 
-@
-BlackBox:
-  name: Clash.Sized.Internal.Signed.*#
-  kind: Expression
-  type: \'(*#) :: KnownNat n => Signed n -> Signed n -> Signed n\'
-  template: ~ARG[1] * ~ARG[2]
-@
+> BlackBox:
+>   name: Clash.Sized.Internal.Signed.*#
+>   kind: Expression
+>   type: '(*#) :: KnownNat n => Signed n -> Signed n -> Signed n'
+>   template: ~ARG[1] * ~ARG[2]
 
 and
 
-@
-BlackBox:
-  name: Clash.Explicit.BlockRam.blockRam#
-  kind: Declaration
-  outputReg: true
-  type: |-
-    blockRam#
-      :: ( KnownDomain dom        ARG[0]
-         , HasCallStack  --       ARG[1]
-         , NFDataX a )   --       ARG[2]
-      => Clock dom       -- clk,  ARG[3]
-      => Enable dom      -- en,   ARG[4]
-      -> Vec n a         -- init, ARG[5]
-      -> Signal dom Int  -- rd,   ARG[6]
-      -> Signal dom Bool -- wren, ARG[7]
-      -> Signal dom Int  -- wr,   ARG[8]
-      -> Signal dom a    -- din,  ARG[9]
-      -> Signal dom a
-  template: |-
-    // blockRam begin
-    reg ~TYPO ~GENSYM[~RESULT_RAM][1] [0:~LENGTH[~TYP[5]]-1];
-
-    reg ~TYP[5] ~GENSYM[ram_init][3];
-    integer ~GENSYM[i][4];
-    initial begin
-      ~SYM[3] = ~CONST[5];
-      for (~SYM[4]=0; ~SYM[4] < ~LENGTH[~TYP[5]]; ~SYM[4] = ~SYM[4] + 1) begin
-        ~SYM[1][~LENGTH[~TYP[5]]-1-~SYM[4]] = ~SYM[3][~SYM[4]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
-      end
-    end
-    ~IF ~ISACTIVEENABLE[4] ~THEN
-    always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
-      if (~ARG[4]) begin
-        if (~ARG[7]) begin
-          ~SYM[1][~ARG[8]] <= ~ARG[9];
-        end
-        ~RESULT <= ~SYM[1][~ARG[6]];
-      end~ELSE
-      if (~ARG[7] & ~ARG[4]) begin
-        ~SYM[1][~ARG[8]] <= ~ARG[9];
-      end
-      if (~ARG[4]) begin
-        ~RESULT <= ~SYM[1][~ARG[6]];
-      end~FI
-    end~ELSE
-    always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
-      if (~ARG[7]) begin
-        ~SYM[1][~ARG[8]] <= ~ARG[9];
-      end
-      ~RESULT <= ~SYM[1][~ARG[6]];
-    end~FI
-    // blockRam end
-@
+> BlackBox:
+>   name: Clash.Explicit.BlockRam.blockRam#
+>   kind: Declaration
+>   outputUsage: NonBlocking
+>   type: |-
+>     blockRam#
+>       :: ( KnownDomain dom        ARG[0]
+>          , HasCallStack  --       ARG[1]
+>          , NFDataX a )   --       ARG[2]
+>       => Clock dom       -- clk,  ARG[3]
+>       => Enable dom      -- en,   ARG[4]
+>       -> Vec n a         -- init, ARG[5]
+>       -> Signal dom Int  -- rd,   ARG[6]
+>       -> Signal dom Bool -- wren, ARG[7]
+>       -> Signal dom Int  -- wr,   ARG[8]
+>       -> Signal dom a    -- din,  ARG[9]
+>       -> Signal dom a
+>   template: |-
+>     // blockRam begin
+>     reg ~TYPO ~GENSYM[~RESULT_RAM][1] [0:~LENGTH[~TYP[5]]-1];
+>
+>     reg ~TYP[5] ~GENSYM[ram_init][3];
+>     integer ~GENSYM[i][4];
+>     initial begin
+>       ~SYM[3] = ~CONST[5];
+>       for (~SYM[4]=0; ~SYM[4] < ~LENGTH[~TYP[5]]; ~SYM[4] = ~SYM[4] + 1) begin
+>         ~SYM[1][~LENGTH[~TYP[5]]-1-~SYM[4]] = ~SYM[3][~SYM[4]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+>       end
+>     end
+>     ~IF ~ISACTIVEENABLE[4] ~THEN
+>     always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~RESULT_blockRam][5]~IF ~VIVADO ~THEN
+>       if (~ARG[4]) begin
+>         if (~ARG[7]) begin
+>           ~SYM[1][~ARG[8]] <= ~ARG[9];
+>         end
+>         ~RESULT <= ~SYM[1][~ARG[6]];
+>       end~ELSE
+>       if (~ARG[7] & ~ARG[4]) begin
+>         ~SYM[1][~ARG[8]] <= ~ARG[9];
+>       end
+>       if (~ARG[4]) begin
+>         ~RESULT <= ~SYM[1][~ARG[6]];
+>       end~FI
+>     end~ELSE
+>     always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[5]
+>       if (~ARG[7]) begin
+>         ~SYM[1][~ARG[8]] <= ~ARG[9];
+>       end
+>       ~RESULT <= ~SYM[1][~ARG[6]];
+>     end~FI
+>     // blockRam end
 
 -}
 
 {- $svprimitives
 And the equivalent SystemVerilog primitives are:
 
-@
-BlackBox:
-  name: Clash.Sized.Internal.Signed.*#
-  kind: Expression
-  type: \'(*#) :: KnownNat n => Signed n -> Signed n -> Signed n\'
-  template: ~ARG[1] * ~ARG[2]
-@
+> BlackBox:
+>   name: Clash.Sized.Internal.Signed.*#
+>   kind: Expression
+>   type: '(*#) :: KnownNat n => Signed n -> Signed n -> Signed n'
+>   template: ~ARG[1] * ~ARG[2]
 
 and
 
-@
-BlackBox:
-  name: Clash.Explicit.BlockRam.blockRam#
-  kind: Declaration
-  type: |-
-    blockRam#
-      :: ( KnownDomain dom        ARG[0]
-         , HasCallStack  --       ARG[1]
-         , NFDataX a )   --       ARG[2]
-      => Clock dom       -- clk,  ARG[3]
-      -> Enable dom      -- en,   ARG[4]
-      -> Vec n a         -- init, ARG[5]
-      -> Signal dom Int  -- rd,   ARG[6]
-      -> Signal dom Bool -- wren, ARG[7]
-      -> Signal dom Int  -- wr,   ARG[8]
-      -> Signal dom a    -- din,  ARG[9]
-      -> Signal dom a
-  template: |-
-    // blockRam begin
-    ~SIGD[~GENSYM[RAM][1]][5];
-    logic [~SIZE[~TYP[9]]-1:0] ~GENSYM[~RESULT_q][2];
-    initial begin
-      ~SYM[1] = ~CONST[5];
-    end~IF ~ISACTIVEENABLE[4] ~THEN
-    always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
-      if (~ARG[4]) begin
-        if (~ARG[7]) begin
-          ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
-        end
-        ~SYM[2] <= ~SYM[1][~ARG[6]];
-      end~ELSE
-      if (~ARG[7] & ~ARG[4]) begin
-        ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
-      end
-      if (~ARG[4]) begin
-        ~SYM[2] <= ~SYM[1][~ARG[6]];
-      end~FI
-    end~ELSE
-    always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[3]
-      if (~ARG[7]) begin
-        ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
-      end
-      ~SYM[2] <= ~SYM[1][~ARG[6]];
-    end~FI
-    assign ~RESULT = ~FROMBV[~SYM[2]][~TYP[9]];
-    // blockRam end
-@
+> BlackBox:
+>   name: Clash.Explicit.BlockRam.blockRam#
+>   kind: Declaration
+>   type: |-
+>     blockRam#
+>       :: ( KnownDomain dom        ARG[0]
+>          , HasCallStack  --       ARG[1]
+>          , NFDataX a )   --       ARG[2]
+>       => Clock dom       -- clk,  ARG[3]
+>       -> Enable dom      -- en,   ARG[4]
+>       -> Vec n a         -- init, ARG[5]
+>       -> Signal dom Int  -- rd,   ARG[6]
+>       -> Signal dom Bool -- wren, ARG[7]
+>       -> Signal dom Int  -- wr,   ARG[8]
+>       -> Signal dom a    -- din,  ARG[9]
+>       -> Signal dom a
+>   template: |-
+>     // blockRam begin
+>     ~SIGD[~GENSYM[RAM][1]][5];
+>     logic [~SIZE[~TYP[9]]-1:0] ~GENSYM[~RESULT_q][2];
+>     initial begin
+>       ~SYM[1] = ~CONST[5];
+>     end~IF ~ISACTIVEENABLE[4] ~THEN
+>     always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
+>       if (~ARG[4]) begin
+>         if (~ARG[7]) begin
+>           ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
+>         end
+>         ~SYM[2] <= ~SYM[1][~ARG[6]];
+>       end~ELSE
+>       if (~ARG[7] & ~ARG[4]) begin
+>         ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
+>       end
+>       if (~ARG[4]) begin
+>         ~SYM[2] <= ~SYM[1][~ARG[6]];
+>       end~FI
+>     end~ELSE
+>     always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~SYM[3]
+>       if (~ARG[7]) begin
+>         ~SYM[1][~ARG[8]] <= ~TOBV[~ARG[9]][~TYP[9]];
+>       end
+>       ~SYM[2] <= ~SYM[1][~ARG[6]];
+>     end~FI
+>     assign ~RESULT = ~FROMBV[~SYM[2]][~TYP[9]];
+>     // blockRam end
 
 -}
 
@@ -1564,13 +1604,18 @@ __asyncRam__
      , 'KnownDomain' wdom
      , 'KnownDomain' rdom
      )
+<<<<<<< HEAD
   => 'Clock' wdom                     -- ^ 'Clock' to which to synchronize the write port of the RAM
   -> 'Clock' rdom                     -- ^ 'Clock' to which the read address signal, @r@, is synchronized to
+=======
+  => 'Clock' wdom                     -- ^ Clock to which to synchronize the write port of the RAM
+  -> 'Clock' rdom                     -- ^ Clock to which the read address signal, \@r\@, is synchronized to
+>>>>>>> cb401b8c5 (Haddock: Fix very confusing formatting errors (#2622))
   -> 'Enable' wdom                    -- ^ Global enable
-  -> 'SNat' n                         -- ^ Size @n@ of the RAM
-  -> 'Signal' rdom addr               -- ^ Read address @r@
-  -> 'Signal' wdom (Maybe (addr, a))  -- ^ (write address @w@, value to write)
-  -> 'Signal' rdom a                  -- ^ Value of the @RAM@ at address @r@
+  -> 'SNat' n                         -- ^ Size \@n\@ of the RAM
+  -> 'Signal' rdom addr               -- ^ Read address \@r\@
+  -> 'Signal' wdom (Maybe (addr, a))  -- ^ (write address \@w\@, value to write)
+  -> 'Signal' rdom a                  -- ^ Value of the RAM at address \@r\@
 @
 
 that the signal containing the read address __r__ is synchronized to a different
@@ -1679,7 +1724,7 @@ asyncFIFOSynchronizer
      , 'KnownDomain' rdom
      , 2 <= addrSize )
   => SNat addrSize
-  -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
+  -- ^ Size of the internally used addresses, the  FIFO contains \@2^addrSize\@
   -- elements.
   -> 'Clock' wdom
   -- ^ 'Clock' to which the write port is synchronized
@@ -1694,7 +1739,7 @@ asyncFIFOSynchronizer
   -> 'Signal' wdom (Maybe a)
   -- ^ Element to insert
   -> ('Signal' rdom a, 'Signal' rdom Bool, 'Signal' wdom Bool)
-  -- ^ (Oldest element in the FIFO, @empty@ flag, @full@ flag)
+  -- ^ (Oldest element in the FIFO, \@empty\@ flag, \@full\@ flag)
 asyncFIFOSynchronizer addrSize\@SNat wclk rclk wrst rrst wen ren rinc wdataM =
   (rdata, rempty, wfull)
  where
@@ -1800,7 +1845,7 @@ asyncFIFOSynchronizer
      , 'KnownDomain' rdom
      , 2 <= addrSize )
   => SNat addrSize
-  -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
+  -- ^ Size of the internally used addresses, the  FIFO contains \@2^addrSize\@
   -- elements.
   -> 'Clock' wdom
   -- ^ Clock to which the write port is synchronized
@@ -1815,7 +1860,7 @@ asyncFIFOSynchronizer
   -> 'Signal' wdom (Maybe a)
   -- ^ Element to insert
   -> ('Signal' rdom a, 'Signal' rdom Bool, 'Signal' wdom Bool)
-  -- ^ (Oldest element in the FIFO, @empty@ flag, @full@ flag)
+  -- ^ (Oldest element in the FIFO, \@empty\@ flag, \@full\@ flag)
 asyncFIFOSynchronizer addrSize\@SNat wclk rclk wrst rrst wen ren rinc wdataM =
   (rdata, rempty, wfull)
  where

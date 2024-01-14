@@ -528,7 +528,7 @@ stripZeros (B0 x)  = case stripZeros x of
 -- head :: Vec (n + 1) a -> a
 --
 -- head' :: forall n a. (1 'GHC.TypeNats.<=' n) => Vec n a -> a
--- head' = 'leToPlus' @1 @n head
+-- head' = 'leToPlus' \@1 \@n head
 -- @
 leToPlus
   :: forall (k :: Nat) (n :: Nat) r

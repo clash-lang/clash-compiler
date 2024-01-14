@@ -26,7 +26,7 @@ domain looks like:
   { _name :: 'Domain'
   -- ^ Domain name
   , _period :: 'Clash.Promoted.Nat.Nat'
-  -- ^ Clock period in /ps/
+  -- ^ Clock period in \/ps\/
   , _activeEdge :: 'ActiveEdge'
   -- ^ Active edge of the clock
   , _resetKind :: 'ResetKind'
@@ -45,8 +45,8 @@ made. Clash provides an implementation 'System' with some common options
 chosen:
 
 @
-instance KnownDomain "System" where
-  type KnownConf "System" = 'DomainConfiguration "System" 10000 'Rising 'Asynchronous 'Defined 'ActiveHigh
+instance KnownDomain 'System' where
+  type KnownConf 'System' = 'DomainConfiguration 'System' 10000 'Rising 'Asynchronous 'Defined 'ActiveHigh
   knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
 @
 
@@ -2120,9 +2120,7 @@ dup1 _      = error "empty list"
 --
 -- It prints a message of the form
 --
--- @
--- Signal sampled for N cycles until value X
--- @
+-- > Signal sampled for N cycles until value X
 --
 -- __NB__: This function is not synthesizable
 --
