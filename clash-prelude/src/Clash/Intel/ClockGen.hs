@@ -193,26 +193,22 @@ When type checking cannot infer the types of the tuple elements, or they have
 the wrong type, the GHC compiler will complain about satisfying @NumOutClocks@.
 The error message on GHC 9.4 and up is:
 
-@
-    • Cannot satisfy: clash-prelude-[...]:Clash.Clocks.Internal.NumOutClocks
-                        (clash-prelude-[...]:Clash.Clocks.Internal.ClocksSyncClocksInst
-                           ([...])
-                           DomInput) <= 18
-    • In the expression: alteraPllSync clkIn rstIn
-@
+>     • Cannot satisfy: clash-prelude-[...]:Clash.Clocks.Internal.NumOutClocks
+>                         (clash-prelude-[...]:Clash.Clocks.Internal.ClocksSyncClocksInst
+>                            ([...])
+>                            DomInput) <= 18
+>     • In the expression: alteraPllSync clkIn rstIn
 
 On older GHC versions, the error message is:
 
-@
-    • Couldn't match type ‘clash-prelude-[...]:Clash.Clocks.Internal.NumOutClocks
-                             (clash-prelude-[...]:Clash.Clocks.Internal.ClocksSyncClocksInst
-                                ([...])
-                                DomInput)
-                           <=? 18’
-                     with ‘'True’
-        arising from a use of ‘alteraPllSync’
-    • In the expression: alteraPllSync clkIn rstIn
-@
+>     • Couldn't match type ‘clash-prelude-[...]:Clash.Clocks.Internal.NumOutClocks
+>                              (clash-prelude-[...]:Clash.Clocks.Internal.ClocksSyncClocksInst
+>                                 ([...])
+>                                 DomInput)
+>                            <=? 18’
+>                      with ‘'True’
+>         arising from a use of ‘alteraPllSync’
+>     • In the expression: alteraPllSync clkIn rstIn
 
 The above error message is also emitted when trying to instantiate more than 18
 output clocks, as it will fail to find an instance. As 'altpllSync' supports no
@@ -220,18 +216,14 @@ more than 5 clocks, trying to instantiate between 6 and 18 output clocks will
 also cause a type checking error. On GHC 9.4 and up, the error for attempting to
 instantiate 6 clocks is:
 
-@
-    • Cannot satisfy: 6 <= 5
-    • In the expression: altpllSync clkIn rstIn
-@
+>     • Cannot satisfy: 6 <= 5
+>     • In the expression: altpllSync clkIn rstIn
 
 On older GHC versions, the error message is less clear:
 
-@
-    • Couldn't match type ‘'False’ with ‘'True’
-        arising from a use of ‘altpllSync’
-    • In the expression: altpllSync clkIn rstIn
-@
+>     • Couldn't match type ‘'False’ with ‘'True’
+>         arising from a use of ‘altpllSync’
+>     • In the expression: altpllSync clkIn rstIn
 -}
 
 {- $unsafe

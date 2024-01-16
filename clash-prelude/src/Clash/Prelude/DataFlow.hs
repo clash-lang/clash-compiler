@@ -75,11 +75,11 @@ The 'DataFlow' type is defined as:
 newtype DataFlow' dom iEn oEn i o
   = DF
   { df :: 'Signal' dom i     -- Incoming data
-       -> 'Signal' dom iEn   -- Flagged with /valid/ bits @iEn@.
-       -> 'Signal' dom oEn   -- Incoming back-pressure, /ready/ edge.
+       -> 'Signal' dom iEn   -- Flagged with \/valid\/ bits \@iEn\@.
+       -> 'Signal' dom oEn   -- Incoming back-pressure, \/ready\/ edge.
        -> ( 'Signal' dom o   -- Outgoing data.
-          , 'Signal' dom oEn -- Flagged with /valid/ bits @oEn@.
-          , 'Signal' dom iEn -- Outgoing back-pressure, /ready/ edge.
+          , 'Signal' dom oEn -- Flagged with \/valid\/ bits \@oEn\@.
+          , 'Signal' dom iEn -- Outgoing back-pressure, \/ready\/ edge.
           )
   }
 @
@@ -122,11 +122,11 @@ newtype DataFlow dom iEn oEn i o
 --
 -- @
 -- 'Signal' dom i        -- Incoming data.
--- -> 'Signal' dom Bool  -- Flagged with a single /valid/ bit.
--- -> 'Signal' dom Bool  -- Incoming back-pressure, /ready/ bit.
+-- -> 'Signal' dom Bool  -- Flagged with a single \/valid\/ bit.
+-- -> 'Signal' dom Bool  -- Incoming back-pressure, \/ready\/ bit.
 -- -> ( 'Signal' dom o   -- Outgoing data.
---    , 'Signal' dom oEn -- Flagged with a single /valid/ bit.
---    , 'Signal' dom iEn -- Outgoing back-pressure, /ready/ bit.
+--    , 'Signal' dom oEn -- Flagged with a single \/valid\/ bit.
+--    , 'Signal' dom iEn -- Outgoing back-pressure, \/ready\/ bit.
 --    )
 -- @
 --

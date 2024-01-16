@@ -129,11 +129,9 @@ dslParser =
 -- The parser will detect a module name if it is mentioned as the first thing
 -- followed by at least three dashes on the following line. For example:
 --
--- @
--- MODULE: my_module_name
--- ----------
--- <!-- HDL code starts here -->
--- @
+-- > MODULE: my_module_name
+-- > ----------
+-- > <!-- HDL code starts here -->
 parse
     :: String
     -> Either ParseError (Maybe String, CoSimDSL)

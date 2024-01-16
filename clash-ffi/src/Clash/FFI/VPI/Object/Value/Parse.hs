@@ -86,9 +86,7 @@ parseBinStr bitSize bin = do
 --
 -- Consider the following bit string:
 --
---   @
---   9'b.0.1.1001
---   @
+-- > 9'b.0.1.1001
 --
 -- Attempting to read this as octal or hexadecimal results in a loss of
 -- precision in the value, giving @XX1@ and @xX9@. When @\'X\'@ (or @\'Z\'@)
