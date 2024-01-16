@@ -63,6 +63,7 @@ import qualified Data.List.Infinite  as Inf
 import           Data.List.Infinite  (Infinite (..))
 import           Data.List.NonEmpty  (NonEmpty)
 import           Data.Ord            (Down (Down))
+import           Data.Proxy          (Proxy)
 import           Data.Ratio          (Ratio, numerator, denominator)
 import qualified Data.Semigroup      as SG
 import qualified Data.Monoid         as M
@@ -397,6 +398,8 @@ printX :: ShowX a => a -> IO ()
 printX x = putStrLn $ showX x
 
 instance ShowX ()
+-- | @since 1.8.2
+instance ShowX (Proxy a)
 instance ShowX a => ShowX (Identity a)
 instance ShowX a => ShowX (Const a b)
 instance (ShowX (f a), ShowX (g a)) => ShowX (Product f g a)
@@ -585,6 +588,8 @@ instance NFDataX a => NFDataX [a]
 instance NFDataX a => NFDataX (NonEmpty a)
 instance (NFDataX a, NFDataX b) => NFDataX (Either a b)
 instance NFDataX a => NFDataX (Maybe a)
+-- | @since 1.8.2
+instance NFDataX (Proxy a)
 instance NFDataX a => NFDataX (Identity a)
 instance NFDataX a => NFDataX (Const a b)
 instance (NFDataX (f a), NFDataX (g a)) => NFDataX (Product f g a)
