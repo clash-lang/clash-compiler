@@ -201,10 +201,8 @@ data HDL
 --
 -- You create a package which has a @myfancyip.cabal@ file with the following stanza:
 --
--- @
--- data-files: path\/to\/MyFancyIP.primitives
--- cpp-options: -DCABAL
--- @
+-- > data-files: path/to/MyFancyIP.primitives
+-- > cpp-options: -DCABAL
 --
 -- and a @MyFancyIP.hs@ module with the simulation definition and primitive.
 --
