@@ -54,6 +54,7 @@ accumulator _ numOnes = (accum, rollover)
 -- | The counter for sigma, which counts counts the number of ones from
 -- the input and resets when count is equal to zero
 accumulatorCounter ::
+  forall sigmaWidth inputWidth.
   (KnownNat sigmaWidth, KnownNat inputWidth, inputWidth <= sigmaWidth) =>
   -- | Parts of the Tuple
   --
@@ -126,6 +127,7 @@ filter _ dataIn accumRdy = (dataOut, resultValid)
 -- | The accumulator for the filter, it adds the input to accum when
 -- the sample from the accumulator is ready
 filterAccumulator ::
+  forall filterDepth adcWdith.
   (KnownNat filterDepth, KnownNat adcWidth) =>
   -- | previous count of the filter accumulator
   BitVector (filterDepth + adcWidth) ->
@@ -173,7 +175,7 @@ sigmaDeltaADC ::
   -- The depth of the decimation filter,
   -- the downsampling rate is equal to 2^FilterDepth
   SNat filterDepth ->
-  -- | analog input from the comparator
+  -- | analog output from the comparator
   Signal dom (BitVector (inputWidth + 1)) ->
   -- | parts of the tuple
   --
