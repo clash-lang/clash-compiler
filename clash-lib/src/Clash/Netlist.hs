@@ -1032,18 +1032,23 @@ mkDcApplication declType [dstHType] bndr dc args = do
             dcArgs   = snd $ indexNote ($(curLoc) ++ "No DC with tag: " ++ show dcI) dcArgPairs dcI
         case compare (length dcArgs) (length argExprsFiltered) of
           EQ -> return (HW.DataCon dstHType (DC (dstHType,dcI)) argExprsFiltered)
-          LT -> error $ $(curLoc) ++ "Over-applied constructor"
-          GT -> error $ $(curLoc) ++ "Under-applied constructor"
+          LT -> error $ $(curLoc) ++ "Over-applied constructor: " ++ StrictText.unpack dcNm
+          GT -> error $ $(curLoc) ++ "Under-applied constructor: " ++ StrictText.unpack dcNm
       Product _ _ dcArgs ->
         case compare (length dcArgs) (length argExprsFiltered) of
           EQ -> return (HW.DataCon dstHType (DC (dstHType,0)) argExprsFiltered)
-          LT -> error $ $(curLoc) ++ "Over-applied constructor"
-          GT -> error $ $(curLoc) ++ "Under-applied constructor"
+          LT -> error $ $(curLoc) ++ "Over-applied constructor: " ++ StrictText.unpack dcNm
+          GT -> error $ unlines [ $(curLoc) ++ "Under-applied constructor:" ++ StrictText.unpack dcNm
+                                , "dcArgs=" ++ unlines [" - " ++ show x | x <- dcArgs]
+                                , "argExprs=" ++ unlines [" - " ++ show x | x <- argExprs]
+                                , "hWTysFilt=" ++ unlines [" - " ++ show x | x <- hWTysFiltered]
+                                , "argExprsFilt=" ++ unlines [" - " ++ show x | x <- argExprsFiltered]
+                                ]
       CustomProduct _ _ _ _ dcArgs ->
         case compare (length dcArgs) (length argExprsFiltered) of
           EQ -> return (HW.DataCon dstHType (DC (dstHType,0)) argExprsFiltered)
-          LT -> error $ $(curLoc) ++ "Over-applied constructor"
-          GT -> error $ $(curLoc) ++ "Under-applied constructor"
+          LT -> error $ $(curLoc) ++ "Over-applied constructor: " ++ StrictText.unpack dcNm
+          GT -> error $ $(curLoc) ++ "Under-applied constructor: " ++ StrictText.unpack dcNm
       Sum _ _ ->
         return (HW.DataCon dstHType (DC (dstHType,dcTag dc - 1)) [])
       CustomSP _ _ _ dcArgsTups -> do
@@ -1055,8 +1060,8 @@ mkDcApplication declType [dstHType] bndr dc args = do
 
         case compare (length dcArgs) (length argExprsFiltered) of
           EQ -> return (HW.DataCon dstHType (DC (dstHType, dcI)) argExprsFiltered)
-          LT -> error $ $(curLoc) ++ "Over-applied constructor"
-          GT -> error $ $(curLoc) ++ "Under-applied constructor"
+          LT -> error $ $(curLoc) ++ "Over-applied constructor: " ++ StrictText.unpack dcNm
+          GT -> error $ $(curLoc) ++ "Under-applied constructor: " ++ StrictText.unpack dcNm
 
       CustomSum _ _ _ _ ->
         return (HW.DataCon dstHType (DC (dstHType, dcTag dc - 1)) [])
