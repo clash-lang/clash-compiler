@@ -11,7 +11,7 @@ data ShiftRegister
   = ShiftRegister
   { _sr   :: Vec 8 Bit
   , _dcnt :: Index 8
-  } deriving (Generic, NFDataX)
+  } deriving (Generic, NFDataX, Eq)
 
 makeLenses ''ShiftRegister
 

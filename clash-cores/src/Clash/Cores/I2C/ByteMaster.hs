@@ -14,7 +14,7 @@ import Clash.Cores.I2C.Types
 import Data.Maybe (fromJust)
 
 data ByteStateMachine = Idle | Active | Start | Read | Write | Ack | Stop
-  deriving (Show, Generic, NFDataX)
+  deriving (Show, Generic, NFDataX, Eq)
 
 data I2COperation = ReadData | WriteData (BitVector 8)
   deriving (Generic, NFDataX)
@@ -29,10 +29,8 @@ data ByteMasterS
   , _coreTxd    :: Bit              -- coreTxd register
   , _shiftsr    :: Bool             -- shift sr
   , _ld         :: Bool             -- load values in to sr
-  , _i2cOpAck    :: Bool             -- host cmd acknowlegde register
-  , _slaveAck     :: Bool             -- slave ack register
   }
-  deriving (Generic, NFDataX)
+  deriving (Generic, NFDataX, Eq)
 
 makeLenses ''ByteMasterS
 
@@ -78,13 +76,11 @@ byteMasterInit
   , _coreTxd    = low
   , _shiftsr    = False
   , _ld         = False
-  , _i2cOpAck   = False
-  , _slaveAck   = True
   }
 
 byteMasterT :: ByteMasterS -> ByteMasterI -> (ByteMasterS, ByteMasterO)
 byteMasterT s@(ByteS {_srState = ShiftRegister {..}, ..})
-            (rst,claimBus,maybeI2COp,ackIn,~(coreAck,al,coreRxd)) = swap $ flip runState s $ do
+            (rst,claimBus,maybeI2COp,ackRead,~(coreAck,al,coreRxd)) = swap $ flip runState s $ do
 
       -- assign dOut the output of the shift-register
   let dout = _sr
@@ -92,31 +88,34 @@ byteMasterT s@(ByteS {_srState = ShiftRegister {..}, ..})
   cntDone <- zoom srState (shiftRegister rst _ld _shiftsr (bv2v (getWriteData $ fromJust maybeI2COp )) coreRxd)
 
   -- state machine
-  coreTxd .= head dout
-  shiftsr .= False
-  ld      .= False
-  i2cOpAck .= False
+  coreTxd   .= head dout
+  shiftsr   .= False
+  ld        .= False
 
   if rst || al then do
     coreCmd    .= I2Cnop
     coreTxd    .= low
     byteStateM .= Idle
-    slaveAck     .= True
   else case (_byteStateM, maybeI2COp) of
     (Idle, _) -> when claimBus $ do
       ld .= True
       byteStateM .= Start
       coreCmd    .= I2Cstart
     (Active, Just ReadData) -> do
+      ld .= True
       byteStateM .= Read
       coreCmd    .= I2Cread
     (Active, Just (WriteData _)) -> do
       ld .= True
       byteStateM .= Write
       coreCmd    .= I2Cwrite
-    (Active ,Nothing) -> do
-      byteStateM .= Active
-      coreCmd    .= I2Cnop
+    (Active ,Nothing) ->
+      if claimBus then do
+        byteStateM .= Active
+        coreCmd    .= I2Cnop
+      else do
+        byteStateM .= Stop
+        coreCmd    .= I2Cstop
     (Start, Nothing) -> when coreAck $ do
       byteStateM .= Active
       coreCmd    .= I2Cnop
@@ -137,7 +136,7 @@ byteMasterT s@(ByteS {_srState = ShiftRegister {..}, ..})
 
     (Read, _) -> when coreAck $ do
       shiftsr .= True
-      coreTxd .= bitCoerce ackIn
+      coreTxd .= (bitCoerce $ not ackRead)
       if cntDone then do
         byteStateM .= Ack
         coreCmd    .= I2Cwrite
@@ -146,26 +145,25 @@ byteMasterT s@(ByteS {_srState = ShiftRegister {..}, ..})
 
     (Ack, _) ->
       if coreAck then do
-        slaveAck  .= bitCoerce coreRxd
-        coreTxd .= high
+        coreTxd    .= high
         -- check for stop; Should a STOP command be generated?
         if claimBus then do
           byteStateM .= Active
           coreCmd    .= I2Cnop
-          -- generate command acknowledge signal
-          i2cOpAck    .= True
         else do
           byteStateM .= Stop
           coreCmd    .= I2Cstop
       else
-        coreTxd .= bitCoerce ackIn
+        coreTxd .= (bitCoerce $ not ackRead)
 
     (Stop, _) -> when coreAck $ do
       byteStateM .= Idle
       coreCmd    .= I2Cnop
-      i2cOpAck   .= True
 
-  let bitCtrl = (_coreCmd,_coreTxd)
-      outp    = (_i2cOpAck,_slaveAck,v2bv dout,bitCtrl)
+  let
+    bitCtrl  = (_coreCmd,_coreTxd)
+    i2cOpAck = (_byteStateM == Ack) && coreAck
+    ackWrite = i2cOpAck && not (bitCoerce coreRxd)
+    outp = (i2cOpAck,ackWrite,v2bv dout,bitCtrl)
 
   return outp
