@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2019,      Myrtle Software Ltd.
-                     2020-2023, QBayLogic B.V.
+                     2020-2024, QBayLogic B.V.
                      2021,      Myrtle.ai
                      2022-2023, Google Inc
   License     :  BSD2 (see the file LICENSE)
@@ -127,7 +127,8 @@ import           Clash.Netlist.Types             hiding (Component, toBit)
 import           Clash.Netlist.Util
 import           Clash.Util                      (clogBase)
 import qualified Data.String.Interpolate         as I
-import           Language.Haskell.TH             (Name)
+import qualified Language.Haskell.TH             as TH
+import qualified Language.Haskell.TH.Syntax      as TH
 import           Prelude
 
 -- | Options for 'blackBoxHaskell' function. Use 'def' from package
@@ -164,9 +165,9 @@ instance Default BlackBoxHaskellOpts where
 --
 -- @[1,2]@ would mean this blackbox __ignores__ its second and third argument.
 blackBoxHaskell
-  :: Name
+  :: TH.Name
   -- ^ blackbox name
-  -> Name
+  -> TH.Name
   -- ^ template function name
   -> BlackBoxHaskellOpts
   -- ^ Options, see data structure for more information
@@ -649,14 +650,21 @@ constructProduct ty els =
 
 -- | Create an n-tuple of 'TExpr'
 tuple :: HasCallStack => [TExpr] -> TExpr
-tuple [] = error $ "nTuple: Cannot create empty tuple"
+tuple [] = error $ "tuple: Cannot create empty tuple"
 tuple [_] =
   -- If we don't put this in: tuple . untuple /= id
-  error $ "nTuple: Cannot create 1-tuple"
+  error $ "tuple: Cannot create 1-tuple"
 tuple els = constructProduct tupTy els
  where
   commas = Text.replicate (length els - 1) ","
-  tupTy = Product ("GHC.Tuple.(" <> commas <> ")") Nothing (map ety els)
+  tupTy = Product (tupModule <> ".(" <> commas <> ")") Nothing (map ety els)
+  tupModule =
+    $(
+    let tupNm = ''(,)
+    in case (TH.nameModule tupNm, TH.nameBase tupNm) of
+        (Just modNm, "(,)") -> TH.lift modNm :: TH.ExpQ
+        _ -> error $ "tuple: (,) has an unexpected name: " <> show tupNm
+    )
 
 -- | Try to get the literal string value of an expression.
 getStr :: TExpr -> Maybe String
