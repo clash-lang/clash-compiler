@@ -46,7 +46,7 @@ import Clash.Netlist.Types
 import Clash.Core.Term ( Term(Data), collectArgs )
 import Clash.Core.Name ( Name(Name, nameOcc) )
 import Clash.Core.DataCon ( DataCon(MkData, dcName) )
-import Clash.Core.Type (Type(..), LitTy (SymTy), splitTyConAppM, isIntegerTy)
+import Clash.Core.Type (Type(..), LitTy (SymTy), ConstTy(TyCon), splitTyConAppM, isIntegerTy)
 import Clash.Core.TyCon(isTupleTyConLike)
 
 import qualified Clash.Netlist.BlackBox.Types as BlackBox
@@ -59,7 +59,7 @@ data Param (name :: Symbol) a = Param a
 
 -- | Port in a port mapping
 data ClockPort (name :: Symbol) dom = ClockPort (Clock dom)
-data ResetPort (name :: Symbol) dom (polarity :: ResetPolarity) = ResetPort (Reset dom)
+data ResetPort (name :: Symbol) (polarity :: ResetPolarity) dom = ResetPort (Reset dom)
 data EnablePort (name :: Symbol) dom = EnablePort (Enable dom)
 data Port (name :: Symbol) dom a = Port (Signal dom a)
 
@@ -133,12 +133,19 @@ instance TermLiteral (PrimPortOrParam ()) where
     = pure (MkPrimPort (PrimClockPort{name=Text.pack nm, dom=Text.pack domNm, meta=()}))
 
     | constrName == show 'ResetPort
-    = error (constrName <> ppShow args) -- TODO
+    , (LitTy (SymTy nm) : pol : LitTy (SymTy domNm) : _) <- rights args
+    = pure (MkPrimPort (PrimResetPort{name=Text.pack nm, dom=Text.pack domNm, meta=(), polarity = getPolarity nm pol}))
 
     | constrName == show 'EnablePort
     = error (constrName <> ppShow args) -- TODO
 
   termToData t = Left t
+
+getPolarity :: HasCallStack => String -> Type -> ResetPolarity
+getPolarity _ (ConstTy (TyCon (Text.unpack . nameOcc -> nm)))
+  | nm == show 'ActiveHigh = ActiveHigh
+  | nm == show 'ActiveLow  = ActiveLow
+getPolarity nm ty = error ("Could not determine ResetPolarity for ResetPort @\""<> nm <> "\" from\n " <> show ty)
 
 -- | Config for 'inst'
 data InstConfig = InstConfig
@@ -169,8 +176,8 @@ instance KnownDomain dom => IsPort (ClockPort name dom) where
   type PortType (ClockPort name dom) = Clock dom
   unPort (ClockPort clk) = clk
 
-instance KnownDomain dom => IsPort (ResetPort name dom polarity) where
-  type PortType (ResetPort name dom polarity) = Reset dom
+instance KnownDomain dom => IsPort (ResetPort name polarity dom) where
+  type PortType (ResetPort name polarity dom) = Reset dom
   unPort (ResetPort rst) = rst
 
 instance KnownDomain dom => IsPort (EnablePort name dom) where
@@ -184,7 +191,7 @@ instance KnownDomain dom => IsPort (Port name dom a) where
 instance Inst ()
 instance KnownDomain dom => Inst (Port s dom a)
 instance KnownDomain dom => Inst (ClockPort s dom)
-instance KnownDomain dom => Inst (ResetPort s dom polarity)
+instance KnownDomain dom => Inst (ResetPort s polarity dom)
 instance KnownDomain dom => Inst (EnablePort s dom)
 instance (IsPort p0, IsPort p1) => Inst (p0, p1)
 instance (IsPort p0, IsPort p1, IsPort p2) => Inst (p0, p1, p2)
@@ -243,7 +250,8 @@ tyToPrimPort (splitTyConAppM -> Just (tyConName'@(Name{nameOcc=Text.unpack -> ty
     = Right [PrimClockPort{name=Text.pack nm, dom=Text.pack domNm, meta=()}]
 
     | tyConName == show 'ResetPort
-    = error (tyConName <> ppShow args) -- TODO
+    , LitTy (SymTy nm) : pol : LitTy (SymTy domNm) : _ <- args
+    = Right [PrimResetPort{name=Text.pack nm, dom=Text.pack domNm, meta=(), polarity = getPolarity nm pol}]
 
     | tyConName == show 'EnablePort
     = error (tyConName <> ppShow args) -- TODO
@@ -339,9 +347,9 @@ instBBTF doms config primArgs0 primResults0 bbCtx
         let
           primArgs1 = P.zipWith addPrimPortOrParamMeta primArgs0 userArgs
           (params0, inPorts0) = partitionPortOrPrims primArgs1
-          inPorts1 = P.map mkInPort inPorts0
           params1 = P.map mkParam params0
 
+        inPorts1 <- mapM mkInPort inPorts0
         instLabel <- Id.make (Text.pack (compName config) <> "_inst")
 
         DSL.instDecl
@@ -363,8 +371,17 @@ instBBTF doms config primArgs0 primResults0 bbCtx
       Just i -> (paramName, DSL.TExpr Integer (Literal Nothing (NumLit i)))
       Nothing -> (paramName, paramMeta)
 
-  mkInPort :: PrimPort DSL.TExpr -> (Text, DSL.TExpr)
-  mkInPort p = (name p, meta p)
+  mkInPort :: PrimPort DSL.TExpr -> State (DSL.BlockState s) (Text, DSL.TExpr)
+  mkInPort = \case
+    PrimResetPort{name, polarity, dom, meta=rstIn} -> do
+      rst <- case HashMap.lookup dom doms of
+              Just (vResetPolarity -> domPolarity)
+                | polarity == domPolarity -> pure rstIn
+                | otherwise -> DSL.notExpr name rstIn
+              Nothing ->
+                error ("Internal error: could not find domain " <> Text.unpack dom)
+      pure (name, rst)
+    p -> pure (name p, meta p)
 
   mkOutPort :: PrimPort HWType -> State (DSL.BlockState s) (Text, DSL.TExpr)
   mkOutPort = \case
