@@ -17,10 +17,12 @@ data ByteStateMachine = Idle | Active | Start | Read | Write | Ack | Stop
   deriving (Show, Generic, NFDataX, Eq)
 
 data I2COperation = ReadData | WriteData (BitVector 8)
-  deriving (Generic, NFDataX)
+  deriving (Generic, NFDataX, BitPack)
+
 getWriteData :: I2COperation -> BitVector 8
 getWriteData ReadData = 0
 getWriteData (WriteData d) = d
+
 data ByteMasterS
   = ByteS
   { _srState    :: ShiftRegister
