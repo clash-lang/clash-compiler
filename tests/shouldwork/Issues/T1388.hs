@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE NoDeriveAnyClass #-}
 
 module T1388 where
 
