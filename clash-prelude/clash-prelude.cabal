@@ -388,7 +388,7 @@ test-suite doctests
       doctest-parallel >= 0.2 && < 0.4,
       filepath
 
-  if flag(workaround-ghc-mmap-crash)
+  if arch(x86_64) && flag(workaround-ghc-mmap-crash)
     ghc-options:    -with-rtsopts=-xm20000000
 
 
@@ -398,7 +398,7 @@ test-suite unittests
   main-is:          unittests.hs
   ghc-options:      -Wall -Wcompat -threaded
   -- Note that multiple -with-rtsopts are not cumulative
-  if flag(workaround-ghc-mmap-crash)
+  if arch(x86_64) && flag(workaround-ghc-mmap-crash)
     ghc-options:    "-with-rtsopts=-N -xm20000000"
   else
     ghc-options:    -with-rtsopts=-N
