@@ -1,5 +1,7 @@
 .benchmark:
-  image: ghcr.io/clash-lang/clash-ci-$GHC_VERSION:2023-08-22
+  image:
+    name: ghcr.io/clash-lang/clash-ci-$GHC_VERSION:2023-08-22
+    pull_policy: [if-not-present, always]
   stage: test
   timeout: 2 hours
   variables:
