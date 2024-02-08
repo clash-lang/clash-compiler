@@ -1,0 +1,1 @@
+FIXED: Clash no longer hides error messages if it fails to load external (precompiled) modules. Note: this fix only works from GHC 9.0 on. See [#2365](https://github.com/clash-lang/clash-compiler/issues/2365)
