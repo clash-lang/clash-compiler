@@ -423,12 +423,8 @@ findTyVarSubsts = go
     (InfixT x1 _ y1 , InfixT x2 _ y2)        -> go x1 x2 ++ go y1 y2
     (UInfixT x1 _ y1, UInfixT x2 _ y2)       -> go x1 x2 ++ go y1 y2
     (ParensT x1     , ParensT x2)            -> go x1 x2
-
-#if __GLASGOW_HASKELL__ >= 808
     (AppKindT t1 k1     , AppKindT t2 k2)      -> go t1 t2 ++ go k1 k2
     (ImplicitParamT _ x1, ImplicitParamT _ x2) -> go x1 x2
-#endif
-
     (PromotedT _          , PromotedT _          ) -> []
     (TupleT _             , TupleT _             ) -> []
     (UnboxedTupleT _      , UnboxedTupleT _      ) -> []

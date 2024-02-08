@@ -95,14 +95,8 @@ import           GHC.Builtin.Names
 import           GHC.Types.SrcLoc       (wiredInSrcSpan)
 import           GHC.Types.Unique       (getKey)
 #else
-#if __GLASGOW_HASKELL__ >= 808
 import           PrelNames
   (ordLTDataConKey, ordEQDataConKey, ordGTDataConKey)
-#else
-import           Unique                 (Unique)
-import           PrelNames
-  (ltDataConKey, eqDataConKey, gtDataConKey)
-#endif
 import           PrelNames
   (integerTyConKey, typeNatAddTyFamNameKey, typeNatExpTyFamNameKey,
    typeNatLeqTyFamNameKey, typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
@@ -121,13 +115,6 @@ import           Clash.Core.TyCon
 import           Clash.Core.Var
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Util
-
-#if __GLASGOW_HASKELL__ <= 806
-ordLTDataConKey, ordEQDataConKey, ordGTDataConKey :: Unique.Unique
-ordLTDataConKey = ltDataConKey
-ordEQDataConKey = eqDataConKey
-ordGTDataConKey = gtDataConKey
-#endif
 
 varAttrs :: Var a -> [Attr Text]
 varAttrs t@(TyVar {}) =

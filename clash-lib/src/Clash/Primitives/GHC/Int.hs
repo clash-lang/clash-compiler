@@ -29,11 +29,9 @@ getIntLit =
   \case
     IntegerLiteral i -> Just i
     IntLiteral i     -> Just i
-#if MIN_VERSION_ghc(8,8,0)
     Int8Literal i    -> Just i
     Int16Literal i   -> Just i
     Int32Literal i   -> Just i
-#endif
     Int64Literal i   -> Just i
     _                -> Nothing
 
