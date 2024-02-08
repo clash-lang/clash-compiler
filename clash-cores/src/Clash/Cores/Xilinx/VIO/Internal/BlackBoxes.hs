@@ -25,10 +25,12 @@ import GHC.Stack (HasCallStack)
 import Data.Foldable (fold)
 import Data.List.Infinite((...), Infinite((:<)))
 import qualified Data.List.NonEmpty as NE
+import Data.Maybe (fromMaybe)
 import Data.String.Interpolate (__i)
 import Data.Text.Prettyprint.Doc.Extra (Doc)
 import Text.Show.Pretty (ppShow)
 
+import qualified Control.Lens as Lens
 import qualified Data.List.Infinite as Infinite
 import qualified Data.Text as T (Text, pack, concat)
 
@@ -50,6 +52,7 @@ import Clash.Netlist.Types
   , TemplateFunction(..)
   , BlackBoxContext(..)
   , BlackBox(BBFunction)
+  , setName
   )
 import Clash.Netlist.BlackBox.Types
   ( TemplateKind(..)
@@ -68,7 +71,9 @@ import Clash.Cores.Xilinx.Internal
   )
 
 vioProbeBBF :: HasCallStack => BlackBoxFunction
-vioProbeBBF _isD _primName _args _resTys = pure $ Right (bbMeta, bb)
+vioProbeBBF _isD _primName _args _resTys = do
+  instName <- fromMaybe "vio_inst" <$> Lens.view setName
+  pure $ Right (bbMeta, bb instName)
  where
    bbMeta :: BlackBoxMeta
    bbMeta = emptyBlackBoxMeta
@@ -81,8 +86,9 @@ vioProbeBBF _isD _primName _args _resTys = pure $ Right (bbMeta, bb)
          ]
      }
 
-   bb :: BlackBox
-   bb = BBFunction (show 'vioProbeTF) 0 vioProbeTF
+   bb :: T.Text -> BlackBox
+   bb instName =
+     BBFunction (show 'vioProbeTF) 0 (vioProbeTF instName)
 
 usedArguments :: [Int]
 usedArguments = (inputNames : outputNames : initOutValues : clock : inputProbes)
@@ -99,8 +105,8 @@ usedArguments = (inputNames : outputNames : initOutValues : clock : inputProbes)
                       -- when forcing this argument to NF we limit it to a modest
                       -- 8096 input ports.
 
-vioProbeTF :: HasCallStack => TemplateFunction
-vioProbeTF =
+vioProbeTF :: HasCallStack => T.Text -> TemplateFunction
+vioProbeTF instName =
   TemplateFunction
     usedArguments
     -- 'validateVioProbeBCC' already produces string describing
@@ -108,7 +114,7 @@ vioProbeTF =
     -- yet. This is prepared to get updated easily as soon as the
     -- feature gets implemented in clash-lib.
     (maybe True error . validateVioProbeBBC)
-    vioProbeBBTF
+    (vioProbeBBTF instName)
 
 checkNameCollision :: HasCallStack => T.Text -> DSL.TExpr -> DSL.TExpr
 checkNameCollision userName tExpr@(DSL.TExpr _ (Identifier (Id.toText -> name) Nothing))
@@ -127,8 +133,12 @@ checkNameCollision _ tExpr = error [__i|
     #{ppShow tExpr}
 |]
 
-vioProbeBBTF :: (Backend s, HasCallStack) => BlackBoxContext -> State s Doc
-vioProbeBBTF bbCtx
+vioProbeBBTF ::
+  (Backend s, HasCallStack) =>
+  T.Text ->
+  BlackBoxContext ->
+  State s Doc
+vioProbeBBTF instName1 bbCtx
   | (   _knownDomainDom
       : _vioConstraint
       : (DSL.getVec -> Just userInputNameExprs)
@@ -161,7 +171,7 @@ vioProbeBBTF bbCtx
             #{ppShow userOutputNames}
         |]
 
-      vioProbeInstName <- Id.makeBasic (vioName (bbCtxName bbCtx))
+      instName2 <- Id.makeBasic instName1
 
       let
         inPs = filter ((> (0 :: Int)) . DSL.tySize . DSL.ety) inputProbes
@@ -190,7 +200,7 @@ vioProbeBBTF bbCtx
 
         inProbesBV <- zipWithM toNameCheckedBv userInputNames inProbes
 
-        DSL.instDecl Empty (Id.unsafeMake vioProbeName) vioProbeInstName []
+        DSL.instDecl Empty (Id.unsafeMake vioProbeName) instName2 []
           (("clk", clk) : zip (NE.toList inNames) inProbesBV)
           (zip outNames outProbesBV)
 
@@ -214,18 +224,6 @@ vioProbeBBTF bbCtx
     outProbeBv <- checkNameCollision nameHintBv <$> DSL.declare nameHintBv bvTy
     outProbe <- DSL.fromBV nameHintOut outTy outProbeBv
     pure (outProbe, outProbeBv)
-
-  -- Return user-friendly name given a context name hint. Note that we ignore
-  -- @__VOID_TDECL_NOOP__@. It is created by 'mkPrimitive' whenever a user hint
-  -- is _not_ given and the primitive returns a zero-width type.
-  --
-  -- XXX: Is the input every 'Nothing' for non-recursive calls? It looks like
-  --      Clash always picks a context hint.
-  vioName :: Maybe T.Text -> T.Text
-  vioName Nothing = "vio_inst"
-  vioName (Just "result") = vioName Nothing
-  vioName (Just "__VOID_TDECL_NOOP__") = vioName Nothing
-  vioName (Just s) = s
 
 vioProbeTclTF :: HasCallStack => TemplateFunction
 vioProbeTclTF =
