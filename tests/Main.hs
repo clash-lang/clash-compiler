@@ -403,7 +403,6 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "NestedPrimitives2" def{hdlSim=[]}
         , runTest "NORX" def
         , runTest "Parameters" def{hdlTargets=[VHDL]}
-        , runTest "PopCount" def
         , runTest "RecordSumOfProducts" def{hdlSim=[]}
         , runTest "Replace" def
         , runTest "TestIndex" def{hdlSim=[]}
@@ -832,6 +831,10 @@ runClashTest = defaultMain $ clashTestRoot
 #if MIN_VERSION_base(4,14,0)
         , runTest "BitReverse" def
 #endif
+        , runTest "BitsTB" def { buildTargets = BuildSpecific [ "bitsTB1"
+                                                              , "bitsTB2"
+                                                              , "bitsTB3"
+                                                              ]}
         ,
           -- vivado segfaults
           runTest "Bounds" def { hdlSim=hdlSim def \\ [Vivado] }
