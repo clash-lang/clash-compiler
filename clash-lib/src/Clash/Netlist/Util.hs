@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd
                     2017-2018, Google Inc.
-                    2021-2023, QBayLogic B.V.
+                    2021-2024, QBayLogic B.V.
                     2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -36,6 +36,7 @@ import           Control.Monad.State.Strict
 import           Control.Monad.Trans.Except
   (ExceptT (..), runExcept, runExceptT, throwE)
 import           Data.Bifunctor          (second)
+import           Data.Char               (ord)
 import           Data.Either             (partitionEithers)
 import           Data.Foldable           (Foldable(toList))
 import           Data.Functor            (($>))
@@ -43,6 +44,7 @@ import           Data.Hashable           (Hashable)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import qualified Data.IntSet             as IntSet
+import           Data.Primitive.ByteArray (ByteArray (..))
 import           Control.Applicative     (Alternative((<|>)))
 import           Data.List               (unzip4, partition)
 import qualified Data.List               as List
@@ -56,6 +58,13 @@ import qualified Data.Text               as Text
 import           Data.Text.Extra         (showt)
 import           Data.Text.Lazy          (toStrict)
 import           Data.Text.Prettyprint.Doc.Extra
+
+#if MIN_VERSION_base(4,15,0)
+import           GHC.Num.Integer                  (Integer (..))
+#else
+import           GHC.Integer.GMP.Internals        (Integer (..), BigNat (..))
+#endif
+
 import           GHC.Stack               (HasCallStack)
 
 #if MIN_VERSION_ghc(9,0,0)
@@ -2111,3 +2120,29 @@ expandTopEntity ihwtys (oId, ohwty) topEntityM
 
 expandTopEntity _ _ topEntityM =
   error ("expandTopEntity expects a Synthesize annotation, but got: " <> show topEntityM)
+
+-- | Convert a Core 'C.Literal' to a Netlist v'HW.Literal'
+mkLiteral :: Int -- ^ int width
+          -> C.Literal -> HW.Expr
+mkLiteral iw lit = case lit of
+  C.IntegerLiteral i -> HW.Literal (Just (Signed iw,iw)) $ NumLit i
+  C.IntLiteral i     -> HW.Literal (Just (Signed iw,iw)) $ NumLit i
+  C.WordLiteral w    -> HW.Literal (Just (Unsigned iw,iw)) $ NumLit w
+  C.Int64Literal i   -> HW.Literal (Just (Signed 64,64)) $ NumLit i
+  C.Word64Literal w  -> HW.Literal (Just (Unsigned 64,64)) $ NumLit w
+  C.Int8Literal i    -> HW.Literal (Just (Signed 8,8)) $ NumLit i
+  C.Int16Literal i   -> HW.Literal (Just (Signed 16,16)) $ NumLit i
+  C.Int32Literal i   -> HW.Literal (Just (Signed 32,32)) $ NumLit i
+  C.Word8Literal w   -> HW.Literal (Just (Unsigned 8,8)) $ NumLit w
+  C.Word16Literal w  -> HW.Literal (Just (Unsigned 16,16)) $ NumLit w
+  C.Word32Literal w  -> HW.Literal (Just (Unsigned 32,32)) $ NumLit w
+  C.CharLiteral c    -> HW.Literal (Just (Unsigned 21,21)) . NumLit . toInteger $ ord c
+  C.FloatLiteral w   -> HW.Literal (Just (BitVector 32,32)) (NumLit $ toInteger w)
+  C.DoubleLiteral w  -> HW.Literal (Just (BitVector 64,64)) (NumLit $ toInteger w)
+  C.NaturalLiteral n -> HW.Literal (Just (Unsigned iw,iw)) $ NumLit n
+#if MIN_VERSION_base(4,15,0)
+  C.ByteArrayLiteral (ByteArray ba) -> HW.Literal Nothing (NumLit (IP ba))
+#else
+  C.ByteArrayLiteral (ByteArray ba) -> HW.Literal Nothing (NumLit (Jp# (BN# ba)))
+#endif
+  C.StringLiteral s  -> HW.Literal Nothing $ StringLit s
