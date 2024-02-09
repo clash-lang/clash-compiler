@@ -2,7 +2,7 @@
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017-2022, Google Inc.,
-                     2017-2023, QBayLogic B.V.
+                     2017-2024, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -1861,6 +1861,8 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [Lit l] <- args
     -> error ("IP: " <> show l)
   "GHC.Num.Integer.IN"
+    | [Lit (ByteArrayLiteral (BA.ByteArray ba))] <- args
+    -> reduce (Literal (IntegerLiteral (IN ba)))
     | [Lit l] <- args
     -> error ("IN: " <> show l)
 #else
