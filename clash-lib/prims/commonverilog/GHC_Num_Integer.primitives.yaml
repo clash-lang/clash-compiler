@@ -150,7 +150,7 @@
     name: GHC.Num.Integer.integerTestBit#
     kind: Expression
     type: 'integerTestBit
-      :: Integer -> Word# -> Bool'
+      :: Integer -> Word# -> Int#'
     template: ~VAR[input][0][~ARG[1]] == 1'b1
     warning: 'GHC.Num.Integer.integerTestBit#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
