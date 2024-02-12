@@ -266,10 +266,10 @@
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerTestBit#
-    kind: Expression
+    kind: Declaration
     type: 'integerTestBit
-      :: Integer -> Word# -> Bool'
-    template: ~VAR[input][0](to_integer(~ARG[1])) = '1'
+      :: Integer -> Word# -> Int#'
+    template: ~RESULT <= (0 => ~VAR[input][0](to_integer(~ARG[1])), others => '0');
     warning: 'GHC.Num.Integer.integerTestBit#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
