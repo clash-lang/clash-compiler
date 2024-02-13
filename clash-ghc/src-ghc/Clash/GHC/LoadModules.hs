@@ -1,13 +1,14 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
-                     2017     , Google Inc.
+                     2017-2024, Google Inc.
                      2021-2023, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -38,9 +39,10 @@ import           Control.Arrow                   (first)
 import           Control.Exception               (SomeException, throw)
 import           Control.Monad                   (forM, join, when)
 import           Data.List.Extra                 (nubSort)
-import           Control.Exception               (throwIO)
+import           Control.Exception               (Exception, throwIO)
 import           Control.Monad                   (foldM)
 #if MIN_VERSION_ghc(9,0,0)
+import           Control.Monad.Catch             (catch, throwM)
 import           Control.Monad.Catch             as MC (try)
 #endif
 import           Control.Monad.IO.Class          (liftIO)
@@ -527,6 +529,26 @@ nameString = OccName.occNameString . Name.nameOccName
 varNameString :: Var.Var -> String
 varNameString = nameString . Var.varName
 
+data LoadModulesException = LoadModulesException
+  { moduleName :: String
+  , externalError :: String
+  , localError :: String
+  } deriving (Exception)
+
+instance Show LoadModulesException where
+  showsPrec :: Int -> LoadModulesException -> ShowS
+  showsPrec _ LoadModulesException{moduleName, externalError, localError} = showString [I.i|
+    Failed to load module '#{moduleName}'.
+
+    Tried to load it from precompiled sources, error was:
+
+      #{externalError}
+
+    Tried to load it from local sources, error was:
+
+      #{localError}
+  |]
+
 loadModules
   :: GHC.Ghc ()
   -- ^ Allows us to have some initial action, such as sharing a linker state
@@ -573,7 +595,21 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
       -- We need to try and load external modules first, because we can't
       -- recover from errors in 'loadLocalModule'.
       loadExternalModule hdl modName >>= \case
-        Left _loadExternalErr -> loadLocalModule hdl modName
+#if MIN_VERSION_ghc(9,0,0)
+        Left loadExternalErr -> do
+          catch @_ @SomeException
+            (loadLocalModule hdl modName)
+            (\localError ->
+              throwM
+                (LoadModulesException
+                  { moduleName = modName
+                  , externalError = show loadExternalErr
+                  , localError = show localError
+                  }))
+#else
+        Left _loadExternalErr -> do
+          loadLocalModule hdl modName
+#endif
         Right res -> pure res
 
     let allBinderIds = map fst (CoreSyn.flattenBinds allBinders)
