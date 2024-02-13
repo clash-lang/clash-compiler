@@ -323,9 +323,6 @@ setupGhc useColor dflagsM idirs = do
 #endif
                            then DynFlags.HscNothing
                            else DynFlags.defaultObjectTarget $
-#if !MIN_VERSION_ghc(8,10,0)
-                                  DynFlags.targetPlatform
-#endif
                                     dflags
 #endif
                   , DynFlags.reductionDepth = 1000
@@ -673,11 +670,7 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
 
         knownConfs   = filter (\x -> "KnownConf" == nameString (FamInstEnv.fi_fam x)) allTCInsts
 
-#if MIN_VERSION_ghc(8,10,0)
         fsToText     = Text.decodeUtf8 . FastString.bytesFS
-#else
-        fsToText     = Text.decodeUtf8 . FastString.fastStringToByteString
-#endif
 
         famToDomain  = fromMaybe (error "KnownConf: Expected Symbol at LHS of type family")
                          . join . fmap (fmap fsToText) . fmap Type.isStrLitTy

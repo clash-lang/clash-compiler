@@ -27,14 +27,12 @@ module Clash.Core.TysPrim
   , wordPrimTy
   , int64PrimTy
   , word64PrimTy
-#if MIN_VERSION_ghc(8,8,0)
   , int8PrimTy
   , int16PrimTy
   , int32PrimTy
   , word8PrimTy
   , word16PrimTy
   , word32PrimTy
-#endif
   , floatPrimTy
   , doublePrimTy
   , naturalPrimTy
@@ -53,10 +51,8 @@ import           PrelNames
 import           Unique               (getKey)
 #endif
 
-#if MIN_VERSION_ghc(8,8,0)
 import           GHC.Base hiding (Type, TyCon)
 import           Data.Text.Extra (showt)
-#endif
 
 #if MIN_VERSION_base(4,17,0)
 import           Clash.Core.DataCon (DataCon(..), DcStrictness(..))
@@ -134,7 +130,6 @@ voidPrimTyConName :: TyConName
 voidPrimTyConName    = mkUnsafeSystemName "Void#" (getKey voidPrimTyConKey)
 #endif
 
-#if MIN_VERSION_ghc(8,8,0)
 int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, word8PrimTyConName,
   word16PrimTyConName, word32PrimTyConName :: TyConName
 int8PrimTyConName   = mkUnsafeSystemName (showt ''Int8#) (getKey int8PrimTyConKey)
@@ -143,7 +138,6 @@ int32PrimTyConName  = mkUnsafeSystemName (showt ''Int32#) (getKey int32PrimTyCon
 word8PrimTyConName  = mkUnsafeSystemName (showt ''Word8#) (getKey word8PrimTyConKey)
 word16PrimTyConName = mkUnsafeSystemName (showt ''Word16#) (getKey word16PrimTyConKey)
 word32PrimTyConName = mkUnsafeSystemName (showt ''Word32#) (getKey word32PrimTyConKey)
-#endif
 
 liftedPrimTC :: TyConName
              -> TyCon
@@ -256,7 +250,6 @@ voidPrimTc :: TyCon
 voidPrimTc    = liftedPrimTC voidPrimTyConName
 #endif
 
-#if MIN_VERSION_ghc(8,8,0)
 int8PrimTc, int16PrimTc, int32PrimTc, word8PrimTc, word16PrimTc,
   word32PrimTc :: TyCon
 int8PrimTc    = liftedPrimTC int8PrimTyConName
@@ -265,7 +258,6 @@ int32PrimTc   = liftedPrimTC int32PrimTyConName
 word8PrimTc   = liftedPrimTC word8PrimTyConName
 word16PrimTc  = liftedPrimTC word16PrimTyConName
 word32PrimTc  = liftedPrimTC word32PrimTyConName
-#endif
 
 eqPrimTc :: TyCon
 eqPrimTc = PrimTyCon (nameUniq eqPrimTyConName) eqPrimTyConName ty 4
@@ -301,7 +293,6 @@ voidPrimTy :: Type
 voidPrimTy    = mkTyConTy voidPrimTyConName
 #endif
 
-#if MIN_VERSION_ghc(8,8,0)
 int8PrimTy, int16PrimTy, int32PrimTy, word8PrimTy, word16PrimTy,
   word32PrimTy :: Type
 int8PrimTy    = mkTyConTy int8PrimTyConName
@@ -310,7 +301,6 @@ int32PrimTy   = mkTyConTy int32PrimTyConName
 word8PrimTy   = mkTyConTy word8PrimTyConName
 word16PrimTy  = mkTyConTy word16PrimTyConName
 word32PrimTy  = mkTyConTy word32PrimTyConName
-#endif
 
 tysPrimMap :: TyConMap
 tysPrimMap = UniqMap.fromList
@@ -327,14 +317,12 @@ tysPrimMap = UniqMap.fromList
   ,  (wordPrimTyConName , wordPrimTc)
   ,  (int64PrimTyConName , int64PrimTc)
   ,  (word64PrimTyConName , word64PrimTc)
-#if MIN_VERSION_ghc(8,8,0)
   ,  (int8PrimTyConName , int8PrimTc)
   ,  (int16PrimTyConName , int16PrimTc)
   ,  (int32PrimTyConName , int32PrimTc)
   ,  (word8PrimTyConName , word8PrimTc)
   ,  (word16PrimTyConName , word16PrimTc)
   ,  (word32PrimTyConName , word32PrimTc)
-#endif
   ,  (floatPrimTyConName , floatPrimTc)
   ,  (doublePrimTyConName , doublePrimTc)
   ,  (naturalPrimTyConName , naturalPrimTc)

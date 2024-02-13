@@ -59,10 +59,8 @@ import GHC.Stack (HasCallStack)
 
 #if MIN_VERSION_ghc(9,6,0)
 import GHC.Core.Make (chunkify, mkChunkified)
-#elif MIN_VERSION_ghc(8,10,0)
-import GHC.Hs.Utils (chunkify, mkChunkified)
 #else
-import HsUtils (chunkify, mkChunkified)
+import GHC.Hs.Utils (chunkify, mkChunkified)
 #endif
 
 #if MIN_VERSION_ghc(9,0,0)

@@ -32,11 +32,9 @@ getWordLit
 getWordLit =
   \case
     WordLiteral i   -> Just i
-#if MIN_VERSION_ghc(8,8,0)
     Word8Literal i  -> Just i
     Word16Literal i -> Just i
     Word32Literal i -> Just i
-#endif
     Word64Literal i -> Just i
     _               -> Nothing
 

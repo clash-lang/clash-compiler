@@ -14,9 +14,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
-#if !MIN_VERSION_ghc(8,8,0)
-{-# LANGUAGE MonadFailDesugaring #-}
-#endif
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}

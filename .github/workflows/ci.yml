@@ -21,16 +21,11 @@ jobs:
       fail-fast: false
       matrix:
         os: ["macOS", "windows"]
-        ghc: ["8.6", "8.8", "8.10", "9.0", "9.2", "9.4"]
+        ghc: ["8.10", "9.0", "9.2", "9.4"]
         exclude:
           # Some tests fail with a mysterious -11 error code.
           - os: macOS
             ghc: 8.10
-
-          # Windows gets non-deterministically gets stuck in infinite loops
-          # or segfaults while running the testcase.
-          - os: windows
-            ghc: 8.8
 
           # GHC 9.0 fails to compile clash-cores due to a template haskell
           # failure
@@ -115,11 +110,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: [ "8.6.5", "9.0.2", "9.6.2" ]
+        ghc: [ "8.10.7", "9.0.2", "9.6.2" ]
         include:
           - multiple_hidden: yes
 
-          - ghc: 8.6.5
+          - ghc: 8.10.7
             multiple_hidden: no
             workaround_ghc_mmap_crash: yes
 

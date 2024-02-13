@@ -129,11 +129,7 @@ import CoreSyn
    collectArgs, rhssOfAlts, unfoldingTemplate)
 import TysWiredIn (falseDataCon)
 import DataCon    (DataCon, HsImplBang(..),
-#if MIN_VERSION_ghc(8,8,0)
                    dataConExTyCoVars,
-#else
-                   dataConExTyVars,
-#endif
                    dataConName, dataConRepArgTys,
                    dataConTag, dataConTyCon,
                    dataConUnivTyVars, dataConWorkId,
@@ -141,18 +137,12 @@ import DataCon    (DataCon, HsImplBang(..),
 import FamInstEnv (FamInst (..), FamInstEnvs,
                    familyInstances, normaliseType, emptyFamInstEnvs)
 
-#if MIN_VERSION_ghc(8,10,0)
 import FastString (unpackFS, bytesFS)
-#else
-import FastString (unpackFS, fastStringToByteString)
-#endif
 
 import Id         (isDataConId_maybe)
 import IdInfo     (IdDetails (..), unfoldingInfo)
 import Literal    (Literal (..), LitNumType (..))
-#if MIN_VERSION_ghc(8,8,0)
 import Literal    (literalType)
-#endif
 import Module     (moduleName, moduleNameString)
 import Name       (Name, nameModule_maybe,
                    nameOccName, nameUnique, getSrcSpan)
@@ -175,11 +165,7 @@ import Unique     (Uniquable (..), Unique, getKey, hasKey)
 import Var        (Id, TyVar, Var, idDetails,
                    isTyVar, varName, varType,
                    varUnique, idInfo, isGlobalId)
-#if MIN_VERSION_ghc(8,8,0)
 import Var        (VarBndr (..))
-#else
-import Var        (TyVarBndr (..))
-#endif
 import VarSet     (isEmptyVarSet)
 #endif
 
@@ -361,11 +347,7 @@ makeAlgTyConRhs algTcRhs = case algTcRhs of
   DataTyCon {data_cons = dcs} -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
   SumTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
 
-#if MIN_VERSION_ghc(8,10,0)
   NewTyCon dc _ (rhsTvs,rhsEtad) _ _ ->
-#else
-  NewTyCon dc _ (rhsTvs,rhsEtad) _ ->
-#endif
                                       Just <$> (C.NewTyCon <$> coreToDataCon dc
                                                            <*> ((,) <$> mapM coreToTyVar rhsTvs
                                                                     <*> coreToType rhsEtad
@@ -472,7 +454,6 @@ coreToTerm primMap unlocs = term
       Text.readMaybe (Text.unpack nm2)
 
     term' (Var x)                 = var x
-#if MIN_VERSION_ghc(8,8,0)
     term' (Lit l@LitRubbish{}) = do
       ty <- coreToType (literalType l)
       return (C.Prim (C.PrimInfo (pack "_RUBBISH_")
@@ -480,7 +461,6 @@ coreToTerm primMap unlocs = term
                                  C.WorkNever
                                  C.SingleResult
                                  C.NoUnfolding))
-#endif
     term' (Lit l)                 = return $ C.Literal (coreToLiteral l)
     term' (App eFun (Type tyArg)) = C.TyApp <$> term eFun <*> coreToType tyArg
     term' (App eFun eArg)         = C.App   <$> term eFun <*> term eArg
@@ -679,16 +659,11 @@ coreToTerm primMap unlocs = term
     coreToLiteral :: Literal
                   -> C.Literal
     coreToLiteral l = case l of
-#if MIN_VERSION_ghc(8,8,0)
       LitString  fs  -> C.StringLiteral (Char8.unpack fs)
       LitChar    c   -> C.CharLiteral c
       LitRubbish{}   ->
         error $ "coreToTerm: Encountered LibRubbish. This is a bug in Clash. "
              ++ "Report on https://github.com/clash-lang/clash-compiler/issues."
-#else
-      MachStr    fs  -> C.StringLiteral (Char8.unpack fs)
-      MachChar   c   -> C.CharLiteral c
-#endif
 #if MIN_VERSION_ghc(9,0,0)
       LitNumber lt i -> case lt of
 #else
@@ -712,17 +687,10 @@ coreToTerm primMap unlocs = term
         LitNumWord16  -> C.Word16Literal i
         LitNumWord32  -> C.Word32Literal i
 #endif
-#if MIN_VERSION_ghc(8,8,0)
       LitFloat r    -> C.FloatLiteral . floatToWord $ fromRational r
       LitDouble r   -> C.DoubleLiteral . doubleToWord $ fromRational r
       LitNullAddr   -> C.StringLiteral []
       LitLabel fs _ _ -> C.StringLiteral (unpackFS fs)
-#else
-      MachFloat r    -> C.FloatLiteral . floatToWord $ fromRational r
-      MachDouble r   -> C.DoubleLiteral . doubleToWord $ fromRational r
-      MachNullAddr   -> C.StringLiteral []
-      MachLabel fs _ _ -> C.StringLiteral (unpackFS fs)
-#endif
 
 addUsefull :: SrcSpan
            -> C2C a
@@ -828,21 +796,15 @@ coreToDataCon dc = do
     mkDc dcTy repTys = do
 #if MIN_VERSION_ghc(9,6,0)
       let decLabel = decodeUtf8 . bytesFS . field_label . flLabel
-#elif MIN_VERSION_ghc(8,10,0)
-      let decLabel = decodeUtf8 . bytesFS . flLabel
 #else
-      let decLabel = decodeUtf8 . fastStringToByteString . flLabel
+      let decLabel = decodeUtf8 . bytesFS . flLabel
 #endif
       let repBangs = fmap hsImplBangToBool (dataConImplBangs dc)
       let fLabels  = map decLabel (dataConFieldLabels dc)
 
       nm   <- coreToName dataConName getUnique qualifiedNameString dc
       uTvs <- mapM coreToTyVar (dataConUnivTyVars dc)
-#if MIN_VERSION_ghc(8,8,0)
       eTvs <- mapM coreToTyVar (dataConExTyCoVars dc)
-#else
-      eTvs <- mapM coreToTyVar (dataConExTyVars dc)
-#endif
       return $ C.MkData
              { C.dcName        = nm
              , C.dcUniq        = C.nameUniq nm
@@ -1042,20 +1004,12 @@ coreToType' (TyConApp tc args)
                         tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
                         tyConMap %= (C.insert tcName tc)
                         C.mkTyConApp <$> (pure tcName) <*> mapM coreToType args
-#if MIN_VERSION_ghc(8,8,0)
 coreToType' (ForAllTy (Bndr tv _) ty)   = C.ForAllTy <$> coreToTyVar tv <*> coreToType ty
-#else
-coreToType' (ForAllTy (TvBndr tv _) ty) = C.ForAllTy <$> coreToTyVar tv <*> coreToType ty
-#endif
-#if MIN_VERSION_ghc(8,10,0)
--- TODO after we drop 8.8: save the distinction between => and ->
+-- TODO: save the distinction between => and ->
 #if MIN_VERSION_ghc(9,0,0)
 coreToType' (FunTy _ _ ty1 ty2)             = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
 #else
 coreToType' (FunTy _ ty1 ty2)             = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
-#endif
-#else
-coreToType' (FunTy ty1 ty2)             = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
 #endif
 coreToType' (LitTy tyLit)    = return $ C.LitTy (coreToTyLit tyLit)
 coreToType' (AppTy ty1 ty2)  = C.AppTy <$> coreToType ty1 <*> coreToType' ty2

@@ -65,8 +65,8 @@ Note that release branches might contain non-released patches.
 ## GHC compatibility
 |      | Linux | Windows | macOS | Clash (released) | Clash (development version)
 |------|-------|---------|-------|------------------|--------------------------
-| 8.6  | ✔️     | ✔️       | ✔️     | 1.0 - 1.6        | ✔️
-| 8.8  | ✔️     | ❌      | ✔️     | 1.0 - 1.6        | ✔️
+| 8.6  | ✔️     | ✔️       | ✔️     | 1.0 - 1.6        | ❌  ️
+| 8.8  | ✔️     | ❌      | ✔️     | 1.0 - 1.6        | ❌  ️
 | 8.10 | ✔️     | ✔️       | ❌    | 1.2 - 1.6        | ✔️
 | 9.0  | ✔️     | ✔️²      | ✔️     | 1.4 - 1.6        | ✔️
 | 9.2  | ⚠️¹    | ⚠️¹      | ⚠️¹    |                  | ⚠️¹️
