@@ -5,6 +5,7 @@
       Int8'
     template: resize(~ARG[0],8)
     workInfo: Never
+    comment: TODO Starting with ghc-9.0/base-4.16 this takes an I8# that is already properly sized and don't have to do this resize anymore. Same applies to the rest of this file.
 - BlackBox:
     name: GHC.Int.I16#
     kind: Expression
