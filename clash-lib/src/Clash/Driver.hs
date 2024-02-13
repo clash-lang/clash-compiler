@@ -12,12 +12,13 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Driver where
 
@@ -25,10 +26,10 @@ import           Control.Concurrent               (MVar, modifyMVar, modifyMVar_
 import           Control.Concurrent.Async         (mapConcurrently_)
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
-import           Control.Exception                (throw)
+import           Control.Exception                (throw, Exception)
 import qualified Control.Monad                    as Monad
 import           Control.Monad                    (unless, foldM, forM, filterM)
-import           Control.Monad.Catch              (MonadMask)
+import           Control.Monad.Catch              (MonadMask, MonadThrow (throwM))
 import           Control.Monad.Extra              (whenM, ifM, unlessM)
 import           Control.Monad.IO.Class           (MonadIO)
 import           Control.Monad.State              (evalState, get)
@@ -49,6 +50,8 @@ import qualified Data.HashSet                     as HashSet
 import           Data.Proxy                       (Proxy(..))
 import           Data.List                        (intercalate)
 import qualified Data.List                        as List
+import           Data.List.NonEmpty               (NonEmpty((:|)))
+import qualified Data.List.NonEmpty               as NonEmpty
 import           Data.Maybe                       (fromMaybe, maybeToList, mapMaybe)
 import qualified Data.Map.Ordered                 as OMap
 import           Data.Map.Ordered.Extra           ()
@@ -539,7 +542,7 @@ loadImportAndInterpret
   -- ^ Function name
   -> String
   -- ^ Type name ('BlackBoxFunction' or 'TemplateFunction')
-  -> m (Either Hint.InterpreterError a)
+  -> m (Either (NonEmpty Hint.InterpreterError) a)
 loadImportAndInterpret iPaths0 interpreterArgs topDir qualMod funcName typ = do
   Hint.liftIO $ Monad.when debugIsOn $
     putStr "Hint: Interpreting " >> putStrLn (qualMod ++ "." ++ funcName)
@@ -552,10 +555,10 @@ loadImportAndInterpret iPaths0 interpreterArgs topDir qualMod funcName typ = do
     Hint.unsafeInterpret funcName typ
 
   case bbfE of
-    Left _ -> do
+    Left globalException -> do
       -- Try to interpret module as a local module, not yet present in the
       -- global package database(s).
-      Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
+      localRes <- Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
         Hint.reset
         iPaths1 <- (iPaths0++) <$> Hint.get Hint.searchPath
         Hint.set [ Hint.searchPath Hint.:= iPaths1
@@ -563,8 +566,13 @@ loadImportAndInterpret iPaths0 interpreterArgs topDir qualMod funcName typ = do
         Hint.loadModules [qualMod]
         Hint.setImports [ "Clash.Netlist.BlackBox.Types", "Clash.Netlist.Types", qualMod]
         Hint.unsafeInterpret funcName typ
-    Right _ -> do
-      return bbfE
+
+      case localRes of
+        Left localException -> pure (Left (globalException :| [localException]))
+        Right res -> pure (Right res)
+
+    Right res -> do
+      return (Right res)
  where
    langExts = map Hint.asExtension $
                 map show wantedLanguageExtensions ++
@@ -631,11 +639,7 @@ compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf usedArgs multiRe
         let interpreterArgs = concatMap (("-package-db":) . (:[])) pkgDbs
         -- Compile a blackbox template function or fetch it from an already compiled file.
         r <- go interpreterArgs source
-        processHintError
-          (show bbGenName)
-          bbName
-          id
-          r
+        processHintErrors (show bbGenName) bbName r
 
   pure (BlackBoxHaskell bbName wf usedArgs multiRes bbGenName (hash source, bbFunc))
  where
@@ -656,7 +660,7 @@ compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf usedArgs multiRe
     go
       :: [String]
       -> Maybe Text
-      -> IO (Either Hint.InterpreterError BlackBoxFunction)
+      -> IO (Either (NonEmpty Hint.InterpreterError) BlackBoxFunction)
     go args (Just source') = do
       -- Create a temporary directory with user module in it, add it to the
       -- list of import direcotries, and run as if it were a "normal" compiled
@@ -709,7 +713,8 @@ compilePrimitive idirs pkgDbs topDir
       Text.writeFile (modDir </> last modNames <.>  "hs") source
       loadImportAndInterpret (tmpDir':idirs) iArgs topDir qualMod funcName "TemplateFunction"
     let hsh = hash (qualMod, source)
-    processHintError (show bbGenName) pNm (BBFunction (Data.Text.unpack pNm) hsh) r
+    BBFunction (Data.Text.unpack pNm) hsh <$>
+      processHintErrors (show bbGenName) pNm  r
   parseBB ((THaskell,bbGenName),Nothing) = do
     let BlackBoxFunctionName modNames funcName = bbGenName
         qualMod = intercalate "." modNames
@@ -720,36 +725,42 @@ compilePrimitive idirs pkgDbs topDir
         Just f -> pure f
         Nothing -> do
           r <- loadImportAndInterpret idirs iArgs topDir qualMod funcName "TemplateFunction"
-          processHintError (show bbGenName) pNm id r
+          processHintErrors (show bbGenName) pNm r
     pure (BBFunction (Data.Text.unpack pNm) hsh tf)
 
 compilePrimitive _ _ _ (Primitive pNm wf typ) =
   return (Primitive pNm wf typ)
 {-# SCC compilePrimitive #-}
 
-processHintError
-  :: Monad m
-  => String
-  -> Data.Text.Text
-  -> (t -> r)
-  -> Either Hint.InterpreterError t
-  -> m r
-processHintError fun bb go r = case r of
-  Left (Hint.GhcException err) ->
-    error' "GHC Exception" err
-  Left (Hint.NotAllowed err) ->
-    error' "NotAllowed error" err
-  Left (Hint.UnknownError err) ->
-    error' "an unknown error" err
-  Left (Hint.WontCompile ghcErrs) ->
-    error' "compilation errors" (intercalate "\n\n" $ map Hint.errMsg ghcErrs)
-  Right f ->
-    return $ go f
+newtype HintError = HintError String deriving (Exception)
+
+instance Show HintError where
+  showsPrec :: Int -> HintError -> ShowS
+  showsPrec _ (HintError e) = showString e
+
+processHintErrors ::
+  (MonadThrow m, Monad m) =>
+  -- | Function to interpret
+  String ->
+  -- | BlackBox function name
+  Data.Text.Text ->
+  -- | Hint result
+  Either (NonEmpty Hint.InterpreterError) t ->
+  m t
+processHintErrors fun bb r = case r of
+  Left es -> throwM $ HintError (formatExceptions (NonEmpty.toList es))
+  Right f -> pure f
  where
-  error' errType report =
-    error $ unwords [ "Encountered", errType, "while compiling blackbox template"
-                    , "function", show fun, "for function", show bb ++ "."
-                    , "Compilation reported: \n\n" ++ report ]
+  formatExceptions es = [I.i|
+    Encountered one or more exceptions when compiling blackbox template function
+    '#{fun}' for function '#{bb}'.
+  |] <> "\n\n" <> intercalate "\n\n" (map formatException es)
+
+  formatException e = [I.i|
+    Encountered:
+
+      #{e}
+  |]
 
 -- | Pretty print Components to HDL Documents
 createHDL
