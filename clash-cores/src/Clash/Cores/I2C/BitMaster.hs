@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
-module I2C.BitMaster (bitMaster) where
+module Clash.Cores.I2C.BitMaster (bitMaster) where
 
 import Clash.Prelude
 
@@ -9,10 +9,20 @@ import Control.Monad
 import Control.Monad.Trans.State
 import Data.Tuple
 
-import I2C.BitMaster.BusCtrl
-import I2C.BitMaster.StateMachine
-import I2C.Types
+import Clash.Cores.I2C.BitMaster.BusCtrl
+import Clash.Cores.I2C.BitMaster.StateMachine
+import Clash.Cores.I2C.Types
 
+-- | Internal state of the I2C BitMaster.
+--
+-- It includes the bus status controller, bit-level state machine, and various control signals and counters.
+-- The '_busState' manages the overall status of the I2C bus.
+-- The '_stateMachine' handles the bit-level I2C operations.
+-- The '_dout' holds the data to be sent out on the I2C bus.
+-- The '_dsclOen' is a delayed version of the SCL output enable signal.
+-- The '_clkEn' enables the clock for the state machine.
+-- The '_slaveWait' indicates if the slave is pulling the SCL line low, causing the master to wait.
+-- The '_cnt' is a counter used for clock division.
 data BitMasterS
   = BitS
   { _busState       :: BusStatusCtrl
@@ -27,43 +37,38 @@ data BitMasterS
 
 makeLenses ''BitMasterS
 
+
+-- | 5-tuple containing the input interface for the BitMaster.
+--  1. Resets the internal state when asserted
+--  2. Enables or disables the BitMaster
+--  3. Used for clock division
+--  4. Carries command and data in signals
+--  5. Contains the SCL and SDA input signals
 type BitMasterI = (Bool,Bool,Unsigned 16,BitCtrlSig,I2CIn)
+
+-- | 3-tuple containing the output interface for the BitMaster.
+-- 1. Carries command acknowledgment and other flags
+-- 2. Indicates if the BitMaster is currently busy
+-- 3. Contains the SCL and SDA output signals
 type BitMasterO = (BitRespSig,Bool,I2COut)
 
-{-# ANN bitMaster
-  (Synthesize
-    { t_name     = "bitmaster"
-    , t_inputs   = [ PortName "clk"
-                   , PortName "arst"
-                   , PortName "gen"
-                   , PortProduct ""
-                      [ PortName "rst"
-                      , PortName "ena"
-                      , PortName "clkCnt"
-                      , PortProduct ""
-                          [ PortName "cmd"
-                          , PortName "din" ]
-                      , PortName "i2cI" ]
-                   ]
-    , t_output   = PortProduct ""
-                     [ PortProduct ""
-                        [ PortName "cmdAck"
-                        , PortName "al"
-                        , PortName "dout" ]
-                     , PortName "busy"
-                     , PortName "i2cO"
-                     ]
-    }) #-}
+-- | Bit level I2C controller that contains a statemachine to properly:
+-- * Monitor the bus for activity and arbitration.
+-- * Read singular bits from the bus.
+-- * Write singular bits to the bus.
+-- * Return bits read from the bus.
 bitMaster
-  :: Clock System
-  -> Reset System
-  -> Enable System
-  -> Unbundled System BitMasterI
-  -> Unbundled System BitMasterO
+  :: KnownDomain dom
+  => Clock dom
+  -> Reset dom
+  -> Enable dom
+  -> Unbundled dom BitMasterI
+  -> Unbundled dom BitMasterO
 bitMaster = exposeClockResetEnable (mealyB bitMasterT bitMasterInit)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE bitMaster #-}
 
+bitMasterInit :: BitMasterS
 bitMasterInit = BitS { _stateMachine   = stateMachineStart
                             , _busState       = busStartState
                             , _dout           = high       -- dout register
@@ -79,7 +84,8 @@ bitMasterT s@(BitS { _stateMachine = StateMachine  {..}
                    , _busState     = BusStatusCtrl {..}
                    , ..
                    })
-                  (rst,ena,clkCnt,(cmd,din),i2cI@(sclI,sdaI)) = swap $ flip runState s $ do
+                  (rst,ena,clkCnt,(cmd,din),i2cI@(_sclI,_sdaI)) =
+                     swap $ flip runState s $ do
   -- Whenever the slave is not ready it can delay the cycle by pulling SCL low
   -- delay scloEn
   dsclOen .= _sclOen
@@ -116,9 +122,8 @@ bitMasterT s@(BitS { _stateMachine = StateMachine  {..}
   zoom stateMachine (bitStateMachine rst _al _clkEn cmd din)
 
   -- assign outputs
-  let sclO = low
-      sdaO = low
-      i2cO = (sclO,_sclOen,sdaO,_sdaOen)
-      outp = ((_cmdAck,_al,_dout),_busy,i2cO)
+  let
+    i2cO =  (if _sclOen then Nothing else Just 0, if _sdaOen then Nothing else Just 0)
+    outp = ((_cmdAck,_al,_dout),_busy,i2cO)
 
   return outp

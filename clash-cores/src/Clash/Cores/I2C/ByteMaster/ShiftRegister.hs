@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-module I2C.ByteMaster.ShiftRegister where
+module Clash.Cores.I2C.ByteMaster.ShiftRegister where
 
 import Clash.Prelude
 
@@ -11,23 +11,26 @@ data ShiftRegister
   = ShiftRegister
   { _sr   :: Vec 8 Bit
   , _dcnt :: Index 8
-  } deriving (Generic, NFDataX)
+  } deriving (Generic, NFDataX, Eq)
 
 makeLenses ''ShiftRegister
 
 {-# INLINE shiftStartState #-}
+
+shiftStartState :: ShiftRegister
 shiftStartState
   = ShiftRegister
   { _sr   = repeat low
   , _dcnt = 0
   }
 
-shiftRegister :: Bool
-              -> Bool
-              -> Bool
-              -> Vec 8 Bit
-              -> Bit
-              -> State ShiftRegister Bool
+shiftRegister ::
+  Bool ->
+  Bool ->
+  Bool ->
+  Vec 8 Bit ->
+  Bit ->
+  State ShiftRegister Bool
 shiftRegister rst ld shiftsr din coreRxd = do
   (ShiftRegister {..}) <- get
 
