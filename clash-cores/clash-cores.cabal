@@ -12,7 +12,10 @@ maintainer:          devops@qbaylogic.com
 copyright:           Copyright © 2019     , Foamspace Corp.,
                                  2022-2023, QBayLogic B.V.
 category:            Hardware
-build-type:          Simple
+-- TODO: Revert to "Simple". See:
+--
+--   https://github.com/clash-lang/clash-compiler/pull/2665#issuecomment-1939044550
+build-type:          Custom
 extra-source-files:  CHANGELOG.md
 
 flag doctests
@@ -38,6 +41,14 @@ flag nix
     Are we building this package from nix
   default: False
   manual: True
+
+-- TODO: Remove this workaround. See:
+--
+--   https://github.com/clash-lang/clash-compiler/pull/2665#issuecomment-1939044550
+custom-setup
+  setup-depends:
+    base,
+    Cabal
 
 common basic-config
   default-language: Haskell2010

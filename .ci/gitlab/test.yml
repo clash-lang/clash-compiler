@@ -82,37 +82,37 @@ build:
 cores:unittests:
   extends: .test-nocache
   script:
-    - ./dist-newstyle/build/*/*/clash-cores-*/t/unittests/build/unittests/unittests --hide-successes
+    - $(.ci/find_cabal_bin.sh clash-cores unittests t) --hide-successes
 
 cosim:unittests:
   extends: .test-nocache
   script:
-    - ./dist-newstyle/build/*/*/clash-cosim-*/build/test/test
+    - $(.ci/find_cabal_bin.sh clash-cosim test t)
 
 prelude:unittests:
   extends: .test-nocache
   script:
-    - ./dist-newstyle/build/*/*/clash-prelude-*/t/unittests/build/unittests/unittests --hide-successes
+    - $(.ci/find_cabal_bin.sh clash-prelude unittests t) --hide-successes
 
 lib:doctests:
   extends: .test-nocache
   script:
-    - ./dist-newstyle/build/*/*/clash-lib-*/t/doctests/build/doctests/doctests -j${THREADS}
+    - $(.ci/find_cabal_bin.sh clash-lib doctests t) -j${THREADS}
 
 lib:unittests:
   extends: .test-nocache
   script:
-    - ./dist-newstyle/build/*/*/clash-lib-*/t/unittests/build/unittests/unittests --hide-successes
+    - $(.ci/find_cabal_bin.sh clash-lib unittests t) --hide-successes
 
 prelude:doctests:
   extends: .test-nocache
   script:
-    - ./dist-newstyle/build/*/*/clash-prelude-*/t/doctests/build/doctests/doctests -j${THREADS}
+    - $(.ci/find_cabal_bin.sh clash-prelude doctests t) -j${THREADS}
 
 ffi:interface-tests:
   extends: .test-nocache
   script:
-    - ./dist-newstyle/build/*/*/clash-ffi-*/x/ffi-interface-tests/build/ffi-interface-tests/ffi-interface-tests --smallcheck-max-count 2000
+    - $(.ci/find_cabal_bin.sh clash-ffi ffi-interface-tests x) --smallcheck-max-count 2000
 
 # Tests run on local fast machines:
 
@@ -128,17 +128,17 @@ build-clash-dev:
 suite:vhdl:
   extends: .test-cache-local
   script:
-    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-vivado
+    - $(.ci/find_cabal_bin.sh clash-testsuite clash-testsuite x) -j${THREADS} -p .VHDL --hide-successes --no-vivado
 
 suite:verilog:
   extends: .test-cache-local
   script:
-    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-vivado
+    - $(.ci/find_cabal_bin.sh clash-testsuite clash-testsuite x) -j${THREADS} -p .Verilog --hide-successes --no-vivado
 
 suite:systemverilog:
   extends: .test-cache-local
   script:
-    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim --no-vivado
+    - $(.ci/find_cabal_bin.sh clash-testsuite clash-testsuite x) -j${THREADS} -p .SystemVerilog --hide-successes --no-modelsim --no-vivado
 
 # Vivado is quite slow, so we only run a subset of the tests on development branches
 # with it. The full testsuite gets run with Vivado every night on 'master'.
@@ -146,7 +146,7 @@ suite:cores:
   extends: .test-cache-local
   script:
     - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p Cores --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+    - $(.ci/find_cabal_bin.sh clash-testsuite clash-testsuite x) -j$THREADS -p Cores --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
   tags:
     - local
     - vivado-2022.1-standard
@@ -195,7 +195,7 @@ suite:vivado:verilog:
   extends: .test-cache-local-nightly
   script:
     - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-    - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+    - $(.ci/find_cabal_bin.sh clash-testsuite clash-testsuite x) -j$THREADS -p .Verilog --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
   tags:
     - local
     - vivado-2022.1-standard
@@ -215,7 +215,7 @@ suite:vivado:verilog:
 #   extends: .test-cache-local-nightly
 #   script:
 #     - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-#     - ./dist-newstyle/build/*/*/clash-testsuite-*/x/clash-testsuite/build/clash-testsuite/clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+#     - $(.ci/find_cabal_bin.sh clash-testsuite clash-testsuite x) -j$THREADS -p .VHDL --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
 #   tags:
 #     - local
 #     - vivado-2022.1-standard

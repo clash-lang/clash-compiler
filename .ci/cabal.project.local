@@ -14,9 +14,6 @@ package clash-prelude
   tests: True
   benchmarks: True
 
-  -- clash-prelude unittests fail with dynamic executables
-  executable-dynamic: False
-
 package clash-lib
   ghc-options: -Werror
   tests: True
@@ -30,12 +27,19 @@ package clash-cosim
   ghc-options: -Werror
   tests: True
 
-  -- clash-cosim unittests fail with dynamic executables
+  -- clash-cosim unittests fail with dynamic executables because of a bug in
+  -- Cabal-the-library in combination with custom setup where the library path
+  -- is not added to the RPATH
   executable-dynamic: False
 
 package clash-cores
   ghc-options: -Werror
   tests: True
+
+  -- clash-cores unittests fail with dynamic executables because of a bug in
+  -- Cabal-the-library in combination with custom setup where the library path
+  -- is not added to the RPATH
+  executable-dynamic: False
 
 package clash-prelude-hedgehog
   ghc-options: -Werror
