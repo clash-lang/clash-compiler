@@ -1,6 +1,6 @@
 {-|
   Copyright  :  (C) 2015-2016, University of Twente,
-                    2021-2022, QBayLogic B.V.
+                    2021-2024, QBayLogic B.V.
                     2022,      LumiGuide Fietsdetectie B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -271,7 +271,7 @@ allEqual (x:xs) = all (== x) xs
 -- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
 -- of an expression. Also substitute truly disjoint applications of globals by a
 -- reference to a lifted out application.
-collectGlobals'
+collectGlobals
   :: InScopeSet
   -> [(Term,Term)]
   -- ^ Substitution of (applications of) a global binder by a reference to a
@@ -280,10 +280,8 @@ collectGlobals'
   -- ^ List of already seen global binders
   -> Term
   -- ^ The expression
-  -> Bool
-  -- ^ Whether expression is constant
   -> NormalizeSession (Term, InScopeSet, [(Term, ([Term], CaseTree [Either Term Type]))])
-collectGlobals' is0 substitution seen (Case scrut ty alts) _eIsConstant = do
+collectGlobals is0 substitution seen (Case scrut ty alts) = do
   rec (alts1, isAlts, collectedAlts) <-
         collectGlobalsAlts is0 substitution seen scrut1 alts
       (scrut1, isScrut, collectedScrut) <-
@@ -292,8 +290,8 @@ collectGlobals' is0 substitution seen (Case scrut ty alts) _eIsConstant = do
          , unionInScope isAlts isScrut
          , collectedAlts ++ collectedScrut )
 
-collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), ticks)) eIsconstant
-  | not eIsconstant = do
+collectGlobals is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), ticks))
+  | not (isConstant e) = do
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
     evaluate <- Lens.view evaluator
@@ -331,7 +329,7 @@ collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), t
 -- the ANF, CSE, and DeadCodeRemoval pass all duplicates are removed.
 --
 -- I think we should be able to do better, but perhaps we cannot fix it here.
-collectGlobals' is0 substitution seen (Letrec lbs body) _eIsConstant = do
+collectGlobals is0 substitution seen (Letrec lbs body) = do
   let is1 = extendInScopeSetList is0 (map fst lbs)
   (body1,isBody,collectedBody) <-
     collectGlobals is1 substitution seen body
@@ -342,27 +340,11 @@ collectGlobals' is0 substitution seen (Letrec lbs body) _eIsConstant = do
          , map (second (second (LB lbs1))) (collectedBody ++ collectedBndrs)
          )
 
-collectGlobals' is0 substitution seen (Tick t e) eIsConstant = do
-  (e1,is1,collected) <- collectGlobals' is0 substitution seen e eIsConstant
+collectGlobals is0 substitution seen (Tick t e) = do
+  (e1,is1,collected) <- collectGlobals is0 substitution seen e
   return (Tick t e1, is1, collected)
 
-collectGlobals' is0 _ _ e _ = return (e,is0,[])
-
--- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
--- of an expression. Also substitute truly disjoint applications of globals by a
--- reference to a lifted out application.
-collectGlobals
-  :: InScopeSet
-  -> [(Term,Term)]
-  -- ^ Substitution of (applications of) a global binder by a reference to
-  -- a lifted term.
-  -> [Term]
-  -- ^ List of already seen global binders
-  -> Term
-  -- ^ The expression
-  -> NormalizeSession (Term, InScopeSet, [(Term, ([Term], CaseTree [Either Term Type]))])
-collectGlobals inScope substitution seen e =
-  collectGlobals' inScope substitution seen e (isConstant e)
+collectGlobals is0 _ _ e = return (e,is0,[])
 
 -- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
 -- of a list of application arguments. Also substitute truly disjoint
