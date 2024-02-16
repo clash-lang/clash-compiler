@@ -93,7 +93,7 @@ import Clash.Normalize.Transformations.Letrec (deadCode)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Combinators (bottomupR)
 import Clash.Rewrite.Types
-import Clash.Rewrite.Util (changed, isUntranslatableType)
+import Clash.Rewrite.Util (changed, isFromInt, isUntranslatableType)
 import Clash.Rewrite.WorkFree (isConstant)
 import Clash.Util (MonadUnique, curLoc)
 
@@ -706,6 +706,7 @@ interestingToLift inScope eval e@(Prim pInfo) args ticks
       ,("Clash.Sized.Internal.BitVector.quot#",lastNotPow2)
       ,("Clash.Sized.Internal.BitVector.rem#",lastNotPow2)
       ,("Clash.Sized.Internal.Index.*#",tailNonPow2)
+      ,("Clash.Sized.Internal.Index.times#",tailNotPow2)
       ,("Clash.Sized.Internal.Index.quot#",lastNotPow2)
       ,("Clash.Sized.Internal.Index.rem#",lastNotPow2)
       ,("Clash.Sized.Internal.Signed.*#",tailNonPow2)
@@ -755,22 +756,13 @@ interestingToLift inScope eval e@(Prim pInfo) args ticks
     termIsPow2 e' = case eval e' of
       Literal (IntegerLiteral n) -> isPow2 n
       a -> case collectArgs a of
-        (Prim p,[Right _,Left _,Left (Literal (IntegerLiteral n))])
-          | isFromInteger (primName p) -> isPow2 n
+        (Prim p,[Right _,Left _,       Left (Literal (IntegerLiteral n))])
+          | isFromInt (primName p) -> isPow2 n
         (Prim p,[Right _,Left _,Left _,Left (Literal (IntegerLiteral n))])
           | primName p == "Clash.Sized.Internal.BitVector.fromInteger#"  -> isPow2 n
-        (Prim p,[Right _,       Left _,Left (Literal (IntegerLiteral n))])
-          | primName p == "Clash.Sized.Internal.BitVector.fromInteger##" -> isPow2 n
-
         _ -> False
 
     isPow2 x = x /= 0 && (x .&. (complement x + 1)) == x
-
-    isFromInteger x = x `elem` ["Clash.Sized.Internal.BitVector.fromInteger#"
-                               ,"Clash.Sized.Integer.Index.fromInteger"
-                               ,"Clash.Sized.Internal.Signed.fromInteger#"
-                               ,"Clash.Sized.Internal.Unsigned.fromInteger#"
-                               ]
 
     isHOTy t = case splitFunForallTy t of
       (args',_) -> any isPolyFunTy (Either.rights args')
