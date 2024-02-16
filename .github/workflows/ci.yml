@@ -33,8 +33,8 @@ jobs:
             ghc: 9.0
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: haskell/actions/setup@v2
+      - uses: actions/checkout@v4
+      - uses: haskell-actions/setup@v2
         id: setup-haskell
         with:
           enable-stack: true
@@ -57,7 +57,7 @@ jobs:
 
       - name: Cache (Windows)
         if: ${{ runner.os == 'Windows' }}
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           # On windows we have to use "\" as a path separator, otherwise caching fails
           path: |
@@ -66,7 +66,7 @@ jobs:
           restore-keys: ${{ matrix.os }}-${{ matrix.ghc }}-
       - name: Cache (non-Windows)
         if: ${{ runner.os != 'Windows' }}
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ${{ steps.setup-haskell.outputs.stack-root }}/snapshots
@@ -110,7 +110,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: [ "8.10.7", "9.0.2", "9.6.2" ]
+        ghc: [ "8.10.7", "9.0.2", "9.6.4" ]
         include:
           - multiple_hidden: yes
 
@@ -124,7 +124,7 @@ jobs:
 
     # Run steps inside the clash CI docker image
     container:
-      image: ghcr.io/clash-lang/clash-ci-${{ matrix.ghc }}:2023-08-22
+      image: ghcr.io/clash-lang/clash-ci-${{ matrix.ghc }}:2024-02-15
 
       env:
         THREADS: 2
@@ -135,7 +135,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: true
           ref: ${{ github.event.pull_request.head.ref }}
@@ -152,7 +152,7 @@ jobs:
           mv cabal.project.freeze frozen
 
       - name: Restore Cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             dist-newstyle
@@ -204,7 +204,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Check dependencies for failures
         run: |
