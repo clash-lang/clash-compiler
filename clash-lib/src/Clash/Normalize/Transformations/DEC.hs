@@ -669,8 +669,11 @@ mkBigTupSelector inScope tcm tupTcm scrut tys n = go (chunkify tys)
 -- This holds for all global functions, and certain primitives. Currently those
 -- primitives are:
 --
--- * All non-power-of-two multiplications
--- * All division-like operations with a non-power-of-two divisor
+-- * All non-cheap multiplications
+-- * All division-like operations with a non-cheap divisor
+--
+-- Multiplying/dividing by zero or powers of two are considered cheap and
+-- isn't lifted out.
 interestingToLift
   :: InScopeSet
   -- ^ in scope
@@ -768,7 +771,8 @@ interestingToLift inScope eval e@(Prim pInfo) args ticks
           | primName p == "Clash.Sized.Internal.BitVector.fromInteger#"  -> isPow2 n
         _ -> False
 
-    isPow2 x = x /= 0 && (x .&. (complement x + 1)) == x
+    -- This used to contain (x /= 0), but multiplying by zero is free
+    isPow2 x = (x .&. (complement x + 1)) == x
 
     isHOTy t = case splitFunForallTy t of
       (args',_) -> any isPolyFunTy (Either.rights args')
