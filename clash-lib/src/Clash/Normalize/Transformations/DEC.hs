@@ -315,7 +315,7 @@ collectGlobals is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), ti
         (args1,isArgs,collectedArgs) <-
           collectGlobalsArgs is0 substitution seen args
         let seenInArgs = map fst collectedArgs ++ seen
-        isInteresting <- interestingToLift is0 eval fun args ticks
+            isInteresting = interestingToLift is0 eval fun args ticks
         case isInteresting of
           Just fun1 | fun1 `notElem` seenInArgs -> do
             let e1 = Maybe.fromMaybe (mkApps fun1 args1) (List.lookup fun1 substitution)
@@ -682,26 +682,26 @@ interestingToLift
   -- ^ Arguments
   -> [TickInfo]
   -- ^ Tick annoations
-  -> RewriteMonad extra (Maybe Term)
+  -> Maybe Term
 interestingToLift inScope _ e@(Var v) _ ticks =
   if NoDeDup `notElem` ticks && (isGlobalId v ||  v `elemInScopeSet` inScope)
-     then pure (Just e)
-     else pure Nothing
+     then (Just e)
+     else Nothing
 interestingToLift inScope eval e@(Prim pInfo) args ticks
   | NoDeDup `notElem` ticks = do
   let anyArgNotConstant = any (not . isConstant) lArgs
   case List.lookup (primName pInfo) interestingPrims of
-    Just t | t || anyArgNotConstant -> pure (Just e)
-    _ | DeDup `elem` ticks -> pure (Just e)
-    _ -> do
-      let isInteresting = (\(x, y, z) -> interestingToLift inScope eval x y z) . collectArgsTicks
+    Just t | t || anyArgNotConstant -> (Just e)
+    _ | DeDup `elem` ticks -> (Just e)
+    _ ->
       if isHOTy (coreTypeOf pInfo) then do
-        anyInteresting <- List.anyM (fmap Maybe.isJust . isInteresting) lArgs
-        if anyInteresting then pure (Just e) else pure Nothing
+        let anyInteresting = List.any (Maybe.isJust . isInteresting) lArgs
+        if anyInteresting then Just e else Nothing
       else
-        pure Nothing
+        Nothing
 
   where
+    isInteresting = (\(x, y, z) -> interestingToLift inScope eval x y z) . collectArgsTicks
     interestingPrims =
       [("Clash.Sized.Internal.BitVector.*#",tailNonPow2)
       ,("Clash.Sized.Internal.BitVector.times#",tailNonPow2)
@@ -777,4 +777,4 @@ interestingToLift inScope eval e@(Prim pInfo) args ticks
     isHOTy t = case splitFunForallTy t of
       (args',_) -> any isPolyFunTy (Either.rights args')
 
-interestingToLift _ _ _ _ _ = pure Nothing
+interestingToLift _ _ _ _ _ = Nothing
