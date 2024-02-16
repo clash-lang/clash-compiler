@@ -6,7 +6,11 @@
 #
 # To use buildkit, you need to set DOCKER_BUILDKIT=1 in your shell
 
+<<<<<<< HEAD
 ARG UBUNTU_VERSION=focal-20210416
+=======
+ARG UBUNTU_VERSION
+>>>>>>> b96bf0790 (GitLab CI: Simplify finding binaries (#2669))
 FROM ubuntu:$UBUNTU_VERSION AS builder
 
 LABEL vendor="QBayLogic B.V." maintainer="devops@qbaylogic.com"
@@ -118,7 +122,7 @@ RUN curl "https://downloads.haskell.org/~ghcup/$ghcup_version/x86_64-linux-ghcup
  && ghcup install ghc $ghc_version --set \
  && ghcup install cabal $cabal_version --set
 
-ARG UBUNTU_VERSION=focal-20210416
+ARG UBUNTU_VERSION
 FROM ubuntu:$UBUNTU_VERSION AS run
 
 LABEL vendor="QBayLogic B.V." maintainer="devops@qbaylogic.com"

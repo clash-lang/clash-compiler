@@ -25,6 +25,22 @@ set -u
 # Build with default constraints
 cabal v2-build all --write-ghc-environment-files=always
 
+# Put all the test binaries in a predictable location
+TESTS="
+clash-cores:unittests
+clash-cosim:test
+clash-ffi:ffi-interface-tests
+clash-lib:doctests
+clash-lib:unittests
+clash-prelude:doctests
+clash-prelude:unittests
+clash-testsuite:clash-testsuite
+"
+mkdir bin
+for TEST in $TESTS; do
+  ln -s "$(realpath --relative-to=bin "$(cabal list-bin $TEST)")" bin/$TEST
+done
+
 # `CI_COMMIT_TAG` is set when a tag has been created on GitHub. We use this to
 # trigger a release pipeline (release to Snap / Hackage).
 if [[ ${CI_COMMIT_TAG:-} != "" ]]; then
