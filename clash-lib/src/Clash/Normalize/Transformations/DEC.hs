@@ -703,22 +703,22 @@ interestingToLift inScope eval e@(Prim pInfo) args ticks
   where
     isInteresting = (\(x, y, z) -> interestingToLift inScope eval x y z) . collectArgsTicks
     interestingPrims =
-      [("Clash.Sized.Internal.BitVector.*#",tailNonPow2)
-      ,("Clash.Sized.Internal.BitVector.times#",tailNonPow2)
+      [("Clash.Sized.Internal.BitVector.*#",bothNotPow2)
+      ,("Clash.Sized.Internal.BitVector.times#",bothNotPow2)
       ,("Clash.Sized.Internal.BitVector.quot#",lastNotPow2)
       ,("Clash.Sized.Internal.BitVector.rem#",lastNotPow2)
-      ,("Clash.Sized.Internal.Index.*#",tailNonPow2)
-      ,("Clash.Sized.Internal.Index.times#",tailNotPow2)
+      ,("Clash.Sized.Internal.Index.*#",bothNotPow2)
+      ,("Clash.Sized.Internal.Index.times#",bothNotPow2)
       ,("Clash.Sized.Internal.Index.quot#",lastNotPow2)
       ,("Clash.Sized.Internal.Index.rem#",lastNotPow2)
-      ,("Clash.Sized.Internal.Signed.*#",tailNonPow2)
-      ,("Clash.Sized.Internal.Signed.times#",tailNonPow2)
+      ,("Clash.Sized.Internal.Signed.*#",bothNotPow2)
+      ,("Clash.Sized.Internal.Signed.times#",bothNotPow2)
       ,("Clash.Sized.Internal.Signed.rem#",lastNotPow2)
       ,("Clash.Sized.Internal.Signed.quot#",lastNotPow2)
       ,("Clash.Sized.Internal.Signed.div#",lastNotPow2)
       ,("Clash.Sized.Internal.Signed.mod#",lastNotPow2)
-      ,("Clash.Sized.Internal.Unsigned.*#",tailNonPow2)
-      ,("Clash.Sized.Internal.Unsigned.times#",tailNonPow2)
+      ,("Clash.Sized.Internal.Unsigned.*#",bothNotPow2)
+      ,("Clash.Sized.Internal.Unsigned.times#",bothNotPow2)
       ,("Clash.Sized.Internal.Unsigned.quot#",lastNotPow2)
       ,("Clash.Sized.Internal.Unsigned.rem#",lastNotPow2)
       ,("GHC.Base.quotInt",lastNotPow2)
@@ -728,32 +728,36 @@ interestingToLift inScope eval e@(Prim pInfo) args ticks
       ,("GHC.Classes.divInt#",lastNotPow2)
       ,("GHC.Classes.modInt#",lastNotPow2)
 #if MIN_VERSION_base(4,15,0)
-      ,("GHC.Num.Integer.integerMul",allNonPow2)
+      ,("GHC.Num.Integer.integerMul",bothNotPow2)
       ,("GHC.Num.Integer.integerDiv",lastNotPow2)
       ,("GHC.Num.Integer.integerMod",lastNotPow2)
       ,("GHC.Num.Integer.integerQuot",lastNotPow2)
       ,("GHC.Num.Integer.integerRem",lastNotPow2)
 #else
-      ,("GHC.Integer.Type.timesInteger",allNonPow2)
+      ,("GHC.Integer.Type.timesInteger",bothNotPow2)
       ,("GHC.Integer.Type.divInteger",lastNotPow2)
       ,("GHC.Integer.Type.modInteger",lastNotPow2)
       ,("GHC.Integer.Type.quotInteger",lastNotPow2)
       ,("GHC.Integer.Type.remInteger",lastNotPow2)
 #endif
-      ,("GHC.Prim.*#",allNonPow2)
+      ,("GHC.Prim.*#",bothNotPow2)
       ,("GHC.Prim.quotInt#",lastNotPow2)
       ,("GHC.Prim.remInt#",lastNotPow2)
       ]
 
     lArgs       = Either.lefts args
 
-    allNonPow2  = all (not . termIsPow2) lArgs
-    tailNonPow2 = case lArgs of
-                    [] -> True
-                    _  -> all (not . termIsPow2) (drop 1 lArgs)
     lastNotPow2 = case lArgs of
                     [] -> True
                     _  -> not (termIsPow2 (last lArgs))
+    -- | This only looks at the last two arguments, skipping over any constraints if they exist
+    bothNotPow2 = go lArgs
+     where
+      go xs = case xs of
+                [] -> True
+                [a] -> not (termIsPow2 a)
+                [a,b] -> not (termIsPow2 a) && not (termIsPow2 b)
+                (_:rest) -> go rest
 
     termIsPow2 e' = case eval e' of
       Literal (IntegerLiteral n) -> isPow2 n
