@@ -336,7 +336,7 @@ collectGlobals is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), ti
             isInteresting = interestingToLift is0 eval fun args ticks
         case isInteresting of
           Just fun1 | fun1 `notElem` seenInArgs -> do
-            let e1 = Maybe.fromMaybe (mkApps fun1 args1) (List.lookup fun1 substitution)
+            let e1 = Maybe.fromMaybe (mkApps (mkTicks fun1 ticks) args1) (List.lookup fun1 substitution)
             -- This function is lifted out an environment with the currently 'seen'
             -- binders. When we later apply substitution, we need to start with this
             -- environment, otherwise we perform incorrect substitutions in the
