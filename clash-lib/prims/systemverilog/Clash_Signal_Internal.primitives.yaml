@@ -100,10 +100,12 @@
       localparam ~GENSYM[half_period][0] = (~PERIOD[0]0 / 2);
       always begin
         ~RESULT = ~IF~ACTIVEEDGE[Rising][0]~THEN 0 ~ELSE 1 ~FI;
-        `ifndef VERILATOR
         #~LONGESTPERIOD0 forever begin
           ~IF~ISACTIVEENABLE[1]~THEN
           if (~ ~ARG[1]) begin
+            `ifdef VERILATOR
+              $c("std::exit(0);");
+            `endif
             $finish;
           end
           ~ELSE~FI
@@ -112,40 +114,7 @@
           ~RESULT = ~ ~RESULT;
           #~SYM[0];
         end
-        `else
-        ~RESULT = $c("this->~GENSYM[tb_clock_gen][1](",~SYM[0],",~IF~ACTIVEEDGE[Rising][0]~THENtrue~ELSEfalse~FI,",(~ ~ARG[1]),")");
-        `endif
       end
-
-      `ifdef VERILATOR
-        `systemc_interface
-        CData ~SYM[1](vluint32_t half_period, bool active_rising, bool result_rec) {
-          static vluint32_t init_wait = ~LONGESTPERIOD0;
-          static vluint32_t to_wait = 0;
-          static CData clock = active_rising ? 0 : 1;
-
-          if(init_wait == 0) {
-            if(result_rec) {
-              std::exit(0);
-            }
-            else {
-              if(to_wait == 0) {
-                to_wait = half_period - 1;
-                clock = clock == 0 ? 1 : 0;
-              }
-              else {
-                to_wait = to_wait - 1;
-              }
-            }
-          }
-          else {
-            init_wait = init_wait - 1;
-          }
-
-          return clock;
-        }
-        `verilog
-      `endif
       // pragma translate_on
       // tbClockGen end
     warning: Clash.Signal.Internal.tbClockGen is not synthesizable!
@@ -170,6 +139,9 @@
         #~LONGESTPERIOD0 forever begin
           ~IF~ISACTIVEENABLE[2]~THEN
           if (~ ~ARG[2]) begin
+            `ifdef VERILATOR
+              $c("std::exit(0);");
+            `endif
             $finish;
           end
           ~ELSE~FI
@@ -196,39 +168,10 @@
       // resetGen begin
       // pragma translate_off
       localparam ~GENSYM[reset_period][0] = ~LONGESTPERIOD0 - 10 + (~LIT[2] * ~PERIOD[0]0);
-      `ifndef VERILATOR
       initial begin
         #1 ~RESULT = ~IF ~ISACTIVEHIGH[0] ~THEN 1 ~ELSE 0 ~FI;
         #~SYM[0] ~RESULT = ~IF ~ISACTIVEHIGH[0] ~THEN 0 ~ELSE 1 ~FI;
       end
-      `else
-      always begin
-        // The redundant (~RESULT | ~ ~RESULT) is needed to ensure that this is
-        // calculated in every cycle by verilator. Without it, the reset will stop
-        // being updated and will be stuck as asserted forever.
-        ~RESULT =
-        $c("this->~GENSYM[reset_gen][1](",~SYM[0],",~IF~ISACTIVEHIGH[0]~THENtrue~ELSEfalse~FI)") & (~RESULT | ~ ~RESULT);
-      end
-      `systemc_interface
-      CData ~SYM[1](vluint32_t reset_period, bool active_high) {
-        static vluint32_t to_wait = reset_period;
-        static CData reset = active_high ? 1 : 0;
-        static bool finished = false;
-
-        if(!finished) {
-          if(to_wait == 0) {
-            reset = reset == 0 ? 1 : 0;
-            finished = true;
-          }
-          else {
-            to_wait = to_wait - 1;
-          }
-        }
-
-        return reset;
-      }
-      `verilog
-      `endif
       // pragma translate_on
       // resetGen end
     warning: Clash.Signal.Internal.resetGenN can not be synthesized to hardware!

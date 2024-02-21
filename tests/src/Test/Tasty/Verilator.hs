@@ -42,11 +42,6 @@ instance IsTest VerilatorMakeTest where
         dir <- vmDirectory
         libs <- listDirectory dir >>= filterM doesDirectoryExist . fmap (dir </>)
 
-        -- Only pass the sources for the shim and the entity to simulate. The other
-        -- modules will be found in the included directories. The path to the C++
-        -- shim MUST include the subdirectories below the working directory
-        -- explicitly.
-        cSrc <- glob (dir </> "*" </> vmTop <> "_shim.cpp")
         vSrc <- fmap takeFileName <$> glob (dir </> "*" </> vmTop <> ".v")
 
         -- Types modules have to be given first, or verilator will complain that
@@ -58,7 +53,7 @@ instance IsTest VerilatorMakeTest where
         -- Clash by default will not mix HDLs in it's output. If this ever changes,
         -- and it is possible to have `clash` output both Verilog and SystemVerilog
         -- then this will need to change.
-        runVerilator dir (mkArgs libs (cSrc <> vSrc <> svSrc))
+        runVerilator dir (mkArgs libs (vSrc <> svSrc))
 
     | otherwise =
         pure (testPassed "Ignoring test due to --no-verilator")
@@ -75,7 +70,7 @@ instance IsTest VerilatorMakeTest where
            , vmTop
            , "--cc"               -- Build for C++, not SystemC
            , "--build"            -- Build the verilated code immediately
-           , "--exe"              -- Create an executable instead of a library
+           , "--binary"           -- Create an binary to execute
            ]
         <> srcs
 

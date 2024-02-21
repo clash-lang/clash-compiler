@@ -664,13 +664,23 @@ runClashTest = defaultMain $ clashTestRoot
                                                         , "testBenchUS"
                                                         ]}
           in runTest "DDRin" _opts
+
+          -- XXX: `ddrOut` contains a number of (implicit) parallel, coinciding
+          --      processes. Execution for these processes is left undefined in
+          --      the Verilog spec, nor is there a mechanism to get consistent
+          --      behavior (like in VHDL). Therefore, simulators are free to pick
+          --      any execution order they'd like. ModelSim and Verilator pick
+          --      differently, so when a test works in one, it doesn't in the
+          --      other. As a quick "fix" we disable Verilator, though we might
+          --      consider rewriting the test such that it doesn't depend or
+          --      accounts for the raciness.
         , let _opts = def{ buildTargets = BuildSpecific [ "testBenchUA"
                                                         , "testBenchUS"
                                                         , "testBenchGA"
                                                         , "testBenchGS"
                                                         ]
-                         , hdlLoad = hdlLoad def \\ [Vivado]
-                         , hdlSim = hdlSim def \\ [Vivado]
+                         , hdlLoad = hdlLoad def \\ [Vivado, Verilator]
+                         , hdlSim = hdlSim def \\ [Vivado, Verilator]
                          }
           in runTest "DDRout" _opts
         , let _opts = def{ buildTargets = BuildSpecific [ "testBenchUA"

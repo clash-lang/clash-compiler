@@ -17,6 +17,9 @@
       always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin
         if (~ARG[6] !== ~ARG[7]) begin
           $display("@%0tns: %s, expected: %b, actual: %b", $time, ~LIT[5], ~TOBV[~ARG[7]][~TYP[7]], ~TOBV[~ARG[6]][~TYP[6]]);
+          `ifdef VERILATOR
+            $c("std::exit(1);");
+          `endif
           $stop;
         end
       end
@@ -47,10 +50,12 @@
       always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin
         if (~SYM[1] !== ~SYM[2]) begin
           $display("@%0tns: %s, expected: %b, actual: %b", $time, ~LIT[4], ~TOBV[~ARG[6]][~TYP[6]], ~TOBV[~ARG[5]][~TYP[5]]);
+          `ifdef VERILATOR
+            $c("std::exit(1);");
+          `endif
           $stop;
         end
       end
       // pragma translate_on
       assign ~RESULT = ~ARG[7];
       // assertBitVector end
-

@@ -1,0 +1,1 @@
+REMOVED: Newer Verilators (> v5) can deal with delay statements, hence removing the need for Clash specific workarounds. If you relied on Clash-generated Verilator shims, consider using `verilator --build --binary` instead.
