@@ -9,11 +9,13 @@ import           Clash.Annotations.Primitive (HDL(..))
 import qualified Data.Text                 as Text
 import           Data.Default              (def)
 import           Data.List                 ((\\), intercalate)
+import           Data.List.Extra           (trim)
 import           Data.Version              (versionBranch)
 import           System.Directory
-  (getCurrentDirectory, doesDirectoryExist, makeAbsolute)
+  (getCurrentDirectory, doesDirectoryExist, makeAbsolute, setCurrentDirectory)
 import           System.Environment
 import           System.Info
+import           System.Process            (readProcess)
 import           GHC.Conc                  (numCapabilities)
 import           GHC.Stack
 import           GHC.IO.Unsafe             (unsafePerformIO)
@@ -1195,6 +1197,8 @@ runClashTest = defaultMain $ clashTestRoot
 
 main :: IO ()
 main = do
+  projectRoot <- trim <$> readProcess "git" ["rev-parse", "--show-toplevel"] ""
+  setCurrentDirectory projectRoot
   setEnv "TASTY_NUM_THREADS" (show numCapabilities)
   setClashEnvs compiledWith
   runClashTest
