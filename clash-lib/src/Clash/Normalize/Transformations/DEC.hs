@@ -1,6 +1,6 @@
 {-|
   Copyright  :  (C) 2015-2016, University of Twente,
-                    2021-2022, QBayLogic B.V.
+                    2021-2024, QBayLogic B.V.
                     2022,      LumiGuide Fietsdetectie B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -31,6 +31,7 @@
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE MagicHash #-}
 
 module Clash.Normalize.Transformations.DEC
   ( disjointExpressionConsolidation
@@ -56,6 +57,7 @@ import qualified Data.Maybe as Maybe
 import Data.Monoid (All(..))
 import qualified Data.Text as Text
 import GHC.Stack (HasCallStack)
+import qualified Language.Haskell.TH as TH
 
 #if MIN_VERSION_ghc(9,6,0)
 import GHC.Core.Make (chunkify, mkChunkified)
@@ -93,9 +95,25 @@ import Clash.Normalize.Transformations.Letrec (deadCode)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Combinators (bottomupR)
 import Clash.Rewrite.Types
-import Clash.Rewrite.Util (changed, isUntranslatableType)
+import Clash.Rewrite.Util (changed, isFromInt, isUntranslatableType)
 import Clash.Rewrite.WorkFree (isConstant)
 import Clash.Util (MonadUnique, curLoc)
+
+-- primitives
+import qualified Clash.Sized.Internal.BitVector
+import qualified Clash.Sized.Internal.Index
+import qualified Clash.Sized.Internal.Signed
+import qualified Clash.Sized.Internal.Unsigned
+import qualified GHC.Base
+import qualified GHC.Classes
+#if MIN_VERSION_base(4,15,0)
+import qualified GHC.Num.Integer
+#else
+-- interger-gmp primitives are defined in the hidden module GHC.Integer.Type,
+-- but exported from GHC.Integer
+import qualified GHC.Integer as GHC.Integer.Type
+#endif
+import qualified GHC.Prim
 
 -- | This transformation lifts applications of global binders out of
 -- alternatives of case-statements.
@@ -271,7 +289,7 @@ allEqual (x:xs) = all (== x) xs
 -- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
 -- of an expression. Also substitute truly disjoint applications of globals by a
 -- reference to a lifted out application.
-collectGlobals'
+collectGlobals
   :: InScopeSet
   -> [(Term,Term)]
   -- ^ Substitution of (applications of) a global binder by a reference to a
@@ -280,10 +298,8 @@ collectGlobals'
   -- ^ List of already seen global binders
   -> Term
   -- ^ The expression
-  -> Bool
-  -- ^ Whether expression is constant
   -> NormalizeSession (Term, InScopeSet, [(Term, ([Term], CaseTree [Either Term Type]))])
-collectGlobals' is0 substitution seen (Case scrut ty alts) _eIsConstant = do
+collectGlobals is0 substitution seen (Case scrut ty alts) = do
   rec (alts1, isAlts, collectedAlts) <-
         collectGlobalsAlts is0 substitution seen scrut1 alts
       (scrut1, isScrut, collectedScrut) <-
@@ -292,8 +308,8 @@ collectGlobals' is0 substitution seen (Case scrut ty alts) _eIsConstant = do
          , unionInScope isAlts isScrut
          , collectedAlts ++ collectedScrut )
 
-collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), ticks)) eIsconstant
-  | not eIsconstant = do
+collectGlobals is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), ticks))
+  | not (isConstant e) = do
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
     evaluate <- Lens.view evaluator
@@ -315,10 +331,10 @@ collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), t
         (args1,isArgs,collectedArgs) <-
           collectGlobalsArgs is0 substitution seen args
         let seenInArgs = map fst collectedArgs ++ seen
-        isInteresting <- interestingToLift is0 eval fun args ticks
+            isInteresting = interestingToLift is0 eval fun args ticks
         case isInteresting of
           Just fun1 | fun1 `notElem` seenInArgs -> do
-            let e1 = Maybe.fromMaybe (mkApps fun1 args1) (List.lookup fun1 substitution)
+            let e1 = Maybe.fromMaybe (mkApps (mkTicks fun1 ticks) args1) (List.lookup fun1 substitution)
             -- This function is lifted out an environment with the currently 'seen'
             -- binders. When we later apply substitution, we need to start with this
             -- environment, otherwise we perform incorrect substitutions in the
@@ -331,7 +347,7 @@ collectGlobals' is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), t
 -- the ANF, CSE, and DeadCodeRemoval pass all duplicates are removed.
 --
 -- I think we should be able to do better, but perhaps we cannot fix it here.
-collectGlobals' is0 substitution seen (Letrec lbs body) _eIsConstant = do
+collectGlobals is0 substitution seen (Letrec lbs body) = do
   let is1 = extendInScopeSetList is0 (map fst lbs)
   (body1,isBody,collectedBody) <-
     collectGlobals is1 substitution seen body
@@ -342,27 +358,11 @@ collectGlobals' is0 substitution seen (Letrec lbs body) _eIsConstant = do
          , map (second (second (LB lbs1))) (collectedBody ++ collectedBndrs)
          )
 
-collectGlobals' is0 substitution seen (Tick t e) eIsConstant = do
-  (e1,is1,collected) <- collectGlobals' is0 substitution seen e eIsConstant
+collectGlobals is0 substitution seen (Tick t e) = do
+  (e1,is1,collected) <- collectGlobals is0 substitution seen e
   return (Tick t e1, is1, collected)
 
-collectGlobals' is0 _ _ e _ = return (e,is0,[])
-
--- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
--- of an expression. Also substitute truly disjoint applications of globals by a
--- reference to a lifted out application.
-collectGlobals
-  :: InScopeSet
-  -> [(Term,Term)]
-  -- ^ Substitution of (applications of) a global binder by a reference to
-  -- a lifted term.
-  -> [Term]
-  -- ^ List of already seen global binders
-  -> Term
-  -- ^ The expression
-  -> NormalizeSession (Term, InScopeSet, [(Term, ([Term], CaseTree [Either Term Type]))])
-collectGlobals inScope substitution seen e =
-  collectGlobals' inScope substitution seen e (isConstant e)
+collectGlobals is0 _ _ e = return (e,is0,[])
 
 -- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
 -- of a list of application arguments. Also substitute truly disjoint
@@ -575,7 +575,7 @@ areShared tcm inScope xs@(x:_) = noFV1 && (isProof x || allEqual xs)
   isLocallyBound v = isLocalId v && v `notElemInScopeSet` inScope
 
   isProof (Left co) = case tyView (inferCoreTypeOf tcm co) of
-    TyConApp (nameOcc -> "GHC.Types.~") _ -> True
+    TyConApp (nameOcc -> nm) _ ->  nm == fromTHName ''(~)
     _ -> False
   isProof _ = False
 
@@ -685,8 +685,11 @@ mkBigTupSelector inScope tcm tupTcm scrut tys n = go (chunkify tys)
 -- This holds for all global functions, and certain primitives. Currently those
 -- primitives are:
 --
--- * All non-power-of-two multiplications
--- * All division-like operations with a non-power-of-two divisor
+-- * All non-cheap multiplications
+-- * All division-like operations with a non-cheap divisor
+--
+-- Multiplying/dividing by zero or powers of two are considered cheap and
+-- isn't lifted out.
 interestingToLift
   :: InScopeSet
   -- ^ in scope
@@ -698,99 +701,99 @@ interestingToLift
   -- ^ Arguments
   -> [TickInfo]
   -- ^ Tick annoations
-  -> RewriteMonad extra (Maybe Term)
+  -> Maybe Term
 interestingToLift inScope _ e@(Var v) _ ticks =
   if NoDeDup `notElem` ticks && (isGlobalId v ||  v `elemInScopeSet` inScope)
-     then pure (Just e)
-     else pure Nothing
+     then (Just e)
+     else Nothing
 interestingToLift inScope eval e@(Prim pInfo) args ticks
   | NoDeDup `notElem` ticks = do
   let anyArgNotConstant = any (not . isConstant) lArgs
   case List.lookup (primName pInfo) interestingPrims of
-    Just t | t || anyArgNotConstant -> pure (Just e)
-    _ | DeDup `elem` ticks -> pure (Just e)
-    _ -> do
-      let isInteresting = (\(x, y, z) -> interestingToLift inScope eval x y z) . collectArgsTicks
+    Just t | t || anyArgNotConstant -> (Just e)
+    _ | DeDup `elem` ticks -> (Just e)
+    _ ->
       if isHOTy (coreTypeOf pInfo) then do
-        anyInteresting <- List.anyM (fmap Maybe.isJust . isInteresting) lArgs
-        if anyInteresting then pure (Just e) else pure Nothing
+        let anyInteresting = List.any (Maybe.isJust . isInteresting) lArgs
+        if anyInteresting then Just e else Nothing
       else
-        pure Nothing
+        Nothing
 
   where
-    interestingPrims =
-      [("Clash.Sized.Internal.BitVector.*#",tailNonPow2)
-      ,("Clash.Sized.Internal.BitVector.times#",tailNonPow2)
-      ,("Clash.Sized.Internal.BitVector.quot#",lastNotPow2)
-      ,("Clash.Sized.Internal.BitVector.rem#",lastNotPow2)
-      ,("Clash.Sized.Internal.Index.*#",tailNonPow2)
-      ,("Clash.Sized.Internal.Index.quot#",lastNotPow2)
-      ,("Clash.Sized.Internal.Index.rem#",lastNotPow2)
-      ,("Clash.Sized.Internal.Signed.*#",tailNonPow2)
-      ,("Clash.Sized.Internal.Signed.times#",tailNonPow2)
-      ,("Clash.Sized.Internal.Signed.rem#",lastNotPow2)
-      ,("Clash.Sized.Internal.Signed.quot#",lastNotPow2)
-      ,("Clash.Sized.Internal.Signed.div#",lastNotPow2)
-      ,("Clash.Sized.Internal.Signed.mod#",lastNotPow2)
-      ,("Clash.Sized.Internal.Unsigned.*#",tailNonPow2)
-      ,("Clash.Sized.Internal.Unsigned.times#",tailNonPow2)
-      ,("Clash.Sized.Internal.Unsigned.quot#",lastNotPow2)
-      ,("Clash.Sized.Internal.Unsigned.rem#",lastNotPow2)
-      ,("GHC.Base.quotInt",lastNotPow2)
-      ,("GHC.Base.remInt",lastNotPow2)
-      ,("GHC.Base.divInt",lastNotPow2)
-      ,("GHC.Base.modInt",lastNotPow2)
-      ,("GHC.Classes.divInt#",lastNotPow2)
-      ,("GHC.Classes.modInt#",lastNotPow2)
+    isInteresting = (\(x, y, z) -> interestingToLift inScope eval x y z) . collectArgsTicks
+    interestingPrims = map (first fromTHName)
+      [('(Clash.Sized.Internal.BitVector.*#),bothNotPow2)
+      ,('Clash.Sized.Internal.BitVector.times#,bothNotPow2)
+      ,('Clash.Sized.Internal.BitVector.quot#,lastNotPow2)
+      ,('Clash.Sized.Internal.BitVector.rem#,lastNotPow2)
+      ,('(Clash.Sized.Internal.Index.*#),bothNotPow2)
+      ,('Clash.Sized.Internal.Index.times#,bothNotPow2)
+      ,('Clash.Sized.Internal.Index.quot#,lastNotPow2)
+      ,('Clash.Sized.Internal.Index.rem#,lastNotPow2)
+      ,('(Clash.Sized.Internal.Signed.*#),bothNotPow2)
+      ,('Clash.Sized.Internal.Signed.times#,bothNotPow2)
+      ,('Clash.Sized.Internal.Signed.rem#,lastNotPow2)
+      ,('Clash.Sized.Internal.Signed.quot#,lastNotPow2)
+      ,('Clash.Sized.Internal.Signed.div#,lastNotPow2)
+      ,('Clash.Sized.Internal.Signed.mod#,lastNotPow2)
+      ,('(Clash.Sized.Internal.Unsigned.*#),bothNotPow2)
+      ,('Clash.Sized.Internal.Unsigned.times#,bothNotPow2)
+      ,('Clash.Sized.Internal.Unsigned.quot#,lastNotPow2)
+      ,('Clash.Sized.Internal.Unsigned.rem#,lastNotPow2)
+      ,('GHC.Base.quotInt,lastNotPow2)
+      ,('GHC.Base.remInt,lastNotPow2)
+      ,('GHC.Base.divInt,lastNotPow2)
+      ,('GHC.Base.modInt,lastNotPow2)
+      ,('GHC.Classes.divInt#,lastNotPow2)
+      ,('GHC.Classes.modInt#,lastNotPow2)
 #if MIN_VERSION_base(4,15,0)
-      ,("GHC.Num.Integer.integerMul",allNonPow2)
-      ,("GHC.Num.Integer.integerDiv",lastNotPow2)
-      ,("GHC.Num.Integer.integerMod",lastNotPow2)
-      ,("GHC.Num.Integer.integerQuot",lastNotPow2)
-      ,("GHC.Num.Integer.integerRem",lastNotPow2)
+      ,('GHC.Num.Integer.integerMul,bothNotPow2)
+      ,('GHC.Num.Integer.integerDiv,lastNotPow2)
+      ,('GHC.Num.Integer.integerMod,lastNotPow2)
+      ,('GHC.Num.Integer.integerQuot,lastNotPow2)
+      ,('GHC.Num.Integer.integerRem,lastNotPow2)
 #else
-      ,("GHC.Integer.Type.timesInteger",allNonPow2)
-      ,("GHC.Integer.Type.divInteger",lastNotPow2)
-      ,("GHC.Integer.Type.modInteger",lastNotPow2)
-      ,("GHC.Integer.Type.quotInteger",lastNotPow2)
-      ,("GHC.Integer.Type.remInteger",lastNotPow2)
+      ,('GHC.Integer.Type.timesInteger,bothNotPow2)
+      ,('GHC.Integer.Type.divInteger,lastNotPow2)
+      ,('GHC.Integer.Type.modInteger,lastNotPow2)
+      ,('GHC.Integer.Type.quotInteger,lastNotPow2)
+      ,('GHC.Integer.Type.remInteger,lastNotPow2)
 #endif
-      ,("GHC.Prim.*#",allNonPow2)
-      ,("GHC.Prim.quotInt#",lastNotPow2)
-      ,("GHC.Prim.remInt#",lastNotPow2)
+      ,('(GHC.Prim.*#),bothNotPow2)
+      ,('GHC.Prim.quotInt#,lastNotPow2)
+      ,('GHC.Prim.remInt#,lastNotPow2)
       ]
 
     lArgs       = Either.lefts args
 
-    allNonPow2  = all (not . termIsPow2) lArgs
-    tailNonPow2 = case lArgs of
-                    [] -> True
-                    _  -> all (not . termIsPow2) (drop 1 lArgs)
     lastNotPow2 = case lArgs of
                     [] -> True
                     _  -> not (termIsPow2 (last lArgs))
+    -- | This only looks at the last two arguments, skipping over any constraints if they exist
+    bothNotPow2 = go lArgs
+     where
+      go xs = case xs of
+                [] -> True
+                [a] -> not (termIsPow2 a)
+                [a,b] -> not (termIsPow2 a) && not (termIsPow2 b)
+                (_:rest) -> go rest
 
     termIsPow2 e' = case eval e' of
       Literal (IntegerLiteral n) -> isPow2 n
       a -> case collectArgs a of
-        (Prim p,[Right _,Left _,Left (Literal (IntegerLiteral n))])
-          | isFromInteger (primName p) -> isPow2 n
+        (Prim p,[Right _,Left _,       Left (Literal (IntegerLiteral n))])
+          | isFromInt (primName p) -> isPow2 n
         (Prim p,[Right _,Left _,Left _,Left (Literal (IntegerLiteral n))])
-          | primName p == "Clash.Sized.Internal.BitVector.fromInteger#"  -> isPow2 n
-        (Prim p,[Right _,       Left _,Left (Literal (IntegerLiteral n))])
-          | primName p == "Clash.Sized.Internal.BitVector.fromInteger##" -> isPow2 n
-
+          | primName p == fromTHName 'Clash.Sized.Internal.BitVector.fromInteger#  -> isPow2 n
         _ -> False
 
-    isPow2 x = x /= 0 && (x .&. (complement x + 1)) == x
-
-    isFromInteger x = x `elem` ["Clash.Sized.Internal.BitVector.fromInteger#"
-                               ,"Clash.Sized.Integer.Index.fromInteger"
-                               ,"Clash.Sized.Internal.Signed.fromInteger#"
-                               ,"Clash.Sized.Internal.Unsigned.fromInteger#"
-                               ]
+    -- This used to contain (x /= 0), but multiplying by zero is free
+    isPow2 x = (x .&. (complement x + 1)) == x
 
     isHOTy t = case splitFunForallTy t of
       (args',_) -> any isPolyFunTy (Either.rights args')
 
-interestingToLift _ _ _ _ _ = pure Nothing
+interestingToLift _ _ _ _ _ = Nothing
+
+fromTHName :: TH.Name -> Text.Text
+fromTHName = Text.pack . show
