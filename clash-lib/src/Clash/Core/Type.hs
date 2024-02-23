@@ -2,7 +2,7 @@
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016     , Myrtle Software Ltd,
                      2017     , Google Inc.
-                     2021     , QBayLogic B.V.
+                     2021-2024, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -439,6 +439,10 @@ funSubst
 funSubst _   Nothing  = const Nothing
 funSubst tcm (Just s) = uncurry go
   where
+    -- AnnType cannot be matched in type-families within regular GHC (as they
+    -- are type synonyms) so it is fine to skip over them here.
+    go (AnnType _ t1) t2 = go t1 t2
+
     go (VarTy nmF) ty = case lookup nmF s of
       Nothing -> Just ((nmF,ty):s)
       -- Given, for example, the type family definition:
@@ -456,6 +460,10 @@ funSubst tcm (Just s) = uncurry go
       -- and if so, the applied type, and the type in the substitution should match.
       Just ty' | ty' `aeqType` ty -> Just s
       _ -> Nothing
+
+    -- Only look through annotations in RHS after the VarTy case, so we can
+    -- preserve annotations in the substitution created by the VarTy case above
+    go t1 (AnnType _ t2) = go t1 t2
 
     -- [Note] funSubst FunTy
     --
@@ -482,13 +490,11 @@ funSubst tcm (Just s) = uncurry go
                    , argView tcm r2 -- See [Note: Eager type families]
                    )
 
-    go ty1@(ConstTy _) ty2 =
-      -- Looks through AnnType
-      if ty1 `aeqType` ty2 then Just s else Nothing
+    go (ConstTy c1) (ConstTy c2)
+      | c1 == c2 = Just s
 
-    go ty1@(LitTy _) ty2 =
-      -- Looks through AnnType
-      if ty1 `aeqType` ty2 then Just s else Nothing
+    go (LitTy l1) (LitTy l2)
+      | l1 == l2 = Just s
 
     go _ _ = Nothing
 
