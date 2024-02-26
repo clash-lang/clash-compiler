@@ -3,9 +3,9 @@
 set -xeo pipefail
 
 REPO="ghcr.io/clash-lang"
-NAME="clash-ci-"
+NAME="clash-ci"
 DIR=$(dirname "$0")
-now=$(date +%F)
+now=$(date +%Y%m%d)
 
 if [[ "$1" == "-y" ]]; then
   push=y
@@ -31,8 +31,7 @@ do
     --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} \
     --build-arg cabal_version=${CABAL_VERSION} \
     --build-arg ghc_version=${GHC_VERSION} \
-    -t "${REPO}/${NAME}${GHC_VERSION}:$now" \
-    -t "${REPO}/${NAME}${GHC_VERSION}:latest" \
+    -t "${REPO}/${NAME}:${GHC_VERSION}-$now" \
     "$DIR"
 done
 
@@ -44,8 +43,7 @@ if [[ $push =~ ^[Yy]$ ]]; then
   for i in "${!GHC_VERSIONS[@]}"
   do
     GHC_VERSION="${GHC_VERSIONS[i]}"
-    docker push "${REPO}/${NAME}${GHC_VERSION}:$now"
-    docker push "${REPO}/${NAME}${GHC_VERSION}:latest"
+    docker push "${REPO}/${NAME}:${GHC_VERSION}-$now"
   done
 else
   echo "Skipping push to container registry"

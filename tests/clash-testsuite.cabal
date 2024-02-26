@@ -151,7 +151,8 @@ executable clash-testsuite
 
   build-depends:
     containers,
-    clash-testsuite
+    clash-testsuite,
+    extra,
 
   if impl(ghc >= 9.0.0)
     build-depends:

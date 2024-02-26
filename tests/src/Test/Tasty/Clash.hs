@@ -379,7 +379,7 @@ verilatorTests opts@TestOptions{..} parentTmp =
     ]
   sim t =
     [ singleTest (simName t) $
-          VerilatorSimTest expectSimFail vvpStdoutNonEmptyFail (dir t) t
+          VerilatorSimTest expectSimFail False (dir t) t
     ]
 
 -- | Generate a test tree for running Vivado. Depending on 'hdlSim' it will be

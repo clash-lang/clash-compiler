@@ -9,11 +9,13 @@ import           Clash.Annotations.Primitive (HDL(..))
 import qualified Data.Text                 as Text
 import           Data.Default              (def)
 import           Data.List                 ((\\), intercalate)
+import           Data.List.Extra           (trim)
 import           Data.Version              (versionBranch)
 import           System.Directory
-  (getCurrentDirectory, doesDirectoryExist, makeAbsolute)
+  (getCurrentDirectory, doesDirectoryExist, makeAbsolute, setCurrentDirectory)
 import           System.Environment
 import           System.Info
+import           System.Process            (readProcess)
 import           GHC.Conc                  (numCapabilities)
 import           GHC.Stack
 import           GHC.IO.Unsafe             (unsafePerformIO)
@@ -662,13 +664,23 @@ runClashTest = defaultMain $ clashTestRoot
                                                         , "testBenchUS"
                                                         ]}
           in runTest "DDRin" _opts
+
+          -- XXX: `ddrOut` contains a number of (implicit) parallel, coinciding
+          --      processes. Execution for these processes is left undefined in
+          --      the Verilog spec, nor is there a mechanism to get consistent
+          --      behavior (like in VHDL). Therefore, simulators are free to pick
+          --      any execution order they'd like. ModelSim and Verilator pick
+          --      differently, so when a test works in one, it doesn't in the
+          --      other. As a quick "fix" we disable Verilator, though we might
+          --      consider rewriting the test such that it doesn't depend or
+          --      accounts for the raciness.
         , let _opts = def{ buildTargets = BuildSpecific [ "testBenchUA"
                                                         , "testBenchUS"
                                                         , "testBenchGA"
                                                         , "testBenchGS"
                                                         ]
-                         , hdlLoad = hdlLoad def \\ [Vivado]
-                         , hdlSim = hdlSim def \\ [Vivado]
+                         , hdlLoad = hdlLoad def \\ [Vivado, Verilator]
+                         , hdlSim = hdlSim def \\ [Vivado, Verilator]
                          }
           in runTest "DDRout" _opts
         , let _opts = def{ buildTargets = BuildSpecific [ "testBenchUA"
@@ -1195,6 +1207,8 @@ runClashTest = defaultMain $ clashTestRoot
 
 main :: IO ()
 main = do
+  projectRoot <- trim <$> readProcess "git" ["rev-parse", "--show-toplevel"] ""
+  setCurrentDirectory projectRoot
   setEnv "TASTY_NUM_THREADS" (show numCapabilities)
   setClashEnvs compiledWith
   runClashTest

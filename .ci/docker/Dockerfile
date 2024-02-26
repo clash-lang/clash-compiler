@@ -94,10 +94,10 @@ RUN git clone https://github.com/cliffordwolf/SymbiYosys.git SymbiYosys \
 
 FROM builder AS build-verilator
 
-ARG DEPS_VERILATOR="perl python3 make autoconf g++ flex bison ccache libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlib1g zlib1g-dev"
+ARG DEPS_VERILATOR="perl python3 make autoconf g++ flex bison ccache libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlib1g zlib1g-dev help2man"
 RUN apt-get install -y --no-install-recommends $DEPS_VERILATOR
 
-ARG verilator_version="v4.214"
+ARG verilator_version="v5.020"
 RUN git clone https://github.com/verilator/verilator verilator \
   && cd verilator \
   && git checkout $verilator_version \

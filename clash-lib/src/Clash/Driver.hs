@@ -61,11 +61,6 @@ import           Data.Text.Lazy                   (Text)
 import qualified Data.Text.Lazy                   as Text
 import           Data.Text.Lazy.Encoding          as Text
 import qualified Data.Text.Lazy.IO                as Text
-#if MIN_VERSION_prettyprinter(1,7,0)
-import           Prettyprinter (pretty)
-#else
-import           Data.Text.Prettyprint.Doc (pretty)
-#endif
 import           Data.Text.Prettyprint.Doc.Extra
   (Doc, LayoutOptions (..), PageWidth (..) , layoutPretty, renderLazy)
 import qualified Data.Time.Clock                  as Clock
@@ -418,14 +413,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
           then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles fileNames
           else pure (edamFiles, fileNames)
 
-      -- If we are generating (System)Verilog, we could potentially verilate
-      -- the results. Clash can output a C++ shim for doing this automatically.
-      fileNames2 <-
-        case hdlFromBackend (Proxy @backend) of
-          VHDL -> pure fileNames1
-          _ -> writeVerilatorShim hdlDir topNm fileNames1
-
-      writeManifest manPath manifest0{fileNames=fileNames2}
+      writeManifest manPath manifest0{fileNames=fileNames1}
 
       topTime <- Clock.getCurrentTime
       let topDiff = reportTimeDiff topTime prevTime
@@ -495,11 +483,6 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
           then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles filesAndDigests0
           else pure (edamFiles, filesAndDigests0)
 
-      filesAndDigests2 <-
-        case hdlFromBackend (Proxy @backend) of
-          VHDL -> pure filesAndDigests1
-          _ -> writeVerilatorShim hdlDir topNm filesAndDigests1
-
       let
         depUniques = fromMaybe [] (HashMap.lookup (getUnique topEntity) deps)
         depBindings = mapMaybe (flip lookupVarEnvDirectly bindingsMap) depUniques
@@ -508,7 +491,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
         manifest =
           mkManifest
             hdlState' domainConfs opts topComponent components depIds
-            filesAndDigests2 topHash
+            filesAndDigests1 topHash
       writeManifest manPath manifest
 
       topTime <- hdlDocs `seq` Clock.getCurrentTime
@@ -813,48 +796,6 @@ createHDL backend opts modName seen components domainConfs top topName = flip ev
       (error $ $(curLoc) ++ "Unknown synthesis domain: " ++ show dom)
       dom
       domainConfs
-
-writeVerilatorShim
-  :: FilePath
-  -> Id.Identifier
-  -> [(FilePath, ByteString)]
-  -> IO [(FilePath, ByteString)]
-writeVerilatorShim hdlDir topNm filesAndDigests = do
-  let file = Data.Text.unpack (Id.toText topNm) <> "_shim" <.> "cpp"
-  digest <- writeHDL hdlDir (file, pprVerilatorShim topNm)
-  pure ((file, digest) : filesAndDigests)
-
--- | Create a shim for using verilator, which loads the entity and steps
--- through simulation until finished.
---
-pprVerilatorShim :: Id.Identifier -> Doc
-pprVerilatorShim (Id.toText -> topNm) =
-  -- Extra newlines are aggressively inserted so the quasiquoter doesn't wrap
-  -- the outlines lines in the file. It doesn't matter for code inside main,
-  -- but is fatal for the #include directives.
-  pretty $ Data.Text.pack [I.i|
-    \#include <cstdlib>
-
-    \#include <verilated.h>
-
-    \#include "V#{topNm}.h"
-
-    int main(int argc, char **argv) {
-      Verilated::commandArgs(argc, argv);
-
-      V#{topNm} *top = new V#{topNm};
-
-      while(!Verilated::gotFinish()) {
-        top->eval();
-      }
-
-      top->final();
-
-      delete top;
-
-      return EXIT_SUCCESS;
-    }
-  |]
 
 writeEdam ::
   FilePath ->
