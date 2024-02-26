@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021-2023, QBayLogic B.V.
+                     2021-2024, QBayLogic B.V.
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -1216,7 +1216,7 @@ exprLitV = exprLit undefValue
 exprLit :: Lens' s (Maybe (Maybe Int)) -> Maybe (HWType,Size) -> Literal -> Ap (State s) Doc
 exprLit _ Nothing (NumLit i) = integer i
 
-exprLit k (Just (hty,sz)) (NumLit i) = case hty of
+exprLit k (Just (hty,sz)) (NumLit i0) = case hty of
   Unsigned _
    | i < 0     -> string "-" <> int sz <> string "'d" <> integer (abs i)
    | otherwise -> int sz <> string "'d" <> integer i
@@ -1227,6 +1227,11 @@ exprLit k (Just (hty,sz)) (NumLit i) = case hty of
   _ -> int sz <> string "'b" <> blit
   where
     blit = bits k (toBits sz i)
+    i = case hty of
+             Signed _ -> let mask = 2^(sz-1) in case divMod i0 mask of
+                (s,i'') | even s    -> i''
+                        | otherwise -> i'' - mask
+             _ -> i0 `mod` 2^sz
 exprLit k (Just (_,sz)) (BitVecLit m i) = int sz <> string "'b" <> bvlit
   where
     bvlit = bits k (toBits' sz m i)
