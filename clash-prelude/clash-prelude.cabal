@@ -285,6 +285,8 @@ Library
                       Clash.Sized.Signed
                       Clash.Sized.Unsigned
                       Clash.Sized.Vector
+                      Clash.Sized.Vector.ToTuple
+                      Clash.Sized.Vector.ToTuple.TH
 
                       Clash.Sized.Internal.BitVector
                       Clash.Sized.Internal.Index
@@ -353,6 +355,7 @@ Library
                       reflection                >= 2       && < 2.2,
                       singletons                >= 2.0     && < 3.1,
                       string-interpolate        ^>= 0.3,
+                      tagged                    >= 0.8     && < 0.9,
                       template-haskell          >= 2.12.0.0 && < 2.22,
                       th-abstraction            >= 0.2.10 && < 0.7.0,
                       th-lift                   >= 0.7.0    && < 0.9,
