@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016     , Myrtle Software Ltd,
                     2017     , Google Inc.,
-                    2021-2022, QBayLogic B.V.
+                    2021-2023, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -77,7 +77,7 @@ import           Clash.Core.Type             (Type (..), normalizeType)
 import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
-  (InScopeSet, extendInScopeSet, extendInScopeSetList, mkInScopeSet,
+  (InScopeSet, extendInScopeSet, extendInScopeSetList, mkInScopeSet, notElemInScopeSet,
    uniqAway, uniqAway', mapVarEnv, eltsVarEnv, unitVarSet, emptyVarEnv,
    mkVarEnv, eltsVarSet, elemVarEnv, lookupVarEnv, extendVarEnv, elemVarSet,
    differenceVarEnv)
@@ -173,12 +173,13 @@ apply = \s rewrite ctx expr0 -> do
     return ()
 
   if isDebugging opts
-    then applyDebug s expr0 hasChanged expr1
+    then applyDebug ctx s expr0 hasChanged expr1
     else return expr1
 {-# INLINE apply #-}
 
 applyDebug
-  :: String
+  :: TransformContext
+  -> String
   -- ^ Name of the transformation
   -> Term
   -- ^ Original expression
@@ -187,7 +188,7 @@ applyDebug
   -> Term
   -- ^ New expression
   -> RewriteMonad extra Term
-applyDebug name exprOld hasChanged exprNew = do
+applyDebug ctx name exprOld hasChanged exprNew = do
   nTrans <- Lens.use transformCounter
   opts <- Lens.view debugOpts
 
@@ -212,9 +213,14 @@ applyDebug name exprOld hasChanged exprNew = do
       let beforeTy          = inferCoreTypeOf tcm exprOld
           beforeFV          = Lens.setOf freeLocalVars exprOld
           afterTy           = inferCoreTypeOf tcm exprNew
-          afterFV           = Lens.setOf freeLocalVars exprNew
+          afterFV           = filterFVs (Lens.setOf freeLocalVars exprNew)
           newFV             = not (afterFV `Set.isSubsetOf` beforeFV)
           accidentalShadows = findAccidentialShadows exprNew
+          -- see NOTE [Filter free variables]
+          allowNewFVsFromCtx = name == "caseCon"
+          filterFVs | allowNewFVsFromCtx = Set.filter notInCtx
+                    | otherwise = id
+          notInCtx v = notElemInScopeSet v (tfInScope ctx)
 
       Monad.when newFV $
               error ( concat [ $(curLoc)
@@ -265,6 +271,17 @@ applyDebug name exprOld hasChanged exprNew = do
    where
     before = showPpr exprOld
     after  = showPpr exprNew
+
+-- NOTE [Filter free variables]
+-- Since [Give evaluator acces to inscope let-bindings #2571](https://github.com/clash-lang/clash-compiler/pull/2571)
+-- the evaluator can rewrite expressions using let bindings from the 'TransformContext',
+-- these bindings may reference other things bound in the context which weren't
+-- in the expression before, and in doing so introduces new free variables and
+-- fails this check for new free variables.
+-- To prevent this we filter out all variables from bound in the context.
+-- But only during a caseCon transformation, to not weaken this check unnecessarily.
+
+
 
 -- | Perform a transformation on a Term
 runRewrite
