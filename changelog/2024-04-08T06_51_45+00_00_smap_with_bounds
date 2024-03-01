@@ -1,0 +1,2 @@
+CHANGED: `dfold` now offers a proof witness for the upper bound of the vector size to the folding function. Note that this change may require additional type annotations, as solutions working in the past may complain with an untouchable type error now.
+ADDED: `smapWithBounds` extending `smap` via offering a proof witness for the upper bound of the vector size to the mapping function.
