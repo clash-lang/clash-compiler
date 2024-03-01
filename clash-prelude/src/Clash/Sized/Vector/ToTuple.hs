@@ -3,9 +3,12 @@ Copyright  :  (C) 2024, Google LLC
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-Tooling to safely work around @incomplete-uni-patterns@ warnings produced by GHC
-9.2 and up, or @incomplete-patterns@ warnings on all GHC versions. See 'vecToTuple'
-for more information and examples.
+Tooling to safely work around @incomplete-uni-patterns@ and @incomplete-patterns@
+warnings. See 'vecToTuple' for more information and examples.
+
+Note: This module has been added to make upgrading to GHC 9.2 easier. As of GHC
+      9.2, the @incomplete-uni-patterns@ has been added to the @-Wall@, making
+      previously warning-free code now produce warnings.
 -}
 
 {-# LANGUAGE CPP #-}
@@ -68,7 +71,6 @@ class VecToTuple a where
   --                      with: (a, b, c, d)
 #endif
   -- ...
-  --
   vecToTuple ::  a -> TupType a
 
 instance VecToTuple (Vec 0 a) where
