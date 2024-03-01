@@ -1,0 +1,1 @@
+ADDED: Added `Clash.Sized.Vector.ToTuple.vecToTuple`: a way to safely work around @incomplete-uni-patterns@ warnings produced by GHC 9.2 and up, or @incomplete-patterns@ warnings on all GHC versions.
