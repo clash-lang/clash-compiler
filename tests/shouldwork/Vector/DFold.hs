@@ -11,7 +11,8 @@ import Data.Kind (Type)
 data Append (m :: Nat) (a :: Type) (f :: TyFun Nat Type) :: Type
 type instance Apply (Append m a) l = Vec (l + m) a
 
-append' xs ys = dfold (Proxy :: Proxy (Append m a)) (const (:>)) ys xs
+append' :: forall a k m. KnownNat k => Vec k a -> Vec m a -> Vec (k + m) a
+append' xs ys = dfold (Proxy :: Proxy (Append m a)) (const ((:>) @a)) ys xs
 
 topEntity :: (Vec 3 Int,Vec 7 Int) -> Vec 10 Int
 topEntity = uncurry append'
