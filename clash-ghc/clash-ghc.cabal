@@ -79,7 +79,7 @@ executable clash
     GHC-Options: -dynamic
   -- Note that multiple -with-rtsopts are not cumulative, so we can't add the
   -- common RTS options in the unconditional GHC-Options
-  if flag(workaround-ghc-mmap-crash)
+  if arch(x86_64) && flag(workaround-ghc-mmap-crash)
     GHC-Options: "-with-rtsopts=-A128m -xm20000000"
   else
     GHC-Options: -with-rtsopts=-A128m

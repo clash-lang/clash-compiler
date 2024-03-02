@@ -82,7 +82,7 @@ common basic-config
   if flag(multiple-hidden)
     cpp-options:       -DCLASH_MULTIPLE_HIDDEN
 
-  if flag(workaround-ghc-mmap-crash)
+  if arch(x86_64) && flag(workaround-ghc-mmap-crash)
     cpp-options:       -DCLASH_WORKAROUND_GHC_MMAP_CRASH
 
 library
