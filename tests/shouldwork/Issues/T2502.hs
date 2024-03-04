@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -27,7 +28,7 @@ instance X a => X (Signal System Int -> a) where
 
 bb :: X a => Int -> a
 bb !_ = x
-{-# OPAQUE bb #-}
+{-# CLASH_OPAQUE bb #-}
 {-# ANN bb hasBlackBox #-}
 {-# ANN bb (
   let bbName = show 'bb
@@ -40,11 +41,11 @@ bb !_ = x
 
 bbWrapper :: X a => Int -> a
 bbWrapper i = bb i
-{-# NOINLINE bbWrapper #-}
+{-# CLASH_OPAQUE bbWrapper #-}
 
 topEntity :: Int -> Signal System Int -> Signal System Int
 topEntity i0 i1 = bbWrapper i0 i1
-{-# NOINLINE topEntity #-}
+{-# CLASH_OPAQUE topEntity #-}
 
 mainVHDL :: IO ()
 mainVHDL = do
@@ -52,13 +53,15 @@ mainVHDL = do
 
   -- 'bbWrapper' should get its own file, so we expect two: one for 'topEntity',
   -- one for 'bbWrapper'.
-  --
-  -- XXX: Naming doesn't make sense. 'topEntity1' should be called 'bbWrapper'.
   let hdlDir = topDir </> show 'topEntity
   actual0 <- sort <$> globDir1 "*.vhdl" hdlDir
   let
     actual1 = P.map (P.drop (P.length hdlDir + 1)) actual0
-    expected = ["T2502_topEntity_types.vhdl", "topEntity.vhdl", "topEntity1.vhdl"]
+    expected =
+      [ "T2502_topEntity_types.vhdl"
+      , "bbWrapper.vhdl"
+      , "topEntity.vhdl"
+      ]
   when
     (actual1 /= expected)
     (throwIO $ AssertionFailed $ "Expected " <> show expected <> " got " <> show actual1)

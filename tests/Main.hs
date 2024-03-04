@@ -790,6 +790,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T2342B" def{hdlSim=[]}
         , runTest "T2360" def{hdlSim=[],clashFlags=["-fclash-force-undefined=0"]}
         , outputTest "T2502" def{hdlTargets=[VHDL]}
+        , outputTest "T2508" def{hdlTargets=[VHDL]}
 #if MIN_VERSION_GLASGOW_HASKELL(9,4,0,0)
         , runTest "T2510" def{
             hdlTargets=[VHDL]
