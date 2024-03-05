@@ -91,7 +91,7 @@ topEntity2 (x,y) =
 
 topEntity3 :: (Integer, Integer) -> _
 topEntity3 (x,y) =
-    ( testFiniteBits @(Signed 7) x y
+    ( testFiniteBits @(Signed 66) x y
     , testFiniteBits @(Unsigned 66) (abs x) (abs y)
     , testFiniteBits @(BitVector 66) (abs x) (abs y)
     , testFiniteBits @(Index 128) (abs x `mod` 128) (abs y `mod` 128)
