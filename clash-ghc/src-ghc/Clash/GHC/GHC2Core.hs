@@ -2,7 +2,7 @@
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017-2022, Google Inc.
-                     2021,      QBayLogic B.V.,
+                     2021,2023  QBayLogic B.V.,
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -676,9 +676,9 @@ coreToTerm primMap unlocs = term
         LitNumNatural -> C.NaturalLiteral i
 #endif
         LitNumInt     -> C.IntLiteral i
-        LitNumInt64   -> C.IntLiteral i
+        LitNumInt64   -> C.Int64Literal i
         LitNumWord    -> C.WordLiteral i
-        LitNumWord64  -> C.WordLiteral i
+        LitNumWord64  -> C.Word64Literal i
 #if MIN_VERSION_ghc(9,2,0)
         LitNumInt8    -> C.Int8Literal i
         LitNumInt16   -> C.Int16Literal i

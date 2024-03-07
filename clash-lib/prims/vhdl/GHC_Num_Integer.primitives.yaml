@@ -44,10 +44,16 @@
     workInfo: Never
 - BlackBox:
     name: GHC.Num.Integer.integerMul
-    kind: Expression
+    kind: Declaration
     type: 'integerMul :: Integer
       -> Integer -> Integer'
-    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+    template: |-
+      ~GENSYM[~RESULT_mult][0] : block
+        signal ~GENSYM[~RESULT_mult_full][1] : signed(~SIZE[~TYPO]*2-1 downto 0);
+      begin
+        ~SYM[1] <= ~ARG[0] * ~ARG[1];
+        ~RESULT <= ~SYM[1](~SIZE[~TYPO]-1 downto 0);
+      end block;
     warning: 'GHC.Num.Integer.integerMul: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
@@ -266,10 +272,10 @@
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
     name: GHC.Num.Integer.integerTestBit#
-    kind: Expression
+    kind: Declaration
     type: 'integerTestBit
-      :: Integer -> Word# -> Bool'
-    template: ~VAR[input][0](to_integer(~ARG[1])) = '1'
+      :: Integer -> Word# -> Int#'
+    template: ~RESULT <= (0 => ~VAR[input][0](to_integer(~ARG[1])), others => '0');
     warning: 'GHC.Num.Integer.integerTestBit#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
