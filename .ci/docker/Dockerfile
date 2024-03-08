@@ -21,6 +21,7 @@ FROM builder AS build-ghdl
 ARG DEPS_GHDL="gnat-10 llvm-13-dev"
 RUN apt-get install -y --no-install-recommends $DEPS_GHDL
 
+# TODO when updating this see if you can enable the Int32 part of tests/shouldwork/Numbers/Bits.hs
 ARG ghdl_version="2.0.0"
 RUN curl -L "https://github.com/ghdl/ghdl/archive/v$ghdl_version.tar.gz" \
         | tar -xz \

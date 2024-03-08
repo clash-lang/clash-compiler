@@ -3,7 +3,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017     , Google Inc.,
-                    2021-2023, QBayLogic B.V.
+                    2021-2024, QBayLogic B.V.
                     2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -29,7 +29,6 @@ import           Control.Monad                 (when, replicateM, zipWithM)
 import           Control.Monad.Extra           (concatMapM)
 import           Control.Monad.IO.Class        (liftIO)
 import           Data.Bifunctor                (first, second)
-import           Data.Char                     (ord)
 import           Data.Either                   (lefts, partitionEithers)
 import           Data.Foldable                 (for_)
 import qualified Data.HashMap.Lazy             as HashMap
@@ -68,7 +67,7 @@ import           Clash.Annotations.Primitive
 import           Clash.Core.DataCon            as D (dcTag)
 import           Clash.Core.FreeVars           (freeIds)
 import           Clash.Core.HasType
-import           Clash.Core.Literal            as L (Literal (..))
+import           Clash.Core.Literal            as C (Literal (..))
 import           Clash.Core.Name
   (Name (..), mkUnsafeSystemName)
 import qualified Clash.Netlist.Id              as Id
@@ -263,6 +262,7 @@ isLiteral e = case collectArgs e of
   (C.Literal _,_)  -> True
   _                -> False
 
+
 mkArgument
   :: TextS.Text
   -- ^ Blackbox function name
@@ -291,36 +291,9 @@ mkArgument bbName bndr nArg e = do
       Just hwTy -> case collectArgsTicks e of
         (C.Var v,[],_) -> do
           return ((Identifier (Id.unsafeFromCoreId v) Nothing,hwTy,False),[])
-        (C.Literal (IntegerLiteral i),[],_) ->
-          return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (IntLiteral i), [],_) ->
-          return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (WordLiteral w), [],_) ->
-          return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit w),hwTy,True),[])
-        (C.Literal (CharLiteral c), [],_) ->
-          return ((N.Literal (Just (Unsigned 21,21)) (N.NumLit . toInteger $ ord c),hwTy,True),[])
-        (C.Literal (StringLiteral s),[],_) ->
-          return ((N.Literal Nothing (N.StringLit s),hwTy,True),[])
-        (C.Literal (Int64Literal i), [],_) ->
-          return ((N.Literal (Just (Signed 64,64)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (Word64Literal i), [],_) ->
-          return ((N.Literal (Just (Unsigned 64,64)) (N.NumLit i),hwTy,True),[])
-#if MIN_VERSION_base(4,16,0)
-        (C.Literal (Int8Literal i), [],_) ->
-          return ((N.Literal (Just (Signed 8,8)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (Int16Literal i), [],_) ->
-          return ((N.Literal (Just (Signed 16,16)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (Int32Literal i), [],_) ->
-          return ((N.Literal (Just (Signed 16,16)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (Word8Literal i), [],_) ->
-          return ((N.Literal (Just (Unsigned 8,8)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (Word16Literal i), [],_) ->
-          return ((N.Literal (Just (Unsigned 16,16)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (Word32Literal i), [],_) ->
-          return ((N.Literal (Just (Unsigned 32,32)) (N.NumLit i),hwTy,True),[])
-#endif
-        (C.Literal (NaturalLiteral n), [],_) ->
-          return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit n),hwTy,True),[])
+        (C.Literal l,[],_) ->
+          return ((mkLiteral iw l,hwTy,True),[])
+
         (Prim pinfo,args,ticks) -> withTicks ticks $ \tickDecls -> do
           (e',d) <- mkPrimitive True False Concurrent (NetlistId bndr ty) pinfo args tickDecls
           case e' of

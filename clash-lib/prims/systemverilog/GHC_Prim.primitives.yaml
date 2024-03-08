@@ -871,7 +871,7 @@
       genvar ~GENSYM[k][18];
       ~GENERATE
       for (~SYM[18]=0;~SYM[18]<8;~SYM[18]=~SYM[18]+1) begin : ~GENSYM[reverse][19]
-        assign ~SYM[1][~SYM[18]] = ~ARG[0][~SYM[18]];
+        assign ~SYM[1][~SYM[18]] = ~VAR[][0][~SYM[18]];
       end
       ~ENDGENERATE
 
@@ -942,7 +942,7 @@
       genvar ~GENSYM[k][18];
       ~GENERATE
       for (~SYM[18]=0;~SYM[18]<16;~SYM[18]=~SYM[18]+1) begin : ~GENSYM[reverse][19]
-        assign ~SYM[1][~SYM[18]] = ~ARG[0][~SYM[18]];
+        assign ~SYM[1][~SYM[18]] = ~VAR[][0][~SYM[18]];
       end
       ~ENDGENERATE
 
@@ -1029,7 +1029,7 @@
       genvar ~GENSYM[k][18];
       ~GENERATE
       for (~SYM[18]=0;~SYM[18]<32;~SYM[18]=~SYM[18]+1) begin : ~GENSYM[reverse][19]
-        assign ~SYM[1][~SYM[18]] = ~ARG[0][~SYM[18]];
+        assign ~SYM[1][~SYM[18]] = ~VAR[][0][~SYM[18]];
       end
       ~ENDGENERATE
 
@@ -1132,7 +1132,7 @@
       genvar ~GENSYM[k][18];
       ~GENERATE
       for (~SYM[18]=0;~SYM[18]<64;~SYM[18]=~SYM[18]+1) begin : ~GENSYM[reverse][19]
-        assign ~SYM[1][~SYM[18]] = ~ARG[0][~SYM[18]];
+        assign ~SYM[1][~SYM[18]] = ~VAR[][0][~SYM[18]];
       end
       ~ENDGENERATE
 
@@ -1144,7 +1144,7 @@
       end
       ~ENDGENERATE
 
-      logic [0:47] a;
+      logic [0:47] ~GENSYM[a][4];
       genvar ~GENSYM[i1][5];
       ~GENERATE
       for (~SYM[5]=0;~SYM[5]<16;~SYM[5]=~SYM[5]+1) begin : ~GENSYM[mux_stage][6]
@@ -1252,7 +1252,7 @@
       genvar ~GENSYM[k][18];
       ~GENERATE
       for (~SYM[18]=0;~SYM[18]<64;~SYM[18]=~SYM[18]+1) begin : ~GENSYM[reverse][19]
-        assign ~SYM[1][~SYM[18]] = ~ARG[0][~SYM[18]];
+        assign ~SYM[1][~SYM[18]] = ~VAR[][0][~SYM[18]];
       end
       ~ENDGENERATE
 
@@ -1347,7 +1347,7 @@
       genvar ~SYM[18];
       ~GENERATE
       for (~SYM[18]=0;~SYM[18]<32;~SYM[18]=~SYM[18]+1) begin : ~SYM[19]
-        assign ~SYM[1][~SYM[18]] = ~ARG[0][~SYM[18]];
+        assign ~SYM[1][~SYM[18]] = ~VAR[][0][~SYM[18]];
       end
       ~ENDGENERATE
 

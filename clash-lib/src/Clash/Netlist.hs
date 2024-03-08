@@ -2,7 +2,7 @@
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017-2018, Google Inc.,
-                     2021-2022, QBayLogic B.V.
+                     2021-2024, QBayLogic B.V.
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -41,14 +41,8 @@ import           Data.Maybe
   (listToMaybe, fromMaybe)
 import qualified Data.Map.Ordered                 as OMap
 import qualified Data.Set                         as Set
-import           Data.Primitive.ByteArray         (ByteArray (..))
 import qualified Data.Text                        as StrictText
 import           GHC.Stack                        (HasCallStack)
-#if MIN_VERSION_base(4,15,0)
-import           GHC.Num.Integer                  (Integer (..))
-#else
-import           GHC.Integer.GMP.Internals        (Integer (..), BigNat (..))
-#endif
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Utils.Outputable             (ppr, showSDocUnsafe)
@@ -825,30 +819,7 @@ mkExpr :: HasCallStack
        -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
 mkExpr _ _ _ (stripTicks -> Core.Literal l) = do
   iw <- Lens.view intWidth
-  case l of
-    IntegerLiteral i -> return (HW.Literal (Just (Signed iw,iw)) $ NumLit i, [])
-    IntLiteral i     -> return (HW.Literal (Just (Signed iw,iw)) $ NumLit i, [])
-    WordLiteral w    -> return (HW.Literal (Just (Unsigned iw,iw)) $ NumLit w, [])
-    Int64Literal i   -> return (HW.Literal (Just (Signed 64,64)) $ NumLit i, [])
-    Word64Literal w  -> return (HW.Literal (Just (Unsigned 64,64)) $ NumLit w, [])
-#if MIN_VERSION_ghc(8,8,0)
-    Int8Literal i    -> return (HW.Literal (Just (Signed 8,8)) $ NumLit i, [])
-    Int16Literal i   -> return (HW.Literal (Just (Signed 16,16)) $ NumLit i, [])
-    Int32Literal i   -> return (HW.Literal (Just (Signed 32,32)) $ NumLit i, [])
-    Word8Literal w   -> return (HW.Literal (Just (Unsigned 8,8)) $ NumLit w, [])
-    Word16Literal w  -> return (HW.Literal (Just (Unsigned 16,16)) $ NumLit w, [])
-    Word32Literal w  -> return (HW.Literal (Just (Unsigned 32,32)) $ NumLit w, [])
-#endif
-    CharLiteral c    -> return (HW.Literal (Just (Unsigned 21,21)) . NumLit . toInteger $ ord c, [])
-    FloatLiteral w   -> return (HW.Literal (Just (BitVector 32,32)) (NumLit $ toInteger w), [])
-    DoubleLiteral w  -> return (HW.Literal (Just (BitVector 64,64)) (NumLit $ toInteger w), [])
-    NaturalLiteral n -> return (HW.Literal (Just (Unsigned iw,iw)) $ NumLit n, [])
-#if MIN_VERSION_base(4,15,0)
-    ByteArrayLiteral (ByteArray ba) -> return (HW.Literal Nothing (NumLit (IP ba)),[])
-#else
-    ByteArrayLiteral (ByteArray ba) -> return (HW.Literal Nothing (NumLit (Jp# (BN# ba))),[])
-#endif
-    StringLiteral s  -> return (HW.Literal Nothing $ StringLit s, [])
+  return (mkLiteral iw l, [])
 
 mkExpr bbEasD declType bndr app =
  let (appF,args,ticks) = collectArgsTicks app

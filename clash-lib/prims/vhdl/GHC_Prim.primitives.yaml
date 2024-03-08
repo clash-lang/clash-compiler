@@ -42,10 +42,16 @@
     template: signed(std_logic_vector(resize(~ARG[0],~SIZE[~TYPO])))
 - BlackBox:
     name: GHC.Prim.*#
-    kind: Expression
+    kind: Declaration
     type: '(*#) :: Int# ->
       Int# -> Int#'
-    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+    template: |-
+      ~GENSYM[~RESULT_mult][0] : block
+        signal ~GENSYM[~RESULT_mult_full][1] : signed(~SIZE[~TYPO]*2-1 downto 0);
+      begin
+        ~SYM[1] <= ~ARG[0] * ~ARG[1];
+        ~RESULT <= ~SYM[1](~SIZE[~TYPO]-1 downto 0);
+      end block;
 - BlackBox:
     name: GHC.Prim.remInt#
     kind: Declaration
@@ -584,7 +590,7 @@
           return ~SYM[2](3,a(0 to 5));
         end function;
       begin
-        ~RESULT <= resize(~SYM[3](~ARG[0](7 downto 0)),~SIZE[~TYPO]);
+        ~RESULT <= resize(~SYM[3](~VAR[][0](7 downto 0)),~SIZE[~TYPO]);
       end block;
       -- clz8 end
 - BlackBox:
@@ -628,7 +634,7 @@
           return ~SYM[2](4,b(0 to 7));
         end function;
       begin
-        ~RESULT <= resize(~SYM[3](~ARG[0](15 downto 0)),~SIZE[~TYPO]);
+        ~RESULT <= resize(~SYM[3](~VAR[][0](15 downto 0)),~SIZE[~TYPO]);
       end block;
       -- clz16 end
 - BlackBox:
@@ -674,7 +680,7 @@
           return ~SYM[2](5,c(0 to 9));
         end function;
       begin
-        ~RESULT <= resize(~SYM[3](~ARG[0](31 downto 0)),~SIZE[~TYPO]);
+        ~RESULT <= resize(~SYM[3](~VAR[][0](31 downto 0)),~SIZE[~TYPO]);
       end block;
       -- clz32 end
 - BlackBox:
@@ -941,7 +947,7 @@
         signal ~GENSYM[w_reversed][5] : ~TYP[0];
       begin
         ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~VAR[w][0]'range generate
-          ~SYM[5](~VAR[w][0]'high - ~SYM[7]) <= ~VAR[w][0](~SYM[3]);
+          ~SYM[5](~VAR[w][0]'high - ~SYM[7]) <= ~VAR[w][0](~SYM[7]);
         end generate;
       ~IF ~IW64 ~THEN
         ~RESULT <= resize(~SYM[3](~SYM[5](63 downto 32)),~SIZE[~TYPO]);
@@ -1273,8 +1279,14 @@
     template: -~ARG[0]
 - BlackBox:
     name: GHC.Prim.timesInt8#
-    kind: Expression
-    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_mult][0] : block
+        signal ~GENSYM[~RESULT_mult_full][1] : signed(~SIZE[~TYPO]*2-1 downto 0);
+      begin
+        ~SYM[1] <= ~ARG[0] * ~ARG[1];
+        ~RESULT <= ~SYM[1](~SIZE[~TYPO]-1 downto 0);
+      end block;
 - BlackBox:
     name: GHC.Prim.quotInt8#
     kind: Declaration
@@ -1523,8 +1535,14 @@
     template: -~ARG[0]
 - BlackBox:
     name: GHC.Prim.timesInt16#
-    kind: Expression
-    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_mult][0] : block
+        signal ~GENSYM[~RESULT_mult_full][1] : signed(~SIZE[~TYPO]*2-1 downto 0);
+      begin
+        ~SYM[1] <= ~ARG[0] * ~ARG[1];
+        ~RESULT <= ~SYM[1](~SIZE[~TYPO]-1 downto 0);
+      end block;
 - BlackBox:
     name: GHC.Prim.quotInt16#
     kind: Declaration
@@ -1773,8 +1791,14 @@
     template: -~ARG[0]
 - BlackBox:
     name: GHC.Prim.timesInt32#
-    kind: Expression
-    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_mult][0] : block
+        signal ~GENSYM[~RESULT_mult_full][1] : signed(~SIZE[~TYPO]*2-1 downto 0);
+      begin
+        ~SYM[1] <= ~ARG[0] * ~ARG[1];
+        ~RESULT <= ~SYM[1](~SIZE[~TYPO]-1 downto 0);
+      end block;
 - BlackBox:
     name: GHC.Prim.quotInt32#
     kind: Declaration
@@ -2023,8 +2047,14 @@
     template: -~ARG[0]
 - BlackBox:
     name: GHC.Prim.timesInt64#
-    kind: Expression
-    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+    kind: Declaration
+    template: |-
+      ~GENSYM[~RESULT_mult][0] : block
+        signal ~GENSYM[~RESULT_mult_full][1] : signed(~SIZE[~TYPO]*2-1 downto 0);
+      begin
+        ~SYM[1] <= ~ARG[0] * ~ARG[1];
+        ~RESULT <= ~SYM[1](~SIZE[~TYPO]-1 downto 0);
+      end block;
 - BlackBox:
     name: GHC.Prim.quotInt64#
     kind: Declaration

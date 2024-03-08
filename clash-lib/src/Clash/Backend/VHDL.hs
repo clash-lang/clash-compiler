@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021-2023, QBayLogic B.V.
+                     2021-2024, QBayLogic B.V.
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -1863,7 +1863,7 @@ exprLit Nothing (NumLit i) = integer i
 
 exprLit (Just (hty,sz)) (NumLit i) = case hty of
   Unsigned n
-    | i < (-2^(31 :: Integer)) -> "unsigned" <> parens ("std_logic_vector" <> parens ("signed'" <> parens lit))
+    | i <= (-2^(31 :: Integer))-> "unsigned" <> parens ("std_logic_vector" <> parens ("signed'" <> parens lit))
     | i < 0                    -> "unsigned" <> parens ("std_logic_vector" <> parens ("to_signed" <> parens(integer i <> "," <> int n)))
     | i < 2^(31 :: Integer) -> "to_unsigned" <> parens (integer i <> "," <> int n)
     | otherwise -> "unsigned'" <> parens lit
