@@ -1,0 +1,1 @@
+FIXED: `foldl` on `Vec` is now strict. See [this GitHub discussion](https://github.com/hasura/graphql-engine/pull/2933#discussion_r328821960) and [this blog post](https://well-typed.com/blog/90/) for more information. [#2482](https://github.com/clash-lang/clash-compiler/issues/2482)
