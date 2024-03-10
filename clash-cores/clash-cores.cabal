@@ -156,6 +156,7 @@ library
     Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO
     Clash.Cores.LatticeSemi.ECP5.IO
     Clash.Cores.LatticeSemi.ECP5.Blackboxes.IO
+    Clash.Cores.SigmaDeltaADC
 
   ghc-options:
     -fexpose-all-unfoldings
