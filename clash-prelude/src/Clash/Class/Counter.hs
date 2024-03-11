@@ -7,7 +7,7 @@
 -}
 
 module Clash.Class.Counter
-  ( Counter
+  ( Counter(countMin, countMax, countSuccOverflow, countPredOverflow)
   , countSucc
   , countPred
   ) where

@@ -48,11 +48,6 @@ import GHC.TypeLits (KnownNat, type (<=))
 --
 -- and have 'Clash.Class.Counter.countSucc' work as described.
 --
--- __NB__: This class exposes four functions 'countMin', 'countMax',
--- 'countSuccOverflow', and 'countPredOverflow'. These functions are considered
--- an internal API. Users are encouraged to use 'Clash.Class.Counter.countSucc'
--- and 'Clash.Class.Counter.countPred'.
---
 class Counter a where
   -- | Value counter wraps around to on a 'countSuccOverflow' overflow
   countMin :: a
