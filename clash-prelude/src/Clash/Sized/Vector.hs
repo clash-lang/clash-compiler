@@ -141,7 +141,7 @@ import Unsafe.Coerce              (unsafeCoerce)
 
 import Clash.Annotations.Primitive
   (Primitive(InlineYamlPrimitive), HDL(..), dontTranslate, hasBlackBox)
-import Clash.Magic (clashCompileError)
+import Clash.Magic (clashCompileError, clashSimulation)
 import Clash.Promoted.Nat
   (SNat (..), SNatLE (..), UNat (..), compareSNat, pow2SNat,
    snatProxy, snatToInteger, subSNat, withSNat, toUNat, natToInteger)
@@ -1058,8 +1058,26 @@ foldr f z (x `Cons` xs) = f x (foldr f z xs)
 -- delay, of O(@'length' xs@). Use 'fold' if your binary operator @f@ is
 -- associative, as @"'fold' f xs"@ produces a structure with a depth of
 -- O(log_2(@'length' xs@)).
-foldl :: (b -> a -> b) -> b -> Vec n a -> b
-foldl f z xs = last (scanl f z xs)
+foldl :: forall b a n . (b -> a -> b) -> b -> Vec n a -> b
+foldl f z0 xs0
+  -- We use 'go' to make 'foldl' strict during Haskell simulation, while using
+  -- 'scanl' to make Clash's life easier during normalization. We make 'foldl'
+  -- strict due to similar reasoning to:
+  --
+  --   https://well-typed.com/blog/90/
+  --
+  -- Also see:
+  --
+  --   https://github.com/hasura/graphql-engine/pull/2933#discussion_r328821960
+  --
+  | clashSimulation = go z0 xs0
+  | otherwise = last (scanl f z0 xs0)
+ where
+  go :: forall m. b -> Vec m a -> b
+  go z Nil = z
+  go z (Cons x xs) =
+    let z1 = f z x
+    in z1 `seq` go z1 xs
 {-# INLINE foldl #-}
 
 -- | 'foldr1' is a variant of 'foldr' that has no starting value argument,
