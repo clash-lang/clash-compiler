@@ -1,5 +1,7 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralisedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -8,12 +10,15 @@ module Clash.Class.Counter.Internal where
 import Clash.CPP (maxTupleSize)
 
 import Clash.Class.Counter.TH (genTupleInstances)
-import Clash.Sized.BitVector (BitVector)
+import Clash.Sized.BitVector (BitVector, Bit)
 import Clash.Sized.Index (Index)
 import Clash.Sized.Signed (Signed)
 import Clash.Sized.Unsigned (Unsigned)
 
 import Data.Bifunctor (bimap)
+import Data.Functor.Identity (Identity(..))
+import Data.Int (Int8, Int16, Int32, Int64)
+import Data.Word (Word8, Word16, Word32, Word64)
 import GHC.TypeLits (KnownNat, type (<=))
 
 -- $setup
@@ -42,11 +47,6 @@ import GHC.TypeLits (KnownNat, type (<=))
 -- @
 --
 -- and have 'Clash.Class.Counter.countSucc' work as described.
---
--- __NB__: This class exposes four functions 'countMin', 'countMax',
--- 'countSuccOverflow', and 'countPredOverflow'. These functions are considered
--- an internal API. Users are encouraged to use 'Clash.Class.Counter.countSucc'
--- and 'Clash.Class.Counter.countPred'.
 --
 class Counter a where
   -- | Value counter wraps around to on a 'countSuccOverflow' overflow
@@ -79,6 +79,56 @@ instance (1 <= n, KnownNat n) => Counter (Index n)
 instance KnownNat n => Counter (Unsigned n)
 instance KnownNat n => Counter (Signed n)
 instance KnownNat n => Counter (BitVector n)
+
+-- | @since 1.8.2
+instance Counter Bool
+-- | @since 1.8.2
+instance Counter Bit
+-- | @since 1.8.2
+instance Counter Int
+-- | @since 1.8.2
+instance Counter Int8
+-- | @since 1.8.2
+instance Counter Int16
+-- | @since 1.8.2
+instance Counter Int32
+-- | @since 1.8.2
+instance Counter Int64
+-- | @since 1.8.2
+instance Counter Word
+-- | @since 1.8.2
+instance Counter Word8
+-- | @since 1.8.2
+instance Counter Word16
+-- | @since 1.8.2
+instance Counter Word32
+-- | @since 1.8.2
+instance Counter Word64
+
+-- | @since 1.8.2
+deriving newtype instance Counter a => Counter (Identity a)
+
+-- | 'Nothing' is considered the minimum value, while @'Just' 'countMax'@ is
+-- considered the maximum value.
+--
+-- @since 1.8.2
+instance Counter a => Counter (Maybe a) where
+  countMin = Nothing
+  countMax = Just countMax
+
+  countSuccOverflow = \case
+    Nothing -> (False, Just countMin)
+    Just a0 ->
+      case countSuccOverflow a0 of
+        (True, _) -> (True, Nothing)
+        (False, a1) -> (False, Just a1)
+
+  countPredOverflow = \case
+    Nothing -> (True, Just countMax)
+    Just a0 ->
+      case countPredOverflow a0 of
+        (True, _) -> (False, Nothing)
+        (False, a1) -> (False, Just a1)
 
 -- | Counter instance that flip-flops between 'Left' and 'Right'. Examples:
 --

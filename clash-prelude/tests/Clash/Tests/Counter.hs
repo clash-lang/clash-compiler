@@ -6,7 +6,6 @@ module Clash.Tests.Counter where
 import qualified Prelude as P
 
 import Clash.Class.Counter
-import Clash.Class.Counter.Internal
 import Clash.Prelude
 import Data.Proxy
 import Data.Typeable
