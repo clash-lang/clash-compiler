@@ -25,6 +25,7 @@ module Clash.GHC.Evaluator.Primitive
   , isUndefinedXPrimVal
   ) where
 
+import qualified Control.Lens               as Lens
 import           Control.Concurrent.Supply  (Supply,freshId)
 import           Control.DeepSeq            (force)
 import           Control.Exception          (ArithException(..), Exception, tryJust, evaluate)
@@ -94,24 +95,26 @@ import           Unique              (getKey)
 import           Clash.Class.BitPack (pack,unpack)
 import           Clash.Core.DataCon  (DataCon (..))
 import           Clash.Core.Evaluator.Types
+import           Clash.Core.FreeVars (typeFreeVars)
 import           Clash.Core.HasType  (piResultTys, applyTypeToArgs)
 import           Clash.Core.Literal  (Literal (..))
 import           Clash.Core.Name
   (Name (..), NameSort (..), mkUnsafeSystemName)
 import           Clash.Core.Pretty   (showPpr)
+import           Clash.Core.Subst    (extendTvSubst, mkSubst, substTy)
 import           Clash.Core.Term
   (IsMultiPrim (..), Pat (..), PrimInfo (..), Term (..), WorkInfo (..), mkApps,
    PrimUnfolding(..), collectArgs)
 import           Clash.Core.Type
   (Type (..), ConstTy (..), LitTy (..), TypeView (..), mkFunTy, mkTyConApp,
-   splitFunForallTy, tyView)
+   normalizeType, splitFunForallTy, tyView)
 import           Clash.Core.TyCon
   (TyConMap, TyConName, tyConDataCons)
 import           Clash.Core.TysPrim
 import           Clash.Core.Util
   (mkRTree,mkVec,tyNatSize,dataConInstArgTys,primCo, mkSelectorCase,undefinedPrims,
    undefinedXPrims)
-import           Clash.Core.Var      (mkLocalId, mkTyVar)
+import           Clash.Core.Var      (mkLocalId, mkTyVar, varName)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug
 import           Clash.GHC.GHC2Core  (modNameM)
@@ -4343,13 +4346,24 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
          0 -> reduce (valToTerm z)
          _ -> let (tyArgs,_)  = splitFunForallTy ty
                   (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 2)
-                  TyConApp snatTcNm _ = tyView (Either.rights tyArgs' !! 0)
+                  ubpT = Either.rights tyArgs' !! 0
+                  fTVs = Lens.toListOf typeFreeVars ubpT
+                  Just tvN = List.find ((== "n") . nameOcc . varName) fTVs
+                  subst0 = extendTvSubst (mkSubst is0) tvN k'ty
+                  Just tvK = List.find ((== "k") . nameOcc . varName) fTVs
+                  subst1 = extendTvSubst subst0 tvK (LitTy (NumTy k'))
+                  witness = normalizeType tcm (substTy subst1 ubpT)
+                  TyConApp tupTcNm _ = tyView witness
+                  Just witnessTc = UniqMap.lookup tupTcNm tcm
+                  ubp : _ = tyConDataCons witnessTc
+                  TyConApp snatTcNm _ = tyView (Either.rights tyArgs' !! 1)
                   Just snatTc = UniqMap.lookup snatTcNm tcm
                   [snatDc]    = tyConDataCons snatTc
                   k'ty        = LitTy (NumTy (k'-1))
               in  reduceWHNF $
                   mkApps (valToTerm f)
                          [Right k'ty
+                         ,Left (Data ubp)
                          ,Left (mkApps (Data snatDc)
                                        [Right k'ty
                                        ,Left (Literal (NaturalLiteral (k'-1)))])
@@ -4365,6 +4379,8 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                        ,Left (Either.lefts vArgs !! 2)
                                        ])
                          ]
+    where
+      is0 = mScopeNames mach
   "Clash.Sized.Vector.dtfold"
     | isSubj
     , pTy : kTy : aTy : _ <- tys
