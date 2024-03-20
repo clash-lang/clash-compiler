@@ -62,3 +62,9 @@ package clash-profiling
 
 package clash-profiling-prepare
   ghc-options: -Werror
+
+allow-newer:
+  th-abstraction,
+
+constraints:
+  th-abstraction == 0.7.0.0,

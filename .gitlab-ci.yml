@@ -1,12 +1,3 @@
-default:
-  # Make all tasks interruptible by default
-  interruptible: true
-  retry:
-    max: 2
-    when:
-      - runner_system_failure
-      - stuck_or_timeout_failure
-
 include:
   - '/.ci/gitlab/common.yml'
   - '/.ci/gitlab/publish.yml'
@@ -39,21 +30,17 @@ tests:
     CI_PARENT_PIPELINE_SOURCE: $CI_PIPELINE_SOURCE
   parallel:
     matrix:
-      - GHC_VERSION: 9.6.2
+      - GHC_VERSION: 9.6.4
         RUN_TESTS: "always"
 
-      - GHC_VERSION: [9.4.6, 9.2.8]
+      - GHC_VERSION: [9.4.8, 9.2.8]
         RUN_TESTS: "nightly"
 
       - GHC_VERSION: 9.0.2
         WORKAROUND_GHC_MMAP_CRASH: "yes"
         RUN_TESTS: "always"
 
-      - GHC_VERSION: [8.10.7, 8.8.4]
-        WORKAROUND_GHC_MMAP_CRASH: "yes"
-        RUN_TESTS: "nightly"
-
-      - GHC_VERSION: 8.6.5
+      - GHC_VERSION: [8.10.7]
         WORKAROUND_GHC_MMAP_CRASH: "yes"
         MULTIPLE_HIDDEN: "no"
         RUN_TESTS: "always"
