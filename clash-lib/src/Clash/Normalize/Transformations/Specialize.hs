@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021-2023, QBayLogic B.V.
+                    2021-2024, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -45,6 +45,7 @@ import qualified Data.Set.Ordered as OSet
 import qualified Data.Set.Ordered.Extra as OSet
 import qualified Data.Text as Text
 import qualified Data.Text.Extra as Text
+import GHC.BasicTypes.Extra (isNoInline)
 import GHC.Stack (HasCallStack)
 
 #if MIN_VERSION_ghc(9,0,0)
@@ -331,10 +332,10 @@ cache. Consider these applications which differ only by ticks:
 
 If one of these had been specialized, the other two would hit that term in the
 specialization cache, saving Clash from having to re-do work which is in effect
-the same. To preserve this behaviour, we use 'stripAllTicks' on the keys for
+the same. To preserve this behavior, we use 'stripAllTicks' on the keys for
 the specialization cache.
 
-TODO While this preserves the old behaviour, the old behaviour is likely not
+TODO While this preserves the old behavior, the old behavior is likely not
 quite what we want. Using a value from the specialization cache may change the
 ticks present, which can affect naming / debugging information in generated HDL.
 We may also not want to look at ticks, as then the specialization cache will
@@ -448,31 +449,42 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
                                        args
               -- Determine name the resulting specialized function, and the
               -- form of the specialized-on argument
-              (fId,inl',specArg') <- case specArg of
+              (newName, inl', specArg') <- case specArg of
                 Left a@(collectArgsTicks -> (Var g,gArgs,_gTicks)) -> if isPolyFun tcm a
                     then do
                       -- In case we are specializing on an argument that is a
-                      -- global function then we use that function's name as the
-                      -- name of the specialized higher-order function.
+                      -- global function then we use that function's name as part
+                      -- of the name of the specialized higher-order function.
                       -- Additionally, we will return the body of the global
                       -- function, instead of a variable reference to the
                       -- global function.
                       --
-                      -- This will turn things like @mealy g k@ into a new
-                      -- binding @g'@ where both the body of @mealy@ and @g@
+                      -- This will turn things like @mealy g@ into a new
+                      -- binding where both the body of @mealy@ and @g@
                       -- are inlined, meaning the state-transition-function
                       -- and the memory element will be in a single function.
+                      --
+                      -- The name of the new function depends on NOINLINE / OPAQUE
+                      -- annotations.
+                      --
+                      --    OPAQUE    | Name for @f g@
+                      --   -----------|---------------
+                      --    f and g   | f_g
+                      --    f         | f
+                      --    g         | g
+                      --    !f and !g | f_g
+                      --
                       gTmM <- fmap (UniqMap.lookup g) $ Lens.use bindings
                       return
-                        ( g
+                        ( specializeName (inl, varName f) (bindingSpec <$> gTmM, varName g)
                         , preferNoInline inl (maybe noUserInline bindingSpec gTmM)
                         , maybe specArg (Left . (`mkApps` gArgs) . bindingTerm) gTmM
                         )
-                    else return (f,inl,specArg)
-                _ -> return (f,inl,specArg)
+                    else return (varName f, inl, specArg)
+                _ -> return (varName f, inl, specArg)
               -- Create specialized functions
               let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg'])) (boundArgs ++ specBndrs)
-              newf <- mkFunction (varName fId) sp inl' newBody
+              newf <- mkFunction newName sp inl' newBody
               -- Remember specialization
               (extra.specialisationHistory) %= UniqMap.insertWith (+) f 1
               (extra.specialisationCache)  %= Map.insert (f,argLen,specAbs) newf
@@ -487,6 +499,19 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
 #else
     noUserInline = NoUserInline
 #endif
+
+    specializeName :: (InlineSpec, Name Term) -> (Maybe InlineSpec, Name Term) -> Name Term
+    specializeName (spec0, n0) (spec1, n1)
+      | (ann0 && ann1) || (not ann0 && not ann1)
+      = n0{nameOcc=nameOcc n0 <> "_" <> stripMods (nameOcc n1)}
+      | ann0 = n0
+      | otherwise = n1
+     where
+      ann0 = isNoInline spec0
+      ann1 = fmap isNoInline spec1 == Just True
+
+    stripMods :: Text.Text -> Text.Text
+    stripMods = Text.takeWhileEnd (/= '.')
 
     collectBndrsMinusApps :: Term -> [Name a]
     collectBndrsMinusApps = reverse . go []

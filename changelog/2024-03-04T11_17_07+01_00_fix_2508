@@ -1,0 +1,1 @@
+FIXED: Clash now generates more intuitive names for specialized binders. See [#2508](https://github.com/clash-lang/clash-compiler/issues/2508).

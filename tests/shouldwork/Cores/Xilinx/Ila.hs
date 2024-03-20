@@ -100,7 +100,7 @@ mainVHDL = do
 
   -- HDL content check:
   let hdlDir = dir </> show 'testWithDefaultsOne
-  [path] <- glob (hdlDir </> "Ila_testWithDefaultsOne_oneCounter*.vhdl")
+  [path] <- glob (hdlDir </> "Ila_testWithDefaultsOne_ila.vhdl")
   contents <- readFile path
   assertIn contents "attribute KEEP of foo : signal is \"true\";" -- signal name
   assertIn contents "one_counter_ila : testWithDefaultsOne_ila"   -- instantiation label

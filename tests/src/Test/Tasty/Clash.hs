@@ -207,6 +207,15 @@ data ClashGenTest = ClashGenTest
   , cgHdlDirectory :: IO FilePath
   }
 
+-- | See https://github.com/clash-lang/clash-compiler/pull/2511
+dOpaque :: String
+dOpaque =
+#if __GLASGOW_HASKELL__ >= 904
+  "-DCLASH_OPAQUE=OPAQUE"
+#else
+  "-DCLASH_OPAQUE=NOINLINE"
+#endif
+
 instance IsTest ClashGenTest where
   run optionSet ClashGenTest{..} progressCallback = do
     oDir <- cgOutputDirectory
@@ -239,13 +248,7 @@ instance IsTest ClashGenTest where
       , "-odir", oDir
       , "-hidir", oDir
       , "-fclash-debug", "DebugSilent"
-
-      -- See https://github.com/clash-lang/clash-compiler/pull/2511
-#if __GLASGOW_HASKELL__ >= 904
-      , "-DCLASH_OPAQUE=OPAQUE"
-#else
-      , "-DCLASH_OPAQUE=NOINLINE"
-#endif
+      , dOpaque
       ] <> cgExtraArgs
 
     target =
@@ -524,7 +527,7 @@ outputTest' modName target extraClashArgs extraGhcArgs path =
   clashBuild workDir = singleTest "clash (exec)" (ClashBinaryTest {
       cbBuildTarget=target
     , cbSourceDirectory=sourceDir
-    , cbExtraBuildArgs="-DOUTPUTTEST" : extraGhcArgs
+    , cbExtraBuildArgs=dOpaque : "-DOUTPUTTEST" : extraGhcArgs
     , cbExtraExecArgs=[]
     , cbModName=modName
     , cbOutputDirectory=workDir
