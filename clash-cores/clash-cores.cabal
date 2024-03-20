@@ -126,6 +126,7 @@ library
     Clash.Cores.CRC
     Clash.Cores.CRC.Internal
     Clash.Cores.CRC.Catalog
+    Clash.Cores.CRC.Derive
     Clash.Cores.LatticeSemi.ECP5.Blackboxes.IO
     Clash.Cores.LatticeSemi.ECP5.IO
     Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO
@@ -178,7 +179,6 @@ library
     reducers                >= 3.12.2 && < 4.0,
     text                    >= 1.2.2 && < 2.2,
     constraints             >= 0.9   && < 1.0,
-    split                   >= 0.2   && < 0.3,
     template-haskell        >= 2.12.0.0 && < 2.22
 
 test-suite unittests
