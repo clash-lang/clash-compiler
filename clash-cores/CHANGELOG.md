@@ -5,3 +5,4 @@
 * Add SPI master and slave cores
 * Add Lattice Semi SB_IO primitive
 * Add UART core
+* Add CRC core
