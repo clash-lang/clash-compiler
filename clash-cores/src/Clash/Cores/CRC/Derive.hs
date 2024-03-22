@@ -25,17 +25,17 @@ typeRepToTHType (SomeTypeRep (Con tyCon)) = TH.ConT $ TH.Name nameBase flavor
           (TH.mkModName $ tyConModule tyCon)
 typeRepToTHType _ = error "typeRepToTHType: Absurd, Report this to the Clash compiler team: https://github.com/clash-lang/clash-compiler/issues"
 
--- | Derive an instance for the `HardwareCRC` class for the given arguments.
+-- | Derive an instance for the 'HardwareCRC' class for the given arguments.
 --
---   For example, the following derives a `HardwareCRC` instance for the 32-bit Ethernet CRC
+--   For example, the following derives a 'HardwareCRC' instance for the 32-bit Ethernet CRC
 --   where you can feed it 8, 16, 24 or 32 bit at the time:
 --
 --   > $(deriveHardwareCRC (Proxy @CRC32_ETHERNET) d8 d4)
 --
 --   For the derivation to work the @MultiParamTypeClasses@ must be enabled in
---   the module that uses `deriveHardwareCRC`.
+--   the module that uses 'deriveHardwareCRC'.
 --
---   See `HardwareCRC`,`crcEngine` and `crcValidator` for more information what
+--   See 'HardwareCRC','crcEngine' and 'crcValidator' for more information what
 --   the arguments mean.
 deriveHardwareCRC
   :: Typeable crc
