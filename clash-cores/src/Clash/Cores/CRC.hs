@@ -6,14 +6,14 @@
 Utilities for computing cyclic redundancy checks (CRCs) in software and in
 hardware.
 
-CRCs are specified using `CRCParams` type in conjunction with the `KnownCRC` type class.
-`CRCParams` contains settings for CRC width, polynomial, initial value,
+CRCs are specified using 'CRCParams' type in conjunction with the 'KnownCRC' type class.
+'CRCParams' contains settings for CRC width, polynomial, initial value,
 input/output reflection, and output XOR. This fully defines a CRC computation.
-Many commonly used CRC algorithms are available in the `Clash.Cores.CRC.Catalog`
+Many commonly used CRC algorithms are available in the 'Clash.Cores.CRC.Catalog'
 module, while most other CRC designs can be accommodated by manually constructing
-`CRCParams` and writing a `KnownCRC` instance.
+'CRCParams' and writing a 'KnownCRC' instance.
 
-Call the `mkSoftwareCRC` using a specifc CRC to create an engine to perform software
+Call the 'mkSoftwareCRC' using a specifc CRC to create an engine to perform software
 computations. It's not intented to be used on hardware.
 
 Example usage:
@@ -33,10 +33,10 @@ that can handle @BitVector 8@ input and use it to compute the CRC.
 True
 
 For a hardware implementation the first thing you have to do is use Template Haskell
-to derive a `HardwareCRC` instance using `Clash.Cores.CRC.Derive.deriveHardwareCRC`.
+to derive a 'HardwareCRC' instance using 'Clash.Cores.CRC.Derive.deriveHardwareCRC'.
 Here you to provide a concrete @dataWidth@ and @nLanes@. Upto
 @dataWidth * nLanes@ of an input can be handled in a single clock cycle in
-@dataWidth@ increments. See the type of `crcEngine` to see what impact it has
+@dataWidth@ increments. See the type of 'crcEngine' to see what impact it has
 on the CRC circuit.
 
 >>> $(deriveHardwareCRC (Proxy @CRC32_ETHERNET) d8 d4)
@@ -58,7 +58,7 @@ indicates how many @BitVector 8@ are valid inside the @Vec@. 0 means 1 is valid.
 >>> crcFromHardware == checkValue
 >>> True
 
-Notice that the `crcEngine` has latency of one clock cycle.
+Notice that the 'crcEngine' has latency of one clock cycle.
 
 -}
 
