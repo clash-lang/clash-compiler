@@ -25,18 +25,22 @@ typeRepToTHType (SomeTypeRep (Con tyCon)) = TH.ConT $ TH.Name nameBase flavor
           (TH.mkModName $ tyConModule tyCon)
 typeRepToTHType _ = error "typeRepToTHType: Absurd, Report this to the Clash compiler team: https://github.com/clash-lang/clash-compiler/issues"
 
--- | Derive an instance for the 'HardwareCRC' class for the given arguments.
+-- | Derive an instance for the 'HardwareCRC' class for the given arguments
 --
---   For example, the following derives a 'HardwareCRC' instance for the 32-bit Ethernet CRC
---   where you can feed it 8, 16, 24 or 32 bit at the time:
+-- For example, the following derives a 'HardwareCRC' instance for the 32-bit Ethernet CRC
+-- where you can feed it 8, 16, 24 or 32 bits at a time:
 --
---   > $(deriveHardwareCRC (Proxy @CRC32_ETHERNET) d8 d4)
+-- @
+-- {\-\# LANGUAGE MultiParamTypeClasses \#-\}
 --
---   For the derivation to work the @MultiParamTypeClasses@ must be enabled in
---   the module that uses 'deriveHardwareCRC'.
+-- deriveHardwareCRC (Proxy \@CRC32_ETHERNET) d8 d4
+-- @
 --
---   See 'HardwareCRC','crcEngine' and 'crcValidator' for more information what
---   the arguments mean.
+-- For the derivation to work the @MultiParamTypeClasses@ pragma must be enabled in
+-- the module that uses 'deriveHardwareCRC'.
+--
+-- See 'HardwareCRC', 'crcEngine' and 'crcValidator' for more information about what
+-- the arguments mean.
 deriveHardwareCRC
   :: Typeable crc
   => KnownCRC crc
@@ -47,7 +51,7 @@ deriveHardwareCRC
   -> SNat dataWidth
   -- ^ The width in bits of the words it can handle every clock cycle
   -> SNat nLanes
-  -- ^ The number of lanes.
+  -- ^ The number of lanes
   -> TH.Q [TH.Dec]
 deriveHardwareCRC crc dataWidth@SNat nLanes@SNat = do
   let crcTy = pure $ typeRepToTHType $ someTypeRep crc

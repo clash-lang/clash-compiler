@@ -59,10 +59,10 @@ data CRCParams (crcWidth :: Nat) (dataWidth :: Nat)
 -- | No domain in 'CRCParams'
 type instance TryDomain t (CRCParams crcWidth dataWidth) = 'NotFound
 
--- | This class is used to define CRCs.
+-- | This class is used to define CRCs
 --
 -- First make a data declaration without constructors for your CRC and then
--- create a 'KnownCRC' instance for that type which contains your CRC parameters
+-- create a 'KnownCRC' instance for that type which contains your CRC parameters:
 --
 -- @
 -- data MyCRC
@@ -79,14 +79,14 @@ type instance TryDomain t (CRCParams crcWidth dataWidth) = 'NotFound
 --    }
 -- @
 --
---   See 'Clash.Cores.CRC.Catalog' for many definition examples.
+-- See "Clash.Cores.CRC.Catalog" for many definition examples.
 class (KnownNat (CRCWidth crc), 1 <= (CRCWidth crc)) => KnownCRC (crc :: Type) where
   type CRCWidth crc :: Nat
   crcParams :: Proxy crc -> SNat dataWidth -> CRCParams (CRCWidth crc) dataWidth
 
--- | Allow one to compute values for the CRC.
+-- | Allow one to compute values for the CRC
 --
--- __N.B.__: NOT for use in hardware.
+-- __NB__: NOT for use in hardware
 data SoftwareCRC (crcWidth :: Nat) (dataWidth :: Nat)
   = SoftwareCRC
       { _crcParams      :: CRCParams crcWidth dataWidth
@@ -99,17 +99,17 @@ data SoftwareCRC (crcWidth :: Nat) (dataWidth :: Nat)
 -- | No domain in 'SoftwareCRC'
 type instance TryDomain t (SoftwareCRC crcWidth dataWidth) = 'NotFound
 
--- | Apply function n times over input.
+-- | Apply function n times over input
 nTimes :: Int -> (a -> a) -> a -> a
 nTimes 0 _ x = x
 nTimes n f x = nTimes (n - 1) f (f x)
 
--- | Apply function only when bool is True.
+-- | Apply function only when bool is True
 applyWhen :: Bool -> (a -> a) -> a -> a
 applyWhen True f x = f x
 applyWhen False _ x = x
 
--- | Reverse bitvector.
+-- | Reverse bitvector
 reverseBV :: KnownNat n => BitVector n -> BitVector n
 reverseBV = v2bv . reverse . bv2v
 
@@ -126,9 +126,9 @@ reverseBV = v2bv . reverse . bv2v
 -- the relation between the two widths.
 -- The new CRC is then shifted right by the data width before output.
 
--- | Create a 'SoftwareCRC' from 'CRCParams'.
+-- | Create a 'SoftwareCRC' from 'CRCParams'
 --
--- __N.B.__: NOT for use in hardware.
+-- __NB__: NOT for use in hardware
 mkSoftwareCRCFromParams
   :: forall (crcWidth :: Nat) (dataWidth :: Nat)
    . CRCParams crcWidth dataWidth
@@ -141,9 +141,10 @@ mkSoftwareCRCFromParams _crcParams@CRCParams{..} = go _crcParams
         _crcTopBitMask = shiftL 1 (snatToNum combSNat - 1)
         _crcpolyShifted = shiftL (extend _crcPolynomial) (snatToNum _crcDataWidth)
         _crcCurrent = 0
--- | Create a 'SoftwareCRC' given 'KnownCRC'.
+
+-- | Create a 'SoftwareCRC' given 'KnownCRC'
 --
--- __N.B.__: NOT for use in hardware.
+-- __NB__: NOT for use in hardware
 mkSoftwareCRC
   :: forall (crc :: Type) (dataWidth :: Nat)
    . KnownCRC crc
@@ -161,14 +162,14 @@ mkSoftwareCRC p dataWidth@SNat = reset $ SoftwareCRC { .. }
     _crcCurrent = 0
 
 
--- | Reset the 'SoftwareCRC'. If you want to re-use it for multiple messages
---   You need to reset it in-between messages.
+-- | Reset the 'SoftwareCRC'. If you want to reuse it for multiple messages
+--   you need to reset it in between messages.
 reset
   :: forall (crcWidth :: Nat) (dataWidth :: Nat)
    . SoftwareCRC crcWidth dataWidth
-  -- ^ Current CRC engine.
+  -- ^ Current CRC engine
   -> SoftwareCRC crcWidth dataWidth
-  -- ^ CRC engine fresh to be used.
+  -- ^ CRC engine fresh to be used
 reset engine@(SoftwareCRC {..}) = go _crcParams
   where
     CRCParams {..} = _crcParams
@@ -178,15 +179,15 @@ reset engine@(SoftwareCRC {..}) = go _crcParams
         initial = extend _crcInitial
         initialCRC = shiftL initial (snatToNum _crcDataWidth)
 
--- | Feed a word to the 'SoftwareCRC'.
+-- | Feed a word to the 'SoftwareCRC'
 feed
   :: forall (crcWidth :: Nat) (dataWidth :: Nat)
    . SoftwareCRC crcWidth dataWidth
-  -- ^ Current 'SoftwareCRC'.
+  -- ^ Current 'SoftwareCRC'
   -> BitVector dataWidth
-  -- ^ Update 'SoftwareCRC' with this input.
+  -- ^ Update 'SoftwareCRC' with this input
   -> SoftwareCRC crcWidth dataWidth
-  -- ^ 'SoftwareCRC' with update processed.
+  -- ^ 'SoftwareCRC' with update processed
 feed engine@(SoftwareCRC {..}) word = go _crcParams
   where
     CRCParams {..} = _crcParams
@@ -199,7 +200,7 @@ feed engine@(SoftwareCRC {..}) word = go _crcParams
         applyCrc crc w = applyPoly $ crc `xor` (shiftL (extend w) (snatToNum _crcWidth))
         nextCrc = applyCrc _crcCurrent $ applyWhen _crcReflectInput reverseBV word
 
--- | Get current CRC state. This is the value before any output reflection and output XOR
+-- | Get current CRC state. This is the value before any output reflection and output XOR.
 getCRCState
   :: forall (crcWidth :: Nat) (dataWidth :: Nat)
    . SoftwareCRC crcWidth dataWidth
@@ -209,7 +210,8 @@ getCRCState (SoftwareCRC {..}) = go _crcParams
     go (CRCParams SNat SNat _ _ _ _ _) = fst $ split _crcCurrent
 
 -- | Generate the CRC
---   If the 'SoftwareCRC' will be re-used 'reset' must be called before starting
+--
+--   If the 'SoftwareCRC' will be reused, 'reset' must be called before starting
 --   to process the next message.
 digest
   :: forall (crcWidth :: Nat) (dataWidth :: Nat)
@@ -226,13 +228,13 @@ digest params@(SoftwareCRC {..}) = go _crcParams
 --   CRC register after processing any valid codeword. Raw in this case means
 --   this is the residue before the output reflection and out xor has been applied.
 --
---   Upto @dataWidth@ padding can be given. This is useful during CRC verification
+--   Up to @dataWidth@ padding can be given. This is useful during CRC verification
 --   in the scenario where where you want to handle more words in a single cycle
---   then is native to the protocol.
+--   than are native to the protocol.
 --
---   For example ethernet uses a 32-bit CRC, you may want a data width of 32-bit
---   To achieve higher throughput. But Ethernet is byte oriented.
---   This means that it is possible for 8, 16, 24 or 32-bit in the last data
+--   For example ethernet uses a 32-bit CRC, so you may want a data width of 32 bit
+--   to achieve higher throughput. But Ethernet is byte-oriented.
+--   This means that it is possible for 8, 16, 24 or 32 bits in the last data
 --   word of the stream to be valid.
 --   We can calculate a residue for each case and compare it to the CRC result.
 --   This saves us from having to instantiate four seperate CRCs for the receive path.
@@ -256,7 +258,7 @@ rawResidue p nExtra = rawResi
                     (V.toList crcVal) L.++ (L.replicate nExtra 0)
     rawResi = getCRCState $ L.foldl' feed swCRC bitsToFeed
 
--- | Compute the residue value for these CRCParam, which is the value left in the
+-- | Compute the residue value for these 'CRCParams', which is the value left in the
 --   CRC register after processing any valid codeword.
 residue
   :: forall (crc :: Type)
@@ -281,12 +283,12 @@ residue p =  applyWhen _crcReflectOutput reverseBV $ rawResidue p 0
 --
 --     - @n@ is the CRC width
 --
---     - @m@ is the data word width.
+--     - @m@ is the data word width
 --
---   The matrix is used to select which bits are XORd together to compute
+--   The matrix is used to select which bits are XOR'd together to compute
 --   each bit @i@ of the new state. If @F[i][j]@ is set then bit @j@ of the
 --   @old state@ is included in the XOR. If @G[i][j]@ is set then bit @j@ of the
---   @input@ is included in the XOR
+--   @input@ is included in the XOR.
 --
 --   These matrices are not affected by '_crcInitial', '_crcReflectOutput' or
 --   '_crcXorOutput'.
@@ -300,7 +302,7 @@ data FGMatrices (crcWidth :: Nat) (dataWidth :: Nat)
 -- | No domain in 'FGMatrices'
 type instance TryDomain t (FGMatrices crcWidth dataWidth) = 'NotFound
 
--- | Compute the 'FGMatrices' from 'CRCParams'.
+-- | Compute the 'FGMatrices' from 'CRCParams'
 mkFGMatrices
   :: forall (crc :: Type) (dataWidth :: Nat)
    . KnownCRC crc
@@ -321,7 +323,7 @@ mkFGMatrices crc dataWidth@SNat = FGMatrices f g
     f = postProcess $ bv2v . (\p -> runCrc p 0) <$> onehots (SNat @(CRCWidth crc))
     g = postProcess $ bv2v . (\p -> runCrc 0 p) <$> onehots dataWidth
 
--- | Vertically partition a matrix.
+-- | Vertically partition a matrix
 partitionMatrix
   :: KnownNat q
   => SNat p
@@ -329,7 +331,7 @@ partitionMatrix
   -> Vec n (Vec p (BitVector q))
 partitionMatrix SNat mat = fmap (fmap v2bv . unconcatI . bv2v) mat
 
--- | Flatten vertically partition matrix.
+-- | Flatten vertically partitioned matrix
 unPartitionMatrix
   :: KnownNat q
   => SNat p
@@ -337,20 +339,20 @@ unPartitionMatrix
   -> Vec n (BitVector (p * q))
 unPartitionMatrix SNat mat = fmap (v2bv . concat . fmap bv2v) mat
 
--- | Helper type that contains the flattened @F@ @G@ matrices for each lane.
+-- | Helper type that contains the flattened @F@ and @G@ matrices for each lane
 data CRCLaneParams (crcWidth :: Nat) (dataWidth :: Nat) (nLanes :: Nat) where
-  -- | The final lane.
+  -- | The final lane
   CRCLane1
     :: Vec crcWidth (BitVector (crcWidth + dataWidth))
-    -- ^ Flattened @F|G@ matrix for this lane.
+    -- ^ Flattened @F|G@ matrix for this lane
     -> CRCLaneParams crcWidth dataWidth 1
-  -- | Not the final lane.
+  -- | Not the final lane
   CRCLaneN
     :: 2 <= lane
     => SNat lane
     -- ^ Which lane this is
     -> Vec crcWidth (BitVector (crcWidth + lane * dataWidth))
-    -- ^ Flattened @F|G@ matrix for this lane.
+    -- ^ Flattened @F|G@ matrix for this lane
     -> CRCLaneParams crcWidth dataWidth (lane - 1)
     -> CRCLaneParams crcWidth dataWidth lane
 
@@ -363,7 +365,7 @@ deriving instance (KnownNat crcWidth, KnownNat dataWidth, KnownNat nLanes)
 -- | No domain in 'CRCLaneParams'
 type instance TryDomain t (CRCLaneParams crcWidth dataWidth nLanes) = 'NotFound
 
--- | Contains all necessary parameters for the hardware CRC implementation.
+-- | Contains all necessary parameters for the hardware CRC implementation
 data CRCHardwareParams (crcWidth :: Nat) (dataWidth :: Nat) (nLanes :: Nat)
   = CRCHardwareParams
       { _crcNlanes :: SNat nLanes
@@ -380,10 +382,9 @@ type instance TryDomain t (CRCHardwareParams crcWidth dataWidth nLanes) = 'NotFo
 --
 -- @nLanes@ indicates the maximum number of @dataWidth@ words you want to
 -- process in a single cycle. For example the stream could be byte-oriented,
--- but processing is done @n@-bytes at a time.
+-- but processing is done @n@ bytes at a time.
 --
 -- Use the 'Clash.Cores.CRC.Derive.deriveHardwareCRC'
-
 class
   ( KnownCRC crc, KnownNat dataWidth, 1 <= dataWidth, KnownNat nLanes, 1 <= nLanes)
   => HardwareCRC (crc :: Type) (dataWidth :: Nat) (nLanes :: Nat) where
@@ -405,7 +406,7 @@ data SNatOrdering a b where
 -- | No domain in 'SNatOrdering'
 type instance TryDomain t (SNatOrdering a b) = 'NotFound
 
--- | Get an ordering relation between two SNats.
+-- | Get an ordering relation between two SNats
 compareSNat2 :: forall a b . SNat a -> SNat b -> SNatOrdering a b
 compareSNat2 a b
   = case compare (snatToInteger a) (snatToInteger b) of
@@ -413,14 +414,14 @@ compareSNat2 a b
       EQ -> unsafeCoerce (SNatEQ2 @0 @0)
       GT -> unsafeCoerce (SNatGT2 @1 @0)
 
--- | Flattens the @F@ and @G@ matrices into a single @F|G@ matrix.
+-- | Flattens the @F@ and @G@ matrices into a single @F|G@ matrix
 flattenFGMatrices
   :: KnownNat dataWidth
   => FGMatrices crcWidth dataWidth
   -> Vec crcWidth (BitVector (crcWidth + dataWidth))
 flattenFGMatrices (FGMatrices f g) = zipWith (++#) f g
 
--- | Compute CRC lane parameters given 'CRCParams' and the number of lanes.
+-- | Compute CRC lane parameters given 'CRCParams' and the number of lanes
 mkCRCLaneParams
   :: KnownCRC crc
   => 1 <= nLanes
@@ -468,7 +469,7 @@ mkCRCHardwareParams
   -> SNat dataWidth
   -- ^ The width of the word to feed
   -> SNat nLanes
-  -- ^ The number of lanes.
+  -- ^ The number of lanes
   -> CRCHardwareParams (CRCWidth crc) dataWidth nLanes
 mkCRCHardwareParams crc dataWidth nLanes@SNat
   = hwParams
@@ -521,8 +522,9 @@ takeLe
 takeLe SNat vs = leToPlus @n @m $ takeI vs
 
 -- | Apply a step to a CRC and input given by @lanePrev@
---   This function crashes if called with out of bounds @lanePrev@
---   meant to be used via 'smap'
+--
+-- This function is meant to be used via 'smap' and crashes if called with
+-- out-of-bounds @lanePrev@.
 laneStep
   :: CRCHardwareParams crcWidth dataWidth nLanes
   -> SNat lanePrev
@@ -537,16 +539,16 @@ laneStep (CRCHardwareParams nLanes@SNat (CRCParams SNat SNat _ _ _ _ _) lanePara
 
 -- | A parallel multilane CRC engine and validator
 --
--- @dataWidth@ _should_ always cleanly divide @crcWidth@. If this is not the case
+-- @dataWidth@ should /always/ cleanly divide @crcWidth@. If this is not the case
 -- then it is possible for the last message to be misaligned.
 --
--- For example if you have @dataWidth@ of @48@ and a @crcWidth@ of @32@. Then a possible
--- message could be 128-bits, two words + CRC. But this cannot be safely
--- ran through the CRC circuit. Because the final fragment contains 32 valid bits
+-- For example if you have a @dataWidth@ of @48@ and a @crcWidth@ of @32@. Then a possible
+-- message could be 128 bits, two words + CRC. But this cannot be safely
+-- run through the CRC circuit, because the final fragment contains 32 valid bits
 -- and 16 invalid bits.
 --
 -- This rule is __NOT__ checked at the type level because as long you take
--- care that misalignment does not occur it's not a problem.
+-- care that misalignment does not occur it is not a problem.
 crcEngine
   :: forall (dom :: Domain)
             (crc :: Type)
@@ -571,7 +573,7 @@ crcEngine
   -- ^ The resulting CRC. There is a delay of a single cycle from input to output.
 crcEngine crc dataWidth nLanes = crcEngineFromParams $ crcHardwareParams crc dataWidth nLanes
 
--- | like 'crcEngine' but uses 'CRCHardwareParams' instead of 'HardwareCRC' constraint
+-- | Like 'crcEngine' but uses 'CRCHardwareParams' instead of a 'HardwareCRC' constraint
 crcEngineFromParams
   :: forall (dom :: Domain)
             (crcWidth :: Nat)
@@ -594,7 +596,7 @@ crcEngineFromParams hwParams@(CRCHardwareParams _ CRCParams{..} _ _) inDat = crc
       crcState = regEn _crcInitial (isJust <$> inDat) nextCrcState
       crcOut = xor _crcXorOutput <$> (applyWhen _crcReflectOutput reverseBV <$> crcState)
 
--- | The validator, see 'crcEngine' for more details.
+-- | The validator, see 'crcEngine' for more details
 --
 -- Additionally the 'crcValidator' has two extra requirements:
 --
@@ -618,14 +620,14 @@ crcValidator
   -> Proxy nLanes
   -- ^ How many words can be fed at maximum in a single cycle
   -> Signal dom (Maybe (Index nLanes, Vec nLanes (BitVector dataWidth)))
-  -- ^ The input data.
+  -- ^ The input data
   -> Signal dom Bool
   -- ^ Whether the CRC is valid. This is valid on the transfer of the last
-  --   word in the message + crc. So there is no one clock cycle delay
-  --   in contrast with 'crcEngine'
+  --   word in the message + crc. So there is no one clock cycle delay,
+  --   in contrast with 'crcEngine'.
 crcValidator crc dataWidth nLanes = crcValidatorFromParams $ crcHardwareParams crc dataWidth nLanes
 
--- | like 'crcValidator' but uses 'CRCHardwareParams' instead of 'HardwareCRC' constraint
+-- | Like 'crcValidator' but uses 'CRCHardwareParams' instead of a 'HardwareCRC' constraint
 crcValidatorFromParams
   :: forall (dom :: Domain)
             (crcWidth :: Nat)
