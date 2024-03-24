@@ -23,7 +23,7 @@ tb ::
   ) =>
   Proxy a -> Proxy b ->
   -- | Initial values
-  Maybe Bool ->
+  Maybe Asserted ->
   SNat stages ->
   -- | Expected data
   Vec n (BitVector 1) ->
@@ -60,7 +60,7 @@ expected ::
   Proxy a ->
   Proxy b ->
   -- | Initial values
-  Maybe Bool ->
+  Maybe Asserted ->
   SNat stages ->
   SNat samples ->
   ExpQ

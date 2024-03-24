@@ -8,6 +8,7 @@
 module Clash.Cores.Xilinx.Xpm.Cdc.SyncRst
   ( xpmCdcSyncRst
   , XpmCdcSyncRstConfig(..)
+  , Asserted(..)
   , xpmCdcSyncRstWith
   ) where
 
@@ -19,25 +20,37 @@ import GHC.Stack (HasCallStack)
 
 import Clash.Cores.Xilinx.Xpm.Cdc.Internal
 
--- | TODO
--- registers. Use 'xpmCdcSyncRstWith' to change these settings. For more
--- information see [PG382](https://docs.xilinx.com/r/en-US/pg382-xpm-cdc-generator/XPM_CDC_SYNC_RST).
+-- | Used to specify initial values for 'xpmCdcSyncRst' and 'xpmCdcSyncRstWith'.
+data Asserted = Asserted | Deasserted
+  deriving (Show, Eq)
+
+-- | This macro synchronizes a reset signal to the destination clock domain. The
+-- generated output will both assert and deassert synchronously to the
+-- destination clock domain. For proper operation, the input data must be sampled
+-- two or more times by the destination clock. You can define the number of
+-- register stages used in the synchronizers and the initial value of these
+-- registers after configuration. Use 'xpmCdcSyncRstWith' to change these
+-- settings. For more information see
+-- [PG382](https://docs.xilinx.com/r/en-US/pg382-xpm-cdc-generator/XPM_CDC_SYNC_RST).
 xpmCdcSyncRst ::
   forall src dst.
   ( KnownDomain src
   , KnownDomain dst
   , HasCallStack
   ) =>
+  -- | If destination domain supports initial values, this will be used as the
+  -- initial value for the synchronization registers.
+  Asserted ->
   Clock src ->
   Clock dst ->
   Reset src ->
   Reset dst
-xpmCdcSyncRst = xpmCdcSyncRstWith XpmCdcSyncRstConfig{..}
+xpmCdcSyncRst asserted = xpmCdcSyncRstWith XpmCdcSyncRstConfig{..}
  where
   stages = d4
   initialValues =
     case initBehavior @dst of
-      SDefined -> Just True
+      SDefined -> Just asserted
       SUnknown -> Nothing
 {-# INLINE xpmCdcSyncRst #-}
 
@@ -47,13 +60,11 @@ data XpmCdcSyncRstConfig stages = XpmCdcSyncRstConfig
     -- destination domain.
     stages :: SNat stages
 
-   -- TODO
-    -- | Whether to initialize registers used within the primitive, and if they should. Note that
+    -- | Whether to initialize registers used within the primitive. Note that
     -- 'xpmCdcSyncRst' will set this to @Just True@ if both domains support initial
     -- values, to @Nothing@ if neither domain does, and will otherwise emit an
     -- error.
-  , initialValues :: Maybe Bool
-
+  , initialValues :: Maybe Asserted
   }
 
 -- | Like 'xpmCdcSyncRst', but with a configurable number of stages and initial values.
@@ -84,7 +95,9 @@ xpmCdcSyncRstWith XpmCdcSyncRstConfig{stages=stages@SNat, ..} clkSrc clkDst srcI
           , libraryImport = Just "xpm.vcomponents.all" }
 
         (Param @"DEST_SYNC_FF"   @Integer (natToNum @stages))
-        (Param @"INIT"           @Integer (if fromMaybe True initialValues then 1 else 0))
+        (Param @"INIT"           @Integer (case fromMaybe Asserted initialValues of
+                                             Asserted -> 1
+                                             Deasserted -> 0))
 
         (Param @"INIT_SYNC_FF"   @Integer (if isJust initialValues then 1 else 0))
         (Param @"SIM_ASSERT_CHK" @Integer 0)
@@ -96,7 +109,8 @@ xpmCdcSyncRstWith XpmCdcSyncRstConfig{stages=stages@SNat, ..} clkSrc clkDst srcI
   sim = unsafeFromActiveHigh $ go (snatToNum stages) $ unsafeToActiveHigh srcIn
    where
     initVal = case initialValues of
-      Just x -> x
+      Just Asserted -> True
+      Just Deasserted -> False
       Nothing -> deepErrorX "xpmCdcSyncRst: initial values undefined"
 
     go :: Word -> Signal src Bool -> Signal dst Bool

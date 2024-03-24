@@ -6,6 +6,7 @@ import Data.Proxy
 
 import XpmTestCommon (D3, D5, D10, D11)
 
+import Clash.Cores.Xilinx.Xpm.Cdc.SyncRst (Asserted(..))
 import qualified XpmCdcSyncRstTypes as Types
 
 -- | This 'topEntity' exists to make @clash-testsuite@ happy. Without it cannot
@@ -30,15 +31,15 @@ tb1 = done
 tb2 = done
  where
   --                          src dst stages  samples              init
-  done =             Types.tb @D3 @D5 @10     @100     Proxy Proxy (Just True) SNat expected
-  expected = $(Types.expected @D3 @D5 @10     @100     Proxy Proxy (Just True) SNat SNat)
+  done =             Types.tb @D3 @D5 @10     @100     Proxy Proxy (Just Asserted) SNat expected
+  expected = $(Types.expected @D3 @D5 @10     @100     Proxy Proxy (Just Asserted) SNat SNat)
 {-# ANN tb2 (TestBench 'topEntity) #-}
 
 tb3 = done
  where
   --                          src dst stages  samples              init
-  done =             Types.tb @D3 @D5 @2      @100     Proxy Proxy (Just False) SNat expected
-  expected = $(Types.expected @D3 @D5 @2      @100     Proxy Proxy (Just False) SNat SNat)
+  done =             Types.tb @D3 @D5 @2      @100     Proxy Proxy (Just Deasserted) SNat expected
+  expected = $(Types.expected @D3 @D5 @2      @100     Proxy Proxy (Just Deasserted) SNat SNat)
 {-# ANN tb3 (TestBench 'topEntity) #-}
 
 tb4 = done
@@ -58,13 +59,13 @@ tb5 = done
 tb6 = done
  where
   --                          src dst  stages  samples              init
-  done =             Types.tb @D5 @D11 @2      @100     Proxy Proxy (Just True) SNat expected
-  expected = $(Types.expected @D5 @D11 @2      @100     Proxy Proxy (Just True) SNat SNat)
+  done =             Types.tb @D5 @D11 @2      @100     Proxy Proxy (Just Asserted) SNat expected
+  expected = $(Types.expected @D5 @D11 @2      @100     Proxy Proxy (Just Asserted) SNat SNat)
 {-# ANN tb6 (TestBench 'topEntity) #-}
 
 tb7 = done
  where
   --                          src dst  stages  samples              init
-  done =             Types.tb @D11 @D5 @2      @100     Proxy Proxy (Just False) SNat expected
-  expected = $(Types.expected @D11 @D5 @2      @100     Proxy Proxy (Just False) SNat SNat)
+  done =             Types.tb @D11 @D5 @2      @100     Proxy Proxy (Just Deasserted) SNat expected
+  expected = $(Types.expected @D11 @D5 @2      @100     Proxy Proxy (Just Deasserted) SNat SNat)
 {-# ANN tb7 (TestBench 'topEntity) #-}
