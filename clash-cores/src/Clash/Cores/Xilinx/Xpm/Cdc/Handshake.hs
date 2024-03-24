@@ -162,7 +162,6 @@ xpmCdcHandshakeWith ::
   , "src_rcv"  ::: Signal src Bool
   )
 xpmCdcHandshakeWith XpmCdcHandshakeConfig{srcStages=srcStages@SNat, dstStages=dstStages@SNat, ..} clkSrc clkDst srcIn srcSend dstAck
-  -- = xpmCdcHandshake# initialValues srcStages dstStages clkSrc clkDst srcIn srcSend dstAck
   | clashSimulation = sim
   | otherwise = synth
  where
