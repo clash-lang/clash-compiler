@@ -16,7 +16,8 @@ import Clash.Explicit.Prelude
 
 import GHC.Stack (HasCallStack)
 
-import Clash.Cores.Xilinx.Xpm.Cdc.Handshake.Internal (xpmCdcHandshake#)
+import Clash.Cores.Xilinx.Xpm.Cdc.Internal
+import Clash.Cores.Xilinx.Xpm.Cdc.Single (XpmCdcSingleConfig(..), xpmCdcSingleWith)
 
 -- | Synchronizes data from the source clock domain to the destination. For this
 -- to function correctly, a full handshake must be completed before another data
@@ -160,6 +161,66 @@ xpmCdcHandshakeWith ::
   , "dest_req" ::: Signal dst Bool
   , "src_rcv"  ::: Signal src Bool
   )
-xpmCdcHandshakeWith XpmCdcHandshakeConfig{..} =
-  xpmCdcHandshake# initialValues srcStages dstStages
+xpmCdcHandshakeWith XpmCdcHandshakeConfig{srcStages=srcStages@SNat, dstStages=dstStages@SNat, ..} clkSrc clkDst srcIn srcSend dstAck
+  | clashSimulation = sim
+  | otherwise = synth
+ where
+  -- Definition used in for HDL generation
+  synth = (unpack <$> unPort go0, bitCoerce <$> unPort go1,  bitCoerce <$> unPort go2)
+   where
+    (go0,go1,go2) = go
+    go :: ( Port "dest_out" dst (BitVector (BitSize a))
+          , Port "dest_req" dst Bit
+          , Port "src_rcv"  src Bit
+          )
+
+    go =
+      inst
+        (instConfig "xpm_cdc_handshake")
+          { library = Just "xpm"
+          , libraryImport = Just "xpm.vcomponents.all" }
+
+        (Param @"DEST_EXT_HSK"   @Integer 1)
+        (Param @"DEST_SYNC_FF"   @Integer (natToNum @dstStages))
+
+        (Param @"INIT_SYNC_FF"   @Integer (if initialValues then 1 else 0))
+        (Param @"SIM_ASSERT_CHK" @Integer 0)
+        (Param @"SRC_SYNC_FF"    @Integer (natToNum @srcStages))
+        (Param @"WIDTH"          @Integer (natToNum @(BitSize a)))
+
+        (Port      @"dest_ack" (bitCoerce @Bool @Bit <$> dstAck))
+        (ClockPort @"dest_clk" clkDst)
+
+        (ClockPort @"src_clk"  clkSrc)
+        (Port      @"src_in"   (pack <$> srcIn))
+        (Port      @"src_send" (bitCoerce @Bool @Bit <$> srcSend))
+
+  -- Definition used in Clash simulation
+  sim = (dstOut, dstReq, srcRcv)
+
+  defOpts :: forall stages. SNat stages -> XpmCdcSingleConfig stages
+  defOpts nStages = XpmCdcSingleConfig
+    { stages = nStages
+    , initialValues = initialValues
+    , registerInput = False }
+
+  srcSendFfSynced = xpmCdcSingleWith (defOpts dstStages) clkSrc clkDst srcSendFf
+  srcRcv = xpmCdcSingleWith (defOpts srcStages) clkDst clkSrc dstAck
+
+  srcSendFf = delay clkSrc enableGen (initVal False) srcSend
+  srcHsDataFf = delay clkSrc (toEnable (not <$> srcSendFf)) (initVal (unpack 0)) srcIn
+  dstOutEna = toEnable (srcSendFfSynced .&&. fmap not dstReq)
+
+  dstOut =
+    delay
+      clkDst dstOutEna (initVal (unpack 0))
+      (unsafeSynchronizer clkSrc clkDst srcHsDataFf)
+
+  dstReq = delay clkDst enableGen (initVal False) srcSendFfSynced
+
+  initVal :: forall x . NFDataX x => x -> x
+  initVal v
+    | initialValues = v
+    | otherwise = deepErrorX "xpmCdcHandshake: initial values undefined"
+
 {-# INLINE xpmCdcHandshakeWith #-}

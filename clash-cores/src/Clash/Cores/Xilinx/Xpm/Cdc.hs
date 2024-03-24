@@ -19,10 +19,14 @@ module Clash.Cores.Xilinx.Xpm.Cdc
   ( xpmCdcArraySingle
   , xpmCdcGray
   , xpmCdcHandshake
+  , xpmCdcPulse
   , xpmCdcSingle
+  , xpmCdcSyncRst
   ) where
 
 import Clash.Cores.Xilinx.Xpm.Cdc.ArraySingle
 import Clash.Cores.Xilinx.Xpm.Cdc.Gray
 import Clash.Cores.Xilinx.Xpm.Cdc.Handshake
+import Clash.Cores.Xilinx.Xpm.Cdc.Pulse
 import Clash.Cores.Xilinx.Xpm.Cdc.Single
+import Clash.Cores.Xilinx.Xpm.Cdc.SyncRst
