@@ -112,12 +112,12 @@ xpmCdcGrayWith XpmCdcGrayConfig{stages=stages@SNat, ..} clkSrc clkDst srcIn
           { library = Just "xpm"
           , libraryImport = Just "xpm.vcomponents.all" }
 
-        (Param @"DEST_SYNC_FF"   @Integer (natToNum @stages))
-        (Param @"INIT_SYNC_FF"   @Integer (if initialValues then 1 else 0))
-        (Param @"REG_OUTPUT"     @Integer 0)
-        (Param @"SIM_ASSERT_CHK" @Integer 0)
+        (Param @"DEST_SYNC_FF"          @Integer (natToNum @stages))
+        (Param @"INIT_SYNC_FF"          @Integer (if initialValues then 1 else 0))
+        (Param @"REG_OUTPUT"            @Integer 0)
+        (Param @"SIM_ASSERT_CHK"        @Integer 0)
         (Param @"SIM_LOSSLESS_GRAY_CHK" @Integer 0)
-        (Param @"WIDTH"          @Integer (natToNum @n))
+        (Param @"WIDTH"                 @Integer (natToNum @n))
 
         (ClockPort @"src_clk"    clkSrc)
         (ClockPort @"dest_clk"   clkDst)
