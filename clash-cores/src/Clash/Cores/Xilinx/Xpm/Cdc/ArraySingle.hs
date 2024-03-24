@@ -20,10 +20,15 @@ import Clash.Cores.Xilinx.Xpm.Cdc.Internal
 
 -- | Synchronizes an array of independent bits from the source clock domain to
 -- the destination. Be careful when using this primitive: each bit will be
--- synchronized independently. By default, it registers its input, uses four
--- synchronization stages, and auto-detects whether to use initial values for
--- the synchronization registers. Use 'xpmCdcArraySingleWith' to change these
--- settings. For more information see [PG382](https://docs.xilinx.com/r/en-US/pg382-xpm-cdc-generator/XPM_CDC_ARRAY_SINGLE).
+-- synchronized independently. That is to say, a word appearing in the source
+-- domain will not necessarily appear in the destination domain. If this word
+-- synchronization is needed, consider using a FIFO or
+-- 'Clash.Cores.Xilinx.Xpm.Cdc.Handshake.xpmCdcHandshake'.
+--
+-- By default, it registers its input, uses four synchronization stages, and
+-- auto-detects whether to use initial values for the synchronization registers.
+-- Use 'xpmCdcArraySingleWith' to change these settings. For more information
+-- see [PG382](https://docs.xilinx.com/r/en-US/pg382-xpm-cdc-generator/XPM_CDC_ARRAY_SINGLE).
 --
 -- __N.B.__: In order to simulate initial values, both the source and destination
 --           domain need to support them. If the source and destination domain
