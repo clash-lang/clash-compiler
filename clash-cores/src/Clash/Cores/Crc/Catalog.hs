@@ -12,16 +12,17 @@ Every CRC expects a datawidth input which indicates what width in bits of data
 will be fed into it.
 -}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
-module Clash.Cores.CRC.Catalog where
+module Clash.Cores.Crc.Catalog where
 
 import Clash.Prelude
-import Clash.Cores.CRC.Internal
+import Clash.Cores.Crc.Internal
 
-data CRC3_GSM
-instance KnownCRC CRC3_GSM where
-  type CRCWidth CRC3_GSM = 3
-  crcParams _ dataWidth = CRCParams
+data Crc3_gsm
+instance KnownCrc Crc3_gsm where
+  type CrcWidth Crc3_gsm = 3
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x3
@@ -31,10 +32,10 @@ instance KnownCRC CRC3_GSM where
     , _crcXorOutput = 0x7
     }
 
-data CRC3_ROHC
-instance KnownCRC CRC3_ROHC where
-  type CRCWidth CRC3_ROHC = 3
-  crcParams _ dataWidth = CRCParams
+data Crc3_rohc
+instance KnownCrc Crc3_rohc where
+  type CrcWidth Crc3_rohc = 3
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x3
@@ -44,10 +45,10 @@ instance KnownCRC CRC3_ROHC where
     , _crcXorOutput = 0x0
     }
 
-data CRC4_G_704
-instance KnownCRC CRC4_G_704 where
-  type CRCWidth CRC4_G_704 = 4
-  crcParams _ dataWidth = CRCParams
+data Crc4_g_704
+instance KnownCrc Crc4_g_704 where
+  type CrcWidth Crc4_g_704 = 4
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x3
@@ -56,12 +57,12 @@ instance KnownCRC CRC4_G_704 where
     , _crcReflectOutput = True
     , _crcXorOutput = 0x0
     }
-type CRC4_ITU = CRC4_G_704
+type Crc4_itu = Crc4_g_704
 
-data CRC4_INTERLAKEN
-instance KnownCRC CRC4_INTERLAKEN where
-  type CRCWidth CRC4_INTERLAKEN = 4
-  crcParams _ dataWidth = CRCParams
+data Crc4_interlaken
+instance KnownCrc Crc4_interlaken where
+  type CrcWidth Crc4_interlaken = 4
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x3
@@ -71,10 +72,10 @@ instance KnownCRC CRC4_INTERLAKEN where
     , _crcXorOutput = 0xf
     }
 
-data CRC5_EPC_C1G2
-instance KnownCRC CRC5_EPC_C1G2 where
-  type CRCWidth CRC5_EPC_C1G2 = 5
-  crcParams _ dataWidth = CRCParams
+data Crc5_epc_c1g2
+instance KnownCrc Crc5_epc_c1g2 where
+  type CrcWidth Crc5_epc_c1g2 = 5
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x09
@@ -83,12 +84,12 @@ instance KnownCRC CRC5_EPC_C1G2 where
     , _crcReflectOutput = False
     , _crcXorOutput = 0x00
     }
-type CRC5_EPC = CRC5_EPC_C1G2
+type Crc5_epc = Crc5_epc_c1g2
 
-data CRC5_G_704
-instance KnownCRC CRC5_G_704 where
-  type CRCWidth CRC5_G_704 = 5
-  crcParams _ dataWidth = CRCParams
+data Crc5_g_704
+instance KnownCrc Crc5_g_704 where
+  type CrcWidth Crc5_g_704 = 5
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x15
@@ -97,12 +98,12 @@ instance KnownCRC CRC5_G_704 where
     , _crcReflectOutput = True
     , _crcXorOutput = 0x00
     }
-type CRC5_ITU = CRC5_G_704
+type Crc5_itu = Crc5_g_704
 
-data CRC5_USB
-instance KnownCRC CRC5_USB where
-  type CRCWidth CRC5_USB = 5
-  crcParams _ dataWidth = CRCParams
+data Crc5_usb
+instance KnownCrc Crc5_usb where
+  type CrcWidth Crc5_usb = 5
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x05
@@ -112,10 +113,10 @@ instance KnownCRC CRC5_USB where
     , _crcXorOutput = 0x1f
     }
 
-data CRC6_CDMA2000_A
-instance KnownCRC CRC6_CDMA2000_A where
-  type CRCWidth CRC6_CDMA2000_A = 6
-  crcParams _ dataWidth = CRCParams
+data Crc6_cdma2000_a
+instance KnownCrc Crc6_cdma2000_a where
+  type CrcWidth Crc6_cdma2000_a = 6
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x27
@@ -125,10 +126,10 @@ instance KnownCRC CRC6_CDMA2000_A where
     , _crcXorOutput = 0x00
     }
 
-data CRC6_CDMA2000_B
-instance KnownCRC CRC6_CDMA2000_B where
-  type CRCWidth CRC6_CDMA2000_B = 6
-  crcParams _ dataWidth = CRCParams
+data Crc6_cdma2000_b
+instance KnownCrc Crc6_cdma2000_b where
+  type CrcWidth Crc6_cdma2000_b = 6
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x07
@@ -138,10 +139,10 @@ instance KnownCRC CRC6_CDMA2000_B where
     , _crcXorOutput = 0x00
     }
 
-data CRC6_DARC
-instance KnownCRC CRC6_DARC where
-  type CRCWidth CRC6_DARC = 6
-  crcParams _ dataWidth = CRCParams
+data Crc6_darc
+instance KnownCrc Crc6_darc where
+  type CrcWidth Crc6_darc = 6
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x19
@@ -151,10 +152,10 @@ instance KnownCRC CRC6_DARC where
     , _crcXorOutput = 0x00
     }
 
-data CRC6_G_704
-instance KnownCRC CRC6_G_704 where
-  type CRCWidth CRC6_G_704 = 6
-  crcParams _ dataWidth = CRCParams
+data Crc6_g_704
+instance KnownCrc Crc6_g_704 where
+  type CrcWidth Crc6_g_704 = 6
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x03
@@ -163,12 +164,12 @@ instance KnownCRC CRC6_G_704 where
     , _crcReflectOutput = True
     , _crcXorOutput = 0x00
     }
-type CRC6_ITU = CRC6_G_704
+type Crc6_itu = Crc6_g_704
 
-data CRC6_GSM
-instance KnownCRC CRC6_GSM where
-  type CRCWidth CRC6_GSM = 6
-  crcParams _ dataWidth = CRCParams
+data Crc6_gsm
+instance KnownCrc Crc6_gsm where
+  type CrcWidth Crc6_gsm = 6
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x2f
@@ -178,10 +179,10 @@ instance KnownCRC CRC6_GSM where
     , _crcXorOutput = 0x3f
     }
 
-data CRC7_MMC
-instance KnownCRC CRC7_MMC where
-  type CRCWidth CRC7_MMC = 7
-  crcParams _ dataWidth = CRCParams
+data Crc7_mmc
+instance KnownCrc Crc7_mmc where
+  type CrcWidth Crc7_mmc = 7
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x09
@@ -191,10 +192,10 @@ instance KnownCRC CRC7_MMC where
     , _crcXorOutput = 0x00
     }
 
-data CRC7_ROHC
-instance KnownCRC CRC7_ROHC where
-  type CRCWidth CRC7_ROHC = 7
-  crcParams _ dataWidth = CRCParams
+data Crc7_rohc
+instance KnownCrc Crc7_rohc where
+  type CrcWidth Crc7_rohc = 7
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x4f
@@ -204,10 +205,10 @@ instance KnownCRC CRC7_ROHC where
     , _crcXorOutput = 0x00
     }
 
-data CRC7_UMTS
-instance KnownCRC CRC7_UMTS where
-  type CRCWidth CRC7_UMTS = 7
-  crcParams _ dataWidth = CRCParams
+data Crc7_umts
+instance KnownCrc Crc7_umts where
+  type CrcWidth Crc7_umts = 7
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x45
@@ -217,10 +218,10 @@ instance KnownCRC CRC7_UMTS where
     , _crcXorOutput = 0x00
     }
 
-data CRC8_AUTOSAR
-instance KnownCRC CRC8_AUTOSAR where
-  type CRCWidth CRC8_AUTOSAR = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_autosar
+instance KnownCrc Crc8_autosar where
+  type CrcWidth Crc8_autosar = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x2f
@@ -230,10 +231,10 @@ instance KnownCRC CRC8_AUTOSAR where
     , _crcXorOutput = 0xff
     }
 
-data CRC8_BLUETOOTH
-instance KnownCRC CRC8_BLUETOOTH where
-  type CRCWidth CRC8_BLUETOOTH = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_bluetooth
+instance KnownCrc Crc8_bluetooth where
+  type CrcWidth Crc8_bluetooth = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0xa7
@@ -243,10 +244,10 @@ instance KnownCRC CRC8_BLUETOOTH where
     , _crcXorOutput = 0x00
     }
 
-data CRC8_CDMA2000
-instance KnownCRC CRC8_CDMA2000 where
-  type CRCWidth CRC8_CDMA2000 = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_cdma2000
+instance KnownCrc Crc8_cdma2000 where
+  type CrcWidth Crc8_cdma2000 = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x9b
@@ -256,10 +257,10 @@ instance KnownCRC CRC8_CDMA2000 where
     , _crcXorOutput = 0x00
     }
 
-data CRC8_DARC
-instance KnownCRC CRC8_DARC where
-  type CRCWidth CRC8_DARC = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_darc
+instance KnownCrc Crc8_darc where
+  type CrcWidth Crc8_darc = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x39
@@ -269,10 +270,10 @@ instance KnownCRC CRC8_DARC where
     , _crcXorOutput = 0x00
     }
 
-data CRC8_DVB_S2
-instance KnownCRC CRC8_DVB_S2 where
-  type CRCWidth CRC8_DVB_S2 = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_dvb_s2
+instance KnownCrc Crc8_dvb_s2 where
+  type CrcWidth Crc8_dvb_s2 = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0xd5
@@ -282,10 +283,10 @@ instance KnownCRC CRC8_DVB_S2 where
     , _crcXorOutput = 0x00
     }
 
-data CRC8_GSM_A
-instance KnownCRC CRC8_GSM_A where
-  type CRCWidth CRC8_GSM_A = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_gsm_a
+instance KnownCrc Crc8_gsm_a where
+  type CrcWidth Crc8_gsm_a = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1d
@@ -295,10 +296,10 @@ instance KnownCRC CRC8_GSM_A where
     , _crcXorOutput = 0x00
     }
 
-data CRC8_GSM_B
-instance KnownCRC CRC8_GSM_B where
-  type CRCWidth CRC8_GSM_B = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_gsm_b
+instance KnownCrc Crc8_gsm_b where
+  type CrcWidth Crc8_gsm_b = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x49
@@ -308,10 +309,10 @@ instance KnownCRC CRC8_GSM_B where
     , _crcXorOutput = 0xff
     }
 
-data CRC8_HITAG
-instance KnownCRC CRC8_HITAG where
-  type CRCWidth CRC8_HITAG = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_hitag
+instance KnownCrc Crc8_hitag where
+  type CrcWidth Crc8_hitag = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1d
@@ -321,10 +322,10 @@ instance KnownCRC CRC8_HITAG where
     , _crcXorOutput = 0x00
     }
 
-data CRC8_I_432_1
-instance KnownCRC CRC8_I_432_1 where
-  type CRCWidth CRC8_I_432_1 = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_i_432_1
+instance KnownCrc Crc8_i_432_1 where
+  type CrcWidth Crc8_i_432_1 = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x07
@@ -333,12 +334,12 @@ instance KnownCRC CRC8_I_432_1 where
     , _crcReflectOutput = False
     , _crcXorOutput = 0x55
     }
-type CRC8_ITU = CRC8_I_432_1
+type Crc8_itu = Crc8_i_432_1
 
-data CRC8_I_CODE
-instance KnownCRC CRC8_I_CODE where
-  type CRCWidth CRC8_I_CODE = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_i_code
+instance KnownCrc Crc8_i_code where
+  type CrcWidth Crc8_i_code = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1d
@@ -348,10 +349,10 @@ instance KnownCRC CRC8_I_CODE where
     , _crcXorOutput = 0x00
     }
 
-data CRC8_LTE
-instance KnownCRC CRC8_LTE where
-  type CRCWidth CRC8_LTE = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_lte
+instance KnownCrc Crc8_lte where
+  type CrcWidth Crc8_lte = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x9b
@@ -361,10 +362,10 @@ instance KnownCRC CRC8_LTE where
     , _crcXorOutput = 0x00
     }
 
-data CRC8_MAXIM_DOW
-instance KnownCRC CRC8_MAXIM_DOW where
-  type CRCWidth CRC8_MAXIM_DOW = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_maxim_dow
+instance KnownCrc Crc8_maxim_dow where
+  type CrcWidth Crc8_maxim_dow = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x31
@@ -373,12 +374,12 @@ instance KnownCRC CRC8_MAXIM_DOW where
     , _crcReflectOutput = True
     , _crcXorOutput = 0x00
     }
-type CRC8_MAXIM = CRC8_MAXIM_DOW
+type Crc8_maxim = Crc8_maxim_dow
 
-data CRC8_MIFARE_MAD
-instance KnownCRC CRC8_MIFARE_MAD where
-  type CRCWidth CRC8_MIFARE_MAD = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_mifare_mad
+instance KnownCrc Crc8_mifare_mad where
+  type CrcWidth Crc8_mifare_mad = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1d
@@ -388,10 +389,10 @@ instance KnownCRC CRC8_MIFARE_MAD where
     , _crcXorOutput = 0x00
     }
 
-data CRC8_NRSC_5
-instance KnownCRC CRC8_NRSC_5 where
-  type CRCWidth CRC8_NRSC_5 = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_nrsc_5
+instance KnownCrc Crc8_nrsc_5 where
+  type CrcWidth Crc8_nrsc_5 = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x31
@@ -401,10 +402,10 @@ instance KnownCRC CRC8_NRSC_5 where
     , _crcXorOutput = 0x00
     }
 
-data CRC8_OPENSAFETY
-instance KnownCRC CRC8_OPENSAFETY where
-  type CRCWidth CRC8_OPENSAFETY = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_opensafety
+instance KnownCrc Crc8_opensafety where
+  type CrcWidth Crc8_opensafety = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x2f
@@ -414,10 +415,10 @@ instance KnownCRC CRC8_OPENSAFETY where
     , _crcXorOutput = 0x00
     }
 
-data CRC8_ROHC
-instance KnownCRC CRC8_ROHC where
-  type CRCWidth CRC8_ROHC = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_rohc
+instance KnownCrc Crc8_rohc where
+  type CrcWidth Crc8_rohc = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x07
@@ -427,10 +428,10 @@ instance KnownCRC CRC8_ROHC where
     , _crcXorOutput = 0x00
     }
 
-data CRC8_SAE_J1850
-instance KnownCRC CRC8_SAE_J1850 where
-  type CRCWidth CRC8_SAE_J1850 = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_sae_j1850
+instance KnownCrc Crc8_sae_j1850 where
+  type CrcWidth Crc8_sae_j1850 = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1d
@@ -440,10 +441,10 @@ instance KnownCRC CRC8_SAE_J1850 where
     , _crcXorOutput = 0xff
     }
 
-data CRC8_SMBUS
-instance KnownCRC CRC8_SMBUS where
-  type CRCWidth CRC8_SMBUS = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_smbus
+instance KnownCrc Crc8_smbus where
+  type CrcWidth Crc8_smbus = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x07
@@ -453,10 +454,10 @@ instance KnownCRC CRC8_SMBUS where
     , _crcXorOutput = 0x00
     }
 
-data CRC8_TECH_3250
-instance KnownCRC CRC8_TECH_3250 where
-  type CRCWidth CRC8_TECH_3250 = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_tech_3250
+instance KnownCrc Crc8_tech_3250 where
+  type CrcWidth Crc8_tech_3250 = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1d
@@ -465,13 +466,13 @@ instance KnownCRC CRC8_TECH_3250 where
     , _crcReflectOutput = True
     , _crcXorOutput = 0x00
     }
-type CRC8_AES = CRC8_TECH_3250
-type CRC8_ETU = CRC8_TECH_3250
+type Crc8_aes = Crc8_tech_3250
+type Crc8_etu = Crc8_tech_3250
 
-data CRC8_WCDMA
-instance KnownCRC CRC8_WCDMA where
-  type CRCWidth CRC8_WCDMA = 8
-  crcParams _ dataWidth = CRCParams
+data Crc8_wcdma
+instance KnownCrc Crc8_wcdma where
+  type CrcWidth Crc8_wcdma = 8
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x9b
@@ -481,10 +482,10 @@ instance KnownCRC CRC8_WCDMA where
     , _crcXorOutput = 0x00
     }
 
-data CRC10_ATM
-instance KnownCRC CRC10_ATM where
-  type CRCWidth CRC10_ATM = 10
-  crcParams _ dataWidth = CRCParams
+data Crc10_atm
+instance KnownCrc Crc10_atm where
+  type CrcWidth Crc10_atm = 10
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x233
@@ -493,12 +494,12 @@ instance KnownCRC CRC10_ATM where
     , _crcReflectOutput = False
     , _crcXorOutput = 0x000
     }
-type CRC10_I_610 = CRC10_ATM
+type Crc10_i_610 = Crc10_atm
 
-data CRC10_CDMA2000
-instance KnownCRC CRC10_CDMA2000 where
-  type CRCWidth CRC10_CDMA2000 = 10
-  crcParams _ dataWidth = CRCParams
+data Crc10_cdma2000
+instance KnownCrc Crc10_cdma2000 where
+  type CrcWidth Crc10_cdma2000 = 10
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x3d9
@@ -508,10 +509,10 @@ instance KnownCRC CRC10_CDMA2000 where
     , _crcXorOutput = 0x000
     }
 
-data CRC10_GSM
-instance KnownCRC CRC10_GSM where
-  type CRCWidth CRC10_GSM = 10
-  crcParams _ dataWidth = CRCParams
+data Crc10_gsm
+instance KnownCrc Crc10_gsm where
+  type CrcWidth Crc10_gsm = 10
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x175
@@ -521,10 +522,10 @@ instance KnownCRC CRC10_GSM where
     , _crcXorOutput = 0x3ff
     }
 
-data CRC11_FLEXRAY
-instance KnownCRC CRC11_FLEXRAY where
-  type CRCWidth CRC11_FLEXRAY = 11
-  crcParams _ dataWidth = CRCParams
+data Crc11_flexray
+instance KnownCrc Crc11_flexray where
+  type CrcWidth Crc11_flexray = 11
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x385
@@ -534,10 +535,10 @@ instance KnownCRC CRC11_FLEXRAY where
     , _crcXorOutput = 0x000
     }
 
-data CRC11_UMTS
-instance KnownCRC CRC11_UMTS where
-  type CRCWidth CRC11_UMTS = 11
-  crcParams _ dataWidth = CRCParams
+data Crc11_umts
+instance KnownCrc Crc11_umts where
+  type CrcWidth Crc11_umts = 11
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x307
@@ -547,10 +548,10 @@ instance KnownCRC CRC11_UMTS where
     , _crcXorOutput = 0x000
     }
 
-data CRC12_CDMA2000
-instance KnownCRC CRC12_CDMA2000 where
-  type CRCWidth CRC12_CDMA2000 = 12
-  crcParams _ dataWidth = CRCParams
+data Crc12_cdma2000
+instance KnownCrc Crc12_cdma2000 where
+  type CrcWidth Crc12_cdma2000 = 12
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0xf13
@@ -560,10 +561,10 @@ instance KnownCRC CRC12_CDMA2000 where
     , _crcXorOutput = 0x000
     }
 
-data CRC12_DECT
-instance KnownCRC CRC12_DECT where
-  type CRCWidth CRC12_DECT = 12
-  crcParams _ dataWidth = CRCParams
+data Crc12_dect
+instance KnownCrc Crc12_dect where
+  type CrcWidth Crc12_dect = 12
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x80f
@@ -573,10 +574,10 @@ instance KnownCRC CRC12_DECT where
     , _crcXorOutput = 0x000
     }
 
-data CRC12_GSM
-instance KnownCRC CRC12_GSM where
-  type CRCWidth CRC12_GSM = 12
-  crcParams _ dataWidth = CRCParams
+data Crc12_gsm
+instance KnownCrc Crc12_gsm where
+  type CrcWidth Crc12_gsm = 12
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0xd31
@@ -586,10 +587,10 @@ instance KnownCRC CRC12_GSM where
     , _crcXorOutput = 0xfff
     }
 
-data CRC12_UMTS
-instance KnownCRC CRC12_UMTS where
-  type CRCWidth CRC12_UMTS = 12
-  crcParams _ dataWidth = CRCParams
+data Crc12_umts
+instance KnownCrc Crc12_umts where
+  type CrcWidth Crc12_umts = 12
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x80f
@@ -598,12 +599,12 @@ instance KnownCRC CRC12_UMTS where
     , _crcReflectOutput = True
     , _crcXorOutput = 0x000
     }
-type CRC12_3GPP = CRC12_UMTS
+type Crc12_3gpp = Crc12_umts
 
-data CRC13_BBC
-instance KnownCRC CRC13_BBC where
-  type CRCWidth CRC13_BBC = 13
-  crcParams _ dataWidth = CRCParams
+data Crc13_bbc
+instance KnownCrc Crc13_bbc where
+  type CrcWidth Crc13_bbc = 13
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1cf5
@@ -613,10 +614,10 @@ instance KnownCRC CRC13_BBC where
     , _crcXorOutput = 0x0000
     }
 
-data CRC14_DARC
-instance KnownCRC CRC14_DARC where
-  type CRCWidth CRC14_DARC = 14
-  crcParams _ dataWidth = CRCParams
+data Crc14_darc
+instance KnownCrc Crc14_darc where
+  type CrcWidth Crc14_darc = 14
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x0805
@@ -626,10 +627,10 @@ instance KnownCRC CRC14_DARC where
     , _crcXorOutput = 0x0000
     }
 
-data CRC14_GSM
-instance KnownCRC CRC14_GSM where
-  type CRCWidth CRC14_GSM = 14
-  crcParams _ dataWidth = CRCParams
+data Crc14_gsm
+instance KnownCrc Crc14_gsm where
+  type CrcWidth Crc14_gsm = 14
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x202d
@@ -639,10 +640,10 @@ instance KnownCRC CRC14_GSM where
     , _crcXorOutput = 0x3fff
     }
 
-data CRC15_CAN
-instance KnownCRC CRC15_CAN where
-  type CRCWidth CRC15_CAN = 15
-  crcParams _ dataWidth = CRCParams
+data Crc15_can
+instance KnownCrc Crc15_can where
+  type CrcWidth Crc15_can = 15
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x4599
@@ -652,10 +653,10 @@ instance KnownCRC CRC15_CAN where
     , _crcXorOutput = 0x0000
     }
 
-data CRC15_MPT1327
-instance KnownCRC CRC15_MPT1327 where
-  type CRCWidth CRC15_MPT1327 = 15
-  crcParams _ dataWidth = CRCParams
+data Crc15_mpt1327
+instance KnownCrc Crc15_mpt1327 where
+  type CrcWidth Crc15_mpt1327 = 15
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x6815
@@ -665,10 +666,10 @@ instance KnownCRC CRC15_MPT1327 where
     , _crcXorOutput = 0x0001
     }
 
-data CRC16_ARC
-instance KnownCRC CRC16_ARC where
-  type CRCWidth CRC16_ARC = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_arc
+instance KnownCrc Crc16_arc where
+  type CrcWidth Crc16_arc = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x8005
@@ -677,12 +678,12 @@ instance KnownCRC CRC16_ARC where
     , _crcReflectOutput = True
     , _crcXorOutput = 0x0000
     }
-type CRC16_IBM = CRC16_ARC
+type Crc16_ibm = Crc16_arc
 
-data CRC16_CDMA2000
-instance KnownCRC CRC16_CDMA2000 where
-  type CRCWidth CRC16_CDMA2000 = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_cdma2000
+instance KnownCrc Crc16_cdma2000 where
+  type CrcWidth Crc16_cdma2000 = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0xc867
@@ -692,10 +693,10 @@ instance KnownCRC CRC16_CDMA2000 where
     , _crcXorOutput = 0x0000
     }
 
-data CRC16_CMS
-instance KnownCRC CRC16_CMS where
-  type CRCWidth CRC16_CMS = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_cms
+instance KnownCrc Crc16_cms where
+  type CrcWidth Crc16_cms = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x8005
@@ -705,10 +706,10 @@ instance KnownCRC CRC16_CMS where
     , _crcXorOutput = 0x0000
     }
 
-data CRC16_DDS_110
-instance KnownCRC CRC16_DDS_110 where
-  type CRCWidth CRC16_DDS_110 = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_dds_110
+instance KnownCrc Crc16_dds_110 where
+  type CrcWidth Crc16_dds_110 = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x8005
@@ -718,10 +719,10 @@ instance KnownCRC CRC16_DDS_110 where
     , _crcXorOutput = 0x0000
     }
 
-data CRC16_DECT_R
-instance KnownCRC CRC16_DECT_R where
-  type CRCWidth CRC16_DECT_R = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_dect_r
+instance KnownCrc Crc16_dect_r where
+  type CrcWidth Crc16_dect_r = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x0589
@@ -731,10 +732,10 @@ instance KnownCRC CRC16_DECT_R where
     , _crcXorOutput = 0x0001
     }
 
-data CRC16_DECT_X
-instance KnownCRC CRC16_DECT_X where
-  type CRCWidth CRC16_DECT_X = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_dect_x
+instance KnownCrc Crc16_dect_x where
+  type CrcWidth Crc16_dect_x = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x0589
@@ -744,10 +745,10 @@ instance KnownCRC CRC16_DECT_X where
     , _crcXorOutput = 0x0000
     }
 
-data CRC16_DNP
-instance KnownCRC CRC16_DNP where
-  type CRCWidth CRC16_DNP = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_dnp
+instance KnownCrc Crc16_dnp where
+  type CrcWidth Crc16_dnp = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x3d65
@@ -757,10 +758,10 @@ instance KnownCRC CRC16_DNP where
     , _crcXorOutput = 0xffff
     }
 
-data CRC16_EN_13757
-instance KnownCRC CRC16_EN_13757 where
-  type CRCWidth CRC16_EN_13757 = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_en_13757
+instance KnownCrc Crc16_en_13757 where
+  type CrcWidth Crc16_en_13757 = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x3d65
@@ -770,10 +771,10 @@ instance KnownCRC CRC16_EN_13757 where
     , _crcXorOutput = 0xffff
     }
 
-data CRC16_GENIBUS
-instance KnownCRC CRC16_GENIBUS where
-  type CRCWidth CRC16_GENIBUS = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_genibus
+instance KnownCrc Crc16_genibus where
+  type CrcWidth Crc16_genibus = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1021
@@ -782,15 +783,15 @@ instance KnownCRC CRC16_GENIBUS where
     , _crcReflectOutput = False
     , _crcXorOutput = 0xffff
     }
-type CRC16_DARC = CRC16_GENIBUS
-type CRC16_EPC = CRC16_GENIBUS
-type CRC16_EPC_C1G2 = CRC16_GENIBUS
-type CRC16_I_CODE = CRC16_GENIBUS
+type Crc16_darc = Crc16_genibus
+type Crc16_epc = Crc16_genibus
+type Crc16_epc_c1g2 = Crc16_genibus
+type Crc16_i_code = Crc16_genibus
 
-data CRC16_GSM
-instance KnownCRC CRC16_GSM where
-  type CRCWidth CRC16_GSM = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_gsm
+instance KnownCrc Crc16_gsm where
+  type CrcWidth Crc16_gsm = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1021
@@ -800,10 +801,10 @@ instance KnownCRC CRC16_GSM where
     , _crcXorOutput = 0xffff
     }
 
-data CRC16_IBM_3740
-instance KnownCRC CRC16_IBM_3740 where
-  type CRCWidth CRC16_IBM_3740 = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_ibm_3740
+instance KnownCrc Crc16_ibm_3740 where
+  type CrcWidth Crc16_ibm_3740 = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1021
@@ -812,13 +813,13 @@ instance KnownCRC CRC16_IBM_3740 where
     , _crcReflectOutput = False
     , _crcXorOutput = 0x0000
     }
-type CRC16_AUTOSAR = CRC16_IBM_3740
-type CRC16_CCITT_FALSE = CRC16_IBM_3740
+type Crc16_autosar = Crc16_ibm_3740
+type Crc16_ccitt_false = Crc16_ibm_3740
 
-data CRC16_IBM_SDLC
-instance KnownCRC CRC16_IBM_SDLC where
-  type CRCWidth CRC16_IBM_SDLC = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_ibm_sdlc
+instance KnownCrc Crc16_ibm_sdlc where
+  type CrcWidth Crc16_ibm_sdlc = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1021
@@ -827,14 +828,14 @@ instance KnownCRC CRC16_IBM_SDLC where
     , _crcReflectOutput = True
     , _crcXorOutput = 0xffff
     }
-type CRC16_ISO_HDLC = CRC16_IBM_SDLC
-type CRC16_ISO_IEC_14443_3_B = CRC16_IBM_SDLC
-type CRC16_X25 = CRC16_IBM_SDLC
+type Crc16_iso_hdlc = Crc16_ibm_sdlc
+type Crc16_iso_iec_14443_3_b = Crc16_ibm_sdlc
+type Crc16_x25 = Crc16_ibm_sdlc
 
-data CRC16_ISO_IEC_14443_3_A
-instance KnownCRC CRC16_ISO_IEC_14443_3_A where
-  type CRCWidth CRC16_ISO_IEC_14443_3_A = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_iso_iec_14443_3_a
+instance KnownCrc Crc16_iso_iec_14443_3_a where
+  type CrcWidth Crc16_iso_iec_14443_3_a = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1021
@@ -844,10 +845,10 @@ instance KnownCRC CRC16_ISO_IEC_14443_3_A where
     , _crcXorOutput = 0x0000
     }
 
-data CRC16_KERMIT
-instance KnownCRC CRC16_KERMIT where
-  type CRCWidth CRC16_KERMIT = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_kermit
+instance KnownCrc Crc16_kermit where
+  type CrcWidth Crc16_kermit = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1021
@@ -856,15 +857,15 @@ instance KnownCRC CRC16_KERMIT where
     , _crcReflectOutput = True
     , _crcXorOutput = 0x0000
     }
-type CRC16_BLUETOOTH = CRC16_KERMIT
-type CRC16_CCITT = CRC16_KERMIT
-type CRC16_CCITT_TRUE = CRC16_KERMIT
-type CRC16_V_41_LSB = CRC16_KERMIT
+type Crc16_bluetooth = Crc16_kermit
+type Crc16_ccitt = Crc16_kermit
+type Crc16_ccitt_true = Crc16_kermit
+type Crc16_v_41_lsb = Crc16_kermit
 
-data CRC16_LJ1200
-instance KnownCRC CRC16_LJ1200 where
-  type CRCWidth CRC16_LJ1200 = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_lj1200
+instance KnownCrc Crc16_lj1200 where
+  type CrcWidth Crc16_lj1200 = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x6f63
@@ -874,10 +875,10 @@ instance KnownCRC CRC16_LJ1200 where
     , _crcXorOutput = 0x0000
     }
 
-data CRC16_M17
-instance KnownCRC CRC16_M17 where
-  type CRCWidth CRC16_M17 = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_m17
+instance KnownCrc Crc16_m17 where
+  type CrcWidth Crc16_m17 = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x5935
@@ -887,10 +888,10 @@ instance KnownCRC CRC16_M17 where
     , _crcXorOutput = 0x0000
     }
 
-data CRC16_MAXIM_DOW
-instance KnownCRC CRC16_MAXIM_DOW where
-  type CRCWidth CRC16_MAXIM_DOW = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_maxim_dow
+instance KnownCrc Crc16_maxim_dow where
+  type CrcWidth Crc16_maxim_dow = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x8005
@@ -899,12 +900,12 @@ instance KnownCRC CRC16_MAXIM_DOW where
     , _crcReflectOutput = True
     , _crcXorOutput = 0xffff
     }
-type CRC16_MAXIM = CRC16_MAXIM_DOW
+type Crc16_maxim = Crc16_maxim_dow
 
-data CRC16_MCRF4XX
-instance KnownCRC CRC16_MCRF4XX where
-  type CRCWidth CRC16_MCRF4XX = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_mcrf4xx
+instance KnownCrc Crc16_mcrf4xx where
+  type CrcWidth Crc16_mcrf4xx = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1021
@@ -914,10 +915,10 @@ instance KnownCRC CRC16_MCRF4XX where
     , _crcXorOutput = 0x0000
     }
 
-data CRC16_MODBUS
-instance KnownCRC CRC16_MODBUS where
-  type CRCWidth CRC16_MODBUS = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_modbus
+instance KnownCrc Crc16_modbus where
+  type CrcWidth Crc16_modbus = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x8005
@@ -927,10 +928,10 @@ instance KnownCRC CRC16_MODBUS where
     , _crcXorOutput = 0x0000
     }
 
-data CRC16_NRSC_5
-instance KnownCRC CRC16_NRSC_5 where
-  type CRCWidth CRC16_NRSC_5 = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_nrsc_5
+instance KnownCrc Crc16_nrsc_5 where
+  type CrcWidth Crc16_nrsc_5 = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x080b
@@ -940,10 +941,10 @@ instance KnownCRC CRC16_NRSC_5 where
     , _crcXorOutput = 0x0000
     }
 
-data CRC16_OPENSAFETY_A
-instance KnownCRC CRC16_OPENSAFETY_A where
-  type CRCWidth CRC16_OPENSAFETY_A = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_opensafety_a
+instance KnownCrc Crc16_opensafety_a where
+  type CrcWidth Crc16_opensafety_a = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x5935
@@ -953,10 +954,10 @@ instance KnownCRC CRC16_OPENSAFETY_A where
     , _crcXorOutput = 0x0000
     }
 
-data CRC16_OPENSAFETY_B
-instance KnownCRC CRC16_OPENSAFETY_B where
-  type CRCWidth CRC16_OPENSAFETY_B = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_opensafety_b
+instance KnownCrc Crc16_opensafety_b where
+  type CrcWidth Crc16_opensafety_b = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x755b
@@ -966,10 +967,10 @@ instance KnownCRC CRC16_OPENSAFETY_B where
     , _crcXorOutput = 0x0000
     }
 
-data CRC16_PROFIBUS
-instance KnownCRC CRC16_PROFIBUS where
-  type CRCWidth CRC16_PROFIBUS = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_profibus
+instance KnownCrc Crc16_profibus where
+  type CrcWidth Crc16_profibus = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1dcf
@@ -978,12 +979,12 @@ instance KnownCRC CRC16_PROFIBUS where
     , _crcReflectOutput = False
     , _crcXorOutput = 0xffff
     }
-type CRC16_IEC_61158_2 = CRC16_PROFIBUS
+type Crc16_iec_61158_2 = Crc16_profibus
 
-data CRC16_RIELLO
-instance KnownCRC CRC16_RIELLO where
-  type CRCWidth CRC16_RIELLO = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_riello
+instance KnownCrc Crc16_riello where
+  type CrcWidth Crc16_riello = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1021
@@ -993,10 +994,10 @@ instance KnownCRC CRC16_RIELLO where
     , _crcXorOutput = 0x0000
     }
 
-data CRC16_SPI_FUJITSU
-instance KnownCRC CRC16_SPI_FUJITSU where
-  type CRCWidth CRC16_SPI_FUJITSU = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_spi_fujitsu
+instance KnownCrc Crc16_spi_fujitsu where
+  type CrcWidth Crc16_spi_fujitsu = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1021
@@ -1005,12 +1006,12 @@ instance KnownCRC CRC16_SPI_FUJITSU where
     , _crcReflectOutput = False
     , _crcXorOutput = 0x0000
     }
-type CRC16_AUG_CCITT = CRC16_SPI_FUJITSU
+type Crc16_aug_ccitt = Crc16_spi_fujitsu
 
-data CRC16_T10_DIF
-instance KnownCRC CRC16_T10_DIF where
-  type CRCWidth CRC16_T10_DIF = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_t10_dif
+instance KnownCrc Crc16_t10_dif where
+  type CrcWidth Crc16_t10_dif = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x8bb7
@@ -1020,10 +1021,10 @@ instance KnownCRC CRC16_T10_DIF where
     , _crcXorOutput = 0x0000
     }
 
-data CRC16_TELEDISK
-instance KnownCRC CRC16_TELEDISK where
-  type CRCWidth CRC16_TELEDISK = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_teledisk
+instance KnownCrc Crc16_teledisk where
+  type CrcWidth Crc16_teledisk = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0xa097
@@ -1033,10 +1034,10 @@ instance KnownCRC CRC16_TELEDISK where
     , _crcXorOutput = 0x0000
     }
 
-data CRC16_TMS37157
-instance KnownCRC CRC16_TMS37157 where
-  type CRCWidth CRC16_TMS37157 = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_tms37157
+instance KnownCrc Crc16_tms37157 where
+  type CrcWidth Crc16_tms37157 = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1021
@@ -1046,10 +1047,10 @@ instance KnownCRC CRC16_TMS37157 where
     , _crcXorOutput = 0x0000
     }
 
-data CRC16_UMTS
-instance KnownCRC CRC16_UMTS where
-  type CRCWidth CRC16_UMTS = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_umts
+instance KnownCrc Crc16_umts where
+  type CrcWidth Crc16_umts = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x8005
@@ -1058,13 +1059,13 @@ instance KnownCRC CRC16_UMTS where
     , _crcReflectOutput = False
     , _crcXorOutput = 0x0000
     }
-type CRC16_VERIFONE = CRC16_UMTS
-type CRC16_BUYPASS = CRC16_UMTS
+type Crc16_verifone = Crc16_umts
+type Crc16_buypass = Crc16_umts
 
-data CRC16_USB
-instance KnownCRC CRC16_USB where
-  type CRCWidth CRC16_USB = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_usb
+instance KnownCrc Crc16_usb where
+  type CrcWidth Crc16_usb = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x8005
@@ -1074,10 +1075,10 @@ instance KnownCRC CRC16_USB where
     , _crcXorOutput = 0xffff
     }
 
-data CRC16_XMODEM
-instance KnownCRC CRC16_XMODEM where
-  type CRCWidth CRC16_XMODEM = 16
-  crcParams _ dataWidth = CRCParams
+data Crc16_xmodem
+instance KnownCrc Crc16_xmodem where
+  type CrcWidth Crc16_xmodem = 16
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1021
@@ -1086,15 +1087,15 @@ instance KnownCRC CRC16_XMODEM where
     , _crcReflectOutput = False
     , _crcXorOutput = 0x0000
     }
-type CRC16_ACORN = CRC16_XMODEM
-type CRC16_LTE = CRC16_XMODEM
-type CRC16_V_41_MSB = CRC16_XMODEM
-type CRC16_ZMODEM = CRC16_XMODEM
+type Crc16_acorn = Crc16_xmodem
+type Crc16_lte = Crc16_xmodem
+type Crc16_v_41_msb = Crc16_xmodem
+type Crc16_zmodem = Crc16_xmodem
 
-data CRC17_CAN_FD
-instance KnownCRC CRC17_CAN_FD where
-  type CRCWidth CRC17_CAN_FD = 17
-  crcParams _ dataWidth = CRCParams
+data Crc17_can_fd
+instance KnownCrc Crc17_can_fd where
+  type CrcWidth Crc17_can_fd = 17
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1685b
@@ -1104,10 +1105,10 @@ instance KnownCRC CRC17_CAN_FD where
     , _crcXorOutput = 0x00000
     }
 
-data CRC21_CAN_FD
-instance KnownCRC CRC21_CAN_FD where
-  type CRCWidth CRC21_CAN_FD = 21
-  crcParams _ dataWidth = CRCParams
+data Crc21_can_fd
+instance KnownCrc Crc21_can_fd where
+  type CrcWidth Crc21_can_fd = 21
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x102899
@@ -1117,10 +1118,10 @@ instance KnownCRC CRC21_CAN_FD where
     , _crcXorOutput = 0x000000
     }
 
-data CRC24_BLE
-instance KnownCRC CRC24_BLE where
-  type CRCWidth CRC24_BLE = 24
-  crcParams _ dataWidth = CRCParams
+data Crc24_ble
+instance KnownCrc Crc24_ble where
+  type CrcWidth Crc24_ble = 24
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x00065b
@@ -1130,10 +1131,10 @@ instance KnownCRC CRC24_BLE where
     , _crcXorOutput = 0x000000
     }
 
-data CRC24_FLEXRAY_A
-instance KnownCRC CRC24_FLEXRAY_A where
-  type CRCWidth CRC24_FLEXRAY_A = 24
-  crcParams _ dataWidth = CRCParams
+data Crc24_flexray_a
+instance KnownCrc Crc24_flexray_a where
+  type CrcWidth Crc24_flexray_a = 24
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x5d6dcb
@@ -1143,10 +1144,10 @@ instance KnownCRC CRC24_FLEXRAY_A where
     , _crcXorOutput = 0x000000
     }
 
-data CRC24_FLEXRAY_B
-instance KnownCRC CRC24_FLEXRAY_B where
-  type CRCWidth CRC24_FLEXRAY_B = 24
-  crcParams _ dataWidth = CRCParams
+data Crc24_flexray_b
+instance KnownCrc Crc24_flexray_b where
+  type CrcWidth Crc24_flexray_b = 24
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x5d6dcb
@@ -1156,10 +1157,10 @@ instance KnownCRC CRC24_FLEXRAY_B where
     , _crcXorOutput = 0x000000
     }
 
-data CRC24_INTERLAKEN
-instance KnownCRC CRC24_INTERLAKEN where
-  type CRCWidth CRC24_INTERLAKEN = 24
-  crcParams _ dataWidth = CRCParams
+data Crc24_interlaken
+instance KnownCrc Crc24_interlaken where
+  type CrcWidth Crc24_interlaken = 24
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x328b63
@@ -1169,10 +1170,10 @@ instance KnownCRC CRC24_INTERLAKEN where
     , _crcXorOutput = 0xffffff
     }
 
-data CRC24_LTE_A
-instance KnownCRC CRC24_LTE_A where
-  type CRCWidth CRC24_LTE_A = 24
-  crcParams _ dataWidth = CRCParams
+data Crc24_lte_a
+instance KnownCrc Crc24_lte_a where
+  type CrcWidth Crc24_lte_a = 24
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x864cfb
@@ -1182,10 +1183,10 @@ instance KnownCRC CRC24_LTE_A where
     , _crcXorOutput = 0x000000
     }
 
-data CRC24_LTE_B
-instance KnownCRC CRC24_LTE_B where
-  type CRCWidth CRC24_LTE_B = 24
-  crcParams _ dataWidth = CRCParams
+data Crc24_lte_b
+instance KnownCrc Crc24_lte_b where
+  type CrcWidth Crc24_lte_b = 24
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x800063
@@ -1195,10 +1196,10 @@ instance KnownCRC CRC24_LTE_B where
     , _crcXorOutput = 0x000000
     }
 
-data CRC24_OPENPGP
-instance KnownCRC CRC24_OPENPGP where
-  type CRCWidth CRC24_OPENPGP = 24
-  crcParams _ dataWidth = CRCParams
+data Crc24_openpgp
+instance KnownCrc Crc24_openpgp where
+  type CrcWidth Crc24_openpgp = 24
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x864cfb
@@ -1208,10 +1209,10 @@ instance KnownCRC CRC24_OPENPGP where
     , _crcXorOutput = 0x000000
     }
 
-data CRC24_OS_9
-instance KnownCRC CRC24_OS_9 where
-  type CRCWidth CRC24_OS_9 = 24
-  crcParams _ dataWidth = CRCParams
+data Crc24_os_9
+instance KnownCrc Crc24_os_9 where
+  type CrcWidth Crc24_os_9 = 24
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x800063
@@ -1221,10 +1222,10 @@ instance KnownCRC CRC24_OS_9 where
     , _crcXorOutput = 0xffffff
     }
 
-data CRC30_CDMA
-instance KnownCRC CRC30_CDMA where
-  type CRCWidth CRC30_CDMA = 30
-  crcParams _ dataWidth = CRCParams
+data Crc30_cdma
+instance KnownCrc Crc30_cdma where
+  type CrcWidth Crc30_cdma = 30
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x2030b9c7
@@ -1234,10 +1235,10 @@ instance KnownCRC CRC30_CDMA where
     , _crcXorOutput = 0x3fffffff
     }
 
-data CRC31_PHILIPS
-instance KnownCRC CRC31_PHILIPS where
-  type CRCWidth CRC31_PHILIPS = 31
-  crcParams _ dataWidth = CRCParams
+data Crc31_philips
+instance KnownCrc Crc31_philips where
+  type CrcWidth Crc31_philips = 31
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x04c11db7
@@ -1247,10 +1248,10 @@ instance KnownCRC CRC31_PHILIPS where
     , _crcXorOutput = 0x7fffffff
     }
 
-data CRC32_AIXM
-instance KnownCRC CRC32_AIXM where
-  type CRCWidth CRC32_AIXM = 32
-  crcParams _ dataWidth = CRCParams
+data Crc32_aixm
+instance KnownCrc Crc32_aixm where
+  type CrcWidth Crc32_aixm = 32
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x814141ab
@@ -1260,10 +1261,10 @@ instance KnownCRC CRC32_AIXM where
     , _crcXorOutput = 0x00000000
     }
 
-data CRC32_AUTOSAR
-instance KnownCRC CRC32_AUTOSAR where
-  type CRCWidth CRC32_AUTOSAR = 32
-  crcParams _ dataWidth = CRCParams
+data Crc32_autosar
+instance KnownCrc Crc32_autosar where
+  type CrcWidth Crc32_autosar = 32
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0xf4acfb13
@@ -1273,10 +1274,10 @@ instance KnownCRC CRC32_AUTOSAR where
     , _crcXorOutput = 0xffffffff
     }
 
-data CRC32_BASE91_D
-instance KnownCRC CRC32_BASE91_D where
-  type CRCWidth CRC32_BASE91_D = 32
-  crcParams _ dataWidth = CRCParams
+data Crc32_base91_d
+instance KnownCrc Crc32_base91_d where
+  type CrcWidth Crc32_base91_d = 32
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0xa833982b
@@ -1286,10 +1287,10 @@ instance KnownCRC CRC32_BASE91_D where
     , _crcXorOutput = 0xffffffff
     }
 
-data CRC32_BZIP2
-instance KnownCRC CRC32_BZIP2 where
-  type CRCWidth CRC32_BZIP2 = 32
-  crcParams _ dataWidth = CRCParams
+data Crc32_bzip2
+instance KnownCrc Crc32_bzip2 where
+  type CrcWidth Crc32_bzip2 = 32
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x04c11db7
@@ -1298,13 +1299,13 @@ instance KnownCRC CRC32_BZIP2 where
     , _crcReflectOutput = False
     , _crcXorOutput = 0xffffffff
     }
-type CRC32_AAL5 = CRC32_BZIP2
-type CRC32_DECT_B = CRC32_BZIP2
+type Crc32_aal5 = Crc32_bzip2
+type Crc32_dect_b = Crc32_bzip2
 
-data CRC32_CD_ROM_EDC
-instance KnownCRC CRC32_CD_ROM_EDC where
-  type CRCWidth CRC32_CD_ROM_EDC = 32
-  crcParams _ dataWidth = CRCParams
+data Crc32_cd_rom_edc
+instance KnownCrc Crc32_cd_rom_edc where
+  type CrcWidth Crc32_cd_rom_edc = 32
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x8001801b
@@ -1314,10 +1315,10 @@ instance KnownCRC CRC32_CD_ROM_EDC where
     , _crcXorOutput = 0x00000000
     }
 
-data CRC32_CKSUM
-instance KnownCRC CRC32_CKSUM where
-  type CRCWidth CRC32_CKSUM = 32
-  crcParams _ dataWidth = CRCParams
+data Crc32_cksum
+instance KnownCrc Crc32_cksum where
+  type CrcWidth Crc32_cksum = 32
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x04c11db7
@@ -1326,12 +1327,12 @@ instance KnownCRC CRC32_CKSUM where
     , _crcReflectOutput = False
     , _crcXorOutput = 0xffffffff
     }
-type CRC32_POSIX = CRC32_CKSUM
+type Crc32_posix = Crc32_cksum
 
-data CRC32_ISCSI
-instance KnownCRC CRC32_ISCSI where
-  type CRCWidth CRC32_ISCSI = 32
-  crcParams _ dataWidth = CRCParams
+data Crc32_iscsi
+instance KnownCrc Crc32_iscsi where
+  type CrcWidth Crc32_iscsi = 32
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x1edc6f41
@@ -1340,14 +1341,14 @@ instance KnownCRC CRC32_ISCSI where
     , _crcReflectOutput = True
     , _crcXorOutput = 0xffffffff
     }
-type CRC32_BASE91_C = CRC32_ISCSI
-type CRC32_CASTAGNOLI = CRC32_ISCSI
-type CRC32_INTERLAKEN = CRC32_ISCSI
+type Crc32_base91_c = Crc32_iscsi
+type Crc32_castagnoli = Crc32_iscsi
+type Crc32_interlaken = Crc32_iscsi
 
-data CRC32_ISO_HDLC
-instance KnownCRC CRC32_ISO_HDLC where
-  type CRCWidth CRC32_ISO_HDLC = 32
-  crcParams _ dataWidth = CRCParams
+data Crc32_iso_hdlc
+instance KnownCrc Crc32_iso_hdlc where
+  type CrcWidth Crc32_iso_hdlc = 32
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x04c11db7
@@ -1356,16 +1357,16 @@ instance KnownCRC CRC32_ISO_HDLC where
     , _crcReflectOutput = True
     , _crcXorOutput = 0xffffffff
     }
-type CRC32_ADCCP = CRC32_ISO_HDLC
-type CRC32_V_42 = CRC32_ISO_HDLC
-type CRC32_XZ = CRC32_ISO_HDLC
-type CRC32_PKZIP = CRC32_ISO_HDLC
-type CRC32_ETHERNET = CRC32_ISO_HDLC
+type Crc32_adccp = Crc32_iso_hdlc
+type Crc32_v_42 = Crc32_iso_hdlc
+type Crc32_xz = Crc32_iso_hdlc
+type Crc32_pkzip = Crc32_iso_hdlc
+type Crc32_ethernet = Crc32_iso_hdlc
 
-data CRC32_JAMCRC
-instance KnownCRC CRC32_JAMCRC where
-  type CRCWidth CRC32_JAMCRC = 32
-  crcParams _ dataWidth = CRCParams
+data Crc32_jamcrc
+instance KnownCrc Crc32_jamcrc where
+  type CrcWidth Crc32_jamcrc = 32
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x04c11db7
@@ -1375,10 +1376,10 @@ instance KnownCRC CRC32_JAMCRC where
     , _crcXorOutput = 0x00000000
     }
 
-data CRC32_MEF
-instance KnownCRC CRC32_MEF where
-  type CRCWidth CRC32_MEF = 32
-  crcParams _ dataWidth = CRCParams
+data Crc32_mef
+instance KnownCrc Crc32_mef where
+  type CrcWidth Crc32_mef = 32
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x741b8cd7
@@ -1388,10 +1389,10 @@ instance KnownCRC CRC32_MEF where
     , _crcXorOutput = 0x00000000
     }
 
-data CRC32_MPEG_2
-instance KnownCRC CRC32_MPEG_2 where
-  type CRCWidth CRC32_MPEG_2 = 32
-  crcParams _ dataWidth = CRCParams
+data Crc32_mpeg_2
+instance KnownCrc Crc32_mpeg_2 where
+  type CrcWidth Crc32_mpeg_2 = 32
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x04c11db7
@@ -1401,10 +1402,10 @@ instance KnownCRC CRC32_MPEG_2 where
     , _crcXorOutput = 0x00000000
     }
 
-data CRC32_XFER
-instance KnownCRC CRC32_XFER where
-  type CRCWidth CRC32_XFER = 32
-  crcParams _ dataWidth = CRCParams
+data Crc32_xfer
+instance KnownCrc Crc32_xfer where
+  type CrcWidth Crc32_xfer = 32
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x000000af
@@ -1414,10 +1415,10 @@ instance KnownCRC CRC32_XFER where
     , _crcXorOutput = 0x00000000
     }
 
-data CRC40_GSM
-instance KnownCRC CRC40_GSM where
-  type CRCWidth CRC40_GSM = 40
-  crcParams _ dataWidth = CRCParams
+data Crc40_gsm
+instance KnownCrc Crc40_gsm where
+  type CrcWidth Crc40_gsm = 40
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x0004820009
@@ -1427,10 +1428,10 @@ instance KnownCRC CRC40_GSM where
     , _crcXorOutput = 0xffffffffff
     }
 
-data CRC64_ECMA_182
-instance KnownCRC CRC64_ECMA_182 where
-  type CRCWidth CRC64_ECMA_182 = 64
-  crcParams _ dataWidth = CRCParams
+data Crc64_ecma_182
+instance KnownCrc Crc64_ecma_182 where
+  type CrcWidth Crc64_ecma_182 = 64
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x42f0e1eba9ea3693
@@ -1440,10 +1441,10 @@ instance KnownCRC CRC64_ECMA_182 where
     , _crcXorOutput = 0x0000000000000000
     }
 
-data CRC64_GO_ISO
-instance KnownCRC CRC64_GO_ISO where
-  type CRCWidth CRC64_GO_ISO = 64
-  crcParams _ dataWidth = CRCParams
+data Crc64_go_iso
+instance KnownCrc Crc64_go_iso where
+  type CrcWidth Crc64_go_iso = 64
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x000000000000001b
@@ -1453,10 +1454,10 @@ instance KnownCRC CRC64_GO_ISO where
     , _crcXorOutput = 0xffffffffffffffff
     }
 
-data CRC64_MS
-instance KnownCRC CRC64_MS where
-  type CRCWidth CRC64_MS = 64
-  crcParams _ dataWidth = CRCParams
+data Crc64_ms
+instance KnownCrc Crc64_ms where
+  type CrcWidth Crc64_ms = 64
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x259c84cba6426349
@@ -1466,10 +1467,10 @@ instance KnownCRC CRC64_MS where
     , _crcXorOutput = 0x0000000000000000
     }
 
-data CRC64_REDIS
-instance KnownCRC CRC64_REDIS where
-  type CRCWidth CRC64_REDIS = 64
-  crcParams _ dataWidth = CRCParams
+data Crc64_redis
+instance KnownCrc Crc64_redis where
+  type CrcWidth Crc64_redis = 64
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0xad93d23594c935a9
@@ -1479,10 +1480,10 @@ instance KnownCRC CRC64_REDIS where
     , _crcXorOutput = 0x0000000000000000
     }
 
-data CRC64_WE
-instance KnownCRC CRC64_WE where
-  type CRCWidth CRC64_WE = 64
-  crcParams _ dataWidth = CRCParams
+data Crc64_we
+instance KnownCrc Crc64_we where
+  type CrcWidth Crc64_we = 64
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x42f0e1eba9ea3693
@@ -1492,10 +1493,10 @@ instance KnownCRC CRC64_WE where
     , _crcXorOutput = 0xffffffffffffffff
     }
 
-data CRC64_XZ
-instance KnownCRC CRC64_XZ where
-  type CRCWidth CRC64_XZ = 64
-  crcParams _ dataWidth = CRCParams
+data Crc64_xz
+instance KnownCrc Crc64_xz where
+  type CrcWidth Crc64_xz = 64
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x42f0e1eba9ea3693
@@ -1504,12 +1505,12 @@ instance KnownCRC CRC64_XZ where
     , _crcReflectOutput = True
     , _crcXorOutput = 0xffffffffffffffff
     }
-type CRC64_ECMA = CRC64_XZ
+type Crc64_ecma = Crc64_xz
 
-data CRC82_DARC
-instance KnownCRC CRC82_DARC where
-  type CRCWidth CRC82_DARC = 82
-  crcParams _ dataWidth = CRCParams
+data Crc82_darc
+instance KnownCrc Crc82_darc where
+  type CrcWidth Crc82_darc = 82
+  crcParams _ dataWidth = CrcParams
     { _crcWidth = SNat
     , _crcDataWidth = dataWidth
     , _crcPolynomial = 0x0308c0111011401440411

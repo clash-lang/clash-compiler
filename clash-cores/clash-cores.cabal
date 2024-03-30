@@ -123,6 +123,9 @@ library
   hs-source-dirs: src
 
   exposed-modules:
+    Clash.Cores.Crc
+    Clash.Cores.Crc.Internal
+    Clash.Cores.Crc.Catalog
     Clash.Cores.CRC
     Clash.Cores.CRC.Internal
     Clash.Cores.CRC.Catalog
@@ -191,7 +194,7 @@ test-suite unittests
     buildable: False
 
   other-Modules:
-    Test.Cores.CRC
+    Test.Cores.Crc
     Test.Cores.Internal.SampleSPI
     Test.Cores.Internal.Signals
     Test.Cores.SPI
