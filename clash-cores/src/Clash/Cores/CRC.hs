@@ -64,16 +64,18 @@ Notice that the 'crcEngine' has a latency of one clock cycle.
 
 module Clash.Cores.CRC
   ( CRCParams(..)
+  , KnownCRC(..)
   -- ** Software
   , SoftwareCRC
   , mkSoftwareCRC
   , reset
   , feed
   , digest
+  , rawResidue
   , residue
   -- ** Hardware
   , HardwareCRC
-  , CRCHardwareParams
+  , deriveHardwareCRC
   , crcEngine
   , crcValidator
   ) where

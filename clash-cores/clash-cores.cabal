@@ -126,7 +126,6 @@ library
     Clash.Cores.CRC
     Clash.Cores.CRC.Internal
     Clash.Cores.CRC.Catalog
-    Clash.Cores.CRC.Derive
     Clash.Cores.Xilinx.Internal
     Clash.Cores.Xilinx.BlockRam
     Clash.Cores.Xilinx.BlockRam.BlackBoxes
