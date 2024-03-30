@@ -12,6 +12,8 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
 
+{-# OPTIONS_HADDOCK hide #-}
+
 module Clash.Cores.CRC.Internal where
 
 import           Clash.Prelude
@@ -22,6 +24,10 @@ import qualified Data.List as L
 import           Data.Maybe
 import           Data.Proxy                  (Proxy)
 import           Unsafe.Coerce               (unsafeCoerce)
+
+import qualified Language.Haskell.TH as TH
+import qualified Language.Haskell.TH.Syntax as TH
+import           Type.Reflection
 
 -- | Contains all the parameters to generate a CRC implementation
 data CRCParams (crcWidth :: Nat) (dataWidth :: Nat)
@@ -98,11 +104,6 @@ data SoftwareCRC (crcWidth :: Nat) (dataWidth :: Nat)
 
 -- | No domain in 'SoftwareCRC'
 type instance TryDomain t (SoftwareCRC crcWidth dataWidth) = 'NotFound
-
--- | Apply function n times over input
-nTimes :: Int -> (a -> a) -> a -> a
-nTimes 0 _ x = x
-nTimes n f x = nTimes (n - 1) f (f x)
 
 -- | Apply function only when bool is True
 applyWhen :: Bool -> (a -> a) -> a -> a
@@ -196,7 +197,7 @@ feed engine@(SoftwareCRC {..}) word = go _crcParams
         applyPolyBit crcB
           | crcB .&. _crcTopBitMask > 0 = (shiftL crcB 1) `xor` _crcpolyShifted
           | otherwise                   = shiftL crcB 1
-        applyPoly crcW = nTimes (snatToNum _crcDataWidth) applyPolyBit crcW
+        applyPoly crcW = L.iterate applyPolyBit crcW L.!! snatToNum _crcDataWidth
         applyCrc crc w = applyPoly $ crc `xor` (shiftL (extend w) (snatToNum _crcWidth))
         nextCrc = applyCrc _crcCurrent $ applyWhen _crcReflectInput reverseBV word
 
@@ -384,7 +385,9 @@ type instance TryDomain t (CRCHardwareParams crcWidth dataWidth nLanes) = 'NotFo
 -- process in a single cycle. For example the stream could be byte-oriented,
 -- but processing is done @n@ bytes at a time.
 --
--- Use the 'Clash.Cores.CRC.Derive.deriveHardwareCRC'
+-- Use the 'Clash.Cores.CRC.Derive.deriveHardwareCRC' to create an instance.
+-- No instances should be implemented by hand due to requiring compile
+-- time evaluation.
 class
   ( KnownCRC crc, KnownNat dataWidth, 1 <= dataWidth, KnownNat nLanes, 1 <= nLanes)
   => HardwareCRC (crc :: Type) (dataWidth :: Nat) (nLanes :: Nat) where
@@ -392,7 +395,7 @@ class
     :: Proxy crc
     -- ^ Which CRC
     -> Proxy dataWidth
-    -- ^ What word size in bytes the hardware implementation can handle
+    -- ^ What word size in bits the hardware implementation can handle
     -> Proxy nLanes
     -- ^ The number of lanes
     -> CRCHardwareParams (CRCWidth crc) dataWidth nLanes
@@ -483,6 +486,53 @@ mkCRCHardwareParams crc dataWidth nLanes@SNat
         , _crcResidues = fmap computeResidue $ reverse indicesI
         }
 
+typeRepToTHType :: SomeTypeRep -> TH.Type
+typeRepToTHType (SomeTypeRep (Con tyCon)) = TH.ConT $ TH.Name nameBase flavor
+  where
+    nameBase = TH.mkOccName (tyConName tyCon)
+    flavor
+      = TH.NameG TH.TcClsName
+          (TH.mkPkgName $ tyConPackage tyCon)
+          (TH.mkModName $ tyConModule tyCon)
+typeRepToTHType _ = error "typeRepToTHType: Absurd, Report this to the Clash compiler team: https://github.com/clash-lang/clash-compiler/issues"
+
+-- | Derive an instance for the 'HardwareCRC' class for the given arguments
+--
+-- For example, the following derives a 'HardwareCRC' instance for the 32-bit Ethernet CRC
+-- where you can feed it 8, 16, 24 or 32 bits at a time:
+--
+-- @
+-- {\-\# LANGUAGE MultiParamTypeClasses \#-\}
+--
+-- deriveHardwareCRC (Proxy \@CRC32_ETHERNET) d8 d4
+-- @
+--
+-- For the derivation to work the @MultiParamTypeClasses@ pragma must be enabled in
+-- the module that uses 'deriveHardwareCRC'.
+--
+-- See 'HardwareCRC', 'crcEngine' and 'crcValidator' for more information about what
+-- the arguments mean.
+deriveHardwareCRC
+  :: Typeable crc
+  => KnownCRC crc
+  => 1 <= dataWidth
+  => 1 <= nLanes
+  => Proxy crc
+  -- ^ For which CRC to derive the instance
+  -> SNat dataWidth
+  -- ^ The width in bits of the words it can handle every clock cycle
+  -> SNat nLanes
+  -- ^ The number of lanes
+  -> TH.Q [TH.Dec]
+deriveHardwareCRC crc dataWidth@SNat nLanes@SNat = do
+  let crcTy = pure $ typeRepToTHType $ someTypeRep crc
+      dataWidthTy = pure $ TH.LitT $ TH.NumTyLit $ snatToNum dataWidth
+      nLanesTy = pure $ TH.LitT $ TH.NumTyLit $ snatToNum nLanes
+      hwParams = lift $ mkCRCHardwareParams crc dataWidth nLanes
+
+  [d| instance HardwareCRC $crcTy $dataWidthTy $nLanesTy where
+        crcHardwareParams _ _ _ = $hwParams |]
+
 -- | Matrix multiplication in the binary finite field
 matVecMul
   :: forall (m :: Nat)
@@ -558,10 +608,6 @@ crcEngine
   => HardwareCRC crc dataWidth nLanes
   => Proxy crc
   -- ^ The CRC
-  -> Proxy dataWidth
-  -- ^ The width of the words to feed
-  -> Proxy nLanes
-  -- ^ How many words can be fed at maximum in a single cycle
   -> Signal dom (Maybe (Index nLanes, Vec nLanes (BitVector dataWidth)))
   -- ^ The input data. @Index nLanes@ indicates how many @dataWidth@ words are
   --   valid in the vector minus 1.
@@ -571,7 +617,7 @@ crcEngine
   --
   -> Signal dom (BitVector (CRCWidth crc))
   -- ^ The resulting CRC. There is a delay of a single cycle from input to output.
-crcEngine crc dataWidth nLanes = crcEngineFromParams $ crcHardwareParams crc dataWidth nLanes
+crcEngine crc = crcEngineFromParams $ crcHardwareParams crc Proxy Proxy
 
 -- | Like 'crcEngine' but uses 'CRCHardwareParams' instead of a 'HardwareCRC' constraint
 crcEngineFromParams
@@ -615,17 +661,13 @@ crcValidator
   => HardwareCRC crc dataWidth nLanes
   => Proxy crc
   -- ^ The CRC
-  -> Proxy dataWidth
-  -- ^ The width of the words to feed
-  -> Proxy nLanes
-  -- ^ How many words can be fed at maximum in a single cycle
   -> Signal dom (Maybe (Index nLanes, Vec nLanes (BitVector dataWidth)))
   -- ^ The input data
   -> Signal dom Bool
   -- ^ Whether the CRC is valid. This is valid on the transfer of the last
   --   word in the message + crc. So there is no one clock cycle delay,
   --   in contrast with 'crcEngine'.
-crcValidator crc dataWidth nLanes = crcValidatorFromParams $ crcHardwareParams crc dataWidth nLanes
+crcValidator crc = crcValidatorFromParams $ crcHardwareParams crc Proxy Proxy
 
 -- | Like 'crcValidator' but uses 'CRCHardwareParams' instead of a 'HardwareCRC' constraint
 crcValidatorFromParams
