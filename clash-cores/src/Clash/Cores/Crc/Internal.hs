@@ -154,14 +154,7 @@ mkSoftwareCrc
   -> SNat dataWidth
   -- ^ The @dataWidth@ of the words to feed
   -> SoftwareCrc (CrcWidth crc) dataWidth
-mkSoftwareCrc p dataWidth@SNat = reset $ SoftwareCrc { .. }
-  where
-    _crcParams@CrcParams{..} = crcParams p dataWidth
-    combSNat = addSNat _crcWidth _crcDataWidth
-    _crcTopBitMask = shiftL 1 (snatToNum combSNat - 1)
-    _crcpolyShifted = shiftL (extend _crcPolynomial) (snatToNum _crcDataWidth)
-    _crcCurrent = 0
-
+mkSoftwareCrc p dataWidth = mkSoftwareCrcFromParams $ crcParams p dataWidth
 
 -- | Reset the 'SoftwareCrc'. If you want to reuse it for multiple messages
 --   you need to reset it in between messages.
@@ -325,20 +318,20 @@ mkFGMatrices crc dataWidth@SNat = FGMatrices f g
     g = postProcess $ bv2v . (\p -> runCrc 0 p) <$> onehots dataWidth
 
 -- | Vertically partition a matrix
-partitionMatrix
+partitionMat
   :: KnownNat q
   => SNat p
   -> Vec n (BitVector (p * q))
   -> Vec n (Vec p (BitVector q))
-partitionMatrix SNat mat = fmap (fmap v2bv . unconcatI . bv2v) mat
+partitionMat SNat mat = fmap (fmap v2bv . unconcatI . bv2v) mat
 
 -- | Flatten vertically partitioned matrix
-unPartitionMatrix
+unPartitionMat
   :: KnownNat q
-  => SNat p
-  -> Vec n (Vec p (BitVector q))
+  => KnownNat p
+  => Vec n (Vec p (BitVector q))
   -> Vec n (BitVector (p * q))
-unPartitionMatrix SNat mat = fmap (v2bv . concat . fmap bv2v) mat
+unPartitionMat mat = fmap (v2bv . concat . fmap bv2v) mat
 
 -- | Helper type that contains the flattened @F@ and @G@ matrices for each lane
 data CrcLaneParams (crcWidth :: Nat) (dataWidth :: Nat) (nLanes :: Nat) where
@@ -400,7 +393,7 @@ class
     -- ^ The number of lanes
     -> CrcHardwareParams (CrcWidth crc) dataWidth nLanes
 
--- | Similar to 'compareSNat' but splits into Lt, Eq and Gt instead of Le and Eq.
+-- | Similar to 'compareSNat' but splits into Lt, Eq and Gt instead of Le and Gt.
 data SNatOrdering a b where
   SNatLT2 :: forall a b. a <= (b - 1) => SNatOrdering a b
   SNatEQ2 :: forall a b. a ~ b => SNatOrdering a b
@@ -439,7 +432,7 @@ mkCrcLaneParams crc dataWidth@SNat nLanes@SNat
         where
           reflectInput = _crcReflectInput $ crcParams crc d1
           (FGMatrices f g) = mkFGMatrices crc (mulSNat nLanes dataWidth)
-          reverseLanes = unPartitionMatrix nLanes . fmap reverse . partitionMatrix nLanes
+          reverseLanes = unPartitionMat . fmap reverse . partitionMat nLanes
           fg = flattenFGMatrices $ FGMatrices f (applyWhen reflectInput reverseLanes g)
       _ -> clashCompileError "mkCrcLaneParams: Absurd, Report this to the Clash compiler team: https://github.com/clash-lang/clash-compiler/issues"
 
@@ -501,11 +494,11 @@ typeRepToTHType _ = error "typeRepToTHType: Absurd, Report this to the Clash com
 -- For example, the following derives a 'HardwareCrc' instance for the 32-bit Ethernet CRC
 -- where you can feed it 8, 16, 24 or 32 bits at a time:
 --
--- @
--- {\-\# LANGUAGE MultiParamTypeClasses \#-\}
+--   @
+--   {\-\# LANGUAGE MultiParamTypeClasses \#-\}
 --
--- deriveHardwareCrc (Proxy \@Crc32_ethernet) d8 d4
--- @
+--   $(deriveHardwareCrc (Proxy \@Crc32_ethernet) d8 d4)
+--   @
 --
 -- For the derivation to work the @MultiParamTypeClasses@ pragma must be enabled in
 -- the module that uses 'deriveHardwareCrc'.
@@ -585,7 +578,7 @@ laneStep
 laneStep (CrcHardwareParams nLanes@SNat (CrcParams SNat SNat _ _ _ _ _) laneParams _) lanePrev@SNat _ crc input
   = let lane = addSNat lanePrev d1 in case compareSNat lane nLanes of
     SNatLE -> matVecMul (getFGMatrix laneParams lane) (crc ++# (pack $ takeLe lane input))
-    _      -> clashCompileError "lookupLaneStep: Absurd, Report this to the Clash compiler team: https://github.com/clash-lang/clash-compiler/issues"
+    _      -> clashCompileError "laneStep: Absurd, Report this to the Clash compiler team: https://github.com/clash-lang/clash-compiler/issues"
 
 -- | A parallel multilane CRC engine and validator
 --
