@@ -183,7 +183,7 @@ crcValidatorEqSoftware crc nLanesI dataWidthCfg inpI
 
           hwInp = Nothing : (toVecN $ fmap Just inpsWithCrc)
           hwOut = crcValidator' (fromList hwInp)
-          hwOk = List.last $ sampleN (List.length hwInp) hwOut
+          hwOk = List.last $ sampleN (1 + List.length hwInp) hwOut
 
 
 mkCrcProps
