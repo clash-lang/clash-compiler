@@ -683,5 +683,6 @@ crcValidatorFromParams hwParams@(CrcHardwareParams _ CrcParams{..} _ residues) i
 
       nextCrcState = step <$> crcState <*> datX
       crcState = regEn _crcInitial (isJust <$> inDat) nextCrcState
-      checkResidue = fmap (residues !!) validLanesX
-      matched = mux (isJust <$> inDat) (liftA2 (==) checkResidue nextCrcState) (pure False)
+      checkResidue = fmap (residues !!) $ register undefined validLanesX
+      lastValid = register False $ isJust <$> inDat
+      matched = mux lastValid (liftA2 (==) checkResidue crcState) (pure False)
