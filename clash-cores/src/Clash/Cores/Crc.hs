@@ -20,7 +20,16 @@ Example usage:
 
 First we convert the check characters to @BitVector 8@ for processing.
 
->>> charToBV = fromIntegral . ord
+>>> :set -XMultiParamTypeClasses
+>>> import Clash.Prelude
+>>> import Clash.Sized.Vector (unsafeFromList)
+>>> import Data.Char (ord)
+>>> import qualified Data.List as List
+>>> import Data.Proxy (Proxy(..))
+>>> import Clash.Cores.Crc
+>>> import Clash.Cores.Crc.Catalog
+
+>>> charToBv = fromIntegral . ord
 >>> checkInput = fmap charToBv "123456789"
 >>> checkValue = 0xcbf43926
 
@@ -39,9 +48,13 @@ Here you need to provide a concrete @dataWidth@ and @nLanes@. Up to
 @dataWidth@ increments. See the type of 'crcEngine' to see what impact it has
 on the CRC circuit.
 
->>> $(deriveHardwareCrc (Proxy @Crc32_ethernet) d8 d4)
+>>> :{
+deriveHardwareCrc (Proxy @Crc32_ethernet) d8 d4
+dummy = 1
+:}
+
 >>> crcEngine' = exposeClockResetEnable crcEngine systemClockGen resetGen enableGen
->>> myEngine = crcEngine' (Proxy @Crc32_ethernet) (Proxy @8) (Proxy @4)
+>>> myEngine = crcEngine' (Proxy @Crc32_ethernet)
 
 We can give up to 4 bytes from @checkInput@ to our hardware CRC in the format
 of @Maybe (Index 4, Vec 4 (BitVector 8))@. The @Maybe@ indicates whether
@@ -49,14 +62,14 @@ we want to run the CRC engine this clock cycle. The @Index@ inside the @Maybe@
 indicates how many @BitVector 8@ are valid inside the @Vec@. 0 means 1 is valid.
 3 means 4 are valid.
 
->>> hwInp0 = Just (3, unsafeFromList $ fmap charToBV "1234")
->>> hwInp1 = Just (3, unsafeFromList $ fmap charToBV "5678")
->>> hwInp2 = Just (0, unsafeFromList $ fmap charToBV "9___")
+>>> hwInp0 = Just (3, unsafeFromList $ fmap charToBv "1234" :: Vec 4 (BitVector 8))
+>>> hwInp1 = Just (3, unsafeFromList $ fmap charToBv "5678")
+>>> hwInp2 = Just (0, unsafeFromList $ fmap charToBv "9___")
 >>> hwInp = [Nothing, hwInp0, hwInp1, hwInp2]
 >>> hwOut = myEngine $ fromList hwInp
 >>> crcFromHardware = List.last $ sampleN (1 + List.length hwInp) hwOut
 >>> crcFromHardware == checkValue
->>> True
+True
 
 Notice that the 'crcEngine' has a latency of one clock cycle.
 

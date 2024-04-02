@@ -34,6 +34,7 @@ data CrcParams (crcWidth :: Nat) (dataWidth :: Nat)
   = CrcParams
       { _crcWidth         :: SNat crcWidth
       -- ^ Bit width of CRC word. Also known as "width" in the Williams model.
+      --   See http://techref.massmind.org/techref/method/math/crcguide.html
       , _crcDataWidth     :: SNat dataWidth
       -- ^ Bit width of data words
       , _crcPolynomial    :: BitVector crcWidth
