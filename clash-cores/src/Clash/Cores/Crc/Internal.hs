@@ -676,13 +676,13 @@ crcValidatorFromParams
   => CrcHardwareParams crcWidth dataWidth nLanes
   -> Signal dom (Maybe (Index nLanes, Vec nLanes (BitVector dataWidth)))
   -> Signal dom Bool
-crcValidatorFromParams hwParams@(CrcHardwareParams _ CrcParams{..} _ residues) inDat = matched
+crcValidatorFromParams hwParams@(CrcHardwareParams _ CrcParams{..} _ residues) inDat = match
     where
       step = laneStep hwParams (subSNatLe (SNat @nLanes) d1) ()
       (validLanesX, datX) = unbundle $ fromJustX <$> inDat
 
       nextCrcState = step <$> crcState <*> datX
       crcState = regEn _crcInitial (isJust <$> inDat) nextCrcState
-      checkResidue = fmap (residues !!) $ register undefined validLanesX
-      lastValid = register False $ isJust <$> inDat
-      matched = mux lastValid (liftA2 (==) checkResidue crcState) (pure False)
+      matches = zipWith (==) residues <$> (fmap pure crcState)
+      rawMatch = (!!) <$> matches <*> register undefined validLanesX
+      match = (register False $ isJust <$> inDat) .&&. rawMatch
