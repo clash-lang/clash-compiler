@@ -77,7 +77,8 @@ Notice that the 'crcEngine' has a latency of one clock cycle.
 
 module Clash.Cores.Crc
   ( CrcParams(..)
-  , KnownCrc(..)
+  , KnownCrc
+  , crcParams
   -- ** Software
   , SoftwareCrc
   , mkSoftwareCrc
