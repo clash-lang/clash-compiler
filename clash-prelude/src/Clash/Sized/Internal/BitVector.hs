@@ -509,6 +509,7 @@ instance KnownNat n => NFDataX (BitVector n) where
   deepErrorX _ = undefined#
   rnfX = rwhnfX
   hasUndefined bv = isLeft (isX bv) || unsafeMask bv /= 0
+  ensureSpine = xToBV -- Converts `XException` to 'undefined#'
 
 -- | Create a binary literal
 --
