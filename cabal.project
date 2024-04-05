@@ -51,6 +51,7 @@ package clash-cores
   -- Tweak haddock stylesheet to enable word wrapping of types.
   -- We specify the default Linuwial theme as an alnernate
   -- so we're able to import its css file from the custom theme.
+  ghc-options: +RTS -qn4 -A128M -RTS -j4
   haddock-options: --theme=doc/linuwial-wrap-types.css --theme=Linuwial
 
 package clash-benchmark
