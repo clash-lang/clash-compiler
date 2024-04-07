@@ -8,11 +8,6 @@ import Clash.Explicit.Testbench
 import Data.Proxy
 import Language.Haskell.TH.Lib
 
-createDomain vXilinxSystem{vName="D3",  vPeriod=hzToPeriod 30e6}
-createDomain vXilinxSystem{vName="D5",  vPeriod=hzToPeriod 50e6}
-createDomain vXilinxSystem{vName="D10", vPeriod=hzToPeriod 100e6}
-createDomain vXilinxSystem{vName="D11", vPeriod=hzToPeriod 110e6}
-
 tb ::
   forall a b width stages n .
   ( KnownNat n, 1 <= n
@@ -65,6 +60,6 @@ expected Proxy Proxy SNat SNat SNat = listToVecTH out1
       (XpmCdcGrayConfig SNat True)
       (clockGen @a)
       (clockGen @b)
-      (fromList [0..])
+      (fromList (cycle [0..]))
 
   out1 = pack <$> sampleN (natToNum @samples) out0

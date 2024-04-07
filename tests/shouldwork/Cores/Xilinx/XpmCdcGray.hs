@@ -3,7 +3,7 @@ module XpmCdcGray where
 import Clash.Explicit.Prelude
 import Data.Proxy
 
-import XpmCdcGrayTypes (D3, D5, D10, D11)
+import XpmTestCommon (D3, D5, D10, D11)
 
 import qualified XpmCdcGrayTypes as Types
 
@@ -15,8 +15,8 @@ topEntity = 0
 tb0 = done
  where
   --                          src dst  width  stages  samples
-  done =             Types.tb @D3 @D5 @16     @4      @100     Proxy Proxy SNat expected
-  expected = $(Types.expected @D3 @D5 @16     @4      @100     Proxy Proxy SNat SNat SNat)
+  done =             Types.tb @D3 @D5 @4      @4      @100     Proxy Proxy SNat expected
+  expected = $(Types.expected @D3 @D5 @4      @4      @100     Proxy Proxy SNat SNat SNat)
 {-# ANN tb0 (TestBench 'topEntity) #-}
 
 tb1 = done

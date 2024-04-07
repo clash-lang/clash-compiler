@@ -79,7 +79,8 @@ import Clash.Core.Type                      (Type)
 import Clash.Core.Var                       (Id)
 import Clash.Core.TyCon                     (TyConMap)
 import Clash.Core.VarEnv                    (VarEnv)
-import Clash.Driver.Types                   (BindingMap, ClashEnv(..), ClashOpts(..))
+import Clash.Driver.Types
+  (BindingMap, ClashEnv(..), ClashOpts(..))
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Primitives.Types               (CompiledPrimMap)
 import Clash.Signal.Internal
@@ -361,6 +362,12 @@ data ComponentPrefix
 -- | Existentially quantified backend
 data SomeBackend where
   SomeBackend :: Backend backend => backend -> SomeBackend
+
+onSomeBackend :: (forall b. Backend b => b -> a) -> SomeBackend -> a
+onSomeBackend f (SomeBackend b) = f b
+
+fromSomeBackend :: (forall b. Backend b => b -> a) -> Lens.Getter SomeBackend a
+fromSomeBackend f = Lens.to (onSomeBackend f)
 
 type Comment = Text
 type Directive = Text
