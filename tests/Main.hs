@@ -551,6 +551,11 @@ runClashTest = defaultMain $ clashTestRoot
               , hdlSim=[Vivado]
               , buildTargets=BuildSpecific ["tb" <> show n | n <- [(0::Int)..7]]
               }
+          , runTest "DnaPortE2" def
+              { hdlTargets=[VHDL, Verilog]
+              , hdlLoad=[Vivado]
+              , hdlSim=[Vivado]
+              }
           , clashTestGroup "DcFifo"
             [ let _opts =
                     def{ hdlTargets=[VHDL, Verilog]
