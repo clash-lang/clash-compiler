@@ -144,6 +144,8 @@ library
     Clash.Cores.Xilinx.Ila
     Clash.Cores.Xilinx.Ila.Internal
     Clash.Cores.Xilinx.Internal
+    Clash.Cores.Xilinx.Unisim.DnaPortE2
+    Clash.Cores.Xilinx.Unisim.DnaPortE2.Internal
     Clash.Cores.Xilinx.VIO
     Clash.Cores.Xilinx.VIO.Internal.BlackBoxes
     Clash.Cores.Xilinx.Xpm
@@ -190,6 +192,7 @@ test-suite unittests
     Test.Cores.UART
     Test.Cores.Xilinx.BlockRam
     Test.Cores.Xilinx.DcFifo
+    Test.Cores.Xilinx.DnaPortE2
 
   build-depends:
     clash-cores,

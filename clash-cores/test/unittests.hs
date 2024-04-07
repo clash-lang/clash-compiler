@@ -15,14 +15,16 @@ import qualified Test.Cores.SPI.MultiSlave
 import qualified Test.Cores.UART
 import qualified Test.Cores.Xilinx.BlockRam
 import qualified Test.Cores.Xilinx.DcFifo
+import qualified Test.Cores.Xilinx.DnaPortE2
 
 tests :: TestTree
 tests = testGroup "Unittests"
   [ Test.Cores.SPI.tests
   , Test.Cores.SPI.MultiSlave.tests
   , Test.Cores.UART.tests
-  , Test.Cores.Xilinx.DcFifo.tests
   , Test.Cores.Xilinx.BlockRam.tests
+  , Test.Cores.Xilinx.DcFifo.tests
+  , Test.Cores.Xilinx.DnaPortE2.tests
   ]
 
 main :: IO ()
