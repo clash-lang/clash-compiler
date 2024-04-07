@@ -52,6 +52,7 @@ package clash-cores
   -- We specify the default Linuwial theme as an alnernate
   -- so we're able to import its css file from the custom theme.
   haddock-options: --theme=doc/linuwial-wrap-types.css --theme=Linuwial
+  ghc-options: +RTS -qn4 -A128M -RTS -j4
 
 package clash-benchmark
   executable-dynamic: True
