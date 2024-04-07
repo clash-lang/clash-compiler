@@ -123,7 +123,12 @@ library
   hs-source-dirs: src
 
   exposed-modules:
-    Clash.Cores.Xilinx.Internal
+    Clash.Cores.LatticeSemi.ECP5.Blackboxes.IO
+    Clash.Cores.LatticeSemi.ECP5.IO
+    Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO
+    Clash.Cores.LatticeSemi.ICE40.IO
+    Clash.Cores.SPI
+    Clash.Cores.UART
     Clash.Cores.Xilinx.BlockRam
     Clash.Cores.Xilinx.BlockRam.BlackBoxes
     Clash.Cores.Xilinx.BlockRam.Internal
@@ -131,15 +136,16 @@ library
     Clash.Cores.Xilinx.DcFifo.Internal.BlackBoxes
     Clash.Cores.Xilinx.DcFifo.Internal.Instances
     Clash.Cores.Xilinx.DcFifo.Internal.Types
-    Clash.Cores.Xilinx.Ila
-    Clash.Cores.Xilinx.Ila.Internal
-    Clash.Cores.Xilinx.VIO
-    Clash.Cores.Xilinx.VIO.Internal.BlackBoxes
     Clash.Cores.Xilinx.Floating
     Clash.Cores.Xilinx.Floating.Annotations
     Clash.Cores.Xilinx.Floating.BlackBoxes
     Clash.Cores.Xilinx.Floating.Explicit
     Clash.Cores.Xilinx.Floating.Internal
+    Clash.Cores.Xilinx.Ila
+    Clash.Cores.Xilinx.Ila.Internal
+    Clash.Cores.Xilinx.Internal
+    Clash.Cores.Xilinx.VIO
+    Clash.Cores.Xilinx.VIO.Internal.BlackBoxes
     Clash.Cores.Xilinx.Xpm
     Clash.Cores.Xilinx.Xpm.Cdc
     Clash.Cores.Xilinx.Xpm.Cdc.ArraySingle
@@ -149,12 +155,6 @@ library
     Clash.Cores.Xilinx.Xpm.Cdc.Pulse
     Clash.Cores.Xilinx.Xpm.Cdc.Single
     Clash.Cores.Xilinx.Xpm.Cdc.SyncRst
-    Clash.Cores.SPI
-    Clash.Cores.UART
-    Clash.Cores.LatticeSemi.ICE40.IO
-    Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO
-    Clash.Cores.LatticeSemi.ECP5.IO
-    Clash.Cores.LatticeSemi.ECP5.Blackboxes.IO
 
   ghc-options:
     -fexpose-all-unfoldings
