@@ -50,5 +50,5 @@ assertIn needle haystack
 mainVHDL :: IO ()
 mainVHDL = do
   [topDir] <- getArgs
-  content <- readFile (topDir </> show 'topEntity </> "topEntity1.vhdl")
+  content <- readFile (topDir </> show 'topEntity </> "bbWrapper.vhdl")
   assertIn "this should end up in HDL with OPAQUE" content
