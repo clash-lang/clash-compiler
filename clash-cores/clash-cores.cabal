@@ -126,10 +126,6 @@ library
     Clash.Cores.Crc
     Clash.Cores.Crc.Internal
     Clash.Cores.Crc.Catalog
-    Clash.Cores.CRC
-    Clash.Cores.CRC.Internal
-    Clash.Cores.CRC.Catalog
-    Clash.Cores.CRC.Derive
     Clash.Cores.LatticeSemi.ECP5.Blackboxes.IO
     Clash.Cores.LatticeSemi.ECP5.IO
     Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO

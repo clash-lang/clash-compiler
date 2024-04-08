@@ -18,16 +18,15 @@ computations. It's not intended to be used on hardware.
 
 Example usage:
 
-First we convert the check characters to @BitVector 8@ for processing.
-
 >>> :set -XMultiParamTypeClasses
 >>> import Clash.Prelude
 >>> import Clash.Sized.Vector (unsafeFromList)
 >>> import Data.Char (ord)
 >>> import qualified Data.List as List
->>> import Data.Proxy (Proxy(..))
 >>> import Clash.Cores.Crc
 >>> import Clash.Cores.Crc.Catalog
+
+First we convert the check characters to @BitVector 8@ for processing.
 
 >>> charToBv = fromIntegral . ord
 >>> checkInput = fmap charToBv "123456789"
@@ -36,7 +35,7 @@ First we convert the check characters to @BitVector 8@ for processing.
 Here we instantiate a software CRC engine for the 32-bit Ethernet CRC
 that can handle @BitVector 8@ input and use it to compute the CRC.
 
->>> softwareCrc = mkSoftwareCrc (Proxy @Crc32_ethernet) d8
+>>> softwareCrc = mkSoftwareCrc Crc32_ethernet d8
 >>> crcFromSoftware = digest $ List.foldl' feed softwareCrc checkInput
 >>> crcFromSoftware == checkValue
 True
@@ -49,12 +48,17 @@ Here you need to provide a concrete @dataWidth@ and @nLanes@. Up to
 on the CRC circuit.
 
 >>> :{
-deriveHardwareCrc (Proxy @Crc32_ethernet) d8 d4
+deriveHardwareCrc Crc32_ethernet d8 d4
 dummy = 1
 :}
 
 >>> crcEngine' = exposeClockResetEnable crcEngine systemClockGen resetGen enableGen
->>> myEngine = crcEngine' (Proxy @Crc32_ethernet)
+>>> myEngine = crcEngine' Crc32_ethernet
+
+Note how we hinted to @clashi@ that our multi-line command was a list of
+declarations by including a dummy declaration @dummy = 1@. Without this trick,
+@clashi@ would expect an expression and the Template Haskell emitted by
+@deriveHardwareCrc@ would not work.
 
 We can give up to 4 bytes from @checkInput@ to our hardware CRC in the format
 of @Maybe (Index 4, Vec 4 (BitVector 8))@. The @Maybe@ indicates whether
@@ -66,7 +70,7 @@ indicates how many @BitVector 8@ are valid inside the @Vec@. 0 means 1 is valid.
 >>> hwInp1 = Just (3, unsafeFromList $ fmap charToBv "5678")
 >>> hwInp2 = Just (0, unsafeFromList $ fmap charToBv "9___")
 >>> hwInp = [Nothing, hwInp0, hwInp1, hwInp2]
->>> hwOut = myEngine $ fromList hwInp
+>>> hwOut = myEngine (pure False) (fromList hwInp)
 >>> crcFromHardware = List.last $ sampleN (1 + List.length hwInp) hwOut
 >>> crcFromHardware == checkValue
 True
