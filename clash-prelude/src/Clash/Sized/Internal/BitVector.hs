@@ -2,7 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2019     , Gergő Érdi
                   2016-2019, Myrtle Software Ltd,
-                  2021-2022, QBayLogic B.V.
+                  2021-2024, QBayLogic B.V.
                   2023     , Nadia Chambers
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -131,10 +131,12 @@ module Clash.Sized.Internal.BitVector
   , undefError
   , checkUnpackUndef
   , bitPattern
+  , xToBV
   )
 where
 
 import Control.DeepSeq            (NFData (..))
+import Control.Exception          (catch, evaluate)
 import Control.Lens               (Index, Ixed (..), IxValue)
 import Data.Bits                  (Bits (..), FiniteBits (..))
 import Data.Data                  (Data)
@@ -183,6 +185,7 @@ import Language.Haskell.TH        (Quote)
 #else
 import Language.Haskell.TH        (TypeQ)
 #endif
+import System.IO.Unsafe               (unsafeDupablePerformIO)
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
                                    coarbitraryIntegral, shrinkIntegral)
@@ -194,7 +197,7 @@ import Clash.Class.Resize         (Resize (..))
 import Clash.Promoted.Nat
   (SNat (..), SNatLE (..), compareSNat, snatToInteger, snatToNum, natToNum)
 import Clash.XException
-  (ShowX (..), NFDataX (..), errorX, isX, showsPrecXWith, rwhnfX)
+  (ShowX (..), NFDataX (..), errorX, isX, showsPrecXWith, rwhnfX, XException(..))
 
 import Clash.Sized.Internal.Mod
 
@@ -1605,3 +1608,11 @@ bitPattern s = [p| ((\_x -> $preprocess) -> $tuple) |]
       | otherwise = error $
         "Invalid bit pattern: " ++ show c ++
         ", expecting one of '0', '1', '.', '_', or a lowercase alphabetic character"
+
+xToBV :: KnownNat n => BitVector n -> BitVector n
+xToBV x =
+  unsafeDupablePerformIO (catch (evaluate x)
+                                (\(XException _) -> return undefined#))
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE xToBV #-}
+{-# ANN xToBV hasBlackBox #-}
