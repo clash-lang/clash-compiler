@@ -20,10 +20,8 @@ system0 clk arst = bundle (registerFile,done,fault)
   (_dout,hostAck,_busy,al,ackOut,i2cO) =
     i2c clk arst rst (pure True) (pure 19) claim i2cOp (pure True) i2cI
 
-  i2cOp = mux claim (Just <$> mux write (WriteData <$> din) (pure ReadData)) (pure Nothing)
-
-  (claim,write,din,done,fault) = unbundle $
-    config clk (bundle (rst, fmap not rst,hostAck,ackOut,al))
+  (claim,i2cOp,done,fault) =
+    unbundle $ config clk (bundle (rst,fmap not rst,hostAck,ackOut,al))
 
   (sclOut,sdaOut) = unbundle i2cO
   scl  = fmap (bitCoerce . isNothing) sclOut
@@ -46,7 +44,8 @@ systemResult :: (Vec 16 (Unsigned 8), Bool, Bool)
 systemResult = L.last (sampleN 200050 system)
 
 i2cTest :: TestTree
-i2cTest = testCase "i2c core testcase passed."
-  $ assertBool "i2c core test procedure failed" (not f)
+i2cTest = testCase "i2c core testcase passed"
+  $ assertBool "i2c core test procedure failed" (not fault)
  where
-  (_, _, f) = L.last $ takeWhile (\ (_, done, _) -> not done) $ sample system
+  fault =
+    any (\(_,_,f) -> f) (takeWhile (\ (_, done, _) -> not done) $ sample system)

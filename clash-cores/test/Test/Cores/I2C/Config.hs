@@ -4,6 +4,9 @@ module Test.Cores.I2C.Config where
 
 import Clash.Prelude
 import Clash.Explicit.SimIO
+import Numeric (showHex)
+
+import Clash.Cores.I2C.ByteMaster (I2COperation(..))
 
 data ConfStateMachine = CONFena  |
                          CONFaddr | CONFaddrAck |
@@ -12,24 +15,22 @@ data ConfStateMachine = CONFena  |
                          CONFstop
   deriving Show
 
-data ConfS = ConfS { i2cConfStateM :: ConfStateMachine
-                   , i2cClaim      :: Bool
-                   , i2cWrite      :: Bool
-                   , i2cDin        :: Vec 8 Bit
-                   , i2cLutIndex   :: Index 16
-                   , i2cFault      :: Bool
+data ConfS = ConfS { i2cConfStateM   :: ConfStateMachine
+                   , i2cConfClaim    :: Bool
+                   , i2cConfOp       :: Maybe I2COperation
+                   , i2cConfLutIndex :: Index 16
+                   , i2cConfFault    :: Bool
                    }
 
 type ConfI = (Bool,Bool,Bool,Bool,Bool)
-type ConfO = (Bool,Bool,BitVector 8,Bool,Bool)
+type ConfO = (Bool,Maybe I2COperation,Bool,Bool)
 
 confInit :: ConfS
-confInit = ConfS { i2cConfStateM = CONFena
-                 , i2cClaim      = False
-                 , i2cWrite      = False
-                 , i2cDin        = repeat low
-                 , i2cLutIndex   = 0
-                 , i2cFault      = False
+confInit = ConfS { i2cConfStateM   = CONFena
+                 , i2cConfClaim    = False
+                 , i2cConfOp       = Nothing
+                 , i2cConfLutIndex = 0
+                 , i2cConfFault    = False
                  }
 
 configT
@@ -38,7 +39,7 @@ configT
   -> SimIO ConfO
 configT s0 (rst,ena,cmdAck,rxAck,al) = do
   s <- readReg s0
-  let ConfS confStateM claim write din lutIndex fault = s
+  let ConfS confStateM claim i2cOp lutIndex fault = s
 
   let i2cSlvAddr = 0x34 :: BitVector 8
 
@@ -51,88 +52,84 @@ configT s0 (rst,ena,cmdAck,rxAck,al) = do
   sNext <- if rst then pure confInit else case confStateM of
     CONFena
       | ena && not done
-      -> pure s { i2cConfStateM = CONFaddr }
+      -> pure s { i2cConfStateM = CONFaddr
+                , i2cConfClaim  = True
+                }
       | done
       -> do display "done"
             pure s
 
     CONFaddr
-      -> pure s { i2cConfStateM = CONFaddrAck
-                , i2cClaim = True
-                , i2cWrite = True
-                , i2cDin   = unpack i2cSlvAddr
-                }
+      -> do
+        display $ "CONFaddr, writing: " <> showHex i2cSlvAddr ""
+        pure s { i2cConfStateM = CONFaddrAck
+               , i2cConfOp     = Just (WriteData (unpack i2cSlvAddr))
+               }
 
     CONFaddrAck
       | success
-      -> do display "CONFaddrAck"
-            pure s { i2cConfStateM = CONFreg
-                   , i2cWrite = False
+      -> if rxAck then do
+           display "CONFaddrAck"
+           pure s { i2cConfStateM = CONFreg
+                  , i2cConfOp     = Nothing
+                  }
+         else do
+            display "Failure CONFaddr"
+            pure s { i2cConfStateM = CONFena
+                   , i2cConfFault  = True
                    }
 
     CONFreg
-      -> if not rxAck then do
+      -> do
+        display $
+          "CONFreg, writing: " <> showHex (fst lutData) "" <>
+          ", lutIndex: " <> show lutIndex
+        pure s { i2cConfStateM = CONFregAck
+               , i2cConfOp     = Just (WriteData (unpack (fst lutData)))
+               }
+    CONFregAck
+      | success
+      -> if rxAck then do
            display "Success CONFreg"
-           pure s { i2cConfStateM = CONFregAck
-                  , i2cWrite = True
-                  , i2cDin   = unpack (fst lutData)
-                  , i2cFault = False
+           pure s { i2cConfStateM = CONFdata
+                  , i2cConfOp     = Nothing
                   }
          else do
            display "Failure CONFreg"
-           _ <- finish 1
            pure s { i2cConfStateM = CONFena
-                  , i2cFault = True
+                  , i2cConfFault  = True
                   }
 
-    CONFregAck
-      | success
-      -> do display "CONFregAck"
-            pure s { i2cConfStateM = CONFdata
-                   , i2cWrite = False
-                   }
-
     CONFdata
-      -> if not rxAck then do
+      -> do display $ "CONFdata, writing: " <> showHex (snd lutData) ""
+            pure s { i2cConfStateM = CONFdataAck
+                   , i2cConfOp     = Just (WriteData (unpack (snd lutData)))
+                   }
+    CONFdataAck
+      | success
+      -> if rxAck then do
            display "Success CONFdata"
-           pure s { i2cConfStateM = CONFdataAck
-                  , i2cWrite = True
-                  , i2cClaim = False
-                  , i2cDin = unpack (snd lutData)
-                  , i2cFault = False
+           pure s { i2cConfStateM = CONFstop
+                  , i2cConfOp     = Nothing
                   }
          else do
            display "Failure CONFdata"
-           _ <- finish 1
            pure s { i2cConfStateM = CONFena
-                  , i2cFault = True
+                  , i2cConfFault  = True
                   }
-
-    CONFdataAck
-      | success
-      -> do display "CONFdataAck"
-            pure s { i2cConfStateM = CONFstop
-                   , i2cWrite = False
-                   }
 
     CONFstop
-      -> if not rxAck then do
+      -> do
            display "Success CONFstop"
-           pure s { i2cConfStateM = CONFena
-                  , i2cLutIndex = lutIndex + 1
-                  , i2cFault = False
-                  }
-         else do
-           display "Failure CONFstop"
-           _ <- finish 1
-           pure s { i2cConfStateM = CONFena
-                  , i2cFault = True
+           pure s { i2cConfStateM   = CONFena
+                  , i2cConfClaim    = False
+                  , i2cConfLutIndex = lutIndex + 1
                   }
 
     _ -> pure s
 
   writeReg s0 sNext
-  pure (claim,write,pack din,done,fault)
+  pure (claim,i2cOp,done,fault)
 
 configLut :: Index 16 -> (BitVector  8, BitVector 8)
 configLut i
