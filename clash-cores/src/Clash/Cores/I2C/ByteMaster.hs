@@ -138,7 +138,7 @@ byteMasterT s@(ByteS {_srState = ShiftRegister {..}, ..})
 
     (Read, _) -> when coreAck $ do
       shiftsr .= True
-      coreTxd .= (bitCoerce $ not ackRead)
+      coreTxd .= bitCoerce (not ackRead)
       if cntDone then do
         byteStateM .= Ack
         coreCmd    .= I2Cwrite
@@ -156,7 +156,7 @@ byteMasterT s@(ByteS {_srState = ShiftRegister {..}, ..})
           byteStateM .= Stop
           coreCmd    .= I2Cstop
       else
-        coreTxd .= (bitCoerce $ not ackRead)
+        coreTxd .= bitCoerce (not ackRead)
 
     (Stop, _) -> when coreAck $ do
       byteStateM .= Idle
@@ -166,6 +166,6 @@ byteMasterT s@(ByteS {_srState = ShiftRegister {..}, ..})
     bitCtrl  = (_coreCmd,_coreTxd)
     i2cOpAck = (_byteStateM == Ack) && coreAck
     ackWrite = i2cOpAck && not (bitCoerce coreRxd)
-    outp = (i2cOpAck,ackWrite,v2bv dout,bitCtrl)
+    outp     = (i2cOpAck,ackWrite,v2bv dout,bitCtrl)
 
   return outp

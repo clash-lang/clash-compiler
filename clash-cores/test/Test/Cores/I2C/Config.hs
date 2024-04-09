@@ -9,10 +9,10 @@ import Numeric (showHex)
 import Clash.Cores.I2C.ByteMaster (I2COperation(..))
 
 data ConfStateMachine = CONFena  |
-                         CONFaddr | CONFaddrAck |
-                         CONFreg  | CONFregAck  |
-                         CONFdata | CONFdataAck |
-                         CONFstop
+                        CONFaddr | CONFaddrAck |
+                        CONFreg  | CONFregAck  |
+                        CONFdata | CONFdataAck |
+                        CONFstop
   deriving Show
 
 data ConfS = ConfS { i2cConfStateM   :: ConfStateMachine
@@ -22,8 +22,18 @@ data ConfS = ConfS { i2cConfStateM   :: ConfStateMachine
                    , i2cConfFault    :: Bool
                    }
 
-type ConfI = (Bool,Bool,Bool,Bool,Bool)
-type ConfO = (Bool,Maybe I2COperation,Bool,Bool)
+data ConfI = ConfI { i2cRst    :: Bool
+                   , i2cEna    :: Bool
+                   , i2cCmdAck :: Bool
+                   , i2cRxAck  :: Bool
+                   , i2cAl     :: Bool
+                   }
+
+data ConfO = ConfO { i2cClaim :: Bool
+                   , i2cOp    :: Maybe I2COperation
+                   , i2cDone  :: Bool
+                   , i2cFault :: Bool
+                   }
 
 confInit :: ConfS
 confInit = ConfS { i2cConfStateM   = CONFena
@@ -37,12 +47,11 @@ configT
   :: Reg ConfS
   -> ConfI
   -> SimIO ConfO
-configT s0 (rst,ena,cmdAck,rxAck,al) = do
+configT s0 ConfI{i2cRst=rst,i2cEna=ena,i2cCmdAck=cmdAck,i2cRxAck=rxAck,i2cAl=al} = do
   s <- readReg s0
-  let ConfS confStateM claim i2cOp lutIndex fault = s
+  let ConfS confStateM claim op lutIndex fault = s
 
   let i2cSlvAddr = 0x34 :: BitVector 8
-
 
   let success = cmdAck && not al
       done    = lutIndex == 11
@@ -129,7 +138,7 @@ configT s0 (rst,ena,cmdAck,rxAck,al) = do
     _ -> pure s
 
   writeReg s0 sNext
-  pure (claim,i2cOp,done,fault)
+  pure $ ConfO claim op done fault
 
 configLut :: Index 16 -> (BitVector  8, BitVector 8)
 configLut i

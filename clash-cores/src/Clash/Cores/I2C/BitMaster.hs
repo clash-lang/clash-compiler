@@ -70,13 +70,13 @@ bitMaster = exposeClockResetEnable (mealyB bitMasterT bitMasterInit)
 
 bitMasterInit :: BitMasterS
 bitMasterInit = BitS { _stateMachine   = stateMachineStart
-                            , _busState       = busStartState
-                            , _dout           = high       -- dout register
-                            , _dsclOen        = False      -- delayed sclOen signal
-                            , _clkEn          = True       -- statemachine clock enable
-                            , _slaveWait      = False      -- clock generation signal
-                            , _cnt            = 0          -- clock divider counter (synthesis)
-                            }
+                     , _busState       = busStartState
+                     , _dout           = high       -- dout register
+                     , _dsclOen        = False      -- delayed sclOen signal
+                     , _clkEn          = True       -- statemachine clock enable
+                     , _slaveWait      = False      -- clock generation signal
+                     , _cnt            = 0          -- clock divider counter (synthesis)
+                     }
 
 
 bitMasterT :: BitMasterS -> BitMasterI -> (BitMasterS, BitMasterO)

@@ -22,7 +22,15 @@ type ACConfTestI = (Bit,Bit)
 type ACConfTestO = (Bit,Vec 16 (Unsigned 8))
 
 i2cSlaveInit :: ACConfTestS
-i2cSlaveInit = ACCTS (replicate d16 0x0) (replicate d8 0) 0 ATidle high high high 0
+i2cSlaveInit = ACCTS { i2cSlaveRegFile  = replicate d16 0x0
+                     , i2cSlaveAddr     = replicate d8 0
+                     , i2cSlaveCntr     = 0
+                     , i2cSlaveAtStateM = ATidle
+                     , i2cSlavePrevSCL  = high
+                     , i2cSlavePrevSDA  = high
+                     , i2cSlaveSdaOut   = high
+                     , i2cSlaveRegAddr  = 0
+                     }
 
 i2cSlaveT :: Reg ACConfTestS -> ACConfTestI -> SimIO ACConfTestO
 i2cSlaveT s0 (scl,sda) = do
@@ -45,19 +53,24 @@ i2cSlaveT s0 (scl,sda) = do
       | cntr == 8 -> if validAddr then do
                        display "valid addr"
                        pure s { i2cSlaveAtStateM = ATaddrAck
-                              , i2cSlaveAddr = repeat low
-                              , i2cSlaveCntr = 0 }
+                              , i2cSlaveAddr     = repeat low
+                              , i2cSlaveCntr     = 0
+                              }
                      else do
-                       display "invalid addr"
+                       display $ "invalid addr: " <> show addr
                        pure s { i2cSlaveAtStateM = ATidle
-                              , i2cSlaveAddr = repeat low
-                              , i2cSlaveCntr = 0}
-      | sclRising ->   pure s { i2cSlaveCntr = cntr + 1
-                              , i2cSlaveAddr = addr <<+ sda
-                              , i2cSlaveSdaOut = high }
+                              , i2cSlaveAddr     = repeat low
+                              , i2cSlaveCntr     = 0
+                              }
+      | sclRising ->   pure s { i2cSlaveAddr   = addr <<+ sda
+                              , i2cSlaveCntr   = cntr + 1
+                              , i2cSlaveSdaOut = high
+                              }
     ATaddrAck
       | sclRising -> do display "addrAck"
-                        pure s { i2cSlaveAtStateM = ATreg, i2cSlaveSdaOut = low }
+                        pure s { i2cSlaveAtStateM = ATreg
+                               , i2cSlaveSdaOut   = low
+                               }
     ATreg
       | cntr == 8 -> if validRegAddr then do
                        display "valid reg addr"
@@ -67,39 +80,41 @@ i2cSlaveT s0 (scl,sda) = do
                               , i2cSlaveRegAddr  = shiftR (bitCoerce addr) 1
                               }
                      else do
-                       display "invalid reg addr"
+                       display $ "invalid reg addr: " <> show addr
                        pure s { i2cSlaveAtStateM = ATidle
-                              , i2cSlaveAddr = repeat low
-                              , i2cSlaveCntr = 0
+                              , i2cSlaveAddr     = repeat low
+                              , i2cSlaveCntr     = 0
                               }
-      | sclRising -> pure s { i2cSlaveCntr = cntr + 1
-                            , i2cSlaveAddr = addr <<+ sda
-                            , i2cSlaveSdaOut = high }
+      | sclRising -> pure s { i2cSlaveAddr   = addr <<+ sda
+                            , i2cSlaveCntr   = cntr + 1
+                            , i2cSlaveSdaOut = high
+                            }
     ATregAck
       | sclRising -> do display "regAck"
-                        pure s { i2cSlaveSdaOut = low
-                               , i2cSlaveAtStateM = ATval
+                        pure s { i2cSlaveAtStateM = ATval
+                               , i2cSlaveSdaOut   = low
                                }
     ATval
       | cntr == 8 -> do display "val"
                         pure s { i2cSlaveAtStateM = ATvalAck
-                                , i2cSlaveAddr = repeat low
-                                , i2cSlaveCntr = 0
-                                , i2cSlaveRegFile =
-                                  replace regAddr (bitCoerce addr) regFile
-                                }
-      | sclRising -> pure s { i2cSlaveCntr = cntr + 1
-                            , i2cSlaveAddr = addr <<+ sda
-                            , i2cSlaveSdaOut = high }
+                               , i2cSlaveAddr     = repeat low
+                               , i2cSlaveCntr     = 0
+                               , i2cSlaveRegFile  =
+                                 replace regAddr (bitCoerce addr) regFile
+                               }
+      | sclRising -> pure s { i2cSlaveAddr   = addr <<+ sda
+                            , i2cSlaveCntr   = cntr + 1
+                            , i2cSlaveSdaOut = high
+                            }
     ATvalAck
       | sclRising -> do display "valAck"
-                        pure s { i2cSlaveSdaOut = low
-                               , i2cSlaveAtStateM = ATstop
+                        pure s { i2cSlaveAtStateM = ATstop
+                               , i2cSlaveSdaOut   = low
                                }
     ATstop
       | stopCondition -> do display "stop"
                             pure s { i2cSlaveAtStateM = ATidle
-                                   , i2cSlaveSdaOut = high
+                                   , i2cSlaveSdaOut   = high
                                    }
     _ -> pure s
 
