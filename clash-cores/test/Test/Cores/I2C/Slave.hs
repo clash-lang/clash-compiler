@@ -4,6 +4,7 @@ module Test.Cores.I2C.Slave where
 
 import Clash.Prelude
 import Clash.Explicit.SimIO
+import Control.Monad (when)
 
 data ACConfTestS = ACCTS { i2cSlaveRegFile  :: Vec 16 (Unsigned 8)
                          , i2cSlaveAddr     :: Vec 8 Bit
@@ -13,6 +14,7 @@ data ACConfTestS = ACCTS { i2cSlaveRegFile  :: Vec 16 (Unsigned 8)
                          , i2cSlavePrevSDA  :: Bit
                          , i2cSlaveSdaOut   :: Bit
                          , i2cSlaveRegAddr  :: Unsigned 8
+                         , i2cSlaveDebug    :: Bool
                          }
 
 data AudioTestSM = ATidle | ATaddr | ATaddrAck | ATreg | ATregAck | ATval | ATvalAck | ATstop
@@ -30,13 +32,14 @@ i2cSlaveInit = ACCTS { i2cSlaveRegFile  = replicate d16 0x0
                      , i2cSlavePrevSDA  = high
                      , i2cSlaveSdaOut   = high
                      , i2cSlaveRegAddr  = 0
+                     , i2cSlaveDebug    = False
                      }
 
 i2cSlaveT :: Reg ACConfTestS -> ACConfTestI -> SimIO ACConfTestO
 i2cSlaveT s0 (scl,sda) = do
   s <- readReg s0
 
-  let ACCTS regFile addr cntr atStateM prevSCL prevSDA sdaOut regAddr = s
+  let ACCTS regFile addr cntr atStateM prevSCL prevSDA sdaOut regAddr debug = s
 
   let startCondition = (prevSDA == high && sda == low) && scl == high
       stopCondition  = (prevSDA == low && sda == high) && scl == high
@@ -47,17 +50,17 @@ i2cSlaveT s0 (scl,sda) = do
 
   stateMachine <- case atStateM of
     ATidle
-      | startCondition -> do display "start"
+      | startCondition -> do when debug $ display "start"
                              pure s {i2cSlaveAtStateM = ATaddr}
     ATaddr
       | cntr == 8 -> if validAddr then do
-                       display "valid addr"
+                       when debug $ display "valid addr"
                        pure s { i2cSlaveAtStateM = ATaddrAck
                               , i2cSlaveAddr     = repeat low
                               , i2cSlaveCntr     = 0
                               }
                      else do
-                       display $ "invalid addr: " <> show addr
+                       when debug $ display $ "invalid addr: " <> show addr
                        pure s { i2cSlaveAtStateM = ATidle
                               , i2cSlaveAddr     = repeat low
                               , i2cSlaveCntr     = 0
@@ -67,20 +70,20 @@ i2cSlaveT s0 (scl,sda) = do
                               , i2cSlaveSdaOut = high
                               }
     ATaddrAck
-      | sclRising -> do display "addrAck"
+      | sclRising -> do when debug $ display "addrAck"
                         pure s { i2cSlaveAtStateM = ATreg
                                , i2cSlaveSdaOut   = low
                                }
     ATreg
       | cntr == 8 -> if validRegAddr then do
-                       display "valid reg addr"
+                       when debug $ display "valid reg addr"
                        pure s { i2cSlaveAtStateM = ATregAck
                               , i2cSlaveAddr     = repeat low
                               , i2cSlaveCntr     = 0
                               , i2cSlaveRegAddr  = shiftR (bitCoerce addr) 1
                               }
                      else do
-                       display $ "invalid reg addr: " <> show addr
+                       when debug $ display $ "invalid reg addr: " <> show addr
                        pure s { i2cSlaveAtStateM = ATidle
                               , i2cSlaveAddr     = repeat low
                               , i2cSlaveCntr     = 0
@@ -90,12 +93,12 @@ i2cSlaveT s0 (scl,sda) = do
                             , i2cSlaveSdaOut = high
                             }
     ATregAck
-      | sclRising -> do display "regAck"
+      | sclRising -> do when debug $ display "regAck"
                         pure s { i2cSlaveAtStateM = ATval
                                , i2cSlaveSdaOut   = low
                                }
     ATval
-      | cntr == 8 -> do display "val"
+      | cntr == 8 -> do when debug $ display "val"
                         pure s { i2cSlaveAtStateM = ATvalAck
                                , i2cSlaveAddr     = repeat low
                                , i2cSlaveCntr     = 0
@@ -107,12 +110,12 @@ i2cSlaveT s0 (scl,sda) = do
                             , i2cSlaveSdaOut = high
                             }
     ATvalAck
-      | sclRising -> do display "valAck"
+      | sclRising -> do when debug $ display "valAck"
                         pure s { i2cSlaveAtStateM = ATstop
                                , i2cSlaveSdaOut   = low
                                }
     ATstop
-      | stopCondition -> do display "stop"
+      | stopCondition -> do when debug $ display "stop"
                             pure s { i2cSlaveAtStateM = ATidle
                                    , i2cSlaveSdaOut   = high
                                    }

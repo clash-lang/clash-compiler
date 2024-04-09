@@ -4,6 +4,7 @@ module Test.Cores.I2C.Config where
 
 import Clash.Prelude
 import Clash.Explicit.SimIO
+import Control.Monad (when)
 import Numeric (showHex)
 
 import Clash.Cores.I2C.ByteMaster (I2COperation(..))
@@ -20,6 +21,7 @@ data ConfS = ConfS { i2cConfStateM   :: ConfStateMachine
                    , i2cConfOp       :: Maybe I2COperation
                    , i2cConfLutIndex :: Index 16
                    , i2cConfFault    :: Bool
+                   , i2cConfDebug    :: Bool
                    }
 
 data ConfI = ConfI { i2cRst    :: Bool
@@ -41,6 +43,7 @@ confInit = ConfS { i2cConfStateM   = CONFena
                  , i2cConfOp       = Nothing
                  , i2cConfLutIndex = 0
                  , i2cConfFault    = False
+                 , i2cConfDebug    = False
                  }
 
 configT
@@ -49,7 +52,7 @@ configT
   -> SimIO ConfO
 configT s0 ConfI{i2cRst=rst,i2cEna=ena,i2cCmdAck=cmdAck,i2cRxAck=rxAck,i2cAl=al} = do
   s <- readReg s0
-  let ConfS confStateM claim op lutIndex fault = s
+  let ConfS confStateM claim op lutIndex fault debug = s
 
   let i2cSlvAddr = 0x34 :: BitVector 8
 
@@ -65,12 +68,12 @@ configT s0 ConfI{i2cRst=rst,i2cEna=ena,i2cCmdAck=cmdAck,i2cRxAck=rxAck,i2cAl=al}
                 , i2cConfClaim  = True
                 }
       | done
-      -> do display "done"
+      -> do when debug $ display "done"
             pure s
 
     CONFaddr
       -> do
-        display $ "CONFaddr, writing: " <> showHex i2cSlvAddr ""
+        when debug $ display $ "CONFaddr, writing: " <> showHex i2cSlvAddr ""
         pure s { i2cConfStateM = CONFaddrAck
                , i2cConfOp     = Just (WriteData (unpack i2cSlvAddr))
                }
@@ -78,19 +81,19 @@ configT s0 ConfI{i2cRst=rst,i2cEna=ena,i2cCmdAck=cmdAck,i2cRxAck=rxAck,i2cAl=al}
     CONFaddrAck
       | success
       -> if rxAck then do
-           display "CONFaddrAck"
+           when debug $ display "CONFaddrAck"
            pure s { i2cConfStateM = CONFreg
                   , i2cConfOp     = Nothing
                   }
          else do
-            display "Failure CONFaddr"
+            when debug $ display "Failure CONFaddr"
             pure s { i2cConfStateM = CONFena
                    , i2cConfFault  = True
                    }
 
     CONFreg
       -> do
-        display $
+        when debug $ display $
           "CONFreg, writing: " <> showHex (fst lutData) "" <>
           ", lutIndex: " <> show lutIndex
         pure s { i2cConfStateM = CONFregAck
@@ -99,37 +102,37 @@ configT s0 ConfI{i2cRst=rst,i2cEna=ena,i2cCmdAck=cmdAck,i2cRxAck=rxAck,i2cAl=al}
     CONFregAck
       | success
       -> if rxAck then do
-           display "Success CONFreg"
+           when debug $ display "Success CONFreg"
            pure s { i2cConfStateM = CONFdata
                   , i2cConfOp     = Nothing
                   }
          else do
-           display "Failure CONFreg"
+           when debug $ display "Failure CONFreg"
            pure s { i2cConfStateM = CONFena
                   , i2cConfFault  = True
                   }
 
     CONFdata
-      -> do display $ "CONFdata, writing: " <> showHex (snd lutData) ""
+      -> do when debug $ display $ "CONFdata, writing: " <> showHex (snd lutData) ""
             pure s { i2cConfStateM = CONFdataAck
                    , i2cConfOp     = Just (WriteData (unpack (snd lutData)))
                    }
     CONFdataAck
       | success
       -> if rxAck then do
-           display "Success CONFdata"
+           when debug $ display "Success CONFdata"
            pure s { i2cConfStateM = CONFstop
                   , i2cConfOp     = Nothing
                   }
          else do
-           display "Failure CONFdata"
+           when debug $ display "Failure CONFdata"
            pure s { i2cConfStateM = CONFena
                   , i2cConfFault  = True
                   }
 
     CONFstop
       -> do
-           display "Success CONFstop"
+           when debug $ display "Success CONFstop"
            pure s { i2cConfStateM   = CONFena
                   , i2cConfClaim    = False
                   , i2cConfLutIndex = lutIndex + 1
