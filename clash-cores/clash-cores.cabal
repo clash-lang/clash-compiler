@@ -158,6 +158,9 @@ library
     Clash.Cores.Xilinx.Xpm.Cdc.Single
     Clash.Cores.Xilinx.Xpm.Cdc.SyncRst
 
+  other-modules:
+    Data.Text.Extra
+
   ghc-options:
     -fexpose-all-unfoldings
     -fno-worker-wrapper
