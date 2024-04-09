@@ -1,5 +1,5 @@
 {-|
-Copyright   : (C) 2021-2022, QBayLogic B.V.
+Copyright   : (C) 2021-2024, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -68,7 +68,7 @@ genBitVector =
     , (10, Gen.constant undefined#)
     ]
  where
-  genNatural = Gen.integral $ constant 0 (2^natToNatural @n)
+  genNatural = Gen.integral $ constant 0 (2^natToNatural @n - 1)
 
 data SomeBitVector atLeast where
   SomeBitVector :: SNat n -> BitVector (atLeast + n) -> SomeBitVector atLeast
