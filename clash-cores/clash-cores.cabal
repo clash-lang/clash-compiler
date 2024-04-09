@@ -157,6 +157,9 @@ library
     Clash.Cores.LatticeSemi.ECP5.IO
     Clash.Cores.LatticeSemi.ECP5.Blackboxes.IO
 
+  other-modules:
+    Data.Text.Extra
+
   ghc-options:
     -fexpose-all-unfoldings
     -fno-worker-wrapper
