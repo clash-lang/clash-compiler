@@ -7,7 +7,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
-module Clash.Cores.I2C.BitMaster.BusCtrl
+module Clash.Cores.Experimental.I2C.BitMaster.BusCtrl
   ( busStatusCtrl
   , BusStatusCtrl(..)
   , busStartState
@@ -18,8 +18,8 @@ import Control.Lens
 import Control.Monad
 import Control.Monad.State
 
-import Clash.Cores.I2C.BitMaster.StateMachine
-import Clash.Cores.I2C.Types
+import Clash.Cores.Experimental.I2C.BitMaster.StateMachine
+import Clash.Cores.Experimental.I2C.Types
 
 -- | Bus status control state.
 data BusStatusCtrl

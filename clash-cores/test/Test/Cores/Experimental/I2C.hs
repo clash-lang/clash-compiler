@@ -1,15 +1,15 @@
 {-# LANGUAGE CPP #-}
 
-module Test.Cores.I2C where
+module Test.Cores.Experimental.I2C where
 
 import qualified Data.List as L
 
 import Clash.Explicit.Prelude
-import Clash.Cores.I2C
+import Clash.Cores.Experimental.I2C
 
 import Data.Maybe
-import Test.Cores.I2C.Config
-import Test.Cores.I2C.Slave
+import Test.Cores.Experimental.I2C.Config
+import Test.Cores.Experimental.I2C.Slave
 import Test.Tasty
 import Test.Tasty.HUnit
 

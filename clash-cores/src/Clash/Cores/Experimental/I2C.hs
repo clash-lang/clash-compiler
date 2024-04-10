@@ -9,16 +9,15 @@
 
 {-# LANGUAGE CPP #-}
 
-module Clash.Cores.I2C
+module Clash.Cores.Experimental.I2C
   ( i2c
-  , i2cTop
-  , Clash.Cores.I2C.ByteMaster.I2COperation(..)
+  , Clash.Cores.Experimental.I2C.ByteMaster.I2COperation(..)
   ) where
 
 import Clash.Prelude hiding (read)
 
-import Clash.Cores.I2C.BitMaster
-import Clash.Cores.I2C.ByteMaster
+import Clash.Cores.Experimental.I2C.BitMaster
+import Clash.Cores.Experimental.I2C.ByteMaster
 
 -- | Core for I2C communication. Returns the output enable signals for SCL en SDA
 -- These signals assume that when they are `high`, they pull down SCL and SDA respectively.

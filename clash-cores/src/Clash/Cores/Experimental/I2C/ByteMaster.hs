@@ -7,7 +7,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
-module Clash.Cores.I2C.ByteMaster
+module Clash.Cores.Experimental.I2C.ByteMaster
   ( byteMaster
   , ByteMasterI
   , ByteMasterO
@@ -21,8 +21,8 @@ import Control.Monad
 import Control.Monad.Trans.State
 import Data.Tuple
 
-import Clash.Cores.I2C.ByteMaster.ShiftRegister
-import Clash.Cores.I2C.Types
+import Clash.Cores.Experimental.I2C.ByteMaster.ShiftRegister
+import Clash.Cores.Experimental.I2C.Types
 import Data.Maybe (fromJust)
 
 data ByteStateMachine = Idle | Active | Start | Read | Write | Ack | Stop
@@ -67,8 +67,8 @@ type ByteMasterO = (Bool,Bool,BitVector 8,BitCtrlSig)
 
 -- | Byte level controller, takes care of correctly executing i2c communication
 -- based on the supplied control signals. It should be instantiated alongside
--- 'Clash.Cores.I2C.BitMaster.bitMaster'. The outgoing 'BitCtrlSig' controls the
--- 'Clash.Cores.I2C.BitMaster.bitMaster. whose 'BitRespSig' should be supplied as last
+-- 'Clash.Cores.Experimental.I2C.BitMaster.bitMaster'. The outgoing 'BitCtrlSig' controls the
+-- 'Clash.Cores.Experimental.I2C.BitMaster.bitMaster. whose 'BitRespSig' should be supplied as last
 -- input.
 byteMaster
   :: KnownDomain dom

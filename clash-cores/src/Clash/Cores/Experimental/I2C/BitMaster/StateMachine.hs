@@ -7,14 +7,14 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
-module Clash.Cores.I2C.BitMaster.StateMachine where
+module Clash.Cores.Experimental.I2C.BitMaster.StateMachine where
 
 import Clash.Prelude hiding (Read)
 import Control.Lens hiding (Index)
 import Control.Monad
 import Control.Monad.State
 
-import Clash.Cores.I2C.Types
+import Clash.Cores.Experimental.I2C.Types
 
 -- | States for bit-level I2C operations.
 data BitStateMachine

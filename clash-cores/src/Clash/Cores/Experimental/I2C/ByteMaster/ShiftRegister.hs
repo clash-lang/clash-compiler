@@ -6,7 +6,7 @@
 -}
 
 {-# LANGUAGE RecordWildCards #-}
-module Clash.Cores.I2C.ByteMaster.ShiftRegister where
+module Clash.Cores.Experimental.I2C.ByteMaster.ShiftRegister where
 
 import Clash.Prelude
 

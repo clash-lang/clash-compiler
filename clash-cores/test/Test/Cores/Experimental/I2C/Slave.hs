@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 
-module Test.Cores.I2C.Slave where
+module Test.Cores.Experimental.I2C.Slave where
 
 import Clash.Prelude
 import Clash.Explicit.SimIO

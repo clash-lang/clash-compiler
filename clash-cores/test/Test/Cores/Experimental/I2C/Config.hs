@@ -1,13 +1,13 @@
 {-# LANGUAGE CPP #-}
 
-module Test.Cores.I2C.Config where
+module Test.Cores.Experimental.I2C.Config where
 
 import Clash.Prelude
 import Clash.Explicit.SimIO
 import Control.Monad (when)
 import Numeric (showHex)
 
-import Clash.Cores.I2C.ByteMaster (I2COperation(..))
+import Clash.Cores.Experimental.I2C.ByteMaster (I2COperation(..))
 
 data ConfStateMachine = CONFena  |
                         CONFaddr | CONFaddrAck |

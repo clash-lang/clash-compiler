@@ -5,7 +5,7 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
-module Clash.Cores.I2C.Types where
+module Clash.Cores.Experimental.I2C.Types where
 
 import Clash.Prelude
 

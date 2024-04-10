@@ -7,7 +7,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
-module Clash.Cores.I2C.BitMaster
+module Clash.Cores.Experimental.I2C.BitMaster
   ( bitMaster
   , BitMasterI
   , BitMasterO
@@ -20,9 +20,9 @@ import Control.Monad
 import Control.Monad.Trans.State
 import Data.Tuple
 
-import Clash.Cores.I2C.BitMaster.BusCtrl
-import Clash.Cores.I2C.BitMaster.StateMachine
-import Clash.Cores.I2C.Types
+import Clash.Cores.Experimental.I2C.BitMaster.BusCtrl
+import Clash.Cores.Experimental.I2C.BitMaster.StateMachine
+import Clash.Cores.Experimental.I2C.Types
 
 -- | Internal state of the I2C BitMaster.
 data BitMasterS
