@@ -21,9 +21,12 @@ import Clash.Cores.I2C.BitMaster
 import Clash.Cores.I2C.ByteMaster
 
 -- | Core for I2C communication. Returns the output enable signals for SCL en SDA
--- These signals assume that when they are `True`, they pull down SCL and SDA respectively.
+-- These signals assume that when they are `high`, they pull down SCL and SDA respectively.
 -- For 2-wire I2C, you can use BiSignals (`Clash.Signal.Bidirectional.BiSignalIn` and `Clash.Signal.Bidirectional.BiSignalOut`)
--- An example i2c design could look like this:
+--
+-- === __Example__
+--
+-- @
 -- i2cComp clk rst ena sclIn sdaIn = (sclOut, sdaOut)
 --  where
 --   sclOut = writeToBiSignal sclIn (mux sclOe (pure $ Just 0) (pure Nothing))
@@ -31,7 +34,7 @@ import Clash.Cores.I2C.ByteMaster
 --   (sclOe, sdaOe) = unbundle i2cO
 --   i2cIn = bundle (readFromBiSignal sclIn, readFromBiSignal sdaIn)
 --   (dout,i2cOpAck,busy,al,ackWrite,i2cOut) = i2c clk arst rst ena clkCnt claimBus i2cOp ackRead i2cI
---   ...
+-- @
 
 i2c ::
   forall dom .

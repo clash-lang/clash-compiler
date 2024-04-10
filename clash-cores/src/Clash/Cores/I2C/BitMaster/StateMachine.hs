@@ -9,7 +9,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Clash.Cores.I2C.BitMaster.StateMachine where
 
-import Clash.Prelude
+import Clash.Prelude hiding (Read)
 import Control.Lens hiding (Index)
 import Control.Monad
 import Control.Monad.State
@@ -18,7 +18,7 @@ import Clash.Cores.I2C.Types
 
 -- | States for bit-level I2C operations.
 data BitStateMachine
-  = Idle          -- ^ Idle state
+  = Idle            -- ^ Idle state
   | Start (Index 5) -- ^ Start condition state
   | Stop  (Index 4) -- ^ Stop condition state
   | Read  (Index 4) -- ^ Read operation state

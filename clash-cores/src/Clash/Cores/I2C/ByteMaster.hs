@@ -7,7 +7,12 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
-module Clash.Cores.I2C.ByteMaster (byteMaster, I2COperation(..)) where
+module Clash.Cores.I2C.ByteMaster
+  ( byteMaster
+  , ByteMasterI
+  , ByteMasterO
+  , I2COperation(..)
+  ) where
 
 import Clash.Prelude
 
@@ -33,11 +38,11 @@ getWriteData (WriteData d) = d
 data ByteMasterS
   = ByteS
   { _srState    :: ShiftRegister
-  , _byteStateM :: ByteStateMachine -- State machine
-  , _coreCmd    :: I2CCommand       -- coreCmd register
-  , _coreTxd    :: Bit              -- coreTxd register
-  , _shiftsr    :: Bool             -- shift sr
-  , _ld         :: Bool             -- load values in to sr
+  , _byteStateM :: ByteStateMachine
+  , _coreCmd    :: I2CCommand
+  , _coreTxd    :: Bit
+  , _shiftsr    :: Bool
+  , _ld         :: Bool
   }
   deriving (Generic, NFDataX, Eq)
 

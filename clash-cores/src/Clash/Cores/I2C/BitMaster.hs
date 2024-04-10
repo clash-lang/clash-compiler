@@ -7,7 +7,11 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
-module Clash.Cores.I2C.BitMaster (bitMaster) where
+module Clash.Cores.I2C.BitMaster
+  ( bitMaster
+  , BitMasterI
+  , BitMasterO
+  ) where
 
 import Clash.Prelude
 
@@ -21,24 +25,15 @@ import Clash.Cores.I2C.BitMaster.StateMachine
 import Clash.Cores.I2C.Types
 
 -- | Internal state of the I2C BitMaster.
---
--- It includes the bus status controller, bit-level state machine, and various control signals and counters.
--- The '_busState' manages the overall status of the I2C bus.
--- The '_stateMachine' handles the bit-level I2C operations.
--- The '_dout' holds the data to be sent out on the I2C bus.
--- The '_dsclOen' is a delayed version of the SCL output enable signal.
--- The '_clkEn' enables the clock for the state machine.
--- The '_slaveWait' indicates if the slave is pulling the SCL line low, causing the master to wait.
--- The '_cnt' is a counter used for clock division.
 data BitMasterS
   = BitS
-  { _busState       :: BusStatusCtrl
-  , _stateMachine   :: StateMachine
-  , _dout           :: Bit             -- dout register
-  , _dsclOen        :: Bool            -- delayed sclOen signal
-  , _clkEn          :: Bool            -- statemachine clock enable
-  , _slaveWait      :: Bool            -- clock generation signal
-  , _cnt            :: Unsigned 16     -- clock divider counter (synthesis)
+  { _busState       :: BusStatusCtrl -- ^ Manage overall status of the I2C bus.
+  , _stateMachine   :: StateMachine  -- ^ Handles the bit-level I2C operations
+  , _dout           :: Bit           -- ^  Data to be sent out on the I2C bus
+  , _dsclOen        :: Bool          -- ^ Delayed version of the SCL output enable signal
+  , _clkEn          :: Bool          -- ^ Enable the clock for the state machine
+  , _slaveWait      :: Bool          -- ^ Whether the slave is pulling the SCL line low, causing the master to wait
+  , _cnt            :: Unsigned 16   -- ^ Counter used for clock division
   }
   deriving (Generic, NFDataX)
 
@@ -46,6 +41,7 @@ makeLenses ''BitMasterS
 
 
 -- | 5-tuple containing the input interface for the BitMaster.
+--
 --  1. Resets the internal state when asserted
 --  2. Enables or disables the BitMaster
 --  3. Used for clock division
@@ -54,12 +50,14 @@ makeLenses ''BitMasterS
 type BitMasterI = (Bool,Bool,Unsigned 16,BitCtrlSig,I2CIn)
 
 -- | 3-tuple containing the output interface for the BitMaster.
+--
 -- 1. Carries command acknowledgment and other flags
 -- 2. Indicates if the BitMaster is currently busy
 -- 3. Contains the SCL and SDA output signals
 type BitMasterO = (BitRespSig,Bool,I2COut)
 
 -- | Bit level I2C controller that contains a statemachine to properly:
+--
 -- * Monitor the bus for activity and arbitration.
 -- * Read singular bits from the bus.
 -- * Write singular bits to the bus.
@@ -78,11 +76,11 @@ bitMaster = exposeClockResetEnable (mealyB bitMasterT bitMasterInit)
 bitMasterInit :: BitMasterS
 bitMasterInit = BitS { _stateMachine   = stateMachineStart
                      , _busState       = busStartState
-                     , _dout           = high       -- dout register
-                     , _dsclOen        = False      -- delayed sclOen signal
-                     , _clkEn          = True       -- statemachine clock enable
-                     , _slaveWait      = False      -- clock generation signal
-                     , _cnt            = 0          -- clock divider counter (synthesis)
+                     , _dout           = high
+                     , _dsclOen        = False
+                     , _clkEn          = True
+                     , _slaveWait      = False
+                     , _cnt            = 0
                      }
 
 

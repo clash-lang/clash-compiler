@@ -7,7 +7,11 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
-module Clash.Cores.I2C.BitMaster.BusCtrl where
+module Clash.Cores.I2C.BitMaster.BusCtrl
+  ( busStatusCtrl
+  , BusStatusCtrl(..)
+  , busStartState
+  ) where
 
 import Clash.Prelude
 import Control.Lens
@@ -20,16 +24,16 @@ import Clash.Cores.I2C.Types
 -- | Bus status control state.
 data BusStatusCtrl
   = BusStatusCtrl
-  { _sI2C           :: I2CIn       -- synchronized SCL and SDA
-  , _dI2C           :: I2CIn       -- delayed sI2C
-  , _al             :: Bool        -- internal arbitration lost signal
-  , _cI2C           :: Vec 2 I2CIn -- capture SCL and SDA
-  , _fI2C           :: Vec 3 I2CIn -- filter input for SCL and SDA
-  , _filterCnt      :: Unsigned 14 -- clock divider for filter
-  , _startCondition :: Bool        -- start detected
-  , _stopCondition  :: Bool        -- stop detected
-  , _busy           :: Bool        -- internal busy signal
-  , _cmdStop        :: Bool        -- STOP command
+  { _sI2C           :: I2CIn       -- ^ Synchronized SCL and SDA
+  , _dI2C           :: I2CIn       -- ^ Delayed sI2C
+  , _al             :: Bool        -- ^ Internal arbitration lost signal
+  , _cI2C           :: Vec 2 I2CIn -- ^ Capture SCL and SDA
+  , _fI2C           :: Vec 3 I2CIn -- ^ Filter input for SCL and SDA
+  , _filterCnt      :: Unsigned 14 -- ^ Clock divider for filter
+  , _startCondition :: Bool        -- ^ Start detected
+  , _stopCondition  :: Bool        -- ^ Stop detected
+  , _busy           :: Bool        -- ^ Internal busy signal
+  , _cmdStop        :: Bool        -- ^ Stop command
   } deriving (Generic, NFDataX)
 
 makeLenses ''BusStatusCtrl
@@ -38,32 +42,43 @@ makeLenses ''BusStatusCtrl
 busStartState :: BusStatusCtrl
 busStartState
   = BusStatusCtrl
-  { _sI2C           = (high,high)        -- synchronized SCL and SDA input
-  , _dI2C           = (high,high)        -- delayed sI2C
-  , _al             = False              -- internal arbitration lost signal
-  , _cI2C           = repeat (high,high) -- capture SCL and SDA
-  , _fI2C           = repeat (high,high) -- filter input for SCL and SDA
-  , _filterCnt      = 0                  -- clock divider for filter
-  , _startCondition = False              -- start detected
-  , _stopCondition  = False              -- stop detected
-  , _busy           = False              -- internal busy signal
-  , _cmdStop        = False              -- STOP command
+  { _sI2C           = (high,high)
+  , _dI2C           = (high,high)
+  , _al             = False
+  , _cI2C           = repeat (high,high)
+  , _fI2C           = repeat (high,high)
+  , _filterCnt      = 0
+  , _startCondition = False
+  , _stopCondition  = False
+  , _busy           = False
+  , _cmdStop        = False
   }
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE busStatusCtrl #-}
 -- | Low level bus status controller that monitors the state of the bus and performs
 -- glitch filtering. It detects start conditions, stop conditions and arbitration loss.
-busStatusCtrl :: Bool
-              -> Bool
-              -> Unsigned 16
-              -> I2CCommand
-              -> Bool
-              -> I2CIn
-              -> BitStateMachine
-              -> Bool
-              -> Bool
-              -> State BusStatusCtrl ()
+busStatusCtrl
+  :: Bool
+  -- ^ Reset
+  -> Bool
+  -- ^ Enable
+  -> Unsigned 16
+  -- ^ Clock counter used for clock division
+  -> I2CCommand
+  -- ^ I2C command
+  -> Bool
+  -- ^ Clock enable
+  -> I2CIn
+  -- ^ SCL and SDA
+  -> BitStateMachine
+  -- ^ Current state of the bit-level state machine
+  -> Bool
+  -- ^ Checks SDA status
+  -> Bool
+  -- ^ Inverted SDA output enable, False pulls the sda low.
+  -> State BusStatusCtrl ()
+  -- ^ Bus status control state
 busStatusCtrl rst ena clkCnt cmd clkEn i2cI bitStateM0 sdaChk0 sdaOen0 = do
   BusStatusCtrl {..} <- get
 
