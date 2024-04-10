@@ -1,3 +1,10 @@
+{-|
+  Copyright   :  (C) 2014, University of Twente
+                     2024, Google LLC
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 module Clash.Cores.I2C.ByteMaster (byteMaster, I2COperation(..)) where
@@ -54,9 +61,10 @@ type ByteMasterI = (Bool,Bool,Maybe I2COperation,Bool,BitRespSig)
 type ByteMasterO = (Bool,Bool,BitVector 8,BitCtrlSig)
 
 -- | Byte level controller, takes care of correctly executing i2c communication
--- based on the supplied control signals. It should be instantiated alongside 'bitMaster'.
--- The outgoing bitCtrl' controls the 'bitMaster' whose 'bitResp' should be supplied
--- as last input.
+-- based on the supplied control signals. It should be instantiated alongside
+-- 'Clash.Cores.I2C.BitMaster.bitMaster'. The outgoing 'BitCtrlSig' controls the
+-- 'Clash.Cores.I2C.BitMaster.bitMaster. whose 'BitRespSig' should be supplied as last
+-- input.
 byteMaster
   :: KnownDomain dom
   => Clock dom

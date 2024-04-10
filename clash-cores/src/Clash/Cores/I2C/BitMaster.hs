@@ -1,3 +1,10 @@
+{-|
+  Copyright   :  (C) 2014, University of Twente
+                     2024, Google LLC
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 module Clash.Cores.I2C.BitMaster (bitMaster) where
