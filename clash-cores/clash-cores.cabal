@@ -147,6 +147,8 @@ library
     Clash.Cores.Xilinx.Floating.BlackBoxes
     Clash.Cores.Xilinx.Floating.Explicit
     Clash.Cores.Xilinx.Floating.Internal
+    Clash.Cores.Xilinx.Ethernet.Gmii
+    Clash.Cores.Xilinx.Ethernet.Gmii.Internal
     Clash.Cores.Xilinx.Ila
     Clash.Cores.Xilinx.Ila.Internal
     Clash.Cores.Xilinx.Internal
@@ -206,6 +208,7 @@ test-suite unittests
     Test.Cores.Xilinx.BlockRam
     Test.Cores.Xilinx.DcFifo
     Test.Cores.Xilinx.DnaPortE2
+    Test.Cores.Xilinx.Ethernet.Gmii
 
   build-depends:
     clash-cores,
@@ -217,6 +220,7 @@ test-suite unittests
     tasty-quickcheck,
     tasty-th,
     hedgehog,
+    HUnit,
     tasty-hedgehog >= 1.2.0,
     infinite-list
 
