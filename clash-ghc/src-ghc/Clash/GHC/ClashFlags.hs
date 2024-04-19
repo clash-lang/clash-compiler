@@ -95,6 +95,7 @@ flagsClash r = [
   , defFlag "fclash-edalize"                     $ NoArg (liftEwM (setEdalize r))
   , defFlag "fclash-no-render-enums"             $ NoArg (liftEwM (setNoRenderEnums r))
   , defFlag "fclash-timescale-precision"         $ SepArg (setTimescalePrecision r)
+  , defFlag "fclash-ignore-broken-ghcs"          $ NoArg (liftEwM (setIgnoreBrokenGhcs r))
   ]
 
 -- | Print deprecated flag warning
@@ -308,6 +309,9 @@ setNoEscapedIds r = modifyIORef r (\c -> c {opt_escapedIds = False})
 
 setLowerCaseBasicIds :: IORef ClashOpts -> IO ()
 setLowerCaseBasicIds r = modifyIORef r (\c -> c {opt_lowerCaseBasicIds = ToLower})
+
+setIgnoreBrokenGhcs :: IORef ClashOpts -> IO ()
+setIgnoreBrokenGhcs r = modifyIORef r (\c -> c {opt_ignoreBrokenGhcs = True})
 
 setUltra :: IORef ClashOpts -> IO ()
 setUltra r = modifyIORef r (\c -> c {opt_ultra = True})
