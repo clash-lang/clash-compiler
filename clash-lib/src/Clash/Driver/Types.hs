@@ -400,6 +400,9 @@ data ClashOpts = ClashOpts
   , opt_timescalePrecision :: Period
   -- ^ Timescale precision set in Verilog files. E.g., setting this would sets
   -- the second part of @`timescale 100fs/100fs@.
+  , opt_ignoreBrokenGhcs :: Bool
+  -- ^ Don't error if we see a (potentially) broken GHC / platform combination.
+  -- See the project's @README.md@ for more information.
   }
   deriving (Show)
 
@@ -433,6 +436,7 @@ instance NFData ClashOpts where
     opt_edalize o `deepseq`
     opt_renderEnums o `deepseq`
     opt_timescalePrecision o `deepseq`
+    opt_ignoreBrokenGhcs o `deepseq`
     ()
 
 instance Eq ClashOpts where
@@ -464,7 +468,8 @@ instance Eq ClashOpts where
     opt_inlineWFCacheLimit s0 == opt_inlineWFCacheLimit s1 &&
     opt_edalize s0 == opt_edalize s1 &&
     opt_renderEnums s0 == opt_renderEnums s1 &&
-    opt_timescalePrecision s0 == opt_timescalePrecision s1
+    opt_timescalePrecision s0 == opt_timescalePrecision s1 &&
+    opt_ignoreBrokenGhcs s0 == opt_ignoreBrokenGhcs s1
 
    where
     eqOverridingBool :: OverridingBool -> OverridingBool -> Bool
@@ -503,7 +508,8 @@ instance Hashable ClashOpts where
     opt_inlineWFCacheLimit `hashWithSalt`
     opt_edalize `hashWithSalt`
     opt_renderEnums `hashWithSalt`
-    opt_timescalePrecision
+    opt_timescalePrecision `hashWithSalt`
+    opt_ignoreBrokenGhcs
    where
     hashOverridingBool :: Int -> OverridingBool -> Int
     hashOverridingBool s1 Auto = hashWithSalt s1 (0 :: Int)
@@ -543,6 +549,7 @@ defClashOpts
   , opt_edalize             = False
   , opt_renderEnums         = True
   , opt_timescalePrecision  = Period 100 Fs
+  , opt_ignoreBrokenGhcs    = False
   }
 
 -- | Synopsys Design Constraint (SDC) information for a component.

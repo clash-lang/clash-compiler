@@ -248,6 +248,7 @@ instance IsTest ClashGenTest where
       , "-odir", oDir
       , "-hidir", oDir
       , "-fclash-debug", "DebugSilent"
+      , "-fclash-ignore-broken-ghcs"
       , dOpaque
       ] <> cgExtraArgs
 
@@ -286,6 +287,7 @@ instance IsTest ClashBinaryTest where
       , "-o", oDir </> "out"
       , "-i" <> cbSourceDirectory
       , "-outputdir", oDir
+      , "-fclash-ignore-broken-ghcs"
       ] <> cbExtraBuildArgs <>
       [ cbSourceDirectory </> cbModName <.> "hs"
       ]

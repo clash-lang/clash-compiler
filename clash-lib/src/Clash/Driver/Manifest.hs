@@ -411,11 +411,12 @@ readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashMo
       -- 2. Caching
     , opt_cachehdl = True
 
-      -- 3. Warnings
+      -- 3. Warnings / errors
     , opt_primWarn = True
     , opt_color = Auto
     , opt_errorExtra = False
     , opt_checkIDir = True
+    , opt_ignoreBrokenGhcs = False
 
       -- 4. Optional output
     , opt_edalize = False
