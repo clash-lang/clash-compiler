@@ -9,8 +9,12 @@
 module Clash.Cores.SPI
   ( SPIMode(..)
     -- * SPI master
+  , SpiMasterIn(..)
+  , SpiMasterOut(..)
   , spiMaster
     -- * SPI slave
+  , SpiSlaveIn(..)
+  , SpiSlaveOut(..)
   , SPISlaveConfig(..)
   , spiSlave
     -- ** Vendor configured SPI slaves
@@ -26,6 +30,53 @@ import Clash.Sized.Internal.BitVector
 
 import Clash.Cores.LatticeSemi.ICE40.IO
 import Clash.Cores.LatticeSemi.ECP5.IO
+import Clash.Class.HasDomain
+
+-- | Input signals of an SPI subordinate.
+data SpiSlaveIn (ds :: BiSignalDefault) (dom :: Domain) (misoLanes :: Nat) (mosiLanes :: Nat) =
+  SpiSlaveIn {
+    spiSlaveMosi :: "MOSI" ::: Signal dom (BitVector mosiLanes),
+      -- ^ Master-out, slave-in
+    spiSlaveMisoIn :: "MISO" ::: BiSignalIn ds dom misoLanes,
+      -- ^ Master-in, slave-out
+    spiSlaveSck :: "SCK" ::: Signal dom Bit,
+      -- ^ Serial Clock
+    spiSlaveSs :: "SS" ::: Signal dom Bit
+      -- ^ Slave select
+  }
+
+type instance TryDomain t (SpiSlaveIn ds dom misoLanes mosiLanes) = 'Found dom
+
+-- | Output signals of an SPI subordinate.
+data SpiSlaveOut (ds :: BiSignalDefault) (dom :: Domain) (misoLanes :: Nat) (mosiLanes :: Nat) =
+  SpiSlaveOut {
+    spiSlaveMisoOut :: "MISO" ::: BiSignalOut ds dom misoLanes
+      -- ^ Master-in, slave-out
+  }
+
+type instance TryDomain t (SpiSlaveOut ds dom misoLanes mosiLanes) = 'Found dom
+
+-- | Output signals of an SPI master.
+data SpiMasterOut (dom :: Domain) (misoLanes :: Nat) (mosiLanes :: Nat) =
+  SpiMasterOut {
+    spiMasterMosi :: "MOSI" ::: Signal dom (BitVector mosiLanes),
+      -- ^ Master-out, slave-in
+    spiMasterSck :: "SCK" ::: Signal dom Bit,
+      -- ^ Serial Clock
+    spiMasterSs :: "SS" ::: Signal dom Bit
+      -- ^ Slave select
+  }
+
+type instance TryDomain t (SpiMasterOut dom misoLanes mosiLanes) = 'Found dom
+
+-- | Input signals of an SPI master.
+data SpiMasterIn (dom :: Domain) (misoLanes :: Nat) (mosiLanes :: Nat) =
+  SpiMasterIn {
+    spiMasterMiso :: "MISO" ::: Signal dom (BitVector misoLanes)
+      -- ^ Master-in, slave-out
+  }
+
+type instance TryDomain t (SpiMasterIn dom misoLanes mosiLanes) = 'Found dom
 
 -- | SPI mode
 --
@@ -184,35 +235,29 @@ spiSlave
    . (HiddenClockResetEnable dom, KnownNat n, 1 <= n)
   => SPISlaveConfig ds dom
   -- ^ Configure SPI mode and tri-state buffer
-  -> Signal dom Bool
-  -- ^ Serial Clock (SCLK)
-  -> Signal dom Bit
-  -- ^ Master Output Slave Input (MOSI)
-  -> BiSignalIn ds dom 1
-  -- ^ Master Input Slave Output (MISO)
-  --
-  -- Inout port connected to the tri-state buffer for the MISO
-  -> Signal dom Bool
-  -- ^ Slave select (SS)
+  -> SpiSlaveIn ds dom 1 1
+  -- ^ SPI interface
   -> Signal dom (BitVector n)
-  -- ^ Data to send from master to slave
+  -- ^ Data to send from slave to master.
   --
   -- Input is latched the moment slave select goes low
-  -> ( BiSignalOut ds dom 1
+  -> ( SpiSlaveOut ds dom 1 1
      , Signal dom Bool
      , Signal dom (Maybe (BitVector n)))
   -- ^ Parts of the tuple:
   --
   -- 1. The "out" part of the inout port of the MISO; used only for simulation.
   --
-  -- 2. (Maybe) the word send by the master
-spiSlave (SPISlaveConfig mode latch buf) sclk mosi bin ss din =
+  -- 2. the acknowledgement for the data sent from the master to the slave.
+  --
+  -- 2. (Maybe) the word sent by the master
+spiSlave (SPISlaveConfig mode latch buf) (SpiSlaveIn mosi bin sclk ss) din =
   let ssL   = if latch then delay undefined ss   else ss
       mosiL = if latch then delay undefined mosi else mosi
       sclkL = if latch then delay undefined sclk else sclk
-      (miso, ack, dout) = spiCommon mode ssL mosiL sclkL din
-      bout = buf bin (not <$> ssL) miso
-  in  (bout, ack, dout)
+      (miso, ack, dout) = spiCommon mode (bitToBool <$> ssL) (head . bv2v <$> mosiL) (bitToBool <$> sclkL) din
+      bout = buf bin (not . bitToBool <$> ssL) miso
+  in  (SpiSlaveOut bout, ack, dout)
 
 -- | SPI master configurable in the SPI mode and clock divider
 --
@@ -237,11 +282,8 @@ spiMaster
   -> Signal dom (Maybe (BitVector n))
   -- ^ Data to send from master to slave, transmission starts when receiving
   -- /Just/ a value
-  -> Signal dom Bit
-  -- ^ Master Input Slave Output (MISO)
-  -> ( Signal dom Bool -- SCK
-     , Signal dom Bit  -- MOSI
-     , Signal dom Bool -- SS
+  -> SpiMasterIn dom 1 1
+  -> ( SpiMasterOut dom 1 1
      , Signal dom Bool -- Busy
      , Signal dom Bool -- Acknowledge
      , Signal dom (Maybe (BitVector n)) -- Data: Slave -> Master
@@ -254,15 +296,15 @@ spiMaster
   -- 4. Busy signal indicating that a transmission is in progress, new words on
   --    the data line will be ignored when /True/
   -- 5. (Maybe) the word send from the slave to the master
-spiMaster mode fN fW din miso =
-  let (mosi, ack, dout)   = spiCommon mode ssL misoL sclkL
+spiMaster mode fN fW din (SpiMasterIn miso) =
+  let (mosi, ack, dout)   = spiCommon mode ssL (head . bv2v <$> misoL) sclkL
                         (fromMaybe undefined# <$> din)
       latch = snatToInteger fN /= 1
       ssL   = if latch then delay undefined ss   else ss
       misoL = if latch then delay undefined miso else miso
       sclkL = if latch then delay undefined sclk else sclk
       (ss, sclk, busy) = spiGen mode fN fW din
-  in  (sclk, mosi, ss, busy, ack, dout)
+  in  (SpiMasterOut (v2bv . singleton <$> mosi) (boolToBit <$> sclk) (boolToBit <$> ss), busy, ack, dout)
 
 -- | Generate slave select and SCK
 spiGen
@@ -339,21 +381,12 @@ spiSlaveLatticeSBIO
   --   Clock: 2*SCK < Core
   --
   -- * Set to /False/ when core clock is twice as fast, or as fast, as the SCK
-  -> Signal dom Bool
-  -- ^ Serial Clock (SCLK)
-  -> Signal dom Bit
-  -- ^ Master Output Slave Input (MOSI)
-  -> BiSignalIn 'Floating dom 1
-  -- ^ Master Input Slave Output (MISO)
-  --
-  -- Inout port connected to the tri-state buffer for the MISO
-  -> Signal dom Bool
-  -- ^ Slave select (SS)
+  -> SpiSlaveIn 'Floating dom 1 1
   -> Signal dom (BitVector n)
   -- ^ Data to send from slave to master
   --
   -- Input is latched the moment slave select goes low
-  -> ( BiSignalOut 'Floating dom 1
+  -> ( SpiSlaveOut 'Floating dom 1 1
      , Signal dom Bool
      , Signal dom (Maybe (BitVector n)))
   -- ^ Parts of the tuple:
@@ -385,21 +418,12 @@ spiSlaveLatticeBB
   --   Clock: 2*SCK < Core
   --
   -- * Set to /False/ when core clock is twice as fast, or as fast, as the SCK
-  -> Signal dom Bool
-  -- ^ Serial Clock (SCLK)
-  -> Signal dom Bit
-  -- ^ Master Output Slave Input (MOSI)
-  -> BiSignalIn 'Floating dom 1
-  -- ^ Master Input Slave Output (MISO)
-  --
-  -- Inout port connected to the tri-state buffer for the MISO
-  -> Signal dom Bool
-  -- ^ Slave select (SS)
+  -> SpiSlaveIn 'Floating dom 1 1
   -> Signal dom (BitVector n)
   -- ^ Data to send from slave to master
   --
   -- Input is latched the moment slave select goes low
-  -> ( BiSignalOut 'Floating dom 1
+  -> ( SpiSlaveOut 'Floating dom 1 1
      , Signal dom Bool
      , Signal dom (Maybe (BitVector n)))
   -- ^ Parts of the tuple:
