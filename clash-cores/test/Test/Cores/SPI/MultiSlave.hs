@@ -83,7 +83,7 @@ testMasterMultiSlave divHalf wait mVal sVal mode latch duration =
 
   (SpiMasterOut mosi sclk ss, bp, masterAck, masterOut) =
     withClockResetEnable clk rst enableGen
-      (spiMaster mode divHalf wait masterIn (SpiMasterIn $ readFromBiSignal miso))
+      (spiMaster1 mode divHalf wait masterIn (SpiMasterIn $ readFromBiSignal miso))
 
   clk = systemClockGen
   rst = systemResetGen

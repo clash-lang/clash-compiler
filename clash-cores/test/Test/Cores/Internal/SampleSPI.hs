@@ -81,7 +81,7 @@ sampleCycling genM genS divHalf wait mVals sVals mode latch duration =
 
   (SpiMasterOut mosi sclk ss, bp, mAck, mOut) =
     withClockResetEnable clk rst enableGen
-      (spiMaster mode divHalf wait masterIn (SpiMasterIn $ readFromBiSignal miso))
+      (spiMaster1 mode divHalf wait masterIn (SpiMasterIn $ readFromBiSignal miso))
 
   clk = systemClockGen
   rst = systemResetGen
