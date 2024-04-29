@@ -9,6 +9,8 @@
 module Clash.Cores.SPI
   ( SPIMode(..)
     -- * SPI master
+  , SpiMasterIn(..)
+  , SpiMasterOut(..)
   , spiMaster
     -- * SPI slave
   , SPISlaveConfig(..)
@@ -26,6 +28,29 @@ import Clash.Sized.Internal.BitVector
 
 import Clash.Cores.LatticeSemi.ICE40.IO
 import Clash.Cores.LatticeSemi.ECP5.IO
+import Clash.Class.HasDomain
+
+-- | Output signals of an SPI master.
+data SpiMasterOut (dom :: Domain) (misoLanes :: Nat) (mosiLanes :: Nat) =
+  SpiMasterOut {
+    spiMasterMosi :: "MOSI" ::: Signal dom (BitVector mosiLanes),
+      -- ^ Master-out, slave-in
+    spiMasterSck :: "SCK" ::: Signal dom Bit,
+      -- ^ Serial Clock
+    spiMasterSs :: "SS" ::: Signal dom Bit
+      -- ^ Slave select
+  }
+
+type instance TryDomain t (SpiMasterOut dom misoLanes mosiLanes) = 'Found dom
+
+-- | Input signals of an SPI master.
+data SpiMasterIn (dom :: Domain) (misoLanes :: Nat) (mosiLanes :: Nat) =
+  SpiMasterIn {
+    spiMasterMiso :: "MISO" ::: Signal dom (BitVector misoLanes)
+      -- ^ Master-in, slave-out
+  }
+
+type instance TryDomain t (SpiMasterIn dom misoLanes mosiLanes) = 'Found dom
 
 -- | SPI mode
 --
@@ -241,11 +266,8 @@ spiMaster
   -> Signal dom (Maybe (BitVector n))
   -- ^ Data to send from master to slave, transmission starts when receiving
   -- /Just/ a value
-  -> Signal dom Bit
-  -- ^ Master Input Slave Output (MISO)
-  -> ( Signal dom Bool -- SCK
-     , Signal dom Bit  -- MOSI
-     , Signal dom Bool -- SS
+  -> SpiMasterIn dom 1 1
+  -> ( SpiMasterOut dom 1 1
      , Signal dom Bool -- Busy
      , Signal dom Bool -- Acknowledge
      , Signal dom (Maybe (BitVector n)) -- Data: Slave -> Master
@@ -258,15 +280,15 @@ spiMaster
   -- 4. Busy signal indicating that a transmission is in progress, new words on
   --    the data line will be ignored when /True/
   -- 5. (Maybe) the word send from the slave to the master
-spiMaster mode fN fW din miso =
-  let (mosi, ack, dout)   = spiCommon mode ssL misoL sclkL
+spiMaster mode fN fW din (SpiMasterIn miso) =
+  let (mosi, ack, dout)   = spiCommon mode ssL (head . bv2v <$> misoL) sclkL
                         (fromMaybe undefined# <$> din)
       latch = snatToInteger fN /= 1
       ssL   = if latch then delay undefined ss   else ss
       misoL = if latch then delay undefined miso else miso
       sclkL = if latch then delay undefined sclk else sclk
       (ss, sclk, busy) = spiGen mode fN fW din
-  in  (sclk, mosi, ss, busy, ack, dout)
+  in  (SpiMasterOut (v2bv . singleton <$> mosi) sclk ss, busy, ack, dout)
 
 -- | Generate slave select and SCK
 spiGen
