@@ -12,6 +12,7 @@ module Clash.Cores.SPI
   , SpiMasterIn(..)
   , SpiMasterOut(..)
   , spiMaster
+  , spiMaster1
     -- * SPI slave
   , SPISlaveConfig(..)
   , spiSlave
@@ -133,19 +134,23 @@ data SPISlaveConfig ds dom
 
 -- | SPI capture and shift logic that is shared between slave and master
 spiCommon
-  :: forall n dom
-   . (HiddenClockResetEnable dom, KnownNat n, 1 <= n)
+  :: forall n dom inW outW
+   . ( HiddenClockResetEnable dom
+     , KnownNat inW
+     , KnownNat outW
+     , KnownNat n
+     , 1 <= n )
   => SPIMode
   -> Signal dom Bit
   -- ^ Slave select
-  -> Signal dom Bit
+  -> Signal dom (BitVector inW)
   -- ^ Slave: MOSI; Master: MISO
   -> Signal dom Bit
   -- ^ SCK
-  -> Signal dom (BitVector n)
-  -> ( Signal dom Bit   -- Slave: MISO; Master: MOSI
-     , Signal dom Bool  -- Acknowledge start of transfer
-     , Signal dom (Maybe (BitVector n))
+  -> Signal dom (Vec outW (BitVector n))
+  -> ( Signal dom (BitVector outW) -- Slave: MISO; Master: MOSI
+     , Signal dom Bool             -- Acknowledge start of transfer
+     , Signal dom (Maybe (Vec inW (BitVector n)))
      )
 spiCommon mode ssI msI sckI dinI =
   mooreB go cvt ( 0 :: Index n      -- cntR
@@ -159,13 +164,16 @@ spiCommon mode ssI msI sckI dinI =
                 (ssI,msI,sckI,dinI)
  where
   cvt (_,_,_,dataInQ,dataOutQ,ackQ,doneQ) =
-    ( head dataOutQ
+    ( v2bv $ map head dataOutQ
     , ackQ
     , if doneQ
-         then Just (pack dataInQ)
+         then Just (map v2bv dataInQ)
          else Nothing
     )
 
+  go :: (Index n, Bool, Bit, Vec inW (Vec n Bit), Vec outW (Vec n Bit), Bool, Bool)
+     -> (Bit, BitVector inW, Bit, Vec outW (BitVector n))
+     -> (Index n, Bool, Bit, Vec inW (Vec n Bit), Vec outW (Vec n Bit), Bool, Bool)
   go (cntQ,cntOldQ,sckOldQ,dataInQ,dataOutQ,_,_) (ss,ms,sck,din) =
     (cntD,cntOldD,sck,dataInD,dataOutD,ackD,doneD)
    where
@@ -174,19 +182,21 @@ spiCommon mode ssI msI sckI dinI =
       | sampleSck  = if cntQ == maxBound then 0 else cntQ + 1
       | otherwise  = cntQ
 
+    dataInD :: Vec inW (Vec n Bit)
     dataInD
       | ss == high = unpack undefined#
-      | sampleSck  = tail @(n-1) dataInQ :< ms
+      | sampleSck  = zipWith (\d m -> tail @(n-1) d :< m) dataInQ (bv2v ms)
       | otherwise  = dataInQ
 
+    dataOutD :: Vec outW (Vec n Bit)
     dataOutD
       | ss == high ||
         (sampleOnTrailing mode && sampleSck && cntQ == maxBound)
-      = unpack din
+      = fmap bv2v din
       | shiftSck
       = if sampleOnTrailing mode && cntQ == 0
         then dataOutQ
-        else tail @(n-1) dataOutQ :< unpack undefined#
+        else map (\d -> tail @(n-1) d :< unpack undefined#) dataOutQ
       | otherwise
       = dataOutQ
 
@@ -239,15 +249,62 @@ spiSlave (SPISlaveConfig mode latch buf) sclk mosi bin ss din =
   let ssL   = if latch then delay undefined ss   else ss
       mosiL = if latch then delay undefined mosi else mosi
       sclkL = if latch then delay undefined sclk else sclk
-      (miso, ack, dout) = spiCommon mode ssL mosiL sclkL din
-      bout = buf bin (fmap (== low) ssL) miso
-  in  (bout, ack, dout)
+      (miso, ack, dout) =
+        spiCommon mode ssL (pack <$> mosiL) sclkL (singleton <$> din)
+      bout = buf bin (fmap (== low) ssL) (unpack <$> miso)
+  in  (bout, ack, fmap head <$> dout)
 
 -- | SPI master configurable in the SPI mode and clock divider
 --
 -- Adds latch to MISO line if the (half period) clock divider is
 -- set to 2 or higher.
 spiMaster
+  :: forall n halfPeriod waitTime dom misoW mosiW
+   . ( HiddenClockResetEnable dom
+     , KnownNat misoW
+     , KnownNat mosiW
+     , KnownNat n
+     , 1 <= n
+     , 1 <= halfPeriod
+     , 1 <= waitTime )
+  => SPIMode
+  -- ^ SPI Mode
+  -> SNat halfPeriod
+  -- ^ Clock divider (half period)
+  --
+  -- If set to two or higher, the MISO line will be latched
+  -> SNat waitTime
+  -- ^ (core clock) cycles between de-asserting slave-select and start of
+  -- the SPI clock
+  -> Signal dom (Maybe (Vec mosiW (BitVector n)))
+  -- ^ Data to send from master to slave, transmission starts when receiving
+  -- /Just/ a value
+  -> SpiMasterIn dom misoW mosiW
+  -> ( SpiMasterOut dom misoW mosiW
+     , Signal dom Bool -- Busy
+     , Signal dom Bool -- Acknowledge
+     , Signal dom (Maybe (Vec misoW (BitVector n))) -- Data: Slave -> Master
+     )
+  -- ^ Parts of the tuple:
+  --
+  -- 1. Serial Clock (SCLK)
+  -- 2. Master Output Slave Input (MOSI)
+  -- 3. Slave select (SS)
+  -- 4. Busy signal indicating that a transmission is in progress, new words on
+  --    the data line will be ignored when /True/
+  -- 5. (Maybe) the word send from the slave to the master
+spiMaster mode fN fW din (SpiMasterIn miso) =
+  let (mosi, ack, dout)   = spiCommon mode ssL misoL sclkL
+                        (fromMaybe (repeat undefined#) <$> din)
+      latch = snatToInteger fN /= 1
+      ssL   = if latch then delay undefined ss   else ss
+      misoL = if latch then delay undefined miso else miso
+      sclkL = if latch then delay undefined sclk else sclk
+      (ss, sclk, busy) = spiGen mode fN fW din
+  in  (SpiMasterOut mosi sclk ss, busy, ack, dout)
+
+-- | SPI master with single-bit MISO and MOSI width.
+spiMaster1
   :: forall n halfPeriod waitTime dom
    . ( HiddenClockResetEnable dom
      , KnownNat n
@@ -272,36 +329,24 @@ spiMaster
      , Signal dom Bool -- Acknowledge
      , Signal dom (Maybe (BitVector n)) -- Data: Slave -> Master
      )
-  -- ^ Parts of the tuple:
-  --
-  -- 1. Serial Clock (SCLK)
-  -- 2. Master Output Slave Input (MOSI)
-  -- 3. Slave select (SS)
-  -- 4. Busy signal indicating that a transmission is in progress, new words on
-  --    the data line will be ignored when /True/
-  -- 5. (Maybe) the word send from the slave to the master
-spiMaster mode fN fW din (SpiMasterIn miso) =
-  let (mosi, ack, dout)   = spiCommon mode ssL (head . bv2v <$> misoL) sclkL
-                        (fromMaybe undefined# <$> din)
-      latch = snatToInteger fN /= 1
-      ssL   = if latch then delay undefined ss   else ss
-      misoL = if latch then delay undefined miso else miso
-      sclkL = if latch then delay undefined sclk else sclk
-      (ss, sclk, busy) = spiGen mode fN fW din
-  in  (SpiMasterOut (v2bv . singleton <$> mosi) sclk ss, busy, ack, dout)
+spiMaster1 mode halfPeriod waitTime dout spiIn =
+    let (spiOut, busy, ack, din) =
+            spiMaster mode halfPeriod waitTime (fmap singleton <$> dout) spiIn
+    in (spiOut, busy, ack, fmap head <$> din)
 
 -- | Generate slave select and SCK
 spiGen
-  :: forall n halfPeriod waitTime dom
+  :: forall n halfPeriod waitTime dom outW
    . ( HiddenClockResetEnable dom
      , KnownNat n
+     , KnownNat outW
      , 1 <= n
      , 1 <= halfPeriod
      , 1 <= waitTime )
   => SPIMode
   -> SNat halfPeriod
   -> SNat waitTime
-  -> Signal dom (Maybe (BitVector n))
+  -> Signal dom (Maybe (Vec outW (BitVector n)))
   -> ( Signal dom Bit
      , Signal dom Bit
      , Signal dom Bool
