@@ -111,11 +111,11 @@ spiCommon
   :: forall n dom
    . (HiddenClockResetEnable dom, KnownNat n, 1 <= n)
   => SPIMode
-  -> Signal dom Bool
+  -> Signal dom Bit
   -- ^ Slave select
   -> Signal dom Bit
   -- ^ Slave: MOSI; Master: MISO
-  -> Signal dom Bool
+  -> Signal dom Bit
   -- ^ SCK
   -> Signal dom (BitVector n)
   -> ( Signal dom Bit   -- Slave: MISO; Master: MOSI
@@ -145,38 +145,42 @@ spiCommon mode ssI msI sckI dinI =
     (cntD,cntOldD,sck,dataInD,dataOutD,ackD,doneD)
    where
     cntD
-      | ss        = 0
-      | sampleSck = if cntQ == maxBound then 0 else cntQ + 1
-      | otherwise = cntQ
+      | ss == high = 0
+      | sampleSck  = if cntQ == maxBound then 0 else cntQ + 1
+      | otherwise  = cntQ
 
     dataInD
-      | ss        = unpack undefined#
-      | sampleSck = tail @(n-1) dataInQ :< ms
-      | otherwise = dataInQ
+      | ss == high = unpack undefined#
+      | sampleSck  = tail @(n-1) dataInQ :< ms
+      | otherwise  = dataInQ
 
     dataOutD
-      | ss || (sampleOnTrailing mode && sampleSck && cntQ == maxBound) = unpack din
-      | shiftSck  = if sampleOnTrailing mode && cntQ == 0
-                    then dataOutQ
-                    else tail @(n-1) dataOutQ :< unpack undefined#
-      | otherwise = dataOutQ
+      | ss == high ||
+        (sampleOnTrailing mode && sampleSck && cntQ == maxBound)
+      = unpack din
+      | shiftSck
+      = if sampleOnTrailing mode && cntQ == 0
+        then dataOutQ
+        else tail @(n-1) dataOutQ :< unpack undefined#
+      | otherwise
+      = dataOutQ
 
     -- The counter is updated during the capture moment
     -- But we need to know during the shift moment whether the counter
     -- overflowed to determine whether we need to load new data or shift
     -- the existing data. That's why we capture it here.
-    cntOldD | not ss && shiftSck = cntQ == maxBound
-            | otherwise          = cntOldQ
+    cntOldD | ss == low && shiftSck = cntQ == maxBound
+            | otherwise             = cntOldQ
 
-    ackD  = not ss && shiftSck && cntQ == 1
-    doneD = not ss && sampleSck && cntQ == maxBound
+    ackD  = ss == low && shiftSck && cntQ == 1
+    doneD = ss == low && sampleSck && cntQ == maxBound
 
     (sampleSck, shiftSck)
       | sampleOnRising mode = (risingSck, fallingSck)
       | otherwise           = (fallingSck, risingSck)
      where
-      risingSck  = not sckOldQ && sck
-      fallingSck = sckOldQ && not sck
+      risingSck  = sckOldQ == low && sck == high
+      fallingSck = sckOldQ == high && sck == low
 
 -- | SPI slave configurable SPI mode and tri-state buffer
 spiSlave
@@ -184,7 +188,7 @@ spiSlave
    . (HiddenClockResetEnable dom, KnownNat n, 1 <= n)
   => SPISlaveConfig ds dom
   -- ^ Configure SPI mode and tri-state buffer
-  -> Signal dom Bool
+  -> Signal dom Bit
   -- ^ Serial Clock (SCLK)
   -> Signal dom Bit
   -- ^ Master Output Slave Input (MOSI)
@@ -192,7 +196,7 @@ spiSlave
   -- ^ Master Input Slave Output (MISO)
   --
   -- Inout port connected to the tri-state buffer for the MISO
-  -> Signal dom Bool
+  -> Signal dom Bit
   -- ^ Slave select (SS)
   -> Signal dom (BitVector n)
   -- ^ Data to send from master to slave
@@ -211,7 +215,7 @@ spiSlave (SPISlaveConfig mode latch buf) sclk mosi bin ss din =
       mosiL = if latch then delay undefined mosi else mosi
       sclkL = if latch then delay undefined sclk else sclk
       (miso, ack, dout) = spiCommon mode ssL mosiL sclkL din
-      bout = buf bin (not <$> ssL) miso
+      bout = buf bin (fmap (== low) ssL) miso
   in  (bout, ack, dout)
 
 -- | SPI master configurable in the SPI mode and clock divider
@@ -276,18 +280,16 @@ spiGen
   -> SNat halfPeriod
   -> SNat waitTime
   -> Signal dom (Maybe (BitVector n))
-  -> ( Signal dom Bool
-     , Signal dom Bool
+  -> ( Signal dom Bit
+     , Signal dom Bit
      , Signal dom Bool
      )
 spiGen mode SNat SNat =
-  unbundle . moore go cvt (0 :: Index (2*n),False,Idle @halfPeriod @waitTime)
+  unbundle . moore go cvt (0 :: Index (2*n),initSck,Idle @halfPeriod @waitTime)
  where
-  cvt (_, sck, st) =
-    ( st == Idle
-    , if idleOnLow mode then sck else not sck
-    , st /= Idle
-    )
+  cvt (_, sck, st) = (if busy then low else high, sck, busy)
+   where
+    busy = st /= Idle
 
   go (cntQ,sckQ,stQ) din = (cntD,sckD,stD)
    where
@@ -313,8 +315,10 @@ spiGen mode SNat SNat =
       _ -> 0
 
     sckD = case stQ of
-      Transfer n | n == maxBound -> not sckQ
+      Transfer n | n == maxBound -> complement sckQ
       _ -> sckQ
+
+  initSck = if idleOnLow mode then low else high
 
 data SPIMasterState halfPeriod waitTime
   = Idle
@@ -339,7 +343,7 @@ spiSlaveLatticeSBIO
   --   Clock: 2*SCK < Core
   --
   -- * Set to /False/ when core clock is twice as fast, or as fast, as the SCK
-  -> Signal dom Bool
+  -> Signal dom Bit
   -- ^ Serial Clock (SCLK)
   -> Signal dom Bit
   -- ^ Master Output Slave Input (MOSI)
@@ -347,7 +351,7 @@ spiSlaveLatticeSBIO
   -- ^ Master Input Slave Output (MISO)
   --
   -- Inout port connected to the tri-state buffer for the MISO
-  -> Signal dom Bool
+  -> Signal dom Bit
   -- ^ Slave select (SS)
   -> Signal dom (BitVector n)
   -- ^ Data to send from slave to master
@@ -385,7 +389,7 @@ spiSlaveLatticeBB
   --   Clock: 2*SCK < Core
   --
   -- * Set to /False/ when core clock is twice as fast, or as fast, as the SCK
-  -> Signal dom Bool
+  -> Signal dom Bit
   -- ^ Serial Clock (SCLK)
   -> Signal dom Bit
   -- ^ Master Output Slave Input (MOSI)
@@ -393,7 +397,7 @@ spiSlaveLatticeBB
   -- ^ Master Input Slave Output (MISO)
   --
   -- Inout port connected to the tri-state buffer for the MISO
-  -> Signal dom Bool
+  -> Signal dom Bit
   -- ^ Slave select (SS)
   -> Signal dom (BitVector n)
   -- ^ Data to send from slave to master

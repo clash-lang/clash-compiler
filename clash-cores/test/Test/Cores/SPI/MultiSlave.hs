@@ -23,8 +23,8 @@ slaveAddressRotate
    . (KnownDomain dom, KnownNat n, 1 <= n)
   => Clock dom
   -> Reset dom
-  -> (Signal dom Bool, Signal dom Bool)
-  -> Vec n (Signal dom Bool)
+  -> (Signal dom Bit, Signal dom Bool)
+  -> Vec n (Signal dom Bit)
 slaveAddressRotate clk rst =
   E.mealyB clk rst enableGen
     (\(cntQ, bQ) (ss, b) ->
@@ -32,7 +32,8 @@ slaveAddressRotate clk rst =
             cntD | bF = if cntQ == maxBound then 0 else cntQ + 1
                  | otherwise = cntQ
 
-            oH = (ss ||) <$> (unpack . complement $ bin2onehot cntQ)
+            oH | ss == high = repeat high
+               | otherwise  = unpack $ complement $ bin2onehot cntQ
         in  ((cntD, b), oH))
     (0 :: Index n, False)
  where
