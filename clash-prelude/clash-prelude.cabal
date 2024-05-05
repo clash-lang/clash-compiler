@@ -349,7 +349,7 @@ Library
                       hashable                  >= 1.2.1.0  && < 1.5,
                       half                      >= 0.2.2.3 && < 1.0,
                       infinite-list           ^>= 0.1,
-                      lens                      >= 4.10    && < 5.3,
+                      lens                      >= 4.10    && < 5.4,
                       QuickCheck                >= 2.7     && < 2.15,
                       recursion-schemes         >= 5.1     && < 5.3,
                       reflection                >= 2       && < 2.2,
