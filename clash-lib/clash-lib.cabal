@@ -170,7 +170,7 @@ Library
                       haskell-src-meta        >= 0.8      && < 0.9,
                       hint                    >= 0.7      && < 0.10,
                       infinite-list           ^>= 0.1,
-                      lens                    >= 4.10     && < 5.3,
+                      lens                    >= 4.10     && < 5.4,
                       mtl                     >= 2.1.2    && < 2.4,
                       ordered-containers      >= 0.2      && < 0.3,
                       prettyprinter           >= 1.2.0.1  && < 1.8,
