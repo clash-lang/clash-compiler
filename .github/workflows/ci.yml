@@ -15,26 +15,26 @@ concurrency:
 jobs:
   build_mac_windows:
     name: Build and run limited tests
-    runs-on: ${{ matrix.os }}-latest
+    runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false
       matrix:
-        os: ["macOS", "windows"]
+        os: ["macOS-13", "windows-latest"]
         ghc: ["8.10", "9.0", "9.2", "9.4", "9.6"]
         exclude:
           # Some tests fail with a mysterious -11 error code.
-          - os: macOS
+          - os: macOS-13
             ghc: 8.10
 
           # GHC 9.0 fails to compile clash-cores due to a template haskell
           # failure
-          - os: windows
+          - os: windows-latest
             ghc: 9.0
 
           # GHC/Clash starts extremely slowly, see
           # https://github.com/clash-lang/clash-compiler/issues/2684
-          - os: windows
+          - os: windows-latest
             ghc: 9.6
 
     steps:
@@ -46,11 +46,11 @@ jobs:
           stack-no-global: true
 
       - name: Install IVerilog (macOS)
-        if: matrix.os == 'macOS'
+        if: ${{ startsWith(matrix.os, 'macOS') }}
         run: brew install icarus-verilog
 
       - name: Install IVerilog (Windows)
-        if: matrix.os == 'Windows'
+        if: ${{ startsWith(matrix.os, 'windows') }}
         run: choco install --no-progress iverilog
 
       - name: General Setup
@@ -61,7 +61,7 @@ jobs:
           cat stack.yaml
 
       - name: Cache (Windows)
-        if: ${{ runner.os == 'Windows' }}
+        if: ${{ startsWith(matrix.os, 'windows') }}
         uses: actions/cache@v4
         with:
           # On windows we have to use "\" as a path separator, otherwise caching fails
@@ -70,7 +70,7 @@ jobs:
           key: ${{ matrix.os }}-${{ matrix.ghc }}-${{ hashFiles('stack.yaml', '**/*.cabal', '.github/workflows/ci.yml') }}
           restore-keys: ${{ matrix.os }}-${{ matrix.ghc }}-
       - name: Cache (non-Windows)
-        if: ${{ runner.os != 'Windows' }}
+        if: ${{ !startsWith(matrix.os, 'windows') }}
         uses: actions/cache@v4
         with:
           path: |
