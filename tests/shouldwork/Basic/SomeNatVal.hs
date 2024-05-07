@@ -1,8 +1,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module SomeNatVal where
 
-import Clash.Prelude hiding (someNatVal)
-import GHC.TypeNats (someNatVal)
+import Clash.Prelude
+import GHC.TypeNats (SomeNat(..), sameNat, someNatVal)
 import GHC.Natural
 
 topEntity ::  Bool

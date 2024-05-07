@@ -137,10 +137,13 @@ import           Control.Applicative
 import           Data.Bits
 import           GHC.Generics (Generic, Generic1)
 
-import           GHC.TypeLits
-#if MIN_VERSION_base(4,18,0)
-  hiding (SNat, SSymbol, fromSNat)
-#endif
+import GHC.TypeLits
+        ( Nat, Symbol, KnownNat, KnownSymbol
+        , natVal, symbolVal
+        , type (<=)
+        , type (+), type (*), type (^), type (-)
+        , AppendSymbol
+        )
 import           GHC.TypeLits.Extra
 import           Clash.HaskellPrelude
 

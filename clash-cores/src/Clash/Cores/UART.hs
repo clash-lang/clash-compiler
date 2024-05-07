@@ -35,6 +35,7 @@ module Clash.Cores.UART
 import Clash.Prelude
 import Clash.Class.HasDomain (TryDomain, TryDomainResult(Found))
 import Data.Maybe (isJust)
+import GHC.TypeLits (TypeError, ErrorMessage(..))
 
 -- | Utility type that represents a second
 type Second = 1_000_000_000_000 -- picoseconds
