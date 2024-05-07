@@ -180,6 +180,8 @@ data Vec :: Nat -> Type -> Type where
   Nil  :: Vec 0 a
   Cons :: a -> Vec n a -> Vec (n + 1) a
 
+{-# COMPLETE Nil, (:>) #-}
+
 -- | In many cases, this Generic instance only allows generic
 -- functions/instances over vectors of at least size 1, due to the
 -- /n-1/ in the /Rep (Vec n a)/ definition.
