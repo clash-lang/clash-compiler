@@ -1,6 +1,7 @@
 {-|
   Copyright   :  (C) 2019, Foamspace corp
                      2022, Google LLC
+                     2024, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
