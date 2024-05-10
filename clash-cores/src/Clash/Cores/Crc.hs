@@ -66,11 +66,11 @@ we want to run the CRC engine this clock cycle. The @Index@ inside the @Maybe@
 indicates how many @BitVector 8@ are valid inside the @Vec@. 0 means 1 is valid.
 3 means 4 are valid.
 
->>> hwInp0 = Just (3, unsafeFromList $ fmap charToBv "1234" :: Vec 4 (BitVector 8))
->>> hwInp1 = Just (3, unsafeFromList $ fmap charToBv "5678")
->>> hwInp2 = Just (0, unsafeFromList $ fmap charToBv "9___")
+>>> hwInp0 = Just (True,  3, unsafeFromList $ fmap charToBv "1234" :: Vec 4 (BitVector 8))
+>>> hwInp1 = Just (False, 3, unsafeFromList $ fmap charToBv "5678")
+>>> hwInp2 = Just (False, 0, unsafeFromList $ fmap charToBv "9___")
 >>> hwInp = [Nothing, hwInp0, hwInp1, hwInp2]
->>> hwOut = myEngine (pure False) (fromList hwInp)
+>>> hwOut = myEngine (fromList hwInp)
 >>> crcFromHardware = List.last $ sampleN (1 + List.length hwInp) hwOut
 >>> crcFromHardware == checkValue
 True

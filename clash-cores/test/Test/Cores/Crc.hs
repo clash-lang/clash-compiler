@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  CRC validation
+  CRC implementation validation
 -}
 
 {-# LANGUAGE AllowAmbiguousTypes #-}
@@ -14,7 +14,7 @@ module Test.Cores.Crc where
 
 import qualified Data.List as List
 import           Data.Char (ord)
-import           Data.Maybe (catMaybes, fromJust)
+import           Data.Maybe (catMaybes, fromJust, isJust)
 import           Data.Proxy (Proxy(..))
 import           Data.Kind (Type)
 import           Test.Tasty
@@ -32,18 +32,30 @@ toVecN
    . KnownNat n
   => Default a
   => [Maybe a]
-  -> [Maybe (Index n, Vec n a)]
-toVecN [] = []
-toVecN xs = result:toVecN bs
+  -> [Maybe (Bool, Index n, Vec n a)]
+toVecN a = out
   where
-    n = natToNum @n
-    (as, bs) = List.splitAt n xs
-    as' = catMaybes as
-    valid = List.length as'
-    vs = V.unsafeFromList $ as' List.++ List.replicate (n - valid) def
-    result = if valid /= 0
-               then Just (fromIntegral $ valid - 1, vs)
-               else Nothing
+    addReset rst (Just (i, vs)) = Just (rst, i, vs)
+    addReset _ Nothing = Nothing
+    raw0 = go a
+    raw1 = fmap (addReset False) $ go a
+    out = case List.findIndex isJust raw0 of
+      Just i -> List.take i raw1 List.++
+                  [addReset True $ raw0 List.!! i] List.++
+                  List.drop (i+1) raw1
+      Nothing -> raw1
+
+    go [] = []
+    go xs = result:go bs
+      where
+        n = natToNum @n
+        (as, bs) = List.splitAt n xs
+        as' = catMaybes as
+        valid = List.length as'
+        vs = V.unsafeFromList $ as' List.++ List.replicate (n - valid) def
+        result = if valid /= 0
+                  then Just (fromIntegral $ valid - 1, vs)
+                  else Nothing
 
 proxyToSNat :: KnownNat n => Proxy n -> SNat n
 proxyToSNat _ = SNat
@@ -101,11 +113,11 @@ crcEngineResetProp crc checkVal inp = hwCrc QC.=== checkVal
     hwParams = mkCrcHardwareParams crc dw d1
     crcEngine' = exposeClockResetEnable crcEngineFromParams systemClockGen resetGen enableGen hwParams
 
-    resetInp = List.replicate (1 + List.length inp) False List.++ [True] List.++ (List.repeat False)
-    toInp b = Just (0, singleton b)
-    someInp = toInp <$> inp List.++ (getCheckInput SNat dw _crcReflectInput)
+    -- We reset on the first part and when giving the first fragment of the check input
+    toInp (i, b) = Just (i == 0 || i == (List.length inp), 0, singleton b)
+    someInp = fmap toInp $ List.zip [(0 :: Int) ..] $ inp List.++ (getCheckInput SNat dw _crcReflectInput)
 
-    hwOut = crcEngine' (fromList resetInp) (fromList $ Nothing:someInp)
+    hwOut = crcEngine' (fromList $ Nothing:someInp)
     hwCrc = List.last $ sampleN (2 + List.length someInp) hwOut
 
 crcEngineEqSoftware
@@ -144,7 +156,7 @@ crcEngineEqSoftware crc nLanesI dataWidthCfg inpI
           inps = fmap (fmap fromIntegral) inpI
 
           hwParams = mkCrcHardwareParams crc dataWidth nLanes
-          crcEngine' = exposeClockResetEnable crcEngineFromParams systemClockGen resetGen enableGen hwParams (pure False)
+          crcEngine' = exposeClockResetEnable crcEngineFromParams systemClockGen resetGen enableGen hwParams
 
           swCrc = digest $ List.foldl' feed (mkSoftwareCrc crc dataWidth) (catMaybes inps)
           hwInp = Nothing : (toVecN inps)
@@ -199,7 +211,7 @@ crcValidatorEqSoftware crc nLanesI dataWidthCfg inpI
           inpsWithCrc = inpJusts List.++ (V.toList swCrcVec)
 
           hwParams = mkCrcHardwareParams crc dataWidth nLanes
-          crcValidator' = exposeClockResetEnable crcValidatorFromParams systemClockGen resetGen enableGen hwParams (pure False)
+          crcValidator' = exposeClockResetEnable crcValidatorFromParams systemClockGen resetGen enableGen hwParams
 
           hwInp = Nothing : (toVecN $ fmap Just inpsWithCrc)
           hwOut = crcValidator' (fromList hwInp)

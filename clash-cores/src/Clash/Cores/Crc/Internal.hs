@@ -58,7 +58,7 @@ data CrcParams (crcWidth :: Nat)
       --   of the output is the highest-order bit of the CRC register.
       --   Note that this reflection is performed over the entire CRC register;
       --   for transmission you may want to treat the output as a little-endian
-      --   multi-word value, so for example the reflected 16 bit output 0x4E4C
+      --   multi-word value, so for example the reflected 16-bit output 0x4E4C
       --   would be transmitted as the two octets 0x4C 0x4E, each transmitted
       --   least significant bit first.
       , _crcXorOutput     :: BitVector crcWidth
@@ -96,7 +96,7 @@ class (KnownNat (CrcWidth crc), 1 <= (CrcWidth crc)) => KnownCrc (crc :: Type) w
 
 -- | Allow one to compute values for the CRC
 --
--- __NB__: NOT for use in hardware
+-- __NB__: This data type is not synthesizable
 data SoftwareCrc (crcWidth :: Nat) (dataWidth :: Nat)
   = SoftwareCrc
       { _crcParams      :: CrcParams crcWidth
@@ -134,7 +134,7 @@ reverseBV = v2bv . reverse . bv2v
 
 -- | Create a 'SoftwareCrc' from 'CrcParams'
 --
--- __NB__: NOT for use in hardware
+-- __NB__: This function is not synthesizable
 mkSoftwareCrcFromParams
   :: forall (crcWidth :: Nat) (dataWidth :: Nat)
    . CrcParams crcWidth
@@ -151,7 +151,7 @@ mkSoftwareCrcFromParams _crcParams@CrcParams{..} _crcDataWidth@SNat = go _crcPar
 
 -- | Create a 'SoftwareCrc' given 'KnownCrc'
 --
--- __NB__: NOT for use in hardware
+-- __NB__: This function is not synthesizable
 mkSoftwareCrc
   :: forall (crc :: Type) (dataWidth :: Nat)
    . KnownCrc crc
@@ -232,13 +232,23 @@ digest params@(SoftwareCrc {..}) = go _crcDataWidth _crcParams
 --   in the scenario where where you want to handle more words in a single cycle
 --   than are native to the protocol.
 --
---   For example ethernet is byte-oriented but you may want to handle 32 bit
---   in a single cycle to achaive a high throughput.
+--   For example ethernet is byte-oriented but you may want to handle 32-bit
+--   in a single cycle to achieve a high throughput.
 --   This means that it is possible for 8, 16, 24 or 32 bits in the last data
 --   word of the stream to be valid.
 --   We can calculate a residue for each case and compare it to the CRC result.
 --   This saves us from having to instantiate four seperate CRCs for the receive path.
 --   The invalid words must be set to zero.
+--
+--   To use the output of this function as a constant in your design, you can
+--   lift it through Template Haskell:
+--
+-- @
+-- res :: BitVector 32
+-- res = $(lift $ rawResidue Crc32_ethernet 0)
+-- @
+--
+-- __NB__: This function is not synthesizable
 rawResidue
   :: forall (crc :: Type)
    . KnownCrc crc
@@ -260,6 +270,16 @@ rawResidue crc nExtra = rawResi
 
 -- | Compute the residue value for these 'CrcParams', which is the value left in the
 --   CRC register after processing any valid codeword.
+--
+--   To use the output of this function as a constant in your design, you can
+--   lift it through Template Haskell:
+--
+-- @
+-- res :: BitVector 32
+-- res = $(lift $ residue Crc32_ethernet)
+-- @
+--
+-- __NB__: This function is not synthesizable
 residue
   :: forall (crc :: Type)
    . KnownCrc crc
@@ -383,20 +403,20 @@ type instance TryDomain t (CrcHardwareParams crcWidth dataWidth nLanes) = 'NotFo
 --
 -- @nLanes@ indicates the maximum number of @dataWidth@ words you want to
 -- process in a single cycle. For example the stream could be byte-oriented,
--- but processing is done @n@ bytes at a time.
+-- but processing is done @n@-bytes at a time.
 --
--- Use the 'Clash.Cores.Crc.deriveHardwareCrc' to create an instance.
--- No instances should be implemented by hand, because a proper instance
--- requires compile-time evaluation.
+-- Use 'Clash.Cores.Crc.deriveHardwareCrc' to create an instance. No instances
+-- should be implemented by hand, because a proper instance requires
+-- compile-time evaluation.
 class
   ( KnownCrc crc, KnownNat dataWidth, 1 <= dataWidth, KnownNat nLanes, 1 <= nLanes)
   => HardwareCrc (crc :: Type) (dataWidth :: Nat) (nLanes :: Nat) where
   crcHardwareParams
     :: crc
     -- ^ Which CRC
-    -> Proxy dataWidth
+    -> SNat dataWidth
     -- ^ What word size in bits the hardware implementation can handle
-    -> Proxy nLanes
+    -> SNat nLanes
     -- ^ The number of lanes
     -> CrcHardwareParams (CrcWidth crc) dataWidth nLanes
 
@@ -441,7 +461,7 @@ mkCrcLaneParams crc dataWidth@SNat nLanes@SNat
           (FGMatrices f g) = mkFGMatrices crc (mulSNat nLanes dataWidth)
           reverseLanes = unPartitionMat . fmap reverse . partitionMat nLanes
           fg = flattenFGMatrices $ FGMatrices f (applyWhen reflectInput reverseLanes g)
-      _ -> error "mkCrcLaneParams: Absurd, Report this to the Clash compiler team: https://github.com/clash-lang/clash-compiler/issues"
+      _ -> clashCompileError "mkCrcLaneParams: Absurd, Report this to the Clash compiler team: https://github.com/clash-lang/clash-compiler/issues"
 
 -- | Get the flattened @F|G@ Matrix for a given lane
 getFGMatrix
@@ -453,12 +473,12 @@ getFGMatrix
 getFGMatrix (CrcLane1 fg) lane
   = case compareSNat2 d1 lane of
       SNatEQ2 -> fg
-      _ -> error "getFGMatrix, CrcLane1: Absurd, Report this to the Clash compiler team: https://github.com/clash-lang/clash-compiler/issues"
+      _ -> clashCompileError "getFGMatrix, CrcLane1: Absurd, Report this to the Clash compiler team: https://github.com/clash-lang/clash-compiler/issues"
 getFGMatrix (CrcLaneN lanes fg next) lane
   = case compareSNat2 lane lanes of
       SNatLT2 -> getFGMatrix next lane
       SNatEQ2 -> fg
-      _ -> error "getFGMatrix, CrcLaneN: Absurd, Report this to the Clash compiler team: https://github.com/clash-lang/clash-compiler/issues"
+      _ -> clashCompileError "getFGMatrix, CrcLaneN: Absurd, Report this to the Clash compiler team: https://github.com/clash-lang/clash-compiler/issues"
 
 -- | Construct parameters for a parallel hardware CRC implementation
 mkCrcHardwareParams
@@ -499,7 +519,7 @@ typeRepToTHType _ = error "typeRepToTHType: Absurd, Report this to the Clash com
 
 -- | Derive an instance for the 'HardwareCrc' class for the given arguments
 --
--- For example, the following derives a 'HardwareCrc' instance for the 32 bit Ethernet CRC
+-- For example, the following derives a 'HardwareCrc' instance for the 32-bit Ethernet CRC
 -- where you can feed it 8, 16, 24 or 32 bits at a time:
 --
 -- @
@@ -588,7 +608,7 @@ laneStep
 laneStep (CrcHardwareParams SNat nLanes@SNat (CrcParams SNat _ _ _ _ _) laneParams _) lanePrev@SNat crc input
   = let lane = addSNat lanePrev d1 in case compareSNat lane nLanes of
     SNatLE -> matVecMul (getFGMatrix laneParams lane) (crc ++# (pack $ takeLe lane input))
-    _      -> error "laneStep: Absurd, Report this to the Clash compiler team: https://github.com/clash-lang/clash-compiler/issues"
+    _      -> clashCompileError "laneStep: Absurd, Report this to the Clash compiler team: https://github.com/clash-lang/clash-compiler/issues"
 
 -- | A parallel multilane CRC engine and validator
 --
@@ -611,19 +631,21 @@ crcEngine
   => HardwareCrc crc dataWidth nLanes
   => crc
   -- ^ The CRC
-  -> Signal dom Bool
-  -- ^ Reset the CRC engine. This reset can be asserted in the same cycle as
-  --   giving the first word.
-  -> Signal dom (Maybe (Index nLanes, Vec nLanes (BitVector dataWidth)))
-  -- ^ The input data. @Index nLanes@ indicates how many @dataWidth@ words are
+  -> Signal dom (Maybe (Bool, Index nLanes, Vec nLanes (BitVector dataWidth)))
+  -- ^ The input data.
+  --   The @Bool@ must be asserted on the first fragment to start a new CRC
+  --   computation
+  --   @Index nLanes@ indicates how many @dataWidth@ words are
   --   valid in the vector minus 1.
   --
-  --     - Ex. 1. @Just (0, 0xDE :> 0xAD :> 0xBE :> 0xEF :> Nil)@ means only the first word @0xDE@ is valid
-  --     - Ex. 2. @Just (3, 0xDE :> 0xAD :> 0xBE :> 0xEF :> Nil@ means all words in the vector are valid
+  --     - Ex. 1. @Just (False, 0, 0xDE :> 0xAD :> 0xBE :> 0xEF :> Nil)@
+  --       means this is not the start of a new message and only the first word @0xDE@ is valid
+  --     - Ex. 2. @Just (True, 3, 0xDE :> 0xAD :> 0xBE :> 0xEF :> Nil@
+  --       means this is the start of a new message and all words in the vector are valid
   --
   -> Signal dom (BitVector (CrcWidth crc))
   -- ^ The resulting CRC. There is a delay of a single cycle from input to output.
-crcEngine crc = crcEngineFromParams $ crcHardwareParams crc Proxy Proxy
+crcEngine crc = crcEngineFromParams $ crcHardwareParams crc SNat SNat
 
 -- | Like 'crcEngine' but uses 'CrcHardwareParams' instead of a 'HardwareCrc' constraint
 crcEngineFromParams
@@ -632,20 +654,19 @@ crcEngineFromParams
             (dataWidth :: Nat)
             (nLanes :: Nat)
    . HiddenClockResetEnable dom
-  => KnownNat crcWidth
-  => KnownNat dataWidth
-  => KnownNat nLanes
   => CrcHardwareParams crcWidth dataWidth nLanes
-  -> Signal dom Bool
-  -> Signal dom (Maybe (Index nLanes, Vec nLanes (BitVector dataWidth)))
+  -> Signal dom (Maybe (Bool, Index nLanes, Vec nLanes (BitVector dataWidth)))
   -> Signal dom (BitVector crcWidth)
-crcEngineFromParams hwParams@(CrcHardwareParams _ _ CrcParams{..} _ _) resetCrc inDat = crcOut
+crcEngineFromParams
+  hwParams@(CrcHardwareParams SNat SNat CrcParams{_crcWidth=SNat, ..} _ _)
+  inDat
+  = crcOut
     where
       steps = smap (\sn _ -> laneStep hwParams sn) (repeat @nLanes ())
-      (validLanesX, datX) = unbundle $ fromJustX <$> inDat
+      (resetCrcX, validLanesX, datX) = unbundle $ fromJustX <$> inDat
       step = fmap (steps !!) validLanesX
 
-      nextCrcState = step <*> (mux resetCrc (pure _crcInitial) crcState) <*> datX
+      nextCrcState = step <*> (mux resetCrcX (pure _crcInitial) crcState) <*> datX
       crcState = regEn _crcInitial (isJust <$> inDat) nextCrcState
       crcOut = xor _crcXorOutput <$> (applyWhen _crcReflectOutput reverseBV <$> crcState)
 
@@ -658,7 +679,7 @@ crcEngineFromParams hwParams@(CrcHardwareParams _ _ CrcParams{..} _ _) resetCrc 
 -- - Any non-valid words must be set to zero.
 --
 -- Due to these extra requirements the implementation can be more efficient
--- then 'crcEngine'.
+-- than 'crcEngine'.
 crcValidator
   :: forall (dom :: Domain)
             (crc :: Type)
@@ -668,14 +689,21 @@ crcValidator
   => HardwareCrc crc dataWidth nLanes
   => crc
   -- ^ The CRC
-  -> Signal dom Bool
-  -- ^ Reset the CRC validator. This has no delay. So this reset can be asserted
-  --   in the same cycle as giving the first word.
-  -> Signal dom (Maybe (Index nLanes, Vec nLanes (BitVector dataWidth)))
-  -- ^ The input data
+  -> Signal dom (Maybe (Bool, Index nLanes, Vec nLanes (BitVector dataWidth)))
+  -- ^ The input data.
+  --   The @Bool@ must be asserted on the first fragment to start a new CRC
+  --   computation
+  --   @Index nLanes@ indicates how many @dataWidth@ words are
+  --   valid in the vector minus 1.
+  --
+  --     - Ex. 1. @Just (False, 0, 0xDE :> 0xAD :> 0xBE :> 0xEF :> Nil)@
+  --       means this is not the start of a new message and only the first word @0xDE@ is valid
+  --     - Ex. 2. @Just (True, 3, 0xDE :> 0xAD :> 0xBE :> 0xEF :> Nil@
+  --       means this is the start of a new message and all words in the vector are valid
+  --
   -> Signal dom Bool
   -- ^ Whether the CRC is valid. There is a delay of a single cycle from input to output.
-crcValidator crc = crcValidatorFromParams $ crcHardwareParams crc Proxy Proxy
+crcValidator crc = crcValidatorFromParams $ crcHardwareParams crc SNat SNat
 
 -- | Like 'crcValidator' but uses 'CrcHardwareParams' instead of a 'HardwareCrc' constraint
 crcValidatorFromParams
@@ -684,21 +712,21 @@ crcValidatorFromParams
             (dataWidth :: Nat)
             (nLanes :: Nat)
    . HiddenClockResetEnable dom
-  => KnownNat crcWidth
-  => KnownNat dataWidth
-  => KnownNat nLanes
   => 1 <= nLanes
   => CrcHardwareParams crcWidth dataWidth nLanes
+  -> Signal dom (Maybe (Bool, Index nLanes, Vec nLanes (BitVector dataWidth)))
   -> Signal dom Bool
-  -> Signal dom (Maybe (Index nLanes, Vec nLanes (BitVector dataWidth)))
-  -> Signal dom Bool
-crcValidatorFromParams hwParams@(CrcHardwareParams _ _ CrcParams{..} _ residues) resetCrc inDat = match
+crcValidatorFromParams
+  hwParams@(CrcHardwareParams SNat SNat CrcParams{_crcWidth=SNat, ..} _ residues)
+  inDat
+  = match
     where
       step = laneStep hwParams (subSNatLe (SNat @nLanes) d1)
-      (validLanesX, datX) = unbundle $ fromJustX <$> inDat
+      inValid = isJust <$> inDat
+      (resetCrcX, validLanesX, datX) = unbundle $ fromJustX <$> inDat
 
-      nextCrcState = step <$> (mux resetCrc (pure _crcInitial) crcState) <*> datX
-      crcState = regEn _crcInitial (isJust <$> inDat) nextCrcState
+      nextCrcState = step <$> (mux resetCrcX (pure _crcInitial) crcState) <*> datX
+      crcState = regEn _crcInitial inValid nextCrcState
       matches = zipWith (==) residues <$> fmap pure crcState
-      rawMatch = (!!) <$> matches <*> register undefined validLanesX
-      match = (register False $ isJust <$> inDat) .&&. rawMatch
+      lane = regEn 0 inValid validLanesX
+      match = (!!) <$> matches <*> lane
