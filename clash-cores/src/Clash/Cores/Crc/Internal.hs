@@ -244,8 +244,13 @@ digest params@(SoftwareCrc {..}) = go _crcDataWidth _crcParams
 --   lift it through Template Haskell:
 --
 -- @
+-- import qualified Data.List as L
+--
 -- res :: BitVector 32
 -- res = $(lift $ rawResidue Crc32_ethernet 0)
+--
+-- ress :: Vec 4 (BitVector 32)
+-- ress = $('Clash.Sized.Vector.listToVecTH' $ L.map (rawResidue Crc32_ethernet) [0..3])
 -- @
 --
 -- __NB__: This function is not synthesizable
