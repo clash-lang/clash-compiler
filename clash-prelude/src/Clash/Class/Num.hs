@@ -1,5 +1,6 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente
+                  2024,      Google LLC
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -42,6 +43,9 @@ class ExtendingNum a b where
   -- that is potentially different from either argument.
   mul :: a -> b -> MResult a b
 
+infixl 7  `mul`
+infixl 6  `add`, `sub`
+
 -- * Saturating arithmetic functions
 
 -- | Determine how overflow and underflow are handled by the functions in
@@ -76,19 +80,25 @@ class (Bounded a, Num a) => SaturatingNum a where
   satPred s n = satSub s n 1
   {-# INLINE satPred #-}
 
+infixl 7  `satMul`
+infixl 6  `satAdd`, `satSub`
+
 -- | Addition that clips to 'maxBound' on overflow, and 'minBound' on underflow
 boundedAdd :: SaturatingNum a => a -> a -> a
 boundedAdd = satAdd SatBound
 {-# INLINE boundedAdd #-}
+infixl 6  `boundedAdd`
 
 -- | Subtraction that clips to 'maxBound' on overflow, and 'minBound' on
 -- underflow
 boundedSub  :: SaturatingNum a => a -> a -> a
 boundedSub = satSub SatBound
 {-# INLINE boundedSub #-}
+infixl 6 `boundedSub`
 
 -- | Multiplication that clips to 'maxBound' on overflow, and 'minBound' on
 -- underflow
 boundedMul :: SaturatingNum a => a -> a -> a
 boundedMul = satMul SatBound
 {-# INLINE boundedMul #-}
+infixl 7  `boundedMul`
