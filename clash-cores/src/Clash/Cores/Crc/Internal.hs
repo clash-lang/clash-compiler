@@ -408,7 +408,7 @@ type instance TryDomain t (CrcHardwareParams crcWidth dataWidth nLanes) = 'NotFo
 --
 -- @nLanes@ indicates the maximum number of @dataWidth@ words you want to
 -- process in a single cycle. For example the stream could be byte-oriented,
--- but processing is done @n@-bytes at a time.
+-- but processing is done @n@ bytes at a time.
 --
 -- Use 'Clash.Cores.Crc.deriveHardwareCrc' to create an instance. No instances
 -- should be implemented by hand, because a proper instance requires
