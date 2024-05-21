@@ -632,7 +632,7 @@ crcEngine
             (crc :: Type)
             (dataWidth :: Nat)
             (nLanes :: Nat)
-   . HiddenClockResetEnable dom
+   . (HiddenClock dom, HiddenEnable dom)
   => HardwareCrc crc dataWidth nLanes
   => crc
   -- ^ The CRC
@@ -661,7 +661,7 @@ crcEngineFromParams
             (crcWidth :: Nat)
             (dataWidth :: Nat)
             (nLanes :: Nat)
-   . HiddenClockResetEnable dom
+   . (HiddenClock dom, HiddenEnable dom)
   => CrcHardwareParams crcWidth dataWidth nLanes
   -> Signal dom (Maybe (Bool, Index nLanes, Vec nLanes (BitVector dataWidth)))
   -> Signal dom (BitVector crcWidth)
