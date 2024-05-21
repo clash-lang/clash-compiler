@@ -232,8 +232,8 @@ digest params@(SoftwareCrc {..}) = go _crcDataWidth _crcParams
 --   in the scenario where where you want to handle more words in a single cycle
 --   than are native to the protocol.
 --
---   For example ethernet is byte-oriented but you may want to handle 32-bit
---   in a single cycle to achieve a high throughput.
+--   For example ethernet is byte-oriented but you may want to handle 32 bit
+--   in a single cycle to achieve high throughput.
 --   This means that it is possible for 8, 16, 24 or 32 bits in the last data
 --   word of the stream to be valid.
 --   We can calculate a residue for each case and compare it to the CRC result.
