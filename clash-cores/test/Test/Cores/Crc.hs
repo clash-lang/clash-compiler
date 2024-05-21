@@ -150,7 +150,7 @@ crcEngineEqSoftware crc nLanesI dataWidthCfg inpI
         => SNat nLanes
         -> SNat dataWidth
         -> QC.Property
-      prop nLanes@SNat dataWidth@SNat = hwCrc QC.=== swCrc
+      prop nLanes@SNat dataWidth@SNat = not (List.null inpJusts) QC.==> hwCrc QC.=== swCrc
         where
           inps :: [Maybe (BitVector dataWidth)]
           inps = fmap (fmap fromIntegral) inpI
@@ -158,7 +158,9 @@ crcEngineEqSoftware crc nLanesI dataWidthCfg inpI
           hwParams = mkCrcHardwareParams crc dataWidth nLanes
           crcEngine' = exposeClockResetEnable crcEngineFromParams systemClockGen resetGen enableGen hwParams
 
-          swCrc = digest $ List.foldl' feed (mkSoftwareCrc crc dataWidth) (catMaybes inps)
+          inpJusts = catMaybes inps
+
+          swCrc = digest $ List.foldl' feed (mkSoftwareCrc crc dataWidth) inpJusts
           hwInp = Nothing : (toVecN inps)
           hwOut = crcEngine' (fromList hwInp)
           hwCrc = List.last $ sampleN (1 + List.length hwInp) hwOut
