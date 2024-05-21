@@ -698,17 +698,20 @@ crcValidator
   => crc
   -- ^ The CRC
   -> Signal dom (Maybe (Bool, Index nLanes, Vec nLanes (BitVector dataWidth)))
-  -- ^ The input data.
+  -- ^ The input data
+  --
   --   The @Bool@ must be asserted on the first fragment to start a new CRC
-  --   computation
+  --   computation.
+  --
   --   @Index nLanes@ indicates how many @dataWidth@ words are
   --   valid in the vector minus 1.
   --
   --     - Ex. 1. @Just (False, 0, 0xDE :> 0xAD :> 0xBE :> 0xEF :> Nil)@
-  --       means this is not the start of a new message and only the first word @0xDE@ is valid
+  --       means this is not the start of a new message and only the first word
+  --       @0xDE@ is valid.
   --     - Ex. 2. @Just (True, 3, 0xDE :> 0xAD :> 0xBE :> 0xEF :> Nil@
-  --       means this is the start of a new message and all words in the vector are valid
-  --
+  --       means this is the start of a new message and all words in the vector
+  --       are valid.
   -> Signal dom Bool
   -- ^ Whether the CRC is valid. There is a delay of a single cycle from input to output.
 crcValidator crc = crcValidatorFromParams $ crcHardwareParams crc SNat SNat
