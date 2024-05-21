@@ -693,7 +693,7 @@ crcValidator
             (crc :: Type)
             (dataWidth :: Nat)
             (nLanes :: Nat)
-   . HiddenClockResetEnable dom
+   . (HiddenClock dom, HiddenEnable dom)
   => HardwareCrc crc dataWidth nLanes
   => crc
   -- ^ The CRC
@@ -719,7 +719,7 @@ crcValidatorFromParams
             (crcWidth :: Nat)
             (dataWidth :: Nat)
             (nLanes :: Nat)
-   . HiddenClockResetEnable dom
+   . (HiddenClock dom, HiddenEnable dom)
   => 1 <= nLanes
   => CrcHardwareParams crcWidth dataWidth nLanes
   -> Signal dom (Maybe (Bool, Index nLanes, Vec nLanes (BitVector dataWidth)))
