@@ -117,12 +117,21 @@ common basic-config
     QuickCheck,
     string-interpolate        ^>= 0.3,
     template-haskell,
+    transformers,
 
 library
   import: basic-config
   hs-source-dirs: src
 
   exposed-modules:
+    Clash.Cores.Experimental.I2C
+    Clash.Cores.Experimental.I2C.BitMaster
+    Clash.Cores.Experimental.I2C.BitMaster.BusCtrl
+    Clash.Cores.Experimental.I2C.BitMaster.StateMachine
+    Clash.Cores.Experimental.I2C.ByteMaster
+    Clash.Cores.Experimental.I2C.ByteMaster.ShiftRegister
+    Clash.Cores.Experimental.I2C.Types
+
     Clash.Cores.LatticeSemi.ECP5.Blackboxes.IO
     Clash.Cores.LatticeSemi.ECP5.IO
     Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO
@@ -188,6 +197,9 @@ test-suite unittests
     buildable: False
 
   other-Modules:
+    Test.Cores.Experimental.I2C
+    Test.Cores.Experimental.I2C.Config
+    Test.Cores.Experimental.I2C.Slave
     Test.Cores.Internal.SampleSPI
     Test.Cores.Internal.Signals
     Test.Cores.SPI

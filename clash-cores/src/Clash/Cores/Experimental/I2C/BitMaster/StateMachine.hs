@@ -1,45 +1,64 @@
+{-|
+  Copyright   :  (C) 2014, University of Twente
+                     2024, Google LLC
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
-module I2C.BitMaster.StateMachine where
+module Clash.Cores.Experimental.I2C.BitMaster.StateMachine where
 
-import Clash.Prelude
+import Clash.Prelude hiding (Read)
 import Control.Lens hiding (Index)
 import Control.Monad
 import Control.Monad.State
 
-import I2C.Types
+import Clash.Cores.Experimental.I2C.Types
 
+-- | States for bit-level I2C operations.
 data BitStateMachine
-  = Idle
-  | Start (Index 5)
-  | Stop  (Index 4)
-  | Read  (Index 4)
-  | Write (Index 4)
+  = Idle            -- ^ Idle state
+  | Start (Index 5) -- ^ Start condition state
+  | Stop  (Index 4) -- ^ Stop condition state
+  | Read  (Index 4) -- ^ Read operation state
+  | Write (Index 4) -- ^ Write operation state
   deriving (Eq, Generic, NFDataX)
 
+-- | Defines the state machine with control and status registers.
 data StateMachine
   = StateMachine
-  { _sclOen    :: Bool            -- i2c clock output enable register
-  , _sdaOen    :: Bool            -- i2c data output enable register
-  , _sdaChk    :: Bool            -- check SDA status (multi-master arbiter)
-  , _cmdAck    :: Bool            -- command completed
-  , _bitStateM :: BitStateMachine -- State Machine
+  { _sclOen    :: Bool            -- ^ Inverted SCL output enable, False pulls the scl low.
+  , _sdaOen    :: Bool            -- ^ Inverted SDA output enable, False pulls the sda low.
+  , _sdaChk    :: Bool            -- ^ Checks SDA status
+  , _cmdAck    :: Bool            -- ^ Acknowledges command completion
+  , _bitStateM :: BitStateMachine -- ^ Current state of the bit-level state machine
   } deriving (Generic, NFDataX)
 
 makeLenses ''StateMachine
 
-{-# INLINE stateMachineStart #-}
+-- | Initial state of the state machine.
+stateMachineStart :: StateMachine
 stateMachineStart
   = StateMachine
-  { _sclOen    = True
-  , _sdaOen    = True
-  , _sdaChk    = False
-  , _cmdAck    = False
-  , _bitStateM = Idle
+  { _sclOen    = True  -- ^ SCL output enabled by default
+  , _sdaOen    = True  -- ^ SDA output enabled by default
+  , _sdaChk    = False -- ^ SDA status check disabled by default
+  , _cmdAck    = False -- ^ Command acknowledgment flag set to false
+  , _bitStateM = Idle  -- ^ Initial state set to Idle
   }
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE bitStateMachine #-}
+-- | Bit level I2C state machine that manages transitions between various states from
+-- 'StateMachine' based on the input parameters and the current state.
+--
+-- * In the 'Start' state, the function initiates the start condition on the I2C bus.
+-- * In the 'Stop' state, it initiates the stop condition, releasing the bus.
+-- * In the 'Read' state, it reads a bit from the slave device.
+-- * In the 'Write' state, it writes a bit to the slave device.
+--
+-- The function ensures that the state transitions are compliant with the I2C protocol.
 bitStateMachine :: Bool
                 -> Bool
                 -> Bool
@@ -175,5 +194,5 @@ bitStateMachine rst al clkEn cmd din = do
                        I2Cstop   -> Stop 0
                        I2Cwrite  -> Write 0
                        I2Cread   -> Read 0
-                       otherwise -> Idle
+                       _         -> Idle
         sdaChk    .= False

@@ -158,24 +158,6 @@ runClashTest = defaultMain $ clashTestRoot
     , clashTestGroup "crc32"
         [ runTest "CRC32" def
         ]
-    , clashTestGroup "i2c"
-        [ let _opts = def { clashFlags=["-O2","-fclash-component-prefix","test"]
-                        , buildTargets=BuildSpecific ["test_i2c"]
-                        , hdlSim=[]
-                        }
-           in runTest "I2C" _opts
-        ,
-          -- TODO: this uses finish_and_return, with is Icarus Verilog only.
-          -- see: https://github.com/clash-lang/clash-compiler/issues/2265
-          let _opts = def { buildTargets = BuildSpecific ["system"]
-                          , hdlTargets = [Verilog]
-                          , hdlLoad = [IVerilog]
-                          , hdlSim = [IVerilog]
-                          , vvpStdoutNonEmptyFail = False
-                          }
-           in runTest "I2Ctest" _opts
-
-        ]
     ]
   , clashTestGroup "tests"
     [ clashTestGroup "shouldfail"
