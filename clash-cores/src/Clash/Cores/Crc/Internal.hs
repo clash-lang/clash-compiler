@@ -675,7 +675,7 @@ crcEngineFromParams
       step = fmap (steps !!) validLanesX
 
       nextCrcState = step <*> (mux resetCrcX (pure _crcInitial) crcState) <*> datX
-      crcState = regEn _crcInitial (isJust <$> inDat) nextCrcState
+      crcState = delayEn (errorX "crcEngine: Undefined initial value") (isJust <$> inDat) nextCrcState
       crcOut = xor _crcXorOutput <$> (applyWhen _crcReflectOutput reverseBV <$> crcState)
 
 -- | The validator, see 'crcEngine' for more details
@@ -737,7 +737,7 @@ crcValidatorFromParams
       (resetCrcX, validLanesX, datX) = unbundle $ fromJustX <$> inDat
 
       nextCrcState = step <$> (mux resetCrcX (pure _crcInitial) crcState) <*> datX
-      crcState = regEn _crcInitial inValid nextCrcState
+      crcState = delayEn (errorX "crcValidator: Undefined initial value") inValid nextCrcState
       matches = zipWith (==) residues <$> fmap pure crcState
-      lane = regEn 0 inValid validLanesX
+      lane = delayEn 0 inValid validLanesX
       match = (!!) <$> matches <*> lane
