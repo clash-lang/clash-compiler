@@ -74,7 +74,6 @@ module Clash.Signal.Trace
   -- * Internal
   -- ** Types
   , Period
-  , Changed
   , Value
   , Width
   , TraceMap
