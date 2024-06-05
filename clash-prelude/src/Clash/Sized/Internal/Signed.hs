@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016     , Myrtle Software Ltd,
-                  2021-2023, QBayLogic B.V.
+                  2021-2024, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -881,7 +881,7 @@ instance (KnownNat n) => Ix (Signed n) where
   range (a, b) = [a..b]
   index ab@(a, b) x
     | inRange ab x = fromIntegral $ x - a
-    | otherwise = error $ printf "Index %d out of bounds (%d, %d) ab" x a b
+    | otherwise = error $ printf "Index (%d) out of range ((%d, %d))" x a b
   inRange (a, b) x = a <= x && x <= b
 
 -- | Shift left that ties to zero on negative shifts
