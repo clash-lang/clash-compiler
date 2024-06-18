@@ -1,3 +1,5 @@
+{- FOURMOLU_DISABLE -}
+
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
