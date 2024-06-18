@@ -1,0 +1,1 @@
+ADDED: Introduced various new types to `Clash.Signal` to more easily represent time and its relation to your clock domain. New types: `Seconds`, `Milliseconds`, `Microseconds`, `Nanoseconds`, `Picoseconds`, `DomainToHz`, `HzToPeriod`, `PeriodToHz`, `PeriodToCycles`, `ClockDivider`.

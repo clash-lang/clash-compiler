@@ -2,7 +2,6 @@ module T1187.Keypad (inputKeypad) where
 
 import Clash.Prelude
 import T1187.Utils (debounce, roundRobin, moreIdx, (.==))
-import T1187.Clock (Milliseconds, ClockDivider)
 import Control.Monad (mplus)
 
 type Matrix rows cols a = Vec rows (Vec cols a)

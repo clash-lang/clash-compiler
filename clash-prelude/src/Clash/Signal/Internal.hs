@@ -1,8 +1,9 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
-                  2017-2019, Myrtle Software Ltd
+                  2017-2019, Myrtle Software Ltd,
                   2017-2022, Google Inc.,
-                  2021-2023, QBayLogic B.V.
+                  2020     , Gergő Érdi,
+                  2021-2024, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -67,12 +68,22 @@ module Clash.Signal.Internal
   , DomainConfigurationInitBehavior
   , DomainConfigurationResetPolarity
 
-    -- *** Convenience types
-
+  -- *** Convenience types
   , HasSynchronousReset
   , HasAsynchronousReset
   , HasDefinedInitialValues
-
+  -- **** Time representations
+  , Seconds
+  , Milliseconds
+  , Microseconds
+  , Nanoseconds
+  , Picoseconds
+  -- **** Time conversions
+  , DomainToHz
+  , HzToPeriod
+  , PeriodToHz
+  , PeriodToCycles
+  , ClockDivider
     -- ** Default domains
   , System
   , XilinxSystem
@@ -191,7 +202,9 @@ import Data.Ratio                 (Ratio)
 import Data.Type.Equality         ((:~:))
 import GHC.Generics               (Generic)
 import GHC.Stack                  (HasCallStack, withFrozenCallStack)
-import GHC.TypeLits               (KnownSymbol, KnownNat, Nat, Symbol, type (<=), sameSymbol)
+import GHC.TypeLits
+  (Div, KnownSymbol, KnownNat, Nat, Symbol, type (<=), type (*), sameSymbol)
+import GHC.TypeLits.Extra         (DivRU)
 import Language.Haskell.TH.Syntax -- (Lift (..), Q, Dec)
 import Language.Haskell.TH.Compat
 import Numeric.Natural            (Natural)
@@ -438,6 +451,39 @@ type HasDefinedInitialValues (dom :: Domain) =
 -- @
 type DomainResetPolarity (dom :: Domain) =
   DomainConfigurationResetPolarity (KnownConf dom)
+
+-- * Time representation
+
+-- | Gets time in 'Picoseconds' from time in 'Seconds'
+type Seconds      (s  :: Nat) = Milliseconds (1000 * s)
+-- | Gets time in 'Picoseconds' from time in 'Milliseconds'
+type Milliseconds (ms :: Nat) = Microseconds (1000 * ms)
+-- | Gets time in 'Picoseconds' from time in 'Microseconds'
+type Microseconds (us :: Nat) = Nanoseconds  (1000 * us)
+-- | Gets time in 'Picoseconds' from time in 'Nanoseconds'
+type Nanoseconds  (ns :: Nat) = Picoseconds  (1000 * ns)
+-- | Gets time in 'Picoseconds' from time in picoseconds, essentially 'id'
+type Picoseconds  (ps :: Nat) = ps
+
+-- | Converts a frequency in hertz to a period in picoseconds. This might lead to rounding
+-- errors.
+type HzToPeriod (hz :: Nat) = Seconds 1 `Div` hz
+
+-- | The domain's clock frequency in hertz, calculated based on the period stored in
+-- picoseconds. This might lead to rounding errors.
+type DomainToHz (dom :: Domain) = PeriodToHz (DomainPeriod dom)
+
+-- | Number of clock cycles required at the clock frequency of @dom@ before a minimum
+-- @period@ has passed
+type PeriodToCycles (dom :: Domain) (period :: Nat) =  period `DivRU` DomainPeriod dom
+
+-- | Converts a period in picoseconds to a frequency in hertz. This might lead to rounding
+-- errors.
+type PeriodToHz (period :: Nat) = (Seconds 1) `Div` period
+
+-- | Number of clock cycles required at the clock frequency of @dom@ before a minimum
+-- @period@ has passed. The same as 'PeriodToCycles'.
+type ClockDivider (dom :: Domain) (period :: Nat) = PeriodToCycles dom period
 
 -- | Singleton version of 'DomainConfiguration'
 data SDomainConfiguration (dom :: Domain) (conf :: DomainConfiguration) where

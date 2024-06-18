@@ -1,5 +1,6 @@
 {-|
   Copyright   :  (C) 2021, LUMI GUIDE FIETSDETECTIE B.V.
+                     2024, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -26,27 +27,16 @@ module Clash.Cores.UART
   -- * Internal
   , UartBaudGenTick
   , UartBaudGenTick2
-  , PeriodToHz
   , DivRound
   , BaudGenCounterWidth
-  , Second
   ) where
 
 import Clash.Prelude
 import Clash.Class.HasDomain (TryDomain, TryDomainResult(Found))
 import Data.Maybe (isJust)
 
--- | Utility type that represents a second
-type Second = 1_000_000_000_000 -- picoseconds
-
 -- | Division that rounds the result
 type DivRound (a :: Nat) (b :: Nat) = Div (a + (Div b 2)) b
-
--- | Calculate frequency from period at type level
-type PeriodToHz (period :: Nat) = Div Second period
-
--- | Calculate period from frequency at type level
-type HzToPeriod (freq :: Nat) = Div Second freq
 
 -- | UART baud generator
 newtype BaudGenerator (dom :: Domain) = BaudGenerator (Signal dom Bool)

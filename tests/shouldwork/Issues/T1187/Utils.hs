@@ -14,7 +14,6 @@ module T1187.Utils
 import Clash.Prelude
 import Data.Maybe (fromMaybe)
 import Control.Monad.State
-import T1187.Clock
 
 unchanged :: (HiddenClockResetEnable dom, Eq a, NFDataX a) => a -> Signal dom a -> Signal dom Bool
 unchanged x0 x = x .==. register x0 x
