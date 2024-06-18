@@ -69,10 +69,11 @@ import Clash.Annotations.Primitive
 import Clash.Backend (Backend, hdlKind)
 import Clash.Core.DataCon ( DataCon(MkData, dcName) )
 import Clash.Core.Name ( Name(Name, nameOcc) )
-import Clash.Core.Term ( Term(Data), collectArgs )
+import Clash.Core.Term ( Term(Data,Var), collectArgs )
 import Clash.Core.TermLiteral (TermLiteral(..), termToDataError, deriveTermLiteral)
 import Clash.Core.TyCon(isTupleTyConLike)
-import Clash.Core.Type (Type(..), LitTy (SymTy), ConstTy(TyCon), splitTyConAppM, isIntegerTy)
+import Clash.Core.Type (Type(..), TypeView (..), LitTy (SymTy), ConstTy(TyCon), isIntegerTy, splitTyConAppM, tyView)
+import Clash.Core.Var (varType)
 import Clash.Driver.Types (DomainMap, envDomains)
 import Clash.Netlist.BlackBox.Types
   ( BlackBoxFunction, BlackBoxMeta(bbKind), TemplateKind(TDecl), emptyBlackBoxMeta
@@ -187,8 +188,31 @@ instance TermLiteral (PrimPortOrParam ()) where
         , meta = ()
         , polarity = getPolarity nm pol
         }))
-
+  termToData (Var v)
+    | Just x <- primPortOrParamFromType (varType v) = Right x
   termToData t = Left t
+
+primPortOrParamFromType :: Type -> Maybe (PrimPortOrParam ())
+primPortOrParamFromType ty = case tyView ty of
+  TyConApp (Text.unpack . nameOcc -> tcNm) tyArgs
+    | tcNm == show 'Param -> case tyArgs of
+      [LitTy (SymTy nm), _] ->
+        Just (MkPrimParam (PrimParam{paramName=Text.pack nm, paramAsInteger=Nothing, paramMeta=()}))  -- TODO test if we can the the value from the term level
+      _ -> error $ "Invalid ty arguments to Param:\n" <> show ty
+    | tcNm == show 'Port -> case tyArgs of
+      [LitTy (SymTy nm), LitTy (SymTy domNm), _a] ->
+        Just (MkPrimPort (PrimSignalPort{name=Text.pack nm, dom=Text.pack domNm, meta=()}))
+      _ -> error $ "Invalid ty arguments to Port:\n" <> show ty
+    | tcNm == show 'ClockPort -> case tyArgs of
+      [LitTy (SymTy nm), LitTy (SymTy domNm)] ->
+        Just (MkPrimPort (PrimClockPort{name=Text.pack nm, dom=Text.pack domNm, meta=()}))
+      _ -> error $ "invalid ty arguments to ClockPort:\n" <> show ty
+    | tcNm == show 'ResetPort -> case tyArgs of
+      [LitTy (SymTy nm), pol, LitTy (SymTy domNm)] ->
+        Just (MkPrimPort (PrimResetPort{name=Text.pack nm, dom=Text.pack domNm, meta=(), polarity = getPolarity nm pol}))
+      _ -> error $ "invalid ty arguments to ResetPort:\n" <> show ty
+    | otherwise -> error $ unlines ["Failed to get PortOrParamFromType from tcNm: " <> show tcNm, "tyArgs:", show tyArgs,"type:",show ty]
+  _ -> error $ "Failed to get PortOrParamFromType from type:\n" <> show ty
 
 -- | Get the 'ResetPolarity' from a type. This is used to automatically insert
 -- a @not@ if the reset polarity does not match the reset polarity of the domain.
@@ -370,11 +394,7 @@ inst !_ = instX
 
 -- | Interpret arguments as 'PrimPortOrParam's
 argsToPrimPortOrParams :: [Term] -> Either String [PrimPortOrParam ()]
-argsToPrimPortOrParams [] = pure []
-argsToPrimPortOrParams (t:ts) = do
-  arg <- termToDataError t
-  args <- argsToPrimPortOrParams ts
-  pure (arg:args)
+argsToPrimPortOrParams = mapM termToDataError
 
 -- | Interpret result type as 'PrimPort's
 tyToPrimPort :: Type -> Either String [PrimPort ()]
