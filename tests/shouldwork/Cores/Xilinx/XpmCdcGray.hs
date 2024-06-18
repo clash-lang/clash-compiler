@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module XpmCdcGray where
 
 import Clash.Explicit.Prelude

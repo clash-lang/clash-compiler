@@ -209,11 +209,10 @@ data ClashGenTest = ClashGenTest
 
 -- | See https://github.com/clash-lang/clash-compiler/pull/2511
 dOpaque :: String
-dOpaque =
 #if __GLASGOW_HASKELL__ >= 904
-  "-DCLASH_OPAQUE=OPAQUE"
+dOpaque = "-DCLASH_OPAQUE=OPAQUE"
 #else
-  "-DCLASH_OPAQUE=NOINLINE"
+dOpaque = "-DCLASH_OPAQUE=NOINLINE"
 #endif
 
 instance IsTest ClashGenTest where
@@ -490,6 +489,20 @@ runTest
 runTest modName opts path =
   testGroup modName (map (runTest1 modName opts (modName:path)) (hdlTargets opts))
 
+runTestIf
+  :: Bool
+  -- ^ Whether to run the test
+  -> String
+  -- ^ Name of test
+  -> TestOptions
+  -> [TestName]
+  -- ^ Parent test names in order of distance to the test. That is, the last
+  -- item in the list will be the root node, while the first one will be the
+  -- one closest to the test. Should correspond to directories on filesystem.
+  -> TestTree
+runTestIf True modName opts path = runTest modName opts path
+runTestIf False modName _ _ = testGroup (modName ++ " - skipped") []
+
 outputTest'
   :: String
   -- ^ Module name
@@ -549,6 +562,28 @@ outputTest modName opts path =
         | target <- hdlTargets opts
         ]
 
+ghc906extraBuildArgs :: [String]
+#if __GLASGOW_HASKELL__ >= 906
+ghc906extraBuildArgs
+  = "-dynamic" :
+  -- All libraries in the GHC environment file are passed to the GHC
+  -- linking stage, even when they are not used by the particular target.
+  -- The clash-ffi so-lib contains undefined references, but said library
+  -- isn't actually used in any of the clash-lib tests. So we just tell
+  -- the linker to shut up and continue producing an executable, as the
+  -- undefined references will not be an issue at run-time.
+  "-optl" : "-Wl,--allow-shlib-undefined" : []
+#else
+ghc906extraBuildArgs = []
+#endif
+
+mmapWorkAroundArgs :: [String]
+#ifdef CLASH_WORKAROUND_GHC_MMAP_CRASH
+mmapWorkAroundArgs = ["-with-rtsopts=-xm20000000"]
+#else
+mmapWorkAroundArgs = []
+#endif
+
 clashLibTest'
   :: String
   -- ^ Module name
@@ -573,21 +608,10 @@ clashLibTest' modName target extraGhcArgs path =
   clashBuild workDir = singleTest "clash (exec)" (ClashBinaryTest {
       cbBuildTarget=target
     , cbSourceDirectory=sourceDir
-    , cbExtraBuildArgs="-DCLASHLIBTEST" :
-#if __GLASGOW_HASKELL__ >= 906
-        "-dynamic" :
-        -- All libraries in the GHC environment file are passed to the GHC
-        -- linking stage, even when they are not used by the particular target.
-        -- The clash-ffi so-lib contains undefined references, but said library
-        -- isn't actually used in any of the clash-lib tests. So we just tell
-        -- the linker to shut up and continue producing an executable, as the
-        -- undefined references will not be an issue at run-time.
-        "-optl" : "-Wl,--allow-shlib-undefined" :
-#endif
-#ifdef CLASH_WORKAROUND_GHC_MMAP_CRASH
-        "-with-rtsopts=-xm20000000" :
-#endif
-        extraGhcArgs
+    , cbExtraBuildArgs=[ "-DCLASHLIBTEST" ]
+        ++ ghc906extraBuildArgs
+        ++ mmapWorkAroundArgs
+        ++ extraGhcArgs
     , cbExtraExecArgs=[]
     , cbModName=modName
     , cbOutputDirectory=workDir

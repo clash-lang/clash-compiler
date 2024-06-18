@@ -1,3 +1,5 @@
+{-# LANGUAGE MagicHash #-}
+
 -- Tests that ~LIT's are rendered as bare literals in HDL
 
 {-# LANGUAGE AllowAmbiguousTypes #-}

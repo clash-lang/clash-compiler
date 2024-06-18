@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module NumConstantFoldingTB_2 where
 import Clash.Prelude
 import Clash.Explicit.Testbench
@@ -14,4 +16,3 @@ testBench = done
     done           = expectedOutput (pure topEntity)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen
-

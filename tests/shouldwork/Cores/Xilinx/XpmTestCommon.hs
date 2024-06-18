@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -fforce-recomp #-}
 module XpmTestCommon where

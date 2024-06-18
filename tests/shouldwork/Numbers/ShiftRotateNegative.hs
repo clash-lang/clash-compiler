@@ -12,6 +12,7 @@ import Clash.Prelude
 import Clash.Explicit.Testbench
 import Clash.Sized.Internal.BitVector
 
+{- FOURMOLU_DISABLE -}
 testBench :: Signal System Bool
 testBench = done
  where
@@ -107,6 +108,7 @@ topEntity (x, i) =
   , g (unpack x) i
   ) :>
   Nil
+{- FOURMOLU_ENABLE -}
 
 f :: (Bits a) => a -> Int -> a
 f x i = x `shiftL` (-i) `rotateL` (-i) `shiftR` (-i) `rotateR` (-i)
