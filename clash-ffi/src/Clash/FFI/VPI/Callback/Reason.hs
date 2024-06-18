@@ -66,6 +66,7 @@ obviously unchecked / unsafe, so must be performed carefully.
 --   for a compliant VPI implementation but a feature is optional and may not
 --   be implemented in all tools.
 --
+{- FOURMOLU_DISABLE -}
 data CallbackReason
   = forall a. Coercible a Object => AfterValueChange a TimeType ValueFormat
   -- ^ Triggered after the value of the object @a@ changes.
@@ -148,6 +149,7 @@ data CallbackReason
   -- ^ Triggered after non-blocking events in a time step are executed, but
   -- before read-only events are processed.
 #endif
+{- FOURMOLU_ENABLE -}
 
 type instance CRepr CallbackReason = (CInt, Object, Ptr CTime, Ptr CValue)
 
@@ -494,6 +496,7 @@ instance Show UnknownCallbackReason where
       , prettyCallStack c
       ]
 
+{- FOURMOLU_DISABLE -}
 instance UnsafeReceive CallbackReason where
   unsafeReceive (creason, object, ctime, cvalue) =
     let mObject = if isNullObject object then Nothing else Just object in
@@ -737,3 +740,4 @@ instance Receive CallbackReason where
 #endif
 
       n  -> throwIO $ UnknownCallbackReason n callStack
+{- FOURMOLU_ENABLE -}

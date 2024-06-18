@@ -7,8 +7,8 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Clash.FFI.VPI.Control
 #if defined(VERILOG_2001)
+module Clash.FFI.VPI.Control
   ( Control(..)
   , StopValue(..)
   , DiagnosticLevel(..)
@@ -115,5 +115,5 @@ controlSimulator control = do
     throwIO $ CouldNotControl control callStack
 
 #else
-  () where
+  module Clash.FFI.VPI.Control () where
 #endif
