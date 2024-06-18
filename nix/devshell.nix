@@ -23,8 +23,9 @@ pkgs.mkShell {
   buildInputs = [
     clashPkgs.cabal-install
     clashPkgs.haskell-language-server
+    clashPkgs.fourmolu
 
-    pkgs.ghdl-llvm
+    # pkgs.ghdl-llvm
     pkgs.nixpkgs-fmt
     pkgs.symbiyosys
     pkgs.verilator
