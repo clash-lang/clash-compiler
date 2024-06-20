@@ -104,6 +104,7 @@ library
     -- an external interface file. See
     -- https://github.com/clash-lang/clash-compiler/issues/1796 for an example.
     shouldwork/LoadModules/precompiled
+    shouldwork/Basic/precompiled
 
   exposed-modules:
     Test.Tasty.Common
@@ -121,6 +122,9 @@ library
 
     -- From tests/shouldwork/LoadModules/precompiled
     T1796a
+
+    -- From tests/shouldwork/Basic/precompiled
+    SimulationMagic2736a
 
   other-modules:
     Paths_clash_testsuite
