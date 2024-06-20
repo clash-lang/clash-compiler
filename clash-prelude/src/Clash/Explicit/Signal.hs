@@ -173,7 +173,6 @@ module Clash.Explicit.Signal
   , DomainInitBehavior
   , DomainResetPolarity
     -- *** Convenience types #conveniencetypes#
-    -- **** Simplifying
     -- $conveniencetypes
 
   , HasSynchronousReset
@@ -345,6 +344,8 @@ countSometimes clk rst en = s where
 -}
 
 {- $conveniencetypes
+
+==== Simplifying
 
 If you want to write part of your Clash design as domain-polymorphic functions,
 it can be practical to define a design-wide constraint synonym that captures the
