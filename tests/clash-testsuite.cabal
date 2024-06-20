@@ -103,7 +103,7 @@ library
     -- Behaviour when loading modules can differ if the module is loaded from
     -- an external interface file. See
     -- https://github.com/clash-lang/clash-compiler/issues/1796 for an example.
-    shouldwork/LoadModules
+    shouldwork/LoadModules/precompiled
 
   exposed-modules:
     Test.Tasty.Common
@@ -119,8 +119,8 @@ library
     Test.Tasty.Vivado
     Test.Tasty.Clash.CollectSimResults
 
-    -- From tests/shouldwork/LoadModules
-    T1796
+    -- From tests/shouldwork/LoadModules/precompiled
+    T1796a
 
   other-modules:
     Paths_clash_testsuite
