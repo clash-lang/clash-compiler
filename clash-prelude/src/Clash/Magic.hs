@@ -44,6 +44,7 @@ module Clash.Magic
   ) where
 
 import Data.String.Interpolate     (__i)
+import GHC.Magic                   (noinline)
 import GHC.Stack                   (HasCallStack, withFrozenCallStack)
 import Clash.NamedTypes            ((:::))
 import GHC.TypeLits                (Nat,Symbol)
@@ -259,7 +260,8 @@ noDeDup = id
 
 -- | 'True' in Haskell/Clash simulation. Replaced by 'False' when generating HDL.
 clashSimulation :: Bool
-clashSimulation = True
+clashSimulation = noinline True
+-- The 'noinline' is here to prevent SpecConstr from poking through the OPAQUE, see #2736
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE clashSimulation #-}
 

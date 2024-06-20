@@ -1,4 +1,6 @@
-module SimulationMagic where
+{-# LANGUAGE TemplateHaskellQuotes #-}
+{-# OPTIONS_GHC -O2 -fspec-constr #-}
+module SimulationMagic2736 where
 
 import Prelude as P
 import Data.List (isInfixOf)
@@ -6,11 +8,10 @@ import System.Environment (getArgs)
 import System.FilePath ((</>))
 
 import Clash.Prelude
-import Clash.Magic (clashSimulation)
+import SimulationMagic2736a
 
 f :: Int
-f | clashSimulation = 123
-  | otherwise       = 456
+f = f0
 {-# ANN f (defSyn "f") #-}
 
 assertNotIn :: String -> String -> IO ()
