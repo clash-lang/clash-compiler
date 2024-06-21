@@ -126,6 +126,9 @@ library
     Clash.Cores.Crc
     Clash.Cores.Crc.Internal
     Clash.Cores.Crc.Catalog
+    Clash.Cores.EbTb
+    Clash.Cores.EbTb.Decoder
+    Clash.Cores.EbTb.Encoder
     Clash.Cores.LatticeSemi.ECP5.Blackboxes.IO
     Clash.Cores.LatticeSemi.ECP5.IO
     Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO
@@ -194,6 +197,7 @@ test-suite unittests
 
   other-Modules:
     Test.Cores.Crc
+    Test.Cores.EbTb
     Test.Cores.Internal.SampleSPI
     Test.Cores.Internal.Signals
     Test.Cores.SPI
