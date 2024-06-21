@@ -8,7 +8,6 @@ module T1187.SerialTx
 
 import Clash.Prelude
 import T1187.Utils (mealyStateB)
-import T1187.Clock
 
 import Control.Monad.State
 

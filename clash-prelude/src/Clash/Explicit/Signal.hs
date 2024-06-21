@@ -3,7 +3,7 @@ Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software,
                   2017-2022, Google Inc.
                   2020     , Ben Gamari,
-                  2021-2023, QBayLogic B.V.
+                  2021-2024, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -173,12 +173,23 @@ module Clash.Explicit.Signal
   , DomainInitBehavior
   , DomainResetPolarity
     -- *** Convenience types #conveniencetypes#
-    -- **** Simplifying
     -- $conveniencetypes
 
   , HasSynchronousReset
   , HasAsynchronousReset
   , HasDefinedInitialValues
+  -- **** Time representations
+  , Seconds
+  , Milliseconds
+  , Microseconds
+  , Nanoseconds
+  , Picoseconds
+  -- **** Time conversions
+  , DomainToHz
+  , HzToPeriod
+  , PeriodToHz
+  , PeriodToCycles
+  , ClockDivider
     -- ** Default domains
   , System
   , XilinxSystem
@@ -345,6 +356,8 @@ countSometimes clk rst en = s where
 -}
 
 {- $conveniencetypes
+
+==== Simplifying
 
 If you want to write part of your Clash design as domain-polymorphic functions,
 it can be practical to define a design-wide constraint synonym that captures the

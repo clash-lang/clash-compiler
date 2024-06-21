@@ -1,5 +1,6 @@
 {-|
   Copyright   :  (C) 2021, LUMI GUIDE FIETSDETECTIE B.V.
+                     2024, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -41,7 +42,7 @@ baudGeneratorErr
 baudGeneratorErr baud@SNat = errPercent <= 0.625
   where
     clock100Period = snatToNum @Int (clockPeriod @System100)
-    uartPeriod = snatToNum @Int $ SNat @(Div Second baud)
+    uartPeriod = snatToNum @Int $ SNat @(HzToPeriod baud)
     (clk, rst, en) = (clockGen @System100, resetGen, enableGen)
     uartEn = baudGenToSignal
                $ exposeClockResetEnable
@@ -120,7 +121,7 @@ txWord transmit = txBits == expected
     ack' = liftA2 (||) ack (register clk rst en False ack')
     txM = mux ack' (pure Nothing) (pure $ Just transmit)
     -- Ensure the transmitted bits have appropiate timing
-    uartPeriod = natToNum @(Div Second (baud * (DomainPeriod System)))
+    uartPeriod = natToNum @(PeriodToCycles System (HzToPeriod baud))
     highBit = List.replicate uartPeriod (1 :: Bit)
     lowBit = List.replicate uartPeriod (0 :: Bit)
     dataBitToList 0 = lowBit
