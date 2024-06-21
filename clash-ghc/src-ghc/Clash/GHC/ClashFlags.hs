@@ -43,13 +43,17 @@ parseClashFlags :: IORef ClashOpts -> [Located String]
                 -> IO ([Located String],[Warn])
 parseClashFlags r = parseClashFlagsFull (flagsClash r)
 
+processGhcArgs :: [Flag IO] -> [Located String] -> IO ([Located String], [Err], [Warn])
+#if MIN_VERSION_ghc(9,4,0)
+processGhcArgs flagsAvailable args = processArgs flagsAvailable args parseResponseFile
+#else
+processGhcArgs flagsAvailable args = processArgs flagsAvailable args
+#endif
+
 parseClashFlagsFull :: [Flag IO] -> [Located String]
                     -> IO ([Located String],[Warn])
-parseClashFlagsFull flagsAvialable args = do
-  (leftovers,errs,warns) <- processArgs flagsAvialable args
-#if MIN_VERSION_ghc(9,4,0)
-                              parseResponseFile
-#endif
+parseClashFlagsFull flagsAvailable args = do
+  (leftovers,errs,warns) <- processGhcArgs flagsAvailable args
 
   unless (null errs) $ throwGhcExceptionIO $
     errorsToGhcException . map (("on the commandline", ) .  unLoc . errMsg)

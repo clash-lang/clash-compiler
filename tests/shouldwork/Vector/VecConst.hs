@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module VecConst where
 
 import Clash.Prelude

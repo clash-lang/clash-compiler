@@ -107,6 +107,19 @@ indexMaybe [] _     = Nothing
 indexMaybe (x:_)  0 = Just x
 indexMaybe (_:xs) n = indexMaybe xs (n-1)
 
+opaqueBindingSpec :: GHC.InlineSpec
+inlineBindingSpec :: GHC.InlineSpec
+opaqueString :: String
+#if MIN_VERSION_ghc(9,4,0)
+opaqueBindingSpec = GHC.Opaque GHC.NoSourceText
+inlineBindingSpec = GHC.Inline GHC.NoSourceText
+opaqueString = "OPAQUE"
+#else
+opaqueBindingSpec = GHC.NoInline
+inlineBindingSpec = GHC.Inline
+opaqueString = "INLINE"
+#endif
+
 generateBindings
   :: ClashOpts
   -> GHC.Ghc ()
@@ -155,11 +168,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
                                     -- selectors, no need to check free vars.
       clsMap =
         fmap (\(v,i) ->
-#if MIN_VERSION_ghc(9,4,0)
-               (Binding v GHC.noSrcSpan (GHC.Inline GHC.NoSourceText) IsFun
-#else
-               (Binding v GHC.noSrcSpan GHC.Inline IsFun
-#endif
+               (Binding v GHC.noSrcSpan inlineBindingSpec IsFun
                   (mkClassSelector inScope0 allTcCache (varType v) i) False))
              clsVMap
       allBindings                   = bindingsMap `unionVarEnv` clsMap
@@ -210,11 +219,7 @@ setNoInlineTopEntities bm tes =
 
   go b@Binding{bindingId}
     | bindingId `elemVarSet` ids
-#if MIN_VERSION_ghc(9,4,0)
-    = b { bindingSpec = GHC.Opaque GHC.NoSourceText }
-#else
-    = b { bindingSpec = GHC.NoInline }
-#endif
+    = b { bindingSpec = opaqueBindingSpec }
     | otherwise = b
 
 -- TODO This function should be changed to provide the information that
@@ -274,6 +279,48 @@ mkBindings primMap bindings clsOps unlocatable = do
 
   return (mkVarEnv (concat bindingsList), mkVarEnv clsOpList)
 
+#if MIN_VERSION_ghc(9,4,0)
+strictnessInfo :: GHC.IdInfo -> GHC.DmdSig
+strictnessInfo info = GHC.dmdSigInfo info
+
+argDemands :: GHC.DmdSig -> [GHC.Demand]
+argDemands strictness = fst $ GHC.splitDmdSig strictness
+#else
+strictnessInfo :: GHC.IdInfo -> GHC.StrictSig
+strictnessInfo info = GHC.strictnessInfo info
+
+argDemands :: GHC.StrictSig -> [GHC.Demand]
+argDemands strictness = fst $ GHC.splitStrictSig strictness
+#endif
+
+#if MIN_VERSION_ghc(9,4,0)
+appIsDeadEnd :: GHC.DmdSig -> Int -> Bool
+#else
+appIsDeadEnd :: GHC.StrictSig -> Int -> Bool
+#endif
+#if MIN_VERSION_ghc(9,2,0)
+appIsDeadEnd = GHC.isDeadEndAppSig
+#elif MIN_VERSION_ghc(9,0,0)
+appIsDeadEnd = GHC.appIsDeadEnd
+#else
+appIsDeadEnd = GHC.appIsBottom
+#endif
+
+funArity :: GHC.Type -> Int
+#if MIN_VERSION_ghc(9,2,0)
+funArity ty = length . fst . GHC.splitFunTys . snd . GHC.splitForAllTyCoVars $ ty
+#else
+funArity ty = length . fst . GHC.splitFunTys . snd . GHC.splitForAllTys $ ty
+#endif
+
+realSrcLoc :: GHC.SrcLoc -> Maybe GHC.RealSrcLoc
+realSrcLoc (GHC.UnhelpfulLoc _) = Nothing
+#if MIN_VERSION_ghc(9,0,0)
+realSrcLoc (GHC.RealSrcLoc l _) = Just l
+#else
+realSrcLoc (GHC.RealSrcLoc l _) = Just l
+#endif
+
 {-
 NOTE [bindings in recursive groups]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -316,30 +363,11 @@ checkPrimitive primMap v = do
       let
         info = GHC.idInfo v
         inline = GHC.inlinePragmaSpec $ GHC.inlinePragInfo info
-#if MIN_VERSION_ghc(9,4,0)
-        strictness = GHC.dmdSigInfo info
-#else
-        strictness = GHC.strictnessInfo info
-#endif
+        strictness = strictnessInfo info
         ty = GHC.varType v
-#if MIN_VERSION_ghc(9,2,0)
-        (argTys,_resTy) = GHC.splitFunTys (snd (GHC.splitForAllTyCoVars ty))
-#else
-        (argTys,_resTy) = GHC.splitFunTys . snd . GHC.splitForAllTys $ ty
-#endif
-#if MIN_VERSION_ghc(9,4,0)
-        (dmdArgs,_dmdRes) = GHC.splitDmdSig strictness
-#else
-        (dmdArgs,_dmdRes) = GHC.splitStrictSig strictness
-#endif
-        nrOfArgs = length argTys
-        loc = case GHC.getSrcLoc v of
-                GHC.UnhelpfulLoc _ -> ""
-#if MIN_VERSION_ghc(9,0,0)
-                GHC.RealSrcLoc l _ -> showPpr l ++ ": "
-#else
-                GHC.RealSrcLoc l   -> showPpr l ++ ": "
-#endif
+        dmdArgs = argDemands strictness
+        nrOfArgs = funArity ty
+        loc = maybe "" (\l -> showPpr l ++ ": ") $ realSrcLoc $ GHC.getSrcLoc v
         warnIf cond msg = traceIf cond ("\n"++loc++"Warning: "++msg) return ()
       qName <- Text.unpack <$> qualifiedNameString (GHC.varName v)
       let primStr = "primitive " ++ qName ++ " "
@@ -360,19 +388,9 @@ checkPrimitive primMap v = do
 
       unless (qName == "Clash.XException.errorX" || "GHC." `isPrefixOf` qName) $ do
         warnIf (not (isOpaque inline))
-#if MIN_VERSION_ghc(9,4,0)
-          (primStr ++ "isn't marked OPAQUE."
-#else
-          (primStr ++ "isn't marked NOINLINE."
-#endif
+          (primStr ++ "isn't marked " ++ opaqueString ++ "."
           ++ "\nThis might make Clash ignore this primitive.")
-#if MIN_VERSION_ghc(9,2,0)
-        warnIf (GHC.isDeadEndAppSig strictness nrOfArgs)
-#elif MIN_VERSION_ghc(9,0,0)
-        warnIf (GHC.appIsDeadEnd strictness nrOfArgs)
-#else
-        warnIf (GHC.appIsBottom strictness nrOfArgs)
-#endif
+        warnIf (appIsDeadEnd strictness nrOfArgs)
           ("The Haskell implementation of " ++ primStr
           ++ "produces a result that always results in an error.\n"
           ++ "This can lead to compile failures because GHC can replace entire "

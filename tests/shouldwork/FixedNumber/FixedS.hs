@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module FixedS where
 
 import Clash.Prelude

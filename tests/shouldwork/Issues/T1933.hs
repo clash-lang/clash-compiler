@@ -1,4 +1,6 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 module T1933 where
 
 import Clash.Prelude
@@ -30,11 +32,14 @@ q = coerce p
 {-# CLASH_OPAQUE q #-}
 
 topEntity :: Unsigned 12 -> T
-topEntity x =
 #if __GLASGOW_HASKELL__ == 900
+topEntity x =
   let r = fromIntegral q :: Unsigned 12
-#else
-  let r = coerce q :: Unsigned 12
-#endif
       {-# NOINLINE r #-}
    in f (MkT x r)
+#else
+topEntity x =
+  let r = coerce q :: Unsigned 12
+      {-# NOINLINE r #-}
+   in f (MkT x r)
+#endif

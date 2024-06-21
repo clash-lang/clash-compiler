@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module XpmCdcHandshake where
 
 import Clash.Cores.Xilinx.Xpm.Cdc.Handshake

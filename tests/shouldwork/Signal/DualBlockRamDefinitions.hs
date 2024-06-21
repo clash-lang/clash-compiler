@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wno-orphans -Wno-missing-signatures #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module DualBlockRamDefinitions where
 

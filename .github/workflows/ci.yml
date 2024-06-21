@@ -13,6 +13,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  fourmolu:
+    runs-on: ubuntu-latest
+    steps:
+      # Note that you must checkout your code before running haskell-actions/run-fourmolu
+      - uses: actions/checkout@v3
+      - uses: haskell-actions/run-fourmolu@v9
+        with:
+          version: "0.14.0.0"
+          pattern: |
+            *.hs
+            !clash-ghc/src-bin-*
+
+
   build_mac_windows:
     name: Build and run limited tests
     runs-on: ${{ matrix.os }}

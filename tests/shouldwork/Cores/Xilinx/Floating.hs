@@ -6,6 +6,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -fconstraint-solver-iterations=10 -Wall -Werror #-}
 

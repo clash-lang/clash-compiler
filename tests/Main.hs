@@ -27,8 +27,8 @@ import           Test.Tasty.Clash
 
 -- | GHC version as major.minor.patch1. For example: 8.10.2.
 ghcVersion3 :: String
-ghcVersion3 =
 #ifdef __GLASGOW_HASKELL_PATCHLEVEL2__
+ghcVersion3 =
   let ghc_p1 = __GLASGOW_HASKELL_PATCHLEVEL1__
       ghc_p2 = __GLASGOW_HASKELL_PATCHLEVEL2__ in
   case ghc_p2 of
@@ -37,8 +37,37 @@ ghcVersion3 =
     _ ->
       intercalate "." (map show (versionBranch compilerVersion <> [ghc_p1,ghc_p2]))
 #else
+ghcVersion3 =
   let ghc_p1 = __GLASGOW_HASKELL_PATCHLEVEL1__ in
   intercalate "." (map show (versionBranch compilerVersion <> [ghc_p1]))
+#endif
+
+multipleHiddenEnabled :: Bool
+#ifdef CLASH_MULTIPLE_HIDDEN
+multipleHiddenEnabled = True
+#else
+multipleHiddenEnabled = False
+#endif
+
+coSimEnabled :: Bool
+#ifdef COSIM
+coSimEnabled = True
+#else
+coSimEnabled = False
+#endif
+
+ghcVersionGreater94 :: Bool
+#if MIN_VERSION_GLASGOW_HASKELL(9,4,0,0)
+ghcVersionGreater94 = True
+#else
+ghcVersionGreater94 = False
+#endif
+
+baseVersionGreater414 :: Bool
+#if MIN_VERSION_base(4,14,0)
+baseVersionGreater414 = True
+#else
+baseVersionGreater414 = False
 #endif
 
 -- Directory clash binary is expected to live in
@@ -380,9 +409,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "DivZero" def
         , runTest "LambdaDrop" def{hdlSim=[]}
         , runTest "IrrefError" def{hdlSim=[]}
-#ifdef CLASH_MULTIPLE_HIDDEN
-        , runTest "MultipleHidden" def
-#endif
+        , runTestIf multipleHiddenEnabled "MultipleHidden" def
         , outputTest "NameInlining" def
         , runTest "NameInstance" def{hdlSim=[]}
         , outputTest "NameInstance" def
@@ -637,12 +664,10 @@ runClashTest = defaultMain $ clashTestRoot
         [ runTest "MAC" def{hdlSim=[]}
         , runTest "CBlockRamTest" def{hdlSim=[]}
         ]
-#ifdef COSIM
       , clashTestGroup "CoSim"
-        [ runTest "Multiply" def{hdlTargets=[Verilog]}
-        , runTest "Register" def{hdlTargets=[Verilog]}
+        [ runTestIf coSimEnabled "Multiply" def{hdlTargets=[Verilog]}
+        , runTestIf coSimEnabled "Register" def{hdlTargets=[Verilog]}
         ]
-#endif
       , clashTestGroup "CustomReprs"
         [ clashTestGroup "RotateC"
           [ runTest "RotateC" def
@@ -717,9 +742,7 @@ runClashTest = defaultMain $ clashTestRoot
         ]
       , clashTestGroup "Feedback"
         [ runTest "Fib" def
-#ifdef CLASH_MULTIPLE_HIDDEN
-        , runTest "MutuallyRecursive" def
-#endif
+        , runTestIf multipleHiddenEnabled "MutuallyRecursive" def
         ]
       , clashTestGroup "Fixed"
         [ runTest "Mixer" def
@@ -808,14 +831,12 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T2360" def{hdlSim=[],clashFlags=["-fclash-force-undefined=0"]}
         , outputTest "T2502" def{hdlTargets=[VHDL]}
         , outputTest "T2508" def{hdlTargets=[VHDL]}
-#if MIN_VERSION_GLASGOW_HASKELL(9,4,0,0)
-        , runTest "T2510" def{
+        , runTestIf ghcVersionGreater94 "T2510" def{
             hdlTargets=[VHDL]
           , hdlSim=[]
           , expectClashFail=Just (TestSpecificExitCode 0, "Warning: primitive T2510.bb isn't marked OPAQUE.")
           }
         , outputTest "T2510" def{hdlTargets=[VHDL], clashFlags=["-DNOINLINE=OPAQUE"]}
-#endif
         , outputTest "T2542" def{hdlTargets=[VHDL]}
         , runTest "T2593" def{hdlSim=[]}
         , runTest "T2623CaseConFVs" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
@@ -846,9 +867,7 @@ runClashTest = defaultMain $ clashTestRoot
           ]
       , clashTestGroup "Numbers"
         [ runTest "BitInteger" def
-#if MIN_VERSION_base(4,14,0)
-        , runTest "BitReverse" def
-#endif
+        , runTestIf baseVersionGreater414 "BitReverse" def
         , runTest "BitsTB" def { buildTargets = BuildSpecific [ "bitsTB1"
                                                               , "bitsTB2"
                                                               , "bitsTB3"
@@ -950,13 +969,9 @@ runClashTest = defaultMain $ clashTestRoot
           [ runTest "Blob" def
           ]
         , runTest "AndEnable" def
-#ifdef CLASH_MULTIPLE_HIDDEN
-        ,
-          -- TODO: Vivado is disabled because it gives different results, see
+        , -- TODO: Vivado is disabled because it gives different results, see
           -- https://github.com/clash-lang/clash-compiler/issues/2267
-          runTest "AndSpecificEnable" def{hdlSim=hdlSim def \\ [Vivado]}
-
-#endif
+          runTestIf multipleHiddenEnabled "AndSpecificEnable" def{hdlSim=hdlSim def \\ [Vivado]}
         , runTest "Ram" def
         , clashTestGroup "Ram"
           [ runTest "RMultiTop" def

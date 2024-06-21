@@ -138,11 +138,11 @@ let
         };
 
       clash-prelude =
-        hprev.callCabal2nixWithOptions
+        prev.haskell.lib.dontCheck (hprev.callCabal2nixWithOptions
           "clash-prelude"
           ../clash-prelude
           "--flag workaround-ghc-mmap-crash"
-          { };
+          { });
 
       clash-prelude-hedgehog =
         hprev.callCabal2nix "clash-prelude-hedgehog" ../clash-prelude-hedgehog {

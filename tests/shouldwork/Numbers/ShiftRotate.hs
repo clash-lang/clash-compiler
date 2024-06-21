@@ -7,6 +7,7 @@ So it checks that the HDL implementations have the same behavior as the Haskell 
 -}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 module ShiftRotate where
 import Clash.Prelude

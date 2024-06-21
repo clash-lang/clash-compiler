@@ -44,7 +44,7 @@ flag pedantic
 
 custom-setup
 --  ghc-options:   -Wall -Werror
-  setup-depends: aeson,
+  setup-depends: aeson >= 2.0.0,
                  base >= 4.10 && < 5,
                  bytestring,
                  Cabal,

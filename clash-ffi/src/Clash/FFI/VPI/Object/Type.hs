@@ -22,19 +22,28 @@ import           Clash.FFI.View
 -- queried using the @vpiType@ property, and the value used to identify when
 -- it is safe to coerce into a type in the higher-level VPI API.
 --
+#if defined(VERILOG_2001)
 data ObjectType
   = ObjModule
   | ObjNet
   | ObjParameter
   | ObjPort
   | ObjReg
-#if defined(VERILOG_2001)
   | ObjCallback
-#endif
   deriving stock (Eq, Show)
+#else
+data ObjectType
+  = ObjModule
+  | ObjNet
+  | ObjParameter
+  | ObjPort
+  | ObjReg
+  deriving stock (Eq, Show)
+#endif
 
 type instance CRepr ObjectType = CInt
 
+#if defined(VERILOG_2001)
 instance Send ObjectType where
   send =
     pure . \case
@@ -43,8 +52,16 @@ instance Send ObjectType where
       ObjParameter -> 41
       ObjPort -> 44
       ObjReg -> 48
-#if defined(VERILOG_2001)
       ObjCallback -> 107
+#else
+instance Send ObjectType where
+  send =
+    pure . \case
+      ObjModule -> 32
+      ObjNet -> 36
+      ObjParameter -> 41
+      ObjPort -> 44
+      ObjReg -> 48
 #endif
 
 -- | An exception thrown when decoding an object type if an invalid value is
@@ -65,6 +82,7 @@ instance Show UnknownObjectType where
       , prettyCallStack c
       ]
 
+#if defined(VERILOG_2001)
 instance Receive ObjectType where
   receive = \case
     32 -> pure ObjModule
@@ -72,7 +90,15 @@ instance Receive ObjectType where
     41 -> pure ObjParameter
     44 -> pure ObjPort
     48 -> pure ObjReg
-#if defined(VERILOG_2001)
     107 -> pure ObjCallback
-#endif
     ty -> throwIO $ UnknownObjectType ty callStack
+#else
+instance Receive ObjectType where
+  receive = \case
+    32 -> pure ObjModule
+    36 -> pure ObjNet
+    41 -> pure ObjParameter
+    44 -> pure ObjPort
+    48 -> pure ObjReg
+    ty -> throwIO $ UnknownObjectType ty callStack
+#endif

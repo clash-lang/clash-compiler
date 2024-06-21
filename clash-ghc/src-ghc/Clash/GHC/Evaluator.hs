@@ -367,6 +367,23 @@ instantiate tcm pVal@(PrimVal (PrimInfo{primType}) tys es) ty m
 
 instantiate _ p _ _ = error $ "Evaluator.instantiate: Not a tylambda: " ++ show p
 
+getByteArrayIP :: Integer -> BA.ByteArray#
+#if MIN_VERSION_base(4,15,0)
+getByteArrayIP !(IP ba0) = ba0
+#else
+getByteArrayIP !(Jp# !(BN# ba0)) = ba0
+#endif
+getByteArrayIP _ = error "getByteArrayIP: not IP"
+
+getByteArrayIN :: Integer -> BA.ByteArray#
+#if MIN_VERSION_base(4,15,0)
+getByteArrayIN !(IN ba0) = ba0
+#else
+getByteArrayIN !(Jn# !(BN# ba0)) = ba0
+#endif
+getByteArrayIN _ = error "getByteArrayIN: not IN"
+
+
 -- | Evaluate a case-expression
 scrutinise :: Value -> Type -> [Alt] -> Machine -> Machine
 scrutinise v _altTy [] m = setTerm (valToTerm v) m
@@ -390,19 +407,11 @@ scrutinise (Lit l) _altTy alts m = case alts of
        1 | l1 >= ((-2)^(63::Int)) &&  l1 < 2^(63::Int) ->
           Just (IntLiteral l1)
        2 | l1 >= (2^(63::Int)) ->
-#if MIN_VERSION_base(4,15,0)
-          let !(IP ba0) = l1
-#else
-          let !(Jp# !(BN# ba0)) = l1
-#endif
+          let ba0 = getByteArrayIP l1
               ba1 = BA.ByteArray ba0
           in  Just (ByteArrayLiteral ba1)
        3 | l1 < ((-2)^(63::Int)) ->
-#if MIN_VERSION_base(4,15,0)
-          let !(IN ba0) = l1
-#else
-          let !(Jn# !(BN# ba0)) = l1
-#endif
+          let ba0 = getByteArrayIN l1
               ba1 = BA.ByteArray ba0
           in  Just (ByteArrayLiteral ba1)
        _ -> Nothing
@@ -415,11 +424,7 @@ scrutinise (Lit l) _altTy alts m = case alts of
        1 | l1 >= 0 &&  l1 < 2^(64::Int) ->
           Just (WordLiteral l1)
        2 | l1 >= (2^(64::Int)) ->
-#if MIN_VERSION_base(4,15,0)
-          let !(IP ba0) = l1
-#else
-          let !(Jp# !(BN# ba0)) = l1
-#endif
+          let ba0 = getByteArrayIP l1
               ba1 = BA.ByteArray ba0
           in  Just (ByteArrayLiteral ba1)
        _ -> Nothing

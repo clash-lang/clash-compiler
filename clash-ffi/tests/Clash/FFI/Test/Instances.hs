@@ -267,6 +267,8 @@ instance TShow CallbackReason where
          <> pShow t
 #endif
 
+{- FOURMOLU_DISABLE -}
+
 instance Monad m => Serial m CallbackReason where
   series =
        (AfterValueChange <$> obj <~> series <~> series)
@@ -310,6 +312,8 @@ instance Monad m => Serial m CallbackReason where
 
       mObj :: Series m (Maybe Object)
       mObj = series
+
+{- FOURMOLU_ENABLE -}
 
 -- Additional Clash.FFI.VPI.Control.Control Instances
 
@@ -398,6 +402,7 @@ instance Monad m => Serial m (Property CInt) where
 instance Monad m => Serial m (Property CString) where
   series = foldl (\/) (pure Name) $ map pure [FullName, File]
 
+{- FOURMOLU_DISABLE -}
 instance Monad m => Serial m (Property Bool) where
   series =
     foldl (\/) (pure IsScalar) $ map pure
@@ -407,6 +412,7 @@ instance Monad m => Serial m (Property Bool) where
       , IsLocalParam
 #endif
       ]
+{- FOURMOLU_ENABLE -}
 
 -- Additional Clash.FFI.VPI.Object.Time.TimeType Instances
 

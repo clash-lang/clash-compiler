@@ -196,11 +196,7 @@ blackboxObject
     -- ^ templateD
     -> Value
 blackboxObject bbname type_ templateD =
-#if MIN_VERSION_aeson(2,0,0)
   Object (KM.fromList [("BlackBox", Object (KM.fromList [
-#else
-  Object (fromList [("BlackBox", Object (fromList [
-#endif
       ("name", String $ Text.pack bbname)
     , ("kind", "Declaration")
     , ("type", String $ Text.pack type_)
