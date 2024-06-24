@@ -1,0 +1,20 @@
+CHANGED: You can now only create an `SDomainConfiguration` when the `period` of the domain is at least `1`.
+Pattern matching on an `SDomainConfiguration` bring the `1 <= period` into scope.
+This in turns enables the following code to typecheck:
+```
+import Clash.Prelude
+import Data.Proxy
+
+f ::
+  forall dom .
+  KnownDomain dom =>
+  Proxy dom ->
+  SNat (PeriodToCycles dom (Milliseconds 1))
+f Proxy = case knownDomain @dom of
+    SDomainConfiguration {} -> SNat
+```
+where the `DivRU` in
+```
+type PeriodToCycles (dom :: Domain) (period :: Nat) =  period `DivRU` DomainPeriod dom
+```
+requires that the `DomainPeriod dom` is at least `1`.
