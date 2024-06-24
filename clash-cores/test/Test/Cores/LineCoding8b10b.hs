@@ -4,9 +4,9 @@
 --   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 --
 --   8b/10b encoding and decoding tests
-module Test.Cores.EbTb where
+module Test.Cores.LineCoding8b10b where
 
-import Clash.Cores.EbTb
+import Clash.Cores.LineCoding8b10b
 import Clash.Hedgehog.Sized.BitVector
 import qualified Clash.Prelude as C
 import qualified Hedgehog as H
@@ -31,38 +31,38 @@ checkBitSequence cg =
       then ((if accMax < (acc + 1) then acc + 1 else accMax, acc + 1), i)
       else ((accMax, 0), i)
 
--- Check if the output of 'ebTbDecode' is a valid value for a given value from
--- 'ebTbEncode'.
-prop_ebTbDecodeCheckNothing :: H.Property
-prop_ebTbDecodeCheckNothing = H.property $ do
+-- Check if the output of 'decode8b10b' is a valid value for a given value from
+-- 'encode8b10b'.
+prop_decode8b10bCheckNothing :: H.Property
+prop_decode8b10bCheckNothing = H.property $ do
   inp <- H.forAll (Gen.filterT checkBitSequence genDefinedBitVector)
   let out = isValidDw dw1 && isValidDw dw2
        where
-        (_, dw1) = ebTbDecode False $ snd $ ebTbEncode False (Dw inp)
-        (_, dw2) = ebTbDecode True $ snd $ ebTbEncode True (Dw inp)
+        (_, dw1) = decode8b10b False $ snd $ encode8b10b False (Dw inp)
+        (_, dw2) = decode8b10b True $ snd $ encode8b10b True (Dw inp)
 
   H.assert out
 
 -- | Encode the input signal and check whether it is a valid value. It should be
 --   valid for every possible input.
-prop_ebTbEncodeCheckNothing :: H.Property
-prop_ebTbEncodeCheckNothing = H.property $ do
+prop_encode8b10bCheckNothing :: H.Property
+prop_encode8b10bCheckNothing = H.property $ do
   inp <- H.forAll genDefinedBitVector
-  let out = 0 /= snd (ebTbEncode False (Dw inp))
+  let out = 0 /= snd (encode8b10b False (Dw inp))
 
   H.assert out
 
 -- | Encode and then decode the input signal, but if the result of the encode or
 --   decode functions is invalid, propagate the input itself to the output. The
---   properties 'prop_ebTbDecodeCheckNothing' and 'prop_ebTbEncodeCheckNothing'
---   are used to assert that there are no invalid values in the outputs of these
---   functions.
-prop_ebTbEncodeDecode :: H.Property
-prop_ebTbEncodeDecode = H.property $ do
+--   properties 'prop_decode8b10bCheckNothing' and
+--   'prop_encode8b10bCheckNothing' are used to assert that there are no invalid
+--   values in the outputs of these functions.
+prop_encodeDecode8b10b :: H.Property
+prop_encodeDecode8b10b = H.property $ do
   inp <- H.forAll genDefinedBitVector
   let out = if isValidDw dw then fromDw dw else inp
        where
-        dw = snd $ ebTbDecode False $ snd $ ebTbEncode False (Dw inp)
+        dw = snd $ decode8b10b False $ snd $ encode8b10b False (Dw inp)
 
       expected = inp
 
@@ -74,8 +74,8 @@ prop_ebTbEncodeDecode = H.property $ do
 --   words. The generated list is filtered to make sure that there are no
 --   accidental commas in the input list, as these are only accepted for a small
 --   subset of control signals.
-prop_ebTbDecodeEncode :: H.Property
-prop_ebTbDecodeEncode = H.property $ do
+prop_decodeEncode8b10b :: H.Property
+prop_decodeEncode8b10b = H.property $ do
   inp <-
     H.forAll
       (Gen.filterT checkBitSequence genDefinedBitVector)
@@ -83,9 +83,9 @@ prop_ebTbDecodeEncode = H.property $ do
        where
         o = g False inp
 
-        g rd i = if isValidDw dw then snd $ ebTbEncode rd dw else i
+        g rd i = if isValidDw dw then snd $ encode8b10b rd dw else i
          where
-          dw = snd $ ebTbDecode rd i
+          dw = snd $ decode8b10b rd i
 
       expected = inp
 

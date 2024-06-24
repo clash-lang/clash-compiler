@@ -6,10 +6,10 @@
 --   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 --
 --   8b/10b encoding and decoding functions
-module Clash.Cores.EbTb where
+module Clash.Cores.LineCoding8b10b where
 
-import qualified Clash.Cores.EbTb.Decoder as Dec
-import qualified Clash.Cores.EbTb.Encoder as Enc
+import qualified Clash.Cores.LineCoding8b10b.Decoder as Dec
+import qualified Clash.Cores.LineCoding8b10b.Encoder as Enc
 import Clash.Prelude
 
 -- | Data type that contains a 'BitVector 8' with the corresponding error
@@ -47,14 +47,14 @@ fromDw dw = case dw of
 --   Remark:
 --   - For timing, this probably needs to make use of a 'romBlobPow2', which is
 --     not asynchronous. This does, however, introduce a delay.
-ebTbDecode ::
+decode8b10b ::
   -- | Running disparity
   Bool ->
   -- | Code group
   BitVector 10 ->
   -- | Tuple containing the new running disparity and the 'DataWord'
   (Bool, DataWord)
-ebTbDecode rd cg = (rdNew, dw)
+decode8b10b rd cg = (rdNew, dw)
  where
   dw
     | cgEr = DwError (pack _dw)
@@ -74,7 +74,7 @@ ebTbDecode rd cg = (rdNew, dw)
   cw = bitCoerce $ statusBits !! (2 :: Index 4)
   rdNew = bitCoerce $ last statusBits
 
-{-# CLASH_OPAQUE ebTbDecode #-}
+{-# CLASH_OPAQUE decode8b10b #-}
 
 -- | Take the running disparity and the current 'DataWord', and return a tuple
 --   containing the new running disparity and a 'BitVector' containing the
@@ -84,14 +84,14 @@ ebTbDecode rd cg = (rdNew, dw)
 --   Remark:
 --   - For timing, this probably needs to make use of a 'romBlobPow2', which is
 --     not asynchronous. This does, however, introduce a delay.
-ebTbEncode ::
+encode8b10b ::
   -- | Running disparity
   Bool ->
   -- | Data word
   DataWord ->
   -- | Tuple containing the new running disparity and the code group
   (Bool, BitVector 10)
-ebTbEncode rd (Dw dw) = (rdNew, pack $ reverse cg)
+encode8b10b rd (Dw dw) = (rdNew, pack $ reverse cg)
  where
   (statusBits, cg) =
     splitAt d2
@@ -101,7 +101,7 @@ ebTbEncode rd (Dw dw) = (rdNew, pack $ reverse cg)
       $ unpack (0 ++# bitCoerce rd ++# dw)
 
   rdNew = bitCoerce $ last statusBits
-ebTbEncode rd (Cw dw) = (rdNew, if cgEr then 0 else pack $ reverse cg)
+encode8b10b rd (Cw dw) = (rdNew, if cgEr then 0 else pack $ reverse cg)
  where
   (statusBits, cg) =
     splitAt d2
@@ -112,6 +112,6 @@ ebTbEncode rd (Cw dw) = (rdNew, if cgEr then 0 else pack $ reverse cg)
 
   cgEr = bitCoerce $ head statusBits
   rdNew = bitCoerce $ last statusBits
-ebTbEncode rd _ = (rd, 0)
+encode8b10b rd _ = (rd, 0)
 
-{-# CLASH_OPAQUE ebTbEncode #-}
+{-# CLASH_OPAQUE encode8b10b #-}
