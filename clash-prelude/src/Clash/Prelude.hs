@@ -247,7 +247,8 @@ functions a type class called 'Clash.Class.Parity.Parity' is available at
 -- [1 :> 0 :> 0 :> 0 :> Nil,2 :> 1 :> 0 :> 0 :> Nil,3 :> 2 :> 1 :> 0 :> Nil,4 :> 3 :> 2 :> 1 :> Nil,5 :> 4 :> 3 :> 2 :> Nil,...
 -- ...
 window
-  :: ( HiddenClockResetEnable dom
+  :: forall dom n a
+   . ( HiddenClockResetEnable dom
      , KnownNat n
      , Default a
      , NFDataX a )
@@ -255,7 +256,7 @@ window
   -- ^ Signal to create a window over
   -> Vec (n + 1) (Signal dom a)
   -- ^ Window of at least size 1
-window = hideClockResetEnable E.window
+window = hideClockResetEnable @dom E.window
 {-# INLINE window #-}
 
 -- | Give a delayed window over a 'Signal'
@@ -270,7 +271,8 @@ window = hideClockResetEnable E.window
 -- [0 :> 0 :> 0 :> Nil,1 :> 0 :> 0 :> Nil,2 :> 1 :> 0 :> Nil,3 :> 2 :> 1 :> Nil,4 :> 3 :> 2 :> Nil,...
 -- ...
 windowD
-  :: ( HiddenClockResetEnable dom
+  :: forall dom n a
+   . ( HiddenClockResetEnable dom
      , KnownNat n
      , Default a
      , NFDataX a )
@@ -278,13 +280,14 @@ windowD
   -- ^ Signal to create a window over
   -> Vec (n + 1) (Signal dom a)
   -- ^ Window of at least size 1
-windowD = hideClockResetEnable E.windowD
+windowD = hideClockResetEnable @dom E.windowD
 {-# INLINE windowD #-}
 
 -- | Implicit version of 'Clash.Class.AutoReg.autoReg'
 autoReg
-  :: (HasCallStack, HiddenClockResetEnable dom, AutoReg a)
+  :: forall dom a
+   . (HasCallStack, HiddenClockResetEnable dom, AutoReg a)
   => a
   -> Signal dom a
   -> Signal dom a
-autoReg = hideClockResetEnable E.autoReg
+autoReg = hideClockResetEnable @dom E.autoReg

@@ -797,7 +797,8 @@ simulateWithReset m resetVal f as =
 
 -- | Same as 'simulateWithReset', but only sample the first /Int/ output values.
 simulateWithResetN
-  :: ( KnownDomain dom
+  :: forall dom m a b
+   . ( KnownDomain dom
      , NFDataX a
      , NFDataX b
      , 1 <= m )
@@ -817,7 +818,7 @@ simulateWithResetN
   -> [a]
   -> [b]
 simulateWithResetN nReset resetVal nSamples f as =
-  take nSamples (simulateWithReset nReset resetVal f as)
+  take nSamples (simulateWithReset @dom nReset resetVal f as)
 {-# INLINE simulateWithResetN #-}
 
 -- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
@@ -924,7 +925,7 @@ sampleWithResetN
   -- ^ 'Signal' to sample
   -> [a]
 sampleWithResetN nReset nSamples f =
-  take nSamples (sampleWithReset nReset f)
+  take nSamples (sampleWithReset @dom nReset f)
 
 -- | Simulate a component until it matches a condition
 --

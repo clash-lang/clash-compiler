@@ -79,7 +79,8 @@ let macT s (x,y) = x * y + s
 --     s2 = 'moore' macT id 0 ('Clash.Signal.bundle' (b,y))
 -- @
 moore
-  :: ( HiddenClockResetEnable dom
+  :: forall dom s i o
+   . ( HiddenClockResetEnable dom
      , NFDataX s )
   => (s -> i -> s)
   -- ^ Transfer function in moore machine form: @state -> input -> newstate@
@@ -90,7 +91,7 @@ moore
   -> (Signal dom i -> Signal dom o)
   -- ^ Synchronous sequential function with input and output matching that
   -- of the moore machine
-moore = hideClockResetEnable E.moore
+moore = hideClockResetEnable @dom E.moore
 {-# INLINE moore #-}
 
 
@@ -133,7 +134,8 @@ medvedev tr st = moore tr id st
 --     (i2,b2) = 'mooreB' t o 3 (c,i1)
 -- @
 mooreB
-  :: ( HiddenClockResetEnable dom
+  :: forall dom s i o
+   . ( HiddenClockResetEnable dom
      , NFDataX s
      , Bundle i
      , Bundle o )
@@ -146,7 +148,7 @@ mooreB
   -> (Unbundled dom i -> Unbundled dom o)
    -- ^ Synchronous sequential function with input and output matching that
    -- of the moore machine
-mooreB = hideClockResetEnable E.mooreB
+mooreB = hideClockResetEnable @dom E.mooreB
 {-# INLINE mooreB #-}
 
 -- | A version of 'medvedev' that does automatic 'Bundle'ing

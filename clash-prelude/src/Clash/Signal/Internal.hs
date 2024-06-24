@@ -21,6 +21,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableSuperClasses #-}
 
 {-# LANGUAGE Unsafe #-}
 
@@ -509,7 +510,7 @@ type KnownConfiguration dom conf = (KnownDomain dom, KnownConf dom ~ conf)
 
 -- | A 'KnownDomain' constraint indicates that a circuit's behavior depends on
 -- some properties of a domain. See 'DomainConfiguration' for more information.
-class (KnownSymbol dom, KnownNat (DomainPeriod dom)) => KnownDomain (dom :: Domain) where
+class (KnownSymbol dom, KnownNat (DomainPeriod dom), 1 <= DomainPeriod dom) => KnownDomain (dom :: Domain) where
   type KnownConf dom :: DomainConfiguration
   -- | Returns 'SDomainConfiguration' corresponding to an instance's 'DomainConfiguration'.
   --
