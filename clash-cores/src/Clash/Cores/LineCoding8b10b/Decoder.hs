@@ -5,11 +5,9 @@
 --   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 --
 --   8b/10b decoding look-up table
-module Clash.Cores.EbTb.Decoder where
+module Clash.Cores.LineCoding8b10b.Decoder where
 
 import Clash.Prelude
-
--- https://github.com/bensampson5/libsv/blob/main/libsv/coders/decoder_8b10b.sv
 
 -- | Defines a list that is used as a lookup table for converting code groups to
 --   data words. The list is indexed as the 11-bit concatenation of the running
