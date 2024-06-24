@@ -488,6 +488,7 @@ type ClockDivider (dom :: Domain) (period :: Nat) = PeriodToCycles dom period
 -- | Singleton version of 'DomainConfiguration'
 data SDomainConfiguration (dom :: Domain) (conf :: DomainConfiguration) where
   SDomainConfiguration ::
+    1 <= period =>
     { sName :: SSymbol dom
       -- ^ Domain name
     , sPeriod :: SNat period
