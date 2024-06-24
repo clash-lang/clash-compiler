@@ -153,10 +153,10 @@ fifoVerifier ::
 fifoVerifier clk rst ena actual = done0
  where
   expected = regEn clk rst ena 0 (isJust <$> actual) $ expected + 1
-  samplesDone = expected .>. 100
+  samplesDone = expected .> 100
   stuckCnt :: Signal dom (Index 25000)
   stuckCnt = regEn clk rst ena 0 (not <$> stuck) $ stuckCnt + 1
-  stuck = stuckCnt .==. pure maxBound
+  stuck = stuckCnt .== maxBound
   -- Delay one cycle so assertion definitely triggers before stopping simulation
   done = register clk rst ena False $ samplesDone .||. stuck
   expected0 = liftA2 (<$) expected actual
