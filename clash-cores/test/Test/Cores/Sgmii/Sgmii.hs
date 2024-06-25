@@ -137,7 +137,7 @@ prop_loopbackTest = H.property $ do
   simDuration <- H.forAll (Gen.integral (Range.linear 1 100))
 
   inp <- H.forAll (Gen.list (Range.singleton simDuration) genDefinedBitVector)
-  let setupSamples = 86
+  let setupSamples = 90
       delaySamples = 17
       controlCount = 9
 
@@ -168,7 +168,7 @@ prop_duplexTransmission = H.property $ do
 
   inp1 <- H.forAll (Gen.list (Range.singleton simDuration) genDefinedBitVector)
   inp2 <- H.forAll (Gen.list (Range.singleton simDuration) genDefinedBitVector)
-  let setupSamples = 86
+  let setupSamples = 90
       delaySamples = 9
       controlCount = 9
 

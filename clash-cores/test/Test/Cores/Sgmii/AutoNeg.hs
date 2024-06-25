@@ -54,7 +54,7 @@ autoNegSim i = s
  where
   (s, _, _) =
     C.unbundle $
-      C.mealy autoNegT (AnEnable (C.repeat Invalid) (C.repeat 0) 0) i
+      C.moore autoNegT autoNegO (AnEnable (C.repeat Invalid) (C.repeat 0) 0) i
 
 -- | Generate a list of values that do not contain the acknowledge bit, and
 --   assert that the @ACKNOWLEDGE_DETECT@ state is entered but not the
