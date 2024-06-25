@@ -19,15 +19,15 @@ pcsTransmit ::
   -- | The new data word that needs to be transmitted
   Signal dom (BitVector 8) ->
   -- | The 'Xmit' signal from 'Sgmii.autoNeg'
-  Signal dom Xmit ->
+  Signal dom (Maybe Xmit) ->
   -- | The 'ConfReg' from 'Sgmii.autoNeg'
-  Signal dom ConfReg ->
+  Signal dom (Maybe ConfReg) ->
   -- | The 8b/10b encoded output value
   Signal dom (BitVector 10)
 pcsTransmit txEn txEr dw xmit txConfReg = cg
  where
   (_, cg, txEven, cgSent) =
-    mealyB codeGroupT (SpecialGo False Even OSetC) (txOSet, dw, txConfReg)
+    mealyB codeGroupT (SpecialGo False 0 Even OSetC) (txOSet, dw, txConfReg)
 
   (_, txOSet) =
     mealyB

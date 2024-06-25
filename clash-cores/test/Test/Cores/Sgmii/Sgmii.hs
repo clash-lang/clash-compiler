@@ -27,7 +27,14 @@ import Prelude
 sgmiiCommon ::
   (C.HiddenClockResetEnable dom) =>
   C.Signal dom (C.BitVector 10) ->
-  C.Signal dom (Maybe Bool, Maybe Bool, Maybe DataWord, Xmit, ConfReg)
+  C.Signal
+    dom
+    ( Maybe Bool
+    , Maybe Bool
+    , Maybe DataWord
+    , Maybe Xmit
+    , Maybe ConfReg
+    )
 sgmiiCommon cg1 = C.bundle (rxDv, rxEr, dw2, xmit, txConfReg)
  where
   (xmit, txConfReg) =
@@ -116,13 +123,18 @@ confRegSim confReg1 = fromMaybe 0 <$> confReg2
  where
   (_, _, _, _, confReg2) =
     C.unbundle $
-      pcsReceive cg2 rd dw2 rxEven1 syncStatus (pure Conf)
+      pcsReceive cg2 rd dw2 rxEven1 syncStatus (pure $ Just Conf)
 
   (cg2, rd, dw2, rxEven1, syncStatus) = C.unbundle $ sync cg1
 
   cg1 =
     C.unbundle $
-      pcsTransmit (pure False) (pure False) (pure 0) (pure Conf) confReg1
+      pcsTransmit
+        (pure False)
+        (pure False)
+        (pure 0)
+        (pure $ Just Conf)
+        (Just <$> confReg1)
 
 -- | Test that the completely integrated system works in a loopback mode, where
 --   the output of the second 'sgmii' instance is connected to its own input.
@@ -137,7 +149,7 @@ prop_loopbackTest = H.property $ do
   simDuration <- H.forAll (Gen.integral (Range.linear 1 100))
 
   inp <- H.forAll (Gen.list (Range.singleton simDuration) genDefinedBitVector)
-  let setupSamples = 90
+  let setupSamples = 86
       delaySamples = 17
       controlCount = 9
 
@@ -168,7 +180,7 @@ prop_duplexTransmission = H.property $ do
 
   inp1 <- H.forAll (Gen.list (Range.singleton simDuration) genDefinedBitVector)
   inp2 <- H.forAll (Gen.list (Range.singleton simDuration) genDefinedBitVector)
-  let setupSamples = 90
+  let setupSamples = 86
       delaySamples = 9
       controlCount = 9
 

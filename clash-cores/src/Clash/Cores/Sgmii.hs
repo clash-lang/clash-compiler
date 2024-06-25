@@ -18,9 +18,9 @@ sgmiiCdc ::
     Clock dom1 ->
     Reset dom0 ->
     Reset dom1 ->
-    Signal dom0 Xmit ->
-    Signal dom0 ConfReg ->
-    Signal dom1 (Xmit, ConfReg)
+    Signal dom0 (Maybe Xmit) ->
+    Signal dom0 (Maybe ConfReg) ->
+    Signal dom1 (Maybe Xmit, Maybe ConfReg)
   ) ->
   Clock dom0 ->
   Clock dom1 ->
@@ -49,10 +49,10 @@ sgmiiCdc autoNegCdc clk0 clk1 rst0 rst1 txEn txEr dw1 cg1 =
 
   (xmit1, txConfReg1) =
     unbundle
-      $ autoNeg' clk0 rst0 enableGen mrAdvAbility syncStatus rudi rxConfReg
+      $ autoNeg' clk0 rst0 enableGen confReg syncStatus rudi rxConfReg
    where
     autoNeg' = exposeClockResetEnable autoNeg
-    mrAdvAbility = 0b0100000000000001
+    confReg = 0b0100000000000001
 
   dw4 = (fmap . fmap) fromDw dw3
 

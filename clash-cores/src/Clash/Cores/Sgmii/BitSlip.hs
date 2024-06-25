@@ -47,7 +47,7 @@ bitSlipT BSOk{..} cg = nextState
 
   s = resize $ _s ++# cg
 
--- | Output state for 'bitSlip' that takes the calculated index value and
+-- | Output function for 'bitSlip' that takes the calculated index value and
 --   rotates the state vector to create the new output value
 bitSlipO ::
   -- | Current state

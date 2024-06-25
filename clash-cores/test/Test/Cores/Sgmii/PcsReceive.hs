@@ -51,7 +51,7 @@ pcsReceiveSim ::
     , C.Vec 3 DataWord
     , Even
     , SyncStatus
-    , Xmit
+    , Maybe Xmit
     ) ->
   C.Signal dom PcsReceiveState
 pcsReceiveSim s i = s'
@@ -71,15 +71,15 @@ prop_pcsReceiveStartOfPacket = H.property $ do
         C.sampleN
           simDuration
           ( pcsReceiveSim @C.System
-              (StartOfPacket True)
+              (StartOfPacket True Idle)
               (C.fromList (map f inp))
           )
        where
-        f (rd, dw) = (0, rd, C.repeat dw, Even, Ok, Idle)
+        f (rd, dw) = (0, rd, C.repeat dw, Even, Ok, Just Idle)
 
   H.assert $ isJust $ find g simOut
  where
-  g (RxData _ _) = True
+  g RxData{} = True
   g _ = False
 
 tests :: TestTree

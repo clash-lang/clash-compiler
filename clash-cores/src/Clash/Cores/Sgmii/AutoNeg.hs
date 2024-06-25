@@ -30,7 +30,7 @@ data AutoNegState dom
   | AbilityDetect
       { _rudis :: Vec 3 Rudi
       , _rxConfRegs :: Vec 3 ConfReg
-      , _mrAdvAbility :: ConfReg
+      , _confReg :: ConfReg
       , _failTimer :: Timeout dom
       }
   | AcknowledgeDetect
@@ -132,22 +132,21 @@ autoNegT AnEnable{..} (_, syncStatus, rudi, rxConfReg) = nextState
   rudis = maybe _rudis (_rudis <<+) rudi
   rxConfRegs = maybe _rxConfRegs (_rxConfRegs <<+) rxConfReg
   failTimer = if syncStatus == Fail then _failTimer + 1 else 0
-autoNegT AnRestart{..} (mrAdvAbility, syncStatus, rudi, rxConfReg) = nextState
+autoNegT AnRestart{..} (confReg, syncStatus, rudi, rxConfReg) = nextState
  where
   nextState
     | failTimer >= timeout (Proxy @dom) =
         AnEnable rudis rxConfRegs (timeout (Proxy @dom) - 1)
     | rudi == Just Invalid = AnEnable rudis rxConfRegs failTimer
     | linkTimer >= timeout (Proxy @dom) =
-        AbilityDetect rudis rxConfRegs mrAdvAbility failTimer
+        AbilityDetect rudis rxConfRegs confReg failTimer
     | otherwise = AnRestart rudis rxConfRegs failTimer linkTimer
 
   rudis = maybe _rudis (_rudis <<+) rudi
   rxConfRegs = maybe _rxConfRegs (_rxConfRegs <<+) rxConfReg
   linkTimer = _linkTimer + 1
   failTimer = if syncStatus == Fail then _failTimer + 1 else 0
-autoNegT AbilityDetect{..} (mrAdvAbility, syncStatus, rudi, rxConfReg) =
-  nextState
+autoNegT AbilityDetect{..} (confReg, syncStatus, rudi, rxConfReg) = nextState
  where
   nextState
     | failTimer >= timeout (Proxy @dom) =
@@ -155,14 +154,13 @@ autoNegT AbilityDetect{..} (mrAdvAbility, syncStatus, rudi, rxConfReg) =
     | rudi == Just Invalid = AnEnable rudis rxConfRegs failTimer
     | abilityMatch rudis rxConfRegs && last rxConfRegs /= 0 =
         AcknowledgeDetect rudis rxConfRegs txConfReg failTimer
-    | otherwise = AbilityDetect rudis rxConfRegs mrAdvAbility failTimer
+    | otherwise = AbilityDetect rudis rxConfRegs confReg failTimer
 
   rudis = maybe _rudis (_rudis <<+) rudi
   rxConfRegs = maybe _rxConfRegs (_rxConfRegs <<+) rxConfReg
-  txConfReg = replaceBit (14 :: Index 16) 0 mrAdvAbility
+  txConfReg = replaceBit (14 :: Index 16) 0 confReg
   failTimer = if syncStatus == Fail then _failTimer + 1 else 0
-autoNegT AcknowledgeDetect{..} (_, syncStatus, rudi, rxConfReg) =
-  nextState
+autoNegT AcknowledgeDetect{..} (_, syncStatus, rudi, rxConfReg) = nextState
  where
   nextState
     | failTimer >= timeout (Proxy @dom) =
@@ -240,7 +238,7 @@ autoNegO self@AnEnable{} = (self, Just Conf, Just 0)
 autoNegO self@AnRestart{} = (self, Nothing, Just 0)
 autoNegO self@AbilityDetect{..} = (self, Nothing, Just txConfReg)
  where
-  txConfReg = replaceBit (14 :: Index 16) 0 _mrAdvAbility
+  txConfReg = replaceBit (14 :: Index 16) 0 _confReg
 autoNegO self@AcknowledgeDetect{..} = (self, Nothing, Just txConfReg)
  where
   txConfReg = replaceBit (14 :: Index 16) 1 _txConfReg
@@ -262,9 +260,9 @@ autoNeg ::
   -- | A new value of 'ConfReg' from 'Sgmii.pcsReceive'
   Signal dom (Maybe ConfReg) ->
   -- | Tuple containing the new value for 'Xmit' and a new 'ConfReg'
-  Signal dom (Xmit, ConfReg)
+  Signal dom (Maybe Xmit, Maybe ConfReg)
 autoNeg confReg syncStatus rudi rxConfReg =
-  bundle (regMaybe Conf xmit, regMaybe 0 txConfReg)
+  bundle (xmit, txConfReg)
  where
   (_, xmit, txConfReg) =
     mooreB

@@ -4,6 +4,7 @@ module Clash.Cores.Sgmii.PcsTransmit.OrderedSet where
 
 import Clash.Cores.Sgmii.Common
 import Clash.Prelude
+import Data.Maybe (fromJust, fromMaybe, isJust)
 
 -- | State type of 'orderedSetT' as defined in IEEE 802.3 Clause 36, with the
 --   exeception of @TX_TEST_XMIT@, @TX_PACKET@ and @ALIGN_ERR_START@ as these
@@ -24,6 +25,21 @@ data OrderedSetState
   | TxDataError {_xmit :: Xmit}
   deriving (Generic, NFDataX, Eq, Show)
 
+-- | State transitions from @GENERATE_CODE_GROUPS@ from Figure 36-6
+generateCg ::
+  Bool -> Bool -> Xmit -> Xmit -> Even -> Bool -> Maybe OrderedSetState
+generateCg txEn txEr xmit _xmit txEven cgSent = nextState
+ where
+  xmitChange = xmit /= _xmit && cgSent && txEven == Odd
+
+  nextState
+    | xmitChange && xmit == Conf = Just (Configuration xmit)
+    | xmitChange && xmit == Idle = Just (IdleS xmit)
+    | xmitChange && xmit == Data && txEn = Just (IdleS xmit)
+    | xmitChange && xmit == Data && txEr = Just (IdleS xmit)
+    | xmitChange && xmit == Data && not txEn && not txEr = Just (XmitData xmit)
+    | otherwise = Nothing
+
 -- | Void function that is used to check whether @/V/@ needs to be propagated
 --   based on the values of the input pins
 void :: OrderedSet -> Bool -> Bool -> BitVector 8 -> OrderedSet
@@ -40,94 +56,69 @@ orderedSetT ::
   OrderedSetState ->
   -- | The new input values, partly from the outside world, and partly from
   --   'autoNeg' and 'codeGroupT'
-  (Bool, Bool, BitVector 8, Xmit, Even, Bool) ->
+  (Bool, Bool, BitVector 8, Maybe Xmit, Even, Bool) ->
   -- | The new state and the new output values
   (OrderedSetState, (OrderedSetState, OrderedSet))
 orderedSetT self@Configuration{..} (txEn, txEr, _, xmit, txEven, cgSent) =
   (nextState, out)
  where
-  xmitChange = xmit /= _xmit && cgSent && txEven == Odd
+  xmit' = fromMaybe _xmit xmit
+  s = generateCg txEn txEr xmit' _xmit txEven cgSent
 
-  nextState
-    | xmitChange && xmit == Conf = Configuration xmit
-    | xmitChange && xmit == Idle = IdleS xmit
-    | xmitChange && xmit == Data && txEn = IdleS xmit
-    | xmitChange && xmit == Data && txEr = IdleS xmit
-    | xmitChange && xmit == Data && not txEn && not txEr = XmitData xmit
-    | otherwise = self
+  nextState = fromMaybe self s
 
-  txOSet = OSetC
-
-  out = (self, txOSet)
+  out = (self, OSetC)
 orderedSetT self@IdleS{..} (txEn, txEr, _, xmit, txEven, cgSent) =
   (nextState, out)
  where
-  xmitChange = xmit /= _xmit && cgSent && txEven == Odd
+  xmit' = fromMaybe _xmit xmit
+  s = generateCg txEn txEr xmit' _xmit txEven cgSent
 
   nextState
-    | xmitChange && xmit == Conf = Configuration xmit
-    | xmitChange && xmit == Idle = IdleS xmit
-    | xmitChange && xmit == Data && txEn = IdleS xmit
-    | xmitChange && xmit == Data && txEr = IdleS xmit
-    | xmitChange && xmit == Data && not txEn && not txEr = XmitData xmit
-    | xmit == Data && cgSent && not txEn && not txEr = XmitData xmit
+    | isJust s = fromJust s
+    | xmit' == Data && cgSent && not txEn && not txEr = XmitData xmit'
     | otherwise = self
 
-  txOSet = OSetI
-
-  out = (self, txOSet)
+  out = (self, OSetI)
 orderedSetT self@XmitData{..} (txEn, txEr, _, xmit, txEven, cgSent) =
   (nextState, out)
  where
-  xmitChange = xmit /= _xmit && cgSent && txEven == Odd
+  xmit' = fromMaybe _xmit xmit
+  s = generateCg txEn txEr xmit' _xmit txEven cgSent
 
   nextState
-    | xmitChange && xmit == Conf = Configuration xmit
-    | xmitChange && xmit == Idle = IdleS xmit
-    | xmitChange && xmit == Data && txEn = IdleS xmit
-    | xmitChange && xmit == Data && txEr = IdleS xmit
-    | xmitChange && xmit == Data && not txEn && not txEr = XmitData xmit
-    | txEn && not txEr && cgSent = StartOfPacket xmit
-    | txEn && txEr && cgSent = StartError xmit
-    | not txEn && cgSent = XmitData xmit
+    | isJust s = fromJust s
+    | txEn && not txEr && cgSent = StartOfPacket xmit'
+    | txEn && txEr && cgSent = StartError xmit'
+    | not txEn && cgSent = XmitData xmit'
     | otherwise = self
 
-  txOSet = OSetI
-
-  out = (self, txOSet)
+  out = (self, OSetI)
 orderedSetT self@StartOfPacket{..} (txEn, txEr, _, xmit, txEven, cgSent) =
   (nextState, out)
  where
-  xmitChange = xmit /= _xmit && cgSent && txEven == Odd
+  xmit' = fromMaybe _xmit xmit
+  s = generateCg txEn txEr xmit' _xmit txEven cgSent
 
   nextState
-    | xmitChange && xmit == Conf = Configuration xmit
-    | xmitChange && xmit == Idle = IdleS xmit
-    | xmitChange && xmit == Data && txEn = IdleS xmit
-    | xmitChange && xmit == Data && txEr = IdleS xmit
-    | xmitChange && xmit == Data && not txEn && not txEr = XmitData xmit
-    | txEn && cgSent = TxData xmit
-    | not txEn && not txEr && cgSent = EndOfPacketNoExt xmit
-    | not txEn && txEr && cgSent = EndOfPacketExt xmit
+    | isJust s = fromJust s
+    | txEn && cgSent = TxData xmit'
+    | not txEn && not txEr && cgSent = EndOfPacketNoExt xmit'
+    | not txEn && txEr && cgSent = EndOfPacketExt xmit'
     | otherwise = self
 
-  txOSet = OSetS
-
-  out = (self, txOSet)
+  out = (self, OSetS)
 orderedSetT self@TxData{..} (txEn, txEr, dw, xmit, txEven, cgSent) =
   (nextState, out)
  where
-  xmitChange = xmit /= _xmit && cgSent && txEven == Odd
+  xmit' = fromMaybe _xmit xmit
+  s = generateCg txEn txEr xmit' _xmit txEven cgSent
 
   nextState
-    | xmitChange && xmit == Conf = Configuration xmit
-    | xmitChange && xmit == Idle = IdleS xmit
-    | xmitChange && xmit == Data && txEn = IdleS xmit
-    | xmitChange && xmit == Data && txEr = IdleS xmit
-    | xmitChange && xmit == Data && not txEn && not txEr = XmitData xmit
-    | txEn && cgSent = TxData xmit
-    | not txEn && not txEr && cgSent = EndOfPacketNoExt xmit
-    | not txEn && txEr && cgSent = EndOfPacketExt xmit
+    | isJust s = fromJust s
+    | txEn && cgSent = TxData xmit'
+    | not txEn && not txEr && cgSent = EndOfPacketNoExt xmit'
+    | not txEn && txEr && cgSent = EndOfPacketExt xmit'
     | otherwise = self
 
   txOSet = void OSetD txEn txEr dw
@@ -136,68 +127,50 @@ orderedSetT self@TxData{..} (txEn, txEr, dw, xmit, txEven, cgSent) =
 orderedSetT self@EndOfPacketNoExt{..} (txEn, txEr, _, xmit, txEven, cgSent) =
   (nextState, out)
  where
-  xmitChange = xmit /= _xmit && cgSent && txEven == Odd
+  xmit' = fromMaybe _xmit xmit
+  s = generateCg txEn txEr xmit' _xmit txEven cgSent
 
   nextState
-    | xmitChange && xmit == Conf = Configuration xmit
-    | xmitChange && xmit == Idle = IdleS xmit
-    | xmitChange && xmit == Data && txEn = IdleS xmit
-    | xmitChange && xmit == Data && txEr = IdleS xmit
-    | xmitChange && xmit == Data && not txEn && not txEr = XmitData xmit
-    | cgSent = Epd2NoExt xmit
+    | isJust s = fromJust s
+    | cgSent = Epd2NoExt xmit'
     | otherwise = self
 
-  txOSet = OSetT
-
-  out = (self, txOSet)
+  out = (self, OSetT)
 orderedSetT self@Epd2NoExt{..} (txEn, txEr, _, xmit, txEven, cgSent) =
   (nextState, out)
  where
-  xmitChange = xmit /= _xmit && cgSent && txEven == Odd
+  xmit' = fromMaybe _xmit xmit
+  s = generateCg txEn txEr xmit' _xmit txEven cgSent
 
   nextState
-    | xmitChange && xmit == Conf = Configuration xmit
-    | xmitChange && xmit == Idle = IdleS xmit
-    | xmitChange && xmit == Data && txEn = IdleS xmit
-    | xmitChange && xmit == Data && txEr = IdleS xmit
-    | xmitChange && xmit == Data && not txEn && not txEr = XmitData xmit
-    | txEven == Odd && cgSent = XmitData xmit
-    | txEven == Even && cgSent = Epd3 xmit
+    | isJust s = fromJust s
+    | txEven == Odd && cgSent = XmitData xmit'
+    | txEven == Even && cgSent = Epd3 xmit'
     | otherwise = self
 
-  txOSet = OSetR
-
-  out = (self, txOSet)
+  out = (self, OSetR)
 orderedSetT self@Epd3{..} (txEn, txEr, _, xmit, txEven, cgSent) =
   (nextState, out)
  where
-  xmitChange = xmit /= _xmit && cgSent && txEven == Odd
+  xmit' = fromMaybe _xmit xmit
+  s = generateCg txEn txEr xmit' _xmit txEven cgSent
 
   nextState
-    | xmitChange && xmit == Conf = Configuration xmit
-    | xmitChange && xmit == Idle = IdleS xmit
-    | xmitChange && xmit == Data && txEn = IdleS xmit
-    | xmitChange && xmit == Data && txEr = IdleS xmit
-    | xmitChange && xmit == Data && not txEn && not txEr = XmitData xmit
-    | cgSent = XmitData xmit
+    | isJust s = fromJust s
+    | cgSent = XmitData xmit'
     | otherwise = self
 
-  txOSet = OSetR
-
-  out = (self, txOSet)
+  out = (self, OSetR)
 orderedSetT self@EndOfPacketExt{..} (txEn, txEr, dw, xmit, txEven, cgSent) =
   (nextState, out)
  where
-  xmitChange = xmit /= _xmit && cgSent && txEven == Odd
+  xmit' = fromMaybe _xmit xmit
+  s = generateCg txEn txEr xmit' _xmit txEven cgSent
 
   nextState
-    | xmitChange && xmit == Conf = Configuration xmit
-    | xmitChange && xmit == Idle = IdleS xmit
-    | xmitChange && xmit == Data && txEn = IdleS xmit
-    | xmitChange && xmit == Data && txEr = IdleS xmit
-    | xmitChange && xmit == Data && not txEn && not txEr = XmitData xmit
-    | not txEr && cgSent = ExtendBy1 xmit
-    | txEr && cgSent = CarrierExtend xmit
+    | isJust s = fromJust s
+    | not txEr && cgSent = ExtendBy1 xmit'
+    | txEr && cgSent = CarrierExtend xmit'
     | otherwise = self
 
   txOSet = void OSetT txEn txEr dw
@@ -206,35 +179,27 @@ orderedSetT self@EndOfPacketExt{..} (txEn, txEr, dw, xmit, txEven, cgSent) =
 orderedSetT self@ExtendBy1{..} (txEn, txEr, _, xmit, txEven, cgSent) =
   (nextState, out)
  where
-  xmitChange = xmit /= _xmit && cgSent && txEven == Odd
+  xmit' = fromMaybe _xmit xmit
+  s = generateCg txEn txEr xmit' _xmit txEven cgSent
 
   nextState
-    | xmitChange && xmit == Conf = Configuration xmit
-    | xmitChange && xmit == Idle = IdleS xmit
-    | xmitChange && xmit == Data && txEn = IdleS xmit
-    | xmitChange && xmit == Data && txEr = IdleS xmit
-    | xmitChange && xmit == Data && not txEn && not txEr = XmitData xmit
-    | cgSent = Epd2NoExt xmit
+    | isJust s = fromJust s
+    | cgSent = Epd2NoExt xmit'
     | otherwise = self
 
-  txOSet = OSetR
-
-  out = (self, txOSet)
+  out = (self, OSetR)
 orderedSetT self@CarrierExtend{..} (txEn, txEr, dw, xmit, txEven, cgSent) =
   (nextState, out)
  where
-  xmitChange = xmit /= _xmit && cgSent && txEven == Odd
+  xmit' = fromMaybe _xmit xmit
+  s = generateCg txEn txEr xmit' _xmit txEven cgSent
 
   nextState
-    | xmitChange && xmit == Conf = Configuration xmit
-    | xmitChange && xmit == Idle = IdleS xmit
-    | xmitChange && xmit == Data && txEn = IdleS xmit
-    | xmitChange && xmit == Data && txEr = IdleS xmit
-    | xmitChange && xmit == Data && not txEn && not txEr = XmitData xmit
-    | not txEn && not txEr && cgSent = ExtendBy1 xmit
-    | txEn && txEr && cgSent = StartError xmit
-    | txEn && not txEr && cgSent = StartOfPacket xmit
-    | not txEn && txEr && cgSent = CarrierExtend xmit
+    | isJust s = fromJust s
+    | not txEn && not txEr && cgSent = ExtendBy1 xmit'
+    | txEn && txEr && cgSent = StartError xmit'
+    | txEn && not txEr && cgSent = StartOfPacket xmit'
+    | not txEn && txEr && cgSent = CarrierExtend xmit'
     | otherwise = self
 
   txOSet = void OSetR txEn txEr dw
@@ -243,36 +208,26 @@ orderedSetT self@CarrierExtend{..} (txEn, txEr, dw, xmit, txEven, cgSent) =
 orderedSetT self@StartError{..} (txEn, txEr, _, xmit, txEven, cgSent) =
   (nextState, out)
  where
-  xmitChange = xmit /= _xmit && cgSent && txEven == Odd
+  xmit' = fromMaybe _xmit xmit
+  s = generateCg txEn txEr xmit' _xmit txEven cgSent
 
   nextState
-    | xmitChange && xmit == Conf = Configuration xmit
-    | xmitChange && xmit == Idle = IdleS xmit
-    | xmitChange && xmit == Data && txEn = IdleS xmit
-    | xmitChange && xmit == Data && txEr = IdleS xmit
-    | xmitChange && xmit == Data && not txEn && not txEr = XmitData xmit
-    | cgSent = TxDataError xmit
+    | isJust s = fromJust s
+    | cgSent = TxDataError xmit'
     | otherwise = self
 
-  txOSet = OSetS
-
-  out = (self, txOSet)
+  out = (self, OSetS)
 orderedSetT self@TxDataError{..} (txEn, txEr, _, xmit, txEven, cgSent) =
   (nextState, out)
  where
-  xmitChange = xmit /= _xmit && cgSent && txEven == Odd
+  xmit' = fromMaybe _xmit xmit
+  s = generateCg txEn txEr xmit' _xmit txEven cgSent
 
   nextState
-    | xmitChange && xmit == Conf = Configuration xmit
-    | xmitChange && xmit == Idle = IdleS xmit
-    | xmitChange && xmit == Data && txEn = IdleS xmit
-    | xmitChange && xmit == Data && txEr = IdleS xmit
-    | xmitChange && xmit == Data && not txEn && not txEr = XmitData xmit
-    | txEn && cgSent = TxData xmit
-    | not txEn && not txEr && cgSent = EndOfPacketNoExt xmit
-    | not txEn && txEr && cgSent = EndOfPacketExt xmit
+    | isJust s = fromJust s
+    | txEn && cgSent = TxData xmit'
+    | not txEn && not txEr && cgSent = EndOfPacketNoExt xmit'
+    | not txEn && txEr && cgSent = EndOfPacketExt xmit'
     | otherwise = self
 
-  txOSet = OSetV
-
-  out = (self, txOSet)
+  out = (self, OSetV)

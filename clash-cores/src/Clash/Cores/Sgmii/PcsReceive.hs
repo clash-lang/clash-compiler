@@ -6,6 +6,7 @@ module Clash.Cores.Sgmii.PcsReceive where
 import Clash.Cores.LineCoding8b10b
 import Clash.Cores.Sgmii.Common
 import Clash.Prelude
+import Data.Maybe (fromMaybe)
 
 -- | Defines all possible valid 'checkEnd' results, as well as @None@ for no
 --   valid result
@@ -29,24 +30,24 @@ data CheckEnd
 data PcsReceiveState
   = Init1
   | Init2
-  | WaitForK {_rx :: Bool}
-  | RxK {_rx :: Bool}
-  | RxCB {_rx :: Bool}
-  | RxCC {_rx :: Bool, _hist :: DataWord}
-  | RxCD {_rx :: Bool, _hist :: DataWord, _rxConfReg :: ConfReg}
-  | RxInvalid {_rx :: Bool}
-  | IdleD {_rx :: Bool}
-  | FalseCarrier {_rx :: Bool}
-  | StartOfPacket {_rx :: Bool}
-  | EarlyEnd {_rx :: Bool}
-  | TriRri {_rx :: Bool}
-  | TrrExtend {_rx :: Bool}
-  | PacketBurstRrs {_rx :: Bool}
-  | ExtendErr {_rx :: Bool}
-  | EarlyEndExt {_rx :: Bool}
-  | RxData {_rx :: Bool, _hist :: DataWord}
-  | RxDataError {_rx :: Bool, _hist :: DataWord}
-  | LinkFailed {_rx :: Bool}
+  | WaitForK {_rx :: Bool, _xmit :: Xmit}
+  | RxK {_rx :: Bool, _xmit :: Xmit}
+  | RxCB {_rx :: Bool, _xmit :: Xmit}
+  | RxCC {_rx :: Bool, _xmit :: Xmit, _hist :: DataWord}
+  | RxCD {_rx :: Bool, _xmit :: Xmit, _hist :: DataWord, _rxConfReg :: ConfReg}
+  | RxInvalid {_rx :: Bool, _xmit :: Xmit}
+  | IdleD {_rx :: Bool, _xmit :: Xmit}
+  | FalseCarrier {_rx :: Bool, _xmit :: Xmit}
+  | StartOfPacket {_rx :: Bool, _xmit :: Xmit}
+  | EarlyEnd {_rx :: Bool, _xmit :: Xmit}
+  | TriRri {_rx :: Bool, _xmit :: Xmit}
+  | TrrExtend {_rx :: Bool, _xmit :: Xmit}
+  | PacketBurstRrs {_rx :: Bool, _xmit :: Xmit}
+  | ExtendErr {_rx :: Bool, _xmit :: Xmit}
+  | EarlyEndExt {_rx :: Bool, _xmit :: Xmit}
+  | RxData {_rx :: Bool, _xmit :: Xmit, _hist :: DataWord}
+  | RxDataError {_rx :: Bool, _xmit :: Xmit, _hist :: DataWord}
+  | LinkFailed {_rx :: Bool, _xmit :: Xmit}
   deriving (Generic, NFDataX, Eq, Show)
 
 -- | Calculate the number of bits that are different in two code groups. For
@@ -133,7 +134,7 @@ pcsReceiveT ::
   PcsReceiveState ->
   -- | Input values, where @Vec 3 CodeGroup@ contains the current and next two
   -- | data words
-  (BitVector 10, Bool, Vec 3 DataWord, Even, SyncStatus, Xmit) ->
+  (BitVector 10, Bool, Vec 3 DataWord, Even, SyncStatus, Maybe Xmit) ->
   -- | Tuple with the new state and the output values
   ( PcsReceiveState
   , ( PcsReceiveState
@@ -151,72 +152,78 @@ pcsReceiveT self@Init1 _ = (nextState, out)
   out = (self, Nothing, Nothing, Nothing, Nothing, Nothing)
 pcsReceiveT self@Init2 _ = (nextState, out)
  where
-  nextState = WaitForK False
+  nextState = WaitForK False Conf
 
   out = (self, Nothing, Nothing, Nothing, Nothing, Nothing)
-pcsReceiveT self@WaitForK{} (_, _, dws, rxEven, syncStatus, _) =
+pcsReceiveT self@WaitForK{..} (_, _, dws, rxEven, syncStatus, xmit) =
   (nextState, out)
  where
   nextState
-    | syncStatus == Fail = LinkFailed rx
-    | head dws == cwK28_5 && rxEven == Even = RxK rx
+    | syncStatus == Fail = LinkFailed rx xmit'
+    | head dws == cwK28_5 && rxEven == Even = RxK rx xmit'
     | otherwise = self
 
   rx = False
+  xmit' = fromMaybe _xmit xmit
   rxDv = Just False
   rxEr = Just False
 
   out = (self, rxDv, rxEr, Nothing, Nothing, Nothing)
-pcsReceiveT self@RxK{} (_, _, dws, _, syncStatus, xmit) = (nextState, out)
+pcsReceiveT self@RxK{..} (_, _, dws, _, syncStatus, xmit) = (nextState, out)
  where
   nextState
-    | syncStatus == Fail = LinkFailed rx
-    | dw == dwD21_5 = RxCB rx
-    | dw == dwD02_2 = RxCB rx
-    | not (isDw dw) && xmit /= Data = RxInvalid rx
-    | xmit /= Data && isDw dw = IdleD rx
-    | xmit == Data = IdleD rx
+    | syncStatus == Fail = LinkFailed rx xmit'
+    | dw == dwD21_5 = RxCB rx xmit'
+    | dw == dwD02_2 = RxCB rx xmit'
+    | not (isDw dw) && xmit' /= Data = RxInvalid rx xmit'
+    | xmit' /= Data && isDw dw = IdleD rx xmit'
+    | xmit' == Data = IdleD rx xmit'
     | otherwise = self
 
   rx = False
+  xmit' = fromMaybe _xmit xmit
   dw = head dws
   rxDv = Just False
   rxEr = Just False
 
   out = (self, rxDv, rxEr, Nothing, Nothing, Nothing)
-pcsReceiveT self@RxCB{..} (_, _, dws, _, syncStatus, _) = (nextState, out)
+pcsReceiveT self@RxCB{..} (_, _, dws, _, syncStatus, xmit) = (nextState, out)
  where
   nextState
-    | syncStatus == Fail = LinkFailed _rx
-    | isDw dw = RxCC _rx dw
-    | not (isDw dw) = RxInvalid _rx
+    | syncStatus == Fail = LinkFailed _rx xmit'
+    | isDw dw = RxCC _rx xmit' dw
+    | not (isDw dw) = RxInvalid _rx xmit'
     | otherwise = self
 
+  xmit' = fromMaybe _xmit xmit
   dw = head dws
   rxDv = Just False
   rxEr = Just False
 
   out = (self, rxDv, rxEr, Nothing, Nothing, Nothing)
-pcsReceiveT self@RxCC{..} (_, _, dws, _, syncStatus, _) = (nextState, out)
+pcsReceiveT self@RxCC{..} (_, _, dws, _, syncStatus, xmit) = (nextState, out)
  where
   nextState
-    | syncStatus == Fail = LinkFailed _rx
-    | isDw dw = RxCD _rx dw $ resize $ fromDw _hist
-    | not (isDw dw) = RxInvalid _rx
+    | syncStatus == Fail = LinkFailed _rx xmit'
+    | isDw dw = RxCD _rx xmit' dw $ resize $ fromDw _hist
+    | not (isDw dw) = RxInvalid _rx xmit'
     | otherwise = self
 
+  xmit' = fromMaybe _xmit xmit
   dw = head dws
 
   out = (self, Nothing, Nothing, Nothing, Nothing, Nothing)
-pcsReceiveT self@RxCD{..} (_, _, dws, rxEven, syncStatus, _) = (nextState, out)
+pcsReceiveT self@RxCD{..} (_, _, dws, rxEven, syncStatus, xmit) =
+  (nextState, out)
  where
   nextState
-    | syncStatus == Fail = LinkFailed _rx
-    | dw == cwK28_5 && rxEven == Even = RxK _rx
-    | dw /= cwK28_5 = RxInvalid _rx
-    | rxEven == Odd = RxInvalid _rx
+    | syncStatus == Fail = LinkFailed _rx xmit'
+    | dw == cwK28_5 && rxEven == Even = RxK _rx xmit'
+    | dw /= cwK28_5 = RxInvalid _rx xmit'
+    | rxEven == Odd = RxInvalid _rx xmit'
     | otherwise = self
 
+  xmit' = fromMaybe _xmit xmit
   dw = head dws
   rudi = Just C
   rxConfReg = (fromDw _hist ++# 0) .|. _rxConfReg
@@ -226,198 +233,210 @@ pcsReceiveT self@RxInvalid{..} (_, _, dws, rxEven, syncStatus, xmit) =
   (nextState, out)
  where
   nextState
-    | syncStatus == Fail = LinkFailed rx
-    | dw == cwK28_5 && rxEven == Even = RxK rx
-    | dw /= cwK28_5 && rxEven == Even = WaitForK rx
+    | syncStatus == Fail = LinkFailed rx xmit'
+    | dw == cwK28_5 && rxEven == Even = RxK rx xmit'
+    | dw /= cwK28_5 && rxEven == Even = WaitForK rx xmit'
     | otherwise = self
 
-  rx = xmit == Data || _rx
+  rx = xmit' == Data || _rx
+  xmit' = fromMaybe _xmit xmit
   dw = head dws
 
-  rudi = if xmit == Conf then Just Invalid else Nothing
+  rudi = if xmit' == Conf then Just Invalid else Nothing
 
   out = (self, Nothing, Nothing, Nothing, rudi, Nothing)
-pcsReceiveT self@IdleD{} (cg, rd, dws, rxEven, syncStatus, xmit) =
+pcsReceiveT self@IdleD{..} (cg, rd, dws, rxEven, syncStatus, xmit) =
   (nextState, out)
  where
   carrierDetected = carrierDetect cg rd rxEven
 
   nextState
-    | syncStatus == Fail = LinkFailed rx
-    | dw /= cwK28_5 && xmit /= Data = RxInvalid rx
-    | carrierDetected && xmit == Data && dw /= cwS =
-        FalseCarrier rx
-    | carrierDetected && xmit == Data && dw == cwS =
-        StartOfPacket rx
-    | not carrierDetected && xmit == Data = RxK rx
-    | dw == cwK28_5 = RxK rx
+    | syncStatus == Fail = LinkFailed rx xmit'
+    | dw /= cwK28_5 && xmit' /= Data = RxInvalid rx xmit'
+    | carrierDetected && xmit' == Data && dw /= cwS =
+        FalseCarrier rx xmit'
+    | carrierDetected && xmit' == Data && dw == cwS =
+        StartOfPacket rx xmit'
+    | not carrierDetected && xmit' == Data = RxK rx xmit'
+    | dw == cwK28_5 = RxK rx xmit'
     | otherwise = self
 
   rx = False
+  xmit' = fromMaybe _xmit xmit
   dw = head dws
   rxDv = Just False
   rxEr = Just False
   rudi = Just I
 
   out = (self, rxDv, rxEr, Nothing, rudi, Nothing)
-pcsReceiveT self@FalseCarrier{} (_, _, dws, rxEven, syncStatus, _) =
+pcsReceiveT self@FalseCarrier{..} (_, _, dws, rxEven, syncStatus, xmit) =
   (nextState, out)
  where
   nextState
-    | syncStatus == Fail = LinkFailed rx
-    | dw == cwK28_5 && rxEven == Even = RxK rx
+    | syncStatus == Fail = LinkFailed rx xmit'
+    | dw == cwK28_5 && rxEven == Even = RxK rx xmit'
     | otherwise = self
 
   rx = True
+  xmit' = fromMaybe _xmit xmit
   dw = head dws
   rxEr = Just True
 
   out = (self, Nothing, rxEr, Just $ Cw 0b00001110, Nothing, Nothing)
-pcsReceiveT self@StartOfPacket{} (_, _, dws, rxEven, syncStatus, _) =
+pcsReceiveT self@StartOfPacket{..} (_, _, dws, rxEven, syncStatus, xmit) =
   (nextState, out)
  where
   rxEnd = checkEnd dws
 
   nextState
-    | syncStatus == Fail = LinkFailed rx
-    | rxEnd == Just K28_5DK28_5 && rxEven == Even = EarlyEnd rx
-    | rxEnd == Just K28_5D21_5D00_0 && rxEven == Even = EarlyEnd rx
-    | rxEnd == Just K28_5D02_2D00_0 && rxEven == Even = EarlyEnd rx
-    | rxEnd == Just TRK28_5 && rxEven == Even = TriRri rx
-    | rxEnd == Just TRR = TrrExtend rx
-    | rxEnd == Just RRR = EarlyEnd rx
-    | isDw dw = RxData rx dw
-    | otherwise = RxDataError rx dw
+    | syncStatus == Fail = LinkFailed rx xmit'
+    | rxEnd == Just K28_5DK28_5 && rxEven == Even = EarlyEnd rx xmit'
+    | rxEnd == Just K28_5D21_5D00_0 && rxEven == Even = EarlyEnd rx xmit'
+    | rxEnd == Just K28_5D02_2D00_0 && rxEven == Even = EarlyEnd rx xmit'
+    | rxEnd == Just TRK28_5 && rxEven == Even = TriRri rx xmit'
+    | rxEnd == Just TRR = TrrExtend rx xmit'
+    | rxEnd == Just RRR = EarlyEnd rx xmit'
+    | isDw dw = RxData rx xmit' dw
+    | otherwise = RxDataError rx xmit' dw
 
   rx = True
+  xmit' = fromMaybe _xmit xmit
   dw = head dws
   rxDv = Just True
   rxEr = Just False
 
   out = (self, rxDv, rxEr, Just $ Cw 0b01010101, Nothing, Nothing)
-pcsReceiveT self@EarlyEnd{..} (_, _, dws, _, syncStatus, _) = (nextState, out)
+pcsReceiveT self@EarlyEnd{..} (_, _, dws, _, syncStatus, xmit) =
+  (nextState, out)
  where
   nextState
-    | syncStatus == Fail = LinkFailed _rx
-    | dw /= dwD21_5 && dw /= dwD02_2 = IdleD _rx
-    | dw == dwD02_2 = RxCB _rx
-    | dw == dwD21_5 = RxCB _rx
+    | syncStatus == Fail = LinkFailed _rx xmit'
+    | dw /= dwD21_5 && dw /= dwD02_2 = IdleD _rx xmit'
+    | dw == dwD02_2 = RxCB _rx xmit'
+    | dw == dwD21_5 = RxCB _rx xmit'
     | otherwise = self
 
+  xmit' = fromMaybe _xmit xmit
   dw = head dws
-
   rxEr = Just True
 
   out = (self, Nothing, rxEr, Nothing, Nothing, Nothing)
-pcsReceiveT self@TriRri{} (_, _, dws, _, syncStatus, _) = (nextState, out)
+pcsReceiveT self@TriRri{..} (_, _, dws, _, syncStatus, xmit) = (nextState, out)
  where
   nextState
-    | syncStatus == Fail = LinkFailed rx
-    | head dws == cwK28_5 = RxK rx
+    | syncStatus == Fail = LinkFailed rx xmit'
+    | head dws == cwK28_5 = RxK rx xmit'
     | otherwise = self
 
   rx = False
+  xmit' = fromMaybe _xmit xmit
   rxDv = Just False
   rxEr = Just False
 
   out = (self, rxDv, rxEr, Nothing, Nothing, Nothing)
-pcsReceiveT self@TrrExtend{..} (_, _, dws, rxEven, syncStatus, _) =
+pcsReceiveT self@TrrExtend{..} (_, _, dws, rxEven, syncStatus, xmit) =
   (nextState, out)
  where
   rxEnd = checkEnd dws
 
   nextState
-    | syncStatus == Fail = LinkFailed _rx
-    | rxEnd == Just RRR = TrrExtend _rx
-    | rxEnd == Just RRK28_5 && rxEven == Even = TriRri _rx
-    | rxEnd == Just RRS = PacketBurstRrs _rx
-    | otherwise = ExtendErr _rx
+    | syncStatus == Fail = LinkFailed _rx xmit'
+    | rxEnd == Just RRR = TrrExtend _rx xmit'
+    | rxEnd == Just RRK28_5 && rxEven == Even = TriRri _rx xmit'
+    | rxEnd == Just RRS = PacketBurstRrs _rx xmit'
+    | otherwise = ExtendErr _rx xmit'
 
+  xmit' = fromMaybe _xmit xmit
   rxDv = Just False
   rxEr = Just True
 
   out = (self, rxDv, rxEr, Just $ Cw 0b00001111, Nothing, Nothing)
-pcsReceiveT self@PacketBurstRrs{..} (_, _, dws, _, syncStatus, _) =
+pcsReceiveT self@PacketBurstRrs{..} (_, _, dws, _, syncStatus, xmit) =
   (nextState, out)
  where
   nextState
-    | syncStatus == Fail = LinkFailed _rx
-    | head dws == cwS = StartOfPacket _rx
+    | syncStatus == Fail = LinkFailed _rx xmit'
+    | head dws == cwS = StartOfPacket _rx xmit'
     | otherwise = self
 
+  xmit' = fromMaybe _xmit xmit
   rxDv = Just False
 
   out = (self, rxDv, Nothing, Just $ Cw 0b00001111, Nothing, Nothing)
-pcsReceiveT self@ExtendErr{..} (_, _, dws, rxEven, syncStatus, _) =
+pcsReceiveT self@ExtendErr{..} (_, _, dws, rxEven, syncStatus, xmit) =
   (nextState, out)
  where
   rxEnd = checkEnd dws
   selfCond = dw /= cwS && dw /= cwK28_5 && rxEven == Even
 
   nextState
-    | syncStatus == Fail = LinkFailed _rx
-    | dw == cwS = StartOfPacket _rx
-    | dw == cwK28_5 && rxEven == Even = RxK _rx
-    | selfCond && rxEnd == Just RRR = TrrExtend _rx
-    | selfCond && rxEnd == Just RRK28_5 = TriRri _rx
-    | selfCond && rxEnd == Just RRS = PacketBurstRrs _rx
+    | syncStatus == Fail = LinkFailed _rx xmit'
+    | dw == cwS = StartOfPacket _rx xmit'
+    | dw == cwK28_5 && rxEven == Even = RxK _rx xmit'
+    | selfCond && rxEnd == Just RRR = TrrExtend _rx xmit'
+    | selfCond && rxEnd == Just RRK28_5 = TriRri _rx xmit'
+    | selfCond && rxEnd == Just RRS = PacketBurstRrs _rx xmit'
     | otherwise = self
 
+  xmit' = fromMaybe _xmit xmit
   dw = head dws
   rxDv = Just False
 
   out = (self, rxDv, Nothing, Just $ Cw 0b00011111, Nothing, Nothing)
-pcsReceiveT self@EarlyEndExt{..} (_, _, dws, rxEven, syncStatus, _) =
+pcsReceiveT self@EarlyEndExt{..} (_, _, dws, rxEven, syncStatus, xmit) =
   (nextState, out)
  where
   rxEnd = checkEnd dws
 
   nextState
-    | syncStatus == Fail = LinkFailed _rx
-    | rxEnd == Just RRR = TrrExtend _rx
-    | rxEnd == Just RRK28_5 && rxEven == Even = TriRri _rx
-    | rxEnd == Just RRS = PacketBurstRrs _rx
-    | otherwise = ExtendErr _rx
+    | syncStatus == Fail = LinkFailed _rx xmit'
+    | rxEnd == Just RRR = TrrExtend _rx xmit'
+    | rxEnd == Just RRK28_5 && rxEven == Even = TriRri _rx xmit'
+    | rxEnd == Just RRS = PacketBurstRrs _rx xmit'
+    | otherwise = ExtendErr _rx xmit'
 
+  xmit' = fromMaybe _xmit xmit
   rxEr = Just True
 
   out = (self, Nothing, rxEr, Nothing, Nothing, Nothing)
-pcsReceiveT self@RxData{..} (_, _, dws, rxEven, syncStatus, _) =
+pcsReceiveT self@RxData{..} (_, _, dws, rxEven, syncStatus, xmit) =
   (nextState, out)
  where
   rxEnd = checkEnd dws
 
   nextState
-    | syncStatus == Fail = LinkFailed _rx
-    | rxEnd == Just K28_5DK28_5 && rxEven == Even = EarlyEnd _rx
-    | rxEnd == Just K28_5D21_5D00_0 && rxEven == Even = EarlyEnd _rx
-    | rxEnd == Just K28_5D02_2D00_0 && rxEven == Even = EarlyEnd _rx
-    | rxEnd == Just TRK28_5 && rxEven == Even = TriRri _rx
-    | rxEnd == Just TRR = TrrExtend _rx
-    | rxEnd == Just RRR = EarlyEnd _rx
-    | isDw dw = RxData _rx dw
-    | otherwise = RxDataError _rx dw
+    | syncStatus == Fail = LinkFailed _rx xmit'
+    | rxEnd == Just K28_5DK28_5 && rxEven == Even = EarlyEnd _rx xmit'
+    | rxEnd == Just K28_5D21_5D00_0 && rxEven == Even = EarlyEnd _rx xmit'
+    | rxEnd == Just K28_5D02_2D00_0 && rxEven == Even = EarlyEnd _rx xmit'
+    | rxEnd == Just TRK28_5 && rxEven == Even = TriRri _rx xmit'
+    | rxEnd == Just TRR = TrrExtend _rx xmit'
+    | rxEnd == Just RRR = EarlyEnd _rx xmit'
+    | isDw dw = RxData _rx xmit' dw
+    | otherwise = RxDataError _rx xmit' dw
 
+  xmit' = fromMaybe _xmit xmit
   dw = head dws
   rxEr = Just False
 
   out = (self, Nothing, rxEr, Just _hist, Nothing, Nothing)
-pcsReceiveT self@RxDataError{..} (_, _, dws, rxEven, syncStatus, _) =
+pcsReceiveT self@RxDataError{..} (_, _, dws, rxEven, syncStatus, xmit) =
   (nextState, out)
  where
   rxEnd = checkEnd dws
 
   nextState
-    | syncStatus == Fail = LinkFailed _rx
-    | rxEnd == Just K28_5DK28_5 && rxEven == Even = EarlyEnd _rx
-    | rxEnd == Just K28_5D21_5D00_0 && rxEven == Even = EarlyEnd _rx
-    | rxEnd == Just K28_5D02_2D00_0 && rxEven == Even = EarlyEnd _rx
-    | rxEnd == Just TRK28_5 && rxEven == Even = TriRri _rx
-    | rxEnd == Just TRR = TrrExtend _rx
-    | rxEnd == Just RRR = EarlyEnd _rx
-    | isDw dw = RxData _rx dw
-    | otherwise = RxDataError _rx dw
+    | syncStatus == Fail = LinkFailed _rx xmit'
+    | rxEnd == Just K28_5DK28_5 && rxEven == Even = EarlyEnd _rx xmit'
+    | rxEnd == Just K28_5D21_5D00_0 && rxEven == Even = EarlyEnd _rx xmit'
+    | rxEnd == Just K28_5D02_2D00_0 && rxEven == Even = EarlyEnd _rx xmit'
+    | rxEnd == Just TRK28_5 && rxEven == Even = TriRri _rx xmit'
+    | rxEnd == Just TRR = TrrExtend _rx xmit'
+    | rxEnd == Just RRR = EarlyEnd _rx xmit'
+    | isDw dw = RxData _rx xmit' dw
+    | otherwise = RxDataError _rx xmit' dw
 
+  xmit' = fromMaybe _xmit xmit
   dw = head dws
   rxEr = Just True
 
@@ -426,14 +445,15 @@ pcsReceiveT self@LinkFailed{..} (_, _, _, _, syncStatus, xmit) =
   (nextState, out)
  where
   nextState
-    | syncStatus == Fail = LinkFailed rx
-    | otherwise = WaitForK rx
+    | syncStatus == Fail = LinkFailed rx xmit'
+    | otherwise = WaitForK rx xmit'
 
   (rx, rxDv, rxEr) =
     if _rx
       then (False, Nothing, Just True)
       else (_rx, Just False, Just False)
-  rudi = if xmit /= Data then Just Invalid else Nothing
+  xmit' = fromMaybe _xmit xmit
+  rudi = if xmit' /= Data then Just Invalid else Nothing
 
   out = (self, rxDv, rxEr, Nothing, rudi, Nothing)
 
@@ -453,7 +473,7 @@ pcsReceive ::
   -- | The current 'SyncStatus' from 'Sgmii.sync'
   Signal dom SyncStatus ->
   -- | The 'Xmit' signal from 'Sgmii.autoNeg'
-  Signal dom Xmit ->
+  Signal dom (Maybe Xmit) ->
   -- | Tuple containing the output values
   Signal dom (Maybe Bool, Maybe Bool, Maybe DataWord, Maybe Rudi, Maybe ConfReg)
 pcsReceive cg rd dw1 rxEven syncStatus xmit =
