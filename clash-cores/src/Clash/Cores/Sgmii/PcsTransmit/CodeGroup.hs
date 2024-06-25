@@ -19,11 +19,11 @@ data CodeGroupState
   | ConfigurationC1A {_rd :: Bool}
   | ConfigurationC1B {_rd :: Bool}
   | ConfigurationC1C {_rd :: Bool}
-  | ConfigurationC1D {_rd :: Bool}
+  | ConfigurationC1D {_rd :: Bool, _txConfReg :: ConfReg}
   | ConfigurationC2A {_rd :: Bool}
   | ConfigurationC2B {_rd :: Bool}
   | ConfigurationC2C {_rd :: Bool}
-  | ConfigurationC2D {_rd :: Bool}
+  | ConfigurationC2D {_rd :: Bool, _txConfReg :: ConfReg}
   deriving (Generic, NFDataX, Eq, Show)
 
 -- | State transition function for the states as defined in IEEE 802.3 Clause
@@ -131,14 +131,13 @@ codeGroupT self@ConfigurationC1B{..} _ = (nextState, out)
   out = (self, cg, txEven, False)
 codeGroupT self@ConfigurationC1C{..} (_, _, txConfReg) = (nextState, out)
  where
-  nextState = ConfigurationC1D rd
+  nextState = ConfigurationC1D rd txConfReg
 
   (rd, cg) = encode8b10b _rd (Dw (resize txConfReg))
   txEven = Even
 
   out = (self, cg, txEven, False)
-codeGroupT self@ConfigurationC1D{..} (txOSet, _, txConfReg) =
-  (nextState, out)
+codeGroupT self@ConfigurationC1D{..} (txOSet, _, _) = (nextState, out)
  where
   nextState
     | txOSet == OSetD = DataGo rd txEven
@@ -147,7 +146,7 @@ codeGroupT self@ConfigurationC1D{..} (txOSet, _, txConfReg) =
     | txOSet == OSetC = ConfigurationC2A rd
     | otherwise = SpecialGo rd txEven txOSet
 
-  (rd, cg) = encode8b10b _rd (Dw (resize $ rotateR txConfReg 8))
+  (rd, cg) = encode8b10b _rd (Dw (resize $ rotateR _txConfReg 8))
   txEven = Odd
 
   out = (self, cg, txEven, True)
@@ -169,13 +168,13 @@ codeGroupT self@ConfigurationC2B{..} _ = (nextState, out)
   out = (self, cg, txEven, False)
 codeGroupT self@ConfigurationC2C{..} (_, _, txConfReg) = (nextState, out)
  where
-  nextState = ConfigurationC2D rd
+  nextState = ConfigurationC2D rd txConfReg
 
   (rd, cg) = encode8b10b _rd (Dw (resize txConfReg))
   txEven = Even
 
   out = (self, cg, txEven, False)
-codeGroupT self@ConfigurationC2D{..} (txOSet, _, txConfReg) =
+codeGroupT self@ConfigurationC2D{..} (txOSet, _, _) =
   (nextState, out)
  where
   nextState
@@ -185,7 +184,7 @@ codeGroupT self@ConfigurationC2D{..} (txOSet, _, txConfReg) =
     | txOSet == OSetC = ConfigurationC1A rd
     | otherwise = SpecialGo rd txEven txOSet
 
-  (rd, cg) = encode8b10b _rd (Dw (resize $ rotateR txConfReg 8))
+  (rd, cg) = encode8b10b _rd (Dw (resize $ rotateR _txConfReg 8))
   txEven = Odd
 
   out = (self, cg, txEven, True)

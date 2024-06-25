@@ -124,7 +124,7 @@ autoNegT ::
   (ConfReg, SyncStatus, Maybe Rudi, Maybe ConfReg) ->
   -- | Tuple with the new state and the outputs of the state transition function
   (AutoNegState dom, (AutoNegState dom, Xmit, ConfReg))
-autoNegT self@AnEnable{..} (_, syncStatus, rudi, rxConfRegNew) =
+autoNegT self@AnEnable{..} (_, syncStatus, rudi, rxConfReg) =
   (nextState, out)
  where
   nextState
@@ -134,13 +134,13 @@ autoNegT self@AnEnable{..} (_, syncStatus, rudi, rxConfRegNew) =
     | otherwise = AnRestart rudis rxConfRegs failTimer 0
 
   rudis = maybe _rudis (_rudis <<+) rudi
-  rxConfRegs = maybe _rxConfRegs (_rxConfRegs <<+) rxConfRegNew
+  rxConfRegs = maybe _rxConfRegs (_rxConfRegs <<+) rxConfReg
   txConfReg = 0
   failTimer = if syncStatus == Fail then _failTimer + 1 else 0
   xmit = Conf
 
   out = (self, xmit, txConfReg)
-autoNegT self@AnRestart{..} (_, syncStatus, rudi, rxConfRegNew) =
+autoNegT self@AnRestart{..} (_, syncStatus, rudi, rxConfReg) =
   (nextState, out)
  where
   nextState
@@ -152,13 +152,13 @@ autoNegT self@AnRestart{..} (_, syncStatus, rudi, rxConfRegNew) =
     | otherwise = AnRestart rudis rxConfRegs failTimer linkTimer
 
   rudis = maybe _rudis (_rudis <<+) rudi
-  rxConfRegs = maybe _rxConfRegs (_rxConfRegs <<+) rxConfRegNew
+  rxConfRegs = maybe _rxConfRegs (_rxConfRegs <<+) rxConfReg
   linkTimer = _linkTimer + 1
   failTimer = if syncStatus == Fail then _failTimer + 1 else 0
   xmit = Conf
 
   out = (self, xmit, 0)
-autoNegT self@AbilityDetect{..} (mrAdvAbility, syncStatus, rudi, rxConfRegNew) =
+autoNegT self@AbilityDetect{..} (mrAdvAbility, syncStatus, rudi, rxConfReg) =
   (nextState, out)
  where
   nextState
@@ -170,13 +170,13 @@ autoNegT self@AbilityDetect{..} (mrAdvAbility, syncStatus, rudi, rxConfRegNew) =
     | otherwise = AbilityDetect rudis rxConfRegs failTimer
 
   rudis = maybe _rudis (_rudis <<+) rudi
-  rxConfRegs = maybe _rxConfRegs (_rxConfRegs <<+) rxConfRegNew
+  rxConfRegs = maybe _rxConfRegs (_rxConfRegs <<+) rxConfReg
   txConfReg = replaceBit (14 :: Index 16) 0 mrAdvAbility
   failTimer = if syncStatus == Fail then _failTimer + 1 else 0
   xmit = Conf
 
   out = (self, xmit, txConfReg)
-autoNegT self@AcknowledgeDetect{..} (_, syncStatus, rudi, rxConfRegNew) =
+autoNegT self@AcknowledgeDetect{..} (_, syncStatus, rudi, rxConfReg) =
   (nextState, out)
  where
   nextState
@@ -192,13 +192,13 @@ autoNegT self@AcknowledgeDetect{..} (_, syncStatus, rudi, rxConfRegNew) =
     | otherwise = AcknowledgeDetect rudis rxConfRegs failTimer txConfReg
 
   rudis = maybe _rudis (_rudis <<+) rudi
-  rxConfRegs = maybe _rxConfRegs (_rxConfRegs <<+) rxConfRegNew
+  rxConfRegs = maybe _rxConfRegs (_rxConfRegs <<+) rxConfReg
   txConfReg = replaceBit (14 :: Index 16) 1 _txConfReg
   failTimer = if syncStatus == Fail then _failTimer + 1 else 0
   xmit = Conf
 
   out = (self, xmit, txConfReg)
-autoNegT self@CompleteAcknowledge{..} (_, syncStatus, rudi, rxConfRegNew) =
+autoNegT self@CompleteAcknowledge{..} (_, syncStatus, rudi, rxConfReg) =
   (nextState, out)
  where
   nextState
@@ -215,13 +215,13 @@ autoNegT self@CompleteAcknowledge{..} (_, syncStatus, rudi, rxConfRegNew) =
         CompleteAcknowledge rudis rxConfRegs failTimer linkTimer _txConfReg
 
   rudis = maybe _rudis (_rudis <<+) rudi
-  rxConfRegs = maybe _rxConfRegs (_rxConfRegs <<+) rxConfRegNew
+  rxConfRegs = maybe _rxConfRegs (_rxConfRegs <<+) rxConfReg
   linkTimer = _linkTimer + 1
   failTimer = if syncStatus == Fail then _failTimer + 1 else 0
   xmit = Conf
 
   out = (self, xmit, _txConfReg)
-autoNegT self@IdleDetect{..} (_, syncStatus, rudi, rxConfRegNew) =
+autoNegT self@IdleDetect{..} (_, syncStatus, rudi, rxConfReg) =
   (nextState, out)
  where
   nextState
@@ -235,13 +235,13 @@ autoNegT self@IdleDetect{..} (_, syncStatus, rudi, rxConfRegNew) =
     | otherwise = IdleDetect rudis rxConfRegs failTimer linkTimer _txConfReg
 
   rudis = maybe _rudis (_rudis <<+) rudi
-  rxConfRegs = maybe _rxConfRegs (_rxConfRegs <<+) rxConfRegNew
+  rxConfRegs = maybe _rxConfRegs (_rxConfRegs <<+) rxConfReg
   linkTimer = _linkTimer + 1
   failTimer = if syncStatus == Fail then _failTimer + 1 else 0
   xmit = Idle
 
   out = (self, xmit, _txConfReg)
-autoNegT self@LinkOk{..} (_, syncStatus, rudi, rxConfRegNew) = (nextState, out)
+autoNegT self@LinkOk{..} (_, syncStatus, rudi, rxConfReg) = (nextState, out)
  where
   nextState
     | failTimer >= timeout (Proxy @dom) =
@@ -251,7 +251,7 @@ autoNegT self@LinkOk{..} (_, syncStatus, rudi, rxConfRegNew) = (nextState, out)
     | otherwise = LinkOk rudis rxConfRegs failTimer _txConfReg
 
   rudis = maybe _rudis (_rudis <<+) rudi
-  rxConfRegs = maybe _rxConfRegs (_rxConfRegs <<+) rxConfRegNew
+  rxConfRegs = maybe _rxConfRegs (_rxConfRegs <<+) rxConfReg
   failTimer = if syncStatus == Fail then _failTimer + 1 else 0
   xmit = Data
 
