@@ -43,10 +43,6 @@ fromDw dw = case dw of
 --   containing the new running disparity and a 'DataWord' containing the
 --   decoded value. This function uses a 'MemBlob' to store the decoder lookup
 --   table.
---
---   Remark:
---   - For timing, this probably needs to make use of a 'romBlobPow2', which is
---     not asynchronous. This does, however, introduce a delay.
 decode8b10b ::
   -- | Running disparity
   Bool ->
@@ -80,10 +76,6 @@ decode8b10b rd cg = (rdNew, dw)
 --   containing the new running disparity and a 'BitVector' containing the
 --   encoded value. This function uses a 'MemBlob' to store the encoder lookup
 --   table.
---
---   Remark:
---   - For timing, this probably needs to make use of a 'romBlobPow2', which is
---     not asynchronous. This does, however, introduce a delay.
 encode8b10b ::
   -- | Running disparity
   Bool ->
@@ -91,27 +83,24 @@ encode8b10b ::
   DataWord ->
   -- | Tuple containing the new running disparity and the code group
   (Bool, BitVector 10)
-encode8b10b rd (Dw dw) = (rdNew, pack $ reverse cg)
+encode8b10b rd dw = out
  where
+  cw = case dw of
+    Cw _ -> 1
+    _ -> 0
+
   (statusBits, cg) =
     splitAt d2
       $ bv2v
       $ asyncRomBlobPow2
         $(memBlobTH Nothing Enc.encoderLut)
-      $ unpack (0 ++# bitCoerce rd ++# dw)
+      $ unpack (cw ++# bitCoerce rd ++# fromDw dw)
 
   rdNew = bitCoerce $ last statusBits
-encode8b10b rd (Cw dw) = (rdNew, if cgEr then 0 else pack $ reverse cg)
- where
-  (statusBits, cg) =
-    splitAt d2
-      $ bv2v
-      $ asyncRomBlobPow2
-        $(memBlobTH Nothing Enc.encoderLut)
-      $ unpack (1 ++# bitCoerce rd ++# dw)
 
-  cgEr = bitCoerce $ head statusBits
-  rdNew = bitCoerce $ last statusBits
-encode8b10b rd _ = (rd, 0)
+  out = case dw of
+    Cw _ -> (rdNew, pack $ reverse cg)
+    Dw _ -> (rdNew, pack $ reverse cg)
+    _ -> (rd, 0)
 
 {-# CLASH_OPAQUE encode8b10b #-}
