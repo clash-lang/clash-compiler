@@ -40,7 +40,7 @@ data SyncStatus = Ok | Fail
 -- | Signal that is received by the two PCS blocks from the auto-negotiation
 --   block to indicate the current state of the auto-negotiation block
 data Xmit = Conf | Data | Idle
-  deriving (Generic, NFDataX, Eq, Show)
+  deriving (Generic, NFDataX, Eq, Show, BitPack)
 
 -- The following data words are used for comparisions in 'pcsReceive', and are
 -- defined here to be usable in other places as well.

@@ -32,7 +32,7 @@ pcsTransmit txEn txEr dw xmit txConfReg = cg
   (_, txOSet) =
     mealyB
       orderedSetT
-      (Configuration Conf)
+      (Configuration Conf False)
       (txEn, txEr, dw, xmit, txEven, cgSent)
 
 {-# CLASH_OPAQUE pcsTransmit #-}

@@ -16,8 +16,6 @@ sgmiiCdc ::
   (KnownDomain dom0, KnownDomain dom1) =>
   ( Clock dom0 ->
     Clock dom1 ->
-    Reset dom0 ->
-    Reset dom1 ->
     Signal dom0 (Maybe Xmit) ->
     Signal dom0 (Maybe ConfReg) ->
     Signal dom1 (Maybe Xmit, Maybe ConfReg)
@@ -45,7 +43,7 @@ sgmiiCdc autoNegCdc clk0 clk1 rst0 rst1 txEn txEr dw1 cg1 =
     pcsTransmit' = exposeClockResetEnable pcsTransmit
 
   (xmit2, txConfReg2) =
-    unbundle $ autoNegCdc clk0 clk1 rst0 rst1 xmit1 txConfReg1
+    unbundle $ autoNegCdc clk0 clk1 xmit1 txConfReg1
 
   (xmit1, txConfReg1) =
     unbundle

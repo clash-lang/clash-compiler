@@ -69,12 +69,6 @@ bitDifference cg0 cg1 = foldl f 0 $ map bitCoerce $ bv2v $ xor cg0 cg1
 --   group and both alternative representations of the K28.5 control word or a
 --   difference of between 2 and 9 bits between the code group and the expected
 --   encoding of the K28.5 control word.
---
---   Remarks:
---   - Currently this function needs to re-encode the received data words to
---     be able to determine the bit difference, this is rather unecessary in
---     practice and could be resolved by determining the carrier detect status
---     at an earlier point, for example at 'Sgmii.sync'
 carrierDetect ::
   -- | Code group
   BitVector 10 ->
