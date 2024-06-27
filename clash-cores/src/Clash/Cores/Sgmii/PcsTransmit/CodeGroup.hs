@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Clash.Cores.Sgmii.PcsTransmit.CodeGroup where
@@ -208,3 +209,5 @@ codeGroupT self@ConfigurationC2D{..} (txOSet, _, txConfReg) =
   txEven = Odd
 
   out = (self, cg, txEven, True)
+
+{-# CLASH_OPAQUE codeGroupT #-}

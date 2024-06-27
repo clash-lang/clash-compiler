@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Clash.Cores.Sgmii.PcsTransmit.OrderedSet where
@@ -255,3 +256,5 @@ orderedSetT self@TxDataError{..} (txEn, txEr, _, xmit, txEven, cgSent) =
     | otherwise = TxDataError xmit' xmitChange
 
   out = (self, OSetV)
+
+{-# CLASH_OPAQUE orderedSetT #-}

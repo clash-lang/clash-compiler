@@ -12,59 +12,60 @@ import Clash.Cores.Sgmii.Sync
 import Clash.Prelude
 
 sgmiiCdc ::
-  forall dom0 dom1.
-  (KnownDomain dom0, KnownDomain dom1) =>
-  ( Clock dom0 ->
-    Clock dom1 ->
-    Signal dom0 (Maybe Xmit) ->
-    Signal dom0 (Maybe ConfReg) ->
-    Signal dom1 (Maybe Xmit, Maybe ConfReg)
+  forall rxDom txDom.
+  (KnownDomain rxDom, KnownDomain txDom) =>
+  ( Clock rxDom ->
+    Clock txDom ->
+    Signal rxDom (Maybe Xmit) ->
+    Signal rxDom (Maybe ConfReg) ->
+    Signal txDom (Maybe Xmit, Maybe ConfReg)
   ) ->
-  Clock dom0 ->
-  Clock dom1 ->
-  Reset dom0 ->
-  Reset dom1 ->
-  Signal dom1 Bool ->
-  Signal dom1 Bool ->
-  Signal dom1 (BitVector 8) ->
-  Signal dom0 (BitVector 10) ->
-  (Signal dom0 (Bool, Bool, BitVector 8), Signal dom1 (BitVector 10))
-sgmiiCdc autoNegCdc clk0 clk1 rst0 rst1 txEn txEr dw1 cg1 =
+  Clock rxDom ->
+  Clock txDom ->
+  Reset rxDom ->
+  Reset txDom ->
+  Signal txDom Bool ->
+  Signal txDom Bool ->
+  Signal txDom (BitVector 8) ->
+  Signal rxDom (BitVector 10) ->
+  (Signal rxDom (Bool, Bool, BitVector 8), Signal txDom (BitVector 10))
+sgmiiCdc autoNegCdc rxClk txClk rxRst txRst txEn txEr dw1 cg1 =
   ( bundle
-      ( exposeClockResetEnable regMaybe clk0 rst0 enableGen False rxDv
-      , exposeClockResetEnable regMaybe clk0 rst0 enableGen False rxEr
-      , exposeClockResetEnable regMaybe clk0 rst0 enableGen 0 dw4
+      ( exposeClockResetEnable regMaybe rxClk rxRst enableGen False rxDv
+      , exposeClockResetEnable regMaybe rxClk rxRst enableGen False rxEr
+      , exposeClockResetEnable regMaybe rxClk rxRst enableGen 0 dw4
       )
   , cg4
   )
  where
-  cg4 = pcsTransmit' clk1 rst1 enableGen txEn txEr dw1 xmit2 txConfReg2
+  cg4 = pcsTransmit' txClk txRst enableGen txEn txEr dw1 xmit2 txConfReg2
    where
     pcsTransmit' = exposeClockResetEnable pcsTransmit
 
   (xmit2, txConfReg2) =
-    unbundle $ autoNegCdc clk0 clk1 xmit1 txConfReg1
+    unbundle $ autoNegCdc rxClk txClk xmit1 txConfReg1
 
   (xmit1, txConfReg1) =
     unbundle
-      $ autoNeg' clk0 rst0 enableGen confReg syncStatus rudi rxConfReg
+      $ autoNeg' rxClk rxRst enableGen confReg syncStatus rudi rxConfReg
    where
     autoNeg' = exposeClockResetEnable autoNeg
-    confReg = 0b0100000000000001
+    confReg = pure 0b0100000000000001
 
   dw4 = (fmap . fmap) fromDw dw3
 
   (rxDv, rxEr, dw3, rudi, rxConfReg) =
     unbundle
-      $ pcsReceive' clk0 rst0 enableGen cg3 rd dw2 rxEven syncStatus xmit1
+      $ pcsReceive' rxClk rxRst enableGen cg3 rd dw2 rxEven syncStatus xmit1
    where
     pcsReceive' = exposeClockResetEnable pcsReceive
 
-  (cg3, rd, dw2, rxEven, syncStatus) = unbundle $ sync' clk0 rst0 enableGen cg2
+  (cg3, rd, dw2, rxEven, syncStatus) =
+    unbundle $ sync' rxClk rxRst enableGen cg2
    where
     sync' = exposeClockResetEnable sync
 
-  (cg2, _) = unbundle $ bitSlip' clk0 rst0 enableGen cg1
+  (cg2, _) = unbundle $ bitSlip' rxClk rxRst enableGen cg1
    where
     bitSlip' = exposeClockResetEnable bitSlip
 
