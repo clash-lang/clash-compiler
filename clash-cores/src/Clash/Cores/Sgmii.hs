@@ -28,12 +28,16 @@ sgmiiCdc ::
   Signal txDom Bool ->
   Signal txDom (BitVector 8) ->
   Signal rxDom (BitVector 10) ->
-  (Signal rxDom (Bool, Bool, BitVector 8), Signal txDom (BitVector 10))
+  ( Signal rxDom (Bool, Bool, BitVector 8, BitVector 8, BitVector 10)
+  , Signal txDom (BitVector 10)
+  )
 sgmiiCdc autoNegCdc rxClk txClk rxRst txRst txEn txEr dw1 cg1 =
   ( bundle
       ( exposeClockResetEnable regMaybe rxClk rxRst enableGen False rxDv
       , exposeClockResetEnable regMaybe rxClk rxRst enableGen False rxEr
       , exposeClockResetEnable regMaybe rxClk rxRst enableGen 0 dw4
+      , fromDw . head <$> dw2
+      , cg2
       )
   , cg4
   )
