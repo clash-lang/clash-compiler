@@ -149,8 +149,8 @@ prop_loopbackTest = H.property $ do
   simDuration <- H.forAll (Gen.integral (Range.linear 1 100))
 
   inp <- H.forAll (Gen.list (Range.singleton simDuration) genDefinedBitVector)
-  let setupSamples = 86
-      delaySamples = 17
+  let setupSamples = 91
+      delaySamples = 19
       controlCount = 9
 
       simOut =
@@ -180,8 +180,8 @@ prop_duplexTransmission = H.property $ do
 
   inp1 <- H.forAll (Gen.list (Range.singleton simDuration) genDefinedBitVector)
   inp2 <- H.forAll (Gen.list (Range.singleton simDuration) genDefinedBitVector)
-  let setupSamples = 86
-      delaySamples = 9
+  let setupSamples = 91
+      delaySamples = 10
       controlCount = 9
 
       inp = zip inp1 inp2
@@ -209,7 +209,7 @@ prop_duplexTransmission = H.property $ do
 --   block to the receive block in exactly 22 cycles
 prop_confRegPropagated :: H.Property
 prop_confRegPropagated = H.property $ do
-  simDuration <- H.forAll (Gen.integral (Range.singleton 23))
+  simDuration <- H.forAll (Gen.integral (Range.singleton 24))
 
   inp <- H.forAll genDefinedBitVector
   let simOut =

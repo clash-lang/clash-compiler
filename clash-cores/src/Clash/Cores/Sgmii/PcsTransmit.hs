@@ -27,7 +27,11 @@ pcsTransmit ::
 pcsTransmit txEn txEr dw xmit txConfReg = cg
  where
   (_, cg, txEven, cgSent) =
-    mealyB codeGroupT (SpecialGo False 0 Even OSetC) (txOSet, dw, txConfReg)
+    mooreB
+      codeGroupT
+      codeGroupO
+      (SpecialGo False 0 0 Even OSetC)
+      (txOSet, dw, txConfReg)
 
   (_, txOSet) =
     mealyB
