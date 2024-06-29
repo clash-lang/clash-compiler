@@ -70,18 +70,20 @@ jobs:
           # Print out stack.yaml for debugging purposes
           cat stack.yaml
 
-      - name: Cache (Windows)
+      - name: Restore cache (Windows)
         if: ${{ startsWith(matrix.os, 'windows') }}
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
+        id: cache-win
         with:
           # On windows we have to use "\" as a path separator, otherwise caching fails
           path: |
             ${{ steps.setup-haskell.outputs.stack-root }}\snapshots
           key: ${{ matrix.os }}-${{ matrix.ghc }}-${{ hashFiles('stack.yaml', '**/*.cabal', '.github/workflows/ci.yml') }}
           restore-keys: ${{ matrix.os }}-${{ matrix.ghc }}-
-      - name: Cache (non-Windows)
+      - name: Restore cache (non-Windows)
         if: ${{ !startsWith(matrix.os, 'windows') }}
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
+        id: cache-other
         with:
           path: |
             ${{ steps.setup-haskell.outputs.stack-root }}/snapshots
@@ -103,6 +105,29 @@ jobs:
       - name: Build happy with Stack
         shell: bash
         run: ./.ci/retry.sh stack build happy
+
+      - name: Build dependencies
+        run: stack build --only-dependencies
+
+      - name: Save cache (Windows)
+        uses: actions/cache/save@v4
+        # Trying to save over an existing cache gives distracting
+        # "Warning: Cache save failed." since they are immutable
+        if: ${{ startsWith(matrix.os, 'windows') && steps.cache-win.outputs.cache-hit != 'true' }}
+        with:
+          # On windows we have to use "\" as a path separator, otherwise caching fails
+          path: |
+            ${{ steps.setup-haskell.outputs.stack-root }}\snapshots
+          key: ${{ matrix.os }}-${{ matrix.ghc }}-${{ hashFiles('stack.yaml', '**/*.cabal', '.github/workflows/ci.yml') }}
+      - name: Save cache (non-Windows)
+        uses: actions/cache/save@v4
+        # Trying to save over an existing cache gives distracting
+        # "Warning: Cache save failed." since they are immutable
+        if: ${{ !startsWith(matrix.os, 'windows') && steps.cache-other.outputs.cache-hit != 'true' }}
+        with:
+          path: |
+            ${{ steps.setup-haskell.outputs.stack-root }}/snapshots
+          key: ${{ matrix.os }}-${{ matrix.ghc }}-${{ hashFiles('stack.yaml', '**/*.cabal', '.github/workflows/ci.yml') }}
 
       # Note: the --pedantic switch adds -Wall -Werror to the options passed to
       # GHC. Options specified in stack.yaml (like -Wcompat) are still passed;
@@ -158,6 +183,8 @@ jobs:
 
       - name: Setup CI
         run: |
+          # Work around dubious owner error
+          git config --global --add safe.directory "$(pwd)"
           export CABAL_DIR=$HOME/.cabal
           ./.ci/setup.sh
           cabal v2-freeze
@@ -167,13 +194,14 @@ jobs:
           mv cabal.project.freeze frozen
 
       - name: Restore Cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
+        id: cache
         with:
           path: |
             dist-newstyle
             ~/.cabal/store
 
-          key: ${{ matrix.ghc }}-${{ hashFiles('frozen', 'cabal.project') }}
+          key: ${{ matrix.ghc }}-${{ hashFiles('frozen', 'cabal.project', '**/*.cabal', '.github/workflows/ci.yml') }}
           restore-keys: ${{ matrix.ghc }}-
 
       - name: Build Clash
@@ -181,14 +209,29 @@ jobs:
           export CABAL_DIR=$HOME/.cabal
           ./.ci/build.sh
 
+      - name: Save Cache
+        # Trying to save over an existing cache gives distracting
+        # "Warning: Cache save failed." since they are immutable
+        if: ${{ !cancelled() && steps.cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            dist-newstyle
+            ~/.cabal/store
+
+          key: ${{ matrix.ghc }}-${{ hashFiles('frozen', 'cabal.project', '**/*.cabal', '.github/workflows/ci.yml') }}
+
       - name: Unit Tests
         if: github.ref != 'refs/heads/master'
         run: |
           export CABAL_DIR=$HOME/.cabal
-          cabal v2-test clash-prelude
-          cabal v2-test clash-lib
-          cabal v2-test clash-cores
-          cabal v2-test clash-cosim
+          cabal v2-run clash-prelude:doctests
+          cabal v2-run clash-prelude:unittests -- --hide-successes
+          cabal v2-run clash-lib:doctests
+          cabal v2-run clash-lib:unittests -- --hide-successes
+          cabal v2-run clash-cores:doctests
+          cabal v2-run clash-cores:unittests -- --hide-successes
+          cabal v2-run clash-cosim:test -- --hide-successes
 
       - name: Testsuite (VHDL)
         if: github.ref != 'refs/heads/master'
@@ -211,7 +254,7 @@ jobs:
 
   all:
     name: All jobs finished
-    if: always()
+    if: ${{ !cancelled() }}
     needs: [
         build_mac_windows,
         build_and_test,
