@@ -52,8 +52,7 @@ deriveHardwareCrc Crc32_ethernet d8 d4
 dummy = 1
 :}
 
->>> crcEngine' = exposeClockResetEnable crcEngine systemClockGen resetGen enableGen
->>> myEngine = crcEngine' Crc32_ethernet
+>>> myEngine = crcEngine Crc32_ethernet
 
 Note how we hinted to @clashi@ that our multi-line command was a list of
 declarations by including a dummy declaration @dummy = 1@. Without this trick,
@@ -71,7 +70,7 @@ indicates how many @BitVector 8@ are valid inside the @Vec@. 0 means 1 is valid.
 >>> hwInp2 = Just (False, 0, unsafeFromList $ fmap charToBv "9___")
 >>> hwInp = [Nothing, hwInp0, hwInp1, hwInp2]
 >>> hwOut = myEngine (fromList hwInp)
->>> crcFromHardware = List.last $ sampleN (1 + List.length hwInp) hwOut
+>>> crcFromHardware = List.last $ sampleN @System (1 + List.length hwInp) hwOut
 >>> crcFromHardware == checkValue
 True
 

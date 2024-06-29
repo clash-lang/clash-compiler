@@ -568,7 +568,6 @@ matVecMul
             (n :: Nat)
    . KnownNat m
   => KnownNat n
-  -- ^ @n@ columns
   => Vec m (BitVector n)
   -- ^ The Matrix
   -> BitVector n
