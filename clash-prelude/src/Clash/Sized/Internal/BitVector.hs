@@ -193,6 +193,7 @@ import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
 import Clash.Class.Resize         (Resize (..))
 import Clash.Promoted.Nat
   (SNat (..), SNatLE (..), compareSNat, snatToInteger, snatToNum, natToNum)
+import Clash.Sized.Internal (formatRange)
 import Clash.XException
   (ShowX (..), NFDataX (..), errorX, isX, showsPrecXWith, rwhnfX)
 
@@ -1049,9 +1050,8 @@ index# bv@(BV m v) i
 #endif
     err = error $ concat [ "(!): "
                          , show i
-                         , " is out of range ["
-                         , show (sz - 1)
-                         , "..0]"
+                         , " is out of range "
+                         , formatRange 0 (sz - 1)
                          ]
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
@@ -1142,9 +1142,8 @@ replaceBit# bv@(BV m v) i (Bit mb b)
 #endif
     err  = error $ concat [ "replaceBit: "
                           , show i
-                          , " is out of range ["
-                          , show (sz - 1)
-                          , "..0]"
+                          , " is out of range "
+                          , formatRange 0 (sz - 1)
                           ]
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511

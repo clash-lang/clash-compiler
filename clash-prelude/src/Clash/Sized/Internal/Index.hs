@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software Ltd,
-                  2021-2023, QBayLogic B.V.
+                  2021-2024, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -108,6 +108,7 @@ import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
 import Clash.Class.Parity         (Parity (..))
 import Clash.Class.Resize         (Resize (..))
 import Clash.Class.BitPack.BitIndex (replaceBit)
+import Clash.Sized.Internal       (formatRange)
 import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV), high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV
 import Clash.Promoted.Nat         (SNat(..), snatToNum, natToInteger, leToPlusKN)
@@ -347,7 +348,7 @@ fromInteger_INLINE i = bound `seq` if i > (-1) && i < bound then I i else err
   where
     bound = natToInteger @n
     err   = errorX ("Clash.Sized.Index: result " ++ show i ++
-                   " is out of bounds: [0.." ++ show (bound - 1) ++ "]")
+                   " is out of bounds: " ++ formatRange 0 (bound - 1))
 
 instance ExtendingNum (Index m) (Index n) where
   type AResult (Index m) (Index n) = Index (m + n - 1)
@@ -591,5 +592,5 @@ instance (KnownNat n) => Ix (Index n) where
   range (a, b) = [a..b]
   index ab@(a, b) x
     | inRange ab x = fromIntegral $ x - a
-    | otherwise = error $ printf "Index %d out of bounds (%d, %d)" x a b
+    | otherwise = error $ printf "Index (%d) out of range ((%d, %d))" x a b
   inRange (a, b) x = a <= x && x <= b

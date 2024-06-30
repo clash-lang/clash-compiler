@@ -315,6 +315,7 @@ Library
                       Clash.Clocks.Internal
                       Clash.CPP
                       Clash.Signal.Bundle.Internal
+                      Clash.Sized.Internal
                       Language.Haskell.TH.Compat
                       Paths_clash_prelude
 
