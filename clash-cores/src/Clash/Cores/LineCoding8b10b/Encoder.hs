@@ -12,9 +12,9 @@ import Clash.Prelude
 -- | Defines a list that is used as a lookup table for converting data words to
 --   code groups. The list is indexed as the 10-bit concatenation of whether the
 --   signal is a control signal ('Bit'), the running disparity ('Bit'), and the
---   data word ('BitVector 8'). The result is a tuple containing an error code
+--   data word ('BitVector'). The result is a tuple containing an error code
 --   ('Bit'), the new running disparity ('Bit') and the encoded code group
---   ('BitVector 10').
+--   ('BitVector').
 encoderLut :: [(Bit, Bit, BitVector 10)]
 encoderLut =
   [ (0, 0, 0b0010111001) -- D00.0

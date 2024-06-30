@@ -17,7 +17,7 @@ import Test.Tasty.TH
 import Prelude
 
 -- | Check if a 'BitVector' does not contain a sequence of bits with the same
---   value for 5 or more bits consequetively.
+--   value for 5 or more indices consecutively.
 checkBitSequence :: (C.KnownNat n) => C.BitVector n -> Bool
 checkBitSequence cg =
   fst (fst (C.mapAccumL (f 0) (0, 0) (C.bv2v cg)))
@@ -36,7 +36,7 @@ checkBitSequence cg =
 prop_decode8b10bCheckNothing :: H.Property
 prop_decode8b10bCheckNothing = H.property $ do
   inp <- H.forAll (Gen.filterT checkBitSequence genDefinedBitVector)
-  let out = isValidDw dw1 && isValidDw dw2
+  let out = isValidSymbol dw1 && isValidSymbol dw2
        where
         (_, dw1) = decode8b10b False $ snd $ encode8b10b False (Dw inp)
         (_, dw2) = decode8b10b True $ snd $ encode8b10b True (Dw inp)
@@ -60,7 +60,7 @@ prop_encode8b10bCheckNothing = H.property $ do
 prop_encodeDecode8b10b :: H.Property
 prop_encodeDecode8b10b = H.property $ do
   inp <- H.forAll genDefinedBitVector
-  let out = if isValidDw dw then fromDw dw else inp
+  let out = if isValidSymbol dw then fromDw dw else inp
        where
         dw = snd $ decode8b10b False $ snd $ encode8b10b False (Dw inp)
 
@@ -83,7 +83,7 @@ prop_decodeEncode8b10b = H.property $ do
        where
         o = g False inp
 
-        g rd i = if isValidDw dw then snd $ encode8b10b rd dw else i
+        g rd i = if isValidSymbol dw then snd $ encode8b10b rd dw else i
          where
           dw = snd $ decode8b10b rd i
 
