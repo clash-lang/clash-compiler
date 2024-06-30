@@ -201,19 +201,21 @@ functions a type class called 'Clash.Class.Parity.Parity' is available at
 -- [(8,8),(1,1),(2,2),(3,3)...
 -- ...
 registerB
-  :: ( HiddenClockResetEnable dom
+  :: forall dom a
+   . ( HiddenClockResetEnable dom
      , NFDataX a
      , Bundle a )
   => a
   -> Unbundled dom a
   -> Unbundled dom a
-registerB = hideClockResetEnable E.registerB
+registerB = hideClockResetEnable @dom E.registerB
 infixr 3 `registerB`
 {-# INLINE registerB #-}
 
 -- | Give a pulse when the 'Signal' goes from 'minBound' to 'maxBound'
 isRising
-  :: ( HiddenClockResetEnable dom
+  :: forall dom a
+   . ( HiddenClockResetEnable dom
      , NFDataX a
      , Bounded a
      , Eq a )
@@ -221,12 +223,13 @@ isRising
   -- ^ Starting value
   -> Signal dom a
   -> Signal dom Bool
-isRising = hideClockResetEnable E.isRising
+isRising = hideClockResetEnable @dom E.isRising
 {-# INLINE isRising #-}
 
 -- | Give a pulse when the 'Signal' goes from 'maxBound' to 'minBound'
 isFalling
-  :: ( HiddenClockResetEnable dom
+  :: forall dom a
+   . ( HiddenClockResetEnable dom
      , NFDataX a
      , Bounded a
      , Eq a )
@@ -234,7 +237,7 @@ isFalling
   -- ^ Starting value
   -> Signal dom a
   -> Signal dom Bool
-isFalling = hideClockResetEnable E.isFalling
+isFalling = hideClockResetEnable @dom E.isFalling
 {-# INLINE isFalling #-}
 
 -- | Give a pulse every @n@ clock cycles. This is a useful helper function when
@@ -255,10 +258,11 @@ isFalling = hideClockResetEnable E.isFalling
 -- counter = 'Clash.Signal.regEn' 0 ('riseEvery' ('SNat' :: 'SNat' 10000000)) (counter + 1)
 -- @
 riseEvery
-  :: HiddenClockResetEnable dom
+  :: forall dom n
+   . HiddenClockResetEnable dom
   => SNat n
   -> Signal dom Bool
-riseEvery = hideClockResetEnable E.riseEvery
+riseEvery = hideClockResetEnable @dom E.riseEvery
 {-# INLINE riseEvery #-}
 
 -- | Oscillate a @'Bool'@ for a given number of cycles. This is a convenient
@@ -282,9 +286,10 @@ riseEvery = hideClockResetEnable E.riseEvery
 -- >>> sampleN @System 200 (oscillate False d1) == sampleN @System 200 osc'
 -- True
 oscillate
-  :: HiddenClockResetEnable dom
+  :: forall dom n
+   . HiddenClockResetEnable dom
   => Bool
   -> SNat n
   -> Signal dom Bool
-oscillate = hideClockResetEnable E.oscillate
+oscillate = hideClockResetEnable @dom E.oscillate
 {-# INLINE oscillate #-}

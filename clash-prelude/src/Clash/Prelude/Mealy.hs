@@ -120,7 +120,8 @@ delayTop = mealyS delayS initialDelayState
 --     s2 = 'mealy' macT 0 ('Clash.Signal.bundle' (b,y))
 -- @
 mealy
-  :: ( HiddenClockResetEnable dom
+  :: forall dom s i o
+   . ( HiddenClockResetEnable dom
      , NFDataX s )
   => (s -> i -> (s,o))
   -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
@@ -129,7 +130,7 @@ mealy
   -> (Signal dom i -> Signal dom o)
   -- ^ Synchronous sequential function with input and output matching that
   -- of the mealy machine
-mealy = hideClockResetEnable E.mealy
+mealy = hideClockResetEnable @dom E.mealy
 {-# INLINE mealy #-}
 
 -- | A version of 'mealy' that does automatic 'Bundle'ing
@@ -159,7 +160,8 @@ mealy = hideClockResetEnable E.mealy
 --     (i2,b2) = 'mealyB' f 3 (c,i1)
 -- @
 mealyB
-  :: ( HiddenClockResetEnable dom
+  :: forall dom s i o
+   . ( HiddenClockResetEnable dom
      , NFDataX s
      , Bundle i
      , Bundle o )
@@ -170,7 +172,7 @@ mealyB
   -> (Unbundled dom i -> Unbundled dom o)
   -- ^ Synchronous sequential function with input and output matching that
   -- of the mealy machine
-mealyB = hideClockResetEnable E.mealyB
+mealyB = hideClockResetEnable @dom E.mealyB
 {-# INLINE mealyB #-}
 
 
@@ -209,7 +211,8 @@ mealyB = hideClockResetEnable E.mealyB
 -- ...
 --
 mealyS
-  :: ( HiddenClockResetEnable dom
+  :: forall dom s i o
+   . ( HiddenClockResetEnable dom
      , NFDataX s )
   => (i -> State s o)
   --  ^ Transfer function in mealy machine handling inputs using @Control.Monad.Strict.State s@.
@@ -218,12 +221,13 @@ mealyS
   -> (Signal dom i -> Signal dom o)
   -- ^ Synchronous sequential function with input and output matching that
   -- of the mealy machine
-mealyS = hideClockResetEnable E.mealyS
+mealyS = hideClockResetEnable @dom E.mealyS
 {-# INLINE mealyS #-}
 
 -- | A version of 'mealyS' that does automatic 'Bundle'ing, see 'mealyB' for details.
 mealySB
-  :: ( HiddenClockResetEnable dom
+  :: forall dom s i o
+   . ( HiddenClockResetEnable dom
      , NFDataX s
      , Bundle i
      , Bundle o  )
@@ -234,7 +238,7 @@ mealySB
   -> (Unbundled dom i -> Unbundled dom o)
   -- ^ Synchronous sequential function with input and output matching that
   -- of the mealy machine
-mealySB = hideClockResetEnable E.mealySB
+mealySB = hideClockResetEnable @dom E.mealySB
 {-# INLINE mealySB #-}
 
 -- | Infix version of 'mealyB'

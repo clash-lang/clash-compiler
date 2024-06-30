@@ -80,14 +80,15 @@ import           Clash.XException              (NFDataX)
 -- >>> sampleN @System 7 (toSignal (delay3 (dfromList [0..])))
 -- [-1,-1,-1,-1,1,2,3]
 delayed
-  :: ( KnownNat d
+  :: forall d n dom a
+   . ( KnownNat d
      , HiddenClockResetEnable dom
      , NFDataX a
      )
   => Vec d a
   -> DSignal dom n a
   -> DSignal dom (n + d) a
-delayed = hideClockResetEnable E.delayed
+delayed = hideClockResetEnable @dom E.delayed
 
 {- | Delay a 'DSignal' for @d@ periods, where @d@ is derived from the context.
 
@@ -123,14 +124,15 @@ delayedI @3
 #endif
 -}
 delayedI
-  :: ( KnownNat d
+  :: forall d a dom n
+   . ( KnownNat d
      , NFDataX a
      , HiddenClockResetEnable dom  )
   => a
   -- ^ Initial value
   -> DSignal dom n a
   -> DSignal dom (n + d) a
-delayedI = hideClockResetEnable E.delayedI
+delayedI = hideClockResetEnable @dom E.delayedI
 
 -- | Delay a 'DSignal' for @d@ cycles, the value at time 0..d-1 is /a/.
 --

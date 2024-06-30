@@ -201,7 +201,8 @@ outputVerifierBitVector' = hideReset (hideClock E.outputVerifierBitVector')
 
 -- | Ignore signal for a number of cycles, while outputting a static value.
 ignoreFor
-  :: HiddenClockResetEnable dom
+  :: forall dom n a
+   . HiddenClockResetEnable dom
   => SNat n
   -- ^ Number of cycles to ignore incoming signal
   -> a
@@ -211,5 +212,5 @@ ignoreFor
   -> Signal dom a
   -- ^ Either a passthrough of the incoming signal, or the static value
   -- provided as the second argument.
-ignoreFor = hideClockResetEnable E.ignoreFor
+ignoreFor = hideClockResetEnable @dom E.ignoreFor
 {-# INLINE ignoreFor #-}

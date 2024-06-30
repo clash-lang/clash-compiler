@@ -757,7 +757,7 @@ blockRamU
   -- ^ Value of the BRAM at address @r@ from the previous clock cycle
 blockRamU =
   \rstStrategy cnt initF rd wrM -> withFrozenCallStack
-    (hideClockResetEnable E.blockRamU) rstStrategy cnt initF rd wrM
+    (hideClockResetEnable @dom E.blockRamU) rstStrategy cnt initF rd wrM
 {-# INLINE blockRamU #-}
 
 -- | A version of 'blockRam' that is initialized with the same value on all
@@ -786,7 +786,7 @@ blockRam1
   -- ^ Value of the BRAM at address @r@ from the previous clock cycle
 blockRam1 =
   \rstStrategy cnt initValue rd wrM -> withFrozenCallStack
-    (hideClockResetEnable E.blockRam1) rstStrategy cnt initValue rd wrM
+    (hideClockResetEnable @dom E.blockRam1) rstStrategy cnt initValue rd wrM
 {-# INLINE blockRam1 #-}
 
 -- | Create a block RAM with space for 2^@n@ elements
@@ -866,7 +866,8 @@ readNew (blockRam (0 :> 1 :> Nil))
 #endif
 -}
 readNew
-  :: ( HiddenClockResetEnable dom
+  :: forall dom addr a
+   . ( HiddenClockResetEnable dom
      , NFDataX a
      , Eq addr )
   => (Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a)
@@ -877,7 +878,7 @@ readNew
   -- ^ (Write address @w@, value to write)
   -> Signal dom a
   -- ^ Value of the BRAM at address @r@ from the previous clock cycle
-readNew = hideClockResetEnable E.readNew
+readNew = hideClockResetEnable @dom E.readNew
 {-# INLINE readNew #-}
 
 -- | Produces vendor-agnostic HDL that will be inferred as a true dual-port

@@ -1928,7 +1928,7 @@ sampleWithResetN
   -- (and reset)
   -> [a]
 sampleWithResetN nReset nSamples f =
-  take nSamples (sampleWithReset nReset f)
+  take nSamples (sampleWithReset @dom nReset f)
 
 -- | /Lazily/ get an infinite list of samples from a 'Signal'
 --
@@ -2010,7 +2010,7 @@ simulate
   -- and/or enable.
   -> [a]
   -> [b]
-simulate f as = simulateWithReset (SNat @1) rval f as
+simulate f as = simulateWithReset @dom (SNat @1) rval f as
   where
     rval = maybe (error "simulate: no stimuli") fst (uncons as)
 {-# INLINE simulate #-}
@@ -2030,7 +2030,7 @@ simulateN
   -- (and reset)
   -> [a]
   -> [b]
-simulateN n f as = simulateWithResetN (SNat @1) rval n f as
+simulateN n f as = simulateWithResetN @dom (SNat @1) rval n f as
   where
     rval = maybe (error "simulate: no stimuli") fst (uncons as)
 {-# INLINE simulateN #-}
@@ -2055,7 +2055,7 @@ simulateWithReset
   -> [a]
   -> [b]
 simulateWithReset n resetVal f as =
-  E.simulateWithReset n resetVal (exposeClockResetEnable f) as
+  E.simulateWithReset @dom n resetVal (exposeClockResetEnable f) as
 {-# INLINE simulateWithReset #-}
 
 -- | Same as 'simulateWithReset', but only sample the first /Int/ output values.
@@ -2077,7 +2077,7 @@ simulateWithResetN
   -> [a]
   -> [b]
 simulateWithResetN nReset resetVal nSamples f as =
-  E.simulateWithResetN nReset resetVal nSamples (exposeClockResetEnable f) as
+  E.simulateWithResetN @dom nReset resetVal nSamples (exposeClockResetEnable f) as
 {-# INLINE simulateWithResetN #-}
 
 
@@ -2263,14 +2263,15 @@ runUntil check s =
 --
 -- __NB__: This function is not synthesizable
 testFor
-  :: KnownDomain dom
+  :: forall dom
+   . KnownDomain dom
   => Int
   -- ^ The number of cycles we want to test for
   -> (HiddenClockResetEnable dom  => Signal dom Bool)
   -- ^ 'Signal' we want to evaluate, whose source potentially has a hidden clock
   -- (and reset)
   -> Property
-testFor n s = property (and (Clash.Signal.sampleN n s))
+testFor n s = property (and (Clash.Signal.sampleN @dom n s))
 
 #ifdef CLASH_MULTIPLE_HIDDEN
 -- ** Synchronization primitive
@@ -2303,7 +2304,7 @@ holdReset
   -- signal becomes deasserted.
   -> Reset dom
 holdReset m =
-  hideClockResetEnable (\clk rst en -> E.holdReset clk en m rst)
+  hideClockResetEnable @dom (\clk rst en -> E.holdReset clk en m rst)
 
 -- | Like 'fromList', but resets on reset and has a defined reset value.
 --
