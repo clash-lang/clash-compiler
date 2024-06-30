@@ -385,7 +385,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "NameInstance" def{hdlSim=[]}
         , outputTest "NameInstance" def
         , outputTest "SetName" def{hdlTargets=[VHDL]}
-        , outputTest "SimulationMagic" def{hdlTargets=[VHDL]}
+        , outputTest "SimulationMagic2736" def{hdlTargets=[VHDL]}
         , runTest "PatError" def{hdlSim=[]}
         , runTest "ByteSwap32" def
         , runTest "CharTest" def
