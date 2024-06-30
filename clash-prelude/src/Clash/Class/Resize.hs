@@ -1,6 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente
                   2020,      Myrtle Software Ltd
+                  2024,      QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -25,6 +26,8 @@ import Data.Kind (Type)
 import Data.Proxy (Proxy(Proxy))
 import GHC.Stack (HasCallStack)
 import GHC.TypeLits (Nat, KnownNat, type (+))
+
+import Clash.Sized.Internal (formatRange)
 
 -- | Coerce a value to be represented by a different number of bits
 class Resize (f :: Nat -> Type) where
@@ -61,9 +64,8 @@ checkIntegral Proxy v =
   if toInteger v > toInteger (maxBound @b)
   || toInteger v < toInteger (minBound @b) then
     error $ "Given integral " <> show (toInteger v) <> " is out of bounds for" <>
-            " target type. Bounds of target type are: [" <>
-            show (toInteger (minBound @b)) <> ".." <>
-            show (toInteger (maxBound @b)) <> "]."
+            " target type. Bounds of target type are: " <>
+            formatRange (toInteger (minBound @b)) (toInteger (maxBound @b)) <> "."
   else
     ()
 
