@@ -2,6 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Myrtle Software Ltd
                   2022-2023, QBayLogic B.V.
+                  2024,      Alex Mason
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -179,6 +180,8 @@ infixr CONS_PREC `Cons`
 data Vec :: Nat -> Type -> Type where
   Nil  :: Vec 0 a
   Cons :: a -> Vec n a -> Vec (n + 1) a
+
+{-# COMPLETE Nil, (:>) #-}
 
 -- | In many cases, this Generic instance only allows generic
 -- functions/instances over vectors of at least size 1, due to the
