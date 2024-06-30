@@ -56,7 +56,7 @@ bitSlipO ::
   (BitSlipState 10, BitVector 10, Bool)
 bitSlipO self@BSFail{..} = out
  where
-  out = (self, resize $ rotateR _s (10 - fromEnum (last _ns)), False)
+  out = (self, resize _s, False)
 bitSlipO self@BSOk{..} = out
  where
   out = (self, resize $ rotateR _s (10 - fromEnum _n), True)

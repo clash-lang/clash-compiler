@@ -28,7 +28,7 @@ sgmiiCdc ::
   Signal txDom Bool ->
   Signal txDom (BitVector 8) ->
   Signal rxDom (BitVector 10) ->
-  ( Signal rxDom (Bool, Bool, BitVector 8, BitVector 8, BitVector 10)
+  ( Signal rxDom (Bool, Bool, BitVector 8, BitVector 8, BitVector 10, Bool)
   , Signal txDom (BitVector 10)
   )
 sgmiiCdc autoNegCdc rxClk txClk rxRst txRst txEn txEr dw1 cg1 =
@@ -38,6 +38,7 @@ sgmiiCdc autoNegCdc rxClk txClk rxRst txRst txEn txEr dw1 cg1 =
       , exposeClockResetEnable regMaybe rxClk rxRst enableGen 0 dw4
       , fromDw . head <$> dw2
       , cg2
+      , ok
       )
   , cg4
   )
@@ -69,7 +70,7 @@ sgmiiCdc autoNegCdc rxClk txClk rxRst txRst txEn txEr dw1 cg1 =
    where
     sync' = exposeClockResetEnable sync
 
-  (cg2, _) = unbundle $ bitSlip' rxClk rxRst enableGen cg1
+  (cg2, ok) = unbundle $ bitSlip' rxClk rxRst enableGen cg1
    where
     bitSlip' = exposeClockResetEnable bitSlip
 
