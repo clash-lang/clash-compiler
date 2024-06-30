@@ -79,6 +79,11 @@ build:
 
 # Tests run on shared runners:
 
+cores:doctests:
+  extends: .test-nocache
+  script:
+    - bin/clash-cores:doctests -j$THREADS
+
 cores:unittests:
   extends: .test-nocache
   script:
@@ -88,6 +93,11 @@ cosim:unittests:
   extends: .test-nocache
   script:
     - bin/clash-cosim:test
+
+prelude:doctests:
+  extends: .test-nocache
+  script:
+    - bin/clash-prelude:doctests -j$THREADS
 
 prelude:unittests:
   extends: .test-nocache
@@ -103,11 +113,6 @@ lib:unittests:
   extends: .test-nocache
   script:
     - bin/clash-lib:unittests --hide-successes
-
-prelude:doctests:
-  extends: .test-nocache
-  script:
-    - bin/clash-prelude:doctests -j$THREADS
 
 ffi:interface-tests:
   extends: .test-nocache

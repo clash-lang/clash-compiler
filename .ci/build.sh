@@ -28,6 +28,7 @@ cabal v2-build all --write-ghc-environment-files=always
 
 # Put all the test binaries in a predictable location
 TESTS="
+clash-cores:doctests
 clash-cores:unittests
 clash-cosim:test
 clash-ffi:ffi-interface-tests
