@@ -1,0 +1,1 @@
+ADDED: The Vec type now has a [COMPLETE pragma](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/pragmas.html#complete-pragma) to avoid incomplete pattern matches when using the `(:>)` pattern.
