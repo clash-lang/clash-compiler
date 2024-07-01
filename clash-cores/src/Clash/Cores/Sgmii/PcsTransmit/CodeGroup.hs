@@ -47,7 +47,7 @@ data CodeGroupState
 codeGroupT ::
   -- | State variable
   CodeGroupState ->
-  -- | Input 'DataWord' from the ordered set, new input value and the config
+  -- | Input data word from the ordered set, new input value and the config
   --   register
   (OrderedSet, BitVector 8, Maybe ConfReg) ->
   -- | The new state
