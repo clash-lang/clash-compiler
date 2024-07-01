@@ -130,6 +130,17 @@ library
     Clash.Cores.LatticeSemi.ECP5.IO
     Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO
     Clash.Cores.LatticeSemi.ICE40.IO
+    Clash.Cores.LineCoding8b10b
+    Clash.Cores.LineCoding8b10b.Decoder
+    Clash.Cores.LineCoding8b10b.Encoder
+    Clash.Cores.Sgmii
+    Clash.Cores.Sgmii.AutoNeg
+    Clash.Cores.Sgmii.Common
+    Clash.Cores.Sgmii.PcsReceive
+    Clash.Cores.Sgmii.PcsTransmit
+    Clash.Cores.Sgmii.PcsTransmit.CodeGroup
+    Clash.Cores.Sgmii.PcsTransmit.OrderedSet
+    Clash.Cores.Sgmii.Sync
     Clash.Cores.SPI
     Clash.Cores.UART
     Clash.Cores.Xilinx.BlockRam
@@ -195,7 +206,13 @@ test-suite unittests
   other-Modules:
     Test.Cores.Crc
     Test.Cores.Internal.SampleSPI
+    Test.Cores.LineCoding8b10b
     Test.Cores.Internal.Signals
+    Test.Cores.Sgmii.AutoNeg
+    Test.Cores.Sgmii.PcsReceive
+    Test.Cores.Sgmii.PcsTransmit
+    Test.Cores.Sgmii.Sgmii
+    Test.Cores.Sgmii.Sync
     Test.Cores.SPI
     Test.Cores.SPI.MultiSlave
     Test.Cores.UART
