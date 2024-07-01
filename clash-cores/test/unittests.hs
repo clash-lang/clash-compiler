@@ -13,7 +13,6 @@ import Test.Tasty
 import qualified Test.Cores.Crc
 import qualified Test.Cores.LineCoding8b10b
 import qualified Test.Cores.Sgmii.AutoNeg
-import qualified Test.Cores.Sgmii.BitSlip
 import qualified Test.Cores.Sgmii.PcsReceive
 import qualified Test.Cores.Sgmii.PcsTransmit
 import qualified Test.Cores.Sgmii.Sgmii
@@ -30,7 +29,6 @@ tests = testGroup "Unittests"
   [ Test.Cores.Crc.tests
   , Test.Cores.LineCoding8b10b.tests
   , Test.Cores.Sgmii.AutoNeg.tests
-  , Test.Cores.Sgmii.BitSlip.tests
   , Test.Cores.Sgmii.PcsReceive.tests
   , Test.Cores.Sgmii.PcsTransmit.tests
   , Test.Cores.Sgmii.Sgmii.tests

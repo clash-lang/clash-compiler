@@ -135,7 +135,6 @@ library
     Clash.Cores.LineCoding8b10b.Encoder
     Clash.Cores.Sgmii
     Clash.Cores.Sgmii.AutoNeg
-    Clash.Cores.Sgmii.BitSlip
     Clash.Cores.Sgmii.Common
     Clash.Cores.Sgmii.PcsReceive
     Clash.Cores.Sgmii.PcsTransmit
@@ -210,7 +209,6 @@ test-suite unittests
     Test.Cores.LineCoding8b10b
     Test.Cores.Internal.Signals
     Test.Cores.Sgmii.AutoNeg
-    Test.Cores.Sgmii.BitSlip
     Test.Cores.Sgmii.PcsReceive
     Test.Cores.Sgmii.PcsTransmit
     Test.Cores.Sgmii.Sgmii

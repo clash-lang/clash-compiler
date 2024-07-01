@@ -4,7 +4,6 @@ module Test.Cores.Sgmii.Sgmii where
 
 import Clash.Cores.LineCoding8b10b
 import Clash.Cores.Sgmii.AutoNeg
-import Clash.Cores.Sgmii.BitSlip
 import Clash.Cores.Sgmii.Common
 import Clash.Cores.Sgmii.PcsReceive
 import Clash.Cores.Sgmii.PcsTransmit
@@ -41,12 +40,10 @@ sgmiiCommon cg1 = C.bundle (rxDv, rxEr, dw2, xmit, txConfReg)
     C.unbundle $ autoNeg 0b0100000000000001 syncStatus rudi rxConfReg
 
   (rxDv, rxEr, dw2, rudi, rxConfReg) =
-    C.unbundle $ pcsReceive cg3 rd dw1 rxEven syncStatus xmit
+    C.unbundle $ pcsReceive cg2 rd dw1 rxEven syncStatus xmit
 
-  (cg3, rd, dw1, rxEven, syncStatus) =
-    C.unbundle $ sync cg2
-
-  (cg2, _) = C.unbundle $ bitSlip cg1
+  (cg2, rd, dw1, rxEven, syncStatus) =
+    C.unbundle $ sync cg1
 
 -- | Placeholder integration function for all different parts of SGMII. This is
 --   used to check whether the combination of the blocks in this module actually
@@ -149,8 +146,8 @@ prop_loopbackTest = H.property $ do
   simDuration <- H.forAll (Gen.integral (Range.linear 1 100))
 
   inp <- H.forAll (Gen.list (Range.singleton simDuration) genDefinedBitVector)
-  let setupSamples = 91
-      delaySamples = 19
+  let setupSamples = 85
+      delaySamples = 15
       controlCount = 9
 
       simOut =
@@ -180,8 +177,8 @@ prop_duplexTransmission = H.property $ do
 
   inp1 <- H.forAll (Gen.list (Range.singleton simDuration) genDefinedBitVector)
   inp2 <- H.forAll (Gen.list (Range.singleton simDuration) genDefinedBitVector)
-  let setupSamples = 91
-      delaySamples = 10
+  let setupSamples = 85
+      delaySamples = 8
       controlCount = 9
 
       inp = zip inp1 inp2

@@ -4,7 +4,6 @@ module Clash.Cores.Sgmii where
 
 import Clash.Cores.LineCoding8b10b
 import Clash.Cores.Sgmii.AutoNeg
--- import Clash.Cores.Sgmii.BitSlip
 import Clash.Cores.Sgmii.Common
 import Clash.Cores.Sgmii.PcsReceive
 import Clash.Cores.Sgmii.PcsTransmit
@@ -37,10 +36,10 @@ sgmiiCdc autoNegCdc rxClk txClk rxRst txRst txEn txEr dw1 cg1 =
       , exposeClockResetEnable regMaybe rxClk rxRst enableGen False rxEr
       , exposeClockResetEnable regMaybe rxClk rxRst enableGen 0 dw4
       )
-  , cg4
+  , cg3
   )
  where
-  cg4 = pcsTransmit' txClk txRst enableGen txEn txEr dw1 xmit2 txConfReg2
+  cg3 = pcsTransmit' txClk txRst enableGen txEn txEr dw1 xmit2 txConfReg2
    where
     pcsTransmit' = exposeClockResetEnable pcsTransmit
 
@@ -58,17 +57,13 @@ sgmiiCdc autoNegCdc rxClk txClk rxRst txRst txEn txEr dw1 cg1 =
 
   (rxDv, rxEr, dw3, rudi, rxConfReg) =
     unbundle
-      $ pcsReceive' rxClk rxRst enableGen cg3 rd dw2 rxEven syncStatus xmit1
+      $ pcsReceive' rxClk rxRst enableGen cg2 rd dw2 rxEven syncStatus xmit1
    where
     pcsReceive' = exposeClockResetEnable pcsReceive
 
-  (cg3, rd, dw2, rxEven, syncStatus) =
+  (cg2, rd, dw2, rxEven, syncStatus) =
     unbundle $ sync' rxClk rxRst enableGen cg1
    where
     sync' = exposeClockResetEnable sync
-
--- (cg2, _) = unbundle $ bitSlip' rxClk rxRst enableGen cg1
---  where
---   bitSlip' = exposeClockResetEnable bitSlip
 
 {-# CLASH_OPAQUE sgmiiCdc #-}
