@@ -66,7 +66,7 @@ decode8b10b rd cg = (rdNew, dw)
       $ bv2v
       $ asyncRomBlobPow2
         $(memBlobTH Nothing Dec.decoderLut)
-      $ unpack (bitCoerce rd ++# pack (reverse $ bv2v cg))
+      $ unpack (bitCoerce rd ++# cg)
 
   rdEr = bitCoerce $ head statusBits
   cgEr = bitCoerce $ statusBits !! (1 :: Index 4)
@@ -102,8 +102,8 @@ encode8b10b rd dw = out
   rdNew = bitCoerce $ last statusBits
 
   out = case dw of
-    Cw _ -> (rdNew, pack $ reverse cg)
-    Dw _ -> (rdNew, pack $ reverse cg)
+    Cw _ -> (rdNew, pack cg)
+    Dw _ -> (rdNew, pack cg)
     _ -> (rd, 0)
 
 {-# CLASH_OPAQUE encode8b10b #-}
