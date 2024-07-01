@@ -14,7 +14,7 @@ type Timeout dom = Index (DivRU (1600000000) (Max 1 (DomainPeriod dom)))
 
 -- | State type of 'autoNeg'. This contains all states as they are defined in
 --   IEEE 802.3 Clause 37, with exception of the @AN_DISABLE_LINK_OK@ state as
---   SGMII always requires auto negotiation to be available
+--   SGMII always requires auto negotiation to be available.
 data AutoNegState dom
   = AnEnable
       { _rudis :: Vec 3 Rudi
@@ -70,7 +70,7 @@ timeout Proxy = if clashSimulation then 3 else maxBound
 -- | Check if the the last three received values of @rxConfReg@ are the same
 --   (with the exception for bit 14, the acknowledge bit, which is discarded).
 --   If there has been 'Rudi' value of 'I' in the same set of values, then
---   return False.
+--   return 'False'.
 abilityMatch ::
   -- | Last three values for 'Rudi'
   Vec 3 Rudi ->
