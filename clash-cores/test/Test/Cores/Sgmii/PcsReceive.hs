@@ -18,24 +18,24 @@ import Test.Tasty.TH
 import Prelude
 
 -- | Function that creates a list with a given range that contains a list of
---   running disparities and 'DataWord's
-genDataWords :: H.Range Int -> H.Gen [(Bool, DataWord)]
-genDataWords range = do
+--   running disparities and 'Symbol8b10b's
+genSymbol8b10bs :: H.Range Int -> H.Gen [(Bool, Symbol8b10b)]
+genSymbol8b10bs range = do
   n <- Gen.int range
-  genDataWords1 n False
+  genSymbol8b10bs1 n False
 
--- | Recursive function to generate a list of 'DataWord's with the correct
+-- | Recursive function to generate a list of 'Symbol8b10b's with the correct
 --   running disparity
-genDataWords1 :: Int -> Bool -> H.Gen [(Bool, DataWord)]
-genDataWords1 0 _ = pure []
-genDataWords1 n rd = do
-  (rdNew, dw) <- genDataWord rd
-  ((rdNew, dw) :) <$> genDataWords1 (pred n) rdNew
+genSymbol8b10bs1 :: Int -> Bool -> H.Gen [(Bool, Symbol8b10b)]
+genSymbol8b10bs1 0 _ = pure []
+genSymbol8b10bs1 n rd = do
+  (rdNew, dw) <- genSymbol8b10b rd
+  ((rdNew, dw) :) <$> genSymbol8b10bs1 (pred n) rdNew
 
--- | Generate a 'DataWord' by creating a 'BitVector' of length 10 and decoding
---   it with the 'decode8b10b' function
-genDataWord :: Bool -> H.Gen (Bool, DataWord)
-genDataWord rd = Gen.filter f $ decode8b10b rd <$> genDefinedBitVector
+-- | Generate a 'Symbol8b10b' by creating a 'BitVector' of length 10 and
+--   decoding it with the 'decode8b10b' function
+genSymbol8b10b :: Bool -> H.Gen (Bool, Symbol8b10b)
+genSymbol8b10b rd = Gen.filter f $ decode8b10b rd <$> genDefinedBitVector
  where
   f (_, dw) = isDw dw
 
@@ -48,7 +48,7 @@ pcsReceiveSim ::
     dom
     ( C.BitVector 10
     , Bool
-    , C.Vec 3 DataWord
+    , C.Vec 3 Symbol8b10b
     , Even
     , SyncStatus
     , Maybe Xmit
@@ -59,13 +59,13 @@ pcsReceiveSim s i = s'
   (s', _, _, _, _, _) =
     C.unbundle $ C.mealy pcsReceiveT s i
 
--- | Test that for an arbitrary list of inputs 'DataWord's, the state machine
+-- | Test that for an arbitrary list of inputs 'Symbol8b10b's, the state machine
 --   will move from @START_OF_PACKET@ to @RX_DATA@
 prop_pcsReceiveStartOfPacket :: H.Property
 prop_pcsReceiveStartOfPacket = H.property $ do
   simDuration <- H.forAll (Gen.integral (Range.linear 10 100))
 
-  inp <- H.forAll (genDataWords (Range.singleton simDuration))
+  inp <- H.forAll (genSymbol8b10bs (Range.singleton simDuration))
 
   let simOut =
         C.sampleN

@@ -47,50 +47,50 @@ data Xmit = Conf | Data | Idle
 
 -- | Data word corresponding to the decoded version of code group D00.0, used
 --   for early-end detection
-dwD00_0 :: DataWord
+dwD00_0 :: Symbol8b10b
 dwD00_0 = Dw 0b00000000
 
 -- | Data word corresponding to the decoded version of code group D02.2, used
 --   for alternating configuration transmission
-dwD02_2 :: DataWord
+dwD02_2 :: Symbol8b10b
 dwD02_2 = Dw 0b01000010
 
 -- | Data word corresponding to the decoded version of code group D05.6, used
 --   for correcting idle transmission
-dwD05_6 :: DataWord
+dwD05_6 :: Symbol8b10b
 dwD05_6 = Dw 0b11000101
 
 -- | Data word corresponding to the decoded version of code group D16.2, used
 --   for preserving idle transmission
-dwD16_2 :: DataWord
+dwD16_2 :: Symbol8b10b
 dwD16_2 = Dw 0b01010000
 
 -- | Data word corresponding to the decoded version of code group D21.5, used
 --   for alternating configuration transmission
-dwD21_5 :: DataWord
+dwD21_5 :: Symbol8b10b
 dwD21_5 = Dw 0b10110101
 
 -- | Data word  corresponding to the decoded version of code group K28.5, the
 --   most commonly used comma value
-cwK28_5 :: DataWord
+cwK28_5 :: Symbol8b10b
 cwK28_5 = Cw 0b10111100
 
 -- | Data word corresponding to the decoded version of code group K23.7, used
 --   for encapsulation of @Carrier_Extend@ (/R/)
-cwR :: DataWord
+cwR :: Symbol8b10b
 cwR = Cw 0b11110111
 
 -- | Data word corresponding to the decoded version of code group K27.7, used
 --   for encapsulation of @Start_of_Packet@ (/S/)
-cwS :: DataWord
+cwS :: Symbol8b10b
 cwS = Cw 0b11111011
 
 -- | Data word corresponding to the decoded version of code group D29.7, used
 --   for encapsulation of @End_of_Packet@ (/T/)
-cwT :: DataWord
+cwT :: Symbol8b10b
 cwT = Cw 0b11111101
 
 -- | Data word corresponding to the decoded version of code group K30.7, used
 --   for encapsulation of @Error_Propagation@ (/V/)
-cwV :: DataWord
+cwV :: Symbol8b10b
 cwV = Cw 0b11111110

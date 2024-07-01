@@ -33,8 +33,13 @@ data PcsReceiveState
   | WaitForK {_rx :: Bool, _xmit :: Xmit}
   | RxK {_rx :: Bool, _xmit :: Xmit}
   | RxCB {_rx :: Bool, _xmit :: Xmit}
-  | RxCC {_rx :: Bool, _xmit :: Xmit, _hist :: DataWord}
-  | RxCD {_rx :: Bool, _xmit :: Xmit, _hist :: DataWord, _rxConfReg :: ConfReg}
+  | RxCC {_rx :: Bool, _xmit :: Xmit, _hist :: Symbol8b10b}
+  | RxCD
+      { _rx :: Bool
+      , _xmit :: Xmit
+      , _hist :: Symbol8b10b
+      , _rxConfReg :: ConfReg
+      }
   | RxInvalid {_rx :: Bool, _xmit :: Xmit}
   | IdleD {_rx :: Bool, _xmit :: Xmit}
   | FalseCarrier {_rx :: Bool, _xmit :: Xmit}
@@ -45,8 +50,8 @@ data PcsReceiveState
   | PacketBurstRrs {_rx :: Bool, _xmit :: Xmit}
   | ExtendErr {_rx :: Bool, _xmit :: Xmit}
   | EarlyEndExt {_rx :: Bool, _xmit :: Xmit}
-  | RxData {_rx :: Bool, _xmit :: Xmit, _hist :: DataWord}
-  | RxDataError {_rx :: Bool, _xmit :: Xmit, _hist :: DataWord}
+  | RxData {_rx :: Bool, _xmit :: Xmit, _hist :: Symbol8b10b}
+  | RxDataError {_rx :: Bool, _xmit :: Xmit, _hist :: Symbol8b10b}
   | LinkFailed {_rx :: Bool, _xmit :: Xmit}
   deriving (Generic, NFDataX, Eq, Show)
 
@@ -103,7 +108,7 @@ carrierDetect cg rd rxEven
 --   check whether they correspond to one of the specified end conditions
 checkEnd ::
   -- | Current and next 2 data words
-  Vec 3 DataWord ->
+  Vec 3 Symbol8b10b ->
   -- | End condition
   Maybe CheckEnd
 checkEnd dws
@@ -128,13 +133,13 @@ pcsReceiveT ::
   PcsReceiveState ->
   -- | Input values, where @Vec 3 CodeGroup@ contains the current and next two
   -- | data words
-  (BitVector 10, Bool, Vec 3 DataWord, Even, SyncStatus, Maybe Xmit) ->
+  (BitVector 10, Bool, Vec 3 Symbol8b10b, Even, SyncStatus, Maybe Xmit) ->
   -- | Tuple with the new state and the output values
   ( PcsReceiveState
   , ( PcsReceiveState
     , Maybe Bool
     , Maybe Bool
-    , Maybe DataWord
+    , Maybe Symbol8b10b
     , Maybe Rudi
     , Maybe ConfReg
     )
@@ -460,8 +465,8 @@ pcsReceive ::
   Signal dom (BitVector 10) ->
   -- | Current running disparity from 'Sgmii.sync'
   Signal dom Bool ->
-  -- | Input 'DataWord' from 'Sgmii.sync'
-  Signal dom (Vec 3 DataWord) ->
+  -- | Input 'Symbol8b10b' from 'Sgmii.sync'
+  Signal dom (Vec 3 Symbol8b10b) ->
   -- | The 'Even' value from 'Sgmii.sync'
   Signal dom Even ->
   -- | The current 'SyncStatus' from 'Sgmii.sync'
@@ -469,7 +474,14 @@ pcsReceive ::
   -- | The 'Xmit' signal from 'Sgmii.autoNeg'
   Signal dom (Maybe Xmit) ->
   -- | Tuple containing the output values
-  Signal dom (Maybe Bool, Maybe Bool, Maybe DataWord, Maybe Rudi, Maybe ConfReg)
+  Signal
+    dom
+    ( Maybe Bool
+    , Maybe Bool
+    , Maybe Symbol8b10b
+    , Maybe Rudi
+    , Maybe ConfReg
+    )
 pcsReceive cg rd dw1 rxEven syncStatus xmit =
   bundle (rxDv, rxEr, dw2, rudi, rxConfReg)
  where

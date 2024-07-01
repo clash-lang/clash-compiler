@@ -31,7 +31,7 @@ sgmiiCommon ::
     dom
     ( Maybe Bool
     , Maybe Bool
-    , Maybe DataWord
+    , Maybe Symbol8b10b
     , Maybe Xmit
     , Maybe ConfReg
     )
