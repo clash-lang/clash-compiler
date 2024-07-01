@@ -95,8 +95,8 @@ carrierDetect cg rd rxEven
       True
   | otherwise = False
  where
-  cgK28_5N = 0b0011111010
-  cgK28_5P = 0b1100000101
+  cgK28_5N = 0b0101111100
+  cgK28_5P = 0b1010000011
   cgK28_5 = if rd then cgK28_5P else cgK28_5N
 
 -- | Take the running disparity, the current and next two input data words and

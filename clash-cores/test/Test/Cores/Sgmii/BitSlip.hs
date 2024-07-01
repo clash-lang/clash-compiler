@@ -19,7 +19,7 @@ import Prelude
 bitSlipSim ::
   (C.HiddenClockResetEnable dom) =>
   C.Signal dom (C.BitVector 10) ->
-  C.Signal dom (BitSlipState 10, C.BitVector 10, Bool)
+  C.Signal dom (BitSlipState, C.BitVector 10, Bool)
 bitSlipSim cg =
   C.bundle $ C.mooreB bitSlipT bitSlipO (BSFail 0 (C.repeat 0) (C.repeat 0)) cg
 

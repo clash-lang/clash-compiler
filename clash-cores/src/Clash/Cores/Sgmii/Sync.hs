@@ -83,17 +83,10 @@ data SyncState
       }
   deriving (Generic, NFDataX, Eq, Show)
 
--- | Vector containing the 3 code groups that contain a comma (K28.1, K28.5 and
---   K28.7) and their alternative forms (with opposite running disparity)
-commas :: Vec 6 (BitVector 10)
-commas =
-  0b0011111001
-    :> 0b1100000110
-    :> 0b0011111010
-    :> 0b1100000101
-    :> 0b0011111000
-    :> 0b1100000111
-    :> Nil
+-- | Vector containing the two alternative forms (with opposite running
+--   disparity) of K28.5
+commas :: Vec 2 (BitVector 10)
+commas = 0b0101111100 :> 0b1010000011 :> Nil
 
 -- | State transition function for 'sync'. Takes the state as defined in
 --   'SyncState', a the new incoming code group from the SerDes-block and

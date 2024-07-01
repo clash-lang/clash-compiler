@@ -7,13 +7,13 @@ import Clash.Prelude
 import Data.Maybe (fromJust, isNothing)
 
 -- | State variable for 'bitSlip'
-data BitSlipState n
+data BitSlipState
   = BSFail
-      { _s :: BitVector (2 * n)
-      , _ns :: Vec 8 (Index n)
-      , _hist :: Vec 10 (BitVector 7)
+      { _s :: BitVector 20
+      , _ns :: Vec 8 (Index 14)
+      , _hist :: Vec 14 (BitVector 7)
       }
-  | BSOk {_s :: BitVector (2 * n), _n :: Index n}
+  | BSOk {_s :: BitVector 20, _n :: Index 14}
   deriving (Generic, NFDataX, Eq, Show)
 
 -- | State transition function for 'bitSlip', where the initial state is the
@@ -22,11 +22,11 @@ data BitSlipState n
 --   'BitVector'
 bitSlipT ::
   -- | Current state
-  BitSlipState 10 ->
+  BitSlipState ->
   -- | New input value
   BitVector 10 ->
   -- | New state
-  BitSlipState 10
+  BitSlipState
 bitSlipT BSFail{..} cg = nextState
  where
   nextState
@@ -36,11 +36,11 @@ bitSlipT BSFail{..} cg = nextState
 
   s = resize $ _s ++# cg
   ns = maybe _ns (_ns <<+) n
-  hist = map pack $ take d10 $ windows1d d7 $ bv2v s
+  hist = map pack $ windows1d d7 $ bv2v s
 
   n = elemIndex True $ map f _hist
    where
-    f a = a == 0b0011111 || a == 0b1100000
+    f a = a == 0b1111100 || a == 0b0000011
 bitSlipT BSOk{..} cg = nextState
  where
   nextState = BSOk s _n
@@ -51,15 +51,15 @@ bitSlipT BSOk{..} cg = nextState
 --   rotates the state vector to create the new output value
 bitSlipO ::
   -- | Current state
-  BitSlipState 10 ->
+  BitSlipState ->
   -- | New output value
-  (BitSlipState 10, BitVector 10, Bool)
+  (BitSlipState, BitVector 10, Bool)
 bitSlipO self@BSFail{..} = out
  where
-  out = (self, resize _s, False)
+  out = (self, resize $ rotateR _s 10, False)
 bitSlipO self@BSOk{..} = out
  where
-  out = (self, resize $ rotateR _s (10 - fromEnum _n), True)
+  out = (self, resize $ rotateR _s (13 - fromEnum _n), True)
 
 -- | Function that takes a code word and returns the same code word, but if a
 --   comma is detected the code words is shifted such that the comma is at the
