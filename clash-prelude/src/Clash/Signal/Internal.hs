@@ -204,7 +204,7 @@ import GHC.Generics               (Generic)
 import GHC.Stack                  (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits
   (Div, KnownSymbol, KnownNat, Nat, Symbol, type (<=), type (*), sameSymbol)
-import GHC.TypeLits.Extra         (DivRU)
+import GHC.TypeLits.Extra         (DivRU, Max)
 import Language.Haskell.TH.Syntax -- (Lift (..), Q, Dec)
 import Language.Haskell.TH.Compat
 import Numeric.Natural            (Natural)
@@ -479,7 +479,7 @@ type PeriodToCycles (dom :: Domain) (period :: Nat) =  period `DivRU` DomainPeri
 
 -- | Converts a period in picoseconds to a frequency in hertz. This might lead to rounding
 -- errors.
-type PeriodToHz (period :: Nat) = (Seconds 1) `Div` period
+type PeriodToHz (period :: Nat) = Max 1 ((Seconds 1) `Div` (Max 1 period))
 
 -- | Number of clock cycles required at the clock frequency of @dom@ before a minimum
 -- @period@ has passed. The same as 'PeriodToCycles'.
