@@ -166,7 +166,7 @@ Library
                       ghc                     >= 8.10.0   && < 9.9,
                       ghc-boot-th,
                       ghc-prim,
-                      hashable                >= 1.2.1.0  && < 1.5,
+                      hashable                >= 1.2.1.0  && < 1.6,
                       haskell-src-meta        >= 0.8      && < 0.9,
                       hint                    >= 0.7      && < 0.10,
                       infinite-list           ^>= 0.1,
