@@ -88,22 +88,16 @@ encode8b10b ::
   (Bool, BitVector 10)
 encode8b10b rd dw = out
  where
-  cw = case dw of
-    Cw _ -> 1
-    _ -> 0
+  cw = isValidSymbol dw && not (isDw dw)
 
   (statusBits, cg) =
     splitAt d2
       $ bv2v
       $ asyncRomBlobPow2
         $(memBlobTH Nothing Enc.encoderLut)
-      $ unpack (cw ++# bitCoerce rd ++# fromDw dw)
+      $ unpack (bitCoerce cw ++# bitCoerce rd ++# fromDw dw)
 
   rdNew = bitCoerce $ last statusBits
-
-  out = case dw of
-    Cw _ -> (rdNew, pack cg)
-    Dw _ -> (rdNew, pack cg)
-    _ -> (rd, 0)
+  out = if isValidSymbol dw then (rdNew, pack cg) else (rd, 0)
 
 {-# CLASH_OPAQUE encode8b10b #-}
