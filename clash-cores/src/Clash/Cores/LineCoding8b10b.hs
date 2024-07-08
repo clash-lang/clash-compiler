@@ -95,7 +95,7 @@ encode8b10b rd dw = out
       $ bv2v
       $ asyncRomBlobPow2
         $(memBlobTH Nothing Enc.encoderLut)
-      $ unpack (bitCoerce cw ++# bitCoerce rd ++# fromDw dw)
+      $ unpack (pack cw ++# pack rd ++# fromDw dw)
 
   rdNew = bitCoerce $ last statusBits
   out = if isValidSymbol dw then (rdNew, pack cg) else (rd, 0)
