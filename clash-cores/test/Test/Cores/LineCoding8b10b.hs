@@ -16,26 +16,37 @@ import Test.Tasty.Hedgehog
 import Test.Tasty.TH
 import Prelude
 
--- | Check if a 'BitVector' does not contain a sequence of bits with the same
---   value for 5 or more indices consecutively.
-checkBitSequence :: (C.KnownNat n) => C.BitVector n -> Bool
-checkBitSequence cg =
-  fst (fst (C.mapAccumL (f 0) (0, 0) (C.bv2v cg)))
-    < 5
-    && fst (fst (C.mapAccumL (f 1) (0, 0) (C.bv2v cg)))
-      < 5
+-- | Function that creates a list with a given range that contains a list of
+--   running disparities and 'Symbol8b10b's
+genSymbol8b10bs :: H.Range Int -> H.Gen [(Bool, Symbol8b10b)]
+genSymbol8b10bs range = do
+  n <- Gen.int range
+  genSymbol8b10bs1 n False
+
+-- | Recursive function to generate a list of 'Symbol8b10b's with the correct
+--   running disparity
+genSymbol8b10bs1 :: Int -> Bool -> H.Gen [(Bool, Symbol8b10b)]
+genSymbol8b10bs1 0 _ = pure []
+genSymbol8b10bs1 n rd = do
+  (rdNew, dw) <- genSymbol8b10b rd
+  ((rdNew, dw) :) <$> genSymbol8b10bs1 (pred n) rdNew
+
+-- | Generate a 'Symbol8b10b' by creating a 'BitVector' of length 10 and
+--   decoding it with the 'decode8b10b' function
+genSymbol8b10b :: Bool -> H.Gen (Bool, Symbol8b10b)
+genSymbol8b10b rd = Gen.filter f $ decode8b10b rd <$> genDefinedBitVector
  where
-  f :: C.Bit -> (Int, Int) -> C.Bit -> ((Int, Int), C.Bit)
-  f c (accMax, acc) i =
-    if i == c
-      then ((if accMax < (acc + 1) then acc + 1 else accMax, acc + 1), i)
-      else ((accMax, 0), i)
+  f (_, dw) = isDw dw
+
+-- | Function that checks whether a 'BitVector' is a valid data word
+codeGroupOk :: C.BitVector 10 -> Bool
+codeGroupOk cg = isDw $ snd $ decode8b10b True cg
 
 -- Check if the output of 'decode8b10b' is a valid value for a given value from
 -- 'encode8b10b'.
 prop_decode8b10bCheckNothing :: H.Property
 prop_decode8b10bCheckNothing = H.property $ do
-  inp <- H.forAll (Gen.filterT checkBitSequence genDefinedBitVector)
+  inp <- H.forAll genDefinedBitVector
   let out = isValidSymbol dw1 && isValidSymbol dw2
        where
         (_, dw1) = decode8b10b False $ snd $ encode8b10b False (Dw inp)
@@ -78,7 +89,7 @@ prop_decodeEncode8b10b :: H.Property
 prop_decodeEncode8b10b = H.property $ do
   inp <-
     H.forAll
-      (Gen.filterT checkBitSequence genDefinedBitVector)
+      (Gen.filter codeGroupOk genDefinedBitVector)
   let out = if o == inp then o else g True inp
        where
         o = g False inp
