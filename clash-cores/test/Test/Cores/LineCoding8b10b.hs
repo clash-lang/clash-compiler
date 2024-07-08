@@ -9,12 +9,25 @@ module Test.Cores.LineCoding8b10b where
 import Clash.Cores.LineCoding8b10b
 import Clash.Hedgehog.Sized.BitVector
 import qualified Clash.Prelude as C
+import Data.Maybe (isNothing)
 import qualified Hedgehog as H
 import qualified Hedgehog.Gen as Gen
 import Test.Tasty
 import Test.Tasty.Hedgehog
 import Test.Tasty.TH
 import Prelude
+
+-- | Check if a 'BitVector' does not contain a sequence of bits with the same
+--   value for 5 or more indices consecutively
+checkBitSequence :: C.BitVector 10 -> Bool
+checkBitSequence cg =
+  isNothing $
+    C.elemIndex True $
+      C.map (f . C.pack) $
+        C.windows1d C.d5 $
+          C.bv2v cg
+ where
+  f a = a == 0b11111 || a == 0b00000
 
 -- | Function that creates a list with a given range that contains a list of
 --   running disparities and 'Symbol8b10b's
@@ -38,14 +51,10 @@ genSymbol8b10b rd = Gen.filter f $ decode8b10b rd <$> genDefinedBitVector
  where
   f (_, dw) = isDw dw
 
--- | Function that checks whether a 'BitVector' is a valid data word
-codeGroupOk :: C.BitVector 10 -> Bool
-codeGroupOk cg = isDw $ snd $ decode8b10b True cg
-
 -- Check if the output of 'decode8b10b' is a valid value for a given value from
 -- 'encode8b10b'.
 prop_decode8b10bCheckNothing :: H.Property
-prop_decode8b10bCheckNothing = H.property $ do
+prop_decode8b10bCheckNothing = H.withTests 1000 $ H.property $ do
   inp <- H.forAll genDefinedBitVector
   let out = isValidSymbol dw1 && isValidSymbol dw2
        where
@@ -57,7 +66,7 @@ prop_decode8b10bCheckNothing = H.property $ do
 -- | Encode the input signal and check whether it is a valid value. It should be
 --   valid for every possible input.
 prop_encode8b10bCheckNothing :: H.Property
-prop_encode8b10bCheckNothing = H.property $ do
+prop_encode8b10bCheckNothing = H.withTests 1000 $ H.property $ do
   inp <- H.forAll genDefinedBitVector
   let out = 0 /= snd (encode8b10b False (Dw inp))
 
@@ -69,7 +78,7 @@ prop_encode8b10bCheckNothing = H.property $ do
 --   'prop_encode8b10bCheckNothing' are used to assert that there are no invalid
 --   values in the outputs of these functions.
 prop_encodeDecode8b10b :: H.Property
-prop_encodeDecode8b10b = H.property $ do
+prop_encodeDecode8b10b = H.withTests 1000 $ H.property $ do
   inp <- H.forAll genDefinedBitVector
   let out = if isValidSymbol dw then fromDw dw else inp
        where
@@ -86,10 +95,10 @@ prop_encodeDecode8b10b = H.property $ do
 --   accidental commas in the input list, as these are only accepted for a small
 --   subset of control signals.
 prop_decodeEncode8b10b :: H.Property
-prop_decodeEncode8b10b = H.property $ do
+prop_decodeEncode8b10b = H.withTests 1000 $ H.property $ do
   inp <-
     H.forAll
-      (Gen.filter codeGroupOk genDefinedBitVector)
+      (Gen.filter checkBitSequence genDefinedBitVector)
   let out = if o == inp then o else g True inp
        where
         o = g False inp
