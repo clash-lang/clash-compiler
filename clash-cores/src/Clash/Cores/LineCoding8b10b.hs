@@ -30,17 +30,22 @@ isDw :: Symbol8b10b -> Bool
 isDw (Dw _) = True
 isDw _ = False
 
+-- | Function to check whether a 'Symbol8b10b' results in a control word
+isCw :: Symbol8b10b -> Bool
+isCw (Cw _) = True
+isCw _ = False
+
 -- | Function to check whether a 'Symbol8b10b' is not an error value
 isValidSymbol :: Symbol8b10b -> Bool
-isValidSymbol (Cw _) = True
-isValidSymbol dw = isDw dw
+isValidSymbol sym = isDw sym || isCw sym
 
 -- | Function to convert a 'Symbol8b10b' to a plain 'BitVector 8'
-fromDw :: Symbol8b10b -> BitVector 8
-fromDw dw = case dw of
-  Dw _dw -> _dw
-  Cw _dw -> _dw
-  _ -> 0
+fromSymbol :: Symbol8b10b -> BitVector 8
+fromSymbol sym = case sym of
+  Dw w -> w
+  Cw w -> w
+  DwError w -> w
+  RdError w -> w
 
 -- | Take the running disparity and the current code group, and return a tuple
 --   containing the new running disparity and a 'Symbol8b10b' containing the
@@ -53,25 +58,19 @@ decode8b10b ::
   BitVector 10 ->
   -- | Tuple containing the new running disparity and the 'Symbol8b10b'
   (Bool, Symbol8b10b)
-decode8b10b rd cg = (rdNew, dw)
+decode8b10b rd cg = (rdNew, sym)
  where
-  dw
-    | cgEr = DwError (pack _dw)
-    | rdEr = RdError (pack _dw)
-    | cw = Cw (pack _dw)
-    | otherwise = Dw (pack _dw)
+  sym
+    | cgEr = DwError w
+    | rdEr = RdError w
+    | cw = Cw w
+    | otherwise = Dw w
 
-  (statusBits, _dw) =
-    splitAt d4
-      $ bv2v
+  (rdEr, cgEr, cw, rdNew, w) =
+    unpack
       $ asyncRomBlobPow2
         $(memBlobTH Nothing Dec.decoderLut)
-      $ unpack (bitCoerce rd ++# cg)
-
-  rdEr = bitCoerce $ head statusBits
-  cgEr = bitCoerce $ statusBits !! (1 :: Index 4)
-  cw = bitCoerce $ statusBits !! (2 :: Index 4)
-  rdNew = bitCoerce $ last statusBits
+      $ unpack (pack rd ++# cg)
 
 {-# CLASH_OPAQUE decode8b10b #-}
 
@@ -86,18 +85,14 @@ encode8b10b ::
   Symbol8b10b ->
   -- | Tuple containing the new running disparity and the code group
   (Bool, BitVector 10)
-encode8b10b rd dw = out
+encode8b10b rd sym = out
  where
-  cw = isValidSymbol dw && not (isDw dw)
-
-  (statusBits, cg) =
-    splitAt d2
-      $ bv2v
+  (_er, rdNew, cg) =
+    unpack @(Bool, Bool, BitVector 10)
       $ asyncRomBlobPow2
         $(memBlobTH Nothing Enc.encoderLut)
-      $ unpack (pack cw ++# pack rd ++# fromDw dw)
+      $ unpack (pack (isCw sym) ++# pack rd ++# fromSymbol sym)
 
-  rdNew = bitCoerce $ last statusBits
-  out = if isValidSymbol dw then (rdNew, pack cg) else (rd, 0)
+  out = if isValidSymbol sym then (rdNew, cg) else (rd, 0)
 
 {-# CLASH_OPAQUE encode8b10b #-}

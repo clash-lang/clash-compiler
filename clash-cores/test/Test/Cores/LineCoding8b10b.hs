@@ -56,21 +56,26 @@ genSymbol8b10b rd = Gen.filter f $ decode8b10b rd <$> genDefinedBitVector
 prop_decode8b10bCheckNothing :: H.Property
 prop_decode8b10bCheckNothing = H.withTests 1000 $ H.property $ do
   inp <- H.forAll genDefinedBitVector
-  let out = isValidSymbol dw1 && isValidSymbol dw2
-       where
-        (_, dw1) = decode8b10b False $ snd $ encode8b10b False (Dw inp)
-        (_, dw2) = decode8b10b True $ snd $ encode8b10b True (Dw inp)
 
-  H.assert out
+  H.assert $
+    isValidSymbol $
+      snd $
+        decode8b10b False $
+          snd $
+            encode8b10b False (Dw inp)
+  H.assert $
+    isValidSymbol $
+      snd $
+        decode8b10b True $
+          snd $
+            encode8b10b True (Dw inp)
 
 -- | Encode the input signal and check whether it is a valid value. It should be
 --   valid for every possible input.
 prop_encode8b10bCheckNothing :: H.Property
 prop_encode8b10bCheckNothing = H.withTests 1000 $ H.property $ do
   inp <- H.forAll genDefinedBitVector
-  let out = 0 /= snd (encode8b10b False (Dw inp))
-
-  H.assert out
+  snd (encode8b10b False (Dw inp)) H./== 0
 
 -- | Encode and then decode the input signal, but if the result of the encode or
 --   decode functions is invalid, propagate the input itself to the output. The
@@ -80,7 +85,7 @@ prop_encode8b10bCheckNothing = H.withTests 1000 $ H.property $ do
 prop_encodeDecode8b10b :: H.Property
 prop_encodeDecode8b10b = H.withTests 1000 $ H.property $ do
   inp <- H.forAll genDefinedBitVector
-  let out = if isValidSymbol dw then fromDw dw else inp
+  let out = if isValidSymbol dw then fromSymbol dw else inp
        where
         dw = snd $ decode8b10b False $ snd $ encode8b10b False (Dw inp)
 
