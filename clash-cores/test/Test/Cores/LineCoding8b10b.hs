@@ -29,6 +29,12 @@ checkBitSequence cg =
  where
   f a = a == 0b11111 || a == 0b00000
 
+-- | Function that checks whether a code group corresponds to a valid symbol
+isValidCodeGroup :: C.BitVector 10 -> Bool
+isValidCodeGroup cg =
+  isValidSymbol (snd $ decode8b10b True cg)
+    || isValidSymbol (snd $ decode8b10b False cg)
+
 -- | Function that creates a list with a given range that contains a list of
 --   running disparities and 'Symbol8b10b's
 genSymbol8b10bs :: H.Range Int -> H.Gen [(Bool, Symbol8b10b)]
@@ -52,67 +58,100 @@ genSymbol8b10b rd = Gen.filter f $ decode8b10b rd <$> genDefinedBitVector
   f (_, dw) = isDw dw
 
 -- Check if the output of 'decode8b10b' is a valid value for a given value from
--- 'encode8b10b'.
-prop_decode8b10bCheckNothing :: H.Property
-prop_decode8b10bCheckNothing = H.withTests 1000 $ H.property $ do
+-- 'encode8b10b'
+prop_decode8b10bCheckValid :: H.Property
+prop_decode8b10bCheckValid = H.withTests 1000 $ H.property $ do
   inp <- H.forAll genDefinedBitVector
 
-  H.assert $
-    isValidSymbol $
-      snd $
-        decode8b10b False $
-          snd $
-            encode8b10b False (Dw inp)
   H.assert $
     isValidSymbol $
       snd $
         decode8b10b True $
           snd $
             encode8b10b True (Dw inp)
+  H.assert $
+    isValidSymbol $
+      snd $
+        decode8b10b False $
+          snd $
+            encode8b10b False (Dw inp)
 
--- | Encode the input signal and check whether it is a valid value. It should be
---   valid for every possible input.
-prop_encode8b10bCheckNothing :: H.Property
-prop_encode8b10bCheckNothing = H.withTests 1000 $ H.property $ do
+-- | Encode the input signal and check whether it is a valid value
+prop_encode8b10bCheckValid :: H.Property
+prop_encode8b10bCheckValid = H.withTests 1000 $ H.property $ do
   inp <- H.forAll genDefinedBitVector
+
+  snd (encode8b10b True (Dw inp)) H./== 0
   snd (encode8b10b False (Dw inp)) H./== 0
 
--- | Encode and then decode the input signal, but if the result of the encode or
---   decode functions is invalid, propagate the input itself to the output. The
---   properties 'prop_decode8b10bCheckNothing' and
---   'prop_encode8b10bCheckNothing' are used to assert that there are no invalid
---   values in the outputs of these functions.
+-- | Encode and then decode a valid input and check whether it is the same
 prop_encodeDecode8b10b :: H.Property
 prop_encodeDecode8b10b = H.withTests 1000 $ H.property $ do
   inp <- H.forAll genDefinedBitVector
-  let out = if isValidSymbol dw then fromSymbol dw else inp
+  let out = case ( isValidSymbol dw1
+                 , isValidSymbol dw2
+                 , isValidSymbol dw3
+                 , isValidSymbol dw4
+                 ) of
+        (True, _, _, _) -> dw1
+        (_, True, _, _) -> dw2
+        (_, _, True, _) -> dw3
+        (_, _, _, True) -> dw4
+        _ -> undefined
        where
-        dw = snd $ decode8b10b False $ snd $ encode8b10b False (Dw inp)
+        dw1 = snd $ decode8b10b True cg1
+        dw2 = snd $ decode8b10b True cg2
+        dw3 = snd $ decode8b10b False cg1
+        dw4 = snd $ decode8b10b False cg2
 
-      expected = inp
+        cg1 = snd $ encode8b10b True (Dw inp)
+        cg2 = snd $ encode8b10b False (Dw inp)
+
+      expected = Dw inp
 
   out H.=== expected
 
--- | Encode and then decode the input signal, but if the result of the encode or
---   decode functions is invalid, propagate the input itself to the output as
---   the set of valid code groups is much larger than the set of valid data
---   words. The generated list is filtered to make sure that there are no
---   accidental commas in the input list, as these are only accepted for a small
---   subset of control signals.
+-- | Decode and then encode a valid input, and then decode it and the input to
+--   check if they are the same
 prop_decodeEncode8b10b :: H.Property
 prop_decodeEncode8b10b = H.withTests 1000 $ H.property $ do
-  inp <-
-    H.forAll
-      (Gen.filter checkBitSequence genDefinedBitVector)
-  let out = if o == inp then o else g True inp
+  inp <- H.forAll (Gen.filter isValidCodeGroup genDefinedBitVector)
+  let out = case ( isValidSymbol dw3
+                 , isValidSymbol dw4
+                 , isValidSymbol dw5
+                 , isValidSymbol dw6
+                 ) of
+        (True, _, _, _) -> dw3
+        (_, True, _, _) -> dw4
+        (_, _, True, _) -> dw5
+        (_, _, _, True) -> dw6
+        _ -> undefined
        where
-        o = g False inp
+        dw3 = snd $ decode8b10b True cg1
+        dw4 = snd $ decode8b10b True cg2
+        dw5 = snd $ decode8b10b False cg1
+        dw6 = snd $ decode8b10b False cg2
 
-        g rd i = if isValidSymbol dw then snd $ encode8b10b rd dw else i
-         where
-          dw = snd $ decode8b10b rd i
+        cg1 = snd $ case (isValidSymbol dw1, isValidSymbol dw2) of
+          (True, _) -> encode8b10b False dw1
+          (_, True) -> encode8b10b False dw2
+          _ -> undefined
 
-      expected = inp
+        cg2 = snd $ case (isValidSymbol dw1, isValidSymbol dw2) of
+          (True, _) -> encode8b10b True dw1
+          (_, True) -> encode8b10b True dw2
+          _ -> undefined
+
+        dw1 = snd $ decode8b10b True inp
+        dw2 = snd $ decode8b10b False inp
+
+      expected = case (isValidSymbol dw1, isValidSymbol dw2) of
+        (True, _) -> dw1
+        (_, True) -> dw2
+        _ -> undefined
+       where
+        dw1 = snd $ decode8b10b True inp
+        dw2 = snd $ decode8b10b False inp
 
   out H.=== expected
 
