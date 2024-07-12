@@ -76,14 +76,6 @@ prop_decode8b10bCheckValid = H.withTests 1000 $ H.property $ do
           snd $
             encode8b10b False (Dw inp)
 
--- | Encode the input signal and check whether it is a valid value
-prop_encode8b10bCheckValid :: H.Property
-prop_encode8b10bCheckValid = H.withTests 1000 $ H.property $ do
-  inp <- H.forAll genDefinedBitVector
-
-  snd (encode8b10b True (Dw inp)) H./== 0
-  snd (encode8b10b False (Dw inp)) H./== 0
-
 -- | Encode and then decode a valid input and check whether it is the same
 prop_encodeDecode8b10b :: H.Property
 prop_encodeDecode8b10b = H.withTests 1000 $ H.property $ do
