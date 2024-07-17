@@ -39,7 +39,7 @@ isCw _ = False
 isValidSymbol :: Symbol8b10b -> Bool
 isValidSymbol sym = isDw sym || isCw sym
 
--- | Function to convert a 'Symbol8b10b' to a plain 'BitVector 8'
+-- | Function to convert a 'Symbol8b10b' to a plain 'BitVector'
 fromSymbol :: Symbol8b10b -> BitVector 8
 fromSymbol sym = case sym of
   Dw w -> w
