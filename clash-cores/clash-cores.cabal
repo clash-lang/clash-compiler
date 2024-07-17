@@ -133,6 +133,16 @@ library
     Clash.Cores.LineCoding8b10b
     Clash.Cores.LineCoding8b10b.Decoder
     Clash.Cores.LineCoding8b10b.Encoder
+    Clash.Cores.Sgmii
+    Clash.Cores.Sgmii.AutoNeg
+    Clash.Cores.Sgmii.BitSlip
+    Clash.Cores.Sgmii.Common
+    Clash.Cores.Sgmii.PcsReceive
+    Clash.Cores.Sgmii.PcsTransmit
+    Clash.Cores.Sgmii.PcsTransmit.CodeGroup
+    Clash.Cores.Sgmii.PcsTransmit.OrderedSet
+    Clash.Cores.Sgmii.RateAdapt
+    Clash.Cores.Sgmii.Sync
     Clash.Cores.SPI
     Clash.Cores.UART
     Clash.Cores.Xilinx.BlockRam
@@ -202,6 +212,11 @@ test-suite unittests
     Test.Cores.Internal.SampleSPI
     Test.Cores.LineCoding8b10b
     Test.Cores.Internal.Signals
+    Test.Cores.Sgmii.AutoNeg
+    Test.Cores.Sgmii.BitSlip
+    Test.Cores.Sgmii.RateAdapt
+    Test.Cores.Sgmii.Sgmii
+    Test.Cores.Sgmii.Sync
     Test.Cores.SPI
     Test.Cores.SPI.MultiSlave
     Test.Cores.UART
