@@ -116,6 +116,7 @@ import           Clash.Core.Var
 import           Clash.Core.VarEnv
   (elemVarEnv, emptyVarEnv, lookupVarEnv, lookupVarEnv', mkVarEnv, lookupVarEnvDirectly, eltsVarEnv, VarEnv)
 import           Clash.Debug                      (debugIsOn)
+import qualified Clash.Driver.BrokenGhcs          as BrokenGhcs
 import           Clash.Driver.Types
 import           Clash.Driver.Manifest
   (Manifest(..), readFreshManifest, UnexpectedModification, pprintUnexpectedModifications,
@@ -323,6 +324,9 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
     let tcm = envTyConMap env
     let topEntities0 = designEntities design
     let opts = envOpts env
+
+    -- Detect "broken" GHCs and throw an error (unless silenced)
+    unless (opt_ignoreBrokenGhcs opts) BrokenGhcs.assertWorking
 
     removeHistoryFile (dbg_historyFile (opt_debug opts))
 
