@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Myrtle Software Ltd
-                  2022-2023, QBayLogic B.V.
+                  2022-2024, QBayLogic B.V.
                   2024,      Alex Mason
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -411,7 +411,18 @@ singleton = (`Cons` Nil)
 >>> head (1:>2:>3:>Nil)
 1
 
-#if __GLASGOW_HASKELL__ >= 900
+#if __GLASGOW_HASKELL__ >= 910
+>>> head Nil
+<interactive>:...
+    • Couldn't match type ‘1’ with ‘0’
+      Expected: Vec (0 + 1) a
+        Actual: Vec 0 a
+    • In the first argument of ‘head’, namely ‘Nil’
+      In the expression: head Nil
+      In an equation for ‘it’: it = head Nil
+<BLANKLINE>
+
+#elif __GLASGOW_HASKELL__ >= 900
 >>> head Nil
 <BLANKLINE>
 <interactive>:...
@@ -446,7 +457,18 @@ head (x `Cons` _) = x
 >>> tail (1:>2:>3:>Nil)
 2 :> 3 :> Nil
 
-#if __GLASGOW_HASKELL__ >= 900
+#if __GLASGOW_HASKELL__ >= 910
+>>> tail Nil
+<interactive>:...
+    • Couldn't match type ‘1’ with ‘0’
+      Expected: Vec (0 + 1) a
+        Actual: Vec 0 a
+    • In the first argument of ‘tail’, namely ‘Nil’
+      In the expression: tail Nil
+      In an equation for ‘it’: it = tail Nil
+<BLANKLINE>
+
+#elif __GLASGOW_HASKELL__ >= 900
 >>> tail Nil
 <BLANKLINE>
 <interactive>:...
@@ -481,7 +503,18 @@ tail (_ `Cons` xs) = xs
 >>> last (1:>2:>3:>Nil)
 3
 
-#if __GLASGOW_HASKELL__ >= 900
+#if __GLASGOW_HASKELL__ >= 910
+>>> last Nil
+<interactive>:...
+    • Couldn't match type ‘1’ with ‘0’
+      Expected: Vec (0 + 1) a
+        Actual: Vec 0 a
+    • In the first argument of ‘last’, namely ‘Nil’
+      In the expression: last Nil
+      In an equation for ‘it’: it = last Nil
+<BLANKLINE>
+
+#elif __GLASGOW_HASKELL__ >= 900
 >>> last Nil
 <BLANKLINE>
 <interactive>:...
@@ -517,7 +550,18 @@ last (_ `Cons` y `Cons` ys) = last (y `Cons` ys)
 >>> init (1:>2:>3:>Nil)
 1 :> 2 :> Nil
 
-#if __GLASGOW_HASKELL__ >= 900
+#if __GLASGOW_HASKELL__ >= 910
+>>> init Nil
+<interactive>:...
+    • Couldn't match type ‘1’ with ‘0’
+      Expected: Vec (0 + 1) a
+        Actual: Vec 0 a
+    • In the first argument of ‘init’, namely ‘Nil’
+      In the expression: init Nil
+      In an equation for ‘it’: it = init Nil
+<BLANKLINE>
+
+#elif __GLASGOW_HASKELL__ >= 900
 >>> init Nil
 <BLANKLINE>
 <interactive>:...
@@ -812,7 +856,7 @@ imap f = go 0
 
 {- | Zip two vectors with a functions that also takes the elements' indices.
 
-#if __GLASGOW_HASKELL__ >= 900 && __GLASGOW_HASKELL__ < 904
+#if (__GLASGOW_HASKELL__ >= 900 && __GLASGOW_HASKELL__ < 904) || __GLASGOW_HASKELL__ >= 910
 >>> izipWith (\i a b -> i + a + b) (2 :> 2 :> Nil)  (3 :> 3:> Nil)
 *** Exception: X: Clash.Sized.Index: result 2 is out of bounds: [0..1]
 ...
@@ -1511,7 +1555,19 @@ replace i y xs = replace_int xs (fromEnum i) y
 >>> take d0               (1:>2:>Nil)
 Nil
 
-#if __GLASGOW_HASKELL__ == 906
+#if __GLASGOW_HASKELL__ >= 910
+>>> take d4               (1:>2:>Nil)
+<interactive>:...
+    • Couldn't match type ‘4 + n0’ with ‘2’
+      Expected: Vec (4 + n0) a
+        Actual: Vec (1 + 1) a
+      The type variable ‘n0’ is ambiguous
+    • In the second argument of ‘take’, namely ‘(1 :> 2 :> Nil)’
+      In the expression: take d4 (1 :> 2 :> Nil)
+      In an equation for ‘it’: it = take d4 (1 :> 2 :> Nil)
+<BLANKLINE>
+
+#elif __GLASGOW_HASKELL__ == 906
 >>> take d4               (1:>2:>Nil)
 <BLANKLINE>
 <interactive>:...
@@ -1570,7 +1626,16 @@ takeI = withSNat take
 >>> drop d0               (1:>2:>Nil)
 1 :> 2 :> Nil
 
-#if __GLASGOW_HASKELL__ == 906
+#if __GLASGOW_HASKELL__ >= 910
+>>> drop d4               (1:>2:>Nil)
+<interactive>:...: error:...
+    • Couldn't match...type ‘4 + n0...
+      The type variable ‘n0’ is ambiguous
+    • In the first argument of ‘print’, namely ‘it’
+      In a stmt of an interactive GHCi command: print it
+<BLANKLINE>
+
+#elif __GLASGOW_HASKELL__ == 906
 >>> drop d4               (1:>2:>Nil)
 <BLANKLINE>
 <interactive>:...: error:...
@@ -2385,7 +2450,27 @@ defined in the instance 'Clash.Class.Num.ExtendingNum' instance of 'Index'.
 However, we cannot simply use 'fold' to create a tree-structure of
 'Clash.Class.Num.add'es:
 
-#if __GLASGOW_HASKELL__ >= 900
+#if __GLASGOW_HASKELL__ >= 910
+>>> :{
+let populationCount' :: (KnownNat (n+1), KnownNat (n+2))
+                     => BitVector (n+1) -> Index (n+2)
+    populationCount' = fold add . map fromIntegral . bv2v
+:}
+<interactive>:...
+    • Couldn't match type: ((n + 2) + (n + 2)) - 1
+                     with: n + 2
+      Expected: Index (n + 2) -> Index (n + 2) -> Index (n + 2)
+        Actual: Index (n + 2)
+                -> Index (n + 2) -> AResult (Index (n + 2)) (Index (n + 2))
+    • In the first argument of ‘fold’, namely ‘add’
+      In the first argument of ‘(.)’, namely ‘fold add’
+      In the expression: fold add . map fromIntegral . bv2v
+    • Relevant bindings include
+        populationCount' :: BitVector (n + 1) -> Index (n + 2)
+          (bound at ...)
+<BLANKLINE>
+
+#elif __GLASGOW_HASKELL__ >= 900
 >>> :{
 let populationCount' :: (KnownNat (n+1), KnownNat (n+2))
                      => BitVector (n+1) -> Index (n+2)

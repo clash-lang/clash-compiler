@@ -1,5 +1,5 @@
 {-|
-Copyright  :  (C) 2021-2022, QBayLogic B.V.
+Copyright  :  (C) 2021-2024, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -236,55 +236,68 @@ blockRamBlob# !_ gen content@MemBlob{} = \rd wen waS wd -> runST $ do
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE blockRamBlob# #-}
 
--- | Create a 'MemBlob' binding from a list of values
---
--- Since this uses Template Haskell, nothing in the arguments given to
--- 'createMemBlob' can refer to something defined in the same module.
---
--- === __Example__
---
--- @
--- 'createMemBlob' "content" 'Nothing' [15 :: Unsigned 8 .. 17]
---
--- ram clk en = 'blockRamBlob' clk en content
--- @
---
--- The 'Data.Maybe.Maybe' datatype has don't care bits, where the actual value
--- does not matter. But the bits need a defined value in the memory. Either 0 or
--- 1 can be used, and both are valid representations of the data.
---
--- >>> import qualified Prelude as P
--- >>> let es = [ Nothing, Just (7 :: Unsigned 8), Just 8 ]
--- >>> :{
--- createMemBlob "content0" (Just 0) es
--- createMemBlob "content1" (Just 1) es
--- x = 1
--- :}
---
--- >>> let pr = mapM_ (putStrLn . show)
--- >>> pr $ P.map pack es
--- 0b0_...._....
--- 0b1_0000_0111
--- 0b1_0000_1000
--- >>> pr $ unpackMemBlob content0
--- 0b0_0000_0000
--- 0b1_0000_0111
--- 0b1_0000_1000
--- >>> pr $ unpackMemBlob content1
--- 0b0_1111_1111
--- 0b1_0000_0111
--- 0b1_0000_1000
--- >>> :{
--- createMemBlob "contentN" Nothing es
--- x = 1
--- :}
--- <BLANKLINE>
--- <interactive>:...: error:...
---     packBVs: cannot convert don't care values. Please specify a mapping to a definite value.
---
--- Note how we hinted to @clashi@ that our multi-line command was a list of
--- declarations by including a dummy declaration @x = 1@. Without this trick,
--- @clashi@ would expect an expression and the Template Haskell would not work.
+{- | Create a 'MemBlob' binding from a list of values
+
+Since this uses Template Haskell, nothing in the arguments given to
+'createMemBlob' can refer to something defined in the same module.
+
+=== __Example__
+
+@
+'createMemBlob' "content" 'Nothing' [15 :: Unsigned 8 .. 17]
+
+ram clk en = 'blockRamBlob' clk en content
+@
+
+The 'Data.Maybe.Maybe' datatype has don't care bits, where the actual value
+does not matter. But the bits need a defined value in the memory. Either 0 or
+1 can be used, and both are valid representations of the data.
+
+>>> import qualified Prelude as P
+>>> let es = [ Nothing, Just (7 :: Unsigned 8), Just 8 ]
+>>> :{
+createMemBlob "content0" (Just 0) es
+createMemBlob "content1" (Just 1) es
+x = 1
+:}
+
+>>> let pr = mapM_ (putStrLn . show)
+>>> pr $ P.map pack es
+0b0_...._....
+0b1_0000_0111
+0b1_0000_1000
+>>> pr $ unpackMemBlob content0
+0b0_0000_0000
+0b1_0000_0111
+0b1_0000_1000
+>>> pr $ unpackMemBlob content1
+0b0_1111_1111
+0b1_0000_0111
+0b1_0000_1000
+
+#if __GLASGOW_HASKELL__ >= 910
+>>> :{
+createMemBlob "contentN" Nothing es
+x = 1
+:}
+<interactive>:...: error:...
+    packBVs: cannot convert don't care values. Please specify a mapping to a definite value.
+<BLANKLINE>
+
+#else
+>>> :{
+createMemBlob "contentN" Nothing es
+x = 1
+:}
+<BLANKLINE>
+<interactive>:...: error:...
+    packBVs: cannot convert don't care values. Please specify a mapping to a definite value.
+
+#endif
+Note how we hinted to @clashi@ that our multi-line command was a list of
+declarations by including a dummy declaration @x = 1@. Without this trick,
+@clashi@ would expect an expression and the Template Haskell would not work.
+-}
 createMemBlob
   :: forall a f
    . ( Foldable f
@@ -320,43 +333,55 @@ createMemBlob name care es =
   (len, runsB, endsB) = either error id packed
   packed = packBVs care es
 
--- | Create a 'MemBlob' from a list of values
---
--- Since this uses Template Haskell, nothing in the arguments given to
--- 'memBlobTH' can refer to something defined in the same module.
---
--- === __Example__
---
--- @
--- ram clk en = 'blockRamBlob' clk en $(memBlobTH Nothing [15 :: Unsigned 8 .. 17])
--- @
---
--- The 'Data.Maybe.Maybe' datatype has don't care bits, where the actual value
--- does not matter. But the bits need a defined value in the memory. Either 0 or
--- 1 can be used, and both are valid representations of the data.
---
--- >>> import qualified Prelude as P
--- >>> let es = [ Nothing, Just (7 :: Unsigned 8), Just 8 ]
--- >>> content0 = $(memBlobTH (Just 0) es)
--- >>> content1 = $(memBlobTH (Just 1) es)
--- >>> let pr = mapM_ (putStrLn . show)
--- >>> pr $ P.map pack es
--- 0b0_...._....
--- 0b1_0000_0111
--- 0b1_0000_1000
--- >>> pr $ unpackMemBlob content0
--- 0b0_0000_0000
--- 0b1_0000_0111
--- 0b1_0000_1000
--- >>> pr $ unpackMemBlob content1
--- 0b0_1111_1111
--- 0b1_0000_0111
--- 0b1_0000_1000
--- >>> $(memBlobTH Nothing es)
--- <BLANKLINE>
--- <interactive>:...: error:...
---     • packBVs: cannot convert don't care values. Please specify a mapping to a definite value.
---     • In the untyped splice: $(memBlobTH Nothing es)
+{- | Create a 'MemBlob' from a list of values
+
+Since this uses Template Haskell, nothing in the arguments given to
+'memBlobTH' can refer to something defined in the same module.
+
+=== __Example__
+
+@
+ram clk en = 'blockRamBlob' clk en $(memBlobTH Nothing [15 :: Unsigned 8 .. 17])
+@
+
+The 'Data.Maybe.Maybe' datatype has don't care bits, where the actual value
+does not matter. But the bits need a defined value in the memory. Either 0 or
+1 can be used, and both are valid representations of the data.
+
+>>> import qualified Prelude as P
+>>> let es = [ Nothing, Just (7 :: Unsigned 8), Just 8 ]
+>>> content0 = $(memBlobTH (Just 0) es)
+>>> content1 = $(memBlobTH (Just 1) es)
+>>> let pr = mapM_ (putStrLn . show)
+>>> pr $ P.map pack es
+0b0_...._....
+0b1_0000_0111
+0b1_0000_1000
+>>> pr $ unpackMemBlob content0
+0b0_0000_0000
+0b1_0000_0111
+0b1_0000_1000
+>>> pr $ unpackMemBlob content1
+0b0_1111_1111
+0b1_0000_0111
+0b1_0000_1000
+
+#if __GLASGOW_HASKELL__ >= 910
+>>> $(memBlobTH Nothing es)
+<interactive>:...: error:...
+    • packBVs: cannot convert don't care values. Please specify a mapping to a definite value.
+    • In the untyped splice: $(memBlobTH Nothing es)
+<BLANKLINE>
+
+#else
+>>> $(memBlobTH Nothing es)
+<BLANKLINE>
+<interactive>:...: error:...
+    • packBVs: cannot convert don't care values. Please specify a mapping to a definite value.
+    • In the untyped splice: $(memBlobTH Nothing es)
+
+#endif
+-}
 memBlobTH
   :: forall a f
    . ( Foldable f
