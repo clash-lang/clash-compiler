@@ -148,20 +148,19 @@ import Numeric                    (readOct, readHex)
 import GHC.Exts
   (Word#, Word (W#), eqWord#, int2Word#, isTrue#, uncheckedShiftRL#)
 #if MIN_VERSION_base(4,15,0)
-import GHC.Exts (minusWord#, gtWord#, word2Int#)
+import GHC.Exts (minusWord#, gtWord#, word2Int#, dataToTag#)
 import GHC.Num.BigNat (bigNatShiftR#, bigNatToWord)
 import GHC.Num.Integer (integerFromNatural, integerToNatural)
 import GHC.Num.Natural
   (Natural (..), naturalFromWord, naturalShiftL, naturalShiftR, naturalToWord)
 #else
-import GHC.Exts ((>#))
+import GHC.Exts ((>#), dataToTag#)
 import qualified GHC.Exts
 import GHC.Integer.GMP.Internals  (Integer (..), bigNatToWord, shiftRBigNat)
 import GHC.Natural
   (Natural (..), naturalFromInteger, wordToNatural)
 #endif
 import GHC.Natural                (naturalToInteger)
-import GHC.Prim                   (dataToTag#)
 import GHC.Stack                  (withFrozenCallStack)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-))
 #if MIN_VERSION_base(4,15,0)
