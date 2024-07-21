@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016     , Myrtle Software Ltd,
-                     2021     , QBayLogic B.V.
+                     2021-2024, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -47,10 +47,8 @@ where
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Builtin.Names
-import           GHC.Types.Unique     (getKey)
 #else
 import           PrelNames
-import           Unique               (getKey)
 #endif
 
 #if MIN_VERSION_ghc(8,8,0)
@@ -68,17 +66,21 @@ import           Clash.Core.Name
 import           Clash.Core.TyCon
 import           Clash.Core.Type
 import           Clash.Core.Var (mkTyVar)
+import           Clash.Unique (fromGhcUnique)
 import qualified Clash.Data.UniqMap as UniqMap
 
 -- | Builtin Name
 liftedTypeKindTyConName, typeNatKindTyConName, typeSymbolKindTyConName :: TyConName
-liftedTypeKindTyConName   = mkUnsafeSystemName "Type" (getKey liftedTypeKindTyConKey)
+liftedTypeKindTyConName   = mkUnsafeSystemName "Type"
+                              (fromGhcUnique liftedTypeKindTyConKey)
 #if MIN_VERSION_ghc(9,2,0)
 typeNatKindTyConName      = naturalPrimTyConName
 #else
-typeNatKindTyConName      = mkUnsafeSystemName "Nat" (getKey typeNatKindConNameKey)
+typeNatKindTyConName      = mkUnsafeSystemName "Nat"
+                              (fromGhcUnique typeNatKindConNameKey)
 #endif
-typeSymbolKindTyConName   = mkUnsafeSystemName "Symbol" (getKey typeSymbolKindConNameKey)
+typeSymbolKindTyConName   = mkUnsafeSystemName "Symbol"
+                              (fromGhcUnique typeSymbolKindConNameKey)
 
 -- | Builtin Kind
 liftedTypeKindTc, typeNatKindTc, typeSymbolKindTc :: TyCon
@@ -96,53 +98,60 @@ intPrimTyConName, integerPrimTyConName, charPrimTyConName, stringPrimTyConName,
   floatPrimTyConName, doublePrimTyConName,
   naturalPrimTyConName, byteArrayPrimTyConName, eqPrimTyConName :: TyConName
 intPrimTyConName     = mkUnsafeSystemName "GHC.Prim.Int#"
-                                (getKey intPrimTyConKey)
+                                (fromGhcUnique intPrimTyConKey)
 #if MIN_VERSION_base(4,15,0)
 integerPrimTyConName = mkUnsafeSystemName "GHC.Num.Integer.Integer"
-                                (getKey integerTyConKey)
+                                (fromGhcUnique integerTyConKey)
 #else
 integerPrimTyConName = mkUnsafeSystemName "GHC.Integer.Type.Integer"
-                                (getKey integerTyConKey)
+                                (fromGhcUnique integerTyConKey)
 #endif
-stringPrimTyConName  = mkUnsafeSystemName "GHC.Prim.Addr#" (getKey addrPrimTyConKey)
+stringPrimTyConName  = mkUnsafeSystemName "GHC.Prim.Addr#"
+                        (fromGhcUnique addrPrimTyConKey)
 charPrimTyConName    = mkUnsafeSystemName "GHC.Prim.Char#"
-                                (getKey charPrimTyConKey)
+                                (fromGhcUnique charPrimTyConKey)
 wordPrimTyConName    = mkUnsafeSystemName "GHC.Prim.Word#"
-                                (getKey wordPrimTyConKey)
+                                (fromGhcUnique wordPrimTyConKey)
 int64PrimTyConName   = mkUnsafeSystemName "GHC.Prim.Int64#"
-                                (getKey int64PrimTyConKey)
+                                (fromGhcUnique int64PrimTyConKey)
 word64PrimTyConName  = mkUnsafeSystemName "GHC.Prim.Word64#"
-                                (getKey word64PrimTyConKey)
+                                (fromGhcUnique word64PrimTyConKey)
 floatPrimTyConName   = mkUnsafeSystemName "GHC.Prim.Float#"
-                                (getKey floatPrimTyConKey)
+                                (fromGhcUnique floatPrimTyConKey)
 doublePrimTyConName  = mkUnsafeSystemName "GHC.Prim.Double#"
-                                (getKey doublePrimTyConKey)
+                                (fromGhcUnique doublePrimTyConKey)
 #if MIN_VERSION_base(4,15,0)
 naturalPrimTyConName = mkUnsafeSystemName "GHC.Num.Natural.Natural"
-                                (getKey naturalTyConKey)
+                                (fromGhcUnique naturalTyConKey)
 #else
 naturalPrimTyConName = mkUnsafeSystemName "GHC.Natural.Natural"
-                                (getKey naturalTyConKey)
+                                (fromGhcUnique naturalTyConKey)
 #endif
 byteArrayPrimTyConName = mkUnsafeSystemName "GHC.Prim.ByteArray#"
-                          (getKey byteArrayPrimTyConKey)
+                          (fromGhcUnique byteArrayPrimTyConKey)
 
-eqPrimTyConName = mkUnsafeSystemName "GHC.Prim.~#" (getKey eqPrimTyConKey)
+eqPrimTyConName = mkUnsafeSystemName "GHC.Prim.~#" (fromGhcUnique eqPrimTyConKey)
 
 #if !MIN_VERSION_ghc(9,2,0)
 voidPrimTyConName :: TyConName
-voidPrimTyConName    = mkUnsafeSystemName "Void#" (getKey voidPrimTyConKey)
+voidPrimTyConName    = mkUnsafeSystemName "Void#" (fromGhcUnique voidPrimTyConKey)
 #endif
 
 #if MIN_VERSION_ghc(8,8,0)
 int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, word8PrimTyConName,
   word16PrimTyConName, word32PrimTyConName :: TyConName
-int8PrimTyConName   = mkUnsafeSystemName (showt ''Int8#) (getKey int8PrimTyConKey)
-int16PrimTyConName  = mkUnsafeSystemName (showt ''Int16#) (getKey int16PrimTyConKey)
-int32PrimTyConName  = mkUnsafeSystemName (showt ''Int32#) (getKey int32PrimTyConKey)
-word8PrimTyConName  = mkUnsafeSystemName (showt ''Word8#) (getKey word8PrimTyConKey)
-word16PrimTyConName = mkUnsafeSystemName (showt ''Word16#) (getKey word16PrimTyConKey)
-word32PrimTyConName = mkUnsafeSystemName (showt ''Word32#) (getKey word32PrimTyConKey)
+int8PrimTyConName   = mkUnsafeSystemName (showt ''Int8#)
+                        (fromGhcUnique int8PrimTyConKey)
+int16PrimTyConName  = mkUnsafeSystemName (showt ''Int16#)
+                        (fromGhcUnique int16PrimTyConKey)
+int32PrimTyConName  = mkUnsafeSystemName (showt ''Int32#)
+                        (fromGhcUnique int32PrimTyConKey)
+word8PrimTyConName  = mkUnsafeSystemName (showt ''Word8#)
+                        (fromGhcUnique word8PrimTyConKey)
+word16PrimTyConName = mkUnsafeSystemName (showt ''Word16#)
+                        (fromGhcUnique word16PrimTyConKey)
+word32PrimTyConName = mkUnsafeSystemName (showt ''Word32#)
+                        (fromGhcUnique word32PrimTyConKey)
 #endif
 
 liftedPrimTC :: TyConName
@@ -167,7 +176,7 @@ integerPrimTc =
   let
     name = integerPrimTyConName
     uniq = nameUniq name
-    isDcNm = mkUnsafeSystemName (showt 'IS) (getKey integerISDataConKey)
+    isDcNm = mkUnsafeSystemName (showt 'IS) (fromGhcUnique integerISDataConKey)
     isDc = MkData
       { dcName = isDcNm
       , dcUniq = nameUniq isDcNm
@@ -179,7 +188,7 @@ integerPrimTc =
       , dcArgStrict = [Strict]
       , dcFieldLabels = []
       }
-    ipDcNm = mkUnsafeSystemName (showt 'IP) (getKey integerIPDataConKey)
+    ipDcNm = mkUnsafeSystemName (showt 'IP) (fromGhcUnique integerIPDataConKey)
     ipDc = MkData
       { dcName = ipDcNm
       , dcUniq = nameUniq ipDcNm
@@ -191,7 +200,7 @@ integerPrimTc =
       , dcArgStrict = [Strict]
       , dcFieldLabels = []
       }
-    inDcNm = mkUnsafeSystemName (showt 'IN) (getKey integerINDataConKey)
+    inDcNm = mkUnsafeSystemName (showt 'IN) (fromGhcUnique integerINDataConKey)
     inDc = MkData
       { dcName = inDcNm
       , dcUniq = nameUniq inDcNm
@@ -211,7 +220,7 @@ naturalPrimTc =
   let
     name = naturalPrimTyConName
     uniq = nameUniq name
-    nsDcNm = mkUnsafeSystemName (showt 'NS) (getKey naturalNSDataConKey)
+    nsDcNm = mkUnsafeSystemName (showt 'NS) (fromGhcUnique naturalNSDataConKey)
     nsDc = MkData
       { dcName = nsDcNm
       , dcUniq = nameUniq nsDcNm
@@ -223,7 +232,7 @@ naturalPrimTc =
       , dcArgStrict = [Strict]
       , dcFieldLabels = []
       }
-    nbDcNm = mkUnsafeSystemName (showt 'NB) (getKey naturalNBDataConKey)
+    nbDcNm = mkUnsafeSystemName (showt 'NB) (fromGhcUnique naturalNBDataConKey)
     nbDc = MkData
       { dcName = nbDcNm
       , dcUniq = nameUniq nbDcNm

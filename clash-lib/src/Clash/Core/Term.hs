@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
                           2017, Google Inc.
-                          2021, QBayLogic B.V.
+                     2021-2024, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -63,7 +63,9 @@ import Data.Binary                             (Binary)
 import Data.Coerce                             (coerce)
 import qualified Data.DList                    as DList
 import Data.Either                             (lefts, rights)
+#if !MIN_VERSION_base(4,20,0)
 import Data.Foldable                           (foldl')
+#endif
 import Data.Hashable                           (Hashable)
 import Data.Maybe                              (catMaybes)
 import Data.List                               (nub, partition)
