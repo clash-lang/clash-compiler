@@ -1415,6 +1415,14 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [DC dc _] <- args
     -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
 
+  "GHC.Prim.dataToTagSmall#"
+    | [DC dc _] <- args
+    -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+
+  "GHC.Prim.dataToTagLarge#"
+    | [DC dc _] <- args
+    -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+
   "GHC.Classes.eqInt" | Just (i,j) <- intCLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i == j))
 
