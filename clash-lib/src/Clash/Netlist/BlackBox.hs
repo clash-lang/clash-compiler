@@ -558,6 +558,26 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                     return (DataTag scrutHTy (Right tmpRhs),netDecl ++ scrutDecls)
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
 
+          | pNm `elem`
+            ["GHC.Prim.dataToTagSmall#", "GHC.Prim.dataToTagLarge#"] -> case args of
+              [Right _, Right _,Left (Data dc)] -> do
+                iw <- Lens.view intWidth
+                return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
+              [Right _, Right _,Left scrut] -> do
+                tcm      <- Lens.view tcCache
+                let scrutTy = inferCoreTypeOf tcm scrut
+                scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
+                (scrutExpr,scrutDecls) <-
+                  mkExpr False Concurrent (NetlistId (Id.unsafeMake "c$dtt_rhs") scrutTy) scrut
+                case scrutExpr of
+                  Identifier id_ Nothing -> return (DataTag scrutHTy (Right id_),scrutDecls)
+                  _ -> do
+                    tmpRhs <- Id.make "c$dtt_rhs"
+                    let assignTy = case declType of { Concurrent -> Cont ; Sequential -> Proc Blocking }
+                    netDecl <- N.mkInit declType assignTy tmpRhs scrutHTy scrutExpr
+                    return (DataTag scrutHTy (Right tmpRhs),netDecl ++ scrutDecls)
+              _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
+
           | pNm == "Clash.Explicit.SimIO.mealyIO" -> do
               resM <- resBndr1 True dst
               case resM of
