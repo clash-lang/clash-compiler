@@ -626,7 +626,7 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
   --
   isHidden :: Name a -> [Type] -> Bool
   isHidden nm [a1, a2] | TyConApp a2Nm _ <- tyView a2 =
-       nameOcc nm == "GHC.Classes.(%,%)"
+       nameOcc nm `elem` ["GHC.Classes.(%,%)", "GHC.Classes.CTuple2"]
     && splitTy (tyView (stripIP a1))
     && nameOcc a2Nm == "Clash.Signal.Internal.KnownDomain"
   isHidden _ _ = False
