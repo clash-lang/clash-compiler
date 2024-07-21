@@ -12,6 +12,8 @@ else
   OPAQUE="NOINLINE"
 fi
 
+cabal build clash-lib clash-ghc --only-dependencies
+
 ghci \
   -fobject-code \
   -iclash-ghc/src-bin-common/ \
