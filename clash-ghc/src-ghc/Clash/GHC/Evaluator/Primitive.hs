@@ -82,14 +82,12 @@ import           GHC.Types.Name      (getSrcSpan, nameOccName, occNameString)
 import           GHC.Builtin.Names   (trueDataConKey, falseDataConKey)
 import qualified GHC.Core.TyCon      as TyCon
 import           GHC.Builtin.Types   (tupleTyCon)
-import           GHC.Types.Unique    (getKey)
 #else
 import           BasicTypes          (Boxity (..))
 import           Name                (getSrcSpan, nameOccName, occNameString)
 import           PrelNames           (trueDataConKey, falseDataConKey)
 import qualified TyCon
 import           TysWiredIn          (tupleTyCon)
-import           Unique              (getKey)
 #endif
 
 import           Clash.Class.BitPack (pack,unpack)
@@ -116,6 +114,7 @@ import           Clash.Core.Var      (mkLocalId, mkTyVar)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug
 import           Clash.GHC.GHC2Core  (modNameM)
+import           Clash.Unique        (fromGhcUnique)
 import           Clash.Util
   (MonadUnique (..), clogBase, flogBase, curLoc)
 import           Clash.Normalize.PrimitiveReductions
@@ -5873,7 +5872,7 @@ ghcTyconToTyConName
   :: TyCon.TyCon
   -> TyConName
 ghcTyconToTyConName tc =
-    Name User n' (getKey (TyCon.tyConUnique tc)) (getSrcSpan n)
+    Name User n' (fromGhcUnique (TyCon.tyConUnique tc)) (getSrcSpan n)
   where
     n'      = fromMaybe "_INTERNAL_" (modNameM n) `Text.append`
               ('.' `Text.cons` Text.pack occName)
@@ -5884,5 +5883,5 @@ svoid :: (State# RealWorld -> State# RealWorld) -> IO ()
 svoid m0 = IO (\s -> case m0 s of s' -> (# s', () #))
 
 isTrueDC,isFalseDC :: DataCon -> Bool
-isTrueDC dc  = dcUniq dc == getKey trueDataConKey
-isFalseDC dc = dcUniq dc == getKey falseDataConKey
+isTrueDC dc  = dcUniq dc == fromGhcUnique trueDataConKey
+isFalseDC dc = dcUniq dc == fromGhcUnique falseDataConKey
