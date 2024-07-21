@@ -290,6 +290,7 @@ ghcTypeToHWType iw = go
         -- To ensure that Clash doesn't get stuck working away callstacks that
         -- never end up being used in the generated HDL.
         "GHC.Stack.Types.CallStack" -> returnN (Void Nothing)
+        "GHC.Internal.Stack.Types.CallStack" -> returnN (Void Nothing)
 
         "Clash.Explicit.SimIO.SimIO" | a0:_ <- args ->
           ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m a0
