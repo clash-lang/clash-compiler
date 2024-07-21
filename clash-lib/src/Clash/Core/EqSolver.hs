@@ -12,16 +12,18 @@ module Clash.Core.EqSolver where
 import Data.List.Extra (zipEqual)
 import Data.Maybe (catMaybes, mapMaybe)
 
-import Clash.Core.Name (Name(nameOcc))
+import Clash.Core.Name (Name(nameUniq))
 import Clash.Core.Term
 import Clash.Core.TyCon
 import Clash.Core.Type
 import Clash.Core.Var
 import Clash.Core.VarEnv (VarSet, elemVarSet, emptyVarSet, mkVarSet)
+import Clash.Unique (fromGhcUnique)
 #if MIN_VERSION_ghc(9,0,0)
 import Clash.Core.DataCon (dcUniq)
-import Clash.Unique (fromGhcUnique)
-import GHC.Builtin.Names (unsafeReflDataConKey)
+import GHC.Builtin.Names (unsafeReflDataConKey, eqPrimTyConKey, typeNatAddTyFamNameKey)
+#else
+import PrelNames (eqPrimTyConKey, typeNatAddTyFamNameKey)
 #endif
 
 -- | Data type that indicates what kind of solution (if any) was found
@@ -120,7 +122,8 @@ normalizeAdd
 normalizeAdd (a, b) = do
   (n, rhs) <- lhsLit a b
   case tyView rhs of
-    TyConApp (nameOcc -> "GHC.TypeNats.+") [left, right] -> do
+    TyConApp tc [left, right]
+      | nameUniq tc == fromGhcUnique typeNatAddTyFamNameKey -> do
       (m, o) <- lhsLit left right
       return (n, m, o)
     _ ->
@@ -178,7 +181,8 @@ typeEq
   -> Maybe (Type, Type)
 typeEq tcm ty =
  case tyView (coreView tcm ty) of
-  TyConApp (nameOcc -> "GHC.Prim.~#") [_, _, left, right] ->
+  TyConApp tc [_, _, left, right]
+    | nameUniq tc == fromGhcUnique eqPrimTyConKey ->
     Just (coreView tcm left, coreView tcm right)
   _ ->
     Nothing
