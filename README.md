@@ -72,6 +72,7 @@ Note that release branches might contain non-released patches.
 | 9.2  | ⚠️¹    | ⚠️¹      | ⚠️¹    | 1.8              | ⚠️¹️
 | 9.4  | ⚠️³ ️   | ⚠️³      | ️⚠️³ ️   | 1.8              | ✔️
 | 9.6  | ✔️³    | ✔️³      | ✔️³    | 1.8              | ✔️
+| 9.8  | ✔️     | ✔️       | ✔️     | 1.8              | ️✔️
 
 ¹ GHC 9.2 contains a regression, rendering Clash error messages indecipherable. This change was reverted in 9.4.
 
