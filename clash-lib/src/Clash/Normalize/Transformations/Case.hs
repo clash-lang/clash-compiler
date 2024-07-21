@@ -266,7 +266,8 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- WHNF of subject is _|_, in the form of `error`: that means that the
       -- entire case-expression is evaluates to _|_
       (Prim pInfo,repTy:_:callStack:msg:_,ticks)
-        | primName pInfo == "GHC.Err.error" ->
+        | primName pInfo `elem` ["GHC.Err.error"
+                                ,"GHC.Internal.Err.error"] ->
         let e1 = mkApps (mkTicks (Prim pInfo) ticks)
                         [repTy,Right ty,callStack,msg]
          in changed e1
@@ -283,7 +284,9 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       (Prim pInfo,repTy:_:msgOrCallStack:_,ticks)
         | primName pInfo `elem` ["Control.Exception.Base.patError"
                                 ,"GHC.Err.undefined"
-                                ,"GHC.Err.errorWithoutStackTrace"] ->
+                                ,"GHC.Err.errorWithoutStackTrace"
+                                ,"GHC.Internal.Err.undefined"
+                                ,"GHC.Internal.Err.errorWithoutStackTrace"] ->
         let e1 = mkApps (mkTicks (Prim pInfo) ticks)
                         [repTy,Right ty,msgOrCallStack]
         in  changed e1
