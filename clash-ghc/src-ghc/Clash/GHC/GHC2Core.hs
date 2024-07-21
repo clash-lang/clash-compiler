@@ -2,7 +2,7 @@
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017-2022, Google Inc.
-                     2021,2023  QBayLogic B.V.,
+                     2021-2024, QBayLogic B.V.,
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -198,6 +198,7 @@ import qualified Clash.Core.Var              as C
 import qualified Clash.Data.UniqMap          as C
 import           Clash.Normalize.Primitives  as C
 import           Clash.Primitives.Types      hiding (name)
+import           Clash.Unique                (fromGhcUnique)
 import           Clash.Util
 import           Clash.GHC.Util
 
@@ -771,7 +772,11 @@ hasPrimCo (AppCo co1 co2) = do
   case tc1M of
     Just _ -> return tc1M
     _ -> hasPrimCo co2
+#if MIN_VERSION_ghc(9,10,0)
+hasPrimCo (ForAllCo {fco_body = co}) = hasPrimCo co
+#else
 hasPrimCo (ForAllCo _ _ co) = hasPrimCo co
+#endif
 
 hasPrimCo co@(AxiomInstCo _ _ coers) = do
     let (Pair ty1 _) = coercionKind co
@@ -1100,7 +1105,7 @@ coreToName
   -> C2C (C.Name a)
 coreToName toName toUnique toString v = do
   ns <- toString (toName v)
-  let key  = getKey (toUnique v)
+  let key  = fromGhcUnique (toUnique v)
       locI = getSrcSpan (toName v)
       -- Is it one of [ds,ds1,ds2,..]
       isDSX = maybe False (maybe True (isDigit . fst) . Text.uncons) . Text.stripPrefix "ds"

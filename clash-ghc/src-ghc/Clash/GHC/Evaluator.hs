@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2017-2022, Google Inc.,
-                     2021-2022, QBayLogic B.V.
+                     2021-2024, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -24,7 +24,10 @@ import           Prelude                                 hiding (lookup)
 
 import           Control.Concurrent.Supply               (Supply, freshId)
 import           Data.Either                             (lefts,rights)
-import           Data.List                               (foldl',mapAccumL)
+import           Data.List                               (mapAccumL)
+#if !MIN_VERSION_base(4,20,0)
+import           Data.List                               (foldl')
+#endif
 import qualified Data.Primitive.ByteArray                as BA
 import qualified Data.Text as Text
 #if MIN_VERSION_base(4,15,0)

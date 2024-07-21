@@ -121,7 +121,9 @@ common common-options
 library
   import:             common-options
   HS-Source-Dirs:     src-ghc, src-bin-common
-  if impl(ghc >= 9.8.0)
+  if impl(ghc >= 9.10.0)
+    HS-Source-Dirs: src-bin-9.10
+  elif impl(ghc >= 9.8.0)
     HS-Source-Dirs: src-bin-9.8
   elif impl(ghc >= 9.6.0)
     HS-Source-Dirs: src-bin-9.6
