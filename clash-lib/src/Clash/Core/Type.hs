@@ -93,7 +93,8 @@ import           GHC.Builtin.Names
   (integerTyConKey, typeNatAddTyFamNameKey, typeNatExpTyFamNameKey,
    typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
    typeNatCmpTyFamNameKey, ordLTDataConKey, ordEQDataConKey, ordGTDataConKey,
-   typeSymbolAppendFamNameKey, typeSymbolCmpTyFamNameKey)
+   typeSymbolAppendFamNameKey, typeSymbolCmpTyFamNameKey,
+   typeNatDivTyFamNameKey, typeNatModTyFamNameKey)
 import           GHC.Types.SrcLoc       (wiredInSrcSpan)
 #else
 import           PrelNames
@@ -102,7 +103,8 @@ import           PrelNames
   (integerTyConKey, typeNatAddTyFamNameKey, typeNatExpTyFamNameKey,
    typeNatLeqTyFamNameKey, typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
    typeNatCmpTyFamNameKey,
-   typeSymbolAppendFamNameKey, typeSymbolCmpTyFamNameKey)
+   typeSymbolAppendFamNameKey, typeSymbolCmpTyFamNameKey,
+   typeNatDivTyFamNameKey, typeNatModTyFamNameKey)
 import           SrcLoc                 (wiredInSrcSpan)
 #endif
 
@@ -663,19 +665,35 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
       [i1, i2] -> Just (LitTy (NumTy (i1 `lcm` i2)))
       _ -> Nothing
 
-  | nameOcc tc `elem` ["GHC.TypeLits.Extra.Div", "GHC.TypeNats.Div"]
+  | nameOcc tc `elem` ["GHC.TypeLits.Extra.Div"]
   = case mapMaybe (litView tcm) tys of
       [i1, i2]
         | i2 > 0
         -> Just (LitTy (NumTy (i1 `div` i2)))
       _ -> Nothing
 
-  | nameOcc tc `elem` ["GHC.TypeLits.Extra.Mod", "GHC.TypeNats.Mod"]
+  | nameOcc tc `elem` ["GHC.TypeLits.Extra.Mod"]
   = case mapMaybe (litView tcm) tys of
       [i1, i2]
         | i2 > 0
         -> Just (LitTy (NumTy (i1 `mod` i2)))
       _ -> Nothing
+
+#if MIN_VERSION_base(4,11,0)
+  | nameUniq tc == fromGhcUnique typeNatDivTyFamNameKey
+  = case mapMaybe (litView tcm) tys of
+      [i1, i2]
+        | i2 > 0
+        -> Just (LitTy (NumTy (i1 `div` i2)))
+      _ -> Nothing
+
+  | nameUniq tc == fromGhcUnique typeNatModTyFamNameKey
+  = case mapMaybe (litView tcm) tys of
+      [i1, i2]
+        | i2 > 0
+        -> Just (LitTy (NumTy (i1 `mod` i2)))
+      _ -> Nothing
+#endif
 
   | Just (FunTyCon {tyConSubst = tcSubst}) <- UniqMap.lookup tc tcm
   = let -- See [Note: Eager type families]
