@@ -1511,6 +1511,16 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , Just c <- flogBase a b
     -> (reduce . Literal . WordLiteral . toInteger) c
 
+  "GHC.Internal.Float.integerToFloat#"
+    | [v] <- args
+    , Just i <- integerLiteral v
+    -> reduce . Literal . FloatLiteral . floatToWord $ F# (integerToFloat# i)
+
+  "GHC.Internal.Float.integerToDouble#"
+    | [v] <- args
+    , Just i <- integerLiteral v
+    -> reduce . Literal . DoubleLiteral . doubleToWord $ D# (integerToDouble# i)
+
   "GHC.Num.Integer.integerToFloat#"
     | [v] <- args
     , Just i <- integerLiteral v
@@ -4620,6 +4630,22 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [arg] <- args
     -> reduce (valToTerm arg)
   "GHC.Float.$wproperFractionDouble"
+    | _ : Lit (DoubleLiteral d) : _ <- args
+    , [sty@(tyView -> TyConApp signedTcNm [nTy@(LitTy (NumTy kn))])] <- tys
+    , nameOcc signedTcNm == showt ''Signed
+    , (_, tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+    , Just tupTc <- UniqMap.lookup tupTcNm tcm
+    , [tupDc] <- tyConDataCons tupTc
+    -> let (sn, d1) = reifyNat kn (\p -> first toInteger (op p (wordToDouble d)))
+           ret = mkApps (Data tupDc) (map Right tyArgs ++
+                  [ Left (mkSignedLit sty nTy kn sn)
+                  , Left (mkDoubleCLit tcm (doubleToWord d1) (last tyArgs))
+                  ])
+        in reduce ret
+    where
+      op :: KnownNat n => Proxy n -> Double -> (Signed n, Double)
+      op _ = properFraction
+  "GHC.Internal.Float.$wproperFractionDouble"
     | _ : Lit (DoubleLiteral d) : _ <- args
     , [sty@(tyView -> TyConApp signedTcNm [nTy@(LitTy (NumTy kn))])] <- tys
     , nameOcc signedTcNm == "Clash.Sized.Internal.Signed.Signed"
