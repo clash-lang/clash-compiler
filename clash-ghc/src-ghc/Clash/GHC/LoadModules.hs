@@ -2,7 +2,7 @@
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017-2024, Google Inc.
-                     2021-2023, QBayLogic B.V.
+                     2021-2024, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -54,7 +54,10 @@ import           Data.Foldable                   (toList)
 import           Data.HashMap.Strict             (HashMap)
 import qualified Data.HashMap.Strict             as HashMap
 import           Data.Typeable                   (Typeable)
-import           Data.List                       (foldl', nub, find)
+import           Data.List                       (nub, find)
+#if !MIN_VERSION_base(4,20,0)
+import           Data.List                       (foldl')
+#endif
 import qualified Data.Map                        as Map
 import           Data.Maybe
   (catMaybes, fromMaybe, listToMaybe, mapMaybe)
@@ -1058,7 +1061,9 @@ unwantedOptimizationFlags df =
                , Opt_RegsGraph -- Don't care
                , Opt_RegsGraph -- Don't care
                , Opt_PedanticBottoms -- Stops eta-expansion through case: avoid
+#if !MIN_VERSION_ghc(9,10,0)
                , Opt_LlvmTBAA -- Don't care
+#endif
                , Opt_CmmSink -- Don't care
                , Opt_CmmElimCommonBlocks -- Don't care
                , Opt_OmitYields -- Don't care
@@ -1180,7 +1185,11 @@ removeStrictnessAnnotations pm =
     rmCD xcon                      = xcon
 #endif
 
-#if MIN_VERSION_ghc(9,4,0)
+#if MIN_VERSION_ghc(9,10,0)
+    rmGConDetails :: GHC.HsConDeclGADTDetails GHC.GhcPs -> GHC.HsConDeclGADTDetails GHC.GhcPs
+    rmGConDetails (GHC.PrefixConGADT tkn args) = GHC.PrefixConGADT tkn (fmap rmHsScaledType args)
+    rmGConDetails (GHC.RecConGADT tkn rec) = GHC.RecConGADT tkn ((fmap . fmap . fmap) rmConDeclF rec)
+#elif MIN_VERSION_ghc(9,4,0)
     rmGConDetails :: GHC.HsConDeclGADTDetails GHC.GhcPs -> GHC.HsConDeclGADTDetails GHC.GhcPs
     rmGConDetails (GHC.PrefixConGADT args) = GHC.PrefixConGADT (fmap rmHsScaledType args)
     rmGConDetails (GHC.RecConGADT rec tkn) = GHC.RecConGADT ((fmap . fmap . fmap) rmConDeclF rec) tkn
