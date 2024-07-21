@@ -2,7 +2,7 @@
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017     , QBayLogic, Google Inc.
-                     2020-2023, QBayLogic,
+                     2020-2024, QBayLogic,
                      2022     , Google Inc.
 
   License     :  BSD2 (see the file LICENSE)
@@ -83,12 +83,10 @@ import           Text.Trifecta.Result
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Builtin.Names                 (eqTyConKey, ipClassKey)
-import           GHC.Types.Unique                  (getKey)
 
 import           GHC.Types.SrcLoc                  (SrcSpan)
 #else
 import           PrelNames               (eqTyConKey, ipClassKey)
-import           Unique                  (getKey)
 
 import           SrcLoc                           (SrcSpan)
 #endif
@@ -143,7 +141,7 @@ import qualified Clash.Primitives.Verification    as P
 import qualified Clash.Primitives.Xilinx.ClockGen as P
 import           Clash.Primitives.Types
 import           Clash.Signal.Internal
-import           Clash.Unique                     (Unique, getUnique)
+import           Clash.Unique                     (Unique, getUnique, fromGhcUnique)
 import           Clash.Util
   (ClashException(..), reportTimeDiff,
    wantedLanguageExtensions, unwantedLanguageExtensions, curLoc)
@@ -215,8 +213,8 @@ splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
   --   * HasCallStack
   shouldNotHavePortName :: Type -> Bool
   shouldNotHavePortName (tyView -> TyConApp (nameUniq -> tcUniq) tcArgs)
-    | tcUniq == getKey eqTyConKey = True
-    | tcUniq == getKey ipClassKey
+    | tcUniq == fromGhcUnique eqTyConKey = True
+    | tcUniq == fromGhcUnique ipClassKey
     , [LitTy (SymTy "callStack"), _] <- tcArgs = True
   shouldNotHavePortName _ = False
 
