@@ -1,0 +1,1 @@
+FIXED: Removed `stringsearch` dependency from `v16-upgrade-primitives`. See [#2726](https://github.com/clash-lang/clash-compiler/issues/2726)
