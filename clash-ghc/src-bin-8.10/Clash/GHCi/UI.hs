@@ -150,6 +150,7 @@ import           Clash.Backend.SystemVerilog (SystemVerilogState)
 import           Clash.Backend.VHDL (VHDLState)
 import           Clash.Backend.Verilog (VerilogState)
 import qualified Clash.Driver
+import           Clash.Driver.Bool (fromGhcOverridingBool)
 import           Clash.Driver.Types (ClashOpts(..), ClashEnv(..), ClashDesign(..))
 
 import           Clash.GHC.PartialEval
@@ -2191,7 +2192,7 @@ makeHDL Proxy startAction optsRef srcs = do
   dflags <- GHC.getSessionDynFlags
   liftIO $ do startTime <- Clock.getCurrentTime
               opts0  <- readIORef optsRef
-              let opts1  = opts0 { opt_color = useColor dflags }
+              let opts1  = opts0 { opt_color = fromGhcOverridingBool (useColor dflags) }
               let iw     = opt_intWidth opts1
                   hdl    = hdlKind backend
                   -- determine whether `-outputdir` was used
