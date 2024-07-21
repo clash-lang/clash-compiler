@@ -1,6 +1,17 @@
 #!/bin/sh
 GHC_VERSION=$(ghc --numeric-version)
 
+# Pass -DCLASH_OPAQUE={OPAQUE,INLINE} to GHC depending on the compiler version.
+# See https://github.com/clash-lang/clash-compiler/pull/2511.
+GHC_MAJOR_1=$(echo ${GHC_VERSION} | cut -d. -f1)
+GHC_MAJOR_2=$(echo ${GHC_VERSION} | cut -d. -f2)
+
+if [ ${GHC_MAJOR_1} -gt 9 ] || ([ ${GHC_MAJOR_1} -ge 9 ] && [ ${GHC_MAJOR_2} -ge 4 ]); then
+  OPAQUE="OPAQUE"
+else
+  OPAQUE="NOINLINE"
+fi
+
 ghci \
   -fobject-code \
   -iclash-ghc/src-bin-common/ \
@@ -12,5 +23,5 @@ ghci \
   -XDeriveLift -XDeriveTraversable -XDerivingStrategies -XInstanceSigs \
   -XKindSignatures -XNoStarIsType -XPostfixOperators -XScopedTypeVariables \
   -XStandaloneDeriving -XTupleSections -XTypeApplications -XTypeOperators \
-  -XViewPatterns -XNoPolyKinds -DDEBUG \
+  -XViewPatterns -XNoPolyKinds -DDEBUG -DCLASH_OPAQUE="${OPAQUE}" \
   Clash.hs
