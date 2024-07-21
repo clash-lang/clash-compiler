@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
-                     2021-2023, QBayLogic B.V.,
+                     2021-2024, QBayLogic B.V.,
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -35,10 +35,8 @@ import           GHC.Stack                     (HasCallStack)
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Builtin.Names       (ipClassKey)
-import           GHC.Types.Unique        (getKey)
 #else
 import           PrelNames               (ipClassKey)
-import           Unique                  (getKey)
 #endif
 
 import Clash.Core.DataCon
@@ -58,6 +56,7 @@ import Clash.Core.Var                    (Id, Var(..), mkLocalId, mkTyVar)
 import Clash.Core.VarEnv
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug                       (traceIf)
+import Clash.Unique                      (fromGhcUnique)
 import Clash.Util
 
 -- | Rebuild a let expression / let expressions by taking the SCCs of a list
@@ -673,7 +672,7 @@ splitShouldSplit tcm = foldr go []
 -- | Strip implicit parameter wrappers (IP)
 stripIP :: Type -> Type
 stripIP t@(tyView -> TyConApp tcNm [_a1, a2]) =
-  if nameUniq tcNm == getKey ipClassKey then a2 else t
+  if nameUniq tcNm == fromGhcUnique ipClassKey then a2 else t
 stripIP t = t
 
 -- | Do an inverse topological sorting of the let-bindings in a let-expression

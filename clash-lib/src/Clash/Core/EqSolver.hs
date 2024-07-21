@@ -1,5 +1,5 @@
 {-|
-  Copyright  :  (C) 2021 QBayLogic B.V.
+  Copyright  :  (C) 2021-2024 QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -20,8 +20,8 @@ import Clash.Core.Var
 import Clash.Core.VarEnv (VarSet, elemVarSet, emptyVarSet, mkVarSet)
 #if MIN_VERSION_ghc(9,0,0)
 import Clash.Core.DataCon (dcUniq)
+import Clash.Unique (fromGhcUnique)
 import GHC.Builtin.Names (unsafeReflDataConKey)
-import GHC.Types.Unique (getKey)
 #endif
 
 -- | Data type that indicates what kind of solution (if any) was found
@@ -139,7 +139,7 @@ isAbsurdPat
 #if MIN_VERSION_base(4,15,0)
 isAbsurdPat _tcm (DataPat dc _ _)
   -- unsafeCoerce is not absurd in the way intended by /isAbsurdPat/
-  | dcUniq dc == getKey unsafeReflDataConKey
+  | dcUniq dc == fromGhcUnique unsafeReflDataConKey
   = False
 #endif
 isAbsurdPat tcm pat =
