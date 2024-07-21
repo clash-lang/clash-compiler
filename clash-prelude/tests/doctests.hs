@@ -15,7 +15,4 @@ extraArgs = map ("--ghc-arg=" ++)
 #else
     "-DCLASH_OPAQUE=NOINLINE"
 #endif
-#ifdef CLASH_MULTIPLE_HIDDEN
-  , "-DCLASH_MULTIPLE_HIDDEN"
-#endif
   ]

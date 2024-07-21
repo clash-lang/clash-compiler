@@ -380,9 +380,6 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "DivZero" def
         , runTest "LambdaDrop" def{hdlSim=[]}
         , runTest "IrrefError" def{hdlSim=[]}
-#ifdef CLASH_MULTIPLE_HIDDEN
-        , runTest "MultipleHidden" def
-#endif
         , outputTest "NameInlining" def
         , runTest "NameInstance" def{hdlSim=[]}
         , outputTest "NameInstance" def
@@ -717,9 +714,7 @@ runClashTest = defaultMain $ clashTestRoot
         ]
       , clashTestGroup "Feedback"
         [ runTest "Fib" def
-#ifdef CLASH_MULTIPLE_HIDDEN
         , runTest "MutuallyRecursive" def
-#endif
         ]
       , clashTestGroup "Fixed"
         [ runTest "Mixer" def
@@ -950,13 +945,6 @@ runClashTest = defaultMain $ clashTestRoot
           [ runTest "Blob" def
           ]
         , runTest "AndEnable" def
-#ifdef CLASH_MULTIPLE_HIDDEN
-        ,
-          -- TODO: Vivado is disabled because it gives different results, see
-          -- https://github.com/clash-lang/clash-compiler/issues/2267
-          runTest "AndSpecificEnable" def{hdlSim=hdlSim def \\ [Vivado]}
-
-#endif
         , runTest "Ram" def
         , clashTestGroup "Ram"
           [ runTest "RMultiTop" def

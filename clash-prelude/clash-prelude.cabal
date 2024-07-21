@@ -90,15 +90,6 @@ flag strict-mapSignal
   default: False
   manual: True
 
-flag multiple-hidden
-  description:
-    Allow multiple hidden clocks, resets, and enables to be used. This is an
-    experimental feature, possibly triggering confusing error messages. By
-    default, it is enabled on development versions of Clash and disabled on
-    releases.
-  default: True
-  manual: True
-
 flag doctests
   description:
     You can disable testing with doctests using `-f-doctests`.
@@ -169,12 +160,6 @@ Library
 
   if flag(strict-mapSignal)
     CPP-Options: -DCLASH_STRICT_MAPSIGNAL
-
-  if flag(multiple-hidden)
-    CPP-Options: -DCLASH_MULTIPLE_HIDDEN
-
-  if flag(multiple-hidden)
-    Exposed-modules:  Clash.Prelude.Synchronizer
 
   Autogen-Modules:    Paths_clash_prelude
 
@@ -394,9 +379,6 @@ test-suite doctests
 
   if arch(x86_64) && flag(workaround-ghc-mmap-crash)
     ghc-options:    -with-rtsopts=-xm20000000
-
-  if flag(multiple-hidden)
-    CPP-Options: -DCLASH_MULTIPLE_HIDDEN
 
 
 test-suite unittests

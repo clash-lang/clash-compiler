@@ -5,12 +5,8 @@
 module T359 where
 
 import Clash.Prelude
-import Clash.Class.HasDomain.HasSingleDomain
 
 newtype Circuit a b c d = Circuit ((a,b) -> (c, d))
-
--- XXX: Broken instance, but I'm just trying to get this test to work again
-type instance TryDomain t (Circuit a b c d) = (Merge t a d)
 
 topEntity
   :: Clock System

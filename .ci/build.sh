@@ -42,16 +42,3 @@ mkdir bin
 for TEST in $TESTS; do
   ln -s "$(realpath --relative-to=bin "$(cabal list-bin $TEST)")" bin/$TEST
 done
-
-# `CI_COMMIT_TAG` is set when a tag has been created on GitHub. We use this to
-# trigger a release pipeline (release to Snap / Hackage).
-if [[ ${CI_COMMIT_TAG:-} != "" ]]; then
-    set +e
-    ! $(cat dist-newstyle/cache/plan.json | python3 -m json.tool | grep multiple-hidden | grep -q true)
-    if [[ $? != 0 ]]; then
-        echo "found enable multiple_hidden flag in 'dist-newstyle/cache/plan.json'"
-        echo "multiple_hidden flag should be disabled on releases!"
-        exit 1;
-    fi
-    set -e
-fi

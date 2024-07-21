@@ -15,6 +15,9 @@ are here mostly to deal with varying @`timescale@ defintions, see:
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TypeFamilies #-}
 
+-- TryDomain instance
+{-# OPTIONS_GHC -Wno-deprecations #-}
+
 module Clash.Backend.Verilog.Time where
 
 import Clash.Class.HasDomain.HasSingleDomain

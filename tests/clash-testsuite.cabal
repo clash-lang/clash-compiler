@@ -22,15 +22,6 @@ flag cosim
    default: False
    manual: True
 
-flag multiple-hidden
-  description:
-    Allow multiple hidden clocks, resets, and enables to be used. This is an
-    experimental feature, possibly triggering confusing error messages. By
-    default, it is enabled on development versions of Clash and disabled on
-    releases.
-  default: True
-  manual: True
-
 flag workaround-ghc-mmap-crash
   description:
     Only use this flag when hit by GHC bug #19421. See clash-compiler PR #2444.
@@ -89,9 +80,6 @@ common basic-config
 
   if flag(cosim)
     cpp-options:       -DCOSIM
-
-  if flag(multiple-hidden)
-    cpp-options:       -DCLASH_MULTIPLE_HIDDEN
 
   if arch(x86_64) && flag(workaround-ghc-mmap-crash)
     cpp-options:       -DCLASH_WORKAROUND_GHC_MMAP_CRASH

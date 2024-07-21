@@ -12,6 +12,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ConstraintKinds #-}
 
+-- TryDomain instance
+{-# OPTIONS_GHC -Wno-deprecations #-}
+
 module Clash.Cores.UART
   ( BaudGenerator
   , ValidBaud
