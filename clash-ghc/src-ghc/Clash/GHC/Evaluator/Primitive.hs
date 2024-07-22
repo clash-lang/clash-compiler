@@ -2147,6 +2147,15 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let resTy = getResultTy tcm ty tys
         in reduce (mkSomeNat tcm n resTy)
 
+  "GHC.Internal.TypeNats.natVal"
+    | [Lit (NaturalLiteral n), _] <- args
+    -> reduce (Literal (NaturalLiteral n))
+
+  "GHC.Internal.TypeNats.someNatVal"
+    | [Lit (NaturalLiteral n)] <- args
+    -> let resTy = getResultTy tcm ty tys
+        in reduce (mkSomeNat tcm n resTy)
+
   "GHC.Types.I#"
     | isSubj
     , [Lit (IntLiteral i)] <- args
@@ -4618,6 +4627,16 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [arg] <- args
     -> reduce (valToTerm arg)
   "GHC.TypeNats.withSomeSNat"
+    | Lit (NaturalLiteral n) : fun : _ <- args
+    , _ : funTy : _ <- Either.rights (fst (splitFunForallTy ty))
+    , (tyView -> TyConApp snatTcNm _) : _ <- Either.rights (fst (splitFunForallTy funTy))
+    , Just snatTc <- UniqMap.lookup snatTcNm tcm
+    , [snatDc] <- tyConDataCons snatTc
+    -> let nTy = LitTy (NumTy n)
+           snat = mkApps (Data snatDc) [Right nTy, Left (Literal (NaturalLiteral n))]
+           ret = mkApps (valToTerm fun) [Right nTy, Left snat]
+        in reduce ret
+  "GHC.Internal.TypeNats.withSomeSNat"
     | Lit (NaturalLiteral n) : fun : _ <- args
     , _ : funTy : _ <- Either.rights (fst (splitFunForallTy ty))
     , (tyView -> TyConApp snatTcNm _) : _ <- Either.rights (fst (splitFunForallTy funTy))
