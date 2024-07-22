@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module UndefinedConstantFoldingTB where
 import Clash.Prelude
 import Clash.Explicit.Testbench

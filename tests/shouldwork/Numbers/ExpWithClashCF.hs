@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module ExpWithClashCF where
 
 import Clash.Prelude

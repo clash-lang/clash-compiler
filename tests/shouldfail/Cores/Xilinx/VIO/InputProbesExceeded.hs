@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module InputProbesExceeded where
 
 import Clash.Prelude

@@ -86,9 +86,13 @@ newtype Object
 #if defined(VERILOG)
 foreign import ccall "vpi_user.h vpi_free_object"
   c_vpi_free_object :: Object -> IO CInt
+c_vpi_release :: Object -> IO CInt
+c_vpi_release = c_vpi_free_object
 #elif defined(SYSTEMVERILOG)
 foreign import ccall "vpi_user.h vpi_release_handle"
   c_vpi_release_handle :: Object -> IO CInt
+c_vpi_release :: Object -> IO CInt
+c_vpi_release = c_vpi_release_handle
 #else
 #error "Neither VERILOG or SYSTEMVERILOG is defined in VPI implementation"
 #endif
@@ -135,13 +139,7 @@ instance IsObject Object where
   freeObject obj =
     Monad.unless (isNullObject obj)
       . Monad.void
-#if defined(VERILOG)
-      $ c_vpi_free_object obj
-#elif defined(SYSTEMVERILOG)
-      $ c_vpi_release_handle obj
-#else
-#error "Neither VERILOG or SYSTEMVERILOG is defined in VPI implementation"
-#endif
+      $ c_vpi_release obj
 
   compareObjects =
     c_vpi_compare_objects

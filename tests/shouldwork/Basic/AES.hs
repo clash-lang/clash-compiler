@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module AES where
 
 import Clash.Prelude

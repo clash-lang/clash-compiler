@@ -1,3 +1,5 @@
+{-# LANGUAGE MagicHash #-}
+
 module UnpackUndefined where
 import Clash.Prelude
 import Clash.Sized.Internal.BitVector

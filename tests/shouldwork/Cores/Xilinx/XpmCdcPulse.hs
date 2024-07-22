@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module XpmCdcPulse where
 
 import Clash.Explicit.Prelude

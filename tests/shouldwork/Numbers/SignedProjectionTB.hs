@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
 -- Test for https://github.com/clash-lang/clash-compiler/issues/601

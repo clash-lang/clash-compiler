@@ -1,4 +1,5 @@
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE MagicHash #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
 

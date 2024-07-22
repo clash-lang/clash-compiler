@@ -47,6 +47,17 @@ arrowsR (t0:ts) t = arrow t0 (arrowsR ts t)
 applyE :: Foldable t => ExpQ -> t Name -> ExpQ
 applyE = foldl (\f x -> [| $f $(varE x) |])
 
+maxNumberOfClocks :: IO Int
+maxNumberOfArgs :: IO Int
+#ifdef CABAL
+-- We're running in a CABAL environment, so we know this environment
+-- variable is set:
+maxNumberOfClocks = read <$> runIO (getEnv "COSIM_MAX_NUMBER_OF_CLOCKS")
+maxNumberOfArgs = read <$> runIO (getEnv "COSIM_MAX_NUMBER_OF_ARGUMENTS")
+#else
+maxNumberOfClocks = pure 1
+maxNumberOfArgs = pure 16
+#endif
 --------------------------------------
 ---- CODE GENERATION -----------------
 --------------------------------------
@@ -56,16 +67,8 @@ applyE = foldl (\f x -> [| $f $(varE x) |])
 -- to 16.)
 coSimGen :: Q [Dec]
 coSimGen = do
-#ifdef CABAL
-    -- We're running in a CABAL environment, so we know this environment
-    -- variable is set:
-    m <- read <$> runIO (getEnv "COSIM_MAX_NUMBER_OF_CLOCKS")
-    n <- read <$> runIO (getEnv "COSIM_MAX_NUMBER_OF_ARGUMENTS")
-#else
-    let m = 1
-    let n = 16
-#endif
-
+    m <- maxNumberOfClocks
+    n <- maxNumberOfArgs
 
     concat <$> (sequence  [coSimGen' clks args | clks <- [0..m], args <-  [1..n]])
 

@@ -2,6 +2,8 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 #if __GLASGOW_HASKELL__ < 900
 {-# LANGUAGE AllowAmbiguousTypes #-}
 #endif

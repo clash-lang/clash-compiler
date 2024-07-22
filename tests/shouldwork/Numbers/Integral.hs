@@ -5,6 +5,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}

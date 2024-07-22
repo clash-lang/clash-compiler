@@ -1,3 +1,4 @@
+{- FOURMOLU_DISABLE -}
 {-|
 Copyright:    (C) 2022 Google Inc.
 License:      BSD2 (see the file LICENSE)

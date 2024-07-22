@@ -13,18 +13,27 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 {-# OPTIONS_GHC -fplugin=Foreign.Storable.Generic.Plugin #-}
 {-# OPTIONS_GHC -fplugin-opt=Foreign.Storable.Generic.Plugin:-v0 #-}
 
+#ifndef IVERILOG
 module Clash.FFI.VPI.Callback
   ( CCallbackInfo(..)
   , CallbackInfo(..)
   , Callback(..)
   , registerCallback
   , removeCallback
-#ifndef IVERILOG
   , getCallbackInfo
   , withCallbackInfo
   , unsafeReceiveCallbackInfo
   , receiveCallbackInfo
+  , module Clash.FFI.VPI.Callback.Reason
+  ) where
 #endif
+
+module Clash.FFI.VPI.Callback
+  ( CCallbackInfo(..)
+  , CallbackInfo(..)
+  , Callback(..)
+  , registerCallback
+  , removeCallback
   , module Clash.FFI.VPI.Callback.Reason
   ) where
 

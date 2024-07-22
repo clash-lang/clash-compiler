@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module AndSpecificEnable where
 
 import Clash.Prelude
