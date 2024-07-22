@@ -112,6 +112,9 @@ whyPp Why{what, solution, issue}= [I.i|
   If you want to ignore this message, pass the following flag to Clash:
 
     -fclash-ignore-broken-ghcs
+
+  Alternatively, you can set the environment variable CLASH_IGNORE_BROKEN_GHCS
+  to 'True'.
   |]
  where
   Ghc{major0, major1, patch} = ghcVersion

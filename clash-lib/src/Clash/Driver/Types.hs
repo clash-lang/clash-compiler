@@ -60,6 +60,7 @@ import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import           Clash.Signal.Internal
 
 import           Clash.Backend.Verilog.Time     (Period(..), Unit(Fs))
+import           Clash.Core.Pretty              (unsafeLookupEnvBool)
 import           Clash.Core.Term                (Term)
 import           Clash.Core.TyCon               (TyConMap, TyConName)
 import           Clash.Core.Var                 (Id)
@@ -549,7 +550,9 @@ defClashOpts
   , opt_edalize             = False
   , opt_renderEnums         = True
   , opt_timescalePrecision  = Period 100 Fs
-  , opt_ignoreBrokenGhcs    = False
+  -- XXX: We probe environment variables until we've found a proper solution to
+  --      https://github.com/clash-lang/clash-compiler/issues/2762.
+  , opt_ignoreBrokenGhcs    = unsafeLookupEnvBool "CLASH_IGNORE_BROKEN_GHCS" False
   }
 
 -- | Synopsys Design Constraint (SDC) information for a component.

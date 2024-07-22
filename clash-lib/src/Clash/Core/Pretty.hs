@@ -27,6 +27,7 @@ module Clash.Core.Pretty
   , tracePprId
   , tracePpr
   , fromPpr
+  , unsafeLookupEnvBool
   )
 where
 

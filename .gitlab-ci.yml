@@ -13,6 +13,10 @@ variables:
   RESTORE_CACHE_ATTEMPTS: 5
   ARTIFACT_DOWNLOAD_ATTEMPTS: 5
 
+  # We test all GHC version we support, so there is no use to fail if Clash
+  # detects a known-to-be-broken compiler.
+  CLASH_IGNORE_BROKEN_GHCS: "True"
+
 stages:
   - pre
   - test
