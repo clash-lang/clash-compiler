@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ["macOS", "windows"]
-        ghc: ["8.6", "8.8", "8.10", "9.0", "9.2", "9.4", "9.6"]
+        ghc: ["8.6", "8.8", "8.10", "9.0", "9.2", "9.4", "9.6", "9.8"]
         exclude:
           # Some tests fail with a mysterious -11 error code.
           - os: macOS
@@ -129,7 +129,7 @@ jobs:
 
     # Run steps inside the clash CI docker image
     container:
-      image: ghcr.io/clash-lang/clash-ci-${{ matrix.ghc }}:2023-08-22
+      image: ghcr.io/clash-lang/clash-ci:${{ matrix.ghc }}-20240726
 
       env:
         THREADS: 2

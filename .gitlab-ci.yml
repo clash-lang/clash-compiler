@@ -39,7 +39,10 @@ tests:
     CI_PARENT_PIPELINE_SOURCE: $CI_PIPELINE_SOURCE
   parallel:
     matrix:
-      - GHC_VERSION: 9.6.2
+      - GHC_VERSION: 9.8.2
+        RUN_TESTS: "always"
+
+      - GHC_VERSION: 9.6.4
         RUN_TESTS: "always"
 
       - GHC_VERSION: [9.4.6, 9.2.8]
