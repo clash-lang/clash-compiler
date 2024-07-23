@@ -46,13 +46,6 @@ txTestXmit txEn txEr xmit txEven tx xmitChange
   | xmit == Data && txEr = Just (IdleS xmit False)
   | otherwise = Just (XmitData xmit False)
 
--- | Function to update the current values for 'Xmit' and @xmitChange@
-xmitUpdate :: OrderedSetState -> Maybe Xmit -> (Xmit, Bool)
-xmitUpdate s xmit = (xmit', xmitChange)
- where
-  xmit' = fromMaybe s._xmit xmit
-  xmitChange = (xmit' /= s._xmit) || s._xmitChange
-
 -- | Void function that is used to check whether @/V/@ needs to be propagated
 --   based on the values of the input pins
 void :: OrderedSet -> Bool -> Bool -> BitVector 8 -> OrderedSet
@@ -60,6 +53,13 @@ void txOSet txEn txEr dw
   | not txEn && txEr && dw /= 0b00001111 = OSetV
   | txEn && txEr = OSetV
   | otherwise = txOSet
+
+-- | Function to update the current values for 'Xmit' and @xmitChange@
+xmitUpdate :: OrderedSetState -> Maybe Xmit -> (Xmit, Bool)
+xmitUpdate s xmit = (xmit', xmitChange)
+ where
+  xmit' = fromMaybe s._xmit xmit
+  xmitChange = (xmit' /= s._xmit) || s._xmitChange
 
 -- | State transition function for the states as defined in IEEE 802.3 Clause
 --   36, specifically Figure 36-5. This function receives the input values and
