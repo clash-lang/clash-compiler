@@ -283,32 +283,27 @@ pcsReceiveO ::
   , Maybe Bool
   , Maybe Symbol8b10b
   , Maybe Rudi
-  , Maybe ConfReg
   )
 pcsReceiveO self = case self of
-  WaitForK{} -> (self, Just False, Just False, Nothing, Nothing, Nothing)
-  RxK{} -> (self, Just False, Just False, Nothing, Nothing, Nothing)
-  RxCB{} -> (self, Just False, Just False, Nothing, Nothing, Nothing)
-  RxCD{} -> (self, Nothing, Nothing, Nothing, Just C, Just rxConfReg)
-  RxInvalid{} -> (self, Nothing, Nothing, Nothing, rudi1, Nothing)
-  IdleD{} -> (self, Just False, Just False, Nothing, Just I, Nothing)
-  FalseCarrier{} ->
-    (self, Nothing, Just True, Just (Cw 0b00001110), Nothing, Nothing)
+  WaitForK{} -> (self, Just False, Just False, Nothing, Nothing)
+  RxK{} -> (self, Just False, Just False, Nothing, Nothing)
+  RxCB{} -> (self, Just False, Just False, Nothing, Nothing)
+  RxCD{} -> (self, Nothing, Nothing, Nothing, Just (C rxConfReg))
+  RxInvalid{} -> (self, Nothing, Nothing, Nothing, rudi1)
+  IdleD{} -> (self, Just False, Just False, Nothing, Just I)
+  FalseCarrier{} -> (self, Nothing, Just True, Just (Cw 0b00001110), Nothing)
   StartOfPacket{} ->
-    (self, Just True, Just False, Just (Cw 0b01010101), Nothing, Nothing)
-  EarlyEnd{} -> (self, Nothing, Just True, Nothing, Nothing, Nothing)
-  TriRri{} -> (self, Just False, Just False, Nothing, Nothing, Nothing)
-  TrrExtend{} ->
-    (self, Just False, Just True, Just (Cw 0b00001111), Nothing, Nothing)
-  PacketBurstRrs{} ->
-    (self, Just False, Nothing, Just (Cw 0b00001111), Nothing, Nothing)
-  ExtendErr{} ->
-    (self, Just False, Nothing, Just (Cw 0b00011111), Nothing, Nothing)
-  EarlyEndExt{} -> (self, Nothing, Just True, Nothing, Nothing, Nothing)
-  RxData{} -> (self, Nothing, Just False, Just self._hist, Nothing, Nothing)
-  RxDataError{} -> (self, Nothing, Just True, Just self._hist, Nothing, Nothing)
-  LinkFailed{} -> (self, rxDv, Just self._rx, Nothing, rudi2, Nothing)
-  _ -> (self, Nothing, Nothing, Nothing, Nothing, Nothing)
+    (self, Just True, Just False, Just (Cw 0b01010101), Nothing)
+  EarlyEnd{} -> (self, Nothing, Just True, Nothing, Nothing)
+  TriRri{} -> (self, Just False, Just False, Nothing, Nothing)
+  TrrExtend{} -> (self, Just False, Just True, Just (Cw 0b00001111), Nothing)
+  PacketBurstRrs{} -> (self, Just False, Nothing, Just (Cw 0b00001111), Nothing)
+  ExtendErr{} -> (self, Just False, Nothing, Just (Cw 0b00011111), Nothing)
+  EarlyEndExt{} -> (self, Nothing, Just True, Nothing, Nothing)
+  RxData{} -> (self, Nothing, Just False, Just self._hist, Nothing)
+  RxDataError{} -> (self, Nothing, Just True, Just self._hist, Nothing)
+  LinkFailed{} -> (self, rxDv, Just self._rx, Nothing, rudi2)
+  _ -> (self, Nothing, Nothing, Nothing, Nothing)
  where
   rxConfReg = (fromSymbol self._hist ++# 0) .|. self._rxConfReg
   rudi1 = if self._xmit == Conf then Just Invalid else Nothing
@@ -338,11 +333,10 @@ pcsReceive ::
   , Signal dom (Maybe Bool)
   , Signal dom (Maybe Symbol8b10b)
   , Signal dom (Maybe Rudi)
-  , Signal dom (Maybe ConfReg)
   )
-pcsReceive cg rd dw1 rxEven syncStatus xmit = (rxDv, rxEr, dw2, rudi, rxConfReg)
+pcsReceive cg rd dw1 rxEven syncStatus xmit = (rxDv, rxEr, dw2, rudi)
  where
-  (_, rxDv, rxEr, dw2, rudi, rxConfReg) =
+  (_, rxDv, rxEr, dw2, rudi) =
     mooreB
       pcsReceiveT
       pcsReceiveO

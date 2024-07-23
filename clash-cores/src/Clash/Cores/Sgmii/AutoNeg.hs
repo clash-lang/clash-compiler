@@ -1,6 +1,5 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fconstraint-solver-iterations=10 #-}
 
 -- |
@@ -13,11 +12,8 @@ module Clash.Cores.Sgmii.AutoNeg where
 
 import Clash.Cores.Sgmii.Common
 import Clash.Prelude
-import Data.Maybe (fromJust, isJust)
+import Data.Maybe (fromMaybe)
 import Data.Proxy
-
--- | List of values for 'ConfReg'
-type ConfRegs = Vec 3 ConfReg
 
 -- | List of values for 'Rudi'
 type Rudis = Vec 3 Rudi
@@ -34,43 +30,41 @@ type Timeout dom = Index (DivRU (Microseconds 1600) (Max 1 (DomainPeriod dom)))
 --   IEEE 802.3 Clause 37, with exception of the @AN_DISABLE_LINK_OK@ state as
 --   SGMII always requires auto-negotiation to be available.
 data AutoNegState dom
-  = AnEnable {_rudis :: Rudis, _rxConfRegs :: ConfRegs, _failT :: Timeout dom}
+  = AnEnable
+      {_rudis :: Maybe Rudis, _rxConfReg :: ConfReg, _failT :: Timeout dom}
   | AnRestart
-      { _rudis :: Rudis
-      , _rxConfRegs :: ConfRegs
+      { _rudis :: Maybe Rudis
+      , _rxConfReg :: ConfReg
       , _failT :: Timeout dom
       , _linkT :: Timeout dom
       }
   | AbilityDetect
-      { _rudis :: Rudis
-      , _rxConfRegs :: ConfRegs
+      {_rudis :: Maybe Rudis, _rxConfReg :: ConfReg, _failT :: Timeout dom}
+  | AckDetect
+      { _rudis :: Maybe Rudis
+      , _rxConfReg :: ConfReg
       , _failT :: Timeout dom
-      , _txConfReg :: ConfReg
+      , _hist :: ConfReg
       }
-  | AcknowledgeDetect
-      { _rudis :: Rudis
-      , _rxConfRegs :: ConfRegs
-      , _failT :: Timeout dom
-      , _txConfReg :: ConfReg
-      }
-  | CompleteAcknowledge
-      { _rudis :: Rudis
-      , _rxConfRegs :: ConfRegs
+  | CompleteAck
+      { _rudis :: Maybe Rudis
+      , _rxConfReg :: ConfReg
       , _failT :: Timeout dom
       , _linkT :: Timeout dom
       }
   | IdleDetect
-      { _rudis :: Rudis
-      , _rxConfRegs :: ConfRegs
+      { _rudis :: Maybe Rudis
+      , _rxConfReg :: ConfReg
       , _failT :: Timeout dom
       , _linkT :: Timeout dom
       }
-  | LinkOk {_rudis :: Rudis, _rxConfRegs :: ConfRegs, _failT :: Timeout dom}
+  | LinkOk
+      {_rudis :: Maybe Rudis, _rxConfReg :: ConfReg, _failT :: Timeout dom}
   deriving (Generic, NFDataX, Eq, Show)
 
--- | The default configuration of the MAC as defined in the SGMII standard
-mrAdvAbility :: ConfReg
-mrAdvAbility = 0b0100000000000001
+-- | Set the acknowledge bit of a 'ConfReg' to zero
+noAckBit :: ConfReg -> ConfReg
+noAckBit = replaceBit (14 :: Index 16) 0
 
 -- | The duration of @linkT@ is 1.6 ms according to the SGMII reference,
 --   which means that it has a frequency of 625 Hz. This is the same as 200000
@@ -81,84 +75,33 @@ mrAdvAbility = 0b0100000000000001
 timeout :: (KnownDomain dom) => Proxy dom -> Timeout dom
 timeout Proxy = if clashSimulation then 3 else maxBound
 
--- | Function that handles the reset to 'AnEnable', this is split out to reduce
---   the amount of state transitions in every state
-anEnable ::
-  forall dom.
-  (KnownDomain dom) =>
-  -- | Fail timer value
-  Timeout dom ->
-  -- | New incoming RUDI value
-  Maybe Rudi ->
-  -- | History of RUDI values
-  Rudis ->
-  -- | History of configuration registers
-  ConfRegs ->
-  -- | Possible state transition
-  Maybe (AutoNegState dom)
-anEnable failT rudi rudis rxConfRegs
-  | failT >= timeout (Proxy @dom) =
-      Just $ AnEnable rudis rxConfRegs (timeout (Proxy @dom) - 1)
-  | rudi == Just Invalid = Just $ AnEnable rudis rxConfRegs failT
-  | otherwise = Nothing
-
 -- | Check if the the last three received values of @rxConfReg@ are the same
 --   (with the exception for bit 14, the acknowledge bit, which is discarded).
 --   If there has been 'Rudi' value of 'I' in the same set of values, then
 --   return 'False'.
-abilityMatch ::
-  -- | Last three values for 'Rudi'
-  Rudis ->
-  -- | Last three values for 'ConfReg'
-  ConfRegs ->
-  -- | Whether they satisfy the 'abilityMatch' condition
-  Bool
-abilityMatch rudis rxConfRegs =
-  repeat (head rxConfRegs') == rxConfRegs' && I `notElem` rudis
+abilityMatch :: Rudis -> Bool
+abilityMatch rudis = repeat (head rxConfRegs) == rxConfRegs && I `notElem` rudis
  where
-  rxConfRegs' = map (replaceBit (14 :: Index 16) 0) rxConfRegs
+  rxConfRegs = map (noAckBit . fromMaybe 0 . toConfReg) rudis
 
 -- | Check if the last three values for 'ConfReg' are all the same, and also
 --   check whether bit 14 (the acknowledge bit) has been asserted
-acknowledgeMatch ::
-  -- | Last three values for 'ConfReg'
-  ConfRegs ->
-  -- | Whether they satisfy the 'acknowledgeMatch' condition
-  Bool
-acknowledgeMatch rxConfRegs =
+ackMatch :: Rudis -> Bool
+ackMatch rudis =
   repeat (head rxConfRegs) == rxConfRegs && testBit (head rxConfRegs) 14
+ where
+  rxConfRegs = map (fromMaybe 0 . toConfReg) rudis
 
--- | Check if both 'abilityMatch' and 'acknowledgeMatch' are true for the same
+-- | Check if both 'abilityMatch' and 'ackMatch' are true for the same
 --   set of 'Rudi' and 'ConfReg' values.
-consistencyMatch ::
-  -- | Last three values for 'Rudi'
-  Rudis ->
-  -- | Last three values for 'ConfReg'
-  ConfRegs ->
-  -- | Whether they satisfy the 'consistencyMatch' condition
-  Bool
-consistencyMatch rudis rxConfigRegs =
-  abilityMatch rudis rxConfigRegs && acknowledgeMatch rxConfigRegs
+consistencyMatch :: ConfReg -> Rudis -> Bool
+consistencyMatch rxConfReg rudis = noAckBit rxConfReg == head rxConfRegs'
+ where
+  rxConfRegs' = map (noAckBit . fromMaybe 0 . toConfReg) rudis
 
 -- | Function that checks that the last three values of 'Rudi' have been 'I'
 idleMatch :: Rudis -> Bool
 idleMatch = (==) (repeat I)
-
--- | General part of the status update of the auto negotiation function, where
---   the new values of 'Rudi', 'ConfReg' and the 'Timeout's are handled.
-anUpdate ::
-  (KnownDomain dom) =>
-  AutoNegState dom ->
-  SyncStatus ->
-  Maybe Rudi ->
-  Maybe ConfReg ->
-  (Rudis, ConfRegs, Timeout dom, Timeout dom)
-anUpdate s syncStatus rudi rxConfReg = (rudis, rxConfRegs, failT, linkT)
- where
-  rudis = maybe s._rudis (s._rudis <<+) rudi
-  rxConfRegs = maybe s._rxConfRegs (s._rxConfRegs <<+) rxConfReg
-  failT = if syncStatus == Fail then s._failT + 1 else 0
-  linkT = s._linkT + 1
 
 -- | State transition function for 'autoNeg' as defined in IEEE 802.3 Clause 37.
 --   It takes the current 'SyncStatus' from 'Sgmii.sync' as well as the 'Rudi'
@@ -169,77 +112,71 @@ autoNegT ::
   -- | Current state
   AutoNegState dom ->
   -- | New input values
-  (SyncStatus, Maybe Rudi, Maybe ConfReg) ->
+  (SyncStatus, Maybe Rudi) ->
   -- | New state
   AutoNegState dom
-autoNegT self@AnEnable{} (syncStatus, rudi, rxConfReg)
-  | isJust s = fromJust s
-  | otherwise = AnRestart rudis rxConfRegs failT 0
+autoNegT self (syncStatus, rudi)
+  | failT >= timeout (Proxy @dom) =
+      AnEnable (Just rudis) rxConfReg (timeout (Proxy @dom) - 1)
+  | rudi == Just Invalid = AnEnable (Just rudis) rxConfReg failT
+  | otherwise = case self of
+      AnEnable{}
+        | otherwise -> AnRestart Nothing rxConfReg failT 0
+      AnRestart{}
+        | linkT >= timeout (Proxy @dom) -> AbilityDetect Nothing rxConfReg failT
+        | otherwise -> AnRestart (Just rudis) rxConfReg failT linkT
+      AbilityDetect{}
+        | abilityMatch rudis && rxConfReg /= 0 ->
+            AckDetect Nothing rxConfReg failT rxConfReg
+        | otherwise -> AbilityDetect (Just rudis) rxConfReg failT
+      AckDetect{}
+        | ackMatch rudis && not (consistencyMatch self._rxConfReg rudis) ->
+            AnEnable Nothing rxConfReg failT
+        | abilityMatch rudis && rxConfReg == 0 ->
+            AnEnable Nothing rxConfReg failT
+        | ackMatch rudis && consistencyMatch self._rxConfReg rudis ->
+            CompleteAck Nothing rxConfReg failT 0
+        | otherwise -> AckDetect (Just rudis) rxConfReg failT self._hist
+      CompleteAck{}
+        | abilityMatch rudis && rxConfReg == 0 ->
+            AnEnable Nothing rxConfReg failT
+        | linkT >= timeout (Proxy @dom) && not (abilityMatch rudis) ->
+            IdleDetect Nothing rxConfReg failT 0
+        | linkT >= timeout (Proxy @dom) && rxConfReg /= 0 ->
+            IdleDetect Nothing rxConfReg failT 0
+        | otherwise -> CompleteAck (Just rudis) rxConfReg failT linkT
+      IdleDetect{}
+        | abilityMatch rudis && rxConfReg == 0 ->
+            AnEnable Nothing rxConfReg failT
+        | linkT >= timeout (Proxy @dom) && idleMatch rudis ->
+            LinkOk Nothing rxConfReg failT
+        | otherwise -> IdleDetect (Just rudis) rxConfReg failT linkT
+      LinkOk{}
+        | abilityMatch rudis -> AnEnable Nothing rxConfReg failT
+        | otherwise -> LinkOk (Just rudis) rxConfReg failT
  where
-  s = anEnable failT rudi rudis rxConfRegs
-  (rudis, rxConfRegs, failT, _) = anUpdate self syncStatus rudi rxConfReg
-autoNegT self@AnRestart{} (syncStatus, rudi, rxConfReg)
-  | isJust s = fromJust s
-  | linkT >= timeout (Proxy @dom) =
-      AbilityDetect rudis rxConfRegs failT mrAdvAbility
-  | otherwise = AnRestart rudis rxConfRegs failT linkT
- where
-  s = anEnable failT rudi rudis rxConfRegs
-  (rudis, rxConfRegs, failT, linkT) = anUpdate self syncStatus rudi rxConfReg
-autoNegT self@AbilityDetect{} (syncStatus, rudi, rxConfReg)
-  | isJust s = fromJust s
-  | abilityMatch rudis rxConfRegs && last rxConfRegs /= 0 =
-      AcknowledgeDetect rudis rxConfRegs failT txConfReg
-  | otherwise = AbilityDetect rudis rxConfRegs failT mrAdvAbility
- where
-  s = anEnable failT rudi rudis rxConfRegs
-  (rudis, rxConfRegs, failT, _) = anUpdate self syncStatus rudi rxConfReg
-  txConfReg = replaceBit (14 :: Index 16) 0 mrAdvAbility
-autoNegT self@AcknowledgeDetect{..} (syncStatus, rudi, rxConfReg)
-  | isJust s = fromJust s
-  | acknowledgeMatch rxConfRegs && not (consistencyMatch rudis rxConfRegs) =
-      AnEnable rudis rxConfRegs failT
-  | abilityMatch rudis rxConfRegs && last rxConfRegs == 0 =
-      AnEnable rudis rxConfRegs failT
-  | acknowledgeMatch rxConfRegs && consistencyMatch rudis rxConfRegs =
-      CompleteAcknowledge rudis rxConfRegs failT 0
-  | otherwise = AcknowledgeDetect rudis rxConfRegs failT txConfReg
- where
-  s = anEnable failT rudi rudis rxConfRegs
-  (rudis, rxConfRegs, failT, _) = anUpdate self syncStatus rudi rxConfReg
-  txConfReg = replaceBit (14 :: Index 16) 1 _txConfReg
-autoNegT self@CompleteAcknowledge{} (syncStatus, rudi, rxConfReg)
-  | isJust s = fromJust s
-  | abilityMatch rudis rxConfRegs && last rxConfRegs == 0 =
-      AnEnable rudis rxConfRegs failT
-  | linkT >= timeout (Proxy @dom) && not (abilityMatch rudis rxConfRegs) =
-      IdleDetect rudis rxConfRegs failT 0
-  | linkT >= timeout (Proxy @dom) && last rxConfRegs /= 0 =
-      IdleDetect rudis rxConfRegs failT 0
-  | otherwise = CompleteAcknowledge rudis rxConfRegs failT linkT
- where
-  s = anEnable failT rudi rudis rxConfRegs
-  (rudis, rxConfRegs, failT, linkT) = anUpdate self syncStatus rudi rxConfReg
-autoNegT self@IdleDetect{} (syncStatus, rudi, rxConfReg)
-  | isJust s = fromJust s
-  | abilityMatch rudis rxConfRegs && last rxConfRegs == 0 =
-      AnEnable rudis rxConfRegs failT
-  | linkT >= timeout (Proxy @dom) && idleMatch rudis =
-      LinkOk rudis rxConfRegs failT
-  | otherwise = IdleDetect rudis rxConfRegs failT linkT
- where
-  s = anEnable failT rudi rudis rxConfRegs
-  (rudis, rxConfRegs, failT, linkT) = anUpdate self syncStatus rudi rxConfReg
-autoNegT self@LinkOk{} (syncStatus, rudi, rxConfReg)
-  | isJust s = fromJust s
-  | abilityMatch rudis rxConfRegs = AnEnable rudis rxConfRegs failT
-  | otherwise = LinkOk rudis rxConfRegs failT
- where
-  s = anEnable failT rudi rudis rxConfRegs
-  (rudis, rxConfRegs, failT, _) = anUpdate self syncStatus rudi rxConfReg
+  rudis = maybe rudis' (rudis' <<+) rudi
+   where
+    rudis' = fromMaybe (repeat I) self._rudis
+  rxConfReg = fromMaybe self._rxConfReg (toConfReg =<< rudi)
+  failT = if syncStatus == Fail then self._failT + 1 else 0
+  linkT = self._linkT + 1
 
 -- | Output function for 'autoNeg' as defined in IEEE 802.3 Clause 37. Returns
 --   the new value for 'Xmit' and 'ConfReg' for 'Sgmii.pcsTransmit'.
+--
+--   __TODO__: The state diagram shows that in the state @ABILITY_DETECT@ the
+--   acknowledge bit should be set to zero. However, if this is done, the PHY
+--   does not always (~50% of the time) exit auto-negotiation mode, which means
+--   that no data can be transmitted. This can be resolved by resetting the PCS
+--   receive. The documentation for SGMII, specifically Table 1, shows that the
+--   acknowledge bit of the configuration register is always asserted, that is
+--   why here the decision has been made to remove this deassertion to zero in
+--   @ABILITY_DETECT@. Now the PHY does correctly exit auto-negotiation mode,
+--   and the configuration register will be transmitted correctly. However, due
+--   to the lack of a description of specific changes in the documentation, it
+--   is not clear whether this is indeed the correct solution, and it should be
+--   investigated further.
 autoNegO ::
   forall dom.
   (KnownDomain dom) =>
@@ -247,23 +184,26 @@ autoNegO ::
   AutoNegState dom ->
   -- | New outputs
   (AutoNegState dom, Maybe Xmit, Maybe ConfReg)
-autoNegO self@AnEnable{} = (self, Just Conf, Just 0)
-autoNegO self@AnRestart{} = (self, Nothing, Just 0)
-autoNegO self@AbilityDetect{..} = (self, Nothing, Just txConfReg)
+autoNegO self = case self of
+  AnEnable{} -> (self, Just Conf, Just 0)
+  AnRestart{} -> (self, Nothing, Just 0)
+  -- According to IEEE 802.3 this should have the acknowledge bit deasserted,
+  -- but for SGMII the acknowledge bit is always asserted
+  AbilityDetect{} -> (self, Nothing, Just txConfReg)
+  AckDetect{} -> (self, Nothing, Just txConfReg)
+  CompleteAck{} -> (self, Nothing, Nothing)
+  IdleDetect{} -> (self, Just Idle, Nothing)
+  LinkOk{} -> (self, Just Data, Nothing)
  where
-  txConfReg = replaceBit (14 :: Index 16) 0 _txConfReg
-autoNegO self@AcknowledgeDetect{..} = (self, Nothing, Just txConfReg)
- where
-  txConfReg = replaceBit (14 :: Index 16) 1 _txConfReg
-autoNegO self@CompleteAcknowledge{} = (self, Nothing, Nothing)
-autoNegO self@IdleDetect{} = (self, Just Idle, Nothing)
-autoNegO self@LinkOk{} = (self, Just Data, Nothing)
+  txConfReg = 0b0100000000000001
 
 -- | Function that implements the auto-negotiation block as defined in IEEE
 --   802.3 Clause 37, but modified to comply to the SGMII standard. This
---   modification is the decrease of 'Timeout' from 10 ms to 1.6 ms. SGMII also
---   uses a different layout of the configuration register, but this does not
---   affect the state machine as the acknowledge bit is in the same location.
+--   modification is the decrease of 'Timeout' from 10 ms to 1.6 ms, and the
+--   fact that SGMII always requires the acknowledge bit to be asserted. SGMII
+--   also uses a different layout of the configuration register, but this does
+--   not affect the state machine as the acknowledge bit is in the same
+--   location.
 --
 --   __N.B.__: This function does not implement the optional Next Page function.
 autoNeg ::
@@ -273,17 +213,15 @@ autoNeg ::
   Signal dom SyncStatus ->
   -- | A new value of 'Rudi' from 'Sgmii.pcsReceive'
   Signal dom (Maybe Rudi) ->
-  -- | A new value of 'ConfReg' from 'Sgmii.pcsReceive'
-  Signal dom (Maybe ConfReg) ->
   -- | Tuple containing the new value for 'Xmit' and a new 'ConfReg'
   (Signal dom (Maybe Xmit), Signal dom (Maybe ConfReg))
-autoNeg syncStatus rudi rxConfReg = (xmit, txConfReg)
+autoNeg syncStatus rudi = (xmit, txConfReg)
  where
   (_, xmit, txConfReg) =
     mooreB
       (autoNegT @dom)
       (autoNegO @dom)
-      (AnEnable (repeat Invalid) (repeat 0) 0)
-      (syncStatus, rudi, rxConfReg)
+      (AnEnable Nothing 0 0)
+      (syncStatus, rudi)
 
 {-# CLASH_OPAQUE autoNeg #-}

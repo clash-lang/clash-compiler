@@ -53,8 +53,20 @@ data OrderedSet
 
 -- | Defines the possible values for the RUDI output signal of the PCS Receive
 --   block as defined in IEEE 802.3 Clause 36
-data Rudi = C | I | Invalid
+data Rudi = C ConfReg | I | Invalid
   deriving (Generic, NFDataX, Eq, Show)
+
+-- | Convert a 'Rudi' to a 'ConfReg'
+toConfReg :: Rudi -> Maybe ConfReg
+toConfReg (C confReg) = Just confReg
+toConfReg _ = Nothing
+
+-- | Convert a 'Rudi' to just the first bits
+toStatus :: Rudi -> BitVector 2
+toStatus rudi = case rudi of
+  C _ -> 0b00
+  I -> 0b01
+  Invalid -> 0b10
 
 -- | Record that holds the current status of the module, specifically the
 --   'SyncStatus' from 'Sgmii.sync', the 'ConfReg' that has been received by
@@ -64,7 +76,7 @@ data SgmiiStatus = SgmiiStatus
   { _cBsOk :: Bool
   , _cSyncStatus :: SyncStatus
   , _cRxConfReg :: ConfReg
-  , _cRudi :: Rudi
+  , _cRudi :: BitVector 2
   , _cXmit :: Xmit
   }
 

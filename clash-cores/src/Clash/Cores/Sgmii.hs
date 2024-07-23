@@ -100,12 +100,12 @@ sgmiiRx rxCg =
       <$> bsOk
       <*> syncStatus
       <*> regMaybe 0 rxConfReg
-      <*> regMaybe Invalid rudi
+      <*> (toStatus <$> regMaybe Invalid rudi)
       <*> regMaybe Conf xmit
 
-  (xmit, txConfReg) = autoNeg syncStatus rudi rxConfReg
-  (rxDv, rxEr, rxDw, rudi, rxConfReg) =
-    pcsReceive cg rd dw rxEven syncStatus xmit
+  rxConfReg = toConfReg <$> regMaybe (C 0) rudi
+  (xmit, txConfReg) = autoNeg syncStatus rudi
+  (rxDv, rxEr, rxDw, rudi) = pcsReceive cg rd dw rxEven syncStatus xmit
   (cg, rd, dw, rxEven, syncStatus) = sync bsCg
   (bsCg, bsOk) = bitSlip rxCg syncStatus
 
