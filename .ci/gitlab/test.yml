@@ -23,6 +23,7 @@ stages:
   before_script:
     - unset SNAPCRAFT_LOGIN_FILE
     - unset HACKAGE_PASSWORD
+    - export GHC_ABI=$(ghc --info | grep "Project Unit Id" | tail -c 7 | cut -c 1-4)
     - export THREADS=$(./.ci/effective_cpus.sh)
     - export CABAL_JOBS=$(./.ci/effective_cpus.sh)
     - export CABAL_DIR=$HOME/.cabal
@@ -33,7 +34,12 @@ stages:
 
     # Not all package in cache get packed into dist.tar.zst, so we need to
     # regenerate the package database
-    - ghc-pkg recache --package-db=$HOME/.cabal/store/ghc-$GHC_VERSION/package.db
+    - |
+      if [ -z ${GHC_ABI} ]; then
+        ghc-pkg recache --package-db=$HOME/.cabal/store/ghc-$GHC_VERSION/package.db;
+      else
+        ghc-pkg recache --package-db=$HOME/.cabal/store/ghc-$GHC_VERSION-$GHC_ABI/package.db;
+      fi
   after_script:
 
 .test-cache-local:
@@ -45,6 +51,7 @@ stages:
   before_script:
     - unset SNAPCRAFT_LOGIN_FILE
     - unset HACKAGE_PASSWORD
+    - export GHC_ABI=$(ghc --info | grep "Project Unit Id" | tail -c 7 | cut -c 1-4)
     - export THREADS=$(./.ci/effective_cpus.sh)
     - export CABAL_JOBS=$(./.ci/effective_cpus.sh)
     - export CABAL_DIR=$HOME/.cabal
@@ -57,7 +64,12 @@ stages:
 
     # Not all package in cache get packed into dist.tar.zst, so we need to
     # regenerate the package database
-    - ghc-pkg recache --package-db=$HOME/.cabal/store/ghc-$GHC_VERSION/package.db
+    - |
+      if [ -z ${GHC_ABI} ]; then
+        ghc-pkg recache --package-db=$HOME/.cabal/store/ghc-$GHC_VERSION/package.db;
+      else
+        ghc-pkg recache --package-db=$HOME/.cabal/store/ghc-$GHC_VERSION-$GHC_ABI/package.db;
+      fi
   after_script:
     - tar -cf - /root/.cabal/packages | zstd -T${THREADS} -3 > cache.tar.zst
 
