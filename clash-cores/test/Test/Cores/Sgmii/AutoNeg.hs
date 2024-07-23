@@ -48,51 +48,49 @@ genConfRegsAck range = do
 --   entered state for debugging purposes.
 autoNegSim ::
   (C.HiddenClockResetEnable dom) =>
-  C.Signal dom (SyncStatus, Maybe Rudi, Maybe ConfReg) ->
+  C.Signal dom (SyncStatus, Maybe Rudi) ->
   C.Signal dom (AutoNegState dom)
-autoNegSim i = s
+autoNegSim (C.unbundle -> i) = s
  where
-  (s, _, _) =
-    C.unbundle $
-      C.moore autoNegT autoNegO (AnEnable (C.repeat Invalid) (C.repeat 0) 0) i
+  (s, _, _) = C.mooreB autoNegT autoNegO (AnEnable Nothing 0 0) i
 
 -- | Generate a list of values that do not contain the acknowledge bit, and
 --   assert that the @ACKNOWLEDGE_DETECT@ state is entered but not the
 --   @COMPLETE_ACKNOWLEDGE@ state
-prop_autoNegNoAcknowledgeComplete :: H.Property
-prop_autoNegNoAcknowledgeComplete = H.property $ do
-  simDuration <- H.forAll (Gen.integral (Range.linear 10 100))
+prop_autoNegNoAckComplete :: H.Property
+prop_autoNegNoAckComplete = H.property $ do
+  simDuration <- H.forAll (Gen.integral (Range.linear 9 100))
 
   inp <- H.forAll (genConfRegsNoAck (Range.singleton simDuration))
   let simOut =
         C.sampleN simDuration (autoNegSim @C.System (C.fromList (map f inp)))
        where
-        f i = (Ok, Nothing, Just i)
+        f a = (Ok, Just (C a))
 
   H.assert $ isNothing (find g simOut)
   H.assert $ isJust (find h simOut)
  where
-  g (CompleteAcknowledge{}) = True
+  g (CompleteAck{}) = True
   g _ = False
 
-  h (AcknowledgeDetect{}) = True
+  h (AckDetect{}) = True
   h _ = False
 
 -- | Generate a list of values that do contain the acknowledge bit, and assert
 --   that the @COMPLETE_ACKNOWLEDGE@ state is entered
-prop_autoNegAcknowledgeComplete :: H.Property
-prop_autoNegAcknowledgeComplete = H.property $ do
-  simDuration <- H.forAll (Gen.integral (Range.linear 10 100))
+prop_autoNegAckComplete :: H.Property
+prop_autoNegAckComplete = H.property $ do
+  simDuration <- H.forAll (Gen.integral (Range.linear 12 100))
 
   inp <- H.forAll (genConfRegsAck (Range.singleton simDuration))
   let simOut =
         C.sampleN simDuration (autoNegSim @C.System (C.fromList (map f inp)))
        where
-        f i = (Ok, Nothing, Just i)
+        f a = (Ok, Just (C a))
 
   H.assert $ isJust (find g simOut)
  where
-  g (CompleteAcknowledge{}) = True
+  g (CompleteAck{}) = True
   g _ = False
 
 -- | Assert that in a simulation, the number of times a given state that uses
@@ -105,7 +103,7 @@ prop_autoNegLinkTimer = H.property $ do
   let simOut =
         C.sampleN simDuration (autoNegSim @C.System (C.fromList (map f inp)))
        where
-        f i = (Ok, Nothing, Just i)
+        f a = (Ok, Just (C a))
 
   (length . filter g) simOut H.=== 3
  where
@@ -123,7 +121,7 @@ prop_autoNegFail = H.property $ do
   let simOut =
         C.sampleN simDuration (autoNegSim @C.System (C.fromList (map f inp)))
        where
-        f i = (Fail, Nothing, Just i)
+        f a = (Fail, Just (C a))
 
   (length . filter g) (drop 10 simOut) H.=== simDuration - 10
  where
@@ -132,7 +130,7 @@ prop_autoNegFail = H.property $ do
 
 -- | Assert that if values with ack set and ack not set are inputted
 --   interchangeably the system will never trigger 'acknowledgeMatch' and thus
---   not reach 'CompleteAcknowledge'.
+--   not reach 'CompleteAck'.
 prop_autoNegNoThreeInARow :: H.Property
 prop_autoNegNoThreeInARow = H.property $ do
   simDuration <- H.forAll (Gen.integral (Range.linear 1 100))
@@ -143,11 +141,11 @@ prop_autoNegNoThreeInARow = H.property $ do
       simOut =
         C.sampleN simDuration (autoNegSim @C.System (C.fromList (map f inp)))
        where
-        f i = (Ok, Nothing, Just i)
+        f a = (Ok, Just (C a))
 
   H.assert $ isNothing (find g simOut)
  where
-  g (CompleteAcknowledge{}) = True
+  g (CompleteAck{}) = True
   g _ = False
 
 C.createDomain C.vSystem{C.vName = "TimeoutDom", C.vPeriod = C.hzToPeriod 125e6}
