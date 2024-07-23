@@ -69,6 +69,8 @@ else
   MULTIPLE_HIDDEN=${MULTIPLE_HIDDEN:-yes}
 fi
 
+cabal v2-update | tee cabal_update_output
+
 # File may exist as part of a dist.tar.zst
 if [ ! -f cabal.project.local ]; then
   cp .ci/cabal.project.local .
@@ -88,7 +90,10 @@ if [ ! -f cabal.project.local ]; then
   set -u
 
   # Fix index-state to prevent rebuilds if Hackage changes between build -> test.
-  sed -i "s/HEAD/$(date -u +%FT%TZ)/g" cabal.project.local
+  # Note we can't simply set it to a timestamp of "now", as Cabal will error out
+  # when its index state is older than what's mentioned in cabal.project(.local).
+  most_recent_index_state=$(grep "The index-state is set to" cabal_update_output | grep -E -o '[^ ]+Z.$' | tr -d .)
+  sed -i "s/HEAD/${most_recent_index_state}/g" cabal.project.local
 fi
 
 cat cabal.project.local
@@ -106,10 +111,3 @@ sed -i "/remote-repo-cache:.*/d" ${HOME}/.cabal/config
 cat ${HOME}/.cabal/config
 
 set +u
-
-# run v2-update first to generate the cabal config file that we can then modify
-# retry 5 times, as hackage servers are not perfectly reliable
-NEXT_WAIT_TIME=0
-until cabal v2-update || [ $NEXT_WAIT_TIME -eq 5 ]; do
-  sleep $(( NEXT_WAIT_TIME++ ))
-done
