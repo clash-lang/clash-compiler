@@ -102,22 +102,6 @@ anEnable failT rudi rudis rxConfRegs
   | rudi == Just Invalid = Just $ AnEnable rudis rxConfRegs failT
   | otherwise = Nothing
 
--- | General part of the status update of the auto negotiation function, where
---   the new values of 'Rudi', 'ConfReg' and the 'Timeout's are handled.
-anUpdate ::
-  (KnownDomain dom) =>
-  AutoNegState dom ->
-  SyncStatus ->
-  Maybe Rudi ->
-  Maybe ConfReg ->
-  (Rudis, ConfRegs, Timeout dom, Timeout dom)
-anUpdate s syncStatus rudi rxConfReg = (rudis, rxConfRegs, failT, linkT)
- where
-  rudis = maybe s._rudis (s._rudis <<+) rudi
-  rxConfRegs = maybe s._rxConfRegs (s._rxConfRegs <<+) rxConfReg
-  failT = if syncStatus == Fail then s._failT + 1 else 0
-  linkT = s._linkT + 1
-
 -- | Check if the the last three received values of @rxConfReg@ are the same
 --   (with the exception for bit 14, the acknowledge bit, which is discarded).
 --   If there has been 'Rudi' value of 'I' in the same set of values, then
@@ -159,6 +143,22 @@ consistencyMatch rudis rxConfigRegs =
 -- | Function that checks that the last three values of 'Rudi' have been 'I'
 idleMatch :: Rudis -> Bool
 idleMatch = (==) (repeat I)
+
+-- | General part of the status update of the auto negotiation function, where
+--   the new values of 'Rudi', 'ConfReg' and the 'Timeout's are handled.
+anUpdate ::
+  (KnownDomain dom) =>
+  AutoNegState dom ->
+  SyncStatus ->
+  Maybe Rudi ->
+  Maybe ConfReg ->
+  (Rudis, ConfRegs, Timeout dom, Timeout dom)
+anUpdate s syncStatus rudi rxConfReg = (rudis, rxConfRegs, failT, linkT)
+ where
+  rudis = maybe s._rudis (s._rudis <<+) rudi
+  rxConfRegs = maybe s._rxConfRegs (s._rxConfRegs <<+) rxConfReg
+  failT = if syncStatus == Fail then s._failT + 1 else 0
+  linkT = s._linkT + 1
 
 -- | State transition function for 'autoNeg' as defined in IEEE 802.3 Clause 37.
 --   It takes the current 'SyncStatus' from 'Sgmii.sync' as well as the 'Rudi'

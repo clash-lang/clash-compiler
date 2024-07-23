@@ -94,32 +94,6 @@ carrierDetect cg rd rxEven
  where
   cgK28_5 = if rd then cgK28_5P else cgK28_5N
 
--- | Function that implements the transitions of the @RECEIVE@ state
-receive :: Vec 3 Symbol8b10b -> Even -> Bool -> Xmit -> Maybe PcsReceiveState
-receive dws rxEven rx xmit
-  | rxEnd == Just K28_5DK28_5 && rxEven == Even = Just (EarlyEnd rx xmit)
-  | rxEnd == Just K28_5D21_5D00_0 && rxEven == Even = Just (EarlyEnd rx xmit)
-  | rxEnd == Just K28_5D02_2D00_0 && rxEven == Even = Just (EarlyEnd rx xmit)
-  | rxEnd == Just TRK28_5 && rxEven == Even = Just (TriRri rx xmit)
-  | rxEnd == Just TRR = Just (TrrExtend rx xmit)
-  | rxEnd == Just RRR = Just (EarlyEnd rx xmit)
-  | isDw (head dws) = Just (RxData rx xmit dw)
-  | otherwise = Nothing
- where
-  rxEnd = checkEnd dws
-  dw = head dws
-
--- | Function that implements the transitions of the @EPD2_CHECK_END@ state
-epd2CheckEnd ::
-  Vec 3 Symbol8b10b -> Even -> Bool -> Xmit -> Maybe PcsReceiveState
-epd2CheckEnd dws rxEven rx xmit
-  | rxEnd == Just RRR = Just (TrrExtend rx xmit)
-  | rxEnd == Just RRK28_5 && rxEven == Even = Just (TriRri rx xmit)
-  | rxEnd == Just RRS = Just (PacketBurstRrs rx xmit)
-  | otherwise = Nothing
- where
-  rxEnd = checkEnd dws
-
 -- | Take the running disparity, the current and next two input data words and
 --   check whether they correspond to one of the specified end conditions
 checkEnd ::
@@ -137,6 +111,32 @@ checkEnd dws
   | dws == repeat cwR ++ cwK28_5 :> Nil = Just RRK28_5
   | dws == repeat cwR ++ cwS :> Nil = Just RRS
   | otherwise = Nothing
+
+-- | Function that implements the transitions of the @EPD2_CHECK_END@ state
+epd2CheckEnd ::
+  Vec 3 Symbol8b10b -> Even -> Bool -> Xmit -> Maybe PcsReceiveState
+epd2CheckEnd dws rxEven rx xmit
+  | rxEnd == Just RRR = Just (TrrExtend rx xmit)
+  | rxEnd == Just RRK28_5 && rxEven == Even = Just (TriRri rx xmit)
+  | rxEnd == Just RRS = Just (PacketBurstRrs rx xmit)
+  | otherwise = Nothing
+ where
+  rxEnd = checkEnd dws
+
+-- | Function that implements the transitions of the @RECEIVE@ state
+receive :: Vec 3 Symbol8b10b -> Even -> Bool -> Xmit -> Maybe PcsReceiveState
+receive dws rxEven rx xmit
+  | rxEnd == Just K28_5DK28_5 && rxEven == Even = Just (EarlyEnd rx xmit)
+  | rxEnd == Just K28_5D21_5D00_0 && rxEven == Even = Just (EarlyEnd rx xmit)
+  | rxEnd == Just K28_5D02_2D00_0 && rxEven == Even = Just (EarlyEnd rx xmit)
+  | rxEnd == Just TRK28_5 && rxEven == Even = Just (TriRri rx xmit)
+  | rxEnd == Just TRR = Just (TrrExtend rx xmit)
+  | rxEnd == Just RRR = Just (EarlyEnd rx xmit)
+  | isDw (head dws) = Just (RxData rx xmit dw)
+  | otherwise = Nothing
+ where
+  rxEnd = checkEnd dws
+  dw = head dws
 
 -- | State transition function for 'pcsReceive'. Takes the state as defined in
 --   'PcsReceiveState' and returns the next state as defined in Clause 36 of
