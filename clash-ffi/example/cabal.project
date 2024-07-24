@@ -4,6 +4,5 @@ write-ghc-environment-files: always
 
 allow-newer:
   hashable,
-  vector-binary-instances:base,
   derive-storable-plugin:ghc,
   derive-storable-plugin:ghci

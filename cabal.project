@@ -66,13 +66,7 @@ optional-packages:
 allow-newer:
   brick:base,
   brick:deepseq,
-  vector-binary-instances:base,
-  cryptohash-sha256:base,
   hashable,
-  haskell-src-meta:template-haskell,
-  string-interpolate:template-haskell,
-  string-interpolate:text,
-  tasty-hedgehog:tasty,
   hedgehog-fakedata:hedgehog,
   rewrite-inspector:binary,
   rewrite-inspector:containers,
