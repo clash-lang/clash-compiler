@@ -9,7 +9,13 @@
 --
 --   Bit slip function that word-aligns a stream of bits based on received
 --   comma values
-module Clash.Cores.Sgmii.BitSlip where
+module Clash.Cores.Sgmii.BitSlip
+  ( BitSlipState (..)
+  , bitSlip
+  , bitSlipO
+  , bitSlipT
+  )
+where
 
 import Clash.Cores.Sgmii.Common
 import Clash.Prelude
@@ -27,10 +33,6 @@ data BitSlipState
       }
   | BSOk {_s :: BitVector 20, _n :: Index 10}
   deriving (Generic, NFDataX, Eq, Show)
-
--- | Reverse the bits of a 'BitVector'
-reverseBV :: (KnownNat n) => BitVector n -> BitVector n
-reverseBV = v2bv . reverse . bv2v
 
 -- | State transition function for 'bitSlip', where the initial state is the
 --   training state, and after 8 consecutive commas have been detected at the

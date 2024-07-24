@@ -55,7 +55,13 @@
 --   basis and they are always transmitted to @TXD@, this port should only be
 --   read when @RX_DV@ is asserted as invalid data might be provided when it is
 --   not.
-module Clash.Cores.Sgmii where
+module Clash.Cores.Sgmii
+  ( sgmii
+  , sgmiiRA
+  , sgmiiRx
+  , sgmiiTx
+  )
+where
 
 import Clash.Cores.LineCoding8b10b
 import Clash.Cores.Sgmii.AutoNeg

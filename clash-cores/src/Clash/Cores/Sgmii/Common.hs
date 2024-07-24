@@ -95,6 +95,10 @@ orNothing :: Bool -> a -> Maybe a
 orNothing True a = Just a
 orNothing False _ = Nothing
 
+-- | Reverse the bits of a 'BitVector'
+reverseBV :: (KnownNat n) => BitVector n -> BitVector n
+reverseBV = v2bv . reverse . bv2v
+
 -- | Code group that corresponds to K28.5 with negative disparity
 cgK28_5N :: Cg
 cgK28_5N = 0b0101111100

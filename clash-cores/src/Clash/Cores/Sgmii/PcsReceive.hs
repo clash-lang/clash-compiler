@@ -8,7 +8,13 @@
 --   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 --
 --   PCS receive process, as defined in IEEE 802.3 Figure 36-7a and 36-7b
-module Clash.Cores.Sgmii.PcsReceive where
+module Clash.Cores.Sgmii.PcsReceive
+  ( PcsReceiveState (..)
+  , pcsReceive
+  , pcsReceiveO
+  , pcsReceiveT
+  )
+where
 
 import Clash.Cores.LineCoding8b10b
 import Clash.Cores.Sgmii.Common

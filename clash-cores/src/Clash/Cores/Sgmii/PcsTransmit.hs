@@ -7,7 +7,7 @@
 --
 --   Top level module for the PCS transmit block, that combines the processes
 --   that are defined in the two submodules @CodeGroup@ and @OrderedSet@.
-module Clash.Cores.Sgmii.PcsTransmit where
+module Clash.Cores.Sgmii.PcsTransmit (pcsTransmit) where
 
 import Clash.Cores.Sgmii.Common
 import Clash.Cores.Sgmii.PcsTransmit.CodeGroup
