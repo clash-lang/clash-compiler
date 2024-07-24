@@ -9,7 +9,12 @@
 --
 --   Code group process of the PCS transmit block, as defined in IEEE 802.3
 --   Figure 36-6
-module Clash.Cores.Sgmii.PcsTransmit.CodeGroup where
+module Clash.Cores.Sgmii.PcsTransmit.CodeGroup
+  ( CodeGroupState (..)
+  , codeGroupO
+  , codeGroupT
+  )
+where
 
 import Clash.Cores.LineCoding8b10b
 import Clash.Cores.Sgmii.Common

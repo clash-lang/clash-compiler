@@ -7,7 +7,11 @@
 --
 --   Functions for the rate adaptation blocks that are required for lower bit
 --   rates than 1000 Mbps
-module Clash.Cores.Sgmii.RateAdapt where
+module Clash.Cores.Sgmii.RateAdapt
+  ( rateAdaptRx
+  , rateAdaptTx
+  )
+where
 
 import Clash.Cores.Sgmii.Common
 import Clash.Prelude

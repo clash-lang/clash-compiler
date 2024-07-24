@@ -8,7 +8,16 @@
 --   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 --
 --   Synchronization process, as defined in IEEE 802.3 Figure 36-9
-module Clash.Cores.Sgmii.Sync where
+module Clash.Cores.Sgmii.Sync
+  ( OutputQueue
+  , SyncState (..)
+  , outputQueueO
+  , outputQueueT
+  , sync
+  , syncO
+  , syncT
+  )
+where
 
 import Clash.Cores.LineCoding8b10b
 import Clash.Cores.Sgmii.Common

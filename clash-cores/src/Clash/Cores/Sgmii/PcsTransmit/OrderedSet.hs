@@ -8,7 +8,11 @@
 --
 --   Ordered set process of the PCS transmit block, as defined in IEEE 802.3
 --   Figure 36-5
-module Clash.Cores.Sgmii.PcsTransmit.OrderedSet where
+module Clash.Cores.Sgmii.PcsTransmit.OrderedSet
+  ( OrderedSetState (..)
+  , orderedSetT
+  )
+where
 
 import Clash.Cores.Sgmii.Common
 import Clash.Prelude

@@ -8,7 +8,15 @@
 --   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 --
 --   Auto-negotiation process, as defined in IEEE 802.3 Figure 37-6
-module Clash.Cores.Sgmii.AutoNeg where
+module Clash.Cores.Sgmii.AutoNeg
+  ( AutoNegState (..)
+  , Rudis
+  , Timeout
+  , autoNeg
+  , autoNegO
+  , autoNegT
+  )
+where
 
 import Clash.Cores.Sgmii.Common
 import Clash.Prelude
