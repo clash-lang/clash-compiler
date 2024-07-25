@@ -49,7 +49,6 @@ tests:
 
       - GHC_VERSION: [8.10.7]
         WORKAROUND_GHC_MMAP_CRASH: "yes"
-        MULTIPLE_HIDDEN: "no"
         RUN_TESTS: "always"
 
 stack-build:

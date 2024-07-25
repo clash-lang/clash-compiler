@@ -104,6 +104,9 @@ topEntity clk rst en = readFromBiSignal bus'
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
 
+-- TryDomain / HasDomain instances
+{-# OPTIONS_GHC -Wno-deprecations #-}
+
 module Clash.Signal.BiSignal (
     BiSignalIn()
   , BiSignalOut()

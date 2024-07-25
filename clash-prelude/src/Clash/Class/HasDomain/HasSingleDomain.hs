@@ -15,10 +15,10 @@ Internals for "Clash.Class.HasDomain"
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-{-# OPTIONS_GHC -Wno-missing-methods #-}
+{-# OPTIONS_GHC -Wno-missing-methods -Wno-deprecations #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
-module Clash.Class.HasDomain.HasSingleDomain where
+module Clash.Class.HasDomain.HasSingleDomain {-# DEPRECATED "Experimental feature multiple hidden has been removed. This module will therefore be removed in Clash 1.12." #-} where
 
 import           Clash.Class.HasDomain.Common
 import           Clash.Class.HasDomain.CodeGen    (mkTryDomainTuples)

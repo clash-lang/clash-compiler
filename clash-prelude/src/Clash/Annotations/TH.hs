@@ -440,7 +440,6 @@ data ClockType = None | SingleClockResetEnable | Other
 --
 -- Fail if:
 -- - There are free type variables.
--- - There are multiple hidden clocks
 handleConstraints :: Type -> ClockType -> Q (Type, ClockType)
 handleConstraints (ForallT [] [] x) clk = handleConstraints x clk
 handleConstraints (ForallT xs@(_:_) _ _) _ =
@@ -466,7 +465,7 @@ clockToPorts None = return []
 clockToPorts (SingleClockResetEnable) =
   return [PortProduct "" [ PortName "clk" , PortName "rst" , PortName "en" ]]
 clockToPorts Other =
-  fail $ failMsg "TH generation for multiple hidden clocks and"
+  fail $ failMsg "TH generation for"
        ++ " HiddenClock/HiddenReset/HiddenEnable currently unsupported!"
 
 -- *

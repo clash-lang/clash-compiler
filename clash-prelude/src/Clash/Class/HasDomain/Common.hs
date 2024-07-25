@@ -7,7 +7,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Clash.Class.HasDomain.Common
+module Clash.Class.HasDomain.Common {-# DEPRECATED "Experimental feature multiple hidden has been removed. This module will therefore be removed in Clash 1.12." #-}
   ( Unlines
   , (:<<>>:)
   , (:$$$:)

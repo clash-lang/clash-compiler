@@ -838,7 +838,7 @@ blockRamPow2 = \cnt rd wrM -> withFrozenCallStack
 
 {- | Create a read-after-write block RAM from a read-before-write one
 
-#if __GLASGOW_HASKELL__ >= 908 && !defined(CLASH_MULTIPLE_HIDDEN)
+#if __GLASGOW_HASKELL__ >= 908
 >>> :t readNew (blockRam (0 :> 1 :> Nil))
 readNew (blockRam (0 :> 1 :> Nil))
   :: ...
@@ -846,7 +846,7 @@ readNew (blockRam (0 :> 1 :> Nil))
      ... =>
      Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a
 
-#elif __GLASGOW_HASKELL__ >= 902 && !defined(CLASH_MULTIPLE_HIDDEN)
+#elif __GLASGOW_HASKELL__ >= 902
 >>> :t readNew (blockRam (0 :> 1 :> Nil))
 readNew (blockRam (0 :> 1 :> Nil))
   :: ...
@@ -888,24 +888,6 @@ readNew = hideClockResetEnable E.readNew
 -- is: WriteFirst. For mixed-port read/write, when port A writes to the address
 -- port B reads from, the output of port B is undefined, and vice versa.
 trueDualPortBlockRam ::
-#ifdef CLASH_MULTIPLE_HIDDEN
-  forall nAddrs dom1 dom2 a .
-  ( HasCallStack
-  , KnownNat nAddrs
-  , HiddenClock dom1
-  , HiddenClock dom2
-  , NFDataX a
-  )
-  => Signal dom1 (E.RamOp nAddrs a)
-  -- ^ RAM operation for port A
-  -> Signal dom2 (E.RamOp nAddrs a)
-  -- ^ RAM operation for port B
-  -> (Signal dom1 a, Signal dom2 a)
-  -- ^ Outputs data on /next/ cycle. When writing, the data written
-  -- will be echoed. When reading, the read data is returned.
-trueDualPortBlockRam inA inB =
-  E.trueDualPortBlockRam (hasClock @dom1) (hasClock @dom2) inA inB
-#else
   forall nAddrs dom a .
   ( HasCallStack
   , KnownNat nAddrs
@@ -920,4 +902,3 @@ trueDualPortBlockRam inA inB =
   -- ^ Outputs data on /next/ cycle. When writing, the data written
   -- will be echoed. When reading, the read data is returned.
 trueDualPortBlockRam inA inB = E.trueDualPortBlockRam hasClock hasClock inA inB
-#endif

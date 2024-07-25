@@ -12,8 +12,6 @@ import qualified Clash.Netlist.Types as N
 import qualified Clash.Netlist.Id as Id
 import Clash.Annotations.TH
 
-import Clash.Class.HasDomain
-
 import Test.Tasty.Clash
 import Test.Tasty.Clash.NetlistTest
 
@@ -24,8 +22,6 @@ data SevenSegment dom (n :: Nat) = SevenSegment
     , segments :: "SEG" ::: Signal dom (Vec 7 Bool)
     , dp :: "DP" ::: Signal dom Bool
     }
-
-type instance TryDomain t (SevenSegment dom n) = Found dom
 
 topEntity
     :: "CLK" ::: Clock System

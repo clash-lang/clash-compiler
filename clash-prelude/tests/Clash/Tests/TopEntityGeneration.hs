@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wwarn #-}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -264,15 +263,6 @@ topEntityFailure6
   -> "out"     ::: Signal System Bool
 topEntityFailure6 = undefined
 
-#if MULTIPLE_HIDDEN
-topEntityFailure7
-  :: HiddenClockResetEnable System
-  => HiddenClockResetEnable XilinxSystem
-  => "int"     ::: Signal System Int
-  -> "out"     ::: Signal System Bool
-topEntityFailure7 = undefined
-#endif
-
 topEntityFailure8
   :: "int"     ::: Signal System (Passthrough Int Simple)
   -> "out"     ::: Signal System Bool
@@ -324,10 +314,6 @@ tests =
           $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntityFailure5) @?= failed
       , testCase "topEntityFailure6" $
           $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntityFailure6) @?= failed
-#if MULTIPLE_HIDDEN
-      , testCase "topEntityFailure7" $
-          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntityFailure7) @?= failed
-#endif
       , testCase "topEntityFailure8" $
           $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntityFailure8) @?= failed
       ]

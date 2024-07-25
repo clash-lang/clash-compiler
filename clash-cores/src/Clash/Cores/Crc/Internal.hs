@@ -20,6 +20,9 @@ rewritten directly from their sources.
 
 {-# OPTIONS_HADDOCK hide #-}
 
+-- Multiple hidden instances
+{-# OPTIONS_GHC -Wno-deprecations #-}
+
 module Clash.Cores.Crc.Internal where
 
 import           Clash.Prelude

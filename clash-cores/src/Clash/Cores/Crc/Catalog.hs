@@ -12,6 +12,9 @@ All entries are from https://reveng.sourceforge.io/crc-catalogue/all.htm
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+-- Multiple hidden instances
+{-# OPTIONS_GHC -Wno-deprecations #-}
+
 module Clash.Cores.Crc.Catalog where
 
 import Clash.Prelude

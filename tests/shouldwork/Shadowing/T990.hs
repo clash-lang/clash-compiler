@@ -8,7 +8,6 @@ import qualified Control.Category as CC
 import Control.Arrow
 
 import Clash.Prelude
-import Clash.Class.HasDomain
 import Clash.Explicit.Testbench
 
 data SignalA dom a b = SA { runSA :: Signal dom a -> Signal dom b }
@@ -25,7 +24,7 @@ instance Arrow (SignalA dom) where
     (SA f) &&& (SA g) = SA $ f &&& g >>> bundle
 
 
-alwaysEnable :: (WithSingleDomain dom a, KnownDomain dom) => (HiddenEnable dom => a) -> a
+alwaysEnable :: KnownDomain dom => (HiddenEnable dom => a) -> a
 alwaysEnable a = exposeEnable a enableGen
 
 alwaysDelayA ::

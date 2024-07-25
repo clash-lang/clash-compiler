@@ -45,14 +45,6 @@ if [[ ${tag_version} != "" ]]; then
             exit 1;
         fi
     fi
-
-    set +e
-    grep "flag multiple-hidden" -A 7 clash-prelude/clash-prelude.cabal | grep -q "default: False"
-    if [[ $? != 0 ]]; then
-        echo "multiple_hidden flag should be disabled by default on releases!"
-        exit 1;
-    fi
-    set -e
 fi
 
 # Print out versions for debugging purposes
@@ -62,22 +54,11 @@ ghc --version
 # This might happen during tags on GitLab CI
 CI_COMMIT_BRANCH=${CI_COMMIT_BRANCH:-no_branch_set_by_ci}
 
-# Set MULTIPLE_HIDDEN on when not building a tag, unless it is already set.
-if [[ $CI_COMMIT_TAG != "" ]]; then
-  MULTIPLE_HIDDEN=${MULTIPLE_HIDDEN:-no}
-else
-  MULTIPLE_HIDDEN=${MULTIPLE_HIDDEN:-yes}
-fi
-
 cabal v2-update | tee cabal_update_output
 
 # File may exist as part of a dist.tar.zst
 if [ ! -f cabal.project.local ]; then
   cp .ci/cabal.project.local .
-
-  if [[ "$MULTIPLE_HIDDEN" == "no" ]]; then
-    sed -i 's/+multiple-hidden/-multiple-hidden/g' cabal.project.local
-  fi
 
   set +u
   if [[ "$WORKAROUND_GHC_MMAP_CRASH" == "yes" ]]; then
