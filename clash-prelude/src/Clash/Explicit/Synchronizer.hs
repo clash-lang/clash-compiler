@@ -30,7 +30,7 @@ module Clash.Explicit.Synchronizer
 where
 
 import Data.Bits                   (complement, shiftR, xor)
-import Data.Constraint             ((:-)(..), Dict (..))
+import Data.Constraint             ((:-)(Sub), Dict (..))
 import Data.Constraint.Nat         (leTrans)
 import Data.Maybe                  (isJust)
 import GHC.TypeLits                (type (+), type (-), type (<=), type (^), KnownNat)
