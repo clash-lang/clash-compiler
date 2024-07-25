@@ -13,18 +13,10 @@ module Clash.Cores.Sgmii.PcsReceive where
 import Clash.Cores.LineCoding8b10b
 import Clash.Cores.Sgmii.Common
 import Clash.Prelude
-import Data.Maybe (fromJust, fromMaybe, isJust)
+import Data.Maybe (fromJust, isJust)
 
 -- | Defines all possible valid 'checkEnd' results
-data CheckEnd
-  = K28_5DK28_5
-  | K28_5D21_5D00_0
-  | K28_5D02_2D00_0
-  | TRK28_5
-  | TRR
-  | RRR
-  | RRK28_5
-  | RRS
+data CheckEnd = KDK | KDD | TRK | TRR | RRR | RRK | RRS
   deriving (Eq, Show)
 
 -- | State type of 'pcsReceive'. This contains all states as they are defined in
@@ -33,28 +25,23 @@ data CheckEnd
 --   group. The transitions of these states are embedded in the states that
 --   usually transition to either of these states.
 data PcsReceiveState
-  = WaitForK {_rx :: Bool, _xmit :: Xmit}
-  | RxK {_rx :: Bool, _xmit :: Xmit}
-  | RxCB {_rx :: Bool, _xmit :: Xmit}
-  | RxCC {_rx :: Bool, _xmit :: Xmit, _hist :: Symbol8b10b}
-  | RxCD
-      { _rx :: Bool
-      , _xmit :: Xmit
-      , _hist :: Symbol8b10b
-      , _rxConfReg :: ConfReg
-      }
+  = WaitForK {_rx :: Bool}
+  | RxK {_rx :: Bool}
+  | RxCB {_rx :: Bool}
+  | RxCC {_rx :: Bool, _hist :: Symbol8b10b}
+  | RxCD {_rx :: Bool, _rxConfReg :: ConfReg}
   | RxInvalid {_rx :: Bool, _xmit :: Xmit}
-  | IdleD {_rx :: Bool, _xmit :: Xmit}
-  | FalseCarrier {_rx :: Bool, _xmit :: Xmit}
-  | StartOfPacket {_rx :: Bool, _xmit :: Xmit}
-  | EarlyEnd {_rx :: Bool, _xmit :: Xmit}
-  | TriRri {_rx :: Bool, _xmit :: Xmit}
-  | TrrExtend {_rx :: Bool, _xmit :: Xmit}
-  | PacketBurstRrs {_rx :: Bool, _xmit :: Xmit}
-  | ExtendErr {_rx :: Bool, _xmit :: Xmit}
-  | EarlyEndExt {_rx :: Bool, _xmit :: Xmit}
-  | RxData {_rx :: Bool, _xmit :: Xmit, _hist :: Symbol8b10b}
-  | RxDataError {_rx :: Bool, _xmit :: Xmit, _hist :: Symbol8b10b}
+  | IdleD {_rx :: Bool}
+  | FalseCarrier {_rx :: Bool}
+  | StartOfPacket {_rx :: Bool}
+  | EarlyEnd {_rx :: Bool}
+  | TriRri {_rx :: Bool}
+  | TrrExtend {_rx :: Bool}
+  | PacketBurstRrs {_rx :: Bool}
+  | ExtendErr {_rx :: Bool}
+  | EarlyEndExt {_rx :: Bool}
+  | RxData {_rx :: Bool, _hist :: Symbol8b10b}
+  | RxDataError {_rx :: Bool, _hist :: Symbol8b10b}
   | LinkFailed {_rx :: Bool, _xmit :: Xmit}
   deriving (Generic, NFDataX, Eq, Show)
 
@@ -102,49 +89,46 @@ checkEnd ::
   -- | End condition
   Maybe CheckEnd
 checkEnd dws
-  | dws == cwK28_5 :> dws !! (1 :: Index 3) :> cwK28_5 :> Nil = Just K28_5DK28_5
-  | dws == cwK28_5 :> dwD21_5 :> dwD00_0 :> Nil = Just K28_5D21_5D00_0
-  | dws == cwK28_5 :> dwD02_2 :> dwD00_0 :> Nil = Just K28_5D02_2D00_0
-  | dws == cwT :> cwR :> cwK28_5 :> Nil = Just TRK28_5
+  | dws == cwK28_5 :> dws !! (1 :: Index 3) :> cwK28_5 :> Nil = Just KDK
+  | dws == cwK28_5 :> dwD21_5 :> dwD00_0 :> Nil = Just KDD
+  | dws == cwK28_5 :> dwD02_2 :> dwD00_0 :> Nil = Just KDD
+  | dws == cwT :> cwR :> cwK28_5 :> Nil = Just TRK
   | dws == cwT :> Nil ++ repeat cwR = Just TRR
   | dws == repeat cwR = Just RRR
-  | dws == repeat cwR ++ cwK28_5 :> Nil = Just RRK28_5
+  | dws == repeat cwR ++ cwK28_5 :> Nil = Just RRK
   | dws == repeat cwR ++ cwS :> Nil = Just RRS
   | otherwise = Nothing
 
 -- | Function that implements the transitions of the @EPD2_CHECK_END@ state
-epd2CheckEnd ::
-  Vec 3 Symbol8b10b -> Even -> Bool -> Xmit -> Maybe PcsReceiveState
-epd2CheckEnd dws rxEven rx xmit
-  | rxEnd == Just RRR = Just (TrrExtend rx xmit)
-  | rxEnd == Just RRK28_5 && rxEven == Even = Just (TriRri rx xmit)
-  | rxEnd == Just RRS = Just (PacketBurstRrs rx xmit)
+epd2CheckEnd :: Vec 3 Symbol8b10b -> Even -> Bool -> Maybe PcsReceiveState
+epd2CheckEnd dws rxEven rx
+  | rxEnd == Just RRR = Just (TrrExtend rx)
+  | rxEnd == Just RRK && rxEven == Even = Just (TriRri rx)
+  | rxEnd == Just RRS = Just (PacketBurstRrs rx)
   | otherwise = Nothing
  where
   rxEnd = checkEnd dws
 
 -- | Function that implements the transitions of the @RECEIVE@ state
-receive :: Vec 3 Symbol8b10b -> Even -> Bool -> Xmit -> Maybe PcsReceiveState
-receive dws rxEven rx xmit
-  | rxEnd == Just K28_5DK28_5 && rxEven == Even = Just (EarlyEnd rx xmit)
-  | rxEnd == Just K28_5D21_5D00_0 && rxEven == Even = Just (EarlyEnd rx xmit)
-  | rxEnd == Just K28_5D02_2D00_0 && rxEven == Even = Just (EarlyEnd rx xmit)
-  | rxEnd == Just TRK28_5 && rxEven == Even = Just (TriRri rx xmit)
-  | rxEnd == Just TRR = Just (TrrExtend rx xmit)
-  | rxEnd == Just RRR = Just (EarlyEnd rx xmit)
-  | isDw (head dws) = Just (RxData rx xmit dw)
+receive :: Vec 3 Symbol8b10b -> Even -> Bool -> Maybe PcsReceiveState
+receive dws rxEven rx
+  | rxEnd == Just KDK && rxEven == Even = Just (EarlyEnd rx)
+  | rxEnd == Just KDD && rxEven == Even = Just (EarlyEnd rx)
+  | rxEnd == Just TRK && rxEven == Even = Just (TriRri rx)
+  | rxEnd == Just TRR = Just (TrrExtend rx)
+  | rxEnd == Just RRR = Just (EarlyEnd rx)
+  | isDw (head dws) = Just (RxData rx (head dws))
   | otherwise = Nothing
  where
   rxEnd = checkEnd dws
-  dw = head dws
 
 -- | State transition function for 'pcsReceive'. Takes the state as defined in
 --   'PcsReceiveState' and returns the next state as defined in Clause 36 of
 --   IEEE 802.3. In contrast to the specification in Clause 36, here
 --   'Sgmii.syncT' is responsible for decoding the code groups instead of this
 --   function, to not duplicate any work, but as this function does need to
---   determine the difference in bits ('bitDifference') the code group is set as
---   an input value as well.
+--   determine the difference in bits the code group is set as an input value as
+--   well.
 --
 --   __N.B.__: This function does not implement the optional EEE
 --   (Energy-Efficient Ethernet) capability.
@@ -153,124 +137,85 @@ pcsReceiveT ::
   PcsReceiveState ->
   -- | Input values, where @Vec 3 CodeGroup@ contains the current and next two
   -- | data words
-  (Cg, Bool, Vec 3 Symbol8b10b, Even, SyncStatus, Maybe Xmit) ->
+  (Cg, Bool, Vec 3 Symbol8b10b, Even, SyncStatus, Xmit) ->
   -- | New state
   PcsReceiveState
 pcsReceiveT WaitForK{..} (_, _, dws, rxEven, syncStatus, xmit)
-  | syncStatus == Fail = LinkFailed False xmit'
-  | head dws == cwK28_5 && rxEven == Even = RxK False xmit'
-  | otherwise = WaitForK _rx xmit'
- where
-  xmit' = fromMaybe _xmit xmit
-pcsReceiveT RxK{..} (_, _, dws, _, syncStatus, xmit)
-  | syncStatus == Fail = LinkFailed False xmit'
-  | dw == dwD21_5 = RxCB False xmit'
-  | dw == dwD02_2 = RxCB False xmit'
-  | not (isDw dw) && xmit' /= Data = RxInvalid False xmit'
-  | xmit' /= Data && isDw dw = IdleD False xmit'
-  | xmit' == Data = IdleD False xmit'
-  | otherwise = RxK _rx xmit'
- where
-  xmit' = fromMaybe _xmit xmit
-  dw = head dws
+  | syncStatus == Fail = LinkFailed False xmit
+  | head dws == cwK28_5 && rxEven == Even = RxK False
+  | otherwise = WaitForK _rx
+pcsReceiveT RxK{} (_, _, dws, _, syncStatus, xmit)
+  | syncStatus == Fail = LinkFailed False xmit
+  | head dws == dwD21_5 || head dws == dwD02_2 = RxCB False
+  | xmit == Data || isDw (head dws) = IdleD False
+  | otherwise = RxInvalid False xmit
 pcsReceiveT RxCB{..} (_, _, dws, _, syncStatus, xmit)
-  | syncStatus == Fail = LinkFailed _rx xmit'
-  | isDw dw = RxCC _rx xmit' dw
-  | otherwise = RxInvalid _rx xmit'
- where
-  xmit' = fromMaybe _xmit xmit
-  dw = head dws
+  | syncStatus == Fail = LinkFailed _rx xmit
+  | isDw (head dws) = RxCC _rx (head dws)
+  | otherwise = RxInvalid _rx xmit
 pcsReceiveT RxCC{..} (_, _, dws, _, syncStatus, xmit)
-  | syncStatus == Fail = LinkFailed _rx xmit'
-  | isDw dw = RxCD _rx xmit' dw $ resize $ fromSymbol _hist
-  | otherwise = RxInvalid _rx xmit'
+  | syncStatus == Fail = LinkFailed _rx xmit
+  | isDw (head dws) = RxCD _rx rxConfReg
+  | otherwise = RxInvalid _rx xmit
  where
-  xmit' = fromMaybe _xmit xmit
-  dw = head dws
+  rxConfReg = pack $ map fromSymbol $ head dws :> _hist :> Nil
 pcsReceiveT RxCD{..} (_, _, dws, rxEven, syncStatus, xmit)
-  | syncStatus == Fail = LinkFailed _rx xmit'
-  | dw == cwK28_5 && rxEven == Even = RxK _rx xmit'
-  | dw /= cwK28_5 = RxInvalid _rx xmit'
-  | rxEven == Odd = RxInvalid _rx xmit'
-  | otherwise = RxCD _rx xmit' _hist _rxConfReg
- where
-  xmit' = fromMaybe _xmit xmit
-  dw = head dws
+  | syncStatus == Fail = LinkFailed _rx xmit
+  | head dws == cwK28_5 && rxEven == Even = RxK _rx
+  | otherwise = RxInvalid _rx xmit
 pcsReceiveT RxInvalid{..} (_, _, dws, rxEven, syncStatus, xmit)
-  | syncStatus == Fail = LinkFailed rx xmit'
-  | dw == cwK28_5 && rxEven == Even = RxK rx xmit'
-  | dw /= cwK28_5 && rxEven == Even = WaitForK rx xmit'
-  | otherwise = RxInvalid _rx xmit'
+  | syncStatus == Fail = LinkFailed rx xmit
+  | rxEven == Odd = RxInvalid rx xmit
+  | head dws == cwK28_5 = RxK rx
+  | otherwise = WaitForK rx
  where
-  rx = xmit' == Data || _rx
-  xmit' = fromMaybe _xmit xmit
-  dw = head dws
-pcsReceiveT IdleD{..} (cg, rd, dws, rxEven, syncStatus, xmit)
-  | syncStatus == Fail = LinkFailed False xmit'
-  | dw /= cwK28_5 && xmit' /= Data = RxInvalid False xmit'
-  | carrierDetected && xmit' == Data && dw /= cwS = FalseCarrier False xmit'
-  | carrierDetected && xmit' == Data && dw == cwS = StartOfPacket False xmit'
-  | otherwise = RxK False xmit'
+  rx = xmit == Data || _rx
+pcsReceiveT IdleD{} (cg, rd, dws, rxEven, syncStatus, xmit)
+  | syncStatus == Fail = LinkFailed False xmit
+  | head dws /= cwK28_5 && xmit /= Data = RxInvalid False xmit
+  | carrierDetected && xmit == Data && head dws /= cwS = FalseCarrier False
+  | carrierDetected && xmit == Data && head dws == cwS = StartOfPacket False
+  | otherwise = RxK False
  where
   carrierDetected = carrierDetect cg rd rxEven
-  xmit' = fromMaybe _xmit xmit
-  dw = head dws
 pcsReceiveT FalseCarrier{..} (_, _, dws, rxEven, syncStatus, xmit)
-  | syncStatus == Fail = LinkFailed True xmit'
-  | dw == cwK28_5 && rxEven == Even = RxK True xmit'
-  | otherwise = FalseCarrier _rx xmit'
- where
-  xmit' = fromMaybe _xmit xmit
-  dw = head dws
+  | syncStatus == Fail = LinkFailed True xmit
+  | head dws == cwK28_5 && rxEven == Even = RxK True
+  | otherwise = FalseCarrier _rx
 pcsReceiveT EarlyEnd{..} (_, _, dws, _, syncStatus, xmit)
-  | syncStatus == Fail = LinkFailed _rx xmit'
-  | dw == dwD02_2 = RxCB _rx xmit'
-  | dw == dwD21_5 = RxCB _rx xmit'
-  | otherwise = IdleD _rx xmit'
- where
-  xmit' = fromMaybe _xmit xmit
-  dw = head dws
+  | syncStatus == Fail = LinkFailed _rx xmit
+  | head dws == dwD21_5 || head dws == dwD02_2 = RxCB False
+  | otherwise = IdleD _rx
 pcsReceiveT TriRri{..} (_, _, dws, _, syncStatus, xmit)
-  | syncStatus == Fail = LinkFailed False xmit'
-  | head dws == cwK28_5 = RxK False xmit'
-  | otherwise = TriRri _rx xmit'
- where
-  xmit' = fromMaybe _xmit xmit
+  | syncStatus == Fail = LinkFailed False xmit
+  | head dws == cwK28_5 = RxK False
+  | otherwise = TriRri _rx
 pcsReceiveT PacketBurstRrs{..} (_, _, dws, _, syncStatus, xmit)
-  | syncStatus == Fail = LinkFailed _rx xmit'
-  | head dws == cwS = StartOfPacket _rx xmit'
-  | otherwise = PacketBurstRrs _rx xmit'
- where
-  xmit' = fromMaybe _xmit xmit
+  | syncStatus == Fail = LinkFailed _rx xmit
+  | head dws == cwS = StartOfPacket _rx
+  | otherwise = PacketBurstRrs _rx
 pcsReceiveT ExtendErr{..} (_, _, dws, rxEven, syncStatus, xmit)
-  | syncStatus == Fail = LinkFailed _rx xmit'
-  | dw == cwS = StartOfPacket _rx xmit'
-  | dw == cwK28_5 && rxEven == Even = RxK _rx xmit'
+  | syncStatus == Fail = LinkFailed _rx xmit
+  | head dws == cwS = StartOfPacket _rx
+  | head dws == cwK28_5 && rxEven == Even = RxK _rx
   | isJust s && rxEven == Even = fromJust s
-  | otherwise = ExtendErr _rx xmit'
+  | otherwise = ExtendErr _rx
  where
-  s = epd2CheckEnd dws rxEven _rx xmit'
-  xmit' = fromMaybe _xmit xmit
-  dw = head dws
-pcsReceiveT LinkFailed{..} (_, _, _, _, syncStatus, xmit)
-  | syncStatus == Fail = LinkFailed False xmit'
-  | otherwise = WaitForK False xmit'
- where
-  xmit' = fromMaybe _xmit xmit
+  s = epd2CheckEnd dws rxEven _rx
+pcsReceiveT LinkFailed{} (_, _, _, _, syncStatus, xmit)
+  | syncStatus == Fail = LinkFailed False xmit
+  | otherwise = WaitForK False
 pcsReceiveT self (_, _, dws, rxEven, syncStatus, xmit)
-  | syncStatus == Fail = LinkFailed self._rx xmit'
+  | syncStatus == Fail = LinkFailed self._rx xmit
   | isJust s1 = fromJust s1
   | otherwise = s2
  where
   (s1, s2) = case self of
     TrrExtend{} ->
-      (epd2CheckEnd dws rxEven self._rx xmit', ExtendErr self._rx xmit')
+      (epd2CheckEnd dws rxEven self._rx, ExtendErr self._rx)
     EarlyEndExt{} ->
-      (epd2CheckEnd dws rxEven self._rx xmit', ExtendErr self._rx xmit')
-    _ -> (receive dws rxEven self._rx xmit', RxDataError self._rx xmit' dw)
-
-  xmit' = fromMaybe self._xmit xmit
-  dw = head dws
+      (epd2CheckEnd dws rxEven self._rx, ExtendErr self._rx)
+    _ -> (receive dws rxEven self._rx, RxDataError self._rx (head dws))
 
 -- | Output function for 'pcsReceive', that sets the outputs as defined in IEEE
 --   802.3 Clause 36.
@@ -288,8 +233,9 @@ pcsReceiveO self = case self of
   WaitForK{} -> (self, Just False, Just False, Nothing, Nothing)
   RxK{} -> (self, Just False, Just False, Nothing, Nothing)
   RxCB{} -> (self, Just False, Just False, Nothing, Nothing)
-  RxCD{} -> (self, Nothing, Nothing, Nothing, Just (C rxConfReg))
-  RxInvalid{} -> (self, Nothing, Nothing, Nothing, rudi1)
+  RxCD{} -> (self, Nothing, Nothing, Nothing, Just (C self._rxConfReg))
+  RxInvalid{} ->
+    (self, Nothing, Nothing, Nothing, orNothing (self._xmit == Conf) Invalid)
   IdleD{} -> (self, Just False, Just False, Nothing, Just I)
   FalseCarrier{} -> (self, Nothing, Just True, Just (Cw 0b00001110), Nothing)
   StartOfPacket{} ->
@@ -302,13 +248,14 @@ pcsReceiveO self = case self of
   EarlyEndExt{} -> (self, Nothing, Just True, Nothing, Nothing)
   RxData{} -> (self, Nothing, Just False, Just self._hist, Nothing)
   RxDataError{} -> (self, Nothing, Just True, Just self._hist, Nothing)
-  LinkFailed{} -> (self, rxDv, Just self._rx, Nothing, rudi2)
+  LinkFailed{} ->
+    ( self
+    , orNothing self._rx False
+    , Just self._rx
+    , Nothing
+    , orNothing (self._xmit /= Data) Invalid
+    )
   _ -> (self, Nothing, Nothing, Nothing, Nothing)
- where
-  rxConfReg = (fromSymbol self._hist ++# 0) .|. self._rxConfReg
-  rudi1 = if self._xmit == Conf then Just Invalid else Nothing
-  rudi2 = if self._xmit /= Data then Just Invalid else Nothing
-  rxDv = if self._rx then Nothing else Just False
 
 -- | The 'pcsReceive' block. Takes a tuple with the new input code group,
 --   running disparity and data word, 'Even', 'SyncStatus' and 'Xmit' signals
@@ -340,7 +287,9 @@ pcsReceive cg rd dw1 rxEven syncStatus xmit = (rxDv, rxEr, dw2, rudi)
     mooreB
       pcsReceiveT
       pcsReceiveO
-      (WaitForK False Idle)
-      (cg, rd, dw1, rxEven, syncStatus, xmit)
+      (WaitForK False)
+      (cg, rd, dw1, rxEven, syncStatus, xmit')
+
+  xmit' = regMaybe Idle xmit
 
 {-# CLASH_OPAQUE pcsReceive #-}

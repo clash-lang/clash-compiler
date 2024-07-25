@@ -29,17 +29,12 @@ data CodeGroupState
       }
   | DataGo {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg, _txEven :: Even}
   | IdleDisparityWrong {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg}
-  | IdleI1B {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg}
   | IdleDisparityOk {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg}
-  | IdleI2B {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg}
-  | ConfigurationC1A {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg}
-  | ConfigurationC1B {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg}
-  | ConfigurationC1C {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg}
-  | ConfigurationC1D {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg}
-  | ConfigurationC2A {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg}
-  | ConfigurationC2B {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg}
-  | ConfigurationC2C {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg}
-  | ConfigurationC2D {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg}
+  | IdleIB {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg, _i :: Index 2}
+  | ConfCA {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg, _i :: Index 2}
+  | ConfCB {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg, _i :: Index 2}
+  | ConfCC {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg, _i :: Index 2}
+  | ConfCD {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg, _i :: Index 2}
   deriving (Generic, NFDataX, Eq, Show)
 
 -- | State transitions from @GENERATE_CODE_GROUP@ from Figure 36-6, which need
@@ -51,7 +46,7 @@ generateCg txOSet rd cg txConfReg txEven
   | txOSet == OSetD = DataGo rd cg txConfReg txEven
   | txOSet == OSetI && rd = IdleDisparityWrong rd cg txConfReg
   | txOSet == OSetI && not rd = IdleDisparityOk rd cg txConfReg
-  | txOSet == OSetC = ConfigurationC1A rd cg txConfReg
+  | txOSet == OSetC = ConfCA rd cg txConfReg 0
   | otherwise = SpecialGo rd cg txConfReg txEven txOSet
 
 -- | State transition function for the states as defined in IEEE 802.3 Clause
@@ -80,24 +75,25 @@ codeGroupT SpecialGo{..} (txOSet, _, txConfReg) =
   txEven = nextEven _txEven
 codeGroupT self (txOSet, dw, txConfReg) = nextState
  where
-  generateCg' = generateCg txOSet rd cg txConfReg'
-
   (dw', nextState) = case self of
     DataGo{} -> (Dw dw, generateCg' txEven)
-    IdleDisparityWrong{} -> (cwK28_5, IdleI1B rd cg txConfReg')
-    IdleI1B{} -> (dwD05_6, generateCg' Odd)
-    IdleDisparityOk{} -> (cwK28_5, IdleI2B rd cg txConfReg')
-    IdleI2B{} -> (dwD16_2, generateCg' Odd)
-    ConfigurationC1A{} -> (cwK28_5, ConfigurationC1B rd cg txConfReg')
-    ConfigurationC1B{} -> (dwD21_5, ConfigurationC1C rd cg txConfReg')
-    ConfigurationC1C{} ->
-      (Dw (resize txConfReg'), ConfigurationC1D rd cg txConfReg')
-    ConfigurationC2A{} -> (cwK28_5, ConfigurationC2B rd cg txConfReg')
-    ConfigurationC2B{} -> (dwD02_2, ConfigurationC2C rd cg txConfReg')
-    ConfigurationC2C{} ->
-      (Dw (resize txConfReg'), ConfigurationC2D rd cg txConfReg')
-    _ -> (Dw (resize $ rotateR self._txConfReg 8), generateCg' Odd)
+    IdleDisparityWrong{} -> (cwK28_5, IdleIB rd cg txConfReg' 0)
+    IdleDisparityOk{} -> (cwK28_5, IdleIB rd cg txConfReg' 1)
+    IdleIB{} -> (if self._i == 0 then dwD05_6 else dwD16_2, generateCg' Odd)
+    ConfCA{} -> (cwK28_5, ConfCB rd cg txConfReg' self._i)
+    ConfCB{} ->
+      ( if self._i == 0 then dwD21_5 else dwD02_2
+      , ConfCC rd cg txConfReg' self._i
+      )
+    ConfCC{} -> (Dw (resize txConfReg'), ConfCD rd cg txConfReg' self._i)
+    ConfCD{} ->
+      ( Dw (resize $ rotateR self._txConfReg 8)
+      , if self._i == 0 && txOSet == OSetC
+          then ConfCA rd cg txConfReg' 1
+          else generateCg' Odd
+      )
 
+  generateCg' = generateCg txOSet rd cg txConfReg'
   txConfReg' = fromMaybe self._txConfReg txConfReg
   (rd, cg) = encode8b10b self._rd dw'
   txEven = nextEven self._txEven
@@ -115,12 +111,9 @@ codeGroupO ::
 codeGroupO self = case self of
   SpecialGo{} -> (self, self._cg, txEven, True)
   DataGo{} -> (self, self._cg, txEven, True)
-  IdleI1B{} -> (self, self._cg, Odd, True)
-  IdleI2B{} -> (self, self._cg, Odd, True)
-  ConfigurationC1B{} -> (self, self._cg, Odd, False)
-  ConfigurationC1D{} -> (self, self._cg, Odd, True)
-  ConfigurationC2B{} -> (self, self._cg, Odd, False)
-  ConfigurationC2D{} -> (self, self._cg, Odd, True)
+  IdleIB{} -> (self, self._cg, Odd, True)
+  ConfCB{} -> (self, self._cg, Odd, False)
+  ConfCD{} -> (self, self._cg, Odd, True)
   _ -> (self, self._cg, Even, False)
  where
   txEven = nextEven self._txEven
