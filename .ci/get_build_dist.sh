@@ -7,7 +7,12 @@ PLAN_JSON=${GIT_ROOT}/dist-newstyle/cache/plan.json
 
 CABAL_HOME=${HOME}/.cabal
 GHC_VERSION=$(ghc --version | grep -E -o '[0-9.]+$')
-PKG_STORE_DIR=${CABAL_HOME}/store/ghc-${GHC_VERSION}
+if ghc --info | grep -q "Project Unit Id"; then
+  GHC_ABI=$(ghc --info | grep "Project Unit Id" | tail -c 7 | cut -c 1-4)
+  PKG_STORE_DIR=${CABAL_HOME}/store/ghc-${GHC_VERSION}-${GHC_ABI}
+else
+  PKG_STORE_DIR=${CABAL_HOME}/store/ghc-${GHC_VERSION}
+fi
 
 # Extract packages used from install plan
 pkgs=$(jq -r '."install-plan"[].id' "${PLAN_JSON}")

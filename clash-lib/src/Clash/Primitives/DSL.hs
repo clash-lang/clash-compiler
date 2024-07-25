@@ -656,6 +656,16 @@ tuple [_] =
   error $ "tuple: Cannot create 1-tuple"
 tuple els = constructProduct tupTy els
  where
+#if MIN_VERSION_base(4,19,0)
+  tupTy = Product (tupModule <> ".Tuple" <> showt (length els)) Nothing (map ety els)
+  tupModule =
+    $(
+    let tupNm = ''(,)
+    in case (TH.nameModule tupNm, TH.nameBase tupNm) of
+        (Just modNm, "Tuple2") -> TH.lift modNm :: TH.ExpQ
+        _ -> error $ "tuple: (,) has an unexpected name: " <> show tupNm
+    )
+#else
   commas = Text.replicate (length els - 1) ","
   tupTy = Product (tupModule <> ".(" <> commas <> ")") Nothing (map ety els)
   tupModule =
@@ -665,6 +675,7 @@ tuple els = constructProduct tupTy els
         (Just modNm, "(,)") -> TH.lift modNm :: TH.ExpQ
         _ -> error $ "tuple: (,) has an unexpected name: " <> show tupNm
     )
+#endif
 
 -- | Try to get the literal string value of an expression.
 getStr :: TExpr -> Maybe String

@@ -8,6 +8,11 @@
     type: forall a. a -> a
     workInfo: Never
 - Primitive:
+    name: GHC.Magic.nospec
+    primType: Function
+    type: forall a. a -> a
+    workInfo: Never
+- Primitive:
     name: GHC.Magic.runRW#
     primType: Function
     workInfo: Never

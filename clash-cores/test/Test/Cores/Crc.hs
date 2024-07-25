@@ -61,7 +61,9 @@ proxyToSNat :: KnownNat n => Proxy n -> SNat n
 proxyToSNat _ = SNat
 
 nearestCleanDivisor :: Integer -> Integer -> Integer
-nearestCleanDivisor a b =  List.head $ List.sortOn (\i -> abs (i - b)) candidates
+nearestCleanDivisor a b = case List.sortOn (\i -> abs (i - b)) candidates of
+    [] -> error ("no nearest clean devisor for: " <> show a <> " / " <> show b)
+    (x:_) -> x
   where
     candidates = List.filter (\i -> rem a i == 0) [1, 2 .. (a + 1)]
 
