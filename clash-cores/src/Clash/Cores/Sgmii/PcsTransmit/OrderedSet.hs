@@ -87,8 +87,7 @@ orderedSetT self@IdleS{} (txEn, txEr, _, xmit, txEven, tx) = (nextState, out)
  where
   nextState
     | isJust s = fromJust s
-    | xmit' == Data && tx && not txEn && not txEr =
-        XmitData xmit' xmitChange
+    | xmit' == Data && not txEn && not txEr && tx = XmitData xmit' xmitChange
     | otherwise = IdleS xmit' xmitChange
 
   (xmit', xmitChange) = xmitUpdate self xmit
