@@ -1,6 +1,5 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
 
 -- |
@@ -23,35 +22,28 @@ type OutputQueue = Vec 3 (Cg, Bool, Symbol8b10b, Even, SyncStatus)
 --   802.3 Clause 36.
 data SyncState
   = LossOfSync {_cg :: Cg, _rd :: Bool, _dw :: Symbol8b10b, _rxEven :: Even}
-  | CommaDetect1 {_cg :: Cg, _rd :: Bool, _dw :: Symbol8b10b}
-  | AcquireSync1 {_cg :: Cg, _rd :: Bool, _dw :: Symbol8b10b, _rxEven :: Even}
-  | CommaDetect2 {_cg :: Cg, _rd :: Bool, _dw :: Symbol8b10b}
-  | AcquireSync2 {_cg :: Cg, _rd :: Bool, _dw :: Symbol8b10b, _rxEven :: Even}
-  | CommaDetect3 {_cg :: Cg, _rd :: Bool, _dw :: Symbol8b10b}
-  | SyncAcquired1 {_cg :: Cg, _rd :: Bool, _dw :: Symbol8b10b, _rxEven :: Even}
-  | SyncAcquired2 {_cg :: Cg, _rd :: Bool, _dw :: Symbol8b10b, _rxEven :: Even}
-  | SyncAcquired2A
+  | CommaDetect {_cg :: Cg, _rd :: Bool, _dw :: Symbol8b10b, _i :: Index 3}
+  | AcquireSync
       { _cg :: Cg
       , _rd :: Bool
       , _dw :: Symbol8b10b
       , _rxEven :: Even
-      , _goodCgs :: Index 4
+      , _i :: Index 3
       }
-  | SyncAcquired3 {_cg :: Cg, _rd :: Bool, _dw :: Symbol8b10b, _rxEven :: Even}
-  | SyncAcquired3A
+  | SyncAcquired
       { _cg :: Cg
       , _rd :: Bool
       , _dw :: Symbol8b10b
       , _rxEven :: Even
-      , _goodCgs :: Index 4
+      , _i :: Index 3
       }
-  | SyncAcquired4 {_cg :: Cg, _rd :: Bool, _dw :: Symbol8b10b, _rxEven :: Even}
-  | SyncAcquired4A
+  | SyncAcquiredA
       { _cg :: Cg
       , _rd :: Bool
       , _dw :: Symbol8b10b
       , _rxEven :: Even
       , _goodCgs :: Index 4
+      , _i :: Index 3
       }
   deriving (Generic, NFDataX, Eq, Show)
 
@@ -80,74 +72,48 @@ syncT ::
   Cg ->
   -- | New state and output tuple
   SyncState
-syncT LossOfSync{..} cg
-  | isNothing comma = LossOfSync cg rd dw rxEven
-  | otherwise = CommaDetect1 cg rd dw
+syncT s cg = case s of
+  LossOfSync{}
+    | isNothing comma -> LossOfSync cg rd dw rxEven
+    | otherwise -> CommaDetect cg rd dw 0
+  CommaDetect{}
+    | not (isDw dw) -> LossOfSync cg rd dw Even
+    | s._i == 0 -> AcquireSync cg rd dw Even s._i
+    | otherwise -> SyncAcquired cg rd dw Even 0
+  AcquireSync{}
+    | not (isValidSymbol dw) -> LossOfSync cg rd dw rxEven
+    | cg `elem` commas && rxEven == Even -> LossOfSync cg rd dw rxEven
+    | cg `elem` commas && rxEven == Odd -> CommaDetect cg rd dw 1
+    | otherwise -> AcquireSync cg rd dw rxEven 0
+  SyncAcquired{}
+    | s._i == maxBound && not (isValidSymbol dw) -> LossOfSync cg rd dw rxEven
+    | s._i == maxBound && cg `elem` commas && rxEven == Even ->
+        LossOfSync cg rd dw rxEven
+    | not (isValidSymbol dw) -> SyncAcquired cg rd dw rxEven (s._i + 1)
+    | cg `elem` commas && rxEven == Even ->
+        SyncAcquired cg rd dw rxEven (s._i + 1)
+    | s._i == 0 -> SyncAcquired cg rd dw rxEven 0
+    | otherwise -> SyncAcquiredA cg rd dw rxEven goodCgs s._i
+  SyncAcquiredA{}
+    | s._i == maxBound && not (isValidSymbol dw) -> LossOfSync cg rd dw rxEven
+    | s._i == maxBound && cg `elem` commas && rxEven == Even ->
+        LossOfSync cg rd dw rxEven
+    | not (isValidSymbol dw) -> SyncAcquired cg rd dw rxEven (s._i + 1)
+    | cg `elem` commas && rxEven == Even ->
+        SyncAcquired cg rd dw rxEven (s._i + 1)
+    | s._i == 0 && goodCgs == maxBound -> SyncAcquired cg rd dw rxEven 0
+    | goodCgs == maxBound -> SyncAcquired cg rd dw rxEven (s._i - 1)
+    | otherwise -> SyncAcquiredA cg rd dw rxEven goodCgs s._i
  where
-  -- As written in the documentation for 'commas', this is used to recover the
-  -- running disparity in case there has been a reset
   comma = elemIndex cg commas
-  rdNew = maybe _rd bitCoerce comma
-
+  rdNew = case s of
+    LossOfSync{} -> maybe s._rd bitCoerce comma
+    _ -> s._rd
   (rd, dw) = decode8b10b rdNew cg
-  rxEven = nextEven _rxEven
-syncT CommaDetect1{..} cg
-  | not (isDw dw) = LossOfSync cg rd dw Even
-  | otherwise = AcquireSync1 cg rd dw Even
- where
-  (rd, dw) = decode8b10b _rd cg
-syncT AcquireSync1{..} cg
-  | not (isValidSymbol dw) = LossOfSync cg rd dw rxEven
-  | cg `elem` commas && rxEven == Even = LossOfSync cg rd dw rxEven
-  | cg `elem` commas && rxEven == Odd = CommaDetect2 cg rd dw
-  | otherwise = AcquireSync1 cg rd dw rxEven
- where
-  (rd, dw) = decode8b10b _rd cg
-  rxEven = nextEven _rxEven
-syncT CommaDetect2{..} cg
-  | not (isDw dw) = LossOfSync cg rd dw Even
-  | otherwise = AcquireSync2 cg rd dw Even
- where
-  (rd, dw) = decode8b10b _rd cg
-syncT AcquireSync2{..} cg
-  | not (isValidSymbol dw) = LossOfSync cg rd dw rxEven
-  | cg `elem` commas && rxEven == Even = LossOfSync cg rd dw rxEven
-  | cg `elem` commas && rxEven == Odd = CommaDetect3 cg rd dw
-  | otherwise = AcquireSync2 cg rd dw rxEven
- where
-  (rd, dw) = decode8b10b _rd cg
-  rxEven = nextEven _rxEven
-syncT CommaDetect3{..} cg
-  | not (isDw dw) = LossOfSync cg rd dw Even
-  | otherwise = SyncAcquired1 cg rd dw Even
- where
-  (rd, dw) = decode8b10b _rd cg
-syncT SyncAcquired1{..} cg
-  | not (isValidSymbol dw) = SyncAcquired2 cg rd dw rxEven
-  | cg `elem` commas && rxEven == Even = SyncAcquired2 cg rd dw rxEven
-  | otherwise = SyncAcquired1 cg rd dw rxEven
- where
-  (rd, dw) = decode8b10b _rd cg
-  rxEven = nextEven _rxEven
-syncT self cg
-  | not (isValidSymbol dw) = s1 cg rd dw rxEven
-  | cg `elem` commas && rxEven == Even = s1 cg rd dw rxEven
-  | goodCgs == maxBound = s2 cg rd dw rxEven
-  | otherwise = s3 cg rd dw rxEven goodCgs
- where
-  (s1, s2, s3, goodCgs) = case self of
-    SyncAcquired2{} -> (SyncAcquired3, undefined, SyncAcquired2A, 0)
-    SyncAcquired2A{} ->
-      (SyncAcquired3, SyncAcquired1, SyncAcquired2A, self._goodCgs + 1)
-    SyncAcquired3{} -> (SyncAcquired4, undefined, SyncAcquired3A, 0)
-    SyncAcquired3A{} ->
-      (SyncAcquired4, SyncAcquired2, SyncAcquired3A, self._goodCgs + 1)
-    SyncAcquired4{} -> (LossOfSync, undefined, SyncAcquired4A, 0)
-    SyncAcquired4A{} ->
-      (LossOfSync, SyncAcquired3, SyncAcquired4A, self._goodCgs + 1)
-
-  (rd, dw) = decode8b10b self._rd cg
-  rxEven = nextEven self._rxEven
+  rxEven = nextEven s._rxEven
+  goodCgs = case s of
+    SyncAcquiredA{} -> s._goodCgs + 1
+    _ -> 0
 
 -- | Output function for 'sync'. Takes the state as defined in 'SyncState' and
 --   returns a tuple containing the outputs as defined in Clause 36 of IEEE
@@ -157,21 +123,13 @@ syncO ::
   SyncState ->
   -- | New state and output tuple
   (SyncState, Cg, Bool, Symbol8b10b, Even, SyncStatus)
-syncO self@LossOfSync{..} = (self, _cg, _rd, _dw, rxEven, Fail)
+syncO s = case s of
+  LossOfSync{} -> (s, s._cg, s._rd, s._dw, rxEven, Fail)
+  CommaDetect{} -> (s, s._cg, s._rd, s._dw, Even, Fail)
+  AcquireSync{} -> (s, s._cg, s._rd, s._dw, rxEven, Fail)
+  _ -> (s, s._cg, s._rd, s._dw, rxEven, Ok)
  where
-  rxEven = nextEven _rxEven
-syncO self@CommaDetect1{..} = (self, _cg, _rd, _dw, Even, Fail)
-syncO self@AcquireSync1{..} = (self, _cg, _rd, _dw, rxEven, Fail)
- where
-  rxEven = nextEven _rxEven
-syncO self@CommaDetect2{..} = (self, _cg, _rd, _dw, Even, Fail)
-syncO self@AcquireSync2{..} = (self, _cg, _rd, _dw, rxEven, Fail)
- where
-  rxEven = nextEven _rxEven
-syncO self@CommaDetect3{..} = (self, _cg, _rd, _dw, Even, Fail)
-syncO self = (self, self._cg, self._rd, self._dw, rxEven, Ok)
- where
-  rxEven = nextEven self._rxEven
+  rxEven = nextEven s._rxEven
 
 -- | Transition function for the inputs of 'Sgmii.pcsReceive'. This is used to
 --   keep a small list of "future" values for 'Symbol8b10b', such that these can
