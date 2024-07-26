@@ -344,9 +344,9 @@ executable v16-upgrade-primitives
     yaml,
     bytestring,
     clash-lib,
+    text,
     containers,
     directory,
-    stringsearch,
     Glob
   GHC-Options:        -Wall -Wcompat
   default-language:   Haskell2010
