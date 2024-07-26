@@ -240,6 +240,7 @@ Library
                       Clash.Debug
 
                       Clash.Driver
+                      Clash.Driver.Bool
                       Clash.Driver.Manifest
                       Clash.Driver.Types
 
