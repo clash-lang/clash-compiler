@@ -52,13 +52,6 @@ import           System.Console.ANSI
   , ConsoleIntensity(BoldIntensity), ConsoleLayer(Foreground), ColorIntensity(Vivid))
 import           System.IO
   (hPutStrLn, stderr, hFlush, hIsTerminalDevice)
-#if MIN_VERSION_ghc(9,4,0)
-import           GHC.Data.Bool                 (OverridingBool(..))
-#elif MIN_VERSION_ghc(9,0,0)
-import           GHC.Utils.Misc                (OverridingBool(..))
-#else
-import           Util                          (OverridingBool(..))
-#endif
 
 import           Clash.Annotations.Primitive
   ( PrimitiveGuard(HasBlackBox, DontTranslate)
@@ -92,6 +85,7 @@ import {-# SOURCE #-} Clash.Netlist
 import qualified Clash.Backend                 as Backend
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug                   (debugIsOn)
+import           Clash.Driver.Bool             (OverridingBool(..))
 import           Clash.Driver.Types
   (ClashOpts(opt_primWarn, opt_color, opt_werror))
 import           Clash.Netlist.BlackBox.Types  as B

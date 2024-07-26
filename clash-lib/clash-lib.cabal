@@ -241,6 +241,7 @@ Library
                       Clash.Debug
 
                       Clash.Driver
+                      Clash.Driver.Bool
                       Clash.Driver.BrokenGhcs
                       Clash.Driver.Manifest
                       Clash.Driver.Types
