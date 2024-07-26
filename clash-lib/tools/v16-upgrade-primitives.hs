@@ -9,8 +9,9 @@ module Main where
 
 #if MIN_VERSION_aeson(2,0,0)
 import qualified Data.Aeson.KeyMap as Aeson
-import Data.ByteString.Lazy.Search (replace)
 import Data.String (IsString)
+import qualified Data.Text.Lazy as LazyText
+import qualified Data.Text.Lazy.Encoding as LazyText
 #endif
 
 import qualified Data.Aeson.Extra as AesonExtra
@@ -89,9 +90,10 @@ customSortOutput x = case x of
       Just val -> Aeson.insert kNew val (Aeson.delete kOld obj)
 
 removeTempKey :: ByteString -> ByteString
-removeTempKey inp = foldl go inp keySortingRenames
+removeTempKey inp =
+  LazyText.encodeUtf8 (foldl go (LazyText.decodeUtf8 inp) keySortingRenames)
  where
-  go bs (orig,temp) = replace (ByteString.toStrict temp) orig bs
+  go txt (orig,temp) = LazyText.replace temp orig txt
 #else
 -- < aeson-2.0 stores keys in HashMaps, whose order we can't possibly predict.
 removeTempKey :: ByteString -> ByteString
