@@ -623,6 +623,7 @@ coreToTerm primMap unlocs = term
               | f == "GHC.Stack.withFrozenCallStack"    -> return (withFrozenCallStackTerm xType)
               | f == "GHC.Magic.noinline"               -> return (idTerm xType)
               | f == "GHC.Magic.lazy"                   -> return (idTerm xType)
+              | f == "GHC.Magic.nospec"                 -> return (idTerm xType)
               | f == "GHC.Magic.runRW#"                 -> return (runRWTerm xType)
               | f == "Clash.Sized.Internal.BitVector.checkUnpackUndef" -> return (checkUnpackUndefTerm xType)
               | f == "Clash.Magic.prefixName"

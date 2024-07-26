@@ -4,9 +4,5 @@ write-ghc-environment-files: always
 
 allow-newer:
   hashable,
-  vector-binary-instances:base
-
-source-repository-package
-    type: git
-    location: https://github.com/christiaanb/hint.git
-    tag: 7803c34c8ae1d83c0f7c13fe6b30fcb3abd0ac51
+  derive-storable-plugin:ghc,
+  derive-storable-plugin:ghci

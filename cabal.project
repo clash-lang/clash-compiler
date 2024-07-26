@@ -65,13 +65,14 @@ optional-packages:
 
 allow-newer:
   brick:base,
-  vector-binary-instances:base,
-  cryptohash-sha256:base,
+  brick:deepseq,
   hashable,
-  haskell-src-meta:template-haskell,
-  string-interpolate:template-haskell,
-  string-interpolate:text,
-  tasty-hedgehog:tasty
+  hedgehog-fakedata:hedgehog,
+  rewrite-inspector:binary,
+  rewrite-inspector:containers,
+  vty:deepseq,
+  derive-storable-plugin:ghc,
+  derive-storable-plugin:ghci
 
 -- Works around: https://github.com/recursion-schemes/recursion-schemes/issues/128. This
 -- shouldn't harm (runtime) performance of Clash, as we only use recursion-schemes with
