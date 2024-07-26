@@ -4,6 +4,7 @@
 module Data.List.Extra
   ( partitionM
   , mapAccumLM
+  , mapAccumRM
   , iterateNM
   , (<:>)
   , indexMaybe
@@ -45,6 +46,19 @@ mapAccumLM f acc (x:xs) = do
   (acc',y) <- f acc x
   (acc'',ys) <- mapAccumLM f acc' xs
   return (acc'',y:ys)
+
+-- | Monadic version of 'Data.List.mapAccumR'
+mapAccumRM
+  :: Monad m
+  => (acc -> x -> m (acc,y))
+  -> acc
+  -> [x]
+  -> m (acc,[y])
+mapAccumRM _ acc [] = return (acc,[])
+mapAccumRM f acc (x:xs) = do
+  (acc1,ys) <- mapAccumRM f acc xs
+  (acc2,y) <- f acc1 x
+  return (acc2,y:ys)
 
 -- | Monadic version of 'iterate'. A carbon copy ('iterateM') would not
 -- terminate, hence the first argument.
