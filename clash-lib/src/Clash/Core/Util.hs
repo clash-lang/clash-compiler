@@ -19,6 +19,12 @@
 module Clash.Core.Util where
 
 import           Control.Concurrent.Supply     (Supply, freshId)
+import Control.Exception.Base (patError)
+#if MIN_VERSION_base(4,16,0)
+import GHC.Prim.Panic (absentError)
+#else
+import Control.Exception.Base (absentError)
+#endif
 import Control.Monad.Trans.Except              (Except, throwE, runExcept)
 import Data.Bifunctor                          (first, second)
 import qualified Data.HashSet                  as HashSet
@@ -31,6 +37,9 @@ import Data.Maybe
 import qualified Data.Set                      as Set
 import qualified Data.Set.Lens                 as Lens
 import qualified Data.Text                     as T
+import           Data.Text.Extra               (showt)
+import           GHC.Real
+  (divZeroError, overflowError, ratioZeroDenominatorError, underflowError)
 import           GHC.Stack                     (HasCallStack)
 
 #if MIN_VERSION_ghc(9,0,0)
@@ -58,6 +67,9 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug                       (traceIf)
 import Clash.Unique                      (fromGhcUnique)
 import Clash.Util
+
+import {-# SOURCE #-} qualified Clash.Normalize.Primitives as Primitives
+import Clash.XException (errorX)
 
 -- | Rebuild a let expression / let expressions by taking the SCCs of a list
 -- of bindings and remaking Let (NonRec ...) ... and Let (Rec ...) ...
@@ -479,27 +491,23 @@ primUCo =
                 }
 
 undefinedPrims :: [T.Text]
-undefinedPrims =
-  [ "Clash.Normalize.Primitives.undefined"
-  , "Control.Exception.Base.absentError"
-  , "Control.Exception.Base.patError"
-  , "GHC.Err.error"
-  , "GHC.Err.errorWithoutStackTrace"
-  , "GHC.Err.undefined"
-  , "GHC.Internal.Err.error"
-  , "GHC.Internal.Err.errorWithoutStackTrace"
-  , "GHC.Internal.Err.undefined"
-  , "GHC.Prim.Panic.absentError"
-  , "GHC.Real.divZeroError"
-  , "GHC.Real.overflowError"
-  , "GHC.Real.ratioZeroDenominatorError"
-  , "GHC.Real.underflowError"
+undefinedPrims = fmap showt
+  [ 'Primitives.undefined
+  , 'patError
+  , 'error
+  , 'errorWithoutStackTrace
+  , 'undefined
+  , 'absentError
+  , 'divZeroError
+  , 'overflowError
+  , 'ratioZeroDenominatorError
+  , 'underflowError
   ]
 
 undefinedXPrims :: [T.Text]
-undefinedXPrims =
-  [ "Clash.Normalize.Primitives.undefinedX"
-  , "Clash.XException.errorX"
+undefinedXPrims = fmap showt
+  [ 'Primitives.undefinedX
+  , 'errorX
   ]
 
 substArgTys
