@@ -88,6 +88,7 @@ import           Clash.Core.VarEnv
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug             (traceIf)
 import           Clash.Driver            (compilePrimitive)
+import           Clash.Driver.Bool       (toGhcOverridingBool)
 import           Clash.Driver.Types      (BindingMap, Binding(..), IsPrim(..), ClashEnv(..), ClashDesign(..), ClashOpts(..))
 import           Clash.GHC.GHC2Core
   (C2C, GHC2CoreState, GHC2CoreEnv (..), tyConMap, coreToId, coreToName, coreToTerm,
@@ -133,7 +134,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
    , partitionEithers -> (unresolvedPrims, pFP)
    , customBitRepresentations
    , primGuards
-   , domainConfs ) <- loadModules startAction (opt_color opts) hdl modName dflagsM importDirs
+   , domainConfs ) <- loadModules startAction (toGhcOverridingBool (opt_color opts)) hdl modName dflagsM importDirs
   startTime <- Clock.getCurrentTime
   primMapR <- generatePrimMap unresolvedPrims primGuards (concat [pFP, primDirs, importDirs])
   tdir <- maybe ghcLibDir (pure . GHC.topDir) dflagsM

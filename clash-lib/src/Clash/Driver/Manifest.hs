@@ -54,6 +54,7 @@ import           Text.Read (readMaybe)
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend (Backend (hdlType), Usage (External))
 import           Clash.Core.Name (nameOcc)
+import           Clash.Driver.Bool (OverridingBool(..))
 import           Clash.Driver.Types
 import           Clash.Primitives.Types
 import           Clash.Core.Var (Id, varName)
@@ -65,14 +66,6 @@ import           Clash.Netlist.Util (typeSize)
 import           Clash.Primitives.Util (hashCompiledPrimMap)
 import           Clash.Signal (VDomainConfiguration(..))
 import           Clash.Util.Graph (callGraphBindings)
-
-#if MIN_VERSION_ghc(9,4,0)
-import GHC.Data.Bool (OverridingBool(..))
-#elif MIN_VERSION_ghc(9,0,0)
-import GHC.Utils.Misc (OverridingBool(..))
-#else
-import Util (OverridingBool(..))
-#endif
 
 data PortDirection
   = In | Out | InOut
