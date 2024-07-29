@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE ViewPatterns #-}
 
 -- |
@@ -81,13 +80,13 @@ syncT ::
   Cg ->
   -- | New state and output tuple
   SyncState
-syncT s cg = case s of
+syncT self cg = case self of
   LossOfSync{}
     | isNothing comma -> LossOfSync cg rd dw rxEven
     | otherwise -> CommaDetect cg rd dw 0
   CommaDetect{}
     | not (isDw dw) -> LossOfSync cg rd dw Even
-    | s._i == 0 -> AcquireSync cg rd dw Even s._i
+    | _i self == 0 -> AcquireSync cg rd dw Even (_i self)
     | otherwise -> SyncAcquired cg rd dw Even 0
   AcquireSync{}
     | not (isValidSymbol dw) -> LossOfSync cg rd dw rxEven
@@ -95,33 +94,35 @@ syncT s cg = case s of
     | cg `elem` commas && rxEven == Odd -> CommaDetect cg rd dw 1
     | otherwise -> AcquireSync cg rd dw rxEven 0
   SyncAcquired{}
-    | s._i == maxBound && not (isValidSymbol dw) -> LossOfSync cg rd dw rxEven
-    | s._i == maxBound && cg `elem` commas && rxEven == Even ->
+    | _i self == maxBound && not (isValidSymbol dw) ->
         LossOfSync cg rd dw rxEven
-    | not (isValidSymbol dw) -> SyncAcquired cg rd dw rxEven (s._i + 1)
+    | _i self == maxBound && cg `elem` commas && rxEven == Even ->
+        LossOfSync cg rd dw rxEven
+    | not (isValidSymbol dw) -> SyncAcquired cg rd dw rxEven (_i self + 1)
     | cg `elem` commas && rxEven == Even ->
-        SyncAcquired cg rd dw rxEven (s._i + 1)
-    | s._i == 0 -> SyncAcquired cg rd dw rxEven 0
-    | otherwise -> SyncAcquiredA cg rd dw rxEven goodCgs s._i
+        SyncAcquired cg rd dw rxEven (_i self + 1)
+    | _i self == 0 -> SyncAcquired cg rd dw rxEven 0
+    | otherwise -> SyncAcquiredA cg rd dw rxEven goodCgs (_i self)
   SyncAcquiredA{}
-    | s._i == maxBound && not (isValidSymbol dw) -> LossOfSync cg rd dw rxEven
-    | s._i == maxBound && cg `elem` commas && rxEven == Even ->
+    | _i self == maxBound && not (isValidSymbol dw) ->
         LossOfSync cg rd dw rxEven
-    | not (isValidSymbol dw) -> SyncAcquired cg rd dw rxEven (s._i + 1)
+    | _i self == maxBound && cg `elem` commas && rxEven == Even ->
+        LossOfSync cg rd dw rxEven
+    | not (isValidSymbol dw) -> SyncAcquired cg rd dw rxEven (_i self + 1)
     | cg `elem` commas && rxEven == Even ->
-        SyncAcquired cg rd dw rxEven (s._i + 1)
-    | s._i == 0 && goodCgs == maxBound -> SyncAcquired cg rd dw rxEven 0
-    | goodCgs == maxBound -> SyncAcquired cg rd dw rxEven (s._i - 1)
-    | otherwise -> SyncAcquiredA cg rd dw rxEven goodCgs s._i
+        SyncAcquired cg rd dw rxEven (_i self + 1)
+    | _i self == 0 && goodCgs == maxBound -> SyncAcquired cg rd dw rxEven 0
+    | goodCgs == maxBound -> SyncAcquired cg rd dw rxEven (_i self - 1)
+    | otherwise -> SyncAcquiredA cg rd dw rxEven goodCgs (_i self)
  where
   comma = elemIndex cg commas
-  rdNew = case s of
-    LossOfSync{} -> maybe s._rd bitCoerce comma
-    _ -> s._rd
+  rdNew = case self of
+    LossOfSync{} -> maybe (_rd self) bitCoerce comma
+    _ -> _rd self
   (rd, dw) = decode8b10b rdNew cg
-  rxEven = nextEven s._rxEven
-  goodCgs = case s of
-    SyncAcquiredA{} -> s._goodCgs + 1
+  rxEven = nextEven (_rxEven self)
+  goodCgs = case self of
+    SyncAcquiredA{} -> _goodCgs self + 1
     _ -> 0
 
 -- | Output function for 'sync'. Takes the state as defined in 'SyncState' and
@@ -132,13 +133,13 @@ syncO ::
   SyncState ->
   -- | New state and output tuple
   (SyncState, Cg, Bool, Symbol8b10b, Even, SyncStatus)
-syncO s = case s of
-  LossOfSync{} -> (s, s._cg, s._rd, s._dw, rxEven, Fail)
-  CommaDetect{} -> (s, s._cg, s._rd, s._dw, Even, Fail)
-  AcquireSync{} -> (s, s._cg, s._rd, s._dw, rxEven, Fail)
-  _ -> (s, s._cg, s._rd, s._dw, rxEven, Ok)
+syncO self = case self of
+  LossOfSync{} -> (self, _cg self, _rd self, _dw self, rxEven, Fail)
+  CommaDetect{} -> (self, _cg self, _rd self, _dw self, Even, Fail)
+  AcquireSync{} -> (self, _cg self, _rd self, _dw self, rxEven, Fail)
+  _ -> (self, _cg self, _rd self, _dw self, rxEven, Ok)
  where
-  rxEven = nextEven s._rxEven
+  rxEven = nextEven (_rxEven self)
 
 -- | Transition function for the inputs of 'Sgmii.pcsReceive'. This is used to
 --   keep a small list of "future" values for 'Symbol8b10b', such that these can

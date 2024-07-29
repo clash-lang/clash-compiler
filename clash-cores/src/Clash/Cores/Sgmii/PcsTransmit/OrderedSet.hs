@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE OverloadedRecordDot #-}
 
 -- |
 --   Copyright   :  (C) 2024, QBayLogic B.V.
@@ -62,8 +61,8 @@ void txOSet txEn txEr dw
 xmitUpdate :: OrderedSetState -> Maybe Xmit -> (Xmit, Bool)
 xmitUpdate s xmit = (xmit', xmitChange)
  where
-  xmit' = fromMaybe s._xmit xmit
-  xmitChange = (xmit' /= s._xmit) || s._xmitChange
+  xmit' = fromMaybe (_xmit s) xmit
+  xmitChange = (xmit' /= _xmit s) || _xmitChange s
 
 -- | State transition function for the states as defined in IEEE 802.3 Clause
 --   36, specifically Figure 36-5. This function receives the input values and

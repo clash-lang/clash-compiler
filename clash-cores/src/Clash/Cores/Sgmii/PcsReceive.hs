@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- |
@@ -212,16 +211,16 @@ pcsReceiveT LinkFailed{} (_, _, _, _, syncStatus, xmit)
   | syncStatus == Fail = LinkFailed False xmit
   | otherwise = WaitForK False
 pcsReceiveT self (_, _, dws, rxEven, syncStatus, xmit)
-  | syncStatus == Fail = LinkFailed self._rx xmit
+  | syncStatus == Fail = LinkFailed (_rx self) xmit
   | isJust s1 = fromJust s1
   | otherwise = s2
  where
   (s1, s2) = case self of
     TrrExtend{} ->
-      (epd2CheckEnd dws rxEven self._rx, ExtendErr self._rx)
+      (epd2CheckEnd dws rxEven (_rx self), ExtendErr (_rx self))
     EarlyEndExt{} ->
-      (epd2CheckEnd dws rxEven self._rx, ExtendErr self._rx)
-    _ -> (receive dws rxEven self._rx, RxDataError self._rx (head dws))
+      (epd2CheckEnd dws rxEven (_rx self), ExtendErr (_rx self))
+    _ -> (receive dws rxEven (_rx self), RxDataError (_rx self) (head dws))
 
 -- | Output function for 'pcsReceive', that sets the outputs as defined in IEEE
 --   802.3 Clause 36.
@@ -239,9 +238,9 @@ pcsReceiveO self = case self of
   WaitForK{} -> (self, Just False, Just False, Nothing, Nothing)
   RxK{} -> (self, Just False, Just False, Nothing, Nothing)
   RxCB{} -> (self, Just False, Just False, Nothing, Nothing)
-  RxCD{} -> (self, Nothing, Nothing, Nothing, Just (C self._rxConfReg))
+  RxCD{} -> (self, Nothing, Nothing, Nothing, Just (C (_rxConfReg self)))
   RxInvalid{} ->
-    (self, Nothing, Nothing, Nothing, orNothing (self._xmit == Conf) Invalid)
+    (self, Nothing, Nothing, Nothing, orNothing (_xmit self == Conf) Invalid)
   IdleD{} -> (self, Just False, Just False, Nothing, Just I)
   FalseCarrier{} -> (self, Nothing, Just True, Just (Cw 0b00001110), Nothing)
   StartOfPacket{} ->
@@ -252,14 +251,14 @@ pcsReceiveO self = case self of
   PacketBurstRrs{} -> (self, Just False, Nothing, Just (Cw 0b00001111), Nothing)
   ExtendErr{} -> (self, Just False, Nothing, Just (Cw 0b00011111), Nothing)
   EarlyEndExt{} -> (self, Nothing, Just True, Nothing, Nothing)
-  RxData{} -> (self, Nothing, Just False, Just self._hist, Nothing)
-  RxDataError{} -> (self, Nothing, Just True, Just self._hist, Nothing)
+  RxData{} -> (self, Nothing, Just False, Just (_hist self), Nothing)
+  RxDataError{} -> (self, Nothing, Just True, Just (_hist self), Nothing)
   LinkFailed{} ->
     ( self
-    , orNothing self._rx False
-    , Just self._rx
+    , orNothing (_rx self) False
+    , Just (_rx self)
     , Nothing
-    , orNothing (self._xmit /= Data) Invalid
+    , orNothing (_xmit self /= Data) Invalid
     )
   _ -> (self, Nothing, Nothing, Nothing, Nothing)
 
