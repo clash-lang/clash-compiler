@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- |
@@ -84,24 +83,24 @@ codeGroupT self (txOSet, dw, txConfReg) = nextState
     DataGo{} -> (Dw dw, generateCg' txEven)
     IdleDisparityWrong{} -> (cwK28_5, IdleIB rd cg txConfReg' 0)
     IdleDisparityOk{} -> (cwK28_5, IdleIB rd cg txConfReg' 1)
-    IdleIB{} -> (if self._i == 0 then dwD05_6 else dwD16_2, generateCg' Odd)
-    ConfCA{} -> (cwK28_5, ConfCB rd cg txConfReg' self._i)
+    IdleIB{} -> (if _i self == 0 then dwD05_6 else dwD16_2, generateCg' Odd)
+    ConfCA{} -> (cwK28_5, ConfCB rd cg txConfReg' (_i self))
     ConfCB{} ->
-      ( if self._i == 0 then dwD21_5 else dwD02_2
-      , ConfCC rd cg txConfReg' self._i
+      ( if _i self == 0 then dwD21_5 else dwD02_2
+      , ConfCC rd cg txConfReg' (_i self)
       )
-    ConfCC{} -> (Dw (resize txConfReg'), ConfCD rd cg txConfReg' self._i)
+    ConfCC{} -> (Dw (resize txConfReg'), ConfCD rd cg txConfReg' (_i self))
     ConfCD{} ->
-      ( Dw (resize $ rotateR self._txConfReg 8)
-      , if self._i == 0 && txOSet == OSetC
+      ( Dw (resize $ rotateR (_txConfReg self) 8)
+      , if _i self == 0 && txOSet == OSetC
           then ConfCA rd cg txConfReg' 1
           else generateCg' Odd
       )
 
   generateCg' = generateCg txOSet rd cg txConfReg'
-  txConfReg' = fromMaybe self._txConfReg txConfReg
-  (rd, cg) = encode8b10b self._rd dw'
-  txEven = nextEven self._txEven
+  txConfReg' = fromMaybe (_txConfReg self) txConfReg
+  (rd, cg) = encode8b10b (_rd self) dw'
+  txEven = nextEven (_txEven self)
 
 {-# CLASH_OPAQUE codeGroupT #-}
 
@@ -114,13 +113,13 @@ codeGroupO ::
   -- | New output values
   (CodeGroupState, Cg, Even, Bool)
 codeGroupO self = case self of
-  SpecialGo{} -> (self, self._cg, txEven, True)
-  DataGo{} -> (self, self._cg, txEven, True)
-  IdleIB{} -> (self, self._cg, Odd, True)
-  ConfCB{} -> (self, self._cg, Odd, False)
-  ConfCD{} -> (self, self._cg, Odd, True)
-  _ -> (self, self._cg, Even, False)
+  SpecialGo{} -> (self, _cg self, txEven, True)
+  DataGo{} -> (self, _cg self, txEven, True)
+  IdleIB{} -> (self, _cg self, Odd, True)
+  ConfCB{} -> (self, _cg self, Odd, False)
+  ConfCD{} -> (self, _cg self, Odd, True)
+  _ -> (self, _cg self, Even, False)
  where
-  txEven = nextEven self._txEven
+  txEven = nextEven (_txEven self)
 
 {-# CLASH_OPAQUE codeGroupO #-}

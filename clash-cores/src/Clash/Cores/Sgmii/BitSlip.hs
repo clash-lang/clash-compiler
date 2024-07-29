@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- |
@@ -72,11 +71,11 @@ bitSlipO ::
   -- | New output value
   (BitSlipState, Cg, Bool)
 bitSlipO self =
-  (self, reverseBV $ resize $ rotateR self._s (10 - fromEnum n), bsOk)
+  (self, reverseBV $ resize $ rotateR (_s self) (10 - fromEnum n), bsOk)
  where
   (n, bsOk) = case self of
-    BSFail{} -> (last self._ns, False)
-    BSOk{} -> (self._n, True)
+    BSFail{} -> (last (_ns self), False)
+    BSOk{} -> (_n self, True)
 
 -- | Function that takes a code word and returns the same code word, but if a
 --   comma is detected the code words is shifted such that the comma is at the

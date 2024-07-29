@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE OverloadedRecordDot #-}
 {-# OPTIONS_GHC -fconstraint-solver-iterations=10 #-}
 
 -- |
@@ -138,13 +137,13 @@ autoNegT self (syncStatus, rudi)
             AckDetect Nothing rxConfReg failT rxConfReg
         | otherwise -> AbilityDetect (Just rudis) rxConfReg failT
       AckDetect{}
-        | ackMatch rudis && not (consistencyMatch self._rxConfReg rudis) ->
+        | ackMatch rudis && not (consistencyMatch (_rxConfReg self) rudis) ->
             AnEnable Nothing rxConfReg failT
         | abilityMatch rudis && rxConfReg == 0 ->
             AnEnable Nothing rxConfReg failT
-        | ackMatch rudis && consistencyMatch self._rxConfReg rudis ->
+        | ackMatch rudis && consistencyMatch (_rxConfReg self) rudis ->
             CompleteAck Nothing rxConfReg failT 0
-        | otherwise -> AckDetect (Just rudis) rxConfReg failT self._hist
+        | otherwise -> AckDetect (Just rudis) rxConfReg failT (_hist self)
       CompleteAck{}
         | abilityMatch rudis && rxConfReg == 0 ->
             AnEnable Nothing rxConfReg failT
@@ -165,10 +164,10 @@ autoNegT self (syncStatus, rudi)
  where
   rudis = maybe rudis' (rudis' <<+) rudi
    where
-    rudis' = fromMaybe (repeat I) self._rudis
-  rxConfReg = fromMaybe self._rxConfReg (toConfReg =<< rudi)
-  failT = if syncStatus == Fail then self._failT + 1 else 0
-  linkT = self._linkT + 1
+    rudis' = fromMaybe (repeat I) (_rudis self)
+  rxConfReg = fromMaybe (_rxConfReg self) (toConfReg =<< rudi)
+  failT = if syncStatus == Fail then _failT self + 1 else 0
+  linkT = _linkT self + 1
 
 -- | Output function for 'autoNeg' as defined in IEEE 802.3 Clause 37. Returns
 --   the new value for 'Xmit' and 'ConfReg' for 'Sgmii.pcsTransmit'.
