@@ -79,7 +79,7 @@ prop_bitSlipInOutCorrect = H.property $ do
             (length inp2 + 1)
             (bitSlipSim @C.System (C.fromList (0 : inp2)))
 
-      expected = take (length simOut) $ tail inp2
+      expected = take (length simOut) $ drop 1 inp2
 
   map f simOut H.=== expected
   H.assert $ isJust $ find g simOut

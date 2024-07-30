@@ -99,8 +99,8 @@ ackMatch rudis =
  where
   rxConfRegs = map (fromMaybe 0 . toConfReg) rudis
 
--- | Check if both 'abilityMatch' and 'ackMatch' are true for the same
---   set of 'Rudi' and 'ConfReg' values.
+-- | Check if ability match and acknowledge match are set for the same value of
+--   'ConfReg'
 consistencyMatch :: ConfReg -> Rudis -> Bool
 consistencyMatch rxConfReg rudis = noAckBit rxConfReg == head rxConfRegs'
  where

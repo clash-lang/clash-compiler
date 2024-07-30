@@ -6,7 +6,8 @@ import Clash.Cores.Sgmii.Common
 import Clash.Cores.Sgmii.RateAdapt
 import Clash.Hedgehog.Sized.BitVector
 import qualified Clash.Prelude as C
-import Data.Maybe (catMaybes, fromJust)
+import Data.List (uncons)
+import Data.Maybe (catMaybes, fromJust, fromMaybe)
 import qualified Hedgehog as H
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
@@ -33,10 +34,15 @@ rateAdaptTxSim (C.unbundle -> (linkSpeed, txDw)) =
   C.bundle $ rateAdaptTx linkSpeed txDw
 
 -- | Function to take the n'th elements of a list
-everyNth :: Int -> [a] -> [a]
+everyNth :: (Num a) => Int -> [a] -> [a]
 everyNth n (drop (n - 1) -> l)
   | null l = []
-  | otherwise = head l : everyNth n (tail l)
+  | otherwise = head' 0 l : everyNth n (drop 1 l)
+
+-- | Function to safely take the first element of a list and replace it with a
+--   default value if the list is empty
+head' :: a -> [a] -> a
+head' a l = fst $ fromMaybe (a, []) $ uncons l
 
 -- | Function that tests the rate adaptation function with a link speed of 1000
 --   Mbps, which means that every input value should be propagated to the output
@@ -77,7 +83,7 @@ prop_rateAdaptRx100 = H.property $ do
        where
         f a = (Speed100, Just a)
 
-      expected = head inp : everyNth 10 (tail inp)
+      expected = head' 0 inp : everyNth 10 (drop 1 inp)
 
   catMaybes simOut H.=== expected
 
@@ -99,7 +105,7 @@ prop_rateAdaptRx10 = H.property $ do
        where
         f a = (Speed10, Just a)
 
-      expected = head inp : everyNth 100 (tail inp)
+      expected = head' 0 inp : everyNth 100 (drop 1 inp)
 
   catMaybes simOut H.=== expected
 

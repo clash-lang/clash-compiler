@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE RecordWildCards #-}
 
 -- |
 --   Copyright   :  (C) 2024, QBayLogic B.V.
@@ -44,8 +43,7 @@ data CodeGroupState
 -- | State transitions from @GENERATE_CODE_GROUP@ from Figure 36-6, which need
 --   to be set in all parent states of @GENERATE_CODE_GROUP@ as this state
 --   itself is not implemented as it does not transmit a code group
-generateCg ::
-  OrderedSet -> Bool -> Cg -> ConfReg -> Even -> CodeGroupState
+generateCg :: OrderedSet -> Bool -> Cg -> ConfReg -> Even -> CodeGroupState
 generateCg txOSet rd cg txConfReg txEven
   | txOSet == OSetD = DataGo rd cg txConfReg txEven
   | txOSet == OSetI && rd = IdleDisparityWrong rd cg txConfReg
@@ -65,21 +63,17 @@ codeGroupT ::
   (OrderedSet, BitVector 8, Maybe ConfReg) ->
   -- | The new state
   CodeGroupState
-codeGroupT SpecialGo{..} (txOSet, _, txConfReg) =
-  generateCg txOSet rd cg txConfReg' txEven
- where
-  dw = case _txOSet of
-    OSetS -> cwS
-    OSetT -> cwT
-    OSetR -> cwR
-    _ -> cwV
-
-  txConfReg' = fromMaybe _txConfReg txConfReg
-  (rd, cg) = encode8b10b _rd dw
-  txEven = nextEven _txEven
 codeGroupT self (txOSet, dw, txConfReg) = nextState
  where
   (dw', nextState) = case self of
+    SpecialGo{} ->
+      ( case _txOSet self of
+          OSetS -> cwS
+          OSetT -> cwT
+          OSetR -> cwR
+          _ -> cwV
+      , generateCg' txEven
+      )
     DataGo{} -> (Dw dw, generateCg' txEven)
     IdleDisparityWrong{} -> (cwK28_5, IdleIB rd cg txConfReg' 0)
     IdleDisparityOk{} -> (cwK28_5, IdleIB rd cg txConfReg' 1)
