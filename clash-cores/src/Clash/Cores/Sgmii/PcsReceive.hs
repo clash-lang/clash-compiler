@@ -20,7 +20,7 @@ import Clash.Cores.Sgmii.Common
 import Clash.Prelude
 import Data.Maybe (fromJust, isJust)
 
--- | Defines all possible valid 'checkEnd' results
+-- | Defines all possible valid termination values
 data CheckEnd = KDK | KDD | TRK | TRR | RRR | RRK | RRS
   deriving (Eq, Show)
 
@@ -76,7 +76,7 @@ carrierDetect ::
   Bool ->
   -- | 'Even' signal
   Even ->
-  -- | The 'carrierDetect' condition
+  -- | The carrier detection condition
   Bool
 carrierDetect cg rd rxEven
   | rxEven /= Even = False
