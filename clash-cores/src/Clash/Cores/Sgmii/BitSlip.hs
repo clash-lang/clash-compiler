@@ -52,7 +52,6 @@ bitSlipT BSFail{..} (cg, _)
   s = resize $ _s ++# reverseBV cg
   ns = maybe _ns (_ns <<+) n
   hist = map pack $ take d10 $ windows1d d10 $ bv2v s
-
   n = elemIndex True $ map f _hist
    where
     f a = a == reverseBV cgK28_5N || a == reverseBV cgK28_5P
@@ -70,12 +69,11 @@ bitSlipO ::
   BitSlipState ->
   -- | New output value
   (BitSlipState, Cg, Status)
-bitSlipO self =
-  (self, reverseBV $ resize $ rotateR (_s self) (10 - fromEnum n), bsStatus)
+bitSlipO s = (s, reverseBV $ resize $ rotateR (_s s) (10 - n), bsStatus)
  where
-  (n, bsStatus) = case self of
-    BSFail{} -> (last (_ns self), Fail)
-    BSOk{} -> (_n self, Ok)
+  (n, bsStatus) = case s of
+    BSFail{} -> (fromEnum $ last (_ns s), Fail)
+    BSOk{} -> (fromEnum $ _n s, Ok)
 
 -- | Function that takes a code word and returns the same code word, but if a
 --   comma is detected the code words is shifted such that the comma is at the
