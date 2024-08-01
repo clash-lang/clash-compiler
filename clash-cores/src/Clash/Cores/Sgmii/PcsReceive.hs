@@ -210,17 +210,17 @@ pcsReceiveT ExtendErr{..} (_, _, dws, rxEven, syncStatus, xmit)
 pcsReceiveT LinkFailed{} (_, _, _, _, syncStatus, xmit)
   | syncStatus == Fail = LinkFailed False xmit
   | otherwise = WaitForK False
-pcsReceiveT self (_, _, dws, rxEven, syncStatus, xmit)
-  | syncStatus == Fail = LinkFailed (_rx self) xmit
+pcsReceiveT s (_, _, dws, rxEven, syncStatus, xmit)
+  | syncStatus == Fail = LinkFailed (_rx s) xmit
   | isJust s1 = fromJust s1
   | otherwise = s2
  where
-  (s1, s2) = case self of
+  (s1, s2) = case s of
     TrrExtend{} ->
-      (epd2CheckEnd dws rxEven (_rx self), ExtendErr (_rx self))
+      (epd2CheckEnd dws rxEven (_rx s), ExtendErr (_rx s))
     EarlyEndExt{} ->
-      (epd2CheckEnd dws rxEven (_rx self), ExtendErr (_rx self))
-    _ -> (receive dws rxEven (_rx self), RxDataError (_rx self) (head dws))
+      (epd2CheckEnd dws rxEven (_rx s), ExtendErr (_rx s))
+    _ -> (receive dws rxEven (_rx s), RxDataError (_rx s) (head dws))
 
 -- | Output function for 'pcsReceive', that sets the outputs as defined in IEEE
 --   802.3 Clause 36.
@@ -234,33 +234,32 @@ pcsReceiveO ::
   , Maybe Symbol8b10b
   , Maybe Rudi
   )
-pcsReceiveO self = case self of
-  WaitForK{} -> (self, Just False, Just False, Nothing, Nothing)
-  RxK{} -> (self, Just False, Just False, Nothing, Nothing)
-  RxCB{} -> (self, Just False, Just False, Nothing, Nothing)
-  RxCD{} -> (self, Nothing, Nothing, Nothing, Just (C (_rxConfReg self)))
+pcsReceiveO s = case s of
+  WaitForK{} -> (s, Just False, Just False, Nothing, Nothing)
+  RxK{} -> (s, Just False, Just False, Nothing, Nothing)
+  RxCB{} -> (s, Just False, Just False, Nothing, Nothing)
+  RxCD{} -> (s, Nothing, Nothing, Nothing, Just (C (_rxConfReg s)))
   RxInvalid{} ->
-    (self, Nothing, Nothing, Nothing, orNothing (_xmit self == Conf) Invalid)
-  IdleD{} -> (self, Just False, Just False, Nothing, Just I)
-  FalseCarrier{} -> (self, Nothing, Just True, Just (Cw 0b00001110), Nothing)
-  StartOfPacket{} ->
-    (self, Just True, Just False, Just (Cw 0b01010101), Nothing)
-  EarlyEnd{} -> (self, Nothing, Just True, Nothing, Nothing)
-  TriRri{} -> (self, Just False, Just False, Nothing, Nothing)
-  TrrExtend{} -> (self, Just False, Just True, Just (Cw 0b00001111), Nothing)
-  PacketBurstRrs{} -> (self, Just False, Nothing, Just (Cw 0b00001111), Nothing)
-  ExtendErr{} -> (self, Just False, Nothing, Just (Cw 0b00011111), Nothing)
-  EarlyEndExt{} -> (self, Nothing, Just True, Nothing, Nothing)
-  RxData{} -> (self, Nothing, Just False, Just (_hist self), Nothing)
-  RxDataError{} -> (self, Nothing, Just True, Just (_hist self), Nothing)
+    (s, Nothing, Nothing, Nothing, orNothing (_xmit s == Conf) Invalid)
+  IdleD{} -> (s, Just False, Just False, Nothing, Just I)
+  FalseCarrier{} -> (s, Nothing, Just True, Just (Cw 0b00001110), Nothing)
+  StartOfPacket{} -> (s, Just True, Just False, Just (Cw 0b01010101), Nothing)
+  EarlyEnd{} -> (s, Nothing, Just True, Nothing, Nothing)
+  TriRri{} -> (s, Just False, Just False, Nothing, Nothing)
+  TrrExtend{} -> (s, Just False, Just True, Just (Cw 0b00001111), Nothing)
+  PacketBurstRrs{} -> (s, Just False, Nothing, Just (Cw 0b00001111), Nothing)
+  ExtendErr{} -> (s, Just False, Nothing, Just (Cw 0b00011111), Nothing)
+  EarlyEndExt{} -> (s, Nothing, Just True, Nothing, Nothing)
+  RxData{} -> (s, Nothing, Just False, Just (_hist s), Nothing)
+  RxDataError{} -> (s, Nothing, Just True, Just (_hist s), Nothing)
   LinkFailed{} ->
-    ( self
-    , orNothing (_rx self) False
-    , Just (_rx self)
+    ( s
+    , orNothing (_rx s) False
+    , Just (_rx s)
     , Nothing
-    , orNothing (_xmit self /= Data) Invalid
+    , orNothing (_xmit s /= Data) Invalid
     )
-  _ -> (self, Nothing, Nothing, Nothing, Nothing)
+  _ -> (s, Nothing, Nothing, Nothing, Nothing)
 
 -- | The 'pcsReceive' block. Takes a tuple with the new input code group,
 --   running disparity and data word, 'Even', 'Status' and 'Xmit' signals

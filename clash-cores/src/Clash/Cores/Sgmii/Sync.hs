@@ -80,13 +80,13 @@ syncT ::
   Cg ->
   -- | New state and output tuple
   SyncState
-syncT self cg = case self of
+syncT s cg = case s of
   LossOfSync{}
     | isNothing comma -> LossOfSync cg rd dw rxEven
     | otherwise -> CommaDetect cg rd dw 0
   CommaDetect{}
     | not (isDw dw) -> LossOfSync cg rd dw Even
-    | _i self == 0 -> AcquireSync cg rd dw Even (_i self)
+    | _i s == 0 -> AcquireSync cg rd dw Even (_i s)
     | otherwise -> SyncAcquired cg rd dw Even 0
   AcquireSync{}
     | not (isValidSymbol dw) -> LossOfSync cg rd dw rxEven
@@ -94,35 +94,33 @@ syncT self cg = case self of
     | cg `elem` commas && rxEven == Odd -> CommaDetect cg rd dw 1
     | otherwise -> AcquireSync cg rd dw rxEven 0
   SyncAcquired{}
-    | _i self == maxBound && not (isValidSymbol dw) ->
+    | _i s == maxBound && not (isValidSymbol dw) -> LossOfSync cg rd dw rxEven
+    | _i s == maxBound && cg `elem` commas && rxEven == Even ->
         LossOfSync cg rd dw rxEven
-    | _i self == maxBound && cg `elem` commas && rxEven == Even ->
-        LossOfSync cg rd dw rxEven
-    | not (isValidSymbol dw) -> SyncAcquired cg rd dw rxEven (_i self + 1)
+    | not (isValidSymbol dw) -> SyncAcquired cg rd dw rxEven (_i s + 1)
     | cg `elem` commas && rxEven == Even ->
-        SyncAcquired cg rd dw rxEven (_i self + 1)
-    | _i self == 0 -> SyncAcquired cg rd dw rxEven 0
-    | otherwise -> SyncAcquiredA cg rd dw rxEven goodCgs (_i self)
+        SyncAcquired cg rd dw rxEven (_i s + 1)
+    | _i s == 0 -> SyncAcquired cg rd dw rxEven 0
+    | otherwise -> SyncAcquiredA cg rd dw rxEven goodCgs (_i s)
   SyncAcquiredA{}
-    | _i self == maxBound && not (isValidSymbol dw) ->
+    | _i s == maxBound && not (isValidSymbol dw) -> LossOfSync cg rd dw rxEven
+    | _i s == maxBound && cg `elem` commas && rxEven == Even ->
         LossOfSync cg rd dw rxEven
-    | _i self == maxBound && cg `elem` commas && rxEven == Even ->
-        LossOfSync cg rd dw rxEven
-    | not (isValidSymbol dw) -> SyncAcquired cg rd dw rxEven (_i self + 1)
+    | not (isValidSymbol dw) -> SyncAcquired cg rd dw rxEven (_i s + 1)
     | cg `elem` commas && rxEven == Even ->
-        SyncAcquired cg rd dw rxEven (_i self + 1)
-    | _i self == 0 && goodCgs == maxBound -> SyncAcquired cg rd dw rxEven 0
-    | goodCgs == maxBound -> SyncAcquired cg rd dw rxEven (_i self - 1)
-    | otherwise -> SyncAcquiredA cg rd dw rxEven goodCgs (_i self)
+        SyncAcquired cg rd dw rxEven (_i s + 1)
+    | _i s == 0 && goodCgs == maxBound -> SyncAcquired cg rd dw rxEven 0
+    | goodCgs == maxBound -> SyncAcquired cg rd dw rxEven (_i s - 1)
+    | otherwise -> SyncAcquiredA cg rd dw rxEven goodCgs (_i s)
  where
   comma = elemIndex cg commas
-  rdNew = case self of
-    LossOfSync{} -> maybe (_rd self) bitCoerce comma
-    _ -> _rd self
+  rdNew = case s of
+    LossOfSync{} -> maybe (_rd s) bitCoerce comma
+    _ -> _rd s
   (rd, dw) = decode8b10b rdNew cg
-  rxEven = nextEven (_rxEven self)
-  goodCgs = case self of
-    SyncAcquiredA{} -> _goodCgs self + 1
+  rxEven = nextEven (_rxEven s)
+  goodCgs = case s of
+    SyncAcquiredA{} -> _goodCgs s + 1
     _ -> 0
 
 -- | Output function for 'sync'. Takes the state as defined in 'SyncState' and
@@ -133,13 +131,13 @@ syncO ::
   SyncState ->
   -- | New state and output tuple
   (SyncState, Cg, Bool, Symbol8b10b, Even, Status)
-syncO self = case self of
-  LossOfSync{} -> (self, _cg self, _rd self, _dw self, rxEven, Fail)
-  CommaDetect{} -> (self, _cg self, _rd self, _dw self, Even, Fail)
-  AcquireSync{} -> (self, _cg self, _rd self, _dw self, rxEven, Fail)
-  _ -> (self, _cg self, _rd self, _dw self, rxEven, Ok)
+syncO s = case s of
+  LossOfSync{} -> (s, _cg s, _rd s, _dw s, rxEven, Fail)
+  CommaDetect{} -> (s, _cg s, _rd s, _dw s, Even, Fail)
+  AcquireSync{} -> (s, _cg s, _rd s, _dw s, rxEven, Fail)
+  _ -> (s, _cg s, _rd s, _dw s, rxEven, Ok)
  where
-  rxEven = nextEven (_rxEven self)
+  rxEven = nextEven (_rxEven s)
 
 -- | Transition function for the inputs of 'Sgmii.pcsReceive'. This is used to
 --   keep a small list of "future" values for 'Symbol8b10b', such that these can

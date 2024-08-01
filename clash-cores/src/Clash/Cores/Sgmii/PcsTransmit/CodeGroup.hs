@@ -63,38 +63,35 @@ codeGroupT ::
   (OrderedSet, BitVector 8, Maybe ConfReg) ->
   -- | The new state
   CodeGroupState
-codeGroupT self (txOSet, dw, txConfReg) = nextState
+codeGroupT s (txOSet, dw, txConfReg) = nextState
  where
-  (dw', nextState) = case self of
+  (dw', nextState) = case s of
     SpecialGo{} ->
-      ( case _txOSet self of
+      ( case _txOSet s of
           OSetS -> cwS
           OSetT -> cwT
           OSetR -> cwR
           _ -> cwV
-      , generateCg' txEven
+      , generateCg' (nextEven (_txEven s))
       )
-    DataGo{} -> (Dw dw, generateCg' txEven)
+    DataGo{} -> (Dw dw, generateCg' (nextEven (_txEven s)))
     IdleDisparityWrong{} -> (cwK28_5, IdleIB rd cg txConfReg' 0)
     IdleDisparityOk{} -> (cwK28_5, IdleIB rd cg txConfReg' 1)
-    IdleIB{} -> (if _i self == 0 then dwD05_6 else dwD16_2, generateCg' Odd)
-    ConfCA{} -> (cwK28_5, ConfCB rd cg txConfReg' (_i self))
+    IdleIB{} -> (if _i s == 0 then dwD05_6 else dwD16_2, generateCg' Odd)
+    ConfCA{} -> (cwK28_5, ConfCB rd cg txConfReg' (_i s))
     ConfCB{} ->
-      ( if _i self == 0 then dwD21_5 else dwD02_2
-      , ConfCC rd cg txConfReg' (_i self)
-      )
-    ConfCC{} -> (Dw (resize txConfReg'), ConfCD rd cg txConfReg' (_i self))
+      (if _i s == 0 then dwD21_5 else dwD02_2, ConfCC rd cg txConfReg' (_i s))
+    ConfCC{} -> (Dw (resize txConfReg'), ConfCD rd cg txConfReg' (_i s))
     ConfCD{} ->
-      ( Dw (resize $ rotateR (_txConfReg self) 8)
-      , if _i self == 0 && txOSet == OSetC
+      ( Dw (resize $ rotateR (_txConfReg s) 8)
+      , if _i s == 0 && txOSet == OSetC
           then ConfCA rd cg txConfReg' 1
           else generateCg' Odd
       )
 
   generateCg' = generateCg txOSet rd cg txConfReg'
-  txConfReg' = fromMaybe (_txConfReg self) txConfReg
-  (rd, cg) = encode8b10b (_rd self) dw'
-  txEven = nextEven (_txEven self)
+  txConfReg' = fromMaybe (_txConfReg s) txConfReg
+  (rd, cg) = encode8b10b (_rd s) dw'
 
 {-# CLASH_OPAQUE codeGroupT #-}
 
@@ -106,14 +103,12 @@ codeGroupO ::
   CodeGroupState ->
   -- | New output values
   (CodeGroupState, Cg, Even, Bool)
-codeGroupO self = case self of
-  SpecialGo{} -> (self, _cg self, txEven, True)
-  DataGo{} -> (self, _cg self, txEven, True)
-  IdleIB{} -> (self, _cg self, Odd, True)
-  ConfCB{} -> (self, _cg self, Odd, False)
-  ConfCD{} -> (self, _cg self, Odd, True)
-  _ -> (self, _cg self, Even, False)
- where
-  txEven = nextEven (_txEven self)
+codeGroupO s = case s of
+  SpecialGo{} -> (s, _cg s, nextEven (_txEven s), True)
+  DataGo{} -> (s, _cg s, nextEven (_txEven s), True)
+  IdleIB{} -> (s, _cg s, Odd, True)
+  ConfCB{} -> (s, _cg s, Odd, False)
+  ConfCD{} -> (s, _cg s, Odd, True)
+  _ -> (s, _cg s, Even, False)
 
 {-# CLASH_OPAQUE codeGroupO #-}
