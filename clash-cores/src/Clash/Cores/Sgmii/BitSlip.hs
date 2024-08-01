@@ -31,7 +31,7 @@ data BitSlipState
       , _hist :: Vec 10 (BitVector 10)
       }
   | BSOk {_s :: BitVector 20, _n :: Index 10}
-  deriving (Generic, NFDataX, Eq, Show)
+  deriving (Generic, NFDataX, Show)
 
 -- | State transition function for 'bitSlip', where the initial state is the
 --   training state, and after 8 consecutive commas have been detected at the
@@ -41,7 +41,7 @@ bitSlipT ::
   -- | Current state
   BitSlipState ->
   -- | New input values
-  (Cg, SyncStatus) ->
+  (Cg, Status) ->
   -- | New state
   BitSlipState
 bitSlipT BSFail{..} (cg, _)
@@ -69,13 +69,13 @@ bitSlipO ::
   -- | Current state
   BitSlipState ->
   -- | New output value
-  (BitSlipState, Cg, Bool)
+  (BitSlipState, Cg, Status)
 bitSlipO self =
-  (self, reverseBV $ resize $ rotateR (_s self) (10 - fromEnum n), bsOk)
+  (self, reverseBV $ resize $ rotateR (_s self) (10 - fromEnum n), bsStatus)
  where
-  (n, bsOk) = case self of
-    BSFail{} -> (last (_ns self), False)
-    BSOk{} -> (_n self, True)
+  (n, bsStatus) = case self of
+    BSFail{} -> (last (_ns self), Fail)
+    BSOk{} -> (_n self, Ok)
 
 -- | Function that takes a code word and returns the same code word, but if a
 --   comma is detected the code words is shifted such that the comma is at the
@@ -86,12 +86,12 @@ bitSlip ::
   -- | Input code group
   Signal dom Cg ->
   -- | Current sync status from 'Sgmii.sync'
-  Signal dom SyncStatus ->
+  Signal dom Status ->
   -- | Output code group
-  (Signal dom Cg, Signal dom Bool)
-bitSlip cg1 syncStatus = (register 0 cg2, register False bsOk)
+  (Signal dom Cg, Signal dom Status)
+bitSlip cg1 syncStatus = (register 0 cg2, register Fail bsStatus)
  where
-  (_, cg2, bsOk) =
+  (_, cg2, bsStatus) =
     mooreB
       bitSlipT
       bitSlipO

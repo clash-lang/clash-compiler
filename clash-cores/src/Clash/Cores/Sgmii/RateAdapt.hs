@@ -28,9 +28,7 @@ rateAdaptRxT n (linkSpeed, a)
   | n == 0 = (n', a)
   | otherwise = (n', Nothing)
  where
-  n' = if ready then 0 else n + 1
-
-  ready = n == repeatN
+  n' = if n == repeatN then 0 else n + 1
   repeatN = case linkSpeed of
     Speed1000 -> 0
     Speed100 -> 9
@@ -61,7 +59,6 @@ rateAdaptTxT ::
 rateAdaptTxT n (linkSpeed, a) = (n', (ready, a))
  where
   n' = if ready then 0 else n + 1
-
   ready = n == repeatN
   repeatN = case linkSpeed of
     Speed1000 -> 0

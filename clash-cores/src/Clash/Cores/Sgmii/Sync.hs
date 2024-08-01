@@ -24,7 +24,7 @@ import Clash.Prelude
 import Data.Maybe (isNothing)
 
 -- | State type of the output queue for 'sync'
-type OutputQueue = Vec 3 (Cg, Bool, Symbol8b10b, Even, SyncStatus)
+type OutputQueue = Vec 3 (Cg, Bool, Symbol8b10b, Even, Status)
 
 -- | State type of 'sync'. This contains all states as they are defined in IEEE
 --   802.3 Clause 36.
@@ -53,7 +53,7 @@ data SyncState
       , _goodCgs :: Index 4
       , _i :: Index 3
       }
-  deriving (Generic, NFDataX, Eq, Show)
+  deriving (Generic, NFDataX, Show)
 
 -- | Vector containing the two alternative forms (with opposite running
 --   disparity) of K28.5. This is the only relevant comma, as the other commas
@@ -132,7 +132,7 @@ syncO ::
   -- | Current state
   SyncState ->
   -- | New state and output tuple
-  (SyncState, Cg, Bool, Symbol8b10b, Even, SyncStatus)
+  (SyncState, Cg, Bool, Symbol8b10b, Even, Status)
 syncO self = case self of
   LossOfSync{} -> (self, _cg self, _rd self, _dw self, rxEven, Fail)
   CommaDetect{} -> (self, _cg self, _rd self, _dw self, Even, Fail)
@@ -148,8 +148,8 @@ outputQueueT ::
   -- | Current state with three values for all inputs
   OutputQueue ->
   -- | New input values for the code group, running disparity, data word, 'Even'
-  --   signal and 'SyncStatus;
-  (Cg, Bool, Symbol8b10b, Even, SyncStatus) ->
+  --   signal and 'Status;
+  (Cg, Bool, Symbol8b10b, Even, Status) ->
   -- | New state
   OutputQueue
 outputQueueT s i = s <<+ i
@@ -161,14 +161,14 @@ outputQueueO ::
   OutputQueue ->
   -- | New output with one value for everything except 'Symbol8b10b' for the
   --   prescient 'Sgmii.checkEnd' function.
-  (Cg, Bool, Vec 3 Symbol8b10b, Even, SyncStatus)
+  (Cg, Bool, Vec 3 Symbol8b10b, Even, Status)
 outputQueueO s = (cg, rd, dw, rxEven, syncStatus)
  where
   (head -> cg, head -> rd, dw, head -> rxEven, head -> syncStatus) = unzip5 s
 
 -- | Takes a code group and runs it through the state machine as defined in
 --   IEEE 802.3 Clause 36 to check whether the signal is synchronized. If it is
---   not, output 'SyncStatus' @Fail@ and try to re-aquire synchronization, else
+--   not, output 'Status' @Fail@ and try to re-aquire synchronization, else
 --   simply pass through the new running disparity and 'Symbol8b10b' from the
 --   decoded code group as well as the 'Even' signal. The current code word is
 --   also propagated as it is required by 'Sgmii.pcsReceive'. This function
@@ -185,7 +185,7 @@ sync ::
   , Signal dom Bool
   , Signal dom (Vec 3 Symbol8b10b)
   , Signal dom Even
-  , Signal dom SyncStatus
+  , Signal dom Status
   )
 sync rxCg =
   mooreB

@@ -22,7 +22,7 @@ import Data.Maybe (fromJust, isJust)
 
 -- | Defines all possible valid termination values
 data CheckEnd = KDK | KDD | TRK | TRR | RRR | RRK | RRS
-  deriving (Eq, Show)
+  deriving (Eq)
 
 -- | State type of 'pcsReceive'. This contains all states as they are defined in
 --   IEEE 802.3 Clause 36, with with exeception of the states @CARRIER_DETECT@,
@@ -48,7 +48,7 @@ data PcsReceiveState
   | RxData {_rx :: Bool, _hist :: Symbol8b10b}
   | RxDataError {_rx :: Bool, _hist :: Symbol8b10b}
   | LinkFailed {_rx :: Bool, _xmit :: Xmit}
-  deriving (Generic, NFDataX, Eq, Show)
+  deriving (Generic, NFDataX, Show)
 
 -- | Calculate the number of bits that are different in two code groups. For
 --   example: the code groups @0b0000@ and @0b0001@ have a difference of 1.
@@ -142,7 +142,7 @@ pcsReceiveT ::
   PcsReceiveState ->
   -- | Input values, where @Vec 3 CodeGroup@ contains the current and next two
   -- | data words
-  (Cg, Bool, Vec 3 Symbol8b10b, Even, SyncStatus, Xmit) ->
+  (Cg, Bool, Vec 3 Symbol8b10b, Even, Status, Xmit) ->
   -- | New state
   PcsReceiveState
 pcsReceiveT WaitForK{..} (_, _, dws, rxEven, syncStatus, xmit)
@@ -263,7 +263,7 @@ pcsReceiveO self = case self of
   _ -> (self, Nothing, Nothing, Nothing, Nothing)
 
 -- | The 'pcsReceive' block. Takes a tuple with the new input code group,
---   running disparity and data word, 'Even', 'SyncStatus' and 'Xmit' signals
+--   running disparity and data word, 'Even', 'Status' and 'Xmit' signals
 --   and runs the transition function 'pcsReceiveT'. The outputs are a set of
 --   'Maybe' values.
 pcsReceive ::
@@ -276,8 +276,8 @@ pcsReceive ::
   Signal dom (Vec 3 Symbol8b10b) ->
   -- | The 'Even' value from 'Sgmii.sync'
   Signal dom Even ->
-  -- | The current 'SyncStatus' from 'Sgmii.sync'
-  Signal dom SyncStatus ->
+  -- | The current 'Status' from 'Sgmii.sync'
+  Signal dom Status ->
   -- | The 'Xmit' signal from 'Sgmii.autoNeg'
   Signal dom (Maybe Xmit) ->
   -- | Tuple containing the output values

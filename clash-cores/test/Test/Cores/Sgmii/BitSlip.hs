@@ -21,7 +21,7 @@ bitSlipSim ::
   forall dom.
   (C.HiddenClockResetEnable dom) =>
   C.Signal dom (C.BitVector 10) ->
-  C.Signal dom (BitSlipState, C.BitVector 10, Bool)
+  C.Signal dom (BitSlipState, C.BitVector 10, Status)
 bitSlipSim cg =
   C.bundle $
     C.mooreB

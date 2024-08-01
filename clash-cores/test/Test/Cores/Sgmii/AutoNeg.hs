@@ -48,7 +48,7 @@ genConfRegsAck range = do
 --   entered state for debugging purposes.
 autoNegSim ::
   (C.HiddenClockResetEnable dom) =>
-  C.Signal dom (SyncStatus, Maybe Rudi) ->
+  C.Signal dom (Status, Maybe Rudi) ->
   C.Signal dom (AutoNegState dom)
 autoNegSim (C.unbundle -> i) = s
  where
@@ -110,9 +110,9 @@ prop_autoNegLinkTimer = H.property $ do
   g (AnRestart{}) = True
   g _ = False
 
--- | Assert that if 'SyncStatus' is set to 'Fail', 'autoNeg' will never leave
---   the 'AnEnable' state (except at initialization, hence the first 10 outputs
---   are dropped from the comparision)
+-- | Assert that if 'Status' is set to 'Fail', 'autoNeg' will never leave the
+--   'AnEnable' state (except at initialization, hence the first 10 outputs are
+--   dropped from the comparision)
 prop_autoNegFail :: H.Property
 prop_autoNegFail = H.property $ do
   simDuration <- H.forAll (Gen.integral (Range.linear 10 100))

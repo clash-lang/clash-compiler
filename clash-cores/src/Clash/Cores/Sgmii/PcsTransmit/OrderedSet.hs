@@ -34,7 +34,7 @@ data OrderedSetState
   | CarrierExtend {_xmit :: Xmit, _xmitChange :: Bool}
   | StartError {_xmit :: Xmit, _xmitChange :: Bool}
   | TxDataError {_xmit :: Xmit, _xmitChange :: Bool}
-  deriving (Generic, NFDataX, Eq, Show)
+  deriving (Generic, NFDataX, Show)
 
 -- | State transitions from @TX_TEST_XMIT@ from Figure 36-5, which need to be
 --   set in all parent states of @TX_TEST_XMIT@ as this state itself is not
