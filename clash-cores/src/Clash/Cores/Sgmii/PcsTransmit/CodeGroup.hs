@@ -38,7 +38,7 @@ data CodeGroupState
   | ConfCB {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg, _i :: Index 2}
   | ConfCC {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg, _i :: Index 2}
   | ConfCD {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg, _i :: Index 2}
-  deriving (Generic, NFDataX, Eq, Show)
+  deriving (Generic, NFDataX, Show)
 
 -- | State transitions from @GENERATE_CODE_GROUP@ from Figure 36-6, which need
 --   to be set in all parent states of @GENERATE_CODE_GROUP@ as this state

@@ -26,7 +26,7 @@ import Data.Proxy
 type Rudis = Vec 3 Rudi
 
 -- | Type that specifies an 'Index' for the timeout of the link timer and the
---   timer used to qualify the 'Fail' status of 'SyncStatus'
+--   timer used to qualify the 'Fail' status of 'Status'
 
 --   TODO: Replace this with @PeriodToCycles dom (Microseconds 1600)@, currently
 --   this doesn't work because then I need to specify @1 <= DomainPeriod dom)
@@ -67,7 +67,7 @@ data AutoNegState dom
       }
   | LinkOk
       {_rudis :: Maybe Rudis, _rxConfReg :: ConfReg, _failT :: Timeout dom}
-  deriving (Generic, NFDataX, Eq, Show)
+  deriving (Generic, NFDataX, Show)
 
 -- | Set the acknowledge bit of a 'ConfReg' to zero
 noAckBit :: ConfReg -> ConfReg
@@ -111,7 +111,7 @@ idleMatch :: Rudis -> Bool
 idleMatch = (==) (repeat I)
 
 -- | State transition function for 'autoNeg' as defined in IEEE 802.3 Clause 37.
---   It takes the current 'SyncStatus' from 'Sgmii.sync' as well as the 'Rudi'
+--   It takes the current 'Status' from 'Sgmii.sync' as well as the 'Rudi'
 --   and 'ConfReg' signals from 'Sgmii.pcsReceive'.
 autoNegT ::
   forall dom.
@@ -119,7 +119,7 @@ autoNegT ::
   -- | Current state
   AutoNegState dom ->
   -- | New input values
-  (SyncStatus, Maybe Rudi) ->
+  (Status, Maybe Rudi) ->
   -- | New state
   AutoNegState dom
 autoNegT self (syncStatus, rudi)
@@ -216,8 +216,8 @@ autoNegO self = case self of
 autoNeg ::
   forall dom.
   (HiddenClockResetEnable dom) =>
-  -- | Current 'SyncStatus' from 'Sgmii.sync'
-  Signal dom SyncStatus ->
+  -- | Current 'Status' from 'Sgmii.sync'
+  Signal dom Status ->
   -- | A new value of 'Rudi' from 'Sgmii.pcsReceive'
   Signal dom (Maybe Rudi) ->
   -- | Tuple containing the new value for 'Xmit' and a new 'ConfReg'

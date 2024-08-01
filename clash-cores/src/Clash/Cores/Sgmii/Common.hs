@@ -28,27 +28,16 @@ nextEven Odd = Even
 
 -- | Link speed that was communicated by the PHY
 data LinkSpeed = Speed10 | Speed100 | Speed1000
-  deriving (Generic, NFDataX, Eq, Show)
+  deriving (Generic, NFDataX, BitPack)
 
 -- | Get the current link speed from a 'ConfReg'
 toLinkSpeed :: ConfReg -> LinkSpeed
-toLinkSpeed confReg
-  | s == 0b10 = Speed1000
-  | s == 0b01 = Speed100
-  | otherwise = Speed10
- where
-  s = pack (testBit confReg 11) ++# pack (testBit confReg 10)
+toLinkSpeed confReg =
+  unpack $ pack (testBit confReg 11) ++# pack (testBit confReg 10)
 
 -- | Defines the possible different types of ordered sets that can be generated
 --   by the 'Sgmii.PcsTransmit.orderedSet' process
-data OrderedSet
-  = OSetC
-  | OSetI
-  | OSetR
-  | OSetS
-  | OSetT
-  | OSetV
-  | OSetD
+data OrderedSet = OSetC | OSetI | OSetR | OSetS | OSetT | OSetV | OSetD
   deriving (Generic, NFDataX, Eq, Show)
 
 -- | Defines the possible values for the RUDI output signal of the PCS Receive
@@ -61,34 +50,27 @@ toConfReg :: Rudi -> Maybe ConfReg
 toConfReg (C confReg) = Just confReg
 toConfReg _ = Nothing
 
--- | Convert a 'Rudi' to just the first bits
-toStatus :: Rudi -> BitVector 2
-toStatus rudi = case rudi of
-  C _ -> 0b00
-  I -> 0b01
-  Invalid -> 0b10
-
 -- | Record that holds the current status of the module, specifically the
---   'SyncStatus' from 'Sgmii.sync', the 'ConfReg' that has been received by
+--   'Status' from 'Sgmii.sync', the 'ConfReg' that has been received by
 --   'Sgmii.pcsReceive', the 'Rudi' that is transmitted by 'Sgmii.pcsReceive'
 --   and the 'Xmit' that is transmitted by 'Sgmii.autoNeg'.
 data SgmiiStatus = SgmiiStatus
-  { _cBsOk :: Bool
-  , _cSyncStatus :: SyncStatus
-  , _cRxConfReg :: ConfReg
-  , _cRudi :: BitVector 2
+  { _cBsStatus :: Status
+  , _cSyncStatus :: Status
+  , _cLinkSpeed :: LinkSpeed
   , _cXmit :: Xmit
+  , _cRudi :: Rudi
   }
 
 -- | Defines the type of the signal that indicates whether the transmission is
 --   in sync ('Ok') or not ('Fail')
-data SyncStatus = Ok | Fail
+data Status = Fail | Ok
   deriving (Generic, NFDataX, Eq, Show)
 
 -- | Signal that is received by the two PCS blocks from the auto-negotiation
 --   block to indicate the current state of the auto-negotiation block
 data Xmit = Conf | Data | Idle
-  deriving (Generic, NFDataX, Eq, Show, BitPack)
+  deriving (Generic, NFDataX, BitPack, Eq, Show)
 
 -- | Return a 'Just' when the argument is 'True', else return a 'Nothing'
 orNothing :: Bool -> a -> Maybe a

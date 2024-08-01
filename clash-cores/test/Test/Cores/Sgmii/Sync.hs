@@ -20,7 +20,7 @@ import Prelude
 syncSim ::
   (C.HiddenClockResetEnable dom) =>
   C.Signal dom Cg ->
-  C.Signal dom (Cg, Bool, C.Vec 3 Symbol8b10b, Even, SyncStatus)
+  C.Signal dom (Cg, Bool, C.Vec 3 Symbol8b10b, Even, Status)
 syncSim cg = C.bundle $ sync cg
 
 -- | Run the 'sync' function on a list of values that do not contain any comma

@@ -103,17 +103,17 @@ sgmiiRx rxCg =
  where
   rxStatus =
     SgmiiStatus
-      <$> bsOk
+      <$> bsStatus
       <*> syncStatus
-      <*> regMaybe 0 rxConfReg
-      <*> (toStatus <$> regMaybe Invalid rudi)
+      <*> (toLinkSpeed <$> regMaybe 0 rxConfReg)
       <*> regMaybe Conf xmit
+      <*> regMaybe Invalid rudi
 
   rxConfReg = toConfReg <$> regMaybe (C 0) rudi
   (xmit, txConfReg) = autoNeg syncStatus rudi
   (rxDv, rxEr, rxDw, rudi) = pcsReceive cg rd dw rxEven syncStatus xmit
   (cg, rd, dw, rxEven, syncStatus) = sync bsCg
-  (bsCg, bsOk) = bitSlip rxCg syncStatus
+  (bsCg, bsStatus) = bitSlip rxCg syncStatus
 
 -- | Transmit side of the SGMII block, that combines all the functions that are
 --   in the transmit domain
