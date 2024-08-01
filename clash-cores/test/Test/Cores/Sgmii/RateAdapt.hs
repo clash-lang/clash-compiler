@@ -33,6 +33,13 @@ rateAdaptTxSim ::
 rateAdaptTxSim (C.unbundle -> (linkSpeed, txDw)) =
   C.bundle $ rateAdaptTx linkSpeed txDw
 
+-- | Convert a speed to a symbol duplication factor
+duplicationFactor :: LinkSpeed -> Int
+duplicationFactor linkSpeed = case linkSpeed of
+  Speed10 -> 100
+  Speed100 -> 10
+  Speed1000 -> 1
+
 -- | Function to take the n'th elements of a list
 everyNth :: (Num a) => Int -> [a] -> [a]
 everyNth n (drop (n - 1) -> l)
@@ -44,10 +51,9 @@ everyNth n (drop (n - 1) -> l)
 head' :: a -> [a] -> a
 head' a l = fst $ fromMaybe (a, []) $ uncons l
 
--- | Function that tests the rate adaptation function with a link speed of 1000
---   Mbps, which means that every input value should be propagated to the output
-prop_rateAdaptRx1000 :: H.Property
-prop_rateAdaptRx1000 = H.property $ do
+-- | Test whether the receive rate adaptation works as intended
+rateAdaptRxTest :: LinkSpeed -> H.Property
+rateAdaptRxTest linkSpeed = H.property $ do
   simDuration <- H.forAll (Gen.integral (Range.linear 1 1000))
 
   inp <- H.forAll (Gen.list (Range.singleton simDuration) genDefinedBitVector)
@@ -56,91 +62,32 @@ prop_rateAdaptRx1000 = H.property $ do
           C.sampleN
             (simDuration + 1)
             ( rateAdaptRxSim @C.System
-                (C.fromList ((Speed1000, Nothing) : map f inp))
+                (C.fromList ((linkSpeed, Nothing) : map f inp))
             )
        where
-        f a = (Speed1000, Just a)
+        f a = (linkSpeed, Just a)
 
-      expected = inp
+      expected =
+        head' 0 inp : everyNth (duplicationFactor linkSpeed) (drop 1 inp)
 
   catMaybes simOut H.=== expected
 
--- | Function that tests the rate adaptation function with a link speed of 100
---   Mbps, which means that every 10th input value (starting at 0) should be
---   propagated to the output
-prop_rateAdaptRx100 :: H.Property
-prop_rateAdaptRx100 = H.property $ do
-  simDuration <- H.forAll (Gen.integral (Range.linear 1 1000))
-
-  inp <- H.forAll (Gen.list (Range.singleton simDuration) genDefinedBitVector)
-  let simOut =
-        drop 1 $
-          C.sampleN
-            (simDuration + 1)
-            ( rateAdaptRxSim @C.System
-                (C.fromList ((Speed100, Nothing) : map f inp))
-            )
-       where
-        f a = (Speed100, Just a)
-
-      expected = head' 0 inp : everyNth 10 (drop 1 inp)
-
-  catMaybes simOut H.=== expected
-
--- | Function that tests the rate adaptation function with a link speed of 10
---   Mbps, which means that every 100th input value (starting at 0) should be
---   propagated to the output
 prop_rateAdaptRx10 :: H.Property
-prop_rateAdaptRx10 = H.property $ do
-  simDuration <- H.forAll (Gen.integral (Range.linear 1 1000))
+prop_rateAdaptRx10 = rateAdaptRxTest Speed10
 
-  inp <- H.forAll (Gen.list (Range.singleton simDuration) genDefinedBitVector)
-  let simOut =
-        drop 1 $
-          C.sampleN
-            (simDuration + 1)
-            ( rateAdaptRxSim @C.System
-                (C.fromList ((Speed10, Nothing) : map f inp))
-            )
-       where
-        f a = (Speed10, Just a)
+prop_rateAdaptRx100 :: H.Property
+prop_rateAdaptRx100 = rateAdaptRxTest Speed100
 
-      expected = head' 0 inp : everyNth 100 (drop 1 inp)
+prop_rateAdaptRx1000 :: H.Property
+prop_rateAdaptRx1000 = rateAdaptRxTest Speed1000
 
-  catMaybes simOut H.=== expected
-
--- | Function that tests the rate adaptation function with a link speed of 1000
---   Mbps, which means that every input value should be propagated to the output
-prop_rateAdaptTx1000 :: H.Property
-prop_rateAdaptTx1000 = H.property $ do
-  simDuration <- H.forAll (Gen.integral (Range.linear 1 100))
-
-  inp <- H.forAll (Gen.list (Range.singleton simDuration) genDefinedBitVector)
-  let simOut =
-        map g $
-          drop 1 $
-            C.sampleN
-              (simDuration + 1)
-              ( rateAdaptTxSim @C.System
-                  (C.fromList ((Speed1000, Nothing) : map f inp))
-              )
-       where
-        f a = (Speed1000, Just a)
-        g (_, a) = fromJust a
-
-      expected = inp
-
-  simOut H.=== expected
-
--- | Function that tests the rate adaptation function with a link speed of 100
---   Mbps, which means that every 10th input value (starting at 0) should be
---   propagated to the output
-prop_rateAdaptTx100 :: H.Property
-prop_rateAdaptTx100 = H.property $ do
+-- | Test whether the transmit rate adaptation works as intended
+rateAdaptTxTest :: LinkSpeed -> H.Property
+rateAdaptTxTest linkSpeed = H.property $ do
   simDuration <- H.forAll (Gen.integral (Range.linear 1 100))
 
   inp1 <- H.forAll (Gen.list (Range.singleton simDuration) genDefinedBitVector)
-  let inp2 = concatMap (replicate 10) inp1
+  let inp2 = concatMap (replicate (duplicationFactor linkSpeed)) inp1
 
       simOut =
         map g $
@@ -148,41 +95,24 @@ prop_rateAdaptTx100 = H.property $ do
             C.sampleN
               (length inp2 + 1)
               ( rateAdaptTxSim @C.System
-                  (C.fromList ((Speed100, Nothing) : map f inp2))
+                  (C.fromList ((linkSpeed, Nothing) : map f inp2))
               )
        where
-        f a = (Speed100, Just a)
+        f a = (linkSpeed, Just a)
         g (_, a) = fromJust a
 
       expected = take (length simOut) inp2
 
   simOut H.=== expected
 
--- | Function that tests the rate adaptation function with a link speed of 10
---   Mbps, which means that every 100th input value (starting at 0) should be
---   propagated to the output
 prop_rateAdaptTx10 :: H.Property
-prop_rateAdaptTx10 = H.property $ do
-  simDuration <- H.forAll (Gen.integral (Range.linear 1 100))
+prop_rateAdaptTx10 = rateAdaptTxTest Speed10
 
-  inp1 <- H.forAll (Gen.list (Range.singleton simDuration) genDefinedBitVector)
-  let inp2 = concatMap (replicate 100) inp1
+prop_rateAdaptTx100 :: H.Property
+prop_rateAdaptTx100 = rateAdaptTxTest Speed100
 
-      simOut =
-        map g $
-          drop 1 $
-            C.sampleN
-              (length inp2 + 1)
-              ( rateAdaptTxSim @C.System
-                  (C.fromList ((Speed10, Nothing) : map f inp2))
-              )
-       where
-        f a = (Speed10, Just a)
-        g (_, a) = fromJust a
-
-      expected = take (length simOut) inp2
-
-  simOut H.=== expected
+prop_rateAdaptTx1000 :: H.Property
+prop_rateAdaptTx1000 = rateAdaptTxTest Speed1000
 
 tests :: TestTree
 tests = $(testGroupGenerator)
