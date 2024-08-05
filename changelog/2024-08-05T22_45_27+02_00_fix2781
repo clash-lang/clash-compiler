@@ -1,0 +1,1 @@
+FIXED: Bug in the compile-time evaluator [#2781](https://github.com/clash-lang/clash-compiler/issues/2781)
