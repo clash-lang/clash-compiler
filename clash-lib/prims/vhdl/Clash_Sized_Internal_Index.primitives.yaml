@@ -1,16 +1,16 @@
 - BlackBox:
     name: Clash.Sized.Internal.Index.pack#
     kind: Expression
-    type: 'pack# :: Index
-      n -> BitVector (CLog 2 n)'
+    type: |-
+      pack# :: Index n -> BitVector (CLogWZ 2 n 0)
     template: std_logic_vector(~ARG[0])
     workInfo: Never
 - BlackBox:
     name: Clash.Sized.Internal.Index.unpack#
     kind: Expression
-    type: 'unpack# :: (KnownNat
-      n, 1 <= n) => BitVector (CLog 2 n) -> Index n'
-    template: unsigned(~ARG[2])
+    type: |-
+      unpack# :: KnownNat n => BitVector (CLogWZ 2 n 0) -> Index n
+    template: unsigned(~ARG[1])
     workInfo: Never
 - BlackBox:
     name: Clash.Sized.Internal.Index.eq#

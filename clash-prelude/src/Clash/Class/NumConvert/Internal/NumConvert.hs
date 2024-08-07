@@ -13,6 +13,7 @@
 
 {- |
 Copyright  :  (C) 2025     , Martijn Bastiaan
+                  2025-2026, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -29,7 +30,7 @@ import Clash.Sized.Signed
 import Clash.Sized.Unsigned
 
 import GHC.TypeLits (KnownNat, type (+), type (<=), type (^))
-import GHC.TypeLits.Extra (CLog)
+import GHC.TypeLits.Extra (CLogWZ)
 
 import Data.Int (Int16, Int32, Int64, Int8)
 import Data.Word (Word16, Word32, Word64, Word8)
@@ -123,19 +124,19 @@ numConvert =
 instance (KnownNat n, KnownNat m, n <= m) => NumConvertCanonical (Index n) (Index m) where
   numConvertCanonical = resize
 
-instance (KnownNat n, KnownNat m, 1 <= n, n <= 2 ^ m) => NumConvertCanonical (Index n) (Unsigned m) where
+instance (KnownNat n, KnownNat m, n <= 2 ^ m) => NumConvertCanonical (Index n) (Unsigned m) where
   numConvertCanonical !a = resize $ bitCoerce a
 
 {- | Note: Conversion from @Index 1@ to @Signed 0@ is lossless, but not within the
 constraints of the instance.
 -}
-instance (KnownNat n, KnownNat m, 1 <= n, CLog 2 n + 1 <= m) => NumConvertCanonical (Index n) (Signed m) where
-  numConvertCanonical !a = numConvertCanonical $ bitCoerce @_ @(Unsigned (CLog 2 n)) a
+instance (KnownNat n, KnownNat m, CLogWZ 2 n 0 + 1 <= m) => NumConvertCanonical (Index n) (Signed m) where
+  numConvertCanonical !a = numConvertCanonical $ bitCoerce @_ @(Unsigned (CLogWZ 2 n 0)) a
 
-instance (KnownNat n, KnownNat m, 1 <= n, n <= 2 ^ m) => NumConvertCanonical (Index n) (BitVector m) where
+instance (KnownNat n, KnownNat m, n <= 2 ^ m) => NumConvertCanonical (Index n) (BitVector m) where
   numConvertCanonical !a = resize $ pack a
 
-instance (KnownNat n, KnownNat m, 1 <= m, 2 ^ n <= m) => NumConvertCanonical (Unsigned n) (Index m) where
+instance (KnownNat n, KnownNat m, 2 ^ n <= m) => NumConvertCanonical (Unsigned n) (Index m) where
   numConvertCanonical !a = bitCoerce $ resize a
 
 instance (KnownNat n, KnownNat m, n <= m) => NumConvertCanonical (Unsigned n) (Unsigned m) where
@@ -153,7 +154,7 @@ instance (KnownNat n, KnownNat m, n <= m) => NumConvertCanonical (Unsigned n) (B
 instance (KnownNat n, KnownNat m, n <= m) => NumConvertCanonical (Signed n) (Signed m) where
   numConvertCanonical !a = resize a
 
-instance (KnownNat n, KnownNat m, 1 <= m, 2 ^ n <= m) => NumConvertCanonical (BitVector n) (Index m) where
+instance (KnownNat n, KnownNat m, 2 ^ n <= m) => NumConvertCanonical (BitVector n) (Index m) where
   numConvertCanonical = unpack . resize
 
 instance (KnownNat n, KnownNat m, n <= m) => NumConvertCanonical (BitVector n) (Unsigned m) where

@@ -11,6 +11,7 @@
 
 {- |
 Copyright  :  (C) 2025     , Martijn Bastiaan
+                  2025-2026, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -26,7 +27,7 @@ import Clash.Sized.Signed
 import Clash.Sized.Unsigned
 
 import GHC.TypeLits (KnownNat, type (+), type (<=), type (^))
-import GHC.TypeLits.Extra (CLog)
+import GHC.TypeLits.Extra (CLogWZ)
 
 {- $setup
 >>> import Clash.Prelude
@@ -100,11 +101,11 @@ maybeNumConvert a =
 instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (Index n) (Index m) where
   maybeNumConvertCanonical !a = maybeResize a
 
-instance (KnownNat n, KnownNat m, 1 <= n) => MaybeNumConvertCanonical (Index n) (Unsigned m) where
-  maybeNumConvertCanonical !a = maybeResize $ bitCoerce @_ @(Unsigned (CLog 2 n)) a
+instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (Index n) (Unsigned m) where
+  maybeNumConvertCanonical !a = maybeResize $ bitCoerce @_ @(Unsigned (CLogWZ 2 n 0)) a
 
-instance (KnownNat n, KnownNat m, 1 <= n) => MaybeNumConvertCanonical (Index n) (Signed m) where
-  maybeNumConvertCanonical !a = maybeNumConvertCanonical $ bitCoerce @_ @(Unsigned (CLog 2 n)) a
+instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (Index n) (Signed m) where
+  maybeNumConvertCanonical !a = maybeNumConvertCanonical $ bitCoerce @_ @(Unsigned (CLogWZ 2 n 0)) a
 
 instance (KnownNat n, KnownNat m, 1 <= n) => MaybeNumConvertCanonical (Index n) (BitVector m) where
   maybeNumConvertCanonical !a = maybeResize $ pack a

@@ -1,0 +1,2 @@
+ADDED: `Index 0` instances for `BitPack`, `Bits`, `Counter`, `FiniteBits`, `MaybeNumConvert`, `NumConvert`, `Partiy`, and `SaturatingNum`.
+ADDED: Zero-sized block RAM implementations for `blockRam1` and `blockRamU`.
