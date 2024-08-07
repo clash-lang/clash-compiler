@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software Ltd,
-                  2021-2025, QBayLogic B.V.
+                  2021-2026, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -90,7 +90,7 @@ import GHC.Natural                (naturalToInteger)
 import GHC.Stack                  (HasCallStack)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-),
                                    type (*), type (<=), natVal)
-import GHC.TypeLits.Extra         (CLog)
+import GHC.TypeLits.Extra         (CLogWZ)
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
                                    coarbitraryIntegral, shrinkIntegral)
@@ -105,7 +105,7 @@ import Clash.Class.BitPack.BitIndex (replaceBit)
 import Clash.Sized.Internal       (formatRange)
 import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV), high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV
-import Clash.Promoted.Nat         (SNat(..), snatToNum, natToInteger, leToPlusKN)
+import Clash.Promoted.Nat         (SNat(..), UNat(..), toUNat, snatToNum, natToInteger)
 import Clash.XException
   (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX, seqX)
 
@@ -161,7 +161,7 @@ data Index (n :: Nat) =
 {-# ANN I hasBlackBox #-}
 
 {-# OPAQUE size# #-}
-size# :: (KnownNat n, 1 <= n) => Index n -> Int
+size# :: KnownNat n => Index n -> Int
 size# = BV.size# . pack#
 
 instance NFData (Index n) where
@@ -170,8 +170,8 @@ instance NFData (Index n) where
   -- NOINLINE is needed so that Clash doesn't trip on the "Index ~# Integer"
   -- coercion
 
-instance (KnownNat n, 1 <= n) => BitPack (Index n) where
-  type BitSize (Index n) = CLog 2 n
+instance KnownNat n => BitPack (Index n) where
+  type BitSize (Index n) = CLogWZ 2 n 0
   pack   = packXWith pack#
   unpack = unpack#
 
@@ -181,12 +181,12 @@ fromSNat = snatToNum
 
 {-# OPAQUE pack# #-}
 {-# ANN pack# hasBlackBox #-}
-pack# :: Index n -> BitVector (CLog 2 n)
+pack# :: Index n -> BitVector (CLogWZ 2 n 0)
 pack# (I i) = BV 0 (naturalFromInteger i)
 
 {-# OPAQUE unpack# #-}
 {-# ANN unpack# hasBlackBox #-}
-unpack# :: (KnownNat n, 1 <= n) => BitVector (CLog 2 n) -> Index n
+unpack# :: KnownNat n => BitVector (CLogWZ 2 n 0) -> Index n
 unpack# (BV 0 i) = fromInteger_INLINE (naturalToInteger i)
 unpack# bv = undefError "Index.unpack" [bv]
 
@@ -343,29 +343,31 @@ minus# (I a) (I b) =
 times# :: Index m -> Index n -> Index (((m - 1) * (n - 1)) + 1)
 times# (I a) (I b) = I (a * b)
 
-instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
-  satAdd SatWrap a b =
-    case natToInteger @n of
-      1 -> a +# b
-      _ -> leToPlusKN @1 @n $
-        case plus# a b of
-          z | let m = fromInteger# (natToInteger @n)
-            , z >= m -> resize# (z - m)
-          z -> resize# z
-  satAdd SatZero a b =
-    leToPlusKN @1 @n $
+instance KnownNat n => SaturatingNum (Index n) where
+  satAdd SatWrap a b = case toUNat (SNat @n) of
+    UZero -> a
+    USucc UZero -> a +# b
+    USucc (USucc _) -> case plus# a b of
+      z | let m = fromInteger# (natToInteger @n)
+        , z >= m -> resize# (z - m)
+      z -> resize# z
+  satAdd SatZero a b = case toUNat (SNat @n) of
+    UZero -> a
+    USucc _ ->
       case plus# a b of
         z | let m = fromInteger# (natToInteger @(n - 1))
           , z > m -> fromInteger# 0
         z -> resize# z
-  satAdd SatError a b =
-    leToPlusKN @1 @n $
+  satAdd SatError a b = case toUNat (SNat @n) of
+    UZero -> a
+    USucc _ ->
       case plus# a b of
         z | let m = fromInteger# (natToInteger @(n - 1))
           , z > m -> errorX "Index.satAdd: overflow"
         z -> resize# z
-  satAdd _ a b =
-    leToPlusKN @1 @n $
+  satAdd _ a b = case toUNat (SNat @n) of
+    UZero -> a
+    USucc _ ->
       case plus# a b of
         z | let m = fromInteger# (natToInteger @(n - 1))
           , z > m -> maxBound#
@@ -384,28 +386,30 @@ instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
        then fromInteger# 0
        else a -# b
 
-  satMul SatWrap a b =
-    case natToInteger @n of
-      1 -> a *# b
-      2 -> case a of {0 -> 0; _ -> b}
-      _ -> leToPlusKN @1 @n $
-        case times# a b of
-          z -> let m = fromInteger# (natToInteger @n)
-               in resize# (z `mod` m)
-  satMul SatZero a b =
-    leToPlusKN @1 @n $
+  satMul SatWrap a b = case toUNat (SNat @n) of
+    UZero -> a
+    USucc UZero -> a *# b
+    USucc (USucc UZero) -> case a of {0 -> 0; _ -> b}
+    USucc (USucc (USucc _)) -> case times# a b of
+      z -> let m = fromInteger# (natToInteger @n)
+           in resize# (z `mod` m)
+  satMul SatZero a b = case toUNat (SNat @n) of
+    UZero -> a
+    USucc _ ->
       case times# a b of
         z | let m = fromInteger# (natToInteger @(n - 1))
           , z > m -> fromInteger# 0
         z -> resize# z
-  satMul SatError a b =
-    leToPlusKN @1 @n $
+  satMul SatError a b = case toUNat (SNat @n) of
+    UZero -> a
+    USucc _ ->
       case times# a b of
         z | let m = fromInteger# (natToInteger @(n - 1))
           , z > m -> errorX "Index.satMul: overflow"
         z -> resize# z
-  satMul _ a b =
-    leToPlusKN @1 @n $
+  satMul _ a b = case toUNat (SNat @n) of
+    UZero -> a
+    USucc _ ->
       case times# a b of
         z | let m = fromInteger# (natToInteger @(n - 1))
           , z > m -> maxBound#
@@ -462,11 +466,11 @@ toInteger# (I n) = n
 instance KnownNat n => PrintfArg (Index n) where
   formatArg = formatArg . toInteger
 
-instance (KnownNat n, 1 <= n) => Parity (Index n) where
+instance KnownNat n => Parity (Index n) where
   even = even . pack
   odd = odd . pack
 
-instance (KnownNat n, 1 <= n) => Bits (Index n) where
+instance KnownNat n => Bits (Index n) where
   a .&. b           = unpack# $ BV.and# (pack# a) (pack# b)
   a .|. b           = unpack# $ BV.or# (pack# a) (pack# b)
   xor a b           = unpack# $ BV.xor# (pack# a) (pack# b)
@@ -486,7 +490,7 @@ instance (KnownNat n, 1 <= n) => Bits (Index n) where
   rotateR v i       = unpack# $ rotateR (pack# v) i
   popCount i        = popCount (pack# i)
 
-instance (KnownNat n, 1 <= n) => FiniteBits (Index n) where
+instance KnownNat n => FiniteBits (Index n) where
   finiteBitSize        = size#
   countLeadingZeros  i = countLeadingZeros  (pack# i)
   countTrailingZeros i = countTrailingZeros (pack# i)

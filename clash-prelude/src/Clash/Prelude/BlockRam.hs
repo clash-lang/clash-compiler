@@ -2,7 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software Ltd,
                   2017     , Google Inc.,
-                  2021-2022, QBayLogic B.V.
+                  2021-2026, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -404,7 +404,7 @@ where
 
 import           Prelude                 (Enum, Maybe, Eq)
 
-import           GHC.TypeLits            (KnownNat, type (^), type (<=))
+import           GHC.TypeLits            (KnownNat, type (^))
 import           GHC.Stack               (HasCallStack, withFrozenCallStack)
 
 import qualified Clash.Explicit.BlockRam as E
@@ -740,7 +740,7 @@ blockRamU
      , NFDataX a
      , Enum addr
      , NFDataX addr
-     , 1 <= n )
+     )
   => E.ResetStrategy r (Index n -> a)
   -- ^ Whether to clear BRAM on asserted reset ('Clash.Explicit.BlockRam.ClearOnReset')
   -- or not ('Clash.Explicit.BlockRam.NoClearOnReset'). The reset needs to be
@@ -767,7 +767,7 @@ blockRam1
      , NFDataX a
      , Enum addr
      , NFDataX addr
-     , 1 <= n )
+     )
   => E.ResetStrategy r ()
   -- ^ Whether to clear BRAM on asserted reset ('Clash.Explicit.BlockRam.ClearOnReset')
   -- or not ('Clash.Explicit.BlockRam.NoClearOnReset'). The reset needs to be

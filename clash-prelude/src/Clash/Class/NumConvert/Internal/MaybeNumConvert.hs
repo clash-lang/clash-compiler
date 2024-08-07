@@ -10,6 +10,7 @@
 
 {- |
 Copyright  :  (C) 2025     , Martijn Bastiaan
+                  2025-2026, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -22,8 +23,8 @@ import Clash.Sized.Index
 import Clash.Sized.Signed
 import Clash.Sized.Unsigned
 
-import GHC.TypeLits (KnownNat, type (+), type (<=), type (^))
-import GHC.TypeLits.Extra (CLog)
+import GHC.TypeLits (KnownNat, type (+), type (^))
+import GHC.TypeLits.Extra (CLogWZ)
 
 import Data.Int (Int16, Int32, Int64, Int8)
 import Data.Word (Word16, Word32, Word64, Word8)
@@ -82,13 +83,13 @@ class MaybeNumConvert a b where
 instance (KnownNat n, KnownNat m) => MaybeNumConvert (Index n) (Index m) where
   maybeNumConvert !a = maybeResize a
 
-instance (KnownNat n, KnownNat m, 1 <= n) => MaybeNumConvert (Index n) (Unsigned m) where
-  maybeNumConvert !a = maybeResize $ bitCoerce @_ @(Unsigned (CLog 2 n)) a
+instance (KnownNat n, KnownNat m) => MaybeNumConvert (Index n) (Unsigned m) where
+  maybeNumConvert !a = maybeResize $ bitCoerce @_ @(Unsigned (CLogWZ 2 n 0)) a
 
-instance (KnownNat n, KnownNat m, 1 <= n) => MaybeNumConvert (Index n) (Signed m) where
-  maybeNumConvert !a = maybeNumConvert $ bitCoerce @_ @(Unsigned (CLog 2 n)) a
+instance (KnownNat n, KnownNat m) => MaybeNumConvert (Index n) (Signed m) where
+  maybeNumConvert !a = maybeNumConvert $ bitCoerce @_ @(Unsigned (CLogWZ 2 n 0)) a
 
-instance (KnownNat n, KnownNat m, 1 <= n) => MaybeNumConvert (Index n) (BitVector m) where
+instance (KnownNat n, KnownNat m) => MaybeNumConvert (Index n) (BitVector m) where
   maybeNumConvert !a = maybeResize $ pack a
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvert (Unsigned n) (Index m) where
