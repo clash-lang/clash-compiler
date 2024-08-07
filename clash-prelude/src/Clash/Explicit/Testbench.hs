@@ -41,7 +41,7 @@ where
 
 import Control.Exception     (catch, evaluate)
 import Debug.Trace           (trace)
-import GHC.TypeLits          (KnownNat, type (+), type (<=))
+import GHC.TypeLits          (KnownNat, type (+))
 import Prelude               hiding ((!!), length)
 import System.IO.Unsafe      (unsafeDupablePerformIO)
 
@@ -204,7 +204,6 @@ outputVerifier'
      , KnownDomain dom
      , Eq a
      , ShowX a
-     , 1 <= l
      )
   => Clock dom
   -- ^ Clock to which the test bench is synchronized
@@ -273,7 +272,6 @@ outputVerifier
      , KnownDomain circuitDom
      , Eq a
      , ShowX a
-     , 1 <= l
      )
   => Clock testDom
   -- ^ Clock to which the test bench is synchronized (but not necessarily
@@ -299,7 +297,6 @@ outputVerifierBitVector'
    . ( KnownNat l
      , KnownNat n
      , KnownDomain dom
-     , 1 <= l
      )
   => Clock dom
   -- ^ Clock to which the input signal is synchronized
@@ -322,7 +319,6 @@ outputVerifierBitVector
      , KnownNat n
      , KnownDomain testDom
      , KnownDomain circuitDom
-     , 1 <= l
      )
   => Clock testDom
   -- ^ Clock to which the test bench is synchronized (but not necessarily
@@ -349,7 +345,6 @@ outputVerifierWith
      , KnownDomain circuitDom
      , Eq a
      , ShowX a
-     , 1 <= l
      )
   => (    Clock testDom
        -> Reset testDom

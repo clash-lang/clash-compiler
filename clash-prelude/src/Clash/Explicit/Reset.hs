@@ -59,7 +59,7 @@ import           Clash.Signal.Internal
 import           Clash.Sized.Index (Index)
 
 import           GHC.Stack (HasCallStack)
-import           GHC.TypeLits (type (+), type (<=))
+import           GHC.TypeLits (type (+))
 
 {- $setup
 >>> import Clash.Explicit.Prelude
@@ -262,7 +262,6 @@ resetGlitchFilter
   :: forall dom glitchlessPeriod
    . ( HasCallStack
      , HasDefinedInitialValues dom
-     , 1 <= glitchlessPeriod
      )
   => SNat glitchlessPeriod
   -- ^ Consider a reset signal to be properly asserted after having seen the
@@ -305,7 +304,6 @@ unsafeResetGlitchFilter
   :: forall dom glitchlessPeriod
    . ( HasCallStack
      , KnownDomain dom
-     , 1 <= glitchlessPeriod
      )
   => SNat glitchlessPeriod
   -- ^ Consider a reset signal to be properly asserted after having seen the
@@ -340,7 +338,6 @@ resetGlitchFilterWithReset
   :: forall dom glitchlessPeriod
    . ( HasCallStack
      , KnownDomain dom
-     , 1 <= glitchlessPeriod
      )
   => SNat glitchlessPeriod
   -- ^ Consider a reset signal to be properly asserted after having seen the
@@ -362,7 +359,6 @@ resetGlitchFilter#
   :: forall dom glitchlessPeriod state
    . ( HasCallStack
      , KnownDomain dom
-     , 1 <= glitchlessPeriod
      , state ~ (Bool, Index glitchlessPeriod)
      )
   => SNat glitchlessPeriod
