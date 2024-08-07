@@ -11,6 +11,7 @@
 
 {- |
 Copyright  :  (C) 2025     , Martijn Bastiaan
+                  2025-2026, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -26,7 +27,7 @@ import Clash.Sized.Signed
 import Clash.Sized.Unsigned
 
 import GHC.TypeLits (KnownNat, type (+), type (<=), type (^))
-import GHC.TypeLits.Extra (CLog)
+import GHC.TypeLits.Extra (CLogWZ)
 
 import Data.Int (Int16, Int32, Int64, Int8)
 import Data.Word (Word16, Word32, Word64, Word8)
@@ -83,19 +84,19 @@ class NumConvert a b where
 instance (KnownNat n, KnownNat m, n <= m) => NumConvert (Index n) (Index m) where
   numConvert = resize
 
-instance (KnownNat n, KnownNat m, 1 <= n, n <= 2 ^ m) => NumConvert (Index n) (Unsigned m) where
+instance (KnownNat n, KnownNat m, n <= 2 ^ m) => NumConvert (Index n) (Unsigned m) where
   numConvert !a = resize $ bitCoerce a
 
 {- | Note: Conversion from @Index 1@ to @Signed 0@ is lossless, but not within the
 constraints of the instance.
 -}
-instance (KnownNat n, KnownNat m, 1 <= n, CLog 2 n + 1 <= m) => NumConvert (Index n) (Signed m) where
-  numConvert !a = numConvert $ bitCoerce @_ @(Unsigned (CLog 2 n)) a
+instance (KnownNat n, KnownNat m, CLogWZ 2 n 0 + 1 <= m) => NumConvert (Index n) (Signed m) where
+  numConvert !a = numConvert $ bitCoerce @_ @(Unsigned (CLogWZ 2 n 0)) a
 
-instance (KnownNat n, KnownNat m, 1 <= n, n <= 2 ^ m) => NumConvert (Index n) (BitVector m) where
+instance (KnownNat n, KnownNat m, n <= 2 ^ m) => NumConvert (Index n) (BitVector m) where
   numConvert !a = resize $ pack a
 
-instance (KnownNat n, KnownNat m, 1 <= m, 2 ^ n <= m) => NumConvert (Unsigned n) (Index m) where
+instance (KnownNat n, KnownNat m, 2 ^ n <= m) => NumConvert (Unsigned n) (Index m) where
   numConvert !a = bitCoerce $ resize a
 
 instance (KnownNat n, KnownNat m, n <= m) => NumConvert (Unsigned n) (Unsigned m) where
@@ -113,7 +114,7 @@ instance (KnownNat n, KnownNat m, n <= m) => NumConvert (Unsigned n) (BitVector 
 instance (KnownNat n, KnownNat m, n <= m) => NumConvert (Signed n) (Signed m) where
   numConvert !a = resize a
 
-instance (KnownNat n, KnownNat m, 1 <= m, 2 ^ n <= m) => NumConvert (BitVector n) (Index m) where
+instance (KnownNat n, KnownNat m, 2 ^ n <= m) => NumConvert (BitVector n) (Index m) where
   numConvert = unpack . resize
 
 instance (KnownNat n, KnownNat m, n <= m) => NumConvert (BitVector n) (Unsigned m) where
