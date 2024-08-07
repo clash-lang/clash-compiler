@@ -149,7 +149,7 @@ case_convertIndexSigned =
     forM_ [0 .. otherMax] $ \m ->
       withSomeSNat n $ \(SNat :: SNat n) ->
         withSomeSNat m $ \(SNat :: SNat m) ->
-          case SNat @(CLog 2 (n + 1) + 1) `compareSNat` SNat @m of
+          case SNat @(CLogWZ 2 (n + 1) 0 + 1) `compareSNat` SNat @m of
             SNatLE -> do
               assertBool (show (n, m)) (convertXException (Proxy @(Index (n + 1))) (Proxy @(Signed m)))
               forM_ [minBound .. maxBound] $ \(i :: Index (n + 1)) -> do
