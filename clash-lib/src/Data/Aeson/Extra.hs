@@ -1,5 +1,6 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente
+                     2024, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -23,7 +24,12 @@ import qualified Data.Text.Lazy.Encoding as LT
 import           Data.Text.Encoding.Error (UnicodeException(..))
 import           Data.List            (intercalate)
 import           Data.List.NonEmpty   (NonEmpty (..))
+#if MIN_VERSION_base(4,20,0)
+import qualified Data.List.NonEmpty   as NE hiding (unzip)
+import qualified Data.Functor         as NE
+#else
 import qualified Data.List.NonEmpty   as NE
+#endif
 import           Data.Tuple.Extra     (second, first)
 import           Data.Aeson           (FromJSON, Result (..), fromJSON)
 import           Data.Aeson.Parser    (json)

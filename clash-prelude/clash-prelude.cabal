@@ -342,7 +342,7 @@ Library
                       singletons                >= 2.0     && < 3.1,
                       string-interpolate        ^>= 0.3,
                       tagged                    >= 0.8     && < 0.9,
-                      template-haskell          >= 2.12.0.0 && < 2.22,
+                      template-haskell          >= 2.12.0.0 && < 2.23,
                       th-abstraction            >= 0.2.10 && < 0.8.0,
                       th-lift                   >= 0.7.0    && < 0.9,
                       th-orphans                >= 0.13.1   && < 1.0,
