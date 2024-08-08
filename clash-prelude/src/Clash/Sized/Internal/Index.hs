@@ -9,6 +9,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -21,6 +22,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
 
 {-# OPTIONS_HADDOCK show-extensions not-home #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Clash.Sized.Internal.Index
   ( -- * Datatypes
@@ -75,8 +77,10 @@ import Prelude hiding             (even, odd)
 
 import Control.DeepSeq            (NFData (..))
 import Data.Bits                  (Bits (..), FiniteBits (..))
+import Data.Constraint            (Dict(..))
 import Data.Data                  (Data)
 import Data.Default.Class         (Default (..))
+import Data.Proxy                 (Proxy(..))
 import Text.Read                  (Read (..), ReadPrec)
 import Text.Printf                (PrintfArg (..), printf)
 import Data.Ix                    (Ix(..))
@@ -93,9 +97,11 @@ import Language.Haskell.TH        (TypeQ)
 import GHC.Generics               (Generic)
 import GHC.Natural                (Natural, naturalFromInteger)
 import GHC.Natural                (naturalToInteger)
+import GHC.Num.Integer            (integerLog2)
 import GHC.Stack                  (HasCallStack)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-),
                                    type (*), type (<=), natVal)
+import GHC.TypeLits.KnownNat      (KnownNat1(..), SNatKn(..), nameToSymbol)
 import GHC.TypeLits.Extra         (CLog)
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
@@ -111,9 +117,10 @@ import Clash.Class.BitPack.BitIndex (replaceBit)
 import Clash.Sized.Internal       (formatRange)
 import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV), high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV
-import Clash.Promoted.Nat         (SNat(..), snatToNum, natToInteger, leToPlusKN)
+import Clash.Promoted.Nat         (SNat(..), SNatLE(..), snatToNum, natToInteger, leToPlusKN, compareSNat)
 import Clash.XException
   (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX, seqX)
+import Unsafe.Coerce              (unsafeCoerce)
 
 {- $setup
 >>> import Clash.Sized.Internal.Index
@@ -184,10 +191,28 @@ instance NFData (Index n) where
   -- NOINLINE is needed so that Clash doesn't trip on the "Index ~# Integer"
   -- coercion
 
-instance (KnownNat n, 1 <= n) => BitPack (Index n) where
-  type BitSize (Index n) = CLog 2 n
-  pack   = packXWith pack#
-  unpack = unpack#
+instance KnownNat n => BitPack (Index n) where
+  type BitSize (Index n) = BitSizeIndex n
+  pack   = case compareSNat (SNat @1) (SNat @n) of
+    SNatGT                   -> const 0
+    SNatLE | Dict <- fact @n -> packXWith pack#
+  unpack = case compareSNat (SNat @1) (SNat @n) of
+    SNatGT                   -> const undefined
+    SNatLE | Dict <- fact @n -> unpack#
+
+type family BitSizeIndex (n :: Nat) where
+  BitSizeIndex 0 = 0
+  BitSizeIndex n = CLog 2 n
+
+instance KnownNat n => KnownNat1 $(nameToSymbol ''BitSizeIndex) n where
+  natSing1 = let n = natVal (Proxy @n)
+              in SNatKn $ if n == 0
+                          then 0
+                          else fromInteger $ toInteger $ integerLog2 n
+  {-# INLINE natSing1 #-}
+
+fact :: forall n. 1 <= n => Dict (CLog 2 n ~ BitSizeIndex n)
+fact = unsafeCoerce (Dict :: Dict (0~0))
 
 -- | Safely convert an `SNat` value to an `Index`
 fromSNat :: (KnownNat m, n + 1 <= m) => SNat n -> Index m
