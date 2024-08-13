@@ -133,6 +133,9 @@ library
     Clash.Cores.LineCoding8b10b
     Clash.Cores.LineCoding8b10b.Decoder
     Clash.Cores.LineCoding8b10b.Encoder
+    Clash.Cores.LineCoding8b10b.Internal
+    Clash.Cores.LineCoding8b10b.Internal.Decoder
+    Clash.Cores.LineCoding8b10b.Internal.Encoder
     Clash.Cores.SPI
     Clash.Cores.UART
     Clash.Cores.Xilinx.BlockRam
