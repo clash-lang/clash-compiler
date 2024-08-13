@@ -95,11 +95,10 @@ encode3b4b ::
   (Bool, BitVector 4)
 encode3b4b rd0 sym = (rd1, if inv1 then complement sb4_1 else sb4_1)
  where
-  inv1 = rd0 `xor` inv0
-  rd1 = case (rd0, disparity1) of
-          (True , SubBlockPositive) -> False
-          (False, SubBlockPositive) -> True
-          (_    , SubBlockNeutral ) -> rd0
+  (rd1, inv1) = case (rd0, disparity1) of
+          (True , SubBlockPositive) -> (False, True)
+          (False, SubBlockPositive) -> (True, False)
+          (_    , SubBlockNeutral ) -> (rd0, (not rd0) && inv0)
           (_    , SubBlockNegative) -> error "lookupSubBlock4 returned a malformed value"
 
   (inv0, disparity1, sb4_1) =
