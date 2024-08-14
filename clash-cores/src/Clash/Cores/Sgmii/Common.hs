@@ -42,12 +42,12 @@ data OrderedSet = OSetC | OSetI | OSetR | OSetS | OSetT | OSetV | OSetD
 
 -- | Defines the possible values for the RUDI output signal of the PCS Receive
 --   block as defined in IEEE 802.3 Clause 36
-data Rudi = C ConfReg | I | Invalid
+data Rudi = RudiC ConfReg | RudiI | RudiInvalid
   deriving (Generic, NFDataX, Eq, Show)
 
 -- | Convert a 'Rudi' to a 'ConfReg'
 toConfReg :: Rudi -> Maybe ConfReg
-toConfReg (C confReg) = Just confReg
+toConfReg (RudiC confReg) = Just confReg
 toConfReg _ = Nothing
 
 -- | Record that holds the current status of the module, specifically the

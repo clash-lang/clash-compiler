@@ -238,10 +238,10 @@ pcsReceiveO s = case s of
   WaitForK{} -> (s, Just False, Just False, Nothing, Nothing)
   RxK{} -> (s, Just False, Just False, Nothing, Nothing)
   RxCB{} -> (s, Just False, Just False, Nothing, Nothing)
-  RxCD{} -> (s, Nothing, Nothing, Nothing, Just (C (_rxConfReg s)))
+  RxCD{} -> (s, Nothing, Nothing, Nothing, Just (RudiC (_rxConfReg s)))
   RxInvalid{} ->
-    (s, Nothing, Nothing, Nothing, orNothing (_xmit s == Conf) Invalid)
-  IdleD{} -> (s, Just False, Just False, Nothing, Just I)
+    (s, Nothing, Nothing, Nothing, orNothing (_xmit s == Conf) RudiInvalid)
+  IdleD{} -> (s, Just False, Just False, Nothing, Just RudiI)
   FalseCarrier{} -> (s, Nothing, Just True, Just (Cw 0b00001110), Nothing)
   StartOfPacket{} -> (s, Just True, Just False, Just (Cw 0b01010101), Nothing)
   EarlyEnd{} -> (s, Nothing, Just True, Nothing, Nothing)
@@ -257,7 +257,7 @@ pcsReceiveO s = case s of
     , orNothing (_rx s) False
     , Just (_rx s)
     , Nothing
-    , orNothing (_xmit s /= Data) Invalid
+    , orNothing (_xmit s /= Data) RudiInvalid
     )
   _ -> (s, Nothing, Nothing, Nothing, Nothing)
 

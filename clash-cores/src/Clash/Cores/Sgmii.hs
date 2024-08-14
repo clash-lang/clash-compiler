@@ -107,9 +107,9 @@ sgmiiRx rxCg =
       <*> syncStatus
       <*> (toLinkSpeed <$> regMaybe 0 rxConfReg)
       <*> regMaybe Conf xmit
-      <*> regMaybe Invalid rudi
+      <*> regMaybe RudiInvalid rudi
 
-  rxConfReg = toConfReg <$> regMaybe (C 0) rudi
+  rxConfReg = toConfReg <$> regMaybe (RudiC 0) rudi
   (xmit, txConfReg) = autoNeg syncStatus rudi
   (rxDv, rxEr, rxDw, rudi) = pcsReceive cg rd dw rxEven syncStatus xmit
   (cg, rd, dw, rxEven, syncStatus) = sync bsCg

@@ -87,7 +87,8 @@ timeout Proxy = if clashSimulation then 3 else maxBound
 --   If there has been 'Rudi' value of 'I' in the same set of values, then
 --   return 'False'.
 abilityMatch :: Rudis -> Bool
-abilityMatch rudis = repeat (head rxConfRegs) == rxConfRegs && I `notElem` rudis
+abilityMatch rudis =
+  repeat (head rxConfRegs) == rxConfRegs && RudiI `notElem` rudis
  where
   rxConfRegs = map (noAckBit . fromMaybe 0 . toConfReg) rudis
 
@@ -108,7 +109,7 @@ consistencyMatch rxConfReg rudis = noAckBit rxConfReg == head rxConfRegs'
 
 -- | Function that checks that the last three values of 'Rudi' have been 'I'
 idleMatch :: Rudis -> Bool
-idleMatch = (==) (repeat I)
+idleMatch = (==) (repeat RudiI)
 
 -- | State transition function for 'autoNeg' as defined in IEEE 802.3 Clause 37.
 --   It takes the current 'Status' from 'Sgmii.sync' as well as the 'Rudi'
@@ -125,7 +126,7 @@ autoNegT ::
 autoNegT s (syncStatus, rudi)
   | failT >= timeout (Proxy @dom) =
       AnEnable (Just rudis) rxConfReg (timeout (Proxy @dom) - 1)
-  | rudi == Just Invalid = AnEnable (Just rudis) rxConfReg failT
+  | rudi == Just RudiInvalid = AnEnable (Just rudis) rxConfReg failT
   | otherwise = case s of
       AnEnable{} -> AnRestart Nothing rxConfReg failT 0
       AnRestart{}
@@ -163,7 +164,7 @@ autoNegT s (syncStatus, rudi)
  where
   rudis = maybe rudis' (rudis' <<+) rudi
    where
-    rudis' = fromMaybe (repeat I) (_rudis s)
+    rudis' = fromMaybe (repeat RudiI) (_rudis s)
   rxConfReg = fromMaybe (_rxConfReg s) (toConfReg =<< rudi)
   failT = if syncStatus == Fail then _failT s + 1 else 0
   linkT = _linkT s + 1

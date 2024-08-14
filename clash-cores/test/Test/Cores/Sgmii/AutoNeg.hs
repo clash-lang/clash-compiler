@@ -65,7 +65,7 @@ prop_autoNegNoAckComplete = H.property $ do
   let simOut =
         C.sampleN simDuration (autoNegSim @C.System (C.fromList (map f inp)))
        where
-        f a = (Ok, Just (C a))
+        f a = (Ok, Just (RudiC a))
 
   H.assert $ isNothing (find g simOut)
   H.assert $ isJust (find h simOut)
@@ -86,7 +86,7 @@ prop_autoNegAckComplete = H.property $ do
   let simOut =
         C.sampleN simDuration (autoNegSim @C.System (C.fromList (map f inp)))
        where
-        f a = (Ok, Just (C a))
+        f a = (Ok, Just (RudiC a))
 
   H.assert $ isJust (find g simOut)
  where
@@ -103,7 +103,7 @@ prop_autoNegLinkTimer = H.property $ do
   let simOut =
         C.sampleN simDuration (autoNegSim @C.System (C.fromList (map f inp)))
        where
-        f a = (Ok, Just (C a))
+        f a = (Ok, Just (RudiC a))
 
   (length . filter g) simOut H.=== 3
  where
@@ -121,7 +121,7 @@ prop_autoNegFail = H.property $ do
   let simOut =
         C.sampleN simDuration (autoNegSim @C.System (C.fromList (map f inp)))
        where
-        f a = (Fail, Just (C a))
+        f a = (Fail, Just (RudiC a))
 
   (length . filter g) (drop 10 simOut) H.=== simDuration - 10
  where
@@ -141,7 +141,7 @@ prop_autoNegNoThreeInARow = H.property $ do
       simOut =
         C.sampleN simDuration (autoNegSim @C.System (C.fromList (map f inp)))
        where
-        f a = (Ok, Just (C a))
+        f a = (Ok, Just (RudiC a))
 
   H.assert $ isNothing (find g simOut)
  where
