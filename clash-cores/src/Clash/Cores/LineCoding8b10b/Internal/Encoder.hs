@@ -67,24 +67,23 @@ encode5b6b ::
   Symbol8b10b ->
   -- | Tuple containing the new running disparity and the sub-block
   (Bool, BitVector 6)
-encode5b6b rd sym =
-  case (rd, disparity1) of
-    (True , SubBlockPositive) -> (False, complement sb6_1)
-    (False, SubBlockPositive) -> (True, sb6_1)
-    (_    , SubBlockNeutral)  -> (rd, sb6_1)
-    (_    , SubBlockNegative) -> error "lookupSubBlock6 returned a malformed value"
+encode5b6b rd0 sym = (rd1, if inv then complement sb6_1 else sb6_1)
  where
-  (disparity1, sb6_1) =
-    case (isCw sym, sb5) of
-      (True, 28) -> -- This is a special case
-                    (SubBlockPositive, 0b001111)
-      (False, 7) -> -- This is a special case
-                    (SubBlockPositive, sb6_0)
-      _          -> (disparity0, sb6_0)
+  rd1 =
+    case disparity1 of
+      SubBlockNeutral -> rd0
+      _               -> not rd0
 
-  sb5 = snd $ unpack @(BitVector 3, BitVector 5) $ fromSymbol sym
-  sb6_0 = lookupSubBlock6 sb5
+  (inv, disparity1, sb6_1) =
+    case (isCw sym, sb5, disparity0) of
+      (True, 28, _              ) -> (rd0  , SubBlockPositive, 0b001111)
+      (_   , 7 , _              ) -> (rd0  , disparity0      , sb6_0)
+      (_   , _ , SubBlockNeutral) -> (False, disparity0      , sb6_0)
+      _                           -> (rd0  , disparity0      , sb6_0)
+
   (_, disparity0) = subBlockDisparity6b sb6_0
+  sb6_0 = lookupSubBlock6 sb5
+  sb5 = snd $ unpack @(BitVector 3, BitVector 5) $ fromSymbol sym
 
 encode3b4b ::
   -- | Running disparity
@@ -93,36 +92,43 @@ encode3b4b ::
   Symbol8b10b ->
   -- | Tuple containing the new running disparity and the sub-block
   (Bool, BitVector 4)
-encode3b4b rd0 sym = (rd1, if inv1 then complement sb4_1 else sb4_1)
+encode3b4b rd0 sym = (rd1, if inv then complement sb4_1 else sb4_1)
  where
-  (rd1, inv1) = case (rd0, disparity1) of
-          (True , SubBlockPositive) -> (False, True)
-          (False, SubBlockPositive) -> (True, False)
-          (_    , SubBlockNeutral ) -> (rd0, (not rd0) && inv0)
-          (_    , SubBlockNegative) -> error "lookupSubBlock4 returned a malformed value"
+  rd1 =
+    case disparity of
+      SubBlockNeutral -> rd0
+      _               -> not rd0
 
-  (inv0, disparity1, sb4_1) =
-    case (isCw sym, disparity0, sb3) of
-      (_, _, 3)
-        -> (False, SubBlockPositive, sb4_0)
-      (True, SubBlockNeutral, _)
-        -> (True, disparity0, sb4_0)
-      (_, _, 7)
-        | isCw sym || pickAlt7
-        -> (False, disparity0, 0b0111)
-      _
-        -> (False, disparity0, sb4_0)
+  (inv, sb4_1) =
+    case (isCw sym, sb3, disparity) of
+      (_   , 3, _              )                        -> (rd0  , sb4_0)
+      (_   , 7, _              ) | isCw sym || pickAlt7 -> (rd0  , 0b0111)
+      (True, _, SubBlockNeutral)                        -> (not rd0, sb4_0)
+      (_   , _, SubBlockNeutral)                        -> (False, sb4_0)
+      _                                                 -> (rd0  , sb4_0)
 
-  pickAlt7 :: Bool
-  pickAlt7 = case (rd0, sb5) of
-               (False, 17) -> True
-               (False, 18) -> True
-               (False, 20) -> True
-               (True , 11) -> True
-               (True , 13) -> True
-               (True , 14) -> True
-               _           -> False
-
-  (sb3, sb5) = unpack @(BitVector 3, BitVector 5) $ fromSymbol sym
+  (_, disparity) = subBlockDisparity4b sb4_0
   sb4_0 = lookupSubBlock4 sb3
-  (_, disparity0) = subBlockDisparity4b sb4_0
+  (sb3, sb5) = unpack @(BitVector 3, BitVector 5) $ fromSymbol sym
+
+  pickAlt7 =
+    case (rd0, sb5) of
+      (False, 17) -> True
+      (False, 18) -> True
+      (False, 20) -> True
+      (True , 11) -> True
+      (True , 13) -> True
+      (True , 14) -> True
+      _           -> False
+
+encode8b10b ::
+  -- | Running disparity
+  Bool ->
+  -- | Data word
+  Symbol8b10b ->
+  -- | Tuple containing the new running disparity and the code group
+  (Bool, BitVector 10)
+encode8b10b rd0 sym = (rd2, sb6 ++# sb4)
+ where
+  (rd1, sb6) = encode5b6b rd0 sym
+  (rd2, sb4) = encode3b4b rd1 sym

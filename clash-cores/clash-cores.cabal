@@ -204,6 +204,7 @@ test-suite unittests
     Test.Cores.Crc
     Test.Cores.Internal.SampleSPI
     Test.Cores.LineCoding8b10b
+    Test.Cores.LineCoding8b10b.Ieee8023Tables
     Test.Cores.Internal.Signals
     Test.Cores.SPI
     Test.Cores.SPI.MultiSlave
@@ -214,6 +215,7 @@ test-suite unittests
     Test.Cores.Xilinx.Ethernet.Gmii
 
   build-depends:
+    pretty-show,
     clash-cores,
     clash-lib,
     clash-prelude-hedgehog,
