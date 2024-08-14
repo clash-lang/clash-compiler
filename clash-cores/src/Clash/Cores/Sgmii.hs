@@ -79,7 +79,7 @@ import Data.Maybe (fromMaybe, isJust)
 sgmiiRx ::
   (HiddenClockResetEnable dom) =>
   -- | Input code group
-  Signal dom Cg ->
+  Signal dom CodeGroup ->
   -- | Output tuple
   ( Signal dom SgmiiStatus
   , Signal dom Bool
@@ -88,7 +88,7 @@ sgmiiRx ::
   , Signal dom (Maybe Xmit)
   , Signal dom (Maybe ConfReg)
   , Signal dom (Maybe ConfReg)
-  , Signal dom Cg
+  , Signal dom CodeGroup
   )
 sgmiiRx rxCg =
   ( rxStatus
@@ -132,7 +132,7 @@ sgmiiTx ::
   -- | Configuration register from PHY
   Signal dom (Maybe ConfReg) ->
   -- | Output code group
-  Signal dom Cg
+  Signal dom CodeGroup
 sgmiiTx txEn txEr txDw xmit txConfReg _ =
   pcsTransmit txEn txEr txDw xmit txConfReg
 
@@ -183,7 +183,7 @@ sgmii ::
   -- | Data octet @TXD@ to be transmitted to the PHY
   Signal txDom (BitVector 8) ->
   -- | Input code group from the PHY
-  Signal rxDom Cg ->
+  Signal rxDom CodeGroup ->
   -- | Tuple that contains the output signals from the SGMII block which are the
   --   current status of the receive block 'SgmiiStatus', the @RX_DV@ signal
   --   that indicates an incoming data packet, @RX_ER@ which indicates a receive
@@ -193,8 +193,8 @@ sgmii ::
   , Signal rxDom Bool
   , Signal rxDom Bool
   , Signal rxDom (BitVector 8)
-  , Signal rxDom Cg
-  , Signal txDom Cg
+  , Signal rxDom CodeGroup
+  , Signal txDom CodeGroup
   )
 sgmii rxTxCdc rxClk txClk rxRst txRst txEn txEr txDw rxCg =
   (rxStatus, rxDv, rxEr, rxDw, bsCg, txCg)
@@ -218,7 +218,7 @@ sgmii rxTxCdc rxClk txClk rxRst txRst txEn txEr txDw rxCg =
 sgmiiRxRA ::
   (HiddenClockResetEnable dom) =>
   -- | Input code group
-  Signal dom Cg ->
+  Signal dom CodeGroup ->
   -- | Output tuple
   ( Signal dom SgmiiStatus
   , Signal dom Bool
@@ -226,7 +226,7 @@ sgmiiRxRA ::
   , Signal dom (Maybe Xmit)
   , Signal dom (Maybe ConfReg)
   , Signal dom (Maybe ConfReg)
-  , Signal dom Cg
+  , Signal dom CodeGroup
   )
 sgmiiRxRA rxCg = (rxStatus, rxEr, out, xmit, txConfReg, rxConfReg, bsCg)
  where
@@ -249,7 +249,7 @@ sgmiiTxRA ::
   -- | Configuration register from PHY
   Signal dom (Maybe ConfReg) ->
   -- | Ready signal and output code group
-  (Signal dom Bool, Signal dom Cg)
+  (Signal dom Bool, Signal dom CodeGroup)
 sgmiiTxRA txEr txDw xmit txConfReg rxConfReg = (txReady, txCg)
  where
   linkSpeed = toLinkSpeed <$> regMaybe 0 rxConfReg
@@ -287,7 +287,7 @@ sgmiiRA ::
   -- | Data octet @TXD@ to be transmitted to the PHY
   Signal txDom (Maybe (BitVector 8)) ->
   -- | Input code group from the PHY
-  Signal rxDom Cg ->
+  Signal rxDom CodeGroup ->
   -- | Tuple that contains the output signals from the SGMII block which are the
   --   current status of the receive block 'SgmiiStatus', @RX_ER@ which
   --   indicates a receive error, @RXD@ which is the incoming data octet from
@@ -297,8 +297,8 @@ sgmiiRA ::
   ( Signal rxDom SgmiiStatus
   , Signal rxDom Bool
   , Signal rxDom (Maybe (BitVector 8))
-  , Signal rxDom Cg
-  , Signal txDom Cg
+  , Signal rxDom CodeGroup
+  , Signal txDom CodeGroup
   , Signal txDom Bool
   )
 sgmiiRA rxTxCdc rxClk txClk rxRst txRst txEr txDw rxCg =

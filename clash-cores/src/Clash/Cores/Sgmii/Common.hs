@@ -11,7 +11,7 @@ import Clash.Cores.LineCoding8b10b
 import Clash.Prelude
 
 -- | Format of a single code group, 10-bit
-type Cg = BitVector 10
+type CodeGroup = BitVector 10
 
 -- | Format of @rxConfReg@ and @txConfReg@, size of two data words
 type ConfReg = BitVector 16
@@ -82,11 +82,11 @@ reverseBV :: (KnownNat n) => BitVector n -> BitVector n
 reverseBV = v2bv . reverse . bv2v
 
 -- | Code group that corresponds to K28.5 with negative disparity
-cgK28_5N :: Cg
+cgK28_5N :: CodeGroup
 cgK28_5N = 0b0101111100
 
 -- | Code group that corresponds to K28.5 with positive disparity
-cgK28_5P :: Cg
+cgK28_5P :: CodeGroup
 cgK28_5P = 0b1010000011
 
 -- | Data word corresponding to the decoded version of code group D00.0, used

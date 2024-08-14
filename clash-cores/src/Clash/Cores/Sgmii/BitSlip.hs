@@ -41,7 +41,7 @@ bitSlipT ::
   -- | Current state
   BitSlipState ->
   -- | New input values
-  (Cg, Status) ->
+  (BitVector 10, Status) ->
   -- | New state
   BitSlipState
 bitSlipT BSFail{..} (cg, _)
@@ -68,7 +68,7 @@ bitSlipO ::
   -- | Current state
   BitSlipState ->
   -- | New output value
-  (BitSlipState, Cg, Status)
+  (BitSlipState, BitVector 10, Status)
 bitSlipO s = (s, reverseBV $ resize $ rotateR (_s s) (10 - n), bsStatus)
  where
   (n, bsStatus) = case s of
@@ -82,11 +82,11 @@ bitSlip ::
   forall dom.
   (HiddenClockResetEnable dom) =>
   -- | Input code group
-  Signal dom Cg ->
+  Signal dom (BitVector 10) ->
   -- | Current sync status from 'Sgmii.sync'
   Signal dom Status ->
   -- | Output code group
-  (Signal dom Cg, Signal dom Status)
+  (Signal dom (BitVector 10), Signal dom Status)
 bitSlip cg1 syncStatus = (register 0 cg2, register Fail bsStatus)
  where
   (_, cg2, bsStatus) =

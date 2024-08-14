@@ -19,8 +19,8 @@ import Prelude
 -- | Simulation function for 'sync' that provides a bundled output
 syncSim ::
   (C.HiddenClockResetEnable dom) =>
-  C.Signal dom Cg ->
-  C.Signal dom (Cg, Bool, C.Vec 3 Symbol8b10b, Even, Status)
+  C.Signal dom CodeGroup ->
+  C.Signal dom (CodeGroup, Bool, C.Vec 3 Symbol8b10b, Even, Status)
 syncSim cg = C.bundle $ sync cg
 
 -- | Run the 'sync' function on a list of values that do not contain any comma

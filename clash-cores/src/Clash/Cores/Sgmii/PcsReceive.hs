@@ -71,7 +71,7 @@ bitDiff cg0 cg1 = foldl f 0 $ map bitCoerce $ bv2v $ xor cg0 cg1
 --   encoding of the K28.5 control word
 carrierDetect ::
   -- | Code group
-  Cg ->
+  CodeGroup ->
   -- | Running disparity
   Bool ->
   -- | 'Even' signal
@@ -142,7 +142,7 @@ pcsReceiveT ::
   PcsReceiveState ->
   -- | Input values, where @Vec 3 CodeGroup@ contains the current and next two
   -- | data words
-  (Cg, Bool, Vec 3 Symbol8b10b, Even, Status, Xmit) ->
+  (CodeGroup, Bool, Vec 3 Symbol8b10b, Even, Status, Xmit) ->
   -- | New state
   PcsReceiveState
 pcsReceiveT WaitForK{..} (_, _, dws, rxEven, syncStatus, xmit)
@@ -268,7 +268,7 @@ pcsReceiveO s = case s of
 pcsReceive ::
   (HiddenClockResetEnable dom) =>
   -- | Current code group from 'Sgmii.sync'
-  Signal dom Cg ->
+  Signal dom CodeGroup ->
   -- | Current running disparity from 'Sgmii.sync'
   Signal dom Bool ->
   -- | Input 'Symbol8b10b' from 'Sgmii.sync'

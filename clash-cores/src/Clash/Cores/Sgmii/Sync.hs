@@ -24,29 +24,31 @@ import Clash.Prelude
 import Data.Maybe (isNothing)
 
 -- | State type of the output queue for 'sync'
-type OutputQueue = Vec 3 (Cg, Bool, Symbol8b10b, Even, Status)
+type OutputQueue = Vec 3 (CodeGroup, Bool, Symbol8b10b, Even, Status)
 
 -- | State type of 'sync'. This contains all states as they are defined in IEEE
 --   802.3 Clause 36.
 data SyncState
-  = LossOfSync {_cg :: Cg, _rd :: Bool, _dw :: Symbol8b10b, _rxEven :: Even}
-  | CommaDetect {_cg :: Cg, _rd :: Bool, _dw :: Symbol8b10b, _i :: Index 3}
+  = LossOfSync
+      {_cg :: CodeGroup, _rd :: Bool, _dw :: Symbol8b10b, _rxEven :: Even}
+  | CommaDetect
+      {_cg :: CodeGroup, _rd :: Bool, _dw :: Symbol8b10b, _i :: Index 3}
   | AcquireSync
-      { _cg :: Cg
+      { _cg :: CodeGroup
       , _rd :: Bool
       , _dw :: Symbol8b10b
       , _rxEven :: Even
       , _i :: Index 3
       }
   | SyncAcquired
-      { _cg :: Cg
+      { _cg :: CodeGroup
       , _rd :: Bool
       , _dw :: Symbol8b10b
       , _rxEven :: Even
       , _i :: Index 3
       }
   | SyncAcquiredA
-      { _cg :: Cg
+      { _cg :: CodeGroup
       , _rd :: Bool
       , _dw :: Symbol8b10b
       , _rxEven :: Even
@@ -62,7 +64,7 @@ data SyncState
 --   disparity when it is decoded and the second comma returns the positive
 --   running disparity when it is decoded. This is used in 'LossOfSync' to
 --   recover the correct running disparity from a received comma.
-commas :: Vec 2 Cg
+commas :: Vec 2 CodeGroup
 commas = cgK28_5N :> cgK28_5P :> Nil
 
 -- | State transition function for 'sync'. Takes the state as defined in
@@ -77,7 +79,7 @@ syncT ::
   -- | Current state
   SyncState ->
   -- | New input codegroup
-  Cg ->
+  CodeGroup ->
   -- | New state and output tuple
   SyncState
 syncT s cg = case s of
@@ -130,7 +132,7 @@ syncO ::
   -- | Current state
   SyncState ->
   -- | New state and output tuple
-  (SyncState, Cg, Bool, Symbol8b10b, Even, Status)
+  (SyncState, CodeGroup, Bool, Symbol8b10b, Even, Status)
 syncO s = case s of
   LossOfSync{} -> (s, _cg s, _rd s, _dw s, rxEven, Fail)
   CommaDetect{} -> (s, _cg s, _rd s, _dw s, Even, Fail)
@@ -147,7 +149,7 @@ outputQueueT ::
   OutputQueue ->
   -- | New input values for the code group, running disparity, data word, 'Even'
   --   signal and 'Status;
-  (Cg, Bool, Symbol8b10b, Even, Status) ->
+  (CodeGroup, Bool, Symbol8b10b, Even, Status) ->
   -- | New state
   OutputQueue
 outputQueueT s i = s <<+ i
@@ -159,7 +161,7 @@ outputQueueO ::
   OutputQueue ->
   -- | New output with one value for everything except 'Symbol8b10b' for the
   --   prescient 'Sgmii.checkEnd' function.
-  (Cg, Bool, Vec 3 Symbol8b10b, Even, Status)
+  (CodeGroup, Bool, Vec 3 Symbol8b10b, Even, Status)
 outputQueueO s = (cg, rd, dw, rxEven, syncStatus)
  where
   (head -> cg, head -> rd, dw, head -> rxEven, head -> syncStatus) = unzip5 s
@@ -175,11 +177,11 @@ outputQueueO s = (cg, rd, dw, rxEven, syncStatus)
 sync ::
   (HiddenClockResetEnable dom) =>
   -- | New code group from the PHY
-  Signal dom Cg ->
+  Signal dom CodeGroup ->
   -- | A tuple containing the input code group, running disparity, a new
   --   'Symbol8b10b', the new value for 'Even' and the current synchronization
   --   status
-  ( Signal dom Cg
+  ( Signal dom CodeGroup
   , Signal dom Bool
   , Signal dom (Vec 3 Symbol8b10b)
   , Signal dom Even

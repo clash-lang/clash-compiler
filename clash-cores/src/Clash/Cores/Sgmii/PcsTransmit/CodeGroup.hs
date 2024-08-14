@@ -25,25 +25,27 @@ import Data.Maybe (fromMaybe)
 data CodeGroupState
   = SpecialGo
       { _rd :: Bool
-      , _cg :: Cg
+      , _cg :: CodeGroup
       , _txConfReg :: ConfReg
       , _txEven :: Even
       , _txOSet :: OrderedSet
       }
-  | DataGo {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg, _txEven :: Even}
-  | IdleDisparityWrong {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg}
-  | IdleDisparityOk {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg}
-  | IdleIB {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg, _i :: Index 2}
-  | ConfCA {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg, _i :: Index 2}
-  | ConfCB {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg, _i :: Index 2}
-  | ConfCC {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg, _i :: Index 2}
-  | ConfCD {_rd :: Bool, _cg :: Cg, _txConfReg :: ConfReg, _i :: Index 2}
+  | DataGo
+      {_rd :: Bool, _cg :: CodeGroup, _txConfReg :: ConfReg, _txEven :: Even}
+  | IdleDisparityWrong {_rd :: Bool, _cg :: CodeGroup, _txConfReg :: ConfReg}
+  | IdleDisparityOk {_rd :: Bool, _cg :: CodeGroup, _txConfReg :: ConfReg}
+  | IdleIB {_rd :: Bool, _cg :: CodeGroup, _txConfReg :: ConfReg, _i :: Index 2}
+  | ConfCA {_rd :: Bool, _cg :: CodeGroup, _txConfReg :: ConfReg, _i :: Index 2}
+  | ConfCB {_rd :: Bool, _cg :: CodeGroup, _txConfReg :: ConfReg, _i :: Index 2}
+  | ConfCC {_rd :: Bool, _cg :: CodeGroup, _txConfReg :: ConfReg, _i :: Index 2}
+  | ConfCD {_rd :: Bool, _cg :: CodeGroup, _txConfReg :: ConfReg, _i :: Index 2}
   deriving (Generic, NFDataX, Show)
 
 -- | State transitions from @GENERATE_CODE_GROUP@ from Figure 36-6, which need
 --   to be set in all parent states of @GENERATE_CODE_GROUP@ as this state
 --   itself is not implemented as it does not transmit a code group
-generateCg :: OrderedSet -> Bool -> Cg -> ConfReg -> Even -> CodeGroupState
+generateCg ::
+  OrderedSet -> Bool -> CodeGroup -> ConfReg -> Even -> CodeGroupState
 generateCg txOSet rd cg txConfReg txEven
   | txOSet == OSetD = DataGo rd cg txConfReg txEven
   | txOSet == OSetI && rd = IdleDisparityWrong rd cg txConfReg
@@ -102,7 +104,7 @@ codeGroupO ::
   -- | Current state
   CodeGroupState ->
   -- | New output values
-  (CodeGroupState, Cg, Even, Bool)
+  (CodeGroupState, CodeGroup, Even, Bool)
 codeGroupO s = case s of
   SpecialGo{} -> (s, _cg s, nextEven (_txEven s), True)
   DataGo{} -> (s, _cg s, nextEven (_txEven s), True)

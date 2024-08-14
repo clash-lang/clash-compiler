@@ -30,7 +30,7 @@ pcsTransmit ::
   -- | The 'ConfReg' from 'Sgmii.autoNeg'
   Signal dom (Maybe ConfReg) ->
   -- | The 8b/10b encoded output value
-  Signal dom Cg
+  Signal dom CodeGroup
 pcsTransmit txEn txEr dw xmit txConfReg = cg
  where
   (_, cg, txEven, cgSent) =
