@@ -84,7 +84,7 @@ timeout Proxy = if clashSimulation then 3 else maxBound
 
 -- | Check if the the last three received values of @rxConfReg@ are the same
 --   (with the exception for bit 14, the acknowledge bit, which is discarded).
---   If there has been 'Rudi' value of 'I' in the same set of values, then
+--   If there has been 'Rudi' value of 'RudiI' in the same set of values, then
 --   return 'False'.
 abilityMatch :: Rudis -> Bool
 abilityMatch rudis =

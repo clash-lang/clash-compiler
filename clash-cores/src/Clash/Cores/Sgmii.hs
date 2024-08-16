@@ -184,11 +184,14 @@ sgmii ::
   Signal txDom (BitVector 8) ->
   -- | Input code group from the PHY
   Signal rxDom CodeGroup ->
-  -- | Tuple that contains the output signals from the SGMII block which are the
-  --   current status of the receive block 'SgmiiStatus', the @RX_DV@ signal
-  --   that indicates an incoming data packet, @RX_ER@ which indicates a receive
-  --   error, @RXD@ which is the incoming data octet from the PHY, and a 10-bit
-  --   code word that can be serialized and transmitted to the PHY.
+  -- | Tuple that contains the output signals from the SGMII block which are:
+  --
+  --   - The current status of the receive block,
+  --   - The @RX_DV@ signal that indicates an incoming data packet,
+  --   - The @RX_ER@ signal that indicates a receive error,
+  --   - The @RXD@ signal which is the incoming data octet from the PHY,
+  --   - The word-aligned version of the received code group from the PHY,
+  --   - A 10-bit code group that can be serialized and transmitted to the PHY.
   ( Signal rxDom SgmiiStatus
   , Signal rxDom Bool
   , Signal rxDom Bool
@@ -288,12 +291,15 @@ sgmiiRA ::
   Signal txDom (Maybe (BitVector 8)) ->
   -- | Input code group from the PHY
   Signal rxDom CodeGroup ->
-  -- | Tuple that contains the output signals from the SGMII block which are the
-  --   current status of the receive block 'SgmiiStatus', @RX_ER@ which
-  --   indicates a receive error, @RXD@ which is the incoming data octet from
-  --   the PHY, and a 10-bit code word that can be serialized and transmitted to
-  --   the PHY. For debugging purposes, also a word-aligned version of the input
-  --   word is outputted.
+  -- | Tuple that contains the output signals from the SGMII block which are:
+  --
+  --   - The current status of the receive block,
+  --   - The @RX_ER@ signal that indicates a receive error,
+  --   - The incoming data octet from the PHY or 'Nothing' when no data word is
+  --     received,
+  --   - The word-aligned version of the received code group from the PHY,
+  --   - A 10-bit code group that can be serialized and transmitted to the PHY,
+  --   - A boolean that indicates if a new data word can be provided.
   ( Signal rxDom SgmiiStatus
   , Signal rxDom Bool
   , Signal rxDom (Maybe (BitVector 8))
