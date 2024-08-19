@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2022, Google Inc.,
-                    2021-2022, QBayLogic B.V.
+                    2021-2024, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
   Transformations on case-expressions
@@ -26,6 +26,12 @@ module Clash.Normalize.Transformations.Case
   , elimExistentials
   ) where
 
+import Control.Exception.Base (patError)
+#if MIN_VERSION_base(4,16,0)
+import GHC.Prim.Panic (absentError)
+#else
+import Control.Exception.Base (absentError)
+#endif
 import qualified Control.Lens as Lens
 import Control.Monad.State.Strict (evalState)
 import Data.Bifunctor (second)
@@ -79,6 +85,8 @@ import Clash.Rewrite.Types
 import Clash.Rewrite.Util (changed, isFromInt, whnfRW)
 import Clash.Rewrite.WorkFree
 import Clash.Util (curLoc)
+
+import Clash.XException (errorX)
 
 -- | Move a Case-decomposition from the subject of a Case-decomposition to the
 -- alternatives
@@ -266,24 +274,23 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- WHNF of subject is _|_, in the form of `error`: that means that the
       -- entire case-expression is evaluates to _|_
       (Prim pInfo,repTy:_:callStack:msg:_,ticks)
-        | primName pInfo == "GHC.Err.error" ->
+        | primName pInfo == Text.showt 'error ->
         let e1 = mkApps (mkTicks (Prim pInfo) ticks)
                         [repTy,Right ty,callStack,msg]
          in changed e1
       -- WHNF of subject is _|_, in the form of `absentError`: that means that
       -- the entire case-expression is evaluates to _|_
       (Prim pInfo,_:msgOrCallStack:_,ticks)
-        | primName pInfo `elem` ["Control.Exception.Base.absentError"
-                                ,"GHC.Prim.Panic.absentError"] ->
+        | primName pInfo == Text.showt 'absentError ->
         let e1 = mkApps (mkTicks (Prim pInfo) ticks)
                         [Right ty,msgOrCallStack]
         in  changed e1
       -- WHNF of subject is _|_, in the form of  `patError`, `undefined`, or
       -- `errorWithoutStackTrace`: that means the entire case-expression is _|_
       (Prim pInfo,repTy:_:msgOrCallStack:_,ticks)
-        | primName pInfo `elem` ["Control.Exception.Base.patError"
-                                ,"GHC.Err.undefined"
-                                ,"GHC.Err.errorWithoutStackTrace"] ->
+        | primName pInfo `elem` [ Text.showt 'patError
+                                , Text.showt 'undefined
+                                , Text.showt 'errorWithoutStackTrace] ->
         let e1 = mkApps (mkTicks (Prim pInfo) ticks)
                         [repTy,Right ty,msgOrCallStack]
         in  changed e1
@@ -297,7 +304,7 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- WHNF of subject is _|_, in the form of `errorX`: that means that
       -- the entire case-expression is evaluates to _|_
       (Prim pInfo,_:callStack:msg:_,ticks)
-        | primName pInfo == "Clash.XException.errorX"
+        | primName pInfo == Text.showt 'errorX
         -> let e1 = mkApps (mkTicks (Prim pInfo) ticks) [Right ty,callStack,msg]
             in changed e1
       -- WHNF of subject is non of the above, so either a variable reference,

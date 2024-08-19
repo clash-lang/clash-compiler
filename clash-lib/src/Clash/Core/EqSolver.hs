@@ -1,5 +1,5 @@
 {-|
-  Copyright  :  (C) 2021 QBayLogic B.V.
+  Copyright  :  (C) 2021-2024 QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -12,16 +12,18 @@ module Clash.Core.EqSolver where
 import Data.List.Extra (zipEqual)
 import Data.Maybe (catMaybes, mapMaybe)
 
-import Clash.Core.Name (Name(nameOcc))
+import Clash.Core.Name (Name(nameUniq))
 import Clash.Core.Term
 import Clash.Core.TyCon
 import Clash.Core.Type
 import Clash.Core.Var
 import Clash.Core.VarEnv (VarSet, elemVarSet, emptyVarSet, mkVarSet)
+import Clash.Unique (fromGhcUnique)
 #if MIN_VERSION_ghc(9,0,0)
 import Clash.Core.DataCon (dcUniq)
-import GHC.Builtin.Names (unsafeReflDataConKey)
-import GHC.Types.Unique (getKey)
+import GHC.Builtin.Names (unsafeReflDataConKey, eqPrimTyConKey, typeNatAddTyFamNameKey)
+#else
+import PrelNames (eqPrimTyConKey, typeNatAddTyFamNameKey)
 #endif
 
 -- | Data type that indicates what kind of solution (if any) was found
@@ -120,7 +122,8 @@ normalizeAdd
 normalizeAdd (a, b) = do
   (n, rhs) <- lhsLit a b
   case tyView rhs of
-    TyConApp (nameOcc -> "GHC.TypeNats.+") [left, right] -> do
+    TyConApp tc [left, right]
+      | nameUniq tc == fromGhcUnique typeNatAddTyFamNameKey -> do
       (m, o) <- lhsLit left right
       return (n, m, o)
     _ ->
@@ -139,7 +142,7 @@ isAbsurdPat
 #if MIN_VERSION_base(4,15,0)
 isAbsurdPat _tcm (DataPat dc _ _)
   -- unsafeCoerce is not absurd in the way intended by /isAbsurdPat/
-  | dcUniq dc == getKey unsafeReflDataConKey
+  | dcUniq dc == fromGhcUnique unsafeReflDataConKey
   = False
 #endif
 isAbsurdPat tcm pat =
@@ -178,7 +181,8 @@ typeEq
   -> Maybe (Type, Type)
 typeEq tcm ty =
  case tyView (coreView tcm ty) of
-  TyConApp (nameOcc -> "GHC.Prim.~#") [_, _, left, right] ->
+  TyConApp tc [_, _, left, right]
+    | nameUniq tc == fromGhcUnique eqPrimTyConKey ->
     Just (coreView tcm left, coreView tcm right)
   _ ->
     Nothing

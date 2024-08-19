@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente
-                     2021,      QBayLogic B.V.
+                     2021-2024, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -125,7 +125,11 @@ isTupleTyConLike nm = tupleName (T.takeWhileEnd (/= '.') (nameOcc nm))
       | Just ('(', nm1) <- T.uncons nm0
       , Just (nm2, ')') <- T.unsnoc nm1
       = T.all (== ',') nm2
-    tupleName _ = T.pack "GHC.Tuple.Prim.Tuple" `T.isPrefixOf` (nameOcc nm)
+    tupleName _ =
+      any (`T.isPrefixOf` (nameOcc nm)) $ map T.pack
+        [ "GHC.Tuple.Prim.Tuple"
+        , "GHC.Tuple.Tuple"
+        ]
 
 -- | Get the DataCons belonging to a TyCon
 tyConDataCons :: TyCon -> [DataCon]

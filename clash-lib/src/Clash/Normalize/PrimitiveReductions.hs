@@ -1,7 +1,7 @@
 {-|
   Copyright  :  (C) 2015-2016, University of Twente,
                     2016     , Myrtle Software Ltd,
-                    2021     , QBayLogic B.V.
+                    2021-2024, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -45,7 +45,12 @@ import           Control.Monad.Trans.Maybe        (MaybeT (..))
 import           Data.Bifunctor                   (second)
 import           Data.List                        (mapAccumR)
 import           Data.List.Extra                  (zipEqual)
+#if MIN_VERSION_base(4,20,0)
+import qualified Data.List.NonEmpty               as NE hiding (unzip)
+import qualified Data.Functor                     as NE
+#else
 import qualified Data.List.NonEmpty               as NE
+#endif
 import qualified Data.Maybe                       as Maybe
 import           Data.Semigroup                   (sconcat)
 import           Data.Text.Extra                  (showt)
@@ -55,13 +60,11 @@ import           GHC.Stack                        (HasCallStack)
 import           GHC.Builtin.Names
   (boolTyConKey, typeNatAddTyFamNameKey, typeNatMulTyFamNameKey,
    typeNatSubTyFamNameKey)
-import           GHC.Types.Unique                 (getKey)
 import           GHC.Types.SrcLoc                 (wiredInSrcSpan)
 #else
 import           PrelNames
   (boolTyConKey, typeNatAddTyFamNameKey, typeNatMulTyFamNameKey,
    typeNatSubTyFamNameKey)
-import           Unique                           (getKey)
 import           SrcLoc                           (wiredInSrcSpan)
 #endif
 
@@ -93,20 +96,21 @@ import {-# SOURCE #-} Clash.Normalize.Strategy
 import           Clash.Normalize.Types
 import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
+import           Clash.Unique (fromGhcUnique)
 import           Clash.Util
 import qualified Clash.Util.Interpolate           as I
 
 typeNatAdd :: TyConName
 typeNatAdd =
-  Name User "GHC.TypeNats.+" (getKey typeNatAddTyFamNameKey) wiredInSrcSpan
+  Name User "GHC.TypeNats.+" (fromGhcUnique typeNatAddTyFamNameKey) wiredInSrcSpan
 
 typeNatMul :: TyConName
 typeNatMul =
-  Name User "GHC.TypeNats.*" (getKey typeNatMulTyFamNameKey) wiredInSrcSpan
+  Name User "GHC.TypeNats.*" (fromGhcUnique typeNatMulTyFamNameKey) wiredInSrcSpan
 
 typeNatSub :: TyConName
 typeNatSub =
-  Name User "GHC.TypeNats.-" (getKey typeNatSubTyFamNameKey) wiredInSrcSpan
+  Name User "GHC.TypeNats.-" (fromGhcUnique typeNatSubTyFamNameKey) wiredInSrcSpan
 
 vecHeadPrim
   :: TyConName
@@ -1072,7 +1076,7 @@ reduceReplace_int n aTy vTy _kn v i newA (TransformContext is0 _ctx) = do
   replace_intElement tcm iDc iTy oldA elIndex = case0
    where
     case0 = Maybe.fromMaybe (error "replace_intElement: faild to build Truce DC") $ do
-      boolTc <- UniqMap.lookup (getKey boolTyConKey) tcm
+      boolTc <- UniqMap.lookup (fromGhcUnique boolTyConKey) tcm
       [_,trueDc] <- pure (tyConDataCons boolTc)
       let eqInt = eqIntPrim iTy (mkTyConApp (tyConName boolTc) [])
       return (Case (mkApps eqInt [ Left i
@@ -1181,7 +1185,7 @@ reduceIndex_int n aTy _kn v i (TransformContext is0 _ctx) = do
   index_intElement tcm iDc iTy (cur,elIndex) next = case0
    where
     case0 = Maybe.fromMaybe (error "reduceIndex_int: faild to build True DC") $ do
-      boolTc <- UniqMap.lookup (getKey boolTyConKey) tcm
+      boolTc <- UniqMap.lookup (fromGhcUnique boolTyConKey) tcm
       [_,trueDc] <- pure (tyConDataCons boolTc)
       let eqInt = eqIntPrim iTy (mkTyConApp (tyConName boolTc) [])
       return (Case (mkApps eqInt [ Left i

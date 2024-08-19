@@ -49,7 +49,10 @@ import           Data.Maybe                           (catMaybes, fromMaybe)
 import           Data.Monoid                          (Ap(Ap))
 import           Data.Monoid.Extra                    ()
 import           Data.List
-  (mapAccumL, mapAccumR, nubBy, foldl')
+  (mapAccumL, mapAccumR, nubBy)
+#if !MIN_VERSION_base(4,20,0)
+import           Data.List                            (foldl')
+#endif
 import           Data.List.Extra                      ((<:>))
 import           Data.Text.Lazy                       (pack)
 import qualified Data.Text.Lazy                       as Text
