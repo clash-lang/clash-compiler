@@ -88,10 +88,11 @@ timeout Proxy = if clashSimulation then 3 else maxBound
 --   If there has been 'Rudi' value of 'RudiI' in the same set of values, then
 --   return 'False'.
 abilityMatch :: Rudis -> Bool
-abilityMatch rudis =
-  repeat (head rxConfRegs) == rxConfRegs && RudiI `notElem` rudis
+abilityMatch rudis = all (match (head rudis)) rudis
  where
-  rxConfRegs = map (noAckBit . fromMaybe 0 . toConfReg) rudis
+  match x y =
+    fromMaybe False (liftA2 (==) (toConfRegNoAck x) (toConfRegNoAck y))
+  toConfRegNoAck = fmap noAckBit . toConfReg
 
 -- | Check if the last three values for 'ConfReg' are all the same, and also
 --   check whether bit 14 (the acknowledge bit) has been asserted
