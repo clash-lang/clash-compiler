@@ -14,6 +14,7 @@ import Clash.Sized.BitVector (BitVector, Bit)
 import Clash.Sized.Index (Index)
 import Clash.Sized.Signed (Signed)
 import Clash.Sized.Unsigned (Unsigned)
+import Clash.Sized.Vector as Vec (Vec, repeat, mapAccumR)
 
 import Data.Bifunctor (bimap)
 import Data.Functor.Identity (Identity(..))
@@ -22,11 +23,14 @@ import Data.Word (Word8, Word16, Word32, Word64)
 import GHC.TypeLits (KnownNat, type (<=))
 
 -- $setup
+-- >>> :m -Prelude
+-- >>> import Clash.Prelude
 -- >>> import Clash.Class.Counter
 -- >>> import Clash.Sized.BitVector (BitVector)
 -- >>> import Clash.Sized.Index (Index)
 -- >>> import Clash.Sized.Signed (Signed)
 -- >>> import Clash.Sized.Unsigned (Unsigned)
+-- >>> import Clash.Sized.Vector (Vec(..), iterate)
 
 -- | t'Clash.Class.Counter.Counter' is a class that composes multiple counters
 -- into a single one. It is similar to odometers found in olds cars,
@@ -193,3 +197,26 @@ instance (Counter a0, Counter a1) => Counter (a0, a1) where
     (overflowA, a1) = countPredOverflow a0
 
 genTupleInstances maxTupleSize
+
+rippleR :: (a -> (Bool, a)) -> Vec n a -> (Bool, Vec n a)
+rippleR f = mapAccumR step True
+  where
+    step carry x = if carry then f x else (False, x)
+
+-- | Counters on vectors increment from right to left.
+--
+-- >>> type T = Vec 2 (Index 10)
+-- >>> countSucc @T (0 :> 0 :> Nil)
+-- 0 :> 1 :> Nil
+-- >>> countSucc @T (0 :> 1 :> Nil)
+-- 0 :> 2 :> Nil
+-- >>> countSucc @T (0 :> 9 :> Nil)
+-- 1 :> 0 :> Nil
+-- >>> iterate (SNat @5) (countSucc @T) (9 :> 8 :> Nil)
+-- (9 :> 8 :> Nil) :> (9 :> 9 :> Nil) :> (0 :> 0 :> Nil) :> (0 :> 1 :> Nil) :> (0 :> 2 :> Nil) :> Nil
+instance (Counter a, KnownNat n, 1 <= n) => Counter (Vec n a) where
+    countMin = Vec.repeat countMin
+    countMax = Vec.repeat countMax
+
+    countSuccOverflow = rippleR countSuccOverflow
+    countPredOverflow = rippleR countPredOverflow
