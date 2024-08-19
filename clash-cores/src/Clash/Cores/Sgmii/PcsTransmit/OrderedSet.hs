@@ -16,7 +16,7 @@ where
 
 import Clash.Cores.Sgmii.Common
 import Clash.Prelude
-import Data.Maybe (fromJust, fromMaybe, isJust)
+import Data.Maybe (fromMaybe)
 
 -- | State type of 'orderedSetT' as defined in IEEE 802.3 Clause 36, with the
 --   exeception of @TX_TEST_XMIT@, @TX_PACKET@ and @ALIGN_ERR_START@ as these
@@ -90,7 +90,7 @@ orderedSetT s@Configuration{} (txEn, txEr, _, xmit, txEven, tx) =
 orderedSetT s@IdleS{} (txEn, txEr, _, xmit, txEven, tx) = (nextState, out)
  where
   nextState
-    | isJust s' = fromJust s'
+    | Just x <- s' = x
     | xmit' == Data && not txEn && not txEr && tx = XmitData xmit' xmitChange
     | otherwise = IdleS xmit' xmitChange
 
@@ -100,7 +100,7 @@ orderedSetT s@IdleS{} (txEn, txEr, _, xmit, txEven, tx) = (nextState, out)
 orderedSetT s@XmitData{} (txEn, txEr, _, xmit, txEven, tx) = (nextState, out)
  where
   nextState
-    | isJust s' = fromJust s'
+    | Just x <- s' = x
     | txEn && not txEr && tx = StartOfPacket xmit' xmitChange
     | txEn && txEr && tx = StartError xmit' xmitChange
     | otherwise = XmitData xmit' xmitChange
@@ -112,7 +112,7 @@ orderedSetT s@StartOfPacket{} (txEn, txEr, _, xmit, txEven, tx) =
   (nextState, out)
  where
   nextState
-    | isJust s' = fromJust s'
+    | Just x <- s' = x
     | txEn && tx = TxData xmit' xmitChange
     | not txEn && not txEr && tx = EndOfPacketNoExt xmit' xmitChange
     | not txEn && txEr && tx = EndOfPacketExt xmit' xmitChange
@@ -124,7 +124,7 @@ orderedSetT s@StartOfPacket{} (txEn, txEr, _, xmit, txEven, tx) =
 orderedSetT s@TxData{} (txEn, txEr, dw, xmit, txEven, tx) = (nextState, out)
  where
   nextState
-    | isJust s' = fromJust s'
+    | Just x <- s' = x
     | txEn && tx = TxData xmit' xmitChange
     | not txEn && not txEr && tx = EndOfPacketNoExt xmit' xmitChange
     | not txEn && txEr && tx = EndOfPacketExt xmit' xmitChange
@@ -138,7 +138,7 @@ orderedSetT s@EndOfPacketNoExt{} (txEn, txEr, _, xmit, txEven, tx) =
   (nextState, out)
  where
   nextState
-    | isJust s' = fromJust s'
+    | Just x <- s' = x
     | tx = Epd2NoExt xmit' xmitChange
     | otherwise = EndOfPacketNoExt xmit' xmitChange
 
@@ -148,7 +148,7 @@ orderedSetT s@EndOfPacketNoExt{} (txEn, txEr, _, xmit, txEven, tx) =
 orderedSetT s@Epd2NoExt{} (txEn, txEr, _, xmit, txEven, tx) = (nextState, out)
  where
   nextState
-    | isJust s' = fromJust s'
+    | Just x <- s' = x
     | txEven == Odd && tx = XmitData xmit' xmitChange
     | txEven == Even && tx = Epd3 xmit' xmitChange
     | otherwise = Epd2NoExt xmit' xmitChange
@@ -159,7 +159,7 @@ orderedSetT s@Epd2NoExt{} (txEn, txEr, _, xmit, txEven, tx) = (nextState, out)
 orderedSetT s@Epd3{} (txEn, txEr, _, xmit, txEven, tx) = (nextState, out)
  where
   nextState
-    | isJust s' = fromJust s'
+    | Just x <- s' = x
     | tx = XmitData xmit' xmitChange
     | otherwise = Epd3 xmit' xmitChange
 
@@ -170,7 +170,7 @@ orderedSetT s@EndOfPacketExt{} (txEn, txEr, dw, xmit, txEven, tx) =
   (nextState, out)
  where
   nextState
-    | isJust s' = fromJust s'
+    | Just x <- s' = x
     | not txEr && tx = ExtendBy1 xmit' xmitChange
     | txEr && tx = CarrierExtend xmit' xmitChange
     | otherwise = EndOfPacketExt xmit' xmitChange
@@ -182,7 +182,7 @@ orderedSetT s@EndOfPacketExt{} (txEn, txEr, dw, xmit, txEven, tx) =
 orderedSetT s@ExtendBy1{} (txEn, txEr, _, xmit, txEven, tx) = (nextState, out)
  where
   nextState
-    | isJust s' = fromJust s'
+    | Just x <- s' = x
     | tx = Epd2NoExt xmit' xmitChange
     | otherwise = ExtendBy1 xmit' xmitChange
 
@@ -193,7 +193,7 @@ orderedSetT s@CarrierExtend{} (txEn, txEr, dw, xmit, txEven, tx) =
   (nextState, out)
  where
   nextState
-    | isJust s' = fromJust s'
+    | Just x <- s' = x
     | not txEn && not txEr && tx = ExtendBy1 xmit' xmitChange
     | txEn && txEr && tx = StartError xmit' xmitChange
     | txEn && not txEr && tx = StartOfPacket xmit' xmitChange
@@ -206,7 +206,7 @@ orderedSetT s@CarrierExtend{} (txEn, txEr, dw, xmit, txEven, tx) =
 orderedSetT s@StartError{} (txEn, txEr, _, xmit, txEven, tx) = (nextState, out)
  where
   nextState
-    | isJust s' = fromJust s'
+    | Just x <- s' = x
     | tx = TxDataError xmit' xmitChange
     | otherwise = StartError xmit' xmitChange
 
@@ -216,7 +216,7 @@ orderedSetT s@StartError{} (txEn, txEr, _, xmit, txEven, tx) = (nextState, out)
 orderedSetT s@TxDataError{} (txEn, txEr, _, xmit, txEven, tx) = (nextState, out)
  where
   nextState
-    | isJust s' = fromJust s'
+    | Just x <- s' = x
     | txEn && tx = TxData xmit' xmitChange
     | not txEn && not txEr && tx = EndOfPacketNoExt xmit' xmitChange
     | not txEn && txEr && tx = EndOfPacketExt xmit' xmitChange

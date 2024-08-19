@@ -19,7 +19,7 @@ where
 
 import Clash.Cores.Sgmii.Common
 import Clash.Prelude
-import Data.Maybe (fromJust, isNothing)
+import Data.Maybe (fromJust)
 
 -- | State variable for 'bitSlip', with the two states as described in
 --   'bitSlipT'. Due to timing constraints, not all functions can be executed in
@@ -46,8 +46,7 @@ bitSlipT ::
   -- | New state
   BitSlipState
 bitSlipT BSFail{..} (cg, _)
-  | isNothing n = BSFail s ns hist
-  | _ns == repeat (fromJust n) = BSOk s (fromJust n)
+  | Just i <- n, _ns == repeat (fromJust n) = BSOk s i
   | otherwise = BSFail s ns hist
  where
   s = resize $ _s ++# reverseBV cg

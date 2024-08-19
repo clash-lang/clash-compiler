@@ -19,7 +19,6 @@ where
 import Clash.Cores.LineCoding8b10b
 import Clash.Cores.Sgmii.Common
 import Clash.Prelude
-import Data.Maybe (fromJust, isJust)
 
 -- | Defines all possible valid termination values
 data CheckEnd = KDK | KDD | TRK | TRR | RRR | RRK | RRS
@@ -204,7 +203,7 @@ pcsReceiveT ExtendErr{..} (_, _, dws, rxEven, syncStatus, xmit)
   | syncStatus == Fail = LinkFailed _rx xmit
   | head dws == cwS = StartOfPacket _rx
   | head dws == cwK28_5 && rxEven == Even = RxK _rx
-  | isJust s && rxEven == Even = fromJust s
+  | Just x <- s, rxEven == Even = x
   | otherwise = ExtendErr _rx
  where
   s = epd2CheckEnd dws rxEven _rx
@@ -213,7 +212,7 @@ pcsReceiveT LinkFailed{} (_, _, _, _, syncStatus, xmit)
   | otherwise = WaitForK False
 pcsReceiveT s (_, _, dws, rxEven, syncStatus, xmit)
   | syncStatus == Fail = LinkFailed (_rx s) xmit
-  | isJust s1 = fromJust s1
+  | Just x <- s1 = x
   | otherwise = s2
  where
   (s1, s2) = case s of

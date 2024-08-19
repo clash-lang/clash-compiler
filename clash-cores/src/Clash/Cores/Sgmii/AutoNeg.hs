@@ -109,7 +109,7 @@ consistencyMatch rxConfReg rudis = noAckBit rxConfReg == head rxConfRegs'
  where
   rxConfRegs' = map (noAckBit . fromMaybe 0 . toConfReg) rudis
 
--- | Function that checks that the last three values of 'Rudi' have been 'I'
+-- | Function that checks that the last three values of 'Rudi' have been 'RudiI'
 idleMatch :: Rudis -> Bool
 idleMatch = (==) (repeat RudiI)
 
