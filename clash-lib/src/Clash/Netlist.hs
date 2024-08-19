@@ -830,6 +830,7 @@ mkExpr bbEasD declType bndr app =
   let hwTyA = case hwTys of
         hwTy:_ -> hwTy
         _ -> error ("internal error: unable to extract sufficient hwTys from: " <> show bndr)
+  let invalid kind = throw (ClashException sp ($(curLoc) ++ "Not in normal form: " ++ kind ++ "\n\n" ++ showPpr app) Nothing)
   case appF of
     Data dc -> mkDcApplication declType hwTys bndr dc tmArgs
     Prim pInfo -> mkPrimitive False bbEasD declType bndr pInfo args tickDecls
@@ -839,9 +840,7 @@ mkExpr bbEasD declType bndr app =
             return (Noop, [])
           else do
             return (Identifier (Id.unsafeFromCoreId f) Nothing, [])
-      | not (null tyArgs) ->
-          throw (ClashException sp ($(curLoc) ++ "Not in normal form: "
-            ++ "Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
+      | not (null tyArgs) -> invalid "Var-application with type arguments"
       | otherwise -> do
           argNm <- Id.suffix (netlistId1 id Id.unsafeFromCoreId bndr) "fun_arg"
           decls  <- mkFunApp argNm f tmArgs tickDecls
@@ -862,12 +861,20 @@ mkExpr bbEasD declType bndr app =
         -- This net was already declared in the call to mkSelection
         return ( Identifier argNm Nothing
                , NetDecl' Nothing argNm hwTyA Nothing:decls)
+    Case _ _ [] -> invalid "No case alternatives\n\n"
     Letrec binders body -> do
       netDecls <- concatMapM mkNetDecl binders
       decls    <- concatMapM (uncurry (mkDeclarations' declType)) binders
       (bodyE,bodyDecls) <- mkExpr bbEasD declType bndr (mkApps (mkTicks body ticks) args)
       return (bodyE,netDecls ++ decls ++ bodyDecls)
-    _ -> throw (ClashException sp ($(curLoc) ++ "Not in normal form: application of a Lambda-expression\n\n" ++ showPpr app) Nothing)
+    Core.Literal _ -> invalid "application of literal"
+    Let _ _ -> invalid "application of let"
+    TyApp _ _ -> invalid "application of type application"
+    Tick _ _ -> invalid "application of tick"
+    Cast _ _ _ -> invalid "application of cast"
+    Lam _ _ -> invalid "application of lambda"
+    TyLam _ _ -> invalid "application of type lambda"
+    App _ _ -> invalid "application of application"
 
 -- | Generate an expression that projects a field out of a data-constructor.
 --
