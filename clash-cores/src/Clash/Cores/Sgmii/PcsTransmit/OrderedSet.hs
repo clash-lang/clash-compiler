@@ -1,12 +1,13 @@
 {-# LANGUAGE CPP #-}
 
--- |
---   Copyright   :  (C) 2024, QBayLogic B.V.
---   License     :  BSD2 (see the file LICENSE)
---   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
---
---   Ordered set process of the PCS transmit block, as defined in IEEE 802.3
---   Figure 36-5
+{- |
+  Copyright   :  (C) 2024, QBayLogic B.V.
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Ordered set process of the PCS transmit block, as defined in IEEE 802.3
+  Figure 36-5
+-}
 module Clash.Cores.Sgmii.PcsTransmit.OrderedSet
   ( OrderedSetState (..)
   , orderedSetT

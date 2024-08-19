@@ -1,10 +1,11 @@
--- |
---   Copyright   :  (C) 2024, QBayLogic B.V.
---   License     :  BSD2 (see the file LICENSE)
---   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
---
---   Common functions, type definitions and hard-coded settings used in the
---   different modules that are defined for SGMII
+{- |
+  Copyright   :  (C) 2024, QBayLogic B.V.
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Common functions, type definitions and hard-coded settings used in the
+  different modules that are defined for SGMII
+-}
 module Clash.Cores.Sgmii.Common where
 
 import Clash.Cores.LineCoding8b10b

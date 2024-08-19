@@ -1,12 +1,13 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 
--- |
---   Copyright   :  (C) 2024, QBayLogic B.V.
---   License     :  BSD2 (see the file LICENSE)
---   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
---
---   PCS receive process, as defined in IEEE 802.3 Figure 36-7a and 36-7b
+{- |
+  Copyright   :  (C) 2024, QBayLogic B.V.
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  PCS receive process, as defined in IEEE 802.3 Figure 36-7a and 36-7b
+-}
 module Clash.Cores.Sgmii.PcsReceive
   ( PcsReceiveState (..)
   , pcsReceive

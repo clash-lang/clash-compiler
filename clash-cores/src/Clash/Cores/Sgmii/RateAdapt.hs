@@ -1,12 +1,13 @@
 {-# LANGUAGE CPP #-}
 
--- |
---   Copyright   :  (C) 2024, QBayLogic B.V.
---   License     :  BSD2 (see the file LICENSE)
---   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
---
---   Functions for the rate adaptation blocks that are required for lower bit
---   rates than 1000 Mbps
+{- |
+  Copyright   :  (C) 2024, QBayLogic B.V.
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Functions for the rate adaptation blocks that are required for lower bit
+  rates than 1000 Mbps
+-}
 module Clash.Cores.Sgmii.RateAdapt
   ( rateAdaptRx
   , rateAdaptTx

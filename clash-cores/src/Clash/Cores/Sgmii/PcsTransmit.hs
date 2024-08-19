@@ -1,12 +1,13 @@
 {-# LANGUAGE CPP #-}
 
--- |
---   Copyright   :  (C) 2024, QBayLogic B.V.
---   License     :  BSD2 (see the file LICENSE)
---   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
---
---   Top level module for the PCS transmit block, that combines the processes
---   that are defined in the two submodules @CodeGroup@ and @OrderedSet@.
+{- |
+  Copyright   :  (C) 2024, QBayLogic B.V.
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Top level module for the PCS transmit block, that combines the processes
+  that are defined in the two submodules @CodeGroup@ and @OrderedSet@.
+-}
 module Clash.Cores.Sgmii.PcsTransmit (pcsTransmit) where
 
 import Clash.Cores.Sgmii.Common

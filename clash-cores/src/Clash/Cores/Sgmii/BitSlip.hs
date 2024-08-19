@@ -1,13 +1,14 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 
--- |
---   Copyright   :  (C) 2024, QBayLogic B.V.
---   License     :  BSD2 (see the file LICENSE)
---   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
---
---   Bit slip function that word-aligns a stream of bits based on received
---   comma values
+{- |
+  Copyright   :  (C) 2024, QBayLogic B.V.
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Bit slip function that word-aligns a stream of bits based on received
+  comma values
+-}
 module Clash.Cores.Sgmii.BitSlip
   ( BitSlipState (..)
   , bitSlip

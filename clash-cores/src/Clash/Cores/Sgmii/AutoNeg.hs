@@ -1,12 +1,13 @@
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fconstraint-solver-iterations=10 #-}
 
--- |
---   Copyright   :  (C) 2024, QBayLogic B.V.
---   License     :  BSD2 (see the file LICENSE)
---   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
---
---   Auto-negotiation process, as defined in IEEE 802.3 Figure 37-6
+{- |
+  Copyright   :  (C) 2024, QBayLogic B.V.
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Auto-negotiation process, as defined in IEEE 802.3 Figure 37-6
+-}
 module Clash.Cores.Sgmii.AutoNeg
   ( AutoNegState (..)
   , Rudis

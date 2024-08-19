@@ -1,60 +1,61 @@
 {-# LANGUAGE CPP #-}
 
--- |
---   Copyright   :  (C) 2024, QBayLogic B.V.
---   License     :  BSD2 (see the file LICENSE)
---   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
---
---   Top-level SGMII module that combines all the blocks that are defined in the
---   sub-modules to one function that can be used in different projects.
---
---   Example usage:
---
--- @
--- topEntity ::
---   Clock Dom0 ->
---   Clock Dom1 ->
---   Reset Dom0 ->
---   Reset Dom1 ->
---   Signal Dom1 Bool ->
---   Signal Dom1 Bool ->
---   Signal Dom1 (BitVector 8) ->
---   Signal Dom0 (BitVector 10) ->
---   ( Signal rxDom SgmiiStatus
---   , Signal rxDom Bool
---   , Signal rxDom Bool
---   , Signal rxDom (BitVector 8)
---   , Signal txDom (BitVector 10)
---   )
--- topEntity = sgmii rxTxCdc
--- @
---   Here, the type of @rxTxCdc@, which is the function that handles the
---   clock domain crossing between the transmit and receive domain between the
---   auto-negotiation block and transmission block, needs to be the following:
---
--- @
--- rxTxCdc ::
---   forall dom0 dom1.
---   (KnownDomain dom0, KnownDomain dom1) =>
---   Clock rxDom ->
---   Clock txDom ->
---   Signal rxDom (Maybe Xmit) ->
---   Signal rxDom (Maybe ConfReg) ->
---   Signal rxDom (Maybe ConfReg) ->
---   ( Signal txDom (Maybe Xmit)
---   , Signal txDom (Maybe ConfReg)
---   , Signal txDom (Maybe ConfReg)
---   )
--- @
---
---   For Xilinx boards, this could be implemented by using, for example, the
---   function 'Clash.Cores.Xilinx.Xpm.Cdc.Handshake.xpmCdcHandshake', but
---   vendor-neutral implementations could make use of other word-synchronizers.
---
---   As the decoding of incoming 10-bit code groups is done on a best-effort
---   basis and they are always transmitted to @TXD@, this port should only be
---   read when @RX_DV@ is asserted as invalid data might be provided when it is
---   not.
+{- |
+  Copyright   :  (C) 2024, QBayLogic B.V.
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Top-level SGMII module that combines all the blocks that are defined in the
+  sub-modules to one function that can be used in different projects.
+
+  Example usage:
+
+@
+topEntity ::
+  Clock Dom0 ->
+  Clock Dom1 ->
+  Reset Dom0 ->
+  Reset Dom1 ->
+  Signal Dom1 Bool ->
+  Signal Dom1 Bool ->
+  Signal Dom1 (BitVector 8) ->
+  Signal Dom0 (BitVector 10) ->
+  ( Signal rxDom SgmiiStatus
+  , Signal rxDom Bool
+  , Signal rxDom Bool
+  , Signal rxDom (BitVector 8)
+  , Signal txDom (BitVector 10)
+  )
+topEntity = sgmii rxTxCdc
+@
+  Here, the type of @rxTxCdc@, which is the function that handles the
+  clock domain crossing between the transmit and receive domain between the
+  auto-negotiation block and transmission block, needs to be the following:
+
+@
+rxTxCdc ::
+  forall dom0 dom1.
+  (KnownDomain dom0, KnownDomain dom1) =>
+  Clock rxDom ->
+  Clock txDom ->
+  Signal rxDom (Maybe Xmit) ->
+  Signal rxDom (Maybe ConfReg) ->
+  Signal rxDom (Maybe ConfReg) ->
+  ( Signal txDom (Maybe Xmit)
+  , Signal txDom (Maybe ConfReg)
+  , Signal txDom (Maybe ConfReg)
+  )
+@
+
+  For Xilinx boards, this could be implemented by using, for example, the
+  function 'Clash.Cores.Xilinx.Xpm.Cdc.Handshake.xpmCdcHandshake', but
+  vendor-neutral implementations could make use of other word-synchronizers.
+
+  As the decoding of incoming 10-bit code groups is done on a best-effort
+  basis and they are always transmitted to @TXD@, this port should only be
+  read when @RX_DV@ is asserted as invalid data might be provided when it is
+  not.
+-}
 module Clash.Cores.Sgmii
   ( sgmii
   , sgmiiRA

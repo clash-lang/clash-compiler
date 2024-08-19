@@ -1,12 +1,13 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
 
--- |
---   Copyright   :  (C) 2024, QBayLogic B.V.
---   License     :  BSD2 (see the file LICENSE)
---   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
---
---   Synchronization process, as defined in IEEE 802.3 Figure 36-9
+{- |
+  Copyright   :  (C) 2024, QBayLogic B.V.
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Synchronization process, as defined in IEEE 802.3 Figure 36-9
+-}
 module Clash.Cores.Sgmii.Sync
   ( OutputQueue
   , SyncState (..)
