@@ -149,7 +149,6 @@ executable clash-testsuite
   if impl(ghc >= 9.0.0)
     build-depends:
       singletons,
-      singletons-base,
       singletons-th
   else
     build-depends:

@@ -17,9 +17,6 @@ in
 
   singletons = prev.callHackage "singletons" "3.0" { };
 
-  # Lower the version to match `singletons-th`.
-  singletons-base = prev.callHackage "singletons-base" "3.0" { };
-
   # The versions on nixpkgs are too new for GHC 9.0.2, which doesn't have
   # type level `Char` literals.
   singletons-th = prev.callHackage "singletons-th" "3.0" {

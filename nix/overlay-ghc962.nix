@@ -28,10 +28,6 @@ in
   # than the defaults in nixpkgs.
   rewrite-inspector = doJailbreak (markUnbroken prev.rewrite-inspector);
 
-  # We want a version that matches with singletons-th, but the tests in here
-  # are also a bit flaky since GHC 9.6 isn't officially supported.
-  singletons-base = dontCheck prev.singletons-base_3_2;
-
   # Use a newer version than the default in nixpkgs.
   singletons-th = prev.singletons-th_3_2;
 
