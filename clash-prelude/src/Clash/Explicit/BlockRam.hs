@@ -1206,9 +1206,9 @@ instance (AutoReg a, KnownNat n) => AutoReg (RamOp n a) where
       valValue = autoReg clk rst (andEnable en (bitToBool . msb <$> tag)) valInit opValue
 
       createRamOp t addr val = case t of
-        0 -> RamNoOp
-        1 -> RamRead addr
-        2 -> RamWrite addr val
+        0b00 -> RamNoOp
+        0b01 -> RamRead addr
+        0b10 -> RamWrite addr val
         _ -> deepErrorX  "autoReg'.createRamOp: impossible"
 
   {-# INLINE autoReg #-}
