@@ -47,4 +47,5 @@ pull_request_rules:
           - "1.8"
 
 queue_rules:
-  update_method: rebase
+  - name: merge-queue
+    update_method: rebase
