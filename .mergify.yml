@@ -34,8 +34,6 @@ pull_request_rules:
         ignore_conflicts: True
         branches:
           - "1.6"
-      queue:
-        update_method: rebase
 
   - name: backport patches to 1.8
     conditions:
@@ -47,5 +45,6 @@ pull_request_rules:
         ignore_conflicts: True
         branches:
           - "1.8"
-      queue:
-        update_method: rebase
+
+queue_rules:
+  update_method: rebase
