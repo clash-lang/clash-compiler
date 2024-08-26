@@ -27,11 +27,11 @@ import Data.Maybe (fromJust)
 --   for 'BSFail'.
 data BitSlipState
   = BSFail
-      { _s :: BitVector 20
-      , _ns :: Vec 8 (Index 10)
+      { _rx :: BitVector 20
+      , _commaLocs :: Vec 8 (Index 10)
       , _hist :: Vec 10 (BitVector 10)
       }
-  | BSOk {_s :: BitVector 20, _n :: Index 10}
+  | BSOk {_rx :: BitVector 20, _commaLoc :: Index 10}
   deriving (Generic, NFDataX, Show)
 
 -- | State transition function for 'bitSlip', where the initial state is the
@@ -46,20 +46,20 @@ bitSlipT ::
   -- | New state
   BitSlipState
 bitSlipT BSFail{..} (cg, _)
-  | Just i <- n, _ns == repeat (fromJust n) = BSOk s i
-  | otherwise = BSFail s ns hist
+  | Just i <- n, _commaLocs == repeat (fromJust n) = BSOk rx i
+  | otherwise = BSFail rx ns hist
  where
-  s = resize $ _s ++# reverseBV cg
-  ns = maybe _ns (_ns <<+) n
-  hist = map pack $ take d10 $ windows1d d10 $ bv2v s
+  rx = resize $ _rx ++# reverseBV cg
+  ns = maybe _commaLocs (_commaLocs <<+) n
+  hist = map pack $ take d10 $ windows1d d10 $ bv2v rx
   n = elemIndex True $ map f _hist
    where
     f a = a == reverseBV cgK28_5N || a == reverseBV cgK28_5P
 bitSlipT BSOk{..} (cg, syncStatus)
-  | syncStatus == Fail = BSFail s (repeat _n) (repeat 0)
-  | otherwise = BSOk s _n
+  | syncStatus == Fail = BSFail rx (repeat _commaLoc) (repeat 0)
+  | otherwise = BSOk rx _commaLoc
  where
-  s = resize $ _s ++# reverseBV cg
+  rx = resize $ _rx ++# reverseBV cg
 
 -- | Output function for 'bitSlip' that takes the calculated index value and
 --   rotates the state vector to create the new output value, or outputs the
@@ -69,11 +69,11 @@ bitSlipO ::
   BitSlipState ->
   -- | New output value
   (BitSlipState, BitVector 10, Status)
-bitSlipO s = (s, reverseBV $ resize $ rotateR (_s s) (10 - n), bsStatus)
+bitSlipO s = (s, reverseBV $ resize $ rotateR (_rx s) (10 - n), bsStatus)
  where
   (n, bsStatus) = case s of
-    BSFail{} -> (fromEnum $ last (_ns s), Fail)
-    BSOk{} -> (fromEnum $ _n s, Ok)
+    BSFail{} -> (fromEnum $ last (_commaLocs s), Fail)
+    BSOk{} -> (fromEnum $ _commaLoc s, Ok)
 
 -- | Function that takes a code word and returns the same code word, but if a
 --   comma is detected the code words is shifted such that the comma is at the
