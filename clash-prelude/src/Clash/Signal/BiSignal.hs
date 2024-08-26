@@ -133,8 +133,8 @@ import           GHC.TypeLits               (KnownNat, Nat)
 import           GHC.Stack                  (HasCallStack)
 import           Data.Reflection            (Given (..))
 
--- | Used to specify the /default/ behavior of a \"BiSignal\", i.e. what value is
--- read when no value is being written to it.
+-- | Used to specify the /default/ behavior of a \"BiSignal\" in Haskell simulation, i.e.
+-- what value is read when no value is being written to it.
 data BiSignalDefault
   = PullUp
   -- ^ __inout__ port behaves as if connected to a pull-up resistor
