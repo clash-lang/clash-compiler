@@ -194,7 +194,7 @@ let
               "clash-testsuite"
               ../tests
               "--flag workaround-ghc-mmap-crash" {
-              inherit (hfinal) clash-cores clash-ghc clash-lib clash-prelude;
+              inherit (hfinal) clash-ghc clash-lib clash-prelude;
             };
         in
         unmodified.overrideAttrs (old: {

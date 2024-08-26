@@ -64,7 +64,6 @@ common basic-config
     -- testsuite to compile, but we do when running it.
     -- Leaving it out will cause the testsuite to compile
     -- it anyway so we're better off doing it beforehand.
-    clash-cores,
     clash-ghc,
     clash-lib,
     clash-prelude
