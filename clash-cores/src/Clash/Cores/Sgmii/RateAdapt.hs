@@ -25,8 +25,9 @@ rateAdaptRxT ::
   (LinkSpeed, Maybe a) ->
   -- | New state and output value
   (Index 100, Maybe a)
-rateAdaptRxT n (linkSpeed, a)
-  | n == 0 = (n', a)
+rateAdaptRxT n (_, Nothing) = (n, Nothing)
+rateAdaptRxT n (linkSpeed, Just a)
+  | n == 0 = (n', Just a)
   | otherwise = (n', Nothing)
  where
   n' = if n == repeatN then 0 else n + 1
