@@ -27,7 +27,7 @@ bitSlipSim cg =
     C.mooreB
       bitSlipT
       bitSlipO
-      (BSFail 0 (C.repeat 0) (C.repeat 0))
+      (BSFail (0, 0) (C.repeat 0) (C.repeat 0))
       (cg, pure Ok)
 
 -- | Check that if 'bitSlip' moves into 'BSOk', the index is non-zero as it

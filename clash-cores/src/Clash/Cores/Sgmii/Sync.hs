@@ -58,16 +58,6 @@ data SyncState
       }
   deriving (Generic, NFDataX, Show)
 
--- | Vector containing the two alternative forms (with opposite running
---   disparity) of K28.5. This is the only relevant comma, as the other commas
---   are set as "reserved" in the list of control words. The order of the commas
---   in this is important, as the first comma returns the negative running
---   disparity when it is decoded and the second comma returns the positive
---   running disparity when it is decoded. This is used in 'LossOfSync' to
---   recover the correct running disparity from a received comma.
-commas :: Vec 2 CodeGroup
-commas = cgK28_5N :> cgK28_5P :> Nil
-
 -- | State transition function for 'sync'. Takes the state as defined in
 --   'SyncState', a the new incoming code group from the deserialization block
 --   and returns the next state as defined in Clause 36 of IEEE 802.3. As is

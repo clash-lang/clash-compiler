@@ -27,11 +27,11 @@ import Data.Maybe (fromJust)
 --   for 'BSFail'.
 data BitSlipState
   = BSFail
-      { _rx :: BitVector 20
+      { _rx :: (CodeGroup, CodeGroup)
       , _commaLocs :: Vec 8 (Index 10)
-      , _hist :: Vec 10 (BitVector 10)
+      , _hist :: Vec 10 CodeGroup
       }
-  | BSOk {_rx :: BitVector 20, _commaLoc :: Index 10}
+  | BSOk {_rx :: (CodeGroup, CodeGroup), _commaLoc :: Index 10}
   deriving (Generic, NFDataX, Show)
 
 -- | State transition function for 'bitSlip', where the initial state is the
@@ -46,20 +46,22 @@ bitSlipT ::
   -- | New state
   BitSlipState
 bitSlipT BSFail{..} (cg, _)
-  | Just i <- n, _commaLocs == repeat (fromJust n) = BSOk rx i
-  | otherwise = BSFail rx ns hist
+  | Just i <- commaLoc, _commaLocs == repeat (fromJust commaLoc) = BSOk rx i
+  | otherwise = BSFail rx commaLocs hist
  where
-  rx = resize $ _rx ++# reverseBV cg
-  ns = maybe _commaLocs (_commaLocs <<+) n
-  hist = map pack $ take d10 $ windows1d d10 $ bv2v rx
-  n = elemIndex True $ map f _hist
+  rx = (snd _rx, cg)
+  commaLocs = maybe _commaLocs (_commaLocs <<+) commaLoc
+
+  hist = map pack b
    where
-    f a = a == reverseBV cgK28_5N || a == reverseBV cgK28_5P
+    b = take d10 (windows1d d10 (bitCoerce rx)) :: (Vec 10 (Vec 10 Bit))
+
+  commaLoc = elemIndex True $ map (`elem` commas) _hist
 bitSlipT BSOk{..} (cg, syncStatus)
   | syncStatus == Fail = BSFail rx (repeat _commaLoc) (repeat 0)
   | otherwise = BSOk rx _commaLoc
  where
-  rx = resize $ _rx ++# reverseBV cg
+  rx = (snd _rx, cg)
 
 -- | Output function for 'bitSlip' that takes the calculated index value and
 --   rotates the state vector to create the new output value, or outputs the
@@ -69,9 +71,9 @@ bitSlipO ::
   BitSlipState ->
   -- | New output value
   (BitSlipState, BitVector 10, Status)
-bitSlipO s = (s, reverseBV $ resize $ rotateR (_rx s) (10 - n), bsStatus)
+bitSlipO s = (s, resize (rotateR (pack (_rx s)) (10 - commaLoc)), bsStatus)
  where
-  (n, bsStatus) = case s of
+  (commaLoc, bsStatus) = case s of
     BSFail{} -> (fromEnum $ last (_commaLocs s), Fail)
     BSOk{} -> (fromEnum $ _commaLoc s, Ok)
 
@@ -93,7 +95,7 @@ bitSlip cg1 syncStatus = (register 0 cg2, register Fail bsStatus)
     mooreB
       bitSlipT
       bitSlipO
-      (BSFail 0 (repeat 0) (repeat 0))
+      (BSFail (0, 0) (repeat 0) (repeat 0))
       (cg1, syncStatus)
 
 {-# CLASH_OPAQUE bitSlip #-}

@@ -78,10 +78,6 @@ orNothing :: Bool -> a -> Maybe a
 orNothing True a = Just a
 orNothing False _ = Nothing
 
--- | Reverse the bits of a 'BitVector'
-reverseBV :: (KnownNat n) => BitVector n -> BitVector n
-reverseBV = v2bv . reverse . bv2v
-
 -- | Code group that corresponds to K28.5 with negative disparity
 cgK28_5N :: CodeGroup
 cgK28_5N = 0b0101111100
@@ -89,6 +85,16 @@ cgK28_5N = 0b0101111100
 -- | Code group that corresponds to K28.5 with positive disparity
 cgK28_5P :: CodeGroup
 cgK28_5P = 0b1010000011
+
+-- | Vector containing the two alternative forms (with opposite running
+--   disparity) of K28.5. This is the only relevant comma, as the other commas
+--   are set as "reserved" in the list of control words. The order of the commas
+--   in this is important, as the first comma returns the negative running
+--   disparity when it is decoded and the second comma returns the positive
+--   running disparity when it is decoded. This is used in 'Sync.LossOfSync' to
+--   recover the correct running disparity from a received comma.
+commas :: Vec 2 CodeGroup
+commas = cgK28_5N :> cgK28_5P :> Nil
 
 -- | Data word corresponding to the decoded version of code group D00.0, used
 --   for early-end detection
