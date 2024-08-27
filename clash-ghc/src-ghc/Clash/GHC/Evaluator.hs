@@ -268,19 +268,22 @@ ghcStep m = case mTerm m of
 -- for each one around the given term.
 --
 newBinder :: [Either TyVar Type] -> Term -> Step
-newBinder tys x m tcm =
-  let (s', iss', x') = mkAbstr (mSupply m, mScopeNames m, x) tys
-      m' = m { mSupply = s', mScopeNames = iss', mTerm = x' }
-   in ghcStep m' tcm
+newBinder tys e m tcm =
+  let ((supply1,_), e1) = etaExpand (mSupply m, mScopeNames m) tys
+      m1 = m { mSupply = supply1, mTerm = e1 }
+   in ghcStep m1 tcm
  where
-  mkAbstr = foldr go
-    where
-      go (Left tv) (s', iss', e') =
-        (s', iss', TyLam tv (TyApp e' (VarTy tv)))
+  etaExpand env args =
+    let (env1,args1) = mapAccumL go env args
+     in (env1,mkAbstraction (foldl' go2 e args1) args1)
 
-      go (Right ty) (s', iss', e') =
-        let ((s'', _), n) = mkUniqSystemId (s', iss') ("x", ty)
-        in  (s'', iss' ,Lam n (App e' (Var n)))
+  go env (Left tv) = (env, Right tv)
+  go env (Right ty) =
+    let (env1, n) = mkUniqSystemId env ("x", ty)
+     in (env1, Left n)
+
+  go2 u (Left i) = App u (Var i)
+  go2 u (Right tv) = TyApp u (VarTy tv)
 
 newLetBinding
   :: TyConMap
