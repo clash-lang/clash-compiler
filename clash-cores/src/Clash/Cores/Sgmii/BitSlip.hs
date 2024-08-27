@@ -19,7 +19,6 @@ where
 
 import Clash.Cores.Sgmii.Common
 import Clash.Prelude
-import Data.Maybe (fromJust)
 
 -- | State variable for 'bitSlip', with the two states as described in
 --   'bitSlipT'. Due to timing constraints, not all functions can be executed in
@@ -46,7 +45,7 @@ bitSlipT ::
   -- | New state
   BitSlipState
 bitSlipT BSFail{..} (cg, _)
-  | Just i <- commaLoc, _commaLocs == repeat (fromJust commaLoc) = BSOk rx i
+  | Just i <- commaLoc, _commaLocs == repeat i = BSOk rx i
   | otherwise = BSFail rx commaLocs hist
  where
   rx = (snd _rx, cg)
