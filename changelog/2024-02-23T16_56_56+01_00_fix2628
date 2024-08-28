@@ -1,0 +1,1 @@
+FIXED: Clash no longer errors out in the netlist generation stage when a polymorphic function is applied to type X in one alternative of a case-statement and applied to a newtype wrapper of type X in a different alternative. See [#2828](https://github.com/clash-lang/clash-compiler/issues/2628)
