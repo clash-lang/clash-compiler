@@ -44,8 +44,9 @@ module Clash.Explicit.Signal.Delayed
   )
 where
 
-import Prelude                    ((.), ($), (<$>), id, Num(..), Maybe(..), fmap, liftA2)
+import Prelude                    ((.), ($), (<$>), id, Num(..), Maybe(..), fmap)
 
+import Control.Applicative        (liftA2)
 import Data.Coerce                (coerce)
 import Data.Kind                  (Type)
 import Data.Type.Equality         ((:~:)(Refl))
