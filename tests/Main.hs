@@ -790,6 +790,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "T2593" def{hdlSim=[]}
         , runTest "T2623CaseConFVs" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
         , runTest "T2781" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
+        , runTest "T2628" def{hdlTargets=[VHDL], buildTargets=BuildSpecific ["TACacheServerStep"], hdlSim=[]}
         ] <>
         if compiledWith == Cabal then
           -- This tests fails without environment files present, which are only
