@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2019, Myrtle Software Ltd.
                      2018, @blaxill
-                     2018, QBayLogic B.V.
+                     2018-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -21,7 +21,7 @@ import           GHC.TypeLits                  (KnownNat)
 import           Prelude                       hiding (head, map, tail)
 
 import           Clash.Signal.Internal         (Domain)
-import           Clash.Signal.Delayed (DSignal, toSignal, unsafeFromSignal)
+import           Clash.Signal.Delayed          (DSignal, toSignal, unsafeFromSignal)
 import qualified Clash.Signal.Bundle           as B
 
 import           Clash.Sized.BitVector         (Bit, BitVector)
