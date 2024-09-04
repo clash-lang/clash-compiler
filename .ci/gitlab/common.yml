@@ -8,17 +8,19 @@ default:
       - stuck_or_timeout_failure
 
 .common:
-  image: ghcr.io/clash-lang/clash-ci:$GHC_VERSION-20240721
+  image: ghcr.io/clash-lang/clash-ci:$GHC_VERSION-$CLASH_DOCKER_TAG
   timeout: 10 minutes
   stage: build
   variables:
+    CLASH_DOCKER_TAG: 20240905
+    CACHE_BUST_TOKEN: 3
     # Note that we copy+paste the image name into CACHE_FALLBACK_KEY. If we don't,
     # $GHC_VERSION gets inserted at verbatim, instead of resolving to some ghc version.
-    CACHE_FALLBACK_KEY: $CI_JOB_NAME-master-ghcr.io/clash-lang/clash-ci:$GHC_VERSION-20240721-3-3-non_protected
+    CACHE_FALLBACK_KEY: $CI_JOB_NAME-master-ghcr.io/clash-lang/clash-ci:$GHC_VERSION-$CLASH_DOCKER_TAG-$CACHE_BUST_TOKEN-3-non_protected
     GIT_SUBMODULE_STRATEGY: recursive
     TERM: xterm-color
   cache:
-    key: $CI_JOB_NAME-$CI_COMMIT_REF_SLUG-$CI_JOB_IMAGE-3
+    key: $CI_JOB_NAME-$CI_COMMIT_REF_SLUG-$CI_JOB_IMAGE-$CACHE_BUST_TOKEN
     when: always
     paths:
       - cache.tar.zst
@@ -31,7 +33,7 @@ default:
     - .ci/setup.sh
   after_script:
     - export THREADS=$(./.ci/effective_cpus.sh)
-    - tar -cf - $(ls -d /root/.cabal /root/.stack || true) | zstd -T${THREADS} -3 > cache.tar.zst
+    - tar -cf - /root/.cabal | zstd -T$THREADS -3 > cache.tar.zst
 
 # We run tests on local machines if:
 #
