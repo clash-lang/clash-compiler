@@ -150,8 +150,8 @@ pElemE = pTagE
 
 -- | Parse SigD
 pSigD :: Parser [Element]
-pSigD = some (pTagE <|> (Text (pack "[") <$ (pack <$> string "[\\"))
-                    <|> (Text (pack "]") <$ (pack <$> string "\\]"))
+pSigD = some (pTagE <|> (EscapedSymbol SquareBracketOpen <$ (pack <$> string "[\\"))
+                    <|> (EscapedSymbol SquareBracketClose <$ (pack <$> string "\\]"))
                     <|> (Text <$> (pack <$> some (satisfyRange '\000' '\90')))
                     <|> (Text <$> (pack <$> some (satisfyRange '\94' '\125'))))
 

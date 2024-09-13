@@ -975,6 +975,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "Indices" def
         , runTest "Iterate" def
         , outputTest "IterateCF" def{hdlTargets=[VHDL]}
+        , runTest "MapHead" def
         , runTest "Minimum" def
         , runTest "MovingAvg" def{hdlSim=[]}
         , runTest "PatHOCon" def{hdlSim=[]}
