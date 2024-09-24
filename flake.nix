@@ -36,7 +36,7 @@
       # The versions of GHC that we want to be able to build / develop against
       # within the nix environment. Since nix is lazy, only derivations for
       # versions of GHC which are used are actually evaluated.
-      ghcVersions = [ "ghc96" "ghc98"];
+      ghcVersions = [ "ghc96" "ghc98" "ghc910" ];
 
       # We pick a single version of GHC to use by default within nix. This is
       # probably cleaner than always having N copies of each package / app and
