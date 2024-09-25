@@ -1,7 +1,7 @@
 { pkgs }:
 final: prev:
 let
-  inherit (pkgs.haskell.lib) doJailbreak dontCheck markUnbroken;
+  inherit (pkgs.haskell.lib) doJailbreak markUnbroken;
 in
 {
   # Use an older version than the default in nixpkgs. Since rewrite-inspector
