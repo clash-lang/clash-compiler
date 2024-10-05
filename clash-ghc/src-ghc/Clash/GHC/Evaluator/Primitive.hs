@@ -4651,7 +4651,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "GHC.Float.$wproperFractionDouble"
     | _ : Lit (DoubleLiteral d) : _ <- args
     , [sty@(tyView -> TyConApp signedTcNm [nTy@(LitTy (NumTy kn))])] <- tys
-    , nameOcc signedTcNm == showt ''Signed
+    , nameOcc signedTcNm == Text.pack (show ''Signed)
     , (_, tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
     , Just tupTc <- UniqMap.lookup tupTcNm tcm
     , [tupDc] <- tyConDataCons tupTc

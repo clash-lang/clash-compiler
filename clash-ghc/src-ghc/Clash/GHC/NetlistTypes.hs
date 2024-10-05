@@ -17,7 +17,6 @@ where
 import Data.Coerce                      (coerce)
 import Data.Functor.Identity            (Identity (..))
 import Data.Text                        (pack)
-import Data.Text.Extra                  (showt)
 import Control.Monad.State.Strict       (State)
 import Control.Monad.Trans.Except
   (Except, ExceptT (..), mapExceptT, runExceptT, throwE)
@@ -151,10 +150,10 @@ ghcTypeToHWType iw = go
         -- XXX: this is a hack to get a KnownDomain from a KnownConfiguration
         "GHC.Classes.(%,%)"
           | [arg0@(tyView -> TyConApp kdNm _), arg1] <- args
-          , nameOcc kdNm == showt ''KnownDomain
+          , nameOcc kdNm == pack (show ''KnownDomain)
           -> case tyView arg1 of
                 TyConApp kdNm1 _
-                  | nameOcc kdNm1 == showt ''KnownDomain
+                  | nameOcc kdNm1 == pack (show ''KnownDomain)
                   -> do k1 <- (stripVoid . stripFiltered) <$> ExceptT (MaybeT (go reprs m arg0))
                         k2 <- (stripVoid . stripFiltered) <$> ExceptT (MaybeT (go reprs m arg1))
                         returnN (Void (Just (Product "GHC.Classes.(%,%)" Nothing [k1,k2])))
@@ -166,10 +165,10 @@ ghcTypeToHWType iw = go
         -- XXX: this is a hack to get a KnownDomain from a KnownConfiguration
         "GHC.Classes.CTuple2"
           | [arg0@(tyView -> TyConApp kdNm _), arg1] <- args
-          , nameOcc kdNm == showt ''KnownDomain
+          , nameOcc kdNm == pack (show ''KnownDomain)
           -> case tyView arg1 of
                 TyConApp kdNm1 _
-                  | nameOcc kdNm1 == showt ''KnownDomain
+                  | nameOcc kdNm1 == pack (show ''KnownDomain)
                   -> do k1 <- (stripVoid . stripFiltered) <$> ExceptT (MaybeT (go reprs m arg0))
                         k2 <- (stripVoid . stripFiltered) <$> ExceptT (MaybeT (go reprs m arg1))
                         returnN (Void (Just (Product "GHC.Classes.CTuple2" Nothing [k1,k2])))
