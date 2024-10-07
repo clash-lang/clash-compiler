@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2017, Google Inc.
                   2019, Myrtle Software Ltd
-                  2022-2023, QBayLogic B.V.
+                  2022-2024, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -280,8 +280,7 @@ writeToBiSignal#
   -> Signal d Bool
   -> Signal d (BitVector n)
   -> BiSignalOut ds d n
--- writeToBiSignal# = writeToBiSignal#
-writeToBiSignal# _ maybeSignal _ _ = BiSignalOut [maybeSignal]
+writeToBiSignal# bIn maybeSignal wEn val = BiSignalOut [bIn `seq` wEn `seq` val `seq` maybeSignal]
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE writeToBiSignal# #-}
 {-# ANN writeToBiSignal# hasBlackBox #-}
