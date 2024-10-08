@@ -1,11 +1,11 @@
 .common:
-  image: ghcr.io/clash-lang/clash-ci:$GHC_VERSION-20240726
+  image: ghcr.io/clash-lang/clash-ci:$GHC_VERSION-20241008
   timeout: 10 minutes
   stage: build
   variables:
     # Note that we copy+paste the image name into CACHE_FALLBACK_KEY. If we don't,
     # $GHC_VERSION gets inserted at verbatim, instead of resolving to some ghc version.
-    CACHE_FALLBACK_KEY: $CI_JOB_NAME-master-ghcr.io/clash-lang/clash-ci:$GHC_VERSION-20240726-3-3-non_protected
+    CACHE_FALLBACK_KEY: $CI_JOB_NAME-master-ghcr.io/clash-lang/clash-ci:$GHC_VERSION-20241008-3-3-non_protected
     GIT_SUBMODULE_STRATEGY: recursive
     TERM: xterm-color
   cache:

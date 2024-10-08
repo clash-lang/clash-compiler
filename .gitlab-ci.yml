@@ -45,10 +45,10 @@ tests:
       - GHC_VERSION: 9.8.2
         RUN_TESTS: "always"
 
-      - GHC_VERSION: 9.6.4
+      - GHC_VERSION: 9.6.6
         RUN_TESTS: "always"
 
-      - GHC_VERSION: [9.4.6, 9.2.8]
+      - GHC_VERSION: [9.4.8, 9.2.8]
         RUN_TESTS: "nightly"
 
       - GHC_VERSION: 9.0.2
