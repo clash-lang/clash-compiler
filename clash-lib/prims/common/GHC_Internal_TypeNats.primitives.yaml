@@ -1,17 +1,17 @@
 - BlackBox:
-    name: GHC.TypeNats.natVal
+    name: GHC.Internal.TypeNats.natVal
     kind: Expression
     type: 'natVal :: forall
       n proxy. KnownNat n => proxy n -> Natural'
     template: ~ARG[0]
     workInfo: Never
 - Primitive:
-    name: GHC.TypeNats.someNatVal
+    name: GHC.Internal.TypeNats.someNatVal
     primType: Function
     type: 'someNatVal :: Natural -> SomeNat'
     workInfo: Never
 - Primitive:
-    name: GHC.TypeNats.withSomeSNat
+    name: GHC.Internal.TypeNats.withSomeSNat
     primType: Function
     type: 'withSomeSNat :: forall rep (r :: TYPE rep). Natural -> (forall n. SNat n -> r) -> r'
     workInfo: Never

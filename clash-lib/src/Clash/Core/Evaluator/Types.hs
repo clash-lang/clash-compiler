@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 {-|
-  Copyright     : (C) 2020-2022, QBayLogic B.V.
+  Copyright     : (C) 2020-2024, QBayLogic B.V.
   License       : BSD2 (see the file LICENSE)
   Maintainer    : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -14,7 +14,9 @@ module Clash.Core.Evaluator.Types where
 import Control.Concurrent.Supply (Supply)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap (insert, lookup)
+#if !MIN_VERSION_base(4,20,0)
 import Data.List (foldl')
+#endif
 import Data.Maybe (fromMaybe, isJust)
 
 #if MIN_VERSION_prettyprinter(1,7,0)

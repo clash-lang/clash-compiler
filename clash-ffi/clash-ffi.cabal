@@ -20,7 +20,7 @@ common common-options
   ghc-options:
     -Wall -Wcompat
   build-depends:
-    base                    >= 4.11 && < 4.20,
+    base                    >= 4.11 && < 4.21,
     bytestring              >= 0.10 && < 0.13,
     clash-prelude           >= 1.2  && < 1.10,
     deepseq                 >= 1.4  && < 1.6,

@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2018, Google Inc.
                   2019, Myrtle Software Ltd
-                  2022, QBayLogic B.V.
+                  2022-2024, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -111,7 +111,10 @@ import qualified Data.ByteString.Lazy  as ByteStringLazy
 import           Data.Char             (ord, chr)
 import           Data.IORef
   (IORef, atomicModifyIORef', atomicWriteIORef, newIORef, readIORef)
-import           Data.List             (foldl1', foldl', unzip4, transpose, uncons)
+#if !MIN_VERSION_base(4,20,0)
+import           Data.List             (foldl')
+#endif
+import           Data.List             (foldl1', unzip4, transpose, uncons)
 import qualified Data.Map.Strict       as Map
 import           Data.Maybe            (fromMaybe, catMaybes)
 import qualified Data.Text             as Text

@@ -62,7 +62,9 @@ import           Control.DeepSeq        as DS
 import           Data.Binary            (Binary)
 import           Data.Coerce            (coerce)
 import           Data.Hashable          (Hashable (hashWithSalt))
+#if !MIN_VERSION_base(4,20,0)
 import           Data.List              (foldl')
+#endif
 import           Data.List.Extra        (splitAtList)
 import           Data.Maybe             (isJust, mapMaybe)
 import           Data.Text              (Text)
@@ -91,9 +93,9 @@ import           GHC.Builtin.Names
   (integerTyConKey, typeNatAddTyFamNameKey, typeNatExpTyFamNameKey,
    typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
    typeNatCmpTyFamNameKey, ordLTDataConKey, ordEQDataConKey, ordGTDataConKey,
-   typeSymbolAppendFamNameKey, typeSymbolCmpTyFamNameKey)
+   typeSymbolAppendFamNameKey, typeSymbolCmpTyFamNameKey,
+   typeNatDivTyFamNameKey, typeNatModTyFamNameKey)
 import           GHC.Types.SrcLoc       (wiredInSrcSpan)
-import           GHC.Types.Unique       (getKey)
 #else
 #if __GLASGOW_HASKELL__ >= 808
 import           PrelNames
@@ -107,9 +109,9 @@ import           PrelNames
   (integerTyConKey, typeNatAddTyFamNameKey, typeNatExpTyFamNameKey,
    typeNatLeqTyFamNameKey, typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
    typeNatCmpTyFamNameKey,
-   typeSymbolAppendFamNameKey, typeSymbolCmpTyFamNameKey)
+   typeSymbolAppendFamNameKey, typeSymbolCmpTyFamNameKey,
+   typeNatDivTyFamNameKey, typeNatModTyFamNameKey)
 import           SrcLoc                 (wiredInSrcSpan)
-import           Unique                 (getKey)
 #endif
 
 -- Local imports
@@ -120,6 +122,7 @@ import {-# SOURCE #-} Clash.Core.Subst
 import           Clash.Core.TyCon
 import           Clash.Core.Var
 import qualified Clash.Data.UniqMap as UniqMap
+import           Clash.Unique (fromGhcUnique)
 import           Clash.Util
 
 #if __GLASGOW_HASKELL__ <= 806
@@ -519,22 +522,22 @@ type families do not reduce on stuck argument, we assume strictly.
 
 reduceTypeFamily :: TyConMap -> Type -> Maybe Type
 reduceTypeFamily tcm (tyView -> TyConApp tc tys)
-  | nameUniq tc == getKey typeNatAddTyFamNameKey
+  | nameUniq tc == fromGhcUnique typeNatAddTyFamNameKey
   = case mapMaybe (litView tcm) tys of
       [i1,i2] -> Just (LitTy (NumTy (i1 + i2)))
       _ -> Nothing
 
-  | nameUniq tc == getKey typeNatMulTyFamNameKey
+  | nameUniq tc == fromGhcUnique typeNatMulTyFamNameKey
   = case mapMaybe (litView tcm) tys of
       [i1, i2] -> Just (LitTy (NumTy (i1 * i2)))
       _ -> Nothing
 
-  | nameUniq tc == getKey typeNatExpTyFamNameKey
+  | nameUniq tc == fromGhcUnique typeNatExpTyFamNameKey
   = case mapMaybe (litView tcm) tys of
       [i1, i2] -> Just (LitTy (NumTy (i1 ^ i2)))
       _ -> Nothing
 
-  | nameUniq tc == getKey typeNatSubTyFamNameKey
+  | nameUniq tc == fromGhcUnique typeNatSubTyFamNameKey
   = case mapMaybe (litView tcm) tys of
       [i1, i2]
         | let z = i1 - i2
@@ -543,7 +546,7 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
       _ -> Nothing
 
 #if !MIN_VERSION_ghc(9,2,0)
-  | nameUniq tc == getKey typeNatLeqTyFamNameKey
+  | nameUniq tc == fromGhcUnique typeNatLeqTyFamNameKey
   = case mapMaybe (litView tcm) tys of
       [i1, i2]
         | Just (FunTyCon {tyConKind = tck}) <- UniqMap.lookup tc tcm
@@ -555,44 +558,53 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
       _ -> Nothing
 #endif
 
-  | nameUniq tc == getKey typeNatCmpTyFamNameKey -- "GHC.TypeNats.CmpNat"
+  | nameUniq tc == fromGhcUnique typeNatCmpTyFamNameKey -- "GHC.TypeNats.CmpNat"
   = case mapMaybe (litView tcm) tys of
       [i1, i2] ->
         Just $ ConstTy $ TyCon $
           case compare i1 i2 of
-            LT -> Name User "GHC.Types.LT" (getKey ordLTDataConKey) wiredInSrcSpan
-            EQ -> Name User "GHC.Types.EQ" (getKey ordEQDataConKey) wiredInSrcSpan
-            GT -> Name User "GHC.Types.GT" (getKey ordGTDataConKey) wiredInSrcSpan
+            LT -> Name User "GHC.Types.LT"
+                    (fromGhcUnique ordLTDataConKey) wiredInSrcSpan
+            EQ -> Name User "GHC.Types.EQ"
+                    (fromGhcUnique ordEQDataConKey) wiredInSrcSpan
+            GT -> Name User "GHC.Types.GT"
+                    (fromGhcUnique ordGTDataConKey) wiredInSrcSpan
       _ -> Nothing
 
-  | nameUniq tc == getKey typeSymbolCmpTyFamNameKey -- "GHC.TypeNats.CmpSymbol"
+  | nameUniq tc == fromGhcUnique typeSymbolCmpTyFamNameKey -- "GHC.TypeNats.CmpSymbol"
   = case mapMaybe (symLitView tcm) tys of
       [s1, s2] ->
         Just $ ConstTy $ TyCon $
           case compare s1 s2 of
-            LT -> Name User "GHC.Types.LT" (getKey ordLTDataConKey) wiredInSrcSpan
-            EQ -> Name User "GHC.Types.EQ" (getKey ordEQDataConKey) wiredInSrcSpan
-            GT -> Name User "GHC.Types.GT" (getKey ordGTDataConKey) wiredInSrcSpan
+            LT -> Name User "GHC.Types.LT"
+                    (fromGhcUnique ordLTDataConKey) wiredInSrcSpan
+            EQ -> Name User "GHC.Types.EQ"
+                    (fromGhcUnique ordEQDataConKey) wiredInSrcSpan
+            GT -> Name User "GHC.Types.GT"
+                    (fromGhcUnique ordGTDataConKey) wiredInSrcSpan
       _ -> Nothing
 
 #if MIN_VERSION_base(4,16,0)
-  | nameUniq tc == getKey typeCharCmpTyFamNameKey -- "GHC.TypeNats.CmpSymbol"
+  | nameUniq tc == fromGhcUnique typeCharCmpTyFamNameKey -- "GHC.TypeNats.CmpSymbol"
   = case mapMaybe (charLitView tcm) tys of
       [s1, s2] ->
         Just $ ConstTy $ TyCon $
           case compare s1 s2 of
-            LT -> Name User (showt 'LT) (getKey ordLTDataConKey) wiredInSrcSpan
-            EQ -> Name User (showt 'EQ) (getKey ordEQDataConKey) wiredInSrcSpan
-            GT -> Name User (showt 'GT) (getKey ordGTDataConKey) wiredInSrcSpan
+            LT -> Name User (showt 'LT)
+                    (fromGhcUnique ordLTDataConKey) wiredInSrcSpan
+            EQ -> Name User (showt 'EQ)
+                    (fromGhcUnique ordEQDataConKey) wiredInSrcSpan
+            GT -> Name User (showt 'GT)
+                    (fromGhcUnique ordGTDataConKey) wiredInSrcSpan
       _ -> Nothing
 
-  | nameUniq tc == getKey typeConsSymbolTyFamNameKey -- ConsSymbol
+  | nameUniq tc == fromGhcUnique typeConsSymbolTyFamNameKey -- ConsSymbol
   , [c0, s0] <- tys
   , Just c1 <- charLitView tcm c0
   , Just s1 <- symLitView tcm s0
   = Just (LitTy (SymTy (c1:s1)))
 
-  | nameUniq tc == getKey typeUnconsSymbolTyFamNameKey -- UnconsSymbol
+  | nameUniq tc == fromGhcUnique typeUnconsSymbolTyFamNameKey -- UnconsSymbol
   , [s1] <- mapMaybe (symLitView tcm) tys
   = fromMaybe (error "reduceTypeFamily: cannot construct UnconsSymbol result") $ do
       FunTyCon {tyConKind = tck} <- UniqMap.lookup tc tcm
@@ -610,16 +622,16 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
                       [charTy,symbolTy,LitTy (CharTy c),LitTy (SymTy cs)]
            in pure (Just (mkTyConApp justTc [tupTcApp,tup]))
 
-  | nameUniq tc == getKey typeCharToNatTyFamNameKey -- CharToNat
+  | nameUniq tc == fromGhcUnique typeCharToNatTyFamNameKey -- CharToNat
   , [c1] <- mapMaybe (charLitView tcm) tys
   = Just (LitTy (NumTy (fromIntegral (ord c1))))
 
-  | nameUniq tc == getKey typeNatToCharTyFamNameKey -- NatToChar
+  | nameUniq tc == fromGhcUnique typeNatToCharTyFamNameKey -- NatToChar
   , [n1] <- mapMaybe (litView tcm) tys
   = Just (LitTy (CharTy (chr (fromInteger n1))))
 #endif
 
-  | nameUniq tc == getKey typeSymbolAppendFamNameKey  -- GHC.TypeLits.AppendSymbol"
+  | nameUniq tc == fromGhcUnique typeSymbolAppendFamNameKey  -- GHC.TypeLits.AppendSymbol"
   = case mapMaybe (symLitView tcm) tys of
       [s1, s2] ->
         Just (LitTy (SymTy (s1 ++ s2)))
@@ -666,19 +678,35 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
       [i1, i2] -> Just (LitTy (NumTy (i1 `lcm` i2)))
       _ -> Nothing
 
-  | nameOcc tc `elem` ["GHC.TypeLits.Extra.Div", "GHC.TypeNats.Div"]
+  | nameOcc tc `elem` ["GHC.TypeLits.Extra.Div"]
   = case mapMaybe (litView tcm) tys of
       [i1, i2]
         | i2 > 0
         -> Just (LitTy (NumTy (i1 `div` i2)))
       _ -> Nothing
 
-  | nameOcc tc `elem` ["GHC.TypeLits.Extra.Mod", "GHC.TypeNats.Mod"]
+  | nameOcc tc `elem` ["GHC.TypeLits.Extra.Mod"]
   = case mapMaybe (litView tcm) tys of
       [i1, i2]
         | i2 > 0
         -> Just (LitTy (NumTy (i1 `mod` i2)))
       _ -> Nothing
+
+#if MIN_VERSION_base(4,11,0)
+  | nameUniq tc == fromGhcUnique typeNatDivTyFamNameKey
+  = case mapMaybe (litView tcm) tys of
+      [i1, i2]
+        | i2 > 0
+        -> Just (LitTy (NumTy (i1 `div` i2)))
+      _ -> Nothing
+
+  | nameUniq tc == fromGhcUnique typeNatModTyFamNameKey
+  = case mapMaybe (litView tcm) tys of
+      [i1, i2]
+        | i2 > 0
+        -> Just (LitTy (NumTy (i1 `mod` i2)))
+      _ -> Nothing
+#endif
 
   | Just (FunTyCon {tyConSubst = tcSubst}) <- UniqMap.lookup tc tcm
   = let -- See [Note: Eager type families]
@@ -716,7 +744,7 @@ charLitView _ _ = Nothing
 #endif
 
 isIntegerTy :: Type -> Bool
-isIntegerTy (ConstTy (TyCon nm)) = nameUniq nm == getKey integerTyConKey
+isIntegerTy (ConstTy (TyCon nm)) = nameUniq nm == fromGhcUnique integerTyConKey
 isIntegerTy _ = False
 
 -- | Normalize a type, looking through Signals and newtypes

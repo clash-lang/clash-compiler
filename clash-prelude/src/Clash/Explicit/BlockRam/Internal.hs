@@ -1,9 +1,10 @@
 {-|
-Copyright  :  (C) 2021-2022, QBayLogic B.V.
+Copyright  :  (C) 2021-2024, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE Trustworthy #-}
@@ -17,7 +18,9 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 import Data.ByteString.Builder (Builder, toLazyByteString, word8, word64BE)
 import qualified Data.ByteString.Unsafe as B
+#if !MIN_VERSION_base(4,20,0)
 import Data.Foldable (foldl')
+#endif
 import Data.Word (Word64)
 import GHC.Exts (Addr#)
 import GHC.TypeLits (KnownNat, Nat)
