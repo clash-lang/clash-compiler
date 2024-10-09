@@ -1,7 +1,8 @@
 {-|
 Copyright  :  (C) 2019, Myrtle Software Ltd
+                  2024, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
@@ -37,6 +38,8 @@ class Exp a where
     -- ^ Exponent
     -> ExpResult a n
     -- ^ Resized result, guaranteed to not have overflown
+
+infixr 8 ^
 
 instance KnownNat m => Exp (Index m) where
   type ExpResult (Index m) n = Index (Max 2 (m ^ n))
