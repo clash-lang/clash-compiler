@@ -14,8 +14,8 @@ elif [[ "$1" != "" ]]; then
   exit 1
 fi
 
-UBUNTU_VERSION=jammy-20240125
-GHC_VERSIONS=(  "9.8.2"  "9.6.4"  "9.4.8"  "9.2.8"   "9.0.2"   "8.10.7")
+UBUNTU_VERSION=jammy-20240808
+GHC_VERSIONS=("9.10.1" "9.8.2"  "9.6.6"  "9.4.8"  "9.2.8"   "9.0.2"   "8.10.7")
 CABAL_VERSION="3.12.1.0"
 
 # We want to use docker buildkit so that our layers are built in parallel. This
