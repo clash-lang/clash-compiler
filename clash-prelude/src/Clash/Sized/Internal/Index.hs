@@ -75,6 +75,7 @@ import Prelude hiding             (even, odd)
 
 import Control.DeepSeq            (NFData (..))
 import Data.Bits                  (Bits (..), FiniteBits (..))
+import Data.Constraint            (Dict(..))
 import Data.Data                  (Data)
 import Data.Default.Class         (Default (..))
 import Text.Read                  (Read (..), ReadPrec)
@@ -96,7 +97,7 @@ import GHC.Natural                (naturalToInteger)
 import GHC.Stack                  (HasCallStack)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-),
                                    type (*), type (<=), natVal)
-import GHC.TypeLits.Extra         (CLog)
+import GHC.TypeLits.Extra         (CLog, CLogWZ)
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
                                    coarbitraryIntegral, shrinkIntegral)
@@ -111,9 +112,10 @@ import Clash.Class.BitPack.BitIndex (replaceBit)
 import Clash.Sized.Internal       (formatRange)
 import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV), high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV
-import Clash.Promoted.Nat         (SNat(..), snatToNum, natToInteger, leToPlusKN)
+import Clash.Promoted.Nat         (SNat(..), SNatLE(..), snatToNum, natToInteger, leToPlusKN, compareSNat)
 import Clash.XException
   (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX, seqX)
+import Unsafe.Coerce              (unsafeCoerce)
 
 {- $setup
 >>> import Clash.Sized.Internal.Index
@@ -184,10 +186,18 @@ instance NFData (Index n) where
   -- NOINLINE is needed so that Clash doesn't trip on the "Index ~# Integer"
   -- coercion
 
-instance (KnownNat n, 1 <= n) => BitPack (Index n) where
-  type BitSize (Index n) = CLog 2 n
-  pack   = packXWith pack#
-  unpack = unpack#
+instance KnownNat n => BitPack (Index n) where
+  type BitSize (Index n) = CLogWZ 2 n 0
+  pack   = case compareSNat (SNat @1) (SNat @n) of
+    SNatGT                      -> const 0
+    SNatLE | Dict <- fact @n @0 -> packXWith pack#
+  unpack = case compareSNat (SNat @1) (SNat @n) of
+    SNatGT                      -> const $ errorX
+      "any value of type 'Index 0' is undefined"
+    SNatLE | Dict <- fact @n @0 -> unpack#
+
+fact :: forall n x. 1 <= n => Dict (CLogWZ 2 n x ~ CLog 2 n)
+fact = unsafeCoerce (Dict :: Dict (0~0))
 
 -- | Safely convert an `SNat` value to an `Index`
 fromSNat :: (KnownNat m, n + 1 <= m) => SNat n -> Index m
