@@ -1,6 +1,6 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente
-                       2021, QBayLogic B.V.
+                  2021-2024, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -54,7 +54,17 @@ __NB__: Bit indices are __DESCENDING__.
 >>> slice d4 d2 (7 :: Unsigned 6)
 0b001
 
-#if __GLASGOW_HASKELL__ == 906
+#if __GLASGOW_HASKELL__ >= 910
+>>> slice d6 d4 (7 :: Unsigned 6)
+<interactive>:...
+    • Couldn't match type ‘7 + i0’ with ‘6’
+        arising from a use of ‘slice’
+      The type variable ‘i0’ is ambiguous
+    • In the expression: slice d6 d4 (7 :: Unsigned 6)
+      In an equation for ‘it’: it = slice d6 d4 (7 :: Unsigned 6)
+<BLANKLINE>
+
+#elif __GLASGOW_HASKELL__ == 906
 >>> slice d6 d4 (7 :: Unsigned 6)
 <BLANKLINE>
 <interactive>:...
@@ -131,7 +141,17 @@ __NB__: Bit indices are __DESCENDING__.
 >>> pack (-29 :: Signed 6)
 0b10_0011
 
-#if __GLASGOW_HASKELL__ == 906
+#if __GLASGOW_HASKELL__ >= 910
+>>> setSlice d6 d5 0 (-5 :: Signed 6)
+<interactive>:...
+    • Couldn't match type ‘7 + i0’ with ‘6’
+        arising from a use of ‘setSlice’
+      The type variable ‘i0’ is ambiguous
+    • In the expression: setSlice d6 d5 0 (- 5 :: Signed 6)
+      In an equation for ‘it’: it = setSlice d6 d5 0 (- 5 :: Signed 6)
+<BLANKLINE>
+
+#elif __GLASGOW_HASKELL__ == 906
 >>> setSlice d6 d5 0 (-5 :: Signed 6)
 <BLANKLINE>
 <interactive>:...

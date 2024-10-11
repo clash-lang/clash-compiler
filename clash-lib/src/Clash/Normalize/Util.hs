@@ -1,6 +1,6 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
-                    2021-2022, QBayLogic B.V.
+                    2021-2024, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -48,10 +48,8 @@ import qualified Data.Text.Extra as Text
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Builtin.Names       (eqTyConKey)
-import           GHC.Types.Unique        (getKey)
 #else
 import           PrelNames               (eqTyConKey)
-import           Unique                  (getKey)
 #endif
 
 import           Clash.Annotations.Primitive (extractPrim)
@@ -450,7 +448,7 @@ substWithTyEq e0 = go [] False e0
   go args changed (TyLam tv e) = go (Right tv : args) changed e
   go args changed (Lam v e)
     | TyConApp (nameUniq -> tcUniq) (tvFirst -> Just (tv, ty)) <- tyView (coreTypeOf v)
-    , tcUniq == getKey eqTyConKey
+    , tcUniq == fromGhcUnique eqTyConKey
     , Right tv `elem` args
     = let
         tvs = rights args
@@ -479,7 +477,7 @@ tvSubstWithTyEq ty0 = go [] False ty0
     = go (Left tv:argsOut) changed ty
   go argsOut changed (tyView -> FunTy arg tyRes)
     | Just (tc,tcArgs) <- splitTyConAppM arg
-    , nameUniq tc == getKey eqTyConKey
+    , nameUniq tc == fromGhcUnique eqTyConKey
     , Just (tv,ty) <- tvFirst tcArgs
     = let
         argsOut2 = Right arg : (argsOut List.\\ [Left tv])

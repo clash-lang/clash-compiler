@@ -1,3 +1,9 @@
+{-|
+Copyright  :  (C) 2024, QBayLogic B.V.
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -9,7 +15,10 @@ import           Clash.Annotations.Primitive (Primitive(InlineYamlPrimitive))
 import           Clash.CPP                   (maxTupleSize)
 import           Clash.Signal.Internal       (Signal((:-)))
 import           Clash.XException            (seqX)
-import           Data.List                   (foldl', uncons)
+#if !MIN_VERSION_base(4,20,0)
+import           Data.List                   (foldl')
+#endif
+import           Data.List                   (uncons)
 import           Data.String.Interpolate     (__i)
 import qualified Language.Haskell.TH.Syntax  as TH
 import           Language.Haskell.TH

@@ -1,6 +1,6 @@
 {-|
 Copyright  :  (C) 2016, University of Twente
-                  2022, QBayLogic B.V.
+                  2022-2024, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -299,7 +299,30 @@ defined in the instance 'Clash.Class.Num.ExtendingNum' instance of 'Index'.
 However, we cannot simply use 'Clash.Sized.Vector.fold' to create a tree-structure of
 'Clash.Class.Num.add's:
 
-#if __GLASGOW_HASKELL__ >= 900
+#if __GLASGOW_HASKELL__ >= 910
+>>> :{
+let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
+                     => BitVector (2^d) -> Index (2^d+1)
+    populationCount' = tfold (resize . bv2i . pack) add . v2t . bv2v
+:}
+<interactive>:...
+    • Couldn't match type: (((2 ^ d) + 1) + ((2 ^ d) + 1)) - 1
+                     with: (2 ^ d) + 1
+      Expected: Index ((2 ^ d) + 1)
+                -> Index ((2 ^ d) + 1) -> Index ((2 ^ d) + 1)
+        Actual: Index ((2 ^ d) + 1)
+                -> Index ((2 ^ d) + 1)
+                -> AResult (Index ((2 ^ d) + 1)) (Index ((2 ^ d) + 1))
+    • In the second argument of ‘tfold’, namely ‘add’
+      In the first argument of ‘(.)’, namely
+        ‘tfold (resize . bv2i . pack) add’
+      In the expression: tfold (resize . bv2i . pack) add . v2t . bv2v
+    • Relevant bindings include
+        populationCount' :: BitVector (2 ^ d) -> Index ((2 ^ d) + 1)
+          (bound at ...)
+<BLANKLINE>
+
+#elif __GLASGOW_HASKELL__ >= 900
 >>> :{
 let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
                      => BitVector (2^d) -> Index (2^d+1)

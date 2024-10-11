@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd
-                     2022,      QBayLogic B.V.
+                     2022-2024, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -34,7 +34,9 @@ import qualified Data.ByteString.Lazy        as BL
 import qualified Data.Sequence               as Seq
 import           Data.Sequence               (Seq)
 import           Data.Either                 (partitionEithers)
+#if !MIN_VERSION_base(4,20,0)
 import           Data.Foldable               (foldl')
+#endif
 import           Data.List                   (elemIndex)
 import qualified Data.Text                   as Text
 import           Data.Maybe                  (isNothing, mapMaybe, catMaybes)

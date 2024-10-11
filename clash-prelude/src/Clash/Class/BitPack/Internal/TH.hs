@@ -1,5 +1,5 @@
 {-|
-Copyright  :  (C) 2019, QBayLogic B.V.
+Copyright  :  (C) 2019-2024, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -11,7 +11,9 @@ module Clash.Class.BitPack.Internal.TH where
 import           Clash.CPP             (maxTupleSize)
 import           Language.Haskell.TH.Compat (mkTySynInstD,mkTupE)
 import           Control.Monad         (replicateM)
+#if !MIN_VERSION_base(4,20,0)
 import           Data.List             (foldl')
+#endif
 import           GHC.TypeLits          (KnownNat)
 import           Language.Haskell.TH
 

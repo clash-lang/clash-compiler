@@ -2,6 +2,12 @@
     name: GHC.Prim.dataToTag#
     primType: Function
 - Primitive:
+    name: GHC.Prim.dataToTagSmall#
+    primType: Function
+- Primitive:
+    name: GHC.Prim.dataToTagLarge#
+    primType: Function
+- Primitive:
     name: GHC.Prim.tagToEnum#
     primType: Function
 - BlackBox:
