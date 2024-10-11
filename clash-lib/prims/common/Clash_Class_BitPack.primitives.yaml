@@ -27,7 +27,7 @@
     template: ~ARG[0]
     workInfo: Never
 - BlackBox:
-    name: Clash.Class.BitPack.Internal.xToBV
+    name: Clash.Sized.Internal.BitVector.xToBV
     kind: Expression
     type: 'xToBV :: KnownNat n => BitVector n -> BitVector n'
     template: ~ARG[1]

@@ -43,6 +43,7 @@ import           Data.Proxy          (Proxy)
 import           Data.Reflection     (reifyNat)
 import           Data.Text           (Text)
 import qualified Data.Text           as Text
+import           Data.Text.Extra     (showt)
 import           GHC.Exts (IsList(..))
 import           GHC.Float
 import           GHC.Int
@@ -202,7 +203,7 @@ ghcPrimUnwind tcm p tys vs v [e] m0
                        , "Clash.Sized.Vector.replace_int"
                        , "GHC.Classes.&&"
                        , "GHC.Classes.||"
-                       , "Clash.Class.BitPack.Internal.xToBV"
+                       , showt 'BitVector.xToBV
                        , "Clash.Sized.Vector.imap_go"
                        ]
   = if isUndefinedPrimVal v then
@@ -2444,7 +2445,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            val = unpack (toBV i :: BitVector 64)
         in reduce (mkDoubleCLit tcm val resTy)
 
-  "Clash.Class.BitPack.Internal.xToBV"
+  "Clash.Sized.Internal.BitVector.xToBV"
     | isSubj
     , Just (nTy, kn) <- extractKnownNat tcm tys
     -- The second argument to `xToBV` is always going to be suspended.

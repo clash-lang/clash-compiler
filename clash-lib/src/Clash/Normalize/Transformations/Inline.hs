@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2022, Google Inc.,
-                    2021-2022, QBayLogic B.V.
+                    2021-2024, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -14,6 +14,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -48,7 +49,7 @@ import GHC.Stack (HasCallStack)
 import GHC.BasicTypes.Extra (isNoInline)
 
 import qualified Clash.Explicit.SimIO as SimIO
-import qualified Clash.Sized.Internal.BitVector as BV (Bit(Bit), BitVector(BV))
+import qualified Clash.Sized.Internal.BitVector as BV (Bit(Bit), BitVector(BV), xToBV)
 
 import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.DataCon (DataCon(..))
@@ -438,7 +439,8 @@ collapseRHSNoops _ (Letrec binds body) = do
     isNoopApp x (Prim PrimInfo{primWorkInfo=WorkIdentity i []},args) = do
       arg <- getTermArg (lefts args) i
       isNoopApp x (collectArgs arg)
-    isNoopApp x (Prim PrimInfo{primName="Clash.Class.BitPack.Internal.xToBV"},args) = do
+    isNoopApp x (Prim PrimInfo{primName},args)
+      | primName == Text.showt 'BV.xToBV = do
       -- We don't make 'xToBV' something of 'WorkIdentity 1 []' because we don't
       -- want 'getIdentity' to replace "naked" occurances of 'xToBV' by
       -- 'unsafeCoerce#'. We don't want that since 'xToBV' has a special evaluator

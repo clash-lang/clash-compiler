@@ -1,0 +1,1 @@
+CHANGED: `BitVector n` now has an implementation for `ensureSpine` which ensures the constructor is present.

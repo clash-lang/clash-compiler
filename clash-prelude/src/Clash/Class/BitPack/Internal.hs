@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2017, Myrtle Software Ltd,
-                  2021-2023  QBayLogic B.V.,
+                  2021-2024  QBayLogic B.V.,
                   2022,      Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -26,7 +26,6 @@ module Clash.Class.BitPack.Internal where
 
 import Prelude                        hiding (map)
 
-import Control.Exception              (catch, evaluate)
 import Data.Binary.IEEE754            (doubleToWord, floatToWord, wordToDouble,
                                        wordToFloat)
 
@@ -44,7 +43,6 @@ import GHC.Generics
 import GHC.TypeLits                   (KnownNat, Nat, type (+), type (-))
 import GHC.TypeLits.Extra             (CLog, Max)
 import Numeric.Half                   (Half (..))
-import System.IO.Unsafe               (unsafeDupablePerformIO)
 
 import Clash.Annotations.Primitive    (hasBlackBox)
 import Clash.Class.BitPack.Internal.TH (deriveBitPackTuples)
@@ -52,8 +50,7 @@ import Clash.Class.Resize             (zeroExtend, resize)
 import Clash.Promoted.Nat             (SNat(..), snatToNum)
 import Clash.Sized.Internal.BitVector
   (pack#, split#, checkUnpackUndef, undefined#, unpack#, unsafeToNatural, isLike#,
-   BitVector, Bit, (++#))
-import Clash.XException
+   BitVector, Bit, (++#), xToBV)
 
 {- $setup
 >>> :m -Prelude
@@ -163,14 +160,6 @@ packXWith
   -> BitVector n
 packXWith f = xToBV . f
 {-# INLINE packXWith #-}
-
-xToBV :: KnownNat n => BitVector n -> BitVector n
-xToBV x =
-  unsafeDupablePerformIO (catch (evaluate x)
-                                (\(XException _) -> return undefined#))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE xToBV #-}
-{-# ANN xToBV hasBlackBox #-}
 
 -- | Pack both arguments to a 'BitVector' and use
 -- 'Clash.Sized.Internal.BitVector.isLike#' to compare them. This is a more
