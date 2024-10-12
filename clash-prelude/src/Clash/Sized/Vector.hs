@@ -108,6 +108,8 @@ import Data.Constraint.Nat        (leZero)
 import Data.Data
   (Data (..), Constr, DataType, Fixity (..), Typeable, mkConstr, mkDataType)
 import Data.Either                (isLeft)
+import Data.Distributive
+import Data.Functor.Rep
 #if MIN_VERSION_base(4,18,0)
 import qualified Data.Foldable1   as F1
 #endif
@@ -2776,3 +2778,16 @@ type instance Lens.Index   (Vec n a) = Index n
 type instance Lens.IxValue (Vec n a) = a
 instance KnownNat n => Lens.Ixed (Vec n a) where
   ix i f xs = replace_int xs (fromEnum i) <$> f (index_int xs (fromEnum i))
+
+instance KnownNat n => Distributive (Vec n) where
+    distribute fxs = tabulate $ \i -> fmap (!! i) fxs
+    {-# INLINE distribute #-}
+
+instance KnownNat n => Representable (Vec n) where
+    type Rep (Vec n) = Index n
+
+    tabulate f = map f indicesI
+    {-# INLINE tabulate #-}
+
+    index = (!!)
+    {-# INLINE index #-}
