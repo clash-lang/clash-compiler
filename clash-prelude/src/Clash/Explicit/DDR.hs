@@ -20,21 +20,27 @@ or "Clash.Xilinx.DDR".
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Clash.Explicit.DDR
   ( ddrIn
   , ddrOut
+  , ddrOutClock
     -- * Internal
   , ddrIn#
   , ddrOut#
+  , ddrOutToClock
   )
 where
 
+import Data.List.Infinite (Infinite(..), (...))
+import Data.String.Interpolate (__i)
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 
-import Clash.Annotations.Primitive    (hasBlackBox)
-import Clash.Explicit.Prelude
+import Clash.Annotations.Primitive (hasBlackBox, Primitive(..), HDL(..))
+import Clash.Explicit.Prelude hiding ((:<))
 import Clash.Signal.Internal
 
 {- $setup
@@ -189,3 +195,61 @@ ddrOut# clk rst en i0 xs ys =
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE ddrOut# #-}
 {-# ANN ddrOut# hasBlackBox #-}
+
+ddrOutClock
+  :: ( KnownDomain domIn
+     , KnownDomain domOut
+     , KnownDomain domDdr
+     , DomainPeriod domIn ~ DomainPeriod domOut
+     , DomainPeriod domIn ~ 2 * DomainPeriod domDdr
+     )
+  => Bit
+  -- ^ Value to output at positive edge of incoming clock. If 1, output clock is
+  -- in phase with input clock. If 0, output clock is 180 degrees out of phase
+  -- with input clock.
+  -> (Signal domIn (Bit, Bit) -> Signal domDdr Bit)
+  -- ^ @ddrOut@ primitive to use
+  -> Clock domOut
+ddrOutClock phase oddr = ddrOutToClock (oddr $ pure (phase, complement phase))
+{-# INLINE ddrOutClock #-}
+
+ddrOutToClock ::
+  ( KnownDomain dom
+  , KnownDomain domDdr
+  , DomainPeriod dom ~ 2 * DomainPeriod domDdr
+  ) =>
+  Signal domDdr Bit ->
+  Clock dom
+ddrOutToClock !_ = Clock SSymbol Nothing
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE ddrOutToClock #-}
+{-# ANN ddrOutToClock (
+  let
+    bbName = show 'ddrOutToClock
+    _knownDom
+      :< _knownDomDdr
+      :< _domPeriod
+      :< ddrSignal
+      :< _ = ((0 :: Int)...)
+  in InlineYamlPrimitive [VHDL] [__i|
+    BlackBox:
+      name: #{bbName}
+      kind: Expression
+      template: ~TYPMO'(~ARG[#{ddrSignal}])
+      workInfo: Never
+|]) #-}
+{-# ANN ddrOutToClock (
+  let
+    bbName = show 'ddrOutToClock
+    _knownDom
+      :< _knownDomDdr
+      :< _domPeriod
+      :< ddrSignal
+      :< _ = ((0 :: Int)...)
+  in InlineYamlPrimitive [Verilog, SystemVerilog] [__i|
+    BlackBox:
+      name: #{bbName}
+      kind: Expression
+      template: ~ARG[#{ddrSignal}]
+      workInfo: Never
+|]) #-}
