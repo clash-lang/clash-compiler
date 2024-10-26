@@ -27,7 +27,7 @@
           .lpm_hint ("UNUSED"),
           .lpm_type ("altddio_in"),
           .power_up_high ("OFF"),
-          .width (~SIZE[~TYP[7]])
+          .width (~SIZE[~TYP[8]])
         )
         ~GENSYM[~COMPNAME_ALTDDIO_IN][7] (~IF ~ISSYNC[2] ~THEN
           .sclr (~ARG[6]),
