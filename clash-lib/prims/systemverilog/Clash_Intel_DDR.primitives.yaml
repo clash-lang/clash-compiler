@@ -36,7 +36,7 @@
           .sclr (1'b0),~FI
           .datain (~ARG[8]),
           .inclock (~ARG[5]),
-          .inclocken (~IF ~ISACTIVEENABLE[7] ~THEN~ARG[7]~ELSE1'b1,~FI),
+          .inclocken (~IF ~ISACTIVEENABLE[7] ~THEN~ARG[7]~ELSE1'b1~FI),
           .dataout_h (~SYM[2]),
           .dataout_l (~SYM[1]),
           .aset (1'b0),
