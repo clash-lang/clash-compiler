@@ -23,7 +23,7 @@
         signal ~GENSYM[dataout_l][1] : ~TYP[8];
         signal ~GENSYM[dataout_h][2] : ~TYP[8];~IF ~ISACTIVEENABLE[7] ~THEN
         signal ~GENSYM[ce_logic][4]: std_logic;~ELSE ~FI
-      begin~IF ~ISACTIVEENABLE[5] ~THEN
+      begin~IF ~ISACTIVEENABLE[7] ~THEN
         ~SYM[4] <= '1' when (~ARG[7]) else '0';~ELSE ~FI
         ~GENSYM[~COMPNAME_ALTDDIO_IN][7] : ALTDDIO_IN
         GENERIC MAP (
@@ -37,7 +37,7 @@
         PORT MAP (~IF ~ISSYNC[6] ~THEN
           sclr      => ~ARG[6],~ELSE
           aclr      => ~ARG[6],~FI
-          datain    => ~ARG[8],~IF ~ISACTIVEENABLE[5] ~THEN
+          datain    => ~ARG[8],~IF ~ISACTIVEENABLE[7] ~THEN
           inclocken => ~SYM[4],~ELSE ~FI
           inclock   => ~ARG[5],
           dataout_h => ~SYM[2],
@@ -71,7 +71,7 @@
       ~GENSYM[~COMPNAME_ALTDDIO_OUT][0] : block ~IF ~ISACTIVEENABLE[7] ~THEN
         signal ~GENSYM[ce_logic][1] : std_logic; ~ELSE ~FI
       begin~IF ~ISACTIVEENABLE[7] ~THEN
-        ~SYM[3] <= '1' when (~ARG[7]) else '0'; ~ELSE ~FI
+        ~SYM[1] <= '1' when (~ARG[7]) else '0'; ~ELSE ~FI
         ~GENSYM[~COMPNAME_ALTDDIO_OUT][7] : ALTDDIO_OUT
           GENERIC MAP (
             extend_oe_disable => "OFF",
@@ -88,8 +88,8 @@
             aclr       => ~ARG[6],~FI ~IF ~ISACTIVEENABLE[7] ~THEN
             outclocken => ~SYM[1],~ELSE ~FI
             outclock   => ~ARG[5],
-            datain_h   => ~ARG[7],
-            datain_l   => ~ARG[8],
+            datain_h   => ~ARG[8],
+            datain_l   => ~ARG[9],
             dataout    => ~RESULT
           );
       end block;
