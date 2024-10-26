@@ -19,8 +19,8 @@
     template: |-
       -- iddr begin
       ~GENSYM[~COMPNAME_IDDR][0] : block
-        signal ~GENSYM[dataout_l][1] : ~TYP[7];
-        signal ~GENSYM[dataout_h][2] : ~TYP[7];
+        signal ~GENSYM[data_pos][1] : ~TYP[7];
+        signal ~GENSYM[data_neg][2] : ~TYP[7];
         signal ~GENSYM[d][3]         : ~TYP[7];~IF ~ISACTIVEENABLE[6] ~THEN
         signal ~GENSYM[ce_logic][4]: std_logic;~ELSE ~FI
       begin~IF ~ISACTIVEENABLE[6] ~THEN
@@ -70,8 +70,8 @@
     template: |-
       -- oddr begin
       ~GENSYM[~COMPNAME_ODDR][0] : block
-        signal ~GENSYM[dataout_l][1] : ~TYPO;
-        signal ~GENSYM[dataout_h][2] : ~TYPO;
+        signal ~GENSYM[data_pos][1] : ~TYPO;
+        signal ~GENSYM[data_neg][2] : ~TYPO;
         signal ~GENSYM[q][3]         : ~TYPO;~IF ~ISACTIVEENABLE[5] ~THEN
         signal ~GENSYM[ce_logic][4]  : std_logic;~ELSE ~FI
       begin~IF ~ISACTIVEENABLE[5] ~THEN
@@ -79,13 +79,13 @@
         ~SYM[1] <= ~ARG[6];
         ~SYM[2] <= ~ARG[7];
 
-        ~GENSYM[gen_iddr][7] : for ~GENSYM[i][8] in ~SYM[3]'range generate
+        ~GENSYM[gen_oddr][7] : for ~GENSYM[i][8] in ~SYM[3]'range generate
         begin
           ~GENSYM[~COMPNAME_ODDR_inst][9] : ODDR
           generic map(
             DDR_CLK_EDGE => "SAME_EDGE",
             INIT => '0',
-            SRTYPE => ~IF ~ISSYNC[2] ~THEN "SYNC" ~ELSE "ASYNC" ~FI)
+            SRTYPE => ~IF ~ISSYNC[1] ~THEN "SYNC" ~ELSE "ASYNC" ~FI)
           port map (
             Q  => ~SYM[3](~SYM[8]),    -- 1-bit DDR output
             C  => ~ARG[3],   -- 1-bit clock input
