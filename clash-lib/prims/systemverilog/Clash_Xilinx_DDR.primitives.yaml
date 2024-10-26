@@ -14,8 +14,8 @@
         -> Signal slow (BitVector m,BitVector m)
     template: |-
       // iddr begin
-      ~SIGD[~GENSYM[dataout_l][1]][7];
-      ~SIGD[~GENSYM[dataout_h][2]][7];
+      ~SIGD[~GENSYM[data_pos][1]][7];
+      ~SIGD[~GENSYM[data_neg][2]][7];
       ~SIGD[~GENSYM[d][3]][7];
       assign ~SYM[3] = ~ARG[7];
 
@@ -57,8 +57,8 @@
         -> Signal fast (BitVector m)
     template: |-
       // oddr begin
-      ~SIGD[~GENSYM[datain_l][1]][7];
-      ~SIGD[~GENSYM[datain_h][2]][7];
+      ~SIGD[~GENSYM[data_pos][1]][7];
+      ~SIGD[~GENSYM[data_neg][2]][7];
       ~SIGD[~GENSYM[q][3]][7];
 
       assign ~SYM[1] = ~ARG[6];
@@ -70,7 +70,7 @@
         ODDR #(
           .DDR_CLK_EDGE("SAME_EDGE"),
           .INIT(1'b0),
-          .SRTYPE(~IF ~ISSYNC[2] ~THEN "SYNC" ~ELSE "ASYNC" ~FI)
+          .SRTYPE(~IF ~ISSYNC[1] ~THEN "SYNC" ~ELSE "ASYNC" ~FI)
         ) ~GENSYM[~COMPNAME_ODDR][9] (
           .Q(~SYM[3][~SYM[8]]),
           .C(~ARG[3]),
