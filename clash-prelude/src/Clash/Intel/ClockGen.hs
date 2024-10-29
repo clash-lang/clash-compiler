@@ -362,8 +362,7 @@ altpll _ = setName @name unsafeAltpll
 -- See also the [ALTPLL (Phase-Locked Loop) IP Core User Guide](https://www.intel.com/content/dam/www/programmable/us/en/pdfs/literature/ug/ug_altpll.pdf)
 unsafeAltpll ::
   forall t domIn .
-  ( KnownDomain domIn
-  , Clocks t
+  ( Clocks t
   , ClocksCxt t
   , NumOutClocks t <= 5
   ) =>
@@ -439,8 +438,7 @@ alteraPll _ = setName @name unsafeAlteraPll
 -- See also the [Altera Phase-Locked Loop (Altera PLL) IP Core User Guide](https://www.intel.com/content/dam/www/programmable/us/en/pdfs/literature/ug/altera_pll.pdf)
 unsafeAlteraPll ::
   forall t domIn .
-  ( KnownDomain domIn
-  , Clocks t
+  ( Clocks t
   , ClocksCxt t
   , NumOutClocks t <= 18
   ) =>

@@ -25,13 +25,12 @@ module Clash.Clocks
 
 import Clash.Clocks.Internal
   (Clocks(..), ClocksSync(..), deriveClocksInstances, deriveClocksSyncInstances)
-import Clash.Signal.Internal (Domain, KnownDomain)
+import Clash.Signal.Internal (Domain, knownDomain)
 
 deriveClocksInstances
 
 type ClocksSyncCxt t (domIn :: Domain) =
-  ( KnownDomain domIn
-  , ClocksSync t
+  ( ClocksSync t
   , ClocksResetSynchronizerCxt t
   , Clocks (ClocksSyncClocksInst t domIn)
   , ClocksCxt (ClocksSyncClocksInst t domIn)

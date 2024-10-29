@@ -50,12 +50,15 @@ module Clash.Explicit.Reset
   ) where
 
 import           Data.Type.Equality ((:~:)(Refl))
+import           Data.Typeable (Typeable)
 
 import           Clash.Class.Num (satSucc, SaturationMode(SatBound))
 import           Clash.Explicit.Signal
 import           Clash.Explicit.Synchronizer (dualFlipFlopSynchronizer)
 import           Clash.Promoted.Nat
-import           Clash.Signal.Internal
+import           Clash.Signal.Internal hiding
+  (unsafeToReset, unsafeFromHighPolarity, unsafeFromActiveHigh, unsafeFromLowPolarity, unsafeFromActiveLow)
+import qualified Clash.Signal.Internal as Internal
 import           Clash.Sized.Index (Index)
 
 import           GHC.Stack (HasCallStack)
@@ -66,8 +69,8 @@ import           GHC.TypeLits (type (+), type (<=))
 -}
 
 -- | A reset that is never asserted
-noReset :: KnownDomain dom => Reset dom
-noReset = unsafeFromActiveHigh (pure False)
+noReset :: forall dom . KnownDomain dom => Reset dom
+noReset = unsafeFromActiveHigh (knownDomain @dom) (pure False)
 
 -- | Output reset will be asserted when either one of the input resets is
 -- asserted
@@ -83,10 +86,10 @@ orReset = unsafeOrReset
 -- asserted. This function is considered unsafe because it can be used on
 -- domains with components with asynchronous resets, where use of this function
 -- can introduce glitches triggering a reset.
-unsafeOrReset :: forall dom. KnownDomain dom => Reset dom -> Reset dom -> Reset dom
-unsafeOrReset (unsafeFromReset -> rst0) (unsafeFromReset -> rst1) =
-  unsafeToReset $
-    case resetPolarity @dom of
+unsafeOrReset :: forall dom. Reset dom -> Reset dom -> Reset dom
+unsafeOrReset r@(unsafeFromReset -> rst0) (unsafeFromReset -> rst1) =
+  Internal.unsafeToReset (resetConf r) $
+    case getResetPolarity (resetConf r) of
       SActiveHigh -> rst0 .||. rst1
       SActiveLow  -> rst0 .&&. rst1
 
@@ -103,10 +106,10 @@ andReset = unsafeAndReset
 -- function is considered unsafe because it can be used on domains with
 -- components with asynchronous resets, where use of this function can introduce
 -- glitches triggering a reset.
-unsafeAndReset :: forall dom. KnownDomain dom => Reset dom -> Reset dom -> Reset dom
-unsafeAndReset (unsafeFromReset -> rst0) (unsafeFromReset -> rst1) =
-  unsafeToReset $
-    case resetPolarity @dom of
+unsafeAndReset :: forall dom. Reset dom -> Reset dom -> Reset dom
+unsafeAndReset r@(unsafeFromReset -> rst0) (unsafeFromReset -> rst1) =
+  Internal.unsafeToReset (resetConf r) $
+    case getResetPolarity (resetConf r) of
       SActiveHigh -> rst0 .&&. rst1
       SActiveLow  -> rst0 .||. rst1
 
@@ -213,20 +216,19 @@ unsafeAndReset (unsafeFromReset -> rst0) (unsafeFromReset -> rst1) =
 --
 resetSynchronizer
   :: forall dom
-   . KnownDomain dom
-  => Clock dom
+   . Clock dom
   -> Reset dom
   -> Reset dom
 resetSynchronizer clk rst = rstOut
  where
-  isActiveHigh = case resetPolarity @dom of { SActiveHigh -> True; _ -> False }
+  isActiveHigh = case getResetPolarity (resetConf rst) of { SActiveHigh -> True; _ -> False }
   rstOut =
-    case (resetKind @dom) of
-      SAsynchronous -> unsafeToReset
+    case getResetKind (resetConf rst) of
+      SAsynchronous -> Internal.unsafeToReset (resetConf rst)
                          $ register clk rst enableGen isActiveHigh
                          $ register clk rst enableGen isActiveHigh
                          $ pure (not isActiveHigh)
-      SSynchronous  -> unsafeToReset
+      SSynchronous  -> Internal.unsafeToReset (resetConf rst)
                          $ delay clk enableGen isActiveHigh
                          $ delay clk enableGen isActiveHigh
                          $ unsafeFromReset rst
@@ -304,7 +306,6 @@ resetGlitchFilter = unsafeResetGlitchFilter
 unsafeResetGlitchFilter
   :: forall dom glitchlessPeriod
    . ( HasCallStack
-     , KnownDomain dom
      , 1 <= glitchlessPeriod
      )
   => SNat glitchlessPeriod
@@ -317,7 +318,7 @@ unsafeResetGlitchFilter glitchlessPeriod clk =
   resetGlitchFilter# glitchlessPeriod reg dffSync
  where
   reg = delay clk enableGen
-  dffSync = dualFlipFlopSynchronizer clk clk noReset enableGen
+  dffSync = dualFlipFlopSynchronizer clk clk (Internal.unsafeFromActiveHigh (clockConf clk) (pure False)) enableGen
 {-# INLINE unsafeResetGlitchFilter #-}
 
 -- | Filter glitches from reset signals by only triggering a reset after it has
@@ -339,7 +340,6 @@ unsafeResetGlitchFilter glitchlessPeriod clk =
 resetGlitchFilterWithReset
   :: forall dom glitchlessPeriod
    . ( HasCallStack
-     , KnownDomain dom
      , 1 <= glitchlessPeriod
      )
   => SNat glitchlessPeriod
@@ -361,7 +361,6 @@ resetGlitchFilterWithReset glitchlessPeriod clk ownRst =
 resetGlitchFilter#
   :: forall dom glitchlessPeriod state
    . ( HasCallStack
-     , KnownDomain dom
      , 1 <= glitchlessPeriod
      , state ~ (Bool, Index glitchlessPeriod)
      )
@@ -379,11 +378,11 @@ resetGlitchFilter#
 resetGlitchFilter# SNat reg dffSync rstIn0 =
   let s' = go <$> s <*> rstIn2
       s  = reg (asserted, 0) s'
-  in unsafeToReset $ fst <$> s
+  in Internal.unsafeToReset (resetConf rstIn0) $ fst <$> s
  where
   rstIn1 = unsafeFromReset rstIn0
   rstIn2 =
-    case resetKind @dom of
+    case getResetKind (resetConf rstIn0) of
       SAsynchronous -> dffSync asserted rstIn1
       SSynchronous -> rstIn1
 
@@ -395,7 +394,7 @@ resetGlitchFilter# SNat reg dffSync rstIn0 =
 
   asserted :: Bool
   asserted =
-    case resetPolarity @dom of
+    case getResetPolarity (resetConf rstIn0) of
       SActiveHigh -> True
       SActiveLow -> False
 
@@ -417,8 +416,7 @@ resetGlitchFilter# SNat reg dffSync rstIn0 =
 --
 holdReset
   :: forall dom n
-   . KnownDomain dom
-  => Clock dom
+   . Clock dom
   -> Enable dom
   -- ^ Global enable
   -> SNat n
@@ -428,7 +426,7 @@ holdReset
   -- ^ Reset to extend
   -> Reset dom
 holdReset clk en SNat rst =
-  unsafeFromActiveHigh ((/=maxBound) <$> counter)
+  Internal.unsafeFromActiveHigh (resetConf rst) ((/=maxBound) <$> counter)
  where
   counter :: Signal dom (Index (n+1))
   counter = register clk rst en 0 (satSucc SatBound <$> counter)
@@ -441,10 +439,7 @@ holdReset clk en SNat rst =
 -- filter glitches. This adds one @domA@ clock cycle delay.
 convertReset
   :: forall domA domB
-   . ( KnownDomain domA
-     , KnownDomain domB
-     )
-  => Clock domA
+   . Clock domA
   -> Clock domB
   -> Reset domA
   -> Reset domB
@@ -452,21 +447,21 @@ convertReset clkA clkB rstA0 = rstB1
  where
   rstA1 = unsafeFromReset rstA0
   rstA2 =
-    case (resetPolarity @domA, resetPolarity @domB) of
+    case (getResetPolarity (clockConf clkA), getResetPolarity (clockConf clkB)) of
       (SActiveLow, SActiveLow)   -> rstA1
       (SActiveHigh, SActiveHigh) -> rstA1
       _                          -> not <$> rstA1
   rstA3 =
-    case resetKind @domA of
+    case getResetKind (clockConf clkA) of
       SSynchronous -> delay clkA enableGen assertedA rstA2
       _            -> rstA2
-  rstB0 = unsafeToReset $ unsafeSynchronizer clkA clkB rstA3
+  rstB0 = Internal.unsafeToReset (clockConf clkB) $ unsafeSynchronizer clkA clkB rstA3
   rstB1 =
-    case (sameDomain @domA @domB) of
+    case sameDomain (clockConf clkA) (clockConf clkB) of
       Just Refl -> rstA0
       Nothing   -> resetSynchronizer clkB rstB0
   assertedA :: Bool
   assertedA =
-    case resetPolarity @domA of
+    case getResetPolarity (clockConf clkA) of
       SActiveHigh -> True
       SActiveLow  -> False

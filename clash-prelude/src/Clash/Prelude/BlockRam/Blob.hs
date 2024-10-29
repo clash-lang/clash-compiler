@@ -18,6 +18,7 @@ practically the same HDL as "Clash.Prelude.BlockRam" and is compatible with all
 tools consuming the generated HDL.
 -}
 
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
 
 {-# LANGUAGE Safe #-}

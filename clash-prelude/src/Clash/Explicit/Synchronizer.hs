@@ -73,9 +73,7 @@ import Clash.XException            (NFDataX, fromJustX)
 --      If you want to have /safe/ __word__-synchronization use
 --      'asyncFIFOSynchronizer'.
 dualFlipFlopSynchronizer
-  :: ( NFDataX a
-     , KnownDomain dom1
-     , KnownDomain dom2 )
+  :: NFDataX a
   => Clock dom1
   -- ^ 'Clock' to which the incoming  data is synchronized
   -> Clock dom2

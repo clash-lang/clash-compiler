@@ -984,7 +984,7 @@ data DomProxy (dom :: Domain) where
 -- A more useful Show instance than the one for 'Proxy'
 instance Show (DomProxy dom) where
   showsPrec d dom@DomProxy =
-    showParen (d > app_prec) $ ("DomProxy @" <>) . (symbolVal dom <>)
+    showParen (d > app_prec) $ ("DomProxy @" <>) . (symbolVal (SSymbol @(DomainName dom)) <>)
    where app_prec = 10
 
 data NamedTest a = NamedTest

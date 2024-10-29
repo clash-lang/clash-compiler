@@ -107,7 +107,7 @@ class NFDataX a => AutoReg a where
   -- This is the version with explicit clock\/reset\/enable inputs,
   -- "Clash.Prelude" exports an implicit version of this: 'Clash.Prelude.autoReg'
   autoReg
-    :: (HasCallStack, KnownDomain dom)
+    :: HasCallStack
     => Clock dom -> Reset dom -> Enable dom
     -> a  -- ^ Reset value
     -> Signal dom a
@@ -164,7 +164,7 @@ instance AutoReg a => AutoReg (Maybe a) where
 
 instance (KnownNat n, AutoReg a) => AutoReg (Vec n a) where
   autoReg
-    :: forall dom. (HasCallStack, KnownDomain dom)
+    :: forall dom. HasCallStack
     => Clock dom -> Reset dom -> Enable dom
     -> Vec n a -- ^ Reset value
     -> Signal dom (Vec n a)

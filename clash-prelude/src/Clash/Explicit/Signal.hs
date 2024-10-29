@@ -167,6 +167,7 @@ module Clash.Explicit.Signal
   , DomainConfiguration(..)
   , SDomainConfiguration(..)
   -- ** Configuration type families
+  , DomainName
   , DomainPeriod
   , DomainActiveEdge
   , DomainResetKind
@@ -319,19 +320,19 @@ import           Clash.XException
 >>> import Clash.Promoted.Nat (SNat(..))
 >>> import qualified Data.List as L
 >>> :{
-instance KnownDomain "Dom2" where
-  type KnownConf "Dom2" = 'DomainConfiguration "Dom2" 2 'Rising 'Asynchronous 'Defined 'ActiveHigh
+data Dom2 = Dom2
+instance KnownDomain Dom2 where
+  type KnownConf Dom2 = 'DomainConfiguration "Dom2" 2 'Rising 'Asynchronous 'Defined 'ActiveHigh
   knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
 :}
 
 >>> :{
-instance KnownDomain "Dom7" where
-  type KnownConf "Dom7" = 'DomainConfiguration "Dom7" 7 'Rising 'Asynchronous 'Defined 'ActiveHigh
+data Dom7 = Dom7
+instance KnownDomain Dom7 where
+  type KnownConf Dom7 = 'DomainConfiguration "Dom7" 7 'Rising 'Asynchronous 'Defined 'ActiveHigh
   knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
 :}
 
->>> type Dom2 = "Dom2"
->>> type Dom7 = "Dom7"
 >>> let clk2 = clockGen @Dom2
 >>> let clk7 = clockGen @Dom7
 >>> let en2 = enableGen @Dom2
@@ -498,9 +499,7 @@ systemResetGen = resetGen
 -- [0,0,1,2,3,4,5,6,7,8,9,10]
 unsafeSynchronizer
   :: forall dom1 dom2 a
-   . ( KnownDomain dom1
-     , KnownDomain dom2 )
-  => Clock dom1
+   . Clock dom1
   -- ^ 'Clock' of the incoming signal
   -> Clock dom2
   -- ^ 'Clock' of the outgoing signal
@@ -586,8 +585,7 @@ andEnable e0 e1 =
 -- | Special version of 'delay' that doesn't take enable signals of any kind.
 -- Initial value will be undefined.
 dflipflop
-  :: ( KnownDomain dom
-     , NFDataX a )
+  :: NFDataX a
   => Clock dom
   -> Signal dom a
   -> Signal dom a
@@ -605,8 +603,7 @@ dflipflop = \clk i ->
 -- >>> sampleN 3 (delay systemClockGen enableGen 0 (fromList [1,2,3,4]))
 -- [0,1,2]
 delay
-  :: ( KnownDomain dom
-     , NFDataX a )
+  :: NFDataX a
   => Clock dom
   -- ^ Clock
   -> Enable dom
@@ -625,8 +622,7 @@ delay = delay#
 -- >>> sampleN 7 (delayMaybe systemClockGen enableGen 0 input)
 -- [0,1,2,2,2,5,6]
 delayMaybe
-  :: ( KnownDomain dom
-     , NFDataX a )
+  :: NFDataX a
   => Clock dom
   -- ^ Clock
   -> Enable dom
@@ -646,8 +642,7 @@ delayMaybe = \clk gen dflt i ->
 -- >>> sampleN 7 (delayEn systemClockGen enableGen 0 enable input)
 -- [0,1,2,2,2,5,6]
 delayEn
-  :: ( KnownDomain dom
-     , NFDataX a )
+  :: NFDataX a
   => Clock dom
   -- ^ Clock
   -> Enable dom
@@ -668,8 +663,7 @@ delayEn = \clk gen dflt en i ->
 -- >>> sampleN 5 (register systemClockGen resetGen enableGen 8 (fromList [1,1,2,3,4]))
 -- [8,8,1,2,3]
 register
-  :: ( KnownDomain dom
-     , NFDataX a )
+  :: NFDataX a
   => Clock dom
   -- ^ clock
   -> Reset dom
@@ -707,8 +701,7 @@ register = \clk rst gen initial i ->
 -- >>> sampleN 9 (count systemClockGen resetGen enableGen)
 -- [0,0,0,1,1,2,2,3,3]
 regMaybe
-  :: ( KnownDomain dom
-     , NFDataX a )
+  :: NFDataX a
   => Clock dom
   -- ^ Clock
   -> Reset dom
@@ -739,9 +732,7 @@ regMaybe = \clk rst en initial iM ->
 -- >>> sampleN 9 (count systemClockGen resetGen enableGen)
 -- [0,0,0,1,1,2,2,3,3]
 regEn
-  :: ( KnownDomain dom
-     , NFDataX a
-     )
+  :: NFDataX a
   => Clock dom
   -- ^ Clock
   -> Reset dom
@@ -865,7 +856,7 @@ simulateB_lazy f = simulate_lazy (bundle . f . unbundle)
 -- __NB__: This function is not synthesizable
 fromListWithReset
   :: forall dom a
-   . (KnownDomain dom, NFDataX a)
+   . NFDataX a
   => Reset dom
   -> a
   -> [a]
@@ -991,7 +982,7 @@ sampleWithResetN nReset nSamples f =
 -- @
 runUntil
   :: forall dom a
-   . (KnownDomain dom, NFDataX a, ShowX a)
+   . (NFDataX a, ShowX a)
   => (a -> Bool)
   -- ^ Condition checking function, should return @True@ to finish run
   -> Signal dom a

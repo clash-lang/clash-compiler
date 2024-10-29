@@ -116,65 +116,12 @@ tests =
           let rst0 = fromList [True, True, False, False, True, True]
               rst1 = unsafeFromActiveHigh rst0
               reg  = register 'a' (pure 'b')
-#ifdef CLASH_MULTIPLE_HIDDEN
-              sig = withReset rst1 reg
-#else
-              sig = withReset @System rst1 reg
-#endif
+              -- sig :: (HiddenClock System, HiddenEnable System) => Signal System Char
+              sig = exposeReset @System reg rst1
           in  testCase "withReset behavior" (sampleN @System 6 sig @?= "aaabaa")
 
-#ifdef CLASH_MULTIPLE_HIDDEN
           -- See: https://github.com/clash-lang/clash-compiler/pull/669
-        , testCase "test0nok_0" (acte "withReset resetGen test0")
-        , testCase "test0nok_1" (acte "withReset (resetGen @System) test0")
-        , testCase "test0nok_2" (acte "withReset @System (resetGen @System) test0")
-        , testCase
-            "test0nok_3"
-            (acte
-              (unwords
-                [ "withReset", "@System", "(resetGen @System)"
-                , "(test0 :: Signal System a -> Signal dom Int)"
-                ]))
 
-        , testCase "test0nok_4" (acte "withSpecificReset resetGen test0")
-        , testCase "test0nok_5" (acte "withSpecificReset (resetGen @System) test0")
-
-        , testCase "test1nok_0" (acte "withReset resetGen test1")
-        , testCase "test1nok_1" (acte "withReset (resetGen @System) test1")
-        , testCase "test1nok_2" (acte "withSpecificReset resetGen test1")
-        , testCase "test1nok_3" (acte "withSpecificReset (resetGen @System) test1")
-
-        , testCase "test2nok_0" (acte "withReset resetGen test2")
-        , testCase "test2nok_1" (acte "withReset (resetGen @System) test2")
-        , testCase "test2nok_2" (acte "withSpecificReset resetGen test2")
-
-        , testCase "test3nok_0" (acte "withReset resetGen test3")
-        , testCase "test3nok_1" (acte "withReset (resetGen @System) test3")
-        , testCase "test3nok_2" (acte "withSpecificReset resetGen test3")
-        , testCase "test3nok_3" (acte "withSpecificReset (resetGen @System) test3")
-
-        , testCase "test4nok_0" (acte $
-             "withSpecificReset resetGen (test4 :: "
-          ++ "((Signal System a, Signal dom2 a), Signal dom3 a)"
-          ++ "-> Signal dom4 a)" )
-
-        , testCase "test4nok_1" (acte $
-             "withSpecificReset resetGen (test4 :: "
-          ++ "((Signal dom1 a, Signal System a), Signal dom3 a)"
-          ++ "-> Signal dom4 a)" )
-
-        , testCase "test4nok_2" (acte $
-             "withReset resetGen (test4 :: "
-          ++ "((Signal System a, Signal dom2 a), Signal dom3 a)"
-          ++ "-> Signal dom4 a)" )
-
-        , testCase "test4nok_3" (acte $
-             "withReset resetGen (test4 :: "
-          ++ "((Signal dom1 a, Signal System a), Signal dom3 a)"
-          ++ "-> Signal dom4 a)" )
-
-        , testCase "test5nok_0" (acte "withSpecificReset resetGen test5")
-#endif
         , testCase "T1521" $
             let
               f (_, b) = (b, b)
@@ -194,21 +141,19 @@ tests =
 
 -- Tests below should survive compilation:
 test0ok_0 = withReset @System (resetGen @System) (test0 @System @System)
-#ifdef CLASH_MULTIPLE_HIDDEN
-test0ok_1 = withReset resetGen (test0 @System @System)
-test0ok_2 = withSpecificReset (resetGen @System) (test0 @System)
-test0ok_3 = withSpecificReset (resetGen @System) (test0 @_ @System)
+test0ok_1 = withReset @System resetGen (test0 @System @System)
+test0ok_2 = withReset (resetGen @System) (test0 @System)
+test0ok_3 = withReset (resetGen @System) (test0 @_ @System)
 
-test2ok_0 = withSpecificReset (resetGen @System) test2
-test2ok_1 = withSpecificReset @System resetGen test2
+test2ok_0 = withReset (resetGen @System) test2
+test2ok_1 = withReset @System resetGen test2
 
-test4ok_0 = withReset resetGen (test4 @System @System @System @System)
-test4ok_1 = withSpecificReset (resetGen @System) (test4 @System @_ @_ @_)
-test4ok_2 = withSpecificReset (resetGen @System) (test4 @_ @System @_ @_)
-test4ok_3 = withSpecificReset (resetGen @System) (test4 @_ @_ @System @_)
+test4ok_0 = withReset @System resetGen (test4 @System @System @System @System)
+test4ok_1 = withReset (resetGen @System) (test4 @System @_ @_ @_)
+test4ok_2 = withReset (resetGen @System) (test4 @_ @System @_ @_)
+test4ok_3 = withReset (resetGen @System) (test4 @_ @_ @System @_)
 
-test5ok_0 = withSpecificReset (resetGen @System) (test5 @System @_)
-#endif
+test5ok_0 = withReset (resetGen @System) (test5 @System @_)
 
 -- | Asserts that static clocks behave the same as dynamic clocks with a static
 -- period signal passed into it.

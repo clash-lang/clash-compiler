@@ -86,7 +86,7 @@ import Clash.XException      (ShowX (..), XException)
 --
 -- __NB__: This function /can/ be used in synthesizable designs.
 assert
-  :: (KnownDomain dom, Eq a, ShowX a)
+  :: (Eq a, ShowX a)
   => Clock dom
   -> Reset dom
   -> String
@@ -98,7 +98,7 @@ assert
   -> Signal dom b
   -- ^ Return value
   -> Signal dom b
-assert clk (Reset _) msg checked expected returned =
+assert clk (Reset _ _) msg checked expected returned =
   (\c e cnt r ->
       if eqX c e
          then r
@@ -121,7 +121,7 @@ assert clk (Reset _) msg checked expected returned =
 
 -- | The same as 'assert', but can handle don't care bits in its expected value.
 assertBitVector
-  :: (KnownDomain dom, KnownNat n)
+  :: KnownNat n
   => Clock dom
   -> Reset dom
   -> String
@@ -133,7 +133,7 @@ assertBitVector
   -> Signal dom b
   -- ^ Return value
   -> Signal dom b
-assertBitVector clk (Reset _) msg checked expected returned =
+assertBitVector clk (Reset _ _) msg checked expected returned =
   (\c e cnt r ->
       if eqX c e
          then r
@@ -173,8 +173,7 @@ assertBitVector clk (Reset _) msg checked expected returned =
 -- [1,1,3,5,7,9,11,13,15,17,19,21,21,21]
 stimuliGenerator
   :: forall l dom   a
-   . ( KnownNat l
-     , KnownDomain dom )
+   . KnownNat l
   => Clock dom
   -- ^ Clock to which to synchronize the output signal
   -> Reset dom
@@ -201,7 +200,6 @@ stimuliGenerator clk rst samples =
 outputVerifier'
   :: forall l a dom
    . ( KnownNat l
-     , KnownDomain dom
      , Eq a
      , ShowX a
      , 1 <= l
@@ -269,8 +267,6 @@ outputVerifier' clk =
 outputVerifier
   :: forall l a testDom circuitDom
    . ( KnownNat l
-     , KnownDomain testDom
-     , KnownDomain circuitDom
      , Eq a
      , ShowX a
      , 1 <= l
@@ -298,7 +294,6 @@ outputVerifierBitVector'
   :: forall l n dom
    . ( KnownNat l
      , KnownNat n
-     , KnownDomain dom
      , 1 <= l
      )
   => Clock dom
@@ -320,8 +315,6 @@ outputVerifierBitVector
   :: forall l n testDom circuitDom
    . ( KnownNat l
      , KnownNat n
-     , KnownDomain testDom
-     , KnownDomain circuitDom
      , 1 <= l
      )
   => Clock testDom
@@ -345,8 +338,6 @@ outputVerifierBitVector =
 outputVerifierWith
   :: forall l a testDom circuitDom
    . ( KnownNat l
-     , KnownDomain testDom
-     , KnownDomain circuitDom
      , Eq a
      , ShowX a
      , 1 <= l
@@ -391,8 +382,7 @@ outputVerifierWith assertF clkTest clkCircuit rst samples i0 =
 -- | Ignore signal for a number of cycles, while outputting a static value.
 ignoreFor
   :: forall dom  n a
-   . KnownDomain dom
-  => Clock dom
+   . Clock dom
   -> Reset dom
   -> Enable dom
   -> SNat n
@@ -473,7 +463,6 @@ tbSystemClockGen = tbClockGen
 -- clk = clockToDiffClock $ tbClockGen (not \<\$\> done)
 -- @
 clockToDiffClock ::
-  KnownDomain dom =>
   -- | Single-ended input
   Clock dom ->
   -- | Differential output
@@ -492,9 +481,7 @@ clockToDiffClock clk = DiffClock clk (ClockN SSymbol)
 -- for simulating the generated HDL.
 unsafeSimSynchronizer
   :: forall dom1 dom2 a
-   . ( KnownDomain dom1
-     , KnownDomain dom2 )
-  => Clock dom1
+   . Clock dom1
   -- ^ 'Clock' of the incoming signal
   -> Clock dom2
   -- ^ 'Clock' of the outgoing signal

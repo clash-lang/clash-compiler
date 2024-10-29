@@ -27,7 +27,6 @@ import Clash.CPP (haddockOnly)
 import Clash.Explicit.Reset (resetSynchronizer)
 import Clash.Explicit.Signal (unsafeSynchronizer)
 import Clash.Magic (setName)
-import Clash.Promoted.Symbol (SSymbol(..))
 import Clash.Signal.Internal
   (clockGen, Clock(..), Domain, KnownDomain, Reset, Signal, unsafeFromActiveLow,
    unsafeToActiveLow)
@@ -39,7 +38,7 @@ class Clocks t where
   type NumOutClocks t :: Nat
 
   clocks ::
-    (KnownDomain domIn, ClocksCxt t) =>
+    ClocksCxt t =>
     Clock domIn ->
     Reset domIn ->
     t
@@ -51,7 +50,7 @@ deriveClocksInstance n =
         type ClocksCxt $instType = $cxtType
         type NumOutClocks $instType = $numOutClocks
 
-        clocks (Clock _ Nothing) $(varP rst) = $funcImpl
+        clocks clk@(Clock _ Nothing) $(varP rst) = $funcImpl
         clocks _ _ = error "clocks: dynamic clocks unsupported"
         {-# CLASH_OPAQUE clocks #-}
     |]
@@ -71,9 +70,9 @@ deriveClocksInstance n =
   -- 'clocks' function
   rst = mkName "rst"
   lockImpl = [|
-    unsafeSynchronizer clockGen clockGen (unsafeToActiveLow $(varE rst))
+    unsafeSynchronizer $(varE (mkName "clk")) clockGen (unsafeToActiveLow $(varE rst))
     |]
-  clkImpls = replicate n [| Clock SSymbol Nothing |]
+  clkImpls = replicate n [| Clock knownDomain Nothing |]
   funcImpl = tupE $ clkImpls <> [lockImpl]
 
 -- Derive instances for up to and including 18 clocks, except when we are
@@ -91,9 +90,7 @@ class ClocksSync t where
   type ClocksResetSynchronizerCxt t :: Constraint
 
   clocksResetSynchronizer ::
-    ( KnownDomain domIn
-    , ClocksResetSynchronizerCxt t
-    ) =>
+    ClocksResetSynchronizerCxt t =>
     ClocksSyncClocksInst t domIn ->
     Clock domIn ->
     t
@@ -140,7 +137,7 @@ deriveClocksSyncInstance n =
   syncImpl m =
     [|
       setName @"resetSynchronizer" (resetSynchronizer $(varE $ clkVarName m)
-        (unsafeFromActiveLow
+        (unsafeFromActiveLow knownDomain
           (unsafeSynchronizer $(varE clkIn) $(varE $ clkVarName m)
                               $(varE pllLock))))
     |]

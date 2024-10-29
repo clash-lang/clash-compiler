@@ -42,8 +42,9 @@ import Clash.Signal.Internal
 >>> import Clash.Explicit.Prelude
 >>> import Clash.Explicit.DDR
 >>> :{
-instance KnownDomain "Fast" where
-  type KnownConf "Fast" = 'DomainConfiguration "Fast" 5000 'Rising 'Asynchronous 'Defined 'ActiveHigh
+data Fast = Fast
+instance KnownDomain Fast where
+  type KnownConf Fast = 'DomainConfiguration "Fast" 5000 'Rising 'Asynchronous 'Defined 'ActiveHigh
   knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
 :}
 
@@ -54,13 +55,13 @@ instance KnownDomain "Fast" where
 -- Consumes a DDR input signal and produces a regular signal containing a pair
 -- of values.
 --
--- >>> printX $ sampleN 5 $ ddrIn systemClockGen systemResetGen enableGen (-1,-2,-3) (fromList [0..10] :: Signal "Fast" Int)
+-- >>> printX $ sampleN 5 $ ddrIn systemClockGen systemResetGen enableGen (-1,-2,-3) (fromList [0..10] :: Signal Fast Int)
 -- [(-1,-2),(-1,-2),(-3,2),(3,4),(5,6)]
 ddrIn
   :: ( HasCallStack
      , NFDataX a
-     , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
+     , KnownConfiguration fast ('DomainConfiguration fastN fPeriod edge reset init polarity)
+     , KnownConfiguration slow ('DomainConfiguration slowN (2*fPeriod) edge reset init polarity) )
   => Clock slow
   -- ^ clock
   -> Reset slow
@@ -79,11 +80,11 @@ ddrIn clk rst en (i0,i1,i2) =
 -- For details about all the seq's en seqX's
 -- see the [Note: register strictness annotations] in Clash.Signal.Internal
 ddrIn#
-  :: forall a slow fast fPeriod polarity edge reset init
+  :: forall a slow fast slowN fastN fPeriod polarity edge reset init
    . ( HasCallStack
      , NFDataX a
-     , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
+     , KnownConfiguration fast ('DomainConfiguration fastN fPeriod edge reset init polarity)
+     , KnownConfiguration slow ('DomainConfiguration slowN (2*fPeriod) edge reset init polarity) )
   => Clock slow
   -> Reset slow
   -> Enable slow
@@ -143,13 +144,13 @@ ddrIn# _ _ _ _ _ _ =
 --
 -- Produces a DDR output signal from a normal signal of pairs of input.
 --
--- >>> sampleN 7 (ddrOut systemClockGen systemResetGen enableGen (-1) (fromList [(0,1),(2,3),(4,5)]) :: Signal "Fast" Int)
+-- >>> sampleN 7 (ddrOut systemClockGen systemResetGen enableGen (-1) (fromList [(0,1),(2,3),(4,5)]) :: Signal Fast Int)
 -- [-1,-1,-1,2,3,4,5]
 ddrOut
   :: ( HasCallStack
      , NFDataX a
-     , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
+     , KnownConfiguration fast ('DomainConfiguration fastN fPeriod edge reset init polarity)
+     , KnownConfiguration slow ('DomainConfiguration slowN (2*fPeriod) edge reset init polarity) )
   => Clock slow
   -> Reset slow
   -> Enable slow
@@ -166,8 +167,8 @@ ddrOut clk rst en i0 =
 ddrOut#
   :: ( HasCallStack
      , NFDataX a
-     , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
+     , KnownConfiguration fast ('DomainConfiguration fastN fPeriod edge reset init polarity)
+     , KnownConfiguration slow ('DomainConfiguration slowN (2*fPeriod) edge reset init polarity) )
   => Clock slow
   -> Reset slow
   -> Enable slow

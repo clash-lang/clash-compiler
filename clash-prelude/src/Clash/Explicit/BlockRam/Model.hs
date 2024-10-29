@@ -218,8 +218,6 @@ tdpbramModel ::
   forall nAddrs domA domB a writeEnable .
   ( HasCallStack
   , KnownNat nAddrs
-  , KnownDomain domA
-  , KnownDomain domB
   , NFDataX a
   ) =>
   TdpbramModelConfig writeEnable a ->

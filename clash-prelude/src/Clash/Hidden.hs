@@ -11,6 +11,9 @@ Hidden arguments
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -25,6 +28,7 @@ where
 import qualified GHC.Classes
 import GHC.TypeLits
 import Unsafe.Coerce
+import GHC.Exts (WithDict (..))
 
 -- | A value reflected to, or /hiding/ at, the /Constraint/ level
 --
@@ -56,9 +60,12 @@ import Unsafe.Coerce
 -- inference rules so we don't end up in type inference absurdity where asking
 -- for the type of an type-annotated value results in a /no-instance-in-scope/
 -- error.
-type Hidden (x :: Symbol) a = GHC.Classes.IP x a
+type family IPName p = (r :: Symbol) | r -> p
 
-newtype Secret x a r = Secret (Hidden x a => r)
+type Hidden x a = GHC.Classes.IP (IPName x) a
+-- type Hidden x a = Param.HasParam x a
+
+-- newtype Secret x a r = Secret (Hidden x a => r)
 
 -- | Expose a 'Hidden' argument so that it can be applied normally, e.g.
 --
@@ -77,7 +84,7 @@ expose
   -- ^ Function with a 'Hidden' argument
   -> (a -> r)
   -- ^ Function with the 'Hidden' argument exposed
-expose k = unsafeCoerce (Secret @x @a @r k)
+expose k = \x -> withDict @(GHC.Classes.IP (IPName x) a) x k  -- unsafeCoerce (Secret @x @a @r k)
 {-# INLINE expose #-}
 
 -- | Using /-XOverloadedLabels/ and /-XRebindableSyntax/, we can turn any
@@ -92,5 +99,6 @@ expose k = unsafeCoerce (Secret @x @a @r k)
 -- g i = f i #foo
 -- @
 fromLabel :: forall x a . Hidden x a => a
-fromLabel = GHC.Classes.ip @x
+fromLabel = GHC.Classes.ip @(IPName x)
+-- fromLabel = Param.ask @x
 {-# INLINE fromLabel #-}

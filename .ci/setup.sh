@@ -45,14 +45,6 @@ if [[ ${tag_version} != "" ]]; then
             exit 1;
         fi
     fi
-
-    set +e
-    grep "flag multiple-hidden" -A 7 clash-prelude/clash-prelude.cabal | grep -q "default: False"
-    if [[ $? != 0 ]]; then
-        echo "multiple_hidden flag should be disabled by default on releases!"
-        exit 1;
-    fi
-    set -e
 fi
 
 # Print out versions for debugging purposes
@@ -72,10 +64,6 @@ fi
 # File may exist as part of a dist.tar.zst
 if [ ! -f cabal.project.local ]; then
   cp .ci/cabal.project.local .
-
-  if [[ "$MULTIPLE_HIDDEN" == "no" ]]; then
-    sed -i 's/+multiple-hidden/-multiple-hidden/g' cabal.project.local
-  fi
 
   set +u
   if [[ "$WORKAROUND_GHC_MMAP_CRASH" == "yes" ]]; then

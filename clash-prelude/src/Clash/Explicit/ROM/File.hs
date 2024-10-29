@@ -100,7 +100,7 @@ import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Explicit.BlockRam.File (initMem, memFile)
 import Clash.Promoted.Nat           (SNat (..), pow2SNat, snatToNum)
 import Clash.Sized.BitVector        (BitVector)
-import Clash.Explicit.Signal        (Clock, Enable, Signal, KnownDomain, delay)
+import Clash.Explicit.Signal        (Clock, Enable, Signal, delay)
 import Clash.Sized.Unsigned         (Unsigned)
 import Clash.XException             (NFDataX(deepErrorX))
 
@@ -133,7 +133,7 @@ import Clash.XException             (NFDataX(deepErrorX))
 -- your own data files.
 romFilePow2
   :: forall dom  n m
-   . (KnownNat m, KnownNat n, KnownDomain dom)
+   . (KnownNat m, KnownNat n)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -174,7 +174,7 @@ romFilePow2 = \clk en -> romFile clk en (pow2SNat (SNat @n))
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 romFile
-  :: (KnownNat m, Enum addr, KnownDomain dom)
+  :: (KnownNat m, Enum addr)
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -193,7 +193,7 @@ romFile = \clk en sz file rd -> romFile# clk en sz file (fromEnum <$> rd)
 -- | romFile primitive
 romFile#
   :: forall m dom n
-   . (KnownNat m, KnownDomain dom)
+   . KnownNat m
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom

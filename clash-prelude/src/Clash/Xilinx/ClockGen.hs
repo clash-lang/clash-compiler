@@ -66,7 +66,7 @@ import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Clocks
   (Clocks(..), ClocksSync(..), ClocksSyncCxt, NumOutClocksSync)
 import Clash.Signal.Internal
-  (Clock, DiffClock(..), Reset, KnownDomain, HasAsynchronousReset)
+  (Clock, DiffClock(..), Reset, HasAsynchronousReset)
 
 {- $domains
 Synthesis domains are denoted by the type-parameter
@@ -327,8 +327,7 @@ clockWizard clkIn rstIn =
 -- reset input, the signal __must__ be glitch-free.
 unsafeClockWizard ::
   forall t domIn .
-  ( KnownDomain domIn
-  , Clocks t
+  ( Clocks t
   , ClocksCxt t
   , NumOutClocks t <= 7
   ) =>
@@ -378,8 +377,7 @@ clockWizardDifferential clkIn@(DiffClock clkInP _) rstIn =
 -- 'Clash.Explicit.Testbench.clockToDiffClock'.
 unsafeClockWizardDifferential ::
   forall t domIn .
-  ( KnownDomain domIn
-  , Clocks t
+  ( Clocks t
   , ClocksCxt t
   , NumOutClocks t <= 7
   ) =>

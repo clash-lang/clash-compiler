@@ -9,6 +9,8 @@ The verification API is currently experimental and subject to change.
 
 -}
 
+{-# LANGUAGE FlexibleContexts #-}
+
 module Clash.Verification
   ( -- * Types
     Assertion

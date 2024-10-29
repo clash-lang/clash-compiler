@@ -104,8 +104,7 @@ let mac :: Clock System
 -- [-1,-1,-1,-1,1,2,3]
 delayed
   :: forall dom  a n d
-   . ( KnownDomain dom
-     , KnownNat d
+   . ( KnownNat d
      , NFDataX a )
   => Clock dom
   -> Reset dom
@@ -154,7 +153,6 @@ delayed clk rst en m ds = coerce (delaySignal (coerce ds))
 --      -> DSignal dom (n + 3) a
 delayedI
   :: ( KnownNat d
-     , KnownDomain dom
      , NFDataX a )
   => Clock dom
   -> Reset dom
@@ -182,8 +180,7 @@ delayedI clk rst en dflt = delayed clk rst en (repeat dflt)
 -- [-1,-1,1,2,3,4]
 delayN
   :: forall dom a d n
-   . ( KnownDomain dom
-     , NFDataX a )
+   . NFDataX a
   => SNat d
   -> a
   -- ^ Initial value
@@ -220,7 +217,6 @@ delayN d dflt ena clk = coerce . go (snatToInteger d) . coerce @_ @(Signal dom a
 delayI
   :: forall d n a dom
    . ( NFDataX a
-     , KnownDomain dom
      , KnownNat d )
   => a
   -- ^ Initial value
@@ -250,7 +246,6 @@ type instance Apply (DelayedFold dom n delay a) k = DSignal dom (n + (delay*k)) 
 delayedFold
   :: forall dom  n delay k a
    . ( NFDataX a
-     , KnownDomain dom
      , KnownNat delay
      , KnownNat k )
   => SNat delay
