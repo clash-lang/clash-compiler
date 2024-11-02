@@ -244,6 +244,7 @@ library
                       Clash.GHC.GHC2Core
                       Clash.GHC.LoadInterfaceFiles
                       Clash.GHC.Util
+                      Data.Text.Extra
                       Paths_clash_ghc
   if impl(ghc >= 8.8.0)
     Other-Modules:    Clash.GHCi.Util
