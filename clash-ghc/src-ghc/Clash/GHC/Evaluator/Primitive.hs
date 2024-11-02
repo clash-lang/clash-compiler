@@ -3827,12 +3827,23 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
          -- (x:xs) <- v
          m' | DC _ vArgs <- last args
             -- (x:fst (splitAt (m-1) xs),snd (splitAt (m-1) xs))
-            -> reduce $
-               mkApps (Data tupDc) $ (map Right tyArgs) ++
-                 [ Left (mkVecCons consCon aTy m' (Either.lefts vArgs !! 1)
-                           (splitAtSelR (Either.lefts vArgs !! 2) m1VecTy [lAlt]))
-                 , Left (splitAtSelR (Either.lefts vArgs !! 2) nVecTy [rAlt])
-                 ]
+            -> case Either.lefts vArgs of
+                (_ : x : xs : _) ->
+                  reduce $
+                    mkApps (Data tupDc) $ (map Right tyArgs) ++
+                      [ Left (mkVecCons consCon aTy m' x
+                                (splitAtSelR xs m1VecTy [lAlt]))
+                      , Left (splitAtSelR xs nVecTy [rAlt])
+                      ]
+                _ ->
+                  -- v actually reduces to Nil and not Cons, this only happens
+                  -- when 'n' would reduce to a negative number; the complement
+                  -- of 'm'.
+                  --
+                  -- See Clash issue: https://github.com/clash-lang/clash-compiler/issues/2831
+                  let resTy = getResultTy tcm ty tys
+                   in reduce (TyApp (Prim NP.undefined) resTy)
+
          -- v doesn't reduce to a data-constructor
          _  -> Nothing
 
