@@ -94,37 +94,37 @@ build:
 cores:unittests:
   extends: .test-nocache
   script:
-    - $(.ci/find_cabal_bin.sh clash-cores unittests t) --hide-successes
+    - bin/clash-cores:unittests --hide-successes
 
 cosim:unittests:
   extends: .test-nocache
   script:
-    - $(.ci/find_cabal_bin.sh clash-cosim test t)
+    - bin/clash-cosim:test
 
 prelude:unittests:
   extends: .test-nocache
   script:
-    - $(.ci/find_cabal_bin.sh clash-prelude unittests t) --hide-successes
+    - bin/clash-prelude:unittests --hide-successes
 
 lib:doctests:
   extends: .test-nocache
   script:
-    - $(.ci/find_cabal_bin.sh clash-lib doctests t) -j${THREADS}
+    - bin/clash-lib:doctests -j$THREADS
 
 lib:unittests:
   extends: .test-nocache
   script:
-    - $(.ci/find_cabal_bin.sh clash-lib unittests t) --hide-successes
+    - bin/clash-lib:unittests --hide-successes
 
 prelude:doctests:
   extends: .test-nocache
   script:
-    - $(.ci/find_cabal_bin.sh clash-prelude doctests t) -j${THREADS}
+    - bin/clash-prelude:doctests -j$THREADS
 
 ffi:interface-tests:
   extends: .test-nocache
   script:
-    - $(.ci/find_cabal_bin.sh clash-ffi ffi-interface-tests x) --smallcheck-max-count 2000
+    - bin/clash-ffi:ffi-interface-tests --smallcheck-max-count 2000
 
 # Tests run on local fast machines:
 
@@ -140,17 +140,17 @@ build-clash-dev:
 suite:vhdl:
   extends: .test-cache-local
   script:
-    - $(.ci/find_cabal_bin.sh clash-testsuite clash-testsuite x) -j${THREADS} -p .VHDL --hide-successes --no-vivado
+    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-vivado
 
 suite:verilog:
   extends: .test-cache-local
   script:
-    - $(.ci/find_cabal_bin.sh clash-testsuite clash-testsuite x) -j${THREADS} -p .Verilog --hide-successes --no-vivado
+    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-vivado
 
 suite:systemverilog:
   extends: .test-cache-local
   script:
-    - $(.ci/find_cabal_bin.sh clash-testsuite clash-testsuite x) -j${THREADS} -p .SystemVerilog --hide-successes --no-modelsim --no-vivado
+    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim --no-vivado
 
 # Vivado is quite slow, so we only run a subset of the tests on development branches
 # with it. The full testsuite gets run with Vivado every night on 'master'.
@@ -158,7 +158,7 @@ suite:cores:
   extends: .test-cache-local
   script:
     - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-    - $(.ci/find_cabal_bin.sh clash-testsuite clash-testsuite x) -j$THREADS -p Cores --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+    - bin/clash-testsuite:clash-testsuite -j$THREADS -p Cores --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
   tags:
     - local
     - vivado-2022.1-standard
@@ -191,6 +191,7 @@ ffi:example:
   script:
      - cd clash-ffi/example && ./run-iverilog.sh
   after_script:
+    - export THREADS=$(./.ci/effective_cpus.sh)
     - tar -cf - /root/.cabal | zstd -T${THREADS} -3 > cache.tar.zst
 
 # Tests run on local fast machines with Vivado installed. We only run these at night
@@ -207,7 +208,7 @@ suite:vivado:verilog:
   extends: .test-cache-local-nightly
   script:
     - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-    - $(.ci/find_cabal_bin.sh clash-testsuite clash-testsuite x) -j$THREADS -p .Verilog --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
   tags:
     - local
     - vivado-2022.1-standard
@@ -227,7 +228,7 @@ suite:vivado:verilog:
 #   extends: .test-cache-local-nightly
 #   script:
 #     - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-#     - $(.ci/find_cabal_bin.sh clash-testsuite clash-testsuite x) -j$THREADS -p .VHDL --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+#     - bin/clash-testsuite:clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
 #   tags:
 #     - local
 #     - vivado-2022.1-standard

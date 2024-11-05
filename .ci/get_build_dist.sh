@@ -31,9 +31,9 @@ done
 echo "${GIT_ROOT}"/dist-newstyle
 ls "${GIT_ROOT}"/.ghc.environment.*
 
-# Pack source distribution too to prevent rebuilds due to changed modification
-# dates.
-ls -d "${GIT_ROOT}"/clash-*
+# Some build products for clash-cosim are here
+echo "${GIT_ROOT}"/clash-cosim/src/cbits
+echo "${GIT_ROOT}"/clash-cosim/src/prims
 
-# Include compile options
-echo "${GIT_ROOT}"/cabal.project.local
+# Include symlinks to built binaries
+echo "${GIT_ROOT}"/bin
