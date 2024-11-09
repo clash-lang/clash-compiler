@@ -495,6 +495,15 @@ runClashTest = defaultMain $ clashTestRoot
                                                         , "testBenchUS"
                                                         ]}
           in runTest "DDRin" _opts
+        , let _opts = def{ buildTargets = BuildSpecific [ "testBenchGA"
+                                                        , "testBenchGS"
+                                                        , "testBenchUA"
+                                                        , "testBenchUS"
+                                                        ]
+                         , hdlLoad = [Vivado]
+                         , hdlSim = [Vivado]
+                         }
+          in runTest "XilinxDDRin" _opts
 
           -- XXX: `ddrOut` contains a number of (implicit) parallel, coinciding
           --      processes. Execution for these processes is left undefined in
@@ -524,6 +533,16 @@ runClashTest = defaultMain $ clashTestRoot
                          , clashFlags=["-fclash-hdlsyn", "Vivado"]
                          }
           in runTest "DDRout" _opts
+        , let _opts = def{ buildTargets = BuildSpecific [ "testBenchUA"
+                                                        , "testBenchUS"
+                                                        , "testBenchGA"
+                                                        , "testBenchGS"
+                                                        ]
+                         , hdlLoad = [Vivado]
+                         , hdlSim = [Vivado]
+                         , clashFlags=["-fclash-hdlsyn", "Vivado"]
+                         }
+          in runTest "XilinxDDRout" _opts
         ]
       , clashTestGroup "DSignal"
         [ runTest "DelayedFold" def
