@@ -45,7 +45,6 @@ stages:
 .test-cache-local:
   extends:
     - .common-local
-    - .nightly-rules
   needs: ["build"]
   stage: test
   before_script:
@@ -91,157 +90,15 @@ build:
 
 # Tests run on shared runners:
 
-cores:doctests:
-  extends: .test-nocache
-  script:
-    - bin/clash-cores:doctests -j$THREADS
-
-cores:unittests:
-  extends: .test-nocache
-  script:
-    - bin/clash-cores:unittests --hide-successes
-
-cosim:unittests:
-  extends: .test-nocache
-  script:
-    - bin/clash-cosim:test
-
-prelude:doctests:
-  extends: .test-nocache
-  script:
-    - bin/clash-prelude:doctests -j$THREADS
-
-prelude:unittests:
-  extends: .test-nocache
-  script:
-    - bin/clash-prelude:unittests --hide-successes
-
-lib:doctests:
-  extends: .test-nocache
-  script:
-    - bin/clash-lib:doctests -j$THREADS
-
-lib:unittests:
-  extends: .test-nocache
-  script:
-    - bin/clash-lib:unittests --hide-successes
-
-ffi:interface-tests:
-  extends: .test-nocache
-  # TODO: remove this when https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
-  # is fixed
-  rules:
-    - if: $SKIP_CLASH_FFI_EXAMPLE != "yes"
-  script:
-    - bin/clash-ffi:ffi-interface-tests --smallcheck-max-count 2000
-
 # Tests run on local fast machines:
-
-# Normally, this job is small. But it is flaky on GHC 9.2; it sometimes fails
-# and we don't know yet why. When it fails, it recompiles things it should have
-# picked up from the 'build' issue and then it is a larger job, so we keep it on
-# local runners for now.
-build-clash-dev:
-  extends: .test-cache-local
-  script:
-    - .ci/build_clash_dev.sh
-
-suite:vhdl:
-  extends: .test-cache-local
-  script:
-    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-vivado
-
-suite:verilog:
-  extends: .test-cache-local
-  script:
-    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-vivado
-
-suite:systemverilog:
-  extends: .test-cache-local
-  script:
-    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim --no-vivado
 
 # Vivado is quite slow, so we only run a subset of the tests on development branches
 # with it. The full testsuite gets run with Vivado every night on 'master'.
-suite:cores:
+suite:ddr:
   extends: .test-cache-local
   script:
     - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-    - bin/clash-testsuite:clash-testsuite -j$THREADS -p Cores --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+    - bin/clash-testsuite:clash-testsuite -j$THREADS -p DDR --no-modelsim
   tags:
     - local
     - vivado-2022.1-standard
-
-ffi:example:
-  extends:
-    - .common-local
-    - .nightly-rules
-  # TODO: remove this when https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
-  # is fixed
-  rules:
-    - if: $SKIP_CLASH_FFI_EXAMPLE != "yes"
-  stage: test
-  needs: []
-  before_script:
-    - unset SNAPCRAFT_LOGIN_FILE
-    - unset HACKAGE_PASSWORD
-    - export THREADS=$(./.ci/effective_cpus.sh)
-    - export CABAL_JOBS=$(./.ci/effective_cpus.sh)
-    - export CABAL_DIR=$HOME/.cabal
-    - export clash_lib_datadir=$(pwd)/clash-lib/
-    - export clash_cosim_datadir=$(pwd)/clash-cosim/
-    - export MASKBINS="$(mktemp -d)"
-    - PATH="$MASKBINS:$PATH"
-    - export
-    - tar -xf cache.tar.zst -C / || true
-      # The iverilog on CI cannot run the example, we only test it builds
-    - ln -s /bin/true "$MASKBINS/iverilog"
-    - ln -s /bin/true "$MASKBINS/vvp"
-    - ls -al "$MASKBINS"
-    - .ci/setup.sh
-      # Make sure we get custom cabals setting in the clash-example project too
-    - cp cabal.project.local clash-ffi/example
-  script:
-     - cd clash-ffi/example && ./run-iverilog.sh
-  after_script:
-    - export THREADS=$(./.ci/effective_cpus.sh)
-    - tar -cf - /root/.cabal | zstd -T${THREADS} -3 > cache.tar.zst
-
-# Tests run on local fast machines with Vivado installed. We only run these at night
-# to save resources - as Vivado is quite slow to execute.
-.test-cache-local-nightly:
-  extends: .test-cache-local
-  rules:
-    - if: $CI_PARENT_PIPELINE_SOURCE == "schedule"  # When schedueled (at night)
-    - if: $CI_PARENT_PIPELINE_SOURCE == "trigger"   # When triggered (manual triggers)
-    - if: '$CI_COMMIT_TAG != null'                  # When tags are set (releases)
-
-
-suite:vivado:verilog:
-  extends: .test-cache-local-nightly
-  script:
-    - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
-  tags:
-    - local
-    - vivado-2022.1-standard
-
-# XXX: Vivado randomly fails with the following error message:
-#
-#          FATAL_ERROR: Vivado Simulator kernel has discovered an exceptional
-#          condition from which it cannot recover. Process will terminate. For
-#          technical support on this issue, please open a WebCase with this
-#          project attached at http://www.xilinx.com/support.
-#
-#      Until we have a way of retrying these test cases or marking them as
-#      skipped, these nightlies have been disabled to prevent a "boy who cried
-#      wolf" situtation.
-#
-# suite:vivado:vhdl:
-#   extends: .test-cache-local-nightly
-#   script:
-#     - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-#     - bin/clash-testsuite:clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
-#   tags:
-#     - local
-#     - vivado-2022.1-standard

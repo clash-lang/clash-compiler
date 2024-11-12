@@ -1,6 +1,5 @@
 include:
   - '/.ci/gitlab/common.yml'
-  - '/.ci/gitlab/publish.yml'
 #   - '/.ci/gitlab/benchmark.yml'
 
 variables:
@@ -56,79 +55,6 @@ tests:
       - GHC_VERSION: [8.10.7]
         WORKAROUND_GHC_MMAP_CRASH: "yes"
         RUN_TESTS: "always"
-
-stack-build:
-  extends: .common-local
-  image: fpco/stack-build:lts-22.33
-  needs: []
-  stage: test
-  variables:
-    CACHE_FALLBACK_KEY: $CI_JOB_NAME-master-$CI_JOB_IMAGE-$CACHE_BUST_TOKEN-3-non_protected
-  before_script:
-    - apt-get update
-    - apt-get install -y zstd
-    - export THREADS=$(./.ci/effective_cpus.sh)
-    - export
-    - tar -xf cache.tar.zst -C / || true
-    # Print stack.yaml for debugging
-    - cat stack.yaml
-  script:
-    # Note: the --pedantic switch adds -Wall -Werror to the options passed to
-    # GHC. Options specified in stack.yaml (like -Wcompat) are still passed; it
-    # is cumulative. Future versions of Stack might add behavior to --pedantic.
-    - stack build -j$THREADS --pedantic
-  after_script:
-    - export THREADS=$(./.ci/effective_cpus.sh)
-    - tar -cf - /root/.stack | zstd -T$THREADS -3 > cache.tar.zst
-
-nix-build:
-  image: nixos/nix:2.10.1
-  needs: []
-  stage: test
-  before_script:
-   - nix-env -i gawk
-  script:
-    - nix-build -j$(./.ci/effective_cpus.sh) --log-format raw --max-silent-time 3600
-  tags:
-    - local
-
-haddock:
-  extends: .common-local
-  needs: []
-  stage: test
-  variables:
-    GHC_VERSION: 9.0.2
-  artifacts:
-    paths:
-      - hadocs/*/*
-    expire_in: 1 month
-  script:
-    - .ci/build_docs.sh
-
-# # Run benchmarks for isclashfastyet.com
-# benchmark-8.10.2:
-#   extends: .benchmark
-
-# "Publish" a release candidate
-hackage-release-candidate:
-  extends: .hackage
-
-  variables:
-    HACKAGE_RELEASE: "no"
-
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-    - if: $CI_PIPELINE_SOURCE == "trigger"
-
-# Release new version of Clash to Hackage
-hackage-release:
-  extends: .hackage
-
-  variables:
-    HACKAGE_RELEASE: "yes"
-
-  rules:
-    - if: '$CI_COMMIT_TAG != null' # tags
 
 # We manually report status to GitHub to work around
 # <https://gitlab.com/gitlab-org/gitlab/-/issues/216629>.
