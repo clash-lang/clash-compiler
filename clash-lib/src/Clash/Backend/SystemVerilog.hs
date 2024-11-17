@@ -530,7 +530,8 @@ module_ c =
     body <- modBody
     imps <- Ap $ use imports
     libs <- Ap $ use libraries
-    modHeader <> line <> modPorts <> line <> include (nub imps) <> uselibs (nub libs) <> pure body <> line <> modEnding
+    syn <- Ap hdlSyn
+    modHeader <> line <> modPorts <> line <> include (nub imps) <> uselibs syn (nub libs) <> pure body <> line <> modEnding
 
   modHeader  = "module" <+> pretty (componentName c)
   modPorts   = indent 4 (tupleInputs inPorts <> line <> tupleOutputs outPorts <> semi)
