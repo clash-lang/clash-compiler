@@ -74,7 +74,7 @@ import           Clash.Backend.Verilog.Time           (periodToString)
 import           Clash.Debug                          (traceIf)
 import           Clash.Driver.Types                   (ClashOpts(..))
 import           Clash.Explicit.BlockRam.Internal     (unpackNats)
-import           Clash.Netlist.BlackBox.Types         (HdlSyn)
+import           Clash.Netlist.BlackBox.Types         (HdlSyn(..))
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, renderFilePath)
 import qualified Clash.Netlist.Id                     as Id
@@ -312,9 +312,10 @@ module_ c =
       body <- modBody
       imps <- Ap $ use imports
       libs <- Ap $ use libraries
+      syn <- Ap hdlSyn
       modHeader <> line <> modPorts <> line <>
         include (HashSet.toList imps) <>
-        uselibs (HashSet.toList libs) <>
+        uselibs syn (HashSet.toList libs) <>
         pure body <> line <> modEnding
 
     modHeader  = "module" <+> pretty (componentName c)
@@ -353,12 +354,23 @@ include xs = line <>
   indent 2 (vcat (mapM (\i -> string "`include" <+> dquotes (string i)) xs))
   <> line <> line
 
-uselibs :: Monad m => [Text.Text] -> Ap m Doc
-uselibs [] = emptyDoc
-uselibs xs = line <>
+uselibs :: Monad m => HdlSyn -> [Text.Text] -> Ap m Doc
+uselibs _ [] = emptyDoc
+uselibs syn xs = line <>
   -- NOTE: We must produce a single uselib directive as later ones overwrite earlier ones.
-  indent 2 (string "`uselib" <+> (hsep (mapM (\l -> ("lib=" <> string l)) xs)))
-  <> line <> line
+  indent 2
+    ( condStart <>
+      string "`uselib" <+> hsep (mapM (\l -> ("lib=" <> string l)) xs) <>
+      line <> condEnd
+    ) <> line
+ where
+  (condStart, condEnd) =
+    case syn of
+      Quartus ->
+        ( "`ifndef ALTERA_RESERVED_QIS" <> line
+        , "`endif" <> line
+        )
+      _ -> mempty
 
 usageFileDoc :: Maybe N.Usage -> HWType -> VerilogM Doc
 usageFileDoc _             FileType  = "integer"
