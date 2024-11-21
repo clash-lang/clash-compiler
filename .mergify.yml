@@ -1,3 +1,18 @@
+queue_rules:
+  - name: duplicated default from backport patches to 1.8
+    queue_conditions:
+      - base=master
+      - label=backport 1.8
+      - merged
+    merge_conditions: []
+    update_method: rebase
+  - name: default
+    merge_conditions:
+      - base=master
+      - label=backport 1.6
+      - merged
+    update_method: rebase
+
 pull_request_rules:
   # For more information: https://doc.mergify.io/actions.html#copy
   # We used to use the 'backport' action, but:
@@ -9,7 +24,7 @@ pull_request_rules:
       - merged
     actions:
       copy:
-        ignore_conflicts: True
+        ignore_conflicts: true
         branches:
           - "1.2"
 
@@ -20,7 +35,7 @@ pull_request_rules:
       - merged
     actions:
       copy:
-        ignore_conflicts: True
+        ignore_conflicts: true
         branches:
           - "1.4"
 
@@ -31,12 +46,9 @@ pull_request_rules:
       - merged
     actions:
       copy:
-        ignore_conflicts: True
+        ignore_conflicts: true
         branches:
           - "1.6"
-      queue:
-        update_method: rebase
-
   - name: backport patches to 1.8
     conditions:
       - base=master
@@ -44,8 +56,10 @@ pull_request_rules:
       - merged
     actions:
       copy:
-        ignore_conflicts: True
+        ignore_conflicts: true
         branches:
           - "1.8"
+  - name: refactored queue action rule
+    conditions: []
+    actions:
       queue:
-        update_method: rebase
