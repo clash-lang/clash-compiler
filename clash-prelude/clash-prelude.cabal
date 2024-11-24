@@ -317,7 +317,8 @@ Library
                       TypeFamilies
                       UndecidableInstances
 
-  Build-depends:      array                     >= 0.5.1.0 && < 0.6,
+  Build-depends:      adjunctions               >= 4.0     && < 5.0,
+                      array                     >= 0.5.1.0 && < 0.6,
                       arrows                    >= 0.4     && < 0.5,
                       base                      >= 4.11    && < 5,
                       binary                    >= 0.8.5   && < 0.11,
@@ -327,6 +328,7 @@ Library
                       data-binary-ieee754       >= 0.4.4   && < 0.6,
                       data-default-class        >= 0.1.2   && < 0.2,
                       deepseq                   >= 1.4.1.0 && < 1.6,
+                      distributive              >= 0.1     && < 1.0,
                       extra                     >= 1.6.17  && < 1.8,
                       ghc-prim                  >= 0.5.1.0 && < 0.12,
                       ghc-typelits-extra        >= 0.4     && < 0.5,
