@@ -854,9 +854,9 @@ blockRamPow2 = \clk en cnt rd wrM -> withFrozenCallStack
   (blockRam clk en cnt rd wrM)
 {-# INLINE blockRamPow2 #-}
 
-data ResetStrategy (r :: Bool) where
-  ClearOnReset :: ResetStrategy 'True
-  NoClearOnReset :: ResetStrategy 'False
+data ResetStrategy (r :: Bool) a where
+  ClearOnReset :: a -> ResetStrategy 'True a
+  NoClearOnReset :: ResetStrategy 'False a
 
 -- | A version of 'blockRam' that has no default values set. May be cleared to
 -- an arbitrary state using a reset function.
@@ -875,25 +875,28 @@ blockRamU
   -- for the BRAM to be reset to its initial state.
   -> Enable dom
   -- ^ 'Enable' line
-  -> ResetStrategy r
+  -> ResetStrategy r (Index n -> a)
   -- ^ Whether to clear BRAM on asserted reset ('ClearOnReset') or
   -- not ('NoClearOnReset'). The reset needs to be asserted for at least /n/
   -- cycles to clear the BRAM.
   -> SNat n
   -- ^ Number of elements in BRAM
-  -> (Index n -> a)
-  -- ^ If applicable (see 'ResetStrategy' argument), reset BRAM using this function
   -> Signal dom addr
   -- ^ Read address @r@
   -> Signal dom (Maybe (addr, a))
   -- ^ (write address @w@, value to write)
   -> Signal dom a
   -- ^ Value of the BRAM at address @r@ from the previous clock cycle
-blockRamU clk rst0 en rstStrategy n@SNat initF rd0 mw0 =
+blockRamU clk rst0 en rstStrategy n@SNat rd0 mw0 =
   case rstStrategy of
-    ClearOnReset ->
+    ClearOnReset initF ->
       -- Use reset infrastructure
       blockRamU# clk en n rd1 we1 wa1 w1
+      where
+        rd1 = mux rstBool 0 (fromEnum <$> rd0)
+        we1 = mux rstBool (pure True) we0
+        wa1 = mux rstBool (fromInteger . toInteger <$> waCounter) (fromEnum <$> wa0)
+        w1  = mux rstBool (initF <$> waCounter) w0
     NoClearOnReset ->
       -- Ignore reset infrastructure, pass values unchanged
       blockRamU# clk en n
@@ -911,11 +914,6 @@ blockRamU clk rst0 en rstStrategy n@SNat initF rd0 mw0 =
   wa0 = fst . fromJustX <$> mw0
   w0  = snd . fromJustX <$> mw0
   we0 = isJust <$> mw0
-
-  rd1 = mux rstBool 0 (fromEnum <$> rd0)
-  we1 = mux rstBool (pure True) we0
-  wa1 = mux rstBool (fromInteger . toInteger <$> waCounter) (fromEnum <$> wa0)
-  w1  = mux rstBool (initF <$> waCounter) w0
 
 -- | blockRAMU primitive
 blockRamU#
@@ -968,7 +966,7 @@ blockRam1
   -- for the BRAM to be reset to its initial state.
   -> Enable dom
   -- ^ 'Enable' line
-  -> ResetStrategy r
+  -> ResetStrategy r ()
   -- ^ Whether to clear BRAM on asserted reset ('ClearOnReset') or
   -- not ('NoClearOnReset'). The reset needs to be asserted for at least /n/
   -- cycles to clear the BRAM.
@@ -984,7 +982,7 @@ blockRam1
   -- ^ Value of the BRAM at address @r@ from the previous clock cycle
 blockRam1 clk rst0 en rstStrategy n@SNat a rd0 mw0 =
   case rstStrategy of
-    ClearOnReset ->
+    ClearOnReset () ->
       -- Use reset infrastructure
       blockRam1# clk en n a rd1 we1 wa1 w1
     NoClearOnReset ->
