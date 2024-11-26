@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2023, Myrtle Software Ltd,
-                     2021-2023, QBayLogic B.V.
+                     2021-2024, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -17,6 +17,7 @@ where
 import Data.Coerce                      (coerce)
 import Data.Functor.Identity            (Identity (..))
 import Data.Text                        (pack)
+import Data.Text.Extra                  (showt)
 import Control.Monad.State.Strict       (State)
 import Control.Monad.Trans.Except
   (Except, ExceptT (..), mapExceptT, runExceptT, throwE)
@@ -41,6 +42,7 @@ import Clash.Util                       (curLoc)
 
 import Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
+import Clash.Signal.Internal (KnownDomain)
 
 ghcTypeToHWType
   :: Int
@@ -149,18 +151,32 @@ ghcTypeToHWType iw = go
         -- XXX: this is a hack to get a KnownDomain from a KnownConfiguration
         "GHC.Classes.(%,%)"
           | [arg0@(tyView -> TyConApp kdNm _), arg1] <- args
-          , nameOcc kdNm == "Clash.Signal.Internal.KnownDomain"
+          , nameOcc kdNm == showt ''KnownDomain
           -> case tyView arg1 of
                 TyConApp kdNm1 _
-                  | nameOcc kdNm1 == "Clash.Signal.Internal.KnownDomain"
+                  | nameOcc kdNm1 == showt ''KnownDomain
                   -> do k1 <- (stripVoid . stripFiltered) <$> ExceptT (MaybeT (go reprs m arg0))
                         k2 <- (stripVoid . stripFiltered) <$> ExceptT (MaybeT (go reprs m arg1))
-                        returnN (Void (Just (Product "(%,%)" Nothing [k1,k2])))
+                        returnN (Void (Just (Product "GHC.Classes.(%,%)" Nothing [k1,k2])))
                   where
                     stripVoid (Void (Just t)) = t
                     stripVoid t = t
                 _ -> ExceptT (MaybeT (go reprs m arg0))
 
+        -- XXX: this is a hack to get a KnownDomain from a KnownConfiguration
+        "GHC.Classes.CTuple2"
+          | [arg0@(tyView -> TyConApp kdNm _), arg1] <- args
+          , nameOcc kdNm == showt ''KnownDomain
+          -> case tyView arg1 of
+                TyConApp kdNm1 _
+                  | nameOcc kdNm1 == showt ''KnownDomain
+                  -> do k1 <- (stripVoid . stripFiltered) <$> ExceptT (MaybeT (go reprs m arg0))
+                        k2 <- (stripVoid . stripFiltered) <$> ExceptT (MaybeT (go reprs m arg1))
+                        returnN (Void (Just (Product "GHC.Classes.CTuple2" Nothing [k1,k2])))
+                  where
+                    stripVoid (Void (Just t)) = t
+                    stripVoid t = t
+                _ -> ExceptT (MaybeT (go reprs m arg0))
 
         "Clash.Signal.Internal.KnownDomain"
           -> case tyConDataCons (UniqMap.find tc m) of
@@ -290,6 +306,7 @@ ghcTypeToHWType iw = go
         -- To ensure that Clash doesn't get stuck working away callstacks that
         -- never end up being used in the generated HDL.
         "GHC.Stack.Types.CallStack" -> returnN (Void Nothing)
+        "GHC.Internal.Stack.Types.CallStack" -> returnN (Void Nothing)
 
         "Clash.Explicit.SimIO.SimIO" | a0:_ <- args ->
           ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m a0

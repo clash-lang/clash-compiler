@@ -82,14 +82,12 @@ import           GHC.Types.Name      (getSrcSpan, nameOccName, occNameString)
 import           GHC.Builtin.Names   (trueDataConKey, falseDataConKey)
 import qualified GHC.Core.TyCon      as TyCon
 import           GHC.Builtin.Types   (tupleTyCon)
-import           GHC.Types.Unique    (getKey)
 #else
 import           BasicTypes          (Boxity (..))
 import           Name                (getSrcSpan, nameOccName, occNameString)
 import           PrelNames           (trueDataConKey, falseDataConKey)
 import qualified TyCon
 import           TysWiredIn          (tupleTyCon)
-import           Unique              (getKey)
 #endif
 
 import           Clash.Class.BitPack (pack,unpack)
@@ -116,6 +114,7 @@ import           Clash.Core.Var      (mkLocalId, mkTyVar)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug
 import           Clash.GHC.GHC2Core  (modNameM)
+import           Clash.Unique        (fromGhcUnique)
 import           Clash.Util
   (MonadUnique (..), clogBase, flogBase, curLoc)
 import           Clash.Normalize.PrimitiveReductions
@@ -1416,6 +1415,14 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [DC dc _] <- args
     -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
 
+  "GHC.Prim.dataToTagSmall#"
+    | [DC dc _] <- args
+    -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+
+  "GHC.Prim.dataToTagLarge#"
+    | [DC dc _] <- args
+    -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+
   "GHC.Classes.eqInt" | Just (i,j) <- intCLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i == j))
 
@@ -1504,6 +1511,16 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | Just (a,b) <- integerLiterals args
     , Just c <- flogBase a b
     -> (reduce . Literal . WordLiteral . toInteger) c
+
+  "GHC.Internal.Float.integerToFloat#"
+    | [v] <- args
+    , Just i <- integerLiteral v
+    -> reduce . Literal . FloatLiteral . floatToWord $ F# (integerToFloat# i)
+
+  "GHC.Internal.Float.integerToDouble#"
+    | [v] <- args
+    , Just i <- integerLiteral v
+    -> reduce . Literal . DoubleLiteral . doubleToWord $ D# (integerToDouble# i)
 
   "GHC.Num.Integer.integerToFloat#"
     | [v] <- args
@@ -2126,6 +2143,15 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce (Literal (NaturalLiteral n))
 
   "GHC.TypeNats.someNatVal"
+    | [Lit (NaturalLiteral n)] <- args
+    -> let resTy = getResultTy tcm ty tys
+        in reduce (mkSomeNat tcm n resTy)
+
+  "GHC.Internal.TypeNats.natVal"
+    | [Lit (NaturalLiteral n), _] <- args
+    -> reduce (Literal (NaturalLiteral n))
+
+  "GHC.Internal.TypeNats.someNatVal"
     | [Lit (NaturalLiteral n)] <- args
     -> let resTy = getResultTy tcm ty tys
         in reduce (mkSomeNat tcm n resTy)
@@ -4610,10 +4636,36 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            snat = mkApps (Data snatDc) [Right nTy, Left (Literal (NaturalLiteral n))]
            ret = mkApps (valToTerm fun) [Right nTy, Left snat]
         in reduce ret
+  "GHC.Internal.TypeNats.withSomeSNat"
+    | Lit (NaturalLiteral n) : fun : _ <- args
+    , _ : funTy : _ <- Either.rights (fst (splitFunForallTy ty))
+    , (tyView -> TyConApp snatTcNm _) : _ <- Either.rights (fst (splitFunForallTy funTy))
+    , Just snatTc <- UniqMap.lookup snatTcNm tcm
+    , [snatDc] <- tyConDataCons snatTc
+    -> let nTy = LitTy (NumTy n)
+           snat = mkApps (Data snatDc) [Right nTy, Left (Literal (NaturalLiteral n))]
+           ret = mkApps (valToTerm fun) [Right nTy, Left snat]
+        in reduce ret
   "GHC.Magic.nospec"
     | [arg] <- args
     -> reduce (valToTerm arg)
   "GHC.Float.$wproperFractionDouble"
+    | _ : Lit (DoubleLiteral d) : _ <- args
+    , [sty@(tyView -> TyConApp signedTcNm [nTy@(LitTy (NumTy kn))])] <- tys
+    , nameOcc signedTcNm == showt ''Signed
+    , (_, tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+    , Just tupTc <- UniqMap.lookup tupTcNm tcm
+    , [tupDc] <- tyConDataCons tupTc
+    -> let (sn, d1) = reifyNat kn (\p -> first toInteger (op p (wordToDouble d)))
+           ret = mkApps (Data tupDc) (map Right tyArgs ++
+                  [ Left (mkSignedLit sty nTy kn sn)
+                  , Left (mkDoubleCLit tcm (doubleToWord d1) (last tyArgs))
+                  ])
+        in reduce ret
+    where
+      op :: KnownNat n => Proxy n -> Double -> (Signed n, Double)
+      op _ = properFraction
+  "GHC.Internal.Float.$wproperFractionDouble"
     | _ : Lit (DoubleLiteral d) : _ <- args
     , [sty@(tyView -> TyConApp signedTcNm [nTy@(LitTy (NumTy kn))])] <- tys
     , nameOcc signedTcNm == "Clash.Sized.Internal.Signed.Signed"
@@ -5873,7 +5925,7 @@ ghcTyconToTyConName
   :: TyCon.TyCon
   -> TyConName
 ghcTyconToTyConName tc =
-    Name User n' (getKey (TyCon.tyConUnique tc)) (getSrcSpan n)
+    Name User n' (fromGhcUnique (TyCon.tyConUnique tc)) (getSrcSpan n)
   where
     n'      = fromMaybe "_INTERNAL_" (modNameM n) `Text.append`
               ('.' `Text.cons` Text.pack occName)
@@ -5884,5 +5936,5 @@ svoid :: (State# RealWorld -> State# RealWorld) -> IO ()
 svoid m0 = IO (\s -> case m0 s of s' -> (# s', () #))
 
 isTrueDC,isFalseDC :: DataCon -> Bool
-isTrueDC dc  = dcUniq dc == getKey trueDataConKey
-isFalseDC dc = dcUniq dc == getKey falseDataConKey
+isTrueDC dc  = dcUniq dc == fromGhcUnique trueDataConKey
+isFalseDC dc = dcUniq dc == fromGhcUnique falseDataConKey

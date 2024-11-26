@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
-                     2021-2023, QBayLogic B.V.,
+                     2021-2024, QBayLogic B.V.,
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -19,6 +19,12 @@
 module Clash.Core.Util where
 
 import           Control.Concurrent.Supply     (Supply, freshId)
+import Control.Exception.Base (patError)
+#if MIN_VERSION_base(4,16,0)
+import GHC.Prim.Panic (absentError)
+#else
+import Control.Exception.Base (absentError)
+#endif
 import Control.Monad.Trans.Except              (Except, throwE, runExcept)
 import Data.Bifunctor                          (first, second)
 import qualified Data.HashSet                  as HashSet
@@ -31,14 +37,15 @@ import Data.Maybe
 import qualified Data.Set                      as Set
 import qualified Data.Set.Lens                 as Lens
 import qualified Data.Text                     as T
+import           Data.Text.Extra               (showt)
+import           GHC.Real
+  (divZeroError, overflowError, ratioZeroDenominatorError, underflowError)
 import           GHC.Stack                     (HasCallStack)
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Builtin.Names       (ipClassKey)
-import           GHC.Types.Unique        (getKey)
 #else
 import           PrelNames               (ipClassKey)
-import           Unique                  (getKey)
 #endif
 
 import Clash.Core.DataCon
@@ -58,7 +65,11 @@ import Clash.Core.Var                    (Id, Var(..), mkLocalId, mkTyVar)
 import Clash.Core.VarEnv
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug                       (traceIf)
+import Clash.Unique                      (fromGhcUnique)
 import Clash.Util
+
+import {-# SOURCE #-} qualified Clash.Normalize.Primitives as Primitives
+import Clash.XException (errorX)
 
 -- | Rebuild a let expression / let expressions by taking the SCCs of a list
 -- of bindings and remaking Let (NonRec ...) ... and Let (Rec ...) ...
@@ -480,24 +491,23 @@ primUCo =
                 }
 
 undefinedPrims :: [T.Text]
-undefinedPrims =
-  [ "Clash.Normalize.Primitives.undefined"
-  , "Control.Exception.Base.absentError"
-  , "Control.Exception.Base.patError"
-  , "GHC.Err.error"
-  , "GHC.Err.errorWithoutStackTrace"
-  , "GHC.Err.undefined"
-  , "GHC.Prim.Panic.absentError"
-  , "GHC.Real.divZeroError"
-  , "GHC.Real.overflowError"
-  , "GHC.Real.ratioZeroDenominatorError"
-  , "GHC.Real.underflowError"
+undefinedPrims = fmap showt
+  [ 'Primitives.undefined
+  , 'patError
+  , 'error
+  , 'errorWithoutStackTrace
+  , 'undefined
+  , 'absentError
+  , 'divZeroError
+  , 'overflowError
+  , 'ratioZeroDenominatorError
+  , 'underflowError
   ]
 
 undefinedXPrims :: [T.Text]
-undefinedXPrims =
-  [ "Clash.Normalize.Primitives.undefinedX"
-  , "Clash.XException.errorX"
+undefinedXPrims = fmap showt
+  [ 'Primitives.undefinedX
+  , 'errorX
   ]
 
 substArgTys
@@ -627,7 +637,7 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
   --
   isHidden :: Name a -> [Type] -> Bool
   isHidden nm [a1, a2] | TyConApp a2Nm _ <- tyView a2 =
-       nameOcc nm == "GHC.Classes.(%,%)"
+       nameOcc nm `elem` ["GHC.Classes.(%,%)", "GHC.Classes.CTuple2"]
     && splitTy (tyView (stripIP a1))
     && nameOcc a2Nm == "Clash.Signal.Internal.KnownDomain"
   isHidden _ _ = False
@@ -673,7 +683,7 @@ splitShouldSplit tcm = foldr go []
 -- | Strip implicit parameter wrappers (IP)
 stripIP :: Type -> Type
 stripIP t@(tyView -> TyConApp tcNm [_a1, a2]) =
-  if nameUniq tcNm == getKey ipClassKey then a2 else t
+  if nameUniq tcNm == fromGhcUnique ipClassKey then a2 else t
 stripIP t = t
 
 -- | Do an inverse topological sorting of the let-bindings in a let-expression
