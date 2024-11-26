@@ -120,7 +120,14 @@ bindConstantVar = inlineBinders test
       True -> return (i `notElemFreeVars` e)
       _    -> do
         tcm <- Lens.view tcCache
-        case isWorkFreeIsh tcm e of
+        (fn,_) <- Lens.use curFun
+        -- Don't inline things that perform work, it increases the circuit size.
+        --
+        -- Also don't inline globally recursive calls, it prevents the
+        -- recToLetRec transformation from transforming global recursion to
+        -- local recursion.
+        -- See https://github.com/clash-lang/clash-compiler/issues/2839
+        case isWorkFreeIsh tcm e && not (e == Var fn) of
           True -> Lens.view inlineConstantLimit >>= \case
             0 -> return True
             n -> return (termSize e <= n)
