@@ -741,14 +741,12 @@ blockRamU
      , Enum addr
      , NFDataX addr
      , 1 <= n )
-  => E.ResetStrategy r
+  => E.ResetStrategy r (Index n -> a)
   -- ^ Whether to clear BRAM on asserted reset ('Clash.Explicit.BlockRam.ClearOnReset')
   -- or not ('Clash.Explicit.BlockRam.NoClearOnReset'). The reset needs to be
   -- asserted for at least /n/ cycles to clear the BRAM.
   -> SNat n
   -- ^ Number of elements in BRAM
-  -> (Index n -> a)
-  -- ^ If applicable (see first argument), reset BRAM using this function
   -> Signal dom addr
   -- ^ Read address @r@
   -> Signal dom (Maybe (addr, a))
@@ -756,8 +754,8 @@ blockRamU
   -> Signal dom a
   -- ^ Value of the BRAM at address @r@ from the previous clock cycle
 blockRamU =
-  \rstStrategy cnt initF rd wrM -> withFrozenCallStack
-    (hideClockResetEnable E.blockRamU) rstStrategy cnt initF rd wrM
+  \rstStrategy cnt rd wrM -> withFrozenCallStack
+    (hideClockResetEnable E.blockRamU) rstStrategy cnt rd wrM
 {-# INLINE blockRamU #-}
 
 -- | A version of 'blockRam' that is initialized with the same value on all
@@ -770,7 +768,7 @@ blockRam1
      , Enum addr
      , NFDataX addr
      , 1 <= n )
-  => E.ResetStrategy r
+  => E.ResetStrategy r ()
   -- ^ Whether to clear BRAM on asserted reset ('Clash.Explicit.BlockRam.ClearOnReset')
   -- or not ('Clash.Explicit.BlockRam.NoClearOnReset'). The reset needs to be
   -- asserted for at least /n/ cycles to clear the BRAM.

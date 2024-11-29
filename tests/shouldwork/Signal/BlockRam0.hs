@@ -29,9 +29,8 @@ topEntity = exposeClockResetEnable go where
   go rd wr = zeroAt0 dout where
     dout =
       blockRamU
-        ClearOnReset
+        (ClearOnReset ((+22) . unpack . pack :: Index 1024 -> Unsigned 10))
         (SNat @1024)
-        ((+22) . unpack . pack :: Index 1024 -> Unsigned 10)
         rd
         wr
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511

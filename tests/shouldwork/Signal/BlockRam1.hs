@@ -29,7 +29,7 @@ topEntity = exposeClockResetEnable go where
   go rd wr = zeroAt0 dout where
     dout =
       blockRam1
-        ClearOnReset
+        (ClearOnReset ())
         (SNat @1024)
         (3 :: Unsigned 8)
         rd

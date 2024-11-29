@@ -1,0 +1,1 @@
+CHANGED: `ResetStrategy` now contains the reset function, to avoid dummy arguments on `NoClearOnReset`
