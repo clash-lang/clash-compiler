@@ -1,12 +1,12 @@
 - BlackBox:
-    name: Clash.Xilinx.DDR.iddr
+    name: Clash.Xilinx.DDR.iddr#
     imports:
     - UNISIM.vcomponents.all
     kind: Declaration
     libraries:
     - UNISIM
     type: |-
-      iddr
+      iddr#
         :: ( HasCallStack             -- ARG[0]
            , KnownConfi~ fast domf    -- ARG[1]
            , KnownConfi~ slow doms    -- ARG[2]

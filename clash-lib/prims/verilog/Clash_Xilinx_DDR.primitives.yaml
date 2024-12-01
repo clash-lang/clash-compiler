@@ -1,8 +1,8 @@
 - BlackBox:
-    name: Clash.Xilinx.DDR.iddr
+    name: Clash.Xilinx.DDR.iddr#
     kind: Declaration
     type: |-
-      iddr
+      iddr#
         :: ( HasCallStack            -- ARG[0]
            , KnownConfi~ fast domf   -- ARG[1]
            , KnownConfi~ slow doms   -- ARG[2]
