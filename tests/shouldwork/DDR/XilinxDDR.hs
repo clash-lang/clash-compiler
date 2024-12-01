@@ -5,17 +5,14 @@ module XilinxDDR where
 import Clash.Annotations.TH
 import Clash.Explicit.Prelude
 import Clash.Xilinx.DDR
-import Data.Bifunctor
 
 import VendorDDR
 
 xilinxIn :: DomCxt slow fast fPeriod reset => VendorIn slow fast
-xilinxIn clk rst en =
-  fmap (bimap unpack unpack) . iddr clk rst en . fmap pack
+xilinxIn = iddr
 
 xilinxOut :: DomCxt slow fast fPeriod reset => VendorOut slow fast
-xilinxOut clk rst en =
-  fmap unpack . oddr clk rst en . fmap (bimap pack pack)
+xilinxOut = oddr
 
 topEntityUA :: TopEntityNoEna System DDRA
 topEntityUA clk rst = topEntityGeneric xilinxIn xilinxOut clk rst enableGen

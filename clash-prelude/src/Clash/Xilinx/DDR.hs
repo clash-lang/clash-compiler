@@ -24,6 +24,7 @@ module Clash.Xilinx.DDR
   )
 where
 
+import Data.Bifunctor
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 
 import Clash.Annotations.Primitive (hasBlackBox)
@@ -43,36 +44,39 @@ import Clash.Explicit.DDR
 -- to instantiate this function in a domain where falling edges are the active
 -- edge will lead to a compilation/simulation error.
 iddr
-  :: forall fast fPeriod edge reset init polarity slow m
+  :: forall a dom domDDR
    . ( HasCallStack
-     , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
-     , KnownNat m )
-  => Clock slow
-  -> Reset slow
-  -> Enable slow
-  -> Signal fast (BitVector m)
+     , KnownDomain dom
+     , KnownDomain domDDR
+     , DomainPeriod dom ~ 2 * DomainPeriod domDDR
+     , DomainActiveEdge dom ~ 'Rising
+     , BitPack a
+     )
+  => Clock dom
+  -> Reset dom
+  -> Enable dom
+  -> Signal domDDR a
   -- ^ DDR input signal
-  -> Signal slow ((BitVector m),(BitVector m))
+  -> Signal dom (a, a)
   -- ^ Normal speed output pair @(o0, o1)@
-iddr =
-  case activeEdge @slow of
-    SRising ->
-      withFrozenCallStack iddr#
-    SFalling ->
-      clashCompileError
-        "iddr: Primitive only supports rising active edge"
+iddr clk rst en =
+  fmap (bimap unpack unpack) . withFrozenCallStack (iddr# clk rst en) .
+    fmap pack
 
 iddr#
-  :: ( HasCallStack
-     , KnownConfiguration fast ('DomainConfiguration fast fPeriod 'Rising reset init polarity)
-     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) 'Rising reset init polarity)
-     , KnownNat m )
-  => Clock slow
-  -> Reset slow
-  -> Enable slow
-  -> Signal fast (BitVector m)
-  -> Signal slow ((BitVector m),(BitVector m))
+  :: forall n dom domDDR
+   . ( HasCallStack
+     , KnownDomain dom
+     , KnownDomain domDDR
+     , DomainPeriod dom ~ 2 * DomainPeriod domDDR
+     , DomainActiveEdge dom ~ 'Rising
+     , KnownNat n
+     )
+  => Clock dom
+  -> Reset dom
+  -> Enable dom
+  -> Signal domDDR (BitVector n)
+  -> Signal dom (BitVector n, BitVector n)
 iddr# clk rst en = withFrozenCallStack ddrIn# clk rst en 0 0 0
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE iddr# #-}
@@ -91,35 +95,40 @@ iddr# clk rst en = withFrozenCallStack ddrIn# clk rst en 0 0 0
 -- to instantiate this function in a domain where the falling edge is the active
 -- edge will lead to a compilation/simulation error.
 oddr
-  :: forall fast fPeriod edge reset init polarity slow m
-   . ( KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
-     , KnownNat m )
-  => Clock slow
-  -> Reset slow
-  -> Enable slow
-  -> Signal slow (BitVector m, BitVector m)
+  :: forall a dom domDDR
+   . ( HasCallStack
+     , KnownDomain dom
+     , KnownDomain domDDR
+     , DomainPeriod dom ~ 2 * DomainPeriod domDDR
+     , DomainActiveEdge dom ~ 'Rising
+     , BitPack a
+     )
+  => Clock dom
+  -> Reset dom
+  -> Enable dom
+  -> Signal dom (a, a)
   -- ^ Normal speed input pair @(i0, i1)@
-  -> Signal fast (BitVector m)
+  -> Signal domDDR a
   -- ^ DDR output signal
 oddr clk rst en =
-  case activeEdge @slow of
-    SRising ->
-       uncurry (withFrozenCallStack oddr# clk rst en) . unbundle
-    SFalling ->
-      clashCompileError
-        "oddr: Primitive only supports rising active edge"
+  fmap unpack . uncurry (withFrozenCallStack oddr# clk rst en) . unbundle .
+    fmap (bimap pack pack)
 
 oddr#
-  :: ( KnownConfiguration fast ('DomainConfiguration fast fPeriod 'Rising reset init polarity)
-     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) 'Rising reset init polarity)
-     , KnownNat m )
-  => Clock slow
-  -> Reset slow
-  -> Enable slow
-  -> Signal slow (BitVector m)
-  -> Signal slow (BitVector m)
-  -> Signal fast (BitVector m)
+  :: forall n dom domDDR
+   . ( HasCallStack
+     , KnownDomain dom
+     , KnownDomain domDDR
+     , DomainPeriod dom ~ 2 * DomainPeriod domDDR
+     , DomainActiveEdge dom ~ 'Rising
+     , KnownNat n
+     )
+  => Clock dom
+  -> Reset dom
+  -> Enable dom
+  -> Signal dom (BitVector n)
+  -> Signal dom (BitVector n)
+  -> Signal domDDR (BitVector n)
 oddr# clk rst en = ddrOut# clk rst en 0
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE oddr# #-}
