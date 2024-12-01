@@ -1,31 +1,34 @@
 - BlackBox:
-    name: Clash.Xilinx.DDR.iddr
+    name: Clash.Xilinx.DDR.iddr#
     imports:
     - UNISIM.vcomponents.all
     kind: Declaration
     libraries:
     - UNISIM
     type: |-
-      iddr
-        :: ( HasCallStack             -- ARG[0]
-           , KnownConfi~ fast domf    -- ARG[1]
-           , KnownConfi~ slow doms    -- ARG[2]
-           , KnownNat m )             -- ARG[3]
-        -> Clock slow                 -- ARG[4]
-        -> Reset slow                 -- ARG[5]
-        -> Enable slow                -- ARG[6]
-        -> Signal fast (BitVector m)  -- ARG[7]
-        -> Signal slow (BitVector m,BitVector m)
+      iddr#
+        :: forall n dom domDDR
+         . HasCallStack                 -- ARG[0]
+        => KnownDomain dom              -- ARG[1]
+        => KnownDomain domDDR           -- ARG[2]
+        => DomPeriod ~ 2 * ...          -- ARG[3]
+        => DomEdge ~ Rising             -- ARG[4]
+        => KnownNat n                   -- ARG[5]
+        => Clock dom                    -- ARG[6]
+        -> Reset dom                    -- ARG[7]
+        -> Enable dom                   -- ARG[8]
+        -> Signal domDDR (BitVector n)  -- ARG[9]
+        -> Signal dom (BitVector n, BitVector n)
     template: |-
       -- iddr begin
       ~GENSYM[~COMPNAME_IDDR][0] : block
-        signal ~GENSYM[data_pos][1] : ~TYP[7];
-        signal ~GENSYM[data_neg][2] : ~TYP[7];
-        signal ~GENSYM[d][3]         : ~TYP[7];~IF ~ISACTIVEENABLE[6] ~THEN
+        signal ~GENSYM[data_pos][1] : ~TYP[9];
+        signal ~GENSYM[data_neg][2] : ~TYP[9];
+        signal ~GENSYM[d][3]         : ~TYP[9];~IF ~ISACTIVEENABLE[8] ~THEN
         signal ~GENSYM[ce_logic][4]: std_logic;~ELSE ~FI
-      begin~IF ~ISACTIVEENABLE[6] ~THEN
-        ~SYM[4] <= '1' when (~ARG[6]) else '0';~ELSE ~FI
-        ~SYM[3] <= ~ARG[7];
+      begin~IF ~ISACTIVEENABLE[8] ~THEN
+        ~SYM[4] <= '1' when (~ARG[8]) else '0';~ELSE ~FI
+        ~SYM[3] <= ~ARG[9];
 
         ~GENSYM[gen_iddr][7] : for ~GENSYM[i][8] in ~SYM[3]'range generate
         begin
@@ -34,14 +37,14 @@
             DDR_CLK_EDGE => "SAME_EDGE",
             INIT_Q1      => '0',
             INIT_Q2      => '0',
-            SRTYPE       => ~IF ~ISSYNC[2] ~THEN "SYNC" ~ELSE "ASYNC" ~FI)
+            SRTYPE       => ~IF ~ISSYNC[1] ~THEN "SYNC" ~ELSE "ASYNC" ~FI)
           port map (
             Q1 => ~SYM[1](~SYM[8]),   -- 1-bit output for positive edge of clock
             Q2 => ~SYM[2](~SYM[8]),   -- 1-bit output for negative edge of clock
-            C  => ~ARG[4],   -- 1-bit clock input
-            CE => ~IF ~ISACTIVEENABLE[6] ~THEN ~SYM[4] ~ELSE '1' ~FI,       -- 1-bit clock enable input
+            C  => ~ARG[6],   -- 1-bit clock input
+            CE => ~IF ~ISACTIVEENABLE[8] ~THEN ~SYM[4] ~ELSE '1' ~FI,       -- 1-bit clock enable input
             D  => ~SYM[3](~SYM[8]),   -- 1-bit DDR data input
-            R  => ~ARG[5],   -- 1-bit reset
+            R  => ~ARG[7],   -- 1-bit reset
             S  => '0'        -- 1-bit set
           );
         end generate;
@@ -58,26 +61,30 @@
     - UNISIM
     type: |-
       oddr#
-        :: ( KnownConfi~ fast domf     -- ARG[0]
-           , KnownConfi~ slow doms     -- ARG[1]
-           , KnownNat m )              -- ARG[2]
-        => Clock slow                  -- ARG[3]
-        -> Reset slow                  -- ARG[4]
-        -> Enable slow                 -- ARG[5]
-        -> Signal slow (BitVector m)   -- ARG[6]
-        -> Signal slow (BitVector m)   -- ARG[7]
-        -> Signal fast (BitVector m)
+        :: forall n dom domDDR
+         . HasCallStack              -- ARG[0]
+        => KnownDomain dom           -- ARG[1]
+        => KnownDomain domDDR        -- ARG[2]
+        => DomPeriod ~ 2 * ...       -- ARG[3]
+        => DomEdge ~ Rising          -- ARG[4]
+        => KnownNat n                -- ARG[5]
+        => Clock dom                 -- ARG[6]
+        -> Reset dom                 -- ARG[7]
+        -> Enable dom                -- ARG[8]
+        -> Signal dom (BitVector n)  -- ARG[9]
+        -> Signal dom (BitVector n)  -- ARG[10]
+        -> Signal domDDR (BitVector n)
     template: |-
       -- oddr begin
       ~GENSYM[~COMPNAME_ODDR][0] : block
         signal ~GENSYM[data_pos][1] : ~TYPO;
         signal ~GENSYM[data_neg][2] : ~TYPO;
-        signal ~GENSYM[q][3]         : ~TYPO;~IF ~ISACTIVEENABLE[5] ~THEN
+        signal ~GENSYM[q][3]         : ~TYPO;~IF ~ISACTIVEENABLE[8] ~THEN
         signal ~GENSYM[ce_logic][4]  : std_logic;~ELSE ~FI
-      begin~IF ~ISACTIVEENABLE[5] ~THEN
-        ~SYM[4] <= '1' when (~ARG[5]) else '0';~ELSE ~FI
-        ~SYM[1] <= ~ARG[6];
-        ~SYM[2] <= ~ARG[7];
+      begin~IF ~ISACTIVEENABLE[8] ~THEN
+        ~SYM[4] <= '1' when (~ARG[8]) else '0';~ELSE ~FI
+        ~SYM[1] <= ~ARG[9];
+        ~SYM[2] <= ~ARG[10];
 
         ~GENSYM[gen_oddr][7] : for ~GENSYM[i][8] in ~SYM[3]'range generate
         begin
@@ -88,11 +95,11 @@
             SRTYPE => ~IF ~ISSYNC[1] ~THEN "SYNC" ~ELSE "ASYNC" ~FI)
           port map (
             Q  => ~SYM[3](~SYM[8]),    -- 1-bit DDR output
-            C  => ~ARG[3],   -- 1-bit clock input
-            CE => ~IF ~ISACTIVEENABLE[5] ~THEN ~SYM[4] ~ELSE '1' ~FI,       -- 1-bit clock enable input
+            C  => ~ARG[6],   -- 1-bit clock input
+            CE => ~IF ~ISACTIVEENABLE[8] ~THEN ~SYM[4] ~ELSE '1' ~FI,       -- 1-bit clock enable input
             D1 => ~SYM[1](~SYM[8]),    -- 1-bit data input (positive edge)
             D2 => ~SYM[2](~SYM[8]),    -- 1-bit data input (negative edge)
-            R  => ~ARG[4],    -- 1-bit reset input
+            R  => ~ARG[7],    -- 1-bit reset input
             S  => '0'         -- 1-bit set input
           );
         end generate;

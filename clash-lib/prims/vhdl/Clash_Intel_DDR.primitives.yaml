@@ -1,45 +1,48 @@
 - BlackBox:
-    name: Clash.Intel.DDR.altddioIn
+    name: Clash.Intel.DDR.altddioIn#
     imports:
     - altera_mf.altera_mf_components.all
     kind: Declaration
     libraries:
     - altera_mf
     type: |-
-      altddioIn
-        :: ( HasCallStack               -- ARG[0]
-           , KnownConfi~ fast domf      -- ARG[1]
-           , KnownConfi~ slow doms      -- ARG[2]
-           , KnownNat m )               -- ARG[3]
-        => SSymbol deviceFamily         -- ARG[4]
-        -> Clock slow                   -- ARG[5]
-        -> Reset slow                   -- ARG[6]
-        -> Enable slow                  -- ARG[7]
-        -> Signal fast (BitVector m)    -- ARG[8]
-        -> Signal slow (BitVector m,BitVector m)
+      altddioIn#
+        :: forall deviceFamily n dom domDDR
+         . HasCallStack                 -- ARG[0]
+        => KnownDomain dom              -- ARG[1]
+        => KnownDomain domDDR           -- ARG[2]
+        => DomPeriod ~ 2 * ...          -- ARG[3]
+        => DomEdge ~ Rising             -- ARG[4]
+        => KnownNat n                   -- ARG[5]
+        => SSymbol deviceFamily         -- ARG[6]
+        -> Clock dom                    -- ARG[7]
+        -> Reset dom                    -- ARG[8]
+        -> Enable dom                   -- ARG[9]
+        -> Signal domDDR (BitVector n)  -- ARG[10]
+        -> Signal dom (BitVector n, BitVector n)
     template: |-
       -- altddioIn begin
       ~GENSYM[~COMPNAME_ALTDDIO_IN][0] : block
-        signal ~GENSYM[dataout_l][1] : ~TYP[8];
-        signal ~GENSYM[dataout_h][2] : ~TYP[8];~IF ~ISACTIVEENABLE[7] ~THEN
+        signal ~GENSYM[dataout_l][1] : ~TYP[10];
+        signal ~GENSYM[dataout_h][2] : ~TYP[10];~IF ~ISACTIVEENABLE[9] ~THEN
         signal ~GENSYM[ce_logic][4]: std_logic;~ELSE ~FI
-      begin~IF ~ISACTIVEENABLE[7] ~THEN
-        ~SYM[4] <= '1' when (~ARG[7]) else '0';~ELSE ~FI
+      begin~IF ~ISACTIVEENABLE[9] ~THEN
+        ~SYM[4] <= '1' when (~ARG[9]) else '0';~ELSE ~FI
         ~GENSYM[~COMPNAME_ALTDDIO_IN][7] : ALTDDIO_IN
         GENERIC MAP (
-          intended_device_family => ~LIT[4],
+          intended_device_family => ~LIT[6],
           invert_input_clocks => "OFF",
           lpm_hint => "UNUSED",
           lpm_type => "altddio_in",
           power_up_high => "OFF",
-          width => ~SIZE[~TYP[8]]
+          width => ~SIZE[~TYP[10]]
         )
-        PORT MAP (~IF ~ISSYNC[6] ~THEN
-          sclr      => ~ARG[6],~ELSE
-          aclr      => ~ARG[6],~FI
-          datain    => ~ARG[8],~IF ~ISACTIVEENABLE[7] ~THEN
+        PORT MAP (~IF ~ISSYNC[1] ~THEN
+          sclr      => ~ARG[8],~ELSE
+          aclr      => ~ARG[8],~FI
+          datain    => ~ARG[10],~IF ~ISACTIVEENABLE[9] ~THEN
           inclocken => ~SYM[4],~ELSE ~FI
-          inclock   => ~ARG[5],
+          inclock   => ~ARG[7],
           dataout_h => ~SYM[2],
           dataout_l => ~SYM[1]
         );
@@ -55,27 +58,30 @@
     - altera_mf
     type: |-
       altddioOut#
-        :: ( HasCallStack             -- ARG[0]
-           , KnownConfi~ fast domf    -- ARG[1]
-           , KnownConfi~ slow doms    -- ARG[2]
-           , KnownNat m )             -- ARG[3]
-        => SSymbol deviceFamily       -- ARG[4]
-        -> Clock slow                 -- ARG[5]
-        -> Reset slow                 -- ARG[6]
-        -> Enable slow                -- ARG[7]
-        -> Signal slow (BitVector m)  -- ARG[8]
-        -> Signal slow (BitVector m)  -- ARG[9]
-        -> Signal fast (BitVector m)
+        :: forall deviceFamily n dom domDDR
+         . HasCallStack              -- ARG[0]
+        => KnownDomain dom           -- ARG[1]
+        => KnownDomain domDDR        -- ARG[2]
+        => DomPeriod ~ 2 * ...       -- ARG[3]
+        => DomEdge ~ Rising          -- ARG[4]
+        => KnownNat n                -- ARG[5]
+        => SSymbol deviceFamily      -- ARG[6]
+        -> Clock dom                 -- ARG[7]
+        -> Reset dom                 -- ARG[8]
+        -> Enable dom                -- ARG[9]
+        -> Signal dom (BitVector n)  -- ARG[10]
+        -> Signal dom (BitVector n)  -- ARG[11]
+        -> Signal domDDR (BitVector n)
     template: |-
       -- altddioOut begin
-      ~GENSYM[~COMPNAME_ALTDDIO_OUT][0] : block ~IF ~ISACTIVEENABLE[7] ~THEN
+      ~GENSYM[~COMPNAME_ALTDDIO_OUT][0] : block ~IF ~ISACTIVEENABLE[9] ~THEN
         signal ~GENSYM[ce_logic][1] : std_logic; ~ELSE ~FI
-      begin~IF ~ISACTIVEENABLE[7] ~THEN
-        ~SYM[1] <= '1' when (~ARG[7]) else '0'; ~ELSE ~FI
+      begin~IF ~ISACTIVEENABLE[9] ~THEN
+        ~SYM[1] <= '1' when (~ARG[9]) else '0'; ~ELSE ~FI
         ~GENSYM[~COMPNAME_ALTDDIO_OUT][7] : ALTDDIO_OUT
           GENERIC MAP (
             extend_oe_disable => "OFF",
-            intended_device_family => ~LIT[4],
+            intended_device_family => ~LIT[6],
             invert_output => "OFF",
             lpm_hint => "UNUSED",
             lpm_type => "altddio_out",
@@ -83,13 +89,13 @@
             power_up_high => "OFF",
             width => ~SIZE[~TYPO]
           )
-          PORT MAP (~IF ~ISSYNC[2] ~THEN
-            sclr       => ~ARG[6],~ELSE
-            aclr       => ~ARG[6],~FI ~IF ~ISACTIVEENABLE[7] ~THEN
+          PORT MAP (~IF ~ISSYNC[1] ~THEN
+            sclr       => ~ARG[8],~ELSE
+            aclr       => ~ARG[8],~FI ~IF ~ISACTIVEENABLE[9] ~THEN
             outclocken => ~SYM[1],~ELSE ~FI
-            outclock   => ~ARG[5],
-            datain_h   => ~ARG[8],
-            datain_l   => ~ARG[9],
+            outclock   => ~ARG[7],
+            datain_h   => ~ARG[10],
+            datain_l   => ~ARG[11],
             dataout    => ~RESULT
           );
       end block;

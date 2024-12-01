@@ -2,57 +2,58 @@
     name: Clash.Explicit.DDR.ddrIn#
     kind: Declaration
     type: |-
-      ddrIn# :: forall a slow fast n pFast enabled synchronous.
-                 ( HasCallStack           -- ARG[0]
-                 , NFDataX a              -- ARG[1]
-                 , KnownConfi~ fast domf  -- ARG[2]
-                 , KnownConfi~ slow doms  -- ARG[3]
-              => Clock slow               -- ARG[4]
-              -> Reset slow               -- ARG[5]
-              -> Enable slow              -- ARG[6]
-              -> a                        -- ARG[7]
-              -> a                        -- ARG[8]
-              -> a                        -- ARG[9]
-              -> Signal fast a            -- ARG[10]
-              -> Signal slow (a,a)
+      ddrIn# :: forall a dom domDDR
+              . HasCallStack             -- ARG[0]
+             => NFDataX a                -- ARG[1]
+             => KnownDomain dom          -- ARG[2]
+             => KnownDomain domDDR       -- ARG[3]
+             => DomPeriod ~ 2 * ...      -- ARG[4]
+             => Clock dom                -- ARG[5]
+             -> Reset dom                -- ARG[6]
+             -> Enable dom               -- ARG[7]
+             -> a                        -- ARG[8]
+             -> a                        -- ARG[9]
+             -> a                        -- ARG[10]
+             -> Signal domDDR a          -- ARG[11]
+             -> Signal dom (a,a)
     template: |-
       -- ddrIn begin
       ~GENSYM[~COMPNAME_ddrIn][0] : block
-        signal ~GENSYM[data_Pos][1]       : ~TYP[9];
-        signal ~GENSYM[data_Neg][2]       : ~TYP[9];
-        signal ~GENSYM[data_Neg_Latch][3] : ~TYP[9];
+        signal ~GENSYM[data_Pos][1]       : ~TYP[11];
+        signal ~GENSYM[data_Neg][2]       : ~TYP[11];
+        signal ~GENSYM[data_Neg_Latch][3] : ~TYP[11];
       begin
-       ~IF ~ISSYNC[3] ~THEN
+       ~IF ~ISSYNC[2] ~THEN
         -- sync
         -------------
-        ~GENSYM[~COMPNAME_ddrIn_pos][6] : process(~ARG[4])
+        ~GENSYM[~COMPNAME_ddrIn_pos][6] : process(~ARG[5])
         begin
-          if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[4]) then
-            if ~ARG[5] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
-              ~SYM[1] <= ~ARG[8];
-            els~IF ~ISACTIVEENABLE[6] ~THENif ~ARG[6] then~ELSEe~FI
-              ~SYM[1] <= ~ARG[10];
+          if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
+            if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
+              ~SYM[1] <= ~ARG[9];
+            els~IF ~ISACTIVEENABLE[7] ~THENif ~ARG[7] then~ELSEe~FI
+              ~SYM[1] <= ~ARG[11];
             end if;
           end if;
         end process;
 
-        ~GENSYM[~COMPNAME_ddrIn_neg][7] : process(~ARG[4])
+        ~GENSYM[~COMPNAME_ddrIn_neg][7] : process(~ARG[5])
         begin
-          if ~IF~ACTIVEEDGE[Rising][2]~THENfalling_edge~ELSErising_edge~FI(~ARG[4]) then
-            if ~ARG[5] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
-              ~SYM[2] <= ~ARG[9];
-            els~IF ~ISACTIVEENABLE[6] ~THENif ~ARG[6] then~ELSEe~FI
+          if ~IF~ACTIVEEDGE[Rising][2]~THENfalling_edge~ELSErising_edge~FI(~ARG[5]) then
+            if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
               ~SYM[2] <= ~ARG[10];
+            els~IF ~ISACTIVEENABLE[7] ~THENif ~ARG[7] then~ELSEe~FI
+              ~SYM[2] <= ~ARG[11];
             end if;
           end if;
         end process;
 
-        ~GENSYM[~COMPNAME_ddrIn_neg_latch][8] : process(~ARG[4])
+        ~GENSYM[~COMPNAME_ddrIn_neg_latch][8] : process(~ARG[5])
         begin
-          if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[4]) then
-            if ~ARG[5] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
-              ~SYM[3] <= ~ARG[7];
-            els~IF ~ISACTIVEENABLE[6] ~THENif ~ARG[6] then~ELSEe~FI
+          if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
+            if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
+              ~SYM[3] <= ~ARG[8];
+            els~IF ~ISACTIVEENABLE[7] ~THENif ~ARG[7] then~ELSEe~FI
               ~SYM[3] <= ~SYM[2];
             end if;
           end if;
@@ -60,29 +61,29 @@
        ~ELSE
         -- async
         --------------
-        ~SYM[6] : process(~ARG[4],~ARG[5])
+        ~SYM[6] : process(~ARG[5],~ARG[6])
         begin
-          if ~ARG[5] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
-            ~SYM[1] <= ~ARG[8];
-          elsif ~IF ~ISACTIVEENABLE[6] ~THEN ~ARG[6] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[4]) then
-            ~SYM[1] <= ~ARG[10];
+          if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
+            ~SYM[1] <= ~ARG[9];
+          elsif ~IF ~ISACTIVEENABLE[7] ~THEN ~ARG[7] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
+            ~SYM[1] <= ~ARG[11];
           end if;
         end process;
 
-        ~SYM[7] : process(~ARG[4],~ARG[5])
+        ~SYM[7] : process(~ARG[5],~ARG[6])
         begin
-          if ~ARG[5] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
-            ~SYM[2] <= ~ARG[9];
-          elsif ~IF ~ISACTIVEENABLE[6] ~THEN ~ARG[6] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENfalling_edge~ELSErising_edge~FI(~ARG[4]) then
+          if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
             ~SYM[2] <= ~ARG[10];
+          elsif ~IF ~ISACTIVEENABLE[7] ~THEN ~ARG[7] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENfalling_edge~ELSErising_edge~FI(~ARG[5]) then
+            ~SYM[2] <= ~ARG[11];
           end if;
         end process;
 
-        ~SYM[8] : process(~ARG[4],~ARG[5])
+        ~SYM[8] : process(~ARG[5],~ARG[6])
         begin
-          if ~ARG[5] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
-            ~SYM[3] <= ~ARG[7];
-          elsif ~IF ~ISACTIVEENABLE[6] ~THEN ~ARG[6] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[4]) then
+          if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
+            ~SYM[3] <= ~ARG[8];
+          elsif ~IF ~ISACTIVEENABLE[7] ~THEN ~ARG[7] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
             ~SYM[3] <= ~SYM[2];
           end if;
         end process;
@@ -94,68 +95,70 @@
     name: Clash.Explicit.DDR.ddrOut#
     kind: Declaration
     type: |-
-      ddrOut# :: ( HasCallStack                -- ARG[0]
-                  , NFDataX a                  -- ARG[1]
-                  , KnownConfi~ fast domf      -- ARG[2]
-                  , KnownConfi~ slow doms      -- ARG[3]
-               => Clock slow                   -- ARG[4]
-               -> Reset slow                   -- ARG[5]
-               -> Enable slow                  -- ARG[6]
-               -> a                            -- ARG[7]
-               -> Signal slow a                -- ARG[8]
-               -> Signal slow a                -- ARG[9]
-               -> Signal fast a
+      ddrOut# :: forall a dom domDDR
+               . HasCallStack                 -- ARG[0]
+              => NFDataX a                    -- ARG[1]
+              => KnownDomain dom              -- ARG[2]
+              => KnownDomain domDDR           -- ARG[3]
+              => DomPeriod ~ 2 * ...          -- ARG[4]
+              => Clock dom                    -- ARG[5]
+              -> Reset dom                    -- ARG[6]
+              -> Enable dom                   -- ARG[7]
+              -> a                            -- ARG[8]
+              -> Signal dom a                 -- ARG[9]
+              -> Signal dom a                 -- ARG[10]
+              -> Signal domDDR a
     template: |-
       -- ddrOut begin
       ~GENSYM[~COMPNAME_ddrOut][0] : block
-        signal ~GENSYM[data_Pos][1] : ~TYP[7];
-        signal ~GENSYM[data_Neg][2] : ~TYP[7];
+        signal ~GENSYM[data_Pos][1] : ~TYP[8];
+        signal ~GENSYM[data_Neg][2] : ~TYP[8];
       begin
-       ~IF ~ISSYNC[3] ~THEN
+       ~IF ~ISSYNC[2] ~THEN
         -- sync
         -------------
-        ~GENSYM[~COMPNAME_ddrOut_pos][5] : process(~ARG[4])
+        ~GENSYM[~COMPNAME_ddrOut_pos][5] : process(~ARG[5])
         begin
-          if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[4]) then
-            if ~ARG[5] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
-              ~SYM[1] <= ~ARG[7];
-            els~IF ~ISACTIVEENABLE[6] ~THENif ~ARG[6] then~ELSEe~FI
+          if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
+            if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
               ~SYM[1] <= ~ARG[8];
+            els~IF ~ISACTIVEENABLE[7] ~THENif ~ARG[7] then~ELSEe~FI
+              ~SYM[1] <= ~ARG[9];
             end if;
           end if;
         end process;
 
-        ~GENSYM[~COMPNAME_ddrOut_neg][6] : process(~ARG[4])
+        ~GENSYM[~COMPNAME_ddrOut_neg][6] : process(~ARG[5])
         begin
-          if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[4]) then
-            if ~ARG[5] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
-              ~SYM[2] <= ~ARG[7];
-            els~IF ~ISACTIVEENABLE[6] ~THENif ~ARG[6] then~ELSEe~FI
-              ~SYM[2] <= ~ARG[9];
+          if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
+            if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
+              ~SYM[2] <= ~ARG[8];
+            els~IF ~ISACTIVEENABLE[7] ~THENif ~ARG[7] then~ELSEe~FI
+              ~SYM[2] <= ~ARG[10];
             end if;
           end if;
         end process;
        ~ELSE
         -- async
         --------------
-        ~SYM[5] : process(~ARG[4],~ARG[5]~VARS[8])
+        ~SYM[5] : process(~ARG[5],~ARG[6]~VARS[9])
         begin
-          if ~ARG[5] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
-            ~SYM[1] <= ~ARG[7];
-          elsif ~IF ~ISACTIVEENABLE[6] ~THEN ~ARG[6] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[4]) then
+          if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
             ~SYM[1] <= ~ARG[8];
+          elsif ~IF ~ISACTIVEENABLE[7] ~THEN ~ARG[7] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
+            ~SYM[1] <= ~ARG[9];
           end if;
         end process;
 
-        ~SYM[6] : process(~ARG[4],~ARG[5]~VARS[9])
+        ~SYM[6] : process(~ARG[5],~ARG[6]~VARS[10])
         begin
-          if ~ARG[5] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
-            ~SYM[2] <= ~ARG[7];
-          elsif ~IF ~ISACTIVEENABLE[6] ~THEN ~ARG[6] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[4]) then
-            ~SYM[2] <= ~ARG[9];
+          if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
+            ~SYM[2] <= ~ARG[8];
+          elsif ~IF ~ISACTIVEENABLE[7] ~THEN ~ARG[7] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
+            ~SYM[2] <= ~ARG[10];
           end if;
         end process;
        ~FI
-        ~RESULT <= ~IF~ACTIVEEDGE[Rising][2]~THEN~SYM[1]~ELSE~SYM[2]~FI when (~ARG[4] = '1') else ~IF~ACTIVEEDGE[Rising][2]~THEN~SYM[2]~ELSE~SYM[1]~FI;
+        ~RESULT <= ~IF~ACTIVEEDGE[Rising][2]~THEN~SYM[1]~ELSE~SYM[2]~FI when (~ARG[5] = '1') else ~IF~ACTIVEEDGE[Rising][2]~THEN~SYM[2]~ELSE~SYM[1]~FI;
       end block;
       -- ddrOut end
