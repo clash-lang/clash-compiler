@@ -2,8 +2,10 @@ FIXED: `Clash.Explicit.DDR`:
   - `ddrIn`: VHDL: Remove data input from sensitivity list of `ddrIn_neg_latch` register as it is superfluous. This should not affect functionality.
   - `ddrOut`: VHDL: Fix incorrect usage of `Enable` input when the domain is set to asynchronous resets. Deasserting the `Enable` exhibited wrong behavior before this fix.
 FIXED: `Clash.Xilinx.DDR`:
+  - These primitives only support clocks where the rising edge is the active edge. Using them in a domain with falling active edges now causes an error.
   - `oddr`: Fix VHDL and SystemVerilog erroring out during HDL generation
   - Symbols in HDL for both `iddr` and `oddr` were renamed to match their function.
 FIXED: `Clash.Intel.DDR`:
+  - These primitives only support clocks where the rising edge is the active edge. Using them in a domain with falling active edges now causes an error.
   - Fix rendering HDL. It variously errored out or generated non-working HDL.
   - Rendering HDL no longer causes Clash to issue a warning about an argument unused in Haskell but used in the primitive black box.
