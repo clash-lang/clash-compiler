@@ -5,38 +5,41 @@
     - altera_mf
     type: |-
       altddioIn#
-        :: ( HasCallStack               -- ARG[0]
-           , KnownConfi~ fast domf      -- ARG[1]
-           , KnownConfi~ slow doms      -- ARG[2]
-           , KnownNat m )               -- ARG[3]
-        => SSymbol deviceFamily         -- ARG[4]
-        -> Clock slow                   -- ARG[5]
-        -> Reset slow                   -- ARG[6]
-        -> Enable slow                  -- ARG[7]
-        -> Signal fast (BitVector m)    -- ARG[8]
-        -> Signal slow (BitVector m,BitVector m)
+        :: forall deviceFamily n dom domDDR
+         . HasCallStack                 -- ARG[0]
+        => KnownDomain dom              -- ARG[1]
+        => KnownDomain domDDR           -- ARG[2]
+        => DomPeriod ~ 2 * ...          -- ARG[3]
+        => DomEdge ~ Rising             -- ARG[4]
+        => KnownNat n                   -- ARG[5]
+        => SSymbol deviceFamily         -- ARG[6]
+        -> Clock dom                    -- ARG[7]
+        -> Reset dom                    -- ARG[8]
+        -> Enable dom                   -- ARG[9]
+        -> Signal domDDR (BitVector n)  -- ARG[10]
+        -> Signal dom (BitVector n, BitVector n)
     template: |-
       // altddioIn begin
-      ~SIGD[~GENSYM[dataout_l][1]][8];
-      ~SIGD[~GENSYM[dataout_h][2]][8];
+      ~SIGD[~GENSYM[dataout_l][1]][10];
+      ~SIGD[~GENSYM[dataout_h][2]][10];
 
       altddio_in
         #(
-          .intended_device_family (~LIT[4]),
+          .intended_device_family (~LIT[6]),
           .invert_input_clocks ("OFF"),
           .lpm_hint ("UNUSED"),
           .lpm_type ("altddio_in"),
           .power_up_high ("OFF"),
-          .width (~SIZE[~TYP[8]])
+          .width (~SIZE[~TYP[10]])
         )
-        ~GENSYM[~COMPNAME_ALTDDIO_IN][7] (~IF ~ISSYNC[2] ~THEN
-          .sclr (~ARG[6]),
+        ~GENSYM[~COMPNAME_ALTDDIO_IN][7] (~IF ~ISSYNC[1] ~THEN
+          .sclr (~ARG[8]),
           .aclr (1'b0),~ELSE
-          .aclr (~ARG[6]),
+          .aclr (~ARG[8]),
           .sclr (1'b0),~FI
-          .datain (~ARG[8]),
-          .inclock (~ARG[5]),
-          .inclocken (~IF ~ISACTIVEENABLE[7] ~THEN~ARG[7]~ELSE1'b1~FI),
+          .datain (~ARG[10]),
+          .inclock (~ARG[7]),
+          .inclocken (~IF ~ISACTIVEENABLE[9] ~THEN~ARG[9]~ELSE1'b1~FI),
           .dataout_h (~SYM[2]),
           .dataout_l (~SYM[1]),
           .aset (1'b0),
