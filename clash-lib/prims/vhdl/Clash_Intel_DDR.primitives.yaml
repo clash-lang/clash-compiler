@@ -1,12 +1,12 @@
 - BlackBox:
-    name: Clash.Intel.DDR.altddioIn
+    name: Clash.Intel.DDR.altddioIn#
     imports:
     - altera_mf.altera_mf_components.all
     kind: Declaration
     libraries:
     - altera_mf
     type: |-
-      altddioIn
+      altddioIn#
         :: ( HasCallStack               -- ARG[0]
            , KnownConfi~ fast domf      -- ARG[1]
            , KnownConfi~ slow doms      -- ARG[2]
