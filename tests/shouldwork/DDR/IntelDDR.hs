@@ -5,19 +5,14 @@ module IntelDDR where
 import Clash.Annotations.TH
 import Clash.Explicit.Prelude
 import Clash.Intel.DDR
-import Data.Bifunctor
 
 import VendorDDR
 
 intelIn :: DomCxt slow fast fPeriod reset => VendorIn slow fast
-intelIn clk rst en =
-  fmap (bimap unpack unpack) .
-    altddioIn (SSymbol @"Arria II GX") clk rst en . fmap pack
+intelIn = altddioIn (SSymbol @"Arria II GX")
 
 intelOut :: DomCxt slow fast fPeriod reset => VendorOut slow fast
-intelOut clk rst en =
-  fmap unpack .
-    altddioOut (SSymbol @"Arria II GX") clk rst en . fmap (bimap pack pack)
+intelOut = altddioOut (SSymbol @"Arria II GX")
 
 topEntityUA :: TopEntityNoEna System DDRA
 topEntityUA clk rst = topEntityGeneric intelIn intelOut clk rst enableGen

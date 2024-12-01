@@ -23,6 +23,7 @@ module Clash.Intel.DDR
   )
 where
 
+import Data.Bifunctor
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 
 import Clash.Annotations.Primitive (hasBlackBox)
@@ -44,43 +45,46 @@ import Clash.Explicit.DDR
 -- to instantiate this function in a domain where falling edges are the active
 -- edge will lead to a compilation/simulation error.
 altddioIn
-  :: forall fast fPeriod edge reset init polarity slow m deviceFamily
+  :: forall deviceFamily a dom domDDR
    . ( HasCallStack
-     , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
-     , KnownNat m )
+     , KnownDomain dom
+     , KnownDomain domDDR
+     , DomainPeriod dom ~ 2 * DomainPeriod domDDR
+     , DomainActiveEdge dom ~ 'Rising
+     , BitPack a
+     )
   => SSymbol deviceFamily
   -- ^ The FPGA family
   --
   -- For example this can be instantiated as follows:
   --
   -- > SSymbol @"Cyclone IV GX"
-  -> Clock slow
-  -> Reset slow
-  -> Enable slow
-  -> Signal fast (BitVector m)
+  -> Clock dom
+  -> Reset dom
+  -> Enable dom
+  -> Signal domDDR a
   -- ^ DDR input signal
-  -> Signal slow (BitVector m,BitVector m)
+  -> Signal dom (a, a)
   -- ^ Normal speed output pair @(o0, o1)@
-altddioIn =
-  case activeEdge @slow of
-    SRising ->
-      withFrozenCallStack altddioIn#
-    SFalling ->
-      clashCompileError
-        "altddioIn: Primitive only supports rising active edge"
+altddioIn devFam clk rst en =
+  fmap (bimap unpack unpack) .
+    withFrozenCallStack (altddioIn# devFam clk rst en) . fmap pack
 
 altddioIn#
-  :: ( HasCallStack
-     , KnownConfiguration fast ('DomainConfiguration fast fPeriod 'Rising reset init polarity)
-     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) 'Rising reset init polarity)
-     , KnownNat m )
+  :: forall deviceFamily n dom domDDR
+   . ( HasCallStack
+     , KnownDomain dom
+     , KnownDomain domDDR
+     , DomainPeriod dom ~ 2 * DomainPeriod domDDR
+     , DomainActiveEdge dom ~ 'Rising
+     , KnownNat n
+     )
   => SSymbol deviceFamily
-  -> Clock slow
-  -> Reset slow
-  -> Enable slow
-  -> Signal fast (BitVector m)
-  -> Signal slow (BitVector m,BitVector m)
+  -> Clock dom
+  -> Reset dom
+  -> Enable dom
+  -> Signal domDDR (BitVector n)
+  -> Signal dom (BitVector n, BitVector n)
 altddioIn# SSymbol clk rst en = withFrozenCallStack ddrIn# clk rst en 0 0 0
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE altddioIn# #-}
@@ -101,44 +105,47 @@ altddioIn# SSymbol clk rst en = withFrozenCallStack ddrIn# clk rst en 0 0 0
 -- to instantiate this function in a domain where the falling edge is the active
 -- edge will lead to a compilation/simulation error.
 altddioOut
-  :: forall fast fPeriod edge reset init polarity slow m deviceFamily
+  :: forall deviceFamily a dom domDDR
    . ( HasCallStack
-     , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
-     , KnownNat m )
+     , KnownDomain dom
+     , KnownDomain domDDR
+     , DomainPeriod dom ~ 2 * DomainPeriod domDDR
+     , DomainActiveEdge dom ~ 'Rising
+     , BitPack a
+     )
   => SSymbol deviceFamily
   -- ^ The FPGA family
   --
   -- For example this can be instantiated as follows:
   --
   -- > SSymbol @"Cyclone IV E"
-  -> Clock slow
-  -> Reset slow
-  -> Enable slow
-  -> Signal slow (BitVector m,BitVector m)
+  -> Clock dom
+  -> Reset dom
+  -> Enable dom
+  -> Signal dom (a, a)
   -- ^ Normal speed input pair @(i0, i1)@
-  -> Signal fast (BitVector m)
+  -> Signal domDDR a
   -- ^ DDR output signal
 altddioOut devFam clk rst en =
-  case activeEdge @slow of
-    SRising ->
-      uncurry (withFrozenCallStack altddioOut# devFam clk rst en) . unbundle
-    SFalling ->
-      clashCompileError
-        "altddioOut: Primitive only supports rising active edge"
+  fmap unpack . uncurry (withFrozenCallStack altddioOut# devFam clk rst en) .
+    unbundle . fmap (bimap pack pack)
 
 altddioOut#
-  :: ( HasCallStack
-     , KnownConfiguration fast ('DomainConfiguration fast fPeriod 'Rising reset init polarity)
-     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) 'Rising reset init polarity)
-     , KnownNat m )
+  :: forall deviceFamily n dom domDDR
+   . ( HasCallStack
+     , KnownDomain dom
+     , KnownDomain domDDR
+     , DomainPeriod dom ~ 2 * DomainPeriod domDDR
+     , DomainActiveEdge dom ~ 'Rising
+     , KnownNat n
+     )
   => SSymbol deviceFamily
-  -> Clock slow
-  -> Reset slow
-  -> Enable slow
-  -> Signal slow (BitVector m)
-  -> Signal slow (BitVector m)
-  -> Signal fast (BitVector m)
+  -> Clock dom
+  -> Reset dom
+  -> Enable dom
+  -> Signal dom (BitVector n)
+  -> Signal dom (BitVector n)
+  -> Signal domDDR (BitVector n)
 altddioOut# SSymbol clk rst en = ddrOut# clk rst en 0
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE altddioOut# #-}
