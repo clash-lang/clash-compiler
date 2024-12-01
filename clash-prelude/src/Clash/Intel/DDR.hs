@@ -9,7 +9,7 @@ DDR primitives for Intel FPGAs using ALTDDIO primitives.
 For general information about DDR primitives see "Clash.Explicit.DDR".
 
 Note that a reset is only available on certain devices,
-see ALTDDIO userguide for the specifics:
+see the ALTDDIO user guide for the specifics:
 <https://www.altera.com/content/dam/altera-www/global/en_US/pdfs/literature/ug/ug_altddio.pdf>
 -}
 
@@ -32,8 +32,20 @@ import Clash.Explicit.DDR
 -- | Intel specific variant of 'ddrIn' implemented using the ALTDDIO_IN IP core.
 --
 -- Reset values are @0@
+--
+-- Of the output pair @(o0, o1)@, @o0@ is the data clocked in on the /falling/
+-- edge and @o1@ is the data clocked in on the /rising/ edge.
+--
+-- Note that the output pair of @altddioIn@ is the other way around than the
+-- input pair of @altddioOut@. In Clash 1.10, this will be made consistent by
+-- changing @altddioIn@ to match @altddioOut@.
+--
+-- __NB__: This primitive only supports rising edges as the active edge. Trying
+-- to instantiate this function in a domain where falling edges are the active
+-- edge will lead to a compilation/simulation error.
 altddioIn
-  :: ( HasCallStack
+  :: forall fast fPeriod edge reset init polarity slow m deviceFamily
+   . ( HasCallStack
      , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
      , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
      , KnownNat m )
@@ -44,25 +56,53 @@ altddioIn
   --
   -- > SSymbol @"Cyclone IV GX"
   -> Clock slow
-  -- ^ clock
   -> Reset slow
-  -- ^ reset
   -> Enable slow
-  -- ^ Global enable
   -> Signal fast (BitVector m)
   -- ^ DDR input signal
   -> Signal slow (BitVector m,BitVector m)
-  -- ^ normal speed output pairs
-altddioIn SSymbol clk rst en = withFrozenCallStack ddrIn# clk rst en 0 0 0
+  -- ^ Normal speed output pair @(o0, o1)@
+altddioIn =
+  case activeEdge @slow of
+    SRising ->
+      withFrozenCallStack altddioIn#
+    SFalling ->
+      clashCompileError
+        "altddioIn: Primitive only supports rising active edge"
+
+altddioIn#
+  :: ( HasCallStack
+     , KnownConfiguration fast ('DomainConfiguration fast fPeriod 'Rising reset init polarity)
+     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) 'Rising reset init polarity)
+     , KnownNat m )
+  => SSymbol deviceFamily
+  -> Clock slow
+  -> Reset slow
+  -> Enable slow
+  -> Signal fast (BitVector m)
+  -> Signal slow (BitVector m,BitVector m)
+altddioIn# SSymbol clk rst en = withFrozenCallStack ddrIn# clk rst en 0 0 0
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE altddioIn #-}
-{-# ANN altddioIn hasBlackBox #-}
+{-# CLASH_OPAQUE altddioIn# #-}
+{-# ANN altddioIn# hasBlackBox #-}
 
 -- | Intel specific variant of 'ddrOut' implemented using the ALTDDIO_OUT IP core.
 --
 -- Reset value is @0@
+--
+-- Of the input pair @(i0, i1)@, @i0@ is the data clocked out on the /rising/
+-- edge and @i1@ is the data clocked out on the /falling/ edge.
+--
+-- Note that the output pair of @altddioIn@ is the other way around than the
+-- input pair of @altddioOut@. In Clash 1.10, this will be made consistent by
+-- changing @altddioIn@ to match @altddioOut@.
+--
+-- __NB__: This primitive only supports rising edges as the active edge. Trying
+-- to instantiate this function in a domain where the falling edge is the active
+-- edge will lead to a compilation/simulation error.
 altddioOut
-  :: ( HasCallStack
+  :: forall fast fPeriod edge reset init polarity slow m deviceFamily
+   . ( HasCallStack
      , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
      , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
      , KnownNat m )
@@ -73,22 +113,24 @@ altddioOut
   --
   -- > SSymbol @"Cyclone IV E"
   -> Clock slow
-  -- ^ clock
   -> Reset slow
-  -- ^ reset
   -> Enable slow
-  -- ^ Global enable
   -> Signal slow (BitVector m,BitVector m)
-  -- ^ normal speed input pair
+  -- ^ Normal speed input pair @(i0, i1)@
   -> Signal fast (BitVector m)
   -- ^ DDR output signal
 altddioOut devFam clk rst en =
-  uncurry (withFrozenCallStack altddioOut# devFam clk rst en) . unbundle
+  case activeEdge @slow of
+    SRising ->
+      uncurry (withFrozenCallStack altddioOut# devFam clk rst en) . unbundle
+    SFalling ->
+      clashCompileError
+        "altddioOut: Primitive only supports rising active edge"
 
 altddioOut#
   :: ( HasCallStack
-     , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity)
+     , KnownConfiguration fast ('DomainConfiguration fast fPeriod 'Rising reset init polarity)
+     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) 'Rising reset init polarity)
      , KnownNat m )
   => SSymbol deviceFamily
   -> Clock slow
