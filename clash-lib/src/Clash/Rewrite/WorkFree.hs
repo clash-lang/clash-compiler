@@ -155,7 +155,18 @@ isWorkFreeClockOrResetOrEnable tcm e =
   if isClockOrReset tcm eTy || isEnable tcm eTy then
     case collectArgs e of
       (Prim p,_) -> Just (primName p == Text.showt 'removedArg)
-      (Var _, []) -> Just True
+      -- Only local variables with a clock type are work-free. When it is a global
+      -- variable, it is probably backed by a clock generator, which is definitely
+      -- not work-free.
+      --
+      -- Inlining let-bindings referencing a global variable with a clock type
+      -- can sometimes lead to the post-normalization flattening stage to generate
+      -- code that violates the invariants of the netlist generation stage.
+      -- Especially when this global binder is defined recursively such as when
+      -- using `tbClockGen`.
+      -- This then ultimately leads to bad verilog names being generated as
+      -- reported in: https://github.com/clash-lang/clash-compiler/issues/2845
+      (Var v, []) -> Just (isLocalId v)
       (Data _, [_dom, Left (stripTicks -> Data _)]) -> Just True -- For Enable True/False
       (Literal _,_) -> Just True
       _ -> Just False
