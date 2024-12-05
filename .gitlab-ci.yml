@@ -40,7 +40,7 @@ tests:
       - GHC_VERSION: 9.8.2
         RUN_TESTS: "always"
 
-      - GHC_VERSION: 9.6.4
+      - GHC_VERSION: 9.6.6
         RUN_TESTS: "always"
 
       - GHC_VERSION: [9.4.8, 9.2.8]
@@ -56,12 +56,27 @@ tests:
 
 stack-build:
   extends: .common-local
+  image: fpco/stack-build:lts-22.33
   needs: []
   stage: test
   variables:
-    GHC_VERSION: 8.10.7
+    CACHE_FALLBACK_KEY: $CI_JOB_NAME-master-$CI_JOB_IMAGE-$CACHE_BUST_TOKEN-3-non_protected
+  before_script:
+    - apt-get update
+    - apt-get install -y zstd
+    - export THREADS=$(./.ci/effective_cpus.sh)
+    - export
+    - tar -xf cache.tar.zst -C / || true
+    # Print stack.yaml for debugging
+    - cat stack.yaml
   script:
-    - .ci/stack_build.sh
+    # Note: the --pedantic switch adds -Wall -Werror to the options passed to
+    # GHC. Options specified in stack.yaml (like -Wcompat) are still passed; it
+    # is cumulative. Future versions of Stack might add behavior to --pedantic.
+    - stack build -j$THREADS --pedantic
+  after_script:
+    - export THREADS=$(./.ci/effective_cpus.sh)
+    - tar -cf - /root/.stack | zstd -T$THREADS -3 > cache.tar.zst
 
 nix-build:
   image: nixos/nix:2.10.1
