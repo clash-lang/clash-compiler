@@ -14,7 +14,7 @@ Maintainer:  QBayLogic B.V. <devops@qbaylogic.com>
 
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
-module Clash.Tutorial (
+module Tutorial (
   -- * Introduction
   -- $introduction
 
@@ -62,6 +62,15 @@ module Clash.Tutorial (
 
   -- *** SystemVerilog primitives
   -- $svprimitives
+
+  -- * Domain Specific Language
+  -- $dslang
+
+  -- *** One output signal case
+  -- $onesignal
+
+  -- *** Multiple output signals case
+  -- $multsignals
 
   -- * Conclusion
   -- $conclusion
@@ -1435,7 +1444,512 @@ and
 >     // blockRam end
 
 -}
+{- $dslang 
+For those who is lazy to learn those weird language used in the Primitves, then another solution is to use
+the Domain Specific Language (DSL) which is defined internally in the Clash library. The DSL feature is currently used
+internally in the clash-cores library, and it is useful in the situation with the proprietary IP cores. Example of this
+can be found in the Intel/Xilinx ClockGen library, and in the clash-cores Xilinx library. 
+This section aims to guide users to write DSL to bind a module(Verilog/SystemVerilog) or an entity(VHDL) and use
+it inside the Clash design. 
 
+The first thing to introduce that is there are 3 functions need to be defined to bind an external entity(VHDL) or
+a module(Verilog/SystemVerilog) that is BlackBoxTemplateFunction, TemplateFunction and BlackBoxFunction.
+These 3 functions allow Haskell to manipulate and generate the corresponding VHDL/Verilog/SystemVerilog so that
+the Clash design can use the external IP core. 
+
+-}
+{- $onesignal
+
+For example, we have this floating point addition core name plusFloat
+which has pipeline depth is 2 and it is defined in the
+VHDL file like this:
+
+> entity plusFloat is
+>    port (clk : in std_logic;
+>          X : in  std_logic_vector(31 downto 0);
+>          Y : in  std_logic_vector(31 downto 0);
+>          R : out  std_logic_vector(31 downto 0)   );
+> end entity;
+
+we will write our haskell function plusFloatExample like this
+
+@
+plusFloatExample
+  :: forall n . 
+  Clock System
+  -> DSignal System n Float
+  -> DSignal System n Float
+  -> DSignal System (n + 2) Float
+plusFloatExample clk a b =
+  delayN d2 undefined enableGen clk (liftA2 (+) a b)
+{\-\# OPAQUE plusFloatExample \#\-\}
+@
+
+Here we use DSignal for software simulation, it has no effect in the hardware synthesis. Another point is the 
+use of the pragma OPAQUE which informs the Clash compiler that this plusFloatExample function is not hardware 
+synthesizable. As a result, we have to define a blackbox to instruct Clash compiler to use the external IP core
+during the synthesis. Thus, we can add this BlackBoxHaskell annotation primitive to let Clash compiler 
+to know that plusFloatExample function is binding to the plusFloat entity. 
+
+@
+{\-\# ANN plusFloatExample (
+    let
+      primName = show 'plusFloatExample
+      tfName = show 'plusFloatBBF
+    in
+      InlineYamlPrimitive [minBound..] [__i|
+        BlackBoxHaskell:
+          name: \#\{primName}
+          templateFunction: \#\{tfName}
+          workInfo: Always
+      |]) \#\-\}
+@
+
+The BlackBoxHaskell annotation primitive instruct Haskell to bind the Haskell function plusFloatExample to
+the BlackBoxFunction plusFloatBBF. Now, we have to define the BlackBoxFunction plusFloatBBF. 
+
+@
+plusFloatBBF :: BlackBoxFunction
+plusFloatBBF _ _ _ _ = do
+  pure (Right ((emptyBlackBoxMeta {bbKind = TDecl}), (BBFunction ("plusFloatTF") 0 (plusFloatTF entityName))))
+@
+
+The next thing to is to defined the TemplateFunction plusFloatTF as we have defined in the argument of the BBFunction. 
+This function is responsible for evaluating the Haskell function plusFloatExample before hardware mapping it to 
+the plusFloat entity
+
+@
+plusFloatTF ::
+  HasCallStack =>
+  Text ->
+  TemplateFunction
+plusFloatTF entityName =
+  TemplateFunction
+    [0..2] -- This is the list of input [clk, a, b] from plusFloatExample to be evaluate
+    (const True) -- This is to render function in any given context
+    (plusFloatBBTF entityName) -- This is the context to be render
+@
+
+The function plusFloatBBTF is the BlackBoxTemplateFunction, and it is responsible for mapping 1 to 1 between
+software Haskell function plusFloatExample and the hardware entity plusFloat. It will be defined like this:
+
+@
+import qualified Clash.Netlist.Types as NT
+import qualified Clash.Primitives.DSL as DSL
+import qualified Clash.Netlist.Id as Id
+import qualified Data.List as L 
+import Control.Monad.State.Lazy (State)
+import Text.Show.Pretty(ppShow)
+plusFloatBBTF ::
+      forall s. Backend s => Text -> BlackBoxContext -> State s Doc
+plusFloatBBTF entityName bbCtx
+      | [clk, x, y] <- L.map fst (DSL.tInputs bbCtx),
+        [r] <- DSL.tResults bbCtx
+      = do plusFloatInstName <- Id.makeBasic "plusFloat_inst"
+           let compInps
+                 = [("clk", DSL.ety clk), ("X", DSL.ety x), ("Y", DSL.ety y)]
+               compOuts = [("R", DSL.ety r)]
+           (DSL.declaration "plusFloat_inst_block"
+              $ (do DSL.compInBlock entityName compInps compOuts
+                    let inps = [("clk", clk), ("X", x), ("Y", y)]
+                        outs = [("R", r)]
+                    DSL.instDecl
+                      Empty (Id.unsafeMake entityName) plusFloatInstName [] inps outs))
+      | otherwise = error (ppShow bbCtx)
+@
+The BlackBoxTemplateFunction plusFloatBBTF use guard pattern to first check the matching between signal. Here,
+it checks the list of input [clk, x, y] and output list [r] which is corresponding to the list of input and output 
+of entity plusFloat to check whether it can exactly map 1 to 1 signal between software and hardware function. 
+If it success, it will continue to generate an instance of the plusFloat. The DSL.ety function is used to translate the 
+Clash type Bit, Float into the hardware type HDL. The declaration of block (DSL.comInBlock) is way used Clash compiler to used the VHDL component 
+inside the VHDL entity.
+
+Normally in VHDL, user declares the name of component before the begin of architecture of the entity:
+
+> entity mainEn is
+>    port (clk : in std_logic 
+>           out: out std_logic);
+> end entity;
+> architecture arch of mainEn is
+>   component myCom is
+>      port ( inp : in std_logic 
+>             outP : out std_logic);
+>   end component; 
+> begin 
+>   u_inst: myCom port map (inp => clk, outP => out);
+> end;
+
+However, the Clash compiler cannot do the component insertion like that, so it uses block declaration instead:
+
+> entity mainEn is
+>    port (clk : in std_logic;
+>          out: out std_logic);
+> end entity;
+> architecture arch of mainEn is
+> begin 
+>    u_inst_block: block
+>      component myCom is
+>        port (inp: in std_logic;
+>              outP: out std_logic);
+>      end component;
+>    begin
+>     u_inst: myCom port map (inp => clk, outP => out);
+>   end block;
+> end ;
+
+Here is the entire Haskell code using DSL library to generate hardware synthesizable code:
+
+@
+{\-\# LANGUAGE OverloadedStrings, TemplateHaskell, BangPatterns \#\-\}
+import Data.String.Interpolate (__i)
+import Data.Text.Prettyprint.Doc.Extra (Doc)
+import GHC.Stack (HasCallStack)
+import Clash.Backend (Backend)
+import Clash.Netlist.BlackBox.Types
+  (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(..), emptyBlackBoxMeta)
+import Clash.Netlist.Types
+  (BlackBox (..), BlackBoxContext, EntityOrComponent(..), TemplateFunction(..))
+import qualified Clash.Netlist.Types as NT
+import qualified Clash.Primitives.DSL as DSL
+import qualified Clash.Netlist.Id as Id
+import Clash.Annotations.Primitive (Primitive(..))
+import Data.Text (Text)
+import Control.Monad.State.Lazy (State)
+import Text.Show.Pretty(ppShow)
+import Clash.Explicit.Prelude 
+
+plusFloatBBTF ::
+      forall s. Backend s => Text -> BlackBoxContext -> State s Doc
+plusFloatBBTF entityName bbCtx
+      | [clk, x, y] <- L.map fst (DSL.tInputs bbCtx),
+        [r] <- DSL.tResults bbCtx
+      = do plusFloatInstName <- Id.makeBasic "plusFloat_inst"
+           let compInps
+                 = [("clk", DSL.ety clk), ("X", DSL.ety x), ("Y", DSL.ety y)]
+               compOuts = [("R", DSL.ety r)]
+           (DSL.declaration "plusFloat_inst_block"
+              $ (do DSL.compInBlock entityName compInps compOuts
+                    let inps = [("clk", clk), ("X", x), ("Y", y)]
+                        outs = [("R", r)]
+                    DSL.instDecl
+                      Empty (Id.unsafeMake entityName) plusFloatInstName [] inps outs))
+      | otherwise = error (ppShow bbCtx)
+plusFloatTF ::
+  HasCallStack =>
+  Text ->
+  TemplateFunction
+plusFloatTF entityName =
+  TemplateFunction
+    [0..2] -- This is the list of input [clk, a, b] from plusFloatExample to be evaluate
+    (const True) -- This is to render function in any given context
+    (plusFloatBBTF entityName) -- This is the context to be render
+
+plusFloatBBF :: BlackBoxFunction
+plusFloatBBF _ _ _ _ = do
+  pure (Right ((emptyBlackBoxMeta {bbKind = TDecl}), (BBFunction ("plusFloatTF") 0 (plusFloatTF entityName))))
+
+plusFloatExample
+  :: forall n . 
+  Clock System
+  -> DSignal System n Float
+  -> DSignal System n Float
+  -> DSignal System (n + 2) Float
+plusFloatExample clk a b =
+  delayN d2 undefined enableGen clk (liftA2 (+) a b)
+{\-\# OPAQUE plusFloatExample \#\-\}
+{\-\# ANN plusFloatExample (
+    let
+      primName = show 'plusFloatExample
+      tfName = show 'plusFloatBBF
+    in
+      InlineYamlPrimitive [minBound..] [__i|
+        BlackBoxHaskell:
+          name: \#\{primName}
+          templateFunction: \#\{tfName}
+          workInfo: Always
+      |]) \#\-\}
+topEntity ::
+  Clock System ->
+  DSignal System 0 Float ->
+  DSignal System 0 Float ->
+  DSignal System (0 + 2) Float 
+topEntity clk a b = plusFloatExample clk a b
+{\-\# ANN topEntity
+  (Synthesize
+    { t_name   = "topEntity"
+    , t_inputs = [ PortName "clk"
+                 , PortName "a"
+                 , PortName "b"
+                 ]
+    , t_output = PortName "result"
+    }) \#\-\}
+@
+
+The VHDL generation for the topEntity is:
+
+> entity topEntity is
+>  port(-- clock
+>       clk    : in in topEntity_types.clk_System;
+>       a      : in std_logic_vector(31 downto 0);
+>       b      : in std_logic_vector(31 downto 0);
+>       result : out std_logic_vector(31 downto 0));
+> end;
+> architecture structural of topEntity is
+> begin
+>  plusFloat_inst_block : block
+>    component plusFloat port
+>      ( clk : in in topEntity_types.clk_System
+>      ; X : in std_logic_vector(31 downto 0)
+>      ; Y : in std_logic_vector(31 downto 0)
+>      ; R : out std_logic_vector(31 downto 0) );
+>    end component;
+>  begin
+>    plusFloat_inst : plusFloat
+>      port map
+>        (clk => clk, X   => a, Y   => b, R   => result);
+>  end block;
+> end;
+
+The Verilog generation for the topEntity is:
+
+> module topEntity
+>    ( // Inputs
+>      input wire  clk // clock
+>    , input wire [31:0] a
+>    , input wire [31:0] b
+>    , output wire [31:0] result
+>    );
+>  plusFloat plusFloat_inst
+>      (.clk (clk), .X (a), .Y (b), .R (result));
+> endmodule
+
+Currently, there is a error to declare block component with Clash. The experimental Clash compiler has
+fixed this problem. User must create a file name __cabal.project__ and include this line inside its content:
+
+> source-repository-package
+>  type: git
+>  location: https://github.com/clash-lang/clash-compiler.git
+>  tag: 5706eafca799ae04fda0ee7d666a40b6c0e7f22b
+>  subdir: clash-prelude
+> 
+> source-repository-package
+>  type: git
+>  location: https://github.com/clash-lang/clash-compiler.git
+>  tag: 5706eafca799ae04fda0ee7d666a40b6c0e7f22b
+>  subdir: clash-ghc
+>
+> source-repository-package
+>  type: git
+>  location: https://github.com/clash-lang/clash-compiler.git
+>  tag: 5706eafca799ae04fda0ee7d666a40b6c0e7f22b
+>  subdir: clash-lib
+
+-}
+{- $multsignals
+The case for binding the haskell function with the module (Verilog) or entity (VHDL) which has multiple 
+output ports is different that the case with only one output signal. Fortunately, this difference only happens
+with the BlackBoxTemplateFunction. 
+For example, we have a module vga controller written in Verilog:
+
+> module vga_controller(
+>    input clk_100MHz,   
+>    input reset,        
+>    output video_on,    
+>    output hsync,       
+>    output vsync,       
+>    output p_tick,      
+>    output [9:0] x,     
+>    output [9:0] y      
+>    );
+> end module;
+
+This module can be very complex to re-implemented it in Haskell function, we can use the function deepErrorX from 
+Clash.XException library to let the Clash compiler know that this function exist during the hardware synthesis,
+but it cannot be simulated in software.
+
+@
+vga_controller 
+    :: Clock System ->
+    Reset System ->
+    ( Signal System Bit          -- ^ video_on 
+     , Signal System Bit         -- ^ Horizontal Sync 
+     , Signal System Bit        -- ^ Vertical Sync
+     , Signal System Bit         -- ^ p_tick
+     , Signal System (BitVector 10)  -- ^ X Position
+     , Signal System (BitVector 10)  -- ^ Y Position
+     )
+vga_controller !clk !rst = deepErrorX "vga_controller: simulation output undefined"
+{\-\# OPAQUE vga_controller \#\-\}
+@
+
+The use of ! in !clk and !rst is to force the Haskell compiler not to lazy evaluate the Haskell vga_controller function.
+The only way for a Haskell function to have multiple outputs is to return a tuple. Naturally, we need a way 
+to tell takes out those output signals out of the tuple and map it to the hardware output signals. 
+The Clash DSL library provide a hardware expression named port product to deal with this situation
+
+@
+vga_controllerBBTF ::
+      forall s. Backend s => Text -> BlackBoxContext -> State s Doc
+vga_controllerBBTF vga_controller bbCtx
+      | [clk_100MHz, reset] <- L.map fst (DSL.tInputs bbCtx),
+        [result] <- DSL.tResults bbCtx,
+        NT.Product _ _ resTyps <- DSL.ety result
+      = do vga_controllerInstName <- Id.makeBasic "vga_controller_inst"
+           let compInps
+                 = [("clk_100MHz", DSL.ety clk_100MHz), ("reset", DSL.ety reset)]
+               compOuts
+                 = L.zip ["video_on", "hsync", "vsync", "p_tick", "x", "y"] resTyps
+           (DSL.declarationReturn bbCtx "vga_controller_inst_block"
+              $ (do declares <- mapM
+                                  (\ (name, typ) -> DSL.declare name typ)
+                                  (L.zip ["video_on", "hsync", "vsync", "p_tick", "x", "y"] resTyps)
+                    let [video_on, hsync, vsync, p_tick, x, y] = declares
+                    let inps = [("clk_100MHz", clk_100MHz), ("reset", reset)]
+                        outs
+                          = [("video_on", video_on), ("hsync", hsync), ("vsync", vsync),
+                             ("p_tick", p_tick), ("x", x), ("y", y)]
+                    DSL.compInBlock vga_controller compInps compOuts
+                    DSL.instDecl
+                      Empty (Id.unsafeMake vga_controller) vga_controllerInstName [] inps
+                      outs
+                    pure
+                      [DSL.constructProduct
+                         (DSL.ety result) [video_on, hsync, vsync, p_tick, x, y]]))
+      | otherwise = error (ppShow bbCtx)
+@
+
+Compared to the BlackBoxTemplateFunction plusFloatBBTF, we can see 3 main differences. 
+The first thing to notice is the extra one comparision in the pattern matching. This extra comparision is to take
+out the type of output signals from the Haskell function as resTyps.  
+The next thing is to declare new signals and map them to list of the output signals
+
+> compOuts = L.zip ["video_on", "hsync", "vsync", "p_tick", "x", "y"] resTyps
+> declares <- mapM (\ (name, typ) -> DSL.declare name typ)
+>                  (L.zip ["video_on", "hsync", "vsync", "p_tick", "x", "y"] resTyps)
+> let [video_on, hsync, vsync, p_tick, x, y] = declares
+
+Finally, after declaring new output signals and mapping them to the hardware type, user need to contruct a port 
+product to group all hardware output signals into 1 software signal. 
+
+> pure [DSL.constructProduct (DSL.ety result) [video_on, hsync, vsync, p_tick, x, y]]
+
+Here is the full example hardware synthesizable Clash code:
+
+@
+{\-\# LANGUAGE OverloadedStrings, TemplateHaskell, BangPatterns \#\-\}
+import Data.String.Interpolate (__i)
+import Data.Text.Prettyprint.Doc.Extra (Doc)
+import GHC.Stack (HasCallStack)
+import Clash.Backend (Backend)
+import Clash.Netlist.BlackBox.Types
+  (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(..), emptyBlackBoxMeta)
+import Clash.Netlist.Types
+  (BlackBox (..), BlackBoxContext, EntityOrComponent(..), TemplateFunction(..))
+import qualified Clash.Netlist.Types as NT
+import qualified Clash.Primitives.DSL as DSL
+import qualified Clash.Netlist.Id as Id
+import Clash.Annotations.Primitive (Primitive(..))
+import Data.Text (Text)
+import Control.Monad.State.Lazy (State)
+import Text.Show.Pretty(ppShow)
+import Clash.Explicit.Prelude 
+ 
+vga_controllerBBTF ::
+      forall s. Backend s => Text -> BlackBoxContext -> State s Doc
+vga_controllerBBTF vga_controller bbCtx
+      | [clk_100MHz, reset] <- L.map fst (DSL.tInputs bbCtx),
+        [result] <- DSL.tResults bbCtx,
+        NT.Product _ _ resTyps <- DSL.ety result
+      = do vga_controllerInstName <- Id.makeBasic "vga_controller_inst"
+           let compInps
+                 = [("clk_100MHz", DSL.ety clk_100MHz), ("reset", DSL.ety reset)]
+               compOuts
+                 = L.zip ["video_on", "hsync", "vsync", "p_tick", "x", "y"] resTyps
+           (DSL.declarationReturn bbCtx "vga_controller_inst_block"
+              $ (do declares <- mapM
+                                  (\ (name, typ) -> DSL.declare name typ)
+                                  (L.zip ["video_on", "hsync", "vsync", "p_tick", "x", "y"] resTyps)
+                    let [video_on, hsync, vsync, p_tick, x, y] = declares
+                    let inps = [("clk_100MHz", clk_100MHz), ("reset", reset)]
+                        outs
+                          = [("video_on", video_on), ("hsync", hsync), ("vsync", vsync),
+                             ("p_tick", p_tick), ("x", x), ("y", y)]
+                    DSL.compInBlock vga_controller compInps compOuts
+                    DSL.instDecl
+                      Empty (Id.unsafeMake vga_controller) vga_controllerInstName [] inps
+                      outs
+                    pure
+                      [DSL.constructProduct
+                         (DSL.ety result) [video_on, hsync, vsync, p_tick, x, y]]))
+      | otherwise = error (ppShow bbCtx)
+vga_controllerTF :: HasCallStack => Text -> TemplateFunction
+vga_controllerTF entityName
+      = TemplateFunction
+          [0, 1, 2] (const True) (vga_controllerBBTF entityName)
+vga_controllerBBF :: BlackBoxFunction
+vga_controllerBBF _ _ _ _
+      = pure
+          (Right
+             (emptyBlackBoxMeta {bbKind = TDecl},
+              BBFunction
+                "vga_controllerTF" 0 (vga_controllerTF "vga_controller")))
+vga_controller
+    :: Clock System ->
+    Reset System ->
+    ( Signal System Bit          -- ^ video_on 
+     , Signal System Bit         -- ^ Horizontal Sync 
+     , Signal System Bit        -- ^ Vertical Sync
+     , Signal System Bit         -- ^ p_tick
+     , Signal System (BitVector 10)  -- ^ X Position
+     , Signal System (BitVector 10)  -- ^ Y Position
+     )
+vga_controller !clk !rst = deepErrorX "vga_controller: simulation output undefined"
+{\-\# OPAQUE vga_controller \#\-\}
+{\-\# ANN vga_controller (let
+      primName = show 'vga_controller
+      tfName = show 'vga_controllerBBF
+    in
+      InlineYamlPrimitive [minBound..] [__i|
+        BlackBoxHaskell:
+          name: #{primName}
+          templateFunction: #{tfName}
+          workInfo: Always
+      |]) \#\-\}
+
+topEntity
+  :: Clock System   -- ^ System Clock (100 MHz)
+  -> Reset System   -- ^ Reset Signal
+  -> Enable System
+  -> Signal System (BitVector 12)  -- ^ Switches input (for color selection)
+  -> ( Signal System Bit         -- ^ Horizontal Sync
+     , Signal System Bit         -- ^ Vertical Sync
+     , Signal System (BitVector 12)  -- ^ RGB Output
+     )
+topEntity clk rst en sw = (hsync, vsync, rgbOut)
+  where
+    -- VGA Controller instantiation
+    (videoOn, hsync, vsync, _, _, _) = vga_controller clk rst
+    -- Resetting register
+    resetting = register clk rst en False (pure False)
+    -- RGB register with conditional input
+    rgbReg = register clk rst en 0 (mux (resetting .||. (fmap bitToBool videoOn)) sw (pure 0))
+    -- Output
+    rgbOut = rgbReg
+-- Synthesize topEntity
+{\-\# ANN topEntity
+  (Synthesize
+    { t_name   = "VGAtopEntity"
+    , t_inputs = [ PortName "clk"
+                 , PortName "rst"
+                 , PortName "en"
+                 , PortName "sw"
+                 ]
+    , t_output = PortProduct "" [PortName "hsync", PortName "vsync", PortName "rgb"]
+    }) \#\-\}
+
+
+@
+-}
 {- $multiclock #multiclock#
 Clash supports designs multiple /clock/ (and /reset/) domains, though perhaps in
 a slightly limited form. What is possible is:
