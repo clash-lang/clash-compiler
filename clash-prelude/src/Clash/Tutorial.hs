@@ -14,7 +14,7 @@ Maintainer:  QBayLogic B.V. <devops@qbaylogic.com>
 
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
-module Tutorial (
+module Clash.Tutorial (
   -- * Introduction
   -- $introduction
 
@@ -1444,18 +1444,18 @@ and
 >     // blockRam end
 
 -}
-{- $dslang 
+{- $dslang
 For those who is lazy to learn those weird language used in the Primitves, then another solution is to use
 the Domain Specific Language (DSL) which is defined internally in the Clash library. The DSL feature is currently used
 internally in the clash-cores library, and it is useful in the situation with the proprietary IP cores. Example of this
-can be found in the Intel/Xilinx ClockGen library, and in the clash-cores Xilinx library. 
+can be found in the Intel/Xilinx ClockGen library, and in the clash-cores Xilinx library.
 This section aims to guide users to write DSL to bind a module(Verilog/SystemVerilog) or an entity(VHDL) and use
-it inside the Clash design. 
+it inside the Clash design.
 
 The first thing to introduce that is there are 3 functions need to be defined to bind an external entity(VHDL) or
 a module(Verilog/SystemVerilog) that is BlackBoxTemplateFunction, TemplateFunction and BlackBoxFunction.
 These 3 functions allow Haskell to manipulate and generate the corresponding VHDL/Verilog/SystemVerilog so that
-the Clash design can use the external IP core. 
+the Clash design can use the external IP core.
 
 -}
 {- $onesignal
@@ -1475,7 +1475,7 @@ we will write our haskell function plusFloatExample like this
 
 @
 plusFloatExample
-  :: forall n . 
+  :: forall n .
   Clock System
   -> DSignal System n Float
   -> DSignal System n Float
@@ -1485,11 +1485,11 @@ plusFloatExample clk a b =
 {\-\# OPAQUE plusFloatExample \#\-\}
 @
 
-Here we use DSignal for software simulation, it has no effect in the hardware synthesis. Another point is the 
-use of the pragma OPAQUE which informs the Clash compiler that this plusFloatExample function is not hardware 
+Here we use DSignal for software simulation, it has no effect in the hardware synthesis. Another point is the
+use of the pragma OPAQUE which informs the Clash compiler that this plusFloatExample function is not hardware
 synthesizable. As a result, we have to define a blackbox to instruct Clash compiler to use the external IP core
-during the synthesis. Thus, we can add this BlackBoxHaskell annotation primitive to let Clash compiler 
-to know that plusFloatExample function is binding to the plusFloat entity. 
+during the synthesis. Thus, we can add this BlackBoxHaskell annotation primitive to let Clash compiler
+to know that plusFloatExample function is binding to the plusFloat entity.
 
 @
 {\-\# ANN plusFloatExample (
@@ -1506,7 +1506,7 @@ to know that plusFloatExample function is binding to the plusFloat entity.
 @
 
 The BlackBoxHaskell annotation primitive instruct Haskell to bind the Haskell function plusFloatExample to
-the BlackBoxFunction plusFloatBBF. Now, we have to define the BlackBoxFunction plusFloatBBF. 
+the BlackBoxFunction plusFloatBBF. Now, we have to define the BlackBoxFunction plusFloatBBF.
 
 @
 plusFloatBBF :: BlackBoxFunction
@@ -1514,8 +1514,8 @@ plusFloatBBF _ _ _ _ = do
   pure (Right ((emptyBlackBoxMeta {bbKind = TDecl}), (BBFunction ("plusFloatTF") 0 (plusFloatTF entityName))))
 @
 
-The next thing to is to defined the TemplateFunction plusFloatTF as we have defined in the argument of the BBFunction. 
-This function is responsible for evaluating the Haskell function plusFloatExample before hardware mapping it to 
+The next thing to is to defined the TemplateFunction plusFloatTF as we have defined in the argument of the BBFunction.
+This function is responsible for evaluating the Haskell function plusFloatExample before hardware mapping it to
 the plusFloat entity
 
 @
@@ -1537,7 +1537,7 @@ software Haskell function plusFloatExample and the hardware entity plusFloat. It
 import qualified Clash.Netlist.Types as NT
 import qualified Clash.Primitives.DSL as DSL
 import qualified Clash.Netlist.Id as Id
-import qualified Data.List as L 
+import qualified Data.List as L
 import Control.Monad.State.Lazy (State)
 import Text.Show.Pretty(ppShow)
 plusFloatBBTF ::
@@ -1558,24 +1558,24 @@ plusFloatBBTF entityName bbCtx
       | otherwise = error (ppShow bbCtx)
 @
 The BlackBoxTemplateFunction plusFloatBBTF use guard pattern to first check the matching between signal. Here,
-it checks the list of input [clk, x, y] and output list [r] which is corresponding to the list of input and output 
-of entity plusFloat to check whether it can exactly map 1 to 1 signal between software and hardware function. 
-If it success, it will continue to generate an instance of the plusFloat. The DSL.ety function is used to translate the 
-Clash type Bit, Float into the hardware type HDL. The declaration of block (DSL.comInBlock) is way used Clash compiler to used the VHDL component 
+it checks the list of input [clk, x, y] and output list [r] which is corresponding to the list of input and output
+of entity plusFloat to check whether it can exactly map 1 to 1 signal between software and hardware function.
+If it success, it will continue to generate an instance of the plusFloat. The DSL.ety function is used to translate the
+Clash type Bit, Float into the hardware type HDL. The declaration of block (DSL.comInBlock) is way used Clash compiler to used the VHDL component
 inside the VHDL entity.
 
 Normally in VHDL, user declares the name of component before the begin of architecture of the entity:
 
 > entity mainEn is
->    port (clk : in std_logic 
+>    port (clk : in std_logic
 >           out: out std_logic);
 > end entity;
 > architecture arch of mainEn is
 >   component myCom is
->      port ( inp : in std_logic 
+>      port ( inp : in std_logic
 >             outP : out std_logic);
->   end component; 
-> begin 
+>   end component;
+> begin
 >   u_inst: myCom port map (inp => clk, outP => out);
 > end;
 
@@ -1586,7 +1586,7 @@ However, the Clash compiler cannot do the component insertion like that, so it u
 >          out: out std_logic);
 > end entity;
 > architecture arch of mainEn is
-> begin 
+> begin
 >    u_inst_block: block
 >      component myCom is
 >        port (inp: in std_logic;
@@ -1616,7 +1616,7 @@ import Clash.Annotations.Primitive (Primitive(..))
 import Data.Text (Text)
 import Control.Monad.State.Lazy (State)
 import Text.Show.Pretty(ppShow)
-import Clash.Explicit.Prelude 
+import Clash.Explicit.Prelude
 
 plusFloatBBTF ::
       forall s. Backend s => Text -> BlackBoxContext -> State s Doc
@@ -1649,7 +1649,7 @@ plusFloatBBF _ _ _ _ = do
   pure (Right ((emptyBlackBoxMeta {bbKind = TDecl}), (BBFunction ("plusFloatTF") 0 (plusFloatTF entityName))))
 
 plusFloatExample
-  :: forall n . 
+  :: forall n .
   Clock System
   -> DSignal System n Float
   -> DSignal System n Float
@@ -1672,7 +1672,7 @@ topEntity ::
   Clock System ->
   DSignal System 0 Float ->
   DSignal System 0 Float ->
-  DSignal System (0 + 2) Float 
+  DSignal System (0 + 2) Float
 topEntity clk a b = plusFloatExample clk a b
 {\-\# ANN topEntity
   (Synthesize
@@ -1731,7 +1731,7 @@ fixed this problem. User must create a file name __cabal.project__ and include t
 >  location: https://github.com/clash-lang/clash-compiler.git
 >  tag: 5706eafca799ae04fda0ee7d666a40b6c0e7f22b
 >  subdir: clash-prelude
-> 
+>
 > source-repository-package
 >  type: git
 >  location: https://github.com/clash-lang/clash-compiler.git
@@ -1746,33 +1746,33 @@ fixed this problem. User must create a file name __cabal.project__ and include t
 
 -}
 {- $multsignals
-The case for binding the haskell function with the module (Verilog) or entity (VHDL) which has multiple 
+The case for binding the haskell function with the module (Verilog) or entity (VHDL) which has multiple
 output ports is different that the case with only one output signal. Fortunately, this difference only happens
-with the BlackBoxTemplateFunction. 
+with the BlackBoxTemplateFunction.
 For example, we have a module vga controller written in Verilog:
 
 > module vga_controller(
->    input clk_100MHz,   
->    input reset,        
->    output video_on,    
->    output hsync,       
->    output vsync,       
->    output p_tick,      
->    output [9:0] x,     
->    output [9:0] y      
+>    input clk_100MHz,
+>    input reset,
+>    output video_on,
+>    output hsync,
+>    output vsync,
+>    output p_tick,
+>    output [9:0] x,
+>    output [9:0] y
 >    );
 > end module;
 
-This module can be very complex to re-implemented it in Haskell function, we can use the function deepErrorX from 
+This module can be very complex to re-implemented it in Haskell function, we can use the function deepErrorX from
 Clash.XException library to let the Clash compiler know that this function exist during the hardware synthesis,
 but it cannot be simulated in software.
 
 @
-vga_controller 
+vga_controller
     :: Clock System ->
     Reset System ->
-    ( Signal System Bit          -- ^ video_on 
-     , Signal System Bit         -- ^ Horizontal Sync 
+    ( Signal System Bit          -- ^ video_on
+     , Signal System Bit         -- ^ Horizontal Sync
      , Signal System Bit        -- ^ Vertical Sync
      , Signal System Bit         -- ^ p_tick
      , Signal System (BitVector 10)  -- ^ X Position
@@ -1783,8 +1783,8 @@ vga_controller !clk !rst = deepErrorX "vga_controller: simulation output undefin
 @
 
 The use of ! in !clk and !rst is to force the Haskell compiler not to lazy evaluate the Haskell vga_controller function.
-The only way for a Haskell function to have multiple outputs is to return a tuple. Naturally, we need a way 
-to tell takes out those output signals out of the tuple and map it to the hardware output signals. 
+The only way for a Haskell function to have multiple outputs is to return a tuple. Naturally, we need a way
+to tell takes out those output signals out of the tuple and map it to the hardware output signals.
 The Clash DSL library provide a hardware expression named port product to deal with this situation
 
 @
@@ -1818,9 +1818,9 @@ vga_controllerBBTF vga_controller bbCtx
       | otherwise = error (ppShow bbCtx)
 @
 
-Compared to the BlackBoxTemplateFunction plusFloatBBTF, we can see 3 main differences. 
+Compared to the BlackBoxTemplateFunction plusFloatBBTF, we can see 3 main differences.
 The first thing to notice is the extra one comparision in the pattern matching. This extra comparision is to take
-out the type of output signals from the Haskell function as resTyps.  
+out the type of output signals from the Haskell function as resTyps.
 The next thing is to declare new signals and map them to list of the output signals
 
 > compOuts = L.zip ["video_on", "hsync", "vsync", "p_tick", "x", "y"] resTyps
@@ -1828,8 +1828,8 @@ The next thing is to declare new signals and map them to list of the output sign
 >                  (L.zip ["video_on", "hsync", "vsync", "p_tick", "x", "y"] resTyps)
 > let [video_on, hsync, vsync, p_tick, x, y] = declares
 
-Finally, after declaring new output signals and mapping them to the hardware type, user need to contruct a port 
-product to group all hardware output signals into 1 software signal. 
+Finally, after declaring new output signals and mapping them to the hardware type, user need to contruct a port
+product to group all hardware output signals into 1 software signal.
 
 > pure [DSL.constructProduct (DSL.ety result) [video_on, hsync, vsync, p_tick, x, y]]
 
@@ -1852,8 +1852,8 @@ import Clash.Annotations.Primitive (Primitive(..))
 import Data.Text (Text)
 import Control.Monad.State.Lazy (State)
 import Text.Show.Pretty(ppShow)
-import Clash.Explicit.Prelude 
- 
+import Clash.Explicit.Prelude
+
 vga_controllerBBTF ::
       forall s. Backend s => Text -> BlackBoxContext -> State s Doc
 vga_controllerBBTF vga_controller bbCtx
@@ -1896,8 +1896,8 @@ vga_controllerBBF _ _ _ _
 vga_controller
     :: Clock System ->
     Reset System ->
-    ( Signal System Bit          -- ^ video_on 
-     , Signal System Bit         -- ^ Horizontal Sync 
+    ( Signal System Bit          -- ^ video_on
+     , Signal System Bit         -- ^ Horizontal Sync
      , Signal System Bit        -- ^ Vertical Sync
      , Signal System Bit         -- ^ p_tick
      , Signal System (BitVector 10)  -- ^ X Position
