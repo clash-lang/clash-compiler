@@ -153,9 +153,9 @@ pprDebugAndThen cont heading prettyMsg =
 -- | A class that can generate unique numbers
 class Monad m => MonadUnique m where
   -- | Get a new unique
-  getUniqueM :: m Int
+  getUniqueM :: m Unique
 
-instance Monad m => MonadUnique (StateT Int m) where
+instance Monad m => MonadUnique (StateT Unique m) where
   getUniqueM = do
     supply <- State.get
     State.modify (+1)

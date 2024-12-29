@@ -12,10 +12,10 @@ import           Clash.GHC.Evaluator
 import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)
 
 import           Clash.Netlist.Types          (TopEntityT(topId))
+import qualified Clash.Util.Supply            as Supply
 
 import           Criterion.Main
 
-import qualified Control.Concurrent.Supply    as Supply
 import           Control.DeepSeq              (NFData(..), rwhnf)
 import           Data.List                    (isPrefixOf, partition)
 import           System.Environment           (getArgs, withArgs)

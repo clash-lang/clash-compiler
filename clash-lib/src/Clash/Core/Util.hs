@@ -18,7 +18,6 @@
 
 module Clash.Core.Util where
 
-import           Control.Concurrent.Supply     (Supply, freshId)
 import Control.Exception.Base (patError)
 #if MIN_VERSION_base(4,16,0)
 import GHC.Prim.Panic (absentError)
@@ -67,6 +66,7 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug                       (traceIf)
 import Clash.Unique                      (fromGhcUnique)
 import Clash.Util
+import Clash.Util.Supply                 (Supply, freshId)
 
 import {-# SOURCE #-} qualified Clash.Normalize.Primitives as Primitives
 import Clash.XException (errorX)

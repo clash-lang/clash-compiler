@@ -27,9 +27,10 @@ import Clash.Rewrite.Types
 import Clash.Rewrite.Util (runRewrite)
 import Clash.Normalize.Types
 import qualified Clash.Util.Interpolate as I
+import Clash.Util.Supply (newSupply)
+import Clash.Unique (Unique)
 
 import Control.Applicative ((<|>))
-import Control.Concurrent.Supply (newSupply)
 import Data.Default
 import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.Parser (parseExp, fromParseResult)
@@ -46,9 +47,9 @@ import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
 import qualified Data.Text as Text
 
-type TypeMap = HashMap.HashMap Int C.Type
+type TypeMap = HashMap.HashMap Unique C.Type
 
-lookupTM :: Int -> TypeMap -> C.Type
+lookupTM :: Unique -> TypeMap -> C.Type
 lookupTM u tm = case HashMap.lookup u tm of
   Just t -> t
   Nothing ->
@@ -217,7 +218,7 @@ parseDecls typs0 decls = (typs1, map parseOtherDecl otherDecls)
     e ->
       error ("parseOtherDecl: " <> show e)
 
-  parseTypeDecl :: Decl l -> [(Int, C.Type)]
+  parseTypeDecl :: Decl l -> [(Unique, C.Type)]
   parseTypeDecl (TypeSig _ nms t) =
     map (\nm -> (C.nameUniq (parseName nm), parseType t)) nms
   parseTypeDecl _ = error "impossible"
