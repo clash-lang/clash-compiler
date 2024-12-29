@@ -138,7 +138,6 @@ library
     singletons,
     generic-lens,
     mtl,
-    concurrent-supply,
     unordered-containers,
     ordered-containers,
     containers,

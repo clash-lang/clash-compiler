@@ -21,7 +21,6 @@
 
 module Clash.Rewrite.Types where
 
-import Control.Concurrent.Supply             (Supply, freshId)
 import Control.DeepSeq                       (NFData)
 import Control.Lens                          (Lens', use, (.=))
 import qualified Control.Lens as Lens
@@ -57,6 +56,7 @@ import Clash.Netlist.Types       (FilteredHWType, HWMap)
 import Clash.Primitives.Types    (CompiledPrimMap)
 import Clash.Rewrite.WorkFree    (isWorkFree)
 import Clash.Util
+import Clash.Util.Supply         (Supply, freshId)
 
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 

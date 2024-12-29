@@ -99,6 +99,7 @@ import           Clash.Netlist.Types     (TopEntityT(..))
 import           Clash.Primitives.Types
   (Primitive (..), CompiledPrimMap)
 import           Clash.Primitives.Util   (generatePrimMap)
+import           Clash.Unique            (Unique)
 import           Clash.Util              (reportTimeDiff)
 import qualified Clash.Util.Interpolate as I
 
@@ -400,15 +401,15 @@ mkClassSelector inScope0 tcm ty sel = newExpr
       Just dictTy@(tyView -> TyConApp tcNm _)
         | Just tc <- UniqMap.lookup tcNm tcm
         , not (isNewTypeTc tc)
-        -> flip State.evalState (0 :: Int) $ do
+        -> flip State.evalState (0 :: Unique) $ do
               dcId <- mkInternalVar inScope0 "dict" dictTy
               let inScope1 = extendInScopeSet inScope0 dcId
               selE <- mkSelectorCase "mkClassSelector" inScope1 tcm (Var dcId) 1 sel
               return (mkTyLams (mkLams selE [dcId]) tvs)
-      Just (tyView -> FunTy arg res) -> flip State.evalState (0 :: Int) $ do
+      Just (tyView -> FunTy arg res) -> flip State.evalState (0 :: Unique) $ do
               dcId <- mkInternalVar inScope0 "dict" (mkFunTy arg res)
               return (mkTyLams (mkLams (Var dcId) [dcId]) tvs)
-      Just dictTy -> flip State.evalState (0 :: Int) $ do
+      Just dictTy -> flip State.evalState (0 :: Unique) $ do
               dcId <- mkInternalVar inScope0 "dict" dictTy
               return (mkTyLams (mkLams (Var dcId) [dcId]) tvs)
       Nothing -> error "mkClassSelector: expected at least one dictionary argument"

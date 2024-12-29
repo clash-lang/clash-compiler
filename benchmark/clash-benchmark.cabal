@@ -15,7 +15,6 @@ library
   ghc-options:         -O2 -Wall -Wcompat
   Exposed-Modules:     BenchmarkCommon
   build-depends:       base,
-                       concurrent-supply,
                        containers,
                        ghc,
                        mtl,
@@ -34,7 +33,6 @@ executable clash-benchmark-normalization
   default-language:    Haskell2010
   ghc-options:         -O2 -Wall -Wcompat -threaded -rtsopts "-with-rtsopts=-N -A128m"
   build-depends:       base,
-                       concurrent-supply,
                        containers,
                        criterion,
                        deepseq,

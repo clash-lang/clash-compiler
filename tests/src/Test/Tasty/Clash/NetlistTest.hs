@@ -37,8 +37,8 @@ import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
 import           Clash.Netlist
 import           Clash.Netlist.Types hiding (backend, hdlDir)
+import qualified Clash.Util.Supply as Supply
 
-import qualified Control.Concurrent.Supply as Supply
 import           Control.DeepSeq (force)
 import           Data.Maybe
 import qualified Data.Map.Ordered as OMap

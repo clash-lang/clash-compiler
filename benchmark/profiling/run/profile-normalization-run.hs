@@ -2,12 +2,12 @@
 
 import           Clash.Driver
 import           Clash.Driver.Types           (ClashEnv(..), ClashOpts(opt_intWidth))
+import qualified Clash.Util.Supply            as Supply
 
 import           Clash.GHC.PartialEval
 import           Clash.GHC.Evaluator
 import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)
 
-import qualified Control.Concurrent.Supply    as Supply
 import           Control.DeepSeq              (deepseq)
 import           Data.Binary                  (decode)
 import           Data.List                    (partition)

@@ -46,7 +46,11 @@ import           Data.Functor            (($>))
 import           Data.Hashable           (Hashable)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
+#if MIN_VERSION_ghc(9,10,0)
+import qualified GHC.Data.Word64Set      as IntSet
+#else
 import qualified Data.IntSet             as IntSet
+#endif
 import           Data.Primitive.ByteArray (ByteArray (..))
 import           Control.Applicative     (Alternative((<|>)))
 import           Data.List               (unzip4, partition)

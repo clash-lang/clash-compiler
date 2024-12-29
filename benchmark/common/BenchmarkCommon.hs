@@ -10,13 +10,12 @@ import Clash.Core.Var
 import Clash.Driver
 import Clash.Driver.Types
 import Clash.Netlist.Types (TopEntityT(topId))
+import Clash.Util.Supply as Supply
 
 import Clash.GHC.PartialEval
 import Clash.GHC.Evaluator
 import Clash.GHC.GenerateBindings
 import Clash.GHC.NetlistTypes
-
-import qualified Control.Concurrent.Supply as Supply
 
 #if MIN_VERSION_ghc(9,2,0)
 import qualified GHC.Driver.Monad as GHC
