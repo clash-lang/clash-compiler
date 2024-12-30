@@ -10,7 +10,6 @@ module Test.Tasty.Clash.CoreTest
   , findBinding
   ) where
 
-import Control.Concurrent.Supply
 import qualified Data.List as List (find)
 
 import Clash.Annotations.Primitive (HDL(..))
@@ -25,6 +24,7 @@ import Clash.Core.TyCon
 import Clash.Core.Var
 import Clash.Core.VarEnv
 import Clash.Driver.Types
+import Clash.Util.Supply
 
 import Clash.GHC.GenerateBindings
 import Clash.GHC.PartialEval

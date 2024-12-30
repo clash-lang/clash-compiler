@@ -42,11 +42,16 @@ module Clash.Data.UniqMap
 import           Prelude hiding (elem, filter, lookup, notElem, null)
 
 import           Control.DeepSeq (NFData)
-import           Data.Binary (Binary)
+import           Data.Binary (Binary (..))
 import           Data.Bifunctor (first)
 import           Data.Function (on)
+#if MIN_VERSION_ghc(9,10,0)
+import           GHC.Data.Word64Map.Strict (Word64Map)
+import qualified GHC.Data.Word64Map.Strict as IntMap
+#else
 import           Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
+#endif
 import qualified Data.List as List (foldl')
 
 #if !MIN_VERSION_containers(0,6,2)
@@ -66,17 +71,27 @@ import           Clash.Unique (Unique, Uniquable(getUnique))
 -- uniqueable and provide their own key, however a unique can be associated
 -- with any value.
 newtype UniqMap a
+#if MIN_VERSION_ghc(9,10,0)
+  = UniqMap { uniqMapToIntMap :: Word64Map a }
+#else
   = UniqMap { uniqMapToIntMap :: IntMap a }
+#endif
   deriving stock Traversable
   deriving newtype
-    ( Binary
-    , Foldable
+    ( Foldable
     , Functor
     , Monoid
     , NFData
     , Semigroup
     , Show
     )
+#if MIN_VERSION_ghc(9,10,0)
+instance Binary a => Binary (UniqMap a) where
+  put (UniqMap m) = put (IntMap.size m) <> mapM_ put (IntMap.toAscList m)
+  get             = fmap (UniqMap . IntMap.fromDistinctAscList) get
+#else
+  deriving newtype Binary
+#endif
 
 instance ClashPretty a => ClashPretty (UniqMap a) where
   clashPretty xs =

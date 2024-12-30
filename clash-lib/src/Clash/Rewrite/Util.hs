@@ -24,7 +24,6 @@ module Clash.Rewrite.Util
   , module Clash.Rewrite.WorkFree
   ) where
 
-import           Control.Concurrent.Supply   (splitSupply)
 import           Control.DeepSeq
 import           Control.Exception           (throw)
 import           Control.Lens ((%=), (+=), (^.))
@@ -95,6 +94,7 @@ import           Clash.Unique
 import           Clash.Util
 import           Clash.Util.Eq               (fastEqBy)
 import qualified Clash.Util.Interpolate as I
+import           Clash.Util.Supply           (splitSupply)
 
 -- | Lift an action working in the '_extra' state to the 'RewriteMonad'
 zoomExtra :: State.State extra a -> RewriteMonad extra a

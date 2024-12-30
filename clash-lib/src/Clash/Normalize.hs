@@ -16,7 +16,6 @@
 
 module Clash.Normalize where
 
-import           Control.Concurrent.Supply        (Supply)
 import           Control.Exception                (throw)
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    (when)
@@ -80,6 +79,7 @@ import           Clash.Rewrite.Util
   (apply, isUntranslatableType, runRewriteSession)
 import           Clash.Util
 import           Clash.Util.Interpolate           (i)
+import           Clash.Util.Supply                (Supply)
 
 import           Data.Binary                      (encode)
 import qualified Data.ByteString                  as BS

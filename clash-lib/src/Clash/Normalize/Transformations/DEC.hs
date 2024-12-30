@@ -37,7 +37,6 @@ module Clash.Normalize.Transformations.DEC
   ( disjointExpressionConsolidation
   ) where
 
-import Control.Concurrent.Supply (splitSupply)
 #if !MIN_VERSION_base(4,18,0)
 import Control.Applicative (liftA2)
 #endif
@@ -52,7 +51,11 @@ import qualified Data.Foldable as Foldable
 import qualified Data.Graph as Graph
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
+#if MIN_VERSION_ghc(9,10,0)
+import qualified GHC.Data.Word64Set as IntSet
+#else
 import qualified Data.IntSet as IntSet
+#endif
 import qualified Data.List as List
 import qualified Data.List.Extra as List
 import qualified Data.Map.Strict as Map
@@ -103,6 +106,7 @@ import Clash.Rewrite.Types
 import Clash.Rewrite.Util (changed, isFromInt, isUntranslatableType)
 import Clash.Rewrite.WorkFree (isConstant)
 import Clash.Util (MonadUnique, curLoc)
+import Clash.Util.Supply (splitSupply)
 
 -- primitives
 import qualified Clash.Sized.Internal.BitVector

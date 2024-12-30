@@ -25,7 +25,6 @@ module Clash.GHC.Evaluator.Primitive
   , isUndefinedXPrimVal
   ) where
 
-import           Control.Concurrent.Supply  (Supply,freshId)
 import           Control.DeepSeq            (force)
 import           Control.Exception          (ArithException(..), Exception, tryJust, evaluate)
 import           Control.Monad.State.Strict (State, MonadState)
@@ -117,6 +116,7 @@ import           Clash.GHC.GHC2Core  (modNameM)
 import           Clash.Unique        (fromGhcUnique)
 import           Clash.Util
   (MonadUnique (..), clogBase, flogBase, curLoc)
+import           Clash.Util.Supply   (Supply,freshId)
 import           Clash.Normalize.PrimitiveReductions
   (typeNatMul, typeNatSub, typeNatAdd, vecLastPrim, vecInitPrim, vecHeadPrim,
    vecTailPrim, mkVecCons, mkVecNil)
