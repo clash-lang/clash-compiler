@@ -2,7 +2,7 @@
   Copyright   :  (C) 2013-2016, University of Twente,
                      2017-2019, Myrtle Software Ltd
                      2017     , Google Inc.,
-                     2021-2023, QBayLogic B.V.
+                     2021-2025, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -145,6 +145,7 @@ module Clash.Prelude
   , AutoReg, autoReg, deriveAutoReg
   , module Clash.Class.BitPack
   , module Clash.Class.Exp
+  , module Clash.Class.Finite
   , module Clash.Class.Num
   , module Clash.Class.Parity
   , module Clash.Class.Resize
@@ -184,6 +185,7 @@ import           Clash.Annotations.TopEntity
 import           Clash.Class.AutoReg         (AutoReg, deriveAutoReg)
 import           Clash.Class.BitPack
 import           Clash.Class.Exp
+import           Clash.Class.Finite
 import           Clash.Class.Num
 import           Clash.Class.Parity
 import           Clash.Class.Resize

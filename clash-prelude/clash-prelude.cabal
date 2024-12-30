@@ -183,6 +183,10 @@ Library
                       Clash.Class.Counter.Internal
                       Clash.Class.Counter.TH
                       Clash.Class.Exp
+                      Clash.Class.Finite
+                      Clash.Class.Finite.Internal
+                      Clash.Class.Finite.Internal.Dictionaries
+                      Clash.Class.Finite.Internal.TH
                       Clash.Class.HasDomain
                       Clash.Class.HasDomain.HasSingleDomain
                       Clash.Class.HasDomain.HasSpecificDomain

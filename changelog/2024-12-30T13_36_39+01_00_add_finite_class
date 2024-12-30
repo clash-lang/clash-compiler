@@ -1,0 +1,1 @@
+ADDED: Added `Clash.Class.Finite.Finite`: a class for types with only finitely many inhabitants. The class can be considered a more hardware-friendly alternative to `Bounded` and `Enum`, utilizing 'Index' instead of `Int` and vectors instead of lists.
