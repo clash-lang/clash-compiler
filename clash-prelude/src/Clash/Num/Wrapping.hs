@@ -1,11 +1,12 @@
-{-
-Copyright   : (C) 2021, QBayLogic B.V.
+{-|
+Copyright   : (C) 2021-2025, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Clash.Num.Wrapping
   ( Wrapping(..)
@@ -22,6 +23,7 @@ import GHC.TypeLits (KnownNat, type (+))
 import Test.QuickCheck (Arbitrary)
 
 import Clash.Class.BitPack (BitPack)
+import Clash.Class.Finite (Finite)
 import Clash.Class.Num (SaturationMode(SatWrap), SaturatingNum(..))
 import Clash.Class.Parity (Parity)
 import Clash.Class.Resize (Resize(..))
@@ -42,6 +44,7 @@ newtype Wrapping a =
     , BitPack
     , Bounded
     , Eq
+    , Finite
     , FiniteBits
     , Hashable
     , NFData

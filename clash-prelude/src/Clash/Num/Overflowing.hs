@@ -1,5 +1,5 @@
 {-|
-Copyright  :  (C) 2021-2022, QBayLogic B.V.
+Copyright  :  (C) 2021-2025, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -8,6 +8,8 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 
 module Clash.Num.Overflowing
   ( Overflowing
@@ -27,6 +29,7 @@ import GHC.Generics (Generic)
 import GHC.TypeLits (KnownNat, type (+))
 
 import Clash.Class.BitPack (BitPack(..))
+import Clash.Class.Finite (Finite(..))
 import Clash.Class.Num (SaturationMode(SatWrap, SatZero), SaturatingNum(..))
 import Clash.Class.Parity (Parity(..))
 import Clash.XException (NFDataX, ShowX)
@@ -44,7 +47,7 @@ data Overflowing a = Overflowing
     -- ^ 'True' when a computation has overflowed
   }
   deriving stock (Generic, Show)
-  deriving anyclass (Binary, Hashable, NFData, NFDataX, ShowX)
+  deriving anyclass (Binary, Finite, Hashable, NFData, NFDataX, ShowX)
 
 {-# INLINE toOverflowing #-}
 toOverflowing :: a -> Overflowing a
