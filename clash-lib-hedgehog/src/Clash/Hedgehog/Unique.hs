@@ -35,7 +35,7 @@ import Clash.Hedgehog.Internal.Bias
 
 genUnique :: forall m. MonadGen m => m Unique
 genUnique =
-#if __GLASGOW_HASKELL__ >= 910
+#if MIN_VERSION_ghc(9,8,4)
   Gen.word64
 #else
   Gen.int
