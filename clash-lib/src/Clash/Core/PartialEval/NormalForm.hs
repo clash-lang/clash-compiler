@@ -30,7 +30,6 @@ module Clash.Core.PartialEval.NormalForm
   , workFreeCache
   ) where
 
-import Control.Concurrent.Supply (Supply)
 import Control.Lens (Lens', lens)
 import Data.IntMap.Strict (IntMap)
 import Data.Map.Strict (Map)
@@ -44,6 +43,7 @@ import Clash.Core.Util (undefinedPrims, undefinedXPrims)
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (VarEnv, InScopeSet)
 import Clash.Driver.Types (Binding(..))
+import Clash.Util.Supply (Supply)
 
 type Args a
   = [Arg a]

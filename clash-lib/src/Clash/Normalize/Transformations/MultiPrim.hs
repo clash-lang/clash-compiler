@@ -98,10 +98,11 @@ setupMultiResultPrim' tcm primInfo@PrimInfo{primType} =
   internalNm prefix n = mkUnsafeInternalName (prefix <> showt n) n
   internalId prefix typ n = mkLocalId typ (internalNm prefix n)
 
-  nTermArgs = length (Either.rights pArgs)
+  nTermArgs = fromIntegral (length (Either.rights pArgs))
+  nResTypes = fromIntegral (length resTypes)
   argIds = zipWith (internalId "a") (Either.rights pArgs) [1..nTermArgs]
-  resIds = zipWith (internalId "r") resTypes [nTermArgs+1..nTermArgs+length resTypes]
-  resId = mkLocalId pResTy (mkUnsafeInternalName "r" (nTermArgs+length resTypes+1))
+  resIds = zipWith (internalId "r") resTypes [nTermArgs+1..nTermArgs+nResTypes]
+  resId = mkLocalId pResTy (mkUnsafeInternalName "r" (nTermArgs+nResTypes+1))
 
   (pArgs, pResTy) = splitFunForallTy primType
   MultiPrimInfo{mpi_resultDc=tupTc, mpi_resultTypes=resTypes} =

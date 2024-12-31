@@ -96,6 +96,7 @@ import Clash.Normalize.Types
   ( NormRewrite, NormalizeSession, specialisationCache, specialisationHistory)
 import Clash.Normalize.Util
   (constantSpecInfo, csrFoundConstant, csrNewBindings, csrNewTerm)
+import Clash.Unique (Unique)
 import Clash.Util (ClashException(..))
 
 -- | Propagate arguments of application inwards; except for 'Lam' where the
@@ -438,7 +439,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
             else do
               let existingNames = collectBndrsMinusApps bodyTm
                   newNames      = [ mkUnsafeInternalName ("pTS" `Text.append` Text.pack (show n)) n
-                                  | n <- [(0::Int)..]
+                                  | n <- [(0::Unique)..]
                                   ]
               -- Make new binders for existing arguments
               (boundArgs,argVars) <- fmap (unzip . map (either (Left &&& Left . Var) (Right &&& Right . VarTy))) $

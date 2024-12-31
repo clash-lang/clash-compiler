@@ -6,6 +6,7 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 Random generation of unique variables and unique containers.
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TupleSections #-}
 
 module Clash.Hedgehog.Unique
@@ -33,7 +34,13 @@ import Clash.Unique
 import Clash.Hedgehog.Internal.Bias
 
 genUnique :: forall m. MonadGen m => m Unique
-genUnique = Gen.int Range.linearBounded
+genUnique =
+#if __GLASGOW_HASKELL__ >= 910
+  Gen.word64
+#else
+  Gen.int
+#endif
+    Range.linearBounded
 
 genUniqMap
   :: forall m k v

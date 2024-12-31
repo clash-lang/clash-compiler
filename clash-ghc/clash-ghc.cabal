@@ -172,7 +172,6 @@ library
 
                       clash-lib                 == 1.8.1,
                       clash-prelude             == 1.8.1,
-                      concurrent-supply         >= 0.1.7    && < 0.2,
                       ghc-typelits-extra        >= 0.3.2    && < 0.5,
                       ghc-typelits-knownnat     >= 0.6      && < 0.8,
                       ghc-typelits-natnormalise >= 0.6      && < 0.8,

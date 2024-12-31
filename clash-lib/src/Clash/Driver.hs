@@ -24,7 +24,6 @@ module Clash.Driver where
 
 import           Control.Concurrent               (MVar, modifyMVar, modifyMVar_, newMVar, withMVar)
 import           Control.Concurrent.Async         (mapConcurrently_)
-import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
 import           Control.Exception                (throw, Exception)
 import qualified Control.Monad                    as Monad
@@ -151,6 +150,7 @@ import           Clash.Util
    wantedLanguageExtensions, unwantedLanguageExtensions, curLoc)
 import           Clash.Util.Graph                 (reverseTopSort)
 import qualified Clash.Util.Interpolate           as I
+import qualified Clash.Util.Supply                as Supply
 
 -- | Worker function of 'splitTopEntityT'
 splitTopAnn
@@ -1129,8 +1129,8 @@ sortTop bindingsMap topEntities =
 
   mapFrom tops =
     let
-      topIndices = HashMap.fromList (zip (map topToUnique tops) [(0 :: Int)..])
+      topIndices = HashMap.fromList (zip (map topToUnique tops) [(0 :: Unique)..])
       nonOrdered = HashMap.fromListWith (<>) (map (second pure) edges)
-      orderFunc k = fromMaybe (-1) (HashMap.lookup k topIndices)
+      orderFunc k = HashMap.lookup k topIndices
     in
       HashMap.map (List.sortOn orderFunc) nonOrdered

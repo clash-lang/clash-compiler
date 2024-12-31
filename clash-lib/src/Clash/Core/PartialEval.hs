@@ -11,7 +11,6 @@ library for the compiler front-end, e.g. Clash.GHC.PartialEval in clash-ghc.
 
 module Clash.Core.PartialEval where
 
-import Control.Concurrent.Supply (Supply)
 import Data.IntMap.Strict (IntMap)
 
 import Clash.Core.PartialEval.AsTerm
@@ -22,6 +21,7 @@ import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (InScopeSet)
 import Clash.Driver.Types (Binding(..), BindingMap)
+import Clash.Util.Supply (Supply)
 
 -- | An evaluator for Clash core. This consists of two functions: one to
 -- evaluate a term to weak-head normal form (WHNF) and another to recursively
