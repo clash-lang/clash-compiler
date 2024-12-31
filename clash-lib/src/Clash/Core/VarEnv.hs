@@ -103,7 +103,7 @@ import           Data.Coerce               (coerce)
 import qualified Data.List                 as List
 import qualified Data.List.Extra           as List
 import           Data.Maybe                (fromMaybe)
-#if MIN_VERSION_ghc(9,10,0)
+#if MIN_VERSION_ghc(9,8,4)
 import           Data.Word                 (Word64)
 #endif
 
@@ -389,7 +389,7 @@ eltsVarSet = UniqMap.elems
 -- * InScopeSet
 
 type Seed
-#if MIN_VERSION_ghc(9,10,0)
+#if MIN_VERSION_ghc(9,8,4)
   = Word64
 #else
   = Int
