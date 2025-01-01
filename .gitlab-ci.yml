@@ -37,7 +37,7 @@ tests:
       - GHC_VERSION: 9.10.1
         RUN_TESTS: "always"
 
-      - GHC_VERSION: 9.8.2
+      - GHC_VERSION: 9.8.4
         RUN_TESTS: "always"
 
       - GHC_VERSION: 9.6.6
