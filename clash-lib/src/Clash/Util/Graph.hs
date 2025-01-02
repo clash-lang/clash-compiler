@@ -16,7 +16,7 @@ module Clash.Util.Graph
 
 import           Data.Tuple            (swap)
 import           Data.Foldable         (foldlM)
-#if MIN_VERSION_ghc(9,10,0)
+#if MIN_VERSION_ghc(9,8,4)
 import qualified GHC.Data.Word64Map.Strict as IntMap
 import qualified GHC.Data.Word64Set        as IntSet
 #else
@@ -33,7 +33,7 @@ import           Clash.Driver.Types (BindingMap, Binding (bindingTerm))
 import           Clash.Normalize.Util (callGraph)
 import           Clash.Unique (Unique)
 
-#if MIN_VERSION_ghc(9,10,0)
+#if MIN_VERSION_ghc(9,8,4)
 type IntMap = IntMap.Word64Map
 type IntSet = IntSet.Word64Set
 #endif
