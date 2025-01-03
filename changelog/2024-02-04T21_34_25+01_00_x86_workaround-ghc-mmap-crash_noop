@@ -1,1 +1,0 @@
-* cabal: Make `workaround-ghc-mmap-crash` a noop on non-x86_64. Fixes [#2656](https://github.com/clash-lang/clash-compiler/issues/2656)

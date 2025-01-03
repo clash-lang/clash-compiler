@@ -1,1 +1,0 @@
-FIXED: Exponentiation (`Clash.Class.Exp`) is now right-associative with a precedence level of 8 (`infixr 8`). By accident, it used to lack a fixity declaration, meaning it was implicitly left-associative at level 9.

@@ -1,1 +1,0 @@
-FIXED: Clash generates illegal Verilog names [#2845](https://github.com/clash-lang/clash-compiler/issues/2845)
