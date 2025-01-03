@@ -51,11 +51,6 @@ import qualified Data.Foldable as Foldable
 import qualified Data.Graph as Graph
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
-#if MIN_VERSION_ghc(9,10,0)
-import qualified GHC.Data.Word64Set as IntSet
-#else
-import qualified Data.IntSet as IntSet
-#endif
 import qualified Data.List as List
 import qualified Data.List.Extra as List
 import qualified Data.Map.Strict as Map
@@ -601,7 +596,7 @@ areShared _   _       []       = True
 areShared tcm inScope xs@(x:_) = noFV1 && (isProof x || allEqual xs)
  where
   noFV1 = case x of
-    Right ty -> getAll (Lens.foldMapOf (typeFreeVars' isLocallyBound IntSet.empty)
+    Right ty -> getAll (Lens.foldMapOf (typeFreeVars' isLocallyBound mempty)
                                        (const (All False)) ty)
     Left tm  -> getAll (Lens.foldMapOf (termFreeVars' isLocallyBound)
                                        (const (All False)) tm)

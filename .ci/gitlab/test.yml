@@ -123,6 +123,10 @@ prelude:doctests:
 
 ffi:interface-tests:
   extends: .test-nocache
+  # TODO: remove this when https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
+  # is fixed
+  rules:
+    - if: $SKIP_CLASH_FFI_EXAMPLE != "yes"
   script:
     - bin/clash-ffi:ffi-interface-tests --smallcheck-max-count 2000
 
@@ -167,6 +171,10 @@ ffi:example:
   extends:
     - .common-local
     - .nightly-rules
+  # TODO: remove this when https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
+  # is fixed
+  rules:
+    - if: $SKIP_CLASH_FFI_EXAMPLE != "yes"
   stage: test
   needs: []
   before_script:

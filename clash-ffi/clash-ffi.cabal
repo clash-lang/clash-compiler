@@ -75,6 +75,12 @@ library
     Clash.FFI.VPI.Port
     Clash.FFI.VPI.Port.Direction
     Clash.FFI.VPI.Reg
+  -- TODO: remove this once https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
+  -- is fixed
+  if impl(ghc < 9.8.3) || impl(ghc == 9.10.1)
+    buildable: true
+  else
+    buildable: false
 
 executable ffi-interface-tests
   import: common-options
@@ -106,3 +112,9 @@ executable ffi-interface-tests
     , tasty
     , tasty-hunit
     , tasty-smallcheck
+  -- TODO: remove this once https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
+  -- is fixed
+  if impl(ghc < 9.8.3) || impl(ghc == 9.10.1)
+    buildable: true
+  else
+    buildable: false
