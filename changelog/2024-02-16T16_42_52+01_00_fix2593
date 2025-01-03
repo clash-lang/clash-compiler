@@ -1,1 +1,0 @@
-FIXED: HDL generation fails when using multiple-hidden feature in combination with synthesis attributes [#2593](https://github.com/clash-lang/clash-compiler/issues/2593)
