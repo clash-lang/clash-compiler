@@ -9,6 +9,7 @@ packages:
   ./clash-prelude
   ./clash-prelude-hedgehog
   ./clash-cores
+  ./clash-testbench
   ./tests
 
 write-ghc-environment-files: always
