@@ -92,3 +92,8 @@ package regex-tdfa
 
 -- rewrite-inspector-0.1.0.11 uses brick-0.50 which doesn't compile with vty-6.0
 constraints: vty < 6.0
+
+source-repository-package
+  type: git
+  location: https://github.com/clash-lang/ghc-typelits-extra.git
+  tag: 6de31070c86ad451abe329940ba4a0a4b571fb58
