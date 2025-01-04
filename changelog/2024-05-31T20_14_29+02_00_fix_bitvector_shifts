@@ -1,1 +1,0 @@
-FIXED: (+>>.) and (.<<+) such that they are compliant with (+>>) and (<<+) for vectors of zero length in the sense that the input vector is kept unchanged.

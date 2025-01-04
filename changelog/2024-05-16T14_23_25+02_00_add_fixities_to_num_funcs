@@ -1,1 +1,0 @@
-CHANGED: Added operator precedences for infix usage of functions exported from `Clash.Class.Num`: `mul`, `add`, `sub`, `satMul`, `satAdd`, `satSub`, `boundedMul`, `boundedAdd`, and `boundedSub`. This means that expressions such as `` a `add` b `mul` c `` now get parsed as `` a `add` (b `mul` c) `` instead of `` (a `add` b) `mul` c ``.

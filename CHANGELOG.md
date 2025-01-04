@@ -1,5 +1,34 @@
 # Changelog for the Clash project
 
+## 1.8.2 *Jan 3rd 2025*
+
+Added:
+* Support for GHC 9.10 [#2758](https://github.com/clash-lang/clash-compiler/pull/2758)
+* Support for GHC 9.8.4 [#2852](https://github.com/clash-lang/clash-compiler/issues/2852)
+* Add `ShowX`, `NFDataX` instances for `Proxy` [#2637](https://github.com/clash-lang/clash-compiler/pull/2637)
+* Added `Clash.Sized.Vector.ToTuple.vecToTuple`: a way to safely work around incomplete patterns warnings on patterns involving `Vec`tors. [#2862](https://github.com/clash-lang/clash-compiler/pull/2682)
+* Added operator precedences for infix usage of functions exported from `Clash.Class.Num`: `mul`, `add`, `sub`, `satMul`, `satAdd`, `satSub`, `boundedMul`, `boundedAdd`, and `boundedSub`. This means that expressions such as `` a `add` b `mul` c `` now get parsed as `` a `add` (b `mul` c) `` instead of `` (a `add` b) `mul` c ``. [#2719](https://github.com/clash-lang/clash-compiler/pull/2719)
+
+Changed:
+* `BitVector n` now has an implementation for `ensureSpine` which ensures the constructor is present. [#2702](https://github.com/clash-lang/clash-compiler/pull/2702)
+* `xToBV` is now located in `Clash.Sized.Internal.BitVector` to avoid circular dependencies. [#2702](https://github.com/clash-lang/clash-compiler/pull/2702)
+* The error messages that mention the valid ranges for out-of-range inputs have been improved to be more intuitive: one of `<empty range>`, `[n]` or `[n..m]`. All _n..m_ ranges are now ordered with the lower bound on the left. [#2733](https://github.com/clash-lang/clash-compiler/pull/2733)
+
+Fixed:
+* cabal: Make `workaround-ghc-mmap-crash` a noop on non-x86_64. Fixes [#2656](https://github.com/clash-lang/clash-compiler/issues/2656)
+* Clash no longer hides error messages if it fails to load external (precompiled) modules. Note: this fix only works from GHC 9.0 on. See [#2365](https://github.com/clash-lang/clash-compiler/issues/2365)
+* HDL generation fails when using multiple-hidden feature in combination with synthesis attributes [#2593](https://github.com/clash-lang/clash-compiler/issues/2593)
+* Clash no longer errors out in the netlist generation stage when a polymorphic function is applied to type X in one alternative of a case-statement and applied to a newtype wrapper of type X in a different alternative. See [#2828](https://github.com/clash-lang/clash-compiler/issues/2628)
+* various issues with black boxes and evaluator rules for number-related primitives [#2689](https://github.com/clash-lang/clash-compiler/pull/2689)
+* `genBitVector` no longer contains off-by-one error on for generated Naturals [#2704](https://github.com/clash-lang/clash-compiler/pull/2704)
+* (+>>.) and (.<<+) such that they are compliant with (+>>) and (<<+) for vectors of zero length in the sense that the input vector is kept unchanged. [#2730](https://github.com/clash-lang/clash-compiler/issues/2730)
+* Removed `stringsearch` dependency from `v16-upgrade-primitives`. See [#2726](https://github.com/clash-lang/clash-compiler/issues/2726)
+* Bug in the compile-time evaluator [#2781](https://github.com/clash-lang/clash-compiler/issues/2781)
+* Exponentiation (`Clash.Class.Exp`) is now right-associative with a precedence level of 8 (`infixr 8`). By accident, it used to lack a fixity declaration, meaning it was implicitly left-associative at level 9. [#2818](https://github.com/clash-lang/clash-compiler/pull/2818)
+* Unused argument warnings on writeToBiSignal# [#2822](https://github.com/clash-lang/clash-compiler/pull/2822)
+* Clash errored saying it cannot translate a globally recursive function in code that originally only contains let-bound (local) recursion [#2839](https://github.com/clash-lang/clash-compiler/issues/2839)
+* Clash generates illegal Verilog names [#2845](https://github.com/clash-lang/clash-compiler/issues/2845)
+
 ## 1.8.1 *Nov 10th 2023*
 
 * Bump package dependencies to allow inclusion in stackage-nightly
