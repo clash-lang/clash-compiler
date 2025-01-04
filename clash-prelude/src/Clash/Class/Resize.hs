@@ -20,6 +20,9 @@ module Clash.Class.Resize
  , checkedResize
  , checkedFromIntegral
  , checkedTruncateB
+ , maybeResize
+ , maybeFromIntegral
+ , maybeTruncateB
  ) where
 
 import Data.Kind (Type)
@@ -117,3 +120,57 @@ checkedTruncateB ::
   f (a + b) -> f a
 checkedTruncateB v =
   checkIntegral (Proxy @(f a)) v `seq` truncateB v
+
+-- | Helper function of 'maybeFromIntegral', 'maybeResize' and 'maybeTruncateB'
+maybeIntegral ::
+  forall a b.
+  (Integral a, Integral b, Bounded b) =>
+  Proxy b ->
+  a -> Bool
+maybeIntegral Proxy v =
+     toInteger v < toInteger (maxBound @b)
+  && toInteger v > toInteger (minBound @b)
+
+-- | Like 'fromIntegral', but returns 'Nothing' if /a/ is out of bounds for /b/.
+-- Useful when you do not know /a/ can be out of bounds, and would like to have
+-- your assumptions checked.
+
+-- * __NB__: 'fromIntegral' is not well suited for Clash as it will go through
+-- 'Integer' which is arbitrarily bounded in HDL. Instead use
+-- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
+maybeFromIntegral ::
+  forall a b.
+  (Integral a, Integral b, Bounded b) =>
+  a -> Maybe b
+maybeFromIntegral v =
+  if maybeIntegral (Proxy @b) v
+    then Just (fromIntegral v)
+    else Nothing
+
+-- | Like 'resize', but returns 'Nothing' if /f a/ is out of bounds for /f b/.
+-- Useful when you do not know /f a/ can be out of bounds, and would like to
+-- have your assumptions checked.
+maybeResize ::
+  forall a b f.
+  ( Resize f
+  , KnownNat a, Integral (f a)
+  , KnownNat b, Integral (f b), Bounded (f b) ) =>
+  f a -> Maybe (f b)
+maybeResize v =
+  if maybeIntegral (Proxy @(f b)) v
+    then Just (resize v)
+    else Nothing
+
+-- | Like 'truncateB', but returns 'Nothing' if /f (a + b)/ is out of bounds for
+-- /f a/. Useful when you do not know /f (a + b)/ can be out of bounds, and
+-- would like to have your assumptions checked.
+maybeTruncateB ::
+  forall a b f.
+  ( Resize f
+  , KnownNat b, Integral (f (a + b))
+  , KnownNat a, Integral (f a), Bounded (f a) ) =>
+  f (a + b) -> Maybe (f a)
+maybeTruncateB v =
+  if maybeIntegral (Proxy @(f a)) v
+    then Just (truncateB v)
+    else Nothing
