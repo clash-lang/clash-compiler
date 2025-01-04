@@ -25,7 +25,7 @@ import           GHC.TypeLits                  (KnownNat)
 import           Prelude                       hiding (head, map, tail)
 
 import           Clash.Signal.Internal         (Domain)
-import           Clash.Signal.Delayed (DSignal, toSignal, unsafeFromSignal)
+import           Clash.Signal.Delayed.Internal (DSignal, toSignal, unsafeFromSignal)
 import qualified Clash.Signal.Bundle           as B
 
 import           Clash.Sized.BitVector         (Bit, BitVector)
