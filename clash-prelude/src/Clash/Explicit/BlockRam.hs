@@ -4,6 +4,7 @@ Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.,
                   2021-2023, QBayLogic B.V.,
                   2022     , Google Inc.,
+                  2024     , Alex Mason,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -445,13 +446,16 @@ import Unsafe.Coerce (unsafeCoerce)
 
 import Clash.Annotations.Primitive
   (Primitive(InlineYamlPrimitive), HDL(..), hasBlackBox)
+import Clash.Class.AutoReg (AutoReg(autoReg))
+import Clash.Class.BitPack (bitToBool, msb)
 import Clash.Class.Num (SaturationMode(SatBound), satSucc)
 import Clash.Explicit.BlockRam.Model (TdpbramModelConfig(..), tdpbramModel)
-import Clash.Explicit.Signal (KnownDomain, Enable, register, fromEnable)
+import Clash.Explicit.Signal (KnownDomain, Enable, register, fromEnable, andEnable)
 import Clash.Promoted.Nat (SNat(..))
 import Clash.Signal.Bundle (unbundle)
 import Clash.Signal.Internal
   (Clock(..), Reset, Signal (..), invertReset, (.&&.), mux)
+import Clash.Sized.BitVector (BitVector)
 import Clash.Sized.Index (Index)
 import Clash.Sized.Unsigned (Unsigned)
 import Clash.Sized.Vector (Vec, replicate, iterateI)
@@ -1167,6 +1171,47 @@ data RamOp n a
   | RamNoOp
   -- ^ No operation
   deriving (Generic, NFDataX, Show)
+
+instance (AutoReg a, KnownNat n) => AutoReg (RamOp n a) where
+  autoReg clk rst en initVal input =
+    createRamOp <$> tagR <*> valAddr <*> valValue
+    where
+      tag = toTag <$> input
+
+      toTag op = case op of
+        RamNoOp    -> 0b00 :: BitVector 2
+        RamRead{}  -> 0b01
+        RamWrite{} -> 0b10
+
+      tagInit = toTag initVal
+      tagR = register clk rst en tagInit tag
+
+      toAddr op = case op of
+        RamNoOp         -> deepErrorX "autoReg'.ramOpAddr"
+        RamRead addr    -> addr
+        RamWrite addr _ -> addr
+
+      toValue op = case op of
+        RamWrite _ a -> a
+        _ -> deepErrorX "autoReg'.ramOpValue"
+
+
+      opAddr  = toAddr  <$> input
+      opValue = toValue <$> input
+
+      addrInit = toAddr  initVal
+      valInit  = toValue initVal
+
+      valAddr  = autoReg clk rst (andEnable en           ((/=0) <$> tag)) addrInit opAddr
+      valValue = autoReg clk rst (andEnable en (bitToBool . msb <$> tag)) valInit opValue
+
+      createRamOp t addr val = case t of
+        0b00 -> RamNoOp
+        0b01 -> RamRead addr
+        0b10 -> RamWrite addr val
+        _ -> deepErrorX  "autoReg'.createRamOp: impossible"
+
+  {-# INLINE autoReg #-}
 
 ramOpAddr :: RamOp n a -> Index n
 ramOpAddr (RamRead addr)    = addr
