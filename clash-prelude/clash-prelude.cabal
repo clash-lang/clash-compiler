@@ -412,6 +412,7 @@ test-suite unittests
 
       base,
       bytestring,
+      constraints   >= 0.9     && < 1.0,
       deepseq,
       hedgehog      >= 1.0.3    && < 1.6,
       hint          >= 0.7      && < 0.10,
@@ -451,6 +452,7 @@ test-suite unittests
                  Clash.Tests.XException
 
                  Clash.Tests.Laws.Enum
+                 Clash.Tests.Laws.Finite
                  Clash.Tests.Laws.SaturatingNum
 
                  Hedgehog.Extra
