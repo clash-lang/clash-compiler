@@ -1,5 +1,6 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente
+                  2025     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -8,7 +9,6 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Extra.Solver -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise  #-}
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module Clash.Sized.Index
@@ -16,9 +16,7 @@ module Clash.Sized.Index
 where
 
 import GHC.TypeLits (KnownNat, type (^))
-import GHC.TypeLits.Extra (CLog) -- documentation only
 
-import Clash.Promoted.Nat (SNat (..), pow2SNat)
 import Clash.Sized.Internal.BitVector (BitVector)
 import Clash.Sized.Internal.Index
 
@@ -29,7 +27,7 @@ import Clash.Sized.Internal.Index
 -- That is, the type of 'Clash.Class.BitPack.unpack' is:
 --
 -- @
--- __unpack__ :: 'BitVector' ('CLog' 2 n) -> 'Index' n
+-- __unpack__ :: 'BitVector' ('GHC.TypeLits.Extra.CLog' 2 n) -> 'Index' n
 -- @
 --
 -- And is useful when you know the size of the 'Index', and want to get a value
