@@ -77,7 +77,7 @@ data XpmCdcPulseConfig stages = XpmCdcPulseConfig
     -- calls @INIT_SYNC_FF@.
   , initialValues :: Bool
 
-    -- | Register output. Makes sure the combinatorial logic in @XPM_CDC_PULSE@
+    -- | Register output. Makes sure the combinational logic in @XPM_CDC_PULSE@
     -- doesn't contribute to any user critical paths.
   , registerOutput :: Bool
     -- This is what [PG382](https://docs.xilinx.com/r/en-US/pg382-xpm-cdc-generator/XPM_CDC_HANDSHAKE)
