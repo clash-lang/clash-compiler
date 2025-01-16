@@ -2,41 +2,6 @@ pull_request_rules:
   # For more information: https://doc.mergify.io/actions.html#copy
   # We used to use the 'backport' action, but:
   # https://github.com/Mergifyio/mergify-engine/issues/789
-  - name: backport patches to 1.2
-    conditions:
-      - base=master
-      - label=backport 1.2
-      - merged
-    actions:
-      copy:
-        ignore_conflicts: True
-        branches:
-          - "1.2"
-
-  - name: backport patches to 1.4
-    conditions:
-      - base=master
-      - label=backport 1.4
-      - merged
-    actions:
-      copy:
-        ignore_conflicts: True
-        branches:
-          - "1.4"
-
-  - name: backport patches to 1.6
-    conditions:
-      - base=master
-      - label=backport 1.6
-      - merged
-    actions:
-      copy:
-        ignore_conflicts: True
-        branches:
-          - "1.6"
-      queue:
-        update_method: rebase
-
   - name: backport patches to 1.8
     conditions:
       - base=master
@@ -44,8 +9,7 @@ pull_request_rules:
       - merged
     actions:
       copy:
-        ignore_conflicts: True
+        ignore_conflicts: true
+        merge_conflict_style: diff3
         branches:
           - "1.8"
-      queue:
-        update_method: rebase
