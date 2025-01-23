@@ -1,39 +1,42 @@
 - BlackBox:
-    name: Clash.Xilinx.DDR.iddr
+    name: Clash.Xilinx.DDR.iddr#
     kind: Declaration
     type: |-
-      iddr
-        :: ( HasCallStack            -- ARG[0]
-           , KnownConfi~ fast domf   -- ARG[1]
-           , KnownConfi~ slow doms   -- ARG[2]
-           , KnownNat m )            -- ARG[3]
-        -> Clock slow                -- ARG[4]
-        -> Reset slow                -- ARG[5]
-        -> Enable slow               -- ARG[6]
-        -> Signal fast (BitVector m) -- ARG[7]
-        -> Signal slow (BitVector m,BitVector m)
+      iddr#
+        :: forall n dom domDDR
+         . HasCallStack                 -- ARG[0]
+        => KnownDomain dom              -- ARG[1]
+        => KnownDomain domDDR           -- ARG[2]
+        => DomPeriod ~ 2 * ...          -- ARG[3]
+        => DomEdge ~ Rising             -- ARG[4]
+        => KnownNat n                   -- ARG[5]
+        => Clock dom                    -- ARG[6]
+        -> Reset dom                    -- ARG[7]
+        -> Enable dom                   -- ARG[8]
+        -> Signal domDDR (BitVector n)  -- ARG[9]
+        -> Signal dom (BitVector n, BitVector n)
     template: |-
       // iddr begin
-      wire ~SIGD[~GENSYM[dataout_l][1]][7];
-      wire ~SIGD[~GENSYM[dataout_h][2]][7];
-      wire ~SIGD[~GENSYM[d][3]][7];
-      assign ~SYM[3] = ~ARG[7];
+      wire ~SIGD[~GENSYM[data_pos][1]][9];
+      wire ~SIGD[~GENSYM[data_neg][2]][9];
+      wire ~SIGD[~GENSYM[d][3]][9];
+      assign ~SYM[3] = ~ARG[9];
 
       genvar ~GENSYM[i][8];
       ~GENERATE
-      for (~SYM[8]=0; ~SYM[8] < ~SIZE[~TYP[7]]; ~SYM[8]=~SYM[8]+1) begin : ~GENSYM[ddri_array][7]
+      for (~SYM[8]=0; ~SYM[8] < ~SIZE[~TYP[9]]; ~SYM[8]=~SYM[8]+1) begin : ~GENSYM[ddri_array][7]
         IDDR #(
           .DDR_CLK_EDGE("SAME_EDGE"),
           .INIT_Q1(1'b0),
           .INIT_Q2(1'b0),
-          .SRTYPE(~IF ~ISSYNC[2] ~THEN "SYNC" ~ELSE "ASYNC" ~FI)
+          .SRTYPE(~IF ~ISSYNC[1] ~THEN "SYNC" ~ELSE "ASYNC" ~FI)
         ) ~GENSYM[~COMPNAME_IDDR][9] (
           .Q1(~SYM[1][~SYM[8]]),
           .Q2(~SYM[2][~SYM[8]]),
-          .C(~ARG[4]),
-          .CE(~IF ~ISACTIVEENABLE[6] ~THEN ~ARG[6] ~ELSE 1'b1 ~FI),
+          .C(~ARG[6]),
+          .CE(~IF ~ISACTIVEENABLE[8] ~THEN ~ARG[8] ~ELSE 1'b1 ~FI),
           .D(~SYM[3][~SYM[8]]),
-          .R(~ARG[5]),
+          .R(~ARG[7]),
           .S(1'b0)
         );
       end
@@ -46,38 +49,42 @@
     kind: Declaration
     type: |-
       oddr#
-        :: ( KnownConfi~ fast domf    -- ARG[0]
-           , KnownConfi~ slow doms    -- ARG[1]
-           , KnownNat m )             -- ARG[2]
-        => Clock slow                 -- ARG[3]
-        -> Reset slow                 -- ARG[4]
-        -> Enable slow                -- ARG[5]
-        -> Signal slow (BitVector m)  -- ARG[6]
-        -> Signal slow (BitVector m)  -- ARG[7]
-        -> Signal fast (BitVector m)
+        :: forall n dom domDDR
+         . HasCallStack              -- ARG[0]
+        => KnownDomain dom           -- ARG[1]
+        => KnownDomain domDDR        -- ARG[2]
+        => DomPeriod ~ 2 * ...       -- ARG[3]
+        => DomEdge ~ Rising          -- ARG[4]
+        => KnownNat n                -- ARG[5]
+        => Clock dom                 -- ARG[6]
+        -> Reset dom                 -- ARG[7]
+        -> Enable dom                -- ARG[8]
+        -> Signal dom (BitVector n)  -- ARG[9]
+        -> Signal dom (BitVector n)  -- ARG[10]
+        -> Signal domDDR (BitVector n)
     template: |-
       // oddr begin
-      wire ~SIGD[~GENSYM[datain_l][1]][7];
-      wire ~SIGD[~GENSYM[datain_h][2]][7];
-      wire ~SIGD[~GENSYM[q][3]][7];
+      wire ~SIGD[~GENSYM[data_pos][1]][10];
+      wire ~SIGD[~GENSYM[data_neg][2]][10];
+      wire ~SIGD[~GENSYM[q][3]][10];
 
-      assign ~SYM[1] = ~ARG[6];
-      assign ~SYM[2] = ~ARG[7];
+      assign ~SYM[1] = ~ARG[9];
+      assign ~SYM[2] = ~ARG[10];
 
       genvar ~GENSYM[i][8];
       ~GENERATE
-      for (~SYM[8]=0; ~SYM[8] < ~SIZE[~TYP[7]]; ~SYM[8]=~SYM[8]+1) begin : ~GENSYM[ddro_array][7]
+      for (~SYM[8]=0; ~SYM[8] < ~SIZE[~TYP[10]]; ~SYM[8]=~SYM[8]+1) begin : ~GENSYM[ddro_array][7]
         ODDR #(
           .DDR_CLK_EDGE("SAME_EDGE"),
           .INIT(1'b0),
           .SRTYPE(~IF ~ISSYNC[1] ~THEN "SYNC" ~ELSE "ASYNC" ~FI)
         ) ~GENSYM[~COMPNAME_ODDR][9] (
           .Q(~SYM[3][~SYM[8]]),
-          .C(~ARG[3]),
-          .CE(~IF ~ISACTIVEENABLE[5] ~THEN ~ARG[5] ~ELSE 1'b1 ~FI),
+          .C(~ARG[6]),
+          .CE(~IF ~ISACTIVEENABLE[8] ~THEN ~ARG[8] ~ELSE 1'b1 ~FI),
           .D1(~SYM[1][~SYM[8]]),
           .D2(~SYM[2][~SYM[8]]),
-          .R(~ARG[4]),
+          .R(~ARG[7]),
           .S(1'b0)
         );
       end

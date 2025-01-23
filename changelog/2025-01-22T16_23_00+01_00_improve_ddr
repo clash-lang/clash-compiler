@@ -1,0 +1,4 @@
+CHANGED: `Clash.Explicit.DDR`, `Clash.Intel.DDR` and `Clash.Xilinx.DDR`:
+  - The constraints for the functions have been rewritten to use `DomainPeriod`, which makes them more readable and relaxes unnecessary constraints on the virtual DDR domain. The type-level variables for the domains have been renamed. `dom` is a real domain, `domDDR` is the virtual DDR domain.
+  - The Xilinx and Intel primitives only support domains where the rising edge is the active edge. This is now enforced at the type level by adding a constraint.
+  - The Xilinx and Intel primitives now directly support any data type that has a `BitPack` instance.
