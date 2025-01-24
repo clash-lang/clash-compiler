@@ -31,6 +31,7 @@ import Data.Proxy (Proxy(..))
 import Data.String.Interpolate (__i)
 import Data.Maybe (isJust)
 import Data.Text.Prettyprint.Doc.Extra (Doc)
+import Debug.Trace (trace)
 import GHC.Stack (HasCallStack)
 import GHC.TypeLits (KnownNat, SomeNat(..), someNatVal)
 import Language.Haskell.TH.Syntax (Lift)
@@ -193,11 +194,10 @@ ilaTF config = TemplateFunction usedArguments (const True) (ilaBBTF config)
 checkNameCollision :: HasCallStack => T.Text -> DSL.TExpr -> DSL.TExpr
 checkNameCollision userName tExpr@(DSL.TExpr _ (Identifier (Id.toText -> name) Nothing))
   | userName == name = tExpr
-  | otherwise = error [I.i|
-      Tried create a signal called '#{userName}', but identifier generation
-      returned '#{name}'. Refusing to instantiate Ila with unreliable probe
-      names.
-  |]
+  | otherwise = trace [I.i|
+      Warning: Tried create a signal called '#{userName}', but identifier generation
+      returned '#{name}'.
+  |] tExpr
 checkNameCollision _ tExpr = error [I.i|
   Internal error: Expected 'TExpr' with the following form:
 
