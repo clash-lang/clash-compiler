@@ -82,7 +82,7 @@ import           Clash.Netlist.Types as N             hiding (intWidth, usages, 
 import           Clash.Netlist.Util
 import           Clash.Signal.Internal                (ActiveEdge (..))
 import           Clash.Util
-  (SrcSpan, noSrcSpan, curLoc, indexNote, makeCached)
+  (SrcSpan, clogBase, noSrcSpan, curLoc, indexNote, makeCached)
 
 -- | State for the 'Clash.Backend.Verilog.VerilogM' monad:
 data VerilogState =
@@ -1151,7 +1151,9 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Index.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  = exprLit undefValue (Just (Index (fromInteger n),fromInteger n)) i
+  , Just k <- clogBase 2 n
+  , let k' = max 1 k
+  = exprLitV (Just (Index (fromInteger n),k')) i
 
 expr_ b (BlackBoxE _ libs imps inc bs bbCtx b') = do
   parenIf (b || b') (Ap (renderBlackBox libs imps inc bs bbCtx <*> pure 0))
@@ -1216,14 +1218,16 @@ rtreeChain _                               = Nothing
 exprLitV :: Maybe (HWType,Size) -> Literal -> VerilogM Doc
 exprLitV = exprLit undefValue
 
-exprLit :: Lens' s (Maybe (Maybe Int)) -> Maybe (HWType,Size) -> Literal -> Ap (State s) Doc
+exprLit :: Backend s => Lens' s (Maybe (Maybe Int)) -> Maybe (HWType,Size) -> Literal -> Ap (State s) Doc
 exprLit _ Nothing (NumLit i) = integer i
 
 exprLit k (Just (hty,sz)) (NumLit i0) = case hty of
   Unsigned _
    | i < 0     -> string "-" <> int sz <> string "'d" <> integer (abs i)
    | otherwise -> int sz <> string "'d" <> integer i
-  Index _ -> int (typeSize hty) <> string "'d" <> integer i
+  Index n
+   | 0 <= i0 && i0 < n -> int (typeSize hty) <> string "'d" <> integer i0
+   | otherwise         -> hdlTypeErrValue hty
   Signed _
    | i < 0     -> string "-" <> int sz <> string "'sd" <> integer (abs i)
    | otherwise -> int sz <> string "'sd" <> integer i
