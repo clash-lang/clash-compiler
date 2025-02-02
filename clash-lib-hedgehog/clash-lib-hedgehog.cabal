@@ -9,7 +9,7 @@ license:            BSD-2-Clause
 license-file:       LICENSE
 author:             QBayLogic B.V.
 maintainer:         devops@qbaylogic.com
-copyright:          Copyright © 2021, QBayLogic B.V.
+copyright:          Copyright © 2021-2025, QBayLogic B.V.
 category:           Hardware
 build-type:         Simple
 
@@ -30,7 +30,7 @@ common basic-config
 
   build-depends:
     base      >= 4.11  && < 5,
-    hedgehog  >= 1.0.3 && < 1.5,
+    hedgehog  >= 1.0.3 && < 1.6,
 
 library
   import: basic-config
