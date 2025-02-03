@@ -2,6 +2,7 @@
 Copyright : © 2015-2016, Christiaan Baaij,
               2017     , Google Inc.
               2019     , Myrtle Software Ltd
+              2025     , QBayLogic B.V.
 Licence   : Creative Commons 4.0 (CC BY 4.0) (https://creativecommons.org/licenses/by/4.0/)
 -}
 
@@ -13,16 +14,10 @@ Licence   : Creative Commons 4.0 (CC BY 4.0) (https://creativecommons.org/licens
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
-{-# OPTIONS_GHC -fno-warn-unused-binds #-}
-{-# OPTIONS_GHC -fno-warn-type-defaults #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
-{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
-
 module Clash.Examples.Internal where
 
 import Clash.Prelude hiding (feedback)
-import Control.Lens
+import Control.Lens hiding ((:>))
 import Control.Monad
 import Control.Monad.Trans.State
 
@@ -45,6 +40,7 @@ decoderCase enable binaryIn | enable =
     0xD -> 0x2000
     0xE -> 0x4000
     0xF -> 0x8000
+    _   -> 0
 decoderCase _ _ = 0
 
 decoderShift :: Bool -> BitVector 4 -> BitVector 16
@@ -72,6 +68,7 @@ encoderCase enable binaryIn | enable =
     0x2000 -> 0xD
     0x4000 -> 0xE
     0x8000 -> 0xF
+    _      -> 0
 encoderCase _ _ = 0
 
 upCounter
@@ -107,7 +104,8 @@ upDownCounter upDown = s
 lfsrF' :: BitVector 16 -> BitVector 16
 lfsrF' s = pack feedback ++# slice (SNat @15) d1 s
   where
-    feedback = s!5 `xor` s!3 `xor` s!2 `xor` s!0
+    feedback = foldr1 xor
+      $ (s !) <$> (5 :: Int) :> 3 :> 2 :> 0 :> Nil
 
 lfsrF
   :: HiddenClockResetEnable dom
@@ -153,9 +151,9 @@ crcT
   => a
   -> Bit
   -> a
-crcT bv dIn = replaceBit 0  dInXor
-            $ replaceBit 5  (bv!4  `xor` dInXor)
-            $ replaceBit 12 (bv!11 `xor` dInXor)
+crcT bv dIn = replaceBit ( 0 :: Int) dInXor
+            $ replaceBit ( 5 :: Int) (bv ! ( 4 :: Int) `xor` dInXor)
+            $ replaceBit (12 :: Int) (bv ! (11 :: Int) `xor` dInXor)
               rotated
   where
     dInXor  = dIn `xor` fb
@@ -200,6 +198,7 @@ data TxReg
 
 makeLenses ''TxReg
 
+uartTX :: TxReg -> Bool -> BitVector 8 -> Bool -> TxReg
 uartTX t@(TxReg {..}) ld_tx_data tx_data tx_enable = flip execState t $ do
   when ld_tx_data $ do
     if not _tx_empty then
@@ -220,6 +219,7 @@ uartTX t@(TxReg {..}) ld_tx_data tx_data tx_enable = flip execState t $ do
   unless tx_enable $
     tx_cnt .= 0
 
+uartRX :: RxReg -> Bit -> Bool -> Bool -> RxReg
 uartRX r@(RxReg {..}) rx_in uld_rx_data rx_enable = flip execState r $ do
   -- Synchronize the async signal
   rx_d1 .= rx_in
@@ -260,6 +260,19 @@ uartRX r@(RxReg {..}) rx_in uld_rx_data rx_enable = flip execState r $ do
   else do
     rx_busy .= False
 
+uart ::
+  HiddenClockResetEnable dom =>
+  Signal dom Bool ->
+  Signal dom (BitVector 8) ->
+  Signal dom Bool ->
+  Signal dom Bit ->
+  Signal dom Bool ->
+  Signal dom Bool ->
+  ( Signal dom Bit
+  , Signal dom Bool
+  , Signal dom (BitVector 8)
+  , Signal dom Bool
+  )
 uart ld_tx_data tx_data tx_enable rx_in uld_rx_data rx_enable =
     ( _tx_out   <$> txReg
     , _tx_empty <$> txReg
