@@ -233,7 +233,7 @@ delayI dflt = delayN (SNat :: SNat d) dflt
 data DelayedFold (dom :: Domain) (n :: Nat) (delay :: Nat) (a :: Type) (f :: TyFun Nat Type) :: Type
 type instance Apply (DelayedFold dom n delay a) k = DSignal dom (n + (delay*k)) a
 
--- | Tree fold over a 'Vec' of 'DSignal's with a combinatorial function,
+-- | Tree fold over a 'Vec' of 'DSignal's with a combinational function,
 -- and delaying @delay@ cycles after each application.
 -- Values at times 0..(delay*k)-1 are set to a default.
 --

@@ -1228,7 +1228,7 @@ resetPolarityProxy _proxy =
 --
 -- * <Clash-Explicit-Signal.html#metastability meta-stability>
 --
--- For asynchronous resets it is unsafe because it can cause combinatorial
+-- For asynchronous resets it is unsafe because it can cause combinational
 -- loops. In case of synchronous resets it can lead to
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
@@ -1248,7 +1248,7 @@ unsafeToActiveHigh (unsafeFromReset -> r) =
 --
 -- * <Clash-Explicit-Signal.html#metastability meta-stability>
 --
--- For asynchronous resets it is unsafe because it can cause combinatorial
+-- For asynchronous resets it is unsafe because it can cause combinational
 -- loops. In case of synchronous resets it can lead to
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
@@ -1266,7 +1266,7 @@ unsafeToHighPolarity = unsafeToActiveHigh
 --
 -- * <Clash-Explicit-Signal.html#metastability meta-stability>
 --
--- For asynchronous resets it is unsafe because it can cause combinatorial
+-- For asynchronous resets it is unsafe because it can cause combinational
 -- loops. In case of synchronous resets it can lead to
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
@@ -1286,7 +1286,7 @@ unsafeToActiveLow (unsafeFromReset -> r) =
 --
 -- * <Clash-Explicit-Signal.html#metastability meta-stability>
 --
--- For asynchronous resets it is unsafe because it can cause combinatorial
+-- For asynchronous resets it is unsafe because it can cause combinational
 -- loops. In case of synchronous resets it can lead to
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
@@ -1303,7 +1303,7 @@ unsafeToLowPolarity = unsafeToActiveLow
 --
 -- * <Clash-Explicit-Signal.html#metastability meta-stability>
 --
--- For asynchronous resets it is unsafe because it can cause combinatorial
+-- For asynchronous resets it is unsafe because it can cause combinational
 -- loops. In case of synchronous resets it can lead to
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
@@ -1319,7 +1319,7 @@ unsafeFromReset (Reset r) = r
 {-# ANN unsafeFromReset hasBlackBox #-}
 
 -- | 'unsafeToReset' is unsafe. For asynchronous resets it is unsafe
--- because it can introduce combinatorial loops. In case of synchronous resets
+-- because it can introduce combinational loops. In case of synchronous resets
 -- it can lead to <Clash-Explicit-Signal.html#metastability meta-stability>
 -- issues in the presence of asynchronous resets.
 --
@@ -1337,7 +1337,7 @@ unsafeToReset r = Reset r
 -- | Interpret a signal of bools as an active high reset and convert it to
 -- a reset signal corresponding to the domain's setting.
 --
--- For asynchronous resets it is unsafe because it can cause combinatorial
+-- For asynchronous resets it is unsafe because it can cause combinational
 -- loops. In case of synchronous resets it can lead to
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
@@ -1354,7 +1354,7 @@ unsafeFromHighPolarity = unsafeFromActiveHigh
 -- | Interpret a signal of bools as an active high reset and convert it to
 -- a reset signal corresponding to the domain's setting.
 --
--- For asynchronous resets it is unsafe because it can cause combinatorial
+-- For asynchronous resets it is unsafe because it can cause combinational
 -- loops. In case of synchronous resets it can lead to
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
@@ -1373,7 +1373,7 @@ unsafeFromActiveHigh r =
 -- | Interpret a signal of bools as an active low reset and convert it to
 -- a reset signal corresponding to the domain's setting.
 --
--- For asynchronous resets it is unsafe because it can cause combinatorial
+-- For asynchronous resets it is unsafe because it can cause combinational
 -- loops. In case of synchronous resets it can lead to
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
@@ -1390,7 +1390,7 @@ unsafeFromLowPolarity = unsafeFromActiveLow
 -- | Interpret a signal of bools as an active low reset and convert it to
 -- a reset signal corresponding to the domain's setting.
 --
--- For asynchronous resets it is unsafe because it can cause combinatorial
+-- For asynchronous resets it is unsafe because it can cause combinational
 -- loops. In case of synchronous resets it can lead to
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.

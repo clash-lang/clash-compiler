@@ -284,7 +284,7 @@ Fixed:
   * Don't overflow the range of VHDL's natural type in shift/rotate, leading to simulation issues. Shift now saturates to a 31-bit shift amount. For rotate, in simulation only, the rotate amount is modulo the word width of the rotated value [#1874](https://github.com/clash-lang/clash-compiler/pull/1874)
   * `shiftL` for Clash datatypes does not cause a crash anymore when running Clash code with a really large shift amount [#1874](https://github.com/clash-lang/clash-compiler/pull/1874)
   * VHDL generated for `Signed.fromInteger` now truncates, like the Clash simulation, when the result is smaller than the argument [#1874](https://github.com/clash-lang/clash-compiler/pull/1874)
-  * Clash now preserves boolean combinatorial logic better when generating HDL [#1881](https://github.com/clash-lang/clash-compiler/issues/1881)
+  * Clash now preserves boolean combinational logic better when generating HDL [#1881](https://github.com/clash-lang/clash-compiler/issues/1881)
   * `valid` field of `TemplateFunction` is now checked for includes [#1945](https://github.com/clash-lang/clash-compiler/issues/1945)
   * Clash now generates clock generators that ensure that the amount of time between simulation start and the first active edge of the clock is equal to (/or longer than/) the period of the clock. The first active edges of the clocks do still occur simultaneously. [#2001](https://github.com/clash-lang/clash-compiler/issues/2001)
   * Expected values in assert become undefined when using `-fclash-compile-ultra` [#2040](https://github.com/clash-lang/clash-compiler/issues/2040)
