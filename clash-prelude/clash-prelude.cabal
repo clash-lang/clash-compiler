@@ -183,6 +183,10 @@ Library
                       Clash.Class.Counter.Internal
                       Clash.Class.Counter.TH
                       Clash.Class.Exp
+                      Clash.Class.Finite
+                      Clash.Class.Finite.Internal
+                      Clash.Class.Finite.Internal.Dictionaries
+                      Clash.Class.Finite.Internal.TH
                       Clash.Class.HasDomain
                       Clash.Class.HasDomain.HasSingleDomain
                       Clash.Class.HasDomain.HasSpecificDomain
@@ -408,6 +412,7 @@ test-suite unittests
 
       base,
       bytestring,
+      constraints   >= 0.9     && < 1.0,
       deepseq,
       hedgehog      >= 1.0.3    && < 1.6,
       hint          >= 0.7      && < 0.10,
@@ -447,6 +452,7 @@ test-suite unittests
                  Clash.Tests.XException
 
                  Clash.Tests.Laws.Enum
+                 Clash.Tests.Laws.Finite
                  Clash.Tests.Laws.SaturatingNum
 
                  Hedgehog.Extra

@@ -27,6 +27,7 @@ import qualified Clash.Tests.Vector
 import qualified Clash.Tests.XException
 
 import qualified Clash.Tests.Laws.Enum
+import qualified Clash.Tests.Laws.Finite
 import qualified Clash.Tests.Laws.SaturatingNum
 
 tests :: TestTree
@@ -56,6 +57,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.XException.tests
   , testGroup "Laws"
     [ Clash.Tests.Laws.Enum.tests
+    , Clash.Tests.Laws.Finite.tests
     , Clash.Tests.Laws.SaturatingNum.tests
     ]
   ]
