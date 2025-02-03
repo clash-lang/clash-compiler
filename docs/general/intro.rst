@@ -35,7 +35,7 @@ Expressive
   expressiveness to hardware design.
 
   This expressive typing makes it easier to develop safe, maintainable
-  hardware. Combinatorial and sequential logic is separated by type, and global
+  hardware. Combinational and sequential logic is separated by type, and global
   safety invariants such as separating incompatible clock domains are enforced
   in the type system.
 
@@ -131,4 +131,3 @@ which versions are compatible.
 
 It is recommended (but not required) that downstream Clash packages and
 published Clash code also follow the PVP specification.
-

@@ -11,7 +11,6 @@
 -}
 module Clash.Core.Evaluator.Types where
 
-import Control.Concurrent.Supply (Supply)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap (insert, lookup)
 #if !MIN_VERSION_base(4,20,0)
@@ -36,6 +35,7 @@ import Clash.Core.Var (Id, IdScope(..), TyVar)
 import Clash.Core.VarEnv
 import Clash.Driver.Types (BindingMap, bindingTerm)
 import Clash.Pretty (ClashPretty(..), fromPretty, showDoc)
+import Clash.Util.Supply (Supply)
 
 whnf'
   :: Evaluator

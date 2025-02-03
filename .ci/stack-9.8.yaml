@@ -1,4 +1,4 @@
-resolver: nightly-2024-07-23
+resolver: lts-23.2
 
 ghc-options:
   "$locals": -Wall -Wcompat
@@ -16,9 +16,5 @@ extra-deps:
 - fakedata-1.0.3@sha256:75630f6b9665965b4b551239ffcf89e4f879f93d235b18d4b249b0ed50513d0d,24593
 - hedgehog-fakedata-0.0.1.5@sha256:d8059e4ef9b7b4112bef9791300118f3a2d776bb191e50b41635a411af609428,1424
 - string-random-0.1.4.3@sha256:4b3092568889e00b419093a1938f14a67743844bc86476ee5cb6f8827dc40545,2172
-# TODO: Remove this workaround. See:
-#
-#   https://github.com/clash-lang/clash-compiler/pull/2665#issuecomment-1939044550
-- Cabal-3.10.3.0
 
 allow-newer: true

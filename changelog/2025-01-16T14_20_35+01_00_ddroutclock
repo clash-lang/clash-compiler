@@ -1,0 +1,1 @@
+NEW: The function `Clash.Explicit.DDR.ddrForwardClock`, which uses a DDR output primitive to forward a clock signal to a DDR-capable output pin.

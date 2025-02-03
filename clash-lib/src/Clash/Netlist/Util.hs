@@ -43,7 +43,6 @@ import           Data.Functor            (($>))
 import           Data.Hashable           (Hashable)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
-import qualified Data.IntSet             as IntSet
 import           Data.Primitive.ByteArray (ByteArray (..))
 import           Control.Applicative     (Alternative((<|>)))
 import           Data.List               (unzip4, partition)
@@ -569,10 +568,10 @@ hasUnconstrainedExistential tcm dc =
         let -- Free FVs in the LHS and RHS of the constraint that are not the
             -- in the set of universal type variables of the constructor.
             ty1FEVs = Lens.toListOf (typeFreeVars' ((`notElem` uTVs) . coerce)
-                                                   IntSet.empty)
+                                                   mempty)
                                     ty1
             ty2FEVs = Lens.toListOf (typeFreeVars' ((`notElem` uTVs) . coerce)
-                                                   IntSet.empty)
+                                                   mempty)
                                     ty2
 
             -- Determine whether `eTV` can be generated from one side of a

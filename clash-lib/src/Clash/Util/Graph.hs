@@ -6,6 +6,8 @@
   Collection of utilities
 -}
 
+{-# LANGUAGE CPP #-}
+
 module Clash.Util.Graph
   ( topSort
   , reverseTopSort
@@ -14,14 +16,27 @@ module Clash.Util.Graph
 
 import           Data.Tuple            (swap)
 import           Data.Foldable         (foldlM)
+#if MIN_VERSION_ghc(9,8,4)
+import qualified GHC.Data.Word64Map.Strict as IntMap
+import qualified GHC.Data.Word64Set        as IntSet
+#else
+import           Data.IntMap.Strict    (IntMap)
 import qualified Data.IntMap.Strict    as IntMap
+import           Data.IntSet           (IntSet)
 import qualified Data.IntSet           as IntSet
+#endif
 
 import           Clash.Core.Var (Id)
 import           Clash.Core.Term (Term)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Driver.Types (BindingMap, Binding (bindingTerm))
 import           Clash.Normalize.Util (callGraph)
+import           Clash.Unique (Unique)
+
+#if MIN_VERSION_ghc(9,8,4)
+type IntMap = IntMap.Word64Map
+type IntSet = IntSet.Word64Set
+#endif
 
 data Marker
   = Temporary
@@ -32,17 +47,17 @@ headSafe [] = Nothing
 headSafe (a:_) = Just a
 
 topSortVisit'
-  :: IntMap.IntMap [Int]
+  :: IntMap [Unique]
   -- ^ Edges
-  -> IntSet.IntSet
+  -> IntSet
   -- ^ Unmarked nodes
-  -> IntMap.IntMap Marker
+  -> IntMap Marker
   -- ^ Marked nodes
-  -> [Int]
+  -> [Unique]
   -- ^ Sorted so far
-  -> Int
+  -> Unique
   -- ^ Node to visit
-  -> Either String (IntSet.IntSet, IntMap.IntMap Marker, [Int])
+  -> Either String (IntSet, IntMap Marker, [Unique])
 topSortVisit' edges unmarked marked sorted node =
   case IntMap.lookup node marked of
     Just Permanent -> Right (unmarked, marked, sorted)
@@ -60,17 +75,17 @@ topSortVisit' edges unmarked marked sorted node =
       topSortVisit' edges unmarked' marked' sorted' node'
 
 topSortVisit
-  :: IntMap.IntMap [Int]
+  :: IntMap [Unique]
   -- ^ Edges
-  -> IntSet.IntSet
+  -> IntSet
   -- ^ Unmarked nodes
-  -> IntMap.IntMap Marker
+  -> IntMap Marker
   -- ^ Marked nodes
-  -> [Int]
+  -> [Unique]
   -- ^ Sorted so far
-  -> Int
+  -> Unique
   -- ^ Node to visit
-  -> Either String (IntSet.IntSet, IntMap.IntMap Marker, [Int])
+  -> Either String (IntSet, IntMap Marker, [Unique])
 topSortVisit edges unmarked marked sorted node = do
   (unmarked', marked', sorted') <-
     topSortVisit' edges unmarked marked sorted node
@@ -83,9 +98,9 @@ topSortVisit edges unmarked marked sorted node = do
 -- errors if edges mention nodes not mentioned in the node list or if the
 -- given graph contains cycles.
 topSort
-  :: [(Int, a)]
+  :: [(Unique, a)]
   -- ^ Nodes
-  -> [(Int, Int)]
+  -> [(Unique, Unique)]
   -- ^ Edges
   -> Either String [a]
   -- ^ Error message or topologically sorted nodes
@@ -128,9 +143,9 @@ topSort nodes@(node:_)  edges = do
 -- Likewise, this function promises __one__ of those lists in reverse, but not
 -- necessarily the reverse of topSort itself.
 reverseTopSort
-  :: [(Int, a)]
+  :: [(Unique, a)]
   -- ^ Nodes
-  -> [(Int, Int)]
+  -> [(Unique, Unique)]
   -- ^ Edges
   -> Either String [a]
   -- ^ Reversely, topologically sorted nodes

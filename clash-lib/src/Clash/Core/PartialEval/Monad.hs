@@ -60,7 +60,6 @@ module Clash.Core.PartialEval.Monad
   ) where
 
 import           Control.Applicative (Alternative)
-import           Control.Concurrent.Supply (Supply)
 import           Control.Monad.Catch (MonadThrow, MonadCatch, MonadMask)
 import           Control.Monad.IO.Class (MonadIO)
 
@@ -85,6 +84,7 @@ import           Clash.Core.Var (Id, TyVar, Var)
 import           Clash.Core.VarEnv
 import           Clash.Driver.Types (Binding(..))
 import           Clash.Rewrite.WorkFree (isWorkFree)
+import           Clash.Util.Supply (Supply)
 
 {-
 NOTE [RWS monad]

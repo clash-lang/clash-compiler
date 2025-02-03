@@ -51,7 +51,7 @@ Maintainer:           QBayLogic B.V. <devops@qbaylogic.com>
 Copyright:            Copyright © 2013-2016, University of Twente,
                                   2016-2017, Myrtle Software Ltd,
                                   2017-2019, QBayLogic B.V., Google Inc.,
-                                  2021-2023, QBayLogic B.V.
+                                  2021-2025, QBayLogic B.V.
 Category:             Hardware
 Build-type:           Simple
 
@@ -409,7 +409,7 @@ test-suite unittests
       base,
       bytestring,
       deepseq,
-      hedgehog      >= 1.0.3    && < 1.5,
+      hedgehog      >= 1.0.3    && < 1.6,
       hint          >= 0.7      && < 0.10,
       quickcheck-classes-base >= 0.6 && < 1.0,
       tasty         >= 1.2      && < 1.6,

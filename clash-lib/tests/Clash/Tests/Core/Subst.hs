@@ -18,6 +18,7 @@ import           Clash.Core.Type         (ConstTy(..), Type(ConstTy))
 import           Clash.Core.Subst
 import           Clash.Core.VarEnv
 import           Clash.Core.Var          (IdScope(..), Var(..))
+import           Clash.Unique            (Unique)
 
 fakeName :: Name a
 fakeName =
@@ -28,7 +29,7 @@ fakeName =
     , nameLoc=noSrcSpan
     }
 
-unique :: Int
+unique :: Unique
 unique = 20
 
 termVar :: Var Term

@@ -1,8 +1,9 @@
 {-|
 Copyright  :  (C) 2017, Google Inc
                   2019, Myrtle Software Ltd
+                  2025, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 We simulate DDR signal by using 'Signal's which have exactly half the period
 (or double the speed) of our normal 'Signal's.
@@ -20,21 +21,28 @@ or "Clash.Xilinx.DDR".
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Clash.Explicit.DDR
   ( ddrIn
   , ddrOut
+  , ddrForwardClock
     -- * Internal
   , ddrIn#
   , ddrOut#
+  , ddrForwardClock#
   )
 where
 
+import Data.List.Infinite (Infinite(..), (...))
+import Data.String.Interpolate (__i)
 import GHC.Stack (HasCallStack, withFrozenCallStack)
+import Unsafe.Coerce (unsafeCoerce)
 
-import Clash.Annotations.Primitive    (hasBlackBox)
-import Clash.Explicit.Prelude
+import Clash.Annotations.Primitive (hasBlackBox, Primitive(..), HDL(..))
+import Clash.Explicit.Prelude hiding ((:<))
 import Clash.Signal.Internal
 
 {- $setup
@@ -189,3 +197,116 @@ ddrOut# clk rst en i0 xs ys =
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE ddrOut# #-}
 {-# ANN ddrOut# hasBlackBox #-}
+
+-- | Use a DDR output primitive to forward a clock to an output pin
+--
+-- This function allows outputting a clock signal on a DDR-capable output pin.
+-- As with the DDR output primitive itself, the created clock cannot be used
+-- internally in the design.
+--
+-- The @ddrOut@ primitive passed in will always have its enable asserted. If the
+-- @Enable@ input of @ddrForwardClock@ is deasserted, the data inputs of the
+-- @ddrOut@ primitive will switch to achieve the desired output signal. This is
+-- because the behavior of the enable input of the DDR primitive differs between
+-- vendor-specific primitives.
+--
+-- The @Reset@ input of this function is passed on to the @ddrOut@ primitive and
+-- not otherwise used by @ddrForwardClock@.
+--
+-- With the @phase@ argument, the phase relation between input and output clock
+-- can be defined. With the argument @Nothing@, the clocks are in phase: the
+-- active edge of the output clock is on the active edge of the input clock,
+-- even if the domains differ on what the active edge is.
+--
+-- With the @idle@ argument, the output level when the @Enable@ input is
+-- deasserted can be defined. With @Nothing@, it will be 0 for a clock with the
+-- rising edge as the active edge, and 1 for a clock with the falling edge as
+-- the active edge.
+--
+-- __NB__: The deassertion of the @Enable@ input or the assertion of the @Reset@
+-- input is not faithfully simulated in Haskell simulation: Haskell simulation
+-- of a Clash design has clocks that always run. The generated HDL will actually
+-- output an idle state when @Enable@ is deasserted (and the reset depends on
+-- the @ddrOut@ primitive used).
+ddrForwardClock
+  :: forall domDDR domOut domIn
+   . KnownDomain domOut
+  => DomainPeriod domIn ~ DomainPeriod domOut
+  => DomainPeriod domIn ~ (2 * DomainPeriod domDDR)
+  => Clock domIn
+  -> Reset domIn
+  -> Enable domIn
+  -> Maybe Bit
+  -- ^ @idle@: Output value when @Enable@ is deasserted
+  -> Maybe Bit
+  -- ^ @phase@: Value to output at active edge of incoming clock
+  -> (Clock domIn -> Reset domIn -> Enable domIn -> Signal domIn (Bit, Bit)
+      -> Signal domDDR Bit)
+  -- ^ @ddrOut@ primitive to use
+  -> Clock domOut
+ddrForwardClock clk rst en idle phase oddr =
+  ddrForwardClock# clk $ oddr clk rst enableGen ins
+ where
+  ins =
+    mux
+      (fromEnable en)
+      (pure (activeLevel, complement activeLevel))
+      (pure (idleLevel, idleLevel))
+  activeLevel =
+    case phase of
+      Nothing ->
+        case activeEdge @domOut of
+          SRising -> 1
+          SFalling -> 0
+      Just x -> x
+  idleLevel =
+    case idle of
+      Nothing ->
+        case activeEdge @domOut of
+          SRising -> 0
+          SFalling -> 1
+      Just x -> x
+
+ddrForwardClock#
+  :: KnownDomain domOut
+  => DomainPeriod domIn ~ DomainPeriod domOut
+  => DomainPeriod domIn ~ (2 * DomainPeriod domDDR)
+  => Clock domIn
+  -> Signal domDDR Bit
+  -> Clock domOut
+ddrForwardClock# (Clock SSymbol periods) ddrSignal =
+  Clock (ddrSignal `seq` SSymbol) (unsafeCoerce periods)
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE ddrForwardClock# #-}
+{-# ANN ddrForwardClock# (
+  let
+    bbName = show 'ddrForwardClock#
+    _knownDomOut
+      :< _domInOutPeriod
+      :< _domDDRPeriod
+      :< _clkIn
+      :< ddrSignal
+      :< _ = ((0 :: Int)...)
+  in InlineYamlPrimitive [VHDL] [__i|
+    BlackBox:
+      name: #{bbName}
+      kind: Expression
+      template: ~TYPMO'(~ARG[#{ddrSignal}])
+      workInfo: Never
+    |]) #-}
+{-# ANN ddrForwardClock# (
+  let
+    bbName = show 'ddrForwardClock#
+    _knownDomOut
+      :< _domInOutPeriod
+      :< _domDDRPeriod
+      :< _clkIn
+      :< ddrSignal
+      :< _ = ((0 :: Int)...)
+  in InlineYamlPrimitive [Verilog, SystemVerilog] [__i|
+    BlackBox:
+      name: #{bbName}
+      kind: Expression
+      template: ~ARG[#{ddrSignal}]
+      workInfo: Never
+    |]) #-}

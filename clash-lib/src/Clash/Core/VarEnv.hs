@@ -103,6 +103,9 @@ import           Data.Coerce               (coerce)
 import qualified Data.List                 as List
 import qualified Data.List.Extra           as List
 import           Data.Maybe                (fromMaybe)
+#if MIN_VERSION_ghc(9,8,4)
+import           Data.Word                 (Word64)
+#endif
 
 #if MIN_VERSION_prettyprinter(1,7,0)
 import           Prettyprinter
@@ -385,14 +388,21 @@ eltsVarSet = UniqMap.elems
 
 -- * InScopeSet
 
+type Seed
+#if MIN_VERSION_ghc(9,8,4)
+  = Word64
+#else
+  = Int
+#endif
+
 -- | Set of variables that is in scope at some point
 --
--- The 'Int' is a kind of hash-value used to generate new uniques. It should
+-- The 'Seed' is a kind of hash-value used to generate new uniques. It should
 -- never be zero
 --
 -- See "Secrets of the Glasgow Haskell Compiler inliner" Section 3.2 for the
 -- motivation
-data InScopeSet = InScopeSet VarSet {-# UNPACK #-} !Int
+data InScopeSet = InScopeSet VarSet {-# UNPACK #-} !Seed
   deriving (Generic, NFData, Binary)
 
 instance ClashPretty InScopeSet where
@@ -412,7 +422,7 @@ extendInScopeSetList
   -> [Var a]
   -> InScopeSet
 extendInScopeSetList (InScopeSet inScope n) vs =
-  InScopeSet (List.foldl' extendVarSet inScope vs) (n + length vs)
+  InScopeSet (List.foldl' extendVarSet inScope vs) (n + fromIntegral (length vs))
 
 -- | Union two sets of in scope variables
 unionInScope
@@ -484,7 +494,7 @@ uniqAway'
   :: (Uniquable a, ClashPretty a)
   => (Unique -> Bool)
   -- ^ Unique in scope test
-  -> Int
+  -> Seed
   -- ^ Seed
   -> a
   -> a
@@ -510,7 +520,7 @@ uniqAway' inScopeTest n u =
 
 deriveUnique
   :: Unique
-  -> Int
+  -> Seed
   -> Unique
 deriveUnique i delta = i + delta
 

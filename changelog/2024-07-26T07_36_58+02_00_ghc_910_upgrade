@@ -1,4 +1,0 @@
-ADDED: Support for GHC 9.10.
-A word of caution: When the Clash compiler is compiled against GHC 9.10, it will
-currently only work reliably on 64-bit platforms. Compile the Clash compiler with
-GHC 9.8 or older if you are on a 32-bit platform.

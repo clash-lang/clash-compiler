@@ -22,7 +22,6 @@ module Clash.GHC.Evaluator where
 
 import           Prelude                                 hiding (lookup)
 
-import           Control.Concurrent.Supply               (Supply, freshId)
 import           Data.Either                             (lefts,rights)
 import           Data.List                               (mapAccumL)
 #if !MIN_VERSION_base(4,20,0)
@@ -55,6 +54,7 @@ import           Clash.Debug
 import qualified Clash.Normalize.Primitives as NP (removedArg, undefined, undefinedX)
 import           Clash.Unique
 import           Clash.Util                              (curLoc)
+import           Clash.Util.Supply                (Supply, freshId)
 
 import           Clash.GHC.Evaluator.Primitive
 

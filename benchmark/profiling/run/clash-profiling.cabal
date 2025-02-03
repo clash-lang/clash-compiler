@@ -16,7 +16,6 @@ executable clash-profile-normalization-run
   build-depends:       base,
                        binary,
                        bytestring,
-                       concurrent-supply,
                        deepseq,
 
                        clash-benchmark,
@@ -34,7 +33,6 @@ executable clash-profile-netlist-run
   build-depends:       base,
                        binary,
                        bytestring,
-                       concurrent-supply,
                        deepseq,
                        filepath,
                        text,

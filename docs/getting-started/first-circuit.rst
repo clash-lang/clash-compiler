@@ -3,7 +3,7 @@
 Example: Multiply and Accumulate
 ================================
 
-Combinatorial MAC
+Combinational MAC
 -----------------
 
 With Clash installed, it is now possible to begin creating hardware designs.
@@ -43,7 +43,7 @@ Synchronous MAC
 
 By adding another output parameter to this function, with the previous value of
 the accumulator, we can define the function as a `Mealy machine`_. This allows
-us to use our combinatorial definition of ``mac`` to create a synchronous
+us to use our combinational definition of ``mac`` to create a synchronous
 circuit (which we call ``macS``).
 
 .. code-block:: haskell
@@ -57,7 +57,7 @@ circuit (which we call ``macS``).
 .. _`Mealy machine`: https://en.wikipedia.org/wiki/Mealy_machine
 
 The input and output of ``macS`` are values of the ``Signal`` type. This type
-represents synchronous values (functions without signals are combinatorial).
+represents synchronous values (functions without signals are combinational).
 There is also an additional ``dom`` type, for synthesis domain, and a
 constraint ``HiddenClockResetEnable`` -- which says the synthesis domain has a
 clock, reset and enable line. These are implicit, although they can be exposed
@@ -91,7 +91,7 @@ will generate the HDL in a subdirectory named after the HDL being output.
   means there can be no type variables in the type signature (i.e. for the
   circuit defined so far you need to specify both ``dom`` and ``a``.
 
-We can test that this circuit works as expected by defining a test bench. 
+We can test that this circuit works as expected by defining a test bench.
 This allows an input to be used and the actual output to be compared against
 an expected output.
 
@@ -112,7 +112,6 @@ function, which takes in the number of samples to draw and the signal which
 generates samples.
 
 .. code-block:: haskell
- 
+
   >>> sampleN 8 testBench
   [False, False, False, False, False, False, False, False]
-

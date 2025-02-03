@@ -8,9 +8,6 @@ in
   # is basically abandonware it catches fire with brick 1.0+.
   brick = doJailbreak prev.brick_0_70_1;
 
-  # Marked as broken in nixpkgs, since it needs on a newer hashable than the
-  # .cabal file currently uploaded to hackage.
-  concurrent-supply = doJailbreak (markUnbroken prev.concurrent-supply);
 
   # Use a branch with changes to support GHC 9.6.1.
   hint =

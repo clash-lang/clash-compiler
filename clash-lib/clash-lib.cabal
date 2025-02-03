@@ -152,7 +152,6 @@ Library
                       binary                  >= 0.8.5    && < 0.11,
                       bytestring              >= 0.10.0.2 && < 0.13,
                       clash-prelude           == 1.9.0,
-                      concurrent-supply       >= 0.1.7    && < 0.2,
                       containers              >= 0.5.0.0  && < 0.8,
                       cryptohash-sha256       >= 0.11     && < 0.12,
                       data-binary-ieee754     >= 0.4.4    && < 0.6,
@@ -309,6 +308,7 @@ Library
                       Clash.Util.Eq
                       Clash.Util.Graph
                       Clash.Util.Interpolate
+                      Clash.Util.Supply
                       Clash.Pretty
 
                       Clash.Verification.Pretty
@@ -415,7 +415,6 @@ test-suite unittests
       base16-bytestring,
       bytestring,
       containers,
-      concurrent-supply,
       data-default,
       deepseq,
       haskell-src-exts,

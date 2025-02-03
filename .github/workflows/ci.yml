@@ -140,7 +140,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: [ "8.10.7", "9.0.2", "9.6.4" ]
+        ghc: [ "8.10.7", "9.0.2", "9.6.6" ]
         include:
           - multiple_hidden: yes
 
@@ -154,7 +154,7 @@ jobs:
 
     # Run steps inside the clash CI docker image
     container:
-      image: ghcr.io/clash-lang/clash-ci:${{ matrix.ghc }}-20240721
+      image: ghcr.io/clash-lang/clash-ci:${{ matrix.ghc }}-20250101
 
       env:
         THREADS: 2
