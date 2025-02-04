@@ -1445,7 +1445,7 @@ and
 
 -}
 {- $dslang
-For those who is lazy to learn those weird language used in the Primitves, then another solution is to use
+Another solution for binding external IP core to a Haskell function instead of using the Primitive template language is to use
 the Domain Specific Language (DSL) which is defined internally in the Clash library. The DSL feature is currently used
 internally in the clash-cores library, and it is useful in the situation with the proprietary IP cores. Example of this
 can be found in the Intel/Xilinx ClockGen library, and in the clash-cores Xilinx library.
@@ -1724,7 +1724,8 @@ The Verilog generation for the topEntity is:
 > endmodule
 
 Currently, there is a error to declare block component with Clash. The experimental Clash compiler has
-fixed this problem. User must create a file name __cabal.project__ and include this line inside its content:
+fixed this problem. user should see the block component in the generated VHDL code.
+If there is no block component, user must create a file name __cabal.project__ and include this line inside its content:
 
 > source-repository-package
 >  type: git
