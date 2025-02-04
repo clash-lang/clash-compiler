@@ -8,6 +8,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
@@ -22,8 +23,6 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
-
-{-# OPTIONS_GHC -fno-warn-incomplete-patterns -fno-warn-redundant-constraints #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -184,6 +183,9 @@ data Vec :: Nat -> Type -> Type where
 
 {-# COMPLETE Nil, (:>) #-}
 
+-- | Tag for K1: @n ~ 0@ proof
+data N
+
 -- | In many cases, this Generic instance only allows generic
 -- functions/instances over vectors of at least size 1, due to the
 -- /n-1/ in the /Rep (Vec n a)/ definition.
@@ -194,7 +196,7 @@ data Vec :: Nat -> Type -> Type where
 instance KnownNat n => Generic (Vec n a) where
   type Rep (Vec n a) =
     D1 ('MetaData "Vec" "Clash.Data.Vector" "clash-prelude" 'False)
-      (C1 ('MetaCons "Nil" 'PrefixI 'False) U1 :+:
+      (C1 ('MetaCons "Nil" 'PrefixI 'False) (K1 N (Dict (n ~ 0))) :+:
        C1 ('MetaCons "Cons" 'PrefixI 'False)
         (S1 ('MetaSel 'Nothing
                 'NoSourceUnpackedness
@@ -206,13 +208,14 @@ instance KnownNat n => Generic (Vec n a) where
                 'NoSourceStrictness
                 'DecidedLazy)
             (Rec0 (Vec (n-1) a))))
-  from Nil         = M1 (L1 (M1 U1))
+  from Nil         = M1 (L1 (M1 (K1 Dict)))
   from (Cons x xs) = M1 (R1 (M1 (M1 (K1 x) :*: M1 (K1 xs))))
   to (M1 g) = case compareSNat (SNat @n) (SNat @0) of
     SNatLE -> case leZero @n of
       Sub Dict -> Nil
     SNatGT -> case g of
       R1 (M1 (M1 (K1 p) :*: M1 (K1 q))) -> Cons p q
+      L1 (M1 (K1 eqZero)) -> case eqZero of {}
 
 instance (KnownNat n, Typeable a, Data a) => Data (Vec n a) where
   gunfold k z _ = case compareSNat (SNat @n) (SNat @0) of
@@ -449,6 +452,12 @@ singleton = (`Cons` Nil)
 -}
 head :: Vec (n + 1) a -> a
 head (x `Cons` _) = x
+#if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
+head xs = unreachable xs
+ where
+  unreachable :: forall n a. 1 <= n => Vec n a -> a
+  unreachable (x `Cons` _) = x
+#endif
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE tail #-}
@@ -494,7 +503,13 @@ head (x `Cons` _) = x
 #endif
 -}
 tail :: Vec (n + 1) a -> Vec n a
-tail (_ `Cons` xs) = xs
+tail (_ `Cons` xr) = xr
+#if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
+tail xs = unreachable xs
+ where
+  unreachable :: forall n a. 1 <= n => Vec n a -> Vec (n - 1) a
+  unreachable (_ `Cons` xr) = xr
+#endif
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE last #-}
@@ -541,7 +556,13 @@ tail (_ `Cons` xs) = xs
 -}
 last :: Vec (n + 1) a -> a
 last (x `Cons` Nil)         = x
-last (_ `Cons` y `Cons` ys) = last (y `Cons` ys)
+last (_ `Cons` y `Cons` xr) = last (y `Cons` xr)
+#if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
+last xs = unreachable xs
+ where
+  unreachable :: 1 <= n => Vec n a -> a
+  unreachable ys@(Cons _ _) = last ys
+#endif
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE init #-}
@@ -588,7 +609,13 @@ last (_ `Cons` y `Cons` ys) = last (y `Cons` ys)
 -}
 init :: Vec (n + 1) a -> Vec n a
 init (_ `Cons` Nil)         = Nil
-init (x `Cons` y `Cons` ys) = x `Cons` init (y `Cons` ys)
+init (x `Cons` y `Cons` xr) = x `Cons` init (y `Cons` xr)
+#if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
+init xs = unreachable xs
+ where
+  unreachable :: 1 <= n => Vec n a -> Vec (n - 1) a
+  unreachable ys@(Cons _ _) = init ys
+#endif
 
 {-# INLINE shiftInAt0 #-}
 -- | Shift in elements to the head of a vector, bumping out elements at the
@@ -740,9 +767,9 @@ splitAt n xs = splitAtU (toUNat n) xs
 {-# ANN splitAt hasBlackBox #-}
 
 splitAtU :: UNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
-splitAtU UZero     ys            = (Nil,ys)
-splitAtU (USucc s) (y `Cons` ys) = let (as,bs) = splitAtU s ys
-                                   in  (y `Cons` as, bs)
+splitAtU UZero     ys = (Nil, ys)
+splitAtU (USucc s) ys = let (as, bs) = splitAtU s $ tail ys
+                        in  (head ys `Cons` as, bs)
 
 -- | Split a vector into two vectors where the length of the two is determined
 -- by the context.
@@ -1237,7 +1264,7 @@ scanl f z xs = ws
 -- >>> scanl1 (-) (1 :> 2 :> 3 :> 4 :> Nil)
 -- 1 :> -1 :> -4 :> -8 :> Nil
 scanl1 :: KnownNat n => (a -> a -> a) -> Vec (n+1) a -> Vec (n+1) a
-scanl1 op (v:>vs) = scanl op v vs
+scanl1 op vs = scanl op (head vs) (tail vs)
 {-# INLINE scanl1 #-}
 
 -- | 'scanr' with no seed value
@@ -2587,6 +2614,11 @@ dtfold _ f g = go (SNat :: SNat k)
           sn'       = sn `subSNat` d1
           (xsL,xsR) = splitAt (pow2SNat sn') xs
       in  g sn' (go sn' xsL) (go sn' xsR)
+#if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
+    go _  Nil =
+      case (const Dict :: forall m. Proxy m -> Dict (1 <= 2 ^ m)) (Proxy @n) of
+        {}
+#endif
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE dtfold #-}
 {-# ANN dtfold hasBlackBox #-}
