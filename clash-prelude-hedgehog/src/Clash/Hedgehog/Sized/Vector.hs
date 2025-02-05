@@ -37,13 +37,13 @@ import Clash.Sized.Vector
 -- | Generate a potentially empty vector, where each element is produced
 -- using the supplied generator. For a non-empty vector, see 'genNonEmptyVec'.
 --
-genVec :: (MonadGen m, KnownNat n) => m a -> m (Vec n a)
+genVec :: forall n a m. (MonadGen m, KnownNat n) => m a -> m (Vec n a)
 genVec genElem = traverse# id (repeat genElem)
 
 -- | Generate a non-empty vector, where each element is produced using the
 -- supplied generator. For a potentially empty vector, see 'genVec'.
 --
-genNonEmptyVec :: (MonadGen m, KnownNat n, 1 <= n) => m a -> m (Vec n a)
+genNonEmptyVec :: forall n a m. (MonadGen m, KnownNat n, 1 <= n) => m a -> m (Vec n a)
 genNonEmptyVec = genVec
 
 data SomeVec atLeast a where
@@ -53,7 +53,8 @@ instance (KnownNat atLeast, Show a) => Show (SomeVec atLeast a) where
   show (SomeVec SNat xs) = show xs
 
 genSomeVec
-  :: (MonadGen m, KnownNat atLeast)
+  :: forall atLeast a m
+   . (MonadGen m, KnownNat atLeast)
   => Range Natural
   -> m a
   -> m (SomeVec atLeast a)

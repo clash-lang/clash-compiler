@@ -31,7 +31,7 @@ import qualified Hedgehog.Range as Range
 import Clash.Promoted.Nat
 import Clash.Sized.Internal.Index
 
-genIndex :: (MonadGen m, KnownNat n) => Range (Index n) -> m (Index n)
+genIndex :: forall n m. (MonadGen m, KnownNat n) => Range (Index n) -> m (Index n)
 genIndex range =
   Gen.frequency
     [ (70, Gen.integral range)
@@ -45,7 +45,8 @@ instance KnownNat atLeast => Show (SomeIndex atLeast) where
   show (SomeIndex SNat ix) = show ix
 
 genSomeIndex
-  :: (MonadGen m, KnownNat atLeast)
+  :: forall atLeast m
+  . (MonadGen m, KnownNat atLeast)
   => Range Natural
   -> m (SomeIndex atLeast)
 genSomeIndex rangeIx = do

@@ -24,19 +24,19 @@ import qualified Hedgehog.Gen as Gen
 
 import Clash.Signal.Internal
 
-genSignal :: (MonadGen m) => m a -> m (Signal dom a)
+genSignal :: forall a dom m. (MonadGen m) => m a -> m (Signal dom a)
 genSignal genElem = liftA2 (:-) genElem (genSignal genElem)
 
-genActiveEdge :: (MonadGen m) => m ActiveEdge
+genActiveEdge :: forall m. (MonadGen m) => m ActiveEdge
 genActiveEdge = Gen.element [Rising, Falling]
 
-genInitBehavior :: (MonadGen m) => m InitBehavior
+genInitBehavior :: forall m. (MonadGen m) => m InitBehavior
 genInitBehavior = Gen.element [Unknown, Defined]
 
-genResetKind :: (MonadGen m) => m ResetKind
+genResetKind :: forall m. (MonadGen m) => m ResetKind
 genResetKind = Gen.element [Asynchronous, Synchronous]
 
-genResetPolarity :: (MonadGen m) => m ResetPolarity
+genResetPolarity :: forall m. (MonadGen m) => m ResetPolarity
 genResetPolarity = Gen.element [ActiveHigh, ActiveLow]
 
 -- TODO Generate a full domain configuration.

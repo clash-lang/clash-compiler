@@ -1,0 +1,1 @@
+CHANGED: Order of type arguments for functions in `clash-prelude-hedgehog` now follows _size_, _domain_, _monad_.

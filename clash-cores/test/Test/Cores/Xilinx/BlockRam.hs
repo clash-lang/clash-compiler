@@ -227,7 +227,7 @@ testsCycleBoth = testGroup "cycleBoth"
   , testProperty "prop_definedOutputCycleBothWord16"
       (prop_definedOutputCycleBoth (Gen.enumBounded @_ @Word16))
   , testProperty "prop_definedOutputCycleBothBitVector16"
-      (prop_definedOutputCycleBoth (genBitVector @_ @16))
+      (prop_definedOutputCycleBoth (genBitVector @16))
   ]
  where
   cyc portA portB = showX $
@@ -286,7 +286,7 @@ testsAccessRam = testGroup "accessRam"
   , testProperty "prop_definedOutputAccessRamWord16"
       (prop_definedOutputAccessRam (Gen.enumBounded @_ @Word16))
   , testProperty "prop_definedOutputAccessRamBitVector16"
-      (prop_definedOutputAccessRam (genBitVector @_ @16))
+      (prop_definedOutputAccessRam (genBitVector @16))
   ]
  where
   access addr byteEna dat =
