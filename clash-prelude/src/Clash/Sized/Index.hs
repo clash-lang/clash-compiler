@@ -1,5 +1,6 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente
+                  2025     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -18,7 +19,6 @@ where
 import GHC.TypeLits (KnownNat, type (^))
 import GHC.TypeLits.Extra (CLog) -- documentation only
 
-import Clash.Promoted.Nat (SNat (..), pow2SNat)
 import Clash.Sized.Internal.BitVector (BitVector)
 import Clash.Sized.Internal.Index
 
