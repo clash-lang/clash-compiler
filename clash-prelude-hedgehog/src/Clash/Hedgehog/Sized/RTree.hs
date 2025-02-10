@@ -31,10 +31,10 @@ import qualified Hedgehog.Gen as Gen
 import Clash.Promoted.Nat
 import Clash.Sized.RTree
 
-genRTree :: (MonadGen m, KnownNat n) => m a -> m (RTree n a)
+genRTree :: forall n a m. (MonadGen m, KnownNat n) => m a -> m (RTree n a)
 genRTree genElem = sequenceA (trepeat genElem)
 
-genNonEmptyRTree :: (MonadGen m, KnownNat n, 1 <= n) => m a -> m (RTree n a)
+genNonEmptyRTree :: forall n a m. (MonadGen m, KnownNat n, 1 <= n) => m a -> m (RTree n a)
 genNonEmptyRTree = genRTree
 
 data SomeRTree atLeast a where
@@ -44,7 +44,8 @@ instance (KnownNat atLeast, Show a) => Show (SomeRTree atLeast a) where
   show (SomeRTree SNat x) = show x
 
 genSomeRTree
-  :: (MonadGen m, KnownNat atLeast)
+  :: forall atLeast a m
+   . (MonadGen m, KnownNat atLeast)
   => Range Natural
   -> m a
   -> m (SomeRTree atLeast a)

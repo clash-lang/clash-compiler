@@ -54,12 +54,12 @@ genBit = Gen.element [low, high, errorX "X"]
 
 -- | Generate a bit vector where all bits are defined.
 --
-genDefinedBitVector :: (MonadGen m, KnownNat n) => m (BitVector n)
+genDefinedBitVector :: forall n m. (MonadGen m, KnownNat n) => m (BitVector n)
 genDefinedBitVector = pack <$> genUnsigned constantBounded
 
 -- | Generate a bit vector where some bits may be undefined.
 --
-genBitVector :: forall m n . (MonadGen m, KnownNat n) => m (BitVector n)
+genBitVector :: forall n m. (MonadGen m, KnownNat n) => m (BitVector n)
 genBitVector =
   Gen.frequency
     [ (70, BV <$> genNatural <*> genNatural)
@@ -77,7 +77,7 @@ instance KnownNat atLeast => Show (SomeBitVector atLeast) where
   show (SomeBitVector SNat bv) = show bv
 
 genSomeBitVector
-  :: forall m atLeast
+  :: forall atLeast m
    . (MonadGen m, KnownNat atLeast)
   => Range Natural
   -> (forall n. KnownNat n => m (BitVector n))

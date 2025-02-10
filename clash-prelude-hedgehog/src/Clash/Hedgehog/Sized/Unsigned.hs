@@ -31,7 +31,7 @@ import qualified Hedgehog.Range as Range
 import Clash.Promoted.Nat
 import Clash.Sized.Internal.Unsigned
 
-genUnsigned :: (MonadGen m, KnownNat n) => Range (Unsigned n) -> m (Unsigned n)
+genUnsigned :: forall n m. (MonadGen m, KnownNat n) => Range (Unsigned n) -> m (Unsigned n)
 genUnsigned range =
   Gen.frequency
     [ (70, Gen.integral range)
@@ -45,7 +45,8 @@ instance KnownNat atLeast => Show (SomeUnsigned atLeast) where
   show (SomeUnsigned SNat x) = show x
 
 genSomeUnsigned
-  :: (MonadGen m, KnownNat atLeast)
+  :: forall atLeast m
+   . (MonadGen m, KnownNat atLeast)
   => Range Natural
   -> m (SomeUnsigned atLeast)
 genSomeUnsigned rangeUnsigned = do

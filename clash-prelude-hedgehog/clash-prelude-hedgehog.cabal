@@ -13,6 +13,8 @@ copyright:          Copyright © 2021-2025, QBayLogic B.V.
 category:           Hardware
 build-type:         Simple
 
+Extra-source-files: CHANGELOG.md
+
 common basic-config
   default-language: Haskell2010
 
