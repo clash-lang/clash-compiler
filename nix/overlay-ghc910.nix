@@ -46,6 +46,8 @@ in
 
   th-desugar = prev.th-desugar_1_17;
 
+  tasty-flaky = prev.callHackage "tasty-flaky" "0.1.2.0" { };
+
   singletons-th = prev.singletons-th_3_4;
 
   # nixplgs doesn't include revision 1, changing dependency on template-haskell.
