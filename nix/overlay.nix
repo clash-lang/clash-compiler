@@ -48,8 +48,6 @@ let
           "ghc-typelits-natnormalise"
           "${ghc-typelits-natnormalise}"
           { };
-      # doctest-parallel = hprev.callHackage "doctest-parallel" "0.3.1" { };
-      # doctest-parallel = hprev.callHackageDirect { pkg = "doctest-parallel"; ver = "0.3.1"; sha256 = "sha256-j0mk4RTEau6Cl90E8vMWZiA/ldRRurtLSYbGGE+q/vk="; } {};
     };
 
   # An overlay with the packages in this repository.
