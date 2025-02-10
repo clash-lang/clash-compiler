@@ -46,4 +46,13 @@ in
 
   # type-errors 0.2.0.2 is bounded on doctest >=0.16.0.1 && <0.22
   doctest = prev.callHackage "doctest" "0.21.1" { };
+
+  # We need a new tasty-flaky. The one from Hackage doesn't build for some weird
+  # reason..
+  tasty-flaky = prev.callCabal2nix "tasty-flaky" (pkgs.fetchFromGitHub {
+    owner = "LaurentRDC";
+    repo  = "tasty-flaky";
+    rev = "fc31a9d622c1eb60030a50152258a9bef785e365";
+    sha256 = "sha256-irLM3aVMxpBgsM72ArulMXcoLY2glalVkG//Lrj2JBI=";
+  }) {};
 }

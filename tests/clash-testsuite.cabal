@@ -153,8 +153,13 @@ executable clash-testsuite
     clash-ghc:clash
 
   build-depends:
+    clash-testsuite,
     containers,
-    clash-testsuite
+    retry,
+
+  if impl(ghc >= 9.0)
+    build-depends:
+      tasty-flaky >= 0.1.2.0,
 
   if impl(ghc >= 9.0.0)
     build-depends:
