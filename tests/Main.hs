@@ -23,6 +23,13 @@ import           Test.Tasty
 import           Test.Tasty.Common
 import           Test.Tasty.Clash
 
+#if __GLASGOW_HASKELL__ >= 900
+import           Control.Retry        (RetryAction(ConsultPolicy, DontRetry), RetryPolicyM, RetryStatus)
+import           Data.List            (isInfixOf)
+import           Test.Tasty.Flaky     (flakyTestWithRetryAction, limitRetries)
+import           Test.Tasty.Providers (Result)
+#endif
+
 -- | GHC version as major.minor.patch1. For example: 8.10.2.
 ghcVersion3 :: String
 ghcVersion3 =
@@ -125,8 +132,26 @@ clashTestGroup testName testTrees =
     testGroup testName $
       zipWith ($) testTrees (repeat (testName : parentNames))
 
+#if __GLASGOW_HASKELL__ >= 900
+-- | Auto-retry failures caused by GHC bug #19421. See clash-compiler PR #2444.
+workaroundMmapCrash :: TestTree -> TestTree
+workaroundMmapCrash = flakyTestWithRetryAction retryAction retryPolicy
+ where
+  retryAction :: RetryStatus -> Result -> IO RetryAction
+  retryAction _ result
+    | "m32_allocator_init: Failed to map" `isInfixOf` show result = pure ConsultPolicy
+    | otherwise = pure DontRetry
+
+  retryPolicy :: RetryPolicyM IO
+  retryPolicy = limitRetries 5
+#endif
+
 runClashTest :: IO ()
-runClashTest = defaultMain $ clashTestRoot
+runClashTest = defaultMain
+#if __GLASGOW_HASKELL__ >= 900
+  $ workaroundMmapCrash
+#endif
+  $ clashTestRoot
   [ clashTestGroup "examples"
     [ runTest "ALU" def{hdlSim=[]}
     , let _opts = def { hdlSim=[]

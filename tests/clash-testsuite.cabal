@@ -106,18 +106,18 @@ library
     shouldwork/Basic/precompiled
 
   exposed-modules:
-    Test.Tasty.Common
     Test.Tasty.Clash
+    Test.Tasty.Clash.CollectSimResults
     Test.Tasty.Clash.CoreTest
     Test.Tasty.Clash.NetlistTest
+    Test.Tasty.Common
     Test.Tasty.Ghdl
     Test.Tasty.Iverilog
     Test.Tasty.Modelsim
-    Test.Tasty.SymbiYosys
     Test.Tasty.Program
+    Test.Tasty.SymbiYosys
     Test.Tasty.Verilator
     Test.Tasty.Vivado
-    Test.Tasty.Clash.CollectSimResults
 
     -- From tests/shouldwork/LoadModules/precompiled
     T1796a
@@ -132,17 +132,17 @@ library
     Paths_clash_testsuite
 
   build-depends:
-    extra,
-    deepseq,
     concurrent-extra,
-    singletons,
+    containers,
+    deepseq,
+    extra,
     generic-lens,
     mtl,
-    unordered-containers,
     ordered-containers,
-    containers,
+    regex-tdfa >=1.3.1.0,
+    singletons,
     template-haskell,
-    regex-tdfa >=1.3.1.0
+    unordered-containers,
 
 
 executable clash-testsuite
@@ -153,8 +153,13 @@ executable clash-testsuite
     clash-ghc:clash
 
   build-depends:
+    clash-testsuite,
     containers,
-    clash-testsuite
+    retry,
+
+  if impl(ghc >= 9.0)
+    build-depends:
+      tasty-flaky >= 0.1.2.0,
 
   if impl(ghc >= 9.0.0)
     build-depends:

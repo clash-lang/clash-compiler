@@ -17,3 +17,4 @@ extra-deps:
  - git: https://github.com/christiaanb/hint.git
    commit: 7803c34c8ae1d83c0f7c13fe6b30fcb3abd0ac51
  - tasty-1.5@sha256:c62c96da1e9d65bf61ce583e9f7085eed1daeb62a45f3106ca252bf9ef87025b,2763
+ - tasty-flaky-0.1.2.0@sha256:2f91ab9f55ae0c472474087f98bb54076aca18f8b058343479d24597a3aa181b,1858
