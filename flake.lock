@@ -3,11 +3,11 @@
     "flake-compat": {
       "flake": false,
       "locked": {
-        "lastModified": 1673956053,
-        "narHash": "sha256-4gtG9iQuiKITOjNQQeQIpoIB6b16fm+504Ch3sNKLd8=",
+        "lastModified": 1696426674,
+        "narHash": "sha256-kvjfFW7WAETZlt09AgDn1MrtKzP7t90Vf7vypd3OL1U=",
         "owner": "edolstra",
         "repo": "flake-compat",
-        "rev": "35bb57c0c8d8b62bbfd284272c928ceb64ddbde9",
+        "rev": "0f9255e01c2351cc7d116c072cb317785dd33b33",
         "type": "github"
       },
       "original": {
@@ -21,11 +21,11 @@
         "systems": "systems"
       },
       "locked": {
-        "lastModified": 1694529238,
-        "narHash": "sha256-zsNZZGTGnMOf9YpHKJqMSsa0dXbfmxeoJ7xHlrt+xmY=",
+        "lastModified": 1726560853,
+        "narHash": "sha256-X6rJYSESBVr3hBoH0WbKE5KvhPU5bloyZ2L4K60/fPQ=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "ff7b65b44d01cf9ba6a71320833626af21126384",
+        "rev": "c1dfcf08411b08f6b8615f7d8971a2bfa81d5e8a",
         "type": "github"
       },
       "original": {
@@ -37,11 +37,11 @@
     "ghc-tcplugins-extra": {
       "flake": false,
       "locked": {
-        "lastModified": 1690791784,
-        "narHash": "sha256-RG9UpAYOjH276sFC+XrX847WR26qVhr/KHTsEOkw3rs=",
+        "lastModified": 1716385093,
+        "narHash": "sha256-pXQoPP22TicWFwpWub9CX1J+rpOKfyX2IyzlCg1qG84=",
         "owner": "clash-lang",
         "repo": "ghc-tcplugins-extra",
-        "rev": "92b5215273bc219da9550799e0869ea6934648f0",
+        "rev": "702dda2095c66c4f5148a749c8b7dbcc8a09f5c1",
         "type": "github"
       },
       "original": {
@@ -53,11 +53,11 @@
     "ghc-typelits-extra": {
       "flake": false,
       "locked": {
-        "lastModified": 1690794410,
-        "narHash": "sha256-Q8zXP9ZcVBkUrniBOM00tYqgGipDhbbPqkVTCrs7vYo=",
+        "lastModified": 1716411282,
+        "narHash": "sha256-YH03Ce+TEWKHGAm7BhynitZomfpYeKpqvZAviw8yEPA=",
         "owner": "clash-lang",
         "repo": "ghc-typelits-extra",
-        "rev": "bbe2a40d6bc640ab065dd87db74ba59e584aa9f2",
+        "rev": "4dadc824a3ef9a511fcf6605167715a5a655ba0d",
         "type": "github"
       },
       "original": {
@@ -69,11 +69,11 @@
     "ghc-typelits-knownnat": {
       "flake": false,
       "locked": {
-        "lastModified": 1690793234,
-        "narHash": "sha256-Y+Qjz8r+B0hUAhRVrxddQxnJLNVKLMAz5OLsRQ5behE=",
+        "lastModified": 1716408841,
+        "narHash": "sha256-A2v6GkMtSJqZXpTwWfIcwshieyRySeR1bP+NogUHNoo=",
         "owner": "clash-lang",
         "repo": "ghc-typelits-knownnat",
-        "rev": "2b72c495b4158d49ef46609036b08e414bcdba5c",
+        "rev": "2e57de3b709dab085fb1657cf73d4f5e833229ee",
         "type": "github"
       },
       "original": {
@@ -85,11 +85,11 @@
     "ghc-typelits-natnormalise": {
       "flake": false,
       "locked": {
-        "lastModified": 1690792488,
-        "narHash": "sha256-1ZSF6FCSmh4Pd7aUEXa5VFkBibuOyE1tqbndGikO+sA=",
+        "lastModified": 1716387676,
+        "narHash": "sha256-G5p0NUy4CpjxGO1VNhb38fhkXESFPxGaZJM0qd6L74U=",
         "owner": "clash-lang",
         "repo": "ghc-typelits-natnormalise",
-        "rev": "3289e1a25df3d7752d6734aa83ba04782d6e43cd",
+        "rev": "84f500a9735675e96253181939c3473a567f6f7a",
         "type": "github"
       },
       "original": {
@@ -100,11 +100,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1694948089,
-        "narHash": "sha256-d2B282GmQ9o8klc22/Rbbbj6r99EnELQpOQjWMyv0rU=",
+        "lastModified": 1726583932,
+        "narHash": "sha256-zACxiQx8knB3F8+Ze+1BpiYrI+CbhxyWpcSID9kVhkQ=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "5148520bfab61f99fd25fb9ff7bfbb50dad3c9db",
+        "rev": "658e7223191d2598641d50ee4e898126768fe847",
         "type": "github"
       },
       "original": {
