@@ -37,6 +37,11 @@ jobs:
           - os: "windows-latest"
             ghc: "9.6"
 
+          # Vector test suite takes an _extremely_ long time to execute. Same
+          # issue as 9.6?
+          - os: "windows-latest"
+            ghc: "9.8"
+
     steps:
       - uses: actions/checkout@v4
       - uses: haskell-actions/setup@v2
