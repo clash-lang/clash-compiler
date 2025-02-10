@@ -37,6 +37,16 @@ jobs:
           - os: "windows"
             ghc: "9.0"
 
+          # GHC/Clash starts extremely slowly, see
+          # https://github.com/clash-lang/clash-compiler/issues/2684
+          - os: "windows"
+            ghc: "9.6"
+
+          # Vector test suite takes an _extremely_ long time to execute. Same
+          # issue as 9.6?
+          - os: "windows"
+            ghc: "9.8"
+
     steps:
       - uses: actions/checkout@v4
       - uses: haskell/actions/setup@v2
