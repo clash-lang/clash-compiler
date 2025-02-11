@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Myrtle Software Ltd
-                  2022-2024, QBayLogic B.V.
+                  2022-2025, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -806,8 +806,11 @@ merge x y = concat (transpose (x :> singleton y))
 -- >>> reverse (1:>2:>3:>4:>Nil)
 -- 4 :> 3 :> 2 :> 1 :> Nil
 reverse :: Vec n a -> Vec n a
-reverse Nil           = Nil
-reverse (x `Cons` xs) = reverse xs :< x
+reverse xs = go Nil xs
+ where
+  go :: i <= n => Vec (n - i) a -> Vec i a -> Vec n a
+  go a (y `Cons` ys) = go (y `Cons` a) ys
+  go a Nil = a
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE reverse #-}
 {-# ANN reverse hasBlackBox #-}
