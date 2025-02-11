@@ -24,18 +24,28 @@ jobs:
         ghc: ["8.6", "8.8", "8.10", "9.0", "9.2", "9.4", "9.6", "9.8"]
         exclude:
           # Some tests fail with a mysterious -11 error code.
-          - os: macOS
-            ghc: 8.10
+          - os: "macOS"
+            ghc: "8.10"
 
           # Windows gets non-deterministically gets stuck in infinite loops
           # or segfaults while running the testcase.
-          - os: windows
-            ghc: 8.8
+          - os: "windows"
+            ghc: "8.8"
 
           # GHC 9.0 fails to compile clash-cores due to a template haskell
           # failure
-          - os: windows
-            ghc: 9.0
+          - os: "windows"
+            ghc: "9.0"
+
+          # GHC/Clash starts extremely slowly, see
+          # https://github.com/clash-lang/clash-compiler/issues/2684
+          - os: "windows"
+            ghc: "9.6"
+
+          # Vector test suite takes an _extremely_ long time to execute. Same
+          # issue as 9.6?
+          - os: "windows"
+            ghc: "9.8"
 
     steps:
       - uses: actions/checkout@v4
