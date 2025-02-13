@@ -1,0 +1,1 @@
+ADDED: Resize functions `maybeResize` and `maybeTruncateB` to `Clash.Class.Resize`. Can be used to resize without loss of information.

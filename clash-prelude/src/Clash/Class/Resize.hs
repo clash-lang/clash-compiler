@@ -6,7 +6,11 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
-{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE MonoLocalBinds #-}
+#if __GLASGOW_HASKELL__ == 902
+{-# LANGUAGE GADTs #-}
+#endif
 
 {-# LANGUAGE Safe #-}
 
@@ -20,6 +24,8 @@ module Clash.Class.Resize
  , checkedResize
  , checkedFromIntegral
  , checkedTruncateB
+ , maybeResize
+ , maybeTruncateB
  ) where
 
 import Data.Kind (Type)
@@ -28,6 +34,12 @@ import GHC.Stack (HasCallStack)
 import GHC.TypeLits (Nat, KnownNat, type (+))
 
 import Clash.Sized.Internal (formatRange)
+
+#if MIN_VERSION_base(4,16,0)
+import GHC.TypeLits (OrderingI(EQI, GTI), cmpNat)
+#else
+import Clash.Promoted.Nat (natToNatural)
+#endif
 
 -- | Coerce a value to be represented by a different number of bits
 class Resize (f :: Nat -> Type) where
@@ -117,3 +129,38 @@ checkedTruncateB ::
   f (a + b) -> f a
 checkedTruncateB v =
   checkIntegral (Proxy @(f a)) v `seq` truncateB v
+
+-- | Like 'resize', but returns 'Nothing' if the argument is out of bounds for
+-- the result type.
+maybeResize ::
+  forall a b f.
+  ( Resize f
+  , KnownNat a, Integral (f a)
+  , KnownNat b, Integral (f b), Bounded (f b) ) =>
+  f a -> Maybe (f b)
+maybeResize v =
+#if MIN_VERSION_base(4,16,0)
+  case Proxy @a `cmpNat` Proxy @b of
+    GTI | v > resize (maxBound @(f b)) -> Nothing
+    GTI | v < resize (minBound @(f b)) -> Nothing
+    EQI -> Just v
+    _ -> Just (resize v)
+#else
+  case natToNatural @a `compare` natToNatural @b of
+    GT | v > resize (maxBound @(f b)) -> Nothing
+    GT | v < resize (minBound @(f b)) -> Nothing
+    _ -> Just (resize v)
+#endif
+
+-- | Like 'truncateB', but returns 'Nothing' if the argument is out of bounds for
+-- the result type.
+maybeTruncateB ::
+  forall a b f.
+  ( Resize f
+  , KnownNat b, Integral (f (a + b))
+  , KnownNat a, Integral (f a), Bounded (f a) ) =>
+  f (a + b) -> Maybe (f a)
+maybeTruncateB v
+  | v > resize (maxBound @(f a)) = Nothing
+  | v < resize (minBound @(f a)) = Nothing
+  | otherwise = Just (truncateB v)
