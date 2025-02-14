@@ -64,7 +64,7 @@ module Clash.Sized.Vector
   , rotateLeft, rotateRight, rotateLeftS, rotateRightS
     -- * Element-wise operations
     -- ** Mapping
-  , map, imap, smap
+  , map, imap, smap, smapWithBounds
     -- ** Zipping
   , zipWith, zipWith3, zipWith4, zipWith5, zipWith6, zipWith7
   , zip, zip3, zip4, zip5, zip6, zip7
@@ -2336,7 +2336,10 @@ lazyV = lazyV' (repeat ())
 -- >>> import Data.Singletons (Apply, Proxy (..), TyFun)
 -- >>> data Append (m :: Nat) (a :: Type) (f :: TyFun Nat Type) :: Type
 -- >>> type instance Apply (Append m a) l = Vec (l + m) a
--- >>> let append' xs ys = dfold (Proxy :: Proxy (Append m a)) (const (:>)) ys xs
+-- >>> :{
+-- >>> append' :: forall a k m. KnownNat k => Vec k a -> Vec m a -> Vec (k + m) a
+-- >>> append' xs ys = dfold (Proxy :: Proxy (Append m a)) (const ((:>) @a)) ys xs
+-- >>> :}
 --
 -- === Example usage
 --
@@ -2414,7 +2417,7 @@ lazyV = lazyV' (repeat ())
 -- fold that produces a structure with a depth of O(log_2(@'length' xs@)).
 dfold :: forall p k a . KnownNat k
       => Proxy (p :: TyFun Nat Type -> Type) -- ^ The /motive/
-      -> (forall l . SNat l -> a -> (p @@ l) -> (p @@ (l + 1)))
+      -> (forall n . n + 1 <= k => SNat n -> a -> (p @@ n) -> (p @@ (n + 1)))
       -- ^ Function to fold.
       --
       -- __NB__: The @SNat l@ is __not__ the index (see (`!!`)) to the
@@ -2425,7 +2428,7 @@ dfold :: forall p k a . KnownNat k
       -> (p @@ k)
 dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
   where
-    go :: SNat n -> Vec n a -> (p @@ n)
+    go :: n <= k => SNat n -> Vec n a -> (p @@ n)
     go _ Nil                        = z
     go s (y `Cons` ys) =
       let s' = s `subSNat` d1
@@ -2594,7 +2597,7 @@ __NB__: The depth, or delay, of the structure produced by
 dtfold :: forall p k a . KnownNat k
        => Proxy (p :: TyFun Nat Type -> Type) -- ^ The /motive/
        -> (a -> (p @@ 0)) -- ^ Function to apply to every element
-       -> (forall l . SNat l -> (p @@ l) -> (p @@ l) -> (p @@ (l + 1)))
+       -> (forall n . SNat n -> (p @@ n) -> (p @@ n) -> (p @@ (n + 1)))
        -- ^ Function to combine results.
        --
        -- __NB__: The @SNat l@ indicates the depth/height of the node in the
@@ -2658,7 +2661,7 @@ type instance Apply (VCons a) l = Vec l a
 --
 -- <<doc/csSort.svg>>
 vfold :: forall k a b . KnownNat k
-      => (forall l . SNat l -> a -> Vec l b -> Vec (l + 1) b)
+      => (forall n . SNat n -> a -> Vec n b -> Vec (n + 1) b)
       -> Vec k a
       -> Vec k b
 vfold f xs = dfold (Proxy @(VCons b)) f Nil xs
@@ -2687,12 +2690,28 @@ minimum = fold (\x y -> if x <= y then x else y)
 -- (1 :> 2 :> 3 :> Nil) :> (1 :> 2 :> 3 :> Nil) :> (1 :> 2 :> 3 :> Nil) :> Nil
 -- >>> rotateMatrix xss
 -- (1 :> 2 :> 3 :> Nil) :> (3 :> 1 :> 2 :> Nil) :> (2 :> 3 :> 1 :> Nil) :> Nil
-smap :: forall k a b . KnownNat k => (forall l . SNat l -> a -> b) -> Vec k a -> Vec k b
+smap :: forall k a b . KnownNat k => (forall n . SNat n -> a -> b) -> Vec k a -> Vec k b
 smap f xs = reverse
           $ dfold (Proxy @(VCons b))
                   (\sn x xs' -> f sn x :> xs')
                   Nil (reverse xs)
 {-# INLINE smap #-}
+
+-- | Extended version of 'smap' offering an additional boundary proof to
+-- the mapped function. Note that the type checker may need additional type
+-- annotations to resolve type ambiguity for this. Thus, if the boundary constraint
+-- is not needed it is recommended to stay with 'smap' instead.
+smapWithBounds ::
+  forall k a b .
+  KnownNat k =>
+  (forall n . n + 1 <= k => SNat n -> a -> b) ->
+  Vec k a ->
+  Vec k b
+smapWithBounds f xs = reverse
+                    $ dfold (Proxy @(VCons b))
+                            (\sn x xs' -> f sn x :> xs')
+                            Nil (reverse xs)
+{-# INLINE smapWithBounds #-}
 
 instance (KnownNat n, BitPack a) => BitPack (Vec n a) where
   type BitSize (Vec n a) = n * (BitSize a)

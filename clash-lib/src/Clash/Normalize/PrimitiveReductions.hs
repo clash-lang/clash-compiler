@@ -43,7 +43,7 @@ import           Control.Lens                     ((.=))
 import           Control.Monad.Trans.Class        (lift)
 import           Control.Monad.Trans.Maybe        (MaybeT (..))
 import           Data.Bifunctor                   (second)
-import           Data.List                        (mapAccumR)
+import           Data.List                        (mapAccumR, uncons)
 import           Data.List.Extra                  (zipEqual)
 #if MIN_VERSION_base(4,20,0)
 import qualified Data.List.NonEmpty               as NE hiding (unzip)
@@ -69,17 +69,21 @@ import           SrcLoc                           (wiredInSrcSpan)
 #endif
 
 import           Clash.Core.DataCon               (DataCon)
+import           Clash.Core.FreeVars              (typeFreeVars)
 import           Clash.Core.HasType
+
 import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Name
   (nameOcc, Name(..), NameSort(User), mkUnsafeSystemName)
 import           Clash.Core.Pretty                (showPpr)
+import           Clash.Core.Subst                 (extendTvSubst, mkSubst, substTy)
 import           Clash.Core.Term
   (IsMultiPrim (..), CoreContext (..), PrimInfo (..), Term (..), WorkInfo (..), Pat (..),
    collectTermIds, mkApps, PrimUnfolding(..))
 import           Clash.Core.Type                  (LitTy (..), Type (..),
                                                    TypeView (..), coreView1,
                                                    mkFunTy, mkTyConApp,
+                                                   normalizeType,
                                                    splitFunForallTy, tyView)
 import           Clash.Core.TyCon
   (TyConMap, TyConName, tyConDataCons, tyConName)
@@ -735,22 +739,34 @@ reduceDFold n aTy _kn _motive fun start arg (TransformContext is0 _ctx) = do
             (uniqs1,(vars,elems)) = second (second sconcat . NE.unzip)
                                   $ extractElems uniqs0 is1 consCon aTy 'D' n arg
             snatDc = Maybe.fromMaybe (error "reduceDFold: faild to build SNat") $ do
-              (_ltv:Right snTy:_,_) <- pure (splitFunForallTy (inferCoreTypeOf tcm fun))
+              (_ltv:_rubp:Right snTy:_,_) <- pure (splitFunForallTy (inferCoreTypeOf tcm fun))
               (TyConApp snatTcNm _) <- pure (tyView snTy)
               snatTc <- UniqMap.lookup snatTcNm tcm
               Maybe.listToMaybe (tyConDataCons snatTc)
-            lbody = doFold (buildSNat snatDc) (n-1) (NE.toList vars)
+            ubp k = Maybe.fromMaybe
+              (error "reduceDFold: failed to extract upper bound proof") $ do
+                (_ltv:Right ubpT:_,_) <- pure (splitFunForallTy (inferCoreTypeOf tcm fun))
+                -- toListOf does not de-duplicate, but we know that there is only
+                -- one free variable in here, thus, taking the first element is fine
+                (tvN, _) <- uncons $ Lens.toListOf typeFreeVars ubpT
+                let subst = extendTvSubst (mkSubst is0) tvN (LitTy (NumTy k))
+                let witness = normalizeType tcm (substTy subst ubpT)
+                (TyConApp tupTcNm _) <- pure (tyView witness)
+                witnessTc <- UniqMap.lookup tupTcNm tcm
+                Maybe.listToMaybe (tyConDataCons witnessTc)
+            lbody = doFold ubp (buildSNat snatDc) (n-1) (NE.toList vars)
             lb    = Letrec (NE.init elems) lbody
         uniqSupply Lens..= uniqs1
         changed lb
     go _ ty = error $ $(curLoc) ++ "reduceDFold: argument does not have a vector type: " ++ showPpr ty
 
-    doFold _    _ []     = start
-    doFold snDc k (x:xs) = mkApps fun
+    doFold _   _    _ []     = start
+    doFold ubp snDc k (x:xs) = mkApps fun
                                  [Right (LitTy (NumTy k))
+                                 ,Left (Data (ubp k))
                                  ,Left (snDc k)
                                  ,Left x
-                                 ,Left (doFold snDc (k-1) xs)
+                                 ,Left (doFold ubp snDc (k-1) xs)
                                  ]
 
 -- | Replace an application of the @Clash.Sized.Vector.head@ primitive on
