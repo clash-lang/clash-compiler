@@ -2,7 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.
                   2019     , Myrtle Software Ltd,
-                  2021-2023, QBayLogic B.V.,
+                  2021-2025, QBayLogic B.V.,
                   2022     , Myrtle.ai,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -134,7 +134,7 @@ module Clash.Explicit.Prelude
     -- *** Other
   , module Control.Applicative
   , module Data.Bits
-  , module Data.Default.Class
+  , module Data.Default
     -- ** Exceptions
   , module Clash.XException
     -- ** Named types
@@ -149,7 +149,7 @@ where
 
 import Control.Applicative
 import Data.Bits
-import Data.Default.Class
+import Data.Default
 import GHC.TypeLits
 #if MIN_VERSION_base(4,18,0)
   hiding (SNat, SSymbol, fromSNat)

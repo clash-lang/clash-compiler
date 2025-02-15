@@ -3,7 +3,7 @@ Copyright  :  (C) 2013-2016, University of Twente,
                   2017-2019, Myrtle Software Ltd,
                   2017-2022, Google Inc.,
                   2020     , Gergő Érdi,
-                  2021-2024, QBayLogic B.V.
+                  2021-2025, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -193,7 +193,7 @@ import Data.Binary                (Binary)
 import Data.Char                  (isAsciiUpper, isAlphaNum, isAscii)
 import Data.Coerce                (coerce)
 import Data.Data                  (Data)
-import Data.Default.Class         (Default (..))
+import Data.Default               (Default (..))
 import Data.Hashable              (Hashable)
 import Data.Int                   (Int64)
 import Data.Maybe                 (isJust)

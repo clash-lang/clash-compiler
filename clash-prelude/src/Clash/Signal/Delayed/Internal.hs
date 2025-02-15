@@ -1,10 +1,10 @@
 {-|
   Copyright   :  (C) 2019     , Myrtle Software Ltd.
                      2018     , @blaxill
-                     2018-2019, QBayLogic B.V.
+                     2018-2025, QBayLogic B.V.
                      2021     , LUMI GUIDE FIETSDETECTIE B.V.
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
@@ -35,7 +35,7 @@ module Clash.Signal.Delayed.Internal
 where
 
 import Data.Coerce                (coerce)
-import Data.Default.Class         (Default(..))
+import Data.Default               (Default(..))
 import GHC.TypeLits               (Nat, type (+))
 import Language.Haskell.TH.Syntax (Lift)
 import Test.QuickCheck            (Arbitrary, CoArbitrary)

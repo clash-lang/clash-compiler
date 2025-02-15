@@ -112,7 +112,7 @@ import Data.Functor.Rep
 #if MIN_VERSION_base(4,18,0)
 import qualified Data.Foldable1   as F1
 #endif
-import Data.Default.Class         (Default (..))
+import Data.Default               (Default (..))
 import qualified Data.Foldable    as F
 import Data.Kind                  (Type)
 import Data.Proxy                 (Proxy (..))

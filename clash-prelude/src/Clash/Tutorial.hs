@@ -2,7 +2,7 @@
 Copyright : © 2014-2016, Christiaan Baaij,
               2017-2019, Myrtle Software Ltd
               2017     , QBayLogic, Google Inc.,
-              2021-2023, QBayLogic B.V.
+              2021-2025, QBayLogic B.V.
               2022     , LUMI GUIDE FIETSDETECTIE B.V.
               2023     , Alex Mason
 
@@ -92,7 +92,7 @@ import GHC.Prim
 import GHC.TypeLits
 import GHC.Word
 import GHC.Stack
-import Data.Default.Class
+import Data.Default
 
 {- $setup
 >>> :set -XTemplateHaskell -XDataKinds -XConstraintKinds -XTypeApplications
