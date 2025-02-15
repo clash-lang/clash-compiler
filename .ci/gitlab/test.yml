@@ -161,17 +161,6 @@ suite:systemverilog:
   script:
     - bin/clash-testsuite:clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim --no-vivado
 
-# Vivado is quite slow, so we only run a subset of the tests on development branches
-# with it. The full testsuite gets run with Vivado every night on 'master'.
-suite:cores:
-  extends: .test-cache-local
-  script:
-    - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-    - bin/clash-testsuite:clash-testsuite -j$THREADS -p Cores --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
-  tags:
-    - local
-    - vivado-2022.1-standard
-
 ffi:example:
   extends:
     - .common-local
