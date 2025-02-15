@@ -2,7 +2,7 @@
   Copyright   :  (C) 2013-2016, University of Twente,
                      2017-2019, Myrtle Software Ltd
                      2017     , Google Inc.,
-                     2021-2023, QBayLogic B.V.
+                     2021-2025, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -151,7 +151,7 @@ module Clash.Prelude
     -- *** Other
   , module Control.Applicative
   , module Data.Bits
-  , module Data.Default.Class
+  , module Data.Default
   , module Data.Kind
     -- ** Exceptions
   , module Clash.XException
@@ -169,7 +169,7 @@ where
 
 import           Control.Applicative
 import           Data.Bits
-import           Data.Default.Class
+import           Data.Default
 import           Data.Kind (Type, Constraint)
 import           GHC.Stack                   (HasCallStack)
 import           GHC.TypeLits

@@ -1,6 +1,6 @@
 {-|
 Copyright  :  (C) 2016, University of Twente
-                  2022-2024, QBayLogic B.V.
+                  2022-2025, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -62,7 +62,7 @@ import Control.Applicative         (liftA2)
 #endif
 import Control.DeepSeq             (NFData(..))
 import qualified Control.Lens      as Lens
-import Data.Default.Class          (Default (..))
+import Data.Default                (Default (..))
 import Data.Either                 (isLeft)
 import Data.Foldable               (toList)
 import Data.Kind                   (Type)
