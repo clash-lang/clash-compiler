@@ -29,7 +29,7 @@ import Data.List (zip4, group)
 import Data.List.Infinite((...), Infinite((:<)))
 import Data.Proxy (Proxy(..))
 import Data.String.Interpolate (__i)
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, fromMaybe)
 import Data.Text.Prettyprint.Doc.Extra (Doc)
 import GHC.Stack (HasCallStack)
 import GHC.TypeLits (KnownNat, SomeNat(..), someNatVal)
@@ -148,15 +148,18 @@ areEqual :: Eq a => [a] -> Maybe a
 areEqual = \case { [x:_] -> Just x; _ -> Nothing } . group
 
 ilaBBF :: HasCallStack => BlackBoxFunction
-ilaBBF _isD _primName args _resTys = Lens.view tcCache >>= go
+ilaBBF _isD _primName args _resTys = do
+  instName <- fromMaybe "ila_inst" <$> Lens.view setName
+  tcm <- Lens.view tcCache
+  go instName tcm
  where
-  go tcm
+  go instName tcm
     | _:_:_:config:_ <- lefts args
     , _:_:(coreView tcm -> LitTy (NumTy n)):_ <- rights args
     , Just (SomeNat (Proxy :: Proxy n)) <- someNatVal n
     = case termToDataError @(IlaConfig n) config of
         Left s -> error ("ilaBBF, bad config:\n" <> s)
-        Right c -> pure $ Right (bbMeta c, bb c)
+        Right c -> pure $ Right (bbMeta c, bb instName c)
     | otherwise = error $ "ilaBBF, bad args:\n" <> ppShow args
 
   bbMeta :: KnownNat n => IlaConfig n -> BlackBoxMeta
@@ -170,8 +173,8 @@ ilaBBF _isD _primName args _resTys = Lens.view tcCache >>= go
         ]
     }
 
-  bb :: KnownNat n => IlaConfig n -> BlackBox
-  bb config = BBFunction (show 'ilaTF) 0 (ilaTF config)
+  bb :: KnownNat n => T.Text -> IlaConfig n -> BlackBox
+  bb instName config = BBFunction (show 'ilaTF) 0 (ilaTF instName config)
 
 usedArguments :: [Int]
 usedArguments = ilaConfig : clock : inputProbes
@@ -187,8 +190,9 @@ usedArguments = ilaConfig : clock : inputProbes
                -- when forcing this argument to NF we limit it to a modest
                -- 8096 input ports.
 
-ilaTF :: (HasCallStack, KnownNat n) => IlaConfig n -> TemplateFunction
-ilaTF config = TemplateFunction usedArguments (const True) (ilaBBTF config)
+ilaTF :: (HasCallStack, KnownNat n) => T.Text -> IlaConfig n -> TemplateFunction
+ilaTF instName config =
+  TemplateFunction usedArguments (const True) (ilaBBTF instName config)
 
 checkNameCollision :: HasCallStack => T.Text -> DSL.TExpr -> DSL.TExpr
 checkNameCollision userName tExpr@(DSL.TExpr _ (Identifier (Id.toText -> name) Nothing))
@@ -211,10 +215,11 @@ checkNameCollision _ tExpr = error [I.i|
 ilaBBTF ::
   forall s n .
   (Backend s, KnownNat n, HasCallStack) =>
+  T.Text ->
   IlaConfig n ->
   BlackBoxContext ->
   State s Doc
-ilaBBTF config bbCtx
+ilaBBTF instName1 config bbCtx
   | (   _knownDomainDom
       : _ilaConstraint
       : _1nConstraint
@@ -236,7 +241,7 @@ ilaBBTF config bbCtx
             #{ppShow userInputNames}
         |]
 
-      ilaInstName <- Id.makeBasic (getIlaName (bbCtxName bbCtx))
+      instName2 <- Id.makeBasic instName1
 
       let
         inPs = filter ((> (0 :: Int)) . DSL.tySize . DSL.ety) inputs
@@ -252,7 +257,7 @@ ilaBBTF config bbCtx
         DSL.instDecl
           Empty
           (Id.unsafeMake ilaName)
-          ilaInstName
+          instName2
           [] -- Generics / parameters
           (("clk", clk) : zip inNames inProbesBV)
           [] -- outputs
@@ -268,15 +273,6 @@ ilaBBTF config bbCtx
   toNameCheckedBv nameHint inProbe =
     checkNameCollision nameHint <$>
       DSL.toBvWithAttrs keepAttrs nameHint inProbe
-
-  -- Return user-friendly name given a context name hint. Note that we ignore
-  -- @__VOID_TDECL_NOOP__@. It is created by 'mkPrimitive' whenever a user hint
-  -- is _not_ given and the primitive returns a zero-width type.
-  getIlaName :: Maybe T.Text -> T.Text
-  getIlaName Nothing = "ila_inst"
-  getIlaName (Just "result") = getIlaName Nothing
-  getIlaName (Just "__VOID_TDECL_NOOP__") = getIlaName Nothing
-  getIlaName (Just s) = s
 
 ilaTclTF :: (HasCallStack, KnownNat n) => IlaConfig n -> TemplateFunction
 ilaTclTF config = TemplateFunction usedArguments (const True) (ilaTclBBTF config)
