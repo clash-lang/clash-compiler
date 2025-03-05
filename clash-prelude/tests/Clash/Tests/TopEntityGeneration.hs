@@ -68,6 +68,12 @@ data HKD f = HKD
     , fd2 :: OrderedCF 'True f  ("fd2" ::: Bool)
     }
 
+data RecordWithSimOnlyField = RecordWithSimOnlyField
+  { simOnlyField1 :: "a" ::: SimOnly (Signal System ("foo" ::: Int))
+  , simOnlyField3 :: "b" ::: Signal System (SimOnly ("bar" ::: Int))
+  , someOtherField :: "c" ::: Signal System ("wobble" ::: Int)
+  }
+
 
 topEntity1 :: "in1" ::: Signal System Int
            -> "in2" ::: Signal System Bool
@@ -226,6 +232,36 @@ expectedTopEntity8 =
     ]
     (PortName "out")
 
+topEntity9 :: (HiddenClockResetEnable System)
+           => "pair" ::: SimOnly (Signal System (Pair Bool))
+           -> "pair" ::: Signal System (SimOnly (Pair Single))
+           -> "out" ::: Signal System Int
+topEntity9 = undefined
+makeTopEntity 'topEntity9
+
+expectedTopEntity9 :: TopEntity
+expectedTopEntity9 =
+ Synthesize "topEntity9"
+    [ PortProduct "" [PortName "clk", PortName "rst", PortName "en"]
+    , PortName "pair"
+    , PortName "pair"
+    ]
+    (PortName "out")
+
+topEntity10 :: (HiddenClockResetEnable System)
+           => "record" ::: Signal System RecordWithSimOnlyField
+           -> "out" ::: Signal System Int
+topEntity10 = undefined
+makeTopEntity 'topEntity10
+
+expectedTopEntity10 :: TopEntity
+expectedTopEntity10 =
+ Synthesize "topEntity10"
+    [ PortProduct "" [PortName "clk", PortName "rst", PortName "en"]
+    , PortProduct "record" [PortName "a",PortName "b",PortName "c_wobble"]
+    ]
+    (PortName "out")
+
 topEntityFailure1
   :: "int"     ::: Signal System Int
   -> "tuple"   ::: ("tup1" ::: Signal System (BitVector 7), "tup2" ::: Signal System (BitVector 9))
@@ -310,6 +346,12 @@ tests =
       , testCase "topEntity8" $
           $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntity8)
           @?= Just expectedTopEntity8
+      , testCase "topEntity9" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntity9)
+          @?= Just expectedTopEntity9
+      , testCase "topEntity10" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntity10)
+          @?= Just expectedTopEntity10
       ]
     , testGroup "Expected failures"
       [ testCase "topEntityFailure1" $
