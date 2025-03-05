@@ -90,6 +90,7 @@ import           Data.Generics.Uniplate.Data    (rewrite)
 import           Clash.Annotations.TopEntity    ( PortName(..)
                                                 , TopEntity(..)
                                                 )
+import           Clash.Magic                    (SimOnly)
 import           Clash.NamedTypes               ((:::))
 import           Clash.Signal                   ( HiddenClockResetEnable
                                                 , HiddenClock, HiddenReset, HiddenEnable
@@ -225,6 +226,7 @@ datatypeNameToPorts name = do
   constructors <- tryReifyDatatype [] datatypeCons name
 
   names <- case constructors of
+    _ | name == ''SimOnly -> return $ Complete []
     []  -> return $ Complete []
     [x] -> portsFromTypes (constructorFields x)
     xs  -> handleNamesInSum xs
@@ -283,6 +285,8 @@ typeTreeToPorts (ConTF name) = do
 typeTreeToPorts f@(AppTF (a,a') (b,b')) = do
   -- Gather types applied to a head type
   case unapp (AppT a b) of
+    -- Skip SimOnly constructs - they're always zero bits
+    (ConT x : _) | x == ''SimOnly -> pure (Complete [])
     -- Return the inner type for signals
     (ConT x : _ : _ : []) | x == ''Clash.Signal.Signal -> b'
     (ConT x : _ : _ : _ : []) | x == ''Clash.Signal.Delayed.DSignal -> b'
