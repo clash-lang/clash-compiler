@@ -72,16 +72,16 @@ sampleCycling genM genS divHalf wait mVals sVals mode latch duration =
   samples = sampleN (getDuration duration) $ bundle (mOut, mAck, sOut, sAck)
   slaveIn = genS clk rst sVals sAck
 
-  (misoZ, sAck, sOut) =
+  (SpiSlaveOut misoZ, sAck, sOut) =
     withClockResetEnable clk rst enableGen
-      (spiSlaveLatticeSBIO mode latch sclk mosi miso ss slaveIn)
+      (spiSlaveLatticeSBIO mode latch (SpiSlaveIn mosi miso sclk ss) slaveIn)
 
   miso = veryUnsafeToBiSignalIn misoZ
   masterIn = genM clk rst mVals mAck bp
 
-  (sclk, mosi, ss, bp, mAck, mOut) =
+  (SpiMasterOut mosi sclk ss, bp, mAck, mOut) =
     withClockResetEnable clk rst enableGen
-      (spiMaster mode divHalf wait masterIn (readFromBiSignal miso))
+      (spiMaster1 mode divHalf wait masterIn (SpiMasterIn $ readFromBiSignal miso))
 
   clk = systemClockGen
   rst = systemResetGen

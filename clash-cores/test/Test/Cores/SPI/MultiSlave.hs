@@ -23,18 +23,20 @@ slaveAddressRotate
    . (KnownDomain dom, KnownNat n, 1 <= n)
   => Clock dom
   -> Reset dom
-  -> (Signal dom Bool, Signal dom Bool)
-  -> Vec n (Signal dom Bool)
-slaveAddressRotate clk rst =
-  E.mealyB clk rst enableGen
-    (\(cntQ, bQ) (ss, b) ->
+  -> (Signal dom Bit, Signal dom Bool)
+  -> Vec n (Signal dom Bit)
+slaveAddressRotate clk rst (ss,bp) =
+  map (fmap boolToBit)
+  $ E.mealyB clk rst enableGen
+    (\(cntQ, bQ) (ss', b) ->
         let bF = bQ && not b
             cntD | bF = if cntQ == maxBound then 0 else cntQ + 1
                  | otherwise = cntQ
 
-            oH = (ss ||) <$> (unpack . complement $ bin2onehot cntQ)
+            oH = (ss' ||) <$> (unpack . complement $ bin2onehot cntQ)
         in  ((cntD, b), oH))
     (0 :: Index n, False)
+    (bitToBool <$> ss, bp)
  where
   bin2onehot = setBit 0 . fromEnum
 
@@ -60,17 +62,17 @@ testMasterMultiSlave divHalf wait mVal sVal mode latch duration =
        ,(L.nub masterOutS,P.length masterOutS))
  where
   slaveIn = pure sVal
-  (misoZ0, _, slaveOut0) =
+  (SpiSlaveOut misoZ0, _, slaveOut0) =
     withClockResetEnable clk rst enableGen
-      (spiSlaveLatticeSBIO mode latch sclk mosi miso ss0 slaveIn)
+      (spiSlaveLatticeSBIO mode latch (SpiSlaveIn mosi miso sclk ss0) slaveIn)
 
-  (misoZ1, _, slaveOut1) =
+  (SpiSlaveOut misoZ1, _, slaveOut1) =
     withClockResetEnable clk rst enableGen
-      (spiSlaveLatticeSBIO mode latch sclk mosi miso ss1 slaveIn)
+      (spiSlaveLatticeSBIO mode latch (SpiSlaveIn mosi miso sclk ss1) slaveIn)
 
-  (misoZ2, _, slaveOut2) =
+  (SpiSlaveOut misoZ2, _, slaveOut2) =
     withClockResetEnable clk rst enableGen
-      (spiSlaveLatticeSBIO mode latch sclk mosi miso ss2 slaveIn)
+      (spiSlaveLatticeSBIO mode latch (SpiSlaveIn mosi miso sclk ss2) slaveIn)
 
   miso = veryUnsafeToBiSignalIn
          (mergeBiSignalOuts (misoZ2 :> misoZ1 :> misoZ0 :> Nil))
@@ -79,9 +81,9 @@ testMasterMultiSlave divHalf wait mVal sVal mode latch duration =
 
   (ss2 `Cons` ss1 `Cons` ss0 `Cons` _) = slaveAddressRotate @3 clk rst (ss,bp)
 
-  (sclk, mosi, ss, bp, masterAck, masterOut) =
+  (SpiMasterOut mosi sclk ss, bp, masterAck, masterOut) =
     withClockResetEnable clk rst enableGen
-      (spiMaster mode divHalf wait masterIn (readFromBiSignal miso))
+      (spiMaster1 mode divHalf wait masterIn (SpiMasterIn $ readFromBiSignal miso))
 
   clk = systemClockGen
   rst = systemResetGen
