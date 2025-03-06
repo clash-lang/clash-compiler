@@ -13,10 +13,13 @@ import           Clash.Verification  (RenderAs (YosysFormal), assert, checkI,
 topEntity :: Clock System -> Reset System -> Enable System -> Signal System (Bool, Bool, Bool)
 topEntity = exposeClockResetEnable go
 
-go :: HiddenClockResetEnable dom => Signal dom (Bool, Bool, Bool)
+go :: forall dom. HiddenClockResetEnable dom => Signal dom (Bool, Bool, Bool)
 go =
   let -- oops, 'b' is never lit
-      c   = register (0 :: Index 15) (countSucc <$> c)
+      cI :: Signal dom (Index 15)
+      cI  = register (0 :: Index 15) (countSucc <$> cI)
+      c :: Signal dom (Unsigned 4)
+      c   = fmap bitCoerce cI
       r   = (< 10) <$> c
       g   = ((>= 10) .&&. (< 15)) <$> c
       b   = (>= 15) <$> c
