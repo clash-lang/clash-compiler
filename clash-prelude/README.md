@@ -2,7 +2,6 @@
 
 [![Pipeline status](https://gitlab.com/clash-lang/clash-compiler/badges/master/pipeline.svg)](https://gitlab.com/clash-lang/clash-compiler/commits/master)
 [![Hackage](https://img.shields.io/hackage/v/clash-prelude.svg)](https://hackage.haskell.org/package/clash-prelude)
-[![Hackage Dependencies](https://img.shields.io/hackage-deps/v/clash-prelude.svg?style=flat)](http://packdeps.haskellers.com/feed?needle=exact%3Aclash-prelude)
 
 Clash is a functional hardware description language that borrows both
 its syntax and semantics from the functional programming language
@@ -25,7 +24,13 @@ Features of Clash:
 
   * Support for multiple clock domains, with type safe clock domain crossing.
 
-# Support
-For updates and questions join the mailing list
-clash-language+subscribe@googlegroups.com or read the
-[forum](https://groups.google.com/d/forum/clash-language)
+# Open-source community
+Clash benefits from an active community. Whether you need a question answered or
+want to contribute to open-source features, browse the features below to make
+the most of Clash.
+
+- [Discourse: long form discussions and questions](https://clash-lang.discourse.group/)
+- [Discord: short form discussions and community chat room](https://discord.gg/rebGq25FB4)
+- [Slack: short form discussions and questions](https://functionalprogramming.slack.com/archives/CPGMJFF50)
+  (Invite yourself at [fpslack.com](https://fpslack.com))
+- [Github: issue tracker](https://github.com/clash-lang/clash-compiler/issues)
