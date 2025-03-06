@@ -17,6 +17,7 @@ Refer to "Clash.Annotations.TopEntity" for controlling naming of entities
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
@@ -43,13 +44,15 @@ module Clash.Magic
   , clashCompileError
   ) where
 
+import Clash.Annotations.Primitive (Primitive(..), hasBlackBox)
+import Clash.NamedTypes            ((:::))
+import Clash.Promoted.Symbol       (SSymbol)
+import Clash.XException            (NFDataX)
 import Data.String.Interpolate     (__i)
+import GHC.Generics                (Generic)
 import GHC.Magic                   (noinline)
 import GHC.Stack                   (HasCallStack, withFrozenCallStack)
-import Clash.NamedTypes            ((:::))
 import GHC.TypeLits                (Nat,Symbol)
-import Clash.Promoted.Symbol       (SSymbol)
-import Clash.Annotations.Primitive (Primitive(..), hasBlackBox)
 
 -- | Prefix instance and register names with the given 'Symbol'
 prefixName
@@ -272,7 +275,7 @@ clashSimulation = noinline True
 --   * Co-simulation state or meta-data
 --   * etc.
 data SimOnly a = SimOnly a
-  deriving (Eq, Ord, Foldable, Traversable)
+  deriving (Generic, Eq, Ord, Foldable, Traversable, NFDataX)
 {-# ANN SimOnly hasBlackBox #-}
 
 instance Functor SimOnly where
