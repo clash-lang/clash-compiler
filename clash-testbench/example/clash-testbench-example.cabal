@@ -1,0 +1,57 @@
+cabal-version:      2.4
+name:               clash-testbench-example
+version:            0.1.0.0
+synopsis:           Exmaple for using clash-testbench
+description:        Exmaple for using clash-testbench
+bug-reports:        https://github.com/clash-lang/clash-compiler/issues
+license:            BSD-2-Clause
+license-file:       LICENSE
+author:             QBayLogic B.V.
+maintainer:         devops@qbaylogic.com
+copyright:          Copyright © 2023, QBayLogic B.V.
+category:           Hardware
+
+common basic-config
+  default-language: Haskell2010
+  ghc-options:
+    -Wall -Wcompat -threaded
+    -fplugin GHC.TypeLits.Extra.Solver
+    -fplugin GHC.TypeLits.Normalise
+    -fplugin GHC.TypeLits.KnownNat.Solver
+  build-depends:
+    base,
+    hedgehog,
+    clash-prelude,
+    clash-prelude-hedgehog,
+    clash-testbench,
+    ghc-typelits-extra,
+    ghc-typelits-knownnat,
+    ghc-typelits-natnormalise,
+
+custom-setup
+  setup-depends:
+    base        >= 4.11  && < 5,
+    Cabal       >= 2.4   && < 3.7,
+    directory   >= 1.3.6 && < 1.4,
+    filepath    >= 1.4.2 && < 1.5,
+
+executable simulate
+  import:           basic-config
+  main-is:          Main.hs
+  other-modules:    Calculator
+                    Register
+                    RegisterFail
+  -- this option is required, since clash-ffi and clash-testbench come
+  -- with unresovled symbols for the VPI interface
+  ghc-options:      -optl -Wl,--unresolved-symbols=ignore-in-object-files
+
+
+foreign-library simulate-ffi
+  import:           basic-config
+  other-modules:    Main
+                    Calculator
+                    Register
+                    RegisterFail
+  type:             native-shared
+--  options:          standalone
+  lib-version-info: 0:1:0

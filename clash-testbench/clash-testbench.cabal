@@ -1,0 +1,57 @@
+cabal-version:      2.2
+
+name:               clash-testbench
+version:            0.1.0.0
+synopsis:           Design your TestBenches in Clash
+description:        Design your TestBenches in Clash
+bug-reports:        https://github.com/clash-lang/clash-compiler/issues
+license:            BSD-2-Clause
+license-file:       LICENSE
+author:             QBayLogic B.V.
+maintainer:         devops@qbaylogic.com
+copyright:          Copyright © 2023, QBayLogic B.V.
+category:           Hardware
+
+library
+  default-language: Haskell2010
+  default-extensions:
+    DataKinds
+    FlexibleContexts
+    FlexibleInstances
+    GADTs
+    ImplicitParams
+    LambdaCase
+    MagicHash
+    MultiWayIf
+    NamedFieldPuns
+    RankNTypes
+    RecordWildCards
+    ScopedTypeVariables
+    TupleSections
+    TypeApplications
+    TypeFamilies
+    ViewPatterns
+  ghc-options:
+    -Wall -Wcompat
+  exposed-modules:
+    Clash.Testbench
+    Clash.Testbench.Signal
+    Clash.Testbench.Input
+    Clash.Testbench.Output
+    Clash.Testbench.Simulate
+    Clash.Testbench.Generate
+    Clash.Testbench.Internal.ID
+    Clash.Testbench.Internal.Signal
+    Clash.Testbench.Internal.Monad
+    Control.Monad.Extra
+  build-depends:
+    base,
+    mtl,
+    array,
+    lattices,
+    hedgehog,
+    containers,
+    bytestring,
+    clash-ffi,
+    clash-prelude,
+  hs-source-dirs: src
