@@ -43,13 +43,13 @@ module Clash.Magic
   , clashCompileError
   ) where
 
+import Clash.Annotations.Primitive (Primitive(..), hasBlackBox)
+import Clash.NamedTypes            ((:::))
+import Clash.Promoted.Symbol       (SSymbol)
 import Data.String.Interpolate     (__i)
 import GHC.Magic                   (noinline)
 import GHC.Stack                   (HasCallStack, withFrozenCallStack)
-import Clash.NamedTypes            ((:::))
 import GHC.TypeLits                (Nat,Symbol)
-import Clash.Promoted.Symbol       (SSymbol)
-import Clash.Annotations.Primitive (Primitive(..), hasBlackBox)
 
 -- | Prefix instance and register names with the given 'Symbol'
 prefixName
