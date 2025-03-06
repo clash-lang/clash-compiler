@@ -12,7 +12,7 @@ default:
   timeout: 10 minutes
   stage: build
   variables:
-    CLASH_DOCKER_TAG: 20250101
+    CLASH_DOCKER_TAG: 20250305
     CACHE_BUST_TOKEN: 3
     # Note that we copy+paste the image name into CACHE_FALLBACK_KEY. If we don't,
     # $GHC_VERSION gets inserted at verbatim, instead of resolving to some ghc version.

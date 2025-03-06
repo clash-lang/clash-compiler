@@ -96,8 +96,6 @@ haddock:
   extends: .common-local
   needs: []
   stage: test
-  variables:
-    GHC_VERSION: 9.0.2
   artifacts:
     paths:
       - hadocs/*/*
