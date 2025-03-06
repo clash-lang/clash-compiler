@@ -14,9 +14,9 @@ elif [[ "$1" != "" ]]; then
   exit 1
 fi
 
-UBUNTU_VERSION=jammy-20240911.1
+UBUNTU_VERSION=jammy-20250126
 GHC_VERSIONS=("9.10.1" "9.8.4" "9.6.6" "9.4.8" "9.2.8" "9.0.2" "8.10.7" "8.8.4" "8.6.5")
-CABAL_VERSION="3.14.1.0"
+CABAL_VERSIONS=("3.14.1.1" "3.14.1.1" "3.14.1.1" "3.14.1.1" "3.14.1.1" "3.14.1.1" "3.12.1.0" "3.14.1.1" "3.14.1.1")
 
 # We want to use docker buildkit so that our layers are built in parallel. This
 # is ignored completely on versions of docker which don't support buildkit.
@@ -25,6 +25,7 @@ export DOCKER_BUILDKIT=1
 for i in "${!GHC_VERSIONS[@]}"
 do
   GHC_VERSION="${GHC_VERSIONS[i]}"
+  CABAL_VERSION="${CABAL_VERSIONS[i]}"
 
   docker build \
     --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} \
