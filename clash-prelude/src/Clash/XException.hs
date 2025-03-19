@@ -2,17 +2,17 @@
 Copyright  :  (C) 2016,      University of Twente,
                   2017,      QBayLogic, Google Inc.
                   2017-2019, Myrtle Software Ltd,
-                  2021-2023, QBayLogic B.V.
+                  2021-2025, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 'XException': An exception for uninitialized values
 
->>> show (errorX "undefined" :: Integer, 4 :: Int)
-"(*** Exception: X: undefined
+>>> show (errorX "No value here" :: Integer, 4 :: Int)
+"(*** Exception: X: No value here
 CallStack (from HasCallStack):
 ...
->>> showX (errorX "undefined" :: Integer, 4 :: Int)
+>>> showX (errorX "No value here" :: Integer, 4 :: Int)
 "(undefined,4)"
 -}
 
@@ -358,11 +358,11 @@ isX a =
 -- | Like the 'Show' class, but values that normally throw an 'XException' are
 -- converted to @undefined@, instead of error'ing out with an exception.
 --
--- >>> show (errorX "undefined" :: Integer, 4 :: Int)
--- "(*** Exception: X: undefined
+-- >>> show (errorX "No value here" :: Integer, 4 :: Int)
+-- "(*** Exception: X: No value here
 -- CallStack (from HasCallStack):
 -- ...
--- >>> showX (errorX "undefined" :: Integer, 4 :: Int)
+-- >>> showX (errorX "No value here" :: Integer, 4 :: Int)
 -- "(undefined,4)"
 --
 -- Can be derived using 'GHC.Generics':
