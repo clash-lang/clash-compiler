@@ -5,23 +5,26 @@
     - altera_mf
     type: |-
       altddioOut#
-        :: ( HasCallStack             -- ARG[0]
-           , KnownConfi~ fast domf    -- ARG[1]
-           , KnownConfi~ slow doms    -- ARG[2]
-           , KnownNat m )             -- ARG[3]
-        => SSymbol deviceFamily       -- ARG[4]
-        -> Clock slow                 -- ARG[5]
-        -> Reset slow                 -- ARG[6]
-        -> Enable slow                -- ARG[7]
-        -> Signal slow (BitVector m)  -- ARG[8]
-        -> Signal slow (BitVector m)  -- ARG[9]
-        -> Signal fast (BitVector m)
+        :: forall deviceFamily n dom domDDR
+         . HasCallStack              -- ARG[0]
+        => KnownDomain dom           -- ARG[1]
+        => KnownDomain domDDR        -- ARG[2]
+        => DomPeriod ~ 2 * ...       -- ARG[3]
+        => DomEdge ~ Rising          -- ARG[4]
+        => KnownNat n                -- ARG[5]
+        => SSymbol deviceFamily      -- ARG[6]
+        -> Clock dom                 -- ARG[7]
+        -> Reset dom                 -- ARG[8]
+        -> Enable dom                -- ARG[9]
+        -> Signal dom (BitVector n)  -- ARG[10]
+        -> Signal dom (BitVector n)  -- ARG[11]
+        -> Signal domDDR (BitVector n)
     template: |-
       // altddioOut begin
       altddio_out
         #(
           .extend_oe_disable ("OFF"),
-          .intended_device_family (~LIT[4]),
+          .intended_device_family (~LIT[6]),
           .invert_output ("OFF"),
           .lpm_hint ("UNUSED"),
           .lpm_type ("altddio_out"),
@@ -29,15 +32,15 @@
           .power_up_high ("OFF"),
           .width (~SIZE[~TYPO])
         )
-        ~GENSYM[~COMPNAME_ALTDDIO_OUT][7] (~IF ~ISSYNC[2] ~THEN
-          .sclr (~ARG[6]),
+        ~GENSYM[~COMPNAME_ALTDDIO_OUT][7] (~IF ~ISSYNC[1] ~THEN
+          .sclr (~ARG[8]),
           .aclr (1'b0),~ELSE
-          .aclr (~ARG[6]),
+          .aclr (~ARG[8]),
           .sclr (1'b0),~FI
-          .datain_h (~ARG[8]),
-          .datain_l (~ARG[9]),
-          .outclock (~ARG[5]),
-          .outclocken (~IF ~ISACTIVEENABLE[7] ~THEN ~ARG[7] ~ELSE 1'b1 ~FI),
+          .datain_h (~ARG[10]),
+          .datain_l (~ARG[11]),
+          .outclock (~ARG[7]),
+          .outclocken (~IF ~ISACTIVEENABLE[9] ~THEN ~ARG[9] ~ELSE 1'b1 ~FI),
           .dataout (~RESULT),
           .aset (1'b0),
           .sset (1'b0),
