@@ -680,12 +680,21 @@ runClashTest = defaultMain
         , runTest "T694" def{hdlSim=[],hdlTargets=[VHDL]}
         ]
       , clashTestGroup "DDR"
-        [ let _opts = def{ buildTargets = BuildSpecific [ "testBenchGA"
+        [
+          -- Since the `XilinxDDR` test is more comprehensive than these tests,
+          -- we skip these tests for Vivado and only run `XilinxDDR`.
+          let _opts = def{ buildTargets = BuildSpecific [ "testBenchGA"
                                                         , "testBenchGS"
                                                         , "testBenchUA"
                                                         , "testBenchUS"
-                                                        ]}
+                                                        ]
+                         , hdlLoad = hdlLoad def \\ [Vivado]
+                         , hdlSim = hdlSim def \\ [Vivado]
+                         }
           in runTest "DDRin" _opts
+
+          -- Since the `XilinxDDR` test is more comprehensive than these tests,
+          -- we skip these tests for Vivado and only run `XilinxDDR`.
         , let _opts = def{ buildTargets = BuildSpecific [ "testBenchUA"
                                                         , "testBenchUS"
                                                         , "testBenchGA"
@@ -695,16 +704,12 @@ runClashTest = defaultMain
                          , hdlSim = hdlSim def \\ [Vivado]
                          }
           in runTest "DDRout" _opts
-        , let _opts = def{ buildTargets = BuildSpecific [ "testBenchUA"
-                                                        , "testBenchUS"
-                                                        , "testBenchGA"
-                                                        , "testBenchGS"
-                                                        ]
+        , let _opts = def{ buildTargets = BuildSpecific ["testBenchAll"]
                          , hdlLoad = [Vivado]
                          , hdlSim = [Vivado]
                          , clashFlags=["-fclash-hdlsyn", "Vivado"]
                          }
-          in runTest "DDRout" _opts
+          in runTest "XilinxDDR" _opts
         ]
       , clashTestGroup "DSignal"
         [ runTest "DelayedFold" def
