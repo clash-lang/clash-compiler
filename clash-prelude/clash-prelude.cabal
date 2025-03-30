@@ -182,6 +182,9 @@ Library
                       Clash.Class.Counter
                       Clash.Class.Counter.Internal
                       Clash.Class.Counter.TH
+                      Clash.Class.Convert
+                      Clash.Class.Convert.Internal.Convert
+                      Clash.Class.Convert.Internal.MaybeConvert
                       Clash.Class.Exp
                       Clash.Class.HasDomain
                       Clash.Class.HasDomain.HasSingleDomain
@@ -428,10 +431,12 @@ test-suite unittests
                  Clash.Tests.BlockRam.Blob
                  Clash.Tests.Clocks
                  Clash.Tests.Counter
+                 Clash.Tests.Convert
                  Clash.Tests.DerivingDataRepr
                  Clash.Tests.DerivingDataReprTypes
                  Clash.Tests.Fixed
                  Clash.Tests.FixedExhaustive
+                 Clash.Tests.MaybeConvert
                  Clash.Tests.MaybeX
                  Clash.Tests.NFDataX
                  Clash.Tests.NumNewtypes
