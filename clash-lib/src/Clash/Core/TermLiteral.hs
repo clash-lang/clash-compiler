@@ -52,7 +52,7 @@ import           Clash.Core.Term                 (Term(Literal, Data), collectAr
 import           Clash.Promoted.Nat
 import           Clash.Promoted.Nat.Unsafe
 import           Clash.Sized.Index               (Index)
-import           Clash.Sized.Vector              (Vec (Nil, Cons), fromList)
+import           Clash.Sized.Vector              (Vec (Nil, (:>)), fromList)
 import qualified Clash.Util.Interpolate          as I
 import qualified Clash.Verification.Internal     as Cv
 
@@ -193,7 +193,7 @@ instance (TermLiteral a, KnownNat n) => TermLiteral (Vec n a) where
       case constr of
         Data (MkData{dcName=Name{nameOcc}})
           | nameOcc == showt 'Nil -> Right []
-          | nameOcc == showt 'Cons ->
+          | nameOcc == showt '(:>) ->
             case lefts args of
               [_gadtProof, c0, cs0] -> do
                 c1 <- termToData @a c0

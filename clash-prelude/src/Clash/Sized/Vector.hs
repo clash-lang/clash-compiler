@@ -171,7 +171,7 @@ import Clash.XException           (ShowX (..), NFDataX (..), seqX, isX)
 
 #define CONS_PREC 5
 
-infixr CONS_PREC `Cons`
+infixr CONS_PREC :>
 -- | Fixed size vectors.
 --
 -- * Lists with their length encoded in their type
@@ -179,9 +179,7 @@ infixr CONS_PREC `Cons`
 --   ending at @'length' - 1@.
 data Vec :: Nat -> Type -> Type where
   Nil  :: Vec 0 a
-  Cons :: a -> Vec n a -> Vec (n + 1) a
-
-{-# COMPLETE Nil, (:>) #-}
+  (:>) :: a -> Vec n a -> Vec (n + 1) a
 
 -- | Tag for K1: @n ~ 0@ proof
 data N
@@ -197,7 +195,7 @@ instance KnownNat n => Generic (Vec n a) where
   type Rep (Vec n a) =
     D1 ('MetaData "Vec" "Clash.Data.Vector" "clash-prelude" 'False)
       (C1 ('MetaCons "Nil" 'PrefixI 'False) (K1 N (Dict (n ~ 0))) :+:
-       C1 ('MetaCons "Cons" 'PrefixI 'False)
+       C1 ('MetaCons "(:>)" 'PrefixI 'False)
         (S1 ('MetaSel 'Nothing
                 'NoSourceUnpackedness
                 'NoSourceStrictness
@@ -208,23 +206,23 @@ instance KnownNat n => Generic (Vec n a) where
                 'NoSourceStrictness
                 'DecidedLazy)
             (Rec0 (Vec (n-1) a))))
-  from Nil         = M1 (L1 (M1 (K1 Dict)))
-  from (Cons x xs) = M1 (R1 (M1 (M1 (K1 x) :*: M1 (K1 xs))))
+  from Nil       = M1 (L1 (M1 (K1 Dict)))
+  from (x :> xs) = M1 (R1 (M1 (M1 (K1 x) :*: M1 (K1 xs))))
   to (M1 g) = case compareSNat (SNat @n) (SNat @0) of
     SNatLE -> case leZero @n of
       Sub Dict -> Nil
     SNatGT -> case g of
-      R1 (M1 (M1 (K1 p) :*: M1 (K1 q))) -> Cons p q
+      R1 (M1 (M1 (K1 p) :*: M1 (K1 q))) -> p :> q
       L1 (M1 (K1 eqZero)) -> case eqZero of {}
 
 instance (KnownNat n, Typeable a, Data a) => Data (Vec n a) where
   gunfold k z _ = case compareSNat (SNat @n) (SNat @0) of
     SNatLE -> case leZero @n of
       Sub Dict -> z Nil
-    SNatGT -> k (k (z @(a -> Vec (n-1) a -> Vec n a) Cons))
-  toConstr Nil        = cNil
-  toConstr (Cons _ _) = cCons
-  dataTypeOf _        = tVec
+    SNatGT -> k (k (z @(a -> Vec (n-1) a -> Vec n a) (:>)))
+  toConstr Nil      = cNil
+  toConstr (_ :> _) = cCons
+  dataTypeOf _      = tVec
 
   gfoldl
     :: (forall d b. Data d => c (d -> b) -> d -> c b)
@@ -244,7 +242,7 @@ cNil :: Constr
 cNil = mkConstr tVec "Nil" [] Prefix
 
 cCons :: Constr
-cCons = mkConstr tVec "Cons" [] Prefix
+cCons = mkConstr tVec ":>" [] Infix
 
 instance NFData a => NFData (Vec n a) where
   rnf = foldl (\() -> rnf) ()
@@ -255,29 +253,40 @@ instance NFData a => NFData (Vec n a) where
 -- 3 :> 4 :> 5 :> Nil
 -- >>> let x = 3:>4:>5:>Nil
 -- >>> :t x
--- x :: Num a => Vec 3 a
+-- x :: Num b => Vec 3 b
 --
 -- Can be used as a pattern:
 --
--- >>> let f (x :> y :> _) = x + y
--- >>> :t f
--- f :: Num a => Vec ((n + 1) + 1) a -> a
+-- >>> :{
+-- f :: Num a => Vec (n + 2) a -> a
+-- f (x :> y :> _) = x + y
+-- :}
+--
 -- >>> f (3:>4:>5:>6:>7:>Nil)
 -- 7
 --
 -- Also in conjunctions with (':<'):
 --
--- >>> let g (a :> b :> (_ :< y :< x)) = a + b +  x + y
--- >>> :t g
--- g :: Num a => Vec ((((n + 1) + 1) + 1) + 1) a -> a
+-- >>> :{
+-- g :: Num a => Vec (n + 4) a -> a
+-- g (a :> b :> (_ :< y :< x)) = a + b + x + y
+-- :}
+--
 -- >>> g (1:>2:>3:>4:>5:>Nil)
 -- 12
-pattern (:>) :: a -> Vec n a -> Vec (n + 1) a
-pattern (:>) x xs <- ((\ys -> (head ys,tail ys)) -> (x,xs))
-  where
-    (:>) x xs = Cons x xs
+pattern Cons ::
+#if MIN_VERSION_base(4,15,0)
+  forall {n} a. () =>
+#else
+  forall n a. () =>
+#endif
+  forall m. n ~ (m + 1) =>
+  a -> Vec m a -> Vec n a
+pattern Cons x xs = (:>) x xs
 
-infixr CONS_PREC :>
+infixr CONS_PREC `Cons`
+{-# COMPLETE Nil, Cons #-}
+{-# DEPRECATED Cons "Use '(:>)' instead. 'Cons' will be removed in Clash 1.12" #-}
 
 instance Show a => Show (Vec n a) where
   showsPrec n = \case
@@ -287,7 +296,7 @@ instance Show a => Show (Vec n a) where
    where
     go :: Vec m a -> ShowS
     go Nil = showString "Nil"
-    go (x `Cons` xs) =
+    go (x :> xs) =
         showsPrec (CONS_PREC + 1) x
       . showString " :> "
       . go xs
@@ -302,14 +311,14 @@ instance ShowX a => ShowX (Vec n a) where
     go :: Vec m a -> ShowS
     go (isX -> Left _) = showString "undefined"
     go Nil = showString "Nil"
-    go (x `Cons` xs) =
+    go (x :> xs) =
         showsPrecX (CONS_PREC + 1) x
       . showString " :> "
       . go xs
 
 instance (KnownNat n, Eq a) => Eq (Vec n a) where
   (==) Nil _            = True
-  (==) v1@(Cons _ _) v2 = fold (&&) (zipWith (==) v1 v2)
+  (==) v1@(_ :> _) v2 = fold (&&) (zipWith (==) v1 v2)
 
 instance (KnownNat n, Ord a) => Ord (Vec n a) where
   compare x y = foldr f EQ $ zipWith compare x y
@@ -332,28 +341,28 @@ instance KnownNat n => Applicative (Vec n) where
   #-}
 
 instance KnownNat n => F.Foldable (Vec n) where
-  fold Nil      = mempty
-  fold z@Cons{} = fold mappend z
-  foldMap _ Nil      = mempty
-  foldMap f z@Cons{} = fold mappend (map f z)
+  fold Nil        = mempty
+  fold z@(_ :> _) = fold mappend z
+  foldMap _ Nil        = mempty
+  foldMap f z@(_ :> _) = fold mappend (map f z)
   foldr     = foldr
   foldl     = foldl
-  foldr1 _ Nil      = clashCompileError "foldr1: empty Vec"
-  foldr1 f z@Cons{} = foldr1 f z
-  foldl1 _ Nil      = clashCompileError "foldl1: empty Vec"
-  foldl1 f z@Cons{} = foldl1 f z
+  foldr1 _ Nil        = clashCompileError "foldr1: empty Vec"
+  foldr1 f z@(_ :> _) = foldr1 f z
+  foldl1 _ Nil        = clashCompileError "foldl1: empty Vec"
+  foldl1 f z@(_ :> _) = foldl1 f z
   toList    = toList
   null Nil  = True
   null _    = False
   length    = length
-  maximum Nil      = clashCompileError "maximum: empty Vec"
-  maximum z@Cons{} = fold (\x y -> if x >= y then x else y) z
-  minimum Nil      = clashCompileError "minimum: empty Vec"
-  minimum z@Cons{} = fold (\x y -> if x <= y then x else y) z
-  sum Nil      = 0
-  sum z@Cons{} = fold (+) z
-  product Nil      = 1
-  product z@Cons{} = fold (*) z
+  maximum Nil        = clashCompileError "maximum: empty Vec"
+  maximum z@(_ :> _) = fold (\x y -> if x >= y then x else y) z
+  minimum Nil        = clashCompileError "minimum: empty Vec"
+  minimum z@(_ :> _) = fold (\x y -> if x <= y then x else y) z
+  sum Nil        = 0
+  sum z@(_ :> _) = fold (+) z
+  product Nil        = 1
+  product z@(_ :> _) = fold (*) z
 
 #if MIN_VERSION_base(4,18,0)
 instance (KnownNat n, 1 <= n) => F1.Foldable1 (Vec n) where
@@ -375,8 +384,8 @@ instance KnownNat n => Traversable (Vec n) where
 {-# CLASH_OPAQUE traverse# #-}
 {-# ANN traverse# hasBlackBox #-}
 traverse# :: forall a f b n . Applicative f => (a -> f b) -> Vec n a -> f (Vec n b)
-traverse# _ Nil           = pure Nil
-traverse# f (x `Cons` xs) = Cons <$> f x <*> traverse# f xs
+traverse# _ Nil       = pure Nil
+traverse# f (x :> xs) = (:>) <$> f x <*> traverse# f xs
 
 instance (Default a, KnownNat n) => Default (Vec n a) where
   def = repeat def
@@ -395,7 +404,7 @@ instance (NFDataX a, KnownNat n) => NFDataX (Vec n a) where
    where
     go :: forall m b . (NFDataX b, KnownNat m) => Vec m b -> Bool
     go Nil = False
-    go (x `Cons` xs) = hasUndefined x || hasUndefined xs
+    go (x :> xs) = hasUndefined x || hasUndefined xs
 
   ensureSpine = map ensureSpine . lazyV
 
@@ -405,7 +414,7 @@ instance (NFDataX a, KnownNat n) => NFDataX (Vec n a) where
 -- >>> singleton 5
 -- 5 :> Nil
 singleton :: a -> Vec 1 a
-singleton = (`Cons` Nil)
+singleton = (:> Nil)
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE head #-}
@@ -451,12 +460,12 @@ singleton = (`Cons` Nil)
 #endif
 -}
 head :: Vec (n + 1) a -> a
-head (x `Cons` _) = x
+head (x :> _) = x
 #if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
 head xs = unreachable xs
  where
   unreachable :: forall n a. 1 <= n => Vec n a -> a
-  unreachable (x `Cons` _) = x
+  unreachable (x :> _) = x
 #endif
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
@@ -503,12 +512,12 @@ head xs = unreachable xs
 #endif
 -}
 tail :: Vec (n + 1) a -> Vec n a
-tail (_ `Cons` xr) = xr
+tail (_ :> xr) = xr
 #if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
 tail xs = unreachable xs
  where
   unreachable :: forall n a. 1 <= n => Vec n a -> Vec (n - 1) a
-  unreachable (_ `Cons` xr) = xr
+  unreachable (_ :> xr) = xr
 #endif
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
@@ -555,13 +564,13 @@ tail xs = unreachable xs
 #endif
 -}
 last :: Vec (n + 1) a -> a
-last (x `Cons` Nil)         = x
-last (_ `Cons` y `Cons` xr) = last (y `Cons` xr)
+last (x :> Nil)     = x
+last (_ :> y :> xr) = last (y :> xr)
 #if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
 last xs = unreachable xs
  where
   unreachable :: 1 <= n => Vec n a -> a
-  unreachable ys@(Cons _ _) = last ys
+  unreachable ys@(_ :> _) = last ys
 #endif
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
@@ -608,13 +617,13 @@ last xs = unreachable xs
 #endif
 -}
 init :: Vec (n + 1) a -> Vec n a
-init (_ `Cons` Nil)         = Nil
-init (x `Cons` y `Cons` xr) = x `Cons` init (y `Cons` xr)
+init (_ :> Nil)     = Nil
+init (x :> y :> xr) = x :> init (y :> xr)
 #if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
 init xs = unreachable xs
  where
   unreachable :: 1 <= n => Vec n a -> Vec (n - 1) a
-  unreachable ys@(Cons _ _) = init ys
+  unreachable ys@(_ :> _) = init ys
 #endif
 
 {-# INLINE shiftInAt0 #-}
@@ -675,9 +684,11 @@ infixl 5 :<
 --
 -- Also in conjunctions with (':>'):
 --
--- >>> let g (a :> b :> (_ :< y :< x)) = a + b +  x + y
--- >>> :t g
--- g :: Num a => Vec ((((n + 1) + 1) + 1) + 1) a -> a
+-- >>> :{
+-- g :: Num a => Vec (n + 4) a -> a
+-- g (a :> b :> (_ :< y :< x)) = a + b + x + y
+-- :}
+--
 -- >>> g (1:>2:>3:>4:>5:>Nil)
 -- 12
 pattern (:<) :: Vec n a -> a -> Vec (n+1) a
@@ -748,8 +759,8 @@ infixr 5 ++
 -- >>> (1:>2:>3:>Nil) ++ (7:>8:>Nil)
 -- 1 :> 2 :> 3 :> 7 :> 8 :> Nil
 (++) :: Vec n a -> Vec m a -> Vec (n + m) a
-Nil           ++ ys = ys
-(x `Cons` xs) ++ ys = x `Cons` xs ++ ys
+Nil       ++ ys = ys
+(x :> xs) ++ ys = x :> (xs ++ ys)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE (++) #-}
 {-# ANN (++) hasBlackBox #-}
@@ -769,7 +780,7 @@ splitAt n xs = splitAtU (toUNat n) xs
 splitAtU :: UNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
 splitAtU UZero     ys = (Nil, ys)
 splitAtU (USucc s) ys = let (as, bs) = splitAtU s $ tail ys
-                        in  (head ys `Cons` as, bs)
+                        in  (head ys :> as, bs)
 
 -- | Split a vector into two vectors where the length of the two is determined
 -- by the context.
@@ -785,8 +796,8 @@ splitAtI = withSNat splitAt
 -- >>> concat ((1:>2:>3:>Nil) :> (4:>5:>6:>Nil) :> (7:>8:>9:>Nil) :> (10:>11:>12:>Nil) :> Nil)
 -- 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> 8 :> 9 :> 10 :> 11 :> 12 :> Nil
 concat :: Vec n (Vec m a) -> Vec (n * m) a
-concat Nil           = Nil
-concat (x `Cons` xs) = x ++ concat xs
+concat Nil       = Nil
+concat (x :> xs) = x ++ concat xs
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE concat #-}
 {-# ANN concat hasBlackBox #-}
@@ -813,7 +824,7 @@ unconcat n xs = unconcatU (withSNat toUNat) (toUNat n) xs
 unconcatU :: UNat n -> UNat m -> Vec (n * m) a -> Vec n (Vec m a)
 unconcatU UZero      _ _  = Nil
 unconcatU (USucc n') m ys = let (as,bs) = splitAtU m ys
-                            in  as `Cons` unconcatU n' m bs
+                            in  as :> unconcatU n' m bs
 
 -- | Split a vector of /(n * m)/ elements into a vector of \"vectors of length
 -- /m/\", where the length /m/ is determined by the context.
@@ -840,7 +851,7 @@ reverse :: Vec n a -> Vec n a
 reverse xs = go Nil xs
  where
   go :: i <= n => Vec (n - i) a -> Vec i a -> Vec n a
-  go a (y `Cons` ys) = go (y `Cons` a) ys
+  go a (y :> ys) = go (y :> a) ys
   go a Nil = a
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE reverse #-}
@@ -855,8 +866,8 @@ reverse xs = go Nil xs
 --
 -- <<doc/map.svg>>
 map :: (a -> b) -> Vec n a -> Vec n b
-map _ Nil           = Nil
-map f (x `Cons` xs) = f x `Cons` map f xs
+map _ Nil       = Nil
+map f (x :> xs) = f x :> map f xs
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE map #-}
 {-# ANN map hasBlackBox #-}
@@ -879,8 +890,8 @@ imap f = go 0
   where
     -- NOTE This has a black box called imap_go
     go :: Index n -> Vec m a -> Vec m b
-    go _ Nil           = Nil
-    go n (x `Cons` xs) = f n x `Cons` go (n+1) xs
+    go _ Nil       = Nil
+    go n (x :> xs) = f n x :> go (n+1) xs
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE imap #-}
 {-# ANN imap hasBlackBox #-}
@@ -943,7 +954,7 @@ ifoldr f z xs = head ws
 ifoldl :: KnownNat n => (a -> Index n -> b -> a) -> a -> Vec n b -> a
 ifoldl f z xs = last ws
   where
-    ws = z `Cons` izipWith (\i b a -> f a i b) xs (init ws)
+    ws = z :> izipWith (\i b a -> f a i b) xs (init ws)
 {-# INLINE ifoldl #-}
 
 -- | Generate a vector of indices.
@@ -1001,8 +1012,8 @@ elemIndex x = findIndex (x ==)
 -- third. This matters when 'zipWith' is used in a recursive setting. See
 -- 'lazyV' for more information.
 zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
-zipWith _ Nil           _  = Nil
-zipWith f (x `Cons` xs) ys = f x (head ys) `Cons` zipWith f xs (tail ys)
+zipWith _ Nil       _  = Nil
+zipWith f (x :> xs) ys = f x (head ys) :> zipWith f xs (tail ys)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE zipWith #-}
 {-# ANN zipWith hasBlackBox #-}
@@ -1112,8 +1123,8 @@ zipWith7 f ts us vs ws xs ys zs =
 -- associative, as @"'fold' f xs"@ produces a structure with a depth of
 -- O(log_2(@'length' xs@)).
 foldr :: (a -> b -> b) -> b -> Vec n a -> b
-foldr _ z Nil           = z
-foldr f z (x `Cons` xs) = f x (foldr f z xs)
+foldr _ z Nil       = z
+foldr f z (x :> xs) = f x (foldr f z xs)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE foldr #-}
 {-# ANN foldr hasBlackBox #-}
@@ -1153,7 +1164,7 @@ foldl f z0 xs0
  where
   go :: forall m. b -> Vec m a -> b
   go z Nil = z
-  go z (Cons x xs) =
+  go z (x :> xs) =
     let z1 = f z x
     in z1 `seq` go z1 xs
 {-# INLINE foldl #-}
@@ -1256,7 +1267,7 @@ fold f vs = fold' (toList vs)
 scanl :: (b -> a -> b) -> b -> Vec n a -> Vec (n + 1) b
 scanl f z xs = ws
   where
-    ws = z `Cons` zipWith (flip f) xs (init ws)
+    ws = z :> zipWith (flip f) xs (init ws)
 {-# INLINE scanl #-}
 
 -- | 'scanl' with no seed value
@@ -1341,7 +1352,7 @@ postscanr f z xs = init (scanr f z xs)
 mapAccumL :: (acc -> x -> (acc,y)) -> acc -> Vec n x -> (acc,Vec n y)
 mapAccumL f acc xs = (acc',ys)
   where
-    accs  = acc `Cons` accs'
+    accs  = acc :> accs'
     ws    = zipWith (flip f) xs (init accs)
     accs' = map fst ws
     ys    = map snd ws
@@ -1507,9 +1518,9 @@ index_int xs i@(I# n0)
                                     , " is larger than maximum index "
                                     , show ((length xs)-1)
                                     ])
-    sub (y `Cons` (!ys)) n = if isTrue# (n ==# 0#)
-                                then y
-                                else sub ys (n -# 1#)
+    sub (y :> (!ys)) n = if isTrue# (n ==# 0#)
+                         then y
+                         else sub ys (n -# 1#)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE index_int #-}
 {-# ANN index_int hasBlackBox #-}
@@ -1553,9 +1564,9 @@ replace_int xs i@(I# n0) a
                                       , " is larger than maximum index "
                                       , show (length xs - 1)
                                       ])
-    sub (y `Cons` (!ys)) n b = if isTrue# (n ==# 0#)
-                                 then b `Cons` ys
-                                 else y `Cons` sub ys (n -# 1#) b
+    sub (y :> (!ys)) n b = if isTrue# (n ==# 0#)
+                           then b :> ys
+                           else y :> sub ys (n -# 1#) b
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE replace_int #-}
 {-# ANN replace_int hasBlackBox #-}
@@ -1729,9 +1740,9 @@ select f s n xs = select' (toUNat n) $ drop f xs
   select' :: forall m j b. (s * m + 1 <= j + s) => UNat m -> Vec j b -> Vec m b
   select' m vs = case m of
     UZero -> Nil
-    USucc UZero -> head @(j - 1) vs `Cons` Nil
+    USucc UZero -> head @(j - 1) vs :> Nil
     USucc m'@(USucc _) -> case deduce @(s * (m - 1) + 1) @j Proxy Proxy of
-      Dict -> head @(j - 1) vs `Cons` select' m' (drop @s @(j - s) s vs)
+      Dict -> head @(j - 1) vs :> select' m' (drop @s @(j - s) s vs)
 
   deduce :: e + s <= k + s => p e -> p k -> Dict (e <= k)
   deduce _ _ = Dict
@@ -1767,7 +1778,7 @@ replicate n a = replicateU (toUNat n) a
 
 replicateU :: UNat n -> a -> Vec n a
 replicateU UZero     _ = Nil
-replicateU (USucc s) x = x `Cons` replicateU s x
+replicateU (USucc s) x = x :> replicateU s x
 
 -- | \"'repeat' @a@\" creates a vector with as many copies of /a/ as demanded
 -- by the context.
@@ -1808,7 +1819,7 @@ iterate SNat = iterateI
 iterateI :: forall n a. KnownNat n => (a -> a) -> a -> Vec n a
 iterateI f a = xs
   where
-    xs = init (a `Cons` ws)
+    xs = init (a :> ws)
     ws = map f (lazyV xs)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE iterateI #-}
@@ -1844,7 +1855,7 @@ unfoldr SNat = unfoldrI
 unfoldrI :: KnownNat n => (s -> (a,s)) -> s -> Vec n a
 unfoldrI f s0 = map fst xs
  where
-  xs = init (f s0 `Cons` ws)
+  xs = init (f s0 :> ws)
   ws = map (f . snd) (lazyV xs)
 {-# INLINE unfoldrI #-}
 
@@ -1900,7 +1911,7 @@ transpose = traverse# id
 --
 -- >>> let xs = (1:>2:>3:>4:>5:>6:>Nil)
 -- >>> :t xs
--- xs :: Num a => Vec 6 a
+-- xs :: Num b => Vec 6 b
 -- >>> :t stencil1d d2 sum xs
 -- stencil1d d2 sum xs :: Num b => Vec 5 b
 -- >>> stencil1d d2 sum xs
@@ -1922,7 +1933,7 @@ drawn from /xss/. The result matrix has /m + 1/ rows of /n + 1/ elements.
 
 >>> let xss = ((1:>2:>3:>4:>Nil):>(5:>6:>7:>8:>Nil):>(9:>10:>11:>12:>Nil):>(13:>14:>15:>16:>Nil):>Nil)
 >>> :t xss
-xss :: Num a => Vec 4 (Vec 4 a)
+xss :: Num b => Vec 4 (Vec 4 b)
 
 #if __GLASGOW_HASKELL__ >= 902
 >>> :t stencil2d d2 d2 (sum . map sum) xss
@@ -1950,7 +1961,7 @@ stencil2d stY stX f xss = (map.map) f (windows2d stY stX xss)
 --
 -- >>> let xs = (1:>2:>3:>4:>5:>6:>Nil)
 -- >>> :t xs
--- xs :: Num a => Vec 6 a
+-- xs :: Num b => Vec 6 b
 -- >>> :t windows1d d2 xs
 -- windows1d d2 xs :: Num a => Vec 5 (Vec 2 a)
 -- >>> windows1d d2 xs
@@ -1972,7 +1983,7 @@ windows1d stX xs = map (take stX) (rotations xs)
 --
 -- >>> let xss = ((1:>2:>3:>4:>Nil):>(5:>6:>7:>8:>Nil):>(9:>10:>11:>12:>Nil):>(13:>14:>15:>16:>Nil):>Nil)
 -- >>> :t xss
--- xss :: Num a => Vec 4 (Vec 4 a)
+-- xss :: Num b => Vec 4 (Vec 4 b)
 -- >>> :t windows2d d2 d2 xss
 -- windows2d d2 d2 xss :: Num a => Vec 3 (Vec 3 (Vec 2 (Vec 2 a)))
 -- >>> windows2d d2 d2 xss
@@ -2134,9 +2145,9 @@ rotateLeftS :: KnownNat n
 rotateLeftS xs d = go (snatToInteger d `mod` natVal (asNatProxy xs)) xs
   where
     go :: Integer -> Vec k a -> Vec k a
-    go _ Nil           = Nil
-    go 0 ys            = ys
-    go n (y `Cons` ys) = go (n-1) (ys :< y)
+    go _ Nil       = Nil
+    go 0 ys        = ys
+    go n (y :> ys) = go (n-1) (ys :< y)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE rotateLeftS #-}
 {-# ANN rotateLeftS hasBlackBox #-}
@@ -2154,9 +2165,9 @@ rotateRightS :: KnownNat n
              -> Vec n a
 rotateRightS xs d = go (snatToInteger d `mod` natVal (asNatProxy xs)) xs
   where
-    go _ Nil            = Nil
-    go 0 ys             = ys
-    go n ys@(Cons _ _)  = go (n-1) (last ys :> init ys)
+    go _ Nil          = Nil
+    go 0 ys           = ys
+    go n ys@(_ :> _)  = go (n-1) (last ys :> init ys)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE rotateRightS #-}
 {-# ANN rotateRightS hasBlackBox #-}
@@ -2323,8 +2334,8 @@ lazyV :: KnownNat n
 lazyV = lazyV' (repeat ())
   where
     lazyV' :: Vec n () -> Vec n a -> Vec n a
-    lazyV' Nil           _  = Nil
-    lazyV' (_ `Cons` xs) ys = head ys `Cons` lazyV' xs (tail ys)
+    lazyV' Nil       _  = Nil
+    lazyV' (_ :> xs) ys = head ys :> lazyV' xs (tail ys)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE lazyV #-}
 {-# ANN lazyV hasBlackBox #-}
@@ -2384,7 +2395,7 @@ lazyV = lazyV' (repeat ())
 -- While the type of (':>') is:
 --
 -- >>> :t (:>)
--- (:>) :: a -> Vec n a -> Vec (n + 1) a
+-- (:>) :: b -> Vec n b -> Vec (n + 1) b
 --
 -- We thus need a @fold@ function that can handle the growing vector type:
 -- 'dfold'. Compared to 'foldr', 'dfold' takes an extra parameter, called the
@@ -2429,8 +2440,8 @@ dfold :: forall p k a . KnownNat k
 dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
   where
     go :: n <= k => SNat n -> Vec n a -> (p @@ n)
-    go _ Nil                        = z
-    go s (y `Cons` ys) =
+    go _ Nil       = z
+    go s (y :> ys) =
       let s' = s `subSNat` d1
       in  f s' y (go s' ys)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
@@ -2611,8 +2622,8 @@ dtfold :: forall p k a . KnownNat k
 dtfold _ f g = go (SNat :: SNat k)
   where
     go :: forall n . SNat n -> Vec (2^n) a -> (p @@ n)
-    go _  (x `Cons` Nil) = f x
-    go sn xs@(Cons _ (Cons _ _)) =
+    go _  (x :> Nil) = f x
+    go sn xs@(_ :> (_ :> _)) =
       let sn' :: SNat (n - 1)
           sn'       = sn `subSNat` d1
           (xsL,xsR) = splitAt (pow2SNat sn') xs
@@ -2727,7 +2738,7 @@ concatBitVector# = go 0
  where
   go :: BitVector (n*m) -> Vec p (BitVector m) -> BitVector (n * m)
   go acc Nil = acc
-  go (BV accMsk accVal) ((BV xMsk xVal) `Cons` xs) =
+  go (BV accMsk accVal) ((BV xMsk xVal) :> xs) =
     let sh = fromInteger (natVal (Proxy @m)) :: Int in
     go (BV (shiftL accMsk sh .|. xMsk) (shiftL accVal sh .|. xVal)) xs
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
@@ -2820,8 +2831,8 @@ forceVX v =
 {-# INLINE forceVX #-}
 
 instance Lift a => Lift (Vec n a) where
-  lift Nil           = [| Nil |]
-  lift (x `Cons` xs) = [| x `Cons` $(lift xs) |]
+  lift Nil       = [| Nil |]
+  lift (x :> xs) = [| x :> $(lift xs) |]
 #if MIN_VERSION_template_haskell(2,16,0)
   liftTyped = liftTypedFromUntyped
 #endif

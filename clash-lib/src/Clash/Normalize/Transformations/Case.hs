@@ -670,8 +670,8 @@ caseOneAlt e = return e
 -- existential should be. For example, consider Vec:
 --
 --    data Vec :: Nat -> Type -> Type where
---      Nil       :: Vec 0 a
---      Cons x xs :: a -> Vec n a -> Vec (n + 1) a
+--      Nil     :: Vec 0 a
+--      x :> xs :: a -> Vec n a -> Vec (n + 1) a
 --
 -- Thus, 'null' (annotated with existentials) could look like:
 --
@@ -679,7 +679,7 @@ caseOneAlt e = return e
 --    null v =
 --      case v of
 --        Nil  {n ~ 0}                                     -> True
---        Cons {n1:Nat} {n~n1+1} (x :: a) (xs :: Vec n1 a) -> False
+--        (:>) {n1:Nat} {n~n1+1} (x :: a) (xs :: Vec n1 a) -> False
 --
 -- When it's applied to a vector of length 5, this becomes:
 --
@@ -687,7 +687,7 @@ caseOneAlt e = return e
 --    null v =
 --      case v of
 --        Nil  {5 ~ 0}                                     -> True
---        Cons {n1:Nat} {5~n1+1} (x :: a) (xs :: Vec n1 a) -> False
+--        (:>) {n1:Nat} {5~n1+1} (x :: a) (xs :: Vec n1 a) -> False
 --
 -- This function solves 'n1' and replaces every occurrence with its solution. A
 -- very limited number of solutions are currently recognized: only adds (such

@@ -14,18 +14,18 @@ topEntity :: Index 10 -> Index 3
 topEntity j = case j < 1 of
   False ->
     let xs :: Vec 1 (Index 3)
-        xs = init (Cons 1 (Cons (incr (head ys)) Nil))
+        xs = init (1 :> (incr (head ys) :> Nil))
         {-# NOINLINE xs #-}
         ys :: Vec 1 (Index 3)
-        ys = init (Cons 1 (Cons (incr (head xs)) Nil))
+        ys = init (1 :> (incr (head xs) :> Nil))
         {-# NOINLINE ys #-}
     in incr (incr (head xs))
   True ->
     let ys :: Vec 1 (Index 3)
-        ys = init (Cons 2 (Cons (incr (head xs)) Nil))
+        ys = init (2 :> (incr (head xs) :> Nil))
         {-# NOINLINE xs #-}
         xs :: Vec 1 (Index 3)
-        xs = init (Cons 2 (Cons (incr (head ys)) Nil))
+        xs = init (2 :> (incr (head ys) :> Nil))
         {-# NOINLINE ys #-}
     in incr (incr (head ys))
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511

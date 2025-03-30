@@ -6,7 +6,7 @@ import Clash.Prelude
 import Clash.Explicit.Testbench
 
 head' :: Vec (n+1) (Signed 16) -> Signed 16
-head' (Cons x xs) = x
+head' (x :> xs) = x
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE head' #-}
 
