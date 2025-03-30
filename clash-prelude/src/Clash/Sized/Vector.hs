@@ -272,10 +272,11 @@ instance NFData a => NFData (Vec n a) where
 -- g :: Num a => Vec ((((n + 1) + 1) + 1) + 1) a -> a
 -- >>> g (1:>2:>3:>4:>5:>Nil)
 -- 12
-pattern (:>) :: a -> Vec n a -> Vec (n + 1) a
-pattern (:>) x xs <- ((\ys -> (head ys,tail ys)) -> (x,xs))
-  where
-    (:>) x xs = Cons x xs
+pattern (:>) ::
+  forall {n} a. () =>
+  forall m. n ~ m + 1 =>
+  a -> Vec m a -> Vec n a
+pattern (:>) x xs = Cons x xs
 
 infixr CONS_PREC :>
 
