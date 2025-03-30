@@ -189,6 +189,9 @@ Library
                       Clash.Class.HasDomain.CodeGen
                       Clash.Class.HasDomain.Common
                       Clash.Class.Num
+                      Clash.Class.NumConvert
+                      Clash.Class.NumConvert.Internal.NumConvert
+                      Clash.Class.NumConvert.Internal.MaybeNumConvert
                       Clash.Class.Parity
                       Clash.Class.Resize
 
@@ -428,10 +431,12 @@ test-suite unittests
                  Clash.Tests.BlockRam.Blob
                  Clash.Tests.Clocks
                  Clash.Tests.Counter
+                 Clash.Tests.NumConvert
                  Clash.Tests.DerivingDataRepr
                  Clash.Tests.DerivingDataReprTypes
                  Clash.Tests.Fixed
                  Clash.Tests.FixedExhaustive
+                 Clash.Tests.MaybeNumConvert
                  Clash.Tests.MaybeX
                  Clash.Tests.NFDataX
                  Clash.Tests.NumNewtypes

@@ -146,6 +146,7 @@ module Clash.Prelude
   , module Clash.Class.BitPack
   , module Clash.Class.Exp
   , module Clash.Class.Num
+  , module Clash.Class.NumConvert
   , module Clash.Class.Parity
   , module Clash.Class.Resize
     -- *** Other
@@ -185,6 +186,7 @@ import           Clash.Class.AutoReg         (AutoReg, deriveAutoReg)
 import           Clash.Class.BitPack
 import           Clash.Class.Exp
 import           Clash.Class.Num
+import           Clash.Class.NumConvert
 import           Clash.Class.Parity
 import           Clash.Class.Resize
 import qualified Clash.Explicit.Prelude      as E
