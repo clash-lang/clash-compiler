@@ -1,8 +1,9 @@
 {-|
 Copyright  :  (C) 2017, Google Inc
                   2019, Myrtle Software Ltd
+                  2025, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 We simulate DDR signal by using 'Signal's which have exactly half the period
 (or double the speed) of our normal 'Signal's.
@@ -42,6 +43,7 @@ import Clash.Signal.Internal
 >>> import Clash.Explicit.Prelude
 >>> import Clash.Explicit.DDR
 >>> :{
+type Fast = ("Fast" :: Domain)
 instance KnownDomain "Fast" where
   type KnownConf "Fast" = 'DomainConfiguration "Fast" 5000 'Rising 'Asynchronous 'Defined 'ActiveHigh
   knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
@@ -54,7 +56,20 @@ instance KnownDomain "Fast" where
 -- Consumes a DDR input signal and produces a regular signal containing a pair
 -- of values.
 --
--- >>> printX $ sampleN 5 $ ddrIn systemClockGen systemResetGen enableGen (-1,-2,-3) (fromList [0..10] :: Signal "Fast" Int)
+-- Data is clocked in on both edges of the clock signal. We can discern the
+-- /active edge/ of the clock and the /other edge/. When the domain has the
+-- rising edge as the active edge (which is the most common), this means that
+-- the /rising/ edge is the /active/ edge and the /falling/ edge is the /other/
+-- edge.
+--
+-- Of the output pair @(o0, o1)@, @o0@ is the data clocked in on the /other/
+-- edge and @o1@ is the data clocked in on the /active/ edge, and @o0@ comes
+-- before @o1@ in time. With a domain where the rising edge is the active edge,
+-- this means @o0@ is clocked in on the falling clock edge and @o1@ is clocked
+-- in on the rising clock edge. For a domain with the falling edge as the active
+-- edge, this is the other way around, but @o0@ still comes before @o1@ in time.
+--
+-- >>> sampleN 5 $ ddrIn systemClockGen systemResetGen enableGen (-1,-2,-3) (fromList [0..10] :: Signal Fast Int)
 -- [(-1,-2),(-1,-2),(-3,2),(3,4),(5,6)]
 ddrIn
   :: ( HasCallStack
@@ -62,16 +77,14 @@ ddrIn
      , KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
      , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
   => Clock slow
-  -- ^ clock
   -> Reset slow
-  -- ^ reset
   -> Enable slow
   -> (a, a, a)
-  -- ^ reset values
+  -- ^ Reset values
   -> Signal fast a
   -- ^ DDR input signal
   -> Signal slow (a, a)
-  -- ^ normal speed output pairs
+  -- ^ Normal speed output pair @(o0, o1)@
 ddrIn clk rst en (i0,i1,i2) =
   withFrozenCallStack $ ddrIn# clk rst en i0 i1 i2
 
@@ -143,7 +156,21 @@ ddrIn# _ _ _ _ _ _ =
 --
 -- Produces a DDR output signal from a normal signal of pairs of input.
 --
--- >>> sampleN 7 (ddrOut systemClockGen systemResetGen enableGen (-1) (fromList [(0,1),(2,3),(4,5)]) :: Signal "Fast" Int)
+-- Data is clocked out on both edges of the clock signal. We can discern the
+-- /active edge/ of the clock and the /other edge/. When the domain has the
+-- rising edge as the active edge (which is the most common), this means that
+-- the /rising/ edge is the /active/ edge and the /falling/ edge is the /other/
+-- edge.
+--
+-- Of the input pair @(i0, i1)@, @i0@ is the data clocked out on the /active/
+-- edge and @i1@ is the data clocked out on the /other/ edge, and @i0@ comes
+-- before @i1@ in time. With a domain where the rising edge is the active edge,
+-- this means @i0@ is clocked out on the rising clock edge and @i1@ is clocked
+-- out on the falling clock edge. For a domain with the falling edge as the
+-- active edge, this is the other way around, but @i0@ still comes before @i1@
+-- in time.
+--
+-- >>> sampleN 7 (ddrOut systemClockGen systemResetGen enableGen (-1) (fromList [(0,1),(2,3),(4,5)]) :: Signal Fast Int)
 -- [-1,-1,-1,2,3,4,5]
 ddrOut
   :: ( HasCallStack
@@ -154,9 +181,9 @@ ddrOut
   -> Reset slow
   -> Enable slow
   -> a
-  -- ^ reset value
+  -- ^ Reset value
   -> Signal slow (a, a)
-  -- ^ Normal speed input pairs
+  -- ^ Normal speed input pair @(i0, i1)@
   -> Signal fast a
   -- ^ DDR output signal
 ddrOut clk rst en i0 =
