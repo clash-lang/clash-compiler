@@ -79,9 +79,9 @@ library
   -- TODO: remove this once https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
   -- is fixed
   if impl(ghc < 9.8.3) || impl(ghc == 9.10.1)
-    buildable: true
+    buildable: True
   else
-    buildable: false
+    buildable: False
 
 executable ffi-interface-tests
   import: common-options
@@ -116,6 +116,6 @@ executable ffi-interface-tests
   -- TODO: remove this once https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
   -- is fixed
   if impl(ghc < 9.8.3) || impl(ghc == 9.10.1)
-    buildable: true
+    buildable: True
   else
-    buildable: false
+    buildable: False
