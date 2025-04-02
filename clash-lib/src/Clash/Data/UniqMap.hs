@@ -39,13 +39,17 @@ module Clash.Data.UniqMap
   , elems
   ) where
 
+#if MIN_VERSION_ghc(9,8,4) || (MIN_VERSION_ghc(9,6,7) && !MIN_VERSION_ghc(9,8,0))
+#define UNIQUE_IS_WORD64
+#endif
+
 import           Prelude hiding (elem, filter, lookup, notElem, null)
 
 import           Control.DeepSeq (NFData)
 import           Data.Binary (Binary (..))
 import           Data.Bifunctor (first)
 import           Data.Function (on)
-#if MIN_VERSION_ghc(9,8,4)
+#ifdef UNIQUE_IS_WORD64
 import           GHC.Data.Word64Map.Strict (Word64Map)
 import qualified GHC.Data.Word64Map.Strict as IntMap
 #else
@@ -71,7 +75,7 @@ import           Clash.Unique (Unique, Uniquable(getUnique))
 -- uniqueable and provide their own key, however a unique can be associated
 -- with any value.
 newtype UniqMap a
-#if MIN_VERSION_ghc(9,8,4)
+#ifdef UNIQUE_IS_WORD64
   = UniqMap { uniqMapToIntMap :: Word64Map a }
 #else
   = UniqMap { uniqMapToIntMap :: IntMap a }
@@ -85,7 +89,7 @@ newtype UniqMap a
     , Semigroup
     , Show
     )
-#if MIN_VERSION_ghc(9,8,4)
+#ifdef UNIQUE_IS_WORD64
 instance Binary a => Binary (UniqMap a) where
   put (UniqMap m) = put (IntMap.size m) <> mapM_ put (IntMap.toAscList m)
   get             = fmap (UniqMap . IntMap.fromDistinctAscList) get

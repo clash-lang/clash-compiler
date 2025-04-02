@@ -17,8 +17,13 @@ module Clash.Unique
   , fromGhcUnique
   ) where
 
+#if MIN_VERSION_ghc(9,8,4) || (MIN_VERSION_ghc(9,6,7) && !MIN_VERSION_ghc(9,8,0))
+#define UNIQUE_IS_WORD64
+#endif
+
 import Data.Word (Word64)
-#if MIN_VERSION_ghc(9,8,4)
+
+#ifdef UNIQUE_IS_WORD64
 import GHC.Word (Word64(W64#))
 import GHC.Exts (Word64#)
 #else
@@ -31,7 +36,7 @@ import qualified GHC.Types.Unique as GHC
 import qualified Unique as GHC
 #endif
 
-#if MIN_VERSION_ghc(9,8,4)
+#ifdef UNIQUE_IS_WORD64
 type Unique = Word64
 type Unique# = Word64#
 
@@ -63,7 +68,7 @@ instance Uniquable Unique where
   getUnique = id
   setUnique = flip const
 
-#if !MIN_VERSION_ghc(9,8,4)
+#ifndef UNIQUE_IS_WORD64
 instance Uniquable Word64 where
   getUnique = fromIntegral
   setUnique _ = fromIntegral

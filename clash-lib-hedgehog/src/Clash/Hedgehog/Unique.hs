@@ -18,6 +18,10 @@ module Clash.Hedgehog.Unique
   , sampleUniqMapBiased
   ) where
 
+#if MIN_VERSION_ghc(9,8,4) || (MIN_VERSION_ghc(9,6,7) && !MIN_VERSION_ghc(9,8,0))
+#define UNIQUE_IS_WORD64
+#endif
+
 import Control.Applicative (Alternative(empty))
 import Data.Either (rights)
 import Hedgehog (MonadGen, Range)
@@ -35,7 +39,7 @@ import Clash.Hedgehog.Internal.Bias
 
 genUnique :: forall m. MonadGen m => m Unique
 genUnique =
-#if MIN_VERSION_ghc(9,8,4)
+#ifdef UNIQUE_IS_WORD64
   Gen.word64
 #else
   Gen.int
