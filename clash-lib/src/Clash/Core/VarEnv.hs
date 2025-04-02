@@ -97,13 +97,17 @@ module Clash.Core.VarEnv
   )
 where
 
+#if MIN_VERSION_ghc(9,8,4) || (MIN_VERSION_ghc(9,6,7) && !MIN_VERSION_ghc(9,8,0))
+#define UNIQUE_IS_WORD64
+#endif
+
 import           Control.DeepSeq           (NFData)
 import           Data.Binary               (Binary)
 import           Data.Coerce               (coerce)
 import qualified Data.List                 as List
 import qualified Data.List.Extra           as List
 import           Data.Maybe                (fromMaybe)
-#if MIN_VERSION_ghc(9,8,4)
+#ifdef UNIQUE_IS_WORD64
 import           Data.Word                 (Word64)
 #endif
 
@@ -389,7 +393,7 @@ eltsVarSet = UniqMap.elems
 -- * InScopeSet
 
 type Seed
-#if MIN_VERSION_ghc(9,8,4)
+#ifdef UNIQUE_IS_WORD64
   = Word64
 #else
   = Int

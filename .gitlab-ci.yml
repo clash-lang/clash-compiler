@@ -43,7 +43,7 @@ tests:
         SKIP_CLASH_FFI_EXAMPLE: "yes"
         RUN_TESTS: "always"
 
-      - GHC_VERSION: 9.6.6
+      - GHC_VERSION: 9.6.7
         RUN_TESTS: "always"
 
       - GHC_VERSION: [9.4.8, 9.2.8]

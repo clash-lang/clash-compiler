@@ -14,9 +14,13 @@ module Clash.Util.Graph
   , callGraphBindings
   ) where
 
+#if MIN_VERSION_ghc(9,8,4) || (MIN_VERSION_ghc(9,6,7) && !MIN_VERSION_ghc(9,8,0))
+#define UNIQUE_IS_WORD64
+#endif
+
 import           Data.Tuple            (swap)
 import           Data.Foldable         (foldlM)
-#if MIN_VERSION_ghc(9,8,4)
+#ifdef UNIQUE_IS_WORD64
 import qualified GHC.Data.Word64Map.Strict as IntMap
 import qualified GHC.Data.Word64Set        as IntSet
 #else
@@ -33,7 +37,7 @@ import           Clash.Driver.Types (BindingMap, Binding (bindingTerm))
 import           Clash.Normalize.Util (callGraph)
 import           Clash.Unique (Unique)
 
-#if MIN_VERSION_ghc(9,8,4)
+#ifdef UNIQUE_IS_WORD64
 type IntMap = IntMap.Word64Map
 type IntSet = IntSet.Word64Set
 #endif

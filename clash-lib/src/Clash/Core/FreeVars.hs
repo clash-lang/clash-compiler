@@ -29,11 +29,15 @@ module Clash.Core.FreeVars
   )
 where
 
+#if MIN_VERSION_ghc(9,8,4) || (MIN_VERSION_ghc(9,6,7) && !MIN_VERSION_ghc(9,8,0))
+#define UNIQUE_IS_WORD64
+#endif
+
 import qualified Control.Lens           as Lens
 import Control.Lens.Fold                (Fold)
 import Control.Lens.Getter              (Contravariant)
 import Data.Coerce
-#if MIN_VERSION_ghc(9,8,4)
+#ifdef UNIQUE_IS_WORD64
 import qualified GHC.Data.Word64Set     as IntSet
 #else
 import qualified Data.IntSet            as IntSet
@@ -86,7 +90,7 @@ typeFreeVars'
   :: (Contravariant f, Applicative f)
   => (forall b . Var b -> Bool)
   -- ^ Predicate telling whether a variable is interesting
-#if MIN_VERSION_ghc(9,8,4)
+#ifdef UNIQUE_IS_WORD64
   -> IntSet.Word64Set
 #else
   -> IntSet.IntSet
