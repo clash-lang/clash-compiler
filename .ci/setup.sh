@@ -10,11 +10,11 @@ fi
 set -e
 
 # Check whether version numbers in
-# clash-{prelude{,-hedgehog},lib{,-hedgehog},ghc,cores} are the same
-cabal_files="clash-prelude/clash-prelude.cabal clash-prelude-hedgehog/clash-prelude-hedgehog.cabal clash-lib/clash-lib.cabal clash-lib-hedgehog/clash-lib-hedgehog.cabal clash-ghc/clash-ghc.cabal clash-cores/clash-cores.cabal"
+# clash-{prelude{,-hedgehog},lib{,-hedgehog},ghc} are the same
+cabal_files="clash-prelude/clash-prelude.cabal clash-prelude-hedgehog/clash-prelude-hedgehog.cabal clash-lib/clash-lib.cabal clash-lib-hedgehog/clash-lib-hedgehog.cabal clash-ghc/clash-ghc.cabal"
 versions=$(grep "^[vV]ersion" $cabal_files | grep -Eo '[0-9]+(\.[0-9]+)+')
 
-if [[ $(echo $versions | tr ' ' '\n' | wc -l) == 6 ]]; then
+if [[ $(echo $versions | tr ' ' '\n' | wc -l) == 5 ]]; then
     if [[ $(echo $versions | tr ' ' '\n' | uniq | wc -l) != 1 ]]; then
         echo "Expected all distributions to have the same version number. Found: $versions"
         exit 1;

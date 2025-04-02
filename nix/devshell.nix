@@ -6,7 +6,6 @@ in
 pkgs.mkShell {
   inputsFrom = [
     clashPkgs.clash-benchmark.env
-    clashPkgs.clash-cores.env
     clashPkgs.clash-cosim.env
     clashPkgs.clash-ffi.env
     clashPkgs.clash-ghc.env

@@ -90,17 +90,6 @@ build:
     - tar -cf - $(.ci/get_build_dist.sh) | zstd -T${THREADS} -15 > dist.tar.zst
 
 # Tests run on shared runners:
-
-cores:doctests:
-  extends: .test-nocache
-  script:
-    - bin/clash-cores:doctests -j$THREADS
-
-cores:unittests:
-  extends: .test-nocache
-  script:
-    - bin/clash-cores:unittests --hide-successes
-
 cosim:unittests:
   extends: .test-nocache
   script:

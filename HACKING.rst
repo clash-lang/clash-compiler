@@ -52,15 +52,6 @@ provide a complete compiler. Primarily, this consists of
 The repository also contains other libraries. These either provide additional
 functionality which is not required, or are not yet production-ready. These are
 
-``clash-cores``
-
-  A collection of IP cores for use in Clash designs. Currently, this includes
-  Lattice Ice IO cores, SPI (with slaves implemented with the Lattice
-  SBIO found on Lattice FPGAs), a UART and support for Xilinx floating point IP.
-
-  .. note:: This library is optional, and is not required to use Clash. In
-    the future it may be extended with additional IP cores.
-
 ``clash-cosim``
 
   Co-simulation for Clash, allowing Verilog to be run inline as though it were

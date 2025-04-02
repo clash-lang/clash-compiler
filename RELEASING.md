@@ -26,7 +26,6 @@ on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/can
   * `clash-lib/clash-lib.cabal`
   * `clash-lib-hedgehog/clash-lib-hedgehog.cabal`
   * `clash-ghc/clash-ghc.cabal`
-  * `clash-cores/clash-cores.cabal`
   * `docs/conf.py`
 2. Update the CHANGELOG (see `changelog/README.md`). Each entry should normally
    end with a link to a PR or issue. The script `changelog/blame_pr.py` will
@@ -58,7 +57,6 @@ on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/can
   * `clash-lib/clash-lib.cabal`
   * `clash-lib-hedgehog/clash-lib-hedgehog.cabal`
   * `clash-ghc/clash-ghc.cabal`
-  * `clash-cores/clash-cores.cabal`
   * `docs/conf.py`
 2. Update the CHANGELOG (see `changelog/README.md`). Each entry should normally
    end with a link to a PR or issue. The script `changelog/blame_pr.py` will

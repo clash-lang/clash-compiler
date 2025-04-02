@@ -7,7 +7,6 @@ packages:
 - clash-prelude
 - clash-lib
 - clash-ghc
-- clash-cores
 - tests
 
 extra-deps:

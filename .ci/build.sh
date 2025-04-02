@@ -4,7 +4,6 @@ set -xueo pipefail
 # Generate source distributions for all our packages
 # TODO: `sdist clash-cosim` only works _after_ building it
 cabal v2-sdist \
-    clash-cores \
     clash-ffi \
     clash-ghc \
     clash-lib \
@@ -28,8 +27,6 @@ cabal v2-build all --write-ghc-environment-files=always
 
 # Put all the test binaries in a predictable location
 TESTS="
-clash-cores:doctests
-clash-cores:unittests
 clash-cosim:test
 clash-lib:doctests
 clash-lib:unittests
