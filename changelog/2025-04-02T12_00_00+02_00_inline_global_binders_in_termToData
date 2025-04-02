@@ -1,0 +1,1 @@
+INTERNAL CHANGE: `termToData` now takes an additional argument of type `BindingMap`. This allows it to inline global variables, making it handle more cases than before. The class function is now called `termToData#`. An additional function `termToDataM` has been introduced to make it easy to use in a `NetlistMonad`/`BlackBoxFunction` context.

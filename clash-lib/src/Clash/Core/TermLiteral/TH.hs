@@ -52,7 +52,7 @@ termToDataName :: Name
 termToDataName =
   -- Note that we can't use a fully qualified name here: GHC disallows fully
   -- qualified names in instance function declarations.
-  mkName "termToData"
+  mkName "termToData#"
 
 showsTypePrecName :: Name
 showsTypePrecName =
@@ -185,7 +185,7 @@ deriveTermToData1 constrs =
   args = zipWith (\n nm -> ValD (VarP nm) (NormalB (arg (toInteger n))) []) [0..nArgs-1] (NE.toList argNames)
   arg n = UInfixE (VarE argsName) (VarE '(!!)) (LitE (IntegerL n))
 
-  -- case nm of {"ConstrOne" -> ConstOne <$> termToData arg0; "ConstrTwo" -> ...}
+  -- case nm of {"ConstrOne" -> ConstOne <$> termToData# arg0; "ConstrTwo" -> ...}
   theCase :: Exp
   theCase =
     CaseE

@@ -1,7 +1,7 @@
 {-|
-Copyright   :  (C) 2019, Myrtle Software Ltd,
-                   2021, QBayLogic B.V.
-                   2022, Google Inc.
+Copyright   :  (C) 2019,      Myrtle Software Ltd,
+                   2021,      QBayLogic B.V.
+                   2022-2025, Google Inc.
 License     :  BSD2 (see the file LICENSE)
 Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -11,9 +11,10 @@ Tools to convert a 'Term' into its "real" representation
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NamedFieldPuns #-}
 
 --{-# OPTIONS_GHC -ddump-splices #-}
 
@@ -22,11 +23,18 @@ module Clash.Core.TermLiteral
   , showsTypePrec
   , showType
   , termToData
+  , termToDataM
   , termToDataError
+  , termToDataErrorM
   , deriveTermLiteral
+
+  -- * Only use for deriving
+  , termToData#
   ) where
 
-import           Data.Bifunctor                  (bimap)
+import           Control.Monad.RWS (MonadState(..))
+import           Control.Lens ((^.))
+import           Data.Bifunctor                  (bimap, second)
 import           Data.Either                     (lefts)
 import           Data.Proxy                      (Proxy(..))
 import           Data.Text                       (Text)
@@ -48,7 +56,11 @@ import           Clash.Core.DataCon              (DataCon(..))
 import           Clash.Core.Literal
 import           Clash.Core.Name                 (Name(..))
 import           Clash.Core.Pretty               (showPpr)
-import           Clash.Core.Term                 (Term(Literal, Data), collectArgs)
+import           Clash.Core.Term                 (Term(..), collectArgs)
+import           Clash.Core.Var                  (isGlobalId)
+import           Clash.Core.VarEnv               (lookupVarEnv)
+import           Clash.Driver.Types              (BindingMap, Binding (bindingTerm))
+import           Clash.Netlist.Types             (NetlistMonad, bindings)
 import           Clash.Promoted.Nat
 import           Clash.Promoted.Nat.Unsafe
 import           Clash.Sized.Index               (Index)
@@ -62,11 +74,51 @@ import           Clash.Core.TermLiteral.TH
 showType :: TermLiteral a => Proxy a -> String
 showType proxy = showsTypePrec 0 proxy ""
 
+-- | Convert 'Term' to the constant it represents. Will return an error if
+-- (one of the subterms) fail to translate. It takes a 'BindingMap' as an
+-- argument, which is used to inline global binders. If you're using this
+-- function in a @BlackBoxFunction@/@NetlistMonad@ context, consider using
+-- 'termToDataM'.
+termToData
+  :: (HasCallStack, TermLiteral a)
+  => BindingMap
+  -> Term
+  -> Either Term a
+termToData bindingMap term = termToData# (inlineGlobalBinders bindingMap term)
+
+-- | Convert 'Term' to the constant it represents. Will return an error if
+-- (one of the subterms) fail to translate.
+termToDataM :: (HasCallStack, TermLiteral a) => Term -> NetlistMonad (Either Term a)
+termToDataM term = do
+  netlistState <- get
+  pure (termToData (netlistState ^. bindings) term)
+
+-- | Replace any global binders with their corresponding term
+inlineGlobalBinders :: BindingMap -> Term -> Term
+inlineGlobalBinders binders = go
+ where
+  go = \case
+    Var v
+      | isGlobalId v
+      , Just (bindingTerm -> t) <- lookupVarEnv v binders -> go t
+      | otherwise -> Var v
+    Data dc -> Data dc
+    Literal l -> Literal l
+    Prim p -> Prim p
+    Lam x t -> Lam x (go t)
+    TyLam x t -> TyLam x (go t)
+    App t1 t2 -> App (go t1) (go t2)
+    TyApp t ty -> TyApp (go t) ty
+    Let b t -> Let b (go t)
+    Case t ty alts -> Case (go t) ty (map (second go) alts)
+    Cast t ty1 ty2 -> Cast (go t) ty1 ty2
+    Tick info t -> Tick info (go t)
+
 -- | Tools to deal with literals encoded as a 'Term'.
 class TermLiteral a where
   -- | Convert 'Term' to the constant it represents. Will return an error if
   -- (one of the subterms) fail to translate.
-  termToData
+  termToData#
     :: HasCallStack
     => Term
     -- ^ Term to convert
@@ -92,56 +144,56 @@ class TermLiteral a where
   showsTypePrec n _ = showsPrec n (typeRep (Proxy @a))
 
 instance TermLiteral Term where
-  termToData = pure
+  termToData# = pure
 
 instance TermLiteral String where
-  termToData (collectArgs -> (_, [Left (Literal (StringLiteral s))])) = Right s
-  termToData t = Left t
+  termToData# (collectArgs -> (_, [Left (Literal (StringLiteral s))])) = Right s
+  termToData# t = Left t
 
 instance TermLiteral Text where
-  termToData (collectArgs -> (_, [Left (Literal (StringLiteral s))])) =
+  termToData# (collectArgs -> (_, [Left (Literal (StringLiteral s))])) =
     Right (Text.pack s)
 #if MIN_VERSION_ghc(9,4,0)
-  termToData (collectArgs -> (_, [ Left (Literal (ByteArrayLiteral (BA.ByteArray ba)))
+  termToData# (collectArgs -> (_, [ Left (Literal (ByteArrayLiteral (BA.ByteArray ba)))
                                  , Left (Literal (IntLiteral off))
                                  , Left (Literal (IntLiteral len))])) =
     Right (Text.Text (Text.ByteArray ba) (fromInteger off) (fromInteger len))
 #endif
-  termToData t = Left t
+  termToData# t = Left t
 
 instance KnownNat n => TermLiteral (Index n) where
-  termToData t@(collectArgs -> (_, [_, _, Left (Literal (IntegerLiteral n))]))
+  termToData# t@(collectArgs -> (_, [_, _, Left (Literal (IntegerLiteral n))]))
     | n < 0 = Left t
     | n >= natToNum @n = Left t
     | otherwise = Right (fromInteger n)
-  termToData t = Left t
+  termToData# t = Left t
 
 instance TermLiteral Int where
-  termToData (collectArgs -> (_, [Left (Literal (IntLiteral n))])) =
+  termToData# (collectArgs -> (_, [Left (Literal (IntLiteral n))])) =
     Right (fromInteger n)
-  termToData t = Left t
+  termToData# t = Left t
 
 instance TermLiteral Word where
-  termToData (collectArgs -> (_, [Left (Literal (WordLiteral n))])) =
+  termToData# (collectArgs -> (_, [Left (Literal (WordLiteral n))])) =
     Right (fromInteger n)
-  termToData t = Left t
+  termToData# t = Left t
 
 instance TermLiteral Integer where
-  termToData (Literal (IntegerLiteral n)) = Right n
-  termToData (collectArgs -> (_, [Left (Literal (IntegerLiteral n))])) = Right n
-  termToData t = Left t
+  termToData# (Literal (IntegerLiteral n)) = Right n
+  termToData# (collectArgs -> (_, [Left (Literal (IntegerLiteral n))])) = Right n
+  termToData# t = Left t
 
 instance TermLiteral Char where
-  termToData (collectArgs -> (_, [Left (Literal (CharLiteral c))])) = Right c
-  termToData t = Left t
+  termToData# (collectArgs -> (_, [Left (Literal (CharLiteral c))])) = Right c
+  termToData# t = Left t
 
 instance TermLiteral Natural where
-  termToData t@(Literal (NaturalLiteral n))
+  termToData# t@(Literal (NaturalLiteral n))
     | n < 0 = Left t
     | otherwise = Right (fromIntegral n)
-  termToData (collectArgs -> (_, [Left (Literal (NaturalLiteral n))])) =
+  termToData# (collectArgs -> (_, [Left (Literal (NaturalLiteral n))])) =
     Right (fromInteger n)
-  termToData t = Left t
+  termToData# t = Left t
 
 -- | Unsafe warning: If you use this instance in a monomorphic context (e.g.,
 -- @TermLiteral (SNat 5)@), you need to make very sure that the term corresponds
@@ -150,7 +202,7 @@ instance TermLiteral Natural where
 -- instance will therefore leave the /n/ polymorphic.
 --
 instance TermLiteral (SNat n) where
-  termToData = \case
+  termToData# = \case
     Literal (NaturalLiteral n) -> Right (unsafeSNat n)
     t                          -> Left t
 
@@ -162,11 +214,11 @@ instance TermLiteral (SNat n) where
     = showParen (n > 10) $ showString "SNat _"
 
 instance (TermLiteral a, TermLiteral b) => TermLiteral (a, b) where
-  termToData (collectArgs -> (_, lefts -> [a, b])) = do
-    a' <- termToData a
-    b' <- termToData b
+  termToData# (collectArgs -> (_, lefts -> [a, b])) = do
+    a' <- termToData# a
+    b' <- termToData# b
     pure (a', b')
-  termToData t = Left t
+  termToData# t = Left t
 
   showsTypePrec _ _ =
     -- XXX: We pass in 11 here, but should really be passing in 0. We never want
@@ -180,7 +232,7 @@ instance (TermLiteral a, TermLiteral b) => TermLiteral (a, b) where
     . showChar ')'
 
 instance (TermLiteral a, KnownNat n) => TermLiteral (Vec n a) where
-  termToData term = do
+  termToData# term = do
     res <- fromList <$> go term
     -- Check whether length of list constructed in 'go' corresponds to the
     -- @KnownNat n@ we've been given
@@ -196,7 +248,7 @@ instance (TermLiteral a, KnownNat n) => TermLiteral (Vec n a) where
           | nameOcc == showt 'Cons ->
             case lefts args of
               [_gadtProof, c0, cs0] -> do
-                c1 <- termToData @a c0
+                c1 <- termToData# @a c0
                 cs1 <- go cs0
                 Right (c1:cs1)
               _ -> Left t
@@ -219,9 +271,10 @@ deriveTermLiteral ''Cv.Property'
 deriveTermLiteral ''Attr
 
 -- | Same as 'termToData', but returns printable error message if it couldn't
--- translate a term.
-termToDataError :: forall a. TermLiteral a => Term -> Either String a
-termToDataError term = bimap err id (termToData term)
+-- translate a term. If you're using this function in a
+-- @BlackBoxFunction@/@NetlistMonad@ context, consider using 'termToDataErrorM'.
+termToDataError :: forall a. TermLiteral a => BindingMap -> Term -> Either String a
+termToDataError binders term = bimap err id (termToData binders term)
  where
   -- XXX: If we put this construct in the quasiquoted part, it yields a parse
   --      error on some platforms. This is likely related to some older version
@@ -246,3 +299,10 @@ termToDataError term = bimap err id (termToData term)
 
       #{shownType}
   |]
+
+-- | Same as 'termToData', but returns printable error message if it couldn't
+-- translate a term.
+termToDataErrorM :: forall a. TermLiteral a => Term -> NetlistMonad (Either String a)
+termToDataErrorM term = do
+  netlistState <- get
+  pure (termToDataError (netlistState ^. bindings) term)

@@ -6,7 +6,7 @@ import Data.Either
 
 
 import qualified Control.Lens                    as Lens
-import           Control.Monad.State             (State)
+import           Control.Monad.State             (State, MonadState (get))
 import           Data.List.Infinite              (Infinite(..), (...))
 import           Data.Maybe                      (listToMaybe)
 import           Data.Monoid                     (Ap(getAp))
@@ -28,17 +28,19 @@ import           Clash.Netlist.Types
   (BlackBox(BBFunction), TemplateFunction(..), BlackBoxContext, Identifier,
    NetlistMonad, Declaration(Assignment, NetDecl), Usage(Cont),
    HWType(Bool, KnownDomain), NetlistId(..),
-   DeclarationType(Concurrent), tcCache, bbInputs, Expr(Identifier))
+   DeclarationType(Concurrent), tcCache, bbInputs, Expr(Identifier), bindings)
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TDecl), RenderVoid(..),
    emptyBlackBoxMeta)
 
 import           Clash.Verification.Internal
 import           Clash.Verification.Pretty
+import Control.Lens ((^.))
 
 checkBBF :: BlackBoxFunction
-checkBBF _isD _primName args _ty =
-  case litArgs of
+checkBBF _isD _primName args _ty = do
+  bindingMap <- (^. bindings) <$> get
+  case litArgs bindingMap of
     Left err -> pure (Left err)
     Right (propName, renderAs, cvProperty0) -> do
       cvProperty1 <- mapM (uncurry bindMaybe) cvProperty0
@@ -58,10 +60,10 @@ checkBBF _isD _primName args _ty =
   (Id.unsafeFromCoreId -> clkId) = varToId (indexNote "clk" (lefts args) clkArg)
   clkExpr = Identifier clkId Nothing
 
-  litArgs = do
-    propName <- termToDataError (indexNote "propName" (lefts args) propNameArg)
-    renderAs <- termToDataError (indexNote "renderAs" (lefts args) renderAsArg)
-    cvProperty <- termToDataError (indexNote "propArg" (lefts args) propArg)
+  litArgs bindingMap = do
+    propName <- termToDataError bindingMap (indexNote "propName" (lefts args) propNameArg)
+    renderAs <- termToDataError bindingMap (indexNote "renderAs" (lefts args) renderAsArg)
+    cvProperty <- termToDataError bindingMap (indexNote "propArg" (lefts args) propArg)
     Right (propName, renderAs, cvProperty)
 
   bb = BBFunction "Clash.Primitives.Verification.checkTF" 0

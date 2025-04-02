@@ -21,7 +21,7 @@ import qualified Data.Text as T
 
 import Clash.Annotations.SynthesisAttributes
 import Clash.Backend (Backend)
-import Clash.Core.TermLiteral (termToDataError)
+import Clash.Core.TermLiteral (termToDataErrorM)
 import Clash.Core.Type (Type(LitTy), LitTy(NumTy), coreView)
 import Clash.Netlist.BlackBox.Types
 import Clash.Netlist.Types
@@ -35,15 +35,19 @@ usedArguments = [attrs, signal]
   attrs :< signal :< _ = (0...)
 
 annotateBBF :: HasCallStack => BlackBoxFunction
-annotateBBF _isD _primName args _resTys = Lens.view tcCache >>= go
+annotateBBF _isD _primName args _resTys = do
+  tcm <- Lens.view tcCache
+  go tcm
  where
   go tcm
     | ((coreView tcm -> LitTy (NumTy n)) : _) <- rights args
     , Just (SomeNat (Proxy :: Proxy n)) <- someNatVal n
     , (attrs0 : _) <- lefts args
-    = case termToDataError attrs0 of
-        Left msg -> error msg
-        Right attrs1 -> pure $ Right (bbMeta, bb @n (fmap T.pack <$> attrs1))
+    = do
+        dataOrError <- termToDataErrorM attrs0
+        case dataOrError of
+          Left msg -> error msg
+          Right attrs1 -> pure $ Right (bbMeta, bb @n (fmap T.pack <$> attrs1))
   go _ = error $ "Unexpected args:\n " <> ppShow args
 
   bbMeta :: BlackBoxMeta
