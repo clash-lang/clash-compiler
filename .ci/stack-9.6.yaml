@@ -9,7 +9,6 @@ packages:
 - clash-lib
 - clash-lib-hedgehog
 - clash-ghc
-- clash-cores
 - tests
 
 extra-deps:

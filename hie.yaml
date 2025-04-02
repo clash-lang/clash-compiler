@@ -3,9 +3,6 @@ cradle:
     # Skip benchmark and profiling code for now
     - path: "./benchmark"
       config: { cradle: {none: }}
-    - path: "./clash-cores"
-      config: { cradle: {cabal: [{path: "./clash-cores/src", component: "lib:clash-cores"}
-                                ,{path: "./clash-cores/test", component: "clash-cores:unittests"}]}}
     - path: "./clash-cosim"
       config: { cradle: {cabal: [{path: "./clash-cosim/src", component: "lib:clash-cosim"}
                                 ,{path: "./clash-cosim/test", component: "clash-cosim:test"}]}}

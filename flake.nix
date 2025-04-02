@@ -89,7 +89,6 @@
         packages = {
           inherit (pkgs."clashPackages-${defaultGhcVersion}")
             clash-benchmark
-            clash-cores
             clash-cosim
             clash-ffi
             clash-ghc

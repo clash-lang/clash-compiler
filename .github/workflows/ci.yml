@@ -27,11 +27,6 @@ jobs:
           - os: "macOS-13"
             ghc: "8.10"
 
-          # GHC 9.0 fails to compile clash-cores due to a template haskell
-          # failure
-          - os: "windows-latest"
-            ghc: "9.0"
-
           # GHC/Clash starts extremely slowly, see
           # https://github.com/clash-lang/clash-compiler/issues/2684
           - os: "windows-latest"
@@ -223,8 +218,6 @@ jobs:
           cabal v2-run clash-prelude:unittests -- --hide-successes
           cabal v2-run clash-lib:doctests
           cabal v2-run clash-lib:unittests -- --hide-successes
-          cabal v2-run clash-cores:doctests
-          cabal v2-run clash-cores:unittests -- --hide-successes
           cabal v2-run clash-cosim:test -- --hide-successes
 
       - name: Testsuite (VHDL)

@@ -5,7 +5,7 @@ set -xueo pipefail
 if [[ "$GHC_VERSION" = "8.6.5" ]]; then
   haddock_pkgs="clash-lib clash-lib-hedgehog clash-cosim"
 else
-  haddock_pkgs="clash-prelude clash-prelude-hedgehog clash-lib clash-lib-hedgehog clash-cosim clash-cores"
+  haddock_pkgs="clash-prelude clash-prelude-hedgehog clash-lib clash-lib-hedgehog clash-cosim"
 fi
 
 mkdir -p hadocs

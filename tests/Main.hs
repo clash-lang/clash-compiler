@@ -662,7 +662,6 @@ runClashTest = defaultMain
         , outputTest "T2542" def{hdlTargets=[VHDL]}
         , runTest "T2593" def{hdlSim=[]}
         , runTest "T2623CaseConFVs" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
-        , runTest "T2781" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
         , runTest "T2628" def{hdlTargets=[VHDL], buildTargets=BuildSpecific ["TACacheServerStep"], hdlSim=[]}
         , runTest "T2831" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
         , runTest "T2839" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
