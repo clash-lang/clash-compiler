@@ -55,6 +55,8 @@ in
     sha256 = "sha256-irLM3aVMxpBgsM72ArulMXcoLY2glalVkG//Lrj2JBI=";
   }) {};
 
+  tasty = prev.tasty_1_5;
+
   singletons-th = prev.singletons-th_3_4;
 
   # nixplgs doesn't include revision 1, changing dependency on template-haskell.
