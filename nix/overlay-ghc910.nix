@@ -25,15 +25,15 @@ in
   hedgehog-fakedata = doJailbreak (markUnbroken prev.hedgehog-fakedata);
 
   # Fails on GHC 9.10 with:
-  #   library/Text/Regex/PCRE/Heavy.hs:123: failure in expression `head $ scan [re|\s*entry (\d+) (\w+)\s*&?|] (" entry 1 hello  &entry 2 hi" :: String)'                                                           
-  # expected: (" entry 1 hello  &",["1","hello"])                                                                                                                                                                 
-  #  but got: <interactive>:55:1: warning: [GHC-63394] [-Wx-partial]                                                                                                                                              
-  #           ^                                                                                                                                                                                  
-  #               In the use of ‘head’                                                                                                                                                                 
+  #   library/Text/Regex/PCRE/Heavy.hs:123: failure in expression `head $ scan [re|\s*entry (\d+) (\w+)\s*&?|] (" entry 1 hello  &entry 2 hi" :: String)'
+  # expected: (" entry 1 hello  &",["1","hello"])
+  #  but got: <interactive>:55:1: warning: [GHC-63394] [-Wx-partial]
+  #           ^
+  #               In the use of ‘head’
   #               (imported from Prelude.Compat, but defined in GHC.Internal.List):
   #               "This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use "Data.List.NonEmpty"."
   # (" entry 1 hello  &",["1","hello"])
-                                                                                                                                                                                                              
+
   pcre-heavy = dontCheck prev.pcre-heavy;
 
   # Relies on older versions of text.
