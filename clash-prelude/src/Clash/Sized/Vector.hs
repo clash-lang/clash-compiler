@@ -259,24 +259,35 @@ instance NFData a => NFData (Vec n a) where
 --
 -- Can be used as a pattern:
 --
--- >>> let f (x :> y :> _) = x + y
--- >>> :t f
--- f :: Num a => Vec ((n + 1) + 1) a -> a
+-- >>> :{
+-- f :: Num a => Vec (n + 2) a -> a
+-- f (x :> y :> _) = x + y
+-- :}
+--
 -- >>> f (3:>4:>5:>6:>7:>Nil)
 -- 7
 --
 -- Also in conjunctions with (':<'):
 --
--- >>> let g (a :> b :> (_ :< y :< x)) = a + b +  x + y
--- >>> :t g
--- g :: Num a => Vec ((((n + 1) + 1) + 1) + 1) a -> a
+-- >>> :{
+-- g :: Num a => Vec (n + 4) a -> a
+-- g (a :> b :> (_ :< y :< x)) = a + b + x + y
+-- :}
+--
 -- >>> g (1:>2:>3:>4:>5:>Nil)
 -- 12
+#if MIN_VERSION_base(4,15,0)
 pattern (:>) ::
   forall {n} a. () =>
   forall m. n ~ m + 1 =>
   a -> Vec m a -> Vec n a
 pattern (:>) x xs = Cons x xs
+#else
+pattern (:>) :: a -> Vec n a -> Vec (n + 1) a
+pattern (:>) x xs <- ((\ys -> (head ys,tail ys)) -> (x,xs))
+  where
+    (:>) x xs = Cons x xs
+#endif
 
 infixr CONS_PREC :>
 
@@ -676,9 +687,11 @@ infixl 5 :<
 --
 -- Also in conjunctions with (':>'):
 --
--- >>> let g (a :> b :> (_ :< y :< x)) = a + b +  x + y
--- >>> :t g
--- g :: Num a => Vec ((((n + 1) + 1) + 1) + 1) a -> a
+-- >>> :{
+-- g :: Num a => Vec (n + 4) a -> a
+-- g (a :> b :> (_ :< y :< x)) = a + b + x + y
+-- :}
+--
 -- >>> g (1:>2:>3:>4:>5:>Nil)
 -- 12
 pattern (:<) :: Vec n a -> a -> Vec (n+1) a
@@ -2385,7 +2398,7 @@ lazyV = lazyV' (repeat ())
 -- While the type of (':>') is:
 --
 -- >>> :t (:>)
--- (:>) :: a -> Vec n a -> Vec (n + 1) a
+-- (:>) :: (n ~ (m + 1)) => a -> Vec m a -> Vec n a
 --
 -- We thus need a @fold@ function that can handle the growing vector type:
 -- 'dfold'. Compared to 'foldr', 'dfold' takes an extra parameter, called the
