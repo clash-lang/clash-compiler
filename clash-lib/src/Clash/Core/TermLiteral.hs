@@ -13,6 +13,7 @@ Tools to convert a 'Term' into its "real" representation
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -84,7 +85,7 @@ termToData
   => BindingMap
   -> Term
   -> Either Term a
-termToData bindingMap term = termToData# (inlineGlobalBinders bindingMap term)
+termToData bindingMap term = termToData# =<< inlineGlobalBinders bindingMap term
 
 -- | Convert 'Term' to the constant it represents. Will return an error if
 -- (one of the subterms) fail to translate.
@@ -93,26 +94,33 @@ termToDataM term = do
   netlistState <- get
   pure (termToData (netlistState ^. bindings) term)
 
+-- | Prevents infinite loops in 'inlineGlobalBinders'
+mAX_GLOBAL_BINDER_INLINES :: Int
+mAX_GLOBAL_BINDER_INLINES = 10_000
+
 -- | Replace any global binders with their corresponding term
-inlineGlobalBinders :: BindingMap -> Term -> Term
-inlineGlobalBinders binders = go
+inlineGlobalBinders :: BindingMap -> Term -> Either Term Term
+inlineGlobalBinders binders = go mAX_GLOBAL_BINDER_INLINES
  where
-  go = \case
+  go 0 = Left
+  go n = \case
     Var v
       | isGlobalId v
-      , Just (bindingTerm -> t) <- lookupVarEnv v binders -> go t
-      | otherwise -> Var v
-    Data dc -> Data dc
-    Literal l -> Literal l
-    Prim p -> Prim p
-    Lam x t -> Lam x (go t)
-    TyLam x t -> TyLam x (go t)
-    App t1 t2 -> App (go t1) (go t2)
-    TyApp t ty -> TyApp (go t) ty
-    Let b t -> Let b (go t)
-    Case t ty alts -> Case (go t) ty (map (second go) alts)
-    Cast t ty1 ty2 -> Cast (go t) ty1 ty2
-    Tick info t -> Tick info (go t)
+      , Just (bindingTerm -> t) <- lookupVarEnv v binders -> go (n - 1) t
+      | otherwise -> pure $ Var v
+    Data dc -> pure $ Data dc
+    Literal l -> pure $ Literal l
+    Prim p -> pure $ Prim p
+    Lam x t -> Lam x <$> go n t
+    TyLam x t -> TyLam x <$> go n t
+    App t1 t2 -> App <$> go n t1 <*> go n t2
+    TyApp t ty -> TyApp <$> go n t <*> pure ty
+    Let b t -> Let b <$> go n t
+    Case t ty alts -> Case <$> go n t <*> pure ty <*> mapM (goAlt n) alts
+    Cast t ty1 ty2 -> Cast <$> go n t <*> pure ty1 <*> pure ty2
+    Tick info t -> Tick info <$> go n t
+
+  goAlt n (p, e) = (p, ) <$> go n e
 
 -- | Tools to deal with literals encoded as a 'Term'.
 class TermLiteral a where
