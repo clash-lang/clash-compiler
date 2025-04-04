@@ -51,7 +51,7 @@ ram rd we wr din =
 
 maskOobRead :: Ram
 maskOobRead rd we wr din =
-  maybeIsX <$> mux (rd .<. 2) ram0 (pure 4)
+  maybeIsX <$> mux (rd .< 2) ram0 (pure 4)
  where
   ram0 = asyncRam# clockGen clockGen enableGen d2 rd we wr din
 
