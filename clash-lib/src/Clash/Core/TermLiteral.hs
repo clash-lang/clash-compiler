@@ -48,7 +48,7 @@ import           Clash.Core.DataCon              (DataCon(..))
 import           Clash.Core.Literal
 import           Clash.Core.Name                 (Name(..))
 import           Clash.Core.Pretty               (showPpr)
-import           Clash.Core.Term                 (Term(Literal, Data), collectArgs)
+import           Clash.Core.Term                 (Term(Literal, Data, Tick), collectArgs)
 import           Clash.Promoted.Nat
 import           Clash.Promoted.Nat.Unsafe
 import           Clash.Sized.Index               (Index)
@@ -127,6 +127,7 @@ instance TermLiteral Word where
   termToData t = Left t
 
 instance TermLiteral Integer where
+  termToData (Tick _ e) = termToData e
   termToData (Literal (IntegerLiteral n)) = Right n
   termToData (collectArgs -> (_, [Left (Literal (IntegerLiteral n))])) = Right n
   termToData t = Left t
@@ -136,6 +137,7 @@ instance TermLiteral Char where
   termToData t = Left t
 
 instance TermLiteral Natural where
+  termToData (Tick _ e) = termToData e
   termToData t@(Literal (NaturalLiteral n))
     | n < 0 = Left t
     | otherwise = Right (fromIntegral n)
@@ -151,6 +153,7 @@ instance TermLiteral Natural where
 --
 instance TermLiteral (SNat n) where
   termToData = \case
+    Tick _ e                   -> termToData e
     Literal (NaturalLiteral n) -> Right (unsafeSNat n)
     t                          -> Left t
 
