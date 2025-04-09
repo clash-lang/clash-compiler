@@ -39,12 +39,13 @@ module Clash.Magic
   -- ** Utilities to differentiate between simulation and generating HDL
   , clashSimulation
   , SimOnly (..)
+  , hdl
 
   -- * Static assertions
   , clashCompileError
   ) where
 
-import Clash.Annotations.Primitive (Primitive(..), hasBlackBox)
+import Clash.Annotations.Primitive (Primitive(..), hasBlackBox, HDL(..))
 import Clash.NamedTypes            ((:::))
 import Clash.Promoted.Symbol       (SSymbol)
 import Clash.XException            (NFDataX)
@@ -293,6 +294,12 @@ instance Semigroup a => Semigroup (SimOnly a) where
 
 instance Monoid a => Monoid (SimOnly a) where
   mempty = SimOnly mempty
+
+hdl :: Maybe HDL
+hdl = Just VHDL
+-- The 'noinline' is here to prevent SpecConstr from poking through the OPAQUE, see #2736
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE hdl #-}
 
 -- | Same as 'error' but will make HDL generation fail if included in the
 -- final circuit.

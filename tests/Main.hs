@@ -376,6 +376,7 @@ runClashTest = defaultMain
         , outputTest "NameInstance" def
         , outputTest "SetName" def{hdlTargets=[VHDL]}
         , outputTest "SimulationMagic2736" def{hdlTargets=[VHDL]}
+        , outputTest "HdlMagic" def{hdlTargets=[VHDL]}
         , runTest "PatError" def{hdlSim=[]}
         , runTest "ByteSwap32" def
         , runTest "CharTest" def

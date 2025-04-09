@@ -182,7 +182,8 @@ library
                       string-interpolate        ^>= 0.3,
                       template-haskell          >= 2.8.0.0  && < 2.23,
                       utf8-string               >= 1.0.0.0  && < 1.1.0.0,
-                      vector                    >= 0.11     && < 1.0
+                      vector                    >= 0.11     && < 1.0,
+                      pretty-show,
 
   if os(darwin)
     -- 8.10 is broken on macOS - it exits tests with status code -11

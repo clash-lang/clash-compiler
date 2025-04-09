@@ -54,6 +54,7 @@ import           Data.Text.Encoding          (decodeUtf8)
 import qualified Data.Traversable            as T
 import           Data.String.Interpolate     (__i)
 import qualified Text.Read                   as Text
+import           Text.Show.Pretty            (ppShow)
 #if MIN_VERSION_ghc(9,4,0)
 import           Data.Primitive.ByteArray    (ByteArray(ByteArray))
 import qualified GHC.Data.Strict             as GHC
@@ -432,6 +433,11 @@ coreToTerm primMap unlocs = term
           = C.Tick C.NoDeDup <$> term f
         go "Clash.Magic.clashSimulation" _
           = C.Data <$> coreToDataCon falseDataCon
+        go "Clash.Magic.hdl" args
+          | [_] <- args
+          = term' e
+          | otherwise
+          = error "Wrong"
         go "Clash.XException.xToErrorCtx" args
           -- xToErrorCtx :: forall a. String -> a -> a
           | [_ty, _msg, x] <- args

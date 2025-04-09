@@ -112,6 +112,7 @@ library
 
     -- From tests/shouldwork/Basic/precompiled
     SimulationMagic2736a
+    HdlMagic1
 
   other-modules:
     Paths_clash_testsuite
