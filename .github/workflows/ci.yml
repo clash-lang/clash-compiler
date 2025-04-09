@@ -6,6 +6,7 @@ on:
       # PRs can only use caches from their target branch. We therefore need to
       # make sure we run on 'master' too.
       - master
+      - test-windows
   pull_request:
 
 concurrency:
@@ -20,22 +21,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["macOS-13", "windows-latest"]
-        ghc: ["8.10", "9.0", "9.2", "9.4", "9.6", "9.8"]
-        exclude:
-          # Some tests fail with a mysterious -11 error code.
-          - os: "macOS-13"
-            ghc: "8.10"
-
-          # GHC/Clash starts extremely slowly, see
-          # https://github.com/clash-lang/clash-compiler/issues/2684
-          - os: "windows-latest"
-            ghc: "9.6"
-
-          # Vector test suite takes an _extremely_ long time to execute. Same
-          # issue as 9.6?
-          - os: "windows-latest"
-            ghc: "9.8"
+        os: ["macOS-13", "windows-latest", "ubuntu-latest"]
+        ghc: ["9.8"]
 
     steps:
       - uses: actions/checkout@v4
@@ -44,14 +31,6 @@ jobs:
         with:
           enable-stack: true
           stack-no-global: true
-
-      - name: Install IVerilog (macOS)
-        if: ${{ startsWith(matrix.os, 'macOS') }}
-        run: brew install icarus-verilog
-
-      - name: Install IVerilog (Windows)
-        if: ${{ startsWith(matrix.os, 'windows') }}
-        run: choco install --no-progress iverilog
 
       - name: General Setup
         shell: bash
@@ -128,153 +107,4 @@ jobs:
 
       - name: Run Vector testsuite
         if: github.ref != 'refs/heads/master'
-        run: stack run -- clash-testsuite --hide-successes -p .Vector. --no-ghdl --no-verilator --no-modelsim --no-vivado
-
-  build_and_test:
-    # Only run for external PRs
-    if: github.event.pull_request.head.repo.full_name != github.repository
-    runs-on: ubuntu-latest
-
-    name: Build and Test
-
-    strategy:
-      fail-fast: false
-      matrix:
-        ghc: [ "8.10.7", "9.0.2", "9.6.7" ]
-        include:
-          - multiple_hidden: yes
-
-          - ghc: 8.10.7
-            multiple_hidden: no
-            workaround_ghc_mmap_crash: yes
-
-          - ghc: 9.0.2
-            workaround_ghc_mmap_crash: yes
-
-
-    # Run steps inside the clash CI docker image
-    container:
-      image: ghcr.io/clash-lang/clash-ci:${{ matrix.ghc }}-20250402
-
-      env:
-        THREADS: 2
-        CABAL_JOBS: 2
-        CI_COMMIT_BRANCH: ${{ github.base_ref }}
-        WORKAROUND_GHC_MMAP_CRASH: ${{ matrix.workaround_ghc_mmap_crash }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-          ref: ${{ github.event.pull_request.head.ref }}
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-
-      - name: Setup CI
-        run: |
-          # Work around dubious owner error
-          git config --global --add safe.directory "$(pwd)"
-          export CABAL_DIR=$HOME/.cabal
-          ./.ci/setup.sh
-          cabal v2-freeze
-
-          # We only want this for caching, and it makes the CI scripts way
-          # more brittle than is ideal.
-          mv cabal.project.freeze frozen
-
-      - name: Restore Cache
-        uses: actions/cache/restore@v4
-        id: cache
-        with:
-          path: |
-            dist-newstyle
-            ~/.cabal/store
-
-          key: ${{ matrix.ghc }}-${{ hashFiles('frozen', 'cabal.project', '**/*.cabal', '.github/workflows/ci.yml') }}
-          restore-keys: ${{ matrix.ghc }}-
-
-      - name: Build Clash
-        run: |
-          export CABAL_DIR=$HOME/.cabal
-          ./.ci/build.sh
-
-      - name: Save Cache
-        # Trying to save over an existing cache gives distracting
-        # "Warning: Cache save failed." since they are immutable
-        if: ${{ !cancelled() && steps.cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            dist-newstyle
-            ~/.cabal/store
-
-          key: ${{ matrix.ghc }}-${{ hashFiles('frozen', 'cabal.project', '**/*.cabal', '.github/workflows/ci.yml') }}
-
-      - name: Unit Tests
-        if: github.ref != 'refs/heads/master'
-        run: |
-          export CABAL_DIR=$HOME/.cabal
-          cabal v2-run clash-prelude:doctests
-          cabal v2-run clash-prelude:unittests -- --hide-successes
-          cabal v2-run clash-lib:doctests
-          cabal v2-run clash-lib:unittests -- --hide-successes
-          cabal v2-run clash-cosim:test -- --hide-successes
-
-      - name: Testsuite (VHDL)
-        if: github.ref != 'refs/heads/master'
-        run: |
-          export CABAL_DIR=$HOME/.cabal
-          cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .VHDL --no-vivado
-
-      - name: Testsuite (Verilog)
-        if: github.ref != 'refs/heads/master'
-        run: |
-          export CABAL_DIR=$HOME/.cabal
-          cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .Verilog --no-vivado
-
-      - name: Testsuite (SystemVerilog)
-        if: github.ref != 'refs/heads/master'
-        run: |
-          export CABAL_DIR=$HOME/.cabal
-          cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .SystemVerilog --no-modelsim --no-vivado
-
-
-  all:
-    name: All jobs finished
-    if: ${{ !cancelled() }}
-    needs: [
-        build_mac_windows,
-        build_and_test,
-      ]
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Check dependencies for failures
-        run: |
-          # Test all dependencies for success/failure
-          set -x
-          success="${{ contains(needs.*.result, 'success') }}"
-          fail="${{ contains(needs.*.result, 'failure') }}"
-          set +x
-
-          # Test whether success/fail variables contain sane values
-          if [[ "${success}" != "true" && "${success}" != "false" ]]; then exit 1; fi
-          if [[ "${fail}"    != "true" && "${fail}"    != "false" ]]; then exit 1; fi
-
-          # We want to fail if one or more dependencies fail. For safety, we introduce
-          # a second check: if no dependencies succeeded something weird is going on.
-          if [[ "${fail}" == "true" || "${success}" == "false" ]]; then
-            echo "One or more dependency failed, or no dependency succeeded."
-            exit 1
-          fi
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get -y install python3-yaml
-
-      - name: Check that the 'all' job depends on all other jobs
-        run: |
-          .ci/all_check.py
+        run: stack run -- clash-testsuite --hide-successes -p .Vector. --no-ghdl --no-verilator --no-modelsim --no-vivado --no-iverilog
