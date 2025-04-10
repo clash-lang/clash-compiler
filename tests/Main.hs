@@ -988,8 +988,19 @@ runClashTest = defaultMain
 
         , outputTest "IndexInt2" def{hdlTargets=[Verilog]}
         , runTest "Concat" def
-        , let _opts = def { hdlLoad = hdlLoad def \\ [Verilator]
-                          , hdlSim = hdlSim def \\ [Verilator]
+        , runTest "DFold" def{hdlTargets = [VHDL, Verilog]}
+        ,
+          -- With GHC 9.0 and 9.2 specifically, Vivado doesn't compile with
+          -- error
+          --     illegal context for assignment pattern
+          -- and Verilator errors on the same line with
+          --     Assignment pattern member not underneath a supported
+          --     construct: NEQCASE
+          -- GHC 8.10 and 9.4 through 9.10 work fine, though.
+          -- https://github.com/clash-lang/clash-compiler/issues/2932
+          let _opts = def { hdlTargets = [SystemVerilog]
+                          , hdlLoad = hdlLoad def \\ [Verilator, Vivado]
+                          , hdlSim = hdlSim def \\ [Verilator, Vivado]
                           }
           in runTest "DFold" _opts
         , runTest "DFold2" def
@@ -1042,8 +1053,7 @@ runClashTest = defaultMain
           }
         ]
       , clashTestGroup "Xilinx"
-        [ let _opts = def{ hdlTargets=[VHDL, Verilog]
-                         , hdlLoad=[Vivado]
+        [ let _opts = def{ hdlLoad=[Vivado]
                          , hdlSim=[Vivado]
                          }
           in runTest "ClockWizard" _opts
