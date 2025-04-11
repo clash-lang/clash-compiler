@@ -1,0 +1,1 @@
+INTERNAL FIX: Ignore `Tick`s in `TermLiteral Integer`, `TermLiteral Char`, `TermLiteral Natural`, and `TermLiteral (SNat n)`
