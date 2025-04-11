@@ -468,6 +468,7 @@ runTest1 modName opts@TestOptions{..} path target =
       [ -- TODO: ModelSim can do VHDL and Verilog too. Add that?
         buildAndSimTests ModelSim (modelsimTests opts tmpDir)
       , buildAndSimTests Verilator (verilatorTests opts tmpDir)
+      , buildAndSimTests Vivado (vivadoTests opts tmpDir)
       ]
 
   verifTests tmpDir =

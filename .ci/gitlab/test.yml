@@ -221,6 +221,15 @@ suite:vivado:verilog:
     - local
     - vivado-2022.1-standard
 
+suite:vivado:systemverilog:
+  extends: .test-cache-local-nightly
+  script:
+    - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
+    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+  tags:
+    - local
+    - vivado-2022.1-standard
+
 # XXX: Vivado randomly fails with the following error message:
 #
 #          FATAL_ERROR: Vivado Simulator kernel has discovered an exceptional
