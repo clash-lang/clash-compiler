@@ -184,7 +184,7 @@ vecTailTy vecNm =
 -- vector, the latter the tail.
 extractHeadTail
   :: DataCon
-  -- ^ The Cons (:>) constructor
+  -- ^ The (:>) constructor
   -> Type
   -- ^ Element type
   -> Integer
@@ -206,7 +206,7 @@ extractHeadTail consCon elTy n vec =
       in
         ( Case vec elTy [(pat, Var el)]
         , Case vec restTy [(pat, Var rest)] )
-    _ -> error "extractHeadTail: failed to instantiate Cons DC"
+    _ -> error "extractHeadTail: failed to instantiate (:>) DC"
  where
   tys = [(LitTy (NumTy n)), elTy, (LitTy (NumTy (n-1)))]
 
@@ -214,7 +214,7 @@ extractHeadTail consCon elTy n vec =
 mkVecCons
   :: HasCallStack
   => DataCon
-  -- ^ The Cons (:>) constructor
+  -- ^ The (:>) constructor
   -> Type
   -- ^ Element type
   -> Integer
@@ -235,7 +235,7 @@ mkVecCons consCon resTy n h t
                             , Left (primCo consCoTy)
                             , Left h
                             , Left t ]
-    _ -> error "mkVecCons: failed to instantiate Cons DC"
+    _ -> error "mkVecCons: failed to instantiate (:>) DC"
 
 -- | Create an empty vector
 mkVecNil
@@ -568,7 +568,7 @@ reduceTraverse n aTy fTy bTy dict fun arg (TransformContext is0 ctx) = do
 -- > (:>) <$> x0 <*> ((:>) <$> x1 <*> pure Nil)
 mkTravVec :: TyConName -- ^ Vec tcon
           -> DataCon   -- ^ Nil con
-          -> DataCon   -- ^ Cons con
+          -> DataCon   -- ^ (:>) con
           -> Term      -- ^ 'pure' term
           -> Term      -- ^ '<*>' term
           -> Term      -- ^ 'fmap' term
@@ -983,7 +983,7 @@ reduceUnconcat unconcatPrimInfo n m aTy _kn sm arg (TransformContext inScope _ct
                                   , Left (snd nextVec)
                                   ]
             -- let (mvec,nextVec) = splitAt sm arg
-            -- in Cons mvec (unconcat sm nextVec)
+            -- in mvec :> (unconcat sm nextVec)
             lBody = mkVecCons consCon innerVecTy n mvec nextUnconcat
             lb = Letrec lbs lBody
 
