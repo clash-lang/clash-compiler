@@ -9,10 +9,12 @@ import qualified Clash.Tests.BitVector
 import qualified Clash.Tests.BlockRam
 import qualified Clash.Tests.BlockRam.Blob
 import qualified Clash.Tests.Clocks
+import qualified Clash.Tests.Convert
 import qualified Clash.Tests.Counter
 import qualified Clash.Tests.DerivingDataRepr
 import qualified Clash.Tests.Fixed
 import qualified Clash.Tests.FixedExhaustive
+import qualified Clash.Tests.MaybeConvert
 import qualified Clash.Tests.MaybeX
 import qualified Clash.Tests.NFDataX
 import qualified Clash.Tests.NumNewtypes
@@ -35,13 +37,15 @@ tests = testGroup "Unittests"
   , Clash.Tests.AutoReg.tests
   , Clash.Tests.BitPack.tests
   , Clash.Tests.BitVector.tests
-  , Clash.Tests.BlockRam.tests
   , Clash.Tests.BlockRam.Blob.tests
+  , Clash.Tests.BlockRam.tests
   , Clash.Tests.Clocks.tests
+  , Clash.Tests.Convert.tests
   , Clash.Tests.Counter.tests
   , Clash.Tests.DerivingDataRepr.tests
   , Clash.Tests.Fixed.tests
   , Clash.Tests.FixedExhaustive.tests
+  , Clash.Tests.MaybeConvert.tests
   , Clash.Tests.MaybeX.tests
   , Clash.Tests.NFDataX.tests
   , Clash.Tests.NumNewtypes.tests
