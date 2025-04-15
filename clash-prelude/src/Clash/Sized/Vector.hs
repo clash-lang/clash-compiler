@@ -693,8 +693,8 @@ infixr 4 +>>
 -- 1 :> 3 :> 4 :> Nil
 -- >>> 1 +>> Nil
 -- Nil
-(+>>) :: KnownNat n => a -> Vec n a -> Vec n a
-s +>> xs = fst (shiftInAt0 xs (singleton s))
+(+>>) :: forall n a . a -> Vec n a -> Vec n a
+s +>> xs = init (s :> xs)
 {-# INLINE (+>>) #-}
 
 
