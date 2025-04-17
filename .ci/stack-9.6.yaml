@@ -1,4 +1,4 @@
-resolver: lts-22.9
+resolver: lts-22.43
 
 ghc-options:
   "$locals": -Wall -Wcompat
@@ -12,16 +12,6 @@ packages:
 - tests
 
 extra-deps:
-- ansi-terminal-0.11.5@sha256:2fe3d006b9ea0dc1a5537a029edb0bc2bbe56a33a6d95264b38b54c58e931e51,3752
-- hedgehog-1.2@sha256:cb20b0f1dad7a7e4461085ea2d8ef084a19d0d5f137133bf88d1fd2f7ce9a5aa,4561
-- hedgehog-fakedata-0.0.1.5@sha256:d8059e4ef9b7b4112bef9791300118f3a2d776bb191e50b41635a411af609428,1424
-- tasty-1.5@sha256:c62c96da1e9d65bf61ce583e9f7085eed1daeb62a45f3106ca252bf9ef87025b,2763
+- hedgehog-fakedata-0.0.1.5@sha256:955223750b74b0097ce426c07409c4629d22fb6cbd3b6bd0e9aeedf991241bad,1424
+- tasty-1.5.3@sha256:9d56ea9dbc274fc853fc531373b2c91bfe360e21460c2c6a5838897d86e3f6d0,2923
 - tasty-flaky-0.1.2.0@sha256:2f91ab9f55ae0c472474087f98bb54076aca18f8b058343479d24597a3aa181b,1858
-
-# TODO: Remove this workaround. See:
-#
-#   https://github.com/clash-lang/clash-compiler/pull/2665#issuecomment-1939044550
-- git: https://github.com/haskell/cabal.git
-  commit: a3865991986361b3a736007f620b6a8878d178e3
-  subdirs:
-  - Cabal
