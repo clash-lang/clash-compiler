@@ -1,0 +1,15 @@
+resolver: nightly-2025-04-17
+
+ghc-options:
+  "$locals": -Wall -Wcompat
+
+packages:
+- clash-prelude
+- clash-prelude-hedgehog
+- clash-lib
+- clash-lib-hedgehog
+- clash-ghc
+- tests
+
+extra-deps:
+- tasty-flaky-0.1.2.0@sha256:2f91ab9f55ae0c472474087f98bb54076aca18f8b058343479d24597a3aa181b,1858
