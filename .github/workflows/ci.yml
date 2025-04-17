@@ -1,12 +1,6 @@
 name: CI
 
-on:
-  push:
-    branches:
-      # PRs can only use caches from their target branch. We therefore need to
-      # make sure we run on 'master' too.
-      - master
-  pull_request:
+on: [push]
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}
@@ -27,10 +21,10 @@ jobs:
           - os: "macOS-13"
             ghc: "8.10"
 
-          # GHC/Clash starts extremely slowly, see
-          # https://github.com/clash-lang/clash-compiler/issues/2684
-          - os: "windows-latest"
-            ghc: "9.6"
+          # # GHC/Clash starts extremely slowly, see
+          # # https://github.com/clash-lang/clash-compiler/issues/2684
+          # - os: "windows-latest"
+          #   ghc: "9.6"
 
           # Vector test suite takes an _extremely_ long time to execute. Same
           # issue as 9.6?
