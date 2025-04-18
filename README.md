@@ -74,14 +74,18 @@ Note that release branches might contain non-released patches.
 | 9.0  | &#x2714;&#xfe0f;                | &#x2714;&#xfe0f;<sup>2</sup>    | &#x2714;&#xfe0f;                | 1.4 - 1.8        | &#x2714;&#xfe0f;
 | 9.2  | &#x26a0;&#xfe0f;<sup>1</sup>    | &#x26a0;&#xfe0f;<sup>1</sup>    | &#x26a0;&#xfe0f;<sup>1</sup>    | 1.8              | &#x26a0;&#xfe0f;<sup>1</sup>
 | 9.4  | &#x26a0;&#xfe0f;<sup>3</sup> ️   | &#x26a0;&#xfe0f;<sup>3</sup>    | ️&#x26a0;&#xfe0f;<sup>3</sup> ️   | 1.8              | &#x2714;&#xfe0f;
-| 9.6  | &#x2714;&#xfe0f;<sup>3</sup>    | &#x2714;&#xfe0f;<sup>3</sup>    | &#x2714;&#xfe0f;<sup>3</sup>    | 1.8              | &#x2714;&#xfe0f;
-| 9.8  | &#x2714;&#xfe0f;                | &#x2714;&#xfe0f;                | &#x2714;&#xfe0f;                | 1.8              | ️&#x2714;&#xfe0f;
+| 9.6  | &#x2714;&#xfe0f;<sup>3</sup>    | &#x2714;&#xfe0f;<sup>3,4</sup>  | &#x2714;&#xfe0f;<sup>3</sup>    | 1.8              | &#x2714;&#xfe0f;
+| 9.8  | &#x2714;&#xfe0f;                | &#x2714;&#xfe0f;<sup>4</sup>    | &#x2714;&#xfe0f;                | 1.8              | ️&#x2714;&#xfe0f;
+| 9.10 | &#x2714;&#xfe0f;                | &#x2714;&#xfe0f;<sup>4</sup>    | &#x2714;&#xfe0f;                | 1.8              | ️&#x2714;&#xfe0f;
+
 
 <sup>1</sup> GHC 9.2 contains a regression, rendering Clash error messages indecipherable. This change was reverted in 9.4.
 
 <sup>2</sup> GHC 9.0.2 on Windows fails to compile `clash-cores`. We therefore don't run the Clash test suite on CI for this combination.
 
 <sup>3</sup> Clash starts extremely slowly when compiled with 9.4.8 up to and including 9.6.2. Consider downgrading to 9.4.7 or upgrading to 9.6.3 and up.
+
+<sup>4</sup> Clash starts extremely slowly on Windows with GHC 9.6 through 9.10, consider downgrading to 9.4.7
 
 ## Cabal
 To use Cabal you need both Cabal and GHC installed on your system. We recommend using [ghcup](https://www.haskell.org/ghcup/). For more information, see [https://www.haskell.org/downloads/](https://www.haskell.org/downloads/).
