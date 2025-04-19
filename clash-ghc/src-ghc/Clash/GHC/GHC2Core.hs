@@ -723,13 +723,21 @@ coreToTerm primMap unlocs = term
       LitFloat r    -> C.FloatLiteral . floatToWord $ fromRational r
       LitDouble r   -> C.DoubleLiteral . doubleToWord $ fromRational r
       LitNullAddr   -> C.StringLiteral []
+#if MIN_VERSION_ghc(9,12,0)
+      LitLabel fs _ -> C.StringLiteral (unpackFS fs)
+#else
       LitLabel fs _ _ -> C.StringLiteral (unpackFS fs)
+<<<<<<< HEAD
 #else
       MachFloat r    -> C.FloatLiteral . floatToWord $ fromRational r
       MachDouble r   -> C.DoubleLiteral . doubleToWord $ fromRational r
       MachNullAddr   -> C.StringLiteral []
       MachLabel fs _ _ -> C.StringLiteral (unpackFS fs)
 #endif
+||||||| parent of f2928247 (Apply Clash specific modifications to `src-bin-9.12`)
+=======
+#endif
+>>>>>>> f2928247 (Apply Clash specific modifications to `src-bin-9.12`)
 
 addUsefull :: SrcSpan
            -> C2C a
@@ -783,6 +791,7 @@ hasPrimCo (ForAllCo {fco_body = co}) = hasPrimCo co
 hasPrimCo (ForAllCo _ _ co) = hasPrimCo co
 #endif
 
+#if !MIN_VERSION_ghc(9,12,0)
 hasPrimCo co@(AxiomInstCo _ _ coers) = do
     let (Pair ty1 _) = coercionKind co
     ty1PM <- isPrimTc ty1
@@ -801,6 +810,7 @@ hasPrimCo co@(AxiomInstCo _ _ coers) = do
                           ,"Clash.Sized.Internal.Unsigned.Unsigned"
                           ])
     isPrimTc _ = return False
+#endif
 
 hasPrimCo (SymCo co) = hasPrimCo co
 
@@ -810,7 +820,11 @@ hasPrimCo (TransCo co1 co2) = do
     Just _ -> return tc1M
     _ -> hasPrimCo co2
 
+#if MIN_VERSION_ghc(9,12,0)
+hasPrimCo (AxiomCo _ coers) = do
+#else
 hasPrimCo (AxiomRuleCo _ coers) = do
+#endif
   tcs <- catMaybes <$> mapM hasPrimCo coers
   return (listToMaybe tcs)
 
@@ -823,7 +837,13 @@ hasPrimCo (LRCo _ co)   = hasPrimCo co
 hasPrimCo (InstCo co _) = hasPrimCo co
 hasPrimCo (SubCo co)    = hasPrimCo co
 
-hasPrimCo _ = return Nothing
+hasPrimCo (Refl {}) = return Nothing
+hasPrimCo (GRefl {}) = return Nothing
+hasPrimCo (FunCo {}) = return Nothing
+hasPrimCo (CoVarCo {}) = return Nothing
+hasPrimCo (UnivCo {}) = return Nothing
+hasPrimCo (KindCo {}) = return Nothing
+hasPrimCo (HoleCo {}) = return Nothing
 
 coreToDataCon :: DataCon
               -> C2C C.DataCon
