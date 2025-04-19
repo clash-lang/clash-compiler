@@ -2,7 +2,6 @@
 
 [![Pipeline status](https://gitlab.com/clash-lang/clash-compiler/badges/master/pipeline.svg)](https://gitlab.com/clash-lang/clash-compiler/commits/master)
 [![Hackage](https://img.shields.io/hackage/v/clash-ghc.svg)](https://hackage.haskell.org/package/clash-ghc)
-[![Hackage Dependencies](https://img.shields.io/hackage-deps/v/clash-ghc.svg?style=flat)](http://packdeps.haskellers.com/feed?needle=QBayLogic)
 [![Documentation Status](https://readthedocs.org/projects/clash-lang/badge/?version=latest)](https://clash-lang.readthedocs.io/en/latest/?badge=latest)
 
 Clash is a functional hardware description language that borrows both
@@ -26,12 +25,16 @@ Features of Clash:
 
   * Support for multiple clock domains, with type safe clock domain crossing.
 
-# Community
-**Mailing list**: for updates and questions join the mailing list clash-language+subscribe@googlegroups.com or read the [forum](https://groups.google.com/d/forum/clash-language)
+# Open-source community
+Clash benefits from an active community. Whether you need a question answered or
+want to contribute to open-source features, browse the features below to make
+the most of Clash.
 
-**Slack**: [functionalprogramming.slack.com#clash](https://functionalprogramming.slack.com/archives/CPGMJFF50) (Invite yourself at [fpslack.com/](https://fpslack.com/)).
-
-**IRC**: [libera.chat#clash (webchat access)](https://web.libera.chat/#clash) (or ircs://irc.libera.chat:6697/clash if you want to use a regular IRC client)
+- [Discourse: long form discussions and questions](https://clash-lang.discourse.group/)
+- [Discord: short form discussions and community chat room](https://discord.gg/rebGq25FB4)
+- [Slack: short form discussions and questions](https://functionalprogramming.slack.com/archives/CPGMJFF50)
+  (Invite yourself at [fpslack.com](https://fpslack.com))
+- [Github: issue tracker](https://github.com/clash-lang/clash-compiler/issues)
 
 # Get Clash
 Check out [clash-lang.org/install](https://clash-lang.org/install/) to install the latest stable release of Clash, or to setup a Clash project.
