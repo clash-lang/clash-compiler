@@ -20,8 +20,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+<<<<<<< HEAD
         os: ["macOS-15", "windows-latest"]
         ghc: ["8.6", "8.8", "8.10", "9.0", "9.2", "9.4", "9.6", "9.8", "9.10"]
+||||||| parent of a6865f1f (Add GHC 9.12 support to `clash-cosim`)
+        os: ["macos-26", "windows-latest"]
+        ghc: ["9.6", "9.8", "9.10"]
+=======
+        os: ["macos-26", "windows-latest"]
+        ghc: ["9.6", "9.8", "9.10", "9.12"]
+>>>>>>> a6865f1f (Add GHC 9.12 support to `clash-cosim`)
         exclude:
           # No GHC binary distribution for GHC 8.6 on aarch64.
           - os: "macOS-15"
@@ -63,6 +71,11 @@ jobs:
           # issue as 9.6?
           - os: "windows-latest"
             ghc: "9.10"
+
+          # Vector test suite takes an _extremely_ long time to execute. Same
+          # issue as 9.6?
+          - os: "windows-latest"
+            ghc: "9.12"
 
     steps:
       - uses: actions/checkout@v5
@@ -181,7 +194,13 @@ jobs:
 
     # Run steps inside the clash CI docker image
     container:
+<<<<<<< HEAD
       image: ghcr.io/clash-lang/clash-ci:${{ matrix.ghc }}-20260320
+||||||| parent of a6865f1f (Add GHC 9.12 support to `clash-cosim`)
+      image: ghcr.io/clash-lang/clash-ci:${{ matrix.ghc }}-20251229
+=======
+      image: ghcr.io/clash-lang/clash-ci:${{ matrix.ghc }}-20260331
+>>>>>>> a6865f1f (Add GHC 9.12 support to `clash-cosim`)
 
       env:
         THREADS: 2

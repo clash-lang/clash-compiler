@@ -1,5 +1,11 @@
 .benchmark:
+<<<<<<< HEAD
   image: ghcr.io/clash-lang/clash-ci:$GHC_VERSION-20260320
+||||||| parent of a6865f1f (Add GHC 9.12 support to `clash-cosim`)
+  image: ghcr.io/clash-lang/clash-ci:$GHC_VERSION-20251229
+=======
+  image: ghcr.io/clash-lang/clash-ci:$GHC_VERSION-20260331
+>>>>>>> a6865f1f (Add GHC 9.12 support to `clash-cosim`)
   stage: test
   timeout: 2 hours
   variables:

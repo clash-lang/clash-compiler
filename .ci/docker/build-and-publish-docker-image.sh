@@ -13,10 +13,20 @@ elif [[ "$1" != "" ]]; then
   echo "Unrecognized argument: $1" >&2
   exit 1
 fi
+<<<<<<< HEAD
 
 UBUNTU_VERSION=jammy-20260217
 GHC_VERSIONS=("9.10.3" "9.8.4" "9.6.7" "9.4.8" "9.2.8" "9.0.2" "8.10.7" "8.8.4" "8.6.5")
 CABAL_VERSIONS=("3.14.2.0" "3.14.2.0" "3.14.2.0" "3.14.2.0" "3.14.2.0" "3.14.2.0" "3.14.2.0" "3.14.2.0" "3.14.2.0")
+||||||| parent of a6865f1f (Add GHC 9.12 support to `clash-cosim`)
+UBUNTU_VERSION=jammy-20251013
+GHC_VERSIONS=(  "9.10.3"   "9.8.4"    "9.6.7")
+CABAL_VERSIONS=("3.14.2.0" "3.14.2.0" "3.14.2.0")
+=======
+UBUNTU_VERSION=jammy-20260217
+GHC_VERSIONS=("9.12.4"  "9.10.3"   "9.8.4"    "9.6.7")
+CABAL_VERSIONS=("3.14.2.0" "3.14.2.0" "3.14.2.0" "3.14.2.0")
+>>>>>>> a6865f1f (Add GHC 9.12 support to `clash-cosim`)
 
 # We want to use docker buildkit so that our layers are built in parallel. This
 # is ignored completely on versions of docker which don't support buildkit.
