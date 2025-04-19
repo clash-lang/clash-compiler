@@ -128,7 +128,7 @@ instance NFData a => NFData (RTree d a) where
 
 textract :: RTree 0 a -> a
 textract (RLeaf x)   = x
-#if __GLASGOW_HASKELL__ != 902
+#if __GLASGOW_HASKELL__ != 902 && __GLASGOW_HASKELL__ < 912
 textract (RBranch _ _) = error $ "textract: nodes hold no values"
 #endif
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
@@ -137,7 +137,7 @@ textract (RBranch _ _) = error $ "textract: nodes hold no values"
 
 tsplit :: RTree (d+1) a -> (RTree d a,RTree d a)
 tsplit (RBranch l r) = (l,r)
-#if __GLASGOW_HASKELL__ != 902
+#if __GLASGOW_HASKELL__ != 902 && __GLASGOW_HASKELL__ < 912
 tsplit (RLeaf _)   = error $ "tsplit: leaf is atomic"
 #endif
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
