@@ -538,7 +538,7 @@ mkADT builtInTranslation reprs m tyString tc args = case tyConDataCons (UniqMap.
 -- data Vec :: Nat -> Type -> Type
 --  where
 --   Nil  :: Vec 0 a
---   Cons :: forall m . (n ~ m + 1) => a -> Vec m a -> Vec n a
+--   (:>) :: forall m . (n ~ m + 1) => a -> Vec m a -> Vec n a
 --
 -- where we can generate a type for `m` when we know `n` (by doing `n-1`).
 --

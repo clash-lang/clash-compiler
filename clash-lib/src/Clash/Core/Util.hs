@@ -98,7 +98,7 @@ unsafeCoerceTy =
 
 -- | Create a vector of supplied elements
 mkVec :: DataCon -- ^ The Nil constructor
-      -> DataCon -- ^ The Cons (:>) constructor
+      -> DataCon -- ^ The (:>) constructor
       -> Type    -- ^ Element type
       -> Integer -- ^ Length of the vector
       -> [Term]  -- ^ Elements to put in the vector
@@ -128,7 +128,7 @@ mkVec nilCon consCon resTy = go
                    _ -> error "impossible"
 
 -- | Append elements to the supplied vector
-appendToVec :: DataCon -- ^ The Cons (:>) constructor
+appendToVec :: DataCon -- ^ The (:>) constructor
             -> Type    -- ^ Element type
             -> Term    -- ^ The vector to append the elements to
             -> Integer -- ^ Length of the vector
@@ -161,7 +161,7 @@ extractElems
   -> InScopeSet
   -- ^ (Superset of) in scope variables
   -> DataCon
-  -- ^ The Cons (:>) constructor
+  -- ^ The (:>) constructor
   -> Type
   -- ^ The element type
   -> Char
@@ -609,10 +609,10 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
   -- Project the n'th value out of a vector
   --
   -- >>> mkVecSelector subj 0
-  -- case subj of Cons x xs -> x
+  -- case subj of x :> xs -> x
   --
   -- >>> mkVecSelector subj 2
-  -- case (case (case subj of Cons x xs -> xs) of Cons x xs -> xs) of Cons x xs -> x
+  -- case (case (case subj of x :> xs -> xs) of x :> xs -> xs) of x :> xs -> x
   mkVecSelector :: forall m . MonadUnique m => InScopeSet -> Term -> Integer -> m Term
   mkVecSelector is0 subj 0 =
     mkSelectorCase ($(curLoc) ++ "mkVecSelector") is0 tcm subj 2 1
