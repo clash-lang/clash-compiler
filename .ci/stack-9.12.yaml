@@ -1,0 +1,18 @@
+resolver: nightly-2026-03-31
+
+ghc-options:
+  "$locals": -Wall -Wcompat
+
+packages:
+- clash-prelude
+- clash-prelude-hedgehog
+- clash-lib
+- clash-lib-hedgehog
+- clash-ghc
+- tests
+
+extra-deps:
+  - QuickCheck-2.15.0.1@sha256:0cfd337bb9e6fbf09255bd24bb498a156f1d9bcd465396ac8657b25034b9ee31,9046
+  - tasty-flaky-0.1.2.0@sha256:2f91ab9f55ae0c472474087f98bb54076aca18f8b058343479d24597a3aa181b,1858
+  - hedgehog-1.5@sha256:c904dc9d8ae7b47a58771a0fbfb7a77882059a2b77c9c0c722dc16de504d0bd4,4817
+  - lifted-async-0.10.2.7@sha256:848cc230afdd5657eafb97f950e58d0a8fcb5e65c801618c32f8c726ad8f9e69,2857
