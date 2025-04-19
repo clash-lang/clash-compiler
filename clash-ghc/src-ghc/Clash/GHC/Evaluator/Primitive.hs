@@ -1493,7 +1493,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
          _ -> Nothing
 
   "GHC.Classes.divInt#" | Just (i,j) <- intLiterals args
-    -> reduce (integerToIntLiteral (i `div` j))
+    -> reduce $ catchDivByZero (integerToIntLiteral (i `div` j))
 
   -- modInt# :: Int# -> Int# -> Int#
   "GHC.Classes.modInt#"
@@ -2015,13 +2015,13 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | Just (i,j) <- naturalLiterals args
     ->
      let nTy = snd (splitFunForallTy ty) in
-     reduce (checkNaturalRange2 nTy i j quot)
+     reduce $ catchDivByZero (checkNaturalRange2 nTy i j quot)
 
   "GHC.Num.Natural.naturalRem"
     | Just (i,j) <- naturalLiterals args
     ->
      let nTy = snd (splitFunForallTy ty) in
-     reduce (checkNaturalRange2 nTy i j rem)
+     reduce $ catchDivByZero (checkNaturalRange2 nTy i j rem)
 #endif
 
 #if MIN_VERSION_base(4,15,0)
@@ -2421,26 +2421,26 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [ DC intDc [Left (Literal (IntLiteral i))]
       , DC _     [Left (Literal (IntLiteral j))]
       ] <- args
-    -> reduce (App (Data intDc) (Literal (IntLiteral (i `quot` j))))
+    -> reduce $ catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `quot` j))))
 
   "GHC.Base.remInt"
     | [ DC intDc [Left (Literal (IntLiteral i))]
       , DC _     [Left (Literal (IntLiteral j))]
       ] <- args
-    -> reduce (App (Data intDc) (Literal (IntLiteral (i `rem` j))))
+    -> reduce $ catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `rem` j))))
 
   "GHC.Base.divInt"
     | [ DC intDc [Left (Literal (IntLiteral i))]
       , DC _     [Left (Literal (IntLiteral j))]
       ] <- args
-    -> reduce (App (Data intDc) (Literal (IntLiteral (i `div` j))))
+    -> reduce $ catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `div` j))))
 
 
   "GHC.Base.modInt"
     | [ DC intDc [Left (Literal (IntLiteral i))]
       , DC _     [Left (Literal (IntLiteral j))]
       ] <- args
-    -> reduce (App (Data intDc) (Literal (IntLiteral (i `mod` j))))
+    -> reduce $ catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `mod` j))))
 
   "Clash.Class.BitPack.Internal.packDouble#" -- :: Double -> BitVector 64
     | [DC _ [Left arg]] <- args
