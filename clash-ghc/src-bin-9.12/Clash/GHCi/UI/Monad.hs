@@ -9,7 +9,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHCi.UI.Monad (
+module Clash.GHCi.UI.Monad (
         GHCi(..), startGHCi,
         GHCiState(..), GhciMonad(..),
         GHCiOption(..), isOptionSet, setOption, unsetOption,
@@ -36,7 +36,7 @@ module GHCi.UI.Monad (
         mkEvalWrapper
     ) where
 
-import GHCi.UI.Info (ModInfo)
+import Clash.GHCi.UI.Info (ModInfo)
 import qualified GHC
 import GHC.Driver.Monad hiding (liftIO)
 import GHC.Utils.Outputable
@@ -56,7 +56,7 @@ import GHC.Builtin.Names (gHC_INTERNAL_GHCI_HELPERS)
 import GHC.Runtime.Interpreter
 import GHC.Runtime.Context
 import GHCi.RemoteTypes
-import GHCi.UI.Exception (printGhciException)
+import Clash.GHCi.UI.Exception (printGhciException)
 import GHC.Hs (ImportDecl, GhcPs, GhciLStmt, LHsDecl)
 import GHC.Hs.Utils
 import GHC.Utils.Misc
