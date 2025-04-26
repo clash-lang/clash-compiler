@@ -1,4 +1,4 @@
-resolver: lts-22.43
+resolver: nightly-2025-04-17
 
 ghc-options:
   "$locals": -Wall -Wcompat
@@ -12,6 +12,4 @@ packages:
 - tests
 
 extra-deps:
-- hedgehog-fakedata-0.0.1.5@sha256:955223750b74b0097ce426c07409c4629d22fb6cbd3b6bd0e9aeedf991241bad,1424
-- tasty-1.5.3@sha256:9d56ea9dbc274fc853fc531373b2c91bfe360e21460c2c6a5838897d86e3f6d0,2923
 - tasty-flaky-0.1.2.0@sha256:2f91ab9f55ae0c472474087f98bb54076aca18f8b058343479d24597a3aa181b,1858
