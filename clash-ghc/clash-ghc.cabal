@@ -211,7 +211,7 @@ library
     CPP-Options:      -DUSE_GHC_PATHS=1
 
   if os(windows)
-    Build-Depends:    Win32                     >= 2.3.1    && < 2.14
+    Build-Depends:    Win32                     >= 2.3.1    && < 2.15
   else
     Build-Depends:    unix                      >= 2.7.1    && < 2.9
 
