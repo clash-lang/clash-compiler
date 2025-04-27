@@ -200,17 +200,10 @@ type role Unsigned nominal
 --
 -- as it is not safe to coerce between different width Unsigned. To change the
 -- width, use the functions in the 'Clash.Class.Resize.Resize' class.
-#if (__GLASGOW_HASKELL__ >= 900 && __GLASGOW_HASKELL__ < 904) || __GLASGOW_HASKELL__ >= 912
 data Unsigned (n :: Nat) =
     -- | The constructor, 'U', and the field, 'unsafeToNatural', are not
     -- synthesizable.
     U { unsafeToNatural :: !Natural }
-#else
-newtype Unsigned (n :: Nat) =
-    -- | The constructor, 'U', and the field, 'unsafeToNatural', are not
-    -- synthesizable.
-    U { unsafeToNatural :: Natural }
-#endif
   deriving (Data, Generic)
 
 {-# ANN U hasBlackBox #-}

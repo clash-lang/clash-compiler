@@ -184,17 +184,10 @@ type role Signed nominal
 --
 -- as it is not safe to coerce between different width Signed. To change the
 -- width, use the functions in the 'Clash.Class.Resize.Resize' class.
-#if (__GLASGOW_HASKELL__ >= 900 && __GLASGOW_HASKELL__ < 904) || __GLASGOW_HASKELL__ >= 912
 data Signed (n :: Nat) =
     -- | The constructor, 'S', and the field, 'unsafeToInteger', are not
     -- synthesizable.
     S { unsafeToInteger :: !Integer}
-#else
-newtype Signed (n :: Nat) =
-    -- | The constructor, 'S', and the field, 'unsafeToInteger', are not
-    -- synthesizable.
-    S { unsafeToInteger :: Integer}
-#endif
   deriving (Data, Generic)
 
 {-# ANN S hasBlackBox #-}
