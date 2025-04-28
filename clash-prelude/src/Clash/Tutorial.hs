@@ -2114,8 +2114,8 @@ Here is a list of Haskell features for which the Clash compiler has only
 
         @
         mapV :: (a -> b) -> Vec n a -> Vec n b
-        mapV _ Nil         = Nil
-        mapV f (Cons x xs) = Cons (f x) (mapV f xs)
+        mapV _ Nil       = Nil
+        mapV f (x :> xs) = f x :> mapV f xs
 
         topEntity :: Vec 4 Int -> Vec 4 Int
         topEntity = mapV (+1)
