@@ -1,29 +1,25 @@
 - BlackBox:
     name: Clash.Sized.Vector.head
     kind: Expression
-    type: 'head :: Vec (n
-      + 1) a -> a'
+    type: 'head :: Vec (n + 1) a -> a'
     template: ~FROMBV[~VAR[vec][0][\0\]][~TYPO]
     workInfo: Never
 - BlackBox:
     name: Clash.Sized.Vector.tail
     kind: Expression
-    type: 'tail :: Vec (n
-      + 1) a -> Vec n a'
+    type: 'tail :: Vec (n + 1) a -> Vec n a'
     template: '~VAR[vec][0][1 : $high(~VAR[vec][0])]'
     workInfo: Never
 - BlackBox:
     name: Clash.Sized.Vector.last
     kind: Expression
-    type: Vec (n + 1) a ->
-      a
+    type: Vec (n + 1) a -> a
     template: ~FROMBV[~VAR[vec][0][\$high(~VAR[vec][0])\]][~TYPO]
     workInfo: Never
 - BlackBox:
     name: Clash.Sized.Vector.init
     kind: Expression
-    type: Vec (n + 1) a ->
-      Vec n a
+    type: Vec (n + 1) a -> Vec n a
     template: '~VAR[vec][0][0 : $high(~VAR[vec][0]) - 1]'
     workInfo: Never
 - BlackBox:
@@ -49,15 +45,13 @@
 - BlackBox:
     name: Clash.Sized.Vector.++
     kind: Expression
-    type: '(++) :: Vec n a
-      -> Vec m a -> Vec (n + m) a'
+    type: '(++) :: Vec n a -> Vec m a -> Vec (n + m) a'
     template: ~FROMBV[{~TOBV[~ARG[0]][~TYP[0]],~TOBV[~ARG[1]][~TYP[1]]}][~TYPO]
     workInfo: Never
 - BlackBox:
     name: Clash.Sized.Vector.concat
     kind: Declaration
-    type: 'concat :: Vec n
-      (Vec m a) -> Vec (n * m) a'
+    type: 'concat :: Vec n (Vec m a) -> Vec (n * m) a'
     template: |-
       // concat begin
       genvar ~GENSYM[n][1];
@@ -71,8 +65,7 @@
 - BlackBox:
     name: Clash.Sized.Vector.splitAt
     kind: Declaration
-    type: 'splitAt :: SNat
-      m -> Vec (m + n) a -> (Vec m a, Vec n a)'
+    type: 'splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)'
     template: |-
       // splitAt begin~IF~LENGTH[~TYPO]~THEN
       assign ~RESULT = ~ARG[1];~ELSE
@@ -110,8 +103,7 @@
 - BlackBox:
     name: Clash.Sized.Vector.map
     kind: Declaration
-    type: 'map :: (a -> b)
-      -> Vec n a -> Vec n b'
+    type: 'map :: (a -> b) -> Vec n a -> Vec n b'
     template: |-
       // map begin
       genvar ~GENSYM[n][1];
@@ -132,8 +124,7 @@
 - BlackBox:
     name: Clash.Sized.Vector.imap
     kind: Declaration
-    type: 'imap :: KnownNat
-      n => (Index n -> a -> b) -> Vec n a -> Vec n b'
+    type: 'imap :: KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b'
     template: |-
       // imap begin
       genvar ~GENSYM[n][1];
@@ -157,8 +148,7 @@
 - BlackBox:
     name: Clash.Sized.Vector.imap_go
     kind: Declaration
-    type: 'imap_go :: Index
-      n -> (Index n -> a -> b) -> Vec m a -> Vec m b'
+    type: 'imap_go :: Index n -> (Index n -> a -> b) -> Vec m a -> Vec m b'
     template: |-
       // imap begin
       genvar ~GENSYM[n][1];
@@ -182,8 +172,7 @@
 - BlackBox:
     name: Clash.Sized.Vector.zipWith
     kind: Declaration
-    type: 'zipWith :: (a ->
-      b -> c) -> Vec n a -> Vec n b -> Vec n c'
+    type: 'zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c'
     template: |-
       // zipWith begin
       genvar ~GENSYM[n][2];
@@ -207,8 +196,7 @@
 - BlackBox:
     name: Clash.Sized.Vector.foldr
     kind: Declaration
-    type: 'foldr :: (a ->
-      b -> b) -> b -> Vec n a -> b'
+    type: 'foldr :: (a -> b -> b) -> b -> Vec n a -> b'
     template: |-
       // foldr start~IF ~LENGTH[~TYP[2]] ~THEN
       ~SIGDO[~GENSYM[intermediate][0]] [0:~LENGTH[~TYP[2]]];
@@ -235,15 +223,13 @@
 - BlackBox:
     name: Clash.Sized.Vector.index_int
     kind: Expression
-    type: 'index_int :: KnownNat
-      n => Vec n a -> Int -> a'
+    type: 'index_int :: KnownNat n => Vec n a -> Int -> a'
     template: ~IF~SIZE[~TYP[1]]~THEN~FROMBV[~VAR[vec][1][\~ARG[2]\]][~TYPO]~ELSE~ERRORO~FI
 - BlackBox:
     name: Clash.Sized.Vector.replace_int
     kind: Declaration
     outputUsage: Blocking
-    type: 'replace_int ::
-      KnownNat n => Vec n a -> Int -> a -> Vec n a'
+    type: 'replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a'
     template: |-
       // replaceVec start
       always_comb begin
@@ -254,15 +240,13 @@
 - BlackBox:
     name: Clash.Sized.Vector.replicate
     kind: Expression
-    type: 'replicate :: SNat
-      n -> a -> Vec n a'
-    template: '''{~LIT[0] {~TOBV[~ARG[1]][~TYP[1]]}}'
+    type: 'replicate :: SNat n -> a -> Vec n a'
+    template: "'{~LIT[0] {~TOBV[~ARG[1]][~TYP[1]]}}"
     workInfo: Never
 - BlackBox:
     name: Clash.Sized.Vector.transpose
     kind: Declaration
-    type: 'transpose :: KnownNat
-      n => Vec m (Vec n a) -> Vec n (Vec m a)'
+    type: 'transpose :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)'
     template: |-
       // transpose begin
       genvar ~GENSYM[row_index][1];
@@ -280,8 +264,7 @@
 - BlackBox:
     name: Clash.Sized.Vector.reverse
     kind: Declaration
-    type: 'reverse :: Vec
-      n a -> Vec n a'
+    type: 'reverse :: Vec n a -> Vec n a'
     template: |-
       // reverse begin
       genvar ~GENSYM[n][1];
@@ -313,8 +296,7 @@
 - BlackBox:
     name: Clash.Sized.Vector.rotateLeftS
     kind: Declaration
-    type: 'rotateLeftS ::
-      KnownNat n => Vec n a -> SNat d -> Vec n a'
+    type: 'rotateLeftS :: KnownNat n => Vec n a -> SNat d -> Vec n a'
     template: |-
       // rotateLeftS begin
       localparam ~GENSYM[shift_amount][2] = ~LIT[2] % ~LIT[0];
@@ -332,8 +314,7 @@
 - BlackBox:
     name: Clash.Sized.Vector.rotateRightS
     kind: Declaration
-    type: 'rotateRightS ::
-      KnownNat n => Vec n a -> SNat d -> Vec n a'
+    type: 'rotateRightS :: KnownNat n => Vec n a -> SNat d -> Vec n a'
     template: |-
       // rotateRightS begin
       localparam ~GENSYM[shift_amount][2] = ~LIT[2] % ~LIT[0];
