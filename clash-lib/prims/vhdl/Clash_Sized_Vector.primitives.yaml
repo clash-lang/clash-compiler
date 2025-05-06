@@ -148,30 +148,30 @@
 - BlackBox:
     name: Clash.Sized.Vector.imap_go
     kind: Declaration
-    type: 'imap_go :: Index n -> (Index n -> a -> b) -> Vec m a -> Vec m b'
+    type: 'imap_go :: (Index n -> a -> b) -> Vec m a -> Index n -> Vec m b'
     template: |-
       -- imap_go begin
-      ~GENSYM[imap][5] : for ~GENSYM[i][1] in ~RESULT'range generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[2]]~THEN
-        signal ~GENSYM[map_in][2]  : ~TYPEL[~TYP[2]];~ELSE ~FI
+      ~GENSYM[imap][5] : for ~GENSYM[i][1] in ~RESULT'range generate~IF ~VIVADO ~THEN~IF~SIZE[~TYP[1]]~THEN
+        signal ~GENSYM[map_in][2]  : ~TYPEL[~TYP[1]];~ELSE ~FI
         signal ~GENSYM[map_out][3] : ~TYPEL[~TYPO];
-        signal ~GENSYM[i2][4]      : ~TYP[0];
-      begin~IF~SIZE[~TYP[2]]~THEN
-        ~SYM[2] <= fromSLV(~VAR[vec][2](~SYM[1]));~ELSE ~FI
-        ~SYM[4] <= ~ARG[0] + to_unsigned(~SYM[1],~SIZE[~TYP[0]]);
-        ~INST 1
+        signal ~GENSYM[i2][4]      : ~TYP[2];
+      begin~IF~SIZE[~TYP[1]]~THEN
+        ~SYM[2] <= fromSLV(~VAR[vec][1](~SYM[1]));~ELSE ~FI
+        ~SYM[4] <= ~ARG[2] + to_unsigned(~SYM[1],~SIZE[~TYP[2]]);
+        ~INST 0
           ~OUTPUT <= ~SYM[3]~ ~TYPEL[~TYPO]~
-          ~INPUT  <= ~SYM[4]~ ~TYP[0]~
-          ~INPUT  <= ~SYM[2]~ ~TYPEL[~TYP[2]]~
+          ~INPUT  <= ~SYM[4]~ ~TYP[2]~
+          ~INPUT  <= ~SYM[2]~ ~TYPEL[~TYP[1]]~
         ~INST
         ~RESULT(~SYM[1]) <= ~TOBV[~SYM[3]][~TYPEL[~TYPO]];
       end generate;~ELSE
-        signal ~SYM[4] : ~TYP[0];
+        signal ~SYM[4] : ~TYP[2];
       begin
-        ~SYM[4] <= ~ARG[0] + to_unsigned(~SYM[1],~SIZE[~TYP[0]]);
-        ~INST 1
+        ~SYM[4] <= ~ARG[2] + to_unsigned(~SYM[1],~SIZE[~TYP[2]]);
+        ~INST 0
           ~OUTPUT <= ~RESULT(~SYM[1])~ ~TYPEL[~TYPO]~
-          ~INPUT  <= ~SYM[4]~ ~TYP[0]~
-          ~INPUT  <= ~VAR[vec][2](~SYM[1])~ ~TYPEL[~TYP[2]]~
+          ~INPUT  <= ~SYM[4]~ ~TYP[2]~
+          ~INPUT  <= ~VAR[vec][1](~SYM[1])~ ~TYPEL[~TYP[1]]~
         ~INST
       end generate;~FI
       -- imap_go end
