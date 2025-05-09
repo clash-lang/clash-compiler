@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2017, Myrtle Software Ltd,
-                  2021-2024  QBayLogic B.V.,
+                  2021-2025, QBayLogic B.V.,
                   2022,      Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -35,6 +35,7 @@ import Data.Functor.Const             (Const)
 import Data.Functor.Identity          (Identity)
 import Data.Functor.Product           (Product)
 import Data.Functor.Sum               (Sum)
+import Data.Char                      (chr, ord)
 import Data.Int
 import Data.Ord                       (Down)
 import Data.Word
@@ -342,6 +343,23 @@ instance BitPack () where
   type BitSize () = 0
   pack   _ = minBound
   unpack _ = ()
+
+instance BitPack Char where
+  type BitSize Char = 21
+  pack   = packXWith packChar#
+  unpack = checkUnpackUndef unpackChar#
+
+packChar# :: Char -> BitVector 21
+packChar# = fromIntegral . ord
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE packChar# #-}
+{-# ANN packChar# hasBlackBox #-}
+
+unpackChar# :: BitVector 21 -> Char
+unpackChar# = chr . fromIntegral
+-- See: https://github.com/clash-lang/clash-compiler/pull/2511
+{-# CLASH_OPAQUE unpackChar# #-}
+{-# ANN unpackChar# hasBlackBox #-}
 
 -- | __NB__: The documentation only shows instances up to /3/-tuples. By
 -- default, instances up to and including /12/-tuples will exist. If the flag
