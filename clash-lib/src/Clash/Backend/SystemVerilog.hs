@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021-2023, QBayLogic B.V.,
+                     2021-2024, QBayLogic B.V.,
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -65,7 +65,7 @@ import           Clash.Netlist.Types                  hiding (intWidth, usages, 
 import           Clash.Netlist.Util
 import           Clash.Signal.Internal                (ActiveEdge (..))
 import           Clash.Util
-  (SrcSpan, noSrcSpan, curLoc, makeCached, indexNote)
+  (SrcSpan, clogBase, noSrcSpan, curLoc, makeCached, indexNote)
 import           Clash.Util.Graph                     (reverseTopSort)
 
 -- | State for the 'Clash.Backend.SystemVerilog.SystemVerilogM' monad:
@@ -1228,7 +1228,9 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Index.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  = exprLitSV (Just (Index (fromInteger n),fromInteger n)) i
+  , Just k <- clogBase 2 n
+  , let k' = max 1 k
+  = exprLitSV (Just (Index (fromInteger n),k')) i
 
 expr_ b (BlackBoxE _ libs imps inc bs bbCtx b') =
   parenIf (b || b') (Ap (renderBlackBox libs imps inc bs bbCtx <*> pure 0))
