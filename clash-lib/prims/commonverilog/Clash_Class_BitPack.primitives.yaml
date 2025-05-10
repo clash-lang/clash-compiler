@@ -1,0 +1,12 @@
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.packChar#
+    kind: Expression
+    type: 'packChar# :: Char -> BitVector 21'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.unpackChar#
+    kind: Expression
+    type: 'unpackChar# :: BitVector 21 -> Char'
+    template: ~ARG[0]
+    workInfo: Never
