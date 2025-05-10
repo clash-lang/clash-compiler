@@ -1,8 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module T1187.Utils
-    ( (.==)
-
-    , debounce
+    ( debounce
 
     , roundRobin
 
@@ -25,17 +23,13 @@ debounce _ initial this = regEn initial stable this
   where
     counter = register (0 :: Index (ClockDivider dom ps)) counter'
     counter' = mux (unchanged initial this) counter 0
-    stable = counter' .==. pure maxBound
+    stable = counter' .== maxBound
 
 roundRobin
     :: forall n dom. (KnownNat n, HiddenClockResetEnable dom)
     => Signal dom Bool
     -> (Signal dom (Vec n Bool), Signal dom (Index n))
 roundRobin _next = undefined
-
-infix 4 .==
-(.==) :: (Eq a, Functor f) => f a -> a -> f Bool
-fx .== y = (== y) <$> fx
 
 moreIdx :: (Eq a, Enum a, Bounded a) => a -> a
 moreIdx = fromMaybe maxBound . succIdx
