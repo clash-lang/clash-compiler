@@ -45,4 +45,4 @@ default:
   extends: .common
   timeout: 2 hours
   tags:
-    - local
+    - diepenheim

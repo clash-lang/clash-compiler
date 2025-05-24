@@ -5,17 +5,9 @@ stages:
   - build
   - test
 
-.nightly-rules:
-  rules:
-    - if: $CI_PARENT_PIPELINE_SOURCE == "schedule"  # When schedueled (at night)
-    - if: $CI_PARENT_PIPELINE_SOURCE == "trigger"   # When triggered (manual triggers)
-    - if: '$CI_COMMIT_TAG != null'                  # When tags are set (releases)
-    - if: '$RUN_TESTS == "always"'                  # When test matrix indicates it should always run
-
 .test-nocache:
   extends:
     - .common
-    - .nightly-rules
   needs: ["build"]
   stage: test
   cache:
@@ -45,7 +37,6 @@ stages:
 .test-cache-local:
   extends:
     - .common-local
-    - .nightly-rules
   needs: ["build"]
   stage: test
   before_script:
@@ -153,7 +144,6 @@ suite:systemverilog:
 ffi:example:
   extends:
     - .common-local
-    - .nightly-rules
   # TODO: remove this when https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
   # is fixed
   rules:
@@ -185,33 +175,18 @@ ffi:example:
     - export THREADS=$(./.ci/effective_cpus.sh)
     - tar -cf - /root/.cabal | zstd -T${THREADS} -3 > cache.tar.zst
 
-# Tests run on local fast machines with Vivado installed. We only run these at night
-# to save resources - as Vivado is quite slow to execute.
-.test-cache-local-nightly:
-  extends: .test-cache-local
-  rules:
-    - if: $CI_PARENT_PIPELINE_SOURCE == "schedule"  # When schedueled (at night)
-    - if: $CI_PARENT_PIPELINE_SOURCE == "trigger"   # When triggered (manual triggers)
-    - if: '$CI_COMMIT_TAG != null'                  # When tags are set (releases)
-
 
 suite:vivado:verilog:
-  extends: .test-cache-local-nightly
+  extends: .test-cache-local
   script:
     - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
     - bin/clash-testsuite:clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
-  tags:
-    - local
-    - vivado-2022.1-standard
 
 suite:vivado:systemverilog:
-  extends: .test-cache-local-nightly
+  extends: .test-cache-local
   script:
     - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
     - bin/clash-testsuite:clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
-  tags:
-    - local
-    - vivado-2022.1-standard
 
 # XXX: Vivado randomly fails with the following error message:
 #

@@ -90,7 +90,7 @@ nix-build:
   script:
     - nix-build -j$(./.ci/effective_cpus.sh) --log-format raw --max-silent-time 3600
   tags:
-    - local
+    - diepenheim
 
 haddock:
   extends: .common-local
