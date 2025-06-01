@@ -15,8 +15,8 @@ where
 
 import           Control.Applicative
 import           Data.String                           (IsString (..))
-import           Data.Text                             as T
-import           Data.Text.Lazy                        as LT
+import qualified Data.Text                             as T
+import qualified Data.Text.Lazy                        as LT
 
 #if MIN_VERSION_prettyprinter(1,7,0)
 import qualified Prettyprinter                         as PP
