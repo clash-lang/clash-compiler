@@ -130,6 +130,7 @@ module Clash.Explicit.Prelude
   , module Clash.Class.BitPack
   , module Clash.Class.Exp
   , module Clash.Class.Num
+  , module Clash.Class.NumConvert
   , module Clash.Class.Resize
     -- *** Other
   , module Control.Applicative
@@ -163,6 +164,7 @@ import Clash.Class.AutoReg
 import Clash.Class.BitPack
 import Clash.Class.Exp
 import Clash.Class.Num
+import Clash.Class.NumConvert
 import Clash.Class.Resize
 import Clash.Magic
 import Clash.NamedTypes
