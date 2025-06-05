@@ -44,7 +44,7 @@ produces produce errors (also see "Clash.XException"). I.e.,
 > x == fromMaybe x (maybeNumConvert @a @b x >>= maybeNumConvert @b @a)
 
 for all values @x@ of type @a@. It should also preserve the numerical value
-interpretation of the bits. For types that have an "Integral" instance, this
+interpretation of the bits. For types that have an @Integral@ instance, this
 intuition is captured by:
 
 > toInteger x == fromMaybe (toInteger x) (toInteger (numConvert @a @b x))
@@ -54,7 +54,7 @@ If a conversion succeeds one way, it should also succeed the other way. I.e.,
 > isJust (maybeNumConvert @a @b x) `implies` isJust (maybeNumConvert @a @b x >>= maybeNumConvert @b @a)
 
 A conversion should succeed if and only if the value is representable in the
-target type. For types that have a "Bounded" and "Integral" instance, this
+target type. For types that have a @Bounded@ and @Integral@ instance, this
 intuition is captured by:
 
 > isJust (maybeNumConvert @a @b x) == (i x >= i (minBound @b) && i x <= i (maxBound @b))
@@ -66,7 +66,7 @@ All implementations should be total, i.e., they should not produce \"bottoms\".
 Additionally, any implementation should be translatable to synthesizable HDL.
 -}
 class MaybeNumConvert a b where
-  {- | NumConvert a supplied value of type @a@ to a value of type @b@. If the value
+  {- | Convert a supplied value of type @a@ to a value of type @b@. If the value
     cannot be represented in the target type, 'Nothing' is returned.
 
     >>> maybeNumConvert (1 :: Index 8) :: Maybe (Unsigned 2)

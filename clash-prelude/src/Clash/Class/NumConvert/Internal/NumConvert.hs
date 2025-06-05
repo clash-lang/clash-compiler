@@ -46,14 +46,14 @@ A conversion is successful if a round trip conversion is lossless. I.e.,
 > Just x == maybeNumConvert (numConvert @a @b x)
 
 for all values @x@ of type @a@. It should also preserve the numerical value
-interpretation of the bits. For types that have an "Integral" instance, this
+interpretation of the bits. For types that have an @Integral@ instance, this
 intuition is captured by:
 
 > toInteger x == toInteger (numConvert @a @b x)
 
 Instances should make sure their constraints are as \"tight\" as possible. I.e.,
 if an instance's constraints cannot be satisfied, then for the same types
-'Clash.Class.NumConvert.maybeConvert' should return 'Nothing' for one or more
+'Clash.Class.NumConvert.maybeNumConvert' should return 'Nothing' for one or more
 values in the domain of the source type @a@:
 
 > L.any isNothing (L.map (maybeNumConvert @a @b) [minBound ..])
@@ -63,7 +63,7 @@ All implementations should be total, i.e., they should not produce \"bottoms\".
 Additionally, any implementation should be translatable to synthesizable HDL.
 -}
 class NumConvert a b where
-  {- | NumConvert a supplied value of type @a@ to a value of type @b@. The conversion
+  {- | Convert a supplied value of type @a@ to a value of type @b@. The conversion
     is guaranteed to succeed.
 
     >>> numConvert (3 :: Index 8) :: Unsigned 8

@@ -37,7 +37,6 @@ module Clash.Tests.MaybeNumConvert where
 
 import Control.Monad (forM_)
 import Data.Data (Proxy (..))
-import Data.Either (isLeft)
 import Data.Maybe (fromMaybe, isJust)
 import GHC.TypeNats (someNatVal)
 import Test.Tasty (TestTree, defaultMain)
@@ -53,6 +52,8 @@ import Clash.Prelude hiding (someNatVal)
 #if !MIN_VERSION_base(4,16,0)
 import Numeric.Natural (Natural)
 #endif
+
+import qualified Data.List as L
 
 main :: IO ()
 main = defaultMain tests
@@ -109,7 +110,9 @@ maybeConvertLaw4 Proxy x =
 
 -- | Checks whether an 'XException' in, means an 'XException' out
 convertXException :: forall a b. (MaybeNumConvert a b) => Proxy a -> Proxy b -> Bool
-convertXException _ _ = isLeft $ isX $ maybeNumConvert @a @b (errorX "" :: a)
+convertXException _ _ = case isX $ maybeNumConvert @a @b (errorX "BOO" :: a) of
+  Left s -> "BOO" `L.isInfixOf` s
+  Right _ -> False
 
 indexMax :: Natural
 indexMax = 128
