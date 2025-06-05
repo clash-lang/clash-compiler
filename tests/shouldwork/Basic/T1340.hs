@@ -72,18 +72,14 @@ catLayout (BitLayout aBitCount aInFn aOutFn) (BitLayout bBitCount bInFn bOutFn) 
   in BitLayout SNat inFn outFn
 
 vecLayout
-  :: forall n n' t
-  .  ( n' ~ (n - 1)
-     , 1 <= n
-     , KnownNat n
-     , KnownNat n' )
+  :: (1 <= n, KnownNat n)
   => Vec n (BitLayout t)
   -> BitLayout (Vec n t)
 vecLayout (BitLayout{..} :> others) = let
   headLayout = BitLayout SNat (headSigFn >>> inFn) (outFn >>> singletonSigFn)
   in case others of
-       Nil -> headLayout
-       _ -> headLayout `catLayout` vecLayout @n' others
+       Nil    -> headLayout
+       _ :> _ -> headLayout `catLayout` vecLayout others
 
 layout :: BitLayout (Vec Lanes Bit)
 layout = mkPos (0 :: Index (Lanes + 1))
