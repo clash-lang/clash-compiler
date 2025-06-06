@@ -73,8 +73,21 @@ nix-build:
   stage: test
   before_script:
    - nix-env -i gawk
+   - export THREADS=$(./.ci/effective_cpus.sh)
+   - export
   script:
-    - nix-build -j$(./.ci/effective_cpus.sh) --log-format raw --max-silent-time 3600
+    - .ci/build_nix.sh .#clash-prelude
+    - .ci/build_nix.sh .#clash-prelude-hedgehog
+    - .ci/build_nix.sh .#clash-lib
+    - .ci/build_nix.sh .#clash-lib-hedgehog
+    - .ci/build_nix.sh .#clash-ghc
+    - .ci/build_nix.sh .#clash-cosim
+    - .ci/build_nix.sh .#clash-ffi
+    - .ci/build_nix.sh .#clash-testsuite
+    - .ci/build_nix.sh .#clash-benchmark
+    - .ci/build_nix.sh .#clash-profiling-prepare
+    - .ci/build_nix.sh .#clash-profiling
+    - .ci/build_nix.sh .#clash-term
   tags:
     - local
 
