@@ -68,5 +68,5 @@ tests =
     , testCase "test6" $ test5 @=? test6
     , testCase "test7" $ test7 @?= ("The big test:\n\n" ++ test5)
     , testCase "test8" $ test8 @?= "looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong \nword"
-    , testCase "test9" $ test9 @?= "\\42"
+    , testCase "test9" $ test9 @?= "\\1337"
     ]
