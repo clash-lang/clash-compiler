@@ -165,6 +165,7 @@ generatePrimMap
   -- ^ unresolved primitives found in annotations (in LoadModules and
   -- LoadInterfaceFiles)
   -> [(TS.Text, PrimitiveGuard ())]
+  -- ^ Primitive guards found in annotations
   -> [FilePath]
   -- ^ Directories to search for primitive definitions
   -> IO ResolvedPrimMap
