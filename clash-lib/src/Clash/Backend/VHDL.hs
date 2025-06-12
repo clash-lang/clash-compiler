@@ -1762,7 +1762,7 @@ expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   , Just k <- clogBase 2 n
   , let k' = max 1 k
-  = exprLit (Just (Unsigned k',k')) i
+  = exprLit (Just (Index n,k')) i
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Index.maxBound#"
@@ -1860,6 +1860,9 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
     | i < 0                    -> "unsigned" <> parens ("std_logic_vector" <> parens ("to_signed" <> parens(integer i <> "," <> int n)))
     | i < 2^(31 :: Integer) -> "to_unsigned" <> parens (integer i <> "," <> int n)
     | otherwise -> "unsigned'" <> parens lit
+  Index n
+   | 0 <= i && i < n -> exprLit (Just (Unsigned sz, sz)) (NumLit i)  -- reuse Unsigned implementation above
+   | otherwise       -> hdlTypeErrValue hty
   Signed n
     | i < 2^(31 :: Integer) && i > (-2^(31 :: Integer)) -> "to_signed" <> parens (integer i <> "," <> int n)
     | otherwise -> "signed'" <> parens lit
