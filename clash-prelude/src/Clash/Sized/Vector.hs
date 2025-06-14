@@ -33,7 +33,7 @@ module Clash.Sized.Vector
     -- ** Length information
   , length, lengthS
     -- ** Indexing
-  , (!!), head, last, at
+  , (!!), index_int, head, last, at
   , indices, indicesI
   , findIndex, elemIndex
     -- ** Extracting sub-vectors (slicing)

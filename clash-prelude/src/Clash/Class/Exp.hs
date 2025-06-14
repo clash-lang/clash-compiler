@@ -11,7 +11,16 @@ Maintainer :  QBayLogic B.V. <devops@qaylogic.com>
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 
-module Clash.Class.Exp (Exp, ExpResult, (^)) where
+module Clash.Class.Exp
+  ( Exp
+  , ExpResult
+  , (^)
+
+  -- | * Internal
+  , expIndex#
+  , expSigned#
+  , expUnsigned#
+  ) where
 
 import qualified Prelude                       as P
 import           Prelude                       hiding ((^))

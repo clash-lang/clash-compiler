@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente
   License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Assortment of utility function used in the Clash library
 -}
@@ -87,6 +87,10 @@ instance Show ClashException where
   show (ClashException _ s eM) = s ++ "\n" ++ maybe "" id eM
 
 instance Exception.Exception ClashException
+
+-- | Construct a string pattern match out of the given @TemplateHaskell@ name
+namePat :: TH.Name -> TH.Q TH.Pat
+namePat = return . TH.LitP . TH.StringL . show
 
 assertPanic
   :: String -> Int -> a
