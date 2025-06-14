@@ -1551,18 +1551,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , Just i <- integerLiteral v
     -> reduce . Literal . DoubleLiteral . doubleToWord $ D# (integerToDouble# i)
 
-  -- XXX: Is this the same as in GHC.FLoat?
-  "GHC.Num.Integer.integerToFloat#"
-    | [v] <- args
-    , Just i <- integerLiteral v
-    -> reduce . Literal . FloatLiteral . floatToWord $ F# (integerToFloat# i)
-
-  -- XXX: Is this the same as in GHC.FLoat?
-  "GHC.Num.Integer.integerToDouble#"
-    | [v] <- args
-    , Just i <- integerLiteral v
-    -> reduce . Literal . DoubleLiteral . doubleToWord $ D# (integerToDouble# i)
-
   $(namePat 'GHC.Float.integerToFloat#)
     | [v] <- args
     , Just i <- integerLiteral v
