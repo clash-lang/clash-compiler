@@ -143,6 +143,8 @@ import qualified Clash.Sized.Internal.Signed
 import qualified Clash.Sized.Internal.Unsigned
 import qualified Clash.Sized.RTree
 import qualified Clash.Sized.Vector
+import qualified GHC.CString
+import qualified GHC.Classes
 
 isUndefinedPrimVal :: Value -> Bool
 isUndefinedPrimVal (PrimVal (PrimInfo{primName}) _ _) =
@@ -158,9 +160,9 @@ isUndefinedXPrimVal _ = False
 ghcPrimUnwind :: PrimUnwind
 ghcPrimUnwind tcm p tys vs v [] m
   | primName p `elem` [ showt 'Clash.Sized.Internal.Index.fromInteger#
-                       , "GHC.CString.unpackCString#"
+                       , showt 'GHC.CString.unpackCString#
                        , showt 'NP.removedArg
-                       , "GHC.Prim.MutableByteArray#"
+                       , showt ''MutableByteArray#
                        , showt 'NP.undefined
                        , showt 'NP.undefinedX
                        ]
@@ -210,9 +212,9 @@ ghcPrimUnwind tcm p tys vs v [e] m0
   -- all the cases can be covered by a match on [e] and their names:
   | primName p `elem` [  showt 'Clash.Sized.Vector.lazyV
                        , showt 'Clash.Sized.Vector.replicate
-                       , showt 'Clash.Sized.Vector.replace_int
-                       , "GHC.Classes.&&"
-                       , "GHC.Classes.||"
+                       , "Clash.Sized.Vector.replace_int"
+                       , showt '(GHC.Classes.&&)
+                       , showt '(GHC.Classes.||)
                        , showt 'BitVector.xToBV
                        , "Clash.Sized.Vector.imap_go"
                        ]
@@ -1219,7 +1221,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            mbaTy = mkFunTy intPrimTy (last tyArgs)
            newE = mkApps (Data tupDc) (map Right tyArgs ++
                     [Left (Prim rwTy)
-                    ,Left (mkApps (Prim (PrimInfo "GHC.Prim.MutableByteArray#" mbaTy WorkNever SingleResult NoUnfolding))
+                    ,Left (mkApps (Prim (PrimInfo (showt ''MutableByteArray#) mbaTy WorkNever SingleResult NoUnfolding))
                                   [Left (Literal . IntLiteral $ toInteger p)])
                     ])
        in Just . setTerm newE $ primInsert p lit mach
