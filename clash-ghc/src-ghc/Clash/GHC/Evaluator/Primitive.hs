@@ -118,7 +118,7 @@ import           Clash.Debug
 import           Clash.GHC.GHC2Core  (modNameM)
 import           Clash.Unique        (fromGhcUnique)
 import           Clash.Util
-  (MonadUnique (..), clogBase, flogBase, curLoc)
+  (MonadUnique (..), clogBase, flogBase, curLoc, namePat)
 import           Clash.Util.Supply   (Supply,freshId)
 import           Clash.Normalize.PrimitiveReductions
   (typeNatMul, typeNatSub, typeNatAdd, vecLastPrim, vecInitPrim, vecHeadPrim,
@@ -136,11 +136,16 @@ import Clash.XException (isX)
 
 import {-# SOURCE #-} Clash.GHC.Evaluator
 
-import qualified Clash.Sized.Vector
+import qualified Clash.Annotations.BitRepresentation.Deriving
+import qualified Clash.Class.BitPack.Internal
+import qualified Clash.Class.Exp
+import qualified Clash.Promoted.Nat
 import qualified Clash.Sized.Internal.BitVector
 import qualified Clash.Sized.Internal.Index
 import qualified Clash.Sized.Internal.Signed
 import qualified Clash.Sized.Internal.Unsigned
+import qualified Clash.Sized.RTree
+import qualified Clash.Sized.Vector
 
 isUndefinedPrimVal :: Value -> Bool
 isUndefinedPrimVal (PrimVal (PrimInfo{primName}) _ _) =
@@ -2448,7 +2453,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       ] <- args
     -> reduce (App (Data intDc) (Literal (IntLiteral (i `mod` j))))
 
-  "Clash.Class.BitPack.Internal.packDouble#" -- :: Double -> BitVector 64
+  $(namePat 'Clash.Class.BitPack.Internal.packDouble#) -- :: Double -> BitVector 64
     | [DC _ [Left arg]] <- args
     , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
     , mach2@Machine{mStack=[],mTerm=Literal (DoubleLiteral i)} <- whnf eval tcm True (setTerm arg $ stackClear mach)
@@ -2458,7 +2463,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
              , mTerm = mkBitVectorLit' resTyInfo 0 (toInteger $ (pack :: Word64 -> BitVector 64) i)
              }
 
-  "Clash.Class.BitPack.Internal.packFloat#" -- :: Float -> BitVector 32
+  $(namePat 'Clash.Class.BitPack.Internal.packFloat#) -- :: Float -> BitVector 32
     | [DC _ [Left arg]] <- args
     , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
     , mach2@Machine{mStack=[],mTerm=Literal (FloatLiteral i)} <- whnf eval tcm True (setTerm arg $ stackClear mach)
@@ -2468,19 +2473,19 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
              , mTerm = mkBitVectorLit' resTyInfo 0 (toInteger $ (pack :: Word32 -> BitVector 32) i)
              }
 
-  "Clash.Class.BitPack.Internal.unpackFloat#"
+  $(namePat 'Clash.Class.BitPack.Internal.unpackFloat#)
     | [i] <- bitVectorLiterals' args
     -> let resTy = getResultTy tcm ty tys
            val = unpack (toBV i :: BitVector 32)
         in reduce (mkFloatCLit tcm val resTy)
 
-  "Clash.Class.BitPack.Internal.unpackDouble#"
+  $(namePat 'Clash.Class.BitPack.Internal.unpackDouble#)
     | [i] <- bitVectorLiterals' args
     -> let resTy = getResultTy tcm ty tys
            val = unpack (toBV i :: BitVector 64)
         in reduce (mkDoubleCLit tcm val resTy)
 
-  "Clash.Sized.Internal.BitVector.xToBV"
+  $(namePat 'Clash.Sized.Internal.BitVector.xToBV)
     | isSubj
     , Just (nTy, kn) <- extractKnownNat tcm tys
     -- The second argument to `xToBV` is always going to be suspended.
@@ -2508,7 +2513,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   --   => Index m
   --   -> SNat n
   --   -> Index (n^m)
-  "Clash.Class.Exp.expIndex#"
+  $(namePat 'Clash.Class.Exp.expIndex#)
     | [b] <- indexLiterals' args
     , [(_mTy, km), (_, e)] <- extractKnownNats tcm tys
     -> reduce (mkIndexLit ty (LitTy (NumTy (km^e))) (km^e) (b^e))
@@ -2518,7 +2523,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   --   => Signed m
   --   -> SNat n
   --   -> Signed (n*m)
-  "Clash.Class.Exp.expSigned#"
+  $(namePat 'Clash.Class.Exp.expSigned#)
     | [b] <- signedLiterals' args
     , [(_mTy, km), (_, e)] <- extractKnownNats tcm tys
     -> reduce (mkSignedLit ty (LitTy (NumTy (km*e))) (km*e) (b^e))
@@ -2528,12 +2533,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   --   => Unsigned m
   --   -> SNat n
   --   -> Unsigned m
-  "Clash.Class.Exp.expUnsigned#"
+  $(namePat 'Clash.Class.Exp.expUnsigned#)
     | [b] <- unsignedLiterals' args
     , [(_mTy, km), (_, e)] <- extractKnownNats tcm tys
     -> reduce (mkUnsignedLit ty (LitTy (NumTy (km*e))) (km*e) (b^e))
 
-  "Clash.Promoted.Nat.powSNat"
+  $(namePat 'Clash.Promoted.Nat.powSNat)
     | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
     -> let c = case a of
                  2 -> 1 `shiftL` (fromInteger b)
@@ -2545,7 +2550,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            mkApps (Data snatDc) [ Right (LitTy (NumTy c))
                                 , Left (Literal (NaturalLiteral c))]
 
-  "Clash.Promoted.Nat.flogBaseSNat"
+  $(namePat 'Clash.Promoted.Nat.flogBaseSNat)
     | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
     , Just c <- flogBase a b
     , let c' = toInteger c
@@ -2556,7 +2561,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
                                 , Left (Literal (NaturalLiteral c'))]
 
-  "Clash.Promoted.Nat.clogBaseSNat"
+  $(namePat 'Clash.Promoted.Nat.clogBaseSNat)
     | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
     , Just c <- clogBase a b
     , let c' = toInteger c
@@ -2569,7 +2574,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | otherwise
     -> error ("clogBaseSNat: args = " <> show args <> ", tys = " <> show tys)
 
-  "Clash.Promoted.Nat.logBaseSNat"
+  $(namePat 'Clash.Promoted.Nat.logBaseSNat)
     | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
     , Just c <- flogBase a b
     , let c' = toInteger c
@@ -2584,24 +2589,24 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 -- BitVector
 ------------
 -- Constructor
-  "Clash.Sized.Internal.BitVector.BV"
+  $(namePat 'Clash.Sized.Internal.BitVector.BV)
     | [Right _] <- map (runExcept . tyNatSize tcm) tys
     , Just (m,i) <- integerLiterals args
     -> let resTyInfo = extractTySizeInfo tcm ty tys
        in  reduce (mkBitVectorLit' resTyInfo m i)
 
-  "Clash.Sized.Internal.BitVector.Bit"
+  $(namePat 'Clash.Sized.Internal.BitVector.Bit)
     | Just (m,i) <- integerLiterals args
     -> reduce (mkBitLit ty m i)
 
 -- Initialization
-  "Clash.Sized.Internal.BitVector.size#"
+  $(namePat 'Clash.Sized.Internal.BitVector.size#)
     | Just (_, kn) <- extractKnownNat tcm tys
     -> let (_,tyView -> TyConApp intTcNm _) = splitFunForallTy ty
            (Just intTc) = UniqMap.lookup intTcNm tcm
            [intCon] = tyConDataCons intTc
        in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral kn))])
-  "Clash.Sized.Internal.BitVector.maxIndex#"
+  $(namePat 'Clash.Sized.Internal.BitVector.maxIndex#)
     | Just (_, kn) <- extractKnownNat tcm tys
     -> let (_,tyView -> TyConApp intTcNm _) = splitFunForallTy ty
            (Just intTc) = UniqMap.lookup intTcNm tcm
@@ -2609,70 +2614,70 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral (kn-1)))])
 
 -- Construction
-  "Clash.Sized.Internal.BitVector.high"
+  $(namePat 'Clash.Sized.Internal.BitVector.high)
     -> reduce (mkBitLit ty 0 1)
-  "Clash.Sized.Internal.BitVector.low"
+  $(namePat 'Clash.Sized.Internal.BitVector.low)
     -> reduce (mkBitLit ty 0 0)
 
-  "Clash.Sized.Internal.BitVector.undefined#"
+  $(namePat 'Clash.Sized.Internal.BitVector.undefined#)
     | Just (_, kn) <- extractKnownNat tcm tys
     -> let resTyInfo = extractTySizeInfo tcm ty tys
            mask = bit (fromInteger kn) - 1
        in reduce (mkBitVectorLit' resTyInfo mask 0)
 
 -- Eq
-  "Clash.Sized.Internal.BitVector.eq##" | [(0,i),(0,j)] <- bitLiterals args
+  $(namePat 'Clash.Sized.Internal.BitVector.eq##) | [(0,i),(0,j)] <- bitLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i == j))
-  "Clash.Sized.Internal.BitVector.neq##" | [(0,i),(0,j)] <- bitLiterals args
+  $(namePat 'Clash.Sized.Internal.BitVector.neq##) | [(0,i),(0,j)] <- bitLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i /= j))
 
 -- Ord
-  "Clash.Sized.Internal.BitVector.lt##" | [(0,i),(0,j)] <- bitLiterals args
+  $(namePat 'Clash.Sized.Internal.BitVector.lt##) | [(0,i),(0,j)] <- bitLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i <  j))
-  "Clash.Sized.Internal.BitVector.ge##" | [(0,i),(0,j)] <- bitLiterals args
+  $(namePat 'Clash.Sized.Internal.BitVector.ge##) | [(0,i),(0,j)] <- bitLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i >= j))
-  "Clash.Sized.Internal.BitVector.gt##" | [(0,i),(0,j)] <- bitLiterals args
+  $(namePat 'Clash.Sized.Internal.BitVector.gt##) | [(0,i),(0,j)] <- bitLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i >  j))
-  "Clash.Sized.Internal.BitVector.le##" | [(0,i),(0,j)] <- bitLiterals args
+  $(namePat 'Clash.Sized.Internal.BitVector.le##) | [(0,i),(0,j)] <- bitLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i <= j))
 
 -- Enum
-  "Clash.Sized.Internal.BitVector.toEnum##"
+  $(namePat 'Clash.Sized.Internal.BitVector.toEnum##)
     | [i] <- intCLiterals' args
     -> let Bit msk val = BitVector.toEnum## (fromInteger i)
        in reduce (mkBitLit ty (toInteger msk) (toInteger val))
 
 -- Bits
-  "Clash.Sized.Internal.BitVector.and##"
+  $(namePat 'Clash.Sized.Internal.BitVector.and##)
     | [i,j] <- bitLiterals args
     -> let Bit msk val = BitVector.and## (toBit i) (toBit j)
        in reduce (mkBitLit ty (toInteger msk) (toInteger val))
-  "Clash.Sized.Internal.BitVector.or##"
+  $(namePat 'Clash.Sized.Internal.BitVector.or##)
     | [i,j] <- bitLiterals args
     -> let Bit msk val = BitVector.or## (toBit i) (toBit j)
        in reduce (mkBitLit ty (toInteger msk) (toInteger val))
-  "Clash.Sized.Internal.BitVector.xor##"
+  $(namePat 'Clash.Sized.Internal.BitVector.xor##)
     | [i,j] <- bitLiterals args
     -> let Bit msk val = BitVector.xor## (toBit i) (toBit j)
        in reduce (mkBitLit ty (toInteger msk) (toInteger val))
 
-  "Clash.Sized.Internal.BitVector.complement##"
+  $(namePat 'Clash.Sized.Internal.BitVector.complement##)
     | [i] <- bitLiterals args
     -> let Bit msk val = BitVector.complement## (toBit i)
        in reduce (mkBitLit ty (toInteger msk) (toInteger val))
 
 -- Pack
-  "Clash.Sized.Internal.BitVector.pack#"
+  $(namePat 'Clash.Sized.Internal.BitVector.pack#)
     | [(msk,i)] <- bitLiterals args
     -> let resTyInfo = extractTySizeInfo tcm ty tys
        in  reduce (mkBitVectorLit' resTyInfo msk i)
 
-  "Clash.Sized.Internal.BitVector.unpack#"
+  $(namePat 'Clash.Sized.Internal.BitVector.unpack#)
     | [(msk,i)] <- bitVectorLiterals' args
     -> reduce (mkBitLit ty msk i)
 
 -- Concatenation
-  "Clash.Sized.Internal.BitVector.++#" -- :: KnownNat m => BitVector n -> BitVector m -> BitVector (n + m)
+  $(namePat '(Clash.Sized.Internal.BitVector.++#)) -- :: KnownNat m => BitVector n -> BitVector m -> BitVector (n + m)
     | Just (_,m) <- extractKnownNat tcm tys
     , [(mski,i),(mskj,j)] <- bitVectorLiterals' args
     -> let val = i `shiftL` fromInteger m .|. j
@@ -2681,7 +2686,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in reduce (mkBitVectorLit' resTyInfo msk val)
 
 -- Reduction
-  "Clash.Sized.Internal.BitVector.reduceAnd#" -- :: KnownNat n => BitVector n -> Bit
+  $(namePat 'Clash.Sized.Internal.BitVector.reduceAnd#) -- :: KnownNat n => BitVector n -> Bit
     | [i] <- bitVectorLiterals' args
     , Just (_, kn) <- extractKnownNat tcm tys
     -> let resTy = getResultTy tcm ty tys
@@ -2690,7 +2695,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     where
       op :: KnownNat n => BitVector n -> Proxy n -> Integer
       op u _ = toInteger (BitVector.reduceAnd# u)
-  "Clash.Sized.Internal.BitVector.reduceOr#" -- :: KnownNat n => BitVector n -> Bit
+  $(namePat 'Clash.Sized.Internal.BitVector.reduceOr#) -- :: KnownNat n => BitVector n -> Bit
     | [i] <- bitVectorLiterals' args
     , Just (_, kn) <- extractKnownNat tcm tys
     -> let resTy = getResultTy tcm ty tys
@@ -2699,7 +2704,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     where
       op :: KnownNat n => BitVector n -> Proxy n -> Integer
       op u _ = toInteger (BitVector.reduceOr# u)
-  "Clash.Sized.Internal.BitVector.reduceXor#" -- :: KnownNat n => BitVector n -> Bit
+  $(namePat 'Clash.Sized.Internal.BitVector.reduceXor#) -- :: KnownNat n => BitVector n -> Bit
     | [i] <- bitVectorLiterals' args
     , Just (_, kn) <- extractKnownNat tcm tys
     -> let resTy = getResultTy tcm ty tys
@@ -2711,7 +2716,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
 
 -- Indexing
-  "Clash.Sized.Internal.BitVector.index#" -- :: KnownNat n => BitVector n -> Int -> Bit
+  $(namePat 'Clash.Sized.Internal.BitVector.index#) -- :: KnownNat n => BitVector n -> Int -> Bit
     | Just (_,kn,i,j) <- bitVectorLitIntLit tcm tys args
       -> let resTy = getResultTy tcm ty tys
              (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
@@ -2720,7 +2725,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
         op u i _ = (toInteger m, toInteger v)
           where Bit m v = (BitVector.index# u i)
-  "Clash.Sized.Internal.BitVector.replaceBit#" -- :: :: KnownNat n => BitVector n -> Int -> Bit -> BitVector n
+  $(namePat 'Clash.Sized.Internal.BitVector.replaceBit#) -- :: :: KnownNat n => BitVector n -> Int -> Bit -> BitVector n
     | Just (_, n) <- extractKnownNat tcm tys
     , [ _
       , PrimVal bvP _ [_, Lit (NaturalLiteral mskBv), Lit (IntegerLiteral bv)]
@@ -2738,7 +2743,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
         op :: KnownNat n => BitVector n -> Int -> Bit -> Proxy n -> (Integer,Integer)
         -- op bv i b _ = (BitVector.unsafeMask res, BitVector.unsafeToInteger res)
         op bv i b _ = splitBV (BitVector.replaceBit# bv i b)
-  "Clash.Sized.Internal.BitVector.setSlice#"
+  $(namePat 'Clash.Sized.Internal.BitVector.setSlice#)
   -- :: SNat (m+1+i) -> BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n) -> BitVector (m + 1 + i)
     | mTy : iTy : nTy : _ <- tys
     , Right m <- runExcept (tyNatSize tcm mTy)
@@ -2748,7 +2753,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let BV msk val = BitVector.setSlice# (unsafeSNat (m+1+iN)) (toBV i) (unsafeSNat m) (unsafeSNat n) (toBV j)
            resTyInfo = extractTySizeInfo tcm ty tys
        in  reduce (mkBitVectorLit' resTyInfo (toInteger msk) (toInteger val))
-  "Clash.Sized.Internal.BitVector.slice#"
+  $(namePat 'Clash.Sized.Internal.BitVector.slice#)
   -- :: BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n)
     | mTy : _ : nTy : _ <- tys
     , Right m <- runExcept (tyNatSize tcm mTy)
@@ -2757,7 +2762,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let BV msk val = BitVector.slice# (toBV i) (unsafeSNat m) (unsafeSNat n)
            resTyInfo = extractTySizeInfo tcm ty tys
        in  reduce (mkBitVectorLit' resTyInfo (toInteger msk) (toInteger val))
-  "Clash.Sized.Internal.BitVector.split#" -- :: forall n m. KnownNat n => BitVector (m + n) -> (BitVector m, BitVector n)
+  $(namePat 'Clash.Sized.Internal.BitVector.split#) -- :: forall n m. KnownNat n => BitVector (m + n) -> (BitVector m, BitVector n)
     | nTy : mTy : _ <- tys
     , Right n <-  runExcept (tyNatSize tcm nTy)
     , Right m <-  runExcept (tyNatSize tcm mTy)
@@ -2777,7 +2782,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                 [ Left (mkBitVectorLit bvTy mTy m mskM valM)
                 , Left (mkBitVectorLit bvTy nTy n mskN valN)])
 
-  "Clash.Sized.Internal.BitVector.msb#" -- :: forall n. KnownNat n => BitVector n -> Bit
+  $(namePat 'Clash.Sized.Internal.BitVector.msb#) -- :: forall n. KnownNat n => BitVector n -> Bit
     | [i] <- bitVectorLiterals' args
     , Just (_, kn) <- extractKnownNat tcm tys
     -> let resTy = getResultTy tcm ty tys
@@ -2788,7 +2793,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       op u _ = (unsafeMask# res, BitVector.unsafeToInteger# res)
         where
           res = BitVector.msb# u
-  "Clash.Sized.Internal.BitVector.lsb#" -- :: BitVector n -> Bit
+  $(namePat 'Clash.Sized.Internal.BitVector.lsb#) -- :: BitVector n -> Bit
     | [i] <- bitVectorLiterals' args
     -> let resTy = getResultTy tcm ty tys
            Bit msk val = BitVector.lsb# (toBV i)
@@ -2797,7 +2802,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
 -- Eq
   -- eq#, neq# :: KnownNat n => BitVector n -> BitVector n -> Bool
-  "Clash.Sized.Internal.BitVector.eq#"
+  $(namePat 'Clash.Sized.Internal.BitVector.eq#)
     | nTy : _ <- tys
     , Right 0 <- runExcept (tyNatSize tcm nTy)
     -> reduce (boolToBoolLiteral tcm ty True)
@@ -2805,7 +2810,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , Just val <- reifyNat kn (liftBitVector2Bool BitVector.eq# ty tcm args)
     -> reduce val
 
-  "Clash.Sized.Internal.BitVector.neq#"
+  $(namePat 'Clash.Sized.Internal.BitVector.neq#)
     | nTy : _ <- tys
     , Right 0 <- runExcept (tyNatSize tcm nTy)
     -> reduce (boolToBoolLiteral tcm ty False)
@@ -2815,28 +2820,28 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
 -- Ord
   -- lt#,ge#,gt#,le# :: KnownNat n => BitVector n -> BitVector n -> Bool
-  "Clash.Sized.Internal.BitVector.lt#"
+  $(namePat 'Clash.Sized.Internal.BitVector.lt#)
     | nTy : _ <- tys
     , Right 0 <- runExcept (tyNatSize tcm nTy)
     -> reduce (boolToBoolLiteral tcm ty False)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftBitVector2Bool BitVector.lt# ty tcm args)
     -> reduce val
-  "Clash.Sized.Internal.BitVector.ge#"
+  $(namePat 'Clash.Sized.Internal.BitVector.ge#)
     | nTy : _ <- tys
     , Right 0 <- runExcept (tyNatSize tcm nTy)
     -> reduce (boolToBoolLiteral tcm ty True)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftBitVector2Bool BitVector.ge# ty tcm args)
     -> reduce val
-  "Clash.Sized.Internal.BitVector.gt#"
+  $(namePat 'Clash.Sized.Internal.BitVector.gt#)
     | nTy : _ <- tys
     , Right 0 <- runExcept (tyNatSize tcm nTy)
     -> reduce (boolToBoolLiteral tcm ty False)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftBitVector2Bool BitVector.gt# ty tcm args)
     -> reduce val
-  "Clash.Sized.Internal.BitVector.le#"
+  $(namePat 'Clash.Sized.Internal.BitVector.le#)
     | nTy : _ <- tys
     , Right 0 <- runExcept (tyNatSize tcm nTy)
     -> reduce (boolToBoolLiteral tcm ty True)
@@ -2846,40 +2851,40 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
 -- Enum
 
-  "Clash.Sized.Internal.BitVector.toEnum#"
+  $(namePat 'Clash.Sized.Internal.BitVector.toEnum#)
     | let resTyInfo@(_,_,kn) = extractTySizeInfo tcm ty tys
     , Just val <- reifyNat kn (liftInteger2BitVector (BitVector.toEnum# . fromInteger) resTyInfo args)
     -> reduce val
 
-  "Clash.Sized.Internal.BitVector.fromEnum#"
+  $(namePat 'Clash.Sized.Internal.BitVector.fromEnum#)
     | Just (_, kn) <- extractKnownNat tcm tys
     , let resTy = getResultTy tcm ty tys
     , Just val <- reifyNat kn (liftBitVector2CInt tcm resTy (toInteger . BitVector.fromEnum#) args)
     -> reduce val
 
 -- Bounded
-  "Clash.Sized.Internal.BitVector.minBound#"
+  $(namePat 'Clash.Sized.Internal.BitVector.minBound#)
     | Just (nTy,len) <- extractKnownNat tcm tys
     -> reduce (mkBitVectorLit ty nTy len 0 0)
-  "Clash.Sized.Internal.BitVector.maxBound#"
+  $(namePat 'Clash.Sized.Internal.BitVector.maxBound#)
     | Just (litTy,mb) <- extractKnownNat tcm tys
     -> let maxB = (2 ^ mb) - 1
        in  reduce (mkBitVectorLit ty litTy mb 0 maxB)
 
 -- Num
-  "Clash.Sized.Internal.BitVector.+#"
+  $(namePat '(Clash.Sized.Internal.BitVector.+#))
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftBitVector2 (BitVector.+#) ty tcm tys args)
     -> reduce val
-  "Clash.Sized.Internal.BitVector.-#"
+  $(namePat '(Clash.Sized.Internal.BitVector.-#))
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftBitVector2 (BitVector.-#) ty tcm tys args)
     -> reduce val
-  "Clash.Sized.Internal.BitVector.*#"
+  $(namePat '(Clash.Sized.Internal.BitVector.*#))
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftBitVector2 (BitVector.*#) ty tcm tys args)
     -> reduce val
-  "Clash.Sized.Internal.BitVector.negate#"
+  $(namePat 'Clash.Sized.Internal.BitVector.negate#)
     | Just (nTy, kn) <- extractKnownNat tcm tys
     , [i] <- bitVectorLiterals' args
     -> let (msk,val) = reifyNat kn (op (toBV i))
@@ -2889,7 +2894,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       op u _ = splitBV (BitVector.negate# u)
 
 -- ExtendingNum
-  "Clash.Sized.Internal.BitVector.plus#" -- :: (KnownNat n, KnownNat m) => BitVector m -> BitVector n -> BitVector (Max m n + 1)
+  $(namePat 'Clash.Sized.Internal.BitVector.plus#) -- :: (KnownNat n, KnownNat m) => BitVector m -> BitVector n -> BitVector (Max m n + 1)
     | [(0,i),(0,j)] <- bitVectorLiterals' args
     -> let ty' = piResultTys tcm ty tys
            (_,resTy) = splitFunForallTy ty'
@@ -2897,7 +2902,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
        in  reduce (mkBitVectorLit resTy resSizeTy resSizeInt 0 (i+j))
 
-  "Clash.Sized.Internal.BitVector.minus#"
+  $(namePat 'Clash.Sized.Internal.BitVector.minus#)
     | [(0,i),(0,j)] <- bitVectorLiterals' args
     -> let ty' = piResultTys tcm ty tys
            (_,resTy) = splitFunForallTy ty'
@@ -2906,7 +2911,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            val = reifyNat resSizeInt (runSizedF (BitVector.-#) i j)
       in  reduce (mkBitVectorLit resTy resSizeTy resSizeInt 0 val)
 
-  "Clash.Sized.Internal.BitVector.times#"
+  $(namePat 'Clash.Sized.Internal.BitVector.times#)
     | [(0,i),(0,j)] <- bitVectorLiterals' args
     -> let ty' = piResultTys tcm ty tys
            (_,resTy) = splitFunForallTy ty'
@@ -2915,15 +2920,15 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce (mkBitVectorLit resTy resSizeTy resSizeInt 0 (i*j))
 
 -- Integral
-  "Clash.Sized.Internal.BitVector.quot#"
+  $(namePat 'Clash.Sized.Internal.BitVector.quot#)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftBitVector2 (BitVector.quot#) ty tcm tys args)
     -> reduce $ catchDivByZero val
-  "Clash.Sized.Internal.BitVector.rem#"
+  $(namePat 'Clash.Sized.Internal.BitVector.rem#)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftBitVector2 (BitVector.rem#) ty tcm tys args)
     -> reduce $ catchDivByZero val
-  "Clash.Sized.Internal.BitVector.toInteger#"
+  $(namePat 'Clash.Sized.Internal.BitVector.toInteger#)
     | Just (_, kn) <- extractKnownNat tcm tys
     , [i] <- bitVectorLiterals' args
     -> let val = reifyNat kn (op (toBV i))
@@ -2933,20 +2938,20 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       op u _ = BitVector.toInteger# u
 
 -- Bits
-  "Clash.Sized.Internal.BitVector.and#"
+  $(namePat 'Clash.Sized.Internal.BitVector.and#)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftBitVector2 (BitVector.and#) ty tcm tys args)
     -> reduce val
-  "Clash.Sized.Internal.BitVector.or#"
+  $(namePat 'Clash.Sized.Internal.BitVector.or#)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftBitVector2 (BitVector.or#) ty tcm tys args)
     -> reduce val
-  "Clash.Sized.Internal.BitVector.xor#"
+  $(namePat 'Clash.Sized.Internal.BitVector.xor#)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftBitVector2 (BitVector.xor#) ty tcm tys args)
     -> reduce val
 
-  "Clash.Sized.Internal.BitVector.complement#"
+  $(namePat 'Clash.Sized.Internal.BitVector.complement#)
     | [i] <- bitVectorLiterals' args
     , Just (nTy, kn) <- extractKnownNat tcm tys
     -> let (msk,val) = reifyNat kn (op (toBV i))
@@ -2955,28 +2960,28 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       op :: KnownNat n => BitVector n -> Proxy n -> (Integer,Integer)
       op u _ = splitBV $ BitVector.complement# u
 
-  "Clash.Sized.Internal.BitVector.shiftL#"
+  $(namePat 'Clash.Sized.Internal.BitVector.shiftL#)
     | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm tys args
       -> let (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
       in reduce (mkBitVectorLit ty nTy kn msk val)
       where
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
         op u i _ = splitBV (BitVector.shiftL# u i)
-  "Clash.Sized.Internal.BitVector.shiftR#"
+  $(namePat 'Clash.Sized.Internal.BitVector.shiftR#)
     | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm tys args
       -> let (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
       in reduce (mkBitVectorLit ty nTy kn msk val)
       where
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
         op u i _ = splitBV (BitVector.shiftR# u i)
-  "Clash.Sized.Internal.BitVector.rotateL#"
+  $(namePat 'Clash.Sized.Internal.BitVector.rotateL#)
     | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm tys args
       -> let (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
       in reduce (mkBitVectorLit ty nTy kn msk val)
       where
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
         op u i _ = splitBV (BitVector.rotateL# u i)
-  "Clash.Sized.Internal.BitVector.rotateR#"
+  $(namePat 'Clash.Sized.Internal.BitVector.rotateR#)
     | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm tys args
       -> let (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
       in reduce (mkBitVectorLit ty nTy kn msk val)
@@ -2985,7 +2990,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
         op u i _ = splitBV (BitVector.rotateR# u i)
 
 -- truncateB
-  "Clash.Sized.Internal.BitVector.truncateB#" -- forall a b . KnownNat a => BitVector (a + b) -> BitVector a
+  $(namePat 'Clash.Sized.Internal.BitVector.truncateB#) -- forall a b . KnownNat a => BitVector (a + b) -> BitVector a
     | aTy  : _ <- tys
     , Right ka <- runExcept (tyNatSize tcm aTy)
     , [(mski,i)] <- bitVectorLiterals' args
@@ -2998,83 +3003,83 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 -- Index
 --------
 -- BitPack
-  "Clash.Sized.Internal.Index.pack#"
+  $(namePat 'Clash.Sized.Internal.Index.pack#)
     | nTy : _ <- tys
     , Right _ <- runExcept (tyNatSize tcm nTy)
     , [i] <- indexLiterals' args
     -> let resTyInfo = extractTySizeInfo tcm ty tys
        in  reduce (mkBitVectorLit' resTyInfo 0 i)
-  "Clash.Sized.Internal.Index.unpack#"
+  $(namePat 'Clash.Sized.Internal.Index.unpack#)
     | Just (nTy,kn) <- extractKnownNat tcm tys
     , [(0,i)] <- bitVectorLiterals' args
     -> reduce (mkIndexLit ty nTy kn i)
 
 -- Eq
-  "Clash.Sized.Internal.Index.eq#" | Just (i,j) <- indexLiterals args
+  $(namePat 'Clash.Sized.Internal.Index.eq#) | Just (i,j) <- indexLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i == j))
-  "Clash.Sized.Internal.Index.neq#" | Just (i,j) <- indexLiterals args
+  $(namePat 'Clash.Sized.Internal.Index.neq#) | Just (i,j) <- indexLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i /= j))
 
 -- Ord
-  "Clash.Sized.Internal.Index.lt#"
+  $(namePat 'Clash.Sized.Internal.Index.lt#)
     | Just (i,j) <- indexLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i < j))
-  "Clash.Sized.Internal.Index.ge#"
+  $(namePat 'Clash.Sized.Internal.Index.ge#)
     | Just (i,j) <- indexLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i >= j))
-  "Clash.Sized.Internal.Index.gt#"
+  $(namePat 'Clash.Sized.Internal.Index.gt#)
     | Just (i,j) <- indexLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i > j))
-  "Clash.Sized.Internal.Index.le#"
+  $(namePat 'Clash.Sized.Internal.Index.le#)
     | Just (i,j) <- indexLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i <= j))
 
 -- Enum
-  "Clash.Sized.Internal.Index.toEnum#"
+  $(namePat 'Clash.Sized.Internal.Index.toEnum#)
     | [i] <- intCLiterals' args
     , Just (nTy, mb) <- extractKnownNat tcm tys
     -> reduce (mkIndexLit ty nTy mb i)
 
-  "Clash.Sized.Internal.Index.fromEnum#"
+  $(namePat 'Clash.Sized.Internal.Index.fromEnum#)
     | [i] <- indexLiterals' args
     -> let resTy = getResultTy tcm ty tys
         in reduce (mkIntCLit tcm i resTy)
 
 -- Bounded
-  "Clash.Sized.Internal.Index.maxBound#"
+  $(namePat 'Clash.Sized.Internal.Index.maxBound#)
     | Just (nTy,mb) <- extractKnownNat tcm tys
     -> reduce (mkIndexLit ty nTy mb (mb - 1))
 
 -- Num
-  "Clash.Sized.Internal.Index.+#"
+  $(namePat '(Clash.Sized.Internal.Index.+#))
     | Just (nTy,kn) <- extractKnownNat tcm tys
     , [i,j] <- indexLiterals' args
     -> reduce (mkIndexLit ty nTy kn (i + j))
-  "Clash.Sized.Internal.Index.-#"
+  $(namePat '(Clash.Sized.Internal.Index.-#))
     | Just (nTy,kn) <- extractKnownNat tcm tys
     , [i,j] <- indexLiterals' args
     -> reduce (mkIndexLit ty nTy kn (i - j))
-  "Clash.Sized.Internal.Index.*#"
+  $(namePat '(Clash.Sized.Internal.Index.*#))
     | Just (nTy,kn) <- extractKnownNat tcm tys
     , [i,j] <- indexLiterals' args
     -> reduce (mkIndexLit ty nTy kn (i * j))
 
 -- ExtendingNum
-  "Clash.Sized.Internal.Index.plus#"
+  $(namePat 'Clash.Sized.Internal.Index.plus#)
     | mTy : nTy : _ <- tys
     , Right _ <- runExcept (tyNatSize tcm mTy)
     , Right _ <- runExcept (tyNatSize tcm nTy)
     , Just (i,j) <- indexLiterals args
     -> let resTyInfo = extractTySizeInfo tcm ty tys
        in  reduce (mkIndexLit' resTyInfo (i + j))
-  "Clash.Sized.Internal.Index.minus#"
+  $(namePat 'Clash.Sized.Internal.Index.minus#)
     | mTy : nTy : _ <- tys
     , Right _ <- runExcept (tyNatSize tcm mTy)
     , Right _ <- runExcept (tyNatSize tcm nTy)
     , Just (i,j) <- indexLiterals args
     -> let resTyInfo = extractTySizeInfo tcm ty tys
        in  reduce (mkIndexLit' resTyInfo (i - j))
-  "Clash.Sized.Internal.Index.times#"
+  $(namePat 'Clash.Sized.Internal.Index.times#)
     | mTy : nTy : _ <- tys
     , Right _ <- runExcept (tyNatSize tcm mTy)
     , Right _ <- runExcept (tyNatSize tcm nTy)
@@ -3083,21 +3088,21 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce (mkIndexLit' resTyInfo (i * j))
 
 -- Integral
-  "Clash.Sized.Internal.Index.quot#"
+  $(namePat 'Clash.Sized.Internal.Index.quot#)
     | Just (nTy,kn) <- extractKnownNat tcm tys
     , Just (i,j) <- indexLiterals args
     -> reduce $ catchDivByZero (mkIndexLit ty nTy kn (i `quot` j))
-  "Clash.Sized.Internal.Index.rem#"
+  $(namePat 'Clash.Sized.Internal.Index.rem#)
     | Just (nTy,kn) <- extractKnownNat tcm tys
     , Just (i,j) <- indexLiterals args
     -> reduce $ catchDivByZero (mkIndexLit ty nTy kn (i `rem` j))
-  "Clash.Sized.Internal.Index.toInteger#"
+  $(namePat 'Clash.Sized.Internal.Index.toInteger#)
     | [PrimVal p _ [_, Lit (IntegerLiteral i)]] <- args
     , primName p == showt 'Clash.Sized.Internal.Index.fromInteger#
     -> reduce (integerToIntegerLiteral i)
 
 -- Resize
-  "Clash.Sized.Internal.Index.resize#"
+  $(namePat 'Clash.Sized.Internal.Index.resize#)
     | Just (mTy,m) <- extractKnownNat tcm tys
     , [i] <- indexLiterals' args
     -> reduce (mkIndexLit ty mTy m i)
@@ -3105,7 +3110,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 ---------
 -- Signed
 ---------
-  "Clash.Sized.Internal.Signed.size#"
+  $(namePat 'Clash.Sized.Internal.Signed.size#)
     | Just (_, kn) <- extractKnownNat tcm tys
     -> let (_,tyView -> TyConApp intTcNm _) = splitFunForallTy ty
            (Just intTc) = UniqMap.lookup intTcNm tcm
@@ -3113,7 +3118,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral kn))])
 
 -- BitPack
-  "Clash.Sized.Internal.Signed.pack#"
+  $(namePat 'Clash.Sized.Internal.Signed.pack#)
     | Just (nTy, kn) <- extractKnownNat tcm tys
     , [i] <- signedLiterals' args
     -> let val = reifyNat kn (op (fromInteger i))
@@ -3121,7 +3126,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     where
         op :: KnownNat n => Signed n -> Proxy n -> Integer
         op s _ = toInteger (Signed.pack# s)
-  "Clash.Sized.Internal.Signed.unpack#"
+  $(namePat 'Clash.Sized.Internal.Signed.unpack#)
     | Just (nTy, kn) <- extractKnownNat tcm tys
     , [(0,i)] <- bitVectorLiterals' args
     -> let val = reifyNat kn (op (fromInteger i))
@@ -3131,56 +3136,56 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
         op s _ = toInteger (Signed.unpack# s)
 
 -- Eq
-  "Clash.Sized.Internal.Signed.eq#" | Just (i,j) <- signedLiterals args
+  $(namePat 'Clash.Sized.Internal.Signed.eq#) | Just (i,j) <- signedLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i == j))
-  "Clash.Sized.Internal.Signed.neq#" | Just (i,j) <- signedLiterals args
+  $(namePat 'Clash.Sized.Internal.Signed.neq#) | Just (i,j) <- signedLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i /= j))
 
 -- Ord
-  "Clash.Sized.Internal.Signed.lt#" | Just (i,j) <- signedLiterals args
+  $(namePat 'Clash.Sized.Internal.Signed.lt#) | Just (i,j) <- signedLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i <  j))
-  "Clash.Sized.Internal.Signed.ge#" | Just (i,j) <- signedLiterals args
+  $(namePat 'Clash.Sized.Internal.Signed.ge#) | Just (i,j) <- signedLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i >= j))
-  "Clash.Sized.Internal.Signed.gt#" | Just (i,j) <- signedLiterals args
+  $(namePat 'Clash.Sized.Internal.Signed.gt#) | Just (i,j) <- signedLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i >  j))
-  "Clash.Sized.Internal.Signed.le#" | Just (i,j) <- signedLiterals args
+  $(namePat 'Clash.Sized.Internal.Signed.le#) | Just (i,j) <- signedLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i <= j))
 
 -- Enum
-  "Clash.Sized.Internal.Signed.toEnum#"
+  $(namePat 'Clash.Sized.Internal.Signed.toEnum#)
     | [i] <- intCLiterals' args
     , Just (litTy, mb) <- extractKnownNat tcm tys
     -> reduce (mkSignedLit ty litTy mb i)
 
-  "Clash.Sized.Internal.Signed.fromEnum#"
+  $(namePat 'Clash.Sized.Internal.Signed.fromEnum#)
     | [i] <- signedLiterals' args
     -> let resTy = getResultTy tcm ty tys
         in reduce (mkIntCLit tcm i resTy)
 
 -- Bounded
-  "Clash.Sized.Internal.Signed.minBound#"
+  $(namePat 'Clash.Sized.Internal.Signed.minBound#)
     | Just (litTy,mb) <- extractKnownNat tcm tys
     -> let minB = negate (2 ^ (mb - 1))
        in  reduce (mkSignedLit ty litTy mb minB)
-  "Clash.Sized.Internal.Signed.maxBound#"
+  $(namePat 'Clash.Sized.Internal.Signed.maxBound#)
     | Just (litTy,mb) <- extractKnownNat tcm tys
     -> let maxB = (2 ^ (mb - 1)) - 1
        in reduce (mkSignedLit ty litTy mb maxB)
 
 -- Num
-  "Clash.Sized.Internal.Signed.+#"
+  $(namePat '(Clash.Sized.Internal.Signed.+#))
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftSigned2 (Signed.+#) ty tcm tys args)
     -> reduce (val)
-  "Clash.Sized.Internal.Signed.-#"
+  $(namePat '(Clash.Sized.Internal.Signed.-#))
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftSigned2 (Signed.-#) ty tcm tys args)
     -> reduce (val)
-  "Clash.Sized.Internal.Signed.*#"
+  $(namePat '(Clash.Sized.Internal.Signed.*#))
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftSigned2 (Signed.*#) ty tcm tys args)
     -> reduce (val)
-  "Clash.Sized.Internal.Signed.negate#"
+  $(namePat 'Clash.Sized.Internal.Signed.negate#)
     | Just (nTy, kn) <- extractKnownNat tcm tys
     , [i] <- signedLiterals' args
     -> let val = reifyNat kn (op (fromInteger i))
@@ -3188,7 +3193,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     where
       op :: KnownNat n => Signed n -> Proxy n -> Integer
       op s _ = toInteger (Signed.negate# s)
-  "Clash.Sized.Internal.Signed.abs#"
+  $(namePat 'Clash.Sized.Internal.Signed.abs#)
     | Just (nTy, kn) <- extractKnownNat tcm tys
     , [i] <- signedLiterals' args
     -> let val = reifyNat kn (op (fromInteger i))
@@ -3198,7 +3203,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       op s _ = toInteger (Signed.abs# s)
 
 -- ExtendingNum
-  "Clash.Sized.Internal.Signed.plus#"
+  $(namePat 'Clash.Sized.Internal.Signed.plus#)
     | Just (i,j) <- signedLiterals args
     -> let ty' = piResultTys tcm ty tys
            (_,resTy) = splitFunForallTy ty'
@@ -3206,7 +3211,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
        in  reduce (mkSignedLit resTy resSizeTy resSizeInt (i+j))
 
-  "Clash.Sized.Internal.Signed.minus#"
+  $(namePat 'Clash.Sized.Internal.Signed.minus#)
     | Just (i,j) <- signedLiterals args
     -> let ty' = piResultTys tcm ty tys
            (_,resTy) = splitFunForallTy ty'
@@ -3214,7 +3219,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
        in  reduce (mkSignedLit resTy resSizeTy resSizeInt (i-j))
 
-  "Clash.Sized.Internal.Signed.times#"
+  $(namePat 'Clash.Sized.Internal.Signed.times#)
     | Just (i,j) <- signedLiterals args
     -> let ty' = piResultTys tcm ty tys
            (_,resTy) = splitFunForallTy ty'
@@ -3223,42 +3228,42 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce (mkSignedLit resTy resSizeTy resSizeInt (i*j))
 
 -- Integral
-  "Clash.Sized.Internal.Signed.quot#"
+  $(namePat 'Clash.Sized.Internal.Signed.quot#)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftSigned2 (Signed.quot#) ty tcm tys args)
     -> reduce $ catchDivByZero val
-  "Clash.Sized.Internal.Signed.rem#"
+  $(namePat 'Clash.Sized.Internal.Signed.rem#)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftSigned2 (Signed.rem#) ty tcm tys args)
     -> reduce $ catchDivByZero val
-  "Clash.Sized.Internal.Signed.div#"
+  $(namePat 'Clash.Sized.Internal.Signed.div#)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftSigned2 (Signed.div#) ty tcm tys args)
     -> reduce $ catchDivByZero val
-  "Clash.Sized.Internal.Signed.mod#"
+  $(namePat 'Clash.Sized.Internal.Signed.mod#)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftSigned2 (Signed.mod#) ty tcm tys args)
     -> reduce $ catchDivByZero val
-  "Clash.Sized.Internal.Signed.toInteger#"
+  $(namePat 'Clash.Sized.Internal.Signed.toInteger#)
     | [PrimVal p _ [_, Lit (IntegerLiteral i)]] <- args
     , primName p == showt 'Clash.Sized.Internal.Signed.fromInteger#
     -> reduce (integerToIntegerLiteral i)
 
 -- Bits
-  "Clash.Sized.Internal.Signed.and#"
+  $(namePat 'Clash.Sized.Internal.Signed.and#)
     | [i,j] <- signedLiterals' args
     , Just (nTy, kn) <- extractKnownNat tcm tys
     -> reduce (mkSignedLit ty nTy kn (i .&. j))
-  "Clash.Sized.Internal.Signed.or#"
+  $(namePat 'Clash.Sized.Internal.Signed.or#)
     | [i,j] <- signedLiterals' args
     , Just (nTy, kn) <- extractKnownNat tcm tys
     -> reduce (mkSignedLit ty nTy kn (i .|. j))
-  "Clash.Sized.Internal.Signed.xor#"
+  $(namePat 'Clash.Sized.Internal.Signed.xor#)
     | [i,j] <- signedLiterals' args
     , Just (nTy, kn) <- extractKnownNat tcm tys
     -> reduce (mkSignedLit ty nTy kn (i `xor` j))
 
-  "Clash.Sized.Internal.Signed.complement#"
+  $(namePat 'Clash.Sized.Internal.Signed.complement#)
     | [i] <- signedLiterals' args
     , Just (nTy, kn) <- extractKnownNat tcm tys
     -> let val = reifyNat kn (op (fromInteger i))
@@ -3267,28 +3272,28 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       op :: KnownNat n => Signed n -> Proxy n -> Integer
       op u _ = toInteger (Signed.complement# u)
 
-  "Clash.Sized.Internal.Signed.shiftL#"
+  $(namePat 'Clash.Sized.Internal.Signed.shiftL#)
     | Just (nTy,kn,i,j) <- signedLitIntLit tcm tys args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in reduce (mkSignedLit ty nTy kn val)
       where
         op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (Signed.shiftL# u i)
-  "Clash.Sized.Internal.Signed.shiftR#"
+  $(namePat 'Clash.Sized.Internal.Signed.shiftR#)
     | Just (nTy,kn,i,j) <- signedLitIntLit tcm tys args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in reduce (mkSignedLit ty nTy kn val)
       where
         op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (Signed.shiftR# u i)
-  "Clash.Sized.Internal.Signed.rotateL#"
+  $(namePat 'Clash.Sized.Internal.Signed.rotateL#)
     | Just (nTy,kn,i,j) <- signedLitIntLit tcm tys args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in reduce (mkSignedLit ty nTy kn val)
       where
         op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (Signed.rotateL# u i)
-  "Clash.Sized.Internal.Signed.rotateR#"
+  $(namePat 'Clash.Sized.Internal.Signed.rotateR#)
     | Just (nTy,kn,i,j) <- signedLitIntLit tcm tys args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in reduce (mkSignedLit ty nTy kn val)
@@ -3297,7 +3302,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
         op u i _ = toInteger (Signed.rotateR# u i)
 
 -- Resize
-  "Clash.Sized.Internal.Signed.resize#" -- forall m n. (KnownNat n, KnownNat m) => Signed n -> Signed m
+  $(namePat 'Clash.Sized.Internal.Signed.resize#) -- forall m n. (KnownNat n, KnownNat m) => Signed n -> Signed m
     | mTy : nTy : _ <- tys
     , Right mInt <- runExcept (tyNatSize tcm mTy)
     , Right nInt <- runExcept (tyNatSize tcm nTy)
@@ -3311,7 +3316,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                           then (i' - mask)
                           else i'
        in reduce (mkSignedLit ty mTy mInt val)
-  "Clash.Sized.Internal.Signed.truncateB#" -- KnownNat m => Signed (m + n) -> Signed m
+  $(namePat 'Clash.Sized.Internal.Signed.truncateB#) -- KnownNat m => Signed (m + n) -> Signed m
     | Just (mTy, km) <- extractKnownNat tcm tys
     , [i] <- signedLiterals' args
     -> let bitsKeep = (bit (fromInteger km)) - 1
@@ -3326,7 +3331,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 -----------
 -- Unsigned
 -----------
-  "Clash.Sized.Internal.Unsigned.size#"
+  $(namePat 'Clash.Sized.Internal.Unsigned.size#)
     | Just (_, kn) <- extractKnownNat tcm tys
     -> let (_,ty') = splitFunForallTy ty
            (TyConApp intTcNm _) = tyView ty'
@@ -3335,11 +3340,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral kn))])
 
 -- BitPack
-  "Clash.Sized.Internal.Unsigned.pack#"
+  $(namePat 'Clash.Sized.Internal.Unsigned.pack#)
     | Just (nTy, kn) <- extractKnownNat tcm tys
     , [i] <- unsignedLiterals' args
     -> reduce (mkBitVectorLit ty nTy kn 0 i)
-  "Clash.Sized.Internal.Unsigned.unpack#"
+  $(namePat 'Clash.Sized.Internal.Unsigned.unpack#)
     | Just (nTy, kn) <- extractKnownNat tcm tys
     , [i] <- bitVectorLiterals' args
     -> let val = reifyNat kn (op (toBV i))
@@ -3349,55 +3354,55 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       op u _ = toInteger (Unsigned.unpack# u)
 
 -- Eq
-  "Clash.Sized.Internal.Unsigned.eq#" | Just (i,j) <- unsignedLiterals args
+  $(namePat 'Clash.Sized.Internal.Unsigned.eq#) | Just (i,j) <- unsignedLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i == j))
-  "Clash.Sized.Internal.Unsigned.neq#" | Just (i,j) <- unsignedLiterals args
+  $(namePat 'Clash.Sized.Internal.Unsigned.neq#) | Just (i,j) <- unsignedLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i /= j))
 
 -- Ord
-  "Clash.Sized.Internal.Unsigned.lt#" | Just (i,j) <- unsignedLiterals args
+  $(namePat 'Clash.Sized.Internal.Unsigned.lt#) | Just (i,j) <- unsignedLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i <  j))
-  "Clash.Sized.Internal.Unsigned.ge#" | Just (i,j) <- unsignedLiterals args
+  $(namePat 'Clash.Sized.Internal.Unsigned.ge#) | Just (i,j) <- unsignedLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i >= j))
-  "Clash.Sized.Internal.Unsigned.gt#" | Just (i,j) <- unsignedLiterals args
+  $(namePat 'Clash.Sized.Internal.Unsigned.gt#) | Just (i,j) <- unsignedLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i >  j))
-  "Clash.Sized.Internal.Unsigned.le#" | Just (i,j) <- unsignedLiterals args
+  $(namePat 'Clash.Sized.Internal.Unsigned.le#) | Just (i,j) <- unsignedLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i <= j))
 
 -- Enum
-  "Clash.Sized.Internal.Unsigned.toEnum#"
+  $(namePat 'Clash.Sized.Internal.Unsigned.toEnum#)
     | [i] <- intCLiterals' args
     , Just (litTy, mb) <- extractKnownNat tcm tys
     -> reduce (mkUnsignedLit ty litTy mb i)
 
-  "Clash.Sized.Internal.Unsigned.fromEnum#"
+  $(namePat 'Clash.Sized.Internal.Unsigned.fromEnum#)
     | [i] <- unsignedLiterals' args
     -> let resTy = getResultTy tcm ty tys
         in reduce (mkIntCLit tcm i resTy)
 
 -- Bounded
-  "Clash.Sized.Internal.Unsigned.minBound#"
+  $(namePat 'Clash.Sized.Internal.Unsigned.minBound#)
     | Just (nTy,len) <- extractKnownNat tcm tys
     -> reduce (mkUnsignedLit ty nTy len 0)
-  "Clash.Sized.Internal.Unsigned.maxBound#"
+  $(namePat 'Clash.Sized.Internal.Unsigned.maxBound#)
     | Just (litTy,mb) <- extractKnownNat tcm tys
     -> let maxB = (2 ^ mb) - 1
        in  reduce (mkUnsignedLit ty litTy mb maxB)
 
 -- Num
-  "Clash.Sized.Internal.Unsigned.+#"
+  $(namePat '(Clash.Sized.Internal.Unsigned.+#))
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.+#) ty tcm tys args)
     -> reduce val
-  "Clash.Sized.Internal.Unsigned.-#"
+  $(namePat '(Clash.Sized.Internal.Unsigned.-#))
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.-#) ty tcm tys args)
     -> reduce val
-  "Clash.Sized.Internal.Unsigned.*#"
+  $(namePat '(Clash.Sized.Internal.Unsigned.*#))
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.*#) ty tcm tys args)
     -> reduce val
-  "Clash.Sized.Internal.Unsigned.negate#"
+  $(namePat 'Clash.Sized.Internal.Unsigned.negate#)
     | Just (nTy, kn) <- extractKnownNat tcm tys
     , [i] <- unsignedLiterals' args
     -> let val = reifyNat kn (op (fromInteger i))
@@ -3407,7 +3412,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       op u _ = toInteger (Unsigned.negate# u)
 
 -- ExtendingNum
-  "Clash.Sized.Internal.Unsigned.plus#" -- :: Unsigned m -> Unsigned n -> Unsigned (Max m n + 1)
+  $(namePat 'Clash.Sized.Internal.Unsigned.plus#) -- :: Unsigned m -> Unsigned n -> Unsigned (Max m n + 1)
     | Just (i,j) <- unsignedLiterals args
     -> let ty' = piResultTys tcm ty tys
            (_,resTy) = splitFunForallTy ty'
@@ -3415,7 +3420,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
        in  reduce (mkUnsignedLit resTy resSizeTy resSizeInt (i+j))
 
-  "Clash.Sized.Internal.Unsigned.minus#"
+  $(namePat 'Clash.Sized.Internal.Unsigned.minus#)
     | [i,j] <- unsignedLiterals' args
     -> let ty' = piResultTys tcm ty tys
            (_,resTy) = splitFunForallTy ty'
@@ -3424,7 +3429,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            val = reifyNat resSizeInt (runSizedF (Unsigned.-#) i j)
       in   reduce (mkUnsignedLit resTy resSizeTy resSizeInt val)
 
-  "Clash.Sized.Internal.Unsigned.times#"
+  $(namePat 'Clash.Sized.Internal.Unsigned.times#)
     | Just (i,j) <- unsignedLiterals args
     -> let ty' = piResultTys tcm ty tys
            (_,resTy) = splitFunForallTy ty'
@@ -3433,34 +3438,34 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce (mkUnsignedLit resTy resSizeTy resSizeInt (i*j))
 
 -- Integral
-  "Clash.Sized.Internal.Unsigned.quot#"
+  $(namePat 'Clash.Sized.Internal.Unsigned.quot#)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.quot#) ty tcm tys args)
     -> reduce $ catchDivByZero val
-  "Clash.Sized.Internal.Unsigned.rem#"
+  $(namePat 'Clash.Sized.Internal.Unsigned.rem#)
     | Just (_, kn) <- extractKnownNat tcm tys
     , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.rem#) ty tcm tys args)
     -> reduce $ catchDivByZero val
-  "Clash.Sized.Internal.Unsigned.toInteger#"
+  $(namePat 'Clash.Sized.Internal.Unsigned.toInteger#)
     | [PrimVal p _ [_, Lit (IntegerLiteral i)]] <- args
     , primName p == showt 'Clash.Sized.Internal.Unsigned.fromInteger#
     -> reduce (integerToIntegerLiteral i)
 
 -- Bits
-  "Clash.Sized.Internal.Unsigned.and#"
+  $(namePat 'Clash.Sized.Internal.Unsigned.and#)
     | Just (i,j) <- unsignedLiterals args
     , Just (nTy, kn) <- extractKnownNat tcm tys
     -> reduce (mkUnsignedLit ty nTy kn (i .&. j))
-  "Clash.Sized.Internal.Unsigned.or#"
+  $(namePat 'Clash.Sized.Internal.Unsigned.or#)
     | Just (i,j) <- unsignedLiterals args
     , Just (nTy, kn) <- extractKnownNat tcm tys
     -> reduce (mkUnsignedLit ty nTy kn (i .|. j))
-  "Clash.Sized.Internal.Unsigned.xor#"
+  $(namePat 'Clash.Sized.Internal.Unsigned.xor#)
     | Just (i,j) <- unsignedLiterals args
     , Just (nTy, kn) <- extractKnownNat tcm tys
     -> reduce (mkUnsignedLit ty nTy kn (i `xor` j))
 
-  "Clash.Sized.Internal.Unsigned.complement#"
+  $(namePat 'Clash.Sized.Internal.Unsigned.complement#)
     | [i] <- unsignedLiterals' args
     , Just (nTy, kn) <- extractKnownNat tcm tys
     -> let val = reifyNat kn (op (fromInteger i))
@@ -3469,28 +3474,28 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       op :: KnownNat n => Unsigned n -> Proxy n -> Integer
       op u _ = toInteger (Unsigned.complement# u)
 
-  "Clash.Sized.Internal.Unsigned.shiftL#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
+  $(namePat 'Clash.Sized.Internal.Unsigned.shiftL#) -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm tys args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in reduce (mkUnsignedLit ty nTy kn val)
       where
         op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (Unsigned.shiftL# u i)
-  "Clash.Sized.Internal.Unsigned.shiftR#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
+  $(namePat 'Clash.Sized.Internal.Unsigned.shiftR#) -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm tys args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in reduce (mkUnsignedLit ty nTy kn val)
       where
         op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (Unsigned.shiftR# u i)
-  "Clash.Sized.Internal.Unsigned.rotateL#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
+  $(namePat 'Clash.Sized.Internal.Unsigned.rotateL#) -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm tys args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in reduce (mkUnsignedLit ty nTy kn val)
       where
         op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (Unsigned.rotateL# u i)
-  "Clash.Sized.Internal.Unsigned.rotateR#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
+  $(namePat 'Clash.Sized.Internal.Unsigned.rotateR#) -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm tys args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in reduce (mkUnsignedLit ty nTy kn val)
@@ -3499,7 +3504,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
         op u i _ = toInteger (Unsigned.rotateR# u i)
 
 -- Resize
-  "Clash.Sized.Internal.Unsigned.resize#" -- forall n m . KnownNat m => Unsigned n -> Unsigned m
+  $(namePat 'Clash.Sized.Internal.Unsigned.resize#) -- forall n m . KnownNat m => Unsigned n -> Unsigned m
     | _ : mTy : _ <- tys
     , Right km <- runExcept (tyNatSize tcm mTy)
     , [i] <- unsignedLiterals' args
@@ -3508,7 +3513,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     in reduce (mkUnsignedLit ty mTy km val)
 
 -- Conversions
-  "Clash.Sized.Internal.Unsigned.unsignedToWord"
+  $(namePat 'Clash.Sized.Internal.Unsigned.unsignedToWord)
     | isSubj
     , [a] <- unsignedLiterals' args
     -> let b = Unsigned.unsignedToWord (U (fromInteger a))
@@ -3517,7 +3522,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            [wordDc] = tyConDataCons wordTc
        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
 
-  "Clash.Sized.Internal.Unsigned.unsigned8toWord8"
+  $(namePat 'Clash.Sized.Internal.Unsigned.unsigned8toWord8)
     | isSubj
     , [a] <- unsignedLiterals' args
     -> let b = Unsigned.unsigned8toWord8 (U (fromInteger a))
@@ -3526,7 +3531,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            [wordDc] = tyConDataCons wordTc
        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
 
-  "Clash.Sized.Internal.Unsigned.unsigned16toWord16"
+  $(namePat 'Clash.Sized.Internal.Unsigned.unsigned16toWord16)
     | isSubj
     , [a] <- unsignedLiterals' args
     -> let b = Unsigned.unsigned16toWord16 (U (fromInteger a))
@@ -3535,7 +3540,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            [wordDc] = tyConDataCons wordTc
        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
 
-  "Clash.Sized.Internal.Unsigned.unsigned32toWord32"
+  $(namePat 'Clash.Sized.Internal.Unsigned.unsigned32toWord32)
     | isSubj
     , [a] <- unsignedLiterals' args
     -> let b = Unsigned.unsigned32toWord32 (U (fromInteger a))
@@ -3544,7 +3549,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            [wordDc] = tyConDataCons wordTc
        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
 
-  "Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL"
+  $(namePat 'Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL)
     | isSubj
     , f : a : _ <- args
     -> reduceWHNF (mkApps (valToTerm f) [Left (valToTerm a)])
@@ -3552,12 +3557,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 --------
 -- RTree
 --------
-  "Clash.Sized.RTree.textract"
+  $(namePat 'Clash.Sized.RTree.textract)
     | isSubj
     , [DC _ tArgs] <- args
     -> reduceWHNF (Either.lefts tArgs !! 1)
 
-  "Clash.Sized.RTree.tsplit"
+  $(namePat 'Clash.Sized.RTree.tsplit)
     | isSubj
     , dTy : aTy : _ <- tys
     , [DC _ tArgs] <- args
@@ -3573,7 +3578,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                   ,Left (Either.lefts tArgs !! 2)
                   ]
 
-  "Clash.Sized.RTree.tdfold"
+  $(namePat 'Clash.Sized.RTree.tdfold)
     | isSubj
     , pTy : kTy : aTy : _ <- tys
     , _ : p : f : g : ts : _ <- args
@@ -3615,7 +3620,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                        ])
                          ]
 
-  "Clash.Sized.RTree.treplicate"
+  $(namePat 'Clash.Sized.RTree.treplicate)
     | isSubj
     , let ty' = piResultTys tcm ty tys
     , (_,tyView -> TyConApp treeTcNm [lenTy,argTy]) <- splitFunForallTy ty'
@@ -3627,7 +3632,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 ---------
 -- Vector
 ---------
-  "Clash.Sized.Vector.length" -- :: KnownNat n => Vec n a -> Int
+  $(namePat 'Clash.Sized.Vector.length) -- :: KnownNat n => Vec n a -> Int
     | isSubj
     , [nTy, _] <- tys
     , Right n <-runExcept (tyNatSize tcm nTy)
@@ -3636,6 +3641,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            [intCon] = tyConDataCons intTc
        in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral (toInteger n)))])
 
+  -- XXX: Not a thing anymore?
   "Clash.Sized.Vector.maxIndex"
     | isSubj
     , [nTy, _] <- tys
@@ -3646,6 +3652,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral (toInteger (n - 1))))])
 
 -- Indexing
+  -- XXX: Not exported
   "Clash.Sized.Vector.index_int" -- :: KnownNat n => Vec n a -> Int
     | nTy : aTy : _  <- tys
     , _ : xs : i : _ <- args
@@ -3669,11 +3676,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                      ]
                     _ -> Nothing
                  _ -> Nothing
-  "Clash.Sized.Vector.head" -- :: Vec (n+1) a -> a
+  $(namePat 'Clash.Sized.Vector.head) -- :: Vec (n+1) a -> a
     | isSubj
     , [DC _ vArgs] <- args
     -> reduceWHNF (Either.lefts vArgs !! 1)
-  "Clash.Sized.Vector.last" -- :: Vec (n+1) a -> a
+  $(namePat 'Clash.Sized.Vector.last) -- :: Vec (n+1) a -> a
     | isSubj
     , [DC _ vArgs] <- args
     , (Right _ : Right aTy : Right nTy : _) <- vArgs
@@ -3687,11 +3694,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                      ,Left (Either.lefts vArgs !! 2)
                                      ])
 -- - Sub-vectors
-  "Clash.Sized.Vector.tail" -- :: Vec (n+1) a -> Vec n a
+  $(namePat 'Clash.Sized.Vector.tail) -- :: Vec (n+1) a -> Vec n a
     | isSubj
     , [DC _ vArgs] <- args
     -> reduceWHNF (Either.lefts vArgs !! 2)
-  "Clash.Sized.Vector.init" -- :: Vec (n+1) a -> Vec n a
+  $(namePat 'Clash.Sized.Vector.init) -- :: Vec (n+1) a -> Vec n a
     | isSubj
     , [DC consCon vArgs] <- args
     , (Right _ : Right aTy : Right nTy : _) <- vArgs
@@ -3705,7 +3712,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                        [Right (LitTy (NumTy (n-1)))
                                        ,Right aTy
                                        ,Left (Either.lefts vArgs !! 2)])
-  "Clash.Sized.Vector.select" -- :: (CmpNat (i+s) (s*n) ~ GT) => SNat f -> SNat s -> SNat n -> Vec (f + i) a -> Vec n a
+  $(namePat 'Clash.Sized.Vector.select) -- :: (CmpNat (i+s) (s*n) ~ GT) => SNat f -> SNat s -> SNat n -> Vec (f + i) a -> Vec n a
     | isSubj
     , iTy : sTy : nTy : fTy : aTy : _ <- tys
     , eq : f : s : n : xs : _ <- args
@@ -3787,7 +3794,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       (Just tupTc)       = UniqMap.lookup tupTcNm tcm
       [tupDc]            = tyConDataCons tupTc
 -- - Splitting
-  "Clash.Sized.Vector.splitAt" -- :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
+  $(namePat 'Clash.Sized.Vector.splitAt) -- :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
     | isSubj
     , (DC snatDc (Right mTy:_)):_ <- args
     , Right m <- runExcept (tyNatSize tcm mTy)
@@ -3856,7 +3863,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
          -- v doesn't reduce to a data-constructor
          _  -> Nothing
 
-  "Clash.Sized.Vector.unconcat" -- :: KnownNat n => SNamt m -> Vec (n * m) a -> Vec n (Vec m a)
+  $(namePat 'Clash.Sized.Vector.unconcat) -- :: KnownNat n => SNamt m -> Vec (n * m) a -> Vec n (Vec m a)
     | isSubj
     , kn : snat : v : _  <- args
     , nTy : mTy : aTy :_ <- tys
@@ -3905,7 +3912,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                     ,Left (Case splitAtCall n1mVecTy [bsAlt])])
 -- Construction
 -- - initialisation
-  "Clash.Sized.Vector.replicate" -- :: SNat n -> a -> Vec n a
+  $(namePat 'Clash.Sized.Vector.replicate) -- :: SNat n -> a -> Vec n a
     | isSubj
     , let ty' = piResultTys tcm ty tys
     , let (_,resTy) = splitFunForallTy ty'
@@ -3917,7 +3924,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            mkVec nilCon consCon argTy len
                  (replicate (fromInteger len) (valToTerm (last args)))
 -- - Concatenation
-  "Clash.Sized.Vector.++" -- :: Vec n a -> Vec m a -> Vec (n + m) a
+  $(namePat '(Clash.Sized.Vector.++)) -- :: Vec n a -> Vec m a -> Vec (n + m) a
     | isSubj
     , (DC dc vArgs):_ <- args
     , Right nTy : Right aTy : _ <- vArgs
@@ -3937,7 +3944,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                       ,Left (valToTerm (last args))
                                       ])
          _ -> Nothing
-  "Clash.Sized.Vector.concat" -- :: Vec n (Vec m a) -> Vec (n * m) a
+  $(namePat 'Clash.Sized.Vector.concat) -- :: Vec n (Vec m a) -> Vec (n * m) a
     | isSubj
     , (nTy : mTy : aTy : _)  <- tys
     , (xs : _)               <- args
@@ -3991,7 +3998,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                  _ -> Nothing
 
 -- - specialized permutations
-  "Clash.Sized.Vector.reverse" -- :: Vec n a -> Vec n a
+  $(namePat 'Clash.Sized.Vector.reverse) -- :: Vec n a -> Vec n a
     | isSubj
     , nTy : aTy : _  <- tys
     , [DC vecDc vArgs] <- args
@@ -4014,7 +4021,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                 ,Left (mkVec nilCon consCon aTy 1 [Either.lefts vArgs !! 1])
                 ]
          _ -> Nothing
-  "Clash.Sized.Vector.transpose" -- :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)
+  $(namePat 'Clash.Sized.Vector.transpose) -- :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)
     | isSubj
     , nTy : mTy : aTy : _ <- tys
     , kn : xss : _ <- args
@@ -4054,7 +4061,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                        ])
                        ]
 
-  "Clash.Sized.Vector.rotateLeftS" -- :: KnownNat n => Vec n a -> SNat d -> Vec n a
+  $(namePat 'Clash.Sized.Vector.rotateLeftS) -- :: KnownNat n => Vec n a -> SNat d -> Vec n a
     | nTy : aTy : _ : _ <- tys
     , kn : xs : d : _ <- args
     , DC dc vArgs <- xs
@@ -4087,7 +4094,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                   ]
          _  -> Nothing
 
-  "Clash.Sized.Vector.rotateRightS" -- :: KnownNat n => Vec n a -> SNat d -> Vec n a
+  $(namePat 'Clash.Sized.Vector.rotateRightS) -- :: KnownNat n => Vec n a -> SNat d -> Vec n a
     | isSubj
     , nTy : aTy : _ : _ <- tys
     , kn : xs : d : _ <- args
@@ -4123,7 +4130,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
          _  -> Nothing
 -- Element-wise operations
 -- - mapping
-  "Clash.Sized.Vector.map" -- :: (a -> b) -> Vec n a -> Vec n b
+  $(namePat 'Clash.Sized.Vector.map) -- :: (a -> b) -> Vec n a -> Vec n b
     | isSubj
     , DC dc vArgs <- args !! 1
     , aTy : bTy : nTy : _ <- tys
@@ -4139,7 +4146,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                       ,Right (LitTy (NumTy (n' - 1)))
                                       ,Left (valToTerm (args !! 0))
                                       ,Left (Either.lefts vArgs !! 2)])
-  "Clash.Sized.Vector.imap" -- :: forall n a b . KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b
+  $(namePat 'Clash.Sized.Vector.imap) -- :: forall n a b . KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b
     | isSubj
     , nTy : aTy : bTy : _ <- tys
     , (tyArgs,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
@@ -4194,7 +4201,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
           -> Nothing
 
   -- :: forall n a. KnownNat n => (a -> a) -> a -> Vec n a
-  "Clash.Sized.Vector.iterateI"
+  $(namePat 'Clash.Sized.Vector.iterateI)
     | isSubj
     , [nTy, aTy] <- tys
     , [_n, f, a] <- args
@@ -4219,7 +4226,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
               ])
 
 -- - Zipping
-  "Clash.Sized.Vector.zipWith" -- :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
+  $(namePat 'Clash.Sized.Vector.zipWith) -- :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
     | isSubj
     , aTy : bTy : cTy : nTy : _ <- tys
     , f : xs : ys : _   <- args
@@ -4251,7 +4258,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                                     ])])
 
 -- Folding
-  "Clash.Sized.Vector.foldr" -- :: (a -> b -> b) -> b -> Vec n a -> b
+  $(namePat 'Clash.Sized.Vector.foldr) -- :: (a -> b -> b) -> b -> Vec n a -> b
     | isSubj
     , aTy : bTy : nTy : _ <- tys
     , f : z : xs : _ <- args
@@ -4271,7 +4278,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                    ,Left  (Either.lefts vArgs !! 2)
                                    ])
                      ]
-  "Clash.Sized.Vector.fold" -- :: (a -> a -> a) -> Vec (n + 1) a -> a
+  $(namePat 'Clash.Sized.Vector.fold) -- :: (a -> a -> a) -> Vec (n + 1) a -> a
     | isSubj
     , nTy : aTy :  _ <- tys
     , f : vs : _ <- args
@@ -4380,7 +4387,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
          -- v doesn't reduce to a data-constructor
          _  -> Nothing
 -- - Specialised folds
-  "Clash.Sized.Vector.dfold"
+  $(namePat 'Clash.Sized.Vector.dfold)
     | isSubj
     , pTy : kTy : aTy : _ <- tys
     , _ : p : f : z : xs : _ <- args
@@ -4425,7 +4432,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                          ]
     where
       is0 = mScopeNames mach
-  "Clash.Sized.Vector.dtfold"
+  $(namePat 'Clash.Sized.Vector.dtfold)
     | isSubj
     , pTy : kTy : aTy : _ <- tys
     , _ : p : f : g : xs : _ <- args
@@ -4489,7 +4496,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                        ,Left (Case splitAtCall xsSVecTy [bsAlt])])
                          ]
 -- Misc
-  "Clash.Sized.Vector.lazyV"
+  $(namePat 'Clash.Sized.Vector.lazyV)
     | isSubj
     , nTy : aTy : _ <- tys
     , _ : xs : _ <- args
@@ -4518,7 +4525,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                              ])
                              ])
 -- Traversable
-  "Clash.Sized.Vector.traverse#"
+  $(namePat 'Clash.Sized.Vector.traverse#)
     | isSubj
     , aTy : fTy : bTy : nTy : _ <- tys
     , apDict : f : xs : _ <- args
@@ -4569,7 +4576,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
       (ids, is0) = (mSupply mach, mScopeNames mach)
 
 -- BitPack
-  "Clash.Sized.Vector.concatBitVector#"
+  $(namePat 'Clash.Sized.Vector.concatBitVector#)
     | isSubj
     , nTy : mTy : _ <- tys
     , _  : km  : v : _ <- args
@@ -4595,7 +4602,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                 ])
                  ]
          _ -> Nothing
-  "Clash.Sized.Vector.unconcatBitVector#"
+  $(namePat 'Clash.Sized.Vector.unconcatBitVector#)
     | isSubj
     , nTy : mTy : _  <- tys
     , _  : km  : bv : _ <- args
