@@ -151,6 +151,7 @@ import qualified GHC.Classes
 import qualified GHC.CString
 import qualified GHC.Num
 import qualified GHC.Num.Integer
+import qualified GHC.PrimopWrappers
 import qualified GHC.TypeLits
 import qualified GHC.TypeNats
 import qualified GHC.Types
@@ -1438,19 +1439,19 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                    }
        in (\e -> setTerm (Data e) mach) <$> dc
 
+#if MIN_VERSION_ghc_prim(0,12,0)
+  $(namePat 'GHC.PrimopWrappers.dataToTagSmall#)
+    | [DC dc _] <- args
+    -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+
+  $(namePat 'GHC.PrimopWrappers.dataToTagLarge#)
+    | [DC dc _] <- args
+    -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+#else
   $(namePat 'GHC.Prim.dataToTag#)
     | [DC dc _] <- args
     -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
-
-  -- XXX: Primitive does not exist?
-  "GHC.Prim.dataToTagSmall#"
-    | [DC dc _] <- args
-    -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
-
-  -- XXX: Primitive does not exist?
-  "GHC.Prim.dataToTagLarge#"
-    | [DC dc _] <- args
-    -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+#endif
 
   $(namePat 'GHC.Classes.eqInt) | Just (i,j) <- intCLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i == j))
@@ -1561,8 +1562,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , Just i <- integerLiteral v
     -> reduce . Literal . DoubleLiteral . doubleToWord $ D# (integerToDouble# i)
 
-  -- XXX: Not exported?
-  "GHC.Num.Natural.naturalLogBase#"
+  $(namePat 'GHC.Num.naturalLogBase#)
     | Just (a,b) <- naturalLiterals args
     , Just c <- flogBase a b
     -> (reduce . Literal . WordLiteral . toInteger) c
@@ -2413,14 +2413,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [i, j] <- integerLiterals' args
     -> reduce (Literal (IntegerLiteral (andInteger i j)))
 
-#if MIN_VERSION_base(4,15,0)
-  -- XXX: Should this come from GHC.Float?
-  "GHC.Num.Integer.integerToDouble#"
-#else
+#if !MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Integer.Type.doubleFromInteger)
-#endif
     | [i] <- integerLiterals' args
     -> reduce (Literal (DoubleLiteral (doubleToWord (fromInteger i))))
+#endif
 
 #if MIN_VERSION_base(4,17,0)
   "GHC.Num.Integer.$wintegerFromInt64#"
