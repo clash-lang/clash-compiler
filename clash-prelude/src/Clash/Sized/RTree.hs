@@ -54,6 +54,10 @@ module Clash.Sized.RTree
   , t2v
     -- * Misc
   , lazyT
+
+  -- * Internal
+  , textract
+  , tsplit
   )
 where
 
