@@ -57,6 +57,7 @@ module Clash.Sized.Vector
   , merge
     -- * Modifying vectors
   , replace
+  , replace_int
     -- ** Permutations
   , permute, backpermute, scatter, gather
     -- *** Specialized permutations
