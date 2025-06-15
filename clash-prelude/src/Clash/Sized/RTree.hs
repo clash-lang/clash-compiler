@@ -525,7 +525,7 @@ indexTree t i = (t2v t) !! i
 -- >>> replaceTree 2 7 (BR (BR (LR 1) (LR 2)) (BR (LR 3) (LR 4)))
 -- <<1,2>,<7,4>>
 -- >>> replaceTree 9 6 (BR (BR (LR 1) (LR 2)) (BR (LR 3) (LR 4)))
--- <<1,2>,<3,*** Exception: Clash.Sized.Vector.replace: index 9 is larger than maximum index 3
+-- <<1,2>,<3,*** Exception: Clash.Sized.Vector.replace: index 9 is out of bounds: [0..3]
 -- ...
 replaceTree :: (KnownNat d, Enum i) => i -> a -> RTree d a -> RTree d a
 replaceTree i a = v2t . replace i a . t2v

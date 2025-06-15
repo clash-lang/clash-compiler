@@ -828,8 +828,8 @@ unconcatI = withSNat unconcat
 --
 -- >>> merge (1 :> 2 :> 3 :> 4 :> Nil) (5 :> 6 :> 7 :> 8 :> Nil)
 -- 1 :> 5 :> 2 :> 6 :> 3 :> 7 :> 4 :> 8 :> Nil
-merge :: KnownNat n => Vec n a -> Vec n a -> Vec (2 * n) a
-merge x y = concat (transpose (x :> singleton y))
+merge :: Vec n a -> Vec n a -> Vec (2 * n) a
+merge x y = concat $ zipWith (\a b -> a :> singleton b) x y
 {-# INLINE merge #-}
 
 -- | The elements in a vector in reverse order.
@@ -1263,7 +1263,7 @@ scanl f z xs = ws
 --
 -- >>> scanl1 (-) (1 :> 2 :> 3 :> 4 :> Nil)
 -- 1 :> -1 :> -4 :> -8 :> Nil
-scanl1 :: KnownNat n => (a -> a -> a) -> Vec (n+1) a -> Vec (n+1) a
+scanl1 :: forall n a. (a -> a -> a) -> Vec (n+1) a -> Vec (n+1) a
 scanl1 op vs = scanl op (head vs) (tail vs)
 {-# INLINE scanl1 #-}
 
@@ -1271,7 +1271,7 @@ scanl1 op vs = scanl op (head vs) (tail vs)
 --
 -- >>> scanr1 (-) (1 :> 2 :> 3 :> 4 :> Nil)
 -- -2 :> 3 :> -1 :> 4 :> Nil
-scanr1 :: KnownNat n => (a -> a -> a) -> Vec (n+1) a -> Vec (n+1) a
+scanr1 :: forall n a. (a -> a -> a) -> Vec (n+1) a -> Vec (n+1) a
 scanr1 op vs = scanr op (last vs) (init vs)
 {-# INLINE scanr1 #-}
 
@@ -1550,8 +1550,10 @@ replace_int xs i@(I# n0) a
     sub :: Vec m b -> Int# -> b -> Vec m b
     sub Nil     _ _ = error (P.concat [ "Clash.Sized.Vector.replace: index "
                                       , show i
-                                      , " is larger than maximum index "
-                                      , show (length xs - 1)
+                                      , " is out of bounds: "
+                                      , if length xs == 0
+                                         then "<empty range>"
+                                         else "[0.." <> show (length xs - 1) <> "]"
                                       ])
     sub (y `Cons` (!ys)) n b = if isTrue# (n ==# 0#)
                                  then b `Cons` ys
@@ -1571,7 +1573,7 @@ replace_int xs i@(I# n0) a
 -- >>> replace 0 7 (1:>2:>3:>4:>5:>Nil)
 -- 7 :> 2 :> 3 :> 4 :> 5 :> Nil
 -- >>> replace 9 7 (1:>2:>3:>4:>5:>Nil)
--- 1 :> 2 :> 3 :> 4 :> 5 :> *** Exception: Clash.Sized.Vector.replace: index 9 is larger than maximum index 4
+-- 1 :> 2 :> 3 :> 4 :> 5 :> *** Exception: Clash.Sized.Vector.replace: index 9 is out of bounds: [0..4]
 -- ...
 replace :: (KnownNat n, Enum i) => i -> a -> Vec n a -> Vec n a
 replace i y xs = replace_int xs (fromEnum i) y
@@ -2071,11 +2073,11 @@ gather xs = map (xs!!)
 -- >>> let xs = 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> 8 :> 9 :> Nil
 -- >>> interleave d3 xs
 -- 1 :> 4 :> 7 :> 2 :> 5 :> 8 :> 3 :> 6 :> 9 :> Nil
-interleave :: (KnownNat n, KnownNat d)
+interleave :: KnownNat n
            => SNat d -- ^ Interleave step, /d/
            -> Vec (n * d) a
            -> Vec (d * n) a
-interleave d = concat . transpose . unconcat d
+interleave d@SNat = concat . transpose . unconcat d
 {-# INLINE interleave #-}
 
 -- | /Dynamically/ rotate a 'Vec'tor to the left:
