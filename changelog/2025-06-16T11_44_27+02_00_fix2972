@@ -1,0 +1,1 @@
+FIXED: Clash's evaluator now uses `TemplateHaskell` names to detect renamed symbols in `GHC.*` and `Clash.*`. Fixes errors similar to `No blackbox found for: GHC.Internal.Base.eqString` [#2972](https://github.com/clash-lang/clash-compiler/issues/2972)
