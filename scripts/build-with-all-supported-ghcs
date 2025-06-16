@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+GREEN='\033[32m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+GHCS=(
+  ghc-8.10.7
+  ghc-9.0.2
+  ghc-9.2.8
+  ghc-9.4.8
+  ghc-9.6.7
+  ghc-9.8.1
+  ghc-9.10.1
+)
+
+for ghc in "${GHCS[@]}"; do
+  echo -e "${BOLD}${GREEN}> Building dependencies with $ghc..${NC}"
+  cabal build --with-compiler="${ghc}" all --only-dependencies
+done
+
+for ghc in "${GHCS[@]}"; do
+  echo -e "${BOLD}${GREEN}> Building with $ghc..${NC}"
+  cabal build all \
+    --with-compiler="${ghc}" \
+    --ghc-options="-Werror" \
+    --disable-optimization \
+
+done
