@@ -1,0 +1,1 @@
+FIXED: No blackbox found for: `GHC.Internal.Control.Exception.Base.recSelError` on GHC 9.10 [#2966](https://github.com/clash-lang/clash-compiler/issues/2966)
