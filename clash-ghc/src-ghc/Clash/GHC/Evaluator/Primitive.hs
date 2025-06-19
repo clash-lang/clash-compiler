@@ -2176,6 +2176,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [i,j] <- naturalLiterals' args
     -> reduce (Literal (NaturalLiteral (i ^ j)))
 
+  -- XXX: Does it make sense to match on a @NaturalLiteral@ here?
   $(namePat 'GHC.TypeLits.natVal)
     | [Lit (NaturalLiteral n), _] <- args
     -> reduce (integerToIntegerLiteral n)
@@ -2189,11 +2190,8 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let resTy = getResultTy tcm ty tys
         in reduce (mkSomeNat tcm n resTy)
 
-  $(namePat 'GHC.TypeNats.natVal)
-    | [Lit (NaturalLiteral n), _] <- args
-    -> reduce (Literal (NaturalLiteral n))
-
-  $(namePat 'GHC.TypeNats.someNatVal)
+  -- XXX: Does it make sense to match on a @NaturalLiteral@ here?
+  $(namePat 'GHC.TypeLits.someNatVal)
     | [Lit (NaturalLiteral n)] <- args
     -> let resTy = getResultTy tcm ty tys
         in reduce (mkSomeNat tcm n resTy)
