@@ -6,7 +6,7 @@ import Clash.Prelude
 import Clash.Explicit.Testbench
 
 tail' :: Vec 3 (Signed 16) -> Vec 2 (Signed 16)
-tail' (Cons x xs) = xs
+tail' (x :> xs) = xs
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE tail' #-}
 
