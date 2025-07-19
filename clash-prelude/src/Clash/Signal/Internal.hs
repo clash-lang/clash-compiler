@@ -17,10 +17,12 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-# LANGUAGE Unsafe #-}
 
@@ -205,6 +207,7 @@ import GHC.Stack                  (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits
   (Div, KnownSymbol, KnownNat, Nat, Symbol, type (<=), type (*), sameSymbol)
 import GHC.TypeLits.Extra         (DivRU)
+import GHC.Records                (HasField(getField))
 import Language.Haskell.TH.Syntax -- (Lift (..), Q, Dec)
 import Language.Haskell.TH.Compat
 import Numeric.Natural            (Natural)
@@ -821,6 +824,9 @@ head# (x' :- _ )  = x'
 
 tail# :: Signal dom a -> Signal dom a
 tail# (_  :- xs') = xs'
+
+instance HasField (x :: k) r a => HasField x (Signal dom r) (Signal dom a) where
+  getField = fmap (getField @x @r @a)
 
 instance Show a => Show (Signal dom a) where
   show (x :- xs) = show x ++ " " ++ show xs

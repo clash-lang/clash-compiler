@@ -1,0 +1,11 @@
+ADDED: instance `HasField f (Signal dom r) (Signal dom a)`. This means record dot accesses will be passed to the underlying type. For example, this will work:
+
+```haskell
+data MyRecord = MyRecord { myField :: Int }
+
+a :: Signal dom MyRecord
+a = pure (MyRecord 3)
+
+b :: Signal dom Int
+b = a.myField
+```
