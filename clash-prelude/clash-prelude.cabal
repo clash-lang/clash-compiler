@@ -333,7 +333,7 @@ Library
                       deepseq                   >= 1.4.1.0 && < 1.6,
                       distributive              >= 0.1     && < 1.0,
                       extra                     >= 1.6.17  && < 1.9,
-                      ghc-prim                  >= 0.5.1.0 && < 0.12,
+                      ghc-prim                  >= 0.5.1.0 && < 0.13,
                       ghc-typelits-extra        >= 0.4     && < 0.5,
                       ghc-typelits-knownnat     >= 0.7.2   && < 0.8,
                       ghc-typelits-natnormalise >= 0.7.2   && < 0.8,
