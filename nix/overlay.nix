@@ -15,7 +15,9 @@ compilerVersion:
 final: prev:
 let
   # An overlay with the things we need to change for the specified GHC version.
-  ghcOverlay = import (./. + "/overlay-${compilerVersion}.nix") {
+  # The overlays are named without the GHC minor version, so we need to strip the last character from the version
+  strippedMinorVersion = builtins.substring 0 (builtins.stringLength compilerVersion - 1) compilerVersion;
+  ghcOverlay = import (./. + "/overlay-${strippedMinorVersion}.nix") {
     pkgs = prev;
   };
 
