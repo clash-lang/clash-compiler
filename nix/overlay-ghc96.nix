@@ -1,7 +1,7 @@
 { pkgs }:
 final: prev:
 let
-  inherit (pkgs.haskell.lib) doJailbreak markUnbroken;
+  inherit (pkgs.haskell.lib) doJailbreak markUnbroken dontCheck;
 in
 {
   # Use an older version than the default in nixpkgs. Since rewrite-inspector
@@ -50,4 +50,15 @@ in
     rev = "fc31a9d622c1eb60030a50152258a9bef785e365";
     sha256 = "sha256-irLM3aVMxpBgsM72ArulMXcoLY2glalVkG//Lrj2JBI=";
   }) {};
+
+  # This version of tasty isn't available in the nix ghc96 package set
+  tasty = prev.callHackageDirect {
+    pkg = "tasty";
+    ver = "1.5.3";
+    sha256 = "sha256-Ogd8J4aHNeL+xmcRWuJeGBNaePyLs5yo1IoMzvWrVPY=";
+  } {};
+
+  # The tests (not the package itself!) require a tasty <1.5, which won't work as we pull in
+  # tasty 1.5.3. Solution: don't test!
+  time-compat = dontCheck prev.time-compat;
 }
