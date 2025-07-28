@@ -6,7 +6,7 @@ import Clash.Prelude
 import Clash.Explicit.Testbench
 
 tailOfTail :: Vec (n+2) (Signed 16) -> Vec n (Signed 16)
-tailOfTail (Cons _ (Cons _ xs)) = xs
+tailOfTail (_ :> (_ :> xs)) = xs
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE tailOfTail #-}
 
