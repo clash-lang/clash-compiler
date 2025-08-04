@@ -40,7 +40,7 @@ import qualified Data.Text.Extra as Text
 import GHC.Stack (HasCallStack)
 
 import Clash.Annotations.BitRepresentation.Deriving (dontApplyInHDL)
-import Clash.Sized.Vector as Vec (Vec(Cons), splitAt)
+import Clash.Sized.Vector as Vec (Vec((:>)), splitAt)
 
 import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.DataCon (DataCon(..))
@@ -151,9 +151,9 @@ removeUnusedExpr _ e@(Case _ _ [(DataPat _ [] xs,altExpr)]) =
      else return e
 
 -- Replace any expression that creates a Vector of size 0 within the application
--- of the Cons constructor, by the Nil constructor.
+-- of the (:>) constructor, by the Nil constructor.
 removeUnusedExpr _ e@(collectArgsTicks -> (Data dc, [_,Right aTy,Right nTy,_,Left a,Left nil],ticks))
-  | nameOcc (dcName dc) == Text.showt 'Vec.Cons
+  | nameOcc (dcName dc) == Text.showt '(Vec.:>)
   = do
     tcm <- Lens.view tcCache
     case runExcept (tyNatSize tcm nTy) of

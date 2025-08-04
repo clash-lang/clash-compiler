@@ -279,9 +279,9 @@ getLine (File fp) (Reg r) = SimIO $ do
   return 0
  where
    rep :: String -> Vec m (Unsigned 8) -> Vec m (Unsigned 8)
-   rep []     vs          = vs
-   rep (x:xs) (Cons _ vs) = Cons (toEnum (fromEnum x)) (rep xs vs)
-   rep _      Nil         = Nil
+   rep []     vs        = vs
+   rep (x:xs) (_ :> vs) = toEnum (fromEnum x) :> rep xs vs
+   rep _      Nil       = Nil
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE getLine #-}
 {-# ANN getLine hasBlackBox #-}

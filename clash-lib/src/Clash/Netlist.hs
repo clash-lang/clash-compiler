@@ -1056,10 +1056,10 @@ mkDcApplication declType [dstHType] bndr dc args = do
       Vector 0 _ -> return (HW.DataCon dstHType VecAppend [])
       Vector 1 _ -> case argExprsFiltered of
                       [e] -> return (HW.DataCon dstHType VecAppend [e])
-                      _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `Cons`: " ++ showPpr args
+                      _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `(:>)`: " ++ showPpr args
       Vector _ _ -> case argExprsFiltered of
                       [e1,e2] -> return (HW.DataCon dstHType VecAppend [e1,e2])
-                      _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `Cons`: " ++ showPpr args
+                      _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `(:>)`: " ++ showPpr args
       MemBlob _ _ ->
         case compare 6 (length argExprsFiltered) of
           EQ -> return (HW.DataCon dstHType (DC (dstHType,0)) argExprsFiltered)

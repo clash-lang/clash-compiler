@@ -38,16 +38,6 @@ More generally, there is a ``Vec n a`` type which allows collections of
 arbitrary values to be used. These vectors are tagged with their length, to
 prevent out of bounds access at compile-time.
 
-.. warning::
-  The ``Vec n a`` type exports pattern synonyms for inserting at the left and
-  right of a vector. The types of the ``Cons`` constructor and ``(:>)`` pattern
-  are slightly different, and may behave differently in practice.
-
-  The ``Cons`` constructor has a more general type, allowing it to be used in
-  some cases where the pattern cannot be used. However, this additional power
-  comes at the cost of type inference. It is recommended that users use the
-  ``(:>)`` pattern by default, and only use ``Cons`` when necessary.
-
 Synthesis Domains
 -----------------
 
@@ -98,7 +88,7 @@ which can be used to define synchronous circuits. The first of these is
 
 .. _`Mealy machine`: https://en.wikipedia.org/wiki/Mealy_machine
 
-It is also possible to define a `Moore machine`_ using the ``moore`` function 
+It is also possible to define a `Moore machine`_ using the ``moore`` function
 in the Clash prelude. This differs to the Mealy machine by providing output
 based on the previous state (as oppoesd to the newly calculated state), and is
 specified by
@@ -169,4 +159,3 @@ changed to work with undefined values. Currently these are
   library. This allows evaluating values to normal form in code when undefined
   may be present. ``NFData`` can still be used, but will bubble up exceptions
   if undefined is encountered.
-
