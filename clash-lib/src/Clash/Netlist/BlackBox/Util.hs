@@ -417,7 +417,7 @@ renderElem b (Component (Decl n subN (l:ls))) = do
     Just (templ0,_,libs,imps,inc,pCtx) -> do
       let b' = pCtx { bbResults = [(o,oTy)], bbInputs = bbInputs pCtx ++ is }
           layoutOptions = LayoutOptions (AvailablePerLine 120 0.4)
-          render = N.BBTemplate . parseFail . renderLazy . layoutPretty layoutOptions
+          render = N.BBTemplate . parseFail b' . renderLazy . layoutPretty layoutOptions
 
       templ1 <-
         case templ0 of
@@ -674,10 +674,15 @@ generalGetDomainConf getDomainMap ty = case (snd . stripAttributes . stripVoid) 
       Nothing -> error $ "Can't find domain " <> show dom <> ". Please report an issue at https://github.com/clash-lang/clash-compiler/issues."
       Just conf -> pure conf
 
-parseFail :: Text -> BlackBoxTemplate
-parseFail t = case runParse t of
+parseFail :: BlackBoxContext -> Text -> BlackBoxTemplate
+parseFail b t = case runParse t of
   Failure errInfo ->
-    error (show (_errDoc errInfo))
+    error $ unlines
+        [ "error while parsing blackbox: " <> Data.Text.unpack (bbName b)
+        , "in component " <> Data.Text.unpack (Id.toText $ bbCompName b)
+        , "error:"
+        , show (_errDoc errInfo)
+        ]
   Success templ -> templ
 
 idToExpr
