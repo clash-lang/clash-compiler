@@ -19,6 +19,7 @@ module Clash.Netlist.BlackBox.Types
  , BlackBoxTemplate
  , TemplateKind (..)
  , Element(..)
+ , EscapedSymbol(..)
  , Decl(..)
  , HdlSyn(..)
  , RenderVoid(..)
@@ -211,6 +212,12 @@ data Element
   | CtxName
   -- ^ The "context name", name set by `Clash.Magic.setName`, defaults to the
   -- name of the closest binder
+  | EscapedSymbol EscapedSymbol
+  -- ^ Used for "[\" and "\]", they'll be rendered as "[" and "]",
+  -- but pretty printed as "[\" and "\]".
+  deriving (Show, Generic, NFData, Binary, Eq, Hashable)
+
+data EscapedSymbol = SquareBracketOpen | SquareBracketClose
   deriving (Show, Generic, NFData, Binary, Eq, Hashable)
 
 -- | Component instantiation hole. First argument indicates which function argument
