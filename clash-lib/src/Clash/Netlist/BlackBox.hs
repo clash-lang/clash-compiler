@@ -20,7 +20,13 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Netlist.BlackBox where
+module Clash.Netlist.BlackBox
+    ( mkBlackBoxContext
+    , extractPrimWarnOrFail
+    , mkPrimitive
+    , prepareBlackBox
+    , isLiteral
+    ) where
 
 import           Control.Exception             (throw)
 import           Control.Lens                  ((%=))
