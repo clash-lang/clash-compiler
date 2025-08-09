@@ -20,7 +20,21 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Netlist.BlackBox.Util where
+module Clash.Netlist.BlackBox.Util
+    ( renderTemplate
+    , walkElement
+    , verifyBlackBoxContext
+    , onBlackBox
+    , setSym
+    , extractLiterals
+    , renderBlackBox
+    , getUsedArguments
+    , renderFilePath
+    , exprToString
+    , renderElem
+    , getDomainConf
+    , prettyBlackBox
+    ) where
 
 import           Control.Exception               (throw)
 import           Control.Lens
