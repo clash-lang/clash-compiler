@@ -29,15 +29,16 @@ import Prelude                        hiding (map)
 import Data.Binary.IEEE754            (doubleToWord, floatToWord, wordToDouble,
                                        wordToFloat)
 
+import Data.Char                      (chr, ord)
 import Data.Complex                   (Complex)
 import Data.Functor.Compose           (Compose)
 import Data.Functor.Const             (Const)
 import Data.Functor.Identity          (Identity)
 import Data.Functor.Product           (Product)
 import Data.Functor.Sum               (Sum)
-import Data.Char                      (chr, ord)
 import Data.Int
 import Data.Ord                       (Down)
+import Data.Proxy                     (Proxy)
 import Data.Word
 import Foreign.C.Types                (CUShort)
 import GHC.Generics
@@ -477,6 +478,7 @@ instance ( BitPack a
          ) => BitPack (Either a b)
 
 instance BitPack a => BitPack (Maybe a)
+instance BitPack (Proxy a) => BitPack (Proxy a)
 
 instance BitPack a => BitPack (Complex a)
 instance BitPack a => BitPack (Down a)
