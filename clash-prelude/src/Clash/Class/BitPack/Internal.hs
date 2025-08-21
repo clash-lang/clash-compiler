@@ -58,6 +58,7 @@ import Clash.Sized.Internal.BitVector
 >>> :m -Prelude
 >>> :set -XDataKinds
 >>> import Clash.Prelude
+>>> import Data.Proxy
 -}
 
 -- | Convert data to/from a 'BitVector'. This allows functions to be defined
@@ -478,6 +479,14 @@ instance ( BitPack a
          ) => BitPack (Either a b)
 
 instance BitPack a => BitPack (Maybe a)
+
+-- |
+-- >>> pack (Proxy @())
+-- 0
+-- >>> pack (Proxy @5)
+-- 0
+-- >>> pack (Proxy @Bool)
+-- 0
 instance BitPack (Proxy a) => BitPack (Proxy a)
 
 instance BitPack a => BitPack (Complex a)
