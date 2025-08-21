@@ -12,7 +12,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-
+{-# LANGUAGE PolyKinds #-} -- Required for BitPack (KnownNat n) => BitPack (Proxy n) instances
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Extra.Solver #-}
