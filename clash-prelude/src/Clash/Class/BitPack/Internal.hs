@@ -487,7 +487,7 @@ instance BitPack a => BitPack (Maybe a)
 -- 0
 -- >>> pack (Proxy @Bool)
 -- 0
-instance BitPack (Proxy a) => BitPack (Proxy a)
+instance BitPack (Proxy a)
 
 instance BitPack a => BitPack (Complex a)
 instance BitPack a => BitPack (Down a)
