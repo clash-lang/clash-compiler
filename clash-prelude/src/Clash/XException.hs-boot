@@ -1,3 +1,4 @@
+{-# LANGUAGE NoPolyKinds #-}
 module Clash.XException where
 
 import GHC.Stack (HasCallStack)
