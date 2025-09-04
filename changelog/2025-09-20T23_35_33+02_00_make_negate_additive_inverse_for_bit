@@ -1,0 +1,1 @@
+CHANGED/FIXED: `negate` for `Num Bit` is now defined as the additive inverse, i.e., `negate = id`.
