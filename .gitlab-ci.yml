@@ -6,7 +6,7 @@ include:
 variables:
   # Default GHC / Cabal version. Used for generating Haddock and releasing to
   # Hackage.
-  GHC_VERSION: 8.10.7
+  GHC_VERSION: 9.6.7
 
   # https://docs.gitlab.com/runner/executors/custom.html#system-failure
   GET_SOURCES_ATTEMPTS: 5

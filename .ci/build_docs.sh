@@ -2,11 +2,7 @@
 set -xueo pipefail
 
 # Check that documentation was generated successfully
-if [[ "$GHC_VERSION" = "8.6.5" ]]; then
-  haddock_pkgs="clash-lib clash-lib-hedgehog clash-cosim"
-else
-  haddock_pkgs="clash-prelude clash-prelude-hedgehog clash-lib clash-lib-hedgehog clash-cosim"
-fi
+haddock_pkgs="clash-prelude clash-prelude-hedgehog clash-lib clash-lib-hedgehog clash-cosim"
 
 mkdir -p hadocs
 
@@ -16,9 +12,20 @@ for pkg in ${haddock_pkgs}; do
   # Cache dependencies
   cabal v2-build ${pkg} -O0 --enable-documentation --only-dependencies
 
-  # HaskellPrelude yields warnings we cannot fix
+  # The preludes yield link destination warnings we cannot fix. Maybe fixed by:
+  # https://gitlab.haskell.org/ghc/ghc/-/merge_requests/14447?
+  #
+  # Some other modules complain about ambiguous identifiers, but they're
+  # complaining about identifiers in temporary files, i.e. some Haddock
+  # implementation detail.
   cabal v2-haddock ${pkg} -O0 --enable-documentation \
-    |& grep -v "Clash.HaskellPrelude" \
+    |& grep -v "Warning: Clash.HaskellPrelude: could not find link destinations for" \
+    |& grep -v "Warning: Clash.Explicit.Prelude.Safe: could not find link destinations for" \
+    |& grep -v "Warning: Clash.Prelude.Safe: could not find link destinations for" \
+    |& grep -v "Warning: Clash.Explicit.Prelude: could not find link destinations for" \
+    |& grep -v "Warning: Clash.Prelude: could not find link destinations for" \
+    |& grep -v "Warning: 'SNat' is ambiguous. It is defined" \
+    |& grep -v "Warning: 'head' is ambiguous. It is defined" \
     |  tee haddock_log
 
   set +e
@@ -53,8 +60,8 @@ for pkg in ${haddock_pkgs}; do
       exit 1
     fi
 
-    ambiguous_warn="You may be able to disambiguate the identifier by"
-    if grep -q "${ambiguous_warn}" haddock_log; then
+    ambiguous_warn="^Warning: '.*' is ambiguous. It is defined"
+    if grep -E -q "${ambiguous_warn}" haddock_log; then
       echo -e "\e[1m\e[31mAmbiguous identifier found in ${pkg}! Scroll up for full log.\e[0m"
       grep --color=always -n -C 5 "${ambiguous_warn}" haddock_log
       exit 1
