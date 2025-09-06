@@ -11,8 +11,9 @@ GHCS=(
   ghc-9.2.8
   ghc-9.4.8
   ghc-9.6.7
-  ghc-9.8.1
+  ghc-9.8.4
   ghc-9.10.1
+  ghc-9.10.2
 )
 
 for ghc in "${GHCS[@]}"; do
