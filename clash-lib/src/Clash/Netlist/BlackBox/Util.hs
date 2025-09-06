@@ -20,7 +20,21 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Netlist.BlackBox.Util where
+module Clash.Netlist.BlackBox.Util
+    ( renderTemplate
+    , walkElement
+    , verifyBlackBoxContext
+    , onBlackBox
+    , setSym
+    , extractLiterals
+    , renderBlackBox
+    , getUsedArguments
+    , renderFilePath
+    , exprToString
+    , renderElem
+    , getDomainConf
+    , prettyBlackBox
+    ) where
 
 import           Control.Exception               (throw)
 import           Control.Lens
@@ -126,6 +140,7 @@ inputHole = \case
   DevNull _        -> Nothing
   SigD _ nM        -> nM
   CtxName          -> Nothing
+  EscapedSymbol _  -> Nothing
 
 -- | Determine if the number of normal\/literal\/function inputs of a blackbox
 -- context at least matches the number of argument that is expected by the
@@ -403,7 +418,7 @@ renderElem b (Component (Decl n subN (l:ls))) = do
     Just (templ0,_,libs,imps,inc,pCtx) -> do
       let b' = pCtx { bbResults = [(o,oTy)], bbInputs = bbInputs pCtx ++ is }
           layoutOptions = LayoutOptions (AvailablePerLine 120 0.4)
-          render = N.BBTemplate . parseFail . renderLazy . layoutPretty layoutOptions
+          render = N.BBTemplate . parseFail b' . renderLazy . layoutPretty layoutOptions
 
       templ1 <-
         case templ0 of
@@ -660,10 +675,15 @@ generalGetDomainConf getDomainMap ty = case (snd . stripAttributes . stripVoid) 
       Nothing -> error $ "Can't find domain " <> show dom <> ". Please report an issue at https://github.com/clash-lang/clash-compiler/issues."
       Just conf -> pure conf
 
-parseFail :: Text -> BlackBoxTemplate
-parseFail t = case runParse t of
+parseFail :: BlackBoxContext -> Text -> BlackBoxTemplate
+parseFail b t = case runParse t of
   Failure errInfo ->
-    error (show (_errDoc errInfo))
+    error $ unlines
+        [ "error while parsing blackbox: " <> Data.Text.unpack (bbName b)
+        , "in component " <> Data.Text.unpack (Id.toText $ bbCompName b)
+        , "error:"
+        , show (_errDoc errInfo)
+        ]
   Success templ -> templ
 
 idToExpr
@@ -904,6 +924,9 @@ renderTag b CtxName = case bbCtxName b of
     -> return (Id.toLazyText t)
   _ -> error "internal error"
 
+renderTag _ (EscapedSymbol sym) = case sym of
+  SquareBracketOpen  -> return "["
+  SquareBracketClose -> return "]"
 
 renderTag _ e = do e' <- getAp (prettyElem e)
                    error $ $(curLoc) ++ "Unable to evaluate: " ++ show e'
@@ -1108,6 +1131,9 @@ prettyElem (Template bbname source) = do
                                   <> brackets (string $ Text.concat bbname')
                                   <> brackets (string $ Text.concat source'))
 prettyElem CtxName = return "~CTXNAME"
+prettyElem (EscapedSymbol sym) = case sym of
+  SquareBracketOpen  -> return "[\\"
+  SquareBracketClose -> return "\\]"
 
 -- | Recursively walk @Element@, applying @f@ to each element in the tree.
 walkElement
@@ -1178,6 +1204,7 @@ walkElement f el = maybeToList (f el) ++ walked
         Repeat es1 es2 ->
           concatMap go es1 ++ concatMap go es2
         CtxName -> []
+        EscapedSymbol _ -> []
 
 -- | Determine variables used in an expression. Used for VHDL sensitivity list.
 -- Also see: https://github.com/clash-lang/clash-compiler/issues/365
@@ -1266,6 +1293,7 @@ getUsedArguments (N.BBTemplate t) = nub (concatMap (walkElement matchArg) t)
         TypM _ -> Nothing
         Vars _ -> Nothing
         CtxName -> Nothing
+        EscapedSymbol _ -> Nothing
 
 onBlackBox
   :: (BlackBoxTemplate -> r)
