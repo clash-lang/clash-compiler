@@ -158,17 +158,10 @@ type role Index nominal
 --
 -- as it is not safe to coerce between 'Index'es with different ranges. To
 -- change the size, use the functions in the 'Resize' class.
-#if MIN_VERSION_base(4,15,0) && !MIN_VERSION_base(4,17,0)
 data Index (n :: Nat) =
     -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
     -- synthesizable.
     I { unsafeToInteger :: !Integer }
-#else
-newtype Index (n :: Nat) =
-    -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
-    -- synthesizable.
-    I { unsafeToInteger :: Integer }
-#endif
   deriving (Data, Generic)
 
 {-# ANN I hasBlackBox #-}

@@ -203,13 +203,8 @@ type role BiSignalOut nominal nominal nominal
 --
 -- as it is not safe to coerce the default behaviour, synthesis domain or width
 -- of the data in the signal.
-#if MIN_VERSION_base(4,15,0) && !MIN_VERSION_base(4,17,0)
 data BiSignalOut (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
   = BiSignalOut ![Signal dom (Maybe (BitVector n))]
-#else
-newtype BiSignalOut (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
-  = BiSignalOut [Signal dom (Maybe (BitVector n))]
-#endif
 
 type instance HasDomain dom1 (BiSignalOut ds dom2 n) = DomEq dom1 dom2
 type instance TryDomain t (BiSignalOut ds dom n) = 'Found dom

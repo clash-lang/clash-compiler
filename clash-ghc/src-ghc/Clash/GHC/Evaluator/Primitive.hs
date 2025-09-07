@@ -1456,7 +1456,8 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   $(namePat 'GHC.PrimopWrappers.dataToTagLarge#)
     | [DC dc _] <- args
     -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
-#elif MIN_VERSION_ghc(9,10,0)
+#endif
+#if MIN_VERSION_ghc(9,10,0)
   $(namePat 'GHC.Prim.dataToTagSmall#)
     | [DC dc _] <- args
     -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
