@@ -19,7 +19,7 @@ import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types
 import           Control.Monad.State             (State())
 import           Data.Monoid                     (Ap(getAp))
-import           Data.Text as TextS
+import qualified Data.Text as TextS
 import           Data.Text.Prettyprint.Doc.Extra
 import           Prelude
 
