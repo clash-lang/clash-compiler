@@ -12,7 +12,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-
+{-# LANGUAGE PolyKinds #-} -- Required for BitPack (KnownNat n) => BitPack (Proxy n) instances
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Extra.Solver #-}
@@ -58,6 +58,7 @@ import Clash.Sized.Internal.BitVector
 >>> :m -Prelude
 >>> :set -XDataKinds
 >>> import Clash.Prelude
+>>> import Data.Proxy
 -}
 
 -- | Convert data to/from a 'BitVector'. This allows functions to be defined
@@ -478,7 +479,15 @@ instance ( BitPack a
          ) => BitPack (Either a b)
 
 instance BitPack a => BitPack (Maybe a)
-instance BitPack (Proxy a) => BitPack (Proxy a)
+
+-- |
+-- >>> pack (Proxy @())
+-- 0
+-- >>> pack (Proxy @5)
+-- 0
+-- >>> pack (Proxy @Bool)
+-- 0
+instance BitPack (Proxy a)
 
 instance BitPack a => BitPack (Complex a)
 instance BitPack a => BitPack (Down a)
