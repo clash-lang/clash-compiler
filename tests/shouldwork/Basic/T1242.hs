@@ -27,17 +27,17 @@ instance WireApp (U16 'WireRep) (U16 'AppRep) where
     toWire v = case v of U16 x -> U16 x
     toApp v = case v of U16 x -> U16 x
 
-instance (BitPack (t 'AppRep), WireApp (t 'WireRep)  (t 'AppRep)) => BitPack (t 'WireRep) where
-  type BitSize (t 'WireRep) = BitSize (t 'AppRep)
+instance BitPack (U16 'WireRep) where
+  type BitSize (U16 'WireRep) = BitSize (U16 'AppRep)
   pack x = bv
     where
-        bv :: BitVector (BitSize (t 'WireRep))
+        bv :: BitVector (BitSize (U16 'WireRep))
         bv = pack app
-        app :: t 'AppRep
+        app :: U16 'AppRep
         app = toApp $ x
   unpack x = toWire app
     where
-        app :: t 'AppRep
+        app :: U16 'AppRep
         app = unpack x
 
 data Record

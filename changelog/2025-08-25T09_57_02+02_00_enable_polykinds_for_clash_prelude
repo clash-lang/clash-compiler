@@ -1,0 +1,1 @@
+CHANGED: `PolyKinds` is now a `default-extension` of `clash-prelude`. `NoPolyKinds` prevented the derivation of typeclass instances of types that contained a Kind, for example `BitPack (Proxy 52)`.
