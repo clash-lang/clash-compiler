@@ -12,6 +12,6 @@ incr i = if i == maxBound then 0 else i + 1
 topEntity :: Index 10 -> Index 2
 topEntity j = case j < 1 of
   False ->
-    let xs = init (Cons 1 (Cons (incr (head xs)) Nil)) in last xs
+    let xs = init (1 :> (incr (head xs) :> Nil)) in last xs
   True ->
-    let ys = init (Cons 2 (Cons (incr (last ys)) Nil)) in head ys
+    let ys = init (2 :> (incr (last ys) :> Nil)) in head ys

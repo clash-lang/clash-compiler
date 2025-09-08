@@ -51,7 +51,10 @@ class VecToTuple a where
   -- The following would produce a warning even though we can be sure
   -- no other pattern can ever apply:
   --
-  -- >>> (a :> b :> c :> Nil) = myVec
+  -- >>> :{
+  -- a, b, c :: Int
+  -- (a :> b :> c :> Nil) = myVec
+  -- :}
   --
   -- 'vecToTuple' can be used to work around the warning:
   --
