@@ -231,7 +231,7 @@ genSystemVerilog opts _ sp seen us c = do
               nettypeNone <> line <>
               timescale <> line <>
               module_ c <> line <>
-              nettypeDefault 
+              nettypeDefault
 
     commentHeader
          = "/* AUTOMATICALLY GENERATED SYSTEMVERILOG-2005 SOURCE CODE."
