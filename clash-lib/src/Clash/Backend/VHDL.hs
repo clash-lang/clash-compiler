@@ -37,6 +37,8 @@ import qualified Data.HashMap.Lazy                    as HashMap
 import qualified Data.HashMap.Strict                  as HashMapS
 import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
+import qualified Data.Map                             as Map
+import           Data.Map                             (Map)
 import           Data.List
   (mapAccumL, nub, nubBy, intersperse, group, sort)
 import           Data.List.Extra                      ((<:>), equalLength, zipEqual)
@@ -46,6 +48,7 @@ import           Data.Monoid.Extra                    ()
 import qualified Data.Text.Lazy                       as T
 import qualified Data.Text                            as TextS
 import           Data.Text.Extra
+import           Data.Tuple                           (swap)
 
 #if MIN_VERSION_prettyprinter(1,7,0)
 import qualified Prettyprinter                        as PP
@@ -72,7 +75,7 @@ import           Clash.Driver.Types                   (ClashOpts(..))
 import           Clash.Explicit.BlockRam.Internal     (unpackNats)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
-  (extractLiterals, renderBlackBox, renderFilePath)
+  (extractLiterals, renderBlackBox, addFilePath)
 import qualified Clash.Netlist.Id                     as Id
 import           Clash.Netlist.Types                  hiding (intWidth, usages, _usages)
 import           Clash.Netlist.Util
@@ -98,8 +101,10 @@ data VHDLState =
   , _libraries :: [T.Text]
   , _packages  :: [T.Text]
   , _includes  :: [(String,Doc)]
-  , _dataFiles      :: [(String,FilePath)]
-  -- ^ Files to be copied: (filename, old path)
+  , _dataFiles :: Map FilePath String
+  -- ^ Files to be copied: (path to file, file name). The file name stored in
+  -- the map might differ from the file name in the path, to prevent name
+  -- collisions.
   , _memoryDataFiles:: [(String,String)]
   -- ^ Files to be stored: (filename, contents). These files are generated
   -- during the execution of 'genNetlist'.
@@ -139,7 +144,7 @@ instance Backend VHDLState where
     , _libraries=[]
     , _packages=[]
     , _includes=[]
-    , _dataFiles=[]
+    , _dataFiles=mempty
     , _memoryDataFiles=[]
     , _idSeen=Id.emptyIdentifierSet (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) VHDL
     , _tyPkgCtx=False
@@ -271,10 +276,10 @@ instance Backend VHDLState where
   addImports imps = packages %= (imps ++)
   addAndSetData f = do
     fs <- use dataFiles
-    let (fs',f') = renderFilePath fs f
+    let (fs',f') = addFilePath fs f
     dataFiles .= fs'
     return f'
-  getDataFiles = use dataFiles
+  getDataFiles = map swap . Map.assocs <$> use dataFiles
   addMemoryDataFile f = memoryDataFiles %= (f:)
   getMemoryDataFiles = use memoryDataFiles
   ifThenElseExpr _ = False

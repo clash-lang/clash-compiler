@@ -45,6 +45,8 @@ import           Data.HashMap.Strict                  (HashMap)
 import qualified Data.HashMap.Strict                  as HashMap
 import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
+import qualified Data.Map                             as Map
+import           Data.Map                             (Map)
 import           Data.Maybe                           (catMaybes, fromMaybe)
 import           Data.Monoid                          (Ap(Ap))
 import           Data.Monoid.Extra                    ()
@@ -58,6 +60,7 @@ import           Data.Text.Lazy                       (pack)
 import qualified Data.Text.Lazy                       as Text
 import qualified Data.Text                            as TextS
 import           Data.Text.Prettyprint.Doc.Extra
+import           Data.Tuple                           (swap)
 import qualified System.FilePath
 import           GHC.Stack                            (HasCallStack)
 
@@ -76,7 +79,7 @@ import           Clash.Driver.Types                   (ClashOpts(..))
 import           Clash.Explicit.BlockRam.Internal     (unpackNats)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn)
 import           Clash.Netlist.BlackBox.Util
-  (extractLiterals, renderBlackBox, renderFilePath)
+  (extractLiterals, renderBlackBox, addFilePath)
 import qualified Clash.Netlist.Id                     as Id
 import           Clash.Netlist.Types as N             hiding (intWidth, usages, _usages)
 import           Clash.Netlist.Util
@@ -94,8 +97,10 @@ data VerilogState =
     , _includes  :: [(String,Doc)]
     , _imports   :: HashSet Text.Text
     , _libraries :: HashSet Text.Text
-    , _dataFiles      :: [(String,FilePath)]
-    -- ^ Files to be copied: (filename, old path)
+    , _dataFiles :: Map FilePath String
+    -- ^ Files to be copied: (path to file, file name). The file name stored in
+    -- the map might differ from the file name in the path, to prevent name
+    -- collisions.
     , _memoryDataFiles:: [(String,String)]
     -- ^ Files to be stored: (filename, contents). These files are generated
     -- during the execution of 'genNetlist'.
@@ -126,7 +131,7 @@ instance Backend VerilogState where
     , _includes=[]
     , _imports=HashSet.empty
     , _libraries=HashSet.empty
-    , _dataFiles=[]
+    , _dataFiles=mempty
     , _memoryDataFiles=[]
     , _customConstrs=HashMap.empty
     , _intWidth=opt_intWidth opts
@@ -191,10 +196,10 @@ instance Backend VerilogState where
   addImports inps = imports %= (\s -> foldl' (flip HashSet.insert) s inps)
   addAndSetData f = do
     fs <- use dataFiles
-    let (fs',f') = renderFilePath fs f
+    let (fs',f') = addFilePath fs f
     dataFiles .= fs'
     return f'
-  getDataFiles = use dataFiles
+  getDataFiles = map swap . Map.assocs <$> use dataFiles
   addMemoryDataFile f = memoryDataFiles %= (f:)
   getMemoryDataFiles = use memoryDataFiles
   ifThenElseExpr _ = True
