@@ -1,0 +1,1 @@
+FIXED: Clash duplicates included verilog sources when component is instantiated multiple times [#3008](https://github.com/clash-lang/clash-compiler/issues/3008)

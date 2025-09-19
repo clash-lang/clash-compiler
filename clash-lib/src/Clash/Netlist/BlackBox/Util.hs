@@ -63,7 +63,9 @@ import qualified Data.Text.Prettyprint.Doc       as PP
 #endif
 
 import           Data.Text.Prettyprint.Doc.Extra
+import           GHC.IO                          (unsafePerformIO)
 import           GHC.Stack                       (HasCallStack)
+import           System.Directory                (canonicalizePath)
 import           System.FilePath                 (replaceBaseName, takeBaseName,
                                                   takeFileName, (<.>))
 import           Text.Printf
@@ -319,10 +321,14 @@ selectNewName as a
   | otherwise = a
 
 renderFilePath :: [(String,FilePath)] -> String -> ([(String,FilePath)],String)
-renderFilePath fs f = ((f'',f):fs, f'')
+renderFilePath files filePath0 = case existingMatchingPaths of
+  ((fn, _): _) -> (files, fn)
+  _            -> ((newFileName,filePath1):files, newFileName)
   where
-    f'  = takeFileName f
-    f'' = selectNewName (map fst fs) f'
+    filePath1 = unsafePerformIO $ canonicalizePath filePath0
+    existingMatchingPaths = filter ((== filePath1) . snd) files
+    fileName  = takeFileName filePath1
+    newFileName = selectNewName (map fst files) fileName
 
 -- | Render a blackbox given a certain context. Returns a filled out template
 -- and a list of 'hidden' inputs that must be added to the encompassing component.
