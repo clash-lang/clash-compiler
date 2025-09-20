@@ -29,7 +29,8 @@ module Clash.Netlist.BlackBox.Util
     , extractLiterals
     , renderBlackBox
     , getUsedArguments
-    , renderFilePath
+    , canonicalizeDataFilePath
+    , addFilePath
     , exprToString
     , renderElem
     , getDomainConf
@@ -39,7 +40,8 @@ module Clash.Netlist.BlackBox.Util
 import           Control.Exception               (throw)
 import           Control.Lens
   (use, (%=), _1, _2, element, (^?))
-import           Control.Monad                   (forM, (<=<))
+import           Control.Monad                   (forM, (<=<), filterM)
+import           Control.Monad.Extra             (ifM)
 import           Control.Monad.State             (State, StateT (..), lift, gets)
 import           Data.Bitraversable              (bitraverse)
 import           Data.Bool                       (bool)
@@ -50,11 +52,17 @@ import qualified Data.HashMap.Strict             as HashMap
 import qualified Data.IntMap                     as IntMap
 import           Data.List                       (nub)
 import           Data.List.Extra                 (indexMaybe)
+import qualified Data.Map                        as Map
+import           Data.Map                        (Map)
 import           Data.Maybe                      (mapMaybe, maybeToList, fromJust)
 import           Data.Monoid                     (Ap(getAp))
+import qualified Data.Set                        as Set
+import           Data.Set                        (Set)
 import qualified Data.Text
 import           Data.Text.Lazy                  (Text)
 import qualified Data.Text.Lazy                  as Text
+import           System.Directory                (doesFileExist, canonicalizePath)
+import           System.IO.Unsafe                (unsafePerformIO)
 
 #if MIN_VERSION_prettyprinter(1,7,0)
 import qualified Prettyprinter                   as PP
@@ -65,7 +73,7 @@ import qualified Data.Text.Prettyprint.Doc       as PP
 import           Data.Text.Prettyprint.Doc.Extra
 import           GHC.Stack                       (HasCallStack)
 import           System.FilePath                 (replaceBaseName, takeBaseName,
-                                                  takeFileName, (<.>))
+                                                  takeFileName, (<.>), isAbsolute, (</>))
 import           Text.Printf
 import           Text.Read                       (readEither)
 import           Text.Trifecta.Result            hiding (Err)
@@ -307,22 +315,84 @@ setSym bbCtx l = do
                   ++ "blackbox for " ++ bbnm
         )
 
-selectNewName
-    :: Foldable t
-    => t String
-    -- ^ Set of existing names
-    -> FilePath
-    -- ^ Name for new file (
-    -> String
+type FileName = FilePath
+
+-- | Canonicalizes a datafile path, keeping in mind that the path might be
+-- relative to one of the import directories passed in with @-i@.
+canonicalizeDataFilePath ::
+  -- | Import directories passed in with @-i@
+  [FilePath] ->
+  -- | File to canonicalize
+  FilePath ->
+  FilePath
+canonicalizeDataFilePath idirs toCanonicalize
+  | isAbsolute toCanonicalize = unsafePerformIO $
+    ifM
+      (doesFileExist toCanonicalize)
+      (canonicalizePath toCanonicalize)
+      (error [I.i|Could not find data file #{show toCanonicalize}. Does it exist?|])
+  | otherwise = unsafePerformIO $ do
+      let candidates = map (</> toCanonicalize) idirs
+      found <- filterM doesFileExist candidates
+      case found of
+        [] -> error [I.i|
+          Could not find data file #{show toCanonicalize}. The following directories were
+          searched:
+            #{idirs}
+        |]
+        (_:_:_) -> error [I.i|
+          Multiple data files for #{show toCanonicalize} found. The following candidates
+          were found:
+            #{found}
+          Please disambiguate data files.
+        |]
+        [c] ->
+          canonicalizePath c
+{-# NOINLINE canonicalizeDataFilePath #-} -- To contain unsafePerformIO
+
+-- | Select a new file name that doesn't collide with existing names. Might return
+-- the same name as given if there are no collisions.
+selectNewName ::
+  -- | Set of existing names
+  Set FileName ->
+  -- | Name for file
+  FileName ->
+  -- | Updated file name
+  FileName
 selectNewName as a
-  | elem a as = selectNewName as (replaceBaseName a (takeBaseName a ++ "_"))
+  | a `Set.member` as = selectNewName as (replaceBaseName a (takeBaseName a ++ "_"))
   | otherwise = a
 
-renderFilePath :: [(String,FilePath)] -> String -> ([(String,FilePath)],String)
-renderFilePath fs f = ((f'',f):fs, f'')
-  where
-    f'  = takeFileName f
-    f'' = selectNewName (map fst fs) f'
+-- | Add a data file to a collection of existing files. Typically used in the HDL
+-- backend's 'addAndSetData'.
+addFilePath ::
+  -- | Import directories passed in with @-i@
+  [FilePath] ->
+  -- | Map of existing file paths to file names. The file names are guaranteed
+  -- to be unique, as long as this function is used to add new file paths.
+  Map FilePath FileName ->
+  -- | New file path to add. The canonicalized version of this file path is stored
+  -- in the map. See 'canonicalizeFilePath'.
+  FilePath ->
+  -- | Updated map and filename. Note that the returned filename might be different
+  -- from the filename in the given filepath in case of naming collisions.
+  (Map FilePath FileName, FileName)
+addFilePath iDirs existing path =
+  case Map.lookup canonicalizedPath existing of
+    Just existingName ->
+      -- This path was already added, return existing map and name
+      (existing, existingName)
+    Nothing ->
+      -- Select a new name that doesn't collide with existing names
+      ( Map.insert canonicalizedPath newFileName existing
+      , newFileName
+      )
+ where
+  canonicalizedPath = canonicalizeDataFilePath iDirs path
+
+  allNames = Set.fromList (Map.elems existing)
+  fileName = takeFileName canonicalizedPath
+  newFileName = selectNewName allNames fileName
 
 -- | Render a blackbox given a certain context. Returns a filled out template
 -- and a list of 'hidden' inputs that must be added to the encompassing component.
