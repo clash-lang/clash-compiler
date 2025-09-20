@@ -452,6 +452,7 @@ test-suite unittests
                  Clash.Tests.XException
 
                  Clash.Tests.Laws.Enum
+                 Clash.Tests.Laws.Num
                  Clash.Tests.Laws.SaturatingNum
 
                  Hedgehog.Extra

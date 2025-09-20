@@ -4,7 +4,16 @@
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
 
-module Clash.Tests.Laws.SaturatingNum (tests) where
+module Clash.Tests.Laws.SaturatingNum
+  ( tests
+
+  , genBoundedIntegral
+  , genIndex
+  , genSFixed
+  , genSigned
+  , genUFixed
+  , genUnsigned
+  ) where
 
 import Test.Tasty
 import Test.Tasty.Hedgehog.Extra
