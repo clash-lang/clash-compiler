@@ -1,0 +1,1 @@
+CHANGED: when generating (System)Verilog, Clash now resets the default net type from none to the verilog default after the generated module
