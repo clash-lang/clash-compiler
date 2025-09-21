@@ -27,7 +27,7 @@ import           Control.Concurrent.Async         (mapConcurrently_)
 import           Control.DeepSeq
 import           Control.Exception                (throw, Exception)
 import qualified Control.Monad                    as Monad
-import           Control.Monad                    (unless, foldM, forM, filterM)
+import           Control.Monad                    (unless, foldM, forM)
 import           Control.Monad.Catch              (MonadMask, MonadThrow (throwM))
 import           Control.Monad.Extra              (whenM, ifM, unlessM)
 import           Control.Monad.IO.Class           (MonadIO)
@@ -476,7 +476,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
       -- TODO: Data files should go into their own directory
       -- FIXME: Files can silently overwrite each other
       hdlDocDigests <- mapM (writeHDL hdlDir) hdlDocs
-      dataFilesDigests <- copyDataFiles (opt_importPaths opts) hdlDir dfiles
+      dataFilesDigests <- copyDataFiles hdlDir dfiles
       memoryFilesDigests <- writeMemoryDataFiles hdlDir mfiles
 
       let
@@ -1020,17 +1020,16 @@ writeMemoryDataFiles dir files =
   forM files $ \(fname, content) ->
     writeAndHash (dir </> fname) (ByteStringLazyChar8.pack content)
 
--- | Copy data files added with ~FILE
+-- | Copy data files added with ~FILE, assumes the files are canonicalized already.
+-- Throws an error on relative paths as sanity check.
 copyDataFiles
-  :: [FilePath]
-  -- ^ Import directories passed in with @-i@
-  -> FilePath
+  :: FilePath
   -- ^ Directory to copy to
   -> [(FilePath,FilePath)]
   -- ^ [(name of newly made file in HDL output dir, file to copy)]
   -> IO [ByteString]
   -- ^ SHA256 hashes of written files
-copyDataFiles idirs targetDir = mapM copyDataFile
+copyDataFiles targetDir = mapM copyDataFile
  where
   copyDataFile :: (FilePath, FilePath) -> IO ByteString
   copyDataFile (newName, toCopy)
@@ -1039,28 +1038,7 @@ copyDataFiles idirs targetDir = mapM copyDataFile
         (doesFileExist toCopy)
         (copyAndHash toCopy (targetDir </> newName))
         (error [I.i|Could not find data file #{show toCopy}. Does it exist?|])
-    | otherwise = do
-      let candidates = map (</> toCopy) idirs
-      found <- filterM doesFileExist candidates
-      case found of
-        [] -> error [I.i|
-          Could not find data file #{show toCopy}. The following directories were
-          searched:
-
-            #{idirs}
-
-          You can add directories Clash will look in using `-i`.
-        |]
-        (_:_:_) -> error [I.i|
-          Multiple data files for #{show toCopy} found. The following candidates
-          were found:
-
-            #{found}
-
-          Please disambiguate data files.
-        |]
-        [c] ->
-          copyAndHash c (targetDir </> newName)
+    | otherwise = error [I.i|copyDataFiles received a relative path #{show toCopy}. This is a bug in Clash, please report it.|]
 
   copyAndHash src dst = do
     ifM
