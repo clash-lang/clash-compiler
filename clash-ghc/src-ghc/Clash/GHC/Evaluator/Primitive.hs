@@ -2164,6 +2164,27 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "GHC.Real.$wf1" -- :: Int# -> Int# -> Int#
     | [Lit (IntLiteral i), Lit (IntLiteral j)] <- args
     -> reduce (integerToIntLiteral $ i ^ j)
+  "GHC.Internal.Real.^_$s$spowImpl2" -- :: Int# -> Integer -> Integer
+    | [intLiteral -> Just j, integerLiteral -> Just i] <- args
+    -> reduce (integerToIntLiteral $ i ^ j)
+  "GHC.Internal.Real.$w$spowImpl" -- :: Integer -> Int# -> Integer
+    | [integerLiteral -> Just i, intLiteral -> Just j] <- args
+    -> reduce (integerToIntLiteral $ i ^ j)
+  "GHC.Internal.Real.$w$spowImpl1" -- :: Int# -> Int# -> Integer
+    | [intLiteral -> Just i, intLiteral -> Just j] <- args
+    -> reduce (integerToIntLiteral $ i ^ j)
+  "GHC.Real.^_$s$spowImpl2" -- :: Int# -> Integer -> Integer
+    | [intLiteral -> Just j, integerLiteral -> Just i] <- args
+    -> reduce (integerToIntLiteral $ i ^ j)
+  "GHC.Real.$w$spowImpl" -- :: Integer -> Int# -> Integer
+    | [integerLiteral -> Just i, intLiteral -> Just j] <- args
+    -> reduce (integerToIntLiteral $ i ^ j)
+  "GHC.Real.$w$spowImpl1" -- :: Int# -> Int# -> Integer
+    | [intLiteral -> Just i, intLiteral -> Just j] <- args
+    -> reduce (integerToIntLiteral $ i ^ j)
+  "GHC.Real.^_$sf2" -- :: Int# -> Integer -> Integer
+    | [intLiteral -> Just j, integerLiteral -> Just i] <- args
+    -> reduce (integerToIntLiteral $ i ^ j)
 
   -- Type level ^    -- XXX: Very fragile
   -- These is are specialized versions of ^_f, named by some combination of ghc and singletons.
