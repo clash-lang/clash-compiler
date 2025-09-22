@@ -369,7 +369,7 @@ instance Num Bit where
   (+)         = xor##
   (-)         = xor##
   (*)         = and##
-  negate      = complement##
+  negate      = id
   abs         = id
   signum b    = b
   fromInteger = fromInteger## 0##
