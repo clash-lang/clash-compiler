@@ -58,6 +58,7 @@ import Clash.Sized.Internal.BitVector
 >>> :m -Prelude
 >>> :set -XDataKinds
 >>> import Clash.Prelude
+>>> import Data.Proxy
 -}
 
 -- | Convert data to/from a 'BitVector'. This allows functions to be defined
@@ -92,7 +93,7 @@ import Clash.Sized.Internal.BitVector
 -- places.
 --
 -- Clash provides some generic functions on packable types in the prelude, such
--- as indexing into packable stuctures (see "Clash.Class.BitPack.BitIndex") and
+-- as indexing into packable structures (see "Clash.Class.BitPack.BitIndex") and
 -- bitwise reduction of packable data (see "Clash.Class.BitPack.BitReduction").
 --
 class KnownNat (BitSize a) => BitPack a where
@@ -478,7 +479,16 @@ instance ( BitPack a
          ) => BitPack (Either a b)
 
 instance BitPack a => BitPack (Maybe a)
-instance BitPack (Proxy a) => BitPack (Proxy a)
+
+-- | Any 'Proxy' has a bit size of 0 and hence packs to @0 :: BitVector 0@.
+--
+-- >>> pack (Proxy @())
+-- 0
+-- >>> pack (Proxy @5)
+-- 0
+-- >>> pack (Proxy @Bool)
+-- 0
+instance BitPack (Proxy a)
 
 instance BitPack a => BitPack (Complex a)
 instance BitPack a => BitPack (Down a)

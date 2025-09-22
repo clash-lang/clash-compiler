@@ -1,6 +1,6 @@
 {-|
 Copyright  :  (C) 2019, Myrtle Software Ltd
-                  2022, QBayLogic B.V.
+                  2022-2025, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -10,7 +10,6 @@ Internals for "Clash.Class.HasDomain"
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}

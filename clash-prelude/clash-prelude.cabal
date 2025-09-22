@@ -131,6 +131,7 @@ common common-options
                       KindSignatures
                       MagicHash
                       NoStarIsType
+                      PolyKinds
                       PostfixOperators
                       ScopedTypeVariables
                       StandaloneDeriving
