@@ -93,18 +93,20 @@ nix-build:
    - export THREADS=$(./.ci/effective_cpus.sh)
    - export
   script:
-    - .ci/build_nix.sh .#clash-prelude
-    - .ci/build_nix.sh .#clash-prelude-hedgehog
-    - .ci/build_nix.sh .#clash-lib
-    - .ci/build_nix.sh .#clash-lib-hedgehog
-    - .ci/build_nix.sh .#clash-ghc
-    - .ci/build_nix.sh .#clash-cosim
-    - .ci/build_nix.sh .#clash-ffi
-    - .ci/build_nix.sh .#clash-testsuite
-    - .ci/build_nix.sh .#clash-benchmark
-    - .ci/build_nix.sh .#clash-profiling-prepare
-    - .ci/build_nix.sh .#clash-profiling
-    - .ci/build_nix.sh .#clash-term
+    - .ci/setup_cachix.sh
+
+    - .ci/build_and_publish_nix.sh .#clash-prelude
+    - .ci/build_and_publish_nix.sh .#clash-prelude-hedgehog
+    - .ci/build_and_publish_nix.sh .#clash-lib
+    - .ci/build_and_publish_nix.sh .#clash-lib-hedgehog
+    - .ci/build_and_publish_nix.sh .#clash-ghc
+    - .ci/build_and_publish_nix.sh .#clash-cosim
+    - .ci/build_and_publish_nix.sh .#clash-ffi
+    - .ci/build_and_publish_nix.sh .#clash-testsuite
+    - .ci/build_and_publish_nix.sh .#clash-benchmark
+    - .ci/build_and_publish_nix.sh .#clash-profiling-prepare
+    - .ci/build_and_publish_nix.sh .#clash-profiling
+    - .ci/build_and_publish_nix.sh .#clash-term
   tags:
     - local
 
