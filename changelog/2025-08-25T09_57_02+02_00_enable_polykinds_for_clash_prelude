@@ -1,0 +1,1 @@
+CHANGED: The `clash-prelude` package now uses `PolyKinds` by default, meaning all its type class instances are now more general than before. As an example, without `PolyKinds`, `BitPack (Proxy a)` would only be defined when `a :: Type`, with the extension it would be defined for any  `a :: k`. After this change, some instances in user code might now overlap.

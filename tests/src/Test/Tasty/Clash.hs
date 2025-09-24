@@ -216,6 +216,14 @@ dOpaque =
   "-DCLASH_OPAQUE=NOINLINE"
 #endif
 
+commonArgs :: [String]
+commonArgs =
+  [ "-fclash-debug", "DebugSilent"
+  , "-fclash-ignore-broken-ghcs"
+  , "-Werror=unrecognised-pragmas"
+  , dOpaque
+  ]
+
 instance IsTest ClashGenTest where
   run optionSet ClashGenTest{..} progressCallback = do
     oDir <- cgOutputDirectory
@@ -247,10 +255,8 @@ instance IsTest ClashGenTest where
       , "-fclash-hdldir", hdlDir
       , "-odir", oDir
       , "-hidir", oDir
-      , "-fclash-debug", "DebugSilent"
-      , "-fclash-ignore-broken-ghcs"
-      , dOpaque
-      ] <> cgExtraArgs
+      ] <> commonArgs
+        <> cgExtraArgs
 
     target =
       case cgBuildTarget of
@@ -287,10 +293,9 @@ instance IsTest ClashBinaryTest where
       , "-o", oDir </> "out"
       , "-i" <> cbSourceDirectory
       , "-outputdir", oDir
-      , "-fclash-ignore-broken-ghcs"
-      ] <> cbExtraBuildArgs <>
-      [ cbSourceDirectory </> cbModName <.> "hs"
-      ]
+      ] <> commonArgs
+        <> cbExtraBuildArgs
+        <> [cbSourceDirectory </> cbModName <.> "hs"]
 
     execProgram oDir =
       TestProgram (oDir </> "out") (oDir:cbExtraExecArgs) NoGlob PrintStdErr False Nothing []
