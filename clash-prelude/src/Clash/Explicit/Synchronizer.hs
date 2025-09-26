@@ -193,7 +193,6 @@ isFull addrSize@SNat ptr s_ptr =
       in  ptr == (complement (slice addrSize a1 s_ptr) ++# slice a2 d0 s_ptr)
 
 -- | Synchronizer implemented as a FIFO around a synchronous RAM. Based on the
--- design described in "Clash.Tutorial#multiclock", which is itself based on the
 -- design described in <http://www.sunburst-design.com/papers/CummingsSNUG2002SJ_FIFO1.pdf>.
 -- However, this FIFO uses a synchronous dual-ported RAM which, unlike those
 -- designs using RAM with an asynchronous read port, is nearly guaranteed to
