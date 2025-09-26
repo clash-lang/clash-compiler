@@ -39,9 +39,10 @@ Description:
     "Clash.Prelude" and "Clash.Explicit.Prelude" at the same time as they
     have overlapping definitions.
   .
-  A preliminary version of a tutorial can be found in "Clash.Tutorial", for a
-  general overview of the library you should however check out "Clash.Prelude".
-  Some circuit examples can be found in "Clash.Examples".
+  A preliminary version of a tutorial can be found at
+  <https://docs.clash-lang.org/tutorial>, for a general overview of the library
+  you should however check out "Clash.Prelude". Some circuit examples can be
+  found in "Clash.Examples".
 Homepage:             https://clash-lang.org/
 bug-reports:          https://github.com/clash-lang/clash-compiler/issues
 License:              BSD-2-Clause
