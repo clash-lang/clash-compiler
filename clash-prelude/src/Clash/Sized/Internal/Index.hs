@@ -557,6 +557,7 @@ instance ShowX (Index n) where
 
 instance NFDataX (Index n) where
   deepErrorX = errorX
+  ensureSpine = id
   rnfX = rwhnfX
 
 -- | None of the 'Read' class' methods are synthesizable.
