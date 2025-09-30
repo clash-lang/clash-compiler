@@ -233,6 +233,7 @@ instance ShowX (Unsigned n) where
 
 instance NFDataX (Unsigned n) where
   deepErrorX = errorX
+  ensureSpine = id
   rnfX = rwhnfX
 
 -- | None of the 'Read' class' methods are synthesizable.
