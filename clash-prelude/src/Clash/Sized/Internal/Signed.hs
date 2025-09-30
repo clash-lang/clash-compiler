@@ -194,6 +194,7 @@ data Signed (n :: Nat) =
 
 instance NFDataX (Signed n) where
   deepErrorX = errorX
+  ensureSpine = id
   rnfX = rwhnfX
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511

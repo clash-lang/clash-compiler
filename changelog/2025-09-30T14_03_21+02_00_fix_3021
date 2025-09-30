@@ -1,0 +1,1 @@
+FIXED: Clash will no longer error out when converting `ensureSpine` on Clash number types to HDL [#3021](https://github.com/clash-lang/clash-compiler/issues/3021)
