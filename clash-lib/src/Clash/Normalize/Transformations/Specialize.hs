@@ -463,11 +463,19 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
                       -- binding @g'@ where both the body of @mealy@ and @g@
                       -- are inlined, meaning the state-transition-function
                       -- and the memory element will be in a single function.
+                      --
+                      -- Finally, we must make sure we do not inline the bodies
+                      -- of functions with a Synthesize annotation, as that would
+                      -- duplicate Clash compiler work. See also issue #3024
                       gTmM <- fmap (UniqMap.lookup g) $ Lens.use bindings
+                      let gBody = if g `elemVarSet` topEnts then
+                                    Nothing
+                                  else
+                                    fmap bindingTerm gTmM
                       return
                         ( g
                         , preferNoInline inl (maybe noUserInline bindingSpec gTmM)
-                        , maybe specArg (Left . (`mkApps` gArgs) . bindingTerm) gTmM
+                        , maybe specArg (Left . (`mkApps` gArgs)) gBody
                         )
                     else return (f,inl,specArg)
                 _ -> return (f,inl,specArg)
