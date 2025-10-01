@@ -475,11 +475,18 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
                       --    g         | g
                       --    !f and !g | f_g
                       --
+                      -- Finally, we must make sure we do not inline the bodies
+                      -- of functions with a Synthesize annotation, as that would
+                      -- duplicate Clash compiler work. See also issue #3024
                       gTmM <- fmap (UniqMap.lookup g) $ Lens.use bindings
+                      let gBody = if g `elemVarSet` topEnts then
+                                    Nothing
+                                  else
+                                    fmap bindingTerm gTmM
                       return
                         ( specializeName (inl, varName f) (bindingSpec <$> gTmM, varName g)
                         , preferNoInline inl (maybe noUserInline bindingSpec gTmM)
-                        , maybe specArg (Left . (`mkApps` gArgs) . bindingTerm) gTmM
+                        , maybe specArg (Left . (`mkApps` gArgs)) gBody
                         )
                     else return (varName f, inl, specArg)
                 _ -> return (varName f, inl, specArg)
