@@ -298,6 +298,7 @@ instance ShowX Bit where
 
 instance NFDataX Bit where
   deepErrorX = errorX
+  ensureSpine = unpack# . xToBV . pack#
   rnfX = rwhnfX
   hasUndefined bv = isLeft (isX bv) || unsafeMask# bv /= 0
 
