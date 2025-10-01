@@ -1072,6 +1072,7 @@ runClashTest = defaultMain
         , outputTest "Simple" def
         , outputTest "T1771" def
         , runTest "Product" def
+        , outputTest "T3024" def{hdlTargets=[VHDL], hdlLoad = [], hdlSim = []}
         ]
       , clashTestGroup "Testbench"
         [ runTest "TB" def{clashFlags=["-fclash-inline-limit=0"]}
