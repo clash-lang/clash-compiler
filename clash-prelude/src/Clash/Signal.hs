@@ -203,6 +203,7 @@ module Clash.Signal
   , regMaybe
   , regEn
   , mux
+  , apEn
     -- * Simulation and testbench functions
   , clockGen
   , resetGen
