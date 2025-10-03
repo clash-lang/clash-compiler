@@ -2,7 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software Ltd,
                   2017     , Google Inc.,
-                  2021-2024, QBayLogic B.V.
+                  2021-2025, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -202,6 +202,7 @@ module Clash.Signal
   , regMaybe
   , regEn
   , mux
+  , apEn
     -- * Simulation and testbench functions
   , clockGen
   , resetGen
