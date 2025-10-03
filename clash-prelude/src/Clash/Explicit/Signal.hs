@@ -237,6 +237,7 @@ module Clash.Explicit.Signal
   , register
   , regMaybe
   , regEn
+  , regEnN
   , mux
   , apEn
     -- * Simulation and testbench functions
@@ -301,7 +302,8 @@ import           Data.Maybe                     (isJust)
 import           GHC.TypeLits                   (type (<=))
 
 import           Clash.Annotations.Primitive    (hasBlackBox)
-import           Clash.Promoted.Nat             (SNat(..), snatToNum)
+import           Clash.Promoted.Nat
+  (SNat(..), SNatLE(..), compareSNat, leToPlus, snatToNum)
 import           Clash.Signal.Bundle
   (Bundle (..), EmptyTuple(..), TaggedEmptyTuple(..), vecBundle#)
 import           Clash.Signal.BiSignal
@@ -759,6 +761,31 @@ regEn
 regEn = \clk rst gen initial en i ->
   register# clk rst (andEnable gen en) initial initial i
 {-# INLINE regEn #-}
+
+-- | A chain of 'regEn's.
+regEnN ::
+  forall dom a n.
+  (KnownDomain dom, NFDataX a) =>
+  -- | Clock
+  Clock dom ->
+  -- | Reset, 'regEnN' outputs the reset value when the reset value is active
+  Reset dom ->
+  -- | Global enable
+  Enable dom ->
+  -- | The number of stored elements
+  SNat n ->
+  -- | Initial content of all elements in the chain.
+  a ->
+  -- | The "push next input" indicator
+  Signal dom Bool ->
+  Signal dom a ->
+  Signal dom a
+regEnN clk rst gen n@SNat initial en = case compareSNat n (SNat @0) of
+  SNatLE -> id
+  SNatGT -> leToPlus @1 @n
+          $ Clash.Sized.Vector.last
+          . Clash.Sized.Vector.generate n (regEn clk rst gen initial en)
+{-# INLINE regEnN #-}
 
 -- * Simulation functions
 

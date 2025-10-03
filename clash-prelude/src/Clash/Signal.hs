@@ -201,6 +201,7 @@ module Clash.Signal
   , register
   , regMaybe
   , regEn
+  , regEnN
   , mux
   , apEn
     -- * Simulation and testbench functions
@@ -1201,6 +1202,29 @@ regEn = \initial en i ->
     en
     i
 {-# INLINE regEn #-}
+
+-- | A chain of 'regEn's.
+regEnN ::
+  forall dom a n.
+  (HiddenClockResetEnable dom, NFDataX a) =>
+  -- | The number of stored elements
+  SNat n ->
+  -- | Initial content of all elements in the chain.
+  a ->
+  -- | The "push next input" indicator
+  Signal dom Bool ->
+  Signal dom a ->
+  Signal dom a
+regEnN = \sn initial en i ->
+  E.regEnN
+    (fromLabel @(HiddenClockName dom))
+    (fromLabel @(HiddenResetName dom))
+    (fromLabel @(HiddenEnableName dom))
+    sn
+    initial
+    en
+    i
+{-# INLINE regEnN #-}
 
 -- * Signal -> List conversion
 
