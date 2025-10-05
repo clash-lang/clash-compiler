@@ -1,5 +1,5 @@
 {-|
-Copyright  :  (C) 2019-2024, QBayLogic B.V.
+Copyright  :  (C) 2019-2025, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -8,13 +8,14 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 module Clash.Class.BitPack.Internal.TH where
 
-import           Clash.CPP             (maxTupleSize)
+import           Clash.CPP                  (maxTupleSize)
 import           Language.Haskell.TH.Compat (mkTySynInstD,mkTupE)
-import           Control.Monad         (replicateM)
+import           Control.Monad              (replicateM)
 #if !MIN_VERSION_base(4,20,0)
-import           Data.List             (foldl')
+import           Data.List                  (foldl')
 #endif
-import           GHC.TypeLits          (KnownNat)
+import           GHC.TypeError              (ErrorMessage(..), TypeError)
+import           GHC.TypeLits               (KnownNat)
 import           Language.Haskell.TH
 
 -- | Contruct all the tuple (starting at size 3) instances for BitPack.
@@ -24,15 +25,21 @@ deriveBitPackTuples
   -> Name
   -- ^ BitSize
   -> Name
+  -- ^ NoProductType
+  -> Name
   -- ^ pack
   -> Name
   -- ^ unpack
   -> DecsQ
-deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
-  let bitPack  = ConT bitPackName
-      bitSize  = ConT bitSizeName
-      knownNat = ConT ''KnownNat
-      plus     = ConT $ mkName "+"
+deriveBitPackTuples bitPackName bitSizeName noProductTypeName
+                    packName unpackName = do
+  let bitPack   = ConT bitPackName
+      bitSize   = ConT bitSizeName
+      knownNat  = ConT ''KnownNat
+      tyErr     = ConT ''TypeError
+      tyErrText = ConT 'Text
+      tyErrCons = ConT '(:<>:)
+      plus      = ConT $ mkName "+"
 
   allNames <- replicateM maxTupleSize (newName "a")
   retupName <- newName "retup"
@@ -61,6 +68,14 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
           mkTySynInstD bitSizeName [tuple (v:vs)]
             $ plus `AppT` (bitSize `AppT` v) `AppT`
               (bitSize `AppT` foldl AppT (TupleT $ tupleNum - 1) vs)
+
+        -- Associated type NoProductType
+        noProductTypeType =
+          let s1 = LitT $ StrTyLit "Unsatisfiable `NoProductType` constraint: "
+              s2 = LitT $ StrTyLit "Tuples are product types."
+              msg = tyErrCons `AppT` (tyErrText `AppT` s1)
+                              `AppT` (tyErrText `AppT` s2)
+           in mkTySynInstD noProductTypeName [tuple (v:vs)] $ tyErr `AppT` msg
 
         pack =
           FunD
@@ -107,4 +122,5 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
                 []
             ]
 
-    in InstanceD Nothing context instTy [bitSizeType, pack, unpack]
+    in InstanceD Nothing context instTy
+         [bitSizeType, noProductTypeType, pack, unpack]

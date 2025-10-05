@@ -179,6 +179,8 @@ instance NFData (Index n) where
 
 instance (KnownNat n, 1 <= n) => BitPack (Index n) where
   type BitSize (Index n) = CLog 2 n
+  type NoProductType (Index n) = ()
+  type NoSumType (Index n) = ()
   pack   = packXWith pack#
   unpack = unpack#
 

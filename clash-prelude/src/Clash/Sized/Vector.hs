@@ -117,6 +117,7 @@ import qualified Data.Foldable    as F
 import Data.Kind                  (Type)
 import Data.Proxy                 (Proxy (..))
 import Data.Singletons            (TyFun,Apply,type (@@))
+import GHC.TypeError              (ErrorMessage(..), TypeError)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), type (*),
                                    type (^), type (<=), natVal)
 import GHC.Base                   (Int(I#),Int#,isTrue#)
@@ -2711,6 +2712,10 @@ smapWithBounds f xs = reverse
 
 instance (KnownNat n, BitPack a) => BitPack (Vec n a) where
   type BitSize (Vec n a) = n * (BitSize a)
+  type NoProductType (Vec n a) =
+    TypeError ('Text "Unsatisfiable `NoProductType` constraint: "
+               ':<>: Text "Vectors are product types.")
+  type NoSumType (Vec n a) = NoSumType a
   pack   = packXWith (concatBitVector# . map pack)
   unpack = map unpack . unconcatBitVector#
 

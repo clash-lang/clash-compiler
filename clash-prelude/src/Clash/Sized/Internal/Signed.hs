@@ -222,6 +222,8 @@ instance KnownNat n => Read (Signed n) where
 
 instance KnownNat n => BitPack (Signed n) where
   type BitSize (Signed n) = n
+  type NoProductType (Signed n) = ()
+  type NoSumType (Signed n) = ()
   pack   = packXWith pack#
   unpack = unpack#
 
