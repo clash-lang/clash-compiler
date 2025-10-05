@@ -549,6 +549,8 @@ instance (NumFixedC rep int frac) => Num (Fixed rep int frac) where
 
 instance (BitPack (rep (int + frac)), KnownNat (BitSize (rep (int + frac)))) => BitPack (Fixed rep int frac) where
   type BitSize (Fixed rep int frac) = BitSize (rep (int + frac))
+  type IsProductType (Fixed rep int frac) = False
+  type IsSumType (Fixed rep int frac) = False
   pack   (Fixed fRep) = pack fRep
   unpack bv           = Fixed (unpack bv)
 

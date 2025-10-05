@@ -1,5 +1,5 @@
 {-|
-Copyright  :  (C) 2019-2024, QBayLogic B.V.
+Copyright  :  (C) 2019-2025, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -8,14 +8,15 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 module Clash.Class.BitPack.Internal.TH where
 
-import           Clash.CPP             (maxTupleSize)
+import           Clash.CPP                  (maxTupleSize)
 import           Language.Haskell.TH.Compat (mkTySynInstD,mkTupE)
-import           Control.Monad         (replicateM)
+import           Control.Monad              (replicateM)
 #if !MIN_VERSION_base(4,20,0)
-import           Data.List             (foldl')
+import           Data.List                  (foldl')
 #endif
-import           GHC.TypeLits          (KnownNat)
+import           GHC.TypeLits               (KnownNat)
 import           Language.Haskell.TH
+import           Language.Haskell.TH.Syntax (trueName)
 
 -- | Contruct all the tuple (starting at size 3) instances for BitPack.
 deriveBitPackTuples
@@ -24,15 +25,23 @@ deriveBitPackTuples
   -> Name
   -- ^ BitSize
   -> Name
+  -- ^ IsProductType
+  -> Name
+  -- ^ IsSumType
+  -> Name
   -- ^ pack
   -> Name
   -- ^ unpack
   -> DecsQ
-deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
-  let bitPack  = ConT bitPackName
-      bitSize  = ConT bitSizeName
-      knownNat = ConT ''KnownNat
-      plus     = ConT $ mkName "+"
+deriveBitPackTuples bitPackName bitSizeName isProductTypeName isSumTypeName
+                    packName unpackName = do
+  let bitPack   = ConT bitPackName
+      bitSize   = ConT bitSizeName
+      isSumType = ConT isSumTypeName
+      knownNat  = ConT ''KnownNat
+      typeTrue  = ConT trueName
+      plus      = ConT $ mkName "+"
+      typeOr    = ConT $ mkName "||"
 
   allNames <- replicateM maxTupleSize (newName "a")
   retupName <- newName "retup"
@@ -61,6 +70,16 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
           mkTySynInstD bitSizeName [tuple (v:vs)]
             $ plus `AppT` (bitSize `AppT` v) `AppT`
               (bitSize `AppT` foldl AppT (TupleT $ tupleNum - 1) vs)
+
+        -- Associated type IsProductType
+        isProductTypeType =
+          mkTySynInstD isProductTypeName [tuple (v:vs)] typeTrue
+
+        -- Associated type IsSumType
+        isSumTypeType =
+          mkTySynInstD isSumTypeName [tuple (v:vs)]
+            $ typeOr `AppT` (isSumType `AppT` v) `AppT`
+              (isSumType `AppT` foldl AppT (TupleT $ tupleNum - 1) vs)
 
         pack =
           FunD
@@ -107,4 +126,5 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
                 []
             ]
 
-    in InstanceD Nothing context instTy [bitSizeType, pack, unpack]
+    in InstanceD Nothing context instTy
+         [bitSizeType, isProductTypeType, isSumTypeType, pack, unpack]

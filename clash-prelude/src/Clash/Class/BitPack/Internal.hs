@@ -39,6 +39,7 @@ import Data.Functor.Sum               (Sum)
 import Data.Int
 import Data.Ord                       (Down)
 import Data.Proxy                     (Proxy)
+import Data.Type.Bool                 (type (||))
 import Data.Word
 import Foreign.C.Types                (CUShort)
 import GHC.Generics
@@ -109,6 +110,15 @@ class KnownNat (BitSize a) => BitPack a where
   -- >   deriving (Generic, BitPack)
   type BitSize a :: Nat
   type BitSize a = (CLog 2 (GConstructorCount (Rep a))) + (GFieldSize (Rep a))
+
+  -- | Is 'True' for product types.
+  type IsProductType a :: Bool
+  type IsProductType a = GIsProductType (Rep a)
+
+  -- | Is 'True' for sum types.
+  type IsSumType a :: Bool
+  type IsSumType a = GIsSumType (Rep a)
+
   -- | Convert element of type @a@ to a 'BitVector'
   --
   -- >>> pack (-5 :: Signed 6)
@@ -234,71 +244,99 @@ bitCoerceMap f = bitCoerce . f . bitCoerce
 
 instance BitPack Bool where
   type BitSize Bool = 1
+  type IsProductType Bool = False
+  type IsSumType Bool = False
   pack   = let go b = if b then 1 else 0 in packXWith go
   unpack = checkUnpackUndef $ \bv -> if bv == 1 then True else False
 
 instance KnownNat n => BitPack (BitVector n) where
   type BitSize (BitVector n) = n
+  type IsProductType (BitVector n) = False
+  type IsSumType (BitVector n) = False
   pack     = packXWith id
   unpack v = v
 
 instance BitPack Bit where
   type BitSize Bit = 1
+  type IsProductType Bit = False
+  type IsSumType Bit = False
   pack   = packXWith pack#
   unpack = unpack#
 
 instance BitPack Int where
   type BitSize Int = WORD_SIZE_IN_BITS
+  type IsProductType Int = False
+  type IsSumType Int = False
   pack   = packXWith fromIntegral
   unpack = checkUnpackUndef fromIntegral
 
 instance BitPack Int8 where
   type BitSize Int8 = 8
+  type IsProductType Int8 = False
+  type IsSumType Int8 = False
   pack   = packXWith fromIntegral
   unpack = checkUnpackUndef fromIntegral
 
 instance BitPack Int16 where
   type BitSize Int16 = 16
+  type IsProductType Int16 = False
+  type IsSumType Int16 = False
   pack   = packXWith fromIntegral
   unpack = checkUnpackUndef fromIntegral
 
 instance BitPack Int32 where
   type BitSize Int32 = 32
+  type IsProductType Int32 = False
+  type IsSumType Int32 = False
   pack   = packXWith fromIntegral
   unpack = checkUnpackUndef fromIntegral
 
 instance BitPack Int64 where
   type BitSize Int64 = 64
+  type IsProductType Int64 = False
+  type IsSumType Int64 = False
   pack   = packXWith fromIntegral
   unpack = checkUnpackUndef fromIntegral
 
 instance BitPack Word where
   type BitSize Word = WORD_SIZE_IN_BITS
+  type IsProductType Word = False
+  type IsSumType Word = False
   pack   = packXWith fromIntegral
   unpack = checkUnpackUndef fromIntegral
 
 instance BitPack Word8 where
   type BitSize Word8 = 8
+  type IsProductType Word8 = False
+  type IsSumType Word8 = False
   pack   = packXWith fromIntegral
   unpack = checkUnpackUndef fromIntegral
 
 instance BitPack Word16 where
   type BitSize Word16 = 16
+  type IsProductType Word16 = False
+  type IsSumType Word16 = False
   pack   = packXWith fromIntegral
   unpack = checkUnpackUndef fromIntegral
 
 instance BitPack Word32 where
   type BitSize Word32 = 32
+  type IsProductType Word32 = False
+  type IsSumType Word32 = False
   pack   = packXWith fromIntegral
   unpack = checkUnpackUndef fromIntegral
 
 instance BitPack Word64 where
   type BitSize Word64 = 64
+  type IsProductType Word64 = False
+  type IsSumType Word64 = False
   pack   = packXWith fromIntegral
   unpack = checkUnpackUndef fromIntegral
 
 instance BitPack Float where
   type BitSize Float = 32
+  type IsProductType Float = False
+  type IsSumType Float = False
   pack   = packXWith packFloat#
   unpack = checkUnpackUndef unpackFloat#
 
@@ -316,6 +354,8 @@ unpackFloat# (unsafeToNatural -> w) = wordToFloat (fromIntegral w)
 
 instance BitPack Double where
   type BitSize Double = 64
+  type IsProductType Double = False
+  type IsSumType Double = False
   pack   = packXWith packDouble#
   unpack = checkUnpackUndef unpackDouble#
 
@@ -333,21 +373,29 @@ unpackDouble# (unsafeToNatural -> w) = wordToDouble (fromIntegral w)
 
 instance BitPack CUShort where
   type BitSize CUShort = 16
+  type IsProductType CUShort = False
+  type IsSumType CUShort = False
   pack   = packXWith fromIntegral
   unpack = checkUnpackUndef fromIntegral
 
 instance BitPack Half where
   type BitSize Half = 16
+  type IsProductType Half = False
+  type IsSumType Half = False
   pack (Half x) = pack x
   unpack        = checkUnpackUndef $ \x -> Half (unpack x)
 
 instance BitPack () where
   type BitSize () = 0
+  type IsProductType () = False
+  type IsSumType () = False
   pack   _ = minBound
   unpack _ = ()
 
 instance BitPack Char where
   type BitSize Char = 21
+  type IsProductType Char = False
+  type IsSumType Char = False
   pack   = packXWith packChar#
   unpack = checkUnpackUndef unpackChar#
 
@@ -369,6 +417,8 @@ unpackChar# = chr . fromIntegral
 -- GHC imposed limit is either 62 or 64 depending on the GHC version.
 instance (BitPack a, BitPack b) => BitPack (a,b) where
   type BitSize (a,b) = BitSize a + BitSize b
+  type IsProductType (a,b) = True
+  type IsSumType (a,b) = IsSumType a || IsSumType b
   pack = let go (a,b) = pack a ++# pack b in packXWith go
   unpack ab  = let (a,b) = split# ab in (unpack a, unpack b)
 
@@ -380,6 +430,12 @@ class GBitPack f where
   -- | Number of constructors this type has. Indirectly indicates how many bits
   -- are needed to represent the constructor.
   type GConstructorCount f :: Nat
+
+  -- | Is 'True' for product types.
+  type GIsProductType f :: Bool
+
+  -- | Is 'True' for sum types.
+  type GIsSumType f :: Bool
 
   -- | Pack fields of a type. Caller should pack and prepend the constructor bits.
   gPackFields
@@ -404,6 +460,8 @@ class GBitPack f where
 instance GBitPack a => GBitPack (M1 m d a) where
   type GFieldSize (M1 m d a) = GFieldSize a
   type GConstructorCount (M1 m d a) = GConstructorCount a
+  type GIsProductType (M1 m d a) = GIsProductType a
+  type GIsSumType (M1 m d a) = GIsSumType a
 
   gPackFields cc (M1 m1) = gPackFields cc m1
   gUnpack c cc b = M1 (gUnpack c cc b)
@@ -416,6 +474,8 @@ instance ( KnownNat (GFieldSize g)
          ) => GBitPack (f :+: g) where
   type GFieldSize (f :+: g) = Max (GFieldSize f) (GFieldSize g)
   type GConstructorCount (f :+: g) = GConstructorCount f + GConstructorCount g
+  type GIsProductType (f :+: g) = GIsProductType f || GIsProductType g
+  type GIsSumType (f :+: g) = True
 
   gPackFields cc (L1 l) =
     let (sc, packed) = gPackFields cc l in
@@ -443,6 +503,8 @@ instance ( KnownNat (GFieldSize g)
 instance (KnownNat (GFieldSize g), KnownNat (GFieldSize f), GBitPack f, GBitPack g) => GBitPack (f :*: g) where
   type GFieldSize (f :*: g) = GFieldSize f + GFieldSize g
   type GConstructorCount (f :*: g) = 1
+  type GIsProductType (f :*: g) = True
+  type GIsSumType (f :*: g) = GIsSumType f || GIsSumType g
 
   gPackFields cc fg =
     (cc, packXWith go fg)
@@ -460,6 +522,8 @@ instance (KnownNat (GFieldSize g), KnownNat (GFieldSize f), GBitPack f, GBitPack
 instance BitPack c => GBitPack (K1 i c) where
   type GFieldSize (K1 i c) = BitSize c
   type GConstructorCount (K1 i c)  = 1
+  type GIsProductType (K1 i c) = IsProductType c
+  type GIsSumType (K1 i c) = IsSumType c
 
   gPackFields cc (K1 i) = (cc, pack i)
   gUnpack _c _cc b      = K1 (unpack b)
@@ -467,6 +531,8 @@ instance BitPack c => GBitPack (K1 i c) where
 instance GBitPack U1 where
   type GFieldSize U1 = 0
   type GConstructorCount U1 = 1
+  type GIsProductType U1 = False
+  type GIsSumType U1 = False
 
   gPackFields cc U1 = (cc, 0)
   gUnpack _c _cc _b = U1
@@ -517,4 +583,5 @@ bitToBool :: Bit -> Bool
 bitToBool = bitCoerce
 
 -- Derive the BitPack instance for tuples of size 3 to maxTupleSize
-deriveBitPackTuples ''BitPack ''BitSize 'pack 'unpack
+deriveBitPackTuples ''BitPack ''BitSize ''IsProductType ''IsSumType
+                    'pack 'unpack

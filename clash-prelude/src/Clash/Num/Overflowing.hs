@@ -1,5 +1,5 @@
 {-|
-Copyright  :  (C) 2021-2022, QBayLogic B.V.
+Copyright  :  (C) 2021-2025, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -65,6 +65,8 @@ instance (Ord a) => Ord (Overflowing a) where
 
 instance (BitPack a, KnownNat (BitSize a + 1)) => BitPack (Overflowing a) where
   type BitSize (Overflowing a) = BitSize a + 1
+  type IsProductType (Overflowing a) = IsProductType a
+  type IsSumType (Overflowing a) = IsSumType a
   -- Default instance, no explicit implementations.
 
 instance (Parity a) => Parity (Overflowing a) where

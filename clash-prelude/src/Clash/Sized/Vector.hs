@@ -2711,6 +2711,8 @@ smapWithBounds f xs = reverse
 
 instance (KnownNat n, BitPack a) => BitPack (Vec n a) where
   type BitSize (Vec n a) = n * (BitSize a)
+  type IsProductType (Vec n a) = True
+  type IsSumType (Vec n a) = IsSumType a
   pack   = packXWith (concatBitVector# . map pack)
   unpack = map unpack . unconcatBitVector#
 
