@@ -18,6 +18,11 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
+#if MIN_VERSION_ghc(9,12,0)
+-- We'll need to support deprecated primitives too
+{-# OPTIONS_GHC -Wno-deprecations #-}
+#endif
+
 #include "MachDeps.h"
 
 module Clash.GHC.Evaluator.Primitive
@@ -154,6 +159,10 @@ import qualified GHC.CString
 import qualified GHC.TypeLits
 import qualified GHC.TypeNats
 import qualified GHC.Types
+
+#if MIN_VERSION_ghc(9,12,0)
+import qualified GHC.Magic
+#endif
 
 #if MIN_VERSION_base(4,15,0)
 import qualified GHC.Num
@@ -1457,6 +1466,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
 
   $(namePat 'GHC.PrimopWrappers.dataToTagLarge#)
+    | [DC dc _] <- args
+    -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+#endif
+#if MIN_VERSION_ghc(9,12,0)
+  $(namePat 'GHC.Magic.dataToTag#)
     | [DC dc _] <- args
     -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
 #endif

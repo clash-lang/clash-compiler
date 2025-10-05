@@ -452,7 +452,7 @@ singleton = (`Cons` Nil)
 -}
 head :: Vec (n + 1) a -> a
 head (x `Cons` _) = x
-#if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
+#if __GLASGOW_HASKELL__ < 902 || __GLASGOW_HASKELL__ >= 904 && __GLASGOW_HASKELL__ < 912
 head xs = unreachable xs
  where
   unreachable :: forall n a. 1 <= n => Vec n a -> a
@@ -504,7 +504,7 @@ head xs = unreachable xs
 -}
 tail :: Vec (n + 1) a -> Vec n a
 tail (_ `Cons` xr) = xr
-#if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
+#if __GLASGOW_HASKELL__ < 902 || __GLASGOW_HASKELL__ >= 904 && __GLASGOW_HASKELL__ < 912
 tail xs = unreachable xs
  where
   unreachable :: forall n a. 1 <= n => Vec n a -> Vec (n - 1) a
@@ -557,7 +557,7 @@ tail xs = unreachable xs
 last :: Vec (n + 1) a -> a
 last (x `Cons` Nil)         = x
 last (_ `Cons` y `Cons` xr) = last (y `Cons` xr)
-#if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
+#if __GLASGOW_HASKELL__ < 902 || __GLASGOW_HASKELL__ >= 904 && __GLASGOW_HASKELL__ < 912
 last xs = unreachable xs
  where
   unreachable :: 1 <= n => Vec n a -> a
@@ -610,7 +610,7 @@ last xs = unreachable xs
 init :: Vec (n + 1) a -> Vec n a
 init (_ `Cons` Nil)         = Nil
 init (x `Cons` y `Cons` xr) = x `Cons` init (y `Cons` xr)
-#if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
+#if __GLASGOW_HASKELL__ < 902 || __GLASGOW_HASKELL__ >= 904 && __GLASGOW_HASKELL__ < 912
 init xs = unreachable xs
  where
   unreachable :: 1 <= n => Vec n a -> Vec (n - 1) a
@@ -2613,7 +2613,7 @@ dtfold _ f g = go (SNat :: SNat k)
           sn'       = sn `subSNat` d1
           (xsL,xsR) = splitAt (pow2SNat sn') xs
       in  g sn' (go sn' xsL) (go sn' xsR)
-#if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
+#if __GLASGOW_HASKELL__ < 902 || __GLASGOW_HASKELL__ >= 904 && __GLASGOW_HASKELL__ < 912
     go _  Nil =
       case (const Dict :: forall m. Proxy m -> Dict (1 <= 2 ^ m)) (Proxy @n) of
         {}
