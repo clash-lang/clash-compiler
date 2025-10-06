@@ -1,5 +1,47 @@
 # Changelog for the Clash project
 
+## 1.8.3 *Oct 6th 2025*
+
+Added:
+* `Counter` instances for `Bool`, `Bit`, `Int`, `Int8`, `Int16`, `Int32`, `Int64`, `Word`, `Word8`, `Word16`, `Word32`, `Word64`, `Identity` and `Maybe`. [#2692](https://github.com/clash-lang/clash-compiler/pull/2692)
+* The Vec type now has a [COMPLETE pragma](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/pragmas.html#complete-pragma) to avoid incomplete pattern matches when using the `(:>)` pattern. [#3020](https://github.com/clash-lang/clash-compiler/pull/3020)
+* RamOp now has an AutoReg instance. [#2792](https://github.com/clash-lang/clash-compiler/pull/2792)
+* Added instance `NFDataX (SimOnly a)` [#2900](https://github.com/clash-lang/clash-compiler/pull/2900)
+* Support for GHC 9.10 on Windows (macOS and Linux were already supported) [#2945](https://github.com/clash-lang/clash-compiler/pull/2945)
+* Added a `BitPack` instance for `Char` [#2957](https://github.com/clash-lang/clash-compiler/pull/2957)
+* Support for GHC 9.10.2 [#3003](https://github.com/clash-lang/clash-compiler/pull/3003)
+
+Changed:
+* Functions defined on `Clash.Class.Counter` are now public [#2692](https://github.com/clash-lang/clash-compiler/pull/2692)
+
+Fixed:
+* Clash hanging when rendering `Index n` literals, for large values of `n` [#2813](https://github.com/clash-lang/clash-compiler/issues/2813)
+* Render overflowed Index literals as don't-cares in HDL [#2970](https://github.com/clash-lang/clash-compiler/pull/2970)
+* Clash errors out when `Clash.Sized.Vector.splitAt` is compile-time evaluated in an illegal context [#2831]https://github.com/clash-lang/clash-compiler/issues/2831
+* `Clash.Explicit.DDR`: [#2911](https://github.com/clash-lang/clash-compiler/pull/2911)
+  - `ddrIn`: VHDL: Remove data input from sensitivity list of `ddrIn_neg_latch` register as it is superfluous. This should not affect functionality.
+  - `ddrOut`: VHDL: Fix incorrect usage of `Enable` input when the domain is set to asynchronous resets. Deasserting the `Enable` exhibited wrong behavior before this fix.
+* `Clash.Xilinx.DDR`: [#2911](https://github.com/clash-lang/clash-compiler/pull/2911)
+  - These primitives only support clocks where the rising edge is the active edge. Using them in a domain with falling active edges now causes an error.
+  - `oddr`: Fix VHDL and SystemVerilog erroring out during HDL generation
+  - Symbols in HDL for both `iddr` and `oddr` were renamed to match their function.
+* `Clash.Intel.DDR`: [#2911](https://github.com/clash-lang/clash-compiler/pull/2911)
+  - These primitives only support clocks where the rising edge is the active edge. Using them in a domain with falling active edges now causes an error.
+  - Fix rendering HDL. It variously errored out or generated non-working HDL.
+  - Rendering HDL no longer causes Clash to issue a warning about an argument unused in Haskell but used in the primitive black box.
+* `makeTopEntity` now accounts for `SimOnly` constructs. This can prevent warnings in situtations where the `SimOnly` type would contain types `makeTopEntity` cannot handle. [#2897](https://github.com/clash-lang/clash-compiler/pull/2897)
+* Clash did not build on GHC 9.6.7 (but did on 9.6.6) [#2916](https://github.com/clash-lang/clash-compiler/issues/2916)
+* Ignore `Tick`s in `TermLiteral Integer`, `TermLiteral Char`, `TermLiteral Natural`, and `TermLiteral (SNat n)` [#2925](https://github.com/clash-lang/clash-compiler/pull/2925)
+* Fixed laziness issue in internal black box `imap_go` [#2542](https://github.com/clash-lang/clash-compiler/issues/2542)
+* Clash's evaluator now uses `TemplateHaskell` names to detect renamed symbols in `GHC.*` and `Clash.*`. Fixes errors similar to `No blackbox found for: GHC.Internal.Base.eqString` [#2972](https://github.com/clash-lang/clash-compiler/issues/2972)
+* No blackbox found for: `GHC.Internal.Control.Exception.Base.recSelError` on GHC 9.10 [#2966](https://github.com/clash-lang/clash-compiler/issues/2966)
+* Verilog and System Verilog code gen bug for `map head` [#2809](https://github.com/clash-lang/clash-compiler/issues/2809)
+* Error parsing blackbox: `Clash.Sized.Vector.head` [#2988](https://github.com/clash-lang/clash-compiler/issues/2988)
+* Clash no longer duplicates included datafiles when component is instantiated multiple times [#3008](https://github.com/clash-lang/clash-compiler/issues/3008)
+* Clash will no longer emit "no blackbox found for" `GHC.Real`'s exponentiation function if it is applied to constants [#3010](https://github.com/clash-lang/clash-compiler/pull/3010)
+* Clash will no longer error out when converting `ensureSpine` on Clash number types to HDL [#3021](https://github.com/clash-lang/clash-compiler/issues/3021)
+* Clash will no longer ignore Synthesize annotations when the function is used in an argument position [#3024](https://github.com/clash-lang/clash-compiler/issues/3024)
+
 ## 1.8.2 *Jan 3rd 2025*
 
 Added:

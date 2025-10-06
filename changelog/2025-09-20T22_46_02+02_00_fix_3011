@@ -1,1 +1,0 @@
-FIXED: Clash will no longer emit "no blackbox found for" `GHC.Real`'s exponentiation function if it is applied to constants
