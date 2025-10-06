@@ -1,1 +1,0 @@
-FIXED: `makeTopEntity` now accounts for `SimOnly` constructs. This can prevent warnings in situtations where the `SimOnly` type would contain types `makeTopEntity` cannot handle.

@@ -1,1 +1,0 @@
-FIXED: Clash errors out when `Clash.Sized.Vector.splitAt` is compile-time evaluated in an illegal context
