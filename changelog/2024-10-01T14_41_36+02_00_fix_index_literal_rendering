@@ -1,2 +1,0 @@
-FIXED: Clash hanging when rendering `Index n` literals, for large values of `n` [#2813](https://github.com/clash-lang/clash-compiler/issues/2813)
-FIXED: Render overflowed Index literals as don't-cares in HDL
