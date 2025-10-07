@@ -15,7 +15,7 @@ elif [[ "$1" != "" ]]; then
 fi
 UBUNTU_VERSION=jammy-20250126
 GHC_VERSIONS=("9.10.2" "9.8.4"  "9.6.7"  "9.4.8"  "9.2.8"   "9.0.2"   "8.10.7")
-CABAL_VERSIONS=("3.14.1.1" "3.14.1.1" "3.14.1.1" "3.14.1.1" "3.14.1.1" "3.14.1.1" "3.12.1.0")
+CABAL_VERSIONS=("3.14.2.0" "3.14.2.0" "3.14.2.0" "3.14.2.0" "3.14.2.0" "3.14.2.0" "3.12.1.0")
 
 # We want to use docker buildkit so that our layers are built in parallel. This
 # is ignored completely on versions of docker which don't support buildkit.
