@@ -1289,11 +1289,10 @@ postscanr f z xs = init (scanr f z xs)
 mapAccumL :: (acc -> x -> (acc,y)) -> acc -> Vec n x -> (acc,Vec n y)
 mapAccumL f acc xs = (acc',ys)
   where
-    accs  = acc `Cons` accs'
-    ws    = zipWith (flip f) xs (init accs)
-    accs' = map fst ws
-    ys    = map snd ws
-    acc'  = last accs
+    accs        = acc `Cons` accs'
+    ws          = zipWith (flip f) xs (init accs)
+    (accs', ys) = unzip ws
+    acc'        = last accs
 {-# INLINE mapAccumL #-}
 
 -- | The 'mapAccumR' function behaves like a combination of 'map' and 'foldr';
@@ -1310,11 +1309,10 @@ mapAccumL f acc xs = (acc',ys)
 mapAccumR :: (acc -> x -> (acc,y)) -> acc -> Vec n x -> (acc, Vec n y)
 mapAccumR f acc xs = (acc',ys)
   where
-    accs  = accs' :< acc
-    ws    = zipWith (flip f) xs (tail accs)
-    accs' = map fst ws
-    ys    = map snd ws
-    acc'  = head accs
+    accs        = accs' :< acc
+    ws          = zipWith (flip f) xs (tail accs)
+    (accs', ys) = unzip ws
+    acc'        = head accs
 {-# INLINE mapAccumR #-}
 
 -- | 'zip' takes two vectors and returns a vector of corresponding pairs.
