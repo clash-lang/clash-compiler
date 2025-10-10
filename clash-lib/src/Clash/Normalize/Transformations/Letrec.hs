@@ -121,7 +121,7 @@ removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
       tcm <- Lens.view tcCache
       (args1, Monoid.getAny -> hasChanged) <- listen (go tcm 0 usedArgs1 args)
       if hasChanged then
-        return (mkApps (mkTicks p ticks) args1)
+        changed (mkApps (mkTicks p ticks) args1)
       else
         return e
 
