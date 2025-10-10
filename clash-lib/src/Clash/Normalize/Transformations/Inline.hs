@@ -395,12 +395,15 @@ simply a variable reference. See issue #779 -}
 
 -- | Takes a binding and collapses its term if it is a noop
 collapseRHSNoops :: HasCallStack => NormRewrite
-collapseRHSNoops _ (Letrec binds body) = do
-  binds1 <- mapM runCollapseNoop binds
-  return $ Letrec binds1 body
+collapseRHSNoops _ letrec@(Letrec binds body) = do
+  (changes, binds1) <- unzip <$> mapM runCollapseNoop binds
+  if or changes then changed (Letrec binds1 body) else pure letrec
   where
-    runCollapseNoop orig =
-      runMaybeT (collapseNoop orig) >>= Maybe.maybe (return orig) changed
+    runCollapseNoop orig = do
+      maybeBind <- runMaybeT (collapseNoop orig)
+      case maybeBind of
+        Just bind -> pure (True, bind)
+        Nothing -> pure (False, orig)
 
     collapseNoop (iD,term) = do
       (Prim info,args) <- return $ collectArgs term
