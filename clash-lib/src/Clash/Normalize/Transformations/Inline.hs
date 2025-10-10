@@ -46,7 +46,7 @@ import qualified Data.Monoid as Monoid (Any(..))
 import qualified Data.Text as Text
 import qualified Data.Text.Extra as Text
 import GHC.Stack (HasCallStack)
-import GHC.BasicTypes.Extra (isNoInline)
+import GHC.BasicTypes.Extra (isNoInline, isOpaque)
 
 import qualified Clash.Explicit.SimIO as SimIO
 import qualified Clash.Sized.Internal.BitVector as BV (Bit(Bit), BitVector(BV), xToBV)
@@ -393,11 +393,18 @@ in HDL, but not in Haskell, by `unsafeCoerce`.
 The end result of all of this is that we get no/fewer assignments in HDL where the RHS is
 simply a variable reference. See issue #779 -}
 
--- | Takes a binding and collapses its term if it is a noop
+-- | Takes a binding and collapses its term if it is a noop. Only runs at
+-- synthesis boundaries (NOINLINE/OPAQUE functions) to avoid running too early
+-- on functions that might be inlined later. See #3036.
 collapseRHSNoops :: HasCallStack => NormRewrite
 collapseRHSNoops _ letrec@(Letrec binds body) = do
-  (changes, binds1) <- unzip <$> mapM runCollapseNoop binds
-  if or changes then changed (Letrec binds1 body) else pure letrec
+  (curFunId, _) <- Lens.use curFun
+  curBinding <- lookupVarEnv curFunId <$> Lens.use bindings
+  case curBinding of
+    Just binding | isOpaque (bindingSpec binding) -> do
+      (changes, binds1) <- unzip <$> mapM runCollapseNoop binds
+      if or changes then changed (Letrec binds1 body) else pure letrec
+    _ -> pure letrec
   where
     runCollapseNoop orig = do
       maybeBind <- runMaybeT (collapseNoop orig)

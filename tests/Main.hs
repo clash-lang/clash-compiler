@@ -724,7 +724,12 @@ runClashTest = defaultMain
           -- Vivado's mod misbehaves on negative dividend
           runTest "IntegralTB" def{hdlSim=hdlSim def \\ [Vivado]}
 
-        , runTest "NumConstantFoldingTB_1" def{clashFlags=["-itests/shouldwork/Numbers"]}
+        , runTest "NumConstantFoldingTB_1" def
+            { clashFlags = ["-itests/shouldwork/Numbers"]
+              -- IVerilog core dumps with:
+              -- ivl: draw_vpi.c:315: draw_vpi_taskfunc_args: Assertion `(unsigned)(dp - buffer) <= sizeof buffer' failed.
+            , hdlSim = hdlSim def \\ [IVerilog]
+            }
         , outputTest "NumConstantFolding_1" def
             { clashFlags=["-fconstraint-solver-iterations=15"]
             , ghcFlags=["-itests/shouldwork/Numbers"]

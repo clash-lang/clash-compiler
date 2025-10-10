@@ -381,7 +381,12 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
                  apply "reduceNonRepPrim" reduceNonRepPrim >->
                  apply "removeUnusedExpr" removeUnusedExpr) >->
                bottomupR (apply "flattenLet" flattenLet)) !->
-      topdownSucR (apply "topLet" topLet)
+      topdownSucR (apply "topLet" topLet) >->
+      -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
+      -- Note that we do this as the very last step, after all constant propagation
+      -- has been done to avoid #3036.
+      topdownSucR (apply "collapseRHSNoops" collapseRHSNoops) >->
+      topdownSucR (apply "inlineCleanup" inlineCleanup)
 
     goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e _)))
       | isNoInline inl2  = (Nothing     ,[c])
