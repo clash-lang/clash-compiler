@@ -371,6 +371,9 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
         let tm1 = substTm "flattenCallTree.flattenCheap" subst' newExpr
         newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1) (nm', sp)
         return (CBranch (nm,(Binding nm' sp inl pr newExpr' r)) (concat allUsed'))
+     else if isNoInline inl then do
+        newExpr' <- rewriteExpr ("flattenFinal",flattenFinal) (showPpr nm, newExpr) (nm', sp)
+        return (CBranch (nm,(Binding nm' sp inl pr newExpr' r)) allUsed)
      else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
   where
     flatten =
@@ -382,6 +385,13 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
                  apply "removeUnusedExpr" removeUnusedExpr) >->
                bottomupR (apply "flattenLet" flattenLet)) !->
       topdownSucR (apply "topLet" topLet)
+
+    flattenFinal =
+      -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
+      topdownSucR (apply "collapseRHSNoops" collapseRHSNoops) !->
+      topdownSucR (apply "inlineCleanup" inlineCleanup) >->
+      flatten
+
 
     goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e _)))
       | isNoInline inl2  = (Nothing     ,[c])
