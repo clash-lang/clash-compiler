@@ -363,10 +363,10 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
       go pInfo (BlackBox {resultInits=nmDs, multiResult=True}) = withTicks ticks $ \_ -> do
         tcm <- Lens.view tcCache
         let (args1, res) = splitMultiPrimArgs (multiPrimInfo' tcm pInfo) args0
-        (bbCtx, _) <- mkBlackBoxContext (primName pInfo) res args1
+        (bbCtx, _) <- mkBlackBoxContext (primName pInfo) Concurrent res args1
         mapM (go' (primName pInfo) bbCtx) nmDs
       go pInfo (BlackBox {resultInits=nmDs}) = withTicks ticks $ \_ -> do
-        (bbCtx, _) <- mkBlackBoxContext (primName pInfo) [i] args0
+        (bbCtx, _) <- mkBlackBoxContext (primName pInfo) Concurrent [i] args0
         mapM (go' (primName pInfo) bbCtx) nmDs
       go _ _ = pure []
 
@@ -413,8 +413,8 @@ mkDeclarations'
   -> Term
   -- ^ RHS of the let-binder
   -> NetlistMonad [Declaration]
-mkDeclarations' _declType bndr (collectTicks -> (Var v,ticks)) =
-  withTicks ticks (mkFunApp (Id.unsafeFromCoreId bndr) v [])
+mkDeclarations' declType bndr (collectTicks -> (Var v,ticks)) =
+  withTicks ticks (mkFunApp declType (Id.unsafeFromCoreId bndr) v [])
 
 mkDeclarations' _declType _bndr e@(collectTicks -> (Case _ _ [],_)) = do
   (_,sp) <- Lens.use curCompNm
@@ -436,7 +436,7 @@ mkDeclarations' declType bndr app = do
   case appF of
     Var f
       | null tyArgs ->
-        withTicks ticks (mkFunApp (Id.unsafeFromCoreId bndr) f args)
+        withTicks ticks (mkFunApp declType (Id.unsafeFromCoreId bndr) f args)
       | otherwise   -> do
         (_,sp) <- Lens.use curCompNm
         throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
@@ -633,12 +633,13 @@ patPos reprs pat@(DataPat dataCon _ _) =
 -- | Generate a list of Declarations for a let-binder where the RHS is a function application
 mkFunApp
   :: HasCallStack
-  => Identifier -- ^ LHS of the let-binder
+  => DeclarationType
+  -> Identifier -- ^ LHS of the let-binder
   -> Id -- ^ Name of the applied function
   -> [Term] -- ^ Function arguments
   -> [Declaration] -- ^ Tick declarations
   -> NetlistMonad [Declaration]
-mkFunApp dstId fun args tickDecls = do
+mkFunApp declType dstId fun args tickDecls = do
   topAnns <- Lens.use topEntityAnns
   tcm     <- Lens.view tcCache
   case (isGlobalId fun, lookupVarEnv fun topAnns) of
@@ -652,7 +653,7 @@ mkFunApp dstId fun args tickDecls = do
       -> do
         argHWTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) fArgTys1
         (argExprs, concat -> argDecls) <- unzip <$>
-          mapM (\(e,t) -> mkExpr False Concurrent (NetlistId dstId t) e)
+          mapM (\(e,t) -> mkExpr False declType (NetlistId dstId t) e)
                                  (zip args fArgTys1)
 
         -- Filter void arguments, but make sure to render their declarations:
@@ -724,7 +725,7 @@ mkFunApp dstId fun args tickDecls = do
           argHWTys <- mapM coreTypeToHWTypeM' argTys
 
           (argExprs, concat -> argDecls) <- unzip <$>
-            mapM (\(e,t) -> mkExpr False Concurrent (NetlistId dstId t) e)
+            mapM (\(e,t) -> mkExpr False declType (NetlistId dstId t) e)
                  (zip args argTys)
 
           -- Filter void arguments, but make sure to render their declarations:
@@ -735,7 +736,7 @@ mkFunApp dstId fun args tickDecls = do
           let compOutp = (\(_,x,_) -> x) <$> listToMaybe co
           if length filteredTypeExprs == length compInps
             then do
-              (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dstId) filteredTypeExprs
+              (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar declType dstId) filteredTypeExprs
               let inpAssigns    = zipWith (\(i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
                   outpAssign    = case compOutp of
                     Nothing -> []
@@ -799,14 +800,16 @@ mkFunApp dstId fun args tickDecls = do
             "Maybe (Int -> Int)"
           |]
 
-toSimpleVar :: Identifier
+toSimpleVar :: DeclarationType
+            -> Identifier
             -> (Expr,Type)
             -> NetlistMonad (Expr,[Declaration])
-toSimpleVar _ (e@(Identifier _ Nothing),_) = return (e,[])
-toSimpleVar dstId (e,ty) = do
+toSimpleVar _ _ (e@(Identifier _ Nothing),_) = return (e,[])
+toSimpleVar declType dstId (e,ty) = do
   argNm <- Id.suffix dstId "fun_arg"
   hTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
-  argDecl <- mkInit Concurrent Cont argNm hTy e
+  let assignTy = declTypeUsage declType
+  argDecl <- mkInit declType assignTy argNm hTy e
   return (Identifier argNm Nothing, argDecl)
 
 -- | Generate an expression for a term occurring on the RHS of a let-binder
@@ -843,14 +846,14 @@ mkExpr bbEasD declType bndr app =
       | not (null tyArgs) -> invalid "Var-application with type arguments"
       | otherwise -> do
           argNm <- Id.suffix (netlistId1 id Id.unsafeFromCoreId bndr) "fun_arg"
-          decls  <- mkFunApp argNm f tmArgs tickDecls
+          decls  <- mkFunApp declType argNm f tmArgs tickDecls
           if isVoid hwTyA then
             return (Noop, decls)
           else
             -- This net was already declared in the call to mkSelection.
             return ( Identifier argNm Nothing
                    , NetDecl Nothing argNm hwTyA : decls)
-    Case scrut ty' [alt] -> mkProjection bbEasD bndr scrut ty' alt
+    Case scrut ty' [alt] -> mkProjection declType bbEasD bndr scrut ty' alt
     Case scrut tyA (alt:alts) -> do
       argNm <- Id.suffix (netlistId1 id Id.unsafeFromCoreId bndr) "sel_arg"
       decls  <- mkSelection declType (NetlistId argNm (netlistTypes1 bndr))
@@ -880,7 +883,8 @@ mkExpr bbEasD declType bndr app =
 --
 -- Works for both product types, as sum-of-product types.
 mkProjection
-  :: Bool
+  :: DeclarationType
+  -> Bool
   -- ^ Projection must bind to a simple variable
   -> NetlistId
   -- ^ Name hint for the signal to which the projection is (potentially) assigned
@@ -891,8 +895,9 @@ mkProjection
   -> Alt
   -- ^ The field to be projected
   -> NetlistMonad (Expr, [Declaration])
-mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
+mkProjection declType mkDec bndr scrut altTy alt@(pat,v) = do
   tcm <- Lens.view tcCache
+  let assignTy = declTypeUsage declType
   let scrutTy = inferCoreTypeOf tcm scrut
       e = Case scrut scrutTy [alt]
   (_,sp) <- Lens.use curCompNm
@@ -909,7 +914,7 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
         Id.next
         (\b -> Id.suffix (Id.unsafeFromCoreId b) "projection")
         bndr
-    (scrutExpr,newDecls) <- mkExpr False Concurrent (NetlistId scrutNm scrutTy) scrut
+    (scrutExpr,newDecls) <- mkExpr False declType (NetlistId scrutNm scrutTy) scrut
     case scrutExpr of
       Identifier newId modM ->
         pure (Right (newId, modM, newDecls))
@@ -920,7 +925,7 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
         -- TODO: seems useless?
         pure (Left newDecls)
       _ -> do
-        scrutDecl <- mkInit Concurrent Cont scrutNm sHwTy scrutExpr
+        scrutDecl <- mkInit declType assignTy scrutNm sHwTy scrutExpr
         pure (Right (scrutNm, Nothing, newDecls ++ scrutDecl))
 
   case scrutRendered of
@@ -957,7 +962,7 @@ mkProjection mkDec bndr scrut altTy alt@(pat,v) = do
       case bndr of
         NetlistId scrutNm _ | mkDec -> do
           scrutNm' <- Id.next scrutNm
-          scrutDecl <- mkInit Concurrent Cont scrutNm' vHwTy extractExpr
+          scrutDecl <- mkInit declType assignTy scrutNm' vHwTy extractExpr
           return (Identifier scrutNm' Nothing, scrutDecl ++ decls)
         MultiId {} -> error "mkProjection: MultiId"
         _ -> return (extractExpr,decls)
@@ -985,7 +990,7 @@ mkDcApplication declType [dstHType] bndr dc args = do
   let dcNm = nameOcc (dcName dc)
   tcm <- Lens.view tcCache
   let argTys = map (inferCoreTypeOf tcm) args
-  argNm <- netlistId1 return (\b -> Id.suffix (Id.unsafeFromCoreId b) "_dc_arg") bndr
+  argNm <- netlistId1 return (\b -> Id.suffix (Id.unsafeFromCoreId b) "dc_arg") bndr
   argHWTys <- mapM coreTypeToHWTypeM' argTys
 
   (argExprs, concat -> argDecls) <- unzip <$>

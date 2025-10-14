@@ -1,0 +1,1 @@
+FIXED: The compiler now tracks assignment types in more places, which can prevent "clash error call" errors in some specific cases. See [#3045](https://github.com/clash-lang/clash-compiler/issues/3045).

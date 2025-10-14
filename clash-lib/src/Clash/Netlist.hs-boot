@@ -50,7 +50,8 @@ mkDcApplication :: HasCallStack
                 -> NetlistMonad (Expr,[Declaration])
 
 mkProjection
-  :: Bool
+  :: DeclarationType
+  -> Bool
   -> NetlistId
   -> Term
   -> Type
@@ -73,7 +74,8 @@ mkDeclarations' :: HasCallStack => DeclarationType -> Id -> Term -> NetlistMonad
 
 mkFunApp
   :: HasCallStack
-  => Identifier -- ^ LHS of the let-binder
+  => DeclarationType
+  -> Identifier -- ^ LHS of the let-binder
   -> Id -- ^ Name of the applied function
   -> [Term] -- ^ Function arguments
   -> [Declaration] -- ^ Tick declarations
