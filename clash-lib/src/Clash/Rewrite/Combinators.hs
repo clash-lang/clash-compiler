@@ -23,7 +23,8 @@ import           Control.Monad               ((>=>))
 import qualified Control.Monad.Writer        as Writer
 import qualified Data.Monoid                 as Monoid
 
-import           Clash.Core.Term             (Term (..), CoreContext (..), primArg, patIds)
+import           Clash.Core.Term
+  (Term (..), CoreContext (..), primArg, patIds, Bind (..))
 import           Clash.Core.VarEnv
   (extendInScopeSet, extendInScopeSetList)
 import           Clash.Rewrite.Types
@@ -52,10 +53,16 @@ allR trans (TransformContext is c) (TyApp e ty) =
 allR trans (TransformContext is c) (Cast e ty1 ty2) =
   Cast <$> trans (TransformContext is (CastBody:c)) e <*> pure ty1 <*> pure ty2
 
-allR trans (TransformContext is c) (Letrec xes e) = do
+allR trans (TransformContext is c) (Let (NonRec b e1) e2) = do
+  e1' <- trans (TransformContext is (LetBinding b []:c)) e1
+  let is' = extendInScopeSet is b
+  e2' <- trans (TransformContext is' (LetBody [(b,e1)]:c)) e2
+  return (Let (NonRec b e1') e2')
+
+allR trans (TransformContext is c) (Let (Rec xes) e) = do
   xes' <- traverse rewriteBind xes
   e'   <- trans (TransformContext is' (LetBody xes:c)) e
-  return (Letrec xes' e')
+  return (Let (Rec xes') e')
  where
   bndrs              = map fst xes
   is'                = extendInScopeSetList is (map fst xes)

@@ -63,6 +63,7 @@ import Clash.Core.Subst
 import Clash.Core.Term
   ( CoreContext(..), Pat(..), PrimInfo(..), Term(..), WorkInfo(..), collectArgs
   , collectArgsTicks, mkApps , mkTicks, stripTicks)
+import qualified Clash.Core.Term as T (Bind (..))
 import Clash.Core.TermInfo (isLocalVar, termSize)
 import Clash.Core.Type
   (TypeView(..), isClassTy, isPolyFunCoreTy, tyView)
@@ -294,7 +295,7 @@ inlineCast = inlineBinders test
 --   * a data constructor
 --   * I/O actions
 inlineCleanup :: HasCallStack => NormRewrite
-inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
+inlineCleanup (TransformContext is0 _) lr@(Letrec binds body) = do
   prims <- Lens.view primitives
   -- For all let-bindings, count the number of times they are referenced.
   -- We only inline let-bindings which are referenced only once, otherwise
@@ -309,7 +310,7 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
       keep'     = inlineBndrsCleanup is1 (mkVarEnv il) emptyVarEnv
                 $ map snd keep
 
-  if | null il -> return  (Letrec binds body)
+  if | null il -> return lr
      | null keep' -> changed body
      | otherwise -> changed (Letrec keep' body)
   where
@@ -395,18 +396,22 @@ simply a variable reference. See issue #779 -}
 
 -- | Takes a binding and collapses its term if it is a noop
 collapseRHSNoops :: HasCallStack => NormRewrite
-collapseRHSNoops _ (Letrec binds body) = do
-  binds1 <- mapM runCollapseNoop binds
-  return $ Letrec binds1 body
+collapseRHSNoops _ (Let binds body) = do
+  binds1 <- runCollapseNoop binds
+  return $ Let binds1 body
   where
-    runCollapseNoop orig =
-      runMaybeT (collapseNoop orig) >>= Maybe.maybe (return orig) changed
+    runCollapseNoop orig@(T.NonRec i e) =
+      runMaybeT (collapseNoop (i,e)) >>= Maybe.maybe (return orig) (changed . uncurry T.NonRec)
 
-    collapseNoop (iD,term) = do
+    runCollapseNoop (T.Rec bs) = do
+      bs' <- mapM (\orig -> runMaybeT (collapseNoop orig) >>= Maybe.maybe (return orig) changed) bs
+      return (T.Rec bs')
+
+    collapseNoop (iD, term) = do
       (Prim info,args) <- return $ collectArgs term
       identity         <- getIdentity info $ lefts args
       collapsed        <- collapseToIdentity iD identity
-      return (iD,collapsed)
+      return (iD, collapsed)
 
     collapseToIdentity iD identity = do
       tcm <- Lens.view tcCache

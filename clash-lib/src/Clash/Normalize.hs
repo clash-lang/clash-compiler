@@ -388,9 +388,8 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
 
     flattenFinal =
       -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
-      topdownSucR (apply "collapseRHSNoops" collapseRHSNoops) !->
-      topdownSucR (apply "inlineCleanup" inlineCleanup) >->
-      flatten
+      topdownR (apply "collapseRHSNoops" collapseRHSNoops !->
+               (apply "inlineCleanup" inlineCleanup >-> flatten))
 
 
     goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e _)))

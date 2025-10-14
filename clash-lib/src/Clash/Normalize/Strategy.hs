@@ -51,11 +51,11 @@ normalization =
     cse        = topdownR (apply "CSE" simpleCSE)
     xOptim     = bottomupR (apply "xOptimize" xOptimize)
     cleanup    = topdownR (apply "etaExpandSyn" etaExpandSyn) >->
-                 topdownSucR (apply "inlineCleanup" inlineCleanup) !->
-                 innerMost (applyMany [("caseCon"        , caseCon)
-                                      ,("bindConstantVar", bindConstantVar)
-                                      ,("letFlat"        , flattenLet)])
-                 >-> rmDeadcode >-> letTL
+                --  topdownSucR (apply "inlineCleanup" inlineCleanup) !->
+                --  innerMost (applyMany [("caseCon"        , caseCon)
+                --                       ,("bindConstantVar", bindConstantVar)
+                --                       ,("letFlat"        , flattenLet)])
+                 rmDeadcode >-> letTL
     splitArgs  = topdownR (apply "separateArguments" separateArguments) !->
                  bottomupR (apply "caseCon" caseCon)
     bindSimIO  = topdownR (apply "bindSimIO" inlineSimIO)
