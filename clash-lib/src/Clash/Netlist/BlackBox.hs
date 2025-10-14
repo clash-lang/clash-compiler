@@ -136,18 +136,20 @@ mkBlackBoxContext
   :: HasCallStack
   => TextS.Text
   -- ^ Blackbox function name
+  -> DeclarationType
+  -- ^ Are we concurrent or sequential?
   -> [Id]
   -- ^ Identifiers binding the primitive/blackbox application
   -> [Either Term Type]
   -- ^ Arguments of the primitive/blackbox application
   -> NetlistMonad (BlackBoxContext,[Declaration])
-mkBlackBoxContext bbName resIds args@(lefts -> termArgs) = do
+mkBlackBoxContext bbName declType resIds args@(lefts -> termArgs) = do
     -- Make context inputs
     let
       resNms = fmap Id.unsafeFromCoreId resIds
       resNm = fromMaybe (error "mkBlackBoxContext: head") (listToMaybe resNms)
     resTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc) . coreTypeOf) resIds
-    (imps,impDecls) <- unzip <$> zipWithM (mkArgument bbName resNm) [0..] termArgs
+    (imps,impDecls) <- unzip <$> zipWithM (mkArgument bbName resNm declType) [0..] termArgs
     (funs,funDecls) <-
       mapAccumLM
         (addFunction (map coreTypeOf resIds))
@@ -186,7 +188,7 @@ mkBlackBoxContext bbName resIds args@(lefts -> termArgs) = do
 
         curBBlvl Lens.+= 1
         (fs,ds) <- case resIds of
-          (resId:_) -> unzip <$> replicateM funcPlurality (mkFunInput bbName resId arg)
+          (resId:_) -> unzip <$> replicateM funcPlurality (mkFunInput bbName declType resId arg)
           _ -> error "internal error: insufficient resIds"
         curBBlvl Lens.-= 1
 
@@ -269,13 +271,15 @@ mkArgument
   -> Identifier
   -- ^ LHS of the original let-binder. Is used as a name hint to generate new
   -- names in case the argument is a declaration.
+  -> DeclarationType
+  -- ^ Are we concurrent or sequential?
   -> Int
   -- ^ Argument n (zero-indexed). Used for error message.
   -> Term
   -> NetlistMonad ( (Expr,HWType,Bool)
                   , [Declaration]
                   )
-mkArgument bbName bndr nArg e = do
+mkArgument bbName bndr declType nArg e = do
     tcm   <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm e
     iw    <- Lens.view intWidth
@@ -295,18 +299,18 @@ mkArgument bbName bndr nArg e = do
           return ((mkLiteral iw l,hwTy,True),[])
 
         (Prim pinfo,args,ticks) -> withTicks ticks $ \tickDecls -> do
-          (e',d) <- mkPrimitive True False Concurrent (NetlistId bndr ty) pinfo args tickDecls
+          (e',d) <- mkPrimitive True False declType (NetlistId bndr ty) pinfo args tickDecls
           case e' of
             (Identifier _ _) -> return ((e',hwTy,False), d)
             _                -> return ((e',hwTy,isLiteral e), d)
         (Data dc, args,_) -> do
-          (exprN,dcDecls) <- mkDcApplication Concurrent [hwTy] (NetlistId bndr ty) dc (lefts args)
+          (exprN,dcDecls) <- mkDcApplication declType [hwTy] (NetlistId bndr ty) dc (lefts args)
           return ((exprN,hwTy,isLiteral e),dcDecls)
         (Case scrut ty' [alt],[],_) -> do
-          (projection,decls) <- mkProjection False (NetlistId bndr ty) scrut ty' alt
+          (projection,decls) <- mkProjection declType False (NetlistId bndr ty) scrut ty' alt
           return ((projection,hwTy,False),decls)
         (Let _bnds _term, [], _ticks) -> do
-          (exprN, letDecls) <- mkExpr False Concurrent (NetlistId bndr ty) e
+          (exprN, letDecls) <- mkExpr False declType (NetlistId bndr ty) e
           return ((exprN,hwTy,False),letDecls)
         _ -> do
           let errMsg = [I.i|
@@ -402,6 +406,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
   where
     tys = netlistTypes dst
     ty = fromMaybe (error "mkPrimitive") (listToMaybe tys)
+    assignTy = declTypeUsage declType
 
     go
       :: CompiledPrimitive
@@ -435,7 +440,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
           -- from 'resBndr1'.
           tcm <- Lens.view tcCache
           let (args1, resArgs) = splitMultiPrimArgs (multiPrimInfo' tcm pInfo) args
-          (bbCtx, ctxDcls) <- mkBlackBoxContext (primName pInfo) resArgs args1
+          (bbCtx, ctxDcls) <- mkBlackBoxContext (primName pInfo) declType resArgs args1
           (templ, templDecl) <- prepareBlackBox name template bbCtx
           let bbDecl = N.BlackBoxD name (libraries p) (imports p) (includes p) templ bbCtx
           return (Noop, ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
@@ -445,7 +450,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
               resM <- resBndr1 True dst
               case resM of
                 Just (dst',dstNm,dstDecl) -> do
-                  (bbCtx,ctxDcls)   <- mkBlackBoxContext (primName pInfo) [dst'] args
+                  (bbCtx,ctxDcls)   <- mkBlackBoxContext (primName pInfo) declType [dst'] args
                   (templ,templDecl) <- prepareBlackBox pNm template bbCtx
                   let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
                                            (includes p) templ bbCtx
@@ -456,7 +461,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                 Nothing | RenderVoid <- renderVoid p -> do
                   -- TODO: We should probably 'mkBlackBoxContext' to accept empty lists
                   let dst1 = mkLocalId ty (mkUnsafeSystemName "__VOID_TDECL_NOOP__" 0)
-                  (bbCtx,ctxDcls) <- mkBlackBoxContext (primName pInfo) [dst1] args
+                  (bbCtx,ctxDcls) <- mkBlackBoxContext (primName pInfo) declType [dst1] args
                   (templ,templDecl) <- prepareBlackBox pNm template bbCtx
                   let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
                                            (includes p) templ bbCtx
@@ -470,7 +475,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                   resM <- resBndr1 True dst
                   case resM of
                     Just (dst',dstNm,dstDecl) -> do
-                      (bbCtx,ctxDcls) <- mkBlackBoxContext (primName pInfo) [dst'] args
+                      (bbCtx,ctxDcls) <- mkBlackBoxContext (primName pInfo) declType [dst'] args
                       (bbTempl,templDecl) <- prepareBlackBox pNm template bbCtx
                       let bbE =  BlackBoxE pNm (libraries p) (imports p) (includes p) bbTempl bbCtx bbEParen
                       tmpAssgn <- case declType of
@@ -482,7 +487,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                     Nothing | RenderVoid <- renderVoid p -> do
                       -- TODO: We should probably 'mkBlackBoxContext' to accept empty lists
                       let dst1 = mkLocalId ty (mkUnsafeSystemName "__VOID_TEXPRD_NOOP__" 0)
-                      (bbCtx,ctxDcls) <- mkBlackBoxContext (primName pInfo) [dst1] args
+                      (bbCtx,ctxDcls) <- mkBlackBoxContext (primName pInfo) declType [dst1] args
                       (templ,templDecl) <- prepareBlackBox pNm template bbCtx
                       let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
                                                (includes p) templ bbCtx
@@ -494,7 +499,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                   resM <- resBndr1 False dst
                   case resM of
                     Just (dst',_,_) -> do
-                      (bbCtx,ctxDcls)      <- mkBlackBoxContext (primName pInfo) [dst'] args
+                      (bbCtx,ctxDcls)      <- mkBlackBoxContext (primName pInfo) declType [dst'] args
                       (bbTempl,templDecl0) <- prepareBlackBox pNm template bbCtx
                       let templDecl1 = case primName pInfo of
                             "Clash.Sized.Internal.BitVector.fromInteger#"
@@ -513,7 +518,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                     Nothing | RenderVoid <- renderVoid p -> do
                       -- TODO: We should probably 'mkBlackBoxContext' to accept empty lists
                       let dst1 = mkLocalId ty (mkUnsafeSystemName "__VOID_TEXPRE_NOOP__" 0)
-                      (bbCtx,ctxDcls) <- mkBlackBoxContext (primName pInfo) [dst1] args
+                      (bbCtx,ctxDcls) <- mkBlackBoxContext (primName pInfo) declType [dst1] args
                       (templ,templDecl) <- prepareBlackBox pNm template bbCtx
                       let bbDecl = N.BlackBoxD pNm (libraries p) (imports p)
                                                (includes p) templ bbCtx
@@ -535,13 +540,12 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                   tcm     <- Lens.view tcCache
                   let scrutTy = inferCoreTypeOf tcm scrut
                   (scrutExpr,scrutDecls) <-
-                    mkExpr False Concurrent (NetlistId (Id.unsafeMake "c$tte_rhs") scrutTy) scrut
+                    mkExpr False declType (NetlistId (Id.unsafeMake "c$tte_rhs") scrutTy) scrut
                   case scrutExpr of
                     Identifier id_ Nothing -> return (DataTag hwTy (Left id_),scrutDecls)
                     _ -> do
                       scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
                       tmpRhs <- Id.make "c$tte_rhs"
-                      let assignTy = case declType of { Concurrent -> Cont ; Sequential -> Proc Blocking }
                       netDecl <- N.mkInit declType assignTy tmpRhs scrutHTy scrutExpr
                       return (DataTag hwTy (Left tmpRhs), netDecl ++ scrutDecls)
                 _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showPpr showPpr) args)
@@ -554,12 +558,11 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                 let scrutTy = inferCoreTypeOf tcm scrut
                 scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
                 (scrutExpr,scrutDecls) <-
-                  mkExpr False Concurrent (NetlistId (Id.unsafeMake "c$dtt_rhs") scrutTy) scrut
+                  mkExpr False declType (NetlistId (Id.unsafeMake "c$dtt_rhs") scrutTy) scrut
                 case scrutExpr of
                   Identifier id_ Nothing -> return (DataTag scrutHTy (Right id_),scrutDecls)
                   _ -> do
                     tmpRhs <- Id.make "c$dtt_rhs"
-                    let assignTy = case declType of { Concurrent -> Cont ; Sequential -> Proc Blocking }
                     netDecl <- N.mkInit declType assignTy tmpRhs scrutHTy scrutExpr
                     return (DataTag scrutHTy (Right tmpRhs),netDecl ++ scrutDecls)
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
@@ -574,12 +577,11 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                 let scrutTy = inferCoreTypeOf tcm scrut
                 scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
                 (scrutExpr,scrutDecls) <-
-                  mkExpr False Concurrent (NetlistId (Id.unsafeMake "c$dtt_rhs") scrutTy) scrut
+                  mkExpr False declType (NetlistId (Id.unsafeMake "c$dtt_rhs") scrutTy) scrut
                 case scrutExpr of
                   Identifier id_ Nothing -> return (DataTag scrutHTy (Right id_),scrutDecls)
                   _ -> do
                     tmpRhs <- Id.make "c$dtt_rhs"
-                    let assignTy = case declType of { Concurrent -> Cont ; Sequential -> Proc Blocking }
                     netDecl <- N.mkInit declType assignTy tmpRhs scrutHTy scrutExpr
                     return (DataTag scrutHTy (Right tmpRhs),netDecl ++ scrutDecls)
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
@@ -603,8 +605,9 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                   _ -> case dstNms of
                     [dstNm] -> do
                       declareUse (Proc Blocking) dstNm
+                      assn <- procAssign Blocking dstNm expr
                       return ( Identifier dstNm Nothing
-                             , dstDecl ++ decls ++ [Assignment dstNm (Proc Blocking) expr])
+                             , dstDecl ++ decls ++ [assn])
                     _ -> error $ $(curLoc) ++ "bindSimIO: " ++ show resM
                 _ ->
                   return (Noop,decls)
@@ -629,7 +632,8 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                     assn <- case expr of
                               Noop -> pure []
                               _ -> do declareUse (Proc Blocking) dstNm
-                                      pure [Assignment dstNm (Proc Blocking) expr]
+                                      assn <- procAssign Blocking dstNm expr
+                                      pure [assn]
                     return (Identifier dstNm Nothing, dstDecl ++ bindDecls ++ assn)
                   args1 -> error ("internal error: fmapSimIO# has insufficient arguments"
                                   <> showPpr args1)
@@ -658,22 +662,23 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                   _ -> case dstNms of
                     [dstNm] -> do
                       declareUse (Proc Blocking) dstNm
+                      assn <- procAssign Blocking dstNm expr
                       return ( Identifier dstNm Nothing
-                             , dstDecl ++ decls ++ [Assignment dstNm (Proc Blocking) expr])
+                             , dstDecl ++ decls ++ [assn])
                     _ -> error "internal error"
                 _ ->
                   return (Noop,decls)
 
           | pNm == "GHC.Num.Integer.IS" -> do
               (expr,decls) <- case lefts args of
-                (arg:_) -> mkExpr False Concurrent dst arg
+                (arg:_) -> mkExpr False declType dst arg
                 _ -> error "internal error: insufficient arguments"
               iw <- Lens.view intWidth
               return (N.DataCon (Signed iw) (DC (Void Nothing,-1)) [expr],decls)
 
           | pNm == "GHC.Num.Integer.IP" -> do
               (expr,decls) <- case lefts args of
-                (arg:_) -> mkExpr False Concurrent dst arg
+                (arg:_) -> mkExpr False declType dst arg
                 _ -> error "internal error: insufficient arguments"
               case expr of
                 N.Literal Nothing (NumLit _) -> return (expr,decls)
@@ -681,7 +686,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
 
           | pNm == "GHC.Num.Integer.IN" -> do
               (expr,decls) <- case lefts args of
-                (arg:_) -> mkExpr False Concurrent dst arg
+                (arg:_) -> mkExpr False declType dst arg
                 _ -> error "internal error: insufficient arguments"
               case expr of
                 N.Literal Nothing (NumLit i) ->
@@ -690,14 +695,14 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
 
           | pNm == "GHC.Num.Natural.NS" -> do
               (expr,decls) <- case lefts args of
-                (arg:_) -> mkExpr False Concurrent dst arg
+                (arg:_) -> mkExpr False declType dst arg
                 _ -> error "internal error: insufficient arguments"
               iw <- Lens.view intWidth
               return (N.DataCon (Unsigned iw) (DC (Void Nothing,-1)) [expr],decls)
 
           | pNm == "GHC.Num.Integer.NB" -> do
               (expr,decls) <- case lefts args of
-                (arg:_) -> mkExpr False Concurrent dst arg
+                (arg:_) -> mkExpr False declType dst arg
                 _ -> error "internal error: insufficient arguments"
               case expr of
                 N.Literal Nothing (NumLit _) -> return (expr,decls)
@@ -1046,6 +1051,8 @@ mkFunInput
   => TextS.Text
   -- ^ Name of the primitive of which the function in question is an argument.
   -- Used for error reporting.
+  -> DeclarationType
+  -- ^ Are we concurrent or sequential?
   -> Id
   -- ^ Identifier binding the encompassing primitive/blackbox application. Used
   -- as a name hint if 'mkFunInput' needs intermediate signals.
@@ -1059,7 +1066,7 @@ mkFunInput
        ,[((TextS.Text,TextS.Text),BlackBox)]
        ,BlackBoxContext)
       ,[Declaration])
-mkFunInput parentName resId e =
+mkFunInput parentName declType resId e =
  let (appE,args,ticks) = collectArgsTicks e
  in  withTicks ticks $ \tickDecls -> do
   tcm <- Lens.view tcCache
@@ -1111,8 +1118,8 @@ mkFunInput parentName resId e =
                 Just (_resHTy, [areVoids@(countEq False -> 1)]) -> do
                   let nonVoidArgI = fromJust (elemIndex False areVoids)
                   let arg = Id.unsafeMake (TextS.concat ["~ARG[", showt nonVoidArgI, "]"])
-                  let assign = Assignment (Id.unsafeMake "~RESULT") Cont (Identifier arg Nothing)
-                  return (Right ((Id.unsafeMake "", tickDecls ++ [assign]), Cont))
+                  let assign = Assignment (Id.unsafeMake "~RESULT") assignTy (Identifier arg Nothing)
+                  return (Right ((Id.unsafeMake "", tickDecls ++ [assign]), assignTy))
 
                 -- Because we filter void constructs, the argument indices and
                 -- the field indices don't necessarily correspond anymore. We
@@ -1126,8 +1133,8 @@ mkFunInput parentName resId e =
                       mkArg i   = Id.unsafeMake ("~ARG[" <> showt i <> "]")
                       dcInps    = [Identifier (mkArg x) Nothing | x <- originalIndices areVoids1]
                       dcApp     = DataCon resHTy (DC (resHTy,dcI)) dcInps
-                      dcAss     = Assignment (Id.unsafeMake "~RESULT") Cont dcApp
-                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]), Cont))
+                      dcAss     = Assignment (Id.unsafeMake "~RESULT") assignTy dcApp
+                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]), assignTy))
 
                 -- CustomSP the same as SP, but with a user-defined bit
                 -- level representation
@@ -1138,16 +1145,16 @@ mkFunInput parentName resId e =
                       mkArg i   = Id.unsafeMake ("~ARG[" <> showt i <> "]")
                       dcInps    = [Identifier (mkArg x) Nothing | x <- originalIndices areVoids1]
                       dcApp     = DataCon resHTy (DC (resHTy,dcI)) dcInps
-                      dcAss     = Assignment (Id.unsafeMake "~RESULT") Cont dcApp
-                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]), Cont))
+                      dcAss     = Assignment (Id.unsafeMake "~RESULT") assignTy dcApp
+                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]), assignTy))
 
                 -- Like SP, we have to retrieve the index BEFORE filtering voids
                 Just (resHTy@(Product _ _ _), areVoids1:_) -> do
                   let mkArg i    = Id.unsafeMake ("~ARG[" <> showt i <> "]")
                       dcInps    = [ Identifier (mkArg x) Nothing | x <- originalIndices areVoids1]
                       dcApp     = DataCon resHTy (DC (resHTy,0)) dcInps
-                      dcAss     = Assignment (Id.unsafeMake "~RESULT") Cont dcApp
-                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]), Cont))
+                      dcAss     = Assignment (Id.unsafeMake "~RESULT") assignTy dcApp
+                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]), assignTy))
 
                 -- Vectors never have defined areVoids (or all set to False), as
                 -- it would be converted to Void otherwise. We can therefore
@@ -1156,22 +1163,22 @@ mkFunInput parentName resId e =
                   let mkArg i = Id.unsafeMake ("~ARG[" <> showt i <> "]")
                       dcInps = [ Identifier (mkArg x) Nothing | x <- [(1::Int)..2] ]
                       dcApp  = DataCon resHTy (DC (resHTy,1)) dcInps
-                      dcAss  = Assignment (Id.unsafeMake "~RESULT") Cont dcApp
-                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]), Cont))
+                      dcAss  = Assignment (Id.unsafeMake "~RESULT") assignTy dcApp
+                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]), assignTy))
 
                 -- Sum types OR a Sum type after filtering empty types:
                 Just (resHTy@(Sum _ _), _areVoids) -> do
                   let dcI   = dcTag dc - 1
                       dcApp = DataCon resHTy (DC (resHTy,dcI)) []
-                      dcAss = Assignment (Id.unsafeMake "~RESULT") Cont dcApp
-                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]), Cont))
+                      dcAss = Assignment (Id.unsafeMake "~RESULT") assignTy dcApp
+                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]), assignTy))
 
                 -- Same as Sum, but with user defined bit level representation
                 Just (resHTy@(CustomSum {}), _areVoids) -> do
                   let dcI   = dcTag dc - 1
                       dcApp = DataCon resHTy (DC (resHTy,dcI)) []
-                      dcAss = Assignment (Id.unsafeMake "~RESULT") Cont dcApp
-                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]), Cont))
+                      dcAss = Assignment (Id.unsafeMake "~RESULT") assignTy dcApp
+                  return (Right ((Id.unsafeMake "",tickDecls ++ [dcAss]), assignTy))
 
                 Just (Void {}, _areVoids) ->
                   return (error $ $(curLoc) ++ "Encountered Void in mkFunInput."
@@ -1230,7 +1237,7 @@ mkFunInput parentName resId e =
   let pNm = case appE of
               Prim p -> primName p
               _ -> "__INTERNAL__"
-  (bbCtx,dcls) <- mkBlackBoxContext pNm [resId] args
+  (bbCtx,dcls) <- mkBlackBoxContext pNm declType [resId] args
   case templ of
     Left (TDecl,outputUsage,libs,imps,inc,_,templ') -> do
       (l',templDecl)
@@ -1243,16 +1250,16 @@ mkFunInput parentName resId e =
       onBlackBox
         (\t -> do t' <- getAp (prettyBlackBox t)
                   let t'' = Id.unsafeMake (Text.toStrict t')
-                      assn = Assignment (Id.unsafeMake "~RESULT") Cont (Identifier t'' Nothing)
-                  return ((Right (Id.unsafeMake "",[assn]),Cont,libs,imps,inc,bbCtx),dcls))
+                      assn = Assignment (Id.unsafeMake "~RESULT") assignTy (Identifier t'' Nothing)
+                  return ((Right (Id.unsafeMake "",[assn]),assignTy,libs,imps,inc,bbCtx),dcls))
         (\bbName bbHash (TemplateFunction k g _) -> do
           let f' bbCtx' = do
-                let assn = Assignment (Id.unsafeMake "~RESULT") Cont
+                let assn = Assignment (Id.unsafeMake "~RESULT") assignTy
                             (BlackBoxE nm libs imps inc templ' bbCtx' False)
                 p <- getAp (Backend.blockDecl (Id.unsafeMake "") [assn])
                 return p
           return ((Left (BBFunction bbName bbHash (TemplateFunction k g f'))
-                  ,Cont
+                  ,assignTy
                   ,[]
                   ,[]
                   ,[]
@@ -1265,6 +1272,8 @@ mkFunInput parentName resId e =
     Right (decl,u) ->
       return ((Right decl,u,[],[],[],bbCtx),dcls)
   where
+    assignTy = declTypeUsage declType
+
     goExpr app@(collectArgsTicks -> (C.Var fun,args@(_:_),ticks)) = do
       tcm <- Lens.view tcCache
       resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (inferCoreTypeOf tcm app)
@@ -1273,23 +1282,23 @@ mkFunInput parentName resId e =
         then
           withTicks ticks $ \tickDecls -> do
             resNm <- Id.make "result"
-            appDecls <- mkFunApp resNm fun tmArgs tickDecls
-            let assn = [ Assignment (Id.unsafeMake "~RESULT") Cont (Identifier resNm Nothing)
+            appDecls <- mkFunApp declType resNm fun tmArgs tickDecls
+            let assn = [ Assignment (Id.unsafeMake "~RESULT") assignTy (Identifier resNm Nothing)
                        , NetDecl Nothing resNm resTy ]
             nm <- Id.makeBasic "block"
-            return (Right ((nm,assn++appDecls), Cont))
+            return (Right ((nm,assn++appDecls), assignTy))
         else do
           (_,sp) <- Lens.use curCompNm
           throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
     goExpr e' = do
       tcm <- Lens.view tcCache
       let eType = inferCoreTypeOf tcm e'
-      (appExpr,appDecls) <- mkExpr False Concurrent (NetlistId (Id.unsafeMake "c$bb_res") eType) e'
-      let assn = Assignment (Id.unsafeMake "~RESULT") Cont appExpr
+      (appExpr,appDecls) <- mkExpr False declType (NetlistId (Id.unsafeMake "c$bb_res") eType) e'
+      let assn = Assignment (Id.unsafeMake "~RESULT") assignTy appExpr
       nm <- if null appDecls
                then return (Id.unsafeMake "")
                else Id.makeBasic "block"
-      return (Right ((nm,appDecls ++ [assn]), Cont))
+      return (Right ((nm,appDecls ++ [assn]), assignTy))
 
     go is0 n (Lam id_ e') = do
       lvl <- Lens.use curBBlvl
@@ -1302,18 +1311,18 @@ mkFunInput parentName resId e =
       go is1 (n+(1::Int)) e''
 
     go _ _ (C.Var v) = do
-      let assn = Assignment (Id.unsafeMake "~RESULT") Cont (Identifier (Id.unsafeFromCoreId v) Nothing)
-      return (Right ((Id.unsafeMake "",[assn]), Cont))
+      let assn = Assignment (Id.unsafeMake "~RESULT") assignTy (Identifier (Id.unsafeFromCoreId v) Nothing)
+      return (Right ((Id.unsafeMake "",[assn]), assignTy))
 
     go _ _ (Case scrut ty [alt]) = do
       tcm <- Lens.view tcCache
       let sTy = inferCoreTypeOf tcm scrut
-      (projection,decls) <- mkProjection False (NetlistId (Id.unsafeMake "c$bb_res") sTy) scrut ty alt
-      let assn = Assignment (Id.unsafeMake "~RESULT") Cont projection
+      (projection,decls) <- mkProjection declType False (NetlistId (Id.unsafeMake "c$bb_res") sTy) scrut ty alt
+      let assn = Assignment (Id.unsafeMake "~RESULT") assignTy projection
       nm <- if null decls
                then return (Id.unsafeMake "")
                else Id.makeBasic "projection"
-      return (Right ((nm,decls ++ [assn]), Cont))
+      return (Right ((nm,decls ++ [assn]), assignTy))
 
     go _ _ (Case scrut ty (alt:alts@(_:_))) = do
       resNm <- Id.make "result"
@@ -1321,11 +1330,11 @@ mkFunInput parentName resId e =
       -- It's safe to use 'mkUnsafeSystemName' here: only the name, not the
       -- unique, will be used
       let resId'  = NetlistId resNm ty
-      selectionDecls <- mkSelection Concurrent resId' scrut ty (alt :| alts) []
+      selectionDecls <- mkSelection declType resId' scrut ty (alt :| alts) []
       let assn = [ NetDecl' Nothing resNm resTy Nothing
-                 , Assignment (Id.unsafeMake "~RESULT") Cont (Identifier resNm Nothing) ]
+                 , Assignment (Id.unsafeMake "~RESULT") assignTy (Identifier resNm Nothing) ]
       nm <- Id.makeBasic "selection"
-      return (Right ((nm,assn++selectionDecls), Cont))
+      return (Right ((nm,assn++selectionDecls), assignTy))
 
     go is0 _ e'@(Let{}) = do
       tcm <- Lens.view tcCache
@@ -1345,8 +1354,8 @@ mkFunInput parentName resId e =
           -- tests break when reverting to the old behavior. In some cases this
           -- creates "useless" assignments. We should investigate whether we can
           -- get the old behavior back.
-          let resDecl = Assignment (Id.unsafeMake "~RESULT") Cont (Identifier resultId Nothing)
-          return (Right ((nm,resDecl:netDecls ++ decls), Cont))
+          let resDecl = Assignment (Id.unsafeMake "~RESULT") assignTy (Identifier resultId Nothing)
+          return (Right ((nm,resDecl:netDecls ++ decls), assignTy))
         Nothing -> return (Right ((Id.unsafeMake "",[]), Cont))
 
     go is0 n (Tick _ e') = go is0 n e'
