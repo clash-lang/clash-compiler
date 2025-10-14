@@ -52,7 +52,7 @@ normalization =
     xOptim     = bottomupR (apply "xOptimize" xOptimize)
     cleanup    = topdownR (apply "etaExpandSyn" etaExpandSyn) >->
                  -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
-                 topdownSucR (apply "collapseRHSNoops" collapseRHSNoops) >->
+                 -- topdownSucR (apply "collapseRHSNoops" collapseRHSNoops) >->
                  topdownSucR (apply "inlineCleanup" inlineCleanup) !->
                  innerMost (applyMany [("caseCon"        , caseCon)
                                       ,("bindConstantVar", bindConstantVar)
