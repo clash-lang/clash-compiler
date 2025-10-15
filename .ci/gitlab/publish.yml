@@ -12,16 +12,3 @@ hackage-sdist:
     paths:
       - clash-*.tar.gz  # clash-{prelude,lib,ghc}-$version{-docs,}.tar.gz
     expire_in: 1 week
-
-.hackage:
-  extends: .common
-  interruptible: false
-  stage: publish
-  cache:
-    key: hackage-$CI_JOB_IMAGE
-  script:
-    - .ci/publish_sdist.sh clash-prelude
-    - .ci/publish_sdist.sh clash-prelude-hedgehog
-    - .ci/publish_sdist.sh clash-lib
-    - .ci/publish_sdist.sh clash-lib-hedgehog
-    - .ci/publish_sdist.sh clash-ghc
