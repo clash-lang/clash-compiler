@@ -1748,10 +1748,11 @@ iterate SNat = iterateI
 --
 -- <<doc/iterate.svg>>
 iterateI :: forall n a. KnownNat n => (a -> a) -> a -> Vec n a
-iterateI f a = xs
-  where
-    xs = init (a `Cons` ws)
-    ws = map f (lazyV xs)
+iterateI f = iterateU (toUNat (SNat @n))
+ where
+  iterateU :: forall m. UNat m -> a -> Vec m a
+  iterateU UZero _ = Nil
+  iterateU (USucc s) a = a `Cons` iterateU s (f a)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE iterateI #-}
 {-# ANN iterateI (InlineYamlPrimitive [VHDL,Verilog,SystemVerilog] [I.__i|
