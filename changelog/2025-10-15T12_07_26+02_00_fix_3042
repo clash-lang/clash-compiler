@@ -1,0 +1,1 @@
+FIXED: individual items of `iterateI` no longer retain a reference to the whole list, preventing space leaks. See [#3042](https://github.com/clash-lang/clash-compiler/issues/3042).
