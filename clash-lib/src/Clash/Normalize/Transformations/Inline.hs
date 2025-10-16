@@ -60,6 +60,7 @@ import Clash.Core.HasType
 import Clash.Core.Name (Name(..), NameSort(..))
 import Clash.Core.Pretty (PrettyOptions(..), showPpr, showPpr')
 import Clash.Core.Subst
+import qualified Clash.Core.Term as Term
 import Clash.Core.Term
   ( CoreContext(..), Pat(..), PrimInfo(..), Term(..), WorkInfo(..), collectArgs
   , collectArgsTicks, mkApps , mkTicks, stripTicks)
@@ -393,11 +394,25 @@ in HDL, but not in Haskell, by `unsafeCoerce`.
 The end result of all of this is that we get no/fewer assignments in HDL where the RHS is
 simply a variable reference. See issue #779 -}
 
--- | Takes a binding and collapses its term if it is a noop
+-- | Takes a binding and collapses its term if it is a noop. Only runs at
+-- synthesis boundaries (NOINLINE/OPAQUE functions) to avoid running too early
+-- on functions that might be inlined later. See #3036.
 collapseRHSNoops :: HasCallStack => NormRewrite
-collapseRHSNoops _ (Letrec binds body) = do
-  binds1 <- mapM runCollapseNoop binds
-  return $ Letrec binds1 body
+collapseRHSNoops _ letrec@(Let letBind body) = do
+  (curFunId, _) <- Lens.use curFun
+  curBinding <- lookupVarEnv curFunId <$> Lens.use bindings
+  case curBinding of
+    Just binding | isNoInline (bindingSpec binding) -> do
+      -- Explicitly match on Let instead of using LetRec, because we need to
+      -- preserve the structure. See https://github.com/clash-lang/clash-compiler/issues/3044.
+      case letBind of
+        Term.Rec binds -> do
+          binds1 <- mapM runCollapseNoop binds
+          pure (Let (Term.Rec binds1) body)
+        Term.NonRec b0 e0 -> do
+          (b1, e1) <- runCollapseNoop (b0, e0)
+          pure (Let (Term.NonRec b1 e1) body)
+    _ -> pure letrec
   where
     runCollapseNoop orig =
       runMaybeT (collapseNoop orig) >>= Maybe.maybe (return orig) changed

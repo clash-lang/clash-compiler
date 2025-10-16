@@ -954,6 +954,11 @@ data DeclarationType
   = Concurrent
   | Sequential
 
+-- | Default usage for a type of declaration (concurrent or sequential)
+declTypeUsage :: DeclarationType -> Usage
+declTypeUsage Concurrent = Cont
+declTypeUsage Sequential = Proc Blocking
+
 emptyBBContext :: Text -> BlackBoxContext
 emptyBBContext name
   = Context

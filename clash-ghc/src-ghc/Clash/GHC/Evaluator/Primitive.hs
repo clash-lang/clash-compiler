@@ -2167,6 +2167,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "GHC.Internal.Real.^_$s$spowImpl2" -- :: Int# -> Integer -> Integer
     | [intLiteral -> Just j, integerLiteral -> Just i] <- args
     -> reduce (integerToIntLiteral $ i ^ j)
+  "GHC.Internal.Real.^_$s$spowImpl" -- :: Int -> Integer -> Integer
+    | [intLiteral -> Just j, integerLiteral -> Just i] <- args
+    -> reduce (integerToIntLiteral $ i ^ j)
   "GHC.Internal.Real.$w$spowImpl" -- :: Integer -> Int# -> Integer
     | [integerLiteral -> Just i, intLiteral -> Just j] <- args
     -> reduce (integerToIntLiteral $ i ^ j)

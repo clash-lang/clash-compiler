@@ -896,7 +896,7 @@ renameBinder (i, collectArgsTicks -> (k, args, ticks)) = withTicks ticks $ \_ ->
 
   go :: Text -> [Id] -> [Either Term Type] -> [BlackBox] -> NetlistMonad [(Id, Id)]
   go nm is0 bbArgs bbResultTemplates = do
-    (bbCtx, _) <- preserveVarEnv (mkBlackBoxContext nm is0 bbArgs)
+    (bbCtx, _) <- preserveVarEnv (mkBlackBoxContext nm Concurrent is0 bbArgs)
     be <- Lens.use backend
     let
       _sameName i0 i1 = nameOcc (varName i0) == nameOcc (varName i1)
@@ -1645,7 +1645,7 @@ mkTopInstInput epp@(ExpandedPortProduct pNameHint hwty0 ps) = do
   case hwty1 of
     Vector {} -> do
       (ports, decls, ids) <- unzip3 <$> mapM mkTopInstInput ps
-      let assigns = zipWith3 Assignment ids (repeat Cont) (map (indexPN 10) [0..])
+      assigns <- zipWithM contAssign ids (map (indexPN 10) [0..])
       if null attrs then
         return (concat ports, pDecl:assigns ++ concat decls, pName)
       else
@@ -1653,7 +1653,7 @@ mkTopInstInput epp@(ExpandedPortProduct pNameHint hwty0 ps) = do
 
     RTree {} -> do
       (ports, decls, ids) <- unzip3 <$> mapM mkTopInstInput ps
-      let assigns = zipWith3 Assignment ids (repeat Cont) (map (indexPN 10) [0..])
+      assigns <- zipWithM contAssign ids (map (indexPN 10) [0..])
       if null attrs then
         return (concat ports, pDecl:assigns ++ concat decls, pName)
       else
@@ -1661,7 +1661,7 @@ mkTopInstInput epp@(ExpandedPortProduct pNameHint hwty0 ps) = do
 
     Product {} -> do
       (ports, decls, ids) <- unzip3 <$> mapM mkTopInstInput ps
-      let assigns = zipWith3 Assignment ids (repeat Cont) (map (indexPN 0) [0..])
+      assigns <- zipWithM contAssign ids (map (indexPN 0) [0..])
       if null attrs then
         return (concat ports, pDecl:assigns ++ concat decls, pName)
       else
@@ -1682,9 +1682,9 @@ mkTopInstInput epp@(ExpandedPortProduct pNameHint hwty0 ps) = do
               , typeSize elTy - 1
               , 0 )
 
-            assigns =
-              [ Assignment conId Cont (Identifier pName (Just conIx))
-              , Assignment elId  Cont (FromBv Nothing elTy (Identifier pName (Just elIx))) ]
+          assigns <- sequence
+              [ contAssign conId (Identifier pName (Just conIx))
+              , contAssign elId  (FromBv Nothing elTy (Identifier pName (Just elIx))) ]
 
           return (concat ports, pDecl:assigns ++ concat decls, pName)
         _ -> error "Internal error: Unexpected error for PortProduct"
@@ -1738,7 +1738,7 @@ mkTopInstOutput epp@(ExpandedPortProduct productNameHint hwty ps) = do
     Vector sz hwty'' -> do
       (ports, decls, ids0) <- unzip3 <$> mapM mkTopInstOutput ps
       let ids1 = map (flip Identifier Nothing) ids0
-          netassgn = Assignment pName Cont (mkVectorChain sz hwty'' ids1)
+      netassgn <- contAssign pName (mkVectorChain sz hwty'' ids1)
       if null attrs then
         return (concat ports, pDecl:netassgn:concat decls, pName)
       else
@@ -1747,7 +1747,7 @@ mkTopInstOutput epp@(ExpandedPortProduct productNameHint hwty ps) = do
     RTree d hwty'' -> do
       (ports, decls, ids0) <- unzip3 <$> mapM mkTopInstOutput ps
       let ids1 = map (flip Identifier Nothing) ids0
-          netassgn = Assignment pName Cont (mkRTreeChain d hwty'' ids1)
+      netassgn <- contAssign pName (mkRTreeChain d hwty'' ids1)
       if null attrs then
         return (concat ports, pDecl:netassgn:concat decls, pName)
       else
@@ -1756,7 +1756,7 @@ mkTopInstOutput epp@(ExpandedPortProduct productNameHint hwty ps) = do
     Product {} -> do
       (ports, decls, ids0) <- unzip3 <$> mapM mkTopInstOutput ps
       let ids1 = map (flip Identifier Nothing) ids0
-          netassgn = Assignment pName Cont (DataCon hwty (DC (hwty,0)) ids1)
+      netassgn <- contAssign pName (DataCon hwty (DC (hwty,0)) ids1)
       if null attrs then
         return (concat ports, pDecl:netassgn:concat decls, pName)
       else
@@ -1768,7 +1768,7 @@ mkTopInstOutput epp@(ExpandedPortProduct productNameHint hwty ps) = do
           ids2 = case ids1 of
                   [conId, elId] -> [conId, ToBv Nothing elTy elId]
                   _ -> error "Unexpected error for PortProduct"
-          netassgn = Assignment pName Cont (DataCon hwty (DC (BitVector (typeSize hwty),0)) ids2)
+      netassgn <- contAssign pName (DataCon hwty (DC (BitVector (typeSize hwty),0)) ids2)
       return (concat ports, pDecl:netassgn:concat decls, pName)
 
     _ ->

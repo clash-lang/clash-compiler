@@ -11,7 +11,7 @@ import GHC.Stack (HasCallStack)
 import Clash.Core.Term (Term)
 import Clash.Core.Type (Type)
 import Clash.Core.Var (Id)
-import Clash.Netlist.Types (BlackBoxContext, Declaration, NetlistMonad)
+import Clash.Netlist.Types (BlackBoxContext, Declaration, DeclarationType, NetlistMonad)
 import Clash.Primitives.Types (CompiledPrimitive)
 
 extractPrimWarnOrFail
@@ -23,6 +23,8 @@ mkBlackBoxContext
   :: HasCallStack
   => Text
   -- ^ Blackbox function name
+  -> DeclarationType
+  -- ^ Are we concurrent or sequential?
   -> [Id]
   -- ^ Identifiers binding the primitive/blackbox application
   -> [Either Term Type]
