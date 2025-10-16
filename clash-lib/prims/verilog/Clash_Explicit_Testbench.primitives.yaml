@@ -15,8 +15,8 @@
       // assert begin
       // pragma translate_off
       always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin
-        if (~ARG[6] !== ~ARG[7]) begin
-          $display("@%0tns: %s, expected: %b, actual: %b", $time, ~LIT[5], ~ARG[7], ~ARG[6]);
+        if (~VAR[checked][6] !== ~VAR[expected][7]) begin
+          $display("@%0tns: %s, expected: %b, actual: %b", $time, ~LIT[5], ~VAR[expected][7], ~VAR[checked][6]);
           `ifdef VERILATOR
             $c("std::exit(1);");
           `endif
@@ -49,7 +49,7 @@
 
       always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[2]) begin
         if (~SYM[1] !== ~SYM[2]) begin
-          $display("@%0tns: %s, expected: %b, actual: %b", $time, ~LIT[4], ~ARG[6], ~ARG[5]);
+          $display("@%0tns: %s, expected: %b, actual: %b", $time, ~LIT[4], ~VAR[expected][6], ~VAR[checked][5]);
           `ifdef VERILATOR
             $c("std::exit(1);");
           `endif
