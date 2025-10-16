@@ -104,7 +104,7 @@ jobs:
       # https://github.com/commercialhaskell/stack/issues/5770
       - name: Initialize Stack
         shell: bash
-        run: ./.ci/retry.sh stack build base
+        run: ./.ci/retry.sh stack build base -j1 +RTS -N1
 
       # Building 'happy' sometimes fails on Windows for some obscure reason
       - name: Build happy with Stack
