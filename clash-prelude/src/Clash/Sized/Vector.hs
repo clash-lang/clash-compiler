@@ -142,7 +142,7 @@ import Unsafe.Coerce              (unsafeCoerce)
 
 import Clash.Annotations.Primitive
   (Primitive(InlineYamlPrimitive), HDL(..), dontTranslate, hasBlackBox)
-import Clash.Magic (clashCompileError)
+import Clash.Magic (clashCompileError, clashSimulation)
 import Clash.Promoted.Nat
   (SNat (..), SNatLE (..), UNat (..), compareSNat, pow2SNat,
    snatProxy, snatToInteger, subSNat, withSNat, toUNat, natToInteger)
@@ -1289,11 +1289,10 @@ postscanr f z xs = init (scanr f z xs)
 mapAccumL :: (acc -> x -> (acc,y)) -> acc -> Vec n x -> (acc,Vec n y)
 mapAccumL f acc xs = (acc',ys)
   where
-    accs  = acc `Cons` accs'
-    ws    = zipWith (flip f) xs (init accs)
-    accs' = map fst ws
-    ys    = map snd ws
-    acc'  = last accs
+    accs        = acc `Cons` accs'
+    ws          = zipWith (flip f) xs (init accs)
+    (accs', ys) = unzip ws
+    acc'        = last accs
 {-# INLINE mapAccumL #-}
 
 -- | The 'mapAccumR' function behaves like a combination of 'map' and 'foldr';
@@ -1310,11 +1309,10 @@ mapAccumL f acc xs = (acc',ys)
 mapAccumR :: (acc -> x -> (acc,y)) -> acc -> Vec n x -> (acc, Vec n y)
 mapAccumR f acc xs = (acc',ys)
   where
-    accs  = accs' :< acc
-    ws    = zipWith (flip f) xs (tail accs)
-    accs' = map fst ws
-    ys    = map snd ws
-    acc'  = head accs
+    accs        = accs' :< acc
+    ws          = zipWith (flip f) xs (tail accs)
+    (accs', ys) = unzip ws
+    acc'        = head accs
 {-# INLINE mapAccumR #-}
 
 -- | 'zip' takes two vectors and returns a vector of corresponding pairs.
@@ -1378,7 +1376,15 @@ zip7 = zipWith7 (,,,,,,)
 -- >>> unzip ((1,4):>(2,3):>(3,2):>(4,1):>Nil)
 -- (1 :> 2 :> 3 :> 4 :> Nil,4 :> 3 :> 2 :> 1 :> Nil)
 unzip :: Vec n (a,b) -> (Vec n a, Vec n b)
-unzip xs = (map fst xs, map snd xs)
+unzip xs
+  | clashSimulation = unzipSim xs
+  | otherwise = (map fst xs, map snd xs)
+ where
+  unzipSim :: Vec m (a,b) -> (Vec m a, Vec m b)
+  unzipSim Nil = (Nil, Nil)
+  unzipSim (~(a,b) `Cons` rest) =
+    let (as, bs) = unzipSim rest
+    in (a `Cons` as, b `Cons` bs)
 {-# INLINE unzip #-}
 
 -- | 'unzip3' transforms a vector of triplets into a vector of first components,
@@ -1387,31 +1393,55 @@ unzip xs = (map fst xs, map snd xs)
 -- >>> unzip3 ((1,4,5):>(2,3,6):>(3,2,7):>(4,1,8):>Nil)
 -- (1 :> 2 :> 3 :> 4 :> Nil,4 :> 3 :> 2 :> 1 :> Nil,5 :> 6 :> 7 :> 8 :> Nil)
 unzip3 :: Vec n (a,b,c) -> (Vec n a, Vec n b, Vec n c)
-unzip3 xs = ( map (\(x,_,_) -> x) xs
-            , map (\(_,y,_) -> y) xs
-            , map (\(_,_,z) -> z) xs
-            )
+unzip3 xs
+  | clashSimulation = unzip3Sim xs
+  | otherwise = ( map (\(x,_,_) -> x) xs
+                , map (\(_,y,_) -> y) xs
+                , map (\(_,_,z) -> z) xs
+                )
+ where
+  unzip3Sim :: Vec m (a,b,c) -> (Vec m a, Vec m b, Vec m c)
+  unzip3Sim Nil = (Nil, Nil, Nil)
+  unzip3Sim (~(a,b,c) `Cons` rest) =
+    let (as, bs, cs) = unzip3Sim rest
+    in (a `Cons` as, b `Cons` bs, c `Cons` cs)
 {-# INLINE unzip3 #-}
 
 -- | 'unzip4' takes a vector of quadruples and returns four vectors, analogous
 -- to 'unzip'.
 unzip4 :: Vec n (a,b,c,d) -> (Vec n a, Vec n b, Vec n c, Vec n d)
-unzip4 xs = ( map (\(w,_,_,_) -> w) xs
-            , map (\(_,x,_,_) -> x) xs
-            , map (\(_,_,y,_) -> y) xs
-            , map (\(_,_,_,z) -> z) xs
-            )
+unzip4 xs
+  | clashSimulation = unzip4Sim xs
+  | otherwise = ( map (\(w,_,_,_) -> w) xs
+                , map (\(_,x,_,_) -> x) xs
+                , map (\(_,_,y,_) -> y) xs
+                , map (\(_,_,_,z) -> z) xs
+                )
+ where
+  unzip4Sim :: Vec m (a,b,c,d) -> (Vec m a, Vec m b, Vec m c, Vec m d)
+  unzip4Sim Nil = (Nil, Nil, Nil, Nil)
+  unzip4Sim (~(a,b,c,d) `Cons` rest) =
+    let (as, bs, cs, ds) = unzip4Sim rest
+    in (a `Cons` as, b `Cons` bs, c `Cons` cs, d `Cons` ds)
 {-# INLINE unzip4 #-}
 
 -- | 'unzip5' takes a vector of five-tuples and returns five vectors, analogous
 -- to 'unzip'.
 unzip5 :: Vec n (a,b,c,d,e) -> (Vec n a, Vec n b, Vec n c, Vec n d, Vec n e)
-unzip5 xs = ( map (\(v,_,_,_,_) -> v) xs
-            , map (\(_,w,_,_,_) -> w) xs
-            , map (\(_,_,x,_,_) -> x) xs
-            , map (\(_,_,_,y,_) -> y) xs
-            , map (\(_,_,_,_,z) -> z) xs
-            )
+unzip5 xs
+  | clashSimulation = unzip5Sim xs
+  | otherwise = ( map (\(v,_,_,_,_) -> v) xs
+                , map (\(_,w,_,_,_) -> w) xs
+                , map (\(_,_,x,_,_) -> x) xs
+                , map (\(_,_,_,y,_) -> y) xs
+                , map (\(_,_,_,_,z) -> z) xs
+                )
+ where
+  unzip5Sim :: Vec m (a,b,c,d,e) -> (Vec m a, Vec m b, Vec m c, Vec m d, Vec m e)
+  unzip5Sim Nil = (Nil, Nil, Nil, Nil, Nil)
+  unzip5Sim (~(a,b,c,d,e) `Cons` rest) =
+    let (as, bs, cs, ds, es) = unzip5Sim rest
+    in (a `Cons` as, b `Cons` bs, c `Cons` cs, d `Cons` ds, e `Cons` es)
 {-# INLINE unzip5 #-}
 
 -- | 'unzip6' takes a vector of six-tuples and returns six vectors, analogous
@@ -1419,13 +1449,21 @@ unzip5 xs = ( map (\(v,_,_,_,_) -> v) xs
 unzip6
   :: Vec n (a,b,c,d,e,f)
   -> (Vec n a, Vec n b, Vec n c, Vec n d, Vec n e, Vec n f)
-unzip6 xs = ( map (\(u,_,_,_,_,_) -> u) xs
-            , map (\(_,v,_,_,_,_) -> v) xs
-            , map (\(_,_,w,_,_,_) -> w) xs
-            , map (\(_,_,_,x,_,_) -> x) xs
-            , map (\(_,_,_,_,y,_) -> y) xs
-            , map (\(_,_,_,_,_,z) -> z) xs
-            )
+unzip6 xs
+  | clashSimulation = unzip6Sim xs
+  | otherwise = ( map (\(u,_,_,_,_,_) -> u) xs
+                , map (\(_,v,_,_,_,_) -> v) xs
+                , map (\(_,_,w,_,_,_) -> w) xs
+                , map (\(_,_,_,x,_,_) -> x) xs
+                , map (\(_,_,_,_,y,_) -> y) xs
+                , map (\(_,_,_,_,_,z) -> z) xs
+                )
+ where
+  unzip6Sim :: Vec m (a,b,c,d,e,f) -> (Vec m a, Vec m b, Vec m c, Vec m d, Vec m e, Vec m f)
+  unzip6Sim Nil = (Nil, Nil, Nil, Nil, Nil, Nil)
+  unzip6Sim (~(a,b,c,d,e,f) `Cons` rest) =
+    let (as, bs, cs, ds, es, fs) = unzip6Sim rest
+    in (a `Cons` as, b `Cons` bs, c `Cons` cs, d `Cons` ds, e `Cons` es, f `Cons` fs)
 {-# INLINE unzip6 #-}
 
 -- | 'unzip7' takes a vector of seven-tuples and returns seven vectors, analogous
@@ -1433,14 +1471,22 @@ unzip6 xs = ( map (\(u,_,_,_,_,_) -> u) xs
 unzip7
   :: Vec n (a,b,c,d,e,f,g)
   -> (Vec n a, Vec n b, Vec n c, Vec n d, Vec n e, Vec n f, Vec n g)
-unzip7 xs = ( map (\(t,_,_,_,_,_,_) -> t) xs
-            , map (\(_,u,_,_,_,_,_) -> u) xs
-            , map (\(_,_,v,_,_,_,_) -> v) xs
-            , map (\(_,_,_,w,_,_,_) -> w) xs
-            , map (\(_,_,_,_,x,_,_) -> x) xs
-            , map (\(_,_,_,_,_,y,_) -> y) xs
-            , map (\(_,_,_,_,_,_,z) -> z) xs
-            )
+unzip7 xs
+  | clashSimulation = unzip7Sim xs
+  | otherwise = ( map (\(t,_,_,_,_,_,_) -> t) xs
+                , map (\(_,u,_,_,_,_,_) -> u) xs
+                , map (\(_,_,v,_,_,_,_) -> v) xs
+                , map (\(_,_,_,w,_,_,_) -> w) xs
+                , map (\(_,_,_,_,x,_,_) -> x) xs
+                , map (\(_,_,_,_,_,y,_) -> y) xs
+                , map (\(_,_,_,_,_,_,z) -> z) xs
+                )
+ where
+  unzip7Sim :: Vec m (a,b,c,d,e,f,g) -> (Vec m a, Vec m b, Vec m c, Vec m d, Vec m e, Vec m f, Vec m g)
+  unzip7Sim Nil = (Nil, Nil, Nil, Nil, Nil, Nil, Nil)
+  unzip7Sim (~(a,b,c,d,e,f,g) `Cons` rest) =
+    let (as, bs, cs, ds, es, fs, gs) = unzip7Sim rest
+    in (a `Cons` as, b `Cons` bs, c `Cons` cs, d `Cons` ds, e `Cons` es, f `Cons` fs, g `Cons` gs)
 {-# INLINE unzip7 #-}
 
 
