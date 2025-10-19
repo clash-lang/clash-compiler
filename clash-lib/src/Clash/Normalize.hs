@@ -183,8 +183,9 @@ normalizeStep q binds s = do
           then do
             -- mark that we are attempting to normalize id'
             MVar.putMVar binds (bound `extendVarSet` id', pairs)
-            Monad.liftIO $ print  $ ("normalize'" :: String, threadId, id')
+            Monad.liftIO $ print  $ ("normalize'" :: String, threadId, varName id')
             pair <- normalize' id' q
+            Monad.liftIO $ print  $ ("normalize' done" :: String, threadId, varName id')
             MVar.modifyMVar_ binds (pure . second (pair:))
           else
             MVar.putMVar binds (bound, pairs)
