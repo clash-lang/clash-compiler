@@ -84,3 +84,8 @@ package regex-tdfa
 
 -- rewrite-inspector-0.1.0.11 uses brick-0.50 which doesn't compile with vty-6.0
 constraints: vty < 6.0
+
+source-repository-package
+  type: git
+  location: https://github.com/martijnbastiaan/workhorse
+  tag: 26601c11a1dfe82140cd550e75e9de2e6761e44e

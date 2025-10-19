@@ -17,10 +17,10 @@
 
 module Clash.Normalize where
 
-import           Control.Concurrent.Lifted        (getNumCapabilities, myThreadId)
-import qualified Control.Concurrent.Async.Lifted as Async
+import           Control.Concurrent.Lifted        (myThreadId)
 import           Control.Concurrent.MVar.Lifted (MVar)
 import qualified Control.Concurrent.MVar.Lifted as MVar
+import qualified Control.Concurrent.Workhorse.Lifted as Workhorse
 import           Control.Exception                (throw)
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    (when)
@@ -29,7 +29,6 @@ import           Control.Monad.State.Strict       (State)
 import           Data.Bifunctor                   (second)
 import           Data.Default                     (def)
 import           Data.Either                      (lefts,partitionEithers)
-import           Data.Foldable                    (traverse_)
 import qualified Data.HashMap.Strict              as HashMap
 import           Data.List
   (intersect, mapAccumL)
@@ -37,7 +36,6 @@ import qualified Data.Map                         as Map
 import qualified Data.Maybe                       as Maybe
 import qualified Data.Set                         as Set
 import qualified Data.Set.Lens                    as Lens
-import qualified Data.Concurrent.Queue.MichaelScott as MS
 
 #if MIN_VERSION_prettyprinter(1,7,0)
 import           Prettyprinter                    (vcat)
@@ -156,45 +154,40 @@ supplies n s = let (s0', s1') = splitSupply s in s0' : supplies (n-1) s1'
 
 normalize :: [Id] -> NormalizeSession BindingMap
 normalize tops = do
-  q <- Monad.liftIO MS.newQ
-  traverse_ (Monad.liftIO . MS.pushL q) tops
   binds <- MVar.newMVar (emptyVarSet, [])
   uniq0 <- Lens.use uniqSupply
-  nWorkers <- Monad.liftIO getNumCapabilities
-  Monad.liftIO $ print $ ("nWorkers" :: String, nWorkers)
-  let ss = supplies nWorkers uniq0
-  Async.mapConcurrently_ (normalizeStep q binds) ss
+  let ss = supplies (length tops) uniq0
+  Workhorse.doConcurrently_ (normalizeStep binds) (zip tops ss)
   mkVarEnv . snd <$> MVar.readMVar binds
 
 normalizeStep
-    :: MS.LinkedQueue Id
-    -> MVar (VarSet, [(Id, Binding Term)])
-    -> Supply
+    :: MVar (VarSet, [(Id, Binding Term)])
+    -> Workhorse.Pool (Id, Supply) () NormalizeSession
+    -> (Id, Supply)
     -> NormalizeSession ()
-normalizeStep q binds s = do
+normalizeStep binds pool (id', s) = do
   uniqSupply Lens..= s
-  res <- Monad.liftIO $ MS.tryPopR q
   threadId <- myThreadId
-  Monad.liftIO $ print$ ("Pop!" :: String, threadId)
-  case res of
-      Just id' -> do
-        (bound, pairs) <- MVar.takeMVar binds
-        if not (id' `elemVarSet` bound)
-          then do
-            -- mark that we are attempting to normalize id'
-            MVar.putMVar binds (bound `extendVarSet` id', pairs)
-            Monad.liftIO $ print  $ ("normalize'" :: String, threadId, varName id')
-            pair <- normalize' id' q
-            Monad.liftIO $ print  $ ("normalize' done" :: String, threadId, varName id')
-            MVar.modifyMVar_ binds (pure . second (pair:))
-          else
-            MVar.putMVar binds (bound, pairs)
-        nextS <- Lens.use uniqSupply
-        normalizeStep q binds nextS
-      Nothing  -> pure ()
+  Monad.liftIO $ print$ ("Work!" :: String, threadId)
+  work <- MVar.modifyMVar binds $ \(orig@(bound, pairs)) ->
+    if id' `elemVarSet` bound
+    then pure (orig, pure ())
+    else pure
+      ( (bound `extendVarSet` id', pairs)
+      , do
+          Monad.liftIO $ print  $ ("normalize'" :: String, threadId, varName id')
+          pair <- normalize' id' pool
+          Monad.liftIO $ print  $ ("normalize' done" :: String, threadId, varName id')
+          MVar.modifyMVar_ binds (pure . second (pair:))
+      )
 
-normalize' :: Id -> MS.LinkedQueue Id -> NormalizeSession (Id, Binding Term)
-normalize' nm q = do
+  work
+
+normalize' ::
+  Id ->
+  Workhorse.Pool (Id, Supply) () NormalizeSession ->
+  NormalizeSession (Id, Binding Term)
+normalize' nm pool = do
   bndrsV <- Lens.use bindings
   exprM <- MVar.withMVar bndrsV (pure . lookupVarEnv nm)
   let nmS = showPpr (varName nm)
@@ -244,7 +237,10 @@ normalize' nm q = do
                                 $ filter (`notElemVarEnv` extendVarEnv nm nm prevNorm) usedBndrs
                   in pure toNormalize
 
-            traverse_ (Monad.liftIO . MS.pushL q) toNormalize
+            s <- Lens.use uniqSupply
+            let ss = supplies (length toNormalize) s
+            mapM_ (Workhorse.addWork pool) (zip toNormalize ss)
+
             pure (nm, tmNorm)
          else
            do
