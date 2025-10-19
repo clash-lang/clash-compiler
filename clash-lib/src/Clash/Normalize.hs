@@ -17,7 +17,7 @@
 
 module Clash.Normalize where
 
-import           Control.Concurrent.Lifted        (getNumCapabilities)
+import           Control.Concurrent.Lifted        (getNumCapabilities, myThreadId)
 import qualified Control.Concurrent.Async.Lifted as Async
 import           Control.Concurrent.MVar.Lifted (MVar)
 import qualified Control.Concurrent.MVar.Lifted as MVar
@@ -161,6 +161,7 @@ normalize tops = do
   binds <- MVar.newMVar (emptyVarSet, [])
   uniq0 <- Lens.use uniqSupply
   nWorkers <- Monad.liftIO getNumCapabilities
+  Monad.liftIO $ print $ ("nWorkers" :: String, nWorkers)
   let ss = supplies nWorkers uniq0
   Async.mapConcurrently_ (normalizeStep q binds) ss
   mkVarEnv . snd <$> MVar.readMVar binds
@@ -173,6 +174,8 @@ normalizeStep
 normalizeStep q binds s = do
   uniqSupply Lens..= s
   res <- Monad.liftIO $ MS.tryPopR q
+  threadId <- myThreadId
+  Monad.liftIO $ print$ ("Pop!" :: String, threadId)
   case res of
       Just id' -> do
         (bound, pairs) <- MVar.takeMVar binds
@@ -180,6 +183,7 @@ normalizeStep q binds s = do
           then do
             -- mark that we are attempting to normalize id'
             MVar.putMVar binds (bound `extendVarSet` id', pairs)
+            Monad.liftIO $ print  $ ("normalize'" :: String, threadId, id')
             pair <- normalize' id' q
             MVar.modifyMVar_ binds (pure . second (pair:))
           else
