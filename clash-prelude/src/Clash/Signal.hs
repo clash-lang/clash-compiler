@@ -2,7 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software Ltd,
                   2017     , Google Inc.,
-                  2021-2024, QBayLogic B.V.
+                  2021-2025, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -201,7 +201,9 @@ module Clash.Signal
   , register
   , regMaybe
   , regEn
+  , regEnN
   , mux
+  , apEn
     -- * Simulation and testbench functions
   , clockGen
   , resetGen
@@ -1200,6 +1202,29 @@ regEn = \initial en i ->
     en
     i
 {-# INLINE regEn #-}
+
+-- | A chain of 'regEn's.
+regEnN ::
+  forall dom a n.
+  (HiddenClockResetEnable dom, NFDataX a) =>
+  -- | The number of stored elements
+  SNat n ->
+  -- | Initial content of all elements in the chain.
+  a ->
+  -- | The "push next input" indicator
+  Signal dom Bool ->
+  Signal dom a ->
+  Signal dom a
+regEnN = \sn initial en i ->
+  E.regEnN
+    (fromLabel @(HiddenClockName dom))
+    (fromLabel @(HiddenResetName dom))
+    (fromLabel @(HiddenEnableName dom))
+    sn
+    initial
+    en
+    i
+{-# INLINE regEnN #-}
 
 -- * Signal -> List conversion
 
