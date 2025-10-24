@@ -2654,16 +2654,42 @@ dtfold :: forall p k a . KnownNat k
 dtfold _ f g = go (SNat :: SNat k)
   where
     go :: forall n . SNat n -> Vec (2^n) a -> (p @@ n)
+#if __GLASGOW_HASKELL__ >= 904 && __GLASGOW_HASKELL__ < 912
+    go sn = case toUNat sn of
+      UZero -> \case
+        Cons x Nil -> f x
+        Cons x (Cons _ _) -> f x
+      USucc _ -> \case
+        xs@(Cons _ (Cons _ _)) ->
+          let sn' :: SNat (n - 1)
+              sn'       = sn `subSNat` d1
+              (xsL,xsR) = splitAt (pow2SNat sn') xs
+          in  g sn' (go sn' xsL) (go sn' xsR)
+        -- the remaining cases are impossible cases, but GHC cannot
+        -- automatically detect them to be inaccesible. We need to
+        -- give additional evidence for proving them to be absurd.
+        Cons _ Nil -> case p0 sn of Dict -> case p1 sn of {}
+         where
+          p0 :: 1 <= m => SNat m -> Dict (2 <= 2^((m-1)+1))
+          p0 = const Dict
+          p1 :: 1 <= m => SNat m -> Dict (2^m ~ 2^((m-1)+1))
+          p1 = const Dict
+        Nil -> case p sn of {}
+         where
+          p :: SNat m -> Dict (1 <= 2^m)
+          p = const Dict
+#else
     go _  (x `Cons` Nil) = f x
     go sn xs@(Cons _ (Cons _ _)) =
       let sn' :: SNat (n - 1)
           sn'       = sn `subSNat` d1
           (xsL,xsR) = splitAt (pow2SNat sn') xs
       in  g sn' (go sn' xsL) (go sn' xsR)
-#if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
+#if __GLASGOW_HASKELL__ != 902
     go _  Nil =
       case (const Dict :: forall m. Proxy m -> Dict (1 <= 2 ^ m)) (Proxy @n) of
         {}
+#endif
 #endif
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE dtfold #-}
