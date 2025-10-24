@@ -77,11 +77,6 @@ let
           '';
         });
 
-      clash-cores =
-        hprev.callCabal2nixWithOptions "clash-cores" ../clash-cores "--flag nix" {
-          inherit (hfinal) clash-prelude;
-        };
-
       clash-cosim =
         let
           unmodified =
@@ -194,7 +189,7 @@ let
               "clash-testsuite"
               ../tests
               "--flag workaround-ghc-mmap-crash" {
-              inherit (hfinal) clash-cores clash-ghc clash-lib clash-prelude;
+              inherit (hfinal) clash-ghc clash-lib clash-prelude;
             };
         in
         unmodified.overrideAttrs (old: {
