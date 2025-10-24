@@ -248,10 +248,6 @@ powUNat x (USucc y) = mulUNat x (powUNat x y)
 -- __NB__: Not synthesizable
 predUNat :: UNat (n+1) -> UNat n
 predUNat (USucc x) = x
-#if __GLASGOW_HASKELL__ != 902
-predUNat UZero     =
-  error "predUNat: impossible: 0 minus 1, -1 is not a natural number"
-#endif
 
 -- | Subtract two unary-encoded natural numbers
 --

@@ -2654,17 +2654,13 @@ dtfold :: forall p k a . KnownNat k
 dtfold _ f g = go (SNat :: SNat k)
   where
     go :: forall n . SNat n -> Vec (2^n) a -> (p @@ n)
-    go _  (x `Cons` Nil) = f x
-    go sn xs@(Cons _ (Cons _ _)) =
-      let sn' :: SNat (n - 1)
-          sn'       = sn `subSNat` d1
-          (xsL,xsR) = splitAt (pow2SNat sn') xs
-      in  g sn' (go sn' xsL) (go sn' xsR)
-#if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
-    go _  Nil =
-      case (const Dict :: forall m. Proxy m -> Dict (1 <= 2 ^ m)) (Proxy @n) of
-        {}
-#endif
+    go sn = case toUNat sn of
+      UZero   -> f . head
+      USucc _ -> \xs ->
+        let sn' :: SNat (n - 1)
+            sn'       = sn `subSNat` d1
+            (xsL,xsR) = splitAt (pow2SNat sn') xs
+        in  g sn' (go sn' xsL) (go sn' xsR)
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE dtfold #-}
 {-# ANN dtfold hasBlackBox #-}
