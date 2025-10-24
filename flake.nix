@@ -83,6 +83,17 @@
       in
       assert pkgs.lib.asserts.assertOneOf "defaultGhcVersion" defaultGhcVersion ghcVersions;
       {
+<<<<<<< HEAD
+||||||| parent of 6a081049 (Expose all supported GHC versions (#2987))
+        # Export the variable so that other flakes can use it.
+        ghcVersion = defaultGhcVersion;
+
+=======
+        # Export the variable so that other flakes can use it.
+        ghcVersion = defaultGhcVersion;
+        supportedGhcVersions = ghcVersions;
+
+>>>>>>> 6a081049 (Expose all supported GHC versions (#2987))
         packages = {
           inherit (pkgs."clashPackages-${defaultGhcVersion}")
             clash-benchmark
