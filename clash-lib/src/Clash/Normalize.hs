@@ -136,6 +136,7 @@ runNormalization env supply globals typeTrans peEval eval rcsMap lock entities s
     <*> MVar.newMVar (mempty, 0)
     <*> MVar.newMVar emptyVarEnv
     <*> pure lock
+    <*> MVar.newMVar mempty
     <*> pure normState
 
   runRewriteSession rwEnv rwState session

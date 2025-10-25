@@ -58,9 +58,11 @@ import qualified Control.Monad.Trans.RWS.Strict as RWS
 import Data.Binary                           (Binary)
 import Data.HashMap.Strict                   (HashMap)
 import Data.IntMap.Strict                    (IntMap)
+import Data.Map                              (Map)
 import Data.Monoid                           (Any)
 import Data.Text                             (Text)
 import GHC.Generics
+import GHC.Stack                             (CallStack)
 
 import Clash.Core.PartialEval as PE          (Evaluator)
 import Clash.Core.Evaluator.Types as WHNF    (Evaluator, PrimHeap)
@@ -94,6 +96,13 @@ data RewriteStep
   -- ^ Term after `apply`
   } deriving (Show, Generic, NFData, Binary)
 
+data LockTrace = LockTrace
+  { ltTaken :: Maybe (ThreadId, CallStack)
+  -- ^ 'Just' if a thread has taken the lock
+  , ltWaiting :: Map ThreadId CallStack
+  -- ^ Threads waiting to take the lock
+  }
+
 {-
 Note [strictness in RewriteState]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -103,7 +112,7 @@ is not the field itself that needs to be strict but the contents of the MVar.
 When these are updated in rewriting, it is necessary to use `seq` or bang
 patterns to ensure that they are always forced to WHNF.
 
-Since the transform count was replaced in it's entirity with the map of
+Since the transform count was replaced in it's entirety with the map of
 counters, operations on the map are always forced completely with `deepseq`.
 This prevents thunks being built up on map updates, since counting the number
 of transformations applied is common when debugging.
@@ -128,6 +137,9 @@ data RewriteState extra
   -- ^ Map telling whether a binder's definition is work-free
   , _ioLock           :: MVar ()
   -- ^ Synchronization for logging to stdout
+  , _debugLockTrace   :: MVar (Map String LockTrace)
+  -- ^ Maps a lock name to its trace information. Only used when
+  -- @concurrentNormalizationDebug@ is enabled.
   , _extra            :: !extra
   -- ^ Additional state
   }
@@ -195,6 +207,15 @@ specializationLimit = clashEnv . Lens.to (opt_specLimit . envOpts)
 
 normalizeUltra :: Lens.Getter RewriteEnv Bool
 normalizeUltra = clashEnv . Lens.to (opt_ultra . envOpts)
+
+concurrentNormalization :: Lens.Getter RewriteEnv Bool
+concurrentNormalization = clashEnv . Lens.to (opt_concurrentNormalization . envOpts)
+
+concurrentNormalizationTimeout :: Lens.Getter RewriteEnv Int
+concurrentNormalizationTimeout = clashEnv . Lens.to (opt_concurrentNormalizationTimeout . envOpts)
+
+concurrentNormalizationDebug :: Lens.Getter RewriteEnv Bool
+concurrentNormalizationDebug = clashEnv . Lens.to (opt_concurrentNormalizationDebug . envOpts)
 
 -- | Monad that keeps track how many transformations have been applied and can
 -- generate fresh variables and unique identifiers. In addition, it keeps track

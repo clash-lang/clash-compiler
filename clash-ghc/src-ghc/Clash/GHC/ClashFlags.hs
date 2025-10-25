@@ -97,6 +97,8 @@ flagsClash r = [
   , defFlag "fclash-timescale-precision"         $ SepArg (setTimescalePrecision r)
   , defFlag "fclash-ignore-broken-ghcs"          $ NoArg (liftEwM (setIgnoreBrokenGhcs r))
   , defFlag "fclash-concurrent-normalization"    $ NoArg (liftEwM (setConcurrentNormalization r))
+  , defFlag "fclash-concurrent-normalization-timeout" $ IntSuffix (liftEwM . setConcurrentNormalizationTimeout r)
+  , defFlag "fclash-concurrent-normalization-debug"   $ NoArg (liftEwM (setConcurrentNormalizationDebug r))
   ]
 
 -- | Print deprecated flag warning
@@ -337,7 +339,17 @@ setEdalize :: IORef ClashOpts -> IO ()
 setEdalize r = modifyIORef r (\c -> c { opt_edalize = True })
 
 setConcurrentNormalization :: IORef ClashOpts -> IO ()
-setConcurrentNormalization r = modifyIORef r (\c -> c { opt_concurrentNormalization = True })
+setConcurrentNormalization r =
+  modifyIORef r (\c -> c { opt_concurrentNormalization = True })
+
+setConcurrentNormalizationTimeout :: IORef ClashOpts -> Int -> EwM IO ()
+setConcurrentNormalizationTimeout r n
+  | n > 0 = liftEwM $ modifyIORef r (\c -> c {opt_concurrentNormalizationTimeout = n})
+  | otherwise = addErr ("-fclash-concurrent-normalization-timeout: must be greater than 0, got " ++ show n)
+
+setConcurrentNormalizationDebug :: IORef ClashOpts -> IO ()
+setConcurrentNormalizationDebug r =
+  modifyIORef r (\c -> c { opt_concurrentNormalizationDebug = True })
 
 setRewriteHistoryFile :: IORef ClashOpts -> String -> IO ()
 setRewriteHistoryFile r arg = do

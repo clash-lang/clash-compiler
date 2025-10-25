@@ -404,6 +404,16 @@ data ClashOpts = ClashOpts
   -- See the project's @README.md@ for more information.
   , opt_concurrentNormalization :: Bool
   -- ^ Toggle concurrent normalization (usually slower, faster on large designs)
+  , opt_concurrentNormalizationTimeout :: Int
+  -- ^ Set timeout for lock acquisition when using concurrent normalization. The
+  -- default is set to 120 seconds. Because locks are relatively fine-grained
+  -- and threads waiting on a lock are woken up in a FIFO order, this value is
+  -- not expected to be met unless there is a deadlock.
+  , opt_concurrentNormalizationDebug :: Bool
+  -- ^ When enabled, Clash keeps a log of what lock was requested by which thread
+  -- and at what location in the source code. This will be used to provide useful
+  -- error messages when 'opt_concurrentNormalizationTimeout' is exceeded. This
+  -- is disabled by default, due to the cost of tracking this information.
   }
   deriving (Show, Eq, NFData, Generic, Hashable)
 
@@ -441,8 +451,10 @@ defClashOpts
   , opt_timescalePrecision  = Period 100 Fs
   -- XXX: We probe environment variables until we've found a proper solution to
   --      https://github.com/clash-lang/clash-compiler/issues/2762.
-  , opt_ignoreBrokenGhcs        = unsafeLookupEnvBool "CLASH_IGNORE_BROKEN_GHCS" False
-  , opt_concurrentNormalization = False
+  , opt_ignoreBrokenGhcs               = unsafeLookupEnvBool "CLASH_IGNORE_BROKEN_GHCS" False
+  , opt_concurrentNormalization        = False
+  , opt_concurrentNormalizationTimeout = 120
+  , opt_concurrentNormalizationDebug   = False
   }
 
 -- | Synopsys Design Constraint (SDC) information for a component.

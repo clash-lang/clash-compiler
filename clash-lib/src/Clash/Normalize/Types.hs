@@ -56,10 +56,10 @@ data NormalizeState
 
 Lens.makeLenses ''NormalizeState
 
--- | State monad that stores specialisation and inlining information
-type NormalizeMonad = StateT NormalizeState IO
+-- | State monad that stores specialization and inlining information
+type NormalizeMonad m = StateT NormalizeState IO m
 
--- | RewriteSession with extra Normalisation information
+-- | RewriteSession with extra Normalization information
 type NormalizeSession = RewriteMonad NormalizeState
 
 -- | A 'Transform' action in the context of the 'RewriteMonad' and 'NormalizeMonad'

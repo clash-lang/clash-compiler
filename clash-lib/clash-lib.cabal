@@ -267,6 +267,7 @@ Library
                       Clash.Netlist.Util
 
                       Clash.Normalize
+                      Clash.Normalize.Locks
                       Clash.Normalize.PrimitiveReductions
                       Clash.Normalize.Primitives
                       Clash.Normalize.Strategy
