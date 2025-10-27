@@ -61,12 +61,12 @@ import           Clash.Core.Term                  (Term (..), collectArgsTicks
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type                  (isPolyTy)
-import           Clash.Core.Var                   (Id, varName, varType)
+import           Clash.Core.Var                   (Id, varName, varType, Var (varUniq))
 import           Clash.Core.VarEnv
   (VarEnv, VarSet, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv, emptyVarSet,
-   extendVarEnv, extendVarSet, lookupVarEnv, mapMaybeVarEnv,
-   mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv,
-   listToVarEnv, toListVarEnv)
+   extendVarSet, lookupVarEnv, mapMaybeVarEnv,
+   mkVarEnv, mkVarSet, notElemVarSet, nullVarEnv,
+   toListVarEnv)
 import           Clash.Debug                      (traceIf)
 import           Clash.Driver.Types
   (BindingMap, Binding(..), DebugOpts(..), ClashEnv(..))
@@ -232,9 +232,12 @@ normalize' nm pool = do
 
             toNormalize <-
               MVar.withMVar "normalized" normV $ \norm -> do
-                prevNorm <- listToVarEnv <$> traverse (\(k, v) -> (k,) . bindingId <$> MVar.readMVar "normalizedBinding" v) (toListVarEnv norm)
-                let toNormalize = filter (`notElemVarSet` topEnts)
-                                $ filter (`notElemVarEnv` extendVarEnv nm nm prevNorm) usedBndrs
+                let
+                  prevNormUniques = fst <$> toListVarEnv norm
+                  toNormalize = filter (`notElemVarSet` topEnts)
+                              $ filter (\b -> b /= nm)
+                              $ filter (\b -> varUniq b `elem` prevNormUniques)
+                              $ usedBndrs
                   in pure toNormalize
 
             s <- Lens.use uniqSupply
