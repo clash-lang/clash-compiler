@@ -34,7 +34,7 @@ module Clash.Normalize.Util
  where
 
 import           Control.Concurrent.Lifted (myThreadId)
-import qualified Control.Concurrent.MVar.Lifted as MVar
+import qualified Clash.Normalize.TracedMVar as MVar
 import           Control.Lens            ((&),(+~))
 import qualified Control.Lens            as Lens
 import           Data.Bifunctor          (bimap)
@@ -106,7 +106,7 @@ isConstantArg "Clash.Explicit.SimIO.mealyIO" i = pure (i == 2 || i == 3)
 isConstantArg nm i = do
   argMapV <- Lens.use (extra.primitiveArgs)
 
-  MVar.modifyMVar argMapV $ \argMap ->
+  MVar.modifyMVar "primitiveArgs" argMapV $ \argMap ->
     case Map.lookup nm argMap of
       Nothing -> do
         prims <- Lens.view primitives
@@ -146,7 +146,7 @@ alreadyInlined
 alreadyInlined f cf = do
   inlinedHMV <- Lens.use inlineHistory
 
-  MVar.withMVar inlinedHMV $ \inlinedHM ->
+  MVar.withMVar "inlineHistory" inlinedHMV $ \inlinedHM ->
     case lookupVarEnv cf inlinedHM of
       Nothing       -> return Nothing
       Just inlined' -> return (lookupVarEnv f inlined')
@@ -161,7 +161,7 @@ addNewInline
 addNewInline f cf = do
   inlineHistV <- Lens.use inlineHistory
 
-  MVar.modifyMVar_ inlineHistV $
+  MVar.modifyMVar_ "inlineHistory" inlineHistV $
     pure . extendVarEnvWith cf (unitVarEnv f 1) (\_ hm -> extendVarEnvWith f 1 (+) hm)
 
 -- | Test whether a given term represents a non-recursive global variable
@@ -181,12 +181,12 @@ isRecursiveBndr
 isRecursiveBndr f = do
   cgV <- Lens.use (extra.recursiveComponents)
 
-  MVar.modifyMVar cgV $ \cg ->
+  MVar.modifyMVar "recursiveComponents" cgV $ \cg ->
     case lookupVarEnv f cg of
       Just isR -> pure (cg, isR)
       Nothing -> do
         bindingsV <- Lens.use bindings
-        mBind <- MVar.withMVar bindingsV (pure . lookupVarEnv f)
+        mBind <- MVar.withMVar "bindings" bindingsV (pure . lookupVarEnv f)
 
         case mBind of
           Nothing -> pure (cg, False)
@@ -335,7 +335,7 @@ constantSpecInfo ctx e = do
       (var@(Var f), args, ticks) -> do
         curFunsV <- Lens.use curFun
         thread <- myThreadId
-        Just (curF, _) <- MVar.withMVar curFunsV (pure . HashMapS.lookup thread)
+        Just (curF, _) <- MVar.withMVar "curFun" curFunsV (pure . HashMapS.lookup thread)
         isNonRecGlobVar <- isNonRecursiveGlobalVar e
         if isNonRecGlobVar && f /= curF then do
           csr <- mergeCsrs ctx ticks e (mkApps var) args
@@ -427,14 +427,14 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = do
   -- for MVar, I unrolled everything. Maybe there should be MVar versions of
   -- the makeCachedX functions needed in normalization.
 
-  cache <- MVar.takeMVar normalizedV
+  cache <- MVar.takeMVar "normalized" normalizedV
   case lookupVarEnv nm cache of
     Just vMVar -> do
-      MVar.putMVar normalizedV cache
-      MVar.readMVar vMVar
+      MVar.putMVar "normalized" normalizedV cache
+      MVar.readMVar "normalizedBinding" vMVar
     Nothing -> do
-      tmp <- MVar.newEmptyMVar
-      MVar.putMVar normalizedV (extendVarEnv nm tmp cache)
+      tmp <- MVar.newEmptyMVar "normalizedTmp"
+      MVar.putMVar "normalized" normalizedV (extendVarEnv nm tmp cache)
 
       tcm <- Lens.view tcCache
       let nmS = showPpr (varName nm)
@@ -448,15 +448,15 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = do
       -- TODO Should tm3 be done async / added to the job queue when it's made?
       curFunsV <- Lens.use curFun
       thread <- myThreadId
-      old <- MVar.withMVar curFunsV (pure . HashMapS.lookup thread)
+      old <- MVar.withMVar "curFun" curFunsV (pure . HashMapS.lookup thread)
       tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
-      MVar.modifyMVar_ curFunsV $
+      MVar.modifyMVar_ "curFun" curFunsV $
         pure . HashMapS.insert thread (fromMaybe (error $ $(curLoc) ++ "Report as bug: no curFun", noSrcSpan) old)
       let ty' = inferCoreTypeOf tcm tm3
       let r' = nm' `globalIdOccursIn` tm3
       let value = Binding nm'{varType = ty'} sp inl pr tm3 r'
 
-      MVar.putMVar tmp value
+      MVar.putMVar "normalizedTmp" tmp value
       pure value
 
 -- | Turn type equality constraints into substitutions and apply them.
@@ -530,17 +530,17 @@ rewriteExpr :: (String,NormRewrite) -- ^ Transformation to apply
 rewriteExpr (nrwS,nrw) (bndrS,expr) (nm, sp) = do
   curFunsV <- Lens.use curFun
   thread <- myThreadId
-  MVar.modifyMVar_ curFunsV (pure . HashMapS.insert thread (nm, sp))
+  MVar.modifyMVar_ "curFun" curFunsV (pure . HashMapS.insert thread (nm, sp))
   opts <- Lens.view debugOpts
   ioLockV <- Lens.use ioLock
 
-  MVar.withMVar ioLockV $ \() ->
+  MVar.withMVar "ioLock" ioLockV $ \() ->
     traceWhen (hasTransformationInfo FinalTerm opts)
       (bndrS ++ " before " ++ nrwS ++ ":\n\n" ++ showPpr expr ++ "\n")
 
   rewritten <- runRewrite nrwS emptyInScopeSet nrw expr
 
-  MVar.withMVar ioLockV $ \() ->
+  MVar.withMVar "ioLock" ioLockV $ \() ->
     traceWhen (hasTransformationInfo FinalTerm opts)
       (bndrS ++ " after " ++ nrwS ++ ":\n\n" ++ showPpr rewritten ++ "\n")
 

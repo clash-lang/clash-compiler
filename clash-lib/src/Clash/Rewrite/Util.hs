@@ -25,7 +25,7 @@ module Clash.Rewrite.Util
   ) where
 
 import           Control.Concurrent.Lifted (myThreadId)
-import qualified Control.Concurrent.MVar.Lifted as MVar
+import qualified Clash.Normalize.TracedMVar as MVar
 import           Control.DeepSeq
 import           Control.Exception           (throw)
 import           Control.Lens ((^.))
@@ -154,7 +154,7 @@ apply = \s rewrite ctx expr0 -> do
   opts <- Lens.view debugOpts
   ioLockV <- Lens.use ioLock
 
-  MVar.withMVar ioLockV $ \() ->
+  MVar.withMVar "ioLock" ioLockV $ \() ->
     traceWhen (hasDebugInfo TryName s opts) ("Trying: " <> s)
 
   (!expr1,anyChanged) <- Writer.listen (rewrite ctx expr0)
@@ -162,7 +162,7 @@ apply = \s rewrite ctx expr0 -> do
 
   Monad.when hasChanged $ do
     countersV <- Lens.use transformCounters
-    MVar.modifyMVar_ countersV (pure . force . HashMap.insertWith (const succ) (Text.pack s) 1)
+    MVar.modifyMVar_ "transformCounters" countersV (pure . force . HashMap.insertWith (const succ) (Text.pack s) 1)
 
   -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
   let rewriteHistFile = dbg_historyFile opts
@@ -170,13 +170,13 @@ apply = \s rewrite ctx expr0 -> do
     thread <- myThreadId
     curFunsV <- Lens.use curFun
 
-    MVar.withMVar curFunsV $ \curFuns ->
+    MVar.withMVar "curFun" curFunsV $ \curFuns ->
       case fst <$> HashMap.lookup thread curFuns of
         Just curBndr ->
           -- TODO Although we're locking access to the history file, entries
           -- may still be written to it interleaved by entity. I'm not sure if
           -- clash-term can handle this correctly...
-          MVar.withMVar ioLockV $ \() ->
+          MVar.withMVar "ioLock" ioLockV $ \() ->
             Monad.liftIO
               . BS.appendFile (fromJust rewriteHistFile)
               . BL.toStrict
@@ -194,7 +194,7 @@ apply = \s rewrite ctx expr0 -> do
   if isDebugging opts
     then do
       countersV <- Lens.use transformCounters
-      nTrans <- sum <$> MVar.readMVar countersV
+      nTrans <- sum <$> MVar.readMVar "transformCounters" countersV
       applyDebug ctx s expr0 hasChanged expr1 nTrans
     else return expr1
 {-# INLINE apply #-}
@@ -227,7 +227,7 @@ applyDebug ctx name exprOld hasChanged exprNew nTrans = do
   go nTrans' opts = do
     ioLockV <- Lens.use ioLock
 
-    MVar.withMVar ioLockV $ \() ->
+    MVar.withMVar "ioLock" ioLockV $ \() ->
       traceWhen (hasDebugInfo TryTerm name opts) ("Tried: " ++ name ++ " on:\n" ++ before)
 
     Monad.when (dbg_invariants opts && hasChanged) $ do
@@ -284,7 +284,7 @@ applyDebug ctx name exprOld hasChanged exprNew nTrans = do
       error $ $(curLoc) ++ "Expression changed without notice(" ++ name ++  "): before"
                         ++ before ++ "\nafter:\n" ++ after
 
-    MVar.withMVar ioLockV $ \() -> do
+    MVar.withMVar "ioLock" ioLockV $ \() -> do
       traceWhen (hasDebugInfo AppliedName name opts && hasChanged) (name <> " {" <> show nTrans' <> "}")
       traceWhen (hasDebugInfo AppliedTerm name opts && hasChanged)
         ("Changes when applying rewrite to:\n" ++ before ++ "\nResult:\n" ++ after ++ "\n")
@@ -326,8 +326,8 @@ runRewriteSession :: RewriteEnv
                   -> IO a
 runRewriteSession r s m = do
   (a, s', _) <- runR m r s
-  MVar.withMVar (s' ^. transformCounters) $ \counters -> do
-    MVar.withMVar (s' ^. ioLock) $ \() -> do
+  MVar.withMVar "transformCounters" (s' ^. transformCounters) $ \counters -> do
+    MVar.withMVar "ioLock" (s' ^. ioLock) $ \() -> do
       traceWhen (dbg_countTransformations (opt_debug (envOpts (_clashEnv r))))
         ("Clash: Transformations:\n" ++ Text.unpack (showCounters counters))
       traceWhen (None < dbg_transformationInfo (opt_debug (envOpts (_clashEnv r))))
@@ -541,7 +541,7 @@ liftAndSubsituteBinders inScope toLift toKeep body = do
     if x `elemFreeVars` e2 then do
       curFunsV <- Lens.use curFun
       thread <- myThreadId
-      Just (_,sp) <- MVar.withMVar curFunsV (pure . HashMap.lookup thread)
+      Just (_,sp) <- MVar.withMVar "curFun" curFunsV (pure . HashMap.lookup thread)
       throw (ClashException sp [I.i|
         Internal error: inlineOrLiftBInders failed on:
 
@@ -622,9 +622,9 @@ liftBinding (var@Id {varName = idName} ,e) = do
   let newBodyTy = inferCoreTypeOf tcm $ mkTyLams (mkLams e boundFVs) boundFTVs
   curFunsV <- Lens.use curFun
   thread <- myThreadId
-  Just (cf,sp) <- MVar.withMVar curFunsV (pure . HashMap.lookup thread)
+  Just (cf,sp) <- MVar.withMVar "curFun" curFunsV (pure . HashMap.lookup thread)
   bindersV <- Lens.use bindings
-  binders <- MVar.takeMVar bindersV
+  binders <- MVar.takeMVar "bindings" bindersV
   newBodyNm <-
     cloneNameWithBindingMap
       binders
@@ -651,7 +651,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
     -- If it doesn't, create a new binder
     [] -> do -- Add the created function to the list of global bindings
              let r = newBodyId `globalIdOccursIn` newBody
-             MVar.putMVar bindersV $
+             MVar.putMVar "bindings" bindersV $
                UniqMap.insert
                  newBodyNm
                  -- We mark this function as internal so that it can be inlined
@@ -673,7 +673,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
                       (mkTyApps (Var $ bindingId b)
                                 (map VarTy boundFTVs))
                       (map Var boundFVs)
-      MVar.putMVar bindersV binders
+      MVar.putMVar "bindings" bindersV binders
       return (var, newExpr')
 
 liftBinding _ = error $ $(curLoc) ++ "liftBinding: invalid core, expr bound to tyvar"
@@ -693,7 +693,7 @@ mkFunction bndrNm sp inl body = do
   let bodyTy = inferCoreTypeOf tcm body
   bindersV <- Lens.use bindings
 
-  MVar.modifyMVar bindersV $ \binders -> do
+  MVar.modifyMVar "bindings" bindersV $ \binders -> do
     bodyNm <- cloneNameWithBindingMap binders bndrNm
     let vId = mkGlobalId bodyTy bodyNm
         r = vId `globalIdOccursIn` body
@@ -783,8 +783,8 @@ whnfRW isSubj (TransformContext is0 hist) e0 rw = do
   ids <- Lens.use uniqSupply
   ghV <- Lens.use globalHeap
 
-  bndrs <- MVar.takeMVar bndrsV
-  gh <- MVar.takeMVar ghV
+  bndrs <- MVar.takeMVar "bindings" bndrsV
+  gh <- MVar.takeMVar "globalHeap" ghV
 
   let (ids1,ids2) = splitSupply ids
   uniqSupply Lens..= ids2
@@ -793,8 +793,8 @@ whnfRW isSubj (TransformContext is0 hist) e0 rw = do
   case whnf' eval bndrs lh tcm gh ids1 is0 isSubj e0 of
     (!gh1,ph,v) -> do
       let result = bindPureHeap tcm bndrs (ph `differenceVarEnv` lh) v
-      MVar.putMVar bndrsV bndrs
-      MVar.putMVar ghV gh1
+      MVar.putMVar "bindings" bndrsV bndrs
+      MVar.putMVar "globalHeap" ghV gh1
       result
  where
   localBinders acc [] = acc

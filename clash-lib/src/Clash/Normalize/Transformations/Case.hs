@@ -26,7 +26,7 @@ module Clash.Normalize.Transformations.Case
   , elimExistentials
   ) where
 
-import qualified Control.Concurrent.MVar.Lifted as MVar
+import qualified Clash.Normalize.TracedMVar as MVar
 import qualified Control.Lens as Lens
 import Control.Exception.Base (patError)
 import Control.Monad.State.Strict (evalState)
@@ -248,7 +248,7 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- the circuit larger than needed if we were to duplicate that argument.
       newBinder (isN0, substN) (x, arg) = do
         bindingsV <- Lens.use bindings
-        wf <- MVar.withMVar bindingsV (\bndrs -> isWorkFree workFreeBinders bndrs arg)
+        wf <- MVar.withMVar "bindings" bindingsV (\bndrs -> isWorkFree workFreeBinders bndrs arg)
         case wf of
           True -> pure ((isN0, (x, arg):substN), Nothing)
           False ->
@@ -330,7 +330,7 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
             ioLockV <- Lens.use ioLock
             -- When invariants are being checked, report missing evaluation
             -- rules for the primitive evaluator.
-            MVar.withMVar ioLockV $ \() ->
+            MVar.withMVar "ioLock" ioLockV $ \() ->
               traceIf (dbg_invariants opts && isConstant subj)
                 ("Unmatchable constant as case subject: " ++ showPpr subj ++
                    "\nWHNF is: " ++ showPpr subj1)

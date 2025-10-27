@@ -29,7 +29,7 @@ module Clash.Normalize.Transformations.Specialize
 
 import Control.Arrow ((***), (&&&))
 import Control.Concurrent.Lifted (myThreadId)
-import qualified Control.Concurrent.MVar.Lifted as MVar
+import qualified Clash.Normalize.TracedMVar as MVar
 import Control.DeepSeq (deepseq)
 import Control.Exception (throw)
 import qualified Control.Lens as Lens
@@ -207,7 +207,7 @@ appProp ctx@(TransformContext is _) = \case
   go is0 (Lam v e) (Left arg:args) ticks = do
     setChanged
     bndrsV <- Lens.use bindings
-    wf <- MVar.withMVar bndrsV (\bndrs -> isWorkFree workFreeBinders bndrs arg)
+    wf <- MVar.withMVar "bindings" bndrsV (\bndrs -> isWorkFree workFreeBinders bndrs arg)
 
     case isVar arg || wf of
       True ->
@@ -274,7 +274,7 @@ appProp ctx@(TransformContext is _) = \case
     let argTy = inferCoreTypeOf tcm arg
         ty1   = applyFunTy tcm ty0 argTy
     bndrsV <- Lens.use bindings
-    wf <- MVar.withMVar bndrsV (\bndrs -> isWorkFree workFreeBinders bndrs arg)
+    wf <- MVar.withMVar "bindings" bndrsV (\bndrs -> isWorkFree workFreeBinders bndrs arg)
 
     case isVar arg || wf of
       True -> do
@@ -391,12 +391,12 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
   then
     case specArgIn of
       Left _ -> do
-        MVar.withMVar ioLockV $ \() ->
+        MVar.withMVar "ioLock" ioLockV $ \() ->
           traceM ("Not specializing TopEntity: " ++ showPpr (varName f))
 
         return e
       Right tyArg -> do
-        MVar.withMVar ioLockV $ \() ->
+        MVar.withMVar "ioLock" ioLockV $ \() ->
           traceWhen (hasTransformationInfo AppliedTerm opts)
             ("Dropping type application on TopEntity: " ++ showPpr (varName f) ++ "\ntype:\n" ++ showPpr tyArg)
         -- TopEntities aren't allowed to be semantically polymorphic.
@@ -421,7 +421,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
       specAbs = either (Left . stripAllTicks . (`mkAbstraction` specBndrs)) (Right . id) specArg
   -- Determine if 'f' has already been specialized on (a type-normalized) 'specArg'
   cacheV <- Lens.use (extra.specialisationCache)
-  specM <- MVar.withMVar cacheV $ \cache -> pure $ Map.lookup (f,argLen,specAbs) cache
+  specM <- MVar.withMVar "specialisationCache" cacheV $ \cache -> pure $ Map.lookup (f,argLen,specAbs) cache
   case specM of
     -- Use previously specialized function
     Just f' ->
@@ -433,12 +433,12 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
     Nothing -> do
       -- Determine if we can specialize f
       bndrsV <- Lens.use bindings
-      bodyMaybe <- MVar.withMVar bndrsV $ \bndrs -> pure $ UniqMap.lookup f bndrs
+      bodyMaybe <- MVar.withMVar "bindings" bndrsV $ \bndrs -> pure $ UniqMap.lookup f bndrs
       case bodyMaybe of
         Just (Binding _ sp inl _ bodyTm _) -> do
           -- Determine if we see a sequence of specializations on a growing argument
           histV <- Lens.use (extra.specialisationHistory)
-          specHistM <- MVar.withMVar histV $ \hist -> pure $ UniqMap.lookup f hist
+          specHistM <- MVar.withMVar "specialisationHistory" histV $ \hist -> pure $ UniqMap.lookup f hist
           specLim   <- Lens.view specializationLimit
           if maybe False (> specLim) specHistM
             then throw (ClashException
@@ -492,7 +492,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
                       -- of functions with a Synthesize annotation, as that would
                       -- duplicate Clash compiler work. See also issue #3024
                       bndrsV2 <- Lens.use bindings
-                      gTmM <- MVar.withMVar bndrsV2 $ \bndrs -> pure $ UniqMap.lookup g bndrs
+                      gTmM <- MVar.withMVar "bindings" bndrsV2 $ \bndrs -> pure $ UniqMap.lookup g bndrs
                       let gBody = if g `elemVarSet` topEnts then
                                     Nothing
                                   else
@@ -508,8 +508,8 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
               let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg'])) (boundArgs ++ specBndrs)
               newf <- mkFunction newName sp inl' newBody
               -- Remember specialization
-              MVar.modifyMVar_ histV $ \hist -> pure $ UniqMap.insertWith (+) f 1 hist
-              MVar.modifyMVar_ cacheV $ \cache -> pure $ Map.insert (f,argLen,specAbs) newf cache
+              MVar.modifyMVar_ "specialisationHistory" histV $ \hist -> pure $ UniqMap.insertWith (+) f 1 hist
+              MVar.modifyMVar_ "specialisationCache" cacheV $ \cache -> pure $ Map.insert (f,argLen,specAbs) newf cache
               -- use specialized function
               let newExpr = mkApps (mkTicks (Var newf) ticks) (args ++ specVars)
               newf `deepseq` changed newExpr
@@ -557,12 +557,12 @@ specialize' _ctx _ (appE,args,ticks) (Left specArg) = do
   -- See if there's an existing binder that's alpha-equivalent to the
   -- specialized function
   bndrsV3 <- Lens.use bindings
-  existing <- MVar.withMVar bndrsV3 $ \bndrs -> pure $ UniqMap.filter ((`aeqTerm` newBody) . bindingTerm) bndrs
+  existing <- MVar.withMVar "bindings" bndrsV3 $ \bndrs -> pure $ UniqMap.filter ((`aeqTerm` newBody) . bindingTerm) bndrs
   -- Create a new function if an alpha-equivalent binder doesn't exist
   newf <- case UniqMap.elems existing of
     [] -> do curFunsV <- Lens.use curFun
              thread <- myThreadId
-             Just (cf,sp) <- MVar.withMVar curFunsV (pure . HashMap.lookup thread)
+             Just (cf,sp) <- MVar.withMVar "curFun" curFunsV (pure . HashMap.lookup thread)
 #if MIN_VERSION_ghc(9,2,0)
              mkFunction (appendToName (varName cf) "_specF") sp NoUserInlinePrag newBody
 #else
@@ -660,7 +660,7 @@ nonRepSpec ctx e@(App e1 e2)
       | (Var f,fArgs,ticks) <- collectArgsTicks app
       = do
         bndrsV <- Lens.use bindings
-        fTmM <- MVar.withMVar bndrsV (pure . lookupVarEnv f)
+        fTmM <- MVar.withMVar "bindings" bndrsV (pure . lookupVarEnv f)
         case fTmM of
           Just b
             | nameSort (varName (bindingId b)) == Internal

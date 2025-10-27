@@ -10,7 +10,7 @@ module Clash.Normalize.Transformations.Cast
   ) where
 
 import Control.Concurrent.Lifted (myThreadId)
-import qualified Control.Concurrent.MVar.Lifted as MVar
+import qualified Clash.Normalize.TracedMVar as MVar
 import Control.Exception (throw)
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad (when)
@@ -63,12 +63,12 @@ argCastSpec ctx e@(App f (stripTicks -> Cast e' _ _))
  , (Var g, _) <- collectArgs f
  , isGlobalId g = do
   bndrsV <- Lens.use bindings
-  wf <- MVar.withMVar bndrsV (\bndrs -> isWorkFree workFreeBinders bndrs e')
+  wf <- MVar.withMVar "bindings" bndrsV (\bndrs -> isWorkFree workFreeBinders bndrs e')
 
   ioLockV <- Lens.use ioLock
 
   Monad.when (not wf) $
-    MVar.withMVar ioLockV $ \() -> traceM warn
+    MVar.withMVar "ioLock" ioLockV $ \() -> traceM warn
 
   specialize ctx e
  where
@@ -107,7 +107,7 @@ elimCastCast _ c@(Cast (stripTicks -> Cast e tyA tyB) tyB' tyC) = do
   where throwError = do
           curFunsV <- Lens.use curFun
           thread <- myThreadId
-          Just (nm,sp) <- MVar.withMVar curFunsV (pure . HashMap.lookup thread)
+          Just (nm,sp) <- MVar.withMVar "curFun" curFunsV (pure . HashMap.lookup thread)
           throw (ClashException sp ($(curLoc) ++ showPpr nm
                   ++ ": Found 2 nested casts whose types don't line up:\n"
                   ++ showPpr c)

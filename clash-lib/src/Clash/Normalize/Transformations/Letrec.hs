@@ -24,7 +24,7 @@ module Clash.Normalize.Transformations.Letrec
   ) where
 
 import Control.Concurrent.Lifted (myThreadId)
-import qualified Control.Concurrent.MVar.Lifted as MVar
+import qualified Clash.Normalize.TracedMVar as MVar
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
 import Control.Monad.Trans.Except (runExcept)
@@ -204,7 +204,7 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
     case binds1 of
       [(_,e1)] -> do
         bndrsV <- Lens.use bindings
-        MVar.withMVar bndrsV (\bndrs ->isWorkFree workFreeBinders bndrs e1)
+        MVar.withMVar "bindings" bndrsV (\bndrs ->isWorkFree workFreeBinders bndrs e1)
 
       _ -> pure (error "flattenLet: unreachable")
 
@@ -248,7 +248,7 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
         case binds2 of
           [(_,e2)] -> do
             bndrsV <- Lens.use bindings
-            MVar.withMVar bndrsV (\bndrs ->isWorkFree workFreeBinders bndrs e2)
+            MVar.withMVar "bindings" bndrsV (\bndrs ->isWorkFree workFreeBinders bndrs e2)
 
           _ -> pure (error "flattenLet: unreachable")
 
@@ -282,7 +282,7 @@ recToLetRec :: HasCallStack => NormRewrite
 recToLetRec (TransformContext is0 []) e = do
   curFunsV <- Lens.use curFun
   thread <- myThreadId
-  Just (fn,_) <- MVar.withMVar curFunsV (pure . HashMapS.lookup thread)
+  Just (fn,_) <- MVar.withMVar "curFun" curFunsV (pure . HashMapS.lookup thread)
   tcm    <- Lens.view tcCache
   case splitNormalized tcm e of
     Right (args,bndrs,res) -> do

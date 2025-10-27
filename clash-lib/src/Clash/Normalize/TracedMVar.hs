@@ -1,7 +1,5 @@
 {-|
-Copyright  :  (C) 2012-2016, University of Twente,
-                  2016-2019, Myrtle Software Ltd,
-                  2017-2023, QBayLogic B.V., Google Inc.
+Copyright  :  (C) 2025 Martijn Bastiaan
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -14,21 +12,14 @@ to provide detailed tracing information about MVar operations.
 {-# LANGUAGE QuasiQuotes #-}
 
 module Clash.Normalize.TracedMVar
-  ( -- * MVar type
-    MVar
-    -- * Creating MVars
+  ( MVar
   , newEmptyMVar
   , newMVar
-    -- * Taking from MVars
   , takeMVar
-    -- * Putting to MVars
   , putMVar
-    -- * Reading from MVars
   , readMVar
-    -- * Modifying MVars
   , modifyMVar
   , modifyMVar_
-    -- * With MVar operations
   , withMVar
   ) where
 
@@ -64,9 +55,7 @@ trace :: (HasCallStack, MonadBase IO m) => String -> String -> m ()
 trace lockName event = do
   when traceEnabled $ do
     threadId <- Concurrent.myThreadId
-    liftBase $ hPutStrLn stderr [I.i|
-      [TracedMVar][#{threadId}][#{lockName}] #{event} #{callSite}
-    |]
+    liftBase $ hPutStrLn stderr [I.i|[TracedMVar][#{threadId}][#{lockName}] #{event} #{callSite}|]
 
 -- | Trace when trying to acquire a lock
 traceTry :: (HasCallStack, MonadBase IO m) => String -> m ()

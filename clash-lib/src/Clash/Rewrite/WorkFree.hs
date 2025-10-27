@@ -23,7 +23,7 @@ module Clash.Rewrite.WorkFree
   ) where
 
 import Control.Concurrent.MVar (MVar)
-import qualified Control.Concurrent.MVar.Lifted as MVar
+import qualified Clash.Normalize.TracedMVar as MVar
 import Control.Lens as Lens (Lens', use)
 import Control.Monad.State.Class (MonadState)
 import Control.Monad.Trans.Control (MonadBaseControl)
@@ -55,7 +55,7 @@ isWorkFree
   -> m Bool
 isWorkFree cacheL bndrs bndr = do
   lock <- Lens.use cacheL
-  MVar.modifyMVar lock (\cache -> pure (isWorkFreePure cache bndrs bndr))
+  MVar.modifyMVar "workFreeBinders" lock (\cache -> pure (isWorkFreePure cache bndrs bndr))
 
 -- | Determines whether a global binder is work free. Errors if binder does
 -- not exist.

@@ -37,7 +37,7 @@ module Clash.Normalize.Transformations.DEC
   ( disjointExpressionConsolidation
   ) where
 
-import qualified Control.Concurrent.MVar.Lifted as MVar
+import qualified Clash.Normalize.TracedMVar as MVar
 import           Control.Lens ((^.), _1)
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
@@ -341,8 +341,8 @@ collectGlobals is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), ti
     ghV <- Lens.use globalHeap
 
     eval <-
-      MVar.withMVar bndrsV $ \bndrs ->
-        MVar.withMVar ghV $ \gh ->
+      MVar.withMVar "bindings" bndrsV $ \bndrs ->
+        MVar.withMVar "globalHeap" ghV $ \gh ->
           pure $ (Lens.view Lens._3) . whnf' evaluate bndrs mempty tcm gh ids1 is0 False
 
     let eTy  = inferCoreTypeOf tcm e

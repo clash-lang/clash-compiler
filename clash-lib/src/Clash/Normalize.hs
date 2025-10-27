@@ -18,8 +18,8 @@
 module Clash.Normalize where
 
 import           Control.Concurrent.Lifted        (myThreadId)
-import           Control.Concurrent.MVar.Lifted (MVar)
-import qualified Control.Concurrent.MVar.Lifted as MVar
+import           Control.Concurrent.MVar (MVar)
+import qualified Clash.Normalize.TracedMVar as MVar
 import qualified Control.Concurrent.Workhorse.Lifted as Workhorse
 import           Control.Exception                (throw)
 import qualified Control.Lens                     as Lens
@@ -120,21 +120,21 @@ runNormalization
   -> IO a
 runNormalization env supply globals typeTrans peEval eval rcsMap lock entities session = do
   normState <- NormalizeState
-    <$> MVar.newMVar emptyVarEnv
-    <*> MVar.newMVar Map.empty
-    <*> MVar.newMVar emptyVarEnv
-    <*> MVar.newMVar emptyVarEnv
-    <*> MVar.newMVar Map.empty
-    <*> MVar.newMVar rcsMap
+    <$> MVar.newMVar "normalized" emptyVarEnv
+    <*> MVar.newMVar "specialisationHistory" Map.empty
+    <*> MVar.newMVar "specialisationCache" emptyVarEnv
+    <*> MVar.newMVar "inlineHistory" emptyVarEnv
+    <*> MVar.newMVar "inlineCache" Map.empty
+    <*> MVar.newMVar "recursiveComponents" rcsMap
 
   rwState <- RewriteState
-    <$> MVar.newMVar mempty
-    <*> MVar.newMVar globals
+    <$> MVar.newMVar "bindings" mempty
+    <*> MVar.newMVar "globals" globals
     <*> pure supply
-    <*> MVar.newMVar HashMap.empty
-    <*> MVar.newMVar 0
-    <*> MVar.newMVar (mempty, 0)
-    <*> MVar.newMVar emptyVarEnv
+    <*> MVar.newMVar "transformCounters" HashMap.empty
+    <*> MVar.newMVar "globalHeapIdCounter" 0
+    <*> MVar.newMVar "workFreeBinders" (mempty, 0)
+    <*> MVar.newMVar "curFun" emptyVarEnv
     <*> pure lock
     <*> pure normState
 
@@ -154,11 +154,11 @@ supplies n s = let (s0', s1') = splitSupply s in s0' : supplies (n-1) s1'
 
 normalize :: [Id] -> NormalizeSession BindingMap
 normalize tops = do
-  binds <- MVar.newMVar (emptyVarSet, [])
+  binds <- MVar.newMVar "normalizeBinds" (emptyVarSet, [])
   uniq0 <- Lens.use uniqSupply
   let ss = supplies (length tops) uniq0
   Workhorse.doConcurrently_ (normalizeStep binds) (zip tops ss)
-  mkVarEnv . snd <$> MVar.readMVar binds
+  mkVarEnv . snd <$> MVar.readMVar "normalizeBinds" binds
 
 normalizeStep
     :: MVar (VarSet, [(Id, Binding Term)])
@@ -169,7 +169,7 @@ normalizeStep binds pool (id', s) = do
   uniqSupply Lens..= s
   threadId <- myThreadId
   Monad.liftIO $ print$ ("Work!" :: String, threadId)
-  work <- MVar.modifyMVar binds $ \(orig@(bound, pairs)) ->
+  work <- MVar.modifyMVar "normalizeBinds" binds $ \(orig@(bound, pairs)) ->
     if id' `elemVarSet` bound
     then pure (orig, pure ())
     else pure
@@ -178,7 +178,7 @@ normalizeStep binds pool (id', s) = do
           Monad.liftIO $ print  $ ("normalize'" :: String, threadId, varName id')
           pair <- normalize' id' pool
           Monad.liftIO $ print  $ ("normalize' done" :: String, threadId, varName id')
-          MVar.modifyMVar_ binds (pure . second (pair:))
+          MVar.modifyMVar_ "normalizeBinds" binds (pure . second (pair:))
       )
 
   work
@@ -189,7 +189,7 @@ normalize' ::
   NormalizeSession (Id, Binding Term)
 normalize' nm pool = do
   bndrsV <- Lens.use bindings
-  exprM <- MVar.withMVar bndrsV (pure . lookupVarEnv nm)
+  exprM <- MVar.withMVar "bindings" bndrsV (pure . lookupVarEnv nm)
   let nmS = showPpr (varName nm)
   case exprM of
     Just (Binding nm' sp inl pr tm r) -> do
@@ -231,8 +231,8 @@ normalize' nm pool = do
             normV <- Lens.use (extra.normalized)
 
             toNormalize <-
-              MVar.withMVar normV $ \norm -> do
-                prevNorm <- listToVarEnv <$> traverse (\(k, v) -> (k,) . bindingId <$> MVar.readMVar v) (toListVarEnv norm)
+              MVar.withMVar "normalized" normV $ \norm -> do
+                prevNorm <- listToVarEnv <$> traverse (\(k, v) -> (k,) . bindingId <$> MVar.readMVar "normalizedBinding" v) (toListVarEnv norm)
                 let toNormalize = filter (`notElemVarSet` topEnts)
                                 $ filter (`notElemVarEnv` extendVarEnv nm nm prevNorm) usedBndrs
                   in pure toNormalize
@@ -399,7 +399,7 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
       when (Maybe.isJust rewriteHistFile) $ do
         lock <- Lens.use ioLock
 
-        MVar.withMVar lock $ \() ->
+        MVar.withMVar "ioLock" lock $ \() ->
           Monad.liftIO
             . BS.appendFile (Maybe.fromJust rewriteHistFile)
             . BL.toStrict
