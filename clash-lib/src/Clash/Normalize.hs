@@ -61,12 +61,11 @@ import           Clash.Core.Term                  (Term (..), collectArgsTicks
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type                  (isPolyTy)
-import           Clash.Core.Var                   (Id, varName, varType, Var (varUniq))
+import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
   (VarEnv, VarSet, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv, emptyVarSet,
    extendVarSet, lookupVarEnv, mapMaybeVarEnv,
-   mkVarEnv, mkVarSet, notElemVarSet, nullVarEnv,
-   toListVarEnv)
+   mkVarEnv, mkVarSet, nullVarEnv)
 import           Clash.Debug                      (traceIf)
 import           Clash.Driver.Types
   (BindingMap, Binding(..), DebugOpts(..), ClashEnv(..))
@@ -81,7 +80,7 @@ import           Clash.Normalize.Util
 import           Clash.Rewrite.Combinators
   ((>->), (!->), bottomupR, repeatR, topdownR)
 import           Clash.Rewrite.Types
-  (RewriteEnv (..), RewriteState (..), bindings, debugOpts, extra, uniqSupply,
+  (RewriteEnv (..), RewriteState (..), bindings, debugOpts, uniqSupply,
    tcCache, topEntities, newInlineStrategy, ioLock)
 import           Clash.Rewrite.Util
   (apply, isUntranslatableType, runRewriteSession)
@@ -228,21 +227,9 @@ normalize' nm pool = do
                             , showPpr (bindingTerm tmNorm) ])
                     (return ())
 
-            normV <- Lens.use (extra.normalized)
-
-            toNormalize <-
-              MVar.withMVar "normalized" normV $ \norm -> do
-                let
-                  prevNormUniques = fst <$> toListVarEnv norm
-                  toNormalize = filter (`notElemVarSet` topEnts)
-                              $ filter (\b -> b /= nm)
-                              $ filter (\b -> varUniq b `elem` prevNormUniques)
-                              $ usedBndrs
-                  in pure toNormalize
-
             s <- Lens.use uniqSupply
-            let ss = supplies (length toNormalize) s
-            mapM_ (Workhorse.addWork pool) (zip toNormalize ss)
+            let ss = supplies (length usedBndrs) s
+            mapM_ (Workhorse.addWork pool) (zip usedBndrs ss)
 
             pure (nm, tmNorm)
          else
