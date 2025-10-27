@@ -270,6 +270,7 @@ Library
                       Clash.Normalize.PrimitiveReductions
                       Clash.Normalize.Primitives
                       Clash.Normalize.Strategy
+                      Clash.Normalize.TracedMVar
                       Clash.Normalize.Transformations
                       Clash.Normalize.Transformations.ANF
                       Clash.Normalize.Transformations.Case
