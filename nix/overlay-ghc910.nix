@@ -59,7 +59,7 @@ in
 
   singletons-th = prev.singletons-th_3_4;
 
-  # nixplgs doesn't include revision 1, changing dependency on template-haskell.
+  # nixpkgs doesn't include revision 1, changing dependency on template-haskell.
   string-interpolate = pkgs.haskell.lib.compose.overrideCabal (drv: {
     revision = "1";
     editedCabalFile = "sha256-oh0tR+LDFcVzQnm4kSrmhAU+P7wdai536d72Cvhzipg=";

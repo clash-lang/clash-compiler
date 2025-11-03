@@ -78,9 +78,30 @@ let
         });
 
       clash-cores =
-        hprev.callCabal2nixWithOptions "clash-cores" ../clash-cores "--flag nix" {
-          inherit (hfinal) clash-prelude;
-        };
+        let
+          # Remove the -fplugin and Setup.hs settings in the .cabal
+          # For ghc9101+ these options don't matter, but for ghc964 and ghc982 this breaks installation
+          # When entering the installPhase something (I'm not entirely sure what) goes wrong
+          # between Nix and GHC, causing Setup.hs to get invoked with the wrong set of packages
+          # (I think?). Removing the specific flags during installation fixes the issue for Nix,
+          # whilst not breaking regular compilation.
+          #
+          # Do note that this patch only gets applied during *installation* and not *compilation*
+          # That means these flags are still in place during compilation
+          override-attrs = if compilerVersion == "ghc964" || compilerVersion == "ghc982" then
+              fAttr: pAttr: {
+                preInstall = pAttr.preInstall or "" + ''
+                  sed -i "/-fplugin GHC.TypeLits.Extra.Solver/,+2d" clash-cores.cabal
+                '';
+              }
+            else
+              {};
+
+          cores = hprev.callCabal2nixWithOptions "clash-cores" ../clash-cores "--flag nix" {
+            inherit (hfinal) clash-prelude;
+          };
+        in
+          cores.overrideAttrs override-attrs;
 
       clash-cosim =
         let
@@ -194,7 +215,7 @@ let
               "clash-testsuite"
               ../tests
               "--flag workaround-ghc-mmap-crash" {
-              inherit (hfinal) clash-ghc clash-lib clash-prelude;
+              inherit (hfinal) clash-cores clash-ghc clash-lib clash-prelude;
             };
         in
         unmodified.overrideAttrs (old: {

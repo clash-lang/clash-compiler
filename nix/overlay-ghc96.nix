@@ -8,9 +8,10 @@ in
   # is basically abandonware it catches fire with brick 1.0+.
   brick = doJailbreak prev.brick_0_70_1;
 
+  # brick 0.70.1 requires vty < 6.0.
   vty = prev.callHackage "vty" "5.39" { };
 
-  # Marked as broken in nixpkgs, since it needs on a newer hashable than the
+  # Marked as broken in nixpkgs, since it needs a newer hashable than the
   # .cabal file currently uploaded to hackage.
   concurrent-supply = doJailbreak (markUnbroken prev.concurrent-supply);
 

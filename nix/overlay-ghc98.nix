@@ -30,7 +30,7 @@ in
     sha256 = "sha256-irLM3aVMxpBgsM72ArulMXcoLY2glalVkG//Lrj2JBI=";
   }) {};
 
-  # This version of tasty isn't available in the nix ghc96 package set
+  # This version of tasty isn't available in the nix ghc98 package set
   tasty = prev.callHackageDirect {
     pkg = "tasty";
     ver = "1.5.3";
