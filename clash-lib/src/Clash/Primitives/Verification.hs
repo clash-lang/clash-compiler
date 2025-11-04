@@ -11,7 +11,7 @@ import           Data.List.Infinite              (Infinite(..), (...))
 import           Data.Maybe                      (listToMaybe)
 import           Data.Monoid                     (Ap(getAp))
 import           Data.Text.Prettyprint.Doc.Extra (Doc)
-import qualified Data.Text                       as Text
+import           Data.Text                       (Text)
 import           GHC.Stack                       (HasCallStack)
 
 import           Clash.Annotations.Primitive     (HDL(..))
@@ -67,7 +67,7 @@ checkBBF _isD _primName args _ty =
   meta = emptyBlackBoxMeta {bbKind=TDecl, bbRenderVoid=RenderVoid}
 
   bindMaybe
-    :: Maybe String
+    :: Maybe Text
     -- ^ Hint for new identifier
     -> Term
     -- ^ Term to bind. Does not bind if it's already a reference to a signal
@@ -77,7 +77,7 @@ checkBBF _isD _primName args _ty =
   bindMaybe Nothing t = bindMaybe (Just "s") t
   bindMaybe (Just nm) t = do
     tcm <- Lens.view tcCache
-    newId <- Id.make (Text.pack nm)
+    newId <- Id.make nm
     (expr0, decls) <- mkExpr False Concurrent (NetlistId newId (inferCoreTypeOf tcm t)) t
     assn <- contAssign newId expr0
     pure
@@ -91,7 +91,7 @@ checkBBF _isD _primName args _ty =
 checkTF
   :: [Declaration]
   -> (Identifier, [Declaration])
-  -> Text.Text
+  -> Text
   -> RenderAs
   -> Property' Identifier
   -> TemplateFunction
@@ -105,7 +105,7 @@ checkTF'
   -- ^ Extra decls needed
   -> (Identifier, [Declaration])
   -- ^ Clock
-  -> Text.Text
+  -> Text
   -- ^ Prop name
   -> RenderAs
   -> Property' Identifier
