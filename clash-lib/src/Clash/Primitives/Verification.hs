@@ -18,7 +18,7 @@ import           Clash.Annotations.Primitive     (HDL(..))
 import           Clash.Backend
   (Backend, blockDecl, hdlKind)
 import           Clash.Core.HasType
-import           Clash.Core.Term                 (Term(Var), varToId)
+import           Clash.Core.Term                 (Term(Var))
 import           Clash.Core.TermLiteral          (termToDataError)
 import           Clash.Util                      (indexNote)
 import           Clash.Netlist                   (mkExpr)
@@ -41,10 +41,11 @@ checkBBF _isD _primName args _ty =
   case litArgs of
     Left err -> pure (Left err)
     Right (propName, renderAs, cvProperty0) -> do
+      clkBind <- bindMaybe (Just "clk") (indexNote "clk" (lefts args) clkArg)
       cvProperty1 <- mapM (uncurry bindMaybe) cvProperty0
       let decls = concatMap snd cvProperty1
           cvProperty2 = fmap fst cvProperty1
-      pure (Right (meta, bb (checkTF decls (clkExpr, clkId) propName renderAs cvProperty2)))
+      pure (Right (meta, bb (checkTF decls clkBind propName renderAs cvProperty2)))
  where
   -- TODO: Improve error handling; currently errors don't indicate what
   -- TODO: blackbox generated them.
@@ -55,8 +56,6 @@ checkBBF _isD _primName args _ty =
     :< renderAsArg
     :< propArg
     :< _ = ((0 :: Int)...)
-  (Id.unsafeFromCoreId -> clkId) = varToId (indexNote "clk" (lefts args) clkArg)
-  clkExpr = Identifier clkId Nothing
 
   litArgs = do
     propName <- termToDataError (indexNote "propName" (lefts args) propNameArg)
@@ -91,7 +90,7 @@ checkBBF _isD _primName args _ty =
 
 checkTF
   :: [Declaration]
-  -> (Expr, Identifier)
+  -> (Identifier, [Declaration])
   -> Text.Text
   -> RenderAs
   -> Property' Identifier
@@ -104,7 +103,7 @@ checkTF'
    . (HasCallStack, Backend s)
   => [Declaration]
   -- ^ Extra decls needed
-  -> (Expr, Identifier)
+  -> (Identifier, [Declaration])
   -- ^ Clock
   -> Text.Text
   -- ^ Prop name
@@ -112,12 +111,13 @@ checkTF'
   -> Property' Identifier
   -> BlackBoxContext
   -> State s Doc
-checkTF' decls (clk, clkId) propName renderAs prop bbCtx = do
+checkTF' decls (clkId, clkDecls) propName renderAs prop bbCtx = do
   blockName <- Id.makeBasic (propName <> "_block")
-  getAp (blockDecl blockName (renderedPslProperty : decls))
+  getAp (blockDecl blockName (clkDecls <> (renderedPslProperty : decls)))
 
  where
   hdl = hdlKind (undefined :: s)
+  clk = Identifier clkId Nothing
 
   edge =
     case bbInputs bbCtx of
