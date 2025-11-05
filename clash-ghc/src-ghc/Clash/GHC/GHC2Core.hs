@@ -65,7 +65,7 @@ import           Language.Haskell.Syntax.Basic (FieldLabelString (..))
 
 -- GHC API
 #if MIN_VERSION_ghc(9,4,0)
-import GHC.Core.Reduction (Reduction(Reduction))
+import GHC.Core.Reduction (Reduction(Reduction), HetReduction(..))
 #endif
 #if MIN_VERSION_ghc(9,0,0)
 import GHC.Builtin.Types (falseDataCon)
@@ -89,7 +89,9 @@ import GHC.Core.DataCon
    dataConTyCon, dataConUnivTyVars, dataConWorkId, dataConFieldLabels, flLabel,
    HsImplBang(..), dataConImplBangs)
 import GHC.Core.FamInstEnv
-  (FamInst (..), FamInstEnvs, familyInstances, normaliseType, emptyFamInstEnvs)
+  ( FamInst (..), FamInstEnvs
+  , familyInstances, normaliseType, emptyFamInstEnvs, topReduceTyFamApp_maybe
+  )
 import GHC.Data.FastString (unpackFS, bytesFS)
 import GHC.Types.Id (isDataConId_maybe)
 import GHC.Types.Id.Info (IdDetails (..), unfoldingInfo)
@@ -121,8 +123,8 @@ import GHC.Types.Var
 import GHC.Types.Var.Set (isEmptyVarSet)
 #else
 import CoAxiom    (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs),
-                   fromBranches, Role (Nominal))
-import Coercion   (coercionType,coercionKind)
+                   fromBranches, Role (Nominal, Representational))
+import Coercion   (coercionType, coercionKind, mkTransCo)
 import CoreFVs    (exprSomeFreeVars)
 import CoreSyn
   (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..), Tickish (..),
@@ -135,7 +137,8 @@ import DataCon    (DataCon, HsImplBang(..),
                    dataConUnivTyVars, dataConWorkId,
                    dataConFieldLabels, flLabel, dataConImplBangs)
 import FamInstEnv (FamInst (..), FamInstEnvs,
-                   familyInstances, normaliseType, emptyFamInstEnvs)
+                   familyInstances, normaliseType, emptyFamInstEnvs,
+                   normaliseTcArgs, reduceTyFamApp_maybe)
 
 import FastString (unpackFS, bytesFS)
 
@@ -982,10 +985,30 @@ coreToType
   -> C2C C.Type
 coreToType ty = ty'' >>= annotateType ty
   where
-    ty'' =
-      case coreView ty of
-        Just ty' -> coreToType ty'
-        Nothing  -> coreToType' ty
+    ty'' | Just ty' <- coreView ty = coreToType ty'
+         | TyConApp tc xs <- ty = do
+             envs <- view famInstEnvs
+             case topReduceTyFamApp_maybe envs tc xs of
+               Nothing -> coreToType' ty
+#if MIN_VERSION_ghc(9,4,0)
+               Just (HetReduction (Reduction _ ty') _) -> coreToType ty'
+#else
+               Just (_, ty', _) -> coreToType ty'
+#endif
+         | otherwise = coreToType' ty
+
+#if !MIN_VERSION_ghc(9,0,0)
+    -- taken and adapted from GHC.Core.FamInstEnv (GHC 9.0.2)
+    topReduceTyFamApp_maybe envs fam_tc arg_tys
+      | isFamilyTyCon fam_tc
+      , Just (co, rhs) <- reduceTyFamApp_maybe envs role fam_tc ntys
+      = Just (args_co `mkTransCo` co, rhs, res_co)
+      | otherwise
+      = Nothing
+      where
+        role = Representational
+        (args_co, ntys, res_co) = normaliseTcArgs envs role fam_tc arg_tys
+#endif
 
 coreToType'
   :: Type
