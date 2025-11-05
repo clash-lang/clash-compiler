@@ -1,13 +1,19 @@
 { pkgs }:
 final: prev:
 let
-  inherit (pkgs.haskell.lib) doJailbreak dontCheck markUnbroken;
+  inherit (pkgs.haskell.lib) doJailbreak markUnbroken dontCheck;
 in
 {
   # Use an older version than the default in nixpkgs. Since rewrite-inspector
   # is basically abandonware it catches fire with brick 1.0+.
   brick = doJailbreak prev.brick_0_70_1;
 
+  # brick 0.70.1 requires vty < 6.0.
+  vty = prev.callHackage "vty" "5.39" { };
+
+  # Marked as broken in nixpkgs, since it needs a newer hashable than the
+  # .cabal file currently uploaded to hackage.
+  concurrent-supply = doJailbreak (markUnbroken prev.concurrent-supply);
 
   # Use a branch with changes to support GHC 9.6.1.
   hint =
@@ -25,27 +31,17 @@ in
   # than the defaults in nixpkgs.
   rewrite-inspector = doJailbreak (markUnbroken prev.rewrite-inspector);
 
-  # We want a version that matches with singletons-th, but the tests in here
-  # are also a bit flaky since GHC 9.6 isn't officially supported.
-  singletons-base = dontCheck prev.singletons-base_3_2;
-
-  # Use a newer version than the default in nixpkgs.
-  singletons-th = prev.singletons-th_3_2;
-
   # Needs a newer text than the .cabal file currently uploaded to hackage.
   string-qq = doJailbreak prev.string-qq;
-
-  # Needs a newer version than the default in nixpkgs.
-  th-desugar = prev.th-desugar_1_15;
 
   # Needs a newer base than the .cabal file currently uploaded to hackage.
   vector-binary-instances = doJailbreak prev.vector-binary-instances;
 
-  # Use an older version than the default in nixpkgs.
-  th-abstraction = prev.th-abstraction_0_5_0_0;
-
   # type-errors 0.2.0.2 is bounded on doctest >=0.16.0.1 && <0.22
   doctest = prev.callHackage "doctest" "0.21.1" { };
+
+  # Marken as broken, but compiles anyway.
+  hedgehog-fakedata = doJailbreak (markUnbroken prev.hedgehog-fakedata);
 
   # We need a new tasty-flaky. The one from Hackage doesn't build for some weird
   # reason..
@@ -55,4 +51,15 @@ in
     rev = "fc31a9d622c1eb60030a50152258a9bef785e365";
     sha256 = "sha256-irLM3aVMxpBgsM72ArulMXcoLY2glalVkG//Lrj2JBI=";
   }) {};
+
+  # This version of tasty isn't available in the nix ghc96 package set
+  tasty = prev.callHackageDirect {
+    pkg = "tasty";
+    ver = "1.5.3";
+    sha256 = "sha256-Ogd8J4aHNeL+xmcRWuJeGBNaePyLs5yo1IoMzvWrVPY=";
+  } {};
+
+  # The tests (not the package itself!) require a tasty <1.5, which won't work as we pull in
+  # tasty 1.5.3. Solution: don't test!
+  time-compat = dontCheck prev.time-compat;
 }
