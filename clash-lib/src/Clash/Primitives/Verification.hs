@@ -1,3 +1,11 @@
+{-|
+  Copyright  :  (C) 2019     , Myrtle Software Ltd
+                    2021     , Ellie Hermaszewska
+                    2020-2025, QBayLogic B.V.
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Primitives.Verification (checkBBF) where
