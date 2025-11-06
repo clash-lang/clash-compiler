@@ -1,1 +1,0 @@
-FIXED: The `unzip` family no longer retains a reference to the original input for every (unevaluated) part of the output tuple. Similarly, `mapAccumL` and `mapAccumR` are now also more eager to drop references. This can help to prevent space leaks. See [#3038](https://github.com/clash-lang/clash-compiler/issues/3038).

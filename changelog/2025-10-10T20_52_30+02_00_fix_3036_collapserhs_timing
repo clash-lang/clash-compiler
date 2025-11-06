@@ -1,1 +1,0 @@
-FIXED: `collapseRHSNoops` now runs after constant folding, making Clash able to constant fold more expressions than before. See [#3036](https://github.com/clash-lang/clash-compiler/issues/3036).
