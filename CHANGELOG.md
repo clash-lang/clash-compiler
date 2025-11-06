@@ -1,5 +1,17 @@
 # Changelog for the Clash project
 
+## 1.8.4 *Nov 6th 2025*
+
+Changed:
+* Nix flake updated to make it more suitable for use in downstream projects. [#2987](https://github.com/clash-lang/clash-compiler/pull/2987) [#3060](https://github.com/clash-lang/clash-compiler/pull/3060)
+
+Fixed:
+* `collapseRHSNoops` now runs after constant folding, making Clash able to constant fold more expressions than before. See [#3036](https://github.com/clash-lang/clash-compiler/issues/3036).
+* The `unzip` family no longer retains a reference to the original input for every (unevaluated) part of the output tuple. Similarly, `mapAccumL` and `mapAccumR` are now also more eager to drop references. This can help to prevent space leaks. See [#3038](https://github.com/clash-lang/clash-compiler/issues/3038).
+* Individual items of `iterateI` no longer retain a reference to the whole list, preventing space leaks. See [#3042](https://github.com/clash-lang/clash-compiler/issues/3042).
+* The compiler now tracks assignment types in more places, which can prevent "clash error call" errors in some specific cases. See [#3045](https://github.com/clash-lang/clash-compiler/issues/3045).
+* Test bench primitives now assign the string they want to pass to Verilog's `$display` to a variable before printing. This works around a limitation in IVerilog. See [#3046](https://github.com/clash-lang/clash-compiler/issues/3046).
+
 ## 1.8.3 *Oct 6th 2025*
 
 Added:
