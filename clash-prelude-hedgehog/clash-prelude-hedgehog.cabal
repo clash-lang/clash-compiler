@@ -1,7 +1,7 @@
 cabal-version:      2.2
 
 name:               clash-prelude-hedgehog
-version:            1.8.3
+version:            1.8.4
 synopsis:           Hedgehog Generators for clash-prelude
 description:        Hedgehog Generators for clash-prelude
 bug-reports:        https://github.com/clash-lang/clash-compiler/issues
@@ -51,4 +51,4 @@ library
     ghc-typelits-natnormalise >= 0.7.2   && < 0.8,
     text                      >= 1.2.2   && < 2.2,
 
-    clash-prelude             == 1.8.3,
+    clash-prelude             == 1.8.4,
