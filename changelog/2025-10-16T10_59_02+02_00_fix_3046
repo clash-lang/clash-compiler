@@ -1,1 +1,0 @@
-FIXED: Test bench primitives now assign the string they want to pass to Verilog's `$display` to a variable before printing. This works around a limitation in IVerilog. See [#3046](https://github.com/clash-lang/clash-compiler/issues/3046).
