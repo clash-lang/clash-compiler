@@ -1,0 +1,1 @@
+FIXED: The type of string literals passed to the `Clash.Explicit.Verification.check` blackbox now matches with the input provided via `Clash.Explicit.Verification.name`.
