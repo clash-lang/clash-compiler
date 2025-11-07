@@ -1,0 +1,1 @@
+FIXED: Type families that appear in GHC core types are now normalized before being translated into their Clash core equivalent. See [#3063](https://github.com/clash-lang/clash-compiler/issues/3063).
