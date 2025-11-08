@@ -86,8 +86,8 @@
       // map begin
       genvar ~GENSYM[i][1];
       ~GENERATE
-      for (~SYM[1]=0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[map][2]~IF~SIZE[~TYP[1]]~THEN
-        localparam ~GENSYM[vec_index][5] = ~MAXINDEX[~TYPO] - ~SYM[1];
+      for (~SYM[1]=0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[map][2]
+        localparam ~GENSYM[vec_index][5] = ~MAXINDEX[~TYPO] - ~SYM[1];~IF~SIZE[~TYP[1]]~THEN
         wire ~TYPEL[~TYP[1]] ~GENSYM[map_in][3];
         assign ~SYM[3] = ~VAR[vec][1][~SYM[5]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]];~ELSE ~FI
         ~OUTPUTUSAGE[0] ~TYPEL[~TYPO] ~GENSYM[map_out][4];
@@ -115,7 +115,7 @@
         assign ~SYM[4] = ~VAR[vec][2][~SYM[6]*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];~ELSE ~FI
         ~OUTPUTUSAGE[1] ~TYPEL[~TYPO] ~GENSYM[map_out][5];
 
-        assign ~SYM[3] = ~SIZE[~INDEXTYPE[~LIT[0]]]'d~MAXINDEX[~TYPO] - ~SYM[1][0+:~SIZE[~INDEXTYPE[~LIT[0]]]];
+        assign ~SYM[3] = ~SYM[1][0+:~SIZE[~INDEXTYPE[~LIT[0]]]];
         ~INST 1
           ~OUTPUT <= ~SYM[5]~ ~TYPEL[~TYPO]~
           ~INPUT  <= ~SYM[3]~ ~INDEXTYPE[~LIT[0]]~
@@ -141,7 +141,7 @@
         assign ~SYM[4] = ~VAR[vec][1][~SYM[6]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]];~ELSE ~FI
         ~OUTPUTUSAGE[0] ~TYPEL[~TYPO] ~GENSYM[map_out][5];
 
-        assign ~SYM[3] = ~SIZE[~TYP[2]]'d~MAXINDEX[~TYPO] - ~SYM[1][0+:~SIZE[~TYP[2]]] + ~ARG[2];
+        assign ~SYM[3] = ~SYM[1][0+:~SIZE[~TYP[2]]] + ~ARG[2];
         ~INST 0
           ~OUTPUT <= ~SYM[5]~ ~TYPEL[~TYPO]~
           ~INPUT  <= ~SYM[3]~ ~TYP[2]~
@@ -160,8 +160,8 @@
       // zipWith start
       genvar ~GENSYM[i][2];
       ~GENERATE
-      for (~SYM[2] = 0; ~SYM[2] < ~LENGTH[~TYPO]; ~SYM[2] = ~SYM[2] + 1) begin : ~GENSYM[zipWith][6]~IF~SIZE[~TYP[1]]~THEN
-        localparam ~GENSYM[vec_index][7] = ~MAXINDEX[~TYPO] - ~SYM[2];
+      for (~SYM[2] = 0; ~SYM[2] < ~LENGTH[~TYPO]; ~SYM[2] = ~SYM[2] + 1) begin : ~GENSYM[zipWith][6]
+        localparam ~GENSYM[vec_index][7] = ~MAXINDEX[~TYPO] - ~SYM[2];~IF~SIZE[~TYP[1]]~THEN
         wire ~TYPEL[~TYP[1]] ~GENSYM[zipWith_in1][3];
         assign ~SYM[3] = ~VAR[vec1][1][~SYM[7]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]];~ELSE ~FI~IF~SIZE[~TYP[2]]~THEN
         wire ~TYPEL[~TYP[2]] ~GENSYM[zipWith_in2][4];
@@ -188,8 +188,8 @@
 
       genvar ~GENSYM[i][3];
       ~GENERATE
-      for (~SYM[3]=0; ~SYM[3] < ~LENGTH[~TYP[2]]; ~SYM[3]=~SYM[3]+1) begin : ~GENSYM[foldr][4]~IF~SIZE[~TYP[2]]~THEN
-        localparam ~GENSYM[vec_index][8] = ~MAXINDEX[~TYP[2]] - ~SYM[3];
+      for (~SYM[3]=0; ~SYM[3] < ~LENGTH[~TYP[2]]; ~SYM[3]=~SYM[3]+1) begin : ~GENSYM[foldr][4]
+        localparam ~GENSYM[vec_index][8] = ~MAXINDEX[~TYP[2]] - ~SYM[3];~IF~SIZE[~TYP[2]]~THEN
         wire ~TYPEL[~TYP[2]] ~GENSYM[foldr_in1][5];
         assign ~SYM[5] = ~VAR[xs][2][(~SYM[8])*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];~ELSE ~FI
         wire ~TYPO ~GENSYM[foldr_in2][6];
