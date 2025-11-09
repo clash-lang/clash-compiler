@@ -188,8 +188,8 @@
 
       genvar ~GENSYM[i][3];
       ~GENERATE
-      for (~SYM[3]=0; ~SYM[3] < ~LENGTH[~TYP[2]]; ~SYM[3]=~SYM[3]+1) begin : ~GENSYM[foldr][4]
-        localparam ~GENSYM[vec_index][8] = ~MAXINDEX[~TYP[2]] - ~SYM[3];~IF~SIZE[~TYP[2]]~THEN
+      for (~SYM[3]=0; ~SYM[3] < ~LENGTH[~TYP[2]]; ~SYM[3]=~SYM[3]+1) begin : ~GENSYM[foldr][4]~IF~SIZE[~TYP[2]]~THEN
+        localparam ~GENSYM[vec_index][8] = ~MAXINDEX[~TYP[2]] - ~SYM[3];
         wire ~TYPEL[~TYP[2]] ~GENSYM[foldr_in1][5];
         assign ~SYM[5] = ~VAR[xs][2][(~SYM[8])*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];~ELSE ~FI
         wire ~TYPO ~GENSYM[foldr_in2][6];
