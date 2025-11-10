@@ -1,0 +1,1 @@
+CHANGED: Vector functions in Verilog now have indices consistent with the Vec inputs/outputs (before they were reversed).
