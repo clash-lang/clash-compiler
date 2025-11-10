@@ -129,6 +129,7 @@ instance TermLiteral Word where
 instance TermLiteral Integer where
   termToData (Tick _ e) = termToData e
   termToData (Literal (IntegerLiteral n)) = Right n
+  termToData (collectArgs -> (_, [Left (Literal (IntLiteral n))])) = Right n
   termToData (collectArgs -> (_, [Left (Literal (IntegerLiteral n))])) = Right n
   termToData t = Left t
 

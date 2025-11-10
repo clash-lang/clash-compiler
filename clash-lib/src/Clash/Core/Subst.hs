@@ -56,6 +56,7 @@ module Clash.Core.Subst
     -- * Alpha equivalence
   , aeqType
   , aeqTerm
+  , acmpTerm
     -- * Structural equivalence
   , eqTerm
   , eqType
@@ -584,6 +585,7 @@ substTm doc subst = go where
   goTick (NameMod m ty) = NameMod m (substTy subst ty)
   goTick t@DeDup        = t
   goTick t@NoDeDup      = t
+  goTick (Attributes ty tm) = Attributes (substTy subst ty) (go tm)
 
 -- | Substitute within a case-alternative
 substAlt

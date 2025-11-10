@@ -75,6 +75,7 @@ import Clash.Annotations.Primitive          (HDL(..))
 import Clash.Annotations.TopEntity          (TopEntity)
 import Clash.Backend                        (Backend, HasUsageMap (..))
 import Clash.Core.HasType
+import Clash.Core.PartialEval               (Evaluator)
 import Clash.Core.Type                      (Type)
 import Clash.Core.Var                       (Id)
 import Clash.Core.TyCon                     (TyConMap)
@@ -283,6 +284,11 @@ data NetlistEnv
   -- ^ Postfix for instance/register names
   , _setName :: Maybe Text
   -- ^ (Maybe) user given instance/register name
+  , _localAttrs :: [Attr Text]
+  -- ^ Synthesis attributes brough into scope by
+  -- 'Clash.Annotations.SynthesisAttributes.annotateReg'
+  , _peEvaluator :: Evaluator
+  -- ^ Evaluator to evaluate a term to Normal Form
   }
 
 data ComponentMeta = ComponentMeta
