@@ -131,10 +131,10 @@
     kind: Declaration
     type: 'imap_go :: (Index n -> a -> b) -> Vec m a -> Index n -> Vec m b'
     template: |-
-      // imap begin
+      // imap_go begin
       genvar ~GENSYM[i][1];
       ~GENERATE
-      for (~SYM[1]=0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[imap][2]
+      for (~SYM[1]=0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[imap_go][2]
         localparam ~GENSYM[vec_index][6] = ~MAXINDEX[~TYPO] - ~SYM[1];
         wire ~TYP[2] ~GENSYM[map_index][3];~IF~SIZE[~TYP[1]]~THEN
         wire ~TYPEL[~TYP[1]] ~GENSYM[map_in][4];
@@ -150,7 +150,7 @@
         assign ~RESULT[~SYM[6]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]] = ~SYM[5];
       end
       ~ENDGENERATE
-      // imap end
+      // imap_go end
     workInfo: Never
 - BlackBox:
     name: Clash.Sized.Vector.zipWith
