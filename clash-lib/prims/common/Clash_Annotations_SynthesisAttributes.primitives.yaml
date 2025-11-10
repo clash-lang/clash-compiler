@@ -1,0 +1,3 @@
+- Primitive:
+    name: Clash.Annotations.SynthesisAttributes.annotateReg
+    primType: Function
