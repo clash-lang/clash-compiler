@@ -897,7 +897,9 @@ renderTag b (Depth e) = return . Text.pack . show . treeDepth $ lineToType b [e]
 renderTag b (MaxIndex e) = return . Text.pack . show . vecLen $ lineToType b [e]
   where
     vecLen (Vector n _)  = n-1
+    vecLen (Void (Just (Vector n _)))  = n-1
     vecLen (MemBlob n _) = n-1
+    vecLen (Void (Just (MemBlob n _))) = n-1
     vecLen thing =
       error $ $(curLoc) ++ "vecLen of a non-vector-like type: " ++ show thing
 
