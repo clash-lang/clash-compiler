@@ -436,6 +436,11 @@ coreToTerm primMap unlocs = term
           -- xToErrorCtx :: forall a. String -> a -> a
           | [_ty, _msg, x] <- args
           = term x
+        go "Clash.Annotations.SynthesisAttributes.annotateX" args
+          | [Type attrs, _domTy, _aTy, x] <- args
+          = do
+              attrs' <- traverse coreToAttr (listTypeToListOfTypes attrs)
+              C.Tick (C.Attributes attrs') <$> term x
         go nm args
           | Just n <- parseBundle "bundle" nm
             -- length args = domain tyvar + signal arg + number of type vars

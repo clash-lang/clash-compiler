@@ -283,6 +283,7 @@ data NetlistEnv
   -- ^ Postfix for instance/register names
   , _setName :: Maybe Text
   -- ^ (Maybe) user given instance/register name
+  , _localAttrs :: [Attr Text]
   }
 
 data ComponentMeta = ComponentMeta

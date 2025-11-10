@@ -584,6 +584,7 @@ substTm doc subst = go where
   goTick (NameMod m ty) = NameMod m (substTy subst ty)
   goTick t@DeDup        = t
   goTick t@NoDeDup      = t
+  goTick t@Attributes{} = t
 
 -- | Substitute within a case-alternative
 substAlt

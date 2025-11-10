@@ -217,8 +217,7 @@ unsafeCoreTypeToHWTypeM'
   :: String
   -> Type
   -> NetlistMonad HWType
-unsafeCoreTypeToHWTypeM' loc ty =
-  stripFiltered <$> unsafeCoreTypeToHWTypeM loc ty
+unsafeCoreTypeToHWTypeM' loc ty = stripFiltered <$> unsafeCoreTypeToHWTypeM loc ty
 
 -- | Converts a Core type to a HWType within the NetlistMonad; errors on failure
 unsafeCoreTypeToHWTypeM
@@ -1878,6 +1877,9 @@ withTicks ticks0 k = do
   go decls (SrcSpan sp:ticks) =
     go (TickDecl (Comment (Text.pack (showSDocUnsafe (ppr sp)))):decls) ticks
 
+  go decls (Attributes attrs:ticks) =
+    local (\env -> env {_localAttrs = attrs}) (go decls ticks)
+
   go decls (NameMod m nm0:ticks) = do
     tcm <- Lens.view tcCache
     case runExcept (tyLitShow tcm nm0) of
@@ -1901,7 +1903,7 @@ affixName
   :: Text
   -> NetlistMonad Text
 affixName nm0 = do
-  NetlistEnv _ pre suf _ <- ask
+  NetlistEnv _ pre suf _ _ <- ask
   let nm1 = if Text.null pre then nm0 else pre <> "_" <> nm0
       nm2 = if Text.null suf then nm1 else nm1 <> "_" <> suf
   return nm2

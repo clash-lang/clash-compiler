@@ -10,6 +10,7 @@
   (<https://github.com/clash-lang/clash-compiler/issues>).
 -}
 
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
@@ -20,6 +21,7 @@ module Clash.Annotations.SynthesisAttributes
   ( Attr(..)
   , Annotate
   , annotate
+  , annotateX
   , markDebug
   ) where
 
@@ -29,6 +31,7 @@ import Data.Hashable (Hashable)
 import Data.Kind (Type)
 import Data.String.Interpolate (__i)
 import GHC.Generics (Generic)
+import GHC.TypeLits (Symbol)
 import Language.Haskell.TH.Syntax (Lift)
 
 import Clash.Annotations.Primitive (Primitive(InlineYamlPrimitive), hasBlackBox)
@@ -154,3 +157,7 @@ markDebug = annotate $
   :> Attr "noprune"
   :> Attr "preserve"
   :> Nil
+
+annotateX :: forall (attrs :: [Attr Symbol]) dom a . Signal dom a -> Signal dom a
+annotateX a = a
+{-# CLASH_OPAQUE annotateX #-}
