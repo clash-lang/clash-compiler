@@ -281,6 +281,8 @@ termFreeVars' interesting f = go IntSet.empty where
 
   goTick inLocalScope = \case
     NameMod m ty -> NameMod m <$> typeFreeVars' interesting inLocalScope f ty
+    Attributes ty tm -> Attributes <$> typeFreeVars' interesting inLocalScope f ty
+                                   <*> go inLocalScope tm
     tick         -> pure tick
 
 -- | Get the free variables of an expression and count the number of occurrences

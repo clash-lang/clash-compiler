@@ -454,6 +454,9 @@ coreToTerm primMap unlocs = term
           -- xToErrorCtx :: forall a. String -> a -> a
           | [_ty, _msg, x] <- args
           = term x
+        go "Clash.Annotations.SynthesisAttributes.annotateReg" args
+          | [ Type nTy, _domTy, _aTy, attrs, x] <- args
+          = C.Tick <$> (C.Attributes <$> coreToType nTy <*> term attrs) <*> term x
         go nm args
           | Just n <- parseBundle "bundle" nm
             -- length args = domain tyvar + signal arg + number of type vars
@@ -635,6 +638,8 @@ coreToTerm primMap unlocs = term
               -> return (nameModTerm C.SetName xType)
               | f == "Clash.XException.xToErrorCtx"
               -> return (xToErrorCtxTerm xType)
+              | f == "Clash.Annotations.SynthesisAttributes.annotateReg"
+              -> return (annotateRegTerm xType)
               | x `elem` unlocs
               -> return (C.Prim (C.PrimInfo xNameS xType wi C.SingleResult C.NoUnfolding))
               | otherwise
@@ -1563,6 +1568,36 @@ xToErrorCtxTerm (C.ForAllTy aTV funTy)
       C.Var xId)))
 
 xToErrorCtxTerm ty = error $ $(curLoc) ++ show ty
+
+-- | Given the type
+--
+-- > forall n dom a . Vec n (Attr String) -> Signal dom a -> Signal dom a
+--
+-- Generate the term:
+--
+-- > /\(n:Nat) (dom:Symbol) (a:Type).\(attrs:Vec n (Attr String)) (x:Signal dom a).<TICK attrs> x
+annotateRegTerm
+  :: C.Type
+  -> C.Term
+annotateRegTerm (C.ForAllTy nTV (C.ForAllTy domTV (C.ForAllTy aTV funTy)))
+  | C.FunTy attrTy rTy <- C.tyView funTy
+  , C.FunTy xTy _ <- C.tyView rTy
+  = let
+      -- Safe to use `mkUnsafeSystemName` here, because we're building the
+      -- identity \x.x, so any shadowing of 'x' would be the desired behavior.
+      xName            = C.mkUnsafeSystemName "x" 0
+      xId              = C.mkLocalId xTy xName
+      attrName         = C.mkUnsafeSystemName "attrs" 1
+      attrId           = C.mkLocalId attrTy attrName
+    in
+      C.TyLam nTV (
+      C.TyLam domTV (
+      C.TyLam aTV (
+      C.Lam   attrId (
+      C.Lam   xId (
+      C.Tick (C.Attributes (C.VarTy nTV) (C.Var attrId)) (C.Var xId))))))
+
+annotateRegTerm ty = error ($(curLoc) ++ show ty)
 
 isDataConWrapId :: Id -> Bool
 isDataConWrapId v = case idDetails v of
