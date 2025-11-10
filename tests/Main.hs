@@ -901,6 +901,7 @@ runClashTest = defaultMain
         ]
       , clashTestGroup "SynthesisAttributes"
         [ outputTest "Annotate" def{hdlTargets=[VHDL]}
+        , outputTest "AnnotateReg" def
         , outputTest "InstDeclAnnotations" def
         , outputTest "MultipleAnnotations" def
         , outputTest "Product" def

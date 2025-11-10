@@ -450,7 +450,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
       (topComponent, netlist) <- modifyMVar seenV $ \seen -> do
         (topComponent, netlist, seen') <-
           -- TODO My word, this has far too many arguments.
-          genNetlist env isTb transformedBindings topEntityMap compNames
+          genNetlist env peEval isTb transformedBindings topEntityMap compNames
             typeTrans ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
 
         pure (seen', (topComponent, netlist))

@@ -84,11 +84,13 @@ import           Clash.Netlist.Util
 import           Clash.Primitives.Types           as P
 import           Clash.Util
 import qualified Clash.Util.Interpolate           as I
+import Clash.Core.PartialEval (Evaluator)
 
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
 genNetlist
   :: ClashEnv
+  -> Evaluator
   -> Bool
   -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
   -> BindingMap
@@ -113,9 +115,9 @@ genNetlist
   -> Id
   -- ^ Name of the @topEntity@
   -> IO (Component, ComponentMap, IdentifierSet)
-genNetlist env isTb globals tops topNames typeTrans ite be seen0 dir prefixM topEntity = do
+genNetlist env eval isTb globals tops topNames typeTrans ite be seen0 dir prefixM topEntity = do
   ((_meta, topComponent), s) <-
-    runNetlistMonad env isTb globals tops typeTrans ite be seen1 dir componentNames_
+    runNetlistMonad env eval isTb globals tops typeTrans ite be seen1 dir componentNames_
       $ genComponent topEntity
   return (topComponent, _components s, seen1)
  where
@@ -125,6 +127,7 @@ genNetlist env isTb globals tops topNames typeTrans ite be seen0 dir prefixM top
 -- | Run a NetlistMonad action in a given environment
 runNetlistMonad
   :: ClashEnv
+  -> Evaluator
   -> Bool
   -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
   -> BindingMap
@@ -147,8 +150,8 @@ runNetlistMonad
   -> NetlistMonad a
   -- ^ Action to run
   -> IO (a, NetlistState)
-runNetlistMonad env isTb s tops typeTrans ite be seenIds_ dir componentNames_
-  = flip runReaderT (NetlistEnv env "" "" Nothing)
+runNetlistMonad env eval isTb s tops typeTrans ite be seenIds_ dir componentNames_
+  = flip runReaderT (NetlistEnv env "" "" Nothing [] eval)
   . flip runStateT s'
   . runNetlist
   where
@@ -308,8 +311,13 @@ genComponentT compName0 componentExpr = do
       return (ComponentMeta wereVoids sp ids u, component)
 
 mkNetDecl :: (Id, Term) -> NetlistMonad [Declaration]
-mkNetDecl (id_,tm) = preserveVarEnv $ do
-  hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (coreTypeOf id_)
+mkNetDecl (id_,tm) | (_,_,ticks) <- collectArgsTicks tm = preserveVarEnv $ withTicks ticks $ \_ -> do
+
+  lAttrs <- Lens.view localAttrs
+  hwTy0 <- unsafeCoreTypeToHWTypeM' $(curLoc) (coreTypeOf id_)
+  let hwTy = case hwTy0 of
+        Annotated attrs hty0 -> Annotated (attrs ++ lAttrs) hty0
+        hty0 -> annotated lAttrs hty0
 
   if | not (shouldRenderDecl hwTy tm) -> return []
      | (Prim pInfo@PrimInfo{primMultiResult=MultiResult}, args) <- collectArgs tm ->
@@ -356,16 +364,16 @@ mkNetDecl (id_,tm) = preserveVarEnv $ do
 
     -- Set the initialization value of a signal when a primitive wants to set it
     getResInits :: (Id, Term) -> NetlistMonad [Expr]
-    getResInits (i,collectArgsTicks -> (k,args0,ticks)) = case k of
+    getResInits (i,collectArgs -> (k,args0)) = case k of
       Prim p -> extractPrimWarnOrFail (primName p) >>= go p
       _ -> return []
      where
-      go pInfo (BlackBox {resultInits=nmDs, multiResult=True}) = withTicks ticks $ \_ -> do
+      go pInfo (BlackBox {resultInits=nmDs, multiResult=True}) = do
         tcm <- Lens.view tcCache
         let (args1, res) = splitMultiPrimArgs (multiPrimInfo' tcm pInfo) args0
         (bbCtx, _) <- mkBlackBoxContext (primName pInfo) Concurrent res args1
         mapM (go' (primName pInfo) bbCtx) nmDs
-      go pInfo (BlackBox {resultInits=nmDs}) = withTicks ticks $ \_ -> do
+      go pInfo (BlackBox {resultInits=nmDs}) = do
         (bbCtx, _) <- mkBlackBoxContext (primName pInfo) Concurrent [i] args0
         mapM (go' (primName pInfo) bbCtx) nmDs
       go _ _ = pure []
