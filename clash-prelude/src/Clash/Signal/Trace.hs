@@ -398,7 +398,8 @@ dumpVCD## (offset, cycles) traceMap now
 
   periods' = map (`quot` timescale) periods
   valuess' = map slice $ zipWith normalize periods' valuess
-  normalize period values = concatMap (replicate period) values
+  normalize period (initial:values) = initial : concatMap (replicate period) values
+  normalize _      []               = []
   slice values = drop offset $ take cycles values
 
   headerDate       = ["$date", Text.pack $ iso8601Format now, "$end"]
