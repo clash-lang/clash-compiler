@@ -109,7 +109,7 @@ cabal update
 stack run -- clash
 ```
 ## Nix
-Or [use Nix](https://nixos.org/nix/download.html) to get a shell with the `clash` and `clashi` binaries on your PATH:
+Or [use Nix](https://nixos.org/download/) to get a shell with the `clash` and `clashi` binaries on your PATH:
 
 ```bash
 # Start the default dev shell
