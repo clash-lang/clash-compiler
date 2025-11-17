@@ -349,8 +349,6 @@ dumpVCD## (offset, cycles) traceMap now
       error $ "dumpVCD: cycles was " ++ show cycles ++ ", but cannot be negative."
   | null traceMap =
       error $ "dumpVCD: no traces found. Extend the given trace names."
-  | Map.size traceMap > 126 - 33 =
-      Left $ "Tracemap contains more than 93 traces, which is not supported by VCD."
   | (nm:_) <- offensiveNames =
       Left $ unwords [ "Trace '" ++ nm ++ "' contains"
                      , "non-printable ASCII characters, which is not"
@@ -373,7 +371,12 @@ dumpVCD## (offset, cycles) traceMap now
  where
   offensiveNames = filter (any (not . printable)) traceNames
 
-  labels = map chr [33..126]
+  -- Generate labels like reversed digits: 0:[1,2,01,11,21,02,12,22,001,...]
+  labels = "!" : map go [1..]
+   where
+    go 0 = ""
+    go n = chr ( 33 + n `mod` k) : go (n `div` k)
+    k = 126-33+1
 
   timescale = foldl1' gcd (Map.keys periodMap)
   periodMap = toPeriodMap traceMap
@@ -413,7 +416,7 @@ dumpVCD## (offset, cycles) traceMap now
   headerTimescale  = ["$timescale", (show timescale) ++ "ps", "$end"]
   headerWires      = [ Text.unwords $ headerWire w l n
                      | (w, l, n) <- (zip3 widths labels traceNames)]
-  headerWire w l n = map Text.pack ["$var wire", show w, [l], n, "$end"]
+  headerWire w l n = map Text.pack ["$var wire", show w, l, n, "$end"]
   initValues       = map Text.pack $ zipWith ($) formatters inits
 
   formatters = zipWith format widths labels
@@ -421,14 +424,14 @@ dumpVCD## (offset, cycles) traceMap now
   tails = map changed valuess'
 
   -- | Format single value according to VCD spec
-  format :: Width -> Char -> Value -> String
-  format 1 label (0,0)   = ['0', label, '\n']
-  format 1 label (0,1)   = ['1', label, '\n']
-  format 1 label (1,_)   = ['x', label, '\n']
+  format :: Width -> String -> Value -> String
+  format 1 label (0,0)   = '0': label <> "\n"
+  format 1 label (0,1)   = '1': label <> "\n"
+  format 1 label (1,_)   = 'x': label <> "\n"
   format 1 label (mask,val) =
     error $ "Can't format 1 bit wide value for " ++ show label ++ ": value " ++ show val ++ " and mask " ++ show mask
   format n label (mask,val) =
-    "b" ++ map digit (reverse [0..n-1]) ++ " " ++ [label]
+    "b" ++ map digit (reverse [0..n-1]) ++ " " ++ label
     where
       digit d = case (testBit mask d, testBit val d) of
         (False,False) -> '0'
