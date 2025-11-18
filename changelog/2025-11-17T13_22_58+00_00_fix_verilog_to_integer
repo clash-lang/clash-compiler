@@ -1,1 +1,1 @@
-FIXED: toInteger now correctly sign extends when using Verilog backend.
+FIXED: `toInteger`, `toEnum`, and `fromEnum` now correctly sign extend when using Verilog backend.
