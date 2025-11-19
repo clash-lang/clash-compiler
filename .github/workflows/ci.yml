@@ -20,12 +20,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["macOS-13", "windows-latest"]
+        os: ["macOS-15", "windows-latest"]
         ghc: ["8.6", "8.8", "8.10", "9.0", "9.2", "9.4", "9.6", "9.8", "9.10"]
         exclude:
-          # Some tests fail with a mysterious -11 error code.
-          - os: "macOS-13"
+          # No GHC binary distribution for GHC 8.6 on aarch64.
+          - os: "macOS-15"
+            ghc: "8.6"
+
+          # No GHC binary distribution for GHC 8.8 on aarch64.
+          - os: "macOS-15"
+            ghc: "8.8"
+
+          # GHC 8.10 requires LLVM 12 or less, which is disabled on macOS 15.
+          - os: "macOS-15"
             ghc: "8.10"
+
+          # GHC 9.0 requires LLVM 12 or less, which is disabled on macOS 15.
+          - os: "macOS-15"
+            ghc: "9.0"
 
           # Windows gets non-deterministically gets stuck in infinite loops
           # or segfaults while running the testcase.
@@ -53,7 +65,7 @@ jobs:
             ghc: "9.10"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: haskell-actions/setup@v2
         id: setup-haskell
         with:
@@ -180,7 +192,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: true
           ref: ${{ github.event.pull_request.head.ref }}
@@ -267,7 +279,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Check dependencies for failures
         run: |
