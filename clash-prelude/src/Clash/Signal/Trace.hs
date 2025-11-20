@@ -115,6 +115,7 @@ import           Data.IORef
 import           Data.List             (foldl')
 #endif
 import           Data.List             (foldl1', unzip4, transpose, uncons)
+import           Data.List.Extra       (snoc)
 import qualified Data.Map.Strict       as Map
 import           Data.Maybe            (fromMaybe, catMaybes)
 import qualified Data.Text             as Text
@@ -372,11 +373,9 @@ dumpVCD## (offset, cycles) traceMap now
   offensiveNames = filter (any (not . printable)) traceNames
 
   -- Generate labels like reversed digits: 0:[1,2,01,11,21,02,12,22,001,...]
-  labels = "!" : map go [1..]
+  labels = concatMap (\s -> map (snoc s) alphabet) ([]: labels)
    where
-    go 0 = ""
-    go n = chr ( 33 + n `mod` k) : go (n `div` k)
-    k = 126-33+1
+    alphabet = map chr [33..126]
 
   timescale = foldl1' gcd (Map.keys periodMap)
   periodMap = toPeriodMap traceMap
@@ -425,9 +424,9 @@ dumpVCD## (offset, cycles) traceMap now
 
   -- | Format single value according to VCD spec
   format :: Width -> String -> Value -> String
-  format 1 label (0,0)   = '0': label <> "\n"
-  format 1 label (0,1)   = '1': label <> "\n"
-  format 1 label (1,_)   = 'x': label <> "\n"
+  format 1 label (0,0)   = '0': label ++ "\n"
+  format 1 label (0,1)   = '1': label ++ "\n"
+  format 1 label (1,_)   = 'x': label ++ "\n"
   format 1 label (mask,val) =
     error $ "Can't format 1 bit wide value for " ++ show label ++ ": value " ++ show val ++ " and mask " ++ show mask
   format n label (mask,val) =
