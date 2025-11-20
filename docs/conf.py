@@ -26,7 +26,7 @@ master_doc = 'index'
 
 # Project information
 project = 'Clash'
-copyright = '2017-2019, The Clash Developers'
+copyright = '2017-2025, The Clash Developers'
 author = 'The Clash Developers'
 version = '1.9.0'
 release = version
