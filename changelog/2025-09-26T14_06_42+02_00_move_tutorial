@@ -1,4 +1,4 @@
-CHANGED: The content from the `Clash.Tutorial` module has been split and moved to two new locations.
+CHANGED: The content from the `Clash.Tutorial` module and from https://clash-lang.readthedocs.io/ has been split and moved to two new locations.
 1. The actual tutorial parts has been moved to: https://docs.clash-lang.org/tutorial/
 2. Parts that fit better in the clash compiler user guide have been moved to: https://docs.clash-lang.org/compiler-user-guide/
 
