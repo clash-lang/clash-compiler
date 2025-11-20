@@ -126,6 +126,7 @@ module Clash.Signal.Internal
   , syncRegister#
   , registerPowerup#
   , mux
+  , apEn
     -- * Simulation and testbench functions
   , clockGen
   , tbClockGen
@@ -1652,6 +1653,13 @@ syncRegister# clk (unsafeToActiveHigh -> rst) (fromEnable -> ena) initVal resetV
 mux :: Applicative f => f Bool -> f a -> f a -> f a
 mux = liftA3 (\b t f -> if b then t else f)
 {-# INLINE mux #-}
+
+-- | A 'mux' extension muxing between a given argument and an updated version.
+-- Given @apEn b f s@, output an updated version of @s@ (i.e., @f s@)
+-- when @b@ is 'True', but return it unchanged (i.e., @s@) when @b@ is 'False'.
+apEn :: Applicative f => f Bool -> (a -> a) -> f a -> f a
+apEn cond upd x = mux cond (upd <$> x) x
+{-# INLINE apEn #-}
 
 infix 4 .==.
 -- | The above type is a generalization for:
