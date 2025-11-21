@@ -1,6 +1,6 @@
 #!/bin/bash
 n=0
-until [ "$n" -ge 5 ]
+until [ "$n" -ge 20 ]
 do
    $@ && exit 0
    n=$((n+1))
