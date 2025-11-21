@@ -1,0 +1,1 @@
+CHANGED: Vector functions in Verilog now have indices consistent with the Vec inputs/outputs (before they were reversed). This is convenient when writing design constraints, which can now be referenced consistently like `imap[0],imap[1],..`. See [#3088](https://github.com/clash-lang/clash-compiler/issues/3088).
