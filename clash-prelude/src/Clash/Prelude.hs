@@ -29,8 +29,9 @@
     have overlapping definitions.
 
   For now, "Clash.Prelude" is also the best starting point for exploring the
-  library. A preliminary version of a tutorial can be found in "Clash.Tutorial".
-  Some circuit examples can be found in "Clash.Examples".
+  library. A preliminary version of a tutorial can be found at
+  https://docs.clash-lang.org/tutorial. Some circuit examples can be found in
+  "Clash.Examples".
 -}
 
 {-# LANGUAGE CPP #-}
