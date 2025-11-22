@@ -84,32 +84,6 @@ stack-build:
     - export THREADS=$(./.ci/effective_cpus.sh)
     - tar -cf - /root/.stack | zstd -T$THREADS -3 > cache.tar.zst
 
-nix-build:
-  image: nixos/nix:2.10.1
-  needs: []
-  stage: test
-  before_script:
-   - nix-env -i gawk
-   - export THREADS=$(./.ci/effective_cpus.sh)
-   - export
-  script:
-    - .ci/setup_cachix.sh
-
-    - .ci/build_and_publish_nix.sh .#clash-prelude
-    - .ci/build_and_publish_nix.sh .#clash-prelude-hedgehog
-    - .ci/build_and_publish_nix.sh .#clash-lib
-    - .ci/build_and_publish_nix.sh .#clash-lib-hedgehog
-    - .ci/build_and_publish_nix.sh .#clash-ghc
-    - .ci/build_and_publish_nix.sh .#clash-cosim
-    - .ci/build_and_publish_nix.sh .#clash-ffi
-    - .ci/build_and_publish_nix.sh .#clash-testsuite
-    - .ci/build_and_publish_nix.sh .#clash-benchmark
-    - .ci/build_and_publish_nix.sh .#clash-profiling-prepare
-    - .ci/build_and_publish_nix.sh .#clash-profiling
-    - .ci/build_and_publish_nix.sh .#clash-term
-  tags:
-    - local
-
 haddock:
   extends: .common-local
   needs: []
