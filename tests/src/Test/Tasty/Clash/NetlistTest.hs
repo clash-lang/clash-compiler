@@ -97,7 +97,7 @@ runToNetlistStage target f src = do
   hdl = buildTargetToHdl target
 
   netlistFrom (env, bm, tes, compNames, te, seen) =
-    genNetlist env False bm tes compNames (ghcTypeToHWType (opt_intWidth opts))
+    genNetlist env ghcEvaluator False bm tes compNames (ghcTypeToHWType (opt_intWidth opts))
       ite (SomeBackend hdlSt) seen hdlDir Nothing te
    where
     teS     = Text.unpack . nameOcc $ varName te
