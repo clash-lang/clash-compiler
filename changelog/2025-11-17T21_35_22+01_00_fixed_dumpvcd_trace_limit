@@ -1,0 +1,1 @@
+FIXED: Removed the limit on the number of traces in `dumpVCD`. [#3082](https://github.com/clash-lang/clash-compiler/issues/3082)
