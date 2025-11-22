@@ -1,0 +1,1 @@
+FIXED: `dumpVCD` now properly aligns the first clock edges in multi-domain designs. [#3075](https://github.com/clash-lang/clash-compiler/issues/3075)
