@@ -104,7 +104,25 @@
 
           default =
             pkgs."clashPackages-${defaultGhcVersion}".clash-ghc;
-        };
+        } // builtins.listToAttrs
+          (builtins.map (version: {
+            name = "clashPackages-" + version;
+            value = {
+              inherit (pkgs."clashPackages-${version}")
+                clash-benchmark
+                clash-cosim
+                clash-ffi
+                clash-ghc
+                clash-lib
+                clash-lib-hedgehog
+                clash-prelude
+                clash-prelude-hedgehog
+                clash-profiling
+                clash-profiling-prepare
+                clash-term
+                clash-testsuite;
+            };
+          }) ghcVersions);
 
         apps = {
           # Executables listed here can be run using the `nix run` command, which
