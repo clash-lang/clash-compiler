@@ -341,6 +341,7 @@ instance PrettyPrec TickInfo where
   pprPrec prec (NameMod SetName t)    = ("<setName>" <>) <$> pprPrec prec t
   pprPrec _    DeDup                  = pure "<deDup>"
   pprPrec _    NoDeDup                = pure "<noDeDup>"
+  pprPrec prec (Attributes _ attrs)   = ("<attributes>" <>) <$> pprPrec prec attrs
 
 instance PrettyPrec SrcSpan where
   pprPrec _ sp = return ("<src>"<>pretty (GHC.showSDocUnsafe (GHC.ppr sp)))

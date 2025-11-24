@@ -55,6 +55,7 @@ import           Data.Map                (Map)
 import           Data.Maybe
   (catMaybes, fromMaybe, isNothing, mapMaybe, isJust, listToMaybe, maybeToList)
 import           Text.Printf             (printf)
+import           Data.Proxy
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import           Data.Text.Extra         (showt)
@@ -68,6 +69,8 @@ import           GHC.Integer.GMP.Internals        (Integer (..), BigNat (..))
 #endif
 
 import           GHC.Stack               (HasCallStack)
+import           GHC.TypeLits (someNatVal)
+import           GHC.TypeNats (SomeNat(..))
 
 #if MIN_VERSION_ghc(9,0,0)
 import           GHC.Utils.Monad         (zipWith3M)
@@ -90,11 +93,12 @@ import           Clash.Backend           (HasUsageMap (..), HWKind(..), hdlHWTyp
 import           Clash.Core.DataCon      (DataCon (..))
 import           Clash.Core.EqSolver     (typeEq)
 import           Clash.Core.FreeVars     (typeFreeVars, typeFreeVars')
-import           Clash.Core.HasFreeVars  (elemFreeVars)
+import           Clash.Core.HasFreeVars  (elemFreeVars, isClosed)
 import           Clash.Core.HasType
 import qualified Clash.Core.Literal      as C
 import           Clash.Core.Name
-  (Name (..), appendToName, nameOcc)
+  (Name (..), appendToName, mkUnsafeSystemName, nameOcc)
+import           Clash.Core.PartialEval
 import           Clash.Core.Pretty       (showPpr)
 import           Clash.Core.Subst
   (Subst (..), extendIdSubst, extendIdSubstList, extendInScopeId,
@@ -103,16 +107,18 @@ import           Clash.Core.Term
   (primMultiResult, MultiPrimInfo(..), Alt, LetBinding, Pat (..), Term (..), TickInfo (..), NameMod (..),
    IsMultiPrim (..), collectArgsTicks, collectTicks, collectBndrs, PrimInfo(primName), mkTicks, stripTicks)
 import           Clash.Core.TermInfo
+import           Clash.Core.TermLiteral (termToDataError)
 import           Clash.Core.TyCon
   (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type
-  (Type (..), TyVar, TypeView (..), coreView1, normalizeType, splitTyConAppM, tyView)
+  (LitTy (..), Type (..), TyVar, TypeView (..), coreView, coreView1, normalizeType,
+   splitTyConAppM, tyView)
 import           Clash.Core.Util
   (substArgTys, tyLitShow)
 import           Clash.Core.Var
   (Id, Var (..), mkLocalId, modifyVarName)
 import           Clash.Core.VarEnv
-  (InScopeSet, extendInScopeSetList, uniqAway, lookupVarEnv)
+  (InScopeSet, extendInScopeSetList, uniqAway, lookupVarEnv, emptyInScopeSet)
 import qualified Clash.Data.UniqMap as UniqMap
 import {-# SOURCE #-} Clash.Netlist.BlackBox
 import {-# SOURCE #-} Clash.Netlist.BlackBox.Util
@@ -121,8 +127,10 @@ import           Clash.Netlist.BlackBox.Types
 import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.Types     as HW
 import           Clash.Primitives.Types
+import qualified Clash.Sized.Vector as V
 import           Clash.Util
 import qualified Clash.Util.Interpolate  as I
+import Clash.Util.Supply
 
 hmFindWithDefault :: (Eq k, Hashable k) => v -> k -> HashMap k v -> v
 #if MIN_VERSION_unordered_containers(0,2,11)
@@ -220,8 +228,7 @@ unsafeCoreTypeToHWTypeM'
   :: String
   -> Type
   -> NetlistMonad HWType
-unsafeCoreTypeToHWTypeM' loc ty =
-  stripFiltered <$> unsafeCoreTypeToHWTypeM loc ty
+unsafeCoreTypeToHWTypeM' loc ty = stripFiltered <$> unsafeCoreTypeToHWTypeM loc ty
 
 -- | Converts a Core type to a HWType within the NetlistMonad; errors on failure
 unsafeCoreTypeToHWTypeM
@@ -1881,6 +1888,56 @@ withTicks ticks0 k = do
   go decls (SrcSpan sp:ticks) =
     go (TickDecl (Comment (Text.pack (showSDocUnsafe (ppr sp)))):decls) ticks
 
+  go decls (Attributes ty attrs0:ticks) = do
+    -- We have 'Term', `attrs0`, that represents a value of type `Vec n (Attr String)`.
+    -- We want to convert this to an actual value of type `Vec n (Attr String)`, for
+    -- which we will use `termToDataError`.
+    --
+    -- The `termToDataError` only works well for completely evaluated literals.
+    -- Sometimes we end up with a term which hasn't been complete beta-reduced, e.g.
+    -- `(/\b.Nil 0 b (0~0)) Bool` which represents a value of type `Vec 0 Bool`, for
+    -- which `termToDataError` would create an error-value.
+    --
+    -- To ensure that we only pass literals to `termToDataError` we first evaluate
+    -- `attrs0` to Normal Form (NF) using the partial evaluators.
+    tcm <- Lens.view tcCache
+    case coreView tcm ty of
+      LitTy (NumTy n)
+        | Just (SomeNat (Proxy :: Proxy n)) <- someNatVal n
+        -> if isClosed attrs0 then do
+            -- Step 1. Evaluate to normal form
+            nm <- Lens.use bindings
+            ids <- State.liftIO newSupply
+            eval <- Lens.view peEvaluator
+            let attrsTy = inferCoreTypeOf tcm attrs0
+                -- Safe to use `mkUnsafeSystemName` here, because attrs0 has no
+                -- free variables (it's closed), meaning there can be no shadowing
+                attrsName = mkUnsafeSystemName "attrs" 0
+                attrsId = mkLocalId attrsTy attrsName
+
+                genv = mkGlobalEnv nm tcm emptyInScopeSet ids 20 mempty 0
+            -- Force attributes term to Normal Form so that it is a simple literal
+            -- that is understood by `termToDataError`.
+            (attrs1,_) <- State.liftIO (nf eval genv True attrsId attrs0)
+
+            -- Step 2. Create data from the term
+            case termToDataError attrs1 of
+              Left msg -> error msg
+              Right attrs2 ->
+                -- Step 3. Finally add the attributes to the environment.
+                let attrs3 = fmap (fmap Text.pack) attrs2
+                in local (\env -> env {_localAttrs = V.toList @n attrs3}) (go decls ticks)
+           else
+            error errFV
+      _ -> error errNoNum
+   where
+    errHeader = "ERROR: cannot add attribues: " <> showPpr attrs0
+    errNoNum  = unlines [errHeader
+                         ,"REASON: Internal length is not a literal" <> showPpr ty]
+    errFV     = unlines [errHeader
+                         ,"REASON: attributes mentions variables" <> showPpr attrs0
+                         ]
+
   go decls (NameMod m nm0:ticks) = do
     tcm <- Lens.view tcCache
     case runExcept (tyLitShow tcm nm0) of
@@ -1904,7 +1961,7 @@ affixName
   :: Text
   -> NetlistMonad Text
 affixName nm0 = do
-  NetlistEnv _ pre suf _ <- ask
+  NetlistEnv _ pre suf _ _ _ <- ask
   let nm1 = if Text.null pre then nm0 else pre <> "_" <> nm0
       nm2 = if Text.null suf then nm1 else nm1 <> "_" <> suf
   return nm2
