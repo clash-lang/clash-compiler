@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2018, Google Inc.
                   2019, Myrtle Software Ltd
-                  2022-2024, QBayLogic B.V.
+                  2022-2025, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -398,7 +398,8 @@ dumpVCD## (offset, cycles) traceMap now
 
   periods' = map (`quot` timescale) periods
   valuess' = map slice $ zipWith normalize periods' valuess
-  normalize period values = concatMap (replicate period) values
+  normalize period (initial:values) = initial : concatMap (replicate period) values
+  normalize _      []               = []
   slice values = drop offset $ take cycles values
 
   headerDate       = ["$date", Text.pack $ iso8601Format now, "$end"]
