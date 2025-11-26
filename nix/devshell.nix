@@ -23,6 +23,9 @@ pkgs.mkShell {
     clashPkgs.cabal-install
     clashPkgs.haskell-language-server
 
+    # https://discourse.nixos.org/t/non-interactive-bash-errors-from-flake-nix-mkshell/33310
+    pkgs.bashInteractive
+
     pkgs.ghdl-llvm
     pkgs.nixpkgs-fmt
     pkgs.symbiyosys
