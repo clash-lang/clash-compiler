@@ -153,7 +153,7 @@ import Clash.Promoted.Nat.Literals (d1)
 import Clash.Sized.Internal.BitVector (Bit, BitVector (..), split#)
 import Clash.Sized.Index          (Index)
 
-import Clash.Class.BitPack        (packXWith, BitPack (..))
+import Clash.Class.BitPack        (BitPack (..))
 import Clash.XException           (ShowX (..), NFDataX (..), seqX, isX)
 
 {- $setup
@@ -2680,7 +2680,7 @@ smap f xs = reverse
 
 instance (KnownNat n, BitPack a) => BitPack (Vec n a) where
   type BitSize (Vec n a) = n * (BitSize a)
-  pack   = packXWith (concatBitVector# . map pack)
+  pack   = concatBitVector# . map pack . lazyV
   unpack = map unpack . unconcatBitVector#
 
 concatBitVector#
