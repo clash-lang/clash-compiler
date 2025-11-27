@@ -441,7 +441,7 @@ import Data.String.Interpolate (__i)
 import GHC.Arr (STArray, unsafeReadSTArray, unsafeWriteSTArray)
 import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack, withFrozenCallStack)
-import GHC.TypeLits (KnownNat, type (^), type (<=))
+import GHC.TypeLits (KnownNat, type (^))
 import Unsafe.Coerce (unsafeCoerce)
 
 import Clash.Annotations.Primitive
@@ -867,7 +867,7 @@ blockRamU
      , NFDataX a
      , Enum addr
      , NFDataX addr
-     , 1 <= n )
+     )
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Reset dom
@@ -958,7 +958,7 @@ blockRam1
      , NFDataX a
      , Enum addr
      , NFDataX addr
-     , 1 <= n )
+     )
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Reset dom

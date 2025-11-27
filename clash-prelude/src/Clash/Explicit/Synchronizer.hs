@@ -103,7 +103,7 @@ fifoMem
      , KnownDomain rdom
      , NFDataX a
      , KnownNat addrSize
-     , 1 <= addrSize )
+     )
   => Clock wdom
   -> Clock rdom
   -> Enable wdom
