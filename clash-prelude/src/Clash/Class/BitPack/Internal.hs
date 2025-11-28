@@ -111,6 +111,10 @@ class KnownNat (BitSize a) => BitPack a where
   type BitSize a = (CLog 2 (GConstructorCount (Rep a))) + (GFieldSize (Rep a))
   -- | Convert element of type @a@ to a 'BitVector'
   --
+  -- @pack@ will never raise @XException@; as @BitVector@ is three-valued,
+  -- @pack@ applied to an @XException@ will return a @BitVector@ filled with
+  -- undefined bits.
+  --
   -- >>> pack (-5 :: Signed 6)
   -- 0b11_1011
   pack   :: a -> BitVector (BitSize a)
