@@ -1,3 +1,11 @@
+{-|
+  Copyright  :  (C) 2019     , Myrtle Software Ltd
+                    2021     , Ellie Hermaszewska
+                    2020-2025, QBayLogic B.V.
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Primitives.Verification (checkBBF) where
@@ -11,14 +19,14 @@ import           Data.List.Infinite              (Infinite(..), (...))
 import           Data.Maybe                      (listToMaybe)
 import           Data.Monoid                     (Ap(getAp))
 import           Data.Text.Prettyprint.Doc.Extra (Doc)
-import qualified Data.Text                       as Text
+import           Data.Text                       (Text)
 import           GHC.Stack                       (HasCallStack)
 
 import           Clash.Annotations.Primitive     (HDL(..))
 import           Clash.Backend
   (Backend, blockDecl, hdlKind)
 import           Clash.Core.HasType
-import           Clash.Core.Term                 (Term(Var), varToId)
+import           Clash.Core.Term                 (Term(Var))
 import           Clash.Core.TermLiteral          (termToDataError)
 import           Clash.Util                      (indexNote)
 import           Clash.Netlist                   (mkExpr)
@@ -41,10 +49,11 @@ checkBBF _isD _primName args _ty =
   case litArgs of
     Left err -> pure (Left err)
     Right (propName, renderAs, cvProperty0) -> do
+      clkBind <- bindMaybe (Just "clk") (indexNote "clk" (lefts args) clkArg)
       cvProperty1 <- mapM (uncurry bindMaybe) cvProperty0
       let decls = concatMap snd cvProperty1
           cvProperty2 = fmap fst cvProperty1
-      pure (Right (meta, bb (checkTF decls (clkExpr, clkId) propName renderAs cvProperty2)))
+      pure (Right (meta, bb (checkTF decls clkBind propName renderAs cvProperty2)))
  where
   -- TODO: Improve error handling; currently errors don't indicate what
   -- TODO: blackbox generated them.
@@ -55,8 +64,6 @@ checkBBF _isD _primName args _ty =
     :< renderAsArg
     :< propArg
     :< _ = ((0 :: Int)...)
-  (Id.unsafeFromCoreId -> clkId) = varToId (indexNote "clk" (lefts args) clkArg)
-  clkExpr = Identifier clkId Nothing
 
   litArgs = do
     propName <- termToDataError (indexNote "propName" (lefts args) propNameArg)
@@ -68,7 +75,7 @@ checkBBF _isD _primName args _ty =
   meta = emptyBlackBoxMeta {bbKind=TDecl, bbRenderVoid=RenderVoid}
 
   bindMaybe
-    :: Maybe String
+    :: Maybe Text
     -- ^ Hint for new identifier
     -> Term
     -- ^ Term to bind. Does not bind if it's already a reference to a signal
@@ -78,7 +85,7 @@ checkBBF _isD _primName args _ty =
   bindMaybe Nothing t = bindMaybe (Just "s") t
   bindMaybe (Just nm) t = do
     tcm <- Lens.view tcCache
-    newId <- Id.make (Text.pack nm)
+    newId <- Id.make nm
     (expr0, decls) <- mkExpr False Concurrent (NetlistId newId (inferCoreTypeOf tcm t)) t
     assn <- contAssign newId expr0
     pure
@@ -91,8 +98,8 @@ checkBBF _isD _primName args _ty =
 
 checkTF
   :: [Declaration]
-  -> (Expr, Identifier)
-  -> Text.Text
+  -> (Identifier, [Declaration])
+  -> Text
   -> RenderAs
   -> Property' Identifier
   -> TemplateFunction
@@ -104,20 +111,21 @@ checkTF'
    . (HasCallStack, Backend s)
   => [Declaration]
   -- ^ Extra decls needed
-  -> (Expr, Identifier)
+  -> (Identifier, [Declaration])
   -- ^ Clock
-  -> Text.Text
+  -> Text
   -- ^ Prop name
   -> RenderAs
   -> Property' Identifier
   -> BlackBoxContext
   -> State s Doc
-checkTF' decls (clk, clkId) propName renderAs prop bbCtx = do
+checkTF' decls (clkId, clkDecls) propName renderAs prop bbCtx = do
   blockName <- Id.makeBasic (propName <> "_block")
-  getAp (blockDecl blockName (renderedPslProperty : decls))
+  getAp (blockDecl blockName (clkDecls <> (renderedPslProperty : decls)))
 
  where
   hdl = hdlKind (undefined :: s)
+  clk = Identifier clkId Nothing
 
   edge =
     case bbInputs bbCtx of
