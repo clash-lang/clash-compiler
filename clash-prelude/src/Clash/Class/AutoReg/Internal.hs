@@ -341,7 +341,7 @@ calculateRequiredContext conInfo = do
 
 constraintsWantedFor :: Name -> [Type] -> Q Cxt
 constraintsWantedFor clsNm tys
-  | show clsNm == "GHC.TypeNats.KnownNat" = do
+  | show clsNm == show ''KnownNat = do
   -- KnownNat is special, you can't just lookup instances with reifyInstances.
   -- So we just pass KnownNat constraints.
   -- This will most likely require UndecidableInstances.
