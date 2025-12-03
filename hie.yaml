@@ -10,19 +10,7 @@ cradle:
       config: { cradle: {cabal: [{path: "./clash-ghc/src-ghc", component: "lib:clash-ghc"}
                                 ,{path: "./clash-ghc/src-ghc-common", component: "lib:clash-ghc"}]}}
     # The src-bin directories are GHC version dependant, so don't load them
-    - path: "./clash-ghc/src-bin-8.10"
-      config: { cradle: {none: }}
-    - path: "./clash-ghc/src-bin-9.0"
-      config: { cradle: {none: }}
-    - path: "./clash-ghc/src-bin-9.2"
-      config: { cradle: {none: }}
-    - path: "./clash-ghc/src-bin-9.4"
-      config: { cradle: {none: }}
     - path: "./clash-ghc/src-bin-9.6"
-      config: { cradle: {none: }}
-    - path: "./clash-ghc/src-bin-861"
-      config: { cradle: {none: }}
-    - path: "./clash-ghc/src-bin-881"
       config: { cradle: {none: }}
     - path: "./clash-lib-hedgehog"
       config: { cradle: {cabal: [{path: "./clash-lib-hedgehog/src", component: "lib:clash-lib-hedgehog"}]}}

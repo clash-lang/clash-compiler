@@ -21,16 +21,8 @@ jobs:
       fail-fast: false
       matrix:
         os: ["macOS-15", "windows-latest"]
-        ghc: ["8.10", "9.0", "9.2", "9.4", "9.6", "9.8", "9.10"]
+        ghc: ["9.6", "9.8", "9.10"]
         exclude:
-          # GHC 8.10 requires LLVM 12 or less, which is disabled on macOS 15.
-          - os: "macOS-15"
-            ghc: "8.10"
-
-          # GHC 9.0 requires LLVM 12 or less, which is disabled on macOS 15.
-          - os: "macOS-15"
-            ghc: "9.0"
-
           # GHC/Clash starts extremely slowly, see
           # https://github.com/clash-lang/clash-compiler/issues/2684
           - os: "windows-latest"
@@ -149,17 +141,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: [ "8.10.7", "9.0.2", "9.6.7" ]
+        ghc: [ "9.6.7" ]
         include:
           - multiple_hidden: yes
-
-          - ghc: 8.10.7
-            multiple_hidden: no
-            workaround_ghc_mmap_crash: yes
-
-          - ghc: 9.0.2
-            workaround_ghc_mmap_crash: yes
-
 
     # Run steps inside the clash CI docker image
     container:
