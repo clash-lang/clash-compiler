@@ -71,11 +71,7 @@ import Data.Maybe                              (catMaybes)
 import Data.List                               (nub, partition)
 import Data.Text                               (Text)
 import GHC.Generics
-#if MIN_VERSION_ghc(9,0,0)
 import GHC.Types.SrcLoc                        (SrcSpan, leftmost_smallest)
-#else
-import SrcLoc                                  (SrcSpan, leftmost_smallest)
-#endif
 
 -- Internal Modules
 import Clash.Core.DataCon                      (DataCon)

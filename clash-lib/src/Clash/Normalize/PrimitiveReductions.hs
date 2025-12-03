@@ -56,17 +56,10 @@ import           Data.Semigroup                   (sconcat)
 import           Data.Text.Extra                  (showt)
 import           GHC.Stack                        (HasCallStack)
 
-#if MIN_VERSION_ghc(9,0,0)
 import           GHC.Builtin.Names
   (boolTyConKey, typeNatAddTyFamNameKey, typeNatMulTyFamNameKey,
    typeNatSubTyFamNameKey)
 import           GHC.Types.SrcLoc                 (wiredInSrcSpan)
-#else
-import           PrelNames
-  (boolTyConKey, typeNatAddTyFamNameKey, typeNatMulTyFamNameKey,
-   typeNatSubTyFamNameKey)
-import           SrcLoc                           (wiredInSrcSpan)
-#endif
 
 import           Clash.Core.DataCon               (DataCon)
 import           Clash.Core.FreeVars              (typeFreeVars)

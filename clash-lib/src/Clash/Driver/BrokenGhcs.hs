@@ -18,17 +18,10 @@ import Data.Maybe (listToMaybe)
 import Data.Version (Version(Version, versionBranch))
 import GHC.Platform (OS(..))
 
-#if __GLASGOW_HASKELL__ > 810
 import System.Info (fullCompilerVersion)
-#endif
 
 import qualified Clash.Util.Interpolate as I
 import qualified System.Info
-
-#if __GLASGOW_HASKELL__ <= 810
-fullCompilerVersion :: Version
-fullCompilerVersion = System.Info.compilerVersion
-#endif
 
 -- | Current OS. Currently only recognizes Linux, Windows, and macOS.
 os :: OS

@@ -844,20 +844,10 @@ readNew (blockRam (0 :> 1 :> Nil))
      ... =>
      Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a
 
-#elif __GLASGOW_HASKELL__ >= 902
->>> :t readNew (blockRam (0 :> 1 :> Nil))
-readNew (blockRam (0 :> 1 :> Nil))
-  :: ...
-     ... =>
-     Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a
-
 #else
 >>> :t readNew (blockRam (0 :> 1 :> Nil))
 readNew (blockRam (0 :> 1 :> Nil))
   :: ...
-     ...
-     ...
-     ...
      ... =>
      Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a
 

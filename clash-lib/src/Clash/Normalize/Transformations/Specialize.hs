@@ -48,11 +48,7 @@ import qualified Data.Text.Extra as Text
 import GHC.BasicTypes.Extra (isNoInline)
 import GHC.Stack (HasCallStack)
 
-#if MIN_VERSION_ghc(9,0,0)
 import GHC.Types.Basic (InlineSpec (..))
-#else
-import BasicTypes (InlineSpec (..))
-#endif
 
 import qualified Clash.Sized.Internal.BitVector as BV (BitVector, fromInteger#)
 import qualified Clash.Sized.Internal.Index as I (Index, fromInteger#)
@@ -352,17 +348,11 @@ preferNoInline is0 is1
  where
   enumInlineSpec :: InlineSpec -> Int
   enumInlineSpec = \case
-#if MIN_VERSION_ghc(9,2,0)
     NoUserInlinePrag {} -> -1
-#else
-    NoUserInline {} -> -1
-#endif
     Inline {} -> 0
     Inlinable {} -> 1
     NoInline {} -> 2
-#if MIN_VERSION_ghc(9,4,0)
     Opaque {} -> 3
-#endif
 
 -- | Specialize an application on its argument
 specialize'
@@ -502,11 +492,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
         Nothing -> return e
   where
     noUserInline :: InlineSpec
-#if MIN_VERSION_ghc(9,2,0)
     noUserInline = NoUserInlinePrag
-#else
-    noUserInline = NoUserInline
-#endif
 
     specializeName :: (InlineSpec, Name Term) -> (Maybe InlineSpec, Name Term) -> Name Term
     specializeName (spec0, n0) (spec1, n1)
@@ -546,11 +532,7 @@ specialize' _ctx _ (appE,args,ticks) (Left specArg) = do
   -- Create a new function if an alpha-equivalent binder doesn't exist
   newf <- case UniqMap.elems existing of
     [] -> do (cf,sp) <- Lens.use curFun
-#if MIN_VERSION_ghc(9,2,0)
              mkFunction (appendToName (varName cf) "_specF") sp NoUserInlinePrag newBody
-#else
-             mkFunction (appendToName (varName cf) "_specF") sp NoUserInline newBody
-#endif
     (b:_) -> return (bindingId b)
   -- Create specialized argument
   let newArg  = Left $ mkApps (Var newf) specVars

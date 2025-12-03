@@ -2,9 +2,6 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
-#if __GLASGOW_HASKELL__ < 900
-{-# LANGUAGE AllowAmbiguousTypes #-}
-#endif
 
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 

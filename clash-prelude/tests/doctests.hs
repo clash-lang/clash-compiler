@@ -10,9 +10,5 @@ main = mainFromCabal "clash-prelude" =<< fmap (extraArgs ++) getArgs
 extraArgs :: [String]
 extraArgs = map ("--ghc-arg=" ++)
   [
-#if __GLASGOW_HASKELL__ >= 904
     "-DCLASH_OPAQUE=OPAQUE"
-#else
-    "-DCLASH_OPAQUE=NOINLINE"
-#endif
   ]

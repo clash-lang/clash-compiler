@@ -41,10 +41,8 @@ import           Control.Monad                   (forM, join, when)
 import           Data.List.Extra                 (nubSort)
 import           Control.Exception               (Exception, throwIO)
 import           Control.Monad                   (foldM)
-#if MIN_VERSION_ghc(9,0,0)
 import           Control.Monad.Catch             (catch, throwM)
 import           Control.Monad.Catch             as MC (try)
-#endif
 import           Control.Monad.IO.Class          (liftIO)
 import           Data.Char                       (isDigit)
 import           Data.Generics.Uniplate.DataOnly (transform)
@@ -70,9 +68,7 @@ import           Debug.Trace
 import           Language.Haskell.TH.Syntax      (lift)
 import           GHC.Natural                     (naturalFromInteger)
 import           GHC.Stack                       (HasCallStack)
-#if MIN_VERSION_ghc(9,4,0)
 import           System.FilePath.Posix           (dropExtension, takeDirectory)
-#endif
 import           Text.Read                       (readMaybe)
 
 #ifdef USE_GHC_PATHS
@@ -86,17 +82,10 @@ import           System.Process                  (runInteractiveCommand,
 #endif
 
 -- GHC API
-#if MIN_VERSION_ghc(9,0,0)
-#if MIN_VERSION_ghc(9,4,0)
 import           GHC.Driver.Phases (StopPhase(NoStop))
 import           GHC.Driver.Pipeline (mkPipeEnv, runPipeline, hscBackendPipeline)
-#if MIN_VERSION_ghc(9,6,0)
 import           GHC.SysTools.Cpp (offsetIncludePaths)
 import           GHC.Unit.Home.ModInfo (homeMod_bytecode)
-#else
-import           GHC.Driver.Pipeline.Execute (offsetIncludePaths)
-import           GHC.Driver.Pipeline.Monad (PipelineOutput(NoOutputFile, Persistent))
-#endif
 import           GHC.Driver.Pipeline.Monad ( MonadUse(use) )
 import           GHC.Driver.Pipeline.Phases (TPhase(T_HscPostTc))
 import           GHC.Data.Bool (OverridingBool)
@@ -106,10 +95,6 @@ import           GHC.Driver.Monad (modifySession)
 import           GHC.Unit.Env (addHomeModInfoToHug)
 import           GHC.Unit.Home.ModInfo (HomeModInfo(HomeModInfo))
 import           GHC.Unit.Module.ModSummary (findTarget)
-#else
-import           GHC.Utils.Misc (OverridingBool)
-#endif
-#if MIN_VERSION_ghc(9,2,0)
 import qualified GHC.Driver.Env as HscTypes
 import qualified GHC.Unit.Module.ModGuts as HscTypes
 import qualified GHC.Types.SourceError as HscTypes
@@ -117,13 +102,6 @@ import qualified GHC.Unit.Module.Deps as HscTypes
 import qualified GHC.Driver.Backend as Backend
 import qualified GHC.Unit.Module.Graph as Graph
 import qualified GHC.Platform.Ways as Ways
-#if !MIN_VERSION_ghc(9,4,0)
-import qualified GHC.Types.Error as Error
-#endif
-#else
-import qualified GHC.Driver.Types as HscTypes
-import qualified GHC.Driver.Ways as Ways
-#endif
 import qualified GHC.Types.Annotations as Annotations
 import qualified GHC.Core.FVs as CoreFVs
 import qualified GHC.Core as CoreSyn
@@ -156,41 +134,6 @@ import qualified GHC.Types.Unique.Set as UniqSet
 import qualified GHC.Types.Var as Var
 import qualified GHC.Unit.Module.Env as ModuleEnv
 import qualified GHC.Types.Name.Env as NameEnv
-#else
-import qualified Annotations
-import qualified CoreFVs
-import qualified CoreSyn
-import qualified DataCon
-import qualified Digraph
-import qualified DynamicLoading
-import           DynFlags                        (GeneralFlag (..))
-import qualified DynFlags
-import qualified Exception
-import qualified FastString
-import qualified GHC
-import qualified HscMain
-import qualified HscTypes
-import qualified MonadUtils
-import qualified Panic
-import qualified GhcPlugins                      (deserializeWithData, installedUnitIdString)
-import qualified TcRnMonad
-import qualified TcRnTypes
-import qualified TidyPgm
-import qualified TyCon
-import qualified Type
-import qualified Unique
-import qualified UniqFM
-import qualified FamInst
-import qualified FamInstEnv
-import qualified GHC.LanguageExtensions          as LangExt
-import qualified Name
-import qualified OccName
-import           Outputable                      (ppr)
-import qualified Outputable
-import qualified UniqSet
-import           Util (OverridingBool)
-import qualified Var
-#endif
 
 -- Internal Modules
 import           Clash.GHC.GHC2Core                           (modNameM, qualifiedNameString')
@@ -249,11 +192,7 @@ loadExternalModule
           , LoadedBinders
           , [CoreSyn.CoreBind]                     -- All bindings
           ) )
-#if MIN_VERSION_ghc(9,0,0)
 loadExternalModule hdl modName0 = MC.try $ do
-#else
-loadExternalModule hdl modName0 = Exception.gtry $ do
-#endif
   let modName1 = GHC.mkModuleName modName0
   foundMod <- GHC.findModule modName1 Nothing
   let errMsg = "Internal error: found  module, but could not load it"
@@ -278,18 +217,10 @@ setupGhc useColor dflagsM idirs = do
         -- Make sure we read the .ghc environment files
         df <- do
           df <- GHC.getSessionDynFlags
-#if MIN_VERSION_ghc(9,0,0)
-#if MIN_VERSION_ghc(9,2,0)
           logger <- GHC.getLogger
           df1 <- liftIO (GHC.interpretPackageEnv logger df)
-#else
-          df1 <- liftIO (GHC.interpretPackageEnv df)
-#endif
           _ <- GHC.setSessionDynFlags df1
 
-#else
-          _ <- GHC.setSessionDynFlags df {DynFlags.pkgDatabase = Nothing}
-#endif
           GHC.getSessionDynFlags
 
         let df1 = setWantedLanguageExtensions df
@@ -307,29 +238,10 @@ setupGhc useColor dflagsM idirs = do
   let dflags1 = dflags
                   { DynFlags.ghcMode  = GHC.CompManager
                   , DynFlags.ghcLink  = GHC.LinkInMemory
-#if !MIN_VERSION_ghc(9,4,0)
-                  , DynFlags.optLevel = 2
-#endif
-#if MIN_VERSION_ghc(9,2,0)
                   , DynFlags.backend  =
                       if Ways.hostIsProfiled
-#if MIN_VERSION_ghc(9,6,0)
                          then Backend.noBackend
-#else
-                         then Backend.NoBackend
-#endif
                          else Backend.platformDefaultBackend (DynFlags.targetPlatform dflags)
-#else
-                  , DynFlags.hscTarget
-#if MIN_VERSION_ghc(9,0,0)
-                      = if Ways.hostIsProfiled
-#else
-                      = if DynFlags.rtsIsProfiled
-#endif
-                           then DynFlags.HscNothing
-                           else DynFlags.defaultObjectTarget $
-                                    dflags
-#endif
                   , DynFlags.reductionDepth = 1000
                   }
   let dflags2 = unwantedOptimizationFlags dflags1
@@ -349,21 +261,10 @@ setupGhc useColor dflagsM idirs = do
                ])
       (return ())
 
-#if MIN_VERSION_ghc(9,2,0)
   _ <- GHC.setSessionDynFlags dflags3
   hscenv <- GHC.getSession
   hscenv1 <- MonadUtils.liftIO (DynamicLoading.initializePlugins hscenv)
   GHC.setSession hscenv1
-#elif MIN_VERSION_ghc(9,0,0)
-  _ <- GHC.setSessionDynFlags dflags3
-  hscenv <- GHC.getSession
-  dflags4 <- MonadUtils.liftIO (DynamicLoading.initializePlugins hscenv dflags3)
-  _ <- GHC.setSessionDynFlags dflags4
-#else
-  hscenv <- GHC.getSession
-  dflags4 <- MonadUtils.liftIO (DynamicLoading.initializePlugins hscenv dflags3)
-  _ <- GHC.setSessionDynFlags dflags4
-#endif
 
   return ()
 
@@ -382,21 +283,15 @@ loadLocalModule
        , [CoreSyn.CoreBind]                     -- All bindings
        )
 loadLocalModule hdl modName = do
-#if MIN_VERSION_ghc(9,4,0)
   target <- GHC.guessTarget modName Nothing Nothing
-#else
-  target <- GHC.guessTarget modName Nothing
-#endif
   GHC.setTargets [target]
   modGraph <- GHC.depanal [] False
   let modGraph' = GHC.mapMG disableOptimizationsFlags modGraph
       -- 'topSortModuleGraph' ensures that modGraph2, and hence tidiedMods
       -- are in topological order, i.e. the root module is last.
       modGraph2 = Digraph.flattenSCCs $
-#if MIN_VERSION_ghc(9,2,0)
                   -- TODO: this might break backpack
                   Graph.filterToposortToModules $
-#endif
                   GHC.topSortModuleGraph True modGraph' Nothing
 
   liftIO $ mapM_ checkMonoLocalBindsMod modGraph2
@@ -423,23 +318,14 @@ loadLocalModule hdl modName = do
     --
     -- Given that TH splices can do non-trivial computation and I/O,
     -- running TH twice must be avoid.
-#if MIN_VERSION_ghc(9,4,0)
     let (tc_result,_) = GHC.tm_internals_ tcMod
     let tcMod' = tcMod
-#else
-    tcMod' <- GHC.loadModule tcMod
-#endif
     dsMod <- fmap GHC.coreModule $ GHC.desugarModule tcMod'
     hsc_env <- GHC.getSession
     simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env [] dsMod
     checkForInvalidPrelude simpl_guts
-#if MIN_VERSION_ghc(9,4,0)
     opts <- liftIO (initTidyOpts hsc_env)
     (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram opts simpl_guts
-#else
-    (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env simpl_guts
-#endif
-#if MIN_VERSION_ghc(9,4,0)
     let
       loadAsByteCode
         | Just GHC.Target { targetAllowObjCode = obj }
@@ -453,11 +339,7 @@ loadLocalModule hdl modName = do
       input_fn = fromMaybe (error "loadLocalModule") (GHC.ml_hs_file location)
       basename = dropExtension input_fn
       current_dir = takeDirectory basename
-#if MIN_VERSION_ghc(9,6,0)
       interpreterBackend = Backend.interpreterBackend
-#else
-      interpreterBackend = Backend.Interpreter
-#endif
       (bcknd, dflags3)
         | loadAsByteCode
         = ( interpreterBackend
@@ -472,14 +354,7 @@ loadLocalModule hdl modName = do
                                     DynFlags.addImplicitQuoteInclude
                                       old_paths
                                       [current_dir] }
-#if MIN_VERSION_ghc(9,6,0)
       pipelineOutput = Backend.backendPipelineOutput bcknd
-#else
-      pipelineOutput = case bcknd of
-        GHC.Interpreter -> NoOutputFile
-        GHC.NoBackend -> NoOutputFile
-        _ -> Persistent
-#endif
       upd_summary = m { GHC.ms_hspp_opts = dflags }
       hsc_env1 = HscTypes.hscSetFlags dflags hsc_env
       pipe_env = mkPipeEnv NoStop input_fn Nothing pipelineOutput
@@ -488,18 +363,12 @@ loadLocalModule hdl modName = do
                       (TcRnTypes.FrontendTypecheck tc_result) mempty Nothing )
         hscBackendPipeline pipe_env hsc_env1 upd_summary ac
     (iface, linkable) <- liftIO (runPipeline (HscTypes.hsc_hooks hsc_env1) pipeline)
-#if MIN_VERSION_ghc(9,6,0)
     details <- liftIO (HscMain.initModDetails hsc_env1 iface)
     linkable1 <- liftIO (traverse (HscMain.initWholeCoreBindings hsc_env1 iface details)
                                   (homeMod_bytecode linkable))
     let linkable2 = linkable {homeMod_bytecode = linkable1}
-#else
-    details <- liftIO (HscMain.initModDetails hsc_env1 upd_summary iface)
-    let linkable2 = linkable
-#endif
     let mod_info = HomeModInfo iface details linkable2
     modifySession $ HscTypes.hscUpdateHUG (addHomeModInfoToHug mod_info)
-#endif
     let pgm        = HscTypes.cg_binds tidy_guts
     let modFamInstEnv = TcRnTypes.tcg_fam_inst_env $ fst $ GHC.tm_internals_ tcMod
     _ <- GHC.setSessionDynFlags oldDFlags
@@ -595,7 +464,6 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
       -- We need to try and load external modules first, because we can't
       -- recover from errors in 'loadLocalModule'.
       loadExternalModule hdl modName >>= \case
-#if MIN_VERSION_ghc(9,0,0)
         Left loadExternalErr -> do
           catch @_ @SomeException
             (loadLocalModule hdl modName)
@@ -606,10 +474,6 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
                   , externalError = show loadExternalErr
                   , localError = show localError
                   }))
-#else
-        Left _loadExternalErr -> do
-          loadLocalModule hdl modName
-#endif
         Right res -> pure res
 
     let allBinderIds = map fst (CoreSyn.flattenBinds allBinders)
@@ -626,13 +490,7 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
       case m of
         Nothing -> TcRnMonad.liftIO $ throwIO
                                     $ HscTypes.mkSrcErr
-#if MIN_VERSION_ghc(9,4,0)
                                     $ fmap GhcTcRnMessage msgs
-#elif MIN_VERSION_ghc(9,2,0)
-                                    $ Error.getErrorMessages msgs
-#else
-                                    $ snd msgs
-#endif
         Just x  -> return x
 
     allSyn     <- Map.fromList <$> findSynthesizeAnnotations allBinderIds
@@ -858,11 +716,7 @@ findAnnotationsByTargets
   => [Annotations.AnnTarget Name.Name]
   -> m [[a]]
 findAnnotationsByTargets targets =
-#if MIN_VERSION_ghc(9,0,0)
   mapM (GHC.findGlobalAnns Serialized.deserializeWithData) targets
-#else
-  mapM (GHC.findGlobalAnns GhcPlugins.deserializeWithData) targets
-#endif
 
 -- | Find all annotations of a certain type in all modules seen so far.
 findAllModuleAnnotations
@@ -872,19 +726,9 @@ findAllModuleAnnotations = do
   hsc_env <- GHC.getSession
   ann_env <- liftIO $ HscTypes.prepareAnnotations hsc_env Nothing
   return $ concat
-#if MIN_VERSION_ghc(9,4,0)
         $ (\(mEnv,nEnv) -> ModuleEnv.moduleEnvElts mEnv <> NameEnv.nonDetNameEnvElts nEnv)
-#elif MIN_VERSION_ghc(9,0,0)
-         $ (\(mEnv,nEnv) -> ModuleEnv.moduleEnvElts mEnv <> NameEnv.nameEnvElts nEnv)
-#else
-         $ UniqFM.nonDetEltsUFM
-#endif
          $ Annotations.deserializeAnns
-#if MIN_VERSION_ghc(9,0,0)
               Serialized.deserializeWithData
-#else
-              GhcPlugins.deserializeWithData
-#endif
               ann_env
 
 -- | Find all annotations belonging to all binders seen so far.
@@ -1015,19 +859,11 @@ findPrimitiveAnnotations hdl bndrs = do
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule
 parseModule modSum = do
-#if MIN_VERSION_ghc(9,2,0)
   (GHC.ParsedModule pmModSum pmParsedSource extraSrc) <-
     GHC.parseModule modSum
   return (GHC.ParsedModule
             (disableOptimizationsFlags pmModSum)
             pmParsedSource extraSrc)
-#else
-  (GHC.ParsedModule pmModSum pmParsedSource extraSrc anns) <-
-    GHC.parseModule modSum
-  return (GHC.ParsedModule
-            (disableOptimizationsFlags pmModSum)
-            pmParsedSource extraSrc anns)
-#endif
 
 disableOptimizationsFlags :: GHC.ModSummary -> GHC.ModSummary
 disableOptimizationsFlags ms@(GHC.ModSummary {..})
@@ -1035,9 +871,6 @@ disableOptimizationsFlags ms@(GHC.ModSummary {..})
   where
     dflags = unwantedOptimizationFlags (ms_hspp_opts
               { DynFlags.reductionDepth = 1000
-#if !MIN_VERSION_ghc(9,4,0)
-              , DynFlags.optLevel = 2
-#endif
               })
 
 unwantedOptimizationFlags :: GHC.DynFlags -> GHC.DynFlags
@@ -1160,75 +993,48 @@ removeStrictnessAnnotations pm =
     rmTyClD tyClD = tyClD
 
     -- rmDataDefn :: GHC.DataId name => GHC.HsDataDefn name -> GHC.HsDataDefn name
-#if MIN_VERSION_ghc(9,2,0)
     rmDataDefn :: GHC.HsDataDefn GHC.GhcPs -> GHC.HsDataDefn GHC.GhcPs
-#endif
     rmDataDefn hdf = hdf {GHC.dd_cons = (fmap . fmap) rmCD (GHC.dd_cons hdf)}
 
     -- rmCD :: GHC.DataId name => GHC.ConDecl name -> GHC.ConDecl name
     rmCD gadt@(GHC.ConDeclGADT {}) = gadt {GHC.con_res_ty = rmHsType (GHC.con_res_ty gadt)
-#if MIN_VERSION_ghc(9,2,0)
                                           ,GHC.con_g_args = rmGConDetails (GHC.con_g_args gadt)
-#else
-                                          ,GHC.con_args   = rmConDetails (GHC.con_args gadt)
-#endif
                                           }
     rmCD h98@(GHC.ConDeclH98 {})   = h98  {GHC.con_args = rmConDetails (GHC.con_args h98)}
-#if !MIN_VERSION_ghc(9,0,0)
-    rmCD xcon                      = xcon
-#endif
 
 #if MIN_VERSION_ghc(9,10,0)
     rmGConDetails :: GHC.HsConDeclGADTDetails GHC.GhcPs -> GHC.HsConDeclGADTDetails GHC.GhcPs
     rmGConDetails (GHC.PrefixConGADT tkn args) = GHC.PrefixConGADT tkn (fmap rmHsScaledType args)
     rmGConDetails (GHC.RecConGADT tkn rec) = GHC.RecConGADT tkn ((fmap . fmap . fmap) rmConDeclF rec)
-#elif MIN_VERSION_ghc(9,4,0)
+#else
     rmGConDetails :: GHC.HsConDeclGADTDetails GHC.GhcPs -> GHC.HsConDeclGADTDetails GHC.GhcPs
     rmGConDetails (GHC.PrefixConGADT args) = GHC.PrefixConGADT (fmap rmHsScaledType args)
     rmGConDetails (GHC.RecConGADT rec tkn) = GHC.RecConGADT ((fmap . fmap . fmap) rmConDeclF rec) tkn
-#elif MIN_VERSION_ghc(9,2,0)
-    rmGConDetails :: GHC.HsConDeclGADTDetails GHC.GhcPs -> GHC.HsConDeclGADTDetails GHC.GhcPs
-    rmGConDetails (GHC.PrefixConGADT args) = GHC.PrefixConGADT (fmap rmHsScaledType args)
-    rmGConDetails (GHC.RecConGADT rec)     = GHC.RecConGADT ((fmap . fmap . fmap) rmConDeclF rec)
 #endif
 
     -- type HsConDeclDetails name = HsConDetails (LBangType name) (Located [LConDeclField name])
     -- rmConDetails :: _ => GHC.HsConDeclDetails name -> GHC.HsConDeclDetails name
-#if MIN_VERSION_ghc(9,2,0)
     rmConDetails (GHC.PrefixCon tys args) = GHC.PrefixCon tys (fmap rmHsScaledType args)
     rmConDetails (GHC.InfixCon l r)   = GHC.InfixCon (rmHsScaledType l) (rmHsScaledType r)
-#elif MIN_VERSION_ghc(9,0,0)
-    rmConDetails (GHC.PrefixCon args) = GHC.PrefixCon (fmap rmHsScaledType args)
-    rmConDetails (GHC.InfixCon l r)   = GHC.InfixCon (rmHsScaledType l) (rmHsScaledType r)
-#else
-    rmConDetails (GHC.PrefixCon args) = GHC.PrefixCon (fmap rmHsType args)
-    rmConDetails (GHC.InfixCon l r)   = GHC.InfixCon (rmHsType l) (rmHsType r)
-#endif
     rmConDetails (GHC.RecCon rec)     = GHC.RecCon ((fmap . fmap . fmap) rmConDeclF rec)
 
 
     -- rmHsType :: GHC.DataId name => GHC.Located (GHC.HsType name) -> GHC.Located (GHC.HsType name)
     rmHsType = transform go
       where
-#if MIN_VERSION_ghc(9,2,0)
         go ::
           GHC.LBangType GHC.GhcPs ->
           GHC.LBangType GHC.GhcPs
-#endif
         go (GHC.unLoc -> GHC.HsBangTy _ _ ty) = ty
         go ty                               = ty
 
-#if MIN_VERSION_ghc(9,0,0)
     rmHsScaledType = transform go
       where
-#if MIN_VERSION_ghc(9,2,0)
         go ::
           GHC.HsScaled GHC.GhcPs (GHC.LBangType GHC.GhcPs) ->
           GHC.HsScaled GHC.GhcPs (GHC.LBangType GHC.GhcPs)
-#endif
         go (GHC.HsScaled m (GHC.unLoc -> GHC.HsBangTy _ _ ty)) = GHC.HsScaled m ty
         go ty = ty
-#endif
 
     -- rmConDeclF :: GHC.DataId name => GHC.ConDeclField name -> GHC.ConDeclField name
     rmConDeclF cdf = cdf {GHC.cd_fld_type = rmHsType (GHC.cd_fld_type cdf)}
@@ -1246,18 +1052,8 @@ checkForInvalidPrelude guts =
     []    -> return ()
     (x:_) -> throw (ClashException noSrcSpan (msgWrongPrelude x) Nothing)
   where
-#if MIN_VERSION_ghc(9,4,0)
     pkgs = HscTypes.dep_direct_pkgs . HscTypes.mg_deps $ guts
-#else
-    pkgs = HscTypes.dep_pkgs . HscTypes.mg_deps $ guts
-#endif
-#if MIN_VERSION_ghc(9,4,0)
     pkgIds = map (UnitTypes.unitIdString) (toList pkgs)
-#elif MIN_VERSION_ghc(9,0,0)
-    pkgIds = map (UnitTypes.unitIdString . fst) pkgs
-#else
-    pkgIds = map (GhcPlugins.installedUnitIdString . fst) pkgs
-#endif
     prelude = "clash-prelude-"
     isPrelude pkg = case splitAt (length prelude) pkg of
       (x,y:_) | x == prelude && isDigit y -> True     -- check for a digit so we don't match clash-prelude-extras

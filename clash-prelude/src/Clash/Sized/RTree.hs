@@ -128,18 +128,14 @@ instance NFData a => NFData (RTree d a) where
 
 textract :: RTree 0 a -> a
 textract (RLeaf x)   = x
-#if __GLASGOW_HASKELL__ != 902
 textract (RBranch _ _) = error $ "textract: nodes hold no values"
-#endif
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE textract #-}
 {-# ANN textract hasBlackBox #-}
 
 tsplit :: RTree (d+1) a -> (RTree d a,RTree d a)
 tsplit (RBranch l r) = (l,r)
-#if __GLASGOW_HASKELL__ != 902
 tsplit (RLeaf _)   = error $ "tsplit: leaf is atomic"
-#endif
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE tsplit #-}
 {-# ANN tsplit hasBlackBox #-}
@@ -326,7 +322,7 @@ let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
           (bound at ...)
 <BLANKLINE>
 
-#elif __GLASGOW_HASKELL__ >= 900
+#else
 >>> :{
 let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
                      => BitVector (2^d) -> Index (2^d+1)
@@ -341,29 +337,6 @@ let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
         Actual: Index ((2 ^ d) + 1)
                 -> Index ((2 ^ d) + 1)
                 -> AResult (Index ((2 ^ d) + 1)) (Index ((2 ^ d) + 1))
-    • In the second argument of ‘tfold’, namely ‘add’
-      In the first argument of ‘(.)’, namely
-        ‘tfold (resize . bv2i . pack) add’
-      In the expression: tfold (resize . bv2i . pack) add . v2t . bv2v
-    • Relevant bindings include
-        populationCount' :: BitVector (2 ^ d) -> Index ((2 ^ d) + 1)
-          (bound at ...)
-
-#else
->>> :{
-let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
-                     => BitVector (2^d) -> Index (2^d+1)
-    populationCount' = tfold (resize . bv2i . pack) add . v2t . bv2v
-:}
-<BLANKLINE>
-<interactive>:...
-    • Couldn't match type ‘(((2 ^ d) + 1) + ((2 ^ d) + 1)) - 1’
-                     with ‘(2 ^ d) + 1’
-      Expected type: Index ((2 ^ d) + 1)
-                     -> Index ((2 ^ d) + 1) -> Index ((2 ^ d) + 1)
-        Actual type: Index ((2 ^ d) + 1)
-                     -> Index ((2 ^ d) + 1)
-                     -> AResult (Index ((2 ^ d) + 1)) (Index ((2 ^ d) + 1))
     • In the second argument of ‘tfold’, namely ‘add’
       In the first argument of ‘(.)’, namely
         ‘tfold (resize . bv2i . pack) add’

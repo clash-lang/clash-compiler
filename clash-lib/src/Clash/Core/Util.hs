@@ -41,11 +41,7 @@ import           GHC.Real
   (divZeroError, overflowError, ratioZeroDenominatorError, underflowError)
 import           GHC.Stack                     (HasCallStack)
 
-#if MIN_VERSION_ghc(9,0,0)
 import           GHC.Builtin.Names       (ipClassKey)
-#else
-import           PrelNames               (ipClassKey)
-#endif
 
 import Clash.Core.DataCon
 import Clash.Core.EqSolver

@@ -42,13 +42,8 @@ import           System.FilePath      ()
 
 import qualified Clash.Util.Interpolate as I
 import           Clash.Util           (ClashException(..))
-#if MIN_VERSION_ghc(9,0,0)
 import           GHC.Types.SrcLoc     (mkGeneralSrcSpan)
 import           GHC.Data.FastString  (mkFastString)
-#else
-import           SrcLoc               (mkGeneralSrcSpan)
-import           FastString           (mkFastString)
-#endif
 import           GHC.Stack            (HasCallStack)
 
 -- | See 'toSpecNewlines'. A line map maps "virtual" lines to a range of

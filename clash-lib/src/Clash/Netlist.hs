@@ -44,13 +44,8 @@ import qualified Data.Set                         as Set
 import qualified Data.Text                        as StrictText
 import           GHC.Stack                        (HasCallStack)
 
-#if MIN_VERSION_ghc(9,0,0)
 import           GHC.Utils.Outputable             (ppr, showSDocUnsafe)
 import           GHC.Types.SrcLoc                 (isGoodSrcSpan)
-#else
-import           Outputable                       (ppr, showSDocUnsafe)
-import           SrcLoc                           (isGoodSrcSpan)
-#endif
 
 import           Clash.Annotations.Primitive      (HDL)
 import           Clash.Annotations.BitRepresentation.ClashLib

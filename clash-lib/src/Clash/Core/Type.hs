@@ -81,14 +81,9 @@ import           Data.Text.Extra        (showt)
 #endif
 
 -- GHC API
-#if MIN_VERSION_ghc(9,0,0)
-#if MIN_VERSION_ghc(9,2,0)
 import           GHC.Builtin.Names
   (typeCharCmpTyFamNameKey, typeConsSymbolTyFamNameKey, typeUnconsSymbolTyFamNameKey,
    typeCharToNatTyFamNameKey, typeNatToCharTyFamNameKey)
-#else
-import           GHC.Builtin.Names      (typeNatLeqTyFamNameKey)
-#endif
 import           GHC.Builtin.Names
   (integerTyConKey, typeNatAddTyFamNameKey, typeNatExpTyFamNameKey,
    typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
@@ -96,17 +91,6 @@ import           GHC.Builtin.Names
    typeSymbolAppendFamNameKey, typeSymbolCmpTyFamNameKey,
    typeNatDivTyFamNameKey, typeNatModTyFamNameKey)
 import           GHC.Types.SrcLoc       (wiredInSrcSpan)
-#else
-import           PrelNames
-  (ordLTDataConKey, ordEQDataConKey, ordGTDataConKey)
-import           PrelNames
-  (integerTyConKey, typeNatAddTyFamNameKey, typeNatExpTyFamNameKey,
-   typeNatLeqTyFamNameKey, typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
-   typeNatCmpTyFamNameKey,
-   typeSymbolAppendFamNameKey, typeSymbolCmpTyFamNameKey,
-   typeNatDivTyFamNameKey, typeNatModTyFamNameKey)
-import           SrcLoc                 (wiredInSrcSpan)
-#endif
 
 -- Local imports
 import           Clash.Annotations.SynthesisAttributes
@@ -531,19 +515,6 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
         , z >= 0
         -> Just (LitTy (NumTy z))
       _ -> Nothing
-
-#if !MIN_VERSION_ghc(9,2,0)
-  | nameUniq tc == fromGhcUnique typeNatLeqTyFamNameKey
-  = case mapMaybe (litView tcm) tys of
-      [i1, i2]
-        | Just (FunTyCon {tyConKind = tck}) <- UniqMap.lookup tc tcm
-        , (_,tyView -> TyConApp boolTcNm []) <- splitFunTys tcm tck
-        , Just boolTc <- UniqMap.lookup boolTcNm tcm
-        -> let [falseTc,trueTc] = map (coerce . dcName) (tyConDataCons boolTc)
-            in  if i1 <= i2 then Just (mkTyConApp trueTc [])
-                            else Just (mkTyConApp falseTc [])
-      _ -> Nothing
-#endif
 
   | nameUniq tc == fromGhcUnique typeNatCmpTyFamNameKey -- "GHC.TypeNats.CmpNat"
   = case mapMaybe (litView tcm) tys of

@@ -4,7 +4,6 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -21,17 +20,10 @@ import           Clash.Driver.Types     (ClashOpts (..), ClashDesign(..))
 import           Clash.Netlist.Types    (TopEntityT(..))
 
 -- The GHC interface
-#if MIN_VERSION_ghc(9,0,0)
 import qualified GHC.Data.EnumSet       as GHC (member)
 import           GHC.Utils.Panic        (GhcException (..), throwGhcException)
 import qualified GHC
   (DynFlags, ModSummary (..), extensionFlags, moduleName, moduleNameString)
-#else
-import qualified EnumSet                as GHC (member)
-import           Panic                  (GhcException (..), throwGhcException)
-import qualified GHC                    (DynFlags, ModSummary (..), Module (..),
-                                         extensionFlags, moduleNameString)
-#endif
 import           Clash.Core.Name        (nameOcc)
 import           Clash.Core.Var         (varName)
 import           Clash.Normalize.Util   (collectCallGraphUniques, callGraph)

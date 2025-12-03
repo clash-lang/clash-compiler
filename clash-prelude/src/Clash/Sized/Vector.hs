@@ -426,24 +426,13 @@ singleton = (`Cons` Nil)
       In an equation for ‘it’: it = head Nil
 <BLANKLINE>
 
-#elif __GLASGOW_HASKELL__ >= 900
+#else
 >>> head Nil
 <BLANKLINE>
 <interactive>:...
     • Couldn't match type ‘1’ with ‘0’
       Expected: Vec (0 + 1) a
         Actual: Vec 0 a
-    • In the first argument of ‘head’, namely ‘Nil’
-      In the expression: head Nil
-      In an equation for ‘it’: it = head Nil
-
-#else
->>> head Nil
-<BLANKLINE>
-<interactive>:...
-    • Couldn't match type ‘1’ with ‘0’
-      Expected type: Vec (0 + 1) a
-        Actual type: Vec 0 a
     • In the first argument of ‘head’, namely ‘Nil’
       In the expression: head Nil
       In an equation for ‘it’: it = head Nil
@@ -478,24 +467,13 @@ head xs = unreachable xs
       In an equation for ‘it’: it = tail Nil
 <BLANKLINE>
 
-#elif __GLASGOW_HASKELL__ >= 900
+#else
 >>> tail Nil
 <BLANKLINE>
 <interactive>:...
     • Couldn't match type ‘1’ with ‘0’
       Expected: Vec (0 + 1) a
         Actual: Vec 0 a
-    • In the first argument of ‘tail’, namely ‘Nil’
-      In the expression: tail Nil
-      In an equation for ‘it’: it = tail Nil
-
-#else
->>> tail Nil
-<BLANKLINE>
-<interactive>:...
-    • Couldn't match type ‘1’ with ‘0’
-      Expected type: Vec (0 + 1) a
-        Actual type: Vec 0 a
     • In the first argument of ‘tail’, namely ‘Nil’
       In the expression: tail Nil
       In an equation for ‘it’: it = tail Nil
@@ -530,24 +508,13 @@ tail xs = unreachable xs
       In an equation for ‘it’: it = last Nil
 <BLANKLINE>
 
-#elif __GLASGOW_HASKELL__ >= 900
+#else
 >>> last Nil
 <BLANKLINE>
 <interactive>:...
     • Couldn't match type ‘1’ with ‘0’
       Expected: Vec (0 + 1) a
         Actual: Vec 0 a
-    • In the first argument of ‘last’, namely ‘Nil’
-      In the expression: last Nil
-      In an equation for ‘it’: it = last Nil
-
-#else
->>> last Nil
-<BLANKLINE>
-<interactive>:...
-    • Couldn't match type ‘1’ with ‘0’
-      Expected type: Vec (0 + 1) a
-        Actual type: Vec 0 a
     • In the first argument of ‘last’, namely ‘Nil’
       In the expression: last Nil
       In an equation for ‘it’: it = last Nil
@@ -583,24 +550,13 @@ last xs = unreachable xs
       In an equation for ‘it’: it = init Nil
 <BLANKLINE>
 
-#elif __GLASGOW_HASKELL__ >= 900
+#else
 >>> init Nil
 <BLANKLINE>
 <interactive>:...
     • Couldn't match type ‘1’ with ‘0’
       Expected: Vec (0 + 1) a
         Actual: Vec 0 a
-    • In the first argument of ‘init’, namely ‘Nil’
-      In the expression: init Nil
-      In an equation for ‘it’: it = init Nil
-
-#else
->>> init Nil
-<BLANKLINE>
-<interactive>:...
-    • Couldn't match type ‘1’ with ‘0’
-      Expected type: Vec (0 + 1) a
-        Actual type: Vec 0 a
     • In the first argument of ‘init’, namely ‘Nil’
       In the expression: init Nil
       In an equation for ‘it’: it = init Nil
@@ -1652,25 +1608,13 @@ Nil
       In the expression: take d4 (1 :> 2 :> Nil)
       In an equation for ‘it’: it = take d4 (1 :> 2 :> Nil)
 
-#elif __GLASGOW_HASKELL__ >= 900
+#else
 >>> take d4               (1:>2:>Nil)
 <BLANKLINE>
 <interactive>:...
     • Couldn't match type ‘4 + n0’ with ‘2’
       Expected: Vec (4 + n0) a
         Actual: Vec (1 + 1) a
-      The type variable ‘n0’ is ambiguous
-    • In the second argument of ‘take’, namely ‘(1 :> 2 :> Nil)’
-      In the expression: take d4 (1 :> 2 :> Nil)
-      In an equation for ‘it’: it = take d4 (1 :> 2 :> Nil)
-
-#else
->>> take d4               (1:>2:>Nil)
-<BLANKLINE>
-<interactive>:...
-    • Couldn't match type ‘4 + n0’ with ‘2’
-      Expected type: Vec (4 + n0) a
-        Actual type: Vec (1 + 1) a
       The type variable ‘n0’ is ambiguous
     • In the second argument of ‘take’, namely ‘(1 :> 2 :> Nil)’
       In the expression: take d4 (1 :> 2 :> Nil)
@@ -1967,15 +1911,9 @@ drawn from /xss/. The result matrix has /m + 1/ rows of /n + 1/ elements.
 >>> :t xss
 xss :: Num a => Vec 4 (Vec 4 a)
 
-#if __GLASGOW_HASKELL__ >= 902
 >>> :t stencil2d d2 d2 (sum . map sum) xss
 stencil2d d2 d2 (sum . map sum) xss :: Num a => Vec 3 (Vec 3 a)
 
-#else
->>> :t stencil2d d2 d2 (sum . map sum) xss
-stencil2d d2 d2 (sum . map sum) xss :: Num b => Vec 3 (Vec 3 b)
-
-#endif
 >>> stencil2d d2 d2 (sum . map sum) xss
 (14 :> 18 :> 22 :> Nil) :> (30 :> 34 :> 38 :> Nil) :> (46 :> 50 :> 54 :> Nil) :> Nil
 -}
@@ -2553,7 +2491,7 @@ let populationCount' :: (KnownNat (n+1), KnownNat (n+2))
           (bound at ...)
 <BLANKLINE>
 
-#elif __GLASGOW_HASKELL__ >= 900
+#else
 >>> :{
 let populationCount' :: (KnownNat (n+1), KnownNat (n+2))
                      => BitVector (n+1) -> Index (n+2)
@@ -2566,25 +2504,6 @@ let populationCount' :: (KnownNat (n+1), KnownNat (n+2))
       Expected: Index (n + 2) -> Index (n + 2) -> Index (n + 2)
         Actual: Index (n + 2)
                 -> Index (n + 2) -> AResult (Index (n + 2)) (Index (n + 2))
-    • In the first argument of ‘fold’, namely ‘add’
-      In the first argument of ‘(.)’, namely ‘fold add’
-      In the expression: fold add . map fromIntegral . bv2v
-    • Relevant bindings include
-        populationCount' :: BitVector (n + 1) -> Index (n + 2)
-          (bound at ...)
-
-#else
->>> :{
-let populationCount' :: (KnownNat (n+1), KnownNat (n+2))
-                     => BitVector (n+1) -> Index (n+2)
-    populationCount' = fold add . map fromIntegral . bv2v
-:}
-<BLANKLINE>
-<interactive>:...
-    • Couldn't match type ‘((n + 2) + (n + 2)) - 1’ with ‘n + 2’
-      Expected type: Index (n + 2) -> Index (n + 2) -> Index (n + 2)
-        Actual type: Index (n + 2)
-                     -> Index (n + 2) -> AResult (Index (n + 2)) (Index (n + 2))
     • In the first argument of ‘fold’, namely ‘add’
       In the first argument of ‘(.)’, namely ‘fold add’
       In the expression: fold add . map fromIntegral . bv2v

@@ -63,11 +63,7 @@ import GHC.Generics                         (Generic)
 import GHC.Stack
 import Language.Haskell.TH.Syntax           (Lift)
 
-#if MIN_VERSION_ghc(9,0,0)
 import GHC.Types.SrcLoc                     (SrcSpan)
-#else
-import SrcLoc                               (SrcSpan)
-#endif
 
 import Clash.Annotations.SynthesisAttributes(Attr)
 import Clash.Annotations.BitRepresentation  (FieldAnn)
