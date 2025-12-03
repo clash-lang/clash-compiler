@@ -53,9 +53,6 @@ instance Bias TyCon where
     | aeqType ty charPrimTy       = biasBy 2  -- Char#, ByteArray#, Addr#
     | aeqType ty byteArrayPrimTy  = biasBy 2
     | aeqType ty stringPrimTy     = biasBy 2
-#if !MIN_VERSION_base(4,16,0)
-    | aeqType ty voidPrimTy       = biasBy 1  -- Void#
-#endif
 
     | otherwise                   = baseBias  -- Anything else is base
    where

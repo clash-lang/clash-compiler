@@ -19,11 +19,7 @@
 module Clash.Core.Util where
 
 import Control.Exception.Base (patError)
-#if MIN_VERSION_base(4,16,0)
 import GHC.Prim.Panic (absentError)
-#else
-import Control.Exception.Base (absentError)
-#endif
 import Control.Monad.Trans.Except              (Except, throwE, runExcept)
 import Data.Bifunctor                          (first, second)
 import qualified Data.HashSet                  as HashSet

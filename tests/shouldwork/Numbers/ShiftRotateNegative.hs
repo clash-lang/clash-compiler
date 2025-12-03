@@ -2,11 +2,7 @@
 
 module ShiftRotateNegative where
 
-#if MIN_VERSION_base(4,15,0)
 import GHC.Num.Natural (Natural)
-#else
-import GHC.Natural (Natural)
-#endif
 
 import Clash.Prelude
 import Clash.Explicit.Testbench
@@ -32,10 +28,8 @@ testBench = done
     :: Vec 2
          ( Int
          , Word
-#if MIN_VERSION_base(4,15,0)
          , BitVector 64
          , BitVector 64
-#endif
          , Bit
          , BitVector 32
          , Signed 32
@@ -45,10 +39,8 @@ testBench = done
     -- Exceptions when shiftL / shiftR gets a negative count.
     ( deepErrorX "X"
     , deepErrorX "X"
-#if MIN_VERSION_base(4,15,0)
     , deepErrorX "X"
     , deepErrorX "X"
-#endif
     , 0
     , deepErrorX "X"
     , deepErrorX "X"
@@ -57,10 +49,8 @@ testBench = done
     -- shift accepts negative counts.
     ( 4042322160
     , 4042322160
-#if MIN_VERSION_base(4,15,0)
     , 4042322160
     , 4042322160
-#endif
     , 0
     , 0b1111_0000_1111_0000_1111_0000_1111_0000
     , (-252645135)
@@ -74,10 +64,8 @@ topEntity
   -> Vec 2
        ( Int
        , Word
-#if MIN_VERSION_base(4,15,0)
        , BitVector 64
        , BitVector 64
-#endif
        , Bit
        , BitVector 32
        , Signed 32
@@ -86,10 +74,8 @@ topEntity
 topEntity (x, i) =
   ( f (fromIntegral x) i
   , f (fromIntegral x) i
-#if MIN_VERSION_base(4,15,0)
   , fromIntegral $! f (fromIntegral @_ @Integer x) i
   , BV 0 $! f (unsafeToNatural x) i
-#endif
   , f (x!0) i
   , f x i
   , f (unpack x) i
@@ -97,10 +83,8 @@ topEntity (x, i) =
   ) :>
   ( g (fromIntegral x) i
   , g (fromIntegral x) i
-#if MIN_VERSION_base(4,15,0)
   , fromIntegral $! g (fromIntegral @_ @Integer x) i
   , BV 0 $! g (unsafeToNatural x) i
-#endif
   , g (x!0) i
   , g x i
   , g (unpack x) i

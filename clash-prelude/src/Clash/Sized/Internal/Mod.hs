@@ -29,31 +29,18 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 module Clash.Sized.Internal.Mod where
 
-#if MIN_VERSION_base(4,15,0)
 import GHC.Exts (eqWord#, leWord#, word2Int#)
-#else
-import GHC.Exts ((==#))
-#endif
 import GHC.Exts
   ((<=#), geWord#, isTrue#, minusWord#, plusWord#, uncheckedShiftL#, xor#,
    timesWord2#, quotRemWord2#, and#, addWordC#)
-#if MIN_VERSION_base(4,15,0)
 import GHC.Num.BigNat
   (BigNat#, bigNatAdd, bigNatAddWord#, bigNatAnd, bigNatBit#, bigNatCompare,
    bigNatFromWord#, bigNatFromWord2#, bigNatMul, bigNatMulWord#, bigNatRem,
    bigNatSize#, bigNatSubUnsafe, bigNatSubWordUnsafe#, bigNatToWord#, bigNatXor)
 import GHC.Num.Natural (Natural (..))
-#else
-import GHC.Natural (Natural (..))
-import GHC.Integer.GMP.Internals
-  (BigNat, Integer (..), bigNatToWord, compareBigNat, minusBigNat, minusBigNatWord,
-   plusBigNat, plusBigNatWord, sizeofBigNat#, bitBigNat, wordToBigNat2,
-   remBigNat, timesBigNat, timesBigNatWord, xorBigNat, wordToBigNat, andBigNat)
-#endif
 
 #include "MachDeps.h"
 
-#if MIN_VERSION_base(4,15,0)
 -- | modular subtraction
 subMod :: Natural -> Natural -> Natural -> Natural
 subMod (NS m#) (NS x#) (NS y#) =
@@ -200,155 +187,6 @@ subIfGe z# m# = case z# `bigNatCompare` m# of
   LT -> NB z#
   EQ -> NS 0##
   GT -> bigNatToNat (z# `bigNatSubUnsafe` m#)
-#else
--- | modular subtraction
-subMod :: Natural -> Natural -> Natural -> Natural
-subMod (NatS# m#) (NatS# x#) (NatS# y#) =
-  if isTrue# (x# `geWord#` y#) then NatS# z# else NatS# (z# `plusWord#` m#)
-  where
-    z# = x# `minusWord#` y#
-subMod NatS#{} _ _ = brokenInvariant
-subMod (NatJ# m#) (NatS# x#) (NatS# y#) =
-  if isTrue# (x# `geWord#` y#)
-    then NatS# (x# `minusWord#` y#)
-    else bigNatToNat $ m# `minusBigNatWord` (y# `minusWord#` x#)
-subMod (NatJ# m#) (NatS# x#) (NatJ# y#) =
-  bigNatToNat $ (m# `minusBigNat` y#) `plusBigNatWord` x#
-subMod NatJ#{} (NatJ# x#) (NatS# y#) =
-  bigNatToNat $ x# `minusBigNatWord` y#
-subMod (NatJ# m#) (NatJ# x#) (NatJ# y#) = case x# `compareBigNat` y# of
-  LT -> bigNatToNat $ (m# `minusBigNat` y#) `plusBigNat` x#
-  EQ -> NatS# 0##
-  GT -> bigNatToNat $ x# `minusBigNat` y#
-
--- | modular addition
-addMod :: Natural -> Natural -> Natural -> Natural
-addMod (NatS# m#) (NatS# x#) (NatS# y#) =
-  if isTrue# c# || isTrue# (z# `geWord#` m#) then NatS# (z# `minusWord#` m#) else NatS# z#
-  where
-    !(# z#, c# #) = x# `addWordC#` y#
-addMod NatS#{} _ _ = brokenInvariant
-addMod (NatJ# m#) (NatS# x#) (NatS# y#) =
-  if isTrue# c# then subIfGe (wordToBigNat2 1## z#) m# else NatS# z#
-  where
-    !(# z#, c# #) = x# `addWordC#` y#
-addMod (NatJ# m#) (NatS# x#) (NatJ# y#) = subIfGe (y# `plusBigNatWord` x#) m#
-addMod (NatJ# m#) (NatJ# x#) (NatS# y#) = subIfGe (x# `plusBigNatWord` y#) m#
-addMod (NatJ# m#) (NatJ# x#) (NatJ# y#) = subIfGe (x# `plusBigNat`     y#) m#
-
--- | modular multiplication
-mulMod :: Natural -> Natural -> Natural -> Natural
-mulMod (NatS# m#) (NatS# x#) (NatS# y#) = NatS# r#
-  where
-    !(# z1#, z2# #) = timesWord2# x# y#
-    !(# _, r# #) = quotRemWord2# z1# z2# m#
-mulMod NatS#{} _ _ = brokenInvariant
-mulMod (NatJ# m#) (NatS# x#) (NatS# y#) =
-  bigNatToNat $ wordToBigNat2 z1# z2# `remBigNat` m#
-  where
-    !(# z1#, z2# #) = timesWord2# x# y#
-mulMod (NatJ# m#) (NatS# x#) (NatJ# y#) =
-  bigNatToNat $ (y# `timesBigNatWord` x#) `remBigNat` m#
-mulMod (NatJ# m#) (NatJ# x#) (NatS# y#) =
-  bigNatToNat $ (x# `timesBigNatWord` y#) `remBigNat` m#
-mulMod (NatJ# m#) (NatJ# x#) (NatJ# y#) =
-  bigNatToNat $ (x# `timesBigNat` y#) `remBigNat` m#
-
--- | modular multiplication for powers of 2, takes a mask instead of a
--- wrap-around point
-mulMod2 :: Natural -> Natural -> Natural -> Natural
-mulMod2 (NatS# m#) (NatS# x#) (NatS# y#) = NatS# (z2# `and#` m#)
-  where
-    !(# _, z2# #) = timesWord2# x# y#
-mulMod2 NatS#{} _ _ = brokenInvariant
-mulMod2 (NatJ# m#) (NatS# x#) (NatS# y#) =
-  bigNatToNat $ wordToBigNat2 z1# z2# `andBigNat` m#
-  where
-    !(# z1#, z2# #) = timesWord2# x# y#
-mulMod2 (NatJ# m#) (NatS# x#) (NatJ# y#) =
-  bigNatToNat $ (y# `timesBigNatWord` x#) `andBigNat` m#
-mulMod2 (NatJ# m#) (NatJ# x#) (NatS# y#) =
-  bigNatToNat $ (x# `timesBigNatWord` y#) `andBigNat` m#
-mulMod2 (NatJ# m#) (NatJ# x#) (NatJ# y#) =
-  bigNatToNat $ (x# `timesBigNat` y#) `andBigNat` m#
-
--- | modular negations
-negateMod :: Natural -> Natural -> Natural
-negateMod _ (NatS# 0##) = NatS# 0##
-negateMod (NatS# m#) (NatS# x#) = NatS# (m# `minusWord#` x#)
-negateMod NatS#{} _ = brokenInvariant
-negateMod (NatJ# m#) (NatS# x#) = bigNatToNat $ m# `minusBigNatWord` x#
-negateMod (NatJ# m#) (NatJ# x#) = bigNatToNat $ m# `minusBigNat`     x#
-
--- | Given a size in bits, return a function that complements the bits in a
--- 'Natural' up to that size.
-complementMod
-  :: Integer
-  -> (Natural -> Natural)
-complementMod (S# sz#) =
-  if isTrue# (sz# <=# WORD_SIZE_IN_BITS#) then
-    let m# = if isTrue# (sz# ==# WORD_SIZE_IN_BITS#) then
-#if WORD_SIZE_IN_BITS == 64
-                0xFFFFFFFFFFFFFFFF##
-#elif WORD_SIZE_IN_BITS == 32
-                0xFFFFFFFF##
-#else
-#error Unhandled value for WORD_SIZE_IN_BITS
-#endif
-             else
-               (1## `uncheckedShiftL#` sz#) `minusWord#` 1##
-        go (NatS# x#) = NatS# (x# `xor#` m#)
-        go (NatJ# r#) = NatS# (bigNatToWord r# `xor#` m#)
-    in  go
-  else
-    let m# = bitBigNat sz# `minusBigNatWord` 1##
-
-        go (NatS# x#) = bigNatToNat (xorBigNat (wordToBigNat x#) m#)
-        go (NatJ# x#) = bigNatToNat (xorBigNat x# m#)
-    in  go
-complementMod _ = error "size too large"
-
--- | Keep all the bits up to a certain size
-maskMod
-  :: Integer
-  -> (Natural -> Natural)
-maskMod (S# sz#) =
-  if isTrue# (sz# <=# WORD_SIZE_IN_BITS#) then
-    if isTrue# (sz# ==# WORD_SIZE_IN_BITS#) then
-       -- Mask equal to the word size
-       let go (NatJ# x#) = NatS# (bigNatToWord x#)
-           go n          = n
-       in  go
-    else
-       let m# = (1## `uncheckedShiftL#` sz#) `minusWord#` 1##
-
-           go (NatS# x#) = NatS# (x# `and#` m#)
-           go (NatJ# x#) = NatS# (bigNatToWord x# `and#` m#)
-       in  go
-  else
-    let m# = bitBigNat sz#
-
-        -- faster than `andBigNat (m# `minuxBigNatWord` 1##)`
-        go (NatJ# x#) = bigNatToNat (remBigNat x# m#)
-        -- The mask is larger than the word size, so we can keep all the bits
-        go x = x
-    in  go
-maskMod _ = error "size too large"
-
-bigNatToNat :: BigNat -> Natural
-bigNatToNat r# =
-  if isTrue# (sizeofBigNat# r# ==# 1#) then
-    NatS# (bigNatToWord r#)
-  else
-    NatJ# r#
-
-subIfGe :: BigNat -> BigNat -> Natural
-subIfGe z# m# = case z# `compareBigNat` m# of
-  LT -> NatJ# z#
-  EQ -> NatS# 0##
-  GT -> bigNatToNat $ z# `minusBigNat` m#
-
-#endif
 
 brokenInvariant :: a
 brokenInvariant = error "argument is larger than modulo"

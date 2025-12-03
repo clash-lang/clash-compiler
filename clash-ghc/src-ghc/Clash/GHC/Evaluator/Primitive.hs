@@ -52,18 +52,8 @@ import           GHC.Int
 import           GHC.Integer
   (decodeDoubleInteger,encodeDoubleInteger,compareInteger,orInteger,andInteger,
    xorInteger,complementInteger,absInteger,signumInteger)
-#if MIN_VERSION_base(4,16,0)
 import           GHC.Num.Integer (Integer (..), integerEncodeFloat#)
-#elif MIN_VERSION_base(4,15,0)
-import           GHC.Num.Integer
-  (Integer (..), integerEncodeFloat#, integerToFloat#, integerToDouble#)
-#else
-import           GHC.Integer.GMP.Internals
-  (Integer (..), BigNat (..))
-#endif
-#if MIN_VERSION_base(4,15,0)
 import           GHC.Num.Natural     (naturalSubUnsafe)
-#endif
 import           GHC.Natural
 import           GHC.ForeignPtr
 import           GHC.Prim
@@ -145,17 +135,11 @@ import qualified GHC.TypeLits
 import qualified GHC.TypeNats
 import qualified GHC.Types
 
-#if MIN_VERSION_base(4,15,0)
 import qualified GHC.Num
 import qualified GHC.Num.Integer
-#endif
 
 #if MIN_VERSION_ghc_prim(0,12,0)
 import qualified GHC.PrimopWrappers
-#endif
-
-#if !MIN_VERSION_base(4,15,0)
-import qualified GHC.Integer.Logarithms
 #endif
 
 isUndefinedPrimVal :: Value -> Bool
@@ -547,7 +531,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   $(namePat 'GHC.Prim.byteSwap#) | [i] <- wordLiterals' args -- assume 64bits
     -> reduce . integerToWordLiteral . toInteger . byteSwap64 . (fromInteger :: Integer -> Word64) $ i
 
-#if MIN_VERSION_base(4,14,0)
   $(namePat 'GHC.Prim.bitReverse#) | [i] <- wordLiterals' args
     -> reduce . integerToWordLiteral . toInteger . bitReverse64 . fromInteger $ i -- assume 64bits
   $(namePat 'GHC.Prim.bitReverse8#) | [i] <- wordLiterals' args
@@ -558,7 +541,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce . integerToWordLiteral . toInteger . bitReverse32 . fromInteger $ i
   $(namePat 'GHC.Prim.bitReverse64#) | [i] <- word64Literals' args
     -> reduce . integerToWordLiteral . toInteger . bitReverse64 . fromInteger $ i
-#endif
 ------------
 -- Narrowing
 ------------
@@ -587,7 +569,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            b = narrow32Word# a
        in  reduce . Literal . WordLiteral . toInteger $ W# b
 
-#if MIN_VERSION_base(4,16,0)
 --------
 -- Int8#
 --------
@@ -762,7 +743,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 ---------
 -- Int64#
 ---------
-#if MIN_VERSION_base(4,17,0)
   $(namePat 'GHC.Prim.intToInt64#) | [i] <- intLiterals' args
     -> reduce (Literal (Int64Literal i))
   $(namePat 'GHC.Prim.int64ToInt#) | [i] <- int64Literals' args
@@ -802,7 +782,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce r
   $(namePat 'GHC.Prim.neInt64#) | Just r <- liftI64RI neInt64# args
     -> reduce r
-#endif
 
 ---------
 -- Word8#
@@ -984,7 +963,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   $(namePat 'GHC.Prim.neWord32#) | Just r <- liftW32RI neWord32# args
     -> reduce r
 
-#if MIN_VERSION_base(4,17,0)
 ----------
 -- Word64#
 ----------
@@ -1030,8 +1008,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce r
   $(namePat 'GHC.Prim.neWord64#) | Just r <- liftW64RI neWord64# args
     -> reduce r
-#endif
-#endif
 
 ----------
 -- Double#
@@ -1544,26 +1520,17 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [DC bCon _] <- args
     -> reduce (boolToBoolLiteral tcm ty (nameOcc (dcName bCon) == showt 'False))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerLogBase#)
     | Just (a,b) <- integerLiterals args
     , Just c <- flogBase a b
     -> (reduce . Literal . WordLiteral . toInteger) c
 
-#if MIN_VERSION_base(4,16,0)
   $(namePat 'GHC.Float.integerToFloat#)
-#else
-  $(namePat 'GHC.Num.integerToFloat#)
-#endif
     | [v] <- args
     , Just i <- integerLiteral v
     -> reduce . Literal . FloatLiteral . floatToWord $ F# (integerToFloat# i)
 
-#if MIN_VERSION_base(4,16,0)
   $(namePat 'GHC.Float.integerToDouble#)
-#else
-  $(namePat 'GHC.Num.integerToDouble#)
-#endif
     | [v] <- args
     , Just i <- integerLiteral v
     -> reduce . Literal . DoubleLiteral . doubleToWord $ D# (integerToDouble# i)
@@ -1572,32 +1539,13 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | Just (a,b) <- naturalLiterals args
     , Just c <- flogBase a b
     -> (reduce . Literal . WordLiteral . toInteger) c
-#else
-  $(namePat 'GHC.Integer.Logarithms.integerLogBase#)
-    | Just (a,b) <- integerLiterals args
-    , Just c <- flogBase a b
-    -> (reduce . Literal . IntLiteral . toInteger) c
-#endif
 
-#if !MIN_VERSION_base(4,15,0)
-  "GHC.Integer.Type.smallInteger"
-    | [Lit (IntLiteral i)] <- args
-    -> reduce (Literal (IntegerLiteral i))
-#endif
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerToInt#)
-#else
-  "GHC.Integer.Type.integerToInt"
-#endif
     | [i] <- integerLiterals' args
     -> reduce (integerToIntLiteral i)
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerDecodeDouble#) -- :: Double# -> (#Integer, Int##)
-#else
-  "GHC.Integer.Type.decodeDoubleInteger" -- :: Double# -> (#Integer, Int##)
-#endif
     | [Lit (DoubleLiteral i)] <- args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
            (Just tupTc) = UniqMap.lookup tupTcNm tcm
@@ -1609,31 +1557,21 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                 [ Left (integerToIntegerLiteral b)
                 , Left (integerToIntLiteral . toInteger $ I# c)])
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerEncodeDouble#) -- :: Integer -> Int# -> Double
-#else
-  "GHC.Integer.Type.encodeDoubleInteger" -- :: Integer -> Int# -> Double
-#endif
     | [iV, Lit (IntLiteral j)] <- args
     , [i] <- integerLiterals' [iV]
     -> let !(I# k') = fromInteger j
            r = encodeDoubleInteger i k'
     in  reduce . Literal . DoubleLiteral . doubleToWord $ D# r
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerEncodeFloat#)
     | [iV, Lit (IntLiteral j)] <- args
     , [i] <- integerLiterals' [iV]
     -> let !(I# k') = fromInteger j
            r = integerEncodeFloat# i k'
         in reduce . Literal . FloatLiteral . floatToWord $ F# r
-#endif
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerQuotRem#) -- :: Integer -> Integer -> (#Integer, Integer#)
-#else
-  "GHC.Integer.Type.quotRemInteger" -- :: Integer -> Integer -> (#Integer, Integer#)
-#endif
     | [i, j] <- integerLiterals' args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
            (Just tupTc) = UniqMap.lookup tupTcNm tcm
@@ -1644,75 +1582,39 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                 [ Left $ catchDivByZero (integerToIntegerLiteral q)
                 , Left $ catchDivByZero (integerToIntegerLiteral r)])
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerAdd)
-#else
-  "GHC.Integer.Type.plusInteger"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce (integerToIntegerLiteral (i+j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerSub)
-#else
-  "GHC.Integer.Type.minusInteger"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce (integerToIntegerLiteral (i-j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerMul)
-#else
-  "GHC.Integer.Type.timesInteger"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce (integerToIntegerLiteral (i*j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerNegate)
-#else
-  "GHC.Integer.Type.negateInteger"
-#endif
     | [i] <- integerLiterals' args
     -> reduce (integerToIntegerLiteral (negate i))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerDiv)
-#else
-  "GHC.Integer.Type.divInteger"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce $ catchDivByZero (integerToIntegerLiteral (i `div` j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerMod)
-#else
-  "GHC.Integer.Type.modInteger"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce $ catchDivByZero (integerToIntegerLiteral (i `mod` j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerQuot)
-#else
-  "GHC.Integer.Type.quotInteger"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce $ catchDivByZero (integerToIntegerLiteral (i `quot` j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerRem)
-#else
-  "GHC.Integer.Type.remInteger"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce $ catchDivByZero (integerToIntegerLiteral (i `rem` j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerDivMod#)
-#else
-  "GHC.Integer.Type.divModInteger"
-#endif
     | Just (i,j) <- integerLiterals args
     -> let (_,tyView -> TyConApp ubTupTcNm [liftedKi,_,intTy,_]) = splitFunForallTy ty
            (Just ubTupTc) = UniqMap.lookup ubTupTcNm tcm
@@ -1725,107 +1627,55 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                  , Left $ catchDivByZero (Literal (IntegerLiteral m))
                                  ]
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerGt)
-#else
-  "GHC.Integer.Type.gtInteger"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i > j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerGe)
-#else
-  "GHC.Integer.Type.geInteger"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i >= j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerEq)
-#else
-  "GHC.Integer.Type.eqInteger"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i == j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerNe)
-#else
-  "GHC.Integer.Type.neqInteger"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i /= j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerLt)
-#else
-  "GHC.Integer.Type.ltInteger"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i < j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerLe)
-#else
-  "GHC.Integer.Type.leInteger"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce (boolToBoolLiteral tcm ty (i <= j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerGt#)
-#else
-  "GHC.Integer.Type.gtInteger#"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce (boolToIntLiteral (i > j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerGe#)
-#else
-  "GHC.Integer.Type.geInteger#"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce (boolToIntLiteral (i >= j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerEq#)
-#else
-  "GHC.Integer.Type.eqInteger#"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce (boolToIntLiteral (i == j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerNe#)
-#else
-  "GHC.Integer.Type.neqInteger#"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce (boolToIntLiteral (i /= j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerLt#)
-#else
-  "GHC.Integer.Type.ltInteger#"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce (boolToIntLiteral (i < j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerLe#)
-#else
-  "GHC.Integer.Type.leInteger#"
-#endif
     | Just (i,j) <- integerLiterals args
     -> reduce (boolToIntLiteral (i <= j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerCompare)
-#else
-  "GHC.Integer.Type.compareInteger" -- :: Integer -> Integer -> Ordering
-#endif
     | [i, j] <- integerLiterals' args
     -> let -- Get the required result type (viewed as an applied type constructor name)
            (_,tyView -> TyConApp tupTcNm []) = splitFunForallTy ty
@@ -1841,53 +1691,28 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
             EQ -> Data eqDc
             GT -> Data gtDc
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerShiftR#)
     | [iV, Lit (WordLiteral j)] <- args
-#else
-  "GHC.Integer.Type.shiftRInteger"
-    | [iV, Lit (IntLiteral j)] <- args
-#endif
     , [i] <- integerLiterals' [iV]
     -> reduce (integerToIntegerLiteral (i `shiftR` fromInteger j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerShiftL#)
     | [iV, Lit (WordLiteral j)] <- args
-#else
-  "GHC.Integer.Type.shiftLInteger"
-    | [iV, Lit (IntLiteral j)] <- args
-#endif
     , [i] <- integerLiterals' [iV]
     -> reduce (integerToIntegerLiteral (i `shiftL` fromInteger j))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerFromWord#)
-#else
-  "GHC.Integer.Type.wordToInteger"
-#endif
     | [Lit (WordLiteral w)] <- args
     -> reduce (Literal (IntegerLiteral w))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerToWord#)
-#else
-  "GHC.Integer.Type.integerToWord"
-#endif
     | [i] <- integerLiterals' args
     -> reduce (integerToWordLiteral i)
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerTestBit#) -- :: Integer -> Int# -> Int#
     | [Lit (IntegerLiteral i), Lit (WordLiteral j)] <- args
     -> reduce (boolToIntLiteral (testBit i (fromInteger j)))
-#else
-  "GHC.Integer.Type.testBitInteger" -- :: Integer -> Int# -> Bool
-    | [Lit (IntegerLiteral i), Lit (IntLiteral j)] <- args
-    -> reduce (boolToBoolLiteral tcm ty (testBit i (fromInteger j)))
-#endif
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.NS)
     | [Lit (WordLiteral w)] <- args
     -> reduce (Literal (NaturalLiteral w))
@@ -1909,31 +1734,17 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce (Literal (IntegerLiteral (IN ba)))
     | [Lit l] <- args
     -> error ("IN: " <> show l)
-#else
-  $(namePat 'GHC.Natural.NatS#)
-    | [Lit (WordLiteral w)] <- args
-    -> reduce (Literal (NaturalLiteral w))
-#endif
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerFromNatural)
-#else
-  $(namePat 'GHC.Natural.naturalToInteger)
-#endif
     | [i] <- naturalLiterals' args
     -> reduce (Literal (IntegerLiteral (toInteger i)))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerToNatural)
-#else
-  $(namePat 'GHC.Natural.naturalFromInteger)
-#endif
     | [i] <- integerLiterals' args
     ->
      let nTy = snd (splitFunForallTy ty) in
      reduce (checkNaturalRange1 nTy i id)
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerToNaturalClamp)
     | [i] <- integerLiterals' args
     -> if i < 0 then
@@ -1945,9 +1756,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [i] <- integerLiterals' args
     -> let nTy = snd (splitFunForallTy ty) in
        reduce (checkNaturalRange1 nTy i id)
-#endif
 
-#if MIN_VERSION_base(4,17,0) || WORD_SIZE_IN_BITS < 64
   $(namePat 'GHC.Num.Integer.integerToInt64#)
     | [i] <- integerLiterals' args
     -> reduce (integerToInt64Literal i)
@@ -1956,45 +1765,22 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [i] <- integerLiterals' args
     -> reduce (integerToWord64Literal i)
 
-#if MIN_VERSION_base(4,17,0)
   $(namePat 'GHC.Num.Integer.integerFromWord64#)
     | [w] <- word64Literals' args
     -> reduce (Literal (IntegerLiteral w))
-#endif
-#endif
 
-#if !MIN_VERSION_base(4,15,0)
-  -- GHC.shiftLNatural --- XXX: Fragile worker of GHC.shiflLNatural
-  "GHC.Natural.$wshiftLNatural"
-    | [nV,iV] <- args
-    , [n] <- naturalLiterals' [nV]
-    , [i] <- fromInteger <$> intLiterals' [iV]
-    ->
-     let nTy = snd (splitFunForallTy ty) in
-     reduce (checkNaturalRange1 nTy n ((flip shiftL) i))
-#endif
-
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.naturalAdd)
-#else
-  $(namePat 'GHC.Natural.plusNatural)
-#endif
     | Just (i,j) <- naturalLiterals args
     ->
      let nTy = snd (splitFunForallTy ty) in
      reduce (checkNaturalRange2 nTy i j (+))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.naturalMul)
-#else
-  $(namePat 'GHC.Natural.timesNatural)
-#endif
     | Just (i,j) <- naturalLiterals args
     ->
      let nTy = snd (splitFunForallTy ty) in
      reduce (checkNaturalRange2 nTy i j (*))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Natural.naturalSubUnsafe)
     | Just (i,j) <- naturalLiterals args
     ->
@@ -2010,28 +1796,13 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                 case minusNaturalMaybe i' j' of
                   Nothing -> checkNaturalRange1 nTy (-1) id
                   Just n -> naturalToNaturalLiteral n))
-#else
-  $(namePat 'GHC.Natural.minusNatural)
-    | Just (i,j) <- naturalLiterals args
-    ->
-     let nTy = snd (splitFunForallTy ty) in
-     reduce (checkNaturalRange nTy [i, j] (\[i', j'] ->
-                case minusNaturalMaybe i' j' of
-                  Nothing -> checkNaturalRange1 nTy (-1) id
-                  Just n -> naturalToNaturalLiteral n))
-#endif
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.naturalFromWord#)
-#else
-  $(namePat 'GHC.Natural.wordToNatural#)
-#endif
     | [Lit (WordLiteral w)] <- args
     ->
      let nTy = snd (splitFunForallTy ty) in
      reduce (checkNaturalRange1 nTy w id)
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.naturalToWord#)
     | [i] <- naturalLiterals' args
     -> reduce (integerToWordLiteral i)
@@ -2047,9 +1818,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     ->
      let nTy = snd (splitFunForallTy ty) in
      reduce (checkNaturalRange2 nTy i j rem)
-#endif
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.naturalQuotRem#) -- :: Natural -> Natural -> (#Natural, Natural#)
     | [i, j] <- naturalLiterals' args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
@@ -2060,27 +1829,19 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
          mkApps (Data tupDc) (map Right tyArgs ++
                 [ Left $ catchDivByZero (naturalToNaturalLiteral q)
                 , Left $ catchDivByZero (naturalToNaturalLiteral r)])
-#endif
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.naturalGcd)
-#else
-  $(namePat 'GHC.Natural.gcdNatural)
-#endif
     | Just (i,j) <- naturalLiterals args
     ->
      let nTy = snd (splitFunForallTy ty) in
      reduce (checkNaturalRange2 nTy i j gcd)
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.naturalLcm)
     | Just (i,j) <- naturalLiterals args
     ->
      let nTy = snd (splitFunForallTy ty) in
      reduce (checkNaturalRange2 nTy i j lcm)
-#endif
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.naturalGt#)
     | Just (i,j) <- naturalLiterals args
     -> reduce (boolToIntLiteral (i > j))
@@ -2138,7 +1899,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "GHC.Num.Natural.$wnaturalSignum"
     | [i] <- naturalLiterals' args
     -> reduce (Literal (WordLiteral (signum i)))
-#endif
 
   -- GHC.Real.^  -- XXX: Very fragile
   --   ^_f, $wf, $wf1 are specialisations of the internal function f in the implementation of (^) in GHC.Real
@@ -2216,125 +1976,61 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   $(namePat 'GHC.Int.I8#)
     | isSubj
-#if MIN_VERSION_base(4,16,0)
     , [Lit (Int8Literal i)] <- args
-#else
-    , [Lit (IntLiteral i)] <- args
-#endif
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
             (Just intTc) = UniqMap.lookup intTcNm tcm
             [intDc] = tyConDataCons intTc
-#if MIN_VERSION_base(4,16,0)
         in  reduce (mkApps (Data intDc) [Left (Literal (Int8Literal i))])
-#else
-        in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
-#endif
   $(namePat 'GHC.Int.I16#)
     | isSubj
-#if MIN_VERSION_base(4,16,0)
     , [Lit (Int16Literal i)] <- args
-#else
-    , [Lit (IntLiteral i)] <- args
-#endif
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
             (Just intTc) = UniqMap.lookup intTcNm tcm
             [intDc] = tyConDataCons intTc
-#if MIN_VERSION_base(4,16,0)
         in  reduce (mkApps (Data intDc) [Left (Literal (Int16Literal i))])
-#else
-        in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
-#endif
   $(namePat 'GHC.Int.I32#)
     | isSubj
-#if MIN_VERSION_base(4,16,0)
     , [Lit (Int32Literal i)] <- args
-#else
-    , [Lit (IntLiteral i)] <- args
-#endif
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
             (Just intTc) = UniqMap.lookup intTcNm tcm
             [intDc] = tyConDataCons intTc
-#if MIN_VERSION_base(4,16,0)
         in  reduce (mkApps (Data intDc) [Left (Literal (Int32Literal i))])
-#else
-        in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
-#endif
   $(namePat 'GHC.Int.I64#)
     | isSubj
-#if MIN_VERSION_base(4,16,0)
     , [Lit (Int64Literal i)] <- args
-#else
-    , [Lit (IntLiteral i)] <- args
-#endif
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
             (Just intTc) = UniqMap.lookup intTcNm tcm
             [intDc] = tyConDataCons intTc
-#if MIN_VERSION_base(4,16,0)
         in  reduce (mkApps (Data intDc) [Left (Literal (Int64Literal i))])
-#else
-        in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
-#endif
 
   $(namePat 'GHC.Word.W8#)
     | isSubj
-#if MIN_VERSION_base(4,16,0)
     , [Lit (Word8Literal c)] <- args
-#else
-    , [Lit (WordLiteral c)] <- args
-#endif
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
             (Just wordTc) = UniqMap.lookup wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
-#if MIN_VERSION_base(4,16,0)
         in  reduce (mkApps (Data wordDc) [Left (Literal (Word8Literal c))])
-#else
-        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
-#endif
   $(namePat 'GHC.Word.W16#)
     | isSubj
-#if MIN_VERSION_base(4,16,0)
     , [Lit (Word16Literal c)] <- args
-#else
-    , [Lit (WordLiteral c)] <- args
-#endif
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
             (Just wordTc) = UniqMap.lookup wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
-#if MIN_VERSION_base(4,16,0)
         in  reduce (mkApps (Data wordDc) [Left (Literal (Word16Literal c))])
-#else
-        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
-#endif
   $(namePat 'GHC.Word.W32#)
     | isSubj
-#if MIN_VERSION_base(4,16,0)
     , [Lit (Word32Literal c)] <- args
-#else
-    , [Lit (WordLiteral c)] <- args
-#endif
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
             (Just wordTc) = UniqMap.lookup wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
-#if MIN_VERSION_base(4,16,0)
         in  reduce (mkApps (Data wordDc) [Left (Literal (Word32Literal c))])
-#else
-        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
-#endif
   $(namePat 'GHC.Word.W64#)
     | isSubj
-#if MIN_VERSION_base(4,16,0)
     , [Lit (Word64Literal c)] <- args
-#else
-    , [Lit (WordLiteral c)] <- args
-#endif
     ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
             (Just wordTc) = UniqMap.lookup wordTcNm tcm
             [wordDc] = tyConDataCons wordTc
-#if MIN_VERSION_base(4,16,0)
         in  reduce (mkApps (Data wordDc) [Left (Literal (Word64Literal c))])
-#else
-        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral c))])
-#endif
 
   $(namePat 'GHC.Types.W#)
     | isSubj
@@ -2372,88 +2068,45 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
             -> reduce (Literal (DoubleLiteral (doubleToWord (fromRational (n :% d)))))
           _ -> error $ $(curLoc) ++ "GHC.Float.$w$sfromRat'': Not a Float or Double"
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerSignum#)
-#else
-  "GHC.Integer.Type.$wsignumInteger" -- XXX: Not super-fragile, but still..
-#endif
     | [i] <- integerLiterals' args
     -> reduce (Literal (IntLiteral (signum i)))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerSignum)
-#else
-  "GHC.Integer.Type.signumInteger"
-#endif
     | [i] <- integerLiterals' args
     -> reduce (Literal (IntegerLiteral (signumInteger i)))
 
-#if MIN_VERSION_base(4,15,0)
   "GHC.Num.Integer.$wintegerSignum"
     | [i] <- integerLiterals' args
     -> reduce (Literal (IntLiteral (signum i)))
-#endif
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerAbs)
-#else
-  "GHC.Integer.Type.absInteger"
-#endif
     | [i] <- integerLiterals' args
     -> reduce (Literal (IntegerLiteral (absInteger i)))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerBit#)
     | [i] <- wordLiterals' args
-#else
-  "GHC.Integer.Type.bitInteger"
-    | [i] <- intLiterals' args
-#endif
     -> reduce (Literal (IntegerLiteral (bit (fromInteger i))))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerComplement)
-#else
-  "GHC.Integer.Type.complementInteger"
-#endif
     | [i] <- integerLiterals' args
     -> reduce (Literal (IntegerLiteral (complementInteger i)))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerOr)
-#else
-  "GHC.Integer.Type.orInteger"
-#endif
     | [i, j] <- integerLiterals' args
     -> reduce (Literal (IntegerLiteral (orInteger i j)))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerXor)
-#else
-  "GHC.Integer.Type.xorInteger"
-#endif
     | [i, j] <- integerLiterals' args
     -> reduce (Literal (IntegerLiteral (xorInteger i j)))
 
-#if MIN_VERSION_base(4,15,0)
   $(namePat 'GHC.Num.Integer.integerAnd)
-#else
-  "GHC.Integer.Type.andInteger"
-#endif
     | [i, j] <- integerLiterals' args
     -> reduce (Literal (IntegerLiteral (andInteger i j)))
 
-#if !MIN_VERSION_base(4,15,0)
-  "GHC.Integer.Type.doubleFromInteger"
-    | [i] <- integerLiterals' args
-    -> reduce (Literal (DoubleLiteral (doubleToWord (fromInteger i))))
-#endif
-
-#if MIN_VERSION_base(4,17,0)
   "GHC.Num.Integer.$wintegerFromInt64#"
     | [i] <- int64Literals' args
     -> reduce . Literal $ IntLiteral i
-#endif
 
   $(namePat 'GHC.Base.eqString)
     | [PrimVal _ _ [Lit (StringLiteral s1)]
@@ -4853,17 +4506,9 @@ integerLiteral v =
       -> Just i
     DC dc [Left (Literal (ByteArrayLiteral (BA.ByteArray ba)))]
       | dcTag dc == 2
-#if MIN_VERSION_base(4,15,0)
       -> Just (IP ba)
-#else
-      -> Just (Jp# (BN# ba))
-#endif
       | dcTag dc == 3
-#if MIN_VERSION_base(4,15,0)
       -> Just (IN ba)
-#else
-      -> Just (Jn# (BN# ba))
-#endif
     _ -> Nothing
 
 naturalLiterals :: [Value] -> Maybe (Integer, Integer)
@@ -4878,11 +4523,7 @@ naturalLiteral v =
       -> Just i
     DC dc [Left (Literal (ByteArrayLiteral (BA.ByteArray ba)))]
       | dcTag dc == 2
-#if MIN_VERSION_base(4,15,0)
       -> Just (IP ba)
-#else
-      -> Just (Jp# (BN# ba))
-#endif
     _ -> Nothing
 
 integerLiterals' :: [Value] -> [Integer]
@@ -4905,7 +4546,6 @@ intLiteral x = case x of
   Lit (IntLiteral i) -> Just i
   _ -> Nothing
 
-#if MIN_VERSION_base(4,16,0)
 int8Literals' :: [Value] -> [Integer]
 int8Literals' = listOf int8Literal
 
@@ -4930,7 +4570,6 @@ int32Literal x = case x of
   Lit (Int32Literal i) -> Just i
   _ -> Nothing
 
-#if MIN_VERSION_base(4,17,0)
 int64Literals' :: [Value] -> [Integer]
 int64Literals' = listOf int64Literal
 
@@ -4938,8 +4577,6 @@ int64Literal :: Value -> Maybe Integer
 int64Literal x = case x of
   Lit (Int64Literal i) -> Just i
   _ -> Nothing
-#endif
-#endif
 
 intCLiteral :: Value -> Maybe Integer
 intCLiteral v = case v of
@@ -4960,7 +4597,6 @@ wordLiteral x = case x of
   Lit (WordLiteral i) -> Just i
   _ -> Nothing
 
-#if MIN_VERSION_base(4,16,0)
 word8Literals' :: [Value] -> [Integer]
 word8Literals' = listOf word8Literal
 
@@ -4984,21 +4620,14 @@ word32Literal :: Value -> Maybe Integer
 word32Literal x = case x of
   Lit (Word32Literal i) -> Just i
   _ -> Nothing
-#endif
 
 word64Literals' :: [Value] -> [Integer]
 word64Literals' = listOf word64Literal
 
-#if MIN_VERSION_base(4,17,0)
 word64Literal :: Value -> Maybe Integer
 word64Literal x = case x of
   Lit (Word64Literal i) -> Just i
   _ -> Nothing
-#else
--- Prior to GHC 9.4 Word64# didn't exist, 64 bit primitives took Word# instead
-word64Literal :: Value -> Maybe Integer
-word64Literal= wordLiteral
-#endif
 
 charLiterals :: [Value] -> Maybe (Char,Char)
 charLiterals = pairOf charLiteral
@@ -5322,13 +4951,11 @@ integerToIntLiteral = Literal . IntLiteral . toInteger . (fromInteger :: Integer
 integerToWordLiteral :: Integer -> Term
 integerToWordLiteral = Literal . WordLiteral . toInteger . (fromInteger :: Integer -> Word) -- for overflow behavior
 
-#if MIN_VERSION_base(4,17,0) || WORD_SIZE_IN_BITS < 64
 integerToInt64Literal :: Integer -> Term
 integerToInt64Literal = Literal . Int64Literal . toInteger . (fromInteger :: Integer -> Int64) -- for overflow behavior
 
 integerToWord64Literal :: Integer -> Term
 integerToWord64Literal = Literal . Word64Literal . toInteger . (fromInteger :: Integer -> Word64) -- for overflow behavior
-#endif
 
 integerToIntegerLiteral :: Integer -> Term
 integerToIntegerLiteral = Literal . IntegerLiteral
@@ -5570,7 +5197,6 @@ runFF f i
         r = f a
     in  Literal . FloatLiteral . floatToWord $ F# r
 
-#if MIN_VERSION_base(4,16,0)
 liftI8 :: (Int8# -> Int8# -> Int8#) -> [Value] -> Maybe Term
 liftI8 f args = case int8Literals' args of
   [i,j] ->
@@ -5643,7 +5269,6 @@ liftI32RI f args = case int32Literals' args of
      in Just (Literal (IntLiteral (toInteger (I# (f a b)))))
   _ -> Nothing
 
-#if MIN_VERSION_base(4,17,0)
 liftI64 :: (Int64# -> Int64# -> Int64#) -> [Value] -> Maybe Term
 liftI64 f args = case int64Literals' args of
   [i,j] ->
@@ -5667,7 +5292,6 @@ liftI64RI f args = case int64Literals' args of
         !(I64# b) = fromInteger j
      in Just (Literal (IntLiteral (toInteger (I# (f a b)))))
   _ -> Nothing
-#endif
 
 liftW8 :: (Word8# -> Word8# -> Word8#) -> [Value] -> Maybe Term
 liftW8 f args = case word8Literals' args of
@@ -5739,7 +5363,6 @@ liftW32RI f args = case word32Literals' args of
      in Just (Literal (IntLiteral (toInteger (I# (f a b)))))
   _ -> Nothing
 
-#if MIN_VERSION_base(4,17,0)
 liftW64 :: (Word64# -> Word64# -> Word64#) -> [Value] -> Maybe Term
 liftW64 f args = case word64Literals' args of
   [i,j] -> let !(W64# a) = fromInteger i
@@ -5762,8 +5385,6 @@ liftW64RI f args = case word64Literals' args of
         !(W64# b) = fromInteger j
      in Just (Literal (IntLiteral (toInteger (I# (f a b)))))
   _ -> Nothing
-#endif
-#endif
 
 splitAtPrim
   :: TyConName

@@ -149,27 +149,15 @@ import Data.Maybe                 (fromMaybe)
 import Numeric                    (readOct, readHex)
 import GHC.Exts
   (Word#, Word (W#), eqWord#, int2Word#, isTrue#, uncheckedShiftRL#)
-#if MIN_VERSION_base(4,15,0)
 import GHC.Exts (minusWord#, gtWord#, word2Int#, dataToTag#)
 import GHC.Num.BigNat (bigNatShiftR#, bigNatToWord)
 import GHC.Num.Integer (integerFromNatural, integerToNatural)
 import GHC.Num.Natural
   (Natural (..), naturalFromWord, naturalShiftL, naturalShiftR, naturalToWord)
-#else
-import GHC.Exts ((>#), dataToTag#)
-import qualified GHC.Exts
-import GHC.Integer.GMP.Internals  (Integer (..), bigNatToWord, shiftRBigNat)
-import GHC.Natural
-  (Natural (..), naturalFromInteger, wordToNatural)
-#endif
 import GHC.Natural                (naturalToInteger)
 import GHC.Stack                  (withFrozenCallStack)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-))
-#if MIN_VERSION_base(4,15,0)
 import GHC.TypeNats               (natVal)
-#else
-import GHC.TypeLits               (natVal)
-#endif
 import GHC.TypeLits.Extra         (Max)
 import Language.Haskell.TH
   (Lit (..), ExpQ, Type(ConT, AppT, LitT), Exp(VarE, AppE, SigE, LitE),
@@ -448,11 +436,7 @@ complement## (Bit m v) = Bit m (complementB v .&. complementB m)
 
 -- *** BitPack
 pack# :: Bit -> BitVector 1
-#if MIN_VERSION_base(4,15,0)
 pack# (Bit (W# m) (W# b)) = BV (NS m) (NS b)
-#else
-pack# (Bit (W# m) (W# b)) = BV (NatS# m) (NatS# b)
-#endif
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE pack# #-}
 {-# ANN pack# hasBlackBox #-}
@@ -460,13 +444,8 @@ pack# (Bit (W# m) (W# b)) = BV (NatS# m) (NatS# b)
 unpack# :: BitVector 1 -> Bit
 unpack# (BV m b) = Bit (go m) (go b)
  where
-#if MIN_VERSION_base(4,15,0)
   go (NS w) = W# w
   go (NB w) = bigNatToWord w
-#else
-  go (NatS# w) = W# w
-  go (NatJ# w) = W# (bigNatToWord w)
-#endif
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE unpack# #-}
 {-# ANN unpack# hasBlackBox #-}
@@ -703,11 +682,7 @@ fromEnum# = fromEnum . toInteger#
 
 enumFrom# :: forall n. KnownNat n => BitVector n -> [BitVector n]
 enumFrom# (BV 0 x) = map (BV 0 . (`mod` m)) [x .. unsafeToNatural (maxBound :: BitVector n)]
-#if MIN_VERSION_base(4,15,0)
   where m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
-#else
-  where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-#endif
 enumFrom# bv = undefErrorU "enumFrom" bv
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE enumFrom# #-}
@@ -723,11 +698,7 @@ enumFromThen# (BV 0 x) (BV 0 y) =
  where
   bound = if x <= y then maxBound else minBound :: BitVector n
   toBvs = map (BV 0 . (`mod` m))
-#if MIN_VERSION_base(4,15,0)
   m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
-#else
-  m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-#endif
 enumFromThen# bv1 bv2 = undefErrorP "enumFromThen" bv1 bv2
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE enumFromThen# #-}
@@ -739,11 +710,7 @@ enumFromTo#
   -> BitVector n
   -> [BitVector n]
 enumFromTo# (BV 0 x) (BV 0 y) = map (BV 0 . (`mod` m)) [x .. y]
-#if MIN_VERSION_base(4,15,0)
   where m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
-#else
-  where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-#endif
 enumFromTo# bv1 bv2 = undefErrorP "enumFromTo" bv1 bv2
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE enumFromTo# #-}
@@ -756,11 +723,7 @@ enumFromThenTo#
   -> BitVector n
   -> [BitVector n]
 enumFromThenTo# (BV 0 x1) (BV 0 x2) (BV 0 y) = map (BV 0 . (`mod` m)) [x1, x2 .. y]
-#if MIN_VERSION_base(4,15,0)
   where m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
-#else
-  where m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-#endif
 enumFromThenTo# bv1 bv2 bv3 = undefErrorP3 "enumFromTo" bv1 bv2 bv3
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE enumFromThenTo# #-}
@@ -803,11 +766,7 @@ instance KnownNat n => Num (BitVector n) where
     go (BV 0 i) (BV 0 j) = BV 0 (addMod m i j)
     go bv1 bv2 = undefErrorI "+" bv1 bv2
 
-#if MIN_VERSION_base(4,15,0)
     m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
-#else
-    m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-#endif
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE (-#) #-}
@@ -817,11 +776,7 @@ instance KnownNat n => Num (BitVector n) where
     go (BV 0 i) (BV 0 j) = BV 0 (subMod m i j)
     go bv1 bv2 = undefErrorI "-" bv1 bv2
 
-#if MIN_VERSION_base(4,15,0)
     m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
-#else
-    m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-#endif
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE (*#) #-}
@@ -831,11 +786,7 @@ instance KnownNat n => Num (BitVector n) where
   go (BV 0 i) (BV 0 j) = BV 0 (mulMod2 m i j)
   go bv1 bv2 = undefErrorI "*" bv1 bv2
 
-#if MIN_VERSION_base(4,15,0)
   m = (1 `naturalShiftL` naturalToWord (natVal (Proxy @n))) - 1
-#else
-  m = (1 `shiftL` fromInteger (natVal (Proxy @n))) - 1
-#endif
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE negate# #-}
@@ -846,11 +797,7 @@ negate# = go
   go (BV 0 i) = BV 0 (negateMod m i)
   go bv = undefErrorU "negate" bv
 
-#if MIN_VERSION_base(4,15,0)
   m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
-#else
-  m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-#endif
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE fromInteger# #-}
@@ -858,15 +805,9 @@ negate# = go
 fromInteger# :: KnownNat n => Natural -> Integer -> BitVector n
 fromInteger# m i = sz `seq` mx
   where
-#if MIN_VERSION_base(4,15,0)
     mx = BV (m `mod` sz)
             (integerToNatural (i `mod` integerFromNatural sz))
     sz  = 1 `naturalShiftL` naturalToWord (natVal mx)
-#else
-    mx = BV (m `mod` naturalFromInteger sz)
-            (naturalFromInteger (i `mod` sz))
-    sz  = 1 `shiftL` fromInteger (natVal mx) :: Integer
-#endif
 
 instance (KnownNat m, KnownNat n) => ExtendingNum (BitVector m) (BitVector n) where
   type AResult (BitVector m) (BitVector n) = BitVector (Max m n + 1)
@@ -892,11 +833,7 @@ minus# = go
   go (BV 0 a) (BV 0 b) = BV 0 (subMod m a b)
   go bv1 bv2 = undefErrorP "sub" bv1 bv2
 
-#if MIN_VERSION_base(4,15,0)
   m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @(Max m n + 1)))
-#else
-  m = 1 `shiftL` fromInteger (natVal (Proxy @(Max m n + 1)))
-#endif
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE times# #-}
@@ -1021,21 +958,13 @@ instance Default (BitVector n) where
 {-# CLASH_OPAQUE size# #-}
 {-# ANN size# hasBlackBox #-}
 size# :: KnownNat n => BitVector n -> Int
-#if MIN_VERSION_base(4,15,0)
 size# bv = fromIntegral (natVal bv)
-#else
-size# bv = fromInteger (natVal bv)
-#endif
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE maxIndex# #-}
 {-# ANN maxIndex# hasBlackBox #-}
 maxIndex# :: KnownNat n => BitVector n -> Int
-#if MIN_VERSION_base(4,15,0)
 maxIndex# bv = fromIntegral (natVal bv) - 1
-#else
-maxIndex# bv = fromInteger (natVal bv) - 1
-#endif
 
 -- ** Indexing
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
@@ -1047,11 +976,7 @@ index# bv@(BV m v) i
                              (W# (int2Word# (dataToTag# (testBit v i))))
     | otherwise        = err
   where
-#if MIN_VERSION_base(4,15,0)
     sz  = fromIntegral (natVal bv)
-#else
-    sz  = fromInteger (natVal bv)
-#endif
     err = error $ concat [ "(!): "
                          , show i
                          , " is out of range "
@@ -1067,7 +992,6 @@ msb# (BV m v)
   = Bit (msbN m)
         (msbN v)
  where
-#if MIN_VERSION_base(4,15,0)
   !(NS i#) = natVal (Proxy @n)
 
   msbN (NS w) =
@@ -1075,15 +999,6 @@ msb# (BV m v)
     then W# 0##
     else W# (w `uncheckedShiftRL#` (word2Int# (i# `minusWord#` 1##)))
   msbN (NB bn) = bigNatToWord (bigNatShiftR# bn (i# `minusWord#` 1##))
-#else
-  !(S# i#) = natVal (Proxy @n)
-
-  msbN (NatS# w) =
-    if isTrue# (i# ># WORD_SIZE_IN_BITS#)
-    then W# 0##
-    else W# (w `uncheckedShiftRL#` (i# GHC.Exts.-# 1#))
-  msbN (NatJ# bn) = W# (bigNatToWord (shiftRBigNat bn (i# GHC.Exts.-# 1#)))
-#endif
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE lsb# #-}
@@ -1115,15 +1030,9 @@ slice# (BV msk i) m n = BV (shiftR (msk .&. mask) n')
 (++#) :: KnownNat m => BitVector n -> BitVector m -> BitVector (n + m)
 (BV m1 v1) ++# bv2@(BV m2 v2) = BV (m1' .|. m2) (v1' .|. v2)
   where
-#if MIN_VERSION_base(4,15,0)
     size2 = fromIntegral (natVal bv2)
     v1' = naturalShiftL v1 size2
     m1' = naturalShiftL m1 size2
-#else
-    size2 = fromInteger (natVal bv2)
-    v1' = shiftL v1 size2
-    m1' = shiftL m1 size2
-#endif
 
 -- * Modifying BitVectors
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
@@ -1131,19 +1040,11 @@ slice# (BV msk i) m n = BV (shiftR (msk .&. mask) n')
 {-# ANN replaceBit# hasBlackBox #-}
 replaceBit# :: KnownNat n => BitVector n -> Int -> Bit -> BitVector n
 replaceBit# bv@(BV m v) i (Bit mb b)
-#if MIN_VERSION_base(4,15,0)
     | i >= 0 && i < sz = BV (clearBit m i .|. (naturalFromWord mb `shiftL` i))
-#else
-    | i >= 0 && i < sz = BV (clearBit m i .|. (wordToNatural mb `shiftL` i))
-#endif
                             (if testBit b 0 && mb == 0 then setBit v i else clearBit v i)
     | otherwise        = err
   where
-#if MIN_VERSION_base(4,15,0)
     sz   = fromIntegral (natVal bv)
-#else
-    sz   = fromInteger (natVal bv)
-#endif
     err  = error $ concat [ "replaceBit: "
                           , show i
                           , " is out of range "
@@ -1182,21 +1083,12 @@ split#
   => BitVector (m + n)
   -> (BitVector m, BitVector n)
 split# (BV m i) =
-#if MIN_VERSION_base(4,15,0)
   let n     = naturalToWord (natVal (Proxy @n))
       mask  = maskMod (natVal (Proxy @n))
       r     = mask i
       rMask = mask m
       l     = i `naturalShiftR` n
       lMask = m `naturalShiftR` n
-#else
-  let n     = fromInteger (natVal (Proxy @n))
-      mask  = maskMod (natVal (Proxy @n))
-      r     = mask i
-      rMask = mask m
-      l     = i `shiftR` n
-      lMask = m `shiftR` n
-#endif
   in  (BV lMask l, BV rMask r)
 
 and#, or#, xor# :: forall n . KnownNat n => BitVector n -> BitVector n -> BitVector n
@@ -1251,13 +1143,8 @@ shiftL# = \(BV msk v) i ->
      | otherwise
      -> BV ((shiftL msk i) `mod` m) ((shiftL v i) `mod` m)
  where
-#if MIN_VERSION_base(4,15,0)
   sz = naturalToWord (natVal (Proxy @n))
   m = 1 `naturalShiftL` sz
-#else
-  sz = fromInteger (natVal (Proxy @n))
-  m = 1 `shiftL` sz
-#endif
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE shiftR# #-}
@@ -1273,7 +1160,6 @@ shiftR# (BV m v) i
 rotateL# =
   \(BV msk v) b ->
     if b >= 0 then
-#if MIN_VERSION_base(4,15,0)
       let vl    = naturalShiftL v b'
           vr    = naturalShiftR v b''
 
@@ -1281,27 +1167,13 @@ rotateL# =
           mr    = naturalShiftR msk b''
 
           b'   = fromIntegral b `mod` sz
-#else
-      let vl    = shiftL v b'
-          vr    = shiftR v b''
-
-          ml    = shiftL msk b'
-          mr    = shiftR msk b''
-
-          b'   = b `mod` sz
-#endif
           b''  = sz - b'
       in  BV ((ml .|. mr) `mod` m) ((vl .|. vr) `mod` m)
     else
       error $ "'rotateL' undefined for negative number: " ++ show b
  where
-#if MIN_VERSION_base(4,15,0)
   sz = naturalToWord (natVal (Proxy @n))
   m  = 1 `naturalShiftL` sz
-#else
-  sz = fromInteger (natVal (Proxy @n)) :: Int
-  m  = 1 `shiftL` sz
-#endif
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE rotateR# #-}
@@ -1309,31 +1181,18 @@ rotateL# =
 rotateR# =
   \(BV msk v) b ->
     if b >= 0 then
-#if MIN_VERSION_base(4,15,0)
       let vl   = naturalShiftR v b'
           vr   = naturalShiftL v b''
           ml   = naturalShiftR msk b'
           mr   = naturalShiftL msk b''
           b'   = fromIntegral b `mod` sz
-#else
-      let vl   = shiftR v b'
-          vr   = shiftL v b''
-          ml   = shiftR msk b'
-          mr   = shiftL msk b''
-          b'   = b `mod` sz
-#endif
           b''  = sz - b'
       in  BV ((ml .|. mr) `mod` m) ((vl .|. vr) `mod` m)
     else
       error $ "'rotateR' undefined for negative number: " ++ show b
  where
-#if MIN_VERSION_base(4,15,0)
   sz = naturalToWord (natVal (Proxy @n))
   m  = 1 `naturalShiftL` sz
-#else
-  sz = fromInteger (natVal (Proxy @n)) :: Int
-  m  = 1 `shiftL` sz
-#endif
 
 popCountBV :: forall n . KnownNat n => BitVector (n+1) -> I.Index (n+2)
 popCountBV bv =
@@ -1355,11 +1214,7 @@ resizeBV = case compareSNat @n @m (SNat @n) (SNat @m) of
 
 truncateB# :: forall a b . KnownNat a => BitVector (a + b) -> BitVector a
 truncateB# = \(BV msk i) -> BV (msk `mod` m) (i `mod` m)
-#if MIN_VERSION_base(4,15,0)
   where m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @a))
-#else
-  where m = 1 `shiftL` fromInteger (natVal (Proxy @a))
-#endif
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE truncateB# #-}
 {-# ANN truncateB# hasBlackBox #-}
@@ -1506,11 +1361,7 @@ checkUnpackUndef _ bv = res
 -- | Create a BitVector with all its bits undefined
 undefined# :: forall n . KnownNat n => BitVector n
 undefined# =
-#if MIN_VERSION_base(4,15,0)
   let m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
-#else
-  let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-#endif
   in  BV (m-1) 0
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE undefined# #-}

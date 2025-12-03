@@ -21,13 +21,8 @@ module Clash.Hedgehog.Sized.Vector
 
 import Prelude hiding (repeat)
 
-#if !MIN_VERSION_base(4,16,0)
-import GHC.Natural (Natural)
-#endif
 import GHC.TypeNats
-#if MIN_VERSION_base(4,18,0)
   hiding (SNat)
-#endif
 import Hedgehog (MonadGen, Range)
 import qualified Hedgehog.Gen as Gen
 

@@ -14,9 +14,6 @@ Configurable model for true dual-port block RAM
 
 module Clash.Explicit.BlockRam.Model where
 
-#if !MIN_VERSION_base(4,18,0)
-import Control.Applicative (liftA2)
-#endif
 import Control.Exception (throw)
 import Data.Sequence (Seq)
 import GHC.Stack (HasCallStack)

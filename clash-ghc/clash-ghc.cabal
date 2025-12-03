@@ -139,7 +139,7 @@ library
                       TemplateHaskell
 
   Build-Depends:      array                     >= 0.4      && < 0.6,
-                      base                      >= 4.11     && < 5,
+                      base                      >= 4.18     && < 5,
                       bytestring                >= 0.9      && < 0.13,
                       Cabal,
                       containers                >= 0.5.4.0  && < 0.8,

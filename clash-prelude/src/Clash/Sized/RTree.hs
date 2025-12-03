@@ -61,9 +61,6 @@ module Clash.Sized.RTree
   )
 where
 
-#if !MIN_VERSION_base(4,18,0)
-import Control.Applicative         (liftA2)
-#endif
 import Control.DeepSeq             (NFData(..))
 import qualified Control.Lens      as Lens
 import Data.Default                (Default (..))

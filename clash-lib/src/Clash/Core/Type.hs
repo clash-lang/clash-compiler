@@ -73,12 +73,10 @@ import           GHC.Generics           (Generic(..))
 import           GHC.Integer            (smallInteger)
 import           GHC.Integer.Logarithms (integerLogBase#)
 import           GHC.TypeLits           (type TypeError, ErrorMessage(Text, (:<>:)))
-#if MIN_VERSION_base(4,16,0)
 import           GHC.Base               (ord)
 import           Data.Char              (chr)
 import           Data.Maybe             (fromMaybe)
 import           Data.Text.Extra        (showt)
-#endif
 
 -- GHC API
 import           GHC.Builtin.Names
@@ -542,7 +540,6 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
                     (fromGhcUnique ordGTDataConKey) wiredInSrcSpan
       _ -> Nothing
 
-#if MIN_VERSION_base(4,16,0)
   | nameUniq tc == fromGhcUnique typeCharCmpTyFamNameKey -- "GHC.TypeNats.CmpSymbol"
   = case mapMaybe (charLitView tcm) tys of
       [s1, s2] ->
@@ -587,7 +584,6 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
   | nameUniq tc == fromGhcUnique typeNatToCharTyFamNameKey -- NatToChar
   , [n1] <- mapMaybe (litView tcm) tys
   = Just (LitTy (CharTy (chr (fromInteger n1))))
-#endif
 
   | nameUniq tc == fromGhcUnique typeSymbolAppendFamNameKey  -- GHC.TypeLits.AppendSymbol"
   = case mapMaybe (symLitView tcm) tys of
@@ -650,7 +646,6 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
         -> Just (LitTy (NumTy (i1 `mod` i2)))
       _ -> Nothing
 
-#if MIN_VERSION_base(4,11,0)
   | nameUniq tc == fromGhcUnique typeNatDivTyFamNameKey
   = case mapMaybe (litView tcm) tys of
       [i1, i2]
@@ -664,7 +659,6 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
         | i2 > 0
         -> Just (LitTy (NumTy (i1 `mod` i2)))
       _ -> Nothing
-#endif
 
   | Just (FunTyCon {tyConSubst = tcSubst}) <- UniqMap.lookup tc tcm
   = let -- See [Note: Eager type families]
@@ -694,12 +688,10 @@ symLitView _ (LitTy (SymTy s))                = Just s
 symLitView m (reduceTypeFamily m -> Just ty') = symLitView m ty'
 symLitView _ _ = Nothing
 
-#if MIN_VERSION_base(4,16,0)
 charLitView :: TyConMap -> Type -> Maybe Char
 charLitView _ (LitTy (CharTy c)) = Just c
 charLitView m (reduceTypeFamily m -> Just t) = charLitView m t
 charLitView _ _ = Nothing
-#endif
 
 isIntegerTy :: Type -> Bool
 isIntegerTy (ConstTy (TyCon nm)) = nameUniq nm == fromGhcUnique integerTyConKey

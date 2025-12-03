@@ -47,9 +47,7 @@ where
 import Control.Monad (when)
 import Data.IORef
 import GHC.TypeLits
-#if MIN_VERSION_base(4,18,0)
   hiding (SNat)
-#endif
 import Prelude hiding (getChar, putChar, getLine)
 import qualified System.IO as IO
 import System.IO.Unsafe
@@ -94,9 +92,6 @@ apSimIO# (SimIO f) (SimIO m) = SimIO (f <*> m)
 {-# ANN apSimIO# hasBlackBox #-}
 
 instance Monad SimIO where
-#if !MIN_VERSION_base(4,16,0)
-  return = pureSimIO#
-#endif
   (>>=)  = bindSimIO#
 
 bindSimIO# :: SimIO a -> (a -> SimIO b) -> SimIO b

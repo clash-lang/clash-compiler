@@ -32,11 +32,7 @@ import GHC.TypeLits (Nat, KnownNat, type (+))
 
 import Clash.Sized.Internal (formatRange)
 
-#if MIN_VERSION_base(4,16,0)
 import GHC.TypeLits (OrderingI(EQI, GTI), cmpNat)
-#else
-import Clash.Promoted.Nat (natToNatural)
-#endif
 
 -- | Coerce a value to be represented by a different number of bits
 class Resize (f :: Nat -> Type) where
@@ -136,18 +132,11 @@ maybeResize ::
   , KnownNat b, Integral (f b), Bounded (f b) ) =>
   f a -> Maybe (f b)
 maybeResize v =
-#if MIN_VERSION_base(4,16,0)
   case Proxy @a `cmpNat` Proxy @b of
     GTI | v > resize (maxBound @(f b)) -> Nothing
     GTI | v < resize (minBound @(f b)) -> Nothing
     EQI -> Just v
     _ -> Just (resize v)
-#else
-  case natToNatural @a `compare` natToNatural @b of
-    GT | v > resize (maxBound @(f b)) -> Nothing
-    GT | v < resize (minBound @(f b)) -> Nothing
-    _ -> Just (resize v)
-#endif
 
 -- | Like 'truncateB', but returns 'Nothing' if the argument is out of bounds for
 -- the result type.

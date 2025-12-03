@@ -880,9 +880,5 @@ instance (KnownNat n) => Ix (Signed n) where
 
 -- | Shift left that ties to zero on negative shifts
 shiftL0 :: Integer -> Int -> Integer
-#if MIN_VERSION_base(4,15,0)
 shiftL0 = \a sh -> if sh >= 0 then shiftL a sh else 0
-#else
-shiftL0 = shiftL -- True for use with this module
-#endif
 {-# INLINE shiftL0 #-}

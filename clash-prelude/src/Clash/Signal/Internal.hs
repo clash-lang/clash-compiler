@@ -184,9 +184,6 @@ where
 import Data.IORef                 (IORef, atomicModifyIORef, newIORef, readIORef)
 import Type.Reflection            (Typeable)
 import Control.Arrow.Transformer.Automaton
-#if !MIN_VERSION_base(4,18,0)
-import Control.Applicative        (liftA2)
-#endif
 import Control.Applicative        (liftA3)
 import Control.DeepSeq            (NFData)
 import Clash.Annotations.Primitive (hasBlackBox, dontTranslate)

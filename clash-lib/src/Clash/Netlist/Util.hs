@@ -59,11 +59,7 @@ import           Data.Text.Extra         (showt)
 import           Data.Text.Lazy          (toStrict)
 import           Data.Text.Prettyprint.Doc.Extra
 
-#if MIN_VERSION_base(4,15,0)
 import           GHC.Num.Integer                  (Integer (..))
-#else
-import           GHC.Integer.GMP.Internals        (Integer (..), BigNat (..))
-#endif
 
 import           GHC.Stack               (HasCallStack)
 import           GHC.TypeLits (someNatVal)
@@ -2191,9 +2187,5 @@ mkLiteral iw lit = case lit of
   C.FloatLiteral w   -> HW.Literal (Just (BitVector 32,32)) (NumLit $ toInteger w)
   C.DoubleLiteral w  -> HW.Literal (Just (BitVector 64,64)) (NumLit $ toInteger w)
   C.NaturalLiteral n -> HW.Literal (Just (Unsigned iw,iw)) $ NumLit n
-#if MIN_VERSION_base(4,15,0)
   C.ByteArrayLiteral (ByteArray ba) -> HW.Literal Nothing (NumLit (IP ba))
-#else
-  C.ByteArrayLiteral (ByteArray ba) -> HW.Literal Nothing (NumLit (Jp# (BN# ba)))
-#endif
   C.StringLiteral s  -> HW.Literal Nothing $ StringLit s

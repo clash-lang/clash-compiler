@@ -695,9 +695,7 @@ runClashTest = defaultMain
           ]
       , clashTestGroup "Numbers"
         [ runTest "BitInteger" def
-#if MIN_VERSION_base(4,14,0)
         , runTest "BitReverse" def
-#endif
         , runTest "BitsTB" def { buildTargets = BuildSpecific [ "bitsTB1"
                                                               , "bitsTB2"
                                                               , "bitsTB3"

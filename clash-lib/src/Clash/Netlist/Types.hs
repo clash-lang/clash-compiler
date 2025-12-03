@@ -32,9 +32,6 @@ where
 import Control.DeepSeq
 import qualified Control.Lens               as Lens
 import Control.Lens                         (Lens', (.=))
-#if !MIN_VERSION_base(4,13,0)
-import Control.Monad.Fail                   (MonadFail)
-#endif
 import Control.Monad.Reader                 (ReaderT, MonadReader)
 import qualified Control.Monad.State        as Lazy (State)
 import qualified Control.Monad.State.Strict as Strict

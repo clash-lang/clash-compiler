@@ -147,7 +147,7 @@ Library
                       array,
                       async                   >= 2.2.0    && < 2.3,
                       attoparsec              >= 0.10.4.0 && < 0.15,
-                      base                    >= 4.11     && < 5,
+                      base                    >= 4.18     && < 5,
                       base16-bytestring       >= 0.1.1    && < 1.1,
                       binary                  >= 0.8.5    && < 0.11,
                       bytestring              >= 0.10.0.2 && < 0.13,
