@@ -80,15 +80,9 @@ import           System.IO.Temp
 import           Text.Trifecta.Result
   (Result(Success, Failure), _errDoc)
 
-#if MIN_VERSION_ghc(9,0,0)
 import           GHC.Builtin.Names                 (eqTyConKey, ipClassKey)
 
 import           GHC.Types.SrcLoc                  (SrcSpan)
-#else
-import           PrelNames               (eqTyConKey, ipClassKey)
-
-import           SrcLoc                           (SrcSpan)
-#endif
 import           GHC.BasicTypes.Extra             ()
 
 import           Clash.Annotations.Primitive

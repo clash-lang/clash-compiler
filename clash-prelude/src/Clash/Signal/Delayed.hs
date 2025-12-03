@@ -105,22 +105,11 @@ delay2 = 'delayedI'
 
 Or @d@ can be specified using type application:
 
-#if __GLASGOW_HASKELL__ >= 902
 >>> :t delayedI @3
 delayedI @3
   :: ... =>
      a -> DSignal dom n a -> DSignal dom (n + 3) a
 
-#else
->>> :t delayedI @3
-delayedI @3
-  :: (...
-      ...
-      ...
-      ...) =>
-     a -> DSignal dom n a -> DSignal dom (n + 3) a
-
-#endif
 -}
 delayedI
   :: ( KnownNat d

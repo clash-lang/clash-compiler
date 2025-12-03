@@ -1,8 +1,6 @@
 {-# LANGUAGE CPP #-}
 
-#if __GLASGOW_HASKELL__ >= 810
 {-# LANGUAGE StandaloneKindSignatures #-}
-#endif
 {-# LANGUAGE GADTs, UndecidableInstances #-}
 module T1591 where
 

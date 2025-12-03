@@ -69,13 +69,8 @@ import           GHC.Stack               (HasCallStack)
 import           GHC.TypeLits (someNatVal)
 import           GHC.TypeNats (SomeNat(..))
 
-#if MIN_VERSION_ghc(9,0,0)
 import           GHC.Utils.Monad         (zipWith3M)
 import           GHC.Utils.Outputable    (ppr, showSDocUnsafe)
-#else
-import           MonadUtils              (zipWith3M)
-import           Outputable              (ppr, showSDocUnsafe)
-#endif
 
 import           Clash.Annotations.TopEntity
   (TopEntity(..), PortName(..), defSyn)

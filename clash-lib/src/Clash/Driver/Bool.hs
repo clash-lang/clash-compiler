@@ -12,13 +12,7 @@ import Control.DeepSeq (NFData)
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 
-#if MIN_VERSION_ghc(9,4,0)
 import qualified GHC.Data.Bool as Ghc
-#elif MIN_VERSION_ghc(9,0,0)
-import qualified GHC.Utils.Misc as Ghc
-#else
-import qualified Util as Ghc
-#endif
 
 data OverridingBool = Auto | Never | Always
   deriving (Show, Read, Eq, Ord, Enum, Bounded, Hashable, Generic, NFData)

@@ -3,11 +3,7 @@
 
 module Clash.Tests.Core.FreeVars (tests) where
 
-#if MIN_VERSION_ghc(9,0,0)
 import           GHC.Types.SrcLoc        (noSrcSpan)
-#else
-import           SrcLoc                  (noSrcSpan)
-#endif
 import qualified Control.Lens            as Lens
 
 import           Test.Tasty

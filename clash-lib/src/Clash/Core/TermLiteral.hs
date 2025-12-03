@@ -32,11 +32,9 @@ import           Data.Proxy                      (Proxy(..))
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
 import           Data.Text.Extra                 (showt)
-#if MIN_VERSION_ghc(9,4,0)
 import qualified Data.Text.Internal              as Text
 import qualified Data.Text.Array                 as Text
 import qualified Data.Primitive.ByteArray        as BA
-#endif
 import           Data.Typeable                   (Typeable, typeRep)
 import           GHC.Natural
 import           GHC.Stack
@@ -101,12 +99,10 @@ instance TermLiteral String where
 instance TermLiteral Text where
   termToData (collectArgs -> (_, [Left (Literal (StringLiteral s))])) =
     Right (Text.pack s)
-#if MIN_VERSION_ghc(9,4,0)
   termToData (collectArgs -> (_, [ Left (Literal (ByteArrayLiteral (BA.ByteArray ba)))
                                  , Left (Literal (IntLiteral off))
                                  , Left (Literal (IntLiteral len))])) =
     Right (Text.Text (Text.ByteArray ba) (fromInteger off) (fromInteger len))
-#endif
   termToData t = Left t
 
 instance KnownNat n => TermLiteral (Index n) where

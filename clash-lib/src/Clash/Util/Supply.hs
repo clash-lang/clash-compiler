@@ -1,7 +1,5 @@
 {-# LANGUAGE MagicHash, UnboxedTuples, CPP, PatternSynonyms #-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 702
 {-# LANGUAGE Trustworthy #-}
-#endif
 {-# OPTIONS_GHC -fno-full-laziness #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 -----------------------------------------------------------------------------
@@ -42,10 +40,6 @@ module Clash.Util.Supply
 
 import Data.Hashable
 import Data.IORef
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 710
-import Data.Functor ((<$>))
-import Data.Monoid
-#endif
 import GHC.IO (unsafeDupablePerformIO, unsafePerformIO)
 
 import Clash.Unique (Unique, Unique#, pattern Unique#)

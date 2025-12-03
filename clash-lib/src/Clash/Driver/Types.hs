@@ -42,16 +42,8 @@ import           Data.Text.Prettyprint.Doc
 
 import           GHC.Generics                   (Generic)
 
-#if MIN_VERSION_ghc(9,4,0)
 import           GHC.Types.Basic                (InlineSpec)
 import           GHC.Types.SrcLoc               (SrcSpan)
-#elif MIN_VERSION_ghc(9,0,0)
-import           GHC.Types.Basic                (InlineSpec)
-import           GHC.Types.SrcLoc               (SrcSpan)
-#else
-import           BasicTypes                     (InlineSpec)
-import           SrcLoc                         (SrcSpan)
-#endif
 
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import           Clash.Signal.Internal

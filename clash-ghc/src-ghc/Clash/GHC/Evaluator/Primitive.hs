@@ -72,25 +72,15 @@ import           GHC.TypeLits        (KnownNat)
 import           GHC.Types           (IO (..))
 import           GHC.Word
 import           System.IO.Unsafe    (unsafeDupablePerformIO)
-#if MIN_VERSION_ghc(9,4,0)
 import           Data.Bifunctor      (first)
 import qualified Data.Text.Array     as Text
 import qualified Data.Text.Internal  as Text
-#endif
 
-#if MIN_VERSION_ghc(9,0,0)
 import           GHC.Types.Basic     (Boxity (..))
 import           GHC.Types.Name      (getSrcSpan, nameOccName, occNameString)
 import           GHC.Builtin.Names   (trueDataConKey, falseDataConKey)
 import qualified GHC.Core.TyCon      as TyCon
 import           GHC.Builtin.Types   (tupleTyCon)
-#else
-import           BasicTypes          (Boxity (..))
-import           Name                (getSrcSpan, nameOccName, occNameString)
-import           PrelNames           (trueDataConKey, falseDataConKey)
-import qualified TyCon
-import           TysWiredIn          (tupleTyCon)
-#endif
 
 import           Clash.Class.BitPack (pack,unpack)
 import           Clash.Core.DataCon  (DataCon (..))
@@ -1106,15 +1096,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce r
   $(namePat 'GHC.Prim.tanhDouble#) | Just r <- liftDD tanhDouble# args
     -> reduce r
-
-#if MIN_VERSION_ghc(8,7,0)
   $(namePat 'GHC.Prim.asinhDouble#)  | Just r <- liftDD asinhDouble# args
     -> reduce r
   $(namePat 'GHC.Prim.acoshDouble#)  | Just r <- liftDD acoshDouble# args
     -> reduce r
   $(namePat 'GHC.Prim.atanhDouble#)  | Just r <- liftDD atanhDouble# args
     -> reduce r
-#endif
 
   $(namePat '(GHC.Prim.**##)) | Just r <- liftDDD (**##) args
     -> reduce r
@@ -1221,14 +1208,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     where go f = case asinh (F# f) of
                    F# f' -> f'
 
-#if MIN_VERSION_ghc(8,7,0)
   $(namePat 'GHC.Prim.asinhFloat#)  | Just r <- liftFF asinhFloat# args
     -> reduce r
   $(namePat 'GHC.Prim.acoshFloat#)  | Just r <- liftFF acoshFloat# args
     -> reduce r
   $(namePat 'GHC.Prim.atanhFloat#)  | Just r <- liftFF atanhFloat# args
     -> reduce r
-#endif
 
   $(namePat 'GHC.Prim.float2Double#) | [i] <- floatLiterals' args
     -> let !(F# a) = wordToFloat i
@@ -4700,7 +4685,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                         , Left (Case splitCall n1BVTy [bvAlt])
                         ])
          _ -> Nothing
-#if MIN_VERSION_ghc(9,4,0)
   "Data.Text.Show.$wunpackCStringAscii#"
     | [Lit (StringLiteral addr)] <- args
     , Text.Text (Text.ByteArray ba) _off len <- Text.pack addr
@@ -4716,7 +4700,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "GHC.Magic.noinlineConstraint"
     | [arg] <- args
     -> reduce (valToTerm arg)
-#if MIN_VERSION_base(4,18,0)
   $(namePat 'GHC.TypeNats.withSomeSNat)
     | Lit (NaturalLiteral n) : fun : _ <- args
     , _ : funTy : _ <- Either.rights (fst (splitFunForallTy ty))
@@ -4727,7 +4710,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            snat = mkApps (Data snatDc) [Right nTy, Left (Literal (NaturalLiteral n))]
            ret = mkApps (valToTerm fun) [Right nTy, Left snat]
         in reduce ret
-#endif
   -- XXX: Does not seem to exist?
   "GHC.Magic.nospec"
     | [arg] <- args
@@ -4764,7 +4746,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     where
       op :: KnownNat n => Proxy n -> Double -> (Signed n, Double)
       op _ = properFraction
-#endif
+
   _ -> Nothing
   where
     ty = primType pInfo

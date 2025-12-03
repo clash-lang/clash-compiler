@@ -62,14 +62,8 @@ class VecToTuple a where
   --
   -- >>> (a, b, c, d) = vecToTuple myVec
   -- ...
-#if __GLASGOW_HASKELL__ > 900
   --     • Couldn't match type: (a, b, c, d)
   --                      with: (Int, Int, Int)
-#else
-  --     • Couldn't match type: (Int, Int, Int)
-  --                             ^
-  --                      with: (a, b, c, d)
-#endif
   -- ...
   vecToTuple ::  a -> TupType a
 

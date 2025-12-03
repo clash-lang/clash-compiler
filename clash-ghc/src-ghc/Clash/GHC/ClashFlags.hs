@@ -7,23 +7,15 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
-{-# LANGUAGE CPP #-}
-
 module Clash.GHC.ClashFlags
   ( parseClashFlags
   , flagsClash
   )
 where
 
-#if MIN_VERSION_ghc(9,0,0)
 import           GHC.Driver.CmdLine
 import           GHC.Utils.Panic
 import           GHC.Types.SrcLoc
-#else
-import           CmdLineParser
-import           Panic
-import           SrcLoc
-#endif
 
 import           Control.Monad
 import           Data.Char                      (isSpace)
@@ -47,9 +39,7 @@ parseClashFlagsFull :: [Flag IO] -> [Located String]
                     -> IO ([Located String],[Warn])
 parseClashFlagsFull flagsAvialable args = do
   (leftovers,errs,warns) <- processArgs flagsAvialable args
-#if MIN_VERSION_ghc(9,4,0)
                               parseResponseFile
-#endif
 
   unless (null errs) $ throwGhcExceptionIO $
     errorsToGhcException . map (("on the commandline", ) .  unLoc . errMsg)

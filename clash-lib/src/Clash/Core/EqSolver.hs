@@ -19,12 +19,8 @@ import Clash.Core.Type
 import Clash.Core.Var
 import Clash.Core.VarEnv (VarSet, elemVarSet, emptyVarSet, mkVarSet)
 import Clash.Unique (fromGhcUnique)
-#if MIN_VERSION_ghc(9,0,0)
 import Clash.Core.DataCon (dcUniq)
 import GHC.Builtin.Names (unsafeReflDataConKey, eqPrimTyConKey, typeNatAddTyFamNameKey)
-#else
-import PrelNames (eqPrimTyConKey, typeNatAddTyFamNameKey)
-#endif
 
 -- | Data type that indicates what kind of solution (if any) was found
 data TypeEqSolution

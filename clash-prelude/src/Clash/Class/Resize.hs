@@ -8,9 +8,6 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MonoLocalBinds #-}
-#if __GLASGOW_HASKELL__ == 902
-{-# LANGUAGE GADTs #-}
-#endif
 
 {-# LANGUAGE Safe #-}
 

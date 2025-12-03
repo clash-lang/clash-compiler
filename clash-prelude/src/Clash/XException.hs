@@ -736,13 +736,6 @@ instance NFDataX a => NFDataX (SG.Sum a)
 instance NFDataX a => NFDataX (M.First a)
 instance NFDataX a => NFDataX (M.Last a)
 
--- Sg.Option will be removed in 9.2. We can't locally disable deprecation
--- warnings (i.e., for this instance only) so we're prematurely removing it
--- instead.
-#if __GLASGOW_HASKELL__ < 900
-instance NFDataX a => NFDataX (SG.Option a)
-#endif
-
 -- | __NB__: The documentation only shows instances up to /3/-tuples. By
 -- default, instances up to and including /12/-tuples will exist. If the flag
 -- @large-tuples@ is set instances up to the GHC imposed limit will exist. The

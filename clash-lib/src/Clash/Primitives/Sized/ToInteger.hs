@@ -37,7 +37,7 @@ import GHC.Utils.Outputable
 import qualified GHC.Utils.Outputable as Outputable
 import GHC.Types.Error (DiagnosticReason (WarningWithoutFlag))
 import GHC.Types.SrcLoc (isGoodSrcSpan)
-#elif MIN_VERSION_ghc(9,6,0)
+#else
 import GHC.Utils.Error
   (DiagOpts(..), mkPlainDiagnostic, mkPlainMsgEnvelope, pprLocMsgEnvelopeDefault)
 import GHC.Utils.Outputable
@@ -46,35 +46,6 @@ import GHC.Utils.Outputable
 import qualified GHC.Utils.Outputable as Outputable
 import GHC.Types.Error (DiagnosticReason (WarningWithoutFlag))
 import GHC.Types.SrcLoc (isGoodSrcSpan)
-#elif MIN_VERSION_ghc(9,4,0)
-import GHC.Utils.Error
-  (DiagOpts(..), mkPlainDiagnostic, mkPlainMsgEnvelope, pprLocMsgEnvelope)
-import GHC.Utils.Outputable
-  (blankLine, empty, int, integer, showSDocUnsafe, text, ($$), ($+$), (<+>),
-   defaultSDocContext )
-import qualified GHC.Utils.Outputable as Outputable
-import GHC.Types.Error (DiagnosticReason (WarningWithoutFlag))
-import GHC.Types.SrcLoc (isGoodSrcSpan)
-#elif MIN_VERSION_ghc(9,2,0)
-import GHC.Utils.Error (mkPlainWarnMsg, pprLocMsgEnvelope)
-import GHC.Utils.Outputable
-  (blankLine, empty, int, integer, showSDocUnsafe, text, ($$), ($+$), (<+>))
-import qualified GHC.Utils.Outputable as Outputable
-import GHC.Types.SrcLoc (isGoodSrcSpan)
-#elif MIN_VERSION_ghc(9,0,0)
-import GHC.Driver.Session (unsafeGlobalDynFlags)
-import GHC.Utils.Error (mkPlainWarnMsg, pprLocErrMsg)
-import GHC.Utils.Outputable
-  (blankLine, empty, int, integer, showSDocUnsafe, text, ($$), ($+$), (<+>))
-import qualified GHC.Utils.Outputable as Outputable
-import GHC.Types.SrcLoc (isGoodSrcSpan)
-#else
-import DynFlags (unsafeGlobalDynFlags)
-import ErrUtils (mkPlainWarnMsg, pprLocErrMsg)
-import Outputable
-  (blankLine, empty, int, integer, showSDocUnsafe, text, ($$), ($+$), (<+>))
-import qualified Outputable
-import SrcLoc (isGoodSrcSpan)
 #endif
 
 import Clash.Annotations.Primitive (HDL (Verilog,VHDL))
@@ -115,22 +86,11 @@ toIntegerBB hdl hty _isD _primName args _ty = do
             diag     = mkPlainDiagnostic WarningWithoutFlag [] (warnMsg i1 iw $+$ blankLine $+$ srcInfo1)
             warnMsg1 = mkPlainMsgEnvelope opts sp diag
             warnMsg2 = pprLocMsgEnvelopeDefault warnMsg1
-#elif MIN_VERSION_ghc(9,6,0)
+#else
             opts     = DiagOpts mempty mempty False False Nothing defaultSDocContext
             diag     = mkPlainDiagnostic WarningWithoutFlag [] (warnMsg i1 iw $+$ blankLine $+$ srcInfo1)
             warnMsg1 = mkPlainMsgEnvelope opts sp diag
             warnMsg2 = pprLocMsgEnvelopeDefault warnMsg1
-#elif MIN_VERSION_ghc(9,4,0)
-            opts     = DiagOpts mempty mempty False False Nothing defaultSDocContext
-            diag     = mkPlainDiagnostic WarningWithoutFlag [] (warnMsg i1 iw $+$ blankLine $+$ srcInfo1)
-            warnMsg1 = mkPlainMsgEnvelope opts sp diag
-            warnMsg2 = pprLocMsgEnvelope warnMsg1
-#elif MIN_VERSION_ghc(9,2,0)
-            warnMsg1 = mkPlainWarnMsg sp (warnMsg i1 iw $+$ blankLine $+$ srcInfo1)
-            warnMsg2 = pprLocMsgEnvelope warnMsg1
-#else
-            warnMsg1 = mkPlainWarnMsg unsafeGlobalDynFlags sp (warnMsg i1 iw $+$ blankLine $+$ srcInfo1)
-            warnMsg2 = pprLocErrMsg warnMsg1
 #endif
 
         liftIO (hPutStrLn stderr (showSDocUnsafe warnMsg2))

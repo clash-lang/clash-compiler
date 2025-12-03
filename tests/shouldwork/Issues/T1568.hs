@@ -13,13 +13,7 @@ import Clash.Core.VarEnv
 import Clash.Driver.Types
 import GHC.BasicTypes.Extra
 
-#if __GLASGOW_HASKELL__ >= 904
 import GHC.BasicTypes.Extra
-#elif __GLASGOW_HASKELL__ >= 900
-import GHC.Types.Basic
-#else
-import BasicTypes
-#endif
 
 import Test.Tasty.Clash
 import Test.Tasty.Clash.CoreTest

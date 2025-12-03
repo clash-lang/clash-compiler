@@ -61,17 +61,9 @@ import Data.Text.Extra (showt)
 import GHC.Stack (HasCallStack)
 import qualified Language.Haskell.TH as TH
 
-#if MIN_VERSION_ghc(9,6,0)
 import GHC.Core.Make (chunkify, mkChunkified)
-#else
-import GHC.Hs.Utils (chunkify, mkChunkified)
-#endif
 
-#if MIN_VERSION_ghc(9,0,0)
 import GHC.Settings.Constants (mAX_TUPLE_SIZE)
-#else
-import Constants (mAX_TUPLE_SIZE)
-#endif
 
 -- internal
 import Clash.Core.DataCon (DataCon)
