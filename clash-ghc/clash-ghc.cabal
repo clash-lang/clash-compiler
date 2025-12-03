@@ -129,20 +129,9 @@ library
     HS-Source-Dirs: src-bin-9.8
   elif impl(ghc >= 9.6.0)
     HS-Source-Dirs: src-bin-9.6
-  elif impl(ghc >= 9.4.0)
-    HS-Source-Dirs: src-bin-9.4
-  elif impl(ghc >= 9.2.0)
-    HS-Source-Dirs: src-bin-9.2
-  elif impl(ghc >= 9.0.0)
-    HS-Source-Dirs: src-bin-9.0
-  elif impl(ghc >= 8.10.0)
-    HS-Source-Dirs: src-bin-8.10
 
   GHC-Options:        -Wall -Wcompat
-  if impl(ghc >= 8.10.0)
-    CPP-Options:        -DHAVE_INTERNAL_INTERPRETER
-  else
-    CPP-Options:        -DGHCI
+  CPP-Options:        -DHAVE_INTERNAL_INTERPRETER
 
   other-extensions:   FlexibleContexts
                       OverloadedStrings
@@ -167,7 +156,6 @@ library
                       text                      >= 1.2.2    && < 2.2,
                       transformers              >= 0.5.2.0  && < 0.7,
                       unordered-containers      >= 0.2.1.0  && < 0.3,
-
                       clash-lib                 == 1.9.0,
                       clash-prelude             == 1.9.0,
                       ghc-typelits-extra        >= 0.3.2    && < 0.5,
@@ -175,31 +163,19 @@ library
                       ghc-typelits-natnormalise >= 0.6      && < 0.8,
                       deepseq                   >= 1.3.0.2  && < 1.6,
                       time                      >= 1.4.0.1  && < 1.15,
-                      ghc-boot                  >= 8.10.0   && < 9.11,
+                      ghc                       >= 9.6.0    && < 9.11,
+                      ghc-bignum                >= 1.0      && < 1.4,
+                      ghc-boot                  >= 9.6.0    && < 9.11,
                       ghc-prim                  >= 0.3.1.0  && < 0.13,
-                      ghci                      >= 8.10.0   && < 9.11,
+                      ghci                      >= 9.6.0    && < 9.11,
                       uniplate                  >= 1.6.12   && < 1.8,
                       reflection                >= 2.1.2    && < 3.0,
                       primitive                 >= 0.5.0.1  && < 1.0,
                       string-interpolate        ^>= 0.3,
                       template-haskell          >= 2.8.0.0  && < 2.23,
                       utf8-string               >= 1.0.0.0  && < 1.1.0.0,
-                      vector                    >= 0.11     && < 1.0
-
-  if os(darwin)
-    -- 8.10 is broken on macOS - it exits tests with status code -11
-    Build-Depends: ghc >= 9.0.0 && < 9.11
-  else
-    -- Unix
-    Build-Depends: ghc >= 8.10.0 && < 9.11
-
-  if impl(ghc >= 8.10.0)
-    Build-Depends:    exceptions                >= 0.10.4   && < 0.11,
-
-  if impl(ghc >= 9.0.0)
-    Build-Depends:    ghc-bignum                >= 1.0      && < 1.4
-  else
-    Build-Depends:    integer-gmp               >= 1.0.1.0  && < 2.0
+                      vector                    >= 0.11     && < 1.0,
+                      exceptions                >= 0.10.4   && < 0.11,
 
   if flag(use-ghc-paths)
     Build-Depends:    ghc-paths
@@ -240,10 +216,9 @@ library
                       Clash.GHC.GHC2Core
                       Clash.GHC.LoadInterfaceFiles
                       Clash.GHC.Util
+                      Clash.GHCi.Util
                       Data.Text.Extra
                       Paths_clash_ghc
-  if impl(ghc >= 8.8.0)
-    Other-Modules:    Clash.GHCi.Util
 
   if impl(ghc >= 9.8.0)
     Other-Modules:    Clash.GHCi.UI.Exception
