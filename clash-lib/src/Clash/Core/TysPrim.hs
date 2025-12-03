@@ -44,11 +44,9 @@ import           GHC.Builtin.Names
 import           GHC.Base hiding (Type, TyCon)
 import           Data.Text.Extra (showt)
 
-#if MIN_VERSION_base(4,17,0)
 import           Clash.Core.DataCon (DataCon(..), DcStrictness(..))
 import           GHC.Num.Integer (Integer(..))
 import           GHC.Num.Natural (Natural(..))
-#endif
 
 import           Clash.Core.Name
 import           Clash.Core.TyCon
@@ -82,13 +80,8 @@ intPrimTyConName, integerPrimTyConName, charPrimTyConName, stringPrimTyConName,
   naturalPrimTyConName, byteArrayPrimTyConName, eqPrimTyConName :: TyConName
 intPrimTyConName     = mkUnsafeSystemName "GHC.Prim.Int#"
                                 (fromGhcUnique intPrimTyConKey)
-#if MIN_VERSION_base(4,15,0)
 integerPrimTyConName = mkUnsafeSystemName "GHC.Num.Integer.Integer"
                                 (fromGhcUnique integerTyConKey)
-#else
-integerPrimTyConName = mkUnsafeSystemName "GHC.Integer.Type.Integer"
-                                (fromGhcUnique integerTyConKey)
-#endif
 stringPrimTyConName  = mkUnsafeSystemName "GHC.Prim.Addr#"
                         (fromGhcUnique addrPrimTyConKey)
 charPrimTyConName    = mkUnsafeSystemName "GHC.Prim.Char#"
@@ -103,13 +96,8 @@ floatPrimTyConName   = mkUnsafeSystemName "GHC.Prim.Float#"
                                 (fromGhcUnique floatPrimTyConKey)
 doublePrimTyConName  = mkUnsafeSystemName "GHC.Prim.Double#"
                                 (fromGhcUnique doublePrimTyConKey)
-#if MIN_VERSION_base(4,15,0)
 naturalPrimTyConName = mkUnsafeSystemName "GHC.Num.Natural.Natural"
                                 (fromGhcUnique naturalTyConKey)
-#else
-naturalPrimTyConName = mkUnsafeSystemName "GHC.Natural.Natural"
-                                (fromGhcUnique naturalTyConKey)
-#endif
 byteArrayPrimTyConName = mkUnsafeSystemName "GHC.Prim.ByteArray#"
                           (fromGhcUnique byteArrayPrimTyConKey)
 
@@ -140,7 +128,6 @@ intPrimTc, integerPrimTc, charPrimTc, stringPrimTc, wordPrimTc,
   int64PrimTc, word64PrimTc, floatPrimTc, doublePrimTc, naturalPrimTc,
   byteArrayPrimTc :: TyCon
 intPrimTc     = liftedPrimTC intPrimTyConName
-#if MIN_VERSION_base(4,17,0)
 -- While GHC might have dropped Integer and Natural literals, in Clash it is
 -- still nice to have them around. However, Integer and Natural are also no
 -- longer primitive types in GHC, but we still want to give the Integer and
@@ -224,10 +211,6 @@ naturalPrimTc =
     rhs = DataTyCon [nsDc,nbDc]
    in
     AlgTyCon uniq name liftedTypeKind 0 rhs False
-#else
-integerPrimTc = liftedPrimTC integerPrimTyConName
-naturalPrimTc = liftedPrimTC naturalPrimTyConName
-#endif
 charPrimTc    = liftedPrimTC charPrimTyConName
 stringPrimTc  = liftedPrimTC stringPrimTyConName
 wordPrimTc    = liftedPrimTC wordPrimTyConName

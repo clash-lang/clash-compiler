@@ -109,9 +109,7 @@ import Data.Data
 import Data.Either                (isLeft)
 import Data.Distributive
 import Data.Functor.Rep
-#if MIN_VERSION_base(4,18,0)
 import qualified Data.Foldable1   as F1
-#endif
 import Data.Default               (Default (..))
 import qualified Data.Foldable    as F
 import Data.Kind                  (Type)
@@ -146,9 +144,7 @@ import Clash.Magic (clashCompileError, clashSimulation)
 import Clash.Promoted.Nat
   (SNat (..), SNatLE (..), UNat (..), compareSNat, pow2SNat,
    snatProxy, snatToInteger, subSNat, withSNat, toUNat, natToInteger)
-#if MIN_VERSION_base(4,18,0)
 import Clash.Promoted.Nat (leToPlus)
-#endif
 import Clash.Promoted.Nat.Literals (d1)
 import Clash.Sized.Internal.BitVector (Bit, BitVector (..), split#)
 import Clash.Sized.Index          (Index)
@@ -355,7 +351,6 @@ instance KnownNat n => F.Foldable (Vec n) where
   product Nil      = 1
   product z@Cons{} = fold (*) z
 
-#if MIN_VERSION_base(4,18,0)
 instance (KnownNat n, 1 <= n) => F1.Foldable1 (Vec n) where
   fold1         = leToPlus @1 @n $ fold (<>)
   foldMap1 f    = leToPlus @1 @n $ fold (<>) . map f
@@ -363,7 +358,6 @@ instance (KnownNat n, 1 <= n) => F1.Foldable1 (Vec n) where
   minimum       = leToPlus @1 @n minimum
   head          = leToPlus @1 @n head
   last          = leToPlus @1 @n last
-#endif
 
 instance Functor (Vec n) where
   fmap = map
@@ -441,12 +435,10 @@ singleton = (`Cons` Nil)
 -}
 head :: Vec (n + 1) a -> a
 head (x `Cons` _) = x
-#if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
 head xs = unreachable xs
  where
   unreachable :: forall n a. 1 <= n => Vec n a -> a
   unreachable (x `Cons` _) = x
-#endif
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE tail #-}
@@ -482,12 +474,10 @@ head xs = unreachable xs
 -}
 tail :: Vec (n + 1) a -> Vec n a
 tail (_ `Cons` xr) = xr
-#if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
 tail xs = unreachable xs
  where
   unreachable :: forall n a. 1 <= n => Vec n a -> Vec (n - 1) a
   unreachable (_ `Cons` xr) = xr
-#endif
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE last #-}
@@ -524,12 +514,10 @@ tail xs = unreachable xs
 last :: Vec (n + 1) a -> a
 last (x `Cons` Nil)         = x
 last (_ `Cons` y `Cons` xr) = last (y `Cons` xr)
-#if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
 last xs = unreachable xs
  where
   unreachable :: 1 <= n => Vec n a -> a
   unreachable ys@(Cons _ _) = last ys
-#endif
 
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE init #-}
@@ -566,12 +554,10 @@ last xs = unreachable xs
 init :: Vec (n + 1) a -> Vec n a
 init (_ `Cons` Nil)         = Nil
 init (x `Cons` y `Cons` xr) = x `Cons` init (y `Cons` xr)
-#if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
 init xs = unreachable xs
  where
   unreachable :: 1 <= n => Vec n a -> Vec (n - 1) a
   unreachable ys@(Cons _ _) = init ys
-#endif
 
 {-# INLINE shiftInAt0 #-}
 -- | Shift in elements to the head of a vector, bumping out elements at the
@@ -2579,11 +2565,9 @@ dtfold _ f g = go (SNat :: SNat k)
           sn'       = sn `subSNat` d1
           (xsL,xsR) = splitAt (pow2SNat sn') xs
       in  g sn' (go sn' xsL) (go sn' xsR)
-#if !MIN_VERSION_base(4,16,0) || MIN_VERSION_base(4,17,0)
     go _  Nil =
       case (const Dict :: forall m. Proxy m -> Dict (1 <= 2 ^ m)) (Proxy @n) of
         {}
-#endif
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE dtfold #-}
 {-# ANN dtfold hasBlackBox #-}

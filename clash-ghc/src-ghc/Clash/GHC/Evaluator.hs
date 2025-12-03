@@ -29,12 +29,7 @@ import           Data.List                               (foldl')
 #endif
 import qualified Data.Primitive.ByteArray                as BA
 import qualified Data.Text as Text
-#if MIN_VERSION_base(4,15,0)
 import           GHC.Num.Integer                         (Integer (..))
-#else
-import           GHC.Integer.GMP.Internals
-  (Integer (..), BigNat (..))
-#endif
 
 import           Clash.Core.DataCon
 import           Clash.Core.Evaluator.Types
@@ -396,19 +391,11 @@ scrutinise (Lit l) _altTy alts m = case alts of
        1 | l1 >= ((-2)^(63::Int)) &&  l1 < 2^(63::Int) ->
           Just (IntLiteral l1)
        2 | l1 >= (2^(63::Int)) ->
-#if MIN_VERSION_base(4,15,0)
           let !(IP ba0) = l1
-#else
-          let !(Jp# !(BN# ba0)) = l1
-#endif
               ba1 = BA.ByteArray ba0
           in  Just (ByteArrayLiteral ba1)
        3 | l1 < ((-2)^(63::Int)) ->
-#if MIN_VERSION_base(4,15,0)
           let !(IN ba0) = l1
-#else
-          let !(Jn# !(BN# ba0)) = l1
-#endif
               ba1 = BA.ByteArray ba0
           in  Just (ByteArrayLiteral ba1)
        _ -> Nothing
@@ -421,11 +408,7 @@ scrutinise (Lit l) _altTy alts m = case alts of
        1 | l1 >= 0 &&  l1 < 2^(64::Int) ->
           Just (WordLiteral l1)
        2 | l1 >= (2^(64::Int)) ->
-#if MIN_VERSION_base(4,15,0)
           let !(IP ba0) = l1
-#else
-          let !(Jp# !(BN# ba0)) = l1
-#endif
               ba1 = BA.ByteArray ba0
           in  Just (ByteArrayLiteral ba1)
        _ -> Nothing

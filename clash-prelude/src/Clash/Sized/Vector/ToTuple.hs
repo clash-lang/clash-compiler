@@ -30,11 +30,7 @@ import Clash.Sized.Vector.ToTuple.TH (vecToTupleInstances)
 
 import Data.Tagged (Tagged(..))
 
-#if MIN_VERSION_base(4,18,0)
 import Data.Tuple (Solo(MkSolo))
-#elif MIN_VERSION_base(4,16,0)
-import Data.Tuple (Solo(Solo))
-#endif
 
 {- $setup
 >>> :set -XMonoLocalBinds -XGADTs
@@ -71,17 +67,10 @@ instance VecToTuple (Vec 0 a) where
   type TupType (Vec 0 a) = Tagged a ()
   vecToTuple _ = Tagged ()
 
-#if MIN_VERSION_base(4,18,0)
 -- | Instead of using 'vecToTuple' for @Vec 1 _@, you could also consider using 'head'
 instance VecToTuple (Vec 1 a) where
   type TupType (Vec 1 a) = Solo a
   vecToTuple (a1 :> _) = MkSolo a1
-#elif MIN_VERSION_base(4,16,0)
--- | Instead of using 'vecToTuple' for @Vec 1 _@, you could also consider using 'head'
-instance VecToTuple (Vec 1 a) where
-  type TupType (Vec 1 a) = Solo a
-  vecToTuple (a1 :> _) = Solo a1
-#endif
 
 -- | __NB__: The documentation only shows instances up to /3/-tuples. By
 -- default, instances up to and including /12/-tuples will exist. If the flag

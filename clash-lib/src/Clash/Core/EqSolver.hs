@@ -135,12 +135,10 @@ isAbsurdPat
   :: TyConMap
   -> Pat
   -> Bool
-#if MIN_VERSION_base(4,15,0)
 isAbsurdPat _tcm (DataPat dc _ _)
   -- unsafeCoerce is not absurd in the way intended by /isAbsurdPat/
   | dcUniq dc == fromGhcUnique unsafeReflDataConKey
   = False
-#endif
 isAbsurdPat tcm pat =
   any (isAbsurdEq tcm exts) (patEqs tcm pat)
  where

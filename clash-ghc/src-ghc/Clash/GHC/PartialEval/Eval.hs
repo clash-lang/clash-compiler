@@ -26,11 +26,7 @@ import           Data.Bitraversable
 import           Data.Either
 import           Data.Maybe
 import           Data.Primitive.ByteArray (ByteArray(..))
-#if MIN_VERSION_base(4,15,0)
 import           GHC.Num.Integer (Integer (..))
-#else
-import           GHC.Integer.GMP.Internals (BigNat(..), Integer(..))
-#endif
 
 import           GHC.BasicTypes.Extra (isNoInline)
 
@@ -401,43 +397,23 @@ matchLiteral lit alt@(pat, _) =
     DataPat dc [] [i]
       |  IntegerLiteral n <- lit
       -> case n of
-#if MIN_VERSION_base(4,15,0)
            IS _
-#else
-           S# _
-#endif
              | dcTag dc == 1 -> pure $ Match alt [] [(i, VLiteral (IntLiteral n))]
 
-#if MIN_VERSION_base(4,15,0)
            IP bn
-#else
-           Jp# bn
-#endif
              | dcTag dc == 2 -> matchBigNat i bn
 
-#if MIN_VERSION_base(4,15,0)
            IN bn
-#else
-           Jn# bn
-#endif
              | dcTag dc == 3 -> matchBigNat i bn
 
            _ -> pure NoMatch
 
       |  NaturalLiteral n <- lit
       -> case n of
-#if MIN_VERSION_base(4,15,0)
            IS _
-#else
-           S# _
-#endif
              | dcTag dc == 1 -> pure $ Match alt [] [(i, VLiteral (WordLiteral n))]
 
-#if MIN_VERSION_base(4,15,0)
            IP bn
-#else
-           Jp# bn
-#endif
              | dcTag dc == 2 -> matchBigNat i bn
 
            _ -> pure NoMatch
@@ -451,11 +427,7 @@ matchLiteral lit alt@(pat, _) =
  where
   -- Somewhat of a hack: We find the constructor for BigNat and apply a
   -- ByteArray literal made from the given ByteArray to it.
-#if MIN_VERSION_base(4,15,0)
   matchBigNat i ba = do
-#else
-  matchBigNat i (BN# ba) = do
-#endif
     tcm <- getTyConMap
     let bnDcM = do
           integerTcName <- fmap fst (splitTyConAppM integerPrimTy)
