@@ -1103,11 +1103,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            !(# p, q #) = decodeDouble_Int64# a
        in reduce $
           mkApps (Data tupDc) (map Right tyArgs ++
-#if MIN_VERSION_ghc_prim(0,9,0)
                    [ Left (Literal . Int64Literal  . toInteger $ I64# p)
-#else
-                   [ Left (Literal . IntLiteral  . toInteger $ I64# p)
-#endif
                    , Left (Literal . IntLiteral  . toInteger $ I# q)])
 
 --------
