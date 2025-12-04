@@ -645,14 +645,12 @@ runClashTest = defaultMain
         , runTest "T2360" def{hdlSim=[],clashFlags=["-fclash-force-undefined=0"]}
         , outputTest "T2502" def{hdlTargets=[VHDL]}
         , outputTest "T2508" def{hdlTargets=[VHDL]}
-#if MIN_VERSION_GLASGOW_HASKELL(9,4,0,0)
         , runTest "T2510" def{
             hdlTargets=[VHDL]
           , hdlSim=[]
           , expectClashFail=Just (TestSpecificExitCode 0, "Warning: primitive T2510.bb isn't marked OPAQUE.")
           }
         , outputTest "T2510" def{hdlTargets=[VHDL], clashFlags=["-DNOINLINE=OPAQUE"]}
-#endif
         , outputTest "T2542" def{hdlTargets=[VHDL]}
         , runTest "T2593" def{hdlSim=[]}
         , runTest "T2623CaseConFVs" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}

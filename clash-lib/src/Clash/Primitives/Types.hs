@@ -56,9 +56,7 @@ import           GHC.Generics                 (Generic)
 import           GHC.Stack                    (HasCallStack)
 import           Text.Read                    (readMaybe)
 
-#if MIN_VERSION_aeson(2,0,0)
 import qualified Data.Aeson.KeyMap as KeyMap
-#endif
 
 -- | An unresolved primitive still contains pointers to files.
 type UnresolvedPrimitive = Primitive Text ((TemplateFormat,BlackBoxFunctionName),Maybe TemplateSource) (Maybe S.Text) (Maybe TemplateSource)
@@ -238,11 +236,7 @@ data Primitive a b c d
 
 instance FromJSON UnresolvedPrimitive where
   parseJSON (Object v) =
-#if MIN_VERSION_aeson(2,0,0)
     case KeyMap.toList v of
-#else
-    case H.toList v of
-#endif
       [(conKey,Object conVal)] ->
         case conKey of
           "BlackBoxHaskell"  -> do

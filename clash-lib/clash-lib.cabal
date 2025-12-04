@@ -140,7 +140,7 @@ Library
                       RecordWildCards
                       TemplateHaskell
 
-  Build-depends:      aeson                   >= 0.6.2.0  && < 2.3,
+  Build-depends:      aeson                   >= 2.0.0.0  && < 2.3,
                       attoparsec-aeson        >= 2.1      && < 2.3,
                       aeson-pretty            >= 0.8      && < 0.9,
                       ansi-terminal           >= 0.8.0.0  && < 1.2,
@@ -166,7 +166,7 @@ Library
                       ghc-boot,
                       ghc-boot-th,
                       ghc-prim,
-                      hashable                >= 1.2.1.0  && < 1.6,
+                      hashable                >= 1.4.1.0  && < 1.6,
                       haskell-src-meta        >= 0.8      && < 0.9,
                       hint                    >= 0.7      && < 0.10,
                       infinite-list           ^>= 0.1,
@@ -187,7 +187,7 @@ Library
                       trifecta                >= 1.7.1.1  && < 2.2,
                       vector                  >= 0.11     && < 1.0,
                       vector-binary-instances >= 0.2.3.5  && < 0.3,
-                      unordered-containers    >= 0.2.3.3  && < 0.3,
+                      unordered-containers    >= 0.2.11   && < 0.3,
                       yaml                    >= 0.11     && < 0.12,
 
   if impl(ghc >= 9.0.0)

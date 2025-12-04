@@ -162,15 +162,7 @@ visit name a = local (\t -> t & _1 %~ Set.insert name
 
 -- | Grab the 'Name's of type variables in a datatype
 datatypeVars' :: DatatypeInfo -> [Name]
-#if MIN_VERSION_th_abstraction(0,3,0)
 datatypeVars' d = tvName <$> datatypeVars d
-#else
-datatypeVars' d = name <$> datatypeVars d
- where
-  name (VarT n) = n
-  name (SigT n _) = name n
-  name e = error $ "Unexpected datatype variable name of type " ++ show e
-#endif
 
 -- | Run a 'Name' through the template haskell machinery, getting a
 -- 'DatatypeInfo' if the 'Name' specified a datatype. The result is processed by

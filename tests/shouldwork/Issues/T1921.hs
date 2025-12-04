@@ -12,13 +12,8 @@ import Clash.Prelude
   hiding (withKnownNat)
 import Control.Lens
 import Data.Default
-#if MIN_VERSION_singletons(3,0,0)
 import Prelude.Singletons
 import GHC.TypeLits.Singletons as TL
-#else
-import Data.Singletons.Prelude
-import Data.Singletons.TypeLits as TL
-#endif
 
 topEntity :: Clock System -> Reset System -> Enable System -> Signal System (Unsigned 8)
 topEntity = exposeClockResetEnable fibonacciLFSR8

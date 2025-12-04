@@ -18,9 +18,6 @@ import Control.DeepSeq (NFData(..))
 -- In primitive < 0.8.0.0, its ByteArray is a distinct type from
 -- Data.Array.Byte.ByteArray (insofar as the latter even exists).
 #define DEFINE_HASHABLE_BYTEARRAY
-#elif !MIN_VERSION_hashable(1,4,1)
--- hashable < 1.4.1 doesn't define a Hashable ByteArray instance at all.
-#define DEFINE_HASHABLE_BYTEARRAY
 #endif
 
 #ifdef DEFINE_HASHABLE_BYTEARRAY
