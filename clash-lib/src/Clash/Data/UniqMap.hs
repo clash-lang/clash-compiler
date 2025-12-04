@@ -58,10 +58,6 @@ import qualified Data.IntMap.Strict as IntMap
 #endif
 import qualified Data.List as List (foldl')
 
-#if !MIN_VERSION_containers(0,6,2)
-import qualified Data.IntMap.Extra as IntMap
-#endif
-
 #if MIN_VERSION_prettyprinter(1,7,0)
 import           Prettyprinter
 #else
