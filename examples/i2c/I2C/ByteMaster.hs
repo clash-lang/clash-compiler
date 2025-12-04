@@ -63,8 +63,7 @@ byteMaster
   -> Unbundled System ByteMasterI
   -> Unbundled System ByteMasterO
 byteMaster = exposeClockResetEnable (mealyB byteMasterT byteMasterInit)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE byteMaster #-}
+{-# OPAQUE byteMaster #-}
 
 {-# INLINE byteMasterInit #-}
 byteMasterInit :: ByteMasterS

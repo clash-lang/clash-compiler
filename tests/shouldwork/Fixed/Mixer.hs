@@ -18,8 +18,7 @@ cordic angle
 
 topEntity :: SFixed 3 8 -> SFixed 3 8
 topEntity = cordic
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

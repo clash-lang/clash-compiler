@@ -27,8 +27,7 @@ myMultiply
   -> Signal System Int
 myMultiply a b =
   a * b
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE myMultiply #-}
+{-# OPAQUE myMultiply #-}
 
 topEntity
   :: SystemClockResetEnable

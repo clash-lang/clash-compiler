@@ -111,5 +111,4 @@ i2cSlave
   -> Signal System ACConfTestI
   -> Signal System ACConfTestO
 i2cSlave clk = mealyIO clk i2cSlaveT (reg i2cSlaveInit)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE i2cSlave #-}
+{-# OPAQUE i2cSlave #-}

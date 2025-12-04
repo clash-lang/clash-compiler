@@ -37,5 +37,4 @@ i2c clk arst rst ena clkCnt start stop read write ackIn din i2cI = (dout,hostAck
     (hostAck,ackOut,dout,bitCtrl) = byteMaster clk arst enableGen (rst,start,stop,read,write,ackIn,din,bitResp)
     (bitResp,busy,i2cO)           = bitMaster  clk arst enableGen (rst,ena,clkCnt,bitCtrl,i2cI)
     (cmdAck,al,dbout)             = unbundle bitResp
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE i2c #-}
+{-# OPAQUE i2c #-}

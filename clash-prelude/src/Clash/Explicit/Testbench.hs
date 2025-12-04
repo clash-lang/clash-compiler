@@ -115,8 +115,7 @@ assert clk (Reset _) msg checked expected returned =
   where
     eqX a b = unsafeDupablePerformIO (catch (evaluate (a == b))
                                             (\(_ :: XException) -> return False))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE assert #-}
+{-# OPAQUE assert #-}
 {-# ANN assert hasBlackBox #-}
 
 -- | The same as 'assert', but can handle don't care bits in its expected value.
@@ -150,8 +149,7 @@ assertBitVector clk (Reset _) msg checked expected returned =
   where
     eqX a b = unsafeDupablePerformIO (catch (evaluate (a `isLike#` b))
                                             (\(_ :: XException) -> return False))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE assertBitVector #-}
+{-# OPAQUE assertBitVector #-}
 {-# ANN assertBitVector hasBlackBox #-}
 
 
@@ -430,8 +428,7 @@ biTbClockGen done = (testClk, circuitClk)
 -- be optimized away.
 tbEnableGen :: Enable tag
 tbEnableGen = toEnable (pure True)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE tbEnableGen #-}
+{-# OPAQUE tbEnableGen #-}
 {-# ANN tbEnableGen hasBlackBox #-}
 
 -- | Clock generator for the 'System' clock domain.
@@ -479,8 +476,7 @@ clockToDiffClock ::
   -- | Differential output
   DiffClock dom
 clockToDiffClock clk = DiffClock clk (ClockN SSymbol)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE clockToDiffClock #-}
+{-# OPAQUE clockToDiffClock #-}
 {-# ANN clockToDiffClock hasBlackBox #-}
 
 -- | Cross clock domains in a way that is unsuitable for hardware but good
@@ -501,6 +497,5 @@ unsafeSimSynchronizer
   -> Signal dom1 a
   -> Signal dom2 a
 unsafeSimSynchronizer = unsafeSynchronizer
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE unsafeSimSynchronizer #-}
+{-# OPAQUE unsafeSimSynchronizer #-}
 {-# ANN unsafeSimSynchronizer hasBlackBox #-}

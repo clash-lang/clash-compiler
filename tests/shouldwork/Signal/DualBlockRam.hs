@@ -14,8 +14,7 @@ import DualBlockRamTypes
 
 topEntityAB :: TdpRam A B
 topEntityAB = tdpRam
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntityAB #-}
+{-# OPAQUE topEntityAB #-}
 {-# ANN topEntityAB (defSyn "topEntityAB") #-}
 
 testBenchAB :: Signal A Bool
@@ -42,8 +41,7 @@ testBenchAB = strictAnd <$> doneA <*> (unsafeSynchronizer clk10 clk20 doneB)
     clk20 = tbClockGen (not <$> doneA)
     clk10 :: Clock B
     clk10 = tbClockGen (not <$> doneB)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE testBenchAB #-}
+{-# OPAQUE testBenchAB #-}
 {-# ANN testBenchAB (TestBench 'topEntityAB) #-}
 
 topEntityBC :: TdpRam B C
@@ -77,6 +75,5 @@ testBenchBC = strictAnd <$> doneA <*> (unsafeSynchronizer clk7 clk10 doneB)
     clk10 = tbClockGen (not <$> doneA)
     clk7 :: Clock C
     clk7 = tbClockGen (not <$> doneB)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE testBenchBC #-}
+{-# OPAQUE testBenchBC #-}
 {-# ANN testBenchBC (TestBench 'topEntityBC) #-}

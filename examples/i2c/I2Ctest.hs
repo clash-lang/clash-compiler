@@ -28,8 +28,7 @@ system0 clk arst = bundle (regFile,done,fault)
 
   rst = liftA2 (<) rstCounter 500
   rstCounter = register clk arst enableGen (0 :: Unsigned 18) (rstCounter + 1)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE system0 #-}
+{-# OPAQUE system0 #-}
 
 {-# ANN system Synthesize { t_name = "system", t_inputs = [], t_output = PortName "" } #-}
 system = system0 systemClockGen resetGen

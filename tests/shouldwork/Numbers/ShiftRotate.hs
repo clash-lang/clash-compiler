@@ -16,8 +16,7 @@ import Data.Word
 import ShiftRotateBase
 
 topEntity = testall
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 expected :: Vec _ ( Vec Ops (Unsigned 8)
                   , Vec Ops (Signed 8)

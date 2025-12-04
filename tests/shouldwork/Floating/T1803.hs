@@ -22,8 +22,7 @@ topEntity clk rst =
       d :: Signal System Double
       d = stimuliGenerator clk rst (map unpack doubleData)
   in bundle (pack <$> f, pack <$> d)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench
   :: Signal System Bool
@@ -33,8 +32,7 @@ testBench = done
     done = expectOutput $ topEntity clk rst
     clk = tbSystemClockGen (not <$> done)
     rst = systemResetGen
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE testBench #-}
+{-# OPAQUE testBench #-}
 
 {-
  - floatData should end up in the top entity as:

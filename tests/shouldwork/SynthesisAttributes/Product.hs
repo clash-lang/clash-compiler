@@ -41,8 +41,7 @@ topEntity
 topEntity xy = bundle (s, s)
   where
     s = mac xy
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 
 --------------- Actual tests for generated HDL -------------------

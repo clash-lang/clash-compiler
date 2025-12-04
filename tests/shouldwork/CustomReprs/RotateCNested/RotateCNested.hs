@@ -80,8 +80,7 @@ topEntity = fmap f
         Just (JustC c) -> rotateColor c
         Just NothingC  -> Blue
         Nothing        -> Red
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 -- Testbench:
 testBench :: Signal System Bool

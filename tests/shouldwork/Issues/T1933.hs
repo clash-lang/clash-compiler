@@ -11,19 +11,16 @@ data T = MkT (Unsigned 12) (Unsigned 12)
 
 f :: T -> T
 f x = x
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE f #-}
+{-# OPAQUE f #-}
 
 p :: Unsigned 12
 p = case clockGen @System of
       Clock _ -> 4
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE p #-}
+{-# OPAQUE p #-}
 
 q :: Natural
 q = coerce p
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE q #-}
+{-# OPAQUE q #-}
 
 topEntity :: Unsigned 12 -> T
 topEntity x =

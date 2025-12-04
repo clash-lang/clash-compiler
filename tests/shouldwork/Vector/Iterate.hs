@@ -7,8 +7,7 @@ import Clash.Explicit.Testbench
 
 topEntity :: Int -> Vec 2 Int
 topEntity = iterateI succ
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

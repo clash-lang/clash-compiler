@@ -20,15 +20,13 @@ verilog_mult x y = [verilog|
 
   assign result = ${x} * ${y};
   |]
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE verilog_mult #-}
+{-# OPAQUE verilog_mult #-}
 
 topEntity
   :: Signal System (Signed 64)
   -> Signal System (Signed 64)
 topEntity s = verilog_mult s s
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

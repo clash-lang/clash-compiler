@@ -20,8 +20,7 @@ populationCount bv = dtfold (Proxy :: Proxy IIndex)
 
 topEntity :: BitVector 16 -> Index 17
 topEntity = populationCount
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

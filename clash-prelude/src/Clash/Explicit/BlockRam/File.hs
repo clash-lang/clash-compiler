@@ -423,8 +423,7 @@ blockRamFile# (Clock _ Nothing) ena sz file = \rd wen waS wd -> runST $ do
   parseBV' = fmap fst . listToMaybe . readInt 2 (`elem` "01") digitToInt
 blockRamFile# _ _ _ _ = error "blockRamFile#: dynamic clocks not supported"
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE blockRamFile# #-}
+{-# OPAQUE blockRamFile# #-}
 {-# ANN blockRamFile# hasBlackBox #-}
 
 -- | __NB__: Not synthesizable
@@ -435,5 +434,4 @@ initMem = fmap (map parseBV . lines) . readFile
                   Just i  -> fromInteger i
                   Nothing -> error ("Failed to parse: " ++ s)
     parseBV' = fmap fst . listToMaybe . readInt 2 (`elem` "01") digitToInt
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE initMem #-}
+{-# OPAQUE initMem #-}

@@ -16,7 +16,7 @@ toEnumTest = toEnum
 
 topEntity :: Signed 4 -> (Int, Signed 6, Signed 6)
 topEntity x = (fromEnumTest (fromIntegral x), fromIntegralTest x, toEnumTest (fromEnum x))
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
@@ -32,4 +32,4 @@ testBench = done
   done = outputVerifier' clk rst expectedOutputs (topEntity <$> stimuliGenerator clk rst testInputs)
   clk  = tbSystemClockGen (not <$> done)
   rst  = systemResetGen
-{-# CLASH_OPAQUE testBench #-}
+{-# OPAQUE testBench #-}

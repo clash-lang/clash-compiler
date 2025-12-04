@@ -843,8 +843,7 @@ mapSignal# f = go
   -- See -fstrict-mapSignal documentation in clash-prelude.cabal
   theSeq = if fStrictMapSignal then seqX else flip const
   go ~(xs@(a :- as)) = f a :- (a `theSeq` (xs `seq` go as))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE mapSignal# #-}
+{-# OPAQUE mapSignal# #-}
 {-# ANN mapSignal# hasBlackBox #-}
 
 instance Applicative (Signal dom) where
@@ -853,14 +852,12 @@ instance Applicative (Signal dom) where
 
 signal# :: a -> Signal dom a
 signal# a = let s = a :- s in s
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE signal# #-}
+{-# OPAQUE signal# #-}
 {-# ANN signal# hasBlackBox #-}
 
 appSignal# :: Signal dom (a -> b) -> Signal dom a -> Signal dom b
 appSignal# (f :- fs) xs@(~(a :- as)) = f a :- (xs `seq` appSignal# fs as) -- See [NOTE: Lazy ap]
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE appSignal# #-}
+{-# OPAQUE appSignal# #-}
 {-# ANN appSignal# hasBlackBox #-}
 
 instance NFDataX a => NFDataX (Signal domain a) where
@@ -901,8 +898,7 @@ of the second argument is evaluated as soon as the tail of the result is evaluat
 -- Is currently treated as 'id' by the Clash compiler.
 joinSignal# :: Signal dom (Signal dom a) -> Signal dom a
 joinSignal# ~(xs :- xss) = head# xs :- joinSignal# (mapSignal# tail# xss)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE joinSignal# #-}
+{-# OPAQUE joinSignal# #-}
 {-# ANN joinSignal# hasBlackBox #-}
 
 instance Num a => Num (Signal dom a) where
@@ -931,8 +927,7 @@ instance Foldable (Signal dom) where
 -- * The @z@ element will never be used.
 foldr# :: (a -> b -> b) -> b -> Signal dom a -> b
 foldr# f z (a :- s) = a `f` (foldr# f z s)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE foldr# #-}
+{-# OPAQUE foldr# #-}
 {-# ANN foldr# hasBlackBox #-}
 
 instance Traversable (Signal dom) where
@@ -940,8 +935,7 @@ instance Traversable (Signal dom) where
 
 traverse# :: Applicative f => (a -> f b) -> Signal dom a -> f (Signal dom b)
 traverse# f (a :- s) = (:-) <$> f a <*> traverse# f s
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE traverse# #-}
+{-# OPAQUE traverse# #-}
 {-# ANN traverse# hasBlackBox #-}
 
 -- * Clocks, resets, and enables
@@ -1073,8 +1067,7 @@ tbClockGen
   => Signal testDom Bool
   -> Clock testDom
 tbClockGen done = Clock (done `seq` SSymbol) Nothing
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE tbClockGen #-}
+{-# OPAQUE tbClockGen #-}
 {-# ANN tbClockGen hasBlackBox #-}
 
 -- | Femtoseconds expressed as an 'Int64'. Is a newtype to prevent accidental
@@ -1152,8 +1145,7 @@ tbDynamicClockGen ::
   Clock dom
 tbDynamicClockGen periods ena =
   Clock (ena `seq` periods `seq` SSymbol) (Just periods)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE tbDynamicClockGen #-}
+{-# OPAQUE tbDynamicClockGen #-}
 {-# ANN tbDynamicClockGen hasBlackBox #-}
 
 
@@ -1203,8 +1195,7 @@ resetGenN n =
   let asserted = replicate (snatToNum n) True in
   unsafeFromActiveHigh (fromList (asserted ++ repeat False))
 {-# ANN resetGenN hasBlackBox #-}
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE resetGenN #-}
+{-# OPAQUE resetGenN #-}
 
 
 -- | A reset signal belonging to a domain called /dom/.
@@ -1314,8 +1305,7 @@ unsafeFromReset
   :: Reset dom
   -> Signal dom Bool
 unsafeFromReset (Reset r) = r
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE unsafeFromReset #-}
+{-# OPAQUE unsafeFromReset #-}
 {-# ANN unsafeFromReset hasBlackBox #-}
 
 -- | 'unsafeToReset' is unsafe. For asynchronous resets it is unsafe
@@ -1330,8 +1320,7 @@ unsafeToReset
   => Signal dom Bool
   -> Reset dom
 unsafeToReset r = Reset r
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE unsafeToReset #-}
+{-# OPAQUE unsafeToReset #-}
 {-# ANN unsafeToReset hasBlackBox #-}
 
 -- | Interpret a signal of bools as an active high reset and convert it to
@@ -1522,8 +1511,7 @@ delay# (Clock dom _) (fromEnable -> en) powerUpVal0 =
       let o' = if e then x else o
       -- See [Note: register strictness annotations]
       in  o `defaultSeqX` o :- (as `seq` go o' es xs)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE delay# #-}
+{-# OPAQUE delay# #-}
 {-# ANN delay# hasBlackBox #-}
 
 -- | A register with a power up and reset value. Power up values are not
@@ -1556,8 +1544,7 @@ register# clk@(Clock dom _) rst ena powerUpVal resetVal =
       syncRegister# clk rst ena powerUpVal resetVal
     SDomainConfiguration _name _period _edge SAsynchronous _init _polarity ->
       asyncRegister# clk rst ena powerUpVal resetVal
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE register# #-}
+{-# OPAQUE register# #-}
 {-# ANN register# hasBlackBox #-}
 
 -- | Acts like 'id' if given domain allows powerup values, but returns a
@@ -1602,8 +1589,7 @@ asyncRegister# clk (unsafeToActiveHigh -> rst) (fromEnable -> ena) initVal reset
         oE = if r then resetVal else (if e then x else o)
         -- [Note: register strictness annotations]
     in  o `defaultSeqX` oR :- (as `seq` enas `seq` go oE rs es xs)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE asyncRegister# #-}
+{-# OPAQUE asyncRegister# #-}
 {-# ANN asyncRegister# hasBlackBox #-}
 
 -- | Version of 'register#' that simulates a register on a synchronous
@@ -1632,8 +1618,7 @@ syncRegister# clk (unsafeToActiveHigh -> rst) (fromEnable -> ena) initVal resetV
         oR = if r then resetVal else oE
         -- [Note: register strictness annotations]
     in  o `defaultSeqX` o :- (rt `seq` enas `seq` as `seq` go oR rs es xs)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE syncRegister# #-}
+{-# OPAQUE syncRegister# #-}
 {-# ANN syncRegister# dontTranslate #-}
 
 -- | The above type is a generalization for:
@@ -2115,8 +2100,7 @@ signalAutomaton dut = Automaton $ \input0 -> unsafePerformIO $ do
         return (out, next)
 
   go inputRefs (dut inputs)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE signalAutomaton #-}
+{-# OPAQUE signalAutomaton #-}
 
 infiniteRefList :: a -> IO (Signal dom (IORef a))
 infiniteRefList val = go

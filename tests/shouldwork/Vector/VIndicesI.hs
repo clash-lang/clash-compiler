@@ -7,8 +7,7 @@ import Clash.Explicit.Testbench
 
 topEntity :: Signal System (Vec 4 (Index 4))
 topEntity = pure indicesI
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

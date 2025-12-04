@@ -40,8 +40,7 @@ topEntity (a, b, c, d, e, f, g, h, i, j, k) =
       , pack j
       , pack k
       )
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

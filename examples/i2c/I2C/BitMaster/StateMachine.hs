@@ -38,8 +38,7 @@ stateMachineStart
   , _bitStateM = Idle
   }
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE bitStateMachine #-}
+{-# OPAQUE bitStateMachine #-}
 bitStateMachine :: Bool
                 -> Bool
                 -> Bool

@@ -14,8 +14,7 @@ topEntity
   -> Enable System
   -> Signal System Inp -> Signal System Outp
 topEntity = exposeClockResetEnable (transfer `mealy` initS)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 transfer s i = (i,o)
   where

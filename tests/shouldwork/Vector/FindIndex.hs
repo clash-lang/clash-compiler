@@ -7,8 +7,7 @@ import Clash.Explicit.Testbench
 
 topEntity :: Vec 7 (Unsigned 8) -> Maybe (Index 7)
 topEntity = findIndex (> 3)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

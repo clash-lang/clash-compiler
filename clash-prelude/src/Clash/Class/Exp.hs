@@ -75,8 +75,7 @@ expIndex#
   -> Index (Max 2 (m ^ n))
 expIndex# b e@SNat =
   fromInteger (toInteger b P.^ snatToInteger e)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE expIndex# #-}
+{-# OPAQUE expIndex# #-}
 {-# ANN expIndex# hasBlackBox #-}
 
 expSigned#
@@ -86,8 +85,7 @@ expSigned#
   -> Signed (Max 2 (m * n))
 expSigned# b e@SNat =
   fromInteger (toInteger b P.^ snatToInteger e)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE expSigned# #-}
+{-# OPAQUE expSigned# #-}
 {-# ANN expSigned# hasBlackBox #-}
 
 expUnsigned#
@@ -97,6 +95,5 @@ expUnsigned#
   -> Unsigned (Max 1 (m * n))
 expUnsigned# b e@SNat =
   fromInteger (toInteger b P.^ snatToInteger e)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE expUnsigned# #-}
+{-# OPAQUE expUnsigned# #-}
 {-# ANN expUnsigned# hasBlackBox #-}

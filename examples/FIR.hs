@@ -30,8 +30,7 @@ topEntity
   -> Signal System (Signed 16)
   -> Signal System (Signed 16)
 topEntity = exposeClockResetEnable (fir (2:>3:>(-2):>8:>Nil))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

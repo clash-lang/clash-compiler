@@ -27,15 +27,13 @@ newtype TypeA = TypeA (Bytes 4)
 newtype TypeB = TypeB (Words 4)
   deriving (Generic, NFDataX, Show, Eq)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE bytesToWords #-}
+{-# OPAQUE bytesToWords #-}
 bytesToWords :: Bytes 4 -> TypeB
 bytesToWords = TypeB . fmap (\(Byte a) -> Word $ ((unpack . resize .  pack) a))
 
 data TypeAs = Nop | TypeAS TypeA
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE convertTwoTypeAs #-}
+{-# OPAQUE convertTwoTypeAs #-}
 convertTwoTypeAs :: TypeAs -> Maybe TypeB
 convertTwoTypeAs op = case op of
   TypeAS (TypeA a) -> Just $ (bytesToWords a)

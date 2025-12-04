@@ -136,8 +136,7 @@ myAdd
   -> Unsigned n
   -> Unsigned n
 myAdd a b = a + b
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE myAdd #-}
+{-# OPAQUE myAdd #-}
 
 topEntity
   :: Unsigned 32

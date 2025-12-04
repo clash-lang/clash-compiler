@@ -128,7 +128,7 @@ data Attr a
 -- "Clash.Magic".
 annotate :: forall n dom a . Vec n (Attr String) -> Signal dom a -> Signal dom a
 annotate !_attrs !a = a
-{-# CLASH_OPAQUE annotate #-}
+{-# OPAQUE annotate #-}
 {-# ANN annotate hasBlackBox #-}
 {-# ANN annotate
   let primName = show 'annotate
@@ -242,5 +242,5 @@ And it will generate exactly the same Verilog as above.
 -}
 annotateReg :: forall n dom a . Vec n (Attr String) -> Signal dom a -> Signal dom a
 annotateReg !_ x = x
-{-# CLASH_OPAQUE annotateReg #-}
+{-# OPAQUE annotateReg #-}
 {-# ANN annotateReg hasBlackBox #-}

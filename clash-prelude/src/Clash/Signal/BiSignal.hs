@@ -243,8 +243,7 @@ readFromBiSignal# (BiSignalIn ds s) =
     SFloating -> fromMaybe (errorX " undefined value on BiSignalIn") <$> s
     SPullDown  -> fromMaybe minBound <$> s
     SPullUp    -> fromMaybe maxBound <$> s
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE readFromBiSignal# #-}
+{-# OPAQUE readFromBiSignal# #-}
 {-# ANN readFromBiSignal# hasBlackBox #-}
 
 -- | Read the value from an __inout__ port
@@ -264,8 +263,7 @@ mergeBiSignalOuts
   => Vec n (BiSignalOut defaultState dom m)
   -> BiSignalOut defaultState dom m
 mergeBiSignalOuts = mconcat . V.toList
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE mergeBiSignalOuts #-}
+{-# OPAQUE mergeBiSignalOuts #-}
 {-# ANN mergeBiSignalOuts hasBlackBox #-}
 
 writeToBiSignal#
@@ -276,8 +274,7 @@ writeToBiSignal#
   -> Signal d (BitVector n)
   -> BiSignalOut ds d n
 writeToBiSignal# bIn maybeSignal wEn val = BiSignalOut [bIn `seq` wEn `seq` val `seq` maybeSignal]
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE writeToBiSignal# #-}
+{-# OPAQUE writeToBiSignal# #-}
 {-# ANN writeToBiSignal# hasBlackBox #-}
 
 -- | Write to an __inout__ port
@@ -324,6 +321,5 @@ veryUnsafeToBiSignalIn (BiSignalOut signals) = prepend# result biSignalOut'
 
     -- Recursive step
     biSignalOut' = veryUnsafeToBiSignalIn $ BiSignalOut $ map tail# signals
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE veryUnsafeToBiSignalIn #-}
+{-# OPAQUE veryUnsafeToBiSignalIn #-}
 {-# ANN veryUnsafeToBiSignalIn hasBlackBox #-}

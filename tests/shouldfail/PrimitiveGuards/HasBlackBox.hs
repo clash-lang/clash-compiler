@@ -11,8 +11,7 @@ primitive
 primitive =
   (+5)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE primitive #-}
+{-# OPAQUE primitive #-}
 {-# ANN primitive hasBlackBox #-}
 
 topEntity = primitive

@@ -16,13 +16,6 @@ import Clash.GHC.Evaluator
 import Clash.GHC.GenerateBindings
 import Clash.GHC.NetlistTypes
 
-import qualified GHC.Driver.Monad as GHC
-import qualified GHC.Driver.Session as GHC
-import qualified GHC.Driver.Env.Types as GHC
-import qualified GHC.LanguageExtensions as LangExt
-import qualified GHC.Settings as GHC
-import qualified GHC.Utils.Fingerprint as GHC
-
 defaultTests :: [FilePath]
 defaultTests =
   [ "examples/FIR.hs"
@@ -55,26 +48,7 @@ runInputStage idirs src = do
   let o = opts idirs
   let backend = initBackend @VHDLState o
   pds <- primDirs backend
-  generateBindings o action pds (opt_importPaths o) [] (hdlKind backend) src Nothing
- where
-  action = do
-    env <- GHC.getSession
-    let df0 = GHC.hsc_dflags env
-        df1 = addOptP "-DCLASH_OPAQUE=OPAQUE" df0
-        df2 = GHC.xopt_set df1 LangExt.Cpp
-    GHC.setSession (env {GHC.hsc_dflags = df2})
-
-  addOptP :: String -> GHC.DynFlags -> GHC.DynFlags
-  addOptP   f = alterToolSettings $ \s -> s
-            { GHC.toolSettings_opt_P   = f : GHC.toolSettings_opt_P s
-            , GHC.toolSettings_opt_P_fingerprint = fingerprintStrings (f : GHC.toolSettings_opt_P s)
-            }
-
-  alterToolSettings :: (GHC.ToolSettings -> GHC.ToolSettings) -> GHC.DynFlags -> GHC.DynFlags
-  alterToolSettings f dynFlags = dynFlags { GHC.toolSettings = f (GHC.toolSettings dynFlags) }
-
-  fingerprintStrings :: [String] -> GHC.Fingerprint
-  fingerprintStrings ss = GHC.fingerprintFingerprints $ map GHC.fingerprintString ss
+  generateBindings o (return ()) pds (opt_importPaths o) [] (hdlKind backend) src Nothing
 
 runNormalisationStage
   :: [FilePath]

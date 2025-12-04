@@ -9,13 +9,11 @@ data Ex where
 
 f :: Ex -> Bool
 f (Ex n y) = h (replicate n y)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE f #-}
+{-# OPAQUE f #-}
 
 h :: Vec n Bool -> Bool
 h xs = foldr (||) True xs
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE h #-}
+{-# OPAQUE h #-}
 
 g :: Int -> Bool -> Ex
 g 0 b = Ex (SNat @3) b
