@@ -23,10 +23,9 @@ library
 
                        clash-ghc,
                        clash-lib,
-                       clash-prelude
+                       clash-prelude,
 
-  if impl(ghc >= 9.0.0)
-    build-depends:     ghc-boot
+                       ghc-boot
 
 executable clash-benchmark-normalization
   main-is:             benchmark-normalization.hs
