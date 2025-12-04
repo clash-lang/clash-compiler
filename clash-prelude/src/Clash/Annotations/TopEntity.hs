@@ -231,9 +231,7 @@ where
 import           GHC.Generics
 import qualified Language.Haskell.TH        as TH
 import           Language.Haskell.TH.Syntax (Lift(..))
-#if MIN_VERSION_template_haskell(2,16,0)
 import           Language.Haskell.TH.Compat
-#endif
 import           Data.Data
 
 -- | TopEntity annotation
@@ -271,9 +269,7 @@ instance Lift TopEntity where
       , lift output
       ]
   lift (TestBench _) = error "Cannot lift a TestBench"
-#if MIN_VERSION_template_haskell(2,16,0)
   liftTyped = liftTypedFromUntyped
-#endif
 
 -- | Give port names for arguments/results.
 --

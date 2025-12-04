@@ -212,11 +212,7 @@ deriveTermToData1 constrs =
       termName
       (ViewP
         (VarE 'collectArgs)
-#if MIN_VERSION_template_haskell(2,18,0)
         (TupP [ ConP 'Data [] [ViewP (VarE 'dcName') (VarP nameName)]
-#else
-        (TupP [ ConP 'Data [ViewP (VarE 'dcName') (VarP nameName)]
-#endif
               , ViewP
                  (VarE 'lefts)
                  (if nArgs == 0 then WildP else VarP argsName)]))

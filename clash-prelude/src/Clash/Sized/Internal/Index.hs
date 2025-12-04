@@ -82,14 +82,8 @@ import Text.Printf                (PrintfArg (..), printf)
 import Data.Ix                    (Ix(..))
 import Language.Haskell.TH        (appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
-#if MIN_VERSION_template_haskell(2,16,0)
 import Language.Haskell.TH.Compat
-#endif
-#if MIN_VERSION_template_haskell(2,17,0)
 import Language.Haskell.TH        (Quote, Type)
-#else
-import Language.Haskell.TH        (TypeQ)
-#endif
 import GHC.Generics               (Generic)
 import GHC.Natural                (Natural, naturalFromInteger)
 import GHC.Natural                (naturalToInteger)
@@ -537,15 +531,9 @@ resize# (I i) = fromInteger_INLINE i
 instance KnownNat n => Lift (Index n) where
   lift u@(I i) = sigE [| fromInteger# i |] (decIndex (natVal u))
   {-# NOINLINE lift #-}
-#if MIN_VERSION_template_haskell(2,16,0)
   liftTyped = liftTypedFromUntyped
-#endif
 
-#if MIN_VERSION_template_haskell(2,17,0)
 decIndex :: Quote m => Integer -> m Type
-#else
-decIndex :: Integer -> TypeQ
-#endif
 decIndex n = appT (conT ''Index) (litT $ numTyLit n)
 
 instance Show (Index n) where

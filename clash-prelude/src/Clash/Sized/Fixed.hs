@@ -126,15 +126,9 @@ import GHC.TypeLits.Extra         (Max)
 import Language.Haskell.TH        (Q, appT, conT, litT, mkName,
                                    numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
-#if MIN_VERSION_template_haskell(2,16,0)
 import Language.Haskell.TH.Compat
-#endif
-#if MIN_VERSION_template_haskell(2,17,0)
 import Language.Haskell.TH        (Quote)
 import qualified Language.Haskell.TH as TH
-#else
-import Language.Haskell.TH        (TExp, TypeQ)
-#endif
 import Test.QuickCheck            (Arbitrary, CoArbitrary)
 
 import Clash.Class.BitPack        (BitPack (..))
@@ -558,15 +552,9 @@ instance (Lift (rep (int + frac)), KnownNat frac, KnownNat int, Typeable rep) =>
                           (decFixed (typeRep (asRepProxy f))
                                     (natVal (asIntProxy f))
                                     (natVal f))
-#if MIN_VERSION_template_haskell(2,16,0)
   liftTyped = liftTypedFromUntyped
-#endif
 
-#if MIN_VERSION_template_haskell(2,17,0)
 decFixed :: Quote m => TypeRep -> Integer -> Integer -> m TH.Type
-#else
-decFixed :: TypeRep -> Integer -> Integer -> TypeQ
-#endif
 decFixed r i f = do
   foldl appT (conT ''Fixed) [ conT (mkName (show r))
                             , litT (numTyLit i)
@@ -715,11 +703,7 @@ fLit
      , Bounded (rep size)
      , Integral (rep size) )
   => Double
-#if MIN_VERSION_template_haskell(2,17,0)
   -> TH.Code Q (Fixed rep int frac)
-#else
-  -> Q (TExp (Fixed rep int frac))
-#endif
 fLit a = [|| Fixed (fromInteger sat) ||]
   where
     rMax      = toInteger (maxBound :: rep size)

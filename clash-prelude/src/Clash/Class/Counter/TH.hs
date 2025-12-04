@@ -15,11 +15,7 @@ mkTupTy :: [Type] -> Type
 mkTupTy names@(length -> n) = foldl AppT (TupleT n) names
 
 mkTup :: [Exp] -> Exp
-#if MIN_VERSION_template_haskell(2,16,0)
 mkTup = TupE . map Just
-#else
-mkTup = TupE
-#endif
 
 genTupleInstances :: Int -> Q [Dec]
 genTupleInstances maxTupleSize = mapM genTupleInstance [3..maxTupleSize]

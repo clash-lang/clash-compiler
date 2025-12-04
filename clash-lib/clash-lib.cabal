@@ -178,7 +178,7 @@ Library
                       pretty-show             >= 1.9      && < 2.0,
                       primitive               >= 0.5.0.1  && < 1.0,
                       string-interpolate      ^>= 0.3,
-                      template-haskell        >= 2.8.0.0  && < 2.23,
+                      template-haskell        >= 2.20.0.0  && < 2.23,
                       temporary               >= 1.2.1    && < 1.4,
                       terminal-size           >= 0.3      && < 0.4,
                       text                    >= 1.2.2    && < 2.2,

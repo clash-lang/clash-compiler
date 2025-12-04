@@ -164,14 +164,8 @@ import Language.Haskell.TH
    TyLit(NumTyLit), Pat, Q, appT, conT, litE, litP, litT, mkName, numTyLit,
    sigE, tupE, tupP, varP)
 import Language.Haskell.TH.Syntax (Lift(..))
-#if MIN_VERSION_template_haskell(2,16,0)
 import Language.Haskell.TH.Compat
-#endif
-#if MIN_VERSION_template_haskell(2,17,0)
 import Language.Haskell.TH        (Quote)
-#else
-import Language.Haskell.TH        (TypeQ)
-#endif
 import System.IO.Unsafe               (unsafeDupablePerformIO)
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
@@ -293,9 +287,7 @@ instance NFDataX Bit where
 instance Lift Bit where
   lift (Bit m i) = [| fromInteger## $(litE (WordPrimL (toInteger m))) i |]
   {-# NOINLINE lift #-}
-#if MIN_VERSION_template_haskell(2,16,0)
   liftTyped = liftTypedFromUntyped
-#endif
 
 instance Eq Bit where
   (==) = eq##
@@ -1222,17 +1214,10 @@ truncateB# = \(BV msk i) -> BV (msk `mod` m) (i `mod` m)
 instance KnownNat n => Lift (BitVector n) where
   lift bv@(BV m i) = sigE [| fromInteger# m $(litE (IntegerL (toInteger i))) |] (decBitVector (natVal bv))
   {-# NOINLINE lift #-}
-#if MIN_VERSION_template_haskell(2,16,0)
   liftTyped = liftTypedFromUntyped
-#endif
 
-#if MIN_VERSION_template_haskell(2,17,0)
 decBitVector :: Quote m => Natural -> m Type
 decBitVector n = appT (conT ''BitVector) (litT $ numTyLit (integerFromNatural n))
-#else
-decBitVector :: Integer -> TypeQ
-decBitVector n = appT (conT ''BitVector) (litT $ numTyLit n)
-#endif
 
 instance KnownNat n => SaturatingNum (BitVector n) where
   satAdd SatWrap a b = a +# b

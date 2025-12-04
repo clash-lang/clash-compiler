@@ -829,9 +829,7 @@ instance Show a => Show (Signal dom a) where
 
 instance Lift a => Lift (Signal dom a) where
   lift ~(x :- _) = [| signal# x |]
-#if MIN_VERSION_template_haskell(2,16,0)
   liftTyped = liftTypedFromUntyped
-#endif
 
 instance Default a => Default (Signal dom a) where
   def = signal# def
